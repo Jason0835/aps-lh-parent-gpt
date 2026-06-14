@@ -48,10 +48,12 @@ public class Cd90AutoScheduleOutputDraftBuilder {
         }
         Map<String, LocalDate> shiftDates = resolveShiftDates(context.getShifts());
         List<Cd90ShiftScheduleTask> tasks = safe(execution.getRollingContext().getCommittedTasks());
+        // 主结果按帘布+大卷+机台归并，库排明细按主结果+班次+库排归并。
         LinkedHashMap<String, Cd90ScheduleResultDraft> resultByKey = new LinkedHashMap<>();
         LinkedHashMap<String, Cd90LaneAllocationDraft> allocationByKey = new LinkedHashMap<>();
 
         for (Cd90ShiftScheduleTask task : tasks) {
+            // 草稿构建阶段严格校验任务完整性，避免脏任务进入最终短事务后部分落库。
             validateTask(task, shiftDates);
             String resultKey = resultKey(task);
             Cd90ScheduleResultDraft result = resultByKey.computeIfAbsent(resultKey,
@@ -60,6 +62,7 @@ public class Cd90AutoScheduleOutputDraftBuilder {
             mergeAllocations(allocationByKey, resultKey, task);
         }
 
+        // CLASS槽位按CLASS1~CLASS8排序，确保实体映射和解释日志的输出顺序稳定。
         List<Cd90ScheduleResultDraft> results = new ArrayList<>(resultByKey.values());
         results.forEach(item -> item.setShiftSlots(item.getShiftSlots().stream()
                 .sorted(Comparator.comparingInt(slot -> classIndex(slot.getClassField())))
@@ -102,6 +105,7 @@ public class Cd90AutoScheduleOutputDraftBuilder {
                 .filter(item -> task.getClassField().equals(item.getClassField()))
                 .findFirst().orElse(null);
         if (slot == null) {
+            // 自动排程刚生成时完成量和完成率均为0，后续由MES回传更新。
             result.getShiftSlots().add(Cd90ScheduleShiftSlotDraft.builder()
                     .classField(task.getClassField()).scheduleDate(scheduleDate)
                     .planQuantity(task.getPlanQuantity()).finishQuantity(BigDecimal.ZERO)
@@ -110,6 +114,7 @@ public class Cd90AutoScheduleOutputDraftBuilder {
                     .expectedEndTime(task.getExpectedEndTime()).build());
             return;
         }
+        // 同一主结果同一班可能包含多个连续任务段，合并数量并扩展起止时间边界。
         slot.setPlanQuantity(slot.getPlanQuantity().add(task.getPlanQuantity()));
         slot.setProduceOrder(Math.min(slot.getProduceOrder(), task.getProduceOrder()));
         slot.setExpectedStartTime(earlier(slot.getExpectedStartTime(), task.getExpectedStartTime()));
@@ -128,6 +133,7 @@ public class Cd90AutoScheduleOutputDraftBuilder {
         BigDecimal remaining = task.getPlanQuantity();
         for (int index = 0; index < task.getLaneAllocations().size(); index++) {
             Cd90StorageLaneAllocation allocation = task.getLaneAllocations().get(index);
+            // 前序库排按车数比例分配，最后库排承接舍入余量，确保明细合计等于主任务量。
             BigDecimal quantity = index == task.getLaneAllocations().size() - 1
                     ? normalize(remaining) : proportional(task.getPlanQuantity(),
                             allocation.getVehicleCount(), task.getVehicleCount());

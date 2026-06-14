@@ -29,6 +29,7 @@ public class Cd90UnscheduledResultAggregator {
      * 将多班执行轨迹汇总为一规格一原因一行的未排内存结果。
      */
     public List<Cd90UnscheduledResultModel> aggregate(List<Cd90ScheduleAttemptTrace> traces) {
+        // 先按全窗口执行序号排序再分组，确保同一规格的第一失败原因可稳定复现。
         Map<String, List<Cd90ScheduleAttemptTrace>> grouped = safe(traces).stream()
                 .filter(item -> item != null && StringUtils.hasText(item.getClothCode()))
                 .sorted(Comparator.comparingInt(Cd90ScheduleAttemptTrace::getSequence))
@@ -43,10 +44,12 @@ public class Cd90UnscheduledResultAggregator {
 
     private List<Cd90UnscheduledResultModel> aggregateOne(
             String clothCode, List<Cd90ScheduleAttemptTrace> attempts) {
+        // 总需求取该规格首次进入窗口时的正净需求，后续班次重算值不能重复累加。
         BigDecimal demand = attempts.stream()
                 .map(Cd90ScheduleAttemptTrace::getNetDemandQuantity)
                 .filter(value -> value != null && value.signum() > 0)
                 .findFirst().orElse(BigDecimal.ZERO);
+        // 已排数量按各班真实提交任务量求和，失败轨迹的已排量为0。
         BigDecimal scheduled = attempts.stream()
                 .map(Cd90ScheduleAttemptTrace::getScheduledQuantity)
                 .map(this::value).reduce(BigDecimal.ZERO, BigDecimal::add);
@@ -55,11 +58,13 @@ public class Cd90UnscheduledResultAggregator {
             return Collections.emptyList();
         }
 
+        // 原因按实际发生顺序去重；第一条原因作为主因，保留后续诊断原因。
         LinkedHashMap<String, Cd90UnscheduledReason> reasons = new LinkedHashMap<>();
         attempts.stream().map(Cd90ScheduleAttemptTrace::getFailureReason)
                 .filter(StringUtils::hasText)
                 .map(reasonResolver::resolve)
                 .forEach(reason -> reasons.putIfAbsent(reason.getReasonCode(), reason));
+        // 窗口结束仍有余量时必须追加窗口限制，即使此前没有资源失败原因。
         Cd90UnscheduledReason windowLimit = reasonResolver.resolve("SCHEDULE_WINDOW_LIMIT");
         reasons.putIfAbsent(windowLimit.getReasonCode(), windowLimit);
 

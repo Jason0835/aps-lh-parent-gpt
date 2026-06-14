@@ -61,26 +61,32 @@ public class Cd90MultiShiftScheduleExecutor {
         int shiftCount = context.getShifts().size();
         for (int index = 0; index < shiftCount; index++) {
             Cd90ShiftDescriptor shift = context.getShifts().get(index);
+            // 每班独立做超时检查和进度上报，便于异步任务准确显示当前卡点。
             runtimeGuard.checkNotTimedOut(context, shift.getClassField() + "班次开始");
             progressListener.onProgress(progress(index, shiftCount), "SHIFT_EXECUTION",
                     shift.getClassField() + "班次开始", shift);
+            // 每班重新读取需求、库存和库排，不能复用首班输入，否则滚动数据变化无法生效。
             Cd90AutoScheduleInput input = inputService.load(
                     context.getFactoryCode(), context.getScheduleDate(),
                     shift.getClassField(), shift.getShiftCode());
             if (rolling == null) {
+                // 仅首班使用6点库排建立基线，后续班次都从同一滚动上下文重建资源。
                 rolling = rollingContextManager.initialize(input.getStorageLanesAtSix());
             }
+            // 先累计成型消耗，再叠加前序实际/计划入库，得到当前班开始时可见的资源状态。
             BigDecimal cumulativeConsumption = demandProvider.cumulativeConsumptionBeforeShift(
                     context, input, shift);
             rollingContextManager.updateCumulativeConsumption(rolling, cumulativeConsumption);
             Cd90ShiftResourceState initialState = rollingContextManager.openShift(
                     rolling, shift, context.getParameters().getRollCoilMeter(),
                     context.getParameters().getRollTotalCount(), Collections.emptyList());
+            // 单班执行只修改当前班的内存副本；完成后才推进跨班滚动状态。
             Cd90ShiftExecutionResult result = singleShiftScheduleService.execute(
                     context, input, shift, initialState, rolling);
             rollingContextManager.completeShift(rolling, result.getState());
             shiftResults.add(result);
             if (result.getAttemptTraces() != null) {
+                // 将班内序号转换为全窗口稳定序号，未排原因按该顺序去重和确定主因。
                 for (Cd90ScheduleAttemptTrace trace : result.getAttemptTraces()) {
                     trace.setSequence(attemptTraces.size() + 1);
                     attemptTraces.add(trace);
@@ -94,6 +100,7 @@ public class Cd90MultiShiftScheduleExecutor {
                         + "shiftCount={}, taskCount={}",
                 context.getFactoryCode(), context.getScheduleDate(), shiftResults.size(),
                 rolling == null ? 0 : rolling.getCommittedTasks().size());
+        // 所有班次结束后统一汇总未排，避免某一班失败就过早判定最终未排数量。
         return Cd90MultiShiftExecutionResult.builder()
                 .shiftResults(shiftResults).rollingContext(rolling)
                 .attemptTraces(attemptTraces)

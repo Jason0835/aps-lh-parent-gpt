@@ -75,13 +75,16 @@ public class Cd90RollingScheduleContextManager {
                                             BigDecimal coilMeter,
                                             int totalToolingCount,
                                             List<String> machineCodes) {
+        // 只允许预计入库时间不晚于班次开始的记录参与当前班资源重建，防止提前消费未来产量。
         List<Cd90InboundRecord> effectiveInbound = new ArrayList<>();
         effectiveInbound.addAll(beforeShift(context.getActualInboundRecords(), shift.getStartTime()));
         effectiveInbound.addAll(beforeShift(context.getPlannedInboundRecords(), shift.getStartTime()));
+        // 每班都从6点基线重算：基线库排 - 累计消耗 + 当前班前有效入库。
         Cd90ResourceSnapshot snapshot = snapshotBuilder.build(
                 context.getStorageLanesAtSix(), context.getCumulativeConsumption(),
                 coilMeter, effectiveInbound);
 
+        // 机台产能属于班次资源，每班从完整班次秒数重新初始化。
         Map<String, Integer> remainingSeconds = new HashMap<>();
         if (machineCodes != null) {
             machineCodes.forEach(code -> remainingSeconds.put(code, shift.getDurationSeconds()));
@@ -113,8 +116,10 @@ public class Cd90RollingScheduleContextManager {
         for (int index = 0; index < completedState.getTasks().size(); index++) {
             Cd90ShiftScheduleTask task = completedState.getTasks().get(index);
             context.getCommittedTasks().add(task);
+            // 当前班计划任务按预计结束时间转为计划入库，供后续班次净需求和库排重建使用。
             appendPlannedInbound(context, task, taskOffset + index + 1);
         }
+        // 机尾规格跨班继承，用于下一班判断是否发生规格切换和相应耗时。
         context.setTailSpecByMachine(completedState.getTailSpecByMachine() == null
                 ? new HashMap<>() : new HashMap<>(completedState.getTailSpecByMachine()));
         log.info("[直裁自动排程] 当前班次滚动上下文已保存, taskCount={}, "
@@ -135,6 +140,7 @@ public class Cd90RollingScheduleContextManager {
                 ? BigDecimal.ZERO : task.getPlanQuantity();
         for (int index = 0; index < task.getLaneAllocations().size(); index++) {
             Cd90StorageLaneAllocation allocation = task.getLaneAllocations().get(index);
+            // 前序库排按车数比例分摊，最后一条承接小数舍入余量，保证分配量之和等于任务量。
             BigDecimal allocationQuantity = index == task.getLaneAllocations().size() - 1
                     ? remainingQuantity : proportionalQuantity(
                             task.getPlanQuantity(), allocation.getVehicleCount(), totalVehicles);

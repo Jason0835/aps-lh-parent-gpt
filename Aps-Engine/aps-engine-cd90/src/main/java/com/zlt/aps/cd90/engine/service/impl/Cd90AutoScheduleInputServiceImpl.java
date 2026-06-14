@@ -120,7 +120,19 @@ public class Cd90AutoScheduleInputServiceImpl implements Cd90AutoScheduleInputSe
     private List<CxScheduleResult> loadFormingSchedules(String factoryCode,
                                                          LocalDate startDate,
                                                          LocalDate endDate) {
+        // 直裁按胎胚代码分解施工层位，仅查询需求计算所需字段，避免共享实体的展示字段影响排程。
         return cxScheduleMapper.selectList(Wrappers.<CxScheduleResult>lambdaQuery()
+                .select(CxScheduleResult::getCxBatchNo,
+                        CxScheduleResult::getScheduleDate,
+                        CxScheduleResult::getEmbryoCode,
+                        CxScheduleResult::getClass1PlanQty,
+                        CxScheduleResult::getClass2PlanQty,
+                        CxScheduleResult::getClass3PlanQty,
+                        CxScheduleResult::getClass4PlanQty,
+                        CxScheduleResult::getClass5PlanQty,
+                        CxScheduleResult::getClass6PlanQty,
+                        CxScheduleResult::getClass7PlanQty,
+                        CxScheduleResult::getClass8PlanQty)
                 .eq(CxScheduleResult::getFactoryCode, factoryCode)
                 .between(CxScheduleResult::getScheduleDate,
                         Date.valueOf(startDate), Date.valueOf(endDate))

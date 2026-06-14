@@ -36,6 +36,7 @@ public class Cd90FormingDemandExpander {
      */
     public List<Cd90DemandShift> expand(List<Cd90FormingScheduleSource> schedules,
                                         List<Cd90ConstructionMaterial> materials) {
+        // 施工单耗先按胎胚代码分组；同一胎胚同一帘布多层出现时累加毫米单耗。
         Map<String, Map<String, BigDecimal>> consumeByConstruction = groupUnitConsume(materials);
         Map<String, DemandAccumulator> demandByClothAndShift = new LinkedHashMap<>();
 
@@ -43,6 +44,7 @@ public class Cd90FormingDemandExpander {
             if (schedule == null || schedule.getScheduleDate() == null) {
                 continue;
             }
+            // 成型计划必须使用embryoCode关联施工号，不使用SAP品号或成型物料描述。
             Map<String, BigDecimal> clothConsumes = consumeByConstruction.get(schedule.getEmbryoCode());
             if (clothConsumes == null || clothConsumes.isEmpty()) {
                 continue;
@@ -50,10 +52,12 @@ public class Cd90FormingDemandExpander {
             List<BigDecimal> quantities = safe(schedule.getClassPlanQuantities());
             for (int classIndex = 0; classIndex < Math.min(8, quantities.size()); classIndex++) {
                 BigDecimal formingQuantity = value(quantities.get(classIndex));
+                // 成型CLASS1从排程日前一天6点开始，后续CLASS字段按8小时自然班次展开。
                 LocalDateTime startTime = schedule.getScheduleDate().minusDays(1)
                         .atTime(FIRST_SHIFT_TIME).plusHours(classIndex * 8L);
                 String classField = "CLASS" + (classIndex + 1);
                 for (Map.Entry<String, BigDecimal> entry : clothConsumes.entrySet()) {
+                    // 同帘布同自然班次可能来自多条成型计划，使用稳定键统一累计。
                     String key = entry.getKey() + "|" + startTime;
                     DemandAccumulator accumulator = demandByClothAndShift.computeIfAbsent(key,
                             ignored -> new DemandAccumulator(entry.getKey(), classField, startTime));
@@ -104,6 +108,7 @@ public class Cd90FormingDemandExpander {
 
         private void add(BigDecimal quantity, BigDecimal unitConsumeMillimeter) {
             formingQuantity = formingQuantity.add(quantity);
+            // 施工单耗以毫米/条保存，需求统一转换为米后参与库存和排程计算。
             clothDemandQuantity = clothDemandQuantity.add(quantity.multiply(unitConsumeMillimeter)
                     .divide(MILLIMETERS_PER_METER, 10, RoundingMode.HALF_UP));
         }

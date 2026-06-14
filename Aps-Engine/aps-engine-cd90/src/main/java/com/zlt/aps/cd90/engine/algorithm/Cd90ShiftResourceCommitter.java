@@ -46,25 +46,30 @@ public class Cd90ShiftResourceCommitter {
                 ? new ArrayList<>() : new ArrayList<>(request.getTrialPlan().getTrials());
         String lastFailureReason = "NO_AVAILABLE_MACHINE";
         while (!remainingTrials.isEmpty()) {
+            // 每次选择当前最优机台；该机台资源失败后移除并继续尝试下一候选机台。
             Cd90MachineTrial trial = trialSelector.select(remainingTrials);
             if (trial == null) {
                 break;
             }
             remainingTrials.remove(trial);
+            // 在原状态副本上试提交，任何失败都直接丢弃副本，保证资源修改原子性。
             Cd90ShiftResourceState working = copy(originalState);
             Cd90StorageLaneAllocationResult allocation = laneAllocator.allocate(
                     request.getClothCode(), trial.getFinalSchedulableQuantity(),
                     request.getCoilMeter(), working.getLanes());
             if (!allocation.isSuccess()) {
+                // 库排容量不足属于当前机台方案失败，不提前修改工装和机台剩余时间。
                 lastFailureReason = allocation.getFailureReason();
                 continue;
             }
             int availableTooling = working.getTotalToolingCount() - working.getOccupiedToolingCount();
             if (allocation.getRequiredVehicleCount() > availableTooling) {
+                // 工装数按入库车数占用；不足时继续尝试其他方案但仍保留稳定失败原因。
                 lastFailureReason = "ROLL_TOOL_LIMIT";
                 continue;
             }
 
+            // 计划起止时间从机台本班已消耗秒数推导，同机台任务按提交顺序连续排列。
             int beforeSeconds = working.getRemainingSecondsByMachine().getOrDefault(
                     trial.getMachineCode(), fullShiftSeconds(request));
             int afterSeconds = trial.getRemainingSeconds();
@@ -83,6 +88,7 @@ public class Cd90ShiftResourceCommitter {
                     .expectedEndTime(expectedStart.plusSeconds(occupiedSeconds))
                     .laneAllocations(allocation.getAllocations()).build();
 
+            // 以下资源变更必须与任务一起提交，不能只扣减部分资源。
             working.setLanes(allocation.getLanes());
             working.setOccupiedToolingCount(working.getOccupiedToolingCount()
                     + allocation.getRequiredVehicleCount());
@@ -97,6 +103,7 @@ public class Cd90ShiftResourceCommitter {
         }
         log.warn("[直裁自动排程] 当前班次资源提交失败, classField={}, clothCode={}, reason={}",
                 request.getClassField(), request.getClothCode(), lastFailureReason);
+        // 全部方案失败时明确返回原对象，调用方可安全继续处理下一个规格。
         return Cd90ShiftCommitResult.builder().success(false).failureReason(lastFailureReason)
                 .state(originalState).build();
     }

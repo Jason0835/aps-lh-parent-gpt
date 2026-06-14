@@ -52,6 +52,7 @@ public class Cd90ScheduleCandidateBuilder {
             throw new IllegalArgumentException("成型需求窗口班数必须大于0");
         }
 
+        // 先将多条6点库存按帘布汇总，后续所有窗口投影都使用同一库存基准。
         Map<String, BigDecimal> stockByCloth = aggregateStock(stocksAtSix);
         Map<String, List<Cd90DemandShift>> shiftsByCloth = safe(demandShifts).stream()
                 .filter(item -> item != null && StringUtils.hasText(item.getClothCode()))
@@ -61,13 +62,16 @@ public class Cd90ScheduleCandidateBuilder {
 
         List<Cd90ScheduleCandidate> candidates = new ArrayList<>();
         for (Map.Entry<String, List<Cd90DemandShift>> entry : shiftsByCloth.entrySet()) {
+            // 每个帘布按自然班次排序，避免数据库返回顺序影响缺料时间判断。
             List<Cd90DemandShift> allShifts = entry.getValue().stream()
                     .sorted(Comparator.comparing(Cd90DemandShift::getStartTime))
                     .collect(Collectors.toList());
+            // 当前供应窗口之前已经发生的成型消耗必须先从6点库存扣除。
             BigDecimal consumedBeforeWindow = allShifts.stream()
                     .filter(item -> item.getStartTime().isBefore(currentDemandStart))
                     .map(item -> value(item.getClothDemandQuantity()))
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
+            // 只截取参数指定的成型需求窗口，窗口外需求不影响当前班候选排序。
             List<Cd90DemandShift> windowShifts = allShifts.stream()
                     .filter(item -> !item.getStartTime().isBefore(currentDemandStart))
                     .limit(demandWindow)
@@ -80,6 +84,7 @@ public class Cd90ScheduleCandidateBuilder {
             }
 
             BigDecimal stockAtSix = stockByCloth.getOrDefault(entry.getKey(), BigDecimal.ZERO);
+            // 投影库存用于同时计算可供应时长和最早缺料班次，两者共同决定候选优先级。
             Cd90InventoryProjection projection = inventoryCalculator.project(
                     stockAtSix, consumedBeforeWindow, BigDecimal.ZERO);
             Cd90StockGuaranteeResult guarantee = stockGuaranteeCalculator.calculate(
@@ -96,6 +101,7 @@ public class Cd90ScheduleCandidateBuilder {
                     .build());
         }
 
+        // 排序器负责稳定处理同缺料时间候选，避免重复执行时结果顺序抖动。
         List<Cd90ScheduleCandidate> sorted = candidateSorter.sort(candidates);
         log.info("[直裁自动排程] 当前班次候选规格构建完成, demandStart={}, demandWindow={}, "
                         + "clothCount={}, candidateCount={}",

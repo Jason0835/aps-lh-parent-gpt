@@ -54,6 +54,7 @@ public class Cd90MachineResourceServiceImpl implements Cd90MachineResourceServic
             throw new IllegalArgumentException("班次结束时间必须晚于开始时间");
         }
 
+        // 机台主数据先转换为只读窄模型，后续试算不直接修改数据库实体。
         List<Cd90MachineResource> machines = machineInfoMapper.selectList(
                         Wrappers.<Cd90MachineInfo>lambdaQuery()
                                 .eq(Cd90MachineInfo::getFactoryCode, factoryCode)
@@ -63,6 +64,7 @@ public class Cd90MachineResourceServiceImpl implements Cd90MachineResourceServic
                 .collect(Collectors.toMap(Cd90MachineResource::getMachineCode,
                         Function.identity(), (left, right) -> left));
 
+        // 日期范围查询后再用时间区间重叠判断，兼容跨日班次和跨日检修。
         List<Cd90MachineMaintenancePlan> maintenances = maintenanceMapper.selectList(
                 Wrappers.<Cd90MachineMaintenancePlan>lambdaQuery()
                         .eq(Cd90MachineMaintenancePlan::getFactoryCode, factoryCode)
@@ -73,6 +75,7 @@ public class Cd90MachineResourceServiceImpl implements Cd90MachineResourceServic
                 .filter(item -> overlaps(item, shiftStart, shiftEnd))
                 .forEach(item -> markMaintenance(machineByCode.get(item.getMachineCode()), item));
 
+        // 绑定、限制和损耗与机台一起冻结为本班快照，保证同班所有规格使用同一规则版本。
         Cd90MachineResourceSnapshot snapshot = Cd90MachineResourceSnapshot.builder()
                 .machines(machines)
                 .bindings(machineRollMapper.selectList(Wrappers.<Cd90MachineRollMapping>lambdaQuery()
@@ -108,6 +111,7 @@ public class Cd90MachineResourceServiceImpl implements Cd90MachineResourceServic
         }
         LocalDateTime start = toLocalDateTime(maintenance.getDowntimeStartTime());
         LocalDateTime end = toLocalDateTime(maintenance.getDowntimeEndTime());
+        // 同班存在多段检修时取最早开始和最晚结束，保守覆盖全部不可用区间。
         if (machine.getMaintenanceStart() == null || start.isBefore(machine.getMaintenanceStart())) {
             machine.setMaintenanceStart(start);
         }

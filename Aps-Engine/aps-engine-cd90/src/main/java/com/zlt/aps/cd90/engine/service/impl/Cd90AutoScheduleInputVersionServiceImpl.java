@@ -36,6 +36,10 @@ public class Cd90AutoScheduleInputVersionServiceImpl implements Cd90AutoSchedule
     @Override
     public String fingerprint(String factoryCode, LocalDate scheduleDate) {
         String forming = cxMapper.selectList(Wrappers.<CxScheduleResult>lambdaQuery()
+                        // 版本指纹只依赖主键、批次和更新时间，不加载成型结果的其他业务字段。
+                        .select(CxScheduleResult::getId,
+                                CxScheduleResult::getCxBatchNo,
+                                CxScheduleResult::getUpdateTime)
                         .eq(CxScheduleResult::getFactoryCode, factoryCode)
                         .between(CxScheduleResult::getScheduleDate, Date.valueOf(scheduleDate.minusDays(1)),
                                 Date.valueOf(scheduleDate.plusDays(3)))

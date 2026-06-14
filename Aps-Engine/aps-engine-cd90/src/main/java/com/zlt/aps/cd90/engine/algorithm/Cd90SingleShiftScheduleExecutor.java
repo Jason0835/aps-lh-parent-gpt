@@ -58,8 +58,10 @@ public class Cd90SingleShiftScheduleExecutor implements Cd90SingleShiftScheduleS
                                             Cd90ShiftResourceState initialState,
                                             Cd90RollingScheduleContext rolling) {
         validate(context, input, shift, initialState);
+        // 候选已按当前班缺料时间和库存保障时长排序，后续必须保持该稳定顺序执行。
         List<Cd90ScheduleCandidate> candidates = candidatePreparationService.prepare(
                 context, input, shift.getClassField());
+        // 机台快照在班次开始时一次加载，规格之间通过state扣减剩余秒数，避免重复查询造成漂移。
         Cd90MachineResourceSnapshot machineSnapshot = machineResourceService.load(
                 context.getFactoryCode(), shift.getStartTime(), shift.getEndTime());
         Cd90ShiftResourceState state = initialState;
@@ -73,6 +75,7 @@ public class Cd90SingleShiftScheduleExecutor implements Cd90SingleShiftScheduleS
             if (!StringUtils.hasText(clothCode)) {
                 continue;
             }
+            // 净需求会扣除库存和前序计划入库；没有正需求的规格不进入资源试算。
             Cd90ShiftDemandDecision demand = demandProvider.resolve(
                     context, input, shift, candidate, rolling);
             BigDecimal netDemand = demand == null || demand.getNetDemandQuantity() == null
@@ -83,6 +86,7 @@ public class Cd90SingleShiftScheduleExecutor implements Cd90SingleShiftScheduleS
             Cd90ConstructionMaterial construction = findConstruction(
                     input.getConstructionMaterials(), clothCode);
             if (construction == null) {
+                // 数据缺失只终止当前规格，保留轨迹后继续处理后续候选。
                 String reason = "CONSTRUCTION_MISSING";
                 recordFailure(failures, shift, clothCode, reason);
                 attemptTraces.add(trace(shift, clothCode, null, netDemand,
@@ -95,18 +99,21 @@ public class Cd90SingleShiftScheduleExecutor implements Cd90SingleShiftScheduleS
                 log.warn("[直裁自动排程] 月计划剩余量缺失, classField={}, clothCode={}",
                         shift.getClassField(), clothCode);
             }
+            // 先生成全部可行机台试算，再由资源提交器按优先级逐个尝试库排和工装占用。
             Cd90MachineTrialPlan trialPlan = trialPreparationService.prepare(
                     trialRequest(context, shift, state, construction, netDemand, closeOut.isCloseOut()),
                     machineSnapshot);
             Cd90ShiftCommitResult commit = resourceCommitter.commit(
                     commitRequest(context, shift, construction, trialPlan), state);
             if (!commit.isSuccess()) {
+                // 提交失败返回原state，因此失败规格不会污染后续规格的机台、库排和工装资源。
                 recordFailure(failures, shift, clothCode, commit.getFailureReason());
                 attemptTraces.add(trace(shift, clothCode, construction.getBigRollCode(),
                         netDemand, BigDecimal.ZERO, commit.getFailureReason(),
                         attemptTraces.size() + 1));
                 continue;
             }
+            // 只有完整通过机台、库排和工装校验后，才用新状态替换当前班资源。
             state = commit.getState();
             attemptTraces.add(trace(shift, clothCode, construction.getBigRollCode(),
                     netDemand, commit.getTask().getPlanQuantity(), null,

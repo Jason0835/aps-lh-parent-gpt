@@ -49,6 +49,7 @@ public class Cd90AutoScheduleEngineServiceImpl implements Cd90AutoScheduleEngine
 
     @Override
     public Cd90AutoScheduleContext prepare(String factoryCode, Date scheduleDate) {
+        // 第一步只准备不可变计算上下文，不在此阶段创建任务或写入排程结果。
         validateRequest(factoryCode, scheduleDate);
         LocalDate localScheduleDate = scheduleDate.toInstant()
                 .atZone(ZoneId.systemDefault())
@@ -57,10 +58,13 @@ public class Cd90AutoScheduleEngineServiceImpl implements Cd90AutoScheduleEngine
         log.info("[直裁自动排程] Engine开始准备计算上下文, factoryCode={}, scheduleDate={}, stage={}",
                 factoryCode, localScheduleDate, STAGE_BASIC_VALIDATION);
 
+        // 班次数量参与参数校验，必须先加载班次，再解析输出窗口等强类型参数。
         List<Cd90ShiftConfig> enabledShifts = loadEnabledShifts(factoryCode);
         Cd90AutoScheduleParameters parameters = parameterService.load(factoryCode, enabledShifts.size());
+        // 输出窗口按业务班次顺序截取，保证后续滚动计算和结果CLASS字段顺序一致。
         List<Cd90ShiftDescriptor> shifts = shiftWindowResolver.resolve(localScheduleDate, enabledShifts)
                 .stream().limit(parameters.getScheduleWindow()).collect(Collectors.toList());
+        // 输入版本指纹会在最终事务前复核，防止计算期间基础数据变化后覆盖新数据。
         Cd90AutoScheduleContext context = Cd90AutoScheduleContext.builder()
                 .factoryCode(factoryCode)
                 .scheduleDate(localScheduleDate)
@@ -92,9 +96,11 @@ public class Cd90AutoScheduleEngineServiceImpl implements Cd90AutoScheduleEngine
         }
         log.info("[直裁自动排程] Engine开始执行多班排程, factoryCode={}, scheduleDate={}",
                 context.getFactoryCode(), context.getScheduleDate());
+        // 多班循环、草稿归并前后均检查总耗时，超时任务不得进入最终持久化阶段。
         runtimeGuard.checkNotTimedOut(context, "多班排程开始");
         Cd90MultiShiftExecutionResult execution = multiShiftScheduleExecutor.execute(context, listener);
         runtimeGuard.checkNotTimedOut(context, "输出草稿构建前");
+        // Engine仅生成可持久化草稿，批次号、数据库ID和旧批次失效由外层最终事务处理。
         Cd90AutoScheduleOutputDraft output = outputDraftBuilder.build(context, execution);
         runtimeGuard.checkNotTimedOut(context, "输出草稿构建完成");
         if (listener != null) listener.onProgress(90, "BUILD_OUTPUT", "输出草稿构建完成", null);

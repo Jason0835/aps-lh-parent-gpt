@@ -37,6 +37,7 @@ public class Cd90MachineTrialPreparationService {
             throw new IllegalArgumentException("机台资源快照不能为空");
         }
         Cd90AutoScheduleParameters parameters = request.getParameters();
+        // 先执行启用状态、大卷绑定、指定/禁止机台、检修和班次开放等硬约束过滤。
         List<Cd90MachineCandidate> candidates = candidateResolver.resolve(
                 request.getClothCode(), request.getBigRollCode(), request.getShiftCode(),
                 request.getShiftStart(), request.getShiftEnd(), snapshot.getMachines(),
@@ -46,6 +47,7 @@ public class Cd90MachineTrialPreparationService {
         Map<String, String> previousSpecs = request.getPreviousSpecByMachine() == null
                 ? Collections.emptyMap() : request.getPreviousSpecByMachine();
 
+        // 每台候选机独立试算需求补量、损耗、工装、班产和规格切换耗时，不修改资源快照。
         List<Cd90MachineTrial> trials = candidates.stream()
                 .map(candidate -> trialCalculator.calculate(Cd90CandidateMachineTrialInput.builder()
                         .clothCode(request.getClothCode())
@@ -68,6 +70,7 @@ public class Cd90MachineTrialPreparationService {
                         .priorityOrder(candidate.getPriorityOrder())
                         .build()))
                 .collect(Collectors.toList());
+        // 选择器只给出当前最优方案；提交阶段仍会在库排失败时继续尝试其余方案。
         Cd90MachineTrial selected = trialSelector.select(trials);
         log.info("[直裁自动排程] 规格机台试算准备完成, clothCode={}, bigRollCode={}, "
                         + "candidateCount={}, selectedMachine={}",

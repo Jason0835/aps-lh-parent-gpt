@@ -50,18 +50,21 @@ public class Cd90DefaultShiftDemandProvider implements Cd90ShiftDemandProvider {
                                            Cd90ScheduleCandidate candidate,
                                            Cd90RollingScheduleContext rolling) {
         validate(context, input, shift, candidate);
+        // 直裁CLASS字段映射到其负责供应的首个成型自然班次。
         LocalDateTime demandStart = demandStart(context, shift.getClassField());
         List<Cd90DemandShift> clothShifts = safe(input.getDemandShifts()).stream()
                 .filter(item -> item != null && candidate.getClothCode().equals(item.getClothCode()))
                 .filter(item -> item.getStartTime() != null)
                 .sorted(Comparator.comparing(Cd90DemandShift::getStartTime))
                 .collect(Collectors.toList());
+        // 当前班只承担参数窗口内的成型需求，窗口外需求留给后续班次滚动处理。
         List<Cd90DemandShift> window = clothShifts.stream()
                 .filter(item -> !item.getStartTime().isBefore(demandStart))
                 .limit(context.getParameters().getDemandWindow())
                 .collect(Collectors.toList());
         BigDecimal demandQuantity = calculateWindowDemand(
                 window, context.getParameters().getDemandCalcMode());
+        // 窗口前成型消耗用于重算6点库存余额，不属于本次待排需求。
         BigDecimal consumedBeforeWindow = clothShifts.stream()
                 .filter(item -> item.getStartTime().isBefore(demandStart))
                 .map(item -> value(item.getClothDemandQuantity()))
@@ -71,7 +74,9 @@ public class Cd90DefaultShiftDemandProvider implements Cd90ShiftDemandProvider {
                 .map(item -> value(item.getStockQuantity()))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
+        // 实际入库优先于同任务计划入库，解析器会消除互斥记录，避免重复抵扣需求。
         List<Cd90InboundRecord> effectiveInbound = effectiveInbound(rolling);
+        // 班次开始前已入库数量进入当前可用库存；班次后但需求截止前入库用于抵扣未来需求。
         BigDecimal inboundBeforeShift = inboundQuantity(effectiveInbound, candidate.getClothCode(),
                 record -> record.getInboundTime() == null
                         || !record.getInboundTime().isAfter(shift.getStartTime()),
@@ -84,10 +89,12 @@ public class Cd90DefaultShiftDemandProvider implements Cd90ShiftDemandProvider {
                         && !record.getInboundTime().isAfter(demandDeadline),
                 context.getParameters().getRollCoilMeter());
 
+        // 余额为负时拆成历史缺口，余额为正时作为现有库存，两者不能同时重复参与净需求。
         BigDecimal inventoryBalance = stockAtSix.add(inboundBeforeShift).subtract(consumedBeforeWindow);
         BigDecimal expectedStock = inventoryBalance.max(BigDecimal.ZERO);
         BigDecimal shortage = inventoryBalance.signum() < 0
                 ? inventoryBalance.abs() : BigDecimal.ZERO;
+        // 净需求口径：窗口需求 + 历史缺口 - 可用库存 - 截止前有效计划入库，最低为0。
         BigDecimal netDemand = demandCalculator.calculateNetDemand(
                 demandQuantity, shortage, expectedStock, futureEffectivePlan);
         log.debug("[直裁自动排程] 当前班次净需求计算完成, classField={}, clothCode={}, "
@@ -109,6 +116,7 @@ public class Cd90DefaultShiftDemandProvider implements Cd90ShiftDemandProvider {
             throw new IllegalArgumentException("累计消耗计算上下文、输入和班次不能为空");
         }
         LocalDateTime sixAtWindowStart = context.getScheduleDate().minusDays(1).atTime(6, 0);
+        // 只累计6点基线之后、当前班开始之前的自然需求，供库排资源快照重建使用。
         return safe(input.getDemandShifts()).stream()
                 .filter(item -> item != null && item.getStartTime() != null)
                 .filter(item -> !item.getStartTime().isBefore(sixAtWindowStart))
