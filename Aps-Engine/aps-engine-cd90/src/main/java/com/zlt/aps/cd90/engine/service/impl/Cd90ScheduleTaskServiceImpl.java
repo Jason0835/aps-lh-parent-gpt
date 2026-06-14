@@ -118,6 +118,16 @@ public class Cd90ScheduleTaskServiceImpl implements Cd90ScheduleTaskService {
     @Override
     @Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
     public boolean markSuccess(String taskId, String batchNo) {
+        return updateSuccess(taskId, batchNo);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public boolean markSuccessInCurrentTransaction(String taskId, String batchNo) {
+        return updateSuccess(taskId, batchNo);
+    }
+
+    private boolean updateSuccess(String taskId, String batchNo) {
         return taskMapper.update(null, new LambdaUpdateWrapper<Cd90ScheduleTask>()
                 .eq(Cd90ScheduleTask::getTaskId, taskId)
                 .eq(Cd90ScheduleTask::getTaskStatus, Cd90ScheduleTaskStatus.RUNNING)

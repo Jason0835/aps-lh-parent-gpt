@@ -26,4 +26,8 @@ public class Cd90AutoScheduleContext {
     private Cd90AutoScheduleParameters parameters;
     /** 本次输出窗口内按时间排序的班次描述。 */
     private List<Cd90ShiftDescriptor> shifts;
+    /** 工厂当前全部启用班次数，用于最终参数复核。 */
+    private int enabledShiftCount;
+    /** 成型计划、6点库存和库排资源的启动版本指纹。 */
+    private String inputVersionFingerprint;
 }

@@ -36,6 +36,12 @@ public class Cd90ScheduleResultLog extends BaseEntity implements Serializable {
     @TableField("BATCH_NO")
     @Excel(name = "ui.data.column.cd90ScheduleResultLog.batchNo")
     private String batchNo;
+    /** 工单号 */
+    @TableField("ORDER_NO")
+    private String orderNo;
+    /** 大卷编码 */
+    @TableField("BIG_ROLL_CODE")
+    private String bigRollCode;
     /** 帘布代号 */
     @ApiModelProperty("帘布代号")
     @TableField("CLOTH_CODE")
@@ -65,4 +71,10 @@ public class Cd90ScheduleResultLog extends BaseEntity implements Serializable {
     @TableField("LOG_TIME")
     @Excel(name = "ui.data.column.cd90ScheduleResultLog.logTime")
     private Date logTime;
+    /** 自动排程原因编码 */
+    @TableField("REASON_CODE")
+    private String reasonCode;
+    /** 自动排程原因明细JSON */
+    @TableField("REASON_DETAIL")
+    private String reasonDetail;
 }

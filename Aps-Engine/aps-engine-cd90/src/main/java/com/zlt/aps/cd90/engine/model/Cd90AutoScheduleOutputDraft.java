@@ -14,4 +14,6 @@ public class Cd90AutoScheduleOutputDraft {
     private List<Cd90LaneAllocationDraft> laneAllocations;
     private List<Cd90ScheduleExplainLogDraft> explainLogs;
     private List<Cd90UnscheduledResultModel> unscheduledResults;
+    /** 多班执行时实际使用的逐班净需求轨迹，用于需求快照。 */
+    private List<Cd90ScheduleAttemptTrace> demandTraces;
 }

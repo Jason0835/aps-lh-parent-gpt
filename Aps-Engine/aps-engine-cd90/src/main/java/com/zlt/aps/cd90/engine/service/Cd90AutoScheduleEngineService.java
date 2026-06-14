@@ -1,6 +1,7 @@
 package com.zlt.aps.cd90.engine.service;
 
 import com.zlt.aps.cd90.engine.model.Cd90AutoScheduleContext;
+import com.zlt.aps.cd90.engine.model.Cd90AutoScheduleOutputDraft;
 
 import java.util.Date;
 
@@ -20,4 +21,12 @@ public interface Cd90AutoScheduleEngineService {
      * @return 自动排程计算上下文
      */
     Cd90AutoScheduleContext prepare(String factoryCode, Date scheduleDate);
+
+    /**
+     * 执行多班排程并构建最终事务可消费的输出草稿。
+     *
+     * @param context 已冻结参数和输出班次的计算上下文
+     * @return 自动排程输出草稿
+     */
+    Cd90AutoScheduleOutputDraft execute(Cd90AutoScheduleContext context);
 }

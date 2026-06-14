@@ -80,6 +80,8 @@ public class Cd90AutoScheduleOutputDraftBuilder {
                 .explainLogs(logs)
                 .unscheduledResults(execution.getUnscheduledResults() == null
                         ? Collections.emptyList() : execution.getUnscheduledResults())
+                .demandTraces(execution.getAttemptTraces() == null
+                        ? Collections.emptyList() : execution.getAttemptTraces())
                 .build();
     }
 

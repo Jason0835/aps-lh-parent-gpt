@@ -3,12 +3,17 @@ package com.zlt.aps.cd90.engine.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.zlt.aps.cd90.api.domain.entity.Cd90ShiftConfig;
 import com.zlt.aps.cd90.engine.algorithm.Cd90ShiftWindowResolver;
+import com.zlt.aps.cd90.engine.algorithm.Cd90AutoScheduleOutputDraftBuilder;
+import com.zlt.aps.cd90.engine.algorithm.Cd90MultiShiftScheduleExecutor;
 import com.zlt.aps.cd90.engine.mapper.Cd90AutoScheduleShiftMapper;
 import com.zlt.aps.cd90.engine.model.Cd90AutoScheduleContext;
 import com.zlt.aps.cd90.engine.model.Cd90AutoScheduleParameters;
+import com.zlt.aps.cd90.engine.model.Cd90AutoScheduleOutputDraft;
+import com.zlt.aps.cd90.engine.model.Cd90MultiShiftExecutionResult;
 import com.zlt.aps.cd90.engine.model.Cd90ShiftDescriptor;
 import com.zlt.aps.cd90.engine.service.Cd90AutoScheduleEngineService;
 import com.zlt.aps.cd90.engine.service.Cd90AutoScheduleParameterService;
+import com.zlt.aps.cd90.engine.service.Cd90AutoScheduleInputVersionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -35,6 +40,9 @@ public class Cd90AutoScheduleEngineServiceImpl implements Cd90AutoScheduleEngine
     private final Cd90AutoScheduleShiftMapper shiftMapper;
     private final Cd90AutoScheduleParameterService parameterService;
     private final Cd90ShiftWindowResolver shiftWindowResolver;
+    private final Cd90MultiShiftScheduleExecutor multiShiftScheduleExecutor;
+    private final Cd90AutoScheduleOutputDraftBuilder outputDraftBuilder;
+    private final Cd90AutoScheduleInputVersionService inputVersionService;
 
     @Override
     public Cd90AutoScheduleContext prepare(String factoryCode, Date scheduleDate) {
@@ -57,6 +65,8 @@ public class Cd90AutoScheduleEngineServiceImpl implements Cd90AutoScheduleEngine
                 .currentStage(STAGE_BASIC_VALIDATION)
                 .parameters(parameters)
                 .shifts(shifts)
+                .enabledShiftCount(enabledShifts.size())
+                .inputVersionFingerprint(inputVersionService.fingerprint(factoryCode, localScheduleDate))
                 .build();
 
         log.info("[直裁自动排程] Engine计算上下文准备完成, factoryCode={}, scheduleDate={}, "
@@ -64,6 +74,20 @@ public class Cd90AutoScheduleEngineServiceImpl implements Cd90AutoScheduleEngine
                 factoryCode, localScheduleDate, enabledShifts.size(),
                 parameters.getScheduleWindow(), parameters.getFingerprint());
         return context;
+    }
+
+    @Override
+    public Cd90AutoScheduleOutputDraft execute(Cd90AutoScheduleContext context) {
+        if (context == null) {
+            throw new IllegalArgumentException("自动排程计算上下文不能为空");
+        }
+        log.info("[直裁自动排程] Engine开始执行多班排程, factoryCode={}, scheduleDate={}",
+                context.getFactoryCode(), context.getScheduleDate());
+        Cd90MultiShiftExecutionResult execution = multiShiftScheduleExecutor.execute(context);
+        Cd90AutoScheduleOutputDraft output = outputDraftBuilder.build(context, execution);
+        log.info("[直裁自动排程] Engine输出草稿构建完成, resultCount={}, unscheduledCount={}",
+                output.getScheduleResults().size(), output.getUnscheduledResults().size());
+        return output;
     }
 
     /**

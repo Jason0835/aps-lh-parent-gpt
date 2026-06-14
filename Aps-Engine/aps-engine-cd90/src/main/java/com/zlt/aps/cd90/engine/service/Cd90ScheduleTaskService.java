@@ -24,5 +24,8 @@ public interface Cd90ScheduleTaskService {
 
     boolean markSuccess(String taskId, String batchNo);
 
+    /** 在调用方当前事务内更新成功状态，用于最终结果原子提交。 */
+    boolean markSuccessInCurrentTransaction(String taskId, String batchNo);
+
     boolean markFailed(String taskId, String errorMessage);
 }

@@ -82,7 +82,7 @@
 
 <script>
 import moment from 'moment'
-import { autoScheduleResult, listScheduleResult, delScheduleResult, exportScheduleResult } from '@/api/cd90/scheduleResult'
+import { autoScheduleResult, getAutoScheduleTask, listScheduleResult, delScheduleResult, exportScheduleResult } from '@/api/cd90/scheduleResult'
 import { listTireFabricCodes } from '@/api/cd90/specifyMachine'
 import { getCd90MachineEnableOptions } from '@/api/cd90/cd90MachineInfo'
 import TltUploadForm from '@/views/components/tltUploadForm.vue'
@@ -334,12 +334,39 @@ export default {
     handleAutoSchedule() {
       const params = {
         factoryCode: this.query.factoryCode,
-        scheduleDate: this.query.scheduleDate
+        scheduleDate: this.query.scheduleDate,
+        forceRegenerate: false
       }
+      this.submitAutoSchedule(params)
+    },
+    submitAutoSchedule(params) {
       autoScheduleResult(params).then(res => {
+        const data = res.data || {}
+        if (data.needConfirm) {
+          return this.$confirm(res.msg, this.$t('ui.message.tips'), { type: 'warning' })
+            .then(() => this.submitAutoSchedule({ ...params, forceRegenerate: true }))
+        }
         this.$modal.msgSuccess(res.msg)
-        this.getList()
+        if (data.taskId) this.pollAutoScheduleTask(data.taskId)
       })
+    },
+    pollAutoScheduleTask(taskId) {
+      const poll = () => {
+        getAutoScheduleTask(taskId).then(res => {
+          const task = res.data || {}
+          if (task.taskStatus === 'SUCCESS') {
+            this.$modal.msgSuccess('自动排程执行完成')
+            this.getList()
+            return
+          }
+          if (task.taskStatus === 'FAILED') {
+            this.$modal.msgError(task.errorMessage || '自动排程执行失败')
+            return
+          }
+          setTimeout(poll, 2000)
+        })
+      }
+      poll()
     },
     handleInsert() {
       this.showPendingActionMessage()

@@ -12,6 +12,9 @@ export function delScheduleResult(data) {
 export function autoScheduleResult(data) {
   return request({ url: '/cd90/cd90ScheduleResult/autoSchedule', method: 'post', data })
 }
+export function getAutoScheduleTask(taskId) {
+  return request({ url: `/cd90/cd90ScheduleResult/autoSchedule/task/${taskId}`, method: 'get' })
+}
 export function publishScheduleResult(data) {
   return request({ url: '/cd90/cd90ScheduleResult/publish', method: 'post', data })
 }
