@@ -37,4 +37,12 @@ public interface IFactoryMonthPlanMouldDayResultService extends IDocService<Fact
      * @return
      */
     byte[] getFactoryMonthPlanMouldDayResultExportByte(FactoryMonthPlanMouldDayResult factoryMonthPlanMouldDayResult, List<FactoryMonthPlanMouldDayResultExportVo> list, boolean isFinal);
+    
+    /**
+     * 获取导出模板行数
+     * 
+     * @param isFinal 是否定稿版本导出的模板
+     * @return
+     */
+    int getExportTemplateColumnCount(boolean isFinal);
 }

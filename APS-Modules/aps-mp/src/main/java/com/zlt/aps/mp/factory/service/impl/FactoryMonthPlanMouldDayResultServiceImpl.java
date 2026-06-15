@@ -125,7 +125,7 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
     /**
      * 月计划日统计量预警起始列下标
      */
-    private final static int ADJUST_HEADER_DAY_TOTAL_WARNING_START_COLUMN_INDEX = 40;
+    private final static int ADJUST_HEADER_DAY_TOTAL_WARNING_START_COLUMN_INDEX = 42;
     /**
      * 月底计划字段名称
      */
@@ -626,6 +626,10 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
         // 结构类型字典
         List<SysDictData> structureTypeDatas = sysDictDataCacheService.getType("structure_type");
         Map<String, String> structureTypeMap = structureTypeDatas.stream().collect(Collectors.toMap(SysDictData::getDictValue, SysDictData::getDictLabel));
+        // 是否字典
+        List<SysDictData> yesNoDatas = sysDictDataCacheService.getType("biz_yes_no");
+        Map<String, String> yesNoMap = yesNoDatas.stream().collect(Collectors.toMap(SysDictData::getDictValue, SysDictData::getDictLabel));
+        
         //20260604+ 预警配置
         MpMonthPlanExportWarningConfigVo warningConfiguration = getWarningConfiguration(queryResult);
 
@@ -667,7 +671,7 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
             for (FactoryMonthPlanMouldDayResultExportVo exportVo : headList) {
                 this.setLastDayValue(exportVo, dayFieldName1, dayFieldName2); // 设置上月最后两天的值
                 Map<String, Object> listDataMap = this.buildListDataMap(exportVo, storTypeMap, productCategoryMap,
-                        productStatusMap, constructionStageMap, brandMap, structureTypeMap, "A", isFinal);
+                        productStatusMap, constructionStageMap, brandMap, structureTypeMap, yesNoMap, "A", isFinal);
                 headSummaryData.add(listDataMap);
                 if (MonthPlanExportDataTypeEnum.TOTAL.getCode().equals(exportVo.getDataType())) {
                     //20260604+ 日排产量预警处理
@@ -696,7 +700,7 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
                 FactoryMonthPlanMouldDayResultExportVo exportVo = list.get(i);
                 this.setLastDayValue(exportVo, dayFieldName1, dayFieldName2); // 设置上月最后两天的值
                 Map<String, Object> listDataMap = this.buildListDataMap(exportVo, storTypeMap, productCategoryMap,
-                        productStatusMap, constructionStageMap, brandMap, structureTypeMap, null, isFinal);
+                        productStatusMap, constructionStageMap, brandMap, structureTypeMap, yesNoMap, null, isFinal);
                 // Excel行号从2开始（第1行是表头）
                 int rowNum = beginIndex + i;
                 if (!MonthPlanExportDataTypeEnum.RECORD.getCode().equals(exportVo.getDataType())) {
@@ -728,6 +732,19 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
         }
         // 3.5、写到文件
         return ExcelUtils.writeMultiList(inputStream, 0, tableMap, excelDataList);
+    }
+    
+    /**
+     * 获取导出模板行数
+     * 
+     * @param isFinal 是否定稿版本导出的模板
+     * @return
+     */
+    @Override
+    public int getExportTemplateColumnCount(boolean isFinal) {
+        Map<String, Object> tableMap = new HashMap<>();
+        this.loadExportI18nTableName(tableMap, isFinal);
+        return tableMap.size();
     }
 
     /**
@@ -874,6 +891,9 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
         if (isFinal) {
             tableMap.put("prodReqPlan", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.realProdReqPlan"));
             tableMap.put("unRestrictedNetQty", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.realUnRestrictedNetQty"));
+            tableMap.put("lastMonthOverdueQty", I18nUtil.getMessage("ui.data.column.FactoryMonthPlanFinalResult.lastMonthOverdueQty"));
+            tableMap.put("lastMonthValidFlag", I18nUtil.getMessage("ui.data.column.FactoryMonthPlanFinalResult.lastMonthValidFlag"));
+            
         } else {
             tableMap.put("prodReqPlan", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.prodReqPlan"));
             tableMap.put("unRestrictedNetQty", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.unRestrictedNetQty"));
@@ -1007,6 +1027,7 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
      * @param constructionStageMap
      * @param brandMap
      * @param structureTypeMap
+     * @param yesNoMap
      * @param suffix               后缀，用于复制合计行
      * @return
      */
@@ -1015,7 +1036,7 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
                                                  Map<String, String> productCategoryMap,
                                                  Map<String, String> productStatusMap,
                                                  Map<String, String> constructionStageMap, Map<String, String> brandMap,
-                                                 Map<String, String> structureTypeMap, String suffix,
+                                                 Map<String, String> structureTypeMap, Map<String, String> yesNoMap, String suffix,
                                                  boolean isFinal) {
         Map<String, Object> listDataMap = new HashMap<>(16);
         listDataMap.put(this.getRealFieldName("locationType", suffix), storTypeMap.getOrDefault(exportVo.getLocationType(), exportVo.getLocationType()));
@@ -1056,6 +1077,8 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
             listDataMap.put(this.getRealFieldName("adjustProductQty2", suffix), exportVo.getAdjustProductQty2());
             listDataMap.put(this.getRealFieldName("adjustProductQty3", suffix), exportVo.getAdjustProductQty3());
             listDataMap.put(this.getRealFieldName("adjustProductQty4", suffix), exportVo.getAdjustProductQty4());
+            listDataMap.put(this.getRealFieldName("lastMonthOverdueQty", suffix), exportVo.getLastMonthOverdueQty());
+            listDataMap.put(this.getRealFieldName("lastMonthValidFlag", suffix), yesNoMap.getOrDefault(exportVo.getLastMonthValidFlag(), exportVo.getLastMonthValidFlag()));
         } else {
             listDataMap.put(this.getRealFieldName("heightQty", suffix), exportVo.getHeightQty());
             listDataMap.put(this.getRealFieldName("midQty", suffix), exportVo.getMidQty());

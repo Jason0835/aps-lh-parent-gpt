@@ -188,4 +188,14 @@ public class FactoryMonthPlanMouldDayResultExportVo extends FactoryMonthPlanMoul
      */
     @ApiModelProperty(value = "待调整", name = "pendingQty")
     private Integer pendingQty;
+    /**
+     * 上月超欠产
+     */
+    @ApiModelProperty(value = "上月超欠产", name = "lastMonthOverdueQty")
+    private Integer lastMonthOverdueQty;
+    /**
+    * 上月超欠产有效标志
+     */
+    @ApiModelProperty(value = "上月超欠产有效标志", name = "lastMonthValidFlag")
+    private String lastMonthValidFlag;
 }
