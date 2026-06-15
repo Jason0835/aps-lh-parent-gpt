@@ -19,8 +19,8 @@ import java.util.List;
  * @author zlt
  * @date 2021-06-24
  */
-@FeignClient(contextId = "IDjScheduleResultService", value = ServiceNameConstants.GATEWAY_SERVICE, path = "${api.path.dj:nc}")
-public interface IDjScheduleResultService {
+@FeignClient(contextId = "IDjScheduleResultRemoteService", value = ServiceNameConstants.GATEWAY_SERVICE, path = "${api.path.dj:nc}")
+public interface IDjScheduleResultRemoteService {
 
     /**
      * 查询垫胶排程结果列表
@@ -187,4 +187,11 @@ public interface IDjScheduleResultService {
     @PostMapping("/djScheduleResult/getSummaryVo")
     @ApiOperation("获取排程日期的排程结果合计")
     public AjaxResult getSummaryVo(@RequestBody DjScheduleResult scheduleResult);
+
+    /**
+     * 获取连续6个班次的表头
+     */
+    @GetMapping("/djScheduleResult/getWorkClass")
+    @ApiOperation("获取连续6个班次的表头")
+    public AjaxResult getWorkClass(@RequestParam(value = "scheduleDate", required = false) String scheduleDate);
 }

@@ -22,8 +22,8 @@ import com.zlt.aps.dj.api.domain.entity.DjParams;
  * @author zlt
  * @date 2026-06-11
  */
-@FeignClient(contextId = "IDjParamsService", value = ServiceNameConstants.GATEWAY_SERVICE, path = "${api.path.dj:dj}")
-public interface IDjParamsService {
+@FeignClient(contextId = "IDjParamsRemoteService", value = ServiceNameConstants.GATEWAY_SERVICE, path = "${api.path.dj:dj}")
+public interface IDjParamsRemoteService {
 
     /**
      * 获取垫胶参数信息列表

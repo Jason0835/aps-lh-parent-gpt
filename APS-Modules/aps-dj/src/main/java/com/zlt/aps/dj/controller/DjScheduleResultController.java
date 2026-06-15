@@ -1,5 +1,6 @@
 package com.zlt.aps.dj.controller;
 
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -11,6 +12,7 @@ import org.apache.commons.lang3.time.DateFormatUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -26,6 +28,7 @@ import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.ruoyi.common.utils.StringUtils;
 import com.zlt.aps.common.core.constant.ApsConstant;
+import com.zlt.aps.common.engine.enums.WorkClassEnums;
 import com.zlt.aps.common.engine.service.FactoryService;
 import com.zlt.aps.dj.api.domain.entity.DjDayFinishQty;
 import com.zlt.aps.dj.api.domain.entity.DjScheduleResult;
@@ -567,5 +570,45 @@ public class DjScheduleResultController extends BaseController<DjScheduleResult>
     @ApiOperation("获取排程日期的排程结果合计")
     public AjaxResult getSummaryVo(@RequestBody DjScheduleResult scheduleResult) {
         return djScheduleResultService.getSummaryVo(scheduleResult);
+    }
+
+    /**
+     * 获取连续6个班次的表头（以参数scheduleDate的上一天中班作为第一个班，格式：x班MM/dd）
+     */
+    @GetMapping("/getWorkClass")
+    @ApiOperation("获取连续6个班次的表头")
+    public AjaxResult getWorkClass(@RequestParam(value = "scheduleDate", required = false) String scheduleDate) {
+        // 以scheduleDate的上一天作为中班起始日期
+        Date baseDate;
+        if (StringUtils.isNotBlank(scheduleDate)) {
+            baseDate = DateUtils.parseDate(scheduleDate);
+        } else {
+            baseDate = new Date();
+        }
+        Date startDate = DateUtils.addDays(baseDate, -1); // 上一天（中班）
+        WorkClassEnums currentWorkClass = WorkClassEnums.CLASS_DAY;
+        String startDateStr = DateUtils.parseDateToStr("MM/dd", startDate);
+
+        String baseDateStr = DateUtils.parseDateToStr("MM/dd", baseDate);
+        String nextDayStr = DateUtils.parseDateToStr("MM/dd", DateUtils.addDays(baseDate, 1));
+
+        List<String> headers = new ArrayList<>();
+        // class1: 中班 (scheduleDate的上一天)
+        currentWorkClass = currentWorkClass.getNextClass();
+        headers.add(I18nUtil.getMessage(currentWorkClass.getClassName()) + startDateStr);
+        // class2-class4: scheduleDate当天 (夜班, 早班, 中班)
+        currentWorkClass = currentWorkClass.getNextClass();
+        headers.add(I18nUtil.getMessage(currentWorkClass.getClassName()) + baseDateStr);
+        currentWorkClass = currentWorkClass.getNextClass();
+        headers.add(I18nUtil.getMessage(currentWorkClass.getClassName()) + baseDateStr);
+        currentWorkClass = currentWorkClass.getNextClass();
+        headers.add(I18nUtil.getMessage(currentWorkClass.getClassName()) + baseDateStr);
+        // class5-class6: scheduleDate下一天 (夜班, 早班)
+        currentWorkClass = currentWorkClass.getNextClass();
+        headers.add(I18nUtil.getMessage(currentWorkClass.getClassName()) + nextDayStr);
+        currentWorkClass = currentWorkClass.getNextClass();
+        headers.add(I18nUtil.getMessage(currentWorkClass.getClassName()) + nextDayStr);
+
+        return AjaxResult.success(headers);
     }
 }

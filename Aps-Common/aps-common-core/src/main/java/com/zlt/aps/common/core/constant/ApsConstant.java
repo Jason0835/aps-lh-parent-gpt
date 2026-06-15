@@ -191,12 +191,12 @@ public class ApsConstant {
     /**
      * 系统管理模块
      */
-    public static String PROCEDURE_CODE_SYSTEM = "14";
+    public static String PROCEDURE_CODE_SYSTEM = "0";
     
     /**
      * 系统管理模块
      */
-    public static String PROCEDURE_CODE_DJ = "";
+    public static String PROCEDURE_CODE_DJ = "14";
 
     /**
      * 胎面排程下发接口同步key

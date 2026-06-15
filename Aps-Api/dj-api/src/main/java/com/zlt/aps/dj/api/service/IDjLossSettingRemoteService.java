@@ -15,13 +15,17 @@ import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.constant.ServiceNameConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
-import com.zlt.aps.dj.api.domain.entity.DjStock;
+import com.zlt.aps.dj.api.domain.entity.DjLossSetting;
+
 
 /**
- * 垫胶库存信息对外暴露接口
+ * 垫胶损耗率设定Service接口
+ *
+ * @author zlt
+ * @date 2026-06-10
  */
-@FeignClient(contextId = "iDjStockService", value = ServiceNameConstants.GATEWAY_SERVICE, path = "${api.path.dj:dj}")
-public interface IDjStockService {
+@FeignClient(contextId = "IDjLossSettingRemoteService", value = ServiceNameConstants.GATEWAY_SERVICE, path = "${api.path.dj:dj}")
+public interface IDjLossSettingRemoteService {
 
     /**
      * 获取信息列表
@@ -29,8 +33,8 @@ public interface IDjStockService {
      * @param stock
      * @return
      */
-    @PostMapping("/dj/stock/list")
-    TableDataInfo list(@RequestBody DjStock stock);
+    @PostMapping("/dj/lossSetting/list")
+    TableDataInfo list(@RequestBody DjLossSetting lossSetting);
 
     /**
      * 保存信息
@@ -38,8 +42,8 @@ public interface IDjStockService {
      * @param stock
      * @return
      */
-    @PostMapping("/dj/stock/save")
-    AjaxResult save(@Validated @RequestBody DjStock stock);
+    @PostMapping("/dj/lossSetting/save")
+    AjaxResult save(@Validated @RequestBody DjLossSetting lossSetting);
 
     /**
      * 删除信息
@@ -47,7 +51,7 @@ public interface IDjStockService {
      * @param ids
      * @return
      */
-    @DeleteMapping("/dj/stock/{ids}")
+    @DeleteMapping("/dj/lossSetting/{ids}")
     AjaxResult removeByIds(@RequestBody List<Long> ids);
 
     /**
@@ -56,8 +60,8 @@ public interface IDjStockService {
      * @param id
      * @return
      */
-    @GetMapping(value = "/dj/stock/selectStockById/{id}")
-    DjStock selectStockById(@PathVariable("id") Long id);
+    @GetMapping(value = "/dj/lossSetting/selectStockById/{id}")
+    DjLossSetting selectStockById(@PathVariable("id") Long id);
 
     /**
      * 根据ID获取详细信息
@@ -65,14 +69,14 @@ public interface IDjStockService {
      * @param id
      * @return
      */
-    @GetMapping(value = "/dj/stock/{id}")
+    @GetMapping(value = "/dj/lossSetting/{id}")
     AjaxResult getInfo(@PathVariable("id") Long id);
 
     /**
      * 校验唯一性
      */
-    @PostMapping("/dj/stock/checkUnique")
-    String checkUnique(@RequestBody DjStock cxStock);
+    @PostMapping("/dj/lossSetting/checkUnique")
+    String checkUnique(@RequestBody DjLossSetting lossSetting);
 
     /**
      * 导出信息
@@ -80,16 +84,16 @@ public interface IDjStockService {
      * @param stock
      * @return
      */
-    @PostMapping("/dj/stock/exportData/{fileName}")
-    byte[] exportData(@RequestBody DjStock queryVO, @PathVariable("fileName") String fileName);
+    @PostMapping("/dj/lossSetting/exportData/{fileName}")
+    byte[] exportData(@RequestBody DjLossSetting queryVO, @PathVariable("fileName") String fileName);
 
     /**
-     * 导如信息
+     * 导入信息
      * 
      * @param stock
      * @return
      */
-    @PostMapping("/dj/stock/importData")
+    @PostMapping("/dj/lossSetting/importData")
     AjaxResult importData(@RequestBody ImportContext importContext,
             @RequestParam("updateSupport") boolean updateSupport);
 }
