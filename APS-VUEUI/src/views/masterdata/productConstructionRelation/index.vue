@@ -150,7 +150,7 @@ export default {
 
          {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.mdmConstructionInfo.factoryCode"),
           width: 180,
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
@@ -158,12 +158,12 @@ export default {
         },
         {
           prop: "constructionVersion",
-          label: this.$t("版本号"),
+          label: this.$t("ui.data.column.mdmConstructionInfo.constructionVersion"),
           width: 180,
         },
          {
           prop: "embryoDesc",
-          label: this.$t("胎胚描述"),
+          label: this.$t("ui.data.column.mdmConstructionInfo.embryoDesc"),
           align: "left",
           minWidth: 350,
         },
@@ -179,119 +179,119 @@ export default {
         // },
         {
           prop: "constructionCode",
-          label: this.$t("ui.data.column.skuConstruction.embryoCode"),
+          label: this.$t("ui.data.column.mdmConstructionInfo.constructionCode"),
           width: 180,
         },
         {
           prop: "pattern",
-          label: this.$t("ui.data.column.modelinfo.pattern"),
+          label: this.$t("ui.data.column.mdmConstructionInfo.pattern"),
           width: 180,
         },
         {
           prop: "specifications",
-          label: this.$t("ui.data.column.trialPlan.specifications"),
+          label: this.$t("ui.data.column.mdmConstructionInfo.specifications"),
           width: 180,
         },
 
         {
           prop: "mouldMethod",
-          label: this.$t("ui.data.column.construction.mouldMethod"),
+          label: this.$t("ui.data.column.mdmConstructionInfo.mouldMethod"),
           width: 180,
         },
         {
           prop: "buildingDrumType",
-          label: this.$t("ui.data.column.construction.buildingDrumType"),
+          label: this.$t("ui.data.column.mdmConstructionInfo.buildingDrumType"),
           width: 180,
         },
         {
           prop: "paddingCode",
-          label: this.$t("ui.data.column.construction.paddingCode"),
+          label: this.$t("ui.data.column.mdmConstructionInfo.paddingCode"),
           width: 180,
         },
         {
           prop: "sidewallCode",
-          label: this.$t("ui.data.column.construction.sidewallCode"),
+          label: this.$t("ui.data.column.mdmConstructionInfo.sidewallCode"),
           width: 180,
         },
         {
           prop: "treadCode",
-          label: this.$t("ui.data.column.construction.treadCode"),
+          label: this.$t("ui.data.column.mdmConstructionInfo.treadCode"),
           width: 180,
         },
         {
           prop: "tireRingCode",
-          label: this.$t("ui.data.column.construction.tireRingCode"),
+          label: this.$t("ui.data.column.mdmConstructionInfo.tireRingCode"),
           width: 180,
         },
          {
           prop: "beadCode",
-          label: this.$t("ui.data.column.construction.beadCode"),
+          label: this.$t("ui.data.column.mdmConstructionInfo.beadCode"),
           width: 180,
         },
         {
           prop: "rubberCoreCode",
-          label: this.$t("ui.data.column.construction.rubberCore"),
+          label: this.$t("ui.data.column.mdmConstructionInfo.rubberCoreCode"),
           width: 180,
         },
 
         {
           prop: "insideCode",
-          label: this.$t("ui.data.column.construction.insideCode"),
+          label: this.$t("ui.data.column.mdmConstructionInfo.insideCode"),
           width: 180,
         },
         {
           prop: "typeAdhesiveCode",
-          label: this.$t("ui.data.column.construction.typeAdhesiveCode"),
+          label: this.$t("ui.data.column.mdmConstructionInfo.typeAdhesiveCode"),
           width: 180,
         },
 {
           prop: "zeroBeltCode",
-          label: this.$t("ui.data.column.construction.zeroBeltCode"),
+          label: this.$t("ui.data.column.mdmConstructionInfo.zeroBeltCode"),
           width: 180,
         },
         {
           prop: "clothWrappingCode",
-          label: this.$t("ui.data.column.construction.clothWrappingCode"),
+          label: this.$t("ui.data.column.mdmConstructionInfo.clothWrappingCode"),
           width: 180,
         },
         {
           prop: "tireBodyCode",
-          label: this.$t("ui.data.column.construction.tireBodyCode"),
+          label: this.$t("ui.data.column.mdmConstructionInfo.tireBodyCode"),
           width: 180,
         },
         {
           prop: "beltCode1",
-          label: this.$t("ui.data.column.construction.beltCode1"),
+          label: this.$t("ui.data.column.mdmConstructionInfo.beltCode1"),
           width: 180,
         },
         {
           prop: "beltCode2",
-          label: this.$t("ui.data.column.construction.beltCode2"),
+          label: this.$t("ui.data.column.mdmConstructionInfo.beltCode2"),
           width: 180,
         },
         {
           prop: "beltCode3",
-          label: this.$t("ui.data.column.construction.beltCode3"),
+          label: this.$t("ui.data.column.mdmConstructionInfo.beltCode3"),
           width: 180,
         },
         {
           prop: "beltCode4",
-          label: this.$t("ui.data.column.construction.beltCode4"),
+          label: this.$t("ui.data.column.mdmConstructionInfo.beltCode4"),
           width: 180,
         },
         {
           prop: "beltCodeLeftCode",
-          label: this.$t("ui.data.column.construction.beltCodeLeftCode"),
+          label: this.$t("ui.data.column.mdmConstructionInfo.beltCodeLeftCode"),
           width: 180,
         },
         {
           prop: "beltCodeRightCode",
-          label: this.$t("ui.data.column.construction.beltCodeRightCode"),
+          label: this.$t("ui.data.column.mdmConstructionInfo.beltCodeRightCode"),
           width: 180,
         },
         {
           prop: "remark",
-          label: this.$t("common.remark"),
+          label: this.$t("ui.common.column.remark"),
           width: 180,
         },
         {
@@ -307,18 +307,18 @@ export default {
       return [
 
         {
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.mdmConstructionInfo.factoryCode"),
           prop: "factoryCode",
           type:'select',
           dictData: this.dict.type.biz_factory_name,
         },
         {
           prop: "constructionVersion",
-          label: this.$t("版本号"),
+          label: this.$t("ui.data.column.mdmConstructionInfo.constructionVersion"),
         },
         {
           prop: "embryoDesc",
-          label: this.$t("胎胚描述"),
+          label: this.$t("ui.data.column.mdmConstructionInfo.embryoDesc"),
           minWidth: 350,
           align: "left",
         },
@@ -331,15 +331,15 @@ export default {
         //   prop: "specifications",
         // },
         {
-          label: this.$t("ui.data.column.skuConstruction.embryoCode"),
+          label: this.$t("ui.data.column.mdmConstructionInfo.constructionCode"),
           prop: "constructionCode",
         },
         {
-          label: this.$t("ui.data.column.modelinfo.pattern"),
+          label: this.$t("ui.data.column.mdmConstructionInfo.pattern"),
           prop: "pattern",
         },
         {
-          label: this.$t("ui.data.column.trialPlan.specifications"),
+          label: this.$t("ui.data.column.mdmConstructionInfo.specifications"),
           prop: "specifications",
         },
 

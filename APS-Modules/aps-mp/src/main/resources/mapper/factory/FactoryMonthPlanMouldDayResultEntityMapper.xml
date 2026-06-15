@@ -92,6 +92,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             r.ORIGINAL_TOTAL_QTY,
             ifnull(r.total_qty, 0) - ifnull(pm.PRODUCTION_QTY,0) PRODUCT_SURPLUS,
             si.LAST_MONTH_REMAIN_QTY,
+            r.LAST_MONTH_OVERDUE_QTY,
+            r.LAST_MONTH_VALID_FLAG,
             </when>
             <otherwise>
             mc.NET_QTY UN_RESTRICTED_NET_QTY,
@@ -253,6 +255,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             r.ORIGINAL_TOTAL_QTY,
             pm.PRODUCTION_QTY,
             si.LAST_MONTH_REMAIN_QTY,
+            r.LAST_MONTH_OVERDUE_QTY,
+            r.LAST_MONTH_VALID_FLAG,
             </when>
             <otherwise>
             mc.NET_QTY,
