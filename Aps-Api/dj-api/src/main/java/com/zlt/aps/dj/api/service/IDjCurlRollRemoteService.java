@@ -24,8 +24,8 @@ import com.zlt.aps.dj.api.domain.entity.DjCurlRoll;
  * @author zlt
  * @date 2026-06-10
  */
-@FeignClient(contextId = "IDjCurlRollService", value = ServiceNameConstants.GATEWAY_SERVICE, path = "${api.path.dj:dj}")
-public interface IDjCurlRollService {
+@FeignClient(contextId = "IDjCurlRollRemoteService", value = ServiceNameConstants.GATEWAY_SERVICE, path = "${api.path.dj:dj}")
+public interface IDjCurlRollRemoteService {
 
     /**
      * 获取信息列表

@@ -18,7 +18,7 @@ import com.ruoyi.common.text.Convert;
 import com.ruoyi.common4ui.constant.UserConstants;
 import com.ruoyi.common4ui.core.controller.BaseUIController;
 import com.zlt.aps.dj.api.domain.entity.DjParams;
-import com.zlt.aps.dj.api.service.IDjParamsService;
+import com.zlt.aps.dj.api.service.IDjParamsRemoteService;
 
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
@@ -35,7 +35,7 @@ import io.swagger.annotations.ApiOperation;
 public class DjParamsUIController extends BaseUIController<DjParams> {
 
     @Autowired
-    private IDjParamsService iDjParamsService;
+    private IDjParamsRemoteService iDjParamsService;
 
     private final String prefix = "aps/dj/params";
 

@@ -29,7 +29,7 @@ import com.ruoyi.common.text.Convert;
 import com.ruoyi.common4ui.constant.UserConstants;
 import com.ruoyi.common4ui.core.controller.BaseUIController;
 import com.zlt.aps.dj.api.domain.entity.DjLossSetting;
-import com.zlt.aps.dj.api.service.IDjLossSettingService;
+import com.zlt.aps.dj.api.service.IDjLossSettingRemoteService;
 import com.zlt.file.encryptbyll.FileEncryptUtils;
 
 import io.swagger.annotations.Api;
@@ -47,7 +47,7 @@ import io.swagger.annotations.ApiOperation;
 public class DjLossSettingUIController extends BaseUIController<DjLossSetting> {
 
     @Autowired
-    private IDjLossSettingService iDjLossSettingService;
+    private IDjLossSettingRemoteService iDjLossSettingService;
 
     private final String prefix = "aps/dj/lossSetting";
 

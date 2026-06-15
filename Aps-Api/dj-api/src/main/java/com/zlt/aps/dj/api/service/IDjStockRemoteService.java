@@ -15,13 +15,13 @@ import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.constant.ServiceNameConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
-import com.zlt.aps.dj.api.domain.entity.DjMachineInfo;
+import com.zlt.aps.dj.api.domain.entity.DjStock;
 
 /**
- * 垫胶机台信息对外暴露接口
+ * 垫胶库存信息对外暴露接口
  */
-@FeignClient(contextId = "iDjMachineInfoService", value = ServiceNameConstants.GATEWAY_SERVICE, path = "${api.path.dj:dj}")
-public interface IDjMachineInfoService {
+@FeignClient(contextId = "iDjStockRemoteService", value = ServiceNameConstants.GATEWAY_SERVICE, path = "${api.path.dj:dj}")
+public interface IDjStockRemoteService {
 
     /**
      * 获取信息列表
@@ -29,8 +29,8 @@ public interface IDjMachineInfoService {
      * @param stock
      * @return
      */
-    @PostMapping("/dj/machine/list")
-    TableDataInfo list(@RequestBody DjMachineInfo machine);
+    @PostMapping("/dj/stock/list")
+    TableDataInfo list(@RequestBody DjStock stock);
 
     /**
      * 保存信息
@@ -38,8 +38,8 @@ public interface IDjMachineInfoService {
      * @param stock
      * @return
      */
-    @PostMapping("/dj/machine/save")
-    AjaxResult save(@Validated @RequestBody DjMachineInfo machine);
+    @PostMapping("/dj/stock/save")
+    AjaxResult save(@Validated @RequestBody DjStock stock);
 
     /**
      * 删除信息
@@ -47,7 +47,7 @@ public interface IDjMachineInfoService {
      * @param ids
      * @return
      */
-    @DeleteMapping("/dj/machine/{ids}")
+    @DeleteMapping("/dj/stock/{ids}")
     AjaxResult removeByIds(@RequestBody List<Long> ids);
 
     /**
@@ -56,8 +56,8 @@ public interface IDjMachineInfoService {
      * @param id
      * @return
      */
-    @GetMapping(value = "/dj/machine/selectStockById/{id}")
-    DjMachineInfo selectStockById(@PathVariable("id") Long id);
+    @GetMapping(value = "/dj/stock/selectStockById/{id}")
+    DjStock selectStockById(@PathVariable("id") Long id);
 
     /**
      * 根据ID获取详细信息
@@ -65,14 +65,14 @@ public interface IDjMachineInfoService {
      * @param id
      * @return
      */
-    @GetMapping(value = "/dj/machine/{id}")
+    @GetMapping(value = "/dj/stock/{id}")
     AjaxResult getInfo(@PathVariable("id") Long id);
 
     /**
      * 校验唯一性
      */
-    @PostMapping("/dj/machine/checkUnique")
-    String checkUnique(@RequestBody DjMachineInfo machine);
+    @PostMapping("/dj/stock/checkUnique")
+    String checkUnique(@RequestBody DjStock cxStock);
 
     /**
      * 导出信息
@@ -80,16 +80,16 @@ public interface IDjMachineInfoService {
      * @param stock
      * @return
      */
-    @PostMapping("/dj/machine/exportData/{fileName}")
-    byte[] exportData(@RequestBody DjMachineInfo queryVO, @PathVariable("fileName") String fileName);
+    @PostMapping("/dj/stock/exportData/{fileName}")
+    byte[] exportData(@RequestBody DjStock queryVO, @PathVariable("fileName") String fileName);
 
     /**
-     * 导入信息
+     * 导如信息
      * 
      * @param stock
      * @return
      */
-    @PostMapping("/dj/machine/importData")
+    @PostMapping("/dj/stock/importData")
     AjaxResult importData(@RequestBody ImportContext importContext,
             @RequestParam("updateSupport") boolean updateSupport);
 }

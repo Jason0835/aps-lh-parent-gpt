@@ -57,15 +57,23 @@ public class DjScheduleResult extends BaseEntity {
 
     /** 机台编码 */
     @Excel(name = "ui.data.column.dj.scheduleResult.machineCode")
-    @ApiModelProperty(value = "机台编码", name = "machineCode")
+    @ApiModelProperty(value = "机台", name = "machineCode")
     @TableField(value = "MACHINE_CODE")
     private String machineCode;
 
     /** 垫胶编码 */
     @Excel(name = "ui.data.column.dj.scheduleResult.treadCode")
-    @ApiModelProperty(value = "垫胶编码", name = "treadCode")
+    @ApiModelProperty(value = "垫胶", name = "treadCode")
     @TableField("PADDING_CODE")
     private String paddingCode;
+
+    /**
+     * 胶料代码
+     */
+    @Excel(name = "ui.data.column.dj.scheduleResult.glueCode")
+    @ApiModelProperty(value = "胶料")
+    @TableField("GLUE_CODE")
+    private String glueCode;
 
     /** 口型板编码 */
     @Excel(name = "ui.data.column.dj.scheduleResult.mouthPlateCode")
@@ -88,7 +96,7 @@ public class DjScheduleResult extends BaseEntity {
     /** 1班完成量 */
     @Excel(name = "ui.data.column.dj.scheduleResult.class1FinishQty")
     @ApiModelProperty(value = "1班完成量", name = "class1FinishQty")
-    @TableField(value = "CLASS1_FINISH_QTY")
+    @TableField(exist = false)
     private BigDecimal class1FinishQty;
 
     /** 1班原因分析 */
@@ -112,7 +120,7 @@ public class DjScheduleResult extends BaseEntity {
     /** 2班完成量 */
     @Excel(name = "ui.data.column.dj.scheduleResult.class2FinishQty")
     @ApiModelProperty(value = "2班完成量", name = "class2FinishQty")
-    @TableField(value = "CLASS2_FINISH_QTY")
+    @TableField(exist = false)
     private BigDecimal class2FinishQty;
 
     /** 2班原因分析 */
@@ -136,7 +144,7 @@ public class DjScheduleResult extends BaseEntity {
     /** 3班完成量 */
     @Excel(name = "ui.data.column.dj.scheduleResult.class3FinishQty")
     @ApiModelProperty(value = "3班完成量", name = "class3FinishQty")
-    @TableField(value = "CLASS3_FINISH_QTY")
+    @TableField(exist = false)
     private BigDecimal class3FinishQty;
 
     /** 3班原因分析 */
@@ -160,7 +168,7 @@ public class DjScheduleResult extends BaseEntity {
     /** 4班完成量 */
     @Excel(name = "ui.data.column.dj.scheduleResult.class4FinishQty")
     @ApiModelProperty(value = "4班完成量", name = "class4FinishQty")
-    @TableField(value = "CLASS4_FINISH_QTY")
+    @TableField(exist = false)
     private BigDecimal class4FinishQty;
 
     /** 4班原因分析 */
@@ -184,7 +192,7 @@ public class DjScheduleResult extends BaseEntity {
     /** 5班完成量 */
     @Excel(name = "ui.data.column.dj.scheduleResult.class5FinishQty")
     @ApiModelProperty(value = "5班完成量", name = "class5FinishQty")
-    @TableField(value = "CLASS5_FINISH_QTY")
+    @TableField(exist = false)
     private BigDecimal class5FinishQty;
 
     /** 5班原因分析 */
@@ -208,7 +216,7 @@ public class DjScheduleResult extends BaseEntity {
     /** 6班完成量 */
     @Excel(name = "ui.data.column.dj.scheduleResult.class6FinishQty")
     @ApiModelProperty(value = "6班完成量", name = "class6FinishQty")
-    @TableField(value = "CLASS6_FINISH_QTY")
+    @TableField(exist = false)
     private BigDecimal class6FinishQty;
 
     /** 6班原因分析 */
@@ -244,6 +252,49 @@ public class DjScheduleResult extends BaseEntity {
     
     @ApiModelProperty(value = "发布成功计数器，每点击一次发布并成功的话，计数器累加")
     private Integer publishSuccessCount;
+
+    /**
+     * 库存数量
+     */
+    @Excel(name = "ui.data.column.scheduleResult.stockQty")
+    @ApiModelProperty(value = "库存")
+    @TableField(exist = false)
+    private Double stockQty;
+
+    @Excel(name = "ui.data.column.scheduleResult.monthPlanOs")
+    @ApiModelProperty(value = "月计划剩余量")
+    @TableField(exist = false)
+    private Double monthPlanOs;
+
+    @Excel(name = "ui.data.column.scheduleResult.finish")
+    @ApiModelProperty(value = "1班完成率", name = "class1FinishRate")
+    @TableField(exist = false)
+    private BigDecimal class1FinishRate;
+
+    @Excel(name = "ui.data.column.scheduleResult.finish")
+    @ApiModelProperty(value = "2班完成率", name = "class2FinishRate")
+    @TableField(exist = false)
+    private BigDecimal class2FinishRate;
+
+    @Excel(name = "ui.data.column.scheduleResult.finish")
+    @ApiModelProperty(value = "3班完成率", name = "class3FinishRate")
+    @TableField(exist = false)
+    private BigDecimal class3FinishRate;
+
+    @Excel(name = "ui.data.column.scheduleResult.finish")
+    @ApiModelProperty(value = "4班完成率", name = "class4FinishRate")
+    @TableField(exist = false)
+    private BigDecimal class4FinishRate;
+
+    @Excel(name = "ui.data.column.scheduleResult.finish")
+    @ApiModelProperty(value = "5班完成率", name = "class5FinishRate")
+    @TableField(exist = false)
+    private BigDecimal class5FinishRate;
+
+    @Excel(name = "ui.data.column.scheduleResult.finish")
+    @ApiModelProperty(value = "6班完成率", name = "class6FinishRate")
+    @TableField(exist = false)
+    private BigDecimal class6FinishRate;
     
     @TableField(exist = false)
     private String year;

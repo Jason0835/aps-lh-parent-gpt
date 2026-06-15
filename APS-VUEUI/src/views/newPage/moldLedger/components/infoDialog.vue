@@ -107,51 +107,51 @@ export default {
       return [
       {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.mdmModelInfo.factoryCode"),
           type: "select",
           dictData: this.parentDict.type.biz_factory_name,
         },
 
         {
           prop: "mouldCode",
-          label: this.$t("ui.data.column.moldLedger.mouldCode"),
+          label: this.$t("ui.data.column.mdmModelInfo.mouldCode"),
           maxlength:32
         },
         {
           prop: "specifications",
-          label: this.$t("ui.data.column.reportClassAccuracy.materialCode"),
+          label: this.$t("ui.data.column.mdmModelInfo.specifications"),
           maxlength:64
         },
         {
           prop: "logisticsStatus",
-          label: this.$t("ui.data.column.moldLedger.logisticsStatus"),
+          label: this.$t("ui.data.column.mdmModelInfo.logisticsStatus"),
           type: "select",
           dictData: this.parentDict.type.logistics_status,
         },
         {
           prop: "mainPattern",
-          label: this.$t("ui.data.column.moldLedger.mainPattern"),
+          label: this.$t("ui.data.column.mdmMaterialInfo.mainPattern"),
           maxlength:64
         },
         {
           prop: "mouldType",
-          label: this.$t("ui.data.column.modelinfo.mouldType"),
+          label: this.$t("ui.data.column.mdmModelInfo.mouldType"),
           type: "select",
           dictData: this.parentDict.type.biz_mould_Type
         },
         {
           prop: "pattern",
-          label: this.$t("ui.data.column.moldLedger.pattern"),
+          label: this.$t("ui.data.column.mdmModelInfo.pattern"),
           maxlength:64
         },
         {
           prop: "shellStandard",
-          label: this.$t("ui.data.column.moldLedger.shellStandard"),
+          label: this.$t("ui.data.column.mdmModelInfo.shellStandard"),
           maxlength:64
         },
         {
           prop: "mouldStatus",
-          label: this.$t("ui.data.column.docVulcanizationMachStatus.status"),
+          label: this.$t("ui.data.column.mdmModelInfo.mouldStatus"),
           type: "select",
           dictData: this.parentDict.type.biz_available_status
         },

@@ -29,7 +29,7 @@ import com.ruoyi.common.text.Convert;
 import com.ruoyi.common4ui.constant.UserConstants;
 import com.ruoyi.common4ui.core.controller.BaseUIController;
 import com.zlt.aps.dj.api.domain.entity.DjMachineInfo;
-import com.zlt.aps.dj.api.service.IDjMachineInfoService;
+import com.zlt.aps.dj.api.service.IDjMachineInfoRemoteService;
 import com.zlt.file.encryptbyll.FileEncryptUtils;
 
 import io.swagger.annotations.Api;
@@ -46,7 +46,7 @@ import io.swagger.annotations.ApiOperation;
 public class DjMachineInfoUIController extends BaseUIController<DjMachineInfo> {
 
     @Autowired
-    private IDjMachineInfoService iDjMachineInfoService;
+    private IDjMachineInfoRemoteService iDjMachineInfoService;
 
     private final String prefix = "aps/dj/machine";
 

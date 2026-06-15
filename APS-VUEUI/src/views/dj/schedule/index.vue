@@ -259,7 +259,8 @@ import {
   producingIssue,
   validateConstruction,
   getSummaryVo,
-} from "@/api/nc/ncScheduleResult";
+  getWorkClass,
+} from "@/api/dj/djScheduleResult";
 //components
 import TltUploadForm from "@/views/components/tltUploadForm.vue";
 
@@ -274,7 +275,7 @@ import allocateDialog from "./components/allocateDialog.vue";
 import mergeDialog from "./components/mergeDialog.vue";
 
 export default {
-  name: "InsideLinerSchedule",
+  name: "djSchedule",
   components: {
     allocateDialog,
     autoPlanDialog,
@@ -298,6 +299,7 @@ export default {
       loading: false,
       data: [],
       selection: [],
+      classHeaders: [],
       // page: {
       //   current: 1,
       //   pageSize: 20,
@@ -327,95 +329,48 @@ export default {
       machines: (state) => state.insideLiner.machines,
     }),
     columns() {
+      let finishRateFormatter = function (row, column, value, index) {
+        if (value == 0 || value == null) {
+          return "0%";
+        }
+        var str = Number(value * 100).toFixed(2);
+        return (str += "%");
+      };
       let columns = [
         { type: "selection", fixed: "left" },
         {
           label: this.$t("ui.data.column.scheduleResult.baseInfo"),
           children: [
             {
-              prop: "isRelease",
+              prop: "releaseStatus",
               valign: "middle",
               align: "center",
               halign: "center",
-              label: this.$t("ui.data.column.scheduleResult.isRelease"),
-              formatter: (row, column, value, index) => {
-                return this.selectDictLabel(this.dict.type.IS_RELEASE, value);
-              },
+              label: this.$t("ui.data.column.dj.scheduleResult.releaseStatus"),
             },
             {
-              prop: "liningCode",
+              prop: "paddingCode",
               valign: "middle",
               halign: "center",
               align: "center",
               minWidth: 100,
-              //  sortable: "custom",
-              label: this.$t("ui.data.column.scheduleResult.liningCode"),
-              // cellStyle: function (value, row, index) {
-              //   if (
-              //     $.common.isNotEmpty(row.colorCode) &&
-              //     $.common.isNotEmpty(row.colorType)
-              //   ) {
-              //     if (row.colorType == "0") {
-              //       return { css: { color: row.colorCode } };
-              //     } else if (row.colorType == "1") {
-              //       return { css: { background: row.colorCode } };
-              //     }
-              //   }
-              //   return {};
-              // },
+              label: this.$t("ui.data.column.dj.scheduleResult.treadCode"),
             },
             {
-              prop: "wholeGlueCode",
+              prop: "glueCode",
               valign: "middle",
               halign: "center",
               align: "left",
               minWidth: 120,
-              //  sortable: "custom",
-              label: this.$t("ui.data.column.scheduleResult.glueCode"),
+              label: this.$t("ui.data.column.dj.scheduleResult.glueCode"),
             },
             {
-              prop: "glueSeq",
-              valign: "middle",
-              halign: "center",
-              align: "center",
-              //  sortable: "custom",
-              label: this.$t("ui.data.column.scheduleResult.glueSeq"),
-            },
-            {
-              prop: "machineId",
+              prop: "machineCode",
               valign: "middle",
               halign: "center",
               align: "left",
-              //  sortable: "custom",
-              label: this.$t("ui.data.column.scheduleResult.produceLine"),
+              label: this.$t("ui.data.column.dj.scheduleResult.machineCode"),
               formatter: (row, column, value, index) => {
-                // if ($.common.isEmpty(value)) {
-                //   var actions = [];
-                //   actions.push(
-                //     '<a href="javascript:void(0)" onclick="chooseMachine(\'' +
-                //       row.id +
-                //       "','" +
-                //       index +
-                //       "')\">" +
-                //       this.$t("ui.data.column.selectMachineName") +
-                //       "</a> "
-                //   );
-                //   return actions.join("");
-                // }
-                // let machineName = selectMachineName(machineNameList, value);
-                // if (value.indexOf(",") > 0) {
-                //   var actions = [];
-                //   actions.push(
-                //     '<a href="javascript:void(0)" onclick="chooseMachine(\'' +
-                //       row.id +
-                //       "','" +
-                //       index +
-                //       "')\">" +
-                //       machineName +
-                //       "</a> "
-                //   );
-                //   return actions.join("");
-                // }
                 return row.machineName;
               },
             },
@@ -424,579 +379,260 @@ export default {
               valign: "middle",
               halign: "center",
               align: "right",
-              //  sortable: "custom",
-              label: this.$t(
-                "ui.data.column.scheduleResult.br.monthPlanOs.meter"
-              ),
+              label: this.$t("ui.data.column.scheduleResult.monthPlanOs"),
             },
             {
               prop: "stockQty",
               valign: "middle",
               halign: "center",
               align: "right",
-              //  sortable: "custom",
-              label: this.$t("ui.data.column.scheduleResult.stockQty.meter2"),
-            },
-            {
-              prop: "supplyTime",
-              valign: "middle",
-              halign: "center",
-              align: "right",
-              //  sortable: "custom",
-              label: this.$t(
-                "ui.data.column.scheduleResult.br.supplyTime.hour"
-              ),
-            },
-            {
-              prop: "dailyTotalQty",
-              valign: "middle",
-              halign: "center",
-              align: "right",
-              //  sortable: "custom",
-              label: this.$t(
-                "ui.data.column.scheduleResult.dailyTotalQty.meter"
-              ),
+              label: this.$t("ui.data.column.scheduleResult.stockQty"),
             },
           ],
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.nightPlan"),
+          label: this.classHeaders[0] || this.$t("ui.data.column.dj.scheduleResult.class1PlanQty"),
           children: [
             {
-              prop: "dayPlanQty",
-              valign: "middle",
-              halign: "center",
-              align: "right",
-              //  sortable: "custom",
-              label: this.$t("ui.data.column.scheduleResult.plan.meter"),
-              // editable: {
-              //   type: "text",
-              //   label:
-              //     this.$t("ui.data.column.scheduleResult.plan") +
-              //     "(" +
-              //     this.$t("ui.data.column.scheduleResult.unit.meter") +
-              //     ")",
-              //   validate: function (value) {
-              //     var regu = /^[0-9]+?$/;
-              //     if (!regu.test(value)) {
-              //       layer.msg(
-              //         this.$t(
-              //           "ui.data.column.scheduleResult.msg.nonNegativeInteger"
-              //         )
-              //       );
-              //       return this.$t(
-              //         "ui.data.column.scheduleResult.msg.nonNegativeInteger"
-              //       );
-              //     }
-              //     if (value > 9999999) {
-              //       layer.msg(
-              //         this.$t("ui.data.column.mdmMonthProdPlan.greatThan")
-              //       );
-              //       return this.$t("ui.data.column.mdmMonthProdPlan.greatThan");
-              //     }
-              //   },
-              // },
-            },
-            {
-              prop: "dayFinishQty",
-              valign: "middle",
-              halign: "center",
-              align: "right",
-              //  sortable: "custom",
-              label: this.$t("ui.data.column.scheduleResult.finish.meter"),
-            },
-            {
-              prop: "dayProduceOrder",
-              valign: "middle",
-              halign: "center",
-              align: "right",
-              //  sortable: "custom",
-              label: this.$t("ui.data.column.scheduleResult.produceOrder"),
-              // editable: {
-              //   type: "text",
-              //   label: this.$t("ui.data.column.scheduleResult.produceOrder"),
-              //   validate: function (value) {
-              //     var regu = /^[0-9]+?$/;
-              //     if (!regu.test(value)) {
-              //       layer.msg(
-              //         this.$t(
-              //           "ui.data.column.scheduleResult.msg.nonNegativeInteger"
-              //         )
-              //       );
-              //       return this.$t(
-              //         "ui.data.column.scheduleResult.msg.nonNegativeInteger"
-              //       );
-              //     }
-              //     if (value > 999999) {
-              //       var str = this.$t(
-              //         "ui.data.column.mdmMonthProdPlan.greatThan"
-              //       );
-              //       layer.msg(String(str).substring(0, str.length - 1));
-              //       return String(str).substring(0, str.length - 1);
-              //     }
-              //   },
-              // },
-            },
-            {
-          prop: "预计开始时间",
-          valign: "middle",
-          halign: "center",
-          align: "center",
-          label: this.$t("预计开始时间"),
-          width: 150,
-        },
-        {
-          prop: "预计完成时间",
-          valign: "middle",
-          halign: "center",
-          align: "center",
-          label: this.$t("预计完成时间"),
-          width: 150,
-        },
-            {
-              prop: "dayFinishRate",
-              valign: "middle",
-              halign: "center",
-              align: "right",
-              //  sortable: "custom",
-              label: this.$t("ui.data.column.scheduleResult.finishRate"),
-              formatter: function (row, column, value, index) {
-                if (value == 0 || value == null) {
-                  return "0%";
-                }
-                var str = Number(value * 100).toFixed(2);
-                return (str += "%");
-              },
-            },
-            {
-              prop: "dayHandAnalysis",
-              valign: "middle",
-              halign: "center",
-              align: "left",
-              //  sortable: "custom",
-              label: this.$t("ui.data.column.scheduleResult.analysis"),
-              formatter: (row, column, value, index) => {
-                var reasion = "";
-                var SysAnalysis = row.daySysAnalysis;
-                if (value != null) {
-                  reasion = reasion + value;
-                }
-                if (SysAnalysis != null) {
-                  if (reasion != "") {
-                    reasion = reasion + "," + SysAnalysis;
-                  } else {
-                    reasion = SysAnalysis;
-                  }
-                }
-                return reasion;
-              },
-            },
-          ],
-        },
-
-        {
-          label: this.$t("ui.data.column.scheduleResult.dayPlan"),
-          children: [
-            {
-              prop: "nightPlanQty",
-              valign: "middle",
-              halign: "center",
-              align: "right",
-              //  sortable: "custom",
-              label: this.$t("ui.data.column.scheduleResult.plan.meter"),
-              // editable: {
-              //   type: "text",
-              //   label:
-              //     this.$t("ui.data.column.scheduleResult.plan") +
-              //     "(" +
-              //     this.$t("ui.data.column.scheduleResult.unit.meter") +
-              //     ")",
-              //   validate: function (value) {
-              //     var regu = /^[0-9]+?$/;
-              //     if (!regu.test(value)) {
-              //       layer.msg(
-              //         this.$t(
-              //           "ui.data.column.scheduleResult.msg.nonNegativeInteger"
-              //         )
-              //       );
-              //       return this.$t(
-              //         "ui.data.column.scheduleResult.msg.nonNegativeInteger"
-              //       );
-              //     }
-              //     if (value > 9999999) {
-              //       layer.msg(
-              //         this.$t("ui.data.column.mdmMonthProdPlan.greatThan")
-              //       );
-              //       return this.$t("ui.data.column.mdmMonthProdPlan.greatThan");
-              //     }
-              //   },
-              // },
-            },
-            {
-              prop: "nightFinishQty",
-              valign: "middle",
-              halign: "center",
-              align: "right",
-              //  sortable: "custom",
-              label: this.$t("ui.data.column.scheduleResult.finish.meter"),
-            },
-            {
-              prop: "nightProduceOrder",
-              valign: "middle",
-              halign: "center",
-              align: "right",
-              //  sortable: "custom",
-              label: this.$t("ui.data.column.scheduleResult.produceOrder"),
-              // editable: {
-              //   type: "text",
-              //   label: this.$t("ui.data.column.scheduleResult.produceOrder"),
-              //   validate: function (value) {
-              //     var regu = /^[0-9]+?$/;
-              //     if (!regu.test(value)) {
-              //       layer.msg(
-              //         this.$t(
-              //           "ui.data.column.scheduleResult.msg.nonNegativeInteger"
-              //         )
-              //       );
-              //       return this.$t(
-              //         "ui.data.column.scheduleResult.msg.nonNegativeInteger"
-              //       );
-              //     }
-              //     if (value > 999999) {
-              //       var str = this.$t(
-              //         "ui.data.column.mdmMonthProdPlan.greatThan"
-              //       );
-              //       layer.msg(String(str).substring(0, str.length - 1));
-              //       return String(str).substring(0, str.length - 1);
-              //     }
-              //   },
-              // },
-            },
-            {
-          prop: "预计开始时间",
-          valign: "middle",
-          halign: "center",
-          align: "center",
-          label: this.$t("预计开始时间"),
-          width: 150,
-        },
-        {
-          prop: "预计完成时间",
-          valign: "middle",
-          halign: "center",
-          align: "center",
-          label: this.$t("预计完成时间"),
-          width: 150,
-        },
-            {
-              prop: "nightFinishRate",
-              valign: "middle",
-              halign: "center",
-              align: "right",
-              //  sortable: "custom",
-              label: this.$t("ui.data.column.scheduleResult.finishRate"),
-              formatter: function (row, column, value, index) {
-                if (value == 0 || value == null) {
-                  return "0%";
-                }
-                var str = Number(value * 100).toFixed(2);
-                return (str += "%");
-              },
-            },
-            {
-              prop: "nightSysAnalysis",
-              valign: "middle",
-              halign: "center",
-              align: "left",
-              //  sortable: "custom",
-              label: this.$t("ui.data.column.scheduleResult.analysis"),
-              formatter: (row, column, value, index) => {
-                var reasion = "";
-                var HandAnaly = row.nightHandAnalysis;
-                if (value != null) {
-                  reasion = reasion + value;
-                }
-                if (HandAnaly != null) {
-                  if (reasion != "") {
-                    reasion = reasion + "," + HandAnaly;
-                  } else {
-                    reasion = HandAnaly;
-                  }
-                }
-                return reasion;
-              },
-            },
-          ],
-        },
-
-        {
-          label: this.$t("中班计划（14:00-22:00)"),
-          children: [
-            {
-              prop: "nightPlanQty",
-              valign: "middle",
-              halign: "center",
-              align: "right",
-              //  sortable: "custom",
-              label: this.$t("ui.data.column.scheduleResult.plan.meter"),
-              // editable: {
-              //   type: "text",
-              //   label:
-              //     this.$t("ui.data.column.scheduleResult.plan") +
-              //     "(" +
-              //     this.$t("ui.data.column.scheduleResult.unit.meter") +
-              //     ")",
-              //   validate: function (value) {
-              //     var regu = /^[0-9]+?$/;
-              //     if (!regu.test(value)) {
-              //       layer.msg(
-              //         this.$t(
-              //           "ui.data.column.scheduleResult.msg.nonNegativeInteger"
-              //         )
-              //       );
-              //       return this.$t(
-              //         "ui.data.column.scheduleResult.msg.nonNegativeInteger"
-              //       );
-              //     }
-              //     if (value > 9999999) {
-              //       layer.msg(
-              //         this.$t("ui.data.column.mdmMonthProdPlan.greatThan")
-              //       );
-              //       return this.$t("ui.data.column.mdmMonthProdPlan.greatThan");
-              //     }
-              //   },
-              // },
-            },
-            {
-              prop: "nightFinishQty",
-              valign: "middle",
-              halign: "center",
-              align: "right",
-              //  sortable: "custom",
-              label: this.$t("ui.data.column.scheduleResult.finish.meter"),
-            },
-            {
-              prop: "nightProduceOrder",
-              valign: "middle",
-              halign: "center",
-              align: "right",
-              //  sortable: "custom",
-              label: this.$t("ui.data.column.scheduleResult.produceOrder"),
-              // editable: {
-              //   type: "text",
-              //   label: this.$t("ui.data.column.scheduleResult.produceOrder"),
-              //   validate: function (value) {
-              //     var regu = /^[0-9]+?$/;
-              //     if (!regu.test(value)) {
-              //       layer.msg(
-              //         this.$t(
-              //           "ui.data.column.scheduleResult.msg.nonNegativeInteger"
-              //         )
-              //       );
-              //       return this.$t(
-              //         "ui.data.column.scheduleResult.msg.nonNegativeInteger"
-              //       );
-              //     }
-              //     if (value > 999999) {
-              //       var str = this.$t(
-              //         "ui.data.column.mdmMonthProdPlan.greatThan"
-              //       );
-              //       layer.msg(String(str).substring(0, str.length - 1));
-              //       return String(str).substring(0, str.length - 1);
-              //     }
-              //   },
-              // },
-            },
-            {
-          prop: "预计开始时间",
-          valign: "middle",
-          halign: "center",
-          align: "center",
-          label: this.$t("预计开始时间"),
-          width: 150,
-        },
-        {
-          prop: "预计完成时间",
-          valign: "middle",
-          halign: "center",
-          align: "center",
-          label: this.$t("预计完成时间"),
-          width: 150,
-        },
-            {
-              prop: "nightFinishRate",
-              valign: "middle",
-              halign: "center",
-              align: "right",
-              //  sortable: "custom",
-              label: this.$t("ui.data.column.scheduleResult.finishRate"),
-              formatter: function (row, column, value, index) {
-                if (value == 0 || value == null) {
-                  return "0%";
-                }
-                var str = Number(value * 100).toFixed(2);
-                return (str += "%");
-              },
-            },
-            {
-              prop: "nightSysAnalysis",
-              valign: "middle",
-              halign: "center",
-              align: "left",
-              //  sortable: "custom",
-              label: this.$t("ui.data.column.scheduleResult.analysis"),
-              formatter: (row, column, value, index) => {
-                var reasion = "";
-                var HandAnaly = row.nightHandAnalysis;
-                if (value != null) {
-                  reasion = reasion + value;
-                }
-                if (HandAnaly != null) {
-                  if (reasion != "") {
-                    reasion = reasion + "," + HandAnaly;
-                  } else {
-                    reasion = HandAnaly;
-                  }
-                }
-                return reasion;
-              },
-            },
-          ],
-        },
-
-        {
-          label: this.$t("ui.data.column.scheduleResult.prePlanQty"),
-          children: [
-            {
-              prop: "prePlanQty",
-              valign: "middle",
-              halign: "center",
-              align: "right",
-              //  sortable: "custom",
-              label: this.$t("ui.data.column.scheduleResult.plan.meter"),
-              // editable: {
-              //   type: "text",
-              //   label:
-              //     this.$t("ui.data.column.scheduleResult.plan") +
-
-              //     "(" +
-              //     this.$t("ui.data.column.scheduleResult.unit.meter") +
-              //     ")",
-              //   validate: function (value) {
-              //     var regu = /^[0-9]+?$/;
-              //     if (!regu.test(value)) {
-              //       layer.msg(
-              //         this.$t(
-              //           "ui.data.column.scheduleResult.msg.nonNegativeInteger"
-              //         )
-              //       );
-              //       return this.$t(
-              //         "ui.data.column.scheduleResult.msg.nonNegativeInteger"
-              //       );
-              //     }
-              //     if (value > 9999999) {
-              //       layer.msg(
-              //         this.$t("ui.data.column.mdmMonthProdPlan.greatThan")
-              //       );
-              //       return this.$t("ui.data.column.mdmMonthProdPlan.greatThan");
-              //     }
-              //   },
-              // },
-            },
-          ],
-        },
-
-        {
-          label: this.$t("ui.data.column.scheduleResult.ncPlan2"),
-          children: [
-            {
-              prop: "cxClass2Plan",
-              valign: "middle",
-              halign: "center",
-              align: "right",
-              //  sortable: "custom",
-              label: this.$t(
-                "ui.data.column.scheduleResult.br.class1Plan.meter"
-              ),
-            },
-            {
-              prop: "cxClass3Plan",
-              valign: "middle",
-              halign: "center",
-              align: "right",
-              //  sortable: "custom",
-              label: this.$t(
-                "ui.data.column.scheduleResult.br.class2Plan.meter"
-              ),
-            },
-            {
-              prop: "cxClass3Plan",
-              valign: "middle",
-              halign: "center",
-              align: "right",
-              //  sortable: "custom",
-              label: this.$t(
-                "中班计划量(米)"
-              ),
-            },
-            {
-              prop: "cxClass4Plan",
-              valign: "middle",
-              halign: "center",
-              align: "right",
-              //  sortable: "custom",
-              label: this.$t(
-                "ui.data.column.scheduleResult.br.class3Plan.meter"
-              ),
-            },
-            {
-              prop: "cxClass5Plan",
-              valign: "middle",
-              halign: "center",
-              align: "right",
-              //  sortable: "custom",
-              label: this.$t(
-                "ui.data.column.scheduleResult.br.cxClass4Plan.meter"
-              ),
-            },
-            {
-              prop: "cxClass5Plan",
-              valign: "middle",
-              halign: "center",
-              align: "right",
-              //  sortable: "custom",
-              label: this.$t(
-                "次日中班计划量(米)"
-              ),
-            },
-            // {
-            //   prop: "cxClass5Plan",
-            //   valign: "middle",
-            //   halign: "center",
-            //   align: "right",
-            //   sortable: "custom",
-            //   label: this.$t(
-            //     "ui.data.column.scheduleResult.br.cxClass5Plan.meter"
-            //   ),
-            // },
-            ,
-          ],
-        },
-        {
-          // label: this.$t("ui.biz.user.other.info"),
-          label: this.$t("其他信息"),
-          children: [
-            {
-              prop: "remark",
+              prop: "class1Sequence",
               valign: "middle",
               halign: "center",
               align: "center",
-              minWidth: 100,
-              //  sortable: "custom",
-              label: this.$t("ui.common.column.remark"),
-              // formatter: (row, column, value, index) => {
-              //   return $.table.tooltip(value);
-              // },
+              label: this.$t("ui.data.column.dj.scheduleResult.sequence"),
+            },
+            {
+              prop: "class1PlanQty",
+              valign: "middle",
+              halign: "center",
+              align: "right",
+              label: this.$t("ui.data.column.dj.scheduleResult.planQty"),
+            },
+            {
+              prop: "class1FinishQty",
+              valign: "middle",
+              halign: "center",
+              align: "right",
+              label: this.$t("ui.data.column.dj.scheduleResult.finishQty"),
+            },
+            {
+              prop: "class1FinishRate",
+              valign: "middle",
+              halign: "center",
+              align: "right",
+              label: this.$t("ui.data.column.scheduleResult.finish"),
+              formatter: finishRateFormatter,
+            },
+            {
+              prop: "class1Analysis",
+              valign: "middle",
+              halign: "center",
+              align: "left",
+              label: this.$t("ui.data.column.dj.scheduleResult.analysis"),
+            },
+          ],
+        },
+        {
+          label: this.classHeaders[1] || this.$t("ui.data.column.dj.scheduleResult.class2PlanQty"),
+          children: [
+            {
+              prop: "class2Sequence",
+              valign: "middle",
+              halign: "center",
+              align: "center",
+              label: this.$t("ui.data.column.dj.scheduleResult.sequence"),
+            },
+            {
+              prop: "class2PlanQty",
+              valign: "middle",
+              halign: "center",
+              align: "right",
+              label: this.$t("ui.data.column.dj.scheduleResult.planQty"),
+            },
+            {
+              prop: "class2FinishQty",
+              valign: "middle",
+              halign: "center",
+              align: "right",
+              label: this.$t("ui.data.column.dj.scheduleResult.finishQty"),
+            },
+            {
+              prop: "class2FinishRate",
+              valign: "middle",
+              halign: "center",
+              align: "right",
+              label: this.$t("ui.data.column.scheduleResult.finish"),
+              formatter: finishRateFormatter,
+            },
+            {
+              prop: "class2Analysis",
+              valign: "middle",
+              halign: "center",
+              align: "left",
+              label: this.$t("ui.data.column.dj.scheduleResult.analysis"),
+            },
+          ],
+        },
+        {
+          label: this.classHeaders[2] || this.$t("ui.data.column.dj.scheduleResult.class3PlanQty"),
+          children: [
+            {
+              prop: "class3Sequence",
+              valign: "middle",
+              halign: "center",
+              align: "center",
+              label: this.$t("ui.data.column.dj.scheduleResult.sequence"),
+            },
+            {
+              prop: "class3PlanQty",
+              valign: "middle",
+              halign: "center",
+              align: "right",
+              label: this.$t("ui.data.column.dj.scheduleResult.planQty"),
+            },
+            {
+              prop: "class3FinishQty",
+              valign: "middle",
+              halign: "center",
+              align: "right",
+              label: this.$t("ui.data.column.dj.scheduleResult.finishQty"),
+            },
+            {
+              prop: "class3FinishRate",
+              valign: "middle",
+              halign: "center",
+              align: "right",
+              label: this.$t("ui.data.column.scheduleResult.finish"),
+              formatter: finishRateFormatter,
+            },
+            {
+              prop: "class3Analysis",
+              valign: "middle",
+              halign: "center",
+              align: "left",
+              label: this.$t("ui.data.column.dj.scheduleResult.analysis"),
+            },
+          ],
+        },
+        {
+          label: this.classHeaders[3] || this.$t("ui.data.column.dj.scheduleResult.class4PlanQty"),
+          children: [
+            {
+              prop: "class4Sequence",
+              valign: "middle",
+              halign: "center",
+              align: "center",
+              label: this.$t("ui.data.column.dj.scheduleResult.sequence"),
+            },
+            {
+              prop: "class4PlanQty",
+              valign: "middle",
+              halign: "center",
+              align: "right",
+              label: this.$t("ui.data.column.dj.scheduleResult.planQty"),
+            },
+            {
+              prop: "class4FinishQty",
+              valign: "middle",
+              halign: "center",
+              align: "right",
+              label: this.$t("ui.data.column.dj.scheduleResult.finishQty"),
+            },
+            {
+              prop: "class4FinishRate",
+              valign: "middle",
+              halign: "center",
+              align: "right",
+              label: this.$t("ui.data.column.scheduleResult.finish"),
+              formatter: finishRateFormatter,
+            },
+            {
+              prop: "class4Analysis",
+              valign: "middle",
+              halign: "center",
+              align: "left",
+              label: this.$t("ui.data.column.dj.scheduleResult.analysis"),
+            },
+          ],
+        },
+        {
+          label: this.classHeaders[4] || this.$t("ui.data.column.dj.scheduleResult.class5PlanQty"),
+          children: [
+            {
+              prop: "class5Sequence",
+              valign: "middle",
+              halign: "center",
+              align: "center",
+              label: this.$t("ui.data.column.dj.scheduleResult.sequence"),
+            },
+            {
+              prop: "class5PlanQty",
+              valign: "middle",
+              halign: "center",
+              align: "right",
+              label: this.$t("ui.data.column.dj.scheduleResult.planQty"),
+            },
+            {
+              prop: "class5FinishQty",
+              valign: "middle",
+              halign: "center",
+              align: "right",
+              label: this.$t("ui.data.column.dj.scheduleResult.finishQty"),
+            },
+            {
+              prop: "class5FinishRate",
+              valign: "middle",
+              halign: "center",
+              align: "right",
+              label: this.$t("ui.data.column.scheduleResult.finish"),
+              formatter: finishRateFormatter,
+            },
+            {
+              prop: "class5Analysis",
+              valign: "middle",
+              halign: "center",
+              align: "left",
+              label: this.$t("ui.data.column.dj.scheduleResult.analysis"),
+            },
+          ],
+        },
+        {
+          label: this.classHeaders[5] || this.$t("ui.data.column.dj.scheduleResult.class6PlanQty"),
+          children: [
+            {
+              prop: "class6Sequence",
+              valign: "middle",
+              halign: "center",
+              align: "center",
+              label: this.$t("ui.data.column.dj.scheduleResult.sequence"),
+            },
+            {
+              prop: "class6PlanQty",
+              valign: "middle",
+              halign: "center",
+              align: "right",
+              label: this.$t("ui.data.column.dj.scheduleResult.planQty"),
+            },
+            {
+              prop: "class6FinishQty",
+              valign: "middle",
+              halign: "center",
+              align: "right",
+              label: this.$t("ui.data.column.dj.scheduleResult.finishQty"),
+            },
+            {
+              prop: "class6FinishRate",
+              valign: "middle",
+              halign: "center",
+              align: "right",
+              label: this.$t("ui.data.column.scheduleResult.finish"),
+              formatter: finishRateFormatter,
+            },
+            {
+              prop: "class6Analysis",
+              valign: "middle",
+              halign: "center",
+              align: "left",
+              label: this.$t("ui.data.column.dj.scheduleResult.analysis"),
             },
           ],
         },
@@ -1109,6 +745,9 @@ export default {
       this.query = data;
       // this.$set(this.page, "current", 1);
       this.getList();
+      getWorkClass({ scheduleDate: this.query.scheduleDate }).then((res) => {
+        this.classHeaders = res.data;
+      });
     },
     handlePageChange(current, pageSize) {
       // this.$set(this.page, "current", current);
@@ -1250,7 +889,12 @@ export default {
     this.query.scheduleDate = date;
     this.search.scheduleDate = date;
 
-    this.$store.dispatch("insideLiner/getMachineList");
+    this.$store.dispatch("dj/getMachineList");
+
+    //获取班次表头
+    getWorkClass({ scheduleDate: this.query.scheduleDate }).then((res) => {
+      this.classHeaders = res.data;
+    });
   },
   activated() {
     this.getList();
