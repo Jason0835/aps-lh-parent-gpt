@@ -118,6 +118,8 @@
             fin.DAY_31,
             fin.TOTAL_VULCANIZATION_MINUTES,
             fin.DISPLAY_SEQ,
+            fin.LAST_MONTH_OVERDUE_QTY,
+            fin.LAST_MONTH_VALID_FLAG,
             fin.IS_RELEASE,
             fin.REMARK,
             fin.IS_DELETE,
