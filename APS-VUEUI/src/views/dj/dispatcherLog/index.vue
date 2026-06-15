@@ -115,7 +115,7 @@ export default {
           children: [
             {
               prop: "operType",
-              label: this.$t("ui.data.column.nc.dispatcherlog.operType"),
+              label: this.$t("ui.data.column.dispatcherlog.operType"),
               valign: "middle",
               align: "center",
               halign: "center",
@@ -129,7 +129,7 @@ export default {
             },
             {
               prop: "scheduleDate",
-              label: this.$t("ui.data.column.nc.dispatcherlog.scheduleDate"),
+              label: this.$t("ui.data.column.dispatcherlog.scheduleDate"),
               valign: "middle",
               align: "center",
               halign: "center",
@@ -170,7 +170,7 @@ export default {
           children: [
             {
               prop: "beforeMachineId",
-              label: this.$t("ui.data.column.nc.dispatcherlog.beforeMachineId"),
+              label: this.$t("ui.data.column.dispatcherlog.line"),
               valign: "middle",
               align: "center",
               halign: "center",
@@ -184,7 +184,7 @@ export default {
             },
             {
               prop: "beforeDayPlan",
-              label: this.$t("ui.data.column.nc.dispatcherlog.beforeDayPlan"),
+              label: this.$t("ui.data.column.dispatcherlog.nightPlan"),
               valign: "middle",
               align: "center",
               halign: "center",
@@ -192,7 +192,7 @@ export default {
             },
             {
               prop: "beforeNightPlan",
-              label: this.$t("ui.data.column.nc.dispatcherlog.beforeNightPlan"),
+              label: this.$t("ui.data.column.dispatcherlog.midPlan"),
               valign: "middle",
               align: "left",
               halign: "center",
@@ -206,7 +206,7 @@ export default {
           children: [
             {
               prop: "afterMachineId",
-              label: this.$t("ui.data.column.nc.dispatcherlog.afterMachineId"),
+              label: this.$t("ui.data.column.dispatcherlog.line"),
               valign: "middle",
               align: "center",
               halign: "center",
@@ -220,7 +220,7 @@ export default {
             },
             {
               prop: "afterDayPlan",
-              label: this.$t("ui.data.column.nc.dispatcherlog.afterDayPlan"),
+              label: this.$t("ui.data.column.dispatcherlog.nightPlan"),
               valign: "middle",
               align: "left",
               halign: "center",
@@ -228,7 +228,7 @@ export default {
             },
             {
               prop: "afterNightPlan",
-              label: this.$t("ui.data.column.nc.dispatcherlog.afterNightPlan"),
+              label: this.$t("ui.data.column.dispatcherlog.midPlan"),
               valign: "middle",
               align: "left",
               halign: "center",
@@ -243,13 +243,13 @@ export default {
     searchColumns() {
       return [
         {
-          label: this.$t("ui.data.column.nc.dispatcherlog.operType"),
+          label: this.$t("ui.data.column.dispatcherlog.operType"),
           prop: "operType",
           type: "select", //DISPATCHER_OPER_TYPE
           dictData: this.dict.type.DISPATCHER_OPER_TYPE,
         },
         {
-          label: this.$t("ui.data.column.nc.dispatcherlog.scheduleDate"),
+          label: this.$t("ui.data.column.dispatcherlog.scheduleDate"),
           prop: "scheduleDate",
           type: "date",
           valueFormat: "yyyy-MM-dd",
@@ -259,7 +259,7 @@ export default {
           prop: "createBy",
         },
         {
-          label: this.$t("ui.data.column.dispatcherlog.createTime"),
+          label: this.$t("ui.data.column.maintenance.log.createTime"),
           prop: "createTime",
           type: "date",
           dateType: "daterange",
