@@ -65,7 +65,7 @@
           v-hasPermi="[
             'monthplan:mdmSkuConstructionRef:updateMainMaterialDesc',
           ]"
-          >{{ $t("更新胎胚描述到物料信息") }}</el-button
+          >{{ $t("ui.frame.btn.updateEmbryoDescToMaterial") }}</el-button
         >
       </template>
     </page-table>
@@ -160,7 +160,7 @@ export default {
       let columns = [
         {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.mdmSkuConstructionRef.factoryCode"),
           width: 120,
 
           formatter: (row, column, value) => {
@@ -174,18 +174,18 @@ export default {
         // },
         {
           prop: "materialCode",
-          label: this.$t("ui.data.column.monthplan.oriMaterialCode"),
+          label: this.$t("ui.data.column.mdmSkuConstructionRef.materialCode"),
           width: 180,
         },
         {
           prop: "materialDesc",
           align: "left",
           minWidth: 350,
-          label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
+          label: this.$t("ui.data.column.mdmSkuConstructionRef.materialDesc"),
         },
         {
           prop: "trialStatus",
-          label: this.$t("ui.data.column.trialPlan.trialStatus"),
+          label: this.$t("ui.data.column.mdmSkuConstructionRef.trialStatus"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.trial_status, value);
           },
@@ -219,17 +219,17 @@ export default {
         },
         {
           prop: "constructionCode",
-          label: this.$t("ui.data.column.skuConstruction.constructionCode"),
+          label: this.$t("ui.data.column.mdmSkuConstructionRef.constructionCode"),
           width: 180,
         },
         {
           prop: "embryoCode",
-          label: this.$t("ui.data.column.skuConstruction.embryoCode"),
+          label: this.$t("ui.data.column.mdmSkuConstructionRef.embryoCode"),
           width: 180,
         },
         {
           prop: "mainMaterialDesc",
-          label: this.$t("ui.data.rubberMaterial.embryoDesc"),
+          label: this.$t("ui.data.column.mdmSkuConstructionRef.mainMaterialDesc"),
           align: "left",
           minWidth: 350,
         },
@@ -259,12 +259,12 @@ export default {
         // },
         {
           prop: "embryoNo",
-          label: this.$t("ui.data.column.trialPlan.embryoNo"),
+          label: this.$t("ui.data.column.mdmSkuConstructionRef.embryoNo"),
           width: 180,
         },
         {
           prop: "embryoType",
-          label: this.$t("ui.data.column.trialPlan.embryoType"),
+          label: this.$t("ui.data.column.mdmSkuConstructionRef.embryoType"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.trial_status, value);
           },
@@ -277,12 +277,12 @@ export default {
         },
         {
           prop: "textNo",
-          label: this.$t("ui.data.column.trialPlan.textNo"),
+          label: this.$t("ui.data.column.mdmSkuConstructionRef.textNo"),
           width: 180,
         },
         {
           prop: "textType",
-          label: this.$t("ui.data.column.trialPlan.textType"),
+          label: this.$t("ui.data.column.mdmSkuConstructionRef.textType"),
           width: 180,
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.trial_status, value);
@@ -290,17 +290,17 @@ export default {
         },
         {
           prop: "textReleaseDate",
-          label: this.$t("ui.data.column.trialPlan.textReleaseDate"),
+          label: this.$t("ui.data.column.mdmSkuConstructionRef.textReleaseDate"),
           width: 180,
         },
         {
           prop: "lhNo",
-          label: this.$t("ui.data.column.trialPlan.lhNo"),
+          label: this.$t("ui.data.column.mdmSkuConstructionRef.lhNo"),
           width: 180,
         },
         {
           prop: "lhType",
-          label: this.$t("ui.data.column.trialPlan.lhType"),
+          label: this.$t("ui.data.column.mdmSkuConstructionRef.lhType"),
           width: 180,
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.trial_status, value);
@@ -308,7 +308,7 @@ export default {
         },
         {
           prop: "lhReleaseDate",
-          label: this.$t("ui.data.column.trialPlan.lhReleaseDate"),
+          label: this.$t("ui.data.column.mdmSkuConstructionRef.lhReleaseDate"),
           width: 180,
         },
       ];
@@ -318,7 +318,7 @@ export default {
     searchColumns() {
       return [
         {
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.mdmSkuConstructionRef.factoryCode"),
           prop: "factoryCode",
           type: "select",
           dictData: this.dict.type.biz_factory_name,
