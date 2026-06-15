@@ -116,6 +116,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
     private static final String NEW_SPEC_DRY_ICE_MOULD_CHANGE_ANALYSIS = "干冰清洗+换模";
     private static final String NEW_SPEC_CLEANING_ANALYSIS = "模具清洗+换模";
     private static final int NEW_SPEC_CHANGEOVER_PROBE_LIMIT = 16;
+    private static final int RELEASED_MACHINE_MORNING_TAIL_HOURS = 6;
     private static final Set<String> EMPTY_STRING_SET = Collections.emptySet();
     private static final Map<String, String> EMPTY_STRING_MAP = Collections.emptyMap();
     @Resource
@@ -379,6 +380,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         Iterator<SkuScheduleDTO> iterator = context.getNewSpecSkuList().iterator();
         while (iterator.hasNext()) {
             SkuScheduleDTO sku = iterator.next();
+            boolean currentSkuRemoved = false;
             // 续作、换活字块未消费完的 SKU 在此继续参与 S4.5，不因来源不同提前拦截。
             boolean isEnding = endingJudgmentStrategy.isEnding(context, sku);
             if (shouldSkipHistoryShortageOnlyPreviousScheduledSku(context, sku, isEnding)) {
@@ -542,6 +544,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                 switchReadyTime = resolveSpecifyReservedReadyTime(context, sku, machineCode, switchReadyTime);
                 switchReadyTime = ShiftProductionControlUtil.resolveEarliestSwitchStartTime(context, switchReadyTime);
                 switchReadyTime = alignNewSpecSwitchReadyTimeToWindowStart(context, shifts, switchReadyTime);
+                switchReadyTime = adjustReleasedMachineSwitchReadyTime(context, sku, candidateMachine, switchReadyTime);
 
                 // 4. 分配换模窗口；晚班不可换模、换模上限和维保重叠都在分配器中统一收口。
                 // 基础换模时间永远执行，换模均衡仅在开关开启时介入。
@@ -788,6 +791,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                 if (remainingQty <= 0 || !needMoreMachine(context, sku)) {
                     // 全部排完（总量满足 且 每日额度满足），移出待排队列
                     removeCurrentNewSpecSku(context, iterator, sku);
+                    currentSkuRemoved = true;
                     if (remainingQty <= 0) {
                         log.info("新增SKU多机台排产全部完成, materialCode: {}, 使用机台数: {}, 总排产量: {}",
                                 sku.getMaterialCode(), excludedMachineCodes.size() + 1, totalScheduledQty);
@@ -836,14 +840,14 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                 }
             } else {
                 // 即使部分成功（remainingQty > 0 但无更多候选机台），也记录
-                if (remainingQty > 0 && needMoreMachine(context, sku)) {
+                if (!currentSkuRemoved && remainingQty > 0 && needMoreMachine(context, sku)) {
                     log.warn("新增SKU多机台排产未全部完成, materialCode: {}, 已排: {}, 剩余: {}, 满班超排: {}, 候选机台已耗尽",
                             sku.getMaterialCode(), totalScheduledQty, remainingQty, sku.getShiftFillOverQty());
                     // 剩余未排量计入未排结果
                     addUnscheduledResult(context, sku, remainingQty,
                             "多机台产能不足，剩余" + remainingQty + "未排", unscheduledReasonCountMap);
                     removeCurrentNewSpecSku(context, iterator, sku);
-                } else if (remainingQty > 0) {
+                } else if (!currentSkuRemoved && remainingQty > 0) {
                     // 总量上仍有剩余（可能来自欠产传导），但日计划额度已满足，移出待排队列
                     log.info("新增SKU日计划额度已满足但总量仍有剩余, materialCode: {}, 已排: {}, 总量剩余: {}, 满班超排: {}",
                             sku.getMaterialCode(), totalScheduledQty, remainingQty, sku.getShiftFillOverQty());
@@ -3213,6 +3217,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         switchReadyTime = resolveSpecifyReservedReadyTime(context, sku, candidate.getMachineCode(), switchReadyTime);
         switchReadyTime = ShiftProductionControlUtil.resolveEarliestSwitchStartTime(context, switchReadyTime);
         switchReadyTime = alignNewSpecSwitchReadyTimeToWindowStart(context, shifts, switchReadyTime);
+        switchReadyTime = adjustReleasedMachineSwitchReadyTime(context, sku, candidate, switchReadyTime);
         int switchDurationHours = maintenanceOverlapSwitch
                 ? LhScheduleTimeUtil.getMaintenanceOverlapSwitchHours(context)
                 : LhScheduleTimeUtil.getMouldChangeTotalHours(context);
@@ -6218,6 +6223,72 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
             return context.getScheduleDate();
         }
         return null;
+    }
+
+    /**
+     * 调整续作释放机台的新增换模就绪时间。
+     * <p>收尾SKU首日降模释放出的机台，若承接同日有计划且单段换模的新SKU，需要保留早班尾量生产窗口。</p>
+     *
+     * @param context 排程上下文
+     * @param sku 新增SKU
+     * @param machine 候选机台
+     * @param switchReadyTime 原换模就绪时间
+     * @return 调整后的换模就绪时间
+     */
+    private Date adjustReleasedMachineSwitchReadyTime(LhScheduleContext context,
+                                                      SkuScheduleDTO sku,
+                                                      MachineScheduleDTO machine,
+                                                      Date switchReadyTime) {
+        if (context == null || sku == null || machine == null || switchReadyTime == null
+                || CollectionUtils.isEmpty(context.getReleasedContinuousMachineCodeSet())
+                || !context.getReleasedContinuousMachineCodeSet().contains(machine.getMachineCode())
+                || !hasPositivePlanOnSwitchReadyDate(sku, switchReadyTime)
+                || StringUtils.isEmpty(resolveSingleMouldChangeSegment(sku.getMouldChangeInfo()))) {
+            return switchReadyTime;
+        }
+        Date windowStartTime = resolveScheduleWindowStartTime(context, context.getScheduleWindowShifts());
+        if (windowStartTime == null || !switchReadyTime.equals(windowStartTime)) {
+            return switchReadyTime;
+        }
+        Date adjustedTime = LhScheduleTimeUtil.addHours(switchReadyTime, RELEASED_MACHINE_MORNING_TAIL_HOURS);
+        log.info("新增SKU释放机台保留早班尾量, materialCode: {}, machineCode: {}, beforeReadyTime: {}, afterReadyTime: {}",
+                sku.getMaterialCode(), machine.getMachineCode(),
+                LhScheduleTimeUtil.formatDateTime(switchReadyTime),
+                LhScheduleTimeUtil.formatDateTime(adjustedTime));
+        return adjustedTime;
+    }
+
+    /**
+     * 判断SKU在换模就绪业务日是否有正日计划。
+     *
+     * @param sku 新增SKU
+     * @param switchReadyTime 换模就绪时间
+     * @return true-存在正日计划
+     */
+    private boolean hasPositivePlanOnSwitchReadyDate(SkuScheduleDTO sku, Date switchReadyTime) {
+        if (sku == null || switchReadyTime == null || CollectionUtils.isEmpty(sku.getDailyPlanQuotaMap())) {
+            return false;
+        }
+        LocalDate productionDate = switchReadyTime.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+        SkuDailyPlanQuotaDTO quota = sku.getDailyPlanQuotaMap().get(productionDate);
+        return quota != null && quota.getDayPlanQty() > 0;
+    }
+
+    /**
+     * 解析单段换模信息。
+     *
+     * @param mouldChangeInfo 换模信息
+     * @return 单段换模值，多段或空值返回空
+     */
+    private String resolveSingleMouldChangeSegment(String mouldChangeInfo) {
+        if (StringUtils.isEmpty(mouldChangeInfo)) {
+            return null;
+        }
+        String[] segments = StringUtils.split(mouldChangeInfo, ",");
+        if (segments == null || segments.length != 1) {
+            return null;
+        }
+        return StringUtils.trimToNull(segments[0]);
     }
 
     private List<MachineCleaningWindowDTO> resolveMachineCleaningWindowList(LhScheduleContext context, String machineCode) {

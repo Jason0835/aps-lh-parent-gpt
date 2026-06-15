@@ -19,28 +19,28 @@ import java.util.List;
  * @author zlt
  * @date 2021-06-24
  */
-@FeignClient(contextId = "INcScheduleResultService", value = ServiceNameConstants.GATEWAY_SERVICE, path = "${api.path.dj:nc}")
+@FeignClient(contextId = "IDjScheduleResultService", value = ServiceNameConstants.GATEWAY_SERVICE, path = "${api.path.dj:nc}")
 public interface IDjScheduleResultService {
 
     /**
      * 查询垫胶排程结果列表
      */
     @PostMapping("/djScheduleResult/list")
-    TableDataInfo list(@RequestBody DjScheduleResult ncScheduleResult);
+    TableDataInfo list(@RequestBody DjScheduleResult djScheduleResult);
 
 
     /**
      * 新增垫胶排程结果
      */
     @PostMapping("/djScheduleResult")
-    AjaxResult add(@RequestBody DjScheduleResult ncScheduleResult);
+    AjaxResult add(@RequestBody DjScheduleResult djScheduleResult);
 
 
     /**
      * 修改垫胶排程结果
      */
     @PostMapping("/djScheduleResult/edit")
-    AjaxResult edit(@RequestBody DjScheduleResult ncScheduleResult);
+    AjaxResult edit(@RequestBody DjScheduleResult djScheduleResult);
 
     /**
      * 调量
@@ -73,7 +73,7 @@ public interface IDjScheduleResultService {
      * 获取排程结果
      */
     @PostMapping("/djScheduleResult/getList")
-    List<DjScheduleResult> getList(@RequestBody DjScheduleResult ncScheduleResult);
+    List<DjScheduleResult> getList(@RequestBody DjScheduleResult djScheduleResult);
 
     /**
      * 唯一性校验
@@ -85,23 +85,23 @@ public interface IDjScheduleResultService {
      * 导出列表
      */
     @PostMapping("/djScheduleResult/export")
-    byte[] export(@RequestBody DjScheduleResult ncScheduleResult);
+    byte[] export(@RequestBody DjScheduleResult djScheduleResult);
 
     /**
      * 自动排程
-     * @param ncScheduleResult
+     * @param djScheduleResult
      * @return
      */
     @PostMapping("/djScheduleResult/autoPlan")
-    AjaxResult autoPlan(@RequestBody DjScheduleResult ncScheduleResult);
+    AjaxResult autoPlan(@RequestBody DjScheduleResult djScheduleResult);
 
     /**
      * 自动排程
-     * @param ncScheduleResult
+     * @param djScheduleResult
      * @return
      */
     @PostMapping("/djScheduleResult/publish")
-    AjaxResult publish(@RequestBody DjScheduleResult ncScheduleResult);
+    AjaxResult publish(@RequestBody DjScheduleResult djScheduleResult);
 
     /**
      * 查询排程日期是否已发布

@@ -13,7 +13,7 @@ import javax.annotation.Resource;
 class ApsEngineNcApplicationTests {
 
     @Resource
-    private DjEngineService ncEngineService;
+    private DjEngineService djEngineService;
 
     @Test
     public void test() {
@@ -25,8 +25,8 @@ class ApsEngineNcApplicationTests {
      * 胎面自动排程测试
      */
     @Test
-    public void autoNcScheduleTest() {
-        ncEngineService.autoNcSchedule("2022-02-10");
+    public void autoDjScheduleTest() {
+        djEngineService.autoDjSchedule("2022-02-10");
     }
 
     /**
@@ -34,7 +34,7 @@ class ApsEngineNcApplicationTests {
      */
     @Test
     public void handEquilibriumAndProduceOrder() {
-        ncEngineService.handEquilibriumAndProduceOrder("2021-06-29");
+        djEngineService.handEquilibriumAndProduceOrder("2021-06-29");
     }
 
     /**
@@ -42,21 +42,21 @@ class ApsEngineNcApplicationTests {
      */
     @Test
     public void handglueMerge() {
-        ncEngineService.handGlueMerge("2022-02-10");
+        djEngineService.handGlueMerge("2022-02-10");
     }
 
     /**
      * 胎面插单测试
      */
     @Test
-    public void inserNcOrderTest() throws Exception {
+    public void inserDjOrderTest() throws Exception {
         DjScheduleResultVo scheduleVo = new DjScheduleResultVo();
         scheduleVo.setScheduleDate(DateUtils.parseDate("2021-06-29","yyyy-MM-dd"));
-        scheduleVo.setLiningCode("HN0557");
-        scheduleVo.setNightPlanQty(200D);
-        scheduleVo.setDayPlanQty(300D);
-        scheduleVo.setMachineId("64");
-        scheduleVo.setNightProduceOrder(33);
-        ncEngineService.inertNcOrder(scheduleVo);
+//        scheduleVo.setLiningCode("HN0557");
+//        scheduleVo.setNightPlanQty(200D);
+//        scheduleVo.setDayPlanQty(300D);
+//        scheduleVo.setMachineId("64");
+//        scheduleVo.setNightProduceOrder(33);
+        djEngineService.insertDjOrder(scheduleVo);
     }
 }

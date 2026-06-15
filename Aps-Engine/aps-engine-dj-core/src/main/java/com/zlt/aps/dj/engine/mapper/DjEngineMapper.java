@@ -1,16 +1,16 @@
 package com.zlt.aps.dj.engine.mapper;
 
 
+import java.util.Date;
+import java.util.List;
+import java.util.Map;
+
+import org.apache.ibatis.annotations.Param;
+
 import com.zlt.aps.common.engine.domain.EngineConstructionInfo;
 import com.zlt.aps.dj.engine.vo.DjParamsVo;
 import com.zlt.aps.dj.engine.vo.DjScheduleBaseInfoVo;
 import com.zlt.aps.dj.engine.vo.DjScheduleResultVo;
-
-import org.apache.ibatis.annotations.Param;
-
-import java.util.Date;
-import java.util.List;
-import java.util.Map;
 
 public interface DjEngineMapper {
 
@@ -20,7 +20,7 @@ public interface DjEngineMapper {
      * @param productionStage 仅投产阶段规格排产标识
      * @return
      */
-    List<DjScheduleResultVo> statNcScheduleBase(@Param("scheduleDate") String scheduleDate, @Param("productionStage") String productionStage);
+    List<DjScheduleResultVo> statDjScheduleBase(@Param("scheduleDate") String scheduleDate, @Param("productionStage") String productionStage);
 
     /**
      * 创建自动排程记录
@@ -32,19 +32,19 @@ public interface DjEngineMapper {
      * 删除指定日期的排程数据
      * @param scheduleDate
      */
-    void deleteNcSchedule(@Param("scheduleDate") String scheduleDate);
+    void deleteDjSchedule(@Param("scheduleDate") String scheduleDate);
 
     /**
      * 删除指定日期的外协排程数据
      * @param scheduleDate
      */
-    void deleteNcAssistSchedule(@Param("scheduleDate") String scheduleDate);
+    void deleteDjAssistSchedule(@Param("scheduleDate") String scheduleDate);
 
     /**
      * 把排程数据同步到log表
      * @param scheduleDate
      */
-    void syncNcScheduleToLog(@Param("scheduleDate") String scheduleDate);
+    void syncDjScheduleToLog(@Param("scheduleDate") String scheduleDate);
 
     /**
      * 批量新增排程结果数据
@@ -69,28 +69,28 @@ public interface DjEngineMapper {
      * @param scheduleDate 排程日期 yyyy-MM-dd
      * @return
      */
-    String getNcCurrentBatchNo(@Param("scheduleDate") String scheduleDate);
+    String getDjCurrentBatchNo(@Param("scheduleDate") String scheduleDate);
 
     /**
      * 根据排程code查询出关联施工表的其他信息
      * @param liningCodes 垫胶code列表
      * @return
      */
-    List<DjScheduleBaseInfoVo> listNcScheduleBaseInfo(@Param("liningCodes") List<String> liningCodes, @Param("productionStage") String productionStage);
+    List<DjScheduleBaseInfoVo> listDjScheduleBaseInfo(@Param("liningCodes") List<String> liningCodes, @Param("productionStage") String productionStage);
 
 //    /**
 //     * 新增单挑垫胶排程记录
 //     * @param scheduleResultVo
 //     * @return
 //     */
-//    int insertNcScheduleResult(NcScheduleResultVo scheduleResultVo);
+//    int insertDjScheduleResult(NcScheduleResultVo scheduleResultVo);
 
     /**
      * 批量合并排程结果表（根据唯一字段，做更新或新增）
      * @param scheduleResultList
      * @return
      */
-    int mergeNcScheduleResult(@Param("scheduleResultList") List<DjScheduleResultVo> scheduleResultList);
+    int mergeDjScheduleResult(@Param("scheduleResultList") List<DjScheduleResultVo> scheduleResultList);
 
     /**
      * 查询出垫胶需要的施工信息字段
@@ -98,14 +98,14 @@ public interface DjEngineMapper {
      * @param productionStage 仅投产阶段规格排产标识
      * @return
      */
-    List<EngineConstructionInfo> listNcNeedConstruction(@Param("scheduleDate") String scheduleDate, @Param("productionStage") String productionStage);
+    List<EngineConstructionInfo> listDjNeedConstruction(@Param("scheduleDate") String scheduleDate, @Param("productionStage") String productionStage);
 
     /**
      * 查询指定日期的排程数据
      * @param scheduleDate 排程日期
      * @return
      */
-    List<DjScheduleResultVo> listNcEnginSchedule(@Param("scheduleDate") String scheduleDate);
+    List<DjScheduleResultVo> listDjEnginSchedule(@Param("scheduleDate") String scheduleDate);
 
     /**
      * 批量更新各班的生产顺序

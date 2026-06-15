@@ -89,6 +89,15 @@ public enum HalfComponentFinishTableEnum {
             "BIG_ROLL_CODE", null,
             "DAY_FINISH_QTY", "NIGHT_FINISH_QTY",
             9),
+
+    /**
+     * 纤维压延完成量表名
+     */
+    DJ("T_DJ_DAY_FINISH_QTY",
+            "T_DJ_DAY_FINISH_TOTAL",
+            "PADDING_CODE", null,
+            "DAY_FINISH_QTY", "NIGHT_FINISH_QTY",
+            9),
     ;
 
     /**

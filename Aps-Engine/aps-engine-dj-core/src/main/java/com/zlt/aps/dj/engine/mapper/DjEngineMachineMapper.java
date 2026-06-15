@@ -15,12 +15,12 @@ public interface DjEngineMachineMapper {
      * @param jobType 作业类型，0-限制作业，1-不可作业
      * @return
      */
-    List<DjSpecifyMachineVo> listNcSpecifyMachine(@Param("jobType") String jobType);
+    List<DjSpecifyMachineVo> listDjSpecifyMachine(@Param("jobType") String jobType);
 
     /**
      * 查询垫胶机台信息
      *
      * @return 结果
      */
-    List<DjMachineInfo> listNcMachine();
+    List<DjMachineInfo> listDjMachine();
 }

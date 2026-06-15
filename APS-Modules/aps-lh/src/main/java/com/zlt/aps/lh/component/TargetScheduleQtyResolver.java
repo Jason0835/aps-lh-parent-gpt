@@ -5,6 +5,7 @@ import com.zlt.aps.lh.api.constant.LhScheduleParamConstant;
 import com.zlt.aps.lh.api.domain.dto.MachineCleaningWindowDTO;
 import com.zlt.aps.lh.api.domain.dto.MachineScheduleDTO;
 import com.zlt.aps.lh.api.domain.dto.ShiftProductionControlDTO;
+import com.zlt.aps.lh.api.domain.dto.SkuDailyPlanQuotaDTO;
 import com.zlt.aps.lh.api.domain.dto.SkuScheduleDTO;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
@@ -19,6 +20,7 @@ import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.lh.util.MachineCleaningOverlapUtil;
 import com.zlt.aps.lh.util.ShiftCapacityResolverUtil;
 import com.zlt.aps.lh.util.ShiftProductionControlUtil;
+import com.zlt.aps.lh.util.SkuDailyPlanQuotaUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
@@ -773,30 +775,80 @@ public class TargetScheduleQtyResolver {
             endingBaseQty = surplusQty;
             qtySource = "共用胎胚-仅按硫化余量";
             if (surplusQty <= 0) {
-                unscheduledReason = "共用胎胚收尾仅按硫化余量，余量小于等于0";
+                unscheduledReason = "共用胎胚且硫化余量为0";
             }
         } else {
             endingBaseQty = Math.max(embryoStock, surplusQty);
             qtySource = embryoStock > surplusQty ? "单胎胚-取胎胚库存" : "单胎胚-取硫化余量";
         }
-        int endingTargetQty = endingBaseQty;
+        int endingTargetQty = ShiftCapacityResolverUtil.roundUpQtyToMouldMultiple(endingBaseQty, sku.getMouldQty());
         String direction = endingTargetQty > currentTargetQty ? "上调"
                 : endingTargetQty < currentTargetQty ? "下调" : "保持";
         int windowRemainingPlanQty = Math.max(0, sku.getWindowRemainingPlanQty());
         log.info("收尾SKU目标量{}, materialCode: {}, 胎胚编码: {}, 原始共用SKU数: {}, "
                         + "有效共用SKU数: {}, 是否动态共用胎胚: {}, 目标量取值来源: {}, "
-                        + "原目标量: {}, 调整后: {}, 窗口日计划总量: {}, 窗口日计划剩余: {}, "
+                        + "原目标量: {}, 基础目标量: {}, 模台数: {}, 调整后: {}, 窗口日计划总量: {}, 窗口日计划剩余: {}, "
                         + "胎胚库存: {}, 月计划余量: {}, 未排原因: {}",
                 direction, sku.getMaterialCode(), sku.getEmbryoCode(), originalSkuCount,
                 activeSkuCount, sharedEmbryo, qtySource,
-                currentTargetQty, endingTargetQty,
+                currentTargetQty, endingBaseQty, sku.getMouldQty(), endingTargetQty,
                 windowPlanQty, windowRemainingPlanQty, embryoStock, surplusQty, unscheduledReason);
         sku.setTargetScheduleQty(endingTargetQty);
         sku.setRemainingScheduleQty(endingTargetQty);
+        syncEndingDailyQuotaToTargetQty(sku, endingTargetQty, windowRemainingPlanQty);
         if (endingTargetQty <= 0) {
             removeActiveEmbryoSku(context, sku, unscheduledReason);
         }
         return endingTargetQty;
+    }
+
+    /**
+     * 将收尾目标量同步到运行态日计划账本。
+     * <p>收尾 SKU 的业务目标不受窗口 dayN 限制；若只上调 targetScheduleQty，
+     * 后续新增排产或换活字块按账本消费时仍会被原 dayN 剩余额度回裁。</p>
+     *
+     * @param sku 当前收尾 SKU
+     * @param endingTargetQty 收尾目标量
+     * @param originalWindowRemainingQty 原窗口剩余额度
+     */
+    private void syncEndingDailyQuotaToTargetQty(SkuScheduleDTO sku,
+                                                 int endingTargetQty,
+                                                 int originalWindowRemainingQty) {
+        if (Objects.isNull(sku) || endingTargetQty <= 0) {
+            return;
+        }
+        sku.setWindowPlanQty(Math.max(Math.max(0, sku.getWindowPlanQty()), endingTargetQty));
+        sku.setWindowRemainingPlanQty(Math.max(Math.max(0, sku.getWindowRemainingPlanQty()), endingTargetQty));
+        Map<LocalDate, SkuDailyPlanQuotaDTO> quotaMap = sku.getDailyPlanQuotaMap();
+        if (CollectionUtils.isEmpty(quotaMap)) {
+            return;
+        }
+        int currentRemainingQty = SkuDailyPlanQuotaUtil.sumRemainingQty(quotaMap);
+        int appendQty = endingTargetQty - currentRemainingQty;
+        if (appendQty <= 0) {
+            return;
+        }
+        Map.Entry<LocalDate, SkuDailyPlanQuotaDTO> firstEntry = null;
+        for (Map.Entry<LocalDate, SkuDailyPlanQuotaDTO> entry : quotaMap.entrySet()) {
+            if (Objects.nonNull(entry) && Objects.nonNull(entry.getValue())) {
+                firstEntry = entry;
+                break;
+            }
+        }
+        if (Objects.isNull(firstEntry)) {
+            return;
+        }
+        SkuDailyPlanQuotaDTO quota = firstEntry.getValue();
+        quota.setProductionDate(firstEntry.getKey());
+        // 收尾清量允许突破原 dayN，把差额补入首日运行态账本，后续统一由账本消费链路扣减。
+        quota.setDayPlanQty(Math.max(0, quota.getDayPlanQty()) + appendQty);
+        quota.setRemainingQty(Math.max(0, quota.getRemainingQty()) + appendQty);
+        quota.setCompleted(false);
+        SkuDailyPlanQuotaUtil.refreshRollingFields(quotaMap);
+        log.info("收尾SKU日计划账本同步, materialCode: {}, targetQty: {}, 原窗口剩余: {}, "
+                        + "原账本剩余: {}, 补齐量: {}, 同步日期: {}",
+                sku.getMaterialCode(), endingTargetQty, originalWindowRemainingQty,
+                currentRemainingQty, appendQty, firstEntry.getKey());
     }
 
     /**

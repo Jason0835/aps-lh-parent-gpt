@@ -11,20 +11,20 @@ public interface DjEngineService {
      * 垫胶胶自动排程
      * @param scheduleDate 排程日期，格式：yyyy-MM-dd
      */
-    void autoNcSchedule(String scheduleDate);
+    void autoDjSchedule(String scheduleDate);
 
     /**
      * 垫胶插单
      * @param scheduleVo
      */
-    int inertNcOrder(DjScheduleResultVo scheduleVo);
+    int insertDjOrder(DjScheduleResultVo scheduleVo);
 
     /**
      * 批量更新或新增排程记录信息
      * @param scheduleDate 排程日志，格式：yyyy-MM-dd
      * @param scheduleList 排程数据
      */
-    int batchSaveNcSchedule(String scheduleDate, List<DjScheduleResultVo> scheduleList);
+    int batchSaveDjSchedule(String scheduleDate, List<DjScheduleResultVo> scheduleList);
 
 //    /**
 //     * 转机台后，修改排程结果表相应字段数据
@@ -37,7 +37,7 @@ public interface DjEngineService {
      * 确认自动排程机台
      * @param scheduleResult  排程信息
      */
-    void confirmNcMachine(DjScheduleResult scheduleResult);
+    void confirmDjMachine(DjScheduleResult scheduleResult);
 
     /**
      * 手动均衡和重新设置生产顺序

@@ -5,62 +5,62 @@ import java.util.List;
 
 import org.springframework.transaction.annotation.Transactional;
 
+import com.baomidou.mybatisplus.extension.service.IService;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.dj.api.domain.entity.DjDayFinishQty;
 import com.zlt.aps.dj.api.domain.entity.DjScheduleResult;
-import com.zlt.bill.common.service.IBillService;
 
 /**
  * 垫胶胶排程结果Service接口
  *
  * @author zlt
- * @date 2021-06-24
+ * @date 2026-06-13
  */
-public interface DjScheduleResultService extends IBillService<DjScheduleResult> {
+public interface DjScheduleResultService extends IService<DjScheduleResult> {
     /**
      * 查询垫胶排程结果
      *
      * @param id 垫胶排程结果ID
      * @return 垫胶排程结果
      */
-    public DjScheduleResult selectNcScheduleResultById(Long id);
+    public DjScheduleResult selectDjScheduleResultById(Long id);
 
     /**
      * 查询垫胶排程结果列表
      *
-     * @param tcScheduleResult 垫胶排程结果
+     * @param djScheduleResult 垫胶排程结果
      * @return 垫胶排程结果集合
      */
-    public List<DjScheduleResult> selectNcScheduleResultList(DjScheduleResult tcScheduleResult);
+    public List<DjScheduleResult> selectDjScheduleResultList(DjScheduleResult djScheduleResult);
 
     /**
      * 新增垫胶排程结果
      *
-     * @param tcScheduleResult 垫胶排程结果
+     * @param djScheduleResult 垫胶排程结果
      * @return 结果
      */
-    public int insertNcScheduleResult(DjScheduleResult tcScheduleResult);
+    public int insertDjScheduleResult(DjScheduleResult djScheduleResult);
 
     /**
      * 修改垫胶排程结果
      *
-     * @param tcScheduleResult 垫胶排程结果
+     * @param djScheduleResult 垫胶排程结果
      * @return 结果
      */
-    public int updateNcScheduleResult(DjScheduleResult tcScheduleResult);
+    public int updateDjScheduleResult(DjScheduleResult djScheduleResult);
 
     /**
      * 判断是否是“调度员”，如果调度员，则需要需要记录操作日志
      * @param operType 操作类型：0--转机台、1--调量
      * @param newSchedule
      */
-    void insetDispatcherLog(String operType, DjScheduleResult newSchedule);
+    void insertDispatcherLog(String operType, DjScheduleResult newSchedule);
 
     /**
      * 判断是否是“调度员”，如果调度员，则需要需要记录操作日志
      * @param operType 操作类型：0--转机台、1--调量、2--插单
      */
-    void insetDispatcherLogInsertOrder(String operType, List<DjScheduleResult> scheduleResults, DjScheduleResult newSchedule);
+    void insertDispatcherLogInsertOrder(String operType, List<DjScheduleResult> scheduleResults, DjScheduleResult newSchedule);
 
     /**
      * 根据排程日期和代码查询排程结果
@@ -75,7 +75,7 @@ public interface DjScheduleResultService extends IBillService<DjScheduleResult> 
      * @param ids 需要删除的垫胶排程结果ID
      * @return 结果
      */
-    public int deleteNcScheduleResultByIds(Long[] ids);
+    public int deleteDjScheduleResultByIds(Long[] ids);
 
     /**
      * 删除垫胶排程结果信息
@@ -83,7 +83,7 @@ public interface DjScheduleResultService extends IBillService<DjScheduleResult> 
      * @param id 垫胶排程结果ID
      * @return 结果
      */
-    public int deleteNcScheduleResultById(Long id);
+    public int deleteDjScheduleResultById(Long id);
 
     /**
      * 批量更新发布状态
@@ -154,7 +154,7 @@ public interface DjScheduleResultService extends IBillService<DjScheduleResult> 
     @Transactional(rollbackFor = Exception.class)
     public int combinationMiddleAndNight(Long[] ids, String classifiedShift);
 
-    int checkNcCodeExist(DjScheduleResult ncScheduleResult);
+    int checkDjCodeExist(DjScheduleResult djScheduleResult);
 
     int isPublishByIds(Long[] ids);
 

@@ -22,7 +22,7 @@ import java.util.Map;
 public class DjEngineLossServiceImpl implements DjEngineLossService {
 
     @Resource
-    private DjEngineLossMapper ncEngineLossMapper;
+    private DjEngineLossMapper djEngineLossMapper;
 
     /**
      * 把损耗率list转成map
@@ -31,7 +31,7 @@ public class DjEngineLossServiceImpl implements DjEngineLossService {
      */
     public Map<String, Double> getLossRateMap() {
         Map<String, Double> lossMap = new HashMap<>();
-        List<DjLossVo> list = ncEngineLossMapper.listLossRate();
+        List<DjLossVo> list = djEngineLossMapper.listLossRate();
         for (DjLossVo lossVo : list) {
             lossMap.put(lossVo.getLossKey(), lossVo.getLossRate());
         }

@@ -1,5 +1,28 @@
 package com.zlt.aps.dj.engine.service.impl;
 
+import static com.alibaba.fastjson.JSON.toJSONString;
+import static com.zlt.aps.common.core.utils.ApsCommonUtil.getDouble;
+import static com.zlt.aps.common.core.utils.ApsCommonUtil.logSplit;
+import static com.zlt.aps.common.core.utils.ApsCommonUtil.stripZeros;
+
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Collectors;
+
+import javax.annotation.Resource;
+
+import org.apache.commons.collections.CollectionUtils;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.utils.SecurityUtils;
 import com.ruoyi.common.core.utils.bean.BeanUtils;
@@ -20,41 +43,41 @@ import com.zlt.aps.dj.api.domain.entity.DjMachineInfo;
 import com.zlt.aps.dj.api.domain.entity.DjScheduleResult;
 import com.zlt.aps.dj.engine.mapper.DjEngineMapper;
 import com.zlt.aps.dj.engine.mapper.DjEngineStockMapper;
-import com.zlt.aps.dj.engine.service.*;
-import com.zlt.aps.dj.engine.vo.*;
+import com.zlt.aps.dj.engine.service.DjEngineCurlRollService;
+import com.zlt.aps.dj.engine.service.DjEngineGlueService;
+import com.zlt.aps.dj.engine.service.DjEngineLossService;
+import com.zlt.aps.dj.engine.service.DjEngineMachineService;
+import com.zlt.aps.dj.engine.service.DjEngineMonthSurplusService;
+import com.zlt.aps.dj.engine.service.DjEngineService;
+import com.zlt.aps.dj.engine.service.DjEngineStockService;
+import com.zlt.aps.dj.engine.vo.DjMonthSurplusVo;
+import com.zlt.aps.dj.engine.vo.DjParamsVo;
+import com.zlt.aps.dj.engine.vo.DjScheduleBaseInfoVo;
+import com.zlt.aps.dj.engine.vo.DjScheduleResultVo;
+import com.zlt.aps.dj.engine.vo.DjStockConsumeVo;
+import com.zlt.aps.dj.engine.vo.DjStockVo;
+import com.zlt.aps.dj.engine.vo.DjTotalPlanQtyVo;
 
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.collections.CollectionUtils;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import javax.annotation.Resource;
-import java.math.BigDecimal;
-import java.math.RoundingMode;
-import java.util.*;
-import java.util.stream.Collectors;
-
-import static com.alibaba.fastjson.JSON.toJSONString;
-import static com.zlt.aps.common.core.utils.ApsCommonUtil.*;
 
 @Slf4j
 @Service
 public class DjEngineServiceImpl implements DjEngineService {
 
     @Resource
-    private DjEngineMapper ncEngineMapper;
+    private DjEngineMapper djEngineMapper;
     @Resource
-    private DjEngineGlueService ncEngineGlueService;
+    private DjEngineGlueService djEngineGlueService;
     @Resource
-    private DjEngineStockService ncEngineStockService;
+    private DjEngineStockService djEngineStockService;
     @Resource
-    private DjEngineMachineService ncEngineMachineService;
+    private DjEngineMachineService djEngineMachineService;
     @Resource
     private IncrementService incrementService;
     @Resource
-    private DjEngineLossService ncEngineLossService;
+    private DjEngineLossService djEngineLossService;
     @Resource
-    private DjEngineMonthSurplusService ncEngineMonthSurplusService;
+    private DjEngineMonthSurplusService djEngineMonthSurplusService;
     @Resource
     private CxEngineQuotaCommonService cxEngineQuotaCommonService;
     @Resource
@@ -62,9 +85,9 @@ public class DjEngineServiceImpl implements DjEngineService {
     @Resource
     private AutoScheduleLogService autoScheduleLogService;
     @Resource
-    private DjEngineCurlRollService ncEngineCurlRollService;
+    private DjEngineCurlRollService djEngineCurlRollService;
     @Resource
-    private DjEngineStockMapper ncEngineStockMapper;
+    private DjEngineStockMapper djEngineStockMapper;
     private String division = "\r\n---------------------------------------------------\r\n";  //日志分割符
 
     /**
@@ -95,7 +118,7 @@ public class DjEngineServiceImpl implements DjEngineService {
      * @param scheduleDate 排程日期，格式：yyyy-MM-dd
      */
     @Transactional(rollbackFor=Exception.class)
-    public void autoNcSchedule(String scheduleDate) {
+    public void autoDjSchedule(String scheduleDate) {
         String userName = SecurityUtils.getUsername();  //用户名称
         String cxBatchNo = "";  //成型批次号
         String batchNo = this.createBatchNo(scheduleDate);  //垫胶排程批次号
@@ -116,73 +139,72 @@ public class DjEngineServiceImpl implements DjEngineService {
         double mergeThreshold = getDouble(paramsMap.get(EngineConstants.MERGE_PLAN_THRESHOLD));
         BigDecimal productStockHour = new BigDecimal(paramsMap.getOrDefault(EngineConstants.PRODUCT_STOCK_HOUR, DEFAULT_PRODUCT_STOCK_HOUR));
         double productStockDay = productStockHour.divide(HOUR24, 2, RoundingMode.HALF_UP).doubleValue();
-        List<DjScheduleResultVo> scheduleList = ncEngineMapper.statNcScheduleBase(scheduleDate, productionStage);  //根据成型排程记录 统计出 垫胶胶排程记录基础数据
+        List<DjScheduleResultVo> scheduleList = djEngineMapper.statDjScheduleBase(scheduleDate, productionStage);  //根据成型排程记录 统计出 垫胶胶排程记录基础数据
         if (scheduleList == null || scheduleList.isEmpty()) {
             log.info("根据成型排程记录 统计出 垫胶胶排程记录基础数据 为空");
             autoScheduleLogService.insertNcScheduleLog(batchNo, "", "自动排程失败", "自动排程失败，原因：成型排程数据为空，或没有在施工信息中找到对应的物料"); //添加日志
             throw new RuntimeException(I18nUtil.getMessage("engine.auto.scheule.tip1"));
         }
         //过滤掉成型4个班的计划量都为0的数据
-        scheduleList = scheduleList.stream().filter(s -> (s.getCxClass2Plan()+s.getCxClass3Plan()+s.getCxClass4Plan()+s.getCxClass5Plan())>0).collect(Collectors.toList());
+        scheduleList = scheduleList.stream().filter(s -> BigDecimalUtils.add(s.getCxClass2Plan(), s.getCxClass3Plan(), s.getCxClass4Plan()).compareTo(BigDecimal.ZERO) > 0).collect(Collectors.toList());
         autoScheduleLogService.insertNcScheduleLog(batchNo, "", "根据成'型排程记录'统计出垫胶胶排程记录基础数据",  toJSONString(scheduleList));
         this.ValidatedConstruction(scheduleDate, batchNo, productionStage, mapAssistSpec);   //证成型排程记录的胎胚code在施工表中是否都能找到对应记录，如果不能则提示
-        Map<String, String> glueSeqMap = ncEngineGlueService.getGlueSeqMap();  //获取胶料序号map
-        Map<String, String> specifyCanMachineMap = ncEngineMachineService.getSpecifyMachineMap(EngineConstants.JOB_TYPE_CAN); //获得垫胶代码和定点机台的map
-        Map<String, String> specifyNotMachineMap = ncEngineMachineService.getSpecifyMachineMap(EngineConstants.JOB_TYPE_NOT); //获得垫胶代码和定点机台的不可作业map
+        Map<String, String> glueSeqMap = djEngineGlueService.getGlueSeqMap();  //获取胶料序号map
+        Map<String, String> specifyCanMachineMap = djEngineMachineService.getSpecifyMachineMap(EngineConstants.JOB_TYPE_CAN); //获得垫胶代码和定点机台的map
+        Map<String, String> specifyNotMachineMap = djEngineMachineService.getSpecifyMachineMap(EngineConstants.JOB_TYPE_NOT); //获得垫胶代码和定点机台的不可作业map
 
-        Map<String, Double> planStockMap = ncEngineStockService.getPlanStockMap(batchNo, scheduleDate, getDouble(paramsMap.get(EngineConstants.STOCK_LOSS_RATE)));  //计算垫胶16点预计库存
-        Map<String, Double> stockMap = this.loadNcStock(scheduleDate); // 加载库存
+        Map<String, Double> planStockMap = djEngineStockService.getPlanStockMap(batchNo, scheduleDate, getDouble(paramsMap.get(EngineConstants.STOCK_LOSS_RATE)));  //计算垫胶16点预计库存
+        Map<String, Double> stockMap = this.loadDjStock(scheduleDate); // 加载库存
         Map<String, Double> lastDayMidPlanMap = this.loadLastDayMidPlan(scheduleDate); // 加载昨日早班计划
-        Map<String, Double> lossRateMap = ncEngineLossService.getLossRateMap();   //损耗率map
-        Map<String, DjMonthSurplusVo> monthSurplus = ncEngineMonthSurplusService.getMonthSurplus(scheduleDate);  //获得月度计划剩余量、完成量
-        Map<String, BigDecimal> ncCurlLengthMap = ncEngineCurlRollService.getNcCurlLengthMap(); // 胎侧卷曲设置
+        Map<String, Double> lossRateMap = djEngineLossService.getLossRateMap();   //损耗率map
+        Map<String, DjMonthSurplusVo> monthSurplus = djEngineMonthSurplusService.getMonthSurplus(scheduleDate);  //获得月度计划剩余量、完成量
+        Map<String, BigDecimal> djCurlLengthMap = djEngineCurlRollService.getDjCurlLengthMap(); // 胎侧卷曲设置
         this.baseDataLog(batchNo, glueSeqMap, specifyCanMachineMap, planStockMap, lossRateMap, monthSurplus, paramsMap); //把基础数据假如到日志中
         Map<String, DjTotalPlanQtyVo> totalPlanQtyMap = new HashMap<>();  //每个生产线的计划量汇总MAP
-        List<DjMachineInfo> allMachineList = ncEngineMachineService.listNcMachine();
+        List<DjMachineInfo> allMachineList = djEngineMachineService.listDjMachine();
         DjTotalPlanQtyVo totalPlanQtyVo = new DjTotalPlanQtyVo();  //胎面中班和夜班总计划量Vo
         for (DjScheduleResultVo scheduleVo : scheduleList) {
-            cxBatchNo = scheduleVo.getCxBatchNo();
-            scheduleVo.setBatchNo(batchNo);    //批次号
-            String orderNo = this.createOrderNo(batchNo);   //创建工单号
-            scheduleVo.setOrderNo(orderNo);
-            BigDecimal curlLength = ncCurlLengthMap.getOrDefault(scheduleVo.getLiningCode(), standardCurlLength); // 卷曲长度
-            if (curlLength.equals(BigDecimal.ZERO)) {
-                curlLength = standardCurlLength;
-            }
-            BigDecimal toolCapacity = curlLength.multiply(toolRollNum); // 一个工装包含的卷数
-            scheduleVo.getParams().put(EngineConstants.STANDARD_CRIMP_LENGTH, curlLength); // 一卷的长度
-            scheduleVo.getParams().put(EngineConstants.TOOL_CAPACITY, toolCapacity); // 一个工装的长度
-            scheduleVo.getParams().put(EngineConstants.LARGE_DEMAND_REDUCE, largeDemandReduce); // 大需求量不生产工装数
-            scheduleVo.getParams().put(EngineConstants.DELAY_PLAN_QTY, delayPlanQty); // 低于参数的计划量可以推迟到下个班做
-
-            scheduleVo.setGlueSeq(glueSeqMap.get(scheduleVo.getGlueCode()));  //胶料序号
-            autoScheduleLogService.insertNcScheduleLog(batchNo, orderNo, "根据'胶料顺序集合'设置胶料序号",
-                    logSplit("胶料顺序集合：" + toJSONString(glueSeqMap), "数据结果：" + toJSONString(scheduleVo))); //添加日志
-
-//            this.chooseMachine(scheduleVo, specifyCanMachineMap);  //选择生产线
-//            scheduleVo.setPlanStockQty(planStockMap.getOrDefault(scheduleVo.getLiningCode(), 0D));  //16点预计库存
-            scheduleVo.setStockQty(stockMap.getOrDefault(scheduleVo.getLiningCode(), 0D));  // 库存
-            scheduleVo.setSurplusQty(Optional.ofNullable(monthSurplus.get(scheduleVo.getLiningCode())).map(DjMonthSurplusVo::getMonthRemainQty).orElse(0D)); // 剩余量
-            scheduleVo.setLastMidPlanQty(lastDayMidPlanMap.getOrDefault(scheduleVo.getLiningCode(), 0D)); // 上一天早班库存
-            scheduleVo.setPlanStockQty(BigDecimalUtils.qtySub(BigDecimalUtil.add(scheduleVo.getStockQty(), scheduleVo.getLastMidPlanQty()), scheduleVo.getCxClass1Plan())); // 计算19点预计库存
-            autoScheduleLogService.insertNcScheduleLog(batchNo, orderNo, "根据'16点预计库存集合'设置库存",
-                    logSplit("16点预计库存集合：" + toJSONString(planStockMap), "数据结果：" + toJSONString(scheduleVo))); //添加日志
-
-            this.newComputeSupplyTime(scheduleVo, scheduleVo.getPlanStockQty());  //库存供应时长
-            this.computeNcPlanQty(scheduleVo, totalPlanQtyVo, lossRateMap, paramLossRate, mergeThreshold, toolCapacity, productStockDay, largeDemand, bisectThreshold);  //计算垫胶中班和夜班计划量
-//            this.computeNcCurlRoll(scheduleVo, ncCurlLengthMap, standardCurlLength, closeOutSpecList, curlDecimalRounding, totalPlanQtyMap); // 计算卷曲数
-            this.setStatusAndCloseTip(scheduleVo, monthSurplus.get(scheduleVo.getLiningCode()), getDouble(paramsMap.get(EngineConstants.CLOSE_OUT_NUM)));  //设置收尾提示标识 和 生产状态字段
-
-            if(BigDecimalUtil.add(scheduleVo.getCxClass1Plan(), scheduleVo.getCxClass2Plan(), scheduleVo.getCxClass3Plan(), scheduleVo.getCxClass4Plan()) == 0D) {
-                //判断成型前4个班是否有计划量，若无计划，判断为新投产规格，半部件计划计划量放在“预计划”栏位中，中班和夜班计划都显示为0；若有计划，半部件计划正常排产
-                scheduleVo.setPrePlanQty(BigDecimalUtil.add(scheduleVo.getDayPlanQty(), scheduleVo.getNightPlanQty()));
-                scheduleVo.setDayPlanQty(0D);
-                scheduleVo.setNightPlanQty(0D);
-            }
-            scheduleVo.setIsRelease(ApsConstant.NO_RELEASE);
-            scheduleVo.setDelFlag(ApsConstant.DEL_FLAG_NORMAL);
-            scheduleVo.setCreateTime(new Date());
-            scheduleVo.setCreateBy(userName);
+//            scheduleVo.setBatchNo(batchNo);    //批次号
+//            String orderNo = this.createOrderNo(batchNo);   //创建工单号
+//            scheduleVo.setOrderNo(orderNo);
+//            BigDecimal curlLength = djCurlLengthMap.getOrDefault(scheduleVo.getPaddingCode(), standardCurlLength); // 卷曲长度
+//            if (curlLength.equals(BigDecimal.ZERO)) {
+//                curlLength = standardCurlLength;
+//            }
+//            BigDecimal toolCapacity = curlLength.multiply(toolRollNum); // 一个工装包含的卷数
+//            scheduleVo.getParams().put(EngineConstants.STANDARD_CRIMP_LENGTH, curlLength); // 一卷的长度
+//            scheduleVo.getParams().put(EngineConstants.TOOL_CAPACITY, toolCapacity); // 一个工装的长度
+//            scheduleVo.getParams().put(EngineConstants.LARGE_DEMAND_REDUCE, largeDemandReduce); // 大需求量不生产工装数
+//            scheduleVo.getParams().put(EngineConstants.DELAY_PLAN_QTY, delayPlanQty); // 低于参数的计划量可以推迟到下个班做
+//
+////            scheduleVo.setGlueSeq(glueSeqMap.get(scheduleVo.getGlueCode()));  //胶料序号
+//            autoScheduleLogService.insertNcScheduleLog(batchNo, orderNo, "根据'胶料顺序集合'设置胶料序号",
+//                    logSplit("胶料顺序集合：" + toJSONString(glueSeqMap), "数据结果：" + toJSONString(scheduleVo))); //添加日志
+//
+////            this.chooseMachine(scheduleVo, specifyCanMachineMap);  //选择生产线
+////            scheduleVo.setPlanStockQty(planStockMap.getOrDefault(scheduleVo.getPaddingCode(), 0D));  //16点预计库存
+//            scheduleVo.setStockQty(stockMap.getOrDefault(scheduleVo.getPaddingCode(), 0D));  // 库存
+//            scheduleVo.setSurplusQty(Optional.ofNullable(monthSurplus.get(scheduleVo.getPaddingCode())).map(DjMonthSurplusVo::getMonthRemainQty).orElse(0D)); // 剩余量
+//            scheduleVo.setLastMidPlanQty(lastDayMidPlanMap.getOrDefault(scheduleVo.getPaddingCode(), 0D)); // 上一天早班库存
+//            scheduleVo.setPlanStockQty(BigDecimalUtils.qtySub(BigDecimalUtils.add(scheduleVo.getStockQty(), scheduleVo.getClass4PlanQty()), scheduleVo.getCxClass1Plan())); // 计算19点预计库存
+//            autoScheduleLogService.insertNcScheduleLog(batchNo, orderNo, "根据'16点预计库存集合'设置库存",
+//                    logSplit("16点预计库存集合：" + toJSONString(planStockMap), "数据结果：" + toJSONString(scheduleVo))); //添加日志
+//
+//            this.newComputeSupplyTime(scheduleVo, scheduleVo.getPlanStockQty());  //库存供应时长
+//            this.computeDjPlanQty(scheduleVo, totalPlanQtyVo, lossRateMap, paramLossRate, mergeThreshold, toolCapacity, productStockDay, largeDemand, bisectThreshold);  //计算垫胶中班和夜班计划量
+////            this.computeDjCurlRoll(scheduleVo, djCurlLengthMap, standardCurlLength, closeOutSpecList, curlDecimalRounding, totalPlanQtyMap); // 计算卷曲数
+//            this.setStatusAndCloseTip(scheduleVo, monthSurplus.get(scheduleVo.getPaddingCode()), getDouble(paramsMap.get(EngineConstants.CLOSE_OUT_NUM)));  //设置收尾提示标识 和 生产状态字段
+//
+//            if(BigDecimalUtils.add(scheduleVo.getCxClass1Plan(), scheduleVo.getCxClass2Plan(), scheduleVo.getCxClass3Plan(), scheduleVo.getCxClass4Plan()) == 0D) {
+//                //判断成型前4个班是否有计划量，若无计划，判断为新投产规格，半部件计划计划量放在“预计划”栏位中，中班和夜班计划都显示为0；若有计划，半部件计划正常排产
+//                scheduleVo.setPrePlanQty(BigDecimalUtils.add(scheduleVo.getClass3PlanQty(), scheduleVo.getClass2PlanQty()));
+//                scheduleVo.setClass3PlanQty(0D);
+//                scheduleVo.setClass2PlanQty(0D);
+//            }
+//            scheduleVo.setReleaseStatus(ApsConstant.NO_RELEASE);
+//            scheduleVo.setDelFlag(ApsConstant.DEL_FLAG_NORMAL);
+//            scheduleVo.setCreateTime(new Date());
+//            scheduleVo.setCreateBy(userName);
         }
 //        this.equilibrium(scheduleList, paramsMap, totalPlanQtyMap);  //中班和夜班计排程计划量均衡处理
         this.equilibriumDay1(scheduleList, totalPlanQtyVo, paramsMap);
@@ -191,19 +213,19 @@ public class DjEngineServiceImpl implements DjEngineService {
         this.chooseMachineByCapacity(scheduleList, allMachineList, specifyCanMachineMap, specifyNotMachineMap);  //选择生产线
         this.setProduceOrder(scheduleList);  //设置白班和夜班的生产顺序
 
-        List<DjScheduleResultVo> existScheduleList = this.ncEngineMapper.listNcEnginSchedule(scheduleDate);  //查询当天已经存在的排产记录
-        this.syncNcScheduleToLog(scheduleDate);  //把排程数据同步到log表
+        List<DjScheduleResultVo> existScheduleList = this.djEngineMapper.listDjEnginSchedule(scheduleDate);  //查询当天已经存在的排产记录
+        this.syncDjScheduleToLog(scheduleDate);  //把排程数据同步到log表
         this.createScheduleRecord(scheduleDate, cxBatchNo, batchNo);  //创建自动排程记录
 
-        List<DjScheduleResultVo> assistScheduleList = scheduleList.stream().filter(r -> mapAssistSpec.containsKey(r.getLiningCode())).collect(Collectors.toList()); //过滤出外协排程数据
-        scheduleList = scheduleList.stream().filter(r -> !mapAssistSpec.containsKey(r.getLiningCode())).collect(Collectors.toList());  //过滤出非外协的排产数据
+        List<DjScheduleResultVo> assistScheduleList = scheduleList.stream().filter(r -> mapAssistSpec.containsKey(r.getPaddingCode())).collect(Collectors.toList()); //过滤出外协排程数据
+        scheduleList = scheduleList.stream().filter(r -> !mapAssistSpec.containsKey(r.getPaddingCode())).collect(Collectors.toList());  //过滤出非外协的排产数据
         if(StringUtils.isNotEmpty(assistScheduleList)) {
-            ncEngineMapper.batchCreateAssistScheduleResult(assistScheduleList);   //批量新增外协排程结果数据
+            djEngineMapper.batchCreateAssistScheduleResult(assistScheduleList);   //批量新增外协排程结果数据
         }
 
         scheduleList = this.mergeExistSchedule(batchNo, scheduleList, existScheduleList);  //如果当天排程已经存在，则把当天的排程合并到 自动排程的列表中
         if(StringUtils.isNotEmpty(scheduleList)) {
-            ncEngineMapper.batchCreateScheduleResult(scheduleList);   //批量新增非外协排程结果数据
+            djEngineMapper.batchCreateScheduleResult(scheduleList);   //批量新增非外协排程结果数据
         }
     }
 
@@ -213,10 +235,10 @@ public class DjEngineServiceImpl implements DjEngineService {
      * @param scheduleDate
      * @return
      */
-    private Map<String, Double> loadNcStock(String scheduleDate) {
-        return ncEngineStockMapper.listNcStock(scheduleDate).stream()
-                .filter(v -> StringUtils.isNotEmpty(v.getLiningCode()))
-                .collect(Collectors.toMap(DjStockVo::getLiningCode, DjStockVo::getStockNum));
+    private Map<String, Double> loadDjStock(String scheduleDate) {
+        return djEngineStockMapper.listDjStock(scheduleDate).stream()
+                .filter(v -> StringUtils.isNotEmpty(v.getPaddingCode()))
+                .collect(Collectors.toMap(DjStockVo::getPaddingCode, DjStockVo::getStockNum));
     }
 
     /**
@@ -226,9 +248,9 @@ public class DjEngineServiceImpl implements DjEngineService {
      * @return
      */
     private Map<String, Double> loadLastDayMidPlan(String scheduleDate) {
-        return ncEngineStockMapper.listLastDayMidPlan(scheduleDate).stream()
-                .filter(v -> StringUtils.isNotEmpty(v.getLiningCode()))
-                .collect(Collectors.toMap(DjStockConsumeVo::getLiningCode, DjStockConsumeVo::getConsume));
+        return djEngineStockMapper.listLastDayMidPlan(scheduleDate).stream()
+                .filter(v -> StringUtils.isNotEmpty(v.getPaddingCode()))
+                .collect(Collectors.toMap(DjStockConsumeVo::getPaddingCode, DjStockConsumeVo::getConsume));
     }
 
     /**
@@ -239,100 +261,100 @@ public class DjEngineServiceImpl implements DjEngineService {
      * @param totalPlanQtyVo 成型中班和夜班总计划量Vo
      */
     private void equilibriumDay1(List<DjScheduleResultVo> scheduleList, DjTotalPlanQtyVo totalPlanQtyVo, Map<String, String> paramsMap) {
-//        BigDecimal midCapacity = new BigDecimal(paramsMap.getOrDefault("MID_CAPACITY", DEFAULT_MID_CAPACITY)); // 中班定额
-        BigDecimal nightCapacity = new BigDecimal(paramsMap.getOrDefault("NIGHT_CAPACITY", DEFAULT_NIGHT_CAPACITY)); // 夜班定额
-        BigDecimal standardCurlLength = new BigDecimal(paramsMap.getOrDefault(EngineConstants.STANDARD_CRIMP_LENGTH, DEFAULT_STANDARD_CRIMP_LENGTH)); // 卷曲标准长度
-        BigDecimal bisectThreshold = new BigDecimal(paramsMap.getOrDefault(EngineConstants.EQUAL_SHARE_THRESHOLD, DEFAULT_EQUAL_SHARE_THRESHOLD)); // 平分阈值
-        double midPlanQtyReference = nightCapacity.multiply(standardCurlLength).doubleValue(); // 平衡基准，夜班计划为低于夜班定额的最大数
-        double totalDayPlanQty = totalPlanQtyVo.getTotalDayPlanQty(); // 夜班总计划量
-        double totalNightPlanQty = totalPlanQtyVo.getTotalNightPlanQty(); // 早班总计划量
-        double totalNextDayPlanQty = totalPlanQtyVo.getTotalNextDayPlanQty(); // 次日夜班总计划量
-        // 再处理其余的
-        double difNum = BigDecimalUtil.sub(totalDayPlanQty, midPlanQtyReference); // 早班和平均值的差值
-        boolean isNightClassPass = difNum > 0; // 夜班是否超量
-        scheduleList = scheduleList.stream()
-                .sorted((r1, r2) -> {
-                    if (isNightClassPass) {
-                        BigDecimal initStock1 = BigDecimalUtils.add(r1.getStockQty(), r1.getLastMidPlanQty());
-                        BigDecimal initStock2 = BigDecimalUtils.add(r2.getStockQty(), r2.getLastMidPlanQty());
-                        BigDecimal cxClassPlan1 = BigDecimalUtils.add(r1.getCxClass1Plan(), r1.getCxClass2Plan());
-                        BigDecimal cxClassPlan2 = BigDecimalUtils.add(r2.getCxClass1Plan(), r2.getCxClass2Plan());
-                        BigDecimal classStock1 = BigDecimalUtils.sub(initStock1, cxClassPlan1);
-                        BigDecimal classStock2 = BigDecimalUtils.sub(initStock2, cxClassPlan2);
-                        // 夜班超量，将交接班库存较充足的转移到早班（倒序）
-                        return classStock2.compareTo(classStock1);
-                    } else {
-                        BigDecimal classStock1 = BigDecimalUtils.sub(r1.getClassStock(), r1.getCxClass3Plan());
-                        BigDecimal classStock2 = BigDecimalUtils.sub(r2.getClassStock(), r2.getCxClass3Plan());
-                        // 早班超量，将交接班库存较充低的转移到夜班（顺序）
-                        return classStock1.compareTo(classStock2);
-                    }
-                }).collect(Collectors.toList());
-        for (DjScheduleResultVo scheduleVo: scheduleList) {
-            boolean isCloseOutSpec = ApsConstant.STATUS_ENABLE.equals(scheduleVo.getCloseOutSpecFlag()); // 是否收尾规格
-            BigDecimal dayPlanQty = BigDecimalUtils.valueOf(scheduleVo.getDayPlanQty());
-            BigDecimal nightPlanQty = BigDecimalUtils.valueOf(scheduleVo.getNightPlanQty());
-            BigDecimal nextDayPlanQty = BigDecimalUtils.valueOf(scheduleVo.getNextDayPlanQty());
-            BigDecimal toolCapacity = (BigDecimal)scheduleVo.getParams().get(EngineConstants.TOOL_CAPACITY); // 满工装长度
-//            BigDecimal cxPlanQty2 = BigDecimalUtils.add(scheduleVo.getCxClass3Plan(), scheduleVo.getCxClass4Plan()); // 第二天型需求总量
-            BigDecimal dayAddPlan = BigDecimal.ZERO; // 夜班增加量
-            BigDecimal nightAddPlan = BigDecimal.ZERO; // 早班增加量
-            BigDecimal nextDayAddPlan = BigDecimal.ZERO; // 次日夜班增加量
-
-            if (isNightClassPass) { // 夜班超量，则从夜班转移到隔天早班
-                BigDecimal cxPlanQty1 = BigDecimalUtils.add(scheduleVo.getCxClass1Plan(), scheduleVo.getCxClass2Plan()); // 第一天成型需求量
-                BigDecimal lackStock = BigDecimalUtils.sub(cxPlanQty1, BigDecimalUtils.add(scheduleVo.getStockQty(), scheduleVo.getLastMidPlanQty()));
-                lackStock = lackStock.compareTo(BigDecimal.ZERO) <= 0? BigDecimal.ZERO: BigDecimalUtils.ceil(lackStock, toolCapacity);
-                if (lackStock.compareTo(dayPlanQty) >= 0) { // 转移后剩余的计划量不能少于第一天的库存缺口
-                    continue;
-                }
-                nightAddPlan = dayPlanQty.subtract(lackStock);
-                nightAddPlan = BigDecimalUtils.least(nightAddPlan, difNum);
-                if (!isCloseOutSpec) { // 非收尾计划，需要按工装容量取整
-                    nightAddPlan = BigDecimalUtils.ceil(nightAddPlan, toolCapacity);
-                }
-                dayAddPlan = nightAddPlan.negate();
-            } else if (nightPlanQty.compareTo(BigDecimal.ZERO) > 0) { // 隔天超量，且早班大于0，则从早班转移到夜班
-                nightAddPlan = BigDecimalUtils.greatest(difNum, nightPlanQty.negate()); //负数，要取最接近0的（最大值）
-                if (!isCloseOutSpec) { // 非收尾计划，需要按工装容量取整
-                    nightAddPlan = BigDecimalUtils.ceil(nightAddPlan, toolCapacity);
-                }
-                dayAddPlan = nightAddPlan.negate();
-                BigDecimal lastMidPlanQty = BigDecimalUtils.valueOf(scheduleVo.getLastMidPlanQty());
-                // 如果夜班本身没有安排计划，且上一天早班有安排计划，需要检查加上转移量之后是否达到均分阈值
-                if (dayPlanQty.compareTo(BigDecimal.ZERO) == 0 && lastMidPlanQty.compareTo(BigDecimal.ZERO) > 0 && dayAddPlan.compareTo(BigDecimal.ZERO) > 0) {
-                    BigDecimal newDayPlanQty = dayPlanQty.add(dayAddPlan);
-                    if (newDayPlanQty.add(lastMidPlanQty).compareTo(bisectThreshold) <= 0) {
-                        continue; // ，而上一天早班加夜班计划量没有达到均分阈值，则不能转移
-                    }
-                }
-            } else {
-                continue;
-            }
-            // 先算一下是否调整后差异反而更大
-            double newTotalDayPlanQty = BigDecimalUtils.add(totalDayPlanQty, dayAddPlan).doubleValue();
-            double newDifNum = BigDecimalUtil.sub(newTotalDayPlanQty, midPlanQtyReference); // 早班和平均值的差值
-            if (Math.abs(newDifNum) > Math.abs(difNum)) { // 如果更大跳过该规格
-                continue;
-            }
-            // 更新各班计划量
-            scheduleVo.setDayPlanQty(dayPlanQty.add(dayAddPlan).doubleValue());
-            scheduleVo.setNightPlanQty(nightPlanQty.add(nightAddPlan).doubleValue());
-            scheduleVo.setNextDayPlanQty(nextDayPlanQty.add(nextDayAddPlan).doubleValue());
-            if (dayAddPlan.compareTo(BigDecimal.ZERO) != 0) {
-                scheduleVo.setClassStock(this.getClassStock(scheduleVo)); // 夜班计划有变动，需要重算交接班库存
-            }
-            totalDayPlanQty = newTotalDayPlanQty;
-            totalNightPlanQty = BigDecimalUtils.add(totalNightPlanQty, nightAddPlan).doubleValue();
-            totalNextDayPlanQty = BigDecimalUtils.add(totalNextDayPlanQty, nextDayAddPlan).doubleValue();
-            difNum = newDifNum;
-            if (isNightClassPass ^ difNum > 0) { // 如果计算前后差值符号相反则直接结束
-                break;
-            }
-        }
-        totalPlanQtyVo.setTotalDayPlanQty(totalDayPlanQty); // 早班总计划里量
-        totalPlanQtyVo.setTotalNightPlanQty(totalNightPlanQty); // 早班总计划里量
-        totalPlanQtyVo.setTotalNextDayPlanQty(totalNextDayPlanQty); // 次日夜班总计划量
+////        BigDecimal midCapacity = new BigDecimal(paramsMap.getOrDefault("MID_CAPACITY", DEFAULT_MID_CAPACITY)); // 中班定额
+//        BigDecimal nightCapacity = new BigDecimal(paramsMap.getOrDefault("NIGHT_CAPACITY", DEFAULT_NIGHT_CAPACITY)); // 夜班定额
+//        BigDecimal standardCurlLength = new BigDecimal(paramsMap.getOrDefault(EngineConstants.STANDARD_CRIMP_LENGTH, DEFAULT_STANDARD_CRIMP_LENGTH)); // 卷曲标准长度
+//        BigDecimal bisectThreshold = new BigDecimal(paramsMap.getOrDefault(EngineConstants.EQUAL_SHARE_THRESHOLD, DEFAULT_EQUAL_SHARE_THRESHOLD)); // 平分阈值
+//        double midPlanQtyReference = nightCapacity.multiply(standardCurlLength).doubleValue(); // 平衡基准，夜班计划为低于夜班定额的最大数
+//        double totalDayPlanQty = totalPlanQtyVo.getTotalDayPlanQty(); // 夜班总计划量
+//        double totalNightPlanQty = totalPlanQtyVo.getTotalNightPlanQty(); // 早班总计划量
+//        double totalNextDayPlanQty = totalPlanQtyVo.getTotalNextDayPlanQty(); // 次日夜班总计划量
+//        // 再处理其余的
+//        double difNum = BigDecimalUtils.sub(totalDayPlanQty, midPlanQtyReference); // 早班和平均值的差值
+//        boolean isNightClassPass = difNum > 0; // 夜班是否超量
+//        scheduleList = scheduleList.stream()
+//                .sorted((r1, r2) -> {
+//                    if (isNightClassPass) {
+//                        BigDecimal initStock1 = BigDecimalUtils.add(r1.getStockQty(), r1.getClass4PlanQty());
+//                        BigDecimal initStock2 = BigDecimalUtils.add(r2.getStockQty(), r2.getClass4PlanQty());
+//                        BigDecimal cxClassPlan1 = BigDecimalUtils.add(r1.getCxClass1Plan(), r1.getCxClass2Plan());
+//                        BigDecimal cxClassPlan2 = BigDecimalUtils.add(r2.getCxClass1Plan(), r2.getCxClass2Plan());
+//                        BigDecimal classStock1 = BigDecimalUtils.sub(initStock1, cxClassPlan1);
+//                        BigDecimal classStock2 = BigDecimalUtils.sub(initStock2, cxClassPlan2);
+//                        // 夜班超量，将交接班库存较充足的转移到早班（倒序）
+//                        return classStock2.compareTo(classStock1);
+//                    } else {
+//                        BigDecimal classStock1 = BigDecimalUtils.sub(r1.getClassStock(), r1.getCxClass3Plan());
+//                        BigDecimal classStock2 = BigDecimalUtils.sub(r2.getClassStock(), r2.getCxClass3Plan());
+//                        // 早班超量，将交接班库存较充低的转移到夜班（顺序）
+//                        return classStock1.compareTo(classStock2);
+//                    }
+//                }).collect(Collectors.toList());
+//        for (DjScheduleResultVo scheduleVo: scheduleList) {
+//            boolean isCloseOutSpec = ApsConstant.STATUS_ENABLE.equals(scheduleVo.getCloseOutSpecFlag()); // 是否收尾规格
+//            BigDecimal dayPlanQty = BigDecimalUtils.valueOf(scheduleVo.getClass3PlanQty());
+//            BigDecimal nightPlanQty = BigDecimalUtils.valueOf(scheduleVo.getClass2PlanQty());
+//            BigDecimal nextDayPlanQty = BigDecimalUtils.valueOf(scheduleVo.getNextDayPlanQty());
+//            BigDecimal toolCapacity = (BigDecimal)scheduleVo.getParams().get(EngineConstants.TOOL_CAPACITY); // 满工装长度
+////            BigDecimal cxPlanQty2 = BigDecimalUtils.add(scheduleVo.getCxClass3Plan(), scheduleVo.getCxClass4Plan()); // 第二天型需求总量
+//            BigDecimal dayAddPlan = BigDecimal.ZERO; // 夜班增加量
+//            BigDecimal nightAddPlan = BigDecimal.ZERO; // 早班增加量
+//            BigDecimal nextDayAddPlan = BigDecimal.ZERO; // 次日夜班增加量
+//
+//            if (isNightClassPass) { // 夜班超量，则从夜班转移到隔天早班
+//                BigDecimal cxPlanQty1 = BigDecimalUtils.add(scheduleVo.getCxClass1Plan(), scheduleVo.getCxClass2Plan()); // 第一天成型需求量
+//                BigDecimal lackStock = BigDecimalUtils.sub(cxPlanQty1, BigDecimalUtils.add(scheduleVo.getStockQty(), scheduleVo.getClass4PlanQty()));
+//                lackStock = lackStock.compareTo(BigDecimal.ZERO) <= 0? BigDecimal.ZERO: BigDecimalUtils.ceil(lackStock, toolCapacity);
+//                if (lackStock.compareTo(dayPlanQty) >= 0) { // 转移后剩余的计划量不能少于第一天的库存缺口
+//                    continue;
+//                }
+//                nightAddPlan = dayPlanQty.subtract(lackStock);
+//                nightAddPlan = BigDecimalUtils.least(nightAddPlan, difNum);
+//                if (!isCloseOutSpec) { // 非收尾计划，需要按工装容量取整
+//                    nightAddPlan = BigDecimalUtils.ceil(nightAddPlan, toolCapacity);
+//                }
+//                dayAddPlan = nightAddPlan.negate();
+//            } else if (nightPlanQty.compareTo(BigDecimal.ZERO) > 0) { // 隔天超量，且早班大于0，则从早班转移到夜班
+//                nightAddPlan = BigDecimalUtils.greatest(difNum, nightPlanQty.negate()); //负数，要取最接近0的（最大值）
+//                if (!isCloseOutSpec) { // 非收尾计划，需要按工装容量取整
+//                    nightAddPlan = BigDecimalUtils.ceil(nightAddPlan, toolCapacity);
+//                }
+//                dayAddPlan = nightAddPlan.negate();
+//                BigDecimal lastMidPlanQty = BigDecimalUtils.valueOf(scheduleVo.getClass4PlanQty());
+//                // 如果夜班本身没有安排计划，且上一天早班有安排计划，需要检查加上转移量之后是否达到均分阈值
+//                if (dayPlanQty.compareTo(BigDecimal.ZERO) == 0 && lastMidPlanQty.compareTo(BigDecimal.ZERO) > 0 && dayAddPlan.compareTo(BigDecimal.ZERO) > 0) {
+//                    BigDecimal newDayPlanQty = dayPlanQty.add(dayAddPlan);
+//                    if (newDayPlanQty.add(lastMidPlanQty).compareTo(bisectThreshold) <= 0) {
+//                        continue; // ，而上一天早班加夜班计划量没有达到均分阈值，则不能转移
+//                    }
+//                }
+//            } else {
+//                continue;
+//            }
+//            // 先算一下是否调整后差异反而更大
+//            double newTotalDayPlanQty = BigDecimalUtils.add(totalDayPlanQty, dayAddPlan).doubleValue();
+//            double newDifNum = BigDecimalUtils.sub(newTotalDayPlanQty, midPlanQtyReference); // 早班和平均值的差值
+//            if (Math.abs(newDifNum) > Math.abs(difNum)) { // 如果更大跳过该规格
+//                continue;
+//            }
+//            // 更新各班计划量
+//            scheduleVo.setClass3PlanQty(dayPlanQty.add(dayAddPlan).doubleValue());
+//            scheduleVo.setClass2PlanQty(nightPlanQty.add(nightAddPlan).doubleValue());
+//            scheduleVo.setClass4PlanQty(nextDayPlanQty.add(nextDayAddPlan).doubleValue());
+//            if (dayAddPlan.compareTo(BigDecimal.ZERO) != 0) {
+//                scheduleVo.setClassStock(this.getClassStock(scheduleVo)); // 夜班计划有变动，需要重算交接班库存
+//            }
+//            totalDayPlanQty = newTotalDayPlanQty;
+//            totalNightPlanQty = BigDecimalUtils.add(totalNightPlanQty, nightAddPlan).doubleValue();
+//            totalNextDayPlanQty = BigDecimalUtils.add(totalNextDayPlanQty, nextDayAddPlan).doubleValue();
+//            difNum = newDifNum;
+//            if (isNightClassPass ^ difNum > 0) { // 如果计算前后差值符号相反则直接结束
+//                break;
+//            }
+//        }
+//        totalPlanQtyVo.setTotalDayPlanQty(totalDayPlanQty); // 早班总计划里量
+//        totalPlanQtyVo.setTotalNightPlanQty(totalNightPlanQty); // 早班总计划里量
+//        totalPlanQtyVo.setTotalNextDayPlanQty(totalNextDayPlanQty); // 次日夜班总计划量
     }
 
     /**
@@ -341,7 +363,7 @@ public class DjEngineServiceImpl implements DjEngineService {
      * @return
      */
     private Double getClassStock(DjScheduleResultVo scheduleVo) {
-        BigDecimal planQty = BigDecimalUtils.add(scheduleVo.getStockQty(), scheduleVo.getLastMidPlanQty(), scheduleVo.getDayPlanQty());
+        BigDecimal planQty = BigDecimalUtils.add(scheduleVo.getClass1StockQty(), scheduleVo.getClass4PlanQty(), scheduleVo.getClass1PlanQty());
         BigDecimal cxPlanQty = BigDecimalUtils.add(scheduleVo.getCxClass1Plan(), scheduleVo.getCxClass2Plan());
         return planQty.subtract(cxPlanQty).doubleValue();
     }
@@ -362,21 +384,21 @@ public class DjEngineServiceImpl implements DjEngineService {
         BigDecimal standardCurlLength = new BigDecimal(paramsMap.getOrDefault(EngineConstants.STANDARD_CRIMP_LENGTH, DEFAULT_STANDARD_CRIMP_LENGTH)); // 卷曲标准长度
         BigDecimal bisectThreshold = new BigDecimal(paramsMap.getOrDefault(EngineConstants.EQUAL_SHARE_THRESHOLD, DEFAULT_EQUAL_SHARE_THRESHOLD)); // 平分阈值
         BigDecimal toolRollNum = new BigDecimal(paramsMap.getOrDefault(EngineConstants.TOOL_ROLL_NUM, DEFAULT_TOOL_ROLL_NUM)); // 工装包含大卷数量
-        Double toolCapacity = standardCurlLength.multiply(toolRollNum).doubleValue(); // 一个工装包含的卷数
+        BigDecimal toolCapacity = standardCurlLength.multiply(toolRollNum); // 一个工装包含的卷数
         double nightPlanQtyReference = midCapacity.multiply(standardCurlLength).doubleValue(); // 早班平衡基准值
         this.equalShare(CollectionUtil.firstElement(scheduleList).getBatchNo(), scheduleList, totalPlanQtyVo, bisectThreshold); // 先做中夜班均衡
-        double totalNightPlanQty = totalPlanQtyVo.getTotalNightPlanQty(); // 早班总计划里量
-        double totalNextDayPlanQty = totalPlanQtyVo.getTotalNextDayPlanQty(); // 次日夜班总计划量
-        double difNum = BigDecimalUtil.sub(totalNightPlanQty, nightPlanQtyReference); //早班和平衡基准值的差额
-        boolean isNightClassPass = difNum > 0;  //true：早班超量，false：次日夜班超量
-        if (Math.abs(difNum) <= toolCapacity) { // 如果差异少于一车，直接结束
+        BigDecimal totalNightPlanQty = totalPlanQtyVo.getTotalNightPlanQty(); // 早班总计划里量
+        BigDecimal totalNextDayPlanQty = totalPlanQtyVo.getTotalNextDayPlanQty(); // 次日夜班总计划量
+        BigDecimal difNum = BigDecimalUtils.sub(totalNightPlanQty, nightPlanQtyReference); //早班和平衡基准值的差额
+        boolean isNightClassPass = difNum.compareTo(BigDecimal.ZERO) > 0;  //true：早班超量，false：次日夜班超量
+        if (difNum.abs().compareTo(toolCapacity) <= 0) { // 如果差异少于一车，直接结束
             return;
         }
-        isNightClassPass = difNum > 0;
-
+//        isNightClassPass = difNum > 0;
+//
 //        if (isNightClassPass) {
 //            // 次日夜班超量，说明库存充足，都再提前做隔天的，需要从供需比例较小的（库存比较小的）开始调整
-//            scheduleList = scheduleList.stream().sorted(Comparator.comparing(NcScheduleResultVo::getNightPlanQty)).collect(Collectors.toList());
+//            scheduleList = scheduleList.stream().sorted(Comparator.comparing(NcScheduleResultVo::getClass2PlanQty)).collect(Collectors.toList());
 //        } else {
 //            // 次日夜班超量，说明库存充足，都再提前做隔天的，需要从供需比例较小的（库存比较小的）开始调整
 //            scheduleList = scheduleList.stream().sorted(Comparator.comparing(NcScheduleResultVo::getNextDayPlanQty)).collect(Collectors.toList());
@@ -384,8 +406,8 @@ public class DjEngineServiceImpl implements DjEngineService {
         // 按早班库存缺口排序
         boolean isNightClassPassSort = isNightClassPass;
         scheduleList = scheduleList.stream().sorted((s1, s2) -> {
-            BigDecimal lackStock1 = BigDecimalUtils.sub(s1.getClassStock(), s1.getCxClass3Plan());
-            BigDecimal lackStock2 = BigDecimalUtils.sub(s2.getClassStock(), s2.getCxClass3Plan());
+            BigDecimal lackStock1 = BigDecimalUtils.sub(s1.getClass1StockQty(), s1.getCxClass3Plan());
+            BigDecimal lackStock2 = BigDecimalUtils.sub(s2.getClass1StockQty(), s2.getCxClass3Plan());
             if (isNightClassPassSort) { // 早班超量，要推迟，先处理缺口小的 （顺序）
                 return lackStock1.compareTo(lackStock2);
             } else { // 次夜班超量，要提前，先处理缺口大的（倒序）
@@ -394,16 +416,16 @@ public class DjEngineServiceImpl implements DjEngineService {
         }).collect(Collectors.toList());
 
         for (DjScheduleResultVo scheduleVo : scheduleList) {
-            BigDecimal nightPlanQty = BigDecimalUtils.valueOf(scheduleVo.getNightPlanQty());
-            BigDecimal nextDayPlanQty = BigDecimalUtils.valueOf(scheduleVo.getNextDayPlanQty());
+            BigDecimal nightPlanQty = BigDecimalUtils.valueOf(scheduleVo.getCxClass2Plan());
+            BigDecimal nextDayPlanQty = BigDecimalUtils.valueOf(scheduleVo.getCxClass3Plan());
             BigDecimal nightAddPlan;
             BigDecimal nextDayAddPlan;
-            if (scheduleVo.getIsEqualShare()) {
-                continue; // 已均分的计划不需要处理
-            }
+//            if (scheduleVo.getIsEqualShare()) {
+//                continue; // 已均分的计划不需要处理
+//            }
             if (isNightClassPass) {
                 // 计算早班库存缺口
-                double lackStock = BigDecimalUtil.sub(scheduleVo.getCxClass3Plan(), scheduleVo.getClassStock());
+                double lackStock = BigDecimalUtils.sub(scheduleVo.getCxClass3Plan(), scheduleVo.getClass1StockQty()).doubleValue();
                 if (lackStock > 0 && nextDayPlanQty.doubleValue() < lackStock) { // 只要有库存缺口，且次日夜班计划量低于库存缺口，就不要转移到次日夜班
                     continue;
                 }
@@ -419,16 +441,16 @@ public class DjEngineServiceImpl implements DjEngineService {
             BigDecimal newTotalNightPlanQty = BigDecimalUtils.add(totalNightPlanQty, nightAddPlan);
             BigDecimal newTotalNextDayPlanQty = BigDecimalUtils.add(totalNextDayPlanQty, nextDayAddPlan);
             BigDecimal newDifNum = BigDecimalUtils.sub(newTotalNightPlanQty, nightPlanQtyReference); // 计算后早班和平均值的差值
-            if (newDifNum.abs().doubleValue() > Math.abs(difNum)) { // 如果更大跳过该规格
+            if (newDifNum.abs().doubleValue() > difNum.abs().doubleValue()) { // 如果更大跳过该规格
                 continue;
             }
 
-            scheduleVo.setNightPlanQty(BigDecimalUtils.add(nightPlanQty, nightAddPlan).doubleValue());
-            scheduleVo.setNextDayPlanQty(BigDecimalUtils.add(nextDayPlanQty, nextDayAddPlan).doubleValue());
-            totalNightPlanQty = newTotalNightPlanQty.doubleValue();
-            totalNextDayPlanQty = newTotalNextDayPlanQty.doubleValue();
-            difNum = newDifNum.doubleValue(); // 重算差异
-            if (Math.abs(difNum) <= toolCapacity || isNightClassPass ^ difNum > 0) { // 差异少于一车、或者计算前后差值符号相反则直接结束
+//            scheduleVo.setClass2PlanQty(BigDecimalUtils.add(nightPlanQty, nightAddPlan).doubleValue());
+//            scheduleVo.setClass4PlanQty(BigDecimalUtils.add(nextDayPlanQty, nextDayAddPlan).doubleValue());
+            totalNightPlanQty = newTotalNightPlanQty;
+            totalNextDayPlanQty = newTotalNextDayPlanQty;
+            difNum = newDifNum; // 重算差异
+            if (difNum.abs().compareTo(toolCapacity) <= 0 || isNightClassPass ^ difNum.doubleValue() > 0) { // 差异少于一车、或者计算前后差值符号相反则直接结束
                 break;
             }
         }
@@ -446,26 +468,26 @@ public class DjEngineServiceImpl implements DjEngineService {
      */
     private void chooseMachineByCapacity(List<DjScheduleResultVo> scheduleList, List<DjMachineInfo> allMachineList, Map<String, String> specifyCanMachineMap, Map<String, String> specifyNotMachineMap) {
         // 机台夜班已占用产能
-        Map<Long, BigDecimal> midCapacityMap = new HashMap<>(16);
+        Map<String, BigDecimal> midCapacityMap = new HashMap<>(16);
         // 机台白班已占用产能
-        Map<Long, BigDecimal> nightCapacityMap = new HashMap<>(16);
+        Map<String, BigDecimal> nightCapacityMap = new HashMap<>(16);
 
         // 先对排产计划
         List<DjScheduleResultVo> chooseMachineScheduleList = scheduleList.stream().sorted((o1, o2) -> {
-            Integer flag1 = specifyCanMachineMap.containsKey(o1.getLiningCode()) ? 1 : 2;
-            Integer flag2 = specifyCanMachineMap.containsKey(o2.getLiningCode()) ? 1 : 2;
+            Integer flag1 = specifyCanMachineMap.containsKey(o1.getPaddingCode()) ? 1 : 2;
+            Integer flag2 = specifyCanMachineMap.containsKey(o2.getPaddingCode()) ? 1 : 2;
             if (flag1.compareTo(flag2) != 0) { // 先看哪个有定点机台，有定点机台的优先选机台
                 return flag1.compareTo(flag2);
             }
             // 如果定点机台设置一样，则按计划量从大到小
-            BigDecimal planQty1 = BigDecimalUtils.add(o1.getDayPlanQty(), o1.getNightPlanQty());
-            BigDecimal planQty2 = BigDecimalUtils.add(o2.getDayPlanQty(), o2.getNightPlanQty());
+            BigDecimal planQty1 = BigDecimalUtils.add(o1.getClass1PlanQty(), o1.getClass2PlanQty());
+            BigDecimal planQty2 = BigDecimalUtils.add(o2.getClass2PlanQty(), o2.getClass3PlanQty());
             return planQty2.compareTo(planQty1);
         }).collect(Collectors.toList());
 
         // 根据夜班计划分配机台
         for (DjScheduleResultVo scheduleVo : chooseMachineScheduleList) {
-            Double midPlanQty = scheduleVo.getDayPlanQty();
+            Double midPlanQty = scheduleVo.getClass3PlanQty().doubleValue();
             if (midPlanQty == null || midPlanQty <= 0) {
                 continue;
             }
@@ -477,22 +499,22 @@ public class DjEngineServiceImpl implements DjEngineService {
             }
             // 如果有匹配机台，则直接取第一个机台赋值
             DjMachineInfo machine = CollectionUtil.firstElement(optionalMachineList);
-            Long machineId = machine.getId();
-            scheduleVo.setMachineId(String.valueOf(machineId));
+            String machineCode = machine.getMachineCode();
+            scheduleVo.setMachineCode(machineCode);
             //检查机台，如果早班不作业，则把计划量都转移到夜班
             if (!machine.getOpenMachineClass().contains(String.valueOf(OpenMachineClassEnums.CLASS_THREE.getClassIndex()))) {
-                scheduleVo.setDayPlanQty(BigDecimalUtil.add(midPlanQty, scheduleVo.getNightPlanQty()));
-                scheduleVo.setNightPlanQty(0D);
+                scheduleVo.setClass3PlanQty(BigDecimalUtils.add(midPlanQty, scheduleVo.getClass2PlanQty()));
+                scheduleVo.setClass2PlanQty(BigDecimal.ZERO);
             }
             // 占用机台各班产能
-            midCapacityMap.put(machineId, midCapacityMap.getOrDefault(machineId, BigDecimal.ZERO).add(BigDecimalUtils.valueOf(scheduleVo.getDayPlanQty())));
-            nightCapacityMap.put(machineId, nightCapacityMap.getOrDefault(machineId, BigDecimal.ZERO).add(BigDecimalUtils.valueOf(scheduleVo.getNightPlanQty())));
+            midCapacityMap.put(machineCode, midCapacityMap.getOrDefault(machineCode, BigDecimal.ZERO).add(BigDecimalUtils.valueOf(scheduleVo.getClass3PlanQty())));
+            nightCapacityMap.put(machineCode, nightCapacityMap.getOrDefault(machineCode, BigDecimal.ZERO).add(BigDecimalUtils.valueOf(scheduleVo.getClass2PlanQty())));
             chooseMachineLog(scheduleVo, specifyCanMachineMap, specifyNotMachineMap); // 添加日志
         }
 
         // 剩余没有分配到机台的排程检查早班是否有可分配机台
         for (DjScheduleResultVo scheduleVo : chooseMachineScheduleList) {
-            if (StringUtils.isNotEmpty(scheduleVo.getMachineId())) {
+            if (StringUtils.isNotEmpty(scheduleVo.getMachineCode())) {
                 continue;
             }
             // 早班
@@ -505,16 +527,16 @@ public class DjEngineServiceImpl implements DjEngineService {
             }
             // 如果有匹配机台，则直接取第一个机台赋值
             DjMachineInfo machine = CollectionUtil.firstElement(optionalMachineList);
-            Long machineId = machine.getId();
-            scheduleVo.setMachineId(String.valueOf(machineId));
+            String machineCode = machine.getMachineCode();
+            scheduleVo.setMachineCode(machineCode);
             //检查机台，如果夜班不作业，则把计划量都转移到早班
             if (!machine.getOpenMachineClass().contains(String.valueOf(OpenMachineClassEnums.CLASS_TWO.getClassIndex()))) {
-                scheduleVo.setNightPlanQty(BigDecimalUtil.add(scheduleVo.getDayPlanQty(), scheduleVo.getNightPlanQty()));
-                scheduleVo.setDayPlanQty(0D);
+                scheduleVo.setClass2PlanQty(BigDecimalUtils.add(scheduleVo.getClass3PlanQty(), scheduleVo.getClass2PlanQty()));
+                scheduleVo.setClass3PlanQty(BigDecimal.ZERO);
             }
             // 占用机台各班产能
-            midCapacityMap.put(machineId, midCapacityMap.getOrDefault(machineId, BigDecimal.ZERO).add(BigDecimalUtils.valueOf(scheduleVo.getDayPlanQty())));
-            nightCapacityMap.put(machineId, nightCapacityMap.getOrDefault(machineId, BigDecimal.ZERO).add(BigDecimalUtils.valueOf(scheduleVo.getNightPlanQty())));
+            midCapacityMap.put(machineCode, midCapacityMap.getOrDefault(machineCode, BigDecimal.ZERO).add(BigDecimalUtils.valueOf(scheduleVo.getClass3PlanQty())));
+            nightCapacityMap.put(machineCode, nightCapacityMap.getOrDefault(machineCode, BigDecimal.ZERO).add(BigDecimalUtils.valueOf(scheduleVo.getClass2PlanQty())));
             chooseMachineLog(scheduleVo, specifyCanMachineMap, specifyNotMachineMap); // 添加日志
         }
     }
@@ -530,8 +552,8 @@ public class DjEngineServiceImpl implements DjEngineService {
      * @param specifyNotMachineMap 不可作业机台
      * @return 机台列表
      */
-    private List<DjMachineInfo> searchOptionalMachineList(DjScheduleResultVo scheduleVo, String classCode, Map<Long, BigDecimal> capacityMap, List<DjMachineInfo> allMachineList, Map<String, String> specifyCanMachineMap, Map<String, String> specifyNotMachineMap) {
-        String beadCode = scheduleVo.getLiningCode(); // 胎侧代码
+    private List<DjMachineInfo> searchOptionalMachineList(DjScheduleResultVo scheduleVo, String classCode, Map<String, BigDecimal> capacityMap, List<DjMachineInfo> allMachineList, Map<String, String> specifyCanMachineMap, Map<String, String> specifyNotMachineMap) {
+        String beadCode = scheduleVo.getPaddingCode(); // 胎侧代码
         String mouthPlateCode = scheduleVo.getMouthPlateCode(); // 口型板code
         // 定点机台ID列表
         String specifyMachineIds = specifyCanMachineMap.get(beadCode);
@@ -592,8 +614,8 @@ public class DjEngineServiceImpl implements DjEngineService {
                 .sorted(new Comparator<DjMachineInfo>() {// 按剩余产能升序排序
                     @Override
                     public int compare(DjMachineInfo m1, DjMachineInfo m2) {
-                        return capacityMap.getOrDefault(m1.getId(), BigDecimal.ZERO)
-                                .compareTo(capacityMap.getOrDefault(m2.getId(), BigDecimal.ZERO));
+                        return capacityMap.getOrDefault(m1.getMachineCode(), BigDecimal.ZERO)
+                                .compareTo(capacityMap.getOrDefault(m2.getMachineCode(), BigDecimal.ZERO));
                     }
                 }).collect(Collectors.toList());
         return optionalMachineList;
@@ -624,7 +646,7 @@ public class DjEngineServiceImpl implements DjEngineService {
 	private List<String> getCloseOutSpecList(String scheduleDate, BigDecimal closeOutDays, String productionStage) {
 		BigDecimal queryCloseOutDays = closeOutDays.compareTo(BigDecimal.ONE) >= 0? closeOutDays.subtract(BigDecimal.ONE): BigDecimal.ZERO; // 判断天数需要减1，0才是查1天的数据进行判断
 		boolean isProductionStage = PRODUCTION_STAGE_ON.equals(productionStage); // 判断是否只看投产规格
-		return ncEngineMapper.listCloseOutSpec(DateUtils.parseDate(scheduleDate), queryCloseOutDays.intValue(), isProductionStage);
+		return djEngineMapper.listCloseOutSpec(DateUtils.parseDate(scheduleDate), queryCloseOutDays.intValue(), isProductionStage);
 	}
 
 	/**
@@ -637,10 +659,10 @@ public class DjEngineServiceImpl implements DjEngineService {
 	 * @param curlDecimalRounding 卷曲数小数取整值
 	 * @param totalPlanQtyMap     每个生产线的计划量汇总MAP
 	 */
-	private void computeNcCurlRoll(DjScheduleResultVo scheduleVo, Map<String, BigDecimal> tmCurlLengthMap,
+	private void computeDjCurlRoll(DjScheduleResultVo scheduleVo, Map<String, BigDecimal> tmCurlLengthMap,
 			BigDecimal standardCurlLength, List<String> closeOutSpecList, BigDecimal curlDecimalRounding,
 			Map<String, DjTotalPlanQtyVo> totalPlanQtyMap) {
-		String liningCode = scheduleVo.getLiningCode();
+		String liningCode = scheduleVo.getPaddingCode();
 		if (closeOutSpecList.contains(liningCode)) { // 收尾规格，则直接返回
 	        scheduleVo.setCloseOutSpecFlag(ApsConstant.STATUS_ENABLE); // 打上收尾标记
 			return;
@@ -649,8 +671,8 @@ public class DjEngineServiceImpl implements DjEngineService {
 		if (curlLength == null || curlLength.compareTo(BigDecimal.ZERO) <= 0) { // 不合法的配置都按默认值为准
 			curlLength = standardCurlLength;
 		}
-		BigDecimal dayPlanQty = BigDecimalUtil.getValue(scheduleVo.getDayPlanQty());
-		BigDecimal nightPlanQty = BigDecimalUtil.getValue(scheduleVo.getNightPlanQty());
+		BigDecimal dayPlanQty = scheduleVo.getClass3PlanQty();
+		BigDecimal nightPlanQty = scheduleVo.getClass2PlanQty();
 		BigDecimal totalPlanQty = dayPlanQty.add(nightPlanQty); // 本规格胎面的总计划量
 
 		BigDecimal planNum = totalPlanQty.divide(curlLength, 1, RoundingMode.UP); // 卷数，保留1位小数
@@ -671,25 +693,25 @@ public class DjEngineServiceImpl implements DjEngineService {
 		boolean isDay = dayPlanQty.compareTo(BigDecimal.ZERO) > 0; // 是否安排在中班
 		if (isDay) {
 			dayPlanQty = newPlanQty;
-			scheduleVo.setDayPlanQty(dayPlanQty.doubleValue());
+			scheduleVo.setClass3PlanQty(dayPlanQty);
 		} else {
 			nightPlanQty = newPlanQty;
-			scheduleVo.setNightPlanQty(nightPlanQty.doubleValue());
+			scheduleVo.setClass2PlanQty(nightPlanQty);
 		}
 
 		// 将增加的量补到汇总值中
-		String key = scheduleVo.getMachineId(); // 机台id作为Map的key
+		String key = scheduleVo.getMachineCode(); // 机台id作为Map的key
 		key = StringUtils.isBlank(key) ? "" : key;
 		DjTotalPlanQtyVo totalPlanQtyVo = totalPlanQtyMap.getOrDefault(key, new DjTotalPlanQtyVo()); // 取出对应生产线的计划量汇总对象
 		if (isDay) {
 			totalPlanQtyVo.setTotalDayPlanQty(
-					BigDecimalUtil.getValue(totalPlanQtyVo.getTotalDayPlanQty()).add(planQtyDifference).doubleValue());
+					BigDecimalUtils.valueOf(totalPlanQtyVo.getTotalDayPlanQty()).add(planQtyDifference));
 		} else {
 			totalPlanQtyVo.setTotalNightPlanQty(
-					BigDecimalUtil.getValue(totalPlanQtyVo.getTotalNightPlanQty()).add(planQtyDifference).doubleValue());
+					BigDecimalUtils.valueOf(totalPlanQtyVo.getTotalNightPlanQty()).add(planQtyDifference));
 		}
 		totalPlanQtyVo.setTotalPlanQty(
-				BigDecimalUtil.add(totalPlanQtyVo.getTotalDayPlanQty(), totalPlanQtyVo.getTotalNightPlanQty()));
+				BigDecimalUtils.add(totalPlanQtyVo.getTotalDayPlanQty(), totalPlanQtyVo.getTotalNightPlanQty()));
 		totalPlanQtyMap.put(key, totalPlanQtyVo);
 	}
 
@@ -701,7 +723,7 @@ public class DjEngineServiceImpl implements DjEngineService {
      * @param productionStage 仅投产阶段规格排产标识
      */
     private void ValidatedConstruction(String scheduleDate, String batchNo, String productionStage, Map<String, String> mapAssistSpec) {
-        List<EngineConstructionInfo> list = ncEngineMapper.listNcNeedConstruction(scheduleDate, productionStage);
+        List<EngineConstructionInfo> list = djEngineMapper.listDjNeedConstruction(scheduleDate, productionStage);
         list = list.stream().filter(r -> !mapAssistSpec.containsKey(r.getInsideCode())).collect(Collectors.toList());  //校验忽略掉 外协规格，只校验 不是外协的规格
         for(EngineConstructionInfo construction : list) {
             List<String> errorColumns = new ArrayList<>();
@@ -742,7 +764,7 @@ public class DjEngineServiceImpl implements DjEngineService {
      */
     private Map<String, String> mapAssistSpec() {
         Map<String, String> map = new HashMap<>();
-        List<String> listAssistSpec = this.ncEngineMapper.listAssistSpec();
+        List<String> listAssistSpec = this.djEngineMapper.listAssistSpec();
         if(listAssistSpec == null || listAssistSpec.size() == 0) {
             return map;
         }
@@ -760,7 +782,7 @@ public class DjEngineServiceImpl implements DjEngineService {
         String scheduleDate = DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD, scheduleVo.getScheduleDate()); //排程日期
         List<DjScheduleResultVo> scheduleList = new ArrayList<>();
         scheduleList.add(scheduleVo);
-        return this.batchSaveNcSchedule(scheduleDate, scheduleList, true);
+        return this.batchSaveDjSchedule(scheduleDate, scheduleList, true);
     }
 
     /**
@@ -768,8 +790,8 @@ public class DjEngineServiceImpl implements DjEngineService {
      * @param scheduleDate 排程日志，格式：yyyy-MM-dd
      * @param scheduleList 排程数据
      */
-    public int batchSaveNcSchedule(String scheduleDate, List<DjScheduleResultVo> scheduleList) {
-        return this.batchSaveNcSchedule(scheduleDate, scheduleList, false);
+    public int batchSaveDjSchedule(String scheduleDate, List<DjScheduleResultVo> scheduleList) {
+        return this.batchSaveDjSchedule(scheduleDate, scheduleList, false);
     }
 
     /**
@@ -779,29 +801,29 @@ public class DjEngineServiceImpl implements DjEngineService {
      * @param isUpdate 相同唯一键是否做更新操作。true：是
      */
     @Transactional(rollbackFor=Exception.class)
-    public int batchSaveNcSchedule(String scheduleDate, List<DjScheduleResultVo> scheduleList, boolean isUpdate) {
+    public int batchSaveDjSchedule(String scheduleDate, List<DjScheduleResultVo> scheduleList, boolean isUpdate) {
         if(scheduleList == null || scheduleList.isEmpty()) {
             return -1;
         }
         String batchNo = "";
         if(isUpdate) {
-            batchNo = ncEngineMapper.getNcCurrentBatchNo(scheduleDate);  //查询当前排程的批次号
+            batchNo = djEngineMapper.getDjCurrentBatchNo(scheduleDate);  //查询当前排程的批次号
         }
         if(StringUtils.isBlank(batchNo)) {
             //当前的批次号为空，说明还没”自动排程“，那么自己生成一个排程批次号
             batchNo = this.createBatchNo(scheduleDate);  //垫胶排程批次号
             this.createScheduleRecord(scheduleDate, "", batchNo);  //创建自动排程记录
-            this.syncNcScheduleToLog(scheduleDate);  //把排程数据同步到log表
+            this.syncDjScheduleToLog(scheduleDate);  //把排程数据同步到log表
         }
         autoScheduleLogService.insertNcScheduleLog(batchNo, "", "插单或批量导入初始数据", toJSONString(scheduleList));  //添加日志
 
-        List<String> liningCodes = scheduleList.stream().map(DjScheduleResultVo::getLiningCode).collect(Collectors.toList());
+        List<String> liningCodes = scheduleList.stream().map(DjScheduleResultVo::getPaddingCode).collect(Collectors.toList());
         Map<String, String> paramsMap = this.getParamsMap();  // 获取工序参数map
         String productionStage = paramsMap.get(EngineConstants.PRODUCTION_STAGE_PRODUCE);  //仅投产阶段规格排产标识
         Map<String, DjScheduleBaseInfoVo> scheduleBaseInfoMap = getScheduleBaseInfoMap(scheduleDate, liningCodes, productionStage);  //根据垫胶代码查询对应的垫胶基础信息
-        Map<String, String> glueSeqMap = ncEngineGlueService.getGlueSeqMap();  //获取胶料序号map
-        Map<String, Double> planStockMap = ncEngineStockService.getPlanStockMap(batchNo, scheduleDate, getDouble(paramsMap.get(EngineConstants.STOCK_LOSS_RATE)));  //计算垫胶16点预计库存
-        Map<String, DjMonthSurplusVo> monthSurplus = ncEngineMonthSurplusService.getMonthSurplus(scheduleDate);  //获得月度计划剩余量、完成量
+        Map<String, String> glueSeqMap = djEngineGlueService.getGlueSeqMap();  //获取胶料序号map
+        Map<String, Double> planStockMap = djEngineStockService.getPlanStockMap(batchNo, scheduleDate, getDouble(paramsMap.get(EngineConstants.STOCK_LOSS_RATE)));  //计算垫胶16点预计库存
+        Map<String, DjMonthSurplusVo> monthSurplus = djEngineMonthSurplusService.getMonthSurplus(scheduleDate);  //获得月度计划剩余量、完成量
         autoScheduleLogService.insertNcScheduleLog(batchNo, "", "插单或批量导入基础数据", logSplit("半部件基础数据信息:" + toJSONString(scheduleBaseInfoMap),
                 "胶料序号map：" + glueSeqMap, "16点预计库存：" + planStockMap, "月度计划剩余量、完成量：" + monthSurplus, "工序参数map：" + paramsMap));  //添加日志
 
@@ -809,27 +831,27 @@ public class DjEngineServiceImpl implements DjEngineService {
             schedule.setBatchNo(batchNo);  //批次号
             String orderNo = this.createOrderNo(batchNo); //工单号
             schedule.setOrderNo(orderNo);  //工单号
-            DjScheduleBaseInfoVo baseInfoVo = scheduleBaseInfoMap.get(schedule.getLiningCode());
+            DjScheduleBaseInfoVo baseInfoVo = scheduleBaseInfoMap.get(schedule.getPaddingCode());
             if(baseInfoVo != null) {
                 BeanUtils.copyProperties(baseInfoVo, schedule);
             }
-            Double dayPlanQty = schedule.getDayPlanQty();  //中班计划量
-            schedule.setDayPlanQty(dayPlanQty == null ? 0D : dayPlanQty);
-            Double nightPlanQty = schedule.getNightPlanQty();  //夜班计划量
-            schedule.setNightPlanQty(nightPlanQty == null ? 0D : nightPlanQty);
+            BigDecimal dayPlanQty = schedule.getClass3PlanQty();  //中班计划量
+            schedule.setClass3PlanQty(dayPlanQty == null ? BigDecimal.ZERO : dayPlanQty);
+            BigDecimal nightPlanQty = schedule.getClass2PlanQty();  //夜班计划量
+            schedule.setClass2PlanQty(nightPlanQty == null ? BigDecimal.ZERO : nightPlanQty);
 
-            schedule.setGlueSeq(glueSeqMap.get(schedule.getGlueCode()));  //胶料序号
-            schedule.setStockQty(planStockMap.getOrDefault(schedule.getLiningCode(), 0D));  //16点预计库存
-            this.newComputeSupplyTime(schedule, schedule.getStockQty());  //库存供应时长
-            this.setStatusAndCloseTip(schedule, monthSurplus.get(schedule.getLiningCode()), getDouble(paramsMap.get(EngineConstants.CLOSE_OUT_NUM)));  //设置收尾提示标识 和 生产状态字段
-            schedule.setIsRelease(ApsConstant.NO_RELEASE);
-            schedule.setDelFlag(ApsConstant.DEL_FLAG_NORMAL);
+//            schedule.setGlueSeq(glueSeqMap.get(schedule.getGlueCode()));  //胶料序号
+//            schedule.setStockQty(planStockMap.getOrDefault(schedule.getPaddingCode(), 0D));  //16点预计库存
+//            this.newComputeSupplyTime(schedule, schedule.getStockQty());  //库存供应时长
+//            this.setStatusAndCloseTip(schedule, monthSurplus.get(schedule.getPaddingCode()), getDouble(paramsMap.get(EngineConstants.CLOSE_OUT_NUM)));  //设置收尾提示标识 和 生产状态字段
+            schedule.setReleaseStatus(ApsConstant.NO_RELEASE);
+            schedule.setIsDelete(ApsConstant.APS_YES_NO_0);
             schedule.setCreateTime(new Date());
             schedule.setCreateBy(SecurityUtils.getUsername());
             schedule.setCloseOutSpecFlag(ApsConstant.STATUS_DISABLE);
         }
         autoScheduleLogService.insertNcScheduleLog(batchNo, "", "插单或批量导入最终数据", toJSONString(scheduleList));  //添加日志
-        return ncEngineMapper.mergeNcScheduleResult(scheduleList);  //批量合并排程结果表（根据唯一字段，做更新或新增）
+        return djEngineMapper.mergeDjScheduleResult(scheduleList);  //批量合并排程结果表（根据唯一字段，做更新或新增）
     }
 
     /**
@@ -839,17 +861,17 @@ public class DjEngineServiceImpl implements DjEngineService {
      */
     private Map<String, DjScheduleBaseInfoVo> getScheduleBaseInfoMap(String scheduleDate, List<String> liningCodes, String productionStage) {
         Map<String, DjScheduleBaseInfoVo> map = new HashMap<>();
-        List<DjScheduleBaseInfoVo> list = ncEngineMapper.listNcScheduleBaseInfo(liningCodes, ""); //查询出胎面在施工表的基础信息
+        List<DjScheduleBaseInfoVo> list = djEngineMapper.listDjScheduleBaseInfo(liningCodes, ""); //查询出胎面在施工表的基础信息
         if(!StringUtils.isEmpty(list)) {
-            map = list.stream().collect(Collectors.toMap(DjScheduleBaseInfoVo::getLiningCode, baseInfoVo->baseInfoVo));
+            map = list.stream().collect(Collectors.toMap(DjScheduleBaseInfoVo::getPaddingCode, baseInfoVo->baseInfoVo));
         }
 
         Map<String, DjScheduleBaseInfoVo> hasCxMap = new HashMap<>();
-        List<DjScheduleResultVo> hasCxlist = ncEngineMapper.statNcScheduleBase(scheduleDate, productionStage); //查询出在有对应成型排程的胎面基础信息
+        List<DjScheduleResultVo> hasCxlist = djEngineMapper.statDjScheduleBase(scheduleDate, productionStage); //查询出在有对应成型排程的胎面基础信息
         for(DjScheduleResultVo info : hasCxlist) {
             DjScheduleBaseInfoVo baseInfoVo = new DjScheduleBaseInfoVo();
             BeanUtils.copyProperties(info, baseInfoVo);
-            hasCxMap.put(info.getLiningCode(), baseInfoVo);
+            hasCxMap.put(info.getPaddingCode(), baseInfoVo);
         }
 
         map.putAll(hasCxMap);  //有对应成型排程的胎面基础信息 覆盖掉，没有成型排程的胎面基础信息
@@ -861,31 +883,31 @@ public class DjEngineServiceImpl implements DjEngineService {
 //     * @param oldMachineIds  转机台前，旧的机台id
 //     * @param scheduleResult
 //     */
-//    public void changeNcMachine(String oldMachineIds, NcScheduleResult scheduleResult) {
+//    public void changeDjMachine(String oldMachineIds, NcScheduleResult scheduleResult) {
 //        String batchNo = scheduleResult.getBatchNo();  //批次号
 //        String orderNo = scheduleResult.getOrderNo();  //工单号
 //        autoScheduleLogService.insertNcScheduleLog(batchNo, orderNo, "转机台初始数据", logSplit("转机台前的机台ID：" + oldMachineIds, "页面提交的信息：" + toJSONString(scheduleResult)));  //添加日志
-//        Map<String, Double> lossRateMap = ncEngineLossService.getLossRateMap();   //损耗率map
+//        Map<String, Double> lossRateMap = djEngineLossService.getLossRateMap();   //损耗率map
 //        Map<String, String> paramsMap = this.getParamsMap();  // 获取工序参数map
 //        double paramLossRate = getDouble(paramsMap.get(EngineConstants.LOSS_RATE));
 //
 //        //转机台后，不同机台的损耗率不一样，需要重新计算计划量
-//        double oldLossRate = ncEngineLossService.getLossRate(scheduleResult.getLiningCode(), oldMachineIds, lossRateMap, paramLossRate);  //计算出转机台前的耗损率
-//        double lossRate = ncEngineLossService.getLossRate(scheduleResult.getLiningCode(), scheduleResult.getMachineId(), lossRateMap, paramLossRate);
+//        double oldLossRate = djEngineLossService.getLossRate(scheduleResult.getPaddingCode(), oldMachineIds, lossRateMap, paramLossRate);  //计算出转机台前的耗损率
+//        double lossRate = djEngineLossService.getLossRate(scheduleResult.getPaddingCode(), scheduleResult.getMachineCode(), lossRateMap, paramLossRate);
 //        autoScheduleLogService.insertNcScheduleLog(batchNo, orderNo, "转机台需要根据不同机台耗损率重新计算计划量",
 //                logSplit("重新计算计划量规则：先要根据之前机台的耗损率推算出之前在没有加上耗损率之前的计划量A，然后再用计划量A * 当前机台对应的耗损率，计算出最终的计划量", "转机台前的耗损率：" + oldLossRate + "转机台后的耗损率：" + lossRate));  //添加日志
 //
-//        Double dayPlanQty = scheduleResult.getDayPlanQty();  //中班计划量
+//        Double dayPlanQty = scheduleResult.getClass3PlanQty();  //中班计划量
 //        if(dayPlanQty != null) {
-//            dayPlanQty = BigDecimalUtil.div(dayPlanQty, 1 + oldLossRate, 4); //计算出之前没有加上损耗量的 计划量
-//            dayPlanQty = BigDecimalUtil.add(dayPlanQty, BigDecimalUtil.mul(dayPlanQty, lossRate));
-//            scheduleResult.setDayPlanQty(dayPlanQty);
+//            dayPlanQty = BigDecimalUtils.div(dayPlanQty, 1 + oldLossRate, 4); //计算出之前没有加上损耗量的 计划量
+//            dayPlanQty = BigDecimalUtils.add(dayPlanQty, BigDecimalUtils.mul(dayPlanQty, lossRate));
+//            scheduleResult.setClass3PlanQty(dayPlanQty);
 //        }
-//        Double nightPlanQty = scheduleResult.getNightPlanQty();  //夜班计划量
+//        Double nightPlanQty = scheduleResult.getClass2PlanQty();  //夜班计划量
 //        if(nightPlanQty != null) {
-//            nightPlanQty = BigDecimalUtil.div(nightPlanQty, 1 + oldLossRate, 4); //计算出之前没有加上损耗量的 计划量
-//            nightPlanQty = BigDecimalUtil.add(nightPlanQty, BigDecimalUtil.mul(nightPlanQty, lossRate));
-//            scheduleResult.setNightPlanQty(nightPlanQty);
+//            nightPlanQty = BigDecimalUtils.div(nightPlanQty, 1 + oldLossRate, 4); //计算出之前没有加上损耗量的 计划量
+//            nightPlanQty = BigDecimalUtils.add(nightPlanQty, BigDecimalUtils.mul(nightPlanQty, lossRate));
+//            scheduleResult.setClass2PlanQty(nightPlanQty);
 //        }
 //        autoScheduleLogService.insertNcScheduleLog(batchNo, orderNo, "转机台结束后的排程数据", toJSONString(scheduleResult));  //添加日志
 //    }
@@ -894,27 +916,27 @@ public class DjEngineServiceImpl implements DjEngineService {
      * 确认自动排程机台
      * @param scheduleResult  排程信息
      */
-    public void confirmNcMachine(DjScheduleResult scheduleResult) {
+    public void confirmDjMachine(DjScheduleResult scheduleResult) {
         String batchNo = scheduleResult.getBatchNo();  //批次号
         String orderNo = scheduleResult.getOrderNo();  //工单号
         autoScheduleLogService.insertNcScheduleLog(batchNo, orderNo, "确认机台初始数据", logSplit( "页面提交的信息：" + toJSONString(scheduleResult)));  //添加日志
-        Map<String, Double> lossRateMap = ncEngineLossService.getLossRateMap();   //损耗率map
+        Map<String, Double> lossRateMap = djEngineLossService.getLossRateMap();   //损耗率map
         Map<String, String> paramsMap = this.getParamsMap();  // 获取工序参数map
         double paramLossRate = getDouble(paramsMap.get(EngineConstants.LOSS_RATE));
 
         //耗损率
-        double lossRate = ncEngineLossService.getLossRate(scheduleResult.getLiningCode(), scheduleResult.getMachineCode(), lossRateMap, paramLossRate);  //计算出新机台的耗损率
+        double lossRate = djEngineLossService.getLossRate(scheduleResult.getPaddingCode(), scheduleResult.getMachineCode(), lossRateMap, paramLossRate);  //计算出新机台的耗损率
         autoScheduleLogService.insertNcScheduleLog(batchNo, orderNo, "确认机台耗损率", "耗损率：" + lossRate);  //添加日志
 
-        Double dayPlanQty = scheduleResult.getDayPlanQty();  //中班计划量
+        BigDecimal dayPlanQty = scheduleResult.getClass1PlanQty();  //中班计划量
         if(dayPlanQty != null) {
-            dayPlanQty = BigDecimalUtil.add(dayPlanQty, BigDecimalUtil.mul(dayPlanQty, lossRate));
-            scheduleResult.setDayPlanQty(BigDecimalUtil.roundUp(dayPlanQty, 0));
+            dayPlanQty = BigDecimalUtils.add(dayPlanQty, BigDecimalUtils.multiply(dayPlanQty, lossRate));
+            scheduleResult.setClass1PlanQty(dayPlanQty.setScale(0, RoundingMode.UP));
         }
-        Double nightPlanQty = scheduleResult.getNightPlanQty();  //夜班计划量
+        BigDecimal nightPlanQty = scheduleResult.getClass1PlanQty();  //夜班计划量
         if(nightPlanQty != null) {
-            nightPlanQty = BigDecimalUtil.add(nightPlanQty, BigDecimalUtil.mul(nightPlanQty, lossRate));
-            scheduleResult.setNightPlanQty(BigDecimalUtil.roundUp(nightPlanQty, 0));
+            nightPlanQty = BigDecimalUtils.add(nightPlanQty, BigDecimalUtils.multiply(nightPlanQty, lossRate));
+            scheduleResult.setClass2PlanQty(nightPlanQty.setScale(0, RoundingMode.UP));
         }
         autoScheduleLogService.insertNcScheduleLog(batchNo, orderNo, "确认机台结束后的排程数据", toJSONString(scheduleResult));  //添加日志
     }
@@ -924,7 +946,7 @@ public class DjEngineServiceImpl implements DjEngineService {
      * @param scheduleDate 排程日期,格式：yyyy-mm-dd
      */
     public void handEquilibriumAndProduceOrder(String scheduleDate) {
-        List<DjScheduleResultVo> scheduleList = ncEngineMapper.listNcEnginSchedule(scheduleDate);
+        List<DjScheduleResultVo> scheduleList = djEngineMapper.listDjEnginSchedule(scheduleDate);
         if(StringUtils.isEmpty(scheduleList)) {
             return;
         }
@@ -933,21 +955,21 @@ public class DjEngineServiceImpl implements DjEngineService {
         Map<String, DjTotalPlanQtyVo> totalPlanQtyMap = new HashMap<>();  //每个生产线的计划量汇总MAP
         for(DjScheduleResultVo schedule : scheduleList ) {
             batchNo = schedule.getBatchNo();
-            Double dayPlanQty = schedule.getDayPlanQty();  //中班计划量
-            Double nightPlanQty = schedule.getNightPlanQty();  //夜班计划量
+            BigDecimal dayPlanQty = schedule.getClass3PlanQty();  //中班计划量
+            BigDecimal nightPlanQty = schedule.getClass2PlanQty();  //夜班计划量
             //如果中班计划量>0，那么中班计划量=中班计划量+夜班计划量，夜班计划量=0（不二次排程逻辑处理）
-            if (dayPlanQty > 0) {
-                dayPlanQty = BigDecimalUtil.add(dayPlanQty, nightPlanQty);
-                nightPlanQty = 0D;
-                schedule.setDayPlanQty(dayPlanQty);
-                schedule.setNightPlanQty(nightPlanQty);
+            if (dayPlanQty.compareTo(BigDecimal.ZERO) > 0) {
+                dayPlanQty = BigDecimalUtils.add(dayPlanQty, nightPlanQty);
+                nightPlanQty = BigDecimal.ZERO;
+                schedule.setClass3PlanQty(dayPlanQty);
+                schedule.setClass2PlanQty(nightPlanQty);
             }
-            if(schedule.getMachineId() == null) {
-                schedule.setMachineId("");
+            if(schedule.getMachineCode() == null) {
+                schedule.setMachineCode("");
             }
-            if(schedule.getSupplyTime() == null) {
-                schedule.setSupplyTime(0D);
-            }
+//            if(schedule.getSupplyTime() == null) {
+//                schedule.setSupplyTime(0D);
+//            }
             //计算中班总计划量 和 夜班总计划量
             this.groupTotalPlanQtyMap(schedule, totalPlanQtyMap);
         }
@@ -957,10 +979,10 @@ public class DjEngineServiceImpl implements DjEngineService {
         BigDecimal equalShareThreshold = new BigDecimal(paramsMap.getOrDefault(EngineConstants.EQUAL_SHARE_THRESHOLD, DEFAULT_EQUAL_SHARE_THRESHOLD)); // 平分阈值
         this.equalShare(batchNo, scheduleList, null, equalShareThreshold);  //单规格排产数量达到设定值时，中夜班数量对半分
         this.setProduceOrder(scheduleList);  //生产顺序重新计算
-        ncEngineMapper.createTempTable();
-        ncEngineMapper.insertTempTable(scheduleList);
-        ncEngineMapper.batchUpdateProduceOrder(scheduleDate, scheduleList);  //批量更新各班的计划量和生产顺序
-//        ncEngineMapper.dropTempTable();
+        djEngineMapper.createTempTable();
+        djEngineMapper.insertTempTable(scheduleList);
+        djEngineMapper.batchUpdateProduceOrder(scheduleDate, scheduleList);  //批量更新各班的计划量和生产顺序
+//        djEngineMapper.dropTempTable();
     }
 
     /**
@@ -968,17 +990,17 @@ public class DjEngineServiceImpl implements DjEngineService {
      * @param scheduleDate
      */
     public void handGlueMerge(String scheduleDate) {
-        List<DjScheduleResultVo> scheduleList = ncEngineMapper.listNcEnginSchedule(scheduleDate);
+        List<DjScheduleResultVo> scheduleList = djEngineMapper.listDjEnginSchedule(scheduleDate);
         if(StringUtils.isEmpty(scheduleList)) {
             return;
         }
         Map<String, String> paramsMap = this.getParamsMap();  // 获取工序参数map
         String batchNo = scheduleList.get(0).getBatchNo();  //批次号
         this.glueMerge(batchNo, scheduleList, paramsMap.get(EngineConstants.GLUE_MERGE_THRESHOLD), paramsMap.get(EngineConstants.GLUE_MERGE_THRESHOLD_MAX));  //同胶料合并生产
-        ncEngineMapper.createTempTable();
-        ncEngineMapper.insertTempTable(scheduleList);
-        ncEngineMapper.batchUpdatePlanQty(scheduleDate, scheduleList);  //批量更新各班的计划量
-//        ncEngineMapper.dropTempTable();
+        djEngineMapper.createTempTable();
+        djEngineMapper.insertTempTable(scheduleList);
+        djEngineMapper.batchUpdatePlanQty(scheduleDate, scheduleList);  //批量更新各班的计划量
+//        djEngineMapper.dropTempTable();
     }
 
     /**
@@ -989,10 +1011,10 @@ public class DjEngineServiceImpl implements DjEngineService {
      * @param totalPlanQtyMap 每个生产线的计划量汇总MAP
      */
     private void equilibrium(List<DjScheduleResultVo> scheduleList, Map<String, String> paramsMap, Map<String, DjTotalPlanQtyVo> totalPlanQtyMap) {
-        Map<String, List<DjScheduleResultVo>> map = scheduleList.stream().collect(Collectors.groupingBy(s->s.getMachineId()));
+        Map<String, List<DjScheduleResultVo>> map = scheduleList.stream().collect(Collectors.groupingBy(s->s.getMachineCode()));
         scheduleList.clear();
         map.forEach((key, valueList) -> {
-            this.equilibriumOne(valueList, paramsMap, totalPlanQtyMap.get(key));
+//            this.equilibriumOne(valueList, paramsMap, totalPlanQtyMap.get(key));
             scheduleList.addAll(valueList);
         });
     }
@@ -1004,75 +1026,75 @@ public class DjEngineServiceImpl implements DjEngineService {
      * @param paramsMap      工序参数
      * @param totalPlanQtyVo 垫胶中班和夜班总计划量Vo
      */
-    private void equilibriumOne(List<DjScheduleResultVo> scheduleList, Map<String, String> paramsMap, DjTotalPlanQtyVo totalPlanQtyVo) {
-        String batchNo = "";  //批次号
-        String oldScheduleList = toJSONString(scheduleList);
-        double difRate = getDoubleOrDefault(paramsMap.get(EngineConstants.PLAN_DIFFERENCE_RATE) ,100D);  //参数配置：中班总量和夜班总量差额百分比
-        double supplyTimePass = getDoubleOrDefault(paramsMap.get(EngineConstants.SUPPLY_TIME_PASS),12D);;  //参数配置：库存供应时长小时数
-        double difNum = BigDecimalUtil.sub(totalPlanQtyVo.getTotalDayPlanQty(), totalPlanQtyVo.getTotalNightPlanQty()); //中班和夜班计划量差额
-        double actualDifRate = Math.abs(difNum) / totalPlanQtyVo.getTotalPlanQty() * 100;  //实际中班和夜班总计划量差额百分比
-        if (actualDifRate > difRate) {
-            //中班总量和夜班总量的差额百分比超过了参数配置的百分比，则需要做均衡处理
-            boolean isDayClassPass = (difNum > 0);  //true：中班超量，false：夜班超量
-            if (isDayClassPass) {
-                //中班超量，排程结果按中班计划量，从小到大排序
-                scheduleList = scheduleList.stream().sorted(Comparator.comparing(DjScheduleResultVo::getDayPlanQty)).collect(Collectors.toList());
-            } else {
-                //夜班超量，排程结果按夜班计划量，从小到大排序
-                scheduleList = scheduleList.stream().sorted(Comparator.comparing(DjScheduleResultVo::getNightPlanQty)).collect(Collectors.toList());
-            }
-            //开始计划量均衡处理
-            double lastDifRate = actualDifRate;  //上一次的中班总量和夜班总量的差额百分比
-            for (DjScheduleResultVo resultVo : scheduleList) {
-                batchNo = resultVo.getBatchNo();
-                double supplyTime = resultVo.getSupplyTime() == null ? 0D : resultVo.getSupplyTime(); //库存供应时长
-                double dayPlanQty = resultVo.getDayPlanQty();    //中班计划量
-                double nightPlanQty = resultVo.getNightPlanQty();  //夜班计划量
-
-                if (isDayClassPass) {  //中班超量，中班移到夜班
-                    if (dayPlanQty == 0 || supplyTime <= supplyTimePass) {
-                        //库存供应时长 超过supplyTimePass的， 才允许拆到夜班生产
-                        continue;
-                    }
-                    double totalDayPlan = BigDecimalUtil.sub(totalPlanQtyVo.getTotalDayPlanQty(), dayPlanQty);
-                    double totalNightPlan = BigDecimalUtil.add(totalPlanQtyVo.getTotalNightPlanQty(), dayPlanQty);
-                    double newDifNum = BigDecimalUtil.sub(totalDayPlan, totalNightPlan); //中班和夜班计划量差额
-                    double newDifRate = Math.abs(newDifNum) / totalPlanQtyVo.getTotalPlanQty() * 100;   //计算新的差额率
-                    if(newDifRate >= lastDifRate) {
-                        //如果调整后的差额率，比上次调整的高，那上次调整的数据是最均衡的。均衡处理全部结束
-                        break;
-                    }
-
-                    resultVo.setDayPlanQty(0D);
-                    resultVo.setNightPlanQty(BigDecimalUtil.add(dayPlanQty, nightPlanQty));
-                    //重新计算中班和夜班的总计划量
-                    totalPlanQtyVo.setTotalDayPlanQty(totalDayPlan);
-                    totalPlanQtyVo.setTotalNightPlanQty(totalNightPlan);
-                    lastDifRate = newDifRate;
-                } else {  //夜班超量，夜班移到中班
-                    if (nightPlanQty == 0) {
-                        continue;
-                    }
-                    double totalDayPlan =  BigDecimalUtil.add(totalPlanQtyVo.getTotalDayPlanQty(), nightPlanQty);
-                    double totalNightPlan = BigDecimalUtil.sub(totalPlanQtyVo.getTotalNightPlanQty(), nightPlanQty);
-                    double newDifNum = BigDecimalUtil.sub(totalDayPlan, totalNightPlan); //中班和夜班计划量差额
-                    double newDifRate = Math.abs(newDifNum) / totalPlanQtyVo.getTotalPlanQty() * 100;   //计算新的差额率
-                    if(newDifRate >= lastDifRate) {
-                        //如果调整后的差额率，比上次调整的高，那上次调整的数据是最均衡的。均衡处理全部结束
-                        break;
-                    }
-
-                    resultVo.setDayPlanQty(BigDecimalUtil.add(dayPlanQty, nightPlanQty));
-                    resultVo.setNightPlanQty(0D);
-                    //重新计算中班和夜班的总计划量
-                    totalPlanQtyVo.setTotalDayPlanQty(totalDayPlan);
-                    totalPlanQtyVo.setTotalNightPlanQty(totalNightPlan);
-                    lastDifRate = newDifRate;
-                }
-            }
-        }
-        this.equilibriumLog(batchNo, oldScheduleList, scheduleList, paramsMap, totalPlanQtyVo);  //添加日志
-    }
+//    private void equilibriumOne(List<DjScheduleResultVo> scheduleList, Map<String, String> paramsMap, DjTotalPlanQtyVo totalPlanQtyVo) {
+//        String batchNo = "";  //批次号
+//        String oldScheduleList = toJSONString(scheduleList);
+//        double difRate = getDoubleOrDefault(paramsMap.get(EngineConstants.PLAN_DIFFERENCE_RATE) ,100D);  //参数配置：中班总量和夜班总量差额百分比
+//        double supplyTimePass = getDoubleOrDefault(paramsMap.get(EngineConstants.SUPPLY_TIME_PASS),12D);;  //参数配置：库存供应时长小时数
+//        double difNum = BigDecimalUtils.sub(totalPlanQtyVo.getTotalDayPlanQty(), totalPlanQtyVo.getTotalNightPlanQty()); //中班和夜班计划量差额
+//        double actualDifRate = Math.abs(difNum) / totalPlanQtyVo.getTotalPlanQty() * 100;  //实际中班和夜班总计划量差额百分比
+//        if (actualDifRate > difRate) {
+//            //中班总量和夜班总量的差额百分比超过了参数配置的百分比，则需要做均衡处理
+//            boolean isDayClassPass = (difNum > 0);  //true：中班超量，false：夜班超量
+//            if (isDayClassPass) {
+//                //中班超量，排程结果按中班计划量，从小到大排序
+//                scheduleList = scheduleList.stream().sorted(Comparator.comparing(DjScheduleResultVo::getClass3PlanQty)).collect(Collectors.toList());
+//            } else {
+//                //夜班超量，排程结果按夜班计划量，从小到大排序
+//                scheduleList = scheduleList.stream().sorted(Comparator.comparing(DjScheduleResultVo::getClass2PlanQty)).collect(Collectors.toList());
+//            }
+//            //开始计划量均衡处理
+//            double lastDifRate = actualDifRate;  //上一次的中班总量和夜班总量的差额百分比
+//            for (DjScheduleResultVo resultVo : scheduleList) {
+//                batchNo = resultVo.getBatchNo();
+//                double supplyTime = resultVo.getSupplyTime() == null ? 0D : resultVo.getSupplyTime(); //库存供应时长
+//                double dayPlanQty = resultVo.getClass3PlanQty();    //中班计划量
+//                double nightPlanQty = resultVo.getClass2PlanQty();  //夜班计划量
+//
+//                if (isDayClassPass) {  //中班超量，中班移到夜班
+//                    if (dayPlanQty == 0 || supplyTime <= supplyTimePass) {
+//                        //库存供应时长 超过supplyTimePass的， 才允许拆到夜班生产
+//                        continue;
+//                    }
+//                    double totalDayPlan = BigDecimalUtils.sub(totalPlanQtyVo.getTotalDayPlanQty(), dayPlanQty);
+//                    double totalNightPlan = BigDecimalUtils.add(totalPlanQtyVo.getTotalNightPlanQty(), dayPlanQty);
+//                    double newDifNum = BigDecimalUtils.sub(totalDayPlan, totalNightPlan); //中班和夜班计划量差额
+//                    double newDifRate = Math.abs(newDifNum) / totalPlanQtyVo.getTotalPlanQty() * 100;   //计算新的差额率
+//                    if(newDifRate >= lastDifRate) {
+//                        //如果调整后的差额率，比上次调整的高，那上次调整的数据是最均衡的。均衡处理全部结束
+//                        break;
+//                    }
+//
+//                    resultVo.setClass3PlanQty(0D);
+//                    resultVo.setClass2PlanQty(BigDecimalUtils.add(dayPlanQty, nightPlanQty));
+//                    //重新计算中班和夜班的总计划量
+//                    totalPlanQtyVo.setTotalDayPlanQty(totalDayPlan);
+//                    totalPlanQtyVo.setTotalNightPlanQty(totalNightPlan);
+//                    lastDifRate = newDifRate;
+//                } else {  //夜班超量，夜班移到中班
+//                    if (nightPlanQty == 0) {
+//                        continue;
+//                    }
+//                    double totalDayPlan =  BigDecimalUtils.add(totalPlanQtyVo.getTotalDayPlanQty(), nightPlanQty);
+//                    double totalNightPlan = BigDecimalUtils.sub(totalPlanQtyVo.getTotalNightPlanQty(), nightPlanQty);
+//                    double newDifNum = BigDecimalUtils.sub(totalDayPlan, totalNightPlan); //中班和夜班计划量差额
+//                    double newDifRate = Math.abs(newDifNum) / totalPlanQtyVo.getTotalPlanQty() * 100;   //计算新的差额率
+//                    if(newDifRate >= lastDifRate) {
+//                        //如果调整后的差额率，比上次调整的高，那上次调整的数据是最均衡的。均衡处理全部结束
+//                        break;
+//                    }
+//
+//                    resultVo.setClass3PlanQty(BigDecimalUtils.add(dayPlanQty, nightPlanQty));
+//                    resultVo.setClass2PlanQty(0D);
+//                    //重新计算中班和夜班的总计划量
+//                    totalPlanQtyVo.setTotalDayPlanQty(totalDayPlan);
+//                    totalPlanQtyVo.setTotalNightPlanQty(totalNightPlan);
+//                    lastDifRate = newDifRate;
+//                }
+//            }
+//        }
+//        this.equilibriumLog(batchNo, oldScheduleList, scheduleList, paramsMap, totalPlanQtyVo);  //添加日志
+//    }
 
     /**
      * 单规格排产数量达到设定值时，中夜班计划平分
@@ -1080,8 +1102,8 @@ public class DjEngineServiceImpl implements DjEngineService {
      * @param bisectThreshold  各班计划量均分阈值
      */
     private void equalShare(String batchNo, List<DjScheduleResultVo> scheduleList, DjTotalPlanQtyVo totalPlanQtyVo, BigDecimal bisectThreshold) {
-        double totalNightPlanQty = 0D;
-        double totalNextDayPlanQty = 0D;
+        BigDecimal totalNightPlanQty = BigDecimal.ZERO;
+        BigDecimal totalNextDayPlanQty = BigDecimal.ZERO;
         if (totalPlanQtyVo != null) {
             totalNightPlanQty = totalPlanQtyVo.getTotalNightPlanQty();
             totalNextDayPlanQty = totalPlanQtyVo.getTotalNextDayPlanQty();
@@ -1089,35 +1111,35 @@ public class DjEngineServiceImpl implements DjEngineService {
         // 次日早夜班总计划量超过阈值的平分中夜班计划量
         for (DjScheduleResultVo scheduleVo : scheduleList) {
             BigDecimal toolCapacity = (BigDecimal)scheduleVo.getParams().get(EngineConstants.TOOL_CAPACITY); // 满工装长度
-            BigDecimal nightPlanQty = BigDecimalUtils.valueOf(scheduleVo.getNightPlanQty());
-            BigDecimal nextDayPlanQty = BigDecimalUtils.valueOf(scheduleVo.getNextDayPlanQty());
+            BigDecimal nightPlanQty = BigDecimalUtils.valueOf(scheduleVo.getClass2PlanQty());
+            BigDecimal nextDayPlanQty = BigDecimalUtils.valueOf(scheduleVo.getClass4PlanQty());
             BigDecimal totalPlanQty = BigDecimalUtils.add(nightPlanQty, nextDayPlanQty);
             if (totalPlanQty.compareTo(bisectThreshold) > 0) { // 隔天总计划量超过均分阈值
                 BigDecimal avgPlanQty = BigDecimalUtils.ceil(BigDecimalUtils.half(totalPlanQty), toolCapacity); // 超过的要将计划均分到每个班
-                boolean isNightClassLarge = totalNightPlanQty > totalNextDayPlanQty;
+                boolean isNightClassLarge = totalNightPlanQty.compareTo(totalNextDayPlanQty) > 0;
                 BigDecimal newNightPlanQty = isNightClassLarge? totalPlanQty.subtract(avgPlanQty): avgPlanQty;
                 BigDecimal newNextDayPlanQty = !isNightClassLarge? totalPlanQty.subtract(avgPlanQty): avgPlanQty;
-                scheduleVo.setNightPlanQty(newNightPlanQty.doubleValue());
-                scheduleVo.setNextDayPlanQty(newNextDayPlanQty.doubleValue());
-                scheduleVo.setIsEqualShare(true);
+                scheduleVo.setClass2PlanQty(newNightPlanQty);
+                scheduleVo.setClass4PlanQty(newNextDayPlanQty);
+//                scheduleVo.setIsEqualShare(true);
                 // 重算总量
-                totalNightPlanQty = BigDecimalUtil.add(totalNightPlanQty, newNightPlanQty.subtract(nightPlanQty).doubleValue());
-                totalNextDayPlanQty = BigDecimalUtil.add(totalNextDayPlanQty, newNextDayPlanQty.subtract(nextDayPlanQty).doubleValue());
+                totalNightPlanQty = BigDecimalUtils.add(totalNightPlanQty, newNightPlanQty.subtract(nightPlanQty).doubleValue());
+                totalNextDayPlanQty = BigDecimalUtils.add(totalNextDayPlanQty, newNextDayPlanQty.subtract(nextDayPlanQty).doubleValue());
                 continue;
             }
             // 未达到均分阈值的规格，要集中到一个班生产
-            if (scheduleVo.getNightPlanQty() > 0) { // 早班有需求量则合并到早班，否则合并到次日夜班
-                scheduleVo.setNightPlanQty(totalPlanQty.doubleValue());
-                scheduleVo.setNextDayPlanQty(0D);
-                totalNightPlanQty = BigDecimalUtil.add(totalNightPlanQty, nextDayPlanQty.doubleValue());
-                totalNextDayPlanQty = BigDecimalUtil.sub(totalNextDayPlanQty, nextDayPlanQty.doubleValue());
+            if (scheduleVo.getClass2PlanQty().compareTo(BigDecimal.ZERO) > 0) { // 早班有需求量则合并到早班，否则合并到次日夜班
+                scheduleVo.setClass2PlanQty(totalPlanQty);
+                scheduleVo.setClass4PlanQty(BigDecimal.ZERO);
+                totalNightPlanQty = BigDecimalUtils.add(totalNightPlanQty, nextDayPlanQty.doubleValue());
+                totalNextDayPlanQty = BigDecimalUtils.sub(totalNextDayPlanQty, nextDayPlanQty.doubleValue());
             } else {
-                scheduleVo.setNightPlanQty(0D);
-                scheduleVo.setNextDayPlanQty(totalPlanQty.doubleValue());
-                totalNightPlanQty = BigDecimalUtil.sub(totalNightPlanQty, nightPlanQty.doubleValue());
-                totalNextDayPlanQty = BigDecimalUtil.add(totalNextDayPlanQty, nightPlanQty.doubleValue());
+                scheduleVo.setClass2PlanQty(BigDecimal.ZERO);
+                scheduleVo.setClass4PlanQty(totalPlanQty);
+                totalNightPlanQty = BigDecimalUtils.sub(totalNightPlanQty, nightPlanQty.doubleValue());
+                totalNextDayPlanQty = BigDecimalUtils.add(totalNextDayPlanQty, nightPlanQty.doubleValue());
             }
-            scheduleVo.setIsEqualShare(false);
+//            scheduleVo.setIsEqualShare(false);
         }
         if (totalPlanQtyVo != null) {
             totalPlanQtyVo.setTotalNightPlanQty(totalNightPlanQty); // 早班总计划量
@@ -1150,34 +1172,34 @@ public class DjEngineServiceImpl implements DjEngineService {
         }
 
         //根据机台+胶料进行分组
-        Map<String, List<DjScheduleResultVo>> groupMap = scheduleList.stream().collect(Collectors.groupingBy(v -> v.getGlueCode() + v.getMachineId()));
+        Map<String, List<DjScheduleResultVo>> groupMap = scheduleList.stream().collect(Collectors.groupingBy(v -> v.getGlueCode() + v.getMachineCode()));
         scheduleList.clear();
 
         for(List<DjScheduleResultVo> list : groupMap.values()) {
             boolean isPassParam = this.compareSupplyTime(list, threshold);  //判断集合中的库存供应时长 是否 有小于参数值的
 
             for(DjScheduleResultVo scheduleVo : list) {
-                Double dayPlanQty = scheduleVo.getDayPlanQty();
-                Double nightPlanQty = scheduleVo.getNightPlanQty();
+                BigDecimal dayPlanQty = scheduleVo.getClass3PlanQty();
+                BigDecimal nightPlanQty = scheduleVo.getClass2PlanQty();
                 if(isPassParam) {
                     //库存供应时长 有小于 {GLUE_MERGE_THRESHOLD}参数值.计划量全归并到中班
-                    scheduleVo.setDayPlanQty(BigDecimalUtil.add(dayPlanQty, nightPlanQty));
-                    scheduleVo.setNightPlanQty(0D);
+                    scheduleVo.setClass3PlanQty(BigDecimalUtils.add(dayPlanQty, nightPlanQty));
+                    scheduleVo.setClass2PlanQty(BigDecimal.ZERO);
                 } else {
                     //如果供应时长都大于{GLUE_MERGE_THRESHOLD}参数，则计划量都归并到夜班，在此情况下其中要是有记录的供应时长又大于{GLUE_MERGE_THRESHOLD_MAX}参数，则把计划量归并到【预计划】字段中，中班和夜班计划量变0
-                    Double supplyTime = scheduleVo.getSupplyTime();
-                    if(supplyTime > thresholdMax ) {
-                        //则把计划量归并到【预计划】字段中，中班和夜班计划量变0
-                        if(scheduleVo.getDayPlanQty() > 0 || scheduleVo.getNightPlanQty() > 0) {
-                            scheduleVo.setPrePlanQty(BigDecimalUtil.add(dayPlanQty, nightPlanQty));  //设置预计库存
-                            scheduleVo.setDayPlanQty(0D);
-                            scheduleVo.setNightPlanQty(0D);
-                        }
-                    } else {
-                        //计划量都归并到夜班
-                        scheduleVo.setDayPlanQty(0D);
-                        scheduleVo.setNightPlanQty(BigDecimalUtil.add(dayPlanQty, nightPlanQty));
-                    }
+//                    Double supplyTime = scheduleVo.getSupplyTime();
+//                    if(supplyTime > thresholdMax ) {
+//                        //则把计划量归并到【预计划】字段中，中班和夜班计划量变0
+//                        if(scheduleVo.getClass3PlanQty() > 0 || scheduleVo.getClass2PlanQty() > 0) {
+//                            scheduleVo.setPrePlanQty(BigDecimalUtils.add(dayPlanQty, nightPlanQty));  //设置预计库存
+//                            scheduleVo.setClass3PlanQty(0D);
+//                            scheduleVo.setClass2PlanQty(0D);
+//                        }
+//                    } else {
+//                        //计划量都归并到夜班
+//                        scheduleVo.setClass3PlanQty(0D);
+//                        scheduleVo.setClass2PlanQty(BigDecimalUtils.add(dayPlanQty, nightPlanQty));
+//                    }
                 }
             }
             scheduleList.addAll(list);
@@ -1193,11 +1215,11 @@ public class DjEngineServiceImpl implements DjEngineService {
      * @return
      */
     private boolean compareSupplyTime(List<DjScheduleResultVo> list, Double equalShareThreshold) {
-        for(DjScheduleResultVo schedule : list) {
-            if(schedule.getSupplyTime() <= equalShareThreshold) {
-                return true;
-            }
-        }
+//        for(DjScheduleResultVo schedule : list) {
+//            if(schedule.getSupplyTime() <= equalShareThreshold) {
+//                return true;
+//            }
+//        }
         return false;
     }
 
@@ -1207,15 +1229,15 @@ public class DjEngineServiceImpl implements DjEngineService {
      * @param totalPlanQtyMap 每个生产线的计划量汇总MAP
      */
     private void groupTotalPlanQtyMap(DjScheduleResultVo scheduleVo, Map<String, DjTotalPlanQtyVo> totalPlanQtyMap) {
-        String key = scheduleVo.getMachineId();  //机台id作为Map的key
+        String key = scheduleVo.getMachineCode();  //机台id作为Map的key
         key = StringUtils.isBlank(key) ? "" : key;
         DjTotalPlanQtyVo totalPlanQtyVo = totalPlanQtyMap.getOrDefault(key, new DjTotalPlanQtyVo());  //取出对应生产线的计划量汇总对象
 
-        Double dayPlanQty = scheduleVo.getDayPlanQty();  //中班计划量
-        Double nightPlanQty = scheduleVo.getNightPlanQty();  //夜班计划量
-        totalPlanQtyVo.setTotalDayPlanQty(BigDecimalUtil.add(totalPlanQtyVo.getTotalDayPlanQty(), dayPlanQty));
-        totalPlanQtyVo.setTotalNightPlanQty(BigDecimalUtil.add(totalPlanQtyVo.getTotalNightPlanQty(), nightPlanQty));
-        totalPlanQtyVo.setTotalPlanQty(BigDecimalUtil.add(totalPlanQtyVo.getTotalDayPlanQty(), totalPlanQtyVo.getTotalNightPlanQty()));
+        BigDecimal dayPlanQty = scheduleVo.getClass3PlanQty();  //中班计划量
+        BigDecimal nightPlanQty = scheduleVo.getClass2PlanQty();  //夜班计划量
+        totalPlanQtyVo.setTotalDayPlanQty(BigDecimalUtils.add(totalPlanQtyVo.getTotalDayPlanQty(), dayPlanQty));
+        totalPlanQtyVo.setTotalNightPlanQty(BigDecimalUtils.add(totalPlanQtyVo.getTotalNightPlanQty(), nightPlanQty));
+        totalPlanQtyVo.setTotalPlanQty(BigDecimalUtils.add(totalPlanQtyVo.getTotalDayPlanQty(), totalPlanQtyVo.getTotalNightPlanQty()));
         totalPlanQtyMap.put(key, totalPlanQtyVo);  //计算完毕后，把生产线的计划量汇总对象重新存入map中
     }
 
@@ -1242,22 +1264,22 @@ public class DjEngineServiceImpl implements DjEngineService {
      */
     private void setProduceOrder(List<DjScheduleResultVo> scheduleList) {
         //根据机台+胶料进行分组
-        Map<String, List<DjScheduleResultVo>> groupMap = scheduleList.stream().collect(Collectors.groupingBy(v -> v.getGlueCode() + v.getMachineId()));
+        Map<String, List<DjScheduleResultVo>> groupMap = scheduleList.stream().collect(Collectors.groupingBy(v -> v.getGlueCode() + v.getMachineCode()));
         scheduleList.clear();
 
         for(List<DjScheduleResultVo> list : groupMap.values()) {
             int dayProduceOrder = 1; //白班生产顺序
             int nightProduceOrder = 1;  //夜班生产顺序
             //根据库存供应时长升序排序
-            list = list.stream().sorted(Comparator.comparing(DjScheduleResultVo::getSupplyTime)).collect(Collectors.toList());
+//            list = list.stream().sorted(Comparator.comparing(DjScheduleResultVo::getSupplyTime)).collect(Collectors.toList());
             for(DjScheduleResultVo scheduleVo : list) {
-                Double dayPlanQty = scheduleVo.getDayPlanQty();
-                Double nightPlanQty = scheduleVo.getNightPlanQty();
-                if(dayPlanQty > 0) {
-                    scheduleVo.setDayProduceOrder(dayProduceOrder++);
+                BigDecimal dayPlanQty = scheduleVo.getClass3PlanQty();
+                BigDecimal nightPlanQty = scheduleVo.getClass2PlanQty();
+                if(dayPlanQty.doubleValue() > 0) {
+                    scheduleVo.setClass1Sequence(dayProduceOrder++);
                 }
-                if(nightPlanQty > 0) {
-                    scheduleVo.setNightProduceOrder(nightProduceOrder++);
+                if(nightPlanQty.doubleValue() > 0) {
+                    scheduleVo.setClass1Sequence(nightProduceOrder++);
                 }
                 autoScheduleLogService.insertNcScheduleLog(scheduleVo.getBatchNo(), scheduleVo.getOrderNo(), "设置生产顺序字段",
                         logSplit("根据机台+胶料进行分组，然后在根据库存供应时长(从小到大)，设置中班和夜班的生产顺序（有计划量的才设置生产顺序）", "设置后的排程数据：" + toJSONString(scheduleVo)));  //添加日志
@@ -1266,43 +1288,43 @@ public class DjEngineServiceImpl implements DjEngineService {
         }
     }
 
-    /**
-     * 设置收尾提示标识 和 生产状态字段
-     * @param scheduleResultVo
-     * @param monthSurplusVo
-     * @param closeOutNum  参数配置表设置的 提示收尾阈值
-     */
-    private void setStatusAndCloseTip(DjScheduleResultVo scheduleResultVo, DjMonthSurplusVo monthSurplusVo, Double closeOutNum) {
-        if(monthSurplusVo == null) {
-            scheduleResultVo.setMarkCloseOutTip(EngineConstants.CLOSE_TIP_NOT);
-            scheduleResultVo.setProductionStatus(EngineConstants.PRODUCTION_STATUS_NOT);
-            return;
-        }
-        Double monthFinishQty = monthSurplusVo.getMonthFinishQty();  //月度计划完成量
-        Double monthRemainQty = monthSurplusVo.getMonthRemainQty();  //月度计划剩余量
-        if(monthRemainQty < closeOutNum) {
-            //剩余量小宇等于“临近收尾阈值”，设置收尾提示
-            scheduleResultVo.setMarkCloseOutTip(EngineConstants.CLOSE_TIP_NEED);
-        } else {
-            scheduleResultVo.setMarkCloseOutTip(EngineConstants.CLOSE_TIP_NOT);
-        }
-        autoScheduleLogService.insertNcScheduleLog(scheduleResultVo.getBatchNo(), scheduleResultVo.getOrderNo(), "设置收尾提示标识markCloseOutTip",
-                logSplit("剩余量小宇等于“临近收尾阈值”，设置收尾提示","月度计划剩余量：" + monthRemainQty + ",提示收尾阈值：" + closeOutNum, "最终的排程数据：" + toJSONString(scheduleResultVo)));  //添加日志
-
-        if(monthFinishQty == 0D) {
-            //没有完成量
-            scheduleResultVo.setProductionStatus(EngineConstants.PRODUCTION_STATUS_NOT);
-        } else if(monthFinishQty > 0D && monthRemainQty > 0) {
-            //完成量大于0，月度计划量也大于0，说明出于生产中
-            scheduleResultVo.setProductionStatus(EngineConstants.PRODUCTION_STATUS_ING);
-        } else if(monthRemainQty <= 0) {
-            //月度计划量小于等于0，说明出于生产完成
-            scheduleResultVo.setProductionStatus(EngineConstants.PRODUCTION_STATUS_FINISH);
-        }
-        autoScheduleLogService.insertNcScheduleLog(scheduleResultVo.getBatchNo(), scheduleResultVo.getOrderNo(), "修改生产状态productionStatus",
-                logSplit("①完成量为0，对应生产状态：未生产;②完成量大于0，月度计划量也大于0，说明出于生产中;③月度计划量小于等于0，说明出于生产完成",
-                        "月度计划剩余量：" + monthRemainQty + ",月度计划完成量：" + monthFinishQty, "最终的排程数据：" + toJSONString(scheduleResultVo)));  //添加日志
-    }
+//    /**
+//     * 设置收尾提示标识 和 生产状态字段
+//     * @param scheduleResultVo
+//     * @param monthSurplusVo
+//     * @param closeOutNum  参数配置表设置的 提示收尾阈值
+//     */
+//    private void setStatusAndCloseTip(DjScheduleResultVo scheduleResultVo, DjMonthSurplusVo monthSurplusVo, Double closeOutNum) {
+//        if(monthSurplusVo == null) {
+//            scheduleResultVo.setMarkCloseOutTip(EngineConstants.CLOSE_TIP_NOT);
+//            scheduleResultVo.setProductionStatus(EngineConstants.PRODUCTION_STATUS_NOT);
+//            return;
+//        }
+//        Double monthFinishQty = monthSurplusVo.getMonthFinishQty();  //月度计划完成量
+//        Double monthRemainQty = monthSurplusVo.getMonthRemainQty();  //月度计划剩余量
+//        if(monthRemainQty < closeOutNum) {
+//            //剩余量小宇等于“临近收尾阈值”，设置收尾提示
+//            scheduleResultVo.setMarkCloseOutTip(EngineConstants.CLOSE_TIP_NEED);
+//        } else {
+//            scheduleResultVo.setMarkCloseOutTip(EngineConstants.CLOSE_TIP_NOT);
+//        }
+//        autoScheduleLogService.insertNcScheduleLog(scheduleResultVo.getBatchNo(), scheduleResultVo.getOrderNo(), "设置收尾提示标识markCloseOutTip",
+//                logSplit("剩余量小宇等于“临近收尾阈值”，设置收尾提示","月度计划剩余量：" + monthRemainQty + ",提示收尾阈值：" + closeOutNum, "最终的排程数据：" + toJSONString(scheduleResultVo)));  //添加日志
+//
+//        if(monthFinishQty == 0D) {
+//            //没有完成量
+//            scheduleResultVo.setProductionStatus(EngineConstants.PRODUCTION_STATUS_NOT);
+//        } else if(monthFinishQty > 0D && monthRemainQty > 0) {
+//            //完成量大于0，月度计划量也大于0，说明出于生产中
+//            scheduleResultVo.setProductionStatus(EngineConstants.PRODUCTION_STATUS_ING);
+//        } else if(monthRemainQty <= 0) {
+//            //月度计划量小于等于0，说明出于生产完成
+//            scheduleResultVo.setProductionStatus(EngineConstants.PRODUCTION_STATUS_FINISH);
+//        }
+//        autoScheduleLogService.insertNcScheduleLog(scheduleResultVo.getBatchNo(), scheduleResultVo.getOrderNo(), "修改生产状态productionStatus",
+//                logSplit("①完成量为0，对应生产状态：未生产;②完成量大于0，月度计划量也大于0，说明出于生产中;③月度计划量小于等于0，说明出于生产完成",
+//                        "月度计划剩余量：" + monthRemainQty + ",月度计划完成量：" + monthFinishQty, "最终的排程数据：" + toJSONString(scheduleResultVo)));  //添加日志
+//    }
 
     /**
      * 如果当天排程已经存在，则把当天的排程合并到 自动排程的列表中
@@ -1317,10 +1339,10 @@ public class DjEngineServiceImpl implements DjEngineService {
         List<DjScheduleResultVo> mergeList = new ArrayList<>();
 
         Map<String, List<DjScheduleResultVo>> existScheduleMap = existScheduleList.stream().filter(s->s.getPublishSuccessCount()>0)
-                .collect(Collectors.groupingBy(DjScheduleResultVo::getLiningCode)); //拿到重排前，已经有发布给MES的排产数据。key为 半部件规格代码
+                .collect(Collectors.groupingBy(DjScheduleResultVo::getPaddingCode)); //拿到重排前，已经有发布给MES的排产数据。key为 半部件规格代码
 
         for(DjScheduleResultVo autoSchedule : autoScheduleList) {
-            List<DjScheduleResultVo> existScheduleGroupList = existScheduleMap.get(autoSchedule.getLiningCode());
+            List<DjScheduleResultVo> existScheduleGroupList = existScheduleMap.get(autoSchedule.getPaddingCode());
 
             if(existScheduleGroupList != null && existScheduleGroupList.size() == 1) {
                 //对应规格重排前已经发布，并且此规格重排前只有一条排程记录（只对应了一个机台）
@@ -1328,14 +1350,14 @@ public class DjEngineServiceImpl implements DjEngineService {
                 //重排前的数据如果已经发布过，在重新排程后仍有相应的生产需求，计划量按照重新自动排程的计划量安排；订单号需要和之前发布个mes的订单号一致
                 autoSchedule.setOrderNo(existSchedule.getOrderNo());  //订单号
                 autoSchedule.setPublishSuccessCount(existSchedule.getPublishSuccessCount());
-                autoSchedule.setNewestPublishTime(existSchedule.getNewestPublishTime());
-                autoSchedule.setIsRelease(ApsConstant.WAIT_RELEASING);  //发布状态修改
-                autoSchedule.setMachineId(existSchedule.getMachineId());  //机台沿用重排前的机台
+//                autoSchedule.setNewestPublishTime(existSchedule.getNewestPublishTime());
+                autoSchedule.setReleaseStatus(ApsConstant.WAIT_RELEASING);  //发布状态修改
+                autoSchedule.setMachineCode(existSchedule.getMachineCode());  //机台沿用重排前的机台
                 mergeList.add(autoSchedule);
             } else if(existScheduleGroupList != null && existScheduleGroupList.size() > 1) {
                 //对应规格重排前已经发布，并且此规格重排前只有多条排程记录（对应了多个机台）。那需要保留重排之前的排产，并且要把此规格重排后的各班的计划量，拼接到备注中
                 String remarkTip = I18nUtil.getMessage("reschedule.double.spec.remark");
-                remarkTip = StringUtils.format(remarkTip, stripZeros(autoSchedule.getDayPlanQty()), stripZeros(autoSchedule.getNightPlanQty()));
+                remarkTip = StringUtils.format(remarkTip, stripZeros(autoSchedule.getClass3PlanQty()), stripZeros(autoSchedule.getClass2PlanQty()));
                 for(DjScheduleResultVo existSchedule : existScheduleGroupList) {
                     existSchedule.setBatchNo(batchNo);
                     existSchedule.setRemark(remarkTip);
@@ -1345,7 +1367,7 @@ public class DjEngineServiceImpl implements DjEngineService {
                 //对应的规格，重排前没有找到相应记录
                 mergeList.add(autoSchedule);
             }
-            existScheduleMap.remove(autoSchedule.getLiningCode());
+            existScheduleMap.remove(autoSchedule.getPaddingCode());
         }
 
         //重排前的已发布的规格如果没有在重排后的列表中，则需要把对应的规格也加入到最新的排程列表中
@@ -1369,7 +1391,7 @@ public class DjEngineServiceImpl implements DjEngineService {
         params.put("cxBatchNo", cxBatchNo);
         params.put("batchNo", batchNo);
         params.put("userName", SecurityUtils.getUsername());  //用户名
-        ncEngineMapper.createScheduleRecord(params);
+        djEngineMapper.createScheduleRecord(params);
     }
 
     /**
@@ -1377,10 +1399,10 @@ public class DjEngineServiceImpl implements DjEngineService {
      *
      * @param scheduleDate 排程日期，格式：yyyy-MM-dd
      */
-    private void syncNcScheduleToLog(String scheduleDate) {
-        ncEngineMapper.syncNcScheduleToLog(scheduleDate);
-        ncEngineMapper.deleteNcSchedule(scheduleDate);
-        ncEngineMapper.deleteNcAssistSchedule(scheduleDate);
+    private void syncDjScheduleToLog(String scheduleDate) {
+        djEngineMapper.syncDjScheduleToLog(scheduleDate);
+        djEngineMapper.deleteDjSchedule(scheduleDate);
+        djEngineMapper.deleteDjAssistSchedule(scheduleDate);
     }
 
     /**
@@ -1390,9 +1412,9 @@ public class DjEngineServiceImpl implements DjEngineService {
      * @param specifyMachineMap
      */
     private void chooseMachine(DjScheduleResultVo scheduleVo, Map<String, String> specifyMachineMap) {
-        String liningCode = scheduleVo.getLiningCode();  //垫胶代码
+        String liningCode = scheduleVo.getPaddingCode();  //垫胶代码
         String machineIds = specifyMachineMap.get(liningCode);
-        scheduleVo.setMachineId(machineIds == null ? "" : machineIds);
+        scheduleVo.setMachineCode(machineIds == null ? "" : machineIds);
     }
 
     /**
@@ -1402,46 +1424,46 @@ public class DjEngineServiceImpl implements DjEngineService {
      * @param scheduleVo
      * @param stockQty
      */
-    private void newComputeSupplyTime(DjScheduleResultVo scheduleVo,  Double stockQty) {
-        Double cxClass1Plan = (scheduleVo.getCxClass1Plan() == null ? 0D : scheduleVo.getCxClass1Plan());  //对应成型一班的计划量
-        Double cxClass2Plan = (scheduleVo.getCxClass2Plan() == null ? 0D : scheduleVo.getCxClass2Plan());  //对应成型二班的计划量
-        Double cxClass3Plan = (scheduleVo.getCxClass3Plan() == null ? 0D : scheduleVo.getCxClass3Plan());  //对应成型三班的计划量
-        Double cxClass4Plan = (scheduleVo.getCxClass4Plan() == null ? 0D : scheduleVo.getCxClass4Plan());  //对应成型次日一班的计划量
-        Double cxClass5Plan = (scheduleVo.getCxClass5Plan() == null ? 0D : scheduleVo.getCxClass5Plan());  //对应成型次日一班的计划量
+    private void newComputeSupplyTime(DjScheduleResultVo scheduleVo,  BigDecimal stockQty) {
+        Double cxClass1Plan = (scheduleVo.getCxClass1Plan() == null ? 0D : scheduleVo.getCxClass1Plan().doubleValue());  //对应成型一班的计划量
+        Double cxClass2Plan = (scheduleVo.getCxClass2Plan() == null ? 0D : scheduleVo.getCxClass2Plan().doubleValue());  //对应成型二班的计划量
+        Double cxClass3Plan = (scheduleVo.getCxClass3Plan() == null ? 0D : scheduleVo.getCxClass3Plan().doubleValue());  //对应成型三班的计划量
+        Double cxClass4Plan = (scheduleVo.getCxClass4Plan() == null ? 0D : scheduleVo.getCxClass4Plan().doubleValue());  //对应成型次日一班的计划量
+        Double cxClass5Plan = (scheduleVo.getCxClass5Plan() == null ? 0D : scheduleVo.getCxClass5Plan().doubleValue());  //对应成型次日一班的计划量
         autoScheduleLogService.insertNcScheduleLog(scheduleVo.getBatchNo(), scheduleVo.getOrderNo(), "计算库存供应时长前数据",
                 logSplit("具体算法：从1班开始判断，预计库存-1班的计划大于等于0时，供应时长+12小时；预计库存-1班计划-2班计划大于等于0时，供应时长+24小时；预计库存-1班计划-2班计划-3班计划小于0，供应时长=24个小时+（((预计库存-1班计划-2班计划)/3班计划)*12）；以此类推到第5班",
-                        "物料编号：" + scheduleVo.getLiningCode() + ",7点预计库存：" + stockQty + "，对应成型一班的计划量：" + 0 + "，对应成型二班的计划量：" + cxClass2Plan + "，对应成型三班的计划量：" + cxClass3Plan + "，对应成型次日一班的计划量：" + cxClass4Plan + "，对应成型次日二班的计划量：" + cxClass5Plan));
+                        "物料编号：" + scheduleVo.getPaddingCode() + ",7点预计库存：" + stockQty + "，对应成型一班的计划量：" + 0 + "，对应成型二班的计划量：" + cxClass2Plan + "，对应成型三班的计划量：" + cxClass3Plan + "，对应成型次日一班的计划量：" + cxClass4Plan + "，对应成型次日二班的计划量：" + cxClass5Plan));
 
         //根据1班计算库存供应时长
-        double remnantStock = stockQty;    //剩余库存
+        BigDecimal remnantStock = stockQty;    //剩余库存
 //        if(!oneComputeSupplyTime(scheduleVo, remnantStock, cxClass1Plan)) {
 //            return;
 //        }
 
         //根据2班计算库存供应时长
-        remnantStock = BigDecimalUtil.sub(remnantStock, 0);  //重新计算剩余库存
+        remnantStock = BigDecimalUtils.sub(remnantStock, 0);  //重新计算剩余库存
         if(!oneComputeSupplyTime(scheduleVo, remnantStock, cxClass2Plan)) {
             return;
         }
 
         //根据3班计算库存供应时长
-        remnantStock = BigDecimalUtil.sub(remnantStock, cxClass2Plan);  //重新计算剩余库存
+        remnantStock = BigDecimalUtils.sub(remnantStock, cxClass2Plan);  //重新计算剩余库存
         if(!oneComputeSupplyTime(scheduleVo, remnantStock, cxClass3Plan)) {
             return;
         }
 
         //根据次日1班计算库存供应时长
-        remnantStock = BigDecimalUtil.sub(remnantStock, cxClass3Plan);  //重新计算剩余库存
+        remnantStock = BigDecimalUtils.sub(remnantStock, cxClass3Plan);  //重新计算剩余库存
         if(!oneComputeSupplyTime(scheduleVo, remnantStock, cxClass4Plan)) {
             return;
         }
 
         //根据次日2班计算库存供应时长
-        remnantStock = BigDecimalUtil.sub(remnantStock, cxClass4Plan);  //重新计算剩余库存
+        remnantStock = BigDecimalUtils.sub(remnantStock, cxClass4Plan);  //重新计算剩余库存
         if(!oneComputeSupplyTime(scheduleVo, remnantStock, cxClass5Plan)) {
             return;
         }
-        autoScheduleLogService.insertNcScheduleLog(scheduleVo.getBatchNo(), scheduleVo.getOrderNo(), "计算库存供应时长结束","物料编号：" + scheduleVo.getLiningCode() + "，库存供应时长=" + scheduleVo.getSupplyTime());
+//        autoScheduleLogService.insertNcScheduleLog(scheduleVo.getBatchNo(), scheduleVo.getOrderNo(), "计算库存供应时长结束","物料编号：" + scheduleVo.getPaddingCode() + "，库存供应时长=" + scheduleVo.getSupplyTime());
     }
 
     /**
@@ -1451,21 +1473,22 @@ public class DjEngineServiceImpl implements DjEngineService {
      * @param classPlan 对应成型的计划量
      * @return false：不需要再根据其他班在计算了。 true：还需要根据其他班计划量，继续计算库存供应时长
      */
-    private boolean oneComputeSupplyTime(DjScheduleResultVo scheduleVo,Double remnantStock, Double classPlan) {
-        Double supplyTime = scheduleVo.getSupplyTime();
-        supplyTime = (supplyTime == null ? 0D : supplyTime);
-        if(BigDecimalUtil.sub(remnantStock, classPlan) >= 0) {
-            //如果剩余库存 大于 对应班次库存，则库存供应时长直接+12小时
-            scheduleVo.setSupplyTime(BigDecimalUtil.add(supplyTime, 12));  //库存供应时长加12小时
-            return true;
-        } else {
-            //如果剩余库存 小宇 对应班次库存，则库存供应时长在加上：((剩余库存)/对应班班计划)*12小时
-            double classSupplyTime = BigDecimalUtil.mul(BigDecimalUtil.div(remnantStock, classPlan), 12);
-            supplyTime = supplyTime + BigDecimalUtil.roundDown(classSupplyTime, 1);  //设置库存供应时长向下保留1位小数
-            scheduleVo.setSupplyTime(supplyTime);
-            autoScheduleLogService.insertNcScheduleLog(scheduleVo.getBatchNo(), scheduleVo.getOrderNo(), "计算库存供应时长结束","物料编号：" + scheduleVo.getLiningCode() + "，库存供应时长=" + scheduleVo.getSupplyTime());
-            return false;
-        }
+    private boolean oneComputeSupplyTime(DjScheduleResultVo scheduleVo,BigDecimal remnantStock, Double classPlan) {
+//        Double supplyTime = scheduleVo.getSupplyTime();
+//        supplyTime = (supplyTime == null ? 0D : supplyTime);
+//        if(BigDecimalUtils.sub(remnantStock, classPlan) >= 0) {
+//            //如果剩余库存 大于 对应班次库存，则库存供应时长直接+12小时
+//            scheduleVo.setSupplyTime(BigDecimalUtils.add(supplyTime, 12));  //库存供应时长加12小时
+//            return true;
+//        } else {
+//            //如果剩余库存 小宇 对应班次库存，则库存供应时长在加上：((剩余库存)/对应班班计划)*12小时
+//            double classSupplyTime = BigDecimalUtils.mul(BigDecimalUtils.div(remnantStock, classPlan), 12);
+//            supplyTime = supplyTime + BigDecimalUtils.roundDown(classSupplyTime, 1);  //设置库存供应时长向下保留1位小数
+//            scheduleVo.setSupplyTime(supplyTime);
+//            autoScheduleLogService.insertNcScheduleLog(scheduleVo.getBatchNo(), scheduleVo.getOrderNo(), "计算库存供应时长结束","物料编号：" + scheduleVo.getPaddingCode() + "，库存供应时长=" + scheduleVo.getSupplyTime());
+//            return false;
+//        }
+        return true;
     }
 
     /**
@@ -1476,20 +1499,20 @@ public class DjEngineServiceImpl implements DjEngineService {
      */
     private void computeSupplyTime(DjScheduleResultVo scheduleVo, String quotaKeys, Double stockQty, Double unitConsume) {
         if(StringUtils.isBlank(quotaKeys)) {
-            scheduleVo.setSupplyTime(0D);
+//            scheduleVo.setSupplyTime(0D);
             autoScheduleLogService.insertNcScheduleLog(scheduleVo.getBatchNo(), scheduleVo.getOrderNo(), "计算库存供应时长", "库存供应时长为空，原因：没找到对应的成型排程记录");
             return;
         }
         String [] quotaKeyArray = quotaKeys.split(",");
         Integer cxQuota = cxEngineQuotaCommonService.getCxMachineQuota(quotaKeyArray);  //成型定额
-        unitConsume = BigDecimalUtil.div(unitConsume, 1000);   //单耗把毫米转成米
-        Double quota = BigDecimalUtil.mul(cxQuota, unitConsume);   //定额
+//        unitConsume = BigDecimalUtils.div(unitConsume, 1000);   //单耗把毫米转成米
+        Double quota = BigDecimalUtils.multiply(cxQuota, unitConsume).doubleValue();   //定额
         if(quota == 0) {
-            scheduleVo.setSupplyTime(0D);;
+//            scheduleVo.setSupplyTime(0D);;
         } else {
             Double supplyTime = stockQty / quota * 8;  //库存可供成型连续生产的时长
-            supplyTime = BigDecimalUtil.add(supplyTime, addComputeSupplyTime(scheduleVo)); //如果成型一班计划量为0，那么库存供应时长增加8小时；如果成型一班、二班计划量为0，那么供应时长增加16小时；以此类推
-            scheduleVo.setSupplyTime(BigDecimalUtil.roundDown(supplyTime, 1)); //设置困存公用时长向下保留2位小数
+            supplyTime = BigDecimalUtils.add(supplyTime, addComputeSupplyTime(scheduleVo)).doubleValue(); //如果成型一班计划量为0，那么库存供应时长增加8小时；如果成型一班、二班计划量为0，那么供应时长增加16小时；以此类推
+//            scheduleVo.setSupplyTime(BigDecimalUtil.roundDown(supplyTime, 1)); //设置困存公用时长向下保留2位小数
         }
         autoScheduleLogService.insertNcScheduleLog(scheduleVo.getBatchNo(), scheduleVo.getOrderNo(), "计算库存供应时长",
                 logSplit("库存供应时长supplyTime（小时）= 库存/(成型定额*单耗)*8小时;其中成型定额取成型定额的平均值，单耗也是取平均单耗", "成型定额：" + cxQuota + "，半制品平均单耗：" + unitConsume,
@@ -1504,33 +1527,33 @@ public class DjEngineServiceImpl implements DjEngineService {
     private int addComputeSupplyTime(DjScheduleResultVo scheduleVo) {
         int count = 0;
         int addTime = 12;  //每班12小时
-        if(scheduleVo.getCxClass1Plan() == 0) {
-            count++;
-        } else {
-            return count * addTime;
-        }
-
-        if(scheduleVo.getCxClass2Plan() == 0) {
-            count++;
-        } else {
-            return count * addTime;
-        }
-
-        if(scheduleVo.getCxClass3Plan() == 0) {
-            count++;
-        } else {
-            return count * addTime;
-        }
-
-        if(scheduleVo.getCxClass4Plan() == 0) {
-            count++;
-        } else {
-            return count * addTime;
-        }
-
-        if(scheduleVo.getCxClass5Plan() == 0) {
-            count++;
-        }
+//        if(scheduleVo.getCxClass1Plan() == 0) {
+//            count++;
+//        } else {
+//            return count * addTime;
+//        }
+//
+//        if(scheduleVo.getCxClass2Plan() == 0) {
+//            count++;
+//        } else {
+//            return count * addTime;
+//        }
+//
+//        if(scheduleVo.getCxClass3Plan() == 0) {
+//            count++;
+//        } else {
+//            return count * addTime;
+//        }
+//
+//        if(scheduleVo.getCxClass4Plan() == 0) {
+//            count++;
+//        } else {
+//            return count * addTime;
+//        }
+//
+//        if(scheduleVo.getCxClass5Plan() == 0) {
+//            count++;
+//        }
         return count * addTime;
     }
 
@@ -1547,176 +1570,176 @@ public class DjEngineServiceImpl implements DjEngineService {
      * @param largeDemand     大需求量规格
      * @param bisectThreshold 均分阈值
      */
-    private void computeNcPlanQty(DjScheduleResultVo scheduleVo, DjTotalPlanQtyVo totalPlanQtyVo,
-                                  Map<String, Double> lossMap, double paramLossRate, double mergeThreshold, BigDecimal toolCapacity,
-                                  double productStockDay, BigDecimal largeDemand, BigDecimal bisectThreshold) {
-        scheduleVo.setCloseOutSpecFlag(ApsConstant.STATUS_ENABLE); // 收尾标记默认非收尾
-        String oldScheduleResult = toJSONString(scheduleVo); // 没计算前的排程数据json字符串（日志使用）
-        Double stockQty = scheduleVo.getStockQty(); // 库存
-        Double lastMidPlanQty = scheduleVo.getLastMidPlanQty(); // 前日白班计划
-        BigDecimal curlLength = (BigDecimal)scheduleVo.getParams().get(EngineConstants.STANDARD_CRIMP_LENGTH); // 一个卷曲长度
-        BigDecimal delayPlanQty = (BigDecimal)scheduleVo.getParams().get(EngineConstants.DELAY_PLAN_QTY); // 大需求量不生产的工装数
-        BigDecimal largeDemandReduce = (BigDecimal)scheduleVo.getParams().get(EngineConstants.LARGE_DEMAND_REDUCE); // 大需求量备库比例
-//        Double totalConsumeQty = this.getCxClassPlanCumulative(scheduleVo, OpenMachineClassEnums.CLASS_FOUR); // 总需求量，前四个班
-//        totalConsumeQty = BigDecimalUtils.greatest(totalConsumeQty, scheduleVo.getSurplusQty()).doubleValue(); // 取四个半的消耗量与剩余量的最大值
-        Double totalConsumeQty = scheduleVo.getSurplusQty(); // 剩余量
-        double supplyClass = productStockDay; // 预生产库存天数，如果是收尾规格，则直接按整天生产
-//        if (isCloseOutSpec) { // 收尾规格，总需求要加上第五个班的计划
-//            totalConsumeQty = BigDecimalUtil.add(totalConsumeQty, scheduleVo.getCxClass5Plan());
-//        } else { // 如果没有收尾，则总需求需要再加上三四班之和，要乘以预生产库存天数
-//            double cxPlanQty2 = BigDecimalUtil.add(scheduleVo.getCxClass3Plan(), scheduleVo.getCxClass4Plan());
-//            cxPlanQty2 = BigDecimalUtil.mul(cxPlanQty2, supplyClass);
-//            totalConsumeQty = BigDecimalUtil.add(totalConsumeQty, cxPlanQty2);
+//    private void computeDjPlanQty(DjScheduleResultVo scheduleVo, DjTotalPlanQtyVo totalPlanQtyVo,
+//                                  Map<String, Double> lossMap, double paramLossRate, double mergeThreshold, BigDecimal toolCapacity,
+//                                  double productStockDay, BigDecimal largeDemand, BigDecimal bisectThreshold) {
+//        scheduleVo.setCloseOutSpecFlag(ApsConstant.STATUS_ENABLE); // 收尾标记默认非收尾
+//        String oldScheduleResult = toJSONString(scheduleVo); // 没计算前的排程数据json字符串（日志使用）
+//        Double stockQty = scheduleVo.getStockQty(); // 库存
+//        Double lastMidPlanQty = scheduleVo.getClass4PlanQty(); // 前日白班计划
+//        BigDecimal curlLength = (BigDecimal)scheduleVo.getParams().get(EngineConstants.STANDARD_CRIMP_LENGTH); // 一个卷曲长度
+//        BigDecimal delayPlanQty = (BigDecimal)scheduleVo.getParams().get(EngineConstants.DELAY_PLAN_QTY); // 大需求量不生产的工装数
+//        BigDecimal largeDemandReduce = (BigDecimal)scheduleVo.getParams().get(EngineConstants.LARGE_DEMAND_REDUCE); // 大需求量备库比例
+////        Double totalConsumeQty = this.getCxClassPlanCumulative(scheduleVo, OpenMachineClassEnums.CLASS_FOUR); // 总需求量，前四个班
+////        totalConsumeQty = BigDecimalUtils.greatest(totalConsumeQty, scheduleVo.getSurplusQty()).doubleValue(); // 取四个半的消耗量与剩余量的最大值
+//        Double totalConsumeQty = scheduleVo.getSurplusQty(); // 剩余量
+//        double supplyClass = productStockDay; // 预生产库存天数，如果是收尾规格，则直接按整天生产
+////        if (isCloseOutSpec) { // 收尾规格，总需求要加上第五个班的计划
+////            totalConsumeQty = BigDecimalUtils.add(totalConsumeQty, scheduleVo.getCxClass5Plan());
+////        } else { // 如果没有收尾，则总需求需要再加上三四班之和，要乘以预生产库存天数
+////            double cxPlanQty2 = BigDecimalUtils.add(scheduleVo.getCxClass3Plan(), scheduleVo.getCxClass4Plan());
+////            cxPlanQty2 = BigDecimalUtils.mul(cxPlanQty2, supplyClass);
+////            totalConsumeQty = BigDecimalUtils.add(totalConsumeQty, cxPlanQty2);
+////        }
+//
+//        // 每个早班计算交接班库存 = 上一天交接班库存 + 上一天成型计划量总量 - 上一天成型两个班的消耗量
+//        // 交接班库存要按生产几个小时库存算，例如预生产12小时库存，则交接班库存要 > 当天成型需求量 / 2，最多超过一车（110个）
+//        // 上一天成型计划总量原则上平均分配给两个班，但是早班的计划量要 > 上一天成型两个班的需求量 - 上一天交接班库存
+//        double cxPlanQty1 = BigDecimalUtils.add(scheduleVo.getCxClass1Plan(), scheduleVo.getCxClass2Plan());// 第一天成型两个班消耗量
+//        double cxPlanQty2 = BigDecimalUtils.add(scheduleVo.getCxClass3Plan(), scheduleVo.getCxClass4Plan());// 第二天成型两个班消耗量
+//        double cxPlanQty3 = cxPlanQty2;// 第三天成型两个班消耗量（成型没有，如果未收尾暂时先预计与第二天一样）
+//        double classStock1 = stockQty; // 第一天交接班库存，初始为当天库存
+//        double classStock2 = BigDecimalUtils.roundDown(BigDecimalUtils.mul(cxPlanQty2, supplyClass), 0); // 第二天交接班库存，第二天成型两个班的消耗量 * 预生产天数
+//        if (lastMidPlanQty > 0) { // 早班有计划则，交接班库存可以只不要超过早班的需求两
+//            classStock2 = BigDecimalUtils.least(classStock2, scheduleVo.getCxClass3Plan()).doubleValue(); // 交接班库存控制最多是明天早班的需求量
 //        }
-
-        // 每个早班计算交接班库存 = 上一天交接班库存 + 上一天成型计划量总量 - 上一天成型两个班的消耗量
-        // 交接班库存要按生产几个小时库存算，例如预生产12小时库存，则交接班库存要 > 当天成型需求量 / 2，最多超过一车（110个）
-        // 上一天成型计划总量原则上平均分配给两个班，但是早班的计划量要 > 上一天成型两个班的需求量 - 上一天交接班库存
-        double cxPlanQty1 = BigDecimalUtil.add(scheduleVo.getCxClass1Plan(), scheduleVo.getCxClass2Plan());// 第一天成型两个班消耗量
-        double cxPlanQty2 = BigDecimalUtil.add(scheduleVo.getCxClass3Plan(), scheduleVo.getCxClass4Plan());// 第二天成型两个班消耗量
-        double cxPlanQty3 = cxPlanQty2;// 第三天成型两个班消耗量（成型没有，如果未收尾暂时先预计与第二天一样）
-        double classStock1 = stockQty; // 第一天交接班库存，初始为当天库存
-        double classStock2 = BigDecimalUtil.roundDown(BigDecimalUtil.mul(cxPlanQty2, supplyClass), 0); // 第二天交接班库存，第二天成型两个班的消耗量 * 预生产天数
-        if (lastMidPlanQty > 0) { // 早班有计划则，交接班库存可以只不要超过早班的需求两
-            classStock2 = BigDecimalUtils.least(classStock2, scheduleVo.getCxClass3Plan()).doubleValue(); // 交接班库存控制最多是明天早班的需求量
-        }
-//        if (cxPlanQty2 >= BigDecimalUtils.valueOf(DEFAULT_LARGE_DEMAND2).multiply(toolCapacity).doubleValue()) { // 大于60需求的超大需求规格，只需要备一半
-////            BigDecimal newClassStock2 = BigDecimalUtils.half(cxPlanQty2);
-//            BigDecimal newClassStock2 = BigDecimalUtils.sub(cxPlanQty2, largeDemandReduce.multiply(toolCapacity));
+////        if (cxPlanQty2 >= BigDecimalUtils.valueOf(DEFAULT_LARGE_DEMAND2).multiply(toolCapacity).doubleValue()) { // 大于60需求的超大需求规格，只需要备一半
+//////            BigDecimal newClassStock2 = BigDecimalUtils.half(cxPlanQty2);
+////            BigDecimal newClassStock2 = BigDecimalUtils.sub(cxPlanQty2, largeDemandReduce.multiply(toolCapacity));
+////            classStock2 = BigDecimalUtils.least(classStock2, newClassStock2).doubleValue(); // 取结算前后的较小值
+////        } else
+//        if (cxPlanQty2 > largeDemand.multiply(curlLength).doubleValue()) {
+//            BigDecimal newClassStock2 = BigDecimalUtils.multiply(cxPlanQty2, largeDemandReduce, true);  // 大需求量，直接按设定的备库比率备货
 //            classStock2 = BigDecimalUtils.least(classStock2, newClassStock2).doubleValue(); // 取结算前后的较小值
-//        } else
-        if (cxPlanQty2 > largeDemand.multiply(curlLength).doubleValue()) {
-            BigDecimal newClassStock2 = BigDecimalUtils.multiply(cxPlanQty2, largeDemandReduce, true);  // 大需求量，直接按设定的备库比率备货
-            classStock2 = BigDecimalUtils.least(classStock2, newClassStock2).doubleValue(); // 取结算前后的较小值
-        }
-        // 计算第一天相关数值
-        double planQty1 = BigDecimalUtil.add(BigDecimalUtil.sub(classStock2, classStock1), cxPlanQty1);// 第一天成型计划量 = 第二天交接班库存 - 第一天交接班库存 + 第一天成型两个班的消耗量
-        planQty1 = planQty1 > 0 ? planQty1 : 0D; // 上一天交接班库存过多会计算成负数，需要处理成0
-        double class1PlanQty1 = lastMidPlanQty;// 第一天早班计划 = 前日早班计划
-        double class2PlanQty1 = BigDecimalUtil.sub(planQty1, class1PlanQty1);// 第一天夜班计划 = 等于第一天成型计划 - 第一天早班计划
-        // 第一天库存缺口
-        double lackPlanQtyDay1 = BigDecimalUtils.sub(cxPlanQty1, BigDecimalUtils.add(classStock1, class1PlanQty1)).doubleValue();
-        if (lastMidPlanQty > 0 && lackPlanQtyDay1 <= 0 && scheduleVo.getCxClass3Plan() < delayPlanQty.doubleValue()) {
-            class2PlanQty1 = 0D; // 如果早班有排计划了，且成型需求已满足，同时第二天早班需求量不足可推迟生产的计划量，则可以先不做
-        }
-        if (lastMidPlanQty > 0 && class2PlanQty1 > 0) {
-            // 如果早夜班都有排计划，则尝试将夜班补够均分阈值，尝试补够“两天需求量减库存的差值”与“均分阈值”的较小值
-            BigDecimal lackPlanQtyAll = BigDecimalUtils.sub(BigDecimalUtils.add(cxPlanQty1, cxPlanQty2), classStock1);
-            BigDecimal day1PlanQty = BigDecimalUtils.least(bisectThreshold, lackPlanQtyAll);
-            BigDecimal day1PlanQtyDiff = day1PlanQty.subtract(BigDecimalUtils.add(lastMidPlanQty, class2PlanQty1));
-            if (day1PlanQtyDiff.compareTo(BigDecimal.ZERO) > 0) {
-                class2PlanQty1 = BigDecimalUtil.add(class2PlanQty1, day1PlanQtyDiff.doubleValue());
-            }
-        }
-        double newClass2PlanQty1 = this.planQtyRounding(scheduleVo, class2PlanQty1, toolCapacity, totalConsumeQty,
-                OpenMachineClassEnums.CLASS_TWO); // 整车取整
-        // 如果超出整工装的计划量不足半个工装，则减一个工装的量，夜班先不做，因为占用工装太多
-//        if (class2PlanQty1 > toolCapacity.doubleValue() && newClass2PlanQty1 > class2PlanQty1) {
-//            double remainder = BigDecimalUtil.sub(toolCapacity.doubleValue(), BigDecimalUtil.sub(newClass2PlanQty1, class2PlanQty1));
-//            if (BigDecimalUtils.valueOf(remainder).compareTo(BigDecimalUtils.half(toolCapacity)) <= 0) {
-//                newClass2PlanQty1 = BigDecimalUtil.sub(newClass2PlanQty1, toolCapacity.doubleValue());
+//        }
+//        // 计算第一天相关数值
+//        double planQty1 = BigDecimalUtils.add(BigDecimalUtils.sub(classStock2, classStock1), cxPlanQty1);// 第一天成型计划量 = 第二天交接班库存 - 第一天交接班库存 + 第一天成型两个班的消耗量
+//        planQty1 = planQty1 > 0 ? planQty1 : 0D; // 上一天交接班库存过多会计算成负数，需要处理成0
+//        double class1PlanQty1 = lastMidPlanQty;// 第一天早班计划 = 前日早班计划
+//        double class2PlanQty1 = BigDecimalUtils.sub(planQty1, class1PlanQty1);// 第一天夜班计划 = 等于第一天成型计划 - 第一天早班计划
+//        // 第一天库存缺口
+//        double lackPlanQtyDay1 = BigDecimalUtils.sub(cxPlanQty1, BigDecimalUtils.add(classStock1, class1PlanQty1)).doubleValue();
+//        if (lastMidPlanQty > 0 && lackPlanQtyDay1 <= 0 && scheduleVo.getCxClass3Plan() < delayPlanQty.doubleValue()) {
+//            class2PlanQty1 = 0D; // 如果早班有排计划了，且成型需求已满足，同时第二天早班需求量不足可推迟生产的计划量，则可以先不做
+//        }
+//        if (lastMidPlanQty > 0 && class2PlanQty1 > 0) {
+//            // 如果早夜班都有排计划，则尝试将夜班补够均分阈值，尝试补够“两天需求量减库存的差值”与“均分阈值”的较小值
+//            BigDecimal lackPlanQtyAll = BigDecimalUtils.sub(BigDecimalUtils.add(cxPlanQty1, cxPlanQty2), classStock1);
+//            BigDecimal day1PlanQty = BigDecimalUtils.least(bisectThreshold, lackPlanQtyAll);
+//            BigDecimal day1PlanQtyDiff = day1PlanQty.subtract(BigDecimalUtils.add(lastMidPlanQty, class2PlanQty1));
+//            if (day1PlanQtyDiff.compareTo(BigDecimal.ZERO) > 0) {
+//                class2PlanQty1 = BigDecimalUtils.add(class2PlanQty1, day1PlanQtyDiff.doubleValue());
 //            }
 //        }
-
-        double dayPlanQty = newClass2PlanQty1; // 夜班计划
-        scheduleVo.setDayPlanQty(dayPlanQty);
-        // 根据排好的计划量重算相关数值
-        planQty1 = BigDecimalUtil.add(class1PlanQty1, dayPlanQty); // 刷新第一天成型计划量
-        classStock2 = BigDecimalUtil.sub(BigDecimalUtil.add(planQty1, classStock1), cxPlanQty1);// 刷新第二天交接班库存
-        scheduleVo.setClassStock(classStock2); // 保存交接班库存，用于均衡计算
-        scheduleVo.setSupplyDemandRatio(BigDecimalUtil.div(classStock2, cxPlanQty2, 4)); // 计算交接班库存供需比率，第二天交接班库存 / 成型第二天需求量，用于均衡计算
-
-        // 计算第二天相关数值
-        double classStock3 = BigDecimalUtil.roundDown(BigDecimalUtil.mul(cxPlanQty3, supplyClass), 0); // 第三天交接班库存，第三天成型两个班的消耗量 * 预生产天数
-        if (classStock3 > largeDemand.multiply(curlLength).doubleValue()) {
-            BigDecimal newClassStock3 = BigDecimalUtils.multiply(classStock3, largeDemandReduce, true);  // 大需求量，直接按设定的备库比率备货
-            classStock3 = BigDecimalUtils.least(classStock3, newClassStock3).doubleValue(); // 取结算前后的较小值
-        }
-        double planQty2 = BigDecimalUtil.add(BigDecimalUtil.sub(classStock3, classStock2), cxPlanQty2);// 第二天成型计划量 = 第三天交接班库存 - 第二天交接班库存 + 第二天成型两个班的消耗量
-        planQty2 = BigDecimalUtils.upToZero(planQty2).doubleValue(); // 上一天交接班库存过多会计算成负数，需要处理成0
-        double lackPlanQty = BigDecimalUtil.sub(cxPlanQty2, classStock2); // 早班先补交接班库存缺口
-        double class1PlanQty2 = this.planQtyRounding(scheduleVo, lackPlanQty, toolCapacity, totalConsumeQty,
-                OpenMachineClassEnums.CLASS_THREE); // 第二天早班计划优先补库存缺口，整车取整
-        double nightPlanQty = class1PlanQty2; // 早班计划
-        scheduleVo.setNightPlanQty(nightPlanQty);
-        double class2PlanQty2 = BigDecimalUtil.sub(planQty2, class1PlanQty2);// 第二天夜班计划 = 等于第二天成型计划 - 第二天早班计划
-        // 如果交接班库存 - 第二天需求已经超出第三天的一半，则不需要排产（主要针对小批量）
-        if (lackPlanQty < 0 && Math.abs(lackPlanQty) > BigDecimalUtils.half(cxPlanQty3).doubleValue()) {
-            class2PlanQty2 = 0D;
-        }
-        double newClass2PlanQty2 = this.planQtyRounding(scheduleVo, class2PlanQty2, toolCapacity, totalConsumeQty,
-                OpenMachineClassEnums.CLASS_FOUR); // 次日夜班计划 = 第二天夜班计划整车取整
-        // 如果超出整工装的计划量不足半个工装，则减一个工装的量，夜班先不做，因为占用工装太多
-        if (class2PlanQty2 > toolCapacity.doubleValue() && newClass2PlanQty2 > class2PlanQty2) { // 收尾的不处理
-            double remainder = BigDecimalUtil.sub(toolCapacity.doubleValue(), BigDecimalUtil.sub(newClass2PlanQty2, class2PlanQty2));
-            if (BigDecimalUtils.valueOf(remainder).compareTo(BigDecimalUtils.half(toolCapacity)) <= 0) {
-                newClass2PlanQty2 = BigDecimalUtil.sub(newClass2PlanQty2, toolCapacity.doubleValue());
-            }
-        }
-        double nextDayPlanQty = newClass2PlanQty2;
-        scheduleVo.setNextDayPlanQty(nextDayPlanQty);
-
-        // 收尾规格计划如果不足一车，合并到上一个班
-//        if (nextDayPlanQty > 0 && nextDayPlanQty < toolCapacity.doubleValue()) {
-//            nightPlanQty = BigDecimalUtil.add(nightPlanQty, nextDayPlanQty);
-//            nextDayPlanQty = 0D;
+//        double newClass2PlanQty1 = this.planQtyRounding(scheduleVo, class2PlanQty1, toolCapacity, totalConsumeQty,
+//                OpenMachineClassEnums.CLASS_TWO); // 整车取整
+//        // 如果超出整工装的计划量不足半个工装，则减一个工装的量，夜班先不做，因为占用工装太多
+////        if (class2PlanQty1 > toolCapacity.doubleValue() && newClass2PlanQty1 > class2PlanQty1) {
+////            double remainder = BigDecimalUtils.sub(toolCapacity.doubleValue(), BigDecimalUtils.sub(newClass2PlanQty1, class2PlanQty1));
+////            if (BigDecimalUtils.valueOf(remainder).compareTo(BigDecimalUtils.half(toolCapacity)) <= 0) {
+////                newClass2PlanQty1 = BigDecimalUtils.sub(newClass2PlanQty1, toolCapacity.doubleValue());
+////            }
+////        }
+//
+//        double dayPlanQty = newClass2PlanQty1; // 夜班计划
+//        scheduleVo.setClass3PlanQty(dayPlanQty);
+//        // 根据排好的计划量重算相关数值
+//        planQty1 = BigDecimalUtils.add(class1PlanQty1, dayPlanQty); // 刷新第一天成型计划量
+//        classStock2 = BigDecimalUtils.sub(BigDecimalUtils.add(planQty1, classStock1), cxPlanQty1);// 刷新第二天交接班库存
+//        scheduleVo.setClassStock(classStock2); // 保存交接班库存，用于均衡计算
+//        scheduleVo.setSupplyDemandRatio(BigDecimalUtils.div(classStock2, cxPlanQty2, 4)); // 计算交接班库存供需比率，第二天交接班库存 / 成型第二天需求量，用于均衡计算
+//
+//        // 计算第二天相关数值
+//        double classStock3 = BigDecimalUtils.roundDown(BigDecimalUtils.mul(cxPlanQty3, supplyClass), 0); // 第三天交接班库存，第三天成型两个班的消耗量 * 预生产天数
+//        if (classStock3 > largeDemand.multiply(curlLength).doubleValue()) {
+//            BigDecimal newClassStock3 = BigDecimalUtils.multiply(classStock3, largeDemandReduce, true);  // 大需求量，直接按设定的备库比率备货
+//            classStock3 = BigDecimalUtils.least(classStock3, newClassStock3).doubleValue(); // 取结算前后的较小值
 //        }
-//        if (nightPlanQty > 0 && nightPlanQty < toolCapacity.doubleValue()) {
-//            nextDayPlanQty = BigDecimalUtil.add(nightPlanQty, nextDayPlanQty);
-//            nightPlanQty = 0D;
+//        double planQty2 = BigDecimalUtils.add(BigDecimalUtils.sub(classStock3, classStock2), cxPlanQty2);// 第二天成型计划量 = 第三天交接班库存 - 第二天交接班库存 + 第二天成型两个班的消耗量
+//        planQty2 = BigDecimalUtils.upToZero(planQty2).doubleValue(); // 上一天交接班库存过多会计算成负数，需要处理成0
+//        double lackPlanQty = BigDecimalUtils.sub(cxPlanQty2, classStock2); // 早班先补交接班库存缺口
+//        double class1PlanQty2 = this.planQtyRounding(scheduleVo, lackPlanQty, toolCapacity, totalConsumeQty,
+//                OpenMachineClassEnums.CLASS_THREE); // 第二天早班计划优先补库存缺口，整车取整
+//        double nightPlanQty = class1PlanQty2; // 早班计划
+//        scheduleVo.setClass2PlanQty(nightPlanQty);
+//        double class2PlanQty2 = BigDecimalUtils.sub(planQty2, class1PlanQty2);// 第二天夜班计划 = 等于第二天成型计划 - 第二天早班计划
+//        // 如果交接班库存 - 第二天需求已经超出第三天的一半，则不需要排产（主要针对小批量）
+//        if (lackPlanQty < 0 && Math.abs(lackPlanQty) > BigDecimalUtils.half(cxPlanQty3).doubleValue()) {
+//            class2PlanQty2 = 0D;
 //        }
-
-        /*String oldScheduleResult = toJSONString(scheduleVo); //没看是计算前的排程数据json字符串（日志使用）
-        Double stockQty = scheduleVo.getStockQty(); //库存
-//        double unitConsume = BigDecimalUtil.div(scheduleVo.getUnitConsume(), 1000D, 3);
-        //计算夜班计划量 = 成型三班消耗胎面计划量（次日成型早班计划）
-        double dayPlanQty = scheduleVo.getCxClass3Plan();
-        double initDayPlanQty = dayPlanQty;
-        //计算早班计划量 = 成型四班消耗胎面计划量（次日成型夜班计划）
-        double nightPlanQty = scheduleVo.getCxClass4Plan();
-
-        //根据库存重新计算中班计划量：（原中班计划量>库存） ？（ 原中班计划量-库存） ： 0
-        dayPlanQty = (initDayPlanQty > stockQty) ? BigDecimalUtil.sub(dayPlanQty, stockQty) : 0;
-        //根据库存重新计算夜班计划量：（原中班计划量>库存） ？原夜班计划量 ： （原中班计划量+原夜班计划量 - 库存）
-        nightPlanQty = (initDayPlanQty > stockQty) ? nightPlanQty : BigDecimalUtil.sub(BigDecimalUtil.add(initDayPlanQty, nightPlanQty), stockQty);
-        nightPlanQty = (nightPlanQty < 0) ? 0D : nightPlanQty;*/
-
-        String machineId = scheduleVo.getMachineId();  //机台id
-        double lossRate = 0;
-        //只有单个机台的时候，自动排程才计算耗损率
-        if(StringUtils.isNotBlank(machineId) && !machineId.contains(",")) {
-            //计划量要加上耗损量
-            lossRate = ncEngineLossService.getLossRate(scheduleVo.getLiningCode(), scheduleVo.getMachineId(), lossMap, paramLossRate);
-            dayPlanQty = BigDecimalUtil.add(dayPlanQty, BigDecimalUtil.mul(dayPlanQty, lossRate));
-            nightPlanQty = BigDecimalUtil.add(nightPlanQty, BigDecimalUtil.mul(nightPlanQty, lossRate));
-            nextDayPlanQty = BigDecimalUtil.add(nextDayPlanQty, BigDecimalUtil.mul(nextDayPlanQty, lossRate));
-        }
-
-        //如果中班计划量>0，那么中班计划量=中班计划量+夜班计划量，夜班计划量=0（为了让相同的胶在同一个班生产，而且又不能延误生产）
-//        if (dayPlanQty > 0) {
-//            dayPlanQty = BigDecimalUtil.add(dayPlanQty, nightPlanQty);
-//            nightPlanQty = 0D;
+//        double newClass2PlanQty2 = this.planQtyRounding(scheduleVo, class2PlanQty2, toolCapacity, totalConsumeQty,
+//                OpenMachineClassEnums.CLASS_FOUR); // 次日夜班计划 = 第二天夜班计划整车取整
+//        // 如果超出整工装的计划量不足半个工装，则减一个工装的量，夜班先不做，因为占用工装太多
+//        if (class2PlanQty2 > toolCapacity.doubleValue() && newClass2PlanQty2 > class2PlanQty2) { // 收尾的不处理
+//            double remainder = BigDecimalUtils.sub(toolCapacity.doubleValue(), BigDecimalUtils.sub(newClass2PlanQty2, class2PlanQty2));
+//            if (BigDecimalUtils.valueOf(remainder).compareTo(BigDecimalUtils.half(toolCapacity)) <= 0) {
+//                newClass2PlanQty2 = BigDecimalUtils.sub(newClass2PlanQty2, toolCapacity.doubleValue());
+//            }
 //        }
-
-        //计划量向上取整
-        dayPlanQty = BigDecimalUtil.roundUp(dayPlanQty, 0);
-        nightPlanQty = BigDecimalUtil.roundUp(nightPlanQty, 0);
-        nextDayPlanQty = BigDecimalUtil.roundUp(nextDayPlanQty, 0);
-        scheduleVo.setDayPlanQty(dayPlanQty);
-        scheduleVo.setNightPlanQty(nightPlanQty);
-        scheduleVo.setNextDayPlanQty(nextDayPlanQty);
-        scheduleVo.setIsEqualShare(false);
-//        scheduleVo.setCloseOutSpecFlag(ApsConstant.STATUS_DISABLE);
-
-        //计算中班总计划量 和 夜班总计划量
-//        this.groupTotalPlanQtyMap(scheduleVo, totalPlanQtyMap);
-        totalPlanQtyVo.setTotalDayPlanQty(BigDecimalUtil.add(totalPlanQtyVo.getTotalDayPlanQty(), dayPlanQty));
-        totalPlanQtyVo.setTotalNightPlanQty(BigDecimalUtil.add(totalPlanQtyVo.getTotalNightPlanQty(), nightPlanQty));
-        totalPlanQtyVo.setTotalNextDayPlanQty(BigDecimalUtil.add(totalPlanQtyVo.getTotalNextDayPlanQty(), nextDayPlanQty));
-        totalPlanQtyVo.setTotalPlanQty(BigDecimalUtil.add(totalPlanQtyVo.getTotalDayPlanQty(), totalPlanQtyVo.getTotalNightPlanQty(), totalPlanQtyVo.getTotalNextDayPlanQty()));
-
-        this.computeNcPlanQtyLog(oldScheduleResult, scheduleVo, lossMap, paramLossRate, lossRate);  //添加日志
-    }
+//        BigDecimal nextDayPlanQty = newClass2PlanQty2;
+//        scheduleVo.setClass4PlanQty(nextDayPlanQty);
+//
+//        // 收尾规格计划如果不足一车，合并到上一个班
+////        if (nextDayPlanQty > 0 && nextDayPlanQty < toolCapacity.doubleValue()) {
+////            nightPlanQty = BigDecimalUtils.add(nightPlanQty, nextDayPlanQty);
+////            nextDayPlanQty = 0D;
+////        }
+////        if (nightPlanQty > 0 && nightPlanQty < toolCapacity.doubleValue()) {
+////            nextDayPlanQty = BigDecimalUtils.add(nightPlanQty, nextDayPlanQty);
+////            nightPlanQty = 0D;
+////        }
+//
+//        /*String oldScheduleResult = toJSONString(scheduleVo); //没看是计算前的排程数据json字符串（日志使用）
+//        Double stockQty = scheduleVo.getStockQty(); //库存
+////        double unitConsume = BigDecimalUtils.div(scheduleVo.getUnitConsume(), 1000D, 3);
+//        //计算夜班计划量 = 成型三班消耗胎面计划量（次日成型早班计划）
+//        double dayPlanQty = scheduleVo.getCxClass3Plan();
+//        double initDayPlanQty = dayPlanQty;
+//        //计算早班计划量 = 成型四班消耗胎面计划量（次日成型夜班计划）
+//        double nightPlanQty = scheduleVo.getCxClass4Plan();
+//
+//        //根据库存重新计算中班计划量：（原中班计划量>库存） ？（ 原中班计划量-库存） ： 0
+//        dayPlanQty = (initDayPlanQty > stockQty) ? BigDecimalUtils.sub(dayPlanQty, stockQty) : 0;
+//        //根据库存重新计算夜班计划量：（原中班计划量>库存） ？原夜班计划量 ： （原中班计划量+原夜班计划量 - 库存）
+//        nightPlanQty = (initDayPlanQty > stockQty) ? nightPlanQty : BigDecimalUtils.sub(BigDecimalUtils.add(initDayPlanQty, nightPlanQty), stockQty);
+//        nightPlanQty = (nightPlanQty < 0) ? 0D : nightPlanQty;*/
+//
+//        String machineId = scheduleVo.getMachineCode();  //机台id
+//        double lossRate = 0;
+//        //只有单个机台的时候，自动排程才计算耗损率
+//        if(StringUtils.isNotBlank(machineId) && !machineId.contains(",")) {
+//            //计划量要加上耗损量
+//            lossRate = djEngineLossService.getLossRate(scheduleVo.getPaddingCode(), scheduleVo.getMachineCode(), lossMap, paramLossRate);
+//            dayPlanQty = BigDecimalUtils.add(dayPlanQty, BigDecimalUtils.mul(dayPlanQty, lossRate));
+//            nightPlanQty = BigDecimalUtils.add(nightPlanQty, BigDecimalUtils.mul(nightPlanQty, lossRate));
+//            nextDayPlanQty = BigDecimalUtils.add(nextDayPlanQty, BigDecimalUtils.mul(nextDayPlanQty, lossRate));
+//        }
+//
+//        //如果中班计划量>0，那么中班计划量=中班计划量+夜班计划量，夜班计划量=0（为了让相同的胶在同一个班生产，而且又不能延误生产）
+////        if (dayPlanQty > 0) {
+////            dayPlanQty = BigDecimalUtils.add(dayPlanQty, nightPlanQty);
+////            nightPlanQty = 0D;
+////        }
+//
+//        //计划量向上取整
+//        dayPlanQty = BigDecimalUtils.roundUp(dayPlanQty, 0);
+//        nightPlanQty = BigDecimalUtils.roundUp(nightPlanQty, 0);
+//        nextDayPlanQty = BigDecimalUtils.roundUp(nextDayPlanQty, 0);
+//        scheduleVo.setClass3PlanQty(dayPlanQty);
+//        scheduleVo.setClass2PlanQty(nightPlanQty);
+//        scheduleVo.setClass4PlanQty(nextDayPlanQty);
+//        scheduleVo.setIsEqualShare(false);
+////        scheduleVo.setCloseOutSpecFlag(ApsConstant.STATUS_DISABLE);
+//
+//        //计算中班总计划量 和 夜班总计划量
+////        this.groupTotalPlanQtyMap(scheduleVo, totalPlanQtyMap);
+//        totalPlanQtyVo.setTotalDayPlanQty(BigDecimalUtils.add(totalPlanQtyVo.getTotalDayPlanQty(), dayPlanQty));
+//        totalPlanQtyVo.setTotalNightPlanQty(BigDecimalUtils.add(totalPlanQtyVo.getTotalNightPlanQty(), nightPlanQty));
+//        totalPlanQtyVo.setTotalNextDayPlanQty(BigDecimalUtils.add(totalPlanQtyVo.getTotalNextDayPlanQty(), nextDayPlanQty));
+//        totalPlanQtyVo.setTotalPlanQty(BigDecimalUtils.add(totalPlanQtyVo.getTotalDayPlanQty(), totalPlanQtyVo.getTotalNightPlanQty(), totalPlanQtyVo.getTotalNextDayPlanQty()));
+//
+//        this.computeNcPlanQtyLog(oldScheduleResult, scheduleVo, lossMap, paramLossRate, lossRate);  //添加日志
+//    }
 
     /**
      * 获取各班需求量的累计值（从前日早班开始）
@@ -1725,34 +1748,34 @@ public class DjEngineServiceImpl implements DjEngineService {
      * @param classNum
      * @return
      */
-    private Double getCxClassPlanCumulative(DjScheduleResultVo scheduleVo, OpenMachineClassEnums classNum) {
-        Double cxClass1Plan = (scheduleVo.getCxClass1Plan() == null ? 0D : scheduleVo.getCxClass1Plan());  //对应成型前日早班的计划量
-        Double cxClass2Plan = (scheduleVo.getCxClass2Plan() == null ? 0D : scheduleVo.getCxClass2Plan());  //对应成型夜班的计划量
-        Double cxClass3Plan = (scheduleVo.getCxClass3Plan() == null ? 0D : scheduleVo.getCxClass3Plan());  //对应成型早班的计划量
-        Double cxClass4Plan = (scheduleVo.getCxClass4Plan() == null ? 0D : scheduleVo.getCxClass4Plan());  //对应成型次日夜班的计划量
-        Double cxClass5Plan = (scheduleVo.getCxClass5Plan() == null ? 0D : scheduleVo.getCxClass5Plan());  //对应成型次日早班的计划量
-        Double planQty = 0D;
-        if (classNum == null) {
-            return planQty;
-        }
-        planQty = BigDecimalUtil.add(planQty, cxClass1Plan);
-        if (classNum == OpenMachineClassEnums.CLASS_ONE) {
-            return planQty;
-        }
-        planQty = BigDecimalUtil.add(planQty, cxClass2Plan);
-        if (classNum == OpenMachineClassEnums.CLASS_TWO) {
-            return planQty;
-        }
-        planQty = BigDecimalUtil.add(planQty, cxClass3Plan);
-        if (classNum == OpenMachineClassEnums.CLASS_THREE) {
-            return planQty;
-        }
-        planQty = BigDecimalUtil.add(planQty, cxClass4Plan);
-        if (classNum == OpenMachineClassEnums.CLASS_FOUR) {
-            return planQty;
-        }
-        return BigDecimalUtil.add(planQty, cxClass5Plan);
-    }
+//    private Double getCxClassPlanCumulative(DjScheduleResultVo scheduleVo, OpenMachineClassEnums classNum) {
+//        Double cxClass1Plan = (scheduleVo.getCxClass1Plan() == null ? 0D : scheduleVo.getCxClass1Plan());  //对应成型前日早班的计划量
+//        Double cxClass2Plan = (scheduleVo.getCxClass2Plan() == null ? 0D : scheduleVo.getCxClass2Plan());  //对应成型夜班的计划量
+//        Double cxClass3Plan = (scheduleVo.getCxClass3Plan() == null ? 0D : scheduleVo.getCxClass3Plan());  //对应成型早班的计划量
+//        Double cxClass4Plan = (scheduleVo.getCxClass4Plan() == null ? 0D : scheduleVo.getCxClass4Plan());  //对应成型次日夜班的计划量
+//        Double cxClass5Plan = (scheduleVo.getCxClass5Plan() == null ? 0D : scheduleVo.getCxClass5Plan());  //对应成型次日早班的计划量
+//        Double planQty = 0D;
+//        if (classNum == null) {
+//            return planQty;
+//        }
+//        planQty = BigDecimalUtils.add(planQty, cxClass1Plan);
+//        if (classNum == OpenMachineClassEnums.CLASS_ONE) {
+//            return planQty;
+//        }
+//        planQty = BigDecimalUtils.add(planQty, cxClass2Plan);
+//        if (classNum == OpenMachineClassEnums.CLASS_TWO) {
+//            return planQty;
+//        }
+//        planQty = BigDecimalUtils.add(planQty, cxClass3Plan);
+//        if (classNum == OpenMachineClassEnums.CLASS_THREE) {
+//            return planQty;
+//        }
+//        planQty = BigDecimalUtils.add(planQty, cxClass4Plan);
+//        if (classNum == OpenMachineClassEnums.CLASS_FOUR) {
+//            return planQty;
+//        }
+//        return BigDecimalUtils.add(planQty, cxClass5Plan);
+//    }
 
     /**
      * 计划量取整
@@ -1780,19 +1803,19 @@ public class DjEngineServiceImpl implements DjEngineService {
             Integer classIndex = classNum.getClassIndex();
             lastClass = OpenMachineClassEnums.getClassEnums(classIndex - 1);
         }
-        double lastPlanCumulative = this.getNcClassPlanCumulative(scheduleVo, lastClass); // 到上个班次班次班的累计已排计划量
-        double newPlanQty = BigDecimalUtil.add(lastPlanCumulative, roudingPlanQty, scheduleVo.getStockQty()); // 库存+已排计划+本班计划
+//        double lastPlanCumulative = this.getNcClassPlanCumulative(scheduleVo, lastClass); // 到上个班次班次班的累计已排计划量
+//        double newPlanQty = BigDecimalUtils.add(lastPlanCumulative, roudingPlanQty, scheduleVo.getStockQty()); // 库存+已排计划+本班计划
         double result = roudingPlanQty;
-        // 如果库存+计划已经超过总需求量，则本班的计划量要限制住不允许超量
-        if (newPlanQty > totalConsumeQty) {
-            Double increaseMidPlanQty = BigDecimalUtil.sub(newPlanQty, totalConsumeQty);
-            result = BigDecimalUtil.sub(roudingPlanQty, increaseMidPlanQty);
-            result = result > 0? result: 0D;
-        }
-        scheduleVo.setCloseOutSpecFlag(newPlanQty >= totalConsumeQty? ApsConstant.STATUS_ENABLE: ApsConstant.STATUS_DISABLE);
-        if (result < MIN_PLAN_QTY) { // 只差一点点，不处理
-            return 0;
-        }
+//        // 如果库存+计划已经超过总需求量，则本班的计划量要限制住不允许超量
+//        if (newPlanQty > totalConsumeQty) {
+//            Double increaseMidPlanQty = BigDecimalUtils.sub(newPlanQty, totalConsumeQty);
+//            result = BigDecimalUtils.sub(roudingPlanQty, increaseMidPlanQty);
+//            result = result > 0? result: 0D;
+//        }
+//        scheduleVo.setCloseOutSpecFlag(newPlanQty >= totalConsumeQty? ApsConstant.STATUS_ENABLE: ApsConstant.STATUS_DISABLE);
+//        if (result < MIN_PLAN_QTY) { // 只差一点点，不处理
+//            return 0;
+//        }
         return result;
     }
 
@@ -1803,25 +1826,25 @@ public class DjEngineServiceImpl implements DjEngineService {
      * @param classNum
      * @return
      */
-    private Double getNcClassPlanCumulative(DjScheduleResultVo scheduleVo, OpenMachineClassEnums classNum) {
-        Double planQty = 0D;
-        if (classNum == null) {
-            return planQty;
-        }
-        planQty = BigDecimalUtil.add(planQty, scheduleVo.getLastMidPlanQty());
-        if (classNum == OpenMachineClassEnums.CLASS_ONE) {
-            return planQty;
-        }
-        planQty = BigDecimalUtil.add(planQty, scheduleVo.getDayPlanQty());
-        if (classNum == OpenMachineClassEnums.CLASS_TWO) {
-            return planQty;
-        }
-        planQty = BigDecimalUtil.add(planQty, scheduleVo.getNightPlanQty());
-        if (classNum == OpenMachineClassEnums.CLASS_THREE) {
-            return planQty;
-        }
-        return BigDecimalUtil.add(planQty, scheduleVo.getNextDayPlanQty());
-    }
+//    private Double getDjClassPlanCumulative(DjScheduleResultVo scheduleVo, OpenMachineClassEnums classNum) {
+//        Double planQty = 0D;
+//        if (classNum == null) {
+//            return planQty;
+//        }
+//        planQty = BigDecimalUtils.add(planQty, scheduleVo.getClass4PlanQty());
+//        if (classNum == OpenMachineClassEnums.CLASS_ONE) {
+//            return planQty;
+//        }
+//        planQty = BigDecimalUtils.add(planQty, scheduleVo.getClass3PlanQty());
+//        if (classNum == OpenMachineClassEnums.CLASS_TWO) {
+//            return planQty;
+//        }
+//        planQty = BigDecimalUtils.add(planQty, scheduleVo.getClass2PlanQty());
+//        if (classNum == OpenMachineClassEnums.CLASS_THREE) {
+//            return planQty;
+//        }
+//        return BigDecimalUtils.add(planQty, scheduleVo.getNextDayPlanQty());
+//    }
 
     private void computeNcPlanQtyLog(String oldScheduleResult, DjScheduleResultVo scheduleVo, Map<String, Double> lossMap, double paramLossRate, double lossRate) {
         StringBuffer logDetail = new StringBuffer("");
@@ -1863,7 +1886,7 @@ public class DjEngineServiceImpl implements DjEngineService {
      * @return
      */
     private Map<String, String> getParamsMap() {
-        List<DjParamsVo> list = this.ncEngineMapper.listNcParams();
+        List<DjParamsVo> list = this.djEngineMapper.listNcParams();
         Map<String, String> map = list.stream().collect(Collectors.toMap(DjParamsVo::getParamCode, DjParamsVo::getParamValue));
         return map == null ? new HashMap<>() : map;
     }
@@ -1892,9 +1915,9 @@ public class DjEngineServiceImpl implements DjEngineService {
 
     @Override
     public void batchUpdateBatchNoAndOrderNo(String scheduleDate) {
-        List<DjScheduleResultVo> scheduleResultVoList = ncEngineMapper.listNcEnginSchedule(scheduleDate);
+        List<DjScheduleResultVo> scheduleResultVoList = djEngineMapper.listDjEnginSchedule(scheduleDate);
         //查询当前排程的批次号
-        String batchNo = ncEngineMapper.getNcCurrentBatchNo(scheduleDate);
+        String batchNo = djEngineMapper.getDjCurrentBatchNo(scheduleDate);
         if (StringUtils.isBlank(batchNo)) {
             //当前的批次号为空，说明还没”自动排程“或者做的批量导入（需要删掉已排的数据），那么自己生成一个排程批次号
             //胎面排程批次号
@@ -1902,7 +1925,7 @@ public class DjEngineServiceImpl implements DjEngineService {
             //创建自动排程记录
             this.createScheduleRecord(scheduleDate, "", batchNo);
             //把排程数据同步到log表
-//            this.syncNcScheduleToLog(scheduleDate);
+//            this.syncDjScheduleToLog(scheduleDate);
         }
         for (DjScheduleResultVo scheduleResult : scheduleResultVoList) {
             //批次号
@@ -1912,7 +1935,13 @@ public class DjEngineServiceImpl implements DjEngineService {
             scheduleResult.setOrderNo(orderNo);
         }
         if (CollectionUtils.isNotEmpty(scheduleResultVoList)) {
-            ncEngineMapper.batchUpdateBatchNoAndOrderNo(scheduleResultVoList);
+            djEngineMapper.batchUpdateBatchNoAndOrderNo(scheduleResultVoList);
         }
+    }
+
+    @Override
+    public int insertDjOrder(DjScheduleResultVo scheduleVo) {
+        // TODO Auto-generated method stub
+        return 0;
     }
 }
