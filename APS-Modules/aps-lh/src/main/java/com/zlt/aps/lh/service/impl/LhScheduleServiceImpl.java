@@ -2,7 +2,6 @@ package com.zlt.aps.lh.service.impl;
 
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.date.DateUtil;
-import cn.hutool.json.JSON;
 import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
@@ -36,8 +35,8 @@ import com.zlt.aps.lh.engine.observer.ScheduleEvent;
 import com.zlt.aps.lh.engine.observer.ScheduleEventPublisher;
 import com.zlt.aps.lh.exception.ScheduleException;
 import com.zlt.aps.lh.mapper.*;
-import com.zlt.aps.lh.service.ILhScheduleService;
 import com.zlt.aps.lh.service.ILhScheduleResultService;
+import com.zlt.aps.lh.service.ILhScheduleService;
 import com.zlt.aps.lh.service.IScheduleSummaryReportService;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.lh.util.MachineStatusUtil;
@@ -748,6 +747,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         List<LhMouldChangePlanVo> mouldChangePlanExportList = lhMouldChangePlanController.buildLhMouldChangePlanVoList(mouldChangePlanList, mouldChangePlan);
 
         Map<String, Object> mouldChangePlanTableMap = lhMouldChangePlanController.buildExportTableMap(mouldChangePlanExportList, result.getScheduleDate());
+        lhMouldChangePlanController.setExportTitleFieldName(mouldChangePlanTableMap);
         List<List<Map<String, Object>>> mouldChangePlanExcelDataList = new ArrayList<>();
         mouldChangePlanExcelDataList.add(lhMouldChangePlanController.buildExportDataList(mouldChangePlanExportList, mouldChangePlan));
 
@@ -805,7 +805,8 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         byte[] exportBytes = ExcelUtils.writeMultiList(new ByteArrayInputStream(templateBytes), 0, scheduleTableMap, scheduleDataList);
 
         // Sheet 1 - 硫化换模计划：只填充表头占位符，不查询数据库，明细数据传空列表
-        Map<String, Object> mouldChangePlanTableMap = lhMouldChangePlanController.buildExportTableMap(Collections.emptyList(), result.getScheduleDate());
+        Map<String, Object> mouldChangePlanTableMap = new HashMap<>();
+        lhMouldChangePlanController.setExportTitleFieldName(mouldChangePlanTableMap);
         List<List<Map<String, Object>>> mouldChangePlanDataList = new ArrayList<>();
         mouldChangePlanDataList.add(new ArrayList<>());
         exportBytes = ExcelUtils.writeMultiList(new ByteArrayInputStream(exportBytes), 1, mouldChangePlanTableMap, mouldChangePlanDataList);

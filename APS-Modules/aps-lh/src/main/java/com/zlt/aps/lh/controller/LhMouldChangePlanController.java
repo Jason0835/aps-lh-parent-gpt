@@ -328,13 +328,13 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
         List<LhMouldChangePlan> list = this.listExportData(queryVO);
         Map<String, Object> tableMap = new HashMap<>();
         List<List<Map<String, Object>>> excelDataList = new ArrayList<>();
-        // 赋值表头字段名称
-        setExportTitleFieldName(tableMap);
         if (CollectionUtils.isNotEmpty(list)) {
             List<LhMouldChangePlanVo> exportList = this.buildLhMouldChangePlanVoList(list, queryVO);
-            buildExportTableMap(exportList, queryVO.getScheduleDate(), tableMap);
+            tableMap = buildExportTableMap(exportList, queryVO.getScheduleDate());
             excelDataList.add(buildExportDataList(exportList, queryVO));
         }
+        // 赋值表头字段名称
+        setExportTitleFieldName(tableMap);
 
         byte[] resultBytes =  ExcelUtils.writeMultiList(inputStream, 0, tableMap, excelDataList);
         Date endTime = DateUtils.getNowDate();
@@ -362,7 +362,8 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
      * @param scheduleDate 排程日期
      * @return 模板表头数据
      */
-    public Map<String, Object> buildExportTableMap(List<LhMouldChangePlanVo> list, Date scheduleDate, Map<String, Object> tableMap) {
+    public Map<String, Object> buildExportTableMap(List<LhMouldChangePlanVo> list, Date scheduleDate) {
+        Map<String, Object> tableMap = new HashMap<>();
         String titleFormat = I18nUtil.getMessage("mouldChangePlan.export.title");
         String cnFormatDate = DateUtil.format(scheduleDate, "yyyy年MM月dd日");
         String vnFormatDate = DateUtil.format(scheduleDate, "dd/MM/yyyy");
@@ -373,7 +374,7 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
         return tableMap;
     }
 
-    private static void setExportTitleFieldName(Map<String, Object> tableMap) {
+    public void setExportTitleFieldName(Map<String, Object> tableMap) {
         ExcelUtil<LhMouldChangePlanVo> util = new ExcelUtil<>(LhMouldChangePlanVo.class);
         List<Field> allFields = util.getClassField(LhMouldChangePlanVo.class);
         for (Field field : allFields) {
