@@ -194,13 +194,13 @@ export default {
           labelKey: "machineName",
         },
         {
-          label: this.$t("ui.specifyMachine.column.lineType"),
+          label: this.$t("ui.data.column.specifyMachine.lineType"),
           prop: "lineType",
           type: "select",
           dictData: this.dict.type.LINE_TYPE, // "LINE_TYPE",
         },
         {
-          label: this.$t("ui.specifyMachine.column.jobType"),
+          label: this.$t("ui.data.column.specifyMachine.jobType"),
           prop: "jobType",
           type: "select",
           dictData: this.dict.type.JOB_TYPE, // "JOB_TYPE",
