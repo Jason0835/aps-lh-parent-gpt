@@ -299,7 +299,7 @@ public class MpAdjustResultServiceImpl extends AbstractDocService<MpAdjustResult
         String productionVersionNotMatchErrorStr = I18nUtil.getMessage("ui.data.column.mpStructureAllocation.import.productionVersionNotMatch");
         ClassLoader classLoader = this.getClass().getClassLoader();
         DataFormatter dataFormatter = new DataFormatter();
-        int excelColumnCount = iFactoryMonthPlanMouldDayResultService.getExportTemplateColumnCount(false); // excel总列数
+        int excelColumnCount = iFactoryMonthPlanMouldDayResultService.getExportTemplateColumnCount(true); // excel总列数
         
         // 加载月计划调整与结构转产表导出模板，用于获取页签名称
         if (StringUtils.isEmpty(sheetName) || StringUtils.isEmpty(sheetName4DayResult)) {
@@ -371,7 +371,7 @@ public class MpAdjustResultServiceImpl extends AbstractDocService<MpAdjustResult
                 return helper;
             }
             // 解析需求计划版本
-            Cell monthPlanVersionCell4DayResult = sheet4DayResult.getRow(0).getCell(64);
+            Cell monthPlanVersionCell4DayResult = sheet4DayResult.getRow(0).getCell(excelColumnCount - 9);
             if (monthPlanVersionCell4DayResult == null) {
                 helper.setAjaxResult(AjaxResult.error(templateErrorStr));
                 return helper;
@@ -383,7 +383,7 @@ public class MpAdjustResultServiceImpl extends AbstractDocService<MpAdjustResult
                 return helper;
             }
             // 解析生产版本
-            Cell productVersionCell4Day = sheet4DayResult.getRow(0).getCell(excelColumnCount - 9);
+            Cell productVersionCell4Day = sheet4DayResult.getRow(0).getCell(excelColumnCount - 4);
             if (productVersionCell4Day == null) {
                 helper.setAjaxResult(AjaxResult.error(templateErrorStr));
                 return helper;

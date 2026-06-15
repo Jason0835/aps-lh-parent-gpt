@@ -2104,7 +2104,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         String monthPlanVersionNotMatchErrorStr = I18nUtil.getMessage("ui.data.column.mpStructureAllocation.import.monthPlanVersionNotMatch");
         ClassLoader classLoader = this.getClass().getClassLoader();
         DataFormatter dataFormatter = new DataFormatter();
-        int excelColumnCount = iFactoryMonthPlanMouldDayResultService.getExportTemplateColumnCount(true);
+        int excelColumnCount = iFactoryMonthPlanMouldDayResultService.getExportTemplateColumnCount(false);
 
         // 加载月计划调整与结构转产表导出模板，用于获取页签名称
         if (StringUtils.isEmpty(sheetName) || StringUtils.isEmpty(sheetName4DayResult)) {
