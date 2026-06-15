@@ -71,7 +71,7 @@
       <template slot="headerRight">
         <span class="stat-info">
           <span
-            >{{ $t("总合计") }}:
+            >{{ $t("newPage.other.total") }}:
             <span class="stat-value"> {{ stat.totalNum }} </span></span
           >
         </span>
@@ -229,37 +229,37 @@ export default {
         // },
         {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.mdmMaterialInfo.factoryCode"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
           },
         },
         {
           prop: "mouldCode",
-          label: this.$t("ui.data.column.moldLedger.mouldCode"),
+          label: this.$t("ui.data.column.relation.mouldCode"),
           width:150
         },
         {
           prop: "shareMouldCode",
-          label: this.$t("ui.data.rubberMaterial.shareMouldCode"),
+          label: this.$t("ui.data.column.relation.shareMouldCode"),
         },
         {
           prop: "materialCode",
-          label: this.$t("ui.data.column.monthplan.oriMaterialCode"),
+          label: this.$t("ui.data.column.relation.materialCode"),
         },
         {
           prop: "materialDesc",
-          label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
+          label: this.$t("ui.data.column.relation.materialDesc"),
           align: "left",
           minWidth: 350,
         },
         {
           prop: "mainPattern",
-          label: this.$t("ui.data.column.moldLedger.mainPattern"),
+          label: this.$t("ui.data.column.mdmMaterialInfo.mainPattern"),
         },
         {
           prop: "isSamePatterPanel",
-          label: this.$t("ui.data.column.monthplan.samePatternPanel"),
+          label: this.$t("ui.data.column.relation.isSamePatternPanel"),
           width: 80,
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_yes_no, value);
@@ -309,30 +309,30 @@ export default {
       return [
         {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.mdmMaterialInfo.factoryCode"),
           type: "select",
           dictData: this.dict.type.biz_factory_name,
         },
         {
-          label: this.$t("ui.data.column.moldLedger.mouldCode"),
+          label: this.$t("ui.data.column.relation.mouldCode"),
           prop: "mouldCode",
         },
         {
           prop: "materialCode",
-          label: this.$t("ui.data.column.monthplan.oriMaterialCode"),
+          label: this.$t("ui.data.column.relation.materialCode"),
         },
         {
           prop: "materialDesc",
-          label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
+          label: this.$t("ui.data.column.relation.materialDesc"),
           minWidth: 350,
           align: "left",
         },
         {
           prop: "mainPattern",
-          label: this.$t("ui.data.column.moldLedger.mainPattern"),
+          label: this.$t("ui.data.column.mdmMaterialInfo.mainPattern"),
         },
         {
-          label: this.$t("ui.data.column.monthplan.samePatternPanel"),
+          label: this.$t("ui.data.column.relation.isSamePatternPanel"),
           prop: "isSamePatterPanel",
           type: "select",
           dictData: this.dict.type.biz_yes_no,
