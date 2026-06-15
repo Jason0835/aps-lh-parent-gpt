@@ -594,10 +594,9 @@ public class DjScheduleResultController extends BaseController<DjScheduleResult>
 
         List<String> headers = new ArrayList<>();
         // class1: 中班 (scheduleDate的上一天)
-        currentWorkClass = currentWorkClass.getNextClass();
         headers.add(I18nUtil.getMessage(currentWorkClass.getClassName()) + startDateStr);
         // class2-class4: scheduleDate当天 (夜班, 早班, 中班)
-        currentWorkClass = currentWorkClass.getNextClass();
+        currentWorkClass = currentWorkClass.getNextClass(); // 切换班次
         headers.add(I18nUtil.getMessage(currentWorkClass.getClassName()) + baseDateStr);
         currentWorkClass = currentWorkClass.getNextClass();
         headers.add(I18nUtil.getMessage(currentWorkClass.getClassName()) + baseDateStr);
