@@ -142,20 +142,20 @@ export default {
         { type: "selection", fixed: "left" },
         {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.mdmModelInfo.factoryCode"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
           },
         },
         {
           prop: "mouldCode",
-          label: this.$t("ui.data.column.moldLedger.mouldCode"),
+          label: this.$t("ui.data.column.mdmModelInfo.mouldCode"),
           width:180,
           sortable:true
         },
         {
           prop: "mouldType",
-          label: this.$t("ui.data.column.modelinfo.mouldType"),
+          label: this.$t("ui.data.column.mdmModelInfo.mouldType"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_mould_Type, value);
           },
@@ -163,7 +163,7 @@ export default {
         },
         {
           prop: "mouldStatus",
-          label: this.$t("ui.data.column.docVulcanizationMachStatus.status"),
+          label: this.$t("ui.data.column.mdmModelInfo.mouldStatus"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_available_status, value);
           },
@@ -171,7 +171,7 @@ export default {
         },
         {
           prop: "logisticsStatus",
-          label: this.$t("ui.data.column.moldLedger.logisticsStatus"),
+          label: this.$t("ui.data.column.mdmModelInfo.logisticsStatus"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.logistics_status, value);
           },
@@ -179,24 +179,24 @@ export default {
         },
         {
           prop: "specifications",
-          label: this.$t("ui.data.column.reportClassAccuracy.materialCode"),
+          label: this.$t("ui.data.column.mdmModelInfo.specifications"),
           width:180,
           sortable:true
         },
         {
           prop: "mainPattern",
-          label: this.$t("ui.data.column.moldLedger.mainPattern"),
+          label: this.$t("ui.data.column.mdmMaterialInfo.mainPattern"),
           sortable:true
         },
         {
           prop: "pattern",
-          label: this.$t("ui.data.column.moldLedger.pattern"),
+          label: this.$t("ui.data.column.mdmModelInfo.pattern"),
           width:180,
           sortable:true
         },
         {
           prop: "shellStandard",
-          label: this.$t("ui.data.column.moldLedger.shellStandard"),
+          label: this.$t("ui.data.column.mdmModelInfo.shellStandard"),
           sortable:true
         },
         {
@@ -245,46 +245,46 @@ export default {
       return [
         {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.mdmModelInfo.factoryCode"),
           type: "select", //GLUE_TYPE
           dictData: this.dict.type.biz_factory_name,
         },
         {
           prop: "mouldCode",
-          label: this.$t("ui.data.column.moldLedger.mouldCode"),
+          label: this.$t("ui.data.column.mdmModelInfo.mouldCode"),
         },
         {
           prop: "specifications",
-          label: this.$t("ui.data.column.reportClassAccuracy.materialCode"),
+          label: this.$t("ui.data.column.mdmModelInfo.specifications"),
         },
         {
           prop: "logisticsStatus",
-          label: this.$t("ui.data.column.moldLedger.logisticsStatus"),
+          label: this.$t("ui.data.column.mdmModelInfo.logisticsStatus"),
           type: "select", //GLUE_TYPE
           dictData: this.dict.type.logistics_status,
         },
         {
           prop: "mainPattern",
-          label: this.$t("ui.data.column.moldLedger.mainPattern"),
+          label: this.$t("ui.data.column.mdmMaterialInfo.mainPattern"),
         },
         {
           prop: "mouldType",
-          label: this.$t("ui.data.column.modelinfo.mouldType"),
+          label: this.$t("ui.data.column.mdmModelInfo.mouldType"),
           type: "select",
           dictData: this.dict.type.biz_mould_Type,
         },
         {
           prop: "pattern",
-          label: this.$t("ui.data.column.moldLedger.pattern"),
+          label: this.$t("ui.data.column.mdmModelInfo.pattern"),
           // type: "select",
         },
         {
           prop: "shellStandard",
-          label: this.$t("ui.data.column.moldLedger.shellStandard"),
+          label: this.$t("ui.data.column.mdmModelInfo.shellStandard"),
         },
         {
           prop: "mouldStatus",
-          label: this.$t("ui.data.column.docVulcanizationMachStatus.status"),
+          label: this.$t("ui.data.column.mdmModelInfo.mouldStatus"),
           type: "select",
           dictData: this.dict.type.biz_available_status,
         },

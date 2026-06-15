@@ -1,4 +1,5 @@
 {
+  "btn.qualityControlUpdate": "质控状态更新",
   "ui.tq.machineSpecSpeed.column.machineCode": "机台编号",
   "ui.dj.lossSetting.column.paddingCode": "垫胶代码",
   "ui.dj.lossSetting.column.modalName": "垫胶损耗率管理",

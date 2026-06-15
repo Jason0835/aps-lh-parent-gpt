@@ -1,4 +1,5 @@
 {
+  "btn.qualityControlUpdate": "Quality Control Update",
   "ui.data.column.factoryCode": "Factory",
   "ui.dj.lossSetting.column.paddingCode": "Padding code",
   "ui.dj.lossSetting.column.modalName": "Padding rubber loss rate management",

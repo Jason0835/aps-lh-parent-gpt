@@ -48,7 +48,7 @@
            :loading="updateLoading"
             type="primary"
           v-hasPermi="['lean:productinfo:updateQualityStateCodeName']"
-          >{{ $t("质控状态更新") }}
+          >{{ $t("btn.qualityControlUpdate") }}
         </el-button>
         <!--<el-button-->
         <!--  v-hasPermi="['setting:material:export']"-->
@@ -171,23 +171,23 @@ export default {
         //   dictData: this.dict.type.GLUE_TYPE,
         // },
         {
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.mdmMaterialInfo.factoryCode"),
           prop: "factoryCode",
           type: "select", //GLUE_TYPE
           dictData: this.dict.type.biz_factory_name,
         },
         {
-          label: this.$t("ui.data.column.facMonthPlanInit.productSpecsName"),
+          label: this.$t("ui.data.column.mdmMaterialInfo.materialCategory"),
           prop: "materialCategory",
           type: "select", //GLUE_TYPE
           dictData: this.dict.type.material_type,
         },
         {
-          label: this.$t("ui.data.colume.wms.unused.productCode"),
+          label: this.$t("ui.data.column.mdmMaterialInfo.materialCode"),
           prop: "materialCode",
         },
         {
-          label: this.$t("ui.data.defectiveStock.mesMaterialCode"),
+          label: this.$t("ui.data.column.mdmMaterialInfo.mesMaterialCode"),
           prop: "mesMaterialCode",
         },
         // {
@@ -195,47 +195,47 @@ export default {
         //   prop: "materialCode",
         // },
         {
-          label: this.$t("ui.data.column.reportClassAccuracy.materialCode"),
+          label: this.$t("ui.data.column.mdmMaterialInfo.specifications"),
           prop: "specifications",
         },
         {
-          label: this.$t("ui.data.column.confMinProd.pattern"),
+          label: this.$t("ui.data.column.mdmMaterialInfo.pattern"),
           prop: "pattern",
         },
         {
-          label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
+          label: this.$t("ui.data.column.mdmMaterialInfo.materialDesc"),
           minWidth: 350,
           align: "left",
           prop: "materialDesc",
         },
         {
           prop: "embryoCode",
-          label: this.$t("ui.data.rubberMaterial.embryoCode"),
+          label: this.$t("ui.data.column.mdmMaterialInfo.embryoCode"),
         },
         {
           prop: "embryoDesc",
-          label: this.$t("ui.data.rubberMaterial.embryoDesc"),
+          label: this.$t("ui.data.column.mdmMaterialInfo.embryoDesc"),
           minWidth: 350,
           align: "left",
         },
         {
           prop: "qualityStateCode",
           type: "select", //GLUE_TYPE
-          label: this.$t("质控状态"),
+          label: this.$t("ui.data.column.GoodsBox.qualityStateCode"),
           dictData: this.dict.type.quality_state,
 
         },
         {
           prop: "cantProduce",
           type: "select", //GLUE_TYPE
-          label: this.$t("ui.data.column.scheduleAdjust.cantProduce"),
+          label: this.$t("ui.data.column.mdmMaterialInfo.cantProduce"),
           dictData: this.dict.type.biz_yes_no,
 
         },
         {
           prop: "mainPattern",
 
-          label: this.$t("ui.data.column.moldLedger.mainPattern"),
+          label: this.$t("ui.data.column.mdmMaterialInfo.mainPattern"),
         },
       ];
     },
@@ -247,7 +247,7 @@ export default {
           halign: "center",
           align: "center",
           width: 120,
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.mdmMaterialInfo.factoryCode"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
           },
@@ -256,32 +256,32 @@ export default {
           prop: "productTypeName",
           align: "center",
           width: 120,
-          label: this.$t("ui.data.column.monthplan.productType"),
+          label: this.$t("ui.data.column.mdmMaterialInfo.productTypeName"),
         },
         {
           prop: "mesMaterialCategory",
           width: 120,
-          label: this.$t("ui.data.material.mesMaterialCategory"),
+          label: this.$t("ui.data.column.mdmMaterialInfo.mesMaterialCategory"),
         },
         {
           prop: "mesMaterialSubcategory",
           width: 120,
-          label: this.$t("ui.data.material.mesMaterialSubcategory"),
+          label: this.$t("ui.data.column.mdmMaterialInfo.mesMaterialSubcategory"),
         },
         {
           prop: "mesMaterialCateName",
           width: 120,
-          label: this.$t("ui.data.material.mesMaterialCateName"),
+          label: this.$t("ui.data.column.mdmMaterialInfo.mesMaterialCateName"),
         },
         {
           prop: "mesMaterialSubcatName",
           width: 120,
-          label: this.$t("ui.data.material.mesMaterialSubcatName"),
+          label: this.$t("ui.data.column.mdmMaterialInfo.mesMaterialSubcatName"),
         },
         {
           prop: "productCategory",
           width: 120,
-          label: this.$t("ui.data.column.capsuleChuck.productTypeCode"),
+          label: this.$t("ui.data.column.mdmMaterialInfo.productCategory"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.product_category, value);
           },
@@ -289,7 +289,7 @@ export default {
         {
           prop: "qualityStateCode",
           width: 120,
-          label: this.$t("质控状态"),
+          label: this.$t("ui.data.column.GoodsBox.qualityStateCode"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.quality_state, value);
           },
@@ -299,14 +299,14 @@ export default {
           halign: "center",
           align: "center",
           width: 120,
-          label: this.$t("ui.data.column.facMonthPlanInit.productSpecsName"),
+          label: this.$t("ui.data.column.mdmMaterialInfo.materialCategory"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.material_type, value);
           },
         },
         {
           prop: "structureName",
-          label: this.$t("ui.data.column.finishStock.structureName"),
+          label: this.$t("ui.data.column.mdmMaterialInfo.structureName"),
           width: 200,
         },
         {
@@ -314,12 +314,12 @@ export default {
           halign: "center",
           align: "center",
           width: 120,
-          label: this.$t("ui.data.colume.wms.unused.productCode"),
+          label: this.$t("ui.data.column.mdmMaterialInfo.materialCode"),
         },
         {
           prop: "mesMaterialCode",
           width: 120,
-          label: this.$t("ui.data.defectiveStock.mesMaterialCode"),
+          label: this.$t("ui.data.column.mdmMaterialInfo.mesMaterialCode"),
         },
         // {
         //   prop: "物料名称",
@@ -331,7 +331,7 @@ export default {
         {
           prop: "materialDesc",
           minWidth: 350,
-          label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
+          label: this.$t("ui.data.column.mdmMaterialInfo.materialDesc"),
           align: "left",
         },
         {
@@ -339,28 +339,28 @@ export default {
           halign: "center",
           align: "center",
           width: 120,
-          label: this.$t("ui.data.column.reportClassAccuracy.materialCode"),
+          label: this.$t("ui.data.column.mdmMaterialInfo.specifications"),
         },
         {
           prop: "mainPattern",
           halign: "center",
           align: "center",
           width: 120,
-          label: this.$t("ui.data.column.moldLedger.mainPattern"),
+          label: this.$t("ui.data.column.mdmMaterialInfo.mainPattern"),
         },
         {
           prop: "pattern",
           halign: "center",
           align: "center",
           width: 120,
-          label: this.$t("ui.data.column.confMinProd.pattern"),
+          label: this.$t("ui.data.column.mdmMaterialInfo.pattern"),
         },
         {
           prop: "brand",
           halign: "center",
           align: "center",
           width: 120,
-          label: this.$t("ui.data.colume.plan.first.draft.brand"),
+          label: this.$t("ui.data.column.mdmMaterialInfo.brand"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_brand_type, value);
           },
@@ -370,35 +370,35 @@ export default {
           halign: "center",
           align: "center",
           width: 120,
-          label: this.$t("ui.data.column.scheduleAdjust.seep"),
+          label: this.$t("ui.data.column.mdmMaterialInfo.speed"),
         },
         {
           prop: "hierarchy",
           halign: "center",
           align: "center",
           width: 120,
-          label: this.$t("ui.data.column.scheduleAdjust.hierarchy"),
+          label: this.$t("ui.data.column.mdmMaterialInfo.hierarchy"),
         },
         {
           prop: "proSize",
           halign: "center",
           align: "center",
           width: 120,
-          label: this.$t("ui.data.column.scheduleAdjust.proSize"),
+          label: this.$t("ui.data.column.mdmMaterialInfo.proSize"),
         },
         {
           prop: "ability",
           halign: "center",
           align: "center",
           width: 120,
-          label: this.$t("ui.data.column.lean.productinfo.ability"),
+          label: this.$t("ui.data.column.mdmMaterialInfo.ability"),
         },
         {
           prop: "cantProduce",
           halign: "center",
           align: "center",
           width: 120,
-          label: this.$t("ui.data.column.scheduleAdjust.cantProduce"),
+          label: this.$t("ui.data.column.mdmMaterialInfo.cantProduce"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_yes_no, value);
           },
@@ -408,19 +408,19 @@ export default {
           prop: "embryoCode",
           align: "center",
           width: 180,
-          label: this.$t("ui.data.rubberMaterial.embryoCode"),
+          label: this.$t("ui.data.column.mdmMaterialInfo.embryoCode"),
         },
         {
           prop: "embryoDesc",
           align: "left",
           minWidth: 350,
-          label: this.$t("ui.data.rubberMaterial.embryoDesc"),
+          label: this.$t("ui.data.column.mdmMaterialInfo.embryoDesc"),
         },
         {
           prop: "sectionWidth",
           align: "center",
           width: 120,
-          label: this.$t("ui.data.rubberMaterial.sectionWidth"),
+          label: this.$t("ui.data.column.mdmMaterialInfo.sectionWidth"),
         },
 
         {
