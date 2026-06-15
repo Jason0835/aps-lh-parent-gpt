@@ -805,9 +805,9 @@ export default {
       }
       cols.push(
         {
-          prop: "lastMonthOverdueQty",
+          prop: "lastMonthValidFlag",
           label: this.$t(
-            "ui.data.column.mpAdjustResult.lastMonthOverdueQty"
+            "ui.data.column.mpAdjustResult.lastMonthValidFlag"
           ),
           width: 140,
           render: ({ row }) => {
@@ -816,14 +816,14 @@ export default {
                 <span>
                   {this.selectDictLabel(
                     this.dict.type.biz_yes_no,
-                    row.lastMonthOverdueQty
+                    row.lastMonthValidFlag
                   )}
                 </span>
               );
             }
             return (
               <el-select
-                v-model={row.lastMonthOverdueQty}
+                v-model={row.lastMonthValidFlag}
                 size="mini"
                 filterable
                 clearable
@@ -843,8 +843,8 @@ export default {
           },
         },
         {
-          prop: "lastMonthValidFlag",
-          label: this.$t("ui.data.column.mpAdjustResult.lastMonthValidFlag"),
+          prop: "lastMonthOverdueQty",
+          label: this.$t("ui.data.column.mpAdjustResult.lastMonthOverdueQty"),
           width: 120,
           formatter: (row, column, value) => {
             return value === null || value === undefined ? "" : String(value);
