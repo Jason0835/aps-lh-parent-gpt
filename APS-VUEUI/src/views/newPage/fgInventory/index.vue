@@ -133,12 +133,12 @@ export default {
         },
         {
           prop: "finalGrade",
-          label: this.$t("ui.data.column.finishStock.finalGrade"),
+          label: this.$t("ui.data.column.productStock.finalGrade"),
           width:120
         },
         {
           prop: "structureName",
-          label: this.$t("ui.data.column.finishStock.structureName"),
+          label: this.$t("ui.data.column.productStock.structureName"),
           width:200
         },
         {
@@ -163,7 +163,7 @@ export default {
 
         {
           prop: "stockQty",
-          label: this.$t("ui.data.column.finishStock.stockQty"),
+          label: this.$t("ui.data.column.productStock.stockQty"),
         },
         {
           prop: "stockDate",
@@ -198,21 +198,21 @@ export default {
         },
         {
           prop: "isExceedThreeMonth",
-          label: this.$t("ui.data.column.finishStock.isExceedThreeMonth"),
+          label: this.$t("ui.data.column.productStock.isExceedThreeMonth"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_yes_no, value);
           },
         },
         {
           prop: "isExceedSixMonth",
-          label: this.$t("ui.data.column.finishStock.isExceedSixMonth"),
+          label: this.$t("ui.data.column.productStock.isExceedSixMonth"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_yes_no, value);
           },
         },
         {
           prop: "isExceedTwelveMonth",
-          label: this.$t("ui.data.column.finishStock.isExceedTwelveMonth"),
+          label: this.$t("ui.data.column.productStock.isExceedTwelveMonth"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_yes_no, value);
           },

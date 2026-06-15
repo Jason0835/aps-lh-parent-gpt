@@ -100,7 +100,7 @@ export default {
           valueFormat: "yyyy-MM-dd",
         },
         {
-          label: this.$t("ui.data.column.quota.paddingCode"),
+          label: this.$t("ui.data.column.quota.liningCode"),
           prop: "materialCode",
         },
       ],
@@ -134,14 +134,14 @@ export default {
           prop: "materialCode",
           align: "center",
           halign: "center",
-          label: this.$t("ui.data.column.quota.paddingCode"),
+          label: this.$t("ui.data.column.quota.liningCode"),
           // sortable: "custom",
         },
         {
           prop: "stockNum",
           align: "right",
           halign: "center",
-          label: this.$t("ui.data.column.stock.stockNum.meter"),
+          label: this.$t("ui.data.column.stock.stockNum"),
           // sortable: "custom",
         },
 
@@ -149,14 +149,14 @@ export default {
           prop: "modifyNum",
           align: "right",
           halign: "center",
-          label: this.$t("ui.data.column.stock.modifyNum.meter"),
+          label: this.$t("ui.data.column.stock.modifyNum"),
           // sortable: "custom",
         },
         {
           prop: "badNum",
           align: "right",
           halign: "center",
-          label: this.$t("ui.data.column.stock.badNum.meter"),
+          label: this.$t("ui.data.column.stock.badNum"),
           // sortable: "custom",
         },
         {
