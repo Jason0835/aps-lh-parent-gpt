@@ -1664,6 +1664,7 @@
   "ui.data.column.tm.scheduleResult.class6Analysis": "Phân tích ca 6",
   "ui.data.column.tm.scheduleResult.releaseStatus": "Trạng thái phát hành",
   "ui.data.column.tm.scheduleResult.dataSource": "Nguồn dữ liệu",
+  "ui.data.column.mdmDevicePlanShut.dataSource": "Nguồn dữ liệu",
   "ui.data.column.tm.scheduleResult.tailFlag": "Nhiệm vụ kết thúc",
   "ui.data.column.tm.scheduleUnplanned.modelName": "Danh sách chưa xếp lịch mặt lốp",
   "ui.data.column.tm.scheduleUnplanned.factoryCode": "Nhà máy",

@@ -100,7 +100,8 @@ export default {
     "machine_stop_type",
     "biz_factory_name",
     "work_calendar_proc",
-    'device_shut_machine_type'
+    'device_shut_machine_type',
+    'lh_precision_data_source'
   ],
   provide() {
     return {
@@ -195,6 +196,13 @@ export default {
           label: this.$t("ui.data.column.scheduledShutdown.endDate"),
         },
         {
+          prop: "dataSource",
+          label: this.$t("ui.data.column.mdmDevicePlanShut.dataSource"),
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(this.dict.type.lh_precision_data_source, value);
+          },
+        },
+        {
           prop: "remark",
           label: this.$t("common.remark"),
         },
@@ -258,6 +266,12 @@ export default {
           label: this.$t("ui.data.column.scheduledShutdown.machineStopType"),
           type: "select",
           dictData: this.dict.type.machine_stop_type,
+        },
+        {
+          prop: "dataSource",
+          label: this.$t("ui.data.column.mdmDevicePlanShut.dataSource"),
+          type: "select",
+          dictData: this.dict.type.lh_precision_data_source,
         },
         {
           prop: "createTime",

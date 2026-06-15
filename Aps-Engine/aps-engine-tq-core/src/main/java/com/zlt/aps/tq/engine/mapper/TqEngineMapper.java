@@ -112,4 +112,30 @@ public interface TqEngineMapper {
     List<String> listAssistSpec();
 
     int batchUpdateBatchNoAndOrderNo(@Param("list") List<TqScheduleResultVo> scheduleResultVoList);
+
+    /**
+     * 查询胎圈工装车容量数据（整车容量）
+     * @return 胎圈编码→整车容量映射
+     */
+    List<Map<String, Object>> listToolingCartCapacity();
+
+    /**
+     * 查询胎圈工装总数数据
+     * @return 胎圈编码→工装总数映射
+     */
+    List<Map<String, Object>> listToolingTotal();
+
+    /**
+     * 查询胎圈机台检修计划数据
+     * @param scheduleDate 排程日期
+     * @return 检修计划列表
+     */
+    List<Map<String, Object>> listMaintenancePlan(@Param("scheduleDate") String scheduleDate);
+
+    /**
+     * 查询胎圈工作日历（停产班次信息）
+     * @param scheduleDate 排程日期
+     * @return 工作日历列表
+     */
+    List<Map<String, Object>> listWorkCalendar(@Param("scheduleDate") String scheduleDate);
 }

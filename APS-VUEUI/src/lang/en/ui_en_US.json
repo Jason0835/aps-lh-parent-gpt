@@ -628,6 +628,7 @@
   "ui.data.column.tm.scheduleResult.class6Analysis": "Shift 6 Analysis",
   "ui.data.column.tm.scheduleResult.releaseStatus": "Release Status",
   "ui.data.column.tm.scheduleResult.dataSource": "Data Source",
+  "ui.data.column.mdmDevicePlanShut.dataSource": "Data Source",
   "ui.data.column.tm.scheduleResult.tailFlag": "Tail Flag",
   "ui.data.column.tm.scheduleUnplanned.modelName": "Tread Schedule Unplanned",
   "ui.data.column.tm.scheduleUnplanned.factoryCode": "Factory",

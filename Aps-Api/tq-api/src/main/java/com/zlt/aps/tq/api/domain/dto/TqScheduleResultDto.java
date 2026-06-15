@@ -275,6 +275,11 @@ public class TqScheduleResultDto extends ApsBaseDto
     @ApiModelProperty(value = "收尾提示标识(0:提示收尾；1:不需要提示)")
     private String markCloseOutTip;
 
+    /** 收尾规格标识(0:收尾；1:非收尾) */
+    @Excel(name = "ui.data.column.tq.scheduleResult.closeOutSpecFlag", dictType = "CLOSE_OUT_SPEC_FLAG")
+    @ApiModelProperty(value = "收尾规格标识(0:收尾；1:非收尾)")
+    private String closeOutSpecFlag;
+
     @ImportValidated(maxLength = 300)
     @Excel(name = "ui.common.column.remark")
     @ApiModelProperty(value = "备注", position = 500)

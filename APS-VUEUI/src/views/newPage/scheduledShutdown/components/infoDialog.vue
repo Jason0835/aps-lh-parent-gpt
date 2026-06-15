@@ -175,6 +175,12 @@ export default {
           dateType: "datetime",
           valueFormat: "yyyy-MM-dd HH:mm:ss",
         },
+        {
+          prop: "dataSource",
+          label: this.$t("ui.data.column.mdmDevicePlanShut.dataSource"),
+          type: "select",
+          dictData: this.parentDict.type.lh_precision_data_source,
+        },
 
         {
           prop: "remark",
