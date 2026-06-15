@@ -332,7 +332,7 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
         setExportTitleFieldName(tableMap);
         if (CollectionUtils.isNotEmpty(list)) {
             List<LhMouldChangePlanVo> exportList = this.buildLhMouldChangePlanVoList(list, queryVO);
-            tableMap = buildExportTableMap(exportList, queryVO.getScheduleDate());
+            buildExportTableMap(exportList, queryVO.getScheduleDate(), tableMap);
             excelDataList.add(buildExportDataList(exportList, queryVO));
         }
 
@@ -362,8 +362,7 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
      * @param scheduleDate 排程日期
      * @return 模板表头数据
      */
-    public Map<String, Object> buildExportTableMap(List<LhMouldChangePlanVo> list, Date scheduleDate) {
-        Map<String, Object> tableMap = new HashMap<>(16);
+    public Map<String, Object> buildExportTableMap(List<LhMouldChangePlanVo> list, Date scheduleDate, Map<String, Object> tableMap) {
         String titleFormat = I18nUtil.getMessage("mouldChangePlan.export.title");
         String cnFormatDate = DateUtil.format(scheduleDate, "yyyy年MM月dd日");
         String vnFormatDate = DateUtil.format(scheduleDate, "dd/MM/yyyy");
