@@ -51,12 +51,14 @@ import com.zlt.aps.mp.demand.service.ISalesOrderPoolService;
 import com.zlt.aps.mp.engine.adjust.MpWeekRollAdjustEngine;
 import com.zlt.aps.mp.engine.capacity.MpAdjustDailyCapacityLimit;
 import com.zlt.aps.mp.engine.constant.ProductionConstant;
+import com.zlt.aps.mp.factory.dto.MpSkuAdjustInfoVo;
 import com.zlt.aps.mp.factory.mapper.FactoryMonthPlanProductionFinalResultEntityMapper;
 import com.zlt.aps.mp.factory.mapper.MpStructureAllocationEntityMapper;
 import com.zlt.aps.mp.factory.service.IBatchMpMonthPlanStatisticsService;
 import com.zlt.aps.mp.factory.service.IFactoryMonthPlanProductionFinalResultService;
 import com.zlt.aps.mp.factory.service.IMpMonthPlanStatisticsService;
 import com.zlt.aps.mp.factory.service.IMpStructureAllocationService;
+import com.zlt.aps.mp.factory.service.MpSkuAdjustInfoService;
 import com.zlt.aps.mp.factory.service.impl.MoldCavityInsertMaxValueCalculatorImpl;
 import com.zlt.aps.mp.mdm.dto.DataDTO;
 import com.zlt.aps.mp.mdm.handler.DataManager;
@@ -155,6 +157,9 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
 
     @Autowired
     protected IBatchMpMonthPlanStatisticsService batchMpMonthPlanStatisticsService;
+
+    @Autowired
+    protected MpSkuAdjustInfoService mpSkuAdjustInfoService;
 
     @Autowired
     protected BaseDao baseDao;
@@ -876,6 +881,10 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             mpAdjustResult.setTotalPlanQty(finalAdjustVo.getTotalQty());
 
             mpAdjustResult.setAdjustFlag((finalAdjustVo.getActualAdjustQty() != null && Math.abs(finalAdjustVo.getActualAdjustQty()) > 0) ? YesOrNoEnum.YES.getCode() : YesOrNoEnum.NO.getCode());
+            if (YesOrNoEnum.YES.getCode().equals(mpAdjustResult.getAdjustFlag())){
+                //若有调整过标志，将上月有效标志置为否
+                mpAdjustResult.setLastMonthValidFlag(YesOrNoEnum.NO.getCode());
+            }
             if (StringUtil.isEmptyWithTrim(mpAdjustResult.getIsLockSchedule())) {
                 mpAdjustResult.setIsLockSchedule(YesOrNoEnum.NO.getCode());
             }
@@ -992,6 +1001,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         if (StringUtil.isEmptyWithTrim(contextDTO.getVersion())) {
             throw new BusinessException(I18nUtil.getMessage("ui.data.alert.mpWeekRollAdjust.versionEmpty"));
         }
+        contextDTO.setAdjustMonthPlanVersion(contextDTO.getVersion());
         // 设置周程滚动参数
         contextDTO.setParamMap(mpAdjustStructureInService.getMpWeekAdjustParam(contextDTO.getFactoryCode(), ProductTypeEnum.WHOLE_STEEL.getValue()));
 
@@ -2598,7 +2608,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         Map<String, List<MpAdjustDetailVo>> adjustDetailMap = buildMaterialCodeAdjustDetailMap(adjustDetailList);
 
         // 最新需求计划版本
-        String lastMonthPlanVersion = null;
+        /*String lastMonthPlanVersion = null;
         if (PubUtil.isNotEmpty(adjustDetailList)) {
             lastMonthPlanVersion = adjustDetailList.get(0).getLastMonthPlanVersion();
             contextDTO.setAdjustMonthPlanVersion(lastMonthPlanVersion);
@@ -2606,9 +2616,12 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         if (StringUtil.isEmptyWithTrim(lastMonthPlanVersion) && PubUtil.isNotEmpty(adjustResultList)) {
             lastMonthPlanVersion = adjustResultList.get(0).getLastMonthPlanVersion();
             contextDTO.setAdjustMonthPlanVersion(lastMonthPlanVersion);
-        }
+        }*/
         // 通过结构过滤月计划列表
         String structureName = contextDTO.getStructureName();
+
+        // 获取待调整量
+        Map<String, MpSkuAdjustInfoVo> skuAdjustInfoMap = getPendingQtyInfo(contextDTO);
 /*        factoryMonthPlanProdFinalList = factoryMonthPlanProdFinalList.stream()
                 .filter(vo -> StringUtils.isEmpty(structureName) || structureName.equals(vo.getStructureName()))
                 .collect(Collectors.toList());*/
@@ -2632,11 +2645,18 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             }
 
             // 相同业务Key时以调整结果为准；调整独有数据转换为同一VO后追加返回。
+            String oriMonthPlanVersion = monthPlan.getMonthPlanVersion();
             BeanUtil.copyProperties(adjustResult, monthPlan, "id");
             //monthPlan.setId(null);
-
+            MpSkuAdjustInfoVo skuAdjustInfo = skuAdjustInfoMap == null ? null: skuAdjustInfoMap.get(monthPlan.getPendingQtyKey());
+            if (skuAdjustInfo != null && (skuAdjustInfo.getPendingQty() == null || skuAdjustInfo.getPendingQty() == 0)){
+                //若待调整量 == 0 且 调整的需求计划版本与定稿的需求计划版本不一致，将”超欠产有效标识“ = 否；
+                if (!contextDTO.getAdjustMonthPlanVersion().equals(oriMonthPlanVersion)){
+                    monthPlan.setLastMonthValidFlag(YesOrNoEnum.NO.getCode());
+                }
+            }
             // 设置最新需求计划版本
-            monthPlan.setLastMonthPlanVersion(lastMonthPlanVersion);
+            //monthPlan.setLastMonthPlanVersion(lastMonthPlanVersion);
 
             MpAdjustDetailVo adjustDetail = getFirstAdjustDetail(adjustDetailMap, materialCodeKey);
 
@@ -2677,6 +2697,20 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             // 将日期字段中值为0的字段设为null
             handleZeroToNull(monthPlan);
         }
+    }
+
+    /**
+     * 获取待调整量
+     * @param contextDTO 调整上下文
+     * @return
+     */
+    private Map<String, MpSkuAdjustInfoVo> getPendingQtyInfo(MpRollAdjustContextDTO contextDTO){
+        FactoryMonthPlanProductionFinalResult condition = new FactoryMonthPlanProductionFinalResult();
+        condition.setFactoryCode(contextDTO.getFactoryCode());
+        condition.setYear(contextDTO.getMpYear());
+        condition.setMonth(contextDTO.getMpMonth());
+        condition.setProductionVersion(contextDTO.getVersion());
+        return mpSkuAdjustInfoService.getPendingQtyInfo(condition, contextDTO.getAdjustMonthPlanVersion());
     }
 
     /**

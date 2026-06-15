@@ -158,6 +158,10 @@ public class MpAdjustResultServiceImpl extends AbstractDocService<MpAdjustResult
          //实际调整量 = 累计排产量 - 原实际排产量
         int oriTotalQty = entity.getTotalQty()== null ? 0:entity.getTotalQty();
         entity.setAdjustFlag(oriTotalQty != accTotalQty ? YesOrNoEnum.YES.getCode() : YesOrNoEnum.NO.getCode());
+        if (YesOrNoEnum.YES.getCode().equals(entity.getAdjustFlag())){
+            //若有调整过标志，将上月有效标志置为否
+            entity.setLastMonthValidFlag(YesOrNoEnum.NO.getCode());
+        }
         entity.setTotalQty(accTotalQty);
 
         if (StrUtil.isNotBlank(entity.getVersion())) {
