@@ -174,7 +174,7 @@ export default {
     searchColumns() {
       return [
         {
-          label: this.$t("ui.data.column.quota.paddingCode"),
+          label: this.$t("ui.dj.lossSetting.column.paddingCode"),
           prop: "paddingCode",
         },
         {
