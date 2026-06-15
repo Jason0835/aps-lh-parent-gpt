@@ -250,12 +250,14 @@ public class LhMouldChangePlanServiceImpl extends AbstractDocService<LhMouldChan
                 docEntity.setMouldStatus(ApsConstant.FALSE);
                 importList.add(docEntity);
             } else if (updateSupport) {
-           LambdaQueryWrapper<LhMouldChangePlan> queryWrapper = new LambdaQueryWrapper<>();
-           queryWrapper.eq(LhMouldChangePlan::getFactoryCode, docEntity.getFactoryCode());
-           queryWrapper.eq(LhMouldChangePlan::getLhMachineCode, docEntity.getLhMachineCode());
-           queryWrapper.eq(LhMouldChangePlan::getPlanDate, docEntity.getPlanDate());
-           queryWrapper.eq(LhMouldChangePlan::getScheduleDate, docEntity.getScheduleDate());
-           LhMouldChangePlan exist = lhMouldChangePlanMapper.selectOne(queryWrapper);
+                LambdaQueryWrapper<LhMouldChangePlan> queryWrapper = new LambdaQueryWrapper<>();
+                queryWrapper.eq(LhMouldChangePlan::getFactoryCode, docEntity.getFactoryCode());
+                queryWrapper.eq(LhMouldChangePlan::getLhMachineCode, docEntity.getLhMachineCode());
+                Date planDate = DateUtil.beginOfDay(docEntity.getPlanDate());
+                queryWrapper.ge(LhMouldChangePlan::getPlanDate, planDate);
+                queryWrapper.lt(LhMouldChangePlan::getPlanDate, DateUtil.offsetDay(planDate, 1));
+                queryWrapper.eq(LhMouldChangePlan::getScheduleDate, docEntity.getScheduleDate());
+                LhMouldChangePlan exist = lhMouldChangePlanMapper.selectOne(queryWrapper);
                 if (exist == null) {
                     failureNum++;
                     ImportExcelValidatedUtils.addImportErrorLog(importLogId, errorNum,
