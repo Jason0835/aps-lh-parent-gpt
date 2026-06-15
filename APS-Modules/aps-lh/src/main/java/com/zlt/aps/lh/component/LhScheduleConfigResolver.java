@@ -107,6 +107,8 @@ public class LhScheduleConfigResolver {
                 LhScheduleConstant.FIRST_INSPECTION_HOURS);
         putIntValue(resolvedParamMap, lhParamsMap, LhScheduleParamConstant.MAX_FIRST_INSPECTION_PER_SHIFT,
                 LhScheduleConstant.MAX_FIRST_INSPECTION_PER_SHIFT);
+        putIntValue(resolvedParamMap, lhParamsMap, LhScheduleParamConstant.FIRST_INSPECTION_QTY,
+                LhScheduleConstant.FIRST_INSPECTION_QTY, 0);
 
         // 收尾判定参数
         putIntValue(resolvedParamMap, lhParamsMap, LhScheduleParamConstant.ENDING_DETECT_DAYS, LhScheduleConstant.DEFAULT_ENDING_DAYS);
@@ -206,6 +208,8 @@ public class LhScheduleConfigResolver {
                 LhScheduleConstant.NEW_SPEC_SHORTAGE_LOOK_AHEAD_DAYS, 1);
         putIntValue(resolvedParamMap, lhParamsMap, LhScheduleParamConstant.NEW_SPEC_SHORTAGE_ADD_MACHINE_THRESHOLD,
                 LhScheduleConstant.NEW_SPEC_SHORTAGE_ADD_MACHINE_THRESHOLD, 0);
+        putStringValue(resolvedParamMap, lhParamsMap, LhScheduleParamConstant.ODD_SHIFT_CAPACITY_PLUS_SHIFT_TYPE,
+                LhScheduleConstant.ODD_SHIFT_CAPACITY_PLUS_SHIFT_TYPE);
         putIntValue(resolvedParamMap, lhParamsMap, LhScheduleParamConstant.ENABLE_CHANGEOVER_BALANCE,
                 LhScheduleConstant.ENABLE_CHANGEOVER_BALANCE);
         putIntValue(resolvedParamMap, lhParamsMap, LhScheduleParamConstant.CONTINUOUS_SHORTAGE_LOOK_AHEAD_DAYS,

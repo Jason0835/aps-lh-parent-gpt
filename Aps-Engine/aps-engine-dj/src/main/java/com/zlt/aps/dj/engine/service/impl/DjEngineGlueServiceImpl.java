@@ -20,7 +20,7 @@ import java.util.Map;
 public class DjEngineGlueServiceImpl implements DjEngineGlueService {
 
     @Resource
-    private DjEngineGlueMapper ncEngineGlueMapper;
+    private DjEngineGlueMapper djEngineGlueMapper;
 
     /**
      * 获取胶料序号map
@@ -28,7 +28,7 @@ public class DjEngineGlueServiceImpl implements DjEngineGlueService {
      */
     public Map<String, String> getGlueSeqMap() {
         Map<String, String> glueSeqMap = new HashMap<>();
-        List<DjGlueOrderVo> glueOrderList = ncEngineGlueMapper.listGlueSeq();  //查询胶料顺序序号列表
+        List<DjGlueOrderVo> glueOrderList = djEngineGlueMapper.listGlueSeq();  //查询胶料顺序序号列表
         for(DjGlueOrderVo glueOrderVo : glueOrderList) {
             glueSeqMap.put(glueOrderVo.getGlueCode(), glueOrderVo.getGlueSeq());
         }

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.tm.mapper.TmScheduleUnplannedMapper">
+
+    <update id="logicDeleteByFactoryCodeAndScheduleDate">
+        update T_TM_SCHEDULE_UNPLANNED
+        set IS_DELETE = 1,
+            UPDATE_TIME = now()
+        where IS_DELETE = 0
+          and FACTORY_CODE = #{factoryCode}
+          and SCHEDULE_DATE = #{scheduleDate}
+    </update>
+
+</mapper>

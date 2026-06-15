@@ -108,7 +108,6 @@ public class TmShiftConfigController extends AbstractDocBizController<TmShiftCon
     @Override
     protected void builderCondition(QueryWrapper<TmShiftConfig> queryWrapper, TmShiftConfig queryVO) {
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("factoryCode")), "FACTORY_CODE", queryVO.getFieldValueByFieldName("factoryCode"));
-        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("scheduleDate")), "SCHEDULE_DATE", queryVO.getFieldValueByFieldName("scheduleDate"));
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("shiftCode")), "SHIFT_CODE", queryVO.getFieldValueByFieldName("shiftCode"));
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("shiftName")), "SHIFT_NAME", queryVO.getFieldValueByFieldName("shiftName"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("shiftOrder")), "SHIFT_ORDER", queryVO.getFieldValueByFieldName("shiftOrder"));

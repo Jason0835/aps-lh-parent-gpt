@@ -2,14 +2,14 @@ import request from '@/utils/request'
 
 export function listScheduleResult(query) {
   return request({
-    url: 'dj/ncScheduleResult/list',
+    url: 'dj/djScheduleResult/list',
     method: 'post',
     data: query
   })
 }
 export function removeScheduleResult(query) {
   return request({
-    url: 'dj/ncScheduleResult/remove',
+    url: 'dj/djScheduleResult/remove',
     method: 'post',
     data: query
   })
@@ -18,35 +18,35 @@ export function removeScheduleResult(query) {
 //
 export function validateAutoPlan(query) {
   return request({
-    url: 'dj/ncScheduleResult/validateAutoPlan',
+    url: 'dj/djScheduleResult/validateAutoPlan',
     method: 'post',
     data: query
   })
 }
 export function autoPlan(query) {
   return request({
-    url: 'dj/ncScheduleResult/autoPlan',
+    url: 'dj/djScheduleResult/autoPlan',
     method: 'post',
     data: query
   })
 }
 export function balance(query) {
   return request({
-    url: 'dj/ncScheduleResult/balance',
+    url: 'dj/djScheduleResult/balance',
     method: 'post',
     data: query
   })
 }
 // export function modelChange(query) {
 //   return request({
-//     url: 'dj/ncScheduleResult/modelChange',
+//     url: 'dj/djScheduleResult/modelChange',
 //     method: 'post',
 //     data: query
 //   })
 // }
 // export function modelAdjustPlan(query) {
 //   return request({
-//     url: 'dj/ncScheduleResult/modelAdjustPlan',
+//     url: 'dj/djScheduleResult/modelAdjustPlan',
 //     method: 'post',
 //     data: query
 //   })
@@ -55,28 +55,28 @@ export function balance(query) {
 // // 获取胎胚版本
 // export function getProductEmbryoVersions(query) {
 //   return request({
-//     url: 'dj/ncScheduleResult/getProductEmbryoVersions',
+//     url: 'dj/djScheduleResult/getProductEmbryoVersions',
 //     method: 'post',
 //     data: query
 //   })
 // }
 // export function getCxMachines(query) {
 //   return request({
-//     url: 'dj/ncScheduleResult/getCxMachines',
+//     url: 'dj/djScheduleResult/getCxMachines',
 //     method: 'post',
 //     data: query
 //   })
 // }
 // export function validateBeforeAdd(query) {
 //   return request({
-//     url: 'dj/ncScheduleResult/validateBeforeAdd',
+//     url: 'dj/djScheduleResult/validateBeforeAdd',
 //     method: 'post',
 //     data: query
 //   })
 // }
 export function validateAdd(query) {
   return request({
-    url: 'dj/ncScheduleResult/validateAdd',
+    url: 'dj/djScheduleResult/validateAdd',
     method: 'post',
     data: query
   })
@@ -84,28 +84,28 @@ export function validateAdd(query) {
 
 export function editScheduleResult(query) {
   return request({
-    url: 'dj/ncScheduleResult/edit',
+    url: 'dj/djScheduleResult/edit',
     method: 'post',
     data: query
   })
 }
 export function batchChangeMachine(machineId, query) {
   return request({
-    url: 'dj/ncScheduleResult/batchChangeMachine/' + machineId,
+    url: 'dj/djScheduleResult/batchChangeMachine/' + machineId,
     method: 'post',
     data: query
   })
 }
 export function chooseMachine(query) {
   return request({
-    url: 'dj/ncScheduleResult/chooseMachine',
+    url: 'dj/djScheduleResult/chooseMachine',
     method: 'post',
     data: query
   })
 }
 export function mergeProduct(query) {
   return request({
-    url: 'dj/ncScheduleResult/mergeProduct',
+    url: 'dj/djScheduleResult/mergeProduct',
     method: 'post',
     data: query
   })
@@ -113,17 +113,18 @@ export function mergeProduct(query) {
 
 
 
+
 // //
 // export function modifyMoldsValidate(query) {
 //   return request({
-//     url: 'dj/ncScheduleResult/modifyMoldsValidate',
+//     url: 'dj/djScheduleResult/modifyMoldsValidate',
 //     method: 'post',
 //     data: query
 //   })
 // }
 // export function modifyMolds(query) {
 //   return request({
-//     url: 'dj/ncScheduleResult/modifyMolds',
+//     url: 'dj/djScheduleResult/modifyMolds',
 //     method: 'post',
 //     data: query
 //   })
@@ -132,21 +133,21 @@ export function mergeProduct(query) {
 
 // export function validateChangeMachine(query) {
 //   return request({
-//     url: 'dj/ncScheduleResult/validateChangeMachine',
+//     url: 'dj/djScheduleResult/validateChangeMachine',
 //     method: 'post',
 //     data: query
 //   })
 // }
 export function publishValidate(query) {
   return request({
-    url: 'dj/ncScheduleResult/publishValidate',
+    url: 'dj/djScheduleResult/publishValidate',
     method: 'post',
     data: query
   })
 }
 export function publishScheduleResult(query) {
   return request({
-    url: 'dj/ncScheduleResult/publish',
+    url: 'dj/djScheduleResult/publish',
     method: 'post',
     data: query
   })
@@ -154,7 +155,7 @@ export function publishScheduleResult(query) {
 
 // export function hasRecordValidate(query) {
 //   return request({
-//     url: 'dj/ncScheduleResult/hasRecordValidate',
+//     url: 'dj/djScheduleResult/hasRecordValidate',
 //     method: 'post',
 //     data: query
 //   })
@@ -162,7 +163,7 @@ export function publishScheduleResult(query) {
 
 // export function modifyQty(query) {
 //   return request({
-//     url: `dj/ncScheduleResult/modifyQty/${query}`,
+//     url: `dj/djScheduleResult/modifyQty/${query}`,
 //     method: 'post',
 //     // data: query
 //   })
@@ -170,7 +171,7 @@ export function publishScheduleResult(query) {
 
 // export function manualClose(query) {
 //   return request({
-//     url: `dj/ncScheduleResult/manualClose`,
+//     url: `dj/djScheduleResult/manualClose`,
 //     method: 'post',
 //     data: query
 //   })
@@ -178,28 +179,28 @@ export function publishScheduleResult(query) {
 
 // export function listFinished(query) {
 //   return request({
-//     url: `dj/ncScheduleResult/finished/list`,
+//     url: `dj/djScheduleResult/finished/list`,
 //     method: 'post',
 //     data: query
 //   })
 // }
 // export function producingIssue(query) {
 //   return request({
-//    url: `dj/ncScheduleResult/producingIssue`,
+//    url: `dj/djScheduleResult/producingIssue`,
 //     method: 'post',
 //     data: query
 //   })
 // }
 // export function validateConstruction(query) {
 //   return request({
-//    url: `dj/ncScheduleResult/validateConstruction`,
+//    url: `dj/djScheduleResult/validateConstruction`,
 //     method: 'post',
 //     data: query
 //   })
 // }
 export function changeReleaseStatus(query) {
   return request({
-   url: `dj/ncScheduleResult/changeReleaseStatus`,
+   url: `dj/djScheduleResult/changeReleaseStatus`,
     method: 'post',
     data: query
   })
@@ -207,7 +208,7 @@ export function changeReleaseStatus(query) {
 
 export function changeQty(query) {
   return request({
-    url: 'dj/ncScheduleResult/changeQty',
+    url: 'dj/djScheduleResult/changeQty',
     method: 'post',
     data: query
   })
@@ -215,7 +216,7 @@ export function changeQty(query) {
 
 export function combinationMiddleAndNight(query) {
   return request({
-   url: `dj/ncScheduleResult/combinationMiddleAndNight`,
+   url: `dj/djScheduleResult/combinationMiddleAndNight`,
     method: 'post',
     data: query
   })
@@ -223,7 +224,7 @@ export function combinationMiddleAndNight(query) {
 
 export function getSummaryVo(query) {
   return request({
-   url: `dj/ncScheduleResult/getSummaryVo`,
+   url: `dj/djScheduleResult/getSummaryVo`,
     method: 'post',
     data: query
   })

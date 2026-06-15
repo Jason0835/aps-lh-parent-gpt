@@ -29,5 +29,5 @@ public interface DjEngineStockMapper {
      * @param stockDate  日期，格式：yyyy-mm-dd
      * @return
      */
-    List<DjStockVo> listNcStock(@Param("stockDate") String stockDate);
+    List<DjStockVo> listDjStock(@Param("stockDate") String stockDate);
 }

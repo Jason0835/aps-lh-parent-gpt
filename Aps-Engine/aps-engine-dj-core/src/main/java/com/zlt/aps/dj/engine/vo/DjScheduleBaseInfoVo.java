@@ -13,7 +13,7 @@ public class DjScheduleBaseInfoVo {
     /**
      * 垫胶代码
      */
-    private String liningCode;
+    private String paddingCode;
 
     /**
      * 胶料代码

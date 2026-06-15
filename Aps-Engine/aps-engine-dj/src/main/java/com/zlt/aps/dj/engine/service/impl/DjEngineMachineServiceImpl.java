@@ -18,7 +18,7 @@ import java.util.Map;
 public class DjEngineMachineServiceImpl implements DjEngineMachineService {
 
     @Resource
-    private DjEngineMachineMapper ncEngineMachineMapper;
+    private DjEngineMachineMapper djEngineMachineMapper;
 
     /**
      * 获得垫胶代码和定点机台的map
@@ -27,7 +27,7 @@ public class DjEngineMachineServiceImpl implements DjEngineMachineService {
      */
     public Map<String, String> getSpecifyMachineMap(String jobType) {
         Map<String, String> specifyMachineMap = new HashMap<>();
-        List<DjSpecifyMachineVo> list = ncEngineMachineMapper.listNcSpecifyMachine(jobType);  //查询垫胶定点机台信息
+        List<DjSpecifyMachineVo> list = djEngineMachineMapper.listDjSpecifyMachine(jobType);  //查询垫胶定点机台信息
         for(DjSpecifyMachineVo specifyMachineVo : list) {
             specifyMachineMap.put(specifyMachineVo.getLiningCode(), specifyMachineVo.getMachineIds());
         }
@@ -40,7 +40,7 @@ public class DjEngineMachineServiceImpl implements DjEngineMachineService {
      * @return 结果
      */
     @Override
-    public List<DjMachineInfo> listNcMachine() {
-        return ncEngineMachineMapper.listNcMachine();
+    public List<DjMachineInfo> listDjMachine() {
+        return djEngineMachineMapper.listDjMachine();
     }
 }

@@ -24,31 +24,31 @@ public interface DjScheduleResultMapper extends CommBaseMapper<DjScheduleResult>
      * @param id 垫胶排程结果ID
      * @return 垫胶排程结果
      */
-    public DjScheduleResult selectNcScheduleResultById(Long id);
+    public DjScheduleResult selectDjScheduleResultById(Long id);
 
     /**
      * 查询垫胶排程结果列表
      *
-     * @param NcScheduleResult 垫胶排程结果
+     * @param djScheduleResult 垫胶排程结果
      * @return 垫胶排程结果集合
      */
-    public List<DjScheduleResult> selectNcScheduleResultList(DjScheduleResult NcScheduleResult);
+    public List<DjScheduleResult> selectDjScheduleResultList(DjScheduleResult djScheduleResult);
 
     /**
      * 新增垫胶排程结果
      *
-     * @param NcScheduleResult 垫胶排程结果
+     * @param djScheduleResult 垫胶排程结果
      * @return 结果
      */
-    public int insertNcScheduleResult(DjScheduleResult NcScheduleResult);
+    public int insertDjScheduleResult(DjScheduleResult djScheduleResult);
 
     /**
      * 修改垫胶排程结果
      *
-     * @param NcScheduleResult 垫胶排程结果
+     * @param djScheduleResult 垫胶排程结果
      * @return 结果
      */
-    public int updateNcScheduleResult(DjScheduleResult NcScheduleResult);
+    public int updateDjScheduleResult(DjScheduleResult djScheduleResult);
 
     /**
      * 删除垫胶排程结果
@@ -56,7 +56,7 @@ public interface DjScheduleResultMapper extends CommBaseMapper<DjScheduleResult>
      * @param id 垫胶排程结果ID
      * @return 结果
      */
-    public int deleteNcScheduleResultById(Long id);
+    public int deleteDjScheduleResultById(Long id);
 
     /**
      * 批量删除垫胶排程结果
@@ -64,7 +64,7 @@ public interface DjScheduleResultMapper extends CommBaseMapper<DjScheduleResult>
      * @param ids 需要删除的数据ID
      * @return 结果
      */
-    public int deleteNcScheduleResultByIds(Long[] ids);
+    public int deleteDjScheduleResultByIds(Long[] ids);
 
     /**
      * 批量更新发布状态
@@ -99,7 +99,7 @@ public interface DjScheduleResultMapper extends CommBaseMapper<DjScheduleResult>
 	 * @param factoryCode 厂别
 	 * @param companyCode 分公司编号
      */
-    void deployNcScheduleToMid(@Param("dataVersion") String dataVersion, @Param("ids") long[] ids,
+    void deployDjScheduleToMid(@Param("dataVersion") String dataVersion, @Param("ids") long[] ids,
 			@Param("factoryCode") String factoryCode, @Param("companyCode") String companyCode);
 
 
@@ -146,7 +146,7 @@ public interface DjScheduleResultMapper extends CommBaseMapper<DjScheduleResult>
      */
     public int combinationMiddleAndNight(Map<String, Object> map);
 
-    int checkNcCodeExist(DjScheduleResult ncScheduleResult);
+    int checkDjCodeExist(DjScheduleResult djScheduleResult);
 
     /**
      * 根据id查询未发布记录的条数
@@ -190,16 +190,16 @@ public interface DjScheduleResultMapper extends CommBaseMapper<DjScheduleResult>
     /**
      * 获取昨日早班计划量-具体到每个规格
      *
-     * @param tmScheduleResult 排程日期
+     * @param djScheduleResult 排程日期
      * @return 结果
      */
-    List<DjScheduleResult> getLastDayPlanQty4List(DjScheduleResult tmScheduleResult);
+    List<DjScheduleResult> getLastDayPlanQty4List(DjScheduleResult djScheduleResult);
 
     /**
      * 获取成型消耗量-具体到每个规格
      *
-     * @param tmScheduleResult 排程日期
+     * @param djScheduleResult 排程日期
      * @return 结果
      */
-    List<DjScheduleResult> getCxConsume4List(DjScheduleResult tmScheduleResult);
+    List<DjScheduleResult> getCxConsume4List(DjScheduleResult djScheduleResult);
 }

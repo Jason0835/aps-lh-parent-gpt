@@ -326,10 +326,13 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
 
         //1.获取导出数据
         List<LhMouldChangePlan> list = this.listExportData(queryVO);
-        List<LhMouldChangePlanVo> exportList = this.buildLhMouldChangePlanVoList(list, queryVO);
-        Map<String, Object> tableMap = buildExportTableMap(exportList, queryVO.getScheduleDate());
+        Map<String, Object> tableMap = new HashMap<>();
         List<List<Map<String, Object>>> excelDataList = new ArrayList<>();
-        excelDataList.add(buildExportDataList(exportList, queryVO));
+        if (CollectionUtils.isNotEmpty(list)) {
+            List<LhMouldChangePlanVo> exportList = this.buildLhMouldChangePlanVoList(list, queryVO);
+            tableMap = buildExportTableMap(exportList, queryVO.getScheduleDate());
+            excelDataList.add(buildExportDataList(exportList, queryVO));
+        }
 
         byte[] resultBytes =  ExcelUtils.writeMultiList(inputStream, 0, tableMap, excelDataList);
         Date endTime = DateUtils.getNowDate();
@@ -476,12 +479,14 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
             Integer isDryIceClean = item.getIsDryIceClean();
             if (YesOrNoEnum.YES.getValue().equals(isDryIceClean)) {
                 row.put("isDryIceClean", "是Có");
+                row.put("endType", "");
             } else {
                 row.put("isDryIceClean", "");
             }
             Integer isSandblastingClean = item.getIsSandblastingClean();
             if (YesOrNoEnum.YES.getValue().equals(isSandblastingClean)) {
                 row.put("isSandblastingClean", "是Có");
+                row.put("endType", "");
             } else {
                 row.put("isSandblastingClean", "");
             }
@@ -491,6 +496,7 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
             Integer isReplaceBlock = item.getIsReplaceBlock();
             if (YesOrNoEnum.YES.getValue().equals(isReplaceBlock)) {
                 row.put("isReplaceBlock", "是Có");
+                row.put("endType", "");
                 mouldCodeList.add(item.getMouldCode());
             } else {
                 row.put("isReplaceBlock", "");

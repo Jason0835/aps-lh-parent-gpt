@@ -57,6 +57,18 @@ public class Cd90ScheduleResultController extends AbstractDocBizController<Cd90S
         return super.removeByIds(ids);
     }
 
+    /**
+     * 自动生成直裁排程结果。
+     *
+     * @param scheduleResult 自动排程条件，当前使用工厂编码和排程日期
+     * @return 自动排程结果
+     */
+    @ApiOperation("自动排程")
+    @PostMapping("/autoSchedule")
+    public AjaxResult autoSchedule(@RequestBody Cd90ScheduleResult scheduleResult) {
+        return cd90ScheduleResultService.autoSchedule(scheduleResult);
+    }
+
     @ApiOperation("获取详情")
     @GetMapping("/getInfo/{id}")
     @Override

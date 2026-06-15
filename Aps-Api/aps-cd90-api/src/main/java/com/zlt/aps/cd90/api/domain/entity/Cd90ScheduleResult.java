@@ -8,6 +8,8 @@ import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
+
 import java.io.Serializable;
 import java.util.Date;
 
@@ -26,6 +28,7 @@ public class Cd90ScheduleResult extends BaseEntity implements Serializable {
     @ApiModelProperty("排程日期")
     @TableField("SCHEDULE_DATE")
     @Excel(name = "ui.data.column.cd90ScheduleResult.scheduleDate")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
     private Date scheduleDate;
     /** 成型批次号 */
     @ApiModelProperty("成型批次号")
@@ -80,6 +83,7 @@ public class Cd90ScheduleResult extends BaseEntity implements Serializable {
 
     // CLASS1
     @TableField("CLASS1_SCHEDULE_DATE")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
     private Date class1ScheduleDate;
     @TableField("CLASS1_CX_PLAN_QTY")
     private Double class1CxPlanQty;
@@ -99,6 +103,7 @@ public class Cd90ScheduleResult extends BaseEntity implements Serializable {
 
     // CLASS2
     @TableField("CLASS2_SCHEDULE_DATE")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
     private Date class2ScheduleDate;
     @TableField("CLASS2_CX_PLAN_QTY")
     private Double class2CxPlanQty;
@@ -118,6 +123,7 @@ public class Cd90ScheduleResult extends BaseEntity implements Serializable {
 
     // CLASS3
     @TableField("CLASS3_SCHEDULE_DATE")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
     private Date class3ScheduleDate;
     @TableField("CLASS3_CX_PLAN_QTY")
     private Double class3CxPlanQty;
@@ -159,6 +165,7 @@ public class Cd90ScheduleResult extends BaseEntity implements Serializable {
     /** 最新发布时间 */
     @ApiModelProperty("最新发布时间")
     @TableField("NEWEST_PUBLISH_TIME")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
     private Date newestPublishTime;
     /** 收尾规格标记 */
     @ApiModelProperty("收尾规格标记")

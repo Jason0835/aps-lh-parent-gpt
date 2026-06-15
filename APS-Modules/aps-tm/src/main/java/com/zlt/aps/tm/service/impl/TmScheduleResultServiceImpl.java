@@ -14,7 +14,9 @@ import com.zlt.aps.tm.api.domain.entity.TmMachineInfo;
 import com.zlt.aps.tm.api.domain.entity.TmScheduleResult;
 import com.zlt.aps.tm.mapper.TmDispatcherLogMapper;
 import com.zlt.aps.tm.mapper.TmMachineInfoMapper;
+import com.zlt.aps.tm.mapper.TmScheduleResultExplainMapper;
 import com.zlt.aps.tm.mapper.TmScheduleResultMapper;
+import com.zlt.aps.tm.mapper.TmScheduleUnplannedMapper;
 import com.zlt.aps.tm.service.ITmScheduleResultService;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.common.enums.ImportErrorTypeEnums;
@@ -27,6 +29,7 @@ import org.springframework.transaction.annotation.Transactional;
 import javax.annotation.Resource;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -47,6 +50,12 @@ public class TmScheduleResultServiceImpl extends AbstractDocService<TmScheduleRe
 
     @Resource
     private TmMachineInfoMapper tmMachineInfoMapper;
+
+    @Resource
+    private TmScheduleResultExplainMapper tmScheduleResultExplainMapper;
+
+    @Resource
+    private TmScheduleUnplannedMapper tmScheduleUnplannedMapper;
 
     @Override
     protected String getDocTypeCode() {
@@ -205,5 +214,20 @@ public class TmScheduleResultServiceImpl extends AbstractDocService<TmScheduleRe
         log.setAfterClass6PlanQty(newSchedule.getClass6PlanQty());
         // 调用插入日志方法
         tmDispatcherLogMapper.insert(log);
+    }
+
+    /**
+     * 按工厂和排程日期逻辑删除当前有效批次数据
+     * @param factoryCode 工厂编号
+     * @param scheduleDate 排程日期
+     */
+    @Override
+    public void logicDeleteByFactoryCodeAndScheduleDate(String factoryCode, Date scheduleDate) {
+        if (StringUtils.isBlank(factoryCode) || scheduleDate == null) {
+            return;
+        }
+        tmScheduleUnplannedMapper.logicDeleteByFactoryCodeAndScheduleDate(factoryCode, scheduleDate);
+        tmScheduleResultExplainMapper.logicDeleteByFactoryCodeAndScheduleDate(factoryCode, scheduleDate);
+        tmScheduleResultMapper.logicDeleteByFactoryCodeAndScheduleDate(factoryCode, scheduleDate);
     }
 }
