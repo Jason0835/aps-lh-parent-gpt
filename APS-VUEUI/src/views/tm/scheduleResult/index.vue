@@ -21,6 +21,16 @@
         <el-button
           type="primary"
           plain
+          v-hasPermi="['tm:tmScheduleResult:autoPlan']"
+          @click="handleAutoPlan"
+        >{{ $t("ui.data.column.scheduleResult.autoPlan") }}</el-button>
+        <el-button
+          plain
+          @click="handleBoardRefresh"
+        >{{ $t("ui.frame.btn.refresh") }}</el-button>
+        <el-button
+          type="primary"
+          plain
           v-hasPermi="['tm:tmScheduleResult:edit']"
           @click="handleAdd"
         >{{ $t("ui.data.column.scheduleResult.insertOrder") }}</el-button>
@@ -40,6 +50,18 @@
           v-hasPermi="['tm:tmScheduleResult:changeMachine']"
           @click="handleChangeMachine"
         >{{ $t("ui.data.column.scheduleResult.changeMachine") }}</el-button>
+        <el-button
+          type="warning"
+          :disabled="selection.length !== 1"
+          v-hasPermi="['tm:tmScheduleResult:changeQty']"
+          @click="handleChangeQty"
+        >{{ $t("ui.data.column.scheduleResult.changePlan") }}</el-button>
+        <el-button
+          type="success"
+          :disabled="selection.length === 0"
+          v-hasPermi="['tm:tmScheduleResult:publish']"
+          @click="handlePublish"
+        >{{ $t("ui.data.column.scheduleResult.publish") }}</el-button>
         <el-button
           @click="handleExport"
           v-hasPermi="['tm:tmScheduleResult:export']"
@@ -62,7 +84,14 @@
 <script>
 import {mapState} from "vuex";
 import {downloadLink} from "@/utils/request";
-import {listTmScheduleResult, removeTmScheduleResult,} from "@/api/tm/scheduleResult";
+import {
+  autoPlan,
+  listTmScheduleBoard,
+  listTmScheduleResult,
+  publishScheduleResult,
+  publishValidate,
+  removeTmScheduleResult,
+} from "@/api/tm/scheduleResult";
 import tltUpload from "@/components/tltUpload/tltUpload.vue";
 import TltUploadForm from "@/views/components/tltUploadForm.vue";
 import infoDialog from "./components/infoDialog.vue";
@@ -126,6 +155,7 @@ export default {
           prop: "factoryCode",
           label: this.$t("ui.data.column.tm.scheduleResult.factoryCode"),
           type: "select",
+          filterable: true,
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
           },
@@ -167,6 +197,8 @@ export default {
           prop: "releaseStatus",
           halign: "center",
           label: this.$t("ui.data.column.tm.scheduleResult.releaseStatus"),
+          type: "select",
+          filterable: true,
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.IS_RELEASE, value);
           },
@@ -176,6 +208,7 @@ export default {
           halign: "center",
           label: this.$t("ui.data.column.tm.scheduleResult.tailFlag"),
           type: "select",
+          filterable: true,
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_yes_no, value);
           },
@@ -224,6 +257,7 @@ export default {
           label: this.$t("ui.data.column.tm.scheduleResult.factoryCode"),
           type: "select",
           dictData: this.dict.type.biz_factory_name,
+          filterable: true,
         },
         {
           prop: "batchNo",
@@ -268,12 +302,52 @@ export default {
         this.$refs.infoRef.show();
       }
     },
+    // 自动排程入口：只调用结构闭环接口，完整算法由后端后续接入。
+    handleAutoPlan() {
+      const params = this.buildAutoPlanParams();
+      autoPlan(params).then((data) => {
+        const message = data.data && data.data.message ? data.data.message : data.msg;
+        this.$modal.msgSuccess(message);
+        this.getList();
+      });
+    },
+    // 看板刷新入口：使用兼容路径查询看板数据，不改变当前筛选条件。
+    async handleBoardRefresh() {
+      try {
+        this.loading = true;
+        const data = await listTmScheduleBoard(this.formatParams(false));
+        this.data = data.data || [];
+        this.page.total = this.data.length;
+      } finally {
+        this.loading = false;
+      }
+    },
     // 转机台弹窗
     handleChangeMachine() {
       if (this.$refs.changeMachineRef) {
         let row = this.selection;
         this.$refs.changeMachineRef.show(row);
       }
+    },
+    // 调量入口：复用编辑弹窗，由弹窗根据编辑状态调用调量接口。
+    handleChangeQty() {
+      if (this.$refs.infoRef && this.selection.length === 1) {
+        this.$refs.infoRef.show(this.selection[0]);
+      }
+    },
+    // 发布入口：先校验再标记待发布，真实 MES 发布由后续发布流程接入。
+    handlePublish() {
+      const ids = this.selection.map((item) => item.id);
+      this.$confirm(this.$t("ui.biz.alter.makeSurePublish"), {
+        type: "warning",
+      }).then(() => {
+        publishValidate(ids).then(() => {
+          publishScheduleResult(ids).then((data) => {
+            this.$modal.msgSuccess(data.msg);
+            this.getList();
+          });
+        });
+      });
     },
     handleEdit(row) {
       if (this.$refs.infoRef) {
@@ -340,6 +414,17 @@ export default {
     },
     handleExport() {
       downloadLink("/tm/tmScheduleResult/export", this.formatParams(false));
+    },
+
+    buildAutoPlanParams() {
+      const scheduleDate = Array.isArray(this.query.scheduleDate)
+        ? this.query.scheduleDate[0]
+        : this.query.scheduleDate;
+      return {
+        factoryCode: this.query.factoryCode || this.search.factoryCode,
+        scheduleDate,
+        dataSource: "AUTO",
+      };
     },
 
     formatParams(hasPage = true) {

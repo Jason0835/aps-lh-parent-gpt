@@ -10,6 +10,7 @@ import com.ruoyi.common.log.enums.BusinessType;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.tm.api.domain.entity.TmScheduleResult;
+import com.zlt.aps.tm.api.domain.vo.TmAutoScheduleRequestVo;
 import com.zlt.aps.tm.mapper.TmScheduleResultMapper;
 import com.zlt.aps.tm.service.ITmScheduleResultService;
 import com.zlt.bill.common.controller.AbstractDocBizController;
@@ -82,6 +83,56 @@ public class TmScheduleResultController extends AbstractDocBizController<TmSched
     }
 
     /**
+     * 校验自动排程请求。
+     *
+     * @param request 自动排程请求
+     * @return 校验结果，包含批次号和追踪号
+     */
+    @ApiOperation("校验自动排程")
+    @PostMapping("/validateAutoPlan")
+    public AjaxResult validateAutoPlan(@RequestBody TmAutoScheduleRequestVo request) {
+        return AjaxResult.success(tmScheduleResultService.validateAutoPlan(request));
+    }
+
+    /**
+     * 执行自动排程结构闭环。
+     *
+     * @param request 自动排程请求
+     * @return 自动排程结构化响应
+     */
+    @Log(title = "ui.data.column.tm.scheduleResult.modelName", businessType = BusinessType.INSERT_OR_UPDATE)
+    @ApiOperation("自动排程")
+    @PostMapping("/autoPlan")
+    public AjaxResult autoPlan(@RequestBody TmAutoScheduleRequestVo request) {
+        return AjaxResult.success(tmScheduleResultService.autoPlan(request));
+    }
+
+    /**
+     * 查询排程看板数据。
+     *
+     * @param query 查询条件
+     * @return 看板数据列表
+     */
+    @ApiOperation("查询排程看板")
+    @PostMapping("/board")
+    public AjaxResult board(@RequestBody TmScheduleResult query) {
+        return AjaxResult.success(tmScheduleResultService.listBoard(query));
+    }
+
+    /**
+     * 人工插单。
+     *
+     * @param scheduleResult 插单排程结果
+     * @return 插入结果
+     */
+    @Log(title = "ui.data.column.tm.scheduleResult.modelName", businessType = BusinessType.INSERT)
+    @ApiOperation("人工插单")
+    @PostMapping("/insertTask")
+    public AjaxResult insertTask(@RequestBody TmScheduleResult scheduleResult) {
+        return toAjax(tmScheduleResultService.insertTask(scheduleResult));
+    }
+
+    /**
      * 转机台
      */
     @Log(title = "ui.data.column.tm.scheduleResult.modelName", businessType = BusinessType.UPDATE)
@@ -94,6 +145,44 @@ public class TmScheduleResultController extends AbstractDocBizController<TmSched
         scheduleResult.setBaseVale(scheduleResult.getId());
         tmScheduleResultService.insetDispatcherLog(ApsConstant.DISPATCHER_OPER_MACHINE, scheduleResult);
         return toAjax(tmScheduleResultService.updateTmScheduleResult(scheduleResult));
+    }
+
+    /**
+     * 调整计划量。
+     *
+     * @param scheduleResult 调量后的排程结果
+     * @return 调量结果
+     */
+    @Log(title = "ui.data.column.tm.scheduleResult.modelName", businessType = BusinessType.UPDATE)
+    @ApiOperation("调整计划量")
+    @PostMapping("/changeQty")
+    public AjaxResult changeQty(@RequestBody TmScheduleResult scheduleResult) {
+        return toAjax(tmScheduleResultService.changeQty(scheduleResult));
+    }
+
+    /**
+     * 校验发布条件。
+     *
+     * @param ids 排程结果ID列表
+     * @return 校验结果
+     */
+    @ApiOperation("发布校验")
+    @PostMapping("/publishValidate")
+    public AjaxResult publishValidate(@RequestBody List<Long> ids) {
+        return AjaxResult.success(tmScheduleResultService.publishValidate(ids));
+    }
+
+    /**
+     * 标记排程结果为待发布。
+     *
+     * @param ids 排程结果ID列表
+     * @return 发布标记结果
+     */
+    @Log(title = "ui.data.column.tm.scheduleResult.modelName", businessType = BusinessType.UPDATE)
+    @ApiOperation("发布排程")
+    @PostMapping("/publish")
+    public AjaxResult publish(@RequestBody List<Long> ids) {
+        return toAjax(tmScheduleResultService.publish(ids));
     }
 
     @Log(title = "ui.data.column.tm.scheduleResult.modelName", businessType = BusinessType.IMPORT)

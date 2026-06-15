@@ -1193,7 +1193,7 @@ Output:
 
 ## 16. 代码实现步骤
 
-本章用于指导后续 Java 代码按步骤实现。实现时仍遵循 Controller 只做参数接收和结果返回、业务逻辑放在 Service、优先使用 LambdaQueryWrapper/LambdaUpdateWrapper、不手动追加逻辑删除条件、中文注释完整说明类和方法作用的规范。
+本章用于指导后续 Java 代码按步骤实现。实现时仍遵循 Controller 只做参数接收和结果返回、业务逻辑放在 Service、优先使用 LambdaQueryWrapper/LambdaUpdateWrapper、不手动追加逻辑删除条件、中文注释完整说明类和方法作用的规范、不编写getter和setter尽量使用lombok.Data的注解。
 
 ### 16.1 建立通用排程接口包
 

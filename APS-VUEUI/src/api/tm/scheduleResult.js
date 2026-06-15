@@ -27,3 +27,59 @@ export function getTmScheduleResult(id) {
     method: 'get'
   })
 }
+
+export function validateAutoPlan(query) {
+  return request({
+    url: '/tm/tmScheduleResult/validateAutoPlan',
+    method: 'post',
+    data: query
+  })
+}
+
+export function autoPlan(query) {
+  return request({
+    url: '/tm/tmScheduleResult/autoPlan',
+    method: 'post',
+    data: query
+  })
+}
+
+export function listTmScheduleBoard(query) {
+  return request({
+    url: '/tm/tmScheduleResult/board',
+    method: 'post',
+    data: query
+  })
+}
+
+export function insertTask(data) {
+  return request({
+    url: '/tm/tmScheduleResult/insertTask',
+    method: 'post',
+    data: data
+  })
+}
+
+export function changeQty(data) {
+  return request({
+    url: '/tm/tmScheduleResult/changeQty',
+    method: 'post',
+    data: data
+  })
+}
+
+export function publishValidate(ids) {
+  return request({
+    url: '/tm/tmScheduleResult/publishValidate',
+    method: 'post',
+    data: ids
+  })
+}
+
+export function publishScheduleResult(ids) {
+  return request({
+    url: '/tm/tmScheduleResult/publish',
+    method: 'post',
+    data: ids
+  })
+}
