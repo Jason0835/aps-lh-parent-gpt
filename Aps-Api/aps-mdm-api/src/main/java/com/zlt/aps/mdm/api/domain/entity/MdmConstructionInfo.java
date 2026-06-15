@@ -231,6 +231,11 @@ public class MdmConstructionInfo extends BaseEntity {
     @ApiModelProperty(value = "帘线规格", name = "cordSpec")
     @TableField(value = "CORD_SPEC")
     private String cordSpec;
+    
+    /**帘线幅宽**/
+    @ApiModelProperty(value = "帘线幅宽", name = "cordSpec")
+    @TableField(value = "CORD_WIDTH")
+    private BigDecimal cordWidth;
 
     /** 帘布大卷SAP—BOM版本 */
 //    @Excel(name = "ui.data.column.mdmConstructionInfo.cordVersion")
