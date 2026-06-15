@@ -158,6 +158,7 @@ export default {
         {
           label: this.$t('ui.data.column.cd90ScheduleResult.scheduleDate'),
           prop: 'scheduleDate',
+          align: 'center',
           minWidth: 120,
           sortable: 'custom'
         },
@@ -167,9 +168,9 @@ export default {
           minWidth: 100,
           formatter: (row, column, cellValue) => this.selectDictLabel(this.dict.type.IS_RELEASE, cellValue)
         },
-        { label: this.$t('ui.data.column.cd90ScheduleResult.batchNo'), prop: 'batchNo', minWidth: 120 },
-        { label: this.$t('ui.data.column.cd90ScheduleResult.orderNo'), prop: 'orderNo', minWidth: 140 },
-        { label: this.$t('ui.data.column.cd90ScheduleResult.clothCode'), prop: 'clothCode', minWidth: 140 },
+        { label: this.$t('ui.data.column.cd90ScheduleResult.batchNo'), prop: 'batchNo', align: 'left', minWidth: 160 },
+        { label: this.$t('ui.data.column.cd90ScheduleResult.orderNo'), prop: 'orderNo', align: 'left', minWidth: 160 },
+        { label: this.$t('ui.data.column.cd90ScheduleResult.clothCode'), prop: 'clothCode', minWidth: 180 },
         { label: this.$t('ui.data.column.cd90ScheduleResult.machineCode'), prop: 'machineCode', minWidth: 120 },
         { label: this.$t('ui.data.column.cd90ScheduleResult.bigRollCode'), prop: 'bigRollCode', minWidth: 140 },
         { label: this.$t('ui.data.column.cd90ScheduleResult.storageLaneCode'), prop: 'storageLaneCode', minWidth: 140 },

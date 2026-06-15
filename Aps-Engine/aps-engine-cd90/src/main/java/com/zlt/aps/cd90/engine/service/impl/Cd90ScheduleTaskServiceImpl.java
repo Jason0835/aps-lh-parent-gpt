@@ -32,29 +32,73 @@ public class Cd90ScheduleTaskServiceImpl implements Cd90ScheduleTaskService {
 
     private final Cd90ScheduleTaskMapper taskMapper;
 
+    /**
+     * 创建等待执行的直裁自动排程任务。
+     *
+     * <p>该方法使用独立事务（REQUIRES_NEW），确保任务记录的插入不受外部事务回滚影响。
+     * 创建前会先检查同工厂、同日期是否已有进行中（PENDING 或 RUNNING）的任务：
+     * 如果存在活跃任务则直接返回该任务，避免重复创建，实现幂等性。
+     *
+     * <p>任务状态流转：PENDING → RUNNING（异步执行器领取后）→ SUCCESS / FAILED
+     *
+     * @param factoryCode     工厂编码，标识排程所属工厂
+     * @param scheduleDate    排程日期，即本次自动排程的目标日期
+     * @param triggerType     触发类型（MANUAL=手动触发 / AUTO=系统自动触发），用于区分排程来源
+     * @param requestSnapshot 请求快照，记录触发时的关键参数（如"factoryCode=XX,scheduleDate=XX,forceRegenerate=true"），
+     *                        便于事后审计排程触发条件
+     * @param createBy        创建人标识，手动触发时记录操作人，自动触发时为 null
+     * @return 新创建的任务对象；如果同工厂、同日期的活跃任务已存在，则返回已有任务（幂等）
+     */
     @Override
     @Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
     public Cd90ScheduleTask createPending(String factoryCode, Date scheduleDate, String triggerType,
                                           String requestSnapshot, String createBy) {
+        // --- 1. 幂等性检查：查询同工厂、同日期是否已有进行中的任务 ---
+        // findActive 查询条件：factoryCode + scheduleDate + taskStatus IN (PENDING, RUNNING)
+        // 如果查询到活跃任务，说明已有任务在处理该日期的排程，直接返回已有任务，防止重复创建
         Cd90ScheduleTask activeTask = findActive(factoryCode, scheduleDate);
         if (activeTask != null) {
+            // 幂等返回：已有活跃任务，无需重复创建
             return activeTask;
         }
 
+        // --- 2. 构建新任务对象 ---
         Cd90ScheduleTask task = new Cd90ScheduleTask();
+
+        // 2.1 生成全局唯一任务ID，格式: "CD90-" + 32位大写UUID（无连字符）
+        // 示例: CD90-A1B2C3D4E5F6789012345678ABCDEF01
         task.setTaskId("CD90-" + UUID.randomUUID().toString().replace("-", "").toUpperCase());
+
+        // 2.2 工厂编码
         task.setFactoryCode(factoryCode);
+        // 2.3 排程日期
         task.setScheduleDate(scheduleDate);
+        // 2.4 触发类型（MANUAL / AUTO）
         task.setTriggerType(triggerType);
+
+        // 2.5 初始状态：PENDING（等待异步执行器领取）
+        // 状态机：PENDING → RUNNING → SUCCESS / FAILED
         task.setTaskStatus(Cd90ScheduleTaskStatus.PENDING);
+
+        // 2.6 初始进度 0%
         task.setProgress(0);
+        // 2.7 当前阶段：等待基础数据校验
         task.setCurrentStage(Cd90ScheduleTaskStage.VALIDATE_DATA);
+        // 2.8 阶段名称（中文展示）
         task.setCurrentStageName("等待基础数据校验");
+        // 2.9 请求快照，用于事后审计
         task.setRequestSnapshot(requestSnapshot);
+        // 2.10 创建人
         task.setCreateBy(createBy);
+
+        // --- 3. 持久化：插入 cd90_schedule_task 表 ---
+        // 使用独立事务（REQUIRES_NEW），即使外部调用方事务回滚，任务记录也会被保留
         taskMapper.insert(task);
+
+        // --- 4. 记录创建日志 ---
         log.info("[直裁自动排程] 创建等待执行任务, taskId={}, factoryCode={}, scheduleDate={}, triggerType={}",
                 task.getTaskId(), factoryCode, scheduleDate, triggerType);
+
         return task;
     }
 
