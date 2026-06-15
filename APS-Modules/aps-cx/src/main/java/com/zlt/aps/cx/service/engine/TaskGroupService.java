@@ -89,8 +89,11 @@ public class TaskGroupService {
     /** 库存高水位阈值（小时）：超过此值降低优先级 */
     private static final int STOCK_HIGH_HOURS_THRESHOLD = 18;
 
-    /** 可供硫化时长封顶阈值（小时）：预计班后库存可供硫化时长超过此值即封顶产量 */
-    private static final int STOCK_HOURS_CAP = 6;
+    /** 参数编码：可供硫化时长封顶阈值（小时） */
+    private static final String PARAM_STOCK_HOURS_CAP = "SYS04080001";
+
+    /** 参数编码：可供硫化时长封顶开关（Y=开启，N=关闭） */
+    private static final String PARAM_STOCK_HOURS_CAP_ENABLED = "SYS04080005";
 
     /** 一天总秒数 */
     private static final int SECONDS_PER_DAY = 24 * 60 * 60;
@@ -206,6 +209,10 @@ public class TaskGroupService {
         log.info("【收尾参数配置】收尾舍弃阈值={}, 成型余量紧急阈值={}, 近期收尾天数={}, 紧急收尾天数={}",
                 endingDiscardThreshold, endingUrgentFormingRemainder, endingDaysThreshold, urgentEndingDays);
 
+        int stockHoursCap = getStockHoursCap(context);
+        boolean stockHoursCapEnabled = isStockHoursCapEnabled(context);
+        log.info("【立库管控参数】可供硫化时长封顶阈值={}h, 开关={}", stockHoursCap, stockHoursCapEnabled ? "开启" : "关闭");
+
         // 判断当前班次是否为开产班次（用于提前过滤关键产品）
         boolean isOpeningShift = false;
         if (dayShifts != null && !dayShifts.isEmpty()) {
@@ -282,7 +289,7 @@ public class TaskGroupService {
         if (warehouseCapacity > 0) {
             log.info("【立库库容管控】参数: 立库总库容={}条, 预警比例={}%, 预警线={}条, 单胎胚可供硫化>{}h即封顶, 立库中有库存的胎胚种类={}种, 当前立库总库存={}条, 剩余可用={}条",
                     warehouseCapacity, (int)(warehouseCapacityRatio * 100), warehouseThreshold,
-                    STOCK_HOURS_CAP, embryoTotalStockMap.size(),
+                    stockHoursCap, embryoTotalStockMap.size(),
                     runningTotalProjectedStock, Math.max(0, warehouseThreshold - runningTotalProjectedStock));
         }
 
@@ -679,15 +686,15 @@ public class TaskGroupService {
                 materialDailyLhCapacity = materialDailyLhCapacity != null && materialDailyLhCapacity > 0 ? materialDailyLhCapacity / 2 : null;
                 BigDecimal projectedStockHours = null;
                 int capMaxStock = 0;
-                if (taskMoldQty > 0 && materialDailyLhCapacity != null && materialDailyLhCapacity > 0) {
+                if (stockHoursCapEnabled && taskMoldQty > 0 && materialDailyLhCapacity != null && materialDailyLhCapacity > 0) {
                     BigDecimal singleTireMoldSeconds = BigDecimal.valueOf(SECONDS_PER_DAY)
                             .divide(BigDecimal.valueOf(materialDailyLhCapacity), 2, BigDecimal.ROUND_HALF_UP);
                     projectedStockHours = BigDecimal.valueOf(projectedStock)
                             .multiply(singleTireMoldSeconds)
                             .divide(BigDecimal.valueOf(taskMoldQty), 2, BigDecimal.ROUND_HALF_UP)
                             .divide(BigDecimal.valueOf(SECONDS_PER_HOUR), 2, BigDecimal.ROUND_HALF_UP);
-                    if (projectedStockHours.compareTo(BigDecimal.valueOf(STOCK_HOURS_CAP)) > 0) {
-                        capMaxStock = BigDecimal.valueOf(STOCK_HOURS_CAP)
+                    if (projectedStockHours.compareTo(BigDecimal.valueOf(stockHoursCap)) > 0) {
+                        capMaxStock = BigDecimal.valueOf(stockHoursCap)
                                 .multiply(BigDecimal.valueOf(SECONDS_PER_HOUR))
                                 .multiply(BigDecimal.valueOf(taskMoldQty))
                                 .divide(singleTireMoldSeconds, 0, BigDecimal.ROUND_UP)
@@ -700,8 +707,8 @@ public class TaskGroupService {
                             if (capDetail.length() > 0) capDetail.append("; ");
                             capDetail.append("[时间] 本胎胚预计库存=").append(projectedStock)
                                     .append(", 可供硫化=").append(projectedStockHours.setScale(2, BigDecimal.ROUND_HALF_UP)).append("h")
-                                    .append(" > ").append(STOCK_HOURS_CAP).append("h")
-                                    .append(", 6h对应最大库存=").append(capMaxStock)
+                                    .append(" > ").append(stockHoursCap).append("h")
+                                    .append(", ").append(stockHoursCap).append("h对应最大库存=").append(capMaxStock)
                                     .append(", 超出=").append(stockHoursOver)
                                     .append(", 时间允许产量=max(0,").append(originalProduction).append("-").append(stockHoursOver)
                                     .append(")=").append(timeLimit);
@@ -711,7 +718,7 @@ public class TaskGroupService {
                             embryoCode, projectedStock,
                             projectedStock, singleTireMoldSeconds.setScale(2, BigDecimal.ROUND_HALF_UP), taskMoldQty,
                             projectedStockHours.setScale(2, BigDecimal.ROUND_HALF_UP),
-                            projectedStockHours.compareTo(BigDecimal.valueOf(STOCK_HOURS_CAP)) > 0 ? "超限→封顶" : "未超限→通过");
+                            projectedStockHours.compareTo(BigDecimal.valueOf(stockHoursCap)) > 0 ? "超限→封顶" : "未超限→通过");
                 }
 
                 if (capped && maxAllowedProduction < originalProduction) {
@@ -990,7 +997,7 @@ public class TaskGroupService {
                                 dtDailyLhCap = getDailyLhCapacityForMaterial(dtMaterialCode, context);
                                 // 日硫化量为双模值，需÷2得到单模产量（与S5.2.3一致）
                                 dtDailyLhCap = dtDailyLhCap != null && dtDailyLhCap > 0 ? dtDailyLhCap / 2 : null;
-                                if (dtTaskMoldQty > 0 && dtDailyLhCap != null && dtDailyLhCap > 0) {
+                                if (stockHoursCapEnabled && dtTaskMoldQty > 0 && dtDailyLhCap != null && dtDailyLhCap > 0) {
                                     int dtTripCapacity = getTripCapacity(structName, dtEmbryoCode, context);
                                     dtFallbackProduction = Math.min(dtTripCapacity, remainingDemand);
                                     if (dtFallbackProduction > 0) {
@@ -1002,10 +1009,10 @@ public class TaskGroupService {
                                                 .divide(BigDecimal.valueOf(dtTaskMoldQty), 2, BigDecimal.ROUND_HALF_UP)
                                                 .divide(BigDecimal.valueOf(SECONDS_PER_HOUR), 2, BigDecimal.ROUND_HALF_UP);
                                         dtStockHoursAfterResult = dtStockHoursAfter;
-                                        if (dtStockHoursAfter.compareTo(BigDecimal.valueOf(STOCK_HOURS_CAP)) > 0) {
+                                        if (dtStockHoursAfter.compareTo(BigDecimal.valueOf(stockHoursCap)) > 0) {
                                             dtSkip = true;
                                             dtSkipReason = "[时间-事前]预估本轮排" + dtFallbackProduction + "条后=" + dtProjectedAfter
-                                                    + ",可供硫化=" + dtStockHoursAfter.setScale(2, BigDecimal.ROUND_HALF_UP) + "h>" + STOCK_HOURS_CAP + "h";
+                                                    + ",可供硫化=" + dtStockHoursAfter.setScale(2, BigDecimal.ROUND_HALF_UP) + "h>" + stockHoursCap + "h";
                                         }
                                     }
                                 }
@@ -2671,6 +2678,38 @@ public class TaskGroupService {
             }
         }
         return DEFAULT_ENDING_DISCARD_THRESHOLD;
+    }
+
+    /**
+     * 获取可供硫化时长封顶阈值（小时）：预计班后库存可供硫化时长超过此值即封顶产量
+     * 优先使用参数配置 SYS04080001，否则使用默认值 6
+     */
+    private int getStockHoursCap(ScheduleContextVo context) {
+        if (context.getParamConfigMap() != null) {
+            CxParamConfig config = context.getParamConfigMap().get(PARAM_STOCK_HOURS_CAP);
+            if (config != null && config.getParamValue() != null) {
+                try {
+                    return Integer.parseInt(config.getParamValue());
+                } catch (NumberFormatException e) {
+                    log.warn("解析可供硫化时长封顶阈值配置失败: {}", config.getParamValue());
+                }
+            }
+        }
+        return 6;
+    }
+
+    /**
+     * 获取可供硫化时长封顶是否开启
+     * 优先使用参数配置 SYS04080005，Y=开启，N=关闭，默认开启
+     */
+    private boolean isStockHoursCapEnabled(ScheduleContextVo context) {
+        if (context.getParamConfigMap() != null) {
+            CxParamConfig config = context.getParamConfigMap().get(PARAM_STOCK_HOURS_CAP_ENABLED);
+            if (config != null && config.getParamValue() != null) {
+                return "Y".equalsIgnoreCase(config.getParamValue().trim());
+            }
+        }
+        return true;
     }
 
     /**
