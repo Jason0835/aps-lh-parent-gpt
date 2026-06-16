@@ -474,7 +474,8 @@ export default {
       // 获取当前查询参数副本
       const params = { ...this.query };
       // 固定排程日期为 9999-12-31
-      params.scheduleDate = '9999-12-31';
+      // params.scheduleDate = '9999-12-31';
+      params.exportTemplate = true;
       // 构建 URL 参数字符串，只包含非空参数
       const paramsStr = Object.keys(params)
         .filter(key => params[key] !== undefined && params[key] !== null && params[key] !== '')
