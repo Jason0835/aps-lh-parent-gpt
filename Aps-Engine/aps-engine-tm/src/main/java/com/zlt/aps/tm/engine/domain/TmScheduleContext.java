@@ -47,6 +47,9 @@ public class TmScheduleContext {
     /** 本次落库转换汇总 */
     private TmPersistResult persistResult;
 
+    /** 库存预测结果，key=胎面编码 */
+    private Map<String, TmStockForecast> stockForecastMap = new HashMap<>();
+
     /**
      * 按参数编码读取本次排程参数快照。
      *
@@ -90,5 +93,9 @@ public class TmScheduleContext {
 
     public void setSnapshotMap(Map<String, TmSnapshotBuildResult> snapshotMap) {
         this.snapshotMap = snapshotMap == null ? new HashMap<>() : snapshotMap;
+    }
+
+    public void setStockForecastMap(Map<String, TmStockForecast> stockForecastMap) {
+        this.stockForecastMap = stockForecastMap == null ? new HashMap<>() : stockForecastMap;
     }
 }
