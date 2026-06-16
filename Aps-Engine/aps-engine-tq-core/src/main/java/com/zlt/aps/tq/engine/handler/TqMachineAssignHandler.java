@@ -601,10 +601,11 @@ public class TqMachineAssignHandler extends AbsTqScheduleStepHandler {
     // ==================== 任务链构建 ====================
 
     /**
-     * 构建任务链。
+     * 构建任务链（按优先级排序后串联）。
      *
      * <p>按机台维度，将6个班次的生产任务串联成LinkedList。</p>
      * <p>每个节点包含：班次、机台、胎圈编码、计划量、预计库存等信息。</p>
+     * <p>构建顺序：先收集所有节点，再按 classIndex升序 → produceOrder升序 排序后串联。</p>
      * <p>切换班次时，重新计算本班开始预计库存和库存保证班数。</p>
      */
     private void buildTaskChain(TqScheduleContext context) {
@@ -612,12 +613,14 @@ public class TqMachineAssignHandler extends AbsTqScheduleStepHandler {
         List<TqScheduleResultVo> scheduleList = context.getScheduleList();
         double coefficient = context.getParams().getDemandCoefficient() == null ? 2D : context.getParams().getDemandCoefficient();
 
+        // 第一步：收集所有节点（不排序）
+        Map<Long, List<TqTaskNode>> machineNodeMap = new HashMap<>();
         for (TqScheduleResultVo scheduleVo : scheduleList) {
             if (StringUtils.isEmpty(scheduleVo.getMachineId())) {
                 continue;
             }
             Long machineId = Long.valueOf(scheduleVo.getMachineId());
-            LinkedList<TqTaskNode> chain = taskChainMap.computeIfAbsent(machineId, k -> new LinkedList<>());
+            List<TqTaskNode> nodeList = machineNodeMap.computeIfAbsent(machineId, k -> new ArrayList<>());
 
             for (int classIdx = 1; classIdx <= 6; classIdx++) {
                 double planQty = getClassPlanQty(scheduleVo, classIdx);
@@ -631,14 +634,35 @@ public class TqMachineAssignHandler extends AbsTqScheduleStepHandler {
                 node.setBeadCode(scheduleVo.getBeadCode());
                 node.setPlanQty(planQty);
                 node.setProduceOrder(getClassProduceOrder(scheduleVo, classIdx));
+                node.setScheduleId(scheduleVo.getId());
 
+                nodeList.add(node);
+            }
+        }
+
+        // 第二步：按机台分组，组内按 classIndex升序 → produceOrder升序 排序后构建链
+        for (Map.Entry<Long, List<TqTaskNode>> entry : machineNodeMap.entrySet()) {
+            Long machineId = entry.getKey();
+            List<TqTaskNode> nodeList = entry.getValue();
+
+            // 排序：先按班次，同班次内按生产顺序
+            nodeList.sort(Comparator
+                    .comparingInt(TqTaskNode::getClassIndex)
+                    .thenComparingInt(TqTaskNode::getProduceOrder));
+
+            // 构建有序链
+            LinkedList<TqTaskNode> chain = new LinkedList<>();
+            for (TqTaskNode node : nodeList) {
                 // 计算本班开始预计库存
-                double startStock = computeStartStock(chain, scheduleVo, classIdx, context);
+                double startStock = computeStartStock(chain, node, context);
                 node.setStartStockQty(startStock);
 
+                // 计算本班成型消耗量
+                double cxConsume = getCxConsumeByNode(node, coefficient, context);
+                node.setCxConsumeQty(cxConsume);
+
                 // 计算本班结束预计库存 = 开始库存 + 本班产出 - 本班消耗
-                double cxConsume = getCxConsume(scheduleVo, classIdx, coefficient);
-                double endStock = BigDecimalUtil.add(BigDecimalUtil.sub(startStock, cxConsume), planQty);
+                double endStock = BigDecimalUtil.add(BigDecimalUtil.sub(startStock, cxConsume), node.getPlanQty());
                 node.setEndStockQty(endStock);
 
                 // 计算库存保证班数
@@ -649,21 +673,27 @@ public class TqMachineAssignHandler extends AbsTqScheduleStepHandler {
                 // 规格切换时长：与前一个节点规格不同时需要切换
                 if (!chain.isEmpty()) {
                     TqTaskNode lastNode = chain.getLast();
-                    if (!lastNode.getBeadCode().equals(scheduleVo.getBeadCode())) {
-                        // 规格切换
+                    if (!lastNode.getBeadCode().equals(node.getBeadCode())) {
                         double specSwitchTime = context.getParams().getSpecSwitchTime() == null ? 0.5D
                                 : context.getParams().getSpecSwitchTime();
                         double inchSwitchTime = context.getParams().getInchSwitchTime() == null ? 1D
                                 : context.getParams().getInchSwitchTime();
-                        // 如果英寸不同，使用英寸切换时长；否则使用规格切换时长
-                        node.setSwitchTime(inchSwitchTime); // 简化处理，使用英寸切换时长
+                        // 同班次内切换用规格切换时长，跨班次切换用英寸切换时长
+                        boolean sameClass = lastNode.getClassIndex() == node.getClassIndex();
+                        node.setSwitchTime(sameClass ? specSwitchTime : inchSwitchTime);
                     } else {
                         node.setSwitchTime(0);
                     }
                 }
 
+                // 计算有效生产时长（班次时长8小时 - 切换时长）
+                double shiftHours = 8D;
+                node.setEffectiveHours(BigDecimalUtil.sub(shiftHours, node.getSwitchTime()));
+
                 chain.addLast(node);
             }
+
+            taskChainMap.put(machineId, chain);
         }
 
         context.setTaskChainMap(taskChainMap);
@@ -671,17 +701,140 @@ public class TqMachineAssignHandler extends AbsTqScheduleStepHandler {
     }
 
     /**
-     * 计算本班开始预计库存
+     * 计算本班开始预计库存（基于任务链前序节点）。
+     *
+     * <p>规则：</p>
+     * <ul>
+     *   <li>链条第一个节点：使用14点预计库存（planStockQty）</li>
+     *   <li>同班次内后续节点：使用同班次前一个节点的结束库存</li>
+     *   <li>跨班次节点：使用上一个班次最后一个节点的结束库存</li>
+     * </ul>
      */
-    private double computeStartStock(LinkedList<TqTaskNode> chain, TqScheduleResultVo scheduleVo,
-                                     int classIdx, TqScheduleContext context) {
+    private double computeStartStock(LinkedList<TqTaskNode> chain, TqTaskNode currentNode,
+                                     TqScheduleContext context) {
         if (chain.isEmpty()) {
-            // 第一个节点：使用14点预计库存
-            return scheduleVo.getPlanStockQty() == null ? 0D : scheduleVo.getPlanStockQty();
+            // 链条第一个节点：从排产记录取14点预计库存
+            TqScheduleResultVo scheduleVo = findScheduleVo(currentNode, context);
+            return scheduleVo == null ? 0D : (scheduleVo.getPlanStockQty() == null ? 0D : scheduleVo.getPlanStockQty());
         }
         // 后续节点：使用上一个节点的结束库存
         TqTaskNode lastNode = chain.getLast();
         return lastNode.getEndStockQty();
+    }
+
+    /**
+     * 通过任务链节点反查排产记录（用于获取14点预计库存等原始数据）。
+     */
+    private TqScheduleResultVo findScheduleVo(TqTaskNode node, TqScheduleContext context) {
+        if (node.getScheduleId() != null) {
+            return context.getScheduleList().stream()
+                    .filter(s -> s.getId() != null && s.getId().equals(node.getScheduleId()))
+                    .findFirst().orElse(null);
+        }
+        // 兜底：按beadCode+machineId匹配
+        return context.getScheduleList().stream()
+                .filter(s -> s.getBeadCode().equals(node.getBeadCode())
+                        && node.getMachineId().toString().equals(s.getMachineId()))
+                .findFirst().orElse(null);
+    }
+
+    /**
+     * 获取成型消耗量（基于任务链节点反查排产记录）。
+     */
+    private double getCxConsumeByNode(TqTaskNode node, double coefficient, TqScheduleContext context) {
+        TqScheduleResultVo scheduleVo = findScheduleVo(node, context);
+        if (scheduleVo == null) {
+            return 0D;
+        }
+        return getCxConsume(scheduleVo, node.getClassIndex(), coefficient);
+    }
+
+    /**
+     * 刷新任务链（S4/S5调整计划量后调用）。
+     *
+     * <p>从指定机台指定班次开始，重新计算库存、消耗量、保证班数等。</p>
+     *
+     * @param context 排程上下文
+     * @param machineId 需要刷新的机台ID，null表示刷新所有机台
+     * @param fromClassIdx 起始班次索引（1~6），从该班次开始重算
+     */
+    public void refreshTaskChain(TqScheduleContext context, Long machineId, int fromClassIdx) {
+        Map<Long, LinkedList<TqTaskNode>> taskChainMap = context.getTaskChainMap();
+        if (taskChainMap == null || taskChainMap.isEmpty()) {
+            return;
+        }
+
+        double coefficient = context.getParams().getDemandCoefficient() == null ? 2D : context.getParams().getDemandCoefficient();
+
+        // 确定需要刷新的机台列表
+        List<Long> machineIds = machineId != null
+                ? Collections.singletonList(machineId)
+                : new ArrayList<>(taskChainMap.keySet());
+
+        for (Long mid : machineIds) {
+            LinkedList<TqTaskNode> chain = taskChainMap.get(mid);
+            if (chain == null || chain.isEmpty()) {
+                continue;
+            }
+
+            boolean needRecalc = false;
+            for (TqTaskNode node : chain) {
+                if (node.getClassIndex() >= fromClassIdx) {
+                    needRecalc = true;
+                }
+                if (!needRecalc) {
+                    continue;
+                }
+
+                // 重新从排产记录同步planQty（S4/S5可能修改了）
+                TqScheduleResultVo scheduleVo = findScheduleVo(node, context);
+                if (scheduleVo != null) {
+                    node.setPlanQty(getClassPlanQty(scheduleVo, node.getClassIndex()));
+                }
+
+                // 重算库存
+                int nodeIdx = chain.indexOf(node);
+                if (nodeIdx == 0) {
+                    double startStock = scheduleVo == null ? 0D
+                            : (scheduleVo.getPlanStockQty() == null ? 0D : scheduleVo.getPlanStockQty());
+                    node.setStartStockQty(startStock);
+                } else {
+                    node.setStartStockQty(chain.get(nodeIdx - 1).getEndStockQty());
+                }
+
+                // 重算消耗量和结束库存
+                double cxConsume = getCxConsumeByNode(node, coefficient, context);
+                node.setCxConsumeQty(cxConsume);
+                double endStock = BigDecimalUtil.add(BigDecimalUtil.sub(node.getStartStockQty(), cxConsume), node.getPlanQty());
+                node.setEndStockQty(endStock);
+
+                // 重算保证班数
+                double guaranteeShifts = endStock > 0 && cxConsume > 0
+                        ? BigDecimalUtil.div(endStock, cxConsume, 1) : 999;
+                node.setGuaranteeShifts(guaranteeShifts);
+
+                // 重算切换时长
+                if (nodeIdx > 0) {
+                    TqTaskNode prevNode = chain.get(nodeIdx - 1);
+                    if (!prevNode.getBeadCode().equals(node.getBeadCode())) {
+                        double specSwitchTime = context.getParams().getSpecSwitchTime() == null ? 0.5D
+                                : context.getParams().getSpecSwitchTime();
+                        double inchSwitchTime = context.getParams().getInchSwitchTime() == null ? 1D
+                                : context.getParams().getInchSwitchTime();
+                        boolean sameClass = prevNode.getClassIndex() == node.getClassIndex();
+                        node.setSwitchTime(sameClass ? specSwitchTime : inchSwitchTime);
+                    } else {
+                        node.setSwitchTime(0);
+                    }
+                }
+
+                // 重算有效生产时长
+                double shiftHours = 8D;
+                node.setEffectiveHours(BigDecimalUtil.sub(shiftHours, node.getSwitchTime()));
+            }
+        }
+
+        log.info("[任务链刷新] 机台:{}, 起始班次:{}", machineId, fromClassIdx);
     }
 
     /**

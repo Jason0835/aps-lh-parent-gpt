@@ -68,4 +68,14 @@ public class LhDayFinishQty extends BaseEntity implements Serializable {
     @ApiModelProperty(value = "物料描述")
     @TableField(exist = false)
     private String materialDesc;
+
+    @Excel(name = "ui.data.column.lhDayFinishQty.lhNo")
+    @ApiModelProperty(value = "示方号")
+    @TableField(value = "LH_NO")
+    private String lhNo;
+
+    @Excel(name = "ui.data.column.lhDayFinishQty.lhType")
+    @ApiModelProperty(value = "示方类型")
+    @TableField(value = "LH_TYPE")
+    private String lhType;
 }

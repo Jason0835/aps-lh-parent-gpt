@@ -60,4 +60,14 @@ public class TqTaskNode {
      * 规格切换时长（小时），0表示无切换
      */
     private double switchTime;
+
+    /**
+     * 本班成型消耗量（胎圈消耗 = 成型计划 × 系数）
+     */
+    private double cxConsumeQty;
+
+    /**
+     * 本班实际有效生产时长（小时）= 班次时长 - 切换时长
+     */
+    private double effectiveHours;
 }

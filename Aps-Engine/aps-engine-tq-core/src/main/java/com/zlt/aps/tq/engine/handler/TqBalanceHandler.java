@@ -45,6 +45,9 @@ public class TqBalanceHandler extends AbsTqScheduleStepHandler {
     @Resource
     private AutoScheduleLogService autoScheduleLogService;
 
+    @Resource
+    private TqMachineAssignHandler machineAssignHandler;
+
     private static final String DIVISION = "\r\n---------------------------------------------------\r\n";
 
     /** 均衡差额百分比阈值 */
@@ -71,6 +74,9 @@ public class TqBalanceHandler extends AbsTqScheduleStepHandler {
 
         // 4. 均衡D+2日计划（5~6班=D+2日夜早）
         equilibriumDay3(context.getScheduleList(), totalPlanQtyVo, params);
+
+        // 5. 刷新任务链（S5调整了计划量，需同步更新链条节点的库存和保证班数）
+        machineAssignHandler.refreshTaskChain(context, null, 1);
 
         log.info("[S5] 班次均衡调整完成, 总计划量:{}", toJSONString(totalPlanQtyVo));
     }
