@@ -126,4 +126,11 @@ public interface IFactoryMonthPlanProductionFinalResultRemoteService {
     @PostMapping("/factoryMonthPlanFinalResult/listSkuScheduleItems")
     TableDataInfo listSkuScheduleItems(@RequestBody FactoryMonthPlanProductionFinalResultParam queryVO);
 
+    /**
+     * 定时计算上月超欠产
+     */
+    @ApiOperation("定时计算上月超欠产")
+    @PostMapping("/factoryMonthPlanFinalResult/calcLastMonthOverProd")
+    AjaxResult calcLastMonthOverProd();
+
 }

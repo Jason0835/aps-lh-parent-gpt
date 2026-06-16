@@ -117,7 +117,7 @@ export default {
       return [
       {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.mdmDevicePlanShut.factoryCode"),
           type: "select",
           dictData: this.parentDict.type.biz_factory_name,
         },
@@ -130,7 +130,7 @@ export default {
         // },
       {
           prop: "machineType",
-          label: this.$t("ui.data.column.cx.machine.type"),
+          label: this.$t("ui.data.column.mdmDevicePlanShut.machineType"),
           type: "select",
           dictData: this.parentDict.type.device_shut_machine_type,
           listeners: {
@@ -140,7 +140,7 @@ export default {
 
         {
           prop: "machineCode",
-          label: this.$t("ui.data.column.dispatcherlog.machineId"),
+          label: this.$t("ui.data.column.mdmDevicePlanShut.machineCode"),
 
           render: (form) => {
             return (
@@ -157,28 +157,34 @@ export default {
         },
         {
           prop: "machineStopType",
-          label: this.$t("ui.data.column.scheduledShutdown.machineStopType"),
+          label: this.$t("ui.data.column.mdmDevicePlanShut.machineStopType"),
           type: "select",
           dictData: this.parentDict.type.machine_stop_type,
         },
         {
           prop: "beginDate",
-          label: this.$t("ui.data.column.scheduledShutdown.beginDate"),
+          label: this.$t("ui.data.column.mdmDevicePlanShut.beginDate"),
           type: "date",
           dateType: "datetime",
           valueFormat: "yyyy-MM-dd HH:mm:ss",
         },
         {
           prop: "endDate",
-          label: this.$t("ui.data.column.scheduledShutdown.endDate"),
+          label: this.$t("ui.data.column.mdmDevicePlanShut.endDate"),
           type: "date",
           dateType: "datetime",
           valueFormat: "yyyy-MM-dd HH:mm:ss",
         },
+        {
+          prop: "dataSource",
+          label: this.$t("ui.data.column.mdmDevicePlanShut.dataSource"),
+          type: "select",
+          dictData: this.parentDict.type.lh_precision_data_source,
+        },
 
         {
           prop: "remark",
-          label: this.$t("ui.remark"),
+          label: this.$t("ui.data.column.mdmMaterialInfo.remark"),
           maxlength: 200,
         },
       ];

@@ -466,4 +466,29 @@ public class EngineConstants {
      * 参数code：胎圈需求系数（胎圈消耗量=成型需求量×系数），默认2
      */
     public static String DEMAND_COEFFICIENT = "SYS0301002";
+
+    /**
+     * 参数code：胎圈需求算法模式，1=算法1(三班最大值)，2=算法2(逐班对应)，默认2
+     */
+    public static String DEMAND_CALC_MODE = "SYS0301003";
+
+    /**
+     * 参数code：库存供应时长阈值（小时），达到后切换规格，默认24
+     */
+    public static String SUPPLY_TIME_THRESHOLD = "SYS0301004";
+
+    /**
+     * 参数code：胎圈班产上限，默认3000
+     */
+    public static String MAX_CLASS_OUTPUT = "SYS0301005";
+
+    /**
+     * 参数code：规格切换时长（小时），默认0.5
+     */
+    public static String SPEC_SWITCH_TIME = "SYS0301006";
+
+    /**
+     * 参数code：英寸切换时长（小时），默认1
+     */
+    public static String INCH_SWITCH_TIME = "SYS0301007";
 }

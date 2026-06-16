@@ -197,55 +197,55 @@ export default {
       return [
         {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.mdmMouldShellInfo.factoryCode"),
           type: "select",
           dictData: this.parentDict.type.biz_factory_name,
         },
 
         {
           prop: "mouldSetCode",
-          label: this.$t("ui.data.column.monthplan.moldModelCode"),
+          label: this.$t("ui.data.column.mdmMouldShellInfo.moldModelCode"),
           maxlength:30,
         },
         {
           prop: "totalQty",
-          label: this.$t("ui.data.column.docInventoryBoiA.fullQty"),
+          label: this.$t("ui.data.column.mdmMouldShellInfo.qty"),
           type: "number",
           max:999999
         },
         {
           prop: "machineQty",
-          label: this.$t("ui.data.column.monthplan.machineQty"),
+          label: this.$t("ui.data.column.mdmMouldShellInfo.machineQty"),
           type: "number",
           max:999999
         },
         {
           prop: "onHandQty",
-          label: this.$t("ui.data.column.monthplan.onHandQty"),
+          label: this.$t("ui.data.column.mdmMouldShellInfo.onHandQty"),
           type: "number",
           max:999999
         },
         {
           prop: "outBoundQty",
-          label: this.$t("ui.data.column.monthplan.outBoundQty"),
+          label: this.$t("ui.data.column.mdmMouldShellInfo.outBoundQty"),
           type: "number",
           max:999999
         },
         {
           prop: "outBoundPlanQty",
-          label: this.$t("ui.data.column.monthplan.outBoundPlanQty"),
+          label: this.$t("ui.data.column.mdmMouldShellInfo.outBoundPlanQty"),
           type: "number",
           max:999999
         },
         {
           prop: "deplaneQty",
-          label: this.$t("ui.data.column.monthplan.deplaneQty"),
+          label: this.$t("ui.data.column.mdmMouldShellInfo.deplaneQty"),
           type: "number",
           max:999999
         },
         {
           prop: "forceOutBoundQty",
-          label: this.$t("ui.data.column.monthplan.forceOutBoundQty"),
+          label: this.$t("ui.data.column.mdmMouldShellInfo.forceOutBoundQty"),
           type: "number",
           max:999999
         },

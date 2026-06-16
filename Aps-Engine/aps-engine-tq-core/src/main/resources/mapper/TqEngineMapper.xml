@@ -313,4 +313,45 @@
         a.order_no = tempTable.order_no
         where a.del_flag = '0'
     </update>
+    <!-- 查询胎圈工装车整车容量（按胎圈编码分组取最大值） -->
+    <select id="listToolingCartCapacity" resultType="map">
+        select MATERIAL_CODE as materialCode, max(CART_CAPACITY) as cartCapacity
+        from T_TQ_TOOLING_CART_CAPACITY
+        where DEL_FLAG = '0'
+        group by MATERIAL_CODE
+    </select>
+
+    <!-- 查询胎圈工装总数（按胎圈编码关联工装车容量表，取工装总数） -->
+    <select id="listToolingTotal" resultType="map">
+        select tcc.MATERIAL_CODE as materialCode, max(t.TOTAL_QTY) as totalQty
+        from T_TQ_TOOLING_CART_CAPACITY tcc
+        inner join T_TQ_TOOLING t on tcc.TOOLING_CODE = t.TOOLING_CODE and t.DEL_FLAG = '0'
+        where tcc.DEL_FLAG = '0'
+        group by tcc.MATERIAL_CODE
+    </select>
+
+    <!-- 查询胎圈机台检修计划 -->
+    <select id="listMaintenancePlan" resultType="map">
+        select MACHINE_ID as machineId, DOWNTIME_DATE as downtimeDate,
+               DOWNTIME_SHIFT as downtimeShift, DOWNTIME_HOURS as downtimeHours
+        from T_TQ_MACHINE_MAINTENANCE_PLAN
+        where DEL_FLAG = '0'
+        and DOWNTIME_DATE >= date_format(#{scheduleDate}, '%Y-%m-%d')
+        and DOWNTIME_DATE &lt; date_format(date_add(#{scheduleDate}, interval 3 day), '%Y-%m-%d')
+    </select>
+
+    <!-- 查询胎圈工作日历（停产班次），proc_code='08'为胎圈工序 -->
+    <select id="listWorkCalendar" resultType="map">
+        select PRODUCTION_DATE as productionDate,
+               ONE_SHIFT_FLAG as oneShiftFlag,
+               TWO_SHIFT_FLAG as twoShiftFlag,
+               THREE_SHIFT_FLAG as threeShiftFlag,
+               DAY_FLAG as dayFlag
+        from T_MDM_WORK_CALENDAR
+        where DEL_FLAG = '0'
+        and PROC_CODE = '08'
+        and PRODUCTION_DATE >= date_format(#{scheduleDate}, '%Y-%m-%d')
+        and PRODUCTION_DATE &lt; date_format(date_add(#{scheduleDate}, interval 3 day), '%Y-%m-%d')
+    </select>
+
 </mapper>

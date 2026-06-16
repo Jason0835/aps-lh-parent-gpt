@@ -50,6 +50,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             IS_LOCK_SCHEDULE = #{isLockSchedule},
             TOTAL_QTY = #{totalQty},
             ADJUST_FLAG = #{adjustFlag},
+            LAST_MONTH_OVERDUE_QTY = #{lastMonthOverdueQty},
+            LAST_MONTH_VALID_FLAG = #{lastMonthValidFlag},
             UPDATE_BY = #{updateBy},
             UPDATE_TIME = NOW()
         WHERE ID = #{id}

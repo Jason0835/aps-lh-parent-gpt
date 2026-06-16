@@ -52,6 +52,7 @@
         <result property="isRelease" column="is_release"/>
         <result property="productionStatus" column="production_status"/>
         <result property="markCloseOutTip" column="mark_close_out_tip"/>
+        <result property="closeOutSpecFlag" column="close_out_spec_flag"/>
         <result property="remark" column="remark"/>
         <result property="delFlag" column="del_flag"/>
         <result property="createBy" column="create_by"/>
@@ -113,6 +114,7 @@
         <result property="isRelease" column="is_release"/>
         <result property="productionStatus" column="production_status"/>
         <result property="markCloseOutTip" column="mark_close_out_tip"/>
+        <result property="closeOutSpecFlag" column="close_out_spec_flag"/>
         <result property="remark" column="remark"/>
         <result property="delFlag" column="del_flag"/>
         <result property="createBy" column="create_by"/>
@@ -163,6 +165,7 @@
                cx_class5_plan,
                is_release,
                mark_close_out_tip,
+               close_out_spec_flag,
                production_status,
                remark,
                del_flag,
@@ -179,7 +182,7 @@
     </sql>
 
     <sql id="column">
-        a.id, a.schedule_date, a.cx_batch_no, a.batch_no, a.order_no, a.bead_code, a.steel_ring_code, a.triangle_glue_code, a.glue_code, a.mouth_plate_code, a.spec_size, a.machine_id, a.unit_consume, a.stock_qty, a.supply_time, a.mid_plan_qty, a.mid_produce_order, a.mid_sys_analysis, a.mid_hand_analysis, a.night_plan_qty, a.night_produce_order, a.night_sys_analysis, a.night_hand_analysis, a.day_plan_qty, a.day_produce_order, a.day_sys_analysis, a.day_hand_analysis, a.next_mid_plan_qty, a.next_mid_produce_order, a.next_mid_sys_analysis, a.next_mid_hand_analysis, a.cx_class1_plan, a.cx_class2_plan, a.cx_class3_plan, a.cx_class4_plan, a.cx_class5_plan, a.is_release, a.mark_close_out_tip, a.production_status, a.remark, a.del_flag, a.create_by, a.create_time, a.update_by, a.update_time,a.data_source, a.publish_success_count, a.newest_publish_time, a.last_mid_plan_qty,
+        a.id, a.schedule_date, a.cx_batch_no, a.batch_no, a.order_no, a.bead_code, a.steel_ring_code, a.triangle_glue_code, a.glue_code, a.mouth_plate_code, a.spec_size, a.machine_id, a.unit_consume, a.stock_qty, a.supply_time, a.mid_plan_qty, a.mid_produce_order, a.mid_sys_analysis, a.mid_hand_analysis, a.night_plan_qty, a.night_produce_order, a.night_sys_analysis, a.night_hand_analysis, a.day_plan_qty, a.day_produce_order, a.day_sys_analysis, a.day_hand_analysis, a.next_mid_plan_qty, a.next_mid_produce_order, a.next_mid_sys_analysis, a.next_mid_hand_analysis, a.cx_class1_plan, a.cx_class2_plan, a.cx_class3_plan, a.cx_class4_plan, a.cx_class5_plan, a.is_release, a.mark_close_out_tip, a.close_out_spec_flag, a.production_status, a.remark, a.del_flag, a.create_by, a.create_time, a.update_by, a.update_time,a.data_source, a.publish_success_count, a.newest_publish_time, a.last_mid_plan_qty,
     </sql>
 
     <select id="getScheduleResult" parameterType="long" resultType="com.zlt.aps.tq.entity.TqScheduleResult">

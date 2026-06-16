@@ -15,31 +15,31 @@ import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.constant.ServiceNameConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
-import com.zlt.aps.dj.api.domain.entity.DjMachineMaintenance;
+import com.zlt.aps.dj.api.domain.entity.DjMachineInfo;
 
 /**
- * 垫胶机台维修计划对外暴露接口
+ * 垫胶机台信息对外暴露接口
  */
-@FeignClient(contextId = "iDjMachineMaintenanceService", value = ServiceNameConstants.GATEWAY_SERVICE, path = "${api.path.dj:dj}")
-public interface IDjMachineMaintenanceService {
+@FeignClient(contextId = "IDjMachineInfoRemoteService", value = ServiceNameConstants.GATEWAY_SERVICE, path = "${api.path.dj:dj}")
+public interface IDjMachineInfoRemoteService {
 
     /**
      * 获取信息列表
      *
-     * @param djMachineMaintenance
+     * @param stock
      * @return
      */
-    @PostMapping("/dj/machineMaintenance/list")
-    TableDataInfo list(@RequestBody DjMachineMaintenance djMachineMaintenance);
+    @PostMapping("/dj/machine/list")
+    TableDataInfo list(@RequestBody DjMachineInfo machine);
 
     /**
      * 保存信息
      *
-     * @param djMachineMaintenance
+     * @param stock
      * @return
      */
-    @PostMapping("/dj/machineMaintenance/save")
-    AjaxResult save(@Validated @RequestBody DjMachineMaintenance djMachineMaintenance);
+    @PostMapping("/dj/machine/save")
+    AjaxResult save(@Validated @RequestBody DjMachineInfo machine);
 
     /**
      * 删除信息
@@ -47,7 +47,7 @@ public interface IDjMachineMaintenanceService {
      * @param ids
      * @return
      */
-    @DeleteMapping("/dj/machineMaintenance/{ids}")
+    @DeleteMapping("/dj/machine/{ids}")
     AjaxResult removeByIds(@RequestBody List<Long> ids);
 
     /**
@@ -56,31 +56,40 @@ public interface IDjMachineMaintenanceService {
      * @param id
      * @return
      */
-    @GetMapping(value = "/dj/machineMaintenance/{id}")
+    @GetMapping(value = "/dj/machine/selectStockById/{id}")
+    DjMachineInfo selectStockById(@PathVariable("id") Long id);
+
+    /**
+     * 根据ID获取详细信息
+     *
+     * @param id
+     * @return
+     */
+    @GetMapping(value = "/dj/machine/{id}")
     AjaxResult getInfo(@PathVariable("id") Long id);
 
     /**
      * 校验唯一性
      */
-    @PostMapping("/dj/machineMaintenance/checkUnique")
-    String checkUnique(@RequestBody DjMachineMaintenance djMachineMaintenance);
+    @PostMapping("/dj/machine/checkUnique")
+    String checkUnique(@RequestBody DjMachineInfo machine);
 
     /**
      * 导出信息
      * 
-     * @param djMachineMaintenance
+     * @param stock
      * @return
      */
-    @PostMapping("/dj/machineMaintenance/exportData/{fileName}")
-    byte[] exportData(@RequestBody DjMachineMaintenance queryVO, @PathVariable("fileName") String fileName);
+    @PostMapping("/dj/machine/exportData/{fileName}")
+    byte[] exportData(@RequestBody DjMachineInfo queryVO, @PathVariable("fileName") String fileName);
 
     /**
      * 导入信息
      * 
-     * @param importContext
+     * @param stock
      * @return
      */
-    @PostMapping("/dj/machineMaintenance/importData")
+    @PostMapping("/dj/machine/importData")
     AjaxResult importData(@RequestBody ImportContext importContext,
             @RequestParam("updateSupport") boolean updateSupport);
 }

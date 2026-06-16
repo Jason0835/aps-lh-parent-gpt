@@ -144,9 +144,7 @@ export default {
         },
         {
           prop: "sourceProcCode",
-          label: this.$t(
-            "工序"
-          ),
+          label: this.$t("ui.data.column.mdmWorkCalendar.procCode"),
           type: "select",
           dictData: this.selectList,
         },
@@ -171,9 +169,7 @@ export default {
         },
         {
           prop: "targetProcCode",
-          label: this.$t(
-            "工序"
-          ),
+          label: this.$t("ui.data.column.mdmWorkCalendar.procCode"),
           type: "select",
           dictData: this.selectList,
         },

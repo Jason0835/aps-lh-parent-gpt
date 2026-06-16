@@ -229,3 +229,11 @@ export function getSummaryVo(query) {
     data: query
   })
 }
+
+export function getWorkClass(query) {
+  return request({
+   url: `dj/djScheduleResult/getWorkClass`,
+    method: 'get',
+    params: query
+  })
+}

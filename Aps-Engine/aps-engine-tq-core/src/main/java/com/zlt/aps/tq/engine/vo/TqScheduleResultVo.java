@@ -239,4 +239,10 @@ public class TqScheduleResultVo extends ApsBaseDto {
     @ApiModelProperty(value = "数据来源：0>自动排程；1>APS插单；2>导入；")
     private String dataSource;
 
+    @ApiModelProperty(value = "是否未排（0:已排 1:未排）")
+    private String unscheduledFlag;
+
+    @ApiModelProperty(value = "未排原因")
+    private String unscheduledReason;
+
 }

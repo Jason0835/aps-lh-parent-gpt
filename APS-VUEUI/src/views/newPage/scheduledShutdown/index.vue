@@ -100,7 +100,8 @@ export default {
     "machine_stop_type",
     "biz_factory_name",
     "work_calendar_proc",
-    'device_shut_machine_type'
+    'device_shut_machine_type',
+    'lh_precision_data_source'
   ],
   provide() {
     return {
@@ -150,7 +151,7 @@ export default {
         { type: "selection", fixed: "left" },
         {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.mdmDevicePlanShut.factoryCode"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
           },
@@ -167,18 +168,18 @@ export default {
         // },
         {
           prop: "machineType",
-          label: this.$t("ui.data.column.cx.machine.type"),
+          label: this.$t("ui.data.column.mdmDevicePlanShut.machineType"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.device_shut_machine_type, value);
           },
         },
         {
           prop: "machineCode",
-          label: this.$t("ui.data.column.dispatcherlog.machineId"),
+          label: this.$t("ui.data.column.mdmDevicePlanShut.machineCode"),
         },
         {
           prop: "machineStopType",
-          label: this.$t("ui.data.column.scheduledShutdown.machineStopType"),
+          label: this.$t("ui.data.column.mdmDevicePlanShut.machineStopType"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(
               this.dict.type.machine_stop_type,
@@ -188,15 +189,22 @@ export default {
         },
         {
           prop: "beginDate",
-          label: this.$t("ui.data.column.scheduledShutdown.beginDate"),
+          label: this.$t("ui.data.column.mdmDevicePlanShut.beginDate"),
         },
         {
           prop: "endDate",
-          label: this.$t("ui.data.column.scheduledShutdown.endDate"),
+          label: this.$t("ui.data.column.mdmDevicePlanShut.endDate"),
+        },
+        {
+          prop: "dataSource",
+          label: this.$t("ui.data.column.mdmDevicePlanShut.dataSource"),
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(this.dict.type.lh_precision_data_source, value);
+          },
         },
         {
           prop: "remark",
-          label: this.$t("common.remark"),
+          label: this.$t("ui.data.column.mdmMaterialInfo.remark"),
         },
         {
           align: "center",
@@ -233,7 +241,7 @@ export default {
       return [
         {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.mdmDevicePlanShut.factoryCode"),
           type: "select", //GLUE_TYPE
           dictData: this.dict.type.biz_factory_name,
         },
@@ -245,19 +253,25 @@ export default {
         // },
         {
           prop: "machineType",
-          label: this.$t("ui.data.column.cx.machine.type"),
+          label: this.$t("ui.data.column.mdmDevicePlanShut.machineType"),
           type: "select",
           dictData: this.dict.type.device_shut_machine_type,
         },
         {
           prop: "machineCode",
-          label: this.$t("ui.data.column.dispatcherlog.machineId"),
+          label: this.$t("ui.data.column.mdmDevicePlanShut.machineCode"),
         },
         {
           prop: "machineStopType",
-          label: this.$t("ui.data.column.scheduledShutdown.machineStopType"),
+          label: this.$t("ui.data.column.mdmDevicePlanShut.machineStopType"),
           type: "select",
           dictData: this.dict.type.machine_stop_type,
+        },
+        {
+          prop: "dataSource",
+          label: this.$t("ui.data.column.mdmDevicePlanShut.dataSource"),
+          type: "select",
+          dictData: this.dict.type.lh_precision_data_source,
         },
         {
           prop: "createTime",

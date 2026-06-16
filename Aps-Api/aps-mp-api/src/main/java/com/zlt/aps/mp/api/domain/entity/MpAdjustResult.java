@@ -567,6 +567,22 @@ public class MpAdjustResult extends BaseEntity implements IFinalAndAdjustResultI
     private Integer adjustPriority;
 
     /**
+     * 上月超欠产
+     */
+    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.lastMonthOverdueQty")
+    @ApiModelProperty(value = "LAST_MONTH_OVERDUE_QTY", name = "lastMonthOverdueQty")
+    @TableField(value = "LAST_MONTH_OVERDUE_QTY")
+    private Integer lastMonthOverdueQty;
+
+    /**
+     * 上月超欠产有效标志
+     */
+    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.lastMonthValidFlag")
+    @ApiModelProperty(value = "LAST_MONTH_VALID_FLAG", name = "lastMonthValidFlag")
+    @TableField(value = "LAST_MONTH_VALID_FLAG")
+    private String lastMonthValidFlag;
+
+    /**
      * 最大的型腔数，用于排序
      */
     @TableField(exist = false)

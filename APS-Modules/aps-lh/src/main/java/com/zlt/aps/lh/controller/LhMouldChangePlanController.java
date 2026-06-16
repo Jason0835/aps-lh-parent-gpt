@@ -303,6 +303,10 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
 
     @Override
     protected List<LhMouldChangePlan> listExportData(LhMouldChangePlan obj) {
+        // 下载模板导出空列表
+        if (obj.getExportTemplate()) {
+            return Collections.emptyList();
+        }
         QueryWrapper<LhMouldChangePlan> wrapper = new QueryWrapper<>();
         this.builderCondition(wrapper, obj);
         List<LhMouldChangePlan> list = lhMouldChangePlanMapper.selectList(wrapper);
@@ -330,9 +334,11 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
         List<List<Map<String, Object>>> excelDataList = new ArrayList<>();
         if (CollectionUtils.isNotEmpty(list)) {
             List<LhMouldChangePlanVo> exportList = this.buildLhMouldChangePlanVoList(list, queryVO);
-            tableMap = buildExportTableMap(exportList, queryVO.getScheduleDate());
             excelDataList.add(buildExportDataList(exportList, queryVO));
         }
+        tableMap = buildExportTableMap(queryVO.getScheduleDate());
+        // 赋值表头字段名称
+        setExportTitleFieldName(tableMap);
 
         byte[] resultBytes =  ExcelUtils.writeMultiList(inputStream, 0, tableMap, excelDataList);
         Date endTime = DateUtils.getNowDate();
@@ -356,12 +362,11 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
     /**
      * 构建模板表头数据
      *
-     * @param list 排程结果列表
      * @param scheduleDate 排程日期
      * @return 模板表头数据
      */
-    public Map<String, Object> buildExportTableMap(List<LhMouldChangePlanVo> list, Date scheduleDate) {
-        Map<String, Object> tableMap = new HashMap<>(16);
+    public Map<String, Object> buildExportTableMap(Date scheduleDate) {
+        Map<String, Object> tableMap = new HashMap<>();
         String titleFormat = I18nUtil.getMessage("mouldChangePlan.export.title");
         String cnFormatDate = DateUtil.format(scheduleDate, "yyyy年MM月dd日");
         String vnFormatDate = DateUtil.format(scheduleDate, "dd/MM/yyyy");
@@ -369,7 +374,10 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
         String version = "版本phiên bản：" + versionDate;
         tableMap.put("title", String.format(titleFormat, cnFormatDate, vnFormatDate, versionDate));
         tableMap.put("version", version);
+        return tableMap;
+    }
 
+    public void setExportTitleFieldName(Map<String, Object> tableMap) {
         ExcelUtil<LhMouldChangePlanVo> util = new ExcelUtil<>(LhMouldChangePlanVo.class);
         List<Field> allFields = util.getClassField(LhMouldChangePlanVo.class);
         for (Field field : allFields) {
@@ -385,7 +393,6 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
                 tableMap.put(field.getName(), attrName);
             }
         }
-        return tableMap;
     }
 
     public List<Map<String, Object>> buildExportDataList(List<LhMouldChangePlanVo> list, LhMouldChangePlan queryVO) {

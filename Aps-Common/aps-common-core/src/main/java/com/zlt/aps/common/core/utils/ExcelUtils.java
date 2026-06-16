@@ -393,7 +393,14 @@ public class ExcelUtils {
                                     } else if (cellType == CellType.STRING.getCode()) {
                                         newCell.setCellValue(cell.getStringCellValue());
                                     } else if (cellType == CellType.FORMULA.getCode()) {
-                                        newCell.setCellFormula(cell.getCellFormula());
+                                        String formula = cell.getCellFormula();
+                                        // 调整公式中单元格引用的行号：模板行(第listStartRowNum+1行)的公式引用自身行号，
+                                        // 复制到新行(第newRowNum+1行)后，行号偏差为newRowNum - listStartRowNum
+                                        int rowOffset = newRowNum - listStartRowNum;
+                                        if (rowOffset != 0) {
+                                            formula = formula.replaceAll("(?<=[A-Z])" + (listStartRowNum + 1) + "(?![0-9])", String.valueOf(newRowNum + 1));
+                                        }
+                                        newCell.setCellFormula(formula);
                                     } else {
                                         newCell.setCellValue(cell.getStringCellValue());
                                     }

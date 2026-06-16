@@ -153,6 +153,7 @@ public class MdmDevicePlanShutController extends AbstractDocBizController<MdmDev
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("machineStopType")), "MACHINE_STOP_TYPE", queryVO.getFieldValueByFieldName("machineStopType"));
         queryWrapper.ge(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("beginDate")), "BEGIN_DATE", queryVO.getFieldValueByFieldName("beginDate"));
         queryWrapper.le(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("endDate")), "END_DATE", queryVO.getFieldValueByFieldName("endDate"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("dataSource")), "DATA_SOURCE", queryVO.getFieldValueByFieldName("dataSource"));
     }
 
     @Override

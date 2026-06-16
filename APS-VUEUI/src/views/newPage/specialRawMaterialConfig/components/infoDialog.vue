@@ -163,7 +163,7 @@ export default {
     columns() {
       return [
         {
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.rawSpecialMaterialStock.factoryCode"),
           prop: "factoryCode",
           type: "select",
           dictData: this.parentDict.type.biz_factory_name,
@@ -179,65 +179,65 @@ export default {
         },
         {
           prop: "materialCode",
-          label: this.$t("ui.data.column.masterdata.materialCode"),
+          label: this.$t("ui.data.column.rawSpecialMaterialStock.materialCode"),
           maxlength:30
         },
         {
           prop: "materialName",
-          label: this.$t("common.name"),
+          label: this.$t("ui.data.column.rawSpecialMaterialStock.materialName"),
           maxlength:100
         },
         {
           prop: "standardLength",
-          label: this.$t("ui.data.column.masterdata.standardLength"),
+          label: this.$t("ui.data.column.rawSpecialMaterialStock.standardLength"),
           type: "number",
           ax:99999999
         },
         {
           prop: "warehouseStock",
-          label: this.$t("原材料库存"),
+          label: this.$t("ui.data.column.rawSpecialMaterialStock.warehouseStock"),
           type: "number",
           max:99999999
         },
         {
           prop: "midStock",
-          label: this.$t("中间库库存"),
+          label: this.$t("ui.data.column.rawSpecialMaterialStock.midStock"),
           type: "number",
           max:99999999
         },
         {
           prop: "workshopStock",
-          label: this.$t("车间库存"),
+          label: this.$t("ui.data.column.rawSpecialMaterialStock.workshopStock"),
           type: "number",
           max:99999999
         },
         {
           prop: "totalStock",
-          label: this.$t("总库存"),
+          label: this.$t("ui.data.column.rawSpecialMaterialStock.totalStock"),
           type: "number",
           max:99999999
         },
         {
           prop: "stock",
-          label: this.$t("ui.data.column.masterdata.stock"),
+          label: this.$t("ui.data.column.rawSpecialMaterialStock.stock"),
           type: "number",
           max:99999999
         },
         {
           prop: "stockDate",
-          label: this.$t("ui.data.defectiveStock.stockDate"),
+          label: this.$t("ui.data.column.rawSpecialMaterialStock.stockDate"),
           type: "date",
           valueFormat: "yyyy-MM-dd",
 
         },
         {
           prop: "unit",
-          label: this.$t("common.unit"),
+          label: this.$t("ui.data.column.rawSpecialMaterialStock.unit"),
           maxlength:10
         },
         {
           prop: "remark",
-          label: this.$t("common.remark"),
+          label: this.$t("ui.data.column.rawSpecialMaterialRecord.remark"),
           maxlength:100
         },
       ];

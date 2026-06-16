@@ -803,14 +803,62 @@ export default {
           },
         });
       }
-      cols.push({
-        prop: "hasSpecialMaterial",
-        label: this.$t("ui.data.column.mpAdjustResult.hasSpecialMaterial"),
-        width: 120,
-        formatter: (row, column, value) => {
-          return this.selectDictLabel(this.dict.type.biz_yes_no, value);
+      cols.push(
+        {
+          prop: "lastMonthValidFlag",
+          label: this.$t(
+            "ui.data.column.mpAdjustResult.lastMonthValidFlag"
+          ),
+          width: 140,
+          render: ({ row }) => {
+            if (this.isStatisticsRow(row)) {
+              return (
+                <span>
+                  {this.selectDictLabel(
+                    this.dict.type.biz_yes_no,
+                    row.lastMonthValidFlag
+                  )}
+                </span>
+              );
+            }
+            return (
+              <el-select
+                v-model={row.lastMonthValidFlag}
+                size="mini"
+                filterable
+                clearable
+                placeholder={this.$t("ui.frame.btn.choose")}
+                style="width: 100%"
+                onChange={() => this.handleLockScheduleChange(row)}
+              >
+                {this.dict.type.biz_yes_no.map((item) => (
+                  <el-option
+                    key={item.value}
+                    label={item.label}
+                    value={item.value}
+                  />
+                ))}
+              </el-select>
+            );
+          },
         },
-      });
+        {
+          prop: "lastMonthOverdueQty",
+          label: this.$t("ui.data.column.mpAdjustResult.lastMonthOverdueQty"),
+          width: 120,
+          formatter: (row, column, value) => {
+            return value === null || value === undefined ? "" : String(value);
+          },
+        },
+        {
+          prop: "hasSpecialMaterial",
+          label: this.$t("ui.data.column.mpAdjustResult.hasSpecialMaterial"),
+          width: 120,
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(this.dict.type.biz_yes_no, value);
+          },
+        }
+      );
       return cols;
     },
     syncProductionVersionOptions() {

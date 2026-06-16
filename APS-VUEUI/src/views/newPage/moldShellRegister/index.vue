@@ -135,42 +135,42 @@ export default {
         { type: "selection", fixed: "left" },
         {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.mdmMouldShellInfo.factoryCode"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
           },
         },
         {
           prop: "mouldSetCode",
-          label: this.$t("ui.data.column.monthplan.moldModelCode"),
+          label: this.$t("ui.data.column.mdmMouldShellInfo.moldModelCode"),
         },
         {
           prop: "totalQty",
-          label: this.$t("ui.data.column.docInventoryBoiA.fullQty"),
+          label: this.$t("ui.data.column.mdmMouldShellInfo.qty"),
         },
         {
           prop: "machineQty",
-          label: this.$t("ui.data.column.monthplan.machineQty"),
+          label: this.$t("ui.data.column.mdmMouldShellInfo.machineQty"),
         },
         {
           prop: "onHandQty",
-          label: this.$t("ui.data.column.monthplan.onHandQty"),
+          label: this.$t("ui.data.column.mdmMouldShellInfo.onHandQty"),
         },
         {
           prop: "outBoundQty",
-          label: this.$t("ui.data.column.monthplan.outBoundQty"),
+          label: this.$t("ui.data.column.mdmMouldShellInfo.outBoundQty"),
         },
         {
           prop: "outBoundPlanQty",
-          label: this.$t("ui.data.column.monthplan.outBoundPlanQty"),
+          label: this.$t("ui.data.column.mdmMouldShellInfo.outBoundPlanQty"),
         },
         {
           prop: "deplaneQty",
-          label: this.$t("ui.data.column.monthplan.deplaneQty"),
+          label: this.$t("ui.data.column.mdmMouldShellInfo.deplaneQty"),
         },
         {
           prop: "forceOutBoundQty",
-          label: this.$t("ui.data.column.monthplan.forceOutBoundQty"),
+          label: this.$t("ui.data.column.mdmMouldShellInfo.forceOutBoundQty"),
         },
         {
           prop: "remark",
@@ -216,13 +216,13 @@ export default {
       return [
         {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.mdmMouldShellInfo.factoryCode"),
           type: "select",
           dictData: this.dict.type.biz_factory_name,
         },
         {
           prop: "mouldSetCode",
-          label: this.$t("ui.data.column.monthplan.moldModelCode"),
+          label: this.$t("ui.data.column.mdmMouldShellInfo.moldModelCode"),
         },
       ];
     },
