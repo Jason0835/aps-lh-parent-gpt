@@ -136,7 +136,7 @@ export default {
         { type: "selection", fixed: "left" },
         {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.mdmWorkWearInfo.factoryCode"),
           type: "select",
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
@@ -144,7 +144,7 @@ export default {
         },
         {
           prop: "workWearType",
-          label: this.$t("ui.data.column.trialPlan.trialType"),
+          label: this.$t("ui.data.column.mdmWorkWearInfo.workWearType"),
           type: "select",
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_work_type, value);
@@ -153,7 +153,7 @@ export default {
         },
         {
           prop: "workWearStatus",
-          label: this.$t("ui.data.column.WorkWearInfo.workWearStatus"),
+          label: this.$t("ui.data.column.mdmWorkWearInfo.workWearStatus"),
           type: "select",
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_available_status, value);
@@ -161,12 +161,12 @@ export default {
         },
         {
           prop: "workWearName",
-          label: this.$t("common.name"),
+          label: this.$t("ui.data.column.mdmWorkWearInfo.workWearName"),
           width:180
         },
         {
           prop: "cxMachineBrandCode",
-          label: this.$t("成型鼓厂家"),
+          label: this.$t("ui.data.column.mdmWorkWearInfo.cxMachineBrandCode"),
           type: "select",
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_machine_brand, value);
@@ -175,7 +175,7 @@ export default {
         },
         {
           prop: "cxMachineTypeCode",
-          label: this.$t("ui.data.colume.collect.type"),
+          label: this.$t("ui.data.column.mdmWorkWearInfo.cxMachineTypeCode"),
           type: "select",
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_class_type, value);
@@ -184,26 +184,26 @@ export default {
         },
         {
           prop: "perimeterMin",
-          label: this.$t("ui.data.column.capsuleChuck.perimeterMin"),
+          label: this.$t("ui.data.column.mdmWorkWearInfo.perimeterMin"),
         },
         {
           prop: "perimeterMax",
-          label: this.$t("ui.data.column.capsuleChuck.perimeterMax"),
+          label: this.$t("ui.data.column.mdmWorkWearInfo.perimeterMax"),
         },
 
         {
           prop: "specifications",
-          label: this.$t("ui.data.column.specColor.specDesc"),
+          label: this.$t("ui.data.column.mdmWorkWearInfo.specifications"),
           width:180
         },
         {
           prop: "qty",
-          label: this.$t("common.num"),
+          label: this.$t("ui.data.column.mdmWorkWearInfo.qty"),
           width:120
         },
         {
           prop: "unit",
-          label: this.$t("common.unit"),
+          label: this.$t("ui.data.column.mdmWorkWearInfo.unit"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_work_unit, value);
           },
@@ -211,7 +211,7 @@ export default {
         },
         {
           prop: "usedType",
-          label: this.$t("ui.data.column.WorkWearInfo.usedType"),
+          label: this.$t("ui.data.column.mdmWorkWearInfo.usedType"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.cx_machine_type_code, value);
           },
@@ -219,7 +219,7 @@ export default {
         },
         {
           prop: "remark",
-          label: this.$t("common.remark"),
+          label: this.$t("ui.common.column.remark"),
           width:120
         },
         {
@@ -263,30 +263,30 @@ export default {
       return [
         {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.mdmWorkWearInfo.factoryCode"),
           type: "select",
           dictData: this.dict.type.biz_factory_name,
         },
         {
           prop: "workWearType",
-          label: this.$t("ui.data.column.trialPlan.trialType"),
+          label: this.$t("ui.data.column.mdmWorkWearInfo.workWearType"),
           type: "select",
           dictData: this.dict.type.biz_work_type,
         },
         {
           prop: "workWearStatus",
-          label: this.$t("ui.data.column.WorkWearInfo.workWearStatus"),
+          label: this.$t("ui.data.column.mdmWorkWearInfo.workWearStatus"),
           type: "select",
           dictData: this.dict.type.biz_available_status,
         },
         {
           prop: "workWearName",
-          label: this.$t("common.name"),
+          label: this.$t("ui.data.column.mdmWorkWearInfo.workWearName"),
           maxlength: 64,
         },
         {
           prop: "specifications",
-          label: this.$t("ui.data.column.specColor.specDesc"),
+          label: this.$t("ui.data.column.mdmWorkWearInfo.specifications"),
           maxlength: 64,
         },
       ];
