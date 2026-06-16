@@ -169,4 +169,10 @@ public class LhMouldChangePlan extends BaseEntity implements Serializable {
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private Date scheduleDateEnd;
+
+    /**
+     * 是否导出模板
+     */
+    @TableField(exist = false)
+    private Boolean exportTemplate;
 }
