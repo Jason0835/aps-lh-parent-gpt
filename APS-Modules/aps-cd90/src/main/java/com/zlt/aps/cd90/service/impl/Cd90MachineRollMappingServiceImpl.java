@@ -85,6 +85,10 @@ public class Cd90MachineRollMappingServiceImpl extends AbstractDocService<Cd90Ma
         Set<String> tireFabricCodes = CollectionUtils.isEmpty(tireFabricCodeList)
                 ? new HashSet<>()
                 : new HashSet<>(tireFabricCodeList);
+        List<String> cordSpecList = mdmConstructionInfoService.listCordSpecs();
+        Set<String> cordSpecs = CollectionUtils.isEmpty(cordSpecList)
+                ? new HashSet<>()
+                : new HashSet<>(cordSpecList);
         String uniqueMsg = I18nUtil.getMessage("import.validated.unique");
 
         for (int i = 0; i < list.size(); i++) {
@@ -101,6 +105,10 @@ public class Cd90MachineRollMappingServiceImpl extends AbstractDocService<Cd90Ma
             if (!isTireFabricCodeExists(docEntity, tireFabricCodes)) {
                 ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(),
                         errorNum, I18nUtil.getMessage("ui.data.column.cd90MachineRollMapping.clothInvalid"), validated);
+            }
+            if (!isCordSpecExists(docEntity, cordSpecs)) {
+                ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(),
+                        errorNum, I18nUtil.getMessage("ui.data.column.cd90MachineRollMapping.cordSpecInvalid"), validated);
             }
             if (CollectionUtils.isNotEmpty(validated)) {
                 failureNum++;
@@ -167,6 +175,13 @@ public class Cd90MachineRollMappingServiceImpl extends AbstractDocService<Cd90Ma
             return true;
         }
         return tireFabricCodes.contains(entity.getCordFabricCode());
+    }
+
+    private boolean isCordSpecExists(Cd90MachineRollMapping entity, Set<String> cordSpecs) {
+        if (StringUtils.isBlank(entity.getBigRollCode())) {
+            return true;
+        }
+        return cordSpecs.contains(entity.getBigRollCode());
     }
 
     private void normalize(Cd90MachineRollMapping entity) {

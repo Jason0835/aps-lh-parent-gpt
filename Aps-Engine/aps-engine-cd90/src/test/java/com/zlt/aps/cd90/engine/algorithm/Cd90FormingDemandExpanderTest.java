@@ -61,6 +61,28 @@ public class Cd90FormingDemandExpanderTest {
     }
 
     /**
+     * 同一胎胚存在多个施工版本时，每个成型CLASS按自己的recipe号匹配施工版本。
+     */
+    @Test
+    public void shouldMatchConstructionVersionByClassRecipeNo() {
+        Cd90FormingScheduleSource schedule = scheduleWithRecipes("EM001",
+                new String[]{"10", "10", "10"},
+                new String[]{"V1", "V2", null});
+        List<Cd90ConstructionMaterial> materials = Arrays.asList(
+                material("EM001", "V1", "CF001", "500"),
+                material("EM001", "V2", "CF001", "900"));
+
+        List<Cd90DemandShift> result = expander.expand(
+                Collections.singletonList(schedule), materials);
+
+        assertEquals(2, result.size());
+        assertEquals("CLASS1", result.get(0).getClassField());
+        assertEquals(new BigDecimal("5"), result.get(0).getClothDemandQuantity());
+        assertEquals("CLASS2", result.get(1).getClassField());
+        assertEquals(new BigDecimal("9"), result.get(1).getClothDemandQuantity());
+    }
+
+    /**
      * 0计划量班次仍占用自然窗口位置，并标记为停产班次。
      */
     @Test
@@ -75,24 +97,45 @@ public class Cd90FormingDemandExpanderTest {
     }
 
     private Cd90FormingScheduleSource schedule(String embryoCode, String... quantities) {
+        String[] recipeNos = new String[8];
+        Arrays.fill(recipeNos, "V1");
+        return scheduleWithRecipes(embryoCode, quantities, recipeNos);
+    }
+
+    private Cd90FormingScheduleSource scheduleWithRecipes(String embryoCode,
+                                                          String[] quantities,
+                                                          String[] recipeNos) {
         BigDecimal[] values = new BigDecimal[8];
         Arrays.fill(values, BigDecimal.ZERO);
         for (int index = 0; index < quantities.length; index++) {
             values[index] = new BigDecimal(quantities[index]);
+        }
+        String[] recipes = new String[8];
+        if (recipeNos != null) {
+            System.arraycopy(recipeNos, 0, recipes, 0, Math.min(recipeNos.length, recipes.length));
         }
         return Cd90FormingScheduleSource.builder()
                 .cxBatchNo("CX001")
                 .scheduleDate(LocalDate.of(2026, 6, 13))
                 .embryoCode(embryoCode)
                 .classPlanQuantities(Arrays.asList(values))
+                .classRecipeNos(Arrays.asList(recipes))
                 .build();
     }
 
     private Cd90ConstructionMaterial material(String constructionCode,
                                                String clothCode,
                                                String unitConsumeMillimeter) {
+        return material(constructionCode, "V1", clothCode, unitConsumeMillimeter);
+    }
+
+    private Cd90ConstructionMaterial material(String constructionCode,
+                                               String constructionVersion,
+                                               String clothCode,
+                                               String unitConsumeMillimeter) {
         return Cd90ConstructionMaterial.builder()
                 .constructionCode(constructionCode)
+                .constructionVersion(constructionVersion)
                 .clothCode(clothCode)
                 .layerNo(1)
                 .unitConsumeMillimeter(new BigDecimal(unitConsumeMillimeter))

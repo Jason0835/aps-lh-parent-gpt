@@ -40,6 +40,15 @@ public class Cd90AutoScheduleSourceMapper {
                         zeroIfNull(source.getClass6PlanQty()),
                         zeroIfNull(source.getClass7PlanQty()),
                         zeroIfNull(source.getClass8PlanQty())))
+                .classRecipeNos(Arrays.asList(
+                        source.getClass1RecipeNo(),
+                        source.getClass2RecipeNo(),
+                        source.getClass3RecipeNo(),
+                        source.getClass4RecipeNo(),
+                        source.getClass5RecipeNo(),
+                        source.getClass6RecipeNo(),
+                        source.getClass7RecipeNo(),
+                        source.getClass8RecipeNo()))
                 .build();
     }
 

@@ -14,6 +14,8 @@ public class Cd90ConstructionMaterial {
 
     /** 胎胚施工代码。 */
     private String constructionCode;
+    /** 胎胚施工版本，对应成型排程CLASSn_RECIPE_NO。 */
+    private String constructionVersion;
     /** 帘布代码。 */
     private String clothCode;
     /** 大卷代码，对应施工CORD_SPEC。 */

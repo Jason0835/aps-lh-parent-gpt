@@ -33,4 +33,11 @@ public interface IMdmConstructionInfoService  extends IDocService<MdmConstructio
      */
     List<String> listTireFabricCodes();
 
+    /**
+     * 查询投产胎胚施工中的大卷代码（CORD_SPEC）下拉数据。
+     *
+     * @return 去重后的大卷代码列表
+     */
+    List<String> listCordSpecs();
+
 }

@@ -22,4 +22,6 @@ public class Cd90FormingScheduleSource {
     private String embryoCode;
     /** CLASS1至CLASS8成型计划量。 */
     private List<BigDecimal> classPlanQuantities;
+    /** CLASS1至CLASS8对应的施工版本号，来自成型排程CLASSn_RECIPE_NO。 */
+    private List<String> classRecipeNos;
 }

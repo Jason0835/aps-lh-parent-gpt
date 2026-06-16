@@ -26,7 +26,9 @@ class Cd90AutoScheduleSourceMapperTest {
         source.setScheduleDate(Date.valueOf(LocalDate.of(2026, 6, 13)));
         source.setEmbryoCode("EM001");
         source.setClass1PlanQty(new BigDecimal("1"));
+        source.setClass1RecipeNo("V1");
         source.setClass8PlanQty(new BigDecimal("8"));
+        source.setClass8RecipeNo("V8");
 
         Cd90FormingScheduleSource result = mapper.mapFormingSchedule(source);
 
@@ -35,6 +37,8 @@ class Cd90AutoScheduleSourceMapperTest {
         assertEquals(8, result.getClassPlanQuantities().size());
         assertEquals(new BigDecimal("1"), result.getClassPlanQuantities().get(0));
         assertEquals(new BigDecimal("8"), result.getClassPlanQuantities().get(7));
+        assertEquals("V1", result.getClassRecipeNos().get(0));
+        assertEquals("V8", result.getClassRecipeNos().get(7));
     }
 
     @Test

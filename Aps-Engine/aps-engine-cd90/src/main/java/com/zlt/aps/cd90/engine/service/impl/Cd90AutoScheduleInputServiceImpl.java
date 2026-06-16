@@ -81,8 +81,12 @@ public class Cd90AutoScheduleInputServiceImpl implements Cd90AutoScheduleInputSe
                 .map(CxScheduleResult::getEmbryoCode)
                 .filter(StringUtils::hasText)
                 .collect(Collectors.toSet());
+        Set<String> constructionVersions = formingSchedules.stream()
+                .flatMap(schedule -> safe(schedule.getClassRecipeNos()).stream())
+                .filter(StringUtils::hasText)
+                .collect(Collectors.toSet());
         List<Cd90ConstructionMaterial> constructionMaterials = loadConstructionMaterials(
-                factoryCode, embryoCodes);
+                factoryCode, embryoCodes, constructionVersions);
         List<Cd90DemandShift> demandShifts = formingDemandExpander.expand(
                 formingSchedules, constructionMaterials);
         List<Cd90EmbryoPlanSurplus> embryoPlanSurpluses = loadEmbryoPlanSurpluses(
@@ -153,13 +157,21 @@ public class Cd90AutoScheduleInputServiceImpl implements Cd90AutoScheduleInputSe
                         CxScheduleResult::getScheduleDate,
                         CxScheduleResult::getEmbryoCode,
                         CxScheduleResult::getClass1PlanQty,
+                        CxScheduleResult::getClass1RecipeNo,
                         CxScheduleResult::getClass2PlanQty,
+                        CxScheduleResult::getClass2RecipeNo,
                         CxScheduleResult::getClass3PlanQty,
+                        CxScheduleResult::getClass3RecipeNo,
                         CxScheduleResult::getClass4PlanQty,
+                        CxScheduleResult::getClass4RecipeNo,
                         CxScheduleResult::getClass5PlanQty,
+                        CxScheduleResult::getClass5RecipeNo,
                         CxScheduleResult::getClass6PlanQty,
+                        CxScheduleResult::getClass6RecipeNo,
                         CxScheduleResult::getClass7PlanQty,
-                        CxScheduleResult::getClass8PlanQty)
+                        CxScheduleResult::getClass7RecipeNo,
+                        CxScheduleResult::getClass8PlanQty,
+                        CxScheduleResult::getClass8RecipeNo)
                 .eq(CxScheduleResult::getFactoryCode, factoryCode)
                 .between(CxScheduleResult::getScheduleDate,
                         Date.valueOf(startDate), Date.valueOf(endDate))
@@ -168,17 +180,28 @@ public class Cd90AutoScheduleInputServiceImpl implements Cd90AutoScheduleInputSe
     }
 
     private List<Cd90ConstructionMaterial> loadConstructionMaterials(String factoryCode,
-                                                                      Set<String> embryoCodes) {
+                                                                      Set<String> embryoCodes,
+                                                                      Set<String> constructionVersions) {
         if (embryoCodes.isEmpty()) {
             log.warn("[直裁自动排程] 成型计划未找到胎胚代码, factoryCode={}", factoryCode);
+            return Collections.emptyList();
+        }
+        if (constructionVersions.isEmpty()) {
+            log.warn("[直裁自动排程] 成型计划未找到施工版本CLASSn_RECIPE_NO, factoryCode={}", factoryCode);
             return Collections.emptyList();
         }
         return constructionMapper.selectList(Wrappers.<MdmConstructionInfo>lambdaQuery()
                         .eq(MdmConstructionInfo::getFactoryCode, factoryCode)
                         .in(MdmConstructionInfo::getConstructionCode, embryoCodes)
-                        .orderByAsc(MdmConstructionInfo::getConstructionCode))
+                        .in(MdmConstructionInfo::getConstructionVersion, constructionVersions)
+                        .orderByAsc(MdmConstructionInfo::getConstructionCode)
+                        .orderByAsc(MdmConstructionInfo::getConstructionVersion))
                 .stream()
                 .flatMap(construction -> constructionMaterialMapper.map(construction).stream())
                 .collect(Collectors.toList());
+    }
+
+    private <T> List<T> safe(List<T> values) {
+        return values == null ? Collections.emptyList() : values;
     }
 }

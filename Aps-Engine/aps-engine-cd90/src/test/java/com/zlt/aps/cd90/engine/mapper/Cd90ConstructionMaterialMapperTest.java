@@ -61,6 +61,7 @@ public class Cd90ConstructionMaterialMapperTest {
     public void shouldMapBigRollAndCutDimensions() {
         MdmConstructionInfo construction = new MdmConstructionInfo();
         construction.setConstructionCode("EM001");
+        construction.setConstructionVersion("V1");
         construction.setCordSpec("BR001");
         construction.setCordWidth(new BigDecimal("1400"));
         construction.setTireFabricCode1("CF001");
@@ -70,6 +71,7 @@ public class Cd90ConstructionMaterialMapperTest {
         Cd90ConstructionMaterial result = mapper.map(construction).get(0);
 
         assertEquals("BR001", result.getBigRollCode());
+        assertEquals("V1", result.getConstructionVersion());
         assertEquals("CF001", result.getClothCode());
         assertEquals(new BigDecimal("1400"), result.getCordWidth());
         assertEquals(new BigDecimal("280.5"), result.getCraftWidth());

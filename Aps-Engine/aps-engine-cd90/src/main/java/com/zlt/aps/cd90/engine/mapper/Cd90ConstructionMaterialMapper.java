@@ -29,13 +29,16 @@ public class Cd90ConstructionMaterialMapper {
             return Collections.emptyList();
         }
         List<Cd90ConstructionMaterial> result = new ArrayList<>();
-        add(result, construction.getConstructionCode(), construction.getCordSpec(),
+        add(result, construction.getConstructionCode(), construction.getConstructionVersion(),
+                construction.getCordSpec(),
                 construction.getCordWidth(), 1, construction.getTireFabricCode1(),
                 construction.getTireFabricCraft1(), construction.getTireFabricLength1());
-        add(result, construction.getConstructionCode(), construction.getCordSpec(),
+        add(result, construction.getConstructionCode(), construction.getConstructionVersion(),
+                construction.getCordSpec(),
                 construction.getCordWidth(), 2, construction.getTireFabricCode2(),
                 construction.getTireFabricCraft2(), construction.getTireFabricLength2());
-        add(result, construction.getConstructionCode(), construction.getCordSpec(),
+        add(result, construction.getConstructionCode(), construction.getConstructionVersion(),
+                construction.getCordSpec(),
                 construction.getCordWidth(), 3, construction.getTireFabricCode3(),
                 construction.getTireFabricCraft3(), construction.getTireFabricLength3());
         return result;
@@ -43,6 +46,7 @@ public class Cd90ConstructionMaterialMapper {
 
     private void add(List<Cd90ConstructionMaterial> result,
                      String constructionCode,
+                     String constructionVersion,
                      String bigRollCode,
                      BigDecimal cordWidth,
                      int layerNo,
@@ -60,6 +64,7 @@ public class Cd90ConstructionMaterialMapper {
                 constructionCode, clothCode, bigRollCode, layerNo, craftWidthRaw);
         result.add(Cd90ConstructionMaterial.builder()
                 .constructionCode(constructionCode)
+                .constructionVersion(constructionVersion)
                 .clothCode(clothCode)
                 .bigRollCode(bigRollCode)
                 .cordSpec(clothCode)
