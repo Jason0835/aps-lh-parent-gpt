@@ -133,22 +133,22 @@ export default {
         { type: "selection", fixed: "left" },
         {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.mdmMaterialConsumeDetail.factoryCode"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
           },
         },
         {
           prop: "embryoCode",
-          label: this.$t("胎胚代码"),
+          label: this.$t("ui.data.column.mdmMaterialConsumeDetail.embryoCode"),
         },
         {
           prop: "embryoVersion",
-          label: this.$t("胎胚版本"),
+          label: this.$t("ui.data.column.mdmMaterialConsumeDetail.embryoVersion"),
         },
         {
           prop: "childMaterialCode",
-          label: this.$t("原材料物料编号"),
+          label: this.$t("ui.data.column.mdmMaterialConsumeDetail.childMaterialCode"),
         },
         // {
         //   prop: "childMaterialVersion",
@@ -156,16 +156,16 @@ export default {
         // },
         {
           prop: "childMaterialName",
-          label: this.$t("原材料物料描述"),
+          label: this.$t("ui.data.column.mdmMaterialConsumeDetail.childMaterialName"),
         },
 
         {
           prop: "unit",
-          label: this.$t("ui.data.column.boom.unit"),
+          label: this.$t("ui.data.column.mdmMaterialConsumeDetail.unit"),
         },
         {
           prop: "dosage",
-          label: this.$t("用量"),
+          label: this.$t("ui.data.column.mdmMaterialConsumeDetail.dosage"),
         },
 
       ];
@@ -176,21 +176,21 @@ export default {
       return [
         {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.mdmMaterialConsumeDetail.factoryCode"),
           type: "select",
           dictData: this.dict.type.biz_factory_name,
         },
         {
           prop: "embryoCode",
-          label: this.$t("胎胚代码"),
+          label: this.$t("ui.data.column.mdmMaterialConsumeDetail.embryoCode"),
         },
         {
           prop: "childMaterialCode",
-          label: this.$t("原材料物料编号"),
+          label: this.$t("ui.data.column.mdmMaterialConsumeDetail.childMaterialCode"),
         },
         {
           prop: "childMaterialName",
-          label: this.$t("原材料物料描述"),
+          label: this.$t("ui.data.column.mdmMaterialConsumeDetail.childMaterialName"),
         },
       ];
     },
