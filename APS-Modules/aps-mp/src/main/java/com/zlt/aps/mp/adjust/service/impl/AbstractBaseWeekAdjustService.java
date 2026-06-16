@@ -2624,7 +2624,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         }*/
         // 通过结构过滤月计划列表
         String structureName = contextDTO.getStructureName();
-
+        List<MpAdjustResult> updateAdjustResultValidFlagList = new ArrayList<>();
         // 获取待调整量
         Map<String, MpSkuAdjustInfoVo> skuAdjustInfoMap = getPendingQtyInfo(contextDTO);
 /*        factoryMonthPlanProdFinalList = factoryMonthPlanProdFinalList.stream()
@@ -2658,6 +2658,8 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                 //若待调整量 == 0 且 调整的需求计划版本与定稿的需求计划版本不一致，将”超欠产有效标识“ = 否；
                 if (!contextDTO.getAdjustMonthPlanVersion().equals(oriMonthPlanVersion)){
                     monthPlan.setLastMonthValidFlag(YesOrNoEnum.NO.getCode());
+                    adjustResult.setLastMonthValidFlag(YesOrNoEnum.NO.getCode());
+                    updateAdjustResultValidFlagList.add(adjustResult);
                 }
             }
             // 设置最新需求计划版本
@@ -2701,6 +2703,10 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             setWeekAdjustQty(monthPlan, week);
             // 将日期字段中值为0的字段设为null
             handleZeroToNull(monthPlan);
+        }
+
+        if (PubUtil.isNotEmpty(updateAdjustResultValidFlagList)){
+            mpAdjustResultEntityMapper.updateValidFlagBatchById(updateAdjustResultValidFlagList);
         }
     }
 

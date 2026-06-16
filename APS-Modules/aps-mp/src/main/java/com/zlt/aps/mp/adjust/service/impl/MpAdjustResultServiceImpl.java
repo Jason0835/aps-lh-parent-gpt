@@ -160,9 +160,11 @@ public class MpAdjustResultServiceImpl extends AbstractDocService<MpAdjustResult
         entity.setBeginDay(realBeginDay==FactoryConstant.MONTH_MAX_DAY+1 ? 0:realBeginDay);
         entity.setEndDay(realEndDay);
          //实际调整量 = 累计排产量 - 原实际排产量
-        int oriTotalQty = entity.getTotalQty()== null ? 0:entity.getTotalQty();
-        entity.setAdjustFlag(oriTotalQty != accTotalQty ? YesOrNoEnum.YES.getCode() : YesOrNoEnum.NO.getCode());
-        if (YesOrNoEnum.YES.getCode().equals(entity.getAdjustFlag())){
+        if (!YesOrNoEnum.YES.getCode().equals(entity.getAdjustFlag())){
+            int oriTotalQty = entity.getTotalQty()== null ? 0:entity.getTotalQty();
+            entity.setAdjustFlag(oriTotalQty != accTotalQty ? YesOrNoEnum.YES.getCode() : YesOrNoEnum.NO.getCode());
+        }
+       if (YesOrNoEnum.YES.getCode().equals(entity.getAdjustFlag())){
             //若有调整过标志，将上月有效标志置为否
             entity.setLastMonthValidFlag(YesOrNoEnum.NO.getCode());
         }
@@ -200,6 +202,11 @@ public class MpAdjustResultServiceImpl extends AbstractDocService<MpAdjustResult
     @Override
     public void deleteAdjustResultByVersion(String factoryCode, String year, String month, String version,String structureName) {
         mpAdjustResultEntityMapper.deleteAdjustResultByVersion(factoryCode,year,month,version,structureName);
+    }
+
+    @Override
+    public void updateValidFlagBatchById(List<MpAdjustResult> list) {
+        mpAdjustResultEntityMapper.updateValidFlagBatchById(list);
     }
 
     /**
