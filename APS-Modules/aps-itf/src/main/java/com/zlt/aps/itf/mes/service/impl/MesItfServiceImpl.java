@@ -3672,7 +3672,6 @@ public class MesItfServiceImpl implements MesItfService {
                 for (DevPlanCloseVo item : saveList) {
                     MdmDevicePlanShut entity = new MdmDevicePlanShut();
                     entity.setFactoryCode(item.getFactoryCode());
-                    entity.setCompanyCode(item.getCompanyCode());
                     entity.setMachineCode(item.getMachineCode());
                     entity.setMachineType(item.getMachineType());
                     entity.setMachineStopType(item.getMachineStopType());
