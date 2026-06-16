@@ -125,6 +125,11 @@ public enum MesInterfaceCodeEnum {
      * 模具交替计划完成回报
      */
     MOLD_ALTER_PLAN_FINISH("MOLD_ALTER_PLAN_FINISH", "mesItfService", "syncMoldAlterPlanFinish", "模具交替计划完成回报"),
+
+    /**
+     * 设备计划停机同步
+     */
+    DEV_PLAN_CLOSE("DEV_PLAN_CLOSE", "mesItfService", "syncDevPlanClose", "设备计划停机同步"),
     ;
 
     private final String code;

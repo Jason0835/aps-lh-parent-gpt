@@ -733,4 +733,33 @@
         <if test="factoryCode != null and factoryCode != ''">AND FACTORY_CODE = #{factoryCode}</if>
         ORDER BY DATA_VERSION ASC
     </select>
+
+    <!-- 查询设备计划停机同步数据（按版本号） -->
+    <select id="selectDevPlanCloseList" resultType="com.zlt.aps.itf.vo.DevPlanCloseVo">
+        SELECT
+        ID,
+        MACHINE_CODE,
+        MACHINE_TYPE,
+        MACHINE_STOP_TYPE,
+        BEGIN_DATE,
+        END_DATE,
+        REMARK,
+        DEL_FLAG,
+        DATA_VERSION,
+        COMPANY_CODE,
+        FACTORY_CODE
+        FROM DEV_PLAN_CLOSE
+        WHERE 1 = 1
+        <if test="factoryCode != null and factoryCode != ''">AND FACTORY_CODE = #{factoryCode}</if>
+        <if test="companyCode != null and companyCode != ''">AND COMPANY_CODE = #{companyCode}</if>
+        <if test="dataVersion != null and dataVersion != ''">AND DATA_VERSION = #{dataVersion}</if>
+    </select>
+
+    <!-- 查询设备计划停机中间表的最大版本号 -->
+    <select id="selectMaxDataVersionFromDevPlanClose" resultType="java.lang.String">
+        SELECT MAX(DATA_VERSION)
+        FROM DEV_PLAN_CLOSE
+        WHERE DATA_VERSION IS NOT NULL
+        <if test="factoryCode != null and factoryCode != ''">AND FACTORY_CODE = #{factoryCode}</if>
+    </select>
 </mapper>

@@ -382,4 +382,14 @@ public interface MesItfService {
     AjaxResult syncAllVersionsMouldCleanWarnAndGenPlan(AuxReqSyncDataLogs syncDataLogs);
 
     AjaxResult syncDayFinishQtyToChipStock();
+
+    /**
+     * 同步设备计划停机（MES→APS）
+     * 支持全量/增量同步，含删除标识处理
+     * 停机类型=06（临时性故障）时，MES会分步写入开始时间和结束时间，需按ID更新而非插入
+     *
+     * @param syncDataLogs 同步参数
+     * @return 结果
+     */
+    AjaxResult syncDevPlanClose(AuxReqSyncDataLogs syncDataLogs);
 }
