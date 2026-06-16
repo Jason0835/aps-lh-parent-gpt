@@ -1340,6 +1340,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                 }
             }
         }
+        int maxDays = com.zlt.aps.mp.engine.utils.DateUtils.getDaysByYearMonth(contextDTO.getMpYear(), contextDTO.getMpMonth());
         contextDTO.setOneStructureAllocationList(oneStructureAllocationList);
         // 设置总的硫化机台数
         contextDTO.setTotalLhMachines(mpAdjustStructureInService.getLhMachineCount(contextDTO));
@@ -1384,7 +1385,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             // 初始结构开始日\收尾日
             initStructureStartAndEndDay(contextDTO);
             // 检查排产日是否超出结构起产日-收尾日
-            checkStruct2MaterialDate(contextDTO, targetMonthPlanList);
+            checkStruct2MaterialDate(contextDTO, targetMonthPlanList,maxDays);
 
             // 初始化日产信息
             Map<Integer, MpDailyCapacityLimitVo> dailyCapacityLimitVoMap = adjustDailyCapacityLimitObj.getDailyCapacityLimitMap(contextDTO);
@@ -1485,7 +1486,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
      * @param contextDTO
      * @param monthPlanList
      */
-    private void checkStruct2MaterialDate(MpRollAdjustContextDTO contextDTO, List<FactoryMonthPlanFinalAdjustVo> monthPlanList) {
+    private void checkStruct2MaterialDate(MpRollAdjustContextDTO contextDTO, List<FactoryMonthPlanFinalAdjustVo> monthPlanList, int maxDays) {
         if (PubUtil.isEmpty(monthPlanList)) {
             return;
         }
@@ -1497,6 +1498,10 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             }
             if (finalAdjustVo.getBeginDay() == 0 || finalAdjustVo.getEndDay() == 0) {
                 continue;
+            }
+            if (finalAdjustVo.getEndDay() > maxDays){
+                beginDaySb.append(String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.confirm.checkMaterialMaxDay"),
+                        finalAdjustVo.getMaterialCode(), maxDays)).append(BusiConstant.WeekRollAdjust.SPLIT_FRONT_NEW_LINE);
             }
             if (finalAdjustVo.getBeginDay() < contextDTO.getStructureStartDay() || finalAdjustVo.getEndDay() > contextDTO.getStructureDeadLine()) {
                 beginDaySb.append(String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.confirm.checkStructMaterialDay"),
