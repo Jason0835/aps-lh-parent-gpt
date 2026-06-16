@@ -93,6 +93,11 @@ public enum ItfSyncKeyEnum {
      * 硫化精度计划实际执行日期回填
      */
     LH_PRECISION_PLAN_ACTUAL("LH_PRECISION_PLAN_ACTUAL", "MES", "APS", "硫化精度计划实际执行日期回填"),
+
+    /**
+     * 设备计划停机同步
+     */
+    DEV_PLAN_CLOSE("DEV_PLAN_CLOSE", "MES", "APS", "设备计划停机同步"),
     ;
 	/**
 	 * 接口码

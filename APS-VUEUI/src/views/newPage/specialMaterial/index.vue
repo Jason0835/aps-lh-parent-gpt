@@ -139,49 +139,49 @@ export default {
         { type: "selection", fixed: "left" },
         {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.rawSpecialMaterialRecord.factoryCode"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
           },
         },
         {
           prop: "materialType",
-          label: this.$t("ui.data.column.masterdata.materialType"),
+          label: this.$t("ui.data.column.rawSpecialMaterialRecord.materialType"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_rawMaterial_type, value);
           },
         },
         {
           prop: "materialCode",
-          label: this.$t("ui.data.specialMaterial.materialCode"),
+          label: this.$t("ui.data.column.rawSpecialMaterialRecord.materialCode"),
         },
         {
           prop: "materialDesc",
-          label: this.$t("物料名称"),
+          label: this.$t("ui.data.column.rawSpecialMaterialRecord.materialDesc"),
           align: "left",
           minWidth: 350
         },
         {
           prop: "rubberSpec",
-          label: this.$t("ui.data.specialMaterial.rubberSpec"),
+          label: this.$t("ui.data.column.rawSpecialMaterialRecord.rubberSpec"),
           width:160
         },
         {
           prop: "quota",
-          label: this.$t("ui.data.column.quota.quota"),
+          label: this.$t("ui.data.column.rawSpecialMaterialRecord.quota"),
         },
         {
           prop: "unit",
-          label: this.$t("common.unit"),
+          label: this.$t("ui.data.column.rawSpecialMaterialRecord.unit"),
         },
         {
           prop: "partName",
-          label: this.$t("部件名称"),
+          label: this.$t("ui.data.column.rawSpecialMaterialRecord.partName"),
         },
 
         {
           prop: "remark",
-          label: this.$t("common.remark"),
+          label: this.$t("ui.data.column.rawSpecialMaterialRecord.remark"),
         },
         {
           prop: "updateTime",
@@ -222,25 +222,25 @@ export default {
     searchColumns() {
       return [
         {
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.rawSpecialMaterialRecord.factoryCode"),
           prop: "factoryCode",
           type: "select",
           dictData: this.dict.type.biz_factory_name,
         },
 
         {
-          label: this.$t("ui.data.column.masterdata.materialType"),
+          label: this.$t("ui.data.column.rawSpecialMaterialRecord.materialType"),
           prop: "materialType",
           type: "select",
           dictData: this.dict.type.biz_rawMaterial_type,
         },
         {
           prop: "materialCode",
-          label: this.$t("ui.data.specialMaterial.materialCode"),
+          label: this.$t("ui.data.column.rawSpecialMaterialRecord.materialCode"),
         },
         {
           prop: "materialDesc",
-          label: this.$t("物料名称"),
+          label: this.$t("ui.data.column.rawSpecialMaterialRecord.materialDesc"),
           minWidth: 350,
           align: "left",
         }
