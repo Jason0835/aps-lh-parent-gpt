@@ -58,6 +58,7 @@ import { mapState } from "vuex";
 import { downloadLink } from "@/utils/request";
 //interface
 import { listCurlRoll, removeCurlRoll } from "@/api/dj/curlRoll";
+import { getConfigKey } from "@/api/system/config";
 //components
 import tltUpload from "@/components/tltUpload/tltUpload.vue";
 
@@ -69,7 +70,7 @@ export default {
     tltUpload,
     infoDialog,
   },
-  dicts: [],
+  dicts: ["biz_factory_name"],
   provide() {
     return {
       parentDict: this.dict,
@@ -87,9 +88,11 @@ export default {
       },
       sort: {},
       search: {
+        factoryCode: '',
         mainPlanMonth: "",
       },
       query: {
+        factoryCode: '',
         mainPlanMonth: "",
       },
       importDefaultValue: {},
@@ -159,6 +162,13 @@ export default {
     },
     searchColumns() {
       return [
+        {
+          label: this.$t("ui.data.column.factoryCode"),
+          prop: "factoryCode",
+          type: "select",
+          dictData: this.dict.type.biz_factory_name,
+          filterable: true,
+        },
         {
           label: this.$t("ui.dj.curlRoll.column.paddingCode"),
           prop: "paddingCode",
@@ -263,7 +273,13 @@ export default {
     },
   },
   created() {
-    this.getList();
+    getConfigKey("sys.factory.code").then(response => {
+      this.search.factoryCode = response.msg;
+      this.query.factoryCode = response.msg;
+      this.getList();
+    }).catch(() => {
+      this.getList();
+    });
   },
 };
 </script>

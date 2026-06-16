@@ -261,6 +261,7 @@ import {
   getSummaryVo,
   getWorkClass,
 } from "@/api/dj/djScheduleResult";
+import { getConfigKey } from "@/api/system/config";
 //components
 import TltUploadForm from "@/views/components/tltUploadForm.vue";
 
@@ -288,7 +289,7 @@ export default {
     TltUploadForm,
     mergeDialog,
   },
-  dicts: ["IS_RELEASE"],
+  dicts: ["IS_RELEASE", "biz_factory_name"],
   provide() {
     return {
       parentDict: this.dict,
@@ -307,8 +308,12 @@ export default {
       // },
       page: undefined,
       sort: {},
-      search: {},
-      query: {},
+      search: {
+        factoryCode: '',
+      },
+      query: {
+        factoryCode: '',
+      },
       importDefaultValue: {
         scheduleDate: moment().add(1, "days").format("YYYY-MM-DD"),
       },
@@ -391,7 +396,7 @@ export default {
           ],
         },
         {
-          label: this.classHeaders[0] || this.$t("ui.data.column.dj.scheduleResult.class1PlanQty"),
+          label: this.classHeaders[0],
           children: [
             {
               prop: "class1Sequence",
@@ -432,7 +437,7 @@ export default {
           ],
         },
         {
-          label: this.classHeaders[1] || this.$t("ui.data.column.dj.scheduleResult.class2PlanQty"),
+          label: this.classHeaders[1],
           children: [
             {
               prop: "class2Sequence",
@@ -473,7 +478,7 @@ export default {
           ],
         },
         {
-          label: this.classHeaders[2] || this.$t("ui.data.column.dj.scheduleResult.class3PlanQty"),
+          label: this.classHeaders[2],
           children: [
             {
               prop: "class3Sequence",
@@ -514,7 +519,7 @@ export default {
           ],
         },
         {
-          label: this.classHeaders[3] || this.$t("ui.data.column.dj.scheduleResult.class4PlanQty"),
+          label: this.classHeaders[3],
           children: [
             {
               prop: "class4Sequence",
@@ -555,7 +560,7 @@ export default {
           ],
         },
         {
-          label: this.classHeaders[4] || this.$t("ui.data.column.dj.scheduleResult.class5PlanQty"),
+          label: this.classHeaders[4],
           children: [
             {
               prop: "class5Sequence",
@@ -596,7 +601,7 @@ export default {
           ],
         },
         {
-          label: this.classHeaders[5] || this.$t("ui.data.column.dj.scheduleResult.class6PlanQty"),
+          label: this.classHeaders[5],
           children: [
             {
               prop: "class6Sequence",
@@ -642,6 +647,13 @@ export default {
     },
     searchColumns() {
       return [
+        {
+          label: this.$t("ui.data.column.factoryCode"),
+          prop: "factoryCode",
+          type: "select",
+          dictData: this.dict.type.biz_factory_name,
+          filterable: true,
+        },
         {
           label: this.$t("ui.data.column.scheduleResult.scheduleDate"),
           prop: "scheduleDate",
@@ -889,7 +901,13 @@ export default {
     this.query.scheduleDate = date;
     this.search.scheduleDate = date;
 
-    this.$store.dispatch("dj/getMachineList");
+    getConfigKey("sys.factory.code").then(response => {
+      this.search.factoryCode = response.msg;
+      this.query.factoryCode = response.msg;
+      this.$store.dispatch("dj/getMachineList");
+    }).catch(() => {
+      this.$store.dispatch("dj/getMachineList");
+    });
 
     //获取班次表头
     getWorkClass({ scheduleDate: this.query.scheduleDate }).then((res) => {

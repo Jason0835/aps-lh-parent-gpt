@@ -72,6 +72,7 @@
 import { downloadLink } from "@/utils/request";
 //interface
 import { listStock, removeStock, releaseStock } from "@/api/dj/stock";
+import { getConfigKey } from "@/api/system/config";
 //components
 import tltUpload from "@/components/tltUpload/tltUpload.vue";
 
@@ -83,7 +84,7 @@ export default {
     tltUpload,
     infoDialog,
   },
-  dicts: [],
+  dicts: ["biz_factory_name"],
   provide() {
     return {
       parentDict: this.dict,
@@ -91,19 +92,6 @@ export default {
   },
   data() {
     return {
-      searchColumns: [
-        {
-          label: this.$t("ui.data.column.stock.stockDate"),
-          prop: "stockDate",
-          type: "date",
-          dateType: "daterange",
-          valueFormat: "yyyy-MM-dd",
-        },
-        {
-          label: this.$t("ui.data.column.quota.paddingCode"),
-          prop: "materialCode",
-        },
-      ],
       loading: false,
       data: [],
       selection: [],
@@ -113,8 +101,12 @@ export default {
         total: 0,
       },
       sort: {},
-      search: {},
-      query: {},
+      search: {
+        factoryCode: '',
+      },
+      query: {
+        factoryCode: '',
+      },
     };
   },
   computed: {
@@ -199,6 +191,28 @@ export default {
       ];
 
       return columns;
+    },
+    searchColumns() {
+      return [
+        {
+          label: this.$t("ui.data.column.factoryCode"),
+          prop: "factoryCode",
+          type: "select",
+          dictData: this.dict.type.biz_factory_name,
+          filterable: true,
+        },
+        {
+          label: this.$t("ui.data.column.stock.stockDate"),
+          prop: "stockDate",
+          type: "date",
+          dateType: "daterange",
+          valueFormat: "yyyy-MM-dd",
+        },
+        {
+          label: this.$t("ui.data.column.quota.paddingCode"),
+          prop: "materialCode",
+        },
+      ];
     },
   },
   methods: {
@@ -342,16 +356,13 @@ export default {
     },
   },
   created() {
-    let defaultParams = {
-      factoryCode: "116",
-    };
-    this.search = {
-      ...defaultParams,
-    };
-    this.query = {
-      ...defaultParams,
-    };
-    this.getList();},
+    getConfigKey("sys.factory.code").then(response => {
+      this.search.factoryCode = response.msg;
+      this.query.factoryCode = response.msg;
+      this.getList();
+    }).catch(() => {
+      this.getList();
+    });},
 };
 </script>
 <style lang="scss" scoped>
