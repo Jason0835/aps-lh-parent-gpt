@@ -5,10 +5,10 @@ import java.util.List;
 
 import org.springframework.transaction.annotation.Transactional;
 
-import com.baomidou.mybatisplus.extension.service.IService;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.dj.api.domain.entity.DjDayFinishQty;
 import com.zlt.aps.dj.api.domain.entity.DjScheduleResult;
+import com.zlt.bill.common.service.IBillService;
 
 /**
  * 垫胶胶排程结果Service接口
@@ -16,7 +16,7 @@ import com.zlt.aps.dj.api.domain.entity.DjScheduleResult;
  * @author zlt
  * @date 2026-06-13
  */
-public interface DjScheduleResultService extends IService<DjScheduleResult> {
+public interface DjScheduleResultService extends IBillService<DjScheduleResult> {
     /**
      * 查询垫胶排程结果
      *

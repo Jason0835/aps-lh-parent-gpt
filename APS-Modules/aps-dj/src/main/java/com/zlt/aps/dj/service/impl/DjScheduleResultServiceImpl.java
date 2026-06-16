@@ -24,6 +24,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
 import com.ruoyi.common.core.utils.DateUtils;
@@ -54,6 +55,8 @@ import com.zlt.aps.dj.mapper.DjScheduleResultMapper;
 import com.zlt.aps.dj.service.DjDispatcherLogService;
 import com.zlt.aps.dj.service.DjMachineInfoService;
 import com.zlt.aps.dj.service.DjScheduleResultService;
+import com.zlt.aps.utils.BillUtils;
+import com.zlt.bill.common.service.AbstractBillService;
 
 /**
  * 垫胶胶排程结果Service业务层处理
@@ -62,7 +65,7 @@ import com.zlt.aps.dj.service.DjScheduleResultService;
  * @date 2026-06-24
  */
 @Service
-public class DjScheduleResultServiceImpl extends ServiceImpl<DjScheduleResultMapper, DjScheduleResult>
+public class DjScheduleResultServiceImpl extends AbstractBillService<DjScheduleResult>
         implements DjScheduleResultService {
     @Resource
     private DjScheduleResultMapper djScheduleResultMapper;
@@ -107,7 +110,8 @@ public class DjScheduleResultServiceImpl extends ServiceImpl<DjScheduleResultMap
      */
     @Override
     public List<DjScheduleResult> selectDjScheduleResultList(DjScheduleResult djScheduleResult) {
-        List<DjScheduleResult> list = djScheduleResultMapper.selectDjScheduleResultList(djScheduleResult);
+        QueryWrapper<DjScheduleResult> queryWrapper = BillUtils.builderCondition(djScheduleResult);
+        List<DjScheduleResult> list = djScheduleResultMapper.selectList(queryWrapper);
         if (CollectionUtils.isEmpty(list)) {
             return new ArrayList<>();
         }
@@ -577,6 +581,7 @@ public class DjScheduleResultServiceImpl extends ServiceImpl<DjScheduleResultMap
      */
     @Override
     public AjaxResult getSummaryVo(DjScheduleResult scheduleResult) {
+        
         List<DjScheduleResult> djScheduleResultList = selectDjScheduleResultList(scheduleResult);
         List<DjScheduleResult> lastDayPlanQty4List = djScheduleResultMapper.getLastDayPlanQty4List(scheduleResult);
         // 添加昨日排程有，今日排程没有的物料对象，用于后续计算理论交接班库存合计
@@ -660,5 +665,15 @@ public class DjScheduleResultServiceImpl extends ServiceImpl<DjScheduleResultMap
         scheduleSummaryVo.setLastDayPlanQty(totalLastDayPlanQty.doubleValue());
         scheduleSummaryVo.setTheoreticClassStockQty(totalTheoreticClassStockQty.doubleValue());
         return AjaxResult.success(scheduleSummaryVo);
+    }
+
+    @Override
+    public int importData(List<DjScheduleResult> list, boolean updateSupport, long importLogId) {
+        return 0;
+    }
+
+    @Override
+    protected String getBillTypeCode() {
+        return "";
     }
 }

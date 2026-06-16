@@ -48,6 +48,9 @@ public class TqStopCoordinationHandler extends AbsTqScheduleStepHandler {
     @Resource
     private AutoScheduleLogService autoScheduleLogService;
 
+    @Resource
+    private TqMachineAssignHandler machineAssignHandler;
+
     @Override
     protected String getStepName() {
         return "S4-成型/胎圈停产协调";
@@ -67,6 +70,9 @@ public class TqStopCoordinationHandler extends AbsTqScheduleStepHandler {
 
         // 3. 处理停产交集日开产逻辑
         handleStopIntersection(context, cxStopShiftMap, tqStopShiftMap);
+
+        // 4. 刷新任务链（S4调整了计划量，需同步更新链条节点的库存和保证班数）
+        machineAssignHandler.refreshTaskChain(context, null, 1);
 
         log.info("[S4] 成型/胎圈停产协调完成");
     }
