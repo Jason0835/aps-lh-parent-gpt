@@ -124,7 +124,7 @@ export default {
         {
           prop: "factoryCode",
           width: 180,
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.mdmMonCycleSchStruConf.factoryCode"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
           },
@@ -132,26 +132,26 @@ export default {
         {
           prop: "year",
           width: 180,
-          label: this.$t("ui.data.colume.year"),
+          label: this.$t("ui.data.column.mdmMonCycleSchStruConf.year"),
         },
         {
           prop: "month",
           width: 180,
-          label: this.$t("ui.data.colume.month"),
+          label: this.$t("ui.data.column.mdmMonCycleSchStruConf.month"),
         },
         {
           prop: "structureName",
-          label: this.$t("ui.data.column.finishStock.structureName"),
+          label: this.$t("ui.data.column.mdmMonCycleSchStruConf.structureName"),
         },
         {
           prop: "turnoverMonth",
           width: 180,
-          label: this.$t("ui.data.column.curingPlan.turnoverMonth"),
+          label: this.$t("ui.data.column.mdmMonCycleSchStruConf.turnoverMonth"),
         },
         {
           prop: "minVulcanizingMachine",
           width: 180,
-          label: this.$t("ui.data.column.curingPlan.minVulcanizingMachine"),
+          label: this.$t("ui.data.column.mdmMonCycleSchStruConf.minVulcanizingMachine"),
         },
 
         // {
@@ -161,7 +161,7 @@ export default {
         {
           prop: "updateTime",
           width: 180,
-          label: this.$t("ui.data.column.scheduleAdjust.updata"),
+          label: this.$t("ui.data.column.mdmMonCycleSchStruConf.updateDate"),
         },
         {
           align: "center",
@@ -221,7 +221,7 @@ export default {
       return [
         {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.mdmMonCycleSchStruConf.factoryCode"),
           type: "select",
           dictData: this.dict.type.biz_factory_name,
         },
@@ -234,7 +234,7 @@ export default {
         },
         {
           prop: "structureName",
-          label: this.$t("ui.data.column.finishStock.structureName"),
+          label: this.$t("ui.data.column.mdmMonCycleSchStruConf.structureName"),
           type: "select",
           dictData: this.structureList,
           filterable: true,
