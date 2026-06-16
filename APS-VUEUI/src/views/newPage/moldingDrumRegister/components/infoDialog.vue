@@ -192,74 +192,74 @@ export default {
       return [
            {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.mdmWorkWearInfo.factoryCode"),
           type:'select',
           dictData: this.parentDict.type.biz_factory_name,
         },
         {
           prop: "workWearType",
-          label: this.$t("ui.data.column.trialPlan.trialType"),
+          label: this.$t("ui.data.column.mdmWorkWearInfo.workWearType"),
           type:'select',
           dictData: this.parentDict.type.biz_work_type,
         },
         {
           prop: "workWearStatus",
-          label: this.$t("ui.data.column.WorkWearInfo.workWearStatus"),
+          label: this.$t("ui.data.column.mdmWorkWearInfo.workWearStatus"),
           type:'select',
           dictData: this.parentDict.type.biz_available_status,
         },
         {
           prop: "workWearName",
-          label: this.$t("common.name"),
+          label: this.$t("ui.data.column.mdmWorkWearInfo.workWearName"),
           maxlength:64
         },
         {
           prop: "cxMachineBrandCode",
-          label: this.$t("成型鼓厂家"),
+          label: this.$t("ui.data.column.mdmWorkWearInfo.cxMachineBrandCode"),
           type:'select',
           dictData: this.parentDict.type.biz_machine_brand,
         },
         {
           prop: "cxMachineTypeCode",
-          label: this.$t("ui.data.colume.collect.type"),
+          label: this.$t("ui.data.column.mdmWorkWearInfo.cxMachineTypeCode"),
           type:'select',
           dictData: this.parentDict.type.biz_class_type,
         },
         {
           prop: "perimeterMin",
-          label: this.$t("ui.data.column.capsuleChuck.perimeterMin"),
+          label: this.$t("ui.data.column.mdmWorkWearInfo.perimeterMin"),
           type:'number',
           max:999999,
 
         },
         {
           prop: "perimeterMax",
-          label: this.$t("ui.data.column.capsuleChuck.perimeterMax"),
+          label: this.$t("ui.data.column.mdmWorkWearInfo.perimeterMax"),
           type:'number',
           max:999999,
         },
 
         {
           prop: "specifications",
-          label: this.$t("ui.data.column.specColor.specDesc"),
+          label: this.$t("ui.data.column.mdmWorkWearInfo.specifications"),
           maxlength:64
         },
         {
           prop: "qty",
-          label: this.$t("common.num"),
+          label: this.$t("ui.data.column.mdmWorkWearInfo.qty"),
           type:'number',
           min:0,
           max:9999
         },
         {
           prop: "unit",
-          label: this.$t("common.unit"),
+          label: this.$t("ui.data.column.mdmWorkWearInfo.unit"),
           type:'select',
           dictData: this.parentDict.type.biz_work_unit,
         },
         {
           prop: "usedType",
-          label: this.$t("ui.data.column.WorkWearInfo.usedType"),
+          label: this.$t("ui.data.column.mdmWorkWearInfo.usedType"),
           // render: (form) => {
           //   return (
           //     <formingCapacitySelect
@@ -274,7 +274,7 @@ export default {
         },
         {
           prop: "remark",
-          label: this.$t("common.remark"),
+          label: this.$t("ui.common.column.remark"),
           maxlength:100
         },
       ];

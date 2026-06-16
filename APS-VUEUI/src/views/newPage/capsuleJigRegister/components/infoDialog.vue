@@ -147,23 +147,23 @@ export default {
       return [
         {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.mdmCapsuleChuck.factoryCode"),
           type: "select",
           dictData: this.parentDict.type.biz_factory_name,
         },
         {
           prop: "specifications",
-          label: this.$t("ui.data.column.capsuleChuck.specifications"),
+          label: this.$t("ui.data.column.mdmCapsuleChuck.specifications"),
           maxlength: 64,
         },
         {
           prop: "proSize",
-          label: this.$t("ui.data.column.capsuleChuck.proSize"),
+          label: this.$t("ui.data.column.mdmCapsuleChuck.proSize"),
           maxlength: 64,
         },
         {
           prop: "internalQty",
-          label: this.$t("ui.data.column.capsuleChuck.internalQty"),
+          label: this.$t("ui.data.column.mdmCapsuleChuck.internalQty"),
           type: "number",
           listeners: {
             change: this.handleChangeGetMachines,
@@ -172,7 +172,7 @@ export default {
 
         {
           prop: "newChuckQty",
-          label: this.$t("新卡盘"),
+          label: this.$t("ui.data.column.mdmCapsuleChuck.newChuckQty"),
           type: "number",
           listeners: {
             change: this.handleChangeGetMachines,
@@ -186,7 +186,7 @@ export default {
         },
         {
           prop: "remark",
-          label: this.$t("common.remark"),
+          label: this.$t("ui.common.column.remark"),
           maxlength: 256,
         },
       ];

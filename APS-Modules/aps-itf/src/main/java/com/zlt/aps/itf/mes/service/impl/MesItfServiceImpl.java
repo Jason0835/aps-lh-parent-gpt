@@ -75,6 +75,11 @@ import java.util.stream.Collectors;
 @Service("mesItfService")
 public class MesItfServiceImpl implements MesItfService {
 
+    /**
+     * SQL Server单次请求参数上限2100，安全批次大小为50
+     */
+    private static final int BATCH_SIZE = 50;
+
     @Autowired
     private MesItfMapper mesItfMapper;
     @Autowired
@@ -2141,6 +2146,7 @@ public class MesItfServiceImpl implements MesItfService {
      * 1. 清理中间表中同工单号的旧数据，避免脏数据残留
      * 2. 写入MES中间表MOLD_ALTER_PLAN（建在MES分库）
      * 3. 发送MQ通知MES来获取数据
+     * 分批处理避免SQL Server参数上限2100的问题
      * @param moldAlterPlanList 模具交替计划列表
      * @return 结果
      */
@@ -2175,14 +2181,21 @@ public class MesItfServiceImpl implements MesItfService {
 
         try {
             // 先清理中间表中同工单号的旧数据，避免脏数据残留导致MES消费异常
+            // 分批删除，避免SQL Server IN子句参数上限2100的问题
             if (CollectionUtils.isNotEmpty(orderNos) && StringUtils.isNotBlank(factoryCode)) {
-                int deleted = moldAlterPlanIssueMapper.deleteByOrderNosAndFactoryCode(orderNos, factoryCode);
-                if (deleted > 0) {
-                    log.info("清理模具交替计划中间表旧数据, 分厂: {}, 工单号: {}, 删除数量: {}", factoryCode, orderNos, deleted);
+                for (int i = 0; i < orderNos.size(); i += BATCH_SIZE) {
+                    List<String> batchOrderNos = orderNos.subList(i, Math.min(i + BATCH_SIZE, orderNos.size()));
+                    int deleted = moldAlterPlanIssueMapper.deleteByOrderNosAndFactoryCode(batchOrderNos, factoryCode);
+                    if (deleted > 0) {
+                        log.info("清理模具交替计划中间表旧数据, 分厂: {}, 工单号批次: {}/{}, 删除数量: {}", factoryCode, (i / BATCH_SIZE) + 1, (orderNos.size() + BATCH_SIZE - 1) / BATCH_SIZE, deleted);
+                    }
                 }
             }
-            // MOLD_ALTER_PLAN表建在MES分库，使用@DS(DataSource.MES)的独立Mapper直接写入
-            moldAlterPlanIssueMapper.insertMoldAlterPlanList(issueList);
+            // 分批插入，避免SQL Server参数上限2100的问题
+            for (int i = 0; i < issueList.size(); i += BATCH_SIZE) {
+                List<MoldAlterPlanIssue> batch = issueList.subList(i, Math.min(i + BATCH_SIZE, issueList.size()));
+                moldAlterPlanIssueMapper.insertMoldAlterPlanList(batch);
+            }
         } catch (Exception e) {
             log.error("模具交替计划下发到MES中间表失败", e);
             throw e;
@@ -3659,7 +3672,6 @@ public class MesItfServiceImpl implements MesItfService {
                 for (DevPlanCloseVo item : saveList) {
                     MdmDevicePlanShut entity = new MdmDevicePlanShut();
                     entity.setFactoryCode(item.getFactoryCode());
-                    entity.setCompanyCode(item.getCompanyCode());
                     entity.setMachineCode(item.getMachineCode());
                     entity.setMachineType(item.getMachineType());
                     entity.setMachineStopType(item.getMachineStopType());
