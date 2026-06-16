@@ -151,15 +151,9 @@ public class TqPreValidationHandler extends AbsTqScheduleStepHandler {
             String orderNo = createOrderNo(batchNo);
             scheduleVo.setOrderNo(orderNo);
 
-            // 库存（考虑损耗率：实际库存 = 原始库存 × (1-损耗率)）
+            // 库存（6点MES库存，直接使用原始值）
             Double rawStockQty = context.getStockMap().getOrDefault(scheduleVo.getBeadCode(), 0D);
-            Double stockLossRate = context.getParams().getStockLossRate();
-            double actualStockQty = rawStockQty;
-            if (stockLossRate != null && stockLossRate > 0) {
-                double rate = BigDecimalUtil.div(BigDecimalUtil.sub(100, stockLossRate), 100);
-                actualStockQty = BigDecimalUtil.mul(rawStockQty, rate);
-            }
-            scheduleVo.setStockQty(actualStockQty);
+            scheduleVo.setStockQty(rawStockQty);
 
             // 剩余量（月度剩余）
             scheduleVo.setSurplusQty(Optional.ofNullable(context.getMonthSurplusMap().get(scheduleVo.getBeadCode()))
@@ -169,10 +163,15 @@ public class TqPreValidationHandler extends AbsTqScheduleStepHandler {
             // 当天早班(D日早班)计划量（昨天已排的、属于今天早班的胎圈计划量）
             scheduleVo.setTodayMorningPlanQty(context.getTodayMorningPlanMap().getOrDefault(scheduleVo.getBeadCode(), 0D));
 
-            // 计算19点预计库存 = 实际库存(×损耗率) + 当天早班计划量 - 成型一班计划
-            scheduleVo.setPlanStockQty(BigDecimalUtils.qtySub(
+            // 计算14点预计库存 = 6点MES库存 - 早班胎圈预计消耗量 + 早班胎圈计划量
+            // 早班胎圈预计消耗量 = 成型1班消耗 × 需求系数
+            double coefficient = context.getParams().getDemandCoefficient() == null ? 2D : context.getParams().getDemandCoefficient();
+            double morningTqConsume = BigDecimalUtil.mul(
+                    scheduleVo.getCxClass1Plan() == null ? 0D : scheduleVo.getCxClass1Plan(), coefficient);
+            double planStockQty = BigDecimalUtil.sub(
                     BigDecimalUtil.add(scheduleVo.getStockQty(), scheduleVo.getTodayMorningPlanQty()),
-                    scheduleVo.getCxClass1Plan()));
+                    morningTqConsume);
+            scheduleVo.setPlanStockQty(planStockQty);
 
             // 大尺寸规格阈值
             scheduleVo.getParams().put(com.zlt.aps.common.engine.constants.EngineConstants.BIG_SIZE_SPEC,

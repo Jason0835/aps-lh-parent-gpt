@@ -45,6 +45,7 @@ import com.zlt.aps.lh.engine.strategy.support.MouldResourceAllocationResult;
 import com.zlt.aps.lh.engine.strategy.support.MouldResourceContext;
 import com.zlt.aps.lh.engine.strategy.support.NewSpecCandidateCache;
 import com.zlt.aps.lh.engine.strategy.support.ProductionQuantityPolicy;
+import com.zlt.aps.lh.engine.strategy.support.SmallEndingSurplusSkipRule;
 import com.zlt.aps.lh.service.impl.LhMaintenanceScheduleService;
 import com.zlt.aps.lh.util.FirstInspectionQtyUtil;
 import com.zlt.aps.lh.util.LeftRightMouldUtil;
@@ -108,10 +109,12 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
     private static final String NEW_SPEC_SCHEDULE_TYPE = "02";
     private static final String AUTO_DATA_SOURCE = "0";
     private static final String ZERO_PLAN_UNSCHEDULED_REASON = "新增结果裁剪为0";
-    private static final String HISTORY_SHORTAGE_NO_FUTURE_PREVIOUS_SCHEDULED_UNSCHEDULED_REASON =
-            "仅历史欠产、后续无月计划，且最近一次排程已排过，本次跳过补排";
+    private static final String HISTORY_SHORTAGE_NO_FUTURE_PREVIOUS_PRODUCED_UNSCHEDULED_REASON =
+            "仅历史欠产、后续无月计划，且前日已有完成量或前日排程结果已排过，本次跳过补排";
     private static final String SHARED_EMBRYO_ZERO_SURPLUS_UNSCHEDULED_REASON =
             "共用胎胚收尾仅按硫化余量，余量为0且胎胚库存不可用，收尾目标量为0";
+    private static final String SMALL_ENDING_SURPLUS_UNSCHEDULED_REASON =
+            SmallEndingSurplusSkipRule.UNSCHEDULED_REASON;
     private static final String NEW_SPEC_SAND_BLAST_MOULD_CHANGE_ANALYSIS = "喷砂清洗+换模";
     private static final String NEW_SPEC_DRY_ICE_MOULD_CHANGE_ANALYSIS = "干冰清洗+换模";
     private static final String NEW_SPEC_CLEANING_ANALYSIS = "模具清洗+换模";
@@ -383,17 +386,25 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
             boolean currentSkuRemoved = false;
             // 续作、换活字块未消费完的 SKU 在此继续参与 S4.5，不因来源不同提前拦截。
             boolean isEnding = endingJudgmentStrategy.isEnding(context, sku);
-            if (shouldSkipHistoryShortageOnlyPreviousScheduledSku(context, sku, isEnding)) {
+            int previousDayFinishedQty = resolvePreviousDayFinishedQty(context, sku.getMaterialCode());
+            boolean previousScheduled = previousDayFinishedQty <= 0
+                    && hasPreviousScheduledResult(context, sku.getMaterialCode());
+            if (shouldSkipHistoryShortageOnlyPreviousProducedSku(context, sku,
+                    previousDayFinishedQty, previousScheduled)) {
                 int historyShortageQty = Math.max(0, sku.getMonthlyHistoryShortageQty());
                 addUnscheduledResult(context, sku, historyShortageQty,
-                        HISTORY_SHORTAGE_NO_FUTURE_PREVIOUS_SCHEDULED_UNSCHEDULED_REASON,
+                        HISTORY_SHORTAGE_NO_FUTURE_PREVIOUS_PRODUCED_UNSCHEDULED_REASON,
                         unscheduledReasonCountMap);
                 removeCurrentNewSpecSku(context, iterator, sku);
                 progressed = true;
-                log.info("新增SKU仅历史欠产且最近一次已排过，本次跳过补排, materialCode: {}, "
-                                + "historyShortageQty: {}, scheduleDate: {}, previousScheduled: {}",
+                log.info("新增SKU仅历史欠产且前日已有生产记录，本次跳过补排, materialCode: {}, "
+                                + "historyShortageQty: {}, scheduleDate: {}, previousDayFinishedQty: {}, "
+                                + "previousScheduled: {}, reason: {}",
                         sku.getMaterialCode(), historyShortageQty,
-                        LhScheduleTimeUtil.formatDate(context.getScheduleDate()), true);
+                        LhScheduleTimeUtil.formatDate(context.getScheduleDate()),
+                        previousDayFinishedQty,
+                        previousScheduled,
+                        HISTORY_SHORTAGE_NO_FUTURE_PREVIOUS_PRODUCED_UNSCHEDULED_REASON);
                 continue;
             }
             boolean forceEndingByNoFuturePlan = prepareNewSpecShortageQuota(context, sku);
@@ -403,6 +414,10 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
             } else if (sku.isStrictNewSpecShortageOnly()) {
                 // 窗口无计划但月底仍有计划时，仅补本月历史欠产，不按收尾满清，也不触发满班超排。
                 isEnding = false;
+            }
+            if (handleSmallEndingSurplusSkipIfNecessary(context, iterator, sku, isEnding, unscheduledReasonCountMap)) {
+                progressed = true;
+                continue;
             }
             // 收尾SKU在排产前上调目标量（考虑胎胚库存），非收尾SKU保持按余量计算的目标量
             boolean sharedEmbryoZeroSurplusEnding = false;
@@ -879,19 +894,22 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
 
     /**
      * 判断仅历史欠产且后续无计划的SKU是否需要跳过本轮新增补排。
-     * <p>该规则只限制原始非收尾、非续作补偿的新增SKU；窗口 dayN 与月底后续计划均为0，
-     * 且最近一次排程已经有该SKU有效排产量时，避免本轮重复补排历史欠产。</p>
+     * <p>该规则只限制非续作补偿的新增SKU；窗口 dayN 与月底后续计划均为0，
+     * 且前日日完成量大于0时，避免本轮重复补排历史欠产；若日完成量为空或为0，
+     * 再兜底查看接口目标日前一日排程结果是否有有效排产量。</p>
      *
      * @param context 排程上下文
      * @param sku 新增排产SKU
-     * @param originalEnding 原始收尾判断结果
+     * @param previousDayFinishedQty 前日日完成量
+     * @param previousScheduled 接口目标日前一日排程结果是否有排过
      * @return true-跳过本轮新增补排；false-继续原新增排产逻辑
      */
-    private boolean shouldSkipHistoryShortageOnlyPreviousScheduledSku(LhScheduleContext context,
-                                                                      SkuScheduleDTO sku,
-                                                                      boolean originalEnding) {
+    private boolean shouldSkipHistoryShortageOnlyPreviousProducedSku(LhScheduleContext context,
+                                                                     SkuScheduleDTO sku,
+                                                                     int previousDayFinishedQty,
+                                                                     boolean previousScheduled) {
         if (Objects.isNull(context) || Objects.isNull(sku)
-                || originalEnding || sku.isContinuousCompensationSku()) {
+                || sku.isContinuousCompensationSku()) {
             return false;
         }
         if (Math.max(0, sku.getMonthlyHistoryShortageQty()) <= 0) {
@@ -900,7 +918,8 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         if (!isWindowDayPlanEmpty(sku) || Math.max(0, sku.getFutureMonthPlanQtyAfterWindow()) > 0) {
             return false;
         }
-        return hasPreviousScheduledResult(context, sku.getMaterialCode());
+        // 优先以T日前日完成量判断；完成量缺失或为0时，再使用目标日前一日排程结果作为兜底依据。
+        return previousDayFinishedQty > 0 || previousScheduled;
     }
 
     /**
@@ -922,18 +941,47 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
     }
 
     /**
-     * 判断最近一次排程结果中该SKU是否已有有效排产量。
+     * 解析当前排程日T前一日的日完成量。
      *
      * @param context 排程上下文
      * @param materialCode 物料编码
-     * @return true-最近一次已排过；false-未排过
+     * @return 前日日完成量，无记录时返回0
+     */
+    private int resolvePreviousDayFinishedQty(LhScheduleContext context, String materialCode) {
+        if (Objects.isNull(context) || Objects.isNull(context.getScheduleDate())
+                || StringUtils.isEmpty(materialCode)) {
+            return 0;
+        }
+        Date previousDay = LhScheduleTimeUtil.clearTime(LhScheduleTimeUtil.addDays(context.getScheduleDate(), -1));
+        Integer finishedQty = context.getMaterialDayFinishedQtyMap()
+                .get(buildMaterialDayKey(materialCode, previousDay));
+        return Objects.nonNull(finishedQty) ? Math.max(finishedQty, 0) : 0;
+    }
+
+    /**
+     * 构建物料日完成量聚合Key。
+     *
+     * @param materialCode 物料编码
+     * @param finishDate 完成日期
+     * @return 聚合Key
+     */
+    private String buildMaterialDayKey(String materialCode, Date finishDate) {
+        return materialCode + "_" + LhScheduleTimeUtil.formatDate(LhScheduleTimeUtil.clearTime(finishDate));
+    }
+
+    /**
+     * 判断接口目标日前一日排程结果中该SKU是否已有有效排产量。
+     *
+     * @param context 排程上下文
+     * @param materialCode 物料编码
+     * @return true-接口目标日前一日排程结果已排过；false-未排过
      */
     private boolean hasPreviousScheduledResult(LhScheduleContext context, String materialCode) {
         if (Objects.isNull(context) || StringUtils.isEmpty(materialCode)
-                || CollectionUtils.isEmpty(context.getPreviousScheduleResultList())) {
+                || CollectionUtils.isEmpty(context.getTargetPreviousScheduleResultList())) {
             return false;
         }
-        for (LhScheduleResult result : context.getPreviousScheduleResultList()) {
+        for (LhScheduleResult result : context.getTargetPreviousScheduleResultList()) {
             if (Objects.nonNull(result)
                     && StringUtils.equals(materialCode, result.getMaterialCode())
                     && resolveResultScheduledQty(result) > 0) {
@@ -1341,6 +1389,95 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         log.info("新增共用胎胚收尾零余量写入未排, materialCode: {}, embryoCode: {}, surplusQty: {}, embryoStock: {}",
                 sku.getMaterialCode(), sku.getEmbryoCode(), sku.getSurplusQty(), sku.getEmbryoStock());
         return true;
+    }
+
+    /**
+     * 处理新增收尾小余量且前日 T+1 夜班未排满的不排产规则。
+     *
+     * <p>该规则必须在收尾目标量上调前执行，判断依据仍是 SKU 原始硫化余量，避免被
+     * MAX(余量, 胎胚库存) 口径放大后漏判。</p>
+     *
+     * @param context 排程上下文
+     * @param iterator 新增SKU迭代器
+     * @param sku 当前SKU
+     * @param isEnding 是否收尾
+     * @param unscheduledReasonCountMap 未排原因统计
+     * @return true-已写未排并移出待排队列；false-不需要处理
+     */
+    private boolean handleSmallEndingSurplusSkipIfNecessary(LhScheduleContext context,
+                                                            Iterator<SkuScheduleDTO> iterator,
+                                                            SkuScheduleDTO sku,
+                                                            boolean isEnding,
+                                                            Map<String, Integer> unscheduledReasonCountMap) {
+        if (!SmallEndingSurplusSkipRule.shouldSkip(context, sku, isEnding)) {
+            if (isSmallEndingSurplusToleranceMatched(context, sku, isEnding)) {
+                traceSmallEndingSurplusJudge(context, sku, isEnding, false);
+            }
+            return false;
+        }
+        addUnscheduledResult(context, sku, Math.max(0, sku.getSurplusQty()),
+                SMALL_ENDING_SURPLUS_UNSCHEDULED_REASON, unscheduledReasonCountMap);
+        getTargetScheduleQtyResolver().removeActiveEmbryoSku(
+                context, sku, SMALL_ENDING_SURPLUS_UNSCHEDULED_REASON);
+        removeCurrentNewSpecSku(context, iterator, sku);
+        traceSmallEndingSurplusJudge(context, sku, isEnding, true);
+        return true;
+    }
+
+    /**
+     * 判断新增 SKU 是否已进入收尾小余量阈值范围。
+     *
+     * @param context 排程上下文
+     * @param sku 当前SKU
+     * @param isEnding 是否收尾
+     * @return true-收尾且余量小于等于参数值；false-不进入前日夜班判断
+     */
+    private boolean isSmallEndingSurplusToleranceMatched(LhScheduleContext context,
+                                                         SkuScheduleDTO sku,
+                                                         boolean isEnding) {
+        return isEnding && Objects.nonNull(sku)
+                && Math.max(0, sku.getSurplusQty()) <= SmallEndingSurplusSkipRule.resolveToleranceQty(context);
+    }
+
+    /**
+     * 输出新增收尾小余量规则判断日志。
+     *
+     * @param context 排程上下文
+     * @param sku 当前SKU
+     * @param isEnding 是否收尾
+     * @param skipped 是否跳过排产
+     */
+    private void traceSmallEndingSurplusJudge(LhScheduleContext context,
+                                              SkuScheduleDTO sku,
+                                              boolean isEnding,
+                                              boolean skipped) {
+        if (Objects.isNull(sku) || !isEnding) {
+            return;
+        }
+        int toleranceQty = SmallEndingSurplusSkipRule.resolveToleranceQty(context);
+        int previousNightPlanQty = SmallEndingSurplusSkipRule.resolveTargetPreviousT1NightPlanQty(
+                context, sku.getMaterialCode());
+        boolean previousNightFull = SmallEndingSurplusSkipRule.isTargetPreviousT1NightFull(context, sku);
+        StringBuilder detail = new StringBuilder(192);
+        detail.append("新增收尾小余量业务目标日前一日夜班判断, materialCode: ")
+                .append(sku.getMaterialCode())
+                .append(", surplusQty: ")
+                .append(Math.max(0, sku.getSurplusQty()))
+                .append(", toleranceQty: ")
+                .append(toleranceQty)
+                .append(", targetPreviousT1NightPlanQty: ")
+                .append(previousNightPlanQty)
+                .append(", shiftCapacity: ")
+                .append(sku.getShiftCapacity())
+                .append(", targetPreviousT1NightFull: ")
+                .append(previousNightFull)
+                .append(", skipSchedule: ")
+                .append(skipped);
+        if (skipped) {
+            detail.append(", unscheduledReason: ").append(SMALL_ENDING_SURPLUS_UNSCHEDULED_REASON);
+        }
+        log.info(detail.toString());
+        PriorityTraceLogHelper.appendProcessLog(context, "新增收尾小余量不排产", detail.toString());
     }
 
     /**
@@ -2284,7 +2421,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
     }
 
     /**
-     * 新增非收尾首日无日计划时，将首个可排时间推进到首个有计划的生产日。
+     * 新增非收尾首日无可用日计划额度时，将首个可排时间推进到首个可承接的生产日。
      *
      * @param context 排程上下文
      * @param sku SKU
@@ -2304,11 +2441,11 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         LocalDate productionDate = firstProductionStartTime.toInstant()
                 .atZone(ZoneId.systemDefault()).toLocalDate();
         SkuDailyPlanQuotaDTO currentQuota = sku.getDailyPlanQuotaMap().get(productionDate);
-        if (hasPositiveDailyPlanQuota(currentQuota)) {
+        if (hasSchedulableDailyPlanQuota(sku, currentQuota)) {
             return firstProductionStartTime;
         }
         LocalDate nextPlanDate = resolveNextPositiveDailyPlanDate(
-                sku.getDailyPlanQuotaMap(), productionDate, resolveScheduleTargetLocalDate(context));
+                sku, sku.getDailyPlanQuotaMap(), productionDate, resolveScheduleTargetLocalDate(context));
         if (Objects.isNull(nextPlanDate)) {
             return firstProductionStartTime;
         }
@@ -2316,6 +2453,11 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         if (Objects.isNull(nextPlanDateStartTime) || !nextPlanDateStartTime.after(firstProductionStartTime)) {
             return firstProductionStartTime;
         }
+        log.info("新增SKU首个可排时间按日计划额度顺延, materialCode: {}, compensationSku: {}, "
+                        + "fromProductionDate: {}, toProductionDate: {}, fromStartTime: {}, toStartTime: {}",
+                sku.getMaterialCode(), sku.isContinuousCompensationSku(), productionDate, nextPlanDate,
+                LhScheduleTimeUtil.formatDateTime(firstProductionStartTime),
+                LhScheduleTimeUtil.formatDateTime(nextPlanDateStartTime));
         return nextPlanDateStartTime;
     }
 
@@ -2326,10 +2468,21 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                 || CollectionUtils.isEmpty(sku.getDailyPlanQuotaMap())) {
             return false;
         }
-        if (sku.isContinuousCompensationSku() || Math.max(0, sku.getMonthlyHistoryShortageQty()) > 0) {
+        if (sku.isContinuousCompensationSku()) {
+            return true;
+        }
+        if (Math.max(0, sku.getMonthlyHistoryShortageQty()) > 0) {
             return false;
         }
         return !StringUtils.equals(ConstructionStageEnum.TRIAL.getCode(), sku.getConstructionStage());
+    }
+
+    private boolean hasSchedulableDailyPlanQuota(SkuScheduleDTO sku, SkuDailyPlanQuotaDTO quota) {
+        if (Objects.nonNull(sku) && sku.isContinuousCompensationSku()) {
+            // 续作补偿只能承接 S4.4 后剩余的日计划额度，首日已满足时不能在首日借用后续额度换模补量。
+            return Objects.nonNull(quota) && Math.max(0, quota.getRemainingQty()) > 0;
+        }
+        return hasPositiveDailyPlanQuota(quota);
     }
 
     private boolean hasPositiveDailyPlanQuota(SkuDailyPlanQuotaDTO quota) {
@@ -2337,7 +2490,8 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                 && (Math.max(0, quota.getDayPlanQty()) > 0 || Math.max(0, quota.getRemainingQty()) > 0);
     }
 
-    private LocalDate resolveNextPositiveDailyPlanDate(Map<LocalDate, SkuDailyPlanQuotaDTO> quotaMap,
+    private LocalDate resolveNextPositiveDailyPlanDate(SkuScheduleDTO sku,
+                                                       Map<LocalDate, SkuDailyPlanQuotaDTO> quotaMap,
                                                        LocalDate productionDate,
                                                        LocalDate windowEndDate) {
         if (CollectionUtils.isEmpty(quotaMap) || Objects.isNull(productionDate)) {
@@ -2349,7 +2503,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                     || (Objects.nonNull(windowEndDate) && date.isAfter(windowEndDate))) {
                 continue;
             }
-            if (hasPositiveDailyPlanQuota(entry.getValue())) {
+            if (hasSchedulableDailyPlanQuota(sku, entry.getValue())) {
                 return date;
             }
         }
@@ -3274,22 +3428,25 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         }
         for (DailyMachineCapacityDayDecision decision : simulationResult.getDayDecisionList()) {
             log.info("新增SKU dayN机台模拟, materialCode: {}, 当前机台: {}, 日期: {}, 追补截止: {}, "
-                            + "dayN计划: {}, carryShortage: {}, 当日需求: {}, 当日产能: {}, "
-                            + "当日欠产: {}, 决策模式: {}, 是否超过阈值: {}, 窗口8班产能: {}, "
+                            + "dayN计划: {}, 当前日判断计划: {}, carryShortage: {}, 当日需求: {}, 当日产能: {}, "
+                            + "当日欠产: {}, 当前日计划满足: {}, 是否进入后看: {}, 后看日期: {}, "
+                            + "决策模式: {}, 是否超过阈值: {}, 窗口8班产能: {}, "
                             + "窗口计划总量: {}, 欠产阈值: {}, T日晚班完成: {}, 窗口有效产能: {}, "
                             + "窗口后剩余欠产: {}, 后一天计划: {}, 后一天3班产能: {}, 累计需求: {}, "
-                            + "累计产能: {}, 启用机台: {}, 新增机台: {}, 未满足: {}, 原因: {}",
+                            + "累计产能: {}, 启用机台: {}, 新增机台: {}, 是否加机台: {}, 未满足: {}, 原因: {}",
                     sku.getMaterialCode(), segment.getMachineCode(), decision.getProductionDate(),
-                    decision.getLookAheadEndDate(), decision.getTodayPlanQty(), decision.getCarryShortageQty(),
-                    decision.getTodayRequiredQty(), decision.getTodayCapacityQty(), decision.getDayShortageQty(),
-                    decision.getDecisionMode(), decision.isShortageThresholdExceeded(),
+                    decision.getLookAheadEndDate(), decision.getTodayPlanQty(), decision.getCurrentDayPlanQty(),
+                    decision.getCarryShortageQty(), decision.getTodayRequiredQty(),
+                    decision.getTodayCapacityQty(), decision.getDayShortageQty(),
+                    decision.isCurrentDayPlanSatisfied(), decision.isNextDayLookAheadEntered(),
+                    decision.getNextProductionDate(), decision.getDecisionMode(), decision.isShortageThresholdExceeded(),
                     decision.getWindowTotalCapacityQty(), decision.getWindowPlanQty(),
                     decision.getShortageAddMachineThreshold(), decision.getScheduleDayFinishQty(),
                     decision.getWindowEffectiveCapacityQty(), decision.getWindowRemainingShortageQty(),
                     decision.getNextDayPlanQty(), decision.getNextDayThreeShiftCapacityQty(),
                     decision.getDemandQty(), decision.getCapacityQty(),
                     decision.getActiveMachineCount(), decision.getAddedMachineCount(),
-                    decision.getUnmetQty(), decision.getReason());
+                    decision.getAddedMachineCount() > 0, decision.getUnmetQty(), decision.getReason());
         }
     }
 

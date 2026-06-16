@@ -923,6 +923,9 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
             result.setDailyPlanQty(dailyPlanQty);
 
             // ---------- MOULD_SURPLUS_QTY：硫化余量 ----------
+            // 硫化余量 = MAX(月计划总量 - 已完成量 + 上月超欠产量, 0)
+            // 已完成量 = 月累计完成量（截至 T-1 日） + T 日排程晚班完成量
+            // 上月超欠产量：仅当 lastMonthValidFlag = "1" 时取 lastMonthOverdueQty，否则按 0 处理
             if (Objects.nonNull(monthPlan) && Objects.nonNull(monthPlan.getTotalQty())) {
                 int finishedQty = 0;
                 // 本月1日至T-1日累计完成量
@@ -935,7 +938,13 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
                 if (nightFinish != null) {
                     finishedQty += nightFinish.intValue();
                 }
-                int surplus = monthPlan.getTotalQty() - finishedQty;
+                // 上月超欠产量：仅当有效标志为"1"时参与计算
+                int lastMonthOverdue = 0;
+                if ("1".equals(monthPlan.getLastMonthValidFlag())
+                        && Objects.nonNull(monthPlan.getLastMonthOverdueQty())) {
+                    lastMonthOverdue = monthPlan.getLastMonthOverdueQty();
+                }
+                int surplus = monthPlan.getTotalQty() - finishedQty + lastMonthOverdue;
                 result.setMouldSurplusQty(Math.max(surplus, 0));
             }
 

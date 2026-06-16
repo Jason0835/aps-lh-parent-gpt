@@ -7,15 +7,15 @@ import lombok.extern.slf4j.Slf4j;
 /**
  * 胎圈排程模板方法抽象类。
  *
- * <p>定义胎圈排程不可变的算法骨架：S1 → S2 → S3 → S4，
+ * <p>定义胎圈排程不可变的算法骨架：S1 → S2 → S3 → S4 → S5 → S6，
  * 每步之间检查中断状态，任何一步中断则后续步骤全部跳过。</p>
  *
- * <p>子类 {@link TqScheduleTemplateImpl} 通过注入4个Handler来填充具体实现。</p>
+ * <p>子类 {@link TqScheduleTemplateImpl} 通过注入6个Handler来填充具体实现。</p>
  *
  * <pre>
  * 执行流程：
- * S1(前置校验与数据加载) → S2(需求计算与均衡) → S3(机台分配与排序) → S4(结果校验与持久化)
- *       ↓ 中断检查              ↓ 中断检查              ↓ 中断检查
+ * S1(前置校验与数据加载) → S2(需求计算) → S3(班次排产分配) → S4(成型/胎圈停产协调) → S5(班次均衡调整) → S6(结果校验与持久化)
+ *       ↓ 中断检查              ↓ 中断检查         ↓ 中断检查              ↓ 中断检查              ↓ 中断检查
  * </pre>
  *
  * @author APS
@@ -29,9 +29,11 @@ public abstract class AbsTqScheduleTemplate {
      * <p>执行流程：</p>
      * <ol>
      *   <li>S1: 前置校验与数据加载</li>
-     *   <li>S2: 需求计算与均衡</li>
-     *   <li>S3: 机台分配与排序</li>
-     *   <li>S4: 结果校验与持久化</li>
+     *   <li>S2: 需求计算</li>
+     *   <li>S3: 班次排产分配</li>
+     *   <li>S4: 成型/胎圈停产协调</li>
+     *   <li>S5: 班次均衡调整</li>
+     *   <li>S6: 结果校验与持久化</li>
      * </ol>
      *
      * <p>每步之间检查中断状态，任何一步中断则后续步骤全部跳过。</p>
@@ -51,24 +53,40 @@ public abstract class AbsTqScheduleTemplate {
                 return;
             }
 
-            // S2: 需求计算与均衡
+            // S2: 需求计算
             context.setCurrentStep(TqScheduleStepEnum.S2_DEMAND_CALC.getCode());
-            doDemandCalcAndBalance(context);
+            doDemandCalc(context);
             if (context.isInterrupted()) {
                 logInterrupt(context);
                 return;
             }
 
-            // S3: 机台分配与排序
+            // S3: 班次排产分配
             context.setCurrentStep(TqScheduleStepEnum.S3_MACHINE_ASSIGN.getCode());
-            doMachineAssignAndSort(context);
+            doMachineAssign(context);
             if (context.isInterrupted()) {
                 logInterrupt(context);
                 return;
             }
 
-            // S4: 结果校验与持久化
-            context.setCurrentStep(TqScheduleStepEnum.S4_RESULT_PERSIST.getCode());
+            // S4: 成型/胎圈停产协调
+            context.setCurrentStep(TqScheduleStepEnum.S4_STOP_COORDINATION.getCode());
+            doStopCoordination(context);
+            if (context.isInterrupted()) {
+                logInterrupt(context);
+                return;
+            }
+
+            // S5: 班次均衡调整
+            context.setCurrentStep(TqScheduleStepEnum.S5_BALANCE.getCode());
+            doBalance(context);
+            if (context.isInterrupted()) {
+                logInterrupt(context);
+                return;
+            }
+
+            // S6: 结果校验与持久化
+            context.setCurrentStep(TqScheduleStepEnum.S6_RESULT_PERSIST.getCode());
             doResultValidationAndSave(context);
 
         } catch (Exception e) {
@@ -91,25 +109,43 @@ public abstract class AbsTqScheduleTemplate {
     protected abstract void doPreValidation(TqScheduleContext context);
 
     /**
-     * S2: 需求计算与均衡。
+     * S2: 需求计算。
      *
-     * <p>职责：计算供应时长、计划量、收尾判断、两天均衡。</p>
-     *
-     * @param context 排程上下文
-     */
-    protected abstract void doDemandCalcAndBalance(TqScheduleContext context);
-
-    /**
-     * S3: 机台分配与排序。
-     *
-     * <p>职责：多维度机台过滤（定点/口型板/寸口/维修）、候选机台排序、生产顺序设置。</p>
+     * <p>职责：计算供应时长、计划量、收尾判断（基于胎胚关联汇总）。</p>
      *
      * @param context 排程上下文
      */
-    protected abstract void doMachineAssignAndSort(TqScheduleContext context);
+    protected abstract void doDemandCalc(TqScheduleContext context);
 
     /**
-     * S4: 结果校验与持久化。
+     * S3: 班次排产分配。
+     *
+     * <p>职责：3步排产策略（当前机台→切换机台→延后）、机台定额约束、生产顺序设置。</p>
+     *
+     * @param context 排程上下文
+     */
+    protected abstract void doMachineAssign(TqScheduleContext context);
+
+    /**
+     * S4: 成型/胎圈停产协调。
+     *
+     * <p>职责：成型停产提前备货、胎圈停产前移、停产交集开产逻辑。</p>
+     *
+     * @param context 排程上下文
+     */
+    protected abstract void doStopCoordination(TqScheduleContext context);
+
+    /**
+     * S5: 班次均衡调整。
+     *
+     * <p>职责：按机台定额约束调整各班次产量、交接班库存平衡、同日班次差额调整。</p>
+     *
+     * @param context 排程上下文
+     */
+    protected abstract void doBalance(TqScheduleContext context);
+
+    /**
+     * S6: 结果校验与持久化。
      *
      * <p>职责：外协分离、历史合并、数据落库、日志记录。</p>
      *

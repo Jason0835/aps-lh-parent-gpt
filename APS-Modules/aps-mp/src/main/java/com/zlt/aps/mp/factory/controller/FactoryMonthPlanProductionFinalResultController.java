@@ -725,4 +725,15 @@ public class FactoryMonthPlanProductionFinalResultController extends AbstractDoc
     public AjaxResult syncAdjustedMonthPlanToScmAndMes(@RequestBody FactoryMonthPlanProductionFinalResult factoryMonthPlanProdFinal) {
         return monthPlanSyncService.syncAdjustedMonthPlanToScmAndMes(factoryMonthPlanProdFinal);
     }
+
+    /**
+     * 定时计算上月超欠产
+     * 根据上月计划排产量和上月硫化日完成量(合格品)计算超欠产，
+     * 并置上月超欠产有效标志=是
+     */
+    @ApiOperation("定时计算上月超欠产")
+    @PostMapping("/calcLastMonthOverProd")
+    public AjaxResult calcLastMonthOverProd() {
+        return factoryMonthPlanProductionFinalResultService.calcLastMonthOverProd();
+    }
 }

@@ -169,4 +169,24 @@
         <if test="lastMonthPlanVersion != null and lastMonthPlanVersion != ''">AND IFNULL(fin.LAST_MONTH_PLAN_VERSION, fin.MONTH_PLAN_VERSION) like CONCAT('%', #{lastMonthPlanVersion}, '%')</if>
     </select>
 
+    <!-- 计算上月超欠产并更新定稿表
+         逻辑：超欠产 = 上月硫化日完成量(合格品) - 上月计划排产量
+         按分厂+物料编码匹配，支持多分厂
+    -->
+    <update id="updateLastMonthOverProd">
+        UPDATE T_MP_MONTH_PLAN_PROD_FINAL f
+        LEFT JOIN (
+            SELECT FACTORY_CODE, MATERIAL_CODE, IFNULL(SUM(DAY_FINISH_QTY), 0) AS FINISH_QTY
+            FROM T_LH_DAY_FINISH_QTY
+            WHERE FINISH_DATE BETWEEN #{startDate} AND #{endDate}
+              AND IS_DELETE = '0'
+            GROUP BY FACTORY_CODE, MATERIAL_CODE
+        ) fin ON f.FACTORY_CODE = fin.FACTORY_CODE AND f.MATERIAL_CODE = fin.MATERIAL_CODE
+        SET f.LAST_MONTH_OVERDUE_QTY = IFNULL(fin.FINISH_QTY, 0) - IFNULL(f.TOTAL_QTY, 0),
+            f.LAST_MONTH_VALID_FLAG = '1',
+            f.UPDATE_TIME = NOW()
+        WHERE f.YEAR = #{year}
+          AND f.MONTH = #{month}
+    </update>
+
 </mapper>

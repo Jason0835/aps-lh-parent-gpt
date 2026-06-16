@@ -54,4 +54,9 @@ public class TqMachineInfo extends BaseEntity {
     @TableField("REMARK")
     @ImportValidated(maxLength = 900)
     private String remark;
+
+    @ApiModelProperty(value = "定额：该机台单班标准产量", position = 80)
+    @Excel(name = "ui.data.column.machine.quota")
+    @TableField("QUOTA")
+    private Double quota;
 }

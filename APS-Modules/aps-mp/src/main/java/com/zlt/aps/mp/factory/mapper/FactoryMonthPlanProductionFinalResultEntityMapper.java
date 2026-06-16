@@ -4,7 +4,9 @@ import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import com.zlt.aps.mp.api.domain.vo.FactoryMonthPlanFinalAdjustVo;
 import com.zlt.core.dao.basemapper.CommBaseMapper;
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
 
+import java.util.Date;
 import java.util.List;
 
 /**
@@ -36,4 +38,19 @@ public interface FactoryMonthPlanProductionFinalResultEntityMapper extends CommB
      * @return 结果
      */
     List<FactoryMonthPlanFinalAdjustVo> list4Adjust(FactoryMonthPlanProductionFinalResult queryVO);
+
+    /**
+     * 计算上月超欠产并更新定稿表
+     * 超欠产 = 上月硫化日完成量(合格品) - 上月计划排产量
+     *
+     * @param year      上月年份
+     * @param month     上月月份
+     * @param startDate 上月开始日期
+     * @param endDate   上月结束日期
+     * @return 更新记录数
+     */
+    int updateLastMonthOverProd(@Param("year") Integer year,
+                                @Param("month") Integer month,
+                                @Param("startDate") Date startDate,
+                                @Param("endDate") Date endDate);
 }

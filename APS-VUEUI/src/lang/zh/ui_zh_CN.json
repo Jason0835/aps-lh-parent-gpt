@@ -3345,6 +3345,7 @@
   "ui.data.column.tm.scheduleResult.class6Analysis": "6班原因分析",
   "ui.data.column.tm.scheduleResult.releaseStatus": "发布状态",
   "ui.data.column.tm.scheduleResult.dataSource": "数据来源",
+  "ui.data.column.mdmDevicePlanShut.dataSource": "数据来源",
   "ui.data.column.tm.scheduleResult.tailFlag": "是否收尾任务",
   "ui.data.column.tm.scheduleUnplanned.modelName": "胎面排程未排列表",
   "ui.data.column.tm.scheduleUnplanned.factoryCode": "工厂",

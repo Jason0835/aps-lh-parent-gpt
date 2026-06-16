@@ -208,6 +208,10 @@ public class TqScheduleResult extends ApsBaseEntity {
     @TableField("MARK_CLOSE_OUT_TIP")
     private String markCloseOutTip;
 
+    @ApiModelProperty(value = "收尾规格标识(0:收尾；1:非收尾)")
+    @TableField("CLOSE_OUT_SPEC_FLAG")
+    private String closeOutSpecFlag;
+
     @ApiModelProperty(value = "是否发布，0--未发布，1--已发布。对应数据字典为：IS_RELEASE")
     @TableField("IS_RELEASE")
     private String isRelease;
