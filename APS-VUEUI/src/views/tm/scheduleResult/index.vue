@@ -84,14 +84,7 @@
 <script>
 import {mapState} from "vuex";
 import {downloadLink} from "@/utils/request";
-import {
-  autoPlan,
-  listTmScheduleBoard,
-  listTmScheduleResult,
-  publishScheduleResult,
-  publishValidate,
-  removeTmScheduleResult,
-} from "@/api/tm/scheduleResult";
+import {autoPlan, listTmScheduleResult, publishScheduleResult, publishValidate, removeTmScheduleResult,} from "@/api/tm/scheduleResult";
 import tltUpload from "@/components/tltUpload/tltUpload.vue";
 import TltUploadForm from "@/views/components/tltUploadForm.vue";
 import infoDialog from "./components/infoDialog.vue";
@@ -302,25 +295,32 @@ export default {
         this.$refs.infoRef.show();
       }
     },
-    // 自动排程入口：只调用结构闭环接口，完整算法由后端后续接入。
+    // 自动排程入口：先校验旧批次，全部未发布时由用户确认后再覆盖。
     handleAutoPlan() {
       const params = this.buildAutoPlanParams();
+      validateAutoPlan(params).then((validateResult) => {
+        const result = validateResult.data || {};
+        if (result.confirmRequired) {
+          this.$confirm(result.message, {
+            type: "warning",
+          }).then(() => {
+            this.doAutoPlan({
+              ...params,
+              confirmOverwrite: true,
+            });
+          });
+          return;
+        }
+        this.doAutoPlan(params);
+      });
+    },
+    // 执行自动排程请求。
+    doAutoPlan(params) {
       autoPlan(params).then((data) => {
         const message = data.data && data.data.message ? data.data.message : data.msg;
         this.$modal.msgSuccess(message);
         this.getList();
       });
-    },
-    // 看板刷新入口：使用兼容路径查询看板数据，不改变当前筛选条件。
-    async handleBoardRefresh() {
-      try {
-        this.loading = true;
-        const data = await listTmScheduleBoard(this.formatParams(false));
-        this.data = data.data || [];
-        this.page.total = this.data.length;
-      } finally {
-        this.loading = false;
-      }
     },
     // 转机台弹窗
     handleChangeMachine() {

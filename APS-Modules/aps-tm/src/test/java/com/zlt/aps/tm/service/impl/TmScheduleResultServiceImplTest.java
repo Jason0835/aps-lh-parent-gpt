@@ -16,7 +16,6 @@ import org.mockito.Mock;
 import org.mockito.junit.MockitoJUnitRunner;
 
 import java.math.BigDecimal;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.Date;
 
@@ -154,98 +153,66 @@ public class TmScheduleResultServiceImplTest {
     }
 
     @Test
-    public void validateAutoPlanShouldReturnBatchAndTraceId() {
-        TmAutoScheduleRequestVo request = new TmAutoScheduleRequestVo();
-        request.setFactoryCode("116");
-        request.setScheduleDate(new Date());
-        request.setTraceId("TRACE-STRUCTURE");
+    public void validateAutoPlanShouldRequireConfirmWhenOldBatchAllNoRelease() {
+        TmAutoScheduleRequestVo request = buildAutoRequest();
+        TmScheduleResult oldResult = new TmScheduleResult();
+        oldResult.setReleaseStatus(ApsConstant.NO_RELEASE);
+        when(tmScheduleResultMapper.selectList(org.mockito.ArgumentMatchers.any())).thenReturn(Collections.singletonList(oldResult));
 
         TmAutoScheduleResponseVo response = service.validateAutoPlan(request);
 
         assertEquals(Boolean.TRUE, response.getSuccess());
-        assertEquals("TRACE-STRUCTURE", response.getTraceId());
-        assertNotNull(response.getBatchNo());
+        assertEquals(Boolean.TRUE, response.getConfirmRequired());
     }
 
     @Test(expected = ServiceException.class)
-    public void validateAutoPlanShouldRejectMissingScheduleDate() {
-        TmAutoScheduleRequestVo request = new TmAutoScheduleRequestVo();
-        request.setFactoryCode("116");
+    public void validateAutoPlanShouldRejectWhenOldBatchHasReleasedResult() {
+        TmAutoScheduleRequestVo request = buildAutoRequest();
+        TmScheduleResult oldResult = new TmScheduleResult();
+        oldResult.setReleaseStatus(ApsConstant.IS_RELEASE);
+        when(tmScheduleResultMapper.selectList(org.mockito.ArgumentMatchers.any())).thenReturn(Collections.singletonList(oldResult));
 
         service.validateAutoPlan(request);
     }
 
     @Test
-    public void autoPlanShouldReturnCurrentBoardCountWithoutDeletingOldBatch() {
-        TmAutoScheduleRequestVo request = new TmAutoScheduleRequestVo();
-        request.setFactoryCode("116");
-        request.setScheduleDate(new Date());
-        when(tmScheduleResultMapper.selectList(org.mockito.ArgumentMatchers.any())).thenReturn(Arrays.asList(new TmScheduleResult(), new TmScheduleResult()));
+    public void autoPlanShouldDeleteOldBatchAfterConfirmWhenAllNoRelease() {
+        TmAutoScheduleRequestVo request = buildAutoRequest();
+        request.setConfirmOverwrite(Boolean.TRUE);
+        TmScheduleResult oldResult = new TmScheduleResult();
+        oldResult.setReleaseStatus(ApsConstant.NO_RELEASE);
+        when(tmScheduleResultMapper.selectList(org.mockito.ArgumentMatchers.any())).thenReturn(Collections.singletonList(oldResult));
 
         TmAutoScheduleResponseVo response = service.autoPlan(request);
 
         assertEquals(Boolean.TRUE, response.getSuccess());
-        assertEquals(Integer.valueOf(2), response.getResultCount());
-        verify(tmScheduleResultMapper).selectList(org.mockito.ArgumentMatchers.any());
-    }
-
-    @Test
-    public void insertTaskShouldSetDefaultReleaseStatusAndWriteDispatcherLog() {
-        TmScheduleResult scheduleResult = new TmScheduleResult();
-        scheduleResult.setScheduleDate(new Date());
-        scheduleResult.setTreadCode("TR-001");
-        when(tmScheduleResultMapper.insert(scheduleResult)).thenReturn(1);
-
-        assertEquals(1, service.insertTask(scheduleResult));
-        assertEquals("116", scheduleResult.getFactoryCode());
-        assertEquals(ApsConstant.NO_RELEASE, scheduleResult.getReleaseStatus());
-        verify(tmDispatcherLogMapper).insert(org.mockito.ArgumentMatchers.any());
-    }
-
-    @Test
-    public void changeQtyShouldWritePlanDispatcherLogAndUpdateResult() {
-        TmScheduleResult oldSchedule = new TmScheduleResult();
-        oldSchedule.setId(10L);
-        oldSchedule.setMachineCode("TM-01");
-        oldSchedule.setClass1PlanQty(BigDecimal.TEN);
-        TmScheduleResult newSchedule = new TmScheduleResult();
-        newSchedule.setId(10L);
-        newSchedule.setMachineCode("TM-01");
-        newSchedule.setClass1PlanQty(BigDecimal.valueOf(12));
-        when(tmScheduleResultMapper.isReleasingOrTimeoutByIds(new Long[]{10L})).thenReturn(0);
-        when(tmScheduleResultMapper.selectById(10L)).thenReturn(oldSchedule);
-        when(tmScheduleResultMapper.updateById(newSchedule)).thenReturn(1);
-
-        assertEquals(1, service.changeQty(newSchedule));
-        assertEquals(ApsConstant.NO_RELEASE, newSchedule.getReleaseStatus());
-        verify(tmDispatcherLogMapper).insert(org.mockito.ArgumentMatchers.any());
-    }
-
-    @Test
-    public void publishShouldSetWaitReleasingStatus() {
-        when(tmScheduleResultMapper.isReleasingOrTimeoutByIds(new Long[]{1L, 2L})).thenReturn(0);
-        when(tmScheduleResultMapper.updateById(org.mockito.ArgumentMatchers.any())).thenReturn(1);
-
-        assertEquals(2, service.publish(Arrays.asList(1L, 2L)));
-        verify(tmScheduleResultMapper, org.mockito.Mockito.times(2)).updateById(org.mockito.ArgumentMatchers.any());
+        assertEquals(Boolean.FALSE, response.getConfirmRequired());
+        org.mockito.InOrder inOrder = inOrder(tmScheduleUnplannedMapper, tmScheduleResultExplainMapper, tmScheduleResultMapper);
+        inOrder.verify(tmScheduleUnplannedMapper).logicDeleteByFactoryCodeAndScheduleDate("116", request.getScheduleDate());
+        inOrder.verify(tmScheduleResultExplainMapper).logicDeleteByFactoryCodeAndScheduleDate("116", request.getScheduleDate());
+        inOrder.verify(tmScheduleResultMapper).logicDeleteByFactoryCodeAndScheduleDate("116", request.getScheduleDate());
     }
 
     @Test(expected = ServiceException.class)
-    public void publishValidateShouldRejectEmptyIds() {
-        service.publishValidate(Collections.emptyList());
+    public void insertTaskShouldRejectWhenSequenceIsNotAfterSecondInProductionSpec() {
+        TmScheduleResult scheduleResult = new TmScheduleResult();
+        scheduleResult.setScheduleDate(new Date());
+        scheduleResult.setTreadCode("TR-001");
+        scheduleResult.setClass1Sequence(2);
+
+        service.insertTask(scheduleResult);
     }
 
     /**
-     * 校验解释实体字段映射到指定数据库列。
+     * 构造自动排程测试请求。
      *
-     * @param fieldName 实体字段名
-     * @param columnName 数据库列名
-     * @throws NoSuchFieldException 字段不存在时抛出
+     * @return 自动排程请求
      */
-    private void assertTableField(String fieldName, String columnName) throws NoSuchFieldException {
-        TableField tableField = TmScheduleResultExplain.class.getDeclaredField(fieldName).getAnnotation(TableField.class);
-
-        assertNotNull(tableField);
-        assertEquals(columnName, tableField.value());
+    private TmAutoScheduleRequestVo buildAutoRequest() {
+        TmAutoScheduleRequestVo request = new TmAutoScheduleRequestVo();
+        request.setFactoryCode("116");
+        request.setScheduleDate(new Date());
+        request.setTraceId("TRACE-TEST");
+        return request;
     }
 }

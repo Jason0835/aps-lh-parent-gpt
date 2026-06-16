@@ -9,8 +9,8 @@ import java.io.Serializable;
 /**
  * 胎面自动排程响应对象。
  *
- * <p>用于返回本次排程批次、追踪标识和结果汇总。该对象只作为契约层返回值，
- * 不承载数据库实体和任务链指针。</p>
+ * <p>用于返回自动排程校验、执行结果和前端是否需要二次确认的信息。
+ * 该对象不持有数据库实体和任务链指针。</p>
  */
 @Data
 @ApiModel(value = "胎面自动排程响应对象", description = "胎面自动排程响应对象")
@@ -21,6 +21,10 @@ public class TmAutoScheduleResponseVo implements Serializable {
     /** 是否成功 */
     @ApiModelProperty(value = "是否成功", name = "success")
     private Boolean success;
+
+    /** 是否需要前端确认覆盖旧批次 */
+    @ApiModelProperty(value = "是否需要前端确认覆盖旧批次", name = "confirmRequired")
+    private Boolean confirmRequired;
 
     /** 批次号 */
     @ApiModelProperty(value = "批次号", name = "batchNo")

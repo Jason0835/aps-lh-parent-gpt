@@ -1,15 +1,16 @@
 package com.zlt.aps.tm.engine.domain;
 
-import com.zlt.aps.common.engine.schedule.ScheduleScoreResult;
 import lombok.Data;
 
 import java.math.BigDecimal;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 /**
- * 胎面候选机台对象。
+ * 胎面机台候选对象。
  *
- * <p>用于承载候选机台的剩余产能、链尾胶料、链尾口型、过滤状态和评分结果。规则链会
- * 原地标记过滤状态，评分策略会写入评分结果。</p>
+ * <p>用于承载机台过滤、评分输入和结果。过滤、评分方法会修改本对象的过滤状态和评分结果，
+ * 不修改任务链。</p>
  */
 @Data
 public class TmMachineCandidate {
@@ -17,17 +18,41 @@ public class TmMachineCandidate {
     /** 机台编码 */
     private String machineCode;
 
-    /** 剩余产能 */
+    /** 是否启用 */
+    private Boolean enabled;
+
+    /** 剩余产能，单位米 */
     private BigDecimal remainCapacity;
 
-    /** 链尾胶料 */
-    private String tailGlueCode;
+    /** 口型板是否匹配 */
+    private Boolean mouthPlateMatched;
 
-    /** 链尾口型板 */
+    /** 胶料机台关系是否匹配 */
+    private Boolean glueMachineMatched;
+
+    /** 是否满足选择定点生产机台 */
+    private Boolean fixedMachineSelected;
+
+    /** 是否命中定点不可生产机台 */
+    private Boolean fixedMachineExcluded;
+
+    /** 链尾主胶料编码 */
+    private String tailMainGlueCode;
+
+    /** 链尾基部胶编码 */
+    private String tailBaseGlueCode;
+
+    /** 链尾口型板编码 */
     private String tailMouthPlateCode;
 
+    /** 切换成本小时数 */
+    private BigDecimal switchCostHours;
+
+    /** 是否命中定点生产加分 */
+    private Boolean fixedMachineMatched;
+
     /** 是否已被过滤 */
-    private boolean filtered;
+    private Boolean filtered = Boolean.FALSE;
 
     /** 过滤原因编码 */
     private String filterReasonCode;
@@ -35,32 +60,9 @@ public class TmMachineCandidate {
     /** 过滤原因描述 */
     private String filterReasonDesc;
 
-    /** 过滤证据 */
-    private Object filterEvidence;
+    /** 过滤或评分证据 */
+    private Map<String, Object> evidence = new LinkedHashMap<>();
 
     /** 评分结果 */
-    private ScheduleScoreResult scoreResult;
-
-    /**
-     * 标记候选机台被过滤。
-     *
-     * @param reasonCode 原因编码
-     * @param reasonDesc 原因描述
-     * @param evidence   过滤证据
-     */
-    public void markFiltered(String reasonCode, String reasonDesc, Object evidence) {
-        this.filtered = true;
-        this.filterReasonCode = reasonCode;
-        this.filterReasonDesc = reasonDesc;
-        this.filterEvidence = evidence;
-    }
-
-    /**
-     * 写入候选机台评分结果。
-     *
-     * @param scoreResult 评分结果
-     */
-    public void applyScore(ScheduleScoreResult scoreResult) {
-        this.scoreResult = scoreResult;
-    }
+    private BigDecimal score = BigDecimal.ZERO;
 }

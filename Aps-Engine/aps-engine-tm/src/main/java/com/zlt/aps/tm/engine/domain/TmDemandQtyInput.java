@@ -5,16 +5,29 @@ import lombok.Data;
 import java.math.BigDecimal;
 
 /**
- * 胎面需求量计算输入对象。
+ * 胎面需求量计算输入。
  *
- * <p>用于向需求量策略传递成型需求、胎面长度和班次等输入。骨架阶段不定义具体算法。</p>
+ * <p>用于传入当前班需求、保证范围需求和 6 点库存滚动余额。
+ * 本对象不读取数据库，不修改任务链。</p>
  */
 @Data
 public class TmDemandQtyInput {
 
-    /** 胎面编码 */
+    /** 胎面规格编码 */
     private String treadCode;
 
-    /** 基础需求量 */
-    private BigDecimal baseDemandQty;
+    /** 当前班成型胎面需求量，单位米 */
+    private BigDecimal currentShiftDemandQty;
+
+    /** 保证范围内成型胎面需求量，单位米 */
+    private BigDecimal guardDemandQty;
+
+    /** 当前班开始滚动库存，单位米 */
+    private BigDecimal rollingStockQty;
+
+    /** 库存最低保证班数 */
+    private Integer guardShiftCount;
+
+    /** 保证范围总小时数 */
+    private BigDecimal guardRangeHours;
 }

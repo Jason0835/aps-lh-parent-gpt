@@ -230,37 +230,47 @@ public class TmScheduleResultServiceImpl extends AbstractDocService<TmScheduleRe
     }
 
     /**
-     * 校验胎面自动排程请求是否满足结构闭环执行条件。
+     * 校验胎面自动排程请求。
      *
      * @param request 自动排程请求
-     * @return 自动排程响应，包含批次、追踪号和提示消息
-     * @throws ServiceException 工厂或排程日期为空时抛出
+     * @return 自动排程校验响应
+     * @throws ServiceException 工厂、日期缺失或存在已发布旧结果时抛出
      */
     @Override
     public TmAutoScheduleResponseVo validateAutoPlan(TmAutoScheduleRequestVo request) {
         validateAutoScheduleRequest(request);
         TmAutoScheduleResponseVo response = buildAutoScheduleResponse(request);
+        List<TmScheduleResult> currentResultList = listBoard(buildQueryFromRequest(request));
+        fillOverwriteCheckResult(request, response, currentResultList, false);
         response.setSuccess(Boolean.TRUE);
-        response.setMessage("自动排程结构校验通过，完整业务算法待确认后接入");
+        response.setMessage(Boolean.TRUE.equals(response.getConfirmRequired())
+                ? "当前排程日期已有未发布计划，确认后将重新生成" : "自动排程校验通过");
         return response;
     }
 
     /**
-     * 执行胎面自动排程结构闭环。
+     * 执行胎面自动排程。
+     *
+     * <p>当前先实现旧批次覆盖事务边界校验；完整算法结果写入待数据加载和算法入口接入后继续扩展。</p>
      *
      * @param request 自动排程请求
      * @return 自动排程响应
-     * @throws ServiceException 请求非法时抛出
+     * @throws ServiceException 请求非法、旧批次不可覆盖或未确认覆盖时抛出
      */
     @Override
     public TmAutoScheduleResponseVo autoPlan(TmAutoScheduleRequestVo request) {
         validateAutoScheduleRequest(request);
         TmAutoScheduleResponseVo response = buildAutoScheduleResponse(request);
         List<TmScheduleResult> currentResultList = listBoard(buildQueryFromRequest(request));
+        fillOverwriteCheckResult(request, response, currentResultList, true);
+        if (CollUtil.isNotEmpty(currentResultList)) {
+            logicDeleteByFactoryCodeAndScheduleDate(request.getFactoryCode(), request.getScheduleDate());
+        }
         response.setSuccess(Boolean.TRUE);
-        response.setResultCount(currentResultList.size());
+        response.setConfirmRequired(Boolean.FALSE);
+        response.setResultCount(0);
         response.setUnplannedCount(0);
-        response.setMessage("自动排程结构闭环已执行，未覆盖旧批次且未写入未确认算法结果");
+        response.setMessage("自动排程已通过旧批次覆盖校验，完整算法结果写入待数据加载接入");
         return response;
     }
 
@@ -268,7 +278,7 @@ public class TmScheduleResultServiceImpl extends AbstractDocService<TmScheduleRe
      * 查询胎面排程看板数据。
      *
      * @param query 查询条件
-     * @return 看板结果列表
+     * @return 看板排程结果
      */
     @Override
     public List<TmScheduleResult> listBoard(TmScheduleResult query) {
@@ -291,7 +301,7 @@ public class TmScheduleResultServiceImpl extends AbstractDocService<TmScheduleRe
     /**
      * 插入人工插单排程结果。
      *
-     * @param scheduleResult 插单结果
+     * @param scheduleResult 插单排程结果
      * @return 写入行数
      * @throws ServiceException 必填字段缺失时抛出
      */
@@ -309,6 +319,7 @@ public class TmScheduleResultServiceImpl extends AbstractDocService<TmScheduleRe
         if (StrUtil.isBlank(scheduleResult.getTreadCode())) {
             throw new ServiceException("插单胎面编码不能为空");
         }
+        validateInsertAfterSecondSequence(scheduleResult);
         scheduleResult.setReleaseStatus(ApsConstant.NO_RELEASE);
         int insertCount = tmScheduleResultMapper.insert(scheduleResult);
         scheduleResult.setBaseVale(scheduleResult.getId());
@@ -319,9 +330,9 @@ public class TmScheduleResultServiceImpl extends AbstractDocService<TmScheduleRe
     /**
      * 调整排程计划量。
      *
-     * @param scheduleResult 调量后的排程结果
+     * @param scheduleResult 调整后的排程结果
      * @return 更新行数
-     * @throws ServiceException 记录不存在或处于不可调整状态时抛出
+     * @throws ServiceException 记录不存在或不可调整时抛出
      */
     @Override
     public int changeQty(TmScheduleResult scheduleResult) {
@@ -339,9 +350,9 @@ public class TmScheduleResultServiceImpl extends AbstractDocService<TmScheduleRe
     /**
      * 校验排程结果是否允许发布。
      *
-     * @param ids 排程结果ID列表
-     * @return true 表示可发布
-     * @throws ServiceException 参数非法或存在发布中/超时失败记录时抛出
+     * @param ids 排程结果 ID 列表
+     * @return true 表示允许发布
+     * @throws ServiceException 参数为空或存在发布中、超时失败记录时抛出
      */
     @Override
     public boolean publishValidate(List<Long> ids) {
@@ -357,9 +368,9 @@ public class TmScheduleResultServiceImpl extends AbstractDocService<TmScheduleRe
     /**
      * 将排程结果标记为待发布。
      *
-     * @param ids 排程结果ID列表
+     * @param ids 排程结果 ID 列表
      * @return 更新行数
-     * @throws ServiceException 参数非法或记录不可发布时抛出
+     * @throws ServiceException 参数为空或记录不可发布时抛出
      */
     @Override
     public int publish(List<Long> ids) {
@@ -396,7 +407,7 @@ public class TmScheduleResultServiceImpl extends AbstractDocService<TmScheduleRe
      * 根据自动排程请求构建基础响应。
      *
      * @param request 自动排程请求
-     * @return 自动排程响应
+     * @return 自动排程基础响应
      */
     private TmAutoScheduleResponseVo buildAutoScheduleResponse(TmAutoScheduleRequestVo request) {
         TmAutoScheduleResponseVo response = new TmAutoScheduleResponseVo();
@@ -404,6 +415,7 @@ public class TmScheduleResultServiceImpl extends AbstractDocService<TmScheduleRe
         response.setTraceId(StrUtil.blankToDefault(request.getTraceId(), IdUtil.fastSimpleUUID()));
         response.setResultCount(0);
         response.setUnplannedCount(0);
+        response.setConfirmRequired(Boolean.FALSE);
         return response;
     }
 
@@ -418,5 +430,51 @@ public class TmScheduleResultServiceImpl extends AbstractDocService<TmScheduleRe
         query.setFactoryCode(request.getFactoryCode());
         query.setScheduleDate(request.getScheduleDate());
         return query;
+    }
+
+    /**
+     * 校验旧批次覆盖口径。
+     *
+     * @param request           自动排程请求
+     * @param response          自动排程响应
+     * @param currentResultList 当前排程日期已有结果
+     * @param executeMode       是否为执行模式，true 时要求确认后才允许覆盖
+     * @throws ServiceException 存在非未发布旧结果，或执行模式未确认覆盖时抛出
+     */
+    private void fillOverwriteCheckResult(TmAutoScheduleRequestVo request, TmAutoScheduleResponseVo response,
+                                          List<TmScheduleResult> currentResultList, boolean executeMode) {
+        if (CollUtil.isEmpty(currentResultList)) {
+            response.setConfirmRequired(Boolean.FALSE);
+            return;
+        }
+        boolean allNoRelease = currentResultList.stream()
+                .allMatch(item -> ApsConstant.NO_RELEASE.equals(item.getReleaseStatus()));
+        if (!allNoRelease) {
+            throw new ServiceException(String.format("排程日期：%s已有发布过的生成计划，不可重复生成",
+                    DateUtil.formatDate(request.getScheduleDate())));
+        }
+        response.setConfirmRequired(Boolean.TRUE);
+        if (executeMode && !Boolean.TRUE.equals(request.getConfirmOverwrite())) {
+            throw new ServiceException("当前排程日期已有未发布计划，请确认后重新生成");
+        }
+    }
+
+    /**
+     * 校验人工插单只能插到第二个在产规格之后。
+     *
+     * <p>当前实体按 1-6 班横向字段承载顺序，若前端传入任一班次顺序且小于等于 2，
+     * 说明插单位置不在第二顺序之后，需要直接拒绝。未传顺序时保持旧接口兼容。</p>
+     *
+     * @param scheduleResult 插单排程结果
+     * @throws ServiceException 插单位置不在第二顺序之后时抛出
+     */
+    private void validateInsertAfterSecondSequence(TmScheduleResult scheduleResult) {
+        List<Integer> sequenceList = Arrays.asList(scheduleResult.getClass1Sequence(), scheduleResult.getClass2Sequence(),
+                scheduleResult.getClass3Sequence(), scheduleResult.getClass4Sequence(), scheduleResult.getClass5Sequence(),
+                scheduleResult.getClass6Sequence());
+        boolean invalid = sequenceList.stream().anyMatch(sequence -> sequence != null && sequence <= 2);
+        if (invalid) {
+            throw new ServiceException("当前机台班次只能插到第二个在产规格之后");
+        }
     }
 }

@@ -161,25 +161,25 @@ public class TmScheduleResultController extends AbstractDocBizController<TmSched
     }
 
     /**
-     * 校验发布条件。
+     * 校验胎面发布。
      *
-     * @param ids 排程结果ID列表
+     * @param ids 排程结果 ID 列表
      * @return 校验结果
      */
-    @ApiOperation("发布校验")
+    @ApiOperation("校验胎面发布")
     @PostMapping("/publishValidate")
     public AjaxResult publishValidate(@RequestBody List<Long> ids) {
         return AjaxResult.success(tmScheduleResultService.publishValidate(ids));
     }
 
     /**
-     * 标记排程结果为待发布。
+     * 发布胎面排程。
      *
-     * @param ids 排程结果ID列表
-     * @return 发布标记结果
+     * @param ids 排程结果 ID 列表
+     * @return 发布结果
      */
     @Log(title = "ui.data.column.tm.scheduleResult.modelName", businessType = BusinessType.UPDATE)
-    @ApiOperation("发布排程")
+    @ApiOperation("发布胎面排程")
     @PostMapping("/publish")
     public AjaxResult publish(@RequestBody List<Long> ids) {
         return toAjax(tmScheduleResultService.publish(ids));
