@@ -75,26 +75,26 @@ export default {
       return [
         {
           prop: "paramCode",
-          label: this.$t("ui.data.factoryParam.paramCode"),
+          label: this.$t("ui.data.column.factoryParam.paramCode"),
           disabled: true,
         },
         {
           prop: "paramName",
-          label: this.$t("common.api.config.columnname.name"),
+          label: this.$t("ui.data.column.factoryParam.paramName"),
           disabled: true,
         },
         {
           prop: "paramValue",
-          label: this.$t("ui.data.factoryParam.paramValue"),
+          label: this.$t("ui.data.column.factoryParam.paramValue"),
         },
         {
           prop: "defauleValue",
-          label: this.$t("ui.data.factoryParam.defauleValue"),
+          label: this.$t("ui.data.column.factoryParam.defauleValue"),
           disabled: true,
         },
         {
           prop: "remark",
-          label: this.$t("common.remark"),
+          label: this.$t("ui.common.column.remark"),
           type: "textarea",
           maxlength: "300",
         },
