@@ -4,6 +4,7 @@ import com.zlt.aps.cd90.engine.model.Cd90MachineCandidate;
 import com.zlt.aps.cd90.engine.model.Cd90MachineResource;
 import com.zlt.aps.cd90.engine.model.Cd90MachineRestriction;
 import com.zlt.aps.cd90.engine.model.Cd90MachineRollBinding;
+import com.zlt.aps.cd90.engine.model.Cd90MachineCandidateResolution;
 import org.junit.Test;
 
 import java.math.BigDecimal;
@@ -66,6 +67,20 @@ public class Cd90MachineCandidateResolverTest {
                 Collections.emptyList(), Collections.emptyList());
 
         assertEquals(0, result.size());
+    }
+
+    @Test
+    public void allBoundMachinesProhibitedShouldReturnStableReason() {
+        Cd90MachineCandidateResolution result = resolver.resolveDetailed(
+                "CF001", "BR001", "NIGHT", shiftStart(), shiftStart().plusHours(8),
+                Arrays.asList(machine("M1", "0", "NIGHT"), machine("M2", "0", "NIGHT")),
+                Arrays.asList(binding("BR001", "M1"), binding("BR001", "M2")),
+                Arrays.asList(restriction("M1", "1"), restriction("M2", "1")),
+                Collections.emptyList());
+
+        assertEquals(0, result.getCandidates().size());
+        assertEquals("MACHINE_PROHIBITED", result.getFailureReason());
+        assertEquals(Arrays.asList("M1", "M2"), result.getBoundMachineCodes());
     }
 
     private LocalDateTime shiftStart() {

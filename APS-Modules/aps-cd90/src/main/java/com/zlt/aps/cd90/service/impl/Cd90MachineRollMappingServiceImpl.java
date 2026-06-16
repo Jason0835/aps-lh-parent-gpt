@@ -58,7 +58,7 @@ public class Cd90MachineRollMappingServiceImpl extends AbstractDocService<Cd90Ma
     }
 
     /**
-     * 校验同一工厂、钢压大卷、帘布、机台下是否已存在映射。
+     * 校验同一工厂、大卷、帘布、机台下是否已存在映射。
      *
      * @param entity 大卷与机台映射
      * @return 唯一性标识

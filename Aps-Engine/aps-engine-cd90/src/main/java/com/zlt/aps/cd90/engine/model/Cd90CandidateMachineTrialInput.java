@@ -41,6 +41,16 @@ public class Cd90CandidateMachineTrialInput {
     private String currentSpec;
     /** 规格切换耗时分钟数。 */
     private int specChangeMinutes;
+    /** 机台链尾大卷与直裁规格。 */
+    private Cd90MachineTailState previousTail;
+    /** 当前任务大卷与直裁规格。 */
+    private Cd90MachineTailState currentTail;
+    /** 同大卷不同规格切换耗时。 */
+    private int sameRollDiffSpecChangeMinutes;
+    /** 不同大卷同规格切换耗时。 */
+    private int diffRollSameSpecChangeMinutes;
+    /** 不同大卷不同规格切换耗时。 */
+    private int diffRollDiffSpecChangeMinutes;
     /** 损耗率规则。 */
     private List<Cd90LossRateRule> lossRateRules;
     /** 是否为定点优先机台。 */

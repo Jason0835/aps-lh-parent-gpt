@@ -23,9 +23,13 @@ public final class Cd90AutoScheduleParamCode {
     public static final String STOP_LOOKAHEAD_DAYS = "SYS0701020";
     public static final String RESTART_STOCK_THRESHOLD = "SYS0701021";
     public static final String ROLL_TOTAL_COUNT = "SYS0701022";
-    public static final String SPEC_CHANGE_MINUTES = "SYS0701023";
+    public static final String SAME_ROLL_DIFF_SPEC_CHANGE_MINUTES = "SYS0701023";
+    /** 旧字段兼容别名，新代码使用SAME_ROLL_DIFF_SPEC_CHANGE_MINUTES。 */
+    public static final String SPEC_CHANGE_MINUTES = SAME_ROLL_DIFF_SPEC_CHANGE_MINUTES;
     public static final String TASK_TIMEOUT_MINUTES = "SYS0701024";
     public static final String AUTO_SCHEDULE_CRON = "SYS0701025";
+    public static final String DIFF_ROLL_SAME_SPEC_CHANGE_MINUTES = "SYS0701026";
+    public static final String DIFF_ROLL_DIFF_SPEC_CHANGE_MINUTES = "SYS0701027";
 
     public static final List<String> ALL_CODES = Collections.unmodifiableList(Arrays.asList(
             CRIMP_LENGTH,
@@ -40,9 +44,11 @@ public final class Cd90AutoScheduleParamCode {
             STOP_LOOKAHEAD_DAYS,
             RESTART_STOCK_THRESHOLD,
             ROLL_TOTAL_COUNT,
-            SPEC_CHANGE_MINUTES,
+            SAME_ROLL_DIFF_SPEC_CHANGE_MINUTES,
             TASK_TIMEOUT_MINUTES,
-            AUTO_SCHEDULE_CRON
+            AUTO_SCHEDULE_CRON,
+            DIFF_ROLL_SAME_SPEC_CHANGE_MINUTES,
+            DIFF_ROLL_DIFF_SPEC_CHANGE_MINUTES
     ));
 
     private Cd90AutoScheduleParamCode() {

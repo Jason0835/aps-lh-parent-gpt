@@ -15,6 +15,8 @@ public class Cd90ScheduleCandidate {
 
     /** 帘布代码。 */
     private String clothCode;
+    /** 大卷代码，对应施工CORD_SPEC。 */
+    private String bigRollCode;
     /** 当前直裁班次是否会发生缺料。 */
     private boolean shortageInCurrentShift;
     /** 最早缺料时点。 */

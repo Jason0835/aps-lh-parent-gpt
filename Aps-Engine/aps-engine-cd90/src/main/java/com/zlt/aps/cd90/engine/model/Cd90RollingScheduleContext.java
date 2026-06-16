@@ -28,4 +28,6 @@ public class Cd90RollingScheduleContext {
     private List<Cd90ShiftScheduleTask> committedTasks;
     /** 各机台最近一次已提交任务的机尾规格。 */
     private Map<String, String> tailSpecByMachine;
+    /** 各机台最近一次已提交任务的机尾大卷与直裁规格。 */
+    private Map<String, Cd90MachineTailState> tailByMachine;
 }

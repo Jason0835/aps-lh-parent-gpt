@@ -1,6 +1,7 @@
 package com.zlt.aps.cd90.engine.algorithm;
 
 import com.zlt.aps.cd90.engine.model.Cd90MachineTrial;
+import com.zlt.aps.cd90.engine.model.Cd90MachineTailState;
 import com.zlt.aps.cd90.engine.model.Cd90ShiftCommitRequest;
 import com.zlt.aps.cd90.engine.model.Cd90ShiftCommitResult;
 import com.zlt.aps.cd90.engine.model.Cd90ShiftResourceState;
@@ -44,7 +45,8 @@ public class Cd90ShiftResourceCommitter {
         }
         List<Cd90MachineTrial> remainingTrials = request.getTrialPlan().getTrials() == null
                 ? new ArrayList<>() : new ArrayList<>(request.getTrialPlan().getTrials());
-        String lastFailureReason = "NO_AVAILABLE_MACHINE";
+        String lastFailureReason = request.getTrialPlan().getFailureReason() == null
+                ? "NO_AVAILABLE_MACHINE" : request.getTrialPlan().getFailureReason();
         while (!remainingTrials.isEmpty()) {
             // 每次选择当前最优机台；该机台资源失败后移除并继续尝试下一候选机台。
             Cd90MachineTrial trial = trialSelector.select(remainingTrials);
@@ -94,6 +96,8 @@ public class Cd90ShiftResourceCommitter {
                     + allocation.getRequiredVehicleCount());
             working.getRemainingSecondsByMachine().put(trial.getMachineCode(), afterSeconds);
             working.getTailSpecByMachine().put(trial.getMachineCode(), request.getCordSpec());
+            working.getTailByMachine().put(trial.getMachineCode(), Cd90MachineTailState.builder()
+                    .clothCode(request.getClothCode()).bigRollCode(request.getBigRollCode()).build());
             working.getTasks().add(task);
             log.info("[直裁自动排程] 当前班次资源提交成功, classField={}, clothCode={}, "
                             + "machineCode={}, planQuantity={}, vehicleCount={}, produceOrder={}",
@@ -123,8 +127,19 @@ public class Cd90ShiftResourceCommitter {
                 .occupiedToolingCount(source.getOccupiedToolingCount())
                 .remainingSecondsByMachine(copyMap(source.getRemainingSecondsByMachine()))
                 .tailSpecByMachine(copyMap(source.getTailSpecByMachine()))
+                .tailByMachine(copyTailMap(source.getTailByMachine()))
                 .tasks(source.getTasks() == null ? new ArrayList<>() : new ArrayList<>(source.getTasks()))
                 .build();
+    }
+
+    private Map<String, Cd90MachineTailState> copyTailMap(Map<String, Cd90MachineTailState> source) {
+        Map<String, Cd90MachineTailState> result = new HashMap<>();
+        if (source != null) {
+            source.forEach((machineCode, tail) -> result.put(machineCode, tail == null ? null
+                    : Cd90MachineTailState.builder().clothCode(tail.getClothCode())
+                            .bigRollCode(tail.getBigRollCode()).build()));
+        }
+        return result;
     }
 
     private <K, V> Map<K, V> copyMap(Map<K, V> source) {

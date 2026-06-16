@@ -45,6 +45,7 @@ public class Cd90RollingScheduleContextManager {
                 .plannedInboundRecords(new ArrayList<>())
                 .committedTasks(new ArrayList<>())
                 .tailSpecByMachine(new HashMap<>())
+                .tailByMachine(new HashMap<>())
                 .build();
     }
 
@@ -98,6 +99,7 @@ public class Cd90RollingScheduleContextManager {
                 .occupiedToolingCount(snapshot.getOccupiedVehicleCount())
                 .remainingSecondsByMachine(remainingSeconds)
                 .tailSpecByMachine(new HashMap<>(context.getTailSpecByMachine()))
+                .tailByMachine(copyTails(context.getTailByMachine()))
                 .tasks(new ArrayList<>()).build();
     }
 
@@ -122,6 +124,7 @@ public class Cd90RollingScheduleContextManager {
         // 机尾规格跨班继承，用于下一班判断是否发生规格切换和相应耗时。
         context.setTailSpecByMachine(completedState.getTailSpecByMachine() == null
                 ? new HashMap<>() : new HashMap<>(completedState.getTailSpecByMachine()));
+        context.setTailByMachine(copyTails(completedState.getTailByMachine()));
         log.info("[直裁自动排程] 当前班次滚动上下文已保存, taskCount={}, "
                         + "plannedInboundCount={}, machineTailCount={}",
                 completedState.getTasks().size(), context.getPlannedInboundRecords().size(),
@@ -185,5 +188,17 @@ public class Cd90RollingScheduleContextManager {
                 .laneCode(item.getLaneCode()).clothCode(item.getClothCode())
                 .vehicleCount(item.getVehicleCount()).maxVehicleCount(item.getMaxVehicleCount())
                 .build()).collect(Collectors.toList());
+    }
+
+    /** 复制机台链尾状态，避免跨班共享可变对象。 */
+    private Map<String, com.zlt.aps.cd90.engine.model.Cd90MachineTailState> copyTails(
+            Map<String, com.zlt.aps.cd90.engine.model.Cd90MachineTailState> source) {
+        Map<String, com.zlt.aps.cd90.engine.model.Cd90MachineTailState> result = new HashMap<>();
+        if (source != null) {
+            source.forEach((machineCode, tail) -> result.put(machineCode, tail == null ? null
+                    : com.zlt.aps.cd90.engine.model.Cd90MachineTailState.builder()
+                            .clothCode(tail.getClothCode()).bigRollCode(tail.getBigRollCode()).build()));
+        }
+        return result;
     }
 }

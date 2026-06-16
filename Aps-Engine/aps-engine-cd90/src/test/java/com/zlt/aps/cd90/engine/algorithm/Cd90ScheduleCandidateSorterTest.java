@@ -1,6 +1,7 @@
 package com.zlt.aps.cd90.engine.algorithm;
 
 import com.zlt.aps.cd90.engine.model.Cd90ScheduleCandidate;
+import com.zlt.aps.cd90.engine.model.Cd90MachineTailState;
 import org.junit.Test;
 
 import java.math.BigDecimal;
@@ -36,6 +37,45 @@ public class Cd90ScheduleCandidateSorterTest {
         assertEquals("C3", result.get(3).getClothCode());
     }
 
+    /**
+     * 相同缺料优先级内，直裁规格连续优先于大卷连续。
+     */
+    @Test
+    public void shouldSortBySpecThenRollContinuity() {
+        LocalDateTime shortageTime = LocalDateTime.of(2026, 6, 13, 14, 0);
+        Cd90MachineTailState tail = Cd90MachineTailState.builder()
+                .clothCode("C1").bigRollCode("R1").build();
+
+        List<Cd90ScheduleCandidate> result = sorter.sort(Arrays.asList(
+                candidate("C2", "R2", true, shortageTime, "1"),
+                candidate("C2", "R1", true, shortageTime, "1"),
+                candidate("C1", "R2", true, shortageTime, "1"),
+                candidate("C1", "R1", true, shortageTime, "1")
+        ), tail);
+
+        assertEquals("R1/C1", key(result.get(0)));
+        assertEquals("R2/C1", key(result.get(1)));
+        assertEquals("R1/C2", key(result.get(2)));
+        assertEquals("R2/C2", key(result.get(3)));
+    }
+
+    /**
+     * 连续生产规则不能覆盖更紧急的本班缺料候选。
+     */
+    @Test
+    public void urgentShortageShouldRemainFirst() {
+        LocalDateTime shortageTime = LocalDateTime.of(2026, 6, 13, 14, 0);
+        Cd90MachineTailState tail = Cd90MachineTailState.builder()
+                .clothCode("C1").bigRollCode("R1").build();
+
+        List<Cd90ScheduleCandidate> result = sorter.sort(Arrays.asList(
+                candidate("C1", "R1", false, shortageTime, "1"),
+                candidate("C2", "R2", true, shortageTime, "2")
+        ), tail);
+
+        assertEquals("R2/C2", key(result.get(0)));
+    }
+
     private Cd90ScheduleCandidate candidate(String clothCode,
                                             boolean shortageInCurrentShift,
                                             LocalDateTime shortageTime,
@@ -46,5 +86,22 @@ public class Cd90ScheduleCandidateSorterTest {
                 .earliestShortageTime(shortageTime)
                 .stockSupplyHours(new BigDecimal(supplyHours))
                 .build();
+    }
+
+    private Cd90ScheduleCandidate candidate(String clothCode,
+                                            String bigRollCode,
+                                            boolean shortageInCurrentShift,
+                                            LocalDateTime shortageTime,
+                                            String supplyHours) {
+        return Cd90ScheduleCandidate.builder()
+                .clothCode(clothCode).bigRollCode(bigRollCode)
+                .shortageInCurrentShift(shortageInCurrentShift)
+                .earliestShortageTime(shortageTime)
+                .stockSupplyHours(new BigDecimal(supplyHours))
+                .build();
+    }
+
+    private String key(Cd90ScheduleCandidate candidate) {
+        return candidate.getBigRollCode() + "/" + candidate.getClothCode();
     }
 }

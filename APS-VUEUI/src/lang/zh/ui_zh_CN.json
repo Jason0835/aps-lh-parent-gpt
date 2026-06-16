@@ -3238,7 +3238,7 @@
   "ui.data.column.cd90MachineMaintenancePlan.checkUnique": "同一工厂下已存在相同机台和停机时间段的检修计划",
   "ui.data.column.cd90MachineRollMapping.modelName": "直裁大卷与机台映射",
   "ui.data.column.cd90MachineRollMapping.factoryCode": "工厂",
-  "ui.data.column.cd90MachineRollMapping.bigRollCode": "钢压大卷代码",
+  "ui.data.column.cd90MachineRollMapping.bigRollCode": "大卷",
   "ui.data.column.cd90MachineRollMapping.cordFabricCode": "帘布代码",
   "ui.data.column.cd90MachineRollMapping.machineCode": "机台编码",
   "ui.data.column.cd90MachineRollMapping.checkUnique": "同一工厂下已存在相同大卷和机台的映射",

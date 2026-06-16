@@ -44,6 +44,12 @@ public class Cd90AutoScheduleParameters {
     private BigDecimal rollCoilMeter;
     /** 规格切换耗时，单位为分钟。 */
     private int specChangeMinutes;
+    /** 同大卷不同直裁规格切换耗时，单位分钟。 */
+    private int sameRollDiffSpecChangeMinutes;
+    /** 不同大卷同直裁规格切换耗时，单位分钟。 */
+    private int diffRollSameSpecChangeMinutes;
+    /** 不同大卷不同直裁规格切换耗时，单位分钟。 */
+    private int diffRollDiffSpecChangeMinutes;
     /** 自动排程任务超时分钟数。 */
     private int taskTimeoutMinutes;
     /** 自动排程定时表达式。 */

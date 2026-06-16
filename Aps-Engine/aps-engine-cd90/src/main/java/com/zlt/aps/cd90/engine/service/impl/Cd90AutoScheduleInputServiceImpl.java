@@ -10,15 +10,18 @@ import com.zlt.aps.cd90.engine.mapper.Cd90EngineConstructionMapper;
 import com.zlt.aps.cd90.engine.mapper.Cd90EngineCxScheduleMapper;
 import com.zlt.aps.cd90.engine.mapper.Cd90EngineStockMapper;
 import com.zlt.aps.cd90.engine.mapper.Cd90EngineStorageLaneMapper;
+import com.zlt.aps.cd90.engine.mapper.Cd90EngineMonthSurplusMapper;
 import com.zlt.aps.cd90.engine.model.Cd90AutoScheduleInput;
 import com.zlt.aps.cd90.engine.model.Cd90ConstructionMaterial;
 import com.zlt.aps.cd90.engine.model.Cd90DemandShift;
 import com.zlt.aps.cd90.engine.model.Cd90FormingScheduleSource;
+import com.zlt.aps.cd90.engine.model.Cd90EmbryoPlanSurplus;
 import com.zlt.aps.cd90.engine.model.Cd90StockSource;
 import com.zlt.aps.cd90.engine.model.Cd90StorageLaneState;
 import com.zlt.aps.cd90.engine.service.Cd90AutoScheduleInputService;
 import com.zlt.aps.cx.api.domain.entity.CxScheduleResult;
 import com.zlt.aps.mdm.api.domain.entity.MdmConstructionInfo;
+import com.zlt.aps.mdm.api.domain.entity.MdmMonthSurplus;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -44,6 +47,7 @@ public class Cd90AutoScheduleInputServiceImpl implements Cd90AutoScheduleInputSe
     private final Cd90EngineConstructionMapper constructionMapper;
     private final Cd90EngineStockMapper stockMapper;
     private final Cd90EngineStorageLaneMapper storageLaneMapper;
+    private final Cd90EngineMonthSurplusMapper monthSurplusMapper;
     private final Cd90ConstructionMaterialMapper constructionMaterialMapper;
     private final Cd90AutoScheduleSourceMapper sourceMapper;
     private final Cd90FormingDemandExpander formingDemandExpander;
@@ -81,6 +85,8 @@ public class Cd90AutoScheduleInputServiceImpl implements Cd90AutoScheduleInputSe
                 factoryCode, embryoCodes);
         List<Cd90DemandShift> demandShifts = formingDemandExpander.expand(
                 formingSchedules, constructionMaterials);
+        List<Cd90EmbryoPlanSurplus> embryoPlanSurpluses = loadEmbryoPlanSurpluses(
+                factoryCode, scheduleDate, embryoCodes);
 
         List<Cd90StockSource> stocksAtSix = stockMapper.selectList(Wrappers.<Cd90Stock>lambdaQuery()
                         .eq(Cd90Stock::getFactoryCode, factoryCode)
@@ -111,10 +117,31 @@ public class Cd90AutoScheduleInputServiceImpl implements Cd90AutoScheduleInputSe
                 .formingSchedules(formingSchedules)
                 .constructionMaterials(constructionMaterials)
                 .stocksAtSix(stocksAtSix)
+                .embryoPlanSurpluses(embryoPlanSurpluses)
                 .demandShifts(demandShifts)
                 .storageLanesAtSix(storageLanesAtSix)
                 .inboundRecords(Collections.emptyList())
                 .build();
+    }
+
+    /** 按胎胚代码加载当前排程月份的月计划剩余量。 */
+    private List<Cd90EmbryoPlanSurplus> loadEmbryoPlanSurpluses(String factoryCode,
+                                                                LocalDate scheduleDate,
+                                                                Set<String> embryoCodes) {
+        if (embryoCodes.isEmpty()) {
+            return Collections.emptyList();
+        }
+        return monthSurplusMapper.selectList(Wrappers.<MdmMonthSurplus>lambdaQuery()
+                        .select(MdmMonthSurplus::getMaterialCode, MdmMonthSurplus::getPlanSurplusQty)
+                        .eq(MdmMonthSurplus::getFactoryCode, factoryCode)
+                        .eq(MdmMonthSurplus::getYear, scheduleDate.getYear())
+                        .eq(MdmMonthSurplus::getMonth, scheduleDate.getMonthValue())
+                        .in(MdmMonthSurplus::getMaterialCode, embryoCodes)
+                        .orderByAsc(MdmMonthSurplus::getMaterialCode))
+                .stream().map(item -> Cd90EmbryoPlanSurplus.builder()
+                        .embryoCode(item.getMaterialCode())
+                        .planSurplusQuantity(item.getPlanSurplusQty()).build())
+                .collect(Collectors.toList());
     }
 
     private List<CxScheduleResult> loadFormingSchedules(String factoryCode,

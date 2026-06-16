@@ -20,6 +20,8 @@ public class Cd90ShiftResourceState {
     private Map<String, Integer> remainingSecondsByMachine;
     /** 各机台任务链尾帘线规格。 */
     private Map<String, String> tailSpecByMachine;
+    /** 各机台任务链尾大卷与直裁规格。 */
+    private Map<String, Cd90MachineTailState> tailByMachine;
     /** 当前班次已提交任务链。 */
     private List<Cd90ShiftScheduleTask> tasks;
 }

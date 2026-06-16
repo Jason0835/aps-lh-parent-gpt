@@ -5,6 +5,10 @@ import com.zlt.aps.cd90.engine.model.Cd90AutoScheduleInput;
 import com.zlt.aps.cd90.engine.model.Cd90CloseOutDecision;
 import com.zlt.aps.cd90.engine.model.Cd90ConstructionMaterial;
 import com.zlt.aps.cd90.engine.model.Cd90MachineResourceSnapshot;
+import com.zlt.aps.cd90.engine.model.Cd90MachineTailState;
+import com.zlt.aps.cd90.engine.model.Cd90EmbryoCloseOutItem;
+import com.zlt.aps.cd90.engine.model.Cd90EmbryoPlanSurplus;
+import com.zlt.aps.cd90.engine.model.Cd90FormingScheduleSource;
 import com.zlt.aps.cd90.engine.model.Cd90MachineTrialPlan;
 import com.zlt.aps.cd90.engine.model.Cd90MachineTrialRequest;
 import com.zlt.aps.cd90.engine.model.Cd90RollingScheduleContext;
@@ -32,6 +36,9 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.HashSet;
+import java.util.stream.Collectors;
 
 /**
  * 单个直裁班次的候选规格执行器。
@@ -47,6 +54,7 @@ public class Cd90SingleShiftScheduleExecutor implements Cd90SingleShiftScheduleS
     private final Cd90MachineTrialPreparationService trialPreparationService;
     private final Cd90ShiftResourceCommitter resourceCommitter;
     private final Cd90CloseOutCalculator closeOutCalculator;
+    private final Cd90ScheduleCandidateSorter candidateSorter;
 
     /**
      * 逐规格执行机台试算和资源原子提交；规格失败不会中断后续候选。
@@ -59,8 +67,9 @@ public class Cd90SingleShiftScheduleExecutor implements Cd90SingleShiftScheduleS
                                             Cd90RollingScheduleContext rolling) {
         validate(context, input, shift, initialState);
         // 候选已按当前班缺料时间和库存保障时长排序，后续必须保持该稳定顺序执行。
-        List<Cd90ScheduleCandidate> candidates = candidatePreparationService.prepare(
-                context, input, shift.getClassField());
+        List<Cd90ScheduleCandidate> candidates = new ArrayList<>(candidatePreparationService.prepare(
+                context, input, shift.getClassField()));
+        attachBigRollCodes(candidates, input.getConstructionMaterials());
         // 机台快照在班次开始时一次加载，规格之间通过state扣减剩余秒数，避免重复查询造成漂移。
         Cd90MachineResourceSnapshot machineSnapshot = machineResourceService.load(
                 context.getFactoryCode(), shift.getStartTime(), shift.getEndTime());
@@ -70,7 +79,11 @@ public class Cd90SingleShiftScheduleExecutor implements Cd90SingleShiftScheduleS
 
         log.info("[直裁自动排程] 当前班次执行开始, classField={}, shiftCode={}, candidateCount={}",
                 shift.getClassField(), shift.getShiftCode(), candidates.size());
-        for (Cd90ScheduleCandidate candidate : candidates) {
+        while (!candidates.isEmpty()) {
+            // 每提交一个任务后按最新链尾重新排序，使同规格优先规则能够连续生效。
+            Cd90MachineTailState latestTail = latestTail(state);
+            candidates = candidateSorter.sort(candidates, latestTail);
+            Cd90ScheduleCandidate candidate = candidates.remove(0);
             String clothCode = candidate == null ? null : candidate.getClothCode();
             if (!StringUtils.hasText(clothCode)) {
                 continue;
@@ -94,11 +107,13 @@ public class Cd90SingleShiftScheduleExecutor implements Cd90SingleShiftScheduleS
                 continue;
             }
             Cd90CloseOutDecision closeOut = closeOutCalculator.decide(
-                    demand.getPlanSurplusQuantity(), netDemand);
+                    closeOutItems(clothCode, input));
             if (closeOut.isMissingPlanSurplusWarning()) {
                 log.warn("[直裁自动排程] 月计划剩余量缺失, classField={}, clothCode={}",
                         shift.getClassField(), clothCode);
             }
+            log.info("[直裁自动排程] 规格收尾判断完成, classField={}, clothCode={}, closeOut={}, details={}",
+                    shift.getClassField(), clothCode, closeOut.isCloseOut(), closeOut.getEmbryoItems());
             // 先生成全部可行机台试算，再由资源提交器按优先级逐个尝试库排和工装占用。
             Cd90MachineTrialPlan trialPlan = trialPreparationService.prepare(
                     trialRequest(context, shift, state, construction, netDemand, closeOut.isCloseOut()),
@@ -157,6 +172,7 @@ public class Cd90SingleShiftScheduleExecutor implements Cd90SingleShiftScheduleS
                 .shiftHours(Math.max(1, shift.getDurationSeconds() / 3600))
                 .remainingSecondsByMachine(state.getRemainingSecondsByMachine())
                 .previousSpecByMachine(state.getTailSpecByMachine())
+                .previousTailByMachine(state.getTailByMachine())
                 .parameters(context.getParameters()).build();
     }
 
@@ -183,8 +199,59 @@ public class Cd90SingleShiftScheduleExecutor implements Cd90SingleShiftScheduleS
                 .findFirst().orElse(null);
     }
 
+    /** 根据施工映射补充候选大卷，供非开产模式连续排序使用。 */
+    private void attachBigRollCodes(List<Cd90ScheduleCandidate> candidates,
+                                    List<Cd90ConstructionMaterial> materials) {
+        for (Cd90ScheduleCandidate candidate : safe(candidates)) {
+            Cd90ConstructionMaterial material = candidate == null ? null
+                    : findConstruction(materials, candidate.getClothCode());
+            if (material != null) {
+                candidate.setBigRollCode(material.getBigRollCode());
+            }
+        }
+    }
+
+    /** 当前班最后提交任务作为下一候选的连续生产参照。 */
+    private Cd90MachineTailState latestTail(Cd90ShiftResourceState state) {
+        if (state == null || state.getTasks() == null || state.getTasks().isEmpty()) {
+            return null;
+        }
+        com.zlt.aps.cd90.engine.model.Cd90ShiftScheduleTask task =
+                state.getTasks().get(state.getTasks().size() - 1);
+        return Cd90MachineTailState.builder().clothCode(task.getClothCode())
+                .bigRollCode(task.getBigRollCode()).build();
+    }
+
     private int occupiedVehicles(List<Cd90StorageLaneState> lanes) {
         return safe(lanes).stream().mapToInt(Cd90StorageLaneState::getVehicleCount).sum();
+    }
+
+    /** 汇总当前直裁规格关联胎胚的计划量，并与各自月计划剩余量配对。 */
+    private List<Cd90EmbryoCloseOutItem> closeOutItems(String clothCode,
+                                                       Cd90AutoScheduleInput input) {
+        Set<String> embryoCodes = safe(input.getConstructionMaterials()).stream()
+                .filter(item -> item != null && clothCode.equals(item.getClothCode()))
+                .map(Cd90ConstructionMaterial::getConstructionCode)
+                .filter(StringUtils::hasText).collect(Collectors.toCollection(HashSet::new));
+        Map<String, BigDecimal> planByEmbryo = safe(input.getFormingSchedules()).stream()
+                .filter(item -> item != null && embryoCodes.contains(item.getEmbryoCode()))
+                .collect(Collectors.groupingBy(Cd90FormingScheduleSource::getEmbryoCode,
+                        Collectors.reducing(BigDecimal.ZERO, this::sumClassPlanQuantities,
+                                BigDecimal::add)));
+        Map<String, BigDecimal> surplusByEmbryo = safe(input.getEmbryoPlanSurpluses()).stream()
+                .filter(item -> item != null && StringUtils.hasText(item.getEmbryoCode()))
+                .collect(Collectors.toMap(Cd90EmbryoPlanSurplus::getEmbryoCode,
+                        Cd90EmbryoPlanSurplus::getPlanSurplusQuantity, (first, second) -> second));
+        return embryoCodes.stream().sorted().map(embryoCode -> Cd90EmbryoCloseOutItem.builder()
+                .embryoCode(embryoCode)
+                .calculatedPlanQuantity(planByEmbryo.getOrDefault(embryoCode, BigDecimal.ZERO))
+                .planSurplusQuantity(surplusByEmbryo.get(embryoCode)).build())
+                .collect(Collectors.toList());
+    }
+
+    private BigDecimal sumClassPlanQuantities(Cd90FormingScheduleSource source) {
+        return safe(source.getClassPlanQuantities()).stream().filter(java.util.Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
     private void recordFailure(Map<String, String> failures, Cd90ShiftDescriptor shift,

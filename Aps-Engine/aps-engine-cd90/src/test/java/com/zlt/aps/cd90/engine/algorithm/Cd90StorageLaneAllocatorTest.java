@@ -54,6 +54,20 @@ public class Cd90StorageLaneAllocatorTest {
         assertEquals(null, original.get(1).getClothCode());
     }
 
+    @Test
+    public void sameClothLanesShouldUseHigherVehicleCountFirst() {
+        List<Cd90StorageLaneState> original = Arrays.asList(
+                lane("L1", "CF001", 2, 7),
+                lane("L2", "CF001", 5, 7),
+                lane("L3", "CF001", 3, 7));
+
+        Cd90StorageLaneAllocationResult result = allocator.allocate(
+                "CF001", new BigDecimal("300"), new BigDecimal("100"), original);
+
+        assertEquals("L2", result.getAllocations().get(0).getLaneCode());
+        assertEquals("L3", result.getAllocations().get(1).getLaneCode());
+    }
+
     private Cd90StorageLaneState lane(String code, String clothCode, int count, int max) {
         return Cd90StorageLaneState.builder().laneCode(code).clothCode(clothCode)
                 .vehicleCount(count).maxVehicleCount(max).build();

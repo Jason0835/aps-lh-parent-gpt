@@ -44,9 +44,15 @@ public class Cd90CandidateMachineTrialCalculator {
                 input.getMinimumStartQuantity(), input.getCoilMeter());
         Cd90ToolingTrial tooling = toolingCalculator.calculate(
                 actualQuantity, input.getTotalToolingCount(), input.getOccupiedVehicleCount(), input.getCoilMeter());
-        Cd90MachineCapacityTrial capacity = capacityCalculator.calculateWithRemainingSeconds(
-                input.getQuota(), input.getShiftHours(), input.getRemainingSeconds(),
-                input.getPreviousSpec(), input.getCurrentSpec(), input.getSpecChangeMinutes(), actualQuantity);
+        Cd90MachineCapacityTrial capacity = input.getCurrentTail() == null
+                ? capacityCalculator.calculateWithRemainingSeconds(
+                        input.getQuota(), input.getShiftHours(), input.getRemainingSeconds(),
+                        input.getPreviousSpec(), input.getCurrentSpec(), input.getSpecChangeMinutes(), actualQuantity)
+                : capacityCalculator.calculateWithRemainingSeconds(
+                        input.getQuota(), input.getShiftHours(), input.getRemainingSeconds(),
+                        input.getPreviousTail(), input.getCurrentTail(),
+                        input.getSameRollDiffSpecChangeMinutes(), input.getDiffRollSameSpecChangeMinutes(),
+                        input.getDiffRollDiffSpecChangeMinutes(), actualQuantity);
         BigDecimal finalQuantity = actualQuantity
                 .min(tooling.getSchedulableQuantity())
                 .min(capacity.getCapacityQuantity());
@@ -62,8 +68,12 @@ public class Cd90CandidateMachineTrialCalculator {
                 .fullyAccommodated(finalQuantity.compareTo(actualQuantity) >= 0)
                 .preferredMachine(input.isPreferredMachine())
                 .priorityOrder(input.getPriorityOrder())
-                .sameTailSpec(input.getPreviousSpec() != null
-                        && input.getPreviousSpec().equals(input.getCurrentSpec()))
+                .sameTailSpec(input.getCurrentTail() == null
+                        ? input.getPreviousSpec() != null && input.getPreviousSpec().equals(input.getCurrentSpec())
+                        : input.getPreviousTail() != null
+                                && input.getPreviousTail().getClothCode() != null
+                                && input.getPreviousTail().getClothCode()
+                                        .equals(input.getCurrentTail().getClothCode()))
                 .remainingSeconds(capacity.getRemainingSeconds())
                 .build();
         log.debug("[直裁自动排程] 候选机台试算完成, clothCode={}, machineCode={}, lossRateLevel={}, "

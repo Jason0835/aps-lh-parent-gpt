@@ -32,6 +32,9 @@ public class Cd90AutoScheduleParameterParserTest {
         assertEquals(6, result.getScheduleWindow());
         assertEquals(new BigDecimal("2.5"), result.getStockGuaranteeShifts());
         assertEquals(12, result.getRollTotalCount());
+        assertEquals(5, result.getSameRollDiffSpecChangeMinutes());
+        assertEquals(7, result.getDiffRollSameSpecChangeMinutes());
+        assertEquals(9, result.getDiffRollDiffSpecChangeMinutes());
         assertEquals(30, result.getTaskTimeoutMinutes());
     }
 
@@ -77,6 +80,8 @@ public class Cd90AutoScheduleParameterParserTest {
         params.add(param("SYS0701023", "5"));
         params.add(param("SYS0701024", "30"));
         params.add(param("SYS0701025", "0 0 1 * * ?"));
+        params.add(param("SYS0701026", "7"));
+        params.add(param("SYS0701027", "9"));
         params.add(param("SYS0701011", "87"));
         return params;
     }

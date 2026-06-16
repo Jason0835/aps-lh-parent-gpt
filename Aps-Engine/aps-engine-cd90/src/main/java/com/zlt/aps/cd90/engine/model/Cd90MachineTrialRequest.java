@@ -26,5 +26,6 @@ public class Cd90MachineTrialRequest {
     private int shiftHours;
     private Map<String, Integer> remainingSecondsByMachine;
     private Map<String, String> previousSpecByMachine;
+    private Map<String, Cd90MachineTailState> previousTailByMachine;
     private Cd90AutoScheduleParameters parameters;
 }

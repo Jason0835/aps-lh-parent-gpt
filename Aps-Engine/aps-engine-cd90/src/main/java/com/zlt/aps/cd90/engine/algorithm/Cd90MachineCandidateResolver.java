@@ -4,6 +4,7 @@ import com.zlt.aps.cd90.engine.model.Cd90MachineCandidate;
 import com.zlt.aps.cd90.engine.model.Cd90MachineResource;
 import com.zlt.aps.cd90.engine.model.Cd90MachineRestriction;
 import com.zlt.aps.cd90.engine.model.Cd90MachineRollBinding;
+import com.zlt.aps.cd90.engine.model.Cd90MachineCandidateResolution;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
@@ -23,7 +24,7 @@ public class Cd90MachineCandidateResolver {
      * 按大卷绑定、机台状态、开机班次、不可作业和检修约束生成候选机台。
      *
      * @param clothCode 帘布代码
-     * @param bigRollCode 钢压大卷代码
+     * @param bigRollCode 大卷代码，对应施工CORD_SPEC
      * @param shiftCode 当前班次编码
      * @param shiftStart 班次开始时间
      * @param shiftEnd 班次结束时间
@@ -34,6 +35,20 @@ public class Cd90MachineCandidateResolver {
      * @return 已过滤并排序的候选机台
      */
     public List<Cd90MachineCandidate> resolve(String clothCode,
+                                              String bigRollCode,
+                                              String shiftCode,
+                                              LocalDateTime shiftStart,
+                                              LocalDateTime shiftEnd,
+                                              List<Cd90MachineResource> machines,
+                                              List<Cd90MachineRollBinding> bindings,
+                                              List<Cd90MachineRestriction> restrictions,
+                                              List<String> machinePriority) {
+        return resolveDetailed(clothCode, bigRollCode, shiftCode, shiftStart, shiftEnd,
+                machines, bindings, restrictions, machinePriority).getCandidates();
+    }
+
+    /** 生成候选机台并区分无绑定与绑定机台全部不可作业。 */
+    public Cd90MachineCandidateResolution resolveDetailed(String clothCode,
                                               String bigRollCode,
                                               String shiftCode,
                                               LocalDateTime shiftStart,
@@ -60,7 +75,7 @@ public class Cd90MachineCandidateResolver {
                 .collect(Collectors.toSet());
 
         List<String> priority = machinePriority == null ? Collections.emptyList() : machinePriority;
-        return safe(machines).stream()
+        List<Cd90MachineCandidate> candidates = safe(machines).stream()
                 .filter(item -> boundMachines.contains(item.getMachineCode()))
                 .filter(item -> "0".equals(item.getStatus()))
                 .filter(item -> shiftCode != null && shiftCode.equals(item.getOpenMachineClass()))
@@ -76,6 +91,17 @@ public class Cd90MachineCandidateResolver {
                         .thenComparingInt(Cd90MachineCandidate::getPriorityOrder)
                         .thenComparing(Cd90MachineCandidate::getMachineCode))
                 .collect(Collectors.toList());
+        String failureReason = null;
+        if (boundMachines.isEmpty()) {
+            failureReason = "NO_MACHINE_MAPPING";
+        } else if (boundMachines.stream().allMatch(prohibited::contains)) {
+            failureReason = "MACHINE_PROHIBITED";
+        } else if (candidates.isEmpty()) {
+            failureReason = "NO_AVAILABLE_MACHINE";
+        }
+        return Cd90MachineCandidateResolution.builder().candidates(candidates)
+                .boundMachineCodes(boundMachines.stream().sorted().collect(Collectors.toList()))
+                .failureReason(failureReason).build();
     }
 
     private boolean overlaps(Cd90MachineResource machine,

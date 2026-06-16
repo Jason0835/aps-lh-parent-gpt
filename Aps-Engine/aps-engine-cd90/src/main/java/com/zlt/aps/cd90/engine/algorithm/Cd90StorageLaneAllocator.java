@@ -46,7 +46,8 @@ public class Cd90StorageLaneAllocator {
                         || item.getVehicleCount() == 0)
                 .sorted(Comparator
                         .comparing((Cd90StorageLaneState item) -> !clothCode.equals(item.getClothCode()))
-                        .thenComparingInt(Cd90StorageLaneState::getVehicleCount)
+                        .thenComparing(Comparator.comparingInt(
+                                Cd90StorageLaneState::getVehicleCount).reversed())
                         .thenComparing(Cd90StorageLaneState::getLaneCode))
                 .collect(Collectors.toList());
         int remaining = required;

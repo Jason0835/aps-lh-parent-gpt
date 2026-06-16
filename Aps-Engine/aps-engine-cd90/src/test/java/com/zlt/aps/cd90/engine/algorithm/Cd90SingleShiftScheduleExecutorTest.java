@@ -42,7 +42,7 @@ public class Cd90SingleShiftScheduleExecutorTest {
         Cd90MachineResourceService machineService = (factoryCode, start, end) -> machineSnapshot();
         Cd90SingleShiftScheduleExecutor executor = new Cd90SingleShiftScheduleExecutor(
                 candidates, demandProvider, machineService, trialPreparation(), committer(),
-                new Cd90CloseOutCalculator());
+                new Cd90CloseOutCalculator(), new Cd90ScheduleCandidateSorter());
 
         Cd90ShiftExecutionResult result = executor.execute(context(), input(), shift(), state(), null);
 

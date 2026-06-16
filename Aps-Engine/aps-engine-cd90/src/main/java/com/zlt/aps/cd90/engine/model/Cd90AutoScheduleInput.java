@@ -20,6 +20,8 @@ public class Cd90AutoScheduleInput {
     private List<Cd90ConstructionMaterial> constructionMaterials;
     /** 6点库存来源数据。 */
     private List<Cd90StockSource> stocksAtSix;
+    /** 胎胚月计划剩余量。 */
+    private List<Cd90EmbryoPlanSurplus> embryoPlanSurpluses;
 
     /** 当前班次需求窗口明细。 */
     private List<Cd90DemandShift> demandShifts;

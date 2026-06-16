@@ -1,9 +1,14 @@
 package com.zlt.aps.cd90.engine.algorithm;
 
 import com.zlt.aps.cd90.engine.model.Cd90CloseOutDecision;
+import com.zlt.aps.cd90.engine.model.Cd90EmbryoCloseOutItem;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * 直裁收尾规格判定器。
@@ -28,6 +33,7 @@ public class Cd90CloseOutCalculator {
             return Cd90CloseOutDecision.builder()
                     .closeOut(false)
                     .missingPlanSurplusWarning(true)
+                    .embryoItems(Collections.emptyList())
                     .build();
         }
         if (planSurplusQuantity.signum() < 0) {
@@ -36,6 +42,32 @@ public class Cd90CloseOutCalculator {
         return Cd90CloseOutDecision.builder()
                 .closeOut(planSurplusQuantity.compareTo(netDemandQuantity) <= 0)
                 .missingPlanSurplusWarning(false)
+                .embryoItems(Collections.emptyList())
                 .build();
+    }
+
+    /**
+     * 按胎胚逐项比较计划数和月计划剩余量，全部达到才判定直裁规格收尾。
+     */
+    public Cd90CloseOutDecision decide(List<Cd90EmbryoCloseOutItem> items) {
+        List<Cd90EmbryoCloseOutItem> source = items == null ? Collections.emptyList() : items;
+        if (source.isEmpty()) {
+            return Cd90CloseOutDecision.builder().closeOut(false)
+                    .missingPlanSurplusWarning(true).embryoItems(new ArrayList<>()).build();
+        }
+        List<Cd90EmbryoCloseOutItem> details = source.stream().map(item -> {
+            BigDecimal plan = item == null ? null : item.getCalculatedPlanQuantity();
+            BigDecimal surplus = item == null ? null : item.getPlanSurplusQuantity();
+            boolean reached = plan != null && plan.signum() >= 0 && surplus != null
+                    && surplus.signum() >= 0 && plan.compareTo(surplus) >= 0;
+            return Cd90EmbryoCloseOutItem.builder()
+                    .embryoCode(item == null ? null : item.getEmbryoCode())
+                    .calculatedPlanQuantity(plan).planSurplusQuantity(surplus)
+                    .reached(reached).build();
+        }).collect(Collectors.toList());
+        boolean missing = details.stream().anyMatch(item -> item.getPlanSurplusQuantity() == null);
+        boolean closeOut = !missing && details.stream().allMatch(Cd90EmbryoCloseOutItem::isReached);
+        return Cd90CloseOutDecision.builder().closeOut(closeOut)
+                .missingPlanSurplusWarning(missing).embryoItems(details).build();
     }
 }

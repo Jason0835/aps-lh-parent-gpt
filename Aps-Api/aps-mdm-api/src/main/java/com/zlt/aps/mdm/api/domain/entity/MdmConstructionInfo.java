@@ -241,14 +241,19 @@ public class MdmConstructionInfo extends BaseEntity {
     @TableField(value = "ORIGINAL_LINE_CODE")
     private String originalLineCode;
 
-    /** 帘线规格 */
+    /** 大卷代码 */
 //    @Excel(name = "ui.data.column.mdmConstructionInfo.cordSpec")
-    @ApiModelProperty(value = "帘线规格", name = "cordSpec")
+    @ApiModelProperty(value = "大卷代码", name = "cordSpec")
     @TableField(value = "CORD_SPEC")
     private String cordSpec;
     
     /**帘线幅宽**/
     @ApiModelProperty(value = "帘线幅宽", name = "cordSpec")
+    @TableField(value = "CORD_WIDTH")
+    private BigDecimal cordWidth;
+
+    /** 大卷幅宽，同时作为直裁长度 */
+    @ApiModelProperty(value = "大卷幅宽，同时作为直裁长度", name = "cordWidth")
     @TableField(value = "CORD_WIDTH")
     private BigDecimal cordWidth;
 

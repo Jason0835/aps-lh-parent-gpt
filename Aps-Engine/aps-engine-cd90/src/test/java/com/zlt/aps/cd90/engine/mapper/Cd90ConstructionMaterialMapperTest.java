@@ -55,19 +55,24 @@ public class Cd90ConstructionMaterialMapperTest {
     }
 
     /**
-     * 旧Engine既有口径使用施工CORD_SPEC作为直裁钢压大卷代码和帘线规格。
+     * 施工CORD_SPEC只映射为大卷代码，并读取当前层位的直裁宽度和大卷幅宽。
      */
     @Test
-    public void shouldMapCordSpecAsBigRollCode() {
+    public void shouldMapBigRollAndCutDimensions() {
         MdmConstructionInfo construction = new MdmConstructionInfo();
         construction.setConstructionCode("EM001");
         construction.setCordSpec("BR001");
+        construction.setCordWidth(new BigDecimal("1400"));
         construction.setTireFabricCode1("CF001");
+        construction.setTireFabricCraft1("280.5");
         construction.setTireFabricLength1(new BigDecimal("500"));
 
         Cd90ConstructionMaterial result = mapper.map(construction).get(0);
 
         assertEquals("BR001", result.getBigRollCode());
-        assertEquals("BR001", result.getCordSpec());
+        assertEquals("CF001", result.getClothCode());
+        assertEquals(new BigDecimal("1400"), result.getCordWidth());
+        assertEquals(new BigDecimal("280.5"), result.getCraftWidth());
+        assertEquals("280.5", result.getCraftWidthRaw());
     }
 }

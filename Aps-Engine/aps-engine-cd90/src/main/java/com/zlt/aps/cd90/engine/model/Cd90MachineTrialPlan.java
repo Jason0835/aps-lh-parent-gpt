@@ -14,4 +14,6 @@ public class Cd90MachineTrialPlan {
 
     private List<Cd90MachineTrial> trials;
     private Cd90MachineTrial selectedTrial;
+    private String failureReason;
+    private List<String> boundMachineCodes;
 }
