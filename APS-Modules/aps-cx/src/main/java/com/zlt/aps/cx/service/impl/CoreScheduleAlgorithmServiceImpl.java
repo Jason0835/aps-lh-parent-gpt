@@ -1264,6 +1264,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         Map<String, Integer> taskTotalQtyMap = new LinkedHashMap<>();
         Map<String, String> taskStructureMap = new LinkedHashMap<>();
         Map<String, List<Long>> taskLhIdListMap = new LinkedHashMap<>();
+        Map<String, Set<String>> taskMaterialCodeMap = new LinkedHashMap<>();
 
         for (ShiftScheduleResult shiftResult : shiftResults) {
             int day = shiftResult.getDay();
@@ -1303,6 +1304,10 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                 final String effectiveClassField = effectiveClassFieldTmp;
 
                 String taskKey = machineCode + "|" + embryoCode + "|" + (spr.getConstructionStage() != null ? spr.getConstructionStage() : "");
+                // 独立追踪每个taskKey下的所有materialCode，不受后续merge丢失影响
+                if (!materialCode.isEmpty()) {
+                    taskMaterialCodeMap.computeIfAbsent(taskKey, k -> new LinkedHashSet<>()).add(materialCode);
+                }
                 taskClassSprMap.computeIfAbsent(taskKey, k -> new LinkedHashMap<>())
                         .compute(effectiveClassField, (k, existing) -> {
                             if (existing == null) {
@@ -1470,18 +1475,12 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             String machineCode = parts[0];
             String embryoCode = parts.length > 1 ? parts[1] : null;
             String constructionStage = parts.length > 2 && !parts[2].isEmpty() ? parts[2] : null;
-            // materialCode 不再作为 taskKey 的一部分，需要从 classSprMap 中收集所有唯一的materialCode
-            Set<String> materialCodeSet = new LinkedHashSet<>();
+            // materialCode 不再作为 taskKey 的一部分，从独立的 taskMaterialCodeMap 中获取
+            // 使用独立追踪的 Map 而非合并后的 Spr，避免 merge 逻辑丢失非首个 materialCode
+            Set<String> materialCodeSet = taskMaterialCodeMap.get(taskKey);
             String materialCode = null;
-            if (classSprMap != null && !classSprMap.isEmpty()) {
-                for (ShiftScheduleService.ShiftProductionResult spr : classSprMap.values()) {
-                    if (spr != null && spr.getMaterialCode() != null && !spr.getMaterialCode().isEmpty()) {
-                        materialCodeSet.add(spr.getMaterialCode());
-                    }
-                }
-                if (!materialCodeSet.isEmpty()) {
-                    materialCode = String.join(",", materialCodeSet);
-                }
+            if (materialCodeSet != null && !materialCodeSet.isEmpty()) {
+                materialCode = String.join(",", materialCodeSet);
             }
             String structureName = taskStructureMap.get(taskKey);
 
