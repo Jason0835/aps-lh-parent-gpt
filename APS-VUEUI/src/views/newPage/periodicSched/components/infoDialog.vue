@@ -146,14 +146,14 @@ export default {
       return [
       {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.mdmCycleSchStruConf.factoryCode"),
           type: "select",
           dictData: this.parentDict.type.biz_factory_name,
         },
 
         {
           prop: "structureName",
-          label: this.$t("ui.data.column.finishStock.structureName"),
+          label: this.$t("ui.data.column.mdmCycleSchStruConf.structureName"),
           maxlength:100,
           render: (form) => {
             return (
@@ -167,14 +167,14 @@ export default {
         },
         {
           prop: "turnoverMonth",
-          label: this.$t("ui.data.column.curingPlan.turnoverMonth"),
+          label: this.$t("ui.data.column.mdmCycleSchStruConf.turnoverMonth"),
           type:"number",
           max:50,
           min:0
         },
         {
           prop: "minVulcanizingMachine",
-          label: this.$t("ui.data.column.curingPlan.minVulcanizingMachine"),
+          label: this.$t("ui.data.column.mdmCycleSchStruConf.minVulcanizingMachine"),
           type: "number",
           max:999999,
           min:0

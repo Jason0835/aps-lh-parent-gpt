@@ -176,7 +176,7 @@ export default {
         { type: "selection", fixed: "left" },
         {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.mdmCycleSchStruConf.factoryCode"),
           width: 180,
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
@@ -184,23 +184,23 @@ export default {
         },
         {
           prop: "structureName",
-          label: this.$t("ui.data.column.finishStock.structureName"),
+          label: this.$t("ui.data.column.mdmCycleSchStruConf.structureName"),
 
         },
         {
           prop: "turnoverMonth",
           width: 180,
-          label: this.$t("ui.data.column.curingPlan.turnoverMonth"),
+          label: this.$t("ui.data.column.mdmCycleSchStruConf.turnoverMonth"),
         },
         {
           prop: "minVulcanizingMachine",
           width: 180,
-          label: this.$t("ui.data.column.curingPlan.minVulcanizingMachine"),
+          label: this.$t("ui.data.column.mdmCycleSchStruConf.minVulcanizingMachine"),
         },
         {
           prop: "updateTime",
           width: 180,
-          label: this.$t("ui.data.column.scheduleAdjust.updata"),
+          label: this.$t("ui.data.column.mdmCycleSchStruConf.updateDate"),
         },
 
         {
@@ -239,13 +239,13 @@ export default {
       return [
         {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.mdmCycleSchStruConf.factoryCode"),
           type: "select",
           dictData: this.dict.type.biz_factory_name, // "JOB_TYPE",
         },
         {
           prop: "structureName",
-          label: this.$t("ui.data.column.finishStock.structureName"),
+          label: this.$t("ui.data.column.mdmCycleSchStruConf.structureName"),
           type: "select",
           dictData:this.structureList,
           filterable: true
