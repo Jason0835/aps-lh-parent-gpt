@@ -125,35 +125,35 @@ export default {
         { type: "selection", fixed: "left" },
         {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.factoryParam.factoryCode"),
           formatter: (row, column, value, index) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
           },
         },
         {
           prop: "productTypeCode",
-          label: this.$t("ui.data.column.monthplan.productType"),
+          label: this.$t("ui.data.column.factoryParam.productTypeCode"),
           formatter: (row, column, value, index) => {
             return this.selectDictLabel(this.dict.type.biz_product_type, value);
           },
         },
         {
           prop: "paramCode",
-          label: this.$t("ui.data.factoryParam.paramCode"),
+          label: this.$t("ui.data.column.factoryParam.paramCode"),
           width: 200,
         },
         {
           prop: "paramName",
-          label: this.$t("common.api.config.columnname.name"),
+          label: this.$t("ui.data.column.factoryParam.paramName"),
           width: 300,
         },
         {
           prop: "paramValue",
-          label: this.$t("ui.data.factoryParam.paramValue"),
+          label: this.$t("ui.data.column.factoryParam.paramValue"),
         },
         {
           prop: "defauleValue",
-          label: this.$t("ui.data.factoryParam.defauleValue"),
+          label: this.$t("ui.data.column.factoryParam.defauleValue"),
         },
         {
           prop: "remark",
@@ -194,18 +194,18 @@ export default {
     searchColumns() {
       return [
         {
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.factoryParam.factoryCode"),
           prop: "factoryCode",
           type: "select",
           dictData: this.dict.type.biz_factory_name,
         },
         {
           prop: "paramName",
-          label: this.$t("common.api.config.columnname.name"),
+          label: this.$t("ui.data.column.factoryParam.paramName"),
         },
         {
           prop: "paramCode",
-          label: this.$t("ui.data.factoryParam.paramCode"),
+          label: this.$t("ui.data.column.factoryParam.paramCode"),
         },
       ];
     },
