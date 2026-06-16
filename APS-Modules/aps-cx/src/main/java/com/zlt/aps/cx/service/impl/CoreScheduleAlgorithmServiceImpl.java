@@ -1264,6 +1264,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         Map<String, Integer> taskTotalQtyMap = new LinkedHashMap<>();
         Map<String, String> taskStructureMap = new LinkedHashMap<>();
         Map<String, List<Long>> taskLhIdListMap = new LinkedHashMap<>();
+        Map<String, Set<String>> taskMaterialCodeMap = new LinkedHashMap<>();
 
         for (ShiftScheduleResult shiftResult : shiftResults) {
             int day = shiftResult.getDay();
@@ -1303,6 +1304,11 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                 final String effectiveClassField = effectiveClassFieldTmp;
 
                 String taskKey = machineCode + "|" + embryoCode + "|" + (spr.getConstructionStage() != null ? spr.getConstructionStage() : "");
+                // 独立追踪每个embryo+constructionStage下的所有materialCode（不按机台拆分）
+                String embryoTaskKey = embryoCode + "|" + (spr.getConstructionStage() != null ? spr.getConstructionStage() : "");
+                if (!materialCode.isEmpty()) {
+                    taskMaterialCodeMap.computeIfAbsent(embryoTaskKey, k -> new LinkedHashSet<>()).add(materialCode);
+                }
                 taskClassSprMap.computeIfAbsent(taskKey, k -> new LinkedHashMap<>())
                         .compute(effectiveClassField, (k, existing) -> {
                             if (existing == null) {
@@ -1389,9 +1395,9 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                         String embryoCode = taskAlloc.getEmbryoCode();
                         String materialCode = taskAlloc.getMaterialCode() != null ? taskAlloc.getMaterialCode() : "";
                         String constructionStage = taskAlloc.getConstructionStage() != null ? taskAlloc.getConstructionStage() : "";
-                        String taskKey = allocation.getMachineCode() + "|" + embryoCode + "|" + constructionStage;
+                        String embryoLhKey = embryoCode + "|" + constructionStage;
                         if (taskAlloc.getLhId() != null) {
-                            taskLhIdListMap.computeIfAbsent(taskKey, k -> new ArrayList<>()).add(taskAlloc.getLhId());
+                            taskLhIdListMap.computeIfAbsent(embryoLhKey, k -> new ArrayList<>()).add(taskAlloc.getLhId());
                         }
                     }
                 }
@@ -1470,18 +1476,12 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             String machineCode = parts[0];
             String embryoCode = parts.length > 1 ? parts[1] : null;
             String constructionStage = parts.length > 2 && !parts[2].isEmpty() ? parts[2] : null;
-            // materialCode 不再作为 taskKey 的一部分，需要从 classSprMap 中收集所有唯一的materialCode
-            Set<String> materialCodeSet = new LinkedHashSet<>();
+            // materialCode 从独立的 taskMaterialCodeMap 中获取（embryo级别，不按机台拆分）
+            String embryoMaterialKey = embryoCode + "|" + (constructionStage != null ? constructionStage : "");
+            Set<String> materialCodeSet = taskMaterialCodeMap.get(embryoMaterialKey);
             String materialCode = null;
-            if (classSprMap != null && !classSprMap.isEmpty()) {
-                for (ShiftScheduleService.ShiftProductionResult spr : classSprMap.values()) {
-                    if (spr != null && spr.getMaterialCode() != null && !spr.getMaterialCode().isEmpty()) {
-                        materialCodeSet.add(spr.getMaterialCode());
-                    }
-                }
-                if (!materialCodeSet.isEmpty()) {
-                    materialCode = String.join(",", materialCodeSet);
-                }
+            if (materialCodeSet != null && !materialCodeSet.isEmpty()) {
+                materialCode = String.join(",", materialCodeSet);
             }
             String structureName = taskStructureMap.get(taskKey);
 
@@ -1530,8 +1530,9 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                 }
             }
 
-            // ---- 库存信息（求和合并多个lhId的库存，使用初始库存快照） ----
-            List<Long> lhIdList = taskLhIdListMap.get(taskKey);
+            // ---- 库存信息（求和合并多个lhId的库存，embryo级别不按机台拆分） ----
+            String embryoLhKey = embryoCode + "|" + (constructionStage != null ? constructionStage : "");
+            List<Long> lhIdList = taskLhIdListMap.get(embryoLhKey);
             int totalStock = 0;
             if (lhIdList != null && !lhIdList.isEmpty()) {
                 List<Long> distinctLhIdList = lhIdList.stream().distinct().collect(Collectors.toList());

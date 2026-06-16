@@ -20,8 +20,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.ruoyi.common.core.utils.DateUtils;
-import com.ruoyi.common.core.web.controller.BaseController;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.log.annotation.Log;
@@ -31,11 +31,14 @@ import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.engine.enums.WorkClassEnums;
 import com.zlt.aps.common.engine.service.FactoryService;
 import com.zlt.aps.dj.api.domain.entity.DjDayFinishQty;
+import com.zlt.aps.dj.api.domain.entity.DjDispatcherLog;
 import com.zlt.aps.dj.api.domain.entity.DjScheduleResult;
 import com.zlt.aps.dj.engine.service.DjEngineService;
 import com.zlt.aps.dj.service.DjMachineInfoService;
 import com.zlt.aps.dj.service.DjScheduleResultService;
 import com.zlt.aps.itf.vo.SyncDataLogs;
+import com.zlt.bill.common.controller.AbstractBillBizController;
+import com.zlt.bill.common.service.IBillService;
 import com.zlt.common.utils.StringUtil;
 import com.zlt.sync.api.service.ISyncDataLogsApiService;
 
@@ -49,7 +52,7 @@ import io.swagger.annotations.ApiOperation;
  */
 @RestController
 @RequestMapping("/djScheduleResult")
-public class DjScheduleResultController extends BaseController<DjScheduleResult> {
+public class DjScheduleResultController extends AbstractBillBizController<DjScheduleResult> {
 
     @Value("${excelModelPath}")
     public String excelModelPath;
@@ -131,7 +134,6 @@ public class DjScheduleResultController extends BaseController<DjScheduleResult>
      */
     @PostMapping("/getList")
     public List<DjScheduleResult> getList(@RequestBody DjScheduleResult djScheduleResult) {
-        startPage("MACHINE_CODE, CLASS1_SEQUENCE");
         List<DjScheduleResult> list = djScheduleResultService.selectDjScheduleResultList(djScheduleResult);
         return list;
     }
@@ -609,5 +611,20 @@ public class DjScheduleResultController extends BaseController<DjScheduleResult>
         headers.add(I18nUtil.getMessage(currentWorkClass.getClassName()) + nextDayStr);
 
         return AjaxResult.success(headers);
+    }
+
+    @Override
+    protected IBillService<DjScheduleResult> getBillService() {
+        return djScheduleResultService;
+    }
+    
+    @Override
+    protected String orderStr() {
+        return "MACHINE_CODE, CLASS1_SEQUENCE";
+    }
+
+    @Override
+    protected String getTypeCode() {
+        return "";
     }
 }

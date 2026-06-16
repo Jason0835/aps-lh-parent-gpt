@@ -203,7 +203,7 @@
         {
           label: '排程日期',
           prop: 'scheduleDate',
-          align: "center",
+          align: 'center',
           minWidth: 120,
         },
       ]"
@@ -218,7 +218,7 @@
         {
           label: '排程日期',
           prop: 'scheduleDate',
-          align: "center",
+          align: 'center',
           minWidth: 120,
         },
       ]"
@@ -234,7 +234,7 @@
         {
           label: '排程日期',
           prop: 'scheduleDate',
-          align: "center",
+          align: 'center',
           minWidth: 120,
         },
       ]"
@@ -261,6 +261,7 @@ import {
   getSummaryVo,
   getWorkClass,
 } from "@/api/dj/djScheduleResult";
+import { getConfigKey } from "@/api/system/config";
 //components
 import TltUploadForm from "@/views/components/tltUploadForm.vue";
 
@@ -288,7 +289,7 @@ export default {
     TltUploadForm,
     mergeDialog,
   },
-  dicts: ["IS_RELEASE"],
+  dicts: ["IS_RELEASE", "biz_factory_name"],
   provide() {
     return {
       parentDict: this.dict,
@@ -307,8 +308,12 @@ export default {
       // },
       page: undefined,
       sort: {},
-      search: {},
-      query: {},
+      search: {
+        factoryCode: '',
+      },
+      query: {
+        factoryCode: '',
+      },
       importDefaultValue: {
         scheduleDate: moment().add(1, "days").format("YYYY-MM-DD"),
       },
@@ -344,22 +349,22 @@ export default {
             {
               prop: "releaseStatus",
               valign: "middle",
-              align: "center",
-              halign: "center",
+              align: 'center',
+              halign: 'center',
               label: this.$t("ui.data.column.dj.scheduleResult.releaseStatus"),
             },
             {
               prop: "paddingCode",
               valign: "middle",
-              halign: "center",
-              align: "center",
+              halign: 'center',
+              align: 'center',
               minWidth: 100,
               label: this.$t("ui.data.column.dj.scheduleResult.treadCode"),
             },
             {
               prop: "glueCode",
               valign: "middle",
-              halign: "center",
+              halign: 'center',
               align: "left",
               minWidth: 120,
               label: this.$t("ui.data.column.dj.scheduleResult.glueCode"),
@@ -367,7 +372,7 @@ export default {
             {
               prop: "machineCode",
               valign: "middle",
-              halign: "center",
+              halign: 'center',
               align: "left",
               label: this.$t("ui.data.column.dj.scheduleResult.machineCode"),
               formatter: (row, column, value, index) => {
@@ -377,47 +382,47 @@ export default {
             {
               prop: "monthPlanOs",
               valign: "middle",
-              halign: "center",
+              halign: 'center',
               align: "right",
               label: this.$t("ui.data.column.scheduleResult.monthPlanOs"),
             },
             {
               prop: "stockQty",
               valign: "middle",
-              halign: "center",
+              halign: 'center',
               align: "right",
               label: this.$t("ui.data.column.scheduleResult.stockQty"),
             },
           ],
         },
         {
-          label: this.classHeaders[0] || this.$t("ui.data.column.dj.scheduleResult.class1PlanQty"),
+          label: this.classHeaders[0],
           children: [
             {
               prop: "class1Sequence",
               valign: "middle",
-              halign: "center",
-              align: "center",
+              halign: 'center',
+              align: 'center',
               label: this.$t("ui.data.column.dj.scheduleResult.sequence"),
             },
             {
               prop: "class1PlanQty",
               valign: "middle",
-              halign: "center",
+              halign: 'center',
               align: "right",
               label: this.$t("ui.data.column.dj.scheduleResult.planQty"),
             },
             {
               prop: "class1FinishQty",
               valign: "middle",
-              halign: "center",
+              halign: 'center',
               align: "right",
               label: this.$t("ui.data.column.dj.scheduleResult.finishQty"),
             },
             {
               prop: "class1FinishRate",
               valign: "middle",
-              halign: "center",
+              halign: 'center',
               align: "right",
               label: this.$t("ui.data.column.scheduleResult.finish"),
               formatter: finishRateFormatter,
@@ -425,40 +430,40 @@ export default {
             {
               prop: "class1Analysis",
               valign: "middle",
-              halign: "center",
+              halign: 'center',
               align: "left",
               label: this.$t("ui.data.column.dj.scheduleResult.analysis"),
             },
           ],
         },
         {
-          label: this.classHeaders[1] || this.$t("ui.data.column.dj.scheduleResult.class2PlanQty"),
+          label: this.classHeaders[1],
           children: [
             {
               prop: "class2Sequence",
               valign: "middle",
-              halign: "center",
-              align: "center",
+              halign: 'center',
+              align: 'center',
               label: this.$t("ui.data.column.dj.scheduleResult.sequence"),
             },
             {
               prop: "class2PlanQty",
               valign: "middle",
-              halign: "center",
+              halign: 'center',
               align: "right",
               label: this.$t("ui.data.column.dj.scheduleResult.planQty"),
             },
             {
               prop: "class2FinishQty",
               valign: "middle",
-              halign: "center",
+              halign: 'center',
               align: "right",
               label: this.$t("ui.data.column.dj.scheduleResult.finishQty"),
             },
             {
               prop: "class2FinishRate",
               valign: "middle",
-              halign: "center",
+              halign: 'center',
               align: "right",
               label: this.$t("ui.data.column.scheduleResult.finish"),
               formatter: finishRateFormatter,
@@ -466,40 +471,40 @@ export default {
             {
               prop: "class2Analysis",
               valign: "middle",
-              halign: "center",
+              halign: 'center',
               align: "left",
               label: this.$t("ui.data.column.dj.scheduleResult.analysis"),
             },
           ],
         },
         {
-          label: this.classHeaders[2] || this.$t("ui.data.column.dj.scheduleResult.class3PlanQty"),
+          label: this.classHeaders[2],
           children: [
             {
               prop: "class3Sequence",
               valign: "middle",
-              halign: "center",
-              align: "center",
+              halign: 'center',
+              align: 'center',
               label: this.$t("ui.data.column.dj.scheduleResult.sequence"),
             },
             {
               prop: "class3PlanQty",
               valign: "middle",
-              halign: "center",
+              halign: 'center',
               align: "right",
               label: this.$t("ui.data.column.dj.scheduleResult.planQty"),
             },
             {
               prop: "class3FinishQty",
               valign: "middle",
-              halign: "center",
+              halign: 'center',
               align: "right",
               label: this.$t("ui.data.column.dj.scheduleResult.finishQty"),
             },
             {
               prop: "class3FinishRate",
               valign: "middle",
-              halign: "center",
+              halign: 'center',
               align: "right",
               label: this.$t("ui.data.column.scheduleResult.finish"),
               formatter: finishRateFormatter,
@@ -507,40 +512,40 @@ export default {
             {
               prop: "class3Analysis",
               valign: "middle",
-              halign: "center",
+              halign: 'center',
               align: "left",
               label: this.$t("ui.data.column.dj.scheduleResult.analysis"),
             },
           ],
         },
         {
-          label: this.classHeaders[3] || this.$t("ui.data.column.dj.scheduleResult.class4PlanQty"),
+          label: this.classHeaders[3],
           children: [
             {
               prop: "class4Sequence",
               valign: "middle",
-              halign: "center",
-              align: "center",
+              halign: 'center',
+              align: 'center',
               label: this.$t("ui.data.column.dj.scheduleResult.sequence"),
             },
             {
               prop: "class4PlanQty",
               valign: "middle",
-              halign: "center",
+              halign: 'center',
               align: "right",
               label: this.$t("ui.data.column.dj.scheduleResult.planQty"),
             },
             {
               prop: "class4FinishQty",
               valign: "middle",
-              halign: "center",
+              halign: 'center',
               align: "right",
               label: this.$t("ui.data.column.dj.scheduleResult.finishQty"),
             },
             {
               prop: "class4FinishRate",
               valign: "middle",
-              halign: "center",
+              halign: 'center',
               align: "right",
               label: this.$t("ui.data.column.scheduleResult.finish"),
               formatter: finishRateFormatter,
@@ -548,40 +553,40 @@ export default {
             {
               prop: "class4Analysis",
               valign: "middle",
-              halign: "center",
+              halign: 'center',
               align: "left",
               label: this.$t("ui.data.column.dj.scheduleResult.analysis"),
             },
           ],
         },
         {
-          label: this.classHeaders[4] || this.$t("ui.data.column.dj.scheduleResult.class5PlanQty"),
+          label: this.classHeaders[4],
           children: [
             {
               prop: "class5Sequence",
               valign: "middle",
-              halign: "center",
-              align: "center",
+              halign: 'center',
+              align: 'center',
               label: this.$t("ui.data.column.dj.scheduleResult.sequence"),
             },
             {
               prop: "class5PlanQty",
               valign: "middle",
-              halign: "center",
+              halign: 'center',
               align: "right",
               label: this.$t("ui.data.column.dj.scheduleResult.planQty"),
             },
             {
               prop: "class5FinishQty",
               valign: "middle",
-              halign: "center",
+              halign: 'center',
               align: "right",
               label: this.$t("ui.data.column.dj.scheduleResult.finishQty"),
             },
             {
               prop: "class5FinishRate",
               valign: "middle",
-              halign: "center",
+              halign: 'center',
               align: "right",
               label: this.$t("ui.data.column.scheduleResult.finish"),
               formatter: finishRateFormatter,
@@ -589,40 +594,40 @@ export default {
             {
               prop: "class5Analysis",
               valign: "middle",
-              halign: "center",
+              halign: 'center',
               align: "left",
               label: this.$t("ui.data.column.dj.scheduleResult.analysis"),
             },
           ],
         },
         {
-          label: this.classHeaders[5] || this.$t("ui.data.column.dj.scheduleResult.class6PlanQty"),
+          label: this.classHeaders[5],
           children: [
             {
               prop: "class6Sequence",
               valign: "middle",
-              halign: "center",
-              align: "center",
+              halign: 'center',
+              align: 'center',
               label: this.$t("ui.data.column.dj.scheduleResult.sequence"),
             },
             {
               prop: "class6PlanQty",
               valign: "middle",
-              halign: "center",
+              halign: 'center',
               align: "right",
               label: this.$t("ui.data.column.dj.scheduleResult.planQty"),
             },
             {
               prop: "class6FinishQty",
               valign: "middle",
-              halign: "center",
+              halign: 'center',
               align: "right",
               label: this.$t("ui.data.column.dj.scheduleResult.finishQty"),
             },
             {
               prop: "class6FinishRate",
               valign: "middle",
-              halign: "center",
+              halign: 'center',
               align: "right",
               label: this.$t("ui.data.column.scheduleResult.finish"),
               formatter: finishRateFormatter,
@@ -630,7 +635,7 @@ export default {
             {
               prop: "class6Analysis",
               valign: "middle",
-              halign: "center",
+              halign: 'center',
               align: "left",
               label: this.$t("ui.data.column.dj.scheduleResult.analysis"),
             },
@@ -642,6 +647,13 @@ export default {
     },
     searchColumns() {
       return [
+        {
+          label: this.$t("ui.data.column.factoryCode"),
+          prop: "factoryCode",
+          type: "select",
+          dictData: this.dict.type.biz_factory_name,
+          filterable: true,
+        },
         {
           label: this.$t("ui.data.column.scheduleResult.scheduleDate"),
           prop: "scheduleDate",
@@ -889,7 +901,13 @@ export default {
     this.query.scheduleDate = date;
     this.search.scheduleDate = date;
 
-    this.$store.dispatch("dj/getMachineList");
+    getConfigKey("sys.factory.code").then(response => {
+      this.search.factoryCode = response.msg;
+      this.query.factoryCode = response.msg;
+      this.$store.dispatch("dj/getMachineList");
+    }).catch(() => {
+      this.$store.dispatch("dj/getMachineList");
+    });
 
     //获取班次表头
     getWorkClass({ scheduleDate: this.query.scheduleDate }).then((res) => {

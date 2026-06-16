@@ -19,7 +19,7 @@ import java.util.List;
  * @author zlt
  * @date 2021-06-24
  */
-@FeignClient(contextId = "IDjScheduleResultRemoteService", value = ServiceNameConstants.GATEWAY_SERVICE, path = "${api.path.dj:nc}")
+@FeignClient(contextId = "IDjScheduleResultRemoteService", value = ServiceNameConstants.GATEWAY_SERVICE, path = "${api.path.dj:dj}")
 public interface IDjScheduleResultRemoteService {
 
     /**

@@ -18,7 +18,7 @@ import org.springframework.web.bind.annotation.RequestBody;
  * @author Gim
  * @date 2022-02-25
  */
-@FeignClient(contextId = "IDjDispatcherLogRemoteService", value =ServiceNameConstants.GATEWAY_SERVICE, path="${api.path.dj:nc}")
+@FeignClient(contextId = "IDjDispatcherLogRemoteService", value =ServiceNameConstants.GATEWAY_SERVICE, path="${api.path.dj:dj}")
 public interface IDjDispatcherLogRemoteService {
 
     /**

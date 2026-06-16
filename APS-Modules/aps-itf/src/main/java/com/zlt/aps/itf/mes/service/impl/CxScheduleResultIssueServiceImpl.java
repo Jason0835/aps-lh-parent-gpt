@@ -121,16 +121,16 @@ public class CxScheduleResultIssueServiceImpl implements ICxScheduleResultIssueS
         if (CollectionUtils.isEmpty(mesList)) {
             return;
         }
-        // 批量查询已有记录，按排程日期+机台编码+版本号匹配
+        // 批量查询已有记录，按排程日期+机台编码+胎胚编码+版本号匹配
         List<MesCxScheduleResult> existingRecords = cxScheduleResultIssueMapper.selectExistingByScheduleDateAndMachine(mesList);
         Set<String> existingKeys = existingRecords.stream()
-                .map(r -> r.getScheduleDate() + "|" + r.getMachineCode() + "|" + r.getDataVersion())
+                .map(r -> r.getScheduleDate() + "|" + r.getMachineCode() + "|" + r.getEmbryoCode() + "|" + r.getDataVersion())
                 .collect(Collectors.toSet());
         // 根据查询结果分组：已有记录走批量更新，不存在记录走批量新增
         List<MesCxScheduleResult> updateList = new ArrayList<>();
         List<MesCxScheduleResult> insertList = new ArrayList<>();
         for (MesCxScheduleResult mesItem : mesList) {
-            String key = mesItem.getScheduleDate() + "|" + mesItem.getMachineCode() + "|" + mesItem.getDataVersion();
+            String key = mesItem.getScheduleDate() + "|" + mesItem.getMachineCode() + "|" + mesItem.getEmbryoCode() + "|" + mesItem.getDataVersion();
             if (existingKeys.contains(key)) {
                 updateList.add(mesItem);
             } else {

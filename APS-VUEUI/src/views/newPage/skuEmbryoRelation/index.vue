@@ -156,21 +156,21 @@ export default {
         { type: "selection", fixed: "left" },
         {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.mdmSkuStructureRef.factoryCode"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
           },
         },
         {
           prop: "mainMaterialDesc",
-          label: this.$t("ui.data.rubberMaterial.embryoDesc"),
+          label: this.$t("ui.data.column.mdmSkuStructureRef.mainMaterialDesc"),
           minWidth: 350,
           align: "left",
         },
 
         {
           prop: "structureName",
-          label: this.$t("ui.data.column.finishStock.structureName"),
+          label: this.$t("ui.data.column.mdmSkuStructureRef.structureName"),
 
         },
         {
@@ -232,7 +232,7 @@ export default {
         // },
         {
           prop: "structureName",
-          label: this.$t("ui.data.column.finishStock.structureName"),
+          label: this.$t("ui.data.column.mdmSkuStructureRef.structureName"),
           type: "select",
           dictData: this.newStructureList,
           filterable: true,

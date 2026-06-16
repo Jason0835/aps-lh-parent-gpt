@@ -110,13 +110,13 @@ export default {
       return [
         {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.mdmSkuStructureRef.factoryCode"),
           type: "select",
           dictData: this.parentDict.type.biz_factory_name,
         },
         {
           prop: "mainMaterialDesc",
-          label: this.$t("ui.data.rubberMaterial.embryoDesc"),
+          label: this.$t("ui.data.column.mdmSkuStructureRef.mainMaterialDesc"),
         },
         // {
         //   prop: "materialCode",
@@ -139,7 +139,7 @@ export default {
 
         {
           prop: "structureName",
-          label: this.$t("ui.data.column.finishStock.structureName"),
+          label: this.$t("ui.data.column.mdmSkuStructureRef.structureName"),
           type: "select",
           dictData: this.newStructureList,
           filterable: true,
