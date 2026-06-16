@@ -13,6 +13,7 @@ import com.zlt.aps.tm.engine.domain.TmTaskDraft;
 import com.zlt.aps.tm.engine.domain.TmTransferPosition;
 import com.zlt.aps.tm.engine.event.TmScheduleEvent;
 import com.zlt.aps.tm.engine.event.TmScheduleEventPublisher;
+import com.zlt.aps.tm.engine.mapper.TmStockMapper;
 import com.zlt.aps.tm.engine.service.*;
 import org.junit.Test;
 
@@ -23,6 +24,7 @@ import java.util.Arrays;
 import java.util.List;
 
 import static org.junit.Assert.*;
+import static org.mockito.Mockito.mock;
 
 /**
  * 胎面排程详设场景测试。
@@ -57,9 +59,10 @@ public class TmScheduleScenarioTest {
 
         TmTaskChainScheduleService chainService = new TmTaskChainScheduleService();
         TmPersistService persistService = new TmPersistService();
+        TmStockMapper stockMapper = mock(TmStockMapper.class);
 
         new TmPlanBootstrapService().bootstrap(context);
-        new TmInventoryPredictService().predict(context);
+        new TmInventoryPredictService(stockMapper).predict(context);
         new TmPlanCalcService().calculate(context);
         new TmTaskSortService().sort(context);
         new TmMachineAssignService(chainService).assign(context);

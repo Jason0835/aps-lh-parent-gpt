@@ -1,5 +1,6 @@
 package com.zlt.aps.tm.engine.domain;
 
+import com.zlt.aps.common.engine.schedule.ScheduleScoreResult;
 import lombok.Data;
 
 import java.math.BigDecimal;
@@ -65,4 +66,79 @@ public class TmMachineCandidate {
 
     /** 评分结果 */
     private BigDecimal score = BigDecimal.ZERO;
+
+    /** 评分结果对象 */
+    private ScheduleScoreResult scoreResult;
+
+    /**
+     * 获取是否已被过滤状态。
+     *
+     * @return true 表示已被过滤
+     */
+    public boolean isFiltered() {
+        return filtered != null && filtered;
+    }
+
+    /**
+     * 获取过滤或评分证据。
+     *
+     * @return 证据映射
+     */
+    public Map<String, Object> getFilterEvidence() {
+        return evidence;
+    }
+
+    /**
+     * 获取评分结果。
+     *
+     * @return 评分结果
+     */
+    public ScheduleScoreResult getScoreResult() {
+        return scoreResult;
+    }
+
+    /**
+     * 标记候选机台已被过滤。
+     *
+     * @param reasonCode 过滤原因编码
+     * @param reasonDesc 过滤原因描述
+     * @param evidenceData 过滤证据数据
+     */
+    public void markFiltered(String reasonCode, String reasonDesc, Map<String, String> evidenceData) {
+        this.filtered = Boolean.TRUE;
+        this.filterReasonCode = reasonCode;
+        this.filterReasonDesc = reasonDesc;
+        if (evidenceData != null) {
+            this.evidence.putAll(evidenceData);
+        }
+    }
+
+    /**
+     * 标记候选机台已被过滤。
+     *
+     * @param reasonCode 过滤原因编码
+     * @param reasonDesc 过滤原因描述
+     * @param evidenceData 过滤证据数据
+     */
+    public void markFiltered(String reasonCode, String reasonDesc, String evidenceData) {
+        this.filtered = Boolean.TRUE;
+        this.filterReasonCode = reasonCode;
+        this.filterReasonDesc = reasonDesc;
+        if (evidenceData != null) {
+            this.evidence.put("evidence", evidenceData);
+        }
+    }
+
+    /**
+     * 应用评分结果。
+     *
+     * @param scoreResult 评分结果
+     */
+    public void applyScore(ScheduleScoreResult scoreResult) {
+        if (scoreResult != null) {
+            this.score = scoreResult.getTotalScore();
+            this.scoreResult = scoreResult;
+            this.evidence.put("scoreResult", scoreResult);
+        }
+    }
 }
