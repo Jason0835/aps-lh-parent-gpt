@@ -28,7 +28,7 @@ public class Cd90ScheduleResult extends BaseEntity implements Serializable {
     @ApiModelProperty("排程日期")
     @TableField("SCHEDULE_DATE")
     @Excel(name = "ui.data.column.cd90ScheduleResult.scheduleDate")
-    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private Date scheduleDate;
     /** 成型批次号 */
     @ApiModelProperty("成型批次号")
@@ -83,7 +83,7 @@ public class Cd90ScheduleResult extends BaseEntity implements Serializable {
 
     // CLASS1
     @TableField("CLASS1_SCHEDULE_DATE")
-    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private Date class1ScheduleDate;
     @TableField("CLASS1_CX_PLAN_QTY")
     private Double class1CxPlanQty;
@@ -103,7 +103,7 @@ public class Cd90ScheduleResult extends BaseEntity implements Serializable {
 
     // CLASS2
     @TableField("CLASS2_SCHEDULE_DATE")
-    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private Date class2ScheduleDate;
     @TableField("CLASS2_CX_PLAN_QTY")
     private Double class2CxPlanQty;
@@ -123,7 +123,7 @@ public class Cd90ScheduleResult extends BaseEntity implements Serializable {
 
     // CLASS3
     @TableField("CLASS3_SCHEDULE_DATE")
-    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private Date class3ScheduleDate;
     @TableField("CLASS3_CX_PLAN_QTY")
     private Double class3CxPlanQty;
@@ -143,7 +143,7 @@ public class Cd90ScheduleResult extends BaseEntity implements Serializable {
 
     // CLASS4
     @TableField("CLASS4_SCHEDULE_DATE")
-    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private Date class4ScheduleDate;
     @TableField("CLASS4_CX_PLAN_QTY")
     private Double class4CxPlanQty;
@@ -162,7 +162,7 @@ public class Cd90ScheduleResult extends BaseEntity implements Serializable {
 
     // CLASS5
     @TableField("CLASS5_SCHEDULE_DATE")
-    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private Date class5ScheduleDate;
     @TableField("CLASS5_CX_PLAN_QTY")
     private Double class5CxPlanQty;
@@ -181,7 +181,7 @@ public class Cd90ScheduleResult extends BaseEntity implements Serializable {
 
     // CLASS6
     @TableField("CLASS6_SCHEDULE_DATE")
-    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private Date class6ScheduleDate;
     @TableField("CLASS6_CX_PLAN_QTY")
     private Double class6CxPlanQty;
@@ -200,7 +200,7 @@ public class Cd90ScheduleResult extends BaseEntity implements Serializable {
 
     // CLASS7
     @TableField("CLASS7_SCHEDULE_DATE")
-    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private Date class7ScheduleDate;
     @TableField("CLASS7_CX_PLAN_QTY")
     private Double class7CxPlanQty;
@@ -219,7 +219,7 @@ public class Cd90ScheduleResult extends BaseEntity implements Serializable {
 
     // CLASS8
     @TableField("CLASS8_SCHEDULE_DATE")
-    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private Date class8ScheduleDate;
     @TableField("CLASS8_CX_PLAN_QTY")
     private Double class8CxPlanQty;
@@ -268,7 +268,7 @@ public class Cd90ScheduleResult extends BaseEntity implements Serializable {
     /** 最新发布时间 */
     @ApiModelProperty("最新发布时间")
     @TableField("NEWEST_PUBLISH_TIME")
-    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private Date newestPublishTime;
     /** 收尾规格标记 */
     @ApiModelProperty("收尾规格标记")

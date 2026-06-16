@@ -61,6 +61,11 @@
           v-hasPermi="['cd90:scheduleResult:export']"
           @click="handleExport"
         >{{ $t('ui.frame.btn.export') }}</el-button>
+        <el-button
+          v-hasPermi="['cd90:scheduleResult:list']"
+          type="primary"
+          @click="handleShowUnscheduleResult"
+        >{{ $t('ui.data.column.scheduleResult.unscheduleResult') }}</el-button>
       </template>
     </page-table>
     <tlt-upload-form
@@ -77,6 +82,27 @@
       :schedule-date="query.scheduleDate"
       @success="getList"
     />
+    <el-dialog
+      :title="$t('ui.data.column.scheduleResult.unscheduleResult')"
+      :visible.sync="unscheduleResultDialogVisible"
+      width="80%"
+      append-to-body
+    >
+      <page-table
+        v-loading="unscheduleLoading"
+        :calc-height="false"
+        :columns="unscheduleColumns"
+        :data="unscheduleData"
+        :page="unschedulePage"
+        :search="unscheduleSearch"
+        :search-columns="unscheduleSearchColumns"
+        :show-summary="false"
+        :select-area="false"
+        @search="handleUnscheduleSearch"
+        @reset="handleUnscheduleReset"
+        @pageChange="handleUnschedulePageChange"
+      />
+    </el-dialog>
   </basic-container>
 </template>
 
@@ -85,6 +111,7 @@ import moment from 'moment'
 import { autoScheduleResult, getAutoScheduleTask, listScheduleResult, delScheduleResult, exportScheduleResult } from '@/api/cd90/scheduleResult'
 import { listTireFabricCodes } from '@/api/cd90/specifyMachine'
 import { getCd90MachineEnableOptions } from '@/api/cd90/cd90MachineInfo'
+import { listUnscheduleResult, exportUnscheduleResult } from '@/api/cd90/unscheduleResult'
 import TltUploadForm from '@/views/components/tltUploadForm.vue'
 import ReleaseStatusDialog from './components/releaseStatusDialog.vue'
 
@@ -142,7 +169,18 @@ export default {
       },
       sort: {},
       search: { ...defaultSearch },
-      query: { ...defaultSearch }
+      query: { ...defaultSearch },
+      unscheduleResultDialogVisible: false,
+      unscheduleLoading: false,
+      unscheduleData: [],
+      unschedulePage: {
+        current: 1,
+        pageSize: 20,
+        total: 0,
+        pageSizes: [10, 20, 50, 100]
+      },
+      unscheduleSearch: { factoryCode: '116', scheduleDate: defaultScheduleDate },
+      unscheduleQuery: { factoryCode: '116', scheduleDate: defaultScheduleDate }
     }
   },
   computed: {
@@ -217,6 +255,47 @@ export default {
           type: 'select',
           dictData: this.dict.type.IS_RELEASE,
           filterable: true
+        }
+      ]
+    },
+    unscheduleColumns() {
+      return [
+        { label: this.$t('ui.data.column.cd90UnscheduleResult.scheduleDate'), prop: 'scheduleDate', minWidth: 120 },
+        { label: this.$t('ui.data.column.cd90UnscheduleResult.batchNo'), prop: 'batchNo', minWidth: 160 },
+        { label: this.$t('ui.data.column.cd90UnscheduleResult.clothCode'), prop: 'clothCode', minWidth: 150 },
+        { label: this.$t('ui.data.column.cd90UnscheduleResult.bigRollCode'), prop: 'bigRollCode', minWidth: 140 },
+        { label: this.$t('ui.data.column.cd90UnscheduleResult.demandQty'), prop: 'demandQty', minWidth: 120, align: 'right' },
+        { label: this.$t('ui.data.column.cd90UnscheduleResult.scheduledQty'), prop: 'scheduledQty', minWidth: 120, align: 'right' },
+        { label: this.$t('ui.data.column.cd90UnscheduleResult.unscheduledQty'), prop: 'unscheduledQty', minWidth: 120, align: 'right' },
+        { label: this.$t('ui.data.column.cd90UnscheduleResult.failStage'), prop: 'failStage', minWidth: 140 },
+        { label: this.$t('ui.data.column.cd90UnscheduleResult.reasonCode'), prop: 'reasonCode', minWidth: 180 },
+        { label: this.$t('ui.data.column.cd90UnscheduleResult.unscheduledReason'), prop: 'unscheduledReason', minWidth: 200 }
+      ]
+    },
+    unscheduleSearchColumns() {
+      return [
+        {
+          label: this.$t('ui.data.column.cd90UnscheduleResult.factoryCode'),
+          prop: 'factoryCode',
+          type: 'select',
+          dictData: this.dict.type.biz_factory_name,
+          filterable: true
+        },
+        {
+          label: this.$t('ui.data.column.cd90UnscheduleResult.scheduleDate'),
+          prop: 'scheduleDate',
+          type: 'date',
+          valueFormat: 'yyyy-MM-dd'
+        },
+        {
+          label: this.$t('ui.data.column.cd90UnscheduleResult.clothCode'),
+          prop: 'clothCode',
+          type: 'input'
+        },
+        {
+          label: this.$t('ui.data.column.cd90UnscheduleResult.batchNo'),
+          prop: 'batchNo',
+          type: 'input'
         }
       ]
     }
@@ -430,6 +509,54 @@ export default {
           value: item.value || item.machineCode || item.code || item
         }))
       })
+    },
+    handleShowUnscheduleResult() {
+      this.unscheduleResultDialogVisible = true
+      this.unscheduleSearch = {
+        factoryCode: this.query.factoryCode || this.search.factoryCode,
+        scheduleDate: this.query.scheduleDate || this.search.scheduleDate
+      }
+      this.unscheduleQuery = { ...this.unscheduleSearch }
+      this.getUnscheduleList()
+    },
+    handleUnscheduleSearch(data) {
+      this.unscheduleQuery = Object.keys(data || {}).reduce((result, key) => {
+        const value = data[key]
+        if (value !== null && value !== undefined && value !== '') {
+          result[key] = value
+        }
+        return result
+      }, {})
+      this.unschedulePage.current = 1
+      this.getUnscheduleList()
+    },
+    handleUnscheduleReset() {
+      this.unscheduleSearch = { factoryCode: '116', scheduleDate: this.getDefaultScheduleDate() }
+      this.unscheduleQuery = { ...this.unscheduleSearch }
+      this.unschedulePage.current = 1
+      this.getUnscheduleList()
+    },
+    handleUnschedulePageChange(current, pageSize) {
+      this.unschedulePage.current = current
+      this.unschedulePage.pageSize = pageSize
+      this.getUnscheduleList()
+    },
+    getUnscheduleList() {
+      this.unscheduleLoading = true
+      const params = {
+        ...this.unscheduleQuery,
+        pageNum: this.unschedulePage.current,
+        pageSize: this.unschedulePage.pageSize
+      }
+      listUnscheduleResult(params)
+        .then(res => {
+          const rows = res.rows || res.data || []
+          this.unscheduleData = rows
+          this.unschedulePage.total = res.total || 0
+        })
+        .finally(() => {
+          this.unscheduleLoading = false
+        })
     }
   }
 }

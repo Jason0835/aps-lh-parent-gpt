@@ -3439,6 +3439,21 @@
   "ui.data.column.dj.machineMaintenance.machineName": "机台名称",
   "ui.data.column.dj.machineMaintenance.stopStartTime": "停机开始时间",
   "ui.data.column.dj.machineMaintenance.stopEndTime": "停机结束时间",
-  "ui.data.column.dj.machineMaintenance.stopShift": "停机班次"
+  "ui.data.column.dj.machineMaintenance.stopShift": "停机班次",
+  "ui.data.column.cd90UnscheduleResult.modelName": "直裁未排结果",
+  "ui.data.column.cd90UnscheduleResult.factoryCode": "工厂",
+  "ui.data.column.cd90UnscheduleResult.scheduleDate": "排程日期",
+  "ui.data.column.cd90UnscheduleResult.clothCode": "帘布代号",
+  "ui.data.column.cd90UnscheduleResult.bigRollCode": "帘布大卷编号",
+  "ui.data.column.cd90UnscheduleResult.demandQty": "需求数量(米)",
+  "ui.data.column.cd90UnscheduleResult.scheduledQty": "已排数量(米)",
+  "ui.data.column.cd90UnscheduleResult.unscheduledQty": "未排数量(米)",
+  "ui.data.column.cd90UnscheduleResult.failStage": "失败阶段",
+  "ui.data.column.cd90UnscheduleResult.reasonCode": "未排原因",
+  "ui.data.column.cd90UnscheduleResult.reasonOrder": "原因顺序",
+  "ui.data.column.cd90UnscheduleResult.unscheduledReason": "原因说明",
+  "ui.data.column.cd90UnscheduleResult.candidateMachineCodes": "候选机台",
+  "ui.data.column.cd90UnscheduleResult.batchNo": "批次号",
+  "ui.data.column.scheduleResult.unscheduleResult": "未排结果"
 
 }

@@ -683,5 +683,20 @@
   "ui.data.column.djScheduleResult.importTitle": "Import padding schedule result data",
   "ui.data.column.scheduleResult.djPlan2": "Padding plan qty",
   "ui.biz.alter.makeSureRecreateDj": "Padding schedule already exists for today. Regenerating will overwrite existing records. Are you sure to regenerate?"
+  "ui.data.column.cd90UnscheduleResult.modelName": "90 Degree Cutting Unschedule Result",
+  "ui.data.column.cd90UnscheduleResult.factoryCode": "Factory",
+  "ui.data.column.cd90UnscheduleResult.scheduleDate": "Schedule Date",
+  "ui.data.column.cd90UnscheduleResult.clothCode": "Cloth Code",
+  "ui.data.column.cd90UnscheduleResult.bigRollCode": "Big Roll Code",
+  "ui.data.column.cd90UnscheduleResult.demandQty": "Demand Qty(m)",
+  "ui.data.column.cd90UnscheduleResult.scheduledQty": "Scheduled Qty(m)",
+  "ui.data.column.cd90UnscheduleResult.unscheduledQty": "Unscheduled Qty(m)",
+  "ui.data.column.cd90UnscheduleResult.failStage": "Fail Stage",
+  "ui.data.column.cd90UnscheduleResult.reasonCode": "Reason Code",
+  "ui.data.column.cd90UnscheduleResult.reasonOrder": "Reason Order",
+  "ui.data.column.cd90UnscheduleResult.unscheduledReason": "Reason Description",
+  "ui.data.column.cd90UnscheduleResult.candidateMachineCodes": "Candidate Machines",
+  "ui.data.column.cd90UnscheduleResult.batchNo": "Batch No",
+  "ui.data.column.scheduleResult.unscheduleResult": "Unschedule Result"
 
 }
