@@ -182,7 +182,7 @@
             SELECT
                 f5.FACTORY_CODE,
                 f5.MATERIAL_CODE,
-                IFNULL(fin.FINISH_QTY, 0) - IFNULL(f5.TOTAL_QTY, 0) AS OVERDUE_QTY
+                IFNULL(f5.TOTAL_QTY, 0) - IFNULL(fin.FINISH_QTY, 0) AS OVERDUE_QTY
             FROM T_MP_MONTH_PLAN_PROD_FINAL f5
             LEFT JOIN (
                 SELECT FACTORY_CODE, MATERIAL_CODE, IFNULL(SUM(DAY_FINISH_QTY), 0) AS FINISH_QTY
