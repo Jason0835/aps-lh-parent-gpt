@@ -731,16 +731,18 @@ Process:
 Output:
   ShiftDemandQtyMap(tread_code, shift_code, demand_qty)
 
-Step5 读取 6点胎面库存并初始化滚动库存
+Step5 读取 6点胎面库存并计算14点预计库存
 Load Data:
   MES 6点胎面实际库存或 T_TM_STOCK(stock_date + tread_code)
+  早班胎面需求量（从成型计划表获取）
+  早班胎面计划量（从 T_TM_SCHEDULE_RESULT 获取已排产的早班计划量）
 Process:
   每天早上 6 点从 MES 获取各胎面的实际库存，或读取已落地到 T_TM_STOCK 的 6 点库存快照；
-  rollingStockQty(第1班开始) = sixClockStockQty；
+  计算14点预计库存：rollingStockQty(第1班开始) = sixClockStockQty - 早班胎面需求量 + 早班胎面计划量；
   `已计划入库量`、`已占用量`、`不良量`、`调整量` 数据来源未定义，本版不参与库存公式；
   库存字段建议在代码或接口中命名为 sixClockStockQty，解释表仍可写入 stock_qty。
 Output:
-  StockForecastMap(tread_code, six_clock_stock_qty, rolling_stock_qty)
+  StockForecastMap(tread_code, six_clock_stock_qty, rolling_stock_qty, first_shift_demand_qty, first_shift_plan_qty)
 
 Step6 建立本班机台任务链
 Process:
