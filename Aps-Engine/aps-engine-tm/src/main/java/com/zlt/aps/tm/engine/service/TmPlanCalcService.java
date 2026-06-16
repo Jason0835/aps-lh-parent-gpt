@@ -56,6 +56,12 @@ public class TmPlanCalcService implements ITmPlanCalcService {
                 task.setPlanQty(task.getGuardDemandQty());
                 continue;
             }
+
+            // 兜底：使用总需求量作为计划量
+            if (task.getDemandQty() != null) {
+                task.setPlanQty(task.getDemandQty());
+                continue;
+            }
         }
     }
 }

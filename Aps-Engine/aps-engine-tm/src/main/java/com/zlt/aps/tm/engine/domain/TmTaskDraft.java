@@ -85,16 +85,31 @@ public class TmTaskDraft {
     /** 是否命中定点生产机台 */
     private Boolean fixedMachineMatched;
 
+    /** 需求量，单位米 */
+    private BigDecimal demandQty;
+
+    /** 未排原因编码 */
+    private String unplannedReasonCode;
+
+    /** 未排原因描述 */
+    private String unplannedReasonDesc;
+
+    /**
+     * 判断任务是否未分配机台。
+     *
+     * @return true 表示未分配机台
+     */
+    public boolean isUnassigned() {
+        return machineCode == null || machineCode.trim().isEmpty();
+    }
+
     /**
      * 生成任务业务键。
      *
      * @return 稳定业务键；订单号为空时使用胎面、机台、班次组合兜底
      */
     public String getBusinessKey() {
-        if (isNotBlank(orderNo)) {
-            return orderNo;
-        }
-        return String.valueOf(treadCode) + "#" + machineCode + "#" + shiftOrder;
+        return String.join("|", orderNo, treadCode, glueCode, mouthPlateCode);
     }
 
     /**
