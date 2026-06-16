@@ -112,14 +112,14 @@ export default {
     columns() {
       return [
         {
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.mdmCxMachineFixed.factoryCode"),
           prop: "factoryCode",
           type: "select",
           dictData: this.parentDict.type.biz_factory_name,
         },
         {
           prop: "cxMachineCode",
-          label: this.$t("ui.data.column.workWearInfo.cxMachineCode"),
+          label: this.$t("ui.data.column.mdmCxMachineFixed.cxMachineCode"),
           render: (form) => {
             return (
               <formingCapacitySelect
@@ -132,7 +132,7 @@ export default {
         },
         {
           prop: "fixedStructure1",
-          label: this.$t("ui.data.column.workWearInfo.fixedStructure1"),
+          label: this.$t("ui.data.column.mdmCxMachineFixed.fixedStructure1"),
           render: (form) => {
             return (
               <structureSelect
@@ -147,7 +147,7 @@ export default {
         },
         {
           prop: "fixedStructure2",
-          label: this.$t("ui.data.column.workWearInfo.fixedStructure2"),
+          label: this.$t("ui.data.column.mdmCxMachineFixed.fixedStructure2"),
           render: (form) => {
             return (
               <structureSelect
@@ -162,7 +162,7 @@ export default {
         },
         {
           prop: "fixedStructure3",
-          label: this.$t("ui.data.column.workWearInfo.fixedStructure3"),
+          label: this.$t("ui.data.column.mdmCxMachineFixed.fixedStructure3"),
           maxlength: 500,
           render: (form) => {
             return (
@@ -177,7 +177,7 @@ export default {
         },
         {
           prop: "fixedStructure4",
-          label: this.$t("ui.data.column.workWearInfo.fixedStructure4"),
+          label: this.$t("ui.data.column.mdmCxMachineFixed.fixedStructure4"),
           maxlength: 500,
           render: (form) => {
             return (
@@ -192,7 +192,7 @@ export default {
         },
         {
           prop: "fixedMaterialCode",
-          label: this.$t("ui.data.column.workWearInfo.fixedMaterialCode"),
+          label: this.$t("ui.data.column.mdmCxMachineFixed.fixedMaterialCode"),
           maxlength: 500,
           render: (form) => {
             return (
@@ -208,7 +208,7 @@ export default {
         },
         {
           prop: "disableStructure",
-          label: this.$t("ui.data.column.workWearInfo.disableStructure"),
+          label: this.$t("ui.data.column.mdmCxMachineFixed.disableStructure"),
           maxlength: 500,
           render: (form) => {
             return (
@@ -223,12 +223,12 @@ export default {
         },
         {
           prop: "fixedMaterialDesc",
-          label: this.$t("固定物料描述"),
+          label: this.$t("ui.data.column.mdmCxMachineFixed.fixedMaterialDesc"),
           disabled: true,
         },
         {
           prop: "disableMaterialCode",
-          label: this.$t("ui.data.column.workWearInfo.disableMaterialCode"),
+          label: this.$t("ui.data.column.mdmCxMachineFixed.disableMaterialCode"),
           maxlength: 500,
           render: (form) => {
             return (
@@ -244,7 +244,7 @@ export default {
         },
         {
           prop: "disableMaterialDesc",
-          label: this.$t("不可作业物料描述"),
+          label: this.$t("ui.data.column.mdmCxMachineFixed.disableMaterialDesc"),
           disabled: true,
         },
       ];
