@@ -2642,18 +2642,22 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                 continue;
             }
             String materialCodeKey = String.join(BusiConstant.WeekRollAdjust.SPLIT_GROUP_KEY, materialCode, monthPlan.getConstructionStage());
-
+            String oriMonthPlanVersion = monthPlan.getMonthPlanVersion();
+            MpSkuAdjustInfoVo skuAdjustInfo = skuAdjustInfoMap == null ? null: skuAdjustInfoMap.get(monthPlan.getPendingQtyKey());
             MpAdjustResult adjustResult = CollectionUtils.firstElement(adjustResultMap.get(materialCodeKey));
             if (adjustResult == null) {
                 log.warn("更新月度生产计划：物料编号:{},施工阶段:{},未查询到对应调整结果，跳过", materialCode, monthPlan.getConstructionStage());
+                if (skuAdjustInfo != null && (skuAdjustInfo.getPendingQty() == null || skuAdjustInfo.getPendingQty() == 0)){
+                    //若待调整量 == 0 且 调整的需求计划版本与定稿的需求计划版本不一致，将”超欠产有效标识“ = 否；
+                    if (!contextDTO.getAdjustMonthPlanVersion().equals(oriMonthPlanVersion)){
+                        monthPlan.setLastMonthValidFlag(YesOrNoEnum.NO.getCode());
+                    }
+                }
                 continue;
             }
-
             // 相同业务Key时以调整结果为准；调整独有数据转换为同一VO后追加返回。
-            String oriMonthPlanVersion = monthPlan.getMonthPlanVersion();
             BeanUtil.copyProperties(adjustResult, monthPlan, "id");
             //monthPlan.setId(null);
-            MpSkuAdjustInfoVo skuAdjustInfo = skuAdjustInfoMap == null ? null: skuAdjustInfoMap.get(monthPlan.getPendingQtyKey());
             if (skuAdjustInfo != null && (skuAdjustInfo.getPendingQty() == null || skuAdjustInfo.getPendingQty() == 0)){
                 //若待调整量 == 0 且 调整的需求计划版本与定稿的需求计划版本不一致，将”超欠产有效标识“ = 否；
                 if (!contextDTO.getAdjustMonthPlanVersion().equals(oriMonthPlanVersion)){
