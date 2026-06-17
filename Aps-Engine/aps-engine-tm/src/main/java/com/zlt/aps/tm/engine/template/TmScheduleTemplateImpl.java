@@ -59,11 +59,19 @@ public class TmScheduleTemplateImpl extends AbsTmScheduleTemplate {
         this.processLogger = processLogger;
     }
 
+    /**
+     * 初始化
+     * @param context 上下文
+     */
     @Override
     protected void doBootstrap(TmScheduleContext context) {
         runStep(context, TmScheduleStepEnum.BOOTSTRAP, () -> bootstrapService.bootstrap(context));
     }
 
+    /**
+     * 计算预计库存
+     * @param context 上下文
+     */
     @Override
     protected void doInventoryPredict(TmScheduleContext context) {
         runStep(context, TmScheduleStepEnum.INVENTORY_PREDICT, () -> inventoryPredictService.predict(context));
@@ -74,16 +82,28 @@ public class TmScheduleTemplateImpl extends AbsTmScheduleTemplate {
         runStep(context, TmScheduleStepEnum.PLAN_CALC, () -> planCalcService.calculate(context));
     }
 
+    /**
+     * 待排任务排序
+     * @param context 上下文
+     */
     @Override
     protected void doTaskSort(TmScheduleContext context) {
         runStep(context, TmScheduleStepEnum.TASK_SORT, () -> taskSortService.sort(context));
     }
 
+    /**
+     * 机台分配
+     * @param context 上下文
+     */
     @Override
     protected void doMachineAssign(TmScheduleContext context) {
         runStep(context, TmScheduleStepEnum.MACHINE_ASSIGN, () -> machineAssignService.assign(context));
     }
 
+    /**
+     * 执行解释快照构建和落库
+     * @param context 上下文
+     */
     @Override
     protected void doSnapshotAndPersist(TmScheduleContext context) {
         runStep(context, TmScheduleStepEnum.SNAPSHOT_BUILD, () -> snapshotAndPersistService.snapshotAndPersist(context));

@@ -36,9 +36,10 @@ public class TmTaskChainScheduleService {
             throw new IllegalArgumentException("自动排程追加任务缺少选中机台");
         }
         task.setMachineCode(machine.getMachineCode());
+        Integer shiftOrder = task.getShiftOrder() == null ? 1 : task.getShiftOrder();
         ScheduleTaskLinkedList<TmTaskDraft> chain = context.getTaskChainGroup()
-                .getOrCreate(machine.getMachineCode(), toLocalDate(context), 1);
-        return chain.append(toNode(task, machine.getMachineCode(), 1, context), operationContext(context, "AUTO_APPEND"));
+                .getOrCreate(machine.getMachineCode(), toLocalDate(context), shiftOrder);
+        return chain.append(toNode(task, machine.getMachineCode(), shiftOrder, context), operationContext(context, "AUTO_APPEND"));
     }
 
     /**

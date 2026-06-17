@@ -130,6 +130,21 @@ public class TmPersistServiceTest {
     }
 
     @Test
+    public void convertUnplannedShouldMapTaskShiftFields() {
+        TmPersistService service = new TmPersistService();
+        TmScheduleContext context = buildContext();
+        TmTaskDraft task = buildTask(4);
+        task.setShiftOrder(4);
+
+        TmScheduleResult unplannedResult = service.convertUnplanned(task, context);
+
+        assertEquals(null, unplannedResult.getMachineCode());
+        assertEquals(Integer.valueOf(1), unplannedResult.getClass4Sequence());
+        assertEquals(new BigDecimal("14"), unplannedResult.getClass4PlanQty());
+        assertEquals(null, unplannedResult.getClass1Sequence());
+    }
+
+    @Test
     public void persistUnplannedShouldCompleteWithoutException() {
         TmPersistService service = new TmPersistService();
         TmScheduleContext context = buildContext();

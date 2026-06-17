@@ -18,6 +18,9 @@ import com.zlt.aps.tm.api.domain.entity.TmMachineInfo;
 import com.zlt.aps.tm.api.domain.entity.TmScheduleResult;
 import com.zlt.aps.tm.api.domain.vo.TmAutoScheduleRequestVo;
 import com.zlt.aps.tm.api.domain.vo.TmAutoScheduleResponseVo;
+import com.zlt.aps.tm.engine.domain.TmPersistResult;
+import com.zlt.aps.tm.engine.domain.TmScheduleContext;
+import com.zlt.aps.tm.engine.template.TmScheduleTemplateImpl;
 import com.zlt.aps.tm.mapper.*;
 import com.zlt.aps.tm.service.ITmScheduleResultService;
 import com.zlt.bill.common.service.AbstractDocService;
@@ -54,6 +57,9 @@ public class TmScheduleResultServiceImpl extends AbstractDocService<TmScheduleRe
 
     @Resource
     private TmScheduleUnplannedMapper tmScheduleUnplannedMapper;
+
+    @Resource
+    private TmScheduleTemplateImpl tmScheduleTemplate;
 
     @Override
     protected String getDocTypeCode() {
@@ -251,8 +257,6 @@ public class TmScheduleResultServiceImpl extends AbstractDocService<TmScheduleRe
     /**
      * 执行胎面自动排程。
      *
-     * <p>当前先实现旧批次覆盖事务边界校验；完整算法结果写入待数据加载和算法入口接入后继续扩展。</p>
-     *
      * @param request 自动排程请求
      * @return 自动排程响应
      * @throws ServiceException 请求非法、旧批次不可覆盖或未确认覆盖时抛出
@@ -266,12 +270,35 @@ public class TmScheduleResultServiceImpl extends AbstractDocService<TmScheduleRe
         if (CollUtil.isNotEmpty(currentResultList)) {
             logicDeleteByFactoryCodeAndScheduleDate(request.getFactoryCode(), request.getScheduleDate());
         }
+        TmScheduleContext context = buildScheduleContext(request, response);
+        TmAutoScheduleResponseVo engineResponse = tmScheduleTemplate.execute(context);
+        TmPersistResult persistResult = context.getPersistResult() == null ? new TmPersistResult() : context.getPersistResult();
         response.setSuccess(Boolean.TRUE);
         response.setConfirmRequired(Boolean.FALSE);
-        response.setResultCount(0);
-        response.setUnplannedCount(0);
-        response.setMessage("自动排程已通过旧批次覆盖校验，完整算法结果写入待数据加载接入");
+        response.setBatchNo(context.getBatchNo());
+        response.setTraceId(context.getTraceId());
+        response.setResultCount(persistResult.getResultCount());
+        response.setUnplannedCount(persistResult.getUnplannedCount());
+        response.setMessage(engineResponse != null && StrUtil.isNotBlank(engineResponse.getMessage())
+                ? engineResponse.getMessage() : "胎面自动排程执行完成");
         return response;
+    }
+
+    /**
+     * 构建自动排程运行上下文。
+     *
+     * @param request  自动排程请求
+     * @param response 基础响应，提供批次号和追踪号
+     * @return 自动排程上下文
+     */
+    private TmScheduleContext buildScheduleContext(TmAutoScheduleRequestVo request, TmAutoScheduleResponseVo response) {
+        TmScheduleContext context = new TmScheduleContext();
+        context.setFactoryCode(request.getFactoryCode());
+        context.setScheduleDate(request.getScheduleDate());
+        context.setOperator(StrUtil.blankToDefault(request.getOperator(), "system"));
+        context.setBatchNo(response.getBatchNo());
+        context.setTraceId(response.getTraceId());
+        return context;
     }
 
     /**

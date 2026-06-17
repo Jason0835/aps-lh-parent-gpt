@@ -31,16 +31,40 @@ public abstract class AbsTmScheduleTemplate {
         return buildResponse(context);
     }
 
+    /**
+     * 初始化
+     * @param context 上下文
+     */
     protected abstract void doBootstrap(TmScheduleContext context);
 
+    /**
+     * 计算预计库存
+     * @param context 上下文
+     */
     protected abstract void doInventoryPredict(TmScheduleContext context);
 
+    /**
+     * 需求量和计划量计算
+     * @param context 上下文
+     */
     protected abstract void doDemandAndPlanCalc(TmScheduleContext context);
 
+    /**
+     * 待排任务排序
+     * @param context 上下文
+     */
     protected abstract void doTaskSort(TmScheduleContext context);
 
+    /**
+     * 机台分配
+     * @param context 上下文
+     */
     protected abstract void doMachineAssign(TmScheduleContext context);
 
+    /**
+     * 执行解释快照构建和落库
+     * @param context 上下文
+     */
     protected abstract void doSnapshotAndPersist(TmScheduleContext context);
 
     /**

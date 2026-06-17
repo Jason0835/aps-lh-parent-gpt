@@ -159,8 +159,10 @@ public class TmPersistService {
             result.setGlueCode(task.getGlueCode());
             result.setMouthPlateCode(task.getMouthPlateCode());
             result.setMachineCode(null);
-            result.setClass1PlanQty(task.getPlanQty());
+            applyTaskShiftFields(result, task);
         }
+        result.setReleaseStatus(TmScheduleReleaseStatusEnum.NOT_RELEASED.getCode());
+        result.setDataSource("AUTO");
         return result;
     }
 
@@ -175,8 +177,45 @@ public class TmPersistService {
         result.setTreadCode(task.getTreadCode());
         result.setGlueCode(task.getGlueCode());
         result.setMouthPlateCode(task.getMouthPlateCode());
+        result.setReleaseStatus(TmScheduleReleaseStatusEnum.WAIT_RELEASE.getCode());
+        result.setDataSource("AUTO");
         applyShiftFields(result, node);
         return result;
+    }
+
+    private void applyTaskShiftFields(TmScheduleResult result, TmTaskDraft task) {
+        Integer shiftOrder = task.getShiftOrder() == null ? 1 : task.getShiftOrder();
+        if (Integer.valueOf(1).equals(shiftOrder)) {
+            result.setClass1Sequence(1);
+            result.setClass1PlanQty(task.getPlanQty());
+            return;
+        }
+        if (Integer.valueOf(2).equals(shiftOrder)) {
+            result.setClass2Sequence(1);
+            result.setClass2PlanQty(task.getPlanQty());
+            return;
+        }
+        if (Integer.valueOf(3).equals(shiftOrder)) {
+            result.setClass3Sequence(1);
+            result.setClass3PlanQty(task.getPlanQty());
+            return;
+        }
+        if (Integer.valueOf(4).equals(shiftOrder)) {
+            result.setClass4Sequence(1);
+            result.setClass4PlanQty(task.getPlanQty());
+            return;
+        }
+        if (Integer.valueOf(5).equals(shiftOrder)) {
+            result.setClass5Sequence(1);
+            result.setClass5PlanQty(task.getPlanQty());
+            return;
+        }
+        if (Integer.valueOf(6).equals(shiftOrder)) {
+            result.setClass6Sequence(1);
+            result.setClass6PlanQty(task.getPlanQty());
+            return;
+        }
+        throw new IllegalArgumentException("不支持的胎面排程班次顺序:" + shiftOrder);
     }
 
     private void applyShiftFields(TmScheduleResult result, ScheduleTaskNode<TmTaskDraft> node) {

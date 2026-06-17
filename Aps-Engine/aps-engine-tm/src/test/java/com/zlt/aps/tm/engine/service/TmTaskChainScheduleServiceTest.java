@@ -35,6 +35,24 @@ public class TmTaskChainScheduleServiceTest {
     }
 
     @Test
+    public void appendAutoTaskShouldUseTaskShiftOrder() {
+        TmTaskChainScheduleService service = new TmTaskChainScheduleService();
+        TmScheduleContext context = buildContext();
+        TmTaskDraft task = buildTask("ORD-4", "TM01");
+        task.setShiftOrder(4);
+
+        service.appendAutoTask(task, buildCandidate("TM01"), context);
+
+        assertNull(context.getTaskChainGroup()
+                .get("TM01", DateUtil.toLocalDateTime(context.getScheduleDate()).toLocalDate(), 1));
+        ScheduleTaskLinkedList<TmTaskDraft> chain = context.getTaskChainGroup()
+                .get("TM01", DateUtil.toLocalDateTime(context.getScheduleDate()).toLocalDate(), 4);
+        assertEquals(1, chain.getSize());
+        assertEquals(Integer.valueOf(4), chain.toList().get(0).getShiftOrder());
+        assertEquals("CLASS4", chain.toList().get(0).getShiftCode());
+    }
+
+    @Test
     public void insertManualTaskShouldAddNodeAfterAnchor() {
         TmTaskChainScheduleService service = new TmTaskChainScheduleService();
         TmScheduleContext context = buildContext();
