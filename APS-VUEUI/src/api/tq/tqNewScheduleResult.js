@@ -89,6 +89,15 @@ export function validateChangeMachine(data) {
   })
 }
 
+/** 调量前校验 */
+export function validateChangeQty(data) {
+  return request({
+    url: '/tq/newScheduleResult/validateChangeQty',
+    method: 'post',
+    data: data
+  })
+}
+
 /** 调量 */
 export function changeQty(data) {
   return request({

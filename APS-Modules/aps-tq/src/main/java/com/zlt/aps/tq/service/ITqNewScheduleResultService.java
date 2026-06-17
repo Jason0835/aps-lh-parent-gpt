@@ -49,6 +49,14 @@ public interface ITqNewScheduleResultService extends IDocService<TqNewScheduleRe
     AjaxResult changeMachine(TqChangeMachineDTO dto);
 
     /**
+     * 调量前校验
+     *
+     * @param entity 调量数据
+     * @return 校验结果
+     */
+    AjaxResult validateChangeQty(TqNewScheduleResult entity);
+
+    /**
      * 调量
      *
      * @param entity 调量数据

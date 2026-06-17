@@ -1,6 +1,7 @@
 package com.zlt.aps.lh.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.ruoyi.common.core.utils.PageUtils;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
@@ -43,7 +44,13 @@ public class LhMachineOnlineInfoController extends AbstractDocBizController<LhMa
     @PostMapping("/list")
     @Override
     public TableDataInfo list(@RequestBody LhMachineOnlineInfo queryVO) {
-        return super.list(queryVO);
+        // 重写list方法，强制按机台编码升序排序，避免父类默认排序覆盖
+        QueryWrapper<LhMachineOnlineInfo> wrapper = new QueryWrapper<>();
+        this.builderCondition(wrapper, queryVO);
+        PageUtils.startPage(true, "LH_CODE ASC");
+        List<LhMachineOnlineInfo> list = lhMachineOnlineInfoMapper.selectList(wrapper);
+        PageUtils.clearPage();
+        return getDataTable(list);
     }
 
     @ApiOperation("获取详情信息")
