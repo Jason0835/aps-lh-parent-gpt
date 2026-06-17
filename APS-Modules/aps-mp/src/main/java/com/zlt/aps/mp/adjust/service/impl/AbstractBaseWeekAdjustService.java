@@ -1340,6 +1340,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                 }
             }
         }
+        int maxDays = com.zlt.aps.mp.engine.utils.DateUtils.getDaysByYearMonth(contextDTO.getMpYear(), contextDTO.getMpMonth());
         contextDTO.setOneStructureAllocationList(oneStructureAllocationList);
         // 设置总的硫化机台数
         contextDTO.setTotalLhMachines(mpAdjustStructureInService.getLhMachineCount(contextDTO));
@@ -1384,7 +1385,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             // 初始结构开始日\收尾日
             initStructureStartAndEndDay(contextDTO);
             // 检查排产日是否超出结构起产日-收尾日
-            checkStruct2MaterialDate(contextDTO, targetMonthPlanList);
+            checkStruct2MaterialDate(contextDTO, targetMonthPlanList,maxDays);
 
             // 初始化日产信息
             Map<Integer, MpDailyCapacityLimitVo> dailyCapacityLimitVoMap = adjustDailyCapacityLimitObj.getDailyCapacityLimitMap(contextDTO);
@@ -1485,7 +1486,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
      * @param contextDTO
      * @param monthPlanList
      */
-    private void checkStruct2MaterialDate(MpRollAdjustContextDTO contextDTO, List<FactoryMonthPlanFinalAdjustVo> monthPlanList) {
+    private void checkStruct2MaterialDate(MpRollAdjustContextDTO contextDTO, List<FactoryMonthPlanFinalAdjustVo> monthPlanList, int maxDays) {
         if (PubUtil.isEmpty(monthPlanList)) {
             return;
         }
@@ -1497,6 +1498,10 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             }
             if (finalAdjustVo.getBeginDay() == 0 || finalAdjustVo.getEndDay() == 0) {
                 continue;
+            }
+            if (finalAdjustVo.getEndDay() > maxDays){
+                beginDaySb.append(String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.confirm.checkMaterialMaxDay"),
+                        finalAdjustVo.getMaterialCode(), maxDays)).append(BusiConstant.WeekRollAdjust.SPLIT_FRONT_NEW_LINE);
             }
             if (finalAdjustVo.getBeginDay() < contextDTO.getStructureStartDay() || finalAdjustVo.getEndDay() > contextDTO.getStructureDeadLine()) {
                 beginDaySb.append(String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.confirm.checkStructMaterialDay"),
@@ -2619,7 +2624,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         }*/
         // 通过结构过滤月计划列表
         String structureName = contextDTO.getStructureName();
-
+        List<MpAdjustResult> updateAdjustResultValidFlagList = new ArrayList<>();
         // 获取待调整量
         Map<String, MpSkuAdjustInfoVo> skuAdjustInfoMap = getPendingQtyInfo(contextDTO);
 /*        factoryMonthPlanProdFinalList = factoryMonthPlanProdFinalList.stream()
@@ -2653,6 +2658,8 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                 //若待调整量 == 0 且 调整的需求计划版本与定稿的需求计划版本不一致，将”超欠产有效标识“ = 否；
                 if (!contextDTO.getAdjustMonthPlanVersion().equals(oriMonthPlanVersion)){
                     monthPlan.setLastMonthValidFlag(YesOrNoEnum.NO.getCode());
+                    adjustResult.setLastMonthValidFlag(YesOrNoEnum.NO.getCode());
+                    updateAdjustResultValidFlagList.add(adjustResult);
                 }
             }
             // 设置最新需求计划版本
@@ -2696,6 +2703,10 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             setWeekAdjustQty(monthPlan, week);
             // 将日期字段中值为0的字段设为null
             handleZeroToNull(monthPlan);
+        }
+
+        if (PubUtil.isNotEmpty(updateAdjustResultValidFlagList)){
+            mpAdjustResultEntityMapper.updateValidFlagBatchById(updateAdjustResultValidFlagList);
         }
     }
 

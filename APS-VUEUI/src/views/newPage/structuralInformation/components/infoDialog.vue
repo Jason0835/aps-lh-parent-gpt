@@ -69,12 +69,12 @@ export default {
       return [
       {
           prop: "structureName",
-          label: this.$t("ui.data.column.finishStock.structureName"),
+          label: this.$t("ui.data.column.mdmStructureName.structureName"),
           maxlength:64
         },
         {
           prop: "remark",
-          label: this.$t("common.remark"),
+          label: this.$t("ui.common.column.remark"),
           maxlength:300
         },
       ];

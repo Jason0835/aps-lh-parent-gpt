@@ -165,7 +165,7 @@ export default {
       return [
         {
            prop: "factoryCode",
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.mdmAreaCapaAllocation.factoryCode"),
           type: "select",
           dictData: this.parentDict.type.biz_factory_name,
         },
@@ -186,13 +186,13 @@ export default {
 
         {
           prop: "productTypeCode",
-          label: this.$t("ui.data.column.monthplan.productType"),
+          label: this.$t("ui.data.column.mdmAreaCapaAllocation.productTypeCode"),
           type: "select",
           dictData: this.parentDict.type.biz_product_type,
         },
         {
           prop: "areaCode",
-          label: this.$t("common.area"),
+          label: this.$t("ui.data.column.mdmAreaCapaAllocation.areaCode"),
           render: (form) => {
             return (
               <areaSelect
@@ -218,7 +218,7 @@ export default {
         // },
         {
           prop: "capacityAllocation",
-          label: this.$t("ui.data.column.regionalCapacityAllocation.fenpei"),
+          label: this.$t("ui.data.column.mdmAreaCapaAllocation.capacityAllocation"),
           type: "number",
           max:99999999,
           min:0

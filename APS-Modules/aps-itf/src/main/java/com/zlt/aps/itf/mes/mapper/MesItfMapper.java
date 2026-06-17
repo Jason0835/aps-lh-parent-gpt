@@ -304,4 +304,20 @@ public interface MesItfMapper {
      * @return 版本号列表，按升序排列
      */
     List<String> selectAllDataVersionsFromMouldCleanPlan(@Param("factoryCode") String factoryCode);
+
+    /**
+     * 查询设备计划停机同步数据（按版本号）
+     *
+     * @param syncDataLogs 参数
+     * @return 列表
+     */
+    List<DevPlanCloseVo> selectDevPlanCloseList(AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 查询设备计划停机中间表的最大版本号
+     *
+     * @param factoryCode 分厂编码（可选）
+     * @return 最大版本号，无数据时返回null
+     */
+    String selectMaxDataVersionFromDevPlanClose(@Param("factoryCode") String factoryCode);
 }

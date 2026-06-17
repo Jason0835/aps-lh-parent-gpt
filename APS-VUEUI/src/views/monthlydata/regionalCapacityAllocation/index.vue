@@ -157,15 +157,15 @@ export default {
         { type: "selection", fixed: "left" },
         {
           prop: "year",
-          label: this.$t("ui.data.column.productionMouldConfiguration.year"),
+          label: this.$t("ui.data.column.mdmAreaCapaAllocation.year"),
         },
         {
           prop: "month",
-          label: this.$t("ui.data.column.productionMouldConfiguration.month"),
+          label: this.$t("ui.data.column.mdmAreaCapaAllocation.month"),
         },
         {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.mdmAreaCapaAllocation.factoryCode"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
           },
@@ -173,19 +173,19 @@ export default {
 
         {
           prop: "productTypeCode",
-          label: this.$t("ui.data.column.monthplan.productType"),
+          label: this.$t("ui.data.column.mdmAreaCapaAllocation.productTypeCode"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_product_type, value);
           },
         },
         {
           prop: "areaCodeNameI18n",
-          label: this.$t("common.area"),
+          label: this.$t("ui.data.column.mdmAreaCapaAllocation.areaCode"),
         },
         {
           prop: "capacityAllocation",
           label: this.$t(
-            "ui.data.column.regionalCapacityAllocation.capacityAllocation"
+            "ui.data.column.mdmAreaCapaAllocation.capacityAllocation"
           ),
         },
         {
@@ -239,7 +239,7 @@ export default {
       return [
         {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.mdmAreaCapaAllocation.factoryCode"),
           type: "select",
           dictData: this.dict.type.biz_factory_name,
         },
@@ -253,13 +253,13 @@ export default {
 
         {
           prop: "productTypeCode",
-          label: this.$t("ui.data.column.monthplan.productType"),
+          label: this.$t("ui.data.column.mdmAreaCapaAllocation.productTypeCode"),
           type: "select",
           dictData: this.dict.type.biz_product_type,
         },
         {
           prop: "areaCode",
-          label: this.$t("common.area"),
+          label: this.$t("ui.data.column.mdmAreaCapaAllocation.areaCode"),
           type: "select",
           filterable: true,
           dictData:this.areaDist,

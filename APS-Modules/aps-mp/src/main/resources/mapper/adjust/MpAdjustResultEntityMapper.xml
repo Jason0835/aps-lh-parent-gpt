@@ -79,6 +79,16 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         ORDER BY VERSION DESC
     </select>
 
+    <update id="updateValidFlagBatchById" parameterType="java.util.List">
+        <foreach collection="list" item="item" separator=";">
+            UPDATE T_MP_ADJUST_RESULT
+            SET LAST_MONTH_VALID_FLAG = #{item.lastMonthValidFlag},
+                UPDATE_BY = #{item.updateBy},
+                UPDATE_TIME = NOW()
+            WHERE ID = #{item.id}
+        </foreach>
+    </update>
+
     <select id="getAdjustVersionList" resultType="com.zlt.aps.mp.api.domain.entity.MpAdjustResult">
         SELECT
         r.FACTORY_CODE,

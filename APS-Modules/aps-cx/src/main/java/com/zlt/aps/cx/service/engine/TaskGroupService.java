@@ -1084,8 +1084,9 @@ public class TaskGroupService {
                             BigDecimal afterAdd = structDeferredTime.add(itemTimeSeconds);
                             if (afterAdd.compareTo(remainingCapacity) > 0) {
                                 BigDecimal actualRemaining = remainingCapacity.subtract(structDeferredTime);
-                                log.info("  [R2-产能不足] 结构={}, 已用={}s({}h) + 本项={}s({}h) > 剩余={}s({}h)，本轮跳过",
-                                        structName, structDeferredTime.toBigInteger(),
+                                log.info("  [R2-产能不足] 结构={}, 胎胚={}, 物料={}, 第{}轮失败, 已用={}s({}h) + 本项={}s({}h) > 剩余={}s({}h)，本轮不分配",
+                                        structName, dt.getEmbryoCode(), dtMaterialCode, currentRound,
+                                        structDeferredTime.toBigInteger(),
                                         structDeferredTime.divide(BigDecimal.valueOf(3600), 1, BigDecimal.ROUND_HALF_UP),
                                         itemTimeSeconds.toBigInteger(),
                                         itemTimeSeconds.divide(BigDecimal.valueOf(3600), 1, BigDecimal.ROUND_HALF_UP),

@@ -111,4 +111,11 @@ public class MdmDevicePlanShut extends BaseEntity {
     @ApiModelProperty("备注")
     @TableField("REMARK")
     private String remark;
+
+    /**
+     * 版本号（MES同步时携带，用于增量同步判断）
+     */
+    @ApiModelProperty(value = "版本号", name = "dataVersion")
+    @TableField(value = "DATA_VERSION")
+    private String dataVersion;
 }

@@ -2307,7 +2307,8 @@ public class ScheduleServiceImpl implements ScheduleService {
     /**
      * 找到该物料的最近一个收尾日
      *
-     * <p>从当前日期开始往后找，找到第一个连续排产区间的最后一天。
+     * <p>使用月计划的 END_DAY 确定收尾日，避免中间断产日（如 D20=NULL）导致提前截断。
+     * 多条计划时取最大的 END_DAY。
      *
      * @param plans         月计划列表
      * @param currentDay    当前日期（几号）
@@ -2315,22 +2316,14 @@ public class ScheduleServiceImpl implements ScheduleService {
      * @return 最近一个收尾日
      */
     private int findMaterialEndingDay(List<FactoryMonthPlanProductionFinalResult> plans, int currentDay, int lastDayOfMonth) {
-        Set<Integer> productionDays = collectProductionDays(plans, currentDay, lastDayOfMonth);
-
-        if (productionDays.isEmpty()) {
-            return lastDayOfMonth;
-        }
-
         int endingDay = currentDay;
-        for (int day = currentDay; day <= lastDayOfMonth; day++) {
-            if (productionDays.contains(day)) {
-                endingDay = day;
-            } else if (endingDay > currentDay) {
-                break;
+        for (FactoryMonthPlanProductionFinalResult plan : plans) {
+            Integer planEndDay = plan.getEndDay();
+            if (planEndDay != null && planEndDay > endingDay && planEndDay >= currentDay) {
+                endingDay = planEndDay;
             }
         }
-
-        return endingDay;
+        return endingDay > currentDay ? endingDay : lastDayOfMonth;
     }
 
     /**
@@ -2360,25 +2353,6 @@ public class ScheduleServiceImpl implements ScheduleService {
         return total;
     }
 
-    /**
-     * 收集所有有排产的日期
-     */
-    private Set<Integer> collectProductionDays(List<FactoryMonthPlanProductionFinalResult> plans, int currentDay, int lastDayOfMonth) {
-        Set<Integer> productionDays = new HashSet<>();
-        for (FactoryMonthPlanProductionFinalResult plan : plans) {
-            int planBegin = plan.getBeginDay() != null ? plan.getBeginDay() : 1;
-            int planEnd = plan.getEndDay() != null ? plan.getEndDay() : lastDayOfMonth;
-            int start = Math.max(currentDay, planBegin);
-            int end = Math.min(lastDayOfMonth, planEnd);
-            for (int day = start; day <= end; day++) {
-                Integer dayQty = plan.getDayQty(day);
-                if (dayQty != null && dayQty > 0) {
-                    productionDays.add(day);
-                }
-            }
-        }
-        return productionDays;
-    }
 
     /**
      * 灵活解析日期时间字符串，支持 HH:mm 和 H:mm 两种格式

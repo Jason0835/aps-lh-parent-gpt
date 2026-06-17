@@ -3,6 +3,9 @@ package com.zlt.aps.maindata.mapper;
 import com.zlt.aps.mp.api.domain.entity.MdmDevicePlanShut;
 import com.zlt.core.dao.basemapper.CommBaseMapper;
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
+
+import java.util.List;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -21,4 +24,12 @@ import org.apache.ibatis.annotations.Mapper;
 @Mapper
 public interface MdmDevicePlanShutEntityMapper extends CommBaseMapper<MdmDevicePlanShut> {
 
+    /**
+     * 批量根据唯一键查询
+     * 唯一键维度：FACTORY_CODE + MACHINE_CODE + MACHINE_TYPE + MACHINE_STOP_TYPE + BEGIN_DATE
+     *
+     * @param list 数据列表
+     * @return 查询结果
+     */
+    List<MdmDevicePlanShut> selectByUniqueKeyList(@Param("list") List<MdmDevicePlanShut> list);
 }

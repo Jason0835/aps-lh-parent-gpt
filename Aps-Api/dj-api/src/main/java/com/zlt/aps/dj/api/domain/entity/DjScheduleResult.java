@@ -29,7 +29,6 @@ public class DjScheduleResult extends BaseEntity {
     private static final long serialVersionUID = 1L;
 
     /** 工厂编号 */
-    @Excel(name = "ui.data.column.dj.scheduleResult.factoryCode")
     @ApiModelProperty(value = "工厂编号", name = "factoryCode")
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;
@@ -62,7 +61,7 @@ public class DjScheduleResult extends BaseEntity {
     private String machineCode;
 
     /** 垫胶编码 */
-    @Excel(name = "ui.data.column.dj.scheduleResult.treadCode")
+    @Excel(name = "ui.data.column.dj.scheduleResult.paddingCode")
     @ApiModelProperty(value = "垫胶", name = "treadCode")
     @TableField("PADDING_CODE")
     private String paddingCode;
@@ -232,13 +231,11 @@ public class DjScheduleResult extends BaseEntity {
     private String releaseStatus;
 
     /** 数据来源 */
-    @Excel(name = "ui.data.column.dj.scheduleResult.dataSource")
     @ApiModelProperty(value = "数据来源", name = "dataSource")
     @TableField(value = "DATA_SOURCE")
     private String dataSource;
 
     /** 是否收尾任务 */
-    @Excel(name = "ui.data.column.dj.scheduleResult.tailFlag", dictType = "biz_yes_no")
     @ApiModelProperty(value = "是否收尾任务", name = "tailFlag")
     @TableField(value = "TAIL_FLAG")
     private String tailFlag;

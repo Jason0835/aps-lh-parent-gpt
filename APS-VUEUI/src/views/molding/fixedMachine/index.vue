@@ -141,7 +141,7 @@ export default {
         { type: "selection", fixed: "left" },
         {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.mdmCxMachineFixed.factoryCode"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
           },
@@ -149,18 +149,18 @@ export default {
         },
         {
           prop: "cxMachineCode",
-          label: this.$t("ui.data.column.workWearInfo.cxMachineCode"),
+          label: this.$t("ui.data.column.mdmCxMachineFixed.cxMachineCode"),
           width: 120,
         },
         {
           prop: "fixedStructure1",
-          label: this.$t("ui.data.column.workWearInfo.fixedStructure1"),
+          label: this.$t("ui.data.column.mdmCxMachineFixed.fixedStructure1"),
           width: 300,
           render: ({ row }) => {
             return (
               <el-popover
                 placement="left"
-                title={this.$t("ui.data.column.workWearInfo.fixedStructure1")}
+                title={this.$t("ui.data.column.mdmCxMachineFixed.fixedStructure1")}
                 width="500"
                 trigger="click"
               >
@@ -176,13 +176,13 @@ export default {
         },
         {
           prop: "fixedStructure2",
-          label: this.$t("ui.data.column.workWearInfo.fixedStructure2"),
+          label: this.$t("ui.data.column.mdmCxMachineFixed.fixedStructure2"),
           width: 300,
           render: ({ row }) => {
             return (
               <el-popover
                 placement="left"
-                title={this.$t("ui.data.column.workWearInfo.fixedStructure2")}
+                title={this.$t("ui.data.column.mdmCxMachineFixed.fixedStructure2")}
                 width="500"
                 trigger="click"
                 content={row.fixedStructure2}
@@ -199,13 +199,13 @@ export default {
         },
         {
           prop: "fixedStructure3",
-          label: this.$t("ui.data.column.workWearInfo.fixedStructure3"),
+          label: this.$t("ui.data.column.mdmCxMachineFixed.fixedStructure3"),
           width: 300,
           render: ({ row }) => {
             return (
               <el-popover
                 placement="left"
-                title={this.$t("ui.data.column.workWearInfo.fixedStructure3")}
+                title={this.$t("ui.data.column.mdmCxMachineFixed.fixedStructure3")}
                 width="500"
                 trigger="click"
                 content={row.fixedStructure3}
@@ -222,13 +222,13 @@ export default {
         },
         {
           prop: "fixedStructure4",
-          label: this.$t("ui.data.column.workWearInfo.fixedStructure4"),
+          label: this.$t("ui.data.column.mdmCxMachineFixed.fixedStructure4"),
           width: 300,
           render: ({ row }) => {
             return (
               <el-popover
                 placement="left"
-                title={this.$t("ui.data.column.workWearInfo.fixedStructure4")}
+                title={this.$t("ui.data.column.mdmCxMachineFixed.fixedStructure4")}
                 width="500"
                 trigger="click"
                 content={row.fixedStructure4}
@@ -245,13 +245,13 @@ export default {
         },
         {
           prop: "fixedMaterialCode",
-          label: this.$t("ui.data.column.workWearInfo.fixedMaterialCode"),
+          label: this.$t("ui.data.column.mdmCxMachineFixed.fixedMaterialCode"),
           width: 300,
           render: ({ row }) => {
             return (
               // <el-popover
               //   placement="left"
-              //   title={this.$t("ui.data.column.workWearInfo.fixedMaterialCode")}
+              //   title={this.$t("ui.data.column.mdmCxMachineFixed.fixedMaterialCode")}
               //   width="500"
               //   trigger="click"
               //   content={row.fixedMaterialCode}
@@ -262,7 +262,7 @@ export default {
               // </el-popover>
               <el-popover
                 placement="left"
-                title={this.$t("ui.data.column.workWearInfo.fixedMaterialCode")}
+                title={this.$t("ui.data.column.mdmCxMachineFixed.fixedMaterialCode")}
                 width="500"
                 trigger="click"
                 content={row.fixedMaterialCode}
@@ -280,13 +280,13 @@ export default {
         {
           prop: "fixedMaterialDesc",
           align: "left",
-          label: this.$t("固定物料描述"),
+          label: this.$t("ui.data.column.mdmCxMachineFixed.fixedMaterialDesc"),
           minWidth: 350,
           render: ({ row }) => {
             return (
               // <el-popover
               //   placement="left"
-              //   title={this.$t("固定物料描述")}
+              //   title={this.$t("ui.data.column.mdmCxMachineFixed.fixedMaterialDesc")}
               //   width="500"
               //   trigger="click"
               //   content={row.fixedMaterialDesc}
@@ -297,7 +297,7 @@ export default {
               // </el-popover>
               <el-popover
                 placement="left"
-                title={this.$t("固定物料描述")}
+                title={this.$t("ui.data.column.mdmCxMachineFixed.fixedMaterialDesc")}
                 width="500"
                 trigger="click"
                 content={row.fixedMaterialDesc}
@@ -314,13 +314,13 @@ export default {
         },
         {
           prop: "disableStructure",
-          label: this.$t("ui.data.column.workWearInfo.disableStructure"),
+          label: this.$t("ui.data.column.mdmCxMachineFixed.disableStructure"),
           width: 300,
           render: ({ row }) => {
             return (
               // <el-popover
               //   placement="left"
-              //   title={this.$t("ui.data.column.workWearInfo.disableStructure")}
+              //   title={this.$t("ui.data.column.mdmCxMachineFixed.disableStructure")}
               //   width="500"
               //   trigger="click"
               //   content={row.disableStructure}
@@ -331,7 +331,7 @@ export default {
               // </el-popover>
               <el-popover
                 placement="left"
-                title={this.$t("ui.data.column.workWearInfo.disableStructure")}
+                title={this.$t("ui.data.column.mdmCxMachineFixed.disableStructure")}
                 width="500"
                 trigger="click"
                 content={row.disableStructure}
@@ -348,14 +348,14 @@ export default {
         },
         {
           prop: "disableMaterialCode",
-          label: this.$t("ui.data.column.workWearInfo.disableMaterialCode"),
+          label: this.$t("ui.data.column.mdmCxMachineFixed.disableMaterialCode"),
           width: 300,
           render: ({ row }) => {
             return (
               // <el-popover
               //   placement="left"
               //   title={this.$t(
-              //     "ui.data.column.workWearInfo.disableMaterialCode"
+              //     "ui.data.column.mdmCxMachineFixed.disableMaterialCode"
               //   )}
               //   width="500"
               //   trigger="click"
@@ -367,7 +367,7 @@ export default {
               // </el-popover>
               <el-popover
                 placement="left"
-                title={this.$t("ui.data.column.workWearInfo.disableStructure")}
+                title={this.$t("ui.data.column.mdmCxMachineFixed.disableStructure")}
                 width="500"
                 trigger="click"
                 content={row.disableMaterialCode}
@@ -385,13 +385,13 @@ export default {
         {
           prop: "disableMaterialDesc",
           align: "left",
-          label: this.$t("不可作业物料描述"),
+          label: this.$t("ui.data.column.mdmCxMachineFixed.disableMaterialDesc"),
           minWidth: 350,
           render: ({ row }) => {
             return (
               // <el-popover
               //   placement="left"
-              //   title={this.$t("不可作业物料描述")}
+              //   title={this.$t("ui.data.column.mdmCxMachineFixed.disableMaterialDesc")}
               //   width="500"
               //   trigger="click"
               //   content={row.disableMaterialDesc}
@@ -402,7 +402,7 @@ export default {
               // </el-popover>
               <el-popover
                 placement="left"
-                title={this.$t("不可作业物料描述")}
+                title={this.$t("ui.data.column.mdmCxMachineFixed.disableMaterialDesc")}
                 width="500"
                 trigger="click"
                 content={row.disableMaterialDesc}
@@ -451,33 +451,33 @@ export default {
     searchColumns() {
       return [
         {
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.mdmCxMachineFixed.factoryCode"),
           prop: "factoryCode",
           type: "select",
           dictData: this.dict.type.biz_factory_name,
         },
         {
-          label: this.$t("ui.data.column.workWearInfo.cxMachineCode"),
+          label: this.$t("ui.data.column.mdmCxMachineFixed.cxMachineCode"),
           prop: "cxMachineCode",
         },
         {
           prop: "fixedStructure1",
-          label: this.$t("ui.data.column.workWearInfo.fixedStructure1"),
+          label: this.$t("ui.data.column.mdmCxMachineFixed.fixedStructure1"),
         },
         {
           prop: "fixedStructure2",
-          label: this.$t("ui.data.column.workWearInfo.fixedStructure2"),
+          label: this.$t("ui.data.column.mdmCxMachineFixed.fixedStructure2"),
         },
         {
           prop: "fixedStructure3",
-          label: this.$t("ui.data.column.workWearInfo.fixedStructure3"),
+          label: this.$t("ui.data.column.mdmCxMachineFixed.fixedStructure3"),
         },
         {
           prop: "fixedStructure4",
-          label: this.$t("ui.data.column.workWearInfo.fixedStructure4"),
+          label: this.$t("ui.data.column.mdmCxMachineFixed.fixedStructure4"),
         },
         {
-          label: this.$t("ui.data.column.workWearInfo.disableStructure"),
+          label: this.$t("ui.data.column.mdmCxMachineFixed.disableStructure"),
           prop: "disableStructure",
           // type: "select",
           // dictData: this.dict.type.JOB_TYPE, // "JOB_TYPE",

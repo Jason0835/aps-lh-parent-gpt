@@ -787,4 +787,20 @@ public class MesItfController {
     public AjaxResult syncDayFinishQtyToChipStock() {
         return mesItfService.syncDayFinishQtyToChipStock();
     }
+
+    /**
+     * 同步设备计划停机
+     * @param syncDataLogs 参数
+     * @return 结果
+     */
+    @ApiOperation("同步设备计划停机")
+    @PostMapping("/syncDevPlanClose")
+    @AutoLoginLog
+    public AjaxResult syncDevPlanClose(@RequestBody AuxReqSyncDataLogs syncDataLogs) {
+        String factoryCode = syncDataLogs.getFactoryCode();
+        if (StringUtils.isBlank(factoryCode)) {
+            syncDataLogs.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
+        }
+        return mesItfService.syncDevPlanClose(syncDataLogs);
+    }
 }

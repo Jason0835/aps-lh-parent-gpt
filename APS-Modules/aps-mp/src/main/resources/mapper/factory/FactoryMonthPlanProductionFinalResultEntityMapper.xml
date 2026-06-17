@@ -182,22 +182,24 @@
             SELECT
                 f5.FACTORY_CODE,
                 f5.MATERIAL_CODE,
-                IFNULL(fin.FINISH_QTY, 0) - IFNULL(f5.TOTAL_QTY, 0) AS OVERDUE_QTY
+                IFNULL(f5.TOTAL_QTY, 0) - IFNULL(fin.FINISH_QTY, 0) AS OVERDUE_QTY
             FROM T_MP_MONTH_PLAN_PROD_FINAL f5
             LEFT JOIN (
                 SELECT FACTORY_CODE, MATERIAL_CODE, IFNULL(SUM(DAY_FINISH_QTY), 0) AS FINISH_QTY
                 FROM T_LH_DAY_FINISH_QTY
                 WHERE FINISH_DATE BETWEEN #{startDate} AND #{endDate}
-                  AND IS_DELETE = '0'
+                  AND IS_DELETE = 0
                 GROUP BY FACTORY_CODE, MATERIAL_CODE
             ) fin ON f5.FACTORY_CODE = fin.FACTORY_CODE AND f5.MATERIAL_CODE = fin.MATERIAL_CODE
-            WHERE f5.YEAR = #{lastYear}
+            WHERE f5.IS_DELETE = 0
+              AND f5.YEAR = #{lastYear}
               AND f5.MONTH = #{lastMonth}
         ) calc ON f.FACTORY_CODE = calc.FACTORY_CODE AND f.MATERIAL_CODE = calc.MATERIAL_CODE
         SET f.LAST_MONTH_OVERDUE_QTY = calc.OVERDUE_QTY,
             f.LAST_MONTH_VALID_FLAG = CASE WHEN calc.OVERDUE_QTY IS NOT NULL THEN '1' ELSE '0' END,
             f.UPDATE_TIME = NOW()
-        WHERE f.YEAR = #{currentYear}
+        WHERE f.IS_DELETE = 0
+          AND f.YEAR = #{currentYear}
           AND f.MONTH = #{currentMonth}
     </update>
 

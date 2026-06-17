@@ -67,23 +67,6 @@ export default {
   },
   data() {
     return {
-      searchColumns: [
-        {
-          label: this.$t("ui.data.column.factoryCode"),
-          prop: "factoryCode",
-          type: "select",
-          dictData: this.dict.type.biz_factory_name,
-          filterable: true,
-        },
-        {
-          label: this.$t("ui.dj.params.column.paramCode"),
-          prop: "paramCode",
-        },
-        {
-          label: this.$t("ui.dj.params.column.paramName"),
-          prop: "paramName",
-        },
-      ],
       loading: false,
       data: [],
       selection: [],
@@ -102,6 +85,25 @@ export default {
     };
   },
   computed: {
+    searchColumns() {
+      return [
+        {
+          label: this.$t("ui.data.column.factoryCode"),
+          prop: "factoryCode",
+          type: "select",
+          dictData: this.dict.type.biz_factory_name,
+          filterable: true,
+        },
+        {
+          label: this.$t("ui.dj.params.column.paramCode"),
+          prop: "paramCode",
+        },
+        {
+          label: this.$t("ui.dj.params.column.paramName"),
+          prop: "paramName",
+        },
+      ];
+    },
     columns() {
       let columns = [
         { type: "selection", fixed: "left" },

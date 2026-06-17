@@ -75,6 +75,11 @@ import java.util.stream.Collectors;
 @Service("mesItfService")
 public class MesItfServiceImpl implements MesItfService {
 
+    /**
+     * SQL Server单次请求参数上限2100，安全批次大小为50
+     */
+    private static final int BATCH_SIZE = 50;
+
     @Autowired
     private MesItfMapper mesItfMapper;
     @Autowired
@@ -100,6 +105,9 @@ public class MesItfServiceImpl implements MesItfService {
 
     @Autowired
     private MdmDevMaintenancePlanEntityMapper devMaintenancePlanEntityMapper;
+
+    @Autowired
+    private MdmDevicePlanShutEntityMapper devicePlanShutEntityMapper;
 
     @Autowired
     private ICxMesSyncRemoteService cxMesSyncRemoteService;
@@ -2138,6 +2146,7 @@ public class MesItfServiceImpl implements MesItfService {
      * 1. 清理中间表中同工单号的旧数据，避免脏数据残留
      * 2. 写入MES中间表MOLD_ALTER_PLAN（建在MES分库）
      * 3. 发送MQ通知MES来获取数据
+     * 分批处理避免SQL Server参数上限2100的问题
      * @param moldAlterPlanList 模具交替计划列表
      * @return 结果
      */
@@ -2172,14 +2181,21 @@ public class MesItfServiceImpl implements MesItfService {
 
         try {
             // 先清理中间表中同工单号的旧数据，避免脏数据残留导致MES消费异常
+            // 分批删除，避免SQL Server IN子句参数上限2100的问题
             if (CollectionUtils.isNotEmpty(orderNos) && StringUtils.isNotBlank(factoryCode)) {
-                int deleted = moldAlterPlanIssueMapper.deleteByOrderNosAndFactoryCode(orderNos, factoryCode);
-                if (deleted > 0) {
-                    log.info("清理模具交替计划中间表旧数据, 分厂: {}, 工单号: {}, 删除数量: {}", factoryCode, orderNos, deleted);
+                for (int i = 0; i < orderNos.size(); i += BATCH_SIZE) {
+                    List<String> batchOrderNos = orderNos.subList(i, Math.min(i + BATCH_SIZE, orderNos.size()));
+                    int deleted = moldAlterPlanIssueMapper.deleteByOrderNosAndFactoryCode(batchOrderNos, factoryCode);
+                    if (deleted > 0) {
+                        log.info("清理模具交替计划中间表旧数据, 分厂: {}, 工单号批次: {}/{}, 删除数量: {}", factoryCode, (i / BATCH_SIZE) + 1, (orderNos.size() + BATCH_SIZE - 1) / BATCH_SIZE, deleted);
+                    }
                 }
             }
-            // MOLD_ALTER_PLAN表建在MES分库，使用@DS(DataSource.MES)的独立Mapper直接写入
-            moldAlterPlanIssueMapper.insertMoldAlterPlanList(issueList);
+            // 分批插入，避免SQL Server参数上限2100的问题
+            for (int i = 0; i < issueList.size(); i += BATCH_SIZE) {
+                List<MoldAlterPlanIssue> batch = issueList.subList(i, Math.min(i + BATCH_SIZE, issueList.size()));
+                moldAlterPlanIssueMapper.insertMoldAlterPlanList(batch);
+            }
         } catch (Exception e) {
             log.error("模具交替计划下发到MES中间表失败", e);
             throw e;
@@ -3565,5 +3581,138 @@ public class MesItfServiceImpl implements MesItfService {
             }
         }
         return result;
+    }
+
+    /**
+     * 同步设备计划停机（MES→APS）
+     * 采用更新删除标识模式，而不是先删后插
+     * 支持全量/增量同步：
+     * - 首次全量同步：不传版本号时查询MES中间表最大版本号后同步
+     * - 后续增量同步：按版本号增量拉取
+     * - 删除数据同步：DEL_FLAG=1的记录映射为APS表的IS_DELETE=1
+     * - 停机类型=06（临时性故障）特殊处理：MES分步写入开始时间和结束时间，按唯一键更新
+     *
+     * @param syncDataLogs 同步参数
+     * @return 结果
+     */
+    @Override
+    public AjaxResult syncDevPlanClose(AuxReqSyncDataLogs syncDataLogs) {
+        // 查询MES中间表设备计划停机的最大版本号，只同步最新版本的数据
+        String factoryCode = syncDataLogs != null ? syncDataLogs.getFactoryCode() : null;
+        DynamicDataSourceContextHolder.push(DataSource.MES);
+        String maxVersion = mesItfMapper.selectMaxDataVersionFromDevPlanClose(factoryCode);
+        DynamicDataSourceContextHolder.poll();
+
+        if (maxVersion != null && !maxVersion.isEmpty()) {
+            if (syncDataLogs == null) {
+                syncDataLogs = new AuxReqSyncDataLogs();
+            }
+            syncDataLogs.setDataVersion(maxVersion);
+            log.info("同步设备计划停机，最新版本号={}", maxVersion);
+        } else {
+            log.info("MES中间表无设备计划停机版本数据，factoryCode={}", factoryCode);
+        }
+
+        // 从MES中间表查询数据
+        DynamicDataSourceContextHolder.push(DataSource.MES);
+        List<DevPlanCloseVo> syncList = mesItfMapper.selectDevPlanCloseList(syncDataLogs);
+        DynamicDataSourceContextHolder.poll();
+
+        if (CollectionUtils.isEmpty(syncList)) {
+            log.warn("设备计划停机同步：MES中间表查询结果为空，factoryCode={}", factoryCode);
+            return AjaxResult.success("MES中间表无数据可同步");
+        }
+
+        // 按唯一键去重：FACTORY_CODE + MACHINE_CODE + MACHINE_TYPE + MACHINE_STOP_TYPE + BEGIN_DATE
+        Map<String, DevPlanCloseVo> groupMap = syncList.stream()
+                .collect(Collectors.toMap(
+                        item -> item.getFactoryCode() + "|" + item.getMachineCode() + "|"
+                                + item.getMachineType() + "|" + item.getMachineStopType() + "|"
+                                + item.getBeginDate().getTime(),
+                        Function.identity(),
+                        (v1, v2) -> v1
+                ));
+        syncList = new ArrayList<>(groupMap.values());
+
+        try {
+            DynamicDataSourceContextHolder.push(DataSource.APS);
+
+            // 分批处理，每批1000条
+            List<List<DevPlanCloseVo>> splitList = ScmListUtils.getSplitList(syncList, 1000);
+            List<MdmDevicePlanShut> insertOrUpdateList = null;
+            for (List<DevPlanCloseVo> saveList : splitList) {
+                // 查询APS已有数据（按唯一键批量查询）
+                List<MdmDevicePlanShut> existsList = devicePlanShutEntityMapper.selectByUniqueKeyList(
+                        saveList.stream().map(item -> {
+                            MdmDevicePlanShut shut = new MdmDevicePlanShut();
+                            shut.setMachineCode(item.getMachineCode());
+                            shut.setMachineType(item.getMachineType());
+                            shut.setMachineStopType(item.getMachineStopType());
+                            shut.setFactoryCode(item.getFactoryCode());
+                            shut.setBeginDate(item.getBeginDate());
+                            return shut;
+                        }).collect(Collectors.toList())
+                );
+
+                // 构建已存在数据的Map，key为唯一键
+                Map<String, MdmDevicePlanShut> existsMap = new HashMap<>(16);
+                if (CollectionUtils.isNotEmpty(existsList)) {
+                    existsMap = existsList.stream()
+                            .collect(Collectors.toMap(
+                                    item -> GenerageMapKeyUtils.createMapKey(
+                                            item.getFactoryCode(), item.getMachineCode(),
+                                            item.getMachineType(), item.getMachineStopType(),
+                                            item.getBeginDate() != null ? String.valueOf(item.getBeginDate().getTime()) : ""),
+                                    Function.identity(),
+                                    (v1, v2) -> v1
+                            ));
+                }
+
+                insertOrUpdateList = new ArrayList<>();
+                for (DevPlanCloseVo item : saveList) {
+                    MdmDevicePlanShut entity = new MdmDevicePlanShut();
+                    entity.setFactoryCode(item.getFactoryCode());
+                    entity.setMachineCode(item.getMachineCode());
+                    entity.setMachineType(item.getMachineType());
+                    entity.setMachineStopType(item.getMachineStopType());
+                    entity.setBeginDate(item.getBeginDate());
+                    entity.setEndDate(item.getEndDate());
+                    entity.setRemark(item.getRemark());
+                    entity.setDataVersion(item.getDataVersion());
+                    entity.setDataSource("0"); // 数据来源：0-MES
+                    entity.setCreateBy("MES");
+                    entity.setUpdateBy("MES");
+
+                    // 处理删除标识：MES的DEL_FLAG映射为APS的IS_DELETE
+                    if (StringUtils.isNotBlank(item.getDelFlag())) {
+                        entity.setIsDelete(Integer.valueOf(item.getDelFlag()));
+                    } else {
+                        entity.setIsDelete(0);
+                    }
+
+                    // 判断是否已存在，存在则设置ID进行更新
+                    String mapKey = GenerageMapKeyUtils.createMapKey(
+                            entity.getFactoryCode(), entity.getMachineCode(),
+                            entity.getMachineType(), entity.getMachineStopType(),
+                            entity.getBeginDate() != null ? String.valueOf(entity.getBeginDate().getTime()) : "");
+                    if (existsMap.containsKey(mapKey)) {
+                        MdmDevicePlanShut existsData = existsMap.get(mapKey);
+                        entity.setId(existsData.getId());
+                    }
+                    insertOrUpdateList.add(entity);
+                }
+
+                // 批量保存（insertOrUpdate）
+                baseDao.saveBatch(insertOrUpdateList);
+            }
+
+            log.info("设备计划停机同步完成，同步数量={}", syncList.size());
+        } catch (Exception e) {
+            log.error("设备计划停机同步失败，factoryCode={}", factoryCode, e);
+            return AjaxResult.error("设备计划停机同步失败：" + e.getMessage());
+        } finally {
+            DynamicDataSourceContextHolder.poll();
+        }
+        return AjaxResult.success();
     }
 }
