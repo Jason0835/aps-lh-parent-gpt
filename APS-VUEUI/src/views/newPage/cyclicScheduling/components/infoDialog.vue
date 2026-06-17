@@ -144,7 +144,7 @@ export default {
       return [
         {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.supplyOrderPool.factoryCode"),
           type: "select",
           dictData: this.parentDict.type.biz_factory_name,
         },
@@ -157,13 +157,13 @@ export default {
         },
         {
           prop: "orderType",
-          label: this.$t("ui.data.defectiveStock.orderType"),
+          label: this.$t("ui.data.column.supplyOrderPool.orderType"),
           type: "select",
           dictData: this.parentDict.type.supply_order_type,
         },
         {
           prop: "materialCode",
-          label: this.$t("ui.data.column.monthplan.oriMaterialCode"),
+          label: this.$t("ui.data.column.supplyOrderPool.materialCode"),
           render: (form) => {
             return (
               <materialCodeSelect
@@ -176,13 +176,13 @@ export default {
         },
         {
           prop: "locationType",
-          label: this.$t("ui.data.column.finishStock.wai"),
+          label: this.$t("ui.data.column.supplyOrderPool.locationType"),
           type: "select",
           dictData: this.parentDict.type.biz_stor_type,
         },
         {
           prop: "qty",
-          label: this.$t("ui.data.defectiveStock.qty"),
+          label: this.$t("ui.data.column.supplyOrderPool.qty"),
           type: "number",
           render: (form) => {
             return (
@@ -207,19 +207,19 @@ export default {
 
         {
           prop: "materialDesc",
-          label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
+          label: this.$t("ui.data.column.supplyOrderPool.materialDesc"),
           disabled: true,
         },
         {
           prop: "productCategory",
-          label: this.$t("ui.data.column.capsuleChuck.productTypeCode"),
+          label: this.$t("ui.data.column.supplyOrderPool.productCategory"),
           disabled: true,
           type: "select",
           dictData: this.parentDict.type.product_category,
         },
         {
           prop: "brand",
-          label: this.$t("common.brand"),
+          label: this.$t("ui.data.column.supplyOrderPool.brand"),
           disabled: true,
           type: "select",
           dictData: this.parentDict.type.biz_brand_type,
@@ -232,48 +232,48 @@ export default {
         },
         {
           prop: "deliveryFrequency",
-          label: this.$t("ui.data.defectiveStock.deliveryFrequency"),
+          label: this.$t("ui.data.column.supplyOrderPool.deliveryFrequency"),
           disabled: true,
           type: "number",
         },
         {
           prop: "structureFrequency",
-          label: this.$t("ui.data.defectiveStock.structureFrequency"),
+          label: this.$t("ui.data.column.supplyOrderPool.structureFrequency"),
           disabled: true,
           type: "number",
         },
         {
           prop: "saleAreaName",
-          label: this.$t("ui.data.defectiveStock.saleArea"),
+          label: this.$t("ui.data.column.supplyOrderPool.saleArea"),
           disabled: true,
         },
         {
           prop: "threeOverdueStockQty",
-          label: this.$t("ui.data.defectiveStock.threeOverdueStockQty"),
+          label: this.$t("ui.data.column.supplyOrderPool.threeOverdueStockQty"),
           disabled: true,
           type: "number",
         },
         {
           prop: "sixOverdueStockQty",
-          label: this.$t("ui.data.defectiveStock.sixOverdueStockQty"),
+          label: this.$t("ui.data.column.supplyOrderPool.sixOverdueStockQty"),
           disabled: true,
           type: "number",
         },
 
         {
           prop: "twelveOverdueStockQty",
-          label: this.$t("ui.data.defectiveStock.twelveOverdueStockQty"),
+          label: this.$t("ui.data.column.supplyOrderPool.twelveOverdueStockQty"),
           disabled: true,
           type: "number",
         },
         {
           prop: "stockLimit",
-          label: this.$t("ui.data.defectiveStock.stockLimit"),
+          label: this.$t("ui.data.column.supplyOrderPool.stockLimit"),
           disabled: true,
         },
         {
           prop: "remark",
-          label: this.$t("common.remark"),
+          label: this.$t("ui.data.column.supplyOrderPool.remark"),
           maxlength: 200,
         },
       ];

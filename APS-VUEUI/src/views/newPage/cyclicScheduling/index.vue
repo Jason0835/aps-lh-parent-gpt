@@ -136,31 +136,31 @@ export default {
 
         {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.supplyOrderPool.factoryCode"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
           },
         },
         {
           prop: "year",
-          label: this.$t("ui.data.colume.year"),
+          label: this.$t("ui.data.column.supplyOrderPool.year"),
           width: 120,
         },
         {
           prop: "month",
-          label: this.$t("ui.data.colume.month"),
+          label: this.$t("ui.data.column.supplyOrderPool.month"),
           width: 120,
         },
         {
           prop: "productTypeCode",
-          label: this.$t("ui.data.column.monthplan.productType"),
+          label: this.$t("ui.data.column.supplyOrderPool.productTypeCode"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_product_type, value);
           },
         },
         {
           prop: "orderType",
-          label: this.$t("ui.data.defectiveStock.orderType"),
+          label: this.$t("ui.data.column.supplyOrderPool.orderType"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(
               this.dict.type.supply_order_type,
@@ -182,14 +182,14 @@ export default {
         },
         {
           prop: "locationType",
-          label: this.$t("ui.data.column.finishStock.wai"),
+          label: this.$t("ui.data.column.supplyOrderPool.locationType"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_stor_type, value);
           },
         },
         {
           prop: "brand",
-          label: this.$t("common.brand"),
+          label: this.$t("ui.data.column.supplyOrderPool.brand"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_brand_type, value);
           },
@@ -197,72 +197,72 @@ export default {
         },
         {
           prop: "materialCode",
-          label: this.$t("ui.data.column.monthplan.oriMaterialCode"),
+          label: this.$t("ui.data.column.supplyOrderPool.materialCode"),
           width: 120,
         },
         {
           prop: "materialDesc",
-          label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
+          label: this.$t("ui.data.column.supplyOrderPool.materialDesc"),
           align: "left",
           minWidth: 350,
         },
         {
           prop: "productCategory",
-          label: this.$t("ui.data.column.capsuleChuck.productTypeCode"),
+          label: this.$t("ui.data.column.supplyOrderPool.productCategory"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.product_category, value);
           },
         },
         {
           prop: "qty",
-          label: this.$t("ui.data.defectiveStock.qty"),
+          label: this.$t("ui.data.column.supplyOrderPool.qty"),
         },
         {
           prop: "saleAreaName",
-          label: this.$t("ui.data.defectiveStock.saleArea"),
+          label: this.$t("ui.data.column.supplyOrderPool.saleArea"),
           width: 180,
         },
         {
           prop: "threeAverageQty",
-          label: this.$t("ui.data.defectiveStock.threeAverageQty"),
+          label: this.$t("ui.data.column.supplyOrderPool.threeAverageQty"),
         },
         {
           prop: "sixAverageQty",
-          label: this.$t("ui.data.defectiveStock.sixAverageQty"),
+          label: this.$t("ui.data.column.supplyOrderPool.sixAverageQty"),
         },
         {
           prop: "deliveryFrequency",
-          label: this.$t("ui.data.defectiveStock.deliveryFrequency"),
+          label: this.$t("ui.data.column.supplyOrderPool.deliveryFrequency"),
         },
         {
           prop: "structureFrequency",
-          label: this.$t("ui.data.defectiveStock.structureFrequency"),
+          label: this.$t("ui.data.column.supplyOrderPool.structureFrequency"),
         },
         {
           prop: "threeOverdueStockQty",
-          label: this.$t("ui.data.defectiveStock.threeOverdueStockQty"),
+          label: this.$t("ui.data.column.supplyOrderPool.threeOverdueStockQty"),
         },
         {
           prop: "sixOverdueStockQty",
-          label: this.$t("ui.data.defectiveStock.sixOverdueStockQty"),
+          label: this.$t("ui.data.column.supplyOrderPool.sixOverdueStockQty"),
         },
         {
           prop: "twelveOverdueStockQty",
-          label: this.$t("ui.data.defectiveStock.twelveOverdueStockQty"),
+          label: this.$t("ui.data.column.supplyOrderPool.twelveOverdueStockQty"),
         },
         {
           prop: "stockLimit",
-          label: this.$t("ui.data.defectiveStock.stockLimit"),
+          label: this.$t("ui.data.column.supplyOrderPool.stockLimit"),
         },
 
         {
           prop: "remark",
-          label: this.$t("common.remark"),
+          label: this.$t("ui.data.column.supplyOrderPool.remark"),
           width: 120,
         },
         {
           prop: "updateTime",
-          label: this.$t("ui.data.column.scheduleAdjust.updata"),
+          label: this.$t("ui.data.column.supplyOrderPool.updateDate"),
           width: 180,
         },
         {
@@ -304,7 +304,7 @@ export default {
       return [
         {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.supplyOrderPool.factoryCode"),
           type: "select",
           dictData: this.dict.type.biz_factory_name,
         },
@@ -318,28 +318,28 @@ export default {
         },
         {
           prop: "productCategory",
-          label: this.$t("ui.data.column.capsuleChuck.productTypeCode"),
+          label: this.$t("ui.data.column.supplyOrderPool.productCategory"),
           type: "select",
           dictData: this.dict.type.product_category,
         },
         {
           prop: "orderType",
-          label: this.$t("ui.data.defectiveStock.orderType"),
+          label: this.$t("ui.data.column.supplyOrderPool.orderType"),
           type: "select",
           dictData: this.dict.type.supply_order_type,
         },
         {
           prop: "materialCode",
-          label: this.$t("ui.data.column.monthplan.oriMaterialCode"),
+          label: this.$t("ui.data.column.supplyOrderPool.materialCode"),
         },
         {
           prop: "saleAreaName",
-          label: this.$t("区域"),
+          label: this.$t("ui.data.column.supplyOrderPool.saleArea"),
         },
 
         {
           prop: "materialDesc",
-          label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
+          label: this.$t("ui.data.column.supplyOrderPool.materialDesc"),
           minWidth: 350,
           align: "left",
         },
