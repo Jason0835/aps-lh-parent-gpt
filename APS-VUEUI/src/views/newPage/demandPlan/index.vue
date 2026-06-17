@@ -24,7 +24,7 @@
           type="primary"
              v-hasPermi="['monthplan:demandPlan:edit']"
           @click="handleEdit(selection[0])"
-          >{{ $t("ui.data.column.demandPlan.structurePriority") }}
+          >{{ $t("ui.data.demandPlan.structurePriority") }}
         </el-button>
         <el-button
           type="primary"
