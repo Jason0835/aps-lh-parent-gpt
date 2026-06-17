@@ -49,7 +49,6 @@ import com.zlt.aps.common.utils.ExportUtil;
 import com.zlt.aps.common.utils.ImportUtil;
 import com.zlt.aps.dj.api.domain.entity.DjDayFinishQty;
 import com.zlt.aps.dj.api.domain.entity.DjScheduleResult;
-import com.zlt.aps.dj.api.service.IDjMachineInfoRemoteService;
 import com.zlt.aps.dj.api.service.IDjScheduleResultRemoteService;
 import com.zlt.framework.utils.AuthorizationUtils;
 
@@ -79,106 +78,11 @@ public class DjScheduleResultUIController extends BaseController<DjScheduleResul
     @Autowired
     private IImportLogService iImportLogService;
 
-    @Autowired
-    private IDjMachineInfoRemoteService machineInfoService;
-
     @Value("${excelTemplateModel}")
     private String excelTemplateModel;
 
 
     private String prefix = "dj/djScheduleResult";
-
-    /**
-     * 跳转至主页面
-     */
-    @RequiresPermissions("dj:djScheduleResult:view")
-    @GetMapping()
-    public String operlog(ModelMap mmap) {
-        mmap.put("initDate", DateUtils.parseDateToStr("yyyy-MM-dd", DateUtils.addDays(new Date(), 1)));  //当前日期+1天
-        return prefix + "/djScheduleResult";
-    }
-
-    /**
-     * 跳转至新增页面
-     */
-    @GetMapping("/add")
-    public String add(ModelMap mmap) {
-        mmap.put("initDate", DateUtils.parseDateToStr("yyyy-MM-dd", DateUtils.addDays(new Date(), 1)));  //当前日期+1天
-        mmap.put("minDate", DateUtils.parseDateToStr("yyyy-MM-dd", new Date()));  //当前日期
-        mmap.put("djScheduleResult", new DjScheduleResult());
-        return prefix + "/add";
-    }
-
-    /**
-     * 跳转至修改页面
-     */
-    @GetMapping("/edit/{id}")
-    public String edit(@PathVariable("id") Long id, ModelMap mmap) {
-        mmap.put("djScheduleResult", iDjScheduleResultService.getInfo(id));
-        return prefix + "/edit";
-    }
-
-    /**
-     * 跳转至转机台页面
-     */
-    @GetMapping("/changeMachine/{id}")
-    public String changeMachine(@PathVariable("id") Long id, ModelMap mmap) {
-        mmap.put("editType", "1");
-        mmap.put("djScheduleResult", iDjScheduleResultService.getInfo(id));
-        return prefix + "/changePlanOrMachine";
-    }
-
-    /**
-     * 跳转至转机台
-     */
-    @GetMapping("/batchChangeMachine/{ids}")
-    public String batchChangeMachine(@PathVariable("ids") String ids, ModelMap mmap) {
-        String[] split = ids.split(",");
-        List<Long> idList = new ArrayList<>();
-        for (String s : split) {
-            idList.add(Long.valueOf(s));
-        }
-        DjScheduleResult scheduleResult = new DjScheduleResult();
-        mmap.put("selectList", iDjScheduleResultService.getInfos(scheduleResult));
-        return prefix + "/changePlanOrMachine2";
-    }
-
-    /**
-     * 跳转至调量页面
-     */
-    @GetMapping("/changePlan/{id}")
-    public String changePlan(@PathVariable("id") Long id, ModelMap mmap) {
-        mmap.put("editType", "2");
-        mmap.put("djScheduleResult", iDjScheduleResultService.getInfo(id));
-        return prefix + "/changePlanOrMachine";
-    }
-
-    /**
-     * 跳转至自动排程日期页面
-     */
-    @GetMapping("/toAutoPlan")
-    public String toAutoPlan(ModelMap mmap) {
-        mmap.put("initDate", DateUtils.parseDateToStr("yyyy-MM-dd", DateUtils.addDays(new Date(), 1)));  //当前日期+1天
-        return prefix + "/autoPlan";
-    }
-
-    /**
-     * 跳转至均衡页面
-     */
-    @GetMapping("/toBaladje")
-    public String toBaladje(ModelMap mmap) {
-        mmap.put("initDate", DateUtils.parseDateToStr("yyyy-MM-dd", DateUtils.addDays(new Date(), 1)));  //当前日期+1天
-        return prefix + "/baladje";
-    }
-
-    /**
-     * 跳转至归并页面
-     */
-    @GetMapping("/toMergeProduct")
-    public String toMergeProduct(ModelMap mmap) {
-        mmap.put("initDate", DateUtils.parseDateToStr("yyyy-MM-dd", DateUtils.addDays(new Date(), 1)));  //当前日期+1天
-        return prefix + "/mergeProduct";
-    }
 
     /**
      * 根据条件查询垫胶排程结果列表

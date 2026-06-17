@@ -331,7 +331,7 @@ export default {
   },
   computed: {
     ...mapState({
-      machines: (state) => state.insideLiner.machines,
+      machines: (state) => state.dj.machines,
     }),
     columns() {
       let finishRateFormatter = function (row, column, value, index) {
@@ -359,7 +359,7 @@ export default {
               halign: 'center',
               align: 'center',
               minWidth: 100,
-              label: this.$t("ui.data.column.dj.scheduleResult.treadCode"),
+              label: this.$t("ui.data.column.dj.scheduleResult.paddingCode"),
             },
             {
               prop: "glueCode",
@@ -661,22 +661,22 @@ export default {
           valueFormat: "yyyy-MM-dd",
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.liningCode"),
-          prop: "liningCode",
+          label: this.$t("ui.data.column.dj.scheduleResult.paddingCode"),
+          prop: "paddingCode",
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.glueCode"),
-          prop: "wholeGlueCode",
+          label: this.$t("ui.data.column.dj.scheduleResult.glueCode"),
+          prop: "glueCode",
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.isRelease"),
-          prop: "isRelease",
+          label: this.$t("ui.data.column.dj.scheduleResult.releaseStatus"),
+          prop: "releaseStatus",
           type: "select",
           dictData: this.dict.type.IS_RELEASE, // "IS_RELEASE",
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.produceLine"),
-          prop: "machineId",
+          label: this.$t("ui.data.column.dj.scheduleResult.machineCode"),
+          prop: "machineCode",
           type: "select",
           dictData: this.machines,
           valueKey: "id",
@@ -758,7 +758,7 @@ export default {
       // this.$set(this.page, "current", 1);
       this.getList();
       getWorkClass({ scheduleDate: this.query.scheduleDate }).then((res) => {
-        this.classHeaders = res.data;
+        this.classHeaders = res;
       });
     },
     handlePageChange(current, pageSize) {
@@ -911,7 +911,7 @@ export default {
 
     //获取班次表头
     getWorkClass({ scheduleDate: this.query.scheduleDate }).then((res) => {
-      this.classHeaders = res.data;
+      this.classHeaders = res;
     });
   },
   activated() {
