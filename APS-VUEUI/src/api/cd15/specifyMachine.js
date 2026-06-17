@@ -1,40 +1,77 @@
-import request from '@/utils/request'
+import request, { downloadLink } from '@/utils/request'
 
-/**
- * 成型定点机台管理列表
- * @param {Object} query
- * @returns
- */
 export function listSpecifyMachine(query) {
   return request({
-    url: 'cd15/specifyMachine/list',
+    url: '/cd15/specifyMachine/list',
     method: 'post',
     data: query
   })
 }
-/**
- * 编辑
- * @param {Object} query
- * @returns
- */
-export function editSpecifyMachine(query) {
+
+export function getSpecifyMachine(id) {
   return request({
-    url: 'cd15/specifyMachine/save',
-    method: 'post',
-    data: query
+    url: `/cd15/specifyMachine/getInfo/${id}`,
+    method: 'get'
   })
 }
-export function removeSpecifyMachine(query) {
+
+export function addSpecifyMachine(data) {
   return request({
-    url: 'cd15/specifyMachine/remove',
+    url: '/cd15/specifyMachine/add',
     method: 'post',
-    data: query
+    headers: {
+      'Content-Type': 'application/json;charset=UTF-8'
+    },
+    data
   })
 }
-export function removeAllSpecifyMachine(query) {
+
+export function editSpecifyMachine(data) {
   return request({
-    url: 'cd15/specifyMachine/removeAll',
+    url: '/cd15/specifyMachine/edit',
     method: 'post',
-    data: query
+    headers: {
+      'Content-Type': 'application/json;charset=UTF-8'
+    },
+    data
+  })
+}
+
+export function checkUniqueSpecifyMachine(data) {
+  return request({
+    url: '/cd15/specifyMachine/checkUnique',
+    method: 'post',
+    headers: {
+      'Content-Type': 'application/json;charset=UTF-8'
+    },
+    data
+  })
+}
+
+export function removeSpecifyMachine(data) {
+  return request({
+    url: '/cd15/specifyMachine/remove',
+    method: 'post',
+    data
+  })
+}
+
+export function removeAllSpecifyMachine(data) {
+  return request({
+    url: '/cd15/specifyMachine/removeAll',
+    method: 'post',
+    data
+  })
+}
+
+export function exportSpecifyMachine(query) {
+  return downloadLink('/cd15/specifyMachine/export', query)
+}
+
+export function importSpecifyMachine(data) {
+  return request({
+    url: '/cd15/specifyMachine/importData',
+    method: 'post',
+    data
   })
 }

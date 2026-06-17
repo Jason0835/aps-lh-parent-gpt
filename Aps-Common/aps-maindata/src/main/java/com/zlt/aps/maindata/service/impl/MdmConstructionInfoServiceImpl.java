@@ -107,14 +107,14 @@ public class MdmConstructionInfoServiceImpl extends AbstractDocService<MdmConstr
         if (constructionInfos == null || constructionInfos.isEmpty()) {
             return new ArrayList<>();
         }
-        Set<String> codeSet = new TreeSet<>();
-        for (MdmConstructionInfo constructionInfo : constructionInfos) {
-            String cordSpec = constructionInfo.getCordSpec();
-            if (cordSpec != null && !cordSpec.trim().isEmpty()) {
-                codeSet.add(cordSpec.trim());
-            }
-        }
-        return new ArrayList<>(codeSet);
+        return constructionInfos.stream()
+                .map(MdmConstructionInfo::getCordSpec)
+                .filter(Objects::nonNull)
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .collect(java.util.stream.Collectors.toCollection(TreeSet::new))
+                .stream()
+                .collect(java.util.stream.Collectors.toList());
     }
 
     List<String> collectTireFabricCodes(List<MdmConstructionInfo> constructionInfos) {
