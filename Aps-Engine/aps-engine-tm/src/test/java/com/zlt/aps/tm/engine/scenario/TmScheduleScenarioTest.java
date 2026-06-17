@@ -13,7 +13,7 @@ import com.zlt.aps.tm.engine.domain.TmTaskDraft;
 import com.zlt.aps.tm.engine.domain.TmTransferPosition;
 import com.zlt.aps.tm.engine.event.TmScheduleEvent;
 import com.zlt.aps.tm.engine.event.TmScheduleEventPublisher;
-import com.zlt.aps.tm.engine.mapper.TmStockMapper;
+import com.zlt.aps.tm.engine.mapper.TmEngineStockMapper;
 import com.zlt.aps.tm.engine.service.*;
 import org.junit.Test;
 
@@ -59,7 +59,7 @@ public class TmScheduleScenarioTest {
 
         TmTaskChainScheduleService chainService = new TmTaskChainScheduleService();
         TmPersistService persistService = new TmPersistService();
-        TmStockMapper stockMapper = mock(TmStockMapper.class);
+        TmEngineStockMapper stockMapper = mock(TmEngineStockMapper.class);
 
         new TmPlanBootstrapService().bootstrap(context);
         new TmInventoryPredictService(stockMapper).predict(context);

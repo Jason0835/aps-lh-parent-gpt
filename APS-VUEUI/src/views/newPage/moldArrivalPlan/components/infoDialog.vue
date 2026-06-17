@@ -113,18 +113,18 @@ export default {
       return [
         {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.mpMouldDeliveryPlan.factoryCode"),
           type: "select",
           dictData: this.parentDict.type.biz_factory_name,
         },
         {
           prop: "mouldCode",
-          label: this.$t("ui.data.column.moldLedger.mouldCode"),
+          label: this.$t("ui.data.column.mpMouldDeliveryPlan.mouldCode"),
           maxlength: 32,
         },
         {
           prop: "materialCode",
-          label: this.$t("ui.data.column.monthplan.oriMaterialCode"),
+          label: this.$t("ui.data.column.mpMouldDeliveryPlan.materialCode"),
           maxlength: 32,
           render: (form) => {
             return (
@@ -138,13 +138,13 @@ export default {
         },
         {
           prop: "materialDesc",
-          label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
+          label: this.$t("ui.data.column.mpMouldDeliveryPlan.materialDesc"),
           maxlength: 64,
           disabled: true,
         },
         {
           prop: "shipmentDate",
-          label: this.$t("ui.data.column.monthplan.shipmentDate"),
+          label: this.$t("ui.data.column.mpMouldDeliveryPlan.shipmentDate"),
           type: "date",
           valueFormat: "yyyy-MM-dd",
           listeners: {
@@ -160,12 +160,12 @@ export default {
         },
         {
           prop: "mainPattern",
-          label: this.$t("ui.data.column.moldLedger.mainPattern"),
+          label: this.$t("ui.data.column.mdmMaterialInfo.mainPattern"),
           maxlength:60
         },
         {
           prop: "remark",
-          label: this.$t("common.remark"),
+          label: this.$t("ui.common.column.remark"),
           maxlength: 500,
         },
       ];

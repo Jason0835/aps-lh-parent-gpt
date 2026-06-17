@@ -5,8 +5,8 @@ import com.zlt.aps.tm.api.domain.entity.TmStock;
 import com.zlt.aps.tm.engine.domain.TmScheduleContext;
 import com.zlt.aps.tm.engine.domain.TmStockForecast;
 import com.zlt.aps.tm.engine.domain.TmTaskDraft;
+import com.zlt.aps.tm.engine.mapper.TmEngineStockMapper;
 import com.zlt.aps.tm.engine.service.TmInventoryPredictService;
-import com.zlt.aps.tm.engine.mapper.TmStockMapper;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.InjectMocks;
@@ -14,10 +14,12 @@ import org.mockito.Mock;
 import org.mockito.junit.MockitoJUnitRunner;
 
 import java.math.BigDecimal;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Map;
 
 import static org.junit.Assert.*;
-import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 /**
@@ -30,7 +32,7 @@ import static org.mockito.Mockito.*;
 public class TmInventoryPredictServiceTest {
 
     @Mock
-    private TmStockMapper tmStockMapper;
+    private TmEngineStockMapper tmStockMapper;
 
     @InjectMocks
     private TmInventoryPredictService inventoryPredictService;
