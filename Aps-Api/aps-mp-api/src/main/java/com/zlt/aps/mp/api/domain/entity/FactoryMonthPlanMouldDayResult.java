@@ -757,6 +757,19 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     @ApiModelProperty(value = "导入行号", name = "importRowNum")
     @TableField(exist = false)
     private Integer importRowNum;
+    
+    /**
+     * 上月超欠产
+     */
+    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.lastMonthOverdueQty", cellType = Excel.ColumnType.NUMERIC)
+    @ApiModelProperty(value = "上月超欠产", name = "lastMonthOverdueQty")
+    private Integer lastMonthOverdueQty;
+    /**
+    * 上月超欠产有效标志
+     */
+    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.lastMonthValidFlag", dictType = "biz_yes_no")
+    @ApiModelProperty(value = "上月超欠产有效标志", name = "lastMonthValidFlag")
+    private String lastMonthValidFlag;
 
     /**
      * 是否增模又降膜又增模
