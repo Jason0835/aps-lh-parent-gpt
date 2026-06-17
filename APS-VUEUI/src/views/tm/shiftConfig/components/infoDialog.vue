@@ -83,7 +83,6 @@ export default {
                 if (value > this.form.planEndTime) {
                   callback(new Error("开始时间不能大于结束时间"));
                 } else {
-                  this.$refs.form.$refs.infoForm.validateField("planEndTime");
                   callback();
                 }
               } else {
@@ -105,7 +104,6 @@ export default {
                 if (value < this.form.planStartTime) {
                   callback(new Error("结束时间不能小于开始时间"));
                 } else {
-                  this.$refs.form.$refs.infoForm.validateField("planStartTime");
                   callback();
                 }
               } else {
