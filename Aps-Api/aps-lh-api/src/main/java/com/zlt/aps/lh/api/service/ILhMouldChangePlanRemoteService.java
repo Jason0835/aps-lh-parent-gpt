@@ -24,7 +24,7 @@ import java.util.List;
  *     修 改 人：...
  *     修改内容：...
  */
-@FeignClient(contextId = "ILhMouldChangePlanRemoteService", value = ServiceNameConstants.GATEWAY_SERVICE, url = "http://192.168.2.64:9669")
+@FeignClient(contextId = "ILhMouldChangePlanRemoteService", value = ServiceNameConstants.GATEWAY_SERVICE, path = "${api.path.lh:/lh}")
 public interface ILhMouldChangePlanRemoteService {
 
     /**
