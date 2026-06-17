@@ -171,7 +171,7 @@ export default {
         },
         {
           prop: "isSchedule",
-          label: this.$t("是否参与排产"),
+          label: this.$t("ui.data.column.supplyOrderPool.isSchedule"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(
               this.dict.type.is_schedule,
