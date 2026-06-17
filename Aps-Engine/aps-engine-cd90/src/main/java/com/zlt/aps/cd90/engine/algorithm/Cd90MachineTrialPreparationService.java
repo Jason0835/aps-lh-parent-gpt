@@ -41,8 +41,8 @@ public class Cd90MachineTrialPreparationService {
         Cd90AutoScheduleParameters parameters = request.getParameters();
         // 先执行启用状态、大卷绑定、指定/禁止机台、检修和班次开放等硬约束过滤。
         Cd90MachineCandidateResolution resolution = candidateResolver.resolveDetailed(
-                request.getClothCode(), request.getBigRollCode(), request.getShiftCode(),
-                request.getShiftStart(), request.getShiftEnd(), snapshot.getMachines(),
+                request.getClothCode(), request.getBigRollCode(), request.getCraftWidth(),
+                request.getShiftCode(), request.getShiftStart(), request.getShiftEnd(), snapshot.getMachines(),
                 snapshot.getBindings(), snapshot.getRestrictions(), parameters.getMachinePriority());
         List<Cd90MachineCandidate> candidates = resolution.getCandidates();
         Map<String, Integer> seconds = request.getRemainingSecondsByMachine() == null

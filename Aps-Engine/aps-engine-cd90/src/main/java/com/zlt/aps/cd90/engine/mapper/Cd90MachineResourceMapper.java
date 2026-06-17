@@ -24,6 +24,8 @@ public class Cd90MachineResourceMapper {
                 .status(source.getStatus())
                 .openMachineClass(source.getOpenMachineClass())
                 .quota(decimal(source.getQuota()))
+                .clothWidthMax(decimal(source.getClothWidthMax()))
+                .clothWidthMin(decimal(source.getClothWidthMin()))
                 .build();
     }
 

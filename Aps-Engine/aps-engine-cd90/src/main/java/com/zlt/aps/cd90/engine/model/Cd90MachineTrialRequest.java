@@ -17,6 +17,8 @@ public class Cd90MachineTrialRequest {
     private String clothCode;
     private String bigRollCode;
     private String cordSpec;
+    /** 当前层位直裁宽度，来自施工表TIRE_FABRIC_CRAFT1/2/3。 */
+    private BigDecimal craftWidth;
     private String shiftCode;
     private LocalDateTime shiftStart;
     private LocalDateTime shiftEnd;

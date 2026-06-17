@@ -15,6 +15,7 @@ import com.zlt.aps.cd90.engine.mapper.Cd90MachineResourceMapper;
 import com.zlt.aps.cd90.engine.model.Cd90MachineResource;
 import com.zlt.aps.cd90.engine.model.Cd90MachineResourceSnapshot;
 import com.zlt.aps.cd90.engine.service.Cd90MachineResourceService;
+import com.zlt.aps.common.core.constant.ApsConstant;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -58,6 +59,7 @@ public class Cd90MachineResourceServiceImpl implements Cd90MachineResourceServic
         List<Cd90MachineResource> machines = machineInfoMapper.selectList(
                         Wrappers.<Cd90MachineInfo>lambdaQuery()
                                 .eq(Cd90MachineInfo::getFactoryCode, factoryCode)
+                                .eq(Cd90MachineInfo::getStatus, ApsConstant.APS_STRING_1)
                                 .orderByAsc(Cd90MachineInfo::getMachineCode))
                 .stream().map(resourceMapper::mapMachine).collect(Collectors.toList());
         Map<String, Cd90MachineResource> machineByCode = machines.stream()

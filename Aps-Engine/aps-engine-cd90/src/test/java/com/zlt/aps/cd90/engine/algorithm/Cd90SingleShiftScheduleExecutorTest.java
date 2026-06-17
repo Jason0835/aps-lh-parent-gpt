@@ -75,7 +75,7 @@ public class Cd90SingleShiftScheduleExecutorTest {
     private Cd90MachineResourceSnapshot machineSnapshot() {
         return Cd90MachineResourceSnapshot.builder()
                 .machines(Collections.singletonList(Cd90MachineResource.builder()
-                        .machineCode("M1").status("0").openMachineClass("SHIFT1")
+                        .machineCode("M1").status("1").openMachineClass("SHIFT1")
                         .quota(new BigDecimal("800")).build()))
                 .bindings(Collections.singletonList(Cd90MachineRollBinding.builder()
                         .machineCode("M1").bigRollCode("BR2").build()))

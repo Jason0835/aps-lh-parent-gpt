@@ -5,8 +5,10 @@ import com.zlt.aps.cd90.engine.model.Cd90MachineResource;
 import com.zlt.aps.cd90.engine.model.Cd90MachineRestriction;
 import com.zlt.aps.cd90.engine.model.Cd90MachineRollBinding;
 import com.zlt.aps.cd90.engine.model.Cd90MachineCandidateResolution;
+import com.zlt.aps.common.core.constant.ApsConstant;
 import org.springframework.stereotype.Component;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.Comparator;
@@ -47,9 +49,38 @@ public class Cd90MachineCandidateResolver {
                 machines, bindings, restrictions, machinePriority).getCandidates();
     }
 
+    public List<Cd90MachineCandidate> resolve(String clothCode,
+                                              String bigRollCode,
+                                              BigDecimal craftWidth,
+                                              String shiftCode,
+                                              LocalDateTime shiftStart,
+                                              LocalDateTime shiftEnd,
+                                              List<Cd90MachineResource> machines,
+                                              List<Cd90MachineRollBinding> bindings,
+                                              List<Cd90MachineRestriction> restrictions,
+                                              List<String> machinePriority) {
+        return resolveDetailed(clothCode, bigRollCode, craftWidth, shiftCode, shiftStart, shiftEnd,
+                machines, bindings, restrictions, machinePriority).getCandidates();
+    }
+
     /** 生成候选机台并区分无绑定与绑定机台全部不可作业。 */
     public Cd90MachineCandidateResolution resolveDetailed(String clothCode,
                                               String bigRollCode,
+                                              String shiftCode,
+                                              LocalDateTime shiftStart,
+                                              LocalDateTime shiftEnd,
+                                              List<Cd90MachineResource> machines,
+                                              List<Cd90MachineRollBinding> bindings,
+                                              List<Cd90MachineRestriction> restrictions,
+                                              List<String> machinePriority) {
+        return resolveDetailed(clothCode, bigRollCode, null, shiftCode, shiftStart, shiftEnd,
+                machines, bindings, restrictions, machinePriority);
+    }
+
+    /** 生成候选机台并区分无绑定与绑定机台全部不可作业。 */
+    public Cd90MachineCandidateResolution resolveDetailed(String clothCode,
+                                              String bigRollCode,
+                                              BigDecimal craftWidth,
                                               String shiftCode,
                                               LocalDateTime shiftStart,
                                               LocalDateTime shiftEnd,
@@ -65,19 +96,20 @@ public class Cd90MachineCandidateResolver {
                 .collect(Collectors.toSet());
         Set<String> prohibited = safe(restrictions).stream()
                 .filter(item -> clothCode != null && clothCode.equals(item.getClothCode()))
-                .filter(item -> "1".equals(item.getJobType()))
+                .filter(item -> ApsConstant.APS_STRING_1.equals(item.getJobType()))
                 .map(Cd90MachineRestriction::getMachineCode)
                 .collect(Collectors.toSet());
         Set<String> preferred = safe(restrictions).stream()
                 .filter(item -> clothCode != null && clothCode.equals(item.getClothCode()))
-                .filter(item -> "0".equals(item.getJobType()))
+                .filter(item -> ApsConstant.APS_STRING_0.equals(item.getJobType()))
                 .map(Cd90MachineRestriction::getMachineCode)
                 .collect(Collectors.toSet());
 
         List<String> priority = machinePriority == null ? Collections.emptyList() : machinePriority;
         List<Cd90MachineCandidate> candidates = safe(machines).stream()
                 .filter(item -> boundMachines.contains(item.getMachineCode()))
-                .filter(item -> "0".equals(item.getStatus()))
+                .filter(item -> ApsConstant.APS_STRING_1.equals(item.getStatus()))
+                .filter(item -> widthMatched(item, craftWidth))
                 .filter(item -> shiftCode != null && shiftCode.equals(item.getOpenMachineClass()))
                 .filter(item -> !prohibited.contains(item.getMachineCode()))
                 .filter(item -> !overlaps(item, shiftStart, shiftEnd))
@@ -102,6 +134,20 @@ public class Cd90MachineCandidateResolver {
         return Cd90MachineCandidateResolution.builder().candidates(candidates)
                 .boundMachineCodes(boundMachines.stream().sorted().collect(Collectors.toList()))
                 .failureReason(failureReason).build();
+    }
+
+    /**
+     * 直裁宽度来自施工表TIRE_FABRIC_CRAFT1/2/3；CORD_WIDTH是大卷宽、直裁长，不参与宽度适配。
+     * 机台上下限为空时视为未限制，避免历史基础数据未维护宽度时把全部机台过滤掉。
+     */
+    private boolean widthMatched(Cd90MachineResource machine, BigDecimal craftWidth) {
+        if (craftWidth == null || machine == null) {
+            return true;
+        }
+        BigDecimal min = machine.getClothWidthMin();
+        BigDecimal max = machine.getClothWidthMax();
+        return (min == null || BigDecimal.ZERO.compareTo(min) == 0 || craftWidth.compareTo(min) >= 0)
+                && (max == null || BigDecimal.ZERO.compareTo(max) == 0 || craftWidth.compareTo(max) <= 0);
     }
 
     private boolean overlaps(Cd90MachineResource machine,

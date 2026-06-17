@@ -28,8 +28,8 @@ public class Cd90MachineCandidateResolverTest {
     public void shouldApplyBindingStatusAndOpenShiftConstraints() {
         List<Cd90MachineCandidate> result = resolver.resolve("CF001", "BR001", "NIGHT",
                 shiftStart(), shiftStart().plusHours(8), Arrays.asList(
-                        machine("M1", "0", "NIGHT"), machine("M2", "1", "NIGHT"),
-                        machine("M3", "0", "MORNING")),
+                        machine("M1", "1", "NIGHT"), machine("M2", "0", "NIGHT"),
+                        machine("M3", "1", "MORNING")),
                 Arrays.asList(binding("BR001", "M1"), binding("BR001", "M2"), binding("BR001", "M3")),
                 Collections.emptyList(), Arrays.asList("M3", "M1"));
 
@@ -42,8 +42,8 @@ public class Cd90MachineCandidateResolverTest {
     public void shouldExcludeProhibitedAndOnlyPreferSpecifiedMachine() {
         List<Cd90MachineCandidate> result = resolver.resolve("CF001", "BR001", "NIGHT",
                 shiftStart(), shiftStart().plusHours(8), Arrays.asList(
-                        machine("M1", "0", "NIGHT"), machine("M2", "0", "NIGHT"),
-                        machine("M3", "0", "NIGHT")),
+                        machine("M1", "1", "NIGHT"), machine("M2", "1", "NIGHT"),
+                        machine("M3", "1", "NIGHT")),
                 Arrays.asList(binding("BR001", "M1"), binding("BR001", "M2"), binding("BR001", "M3")),
                 Arrays.asList(restriction("M1", "1"), restriction("M2", "0")),
                 Collections.emptyList());
@@ -57,7 +57,7 @@ public class Cd90MachineCandidateResolverTest {
 
     @Test
     public void shouldExcludeMaintenanceOverlap() {
-        Cd90MachineResource machine = machine("M1", "0", "NIGHT");
+        Cd90MachineResource machine = machine("M1", "1", "NIGHT");
         machine.setMaintenanceStart(shiftStart().plusHours(2));
         machine.setMaintenanceEnd(shiftStart().plusHours(4));
 
@@ -70,10 +70,25 @@ public class Cd90MachineCandidateResolverTest {
     }
 
     @Test
+    public void shouldOnlyKeepMachinesMatchedByCraftWidth() {
+        List<Cd90MachineCandidate> result = resolver.resolve("CF001", "BR001",
+                new BigDecimal("50"), "NIGHT", shiftStart(), shiftStart().plusHours(8),
+                Arrays.asList(
+                        machine("M1", "1", "NIGHT", "40", "60"),
+                        machine("M2", "1", "NIGHT", "50.1", "70"),
+                        machine("M3", "1", "NIGHT", "30", "49.9")),
+                Arrays.asList(binding("BR001", "M1"), binding("BR001", "M2"), binding("BR001", "M3")),
+                Collections.emptyList(), Collections.emptyList());
+
+        assertEquals(1, result.size());
+        assertEquals("M1", result.get(0).getMachineCode());
+    }
+
+    @Test
     public void allBoundMachinesProhibitedShouldReturnStableReason() {
         Cd90MachineCandidateResolution result = resolver.resolveDetailed(
                 "CF001", "BR001", "NIGHT", shiftStart(), shiftStart().plusHours(8),
-                Arrays.asList(machine("M1", "0", "NIGHT"), machine("M2", "0", "NIGHT")),
+                Arrays.asList(machine("M1", "1", "NIGHT"), machine("M2", "1", "NIGHT")),
                 Arrays.asList(binding("BR001", "M1"), binding("BR001", "M2")),
                 Arrays.asList(restriction("M1", "1"), restriction("M2", "1")),
                 Collections.emptyList());
@@ -90,6 +105,14 @@ public class Cd90MachineCandidateResolverTest {
     private Cd90MachineResource machine(String code, String status, String openShift) {
         return Cd90MachineResource.builder().machineCode(code).status(status)
                 .openMachineClass(openShift).quota(new BigDecimal("1000")).build();
+    }
+
+    private Cd90MachineResource machine(String code, String status, String openShift,
+                                        String clothWidthMin, String clothWidthMax) {
+        return Cd90MachineResource.builder().machineCode(code).status(status)
+                .openMachineClass(openShift).quota(new BigDecimal("1000"))
+                .clothWidthMin(new BigDecimal(clothWidthMin))
+                .clothWidthMax(new BigDecimal(clothWidthMax)).build();
     }
 
     private Cd90MachineRollBinding binding(String bigRollCode, String machineCode) {

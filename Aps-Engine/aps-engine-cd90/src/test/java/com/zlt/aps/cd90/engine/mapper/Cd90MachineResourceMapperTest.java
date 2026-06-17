@@ -22,10 +22,14 @@ public class Cd90MachineResourceMapperTest {
     public void shouldMapMachineBindingAndRestriction() {
         Cd90MachineInfo machine = new Cd90MachineInfo();
         machine.setMachineCode("M1");
-        machine.setStatus("0");
+        machine.setStatus("1");
         machine.setOpenMachineClass("NIGHT");
         machine.setQuota(1200D);
+        machine.setClothWidthMin(40.5D);
+        machine.setClothWidthMax(60.5D);
         assertEquals(new BigDecimal("1200.0"), mapper.mapMachine(machine).getQuota());
+        assertEquals(new BigDecimal("40.5"), mapper.mapMachine(machine).getClothWidthMin());
+        assertEquals(new BigDecimal("60.5"), mapper.mapMachine(machine).getClothWidthMax());
 
         Cd90MachineRollMapping binding = new Cd90MachineRollMapping();
         binding.setBigRollCode("BR1");

@@ -15,12 +15,16 @@ public class Cd90MachineResource {
 
     /** 机台编码。 */
     private String machineCode;
-    /** 机台状态，0为启用。 */
+    /** 机台状态，1为开启。 */
     private String status;
     /** 开机班次编码。 */
     private String openMachineClass;
     /** 满班生产定额，单位米/班。 */
     private BigDecimal quota;
+    /** 机台可裁帘布宽度上限，对应cd90MachineInfo.clothWidthMax。 */
+    private BigDecimal clothWidthMax;
+    /** 机台可裁帘布宽度下限，对应cd90MachineInfo.clothWidthMin。 */
+    private BigDecimal clothWidthMin;
     /** 当前班次内检修开始时间。 */
     private LocalDateTime maintenanceStart;
     /** 当前班次内检修结束时间。 */

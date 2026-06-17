@@ -76,7 +76,7 @@ public class Cd90MachineTrialPreparationServiceTest {
     }
 
     private Cd90MachineResource machine(String code) {
-        return Cd90MachineResource.builder().machineCode(code).status("0")
+        return Cd90MachineResource.builder().machineCode(code).status("1")
                 .openMachineClass("NIGHT").quota(new BigDecimal("1000")).build();
     }
 

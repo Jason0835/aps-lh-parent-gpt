@@ -165,6 +165,7 @@ public class Cd90SingleShiftScheduleExecutor implements Cd90SingleShiftScheduleS
                 .clothCode(construction.getClothCode())
                 .bigRollCode(construction.getBigRollCode())
                 .cordSpec(construction.getCordSpec())
+                .craftWidth(construction.getCraftWidth())
                 .shiftCode(shift.getShiftCode())
                 .shiftStart(shift.getStartTime()).shiftEnd(shift.getEndTime())
                 .netDemandQuantity(netDemand).closeOut(closeOut)
