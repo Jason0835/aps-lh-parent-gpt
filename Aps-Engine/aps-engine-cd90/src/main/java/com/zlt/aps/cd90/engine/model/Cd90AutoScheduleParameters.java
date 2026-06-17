@@ -50,6 +50,12 @@ public class Cd90AutoScheduleParameters {
     private int diffRollSameSpecChangeMinutes;
     /** 不同大卷不同直裁规格切换耗时，单位分钟。 */
     private int diffRollDiffSpecChangeMinutes;
+    /** 上机后按耗尽处理的特殊大卷代码列表。 */
+    private List<String> specialRollUseUpCodes;
+    /** 特殊大卷允许额外前瞻的成型班次数，当前仅由策略组件读取。 */
+    private int specialRollLookaheadShifts;
+    /** 特殊大卷允许的额外备库上限，当前仅由策略组件读取。 */
+    private BigDecimal specialRollExtraStockLimit;
     /** 自动排程任务超时分钟数。 */
     private int taskTimeoutMinutes;
     /** 自动排程定时表达式。 */

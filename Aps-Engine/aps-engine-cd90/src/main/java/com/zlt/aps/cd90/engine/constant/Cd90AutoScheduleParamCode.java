@@ -30,6 +30,9 @@ public final class Cd90AutoScheduleParamCode {
     public static final String AUTO_SCHEDULE_CRON = "SYS0701025";
     public static final String DIFF_ROLL_SAME_SPEC_CHANGE_MINUTES = "SYS0701026";
     public static final String DIFF_ROLL_DIFF_SPEC_CHANGE_MINUTES = "SYS0701027";
+    public static final String SPECIAL_ROLL_USE_UP_CODES = "SYS0701028";
+    public static final String SPECIAL_ROLL_LOOKAHEAD_SHIFTS = "SYS0701029";
+    public static final String SPECIAL_ROLL_EXTRA_STOCK_LIMIT = "SYS0701030";
 
     public static final List<String> ALL_CODES = Collections.unmodifiableList(Arrays.asList(
             CRIMP_LENGTH,
@@ -48,7 +51,10 @@ public final class Cd90AutoScheduleParamCode {
             TASK_TIMEOUT_MINUTES,
             AUTO_SCHEDULE_CRON,
             DIFF_ROLL_SAME_SPEC_CHANGE_MINUTES,
-            DIFF_ROLL_DIFF_SPEC_CHANGE_MINUTES
+            DIFF_ROLL_DIFF_SPEC_CHANGE_MINUTES,
+            SPECIAL_ROLL_USE_UP_CODES,
+            SPECIAL_ROLL_LOOKAHEAD_SHIFTS,
+            SPECIAL_ROLL_EXTRA_STOCK_LIMIT
     ));
 
     private Cd90AutoScheduleParamCode() {

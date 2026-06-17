@@ -83,6 +83,12 @@ public class Cd90AutoScheduleParameterParser {
                         Cd90AutoScheduleParamCode.DIFF_ROLL_SAME_SPEC_CHANGE_MINUTES))
                 .diffRollDiffSpecChangeMinutes(nonNegativeInt(values,
                         Cd90AutoScheduleParamCode.DIFF_ROLL_DIFF_SPEC_CHANGE_MINUTES))
+                .specialRollUseUpCodes(parseCodeList(values.get(
+                        Cd90AutoScheduleParamCode.SPECIAL_ROLL_USE_UP_CODES)))
+                .specialRollLookaheadShifts(nonNegativeInt(values,
+                        Cd90AutoScheduleParamCode.SPECIAL_ROLL_LOOKAHEAD_SHIFTS))
+                .specialRollExtraStockLimit(nonNegativeDecimal(values,
+                        Cd90AutoScheduleParamCode.SPECIAL_ROLL_EXTRA_STOCK_LIMIT))
                 .taskTimeoutMinutes(positiveInt(values, Cd90AutoScheduleParamCode.TASK_TIMEOUT_MINUTES))
                 .autoScheduleCron(values.getOrDefault(Cd90AutoScheduleParamCode.AUTO_SCHEDULE_CRON, ""))
                 .sourceValues(Collections.unmodifiableMap(sourceValues))
@@ -91,6 +97,10 @@ public class Cd90AutoScheduleParameterParser {
     }
 
     private List<String> parseMachinePriority(String value) {
+        return parseCodeList(value);
+    }
+
+    private List<String> parseCodeList(String value) {
         if (!StringUtils.hasText(value)) {
             return Collections.emptyList();
         }

@@ -123,8 +123,6 @@ export default {
         this.loading = false;
       }
     },
-    this.loadMachineOptions();
-    },
     show(data) {
       this.visible = true;
       if (data) {
@@ -136,6 +134,7 @@ export default {
           jobType: "",
         };
       }
+      this.loadMachineOptions();
     },
     hide() {
       this.form = {};
