@@ -30,7 +30,7 @@
 
 <script>
 import infoForm from "@/views/components/infoForm.vue";
-import {saveTmScheduleResult} from "@/api/tm/scheduleResult";
+import {changeQty, insertTask} from "@/api/tm/scheduleResult";
 
 export default {
   components: { infoForm },
@@ -435,7 +435,7 @@ export default {
     async save(params) {
       try {
         this.loading = true;
-        const res = await saveTmScheduleResult(params);
+        const res = this.isEdit ? await changeQty(params) : await insertTask(params);
         this.$modal.msgSuccess(res.msg);
         this.$emit("success");
         this.hide();

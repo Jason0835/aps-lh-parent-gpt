@@ -1,5 +1,7 @@
 package com.zlt.aps.tm.mapper;
 
+import com.zlt.aps.tm.api.domain.entity.TmScheduleResultExplain;
+import com.zlt.core.dao.basemapper.CommBaseMapper;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
@@ -9,7 +11,7 @@ import java.util.Date;
  * 胎面排程结果解释表 Mapper接口
  */
 @Mapper
-public interface TmScheduleResultExplainMapper {
+public interface TmScheduleResultExplainMapper extends CommBaseMapper<TmScheduleResultExplain> {
 
     /**
      * 按工厂和排程日期逻辑删除结果解释

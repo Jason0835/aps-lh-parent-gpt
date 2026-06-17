@@ -33,7 +33,6 @@
 - `glue_code`：主胶料编码
 - `whole_glue_code`：整条胶料组合编码
 - `glue_seq`：胶料顺序
-- `glue_group_code`：已删除，引擎通过 `glue_seq` 关联 `T_TM_GLUE_GROUP_ORDER` / `T_TM_GLUE_ORDER` 获取分组信息
 - `mouth_plate_code`：口型板编码
 - `class1_sequence`~`class6_sequence`：六班顺序
 - `class1_plan_qty`~`class6_plan_qty`：六班计划量
@@ -41,10 +40,7 @@
 - `class1_analysis`~`class6_analysis`：六班原因分析
 - `release_status`：发布状态，统一使用字典 `IS_RELEASE`（`0` 未发布，`1` 已发布，`2` 发布失败，`3` 发布中，`4` 超时失败，`5` 待发布）
 - `data_source`：数据来源
-- `tail_flag`：业务标识，使用 `biz_yes_no`
-- 状态/解释类字段（`task_status`、`assign_status`、`unplanned_reason_code/desc`、`manual_locked_flag`、`sequence_lock_flag`、`force_change_flag`）已移至 `T_TM_SCHEDULE_RESULT_EXPLAIN`
-- `origin_result_id`、`current_result_version`：已删除，无实际业务场景
-- `sys_analysis`、`hand_analysis`：已删除，各班次原因分析由 `class{N}_analysis` 承载
+- `tail_flag`：业务标识，使用 `biz_yes_no
 
 ### 3.3 `T_TM_SCHEDULE_RESULT_EXPLAIN`
 
@@ -70,8 +66,8 @@
 - `candidate_machine_json`：候选机台明细，记录候选机台、过滤原因、排序和评分
 - `machine_select_reason`：最终选机说明
 - `assign_status`、`unplanned_reason_code`、`unplanned_reason_desc`、`unplanned_evidence_json`：未排解释
-- `task_status`：任务状态（已从 RESULT 移入）
-- `manual_locked_flag`、`sequence_lock_flag`、`force_change_flag`：引擎行为约束标识（已从 RESULT 移入），均使用 `biz_yes_no`
+- `task_status`：任务状态
+- `manual_locked_flag`、`sequence_lock_flag`、`force_change_flag`：引擎行为约束标识，均使用 `biz_yes_no`
 - `sys_analysis`、`warning_msg`、`error_msg`：系统分析、告警和异常信息
 
 说明：参数表不做版本号，任务解释表记录当前有效解释和本次最终诊断信息，不承担完整事件历史追溯。
@@ -197,14 +193,19 @@
 - `TM_TAIL_ROUND_RULE`：收尾取整规则
 - `TM_NORMAL_ROUND_RULE`：常规取整规则
 - `TM_LARGE_SMALL_THRESHOLD`：大小批量阈值
-- `TM_STOCK_GUARD_SHIFT_COUNT`：库存保障班次数
+- `TM_STOCK_GUARD_SHIFT_COUNT`：库存最低保证班数。用于控制自动排程至少保障当前班及后续若干班的胎面供应；缺省值按 2 班处理，并在解释信息中记录使用默认值。
+- `TM_DEDUCT_PRIORITY`：需求抵扣优先级。用于后续配置库存余额、前序已排计划量等抵扣项的执行顺序；当前默认抵扣链只使用 6 点库存滚动余额和当前排程链前序胎面计划量，未定义来源的数据不进入默认公式。
 - `TM_ROLLING_SHIFT_COUNT`：局部滚动重算班次数，默认 3
 - `TM_MAX_LOOKAHEAD_SHIFT_COUNT`：需求前瞻班次数
 - `DEMAND_QTY_CALCULATE_TYPE`：需求量计算类型，1=算法1,2=算法2
 
 ### 4.11 `T_TM_STOCK`
 
-作用：维护胎面库存。自动排程通过 `stock_date + tread_code` 获取库存数量、不良数量和调整数量。
+作用：维护胎面库存。自动排程通过 `stock_date + tread_code` 获取库存数量，当前口径下该库存值代表当日 6 点库存快照，建议在代码或接口对象中命名为 `sixClockStockQty`，解释表仍可落到 `stock_qty`。
+
+说明：
+- 库存预测以 6 点库存作为滚动计算起点。
+- `已计划入库量`、`已占用量`、`不良量`、`调整量` 的数据来源尚未定义，本版不参与库存公式；后续明确来源后再纳入扩展抵扣或修正项。
 
 ## 5. 班次建模
 
@@ -243,7 +244,7 @@
 - `TmInventoryPredictService`：读取 `T_TM_STOCK` 和损耗设置，计算预计库存和供应时长。
 - `TmPlanCalcService`：计算计划量、预计划、收尾、小批量补卷等。
 - `TmMachineAssignService`：基于机台、口型板、定点/禁排、胶料机台关系筛选候选机台。
-- `TmCapacityBalanceService`：做产能均衡、中夜班移量、次日回拉和任务顺序计算。
+- `TmCapacityBalanceService`：做产能均衡、中夜班移量、次日回拉和任务顺序计算。当前本轮不实现生产级产能均衡算法，仅保留流程占位和风险记录。
 - `TmSnapshotBuildService`：生成 `T_TM_SCHEDULE_RESULT_EXPLAIN`。
 - `TmPersistService`：统一落结果和解释信息。
 
@@ -261,6 +262,16 @@
 - 参数：`T_TM_PARAMS`
 - 库存：`T_TM_STOCK`
 - 班次：班次字典、`T_TM_SHIFT_CONFIG`
+
+数据加载来源：
+
+- 成型计划：`T_CX_SCHEDULE_RESULT`（通过 `schedule_date` + `factory_code` 查询）
+- BOM施工信息：`T_MDM_CONSTRUCTION_INFO`（通过 `EMBRYO_CODE + BOM_DATA_VERSION` 关联 `CONSTRUCTION_CODE + CONSTRUCTION_VERSION`）
+- 胎面标准长度：`T_MDM_CONSTRUCTION_INFO.TREAD_SHOULDER_LENGTH`（单位：米，成型生产一个胎胚需要多少米的胎面量）
+- 胎面口型板：`T_MDM_CONSTRUCTION_INFO.TREAD_MOUTH_PLATE`
+- 卷曲长度：`T_TM_CURL_ROLL.CURL_LENGTH`（优先取胎面卷曲长度，没有时取参数默认值；卷曲长度是指一个工装能卷曲多少米的胎面）
+- 损耗率：`T_TM_LOSS_SETTING.LOSS_RATE`（优先级：机台+胎面 > 胎面 > 机台 > 默认值）
+- 工作日历：`T_MDM_WORK_CALENDAR`（胎面工序 `procCode="04"`，用于判断停产日期）
 
 ## 7. 自动排程扩展设计
 
@@ -430,7 +441,7 @@ POST /tm/schedule/board
 1. 从 `T_TM_SHIFT_CONFIG` 读取日期范围内班次列，按 `schedule_date + shift_order` 排序。
 2. 从 `T_TM_SCHEDULE_RESULT` 按 `schedule_date` 分组取最新 `batch_no`，形成 `batchMap`。
 3. 从 `T_TM_SCHEDULE_RESULT` 读取这些批次下的任务。
-4. `machine_code is null` 的任务放入 `unassignedTasks`（`assign_status` 已移至 EXPLAIN 表，通过 JOIN 获取）。
+4. `machine_code is null` 的任务放入 `unassignedTasks`。
 5. 已分配任务按 `machine_code + schedule_date` 分组为机台行，每行的 CLASS1~CLASS6 列直接映射到对应班次单元格。
 6. 各单元格内任务按 `class{N}_sequence` 升序排列。
 
@@ -698,39 +709,51 @@ Step2 校验是否允许生成
 Load Data:
   T_TM_SCHEDULE_RESULT
 Process:
-  检查所选排程日期是否已经存在下发过 MES 的计划；
-  如果已有下发过 MES 的计划，则提示“当天已有生成计划，不可重复生成”，本次自动排程终止；
-  如果允许生成，则生成本次 batch_no、trace_id，并准备覆盖当天未下发或未成功下发的旧结果。
+  按 factory_code + schedule_date 查询旧排程结果；
+  如果没有旧结果，则允许生成；
+  如果旧结果全部 release_status = 0（未发布），前端弹框提示用户确认重新生成，用户确认后允许覆盖；
+  如果旧结果存在任一非未发布数据，则拒绝生成，提示“排程日期：%s已有发布过的生成计划，不可重复生成”；
+  重新生成时在同一事务内处理旧结果、未排结果、解释表和调度日志，任一失败整批回滚；
+  如果允许生成，则生成本次 batch_no、trace_id，并准备覆盖当天未发布旧结果。
 Output:
   RunCtx(batch_no, trace_id, schedule_date)
 
 Step3 解析成型计划生成胎面需求
 Load Data:
-  成型近期 6 个班排产计划、胎胚 BOM、胎面标准长度、胎面对应胶料和口型信息
+  T_CX_SCHEDULE_RESULT（成型计划，按 schedule_date + factory_code 查询）
+  T_MDM_CONSTRUCTION_INFO（BOM施工信息，通过 EMBRYO_CODE + BOM_DATA_VERSION 关联 CONSTRUCTION_CODE + CONSTRUCTION_VERSION）
 Process:
   根据胎胚 BOM 解析成型计划，获取需要供应的胎面规格列表；
+  从 T_MDM_CONSTRUCTION_INFO 获取胎面相关字段：TREAD_CODE（胎面编码）、TREAD_SHOULDER_LENGTH（胎面标准长度，单位米）、TREAD_MOUTH_PLATE（胎面口型板）；
   按 6 个班展开每个胎面规格的成型需求，形成后续排程计算的需求明细。
 Output:
   TreadDemandList(tread_code, shift_code, construction_plan_qty, tread_standard_length, glue_code, mouth_plate_code)
 
 Step4 计算胎面每班需求量
 Load Data:
-  TmParams(DEMAND_QTY_CALCULATE_TYPE)
+  TmParams(TM_ALGORITHM_SWITCH)
 Process:
-  如果参数选择算法1，则胎面每班需求量 = 成型三班最大计划量 * 胎面标准长度；
-  如果参数选择算法2，则胎面每班需求量 = 下个班成型计划量 * 胎面标准长度；
+  需求量计算公式：胎面需求量 = 成型计划 class{N}_plan_qty × TREAD_SHOULDER_LENGTH（胎面标准长度）
+  如果参数选择算法1（TM_ALGORITHM_SWITCH=1），则胎面每班需求量 = 成型三班最大计划量 × TREAD_SHOULDER_LENGTH；
+  如果参数选择算法2（TM_ALGORITHM_SWITCH=2），则胎面每班需求量 = 下个班成型计划量 × TREAD_SHOULDER_LENGTH；
   计算每个胎面规格在 6 个班中的需求量。
 Output:
   ShiftDemandQtyMap(tread_code, shift_code, demand_qty)
 
-Step5 计算 14点胎面预计库存
+Step5 读取 6点胎面库存并计算14点预计库存
 Load Data:
-  MES 6点胎面实际库存、早班胎面预计消耗量、早班胎面计划量
+  MES 6点胎面实际库存或 T_TM_STOCK(stock_date + tread_code)
+  早班胎面需求量（从 T_CX_SCHEDULE_RESULT 获取 class1_plan_qty × TREAD_SHOULDER_LENGTH）
+  早班胎面计划量（从 T_TM_SCHEDULE_RESULT 获取已排产的早班计划量）
 Process:
-  每天早上 6 点从 MES 获取各胎面的实际库存；
-  14点胎面预计库存 = 6点MES胎面库存 - 早班胎面预计消耗量 + 早班胎面计划量。
+  每天早上 6 点从 MES 获取各胎面的实际库存，或读取已落地到 T_TM_STOCK 的 6 点库存快照；
+  早班需求量 = 成型计划中该胎面对应 TREAD_CODE 的 class1_plan_qty × TREAD_SHOULDER_LENGTH；
+  早班计划量 = 从 T_TM_SCHEDULE_RESULT 获取当天已排产的早班（CLASS1）计划量合计；
+  计算14点预计库存：rollingStockQty(第1班开始) = sixClockStockQty - 早班胎面需求量 + 早班胎面计划量；
+  `已计划入库量`、`已占用量`、`不良量`、`调整量` 数据来源未定义，本版不参与库存公式；
+  库存字段建议在代码或接口中命名为 sixClockStockQty，解释表仍可写入 stock_qty。
 Output:
-  StockForecastMap(tread_code, stock_14pm)
+  StockForecastMap(tread_code, six_clock_stock_qty, rolling_stock_qty, first_shift_demand_qty, first_shift_plan_qty)
 
 Step6 建立本班机台任务链
 Process:
@@ -743,13 +766,18 @@ Output:
 
 Step7 计算库存保证班数和库存供应成型时长
 Process:
-  库存保证班数 = 14点胎面预计库存 / 胎面当班需求量；
+  参数 TM_STOCK_GUARD_SHIFT_COUNT 表示库存最低保证班数，缺省值为 2 班，保证范围包含当前班，即当前班 + 后续 N-1 班；
+  guardDemandQty = 保证范围内成型胎面需求量合计；
+  currentShiftDemandQty = 当前班成型胎面需求量；
   从当前班开始顺次检查库存，每满足一个班的成型消耗，库存满足成型消耗的班数加 1；
-  库存供应成型时长 = 库存满足成型消耗的班数 * 8小时 + （剩余库存成型计划开始时间 - 当班开始时间）；
-  如果库存不够一个班的成型消耗，则加上本班最早使用该胎面的成型计划预计开始生产时间与本班开始时间的差值；
+  未来保证范围内胎面需求量 = 未来保证范围成型计划量 × 胎面标准长度；
+  futureDemandPerHour = 未来保证范围内胎面需求量 / 未来保证范围总小时数；
+  未来保证范围总小时数 = 未来保证范围内各班次小时数之和；
+  supplyHours = rollingStockQty / futureDemandPerHour；
+  如果未来保证范围需求为 0，则 supplyHours 为空或标记为 NO_FUTURE_DEMAND，不做除零；
   同时计算库存不足时间，供后续判断最晚开始生产时间。
 Output:
-  SupplyCalcResult(tread_code, coverage_shift_count, supply_hours, stock_shortage_time)
+  SupplyCalcResult(tread_code, guard_demand_qty, current_shift_demand_qty, coverage_shift_count, supply_hours, stock_shortage_time)
 
 Step8 排序待排产规格
 Process:
@@ -777,30 +805,37 @@ Output:
 
 Step10 计算需排产量
 Process:
-  需排产量 = （胎面每班需求量 * 库存最低保证班数 - 14点胎面预计库存）*（100% + 损耗率）；
-  库存最低保证班数默认 3 个班，可通过参数配置；
-  如果需排产量未达到最低起排量（默认 300 米，可配置），则本班不排该规格，滚动到下一班重新计算预计库存后再判断。
+  stockGapQty = max(guardDemandQty - rollingStockQty, 0)；
+  baseDemandQty = max(currentShiftDemandQty, stockGapQty)；
+  如果库存足够覆盖最低保证班数，则 baseDemandQty 允许为 0，后续只按其他业务规则补量；
+  抵扣优先级通过 TM_DEDUCT_PRIORITY 扩展，当前默认抵扣项只使用 6 点库存滚动余额和已排入当前排程链的前序胎面计划量；
+  月结余、上班供应量等字段如数据源未明确，仅保留解释字段，不参与公式。
 Output:
-  NeedQtyResult(tread_code, shift_code, need_qty, min_start_check)
+  NeedQtyResult(tread_code, shift_code, guard_demand_qty, stock_gap_qty, base_demand_qty)
 
-Step11 按可用工装限制计划量
+Step11 计算收尾和非收尾实际排产量
 Process:
-  可用工装数量 = （工装总数 - 库存 / 工装卷曲米数）* 整车率；
-  需排产量 = 最小值（可用工装数量 * 工装卷曲米数, 需排产量）；
-  如果可用工装不足以支撑原始需排产量，则按工装上限截断计划量。
-Output:
-  ToolLimitedQty(tread_code, shift_code, plan_qty)
-
-Step12 计算收尾和非收尾实际排产量
-Process:
-  根据月计划成型剩余量判断是否即将收尾；
-  月计划剩余量小于等于需排产量时，该规格视为收尾规格；
-  胎面的余量 = 成型的余量 * 胎面长度 *（100% + 损耗率）；
-  非收尾规格实际排产 = 向上取整(需排产量 / 标准卷曲长度) * 标准卷曲长度；
-  收尾规格实际排产 = 最小值(需排产量, 胎面的余量) * (100% + 损耗率)；
+  收尾标识来源：T_CX_SCHEDULE_RESULT.MARK_CLOSE_OUT_TIP（"0"=提示收尾，"1"=不需要提示）；
+  月计划剩余量小于等于 baseDemandQty 时，该规格视为收尾规格；
+  卷曲长度来源：T_TM_CURL_ROLL.CURL_LENGTH（优先取胎面卷曲长度，没有时取参数默认值）；
+  标准长度来源：T_MDM_CONSTRUCTION_INFO.TREAD_SHOULDER_LENGTH（成型生产一个胎胚需要多少米的胎面量）；
+  损耗率来源：T_TM_LOSS_SETTING.LOSS_RATE（优先级：机台+胎面 > 胎面 > 机台 > 默认值）；
+  非收尾规格：实际排产 = 向上取整(baseDemandQty / 卷曲长度) × 卷曲长度（卷曲长度是指一个工装能卷曲多少米的胎面）；
+  收尾规格：实际排产 = 成型余量 × TREAD_SHOULDER_LENGTH × (100% + 损耗率)（不需要按卷曲长度向上取整）；
+  如果 0 < baseDemandQty < TM_MIN_START_QTY，则补足到最小起排量；
   非收尾规格需补够最低起排量并补成工装卷曲长度的整倍数，收尾规格严格按余量排产并补加损耗率。
 Output:
   ActualPlanQty(tread_code, shift_code, actual_plan_qty, tail_flag)
+
+Step12 按可用工装限制计划量
+Process:
+  planQty 初始值 = actual_plan_qty；
+  当前可用工装数量 = 总工装数量 - (14点胎面预计库存 / 工装卷曲长度)；
+  下班次可用工装数量 = 上班次可用工装数量 - 当前班计划量 / 工装卷曲长度 + 成型对应班次胎面需求量 / 工装卷曲长度；
+  每个班次计划量调整时，都重新计算该班次可用工装数量；
+  工装不足时，按可用工装数量 * 工装卷曲长度反推最大可排米数并截断计划量。
+Output:
+  ToolLimitedQty(tread_code, shift_code, plan_qty)
 
 Step13 处理停产收尾和开产阈值
 Process:
@@ -818,24 +853,28 @@ Load Data:
   T_TM_MACHINE_INFO, T_TM_MACHINE_MAINTENANCE, T_TM_MOUTH_PLATE,
   T_TM_GLUE_MACHINE_REAL, T_TM_SPECIFY_MACHINE, T_TM_MACHINE_SPEED
 Process:
-  只选择状态为启用的机台；
-  根据机台检修计划扣减检修时间段产能，若一整天检修，则该机台视为不可用；
-  根据口型与机台绑定关系，筛选可生产该口型的机台；
-  根据胶料与机台绑定关系，以主胶料为准筛选可投入该胶料的机台；
-  根据定点机台关系选择胎面规格绑定机台，或排除设置了不可生产该胎面规格的机台。
+  按规则链顺序过滤候选机台：机台状态启用 -> 剩余产能大于 0 -> 口型板匹配 -> 胶料机台关系 -> 选择定点生产机台 -> 排除定点不可生产机台；
+  任一规则否决即过滤，不进入评分；
+  每条规则写入规则编码、原因编码、原因描述和证据 JSON；
+  生产速度匹配取值顺序：机台 + 胎面规格 > 胎面规格 > 机台。
 Output:
   MachineCandidates(machine_code, available_capacity, filter_reason)
 
 Step15 选择机台并扣减产能
 Process:
-  如果存在多个可用机台，则选择剩余产能较小且能够容纳本次计划量的机台，优先把一个机台排满；
-  一个班最大可排 5500 米，可通过参数配置；
-  班产需要结合机台检修计划扣减最大班产；
-  总可用产能 = 满产产能 * （8 / (维修时长 + 各规格切换时长 + 各胶料切换时长)）；
-  剩余产能 = 总可用产能 - 已排规格实际排产量；
-  如果一个班排产量已经达到最大值，则将任务安排至下一个班。
+  只对过滤通过的候选机台评分，总分越高越优先；
+  默认评分项和权重：剩余产能适配 35、主胶料连续 20、基部胶相似 15、同口型连续 10、切换成本 10、定点生产 10；
+  主胶料连续：链尾主胶料与当前任务主胶料相同，加最高连续分；
+  基部胶相似：主胶料不同但基部胶相同个数越多分越高；如果只能取得一个基部胶编码，则匹配个数退化为 0 或 1；
+  同口型连续：链尾口型与当前任务口型相同加分；
+  切换成本：规格切换时长、胶料切换时长越短分越高；
+  定点生产：命中定点生产机台加分；
+  完全同分时按机台编码升序排序，保证相同输入结果稳定；
+  扣减产能 = (检修时长H + 上个规格切换时长H + 上个胶料切换时长H) * 机台生产速度；
+  机台剩余产能 = 胎面机台表最大产能 - 扣减产能 - 已排计划量；
+  如果 planQty > 机台剩余产能，则压到机台剩余产能；调整后允许低于需求量，但不能超过产能。
 Output:
-  SelectedMachine(machine_code, remain_capacity)
+  SelectedMachine(machine_code, remain_capacity, score_result)
 
 Step16 生成排程结果
 Persist:
@@ -853,7 +892,7 @@ Output:
 Step17 滚动到下一班
 Process:
   切换班次后，重新计算本班开始预计库存和库存保证班数；
-  下一个班预计库存 = 上一个班预计库存 + 上一个班生产计划 - 上一个班成型需求量；
+  rollingStockQty(下班开始) = rollingStockQty(当前班开始) + 当前班胎面计划量 - 当前班成型胎面需求量；
   创建本机台下一个班的任务链，并继承必要的上班次任务链信息；
   更新机台剩余产能、胎面库存预测和待排规格优先级。
 Output:
@@ -879,6 +918,17 @@ Output:
   RunSummary(batch_no, assigned_count, unassigned_count, error_count)
 ```
 
+### 15.3.1 关键术语定义
+
+| 术语 | 说明 | 来源 |
+|------|------|------|
+| 胎面标准长度（TREAD_SHOULDER_LENGTH） | 成型生产一个胎胚需要多少米的胎面量 | T_MDM_CONSTRUCTION_INFO.TREAD_SHOULDER_LENGTH |
+| 卷曲长度（CURL_LENGTH） | 一个工装能卷曲多少米的胎面 | T_TM_CURL_ROLL.CURL_LENGTH |
+| 损耗率（LOSS_RATE） | 胎面生产过程中的损耗比例 | T_TM_LOSS_SETTING.LOSS_RATE |
+| 收尾标识（MARK_CLOSE_OUT_TIP） | 成型计划是否即将收尾 | T_CX_SCHEDULE_RESULT.MARK_CLOSE_OUT_TIP |
+
+注意：卷曲长度用于工装限制和非收尾规格的卷数取整；标准长度用于需求量计算和收尾规格的计划量计算。两者用途不同，不可混淆。
+
 ### 15.4 插单
 
 ```text
@@ -897,7 +947,8 @@ Load Data:
   胎面主数据（现有主数据来源）、T_TM_MACHINE_INFO、T_TM_SHIFT_CONFIG
 Process:
   校验 tread_code 存在、machine_code 可用、班次窗口有效；
-  校验“第二个在产规格之后”约束。
+  校验“第二个在产规格之后”约束：判定范围为同排程日期、同机台、同班次、第二顺序之后；
+  如果插入位置不在第二顺序之后，则禁止插单并提示“当前机台班次只能插到第二个在产规格之后”。
 Output:
   ValidatedInsert
 
@@ -1181,21 +1232,426 @@ Output:
   RecalcSummary
 ```
 
-### 15.11 待确认问题
+### 15.11 已确认口径与仍待确认问题
+
+以下口径已确认并按本章执行：
+
+- 旧批次覆盖：同一 `factory_code + schedule_date` 无旧结果允许生成；旧结果全部未发布时前端确认后允许重新生成；存在任一非未发布结果时拒绝生成。
+- 库存计算起点：使用 6 点库存作为滚动库存起点；如 `T_TM_STOCK` 当前只有日期维度，则该日期库存代表 6 点库存快照。
+- 库存最低保证班数：参数 `TM_STOCK_GUARD_SHIFT_COUNT` 缺省按 2 班，保证范围包含当前班，即当前班 + 后续 N-1 班。
+- 需求量公式：`baseDemandQty = max(当前班需求, 保证范围库存缺口)`；库存足够覆盖保证范围时，计划量允许为 0。
+- 插单第二个在产规格：判定范围为同排程日期、同机台、同班次、第二顺序之后。
+- 事务边界：自动排程结果、未排结果、解释表、调度日志在同一事务内处理，任一失败整批回滚。
+- MES 发布：本轮仍按简单状态处理，真实 MES 发布行为后续单独接入。
+- 产能均衡：本轮不实现 `TmCapacityBalanceService` 生产级算法。
 
 以下问题仍需业务或技术口径最终确认：
 
-- 覆盖旧批次的实现方式：旧批次按“逻辑失效”处理还是按“is_delete=1”处理，需要固定一种实现，避免统计口径不一致。
-- `总可用产能 = 满产产能 * （8 / (维修时长 + 各规格切换时长 + 各胶料切换时长)）` 的单位换算尚未完全闭环，需要统一“小时/米/班产”维度后再编码。
-- “插单只能加到第二个在产规格之后”的“第二个在产规格”判定范围仍待定（当前机台任务链内，或当前班全局）。
-- 试验胶版本仍依赖外部纸质流程，系统内无版本化库存字段，当前仅能记录“外部确认结果”。
+- `已计划入库量`、`已占用量`、`不良量`、`调整量` 的数据来源尚未定义，本版不参与库存公式。
+- 试验胶版本仍依赖外部纸质流程，系统内无版本化库存字段；代码涉及位置仅保留 `// steve's TODO：试验胶版本化口径待确认后接入`。
 - 导入、导出的模板字段、校验规则和失败回执格式未在本章展开，当前按现有代码行为执行，后续建议补专章说明。
 
-## 16. 代码实现步骤
+## 16. 停产业务逻辑补充设计
 
-本章用于指导后续 Java 代码按步骤实现。实现时仍遵循 Controller 只做参数接收和结果返回、业务逻辑放在 Service、优先使用 LambdaQueryWrapper/LambdaUpdateWrapper、不手动追加逻辑删除条件、中文注释完整说明类和方法作用的规范。
+本章用于补充胎面自动排程中的停产业务逻辑处理。当胎面计划需要停产但成型计划不停产时，需要将停产日期对应的成型需求量重新分配到其他可排班次，确保成型生产线不会因为胎面停产而断供。
 
-### 16.1 建立通用排程接口包
+### 16.1 业务场景
+
+**场景描述**：在胎面自动排程过程中，当胎面计划需要停产但成型计划不停产时，需要将停产日期对应的成型需求量重新分配到其他可排班次。
+
+**具体场景**：
+- 成型计划：未来N天（可配置）都有生产计划（不停产）
+- 胎面计划：未来N天中的某一天需要停产
+- 需求：将停产日期成型对胎面的需求量，均匀分配到其他可排班次
+
+**业务价值**：
+1. 确保成型生产线不会因为胎面停产而断供
+2. 提前在停产前生产足够的胎面库存，满足停产期间的成型需求
+3. 优化库存水平，避免紧急生产或库存积压
+
+### 16.2 核心算法
+
+**算法名称**：胎面停产需求重分配算法
+
+**输入参数**：
+- `CHECK_WINDOW_DAYS`：检查窗口天数（可配置，默认3天）
+- `SHIFT_COUNT`：每天班次数（固定6班）
+- `WORK_CALENDAR`：工作日历数据
+- `FORMING_DEMAND`：成型需求数据
+- `TREAD_DEMAND`：胎面需求数据
+
+**算法步骤**：
+
+1. **获取检查窗口内的工作日历**
+   ```sql
+   SELECT * FROM MDM_WORK_CALENDAR 
+   WHERE proc_code = '04'  -- 胎面工序
+   AND production_date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL CHECK_WINDOW_DAYS DAY)
+   ```
+
+2. **识别停产日期**
+   - 遍历检查窗口内的每一天
+   - 检查当天胎面工作日历的开停产标志
+   - 如果 `dayFlag = 0` 或所有班次标志都为0，则标记为停产日期
+
+3. **检查成型是否停产**
+   ```sql
+   SELECT * FROM MDM_WORK_CALENDAR 
+   WHERE proc_code = '03'  -- 成型工序
+   AND production_date = [停产日期]
+   ```
+
+4. **计算停产日期的成型需求量**
+   - 如果成型不停产，计算当天成型对胎面的总需求量
+   - 需求量 = 各班次成型计划量 × 胎面标准长度
+
+5. **确定可分配班次**
+   - 排除停产日期本身
+   - 排除已经过去的班次
+   - 剩余班次为可分配班次
+
+6. **均匀分配需求量**
+   ```
+   每个可分配班次的增量 = 停产日期成型需求量 / 可分配班次数量
+   ```
+
+7. **更新各班次需求量**
+   - 将增量添加到各可分配班次的原始需求量中
+   - 重新计算库存滚动和保证班数
+
+**停产检查子流程**：
+
+```mermaid
+flowchart TD
+    A([开始]) --> B[获取检查窗口内的工作日历<br/>proc_code = 04 胎面工序]
+    B --> C[设置检查参数<br/>CHECK_WINDOW_DAYS = 3天]
+    C --> D[遍历检查窗口内的每一天]
+    
+    D --> E[获取当前日期胎面工作日历]
+    E --> F{胎面是否停产?<br/>dayFlag = 0 或所有班次标志 = 0}
+    
+    F -->|是| G[标记为停产日期<br/>记录停产日期]
+    F -->|否| H[跳过]
+    
+    G --> I{还有未检查的日期?}
+    H --> I
+    
+    I -->|是| E
+    I -->|否| J[返回所有停产日期列表]
+    
+    J --> K{是否存在停产日期?}
+    K -->|是| L[继续检查成型是否停产]
+    K -->|否| M([返回:无需处理停产业务])
+    
+    L --> N[结束]
+```
+
+**需求重分配子流程**：
+
+```mermaid
+flowchart TD
+    A([开始]) --> B[输入:停产日期列表,成型需求数据]
+    B --> C[遍历每个停产日期]
+    
+    C --> D[获取停产日期成型工作日历<br/>proc_code = 03 成型工序]
+    D --> E{成型是否停产?}
+    
+    E -->|是| F[跳过:成型也停产,无需分配]
+    E -->|否| G[计算停产日期成型总需求量]
+    
+    G --> H["需求量 = Σ(各班次成型计划量 * 胎面标准长度)"]
+    H --> I[确定可分配班次]
+    
+    I --> J["可分配班次 = 检查窗口内所有班次<br/>- 停产日期班次"]
+    J --> K[计算可分配班次数量]
+    
+    K --> L{可分配班次数量 > 0?}
+    L -->|是| M[均匀分配需求量]
+    L -->|否| N[跳过:无可分配班次]
+    
+    M --> O["每个可分配班次增量 =<br/>停产日期成型需求量 / 可分配班次数量"]
+    O --> P[更新各班次原始需求量]
+    P --> Q[重新计算库存滚动]
+    Q --> R[重新计算库存保证班数]
+    
+    R --> S{还有未处理的停产日期?}
+    N --> S
+    
+    S -->|是| D
+    S -->|否| T[返回更新后的需求数据]
+    
+    F --> S
+    
+    T --> U([结束])
+```
+
+### 16.3 代码集成点
+
+**需要修改的文件**：
+
+1. **`TmScheduleResultServiceImpl.java`**：在`autoPlan()`方法中集成停产业务逻辑
+2. **新增`TmShutdownRedistributionService.java`**：专门处理停产业务逻辑
+3. **工作日历服务**：调用`MdmWorkCalendarRemoteService`获取工作日历数据
+
+**调用时机**：
+- 在Step12（计算收尾和非收尾实际排产量）之后
+- 在Step13（处理停产收尾和开产阈值）之前
+
+### 16.4 参数配置
+
+在`T_TM_PARAMS`表中添加以下参数：
+
+| 参数代码 | 参数名称 | 默认值 | 说明 |
+|---------|---------|-------|------|
+| `TM_SHUTDOWN_CHECK_WINDOW` | 停产检查窗口天数 | 3 | 检查未来几天内的停产情况，建议3-7天 |
+| `TM_SHUTDOWN_REDISTRIBUTION_ENABLED` | 停产业务逻辑开关 | 1 | 是否启用停产业务逻辑处理 |
+
+```sql
+INSERT INTO T_TM_PARAMS (param_code, param_name, param_value, param_desc) VALUES
+('TM_SHUTDOWN_CHECK_WINDOW', '停产检查窗口天数', '3', '检查未来几天内的停产情况'),
+('TM_SHUTDOWN_REDISTRIBUTION_ENABLED', '停产业务逻辑开关', '1', '是否启用停产业务逻辑处理');
+```
+
+### 16.5 数据库查询
+
+**查询检查窗口内的工作日历**：
+```sql
+SELECT factory_code, proc_code, production_date, 
+       one_shift_flag, two_shift_flag, three_shift_flag, day_flag
+FROM MDM_WORK_CALENDAR 
+WHERE factory_code = #{factoryCode}
+  AND proc_code = '04'  -- 胎面工序
+  AND production_date BETWEEN #{startDate} AND #{endDate}
+ORDER BY production_date;
+```
+
+**查询成型需求数据**：
+```sql
+SELECT tread_code, shift_code, demand_qty, standard_length
+FROM T_TM_FORMING_DEMAND 
+WHERE factory_code = #{factoryCode}
+  AND schedule_date = #{scheduleDate}
+  AND shift_code = #{shiftCode};
+```
+
+### 16.6 核心算法实现
+
+```java
+/**
+ * 胎面停产需求重分配服务
+ */
+@Service
+public class TmShutdownRedistributionService {
+    
+    /**
+     * 执行停产业务逻辑处理
+     * @param factoryCode 工厂代码
+     * @param scheduleDate 排程日期
+     * @param checkWindowDays 检查窗口天数
+     * @return 调整后的需求数据
+     */
+    public List<TmDemandQtyInput> processShutdownRedistribution(
+            String factoryCode, LocalDate scheduleDate, int checkWindowDays) {
+        
+        // 1. 获取检查窗口内的工作日历
+        LocalDate endDate = scheduleDate.plusDays(checkWindowDays);
+        List<MdmWorkCalendar> treadCalendar = workCalendarRemoteService
+                .getCalendar(factoryCode, "04", scheduleDate, endDate);
+        
+        // 2. 识别检查窗口内的胎面停产日期（检查窗口包含排程日期当天）
+        List<LocalDate> shutdownDates = identifyShutdownDates(treadCalendar);
+        
+        if (shutdownDates.isEmpty()) {
+            return Collections.emptyList();
+        }
+        
+        // 3. 对每个停产日期进行处理
+        List<TmDemandQtyInput> adjustedDemands = new ArrayList<>();
+        
+        for (LocalDate shutdownDate : shutdownDates) {
+            // 检查成型是否停产
+            MdmWorkCalendar formingCalendar = workCalendarRemoteService
+                    .getCalendar(factoryCode, "03", shutdownDate, shutdownDate)
+                    .stream().findFirst().orElse(null);
+            
+            if (formingCalendar != null && !isFormingStopped(formingCalendar)) {
+                // 计算停产日期成型需求量
+                BigDecimal formingDemand = calculateFormingDemand(
+                        factoryCode, shutdownDate);
+                
+                // 确定可分配班次（检查窗口内所有班次减去停产日期班次）
+                List<String> availableShifts = determineAvailableShifts(
+                        scheduleDate, shutdownDate, checkWindowDays);
+                
+                // 均匀分配需求量
+                Map<String, BigDecimal> redistributedDemand = 
+                        redistributeDemand(formingDemand, availableShifts);
+                
+                adjustedDemands.addAll(createAdjustedDemandInputs(
+                        redistributedDemand, scheduleDate));
+            }
+        }
+        
+        return adjustedDemands;
+    }
+    
+    /**
+     * 识别停产日期
+     */
+    private List<LocalDate> identifyShutdownDates(List<MdmWorkCalendar> calendar) {
+        return calendar.stream()
+                .filter(cal -> cal.getDayFlag() == 0 || 
+                        (cal.getOneShiftFlag() == 0 && 
+                         cal.getTwoShiftFlag() == 0 && 
+                         cal.getThreeShiftFlag() == 0))
+                .map(MdmWorkCalendar::getProductionDate)
+                .collect(Collectors.toList());
+    }
+    
+    /**
+     * 均匀分配需求量
+     */
+    private Map<String, BigDecimal> redistributeDemand(
+            BigDecimal totalDemand, List<String> availableShifts) {
+        
+        Map<String, BigDecimal> result = new HashMap<>();
+        
+        if (availableShifts.isEmpty()) {
+            return result;
+        }
+        
+        BigDecimal demandPerShift = totalDemand.divide(
+                BigDecimal.valueOf(availableShifts.size()), 
+                RoundingMode.HALF_UP);
+        
+        for (String shift : availableShifts) {
+            result.put(shift, demandPerShift);
+        }
+        
+        return result;
+    }
+}
+```
+
+**集成到排程流程**：
+
+在`TmScheduleResultServiceImpl.autoPlan()`方法中添加：
+
+```java
+/**
+ * 自动排程主方法
+ */
+public AutoPlanResult autoPlan(String factoryCode, LocalDate scheduleDate) {
+    // ... 现有代码 ...
+    
+    // Step12: 计算收尾和非收尾实际排产量
+    List<TmPlanQtyResult> planQtyResults = calculatePlanQty(...);
+    
+    // 新增：停产业务逻辑处理
+    if (isShutdownRedistributionEnabled()) {
+        List<TmDemandQtyInput> adjustedDemands = 
+                shutdownRedistributionService.processShutdownRedistribution(
+                        factoryCode, scheduleDate, getCheckWindowDays());
+        
+        // 将调整后的需求量合并到原始需求中
+        mergeAdjustedDemands(planQtyResults, adjustedDemands);
+        
+        // 重新计算库存滚动
+        recalculateStockRolling(planQtyResults);
+    }
+    
+    // Step13: 处理停产收尾和开产阈值
+    handleShutdownAndStartupThreshold(...);
+    
+    // ... 后续代码 ...
+}
+```
+
+### 16.7 数据流转图
+
+```mermaid
+graph LR
+    subgraph databases["数据库层"]
+        A["工作日历<br>MDM_WORK_CALENDAR<br>─────────────<br>factory_code<br>proc_code<br>production_date<br>day_flag<br>one_shift_flag<br>two_shift_flag<br>three_shift_flag"]
+        B["成型需求<br>T_TM_FORMING_DEMAND<br>─────────────<br>tread_code<br>shift_code<br>demand_qty<br>standard_length"]
+        C["胎面需求<br>T_TM_DEMAND<br>─────────────<br>tread_code<br>shift_code<br>original_demand_qty<br>adjusted_demand_qty"]
+        D["排程结果<br>T_TM_SCHEDULE_RESULT<br>─────────────<br>batch_no<br>machine_code<br>tread_code<br>class1_plan_qty<br>class2_plan_qty"]
+    end
+    
+    subgraph services["服务层"]
+        E["停产检查服务<br>TmShutdownCheckService<br>─────────────<br>- 检查窗口天数<br>- 识别停产日期<br>- 检查成型是否停产"]
+        F["需求重分配服务<br>TmRedistributionService<br>─────────────<br>- 计算停产日期成型需求量<br>- 确定可分配班次<br>- 均匀分配需求量<br>- 更新需求数据"]
+        G["排程引擎<br>TmScheduleEngine<br>─────────────<br>- 计算需求量<br>- 计算计划量<br>- 筛选机台<br>- 生成排程结果"]
+    end
+    
+    A -->|"提供工作日历数据"| E
+    E -->|"提供停产日期信息"| F
+    B -->|"提供成型需求数据"| F
+    F -->|"更新需求量"| C
+    C -->|"提供调整后的需求数据"| G
+    G -->|"生成排程结果"| D
+```
+
+### 16.8 测试场景
+
+**场景1：基本停产分配**
+
+**输入**：
+- 排程日期：2026-06-14
+- 检查窗口：3天
+- 胎面停产日期：2026-06-16
+- 成型需求：2026-06-16成型需要1000米胎面
+
+**预期输出**：
+- 可分配班次：2026-06-14的3个班次和2026-06-15的3个班次（共6个班次）
+- 每个班次增量：1000/6 ≈ 166.67米
+- 2026-06-14和2026-06-15各班次需求量增加166.67米
+
+**场景2：多日期停产**
+
+**输入**：
+- 排程日期：2026-06-14
+- 检查窗口：3天
+- 胎面停产日期：2026-06-15、2026-06-16
+- 成型需求：2026-06-15需要1000米，2026-06-16需要800米
+
+**预期输出**：
+- 可分配班次：2026-06-14的3个班次（共3个班次）
+- 每个班次增量：(1000+800)/3 = 600米
+- 2026-06-14各班次需求量增加600米
+
+**场景3：成型也停产**
+
+**输入**：
+- 排程日期：2026-06-14
+- 检查窗口：3天
+- 胎面停产日期：2026-06-16
+- 成型也停产：2026-06-16成型也停产
+
+**预期输出**：
+- 跳过需求重分配
+- 保持原始需求量不变
+
+### 16.9 注意事项
+
+1. **性能考虑**：检查窗口不宜过大，建议默认3天，最大不超过7天
+2. **边界处理**：确保分配后的需求量不会导致库存溢出
+3. **日志记录**：详细记录停产业务逻辑的处理过程，便于问题排查
+4. **参数验证**：检查窗口天数必须大于0，小于等于30
+5. **并发处理**：确保停产业务逻辑在排程过程中线程安全
+
+### 16.10 扩展考虑
+
+1. **支持非均匀分配**：可根据班次产能、库存情况等因素进行加权分配
+2. **支持多工序联动**：考虑胎侧、内衬等其他工序的停产业务逻辑
+3. **实时调整**：支持在排程过程中动态调整检查窗口和分配策略
+4. **可视化配置**：提供界面配置停产业务逻辑的参数和规则
+
+## 17. 代码实现步骤
+
+本章用于指导后续 Java 代码按步骤实现。实现时仍遵循 Controller 只做参数接收和结果返回、业务逻辑放在 Service、优先使用 LambdaQueryWrapper/LambdaUpdateWrapper、不手动追加逻辑删除条件、中文注释完整说明类和方法作用的规范、不编写getter和setter尽量使用lombok.Data的注解。
+
+### 17.1 建立通用排程接口包
 
 建议位置：`Aps-Common/aps-engine-common/src/main/java/com/zlt/aps/common/engine/schedule/`。
 
@@ -1232,7 +1688,7 @@ Output:
 
 验证点：通用包编译通过；所有通用接口不引用 `TmScheduleResult`、`TmTaskDraft`、胎面胶料、口型板等 TM 专用类型。
 
-### 16.2 实现双向链表基础结构
+### 17.2 实现双向链表基础结构
 
 目标：提供排程运行态任务链结构，供自动排程和人工调整共用。
 
@@ -1244,7 +1700,7 @@ Output:
   - `unlink()`：摘除当前节点。无参数；无返回值；摘除后当前节点前驱和后继置空。
 
 - `ScheduleTaskLinkedList<T>`：双向链表实现类。
-  - `append`、`insertAfter`、`remove`、`transferTo`、`resequence` 按 16.1 接口实现。
+  - `append`、`insertAfter`、`remove`、`transferTo`、`resequence` 按 17.1 接口实现。
   - `List<ScheduleTaskNode<T>> toList()`：按头到尾返回节点列表。参数无；返回当前链表快照；不允许调用方修改内部指针。
   - `ScheduleTaskNode<T> findByTaskId(String taskId)`：按任务标识查找节点。`taskId` 传业务任务ID；返回节点，不存在返回空或抛出业务异常，由实现类注释明确。
 
@@ -1255,7 +1711,7 @@ Output:
 
 验证点：覆盖追加、头部插入、中间插入、尾部插入、删除头节点、删除中间节点、删除尾节点、跨链转移、重新编号。
 
-### 16.3 建立 TM 引擎领域对象
+### 17.3 建立 TM 引擎领域对象
 
 目标：让自动排程步骤之间传运行态对象，不直接传数据库实体。
 
@@ -1281,7 +1737,7 @@ Output:
 
 验证点：领域对象不继承数据库实体；字段能覆盖解释表需要的 `rule_hit_json`、`candidate_machine_json`、`unplanned_evidence_json`。
 
-### 16.4 实现自动排程模板流程
+### 17.4 实现自动排程模板流程
 
 目标：固定主流程，允许每一步独立替换和测试。
 
@@ -1302,7 +1758,7 @@ Output:
 
 验证点：模板只负责编排，不直接写复杂业务规则；每步可单独 mock 测试。
 
-### 16.5 实现策略与规则链
+### 17.5 实现策略与规则链
 
 目标：把高频变化规则做成可替换实现。
 
@@ -1311,22 +1767,34 @@ Output:
 - `ITmDemandQtyStrategy`：胎面需求量算法策略。
   - `String getAlgorithmCode()`：返回算法编码，例如 `1`、`2`。
   - `TmDemandQtyResult calculate(TmDemandQtyInput input, TmScheduleContext context)`：计算需求量。`input` 传成型计划、胎面长度、班次；`context` 传参数和日志上下文；返回每班需求量。
+  - 默认实现应支持库存最低保证班数：读取 `TM_STOCK_GUARD_SHIFT_COUNT`，缺省 2 班；计算 `guardDemandQty`、`currentShiftDemandQty`、`stockGapQty` 和 `baseDemandQty`；未来需求为 0 时不得除零，供应时长标记为空或 `NO_FUTURE_DEMAND`。
+  - 抵扣优先级通过 `TM_DEDUCT_PRIORITY` 扩展，当前默认抵扣链只使用 6 点库存滚动余额和当前排程链前序胎面计划量，不使用来源未定义字段。
 
 - `ITmPlanQtyStrategy`：胎面计划量算法策略。
   - `TmPlanQtyResult calculate(TmTaskDraft draft, TmScheduleContext context)`：计算计划量。`draft` 传待排任务；返回基础需求、库存抵扣、损耗、工装限制、收尾补正、最终计划量。
+  - 默认实现按以下顺序调整：基础需求量 -> 工装限制 -> 最小起排量 -> 卷数取整 -> 产能压缩。
+  - 工装限制按 `总工装数量 - (14点胎面预计库存 / 工装卷曲长度)` 计算当前可用工装数量，后续班次按 `上班次可用工装数量 - 当前班计划量 / 工装卷曲长度 + 成型对应班次胎面需求量 / 工装卷曲长度` 滚动。
+  - 卷曲长度优先取胎面卷曲长度，没有时取默认工装卷曲长度；计划量不足整卷时向上补足到整倍数。
+  - 产能压缩按 `机台剩余产能 = 胎面机台表最大产能 - 扣减产能 - 已排计划量`，最终计划量不能超过剩余产能。
+  - 涉及试验胶版本的位置只保留 `// steve's TODO：试验胶版本化口径待确认后接入` 注释，不实现版本化逻辑。
 
 - `ITmMachineFilterRule`：胎面候选机台过滤规则。
   - `ScheduleRuleResult evaluate(TmMachineCandidate candidate, TmMachineRuleContext context)`：执行单条规则。`candidate` 传候选机台；`context` 传任务、班次、基础资料；返回通过或过滤结果。
+  - 默认规则链顺序：机台状态启用、剩余产能大于 0、口型板匹配、胶料机台关系、选择定点生产机台、排除定点不可生产机台。
+  - 任一否决即过滤，不进入评分；每条规则必须返回规则编码、原因编码、原因描述和证据 JSON。
 
 - `ITmMachineScoreStrategy`：胎面机台评分策略。
   - `TmMachineScoreResult score(TmMachineCandidate candidate, TmMachineRuleContext context)`：对候选机台评分。返回评分项和总分。
+  - 默认评分权重：剩余产能适配 35、主胶料连续 20、基部胶相似 15、同口型连续 10、切换成本 10、定点生产 10。
+  - 同胶料连续优先判断链尾主胶料与当前任务主胶料是否相同；主胶料不同但基部胶相同个数越多分越高；如果只能拿到一个基部胶编码，则相同个数退化为 0 或 1。
+  - 完全同分时按机台编码升序排序，保证同输入结果稳定。
 
 - `ITmTaskSortStrategy`：待排任务排序策略。
   - `Comparator<TmTaskDraft> buildComparator(TmScheduleContext context)`：返回排序比较器。参数传上下文；返回比较器，用于优先队列。
 
 验证点：算法1/算法2能按参数切换；新增过滤规则不改主流程；过滤结果能进入解释 JSON。
 
-### 16.6 实现 TM 任务链排程服务
+### 17.6 实现 TM 任务链排程服务
 
 目标：统一处理自动排程和人工操作对任务链的修改。
 
@@ -1341,14 +1809,14 @@ Output:
 
 验证点：插单、删除、转机台、调量只影响必要链表；发布成功任务状态回退逻辑由操作门面统一处理。
 
-### 16.7 实现过程日志与解释快照
+### 17.7 实现过程日志与解释快照
 
 目标：让一次排程能通过 `batchNo + traceId` 追溯“为什么这么排”。
 
 建议类与方法：
 
 - `TmScheduleProcessLogger`：胎面过程日志实现。
-  - `logStepStart`、`logStepEnd`、`logRuleResult`、`logChainChange` 按 16.1 接口实现。
+  - `logStepStart`、`logStepEnd`、`logRuleResult`、`logChainChange` 按 17.1 接口实现。
   - `void logUnplanned(TmTaskDraft task, TmRuleTrace trace, TmScheduleContext context)`：记录未排任务。`task` 传未排任务，`trace` 传证据，`context` 传上下文；使用 `warn` 级别。
   - `void logPersistSummary(TmScheduleContext context, TmPersistResult result)`：记录落库汇总。参数传上下文和落库结果；使用 `info` 级别。
 
@@ -1359,7 +1827,7 @@ Output:
 
 验证点：日志中能看到参数加载、库存预测、排序、过滤、评分、任务链变更、未排、局部重算和落库；解释表能看到同一 `traceId` 的规则证据。
 
-### 16.8 实现落库服务
+### 17.8 实现落库服务
 
 目标：统一把运行态任务链结果转换为数据库结果和解释信息。
 
@@ -1380,17 +1848,65 @@ Output:
 
 验证点：同一批次结果和解释数量一致；未排任务可通过结果表和解释表追溯；落库失败不吞异常。
 
-### 16.9 补充测试与验证
+### 17.10 实现数据加载服务
+
+目标：在自动排程初始化阶段，从数据库加载所有基础资料，填充排程上下文。
+
+建议类与方法：
+
+- `TmDataLoadService`：胎面数据加载服务。
+  - `void loadAllData(TmScheduleContext context)`：加载所有基础资料。`context` 传排程上下文（包含 factoryCode、scheduleDate）；无返回值；会修改上下文中的 paramMap、taskDraftList 等字段。
+  - `void loadFormingPlans(TmScheduleContext context)`：加载成型计划。从 T_CX_SCHEDULE_RESULT 按 scheduleDate + factoryCode 查询。
+  - `void loadBomInfo(TmScheduleContext context)`：加载BOM施工信息。从 T_MDM_CONSTRUCTION_INFO 通过 EMBRYO_CODE + BOM_DATA_VERSION 关联获取胎面字段。
+  - `void loadMachineInfo(TmScheduleContext context)`：加载机台基础数据。从 T_TM_MACHINE_INFO 按 factoryCode 查询。
+  - `void loadMachineMaintenance(TmScheduleContext context)`：加载机台维修计划。从 T_TM_MACHINE_MAINTENANCE 按日期范围查询。
+  - `void loadMachineSpeed(TmScheduleContext context)`：加载机台生产速度。从 T_TM_MACHINE_SPEED 按 factoryCode 查询。
+  - `void loadMouthPlate(TmScheduleContext context)`：加载口型板关系。从 T_TM_MOUTH_PLATE 按 factoryCode 查询。
+  - `void loadGlueMachineReal(TmScheduleContext context)`：加载胶料机台关系。从 T_TM_GLUE_MACHINE_REAL 按 factoryCode 查询。
+  - `void loadGlueOrder(TmScheduleContext context)`：加载胶料顺序。从 T_TM_GLUE_GROUP_ORDER + T_TM_GLUE_ORDER 按 factoryCode 查询。
+  - `void loadLossSetting(TmScheduleContext context)`：加载损耗设置。从 T_TM_LOSS_SETTING 按 factoryCode 查询。
+  - `void loadCurlRoll(TmScheduleContext context)`：加载卷曲长度。从 T_TM_CURL_ROLL 按 factoryCode 查询。
+  - `void loadParams(TmScheduleContext context)`：加载排程参数。从 T_TM_PARAMS 全量查询。
+  - `void loadShiftConfig(TmScheduleContext context)`：加载班制配置。从 T_TM_SHIFT_CONFIG 按 factoryCode 查询。
+  - `void loadWorkCalendar(TmScheduleContext context)`：加载工作日历。从 T_MDM_WORK_CALENDAR 按 procCode="04" + 日期范围查询。
+
+- `TmTaskDraftFactory`：胎面任务草稿工厂。
+  - `List<TmTaskDraft> createTaskDrafts(TmScheduleContext context)`：根据成型计划和BOM信息生成待排任务草稿列表。遍历成型计划，关联BOM获取胎面编码，为每个胎面规格生成6个班次的任务草稿，计算需求量 = 成型计划量 × TREAD_SHOULDER_LENGTH。
+
+数据流转：
+
+```text
+TmDataLoadService.loadAllData(context)
+    ├── loadFormingPlans(context)          // T_CX_SCHEDULE_RESULT
+    ├── loadBomInfo(context)               // T_MDM_CONSTRUCTION_INFO
+    ├── loadMachineInfo(context)           // T_TM_MACHINE_INFO
+    ├── loadMachineMaintenance(context)    // T_TM_MACHINE_MAINTENANCE
+    ├── loadMachineSpeed(context)          // T_TM_MACHINE_SPEED
+    ├── loadMouthPlate(context)            // T_TM_MOUTH_PLATE
+    ├── loadGlueMachineReal(context)       // T_TM_GLUE_MACHINE_REAL
+    ├── loadGlueOrder(context)             // T_TM_GLUE_GROUP_ORDER + T_TM_GLUE_ORDER
+    ├── loadLossSetting(context)           // T_TM_LOSS_SETTING
+    ├── loadCurlRoll(context)              // T_TM_CURL_ROLL
+    ├── loadParams(context)                // T_TM_PARAMS
+    ├── loadShiftConfig(context)           // T_TM_SHIFT_CONFIG
+    └── loadWorkCalendar(context)          // T_MDM_WORK_CALENDAR (procCode="04")
+```
+
+验证点：数据加载完成后，context.taskDraftList 不为空；每个任务草稿包含 treadCode、glueCode、mouthPlateCode、demandQty、curlRollLength 等字段。
+
+### 17.9 补充测试与验证
 
 实现顺序建议先测通用结构，再测 TM 业务规则：
 
 1. 通用双向链表单元测试：追加、插入、删除、转移、重新编号、遍历。
 2. TM 排序策略单元测试：强紧急优先于同胶料，库存紧急度排序正确，稳定兜底可重复。
 3. 机台过滤规则链单元测试：开班、机台状态、检修、口型、胶料、定点/禁排、产能。
-4. 机台评分测试：剩余产能可容纳且最小者优先，同胶料和同口型加分生效。
+4. 机台评分测试：剩余产能适配、主胶料连续、基部胶匹配数量、同口型、切换成本、定点生产和机台编码稳定兜底。
 5. 人工操作链表测试：插单、删除、调量、转机台后顺序重算正确。
 6. 解释与日志测试：同一 `batchNo + traceId` 能串起参数、库存、排序、过滤、评分、落库全过程。
-7. 编译验证：实现代码后优先执行 `mvn -pl APS-Modules/aps-tm -am -DskipTests compile`；若改动 API 层，补跑 `mvn -pl Aps-Api/tm-api -am -DskipTests compile`。
+7. 旧批次与插单测试：全未发布旧批次确认后可重排；存在非未发布旧批次拒绝；插单位置不在第二顺序之后拒绝。
+8. 场景测试数据：具体模拟数据放在 `docs/tm` 目录，至少覆盖 6 点库存 1000 米、未来 2 班需求 600/500 米、未来需求为 0、工装限制、最小起排、卷数取整、产能压缩、主胶料/基部胶评分和同分机台编码排序。
+9. 编译验证：实现代码后优先执行 `mvn -pl APS-Modules/aps-tm -am -DskipTests compile`；若改动 API 层，补跑 `mvn -pl Aps-Api/tm-api -am -DskipTests compile`。
 
 验收标准：
 
@@ -1398,3 +1914,4 @@ Output:
 - 通用接口不依赖胎面专用类。
 - 胎面专用实现能覆盖详设中的自动排程、人工操作、局部重算、解释和日志要求。
 - 所有新增类和方法有中文注释，说明作用、参数、返回值、异常和代码意图。
+

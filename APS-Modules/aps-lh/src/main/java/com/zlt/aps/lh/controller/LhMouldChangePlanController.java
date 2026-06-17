@@ -332,6 +332,8 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
         List<LhMouldChangePlan> list = this.listExportData(queryVO);
         Map<String, Object> tableMap = new HashMap<>();
         List<List<Map<String, Object>>> excelDataList = new ArrayList<>();
+        // 赋值表头字段名称
+        setExportTitleFieldName(tableMap);
         if (CollectionUtils.isNotEmpty(list)) {
             List<LhMouldChangePlanVo> exportList = this.buildLhMouldChangePlanVoList(list, queryVO);
             excelDataList.add(buildExportDataList(exportList, queryVO));
