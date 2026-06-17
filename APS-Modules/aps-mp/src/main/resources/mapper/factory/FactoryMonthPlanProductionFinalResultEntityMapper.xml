@@ -127,6 +127,8 @@
             fin.UPDATE_TIME,
             fin.CREATE_BY,
             fin.UPDATE_BY,
+            fin.LAST_MONTH_OVERDUE_QTY,
+            fin.LAST_MONTH_VALID_FLAG,
         NULLIF(fin.ADJUST_QTY1, 0) AS ADJUST_QTY1,
         NULLIF(fin.ADJUST_QTY2, 0) AS ADJUST_QTY2,
         NULLIF(fin.ADJUST_QTY3, 0) AS ADJUST_QTY3,
