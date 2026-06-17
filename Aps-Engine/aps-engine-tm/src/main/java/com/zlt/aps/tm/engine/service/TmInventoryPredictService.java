@@ -5,7 +5,7 @@ import com.zlt.aps.tm.api.domain.entity.TmStock;
 import com.zlt.aps.tm.engine.domain.TmScheduleContext;
 import com.zlt.aps.tm.engine.domain.TmStockForecast;
 import com.zlt.aps.tm.engine.domain.TmTaskDraft;
-import com.zlt.aps.tm.engine.mapper.TmStockMapper;
+import com.zlt.aps.tm.engine.mapper.TmEngineStockMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -26,7 +26,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class TmInventoryPredictService implements ITmInventoryPredictService {
 
-    private final TmStockMapper tmStockMapper;
+    private final TmEngineStockMapper tmStockMapper;
 
     // TODO: 注入成型计划Mapper，用于获取早班需求量
     // private final CxScheduleResultMapper cxScheduleResultMapper;
