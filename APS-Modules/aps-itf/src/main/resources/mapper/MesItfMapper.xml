@@ -307,12 +307,12 @@
         t.CLASS2_PERSON,
         t.CLASS3_PERSON,
         <!-- MES未加字段前先注释，MES加字段后取消注释即可 -->
-        <!--t.CLASS1_LH_NO,
+        t.CLASS1_LH_NO,
         t.CLASS1_LH_TYPE,
         t.CLASS2_LH_NO,
         t.CLASS2_LH_TYPE,
         t.CLASS3_LH_NO,
-        t.CLASS3_LH_TYPE,-->
+        t.CLASS3_LH_TYPE,
         t.DATA_VERSION,
         t.COMPANY_CODE,
         t.FACTORY_CODE
@@ -351,12 +351,12 @@
         t.CLASS2_PERSON,
         t.CLASS3_PERSON,
         <!-- MES未加字段前先注释，MES加字段后取消注释即可 -->
-        <!--t.CLASS1_LH_NO,
+        t.CLASS1_LH_NO,
         t.CLASS1_LH_TYPE,
         t.CLASS2_LH_NO,
         t.CLASS2_LH_TYPE,
         t.CLASS3_LH_NO,
-        t.CLASS3_LH_TYPE,-->
+        t.CLASS3_LH_TYPE,
         t.DATA_VERSION,
         t.COMPANY_CODE,
         t.FACTORY_CODE
@@ -395,12 +395,12 @@
         t.CLASS2_PERSON,
         t.CLASS3_PERSON,
         <!-- MES未加字段前先注释，MES加字段后取消注释即可 -->
-        <!--t.CLASS1_LH_NO,
+        t.CLASS1_LH_NO,
         t.CLASS1_LH_TYPE,
         t.CLASS2_LH_NO,
         t.CLASS2_LH_TYPE,
         t.CLASS3_LH_NO,
-        t.CLASS3_LH_TYPE,-->
+        t.CLASS3_LH_TYPE,
         t.DATA_VERSION,
         t.COMPANY_CODE,
         t.FACTORY_CODE
@@ -434,8 +434,8 @@
         MATERIAL_CODE,
         MES_MATERIAL_CODE,
         <!-- MES未加字段前先注释，MES加字段后取消注释即可 -->
-        <!--LH_NO,
-        LH_TYPE,-->
+        LH_NO,
+        LH_TYPE,
         DATA_VERSION,
         COMPANY_CODE,
         FACTORY_CODE

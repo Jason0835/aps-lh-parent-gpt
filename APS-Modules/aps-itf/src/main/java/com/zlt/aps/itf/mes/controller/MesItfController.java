@@ -499,9 +499,9 @@ public class MesItfController {
     @PostMapping("/issueCxScheduleResult")
     @AutoLoginLog
     public AjaxResult issueCxScheduleResult(@RequestBody List<CxScheduleResultIssue> cxScheduleResultIssueList) {
-        // 从上下文中获取厂别和分公司编码
+        // 分公司编码与分厂编码保持一致
         String factoryCode = FactoryConstant.DEFAULT_FACTORY_CODE;
-        String companyCode = FactoryConstant.DEFAULT_COMPANY_CODE;
+        String companyCode = factoryCode;
         return cxScheduleResultIssueService.issueCxScheduleResult(cxScheduleResultIssueList, factoryCode, companyCode);
     }
 

@@ -2159,9 +2159,9 @@ public class MesItfServiceImpl implements MesItfService {
         // 获取下发接口版本号
         String dataVersion = syncDataHandle.getDataVersion(ItfSyncKeyEnum.MOLD_ALTER_PLAN_ISSUE.getCode());
 
-        // 从数据中获取factoryCode和companyCode
+        // 从数据中获取factoryCode，分公司编码与分厂编码保持一致
         String factoryCode = moldAlterPlanList.get(0).getFactoryCode();
-        String companyCode = moldAlterPlanList.get(0).getCompanyCode();
+        String companyCode = factoryCode;
 
         // 收集工单号列表，用于清理中间表旧数据
         List<String> orderNos = moldAlterPlanList.stream()
@@ -2176,6 +2176,8 @@ public class MesItfServiceImpl implements MesItfService {
             MoldAlterPlanIssue issue = new MoldAlterPlanIssue();
             BeanUtils.copyProperties(plan, issue);
             issue.setDataVersion(dataVersion);
+            // 分公司编码与分厂编码保持一致
+            issue.setCompanyCode(plan.getFactoryCode());
             issueList.add(issue);
         }
 
