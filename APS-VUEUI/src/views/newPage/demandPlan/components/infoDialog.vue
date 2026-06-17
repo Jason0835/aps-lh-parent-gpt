@@ -67,7 +67,7 @@ export default {
       columns: [
         {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.demandPlan.factoryCode"),
           type: "select",
           dictData: this.parentDict.type.biz_factory_name,
         },
@@ -88,7 +88,7 @@ export default {
   },
   computed: {
     title: function () {
-      return this.$t("ui.data.DemandPlan.createMonthRequire");
+      return this.$t("ui.data.demandPlan.createMonthRequire");
     },
   },
   methods: {
