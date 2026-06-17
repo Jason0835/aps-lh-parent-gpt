@@ -80,20 +80,20 @@ export default {
       return [
         {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.productStock.factoryCode"),
           type: "select",
           dictData: this.parentDict.type.biz_factory_name,
         },
 
         {
           prop: "stockDate",
-          label: this.$t("ui.data.defectiveStock.stockDate"),
+          label: this.$t("ui.data.column.productStock.stockDate"),
           type: "date",
           valueFormat: "yyyy-MM-dd",
         },
         {
           prop: "productTypeCode",
-          label: this.$t("ui.data.column.monthplan.productType"),
+          label: this.$t("ui.data.column.productStock.productTypeCode"),
           type: "select",
           dictData: this.parentDict.type.biz_product_type,
         },

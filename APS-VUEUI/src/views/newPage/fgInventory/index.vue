@@ -111,21 +111,21 @@ export default {
         // { type: "selection", fixed: "left" },
         {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.productStock.factoryCode"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
           },
         },
         {
           prop: "productTypeCode",
-          label: this.$t("ui.data.column.monthplan.productType"),
+          label: this.$t("ui.data.column.productStock.productTypeCode"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_product_type, value);
           },
         },
         {
           prop: "brand",
-          label: this.$t("common.brand"),
+          label: this.$t("ui.data.column.productStock.brand"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_brand_type, value);
           },
@@ -133,17 +133,17 @@ export default {
         },
         {
           prop: "finalGrade",
-          label: this.$t("ui.data.column.finishStock.finalGrade"),
+          label: this.$t("ui.data.column.productStock.finalGrade"),
           width:120
         },
         {
           prop: "structureName",
-          label: this.$t("ui.data.column.finishStock.structureName"),
+          label: this.$t("ui.data.column.productStock.structureName"),
           width:200
         },
         {
           prop: "locationType",
-          label: this.$t("ui.data.column.finishStock.wai"),
+          label: this.$t("ui.data.column.productStock.locationType"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_stor_type, value);
           },
@@ -151,19 +151,19 @@ export default {
         },
         {
           prop: "materialCode",
-          label: this.$t("ui.data.column.monthplan.oriMaterialCode"),
+          label: this.$t("ui.data.column.productStock.materialCode"),
           width:180
         },
         {
           prop: "materialDesc",
-          label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
+          label: this.$t("ui.data.column.productStock.materialDesc"),
           align: "left",
           minWidth: 350
         },
 
         {
           prop: "stockQty",
-          label: this.$t("ui.data.column.finishStock.stockQty"),
+          label: this.$t("ui.data.column.productStock.stockQty"),
         },
         {
           prop: "stockDate",
@@ -172,7 +172,7 @@ export default {
         },
         {
           prop: "weekYear",
-          label: this.$t("ui.data.column.monthplan.weekYear"),
+          label: this.$t("ui.data.column.productStock.weekYear"),
         },
 
         // {
@@ -191,28 +191,28 @@ export default {
         // },
         {
           prop: "isExceedTire",
-          label: this.$t("ui.data.column.finishStock.isExceedMonth"),
+          label: this.$t("ui.data.column.productStock.isExceedTire"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_yes_no, value);
           },
         },
         {
           prop: "isExceedThreeMonth",
-          label: this.$t("ui.data.column.finishStock.isExceedThreeMonth"),
+          label: this.$t("ui.data.column.productStock.isExceedThreeMonth"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_yes_no, value);
           },
         },
         {
           prop: "isExceedSixMonth",
-          label: this.$t("ui.data.column.finishStock.isExceedSixMonth"),
+          label: this.$t("ui.data.column.productStock.isExceedSixMonth"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_yes_no, value);
           },
         },
         {
           prop: "isExceedTwelveMonth",
-          label: this.$t("ui.data.column.finishStock.isExceedTwelveMonth"),
+          label: this.$t("ui.data.column.productStock.isExceedTwelveMonth"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_yes_no, value);
           },
@@ -220,7 +220,7 @@ export default {
         {
           prop: "updateTime",
           width: 180,
-          label: this.$t("ui.data.column.scheduleAdjust.updata"),
+          label: this.$t("ui.data.column.demandPlan.updateTime"),
         },
       ];
 
@@ -230,29 +230,29 @@ export default {
       return [
         {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.productStock.factoryCode"),
           type: "select",
           dictData: this.dict.type.biz_factory_name,
         },
         {
           prop: "productTypeCode",
-          label: this.$t("ui.data.column.monthplan.productType"),
+          label: this.$t("ui.data.column.productStock.productTypeCode"),
           type: "select",
           dictData: this.dict.type.biz_product_type,
         },
         // {
         //   prop: "mouldCode",
-        //   label: this.$t("common.brand"),
+        //   label: this.$t("ui.data.column.productStock.brand"),
         // },
         // {
 
         {
           prop: "materialCode",
-          label: this.$t("ui.data.column.monthplan.oriMaterialCode"),
+          label: this.$t("ui.data.column.productStock.materialCode"),
         },
         {
           prop: "materialDesc",
-          label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
+          label: this.$t("ui.data.column.productStock.materialDesc"),
           minWidth: 350,
           align: "left",
         },
@@ -266,7 +266,7 @@ export default {
         // },
         {
           prop: "isExceedMonth",
-          label: this.$t("ui.data.column.finishStock.isExceedMonth"),
+          label: this.$t("ui.data.column.productStock.isExceedTire"),
           type: "checkbox",
         },
       ];
