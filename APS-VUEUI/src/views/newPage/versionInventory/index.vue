@@ -106,36 +106,36 @@ export default {
         // { type: "selection", fixed: "left" },
         {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.dpStockVersion.factoryCode"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
           },
         },
         {
           prop: "productTypeCode",
-          label: this.$t("ui.data.column.monthplan.productType"),
+          label: this.$t("ui.data.column.dpStockVersion.productTypeCode"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_product_type, value);
           },
         },
         {
           prop: "year",
-          label: this.$t("ui.data.colume.year"),
+          label: this.$t("ui.data.column.dpStockVersion.year"),
         },
         {
           prop: "month",
-          label: this.$t("ui.data.colume.month"),
+          label: this.$t("ui.data.column.dpStockVersion.month"),
         },
         {
           prop: "requireVersion",
-          label: this.$t("ui.data.column.finishStock.requireVersion"),
+          label: this.$t("ui.data.column.dpStockVersion.requireVersion"),
           width:150
 
         },
 
         {
           prop: "brand",
-          label: this.$t("common.brand"),
+          label: this.$t("ui.data.column.dpStockVersion.brand"),
           width:120,
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_brand_type, value);
@@ -143,23 +143,23 @@ export default {
         },
         {
           prop: "materialCode",
-          label: this.$t("ui.data.column.monthplan.oriMaterialCode"),
+          label: this.$t("ui.data.column.dpStockVersion.materialCode"),
           width:180
         },
 
         {
           prop: "materialDesc",
-          label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
+          label: this.$t("ui.data.column.dpStockVersion.materialDesc"),
           align: "left",
           minWidth: 350
         },
         {
           prop: "stockQty",
-          label: this.$t("ui.data.column.finishStock.stockQty"),
+          label: this.$t("ui.data.column.dpStockVersion.stockQty"),
         },
         {
           prop: "weekYear",
-          label: this.$t("ui.data.column.monthplan.weekYear"),
+          label: this.$t("ui.data.column.dpStockVersion.weekYear"),
         },
         // {
         //   prop: "dynamicBalance",
@@ -179,7 +179,7 @@ export default {
 
         {
           prop: "isExceedSixMonth",
-          label: this.$t("ui.data.column.finishStock.isExceedSixMonth"),
+          label: this.$t("ui.data.column.dpStockVersion.isExceedSixMonth"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_yes_no, value);
           },
@@ -187,7 +187,7 @@ export default {
 
         {
           prop: "isExceedNineMonth",
-          label: this.$t("ui.data.column.finishStock.isExceedNineMonth"),
+          label: this.$t("ui.data.column.dpStockVersion.isExceedTwelveMonth"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_yes_no, value);
           },
@@ -196,7 +196,7 @@ export default {
         {
           prop: "updateTime",
           width: 180,
-          label: this.$t("ui.data.column.scheduleAdjust.updata"),
+          label: this.$t("ui.data.column.demandPlan.updateTime"),
         },
       ];
 
@@ -206,7 +206,7 @@ export default {
       return [
         {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.dpStockVersion.factoryCode"),
           type: "select",
           dictData: this.dict.type.biz_factory_name,
           listeners: {
@@ -225,25 +225,25 @@ export default {
         },
         {
           prop: "requireVersion",
-          label: this.$t("ui.data.column.finishStock.requireVersion"),
+          label: this.$t("ui.data.column.dpStockVersion.requireVersion"),
           type: "select",
           filterable: true,
           dictData: this.versionList,
         },
         {
           prop: "productTypeCode",
-          label: this.$t("ui.data.column.monthplan.productType"),
+          label: this.$t("ui.data.column.dpStockVersion.productTypeCode"),
           type: "select",
           dictData: this.dict.type.biz_product_type,
         },
 
         {
           prop: "materialCode",
-          label: this.$t("ui.data.column.monthplan.oriMaterialCode"),
+          label: this.$t("ui.data.column.dpStockVersion.materialCode"),
         },
         {
           prop: "materialDesc",
-          label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
+          label: this.$t("ui.data.column.dpStockVersion.materialDesc"),
           minWidth: 350,
           align: "left",
         },
