@@ -17,7 +17,7 @@ import java.util.List;
 /**
  * 国际化变更RemoteService
  */
-@FeignClient(contextId = "I18nChangeRemoteService", value = ServiceNameConstants.GATEWAY_SERVICE, url = "http://192.168.10.130:9102")
+@FeignClient(contextId = "I18nChangeRemoteService", value = ServiceNameConstants.GATEWAY_SERVICE, path = "${api.path.monthplan:/monthplan}")
 public interface I18nChangeRemoteService {
 
     /**
