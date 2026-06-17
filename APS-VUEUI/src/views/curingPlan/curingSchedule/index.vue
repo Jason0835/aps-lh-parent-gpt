@@ -912,21 +912,10 @@ export default {
       }
     },
     isShiftAfterEnding(row, shiftIndex) {
-      const referenceQty = Math.max(row.mouldSurplusQty || 0, row.embryoStock || 0);
-      if (referenceQty <= 0) {
-        return false;
-      }
-      let totalPlanQty = 0;
+      // 以 classXIsEnd = '1' 的班次作为收尾位置，收尾之后的班次返回 true
       for (let i = 1; i <= 8; i++) {
-        totalPlanQty += (row['class' + i + 'PlanQty'] || 0);
-      }
-      if (totalPlanQty < referenceQty) {
-        return false;
-      }
-      let remaining = referenceQty;
-      for (let i = 1; i <= 8; i++) {
-        remaining -= (row['class' + i + 'PlanQty'] || 0);
-        if (remaining <= 0) {
+        const isEnd = row['class' + i + 'IsEnd'];
+        if (String(isEnd) === '1') {
           return shiftIndex > i;
         }
       }

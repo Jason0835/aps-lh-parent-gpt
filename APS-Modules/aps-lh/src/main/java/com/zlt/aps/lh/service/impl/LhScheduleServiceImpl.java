@@ -2970,8 +2970,8 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
     /**
      * 判断指定班次是否已经超过收尾位置。
      * <p>该逻辑对齐前端 curingSchedule/index.vue 中的 isShiftAfterEnding：
-     * 以硫化余量和胎胚库存的较大值作为需要覆盖的参考数量；如果 8 个班次总计划量不足参考数量，
-     * 则不隐藏任何后续班次；当累计计划量覆盖参考数量后，覆盖点之后的班次视为收尾之后，导出为空。</p>
+     * 以各班次的 classXIsEnd 字段作为收尾标识，值为 "1" 的班次视为收尾位置，
+     * 收尾位置之后的班次返回 true，导出时隐藏左右模等展示值。</p>
      *
      * @param result     排程结果明细
      * @param shiftIndex 当前班次序号
@@ -2981,21 +2981,10 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         if (Objects.isNull(result)) {
             return false;
         }
-        int referenceQty = Math.max(defaultZero(result.getMouldSurplusQty()), defaultZero(result.getEmbryoStock()));
-        if (referenceQty <= 0) {
-            return false;
-        }
-        int totalPlanQty = 0;
+        // 以 classXIsEnd = "1" 的班次作为收尾位置，收尾之后的班次返回 true
         for (int shift = 1; shift <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT; shift++) {
-            totalPlanQty += defaultZero(getClassPlanQty(result, shift));
-        }
-        if (totalPlanQty < referenceQty) {
-            return false;
-        }
-        int remaining = referenceQty;
-        for (int shift = 1; shift <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT; shift++) {
-            remaining -= defaultZero(getClassPlanQty(result, shift));
-            if (remaining <= 0) {
+            String isEnd = ShiftFieldUtil.getShiftIsEnd(result, shift);
+            if ("1".equals(isEnd)) {
                 return shiftIndex > shift;
             }
         }
