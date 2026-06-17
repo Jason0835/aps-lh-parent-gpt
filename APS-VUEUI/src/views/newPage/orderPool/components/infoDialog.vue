@@ -104,7 +104,7 @@ export default {
       return [
         // {
         //     prop: "factoryCode",
-        //     label: this.$t("ui.data.column.factoryCode"),
+        //     label: this.$t("ui.data.column.SalesOrderPool.factoryCode"),
         //     type: "select",
         //     disabled: true,
         //     dictData: this.parentDict.type.biz_factory_name,
@@ -112,45 +112,45 @@ export default {
 
         //   {
         //     prop: "productType",
-        //     label: this.$t("ui.data.column.monthplan.productType"),
+        //     label: this.$t("ui.data.column.SalesOrderPool.productType"),
         //     type: "select",
         //     disabled: true,
         //     dictData: this.parentDict.type.biz_product_type,
         //   },
         {
           prop: "salCodePo",
-          label: this.$t("ui.data.column.monthplan.salCodePo"),
+          label: this.$t("ui.data.column.SalesOrderPool.salCodePo"),
 
         },
         {
           prop: "scmPriority",
-          label: this.$t("ui.data.column.monthplan.scmPriority"),
+          label: this.$t("ui.data.column.SalesOrderPool.scmPriority"),
           type: "select",
           dictData: this.parentDict.type.biz_scm_type,
         },
         // {
         //   prop: "area",
-        //   label: this.$t("common.area"),
+        //   label: this.$t("ui.data.column.SalesOrderPool.area"),
         //   disabled: true,
         // },
         // {
         //   prop: "salCode",
-        //   label: this.$t("ui.data.column.monthplan.salCode"),
+        //   label: this.$t("ui.data.column.SalesOrderPool.salCode"),
         //   disabled: true,
         // },
         // {
         //   prop: "salNCode",
-        //   label: this.$t("ui.data.column.monthplan.salNCode"),
+        //   label: this.$t("ui.data.column.SalesOrderPool.salNCode"),
         //   disabled: true,
         // },
         // {
         //   prop: "natCode",
-        //   label: this.$t("ui.data.column.monthplan.natCode"),
+        //   label: this.$t("ui.data.column.SalesOrderPool.natCode"),
         //   disabled: true,
         // },
         // {
         //   prop: "brand",
-        //   label: this.$t("common.brand"),
+        //   label: this.$t("ui.data.column.SalesOrderPool.brand"),
         //   disabled: true,
         // },
 
