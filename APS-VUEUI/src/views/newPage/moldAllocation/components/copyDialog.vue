@@ -104,21 +104,21 @@ export default {
         {
           prop: "factoryCode",
           label: this.$t(
-            "ui.data.column.factoryCode"
+            "ui.data.column.mdmMouldAllocation.factoryCode"
           ),
           type: "select",
           dictData: this.parentDict.type.biz_factory_name,
         },
         {
           prop: "yearMonth",
-          label: this.$t("从"),
+          label: this.$t("ui.params.from"),
           type: "date",
           dateType: "month",
           valueFormat: "yyyy-MM",
         },
         {
           prop: "toYearMonth",
-          label: this.$t("到"),
+          label: this.$t("ui.params.to"),
           type: "date",
           dateType: "month",
           valueFormat: "yyyy-MM",

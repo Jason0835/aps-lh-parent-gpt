@@ -144,47 +144,47 @@ export default {
         { type: "selection", fixed: "left" },
         {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.mdmMouldAllocation.factoryCode"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
           },
         },
         {
           prop: "year",
-          label: this.$t("ui.data.colume.year"),
+          label: this.$t("ui.data.column.mdmMouldAllocation.year"),
         },
         {
           prop: "month",
-          label: this.$t("ui.data.colume.month"),
+          label: this.$t("ui.data.column.mdmMouldAllocation.month"),
         },
         {
           prop: "productTypeCode",
-          label: this.$t("ui.data.column.monthplan.productType"),
+          label: this.$t("ui.data.column.mdmMouldAllocation.productTypeCode"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_product_type, value);
           },
         },
         {
           prop: "structureName",
-          label: this.$t("ui.data.column.finishStock.structureName"),
+          label: this.$t("ui.data.column.mdmMouldAllocation.structureName"),
           width:200
         },
         {
           prop: "specifications",
-          label: this.$t("ui.data.column.trialPlan.specifications"),
+          label: this.$t("ui.data.column.mdmMouldAllocation.specifications"),
           width:200
         },
         {
           prop: "mainPattern",
-          label: this.$t("ui.data.column.moldLedger.mainPattern"),
+          label: this.$t("ui.data.column.mdmMouldAllocation.mainPattern"),
         },
         {
           prop: "allocationQty",
-          label: this.$t("ui.data.column.capsuleChuck.allocationQty"),
+          label: this.$t("ui.data.column.mdmMouldAllocation.allocationQty"),
         },
         {
           prop: "remark",
-          label: this.$t("common.remark"),
+          label: this.$t("ui.common.column.remark"),
         },
         {
           prop: "updateTime",
@@ -226,7 +226,7 @@ export default {
       return [
         {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.mdmMouldAllocation.factoryCode"),
           type: "select",
           dictData: this.dict.type.biz_factory_name,
         },
@@ -240,24 +240,24 @@ export default {
 
         {
           prop: "structureName",
-          label: this.$t("ui.data.column.finishStock.structureName"),
+          label: this.$t("ui.data.column.mdmMouldAllocation.structureName"),
           type: "select",
           dictData:this.structureList,
           filterable: true
         },
         {
           prop: "productTypeCode",
-          label: this.$t("ui.data.column.monthplan.productType"),
+          label: this.$t("ui.data.column.mdmMouldAllocation.productTypeCode"),
           type: "select",
           dictData: this.dict.type.biz_product_type,
         },
         {
           prop: "specifications",
-          label: this.$t("ui.data.column.trialPlan.specifications"),
+          label: this.$t("ui.data.column.mdmMouldAllocation.specifications"),
         },
         {
           prop: "mainPattern",
-          label: this.$t("ui.data.column.moldLedger.mainPattern"),
+          label: this.$t("ui.data.column.mdmMouldAllocation.mainPattern"),
         },
       ];
     },
