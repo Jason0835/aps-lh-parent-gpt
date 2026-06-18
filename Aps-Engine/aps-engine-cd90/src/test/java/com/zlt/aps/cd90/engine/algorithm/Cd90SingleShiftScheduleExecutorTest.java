@@ -54,8 +54,9 @@ public class Cd90SingleShiftScheduleExecutorTest {
                 result.getAttemptTraces().get(0).getNetDemandQuantity());
         assertEquals("CONSTRUCTION_MISSING",
                 result.getAttemptTraces().get(0).getFailureReason());
-        assertEquals(new BigDecimal("100"),
+        assertEquals(new BigDecimal("160"),
                 result.getAttemptTraces().get(1).getScheduledQuantity());
+        assertEquals(2, result.getTasks().get(0).getVehicleCount());
     }
 
     private Cd90MachineTrialPreparationService trialPreparation() {
@@ -89,7 +90,8 @@ public class Cd90SingleShiftScheduleExecutorTest {
         return Cd90AutoScheduleInput.builder()
                 .constructionMaterials(Collections.singletonList(Cd90ConstructionMaterial.builder()
                         .clothCode("C2").bigRollCode("BR2").cordSpec("SPEC2")
-                        .unitConsumeMillimeter(BigDecimal.ONE).build()))
+                        .unitConsumeMillimeter(BigDecimal.ONE)
+                        .curlLength(new BigDecimal("80")).build()))
                 .build();
     }
 

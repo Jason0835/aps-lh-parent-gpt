@@ -1,12 +1,14 @@
 package com.zlt.aps.cd90.engine.service.impl;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.zlt.aps.cd90.api.domain.entity.Cd90CurlLength;
 import com.zlt.aps.cd90.api.domain.entity.Cd90Stock;
 import com.zlt.aps.cd90.api.domain.entity.Cd90StorageLaneLimit;
 import com.zlt.aps.cd90.engine.mapper.Cd90AutoScheduleSourceMapper;
 import com.zlt.aps.cd90.engine.mapper.Cd90ConstructionMaterialMapper;
 import com.zlt.aps.cd90.engine.algorithm.Cd90FormingDemandExpander;
 import com.zlt.aps.cd90.engine.mapper.Cd90EngineConstructionMapper;
+import com.zlt.aps.cd90.engine.mapper.Cd90EngineCurlLengthMapper;
 import com.zlt.aps.cd90.engine.mapper.Cd90EngineCxScheduleMapper;
 import com.zlt.aps.cd90.engine.mapper.Cd90EngineStockMapper;
 import com.zlt.aps.cd90.engine.mapper.Cd90EngineStorageLaneMapper;
@@ -28,10 +30,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.Assert;
 import org.springframework.util.StringUtils;
 
+import java.math.BigDecimal;
 import java.sql.Date;
 import java.time.LocalDate;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -48,6 +52,7 @@ public class Cd90AutoScheduleInputServiceImpl implements Cd90AutoScheduleInputSe
     private final Cd90EngineStockMapper stockMapper;
     private final Cd90EngineStorageLaneMapper storageLaneMapper;
     private final Cd90EngineMonthSurplusMapper monthSurplusMapper;
+    private final Cd90EngineCurlLengthMapper curlLengthMapper;
     private final Cd90ConstructionMaterialMapper constructionMaterialMapper;
     private final Cd90AutoScheduleSourceMapper sourceMapper;
     private final Cd90FormingDemandExpander formingDemandExpander;
@@ -87,6 +92,7 @@ public class Cd90AutoScheduleInputServiceImpl implements Cd90AutoScheduleInputSe
                 .collect(Collectors.toSet());
         List<Cd90ConstructionMaterial> constructionMaterials = loadConstructionMaterials(
                 factoryCode, embryoCodes, constructionVersions);
+        fillStandardCurlLength(factoryCode, constructionMaterials);
         List<Cd90DemandShift> demandShifts = formingDemandExpander.expand(
                 formingSchedules, constructionMaterials);
         List<Cd90EmbryoPlanSurplus> embryoPlanSurpluses = loadEmbryoPlanSurpluses(
@@ -199,6 +205,46 @@ public class Cd90AutoScheduleInputServiceImpl implements Cd90AutoScheduleInputSe
                 .stream()
                 .flatMap(construction -> constructionMaterialMapper.map(construction).stream())
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * 按帘布代号补充标准卷曲长度，单位米。
+     * <p>
+     * 这里只读取t_cd90_curl_length的标准值；如果标准表没有维护或维护了非正数，
+     * 后续排程会在拿到参数快照后再使用CRIMP_LENGTH兜底，避免输入加载接口反向依赖参数解析。
+     * </p>
+     */
+    private void fillStandardCurlLength(String factoryCode, List<Cd90ConstructionMaterial> materials) {
+        Set<String> clothCodes = safe(materials).stream()
+                .filter(item -> item != null)
+                .map(Cd90ConstructionMaterial::getClothCode)
+                .filter(StringUtils::hasText)
+                .collect(Collectors.toSet());
+        if (clothCodes.isEmpty()) {
+            return;
+        }
+        Map<String, BigDecimal> curlLengthByCloth = curlLengthMapper.selectList(
+                        Wrappers.<Cd90CurlLength>lambdaQuery()
+                                .select(Cd90CurlLength::getClothCode, Cd90CurlLength::getCurlLength)
+                                .eq(Cd90CurlLength::getFactoryCode, factoryCode)
+                                .in(Cd90CurlLength::getClothCode, clothCodes)
+                                .orderByAsc(Cd90CurlLength::getClothCode))
+                .stream()
+                .filter(item -> item != null && StringUtils.hasText(item.getClothCode())
+                        && item.getCurlLength() != null && item.getCurlLength() > 0)
+                .collect(Collectors.toMap(Cd90CurlLength::getClothCode,
+                        item -> BigDecimal.valueOf(item.getCurlLength()),
+                        (first, second) -> first));
+        safe(materials).stream()
+                .filter(item -> item != null)
+                .forEach(item -> item.setCurlLength(curlLengthByCloth.get(item.getClothCode())));
+        Set<String> missing = clothCodes.stream()
+                .filter(clothCode -> !curlLengthByCloth.containsKey(clothCode))
+                .collect(Collectors.toSet());
+        if (!missing.isEmpty()) {
+            log.warn("[直裁自动排程] 标准卷曲长度未维护或非正数，将使用参数CRIMP_LENGTH兜底, factoryCode={}, clothCodes={}",
+                    factoryCode, missing);
+        }
     }
 
     private <T> List<T> safe(List<T> values) {

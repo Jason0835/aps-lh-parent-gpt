@@ -62,7 +62,7 @@ public class Cd90MachineTrialPreparationService {
                         .netDemandQuantity(request.getNetDemandQuantity())
                         .closeOut(request.isCloseOut())
                         .minimumStartQuantity(parameters.getMinStartQty())
-                        .coilMeter(parameters.getRollCoilMeter())
+                        .coilMeter(request.getCurlLength())
                         .totalToolingCount(parameters.getRollTotalCount())
                         .occupiedVehicleCount(request.getOccupiedVehicleCount())
                         .quota(candidate.getQuota())

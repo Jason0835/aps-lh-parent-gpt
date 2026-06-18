@@ -2,6 +2,7 @@ package com.zlt.aps.cd90.engine.algorithm;
 
 import com.zlt.aps.cd90.engine.model.Cd90AutoScheduleContext;
 import com.zlt.aps.cd90.engine.model.Cd90AutoScheduleInput;
+import com.zlt.aps.cd90.engine.model.Cd90ConstructionMaterial;
 import com.zlt.aps.cd90.engine.model.Cd90DemandShift;
 import com.zlt.aps.cd90.engine.model.Cd90InboundRecord;
 import com.zlt.aps.cd90.engine.model.Cd90RollingScheduleContext;
@@ -80,14 +81,14 @@ public class Cd90DefaultShiftDemandProvider implements Cd90ShiftDemandProvider {
         BigDecimal inboundBeforeShift = inboundQuantity(effectiveInbound, candidate.getClothCode(),
                 record -> record.getInboundTime() == null
                         || !record.getInboundTime().isAfter(shift.getStartTime()),
-                context.getParameters().getRollCoilMeter());
+                curlLength(input, candidate.getClothCode(), context.getParameters().getRollCoilMeter()));
         LocalDateTime demandDeadline = window.isEmpty()
                 ? demandStart : window.get(window.size() - 1).getStartTime();
         BigDecimal futureEffectivePlan = inboundQuantity(effectiveInbound, candidate.getClothCode(),
                 record -> record.getInboundTime() != null
                         && record.getInboundTime().isAfter(shift.getStartTime())
                         && !record.getInboundTime().isAfter(demandDeadline),
-                context.getParameters().getRollCoilMeter());
+                curlLength(input, candidate.getClothCode(), context.getParameters().getRollCoilMeter()));
 
         // 余额为负时拆成历史缺口，余额为正时作为现有库存，两者不能同时重复参与净需求。
         BigDecimal inventoryBalance = stockAtSix.add(inboundBeforeShift).subtract(consumedBeforeWindow);
@@ -165,6 +166,16 @@ public class Cd90DefaultShiftDemandProvider implements Cd90ShiftDemandProvider {
                         ? value(coilMeter).multiply(BigDecimal.valueOf(item.getVehicleCount()))
                         : item.getInboundQuantity())
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    /** 入库记录只有车数没有精确数量时，按该帘布的标准卷曲长度折算；标准长度缺失时才使用CRIMP_LENGTH兜底。 */
+    private BigDecimal curlLength(Cd90AutoScheduleInput input, String clothCode, BigDecimal fallback) {
+        return safe(input.getConstructionMaterials()).stream()
+                .filter(item -> item != null && clothCode.equals(item.getClothCode()))
+                .map(Cd90ConstructionMaterial::getCurlLength)
+                .filter(item -> item != null && item.signum() > 0)
+                .findFirst()
+                .orElse(fallback);
     }
 
     private LocalDateTime demandStart(Cd90AutoScheduleContext context, String classField) {

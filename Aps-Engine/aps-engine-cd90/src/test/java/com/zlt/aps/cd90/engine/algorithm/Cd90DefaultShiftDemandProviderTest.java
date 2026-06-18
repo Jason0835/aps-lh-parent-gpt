@@ -3,6 +3,7 @@ package com.zlt.aps.cd90.engine.algorithm;
 import com.zlt.aps.cd90.engine.model.Cd90AutoScheduleContext;
 import com.zlt.aps.cd90.engine.model.Cd90AutoScheduleInput;
 import com.zlt.aps.cd90.engine.model.Cd90AutoScheduleParameters;
+import com.zlt.aps.cd90.engine.model.Cd90ConstructionMaterial;
 import com.zlt.aps.cd90.engine.model.Cd90DemandShift;
 import com.zlt.aps.cd90.engine.model.Cd90InboundRecord;
 import com.zlt.aps.cd90.engine.model.Cd90RollingScheduleContext;
@@ -44,6 +45,22 @@ public class Cd90DefaultShiftDemandProviderTest {
     }
 
     @Test
+    public void shouldConvertVehicleInboundByStandardCurlLengthBeforeFallbackParameter() {
+        Cd90RollingScheduleContext rolling = Cd90RollingScheduleContext.builder()
+                .actualInboundRecords(Collections.emptyList())
+                .plannedInboundRecords(Collections.singletonList(Cd90InboundRecord.builder()
+                        .taskKey("T1").clothCode("C1").laneCode("L1").vehicleCount(1)
+                        .inboundTime(LocalDateTime.of(2026, 6, 12, 21, 0)).build()))
+                .build();
+
+        Cd90ShiftDemandDecision result = provider.resolve(
+                context(), input(), shift(), Cd90ScheduleCandidate.builder()
+                        .clothCode("C1").build(), rolling);
+
+        assertEquals(new BigDecimal("170"), result.getNetDemandQuantity());
+    }
+
+    @Test
     public void shouldSumConsumptionBeforeDirectCutShift() {
         BigDecimal result = provider.cumulativeConsumptionBeforeShift(
                 context(), input(), shift());
@@ -62,6 +79,8 @@ public class Cd90DefaultShiftDemandProviderTest {
         return Cd90AutoScheduleInput.builder()
                 .stocksAtSix(Collections.singletonList(Cd90StockSource.builder()
                         .clothCode("C1").stockQuantity(new BigDecimal("50")).build()))
+                .constructionMaterials(Collections.singletonList(Cd90ConstructionMaterial.builder()
+                        .clothCode("C1").curlLength(new BigDecimal("80")).build()))
                 .demandShifts(Arrays.asList(
                         demand(LocalDateTime.of(2026, 6, 12, 6, 0), "100"),
                         demand(LocalDateTime.of(2026, 6, 12, 22, 0), "100"),

@@ -40,7 +40,7 @@ public class Cd90AutoScheduleParameters {
     private BigDecimal restartStockThreshold;
     /** 工装总数。 */
     private int rollTotalCount;
-    /** 单个工装卷曲米数。 */
+    /** 标准卷曲长度缺失时的兜底米数，对应参数CRIMP_LENGTH。 */
     private BigDecimal rollCoilMeter;
     /** 规格切换耗时，单位为分钟。 */
     private int specChangeMinutes;

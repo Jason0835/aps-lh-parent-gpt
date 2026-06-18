@@ -32,4 +32,6 @@ public class Cd90ConstructionMaterial {
     private BigDecimal craftWidth;
     /** 当前层位直裁宽度原始值，用于解析失败时复盘。 */
     private String craftWidthRaw;
+    /** 标准卷曲长度，单位米；优先取t_cd90_curl_length.CURL_LENGTH，缺失时取参数CRIMP_LENGTH。 */
+    private BigDecimal curlLength;
 }

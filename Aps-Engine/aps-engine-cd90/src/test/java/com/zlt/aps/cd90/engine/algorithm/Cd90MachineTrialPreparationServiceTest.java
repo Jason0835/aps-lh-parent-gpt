@@ -40,6 +40,7 @@ public class Cd90MachineTrialPreparationServiceTest {
         assertEquals(2, result.getTrials().size());
         assertEquals("M2", result.getSelectedTrial().getMachineCode());
         assertEquals("CLOTH_MACHINE", result.getSelectedTrial().getLossRateLevel());
+        assertEquals(new BigDecimal("160"), result.getSelectedTrial().getFinalSchedulableQuantity());
     }
 
     private Cd90MachineTrialRequest request() {
@@ -51,6 +52,7 @@ public class Cd90MachineTrialPreparationServiceTest {
                 .shiftCode("NIGHT")
                 .shiftStart(LocalDateTime.of(2026, 6, 12, 22, 0))
                 .shiftEnd(LocalDateTime.of(2026, 6, 13, 6, 0))
+                .curlLength(new BigDecimal("80"))
                 .netDemandQuantity(new BigDecimal("100"))
                 .shiftHours(8).remainingSecondsByMachine(remainingSeconds)
                 .previousSpecByMachine(Collections.emptyMap())

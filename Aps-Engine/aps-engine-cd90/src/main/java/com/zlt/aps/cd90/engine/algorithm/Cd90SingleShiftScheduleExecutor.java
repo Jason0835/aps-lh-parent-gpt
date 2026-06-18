@@ -166,6 +166,7 @@ public class Cd90SingleShiftScheduleExecutor implements Cd90SingleShiftScheduleS
                 .bigRollCode(construction.getBigRollCode())
                 .cordSpec(construction.getCordSpec())
                 .craftWidth(construction.getCraftWidth())
+                .curlLength(effectiveCurlLength(context, construction))
                 .shiftCode(shift.getShiftCode())
                 .shiftStart(shift.getStartTime()).shiftEnd(shift.getEndTime())
                 .netDemandQuantity(netDemand).closeOut(closeOut)
@@ -187,8 +188,23 @@ public class Cd90SingleShiftScheduleExecutor implements Cd90SingleShiftScheduleS
                 .cordSpec(construction.getCordSpec())
                 .classField(shift.getClassField())
                 .shiftStart(shift.getStartTime()).shiftEnd(shift.getEndTime())
-                .coilMeter(context.getParameters().getRollCoilMeter())
+                .coilMeter(effectiveCurlLength(context, construction))
                 .trialPlan(trialPlan).build();
+    }
+
+    /**
+     * 获取本规格实际采用的卷曲长度，单位米。
+     * 优先使用t_cd90_curl_length维护的标准卷曲长度；没有维护时，才启用参数CRIMP_LENGTH作为兜底值。
+     */
+    private BigDecimal effectiveCurlLength(Cd90AutoScheduleContext context,
+                                           Cd90ConstructionMaterial construction) {
+        if (construction.getCurlLength() != null && construction.getCurlLength().signum() > 0) {
+            return construction.getCurlLength();
+        }
+        BigDecimal fallback = context.getParameters().getRollCoilMeter();
+        log.warn("[直裁自动排程] 当前规格未匹配到标准卷曲长度，使用参数CRIMP_LENGTH兜底, clothCode={}, bigRollCode={}, fallbackMeter={}",
+                construction.getClothCode(), construction.getBigRollCode(), fallback);
+        return fallback;
     }
 
     private Cd90ConstructionMaterial findConstruction(List<Cd90ConstructionMaterial> materials,
