@@ -505,6 +505,20 @@ public class ScheduleContextVo {
     private Map<String, List<MpCxCapacityConfiguration>> structureAllocationMap;
 
     /**
+     * 未来月份结构排产配置映射（结构编码 -> 未来可分配机台列表）
+     * <p>用于提前生产能力：当结构在当日无可配置机台时，从未来月份配置中查找可用机台
+     * <p>数据来源：loadFutureStructureAllocations 查询未来3个月的排产配置
+     */
+    private Map<String, List<MpCxCapacityConfiguration>> futureStructureAllocationMap;
+
+    /**
+     * 提前生产机台分配映射（结构编码 -> 可用的未来机台列表）
+     * <p>在 TaskGroupService 中计算：当日无机台的结构，从未来配置中查找并剔除已被当日其他结构占用的机台
+     * <p>供 NewTaskProcessor/ContinueTaskProcessor/TrialTaskProcessor 的 getAvailableMachinesForStructure 回退使用
+     */
+    private Map<String, List<MpCxCapacityConfiguration>> advanceProductionMachineMap;
+
+    /**
      * 月计划排产版本
      * 从硫化排程结果中提取，用于过滤结构排产配置
      */

@@ -430,12 +430,14 @@ public class BalancingService {
         log.info("任务数={}, 可用机台数={}", tasks.size(), availableMachines.size());
 
         // 过滤被收尾舍弃的任务（isLastEndingBatch=true 且 endingExtraInventory=0）
+        // 同时过滤计划量为0的任务（防御性过滤，正常情况下已在Processor层过滤）
         List<CoreScheduleAlgorithmService.DailyEmbryoTask> filteredTasks = tasks.stream()
                 .filter(t -> !(Boolean.TRUE.equals(t.getIsLastEndingBatch())
                         && (t.getEndingExtraInventory() == null || t.getEndingExtraInventory() <= 0)))
+                .filter(t -> t.getEndingExtraInventory() != null && t.getEndingExtraInventory() > 0)
                 .collect(Collectors.toList());
         if (filteredTasks.size() < tasks.size()) {
-            log.info("收尾舍弃过滤: {} 个任务被移除，剩余 {} 个", tasks.size() - filteredTasks.size(), filteredTasks.size());
+            log.info("收尾舍弃/零计划量过滤: {} 个任务被移除，剩余 {} 个", tasks.size() - filteredTasks.size(), filteredTasks.size());
             tasks = filteredTasks;
         }
 
@@ -530,7 +532,8 @@ public class BalancingService {
         }
 
         // 第零排序：约束量试任务优先（候选机台最少，必须先安排）
-        // 新增排序：续作任务优先（候选机台受限，必须先保住）
+        // 续作排序：续作任务优先（候选机台受限，必须先保住）
+        // 净需求排序：非零净需求优先于零净需求（库存已覆盖的任务在种类槽不足时让位给有实际缺口的任务）
         // 第一排序：胎胚总需求量降序（大需求优先占种类槽，产能不足时丢弃小需求更划算）
         // 第二排序：候选机台数升序（受限任务优先）
         final Set<String> availableMachineCodes = availableMachines.stream()
@@ -544,12 +547,19 @@ public class BalancingService {
                     boolean bConstrained = b.getConstrainedMachineCode() != null && !b.getConstrainedMachineCode().isEmpty();
                     if (aConstrained != bConstrained) return aConstrained ? -1 : 1;
 
-                    // 新增排序：续作任务优先（候选机台受限，必须先保住）
+                    // 续作排序：续作任务优先（候选机台受限，必须先保住）
                     boolean aContinue = a.getIsContinueTask() != null && a.getIsContinueTask()
                             && a.getContinueMachineCodes() != null && !a.getContinueMachineCodes().isEmpty();
                     boolean bContinue = b.getIsContinueTask() != null && b.getIsContinueTask()
                             && b.getContinueMachineCodes() != null && !b.getContinueMachineCodes().isEmpty();
                     if (aContinue != bContinue) return aContinue ? -1 : 1;
+
+                    // 净需求排序：非零净需求优先于零净需求
+                    // 零净需求/补充计划任务标记为 deferredRemainingDemand != null，库存已覆盖硫化需求，
+                    // 种类槽不足时应优先让位给有实际缺口的非零净需求任务
+                    boolean aZeroDemand = a.getDeferredRemainingDemand() != null;
+                    boolean bZeroDemand = b.getDeferredRemainingDemand() != null;
+                    if (aZeroDemand != bZeroDemand) return aZeroDemand ? 1 : -1;
 
                     // 第一排序：胎胚总需求量降序（大需求优先占种类槽）
                     int totalA = embryoTotalDemand.getOrDefault(a.getEmbryoCode(), 0);

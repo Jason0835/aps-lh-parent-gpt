@@ -350,7 +350,6 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
 
         // ==================== 第六步：S5.3.7 班次排产（单个班次，无需跨班次均衡） ====================
         List<ShiftScheduleService.ShiftProductionResult> shiftProductionResults = new ArrayList<>();
-        LocalDate scheduleDateForShift = scheduleDate;
 
         for (MachineAllocationResult allocation : allAllocations) {
             String machineCode = allocation.getMachineCode();
@@ -422,7 +421,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                         task.getVulcanizeMachineCount() != null ? task.getVulcanizeMachineCount() : 0);
 
                 List<ShiftScheduleService.ShiftProductionResult> taskShiftResults =
-                        shiftScheduleService.scheduleTaskToShifts(task, machineCode, context, singleShiftList, scheduleDateForShift);
+                        shiftScheduleService.scheduleTaskToShifts(task, machineCode, context, singleShiftList, scheduleDate);
                 shiftProductionResults.addAll(taskShiftResults);
             }
         }
@@ -3216,6 +3215,15 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             }
         }
 
+        // 统计变量（用于汇总日志）
+        int totalOriginalStock = 0;  // 现有记录更新前库存之和
+        int totalNewStock = 0;       // 所有更新记录的新库存之和
+        int countUpdated = 0;        // 更新的记录数
+        int countNew = 0;            // 新增的记录数
+        int countZeroed = 0;         // 新库存归零的记录数
+        int countClamped = 0;        // 钳位的记录数
+        int clampLossTotal = 0;      // 钳位导致的累计损失（少减的条数）
+
         // 遍历所有涉及的胎胚编码
         for (String embryoCode : allEmbryoCodes) {
             int formingOutput = formingOutputMap.getOrDefault(embryoCode, 0);
@@ -3230,13 +3238,40 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             if (stock != null) {
                 // 已有库存记录，直接更新
                 int currentStockNum = stock.getStockNum() != null ? stock.getStockNum() : 0;
-                int newStockNum = Math.max(0, currentStockNum + delta);
+                int rawNewStockNum = currentStockNum + delta;
+                int newStockNum = Math.max(0, rawNewStockNum);
                 stock.setStockNum(newStockNum);
                 log.info("  - {}: 原库存={}, 成型产出={}, 硫化消耗={}, 净变化={}, 新库存={}",
                         embryoCode, currentStockNum, formingOutput, vulcanizingConsumption, delta, newStockNum);
+
+                // 钳位告警：原库存+净变化 < 0 被截断为0
+                if (rawNewStockNum < 0) {
+                    countClamped++;
+                    int clampLoss = -rawNewStockNum;
+                    clampLossTotal += clampLoss;
+                    log.warn("  - {}: 库存钳位！原库存{}+净变化{}={} < 0，实际新库存=0，少减{}条",
+                            embryoCode, currentStockNum, delta, rawNewStockNum, clampLoss);
+                }
+
+                totalOriginalStock += currentStockNum;
+                totalNewStock += newStockNum;
+                countUpdated++;
+                if (newStockNum == 0) {
+                    countZeroed++;
+                }
             } else {
                 // 没有库存记录，但有成型产出或硫化消耗，需要补充创建
                 int newStockNum = Math.max(0, delta);  // 新库存 = 成型产出 - 硫化消耗（不能为负）
+                int rawNewStockNum = delta;
+
+                // 钳位告警：净变化 < 0 被截断为0
+                if (rawNewStockNum < 0) {
+                    countClamped++;
+                    int clampLoss = -rawNewStockNum;
+                    clampLossTotal += clampLoss;
+                    log.warn("  - {}: 新增库存记录钳位！净变化={} < 0，实际新库存=0，少减{}条",
+                            embryoCode, delta, clampLoss);
+                }
 
                 CxStock newStock = new CxStock();
                 newStock.setEmbryoCode(embryoCode);
@@ -3257,8 +3292,24 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
 
                 log.info("  - {}: 【新增库存记录】成型产出={}, 硫化消耗={}, 净变化={}, 新库存={}",
                         embryoCode, formingOutput, vulcanizingConsumption, delta, newStockNum);
+
+                totalNewStock += newStockNum;
+                countNew++;
+                if (newStockNum == 0) {
+                    countZeroed++;
+                }
             }
         }
+
+        // 库存更新汇总日志
+        int netDelta = totalNewStock - totalOriginalStock;
+        log.info("【库存更新汇总】更新{}条(现有{}+新增{})，归零{}条，钳位{}条(少减{}条)，"
+                        + "现有记录更新前库存合计={}，更新后库存合计={}，净变化={}，更新后立库总库存={}条",
+                countUpdated + countNew, countUpdated, countNew, countZeroed,
+                countClamped, clampLossTotal,
+                totalOriginalStock, totalNewStock, netDelta,
+                stocks.stream().filter(s -> s.getStockNum() != null && s.getStockNum() > 0)
+                        .mapToInt(CxStock::getStockNum).sum());
     }
 
     /**
