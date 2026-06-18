@@ -39,6 +39,7 @@ import com.zlt.aps.lh.engine.strategy.support.DailyMachineCapacitySimulationRequ
 import com.zlt.aps.lh.engine.strategy.support.DailyMachineCapacitySimulationResult;
 import com.zlt.aps.lh.engine.strategy.support.DailyMachineCapacitySimulationUtil;
 import com.zlt.aps.lh.engine.strategy.support.DailyMachineExpansionPlanner;
+import com.zlt.aps.lh.engine.strategy.support.EarlyProductionChecker;
 import com.zlt.aps.lh.engine.strategy.support.MachineProductionSegment;
 import com.zlt.aps.lh.engine.strategy.support.MachineScheduleRole;
 import com.zlt.aps.lh.engine.strategy.support.MouldResourceAllocationResult;
@@ -249,6 +250,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
 
         // shifts 是本次排程窗口 class1～class8 的实际业务班次，后续所有班次排量都按该列表落字段。
         List<LhShiftConfigVO> shifts = LhScheduleTimeUtil.getScheduleShifts(context, context.getScheduleDate());
+        rebuildScheduledMachineCountMap(context, shifts);
         Map<String, Integer> unscheduledReasonCountMap = new LinkedHashMap<>(8);
         initializePendingNewSpecSkuTypeCounts(context);
         int scheduledCount = schedulePendingNewSpecs(context, machineMatch, mouldChangeBalance,
@@ -769,6 +771,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                 context.getScheduleResultSourceSkuMap().put(result, sku);
                 updateMachineState(context, candidateMachine, sku, result);
                 registerMachineAssignment(context, machineCode, result);
+                recordScheduledMachineForResult(context, result, shifts);
                 clearSpecifyReservation(context, machineCode, sku.getMaterialCode());
                 candidateCache.clearCapacityCache();
                 scheduledCount++;
@@ -833,6 +836,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
             sku.setTargetScheduleQty(scheduled ? finalTargetScheduleQty : originalTargetScheduleQty);
             if (scheduled) {
                 adjustSameSkuMultiMachineAllocation(context, sku, shifts, quantityPolicy, isEnding);
+                rebuildScheduledMachineCountMap(context, shifts);
             }
             if (!scheduled) {
                 // 所有候选机台都失败，记录未排产原因并移出待排队列
@@ -2817,11 +2821,14 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                                                           Date firstProductionStartTime,
                                                           List<LhShiftConfigVO> shifts,
                                                           boolean isEnding) {
-        if (!shouldDelayFirstProductionForNoPlanDate(sku, firstProductionStartTime, isEnding)) {
+        if (Objects.isNull(sku) || Objects.isNull(firstProductionStartTime)
+                || isEnding || CollectionUtils.isEmpty(sku.getDailyPlanQuotaMap())) {
             return firstProductionStartTime;
         }
-        LocalDate productionDate = firstProductionStartTime.toInstant()
-                .atZone(ZoneId.systemDefault()).toLocalDate();
+        LocalDate productionDate = resolveProductionWorkDate(shifts, firstProductionStartTime);
+        if (Objects.isNull(productionDate)) {
+            return firstProductionStartTime;
+        }
         SkuDailyPlanQuotaDTO currentQuota = sku.getDailyPlanQuotaMap().get(productionDate);
         if (hasSchedulableDailyPlanQuota(sku, currentQuota)) {
             return firstProductionStartTime;
@@ -2829,6 +2836,20 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         LocalDate nextPlanDate = resolveNextPositiveDailyPlanDate(
                 sku, sku.getDailyPlanQuotaMap(), productionDate, resolveScheduleTargetLocalDate(context));
         if (Objects.isNull(nextPlanDate)) {
+            return firstProductionStartTime;
+        }
+        if (!sku.isContinuousCompensationSku()) {
+            boolean canEnterEarlyProduction = EarlyProductionChecker.canEnterEarlyProductionCheck(
+                    context, sku, productionDate, resolveScheduleTargetLocalDate(context),
+                    resolveNewSpecShortageAddMachineThreshold(context));
+            if (canEnterEarlyProduction) {
+                log.info("新增SKU提前生产准入通过，保留当前业务日开产, materialCode: {}, "
+                                + "fromProductionDate: {}, futurePlanDate: {}, firstProductionStartTime: {}",
+                        sku.getMaterialCode(), productionDate, nextPlanDate,
+                        LhScheduleTimeUtil.formatDateTime(firstProductionStartTime));
+                return firstProductionStartTime;
+            }
+        } else if (!shouldDelayFirstProductionForNoPlanDate(sku, firstProductionStartTime, isEnding)) {
             return firstProductionStartTime;
         }
         Date nextPlanDateStartTime = resolveFirstShiftStartTime(shifts, nextPlanDate);
@@ -2904,6 +2925,127 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
             LocalDate shiftWorkDate = shift.getWorkDate().toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
             if (productionDate.equals(shiftWorkDate)) {
                 return shift.getShiftStartDateTime();
+            }
+        }
+        return null;
+    }
+
+    /**
+     * 基于当前排程结果重建结构/SKU已排机台统计。
+     *
+     * @param context 排程上下文
+     * @param shifts 排程窗口班次
+     */
+    private void rebuildScheduledMachineCountMap(LhScheduleContext context, List<LhShiftConfigVO> shifts) {
+        if (Objects.isNull(context)) {
+            return;
+        }
+        context.clearScheduledMachineCountMaps();
+        if (CollectionUtils.isEmpty(context.getScheduleResultList()) || CollectionUtils.isEmpty(shifts)) {
+            return;
+        }
+        int recordCount = 0;
+        for (LhScheduleResult result : context.getScheduleResultList()) {
+            recordCount += recordScheduledMachineForResult(context, result, shifts, false);
+        }
+        log.debug("提前生产已排机台统计重建完成, factoryCode: {}, resultCount: {}, recordDateCount: {}",
+                context.getFactoryCode(), context.getScheduleResultList().size(), recordCount);
+    }
+
+    /**
+     * 根据排程结果登记结构/SKU已排机台。
+     *
+     * @param context 排程上下文
+     * @param result 排程结果
+     * @param shifts 排程窗口班次
+     */
+    private void recordScheduledMachineForResult(LhScheduleContext context,
+                                                 LhScheduleResult result,
+                                                 List<LhShiftConfigVO> shifts) {
+        recordScheduledMachineForResult(context, result, shifts, true);
+    }
+
+    /**
+     * 根据排程结果登记结构/SKU已排机台。
+     *
+     * @param context 排程上下文
+     * @param result 排程结果
+     * @param shifts 排程窗口班次
+     * @param logEnabled 是否输出回写日志
+     * @return 登记的业务日数量
+     */
+    private int recordScheduledMachineForResult(LhScheduleContext context,
+                                                LhScheduleResult result,
+                                                List<LhShiftConfigVO> shifts,
+                                                boolean logEnabled) {
+        if (Objects.isNull(context) || Objects.isNull(result) || CollectionUtils.isEmpty(shifts)
+                || StringUtils.isEmpty(result.getLhMachineCode())) {
+            return 0;
+        }
+        Set<LocalDate> recordedDateSet = new LinkedHashSet<LocalDate>(3);
+        for (LhShiftConfigVO shift : shifts) {
+            if (Objects.isNull(shift) || Objects.isNull(shift.getShiftIndex())) {
+                continue;
+            }
+            Integer planQty = ShiftFieldUtil.getShiftPlanQty(result, shift.getShiftIndex());
+            if (Objects.isNull(planQty) || planQty <= 0) {
+                continue;
+            }
+            LocalDate businessDate = resolveShiftWorkDate(shift);
+            if (Objects.nonNull(businessDate)) {
+                recordedDateSet.add(businessDate);
+            }
+        }
+        for (LocalDate businessDate : recordedDateSet) {
+            context.recordScheduledMachine(businessDate, result.getStructureName(),
+                    result.getMaterialCode(), result.getLhMachineCode());
+            if (logEnabled) {
+                log.info("新增机台回写提前生产统计, factoryCode: {}, businessDate: {}, materialCode: {}, "
+                                + "structureName: {}, machineCode: {}, structureScheduledTotal: {}, skuScheduledTotal: {}",
+                        context.getFactoryCode(), businessDate, result.getMaterialCode(), result.getStructureName(),
+                        result.getLhMachineCode(),
+                        context.getStructureScheduledMachineCount(businessDate, result.getStructureName()),
+                        context.getSkuScheduledMachineCount(businessDate, result.getMaterialCode()));
+            }
+        }
+        return recordedDateSet.size();
+    }
+
+    /**
+     * 解析生产段开产业务日。
+     *
+     * @param segment 生产段
+     * @param shifts 排程窗口班次
+     * @return 开产业务日
+     */
+    private LocalDate resolveSegmentStartProductionDate(MachineProductionSegment segment,
+                                                        List<LhShiftConfigVO> shifts) {
+        if (Objects.isNull(segment)) {
+            return null;
+        }
+        LhShiftConfigVO shift = findShiftByIndex(shifts, segment.getStartProductionShiftIndex());
+        return resolveShiftWorkDate(shift);
+    }
+
+    /**
+     * 根据生产时刻解析所属班次的业务日期。
+     *
+     * @param shifts 排程窗口班次
+     * @param productionTime 生产时刻
+     * @return 所属班次业务日期；未命中排程窗口返回null
+     */
+    private LocalDate resolveProductionWorkDate(List<LhShiftConfigVO> shifts, Date productionTime) {
+        if (CollectionUtils.isEmpty(shifts) || Objects.isNull(productionTime)) {
+            return null;
+        }
+        for (LhShiftConfigVO shift : shifts) {
+            if (Objects.isNull(shift) || Objects.isNull(shift.getShiftStartDateTime())
+                    || Objects.isNull(shift.getShiftEndDateTime())) {
+                continue;
+            }
+            if (!productionTime.before(shift.getShiftStartDateTime())
+                    && productionTime.before(shift.getShiftEndDateTime())) {
+                return resolveShiftWorkDate(shift);
             }
         }
         return null;
@@ -3265,6 +3407,27 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         request.setShortageAddMachineThreshold(resolveNewSpecShortageAddMachineThreshold(context));
         request.setWindowEndDate(windowEndDate);
         request.setWindowLastDayNextPlanLookAheadEnabled(true);
+        LocalDate currentProductionDate = resolveSegmentStartProductionDate(segment, shifts);
+        LocalDate firstFuturePlanDate = EarlyProductionChecker.resolveFirstFuturePlanDate(
+                sku, currentProductionDate, windowEndDate);
+        if (EarlyProductionChecker.isEndingStructureLargeSurplus(
+                context, sku, currentProductionDate, firstFuturePlanDate)) {
+            request.setForceShortageWindowMode(true);
+            int currentPlanMachineCount = context.getStructurePlanMachineCount(
+                    currentProductionDate, sku.getStructureName());
+            int futurePlanMachineCount = context.getStructurePlanMachineCount(
+                    firstFuturePlanDate, sku.getStructureName());
+            log.info("新增SKU结构收尾大余量进入强制加机台模拟, factoryCode: {}, materialCode: {}, "
+                            + "structureName: {}, productionDate: {}, futurePlanDate: {}, "
+                            + "currentPlanMachineCount: {}, futurePlanMachineCount: {}, "
+                            + "historyShortageQty: {}, skuScheduledMachineCount: {}, dailyCapacity: {}, "
+                            + "result: true, reason: 结构已收尾且SKU余量较大",
+                    context.getFactoryCode(), sku.getMaterialCode(), sku.getStructureName(),
+                    currentProductionDate, firstFuturePlanDate, currentPlanMachineCount, futurePlanMachineCount,
+                    monthlyHistoryShortageQty,
+                    context.getSkuScheduledMachineCount(currentProductionDate, sku.getMaterialCode()),
+                    Math.max(0, sku.getDailyCapacity()));
+        }
         request.setSceneType("newSpec");
         DailyMachineCapacitySimulationResult simulationResult =
                 DailyMachineCapacitySimulationUtil.simulateExpansion(request);
