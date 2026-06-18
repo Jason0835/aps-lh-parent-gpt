@@ -285,6 +285,18 @@ public class MdmConstructionInfo extends BaseEntity {
     @TableField(value = "PADDING_CODE")
     private String paddingCode;
 
+    /** 垫胶胶料 */
+    @Excel(name = "ui.data.column.mdmConstructionInfo.paddingRubber", sort = 9)
+    @ApiModelProperty(value = "垫胶胶料", name = "paddingRubber")
+    @TableField(value = "PADDING_RUBBER")
+    private String paddingRubber;
+
+    /** 垫胶长度 */
+    @Excel(name = "ui.data.column.mdmConstructionInfo.paddingLength", sort = 10)
+    @ApiModelProperty(value = "垫胶长度", name = "paddingLength")
+    @TableField(value = "PADDING_LENGTH")
+    private BigDecimal paddingLength;
+
     /** 胶芯 */
     @Excel(name = "ui.data.column.mdmConstructionInfo.rubberCoreCode", sort = 13)
     @ApiModelProperty(value = "胶芯", name = "rubberCoreCode")
