@@ -1568,6 +1568,40 @@ public class MesItfServiceImpl implements MesItfService {
     }
 
     /**
+     * 实时查询MES生胎库存（不写入APS本地表，仅供成型排程实时调用）
+     * 直接从MES中间表查询，映射为CxStock返回，不经过CxMesStock中间转换
+     *
+     * @param syncDataLogs 查询参数（可传factoryCode过滤分厂）
+     * @return 生胎库存列表
+     */
+    @Override
+    public List<CxStock> getCxStock(AuxReqSyncDataLogs syncDataLogs) {
+        DynamicDataSourceContextHolder.push(DataSource.MES);
+        List<CxStock> stockList = mesItfMapper.selectCxStockFromMes(syncDataLogs);
+        DynamicDataSourceContextHolder.poll();
+
+        if (CollectionUtils.isEmpty(stockList)) {
+            log.warn("实时查询MES生胎库存：MES中间表查询结果为空，factoryCode={}", syncDataLogs.getFactoryCode());
+            return stockList;
+        }
+
+        // 按分厂+胎胚编码去重（取第一条）
+        Map<String, CxStock> groupMap = stockList.stream()
+                .collect(Collectors.toMap(
+                        item -> item.getFactoryCode() + "|" + item.getEmbryoCode(),
+                        Function.identity(),
+                        (v1, v2) -> v1
+                ));
+        stockList = new ArrayList<>(groupMap.values());
+
+        // 设置数据来源标识
+        stockList.forEach(item -> item.setDataSource(ApsConstant.DATA_SOURCE_MES));
+
+        log.info("实时查询MES生胎库存：查询完成，factoryCode={}, 返回数量={}", syncDataLogs.getFactoryCode(), stockList.size());
+        return stockList;
+    }
+
+    /**
      * 同步成型排程完成量
      * 采用逻辑删除后插入模式
      * 同步完成后回写成型排程结果表各班次完成量
