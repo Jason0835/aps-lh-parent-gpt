@@ -170,6 +170,9 @@ export default {
       sort: {},
       search: { ...defaultSearch },
       query: { ...defaultSearch },
+      autoScheduleTimer: null,
+      autoSchedulePollTimes: 0,
+      maxAutoSchedulePollTimes: 120,
       unscheduleResultDialogVisible: false,
       unscheduleLoading: false,
       unscheduleData: [],
@@ -305,6 +308,9 @@ export default {
     this.loadClothOptions()
     this.loadMachineOptions()
   },
+  beforeDestroy() {
+    this.clearAutoScheduleTimer()
+  },
   methods: {
     getDefaultScheduleDate() {
       return moment().add(1, 'days').format('YYYY-MM-DD')
@@ -420,33 +426,63 @@ export default {
       this.submitAutoSchedule(params)
     },
     submitAutoSchedule(params) {
-      autoScheduleResult(params).then(res => {
-        const data = res.data || {}
-        if (data.needConfirm) {
-          return this.$confirm(res.msg, this.$t('ui.message.tips'), { type: 'warning' })
-            .then(() => this.submitAutoSchedule({ ...params, forceRegenerate: true }))
-        }
-        this.$modal.msgSuccess(res.msg)
-        if (data.taskId) this.pollAutoScheduleTask(data.taskId)
-      })
+      this.loading = true
+      autoScheduleResult(params)
+        .then(res => {
+          const data = res.data || {}
+          if (data.needConfirm) {
+            this.loading = false
+            return this.$confirm(res.msg, this.$t('ui.message.tips'), { type: 'warning' })
+              .then(() => this.submitAutoSchedule({ ...params, forceRegenerate: true }))
+          }
+          this.loading = false
+          this.$modal.msgSuccess(res.msg)
+          if (data.taskId) {
+            this.pollAutoScheduleTask(data.taskId)
+          } else {
+            this.getList()
+          }
+        })
+        .catch(() => {
+          this.loading = false
+        })
     },
     pollAutoScheduleTask(taskId) {
+      this.clearAutoScheduleTimer()
+      this.autoSchedulePollTimes = 0
       const poll = () => {
         getAutoScheduleTask(taskId).then(res => {
+          this.autoSchedulePollTimes += 1
           const task = res.data || {}
           if (task.taskStatus === 'SUCCESS') {
+            this.clearAutoScheduleTimer()
             this.$modal.msgSuccess('自动排程执行完成')
             this.getList()
             return
           }
           if (task.taskStatus === 'FAILED') {
+            this.clearAutoScheduleTimer()
             this.$modal.msgError(task.errorMessage || '自动排程执行失败')
             return
           }
-          setTimeout(poll, 2000)
+          if (this.autoSchedulePollTimes >= this.maxAutoSchedulePollTimes) {
+            this.clearAutoScheduleTimer()
+            this.$modal.msgWarning(this.$t('ui.data.column.cxScheduleResult.scheduleTimeout'))
+            return
+          }
+          this.autoScheduleTimer = window.setTimeout(poll, 3000)
+        }).catch(() => {
+          this.clearAutoScheduleTimer()
+          this.$modal.msgWarning(this.$t('ui.data.column.cxScheduleResult.scheduleTimeout'))
         })
       }
       poll()
+    },
+    clearAutoScheduleTimer() {
+      if (this.autoScheduleTimer) {
+        window.clearTimeout(this.autoScheduleTimer)
+        this.autoScheduleTimer = null
+      }
     },
     handleInsert() {
       this.showPendingActionMessage()
