@@ -78,7 +78,7 @@ public class DjMachineInfo extends BaseEntity {
     @ImportValidated(name = "ui.data.column.machine.classShift", maxLength = 9,required = true)
     private String classShift;
 
-    /** 开机班次，如：中班、夜班；对应数据字典CLASS_NUM */
+    /** 开机班次，存储 ClassNumThreePlanEnums.classIndex 值（"01"=夜班、"02"=早班、"03"=中班），如"01,02"表示夜班+早班 */
     @ApiModelProperty(value = "开机班次", position =85)
     @Excel(name = "ui.data.column.machine.openMachineClass",dictType = "CLASS_NUM_THREE",dictTypeToExcelEnable = false)
     @ImportValidated(name = "ui.data.column.machine.openMachineClass", maxLength = 20)

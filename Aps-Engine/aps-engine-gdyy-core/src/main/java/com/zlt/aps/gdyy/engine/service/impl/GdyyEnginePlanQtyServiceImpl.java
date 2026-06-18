@@ -420,7 +420,7 @@ public class GdyyEnginePlanQtyServiceImpl implements GdyyEnginePlanQtyService {
 			resultVo.setClass1PlanNum(sumPlanNum);
 			resultVo.setClass2Plan(0D);
 			resultVo.setClass2PlanNum(0D);
-		} else if (EngineConstants.DAY_CLASS_SHIFT.equals(openClassShift)) {
+		} else if (EngineConstants.MORNING_CLASS_SHIFT.equals(openClassShift)) {
 			resultVo.setClass1Plan(0D);
 			resultVo.setClass1PlanNum(0D);
 			resultVo.setClass2Plan(sumPlan);
