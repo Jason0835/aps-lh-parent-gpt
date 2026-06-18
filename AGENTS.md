@@ -5,6 +5,9 @@ utf-8 no bom
 - SpringCloud + Nacos + Gateway + Feign 请求链路：Vue → BootUI → Gateway → 后端微服务 所有服务注册至 Nacos，服务间通过 Feign 通信， 前端权限见BootUI
 - 所有的@apixxx等和注释，必须使用中文。
 - 如果要写plan,解释语言使用中文。
+## 文档规范
+- 文档编写规范见@docs/文档规范.md
+
 ## 前端规范
 - 前端开发规范见@APS-VUEUI/docs/前端规则.md
 

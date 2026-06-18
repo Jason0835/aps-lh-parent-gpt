@@ -65,10 +65,11 @@ public class TrialTaskProcessor {
 
         log.info("========== 开始处理试制任务，共 {} 个任务 ==========", trialTasks.size());
 
-        // Step 1: 按结构分组
+        // Step 1: 按结构分组（跳过计划量为0的任务）
         Map<String, List<CoreScheduleAlgorithmService.DailyEmbryoTask>> structureTaskMap =
                 trialTasks.stream()
                         .filter(t -> t.getStructureName() != null)
+                        .filter(t -> t.getEndingExtraInventory() != null && t.getEndingExtraInventory() > 0)
                         .collect(Collectors.groupingBy(
                                 CoreScheduleAlgorithmService.DailyEmbryoTask::getStructureName,
                                 LinkedHashMap::new,
@@ -260,9 +261,44 @@ public class TrialTaskProcessor {
                     context.getStructureAllocationMap().get(structureName);
             if (configs != null && !configs.isEmpty()) {
                 int day = scheduleDate.getDayOfMonth();
-                return configs.stream()
+                List<MpCxCapacityConfiguration> result = configs.stream()
                         .filter(c -> c.getBeginDay() != null && c.getEndDay() != null)
                         .filter(c -> c.getBeginDay() <= day && c.getEndDay() >= day)
+                        .filter(c -> productionVersion == null
+                                || productionVersion.equals(c.getProductionVersion()))
+                        .collect(Collectors.toList());
+                if (!result.isEmpty()) {
+                    return result;
+                }
+            }
+        }
+        // 提前生产回退：当日无机台时，使用 TaskGroupService 分配的未来机台（已剔除冲突）
+        return getAdvanceProductionMachines(structureName, context, productionVersion);
+    }
+
+    /**
+     * 获取提前生产机台（从 context.advanceProductionMachineMap 回退）
+     *
+     * <p>当结构在当日无可配置机台时，TaskGroupService 已从未来月份配置中查找并剔除冲突机台，
+     * 将结果存入 advanceProductionMachineMap。此处回退获取，确保提前生产机台在处理器中可用。
+     *
+     * @param structureName     结构名称
+     * @param context           排程上下文
+     * @param productionVersion 排产版本
+     * @return 提前生产机台列表（已按版本过滤），无则返回空列表
+     */
+    private List<MpCxCapacityConfiguration> getAdvanceProductionMachines(
+            String structureName, ScheduleContextVo context, String productionVersion) {
+        if (context.getAdvanceProductionMachineMap() != null) {
+            List<MpCxCapacityConfiguration> advanceMachines =
+                    context.getAdvanceProductionMachineMap().get(structureName);
+            if (advanceMachines != null && !advanceMachines.isEmpty()) {
+                log.info("【提前生产】TrialTaskProcessor 结构={} 使用提前生产机台={}",
+                        structureName,
+                        advanceMachines.stream()
+                                .map(MpCxCapacityConfiguration::getCxMachineCode)
+                                .collect(Collectors.toList()));
+                return advanceMachines.stream()
                         .filter(c -> productionVersion == null
                                 || productionVersion.equals(c.getProductionVersion()))
                         .collect(Collectors.toList());

@@ -1,46 +1,42 @@
 package com.zlt.aps.dj.api.domain.entity;
 
 import com.baomidou.mybatisplus.annotation.*;
-import com.zlt.aps.common.core.domain.ApsBaseEntity;
+import com.ruoyi.common.core.annotation.Excel;
+import com.ruoyi.common.core.web.domain.BaseEntity;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
-import java.io.Serializable;
-
 /**
  * <p>
- * 胎侧胶料顺序维护
+ * 垫胶胶料顺序维护
  * </p>
  *
- * @author zhangbinglin
+ * @author zlt
  */
 @Data
 @EqualsAndHashCode(callSuper = false)
-@TableName("T_NC_GLUE_ORDER")
-@ApiModel(value = "NcGlueOrder对象", description = "胎侧胶料顺序维护")
-public class DjGlueOrder extends ApsBaseEntity implements Serializable {
+@TableName("T_DJ_GLUE_ORDER")
+@ApiModel(value = "DjGlueOrder对象", description = "垫胶胶料顺序维护")
+public class DjGlueOrder extends BaseEntity {
 
     private static final long serialVersionUID = 1L;
 
-    @ApiModelProperty(value = "主键ID，对应自增序列为：SEQ_PUBLIC")
-    @TableId(value = "ID", type = IdType.AUTO)
-    private Long id;
-
-    @ApiModelProperty(value = "胶料组别id，对应NC_GLUE_GROUP_ORDER表主键id")
+    /**
+     * 胶料组别id，对应T_DJ_GLUE_GROUP_ORDER表主键id
+     */
+    @ApiModelProperty(value = "胶料组别id")
     @TableField("GLUE_GROUP_ID")
     private Long glueGroupId;
 
+    @Excel(name="ui.dj.glueGroupOrder.column.glueCode")
     @ApiModelProperty(value = "胶料编号")
     @TableField("GLUE_CODE")
     private String glueCode;
 
+    @Excel(name="ui.dj.glueGroupOrder.column.orderNum")
     @ApiModelProperty(value = "生产顺序")
     @TableField("ORDER_NUM")
     private Integer orderNum;
-
-    @ApiModelProperty(value = "备注")
-    @TableField("REMARK")
-    private String remark;
 }

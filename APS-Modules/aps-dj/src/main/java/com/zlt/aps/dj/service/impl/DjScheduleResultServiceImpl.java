@@ -25,6 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
 import com.ruoyi.common.core.utils.DateUtils;
@@ -99,7 +100,7 @@ public class DjScheduleResultServiceImpl extends AbstractBillService<DjScheduleR
      */
     @Override
     public DjScheduleResult selectDjScheduleResultById(Long id) {
-        return djScheduleResultMapper.selectDjScheduleResultById(id);
+        return djScheduleResultMapper.selectById(id);
     }
 
     /**
@@ -170,8 +171,7 @@ public class DjScheduleResultServiceImpl extends AbstractBillService<DjScheduleR
         if (!ApsConstant.RELEASING.equals(scheduleResult.getReleaseStatus())
                 || !ApsConstant.TIMEOUT_FAILURE.equals(scheduleResult.getReleaseStatus())
                 || StringUtils.isEmpty(scheduleResult.getReleaseStatus())) {
-            DjScheduleResult scheduleResult2 = djScheduleResultMapper
-                    .selectDjScheduleResultById(scheduleResult.getId());
+            DjScheduleResult scheduleResult2 = djScheduleResultMapper.selectById(scheduleResult.getId());
             boolean flag = compare(scheduleResult2.getMachineCode(), scheduleResult.getMachineCode());
             flag = flag && Objects.compare(scheduleResult2.getClass1PlanQty(), scheduleResult.getClass1PlanQty(),
                     BigDecimal::compareTo) != 0;
@@ -188,7 +188,12 @@ public class DjScheduleResultServiceImpl extends AbstractBillService<DjScheduleR
                         : ApsConstant.WAIT_RELEASING);
             }
         }
-        return djScheduleResultMapper.updateDjScheduleResult(scheduleResult);
+        LambdaUpdateWrapper<DjScheduleResult> updateWrapper = new LambdaUpdateWrapper<>();
+        updateWrapper.set(DjScheduleResult::getUpdateBy, scheduleResult.getUpdateBy());
+        updateWrapper.set(DjScheduleResult::getUpdateTime, scheduleResult.getUpdateTime());
+        updateWrapper.set(DjScheduleResult::getReleaseStatus, scheduleResult.getReleaseStatus());
+        updateWrapper.eq(DjScheduleResult::getId, scheduleResult.getId());
+        return djScheduleResultMapper.update(scheduleResult, updateWrapper);
     }
 
     /**
@@ -203,7 +208,7 @@ public class DjScheduleResultServiceImpl extends AbstractBillService<DjScheduleR
         // if(!preAuthorizeAspect.hasRole(ApsConstant.DISPATCHER_ROLE)) {
         // return;
         // }
-        DjScheduleResult oldSchedule = this.djScheduleResultMapper.selectDjScheduleResultById(newSchedule.getId()); // 操作前的排程数据
+        DjScheduleResult oldSchedule = this.djScheduleResultMapper.selectById(newSchedule.getId()); // 操作前的排程数据
         // 构建日志并保存
         djDispatcherLogService.saveBill(this.buildDispatcherLog(operType, newSchedule, oldSchedule));
     }
@@ -263,7 +268,7 @@ public class DjScheduleResultServiceImpl extends AbstractBillService<DjScheduleR
      */
     @Override
     public List<DjScheduleResult> selectByScheduleDateAndCode(DjScheduleResult scheduleResult) {
-        return djScheduleResultMapper.selectByScheduleDateAndCode(scheduleResult);
+        return djScheduleResultMapper.selectList(BillUtils.builderCondition(scheduleResult));
     }
 
     public boolean compare(String str1, String str2) {
@@ -288,7 +293,7 @@ public class DjScheduleResultServiceImpl extends AbstractBillService<DjScheduleR
      */
     @Override
     public int deleteDjScheduleResultByIds(Long[] ids) {
-        return djScheduleResultMapper.deleteDjScheduleResultByIds(ids);
+        return djScheduleResultMapper.deleteBatchIds(Arrays.asList(ids));
     }
 
     /**
@@ -299,7 +304,7 @@ public class DjScheduleResultServiceImpl extends AbstractBillService<DjScheduleR
      */
     @Override
     public int deleteDjScheduleResultById(Long id) {
-        return djScheduleResultMapper.deleteDjScheduleResultById(id);
+        return djScheduleResultMapper.deleteById(id);
     }
 
     /**
@@ -317,9 +322,10 @@ public class DjScheduleResultServiceImpl extends AbstractBillService<DjScheduleR
         record.setPublishStatus(ApsConstant.RELEASING);
         record.setDataVersion(dataVersion);
         this.deployDjScheduleToMid(ids, dataVersion, factoryCode, companyCode); // 把排程数据发布到中间库，并通知MES
-        djScheduleResultMapper.insertPublishRecord(record);
-        return djScheduleResultMapper.batchUpdate(Arrays.stream(ids).boxed().collect(Collectors.toList()),
-                ApsConstant.RELEASING);
+//        djScheduleResultMapper.insert(record);
+//        return djScheduleResultMapper.batchUpdate(Arrays.stream(ids).boxed().collect(Collectors.toList()),
+//                ApsConstant.RELEASING);
+        return 0;
     }
 
     /**
@@ -331,8 +337,11 @@ public class DjScheduleResultServiceImpl extends AbstractBillService<DjScheduleR
      */
     @Override
     public void updateRelaseStatus(String dataVersion, long[] ids, String status) {
-        djScheduleResultMapper.batchUpdate(Arrays.stream(ids).boxed().collect(Collectors.toList()), status);
-        djScheduleResultMapper.updatePublishRecordVersion(dataVersion, status);
+        LambdaUpdateWrapper<DjScheduleResult> updateWrapper = new LambdaUpdateWrapper<>();
+        updateWrapper.set(DjScheduleResult::getReleaseStatus, status);
+        updateWrapper.in(DjScheduleResult::getId, ids);
+        djScheduleResultMapper.update(null, updateWrapper);
+//        djScheduleResultMapper.updatePublishRecordVersion(dataVersion, status);
     }
 
     /**
@@ -344,7 +353,8 @@ public class DjScheduleResultServiceImpl extends AbstractBillService<DjScheduleR
         if (ids == null) {
             return;
         }
-        djScheduleResultMapper.deployDjScheduleToMid(dataVersion, ids, factoryCode, companyCode); // 把排程数据同步到接口中间库中
+        // TODO 调用itf接口
+//        djScheduleResultMapper.deployDjScheduleToMid(dataVersion, ids, factoryCode, companyCode); // 把排程数据同步到接口中间库中
     }
 
     /**
@@ -358,7 +368,8 @@ public class DjScheduleResultServiceImpl extends AbstractBillService<DjScheduleR
         SchedulePublishRecord record = new SchedulePublishRecord();
         record.setProcedureCode(ApsConstant.PROCEDURE_CODE_DJ);
         record.setScheduleDate(scheduleDate);
-        return djScheduleResultMapper.isPublish(record) > 0;
+//        return djScheduleResultMapper.isPublish(record) > 0;
+        return true;
     }
 
     /**
@@ -366,7 +377,7 @@ public class DjScheduleResultServiceImpl extends AbstractBillService<DjScheduleR
      */
     @Override
     public List<DjScheduleResult> checkUnique(DjScheduleResult entity) {
-        return djScheduleResultMapper.checkUnique(entity);
+        return djScheduleResultMapper.selectList(BillUtils.builderCondition(entity));
     }
 
     /**
@@ -479,13 +490,13 @@ public class DjScheduleResultServiceImpl extends AbstractBillService<DjScheduleR
      */
     @Override
     public AjaxResult chooseMachine(DjScheduleResult scheduleResult) {
-        if (CollectionUtils.isNotEmpty(djScheduleResultMapper.checkUnique(scheduleResult))) {
+        if (CollectionUtils.isNotEmpty(this.checkUnique(scheduleResult))) {
             return AjaxResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.already.exists"));
         }
         this.djEngineService.confirmDjMachine(scheduleResult); // 确认自动排程机台
         scheduleResult.setReleaseStatus(
                 scheduleResult.getPublishSuccessCount() == 0 ? ApsConstant.NO_RELEASE : ApsConstant.WAIT_RELEASING);
-        djScheduleResultMapper.updateDjScheduleResult(scheduleResult);
+//        djScheduleResultMapper.update(scheduleResult, updateWrapper);
         return AjaxResult.success();
     }
 
@@ -497,7 +508,8 @@ public class DjScheduleResultServiceImpl extends AbstractBillService<DjScheduleR
      */
     @Override
     public int isReleasingOrTimeoutByDate(Date scheduleDate) {
-        return djScheduleResultMapper.isReleasingOrTimeoutByDate(scheduleDate);
+//        return djScheduleResultMapper.isReleasingOrTimeoutByDate(scheduleDate);
+        return 0;
     }
 
     /**
@@ -508,7 +520,8 @@ public class DjScheduleResultServiceImpl extends AbstractBillService<DjScheduleR
      */
     @Override
     public int isReleasingOrTimeoutByIds(Long[] ids) {
-        return djScheduleResultMapper.isReleasingOrTimeoutByIds(ids);
+//        return djScheduleResultMapper.isReleasingOrTimeoutByIds(ids);
+        return 0;
     }
 
     /**
@@ -524,8 +537,9 @@ public class DjScheduleResultServiceImpl extends AbstractBillService<DjScheduleR
         record.setProcedureCode(ApsConstant.PROCEDURE_CODE_DJ);
         record.setScheduleDate(entity.getScheduleDate());
         record.setPublishStatus(entity.getReleaseStatus());
-        djScheduleResultMapper.updatePublishRecord(record);
-        return djScheduleResultMapper.changeReleaseStatus(entity);
+//        djScheduleResultMapper.updatePublishRecord(record);
+//        return djScheduleResultMapper.changeReleaseStatus(entity);
+        return 0;
     }
 
     /**
@@ -540,22 +554,26 @@ public class DjScheduleResultServiceImpl extends AbstractBillService<DjScheduleR
         Map<String, Object> map = new HashMap<>();
         map.put("classifiedShift", classifiedShift);
         map.put("ids", ids);
-        return djScheduleResultMapper.combinationMiddleAndNight(map);
+//        return djScheduleResultMapper.combinationMiddleAndNight(map);
+        return 0;
     }
 
     @Override
     public int checkDjCodeExist(DjScheduleResult djScheduleResult) {
-        return djScheduleResultMapper.checkDjCodeExist(djScheduleResult);
+//        return djScheduleResultMapper.checkDjCodeExist(djScheduleResult);
+        return 0;
     }
 
     @Override
     public int isPublishByIds(Long[] ids) {
-        return djScheduleResultMapper.isPublishByIds(ids);
+//        return djScheduleResultMapper.isPublishByIds(ids);
+        return 0;
     }
 
     @Override
     public List<DjScheduleResult> selectByIds(List<Long> ids2) {
-        return djScheduleResultMapper.selectByIds(ids2);
+//        return djScheduleResultMapper.selectByIds(ids2);
+        return null;
     }
 
     @Autowired
@@ -583,7 +601,8 @@ public class DjScheduleResultServiceImpl extends AbstractBillService<DjScheduleR
     public AjaxResult getSummaryVo(DjScheduleResult scheduleResult) {
         
         List<DjScheduleResult> djScheduleResultList = selectDjScheduleResultList(scheduleResult);
-        List<DjScheduleResult> lastDayPlanQty4List = djScheduleResultMapper.getLastDayPlanQty4List(scheduleResult);
+//        List<DjScheduleResult> lastDayPlanQty4List = djScheduleResultMapper.getLastDayPlanQty4List(scheduleResult);
+        List<DjScheduleResult> lastDayPlanQty4List = new ArrayList<>();
         // 添加昨日排程有，今日排程没有的物料对象，用于后续计算理论交接班库存合计
         List<String> resultCodeList = djScheduleResultList.stream().map(DjScheduleResult::getPaddingCode)
                 .collect(Collectors.toList());
@@ -613,12 +632,12 @@ public class DjScheduleResultServiceImpl extends AbstractBillService<DjScheduleR
             lastDayPlanMap = lastDayPlanQty4List.stream()
                     .collect(Collectors.toMap(DjScheduleResult::getPaddingCode, Function.identity()));
         }
-        List<DjScheduleResult> cxConsume4List = djScheduleResultMapper.getCxConsume4List(scheduleResult);
+//        List<DjScheduleResult> cxConsume4List = djScheduleResultMapper.getCxConsume4List(scheduleResult);
         Map<String, DjScheduleResult> cxConsumeMap = new HashMap<>(16);
-        if (CollectionUtils.isNotEmpty(cxConsume4List)) {
-            cxConsumeMap = cxConsume4List.stream()
-                    .collect(Collectors.toMap(DjScheduleResult::getPaddingCode, Function.identity()));
-        }
+//        if (CollectionUtils.isNotEmpty(cxConsume4List)) {
+//            cxConsumeMap = cxConsume4List.stream()
+//                    .collect(Collectors.toMap(DjScheduleResult::getPaddingCode, Function.identity()));
+//        }
         BigDecimal totalDayPlanQty = BigDecimal.ZERO;
         BigDecimal totalNightPlanQty = BigDecimal.ZERO;
         BigDecimal totalNextDayPlanQty = BigDecimal.ZERO;

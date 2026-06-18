@@ -163,7 +163,7 @@ export default {
       return [
       {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.mpTrialPlan.factoryCode"),
           type: "select",
           dictData: this.parentDict.type.biz_factory_name,
         },
@@ -176,7 +176,7 @@ export default {
         },
         {
           prop: "materialCode",
-          label: this.$t("ui.data.column.monthplan.oriMaterialCode"),
+          label: this.$t("ui.data.column.mdmMaterialInfo.materialCode"),
           render: (form) => {
             return (
               <materialCodeSelect
@@ -189,39 +189,39 @@ export default {
         },
         {
           prop: "specifications",
-          label: this.$t("ui.data.column.trialPlan.specifications"),
+          label: this.$t("ui.data.column.mpTrialPlan.specifications"),
           maxlength:64,
           disabled:true
 
         },
         {
           prop: "pattern",
-          label: this.$t("ui.data.column.modelinfo.pattern"),
+          label: this.$t("ui.data.column.mpTrialPlan.pattern"),
           maxlength:64,
           disabled:true
 
         },
         {
-          label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
+          label: this.$t("ui.data.column.mdmMaterialInfo.materialDesc"),
           prop: "materialDesc",
           disabled:true
         },
         {
           prop: "planDate",
-          label: this.$t("ui.data.column.trialPlan.planDate"),
+          label: this.$t("ui.data.column.mpTrialPlan.planDate"),
           type: "date",
           valueFormat: "yyyy-MM-dd",
         },
         {
           prop: "trialStatus",
-          label: this.$t("ui.data.column.trialPlan.trialStatus"),
+          label: this.$t("ui.data.column.mpTrialPlan.trialStatus"),
           type: "select",
           dictData: this.parentDict.type.lh_trial_status,
           onChange: this.handleTrialStatusChange,
         },
         {
           prop: "trialQty",
-          label: this.$t("common.num"),
+          label: this.$t("ui.data.column.mpTrialPlan.trialQty"),
           type: "number",
           min:0,
           max:99999999
@@ -229,30 +229,30 @@ export default {
 
         {
           prop: "urgencyType",
-          label: this.$t("ui.data.column.trialPlan.urgencyType"),
+          label: this.$t("ui.data.column.mpTrialPlan.urgencyType"),
           type: "select",
           dictData: this.parentDict.type.biz_urgency_type,
         },
         {
           prop: "trialType",
-          label: this.$t("ui.data.column.trialPlan.trialType"),
+          label: this.$t("ui.data.column.mpTrialPlan.trialType"),
           type: "select",
           dictData: this.parentDict.type.biz_trial_type,
         },
 
         {
           prop: "destination",
-          label: this.$t("ui.data.column.trialPlan.destination"),
+          label: this.$t("ui.data.column.mpTrialPlan.destination"),
           maxlength:50
         },
         {
           prop: "responsibleDept",
-          label: this.$t("ui.data.column.trialPlan.responsibleDept"),
+          label: this.$t("ui.data.column.mpTrialPlan.responsibleDept"),
           maxlength:64,
         },
         {
           prop: "embryoNo",
-          label: this.$t("ui.data.column.trialPlan.embryoNo"),
+          label: this.$t("ui.data.column.mdmSkuConstructionRef.embryoNo"),
           render: (form) => {
             return (
               <embryoNoSelect
@@ -267,7 +267,7 @@ export default {
         },
         {
           prop: "embryoReleaseDate",
-          label: this.$t("ui.data.column.trialPlan.madeInfo"),
+          label: this.$t("ui.data.column.mpTrialPlan.madeInfo"),
           disabled:true,
         },
         // {
@@ -282,7 +282,7 @@ export default {
         // },
         {
           prop: "textReleaseDate",
-          label: this.$t("ui.data.column.trialPlan.moldingInfo"),
+          label: this.$t("ui.data.column.mpTrialPlan.moldingInfo"),
           disabled:true,
         },
         // {
@@ -297,7 +297,7 @@ export default {
         // },
         {
           prop: "lhReleaseDate",
-          label: this.$t("ui.data.column.trialPlan.vulcanizationInfo"),
+          label: this.$t("ui.data.column.mpTrialPlan.vulcanizationInfo"),
           disabled:true,
         },
         // {
@@ -312,7 +312,7 @@ export default {
         // },
         {
           prop: "remark",
-          label: this.$t("common.remark"),
+          label: this.$t("ui.data.column.sale.remark"),
           maxlength:500
         },
       ];

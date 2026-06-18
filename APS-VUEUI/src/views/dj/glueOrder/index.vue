@@ -44,8 +44,8 @@
     <!-- <el-button style="display: none" ref="hidePopoverBtnRef"></el-button> -->
     <tlt-upload
       ref="tltUpload"
-      downloadUrl="/nc/glueOrder/importTemplate"
-      uploadUrl="/nc/glueOrder/importData"
+      downloadUrl="/dj/glueOrder/importTemplate"
+      uploadUrl="/dj/glueOrder/importData"
       @uploadSuccess="getList"
     />
     <infoDialog
@@ -61,8 +61,8 @@
 //utils
 import { downloadLink } from "@/utils/request";
 //interface
-import { listGlueGroupOrder } from "@/api/nc/glueGroupOrder";
-import { listGlueOrder, removeGlueOrder } from "@/api/nc/glueOrder";
+import { listGlueGroupOrder } from "@/api/dj/glueGroupOrder";
+import { listGlueOrder, removeGlueOrder } from "@/api/dj/glueOrder";
 //components
 import tltUpload from "@/components/tltUpload/tltUpload.vue";
 
