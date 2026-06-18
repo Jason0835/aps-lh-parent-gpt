@@ -28,7 +28,7 @@ import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.ruoyi.common.utils.StringUtils;
 import com.zlt.aps.common.core.constant.ApsConstant;
-import com.zlt.aps.common.engine.enums.WorkClassEnums;
+import com.zlt.aps.common.engine.enums.ClassNumThreePlanEnums;
 import com.zlt.aps.common.engine.service.FactoryService;
 import com.zlt.aps.dj.api.domain.entity.DjDayFinishQty;
 import com.zlt.aps.dj.api.domain.entity.DjDispatcherLog;
@@ -588,7 +588,7 @@ public class DjScheduleResultController extends AbstractBillBizController<DjSche
             baseDate = new Date();
         }
         Date startDate = DateUtils.addDays(baseDate, -1); // 上一天（中班）
-        WorkClassEnums currentWorkClass = WorkClassEnums.CLASS_DAY;
+        ClassNumThreePlanEnums currentWorkClass = ClassNumThreePlanEnums.CLASS_DAY;
         String startDateStr = DateUtils.parseDateToStr("MM/dd", startDate);
 
         String baseDateStr = DateUtils.parseDateToStr("MM/dd", baseDate);

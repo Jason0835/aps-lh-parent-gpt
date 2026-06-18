@@ -665,7 +665,7 @@ public class MdmConstructionInfo extends BaseEntity {
     @TableField(value = "MOLD_CAVITY")
     private String moldCavity;
 
-    /** 生产阶段（0：投产阶段；1试制阶段） */
+    /** 生产阶段（S：投产阶段；T：量试阶段；X：试制阶段） */
 //    @Excel(name = "ui.data.column.mdmConstructionInfo.productionStage", readConverterExp = "0=：投产阶段；1试制阶段")
     @ApiModelProperty(value = "生产阶段", name = "productionStage")
     @TableField(value = "PRODUCTION_STAGE")

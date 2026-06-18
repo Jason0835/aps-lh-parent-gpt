@@ -397,7 +397,7 @@ public class XwyyEnginePlanQtyServiceImpl implements XwyyEnginePlanQtyService {
 		} else if (EngineConstants.NIGHT_CLASS_SHIFT.equals(openClassShift)) {
 			resultVo.setDayPlanQty(sumPlan);
 			resultVo.setNightPlanQty(0D);
-		} else if (EngineConstants.DAY_CLASS_SHIFT.equals(openClassShift)) {
+		} else if (EngineConstants.MORNING_CLASS_SHIFT.equals(openClassShift)) {
 			resultVo.setDayPlanQty(0D);
 			resultVo.setNightPlanQty(sumPlan);
 		}
