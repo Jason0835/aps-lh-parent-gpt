@@ -70,6 +70,20 @@ public class Cd90MachineCandidateResolverTest {
     }
 
     @Test
+    public void shouldMatchOpenMachineClassByCommaSeparatedShiftCodes() {
+        List<Cd90MachineCandidate> result = resolver.resolve("CF001", "BR001", "02",
+                shiftStart(), shiftStart().plusHours(8), Arrays.asList(
+                        machine("M1", "1", "01,02,03"),
+                        machine("M2", "1", "010,03"),
+                        machine("M3", "1", "03")),
+                Arrays.asList(binding("BR001", "M1"), binding("BR001", "M2"), binding("BR001", "M3")),
+                Collections.emptyList(), Collections.emptyList());
+
+        assertEquals(1, result.size());
+        assertEquals("M1", result.get(0).getMachineCode());
+    }
+
+    @Test
     public void shouldOnlyKeepMachinesMatchedByCraftWidth() {
         List<Cd90MachineCandidate> result = resolver.resolve("CF001", "BR001",
                 new BigDecimal("50"), "NIGHT", shiftStart(), shiftStart().plusHours(8),

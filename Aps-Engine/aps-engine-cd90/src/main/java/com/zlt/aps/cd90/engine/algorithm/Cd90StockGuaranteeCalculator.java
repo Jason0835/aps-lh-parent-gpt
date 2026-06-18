@@ -18,34 +18,43 @@ public class Cd90StockGuaranteeCalculator {
     /**
      * 按有效需求班次顺序计算库存保证班数和供应时长。
      *
-     * @param expectedAvailableStock 预计可用库存
-     * @param demandShifts 有效需求班次明细
-     * @return 库存保证结果
+     * <p>模拟"库存逐个班次消耗"过程：库存足够满足当前班需求时，扣除后继续；
+     * 库存不足以满足完整班需求时，按比例切割最后一个班，返回部分保证。</p>
+     *
+     * @param expectedAvailableStock 预计可用库存（扣除窗口前消耗后），必须 ≥ 0
+     * @param demandShifts 有效需求班次明细，按自然班次时间升序传入
+     * @return 库存保证结果，包含保证班数、供应时长和剩余库存
      */
     public Cd90StockGuaranteeResult calculate(BigDecimal expectedAvailableStock,
                                               List<Cd90DemandShift> demandShifts) {
         if (expectedAvailableStock == null || expectedAvailableStock.signum() < 0) {
             throw new IllegalArgumentException("预计可用库存不能小于0");
         }
+        // 从可用库存开始，逐班扣减需求，直到库存耗尽或所有班次处理完毕。
         BigDecimal remaining = expectedAvailableStock;
         BigDecimal guaranteedShifts = BigDecimal.ZERO;
         BigDecimal supplyHours = BigDecimal.ZERO;
 
         for (Cd90DemandShift shift : demandShifts == null ? Collections.<Cd90DemandShift>emptyList() : demandShifts) {
+            // 跳过不参与计算的班次（如停产班或已跳过班）。
             if (!shift.isIncluded()) {
                 continue;
             }
             BigDecimal demand = value(shift.getClothDemandQuantity());
             BigDecimal hours = value(shift.getShiftHours());
+            // 需求为0的班次不消耗库存，跳过计数。
             if (demand.signum() <= 0) {
                 continue;
             }
             if (remaining.compareTo(demand) >= 0) {
+                // 库存足够覆盖整个班需求：完整扣减，班次数+1，时长为该班完整时长。
                 remaining = remaining.subtract(demand);
                 guaranteedShifts = guaranteedShifts.add(BigDecimal.ONE);
                 supplyHours = supplyHours.add(hours);
                 continue;
             }
+            // 库存不足以覆盖整个班需求：按剩余库存占该班需求的比例，计算部分保证。
+            // 例如剩余100米，该班需求400米，则算0.25班、2小时（8h×0.25）。
             BigDecimal ratio = remaining.divide(demand, 10, RoundingMode.HALF_UP);
             guaranteedShifts = guaranteedShifts.add(ratio);
             supplyHours = supplyHours.add(hours.multiply(ratio));

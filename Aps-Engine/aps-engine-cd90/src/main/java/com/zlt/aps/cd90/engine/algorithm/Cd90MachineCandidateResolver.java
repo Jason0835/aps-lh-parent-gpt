@@ -10,6 +10,7 @@ import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
@@ -110,7 +111,7 @@ public class Cd90MachineCandidateResolver {
                 .filter(item -> boundMachines.contains(item.getMachineCode()))
                 .filter(item -> ApsConstant.APS_STRING_1.equals(item.getStatus()))
                 .filter(item -> widthMatched(item, craftWidth))
-                .filter(item -> shiftCode != null && shiftCode.equals(item.getOpenMachineClass()))
+                .filter(item -> openShiftMatched(item.getOpenMachineClass(), shiftCode))
                 .filter(item -> !prohibited.contains(item.getMachineCode()))
                 .filter(item -> !overlaps(item, shiftStart, shiftEnd))
                 .map(item -> Cd90MachineCandidate.builder()
@@ -148,6 +149,16 @@ public class Cd90MachineCandidateResolver {
         BigDecimal max = machine.getClothWidthMax();
         return (min == null || BigDecimal.ZERO.compareTo(min) == 0 || craftWidth.compareTo(min) >= 0)
                 && (max == null || BigDecimal.ZERO.compareTo(max) == 0 || craftWidth.compareTo(max) <= 0);
+    }
+
+    /** 机台开机班次支持逗号多选存储，例如01,02,03；匹配时按完整班次编码精确比较。 */
+    private boolean openShiftMatched(String openMachineClass, String shiftCode) {
+        if (openMachineClass == null || shiftCode == null) {
+            return false;
+        }
+        return Arrays.stream(openMachineClass.split(","))
+                .map(String::trim)
+                .anyMatch(shiftCode::equals);
     }
 
     private boolean overlaps(Cd90MachineResource machine,

@@ -27,8 +27,8 @@ public class Cd90ScheduleResult extends BaseEntity implements Serializable {
     /** 排程日期 */
     @ApiModelProperty("排程日期")
     @TableField("SCHEDULE_DATE")
-    @Excel(name = "ui.data.column.cd90ScheduleResult.scheduleDate")
-    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    @Excel(name = "ui.data.column.cd90ScheduleResult.scheduleDate",dateFormat = "yyyy-MM-dd")
+    @JsonFormat(pattern = "yyyy-MM-dd")
     private Date scheduleDate;
     /** 成型批次号 */
     @ApiModelProperty("成型批次号")

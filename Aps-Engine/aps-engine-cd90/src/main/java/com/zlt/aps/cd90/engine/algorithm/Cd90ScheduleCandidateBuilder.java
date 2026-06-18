@@ -83,6 +83,7 @@ public class Cd90ScheduleCandidateBuilder {
                 continue;
             }
 
+            //取6点库存
             BigDecimal stockAtSix = stockByCloth.getOrDefault(entry.getKey(), BigDecimal.ZERO);
             // 投影库存用于同时计算可供应时长和最早缺料班次，两者共同决定候选优先级。
             Cd90InventoryProjection projection = inventoryCalculator.project(
