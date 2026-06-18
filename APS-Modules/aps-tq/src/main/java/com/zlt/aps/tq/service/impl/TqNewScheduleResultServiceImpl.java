@@ -16,9 +16,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Date;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * 胎圈排程结果Service实现类（新版）
@@ -261,16 +260,152 @@ public class TqNewScheduleResultServiceImpl extends AbstractDocService<TqNewSche
     }
 
     /**
+     * 调量前校验
+     * 校验规则：
+     * 1. 排程记录必须存在且未删除
+     * 2. 至少有一个班次的计划量被修改
+     * 3. 计划量不能小于0
+     * 4. 历史班次不允许修改计划量（根据当前时间和排程日期判断）
+     * 5. 非历史班次的计划量不能小于完成量
+     *
+     * @param entity 调量数据
+     * @return 校验结果
+     */
+    @Override
+    public AjaxResult validateChangeQty(TqNewScheduleResult entity) {
+        if (entity == null || entity.getId() == null) {
+            return AjaxResult.error("请选择需要调量的排程记录");
+        }
+
+        TqNewScheduleResult record = tqNewScheduleResultMapper.selectById(entity.getId());
+        if (record == null || Objects.equals(record.getIsDelete(), 1)) {
+            return AjaxResult.error("排程记录不存在或已删除");
+        }
+
+        Date now = new Date();
+        boolean hasAdjustField = false;
+        List<String> errorMessages = new ArrayList<>();
+
+        for (int shiftIndex = 1; shiftIndex <= 6; shiftIndex++) {
+            Integer newPlanQty = getPlanQtyByShiftIndex(entity, shiftIndex);
+            Integer oldPlanQty = getPlanQtyByShiftIndex(record, shiftIndex);
+
+            // 只检查被修改的班次
+            if (newPlanQty == null || Objects.equals(newPlanQty, oldPlanQty)) {
+                continue;
+            }
+
+            hasAdjustField = true;
+
+            // 规则3：计划量不能小于0
+            if (newPlanQty < 0) {
+                errorMessages.add(String.format("第%d班计划量不能小于0", shiftIndex));
+                continue;
+            }
+
+            // 判断是否为历史班次
+            boolean historyShift = isHistoryShift(record, shiftIndex, now);
+
+            if (historyShift) {
+                // 规则4：历史班次不允许修改
+                errorMessages.add(String.format("不能修改历史班次（第%d班）的计划量", shiftIndex));
+            } else {
+                // 规则5：非历史班次计划量不能小于完成量
+                Integer finishQty = getFinishQtyByShiftIndex(record, shiftIndex);
+                if (finishQty != null && finishQty > 0 && newPlanQty < finishQty) {
+                    errorMessages.add(String.format("第%d班计划量不能小于完成量%d", shiftIndex, finishQty));
+                }
+            }
+        }
+
+        if (!hasAdjustField) {
+            errorMessages.add("未检测到需要调整的计划量");
+        }
+
+        if (!errorMessages.isEmpty()) {
+            return AjaxResult.error(String.join("；", errorMessages));
+        }
+
+        return AjaxResult.success("校验通过");
+    }
+
+    /**
      * 调量
+     * 业务逻辑：
+     * 1. 前置校验
+     * 2. 更新各班次计划量和原因分析
+     * 3. 如果原排程已发布成功，更新发布状态为待发布
+     * 4. 记录操作日志
      *
      * @param entity 调量数据
      * @return 结果
      */
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public AjaxResult changeQty(TqNewScheduleResult entity) {
-        // TODO 调量业务逻辑待实现
-        log.info("胎圈排程调量，id：{}", entity.getId());
-        return AjaxResult.success();
+        // 1. 前置校验
+        AjaxResult validateResult = validateChangeQty(entity);
+        if (!validateResult.get(AjaxResult.CODE_TAG).equals(200)) {
+            return validateResult;
+        }
+
+        // 2. 查询原记录
+        TqNewScheduleResult record = tqNewScheduleResultMapper.selectById(entity.getId());
+        if (record == null) {
+            return AjaxResult.error("排程记录不存在或已删除");
+        }
+
+        // 3. 构建更新wrapper
+        LambdaUpdateWrapper<TqNewScheduleResult> updateWrapper = new LambdaUpdateWrapper<>();
+        updateWrapper.eq(TqNewScheduleResult::getId, entity.getId());
+
+        boolean hasChange = false;
+
+        // 4. 更新各班次计划量和原因分析
+        for (int shiftIndex = 1; shiftIndex <= 6; shiftIndex++) {
+            Integer newPlanQty = getPlanQtyByShiftIndex(entity, shiftIndex);
+            Integer oldPlanQty = getPlanQtyByShiftIndex(record, shiftIndex);
+            String newAnalysis = getAnalysisByShiftIndex(entity, shiftIndex);
+            String oldAnalysis = getAnalysisByShiftIndex(record, shiftIndex);
+
+            // 更新被修改的计划量
+            if (newPlanQty != null && !Objects.equals(newPlanQty, oldPlanQty)) {
+                setPlanQtyToUpdateWrapper(updateWrapper, shiftIndex, newPlanQty);
+                hasChange = true;
+            }
+
+            // 更新原因分析（非空且与原值不同时更新）
+            if (newAnalysis != null && !newAnalysis.equals(oldAnalysis)) {
+                setAnalysisToUpdateWrapper(updateWrapper, shiftIndex, newAnalysis);
+                hasChange = true;
+            }
+        }
+
+        if (!hasChange) {
+            return AjaxResult.error("没有需要保存的修改内容");
+        }
+
+        // 5. 更新备注
+        if (entity.getRemark() != null && !entity.getRemark().equals(record.getRemark())) {
+            updateWrapper.set(TqNewScheduleResult::getRemark, entity.getRemark());
+        }
+
+        // 6. 状态更新：如果原排程已发布成功（isRelease=1），更新为待发布（isRelease=0）
+        // 发布状态：0-未发布，1-已发布，2-发布失败，3-待发布
+        if ("1".equals(record.getIsRelease())) {
+            updateWrapper.set(TqNewScheduleResult::getIsRelease, "3");
+        }
+
+        // 7. 执行更新
+        tqNewScheduleResultMapper.update(null, updateWrapper);
+
+        log.info("胎圈排程调量成功，id：{}，胎圈代码：{}，机台：{}",
+                entity.getId(), record.getBeadCode(), record.getMachineCode());
+
+        // TODO: 记录排程修改日志
+        // TODO: 滚动更新后续排程
+
+        return AjaxResult.success("调量成功");
     }
 
     /**
@@ -431,5 +566,163 @@ public class TqNewScheduleResultServiceImpl extends AbstractDocService<TqNewSche
             minSeq = Math.min(minSeq, secondRecord.getClass6Sequence());
         }
         return minSeq == Integer.MAX_VALUE ? 1 : minSeq;
+    }
+
+    /**
+     * 根据班次索引获取实体中的计划量
+     *
+     * @param entity     排程结果实体
+     * @param shiftIndex 班次索引（1~6）
+     * @return 计划量
+     */
+    private Integer getPlanQtyByShiftIndex(TqNewScheduleResult entity, int shiftIndex) {
+        switch (shiftIndex) {
+            case 1: return entity.getClass1PlanQty();
+            case 2: return entity.getClass2PlanQty();
+            case 3: return entity.getClass3PlanQty();
+            case 4: return entity.getClass4PlanQty();
+            case 5: return entity.getClass5PlanQty();
+            case 6: return entity.getClass6PlanQty();
+            default: return null;
+        }
+    }
+
+    /**
+     * 根据班次索引获取实体中的完成量
+     *
+     * @param entity     排程结果实体
+     * @param shiftIndex 班次索引（1~6）
+     * @return 完成量
+     */
+    private Integer getFinishQtyByShiftIndex(TqNewScheduleResult entity, int shiftIndex) {
+        switch (shiftIndex) {
+            case 1: return entity.getClass1FinishQty();
+            case 2: return entity.getClass2FinishQty();
+            case 3: return entity.getClass3FinishQty();
+            case 4: return entity.getClass4FinishQty();
+            case 5: return entity.getClass5FinishQty();
+            case 6: return entity.getClass6FinishQty();
+            default: return null;
+        }
+    }
+
+    /**
+     * 根据班次索引获取实体中的原因分析
+     *
+     * @param entity     排程结果实体
+     * @param shiftIndex 班次索引（1~6）
+     * @return 原因分析
+     */
+    private String getAnalysisByShiftIndex(TqNewScheduleResult entity, int shiftIndex) {
+        switch (shiftIndex) {
+            case 1: return entity.getClass1Analysis();
+            case 2: return entity.getClass2Analysis();
+            case 3: return entity.getClass3Analysis();
+            case 4: return entity.getClass4Analysis();
+            case 5: return entity.getClass5Analysis();
+            case 6: return entity.getClass6Analysis();
+            default: return null;
+        }
+    }
+
+    /**
+     * 设置指定班次计划量到UpdateWrapper
+     *
+     * @param updateWrapper 更新条件
+     * @param shiftIndex    班次索引（1~6）
+     * @param planQty       计划量
+     */
+    private void setPlanQtyToUpdateWrapper(LambdaUpdateWrapper<TqNewScheduleResult> updateWrapper,
+                                           int shiftIndex, Integer planQty) {
+        switch (shiftIndex) {
+            case 1: updateWrapper.set(TqNewScheduleResult::getClass1PlanQty, planQty); break;
+            case 2: updateWrapper.set(TqNewScheduleResult::getClass2PlanQty, planQty); break;
+            case 3: updateWrapper.set(TqNewScheduleResult::getClass3PlanQty, planQty); break;
+            case 4: updateWrapper.set(TqNewScheduleResult::getClass4PlanQty, planQty); break;
+            case 5: updateWrapper.set(TqNewScheduleResult::getClass5PlanQty, planQty); break;
+            case 6: updateWrapper.set(TqNewScheduleResult::getClass6PlanQty, planQty); break;
+            default: break;
+        }
+    }
+
+    /**
+     * 设置指定班次原因分析到UpdateWrapper
+     *
+     * @param updateWrapper 更新条件
+     * @param shiftIndex    班次索引（1~6）
+     * @param analysis      原因分析
+     */
+    private void setAnalysisToUpdateWrapper(LambdaUpdateWrapper<TqNewScheduleResult> updateWrapper,
+                                            int shiftIndex, String analysis) {
+        switch (shiftIndex) {
+            case 1: updateWrapper.set(TqNewScheduleResult::getClass1Analysis, analysis); break;
+            case 2: updateWrapper.set(TqNewScheduleResult::getClass2Analysis, analysis); break;
+            case 3: updateWrapper.set(TqNewScheduleResult::getClass3Analysis, analysis); break;
+            case 4: updateWrapper.set(TqNewScheduleResult::getClass4Analysis, analysis); break;
+            case 5: updateWrapper.set(TqNewScheduleResult::getClass5Analysis, analysis); break;
+            case 6: updateWrapper.set(TqNewScheduleResult::getClass6Analysis, analysis); break;
+            default: break;
+        }
+    }
+
+    /**
+     * 判断指定班次是否已成为历史班次
+     * 胎圈排程6班次时间窗口：
+     * 1班：D日中班(16:00-24:00)
+     * 2班：D+1日夜班(00:00-08:00)
+     * 3班：D+1日早班(08:00-16:00)
+     * 4班：D+1日中班(16:00-24:00)
+     * 5班：D+2日夜班(00:00-08:00)
+     * 6班：D+2日早班(08:00-16:00)
+     * D = 排程日期 - 2（即今天）
+     *
+     * @param record     排程结果记录
+     * @param shiftIndex 班次索引（1~6）
+     * @param now        当前时间
+     * @return true表示班次已结束，属于历史班次
+     */
+    private boolean isHistoryShift(TqNewScheduleResult record, int shiftIndex, Date now) {
+        if (record.getScheduleDate() == null) {
+            return false;
+        }
+        // D = 排程日期 - 2
+        Date dDay = DateUtil.beginOfDay(DateUtil.offsetDay(record.getScheduleDate(), -2));
+        Date shiftEndTime = resolveShiftEndTime(dDay, shiftIndex);
+        if (shiftEndTime == null) {
+            return false;
+        }
+        return !now.before(shiftEndTime);
+    }
+
+    /**
+     * 根据D日和班次索引推导班次结束时间
+     *
+     * @param dDay       D日（排程日期-2）
+     * @param shiftIndex 班次索引（1~6）
+     * @return 班次结束时间
+     */
+    private Date resolveShiftEndTime(Date dDay, int shiftIndex) {
+        switch (shiftIndex) {
+            case 1:
+                // 1班：D日中班(16:00-24:00)，结束时间=D日24:00=D+1日00:00
+                return DateUtil.endOfDay(dDay);
+            case 2:
+                // 2班：D+1日夜班(00:00-08:00)，结束时间=D+1日08:00
+                return DateUtil.offsetHour(DateUtil.beginOfDay(DateUtil.offsetDay(dDay, 1)), 8);
+            case 3:
+                // 3班：D+1日早班(08:00-16:00)，结束时间=D+1日16:00
+                return DateUtil.offsetHour(DateUtil.beginOfDay(DateUtil.offsetDay(dDay, 1)), 16);
+            case 4:
+                // 4班：D+1日中班(16:00-24:00)，结束时间=D+1日24:00=D+2日00:00
+                return DateUtil.endOfDay(DateUtil.offsetDay(dDay, 1));
+            case 5:
+                // 5班：D+2日夜班(00:00-08:00)，结束时间=D+2日08:00
+                return DateUtil.offsetHour(DateUtil.beginOfDay(DateUtil.offsetDay(dDay, 2)), 8);
+            case 6:
+                // 6班：D+2日早班(08:00-16:00)，结束时间=D+2日16:00
+                return DateUtil.offsetHour(DateUtil.beginOfDay(DateUtil.offsetDay(dDay, 2)), 16);
+            default:
+                return null;
+        }
     }
 }

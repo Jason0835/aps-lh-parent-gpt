@@ -80,6 +80,8 @@
     <insert-order-dialog ref="insertOrderDialog" @success="getList" />
     <!-- 转机台弹窗 -->
     <change-machine-dialog ref="changeMachineDialog" @success="getList" />
+    <!-- 调量弹窗 -->
+    <adjust-qty-dialog ref="adjustQtyDialog" @success="getList" />
   </basic-container>
 </template>
 <script>
@@ -89,6 +91,7 @@ import { mapState } from "vuex";
 import TltUploadForm from "@/views/components/tltUploadForm.vue";
 import InsertOrderDialog from "./components/insertOrderDialog.vue";
 import ChangeMachineDialog from "./components/changeMachineDialog.vue";
+import AdjustQtyDialog from "./components/adjustQtyDialog.vue";
 
 const formatDate = (date) => {
   const year = date.getFullYear();
@@ -109,6 +112,7 @@ export default {
     TltUploadForm,
     InsertOrderDialog,
     ChangeMachineDialog,
+    AdjustQtyDialog,
   },
   dicts: ["IS_RELEASE"],
   data() {
@@ -490,8 +494,7 @@ export default {
         this.$modal.msgWarning(this.$t("common.tip.selectOne"));
         return;
       }
-      // TODO 调量弹窗待实现，目前先调用接口
-      this.$message.info("调量弹窗待实现");
+      this.$refs.adjustQtyDialog.show(this.selection[0]);
     },
     handleRelease() {
       if (!this.selection || this.selection.length === 0) {

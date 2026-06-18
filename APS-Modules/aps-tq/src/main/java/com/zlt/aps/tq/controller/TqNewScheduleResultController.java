@@ -187,13 +187,26 @@ public class TqNewScheduleResultController extends AbstractDocBizController<TqNe
     }
 
     /**
+     * 调量前校验
+     */
+    @ApiOperation("调量前校验")
+    @PostMapping("/validateChangeQty")
+    public AjaxResult validateChangeQty(@RequestBody TqNewScheduleResult entity) {
+        return tqNewScheduleResultService.validateChangeQty(entity);
+    }
+
+    /**
      * 调量
      */
     @Log(title = "胎圈排程结果(新)", businessType = BusinessType.CHANGE_QTY)
     @ApiOperation("调量")
     @PostMapping("/changeQty")
     public AjaxResult changeQty(@RequestBody TqNewScheduleResult entity) {
-        // TODO 调量业务逻辑待实现：发布状态校验、调度日志等
+        // 先校验，校验通过再执行调量
+        AjaxResult validateResult = tqNewScheduleResultService.validateChangeQty(entity);
+        if (!validateResult.get(AjaxResult.CODE_TAG).equals(200)) {
+            return validateResult;
+        }
         return tqNewScheduleResultService.changeQty(entity);
     }
 

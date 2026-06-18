@@ -151,33 +151,33 @@ export default {
         { type: "selection", fixed: "left" },
         {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.mpMouldDeliveryPlan.factoryCode"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
           },
         },
         {
           prop: "mouldCode",
-          label: this.$t("ui.data.column.moldLedger.mouldCode"),
+          label: this.$t("ui.data.column.mpMouldDeliveryPlan.mouldCode"),
           width:180
         },
         {
           prop: "mainPattern",
-          label: this.$t("ui.data.column.moldLedger.mainPattern"),
+          label: this.$t("ui.data.column.mdmMaterialInfo.mainPattern"),
         },
         {
           prop: "materialCode",
-          label: this.$t("ui.data.column.monthplan.oriMaterialCode"),
+          label: this.$t("ui.data.column.mpMouldDeliveryPlan.materialCode"),
         },
         {
           prop: "materialDesc",
-          label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
+          label: this.$t("ui.data.column.mpMouldDeliveryPlan.materialDesc"),
           align: "left",
           minWidth: 350
         },
         {
           prop: "shipmentDate",
-          label: this.$t("ui.data.column.monthplan.shipmentDate"),
+          label: this.$t("ui.data.column.mpMouldDeliveryPlan.shipmentDate"),
         },
         {
           prop: "boardingDate",
@@ -185,7 +185,7 @@ export default {
         },
         {
           prop: "remark",
-          label: this.$t("common.remark"),
+          label: this.$t("ui.common.column.remark"),
         },
         {
           prop: "updateTime",
@@ -227,25 +227,25 @@ export default {
     searchColumns() {
       return [
         {
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.mpMouldDeliveryPlan.factoryCode"),
           prop: "factoryCode",
           type: "select",
           dictData: this.dict.type.biz_factory_name, // "JOB_TYPE",
         },
         {
-          label: this.$t("ui.data.column.moldLedger.mouldCode"),
+          label: this.$t("ui.data.column.mpMouldDeliveryPlan.mouldCode"),
           prop: "mouldCode",
           // type: "select",
           // dictData: this.dict.type.JOB_TYPE, // "JOB_TYPE",
         },
         {
-          label: this.$t("ui.data.column.monthplan.oriMaterialCode"),
+          label: this.$t("ui.data.column.mpMouldDeliveryPlan.materialCode"),
           prop: "materialCode",
           // type: "select",
           // dictData: this.dict.type.JOB_TYPE, // "JOB_TYPE",
         },
         {
-          label: this.$t("ui.data.column.monthplan.shipmentDate"),
+          label: this.$t("ui.data.column.mpMouldDeliveryPlan.shipmentDate"),
           prop: "createTime",
           type: "date",
           dateType: "daterange",
