@@ -139,10 +139,10 @@ public class MdmSkuLhCapacityServiceImpl extends AbstractDocService<MdmSkuLhCapa
     }
 
     /**
-     * 计算班产量（取最邻近的偶数）
-     * <p>先用向上取整计算班产量，然后判断整数部分是否为奇数：
+     * 计算班产量（向下取整后取最邻近的偶数）
+     * <p>先用向下取整计算班产量，然后判断整数部分是否为奇数：
      * 奇数则+1变为偶数，偶数直接取。</p>
-     * <p>例如：13.5 → 14(奇数+1), 12.1 → 12(偶数直接取), 14.0 → 14</p>
+     * <p>例如：20÷3=6.667 → 向下取整6(偶数不变) → 6; 21÷3=7 → 7(奇数+1) → 8</p>
      *
      * @param billVO 要计算的对象
      */
@@ -151,8 +151,8 @@ public class MdmSkuLhCapacityServiceImpl extends AbstractDocService<MdmSkuLhCapa
         int paramValue = this.getParamValue();
         Integer standardCapacity = billVO.getStandardCapacity();
         if (standardCapacity != null && paramValue != 0) {
-            // 先向上取整得到班产量
-            BigDecimal result = new BigDecimal(standardCapacity).divide(new BigDecimal(paramValue), RoundingMode.UP);
+            // 向下取整得到班产量
+            BigDecimal result = new BigDecimal(standardCapacity).divide(new BigDecimal(paramValue), RoundingMode.DOWN);
             int classCapacity = result.intValue();
             // 取最邻近的偶数：奇数+1，偶数不变
             if (classCapacity % 2 != 0) {
