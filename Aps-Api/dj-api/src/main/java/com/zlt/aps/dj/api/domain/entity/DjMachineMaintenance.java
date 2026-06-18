@@ -52,7 +52,7 @@ public class DjMachineMaintenance extends BaseEntity {
      * 停机班次，对应 ClassNumThreePlanEnums.classIndex："01"=夜班、"02"=早班、"03"=中班
      */
     @Excel(name = "ui.data.column.dj.machineMaintenance.stopShift", dictType = "CLASS_NUM")
-    @ApiModelProperty(value = "停机班次，对应 ClassNumThreePlanEnums.classIndex："01"=夜班、"02"=早班、"03"=中班", name = "stopShift")
+    @ApiModelProperty(value = "停机班次，对应 ClassNumThreePlanEnums.classIndex：01=夜班、02=早班、03=中班", name = "stopShift")
     @TableField(value = "STOP_SHIFT")
     private String stopShift;
 
