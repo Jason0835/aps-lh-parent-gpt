@@ -666,7 +666,7 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
     @Override
     public void fillScheduleResultFields(List<LhScheduleResult> lhScheduleResultList, Date scheduleDate) {
         if (CollectionUtils.isEmpty(lhScheduleResultList) || Objects.isNull(scheduleDate)) {
-            log.warn("fillScheduleResultFields: 传入参数为空, listSize={}, scheduleDate={}", 
+            log.warn("fillScheduleResultFields: 传入参数为空, listSize={}, scheduleDate={}",
                     lhScheduleResultList == null ? 0 : lhScheduleResultList.size(), scheduleDate);
             return;
         }
@@ -679,8 +679,8 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
         log.info("fillScheduleResultFields: 开始填充排程结果字段, 排程日期={}, 结果数量={}, year={}, month={}",
                 DateUtil.formatDate(scheduleDate), lhScheduleResultList.size(), year, month);
 
-        // scheduleDate 业务上为 T+2，计算 T 日用于完成量相关查询
-        Date tDay = DateUtil.offsetDay(scheduleDate, -2);
+        // scheduleDate 业务上为 T+1，计算 T 日用于完成量相关查询
+        Date tDay = DateUtil.offsetDay(scheduleDate, -1);
         log.info("fillScheduleResultFields: scheduleDate={}, T日={}",
                 DateUtil.formatDate(scheduleDate), DateUtil.formatDate(tDay));
 
