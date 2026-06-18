@@ -61,7 +61,7 @@
           plain
           v-hasPermi="['monthplan:monthSaleOrderPlan:add']"
           @click="handleAdd"
-          >{{ $t("上线设置") }}</el-button
+          >{{ $t("ui.data.console.onlineSetup") }}</el-button
         >
         <!-- <el-button
           type="primary"
@@ -184,7 +184,7 @@ export default {
       let columns = [
         { type: "selection", fixed: "left" },
         {
-          label: this.$t("ui.data.demandPlan.monthPlanVersion"),
+          label: this.$t("ui.data.column.MpFactoryProductionVersion.monthPlanVersion"),
           prop: "monthPlanVersion",
           align: "center",
           render: ({ row }) => {
@@ -223,7 +223,7 @@ export default {
         },
         {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.MpFactoryProductionVersion.factoryCode"),
           align: "center",
 
           formatter: (row) => {
@@ -234,7 +234,7 @@ export default {
           },
         },
         {
-          label: this.$t("ui.data.column.monthplan.productType"),
+          label: this.$t("ui.data.column.MpFactoryProductionVersion.productTypeCode"),
           prop: "productTypeCode",
           align: "center",
 
@@ -316,7 +316,7 @@ export default {
         },
 
         {
-          label: this.$t("ui.data.column.console.productionVersion"),
+          label: this.$t("ui.data.column.MpFactoryProductionVersion.productionVersion"),
           prop: "productionVersion",
           align: "center",
           minWidth: 500,
@@ -359,7 +359,7 @@ export default {
           },
         },
         {
-          label: this.$t("ui.data.column.console.isFinal"),
+          label: this.$t("ui.data.column.MpFactoryProductionVersion.isFinal"),
           prop: "isFinal",
           align: "center",
           // formatter: (row, column, value) => {
@@ -416,19 +416,19 @@ export default {
         },
         {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.MpFactoryProductionVersion.factoryCode"),
           type: "select",
           dictData: this.dict.type.biz_factory_name,
           clearable: false,
         },
         {
-          label: this.$t("ui.data.column.monthplan.productType"),
+          label: this.$t("ui.data.column.MpFactoryProductionVersion.productTypeCode"),
           prop: "productTypeCode",
           type: "select",
           dictData: this.dict.type.biz_product_type,
         },
         {
-          label: this.$t("ui.data.demandPlan.monthPlanVersion"),
+          label: this.$t("ui.data.column.MpFactoryProductionVersion.monthPlanVersion"),
           prop: "monthPlanVersion",
           type: "select",
           dictData: this.planVersionList,
@@ -628,7 +628,7 @@ export default {
         this.$refs.checkRef.show(obj);
       }
       return;
-      this.$confirm("确定生成？").then(() => {
+      this.$confirm(this.$t("ui.data.console.confirmGenerate")).then(() => {
         this.loading = true;
         factoryWholeCourseProduction({
           factoryCode: row.factoryCode,

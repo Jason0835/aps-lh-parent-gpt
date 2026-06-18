@@ -132,7 +132,7 @@ export default {
         // { type: "selection", fixed: "left" },
         {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.mdmMonthSurplus.factoryCode"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
           },
@@ -140,19 +140,19 @@ export default {
 
         {
           prop: "year",
-          label: this.$t("ui.data.colume.year"),
+          label: this.$t("ui.data.column.mdmMonthSurplus.year"),
         },
         {
           prop: "month",
-          label: this.$t("ui.data.colume.month"),
+          label: this.$t("ui.data.column.mdmMonthSurplus.month"),
         },
         {
           prop: "requireVersion",
-          label: this.$t("ui.data.column.finishStock.requireVersion"),
+          label: this.$t("ui.data.column.mdmMonthSurplus.requireVersion"),
         },
         {
           prop: "productTypeCode",
-          label: this.$t("ui.data.column.monthplan.productType"),
+          label: this.$t("ui.data.column.mdmMonthSurplus.productTypeCode"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_product_type, value);
           },
@@ -160,29 +160,29 @@ export default {
 
         {
           prop: "brand",
-          label: this.$t("common.brand"),
+          label: this.$t("ui.data.column.mdmMonthSurplus.brand"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_brand_type, value);
           },
         },
         {
           prop: "structureName",
-          label: this.$t("ui.data.column.finishStock.structureName"),
+          label: this.$t("ui.data.column.mdmMonthSurplus.structureName"),
           width:180
         },
         {
           prop: "materialCode",
-          label: this.$t("ui.data.column.monthplan.oriMaterialCode"),
+          label: this.$t("ui.data.column.mdmMonthSurplus.materialCode"),
         },
         {
           prop: "materialDesc",
-          label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
+          label: this.$t("ui.data.column.mdmMonthSurplus.materialDesc"),
           align: "left",
           minWidth: 350
         },
         {
           prop: "planSurplusQty",
-          label: this.$t("ui.data.column.finishStock.planSurplusQty"),
+          label: this.$t("ui.data.column.mdmMonthSurplus.planSurplusQty"),
         },
 
         {
@@ -198,7 +198,7 @@ export default {
       return [
         {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.mdmMonthSurplus.factoryCode"),
           type: "select",
           dictData: this.dict.type.biz_factory_name,
           clearable: false,
@@ -208,7 +208,7 @@ export default {
         },
         {
           prop: "yearMonth",
-          label: this.$t("ui.data.colume.yearMonth"),
+          label: this.$t("ui.data.column.yearMonth"),
           type: "date",
           dateType: "month",
           valueFormat: "yyyy-MM",
@@ -219,7 +219,7 @@ export default {
         },
         {
           prop: "requireVersion",
-          label: this.$t("ui.data.column.finishStock.requireVersion"),
+          label: this.$t("ui.data.column.mdmMonthSurplus.requireVersion"),
           type: "select",
           filterable: true,
           clearable: false,
@@ -227,18 +227,18 @@ export default {
         },
         {
           prop: "productTypeCode",
-          label: this.$t("ui.data.column.monthplan.productType"),
+          label: this.$t("ui.data.column.mdmMonthSurplus.productTypeCode"),
           type: "select",
           dictData: this.dict.type.biz_product_type,
         },
 
         {
           prop: "materialCode",
-          label: this.$t("ui.data.column.monthplan.oriMaterialCode"),
+          label: this.$t("ui.data.column.mdmMonthSurplus.materialCode"),
         },
         {
           prop: "materialDesc",
-          label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
+          label: this.$t("ui.data.column.mdmMonthSurplus.materialDesc"),
           minWidth: 350,
           align: "left",
         },

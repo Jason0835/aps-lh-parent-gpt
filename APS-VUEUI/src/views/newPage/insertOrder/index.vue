@@ -125,7 +125,7 @@ export default {
         { type: "selection", fixed: "left" },
         {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.simulatedResult.factoryCode"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
           },
@@ -133,17 +133,17 @@ export default {
         },
         {
           prop: "year",
-          label: this.$t("ui.data.colume.year"),
+          label: this.$t("ui.data.column.simulatedResult.year"),
           width: 120,
         },
         {
           prop: "month",
-          label: this.$t("ui.data.colume.month"),
+          label: this.$t("ui.data.column.simulatedResult.month"),
           width: 120,
         },
         {
           prop: "productTypeCode",
-          label: this.$t("ui.data.column.monthplan.productType"),
+          label: this.$t("ui.data.column.simulatedResult.productTypeCode"),
           width: 120,
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_product_type, value);
@@ -156,27 +156,27 @@ export default {
         // },
         {
           prop: "structureName",
-          label: this.$t("ui.data.column.finishStock.structureName"),
+          label: this.$t("ui.data.column.simulatedResult.structureName"),
           width: 180,
         },
         {
           prop: "specifications",
-          label: this.$t("ui.data.column.trialPlan.specifications"),
+          label: this.$t("ui.data.column.simulatedResult.specifications"),
           width: 120,
         },
         {
           prop: "pattern",
-          label: this.$t("ui.data.column.modelinfo.pattern"),
+          label: this.$t("ui.data.column.simulatedResult.pattern"),
           width: 120,
         },
         {
           prop: "mainPattern",
-          label: this.$t("ui.data.column.moldLedger.mainPattern"),
+          label: this.$t("ui.data.column.simulatedResult.mainPattern"),
           width: 120,
         },
         {
           prop: "brand",
-          label: this.$t("common.brand"),
+          label: this.$t("ui.data.column.simulatedResult.brand"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_brand_type, value);
           },
@@ -184,49 +184,49 @@ export default {
         },
         {
           prop: "mainMaterialDesc",
-          label: this.$t("ui.data.rubberMaterial.embryoDesc"),
+          label: this.$t("ui.data.column.simulatedResult.mainMaterialDesc"),
           align: "left",
           minWidth: 350,
         },
         {
           prop: "materialCode",
-          label: this.$t("ui.data.column.monthplan.oriMaterialCode"),
+          label: this.$t("ui.data.column.simulatedResult.materialCode"),
           width: 120,
         },
         {
           prop: "materialDesc",
-          label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
+          label: this.$t("ui.data.column.simulatedResult.materialDesc"),
           align: "left",
           minWidth: 350,
         },
         {
           prop: "mouldQty",
-          label: this.$t("ui.data.insertOrder.mouldQty"),
+          label: this.$t("ui.data.column.simulatedResult.mouldQty"),
           width: 120,
         },
         {
           prop: "typeBlockQty",
-          label: this.$t("ui.data.monthlyProductionPlan.typeBlockQty"),
+          label: this.$t("ui.data.column.simulatedResult.typeBlockQty"),
           width: 120,
         },
         {
           prop: "netQty",
-          label: this.$t("ui.data.monthlyProductionPlan.prodReqPlan"),
+          label: this.$t("ui.data.column.simulatedResult.netQty"),
           width: 120,
         },
         {
           prop: "heightQty",
-          label: this.$t("ui.data.insertOrder.heightQty"),
+          label: this.$t("ui.data.column.simulatedResult.heightQty"),
           width: 120,
         },
         {
           prop: "productionQty",
-          label: this.$t("ui.data.insertOrder.productionQty"),
+          label: this.$t("ui.data.column.simulatedResult.productionQty"),
           width: 120,
         },
         {
           prop: "monthPlanVersion",
-          label: this.$t("ui.data.column.finishStock.requireVersion"),
+          label: this.$t("ui.data.column.simulatedResult.monthPlanVersion"),
           width: 180,
         },
         {
@@ -336,7 +336,7 @@ export default {
       return [
         {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.simulatedResult.factoryCode"),
           type: "select",
           dictData: this.dict.type.biz_factory_name,
         },
@@ -349,44 +349,44 @@ export default {
         },
         {
           prop: "structureName",
-          label: this.$t("ui.data.column.finishStock.structureName"),
+          label: this.$t("ui.data.column.simulatedResult.structureName"),
           type: "select",
           dictData: this.structureList,
           filterable: true,
         },
         {
           prop: "productTypeCode",
-          label: this.$t("ui.data.column.monthplan.productType"),
+          label: this.$t("ui.data.column.simulatedResult.productTypeCode"),
           type: "select",
           dictData: this.dict.type.biz_product_type,
         },
         {
           prop: "specifications",
-          label: this.$t("ui.data.column.trialPlan.specifications"),
+          label: this.$t("ui.data.column.simulatedResult.specifications"),
         },
         {
           prop: "pattern",
-          label: this.$t("ui.data.column.modelinfo.pattern"),
+          label: this.$t("ui.data.column.simulatedResult.pattern"),
         },
         {
           prop: "mainMaterialDesc",
-          label: this.$t("ui.data.rubberMaterial.embryoDesc"),
+          label: this.$t("ui.data.column.simulatedResult.mainMaterialDesc"),
           minWidth: 350,
           align: "left",
         },
         {
           prop: "materialCode",
-          label: this.$t("ui.data.column.monthplan.oriMaterialCode"),
+          label: this.$t("ui.data.column.simulatedResult.materialCode"),
         },
         {
           prop: "materialDesc",
-          label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
+          label: this.$t("ui.data.column.simulatedResult.materialDesc"),
           minWidth: 350,
           align: "left",
         },
         {
           prop: "brand",
-          label: this.$t("common.brand"),
+          label: this.$t("ui.data.column.simulatedResult.brand"),
           type: "select",
           dictData: this.dict.type.biz_brand_type,
           filterable: true,
