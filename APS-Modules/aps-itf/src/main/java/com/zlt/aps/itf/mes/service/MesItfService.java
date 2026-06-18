@@ -2,6 +2,7 @@ package com.zlt.aps.itf.mes.service;
 
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.cx.api.domain.entity.CxMachineOnlineInfo;
+import com.zlt.aps.cx.api.domain.entity.CxStock;
 import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
 import com.zlt.aps.itf.vo.MesBrandDict;
 import com.zlt.aps.lh.api.domain.entity.LhMachineOnlineInfo;
@@ -203,6 +204,14 @@ public interface MesItfService {
      * @return 结果
      */
     AjaxResult syncMesCxStock(AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 实时查询MES生胎库存（不写入APS本地表，仅供成型排程实时调用）
+     *
+     * @param syncDataLogs 查询参数（可传factoryCode过滤分厂）
+     * @return 生胎库存列表
+     */
+    List<CxStock> getCxStock(AuxReqSyncDataLogs syncDataLogs);
 
     /**
      * 同步胎面库存

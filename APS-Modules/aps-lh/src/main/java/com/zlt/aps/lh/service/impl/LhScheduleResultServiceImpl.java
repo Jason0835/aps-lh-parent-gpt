@@ -922,23 +922,27 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
             }
             result.setDailyPlanQty(dailyPlanQty);
 
+            // ---------- TOTAL_FINISH_QTY：月累计已完成量 ----------
+            // total_finish_qty = 本月1日至T-1日日完成量汇总 + T日夜班完成量
+            int finishedQty = 0;
+            BigDecimal dayFinishSum = dayFinishSumMap.get(fcMatKey);
+            if (dayFinishSum != null) {
+                finishedQty += dayFinishSum.intValue();
+            }
+            BigDecimal nightFinish = scheNightFinishMap.get(fcMatKey);
+            if (nightFinish != null) {
+                finishedQty += nightFinish.intValue();
+            }
+            // 防御性非负保护，避免数据库异常负值导致余量计算错误
+            finishedQty = Math.max(finishedQty, 0);
+            result.setTotalFinishQty(finishedQty);
+
             // ---------- MOULD_SURPLUS_QTY：硫化余量 ----------
-            // 硫化余量 = MAX(月计划总量 - 已完成量 + 上月超欠产量, 0)
-            // 已完成量 = 月累计完成量（截至 T-1 日） + T 日排程晚班完成量
+            // 硫化余量 = MAX(月计划 totalQty - 已完成量 + LAST_MONTH_OVERDUE_QTY, 0)
+            // LAST_MONTH_OVERDUE_QTY：负数表示超产需扣减，正数表示欠产需加上
+            // 已完成量 = total_finish_qty（1号到T-1日日完成量汇总 + T日夜班完成量）
             // 上月超欠产量：仅当 lastMonthValidFlag = "1" 时取 lastMonthOverdueQty，否则按 0 处理
             if (Objects.nonNull(monthPlan) && Objects.nonNull(monthPlan.getTotalQty())) {
-                int finishedQty = 0;
-                // 本月1日至T-1日累计完成量
-                BigDecimal dayFinishSum = dayFinishSumMap.get(fcMatKey);
-                if (dayFinishSum != null) {
-                    finishedQty += dayFinishSum.intValue();
-                }
-                // T日夜班完成量（class1代表夜班）
-                BigDecimal nightFinish = scheNightFinishMap.get(fcMatKey);
-                if (nightFinish != null) {
-                    finishedQty += nightFinish.intValue();
-                }
-                // 上月超欠产量：仅当有效标志为"1"时参与计算
                 int lastMonthOverdue = 0;
                 if ("1".equals(monthPlan.getLastMonthValidFlag())
                         && Objects.nonNull(monthPlan.getLastMonthOverdueQty())) {

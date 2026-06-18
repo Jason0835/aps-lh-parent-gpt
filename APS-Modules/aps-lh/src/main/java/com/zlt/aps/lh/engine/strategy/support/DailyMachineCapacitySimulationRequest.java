@@ -58,6 +58,9 @@ public class DailyMachineCapacitySimulationRequest implements Serializable {
     /** 欠产未超阈值时，窗口末日是否继续后看下一日计划 */
     private boolean windowLastDayNextPlanLookAheadEnabled;
 
+    /** 是否强制使用欠产阈值窗口回落模式 */
+    private boolean forceShortageWindowMode;
+
     /** 场景类型 */
     private String sceneType;
 }

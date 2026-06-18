@@ -8,6 +8,7 @@ import com.zlt.aps.mp.api.domain.entity.*;
 import com.zlt.aps.cx.api.domain.entity.CxMesStock;
 import com.zlt.aps.cx.api.domain.entity.CxScheFinishQty;
 import com.zlt.aps.cx.api.domain.entity.CxDayFinishQty;
+import com.zlt.aps.cx.api.domain.entity.CxStock;
 import com.zlt.aps.lh.api.domain.entity.LhMachineOnlineInfo;
 import com.zlt.aps.lh.api.domain.entity.LhScheFinishQty;
 import com.zlt.aps.lh.api.domain.entity.LhDayFinishQty;
@@ -122,6 +123,14 @@ public interface MesItfMapper {
      * @return 列表
      */
     List<CxMesStock> selectMesCxStockList(AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 实时查询MES生胎库存，直接映射为CxStock返回（不经过CxMesStock中间表）
+     *
+     * @param syncDataLogs 参数（可传factoryCode过滤分厂）
+     * @return 生胎库存列表
+     */
+    List<CxStock> selectCxStockFromMes(AuxReqSyncDataLogs syncDataLogs);
 
     /**
      * 查询胎面库存同步数据
