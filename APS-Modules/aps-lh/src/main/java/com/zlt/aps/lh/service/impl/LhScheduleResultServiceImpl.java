@@ -1026,7 +1026,10 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
         // 设置1-8班次的硫化示方号，取值同lhNo
         if (StringUtils.isNotEmpty(result.getLhNo())) {
             for (int i = 1; i <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT; i++) {
-                BeanUtil.setProperty(result, "class" + i + "LhNo", result.getLhNo());
+                String classLhType = (String) BeanUtil.getProperty(result, "class" + i + "LhType");
+                if (StringUtils.isNotEmpty(classLhType)) {
+                    BeanUtil.setProperty(result, "class" + i + "LhNo", result.getLhNo());
+                }
             }
         }
 
@@ -1036,7 +1039,10 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
         }
         if (StringUtils.isNotEmpty(lhType)) {
             for (int i = 1; i <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT; i++) {
-                BeanUtil.setProperty(result, "class" + i + "LhType", lhType);
+                String classLhType = (String) BeanUtil.getProperty(result, "class" + i + "LhType");
+                if (StringUtils.isNotEmpty(classLhType)) {
+                    BeanUtil.setProperty(result, "class" + i + "LhType", lhType);
+                }
             }
         }
     }
