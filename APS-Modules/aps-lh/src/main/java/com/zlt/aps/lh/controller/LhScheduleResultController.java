@@ -24,7 +24,6 @@ import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.enums.ConstructionStageEnum;
 import com.zlt.aps.itf.mes.IMesItfService;
-import com.zlt.aps.lh.api.constant.LhScheduleConstant;
 import com.zlt.aps.lh.api.domain.dto.*;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.api.domain.vo.LhScheduleResultTemplateImportVO;
@@ -58,7 +57,6 @@ import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.bind.annotation.ExceptionHandler;
 
 import javax.servlet.http.HttpServletResponse;
 import java.io.ByteArrayInputStream;
@@ -293,7 +291,7 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
                 sheetName, new ByteArrayInputStream(fileBytes), 0, 5, -1);
         AjaxResult ajaxResult = lhScheduleService.importScheduleTemplate(list, result, updateSupport, importLog.getId());
         // 硫化换模计划导入
-        AjaxResult lhMouldChangePlanAjaxResult = lhMouldChangePlanController.importData(importDTO, updateSupport);
+        AjaxResult lhMouldChangePlanAjaxResult = lhMouldChangePlanController.importData(importDTO, Boolean.TRUE);
 
         Date endTime = DateUtils.getNowDate();
         importLog.setRowCount(list.size());
