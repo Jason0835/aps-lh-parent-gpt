@@ -19,6 +19,15 @@ utf-8 no bom
 - 使用LambdaQueryWrapper、LambdaUpdateWrapper
 - 尽可能使用Lambda写法（例如：LambdaQueryWrapper、LambdaUpdateWrapper、LambdaQueryChainWrapper、LambdaUpdateChainWrapper），减少字符串字段名硬编码
 - 强制规则：框架已通过注解自动处理逻辑删除（`isDelete`/`delFlag` 字段），生成或修改查询代码时，除非用户特别说明，禁止手动追加逻辑删除条件。不要写 `wrapper.eq(Entity::getIsDelete, ApsConstant.DEL_FLAG_NORMAL)`、`wrapper.eq(Entity::getDelFlag, ApsConstant.DEL_FLAG_NORMAL)`、`.eq(BaseEntity::getIsDelete, 0)` 或 `.and(w -> w.eq(::getIsDelete, ...).or().isNull(::getIsDelete))` 这类条件；直接使用业务查询条件，由框架自动过滤已删除数据。
+- 批量新增数据统一使用 `baseDao.saveBatch()` 方法保存，不要编写自定义的批量 insert SQL 到 mapper.xml
+- 数值类型转 BigDecimal 统一使用 `BigDecimalUtils.valueOf()` 方法（空值自动返回 0），避免手写 `value != null ? BigDecimal.valueOf(value) : null` 或 `value != null ? new BigDecimal(value.toString()) : BigDecimal.ZERO`
+- 调用类内部的私有方法时统一在调用前加 `this.` 前缀，例如 `this.loadCxSchedule(factoryCode, scheduleDate)`
+- 所有 `if`、`else`、`for`、`while` 等控制语句必须使用大括号 `{}`，且左大括号不换行、右大括号独立一行。禁止单行写法，例如 `if (xxx) return yyy;` 必须写成：
+  ```
+  if (xxx) {
+      return yyy;
+  }
+  ```
 ### 注释规范
 - 优先重要,主要逻辑方法需加注释
 - 注释用中文，尽可能的详细
@@ -38,7 +47,7 @@ UIController extends BaseUIController<Entity>
 - 非数据库字段必须添加 `@TableField(exist = false)`
 - 不在数据库的字段要求反显时，参考@docs/字段反显.md
 - 唯一性校验返回值：`UserConstants.NOT_UNIQUE = "1"` 不唯一，`UserConstants.UNIQUE = "0"` 唯一
-- 如果要生成sql语，创建一个sql文件，放到@docs/sql
+- 如果要生成sql语句，创建一个sql文件，放到@docs/sql
 
 ### Excel导入导出：
 - 所有导出字段必须添加 `@Excel` 注解

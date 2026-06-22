@@ -45,7 +45,7 @@ public class DjParams extends BaseEntity implements Serializable {
     private String productTypeCode;
 
     /**
-     * 参数编码
+     * 参数编码，编码规则：SYS+工序号+分组号+三位流水号，其中垫胶的工序号为14，分组号暂时固定为01
      */
     @Excel(name = "ui.dj.params.column.paramCode")
     @ApiModelProperty(value = "参数编码", name = "paramCode")
