@@ -158,6 +158,9 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
                         sku.getMaterialCode(), machineCode, sku.resolveTargetScheduleQty());
                 continue;
             }
+            // 动态收尾目标量需要先按真实机台模数归整，保证目标量、运行态账本和最终落库口径一致。
+            int machineMouldQty = ShiftCapacityResolverUtil.resolveMachineMouldQty(machine);
+            sku.setMouldQty(machineMouldQty);
             DailyMachineShortageQuotaPlan shortageQuotaPlan =
                     DailyMachineExpansionPlanner.prepareShortageQuota(context, sku, "续作排产");
             if (shouldReleaseWindowNoPlanContinuousSku(shortageQuotaPlan)) {
@@ -213,8 +216,6 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
                     ? tryReserveSpecifySqueezeSwitchStartTime(context, machine, sku, shifts) : null;
             List<LhShiftConfigVO> effectiveShifts = specifySwitchStartTime == null
                     ? shifts : filterShiftsBeforeSwitchStart(shifts, specifySwitchStartTime);
-            int machineMouldQty = ShiftCapacityResolverUtil.resolveMachineMouldQty(machine);
-            sku.setMouldQty(machineMouldQty);
             // 滚动继承结果可直接追加班次量，避免同一机台同一SKU拆成两条连续结果。
             // 若当前窗口需要为定点新增物料挤出换模时间，只使用切换前的有效班次构造结果。
             LhScheduleResult inheritedResult = findMergeableRollingInheritedResult(context, machineCode, sku.getMaterialCode());
@@ -457,16 +458,25 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
         if (sku == null || shortageQuotaPlan == null || !shortageQuotaPlan.isForceEndingByNoFuturePlan()) {
             return;
         }
-        int strictTargetQty = Math.max(0, sku.getSurplusQty());
+        // 窗口及月底均无计划时已明确进入收尾清量，统一收尾标签必须同步到后续日计划扣账链路。
+        String originalSkuTag = sku.getSkuTag();
+        sku.setSkuTag(SkuTagEnum.ENDING.getCode());
+        if (sku.getEndingDaysRemaining() <= 0) {
+            sku.setEndingDaysRemaining(1);
+        }
+        int strictTargetQty = ShiftCapacityResolverUtil.roundUpQtyToMouldMultiple(
+                Math.max(0, sku.getSurplusQty()), sku.getMouldQty());
         sku.setStrictTargetQty(true);
         sku.setTargetScheduleQty(strictTargetQty);
         sku.setRemainingScheduleQty(strictTargetQty);
         sku.setWindowPlanQty(strictTargetQty);
         sku.setWindowRemainingPlanQty(strictTargetQty);
-        log.info("续作窗口及月底均无日计划，按硫化余量严格控量, materialCode: {}, "
-                        + "surplusQty: {}, historyShortageQty: {}, strictTargetQty: {}",
+        log.info("续作窗口及月底均无日计划，按硫化余量严格控量并同步收尾状态, materialCode: {}, "
+                        + "surplusQty: {}, historyShortageQty: {}, originalSkuTag: {}, endingSkuTag: {}, "
+                        + "endingDaysRemaining: {}, strictTargetQty: {}",
                 sku.getMaterialCode(), Math.max(0, sku.getSurplusQty()),
-                Math.max(0, shortageQuotaPlan.getHistoryShortageQty()), strictTargetQty);
+                Math.max(0, shortageQuotaPlan.getHistoryShortageQty()), originalSkuTag, sku.getSkuTag(),
+                sku.getEndingDaysRemaining(), strictTargetQty);
     }
 
     /**
@@ -796,6 +806,9 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
         capEndingFirstDayOnlyContinuationGroups(context, shifts);
         // 降模、补满等后置处理可能再次改变中班计划量，最终扣账前统一按续作日标准公式收敛。
         applyDailyStandardPlanQtyToContinuousResults(context, shifts);
+        // 日标准产量公式可能把收尾残班向上补足，扣账前必须复用严格收尾目标再次收口。
+        capStrictEndingContinuationGroupsToTarget(
+                context, sourceSkuMap, skuResultMap, skuOrder, shifts);
         // 日额度账本必须在最终结果收口后再同步，并以公式修正后的结果驱动零计划与机台状态。
         // 降模、同 SKU 尾量错峰和多机台分摊都会改变最终班次量，不能提前扣账。
         syncContinuousDailyPlanQuota(context, shifts);
@@ -805,6 +818,8 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
         adjustContinuousSameSkuMultiMachineEndingStagger(context, shifts);
         // 同SKU尾量归集会在机台间重新分配最后班次，归集后必须再次恢复每台续作机台的日标准产量公式结果。
         applyDailyStandardPlanQtyToContinuousResults(context, shifts);
+        capStrictEndingContinuationGroupsToTarget(
+                context, sourceSkuMap, skuResultMap, skuOrder, shifts);
         finalizeZeroPlanContinuousResults(context);
         // 降模或额度回裁会再次改变最终计划量，收口后再统一复核一次收尾标记，确保落库口径一致。
         refreshContinuousEndingFlagByResult(context);
@@ -2480,11 +2495,37 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
             capResultShiftQtyToTarget(context, result, shifts, nextQty);
             overQty -= currentQty - ShiftFieldUtil.resolveScheduledQty(result);
         }
-        log.info("续作多机台严格收尾最终收口, materialCode: {}, 目标量: {}, 原总量: {}, "
+        log.info("续作严格收尾最终收口, materialCode: {}, 目标量: {}, 原总量: {}, "
                         + "收口后总量: {}, 机台列表: {}",
                 sourceSku.getMaterialCode(), targetQty, totalPlanQty,
                 skuResults.stream().mapToInt(ShiftFieldUtil::resolveScheduledQty).sum(),
                 joinMachineCodes(skuResults));
+    }
+
+    /**
+     * 对全部续作业务分组执行严格收尾目标复核。
+     * <p>日标准产量修正既可能回裁，也可能补足剩余班次；收尾结果在每次修正后都必须重新收口，
+     * 防止单机和多机场景突破按模数归整后的收尾目标。</p>
+     *
+     * @param context 排程上下文
+     * @param sourceSkuMap 分组来源SKU
+     * @param skuResultMap 分组续作结果
+     * @param skuOrder 分组顺序
+     * @param shifts 全窗口班次
+     */
+    private void capStrictEndingContinuationGroupsToTarget(
+            LhScheduleContext context,
+            Map<String, SkuScheduleDTO> sourceSkuMap,
+            Map<String, List<LhScheduleResult>> skuResultMap,
+            List<String> skuOrder,
+            List<LhShiftConfigVO> shifts) {
+        if (CollectionUtils.isEmpty(skuOrder)) {
+            return;
+        }
+        for (String groupKey : skuOrder) {
+            capStrictEndingContinuationGroupToTarget(
+                    context, sourceSkuMap.get(groupKey), skuResultMap.get(groupKey), shifts);
+        }
     }
 
     /**
