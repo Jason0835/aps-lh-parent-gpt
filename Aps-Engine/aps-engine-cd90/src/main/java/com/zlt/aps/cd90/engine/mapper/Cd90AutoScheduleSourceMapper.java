@@ -70,7 +70,7 @@ public class Cd90AutoScheduleSourceMapper {
     }
 
     /**
-     * 转换库排状态。车数为0时物料占用必须清空，避免空库排被误判为专用库排。
+     * 转换库排状态。即使车数为0，也保留MES同步的帘布代号，供库排严格按帘布匹配。
      *
      * @param source 库排限制实体
      * @return 库排状态
@@ -82,7 +82,7 @@ public class Cd90AutoScheduleSourceMapper {
                 : source.getMaxCarNum();
         return Cd90StorageLaneState.builder()
                 .laneCode(source.getStorageLaneCode())
-                .clothCode(vehicleCount > 0 ? source.getMaterialCode() : null)
+                .clothCode(source.getMaterialCode())
                 .vehicleCount(vehicleCount)
                 .maxVehicleCount(maxVehicleCount)
                 .build();

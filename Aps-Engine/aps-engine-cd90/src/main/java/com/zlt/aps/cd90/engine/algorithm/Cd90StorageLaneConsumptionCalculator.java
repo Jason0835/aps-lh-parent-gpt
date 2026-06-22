@@ -32,9 +32,10 @@ public class Cd90StorageLaneConsumptionCalculator {
      * @return 扣减结果
      */
     public Cd90StorageLaneConsumptionResult consume(Map<String, BigDecimal> cumulativeConsumptionByCloth,
-                                                    BigDecimal coilMeter,
+                                                    Map<String, BigDecimal> curlLengthByCloth,
+                                                    BigDecimal fallbackCoilMeter,
                                                     List<Cd90StorageLaneState> originalLanes) {
-        if (coilMeter == null || coilMeter.signum() <= 0) {
+        if (fallbackCoilMeter == null || fallbackCoilMeter.signum() <= 0) {
             throw new IllegalArgumentException("工装卷曲米数必须大于0");
         }
         List<Cd90StorageLaneState> lanes = originalLanes == null ? new ArrayList<>()
@@ -47,11 +48,12 @@ public class Cd90StorageLaneConsumptionCalculator {
         }
 
         int released = consumptionByCloth.entrySet().stream()
-                .mapToInt(entry -> releaseSameCloth(lanes, entry.getKey(), value(entry.getValue()), coilMeter))
+                .mapToInt(entry -> releaseSameCloth(lanes, entry.getKey(), value(entry.getValue()),
+                        curlLength(curlLengthByCloth, entry.getKey(), fallbackCoilMeter)))
                 .sum();
-        BigDecimal remainder = consumptionByCloth.values().stream()
-                .map(this::value)
-                .map(item -> item.remainder(coilMeter))
+        BigDecimal remainder = consumptionByCloth.entrySet().stream()
+                .map(entry -> value(entry.getValue()).remainder(
+                        curlLength(curlLengthByCloth, entry.getKey(), fallbackCoilMeter)))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         return Cd90StorageLaneConsumptionResult.builder()
@@ -94,6 +96,18 @@ public class Cd90StorageLaneConsumptionCalculator {
 
     private BigDecimal value(BigDecimal value) {
         return value == null ? BigDecimal.ZERO : value;
+    }
+
+    private BigDecimal curlLength(Map<String, BigDecimal> curlLengthByCloth,
+                                  String clothCode,
+                                  BigDecimal fallbackCoilMeter) {
+        if (curlLengthByCloth != null) {
+            BigDecimal curlLength = curlLengthByCloth.get(clothCode);
+            if (curlLength != null && curlLength.signum() > 0) {
+                return curlLength;
+            }
+        }
+        return fallbackCoilMeter;
     }
 
     private Cd90StorageLaneState copy(Cd90StorageLaneState source) {

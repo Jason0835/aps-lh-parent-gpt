@@ -30,15 +30,15 @@ public class Cd90RollingScheduleContextManagerTest {
         manager.updateCumulativeConsumption(context, Collections.singletonMap("C1", new BigDecimal("87")));
 
         Cd90ShiftResourceState first = manager.openShift(context,
-                descriptor("CLASS1", 14, 22), new BigDecimal("87"), 10,
-                Collections.singletonList("M1"));
+                descriptor("CLASS1", 14, 22), Collections.emptyMap(), new BigDecimal("87"),
+                10, Collections.singletonList("M1"));
         first.getTasks().add(task("CLASS1", "M1", 20, 2));
         first.getTailSpecByMachine().put("M1", "SPEC-A");
         manager.completeShift(context, first);
 
         Cd90ShiftResourceState second = manager.openShift(context,
-                descriptor("CLASS2", 22, 30), new BigDecimal("87"), 10,
-                Collections.singletonList("M1"));
+                descriptor("CLASS2", 22, 30), Collections.emptyMap(), new BigDecimal("87"),
+                10, Collections.singletonList("M1"));
 
         assertEquals(2, second.getLanes().get(0).getVehicleCount());
         assertEquals(Integer.valueOf(28800), second.getRemainingSecondsByMachine().get("M1"));

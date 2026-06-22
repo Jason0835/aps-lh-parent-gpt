@@ -57,7 +57,7 @@ class Cd90AutoScheduleSourceMapperTest {
     }
 
     @Test
-    void shouldClearMaterialWhenStorageLaneIsEmpty() {
+    void shouldKeepMaterialWhenStorageLaneIsEmpty() {
         Cd90StorageLaneLimit source = new Cd90StorageLaneLimit();
         source.setStorageLaneCode("L01");
         source.setMaterialCode("CF001");
@@ -69,6 +69,6 @@ class Cd90AutoScheduleSourceMapperTest {
         assertEquals("L01", result.getLaneCode());
         assertEquals(0, result.getVehicleCount());
         assertEquals(7, result.getMaxVehicleCount());
-        assertNull(result.getClothCode());
+        assertEquals("CF001", result.getClothCode());
     }
 }

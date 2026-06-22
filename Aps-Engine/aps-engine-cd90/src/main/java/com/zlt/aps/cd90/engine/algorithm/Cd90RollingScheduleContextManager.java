@@ -78,7 +78,8 @@ public class Cd90RollingScheduleContextManager {
      */
     public Cd90ShiftResourceState openShift(Cd90RollingScheduleContext context,
                                             Cd90ShiftDescriptor shift,
-                                            BigDecimal coilMeter,
+                                            Map<String, BigDecimal> curlLengthByCloth,
+                                            BigDecimal fallbackCoilMeter,
                                             int totalToolingCount,
                                             List<String> machineCodes) {
         // 只允许预计入库时间不晚于班次开始的记录参与当前班资源重建，防止提前消费未来产量。
@@ -88,7 +89,7 @@ public class Cd90RollingScheduleContextManager {
         // 每班都从6点基线重算：基线库排 - 累计消耗 + 当前班前有效入库。
         Cd90ResourceSnapshot snapshot = snapshotBuilder.build(
                 context.getStorageLanesAtSix(), context.getCumulativeConsumptionByCloth(),
-                coilMeter, effectiveInbound);
+                curlLengthByCloth, fallbackCoilMeter, effectiveInbound);
 
         // 机台产能属于班次资源，每班从完整班次秒数重新初始化。
         Map<String, Integer> remainingSeconds = new HashMap<>();

@@ -20,11 +20,11 @@ public class Cd90StorageLaneAllocatorTest {
     private final Cd90StorageLaneAllocator allocator = new Cd90StorageLaneAllocator();
 
     @Test
-    public void shouldPreferSameClothAndSplitAcrossLanes() {
+    public void shouldOnlyUseSameClothLanesAndSplitAcrossLanes() {
         List<Cd90StorageLaneState> original = Arrays.asList(
                 lane("L1", "CF001", 5, 7),
-                lane("L2", null, 0, 7),
-                lane("L3", "CF002", 1, 7));
+                lane("L2", "CF001", 0, 7),
+                lane("L3", "CF002", 0, 7));
 
         Cd90StorageLaneAllocationResult result = allocator.allocate(
                 "CF001", new BigDecimal("500"), new BigDecimal("100"), original);
@@ -36,13 +36,29 @@ public class Cd90StorageLaneAllocatorTest {
         assertEquals(2, result.getAllocations().get(0).getVehicleCount());
         assertEquals("L2", result.getAllocations().get(1).getLaneCode());
         assertEquals(3, result.getAllocations().get(1).getVehicleCount());
-        assertEquals("CF001", result.getLanes().get(1).getClothCode());
+        assertEquals("CF002", result.getLanes().get(2).getClothCode());
+        assertEquals(0, result.getLanes().get(2).getVehicleCount());
+    }
+
+    @Test
+    public void shouldRejectZeroVehicleLaneWhenClothCodeDoesNotMatch() {
+        List<Cd90StorageLaneState> original = Arrays.asList(
+                lane("L1", "CF001", 7, 7),
+                lane("L2", "CF002", 0, 7));
+
+        Cd90StorageLaneAllocationResult result = allocator.allocate(
+                "CF001", new BigDecimal("100"), new BigDecimal("100"), original);
+
+        assertFalse(result.isSuccess());
+        assertEquals("STORAGE_LANE_LIMIT", result.getFailureReason());
+        assertEquals("CF002", original.get(1).getClothCode());
+        assertEquals(0, original.get(1).getVehicleCount());
     }
 
     @Test
     public void insufficientCapacityShouldNotModifyOriginalLanes() {
         List<Cd90StorageLaneState> original = Arrays.asList(
-                lane("L1", "CF001", 6, 7), lane("L2", null, 0, 1));
+                lane("L1", "CF001", 6, 7), lane("L2", "CF002", 0, 1));
 
         Cd90StorageLaneAllocationResult result = allocator.allocate(
                 "CF001", new BigDecimal("300"), new BigDecimal("100"), original);
@@ -51,7 +67,7 @@ public class Cd90StorageLaneAllocatorTest {
         assertEquals("STORAGE_LANE_LIMIT", result.getFailureReason());
         assertEquals(6, original.get(0).getVehicleCount());
         assertEquals(0, original.get(1).getVehicleCount());
-        assertEquals(null, original.get(1).getClothCode());
+        assertEquals("CF002", original.get(1).getClothCode());
     }
 
     @Test

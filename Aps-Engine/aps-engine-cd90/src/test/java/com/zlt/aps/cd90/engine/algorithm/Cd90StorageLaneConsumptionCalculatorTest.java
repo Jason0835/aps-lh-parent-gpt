@@ -24,7 +24,8 @@ public class Cd90StorageLaneConsumptionCalculatorTest {
     @Test
     public void consumptionShouldOnlyReleaseWholeVehicles() {
         Cd90StorageLaneConsumptionResult result = calculator.consume(
-                Collections.singletonMap("C1", new BigDecimal("173")), new BigDecimal("87"), Arrays.asList(
+                Collections.singletonMap("C1", new BigDecimal("173")),
+                Collections.emptyMap(), new BigDecimal("87"), Arrays.asList(
                         lane("L1", 1), lane("L2", 2)
                 ));
 
@@ -41,7 +42,7 @@ public class Cd90StorageLaneConsumptionCalculatorTest {
     public void consumptionShouldOnlyReleaseSameClothLanes() {
         Cd90StorageLaneConsumptionResult result = calculator.consume(
                 Collections.singletonMap("C1", new BigDecimal("100")),
-                new BigDecimal("100"), Arrays.asList(
+                Collections.emptyMap(), new BigDecimal("100"), Arrays.asList(
                         lane("L1", "C1", 1), lane("L2", "C2", 1)
                 ));
 
@@ -49,6 +50,22 @@ public class Cd90StorageLaneConsumptionCalculatorTest {
         assertEquals(0, result.getLanes().get(0).getVehicleCount());
         assertEquals(1, result.getLanes().get(1).getVehicleCount());
         assertEquals("C2", result.getLanes().get(1).getClothCode());
+    }
+
+    /**
+     * ???????????????160??C1=80?????????100??????
+     */
+    @Test
+    public void consumptionShouldPreferClothCurlLengthOverFallback() {
+        Cd90StorageLaneConsumptionResult result = calculator.consume(
+                Collections.singletonMap("C1", new BigDecimal("160")),
+                Collections.singletonMap("C1", new BigDecimal("80")),
+                new BigDecimal("100"), Arrays.asList(lane("L1", 1), lane("L2", 1)));
+
+        assertEquals(2, result.getReleasedVehicleCount());
+        assertEquals(new BigDecimal("0"), result.getRemainderQuantity());
+        assertEquals(0, result.getLanes().get(0).getVehicleCount());
+        assertEquals(0, result.getLanes().get(1).getVehicleCount());
     }
 
     private Cd90StorageLaneState lane(String code, int vehicleCount) {

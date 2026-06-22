@@ -37,10 +37,11 @@ public class Cd90ResourceSnapshotBuilder {
      */
     public Cd90ResourceSnapshot build(List<Cd90StorageLaneState> originalLanes,
                                       Map<String, BigDecimal> cumulativeConsumptionByCloth,
-                                      BigDecimal coilMeter,
+                                      Map<String, BigDecimal> curlLengthByCloth,
+                                      BigDecimal fallbackCoilMeter,
                                       List<Cd90InboundRecord> inboundRecords) {
         Cd90StorageLaneConsumptionResult consumption = consumptionCalculator.consume(
-                cumulativeConsumptionByCloth, coilMeter, originalLanes);
+                cumulativeConsumptionByCloth, curlLengthByCloth, fallbackCoilMeter, originalLanes);
         List<Cd90StorageLaneState> lanes = new ArrayList<>(consumption.getLanes());
         Map<String, Cd90StorageLaneState> laneMap = lanes.stream()
                 .collect(Collectors.toMap(Cd90StorageLaneState::getLaneCode, Function.identity()));

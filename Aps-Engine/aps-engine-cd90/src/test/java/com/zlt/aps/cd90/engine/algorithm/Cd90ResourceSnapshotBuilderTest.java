@@ -27,7 +27,8 @@ public class Cd90ResourceSnapshotBuilderTest {
         Cd90StorageLaneState original = lane("L1", 1);
         Cd90ResourceSnapshot result = builder.build(
                 Collections.singletonList(original), Collections.singletonMap("C1", new BigDecimal("87")),
-                new BigDecimal("87"), Collections.singletonList(Cd90InboundRecord.builder()
+                Collections.emptyMap(), new BigDecimal("87"),
+                Collections.singletonList(Cd90InboundRecord.builder()
                         .taskKey("T1").actual(false).clothCode("C1")
                         .laneCode("L1").vehicleCount(2).build()));
 
@@ -44,12 +45,25 @@ public class Cd90ResourceSnapshotBuilderTest {
     public void shouldKeepOtherClothLaneWhenRebuildingSnapshot() {
         Cd90ResourceSnapshot result = builder.build(
                 Arrays.asList(lane("L1", "C1", 1), lane("L2", "C2", 1)),
-                Collections.singletonMap("C1", new BigDecimal("87")), new BigDecimal("87"),
-                Collections.emptyList());
+                Collections.singletonMap("C1", new BigDecimal("87")), Collections.emptyMap(),
+                new BigDecimal("87"), Collections.emptyList());
 
         assertEquals(0, result.getLanes().get(0).getVehicleCount());
         assertEquals(1, result.getLanes().get(1).getVehicleCount());
         assertEquals("C2", result.getLanes().get(1).getClothCode());
+    }
+
+    /** ?????????????????????? */
+    @Test
+    public void shouldUseClothCurlLengthWhenRebuildingSnapshot() {
+        Cd90ResourceSnapshot result = builder.build(
+                Arrays.asList(lane("L1", "C1", 1), lane("L2", "C1", 1)),
+                Collections.singletonMap("C1", new BigDecimal("160")),
+                Collections.singletonMap("C1", new BigDecimal("80")), new BigDecimal("100"),
+                Collections.emptyList());
+
+        assertEquals(2, result.getReleasedVehicleCount());
+        assertEquals(0, result.getOccupiedVehicleCount());
     }
 
     private Cd90StorageLaneState lane(String code, int vehicles) {

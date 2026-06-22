@@ -2,6 +2,7 @@ package com.zlt.aps.cd90.engine.algorithm;
 
 import com.zlt.aps.cd90.engine.model.Cd90AutoScheduleContext;
 import com.zlt.aps.cd90.engine.model.Cd90AutoScheduleInput;
+import com.zlt.aps.cd90.engine.model.Cd90ConstructionMaterial;
 import com.zlt.aps.cd90.engine.model.Cd90MultiShiftExecutionResult;
 import com.zlt.aps.cd90.engine.model.Cd90RollingScheduleContext;
 import com.zlt.aps.cd90.engine.model.Cd90ScheduleAttemptTrace;
@@ -19,8 +20,10 @@ import org.springframework.stereotype.Component;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * 按输出窗口顺序执行全部直裁班次的内存滚动编排器。
@@ -79,8 +82,9 @@ public class Cd90MultiShiftScheduleExecutor {
                     .cumulativeConsumptionByClothBeforeShift(context, input, shift);
             rollingContextManager.updateCumulativeConsumption(rolling, cumulativeConsumptionByCloth);
             Cd90ShiftResourceState initialState = rollingContextManager.openShift(
-                    rolling, shift, context.getParameters().getRollCoilMeter(),
-                    context.getParameters().getRollTotalCount(), Collections.emptyList());
+                    rolling, shift, buildCurlLengthByCloth(input, context.getParameters().getRollCoilMeter()),
+                    context.getParameters().getRollCoilMeter(), context.getParameters().getRollTotalCount(),
+                    Collections.emptyList());
             // 单班执行只修改当前班的内存副本；完成后才推进跨班滚动状态。
             Cd90ShiftExecutionResult result = singleShiftScheduleService.execute(
                     context, input, shift, initialState, rolling);
@@ -107,6 +111,19 @@ public class Cd90MultiShiftScheduleExecutor {
                 .attemptTraces(attemptTraces)
                 .unscheduledResults(unscheduledResultAggregator.aggregate(attemptTraces))
                 .build();
+    }
+
+    private Map<String, BigDecimal> buildCurlLengthByCloth(Cd90AutoScheduleInput input,
+                                                           BigDecimal fallbackCoilMeter) {
+        if (input == null || input.getConstructionMaterials() == null) {
+            return new HashMap<>();
+        }
+        return input.getConstructionMaterials().stream()
+                .filter(item -> item != null && item.getClothCode() != null)
+                .collect(Collectors.toMap(Cd90ConstructionMaterial::getClothCode,
+                        item -> item.getCurlLength() == null || item.getCurlLength().signum() <= 0
+                                ? fallbackCoilMeter : item.getCurlLength(),
+                        (first, second) -> first));
     }
 
     private int progress(int completedShiftCount, int shiftCount) {

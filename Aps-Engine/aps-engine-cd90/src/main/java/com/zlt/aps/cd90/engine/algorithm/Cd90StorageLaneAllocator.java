@@ -42,8 +42,7 @@ public class Cd90StorageLaneAllocator {
                 : originalLanes.stream().map(this::copy).collect(Collectors.toList());
         List<Cd90StorageLaneState> candidates = lanes.stream()
                 .filter(item -> item.getMaxVehicleCount() > item.getVehicleCount())
-                .filter(item -> clothCode.equals(item.getClothCode())
-                        || item.getVehicleCount() == 0)
+                .filter(item -> clothCode.equals(item.getClothCode()))
                 .sorted(Comparator
                         .comparing((Cd90StorageLaneState item) -> !clothCode.equals(item.getClothCode()))
                         .thenComparing(Comparator.comparingInt(
