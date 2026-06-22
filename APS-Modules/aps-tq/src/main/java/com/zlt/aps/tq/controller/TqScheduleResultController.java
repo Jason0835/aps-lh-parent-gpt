@@ -33,7 +33,7 @@ import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.engine.service.FactoryService;
 import com.zlt.aps.itf.vo.SyncDataLogs;
 import com.zlt.aps.tq.api.domain.dto.TqScheduleResultDto;
-import com.zlt.aps.tq.api.domain.entity.TqDayFinishQty;
+import com.zlt.aps.tq.api.domain.entity.TqScheFinishQty;
 import com.zlt.aps.tq.engine.service.TqEngineService;
 import com.zlt.aps.tq.entity.TqScheduleResult;
 import com.zlt.aps.tq.service.TqScheduleResultService;
@@ -387,14 +387,14 @@ public class TqScheduleResultController extends BaseController {
     }
 
     /**
-     * 导入完成量
+     * 导入完成量（6班制，夜班/早班/中班）
      * @param list 完成量集合
      * @param importLogId 导入记录id
      * @return 结果
      */
     @PostMapping("/importFinishQty")
     @ApiOperation("导入完成量")
-    public AjaxResult importFinishQty(@RequestBody List<TqDayFinishQty> list, @RequestParam("importLogId") Long importLogId) {
+    public AjaxResult importFinishQty(@RequestBody List<TqScheFinishQty> list, @RequestParam("importLogId") Long importLogId) {
         if (StringUtils.isNull(list) || list.isEmpty()) {
             return AjaxResult.error(I18nUtil.getMessage("ui.data.column.import.nodata"));
         }

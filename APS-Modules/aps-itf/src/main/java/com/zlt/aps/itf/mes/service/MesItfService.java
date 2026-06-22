@@ -223,6 +223,41 @@ public interface MesItfService {
     AjaxResult syncTreadStock(AuxReqSyncDataLogs syncDataLogs);
 
     /**
+     * 同步胎圈库存
+     * T_TQ_STOCK：采用逻辑删除+插入方案
+     *   步骤1：逻辑删除当天库存日期的所有数据（IS_DELETE置为1）
+     *   步骤2：将MES最新库存数据批量插入（新记录，IS_DELETE=0）
+     *   历史数据保留，只删当天库存日期的数据
+     *
+     * @param syncDataLogs 同步参数
+     * @return 结果
+     */
+    AjaxResult syncMesTqStock(AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 同步胎圈排程完成量
+     * T_TQ_SCHE_FINISH_QTY：采用逻辑删除+插入方案
+     *   步骤1：逻辑删除当天排程日期的所有数据（IS_DELETE置为1）
+     *   步骤2：将MES最新排程完成量数据批量插入（新记录，IS_DELETE=0）
+     *   步骤3：回写胎圈排程结果表各班次完成量
+     *
+     * @param syncDataLogs 同步参数
+     * @return 结果
+     */
+    AjaxResult syncTqClassShiftFinishQty(AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 同步胎圈排程日完成量
+     * T_TQ_DAY_FINISH_QTY：采用逻辑删除+插入方案
+     *   步骤1：逻辑删除当天排程日期的所有数据（IS_DELETE置为1）
+     *   步骤2：将MES最新排程日完成量数据批量插入（新记录，IS_DELETE=0）
+     *
+     * @param syncDataLogs 同步参数
+     * @return 结果
+     */
+    AjaxResult syncTqScheDayFinishQty(AuxReqSyncDataLogs syncDataLogs);
+
+    /**
      * 同步成型排程完成量
      * 采用更新删除标识模式，而不是先删后插
      *

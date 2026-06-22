@@ -62,6 +62,16 @@ public enum MsgTemplateEnums {
      * 硫化精度计划30天预警
      */
     LH_PRECISION_PLAN_WARNING("LH_PRECISION_PLAN_WARNING", "硫化精度计划30天预警"),
+
+    /**
+     * 胎圈库存不足预警
+     */
+    TQ_STOCK_WARNING("TQ_STOCK_WARNING", "胎圈库存不足预警"),
+
+    /**
+     * 胎圈班次完成量异常预警
+     */
+    TQ_FINISH_QTY_WARNING("TQ_FINISH_QTY_WARNING", "胎圈班次完成量异常预警"),
     ;
 
     private final String code;

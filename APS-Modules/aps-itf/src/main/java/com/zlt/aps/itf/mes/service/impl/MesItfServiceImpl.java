@@ -44,6 +44,11 @@ import com.zlt.aps.cx.api.domain.entity.CxStock;
 import com.zlt.aps.cx.api.domain.entity.CxScheFinishQty;
 import com.zlt.aps.cx.api.domain.entity.CxDayFinishQty;
 import com.zlt.aps.cx.api.service.ICxMesSyncRemoteService;
+import com.zlt.aps.tq.api.domain.entity.TqDayFinishQty;
+import com.zlt.aps.tq.api.domain.entity.TqMesStock;
+import com.zlt.aps.tq.api.domain.entity.TqScheFinishQty;
+import com.zlt.aps.tq.api.domain.entity.TqStock;
+import com.zlt.aps.tq.api.service.ITqMesSyncRemoteService;
 import com.zlt.aps.lh.api.service.ILhMesSyncRemoteService;
 import com.zlt.aps.lh.api.service.ILhChipStockRemoteService;
 import com.zlt.aps.lh.api.domain.entity.LhChipStock;
@@ -111,6 +116,9 @@ public class MesItfServiceImpl implements MesItfService {
 
     @Autowired
     private ICxMesSyncRemoteService cxMesSyncRemoteService;
+
+    @Autowired
+    private ITqMesSyncRemoteService tqMesSyncRemoteService;
 
     @Autowired
     private ILhMesSyncRemoteService lhMesSyncRemoteService;
@@ -1563,6 +1571,191 @@ public class MesItfServiceImpl implements MesItfService {
         } catch (Exception e) {
             log.error("生胎库存同步：Feign调用异常，factoryCode={}, 待插入数量={}", factoryCode, cxStockInsertList.size(), e);
             return AjaxResult.error("生胎库存同步失败：" + e.getMessage());
+        }
+        return AjaxResult.success();
+    }
+
+    /**
+     * 同步胎圈库存
+     * T_TQ_STOCK：采用逻辑删除+插入方案
+     *   步骤1：逻辑删除当天库存日期的所有数据（IS_DELETE置为1）
+     *   步骤2：将MES最新库存数据批量插入（新记录，IS_DELETE=0）
+     *   历史数据保留，只删当天库存日期的数据
+     *
+     * @param syncDataLogs 同步参数
+     * @return 结果
+     */
+    @Override
+    public AjaxResult syncMesTqStock(AuxReqSyncDataLogs syncDataLogs) {
+        // 切换到MES数据源查询中间表
+        DynamicDataSourceContextHolder.push(DataSource.MES);
+        List<TqMesStock> syncList = mesItfMapper.selectMesTqStockList(syncDataLogs);
+        DynamicDataSourceContextHolder.poll();
+
+        // 按库存日期+物料编码去重，保留第一条
+        Map<String, TqMesStock> groupMap = syncList.stream()
+                .collect(Collectors.toMap(
+                        item -> DateUtil.formatDate(item.getStockDate()) + "|" + item.getMaterialCode(),
+                        Function.identity(),
+                        (v1, v2) -> v1
+                ));
+        syncList = new ArrayList<>(groupMap.values());
+
+        if (CollectionUtils.isEmpty(syncList)) {
+            log.warn("胎圈库存同步：MES中间表查询结果为空");
+            return AjaxResult.success("MES中间表无数据可同步");
+        }
+
+        // 转换 TqMesStock → TqStock
+        List<TqStock> tqStockInsertList = syncList.stream().map(item -> {
+            TqStock tqStock = new TqStock();
+            tqStock.setStockDate(item.getStockDate());
+            tqStock.setMaterialCode(item.getMaterialCode());
+            tqStock.setStockNum(item.getAvailableStock() != null ? item.getAvailableStock() : BigDecimal.ZERO);
+            tqStock.setCreateBy("MES");
+            tqStock.setUpdateBy("MES");
+            tqStock.setCreateTime(DateUtils.getNowDate());
+            tqStock.setUpdateTime(DateUtils.getNowDate());
+            return tqStock;
+        }).collect(Collectors.toList());
+
+        try {
+            // 取第一条数据的库存日期作为逻辑删除条件
+            Date stockDate = tqStockInsertList.stream()
+                    .map(TqStock::getStockDate)
+                    .filter(Objects::nonNull)
+                    .findFirst()
+                    .orElse(DateUtils.getNowDate());
+            String stockDateStr = DateUtil.formatDate(stockDate);
+
+            log.info("胎圈库存同步：开始同步，待插入数量={}, 库存日期={}", tqStockInsertList.size(), stockDateStr);
+
+            FeignTokenHelper.runWithToken(() -> {
+                tqMesSyncRemoteService.logicDeleteAndSaveTqStockByStockDate(stockDateStr, "MES", tqStockInsertList);
+            });
+
+            log.info("胎圈库存同步：同步完成，插入数量={}", tqStockInsertList.size());
+        } catch (Exception e) {
+            log.error("胎圈库存同步：Feign调用异常，待插入数量={}", tqStockInsertList.size(), e);
+            return AjaxResult.error("胎圈库存同步失败：" + e.getMessage());
+        }
+        return AjaxResult.success();
+    }
+
+    /**
+     * 同步胎圈排程完成量
+     * 从MES中间表MES_TQ_CLASS_FINISH_QTY查询当天最新版本数据，
+     * 逻辑删除APS旧数据并插入新数据，最后回写胎圈排程结果表各班次完成量
+     *
+     * @param syncDataLogs 同步参数
+     * @return 结果
+     */
+    @Override
+    public AjaxResult syncTqClassShiftFinishQty(AuxReqSyncDataLogs syncDataLogs) {
+        DynamicDataSourceContextHolder.push(DataSource.MES);
+        List<TqScheFinishQty> syncList = mesItfMapper.selectTqClassShiftFinishQtyList(syncDataLogs);
+        DynamicDataSourceContextHolder.poll();
+
+        if (CollectionUtils.isEmpty(syncList)) {
+            log.warn("胎圈排程完成量同步：MES中间表查询结果为空，factoryCode={}", syncDataLogs.getFactoryCode());
+            return AjaxResult.success("MES中间表无数据可同步");
+        }
+
+        List<TqScheFinishQty> insertList = new ArrayList<>();
+        for (TqScheFinishQty item : syncList) {
+            TqScheFinishQty entity = new TqScheFinishQty();
+            BeanUtils.copyProperties(item, entity);
+            entity.setCreateBy("MES");
+            entity.setUpdateBy("MES");
+            entity.setCreateTime(DateUtils.getNowDate());
+            entity.setUpdateTime(DateUtils.getNowDate());
+            entity.setIsDelete(0);
+            insertList.add(entity);
+        }
+
+        try {
+            String factoryCode = syncDataLogs.getFactoryCode();
+            Date scheduleDate = insertList.stream().map(TqScheFinishQty::getScheduleDate).filter(Objects::nonNull).findFirst().orElse(DateUtils.getNowDate());
+            String scheduleDateStr = DateUtil.formatDate(scheduleDate);
+            log.info("胎圈排程完成量同步：开始同步，factoryCode={}, scheduleDate={}, 待插入数量={}", factoryCode, scheduleDateStr, insertList.size());
+
+            FeignTokenHelper.runWithToken(() -> {
+                tqMesSyncRemoteService.logicDeleteAndSaveScheFinishQty(factoryCode, scheduleDateStr, "MES", insertList);
+            });
+
+            log.info("胎圈排程完成量同步：同步完成，factoryCode={}, 插入数量={}", factoryCode, insertList.size());
+        } catch (Exception e) {
+            log.error("胎圈排程完成量同步：Feign调用异常，factoryCode={}, 待插入数量={}", syncDataLogs.getFactoryCode(), insertList.size(), e);
+            return AjaxResult.error("胎圈排程完成量同步失败：" + e.getMessage());
+        }
+
+        try {
+            FeignTokenHelper.runWithToken(() -> {
+                tqMesSyncRemoteService.writeBackScheduleResultFinishQty(insertList);
+            });
+        } catch (Exception e) {
+            log.error("【胎圈排程完成量回写】回写胎圈排程结果表完成量异常", e);
+        }
+        return AjaxResult.success();
+    }
+
+    /**
+     * 同步胎圈排程日完成量
+     * 从MES中间表MES_TQ_DAY_FINISH_TOTL查询前一天的数据，
+     * 逻辑删除APS旧数据并插入新数据
+     *
+     * @param syncDataLogs 同步参数
+     * @return 结果
+     */
+    @Override
+    public AjaxResult syncTqScheDayFinishQty(AuxReqSyncDataLogs syncDataLogs) {
+        DynamicDataSourceContextHolder.push(DataSource.MES);
+        Date nowDate = DateUtils.truncate(DateUtils.getNowDate(), Calendar.DATE);
+        Date lastDate = DateUtils.addDays(nowDate, -1);
+        syncDataLogs.setQueryParams(new HashMap<>());
+        syncDataLogs.getQueryParams().put("scheduleDate", lastDate);
+        List<TqDayFinishQty> syncList = mesItfMapper.selectTqScheDayFinishQtyList(syncDataLogs);
+        DynamicDataSourceContextHolder.poll();
+
+        if (CollectionUtils.isEmpty(syncList)) {
+            log.warn("胎圈排程日完成量同步：MES中间表查询结果为空，factoryCode={}", syncDataLogs.getFactoryCode());
+            return AjaxResult.success("MES中间表无数据可同步");
+        }
+
+        Map<String, TqDayFinishQty> groupMap = syncList.stream()
+                .collect(Collectors.toMap(
+                        item -> item.getFactoryCode() + "|" + DateUtil.formatDate(item.getScheduleDate()) + "|" + item.getBeadCode(),
+                        Function.identity(),
+                        (v1, v2) -> v1
+                ));
+        syncList = new ArrayList<>(groupMap.values());
+
+        List<TqDayFinishQty> insertList = new ArrayList<>();
+        for (TqDayFinishQty item : syncList) {
+            TqDayFinishQty entity = new TqDayFinishQty();
+            BeanUtils.copyProperties(item, entity);
+            entity.setCreateBy("MES");
+            entity.setUpdateBy("MES");
+            entity.setCreateTime(DateUtils.getNowDate());
+            entity.setUpdateTime(DateUtils.getNowDate());
+            entity.setIsDelete(0);
+            insertList.add(entity);
+        }
+
+        try {
+            String factoryCode = syncDataLogs.getFactoryCode();
+            Date scheduleDate = insertList.stream().map(TqDayFinishQty::getScheduleDate).filter(Objects::nonNull).findFirst().orElse(DateUtils.getNowDate());
+            String scheduleDateStr = DateUtil.formatDate(scheduleDate);
+            log.info("胎圈排程日完成量同步：开始同步，factoryCode={}, scheduleDate={}, 待插入数量={}", factoryCode, scheduleDateStr, insertList.size());
+
+            FeignTokenHelper.runWithToken(() -> {
+                tqMesSyncRemoteService.logicDeleteAndSaveDayFinishQty(factoryCode, scheduleDateStr, "MES", insertList);
+            });
+
+            log.info("胎圈排程日完成量同步：同步完成，factoryCode={}, 插入数量={}", factoryCode, insertList.size());
+        } catch (Exception e) {
+            log.error("胎圈排程日完成量同步：Feign调用异常，factoryCode={}, 待插入数量={}", syncDataLogs.getFactoryCode(), insertList.size(), e);
+            return AjaxResult.error("胎圈排程日完成量同步失败：" + e.getMessage());
         }
         return AjaxResult.success();
     }

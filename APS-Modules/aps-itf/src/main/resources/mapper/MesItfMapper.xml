@@ -459,6 +459,53 @@
         <if test="queryParams != null and queryParams.finishDate != null">AND FINISH_DATE = #{queryParams.finishDate}</if>
     </select>
 
+    <!-- 查询胎圈排程完成量同步数据（取当天最新版本） -->
+    <select id="selectTqClassShiftFinishQtyList" resultType="com.zlt.aps.tq.api.domain.entity.TqScheFinishQty">
+        SELECT
+        t.ORDER_NO,
+        t.SCHEDULE_DATE,
+        t.BEAD_CODE,
+        t.MATERIAL_CODE,
+        t.NIGHT_FINISH_QTY,
+        t.DAY_FINISH_QTY,
+        t.MID_FINISH_QTY,
+        t.DATA_VERSION,
+        t.COMPANY_CODE,
+        t.FACTORY_CODE
+        FROM MES_TQ_CLASS_FINISH_QTY t
+        INNER JOIN (
+            SELECT SCHEDULE_DATE, BEAD_CODE, ORDER_NO, MAX(DATA_VERSION) AS MAX_VERSION
+            FROM MES_TQ_CLASS_FINISH_QTY
+            WHERE CONVERT(DATE, SCHEDULE_DATE) = CONVERT(DATE, GETDATE())
+            <if test="factoryCode != null and factoryCode != ''">AND FACTORY_CODE = #{factoryCode}</if>
+            <if test="companyCode != null and companyCode != ''">AND COMPANY_CODE = #{companyCode}</if>
+            GROUP BY SCHEDULE_DATE, BEAD_CODE, ORDER_NO
+        ) latest ON t.SCHEDULE_DATE = latest.SCHEDULE_DATE
+            AND t.BEAD_CODE = latest.BEAD_CODE
+            AND t.ORDER_NO = latest.ORDER_NO
+            AND t.DATA_VERSION = latest.MAX_VERSION
+        WHERE CONVERT(DATE, t.SCHEDULE_DATE) = CONVERT(DATE, GETDATE())
+        <if test="factoryCode != null and factoryCode != ''">AND t.FACTORY_CODE = #{factoryCode}</if>
+        <if test="companyCode != null and companyCode != ''">AND t.COMPANY_CODE = #{companyCode}</if>
+    </select>
+
+    <!-- 查询胎圈排程日完成量同步数据 -->
+    <select id="selectTqScheDayFinishQtyList" resultType="com.zlt.aps.tq.api.domain.entity.TqDayFinishQty">
+        SELECT
+        SCHEDULE_DATE,
+        BEAD_CODE,
+        FINISH_QTY,
+        DATA_VERSION,
+        COMPANY_CODE,
+        FACTORY_CODE
+        FROM MES_TQ_DAY_FINISH_TOTL
+        WHERE 1 = 1
+        <if test="factoryCode != null and factoryCode != ''">AND FACTORY_CODE = #{factoryCode}</if>
+        <if test="companyCode != null and companyCode != ''">AND COMPANY_CODE = #{companyCode}</if>
+        <if test="dataVersion != null and dataVersion != ''">AND DATA_VERSION = #{dataVersion}</if>
+        <if test="queryParams != null and queryParams.scheduleDate != null">AND CONVERT(DATE, SCHEDULE_DATE) = CONVERT(DATE, #{queryParams.scheduleDate})</if>
+    </select>
+
     <select id="selectMoldAlterPlanFinishList" resultType="com.zlt.aps.lh.api.domain.entity.LhMoldAlterPlanFinish">
         SELECT
         LH_BATCH_NO,
@@ -491,6 +538,16 @@
         <if test="factoryCode != null and factoryCode != ''">AND FACTORY_CODE = #{factoryCode}</if>
         <if test="companyCode != null and companyCode != ''">AND COMPANY_CODE = #{companyCode}</if>
         <if test="dataVersion != null and dataVersion != ''">AND DATA_VERSION = #{dataVersion}</if>
+    </select>
+
+    <!-- 查询胎圈库存同步数据 -->
+    <select id="selectMesTqStockList" resultType="com.zlt.aps.tq.api.domain.entity.TqMesStock">
+        SELECT
+        STOCK_DATE,
+        MATERIAL_CODE,
+        AVAILABLE_STOCK
+        FROM MES_TQ_STOCK
+        WHERE 1 = 1
     </select>
 
     <select id="selectLhPrecisionPlanActualList" resultType="com.zlt.aps.itf.vo.DevMaintenancePlan">

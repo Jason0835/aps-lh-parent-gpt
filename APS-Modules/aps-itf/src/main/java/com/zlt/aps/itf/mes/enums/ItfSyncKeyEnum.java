@@ -98,6 +98,21 @@ public enum ItfSyncKeyEnum {
      * 设备计划停机同步
      */
     DEV_PLAN_CLOSE("DEV_PLAN_CLOSE", "MES", "APS", "设备计划停机同步"),
+
+    /**
+     * 胎圈排程结果下发
+     */
+    SYNC_TQ_SCHEDULE_RESULT("BEAD_SCHE_RST_FBK", "APS", "MES", "胎圈排程结果下发接口"),
+
+    /**
+     * 胎圈排程完成量同步
+     */
+    TQ_CLASS_SHIFT_FINISH_QTY("BEAD_COMPLETE_QUANTITY", "MES", "APS", "胎圈排程完成量同步"),
+
+    /**
+     * 胎圈排程日完成量同步
+     */
+    TQ_SCHE_DAY_FINISH_QTY("TQ_DAY_COMPLETE", "MES", "APS", "胎圈排程日完成量同步"),
     ;
 	/**
 	 * 接口码

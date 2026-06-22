@@ -13,6 +13,9 @@ import com.zlt.aps.lh.api.domain.entity.LhMachineOnlineInfo;
 import com.zlt.aps.lh.api.domain.entity.LhScheFinishQty;
 import com.zlt.aps.lh.api.domain.entity.LhDayFinishQty;
 import com.zlt.aps.lh.api.domain.entity.LhMoldAlterPlanFinish;
+import com.zlt.aps.tq.api.domain.entity.TqDayFinishQty;
+import com.zlt.aps.tq.api.domain.entity.TqMesStock;
+import com.zlt.aps.tq.api.domain.entity.TqScheFinishQty;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
@@ -141,6 +144,14 @@ public interface MesItfMapper {
     List<MdmTreadStock> selectTreadStockList(AuxReqSyncDataLogs syncDataLogs);
 
     /**
+     * 查询胎圈库存同步数据
+     *
+     * @param syncDataLogs 参数
+     * @return 列表
+     */
+    List<TqMesStock> selectMesTqStockList(AuxReqSyncDataLogs syncDataLogs);
+
+    /**
      * 查询成型排程完成量同步数据
      *
      * @param syncDataLogs 参数
@@ -188,6 +199,22 @@ public interface MesItfMapper {
      * @return 列表
      */
     List<LhDayFinishQty> selectLhScheDayFinishQtyList(AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 查询胎圈排程完成量同步数据
+     *
+     * @param syncDataLogs 参数
+     * @return 列表
+     */
+    List<TqScheFinishQty> selectTqClassShiftFinishQtyList(AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 查询胎圈排程日完成量同步数据
+     *
+     * @param syncDataLogs 参数
+     * @return 列表
+     */
+    List<TqDayFinishQty> selectTqScheDayFinishQtyList(AuxReqSyncDataLogs syncDataLogs);
 
 
 
