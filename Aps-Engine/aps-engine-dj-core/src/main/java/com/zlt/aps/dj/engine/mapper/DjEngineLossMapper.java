@@ -1,18 +1,10 @@
 package com.zlt.aps.dj.engine.mapper;
 
-
-import java.util.List;
-
-import com.zlt.aps.dj.engine.vo.DjLossVo;
+import com.zlt.aps.dj.api.domain.entity.DjLossSetting;
+import com.zlt.core.dao.basemapper.CommBaseMapper;
 
 /**
- * 损耗率mapper
+ * 损耗率 Mapper
  */
-public interface DjEngineLossMapper {
-
-    /**
-     * 获得损耗率类别
-     * @return
-     */
-    List<DjLossVo> listLossRate();
+public interface DjEngineLossMapper extends CommBaseMapper<DjLossSetting> {
 }

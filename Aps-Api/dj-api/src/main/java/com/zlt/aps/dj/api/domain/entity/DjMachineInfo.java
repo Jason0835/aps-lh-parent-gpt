@@ -66,7 +66,7 @@ public class DjMachineInfo extends BaseEntity {
     @ImportValidated(name = "ui.data.column.machine.thickMax", number = true, min = 0, max = 999999)
     private BigDecimal thickMax;
 
-    /** 生产定额，是指单班一次能生产的量，单位：吨/班 */
+    /** 生产定额，是指单班一次能生产的量，单位：米/班 */
     @ApiModelProperty(value = "生产定额", position =75)
     @Excel(name = "ui.data.column.machine.quata")
     @ImportValidated(name = "ui.data.column.machine.quata", number = true, min = 0, max = 999999)
