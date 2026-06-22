@@ -34,6 +34,10 @@ public class Cd90MachineTrial {
     private int priorityOrder;
     /** 机台链尾是否与当前帘线规格相同。 */
     private boolean sameTailSpec;
+    /** 本次规格切换耗时秒数。 */
+    private int changeSeconds;
+    /** 本次任务按试算量生产耗时秒数。 */
+    private int productionSeconds;
     /** 排入后的班次剩余秒数。 */
     private int remainingSeconds;
 }

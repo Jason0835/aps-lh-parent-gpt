@@ -43,10 +43,8 @@ public class Cd90StorageLaneAllocator {
         List<Cd90StorageLaneState> candidates = lanes.stream()
                 .filter(item -> item.getMaxVehicleCount() > item.getVehicleCount())
                 .filter(item -> clothCode.equals(item.getClothCode()))
-                .sorted(Comparator
-                        .comparing((Cd90StorageLaneState item) -> !clothCode.equals(item.getClothCode()))
-                        .thenComparing(Comparator.comparingInt(
-                                Cd90StorageLaneState::getVehicleCount).reversed())
+                .sorted(Comparator.comparingInt(Cd90StorageLaneState::getVehicleCount)
+                        .reversed()
                         .thenComparing(Cd90StorageLaneState::getLaneCode))
                 .collect(Collectors.toList());
         int remaining = required;
@@ -66,13 +64,15 @@ public class Cd90StorageLaneAllocator {
                     .laneCode(lane.getLaneCode()).vehicleCount(assigned).build());
             remaining -= assigned;
         }
-        if (remaining > 0) {
+        int allocated = required - remaining;
+        if (allocated <= 0) {
             return Cd90StorageLaneAllocationResult.builder().success(false)
                     .failureReason("STORAGE_LANE_LIMIT").requiredVehicleCount(required)
-                    .allocations(new ArrayList<>()).lanes(originalLanes).build();
+                    .allocatedVehicleCount(0).allocations(new ArrayList<>()).lanes(originalLanes).build();
         }
         return Cd90StorageLaneAllocationResult.builder().success(true)
-                .requiredVehicleCount(required).allocations(allocations).lanes(lanes).build();
+                .requiredVehicleCount(required).allocatedVehicleCount(allocated)
+                .allocations(allocations).lanes(lanes).build();
     }
 
     private Cd90StorageLaneState copy(Cd90StorageLaneState source) {

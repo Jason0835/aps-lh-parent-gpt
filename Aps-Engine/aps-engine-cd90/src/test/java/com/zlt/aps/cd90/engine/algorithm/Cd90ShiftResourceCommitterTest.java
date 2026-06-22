@@ -46,11 +46,38 @@ public class Cd90ShiftResourceCommitterTest {
     }
 
     @Test
-    public void shouldFallbackToNextTrialWhenFirstExceedsLaneCapacity() {
+    public void shouldCommitLargePartialLaneAllocationByActualVehicles() {
+        Cd90ShiftResourceState state = state(7);
+
+        Cd90ShiftCommitResult result = committer.commit(request(plan(
+                trial("M1", "640", 20000, true))), state);
+
+        assertTrue(result.isSuccess());
+        assertEquals(new BigDecimal("560"), result.getTask().getPlanQuantity());
+        assertEquals(7, result.getTask().getVehicleCount());
+        assertEquals(7, result.getTask().getLaneAllocations().get(0).getVehicleCount());
+        assertEquals(7, result.getState().getOccupiedToolingCount());
+    }
+
+    @Test
+    public void shouldRejectTinyInitialPartialLaneAllocation() {
         Cd90ShiftResourceState state = state(1);
 
         Cd90ShiftCommitResult result = committer.commit(request(plan(
-                trial("M1", "200", 25000, true), trial("M2", "100", 26000, false))), state);
+                trial("M1", "640", 20000, true))), state);
+
+        assertFalse(result.isSuccess());
+        assertEquals("STORAGE_LANE_LIMIT", result.getFailureReason());
+        assertEquals(0, result.getState().getTasks().size());
+        assertEquals(0, result.getState().getOccupiedToolingCount());
+    }
+
+    @Test
+    public void shouldFallbackToNextTrialWhenFirstTinyPartialLaneCapacity() {
+        Cd90ShiftResourceState state = state(1);
+
+        Cd90ShiftCommitResult result = committer.commit(request(plan(
+                trial("M1", "300", 25000, true), trial("M2", "100", 26000, false))), state);
 
         assertTrue(result.isSuccess());
         assertEquals("M2", result.getTask().getMachineCode());
@@ -75,7 +102,7 @@ public class Cd90ShiftResourceCommitterTest {
                 .cordSpec("BR001").classField("CLASS1")
                 .shiftStart(LocalDateTime.of(2026, 6, 12, 14, 0))
                 .shiftEnd(LocalDateTime.of(2026, 6, 12, 22, 0))
-                .coilMeter(new BigDecimal("100")).trialPlan(plan).build();
+                .coilMeter(new BigDecimal("100")).closeOut(false).trialPlan(plan).build();
     }
 
     private Cd90MachineTrialPlan plan(Cd90MachineTrial... trials) {
@@ -89,6 +116,7 @@ public class Cd90ShiftResourceCommitterTest {
                 .finalSchedulableQuantity(new BigDecimal(quantity))
                 .fullyAccommodated(true).preferredMachine(preferred)
                 .priorityOrder(preferred ? 0 : 1).sameTailSpec(false)
+                .changeSeconds(0).productionSeconds(28800 - remainingSeconds)
                 .remainingSeconds(remainingSeconds).build();
     }
 
@@ -98,7 +126,7 @@ public class Cd90ShiftResourceCommitterTest {
         seconds.put("M2", 28800);
         return Cd90ShiftResourceState.builder()
                 .lanes(Collections.singletonList(Cd90StorageLaneState.builder()
-                        .laneCode("L1").vehicleCount(0).maxVehicleCount(laneCapacity).build()))
+                        .laneCode("L1").clothCode("CF001").vehicleCount(0).maxVehicleCount(laneCapacity).build()))
                 .occupiedToolingCount(0).totalToolingCount(10)
                 .remainingSecondsByMachine(seconds).tailSpecByMachine(new HashMap<>())
                 .tasks(new java.util.ArrayList<>()).build();

@@ -119,7 +119,7 @@ public class Cd90SingleShiftScheduleExecutor implements Cd90SingleShiftScheduleS
                     trialRequest(context, shift, state, construction, netDemand, closeOut.isCloseOut()),
                     machineSnapshot);
             Cd90ShiftCommitResult commit = resourceCommitter.commit(
-                    commitRequest(context, shift, construction, trialPlan), state);
+                    commitRequest(context, shift, construction, trialPlan, closeOut.isCloseOut()), state);
             if (!commit.isSuccess()) {
                 // 提交失败返回原state，因此失败规格不会污染后续规格的机台、库排和工装资源。
                 recordFailure(failures, shift, clothCode, commit.getFailureReason());
@@ -181,7 +181,8 @@ public class Cd90SingleShiftScheduleExecutor implements Cd90SingleShiftScheduleS
     private Cd90ShiftCommitRequest commitRequest(Cd90AutoScheduleContext context,
                                                   Cd90ShiftDescriptor shift,
                                                   Cd90ConstructionMaterial construction,
-                                                  Cd90MachineTrialPlan trialPlan) {
+                                                  Cd90MachineTrialPlan trialPlan,
+                                                  boolean closeOut) {
         return Cd90ShiftCommitRequest.builder()
                 .clothCode(construction.getClothCode())
                 .bigRollCode(construction.getBigRollCode())
@@ -189,6 +190,7 @@ public class Cd90SingleShiftScheduleExecutor implements Cd90SingleShiftScheduleS
                 .classField(shift.getClassField())
                 .shiftStart(shift.getStartTime()).shiftEnd(shift.getEndTime())
                 .coilMeter(effectiveCurlLength(context, construction))
+                .closeOut(closeOut)
                 .trialPlan(trialPlan).build();
     }
 

@@ -48,6 +48,7 @@ public class Cd90StorageLaneConsumptionCalculatorTest {
 
         assertEquals(1, result.getReleasedVehicleCount());
         assertEquals(0, result.getLanes().get(0).getVehicleCount());
+        assertEquals("C1", result.getLanes().get(0).getClothCode());
         assertEquals(1, result.getLanes().get(1).getVehicleCount());
         assertEquals("C2", result.getLanes().get(1).getClothCode());
     }

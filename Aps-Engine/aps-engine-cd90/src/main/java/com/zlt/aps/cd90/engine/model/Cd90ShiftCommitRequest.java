@@ -24,6 +24,8 @@ public class Cd90ShiftCommitRequest {
     private LocalDateTime shiftEnd;
     /** 单车卷曲米数。 */
     private BigDecimal coilMeter;
+    /** 是否收尾规格。 */
+    private boolean closeOut;
     /** 候选机台试算方案。 */
     private Cd90MachineTrialPlan trialPlan;
 }

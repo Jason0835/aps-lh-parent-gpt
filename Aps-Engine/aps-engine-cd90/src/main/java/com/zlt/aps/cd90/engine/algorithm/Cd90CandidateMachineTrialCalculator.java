@@ -68,6 +68,8 @@ public class Cd90CandidateMachineTrialCalculator {
                 .fullyAccommodated(finalQuantity.compareTo(actualQuantity) >= 0)
                 .preferredMachine(input.isPreferredMachine())
                 .priorityOrder(input.getPriorityOrder())
+                .changeSeconds(capacity.getChangeSeconds())
+                .productionSeconds(capacity.getProductionSeconds())
                 .sameTailSpec(input.getCurrentTail() == null
                         ? input.getPreviousSpec() != null && input.getPreviousSpec().equals(input.getCurrentSpec())
                         : input.getPreviousTail() != null

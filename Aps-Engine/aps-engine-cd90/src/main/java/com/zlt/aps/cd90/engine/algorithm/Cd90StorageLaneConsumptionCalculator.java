@@ -87,9 +87,7 @@ public class Cd90StorageLaneConsumptionCalculator {
             int count = Math.min(lane.getVehicleCount(), releasable - released);
             lane.setVehicleCount(lane.getVehicleCount() - count);
             released += count;
-            if (lane.getVehicleCount() == 0) {
-                lane.setClothCode(null);
-            }
+            // 库排释放到0车后仍保留原帘布代码：0车代表该帘布的定向空位，不能变成任意帘布可抢占的公共空库排。
         }
         return released;
     }

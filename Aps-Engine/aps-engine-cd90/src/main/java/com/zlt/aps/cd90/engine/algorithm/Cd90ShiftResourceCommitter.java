@@ -1,7 +1,7 @@
 package com.zlt.aps.cd90.engine.algorithm;
 
-import com.zlt.aps.cd90.engine.model.Cd90MachineTrial;
 import com.zlt.aps.cd90.engine.model.Cd90MachineTailState;
+import com.zlt.aps.cd90.engine.model.Cd90MachineTrial;
 import com.zlt.aps.cd90.engine.model.Cd90ShiftCommitRequest;
 import com.zlt.aps.cd90.engine.model.Cd90ShiftCommitResult;
 import com.zlt.aps.cd90.engine.model.Cd90ShiftResourceState;
@@ -12,6 +12,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -27,6 +29,9 @@ import java.util.stream.Collectors;
 @Component
 @RequiredArgsConstructor
 public class Cd90ShiftResourceCommitter {
+
+    private static final int MIN_PARTIAL_NUMERATOR = 1;
+    private static final int MIN_PARTIAL_DENOMINATOR = 2;
 
     private final Cd90StorageLaneAllocator laneAllocator;
     private final Cd90MachineTrialSelector trialSelector;
@@ -59,22 +64,23 @@ public class Cd90ShiftResourceCommitter {
             Cd90StorageLaneAllocationResult allocation = laneAllocator.allocate(
                     request.getClothCode(), trial.getFinalSchedulableQuantity(),
                     request.getCoilMeter(), working.getLanes());
-            if (!allocation.isSuccess()) {
-                // 库排容量不足属于当前机台方案失败，不提前修改工装和机台剩余时间。
-                lastFailureReason = allocation.getFailureReason();
+            if (!allocation.isSuccess() || !acceptPartialAllocation(allocation, request)) {
+                // 库排容量不足或部分排比例太小，均不提前修改工装和机台剩余时间。
+                lastFailureReason = "STORAGE_LANE_LIMIT";
                 continue;
             }
+            int allocatedVehicles = allocation.getAllocatedVehicleCount();
             int availableTooling = working.getTotalToolingCount() - working.getOccupiedToolingCount();
-            if (allocation.getRequiredVehicleCount() > availableTooling) {
-                // 工装数按入库车数占用；不足时继续尝试其他方案但仍保留稳定失败原因。
+            if (allocatedVehicles > availableTooling) {
+                // 工装数按实际入库车数占用；不足时继续尝试其他方案但仍保留稳定失败原因。
                 lastFailureReason = "ROLL_TOOL_LIMIT";
                 continue;
             }
 
-            // 计划起止时间从机台本班已消耗秒数推导，同机台任务按提交顺序连续排列。
             int beforeSeconds = working.getRemainingSecondsByMachine().getOrDefault(
                     trial.getMachineCode(), fullShiftSeconds(request));
-            int afterSeconds = trial.getRemainingSeconds();
+            BigDecimal committedQuantity = committedQuantity(trial, request.getCoilMeter(), allocatedVehicles);
+            int afterSeconds = adjustedRemainingSeconds(request, trial, beforeSeconds, committedQuantity);
             int elapsedBefore = Math.max(0, fullShiftSeconds(request) - beforeSeconds);
             int occupiedSeconds = Math.max(0, beforeSeconds - afterSeconds);
             LocalDateTime expectedStart = request.getShiftStart().plusSeconds(elapsedBefore);
@@ -84,32 +90,69 @@ public class Cd90ShiftResourceCommitter {
                     .classField(request.getClassField()).clothCode(request.getClothCode())
                     .bigRollCode(request.getBigRollCode()).cordSpec(request.getCordSpec())
                     .machineCode(trial.getMachineCode())
-                    .planQuantity(trial.getFinalSchedulableQuantity())
-                    .vehicleCount(allocation.getRequiredVehicleCount())
+                    .planQuantity(committedQuantity)
+                    .vehicleCount(allocatedVehicles)
                     .produceOrder(produceOrder).expectedStartTime(expectedStart)
                     .expectedEndTime(expectedStart.plusSeconds(occupiedSeconds))
                     .laneAllocations(allocation.getAllocations()).build();
 
             // 以下资源变更必须与任务一起提交，不能只扣减部分资源。
             working.setLanes(allocation.getLanes());
-            working.setOccupiedToolingCount(working.getOccupiedToolingCount()
-                    + allocation.getRequiredVehicleCount());
+            working.setOccupiedToolingCount(working.getOccupiedToolingCount() + allocatedVehicles);
             working.getRemainingSecondsByMachine().put(trial.getMachineCode(), afterSeconds);
             working.getTailSpecByMachine().put(trial.getMachineCode(), request.getCordSpec());
             working.getTailByMachine().put(trial.getMachineCode(), Cd90MachineTailState.builder()
                     .clothCode(request.getClothCode()).bigRollCode(request.getBigRollCode()).build());
             working.getTasks().add(task);
-            log.info("[直裁自动排程] 当前班次资源提交成功, classField={}, clothCode={}, "
-                            + "machineCode={}, planQuantity={}, vehicleCount={}, produceOrder={}",
+            log.info("[直裁自动排程] 当前班次资源提交成功, classField={}, clothCode={}, machineCode={}, "
+                            + "planQuantity={}, vehicleCount={}, requiredVehicleCount={}, produceOrder={}",
                     request.getClassField(), request.getClothCode(), trial.getMachineCode(),
-                    trial.getFinalSchedulableQuantity(), allocation.getRequiredVehicleCount(), produceOrder);
+                    committedQuantity, allocatedVehicles, allocation.getRequiredVehicleCount(), produceOrder);
             return Cd90ShiftCommitResult.builder().success(true).state(working).task(task).build();
         }
         log.warn("[直裁自动排程] 当前班次资源提交失败, classField={}, clothCode={}, reason={}",
                 request.getClassField(), request.getClothCode(), lastFailureReason);
-        // 全部方案失败时明确返回原对象，调用方可安全继续处理下一个规格。
         return Cd90ShiftCommitResult.builder().success(false).failureReason(lastFailureReason)
                 .state(originalState).build();
+    }
+
+    private boolean acceptPartialAllocation(Cd90StorageLaneAllocationResult allocation,
+                                            Cd90ShiftCommitRequest request) {
+        int assigned = allocation.getAllocatedVehicleCount();
+        int required = allocation.getRequiredVehicleCount();
+        if (assigned <= 0) {
+            return false;
+        }
+        if (assigned >= required || request.isCloseOut()) {
+            return true;
+        }
+        // 初次部分排至少接受一半车数；续做收口在下一班通常会变成 required=assigned=1，不会被该规则卡死。
+        return assigned * MIN_PARTIAL_DENOMINATOR >= required * MIN_PARTIAL_NUMERATOR;
+    }
+
+    private BigDecimal committedQuantity(Cd90MachineTrial trial, BigDecimal coilMeter,
+                                         int allocatedVehicles) {
+        BigDecimal laneQuantity = coilMeter.multiply(BigDecimal.valueOf(allocatedVehicles));
+        BigDecimal trialQuantity = trial.getFinalSchedulableQuantity() == null
+                ? BigDecimal.ZERO : trial.getFinalSchedulableQuantity();
+        BigDecimal result = trialQuantity.signum() > 0 ? laneQuantity.min(trialQuantity) : laneQuantity;
+        return normalize(result);
+    }
+
+    private int adjustedRemainingSeconds(Cd90ShiftCommitRequest request, Cd90MachineTrial trial,
+                                         int beforeSeconds, BigDecimal committedQuantity) {
+        BigDecimal trialQuantity = trial.getFinalSchedulableQuantity();
+        if (trialQuantity == null || committedQuantity.compareTo(trialQuantity) >= 0
+                || trial.getProductionSeconds() <= 0) {
+            return trial.getRemainingSeconds();
+        }
+        int productionSeconds = committedQuantity.multiply(BigDecimal.valueOf(trial.getProductionSeconds()))
+                .divide(trialQuantity, 0, RoundingMode.CEILING).intValueExact();
+        return Math.max(0, beforeSeconds - trial.getChangeSeconds() - productionSeconds);
+    }
+
+    private BigDecimal normalize(BigDecimal value) {
+        return value.stripTrailingZeros().scale() < 0 ? value.setScale(0) : value.stripTrailingZeros();
     }
 
     private int fullShiftSeconds(Cd90ShiftCommitRequest request) {

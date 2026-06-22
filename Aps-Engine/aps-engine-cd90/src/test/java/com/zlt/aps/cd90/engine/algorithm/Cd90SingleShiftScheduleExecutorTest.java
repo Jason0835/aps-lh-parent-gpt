@@ -100,7 +100,7 @@ public class Cd90SingleShiftScheduleExecutorTest {
         seconds.put("M1", 28800);
         return Cd90ShiftResourceState.builder()
                 .lanes(Collections.singletonList(Cd90StorageLaneState.builder()
-                        .laneCode("L1").vehicleCount(0).maxVehicleCount(10).build()))
+                        .laneCode("L1").clothCode("C2").vehicleCount(0).maxVehicleCount(10).build()))
                 .totalToolingCount(10).occupiedToolingCount(0)
                 .remainingSecondsByMachine(seconds).tailSpecByMachine(new HashMap<>())
                 .tasks(new java.util.ArrayList<>()).build();
