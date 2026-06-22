@@ -163,36 +163,57 @@ public class Cd90AutoScheduleOutputDraftBuilder {
      */
     private void attachPriorFailureAnalysis(List<Cd90ScheduleResultDraft> results,
                                             List<Cd90ScheduleAttemptTrace> traces) {
-        Map<String, Integer> successSequenceByClothClass = safe(traces).stream()
+        Map<String, Cd90ScheduleAttemptTrace> successTraceByClothClass = safe(traces).stream()
                 .filter(item -> item != null && StringUtils.hasText(item.getClothCode())
                         && StringUtils.hasText(item.getClassField()))
                 .filter(item -> !StringUtils.hasText(item.getFailureReason()))
                 .filter(item -> item.getScheduledQuantity() != null
                         && item.getScheduledQuantity().signum() > 0)
                 .collect(Collectors.toMap(item -> item.getClothCode() + "|" + item.getClassField(),
-                        Cd90ScheduleAttemptTrace::getSequence, Math::min));
+                        item -> item,
+                        (left, right) -> left.getSequence() <= right.getSequence() ? left : right));
         results.forEach(result -> safe(result.getShiftSlots()).forEach(slot -> {
-            Integer successSequence = successSequenceByClothClass.get(
+            Cd90ScheduleAttemptTrace successTrace = successTraceByClothClass.get(
                     result.getClothCode() + "|" + slot.getClassField());
-            if (successSequence == null) {
+            if (successTrace == null) {
                 return;
             }
-            String analysis = safe(traces).stream()
+            List<String> analysisItems = new ArrayList<>();
+            String priorFailureAnalysis = safe(traces).stream()
                     .filter(item -> item != null && result.getClothCode().equals(item.getClothCode()))
                     .filter(item -> StringUtils.hasText(item.getFailureReason()))
-                    .filter(item -> item.getSequence() < successSequence)
+                    .filter(item -> item.getSequence() < successTrace.getSequence())
                     .sorted(Comparator.comparingInt(Cd90ScheduleAttemptTrace::getSequence))
                     .map(this::failureAnalysis)
                     .distinct()
                     .collect(Collectors.joining("</br>"));
-            if (StringUtils.hasText(analysis)) {
-                slot.setAnalysis(analysis);
+            if (StringUtils.hasText(priorFailureAnalysis)) {
+                analysisItems.add(priorFailureAnalysis);
+            }
+            String partialAnalysis = partialScheduleAnalysis(successTrace);
+            if (StringUtils.hasText(partialAnalysis)) {
+                analysisItems.add(partialAnalysis);
+            }
+            if (!analysisItems.isEmpty()) {
+                slot.setAnalysis(String.join("</br>", analysisItems));
             }
         }));
     }
 
     private String failureAnalysis(Cd90ScheduleAttemptTrace trace) {
         return trace.getClassField() + "：" + failureDescription(trace.getFailureReason());
+    }
+
+    private String partialScheduleAnalysis(Cd90ScheduleAttemptTrace trace) {
+        BigDecimal netDemand = trace.getNetDemandQuantity();
+        BigDecimal scheduled = trace.getScheduledQuantity();
+        if (netDemand == null || scheduled == null || scheduled.signum() <= 0
+                || scheduled.compareTo(netDemand) >= 0) {
+            return null;
+        }
+        BigDecimal remaining = netDemand.subtract(scheduled);
+        return trace.getClassField() + "：库排容量不足，仅部分排" + plain(scheduled)
+                + "m，剩余" + plain(remaining) + "m转后续班次重算";
     }
 
     private String failureDescription(String failureReason) {
@@ -220,6 +241,10 @@ public class Cd90AutoScheduleOutputDraftBuilder {
         return "动态状态或产能约束导致无可用候选机台";
     }
 
+    private String plain(BigDecimal value) {
+        BigDecimal normalized = value.stripTrailingZeros();
+        return (normalized.scale() < 0 ? normalized.setScale(0) : normalized).toPlainString();
+    }
     private BigDecimal proportional(BigDecimal total, int vehicles, int totalVehicles) {
         return total.multiply(BigDecimal.valueOf(vehicles))
                 .divide(BigDecimal.valueOf(totalVehicles), 10, RoundingMode.HALF_UP);

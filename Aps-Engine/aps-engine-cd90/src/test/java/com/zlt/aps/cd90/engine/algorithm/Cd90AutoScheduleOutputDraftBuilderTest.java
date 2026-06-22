@@ -102,6 +102,24 @@ public class Cd90AutoScheduleOutputDraftBuilderTest {
                 result.getExplainLogs().get(0).getShiftDetails().get(0).getAnalysis());
     }
 
+    @Test
+    public void shouldWritePartialScheduleReasonToSuccessfulShiftAnalysis() {
+        Cd90ShiftScheduleTask class4 = task("CLASS4", "M1", "400", 5,
+                allocation("L1", 5));
+
+        Cd90AutoScheduleOutputDraft result = builder.build(contextWithFourShifts(),
+                executionWithTraces(Collections.singletonList(class4),
+                        trace("CLASS1", "STORAGE_LANE_LIMIT", BigDecimal.ZERO, 1),
+                        trace("CLASS2", "STORAGE_LANE_LIMIT", BigDecimal.ZERO, 2),
+                        trace("CLASS3", "STORAGE_LANE_LIMIT", BigDecimal.ZERO, 3),
+                        trace("CLASS4", null, new BigDecimal("400"), 4)));
+
+        String analysis = result.getScheduleResults().get(0).getShiftSlots().get(0).getAnalysis();
+        assertEquals("CLASS1：库排容量不足</br>CLASS2：库排容量不足</br>CLASS3：库排容量不足</br>"
+                        + "CLASS4：库排容量不足，仅部分排400m，剩余200m转后续班次重算",
+                analysis);
+        assertEquals(analysis, result.getExplainLogs().get(0).getShiftDetails().get(0).getAnalysis());
+    }
     @Test(expected = IllegalArgumentException.class)
     public void shouldRejectVehicleCountMismatch() {
         Cd90ShiftScheduleTask invalid = task("CLASS1", "M1", "100", 2,
