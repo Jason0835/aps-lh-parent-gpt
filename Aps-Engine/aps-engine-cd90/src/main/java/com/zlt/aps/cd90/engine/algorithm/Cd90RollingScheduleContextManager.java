@@ -40,7 +40,7 @@ public class Cd90RollingScheduleContextManager {
     public Cd90RollingScheduleContext initialize(List<Cd90StorageLaneState> storageLanesAtSix) {
         return Cd90RollingScheduleContext.builder()
                 .storageLanesAtSix(copyLanes(storageLanesAtSix))
-                .cumulativeConsumption(BigDecimal.ZERO)
+                .cumulativeConsumptionByCloth(new HashMap<>())
                 .actualInboundRecords(new ArrayList<>())
                 .plannedInboundRecords(new ArrayList<>())
                 .committedTasks(new ArrayList<>())
@@ -50,15 +50,20 @@ public class Cd90RollingScheduleContextManager {
     }
 
     /**
-     * 更新6点至下一班开始前的累计成型消耗量。
+     * 更新6点至下一班开始前的累计成型消耗量，按帘布代号分组保存。
      *
      * @param context 滚动上下文
-     * @param cumulativeConsumption 累计消耗量
+     * @param cumulativeConsumptionByCloth 按帘布代号汇总的累计消耗量
      */
     public void updateCumulativeConsumption(Cd90RollingScheduleContext context,
-                                            BigDecimal cumulativeConsumption) {
-        context.setCumulativeConsumption(cumulativeConsumption == null
-                ? BigDecimal.ZERO : cumulativeConsumption.max(BigDecimal.ZERO));
+                                            Map<String, BigDecimal> cumulativeConsumptionByCloth) {
+        Map<String, BigDecimal> safeConsumption = cumulativeConsumptionByCloth == null
+                ? new HashMap<>() : cumulativeConsumptionByCloth.entrySet().stream()
+                        .filter(entry -> entry.getKey() != null)
+                        .collect(Collectors.toMap(Map.Entry::getKey,
+                                entry -> entry.getValue() == null
+                                        ? BigDecimal.ZERO : entry.getValue().max(BigDecimal.ZERO)));
+        context.setCumulativeConsumptionByCloth(safeConsumption);
     }
 
     /**
@@ -82,7 +87,7 @@ public class Cd90RollingScheduleContextManager {
         effectiveInbound.addAll(beforeShift(context.getPlannedInboundRecords(), shift.getStartTime()));
         // 每班都从6点基线重算：基线库排 - 累计消耗 + 当前班前有效入库。
         Cd90ResourceSnapshot snapshot = snapshotBuilder.build(
-                context.getStorageLanesAtSix(), context.getCumulativeConsumption(),
+                context.getStorageLanesAtSix(), context.getCumulativeConsumptionByCloth(),
                 coilMeter, effectiveInbound);
 
         // 机台产能属于班次资源，每班从完整班次秒数重新初始化。
@@ -91,9 +96,9 @@ public class Cd90RollingScheduleContextManager {
             machineCodes.forEach(code -> remainingSeconds.put(code, shift.getDurationSeconds()));
         }
         log.info("[直裁自动排程] 当前班次滚动资源已重建, classField={}, shiftCode={}, "
-                        + "effectiveInboundCount={}, occupiedVehicleCount={}, cumulativeConsumption={}",
+                        + "effectiveInboundCount={}, occupiedVehicleCount={}, cumulativeConsumptionByCloth={}",
                 shift.getClassField(), shift.getShiftCode(), effectiveInbound.size(),
-                snapshot.getOccupiedVehicleCount(), context.getCumulativeConsumption());
+                snapshot.getOccupiedVehicleCount(), context.getCumulativeConsumptionByCloth());
         return Cd90ShiftResourceState.builder()
                 .lanes(snapshot.getLanes()).totalToolingCount(totalToolingCount)
                 .occupiedToolingCount(snapshot.getOccupiedVehicleCount())

@@ -8,6 +8,8 @@ import com.zlt.aps.cd90.engine.model.Cd90ShiftDemandDecision;
 import com.zlt.aps.cd90.engine.model.Cd90ShiftDescriptor;
 
 import java.math.BigDecimal;
+import java.util.Collections;
+import java.util.Map;
 
 /**
  * 多班执行器的需求计算边界。
@@ -26,11 +28,20 @@ public interface Cd90ShiftDemandProvider {
                                     Cd90RollingScheduleContext rolling);
 
     /**
-     * 取得6点至当前班次开始前的累计成型消耗量。
+     * 取得6点至当前班次开始前的累计成型消耗量，按帘布代号分组。
+     */
+    default Map<String, BigDecimal> cumulativeConsumptionByClothBeforeShift(
+            Cd90AutoScheduleContext context, Cd90AutoScheduleInput input, Cd90ShiftDescriptor shift) {
+        return Collections.emptyMap();
+    }
+
+    /**
+     * 兼容旧调用：返回所有帘布累计成型消耗合计值。
      */
     default BigDecimal cumulativeConsumptionBeforeShift(Cd90AutoScheduleContext context,
                                                         Cd90AutoScheduleInput input,
                                                         Cd90ShiftDescriptor shift) {
-        return BigDecimal.ZERO;
+        return cumulativeConsumptionByClothBeforeShift(context, input, shift).values().stream()
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 }

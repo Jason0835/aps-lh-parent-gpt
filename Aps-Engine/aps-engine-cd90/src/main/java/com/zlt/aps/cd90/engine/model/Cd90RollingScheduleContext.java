@@ -18,8 +18,8 @@ public class Cd90RollingScheduleContext {
 
     /** 6点库排原始快照，后续班次不得直接覆盖。 */
     private List<Cd90StorageLaneState> storageLanesAtSix;
-    /** 6点至当前班次开始前的累计成型消耗量。 */
-    private BigDecimal cumulativeConsumption;
+    /** 6点至当前班次开始前的累计成型消耗量，按帘布代号分组。 */
+    private Map<String, BigDecimal> cumulativeConsumptionByCloth;
     /** 已知MES实际入库记录。 */
     private List<Cd90InboundRecord> actualInboundRecords;
     /** 前序班次生成的计划入库记录。 */

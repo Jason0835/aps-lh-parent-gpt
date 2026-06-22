@@ -27,20 +27,20 @@ public class Cd90ResourceSnapshotBuilder {
     private final Cd90InboundResolver inboundResolver;
 
     /**
-     * 按“6点快照 - 累计成型消耗 + 有效直裁入库”重建资源。
+     * 按“6点快照 - 按帘布累计成型消耗 + 有效直裁入库”重建资源。
      *
      * @param originalLanes 6点库排原始快照
-     * @param cumulativeConsumption 累计成型消耗
+     * @param cumulativeConsumptionByCloth 按帘布代号汇总的累计成型消耗
      * @param coilMeter 一车卷曲米数
      * @param inboundRecords 班次开始前实际或计划入库记录
      * @return 当前班次资源快照
      */
     public Cd90ResourceSnapshot build(List<Cd90StorageLaneState> originalLanes,
-                                      BigDecimal cumulativeConsumption,
+                                      Map<String, BigDecimal> cumulativeConsumptionByCloth,
                                       BigDecimal coilMeter,
                                       List<Cd90InboundRecord> inboundRecords) {
         Cd90StorageLaneConsumptionResult consumption = consumptionCalculator.consume(
-                cumulativeConsumption, coilMeter, originalLanes);
+                cumulativeConsumptionByCloth, coilMeter, originalLanes);
         List<Cd90StorageLaneState> lanes = new ArrayList<>(consumption.getLanes());
         Map<String, Cd90StorageLaneState> laneMap = lanes.stream()
                 .collect(Collectors.toMap(Cd90StorageLaneState::getLaneCode, Function.identity()));
@@ -63,8 +63,10 @@ public class Cd90ResourceSnapshotBuilder {
             lane.setMaxVehicleCount(Math.max(lane.getMaxVehicleCount(), lane.getVehicleCount()));
         });
         int occupied = lanes.stream().mapToInt(Cd90StorageLaneState::getVehicleCount).sum();
-        log.debug("[直裁自动排程] 当前班次资源快照重建完成, releasedVehicles={}, occupiedVehicles={}, remainder={}",
-                consumption.getReleasedVehicleCount(), occupied, consumption.getRemainderQuantity());
+        log.debug("[直裁自动排程] 当前班次资源快照重建完成, releasedVehicles={}, occupiedVehicles={}, "
+                        + "remainder={}, cumulativeConsumptionByCloth={}",
+                consumption.getReleasedVehicleCount(), occupied, consumption.getRemainderQuantity(),
+                cumulativeConsumptionByCloth);
         return Cd90ResourceSnapshot.builder()
                 .lanes(lanes)
                 .occupiedVehicleCount(occupied)

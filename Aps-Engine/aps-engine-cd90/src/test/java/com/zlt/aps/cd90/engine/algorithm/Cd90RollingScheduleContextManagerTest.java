@@ -27,7 +27,7 @@ public class Cd90RollingScheduleContextManagerTest {
         Cd90RollingScheduleContext context = manager.initialize(Collections.singletonList(
                 Cd90StorageLaneState.builder().laneCode("L1").clothCode("C1")
                         .vehicleCount(1).maxVehicleCount(7).build()));
-        manager.updateCumulativeConsumption(context, new BigDecimal("87"));
+        manager.updateCumulativeConsumption(context, Collections.singletonMap("C1", new BigDecimal("87")));
 
         Cd90ShiftResourceState first = manager.openShift(context,
                 descriptor("CLASS1", 14, 22), new BigDecimal("87"), 10,

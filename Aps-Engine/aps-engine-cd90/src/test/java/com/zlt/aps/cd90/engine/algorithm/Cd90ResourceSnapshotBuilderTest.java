@@ -26,8 +26,8 @@ public class Cd90ResourceSnapshotBuilderTest {
     public void shouldRebuildFromOriginalSnapshotForEveryShift() {
         Cd90StorageLaneState original = lane("L1", 1);
         Cd90ResourceSnapshot result = builder.build(
-                Collections.singletonList(original), new BigDecimal("87"), new BigDecimal("87"),
-                Collections.singletonList(Cd90InboundRecord.builder()
+                Collections.singletonList(original), Collections.singletonMap("C1", new BigDecimal("87")),
+                new BigDecimal("87"), Collections.singletonList(Cd90InboundRecord.builder()
                         .taskKey("T1").actual(false).clothCode("C1")
                         .laneCode("L1").vehicleCount(2).build()));
 
@@ -37,9 +37,28 @@ public class Cd90ResourceSnapshotBuilderTest {
         assertEquals(2, result.getOccupiedVehicleCount());
     }
 
+    /**
+     * C01累计消耗释放资源时，不能释放C02已经占用的L02。
+     */
+    @Test
+    public void shouldKeepOtherClothLaneWhenRebuildingSnapshot() {
+        Cd90ResourceSnapshot result = builder.build(
+                Arrays.asList(lane("L1", "C1", 1), lane("L2", "C2", 1)),
+                Collections.singletonMap("C1", new BigDecimal("87")), new BigDecimal("87"),
+                Collections.emptyList());
+
+        assertEquals(0, result.getLanes().get(0).getVehicleCount());
+        assertEquals(1, result.getLanes().get(1).getVehicleCount());
+        assertEquals("C2", result.getLanes().get(1).getClothCode());
+    }
+
     private Cd90StorageLaneState lane(String code, int vehicles) {
+        return lane(code, "C1", vehicles);
+    }
+
+    private Cd90StorageLaneState lane(String code, String clothCode, int vehicles) {
         return Cd90StorageLaneState.builder()
-                .laneCode(code).clothCode("C1").vehicleCount(vehicles)
+                .laneCode(code).clothCode(clothCode).vehicleCount(vehicles)
                 .maxVehicleCount(7).build();
     }
 }

@@ -19,10 +19,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.List;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -107,23 +104,24 @@ public class Cd90DefaultShiftDemandProvider implements Cd90ShiftDemandProvider {
     }
 
     /**
-     * 汇总6点至当前直裁班次开始前已经发生的成型帘布消耗。
+     * 汇总6点至当前直裁班次开始前已经发生的成型帘布消耗，按帘布代号分组。
      */
     @Override
-    public BigDecimal cumulativeConsumptionBeforeShift(Cd90AutoScheduleContext context,
-                                                       Cd90AutoScheduleInput input,
-                                                       Cd90ShiftDescriptor shift) {
+    public Map<String, BigDecimal> cumulativeConsumptionByClothBeforeShift(
+            Cd90AutoScheduleContext context, Cd90AutoScheduleInput input, Cd90ShiftDescriptor shift) {
         if (context == null || context.getScheduleDate() == null || input == null || shift == null) {
             throw new IllegalArgumentException("累计消耗计算上下文、输入和班次不能为空");
         }
         LocalDateTime sixAtWindowStart = context.getScheduleDate().minusDays(1).atTime(6, 0);
-        // 只累计6点基线之后、当前班开始之前的自然需求，供库排资源快照重建使用。
+        // 库排释放必须按帘布独立扣减，避免某个的成型消耗释放其他已占库排。
         return safe(input.getDemandShifts()).stream()
                 .filter(item -> item != null && item.getStartTime() != null)
+                .filter(item -> item.getClothCode() != null)
                 .filter(item -> !item.getStartTime().isBefore(sixAtWindowStart))
                 .filter(item -> item.getStartTime().isBefore(shift.getStartTime()))
-                .map(item -> value(item.getClothDemandQuantity()))
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+                .collect(Collectors.groupingBy(Cd90DemandShift::getClothCode,
+                        Collectors.mapping(item -> value(item.getClothDemandQuantity()),
+                                Collectors.reducing(BigDecimal.ZERO, BigDecimal::add))));
     }
 
     private BigDecimal calculateWindowDemand(List<Cd90DemandShift> window, String mode) {

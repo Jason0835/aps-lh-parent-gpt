@@ -20,6 +20,7 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 按输出窗口顺序执行全部直裁班次的内存滚动编排器。
@@ -74,9 +75,9 @@ public class Cd90MultiShiftScheduleExecutor {
                 rolling = rollingContextManager.initialize(input.getStorageLanesAtSix());
             }
             // 先累计成型消耗，再叠加前序实际/计划入库，得到当前班开始时可见的资源状态。
-            BigDecimal cumulativeConsumption = demandProvider.cumulativeConsumptionBeforeShift(
-                    context, input, shift);
-            rollingContextManager.updateCumulativeConsumption(rolling, cumulativeConsumption);
+            Map<String, BigDecimal> cumulativeConsumptionByCloth = demandProvider
+                    .cumulativeConsumptionByClothBeforeShift(context, input, shift);
+            rollingContextManager.updateCumulativeConsumption(rolling, cumulativeConsumptionByCloth);
             Cd90ShiftResourceState initialState = rollingContextManager.openShift(
                     rolling, shift, context.getParameters().getRollCoilMeter(),
                     context.getParameters().getRollTotalCount(), Collections.emptyList());
