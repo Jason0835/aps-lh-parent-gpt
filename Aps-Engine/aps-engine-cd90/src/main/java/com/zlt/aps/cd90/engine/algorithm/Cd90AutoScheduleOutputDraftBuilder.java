@@ -4,6 +4,7 @@ import com.zlt.aps.cd90.engine.model.Cd90AutoScheduleContext;
 import com.zlt.aps.cd90.engine.model.Cd90AutoScheduleOutputDraft;
 import com.zlt.aps.cd90.engine.model.Cd90LaneAllocationDraft;
 import com.zlt.aps.cd90.engine.model.Cd90MultiShiftExecutionResult;
+import com.zlt.aps.cd90.engine.model.Cd90ScheduleAttemptTrace;
 import com.zlt.aps.cd90.engine.model.Cd90ScheduleExplainLogDraft;
 import com.zlt.aps.cd90.engine.model.Cd90ScheduleResultDraft;
 import com.zlt.aps.cd90.engine.model.Cd90ScheduleShiftSlotDraft;
@@ -67,6 +68,7 @@ public class Cd90AutoScheduleOutputDraftBuilder {
         results.forEach(item -> item.setShiftSlots(item.getShiftSlots().stream()
                 .sorted(Comparator.comparingInt(slot -> classIndex(slot.getClassField())))
                 .collect(Collectors.toList())));
+        attachPriorFailureAnalysis(results, execution.getAttemptTraces());
         List<Cd90ScheduleExplainLogDraft> logs = results.stream()
                 .map(item -> Cd90ScheduleExplainLogDraft.builder()
                         .resultKey(item.getResultKey()).logType(AUTO_SCHEDULE)
@@ -152,6 +154,72 @@ public class Cd90AutoScheduleOutputDraftBuilder {
         }
     }
 
+    /**
+     * 将同一帘布在成功班次前的失败尝试写入该成功班次的系统分析。
+     * <p>
+     * 例如C02在CLASS1~CLASS3均因库排不足失败、CLASS4成功，则CLASS4_ANALYSIS记录前三班原因，
+     * 页面展示时用</br>分隔，便于复盘为什么最终排到了后续班次。
+     * </p>
+     */
+    private void attachPriorFailureAnalysis(List<Cd90ScheduleResultDraft> results,
+                                            List<Cd90ScheduleAttemptTrace> traces) {
+        Map<String, Integer> successSequenceByClothClass = safe(traces).stream()
+                .filter(item -> item != null && StringUtils.hasText(item.getClothCode())
+                        && StringUtils.hasText(item.getClassField()))
+                .filter(item -> !StringUtils.hasText(item.getFailureReason()))
+                .filter(item -> item.getScheduledQuantity() != null
+                        && item.getScheduledQuantity().signum() > 0)
+                .collect(Collectors.toMap(item -> item.getClothCode() + "|" + item.getClassField(),
+                        Cd90ScheduleAttemptTrace::getSequence, Math::min));
+        results.forEach(result -> safe(result.getShiftSlots()).forEach(slot -> {
+            Integer successSequence = successSequenceByClothClass.get(
+                    result.getClothCode() + "|" + slot.getClassField());
+            if (successSequence == null) {
+                return;
+            }
+            String analysis = safe(traces).stream()
+                    .filter(item -> item != null && result.getClothCode().equals(item.getClothCode()))
+                    .filter(item -> StringUtils.hasText(item.getFailureReason()))
+                    .filter(item -> item.getSequence() < successSequence)
+                    .sorted(Comparator.comparingInt(Cd90ScheduleAttemptTrace::getSequence))
+                    .map(this::failureAnalysis)
+                    .distinct()
+                    .collect(Collectors.joining("</br>"));
+            if (StringUtils.hasText(analysis)) {
+                slot.setAnalysis(analysis);
+            }
+        }));
+    }
+
+    private String failureAnalysis(Cd90ScheduleAttemptTrace trace) {
+        return trace.getClassField() + "：" + failureDescription(trace.getFailureReason());
+    }
+
+    private String failureDescription(String failureReason) {
+        if ("STORAGE_LANE_LIMIT".equals(failureReason)) {
+            return "库排容量不足";
+        }
+        if ("ROLL_TOOL_LIMIT".equals(failureReason)) {
+            return "工装不足";
+        }
+        if ("MACHINE_PROHIBITED".equals(failureReason)) {
+            return "绑定机台均不可作业";
+        }
+        if ("NO_MACHINE_MAPPING".equals(failureReason)) {
+            return "大卷未配置绑定机台";
+        }
+        if ("CONSTRUCTION_MISSING".equals(failureReason)) {
+            return "施工信息或必要基础数据缺失";
+        }
+        if ("SPEC_START_COUNT_LIMIT".equals(failureReason)) {
+            return "连续四班上机次数达到上限";
+        }
+        if ("SCHEDULE_WINDOW_LIMIT".equals(failureReason)) {
+            return "排程窗口结束仍有未安排数量";
+        }
+        return "动态状态或产能约束导致无可用候选机台";
+    }
+
     private BigDecimal proportional(BigDecimal total, int vehicles, int totalVehicles) {
         return total.multiply(BigDecimal.valueOf(vehicles))
                 .divide(BigDecimal.valueOf(totalVehicles), 10, RoundingMode.HALF_UP);
@@ -215,6 +283,7 @@ public class Cd90AutoScheduleOutputDraftBuilder {
                 .classField(item.getClassField()).scheduleDate(item.getScheduleDate())
                 .planQuantity(item.getPlanQuantity()).finishQuantity(item.getFinishQuantity())
                 .produceOrder(item.getProduceOrder()).finishRate(item.getFinishRate())
+                .analysis(item.getAnalysis())
                 .expectedStartTime(item.getExpectedStartTime())
                 .expectedEndTime(item.getExpectedEndTime()).build())
                 .collect(Collectors.toList());

@@ -77,14 +77,14 @@ public class Cd90AutoScheduleDraftMapper {
         Double finish = decimal(slot.getFinishQuantity());
         Double rate = decimal(slot.getFinishRate());
         switch (slot.getClassField()) {
-            case "CLASS1": result.setClass1ScheduleDate(scheduleDate); result.setClass1PlanQty(plan); result.setClass1FinishQty(finish); result.setClass1ProduceOrder(slot.getProduceOrder()); result.setClass1FinishRate(rate); break;
-            case "CLASS2": result.setClass2ScheduleDate(scheduleDate); result.setClass2PlanQty(plan); result.setClass2FinishQty(finish); result.setClass2ProduceOrder(slot.getProduceOrder()); result.setClass2FinishRate(rate); break;
-            case "CLASS3": result.setClass3ScheduleDate(scheduleDate); result.setClass3PlanQty(plan); result.setClass3FinishQty(finish); result.setClass3ProduceOrder(slot.getProduceOrder()); result.setClass3FinishRate(rate); break;
-            case "CLASS4": result.setClass4ScheduleDate(scheduleDate); result.setClass4PlanQty(plan); result.setClass4FinishQty(finish); result.setClass4ProduceOrder(slot.getProduceOrder()); result.setClass4FinishRate(rate); break;
-            case "CLASS5": result.setClass5ScheduleDate(scheduleDate); result.setClass5PlanQty(plan); result.setClass5FinishQty(finish); result.setClass5ProduceOrder(slot.getProduceOrder()); result.setClass5FinishRate(rate); break;
-            case "CLASS6": result.setClass6ScheduleDate(scheduleDate); result.setClass6PlanQty(plan); result.setClass6FinishQty(finish); result.setClass6ProduceOrder(slot.getProduceOrder()); result.setClass6FinishRate(rate); break;
-            case "CLASS7": result.setClass7ScheduleDate(scheduleDate); result.setClass7PlanQty(plan); result.setClass7FinishQty(finish); result.setClass7ProduceOrder(slot.getProduceOrder()); result.setClass7FinishRate(rate); break;
-            case "CLASS8": result.setClass8ScheduleDate(scheduleDate); result.setClass8PlanQty(plan); result.setClass8FinishQty(finish); result.setClass8ProduceOrder(slot.getProduceOrder()); result.setClass8FinishRate(rate); break;
+            case "CLASS1": result.setClass1ScheduleDate(scheduleDate); result.setClass1PlanQty(plan); result.setClass1FinishQty(finish); result.setClass1ProduceOrder(slot.getProduceOrder()); result.setClass1FinishRate(rate); result.setClass1Analysis(slot.getAnalysis()); break;
+            case "CLASS2": result.setClass2ScheduleDate(scheduleDate); result.setClass2PlanQty(plan); result.setClass2FinishQty(finish); result.setClass2ProduceOrder(slot.getProduceOrder()); result.setClass2FinishRate(rate); result.setClass2Analysis(slot.getAnalysis()); break;
+            case "CLASS3": result.setClass3ScheduleDate(scheduleDate); result.setClass3PlanQty(plan); result.setClass3FinishQty(finish); result.setClass3ProduceOrder(slot.getProduceOrder()); result.setClass3FinishRate(rate); result.setClass3Analysis(slot.getAnalysis()); break;
+            case "CLASS4": result.setClass4ScheduleDate(scheduleDate); result.setClass4PlanQty(plan); result.setClass4FinishQty(finish); result.setClass4ProduceOrder(slot.getProduceOrder()); result.setClass4FinishRate(rate); result.setClass4Analysis(slot.getAnalysis()); break;
+            case "CLASS5": result.setClass5ScheduleDate(scheduleDate); result.setClass5PlanQty(plan); result.setClass5FinishQty(finish); result.setClass5ProduceOrder(slot.getProduceOrder()); result.setClass5FinishRate(rate); result.setClass5Analysis(slot.getAnalysis()); break;
+            case "CLASS6": result.setClass6ScheduleDate(scheduleDate); result.setClass6PlanQty(plan); result.setClass6FinishQty(finish); result.setClass6ProduceOrder(slot.getProduceOrder()); result.setClass6FinishRate(rate); result.setClass6Analysis(slot.getAnalysis()); break;
+            case "CLASS7": result.setClass7ScheduleDate(scheduleDate); result.setClass7PlanQty(plan); result.setClass7FinishQty(finish); result.setClass7ProduceOrder(slot.getProduceOrder()); result.setClass7FinishRate(rate); result.setClass7Analysis(slot.getAnalysis()); break;
+            case "CLASS8": result.setClass8ScheduleDate(scheduleDate); result.setClass8PlanQty(plan); result.setClass8FinishQty(finish); result.setClass8ProduceOrder(slot.getProduceOrder()); result.setClass8FinishRate(rate); result.setClass8Analysis(slot.getAnalysis()); break;
             default: throw new IllegalArgumentException("不支持的直裁班次字段: " + slot.getClassField());
         }
     }

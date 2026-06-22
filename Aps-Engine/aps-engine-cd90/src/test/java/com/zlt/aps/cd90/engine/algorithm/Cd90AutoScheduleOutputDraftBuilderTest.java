@@ -5,6 +5,7 @@ import com.zlt.aps.cd90.engine.model.Cd90AutoScheduleOutputDraft;
 import com.zlt.aps.cd90.engine.model.Cd90LaneAllocationDraft;
 import com.zlt.aps.cd90.engine.model.Cd90MultiShiftExecutionResult;
 import com.zlt.aps.cd90.engine.model.Cd90RollingScheduleContext;
+import com.zlt.aps.cd90.engine.model.Cd90ScheduleAttemptTrace;
 import com.zlt.aps.cd90.engine.model.Cd90ScheduleResultDraft;
 import com.zlt.aps.cd90.engine.model.Cd90ShiftDescriptor;
 import com.zlt.aps.cd90.engine.model.Cd90ShiftScheduleTask;
@@ -83,6 +84,24 @@ public class Cd90AutoScheduleOutputDraftBuilderTest {
         assertEquals(new BigDecimal("45"), result.getLaneAllocations().get(1).getAllocationQuantity());
     }
 
+    @Test
+    public void shouldWritePriorFailureReasonsToSuccessfulShiftAnalysis() {
+        Cd90ShiftScheduleTask class4 = task("CLASS4", "M1", "609", 7,
+                allocation("L1", 7));
+
+        Cd90AutoScheduleOutputDraft result = builder.build(contextWithFourShifts(),
+                executionWithTraces(Collections.singletonList(class4),
+                        trace("CLASS1", "STORAGE_LANE_LIMIT", BigDecimal.ZERO, 1),
+                        trace("CLASS2", "STORAGE_LANE_LIMIT", BigDecimal.ZERO, 2),
+                        trace("CLASS3", "STORAGE_LANE_LIMIT", BigDecimal.ZERO, 3),
+                        trace("CLASS4", null, new BigDecimal("609"), 4)));
+
+        assertEquals("CLASS1：库排容量不足</br>CLASS2：库排容量不足</br>CLASS3：库排容量不足",
+                result.getScheduleResults().get(0).getShiftSlots().get(0).getAnalysis());
+        assertEquals(result.getScheduleResults().get(0).getShiftSlots().get(0).getAnalysis(),
+                result.getExplainLogs().get(0).getShiftDetails().get(0).getAnalysis());
+    }
+
     @Test(expected = IllegalArgumentException.class)
     public void shouldRejectVehicleCountMismatch() {
         Cd90ShiftScheduleTask invalid = task("CLASS1", "M1", "100", 2,
@@ -97,6 +116,14 @@ public class Cd90AutoScheduleOutputDraftBuilderTest {
                 shift("CLASS2", LocalDateTime.of(2026, 6, 12, 22, 0)))).build();
     }
 
+    private Cd90AutoScheduleContext contextWithFourShifts() {
+        return Cd90AutoScheduleContext.builder().shifts(Arrays.asList(
+                shift("CLASS1", LocalDateTime.of(2026, 6, 12, 14, 0)),
+                shift("CLASS2", LocalDateTime.of(2026, 6, 12, 22, 0)),
+                shift("CLASS3", LocalDateTime.of(2026, 6, 13, 6, 0)),
+                shift("CLASS4", LocalDateTime.of(2026, 6, 13, 14, 0)))).build();
+    }
+
     private Cd90ShiftDescriptor shift(String classField, LocalDateTime start) {
         return Cd90ShiftDescriptor.builder().classField(classField)
                 .shiftCode(classField + "_SHIFT").startTime(start)
@@ -107,6 +134,16 @@ public class Cd90AutoScheduleOutputDraftBuilderTest {
         return Cd90MultiShiftExecutionResult.builder()
                 .rollingContext(Cd90RollingScheduleContext.builder()
                         .committedTasks(Arrays.asList(tasks)).build())
+                .unscheduledResults(Collections.emptyList()).build();
+    }
+
+    private Cd90MultiShiftExecutionResult executionWithTraces(
+            java.util.List<Cd90ShiftScheduleTask> tasks,
+            Cd90ScheduleAttemptTrace... traces) {
+        return Cd90MultiShiftExecutionResult.builder()
+                .rollingContext(Cd90RollingScheduleContext.builder()
+                        .committedTasks(tasks).build())
+                .attemptTraces(Arrays.asList(traces))
                 .unscheduledResults(Collections.emptyList()).build();
     }
 
@@ -134,5 +171,14 @@ public class Cd90AutoScheduleOutputDraftBuilderTest {
     private Cd90StorageLaneAllocation allocation(String laneCode, int vehicleCount) {
         return Cd90StorageLaneAllocation.builder()
                 .laneCode(laneCode).vehicleCount(vehicleCount).build();
+    }
+
+    private Cd90ScheduleAttemptTrace trace(String classField, String reason,
+                                           BigDecimal scheduledQuantity, int sequence) {
+        return Cd90ScheduleAttemptTrace.builder().classField(classField)
+                .shiftCode(classField + "_SHIFT").clothCode("C1").bigRollCode("BR1")
+                .netDemandQuantity(new BigDecimal("600"))
+                .scheduledQuantity(scheduledQuantity).failureReason(reason)
+                .sequence(sequence).build();
     }
 }

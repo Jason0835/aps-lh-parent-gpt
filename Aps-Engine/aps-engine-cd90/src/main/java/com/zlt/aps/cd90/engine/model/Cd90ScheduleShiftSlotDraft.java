@@ -18,6 +18,8 @@ public class Cd90ScheduleShiftSlotDraft {
     private BigDecimal finishQuantity;
     private int produceOrder;
     private BigDecimal finishRate;
+    /** 系统原因分析；自动排程会把同规格前序失败原因用</br>拼接后写入最终成功班次。 */
+    private String analysis;
     private LocalDateTime expectedStartTime;
     private LocalDateTime expectedEndTime;
 }
