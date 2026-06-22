@@ -204,8 +204,8 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                 refreshResultSummary(context, result);
             }
         }
-        // 多机台余量和胎胚库存按机台数均分，最后一台补尾差，保证展示口径与总量一致。
-        distributeMultiMachineSurplusAndStock(context);
+        // 同SKU多机台只拆分排产量，每条结果保留SKU级完整胎胚库存。
+        retainMultiMachineEmbryoStock(context);
         finalizeZeroPlanNewSpecResults(context);
         // 新增结果在库存裁剪后需按最终计划量复核收尾语义，避免"未收完却标收尾"。
         refreshNewSpecEndingFlagByResult(context);
@@ -7510,41 +7510,6 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
      * @return true-跳过排产
      */
     private boolean shouldSkipTrialSku(LhScheduleContext context, SkuScheduleDTO sku) {
-        if (sku == null || !isTrialOrMassTrialSku(sku)) {
-            return false;
-        }
-        ITrialProductionStrategy strategy = getTrialProductionStrategy();
-        Date firstBlockedDate = null;
-        boolean hasSchedulableBusinessDay = false;
-        Set<String> checkedDateSet = new HashSet<>(8);
-        for (LhShiftConfigVO shift : LhScheduleTimeUtil.getScheduleShifts(context, context.getScheduleDate())) {
-            if (shift == null || shift.getWorkDate() == null) {
-                continue;
-            }
-            String workDateKey = LhScheduleTimeUtil.formatDate(shift.getWorkDate());
-            if (!checkedDateSet.add(workDateKey)) {
-                continue;
-            }
-            Date workDate = shift.getWorkDate();
-            if (!strategy.canScheduleTrialSkuOnDate(context, sku, workDate)) {
-                if (firstBlockedDate == null) {
-                    firstBlockedDate = workDate;
-                }
-                continue;
-            }
-            if (strategy.isDailyTrialLimitReached(context, workDate, sku.getMaterialCode())) {
-                continue;
-            }
-            hasSchedulableBusinessDay = true;
-            break;
-        }
-        if (!hasSchedulableBusinessDay) {
-            Date logDate = firstBlockedDate != null ? firstBlockedDate
-                    : (context.getScheduleDate() != null ? context.getScheduleDate() : context.getScheduleTargetDate());
-            log.info("试制量试SKU排程窗口内无可排业务日, materialCode: {}, 日期: {}",
-                    sku.getMaterialCode(), LhScheduleTimeUtil.formatDate(logDate));
-            return true;
-        }
         return false;
     }
 
@@ -8625,13 +8590,12 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
     }
 
     /**
-     * 多机台余量和胎胚库存按机台条数均分。
-     * <p>对新增阶段结果按物料分组，委托 {@link LhMultiMachineDistributionUtil#distributeForSingleMaterial}
-     * 按机台结果条数均分，最后一条补尾差。</p>
+     * 回写多机台新增结果的SKU完整胎胚库存。
+     * <p>同SKU多机台仅拆分排产量，不进入共用胎胚库存分摊。</p>
      *
      * @param context 排程上下文
      */
-    private void distributeMultiMachineSurplusAndStock(LhScheduleContext context) {
+    private void retainMultiMachineEmbryoStock(LhScheduleContext context) {
         if (context == null || CollectionUtils.isEmpty(context.getScheduleResultList())) {
             return;
         }
@@ -8650,7 +8614,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
             }
             materialResultsMap.computeIfAbsent(result.getMaterialCode(), k -> new ArrayList<>()).add(result);
         }
-        // 委托工具类按机台条数均分
+        // 同一物料的每条新增机台结果统一保留SKU级胎胚库存。
         for (Map.Entry<String, List<LhScheduleResult>> entry : materialResultsMap.entrySet()) {
             List<LhScheduleResult> materialResults = entry.getValue();
             if (materialResults.size() <= 1) {
@@ -8661,13 +8625,12 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
             if (sku == null) {
                 continue;
             }
-            int totalSurplus = Math.max(0, sku.getSurplusQty());
             int totalEmbryoStock = Math.max(0, sku.getEmbryoStock());
-            // 仅分摊胎胚库存，余量不按机台均分（各机台结果保留原始全量值）
-            LhMultiMachineDistributionUtil.distributeForSingleMaterial(
-                    materialResults, totalSurplus, totalEmbryoStock);
-            log.debug("多机台新增胎胚库存分摊完成, materialCode: {}, 机台数: {}, 总余量: {}, 总胎胚库存: {}",
-                    materialCode, materialResults.size(), totalSurplus, totalEmbryoStock);
+            // 同SKU多机台只拆分排产量，每条结果都保留SKU已分配的完整胎胚库存。
+            LhMultiMachineDistributionUtil.retainFullEmbryoStockForSingleMaterial(
+                    materialResults, totalEmbryoStock);
+            log.debug("多机台新增胎胚库存完整回写完成, materialCode: {}, 机台数: {}, SKU胎胚库存: {}",
+                    materialCode, materialResults.size(), totalEmbryoStock);
         }
     }
 

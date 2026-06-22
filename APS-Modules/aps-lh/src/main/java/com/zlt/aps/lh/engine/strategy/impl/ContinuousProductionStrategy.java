@@ -163,7 +163,7 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
             sku.setMouldQty(machineMouldQty);
             DailyMachineShortageQuotaPlan shortageQuotaPlan =
                     DailyMachineExpansionPlanner.prepareShortageQuota(context, sku, "续作排产");
-            if (shouldReleaseWindowNoPlanContinuousSku(shortageQuotaPlan)) {
+            if (shouldReleaseWindowNoPlanContinuousSku(sku, shortageQuotaPlan)) {
                 // 当前窗口没有日计划时不强行续作占机，释放机台给换活字块/新增；后续有计划的情况会登记为占位/补偿。
                 appendWindowNoPlanContinuousUnscheduledResult(context, sku);
                 registerReleasedContinuousMachine(context, machineCode, sku.getMaterialCode(), "窗口内无日计划");
@@ -181,8 +181,14 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
                 continue;
             }
 
+            // 窗口无计划但仍有续作余量时必须先排完，再沿用既有收尾机台释放链。
+            boolean finishWindowNoPlanSurplus =
+                    shouldFinishWindowNoPlanContinuousSurplus(sku, shortageQuotaPlan);
+            if (finishWindowNoPlanSurplus) {
+                applyContinuousWindowNoPlanSurplusStrictTarget(context, sku, shortageQuotaPlan);
+            }
             // SKU收尾判定决定是否严格控量：收尾必须按目标量停，非收尾才允许后续补满可用班次。
-            boolean isEnding = endingJudgmentStrategy.isEnding(context, sku);
+            boolean isEnding = finishWindowNoPlanSurplus || endingJudgmentStrategy.isEnding(context, sku);
             if (shortageQuotaPlan.isForceEndingByNoFuturePlan()) {
                 isEnding = true;
                 applyContinuousNoFutureEndingStrictTarget(sku, shortageQuotaPlan);
@@ -823,8 +829,8 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
         finalizeZeroPlanContinuousResults(context);
         // 降模或额度回裁会再次改变最终计划量，收口后再统一复核一次收尾标记，确保落库口径一致。
         refreshContinuousEndingFlagByResult(context);
-        // 续作最终结果稳定后，再按保留结果分摊多机台胎胚库存，避免零计划结果残留旧口径。
-        distributeMultiMachineSurplusAndStock(context);
+        // 续作最终结果稳定后，统一回写SKU完整胎胚库存，避免同SKU多机台结果残留二次分摊口径。
+        retainMultiMachineEmbryoStock(context);
         syncMachineStateAfterContinuousAdjust(context);
         // 续作阶段全部处理完成后，再按剩余新增待排SKU统一收口结构视图，供S4.5排序使用。
         context.rebuildStructureSkuMapFromPending(context.getNewSpecSkuList());
@@ -1360,13 +1366,56 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
     /**
      * 判断窗口无计划续作SKU是否应直接释放机台。
      *
+     * @param sku 续作SKU
      * @param shortageQuotaPlan 欠产账本准备结果
-     * @return true-无本月历史欠产，按原窗口无计划逻辑释放；false-继续排历史欠产或收尾量
+     * @return true-无本月历史欠产且无续作余量，释放机台；false-继续排历史欠产或续作余量
      */
-    private boolean shouldReleaseWindowNoPlanContinuousSku(DailyMachineShortageQuotaPlan shortageQuotaPlan) {
-        return shortageQuotaPlan != null
+    private boolean shouldReleaseWindowNoPlanContinuousSku(
+            SkuScheduleDTO sku, DailyMachineShortageQuotaPlan shortageQuotaPlan) {
+        return Objects.nonNull(sku)
+                && Objects.nonNull(shortageQuotaPlan)
                 && shortageQuotaPlan.isNoWindowPlan()
-                && Math.max(0, shortageQuotaPlan.getHistoryShortageQty()) <= 0;
+                && Math.max(0, shortageQuotaPlan.getHistoryShortageQty()) <= 0
+                && Math.max(0, sku.getSurplusQty()) <= 0;
+    }
+
+    /**
+     * 判断窗口无计划续作SKU是否仍需按硫化余量继续排产。
+     *
+     * @param sku 续作SKU
+     * @param shortageQuotaPlan 欠产账本准备结果
+     * @return true-仍有硫化余量，继续续作并按收尾释放机台；false-沿用原规则
+     */
+    private boolean shouldFinishWindowNoPlanContinuousSurplus(
+            SkuScheduleDTO sku, DailyMachineShortageQuotaPlan shortageQuotaPlan) {
+        return Objects.nonNull(sku)
+                && Objects.nonNull(shortageQuotaPlan)
+                && shortageQuotaPlan.isNoWindowPlan()
+                && Math.max(0, shortageQuotaPlan.getHistoryShortageQty()) <= 0
+                && Math.max(0, sku.getSurplusQty()) > 0;
+    }
+
+    /**
+     * 将窗口无计划但仍有余量的续作SKU同步为严格收尾目标。
+     *
+     * @param context 排程上下文
+     * @param sku 续作SKU
+     * @param shortageQuotaPlan 欠产账本准备结果
+     */
+    private void applyContinuousWindowNoPlanSurplusStrictTarget(
+            LhScheduleContext context, SkuScheduleDTO sku,
+            DailyMachineShortageQuotaPlan shortageQuotaPlan) {
+        sku.setSkuTag(SkuTagEnum.ENDING.getCode());
+        if (sku.getEndingDaysRemaining() <= 0) {
+            sku.setEndingDaysRemaining(1);
+        }
+        // 复用统一收尾目标量和账本同步，避免窗口dayN为0时结果被回裁。
+        int strictTargetQty = getTargetScheduleQtyResolver().upsizeEndingTargetQty(context, sku);
+        log.info("续作窗口无日计划但仍有硫化余量，继续按余量严格排产, materialCode: {}, "
+                        + "machineCode: {}, surplusQty: {}, futureMonthPlanQtyAfterWindow: {}, "
+                        + "historyShortageQty: {}, strictTargetQty: {}, result: 继续续作并在排完后释放机台",
+                sku.getMaterialCode(), sku.getContinuousMachineCode(), sku.getSurplusQty(),
+                sku.getFutureMonthPlanQtyAfterWindow(), shortageQuotaPlan.getHistoryShortageQty(), strictTargetQty);
     }
 
     /**
@@ -4366,13 +4415,12 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
     }
 
     /**
-     * 多机台余量和胎胚库存按机台条数均分。
-     * <p>对续作阶段结果按来源SKU分组，委托 {@link LhMultiMachineDistributionUtil#distributeForSingleMaterial}
-     * 按机台结果条数均分，最后一条补尾差。</p>
+     * 回写多机台续作结果的SKU完整胎胚库存。
+     * <p>同SKU多机台仅拆分排产量，不进入共用胎胚库存分摊。</p>
      *
      * @param context 排程上下文
      */
-    private void distributeMultiMachineSurplusAndStock(LhScheduleContext context) {
+    private void retainMultiMachineEmbryoStock(LhScheduleContext context) {
         if (context == null || CollectionUtils.isEmpty(context.getScheduleResultList())) {
             return;
         }
@@ -4399,20 +4447,19 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
             }
             groupResultsMap.get(groupKey).add(result);
         }
-        // 委托工具类按机台条数均分
+        // 同一业务SKU的每条机台结果统一保留SKU级胎胚库存。
         for (String groupKey : groupOrder) {
             SkuScheduleDTO sourceSku = groupSourceSkuMap.get(groupKey);
             List<LhScheduleResult> materialResults = groupResultsMap.get(groupKey);
             if (materialResults.size() <= 1) {
                 continue;
             }
-            int totalSurplus = Math.max(0, sourceSku.getSurplusQty());
             int totalEmbryoStock = Math.max(0, sourceSku.getEmbryoStock());
-            // 仅分摊胎胚库存，余量不按机台均分（各机台结果保留原始全量值）
-            LhMultiMachineDistributionUtil.distributeForSingleMaterial(
-                    materialResults, totalSurplus, totalEmbryoStock);
-            log.debug("多机台续作胎胚库存分摊完成, materialCode: {}, 机台数: {}, 总余量: {}, 总胎胚库存: {}",
-                    sourceSku.getMaterialCode(), materialResults.size(), totalSurplus, totalEmbryoStock);
+            // 同SKU多机台只拆分排产量，每条结果都保留SKU已分配的完整胎胚库存。
+            LhMultiMachineDistributionUtil.retainFullEmbryoStockForSingleMaterial(
+                    materialResults, totalEmbryoStock);
+            log.debug("多机台续作胎胚库存完整回写完成, materialCode: {}, 机台数: {}, SKU胎胚库存: {}",
+                    sourceSku.getMaterialCode(), materialResults.size(), totalEmbryoStock);
         }
     }
 
