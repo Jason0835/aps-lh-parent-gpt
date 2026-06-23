@@ -9,6 +9,7 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.text.Convert;
 import com.ruoyi.common4ui.core.controller.BaseUIController;
 import com.zlt.aps.tm.api.domain.entity.TmScheduleResult;
+import com.zlt.aps.tm.api.domain.vo.TmScheduleShiftDateVO;
 import com.zlt.aps.tm.api.service.ITmScheduleResultRemoteService;
 import com.zlt.file.encryptbyll.FileEncryptUtils;
 import io.swagger.annotations.Api;
@@ -26,6 +27,7 @@ import javax.servlet.http.HttpServletResponse;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Date;
 import java.util.List;
 
 /**
@@ -189,5 +191,19 @@ public class TmScheduleResultUIController extends BaseUIController<TmScheduleRes
         ExcelUtil<TmScheduleResult> util = new ExcelUtil<>(TmScheduleResult.class);
         util.exportExcel(response, null, fileName, fileName);
         return AjaxResult.success();
+    }
+
+    /**
+     * 获取胎面排程班次日期列表
+     *
+     * @param scheduleDate 排程日期
+     * @return 班次日期列表
+     */
+    @ApiOperation("获取胎面排程班次日期列表")
+    @PostMapping("/listScheduleShiftDates")
+    @ResponseBody
+    public AjaxResult listScheduleShiftDates(Date scheduleDate) {
+        List<TmScheduleShiftDateVO> list = iTmScheduleResultService.listScheduleShiftDates(scheduleDate);
+        return AjaxResult.success(list);
     }
 }

@@ -10,6 +10,7 @@ import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.redissonLock.annotation.DistributedLock;
 import com.zlt.aps.tm.api.domain.entity.TmScheduleResult;
 import com.zlt.aps.tm.api.domain.vo.TmAutoScheduleRequestVo;
+import com.zlt.aps.tm.api.domain.vo.TmScheduleShiftDateVO;
 import com.zlt.aps.tm.mapper.TmScheduleResultMapper;
 import com.zlt.aps.tm.service.ITmScheduleResultService;
 import com.zlt.bill.common.controller.AbstractDocBizController;
@@ -25,6 +26,7 @@ import org.springframework.web.bind.annotation.*;
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.Date;
 import java.util.List;
 
 /**
@@ -178,6 +180,19 @@ public class TmScheduleResultController extends AbstractDocBizController<TmSched
     @PostMapping("/publish")
     public AjaxResult publish(@RequestBody List<Long> ids) {
         return toAjax(tmScheduleResultService.publish(ids));
+    }
+
+    /**
+     * 获取胎面排程班次日期列表
+     * 根据排程日期构建6个班次的日期展示列表
+     *
+     * @param scheduleDate 排程日期
+     * @return 班次日期列表
+     */
+    @ApiOperation("获取胎面排程班次日期列表")
+    @PostMapping("/listScheduleShiftDates")
+    public List<TmScheduleShiftDateVO> listScheduleShiftDates(@RequestBody Date scheduleDate) {
+        return tmScheduleResultService.listScheduleShiftDates(scheduleDate);
     }
 
     @Log(title = "ui.data.column.tm.scheduleResult.modelName", businessType = BusinessType.IMPORT)
