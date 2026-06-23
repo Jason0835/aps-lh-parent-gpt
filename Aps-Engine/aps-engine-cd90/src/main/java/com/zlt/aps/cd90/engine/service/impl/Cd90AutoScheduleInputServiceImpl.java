@@ -76,8 +76,12 @@ public class Cd90AutoScheduleInputServiceImpl implements Cd90AutoScheduleInputSe
 
         LocalDate formingStartDate = scheduleDate.minusDays(1);
         LocalDate formingEndDate = scheduleDate.plusDays(3);
+        log.info("[直裁自动排程] 加载成型计划, factoryCode={}, scheduleDate={}, formingStartDate={}, formingEndDate={}",
+                factoryCode, scheduleDate, formingStartDate, formingEndDate);
         List<CxScheduleResult> formingEntities = loadFormingSchedules(
                 factoryCode, formingStartDate, formingEndDate);
+        log.info("[直裁自动排程] 成型计划加载结果, factoryCode={}, formingStartDate={}, formingEndDate={}, recordCount={}",
+                factoryCode, formingStartDate, formingEndDate, formingEntities.size());
         List<Cd90FormingScheduleSource> formingSchedules = formingEntities.stream()
                 .map(sourceMapper::mapFormingSchedule)
                 .collect(Collectors.toList());

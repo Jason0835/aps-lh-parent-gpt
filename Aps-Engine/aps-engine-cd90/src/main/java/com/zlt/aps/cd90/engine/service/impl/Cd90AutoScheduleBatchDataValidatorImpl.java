@@ -1,0 +1,328 @@
+package com.zlt.aps.cd90.engine.service.impl;
+
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.zlt.aps.cd90.api.domain.entity.Cd90CurlLength;
+import com.zlt.aps.cd90.api.domain.entity.Cd90MachineInfo;
+import com.zlt.aps.cd90.engine.mapper.Cd90EngineConstructionMapper;
+import com.zlt.aps.cd90.engine.mapper.Cd90EngineCurlLengthMapper;
+import com.zlt.aps.cd90.engine.mapper.Cd90EngineCxScheduleMapper;
+import com.zlt.aps.cd90.engine.mapper.Cd90EngineMachineInfoMapper;
+import com.zlt.aps.cd90.engine.model.Cd90BatchDataCheckResult;
+import com.zlt.aps.cd90.engine.service.Cd90AutoScheduleBatchDataValidator;
+import com.zlt.aps.common.core.constant.ApsConstant;
+import com.zlt.aps.cx.api.domain.entity.CxScheduleResult;
+import com.zlt.aps.mdm.api.domain.entity.MdmConstructionInfo;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
+
+import java.math.BigDecimal;
+import java.sql.Date;
+import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+/**
+ * 直裁自动排程批次级数据先行检查实现。
+ * <p>
+ * 检查口径与 Cd90AutoScheduleInputServiceImpl / Cd90MachineResourceServiceImpl 对齐：
+ * 成型计划按 scheduleDate-1 至 scheduleDate+3 的日期范围查询；
+ * 机台档案按 factoryCode + status=启用 查询；
+ * 施工信息按 CONSTRUCTION_CODE + CONSTRUCTION_VERSION 配对查询，版本来源为成型各班 CLASSn_RECIPE_NO；
+ * 卷曲长度按 factoryCode + CLOTH_CODE 查询，CURL_LENGTH 必须 > 0。
+ * </p>
+ */
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class Cd90AutoScheduleBatchDataValidatorImpl implements Cd90AutoScheduleBatchDataValidator {
+
+    private static final int CONSTRUCTION_LAYERS = 3;
+    private static final String[] CLASS_RECIPE_FIELDS = {
+            "CLASS1_RECIPE_NO", "CLASS2_RECIPE_NO", "CLASS3_RECIPE_NO", "CLASS4_RECIPE_NO",
+            "CLASS5_RECIPE_NO", "CLASS6_RECIPE_NO", "CLASS7_RECIPE_NO", "CLASS8_RECIPE_NO"
+    };
+
+    private final Cd90EngineCxScheduleMapper cxScheduleMapper;
+    private final Cd90EngineConstructionMapper constructionMapper;
+    private final Cd90EngineCurlLengthMapper curlLengthMapper;
+    private final Cd90EngineMachineInfoMapper machineInfoMapper;
+
+    @Override
+    public Cd90BatchDataCheckResult check(String factoryCode, LocalDate scheduleDate) {
+        if (!StringUtils.hasText(factoryCode)) {
+            return Cd90BatchDataCheckResult.builder()
+                    .addError("工厂编码", "DATA_MISSING", "自动排程工厂编码不能为空")
+                    .build();
+        }
+        if (scheduleDate == null) {
+            return Cd90BatchDataCheckResult.builder()
+                    .addError("排程日期", "DATA_MISSING", "自动排程排程日期不能为空")
+                    .build();
+        }
+
+        Cd90BatchDataCheckResult.Builder builder = Cd90BatchDataCheckResult.builder();
+        List<CxScheduleResult> formingSchedules = checkFormingSchedule(builder, factoryCode, scheduleDate);
+        checkMachineInfo(builder, factoryCode);
+        Set<String> clothCodes = checkConstructionInfo(builder, factoryCode, formingSchedules);
+        checkCurlLength(builder, factoryCode, clothCodes);
+
+        Cd90BatchDataCheckResult result = builder.build();
+        log.info("[直裁自动排程] 批次级数据先行检查完成, factoryCode={}, scheduleDate={}, failed={}, errorCount={}, warningCount={}",
+                factoryCode, scheduleDate, result.isFailed(),
+                result.getErrors().size(), result.getWarnings().size());
+        return result;
+    }
+
+    /**
+     * 批次级检查：成型计划数据是否就绪。
+     * 按文档1.5节，成型 scheduleDate 与直裁排程日相同（均为 T+1），
+     * 成型一条记录的 CLASS1~CLASS8 已覆盖 T 日早班至 T+2 日共8个班次，
+     * 因此入口先行检查只查 scheduleDate 当天的成型排程记录即可。
+     * engine 运行时可能按停产场景额外读取相邻班次，但入口检查只关心用户该维护的核心记录是否存在。
+     * 返回查询到的成型记录，供后续施工信息检查使用。
+     */
+    private List<CxScheduleResult> checkFormingSchedule(Cd90BatchDataCheckResult.Builder builder,
+                                                         String factoryCode, LocalDate scheduleDate) {
+        List<CxScheduleResult> schedules = cxScheduleMapper.selectList(Wrappers.<CxScheduleResult>lambdaQuery()
+                .eq(CxScheduleResult::getFactoryCode, factoryCode)
+                .eq(CxScheduleResult::getScheduleDate, Date.valueOf(scheduleDate)));
+        if (schedules == null || schedules.isEmpty()) {
+            builder.addError("成型计划", "DATA_MISSING",
+                    "未找到排程日 " + scheduleDate + " 的成型排程记录",
+                    "请先在成型排程页面生成排程日 " + scheduleDate + " 的成型排程");
+            return new ArrayList<>();
+        }
+        return schedules;
+    }
+
+    /**
+     * 批次级检查：是否有启用的直裁机台。
+     * 口径与 Cd90MachineResourceServiceImpl 对齐：factoryCode + status=启用。
+     */
+    private void checkMachineInfo(Cd90BatchDataCheckResult.Builder builder, String factoryCode) {
+        Long count = machineInfoMapper.selectCount(Wrappers.<Cd90MachineInfo>lambdaQuery()
+                .eq(Cd90MachineInfo::getFactoryCode, factoryCode)
+                .eq(Cd90MachineInfo::getStatus, ApsConstant.APS_STRING_1));
+        if (count == null || count == 0L) {
+            builder.addError("机台档案", "DATA_MISSING",
+                    "未找到启用的直裁机台",
+                    "请在机台档案页面启用至少一台直裁机台");
+        }
+    }
+
+    /**
+     * 批次级检查：施工信息完整性。
+     * 1. 收集成型计划中 (EMBRYO_CODE, CLASSn_RECIPE_NO) 配对，任一为空均报错；
+     * 2. 按 CONSTRUCTION_CODE + CONSTRUCTION_VERSION 查施工表，缺失则报错；
+     * 3. 对每条施工记录校验 CORD_SPEC、CORD_WIDTH 及三层帘布层位字段。
+     * 返回施工中出现过的帘布代号集合，供卷曲长度检查使用。
+     */
+    private Set<String> checkConstructionInfo(Cd90BatchDataCheckResult.Builder builder,
+                                               String factoryCode,
+                                               List<CxScheduleResult> formingSchedules) {
+        if (formingSchedules == null || formingSchedules.isEmpty()) {
+            return new LinkedHashSet<>();
+        }
+        // 1. 收集 (constructionCode, constructionVersion) 配对，同时校验胎胚代号和施工版本非空
+        Set<String> embryoCodes = new LinkedHashSet<>();
+        Set<String> constructionVersions = new LinkedHashSet<>();
+        Set<String> constructionPairs = new LinkedHashSet<>();
+        for (CxScheduleResult schedule : formingSchedules) {
+            String embryoCode = schedule.getEmbryoCode();
+            if (!StringUtils.hasText(embryoCode)) {
+                builder.addError("成型计划", "DATA_MISSING",
+                        "成型计划存在胎胚代号为空的记录",
+                        "请检查成型排程数据的胎胚代号");
+                continue;
+            }
+            embryoCodes.add(embryoCode);
+            for (String classField : CLASS_RECIPE_FIELDS) {
+                String recipeNo = getRecipeNo(schedule, classField);
+                if (!StringUtils.hasText(recipeNo)) {
+                    builder.addError("成型计划", "DATA_MISSING",
+                            "胎胚 " + embryoCode + " 的 " + classField + " 施工版本为空",
+                            "请检查成型排程数据各班次施工版本");
+                    continue;
+                }
+                constructionVersions.add(recipeNo);
+                constructionPairs.add(embryoCode + "@" + recipeNo);
+            }
+        }
+        if (embryoCodes.isEmpty() || constructionVersions.isEmpty()) {
+            return new LinkedHashSet<>();
+        }
+
+        // 2. 查施工表
+        List<MdmConstructionInfo> constructions = constructionMapper.selectList(
+                Wrappers.<MdmConstructionInfo>lambdaQuery()
+                        .eq(MdmConstructionInfo::getFactoryCode, factoryCode)
+                        .in(MdmConstructionInfo::getConstructionCode, embryoCodes)
+                        .in(MdmConstructionInfo::getConstructionVersion, constructionVersions));
+        Map<String, MdmConstructionInfo> constructionByKey = constructions.stream()
+                .collect(Collectors.toMap(
+                        item -> item.getConstructionCode() + "@" + item.getConstructionVersion(),
+                        item -> item, (left, right) -> left, LinkedHashMap::new));
+
+        // 3. 逐个配对校验
+        Set<String> clothCodes = new LinkedHashSet<>();
+        for (String pair : constructionPairs) {
+            String[] parts = pair.split("@", 2);
+            String constructionCode = parts[0];
+            String constructionVersion = parts[1];
+            MdmConstructionInfo construction = constructionByKey.get(pair);
+            if (construction == null) {
+                builder.addError("施工信息", "DATA_MISSING",
+                        "胎胚 " + constructionCode + " 施工版本 " + constructionVersion + " 未维护",
+                        "请在施工信息页面维护对应胎胚和版本的施工资料");
+                continue;
+            }
+            checkConstructionFields(builder, construction, clothCodes);
+        }
+        return clothCodes;
+    }
+
+    /**
+     * 校验单条施工记录的关键字段，并将帘布代号收集到 clothCodes。
+     */
+    private void checkConstructionFields(Cd90BatchDataCheckResult.Builder builder,
+                                          MdmConstructionInfo construction,
+                                          Set<String> clothCodes) {
+        String code = construction.getConstructionCode();
+        String version = construction.getConstructionVersion();
+        String prefix = "胎胚 " + code + " 施工版本 " + version + " ";
+
+        // CORD_SPEC 大卷代码
+        if (!StringUtils.hasText(construction.getCordSpec())) {
+            builder.addError("施工信息", "DATA_MISSING",
+                    prefix + "大卷代码(CORD_SPEC)缺失",
+                    "请在施工信息页面维护大卷代码");
+        }
+        // CORD_WIDTH 大卷幅宽（直裁长度）
+        if (!isPositive(construction.getCordWidth())) {
+            builder.addError("施工信息", "DATA_MISSING",
+                    prefix + "大卷幅宽(CORD_WIDTH)缺失或非正",
+                    "请在施工信息页面维护大卷幅宽且大于0");
+        }
+        // 三层帘布层位
+        for (int layer = 1; layer <= CONSTRUCTION_LAYERS; layer++) {
+            String clothCode = getLayerClothCode(construction, layer);
+            if (!StringUtils.hasText(clothCode)) {
+                continue; // 非必填层，未配置跳过
+            }
+            clothCodes.add(clothCode);
+            String craftRaw = getLayerCraftRaw(construction, layer);
+            BigDecimal craftWidth = parseDecimal(craftRaw);
+            if (craftWidth == null || craftWidth.signum() <= 0) {
+                builder.addError("施工信息", "DATA_MISSING",
+                        prefix + "第 " + layer + " 层帘布 " + clothCode + " 直裁宽度缺失或非正",
+                        "请在施工信息页面维护 TIRE_FABRIC_CRAFT" + layer + " 且大于0");
+            }
+            if (!isPositive(getLayerUnitConsume(construction, layer))) {
+                builder.addError("施工信息", "DATA_MISSING",
+                        prefix + "第 " + layer + " 层帘布 " + clothCode + " 单耗缺失或非正",
+                        "请在施工信息页面维护 TIRE_FABRIC_LENGTH" + layer + " 且大于0");
+            }
+        }
+    }
+
+    /**
+     * 批次级检查：卷曲长度配置。
+     * 对施工中出现的每个帘布代号，要求 t_cd90_curl_length 有记录且 CURL_LENGTH > 0。
+     * 不查 CRIMP_LENGTH 兜底参数，严格要基础数据完整。
+     */
+    private void checkCurlLength(Cd90BatchDataCheckResult.Builder builder,
+                                  String factoryCode,
+                                  Set<String> clothCodes) {
+        if (clothCodes == null || clothCodes.isEmpty()) {
+            return;
+        }
+        List<Cd90CurlLength> curls = curlLengthMapper.selectList(
+                Wrappers.<Cd90CurlLength>lambdaQuery()
+                        .eq(Cd90CurlLength::getFactoryCode, factoryCode)
+                        .in(Cd90CurlLength::getClothCode, clothCodes));
+        Map<String, Cd90CurlLength> curlByCloth = curls.stream()
+                .collect(Collectors.toMap(Cd90CurlLength::getClothCode,
+                        item -> item, (left, right) -> left, LinkedHashMap::new));
+        for (String clothCode : clothCodes) {
+            Cd90CurlLength curl = curlByCloth.get(clothCode);
+            if (curl == null) {
+                builder.addError("卷曲长度", "DATA_MISSING",
+                        "帘布 " + clothCode + " 卷曲长度未维护",
+                        "请在卷曲长度配置页面维护帘布 " + clothCode + " 的卷曲长度");
+                continue;
+            }
+            if (curl.getCurlLength() == null || curl.getCurlLength() <= 0) {
+                builder.addError("卷曲长度", "DATA_MISSING",
+                        "帘布 " + clothCode + " 卷曲长度非正",
+                        "请在卷曲长度配置页面维护帘布 " + clothCode + " 的卷曲长度且大于0");
+            }
+        }
+    }
+
+    /** 取成型记录指定班次的施工版本。 */
+    private String getRecipeNo(CxScheduleResult schedule, String classField) {
+        switch (classField) {
+            case "CLASS1_RECIPE_NO": return schedule.getClass1RecipeNo();
+            case "CLASS2_RECIPE_NO": return schedule.getClass2RecipeNo();
+            case "CLASS3_RECIPE_NO": return schedule.getClass3RecipeNo();
+            case "CLASS4_RECIPE_NO": return schedule.getClass4RecipeNo();
+            case "CLASS5_RECIPE_NO": return schedule.getClass5RecipeNo();
+            case "CLASS6_RECIPE_NO": return schedule.getClass6RecipeNo();
+            case "CLASS7_RECIPE_NO": return schedule.getClass7RecipeNo();
+            case "CLASS8_RECIPE_NO": return schedule.getClass8RecipeNo();
+            default: return null;
+        }
+    }
+
+    /** 取施工记录指定层位的帘布代号。 */
+    private String getLayerClothCode(MdmConstructionInfo construction, int layer) {
+        switch (layer) {
+            case 1: return construction.getTireFabricCode1();
+            case 2: return construction.getTireFabricCode2();
+            case 3: return construction.getTireFabricCode3();
+            default: return null;
+        }
+    }
+
+    /** 取施工记录指定层位的直裁宽度原始值。 */
+    private String getLayerCraftRaw(MdmConstructionInfo construction, int layer) {
+        switch (layer) {
+            case 1: return construction.getTireFabricCraft1();
+            case 2: return construction.getTireFabricCraft2();
+            case 3: return construction.getTireFabricCraft3();
+            default: return null;
+        }
+    }
+
+    /** 取施工记录指定层位的单耗（毫米/条）。 */
+    private BigDecimal getLayerUnitConsume(MdmConstructionInfo construction, int layer) {
+        switch (layer) {
+            case 1: return construction.getTireFabricLength1();
+            case 2: return construction.getTireFabricLength2();
+            case 3: return construction.getTireFabricLength3();
+            default: return null;
+        }
+    }
+
+    private BigDecimal parseDecimal(String raw) {
+        if (!StringUtils.hasText(raw)) {
+            return null;
+        }
+        try {
+            return new BigDecimal(raw.trim());
+        } catch (NumberFormatException exception) {
+            return null;
+        }
+    }
+
+    private boolean isPositive(BigDecimal value) {
+        return value != null && value.signum() > 0;
+    }
+}
