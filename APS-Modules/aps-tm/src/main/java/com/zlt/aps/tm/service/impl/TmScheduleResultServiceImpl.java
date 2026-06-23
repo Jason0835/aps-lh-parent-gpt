@@ -13,7 +13,6 @@ import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.utils.StringUtils;
 import com.zlt.aps.common.core.constant.ApsConstant;
-import com.zlt.aps.common.engine.constants.EngineConstants;
 import com.zlt.aps.common.engine.schedule.ScheduleOperationContext;
 import com.zlt.aps.common.engine.schedule.ScheduleTaskLinkedList;
 import com.zlt.aps.common.engine.schedule.ScheduleTaskNode;
@@ -23,6 +22,7 @@ import com.zlt.aps.tm.api.domain.entity.TmMachineInfo;
 import com.zlt.aps.tm.api.domain.entity.TmScheduleResult;
 import com.zlt.aps.tm.api.domain.vo.TmAutoScheduleRequestVo;
 import com.zlt.aps.tm.api.domain.vo.TmAutoScheduleResponseVo;
+import com.zlt.aps.tm.api.domain.vo.TmScheduleShiftDateVO;
 import com.zlt.aps.tm.api.enums.TmScheduleErrorCodeEnum;
 import com.zlt.aps.tm.engine.domain.*;
 import com.zlt.aps.tm.engine.service.TmScheduleOperationFacade;
@@ -42,6 +42,7 @@ import javax.annotation.Resource;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
 /**
@@ -53,6 +54,12 @@ import java.util.stream.Collectors;
 public class TmScheduleResultServiceImpl extends AbstractDocService<TmScheduleResult> implements ITmScheduleResultService {
 
     private static final String TM_AUTO_PLAN_LOG_PREFIX = "[TM_AUTO_PLAN]";
+
+    /** 胎面自动排程批次号前缀 */
+    private static final String TM_AUTO_BATCH_NO_PREFIX = "TM";
+
+    /** 进程内最后一次批次号时间戳，用于避免同一毫秒内连续生成重复批次号 */
+    private static final AtomicLong LAST_BATCH_TIME_MILLIS = new AtomicLong(0L);
 
     @Resource
     private TmScheduleResultMapper tmScheduleResultMapper;
@@ -591,12 +598,27 @@ public class TmScheduleResultServiceImpl extends AbstractDocService<TmScheduleRe
      */
     private TmAutoScheduleResponseVo buildAutoScheduleResponse(TmAutoScheduleRequestVo request) {
         TmAutoScheduleResponseVo response = new TmAutoScheduleResponseVo();
-        response.setBatchNo(EngineConstants.TM_BATCH_DATE_PREFIX + DateUtil.format(request.getScheduleDate(), "yyyyMMdd"));
+        response.setBatchNo(generateAutoBatchNo());
         response.setTraceId(StrUtil.blankToDefault(request.getTraceId(), IdUtil.fastSimpleUUID()));
         response.setResultCount(0);
         response.setUnplannedCount(0);
         response.setConfirmRequired(Boolean.FALSE);
         return response;
+    }
+
+    /**
+     * 生成胎面自动排程批次号。
+     *
+     * <p>批次号按执行时刻生成，同一天多次自动排程可生成不同批次；若同一进程内连续调用落在同一毫秒，
+     * 使用递增毫秒兜底，保证本进程内不重复。</p>
+     *
+     * @return 批次号，格式 TMyyyyMMddHHmmssSSS
+     */
+    private String generateAutoBatchNo() {
+        long currentMillis = System.currentTimeMillis();
+        long uniqueMillis = LAST_BATCH_TIME_MILLIS.updateAndGet(lastMillis ->
+                currentMillis > lastMillis ? currentMillis : lastMillis + 1);
+        return TM_AUTO_BATCH_NO_PREFIX + DateUtil.format(new Date(uniqueMillis), "yyyyMMddHHmmssSSS");
     }
 
     /**
@@ -818,5 +840,53 @@ public class TmScheduleResultServiceImpl extends AbstractDocService<TmScheduleRe
         String message = I18nUtil.getMessage(errorCode.getMessageKey());
         return StringUtils.isBlank(message) || errorCode.getMessageKey().equals(message)
                 ? errorCode.getDefaultMessage() : message;
+    }
+
+    /**
+     * 获取胎面排程班次日期列表
+     * 根据排程日期构建6个班次的日期展示列表
+     * 胎面排程6个班次覆盖D日中班、D+1日夜早中、D+2日夜早（D=排程日期-2，即今天）：
+     * 班次1：D日中班，班次2~4：D+1日夜早中，班次5~6：D+2日夜早
+     *
+     * @param scheduleDate 排程日期
+     * @return 班次日期列表
+     */
+    @Override
+    public List<TmScheduleShiftDateVO> listScheduleShiftDates(Date scheduleDate) {
+        if (scheduleDate == null) {
+            scheduleDate = DateUtil.offsetDay(new Date(), 2);
+        }
+        // D = 排程日期 - 2（即今天）
+        Date dDay = DateUtil.offsetDay(scheduleDate, -2);
+        Date dPlus1Day = DateUtil.offsetDay(dDay, 1);
+        Date dPlus2Day = DateUtil.offsetDay(dDay, 2);
+        String dDateStr = DateUtil.format(dDay, "MM/dd");
+        String dPlus1DateStr = DateUtil.format(dPlus1Day, "MM/dd");
+        String dPlus2DateStr = DateUtil.format(dPlus2Day, "MM/dd");
+
+        List<TmScheduleShiftDateVO> result = new ArrayList<>(6);
+        result.add(buildShiftDateVO(1, "afternoon", dDateStr));       // D日中班
+        result.add(buildShiftDateVO(2, "night", dPlus1DateStr));      // D+1日夜班
+        result.add(buildShiftDateVO(3, "morning", dPlus1DateStr));    // D+1日早班
+        result.add(buildShiftDateVO(4, "afternoon", dPlus1DateStr));  // D+1日中班
+        result.add(buildShiftDateVO(5, "night", dPlus2DateStr));      // D+2日夜班
+        result.add(buildShiftDateVO(6, "morning", dPlus2DateStr));    // D+2日早班
+        return result;
+    }
+
+    /**
+     * 构建班次日期VO
+     *
+     * @param shift 班次序号
+     * @param shiftType 班次类型
+     * @param shiftDate 班次日期
+     * @return 班次日期VO
+     */
+    private TmScheduleShiftDateVO buildShiftDateVO(int shift, String shiftType, String shiftDate) {
+        TmScheduleShiftDateVO vo = new TmScheduleShiftDateVO();
+        vo.setShift(shift);
+        vo.setShiftType(shiftType);
+        vo.setShiftDate(shiftDate);
+        return vo;
     }
 }
