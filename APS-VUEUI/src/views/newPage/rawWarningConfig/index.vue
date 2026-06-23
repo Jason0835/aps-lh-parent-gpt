@@ -81,7 +81,7 @@ export default {
     infoDialog,
     TltUploadForm
   },
-  dicts: ["LINE_TYPE", "biz_yes_no", "biz_factory_name",'warn_level','warn_type'],
+  dicts: ["LINE_TYPE", "biz_available_status", "biz_factory_name",'warn_level','warn_type'],
   provide() {
     return {
       parentDict: this.dict,
@@ -149,7 +149,7 @@ export default {
           label: this.$t("ui.data.column.rawWarningConfig.enabled"),
 
           formatter: (row, column, value) => {
-            return this.selectDictLabel(this.dict.type.biz_yes_no, value);
+            return this.selectDictLabel(this.dict.type.biz_available_status, value);
           },
         },
         {
