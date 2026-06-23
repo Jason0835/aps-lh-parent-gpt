@@ -108,6 +108,7 @@ public class CalculateStructureCxMachineNumber {
             groupInfo.setSumPlanQty(calculateMaxMouldCapacity(groupInfo, groupDatas, maxEnableMouldNumberMap, productionContext));
             //20260430+ 设置是否按高优先级先排产，按结构高优先级需求占比
             BigDecimal groupHeightRequireRatio = groupInfo.getHeightRequireRatio();
+            PlanRequireLogRecorder.addGroupHeightRequireRatioLog(productionContext, groupInfo.getGroupName(), groupHeightRequireRatio, groupInfo.getSumPlanQty(), groupInfo.getSumHeightRequireQty());
             groupDatas.forEach(singlePlan -> {
                 if (groupHeightRequireRatio.compareTo(heightPrioritySkuProductionRatio) >= BigDecimal.ZERO.intValue()) {
                     singlePlan.setIsPriorityHeight(YesOrNoEnum.YES.getValue());
