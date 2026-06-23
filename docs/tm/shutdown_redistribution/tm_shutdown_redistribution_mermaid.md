@@ -28,7 +28,7 @@ flowchart TD
     E -->|否| G([结束:不生成新排程])
     
     D --> H[解析成型计划和BOM<br/>得到胎面规格 胶料 口型板 6班需求来源]
-    H --> I{需求算法参数<br/>DEMAND_QTY_CALCULATE_TYPE}
+    H --> I{需求算法参数<br/>TM_ALGORITHM_SWITCH}
     
     I -->|算法1| J[每班需求量 = 成型三班最大计划量 * 胎面标准长度]
     I -->|算法2| K[每班需求量 = 下个班成型计划量 * 胎面标准长度]

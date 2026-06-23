@@ -71,3 +71,13 @@ UIController extends BaseUIController<Entity>
   - 英文: `en/ui_en_US.json`
   - 越南语: `vi/ui_vi_VN.json`
 - 格式: `"ui.construction.carcassRawMaterialList": "胎胚原材料清单"`
+
+### Windows PowerShell 命令规范
+- 不直接拼接复杂 PowerShell 命令。
+- 涉及 `rg`、`mvn`、多参数、正则、引号、逗号、管道符时，优先调用 `scripts/` 下的固定脚本。
+- `rg` 残留检查优先使用 `--fixed-strings`，复杂正则必须拆成多条简单检查。
+- Maven 多模块测试必须使用：
+  `mvn -pl <module> -am test -DfailIfNoTests=false`
+- 如果当前模块依赖 `tm-api`、`api`、`common` 等上游模块，必须带 `-am`。
+- 仓库存在无测试模块时，必须带 `-DfailIfNoTests=false`。
+- 命令失败时，先判断是 shell 参数解析问题、Maven 模块依赖问题，还是代码编译/测试问题，不要直接认定代码失败。

@@ -1,0 +1,160 @@
+package com.zlt.aps.tm.engine.strategy;
+
+import com.zlt.aps.tm.engine.domain.TmScheduleContext;
+import com.zlt.aps.tm.engine.domain.TmTaskDraft;
+import org.springframework.stereotype.Component;
+
+import java.math.BigDecimal;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * 胎面默认待排任务排序策略。
+ *
+ * <p>按多级维度构建比较器，保证库存紧急的规格优先排产，同胶料连续生产减少切换。
+ * 排序维度（优先级从高到低）：
+ * <ol>
+ *   <li>可供成型班次分组：按班次从早到晚排序</li>
+ *   <li>库存紧急度：supplyHours 越小越优先</li>
+ *   <li>主胶料分组：同一班次内按主胶料分组</li>
+ *   <li>基部胶相似度：基部胶相同个数越多优先级越高</li>
+ *   <li>同种胶料内供应时长：同一种胶料内按 supplyHours 从小到大排序</li>
+ *   <li>口型聚集：同种预口型尽量安排在一起生产</li>
+ *   <li>稳定兜底：按 businessKey 升序，保证相同输入重复运行结果一致</li>
+ * </ol>
+ * 通过 {@link Component} 注册为 Spring Bean，由 {@link TmStrategyRegistry} 按编码 "DEFAULT" 收集。</p>
+ */
+@Component
+public class TmDefaultTaskSortStrategy implements ITmTaskSortStrategy {
+
+    /**
+     * 获取策略编码。
+     *
+     * @return 策略编码
+     */
+    @Override
+    public String getStrategyCode() {
+        return "DEFAULT";
+    }
+
+    /**
+     * 构建多级任务排序比较器。
+     *
+     * @param context 胎面排程上下文（当前策略暂不使用，预留扩展）
+     * @return 多级比较器
+     */
+    @Override
+    public Comparator<TmTaskDraft> buildComparator(TmScheduleContext context) {
+        Map<String, BigDecimal> glueGroupEarliestSupplyMap = buildGlueGroupEarliestSupplyMap(context);
+        Map<String, Integer> baseGlueCountMap = buildBaseGlueCountMap(context);
+        return Comparator
+                // 1. 可供成型班次分组：按班次从早到晚排序
+                .comparing(TmTaskDraft::getShiftOrder, Comparator.nullsLast(Comparator.naturalOrder()))
+                // 2-3. 库存紧急度和主胶料分组：按同班次胶料组最早供应时长排序，同胶料聚在一起
+                .thenComparing(task -> resolveGlueGroupEarliestSupply(task, glueGroupEarliestSupplyMap),
+                        Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparing(TmTaskDraft::getGlueCode,
+                        Comparator.nullsLast(Comparator.naturalOrder()))
+                // 4. 基部胶相似度：同班次基部胶相同个数越多优先级越高
+                .thenComparing(task -> resolveBaseGlueSimilarity(task, baseGlueCountMap),
+                        Comparator.nullsLast(Comparator.reverseOrder()))
+                .thenComparing(TmTaskDraft::getBaseGlueCode,
+                        Comparator.nullsLast(Comparator.naturalOrder()))
+                // 5. 同种胶料内供应时长：同一种胶料内按 supplyHours 从小到大排序
+                .thenComparing(TmTaskDraft::getSupplyHours,
+                        Comparator.nullsLast(Comparator.naturalOrder()))
+                // 6. 口型聚集：同种预口型尽量安排在一起生产
+                .thenComparing(TmTaskDraft::getMouthPlateCode,
+                        Comparator.nullsLast(Comparator.naturalOrder()))
+                // 7. 稳定兜底：按 businessKey 升序，保证相同输入重复运行结果一致
+                .thenComparing(TmTaskDraft::getBusinessKey,
+                        Comparator.nullsLast(Comparator.naturalOrder()));
+    }
+
+    /**
+     * 构建同一班次、同一主胶料组内的最早供应时长。
+     *
+     * @param context 胎面排程上下文
+     * @return 班次和胶料组合 -> 最早供应时长
+     */
+    private Map<String, BigDecimal> buildGlueGroupEarliestSupplyMap(TmScheduleContext context) {
+        Map<String, BigDecimal> groupMap = new HashMap<>();
+        if (context == null || context.getTaskDraftList() == null) {
+            return groupMap;
+        }
+        for (TmTaskDraft task : context.getTaskDraftList()) {
+            if (task == null || task.getSupplyHours() == null) {
+                continue;
+            }
+            String key = buildShiftGroupKey(task.getShiftOrder(), task.getGlueCode());
+            BigDecimal existing = groupMap.get(key);
+            if (existing == null || task.getSupplyHours().compareTo(existing) < 0) {
+                groupMap.put(key, task.getSupplyHours());
+            }
+        }
+        return groupMap;
+    }
+
+    /**
+     * 构建同一班次内基部胶出现次数，用于近似表达基部胶相似度。
+     *
+     * @param context 胎面排程上下文
+     * @return 班次和基部胶组合 -> 出现次数
+     */
+    private Map<String, Integer> buildBaseGlueCountMap(TmScheduleContext context) {
+        Map<String, Integer> countMap = new HashMap<>();
+        if (context == null || context.getTaskDraftList() == null) {
+            return countMap;
+        }
+        List<TmTaskDraft> taskDraftList = context.getTaskDraftList();
+        for (TmTaskDraft task : taskDraftList) {
+            if (task == null || task.getBaseGlueCode() == null || task.getBaseGlueCode().trim().isEmpty()) {
+                continue;
+            }
+            String key = buildShiftGroupKey(task.getShiftOrder(), task.getBaseGlueCode());
+            countMap.put(key, countMap.getOrDefault(key, 0) + 1);
+        }
+        return countMap;
+    }
+
+    /**
+     * 读取任务所属胶料组的最早供应时长。
+     *
+     * @param task     任务草稿
+     * @param groupMap 胶料组供应时长映射
+     * @return 供应时长
+     */
+    private BigDecimal resolveGlueGroupEarliestSupply(TmTaskDraft task, Map<String, BigDecimal> groupMap) {
+        if (task == null) {
+            return null;
+        }
+        return groupMap.get(buildShiftGroupKey(task.getShiftOrder(), task.getGlueCode()));
+    }
+
+    /**
+     * 读取任务基部胶相似度分值。
+     *
+     * @param task     任务草稿
+     * @param countMap 基部胶出现次数映射
+     * @return 相似度分值
+     */
+    private Integer resolveBaseGlueSimilarity(TmTaskDraft task, Map<String, Integer> countMap) {
+        if (task == null || task.getBaseGlueCode() == null || task.getBaseGlueCode().trim().isEmpty()) {
+            return null;
+        }
+        return countMap.get(buildShiftGroupKey(task.getShiftOrder(), task.getBaseGlueCode()));
+    }
+
+    /**
+     * 构造班次维度分组键。
+     *
+     * @param shiftOrder 班次顺序
+     * @param code       分组编码
+     * @return 分组键
+     */
+    private String buildShiftGroupKey(Integer shiftOrder, String code) {
+        return shiftOrder + "|" + (code == null ? "" : code);
+    }
+}

@@ -1,6 +1,8 @@
 package com.zlt.aps.tm.engine.event;
 
 import cn.hutool.core.collection.CollUtil;
+import com.ruoyi.common.exception.ServiceException;
+import com.zlt.aps.tm.api.enums.TmScheduleErrorCodeEnum;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
 
@@ -31,12 +33,12 @@ public class TmScheduleEventPublisher {
      * 发布胎面排程事件。
      *
      * @param event 胎面排程事件
-     * @throws IllegalArgumentException 事件为空时抛出
+     * @throws ServiceException         事件为空时抛出
      * @throws RuntimeException         任一监听器处理失败时原样抛出
      */
     public void publish(TmScheduleEvent event) {
         if (event == null) {
-            throw new IllegalArgumentException("胎面排程事件不能为空");
+            throw new ServiceException(TmScheduleErrorCodeEnum.TM_PARAM_EMPTY.getDefaultMessage() + ":event");
         }
         if (CollUtil.isEmpty(listeners)) {
             return;

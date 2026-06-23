@@ -1,0 +1,13 @@
+{
+  "caseName": "case_08_stock_enough_no_need_plan",
+  "description": "库存足够覆盖最低保证班数，baseDemandQty 允许为 0",
+  "autoPlanRequest": {"factoryCode": "F1", "scheduleDate": "2026-06-18", "operator": "tester", "traceId": "TRACE-CASE-08", "confirmOverwrite": false},
+  "params": [{"factoryCode": "F1", "paramCode": "TM_ALGORITHM_SWITCH", "paramValue": "1", "enableStatus": "1"}],
+  "cxScheduleResults": [{"orderNo": "ORD-STOCK-ENOUGH", "embryoCode": "CX-S2", "class1PlanQty": 10, "class2PlanQty": 0, "class3PlanQty": 0, "class4PlanQty": 0, "class5PlanQty": 0, "class6PlanQty": 0, "treadCode": "TR-S2", "treadShoulderLength": 1, "treadMouthPlate": "MP-A", "treadRubberCategory": "GL-A"}],
+  "stocks": [{"factoryCode": "F1", "stockDate": "2026-06-17", "treadCode": "TR-S2", "stockQty": 1000}],
+  "machineInfos": [{"factoryCode": "F1", "machineCode": "TM01", "machineStatus": "1", "maxCapacity": 1000}],
+  "machineSpeeds": [{"factoryCode": "F1", "machineCode": "TM01", "productSpeed": 100}],
+  "mouthPlates": [{"factoryCode": "F1", "machineCode": "TM01", "mouthPlateCode": "MP-A"}],
+  "taskOverrides": [{"treadCode": "TR-S2", "shiftOrder": 1, "currentShiftDemandQty": 0, "guardDemandQty": 100}],
+  "expected": {"success": true, "messageContains": "胎面自动排程执行完成", "resultCount": 6, "assignedCount": 6, "unassignedCount": 0, "explainCount": 6, "errorCount": 0, "expectedResults": [{"orderNo": "ORD-STOCK-ENOUGH-CLASS1", "treadCode": "TR-S2", "machineCode": "TM01", "shiftOrder": 1, "sequence": 1, "planQty": 0}]}
+}

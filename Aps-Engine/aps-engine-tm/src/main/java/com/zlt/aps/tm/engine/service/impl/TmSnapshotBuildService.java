@@ -1,4 +1,4 @@
-package com.zlt.aps.tm.engine.service;
+package com.zlt.aps.tm.engine.service.impl;
 
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.json.JSONArray;
@@ -27,6 +27,9 @@ public class TmSnapshotBuildService {
      */
     public TmSnapshotBuildResult buildTaskExplain(TmTaskDraft task, TmScheduleContext context) {
         TmSnapshotBuildResult result = new TmSnapshotBuildResult();
+        if (context != null && task != null) {
+            result.setRuleHitJson(buildRuleHitJson(context.getRuleTraceMap().get(task.getBusinessKey())));
+        }
         result.setSysAnalysis(task == null ? "任务为空" : "骨架阶段已生成任务解释入口");
         return result;
     }

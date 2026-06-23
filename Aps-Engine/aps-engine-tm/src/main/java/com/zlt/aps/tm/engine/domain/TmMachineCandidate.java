@@ -6,6 +6,7 @@ import lombok.Data;
 import java.math.BigDecimal;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * 胎面机台候选对象。
@@ -22,8 +23,32 @@ public class TmMachineCandidate {
     /** 是否启用 */
     private Boolean enabled;
 
+    /** 最大产能，单位米 */
+    private BigDecimal maxCapacity;
+
     /** 剩余产能，单位米 */
     private BigDecimal remainCapacity;
+
+    /** 检修时长，单位小时 */
+    private BigDecimal maintenanceHours;
+
+    /** 机台默认生产速度，单位米/小时 */
+    private BigDecimal machineSpeed;
+
+    /** 胎面规格生产速度映射，key 为胎面编码 */
+    private Map<String, BigDecimal> treadSpeedMap = new LinkedHashMap<>();
+
+    /** 当前机台可用口型板集合 */
+    private Set<String> mouthPlateCodes;
+
+    /** 明确禁止生产的主胶料集合 */
+    private Set<String> forbiddenGlueCodes;
+
+    /** 指定生产的胎面集合 */
+    private Set<String> fixedAllowTreadCodes;
+
+    /** 禁排生产的胎面集合 */
+    private Set<String> fixedForbidTreadCodes;
 
     /** 口型板是否匹配 */
     private Boolean mouthPlateMatched;

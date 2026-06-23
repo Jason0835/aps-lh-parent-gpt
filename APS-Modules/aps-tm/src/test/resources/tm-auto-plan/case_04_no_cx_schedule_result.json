@@ -1,0 +1,9 @@
+{
+  "caseName": "case_04_no_cx_schedule_result",
+  "description": "成型计划为空，无可生成胎面需求",
+  "autoPlanRequest": {"factoryCode": "F1", "scheduleDate": "2026-06-18", "operator": "tester", "traceId": "TRACE-CASE-04", "confirmOverwrite": false},
+  "params": [{"factoryCode": "F1", "paramCode": "TM_ALGORITHM_SWITCH", "paramValue": "1", "enableStatus": "1"}],
+  "cxScheduleResults": [],
+  "machineInfos": [{"factoryCode": "F1", "machineCode": "TM01", "machineStatus": "1", "maxCapacity": 1000}],
+  "expected": {"success": true, "messageContains": "胎面自动排程执行完成", "resultCount": 0, "assignedCount": 0, "unassignedCount": 0, "explainCount": 0, "errorCount": 0}
+}

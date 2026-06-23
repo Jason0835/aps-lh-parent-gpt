@@ -1,0 +1,9 @@
+{
+  "caseName": "case_19_transaction_rollback_when_persist_error",
+  "description": "模拟落库异常，当前代码记录部分失败而不是异常上抛回滚",
+  "skipScenarioRun": true,
+  "autoPlanRequest": {"factoryCode": "F1", "scheduleDate": "2026-06-18", "operator": "tester", "traceId": "TRACE-CASE-19", "confirmOverwrite": false},
+  "params": [{"factoryCode": "F1", "paramCode": "TM_ALGORITHM_SWITCH", "paramValue": "1", "enableStatus": "1"}],
+  "cxScheduleResults": [{"orderNo": "ORD-ROLLBACK", "embryoCode": "CX-RB", "class1PlanQty": 10, "class2PlanQty": 0, "class3PlanQty": 0, "class4PlanQty": 0, "class5PlanQty": 0, "class6PlanQty": 0, "treadCode": "TR-RB", "treadShoulderLength": 1, "treadMouthPlate": "MP-A", "treadRubberCategory": "GL-A"}],
+  "expected": {"success": true, "knownGaps": ["详设要求关键落库失败整批事务回滚；当前 TmBizSnapshotAndPersistService 捕获异常并累计 errorCount，入口仍返回 success=true"]}
+}

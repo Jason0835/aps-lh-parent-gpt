@@ -9,10 +9,11 @@ import com.zlt.aps.tm.engine.domain.TmScheduleContext;
 import com.zlt.aps.tm.engine.domain.TmSnapshotBuildResult;
 import com.zlt.aps.tm.engine.domain.TmTaskDraft;
 import com.zlt.aps.tm.engine.service.ITmSnapshotAndPersistService;
-import com.zlt.aps.tm.engine.service.TmPersistService;
-import com.zlt.aps.tm.engine.service.TmSnapshotBuildService;
+import com.zlt.aps.tm.engine.service.impl.TmPersistService;
+import com.zlt.aps.tm.engine.service.impl.TmSnapshotBuildService;
 import com.zlt.aps.tm.mapper.TmScheduleResultExplainMapper;
 import com.zlt.aps.tm.mapper.TmScheduleResultMapper;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Service;
 
@@ -24,6 +25,7 @@ import java.util.List;
  *
  * <p>负责在模板快照阶段生成解释快照，将任务链转换为排程结果并写入排程结果与解释表。</p>
  */
+@Slf4j
 @Primary
 @Service
 public class TmBizSnapshotAndPersistService implements ITmSnapshotAndPersistService {
@@ -104,25 +106,58 @@ public class TmBizSnapshotAndPersistService implements ITmSnapshotAndPersistServ
         if (CollUtil.isEmpty(resultList)) {
             return persistResult;
         }
-        int resultCount = 0;
-        int explainCount = 0;
-        int unplannedCount = 0;
         for (TmScheduleResult result : resultList) {
-            scheduleResultMapper.insert(result);
-            resultCount++;
-            if (StrUtil.isBlank(result.getMachineCode())) {
-                unplannedCount++;
+            try {
+                scheduleResultMapper.insert(result);
+                persistResult.setResultCount(persistResult.getResultCount() + 1);
+                if (StrUtil.isBlank(result.getMachineCode())) {
+                    persistResult.setUnplannedCount(persistResult.getUnplannedCount() + 1);
+                }
+            } catch (RuntimeException ex) {
+                String errorMsg = buildResultErrorMsg(result, ex);
+                persistResult.addErrorMsg(errorMsg);
+                log.error("[TM_SCHEDULE_PERSIST_RESULT_FAIL] {}", errorMsg, ex);
             }
         }
         for (TmTaskDraft taskDraft : context.getTaskDraftList()) {
             TmSnapshotBuildResult snapshot = context.getSnapshotMap().get(taskDraft.getBusinessKey());
             TmScheduleResultExplain explain = persistService.convertExplain(taskDraft, snapshot, context);
-            scheduleResultExplainMapper.insert(explain);
-            explainCount++;
+            try {
+                scheduleResultExplainMapper.insert(explain);
+                persistResult.setExplainCount(persistResult.getExplainCount() + 1);
+            } catch (RuntimeException ex) {
+                String errorMsg = buildExplainErrorMsg(taskDraft, ex);
+                persistResult.addErrorMsg(errorMsg);
+                log.error("[TM_SCHEDULE_PERSIST_EXPLAIN_FAIL] {}", errorMsg, ex);
+            }
         }
-        persistResult.setResultCount(resultCount);
-        persistResult.setExplainCount(explainCount);
-        persistResult.setUnplannedCount(unplannedCount);
         return persistResult;
+    }
+
+    /**
+     * 构建结果表落库失败信息。
+     *
+     * @param result 排程结果
+     * @param ex     异常
+     * @return 错误信息
+     */
+    private String buildResultErrorMsg(TmScheduleResult result, RuntimeException ex) {
+        return "结果表写入失败，orderNo=" + (result == null ? null : result.getOrderNo())
+                + "，treadCode=" + (result == null ? null : result.getTreadCode())
+                + "，machineCode=" + (result == null ? null : result.getMachineCode())
+                + "，原因=" + ex.getMessage();
+    }
+
+    /**
+     * 构建解释表落库失败信息。
+     *
+     * @param taskDraft 待排任务
+     * @param ex        异常
+     * @return 错误信息
+     */
+    private String buildExplainErrorMsg(TmTaskDraft taskDraft, RuntimeException ex) {
+        return "解释表写入失败，orderNo=" + (taskDraft == null ? null : taskDraft.getOrderNo())
+                + "，treadCode=" + (taskDraft == null ? null : taskDraft.getTreadCode())
+                + "，原因=" + ex.getMessage();
     }
 }

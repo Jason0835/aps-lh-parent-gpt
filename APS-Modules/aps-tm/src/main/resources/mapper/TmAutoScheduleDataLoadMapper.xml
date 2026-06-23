@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.tm.mapper.TmAutoScheduleDataLoadMapper">
+
+    <resultMap id="TmFormingDemandRowResult" type="com.zlt.aps.tm.domain.vo.TmFormingDemandRowVo">
+        <result column="ORDER_NO" property="orderNo"/>
+        <result column="EMBRYO_CODE" property="embryoCode"/>
+        <result column="BOM_DATA_VERSION" property="bomDataVersion"/>
+        <result column="CLASS1_PLAN_QTY" property="class1PlanQty"/>
+        <result column="CLASS2_PLAN_QTY" property="class2PlanQty"/>
+        <result column="CLASS3_PLAN_QTY" property="class3PlanQty"/>
+        <result column="CLASS4_PLAN_QTY" property="class4PlanQty"/>
+        <result column="CLASS5_PLAN_QTY" property="class5PlanQty"/>
+        <result column="CLASS6_PLAN_QTY" property="class6PlanQty"/>
+        <result column="CLASS7_PLAN_QTY" property="class7PlanQty"/>
+        <result column="CLASS8_PLAN_QTY" property="class8PlanQty"/>
+        <result column="TREAD_CODE" property="treadCode"/>
+        <result column="TREAD_SHOULDER_LENGTH" property="treadShoulderLength"/>
+        <result column="TREAD_MOUTH_PLATE" property="treadMouthPlate"/>
+        <result column="TREAD_RUBBER_CATEGORY" property="treadRubberCategory"/>
+    </resultMap>
+
+    <resultMap id="TmWorkCalendarRowResult" type="com.zlt.aps.tm.domain.vo.TmWorkCalendarRowVo">
+        <result column="DAY_FLAG" property="dayFlag"/>
+        <result column="ONE_SHIFT_FLAG" property="oneShiftFlag"/>
+        <result column="TWO_SHIFT_FLAG" property="twoShiftFlag"/>
+        <result column="THREE_SHIFT_FLAG" property="threeShiftFlag"/>
+    </resultMap>
+
+    <select id="selectFormingDemandRows" resultMap="TmFormingDemandRowResult">
+        SELECT cx.ORDER_NO,
+               cx.EMBRYO_CODE,
+               cx.BOM_DATA_VERSION,
+               cx.CLASS1_PLAN_QTY,
+               cx.CLASS2_PLAN_QTY,
+               cx.CLASS3_PLAN_QTY,
+               cx.CLASS4_PLAN_QTY,
+               cx.CLASS5_PLAN_QTY,
+               cx.CLASS6_PLAN_QTY,
+               cx.CLASS7_PLAN_QTY,
+               cx.CLASS8_PLAN_QTY,
+               ci.TREAD_CODE,
+               ci.TREAD_SHOULDER_LENGTH,
+               ci.TREAD_MOUTH_PLATE,
+               ci.TREAD_RUBBER_CATEGORY
+        FROM T_CX_SCHEDULE_RESULT cx
+                 LEFT JOIN T_MDM_CONSTRUCTION_INFO ci
+                           ON cx.EMBRYO_CODE = ci.CONSTRUCTION_CODE
+                               AND cx.BOM_DATA_VERSION = ci.CONSTRUCTION_VERSION
+        WHERE cx.FACTORY_CODE = #{factoryCode}
+          AND cx.SCHEDULE_DATE = #{scheduleDate}
+    </select>
+
+    <select id="selectWorkCalendarRows" resultMap="TmWorkCalendarRowResult">
+        SELECT DAY_FLAG,
+               ONE_SHIFT_FLAG,
+               TWO_SHIFT_FLAG,
+               THREE_SHIFT_FLAG
+        FROM T_MDM_WORK_CALENDAR
+        WHERE FACTORY_CODE = #{factoryCode}
+          AND PROC_CODE = #{procCode}
+          AND PRODUCTION_DATE = #{productionDate}
+    </select>
+
+</mapper>

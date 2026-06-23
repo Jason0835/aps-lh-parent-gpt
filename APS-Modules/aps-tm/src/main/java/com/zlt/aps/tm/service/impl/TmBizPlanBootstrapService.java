@@ -2,7 +2,7 @@ package com.zlt.aps.tm.service.impl;
 
 import com.zlt.aps.tm.engine.domain.TmScheduleContext;
 import com.zlt.aps.tm.engine.service.ITmPlanBootstrapService;
-import com.zlt.aps.tm.engine.service.TmPlanBootstrapService;
+import com.zlt.aps.tm.engine.service.impl.TmPlanBootstrapService;
 import com.zlt.aps.tm.service.TmAutoScheduleDataLoadService;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Service;

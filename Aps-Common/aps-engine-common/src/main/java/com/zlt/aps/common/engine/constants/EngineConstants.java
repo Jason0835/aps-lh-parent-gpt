@@ -10,7 +10,12 @@ public class EngineConstants {
     /**
      * 胎面批次号前缀
      */
-    public static String TM_BATCH_NO_PREFIX = "TM";
+    public static final String TM_BATCH_NO_PREFIX = "TM";
+
+    /**
+     * 胎面日期批次号前缀
+     */
+    public static final String TM_BATCH_DATE_PREFIX = "TM-";
 
     /**
      * 胎面批次号前缀

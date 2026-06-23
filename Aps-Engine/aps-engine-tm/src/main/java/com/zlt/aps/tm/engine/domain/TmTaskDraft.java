@@ -52,6 +52,12 @@ public class TmTaskDraft {
     /** 保证范围总小时数 */
     private BigDecimal guardRangeHours;
 
+    /** 库存供应成型时长，单位小时；越小表示库存越紧急 */
+    private BigDecimal supplyHours;
+
+    /** 库存保证缺口，单位米 */
+    private BigDecimal stockGapQty;
+
     /** 计划量，单位米 */
     private BigDecimal planQty;
 

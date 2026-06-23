@@ -1,5 +1,7 @@
 package com.zlt.aps.tm.engine.strategy;
 
+import com.ruoyi.common.exception.ServiceException;
+import com.zlt.aps.tm.api.enums.TmScheduleErrorCodeEnum;
 import org.springframework.stereotype.Component;
 
 import java.util.HashMap;
@@ -55,7 +57,7 @@ public class TmStrategyRegistry {
     public ITmDemandQtyStrategy getDemandQtyStrategy(String algorithmCode) {
         ITmDemandQtyStrategy strategy = demandQtyStrategyMap.get(algorithmCode);
         if (strategy == null) {
-            throw new IllegalArgumentException("未注册胎面需求量算法:" + algorithmCode);
+            throw new ServiceException(TmScheduleErrorCodeEnum.TM_STRATEGY_NOT_REGISTERED.getDefaultMessage() + ":" + algorithmCode);
         }
         return strategy;
     }
@@ -65,12 +67,12 @@ public class TmStrategyRegistry {
      *
      * @param strategyCode 策略编码
      * @return 计划量策略
-     * @throws IllegalArgumentException 策略编码未注册时抛出
+     * @throws ServiceException 策略编码未注册时抛出
      */
     public ITmPlanQtyStrategy getPlanQtyStrategy(String strategyCode) {
         ITmPlanQtyStrategy strategy = planQtyStrategyMap.get(strategyCode);
         if (strategy == null) {
-            throw new IllegalArgumentException("未注册胎面计划量策略:" + strategyCode);
+            throw new ServiceException(TmScheduleErrorCodeEnum.TM_STRATEGY_NOT_REGISTERED.getDefaultMessage() + ":" + strategyCode);
         }
         return strategy;
     }
@@ -80,12 +82,12 @@ public class TmStrategyRegistry {
      *
      * @param ruleCode 规则编码
      * @return 机台过滤规则
-     * @throws IllegalArgumentException 规则编码未注册时抛出
+     * @throws ServiceException 规则编码未注册时抛出
      */
     public ITmMachineFilterRule getMachineFilterRule(String ruleCode) {
         ITmMachineFilterRule rule = machineFilterRuleMap.get(ruleCode);
         if (rule == null) {
-            throw new IllegalArgumentException("未注册胎面机台过滤规则:" + ruleCode);
+            throw new ServiceException(TmScheduleErrorCodeEnum.TM_STRATEGY_NOT_REGISTERED.getDefaultMessage() + ":" + ruleCode);
         }
         return rule;
     }
@@ -95,12 +97,12 @@ public class TmStrategyRegistry {
      *
      * @param strategyCode 策略编码
      * @return 机台评分策略
-     * @throws IllegalArgumentException 策略编码未注册时抛出
+     * @throws ServiceException 策略编码未注册时抛出
      */
     public ITmMachineScoreStrategy getMachineScoreStrategy(String strategyCode) {
         ITmMachineScoreStrategy strategy = machineScoreStrategyMap.get(strategyCode);
         if (strategy == null) {
-            throw new IllegalArgumentException("未注册胎面机台评分策略:" + strategyCode);
+            throw new ServiceException(TmScheduleErrorCodeEnum.TM_STRATEGY_NOT_REGISTERED.getDefaultMessage() + ":" + strategyCode);
         }
         return strategy;
     }
@@ -110,12 +112,12 @@ public class TmStrategyRegistry {
      *
      * @param strategyCode 策略编码
      * @return 任务排序策略
-     * @throws IllegalArgumentException 策略编码未注册时抛出
+     * @throws ServiceException 策略编码未注册时抛出
      */
     public ITmTaskSortStrategy getTaskSortStrategy(String strategyCode) {
         ITmTaskSortStrategy strategy = taskSortStrategyMap.get(strategyCode);
         if (strategy == null) {
-            throw new IllegalArgumentException("未注册胎面任务排序策略:" + strategyCode);
+            throw new ServiceException(TmScheduleErrorCodeEnum.TM_STRATEGY_NOT_REGISTERED.getDefaultMessage() + ":" + strategyCode);
         }
         return strategy;
     }

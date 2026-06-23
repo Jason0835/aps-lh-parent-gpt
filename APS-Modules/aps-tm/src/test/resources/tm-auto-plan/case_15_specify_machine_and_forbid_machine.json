@@ -1,0 +1,13 @@
+{
+  "caseName": "case_15_specify_machine_and_forbid_machine",
+  "description": "定点机台和禁排机台同时存在，验证规则优先级和候选结果",
+  "autoPlanRequest": {"factoryCode": "F1", "scheduleDate": "2026-06-18", "operator": "tester", "traceId": "TRACE-CASE-15", "confirmOverwrite": false},
+  "params": [{"factoryCode": "F1", "paramCode": "TM_ALGORITHM_SWITCH", "paramValue": "1", "enableStatus": "1"}],
+  "cxScheduleResults": [{"orderNo": "ORD-SPECIFY", "embryoCode": "CX-SP", "class1PlanQty": 10, "class2PlanQty": 0, "class3PlanQty": 0, "class4PlanQty": 0, "class5PlanQty": 0, "class6PlanQty": 0, "treadCode": "TR-SP", "treadShoulderLength": 1, "treadMouthPlate": "MP-A", "treadRubberCategory": "GL-A"}],
+  "stocks": [{"factoryCode": "F1", "stockDate": "2026-06-17", "treadCode": "TR-SP", "stockQty": 1000}],
+  "machineInfos": [{"factoryCode": "F1", "machineCode": "TM01", "machineStatus": "1", "maxCapacity": 1000}, {"factoryCode": "F1", "machineCode": "TM02", "machineStatus": "1", "maxCapacity": 1000}],
+  "machineSpeeds": [{"factoryCode": "F1", "machineCode": "TM01", "productSpeed": 100}, {"factoryCode": "F1", "machineCode": "TM02", "productSpeed": 100}],
+  "mouthPlates": [{"factoryCode": "F1", "machineCode": "TM01", "mouthPlateCode": "MP-A"}, {"factoryCode": "F1", "machineCode": "TM02", "mouthPlateCode": "MP-A"}],
+  "specifyMachines": [{"factoryCode": "F1", "machineCode": "TM02", "treadCode": "TR-SP", "jobType": "0", "enableStatus": "1"}, {"factoryCode": "F1", "machineCode": "TM01", "treadCode": "TR-SP", "jobType": "1", "enableStatus": "1"}],
+  "expected": {"success": true, "messageContains": "胎面自动排程执行完成", "resultCount": 6, "assignedCount": 6, "unassignedCount": 0, "explainCount": 6, "errorCount": 0, "expectedResults": [{"orderNo": "ORD-SPECIFY-CLASS1", "treadCode": "TR-SP", "machineCode": "TM02", "shiftOrder": 1, "sequence": 1, "planQty": 10}]}
+}

@@ -1,0 +1,10 @@
+{
+  "caseName": "case_06_algorithm_2_next_shift_demand",
+  "description": "参数 TM_ALGORITHM_SWITCH=2，数据加载层按下个班成型计划量生成需求，当前引擎计划计算策略未注册算法2",
+  "skipScenarioRun": true,
+  "autoPlanRequest": {"factoryCode": "F1", "scheduleDate": "2026-06-18", "operator": "tester", "traceId": "TRACE-CASE-06", "confirmOverwrite": false},
+  "params": [{"factoryCode": "F1", "paramCode": "TM_ALGORITHM_SWITCH", "paramValue": "2", "enableStatus": "1"}],
+  "cxScheduleResults": [{"orderNo": "ORD-A2", "embryoCode": "CX-A2", "class1PlanQty": 10, "class2PlanQty": 20, "class3PlanQty": 30, "class4PlanQty": 40, "class5PlanQty": 50, "class6PlanQty": 60, "treadCode": "TR-A2", "treadShoulderLength": 1, "treadMouthPlate": "MP-A", "treadRubberCategory": "GL-A"}],
+  "machineInfos": [{"factoryCode": "F1", "machineCode": "TM01", "machineStatus": "1", "maxCapacity": 1000}],
+  "expected": {"success": true, "knownGaps": ["TM_ALGORITHM_SWITCH=2 目前只在数据加载层生效，引擎 TmPlanCalcService 未注册算法2需求量策略"]}
+}

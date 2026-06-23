@@ -1,0 +1,11 @@
+{
+  "caseName": "case_20_stop_production_demand_redistribute",
+  "description": "胎面停产但成型不停产，停产班次需求分配到其他可排班次",
+  "skipScenarioRun": true,
+  "autoPlanRequest": {"factoryCode": "F1", "scheduleDate": "2026-06-18", "operator": "tester", "traceId": "TRACE-CASE-20", "confirmOverwrite": false},
+  "params": [{"factoryCode": "F1", "paramCode": "TM_ALGORITHM_SWITCH", "paramValue": "2", "enableStatus": "1"}],
+  "cxScheduleResults": [{"orderNo": "ORD-SHUTDOWN", "embryoCode": "CX-SD", "class1PlanQty": 10, "class2PlanQty": 20, "class3PlanQty": 30, "class4PlanQty": 40, "class5PlanQty": 50, "class6PlanQty": 60, "treadCode": "TR-SD", "treadShoulderLength": 1, "treadMouthPlate": "MP-A", "treadRubberCategory": "GL-A"}],
+  "machineInfos": [{"factoryCode": "F1", "machineCode": "TM01", "machineStatus": "1", "maxCapacity": 1000}],
+  "workCalendars": [{"procCode": "04", "dayFlag": "0", "oneShiftFlag": "0", "twoShiftFlag": "1", "threeShiftFlag": "1"}, {"procCode": "03", "dayFlag": "1", "oneShiftFlag": "1", "twoShiftFlag": "1", "threeShiftFlag": "1"}],
+  "expected": {"success": true, "knownGaps": ["停产重分配已在数据加载层实现；完整入口使用算法2时仍受引擎算法2策略未注册限制"]}
+}

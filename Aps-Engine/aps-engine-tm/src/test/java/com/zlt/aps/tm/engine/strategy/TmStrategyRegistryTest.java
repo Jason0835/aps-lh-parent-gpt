@@ -1,5 +1,6 @@
 package com.zlt.aps.tm.engine.strategy;
 
+import com.ruoyi.common.exception.ServiceException;
 import org.junit.Test;
 
 import java.util.Collections;
@@ -13,7 +14,7 @@ import static org.junit.Assert.assertEquals;
  */
 public class TmStrategyRegistryTest {
 
-    @Test(expected = IllegalArgumentException.class)
+    @Test(expected = ServiceException.class)
     public void getDemandQtyStrategyShouldRejectMissingStrategy() {
         TmStrategyRegistry registry = new TmStrategyRegistry(Collections.emptyList(), Collections.emptyList(),
                 Collections.emptyList(), Collections.emptyList(), Collections.emptyList());
@@ -21,7 +22,7 @@ public class TmStrategyRegistryTest {
         registry.getDemandQtyStrategy("UNKNOWN");
     }
 
-    @Test(expected = IllegalArgumentException.class)
+    @Test(expected = ServiceException.class)
     public void getPlanQtyStrategyShouldRejectMissingStrategy() {
         TmStrategyRegistry registry = new TmStrategyRegistry(Collections.emptyList(), Collections.emptyList(),
                 Collections.emptyList(), Collections.emptyList(), Collections.emptyList());
@@ -29,7 +30,7 @@ public class TmStrategyRegistryTest {
         registry.getPlanQtyStrategy("UNKNOWN");
     }
 
-    @Test(expected = IllegalArgumentException.class)
+    @Test(expected = ServiceException.class)
     public void getMachineFilterRuleShouldRejectMissingRule() {
         TmStrategyRegistry registry = new TmStrategyRegistry(Collections.emptyList(), Collections.emptyList(),
                 Collections.emptyList(), Collections.emptyList(), Collections.emptyList());
@@ -37,7 +38,7 @@ public class TmStrategyRegistryTest {
         registry.getMachineFilterRule("UNKNOWN");
     }
 
-    @Test(expected = IllegalArgumentException.class)
+    @Test(expected = ServiceException.class)
     public void getMachineScoreStrategyShouldRejectMissingStrategy() {
         TmStrategyRegistry registry = new TmStrategyRegistry(Collections.emptyList(), Collections.emptyList(),
                 Collections.emptyList(), Collections.emptyList(), Collections.emptyList());
@@ -45,7 +46,7 @@ public class TmStrategyRegistryTest {
         registry.getMachineScoreStrategy("UNKNOWN");
     }
 
-    @Test(expected = IllegalArgumentException.class)
+    @Test(expected = ServiceException.class)
     public void getTaskSortStrategyShouldRejectMissingStrategy() {
         TmStrategyRegistry registry = new TmStrategyRegistry(Collections.emptyList(), Collections.emptyList(),
                 Collections.emptyList(), Collections.emptyList(), Collections.emptyList());

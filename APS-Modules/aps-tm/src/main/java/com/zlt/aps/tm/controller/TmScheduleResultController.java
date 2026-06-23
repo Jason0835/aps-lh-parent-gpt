@@ -4,11 +4,10 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
-import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
-import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.constant.FactoryConstant;
+import com.zlt.aps.redissonLock.annotation.DistributedLock;
 import com.zlt.aps.tm.api.domain.entity.TmScheduleResult;
 import com.zlt.aps.tm.api.domain.vo.TmAutoScheduleRequestVo;
 import com.zlt.aps.tm.mapper.TmScheduleResultMapper;
@@ -91,7 +90,7 @@ public class TmScheduleResultController extends AbstractDocBizController<TmSched
     @ApiOperation("校验自动排程")
     @PostMapping("/validateAutoPlan")
     public AjaxResult validateAutoPlan(@RequestBody TmAutoScheduleRequestVo request) {
-        return AjaxResult.success(tmScheduleResultService.validateAutoPlan(request));
+        return AjaxResult.success(tmScheduleResultService.validateTmAutoPlan(request));
     }
 
     /**
@@ -103,8 +102,10 @@ public class TmScheduleResultController extends AbstractDocBizController<TmSched
     @Log(title = "ui.data.column.tm.scheduleResult.modelName", businessType = BusinessType.INSERT_OR_UPDATE)
     @ApiOperation("自动排程")
     @PostMapping("/autoPlan")
+    @DistributedLock(key = "'TM_SCHEDULE:' + #request.factoryCode + ':' + T(cn.hutool.core.date.DateUtil).formatDate(#request.scheduleDate)",
+            waitTime = 0, leaseTime = -1, failMsg = "ui.data.alert.tm.schedule.running")
     public AjaxResult autoPlan(@RequestBody TmAutoScheduleRequestVo request) {
-        return AjaxResult.success(tmScheduleResultService.autoPlan(request));
+        return AjaxResult.success(tmScheduleResultService.tmAutoPlan(request));
     }
 
     /**
@@ -138,13 +139,7 @@ public class TmScheduleResultController extends AbstractDocBizController<TmSched
     @Log(title = "ui.data.column.tm.scheduleResult.modelName", businessType = BusinessType.UPDATE)
     @PostMapping("/changeMachine")
     public AjaxResult changeMachine(@RequestBody TmScheduleResult scheduleResult) {
-        int releasingOrTimeoutByDate = tmScheduleResultService.isReleasingOrTimeoutByIds(new Long[]{scheduleResult.getId()});
-        if (releasingOrTimeoutByDate > 0) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.release.isReleasingOrTimeoutById"));
-        }
-        scheduleResult.setBaseVale(scheduleResult.getId());
-        tmScheduleResultService.insetDispatcherLog(ApsConstant.DISPATCHER_OPER_MACHINE, scheduleResult);
-        return toAjax(tmScheduleResultService.updateTmScheduleResult(scheduleResult));
+        return toAjax(tmScheduleResultService.changeMachine(scheduleResult));
     }
 
     /**

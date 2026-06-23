@@ -1,0 +1,9 @@
+{
+  "caseName": "case_09_tail_tread_plan_qty",
+  "description": "收尾规格计划量，当前代码未接入收尾标识和损耗率",
+  "skipScenarioRun": true,
+  "autoPlanRequest": {"factoryCode": "F1", "scheduleDate": "2026-06-18", "operator": "tester", "traceId": "TRACE-CASE-09", "confirmOverwrite": false},
+  "params": [{"factoryCode": "F1", "paramCode": "TM_ALGORITHM_SWITCH", "paramValue": "1", "enableStatus": "1"}],
+  "cxScheduleResults": [{"orderNo": "ORD-TAIL", "embryoCode": "CX-T", "class1PlanQty": 10, "class2PlanQty": 0, "class3PlanQty": 0, "class4PlanQty": 0, "class5PlanQty": 0, "class6PlanQty": 0, "treadCode": "TR-TAIL", "treadShoulderLength": 2, "treadMouthPlate": "MP-A", "treadRubberCategory": "GL-A"}],
+  "expected": {"success": true, "knownGaps": ["收尾标识、成型余量和损耗率尚未进入当前 TmDefaultPlanQtyStrategy，无法按详设断言收尾计划量"]}
+}

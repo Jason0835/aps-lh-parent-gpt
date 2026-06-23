@@ -2,6 +2,9 @@ package com.zlt.aps.tm.engine.domain;
 
 import lombok.Data;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * 胎面排程落库结果。
  *
@@ -21,4 +24,21 @@ public class TmPersistResult {
 
     /** 异常数量 */
     private int errorCount;
+
+    /** 错误信息列表 */
+    private List<String> errorMsgList = new ArrayList<>();
+
+    /** 最后一条错误信息 */
+    private String lastErrorMsg;
+
+    /**
+     * 追加落库错误信息。
+     *
+     * @param errorMsg 错误信息
+     */
+    public void addErrorMsg(String errorMsg) {
+        errorCount++;
+        lastErrorMsg = errorMsg;
+        errorMsgList.add(errorMsg);
+    }
 }
