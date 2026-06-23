@@ -1,7 +1,28 @@
 {
   "caseName": "case_03_existing_released_result_reject",
   "description": "指定日期已有任一非未发布结果，拒绝重复生成",
-  "autoPlanRequest": {"factoryCode": "F1", "scheduleDate": "2026-06-18", "operator": "tester", "traceId": "TRACE-CASE-03", "confirmOverwrite": true},
-  "oldScheduleResults": [{"factoryCode": "F1", "scheduleDate": "2026-06-18", "releaseStatus": "1", "treadCode": "TR-OLD"}],
-  "expected": {"success": false, "rejectMessageContains": "已有发布过的生成计划", "resultCount": 0, "assignedCount": 0, "unassignedCount": 0, "explainCount": 0}
+  "autoPlanRequest": {
+    "factoryCode": "F1",
+    "scheduleDate": "2026-06-18",
+    "operator": "tester",
+    "traceId": "TRACE-CASE-03",
+    "confirmOverwrite": true
+  },
+  "oldScheduleResults": [
+    {
+      "factoryCode": "F1",
+      "scheduleDate": "2026-06-18",
+      "releaseStatus": "1",
+      "treadCode": "TR-OLD"
+    }
+  ],
+  "expected": {
+    "success": false,
+    "rejectMessageContains": "已有发布过的生成计划",
+    "resultCount": 0,
+    "assignedCount": 0,
+    "unassignedCount": 0,
+    "explainCount": 0
+  }
 }
+

@@ -153,7 +153,7 @@ public class TmTaskChainScheduleServiceTest {
                 .get("TM01", DateUtil.toLocalDateTime(context.getScheduleDate()).toLocalDate(), 1);
         assertEquals(2, chain.getSize());
 
-        // taskId 使用 businessKey 格式: orderNo|treadCode|glueCode|mouthPlateCode
+        // taskId 使用 businessKey 格式: treadCode|glueCode|mouthPlateCode|shiftOrder
         String taskId1 = task1.getBusinessKey();
         ScheduleChainChangeResult<TmTaskDraft> result = service.removeTask(taskId1, context);
 
@@ -162,7 +162,7 @@ public class TmTaskChainScheduleServiceTest {
         assertFalse(result.getRemovedNodes().isEmpty());
         assertNull(context.getTaskNode(taskId1));
         assertEquals(Integer.valueOf(1), chain.toList().get(0).getSequence());
-        assertEquals("ORD-2|TR-ORD-2|GL-ORD-2|MP-ORD-2", chain.toList().get(0).getTaskId());
+        assertEquals("TR-ORD-2|GL-ORD-2|MP-ORD-2|1", chain.toList().get(0).getTaskId());
     }
 
     /**
@@ -358,6 +358,7 @@ public class TmTaskChainScheduleServiceTest {
         task.setTreadCode("TR-" + orderNo);
         task.setGlueCode("GL-" + orderNo);
         task.setMouthPlateCode("MP-" + orderNo);
+        task.setShiftOrder(1);
         task.setPlanQty(new BigDecimal("100"));
         return task;
     }

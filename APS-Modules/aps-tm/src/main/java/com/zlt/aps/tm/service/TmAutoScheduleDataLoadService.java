@@ -57,6 +57,8 @@ public class TmAutoScheduleDataLoadService {
 
     private static final String NO = "0";
 
+    private static final String CLOSE_OUT_TIP = "0";
+
     private static final String JOB_TYPE_ALLOW = "0";
 
     private static final String JOB_TYPE_FORBID = "1";
@@ -96,6 +98,9 @@ public class TmAutoScheduleDataLoadService {
 
     @Resource
     private TmCurlRollMapper tmCurlRollMapper;
+
+    @Resource
+    private TmLossSettingMapper tmLossSettingMapper;
 
     @Resource
     private TmAutoScheduleDataLoadMapper tmAutoScheduleDataLoadMapper;
@@ -247,7 +252,7 @@ public class TmAutoScheduleDataLoadService {
         wrapper.in(TmGlueMachineReal::getMachineCode, candidateMap.keySet());
         List<TmGlueMachineReal> glueRuleList = tmGlueMachineRealMapper.selectList(wrapper);
         for (TmGlueMachineReal glueRule : glueRuleList) {
-            if (StrUtil.isBlank(glueRule.getGlueCode())) {
+            if (StrUtil.isBlank(glueRule.getGlueCode()) || !NO.equals(glueRule.getAllowFlag())) {
                 continue;
             }
             TmMachineCandidate candidate = candidateMap.get(glueRule.getMachineCode());
@@ -425,14 +430,17 @@ public class TmAutoScheduleDataLoadService {
             errorMsg.setLength(errorMsg.length() - 1);
             throw new RuntimeException(errorMsg.toString());
         }
+        // 同一胎面、胶料、口型板的成型需求先聚合，避免同一库存缺口按多个成型工单重复参与计划量计算。
+        List<TmFormingDemandRowVo> demandRowList = mergeFormingDemandRows(rowList);
         String algorithmCode = getParamValue(context, PARAM_ALGORITHM_SWITCH, "1");
         BigDecimal minStartQty = getDecimalParam(context, PARAM_MIN_START_QTY);
         BigDecimal defaultCurlLength = getDecimalParam(context, PARAM_DEFAULT_CURL_LENGTH);
         Integer guardShiftCount = getIntegerParam(context, PARAM_STOCK_GUARD_SHIFT_COUNT, 2);
+        List<TmLossSetting> lossSettingList = loadLossSettings(context);
         TmWorkCalendarRowVo tmCalendar = loadWorkCalendar(context, PROC_CODE_TM);
         TmWorkCalendarRowVo cxCalendar = loadWorkCalendar(context, PROC_CODE_CX);
         List<TmTaskDraft> taskDraftList = new ArrayList<>();
-        for (TmFormingDemandRowVo row : rowList) {
+        for (TmFormingDemandRowVo row : demandRowList) {
             String treadCode = row.getTreadCode();
             BigDecimal treadLength = nvl(row.getTreadShoulderLength());
             if (StrUtil.isBlank(treadCode) || treadLength.compareTo(BigDecimal.ZERO) <= 0) {
@@ -448,10 +456,15 @@ public class TmAutoScheduleDataLoadService {
                 }
                 TmTaskDraft taskDraft = new TmTaskDraft();
                 taskDraft.setOrderNo(row.getOrderNo() + "-CLASS" + shiftOrder);
+                taskDraft.setSourceOrderNos(row.getOrderNo());
                 taskDraft.setTreadCode(treadCode);
                 taskDraft.setGlueCode(row.getTreadRubberCategory());
                 taskDraft.setMouthPlateCode(row.getTreadMouthPlate());
                 taskDraft.setShiftOrder(shiftOrder);
+                taskDraft.setTreadShoulderLength(treadLength);
+                taskDraft.setTailFlag(CLOSE_OUT_TIP.equals(row.getMarkCloseOutTip()) ? YES : NO);
+                taskDraft.setTailBalanceQty(nvl(row.getCxRemainQty()));
+                taskDraft.setLossRate(resolveLossRate(row.getTreadCode(), lossSettingList));
                 taskDraft.setCurrentShiftDemandQty(demandQty);
                 taskDraft.setGuardDemandQty(calculateGuardDemand(classQtyArray, shiftOrder, guardShiftCount).multiply(treadLength));
                 taskDraft.setDemandQty(demandQty);
@@ -466,6 +479,155 @@ public class TmAutoScheduleDataLoadService {
             }
         }
         return taskDraftList;
+    }
+
+    /**
+     * 按胎面、胶料和口型板聚合成型需求。
+     *
+     * <p>胎面自动排程以胎面规格作为生产对象，成型工单号只用于解释追踪。这里先把相同胎面规格的
+     * 班次需求合并，保证库存缺口和收尾判断只针对同一胎面需求计算一次。</p>
+     *
+     * @param rowList 成型需求明细
+     * @return 聚合后的成型需求
+     */
+    private List<TmFormingDemandRowVo> mergeFormingDemandRows(List<TmFormingDemandRowVo> rowList) {
+        if (CollUtil.isEmpty(rowList)) {
+            return Collections.emptyList();
+        }
+        Map<String, TmFormingDemandRowVo> demandMap = new LinkedHashMap<>();
+        for (TmFormingDemandRowVo row : rowList) {
+            String key = buildDemandMergeKey(row);
+            TmFormingDemandRowVo merged = demandMap.get(key);
+            if (merged == null) {
+                demandMap.put(key, copyDemandRow(row));
+                continue;
+            }
+            mergeDemandQty(merged, row);
+        }
+        return new ArrayList<>(demandMap.values());
+    }
+
+    /**
+     * 构造成型需求聚合键。
+     *
+     * @param row 成型需求
+     * @return 聚合键
+     */
+    private String buildDemandMergeKey(TmFormingDemandRowVo row) {
+        return StrUtil.blankToDefault(row.getTreadCode(), "")
+                + "|" + StrUtil.blankToDefault(row.getTreadRubberCategory(), "")
+                + "|" + StrUtil.blankToDefault(row.getTreadMouthPlate(), "");
+    }
+
+    /**
+     * 复制成型需求行，避免聚合过程修改 mapper 返回的原始对象。
+     *
+     * @param row 原始成型需求
+     * @return 可聚合的成型需求副本
+     */
+    private TmFormingDemandRowVo copyDemandRow(TmFormingDemandRowVo row) {
+        TmFormingDemandRowVo target = new TmFormingDemandRowVo();
+        target.setOrderNo(row.getOrderNo());
+        target.setEmbryoCode(row.getEmbryoCode());
+        target.setTreadCode(row.getTreadCode());
+        target.setTreadShoulderLength(row.getTreadShoulderLength());
+        target.setTreadMouthPlate(row.getTreadMouthPlate());
+        target.setTreadRubberCategory(row.getTreadRubberCategory());
+        target.setMarkCloseOutTip(row.getMarkCloseOutTip());
+        target.setCxRemainQty(row.getCxRemainQty());
+        target.setClass1PlanQty(nvl(row.getClass1PlanQty()));
+        target.setClass2PlanQty(nvl(row.getClass2PlanQty()));
+        target.setClass3PlanQty(nvl(row.getClass3PlanQty()));
+        target.setClass4PlanQty(nvl(row.getClass4PlanQty()));
+        target.setClass5PlanQty(nvl(row.getClass5PlanQty()));
+        target.setClass6PlanQty(nvl(row.getClass6PlanQty()));
+        return target;
+    }
+
+    /**
+     * 将同规格成型需求累加到聚合行。
+     *
+     * @param merged 已聚合需求
+     * @param row    当前成型需求
+     */
+    private void mergeDemandQty(TmFormingDemandRowVo merged, TmFormingDemandRowVo row) {
+        merged.setOrderNo(appendSourceOrderNo(merged.getOrderNo(), row.getOrderNo()));
+        merged.setClass1PlanQty(nvl(merged.getClass1PlanQty()).add(nvl(row.getClass1PlanQty())));
+        merged.setClass2PlanQty(nvl(merged.getClass2PlanQty()).add(nvl(row.getClass2PlanQty())));
+        merged.setClass3PlanQty(nvl(merged.getClass3PlanQty()).add(nvl(row.getClass3PlanQty())));
+        merged.setClass4PlanQty(nvl(merged.getClass4PlanQty()).add(nvl(row.getClass4PlanQty())));
+        merged.setClass5PlanQty(nvl(merged.getClass5PlanQty()).add(nvl(row.getClass5PlanQty())));
+        merged.setClass6PlanQty(nvl(merged.getClass6PlanQty()).add(nvl(row.getClass6PlanQty())));
+        if (CLOSE_OUT_TIP.equals(row.getMarkCloseOutTip())) {
+            merged.setMarkCloseOutTip(CLOSE_OUT_TIP);
+        }
+        // 收尾余量来自施工口径，同规格多工单可能重复带出同一余量，不能随成型工单数量累加。
+        merged.setCxRemainQty(nvl(merged.getCxRemainQty()).max(nvl(row.getCxRemainQty())));
+    }
+
+    /**
+     * 追加来源成型工单号。
+     *
+     * @param existing 已有来源工单号
+     * @param orderNo  当前来源工单号
+     * @return 去重后的逗号分隔工单号
+     */
+    private String appendSourceOrderNo(String existing, String orderNo) {
+        if (StrUtil.isBlank(orderNo)) {
+            return existing;
+        }
+        if (StrUtil.isBlank(existing)) {
+            return orderNo;
+        }
+        List<String> orderNoList = Arrays.asList(existing.split(","));
+        return orderNoList.contains(orderNo) ? existing : existing + "," + orderNo;
+    }
+
+    /**
+     * 加载启用的胎面损耗率配置。
+     *
+     * @param context 自动排程上下文
+     * @return 损耗率配置列表；未配置时返回空集合
+     */
+    private List<TmLossSetting> loadLossSettings(TmScheduleContext context) {
+        if (tmLossSettingMapper == null) {
+            return Collections.emptyList();
+        }
+        LambdaQueryWrapper<TmLossSetting> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(TmLossSetting::getFactoryCode, context.getFactoryCode());
+        wrapper.eq(TmLossSetting::getEnableStatus, YES);
+        return Optional.ofNullable(tmLossSettingMapper.selectList(wrapper)).orElse(Collections.emptyList());
+    }
+
+    /**
+     * 按胎面编码解析计划量阶段可使用的损耗率。
+     *
+     * <p>计划量计算发生在机台分配之前，因此当前只能应用胎面级和默认级配置；
+     * 同层级多条配置按 priority 小值优先。</p>
+     *
+     * @param treadCode       胎面编码
+     * @param lossSettingList 损耗率配置列表
+     * @return 损耗率，未配置时返回 0
+     */
+    private BigDecimal resolveLossRate(String treadCode, List<TmLossSetting> lossSettingList) {
+        if (CollUtil.isEmpty(lossSettingList)) {
+            return BigDecimal.ZERO;
+        }
+        Optional<TmLossSetting> treadSetting = lossSettingList.stream()
+                .filter(item -> item.getLossRate() != null)
+                .filter(item -> StrUtil.isBlank(item.getMachineCode()))
+                .filter(item -> StrUtil.isNotBlank(item.getTreadCode()) && item.getTreadCode().equals(treadCode))
+                .min(Comparator.comparing(item -> item.getPriority() == null ? Integer.MAX_VALUE : item.getPriority()));
+        if (treadSetting.isPresent()) {
+            return treadSetting.get().getLossRate();
+        }
+        return lossSettingList.stream()
+                .filter(item -> item.getLossRate() != null)
+                .filter(item -> StrUtil.isBlank(item.getMachineCode()))
+                .filter(item -> StrUtil.isBlank(item.getTreadCode()))
+                .min(Comparator.comparing(item -> item.getPriority() == null ? Integer.MAX_VALUE : item.getPriority()))
+                .map(TmLossSetting::getLossRate)
+                .orElse(BigDecimal.ZERO);
     }
 
     /**

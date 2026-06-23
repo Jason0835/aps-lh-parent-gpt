@@ -87,7 +87,8 @@ public class TmPlanCalcService implements ITmPlanCalcService {
 
             // 已有计划量表示上游已完成特殊业务调整，此处保持不变。
             if (task.getPlanQty() == null) {
-                planQtyStrategy.calculate(task, context);
+                TmPlanQtyResult planQtyResult = planQtyStrategy.calculate(task, context);
+                applyPlanQtyResult(task, planQtyResult);
             }
             addPlanQtyTrace(context, task, planQtyStrategyCode);
         }
@@ -108,6 +109,7 @@ public class TmPlanCalcService implements ITmPlanCalcService {
         evidence.put("rollingStockQty", task.getRollingStockQty());
         evidence.put("stockGapQty", task.getStockGapQty());
         evidence.put("demandQty", task.getDemandQty());
+        evidence.put("sourceOrderNos", task.getSourceOrderNos());
         traceOf(context, task).addRuleHit("DEMAND_QTY_CALC", "PASS", evidence);
     }
 
@@ -123,6 +125,9 @@ public class TmPlanCalcService implements ITmPlanCalcService {
         evidence.put("strategyCode", planQtyStrategyCode);
         evidence.put("planQty", task.getPlanQty());
         evidence.put("demandQty", task.getDemandQty());
+        evidence.put("tailFlag", task.getTailFlag());
+        evidence.put("lossRate", task.getLossRate());
+        evidence.put("calcFormulaDesc", task.getCalcFormulaDesc());
         traceOf(context, task).addRuleHit("PLAN_QTY_CALC", "PASS", evidence);
     }
 
@@ -171,6 +176,26 @@ public class TmPlanCalcService implements ITmPlanCalcService {
         task.setDemandQty(result.getDemandQty());
         task.setGuardShiftCount(result.getGuardShiftCount());
         task.setSupplyHours(result.getSupplyHours());
+    }
+
+    /**
+     * 将计划量策略结果回填到任务草稿，便于解释表落库。
+     *
+     * @param task   任务草稿
+     * @param result 计划量策略结果
+     */
+    private void applyPlanQtyResult(TmTaskDraft task, TmPlanQtyResult result) {
+        if (result == null) {
+            return;
+        }
+        task.setBaseDemandQty(result.getBaseDemandQty());
+        task.setLossAddQty(result.getLossAddQty());
+        task.setToolLimitAdjustQty(result.getToolLimitAdjustQty());
+        task.setMinStartAdjustQty(result.getMinStartAdjustQty());
+        task.setTailRoundAdjustQty(result.getTailRoundAdjustQty());
+        task.setCapacityAdjustQty(result.getCapacityAdjustQty());
+        task.setPlanQty(result.getFinalPlanQty());
+        task.setCalcFormulaDesc(result.getCalcFormulaDesc());
     }
 
     /**

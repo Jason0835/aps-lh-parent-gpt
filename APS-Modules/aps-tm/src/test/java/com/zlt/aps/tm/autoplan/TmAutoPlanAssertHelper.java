@@ -1,7 +1,6 @@
 package com.zlt.aps.tm.autoplan;
 
 import cn.hutool.core.util.StrUtil;
-import com.ruoyi.common.exception.ServiceException;
 import com.zlt.aps.tm.api.domain.entity.TmScheduleResult;
 import com.zlt.aps.tm.api.domain.entity.TmScheduleResultExplain;
 import com.zlt.aps.tm.api.domain.vo.TmAutoScheduleResponseVo;
@@ -16,7 +15,7 @@ import static org.junit.Assert.*;
 /**
  * 胎面自动排程 JSON 场景断言助手。
  *
- * <p>封装响应、排程结果、解释信息和已知差异断言，使每个业务场景测试保持 Given/When/Then 清晰结构。</p>
+ * <p>封装响应、排程结果和解释信息断言，使每个业务场景测试保持 Given/When/Then 清晰结构。</p>
  */
 public class TmAutoPlanAssertHelper {
 
@@ -29,7 +28,6 @@ public class TmAutoPlanAssertHelper {
         TmAutoPlanScenario scenario = mockContext.getScenario();
         TmAutoPlanExpectedResult expected = scenario.getExpected();
         if (Boolean.TRUE.equals(scenario.getSkipScenarioRun())) {
-            assertKnownGaps(scenario);
             return;
         }
         try {
@@ -41,13 +39,11 @@ public class TmAutoPlanAssertHelper {
             assertPersistedResults(scenario, mockContext.getInsertedResults());
             assertPersistedExplains(scenario, mockContext.getInsertedExplains());
             assertPersistSummary(scenario, mockContext.getLastContext());
-            assertKnownGaps(scenario);
-        } catch (ServiceException ex) {
+        } catch (RuntimeException ex) {
             if (!Boolean.FALSE.equals(expected.getSuccess())) {
                 throw ex;
             }
             assertRejectMessage(scenario, ex);
-            assertKnownGaps(scenario);
         }
     }
 
@@ -62,23 +58,8 @@ public class TmAutoPlanAssertHelper {
         assertEquals(scenario.getAutoPlanRequest().getFactoryCode(), context.getFactoryCode());
         assertEquals(scenario.getAutoPlanRequest().getScheduleDate(), context.getScheduleDate());
         if (scenario.getExpected().getResultCount() != null && !Boolean.TRUE.equals(scenario.getSkipScenarioRun())) {
-            assertTrue("任务数量应不超过最终结果数量：" + scenario.getCaseName(),
-                    context.getTaskDraftList().size() <= scenario.getExpected().getResultCount());
-        }
-        assertKnownGaps(scenario);
-    }
-
-    /**
-     * 断言指定场景记录了已知差异。
-     *
-     * @param scenario 场景
-     */
-    public void assertKnownGaps(TmAutoPlanScenario scenario) {
-        if (scenario.getExpected() == null || scenario.getExpected().getKnownGaps() == null) {
-            return;
-        }
-        for (String gap : scenario.getExpected().getKnownGaps()) {
-            assertTrue("knownGaps 不能出现空文本：" + scenario.getCaseName(), StrUtil.isNotBlank(gap));
+            assertTrue("任务数量应不少于归并后的最终结果数量：" + scenario.getCaseName(),
+                    context.getTaskDraftList().size() >= scenario.getExpected().getResultCount());
         }
     }
 
@@ -119,7 +100,7 @@ public class TmAutoPlanAssertHelper {
         }
     }
 
-    private void assertRejectMessage(TmAutoPlanScenario scenario, ServiceException ex) {
+    private void assertRejectMessage(TmAutoPlanScenario scenario, RuntimeException ex) {
         String messageContains = scenario.getExpected().getRejectMessageContains();
         assertTrue("拒绝消息不符合预期：" + ex.getMessage(),
                 messageContains == null || ex.getMessage().contains(messageContains));
@@ -138,6 +119,10 @@ public class TmAutoPlanAssertHelper {
         if (expected.getUnassignedCount() != null) {
             long unassignedCount = resultList.stream().filter(item -> StrUtil.isBlank(item.getMachineCode())).count();
             assertEquals(expected.getUnassignedCount().intValue(), (int) unassignedCount);
+        }
+        for (TmScheduleResult result : resultList) {
+            assertTrue("自动排程结果工单号格式不符合胎面唯一键要求：" + result.getOrderNo(),
+                    result.getOrderNo() != null && result.getOrderNo().matches("TM\\d{17}-\\d{4}"));
         }
         for (TmAutoPlanExpectedResult.ExpectedScheduleResult expectedResult : expected.getExpectedResults()) {
             TmScheduleResult result = findResult(resultList, expectedResult);
@@ -172,6 +157,16 @@ public class TmAutoPlanAssertHelper {
                 assertTrue(explain.getCandidateMachineJson() != null
                         && explain.getCandidateMachineJson().contains(expectedExplain.getCandidateMachineContains()));
             }
+            if (expectedExplain.getMachineSelectReasonContains() != null) {
+                assertTrue(explain.getMachineSelectReason() != null
+                        && explain.getMachineSelectReason().contains(expectedExplain.getMachineSelectReasonContains()));
+            }
+            if (expectedExplain.getAssignStatus() != null) {
+                assertEquals(expectedExplain.getAssignStatus(), explain.getAssignStatus());
+            }
+            if (expectedExplain.getSelectedMachineScore() != null) {
+                assertBigDecimalEquals(expectedExplain.getSelectedMachineScore(), explain.getSelectedMachineScore());
+            }
         }
     }
 
@@ -195,9 +190,6 @@ public class TmAutoPlanAssertHelper {
     }
 
     private boolean matches(TmScheduleResult result, TmAutoPlanExpectedResult.ExpectedScheduleResult expectedResult) {
-        if (StrUtil.isNotBlank(expectedResult.getOrderNo()) && !expectedResult.getOrderNo().equals(result.getOrderNo())) {
-            return false;
-        }
         if (StrUtil.isNotBlank(expectedResult.getTreadCode()) && !expectedResult.getTreadCode().equals(result.getTreadCode())) {
             return false;
         }

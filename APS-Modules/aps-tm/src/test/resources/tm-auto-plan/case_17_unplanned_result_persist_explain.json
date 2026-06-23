@@ -1,10 +1,54 @@
 {
   "caseName": "case_17_unplanned_result_persist_explain",
   "description": "无可用机台导致未排，未排任务仍写入结果表且 machine_code 允许为空",
-  "autoPlanRequest": {"factoryCode": "F1", "scheduleDate": "2026-06-18", "operator": "tester", "traceId": "TRACE-CASE-17", "confirmOverwrite": false},
-  "params": [{"factoryCode": "F1", "paramCode": "TM_ALGORITHM_SWITCH", "paramValue": "1", "enableStatus": "1"}],
-  "cxScheduleResults": [{"orderNo": "ORD-NOMACHINE", "embryoCode": "CX-NM", "class1PlanQty": 10, "class2PlanQty": 0, "class3PlanQty": 0, "class4PlanQty": 0, "class5PlanQty": 0, "class6PlanQty": 0, "treadCode": "TR-NM", "treadShoulderLength": 1, "treadMouthPlate": "MP-A", "treadRubberCategory": "GL-A"}],
-  "stocks": [{"factoryCode": "F1", "stockDate": "2026-06-17", "treadCode": "TR-NM", "stockQty": 1000}],
+  "autoPlanRequest": {
+    "factoryCode": "F1",
+    "scheduleDate": "2026-06-18",
+    "operator": "tester",
+    "traceId": "TRACE-CASE-17",
+    "confirmOverwrite": false
+  },
+  "params": [
+    {
+      "factoryCode": "F1",
+      "paramCode": "TM_ALGORITHM_SWITCH",
+      "paramValue": "1",
+      "enableStatus": "1"
+    }
+  ],
+  "cxScheduleResults": [
+    {
+      "orderNo": "ORD-NOMACHINE",
+      "embryoCode": "CX-NM",
+      "class1PlanQty": 10,
+      "class2PlanQty": 0,
+      "class3PlanQty": 0,
+      "class4PlanQty": 0,
+      "class5PlanQty": 0,
+      "class6PlanQty": 0,
+      "treadCode": "TR-NM",
+      "treadShoulderLength": 1,
+      "treadMouthPlate": "MP-A",
+      "treadRubberCategory": "GL-A"
+    }
+  ],
+  "stocks": [
+    {
+      "factoryCode": "F1",
+      "stockDate": "2026-06-17",
+      "treadCode": "TR-NM",
+      "stockQty": 1000
+    }
+  ],
   "machineInfos": [],
-  "expected": {"success": true, "messageContains": "胎面自动排程执行完成", "resultCount": 6, "assignedCount": 0, "unassignedCount": 6, "explainCount": 6, "errorCount": 0}
+  "expected": {
+    "success": true,
+    "messageContains": "胎面自动排程执行完成",
+    "resultCount": 1,
+    "assignedCount": 0,
+    "unassignedCount": 1,
+    "explainCount": 6,
+    "errorCount": 0
+  }
 }
+

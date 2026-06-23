@@ -7,6 +7,7 @@ import cn.hutool.json.JSONUtil;
 import com.zlt.aps.tm.engine.domain.*;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 /**
@@ -29,9 +30,51 @@ public class TmSnapshotBuildService {
         TmSnapshotBuildResult result = new TmSnapshotBuildResult();
         if (context != null && task != null) {
             result.setRuleHitJson(buildRuleHitJson(context.getRuleTraceMap().get(task.getBusinessKey())));
+            List<TmMachineCandidate> candidates = context.getCandidateTraceMap().get(task.getBusinessKey());
+            result.setCandidateMachineJson(buildCandidateMachineJson(candidates));
+            result.setSelectedMachineScore(resolveSelectedMachineScore(task, candidates));
+            result.setMachineSelectReason(buildMachineSelectReason(task, result.getSelectedMachineScore()));
+            result.setAssignStatus(task.isUnassigned() ? "UNPLANNED" : "PLANNED");
         }
-        result.setSysAnalysis(task == null ? "任务为空" : "骨架阶段已生成任务解释入口");
+        result.setSysAnalysis(task == null ? "任务为空" : "已生成任务规则、候选机台和选机解释");
         return result;
+    }
+
+    /**
+     * 解析选中机台评分。
+     *
+     * @param task       任务草稿
+     * @param candidates 候选机台列表
+     * @return 选中机台评分；未排时返回 null
+     */
+    private BigDecimal resolveSelectedMachineScore(TmTaskDraft task, List<TmMachineCandidate> candidates) {
+        if (task == null || task.isUnassigned() || CollUtil.isEmpty(candidates)) {
+            return null;
+        }
+        for (TmMachineCandidate candidate : candidates) {
+            if (task.getMachineCode().equals(candidate.getMachineCode())) {
+                return candidate.getScore();
+            }
+        }
+        return null;
+    }
+
+    /**
+     * 构建最终选机说明。
+     *
+     * @param task                 任务草稿
+     * @param selectedMachineScore 选中机台评分
+     * @return 选机说明
+     */
+    private String buildMachineSelectReason(TmTaskDraft task, BigDecimal selectedMachineScore) {
+        if (task == null) {
+            return "任务为空，无法选机";
+        }
+        if (task.isUnassigned()) {
+            String reason = task.getUnplannedReasonDesc() == null ? task.getUnplannedReasonCode() : task.getUnplannedReasonDesc();
+            return "未选中机台：" + reason;
+        }
+        return "选中机台 " + task.getMachineCode() + "，评分=" + selectedMachineScore + "，按默认过滤和评分规则选择";
     }
 
     /**

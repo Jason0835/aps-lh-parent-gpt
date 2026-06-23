@@ -10,7 +10,6 @@ import io.swagger.annotations.ApiOperation;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.Date;
 import java.util.List;
 
 /**
@@ -54,10 +53,10 @@ public interface ITmScheduleResultRemoteService {
     /**
      * 获取胎面排程班次日期列表
      *
-     * @param scheduleDate 排程日期
+     * @param scheduleResult 排程日期
      * @return 班次日期列表
      */
     @ApiOperation("获取胎面排程班次日期列表")
     @PostMapping("/tmScheduleResult/listScheduleShiftDates")
-    List<TmScheduleShiftDateVO> listScheduleShiftDates(@RequestBody Date scheduleDate);
+    List<TmScheduleShiftDateVO> listScheduleShiftDates(@RequestBody TmScheduleResult scheduleResult);
 }

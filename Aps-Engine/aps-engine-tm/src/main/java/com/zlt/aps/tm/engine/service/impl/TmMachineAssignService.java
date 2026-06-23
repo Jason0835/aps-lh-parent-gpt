@@ -71,6 +71,7 @@ public class TmMachineAssignService implements ITmMachineAssignService {
             // 已预置机台的任务直接追加到对应机台任务链
             TmMachineCandidate candidate = new TmMachineCandidate();
             candidate.setMachineCode(task.getMachineCode());
+            context.getCandidateTraceMap().put(task.getBusinessKey(), Collections.singletonList(candidate));
             addAssignTrace(context, task, "PASS", task.getMachineCode(), null, null);
             taskChainScheduleService.appendAutoTask(task, candidate, context);
         }
@@ -86,6 +87,7 @@ public class TmMachineAssignService implements ITmMachineAssignService {
         List<TmMachineCandidate> candidateList = context.getMachineCandidateList();
         if (CollUtil.isEmpty(candidateList)) {
             log.warn("[TM_MACHINE_ASSIGN] 工厂无可用机台候选列表，任务[{}]标记无可用机台", task.getBusinessKey());
+            context.getCandidateTraceMap().put(task.getBusinessKey(), Collections.emptyList());
             addAssignTrace(context, task, "REJECT", null, TmUnplannedReasonEnum.NO_AVAILABLE_MACHINE.getCode(),
                     TmUnplannedReasonEnum.NO_AVAILABLE_MACHINE.getDesc());
             markNoAvailableMachine(task);
@@ -123,6 +125,7 @@ public class TmMachineAssignService implements ITmMachineAssignService {
         // 全部候选机台被过滤，标记无可用机台
         if (passedCandidates.isEmpty()) {
             log.info("[TM_MACHINE_ASSIGN] 任务[{}]所有候选机台均被过滤，标记无可用机台", task.getBusinessKey());
+            context.getCandidateTraceMap().put(task.getBusinessKey(), candidates);
             addAssignTrace(context, task, "REJECT", null, TmUnplannedReasonEnum.NO_AVAILABLE_MACHINE.getCode(),
                     TmUnplannedReasonEnum.NO_AVAILABLE_MACHINE.getDesc());
             markNoAvailableMachine(task);
@@ -136,6 +139,7 @@ public class TmMachineAssignService implements ITmMachineAssignService {
             log.debug("[TM_MACHINE_ASSIGN] 任务[{}]机台[{}]评分={}",
                     task.getBusinessKey(), candidate.getMachineCode(), scoreResult.getTotalScore());
         }
+        context.getCandidateTraceMap().put(task.getBusinessKey(), candidates);
 
         // 按评分降序选择最高分机台，同分按机台编码升序排序保证稳定
         passedCandidates.sort(Comparator

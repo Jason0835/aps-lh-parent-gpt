@@ -26,8 +26,9 @@ public class TmEngineDomainTest {
         draft.setTreadCode("TR-1");
         draft.setGlueCode("GL-1");
         draft.setMouthPlateCode("MP-1");
+        draft.setShiftOrder(1);
 
-        assertEquals("ORD-1|TR-1|GL-1|MP-1", draft.getBusinessKey());
+        assertEquals("TR-1|GL-1|MP-1|1", draft.getBusinessKey());
         assertTrue(draft.isUnassigned());
     }
 

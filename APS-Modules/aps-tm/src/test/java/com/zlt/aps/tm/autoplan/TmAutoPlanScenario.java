@@ -25,7 +25,7 @@ public class TmAutoPlanScenario {
     /** 场景说明 */
     private String description;
 
-    /** 是否跳过完整入口测试，仅做步骤级 gap 记录 */
+    /** 是否跳过完整入口测试，仅做步骤级观察 */
     private Boolean skipScenarioRun = Boolean.FALSE;
 
     /** 自动排程入口请求 */
@@ -67,11 +67,20 @@ public class TmAutoPlanScenario {
     /** 胎面卷曲长度资料 */
     private List<TmCurlRoll> curlRolls = new ArrayList<>();
 
+    /** 胎面损耗率设置 */
+    private List<TmLossSetting> lossSettings = new ArrayList<>();
+
     /** 工作日历资料 */
     private List<WorkCalendarData> workCalendars = new ArrayList<>();
 
     /** 任务草稿补充字段，用于覆盖当前数据加载层尚未落地的数据 */
     private List<TaskOverride> taskOverrides = new ArrayList<>();
+
+    /** 是否模拟结果表写入失败 */
+    private Boolean mockResultInsertFailure = Boolean.FALSE;
+
+    /** 是否模拟解释表写入失败 */
+    private Boolean mockExplainInsertFailure = Boolean.FALSE;
 
     /** 期望结果 */
     private TmAutoPlanExpectedResult expected = new TmAutoPlanExpectedResult();
@@ -127,6 +136,18 @@ public class TmAutoPlanScenario {
 
         /** 滚动库存 */
         private BigDecimal rollingStockQty;
+
+        /** 收尾标识，1 表示按收尾规格计算 */
+        private String tailFlag;
+
+        /** 收尾成型余量，单位条 */
+        private BigDecimal tailBalanceQty;
+
+        /** 胎面肩长，单位米 */
+        private BigDecimal treadShoulderLength;
+
+        /** 损耗率，百分比 */
+        private BigDecimal lossRate;
 
         /** 供应小时数 */
         private BigDecimal supplyHours;

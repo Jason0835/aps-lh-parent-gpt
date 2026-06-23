@@ -84,7 +84,14 @@
 <script>
 import {mapState} from "vuex";
 import {downloadLink} from "@/utils/request";
-import {autoPlan, listTmScheduleResult, listScheduleShiftDates, publishScheduleResult, publishValidate, removeTmScheduleResult,} from "@/api/tm/scheduleResult";
+import {
+  autoPlan,
+  listScheduleShiftDates,
+  listTmScheduleResult,
+  publishScheduleResult,
+  publishValidate,
+  removeTmScheduleResult,
+} from "@/api/tm/scheduleResult";
 import tltUpload from "@/components/tltUpload/tltUpload.vue";
 import TltUploadForm from "@/views/components/tltUploadForm.vue";
 import infoDialog from "./components/infoDialog.vue";
@@ -196,6 +203,36 @@ export default {
           prop: "machineCode",
           halign: "center",
           label: this.$t("ui.data.column.tm.scheduleResult.machineCode"),
+        },
+        {
+          prop: "treadCode",
+          halign: "center",
+          label: this.$t("ui.data.column.tm.scheduleResult.treadCode"),
+        },
+        {
+          prop: "glueCode",
+          halign: "center",
+          label: this.$t("ui.data.column.tm.scheduleResult.glueCode"),
+        },
+        {
+          prop: "releaseStatus",
+          halign: "center",
+          label: this.$t("ui.data.column.tm.scheduleResult.releaseStatus"),
+          type: "select",
+          filterable: true,
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(this.dict.type.IS_RELEASE, value);
+          },
+        },
+        {
+          prop: "tailFlag",
+          halign: "center",
+          label: this.$t("ui.data.column.tm.scheduleResult.tailFlag"),
+          type: "select",
+          filterable: true,
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(this.dict.type.biz_yes_no, value);
+          },
         },
         {
           label: this.getShiftLabel(1),
@@ -334,36 +371,6 @@ export default {
               minWidth: 70,
             },
           ],
-        },
-        {
-          prop: "treadCode",
-          halign: "center",
-          label: this.$t("ui.data.column.tm.scheduleResult.treadCode"),
-        },
-        {
-          prop: "glueCode",
-          halign: "center",
-          label: this.$t("ui.data.column.tm.scheduleResult.glueCode"),
-        },
-        {
-          prop: "releaseStatus",
-          halign: "center",
-          label: this.$t("ui.data.column.tm.scheduleResult.releaseStatus"),
-          type: "select",
-          filterable: true,
-          formatter: (row, column, value) => {
-            return this.selectDictLabel(this.dict.type.IS_RELEASE, value);
-          },
-        },
-        {
-          prop: "tailFlag",
-          halign: "center",
-          label: this.$t("ui.data.column.tm.scheduleResult.tailFlag"),
-          type: "select",
-          filterable: true,
-          formatter: (row, column, value) => {
-            return this.selectDictLabel(this.dict.type.biz_yes_no, value);
-          },
         },
         {
           prop: "updateTime",

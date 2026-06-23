@@ -295,6 +295,26 @@ public class TmScheduleResultServiceImplTest {
     }
 
     /**
+     * 测试内容：验证自动排程批次号按执行时刻生成且连续调用不重复。
+     * 测试场景：同一天同一排程日期连续两次执行自动排程校验。
+     * 预期结果：batchNo 符合 TMyyyyMMddHHmmssSSS 格式，且两次结果不同。
+     */
+    @Test
+    public void validateAutoPlanShouldGenerateUniqueExecutionTimeBatchNo() {
+        // 准备请求并 mock 无旧排程结果，连续两次调用校验入口。
+        TmAutoScheduleRequestVo request = buildAutoRequest();
+        when(tmScheduleResultMapper.selectList(org.mockito.ArgumentMatchers.any())).thenReturn(Collections.emptyList());
+
+        TmAutoScheduleResponseVo firstResponse = service.validateTmAutoPlan(request);
+        TmAutoScheduleResponseVo secondResponse = service.validateTmAutoPlan(request);
+
+        // 断言批次号不再按排程日期固定生成，而是按执行时刻生成同日不重复值。
+        assertEquals(true, firstResponse.getBatchNo().matches("TM\\d{17}"));
+        assertEquals(true, secondResponse.getBatchNo().matches("TM\\d{17}"));
+        assertEquals(false, firstResponse.getBatchNo().equals(secondResponse.getBatchNo()));
+    }
+
+    /**
      * 测试内容：验证自动排程请求不能为空。
      * 测试场景：自动排程校验入口传入 null。
      * 预期结果：抛出 ServiceException，不继续查询旧批次。

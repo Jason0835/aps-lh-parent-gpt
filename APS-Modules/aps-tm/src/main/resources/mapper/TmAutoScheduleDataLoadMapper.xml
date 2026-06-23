@@ -16,6 +16,8 @@
         <result column="CLASS6_PLAN_QTY" property="class6PlanQty"/>
         <result column="CLASS7_PLAN_QTY" property="class7PlanQty"/>
         <result column="CLASS8_PLAN_QTY" property="class8PlanQty"/>
+        <result column="MARK_CLOSE_OUT_TIP" property="markCloseOutTip"/>
+        <result column="CX_REMAIN_QTY" property="cxRemainQty"/>
         <result column="TREAD_CODE" property="treadCode"/>
         <result column="TREAD_SHOULDER_LENGTH" property="treadShoulderLength"/>
         <result column="TREAD_MOUTH_PLATE" property="treadMouthPlate"/>
@@ -41,6 +43,8 @@
                cx.CLASS6_PLAN_QTY,
                cx.CLASS7_PLAN_QTY,
                cx.CLASS8_PLAN_QTY,
+               cx.MARK_CLOSE_OUT_TIP,
+               cx.CX_REMAIN_QTY,
                ci.TREAD_CODE,
                ci.TREAD_SHOULDER_LENGTH,
                ci.TREAD_MOUTH_PLATE,
@@ -48,7 +52,9 @@
         FROM T_CX_SCHEDULE_RESULT cx
                  LEFT JOIN T_MDM_CONSTRUCTION_INFO ci
                            ON cx.EMBRYO_CODE = ci.CONSTRUCTION_CODE
-                               AND cx.BOM_DATA_VERSION = ci.CONSTRUCTION_VERSION
+                               AND (cx.BOM_DATA_VERSION = ci.CONSTRUCTION_VERSION
+                                    OR (cx.BOM_DATA_VERSION IS NULL AND ci.CONSTRUCTION_VERSION IS NULL))
+                               AND ci.IS_DELETE = 0
         WHERE cx.FACTORY_CODE = #{factoryCode}
           AND cx.SCHEDULE_DATE = #{scheduleDate}
     </select>

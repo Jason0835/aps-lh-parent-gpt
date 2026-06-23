@@ -1,13 +1,83 @@
 {
   "caseName": "case_02_existing_unreleased_result_replan",
   "description": "指定日期已有旧结果且全部未发布，确认后允许覆盖重排",
-  "autoPlanRequest": {"factoryCode": "F1", "scheduleDate": "2026-06-18", "operator": "tester", "traceId": "TRACE-CASE-02", "confirmOverwrite": true},
-  "params": [{"factoryCode": "F1", "paramCode": "TM_ALGORITHM_SWITCH", "paramValue": "1", "enableStatus": "1"}],
-  "oldScheduleResults": [{"factoryCode": "F1", "scheduleDate": "2026-06-18", "releaseStatus": "0", "treadCode": "TR-OLD"}],
-  "cxScheduleResults": [{"orderNo": "ORD-REPLAN", "embryoCode": "CX-A", "class1PlanQty": 10, "class2PlanQty": 20, "class3PlanQty": 30, "class4PlanQty": 0, "class5PlanQty": 0, "class6PlanQty": 0, "treadCode": "TR-A", "treadShoulderLength": 1, "treadMouthPlate": "MP-A", "treadRubberCategory": "GL-A"}],
-  "stocks": [{"factoryCode": "F1", "stockDate": "2026-06-17", "treadCode": "TR-A", "stockQty": 1000}],
-  "machineInfos": [{"factoryCode": "F1", "machineCode": "TM01", "machineStatus": "1", "maxCapacity": 1000}],
-  "machineSpeeds": [{"factoryCode": "F1", "machineCode": "TM01", "productSpeed": 100}],
-  "mouthPlates": [{"factoryCode": "F1", "machineCode": "TM01", "mouthPlateCode": "MP-A"}],
-  "expected": {"success": true, "messageContains": "胎面自动排程执行完成", "resultCount": 6, "assignedCount": 6, "unassignedCount": 0, "explainCount": 6, "errorCount": 0}
+  "autoPlanRequest": {
+    "factoryCode": "F1",
+    "scheduleDate": "2026-06-18",
+    "operator": "tester",
+    "traceId": "TRACE-CASE-02",
+    "confirmOverwrite": true
+  },
+  "params": [
+    {
+      "factoryCode": "F1",
+      "paramCode": "TM_ALGORITHM_SWITCH",
+      "paramValue": "1",
+      "enableStatus": "1"
+    }
+  ],
+  "oldScheduleResults": [
+    {
+      "factoryCode": "F1",
+      "scheduleDate": "2026-06-18",
+      "releaseStatus": "0",
+      "treadCode": "TR-OLD"
+    }
+  ],
+  "cxScheduleResults": [
+    {
+      "orderNo": "ORD-REPLAN",
+      "embryoCode": "CX-A",
+      "class1PlanQty": 10,
+      "class2PlanQty": 20,
+      "class3PlanQty": 30,
+      "class4PlanQty": 0,
+      "class5PlanQty": 0,
+      "class6PlanQty": 0,
+      "treadCode": "TR-A",
+      "treadShoulderLength": 1,
+      "treadMouthPlate": "MP-A",
+      "treadRubberCategory": "GL-A"
+    }
+  ],
+  "stocks": [
+    {
+      "factoryCode": "F1",
+      "stockDate": "2026-06-17",
+      "treadCode": "TR-A",
+      "stockQty": 1000
+    }
+  ],
+  "machineInfos": [
+    {
+      "factoryCode": "F1",
+      "machineCode": "TM01",
+      "machineStatus": "1",
+      "maxCapacity": 1000
+    }
+  ],
+  "machineSpeeds": [
+    {
+      "factoryCode": "F1",
+      "machineCode": "TM01",
+      "productSpeed": 100
+    }
+  ],
+  "mouthPlates": [
+    {
+      "factoryCode": "F1",
+      "machineCode": "TM01",
+      "mouthPlateCode": "MP-A"
+    }
+  ],
+  "expected": {
+    "success": true,
+    "messageContains": "胎面自动排程执行完成",
+    "resultCount": 1,
+    "assignedCount": 1,
+    "unassignedCount": 0,
+    "explainCount": 6,
+    "errorCount": 0
+  }
 }
+

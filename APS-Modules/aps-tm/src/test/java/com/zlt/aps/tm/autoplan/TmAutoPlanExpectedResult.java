@@ -9,8 +9,7 @@ import java.util.List;
 /**
  * 胎面自动排程 JSON 场景期望结果。
  *
- * <p>用于描述自动排程响应、排程结果、解释信息和当前已知详设差异。
- * 已知差异通过 knownGaps 明确记录，避免测试代码伪造尚未实现的生产能力。</p>
+ * <p>用于描述自动排程响应、排程结果和解释信息。</p>
  */
 @Data
 public class TmAutoPlanExpectedResult {
@@ -41,9 +40,6 @@ public class TmAutoPlanExpectedResult {
 
     /** 期望落库错误数量 */
     private Integer errorCount;
-
-    /** 当前场景对应的已知详设差异 */
-    private List<String> knownGaps = new ArrayList<>();
 
     /** 期望排程结果明细 */
     private List<ExpectedScheduleResult> expectedResults = new ArrayList<>();
@@ -99,5 +95,14 @@ public class TmAutoPlanExpectedResult {
 
         /** 候选机台 JSON 需包含文本 */
         private String candidateMachineContains;
+
+        /** 最终选机说明需包含文本 */
+        private String machineSelectReasonContains;
+
+        /** 分配状态 */
+        private String assignStatus;
+
+        /** 选中机台评分 */
+        private BigDecimal selectedMachineScore;
     }
 }

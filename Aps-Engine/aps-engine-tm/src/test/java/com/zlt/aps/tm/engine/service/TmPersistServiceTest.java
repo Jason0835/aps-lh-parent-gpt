@@ -118,6 +118,10 @@ public class TmPersistServiceTest {
         assertEquals("F1", explain.getFactoryCode());
         assertEquals("BATCH-1", explain.getBatchNo());
         assertEquals("TRACE-1", explain.getTraceId());
+        assertEquals("TR-1|GL-1|MP-1|1", explain.getTaskBusinessKey());
+        assertEquals("ORD-1", explain.getTaskOrderNo());
+        assertEquals("SRC-ORD-1", explain.getSourceOrderNos());
+        assertEquals(Integer.valueOf(1), explain.getShiftOrder());
         assertEquals(new BigDecimal("21"), explain.getBaseDemandQty());
         assertEquals(new BigDecimal("21"), explain.getRequiredQty());
         assertEquals(new BigDecimal("11"), explain.getFinalPlanQty());
@@ -309,9 +313,11 @@ public class TmPersistServiceTest {
     private TmTaskDraft buildTask(int shiftOrder) {
         TmTaskDraft task = new TmTaskDraft();
         task.setOrderNo("ORD-" + shiftOrder);
+        task.setSourceOrderNos("SRC-ORD-" + shiftOrder);
         task.setTreadCode("TR-" + shiftOrder);
         task.setGlueCode("GL-" + shiftOrder);
         task.setMouthPlateCode("MP-" + shiftOrder);
+        task.setShiftOrder(shiftOrder);
         task.setPlanQty(new BigDecimal(10 + shiftOrder));
         return task;
     }

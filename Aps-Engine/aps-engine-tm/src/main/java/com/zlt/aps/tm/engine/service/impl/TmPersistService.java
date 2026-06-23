@@ -98,9 +98,24 @@ public class TmPersistService {
             explain.setTraceId(context.getTraceId());
         }
         if (task != null) {
-            explain.setBaseDemandQty(task.getDemandQty());
+            explain.setTaskBusinessKey(task.getBusinessKey());
+            explain.setTaskOrderNo(task.getOrderNo());
+            explain.setSourceOrderNos(task.getSourceOrderNos());
+            explain.setShiftOrder(task.getShiftOrder());
+            explain.setBaseDemandQty(task.getBaseDemandQty() == null ? task.getDemandQty() : task.getBaseDemandQty());
+            explain.setLossAddQty(task.getLossAddQty());
+            explain.setStockDeductQty(task.getRollingStockQty());
+            explain.setToolLimitAdjustQty(task.getToolLimitAdjustQty());
+            explain.setMinStartAdjustQty(task.getMinStartAdjustQty());
+            explain.setTailRoundAdjustQty(task.getTailRoundAdjustQty());
+            explain.setCapacityAdjustQty(task.getCapacityAdjustQty());
             explain.setRequiredQty(task.getDemandQty());
             explain.setFinalPlanQty(task.getPlanQty());
+            explain.setCalcFormulaDesc(task.getCalcFormulaDesc());
+            explain.setStockQty(task.getSixClockStockQty());
+            explain.setPlanStockQty(task.getRollingStockQty());
+            explain.setSupplyHours(task.getSupplyHours());
+            explain.setCoverageShiftCount(task.getGuardShiftCount());
             explain.setUnplannedReasonCode(task.getUnplannedReasonCode());
             explain.setUnplannedReasonDesc(task.getUnplannedReasonDesc());
             explain.setTaskStatus(task.isUnassigned() ? null : TmScheduleTaskStatusEnum.PLANNED.getCode());
@@ -111,6 +126,9 @@ public class TmPersistService {
         if (snapshot != null) {
             explain.setRuleHitJson(snapshot.getRuleHitJson());
             explain.setCandidateMachineJson(snapshot.getCandidateMachineJson());
+            explain.setSelectedMachineScore(snapshot.getSelectedMachineScore());
+            explain.setMachineSelectReason(snapshot.getMachineSelectReason());
+            explain.setAssignStatus(snapshot.getAssignStatus());
             explain.setUnplannedEvidenceJson(snapshot.getUnplannedEvidenceJson());
             explain.setSysAnalysis(snapshot.getSysAnalysis());
         }
@@ -155,7 +173,6 @@ public class TmPersistService {
         result.setBatchNo(context == null ? null : context.getBatchNo());
         result.setScheduleDate(context == null ? null : context.getScheduleDate());
         if (task != null) {
-            result.setOrderNo(task.getOrderNo());
             result.setTreadCode(task.getTreadCode());
             result.setGlueCode(task.getGlueCode());
             result.setMouthPlateCode(task.getMouthPlateCode());
@@ -173,7 +190,6 @@ public class TmPersistService {
         result.setFactoryCode(context == null ? null : context.getFactoryCode());
         result.setBatchNo(context == null ? null : context.getBatchNo());
         result.setScheduleDate(context == null ? null : context.getScheduleDate());
-        result.setOrderNo(task.getOrderNo());
         result.setMachineCode(node.getMachineCode());
         result.setTreadCode(task.getTreadCode());
         result.setGlueCode(task.getGlueCode());

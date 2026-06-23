@@ -26,7 +26,6 @@ import org.springframework.web.bind.annotation.*;
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.util.Date;
 import java.util.List;
 
 /**
@@ -191,8 +190,8 @@ public class TmScheduleResultController extends AbstractDocBizController<TmSched
      */
     @ApiOperation("获取胎面排程班次日期列表")
     @PostMapping("/listScheduleShiftDates")
-    public List<TmScheduleShiftDateVO> listScheduleShiftDates(@RequestBody Date scheduleDate) {
-        return tmScheduleResultService.listScheduleShiftDates(scheduleDate);
+    public List<TmScheduleShiftDateVO> listScheduleShiftDates(@RequestBody TmScheduleResult scheduleResult) {
+        return tmScheduleResultService.listScheduleShiftDates(scheduleResult.getScheduleDate());
     }
 
     @Log(title = "ui.data.column.tm.scheduleResult.modelName", businessType = BusinessType.IMPORT)

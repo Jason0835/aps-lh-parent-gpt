@@ -169,6 +169,38 @@ public class TmAutoScheduleDataLoadServiceTest {
     }
 
     /**
+     * 测试内容：验证同胎面、同胶料、同口型板的成型需求会先聚合再生成胎面任务。
+     * 测试场景：两个成型工单对应同一个胎面规格，算法 2 按下一班需求生成任务。
+     * 预期结果：只生成 6 条胎面任务，需求量为两个成型工单聚合后的数量，来源工单号仅保留在追踪字段。
+     *
+     * @throws Exception 反射注入依赖或加载数据失败时由测试框架抛出
+     */
+    @Test
+    public void loadAllDataShouldAggregateSameTreadDemandBeforeTaskBuild() throws Exception {
+        // 准备算法 2 和两条同胎面成型需求，验证库存缺口后续不会按成型工单重复放大。
+        TmAutoScheduleDataLoadService service = buildServiceWithCommonMocks(Collections.singletonList(algorithmParam("2")));
+        when(tmAutoScheduleDataLoadMapper.selectFormingDemandRows(any(), any()))
+                .thenReturn(Arrays.asList(
+                        buildDemandRow("CX-ORD-001", "10", "20", "30", "40", "50", "60"),
+                        buildDemandRow("CX-ORD-002", "5", "7", "9", "11", "13", "15")));
+        when(tmAutoScheduleDataLoadMapper.selectWorkCalendarRows(any(), any(), any()))
+                .thenReturn(Collections.emptyList());
+        TmScheduleContext context = buildContext();
+
+        // 执行数据加载。
+        service.loadAllData(context);
+
+        // 断言同规格只生成 6 条任务，1 班按算法 2 读取聚合后的 2 班需求 27。
+        assertEquals(6, context.getTaskDraftList().size());
+        TmTaskDraft firstShiftTask = context.getTaskDraftList().get(0);
+        assertBigDecimalEquals(new BigDecimal("27"), firstShiftTask.getDemandQty());
+        assertEquals("CX-ORD-001,CX-ORD-002", firstShiftTask.getSourceOrderNos());
+        assertEquals("TR-215-001", firstShiftTask.getTreadCode());
+        assertEquals("GL-A", firstShiftTask.getGlueCode());
+        assertEquals("MP-A", firstShiftTask.getMouthPlateCode());
+    }
+
+    /**
      * 测试内容：验证算法 1 使用前三班最大值生成每班需求。
      * 测试场景：成型需求 1-6 班分别为 10 到 60，算法开关为 1。
      * 预期结果：6 个排程班次的当前需求量都等于前三班最大值 30。
@@ -521,6 +553,7 @@ public class TmAutoScheduleDataLoadServiceTest {
         glueRule.setFactoryCode("F1");
         glueRule.setMachineCode(machineCode);
         glueRule.setGlueCode(glueCode);
+        glueRule.setAllowFlag("0");
         glueRule.setEnableStatus("1");
         return glueRule;
     }

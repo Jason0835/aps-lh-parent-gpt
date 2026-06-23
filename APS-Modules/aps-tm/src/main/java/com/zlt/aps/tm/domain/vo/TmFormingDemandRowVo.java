@@ -45,6 +45,12 @@ public class TmFormingDemandRowVo {
     /** 8班成型计划量 */
     private BigDecimal class8PlanQty;
 
+    /** 收尾提示标识，0 表示提示收尾 */
+    private String markCloseOutTip;
+
+    /** 成型余量，单位条 */
+    private BigDecimal cxRemainQty;
+
     /** 胎面编码 */
     private String treadCode;
 

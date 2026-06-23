@@ -58,11 +58,18 @@ public class TmAutoPlanMockFactory {
 
         when(scheduleResultMapper.selectList(any())).thenReturn(nullToEmpty(scenario.getOldScheduleResults()));
         when(scheduleResultMapper.insert(any(TmScheduleResult.class))).thenAnswer(invocation -> {
+            if (Boolean.TRUE.equals(scenario.getMockResultInsertFailure())) {
+                throw new RuntimeException("mock result insert failed");
+            }
             TmScheduleResult result = invocation.getArgument(0);
+            result.setId((long) mockContext.getInsertedResults().size() + 1L);
             mockContext.getInsertedResults().add(result);
             return 1;
         });
         when(explainMapper.insert(any(TmScheduleResultExplain.class))).thenAnswer(invocation -> {
+            if (Boolean.TRUE.equals(scenario.getMockExplainInsertFailure())) {
+                throw new RuntimeException("mock explain insert failed");
+            }
             TmScheduleResultExplain explain = invocation.getArgument(0);
             mockContext.getInsertedExplains().add(explain);
             return 1;
@@ -125,6 +132,7 @@ public class TmAutoPlanMockFactory {
         TmMachineSpeedMapper machineSpeedMapper = mock(TmMachineSpeedMapper.class);
         TmMachineMaintenanceMapper maintenanceMapper = mock(TmMachineMaintenanceMapper.class);
         TmCurlRollMapper curlRollMapper = mock(TmCurlRollMapper.class);
+        TmLossSettingMapper lossSettingMapper = mock(TmLossSettingMapper.class);
 
         when(paramsMapper.selectList(any())).thenReturn(nullToEmpty(scenario.getParams()));
         when(machineInfoMapper.selectList(any())).thenReturn(nullToEmpty(scenario.getMachineInfos()));
@@ -137,6 +145,7 @@ public class TmAutoPlanMockFactory {
         when(machineSpeedMapper.selectList(any())).thenReturn(nullToEmpty(scenario.getMachineSpeeds()));
         when(maintenanceMapper.selectList(any())).thenReturn(nullToEmpty(scenario.getMachineMaintenances()));
         when(curlRollMapper.selectList(any())).thenReturn(nullToEmpty(scenario.getCurlRolls()));
+        when(lossSettingMapper.selectList(any())).thenReturn(nullToEmpty(scenario.getLossSettings()));
 
         setField(service, "tmParamsMapper", paramsMapper);
         setField(service, "tmMachineInfoMapper", machineInfoMapper);
@@ -147,6 +156,7 @@ public class TmAutoPlanMockFactory {
         setField(service, "tmMachineSpeedMapper", machineSpeedMapper);
         setField(service, "tmMachineMaintenanceMapper", maintenanceMapper);
         setField(service, "tmCurlRollMapper", curlRollMapper);
+        setField(service, "tmLossSettingMapper", lossSettingMapper);
         return service;
     }
 
@@ -170,7 +180,7 @@ public class TmAutoPlanMockFactory {
     }
 
     private TmStrategyRegistry buildStrategyRegistry() {
-        return new TmStrategyRegistry(Collections.singletonList(new TmGuardDemandQtyStrategy()),
+        return new TmStrategyRegistry(Arrays.asList(new TmGuardDemandQtyStrategy(), new TmNextShiftDemandQtyStrategy()),
                 Collections.singletonList(new TmDefaultPlanQtyStrategy()),
                 Collections.singletonList(new TmDefaultMachineFilterRule()),
                 Collections.singletonList(new TmDefaultMachineScoreStrategy()),
@@ -253,6 +263,18 @@ public class TmAutoPlanMockFactory {
         }
         if (override.getRollingStockQty() != null) {
             task.setRollingStockQty(override.getRollingStockQty());
+        }
+        if (override.getTailFlag() != null) {
+            task.setTailFlag(override.getTailFlag());
+        }
+        if (override.getTailBalanceQty() != null) {
+            task.setTailBalanceQty(override.getTailBalanceQty());
+        }
+        if (override.getTreadShoulderLength() != null) {
+            task.setTreadShoulderLength(override.getTreadShoulderLength());
+        }
+        if (override.getLossRate() != null) {
+            task.setLossRate(override.getLossRate());
         }
         if (override.getSupplyHours() != null) {
             task.setSupplyHours(override.getSupplyHours());

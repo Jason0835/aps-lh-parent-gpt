@@ -140,6 +140,30 @@ public class TmPlanCalcServiceTest {
     }
 
     /**
+     * 测试内容：验证收尾余量大于基础需求时不按收尾量覆盖计划量。
+     * 测试场景：MARK_CLOSE_OUT_TIP 已折算为收尾标识，但收尾余量乘胎面肩长大于基础需求。
+     * 预期结果：计划量保持基础需求量，不被更大的收尾余量放大。
+     */
+    @Test
+    public void calculateShouldSkipTailQtyWhenTailBaseGreaterThanBaseDemand() {
+        TmPlanCalcService service = buildRealService();
+        TmScheduleContext context = new TmScheduleContext();
+        TmTaskDraft task = buildTask("ORD-TAIL", "TR-TAIL");
+        task.setCurrentShiftDemandQty(new BigDecimal("500"));
+        task.setGuardDemandQty(new BigDecimal("500"));
+        task.setRollingStockQty(BigDecimal.ZERO);
+        task.setTailFlag("1");
+        task.setTailBalanceQty(new BigDecimal("100"));
+        task.setTreadShoulderLength(new BigDecimal("10"));
+        context.setTaskDraftList(Collections.singletonList(task));
+
+        service.calculate(context);
+
+        assertEquals(new BigDecimal("500"), task.getBaseDemandQty());
+        assertEquals(new BigDecimal("500"), task.getPlanQty());
+    }
+
+    /**
      * 构建计划计算服务，当前测试只覆盖参数读取，不需要注册实际策略。
      *
      * @return 计划计算服务

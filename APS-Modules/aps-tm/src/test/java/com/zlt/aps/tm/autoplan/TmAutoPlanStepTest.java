@@ -1,8 +1,13 @@
 package com.zlt.aps.tm.autoplan;
 
+import com.baomidou.mybatisplus.core.MybatisConfiguration;
+import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
+import com.zlt.aps.tm.api.domain.entity.*;
 import com.zlt.aps.tm.engine.domain.TmMachineCandidate;
 import com.zlt.aps.tm.engine.domain.TmScheduleContext;
 import com.zlt.aps.tm.engine.domain.TmTaskDraft;
+import org.apache.ibatis.builder.MapperBuilderAssistant;
+import org.junit.BeforeClass;
 import org.junit.Test;
 
 import java.math.BigDecimal;
@@ -13,7 +18,7 @@ import static org.junit.Assert.*;
  * 胎面自动排程 JSON 步骤级测试。
  *
  * <p>复用完整场景 JSON，验证自动排程 Step2~Step19 中当前代码可观察的加载、需求计算、
- * 库存、排序、派机和落库转换边界；尚未实现或与详设冲突的内容通过 knownGaps 显式记录。</p>
+ * 库存、排序、派机和落库转换边界。</p>
  */
 public class TmAutoPlanStepTest {
 
@@ -22,6 +27,23 @@ public class TmAutoPlanStepTest {
     private final TmAutoPlanMockFactory mockFactory = new TmAutoPlanMockFactory();
 
     private final TmAutoPlanAssertHelper assertHelper = new TmAutoPlanAssertHelper();
+
+    /**
+     * 初始化 MyBatisPlus 表信息缓存，避免步骤测试依赖其他测试类执行顺序。
+     */
+    @BeforeClass
+    public static void initMybatisPlusTableInfo() {
+        initTableInfo(TmScheduleResult.class);
+        initTableInfo(TmParams.class);
+        initTableInfo(TmMachineInfo.class);
+        initTableInfo(TmMouthPlate.class);
+        initTableInfo(TmGlueMachineReal.class);
+        initTableInfo(TmSpecifyMachine.class);
+        initTableInfo(TmMachineSpeed.class);
+        initTableInfo(TmMachineMaintenance.class);
+        initTableInfo(TmCurlRoll.class);
+        initTableInfo(TmLossSetting.class);
+    }
 
     /**
      * 测试内容：验证 JSON 数据加载会生成机台候选和任务草稿。
@@ -62,10 +84,10 @@ public class TmAutoPlanStepTest {
     }
 
     /**
-     * 测试内容：验证算法 2 在数据加载层按下一班成型量生成胎面需求，同时记录引擎策略 gap。
+     * 测试内容：验证算法 2 在数据加载层按下一班成型量生成胎面需求。
      */
     @Test
-    public void shouldCalculateAlgorithmTwoNextShiftDemandAndRecordKnownGap() {
+    public void shouldCalculateAlgorithmTwoNextShiftDemand() {
         // Given
         TmAutoPlanMockFactory.MockContext mockContext = buildContext("case_06_algorithm_2_next_shift_demand.json");
 
@@ -73,7 +95,6 @@ public class TmAutoPlanStepTest {
         TmScheduleContext context = mockFactory.loadContextOnly(mockContext);
 
         // Then
-        assertHelper.assertKnownGaps(mockContext.getScenario());
         TmTaskDraft firstShiftTask = assertHelper.findTask(context, "TR-A2", 1);
         TmTaskDraft sixthShiftTask = assertHelper.findTask(context, "TR-A2", 6);
         assertBigDecimalEquals("20", firstShiftTask.getCurrentShiftDemandQty());
@@ -169,7 +190,7 @@ public class TmAutoPlanStepTest {
     }
 
     /**
-     * 测试内容：验证停产需求在数据加载层重分配到可用班次，同时记录完整入口 gap。
+     * 测试内容：验证停产需求在数据加载层重分配。
      */
     @Test
     public void shouldRedistributeShutdownDemandAtDataLoadStep() {
@@ -180,23 +201,21 @@ public class TmAutoPlanStepTest {
         TmScheduleContext context = mockFactory.loadContextOnly(mockContext);
 
         // Then
-        assertHelper.assertKnownGaps(mockContext.getScenario());
         assertEquals(5, context.getTaskDraftList().size());
         assertBigDecimalEquals("32.500000", assertHelper.findTask(context, "TR-SD", 1).getCurrentShiftDemandQty());
         assertBigDecimalEquals("62.500000", assertHelper.findTask(context, "TR-SD", 4).getCurrentShiftDemandQty());
     }
 
     /**
-     * 测试内容：验证落库失败事务回滚差异通过 knownGaps 明确记录。
+     * 测试内容：验证落库失败会在完整入口上抛异常。
      */
     @Test
-    public void shouldRecordKnownGapForPersistRollbackScenario() {
+    public void shouldRejectWhenPersistFails() {
         // Given
         TmAutoPlanMockFactory.MockContext mockContext = buildContext("case_19_transaction_rollback_when_persist_error.json");
 
         // When / Then
         assertHelper.executeAndAssert(mockContext);
-        assertHelper.assertKnownGaps(mockContext.getScenario());
     }
 
     private TmAutoPlanMockFactory.MockContext buildContext(String fileName) {
@@ -216,5 +235,10 @@ public class TmAutoPlanStepTest {
     private void assertBigDecimalEquals(String expected, BigDecimal actual) {
         assertNotNull("实际数值不能为空", actual);
         assertEquals("BigDecimal 数值不一致", 0, new BigDecimal(expected).compareTo(actual));
+    }
+
+    private static void initTableInfo(Class<?> entityClass) {
+        TableInfoHelper.initTableInfo(new MapperBuilderAssistant(new MybatisConfiguration(), entityClass.getName()),
+                entityClass);
     }
 }

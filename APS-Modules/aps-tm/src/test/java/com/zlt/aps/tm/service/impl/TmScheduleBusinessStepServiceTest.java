@@ -79,6 +79,10 @@ public class TmScheduleBusinessStepServiceTest {
                 .thenReturn(Collections.singletonList(result));
         when(persistService.convertExplain(any(TmTaskDraft.class), any(TmSnapshotBuildResult.class), any(TmScheduleContext.class)))
                 .thenReturn(explain);
+        when(scheduleResultMapper.insert(result)).thenAnswer(invocation -> {
+            result.setId(1L);
+            return 1;
+        });
 
         new TmBizSnapshotAndPersistService(new TmSnapshotBuildService(), persistService,
                 scheduleResultMapper, scheduleResultExplainMapper).snapshotAndPersist(context);

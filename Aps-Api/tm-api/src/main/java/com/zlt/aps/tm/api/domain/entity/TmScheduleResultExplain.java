@@ -42,6 +42,26 @@ public class TmScheduleResultExplain extends BaseEntity {
     @TableField(value = "TRACE_ID")
     private String traceId;
 
+    /** 任务业务键，由胎面|胶料|口型|班次组成，用于唯一定位同一结果下的任务解释 */
+    @ApiModelProperty(value = "任务业务键", name = "taskBusinessKey")
+    @TableField(value = "TASK_BUSINESS_KEY")
+    private String taskBusinessKey;
+
+    /** 任务工单号 */
+    @ApiModelProperty(value = "任务工单号", name = "taskOrderNo")
+    @TableField(value = "TASK_ORDER_NO")
+    private String taskOrderNo;
+
+    /** 聚合前来源成型工单号集合 */
+    @ApiModelProperty(value = "来源成型工单号集合", name = "sourceOrderNos")
+    @TableField(value = "SOURCE_ORDER_NOS")
+    private String sourceOrderNos;
+
+    /** 班次顺序 */
+    @ApiModelProperty(value = "班次顺序", name = "shiftOrder")
+    @TableField(value = "SHIFT_ORDER")
+    private Integer shiftOrder;
+
     /** 基础需求量 */
     @ApiModelProperty(value = "基础需求量", name = "baseDemandQty")
     @TableField(value = "BASE_DEMAND_QTY")

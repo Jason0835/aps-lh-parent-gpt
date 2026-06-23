@@ -20,6 +20,9 @@ import java.math.RoundingMode;
 @Component
 public class TmDefaultPlanQtyStrategy implements ITmPlanQtyStrategy {
 
+    /** 是 */
+    private static final String YES = "1";
+
     /**
      * 获取策略编码。
      *
@@ -49,26 +52,75 @@ public class TmDefaultPlanQtyStrategy implements ITmPlanQtyStrategy {
         TmPlanQtyResult result = new TmPlanQtyResult();
         result.setBaseDemandQty(planQty);
 
+        boolean tailTask = isTailTask(taskDraft, planQty);
+        result.setLossAddQty(BigDecimal.ZERO);
+        result.setMinStartAdjustQty(BigDecimal.ZERO);
+        result.setTailRoundAdjustQty(BigDecimal.ZERO);
+
+        if (tailTask) {
+            BigDecimal beforeTail = planQty;
+            BigDecimal tailBaseQty = nvl(taskDraft.getTailBalanceQty()).multiply(nvl(taskDraft.getTreadShoulderLength()));
+            BigDecimal lossAddQty = calculateLossAddQty(tailBaseQty, taskDraft.getLossRate());
+            planQty = tailBaseQty.add(lossAddQty);
+            result.setLossAddQty(lossAddQty);
+            result.setTailRoundAdjustQty(planQty.subtract(beforeTail));
+        }
+
         BigDecimal beforeTool = planQty;
         planQty = applyToolLimit(taskDraft, planQty);
         result.setToolLimitAdjustQty(planQty.subtract(beforeTool));
 
-        BigDecimal beforeMinStart = planQty;
-        planQty = applyMinStartQty(taskDraft, planQty);
-        result.setMinStartAdjustQty(planQty.subtract(beforeMinStart));
+        if (!tailTask) {
+            BigDecimal beforeMinStart = planQty;
+            planQty = applyMinStartQty(taskDraft, planQty);
+            result.setMinStartAdjustQty(planQty.subtract(beforeMinStart));
 
-        BigDecimal beforeRound = planQty;
-        planQty = roundToCurlLength(taskDraft, planQty);
-        result.setTailRoundAdjustQty(planQty.subtract(beforeRound));
+            BigDecimal beforeRound = planQty;
+            planQty = roundToCurlLength(taskDraft, planQty);
+            result.setTailRoundAdjustQty(planQty.subtract(beforeRound));
+        }
 
         BigDecimal beforeCapacity = planQty;
         planQty = applyCapacity(taskDraft, planQty);
         result.setCapacityAdjustQty(planQty.subtract(beforeCapacity));
 
         result.setFinalPlanQty(planQty);
-        result.setCalcFormulaDesc("基础需求->工装限制->最小起排->卷数取整->产能压缩");
+        result.setCalcFormulaDesc(tailTask
+                ? "收尾余量->损耗补偿->工装限制->产能压缩"
+                : "基础需求->工装限制->最小起排->卷数取整->产能压缩");
         taskDraft.setPlanQty(planQty);
         return result;
+    }
+
+    /**
+     * 判断是否按收尾规格计算计划量。
+     *
+     * @param taskDraft     胎面任务草稿
+     * @param baseDemandQty 基础应排需求量
+     * @return true 表示收尾规格、成型余量和肩长有效，且收尾基础量不大于基础需求
+     */
+    private boolean isTailTask(TmTaskDraft taskDraft, BigDecimal baseDemandQty) {
+        BigDecimal tailBaseQty = nvl(taskDraft.getTailBalanceQty()).multiply(nvl(taskDraft.getTreadShoulderLength()));
+        return YES.equals(taskDraft.getTailFlag())
+                && nvl(taskDraft.getTailBalanceQty()).compareTo(BigDecimal.ZERO) > 0
+                && nvl(taskDraft.getTreadShoulderLength()).compareTo(BigDecimal.ZERO) > 0
+                && tailBaseQty.compareTo(nvl(baseDemandQty)) <= 0;
+    }
+
+    /**
+     * 计算收尾损耗补偿量。
+     *
+     * @param tailBaseQty 收尾基础量
+     * @param lossRate    损耗率，百分比
+     * @return 损耗补偿量
+     */
+    private BigDecimal calculateLossAddQty(BigDecimal tailBaseQty, BigDecimal lossRate) {
+        BigDecimal rate = nvl(lossRate).divide(BigDecimal.valueOf(100), 6, RoundingMode.HALF_UP);
+        if (tailBaseQty == null || tailBaseQty.compareTo(BigDecimal.ZERO) <= 0
+                || rate.compareTo(BigDecimal.ZERO) <= 0) {
+            return BigDecimal.ZERO;
+        }
+        return tailBaseQty.multiply(rate);
     }
 
     /**

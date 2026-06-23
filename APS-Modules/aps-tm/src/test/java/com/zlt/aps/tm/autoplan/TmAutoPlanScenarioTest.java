@@ -35,6 +35,7 @@ public class TmAutoPlanScenarioTest {
         initTableInfo(TmMachineSpeed.class);
         initTableInfo(TmMachineMaintenance.class);
         initTableInfo(TmCurlRoll.class);
+        initTableInfo(TmLossSetting.class);
     }
 
     /**
@@ -98,10 +99,10 @@ public class TmAutoPlanScenarioTest {
     }
 
     /**
-     * 测试内容：算法 2 当前仅记录未注册策略差异。
+     * 测试内容：算法 2 按下个班成型需求完成完整入口排程。
      */
     @Test
-    public void shouldRecordGapForAlgorithmTwoStrategy() {
+    public void shouldPlanWithAlgorithmTwoNextShiftDemand() {
         // Given
         TmAutoPlanMockFactory.MockContext mockContext = buildContext("case_06_algorithm_2_next_shift_demand.json");
 
@@ -134,10 +135,10 @@ public class TmAutoPlanScenarioTest {
     }
 
     /**
-     * 测试内容：收尾规格计划量当前按已知差异记录。
+     * 测试内容：收尾规格按成型余量、肩长和损耗率计算计划量。
      */
     @Test
-    public void shouldRecordGapForTailTreadPlanQty() {
+    public void shouldCalculateTailTreadPlanQty() {
         // Given
         TmAutoPlanMockFactory.MockContext mockContext = buildContext("case_09_tail_tread_plan_qty.json");
 
@@ -254,10 +255,10 @@ public class TmAutoPlanScenarioTest {
     }
 
     /**
-     * 测试内容：落库失败事务回滚当前差异通过 knownGaps 记录。
+     * 测试内容：落库失败时上抛异常并停止后续写入。
      */
     @Test
-    public void shouldRecordGapForPersistRollbackBehavior() {
+    public void shouldRejectWhenPersistResultFails() {
         // Given
         TmAutoPlanMockFactory.MockContext mockContext = buildContext("case_19_transaction_rollback_when_persist_error.json");
 
@@ -266,10 +267,10 @@ public class TmAutoPlanScenarioTest {
     }
 
     /**
-     * 测试内容：停产需求重分配当前仅步骤级验证并记录完整入口差异。
+     * 测试内容：停产需求重分配后完整入口完成排程。
      */
     @Test
-    public void shouldRecordGapForShutdownDemandRedistribution() {
+    public void shouldPlanAfterShutdownDemandRedistribution() {
         // Given
         TmAutoPlanMockFactory.MockContext mockContext = buildContext("case_20_stop_production_demand_redistribute.json");
 
