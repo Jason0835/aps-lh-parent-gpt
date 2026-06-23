@@ -72,7 +72,7 @@ export default {
       columns: [
         {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.rawMaterialRequirePlan.factoryCode"),
           type: "select",
           dictData: this.parentDict.type.biz_factory_name,
         },
@@ -98,7 +98,7 @@ export default {
         },
         {
           prop: "version",
-          label: this.$t("plan.planProduction.planVersion"),
+          label: this.$t("ui.data.column.rawMaterialRequirePlan.version"),
           clearable: false,
         },
 

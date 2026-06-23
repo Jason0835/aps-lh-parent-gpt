@@ -48,6 +48,11 @@ UIController extends BaseUIController<Entity>
 - 不在数据库的字段要求反显时，参考@docs/字段反显.md
 - 唯一性校验返回值：`UserConstants.NOT_UNIQUE = "1"` 不唯一，`UserConstants.UNIQUE = "0"` 唯一
 - 如果要生成sql语句，创建一个sql文件，放到@docs/sql
+- SQL 文件规范：
+  - 使用 MySQL 语法，不使用 Oracle 语法（如 `NVARCHAR2` → `VARCHAR`，`COMMENT ON COLUMN` → 行内 `COMMENT`）
+  - 表名、字段名统一使用反引号（`` ` ``）包裹
+  - 文件名格式：`yyyyMMdd_描述.sql`
+  - 文件内包含表名说明和日期头注释
 
 ### Excel导入导出：
 - 所有导出字段必须添加 `@Excel` 注解
