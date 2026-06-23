@@ -40,4 +40,6 @@ public class Cd90MachineTrial {
     private int productionSeconds;
     /** 排入后的班次剩余秒数。 */
     private int remainingSeconds;
+    /** 试算受限原因：TOOLING_LIMIT表示工装不足，CAPACITY_LIMIT表示机台产能不足；未受限时为空。 */
+    private String limitReason;
 }

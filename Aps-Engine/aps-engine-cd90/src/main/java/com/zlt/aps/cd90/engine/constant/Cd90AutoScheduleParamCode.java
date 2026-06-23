@@ -11,6 +11,8 @@ import java.util.List;
  */
 public final class Cd90AutoScheduleParamCode {
 
+    /** 各班计划量均分阈值：非收尾规格净需求量超过该值时，先按净需求量除以2再计算计划量。 */
+    public static final String EQUAL_SHARE_THRESHOLD = "SYS0701007";
     /** 工装卷曲米数（大卷卷曲长度）：单个工装卷一个完整大卷的长度（米），用于米数需求转大卷个数。 */
     public static final String CRIMP_LENGTH = "SYS0701011";
     /** 需求计算方式：AVERAGE（按班次平均值）或 SUM（各班需求相加）。 */
@@ -53,8 +55,11 @@ public final class Cd90AutoScheduleParamCode {
     public static final String SPECIAL_ROLL_LOOKAHEAD_SHIFTS = "SYS0701029";
     /** 特殊大卷额外备库上限：预留给特殊大卷额外扩展的备库数量上限。 */
     public static final String SPECIAL_ROLL_EXTRA_STOCK_LIMIT = "SYS0701030";
+    /** 非收尾部分排最小车数：库排不足时，实际分配车数达到该值才允许提交部分排。 */
+    public static final String PARTIAL_MIN_VEHICLE_COUNT = "SYS0701031";
 
     public static final List<String> ALL_CODES = Collections.unmodifiableList(Arrays.asList(
+            EQUAL_SHARE_THRESHOLD,
             CRIMP_LENGTH,
             DEMAND_CALC_MODE,
             DEMAND_WINDOW,
@@ -74,7 +79,8 @@ public final class Cd90AutoScheduleParamCode {
             DIFF_ROLL_DIFF_SPEC_CHANGE_MINUTES,
             SPECIAL_ROLL_USE_UP_CODES,
             SPECIAL_ROLL_LOOKAHEAD_SHIFTS,
-            SPECIAL_ROLL_EXTRA_STOCK_LIMIT
+            SPECIAL_ROLL_EXTRA_STOCK_LIMIT,
+            PARTIAL_MIN_VEHICLE_COUNT
     ));
 
     private Cd90AutoScheduleParamCode() {

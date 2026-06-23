@@ -34,6 +34,7 @@ public class Cd90CandidateMachineTrialCalculatorTest {
                 .netDemandQuantity(new BigDecimal("120"))
                 .closeOut(false)
                 .minimumStartQuantity(new BigDecimal("300"))
+                .equalShareThreshold(new BigDecimal("2000"))
                 .coilMeter(new BigDecimal("87"))
                 .totalToolingCount(10)
                 .occupiedVehicleCount(9)

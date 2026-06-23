@@ -23,8 +23,11 @@ public class Cd90UnscheduledReasonResolver {
         if ("MACHINE_PROHIBITED".equals(failureReason)) {
             return reason("MACHINE_PROHIBITED", "MACHINE_FILTER", "大卷绑定机台均不可作业");
         }
-        if ("ROLL_TOOL_LIMIT".equals(failureReason)) {
+        if ("ROLL_TOOL_LIMIT".equals(failureReason) || "TOOLING_LIMIT".equals(failureReason)) {
             return reason("ROLL_TOOL_LIMIT", "ROLL_TOOL", "工装不足");
+        }
+        if ("CAPACITY_LIMIT".equals(failureReason)) {
+            return reason("NO_AVAILABLE_MACHINE", "MACHINE_FILTER", "机台产能不足");
         }
         if ("STORAGE_LANE_LIMIT".equals(failureReason)) {
             return reason("STORAGE_LANE_LIMIT", "STORAGE_LANE", "库排容量不足");
@@ -35,7 +38,7 @@ public class Cd90UnscheduledReasonResolver {
         if ("SCHEDULE_WINDOW_LIMIT".equals(failureReason)) {
             return reason("SCHEDULE_WINDOW_LIMIT", "SCHEDULE_WINDOW", "排程窗口结束仍有未安排数量");
         }
-        return reason("NO_AVAILABLE_MACHINE", "MACHINE_FILTER", "动态状态或产能约束导致无可用候选机台");
+        return reason("NO_AVAILABLE_MACHINE", "MACHINE_FILTER", "动态状态或产能约束导致无可选候选机台");
     }
 
     private Cd90UnscheduledReason reason(String code, String stage, String description) {

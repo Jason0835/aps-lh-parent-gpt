@@ -42,6 +42,25 @@ public class Cd90MachineTrialSelectorTest {
         assertEquals("M3", selected.getMachineCode());
     }
 
+    @Test
+    public void zeroQuantityTrialsShouldUseStableLimitReasonPriority() {
+        Cd90MachineTrial selected = selector.select(Arrays.asList(
+                limitedTrial("M1", "CAPACITY_LIMIT", 0),
+                limitedTrial("M2", "TOOLING_LIMIT", 1)
+        ));
+
+        assertEquals("M2", selected.getMachineCode());
+        assertEquals("TOOLING_LIMIT", selected.getLimitReason());
+    }
+    private Cd90MachineTrial limitedTrial(String machineCode, String limitReason, int priorityOrder) {
+        return Cd90MachineTrial.builder()
+                .machineCode(machineCode)
+                .finalSchedulableQuantity(BigDecimal.ZERO)
+                .priorityOrder(priorityOrder)
+                .remainingSeconds(0)
+                .limitReason(limitReason)
+                .build();
+    }
     private Cd90MachineTrial trial(String machineCode,
                                    boolean fullyAccommodated,
                                    boolean preferredMachine,

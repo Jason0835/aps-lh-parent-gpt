@@ -57,30 +57,46 @@ public class Cd90MachineTrialPreparationService {
         // 每台候选机独立试算需求补量、损耗、工装、班产和规格切换耗时，不修改资源快照。
         List<Cd90MachineTrial> trials = candidates.stream()
                 .map(candidate -> trialCalculator.calculate(Cd90CandidateMachineTrialInput.builder()
+                        // 帘布与机台标识
                         .clothCode(request.getClothCode())
                         .machineCode(candidate.getMachineCode())
+                        // 本次排程净需求量（已扣除已排量）
                         .netDemandQuantity(request.getNetDemandQuantity())
+                        // 是否为清尾：清尾时起排量门槛降低、允许跨机台合并
                         .closeOut(request.isCloseOut())
+                        // 最小起排量、均分阈值
                         .minimumStartQuantity(parameters.getMinStartQty())
+                        .equalShareThreshold(parameters.getEqualShareThreshold())
+                        // 卷长（单卷米数），用于计算卷数
                         .coilMeter(request.getCurlLength())
+                        // 工装总数（卷轴），决定单机同时可上多少卷
                         .totalToolingCount(parameters.getRollTotalCount())
+                        // 已占用车数（前序班次已安排入库的部分）
                         .occupiedVehicleCount(request.getOccupiedVehicleCount())
+                        // 该候选机台定额分配比例
                         .quota(candidate.getQuota())
+                        // 班次可用小时数
                         .shiftHours(request.getShiftHours())
+                        // 机台班次剩余秒数（扣除前序任务后）
                         .remainingSeconds(seconds.getOrDefault(candidate.getMachineCode(),
                                 request.getShiftHours() * 3600))
+                        // 机台上次规格（用于计算换规格耗时）
                         .previousSpec(previousSpecs.get(candidate.getMachineCode()))
                         .currentSpec(request.getCordSpec())
                         .specChangeMinutes(parameters.getSpecChangeMinutes())
+                        // 机台上次尾匹（用于计算换尾耗时）
                         .previousTail(previousTails.get(candidate.getMachineCode()))
                         .currentTail(currentTail)
+                        // 三种规格切换场景耗时（同卷异规格 / 异卷同规格 / 异卷异规格）
                         .sameRollDiffSpecChangeMinutes(changeMinutes(parameters,
                                 parameters.getSameRollDiffSpecChangeMinutes()))
                         .diffRollSameSpecChangeMinutes(changeMinutes(parameters,
                                 parameters.getDiffRollSameSpecChangeMinutes()))
                         .diffRollDiffSpecChangeMinutes(changeMinutes(parameters,
                                 parameters.getDiffRollDiffSpecChangeMinutes()))
+                        // 损耗率规则集（按规格匹配）
                         .lossRateRules(snapshot.getLossRateRules())
+                        // 首选机台标志与优先级顺序
                         .preferredMachine(candidate.isPreferredMachine())
                         .priorityOrder(candidate.getPriorityOrder())
                         .build()))

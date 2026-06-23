@@ -26,6 +26,8 @@ public class Cd90ShiftCommitRequest {
     private BigDecimal coilMeter;
     /** 是否收尾规格。 */
     private boolean closeOut;
+    /** 非收尾部分排最小车数。 */
+    private int partialMinVehicleCount;
     /** 候选机台试算方案。 */
     private Cd90MachineTrialPlan trialPlan;
 }

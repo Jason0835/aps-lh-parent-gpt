@@ -30,9 +30,6 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class Cd90ShiftResourceCommitter {
 
-    private static final int MIN_PARTIAL_NUMERATOR = 1;
-    private static final int MIN_PARTIAL_DENOMINATOR = 2;
-
     private final Cd90StorageLaneAllocator laneAllocator;
     private final Cd90MachineTrialSelector trialSelector;
 
@@ -59,6 +56,14 @@ public class Cd90ShiftResourceCommitter {
                 break;
             }
             remainingTrials.remove(trial);
+            if (trial.getFinalSchedulableQuantity() == null
+                    || trial.getFinalSchedulableQuantity().signum() <= 0) {
+                String reason = trial.getLimitReason() == null ? lastFailureReason : trial.getLimitReason();
+                log.warn("[直裁自动排程] 当前班次资源提交失败, classField={}, clothCode={}, reason={}",
+                        request.getClassField(), request.getClothCode(), reason);
+                return Cd90ShiftCommitResult.builder().success(false).failureReason(reason)
+                        .state(originalState).build();
+            }
             // 在原状态副本上试提交，任何失败都直接丢弃副本，保证资源修改原子性。
             Cd90ShiftResourceState working = copy(originalState);
             Cd90StorageLaneAllocationResult allocation = laneAllocator.allocate(
@@ -126,8 +131,8 @@ public class Cd90ShiftResourceCommitter {
         if (assigned >= required || request.isCloseOut()) {
             return true;
         }
-        // 初次部分排至少接受一半车数；续做收口在下一班通常会变成 required=assigned=1，不会被该规则卡死。
-        return assigned * MIN_PARTIAL_DENOMINATOR >= required * MIN_PARTIAL_NUMERATOR;
+        // 非收尾部分排不再按比例判断，而按参数配置的最小车数判断，避免大需求场景被比例阈值长期卡死。
+        return assigned >= Math.max(1, request.getPartialMinVehicleCount());
     }
 
     private BigDecimal committedQuantity(Cd90MachineTrial trial, BigDecimal coilMeter,

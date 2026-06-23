@@ -74,6 +74,7 @@ public class Cd90AutoScheduleParameterParser {
                 .stopLookaheadDays(positiveInt(values, Cd90AutoScheduleParamCode.STOP_LOOKAHEAD_DAYS))
                 .restartStockThreshold(nonNegativeDecimal(values, Cd90AutoScheduleParamCode.RESTART_STOCK_THRESHOLD))
                 .rollTotalCount(positiveInt(values, Cd90AutoScheduleParamCode.ROLL_TOTAL_COUNT))
+                .equalShareThreshold(positiveDecimal(values, Cd90AutoScheduleParamCode.EQUAL_SHARE_THRESHOLD))
                 .rollCoilMeter(positiveDecimal(values, Cd90AutoScheduleParamCode.CRIMP_LENGTH))
                 .specChangeMinutes(nonNegativeInt(values,
                         Cd90AutoScheduleParamCode.SAME_ROLL_DIFF_SPEC_CHANGE_MINUTES))
@@ -89,6 +90,8 @@ public class Cd90AutoScheduleParameterParser {
                         Cd90AutoScheduleParamCode.SPECIAL_ROLL_LOOKAHEAD_SHIFTS))
                 .specialRollExtraStockLimit(nonNegativeDecimal(values,
                         Cd90AutoScheduleParamCode.SPECIAL_ROLL_EXTRA_STOCK_LIMIT))
+                .partialMinVehicleCount(positiveInt(values,
+                        Cd90AutoScheduleParamCode.PARTIAL_MIN_VEHICLE_COUNT))
                 .taskTimeoutMinutes(positiveInt(values, Cd90AutoScheduleParamCode.TASK_TIMEOUT_MINUTES))
                 .autoScheduleCron(values.getOrDefault(Cd90AutoScheduleParamCode.AUTO_SCHEDULE_CRON, ""))
                 .sourceValues(Collections.unmodifiableMap(sourceValues))

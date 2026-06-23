@@ -20,7 +20,7 @@ public class Cd90ScheduleQuantityCalculatorTest {
     public void closeOutQuantityShouldNotRoundOrFillMinimum() {
         BigDecimal result = calculator.calculateActualQuantity(
                 new BigDecimal("120"), true, new BigDecimal("5"),
-                new BigDecimal("300"), new BigDecimal("87"));
+                new BigDecimal("300"), new BigDecimal("87"), new BigDecimal("2000"));
 
         assertEquals(new BigDecimal("126"), result);
     }
@@ -32,8 +32,19 @@ public class Cd90ScheduleQuantityCalculatorTest {
     public void normalQuantityShouldFillMinimumAndRoundUp() {
         BigDecimal result = calculator.calculateActualQuantity(
                 new BigDecimal("120"), false, new BigDecimal("5"),
-                new BigDecimal("300"), new BigDecimal("87"));
+                new BigDecimal("300"), new BigDecimal("87"), new BigDecimal("2000"));
 
         assertEquals(new BigDecimal("348"), result);
+    }
+    /**
+     * T-06：非收尾规格净需求量超过均分阈值时，先按净需求量除以2，再叠加损耗并按整卷向上取整。
+     */
+    @Test
+    public void normalQuantityShouldShareWhenNetDemandExceedsThreshold() {
+        BigDecimal result = calculator.calculateActualQuantity(
+                new BigDecimal("2500"), false, new BigDecimal("5"),
+                new BigDecimal("300"), new BigDecimal("80"), new BigDecimal("2000"));
+
+        assertEquals(new BigDecimal("1360"), result);
     }
 }

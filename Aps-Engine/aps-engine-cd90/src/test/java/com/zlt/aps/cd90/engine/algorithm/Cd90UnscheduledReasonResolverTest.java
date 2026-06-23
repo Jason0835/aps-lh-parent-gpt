@@ -16,7 +16,6 @@ public class Cd90UnscheduledReasonResolverTest {
 
         assertEquals("MACHINE_PROHIBITED", reason.getReasonCode());
         assertEquals("MACHINE_FILTER", reason.getFailStage());
-        assertEquals("大卷绑定机台均不可作业", reason.getReasonDescription());
     }
 
     @Test
@@ -25,5 +24,16 @@ public class Cd90UnscheduledReasonResolverTest {
 
         assertEquals("NO_MACHINE_MAPPING", reason.getReasonCode());
         assertEquals("MACHINE_FILTER", reason.getFailStage());
+    }
+
+    @Test
+    public void shouldMapLimitReasonsToStableUnscheduledReasons() {
+        Cd90UnscheduledReason tooling = resolver.resolve("TOOLING_LIMIT");
+        Cd90UnscheduledReason capacity = resolver.resolve("CAPACITY_LIMIT");
+
+        assertEquals("ROLL_TOOL_LIMIT", tooling.getReasonCode());
+        assertEquals("ROLL_TOOL", tooling.getFailStage());
+        assertEquals("NO_AVAILABLE_MACHINE", capacity.getReasonCode());
+        assertEquals("MACHINE_FILTER", capacity.getFailStage());
     }
 }

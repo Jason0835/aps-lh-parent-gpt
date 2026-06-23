@@ -39,6 +39,8 @@ public class Cd90AutoScheduleParameterParserTest {
         assertEquals("CSTA623", result.getSpecialRollUseUpCodes().get(1));
         assertEquals(6, result.getSpecialRollLookaheadShifts());
         assertEquals(new BigDecimal("0"), result.getSpecialRollExtraStockLimit());
+        assertEquals(new BigDecimal("2000"), result.getEqualShareThreshold());
+        assertEquals(3, result.getPartialMinVehicleCount());
         assertEquals(30, result.getTaskTimeoutMinutes());
     }
 
@@ -70,6 +72,7 @@ public class Cd90AutoScheduleParameterParserTest {
 
     private List<Cd90Params> createValidParams() {
         List<Cd90Params> params = new ArrayList<>();
+        params.add(param("SYS0701007", "2000"));
         params.add(param("SYS0701012", "SUM"));
         params.add(param("SYS0701013", "4"));
         params.add(param("SYS0701014", "6"));
@@ -89,6 +92,7 @@ public class Cd90AutoScheduleParameterParserTest {
         params.add(param("SYS0701028", "CSTB5126,CSTA623"));
         params.add(param("SYS0701029", "6"));
         params.add(param("SYS0701030", "0"));
+        params.add(param("SYS0701031", "3"));
         params.add(param("SYS0701011", "87"));
         return params;
     }

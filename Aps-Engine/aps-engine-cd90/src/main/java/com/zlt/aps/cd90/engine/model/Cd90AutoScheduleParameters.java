@@ -40,6 +40,8 @@ public class Cd90AutoScheduleParameters {
     private BigDecimal restartStockThreshold;
     /** 工装总数。 */
     private int rollTotalCount;
+    /** 各班计划量均分阈值，按加损耗前的净需求量判断是否触发均分。 */
+    private BigDecimal equalShareThreshold;
     /** 标准卷曲长度缺失时的兜底米数，对应参数CRIMP_LENGTH。 */
     private BigDecimal rollCoilMeter;
     /** 规格切换耗时，单位为分钟。 */
@@ -56,6 +58,8 @@ public class Cd90AutoScheduleParameters {
     private int specialRollLookaheadShifts;
     /** 特殊大卷允许的额外备库上限，当前仅由策略组件读取。 */
     private BigDecimal specialRollExtraStockLimit;
+    /** 非收尾部分排最小车数，达到该车数才允许在库排不足时提交部分排。 */
+    private int partialMinVehicleCount;
     /** 自动排程任务超时分钟数。 */
     private int taskTimeoutMinutes;
     /** 自动排程定时表达式。 */

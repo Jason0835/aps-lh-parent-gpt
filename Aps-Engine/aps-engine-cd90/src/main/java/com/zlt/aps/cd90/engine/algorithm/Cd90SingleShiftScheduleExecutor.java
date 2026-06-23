@@ -191,6 +191,7 @@ public class Cd90SingleShiftScheduleExecutor implements Cd90SingleShiftScheduleS
                 .shiftStart(shift.getStartTime()).shiftEnd(shift.getEndTime())
                 .coilMeter(effectiveCurlLength(context, construction))
                 .closeOut(closeOut)
+                .partialMinVehicleCount(context.getParameters().getPartialMinVehicleCount())
                 .trialPlan(trialPlan).build();
     }
 

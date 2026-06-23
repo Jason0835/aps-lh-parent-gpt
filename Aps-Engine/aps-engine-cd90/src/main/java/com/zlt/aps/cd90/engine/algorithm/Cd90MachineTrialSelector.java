@@ -21,13 +21,46 @@ public class Cd90MachineTrialSelector {
         if (trials == null) {
             return null;
         }
-        return trials.stream()
+        Cd90MachineTrial positive = trials.stream()
                 .filter(item -> item.getFinalSchedulableQuantity() != null
                         && item.getFinalSchedulableQuantity().signum() > 0)
                 .min(this::compare)
                 .orElse(null);
+        if (positive != null) {
+            return positive;
+        }
+        return trials.stream()
+                .filter(item -> item.getLimitReason() != null)
+                .min(this::compareLimitReason)
+                .orElse(null);
+    }
+    private int compareLimitReason(Cd90MachineTrial first, Cd90MachineTrial second) {
+        int result = Integer.compare(limitPriority(first.getLimitReason()), limitPriority(second.getLimitReason()));
+        if (result != 0) {
+            return result;
+        }
+        result = Integer.compare(first.getPriorityOrder(), second.getPriorityOrder());
+        if (result != 0) {
+            return result;
+        }
+        if (first.getMachineCode() == null) {
+            return second.getMachineCode() == null ? 0 : 1;
+        }
+        if (second.getMachineCode() == null) {
+            return -1;
+        }
+        return first.getMachineCode().compareTo(second.getMachineCode());
     }
 
+    private int limitPriority(String limitReason) {
+        if ("TOOLING_LIMIT".equals(limitReason)) {
+            return 0;
+        }
+        if ("CAPACITY_LIMIT".equals(limitReason)) {
+            return 1;
+        }
+        return 2;
+    }
     private int compare(Cd90MachineTrial first, Cd90MachineTrial second) {
         int result = Boolean.compare(second.isFullyAccommodated(), first.isFullyAccommodated());
         if (result != 0) {

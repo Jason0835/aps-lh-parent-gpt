@@ -23,6 +23,8 @@ public class Cd90CandidateMachineTrialInput {
     private boolean closeOut;
     /** 最小起排量。 */
     private BigDecimal minimumStartQuantity;
+    /** 各班计划量均分阈值，按加损耗前的净需求量判断是否触发均分。 */
+    private BigDecimal equalShareThreshold;
     /** 标准卷曲长度。 */
     private BigDecimal coilMeter;
     /** 工装总数。 */

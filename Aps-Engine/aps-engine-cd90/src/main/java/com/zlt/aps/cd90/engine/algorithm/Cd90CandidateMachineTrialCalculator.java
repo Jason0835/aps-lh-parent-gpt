@@ -41,7 +41,7 @@ public class Cd90CandidateMachineTrialCalculator {
                 input.getClothCode(), input.getMachineCode(), input.getLossRateRules());
         BigDecimal actualQuantity = quantityCalculator.calculateActualQuantity(
                 input.getNetDemandQuantity(), input.isCloseOut(), lossRate.getLossRatePercent(),
-                input.getMinimumStartQuantity(), input.getCoilMeter());
+                input.getMinimumStartQuantity(), input.getCoilMeter(), input.getEqualShareThreshold());
         Cd90ToolingTrial tooling = toolingCalculator.calculate(
                 actualQuantity, input.getTotalToolingCount(), input.getOccupiedVehicleCount(), input.getCoilMeter());
         Cd90MachineCapacityTrial capacity = input.getCurrentTail() == null
@@ -56,6 +56,8 @@ public class Cd90CandidateMachineTrialCalculator {
         BigDecimal finalQuantity = actualQuantity
                 .min(tooling.getSchedulableQuantity())
                 .min(capacity.getCapacityQuantity());
+        String limitReason = limitReason(actualQuantity, tooling.getSchedulableQuantity(),
+                capacity.getCapacityQuantity(), finalQuantity);
 
         Cd90MachineTrial result = Cd90MachineTrial.builder()
                 .machineCode(input.getMachineCode())
@@ -77,11 +79,29 @@ public class Cd90CandidateMachineTrialCalculator {
                                 && input.getPreviousTail().getClothCode()
                                         .equals(input.getCurrentTail().getClothCode()))
                 .remainingSeconds(capacity.getRemainingSeconds())
+                .limitReason(limitReason)
                 .build();
         log.debug("[直裁自动排程] 候选机台试算完成, clothCode={}, machineCode={}, lossRateLevel={}, "
                         + "actualQuantity={}, toolingQuantity={}, capacityQuantity={}, finalQuantity={}",
                 input.getClothCode(), input.getMachineCode(), lossRate.getMatchedLevel(), actualQuantity,
                 tooling.getSchedulableQuantity(), capacity.getCapacityQuantity(), finalQuantity);
         return result;
+    }
+
+    private String limitReason(BigDecimal actualQuantity, BigDecimal toolingQuantity,
+                               BigDecimal capacityQuantity, BigDecimal finalQuantity) {
+        if (actualQuantity == null || finalQuantity == null || finalQuantity.compareTo(actualQuantity) >= 0) {
+            return null;
+        }
+        // 工装是跨机台共享资源；当工装与机台产能同时成为最小瓶颈时，优先暴露工装不足，便于补充大卷工装数量。
+        if (toolingQuantity != null && finalQuantity.compareTo(toolingQuantity) == 0
+                && toolingQuantity.compareTo(actualQuantity) < 0) {
+            return "TOOLING_LIMIT";
+        }
+        if (capacityQuantity != null && finalQuantity.compareTo(capacityQuantity) == 0
+                && capacityQuantity.compareTo(actualQuantity) < 0) {
+            return "CAPACITY_LIMIT";
+        }
+        return null;
     }
 }

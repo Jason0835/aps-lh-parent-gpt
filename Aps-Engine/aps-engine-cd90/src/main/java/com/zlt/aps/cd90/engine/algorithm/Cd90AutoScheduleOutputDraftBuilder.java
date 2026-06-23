@@ -220,8 +220,11 @@ public class Cd90AutoScheduleOutputDraftBuilder {
         if ("STORAGE_LANE_LIMIT".equals(failureReason)) {
             return "库排容量不足";
         }
-        if ("ROLL_TOOL_LIMIT".equals(failureReason)) {
+        if ("ROLL_TOOL_LIMIT".equals(failureReason) || "TOOLING_LIMIT".equals(failureReason)) {
             return "工装不足";
+        }
+        if ("CAPACITY_LIMIT".equals(failureReason)) {
+            return "机台产能不足";
         }
         if ("MACHINE_PROHIBITED".equals(failureReason)) {
             return "绑定机台均不可作业";
@@ -238,13 +241,14 @@ public class Cd90AutoScheduleOutputDraftBuilder {
         if ("SCHEDULE_WINDOW_LIMIT".equals(failureReason)) {
             return "排程窗口结束仍有未安排数量";
         }
-        return "动态状态或产能约束导致无可用候选机台";
+        return "动态状态或产能约束导致无可选候选机台";
     }
 
     private String plain(BigDecimal value) {
         BigDecimal normalized = value.stripTrailingZeros();
         return (normalized.scale() < 0 ? normalized.setScale(0) : normalized).toPlainString();
     }
+
     private BigDecimal proportional(BigDecimal total, int vehicles, int totalVehicles) {
         return total.multiply(BigDecimal.valueOf(vehicles))
                 .divide(BigDecimal.valueOf(totalVehicles), 10, RoundingMode.HALF_UP);

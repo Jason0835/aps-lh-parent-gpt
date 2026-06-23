@@ -60,6 +60,19 @@ public class Cd90ShiftResourceCommitterTest {
     }
 
     @Test
+    public void shouldCommitPartialLaneAllocationWhenAssignedVehiclesReachParamThreshold() {
+        Cd90ShiftResourceState state = state(3);
+
+        Cd90ShiftCommitResult result = committer.commit(request(plan(
+                trial("M1", "5500", 20000, true)), 3), state);
+
+        assertTrue(result.isSuccess());
+        assertEquals(new BigDecimal("300"), result.getTask().getPlanQuantity());
+        assertEquals(3, result.getTask().getVehicleCount());
+        assertEquals(3, result.getState().getOccupiedToolingCount());
+    }
+
+    @Test
     public void shouldRejectTinyInitialPartialLaneAllocation() {
         Cd90ShiftResourceState state = state(1);
 
@@ -97,17 +110,43 @@ public class Cd90ShiftResourceCommitterTest {
         assertEquals(0, state.getOccupiedToolingCount());
     }
 
+    @Test
+    public void zeroQuantityTrialShouldReturnLimitReasonWithoutOverwrite() {
+        Cd90ShiftResourceState state = state(10);
+
+        Cd90ShiftCommitResult result = committer.commit(request(plan(
+                limitedTrial("M1", "CAPACITY_LIMIT", 0),
+                limitedTrial("M2", "TOOLING_LIMIT", 1))), state);
+
+        assertFalse(result.isSuccess());
+        assertEquals("TOOLING_LIMIT", result.getFailureReason());
+        assertEquals(0, result.getState().getTasks().size());
+        assertEquals(0, result.getState().getOccupiedToolingCount());
+    }
+
     private Cd90ShiftCommitRequest request(Cd90MachineTrialPlan plan) {
+        return request(plan, 4);
+    }
+
+    private Cd90ShiftCommitRequest request(Cd90MachineTrialPlan plan, int partialMinVehicleCount) {
         return Cd90ShiftCommitRequest.builder().clothCode("CF001").bigRollCode("BR001")
                 .cordSpec("BR001").classField("CLASS1")
                 .shiftStart(LocalDateTime.of(2026, 6, 12, 14, 0))
                 .shiftEnd(LocalDateTime.of(2026, 6, 12, 22, 0))
-                .coilMeter(new BigDecimal("100")).closeOut(false).trialPlan(plan).build();
+                .coilMeter(new BigDecimal("100")).closeOut(false)
+                .partialMinVehicleCount(partialMinVehicleCount).trialPlan(plan).build();
     }
 
     private Cd90MachineTrialPlan plan(Cd90MachineTrial... trials) {
         return Cd90MachineTrialPlan.builder().trials(Arrays.asList(trials))
                 .selectedTrial(trials[0]).build();
+    }
+
+    private Cd90MachineTrial limitedTrial(String machineCode, String limitReason, int priorityOrder) {
+        return Cd90MachineTrial.builder().machineCode(machineCode)
+                .finalSchedulableQuantity(BigDecimal.ZERO)
+                .priorityOrder(priorityOrder).remainingSeconds(0)
+                .limitReason(limitReason).build();
     }
 
     private Cd90MachineTrial trial(String machineCode, String quantity,
