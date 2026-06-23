@@ -76,7 +76,7 @@ public class RawWarningConfig extends BaseEntity {
     /**
      * 是否启用：0-禁用 1-启用
      */
-    @Excel(name = "是否启用", dictType = "biz_available_status", type = Excel.Type.EXPORT)
+    @Excel(name = "是否启用", dictType = "sys_yes_no", type = Excel.Type.EXPORT)
     @ApiModelProperty(value = "是否启用", name = "enabled")
     @TableField(value = "ENABLED")
     private String enabled;
