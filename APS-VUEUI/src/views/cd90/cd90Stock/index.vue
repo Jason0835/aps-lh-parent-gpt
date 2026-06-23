@@ -23,7 +23,7 @@ import infoDialog from "./components/infoDialog.vue";
 export default {
   name: "Stock",
   components: { TltUploadForm, infoDialog },
-  dicts: ["biz_factory_name"],
+  dicts: ["biz_factory_name", "class_num_three_plan"],
   provide() { return { parentDict: this.dict }; },
   data() {
     return {
@@ -39,6 +39,7 @@ export default {
         { type: "selection", fixed: "left" },
         { prop: "factoryCode", align: "center", halign: "center", label: this.$t("ui.data.column.cd90Stock.factoryCode"), minWidth: 120, formatter: (row, column, value) => this.selectDictLabel(this.dict.type.biz_factory_name, value) },
         { prop: "stockDate", align: "center", halign: "center", label: this.$t("ui.data.column.cd90Stock.stockDate"), minWidth: 120 },
+        { prop: "shiftCode", align: "center", halign: "center", label: this.$t("ui.data.column.cd90Stock.shiftCode"), minWidth: 90, formatter: (row, column, value) => this.selectDictLabel(this.dict.type.class_num_three_plan, value) },
         { prop: "materialCode", align: "center", halign: "center", label: this.$t("ui.data.column.cd90Stock.materialCode"), minWidth: 160 },
         { prop: "stockNum", align: "center", halign: "center", label: this.$t("ui.data.column.cd90Stock.stockNum"), minWidth: 130 },
         { prop: "modifyNum", align: "center", halign: "center", label: this.$t("ui.data.column.cd90Stock.modifyNum"), minWidth: 130 },
@@ -55,6 +56,7 @@ export default {
         { label: this.$t("ui.data.column.cd90Stock.factoryCode"), prop: "factoryCode", type: "select", dictData: this.dict.type.biz_factory_name, filterable: true },
         { label: this.$t("ui.data.column.cd90Stock.stockDate"), prop: "stockDate", type: "date", valueFormat: "yyyy-MM-dd" },
         { label: this.$t("ui.data.column.cd90Stock.materialCode"), prop: "materialCode", type: "select", dictData: this.clothOptions, filterable: true, clearable: true },
+        { label: this.$t("ui.data.column.cd90Stock.shiftCode"), prop: "shiftCode", type: "select", dictData: this.dict.type.class_num_three_plan, filterable: true },
       ];
     },
   },

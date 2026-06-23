@@ -47,16 +47,21 @@ public class Cd90AutoScheduleInputVersionServiceImpl implements Cd90AutoSchedule
                 .stream().map(item -> item.getId() + ":" + item.getCxBatchNo() + ":" + item.getUpdateTime())
                 .collect(Collectors.joining("|"));
         String stock = stockMapper.selectList(Wrappers.<Cd90Stock>lambdaQuery()
+                        .select(Cd90Stock::getId,
+                                Cd90Stock::getShiftCode,
+                                Cd90Stock::getSnapshotTime,
+                                Cd90Stock::getUpdateTime)
                         .eq(Cd90Stock::getFactoryCode, factoryCode)
                         .eq(Cd90Stock::getStockDate, Date.valueOf(scheduleDate))
+                        .orderByAsc(Cd90Stock::getShiftCode)
                         .orderByAsc(Cd90Stock::getId))
-                .stream().map(item -> item.getId() + ":" + item.getUpdateTime())
+                .stream().map(item -> item.getId() + ":" + item.getShiftCode() + ":" + item.getSnapshotTime() + ":" + item.getUpdateTime())
                 .collect(Collectors.joining("|"));
         String lanes = laneMapper.selectList(Wrappers.<Cd90StorageLaneLimit>lambdaQuery()
                         .eq(Cd90StorageLaneLimit::getFactoryCode, factoryCode)
                         .eq(Cd90StorageLaneLimit::getLaneDate, Date.valueOf(scheduleDate))
                         .orderByAsc(Cd90StorageLaneLimit::getId))
-                .stream().map(item -> item.getId() + ":" + item.getUpdateTime())
+                .stream().map(item -> item.getId() + ":" + item.getShiftCode() + ":" + item.getUpdateTime())
                 .collect(Collectors.joining("|"));
         return sha256(forming + "#" + stock + "#" + lanes);
     }

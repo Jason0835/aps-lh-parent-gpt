@@ -101,6 +101,7 @@ public class Cd90AutoScheduleInputServiceImpl implements Cd90AutoScheduleInputSe
         List<Cd90StockSource> stocksAtSix = stockMapper.selectList(Wrappers.<Cd90Stock>lambdaQuery()
                         .eq(Cd90Stock::getFactoryCode, factoryCode)
                         .eq(Cd90Stock::getStockDate, Date.valueOf(scheduleDate))
+                        .eq(Cd90Stock::getShiftCode, shiftCode)
                         .orderByAsc(Cd90Stock::getMaterialCode))
                 .stream()
                 .map(sourceMapper::mapStock)
@@ -118,9 +119,9 @@ public class Cd90AutoScheduleInputServiceImpl implements Cd90AutoScheduleInputSe
 
         log.info("[直裁自动排程] 输入数据加载完成, factoryCode={}, scheduleDate={}, classField={}, shiftCode={}, "
                         + "formingRange={}~{}, formingCount={}, constructionMaterialCount={}, "
-                        + "demandShiftCount={}, stockCount={}, storageLaneCount={}",
+                        + "demandShiftCount={}, resourceBaselineShiftCode={}, stockCount={}, storageLaneCount={}",
                 factoryCode, scheduleDate, classField, shiftCode, formingStartDate, formingEndDate,
-                formingSchedules.size(), constructionMaterials.size(), demandShifts.size(), stocksAtSix.size(),
+                formingSchedules.size(), constructionMaterials.size(), demandShifts.size(), shiftCode, stocksAtSix.size(),
                 storageLanesAtSix.size());
 
         return Cd90AutoScheduleInput.builder()

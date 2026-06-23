@@ -66,6 +66,24 @@ public class Cd90ResourceSnapshotBuilderTest {
         assertEquals(0, result.getOccupiedVehicleCount());
     }
 
+    /**
+     * 前序直裁计划入库在后续班次开班前也可能已经被成型消耗，
+     * 重建库排时必须先合并有效入库，再按累计消耗扣减。
+     */
+    @Test
+    public void shouldConsumePlannedInboundWhenRebuildingSnapshot() {
+        Cd90ResourceSnapshot result = builder.build(
+                Collections.singletonList(lane("L1", "C1", 0)),
+                Collections.singletonMap("C1", new BigDecimal("240")),
+                Collections.singletonMap("C1", new BigDecimal("80")), new BigDecimal("100"),
+                Collections.singletonList(Cd90InboundRecord.builder()
+                        .taskKey("T1").actual(false).clothCode("C1")
+                        .laneCode("L1").vehicleCount(5).build()));
+
+        assertEquals(3, result.getReleasedVehicleCount());
+        assertEquals(2, result.getOccupiedVehicleCount());
+        assertEquals(2, result.getLanes().get(0).getVehicleCount());
+    }
     private Cd90StorageLaneState lane(String code, int vehicles) {
         return lane(code, "C1", vehicles);
     }
