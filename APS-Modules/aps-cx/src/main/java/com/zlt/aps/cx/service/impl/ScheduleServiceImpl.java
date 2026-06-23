@@ -316,23 +316,27 @@ public class ScheduleServiceImpl implements ScheduleService {
 
         context.setPrecisionAdvanceDays(precisionAdvanceDays);
 
-        LocalDate cutoffDate = scheduleDate.plusDays(precisionAdvanceDays);
-
         // 查询1：actualDate为空 AND scheduleDate为空 — 从未安排过的精度计划
+        // 限制 planDate <= 排程起始日期 + 班次排程天数 + 精度提前天数，避免全量加载
+        int planDateRangeDays = context.getScheduleDays() + precisionAdvanceDays;
+        java.sql.Timestamp planDateCutoff = java.sql.Timestamp.valueOf(
+                scheduleDate.plusDays(planDateRangeDays).atTime(23, 59, 59));
         List<CxPrecisionPlan> precisionPlans = precisionPlanMapper.selectList(
                 new LambdaQueryWrapper<CxPrecisionPlan>()
                         .isNull(CxPrecisionPlan::getActualDate)
                         .isNull(CxPrecisionPlan::getScheduleDate)
+                        .le(CxPrecisionPlan::getPlanDate, planDateCutoff)
                         .eq(CxPrecisionPlan::getIsDelete, "0"));
 
-        // 查询2：actualDate为空 AND scheduleDate已回填 AND planDate > 排程日期
+        // 查询2：actualDate为空 AND scheduleDate已回填 AND scheduleDate >= 排程起始日期 AND planDate <= 截止日期
         // 这种情况是：前一天排程时已经安排了精度计划并回填了scheduleDate，
-        // 但planDate在今天之后，今天还需要重新做精度（防止精度被提前消耗后当天无法再做）
+        // 当期排程会重排昨天的部分日期这，今天还需要重新纳入做精度（防止精度被提前消耗后当天无法再做）
         List<CxPrecisionPlan> reapplyPlans = precisionPlanMapper.selectList(
                 new LambdaQueryWrapper<CxPrecisionPlan>()
                         .isNull(CxPrecisionPlan::getActualDate)
                         .isNotNull(CxPrecisionPlan::getScheduleDate)
-                        .gt(CxPrecisionPlan::getPlanDate, java.sql.Timestamp.valueOf(scheduleDate.atTime(0, 0, 0)))
+                        .ge(CxPrecisionPlan::getScheduleDate, java.sql.Timestamp.valueOf(scheduleDate.atTime(0, 0, 0)))
+                        .le(CxPrecisionPlan::getPlanDate, planDateCutoff)
                         .eq(CxPrecisionPlan::getIsDelete, "0"));
 
         if (reapplyPlans != null && !reapplyPlans.isEmpty()) {
@@ -419,9 +423,9 @@ public class ScheduleServiceImpl implements ScheduleService {
             loadShiftConfigs(context, factoryCode);
             log.info("班次配置加载完成，班次数：{}", context.getShiftConfigList() != null ? context.getShiftConfigList().size() : 0);
 
-            // 2. 获取设备计划停机信息
+            // 2. 获取设备计划停机信息（使用排产起始日期，覆盖整个排程区间）
             try {
-                loadDevicePlanShuts(context, scheduleDate);
+                loadDevicePlanShuts(context, scheduleStartDate);
                 log.info("设备计划停机信息加载完成");
             } catch (Exception e) {
                 log.warn("加载设备计划停机信息失败，继续执行：{}", e.getMessage());
@@ -501,8 +505,9 @@ public class ScheduleServiceImpl implements ScheduleService {
             }
 
             // 13. 获取月度计划余量并计算成型余量（考虑共用胎胚）
+            // T日使用排产起始日期（scheduleStartDate），而非前端传入的中间天
             try {
-                loadMonthSurplusAndCalculateFormingRemainder(context, scheduleDate);
+                loadMonthSurplusAndCalculateFormingRemainder(context, scheduleStartDate);
             } catch (Exception e) {
                 log.warn("加载月度计划余量失败，继续执行：{}", e.getMessage());
             }
@@ -523,7 +528,7 @@ public class ScheduleServiceImpl implements ScheduleService {
 
             // 15.5 加载精度计划（planDate < 当前班次日期 - 3天 且 actualDate 为空）
             try {
-                loadPrecisionPlans(context, scheduleDate);
+                loadPrecisionPlans(context, scheduleStartDate);
             } catch (Exception e) {
                 log.warn("加载精度计划失败，继续执行：{}", e.getMessage());
             }
