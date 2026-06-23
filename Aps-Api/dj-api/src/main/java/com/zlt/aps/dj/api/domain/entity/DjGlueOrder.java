@@ -30,6 +30,11 @@ public class DjGlueOrder extends BaseEntity {
     @TableField("GLUE_GROUP_ID")
     private Long glueGroupId;
 
+    /** 工厂编码 */
+    @ApiModelProperty(value = "工厂编码", name = "factoryCode")
+    @TableField(value = "FACTORY_CODE")
+    private String factoryCode;
+
     @Excel(name="ui.dj.glueGroupOrder.column.glueCode")
     @ApiModelProperty(value = "胶料编号")
     @TableField("GLUE_CODE")
