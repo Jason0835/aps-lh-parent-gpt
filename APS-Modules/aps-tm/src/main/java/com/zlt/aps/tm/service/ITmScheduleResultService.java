@@ -3,6 +3,7 @@ package com.zlt.aps.tm.service;
 import com.zlt.aps.tm.api.domain.entity.TmScheduleResult;
 import com.zlt.aps.tm.api.domain.vo.TmAutoScheduleRequestVo;
 import com.zlt.aps.tm.api.domain.vo.TmAutoScheduleResponseVo;
+import com.zlt.aps.tm.api.domain.vo.TmScheduleShiftDateVO;
 import com.zlt.bill.common.service.IDocService;
 
 import java.util.Date;
@@ -139,4 +140,13 @@ public interface ITmScheduleResultService extends IDocService<TmScheduleResult> 
      * @throws com.ruoyi.common.exception.ServiceException 参数非法或记录不可发布时抛出
      */
     int publish(List<Long> ids);
+
+    /**
+     * 胎面排程班次日期列表
+     * 根据排程日期构建6个班次的日期展示列表
+     *
+     * @param scheduleDate 排程日期
+     * @return 班次日期列表
+     */
+    List<TmScheduleShiftDateVO> listScheduleShiftDates(Date scheduleDate);
 }
