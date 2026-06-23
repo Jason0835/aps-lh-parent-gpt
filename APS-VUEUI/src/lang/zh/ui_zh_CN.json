@@ -3284,6 +3284,8 @@
   "ui.data.column.cd90Params.errorTips": "错误提示",
   "ui.data.column.cd90Params.checkUnique": "同一工厂下已存在相同参数编码",
   "ui.data.column.cd90ScheduleResult.modelName": "直裁排程结果",
+  "ui.data.column.cd90ScheduleResult.autoScheduleTitle": "直裁自动排程",
+  "ui.data.column.cd90ScheduleResult.autoScheduleConfirm": "当前日期已存在未完成且未发布的自动排程，是否重新生成？",
   "ui.data.column.cd90ScheduleResult.factoryCode": "工厂",
   "ui.data.column.cd90ScheduleResult.scheduleDate": "排程日期",
   "ui.data.column.cd90ScheduleResult.cxBatchNo": "成型批次号",

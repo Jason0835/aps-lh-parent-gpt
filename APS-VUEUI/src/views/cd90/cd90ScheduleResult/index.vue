@@ -77,6 +77,10 @@
       :columns="importColumns"
       @uploadSuccess="getList"
     />
+    <auto-schedule-dialog
+      ref="autoScheduleRef"
+      @success="handleAutoScheduleSuccess"
+    />
     <release-status-dialog
       ref="releaseStatusRef"
       :schedule-date="query.scheduleDate"
@@ -108,11 +112,12 @@
 
 <script>
 import moment from 'moment'
-import { autoScheduleResult, getAutoScheduleTask, listScheduleResult, delScheduleResult, exportScheduleResult } from '@/api/cd90/scheduleResult'
+import { getAutoScheduleTask, listScheduleResult, delScheduleResult, exportScheduleResult } from '@/api/cd90/scheduleResult'
 import { listTireFabricCodes } from '@/api/cd90/specifyMachine'
 import { getCd90MachineEnableOptions } from '@/api/cd90/cd90MachineInfo'
 import { listUnscheduleResult, exportUnscheduleResult } from '@/api/cd90/unscheduleResult'
 import TltUploadForm from '@/views/components/tltUploadForm.vue'
+import AutoScheduleDialog from './components/autoScheduleDialog.vue'
 import ReleaseStatusDialog from './components/releaseStatusDialog.vue'
 
 const SHIFT_CONFIG = [
@@ -126,7 +131,7 @@ const SHIFT_CONFIG = [
 
 export default {
   name: 'Cd90ScheduleResult',
-  components: { TltUploadForm, ReleaseStatusDialog },
+  components: { TltUploadForm, AutoScheduleDialog, ReleaseStatusDialog },
   dicts: ['biz_factory_name', 'IS_RELEASE'],
   provide() {
     return {
@@ -417,34 +422,24 @@ export default {
       this.getList()
     },
     handleAutoSchedule() {
-      const params = {
+      this.$refs.autoScheduleRef.show({
         factoryCode: this.query.factoryCode,
-        scheduleDate: this.query.scheduleDate,
-        forceRegenerate: false
-      }
-      this.submitAutoSchedule(params)
+        scheduleDate: this.query.scheduleDate
+      })
     },
-    submitAutoSchedule(params) {
-      this.loading = true
-      autoScheduleResult(params)
-        .then(res => {
-          const data = res.data || {}
-          if (data.needConfirm) {
-            this.loading = false
-            return this.$confirm(res.msg, this.$t('ui.message.tips'), { type: 'warning' })
-              .then(() => this.submitAutoSchedule({ ...params, forceRegenerate: true }))
-          }
-          this.loading = false
-          this.$modal.msgSuccess(res.msg)
-          if (data.taskId) {
-            this.pollAutoScheduleTask(data.taskId)
-          } else {
-            this.getList()
-          }
-        })
-        .catch(() => {
-          this.loading = false
-        })
+    handleAutoScheduleSuccess(scheduleDate, payload) {
+      if (scheduleDate) {
+        this.query = { ...this.query, scheduleDate }
+        this.search = { ...this.search, scheduleDate }
+        this.updateDateList(scheduleDate)
+      }
+      const data = payload || {}
+      if (data.taskId) {
+        this.pollAutoScheduleTask(data.taskId)
+      } else {
+        this.page.current = 1
+        this.getList()
+      }
     },
     pollAutoScheduleTask(taskId) {
       this.clearAutoScheduleTimer()
