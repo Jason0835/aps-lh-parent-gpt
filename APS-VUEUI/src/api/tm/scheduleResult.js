@@ -83,3 +83,11 @@ export function publishScheduleResult(ids) {
     data: ids
   })
 }
+
+export function listScheduleShiftDates(query) {
+  return request({
+    url: '/tm/tmScheduleResult/listScheduleShiftDates',
+    method: 'post',
+    data: query
+  })
+}
