@@ -9,6 +9,7 @@ import com.zlt.aps.itf.vo.MesBrandDict;
 import com.zlt.aps.lh.api.domain.entity.LhMachineOnlineInfo;
 import com.zlt.aps.mdm.api.domain.entity.MdmMoldAlterPlan;
 import com.zlt.aps.mp.api.domain.entity.*;
+import com.zlt.aps.tq.api.domain.entity.TqScheduleResultIssue;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -248,6 +249,15 @@ public interface IMesItfService {
     public AjaxResult syncTreadStock(@RequestBody AuxReqSyncDataLogs syncDataLogs);
 
     /**
+     * 同步胎圈库存
+     * @param syncDataLogs 参数
+     * @return 结果
+     */
+    @ApiOperation("同步胎圈库存")
+    @PostMapping("/mesItf/syncMesTqStock")
+    public AjaxResult syncMesTqStock(@RequestBody AuxReqSyncDataLogs syncDataLogs);
+
+    /**
      * 同步成型排程完成量
      * @param syncDataLogs 参数
      * @return 结果
@@ -329,6 +339,21 @@ public interface IMesItfService {
     @ApiOperation("硫化排程结果下发到MES")
     @PostMapping("/mesItf/issueLhScheduleResult")
     public AjaxResult issueLhScheduleResult(@RequestBody List<com.zlt.aps.mp.api.domain.entity.LhScheduleResultIssue> lhScheduleResultIssueList);
+
+    /**
+     * 胎圈排程结果下发到MES
+     * 业务规则：
+     * 1. D日（今天）：更新中班数据（胎圈1班→MES中班），夜班早班已过不下发
+     * 2. D+1日（明天）：更新夜早中3班数据（胎圈2/3/4班→MES夜/早/中班）
+     * 3. D+2日（后天）：先删后插夜早2班数据（胎圈5/6班→MES夜/早班），中班尚未排产不下发
+     * 胎圈6班覆盖成型3~8班，CX_CLASS3~8_PLAN全量传递
+     *
+     * @param tqScheduleResultIssueList 胎圈排程结果列表（已按3天拆分）
+     * @return 结果
+     */
+    @ApiOperation("胎圈排程结果下发到MES")
+    @PostMapping("/mesItf/issueTqScheduleResult")
+    public AjaxResult issueTqScheduleResult(@RequestBody List<TqScheduleResultIssue> tqScheduleResultIssueList);
 
     /**
      * 同步出库未扫描订单

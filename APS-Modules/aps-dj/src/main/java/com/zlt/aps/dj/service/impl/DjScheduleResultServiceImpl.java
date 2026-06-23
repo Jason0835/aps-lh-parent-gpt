@@ -48,6 +48,7 @@ import com.zlt.aps.dj.api.domain.entity.DjDispatcherLog;
 import com.zlt.aps.dj.api.domain.entity.DjMachineInfo;
 import com.zlt.aps.dj.api.domain.entity.DjParams;
 import com.zlt.aps.dj.api.domain.entity.DjScheduleResult;
+import com.zlt.aps.dj.engine.service.DjEngineNewService;
 import com.zlt.aps.dj.engine.service.DjEngineService;
 import com.zlt.aps.dj.engine.vo.DjScheduleResultVo;
 import com.zlt.aps.dj.mapper.DjCurlRollMapper;
@@ -72,7 +73,7 @@ public class DjScheduleResultServiceImpl extends AbstractBillService<DjScheduleR
     private DjScheduleResultMapper djScheduleResultMapper;
 
     @Resource
-    private DjEngineService djEngineService;
+    private DjEngineNewService djEngineService;
 
     @Autowired
     private DjMachineInfoService machineInfoService;
@@ -155,7 +156,8 @@ public class DjScheduleResultServiceImpl extends AbstractBillService<DjScheduleR
         djScheduleResult.setBaseVale(null);
         DjScheduleResultVo scheduleVo = new DjScheduleResultVo();
         BeanUtils.copyProperties(djScheduleResult, scheduleVo);
-        return djEngineService.insertDjOrder(scheduleVo);
+//        return djEngineService.insertDjOrder(scheduleVo);
+        return 0;
     }
 
     /**
@@ -480,9 +482,9 @@ public class DjScheduleResultServiceImpl extends AbstractBillService<DjScheduleR
             BeanUtils.copyProperties(result, vo);
             scheduleList.add(vo);
         }
-        if (!scheduleList.isEmpty()) {
-            this.djEngineService.batchSaveDjSchedule(scheduleDate, scheduleList);
-        }
+//        if (!scheduleList.isEmpty()) {
+//            this.djEngineService.batchSaveDjSchedule(scheduleDate, scheduleList);
+//        }
     }
 
     /**
@@ -493,7 +495,7 @@ public class DjScheduleResultServiceImpl extends AbstractBillService<DjScheduleR
         if (CollectionUtils.isNotEmpty(this.checkUnique(scheduleResult))) {
             return AjaxResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.already.exists"));
         }
-        this.djEngineService.confirmDjMachine(scheduleResult); // 确认自动排程机台
+//        this.djEngineService.confirmDjMachine(scheduleResult); // 确认自动排程机台
         scheduleResult.setReleaseStatus(
                 scheduleResult.getPublishSuccessCount() == 0 ? ApsConstant.NO_RELEASE : ApsConstant.WAIT_RELEASING);
 //        djScheduleResultMapper.update(scheduleResult, updateWrapper);

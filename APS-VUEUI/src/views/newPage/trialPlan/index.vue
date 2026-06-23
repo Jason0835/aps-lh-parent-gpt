@@ -164,22 +164,22 @@ export default {
 
         {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.mpTrialPlan.factoryCode"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
           },
         },
         {
           prop: "year",
-          label: this.$t("ui.data.colume.year"),
+          label: this.$t("ui.data.column.mpTrialPlan.year"),
         },
         {
           prop: "month",
-          label: this.$t("ui.data.colume.month"),
+          label: this.$t("ui.data.column.mpTrialPlan.month"),
         },
         {
           prop: "trialType",
-          label: this.$t("ui.data.column.trialPlan.trialType"),
+          label: this.$t("ui.data.column.mpTrialPlan.trialType"),
           width: 120,
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_trial_type, value);
@@ -187,28 +187,28 @@ export default {
         },
         {
           prop: "specifications",
-          label: this.$t("ui.data.column.trialPlan.specifications"),
+          label: this.$t("ui.data.column.mpTrialPlan.specifications"),
           width: 120,
         },
         {
           prop: "pattern",
-          label: this.$t("ui.data.column.modelinfo.pattern"),
+          label: this.$t("ui.data.column.mpTrialPlan.pattern"),
           width: 120,
         },
         {
           prop: "materialCode",
           width: 120,
-          label: this.$t("ui.data.column.monthplan.oriMaterialCode"),
+          label: this.$t("ui.data.column.mdmMaterialInfo.materialCode"),
         },
         {
           prop: "materialDesc",
-          label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
+          label: this.$t("ui.data.column.mdmMaterialInfo.materialDesc"),
           align: "left",
           minWidth: 350,
         },
         {
           prop: "trialStatus",
-          label: this.$t("ui.data.column.trialPlan.trialStatus"),
+          label: this.$t("ui.data.column.mpTrialPlan.trialStatus"),
           width: 120,
           formatter: (row, column, value) => {
             return this.selectDictLabel(
@@ -219,43 +219,43 @@ export default {
         },
         {
           prop: "embryoNo",
-          label: this.$t("ui.data.column.trialPlan.embryoNo"),
+          label: this.$t("ui.data.column.mdmSkuConstructionRef.embryoNo"),
           width: 180,
         },
         {
           prop: "trialQty",
-          label: this.$t("common.num"),
+          label: this.$t("ui.data.column.mpTrialPlan.trialQty"),
           width: 120,
         },
         {
           prop: "urgencyType",
-          label: this.$t("ui.data.column.trialPlan.urgencyType"),
+          label: this.$t("ui.data.column.mpTrialPlan.urgencyType"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_urgency_type, value);
           },
         },
         {
           prop: "planDate",
-          label: this.$t("ui.data.column.trialPlan.planDate"),
+          label: this.$t("ui.data.column.mpTrialPlan.planDate"),
           width: 120,
         },
         {
           prop: "productionDate",
-          label: this.$t("ui.data.column.trialPlan.productionDate"),
+          label: this.$t("ui.data.column.mpTrialPlan.productionDate"),
         },
         {
           prop: "destination",
-          label: this.$t("ui.data.column.trialPlan.destination"),
+          label: this.$t("ui.data.column.mpTrialPlan.destination"),
           width: 120,
         },
         {
           prop: "responsibleDept",
-          label: this.$t("ui.data.column.trialPlan.responsibleDept"),
+          label: this.$t("ui.data.column.mpTrialPlan.responsibleDept"),
           width: 120,
         },
         {
           prop: "embryoReleaseDate",
-          label: this.$t("ui.data.column.trialPlan.madeInfo"),
+          label: this.$t("ui.data.column.mpTrialPlan.madeInfo"),
           width: 180,
         },
         // {
@@ -268,7 +268,7 @@ export default {
         // },
         {
           prop: "textReleaseDate",
-          label: this.$t("ui.data.column.trialPlan.moldingInfo"),
+          label: this.$t("ui.data.column.mpTrialPlan.moldingInfo"),
           width: 180,
         },
         // {
@@ -281,7 +281,7 @@ export default {
         // },
         {
           prop: "lhReleaseDate",
-          label: this.$t("ui.data.column.trialPlan.vulcanizationInfo"),
+          label: this.$t("ui.data.column.mpTrialPlan.vulcanizationInfo"),
           width: 180,
         },
         // {
@@ -294,33 +294,33 @@ export default {
         // },
         // {
         //   prop: "madeInfo",
-        //   label: this.$t("ui.data.column.trialPlan.madeInfo"),
+        //   label: this.$t("ui.data.column.mpTrialPlan.madeInfo"),
         // },
         // {
         //   prop: "moldingInfo",
-        //   label: this.$t("ui.data.column.trialPlan.moldingInfo"),
+        //   label: this.$t("ui.data.column.mpTrialPlan.moldingInfo"),
         // },
         // {
         //   prop: "vulcanizationInfo",
-        //   label: this.$t("ui.data.column.trialPlan.vulcanizationInfo"),
+        //   label: this.$t("ui.data.column.mpTrialPlan.vulcanizationInfo"),
         // },
         {
           prop: "updateByName",
-          label: this.$t("common.updateByName"),
+          label: this.$t("ui.data.column.updateByName"),
         },
         {
           prop: "deptIdName",
-          label: this.$t("ui.data.column.trialPlan.deptName"),
+          label: this.$t("ui.data.column.mpTrialPlan.deptName"),
           width: 120,
         },
         {
           prop: "remark",
-          label: this.$t("common.remark"),
+          label: this.$t("ui.data.column.sale.remark"),
           width: 120,
         },
         {
           prop: "updateTime",
-          label: this.$t("ui.data.column.scheduleAdjust.updata"),
+          label: this.$t("ui.data.column.demandPlanSum.updateTime"),
           width: 180,
         },
         {
@@ -361,7 +361,7 @@ export default {
       return [
         {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.mpTrialPlan.factoryCode"),
           type: "select",
           dictData: this.dict.type.biz_factory_name,
         },
@@ -374,33 +374,33 @@ export default {
         },
         {
           prop: "specifications",
-          label: this.$t("ui.data.column.trialPlan.specifications"),
+          label: this.$t("ui.data.column.mpTrialPlan.specifications"),
         },
         {
           prop: "trialStatus",
-          label: this.$t("ui.data.column.trialPlan.trialStatus"),
+          label: this.$t("ui.data.column.mpTrialPlan.trialStatus"),
           type: "select",
           dictData: this.dict.type.lh_trial_status,
         },
         {
           prop: "urgencyType",
-          label: this.$t("ui.data.column.trialPlan.urgencyType"),
+          label: this.$t("ui.data.column.mpTrialPlan.urgencyType"),
           type: "select",
           dictData: this.dict.type.biz_urgency_type,
         },
         {
           prop: "planDate",
-          label: this.$t("ui.data.column.trialPlan.planDate"),
+          label: this.$t("ui.data.column.mpTrialPlan.planDate"),
           type: "date",
           valueFormat: "yyyy-MM-dd",
         },
         {
           prop: "pattern",
-          label: this.$t("ui.data.column.modelinfo.pattern"),
+          label: this.$t("ui.data.column.mpTrialPlan.pattern"),
         },
         {
           prop: "responsibleDept",
-          label: this.$t("ui.data.column.trialPlan.responsibleDept"),
+          label: this.$t("ui.data.column.mpTrialPlan.responsibleDept"),
         },
       ];
     },

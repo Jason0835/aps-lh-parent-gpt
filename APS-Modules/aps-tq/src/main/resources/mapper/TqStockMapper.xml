@@ -46,4 +46,14 @@
             UPDATE_TIME = NOW(),
             REMARK = VALUES(REMARK)
     </insert>
+
+    <!-- 根据库存日期逻辑删除胎圈库存，只删当天数据，历史数据保留 -->
+    <update id="logicDeleteByStockDate">
+        UPDATE t_tq_stock
+        SET IS_DELETE = 1,
+            UPDATE_BY = #{updateBy},
+            UPDATE_TIME = #{updateTime}
+        WHERE DATE(STOCK_DATE) = #{stockDate}
+          AND IS_DELETE = 0
+    </update>
 </mapper>

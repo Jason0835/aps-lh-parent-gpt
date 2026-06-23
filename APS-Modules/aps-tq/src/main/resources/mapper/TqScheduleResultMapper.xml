@@ -634,8 +634,8 @@
     <select id="getCxConsume" resultType="com.zlt.aps.common.engine.domain.ScheduleSummaryVo">
         SELECT IFNULL(sum(IFNULL(cxr.CLASS3_PLANNED_QTY, 0) + IFNULL(cxr.CLASS2_PLAN_QTY, 0)),0) cxConsumeQty
         FROM T_CX_SCHEDULE_RESULT cxr /*成型排程结果表*/
-        inner join T_PRODUCT_CONSTRUCTION_INFO ci on cxr.EMBRYO_CODE = ci.embryo_code and cxr.BOM_DATA_VERSION =
-        ci.EMBRYO_VERSION /*施工信息表*/
+        inner join T_MDM_CONSTRUCTION_INFO ci on cxr.EMBRYO_CODE = ci.embryo_code and cxr.BOM_DATA_VERSION =
+        ci.EMBRYO_VERSION and ci.IS_DELETE = 0 /*施工信息表*/
         WHERE cxr.schedule_date = STR_TO_DATE(#{scheduleDate}, '%Y-%m-%d')
         <if test="beadCode != null  and beadCode != ''">and INSTR(ci.TIRE_RING_CODE, #{beadCode,jdbcType=VARCHAR}) > 0
         </if>
@@ -684,8 +684,8 @@
         ci.TIRE_RING_CODE as beadCode, IFNULL(sum(IFNULL(cxr.CLASS3_PLANNED_QTY, 0) + IFNULL(cxr.CLASS2_PLAN_QTY, 0)),0)
         as cxConsumeQty
         FROM T_CX_SCHEDULE_RESULT cxr /*成型排程结果表*/
-        inner join T_PRODUCT_CONSTRUCTION_INFO ci on cxr.EMBRYO_CODE = ci.embryo_code and cxr.BOM_DATA_VERSION =
-        ci.EMBRYO_VERSION /*施工信息表*/
+        inner join T_MDM_CONSTRUCTION_INFO ci on cxr.EMBRYO_CODE = ci.embryo_code and cxr.BOM_DATA_VERSION =
+        ci.EMBRYO_VERSION and ci.IS_DELETE = 0 /*施工信息表*/
         WHERE cxr.schedule_date = STR_TO_DATE(#{scheduleDate}, '%Y-%m-%d')
         <if test="beadCode != null  and beadCode != ''">and INSTR(ci.TIRE_RING_CODE, #{beadCode,jdbcType=VARCHAR}) > 0
         </if>

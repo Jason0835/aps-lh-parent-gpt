@@ -1,5 +1,7 @@
 package com.zlt.aps.common.engine.constants;
 
+import com.zlt.aps.common.engine.enums.ClassNumThreePlanEnums;
+
 /**
   * 引擎常量类
 **/
@@ -398,14 +400,19 @@ public class EngineConstants {
     public static final String CHANGE_MACHINE_DATA_SOURCE_SUPPLE="1";
 
     /**
-     * 机台开机班次：夜班，对应字典：CLASS_NUM
+     * 机台开机班次：夜班，对应 ClassNumThreePlanEnums.CLASS_NIGHT("01")
      */
-    public static final String NIGHT_CLASS_SHIFT = "2";
+    public static final String NIGHT_CLASS_SHIFT = ClassNumThreePlanEnums.CLASS_NIGHT.getClassIndex();
 
     /**
-     * 机台开机班次：早班，对应字典：CLASS_NUM
+     * 机台开机班次：早班，对应 ClassNumThreePlanEnums.CLASS_MORNING("02")
      */
-    public static final String DAY_CLASS_SHIFT = "3";
+    public static final String MORNING_CLASS_SHIFT = ClassNumThreePlanEnums.CLASS_MORNING.getClassIndex();
+
+    /**
+     * 机台开机班次：中班，对应 ClassNumThreePlanEnums.CLASS_DAY("03")
+     */
+    public static final String DAY_CLASS_SHIFT = ClassNumThreePlanEnums.CLASS_DAY.getClassIndex();
 
     /**
      * 一次生产卷数

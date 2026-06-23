@@ -87,7 +87,7 @@ public class TcMachineMaintenanceController extends AbstractDocBizController<TcM
             instance.setTime(stopStartTime);
             int hour = instance.get(Calendar.HOUR_OF_DAY);
             if (hour >= 7 && hour <= 19) {
-                billVO.setStopShift(EngineConstants.DAY_CLASS_SHIFT);
+                billVO.setStopShift(EngineConstants.MORNING_CLASS_SHIFT);
             } else {
                 billVO.setStopShift(EngineConstants.NIGHT_CLASS_SHIFT);
             }

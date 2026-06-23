@@ -25,13 +25,13 @@
                IFNULL(sum(cxr.CLASS8_PLAN_QTY),0) CX_CLASS8_PLAN,  /*对应成型8班(D+2日中班)的消耗量，胎圈6班供应*/
                GROUP_CONCAT(DISTINCT concat(cxr.CX_MACHINE_CODE,'$',cxr.EMBRYO_CODE,'$',cxr.BOM_DATA_VERSION) order by cxr.CX_MACHINE_CODE,cxr.EMBRYO_CODE,cxr.BOM_DATA_VERSION SEPARATOR ',') as quotaKeys /*机台code$胎胚代码*/
         from T_CX_SCHEDULE_RESULT cxr /*成型排程结果表*/
-        inner join T_PRODUCT_CONSTRUCTION_INFO ci on cxr.EMBRYO_CODE = ci.embryo_code and cxr.BOM_DATA_VERSION = ci.EMBRYO_VERSION  /*施工信息表*/
+        inner join T_MDM_CONSTRUCTION_INFO ci on cxr.EMBRYO_CODE = ci.embryo_code and cxr.BOM_DATA_VERSION = ci.EMBRYO_VERSION  /*施工信息表*/
         where schedule_date = STR_TO_DATE(#{scheduleDate}, '%Y-%m-%d')
         <if test="productionStage == '1'.toString()">
             and ci.PRODUCTION_STAGE = '0'
         </if>
         and cxr.DEL_FLAG = 0
-        and ci.DEL_FLAG = 0
+        and ci.IS_DELETE = 0
         group by ci.TIRE_RING_CODE
     </select>
 
@@ -288,7 +288,7 @@
               and schedule_date = STR_TO_DATE(#{scheduleDate}, '%Y-%m-%d')
               group by EMBRYO_CODE, BOM_DATA_VERSION
               ) cxr /*成型排程结果表*/
-        left join T_PRODUCT_CONSTRUCTION_INFO ci on cxr.EMBRYO_CODE = ci.embryo_code and cxr.BOM_DATA_VERSION = ci.EMBRYO_VERSION and ci.DEL_FLAG = 0
+        left join T_MDM_CONSTRUCTION_INFO ci on cxr.EMBRYO_CODE = ci.embryo_code and cxr.BOM_DATA_VERSION = ci.EMBRYO_VERSION and ci.IS_DELETE = 0
         where 1=1
         <if test="productionStage == '1'.toString()">
             and (ci.PRODUCTION_STAGE = '0' or ci.PRODUCTION_STAGE is null)

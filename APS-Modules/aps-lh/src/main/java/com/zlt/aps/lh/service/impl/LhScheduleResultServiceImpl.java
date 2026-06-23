@@ -666,7 +666,7 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
     @Override
     public void fillScheduleResultFields(List<LhScheduleResult> lhScheduleResultList, Date scheduleDate) {
         if (CollectionUtils.isEmpty(lhScheduleResultList) || Objects.isNull(scheduleDate)) {
-            log.warn("fillScheduleResultFields: 传入参数为空, listSize={}, scheduleDate={}", 
+            log.warn("fillScheduleResultFields: 传入参数为空, listSize={}, scheduleDate={}",
                     lhScheduleResultList == null ? 0 : lhScheduleResultList.size(), scheduleDate);
             return;
         }
@@ -679,8 +679,8 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
         log.info("fillScheduleResultFields: 开始填充排程结果字段, 排程日期={}, 结果数量={}, year={}, month={}",
                 DateUtil.formatDate(scheduleDate), lhScheduleResultList.size(), year, month);
 
-        // scheduleDate 业务上为 T+2，计算 T 日用于完成量相关查询
-        Date tDay = DateUtil.offsetDay(scheduleDate, -2);
+        // scheduleDate 业务上为 T+1，计算 T 日用于完成量相关查询
+        Date tDay = DateUtil.offsetDay(scheduleDate, -1);
         log.info("fillScheduleResultFields: scheduleDate={}, T日={}",
                 DateUtil.formatDate(scheduleDate), DateUtil.formatDate(tDay));
 
@@ -1026,7 +1026,10 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
         // 设置1-8班次的硫化示方号，取值同lhNo
         if (StringUtils.isNotEmpty(result.getLhNo())) {
             for (int i = 1; i <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT; i++) {
-                BeanUtil.setProperty(result, "class" + i + "LhNo", result.getLhNo());
+                String classLhType = (String) BeanUtil.getProperty(result, "class" + i + "LhType");
+                if (StringUtils.isNotEmpty(classLhType)) {
+                    BeanUtil.setProperty(result, "class" + i + "LhNo", result.getLhNo());
+                }
             }
         }
 
@@ -1036,7 +1039,10 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
         }
         if (StringUtils.isNotEmpty(lhType)) {
             for (int i = 1; i <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT; i++) {
-                BeanUtil.setProperty(result, "class" + i + "LhType", lhType);
+                String classLhType = (String) BeanUtil.getProperty(result, "class" + i + "LhType");
+                if (StringUtils.isNotEmpty(classLhType)) {
+                    BeanUtil.setProperty(result, "class" + i + "LhType", lhType);
+                }
             }
         }
     }

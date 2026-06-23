@@ -13,7 +13,7 @@
                       sum(IFNULL(CLASS3_PLANNED_QTY, 0)) CLASS1_PLAN_QTY, /*7点-隔天7点成型计划量*/
                       sum(IFNULL(CLASS2_PLAN_QTY, 0)) CLASS2_PLAN_QTY /*7点-19点成型计划量*/
                from T_CX_SCHEDULE_RESULT r
-               inner join T_PRODUCT_CONSTRUCTION_INFO ci on r.EMBRYO_CODE = ci.embryo_code and r.BOM_DATA_VERSION = ci.EMBRYO_VERSION and ci.DEL_FLAG = 0 /*施工信息表*/
+               inner join T_MDM_CONSTRUCTION_INFO ci on r.EMBRYO_CODE = ci.embryo_code and r.BOM_DATA_VERSION = ci.EMBRYO_VERSION and ci.IS_DELETE = 0 /*施工信息表*/
                where schedule_date = STR_TO_DATE(#{scheduleDate}, '%Y-%m-%d')
                and r.DEL_FLAG = 0
                group by r.EMBRYO_CODE,r.BOM_DATA_VERSION

@@ -28,11 +28,12 @@ import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.ruoyi.common.utils.StringUtils;
 import com.zlt.aps.common.core.constant.ApsConstant;
-import com.zlt.aps.common.engine.enums.WorkClassEnums;
+import com.zlt.aps.common.engine.enums.ClassNumThreePlanEnums;
 import com.zlt.aps.common.engine.service.FactoryService;
 import com.zlt.aps.dj.api.domain.entity.DjDayFinishQty;
 import com.zlt.aps.dj.api.domain.entity.DjDispatcherLog;
 import com.zlt.aps.dj.api.domain.entity.DjScheduleResult;
+import com.zlt.aps.dj.engine.service.DjEngineNewService;
 import com.zlt.aps.dj.engine.service.DjEngineService;
 import com.zlt.aps.dj.service.DjMachineInfoService;
 import com.zlt.aps.dj.service.DjScheduleResultService;
@@ -61,7 +62,7 @@ public class DjScheduleResultController extends AbstractBillBizController<DjSche
     @Autowired
     private DjMachineInfoService djMachineInfoService;
     @Resource
-    private DjEngineService djEngineService;
+    private DjEngineNewService djEngineService;
     @Autowired
     private FactoryService factoryService;
 	@Resource
@@ -336,7 +337,8 @@ public class DjScheduleResultController extends AbstractBillBizController<DjSche
     public AjaxResult autoPlan(@RequestBody DjScheduleResult djScheduleResult) {
         //执行自动排程算法
         Date scheduleDate = djScheduleResult.getScheduleDate();
-        djEngineService.autoDjSchedule(DateUtils.parseDateToStr("yyyy-MM-dd", scheduleDate));
+        String factoryCode = djScheduleResult.getFactoryCode();
+        djEngineService.autoDjSchedule(factoryCode, scheduleDate);
         return AjaxResult.success();
     }
 
@@ -481,7 +483,7 @@ public class DjScheduleResultController extends AbstractBillBizController<DjSche
         if (releasingOrTimeoutByDate > 0) {
             return AjaxResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.release.isReleasingOrTimeoutByDate"));
         }
-        this.djEngineService.handEquilibriumAndProduceOrder(DateUtils.dateTime(scheduleDate));
+//        this.djEngineService.handEquilibriumAndProduceOrder(DateUtils.dateTime(scheduleDate));
         return AjaxResult.success(scheduleDate);
     }
 
@@ -501,7 +503,7 @@ public class DjScheduleResultController extends AbstractBillBizController<DjSche
         if (releasingOrTimeoutByDate > 0) {
             return AjaxResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.release.isReleasingOrTimeoutByDate"));
         }
-        this.djEngineService.handGlueMerge(DateUtils.dateTime(scheduleDate));
+//        this.djEngineService.handGlueMerge(DateUtils.dateTime(scheduleDate));
         return AjaxResult.success(scheduleDate);
     }
 
@@ -588,7 +590,7 @@ public class DjScheduleResultController extends AbstractBillBizController<DjSche
             baseDate = new Date();
         }
         Date startDate = DateUtils.addDays(baseDate, -1); // 上一天（中班）
-        WorkClassEnums currentWorkClass = WorkClassEnums.CLASS_DAY;
+        ClassNumThreePlanEnums currentWorkClass = ClassNumThreePlanEnums.CLASS_DAY;
         String startDateStr = DateUtils.parseDateToStr("MM/dd", startDate);
 
         String baseDateStr = DateUtils.parseDateToStr("MM/dd", baseDate);

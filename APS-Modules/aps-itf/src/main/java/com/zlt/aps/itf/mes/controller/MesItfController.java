@@ -66,6 +66,9 @@ public class MesItfController {
     @Autowired
     private ILhScheduleResultIssueService lhScheduleResultIssueService;
 
+    @Autowired
+    private com.zlt.aps.itf.mes.service.ITqScheduleResultIssueService tqScheduleResultIssueService;
+
     /**
      * 同步SKU与模具关系
      *
@@ -500,6 +503,54 @@ public class MesItfController {
         return mesItfService.syncTreadStock(syncDataLogs);
     }
 
+    /**
+     * 同步胎圈库存
+     * @param syncDataLogs 参数
+     * @return 结果
+     */
+    @ApiOperation("同步胎圈库存")
+    @PostMapping("/syncMesTqStock")
+    @AutoLoginLog
+    public AjaxResult syncMesTqStock(@RequestBody AuxReqSyncDataLogs syncDataLogs) {
+        String factoryCode = syncDataLogs.getFactoryCode();
+        if (StringUtils.isBlank(factoryCode)) {
+            syncDataLogs.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
+        }
+        return mesItfService.syncMesTqStock(syncDataLogs);
+    }
+
+    /**
+     * 同步胎圈排程完成量
+     * @param syncDataLogs 参数
+     * @return 结果
+     */
+    @ApiOperation("同步胎圈排程完成量")
+    @PostMapping("/syncTqClassShiftFinishQty")
+    @AutoLoginLog
+    public AjaxResult syncTqClassShiftFinishQty(@RequestBody AuxReqSyncDataLogs syncDataLogs) {
+        String factoryCode = syncDataLogs.getFactoryCode();
+        if (StringUtils.isBlank(factoryCode)) {
+            syncDataLogs.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
+        }
+        return mesItfService.syncTqClassShiftFinishQty(syncDataLogs);
+    }
+
+    /**
+     * 同步胎圈排程日完成量
+     * @param syncDataLogs 参数
+     * @return 结果
+     */
+    @ApiOperation("同步胎圈排程日完成量")
+    @PostMapping("/syncTqScheDayFinishQty")
+    @AutoLoginLog
+    public AjaxResult syncTqScheDayFinishQty(@RequestBody AuxReqSyncDataLogs syncDataLogs) {
+        String factoryCode = syncDataLogs.getFactoryCode();
+        if (StringUtils.isBlank(factoryCode)) {
+            syncDataLogs.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
+        }
+        return mesItfService.syncTqScheDayFinishQty(syncDataLogs);
+    }
+
 
 
     /**
@@ -643,6 +694,26 @@ public class MesItfController {
         String factoryCode = FactoryConstant.DEFAULT_FACTORY_CODE;
         String companyCode = factoryCode;
         return lhScheduleResultIssueService.issueLhScheduleResult(lhScheduleResultIssueList, factoryCode, companyCode);
+    }
+
+    /**
+     * 胎圈排程结果下发到MES
+     * 业务规则：
+     * 1. D日（今天）：更新中班数据（胎圈1班→MES中班），夜班早班已过不下发
+     * 2. D+1日（明天）：更新夜早中3班数据（胎圈2/3/4班→MES夜/早/中班）
+     * 3. D+2日（后天）：先删后插夜早2班数据（胎圈5/6班→MES夜/早班），中班尚未排产不下发
+     * 胎圈6班覆盖成型3~8班，CX_CLASS3~8_PLAN全量传递
+     *
+     * @param tqScheduleResultIssueList 胎圈排程结果列表（已按3天拆分）
+     * @return 结果
+     */
+    @ApiOperation("胎圈排程结果下发到MES")
+    @PostMapping("/issueTqScheduleResult")
+    @AutoLoginLog
+    public AjaxResult issueTqScheduleResult(@RequestBody List<com.zlt.aps.tq.api.domain.entity.TqScheduleResultIssue> tqScheduleResultIssueList) {
+        String factoryCode = FactoryConstant.DEFAULT_FACTORY_CODE;
+        String companyCode = factoryCode;
+        return tqScheduleResultIssueService.issueTqScheduleResult(tqScheduleResultIssueList, factoryCode, companyCode);
     }
 
     /**

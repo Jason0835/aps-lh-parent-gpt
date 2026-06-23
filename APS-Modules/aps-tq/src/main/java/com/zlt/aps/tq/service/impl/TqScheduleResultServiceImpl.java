@@ -23,6 +23,7 @@ import java.util.stream.Collectors;
 
 import javax.annotation.Resource;
 
+import com.ruoyi.common.core.utils.SecurityUtils;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.ObjectUtils;
 import org.apache.poi.ss.usermodel.Cell;
@@ -47,16 +48,15 @@ import com.ruoyi.common.security.aspect.PreAuthorizeAspect;
 import com.ruoyi.common.utils.StringUtils;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.domain.SchedulePublishRecord;
-import com.zlt.aps.common.core.enums.HalfComponentFinishTableEnum;
 import com.zlt.aps.common.core.utils.BigDecimalUtil;
 import com.zlt.aps.common.core.utils.BigDecimalUtils;
 import com.zlt.aps.common.core.utils.ExcelUtils;
 import com.zlt.aps.common.core.utils.ImportUtil;
 import com.zlt.aps.common.engine.domain.ScheduleSummaryVo;
-import com.zlt.aps.common.engine.service.impl.BaseFinishQtyImportService;
+
 import com.zlt.aps.common.engine.utils.DateUtil;
 import com.zlt.aps.tq.api.domain.dto.TqScheduleResultDto;
-import com.zlt.aps.tq.api.domain.entity.TqDayFinishQty;
+import com.zlt.aps.tq.api.domain.entity.TqScheFinishQty;
 import com.zlt.aps.tq.api.domain.entity.TqDispatcherLog;
 import com.zlt.aps.tq.api.domain.entity.TqMachineInfo;
 import com.zlt.aps.tq.engine.service.TqEngineService;
@@ -64,8 +64,11 @@ import com.zlt.aps.tq.engine.vo.TqScheduleResultVo;
 import com.zlt.aps.tq.entity.TqScheduleResult;
 import com.zlt.aps.tq.mapper.TqScheduleResultMapper;
 import com.zlt.aps.tq.service.ITqMachineInfoService;
+import com.zlt.aps.tq.service.ITqScheFinishQtyService;
 import com.zlt.aps.tq.service.TqDispatcherLogService;
 import com.zlt.aps.tq.service.TqScheduleResultService;
+import com.zlt.aps.common.engine.service.FactoryService;
+import com.zlt.aps.mp.api.service.IRemoteImportErrorLogService;
 
 /**
  * 胎圈排程结果Service业务层处理
@@ -87,6 +90,10 @@ public class TqScheduleResultServiceImpl extends ServiceImpl<TqScheduleResultMap
     private PreAuthorizeAspect preAuthorizeAspect;
     @Resource
     private TqDispatcherLogService tqDispatcherLogService;
+    @Autowired
+    private FactoryService factoryService;
+    @Resource
+    private IRemoteImportErrorLogService remoteImportErrorLogService;
 
 
     /**
@@ -838,18 +845,95 @@ public class TqScheduleResultServiceImpl extends ServiceImpl<TqScheduleResultMap
     }
 
     @Autowired
-    private BaseFinishQtyImportService baseFinishQtyImportService;
+    private ITqScheFinishQtyService tqScheFinishQtyService;
 
     /**
-     * 导入数据，并保存记录
+     * 导入完成量，保存到T_TQ_SCHE_FINISH_QTY，再回写6班制排程结果表
+     * <p>
+     * 6班制处理流程：
+     * 1. 校验导入数据（排程日期、胎圈代码、工单号必填）
+     * 2. 按工厂+排程日期分组，逐组逻辑删除旧数据并批量插入新数据
+     * 3. 调用回写方法，按3班→6班映射关系更新排程结果表完成量
+     * </p>
      *
-     * @param list        要导入数据
+     * @param list        要导入的完成量数据（夜班/早班/中班）
      * @param importLogId 导入日志id
      * @return 导入后提示信息
      */
     @Override
-    public AjaxResult importFinishQty(List<TqDayFinishQty> list, Long importLogId) {
-        return baseFinishQtyImportService.importFinishQty(list, importLogId, HalfComponentFinishTableEnum.TQ);
+    @org.springframework.transaction.annotation.Transactional(rollbackFor = Exception.class)
+    public AjaxResult importFinishQty(List<TqScheFinishQty> list, Long importLogId) {
+        if (CollectionUtils.isEmpty(list)) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.import.nodata"));
+        }
+
+        // 1. 校验导入数据
+        List<ImportErrorLog> errorLogs = new ArrayList<>();
+        int successNum = 0;
+        int failureNum = 0;
+        String updateBy = SecurityUtils.getUsername();
+
+        for (int i = 0; i < list.size(); i++) {
+            TqScheFinishQty item = list.get(i);
+            int rowNum = i + 2; // Excel行号（第1行为表头）
+            // 必填校验：排程日期、胎圈代码、工单号
+            if (item.getScheduleDate() == null) {
+                failureNum++;
+                addImportErrorLog(importLogId, rowNum, "排程日期不能为空", errorLogs);
+                continue;
+            }
+            if (StringUtils.isEmpty(item.getBeadCode())) {
+                failureNum++;
+                addImportErrorLog(importLogId, rowNum, "胎圈代码不能为空", errorLogs);
+                continue;
+            }
+            if (StringUtils.isEmpty(item.getOrderNo())) {
+                failureNum++;
+                addImportErrorLog(importLogId, rowNum, "工单号不能为空", errorLogs);
+                continue;
+            }
+            // 设置默认工厂编码
+            if (StringUtils.isEmpty(item.getFactoryCode())) {
+                item.setFactoryCode(factoryService.getFactoryCode());
+            }
+            item.setUpdateBy(updateBy);
+            successNum++;
+        }
+
+        // 2. 过滤校验通过的数据
+        List<TqScheFinishQty> validList = list.stream()
+                .filter(item -> item.getScheduleDate() != null
+                        && StringUtils.isNotEmpty(item.getBeadCode())
+                        && StringUtils.isNotEmpty(item.getOrderNo()))
+                .collect(Collectors.toList());
+
+        if (CollectionUtils.isNotEmpty(validList)) {
+            // 按工厂+排程日期分组，逐组逻辑删除旧数据并批量插入
+            Map<String, List<TqScheFinishQty>> groupMap = validList.stream()
+                    .collect(Collectors.groupingBy(item ->
+                            item.getFactoryCode() + "|" + cn.hutool.core.date.DateUtil.formatDate(item.getScheduleDate())));
+
+            for (Map.Entry<String, List<TqScheFinishQty>> entry : groupMap.entrySet()) {
+                List<TqScheFinishQty> groupList = entry.getValue();
+                TqScheFinishQty first = groupList.get(0);
+                tqScheFinishQtyService.logicDeleteAndSaveBatch(
+                        first.getFactoryCode(), first.getScheduleDate(), updateBy, groupList);
+            }
+
+            // 3. 回写6班完成量到排程结果表
+            tqScheFinishQtyService.writeBackScheduleResultFinishQty(validList);
+        }
+
+        // 4. 保存错误日志
+        if (CollectionUtils.isNotEmpty(errorLogs)) {
+            remoteImportErrorLogService.insertImportErrorLogList(errorLogs);
+        }
+
+        // 5. 返回结果
+        if (failureNum > 0) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.import.fail") + "," + successNum + "," + failureNum);
+        }
+        return AjaxResult.success(I18nUtil.getMessage("ui.data.column.import.success") + "," + successNum);
     }
 
     /**

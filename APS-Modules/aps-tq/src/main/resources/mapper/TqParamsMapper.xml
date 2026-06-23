@@ -36,7 +36,7 @@
         <if test="paramCode != null  and paramCode != ''">and INSTR(param_code, #{paramCode}) > 0</if>
         <if test="paramName != null  and paramName != ''">and param_name like concat(concat('%', #{paramName}), '%')</if>
         <if test="orderStr == null">
-            order by create_time desc
+            order by param_code asc
         </if>
         <if test="orderStr != null">
             order by ${orderStr}
