@@ -131,6 +131,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             LEFT JOIN T_MP_MONTH_PLAN_PROD_FINAL f ON f.IS_DELETE = 0
             AND f.MATERIAL_CODE = m.MATERIAL_CODE
             AND f.`YEAR_MONTH` = DATE_FORMAT(DATE_SUB(concat(#{dayResult.year},'-',#{dayResult.month},'-1'),INTERVAL 1 month), '%Y%m')
+            AND f.CONSTRUCTION_STAGE = r.CONSTRUCTION_STAGE
             LEFT JOIN T_DP_CYCLE_STRUCT_CONFIG C ON C.STRUCTURE_NAME = M.STRUCTURE_NAME
             AND C.IS_DELETE = 0
         <choose>
