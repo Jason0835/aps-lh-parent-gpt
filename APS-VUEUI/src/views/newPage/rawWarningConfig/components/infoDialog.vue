@@ -142,7 +142,7 @@ export default {
           prop: "enabled",
           label: this.$t("ui.data.column.rawWarningConfig.enabled"),
           type: "select",
-          dictData: this.parentDict.type.biz_yes_no,
+          dictData: this.parentDict.type.biz_available_status,
         },
 
         {
@@ -201,7 +201,7 @@ export default {
         //   prop: "enabled",
         //   label: this.$t("ui.data.column.rawWarningConfig.enabled"),
         //   type: "select",
-        //   dictData: this.parentDict.type.biz_yes_no,
+        //   dictData: this.parentDict.type.biz_available_status,
         // },
 
         // {
@@ -260,7 +260,7 @@ export default {
           prop: "enabled",
           label: this.$t("ui.data.column.rawWarningConfig.enabled"),
           type: "select",
-          dictData: this.parentDict.type.biz_yes_no,
+          dictData: this.parentDict.type.biz_available_status,
         },
 
         {

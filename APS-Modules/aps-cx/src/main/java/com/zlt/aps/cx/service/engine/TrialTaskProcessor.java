@@ -279,13 +279,17 @@ public class TrialTaskProcessor {
     /**
      * 获取提前生产机台（从 context.advanceProductionMachineMap 回退）
      *
-     * <p>当结构在当日无可配置机台时，TaskGroupService 已从未来月份配置中查找并剔除冲突机台，
+     * <p>当结构在当日无可配置机台时，TaskGroupService 已从提前生产备用配置中查找并剔除冲突机台，
      * 将结果存入 advanceProductionMachineMap。此处回退获取，确保提前生产机台在处理器中可用。
+     *
+     * <p>注意：advanceProductionMachineMap 中的机台已在加载阶段完成版本过滤
+     * （本月未来机台用当月版本过滤，跨月机台用次月版本过滤），此处不再重复过滤，
+     * 避免跨月机台因版本不同被错误剔除。
      *
      * @param structureName     结构名称
      * @param context           排程上下文
-     * @param productionVersion 排产版本
-     * @return 提前生产机台列表（已按版本过滤），无则返回空列表
+     * @param productionVersion 排产版本（未使用，保留参数兼容签名）
+     * @return 提前生产机台列表，无则返回空列表
      */
     private List<MpCxCapacityConfiguration> getAdvanceProductionMachines(
             String structureName, ScheduleContextVo context, String productionVersion) {
@@ -298,10 +302,7 @@ public class TrialTaskProcessor {
                         advanceMachines.stream()
                                 .map(MpCxCapacityConfiguration::getCxMachineCode)
                                 .collect(Collectors.toList()));
-                return advanceMachines.stream()
-                        .filter(c -> productionVersion == null
-                                || productionVersion.equals(c.getProductionVersion()))
-                        .collect(Collectors.toList());
+                return new ArrayList<>(advanceMachines);
             }
         }
         return new ArrayList<>();

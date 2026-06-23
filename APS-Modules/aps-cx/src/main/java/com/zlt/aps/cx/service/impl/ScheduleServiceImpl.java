@@ -135,9 +135,6 @@ public class ScheduleServiceImpl implements ScheduleService {
     private final HolidayScheduleService holidayScheduleService;
     private final ScheduleDataValidator scheduleDataValidator;
 
-    @Autowired
-    private ScheduleExecutionGuard scheduleExecutionGuard;
-
     private final MdmMoldingMachineMapper moldingMachineMapper;
     private final MdmMaterialInfoMapper materialInfoMapper;
     private final MdmMonthSurplusMapper monthSurplusMapper;
@@ -171,20 +168,6 @@ public class ScheduleServiceImpl implements ScheduleService {
         ScheduleResult result = new ScheduleResult();
         result.setSuccess(false);
         result.setScheduleDate(request.getScheduleDate());
-
-        String factoryCode = request.getFactoryCode() != null ? request.getFactoryCode() : DEFAULT_FACTORY_CODE;
-        LocalDate scheduleDate = request.getScheduleDate();
-
-        // 获取排程执行锁（工厂+日期维度）
-        // todo 可以使用注解，代码简洁
-        String lockToken = scheduleExecutionGuard.acquire(factoryCode, scheduleDate);
-        if (lockToken == null) {
-            result.setSuccess(false);
-            result.setErrorCode(ScheduleService.ERROR_CODE_LOCK_CONFLICT);
-            result.setMessage(I18nUtil.getMessage("ui.data.column.cxScheduleResult.scheduleRunning"));
-            log.warn("排程锁已被占用，拒绝重复执行。工厂: {}, 日期: {}", factoryCode, scheduleDate);
-            return result;
-        }
 
         try {
             log.info("开始执行排程，日期：{}，排程模式：{}", request.getScheduleDate(), request.getScheduleMode());
@@ -233,9 +216,6 @@ public class ScheduleServiceImpl implements ScheduleService {
         } catch (Exception e) {
             log.error("排程执行失败", e);
             result.setMessage("排程失败：" + e.getMessage());
-        } finally {
-            // 释放排程执行锁
-            scheduleExecutionGuard.release(factoryCode, scheduleDate, lockToken);
         }
 
         return result;
@@ -292,7 +272,7 @@ public class ScheduleServiceImpl implements ScheduleService {
     /**
      * 加载精度计划
      *
-     * <p>查询条件：planDate <= 排程起始日期 + 提前天数（可配置），且 actualDate 为空（未从MES回调），
+     * <p>查询条件：planDate <= 排程起始日期 + 班次排程天数 + 提前天数（可配置），且 actualDate 为空（未从MES回调），
      * 且 scheduleDate 为空（未执行），且 isDelete=0
      * <p>注意：此处使用排程起始日期一次性加载最大范围的数据，实际每日选择时会根据当天日期动态计算截止。
      * 例如：传入排程日期=5月20日，提前天数=3，查询 planDate <= 5月23日 的所有未执行精度计划，
@@ -1051,61 +1031,98 @@ public class ScheduleServiceImpl implements ScheduleService {
         context.setStructureAllocationMap(structureAllocationMap);
         log.info("加载结构排产配置 {} 条，共 {} 个结构", allocations.size(), structureAllocationMap.size());
 
-        // 加载未来月份的结构排产配置（用于提前生产能力）
+        // 加载提前生产备用结构排产配置（本月 BEGIN_DAY > 当前日期 的机台 + 跨月场景下次月机台）
         loadFutureStructureAllocations(context, scheduleDate);
     }
 
     /**
-     * 加载未来月份的结构排产配置
+     * 加载提前生产备用的结构排产配置
      *
-     * <p>用于提前生产能力：当结构在当日无可配置机台但需要提前生产时，
-     * 系统从未来月份的排产配置中查找该结构最近的推荐机台列表。
+     * <p>用于提前生产能力：当结构在当日（BEGIN_DAY/END_DAY 日期范围内）无可配置机台但需要提前生产时，
+     * 从本月后续日期的排产配置中查找可用机台。
      *
-     * <p>查询范围：当前月份之后的3个月，按排产版本过滤后按结构分组。
-     * 查询结果存入 context.futureStructureAllocationMap，供 TaskGroupService 使用。
+     * <p>数据来源分两部分：
+     * <ol>
+     *   <li><b>本月未来机台</b>：从已加载的当月 structureAllocationMap 中筛选 BEGIN_DAY > 当前日期 的机台记录，
+     *       这些机台在本月后续才会生效，可用于提前生产。</li>
+     *   <li><b>跨月场景下的次月机台</b>：当排程日期范围跨月时（如31号排程包含次月1日），
+     *       硫化任务存储的版本仍为当月版本，需从月计划表（t_mp_month_plan_prod_final）获取次月版本，
+     *       再用次月版本过滤次月的 T_MP_STRUCTURE_ALLOCATION 配置，作为跨月提前生产的机台来源。</li>
+     * </ol>
+     *
+     * <p>查询结果存入 context.futureStructureAllocationMap，供 TaskGroupService 使用。
      *
      * @param context      排程上下文
-     * @param scheduleDate 排程日期
+     * @param scheduleDate 排程日期（中间天）
      */
     private void loadFutureStructureAllocations(ScheduleContextVo context, LocalDate scheduleDate) {
         String factoryCode = context.getFactoryCode() != null ? context.getFactoryCode() : DEFAULT_FACTORY_CODE;
-        String productionVersion = context.getProductionVersion();
+
+        // 排产起始日期 = 中间天 - 1天（T日）
+        LocalDate scheduleStartDate = scheduleDate.minusDays(1);
+        int currentDay = scheduleStartDate.getDayOfMonth();
 
         Map<String, List<MpCxCapacityConfiguration>> futureMap = new LinkedHashMap<>();
 
-        // 查询未来3个月的结构排产配置
-        LocalDate futureDate = scheduleDate.plusMonths(1);
-        for (int i = 0; i < 3; i++) {
-            int year = futureDate.getYear();
-            int month = futureDate.getMonthValue();
-            List<MpCxCapacityConfiguration> futureAllocations =
-                    capacityConfigurationMapper.selectByYearAndMonth(factoryCode, year, month);
-
-            // 按排产版本过滤：只保留与当前排产相同版本的数据
-            if (productionVersion != null && !futureAllocations.isEmpty()) {
-                futureAllocations = futureAllocations.stream()
-                        .filter(a -> productionVersion.equals(a.getProductionVersion()))
+        // 1. 本月未来机台：从已加载的当月配置中筛选 BEGIN_DAY > 当前日期的记录
+        if (context.getStructureAllocationMap() != null) {
+            for (Map.Entry<String, List<MpCxCapacityConfiguration>> entry : context.getStructureAllocationMap().entrySet()) {
+                String structureName = entry.getKey();
+                List<MpCxCapacityConfiguration> futureConfigs = entry.getValue().stream()
+                        .filter(c -> c.getBeginDay() != null && c.getBeginDay() > currentDay)
                         .collect(Collectors.toList());
-            }
-
-            // 按结构分组，合并到 futureMap（同结构多个月份的配置按月份先后顺序合并）
-            for (MpCxCapacityConfiguration config : futureAllocations) {
-                if (config.getStructureName() != null) {
-                    futureMap.computeIfAbsent(config.getStructureName(), k -> new ArrayList<>()).add(config);
+                if (!futureConfigs.isEmpty()) {
+                    futureMap.computeIfAbsent(structureName, k -> new ArrayList<>()).addAll(futureConfigs);
                 }
             }
+        }
+        log.info("本月未来机台（BEGIN_DAY > {}）加载完成，共 {} 个结构有未来机台配置", currentDay, futureMap.size());
 
-            if (!futureAllocations.isEmpty()) {
-                log.info("加载未来月份 {}-{} 结构排产配置 {} 条（提前生产备用）", year, month, futureAllocations.size());
+        // 2. 跨月场景：排程日期范围跨月时，加载次月结构配置
+        int scheduleDays = context.getScheduleDays() != null ? context.getScheduleDays() : DEFAULT_SCHEDULE_DAYS;
+        LocalDate scheduleEndDate = scheduleStartDate.plusDays(scheduleDays - 1);
+        boolean crossMonth = scheduleEndDate.getMonth() != scheduleStartDate.getMonth()
+                || scheduleEndDate.getYear() != scheduleStartDate.getYear();
+        if (crossMonth) {
+            // 跨月场景：硫化任务版本仍为当月版本，需从月计划表获取次月版本
+            LocalDate nextMonthDate = scheduleEndDate.withDayOfMonth(1);
+            int nextYear = nextMonthDate.getYear();
+            int nextMonth = nextMonthDate.getMonthValue();
+            int nextYearMonth = nextYear * 100 + nextMonth;
+
+            // 从月计划表获取次月排产版本
+            List<FactoryMonthPlanProductionFinalResult> nextMonthPlans =
+                    monthPlanMapper.selectByFactoryAndYearMonth(factoryCode, nextYearMonth);
+            String nextMonthVersion = nextMonthPlans.stream()
+                    .map(FactoryMonthPlanProductionFinalResult::getProductionVersion)
+                    .filter(Objects::nonNull)
+                    .findFirst()
+                    .orElse(null);
+
+            if (nextMonthVersion != null) {
+                List<MpCxCapacityConfiguration> nextMonthAllocations =
+                        capacityConfigurationMapper.selectByYearAndMonth(factoryCode, nextYear, nextMonth);
+                int before = nextMonthAllocations.size();
+                nextMonthAllocations = nextMonthAllocations.stream()
+                        .filter(a -> nextMonthVersion.equals(a.getProductionVersion()))
+                        .collect(Collectors.toList());
+
+                for (MpCxCapacityConfiguration config : nextMonthAllocations) {
+                    if (config.getStructureName() != null) {
+                        futureMap.computeIfAbsent(config.getStructureName(), k -> new ArrayList<>()).add(config);
+                    }
+                }
+                log.info("跨月场景：加载次月 {}-{} 结构排产配置 {} 条（版本={}, 过滤前={}）",
+                        nextYear, nextMonth, nextMonthAllocations.size(), nextMonthVersion, before);
+            } else {
+                log.warn("跨月场景：未从月计划表获取到次月 {}-{} 的排产版本，跳过次月结构配置加载", nextYear, nextMonth);
             }
-
-            futureDate = futureDate.plusMonths(1);
         }
 
         context.setFutureStructureAllocationMap(futureMap);
         // 初始化提前生产机台分配映射（TaskGroupService 在分组过程中填充）
         context.setAdvanceProductionMachineMap(new HashMap<>());
-        log.info("加载未来结构排产配置完成，共 {} 个结构有未来机台配置（提前生产备用）", futureMap.size());
+        log.info("加载提前生产备用配置完成，共 {} 个结构有未来机台配置（跨月={}）", futureMap.size(), crossMonth);
     }
 
     /**
