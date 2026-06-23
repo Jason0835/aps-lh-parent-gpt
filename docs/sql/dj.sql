@@ -239,6 +239,7 @@ CREATE TABLE `t_dj_glue_group_order`  (
 -- ----------------------------
 CREATE TABLE `t_dj_glue_order`  (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID，对应自增序列为：SEQ_PUBLIC',
+  `factory_code` varchar(10) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NULL DEFAULT NULL COMMENT '工厂编码',
   `glue_group_id` bigint NULL DEFAULT NULL COMMENT '胶料组别id，对应t_dj_glue_group_order表主键id',
   `glue_code` varchar(30) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NULL DEFAULT NULL COMMENT '胶料编号',
   `order_num` int NULL DEFAULT NULL COMMENT '生产顺序',
@@ -251,5 +252,52 @@ CREATE TABLE `t_dj_glue_order`  (
   PRIMARY KEY (`id`) USING BTREE,
   INDEX `IDX_DJ_GLUE_ORDER_GROUP`(`glue_group_id` ASC) USING BTREE
 ) ENGINE = InnoDB AUTO_INCREMENT = 1 CHARACTER SET = utf8mb3 COLLATE = utf8mb3_general_ci COMMENT = '垫胶胶料顺序维护' ROW_FORMAT = DYNAMIC;
+
+-- ----------------------------
+-- Table structure for t_dj_schedule_result_log
+-- ----------------------------
+CREATE TABLE `t_dj_schedule_result_log`  (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+  `factory_code` varchar(10) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NULL DEFAULT NULL COMMENT '工厂编号',
+  `batch_no` varchar(50) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NULL DEFAULT NULL COMMENT '批次号',
+  `order_no` varchar(50) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NULL DEFAULT NULL COMMENT '工单号',
+  `schedule_date` datetime NULL DEFAULT NULL COMMENT '排程日期',
+  `machine_code` varchar(30) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NULL DEFAULT NULL COMMENT '机台编码',
+  `padding_code` varchar(30) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NULL DEFAULT NULL COMMENT '垫胶编码',
+  `glue_code` varchar(30) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NULL DEFAULT NULL COMMENT '胶料代码',
+  `mouth_plate_code` varchar(30) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NULL DEFAULT NULL COMMENT '口型板编码',
+  `class1_sequence` int NULL DEFAULT NULL COMMENT '1班顺序',
+  `class1_plan_qty` decimal(10,2) NULL DEFAULT NULL COMMENT '1班计划量',
+  `class1_analysis` varchar(500) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NULL DEFAULT NULL COMMENT '1班原因分析',
+  `class2_sequence` int NULL DEFAULT NULL COMMENT '2班顺序',
+  `class2_plan_qty` decimal(10,2) NULL DEFAULT NULL COMMENT '2班计划量',
+  `class2_analysis` varchar(500) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NULL DEFAULT NULL COMMENT '2班原因分析',
+  `class3_sequence` int NULL DEFAULT NULL COMMENT '3班顺序',
+  `class3_plan_qty` decimal(10,2) NULL DEFAULT NULL COMMENT '3班计划量',
+  `class3_analysis` varchar(500) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NULL DEFAULT NULL COMMENT '3班原因分析',
+  `class4_sequence` int NULL DEFAULT NULL COMMENT '4班顺序',
+  `class4_plan_qty` decimal(10,2) NULL DEFAULT NULL COMMENT '4班计划量',
+  `class4_analysis` varchar(500) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NULL DEFAULT NULL COMMENT '4班原因分析',
+  `class5_sequence` int NULL DEFAULT NULL COMMENT '5班顺序',
+  `class5_plan_qty` decimal(10,2) NULL DEFAULT NULL COMMENT '5班计划量',
+  `class5_analysis` varchar(500) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NULL DEFAULT NULL COMMENT '5班原因分析',
+  `class6_sequence` int NULL DEFAULT NULL COMMENT '6班顺序',
+  `class6_plan_qty` decimal(10,2) NULL DEFAULT NULL COMMENT '6班计划量',
+  `class6_analysis` varchar(500) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NULL DEFAULT NULL COMMENT '6班原因分析',
+  `release_status` varchar(2) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NULL DEFAULT NULL COMMENT '发布状态',
+  `data_source` varchar(30) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NULL DEFAULT NULL COMMENT '数据来源',
+  `tail_flag` varchar(2) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NULL DEFAULT NULL COMMENT '是否收尾任务',
+  `publish_success_count` int NULL DEFAULT 0 COMMENT '发布成功计数器',
+  `remark` varchar(900) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NULL DEFAULT NULL COMMENT '备注',
+  `is_delete` int NULL DEFAULT 0 COMMENT '删除标识：0--正常，1-删除',
+  `create_by` varchar(25) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NULL DEFAULT NULL COMMENT '创建者',
+  `create_time` datetime NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_by` varchar(25) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NULL DEFAULT NULL COMMENT '更新者',
+  `update_time` datetime NULL DEFAULT CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`) USING BTREE,
+  INDEX `IDX_LOG_SCHEDULE_DATE`(`schedule_date` ASC) USING BTREE,
+  INDEX `IDX_LOG_SCHEDULE_MACHINE`(`machine_code` ASC) USING BTREE,
+  INDEX `IDX_LOG_BATCH_NO`(`batch_no` ASC) USING BTREE
+) ENGINE = InnoDB AUTO_INCREMENT = 1 CHARACTER SET = utf8mb3 COLLATE = utf8mb3_general_ci COMMENT = '垫胶排程结果日志表' ROW_FORMAT = DYNAMIC;
 
 SET FOREIGN_KEY_CHECKS = 1;

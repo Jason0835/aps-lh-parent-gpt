@@ -116,7 +116,7 @@ export default {
       let columnsDate = [
         {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.rawWarningRecord.factoryCode"),
           type: "select",
           dictData: this.parentDict.type.biz_factory_name,
         },
@@ -133,7 +133,7 @@ export default {
       let column = [
         {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.rawWarningRecord.factoryCode"),
           type: "select",
           dictData: this.parentDict.type.biz_factory_name,
         },
@@ -148,7 +148,7 @@ export default {
         },
         {
           prop: "week",
-          label: this.$t("ui.data.column.rawMaterial.relatedWeek"),
+          label: this.$t("ui.data.column.rawWarningRecord.relatedWeek"),
           type: "number",
           min: 1,
           max: 4,

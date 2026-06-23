@@ -96,14 +96,14 @@ export default {
     columns() {
       return [
         {
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.rawMaterialOutboundRecord.factoryCode"),
           prop: "factoryCode",
           type: "select",
           dictData: this.dict.type.biz_factory_name,
         },
         {
           prop: "sapCode",
-          label: this.$t("ui.data.column.masterdata.materialCode"),
+          label: this.$t("ui.data.column.rawMaterialOutboundRecord.materialCode"),
         },
         {
           prop: "materialDesc",
@@ -111,11 +111,11 @@ export default {
         },
         {
           prop: "standardLength",
-          label: this.$t("标准长"),
+          label: this.$t("ui.data.column.rawSpecialMaterialStock.standardLength"),
         },
         {
-          prop: "比例",
-          label: this.$t("比例"),
+          prop: "quota",
+          label: this.$t("ui.data.column.rawSpecialMaterialRecord.quota"),
         },
         {
           prop: "unit",

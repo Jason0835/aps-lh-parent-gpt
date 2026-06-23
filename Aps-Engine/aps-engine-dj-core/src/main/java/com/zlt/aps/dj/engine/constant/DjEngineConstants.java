@@ -101,6 +101,11 @@ public class DjEngineConstants {
     /** 机台状态：启用 */
     public static final String MACHINE_STATUS_ENABLED = "0";
 
+    // ==================== 单位换算常量 ====================
+
+    /** 毫米转米除数 */
+    public static final BigDecimal MM_TO_M_DIVISOR = new BigDecimal("1000");
+
     /** 成型生产状态：已收尾 */
     public static final String CX_PRODUCTION_STATUS_FINISHED = "2";
 

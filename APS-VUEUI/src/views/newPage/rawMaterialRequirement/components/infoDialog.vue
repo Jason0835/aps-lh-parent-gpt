@@ -201,7 +201,7 @@ export default {
       return [
         {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.rawMaterialRequirePlan.factoryCode"),
           type: "select",
           dictData: this.parentDict.type.biz_factory_name,
           clearable: false,
@@ -216,30 +216,30 @@ export default {
         },
         {
           prop: "materialType",
-          label: this.$t("ui.data.column.trialPlan.trialType"),
+          label: this.$t("ui.data.column.rawSpecialMaterialRecord.materialType"),
           type: "select",
           dictData: this.parentDict.type.biz_rawMaterial_type,
         },
         {
           prop: "materialDesc",
-          label: this.$t("common.name"),
+          label: this.$t("ui.data.column.rawSpecialMaterialRecord.materialDesc"),
           maxlength: 300,
         },
         {
           prop: "materialCode",
-          label: this.$t("ui.data.column.monthplan.oriMaterialCode"),
+          label: this.$t("ui.data.column.rawMaterialRequirePlan.materialCode"),
           maxlength: 10,
         },
         {
           prop: "curMonthQty",
-          label: this.$t("ui.data.column.rawMaterial.curMonthQty"),
+          label: this.$t("ui.data.column.rawMaterialRequirePlan.curMonthQty"),
           type: "number",
           max: 99999999.99,
           min: 0,
         },
         {
           prop: "t1MonthQty",
-          label: this.$t("ui.data.column.rawMaterial.t1MonthQty"),
+          label: this.$t("ui.data.column.rawMaterialRequirePlan.t1MonthQty"),
           type: "number",
           max: 99999999.99,
           min: 0,
@@ -247,28 +247,28 @@ export default {
 
         {
           prop: "t2MonthQty",
-          label: this.$t("ui.data.column.rawMaterial.t2MonthQty"),
+          label: this.$t("ui.data.column.rawMaterialRequirePlan.t2MonthQty"),
           type: "number",
           max: 99999999.99,
           min: 0,
         },
         {
           prop: "curMonthRudrQty",
-          label: this.$t("ui.data.column.rawMaterial.curMonthRudrQty"),
+          label: this.$t("ui.data.column.rawMaterialRequirePlan.curMonthRudrQty"),
           type: "number",
           max: 99999999.99,
           min: 0,
         },
         {
           prop: "t1MonthEudrQty",
-          label: this.$t("ui.data.column.rawMaterial.t1MonthEudrQty"),
+          label: this.$t("ui.data.column.rawMaterialRequirePlan.t1MonthEudrQty"),
           type: "number",
           max: 99999999.99,
           min: 0,
         },
         {
           prop: "t2MonthEudrQty",
-          label: this.$t("ui.data.column.rawMaterial.t2MonthEudrQty"),
+          label: this.$t("ui.data.column.rawMaterialRequirePlan.t2MonthEudrQty"),
           type: "number",
           max: 99999999.99,
           min: 0,

@@ -1364,6 +1364,9 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         // 硫化时间、日计划量、硫化余量、示方号等导入模板没有直接提供的字段。
         lhScheduleResultService.fillScheduleResultFields(insertList, scheduleDate);
 
+        // 从物料表反显胎胚代码和产品结构
+        AppUtils.formatData(insertList, getQueryFormulas());
+
         this.baseDao.insertBatch(insertList);
         if (failureNum > 0) {
             return AjaxResult.error(I18nUtil.getMessage("ui.message.import.fail") + "," + successNum + "," + failureNum, importErrorLogs);
@@ -3325,6 +3328,13 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
             default:
                 return null;
         }
+    }
+
+    @Override
+    public String[] getQueryFormulas() {
+        return new String[]{
+                "embryoCode,structureName->getcolsvaluewithcondition(T_MDM_MATERIAL_INFO, [EMBRYO_CODE,STRUCTURE_NAME], MATERIAL_CODE, materialCode, IS_DELETE=0)"
+        };
     }
 
 }

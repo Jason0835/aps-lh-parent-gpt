@@ -134,4 +134,6 @@ public interface ILhScheduleService extends IDocService<LhScheduleResult> {
      */
     Map<String, Object> buildTodayNightFinishQtyMap(List<LhScheduleResult> list, Date scheduleDate);
 
+    String[] getQueryFormulas();
+
 }
