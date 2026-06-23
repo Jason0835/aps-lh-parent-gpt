@@ -216,7 +216,6 @@ export default {
         { label: this.$t('ui.data.column.cd90ScheduleResult.bigRollCode'), prop: 'bigRollCode', minWidth: 140 },
         { label: this.$t('ui.data.column.cd90ScheduleResult.storageLaneCode'), prop: 'storageLaneCode', minWidth: 140 },
         { label: this.$t('ui.data.column.cd90ScheduleResult.stockQty'), prop: 'stockQty', minWidth: 120 },
-        { label: this.$t('ui.data.column.cd90ScheduleResult.supplyTime'), prop: 'supplyTime', minWidth: 160 },
         ...this.buildShiftColumns(),
         { label: this.$t('ui.data.column.cd90ScheduleResult.remark'), prop: 'remark', minWidth: 160 }
       ]

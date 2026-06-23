@@ -99,7 +99,8 @@ public class Cd90RollingScheduleContextManager {
         log.info("[直裁自动排程] 当前班次滚动资源已重建, classField={}, shiftCode={}, "
                         + "effectiveInboundCount={}, releasedVehicleCount={}, occupiedVehicleCount={}, consumptionRemainder={}, cumulativeConsumptionByCloth={}",
                 shift.getClassField(), shift.getShiftCode(), effectiveInbound.size(),
-                snapshot.getOccupiedVehicleCount(), context.getCumulativeConsumptionByCloth());
+                snapshot.getReleasedVehicleCount(), snapshot.getOccupiedVehicleCount(),
+                snapshot.getConsumptionRemainderQuantity(), context.getCumulativeConsumptionByCloth());
         return Cd90ShiftResourceState.builder()
                 .lanes(snapshot.getLanes()).totalToolingCount(totalToolingCount)
                 .occupiedToolingCount(snapshot.getOccupiedVehicleCount())

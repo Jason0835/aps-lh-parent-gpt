@@ -94,6 +94,8 @@ public class Cd90SingleShiftScheduleExecutor implements Cd90SingleShiftScheduleS
             BigDecimal netDemand = demand == null || demand.getNetDemandQuantity() == null
                     ? BigDecimal.ZERO : demand.getNetDemandQuantity();
             if (netDemand.signum() <= 0) {
+                log.info("[直裁自动排程] 当前班次规格净需求为0，跳过资源试算, classField={}, shiftCode={}, clothCode={}, netDemand={}",
+                        shift.getClassField(), shift.getShiftCode(), clothCode, netDemand);
                 continue;
             }
             Cd90ConstructionMaterial construction = findConstruction(
