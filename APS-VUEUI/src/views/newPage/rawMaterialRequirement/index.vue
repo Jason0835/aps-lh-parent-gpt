@@ -146,26 +146,26 @@ export default {
         { type: "selection", fixed: "left" },
         {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.rawMaterialRequirePlan.factoryCode"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
           },
         },
         {
           prop: "year",
-          label: this.$t("ui.data.colume.year"),
+          label: this.$t("ui.data.column.rawMaterialRequirePlan.year"),
         },
         {
           prop: "month",
-          label: this.$t("ui.data.colume.month"),
+          label: this.$t("ui.data.column.rawMaterialRequirePlan.month"),
         },
         {
           prop: "version",
-          label: this.$t("plan.planProduction.planVersion"),
+          label: this.$t("ui.data.column.rawMaterialRequirePlan.version"),
         },
         {
           prop: "materialType",
-          label: this.$t("ui.data.column.trialPlan.trialType"),
+          label: this.$t("ui.data.column.rawSpecialMaterialRecord.materialType"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(
               this.dict.type.biz_rawMaterial_type,
@@ -176,13 +176,13 @@ export default {
         },
         {
           prop: "materialDesc",
-          label: this.$t("common.name"),
+          label: this.$t("ui.data.column.rawSpecialMaterialRecord.materialDesc"),
           align: "left",
           minWidth: 350,
         },
         {
           prop: "materialCode",
-          label: this.$t("ui.data.column.monthplan.oriMaterialCode"),
+          label: this.$t("ui.data.column.rawMaterialRequirePlan.materialCode"),
           width: 180,
         },
         // {
@@ -195,28 +195,28 @@ export default {
         // },
         {
           prop: "curMonthQty",
-          label: this.$t("ui.data.column.rawMaterial.curMonthQty"),
+          label: this.$t("ui.data.column.rawMaterialRequirePlan.curMonthQty"),
         },
         {
           prop: "t1MonthQty",
-          label: this.$t("ui.data.column.rawMaterial.t1MonthQty"),
+          label: this.$t("ui.data.column.rawMaterialRequirePlan.t1MonthQty"),
         },
 
         {
           prop: "t2MonthQty",
-          label: this.$t("ui.data.column.rawMaterial.t2MonthQty"),
+          label: this.$t("ui.data.column.rawMaterialRequirePlan.t2MonthQty"),
         },
         {
           prop: "curMonthRudrQty",
-          label: this.$t("ui.data.column.rawMaterial.curMonthRudrQty"),
+          label: this.$t("ui.data.column.rawMaterialRequirePlan.curMonthRudrQty"),
         },
         {
           prop: "t1MonthEudrQty",
-          label: this.$t("ui.data.column.rawMaterial.t1MonthEudrQty"),
+          label: this.$t("ui.data.column.rawMaterialRequirePlan.t1MonthEudrQty"),
         },
         {
           prop: "t2MonthEudrQty",
-          label: this.$t("ui.data.column.rawMaterial.t2MonthEudrQty"),
+          label: this.$t("ui.data.column.rawMaterialRequirePlan.t2MonthEudrQty"),
         },
         {
           prop: "remark",
@@ -268,7 +268,7 @@ export default {
     searchColumns() {
       return [
         {
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.rawMaterialRequirePlan.factoryCode"),
           prop: "factoryCode",
           type: "select",
           dictData: this.dict.type.biz_factory_name,
@@ -290,7 +290,7 @@ export default {
         },
         {
           prop: "version",
-          label: this.$t("plan.planProduction.planVersion"),
+          label: this.$t("ui.data.column.rawMaterialRequirePlan.version"),
           type: "select",
           dictData: this.selectList,
           clearable: false,
@@ -298,11 +298,11 @@ export default {
         },
         {
           prop: "materialCode",
-          label: this.$t("ui.data.column.monthplan.oriMaterialCode"),
+          label: this.$t("ui.data.column.rawMaterialRequirePlan.materialCode"),
         },
         {
           prop: "materialDesc",
-          label: this.$t("common.name"),
+          label: this.$t("ui.data.column.rawSpecialMaterialRecord.materialDesc"),
           minWidth: 350,
           align: "left",
         },
@@ -317,7 +317,7 @@ export default {
 
         {
           prop: "materialType",
-          label: this.$t("ui.data.column.trialPlan.trialType"),
+          label: this.$t("ui.data.column.rawSpecialMaterialRecord.materialType"),
           type: "select",
           dictData: this.dict.type.biz_rawMaterial_type,
         },
