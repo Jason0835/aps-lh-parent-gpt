@@ -184,4 +184,11 @@ public interface DjScheduleResultService extends IBillService<DjScheduleResult> 
      * @param scheduleDate 排程日期
      */
     void fillPrevDayClass3Plan(List<DjScheduleResult> list, Date scheduleDate);
+
+    /**
+     * 填充机台名称
+     *
+     * @param list 排程结果列表
+     */
+    void fillMachineName(List<DjScheduleResult> list);
 }

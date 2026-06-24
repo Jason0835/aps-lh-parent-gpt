@@ -23,56 +23,56 @@
       <template slot="header">
         <el-button
           type="warning"
-          v-hasPermi="['nc:ncScheduleResult:autoPlan']"
+          v-hasPermi="['dj:djScheduleResult:autoPlan']"
           @click="handleAutoPlan"
           >{{ $t("ui.data.column.scheduleResult.autoPlan") }}</el-button
         >
         <el-button
           type="warning"
-          v-hasPermi="['nc:ncScheduleResult:add']"
+          v-hasPermi="['dj:djScheduleResult:add']"
           @click="handleAdd"
           >{{ $t("ui.data.column.scheduleResult.insertOrder") }}</el-button
         >
         <el-button
           type="warning"
           @click="() => handleEdit(selection[0])"
-          v-hasPermi="['nc:ncScheduleResult:edit']"
+          v-hasPermi="['dj:djScheduleResult:edit']"
           >{{ $t("ui.frame.btn.modify") }}</el-button
         >
         <el-button
           type="danger"
           :disabled="selection.length === 0"
-          v-hasPermi="['nc:ncScheduleResult:remove']"
+          v-hasPermi="['dj:djScheduleResult:remove']"
           @click="handleDelete"
           >{{ $t("ui.frame.btn.delete") }}</el-button
         >
         <el-button
-          v-hasPermi="['nc:ncScheduleResult:changeMachine']"
+          v-hasPermi="['dj:djScheduleResult:changeMachine']"
           type="primary"
           :disabled="selection.length === 0"
           @click="handleChangeMachine"
           >{{ $t("ui.data.column.scheduleResult.changeMachine") }}</el-button
         >
         <el-button
-          v-hasPermi="['nc:ncScheduleResult:changePlan']"
+          v-hasPermi="['dj:djScheduleResult:changePlan']"
           type="primary"
           @click="handleChangePlan"
           >{{ $t("ui.data.column.scheduleResult.changePlan") }}</el-button
         >
         <el-button
-          v-hasPermi="['nc:ncScheduleResult:balance']"
+          v-hasPermi="['dj:djScheduleResult:balance']"
           type="primary"
           @click="handleBalance"
           >{{ $t("ui.data.column.scheduleResult.balance") }}</el-button
         >
         <el-button
-          v-hasPermi="['nc:ncScheduleResult:mergeProduct']"
+          v-hasPermi="['dj:djScheduleResult:mergeProduct']"
           type="primary"
           @click="handleMergeProduct"
           >{{ $t("ui.data.column.scheduleResult.mergeProduct") }}</el-button
         >
         <el-button
-          v-hasPermi="['nc:ncScheduleResult:combinationMiddleAndNight']"
+          v-hasPermi="['dj:djScheduleResult:combinationMiddleAndNight']"
           type="primary"
           :disabled="selection.length == 0"
           @click="handleCombinationMiddleAndNight"
@@ -80,7 +80,7 @@
         >
 
         <el-button
-          v-hasPermi="['nc:ncScheduleResult:publish']"
+          v-hasPermi="['dj:djScheduleResult:publish']"
           type="primary"
           :disabled="selection.length === 0"
           @click="handlePublish"
@@ -176,7 +176,7 @@
       </template>
     </page-table>
     <!-- <el-button style="display: none" ref="hidePopoverBtnRef"></el-button> -->
-    <autoPlanDialog ref="autoPlanRef" @success="getList" />
+    <autoPlanDialog ref="autoPlanRef" @success="handleAutoPlanSuccess" />
     <addDialog ref="addRef" @success="getList" />
     <editDialog ref="editRef" @success="getList" />
     <changeMachineDialog ref="changeMachineRef" @success="getList" />
@@ -821,12 +821,25 @@ export default {
     handleAutoPlan() {
       console.log("handleAutoPlan");
       if (this.$refs.autoPlanRef) {
-        this.$refs.autoPlanRef.show("", "1");
+        this.$refs.autoPlanRef.show("", "1", this.query.factoryCode);
+      }
+    },
+    // 自动排程成功后，更新排程日期并刷新列表
+    handleAutoPlanSuccess(scheduleDate) {
+      if (scheduleDate) {
+        this.$set(this.query, 'scheduleDate', scheduleDate);
+        this.search = { ...this.search, scheduleDate };
+      }
+      this.getList();
+      if (scheduleDate) {
+        getWorkClass({ scheduleDate }).then((res) => {
+          this.classHeaders = res;
+        });
       }
     },
 
     handleExportUiExcel() {
-      downloadLink("/nc/ncScheduleResult/export", this.formatParams(false));
+      downloadLink("/dj/djScheduleResult/export", this.formatParams(false));
     },
 
     handleChangeReleaseStatus() {

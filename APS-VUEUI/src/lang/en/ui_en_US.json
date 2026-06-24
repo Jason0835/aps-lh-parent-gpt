@@ -674,6 +674,8 @@
   "ui.data.column.dj.dispatcherlog.beforeClass3PlanQty": "Before operation Class3 plan qty",
   "ui.data.column.dj.dispatcherlog.afterMachineId": "After operation machine code",
   "ui.data.column.dj.dispatcherlog.afterDayPlan": "After operation Class1 plan qty",
-  "ui.data.column.dj.dispatcherlog.afterNightPlan": "After operation Class2 plan qty"
+  "ui.data.column.dj.dispatcherlog.afterNightPlan": "After operation Class2 plan qty",
+  "ui.data.column.combinationMiddleAndNight": "Merge Shifts",
+  "ui.biz.alter.makeSureRecreateDj": "Padding schedule already exists for today. Regenerating will overwrite existing records. Are you sure to regenerate?"
 
 }

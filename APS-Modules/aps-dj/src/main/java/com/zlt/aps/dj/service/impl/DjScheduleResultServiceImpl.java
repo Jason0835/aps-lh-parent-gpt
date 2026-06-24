@@ -127,7 +127,8 @@ public class DjScheduleResultServiceImpl extends AbstractBillService<DjScheduleR
     /**
      * 填充机台名称
      */
-    private void fillMachineName(List<DjScheduleResult> list) {
+    @Override
+    public void fillMachineName(List<DjScheduleResult> list) {
         List<DjMachineInfo> machineInfoList = machineInfoService.selectMachineInfoList(new DjMachineInfo());
         Map<String, DjMachineInfo> machineInfoMap = machineInfoList.stream()
                 .collect(Collectors.toMap(DjMachineInfo::getMachineCode, Function.identity(), (s1, s2) -> s1));

@@ -980,6 +980,7 @@
   "ui.biz.alter.publish.modeChange": "确认发布硫化模具变动单吗？",
   "ui.biz.alter.makeSureRecreateByPublished": "该日排程已发布是否重新排程？",
   "ui.biz.alter.makeSureRecreate": "该日已存在排程是否重新排程？",
+  "ui.biz.alter.makeSureRecreateDj": "当天已生成垫胶排程，重新生成会覆盖现有排程记录，是否确定重新生成？",
   "ui.biz.alter.CanNotRecreate": "该日排程已发布，不允许重新排程!",
   "ui.biz.alter.autoPlanByWithoutCreated": "该日还未进行自动排程，是否继续进行插单?",
   "ui.frame.btn.isUpdateExist": "是否更新已存在数据？",

@@ -48,11 +48,13 @@ import com.zlt.aps.dj.engine.mapper.DjEngineStockMapper;
 import com.zlt.aps.dj.engine.model.DjPaddingDemand;
 import com.zlt.aps.dj.engine.model.DjScheduleContext;
 import com.zlt.aps.dj.engine.service.DjEngineNewService;
+import com.zlt.aps.exception.BusinessException;
 import com.zlt.aps.mdm.api.domain.entity.MdmConstructionInfo;
 import com.zlt.aps.mp.api.domain.entity.MpMonthPlanMonitor;
 import com.zlt.core.dao.basedao.BaseDao;
 
 import cn.hutool.core.date.DateUtil;
+import com.ruoyi.common.i18n.utils.I18nUtil;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -119,8 +121,7 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
         // ==================== 步骤1：加载成型计划 ====================
         List<CxScheduleResult> cxScheduleList = this.loadCxSchedule(factoryCode, scheduleDate);
         if (CollectionUtils.isEmpty(cxScheduleList)) {
-            log.warn("步骤1：未加载到成型计划数据，工厂：{}，排产日期：{}", factoryCode, scheduleDate);
-            return Collections.emptyList();
+            throw new BusinessException(I18nUtil.getMessage("ui.dj.engine.noCxSchedule"));
         }
         log.info("步骤1：加载成型计划 {} 条", cxScheduleList.size());
 
@@ -129,16 +130,14 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
         Set<String> constructionCodes = cxScheduleList.stream().map(CxScheduleResult::getEmbryoCode)
                 .filter(Objects::nonNull).collect(Collectors.toSet());
         if (constructionCodes.isEmpty()) {
-            log.warn("步骤2：成型计划中无胎胚代码");
-            return Collections.emptyList();
+            throw new BusinessException(I18nUtil.getMessage("ui.dj.engine.noEmbryoCode"));
         }
 
         // 加载施工数据
         List<MdmConstructionInfo> constructionList = this.loadConstructionInfo(factoryCode,
                 new ArrayList<>(constructionCodes));
         if (CollectionUtils.isEmpty(constructionList)) {
-            log.warn("步骤2：未加载到施工数据");
-            return Collections.emptyList();
+            throw new BusinessException(I18nUtil.getMessage("ui.dj.engine.noConstruction"));
         }
         log.info("步骤2.1：加载施工数据 {} 条", constructionList.size());
 
@@ -265,8 +264,7 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
         // 4.1 加载垫胶机台
         List<DjMachineInfo> machineList = this.loadDjMachines(factoryCode);
         if (CollectionUtils.isEmpty(machineList)) {
-            log.warn("步骤4.1：未加载到垫胶机台数据");
-            return Collections.emptyList();
+            throw new BusinessException(I18nUtil.getMessage("ui.dj.engine.noMachine"));
         }
         Map<String, DjMachineInfo> machineMap = machineList.stream()
                 .collect(Collectors.toMap(DjMachineInfo::getMachineCode, m -> m));
@@ -289,8 +287,7 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
         // 步骤5.1~5.4 核心排产循环
         List<DjScheduleResult> scheduleResults = this.executeSchedule(demandList, context);
         if (CollectionUtils.isEmpty(scheduleResults)) {
-            log.warn("步骤5：排产结果为空");
-            return Collections.emptyList();
+            throw new BusinessException(I18nUtil.getMessage("ui.dj.engine.noScheduleResult"));
         }
         log.info("步骤5.1~5.4：排产完成，生成 {} 条排产结果", scheduleResults.size());
 

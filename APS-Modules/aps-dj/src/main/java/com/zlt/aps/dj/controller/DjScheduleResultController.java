@@ -75,6 +75,10 @@ public class DjScheduleResultController extends AbstractBillBizController<DjSche
     public TableDataInfo list(@RequestBody DjScheduleResult queryVO) {
         TableDataInfo table = super.list(queryVO);
         List<DjScheduleResult> rows = (List<DjScheduleResult>)table.getRows();
+        // 加载机台名称
+        if (CollectionUtils.isNotEmpty(rows)) {
+            djScheduleResultService.fillMachineName(rows);
+        }
         // 加载 T-1 日早班数据
         if (CollectionUtils.isNotEmpty(rows)) {
             djScheduleResultService.fillPrevDayClass3Plan(rows, queryVO.getScheduleDate());

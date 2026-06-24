@@ -88,6 +88,7 @@
   "ui.biz.alter.makeSurePublish": "Xác nhận xuất bản sắp xếp sản xuất?",
   "ui.biz.alter.makeSureRecreateByPublished": "Lịch trình ngày đã xuất bản, có sắp xếp lại không?",
   "ui.biz.alter.makeSureRecreate": "Đã tồn tại lịch trình ngày này, có sắp xếp lại không?",
+  "ui.biz.alter.makeSureRecreateDj": "Đã tồn tại lịch trình đệm cao su cho ngày hôm nay. Tạo lại sẽ ghi đè lên bản ghi hiện tại. Bạn có chắc chắn muốn tạo lại không?",
   "ui.biz.alter.CanNotRecreate": "Lịch trình ngày đã xuất bản, không cho phép sắp xếp lại!",
   "ui.biz.alter.autoPlanByWithoutCreated": "Chưa sắp xếp tự động ngày này, có tiếp tục chèn đơn không?",
   "ui.biz.alter.publishedNotImport": "Lịch trình ngày đã xuất bản, không cho phép nhập!",
