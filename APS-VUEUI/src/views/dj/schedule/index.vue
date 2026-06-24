@@ -352,13 +352,16 @@ export default {
               align: 'center',
               halign: 'center',
               label: this.$t("ui.data.column.dj.scheduleResult.releaseStatus"),
+              formatter: (row, column, value, index) => {
+                return this.selectDictLabel(this.dict.type.IS_RELEASE, value);
+              },
             },
             {
-              prop: "paddingCode",
+              prop: "paddingName",
               valign: "middle",
               halign: 'center',
               align: 'center',
-              minWidth: 100,
+              minWidth: 120,
               label: this.$t("ui.data.column.dj.scheduleResult.paddingCode"),
             },
             {

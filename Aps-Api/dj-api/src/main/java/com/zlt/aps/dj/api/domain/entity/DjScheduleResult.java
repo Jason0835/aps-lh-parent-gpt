@@ -66,6 +66,12 @@ public class DjScheduleResult extends BaseEntity {
     @TableField("PADDING_CODE")
     private String paddingCode;
 
+    /** 垫胶物料名 */
+    @Excel(name = "ui.data.column.dj.scheduleResult.paddingName")
+    @ApiModelProperty(value = "垫胶物料名", name = "paddingName")
+    @TableField(value = "PADDING_NAME")
+    private String paddingName;
+
     /**
      * 胶料代码
      */
