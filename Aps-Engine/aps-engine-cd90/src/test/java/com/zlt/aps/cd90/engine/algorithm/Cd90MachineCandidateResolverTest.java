@@ -12,9 +12,11 @@ import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 /**
@@ -99,6 +101,52 @@ public class Cd90MachineCandidateResolverTest {
     }
 
     @Test
+    public void shouldReturnWidthMismatchWhenAllBoundMachinesWidthExceeded() {
+        Cd90MachineCandidateResolution result = resolver.resolveDetailed(
+                "CF001", "BR001", new BigDecimal("894"), "NIGHT",
+                shiftStart(), shiftStart().plusHours(8),
+                Arrays.asList(
+                        machine("M1", "1", "NIGHT", "250", "320"),
+                        machine("M2", "1", "NIGHT", "250", "320")),
+                Arrays.asList(binding("BR001", "M1"), binding("BR001", "M2")),
+                Collections.emptyList(), Collections.emptyList());
+
+        assertEquals(0, result.getCandidates().size());
+        assertEquals("WIDTH_MISMATCH", result.getFailureReason());
+    }
+
+    @Test
+    public void shouldReturnWidthMismatchWhenNoBindingAndAllMachinesWidthExceeded() {
+        Cd90MachineCandidateResolution result = resolver.resolveDetailed(
+                "CF001", "BR001", new BigDecimal("894"), "NIGHT",
+                shiftStart(), shiftStart().plusHours(8),
+                Arrays.asList(
+                        machine("M1", "1", "NIGHT", "250", "320"),
+                        machine("M2", "1", "NIGHT", "250", "320")),
+                Collections.emptyList(),
+                Collections.emptyList(), Collections.emptyList());
+
+        assertEquals(0, result.getCandidates().size());
+        assertEquals("WIDTH_MISMATCH", result.getFailureReason());
+    }
+
+    @Test
+    public void shouldReturnNoAvailableMachineWhenMultipleConstraintsFail() {
+        // 宽度不匹配 + 开机班次不匹配同时存在时，不归因于宽度，按 NO_AVAILABLE_MACHINE 兜底。
+        Cd90MachineCandidateResolution result = resolver.resolveDetailed(
+                "CF001", "BR001", new BigDecimal("894"), "NIGHT",
+                shiftStart(), shiftStart().plusHours(8),
+                Arrays.asList(
+                        machine("M1", "1", "MORNING", "250", "320"),
+                        machine("M2", "0", "NIGHT", "250", "320")),
+                Collections.emptyList(),
+                Collections.emptyList(), Collections.emptyList());
+
+        assertEquals(0, result.getCandidates().size());
+        assertEquals("NO_AVAILABLE_MACHINE", result.getFailureReason());
+    }
+
+    @Test
     public void allBoundMachinesProhibitedShouldReturnStableReason() {
         Cd90MachineCandidateResolution result = resolver.resolveDetailed(
                 "CF001", "BR001", "NIGHT", shiftStart(), shiftStart().plusHours(8),
@@ -110,6 +158,55 @@ public class Cd90MachineCandidateResolverTest {
         assertEquals(0, result.getCandidates().size());
         assertEquals("MACHINE_PROHIBITED", result.getFailureReason());
         assertEquals(Arrays.asList("M1", "M2"), result.getBoundMachineCodes());
+    }
+
+    @Test
+    public void shouldFallBackToAllEnabledMachinesWhenNoBinding() {
+        Cd90MachineCandidateResolution result = resolver.resolveDetailed(
+                "CF001", "BR001", "NIGHT", shiftStart(), shiftStart().plusHours(8),
+                Arrays.asList(machine("M1", "1", "NIGHT"), machine("M2", "1", "NIGHT"),
+                        machine("M3", "1", "NIGHT")),
+                Collections.emptyList(),
+                Collections.emptyList(),
+                Arrays.asList("M3", "M1"));
+
+        assertEquals(3, result.getCandidates().size());
+        assertEquals(Arrays.asList("M3", "M1", "M2"),
+                result.getCandidates().stream().map(Cd90MachineCandidate::getMachineCode)
+                        .collect(Collectors.toList()));
+        assertNull(result.getFailureReason());
+        assertTrue(result.getBoundMachineCodes().isEmpty());
+    }
+
+    @Test
+    public void shouldFallBackToAllEnabledWhenBindingEmptyAndSomeProhibited() {
+        Cd90MachineCandidateResolution result = resolver.resolveDetailed(
+                "CF001", "BR001", "NIGHT", shiftStart(), shiftStart().plusHours(8),
+                Arrays.asList(machine("M1", "1", "NIGHT"), machine("M2", "1", "NIGHT"),
+                        machine("M3", "1", "NIGHT")),
+                Collections.emptyList(),
+                Arrays.asList(restriction("M1", "1")),
+                Collections.emptyList());
+
+        assertEquals(2, result.getCandidates().size());
+        assertEquals(Arrays.asList("M2", "M3"),
+                result.getCandidates().stream().map(Cd90MachineCandidate::getMachineCode)
+                        .collect(Collectors.toList()));
+        assertNull(result.getFailureReason());
+    }
+
+    @Test
+    public void shouldNotEmitMachineProhibitedWhenNoBinding() {
+        Cd90MachineCandidateResolution result = resolver.resolveDetailed(
+                "CF001", "BR001", "NIGHT", shiftStart(), shiftStart().plusHours(8),
+                Arrays.asList(machine("M1", "1", "NIGHT"), machine("M2", "1", "NIGHT")),
+                Collections.emptyList(),
+                Arrays.asList(restriction("M1", "1"), restriction("M2", "1")),
+                Collections.emptyList());
+
+        assertEquals(0, result.getCandidates().size());
+        // 无绑定时不存在"绑定机台全部被排除"的语义，不应返回 MACHINE_PROHIBITED。
+        assertEquals("NO_AVAILABLE_MACHINE", result.getFailureReason());
     }
 
     private LocalDateTime shiftStart() {

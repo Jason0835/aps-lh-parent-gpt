@@ -5,6 +5,7 @@ import com.zlt.aps.cd90.engine.model.Cd90LossRateSelection;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Predicate;
@@ -26,6 +27,22 @@ public class Cd90LossRateResolver {
     public Cd90LossRateSelection resolve(String clothCode,
                                          String machineCode,
                                          List<Cd90LossRateRule> rules) {
+        return resolve(clothCode, machineCode, rules, null);
+    }
+
+    /**
+     * 按“帘布加机台、帘布、机台、通用”优先级取得损耗率；四层均未命中时使用参数兜底损耗率。
+     *
+     * @param clothCode 帘布代码
+     * @param machineCode 候选机台代码
+     * @param rules 损耗率规则
+     * @param fallbackLossRatePercent 参数 SYS0701003 配置的通用损耗率兜底（百分比）
+     * @return 最终损耗率及命中层级
+     */
+    public Cd90LossRateSelection resolve(String clothCode,
+                                         String machineCode,
+                                         List<Cd90LossRateRule> rules,
+                                         BigDecimal fallbackLossRatePercent) {
         Cd90LossRateRule rule = find(rules, item -> same(item.getClothCode(), clothCode)
                 && same(item.getMachineCode(), machineCode));
         if (rule != null) {
@@ -48,6 +65,12 @@ public class Cd90LossRateResolver {
                 && !StringUtils.hasText(item.getMachineCode()));
         if (rule != null) {
             return selection(rule, "GENERAL");
+        }
+        if (fallbackLossRatePercent != null && fallbackLossRatePercent.signum() >= 0) {
+            return Cd90LossRateSelection.builder()
+                    .lossRatePercent(fallbackLossRatePercent)
+                    .matchedLevel("FALLBACK")
+                    .build();
         }
         throw new IllegalArgumentException("未找到候选机台适用的损耗率");
     }

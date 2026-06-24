@@ -19,10 +19,10 @@ public class Cd90UnscheduledReasonResolverTest {
     }
 
     @Test
-    public void shouldKeepMissingMachineMappingAsIndependentReason() {
-        Cd90UnscheduledReason reason = resolver.resolve("NO_MACHINE_MAPPING");
+    public void shouldMapWidthMismatchAsIndependentReason() {
+        Cd90UnscheduledReason reason = resolver.resolve("WIDTH_MISMATCH");
 
-        assertEquals("NO_MACHINE_MAPPING", reason.getReasonCode());
+        assertEquals("WIDTH_MISMATCH", reason.getReasonCode());
         assertEquals("MACHINE_FILTER", reason.getFailStage());
     }
 

@@ -57,6 +57,8 @@ public final class Cd90AutoScheduleParamCode {
     public static final String SPECIAL_ROLL_EXTRA_STOCK_LIMIT = "SYS0701030";
     /** 非收尾部分排最小车数：库排不足时，实际分配车数达到该值才允许提交部分排。 */
     public static final String PARTIAL_MIN_VEHICLE_COUNT = "SYS0701031";
+    /** 通用损耗率兜底（百分比）：t_cd90_loss_setting 四层优先级均未命中时使用，对应参数 LOSS_RATE。 */
+    public static final String LOSS_RATE = "SYS0701003";
 
     public static final List<String> ALL_CODES = Collections.unmodifiableList(Arrays.asList(
             EQUAL_SHARE_THRESHOLD,
@@ -80,7 +82,8 @@ public final class Cd90AutoScheduleParamCode {
             SPECIAL_ROLL_USE_UP_CODES,
             SPECIAL_ROLL_LOOKAHEAD_SHIFTS,
             SPECIAL_ROLL_EXTRA_STOCK_LIMIT,
-            PARTIAL_MIN_VEHICLE_COUNT
+            PARTIAL_MIN_VEHICLE_COUNT,
+            LOSS_RATE
     ));
 
     private Cd90AutoScheduleParamCode() {

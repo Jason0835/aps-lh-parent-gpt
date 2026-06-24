@@ -32,6 +32,26 @@ public class Cd90LossRateResolverTest {
         assertEquals("CLOTH_MACHINE", result.getMatchedLevel());
     }
 
+    /**
+     * 四层优先级均未命中且未提供兜底时仍抛异常，保持原有强校验语义。
+     */
+    @Test(expected = IllegalArgumentException.class)
+    public void shouldThrowWhenNoRuleAndNoFallback() {
+        resolver.resolve("C1", "M1", Arrays.asList(), null);
+    }
+
+    /**
+     * 四层优先级均未命中时使用参数 SYS0701003 兜底损耗率，命中层级标记为 FALLBACK。
+     */
+    @Test
+    public void shouldUseFallbackWhenNoRuleMatched() {
+        Cd90LossRateSelection result = resolver.resolve("C1", "M1", Arrays.asList(),
+                new BigDecimal("5"));
+
+        assertEquals(new BigDecimal("5"), result.getLossRatePercent());
+        assertEquals("FALLBACK", result.getMatchedLevel());
+    }
+
     private Cd90LossRateRule rule(String clothCode, String machineCode, String rate) {
         return Cd90LossRateRule.builder()
                 .clothCode(clothCode)

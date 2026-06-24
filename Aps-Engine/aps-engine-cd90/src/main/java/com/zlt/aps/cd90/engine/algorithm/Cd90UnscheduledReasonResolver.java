@@ -17,11 +17,11 @@ public class Cd90UnscheduledReasonResolver {
         if ("CONSTRUCTION_MISSING".equals(failureReason)) {
             return reason("DATA_MISSING", "DATA_PREPARATION", "施工信息或必要基础数据缺失");
         }
-        if ("NO_MACHINE_MAPPING".equals(failureReason)) {
-            return reason("NO_MACHINE_MAPPING", "MACHINE_FILTER", "大卷未配置绑定机台");
-        }
         if ("MACHINE_PROHIBITED".equals(failureReason)) {
             return reason("MACHINE_PROHIBITED", "MACHINE_FILTER", "大卷绑定机台均不可作业");
+        }
+        if ("WIDTH_MISMATCH".equals(failureReason)) {
+            return reason("WIDTH_MISMATCH", "MACHINE_FILTER", "施工直裁宽度超出机台裁断宽度范围");
         }
         if ("ROLL_TOOL_LIMIT".equals(failureReason) || "TOOLING_LIMIT".equals(failureReason)) {
             return reason("ROLL_TOOL_LIMIT", "ROLL_TOOL", "工装不足");

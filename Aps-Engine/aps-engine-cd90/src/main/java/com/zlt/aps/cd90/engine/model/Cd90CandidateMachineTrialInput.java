@@ -55,6 +55,8 @@ public class Cd90CandidateMachineTrialInput {
     private int diffRollDiffSpecChangeMinutes;
     /** 损耗率规则。 */
     private List<Cd90LossRateRule> lossRateRules;
+    /** 通用损耗率兜底（百分比），四层优先级均未命中时使用。 */
+    private BigDecimal fallbackLossRatePercent;
     /** 是否为定点优先机台。 */
     private boolean preferredMachine;
     /** 配置的机台优先顺序。 */

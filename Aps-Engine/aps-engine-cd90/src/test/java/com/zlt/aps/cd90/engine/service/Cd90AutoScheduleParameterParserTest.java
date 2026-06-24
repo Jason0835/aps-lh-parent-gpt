@@ -94,6 +94,7 @@ public class Cd90AutoScheduleParameterParserTest {
         params.add(param("SYS0701030", "0"));
         params.add(param("SYS0701031", "3"));
         params.add(param("SYS0701011", "87"));
+        params.add(param("SYS0701003", "0"));
         return params;
     }
 

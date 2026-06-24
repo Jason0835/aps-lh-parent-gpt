@@ -229,8 +229,8 @@ public class Cd90AutoScheduleOutputDraftBuilder {
         if ("MACHINE_PROHIBITED".equals(failureReason)) {
             return "绑定机台均不可作业";
         }
-        if ("NO_MACHINE_MAPPING".equals(failureReason)) {
-            return "大卷未配置绑定机台";
+        if ("WIDTH_MISMATCH".equals(failureReason)) {
+            return "施工直裁宽度超出机台裁断宽度范围";
         }
         if ("CONSTRUCTION_MISSING".equals(failureReason)) {
             return "施工信息或必要基础数据缺失";

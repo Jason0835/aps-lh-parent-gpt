@@ -96,6 +96,8 @@ public class Cd90MachineTrialPreparationService {
                                 parameters.getDiffRollDiffSpecChangeMinutes()))
                         // 损耗率规则集（按规格匹配）
                         .lossRateRules(snapshot.getLossRateRules())
+                        // 通用损耗率兜底（百分比），四层优先级均未命中时使用
+                        .fallbackLossRatePercent(parameters.getFallbackLossRatePercent())
                         // 首选机台标志与优先级顺序
                         .preferredMachine(candidate.isPreferredMachine())
                         .priorityOrder(candidate.getPriorityOrder())

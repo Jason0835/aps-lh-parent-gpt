@@ -38,7 +38,8 @@ public class Cd90CandidateMachineTrialCalculator {
         }
 
         Cd90LossRateSelection lossRate = lossRateResolver.resolve(
-                input.getClothCode(), input.getMachineCode(), input.getLossRateRules());
+                input.getClothCode(), input.getMachineCode(), input.getLossRateRules(),
+                input.getFallbackLossRatePercent());
         BigDecimal actualQuantity = quantityCalculator.calculateActualQuantity(
                 input.getNetDemandQuantity(), input.isCloseOut(), lossRate.getLossRatePercent(),
                 input.getMinimumStartQuantity(), input.getCoilMeter(), input.getEqualShareThreshold());

@@ -92,6 +92,7 @@ public class Cd90AutoScheduleParameterParser {
                         Cd90AutoScheduleParamCode.SPECIAL_ROLL_EXTRA_STOCK_LIMIT))
                 .partialMinVehicleCount(positiveInt(values,
                         Cd90AutoScheduleParamCode.PARTIAL_MIN_VEHICLE_COUNT))
+                .fallbackLossRatePercent(nonNegativeDecimal(values, Cd90AutoScheduleParamCode.LOSS_RATE))
                 .taskTimeoutMinutes(positiveInt(values, Cd90AutoScheduleParamCode.TASK_TIMEOUT_MINUTES))
                 .autoScheduleCron(values.getOrDefault(Cd90AutoScheduleParamCode.AUTO_SCHEDULE_CRON, ""))
                 .sourceValues(Collections.unmodifiableMap(sourceValues))

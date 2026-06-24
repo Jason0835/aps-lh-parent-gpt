@@ -60,6 +60,8 @@ public class Cd90AutoScheduleParameters {
     private BigDecimal specialRollExtraStockLimit;
     /** 非收尾部分排最小车数，达到该车数才允许在库排不足时提交部分排。 */
     private int partialMinVehicleCount;
+    /** 通用损耗率兜底（百分比），对应参数 SYS0701003；t_cd90_loss_setting 四层优先级均未命中时使用。 */
+    private BigDecimal fallbackLossRatePercent;
     /** 自动排程任务超时分钟数。 */
     private int taskTimeoutMinutes;
     /** 自动排程定时表达式。 */

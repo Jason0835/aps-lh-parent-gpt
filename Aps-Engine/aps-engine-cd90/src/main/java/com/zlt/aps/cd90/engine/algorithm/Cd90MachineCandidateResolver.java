@@ -6,6 +6,7 @@ import com.zlt.aps.cd90.engine.model.Cd90MachineRestriction;
 import com.zlt.aps.cd90.engine.model.Cd90MachineRollBinding;
 import com.zlt.aps.cd90.engine.model.Cd90MachineCandidateResolution;
 import com.zlt.aps.common.core.constant.ApsConstant;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -20,6 +21,7 @@ import java.util.stream.Collectors;
 /**
  * 候选机台硬约束过滤器。
  */
+@Slf4j
 @Component
 public class Cd90MachineCandidateResolver {
 
@@ -95,6 +97,8 @@ public class Cd90MachineCandidateResolver {
                         || item.getClothCode().equals(clothCode))
                 .map(Cd90MachineRollBinding::getMachineCode)
                 .collect(Collectors.toSet());
+        // 大卷无绑定时不管控，候选集合放开为所有满足其它硬约束的启用机台。
+        boolean hasBinding = !boundMachines.isEmpty();
         Set<String> prohibited = safe(restrictions).stream()
                 .filter(item -> clothCode != null && clothCode.equals(item.getClothCode()))
                 .filter(item -> ApsConstant.APS_STRING_1.equals(item.getJobType()))
@@ -108,7 +112,7 @@ public class Cd90MachineCandidateResolver {
 
         List<String> priority = machinePriority == null ? Collections.emptyList() : machinePriority;
         List<Cd90MachineCandidate> candidates = safe(machines).stream()
-                .filter(item -> boundMachines.contains(item.getMachineCode()))
+                .filter(item -> !hasBinding || boundMachines.contains(item.getMachineCode()))
                 .filter(item -> ApsConstant.APS_STRING_1.equals(item.getStatus()))
                 .filter(item -> widthMatched(item, craftWidth))
                 .filter(item -> openShiftMatched(item.getOpenMachineClass(), shiftCode))
@@ -124,17 +128,75 @@ public class Cd90MachineCandidateResolver {
                         .thenComparingInt(Cd90MachineCandidate::getPriorityOrder)
                         .thenComparing(Cd90MachineCandidate::getMachineCode))
                 .collect(Collectors.toList());
+        if (candidates.isEmpty() && !safe(machines).isEmpty()) {
+            for (Cd90MachineResource item : safe(machines)) {
+                if (!hasBinding || boundMachines.contains(item.getMachineCode())) {
+                    log.warn("[直裁自动排程] 机台被硬约束过滤, clothCode={}, bigRollCode={}, machineCode={}, "
+                                    + "status={}, openMachineClass={}, shiftCode={}, craftWidth={}, "
+                                    + "clothWidthMin={}, clothWidthMax={}, widthMatched={}, openShiftMatched={}, "
+                                    + "prohibited={}, maintenanceStart={}, maintenanceEnd={}",
+                            clothCode, bigRollCode, item.getMachineCode(), item.getStatus(),
+                            item.getOpenMachineClass(), shiftCode, craftWidth,
+                            item.getClothWidthMin(), item.getClothWidthMax(),
+                            widthMatched(item, craftWidth),
+                            openShiftMatched(item.getOpenMachineClass(), shiftCode),
+                            prohibited.contains(item.getMachineCode()),
+                            item.getMaintenanceStart(), item.getMaintenanceEnd());
+                }
+            }
+        }
         String failureReason = null;
-        if (boundMachines.isEmpty()) {
-            failureReason = "NO_MACHINE_MAPPING";
-        } else if (boundMachines.stream().allMatch(prohibited::contains)) {
+        if (hasBinding && boundMachines.stream().allMatch(prohibited::contains)) {
             failureReason = "MACHINE_PROHIBITED";
         } else if (candidates.isEmpty()) {
-            failureReason = "NO_AVAILABLE_MACHINE";
+            failureReason = resolveEmptyFailureReason(machines, hasBinding, boundMachines,
+                    craftWidth, shiftCode, prohibited, shiftStart, shiftEnd);
         }
         return Cd90MachineCandidateResolution.builder().candidates(candidates)
                 .boundMachineCodes(boundMachines.stream().sorted().collect(Collectors.toList()))
                 .failureReason(failureReason).build();
+    }
+
+    /**
+     * 候选集合为空时按硬约束过滤原因细分失败编码。
+     * 若候选范围内所有机台均因宽度不匹配被排除（其它硬约束均通过），返回 WIDTH_MISMATCH；
+     * 否则返回 NO_AVAILABLE_MACHINE，由上层按动态状态或产能约束兜底。
+     */
+    private String resolveEmptyFailureReason(List<Cd90MachineResource> machines,
+                                             boolean hasBinding,
+                                             Set<String> boundMachines,
+                                             BigDecimal craftWidth,
+                                             String shiftCode,
+                                             Set<String> prohibited,
+                                             LocalDateTime shiftStart,
+                                             LocalDateTime shiftEnd) {
+        if (craftWidth == null) {
+            return "NO_AVAILABLE_MACHINE";
+        }
+        boolean anyInScope = false;
+        boolean anyWidthMismatch = false;
+        for (Cd90MachineResource item : safe(machines)) {
+            if (hasBinding && !boundMachines.contains(item.getMachineCode())) {
+                continue;
+            }
+            anyInScope = true;
+            if (!widthMatched(item, craftWidth)) {
+                anyWidthMismatch = true;
+            }
+            // 若有机台仅因宽度不匹配被排除，但其它硬约束均通过，则视为宽度不匹配场景。
+            if (ApsConstant.APS_STRING_1.equals(item.getStatus())
+                    && openShiftMatched(item.getOpenMachineClass(), shiftCode)
+                    && !prohibited.contains(item.getMachineCode())
+                    && !overlaps(item, shiftStart, shiftEnd)
+                    && !widthMatched(item, craftWidth)) {
+                return "WIDTH_MISMATCH";
+            }
+        }
+        // 候选范围内没有机台时仍按无可用机台兜底，避免与无绑定场景混淆。
+        if (!anyInScope) {
+            return "NO_AVAILABLE_MACHINE";
+        }
+        return anyWidthMismatch ? "WIDTH_MISMATCH" : "NO_AVAILABLE_MACHINE";
     }
 
     /**
