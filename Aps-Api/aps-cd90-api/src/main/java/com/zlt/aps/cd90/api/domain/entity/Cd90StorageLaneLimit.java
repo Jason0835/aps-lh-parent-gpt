@@ -41,7 +41,7 @@ public class Cd90StorageLaneLimit extends BaseEntity implements Serializable {
      * 胎体代码/规格
      */
     @ApiModelProperty("胎体代码/规格")
-    @ImportExcelValidated(required = true, maxLength = 60)
+    @ImportExcelValidated(required = false, maxLength = 60)
     @TableField("MATERIAL_CODE")
     @Excel(name = "ui.data.column.cd90StorageLaneLimit.materialCode")
     private String materialCode;

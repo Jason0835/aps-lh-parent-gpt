@@ -28,7 +28,6 @@ export default {
       loading: false, visible: false, isEdit: false, form: {},
       rules: {
         factoryCode: [requiredSelect],
-        materialCode: [requiredSelect],
         laneDate: [requiredInput],
         shiftCode: [requiredInput],
         storageLaneCode: [requiredInput],
