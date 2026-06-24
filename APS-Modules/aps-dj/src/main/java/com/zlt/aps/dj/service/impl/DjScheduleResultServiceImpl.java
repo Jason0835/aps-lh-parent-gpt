@@ -118,22 +118,16 @@ public class DjScheduleResultServiceImpl extends AbstractBillService<DjScheduleR
             return new ArrayList<>();
         }
         List<DjMachineInfo> machineInfoList = machineInfoService.selectMachineInfoList(new DjMachineInfo());
-        Map<Long, DjMachineInfo> machineInfoMap = machineInfoList.stream()
-                .collect(Collectors.toMap(DjMachineInfo::getId, Function.identity(), (s1, s2) -> s1));
+        Map<String, DjMachineInfo> machineInfoMap = machineInfoList.stream()
+                .collect(Collectors.toMap(DjMachineInfo::getMachineCode, Function.identity(), (s1, s2) -> s1));
         if (CollectionUtils.isNotEmpty(list)) {
             for (DjScheduleResult scheduleResult : list) {
-                String machineIdStr = scheduleResult.getMachineCode();
-                if (StringUtils.isNotBlank(machineIdStr)) {
+                String machineCodeStr = scheduleResult.getMachineCode();
+                if (StringUtils.isNotBlank(machineCodeStr)) {
                     List<String> machineNameList = new ArrayList<>();
-                    String[] machineIdArr = machineIdStr.split(",");
-                    for (String machineId : machineIdArr) {
-                        Long key = null;
-                        try {
-                            key = Long.valueOf(machineId);
-                        } catch (NumberFormatException e) {
-                            e.printStackTrace();
-                            continue;
-                        }
+                    String[] machineIdArr = machineCodeStr.split(",");
+                    for (String machineCode : machineIdArr) {
+                        String key = machineCode;
                         if (machineInfoMap.containsKey(key)) {
                             DjMachineInfo machineInfo = machineInfoMap.get(key);
                             machineNameList.add(machineInfo.getMachineName());
@@ -610,13 +604,16 @@ public class DjScheduleResultServiceImpl extends AbstractBillService<DjScheduleR
                 .collect(Collectors.toList());
         List<String> notExistCodeList = lastDayPlanQty4List.stream().map(DjScheduleResult::getPaddingCode)
                 .filter(item -> !resultCodeList.contains(item)).collect(Collectors.toList());
-        LambdaQueryWrapper<DjCurlRoll> curlRollQueryWrapper = new LambdaQueryWrapper<>();
-        curlRollQueryWrapper.in(DjCurlRoll::getPaddingCode, notExistCodeList);
-        List<DjCurlRoll> curlRollList = curlRollMapper.selectList(curlRollQueryWrapper);
-        Map<String, BigDecimal> curlRollMap = new HashMap<>(16);
-        if (CollectionUtils.isNotEmpty(curlRollList)) {
-            curlRollMap = curlRollList.stream()
-                    .collect(Collectors.toMap(DjCurlRoll::getPaddingCode, DjCurlRoll::getCurlLength));
+        
+        if (CollectionUtils.isNotEmpty(notExistCodeList)) {
+            LambdaQueryWrapper<DjCurlRoll> curlRollQueryWrapper = new LambdaQueryWrapper<>();
+            curlRollQueryWrapper.in(DjCurlRoll::getPaddingCode, notExistCodeList);
+            List<DjCurlRoll> curlRollList = curlRollMapper.selectList(curlRollQueryWrapper);
+            Map<String, BigDecimal> curlRollMap = new HashMap<>(16);
+            if (CollectionUtils.isNotEmpty(curlRollList)) {
+                curlRollMap = curlRollList.stream()
+                        .collect(Collectors.toMap(DjCurlRoll::getPaddingCode, DjCurlRoll::getCurlLength));
+            }
         }
 
         LambdaQueryWrapper<DjParams> paramWrapper = new LambdaQueryWrapper<>();

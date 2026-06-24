@@ -621,7 +621,7 @@ public class DjScheduleResultController extends AbstractBillBizController<DjSche
     }
     
     @Override
-    protected String orderStr() {
+    protected String getOrderBy() {
         return "MACHINE_CODE, CLASS1_SEQUENCE";
     }
 
