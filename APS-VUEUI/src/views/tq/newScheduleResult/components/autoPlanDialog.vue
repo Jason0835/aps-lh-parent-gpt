@@ -85,17 +85,36 @@ export default {
   },
   methods: {
     /**
-     * 处理胎圈自动排程接口响应
+     * 判断排程响应是否包含可展示的校验明细
+     * @param {Object} data 接口响应
+     * @returns {boolean}
+     */
+    hasScheduleValidationDetails(data) {
+      return (
+        (data.validationErrors &&
+          Array.isArray(data.validationErrors) &&
+          data.validationErrors.length > 0) ||
+        (data.validationErrorDetails &&
+          Array.isArray(data.validationErrorDetails) &&
+          data.validationErrorDetails.length > 0)
+      );
+    },
+    /**
+     * 处理胎圈自动排程接口响应（后台异步回调）
      * @param {Object} data 接口响应
      * @param {Object} params 排程参数
      */
     handleAutoPlanResponse(data, params) {
       const tip = data.message || data.msg || "";
       if (data.code != null && data.code !== 200) {
-        this.$modal.msgError(tip || this.$t("ui.data.btn.ajax.code.msg"));
+        if (this.hasScheduleValidationDetails(data)) {
+          this.$emit("validationError", data);
+        } else {
+          this.$modal.msgError(tip || this.$t("ui.data.btn.ajax.code.msg"));
+        }
         return;
       }
-      this.$modal.msgSuccess(tip || this.$t("ui.data.btn.tqNewScheduleResult.autoPlan"));
+      this.$modal.msgSuccess(tip || this.$t("ui.data.column.tqNewScheduleResult.scheduleCompleted"));
       this.$emit("success", { ...params });
     },
     /**
@@ -104,7 +123,9 @@ export default {
      */
     handleAutoPlan(params) {
       this.$modal.msgSuccess(
-        this.$t("ui.data.btn.tqNewScheduleResult.autoPlan")
+        this.$t(
+          "ui.data.column.tqNewScheduleResult.scheduleExecuting"
+        )
       );
       this.hide();
       autoPlan(params)
@@ -112,7 +133,9 @@ export default {
         .catch((error) => {
           console.error(error);
           this.$modal.msgWarning(
-            this.$t("ui.data.btn.tqNewScheduleResult.autoPlan")
+            this.$t(
+              "ui.data.column.tqNewScheduleResult.scheduleTimeout"
+            )
           );
         });
     },

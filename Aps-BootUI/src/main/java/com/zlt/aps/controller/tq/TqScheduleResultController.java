@@ -240,9 +240,9 @@ public class TqScheduleResultController extends BaseController {
      * 转机台
      */
     @ApiOperation("转机台")
-    @PostMapping("/batchChangeMachine/{machineId}")
+    @PostMapping("/batchChangeMachine/{machineCode}")
     @ResponseBody
-    public AjaxResult batchChangeMachine(@PathVariable("machineId") String machineId, String selects) {
+    public AjaxResult batchChangeMachine(@PathVariable("machineCode") String machineCode, String selects) {
         List<TqScheduleResultDto> scheduleResultList = JSON.parseArray(selects, TqScheduleResultDto.class);
         TqScheduleResultDto query = new TqScheduleResultDto();
         StringBuilder sb1 = new StringBuilder();
@@ -250,7 +250,7 @@ public class TqScheduleResultController extends BaseController {
         for (TqScheduleResultDto scheduleResult : scheduleResultList) {
             query.setId(scheduleResult.getId());
             query.setScheduleDate(scheduleResult.getScheduleDate());
-//            query.setMachineId(machineId);
+            query.setMachineCode(machineCode);
             query.setBeadCode(scheduleResult.getBeadCode());
             Boolean unique = iTqScheduleResultService.checkUnique(query);
             if (!unique) {
@@ -261,7 +261,7 @@ public class TqScheduleResultController extends BaseController {
                 }
                 continue;
             }
-//            scheduleResult.setMachineId(machineId);
+            scheduleResult.setMachineCode(machineCode);
             AjaxResult result = iTqScheduleResultService.changeMachine(scheduleResult);
             if (result.get(GatewayConstants.MSG_TAG).equals(I18nUtil.getMessage("ui.data.column.scheduleResult.release.isReleasingOrTimeoutById"))) {
                 if (sb2.length() > 0) {

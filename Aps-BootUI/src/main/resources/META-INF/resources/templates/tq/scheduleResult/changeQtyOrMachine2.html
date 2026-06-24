@@ -11,9 +11,9 @@
         <div class="form-group" id="produceLine2">
             <label class="col-sm-3 control-label is-required">[[#{ui.data.column.scheduleResult.produceLine}]]：</label>
             <div class="col-sm-8">
-                <select id="machineId" name="machineId" required class="form-control selectpicker" th:data-none-selected-text="#{ui.data.column.scheduleResult.chooseMachine}" th:with="type=${@tq.getMachineInfo('0')}">
+                <select id="machineCode" name="machineCode" required class="form-control selectpicker" th:data-none-selected-text="#{ui.data.column.scheduleResult.chooseMachine}" th:with="type=${@tq.getMachineInfo('0')}">
                     <option value="">[[#{ui.data.column.selectMachineName}]]</option>
-                    <option th:each="machineInfo : ${type}" th:text="${machineInfo.machineName}" th:value="${machineInfo.id}"></option>
+                    <option th:each="machineInfo : ${type}" th:text="${machineInfo.machineName}" th:value="${machineInfo.machineCode}"></option>
                 </select>
             </div>
         </div>
@@ -30,11 +30,11 @@
 
     function submitHandler() {
         if ($.validate.form()) {
-            var machineId = $('#machineId').val();
+            var machineCode = $('#machineCode').val();
             var datas = [];
             var list = [[${selectList}]];
             datas.push({"name": "selects", "value": JSON.stringify(list)})
-            $.operate.save(prefix + "/batchChangeMachine/" + machineId, datas, function (result) {
+            $.operate.save(prefix + "/batchChangeMachine/" + machineCode, datas, function (result) {
                 if (result.code == web_status.FAIL) {
                     var parent = window.parent;
                     $.modal.close();
