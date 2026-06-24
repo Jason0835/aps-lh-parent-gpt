@@ -2,7 +2,10 @@ package com.zlt.aps.cd90.engine.model;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * 直裁自动排程批次级数据检查结果。
@@ -44,12 +47,26 @@ public class Cd90BatchDataCheckResult {
         return Collections.unmodifiableList(warnings);
     }
 
-    /** 主错误信息，用于AjaxResult.error(msg)的简短提示；无错误时返回空串。 */
+    /** 主错误信息，用于AjaxResult.success(msg, data)的简短提示；无错误时返回空串。按field分组聚合。 */
     public String getPrimaryMessage() {
         if (errors.isEmpty()) {
             return "";
         }
-        return errors.get(0).getMessage();
+        // 按 field 分组聚合，同一 field 多条时显示条数
+        Map<String, List<CheckError>> byField = errors.stream()
+                .collect(Collectors.groupingBy(CheckError::getField,
+                        LinkedHashMap::new, Collectors.toList()));
+        return byField.entrySet().stream()
+                .map(entry -> {
+                    String field = entry.getKey();
+                    int count = entry.getValue().size();
+                    String firstMsg = entry.getValue().get(0).getMessage();
+                    if (count == 1) {
+                        return field + ": " + firstMsg;
+                    }
+                    return field + "(" + count + "项): " + firstMsg;
+                })
+                .collect(Collectors.joining("; "));
     }
 
     public static class Builder {

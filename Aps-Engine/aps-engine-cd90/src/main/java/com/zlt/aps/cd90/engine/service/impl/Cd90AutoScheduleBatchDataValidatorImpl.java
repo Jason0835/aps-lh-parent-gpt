@@ -74,9 +74,21 @@ public class Cd90AutoScheduleBatchDataValidatorImpl implements Cd90AutoScheduleB
         checkCurlLength(builder, factoryCode, clothCodes);
 
         Cd90BatchDataCheckResult result = builder.build();
-        log.info("[直裁自动排程] 批次级数据先行检查完成, factoryCode={}, scheduleDate={}, failed={}, errorCount={}, warningCount={}",
-                factoryCode, scheduleDate, result.isFailed(),
-                result.getErrors().size(), result.getWarnings().size());
+        if (result.isFailed()) {
+            log.warn("[直裁自动排程] 批次级数据先行检查失败, factoryCode={}, scheduleDate={}, errorCount={}, warningCount={}",
+                    factoryCode, scheduleDate, result.getErrors().size(), result.getWarnings().size());
+            for (Cd90BatchDataCheckResult.CheckError error : result.getErrors()) {
+                log.warn("[直裁自动排程] 批次级检查错误, field={}, reasonCode={}, message={}, suggestion={}",
+                        error.getField(), error.getReasonCode(), error.getMessage(), error.getSuggestion());
+            }
+            for (Cd90BatchDataCheckResult.CheckError warning : result.getWarnings()) {
+                log.warn("[直裁自动排程] 批次级检查警告, field={}, reasonCode={}, message={}, suggestion={}",
+                        warning.getField(), warning.getReasonCode(), warning.getMessage(), warning.getSuggestion());
+            }
+        } else {
+            log.info("[直裁自动排程] 批次级数据先行检查通过, factoryCode={}, scheduleDate={}",
+                    factoryCode, scheduleDate);
+        }
         return result;
     }
 
@@ -119,7 +131,7 @@ public class Cd90AutoScheduleBatchDataValidatorImpl implements Cd90AutoScheduleB
 
     /**
      * 批次级检查：施工信息完整性。
-     * 1. 收集成型计划中 (EMBRYO_CODE, CLASSn_RECIPE_NO) 配对，任一为空均报错；
+     * 1. 收集成型计划中 (EMBRYO_CODE, CLASSn_RECIPE_NO) 配对；班次计划量为空或≤0时跳过该班次；
      * 2. 按 CONSTRUCTION_CODE + CONSTRUCTION_VERSION 查施工表，缺失则报错；
      * 3. 对每条施工记录校验 CORD_SPEC、CORD_WIDTH 及三层帘布层位字段。
      * 返回施工中出现过的帘布代号集合，供卷曲长度检查使用。
@@ -143,7 +155,13 @@ public class Cd90AutoScheduleBatchDataValidatorImpl implements Cd90AutoScheduleB
                 continue;
             }
             embryoCodes.add(embryoCode);
-            for (String classField : CLASS_RECIPE_FIELDS) {
+            for (int classIndex = 1; classIndex <= CLASS_RECIPE_FIELDS.length; classIndex++) {
+                // 班次计划量为空或≤0时，该班次不生产，跳过施工版本校验
+                BigDecimal planQty = getClassPlanQty(schedule, classIndex);
+                if (planQty == null || planQty.signum() <= 0) {
+                    continue;
+                }
+                String classField = CLASS_RECIPE_FIELDS[classIndex - 1];
                 String recipeNo = getRecipeNo(schedule, classField);
                 if (!StringUtils.hasText(recipeNo)) {
                     builder.addError("成型计划", "DATA_MISSING",
@@ -277,6 +295,21 @@ public class Cd90AutoScheduleBatchDataValidatorImpl implements Cd90AutoScheduleB
             case "CLASS6_RECIPE_NO": return schedule.getClass6RecipeNo();
             case "CLASS7_RECIPE_NO": return schedule.getClass7RecipeNo();
             case "CLASS8_RECIPE_NO": return schedule.getClass8RecipeNo();
+            default: return null;
+        }
+    }
+
+    /** 取成型记录指定班次（1~8）的计划量。 */
+    private BigDecimal getClassPlanQty(CxScheduleResult schedule, int classIndex) {
+        switch (classIndex) {
+            case 1: return schedule.getClass1PlanQty();
+            case 2: return schedule.getClass2PlanQty();
+            case 3: return schedule.getClass3PlanQty();
+            case 4: return schedule.getClass4PlanQty();
+            case 5: return schedule.getClass5PlanQty();
+            case 6: return schedule.getClass6PlanQty();
+            case 7: return schedule.getClass7PlanQty();
+            case 8: return schedule.getClass8PlanQty();
             default: return null;
         }
     }

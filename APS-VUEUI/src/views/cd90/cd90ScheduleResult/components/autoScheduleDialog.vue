@@ -217,10 +217,13 @@ export default {
 <style>
 /* 批次级数据检查错误/警告弹窗，内容过多时可滚动（非scoped，因为 $alert 挂在 body 级别） */
 .cd90-auto-schedule-batch-check {
-  max-width: 600px;
-}
-.cd90-auto-schedule-batch-check .el-message-box {
+  width: auto !important;
+  max-width: 1200px;
   max-height: 85vh;
+  margin: 0 auto;
+  position: relative;
+  top: 50%;
+  transform: translateY(-50%);
   display: flex;
   flex-direction: column;
 }
