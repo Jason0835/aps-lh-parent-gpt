@@ -128,6 +128,33 @@ public class Cd90AutoScheduleOutputDraftBuilderTest {
         builder.build(context(), execution(invalid));
     }
 
+    @Test
+    public void shouldJoinMultipleLaneCodesAsPrimaryLaneCode() {
+        // 单任务跨多个库排时,主表 primaryLaneCode 用逗号拼接去重
+        Cd90ShiftScheduleTask task = task("CLASS1", "M1", "500", 5,
+                allocation("L1", 2), allocation("L2", 3));
+
+        Cd90AutoScheduleOutputDraft result = builder.build(context(), execution(task));
+
+        Cd90ScheduleResultDraft draft = result.getScheduleResults().get(0);
+        assertEquals("L1,L2", draft.getPrimaryLaneCode());
+    }
+
+    @Test
+    public void shouldDeduplicateLaneCodesWhenSameLaneAcrossAllocations() {
+        // 同一库排在同一任务的多条分配中出现时,主表 primaryLaneCode 去重
+        Cd90ShiftScheduleTask first = task("CLASS1", "M1", "100", 1,
+                allocation("L1", 1));
+        Cd90ShiftScheduleTask second = task("CLASS1", "M1", "100", 1,
+                allocation("L1", 1));
+        second.setProduceOrder(2);
+
+        Cd90AutoScheduleOutputDraft result = builder.build(context(), execution(first, second));
+
+        Cd90ScheduleResultDraft draft = result.getScheduleResults().get(0);
+        assertEquals("L1", draft.getPrimaryLaneCode());
+    }
+
     private Cd90AutoScheduleContext context() {
         return Cd90AutoScheduleContext.builder().shifts(Arrays.asList(
                 shift("CLASS1", LocalDateTime.of(2026, 6, 12, 14, 0)),

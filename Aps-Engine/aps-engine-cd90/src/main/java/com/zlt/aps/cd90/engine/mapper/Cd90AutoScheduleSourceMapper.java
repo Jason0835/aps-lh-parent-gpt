@@ -70,21 +70,27 @@ public class Cd90AutoScheduleSourceMapper {
     }
 
     /**
-     * 转换库排状态。即使车数为0，也保留MES同步的帘布代号，供库排严格按帘布匹配。
+     * 转换库排状态。即使车数为0,也保留MES同步的帘布代号,供库排严格按帘布匹配。
+     * <p>
+     * MAX_CAR_NUM 必填(2026/06/24 变更):不同库排可不同,不再兜底推算;为空或非正时直接抛异常,
+     * 由批次级数据先行检查在排程前拦截。
+     * </p>
      *
      * @param source 库排限制实体
      * @return 库排状态
      */
     public Cd90StorageLaneState mapStorageLane(Cd90StorageLaneLimit source) {
         int vehicleCount = source.getCarNum() == null ? 0 : source.getCarNum();
-        int maxVehicleCount = source.getMaxCarNum() == null
-                ? vehicleCount + (source.getAvailableCarNum() == null ? 0 : source.getAvailableCarNum())
-                : source.getMaxCarNum();
+        Integer maxCarNum = source.getMaxCarNum();
+        if (maxCarNum == null || maxCarNum <= 0) {
+            throw new IllegalArgumentException(
+                    "库排 " + source.getStorageLaneCode() + " 未维护有效最大车数");
+        }
         return Cd90StorageLaneState.builder()
                 .laneCode(source.getStorageLaneCode())
                 .clothCode(source.getMaterialCode())
                 .vehicleCount(vehicleCount)
-                .maxVehicleCount(maxVehicleCount)
+                .maxVehicleCount(maxCarNum)
                 .build();
     }
 

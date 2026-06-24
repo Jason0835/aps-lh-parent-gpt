@@ -91,8 +91,13 @@ public class Cd90AutoScheduleOutputDraftBuilder {
     }
 
     private Cd90ScheduleResultDraft newResultDraft(String key, Cd90ShiftScheduleTask task) {
-        String primaryLane = task.getLaneAllocations().isEmpty()
-                ? null : task.getLaneAllocations().get(0).getLaneCode();
+        // 主表 STORAGE_LANE_CODE 拼接本任务所有分配库排(去重),完整分配见明细表 t_cd90_schedule_lane_allocation
+        String primaryLane = task.getLaneAllocations().isEmpty() ? null
+                : task.getLaneAllocations().stream()
+                        .map(Cd90StorageLaneAllocation::getLaneCode)
+                        .filter(StringUtils::hasText)
+                        .distinct()
+                        .collect(Collectors.joining(","));
         return Cd90ScheduleResultDraft.builder()
                 .resultKey(key).clothCode(task.getClothCode())
                 .bigRollCode(task.getBigRollCode()).cordSpec(task.getCordSpec())

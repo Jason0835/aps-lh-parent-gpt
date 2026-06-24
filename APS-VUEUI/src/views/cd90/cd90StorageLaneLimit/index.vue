@@ -39,7 +39,7 @@ export default {
         { type: "selection", fixed: "left" },
         { prop: "factoryCode", align: "center", halign: "center", label: this.$t("ui.data.column.cd90StorageLaneLimit.factoryCode"), minWidth: 120, formatter: (row, column, value) => this.selectDictLabel(this.dict.type.biz_factory_name, value) },
         { prop: "laneDate", align: "center", halign: "center", label: this.$t("ui.data.column.cd90StorageLaneLimit.laneDate"), minWidth: 110 },
-        { prop: "materialCode", align: "center", halign: "center", label: this.$t("ui.data.column.cd90StorageLaneLimit.materialCode"), minWidth: 150 },
+        { prop: "materialCode", align: "center", halign: "center", label: this.$t("ui.data.column.cd90StorageLaneLimit.materialCode"), minWidth: 150, formatter: (row, column, value) => (value === null || value === undefined || value === "") ? this.$t("ui.data.column.cd90StorageLaneLimit.emptyLane") : value },
         { prop: "shiftCode", align: "center", halign: "center", label: this.$t("ui.data.column.cd90StorageLaneLimit.shiftCode"), minWidth: 90, formatter: (row, column, value) => this.selectDictLabel(this.dict.type.class_num_three_plan, value) },
         { prop: "storageLaneCode", align: "center", halign: "center", label: this.$t("ui.data.column.cd90StorageLaneLimit.storageLaneCode"), minWidth: 130 },
         { prop: "carNum", align: "center", halign: "center", label: this.$t("ui.data.column.cd90StorageLaneLimit.carNum"), minWidth: 90 },

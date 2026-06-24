@@ -65,8 +65,8 @@ public class Cd90ScheduleResult extends BaseEntity implements Serializable {
     @TableField("MACHINE_CODE")
     @Excel(name = "ui.data.column.cd90ScheduleResult.machineCode")
     private String machineCode;
-    /** 库排号 */
-    @ApiModelProperty("库排号")
+    /** 库排号,多库排用逗号拼接;完整分配见t_cd90_schedule_lane_allocation */
+    @ApiModelProperty("库排号,多库排用逗号拼接;完整分配见t_cd90_schedule_lane_allocation")
     @TableField("STORAGE_LANE_CODE")
     @Excel(name = "ui.data.column.cd90ScheduleResult.storageLaneCode")
     private String storageLaneCode;

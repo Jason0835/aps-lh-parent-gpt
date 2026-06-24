@@ -3,10 +3,12 @@ package com.zlt.aps.cd90.engine.service.impl;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.zlt.aps.cd90.api.domain.entity.Cd90CurlLength;
 import com.zlt.aps.cd90.api.domain.entity.Cd90MachineInfo;
+import com.zlt.aps.cd90.api.domain.entity.Cd90StorageLaneLimit;
 import com.zlt.aps.cd90.engine.mapper.Cd90EngineConstructionMapper;
 import com.zlt.aps.cd90.engine.mapper.Cd90EngineCurlLengthMapper;
 import com.zlt.aps.cd90.engine.mapper.Cd90EngineCxScheduleMapper;
 import com.zlt.aps.cd90.engine.mapper.Cd90EngineMachineInfoMapper;
+import com.zlt.aps.cd90.engine.mapper.Cd90EngineStorageLaneMapper;
 import com.zlt.aps.cd90.engine.model.Cd90BatchDataCheckResult;
 import com.zlt.aps.cd90.engine.service.Cd90AutoScheduleBatchDataValidator;
 import com.zlt.aps.common.core.constant.ApsConstant;
@@ -53,6 +55,7 @@ public class Cd90AutoScheduleBatchDataValidatorImpl implements Cd90AutoScheduleB
     private final Cd90EngineConstructionMapper constructionMapper;
     private final Cd90EngineCurlLengthMapper curlLengthMapper;
     private final Cd90EngineMachineInfoMapper machineInfoMapper;
+    private final Cd90EngineStorageLaneMapper storageLaneMapper;
 
     @Override
     public Cd90BatchDataCheckResult check(String factoryCode, LocalDate scheduleDate) {
@@ -72,6 +75,7 @@ public class Cd90AutoScheduleBatchDataValidatorImpl implements Cd90AutoScheduleB
         checkMachineInfo(builder, factoryCode);
         Set<String> clothCodes = checkConstructionInfo(builder, factoryCode, formingSchedules);
         checkCurlLength(builder, factoryCode, clothCodes);
+        checkStorageLaneLimit(builder, factoryCode, scheduleDate);
 
         Cd90BatchDataCheckResult result = builder.build();
         if (result.isFailed()) {
@@ -280,6 +284,59 @@ public class Cd90AutoScheduleBatchDataValidatorImpl implements Cd90AutoScheduleB
                 builder.addError("卷曲长度", "DATA_MISSING",
                         "帘布 " + clothCode + " 卷曲长度非正",
                         "请在卷曲长度配置页面维护帘布 " + clothCode + " 的卷曲长度且大于0");
+            }
+        }
+    }
+
+    /**
+     * 批次级检查:库排限制数据完整性。
+     * 检查排程日期当天所有班次的库排数据:
+     * 1. MAX_CAR_NUM 必须维护且 >0(2026/06/24 变更,去掉 default 7,必填);
+     * 2. CAR_NUM 不能为负,且不能大于 MAX_CAR_NUM;
+     * 3. 空库排(MATERIAL_CODE 为空)时 CAR_NUM 必须 = 0。
+     * 排程前拦截,避免 Allocator 运行时抛异常。
+     */
+    private void checkStorageLaneLimit(Cd90BatchDataCheckResult.Builder builder,
+                                       String factoryCode, LocalDate scheduleDate) {
+        List<Cd90StorageLaneLimit> lanes = storageLaneMapper.selectList(
+                Wrappers.<Cd90StorageLaneLimit>lambdaQuery()
+                        .eq(Cd90StorageLaneLimit::getFactoryCode, factoryCode)
+                        .eq(Cd90StorageLaneLimit::getLaneDate, Date.valueOf(scheduleDate)));
+        if (lanes == null || lanes.isEmpty()) {
+            return;
+        }
+        for (Cd90StorageLaneLimit lane : lanes) {
+            String laneCode = lane.getStorageLaneCode();
+            String shiftCode = lane.getShiftCode();
+            String prefix = "库排 " + laneCode + "(班次 " + shiftCode + ") ";
+            Integer maxCarNum = lane.getMaxCarNum();
+            if (maxCarNum == null || maxCarNum <= 0) {
+                builder.addError("库排限制", "MAX_CAR_NUM_MISSING",
+                        prefix + "未维护有效最大车数",
+                        "请在库排限制维护页面补充最大车数且大于0");
+                continue;
+            }
+            Integer carNum = lane.getCarNum();
+            if (carNum == null) {
+                builder.addError("库排限制", "CAR_NUM_MISSING",
+                        prefix + "当前车数为空(空库排请填0)",
+                        "请在库排限制维护页面维护当前车数");
+                continue;
+            }
+            if (carNum < 0) {
+                builder.addError("库排限制", "CAR_NUM_INVALID",
+                        prefix + "当前车数为负数",
+                        "请在库排限制维护页面修正当前车数");
+            }
+            if (carNum > maxCarNum) {
+                builder.addError("库排限制", "CAR_NUM_EXCEED",
+                        prefix + "当前车数 " + carNum + " 大于最大车数 " + maxCarNum,
+                        "请在库排限制维护页面修正当前车数或最大车数");
+            }
+            if (!StringUtils.hasText(lane.getMaterialCode()) && carNum != 0) {
+                builder.addError("库排限制", "EMPTY_LANE_CAR_NUM_INVALID",
+                        prefix + "胎体代码为空(空库排)但当前车数 " + carNum + " 不为0",
+                        "空库排请将当前车数填0,或补充胎体代码");
             }
         }
     }

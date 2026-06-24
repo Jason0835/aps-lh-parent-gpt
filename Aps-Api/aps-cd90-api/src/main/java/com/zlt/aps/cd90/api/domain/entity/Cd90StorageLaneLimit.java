@@ -75,6 +75,7 @@ public class Cd90StorageLaneLimit extends BaseEntity implements Serializable {
      * 最大车数
      */
     @ApiModelProperty("最大车数")
+    @ImportExcelValidated(required = true)
     @TableField("MAX_CAR_NUM")
     @Excel(name = "ui.data.column.cd90StorageLaneLimit.maxCarNum")
     private Integer maxCarNum;
