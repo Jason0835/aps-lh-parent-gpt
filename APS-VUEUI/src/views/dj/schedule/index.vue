@@ -110,36 +110,25 @@
       </template>
       <template slot="headerRight">
         <span class="stat-info">
-          <span>
-            昨日早班合计：<span class="stat-value">{{
-              stat.lastDayPlanQty === null ? "--" : stat.lastDayPlanQty
-            }}</span
-            >，
-          </span>
-          <span
-            >夜班合计：<span class="stat-value">{{
+          <span>{{ $t("ui.data.column.dj.scheduleResult.statNightPlanQty") }}：<span class="stat-value">{{
               stat.dayPlanQty === null ? "--" : stat.dayPlanQty
             }}</span
             >，</span
           >
-          <span
-            >早班合计：<span class="stat-value">{{
+          <span>{{ $t("ui.data.column.dj.scheduleResult.statMorningPlanQty") }}：<span class="stat-value">{{
               stat.nightPlanQty === null ? "--" : stat.nightPlanQty
             }}</span
             >，</span
           >
-          <span
-            >库存合计：<span class="stat-value">{{
-              stat.stockQty === null ? "--" : stat.stockQty
+          <span>{{ $t("ui.data.column.dj.scheduleResult.statMiddlePlanQty") }}：<span class="stat-value">{{
+              stat.nextDayPlanQty === null ? "--" : stat.nextDayPlanQty
             }}</span
             >，</span
           >
-          <span
-            >理论交班库存合计：<span class="stat-value">{{
-              stat.theoreticClassStockQty === null
-                ? "--"
-                : stat.theoreticClassStockQty
-            }}</span></span
+          <span>{{ $t("ui.data.column.scheduleResult.stockQty") }}合计：<span class="stat-value">{{
+              stat.stockQty === null ? "--" : stat.stockQty
+            }}</span
+            ></span
           >
         </span>
       </template>

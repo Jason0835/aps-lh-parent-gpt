@@ -39,20 +39,13 @@ import com.zlt.aps.common.core.domain.SchedulePublishRecord;
 import com.zlt.aps.common.core.enums.HalfComponentFinishTableEnum;
 import com.zlt.aps.common.core.utils.BigDecimalUtils;
 import com.zlt.aps.common.core.utils.ImportUtil;
-import com.zlt.aps.common.engine.constants.EngineConstants;
 import com.zlt.aps.common.engine.domain.ScheduleSummaryVo;
 import com.zlt.aps.common.engine.service.impl.BaseFinishQtyImportService;
-import com.zlt.aps.dj.api.domain.entity.DjCurlRoll;
 import com.zlt.aps.dj.api.domain.entity.DjDayFinishQty;
 import com.zlt.aps.dj.api.domain.entity.DjDispatcherLog;
 import com.zlt.aps.dj.api.domain.entity.DjMachineInfo;
-import com.zlt.aps.dj.api.domain.entity.DjParams;
 import com.zlt.aps.dj.api.domain.entity.DjScheduleResult;
-import com.zlt.aps.dj.engine.service.DjEngineNewService;
-import com.zlt.aps.dj.engine.service.DjEngineService;
 import com.zlt.aps.dj.engine.vo.DjScheduleResultVo;
-import com.zlt.aps.dj.mapper.DjCurlRollMapper;
-import com.zlt.aps.dj.mapper.DjParamsMapper;
 import com.zlt.aps.dj.mapper.DjScheduleResultMapper;
 import com.zlt.aps.dj.service.DjDispatcherLogService;
 import com.zlt.aps.dj.service.DjMachineInfoService;
@@ -72,9 +65,6 @@ public class DjScheduleResultServiceImpl extends AbstractBillService<DjScheduleR
     @Resource
     private DjScheduleResultMapper djScheduleResultMapper;
 
-    @Resource
-    private DjEngineNewService djEngineService;
-
     @Autowired
     private DjMachineInfoService machineInfoService;
 
@@ -83,15 +73,6 @@ public class DjScheduleResultServiceImpl extends AbstractBillService<DjScheduleR
 
     @Resource
     private DjDispatcherLogService djDispatcherLogService;
-
-    /**
-     * 默认标准长度
-     */
-    private static final String DEFAULT_STANDARD_LENGTH = "80";
-    @Autowired
-    private DjCurlRollMapper curlRollMapper;
-    @Autowired
-    private DjParamsMapper paramsMapper;
 
     /**
      * 查询垫胶排程结果
@@ -651,93 +632,28 @@ public class DjScheduleResultServiceImpl extends AbstractBillService<DjScheduleR
      */
     @Override
     public AjaxResult getSummaryVo(DjScheduleResult scheduleResult) {
-        
         List<DjScheduleResult> djScheduleResultList = selectDjScheduleResultList(scheduleResult);
-//        List<DjScheduleResult> lastDayPlanQty4List = djScheduleResultMapper.getLastDayPlanQty4List(scheduleResult);
-        List<DjScheduleResult> lastDayPlanQty4List = new ArrayList<>();
-        // 添加昨日排程有，今日排程没有的物料对象，用于后续计算理论交接班库存合计
-        List<String> resultCodeList = djScheduleResultList.stream().map(DjScheduleResult::getPaddingCode)
-                .collect(Collectors.toList());
-        List<String> notExistCodeList = lastDayPlanQty4List.stream().map(DjScheduleResult::getPaddingCode)
-                .filter(item -> !resultCodeList.contains(item)).collect(Collectors.toList());
-        
-        if (CollectionUtils.isNotEmpty(notExistCodeList)) {
-            LambdaQueryWrapper<DjCurlRoll> curlRollQueryWrapper = new LambdaQueryWrapper<>();
-            curlRollQueryWrapper.in(DjCurlRoll::getPaddingCode, notExistCodeList);
-            List<DjCurlRoll> curlRollList = curlRollMapper.selectList(curlRollQueryWrapper);
-            Map<String, BigDecimal> curlRollMap = new HashMap<>(16);
-            if (CollectionUtils.isNotEmpty(curlRollList)) {
-                curlRollMap = curlRollList.stream()
-                        .collect(Collectors.toMap(DjCurlRoll::getPaddingCode, DjCurlRoll::getCurlLength));
-            }
-        }
 
-        LambdaQueryWrapper<DjParams> paramWrapper = new LambdaQueryWrapper<>();
-        paramWrapper.eq(DjParams::getParamCode, EngineConstants.STANDARD_CRIMP_LENGTH);
-        DjParams standardLengthParams = paramsMapper.selectOne(paramWrapper);
-        for (String code : notExistCodeList) {
-            DjScheduleResult result = new DjScheduleResult();
-            result.setPaddingCode(code);
-            BigDecimal standardLength = standardLengthParams == null ? new BigDecimal(DEFAULT_STANDARD_LENGTH)
-                    : new BigDecimal(standardLengthParams.getParamValue());
-            djScheduleResultList.add(result);
-        }
-        Map<String, DjScheduleResult> lastDayPlanMap = new HashMap<>(16);
-        if (CollectionUtils.isNotEmpty(lastDayPlanQty4List)) {
-            lastDayPlanMap = lastDayPlanQty4List.stream()
-                    .collect(Collectors.toMap(DjScheduleResult::getPaddingCode, Function.identity()));
-        }
-//        List<DjScheduleResult> cxConsume4List = djScheduleResultMapper.getCxConsume4List(scheduleResult);
-        Map<String, DjScheduleResult> cxConsumeMap = new HashMap<>(16);
-//        if (CollectionUtils.isNotEmpty(cxConsume4List)) {
-//            cxConsumeMap = cxConsume4List.stream()
-//                    .collect(Collectors.toMap(DjScheduleResult::getPaddingCode, Function.identity()));
-//        }
-        BigDecimal totalDayPlanQty = BigDecimal.ZERO;
-        BigDecimal totalNightPlanQty = BigDecimal.ZERO;
-        BigDecimal totalNextDayPlanQty = BigDecimal.ZERO;
+        BigDecimal totalClass2PlanQty = BigDecimal.ZERO; // 夜班
+        BigDecimal totalClass3PlanQty = BigDecimal.ZERO; // 早班
+        BigDecimal totalClass4PlanQty = BigDecimal.ZERO; // 中班
         BigDecimal totalStockQty = BigDecimal.ZERO;
-        BigDecimal totalLastDayPlanQty = BigDecimal.ZERO;
-        BigDecimal totalTheoreticClassStockQty = BigDecimal.ZERO;
+        BigDecimal totalPrevDayClass3PlanQty = BigDecimal.ZERO; // 昨日中班
 
         for (DjScheduleResult result : djScheduleResultList) {
-//            Double stockQty = ObjectUtils.defaultIfNull(result.getStockQty(), 0D);
-//            BigDecimal nightPlanQty = BigDecimalUtils.valueOf(result.getClass1PlanQty());
-//            String code = result.getPaddingCode();
-//            if (lastDayPlanMap.containsKey(code)) {
-//                DjScheduleResult lastDayResult = lastDayPlanMap.get(code);
-//                result.setLastMidPlanQty(lastDayResult.getLastMidPlanQty());
-//            }
-//            if (cxConsumeMap.containsKey(code)) {
-//                DjScheduleResult cxConsumeResult = cxConsumeMap.get(code);
-//                result.setCxConsumeQty(cxConsumeResult.getCxConsumeQty());
-//            }
-//            Double lastMidPlanQty = result.getLastMidPlanQty();
-//            Double cxConsumeQty = result.getCxConsumeQty();
-//            // 理论交班库存计算,理论交班库存 = 库存 + 昨日早班 + 夜班 - 成型消耗量
-//            if (lastMidPlanQty != null && cxConsumeQty != null) {
-//                result.setTheoreticClassStockQty(stockQty + lastMidPlanQty + nightPlanQty - cxConsumeQty);
-//            }
-//
-//            totalDayPlanQty = BigDecimalUtils.add(ObjectUtils.defaultIfNull(result.getDayPlanQty(), 0D),
-//                    totalDayPlanQty);
-//            totalNightPlanQty = BigDecimalUtils.add(ObjectUtils.defaultIfNull(result.getNightPlanQty(), 0D),
-//                    totalNightPlanQty);
-//            totalNextDayPlanQty = BigDecimalUtils.add(ObjectUtils.defaultIfNull(result.getNextDayPlanQty(), 0D),
-//                    totalNightPlanQty);
-//            totalStockQty = BigDecimalUtils.add(ObjectUtils.defaultIfNull(result.getStockQty(), 0D), totalStockQty);
-//            totalLastDayPlanQty = BigDecimalUtils.add(ObjectUtils.defaultIfNull(result.getLastMidPlanQty(), 0D),
-//                    totalLastDayPlanQty);
-//            totalTheoreticClassStockQty = BigDecimalUtils.add(
-//                    ObjectUtils.defaultIfNull(result.getTheoreticClassStockQty(), 0D), totalTheoreticClassStockQty);
+            totalClass2PlanQty = totalClass2PlanQty.add(BigDecimalUtils.valueOf(result.getClass2PlanQty()));
+            totalClass3PlanQty = totalClass3PlanQty.add(BigDecimalUtils.valueOf(result.getClass3PlanQty()));
+            totalClass4PlanQty = totalClass4PlanQty.add(BigDecimalUtils.valueOf(result.getClass4PlanQty()));
+            totalStockQty = totalStockQty.add(BigDecimalUtils.valueOf(result.getStockQty()));
+            totalPrevDayClass3PlanQty = totalPrevDayClass3PlanQty.add(BigDecimalUtils.valueOf(result.getPrevDayClass3PlanQty()));
         }
+
         ScheduleSummaryVo scheduleSummaryVo = new ScheduleSummaryVo();
-        scheduleSummaryVo.setDayPlanQty(totalDayPlanQty.doubleValue());
-        scheduleSummaryVo.setNightPlanQty(totalNightPlanQty.doubleValue());
-        scheduleSummaryVo.setNextDayPlanQty(totalNextDayPlanQty.doubleValue());
+        scheduleSummaryVo.setDayPlanQty(totalClass2PlanQty.doubleValue());
+        scheduleSummaryVo.setNightPlanQty(totalClass3PlanQty.doubleValue());
+        scheduleSummaryVo.setNextDayPlanQty(totalClass4PlanQty.doubleValue());
         scheduleSummaryVo.setStockQty(totalStockQty.doubleValue());
-        scheduleSummaryVo.setLastDayPlanQty(totalLastDayPlanQty.doubleValue());
-        scheduleSummaryVo.setTheoreticClassStockQty(totalTheoreticClassStockQty.doubleValue());
+        scheduleSummaryVo.setLastDayPlanQty(totalPrevDayClass3PlanQty.doubleValue());
         return AjaxResult.success(scheduleSummaryVo);
     }
 
