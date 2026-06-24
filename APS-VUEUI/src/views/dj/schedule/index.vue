@@ -383,13 +383,6 @@ export default {
               },
             },
             {
-              prop: "monthPlanOs",
-              valign: "middle",
-              halign: 'center',
-              align: "right",
-              label: this.$t("ui.data.column.scheduleResult.monthPlanOs"),
-            },
-            {
               prop: "stockQty",
               valign: "middle",
               halign: 'center',
@@ -400,6 +393,47 @@ export default {
         },
         {
           label: this.classHeaders[0],
+          children: [
+            {
+              prop: "prevDayClass3Sequence",
+              valign: "middle",
+              halign: 'center',
+              align: 'center',
+              label: this.$t("ui.data.column.dj.scheduleResult.sequence"),
+            },
+            {
+              prop: "prevDayClass3PlanQty",
+              valign: "middle",
+              halign: 'center',
+              align: "right",
+              label: this.$t("ui.data.column.dj.scheduleResult.planQty"),
+            },
+            {
+              prop: "prevDayClass3FinishQty",
+              valign: "middle",
+              halign: 'center',
+              align: "right",
+              label: this.$t("ui.data.column.dj.scheduleResult.finishQty"),
+            },
+            {
+              prop: "prevDayClass3FinishRate",
+              valign: "middle",
+              halign: 'center',
+              align: "right",
+              label: this.$t("ui.data.column.scheduleResult.finish"),
+              formatter: finishRateFormatter,
+            },
+            {
+              prop: "prevDayClass3Analysis",
+              valign: "middle",
+              halign: 'center',
+              align: "left",
+              label: this.$t("ui.data.column.dj.scheduleResult.analysis"),
+            },
+          ],
+        },
+        {
+          label: this.classHeaders[1],
           children: [
             {
               prop: "class1Sequence",
@@ -440,7 +474,7 @@ export default {
           ],
         },
         {
-          label: this.classHeaders[1],
+          label: this.classHeaders[2],
           children: [
             {
               prop: "class2Sequence",
@@ -481,7 +515,7 @@ export default {
           ],
         },
         {
-          label: this.classHeaders[2],
+          label: this.classHeaders[3],
           children: [
             {
               prop: "class3Sequence",
@@ -522,7 +556,7 @@ export default {
           ],
         },
         {
-          label: this.classHeaders[3],
+          label: this.classHeaders[4],
           children: [
             {
               prop: "class4Sequence",
@@ -563,7 +597,7 @@ export default {
           ],
         },
         {
-          label: this.classHeaders[4],
+          label: this.classHeaders[5],
           children: [
             {
               prop: "class5Sequence",
@@ -604,7 +638,7 @@ export default {
           ],
         },
         {
-          label: this.classHeaders[5],
+          label: this.classHeaders[6],
           children: [
             {
               prop: "class6Sequence",

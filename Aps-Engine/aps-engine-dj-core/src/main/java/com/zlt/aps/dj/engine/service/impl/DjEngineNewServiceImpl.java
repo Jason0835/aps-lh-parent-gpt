@@ -30,7 +30,6 @@ import com.zlt.aps.dj.api.domain.entity.DjMachineInfo;
 import com.zlt.aps.dj.api.domain.entity.DjMachineMaintenance;
 import com.zlt.aps.dj.api.domain.entity.DjParams;
 import com.zlt.aps.dj.api.domain.entity.DjScheduleResult;
-import com.zlt.aps.dj.api.domain.entity.DjScheduleResultLog;
 import com.zlt.aps.dj.api.domain.entity.DjSpecifyMachine;
 import com.zlt.aps.dj.api.domain.entity.DjStock;
 import com.zlt.aps.dj.engine.constant.DjEngineConstants;
@@ -226,11 +225,39 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
                 constructionMap, newSpecPaddingCodes);
         log.info("步骤3.3：生成垫胶需求清单 {} 个规格", demandList.size());
 
-        // 初始化交班库存（第1班接班库存 = 有效库存）
+        // 第1班接班库存不等同于有效库存（早上6点快照），需预估6:00~14:00（早班）的库存变化
+        // 公式：接班库存 = 有效库存 + 前日早班垫胶计划量 - 当日早班成型消耗量
+        // 前日早班垫胶计划量：T-1日排产结果中 class3（早班 6:00~14:00）的计划量
+        // 当日早班成型消耗量：CX T日 class1 计划量按单耗换算
         Map<String, BigDecimal> handoverInventory = new HashMap<>();
+        Date prevDate = DateUtil.offsetDay(scheduleDate, -1);
+        List<DjScheduleResult> prevDayResults = djEngineScheduleResultMapper.selectList(
+                new LambdaQueryWrapper<DjScheduleResult>()
+                        .eq(DjScheduleResult::getScheduleDate, prevDate));
+        Map<String, BigDecimal> prevDayClass3Plan = new HashMap<>();
+        if (!CollectionUtils.isEmpty(prevDayResults)) {
+            for (DjScheduleResult r : prevDayResults) {
+                BigDecimal class3Plan = r.getClass3PlanQty();
+                if (class3Plan != null && class3Plan.compareTo(BigDecimal.ZERO) > 0) {
+                    prevDayClass3Plan.merge(r.getPaddingCode(), class3Plan, BigDecimal::add);
+                }
+            }
+        }
         for (DjPaddingDemand demand : demandList) {
-            BigDecimal stock = effectiveStockMap.getOrDefault(demand.getPaddingCode(), BigDecimal.ZERO);
-            handoverInventory.put(demand.getPaddingCode(), stock);
+            String paddingCode = demand.getPaddingCode();
+            BigDecimal stock = effectiveStockMap.getOrDefault(paddingCode, BigDecimal.ZERO);
+            BigDecimal addPlan = prevDayClass3Plan.getOrDefault(paddingCode, BigDecimal.ZERO);
+            // CX class1（早班）消耗量
+            BigDecimal cxConsume = BigDecimal.ZERO;
+            Map<Integer, BigDecimal> shiftConsume = consumeQty.get(paddingCode);
+            if (shiftConsume != null) {
+                cxConsume = shiftConsume.getOrDefault(1, BigDecimal.ZERO);
+            }
+            BigDecimal inventory = stock.add(addPlan).subtract(cxConsume);
+            if (inventory.compareTo(BigDecimal.ZERO) < 0) {
+                inventory = BigDecimal.ZERO;
+            }
+            handoverInventory.put(paddingCode, inventory);
         }
         context.setHandoverInventory(handoverInventory);
 
@@ -592,6 +619,7 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
                         demand.setConstructionCode(construction.getConstructionCode());
                         demand.setProductionStatus(construction.getProductionStage());
                         demand.setPaddingName(construction.getPaddingName());
+                        demand.setGlueCode(construction.getPaddingRubber());
                     }
                     break;
                 }
@@ -882,6 +910,9 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
                         spec.isTailFinished() ? DjEngineConstants.TAIL_FLAG_YES : DjEngineConstants.TAIL_FLAG_NO);
                 result.setReleaseStatus(DjEngineConstants.RELEASE_STATUS_UNPUBLISHED);
                 result.setDataSource(DjEngineConstants.DATA_SOURCE_AUTO);
+                // 记录排程时使用的有效库存
+                result.setStockQty(
+                        context.getEffectiveStockMap().getOrDefault(spec.getPaddingCode(), BigDecimal.ZERO));
                 results.add(result);
             }
         }
@@ -1336,13 +1367,19 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
             return r;
         });
 
-        // 设置对应班次的计划量和顺序
-        int order = context.getCurrentOrderSeq() + 1;
-        context.setCurrentOrderSeq(order);
+        // 各机台各班次使用独立的生产顺序计数器
+        Map<String, Map<Integer, Integer>> shiftSeqMap = context.getShiftSequenceMap();
+        if (shiftSeqMap == null) {
+            shiftSeqMap = new HashMap<>();
+            context.setShiftSequenceMap(shiftSeqMap);
+        }
+        Map<Integer, Integer> machineShiftSeq = shiftSeqMap.computeIfAbsent(machineCode, k -> new HashMap<>());
+        int seq = machineShiftSeq.getOrDefault(shiftIndex, 0) + 1;
+        machineShiftSeq.put(shiftIndex, seq);
 
         // 使用 setFieldValueByFieldName 动态设置对应班次的计划量和顺序
         result.setFieldValueByFieldName(String.format(DjEngineConstants.CLASS_PLAN_QTY_FIELD, shiftIndex), produceQty);
-        result.setFieldValueByFieldName(String.format(DjEngineConstants.CLASS_SEQUENCE_FIELD, shiftIndex), order);
+        result.setFieldValueByFieldName(String.format(DjEngineConstants.CLASS_SEQUENCE_FIELD, shiftIndex), seq);
     }
 
     /**
@@ -1407,11 +1444,11 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
         String dateStr = DateUtil.format(scheduleDate, DjEngineConstants.BATCH_NO_DATE_FORMAT);
         String prefix = DjEngineConstants.BATCH_NO_PREFIX + dateStr;
 
-        // 查询当天已使用的最大批次号序号（从日志表中查询最大批次号）
-        List<DjScheduleResultLog> logRecords = djEngineScheduleResultLogMapper.selectList(
-                new LambdaQueryWrapper<DjScheduleResultLog>().eq(DjScheduleResultLog::getScheduleDate, scheduleDate)
-                        .isNotNull(DjScheduleResultLog::getBatchNo));
-        String maxBatchNo = logRecords.stream().map(DjScheduleResultLog::getBatchNo).max(String::compareTo)
+        // 查询当天已使用的最大批次号序号（从排程结果主表中查询，归档在生成批次号之后执行）
+        List<DjScheduleResult> records = djEngineScheduleResultMapper.selectList(
+                new LambdaQueryWrapper<DjScheduleResult>().eq(DjScheduleResult::getScheduleDate, scheduleDate)
+                        .isNotNull(DjScheduleResult::getBatchNo));
+        String maxBatchNo = records.stream().map(DjScheduleResult::getBatchNo).max(String::compareTo)
                 .orElse(null);
         int seq = 1; // 默认从001开始
         if (maxBatchNo != null && maxBatchNo.startsWith(prefix)) {

@@ -117,26 +117,81 @@ public class DjScheduleResultServiceImpl extends AbstractBillService<DjScheduleR
         if (CollectionUtils.isEmpty(list)) {
             return new ArrayList<>();
         }
+        // 加载机台名称
+        this.fillMachineName(list);
+        // 加载 T-1 日早班计划量（class3）
+        this.fillPrevDayClass3Plan(list, djScheduleResult.getScheduleDate());
+        return list;
+    }
+
+    /**
+     * 填充机台名称
+     */
+    private void fillMachineName(List<DjScheduleResult> list) {
         List<DjMachineInfo> machineInfoList = machineInfoService.selectMachineInfoList(new DjMachineInfo());
         Map<String, DjMachineInfo> machineInfoMap = machineInfoList.stream()
                 .collect(Collectors.toMap(DjMachineInfo::getMachineCode, Function.identity(), (s1, s2) -> s1));
-        if (CollectionUtils.isNotEmpty(list)) {
-            for (DjScheduleResult scheduleResult : list) {
-                String machineCodeStr = scheduleResult.getMachineCode();
-                if (StringUtils.isNotBlank(machineCodeStr)) {
-                    List<String> machineNameList = new ArrayList<>();
-                    String[] machineIdArr = machineCodeStr.split(",");
-                    for (String machineCode : machineIdArr) {
-                        String key = machineCode;
-                        if (machineInfoMap.containsKey(key)) {
-                            DjMachineInfo machineInfo = machineInfoMap.get(key);
-                            machineNameList.add(machineInfo.getMachineName());
-                        }
+        for (DjScheduleResult scheduleResult : list) {
+            String machineCodeStr = scheduleResult.getMachineCode();
+            if (StringUtils.isNotBlank(machineCodeStr)) {
+                List<String> machineNameList = new ArrayList<>();
+                String[] machineIdArr = machineCodeStr.split(",");
+                for (String machineCode : machineIdArr) {
+                    String key = machineCode;
+                    if (machineInfoMap.containsKey(key)) {
+                        DjMachineInfo machineInfo = machineInfoMap.get(key);
+                        machineNameList.add(machineInfo.getMachineName());
                     }
                 }
+                scheduleResult.setMachineName(String.join(",", machineNameList));
             }
         }
-        return list;
+    }
+
+    /**
+     * 填充 T-1 日早班数据（前日排产结果中 class3 相关字段）
+     */
+    @Override
+    public void fillPrevDayClass3Plan(List<DjScheduleResult> list, Date scheduleDate) {
+        if (scheduleDate == null) {
+            return;
+        }
+        Date prevDate = DateUtils.addDays(scheduleDate, -1);
+        List<DjScheduleResult> prevDayList = djScheduleResultMapper.selectList(
+                new LambdaQueryWrapper<DjScheduleResult>()
+                        .eq(DjScheduleResult::getScheduleDate, prevDate));
+        if (CollectionUtils.isEmpty(prevDayList)) {
+            return;
+        }
+        // 按 machineCode + paddingCode 汇总 T-1 日 class3 数据
+        // planQty 需要累加，其余字段取第一个匹配记录的值
+        Map<String, DjScheduleResult> prevDayClass3FirstMap = new HashMap<>();
+        Map<String, BigDecimal> prevDayClass3PlanSumMap = new HashMap<>();
+        for (DjScheduleResult prev : prevDayList) {
+            String key = prev.getMachineCode() + ":" + prev.getPaddingCode();
+            // 记录第一个匹配（用于 sequence/finishQty/finishRate/analysis）
+            prevDayClass3FirstMap.putIfAbsent(key, prev);
+            // 累加计划量
+            BigDecimal class3Plan = prev.getClass3PlanQty();
+            if (class3Plan != null && class3Plan.compareTo(BigDecimal.ZERO) > 0) {
+                prevDayClass3PlanSumMap.merge(key, class3Plan, BigDecimal::add);
+            }
+        }
+        // 设置到当前结果
+        for (DjScheduleResult curr : list) {
+            String key = curr.getMachineCode() + ":" + curr.getPaddingCode();
+            DjScheduleResult first = prevDayClass3FirstMap.get(key);
+            if (first != null) {
+                curr.setPrevDayClass3Sequence(first.getClass3Sequence());
+                curr.setPrevDayClass3FinishQty(first.getClass3FinishQty());
+                curr.setPrevDayClass3FinishRate(first.getClass3FinishRate());
+                curr.setPrevDayClass3Analysis(first.getClass3Analysis());
+            }
+            BigDecimal planSum = prevDayClass3PlanSumMap.get(key);
+            if (planSum != null) {
+                curr.setPrevDayClass3PlanQty(planSum);
+            }
+        }
     }
 
     /**

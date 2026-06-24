@@ -106,6 +106,7 @@
   "ui.data.column.dj.scheduleResult.planQty": "Plan Qty",
   "ui.data.column.dj.scheduleResult.finishQty": "Finish Qty",
   "ui.data.column.dj.scheduleResult.analysis": "Analysis",
+  "ui.data.column.dj.scheduleResult.prevDayClass3": "Prev Day Early Shift",
   "ui.data.column.cxScheduleResult.cxMachineCode": "Molding Machine",
   "ui.data.column.cxScheduleResult.lhMachineCode": "Curing Machine",
   "ui.data.column.cxScheduleResult.structureName": "Structure",

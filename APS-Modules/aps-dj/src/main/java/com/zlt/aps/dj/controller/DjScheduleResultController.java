@@ -23,6 +23,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
@@ -67,6 +68,19 @@ public class DjScheduleResultController extends AbstractBillBizController<DjSche
     private FactoryService factoryService;
 	@Resource
 	private ISyncDataLogsApiService syncDataLogsService;
+	
+
+    @ApiOperation("按条件分页查询")
+    @PostMapping("/list")
+    public TableDataInfo list(@RequestBody DjScheduleResult queryVO) {
+        TableDataInfo table = super.list(queryVO);
+        List<DjScheduleResult> rows = (List<DjScheduleResult>)table.getRows();
+        // 加载 T-1 日早班数据
+        if (CollectionUtils.isNotEmpty(rows)) {
+            djScheduleResultService.fillPrevDayClass3Plan(rows, queryVO.getScheduleDate());
+        }
+        return getDataTable(rows);
+    }
 
     /**
      * 新增垫胶排程结果
@@ -578,6 +592,7 @@ public class DjScheduleResultController extends AbstractBillBizController<DjSche
 
     /**
      * 获取连续6个班次的表头（以参数scheduleDate的上一天中班作为第一个班，格式：x班MM/dd）
+     * 额外返回前日早班作为第0个元素（共7个元素，index 0 = 前日早班，index 1~6 = 同原逻辑）
      */
     @GetMapping("/getWorkClass")
     @ApiOperation("获取连续6个班次的表头")
@@ -597,6 +612,8 @@ public class DjScheduleResultController extends AbstractBillBizController<DjSche
         String nextDayStr = DateUtils.parseDateToStr("MM/dd", DateUtils.addDays(baseDate, 1));
 
         List<String> headers = new ArrayList<>();
+        // 前日早班（T-1早班）：中班的上一班是早班，日期与中班相同
+        headers.add(I18nUtil.getMessage(ClassNumThreePlanEnums.CLASS_MORNING.getClassName()) + startDateStr);
         // class1: 中班 (scheduleDate的上一天)
         headers.add(I18nUtil.getMessage(currentWorkClass.getClassName()) + startDateStr);
         // class2-class4: scheduleDate当天 (夜班, 早班, 中班)
@@ -622,7 +639,7 @@ public class DjScheduleResultController extends AbstractBillBizController<DjSche
     
     @Override
     protected String getOrderBy() {
-        return "MACHINE_CODE, CLASS1_SEQUENCE";
+        return "MACHINE_CODE, ISNULL(CLASS1_SEQUENCE), CLASS1_SEQUENCE, ISNULL(CLASS2_SEQUENCE), CLASS2_SEQUENCE, ISNULL(CLASS3_SEQUENCE), CLASS3_SEQUENCE";
     }
 
     @Override

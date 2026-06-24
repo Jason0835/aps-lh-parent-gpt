@@ -176,4 +176,12 @@ public interface DjScheduleResultService extends IBillService<DjScheduleResult> 
      * @return 结果
      */
     AjaxResult getSummaryVo(DjScheduleResult scheduleResult);
+
+    /**
+     * 填充 T-1 日早班数据（前日排产结果中 class3 相关字段）
+     *
+     * @param list 当前排程结果列表
+     * @param scheduleDate 排程日期
+     */
+    void fillPrevDayClass3Plan(List<DjScheduleResult> list, Date scheduleDate);
 }
