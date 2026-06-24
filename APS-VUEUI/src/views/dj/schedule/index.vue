@@ -35,7 +35,8 @@
         >
         <el-button
           type="warning"
-          @click="() => handleEdit(selection[0])"
+          @click="handleEdit()"
+          :disabled="selection.length !== 1"
           v-hasPermi="['dj:djScheduleResult:edit']"
           >{{ $t("ui.frame.btn.modify") }}</el-button
         >
@@ -52,12 +53,6 @@
           :disabled="selection.length === 0"
           @click="handleChangeMachine"
           >{{ $t("ui.data.column.scheduleResult.changeMachine") }}</el-button
-        >
-        <el-button
-          v-hasPermi="['dj:djScheduleResult:changePlan']"
-          type="primary"
-          @click="handleChangePlan"
-          >{{ $t("ui.data.column.scheduleResult.changePlan") }}</el-button
         >
         <el-button
           v-hasPermi="['dj:djScheduleResult:balance']"
@@ -86,58 +81,32 @@
           @click="handlePublish"
           >{{ $t("ui.data.column.scheduleResult.publish") }}</el-button
         >
-        <el-dropdown>
-          <el-button type="primary" style="margin-left: 10px">
-            更多按钮<i class="el-icon-arrow-down el-icon--right"></i>
-          </el-button>
-          <el-dropdown-menu slot="dropdown">
-            <el-dropdown-item>
-              <el-button
-                type="primary"
-                class="more-btn"
-                @click="handleExportUiExcel"
-              >
-                {{ $t("ui.frame.btn.export") }}
-              </el-button>
-            </el-dropdown-item>
-            <el-dropdown-item>
-              <el-button
-                type="primary"
-                class="more-btn"
-                @click="$refs.tltUploadForm.handleImport(importDefaultValue)"
-              >
-                {{ $t("ui.frame.btn.import") }}
-              </el-button>
-            </el-dropdown-item>
-            <el-dropdown-item>
-              <el-button
-                type="primary"
-                class="more-btn"
-                @click="$refs.tltUploadForm2.handleImport(importDefaultValue)"
-              >
-                {{ $t("导入2") }}
-              </el-button>
-            </el-dropdown-item>
-            <el-dropdown-item v-hasPermi="['nc:finishQty:import']">
-              <el-button
-                type="primary"
-                class="more-btn"
-                @click="$refs.tltUploadForm3.handleImport(importDefaultValue)"
-              >
-                {{ $t("完成量导入") }}
-              </el-button>
-            </el-dropdown-item>
-            <el-dropdown-item v-hasRole="['admin']">
-              <el-button
-                type="primary"
-                class="more-btn"
-                @click="handleChangeReleaseStatus"
-              >
-                {{ $t("ui.data.column.scheduleResult.changeReleaseStatus") }}
-              </el-button>
-            </el-dropdown-item>
-          </el-dropdown-menu>
-        </el-dropdown>
+        <el-button
+          type="primary"
+          @click="handleExportUiExcel"
+        >
+          {{ $t("ui.frame.btn.export") }}
+        </el-button>
+        <el-button
+          type="primary"
+          @click="$refs.tltUploadForm.handleImport(importDefaultValue)"
+        >
+          {{ $t("ui.frame.btn.import") }}
+        </el-button>
+        <el-button
+          type="primary"
+          v-hasPermi="['nc:finishQty:import']"
+          @click="$refs.tltUploadForm3.handleImport(importDefaultValue)"
+        >
+          {{ $t("完成量导入") }}
+        </el-button>
+        <el-button
+          type="primary"
+          v-hasRole="['admin']"
+          @click="handleChangeReleaseStatus"
+        >
+          {{ $t("ui.data.column.scheduleResult.changeReleaseStatus") }}
+        </el-button>
       </template>
       <template slot="headerRight">
         <span class="stat-info">
@@ -195,28 +164,13 @@
     />
     <tlt-upload-form
       ref="tltUploadForm"
-      title="导入内衬排程结果数据"
-      downloadUrl="/nc/ncScheduleResult/importTemplate"
-      uploadUrl="/nc/ncScheduleResult/importScheduleData"
+      :title="$t('ui.data.column.djScheduleResult.importTitle')"
+      downloadUrl="/dj/djScheduleResult/importTemplate"
+      uploadUrl="/dj/djScheduleResult/importScheduleData"
       @uploadSuccess="getList"
       :columns="[
         {
-          label: '排程日期',
-          prop: 'scheduleDate',
-          align: 'center',
-          minWidth: 120,
-        },
-      ]"
-      :rules="importRules"
-    />
-    <tlt-upload-form
-      ref="tltUploadForm2"
-      title="导入内衬排程结果数据"
-      uploadUrl="/nc/ncScheduleResult/importScheduleData2"
-      @uploadSuccess="getList"
-      :columns="[
-        {
-          label: '排程日期',
+          label: this.$t('ui.data.column.scheduleResult.scheduleDate'),
           prop: 'scheduleDate',
           align: 'center',
           minWidth: 120,
@@ -226,13 +180,13 @@
     />
     <tlt-upload-form
       ref="tltUploadForm3"
-      title="导入内衬排程结果数据"
-      uploadUrl="/nc/ncScheduleResult/importFinishQty"
-      downloadUrl="/nc/ncScheduleResult/importFinishQtyTemplate"
+      :title="$t('ui.data.column.djScheduleResult.importTitle')"
+      uploadUrl="/dj/djScheduleResult/importFinishQty"
+      downloadUrl="/dj/djScheduleResult/importFinishQtyTemplate"
       @uploadSuccess="getList"
       :columns="[
         {
-          label: '排程日期',
+          label: this.$t('ui.data.column.scheduleResult.scheduleDate'),
           prop: 'scheduleDate',
           align: 'center',
           minWidth: 120,
@@ -735,9 +689,13 @@ export default {
         this.$refs.addRef.show();
       }
     },
-    handleEdit(row) {
+    handleEdit() {
+      if (this.selection.length !== 1) {
+        this.$modal.msgWarning("请选择一条记录");
+        return;
+      }
       if (this.$refs.editRef) {
-        this.$refs.editRef.show(row);
+        this.$refs.editRef.show(this.selection[0]);
       }
     },
     handleDelete(row) {

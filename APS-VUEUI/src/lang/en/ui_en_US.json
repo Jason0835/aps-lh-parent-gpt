@@ -676,6 +676,9 @@
   "ui.data.column.dj.dispatcherlog.afterDayPlan": "After operation Class1 plan qty",
   "ui.data.column.dj.dispatcherlog.afterNightPlan": "After operation Class2 plan qty",
   "ui.data.column.combinationMiddleAndNight": "Merge Shifts",
+  "ui.data.column.djScheduleResult.modalName": "Padding Schedule Result",
+  "ui.data.column.djScheduleResult.importTitle": "Import padding schedule result data",
+  "ui.data.column.scheduleResult.djPlan2": "Padding plan qty",
   "ui.biz.alter.makeSureRecreateDj": "Padding schedule already exists for today. Regenerating will overwrite existing records. Are you sure to regenerate?"
 
 }

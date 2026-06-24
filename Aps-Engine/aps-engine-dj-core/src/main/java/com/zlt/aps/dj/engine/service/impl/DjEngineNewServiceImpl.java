@@ -145,6 +145,30 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
         Map<String, MdmConstructionInfo> constructionMap = constructionList.stream()
                 .collect(Collectors.toMap(MdmConstructionInfo::getConstructionCode, c -> c, (a, b) -> a));
 
+        // 校验：所有胎胚代码必须能匹配到施工数据
+        List<String> unmatchedCodes = constructionCodes.stream()
+                .filter(code -> !constructionMap.containsKey(code))
+                .collect(Collectors.toList());
+        if (!unmatchedCodes.isEmpty()) {
+            log.warn("步骤2：以下胎胚代码无对应施工数据：{}", unmatchedCodes);
+            throw new BusinessException(I18nUtil.getMessage("ui.dj.engine.noConstruction"));
+        }
+
+        // 校验：施工数据中垫胶代码和垫胶长度必须有效
+        List<String> invalidConstructionCodes = new ArrayList<>();
+        for (Map.Entry<String, MdmConstructionInfo> entry : constructionMap.entrySet()) {
+            MdmConstructionInfo construction = entry.getValue();
+            if (StringUtils.isEmpty(construction.getPaddingCode())
+                    || construction.getPaddingLength() == null
+                    || construction.getPaddingLength().compareTo(BigDecimal.ZERO) <= 0) {
+                invalidConstructionCodes.add(entry.getKey());
+            }
+        }
+        if (!invalidConstructionCodes.isEmpty()) {
+            log.warn("步骤2：以下胎胚代码施工数据中垫胶代码或垫胶长度无效：{}", invalidConstructionCodes);
+            throw new BusinessException(I18nUtil.getMessage("ui.dj.engine.invalidConstruction"));
+        }
+
         // 2.2 关联成型计划与施工数据，解析垫胶消耗量
         // 按垫胶规格统计对应的成型机台数量
         Map<String, Integer> paddingCxMachineCount = this.calcPaddingCxMachineCount(cxScheduleList, constructionMap);
