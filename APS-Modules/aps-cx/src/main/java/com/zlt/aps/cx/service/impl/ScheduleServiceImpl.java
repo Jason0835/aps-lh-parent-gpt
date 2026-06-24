@@ -135,6 +135,9 @@ public class ScheduleServiceImpl implements ScheduleService {
     private final HolidayScheduleService holidayScheduleService;
     private final ScheduleDataValidator scheduleDataValidator;
 
+    @Autowired
+    private ScheduleExecutionGuard scheduleExecutionGuard;
+
     private final MdmMoldingMachineMapper moldingMachineMapper;
     private final MdmMaterialInfoMapper materialInfoMapper;
     private final MdmMonthSurplusMapper monthSurplusMapper;
@@ -168,6 +171,19 @@ public class ScheduleServiceImpl implements ScheduleService {
         ScheduleResult result = new ScheduleResult();
         result.setSuccess(false);
         result.setScheduleDate(request.getScheduleDate());
+
+        String factoryCode = request.getFactoryCode() != null ? request.getFactoryCode() : DEFAULT_FACTORY_CODE;
+        LocalDate scheduleDate = request.getScheduleDate();
+
+        // 获取排程执行锁（工厂+日期维度）
+        String lockToken = scheduleExecutionGuard.acquire(factoryCode, scheduleDate);
+        if (lockToken == null) {
+            result.setSuccess(false);
+            result.setErrorCode(ScheduleService.ERROR_CODE_LOCK_CONFLICT);
+            result.setMessage(I18nUtil.getMessage("ui.data.column.cxScheduleResult.scheduleRunning"));
+            log.warn("排程锁已被占用，拒绝重复执行。工厂: {}, 日期: {}", factoryCode, scheduleDate);
+            return result;
+        }
 
         try {
             log.info("开始执行排程，日期：{}，排程模式：{}", request.getScheduleDate(), request.getScheduleMode());
@@ -216,6 +232,9 @@ public class ScheduleServiceImpl implements ScheduleService {
         } catch (Exception e) {
             log.error("排程执行失败", e);
             result.setMessage("排程失败：" + e.getMessage());
+        } finally {
+            // 释放排程执行锁
+            scheduleExecutionGuard.release(factoryCode, scheduleDate, lockToken);
         }
 
         return result;
@@ -2243,6 +2262,16 @@ public class ScheduleServiceImpl implements ScheduleService {
             newRecord.setDailyPlanQty(ending.getDistributedQuantity());
             newRecord.setTotalDailyPlanQty(ending.getDistributedQuantity());
             newRecord.setMouldSurplusQty(ending.getFormingRemainder());
+
+            // 补充的延误物料任务无硫化消耗，各班次计划量设为0
+            newRecord.setClass1PlanQty(0);
+            newRecord.setClass2PlanQty(0);
+            newRecord.setClass3PlanQty(0);
+            newRecord.setClass4PlanQty(0);
+            newRecord.setClass5PlanQty(0);
+            newRecord.setClass6PlanQty(0);
+            newRecord.setClass7PlanQty(0);
+            newRecord.setClass8PlanQty(0);
 
             // 分配唯一负数ID，使后续库存分配、班次排量等逻辑能按任务维度正确处理
             newRecord.setId(syntheticId--);

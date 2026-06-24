@@ -204,7 +204,8 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                     context, day, shiftConfig, currentScheduleDate, machineOnlineEmbryoMap);
             shiftResults.add(shiftResult);
 
-            // 更新机台在产状态
+            // 更新机台在产状态：仅用本班次分配结果替换（滚动替换，不累积）
+            // 语义：班次N均衡分配的胎胚仅作为班次N+1的"续作历史"，MES在机数据仅用于第1班次
             machineOnlineEmbryoMap = updateMachineOnlineStatus(
                     shiftResult.getAllAllocations(), machineOnlineEmbryoMap);
 
@@ -1167,17 +1168,15 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
     }
 
     /**
-     * 更新机台在产状态
+     * 更新机台在产状态（滚动替换：仅保留本班次分配结果，作为下一班次的续作历史）
+     * <p>语义：班次N均衡分配的胎胚仅作为班次N+1的"续作历史"，不累积之前班次和MES在机数据
      */
     private Map<String, Set<String>> updateMachineOnlineStatus(
             List<MachineAllocationResult> allocations,
             Map<String, Set<String>> currentMachineOnlineMap) {
 
+        // 仅用本班次分配结果构建新Map，不拷贝currentMachineOnlineMap（滚动替换而非累积合并）
         Map<String, Set<String>> newMap = new HashMap<>();
-        for (Map.Entry<String, Set<String>> entry : currentMachineOnlineMap.entrySet()) {
-            newMap.put(entry.getKey(), new HashSet<>(entry.getValue()));
-        }
-
         for (MachineAllocationResult allocation : allocations) {
             for (TaskAllocation taskAlloc : allocation.getTaskAllocations()) {
                 if (taskAlloc.getEmbryoCode() != null) {
@@ -1187,7 +1186,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             }
         }
 
-        log.debug("更新机台在产状态完成，共 {} 个胎胚: {}", newMap.size(), formatMachineEmbryoMap(newMap));
+        log.debug("更新机台在产状态完成（滚动替换），共 {} 个胎胚: {}", newMap.size(), formatMachineEmbryoMap(newMap));
         return newMap;
     }
 
