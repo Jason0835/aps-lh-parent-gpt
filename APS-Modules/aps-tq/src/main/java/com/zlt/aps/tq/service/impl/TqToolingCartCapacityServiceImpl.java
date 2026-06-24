@@ -35,8 +35,7 @@ public class TqToolingCartCapacityServiceImpl extends AbstractDocService<TqTooli
     public String checkUnique(TqToolingCartCapacity entity) {
         QueryWrapper<TqToolingCartCapacity> wrapper = new QueryWrapper<>();
         wrapper.ne(entity.getId() != null, "ID", entity.getId());
-        wrapper.eq("CART_CODE", entity.getCartCode());
-        wrapper.eq("MATERIAL_CODE", entity.getMaterialCode());
+        wrapper.eq("BEAD_CODE", entity.getBeadCode());
         wrapper.eq("IS_DELETE", 0);
         if (tqToolingCartCapacityMapper.selectCount(wrapper) > 0) {
             return UserConstants.NOT_UNIQUE;
@@ -46,7 +45,7 @@ public class TqToolingCartCapacityServiceImpl extends AbstractDocService<TqTooli
 
     @Override
     protected List<String> getCheckUniqueFields() {
-        return Arrays.asList("cartCode", "materialCode");
+        return Arrays.asList("beadCode");
     }
 
     @Override
@@ -62,19 +61,18 @@ public class TqToolingCartCapacityServiceImpl extends AbstractDocService<TqTooli
         List<TqToolingCartCapacity> importList = new ArrayList<>();
 
         Map<String, Long> groupMap = list.stream()
-                .collect(Collectors.groupingBy(a -> (a.getCartCode() + a.getMaterialCode()), Collectors.counting()));
+                .collect(Collectors.groupingBy(a -> a.getBeadCode(), Collectors.counting()));
 
         for (int i = 0; i < list.size(); i++) {
             TqToolingCartCapacity entity = list.get(i);
 
-            Long hasValue = groupMap.get(entity.getCartCode() + entity.getMaterialCode());
+            Long hasValue = groupMap.get(entity.getBeadCode());
             if (hasValue != null && hasValue > 1) {
                 failureNum++;
                 entity.setId(-999L);
                 String message = I18nUtil.getMessage("ui.data.column.all.conflictRecord");
-                String columnName = I18nUtil.getMessage("ui.tq.toolingCartCapacity.column.cartCode");
-                String columnName2 = I18nUtil.getMessage("ui.tq.toolingCartCapacity.column.materialCode");
-                message = String.format(message, columnName + "+" + columnName2);
+                String columnName = I18nUtil.getMessage("ui.tq.toolingCartCapacity.column.beadCode");
+                message = String.format(message, columnName);
                 addImportErrorLog(importLogId, i + 2, message, importErrorLogs);
                 continue;
             }

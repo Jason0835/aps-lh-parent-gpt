@@ -1,6 +1,7 @@
 package com.zlt.aps.tq.controller;
 
 import cn.hutool.core.date.DateUtil;
+import com.alibaba.cloud.commons.lang.StringUtils;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.core.utils.DateUtils;
@@ -141,10 +142,14 @@ public class TqNewScheduleResultController extends AbstractDocBizController<TqNe
     @PostMapping("/autoPlan")
     public AjaxResult autoPlan(@RequestBody TqNewScheduleResult queryVO) {
         Date scheduleDate = queryVO.getScheduleDateQuery();
+        String factoryCode = queryVO.getFactoryCode();
         if (scheduleDate == null) {
             return AjaxResult.error("排程日期不能为空");
         }
-        tqEngineService.autoTqSchedule(DateUtils.parseDateToStr("yyyy-MM-dd", scheduleDate));
+        if (StringUtils.isEmpty(factoryCode)) {
+            return AjaxResult.error("分厂不能为空");
+        }
+        tqEngineService.autoTqSchedule(DateUtils.parseDateToStr("yyyy-MM-dd", scheduleDate), factoryCode);
         return AjaxResult.success();
     }
 

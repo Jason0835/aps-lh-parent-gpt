@@ -59,7 +59,6 @@ import {
   removeToolingCartCapacity,
   exportToolingCartCapacity,
 } from "@/api/tq/toolingCartCapacity";
-import { listAllTooling } from "@/api/tq/tooling";
 import tltUpload from "@/components/tltUpload/tltUpload.vue";
 import InfoDialog from "./components/infoDialog.vue";
 
@@ -72,10 +71,8 @@ export default {
   data() {
     return {
       loading: false,
-      toolingLoading: false,
       data: [],
       selection: [],
-      toolingList: [],
       page: {
         current: 1,
         pageSize: 20,
@@ -90,17 +87,8 @@ export default {
     searchColumns() {
       return [
         {
-          label: this.$t("ui.tq.toolingCartCapacity.column.cartCode"),
-          prop: "cartCode",
-          type: "select",
-          dictData: this.toolingList,
-          labelKey: "toolingCode",
-          valueKey: "toolingCode",
-          filterable: true,
-        },
-        {
-          label: this.$t("ui.tq.toolingCartCapacity.column.materialCode"),
-          prop: "materialCode",
+          label: this.$t("ui.tq.toolingCartCapacity.column.beadCode"),
+          prop: "beadCode",
         },
       ];
     },
@@ -108,17 +96,10 @@ export default {
       return [
         { type: "selection", fixed: "left" },
         {
-          prop: "cartCode",
+          prop: "beadCode",
           align: "center",
           halign: "center",
-          label: this.$t("ui.tq.toolingCartCapacity.column.cartCode"),
-          minWidth: 120,
-        },
-        {
-          prop: "materialCode",
-          align: "center",
-          halign: "center",
-          label: this.$t("ui.tq.toolingCartCapacity.column.materialCode"),
+          label: this.$t("ui.tq.toolingCartCapacity.column.beadCode"),
           minWidth: 120,
         },
         {
@@ -284,21 +265,9 @@ export default {
         this.loading = false;
       }
     },
-    async loadToolingList() {
-      this.toolingLoading = true;
-      try {
-        const res = await listAllTooling();
-        this.toolingList = Array.isArray(res) ? res : (res.data || res.rows || []);
-      } catch (error) {
-        console.log(error);
-      } finally {
-        this.toolingLoading = false;
-      }
-    },
   },
   mounted() {
     this.getList();
-    this.loadToolingList();
   },
 };
 </script>

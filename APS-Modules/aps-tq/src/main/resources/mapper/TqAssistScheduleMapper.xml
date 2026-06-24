@@ -16,7 +16,7 @@
         <result property="glueCode" column="glue_code"/>
         <result property="mouthPlateCode" column="mouth_plate_code"/>
         <result property="specSize" column="spec_size"/>
-        <result property="machineId" column="machine_id"/>
+        <result property="machineCode" column="machine_code"/>
         <result property="unitConsume" column="unit_consume"/>
         <result property="stockQty" column="stock_qty"/>
         <result property="supplyTime" column="supply_time"/>
@@ -64,11 +64,11 @@
     </resultMap>
 
     <sql id="selectTqAssistScheduleVo">
-        select id, schedule_date, cx_batch_no, batch_no, order_no, bead_code, steel_ring_code, triangle_glue_code, glue_code, mouth_plate_code, spec_size, machine_id, unit_consume, stock_qty, supply_time, mid_plan_qty, mid_finish_qty, mid_produce_order, mid_finish_rate, mid_sys_analysis, mid_hand_analysis, night_plan_qty, night_finish_qty, night_produce_order, night_finish_rate, night_sys_analysis, night_hand_analysis, day_plan_qty, day_finish_qty, day_produce_order, day_finish_rate, day_sys_analysis, day_hand_analysis, next_mid_plan_qty, next_mid_finish_qty, next_mid_produce_order, next_mid_finish_rate, next_mid_sys_analysis, next_mid_hand_analysis, cx_class1_plan, cx_class2_plan, cx_class3_plan, cx_class4_plan, cx_class5_plan, is_release, mark_close_out_tip, production_status, data_source, remark, del_flag, create_by, create_time, update_by, update_time from t_tq_assist_schedule
+        select id, schedule_date, cx_batch_no, batch_no, order_no, bead_code, steel_ring_code, triangle_glue_code, glue_code, mouth_plate_code, spec_size, machine_code, unit_consume, stock_qty, supply_time, mid_plan_qty, mid_finish_qty, mid_produce_order, mid_finish_rate, mid_sys_analysis, mid_hand_analysis, night_plan_qty, night_finish_qty, night_produce_order, night_finish_rate, night_sys_analysis, night_hand_analysis, day_plan_qty, day_finish_qty, day_produce_order, day_finish_rate, day_sys_analysis, day_hand_analysis, next_mid_plan_qty, next_mid_finish_qty, next_mid_produce_order, next_mid_finish_rate, next_mid_sys_analysis, next_mid_hand_analysis, cx_class1_plan, cx_class2_plan, cx_class3_plan, cx_class4_plan, cx_class5_plan, is_release, mark_close_out_tip, production_status, data_source, remark, del_flag, create_by, create_time, update_by, update_time from t_tq_assist_schedule
     </sql>
 
     <sql id="column">
-        a.id, a.schedule_date, a.cx_batch_no, a.batch_no, a.order_no, a.bead_code, a.steel_ring_code, a.triangle_glue_code, a.glue_code, a.mouth_plate_code, a.spec_size, a.machine_id, a.unit_consume, a.stock_qty, a.supply_time, a.mid_plan_qty, a.mid_produce_order, a.mid_sys_analysis, a.mid_hand_analysis, a.night_plan_qty, a.night_produce_order, a.night_sys_analysis, a.night_hand_analysis, a.day_plan_qty, a.day_produce_order, a.day_sys_analysis, a.day_hand_analysis, a.next_mid_plan_qty, a.next_mid_produce_order, a.next_mid_sys_analysis, a.next_mid_hand_analysis, a.cx_class1_plan, a.cx_class2_plan, a.cx_class3_plan, a.cx_class4_plan, a.cx_class5_plan, a.is_release, a.mark_close_out_tip, a.production_status, a.remark, a.del_flag, a.create_by, a.create_time, a.update_by, a.update_time,a.data_source,
+        a.id, a.schedule_date, a.cx_batch_no, a.batch_no, a.order_no, a.bead_code, a.steel_ring_code, a.triangle_glue_code, a.glue_code, a.mouth_plate_code, a.spec_size, a.machine_code, a.unit_consume, a.stock_qty, a.supply_time, a.mid_plan_qty, a.mid_produce_order, a.mid_sys_analysis, a.mid_hand_analysis, a.night_plan_qty, a.night_produce_order, a.night_sys_analysis, a.night_hand_analysis, a.day_plan_qty, a.day_produce_order, a.day_sys_analysis, a.day_hand_analysis, a.next_mid_plan_qty, a.next_mid_produce_order, a.next_mid_sys_analysis, a.next_mid_hand_analysis, a.cx_class1_plan, a.cx_class2_plan, a.cx_class3_plan, a.cx_class4_plan, a.cx_class5_plan, a.is_release, a.mark_close_out_tip, a.production_status, a.remark, a.del_flag, a.create_by, a.create_time, a.update_by, a.update_time,a.data_source,
     </sql>
 
     <select id="selectTqAssistScheduleList" parameterType="com.zlt.aps.tq.api.domain.entity.TqAssistSchedule"
@@ -105,8 +105,8 @@
             <if test="productionStatus != null  and productionStatus != ''">and a.production_status = #{productionStatus}</if>
             <if test="isRelease != null  and isRelease != ''">and a.IS_RELEASE = #{isRelease}</if>
             <if test="mouthPlateCode != null  and mouthPlateCode != ''">and INSTR(a.mouth_plate_code, #{mouthPlateCode}) > 0 </if>
-            <if test="machineId != null  and machineId != ''">and instr(concat(',',a.machine_id,','),  concat(',',#{machineId},','))>0</if>
-            order by (case when instr(machine_id,',') > 0 then machine_id when machine_id is null or machine_id = '' then '0' else '-1' end) desc/*多个机台 和 没有机台的排在前面*/,a.CREATE_TIME
+            <if test="machineCode != null  and machineCode != ''">and instr(concat(',',a.machine_code,','),  concat(',',#{machineCode},','))>0</if>
+            order by (case when instr(machine_code,',') > 0 then machine_code when machine_code is null or machine_code = '' then '0' else '-1' end) desc/*多个机台 和 没有机台的排在前面*/,a.CREATE_TIME
         ) t
         <if test="orderStr != null">
             order by ${orderStr}

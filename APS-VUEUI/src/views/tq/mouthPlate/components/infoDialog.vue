@@ -53,7 +53,7 @@ export default {
             trigger: "blur",
           },
         ],
-        machineId: [
+        machineCode: [
           {
             required: true,
             message: this.$t("common.rule.select"),
@@ -83,7 +83,7 @@ export default {
         },
         {
           label: this.$t("ui.specifyMachine.column.machineName"),
-          prop: "machineId",
+          prop: "machineCode",
           span: 24,
           required: true,
           type: "select",
@@ -92,7 +92,7 @@ export default {
           loading: this.machineLoading,
           props: {
             label: "machineName",
-            value: "id",
+            value: "machineCode",
           },
           onFocus: this.handleMachineFocus,
         },
@@ -154,11 +154,11 @@ export default {
           ...data,
         };
         // 编辑模式下，将当前选中的机台加入下拉选项
-        if (data.machineId && data.machineName) {
+        if (data.machineCode && data.machineName) {
           this.machineList = [
             {
-              id: data.machineId,
-              machineCode: data.machineName,
+              machineCode: data.machineCode,
+              machineName: data.machineName,
             },
           ];
         }

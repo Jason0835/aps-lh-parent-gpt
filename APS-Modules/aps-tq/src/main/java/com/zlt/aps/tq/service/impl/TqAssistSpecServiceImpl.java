@@ -77,11 +77,11 @@ public class TqAssistSpecServiceImpl extends ServiceImpl<TqAssistSpecMapper, TqA
      * 根据code判断是否已经存在
      */
     public String checkAssistSpecCodeUnique(TqAssistSpec dto) {
-        if (dto == null || StringUtils.isBlank(dto.getMaterialCode())) {
+        if (dto == null || StringUtils.isBlank(dto.getBeadCode())) {
             return UserConstants.NOT_UNIQUE;
         }
         QueryWrapper<TqAssistSpec> queryWrapper = new QueryWrapper<>();
-        queryWrapper.eq("MATERIAL_CODE", dto.getMaterialCode());
+        queryWrapper.eq("BEAD_CODE", dto.getBeadCode());
         queryWrapper.eq("DEL_FLAG", ApsConstant.DEL_FLAG_NORMAL);
         if (dto.getId() != null) {
             queryWrapper.ne("ID", dto.getId());  //编辑的时候校验，要过滤掉自身的id
@@ -110,18 +110,18 @@ public class TqAssistSpecServiceImpl extends ServiceImpl<TqAssistSpecMapper, TqA
         List<TqAssistSpec> importList = new ArrayList<>();
 
         //按业务主键分组
-        Map<String, Long> groupMap = list.stream().collect(Collectors.groupingBy(TqAssistSpec::getMaterialCode, Collectors.counting()));
+        Map<String, Long> groupMap = list.stream().collect(Collectors.groupingBy(TqAssistSpec::getBeadCode, Collectors.counting()));
 
         for (int i = 0; i < list.size(); i++) {
             TqAssistSpec bigRoll = list.get(i);
 
             //重复记录校验
-            Long hasValue = groupMap.get(bigRoll.getMaterialCode());
+            Long hasValue = groupMap.get(bigRoll.getBeadCode());
             if (hasValue > 1) {
                 failureNum++;
                 bigRoll.setId(-999L);
                 String message = I18nUtil.getMessage("ui.data.column.all.conflictRecord");
-                String columnName = I18nUtil.getMessage("ui.common.column.assist.tq.materialCode");
+                String columnName = I18nUtil.getMessage("ui.common.column.assist.tq.beadCode");
                 message=String.format(message,columnName);
                 addImportErrorLog(importLogId, i + 2,message, importErrorLogs);
                 continue;

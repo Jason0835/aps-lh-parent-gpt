@@ -19,18 +19,15 @@ import lombok.EqualsAndHashCode;
 public class TqSpecifyMachine extends BaseEntity {
     private static final long serialVersionUID = 1L;
 
-    @Excel(name = "ui.tq.specifyMachine.column.materialCode")
+    @Excel(name = "ui.tq.specifyMachine.column.beadCode")
     @ApiModelProperty(value = "胎圈编码", position = 20)
-    @TableField("MATERIAL_CODE")
+    @TableField("BEAD_CODE")
     @ImportValidated(required = true, isCode = true, maxLength = 20)
-    private String materialCode;
+    private String beadCode;
 
-    @ApiModelProperty(value = "机台id", position = 30)
-    @TableField("MACHINE_ID")
-    private Long machineId;
-
-    @ApiModelProperty(value = "机台编号", position = 35)
-    @TableField(exist = false)
+    @Excel(name = "ui.tq.specifyMachine.column.machineCode")
+    @ApiModelProperty(value = "机台编号", position = 30)
+    @TableField("MACHINE_CODE")
     private String machineCode;
 
     @Excel(name = "ui.specifyMachine.column.machineName")

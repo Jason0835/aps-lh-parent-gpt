@@ -33,25 +33,25 @@ public class MouthPlateFilter implements IMachineFilterStrategy {
             return candidateMachines;
         }
 
-        String mouthPlateMachineIds = context.getMouthPlateMachineMap().get(mouthPlateCode);
-        if (mouthPlateMachineIds == null || mouthPlateMachineIds.isEmpty()) {
+        String mouthPlateMachineCodes = context.getMouthPlateMachineMap().get(mouthPlateCode);
+        if (mouthPlateMachineCodes == null || mouthPlateMachineCodes.isEmpty()) {
             return candidateMachines;
         }
 
-        List<String> mouthPlateIdList = Arrays.asList(mouthPlateMachineIds.split(","));
+        List<String> mouthPlateCodeList = Arrays.asList(mouthPlateMachineCodes.split(","));
 
         // 过滤出口型板对应的机台
         List<TqMachineInfo> filtered = candidateMachines.stream()
-                .filter(m -> mouthPlateIdList.contains(String.valueOf(m.getId())))
+                .filter(m -> mouthPlateCodeList.contains(m.getMachineCode()))
                 .collect(Collectors.toList());
 
         if (!CollectionUtils.isEmpty(filtered)) {
             // 排除不可作业的机台
-            String notMachineIds = context.getSpecifyNotMachineMap().get(scheduleVo.getBeadCode());
-            if (notMachineIds != null && !notMachineIds.isEmpty()) {
-                List<String> notIdList = Arrays.asList(notMachineIds.split(","));
+            String notMachineCodes = context.getSpecifyNotMachineMap().get(scheduleVo.getBeadCode());
+            if (notMachineCodes != null && !notMachineCodes.isEmpty()) {
+                List<String> notCodeList = Arrays.asList(notMachineCodes.split(","));
                 filtered = filtered.stream()
-                        .filter(m -> !notIdList.contains(String.valueOf(m.getId())))
+                        .filter(m -> !notCodeList.contains(m.getMachineCode()))
                         .collect(Collectors.toList());
             }
 

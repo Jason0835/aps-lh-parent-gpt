@@ -57,11 +57,21 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
- * 胎圈排程结果Controller
+ * 【已废弃】胎圈排程结果Controller（4班次制旧版，BootUI层）
+ *
+ * <p>废弃说明：
+ * <ul>
+ *   <li>本Controller为旧版4班次制胎圈排程BootUI接口，已由新版6班次制接口替代</li>
+ *   <li>新版接口前缀：/tq/newScheduleResult/*</li>
+ *   <li>新版算法依据：胎圈自动排程_v5.xmind（6班次制）</li>
+ *   <li>请勿在此Controller新增功能，所有新需求请到新版接口实现</li>
+ *   <li>计划在前端完全切换到新版接口后，本Controller将一并删除</li>
+ * </ul>
  *
  * @author chen
  * @date 2021-06-21
  */
+@Deprecated
 @Api(tags = "胎圈排程结果")
 @Controller
 @RequestMapping("/tq/scheduleResult")
@@ -230,9 +240,9 @@ public class TqScheduleResultController extends BaseController {
      * 转机台
      */
     @ApiOperation("转机台")
-    @PostMapping("/batchChangeMachine/{machineId}")
+    @PostMapping("/batchChangeMachine/{machineCode}")
     @ResponseBody
-    public AjaxResult batchChangeMachine(@PathVariable("machineId") String machineId, String selects) {
+    public AjaxResult batchChangeMachine(@PathVariable("machineCode") String machineCode, String selects) {
         List<TqScheduleResultDto> scheduleResultList = JSON.parseArray(selects, TqScheduleResultDto.class);
         TqScheduleResultDto query = new TqScheduleResultDto();
         StringBuilder sb1 = new StringBuilder();
@@ -240,7 +250,7 @@ public class TqScheduleResultController extends BaseController {
         for (TqScheduleResultDto scheduleResult : scheduleResultList) {
             query.setId(scheduleResult.getId());
             query.setScheduleDate(scheduleResult.getScheduleDate());
-            query.setMachineId(machineId);
+            query.setMachineCode(machineCode);
             query.setBeadCode(scheduleResult.getBeadCode());
             Boolean unique = iTqScheduleResultService.checkUnique(query);
             if (!unique) {
@@ -251,7 +261,7 @@ public class TqScheduleResultController extends BaseController {
                 }
                 continue;
             }
-            scheduleResult.setMachineId(machineId);
+            scheduleResult.setMachineCode(machineCode);
             AjaxResult result = iTqScheduleResultService.changeMachine(scheduleResult);
             if (result.get(GatewayConstants.MSG_TAG).equals(I18nUtil.getMessage("ui.data.column.scheduleResult.release.isReleasingOrTimeoutById"))) {
                 if (sb2.length() > 0) {
@@ -579,31 +589,31 @@ public class TqScheduleResultController extends BaseController {
     /**
      * 跳转至选机台页面
      */
-    @GetMapping("/chooseMachine/{id}")
-    public String chooseMachine(@PathVariable("id") String idAndRowIndex, ModelMap mmap) {
-        String[] idAndRowIndexArr = idAndRowIndex.split(",");
-        TqScheduleResultDto scheduleResult = iTqScheduleResultService.getInfo(Long.valueOf(idAndRowIndexArr[0]));
-        TqMachineInfo machineInfo = new TqMachineInfo();
-        machineInfo.setStatus("0");
-        List<TqMachineInfo> machineInfoList = machineInfoService.exportList(machineInfo);
-        Map<String, TqMachineInfo> machineCodeMap = machineInfoList.stream().collect(Collectors.toMap(b -> b.getId() + "", a -> a));
-
-        if (StringUtils.isNotEmpty(scheduleResult.getMachineId())) {
-            List<TqMachineInfo> newMachineInfoList = new ArrayList<>();
-            String[] machineIds = scheduleResult.getMachineId().split(",");
-            for (String item : machineIds) {
-                if (machineCodeMap.get(item) != null) {
-                    newMachineInfoList.add(machineCodeMap.get(item));
-                }
-            }
-            mmap.put("machineInfoList", newMachineInfoList);
-        } else {
-            mmap.put("machineInfoList", machineInfoList);
-        }
-        mmap.put("scheduleResult", scheduleResult);
-        mmap.put("rowIndex", idAndRowIndexArr[1]);
-        return prefix + "/chooseMachine";
-    }
+//    @GetMapping("/chooseMachine/{id}")
+//    public String chooseMachine(@PathVariable("id") String idAndRowIndex, ModelMap mmap) {
+//        String[] idAndRowIndexArr = idAndRowIndex.split(",");
+//        TqScheduleResultDto scheduleResult = iTqScheduleResultService.getInfo(Long.valueOf(idAndRowIndexArr[0]));
+//        TqMachineInfo machineInfo = new TqMachineInfo();
+//        machineInfo.setStatus("0");
+//        List<TqMachineInfo> machineInfoList = machineInfoService.exportList(machineInfo);
+//        Map<String, TqMachineInfo> machineCodeMap = machineInfoList.stream().collect(Collectors.toMap(b -> b.getId() + "", a -> a));
+//
+//        if (StringUtils.isNotEmpty(scheduleResult.getMachineId())) {
+//            List<TqMachineInfo> newMachineInfoList = new ArrayList<>();
+//            String[] machineIds = scheduleResult.getMachineId().split(",");
+//            for (String item : machineIds) {
+//                if (machineCodeMap.get(item) != null) {
+//                    newMachineInfoList.add(machineCodeMap.get(item));
+//                }
+//            }
+//            mmap.put("machineInfoList", newMachineInfoList);
+//        } else {
+//            mmap.put("machineInfoList", machineInfoList);
+//        }
+//        mmap.put("scheduleResult", scheduleResult);
+//        mmap.put("rowIndex", idAndRowIndexArr[1]);
+//        return prefix + "/chooseMachine";
+//    }
 
     /**
      * 选机台

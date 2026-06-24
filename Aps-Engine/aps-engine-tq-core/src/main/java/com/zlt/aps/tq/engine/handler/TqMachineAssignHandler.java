@@ -98,15 +98,15 @@ public class TqMachineAssignHandler extends AbsTqScheduleStepHandler {
         }
 
         // 机台产能占用追踪（6个班次）
-        Map<Long, BigDecimal> class1CapacityMap = new HashMap<>();
-        Map<Long, BigDecimal> class2CapacityMap = new HashMap<>();
-        Map<Long, BigDecimal> class3CapacityMap = new HashMap<>();
-        Map<Long, BigDecimal> class4CapacityMap = new HashMap<>();
-        Map<Long, BigDecimal> class5CapacityMap = new HashMap<>();
-        Map<Long, BigDecimal> class6CapacityMap = new HashMap<>();
-        Map<String, List<Long>> glueMap = new HashMap<>();
-        Map<String, List<Long>> mouthPlatMap = new HashMap<>();
-        Map<String, Long> plannedMachineMap = new HashMap<>();
+        Map<String, BigDecimal> class1CapacityMap = new HashMap<>();
+        Map<String, BigDecimal> class2CapacityMap = new HashMap<>();
+        Map<String, BigDecimal> class3CapacityMap = new HashMap<>();
+        Map<String, BigDecimal> class4CapacityMap = new HashMap<>();
+        Map<String, BigDecimal> class5CapacityMap = new HashMap<>();
+        Map<String, BigDecimal> class6CapacityMap = new HashMap<>();
+        Map<String, List<String>> glueMap = new HashMap<>();
+        Map<String, List<String>> mouthPlatMap = new HashMap<>();
+        Map<String, String> plannedMachineMap = new HashMap<>();
 
         // 按优先级排序：定点机台优先 → 已排产规格优先 → 计划量从大到小
         List<TqScheduleResultVo> sortedScheduleList = scheduleList.stream().sorted((o1, o2) -> {
@@ -141,7 +141,7 @@ public class TqMachineAssignHandler extends AbsTqScheduleStepHandler {
                 OpenMachineClassEnums.CLASS_THREE.getClassIndex()   // 6班=D+2日早班
         };
 
-        Map<Long, BigDecimal>[] capacityMaps = new Map[]{
+        Map<String, BigDecimal>[] capacityMaps = new Map[]{
                 class1CapacityMap, class2CapacityMap, class3CapacityMap,
                 class4CapacityMap, class5CapacityMap, class6CapacityMap
         };
@@ -182,10 +182,10 @@ public class TqMachineAssignHandler extends AbsTqScheduleStepHandler {
                 // ========== 3步排产策略 ==========
 
                 // 步骤1：当前班次，当前已分配机台
-                if (StringUtils.isNotEmpty(scheduleVo.getMachineId())) {
-                    Long machineId = Long.valueOf(scheduleVo.getMachineId());
+                if (StringUtils.isNotEmpty(scheduleVo.getMachineCode())) {
+                    String machineCode = scheduleVo.getMachineCode();
                     TqMachineInfo existingMachine = allMachineList.stream()
-                            .filter(m -> m.getId().equals(machineId))
+                            .filter(m -> m.getMachineCode().equals(machineCode))
                             .findFirst().orElse(null);
 
                     // 机台不支持当前班次，延后到下一班
@@ -198,7 +198,7 @@ public class TqMachineAssignHandler extends AbsTqScheduleStepHandler {
                     double machineQuota = getMachineQuota(existingMachine, defaultQuota);
 
                     // 定额检查：已排产能 + 当前计划量不能超过定额
-                    BigDecimal currentCapacity = capacityMaps[classIdx].getOrDefault(machineId, BigDecimal.ZERO);
+                    BigDecimal currentCapacity = capacityMaps[classIdx].getOrDefault(machineCode, BigDecimal.ZERO);
                     double remainingCapacity = BigDecimalUtil.sub(machineQuota, currentCapacity.doubleValue());
 
                     if (remainingCapacity <= 0) {
@@ -218,7 +218,7 @@ public class TqMachineAssignHandler extends AbsTqScheduleStepHandler {
                     } else if (planQty > remainingCapacity) {
                         // 部分可排：截断到剩余定额，超出部分进入步骤2/3
                         setClassPlanQty(scheduleVo, classIdx + 1, remainingCapacity);
-                        capacityMaps[classIdx].put(machineId, capacityMaps[classIdx].getOrDefault(machineId, BigDecimal.ZERO)
+                        capacityMaps[classIdx].put(machineCode, capacityMaps[classIdx].getOrDefault(machineCode, BigDecimal.ZERO)
                                 .add(BigDecimalUtils.valueOf(remainingCapacity)));
 
                         double overflowQty = BigDecimalUtil.sub(planQty, remainingCapacity);
@@ -234,7 +234,7 @@ public class TqMachineAssignHandler extends AbsTqScheduleStepHandler {
                         }
                     } else {
                         // 全部可排
-                        capacityMaps[classIdx].put(machineId, capacityMaps[classIdx].getOrDefault(machineId, BigDecimal.ZERO)
+                        capacityMaps[classIdx].put(machineCode, capacityMaps[classIdx].getOrDefault(machineCode, BigDecimal.ZERO)
                                 .add(BigDecimalUtils.valueOf(planQty)));
                     }
                     continue;
@@ -254,20 +254,20 @@ public class TqMachineAssignHandler extends AbsTqScheduleStepHandler {
                 scheduleVo.setUnscheduledFlag("0");
 
                 TqMachineInfo machine = CollectionUtil.firstElement(optionalMachineList);
-                Long machineId = machine.getId();
-                scheduleVo.setMachineId(String.valueOf(machineId));
+                String machineCode = machine.getMachineCode();
+                scheduleVo.setMachineCode(machineCode);
 
                 // 获取机台定额
                 double machineQuota = getMachineQuota(machine, defaultQuota);
 
                 // 定额约束检查
-                BigDecimal currentCapacity = capacityMaps[classIdx].getOrDefault(machineId, BigDecimal.ZERO);
+                BigDecimal currentCapacity = capacityMaps[classIdx].getOrDefault(machineCode, BigDecimal.ZERO);
                 double remainingCapacity = BigDecimalUtil.sub(machineQuota, currentCapacity.doubleValue());
 
                 if (planQty > remainingCapacity && remainingCapacity > 0) {
                     // 部分可排
                     setClassPlanQty(scheduleVo, classIdx + 1, remainingCapacity);
-                    capacityMaps[classIdx].put(machineId, capacityMaps[classIdx].getOrDefault(machineId, BigDecimal.ZERO)
+                    capacityMaps[classIdx].put(machineCode, capacityMaps[classIdx].getOrDefault(machineCode, BigDecimal.ZERO)
                             .add(BigDecimalUtils.valueOf(remainingCapacity)));
 
                     double overflowQty = BigDecimalUtil.sub(planQty, remainingCapacity);
@@ -279,7 +279,7 @@ public class TqMachineAssignHandler extends AbsTqScheduleStepHandler {
                     deferToNextClass(scheduleVo, classIdx + 1, planQty);
                 } else {
                     // 全部可排
-                    capacityMaps[classIdx].put(machineId, capacityMaps[classIdx].getOrDefault(machineId, BigDecimal.ZERO)
+                    capacityMaps[classIdx].put(machineCode, capacityMaps[classIdx].getOrDefault(machineCode, BigDecimal.ZERO)
                             .add(BigDecimalUtils.valueOf(planQty)));
                 }
 
@@ -288,13 +288,13 @@ public class TqMachineAssignHandler extends AbsTqScheduleStepHandler {
                     if (i == classIdx) continue; // 当前班已处理
                     double classPlan = getClassPlanQty(scheduleVo, i + 1);
                     if (classPlan > 0) {
-                        capacityMaps[i].put(machineId, capacityMaps[i].getOrDefault(machineId, BigDecimal.ZERO)
+                        capacityMaps[i].put(machineCode, capacityMaps[i].getOrDefault(machineCode, BigDecimal.ZERO)
                                 .add(BigDecimalUtils.valueOf(classPlan)));
                     }
                 }
-                plannedMachineMap.put(scheduleVo.getBeadCode(), machineId);
-                putMachineId(scheduleVo.getGlueCode(), machineId, glueMap);
-                putMachineId(scheduleVo.getMouthPlateCode(), machineId, mouthPlatMap);
+                plannedMachineMap.put(scheduleVo.getBeadCode(), machineCode);
+                putMachineCode(scheduleVo.getGlueCode(), machineCode, glueMap);
+                putMachineCode(scheduleVo.getMouthPlateCode(), machineCode, mouthPlatMap);
 
                 chooseMachineLog(scheduleVo, context);
             }
@@ -317,21 +317,21 @@ public class TqMachineAssignHandler extends AbsTqScheduleStepHandler {
      * @return true=切换成功，false=无可用机台
      */
     private boolean trySwitchMachine(TqScheduleResultVo scheduleVo, int classIdx, String classCode,
-                                     double overflowQty, Map<Long, BigDecimal>[] capacityMaps,
+                                     double overflowQty, Map<String, BigDecimal>[] capacityMaps,
                                      List<TqMachineInfo> allMachineList, TqScheduleContext context,
                                      List<IMachineFilterStrategy> sortedStrategies,
-                                     Map<String, Long> plannedMachineMap,
-                                     Map<String, List<Long>> glueMap, Map<String, List<Long>> mouthPlatMap,
+                                     Map<String, String> plannedMachineMap,
+                                     Map<String, List<String>> glueMap, Map<String, List<String>> mouthPlatMap,
                                      double defaultQuota) {
         // 搜索其他可用机台（排除当前已分配的机台）
-        String currentMachineId = scheduleVo.getMachineId();
+        String currentMachineCode = scheduleVo.getMachineCode();
         List<TqMachineInfo> optionalMachineList = searchOptionalMachineList(
                 scheduleVo, classCode, capacityMaps[classIdx], allMachineList, context, sortedStrategies, plannedMachineMap);
 
         // 排除当前机台
-        if (StringUtils.isNotEmpty(currentMachineId)) {
+        if (StringUtils.isNotEmpty(currentMachineCode)) {
             optionalMachineList = optionalMachineList.stream()
-                    .filter(m -> !m.getId().toString().equals(currentMachineId))
+                    .filter(m -> !m.getMachineCode().equals(currentMachineCode))
                     .collect(Collectors.toList());
         }
 
@@ -346,7 +346,7 @@ public class TqMachineAssignHandler extends AbsTqScheduleStepHandler {
         TqMachineInfo switchMachine = optionalMachineList.stream()
                 .max(Comparator.comparingDouble(m -> {
                     double quota = getMachineQuota(m, defaultQuota);
-                    double used = capacityMaps[classIdx].getOrDefault(m.getId(), BigDecimal.ZERO).doubleValue();
+                    double used = capacityMaps[classIdx].getOrDefault(m.getMachineCode(), BigDecimal.ZERO).doubleValue();
                     return BigDecimalUtil.sub(quota, used);
                 })).orElse(null);
 
@@ -355,7 +355,7 @@ public class TqMachineAssignHandler extends AbsTqScheduleStepHandler {
         }
 
         double switchMachineQuota = getMachineQuota(switchMachine, defaultQuota);
-        BigDecimal switchCapacity = capacityMaps[classIdx].getOrDefault(switchMachine.getId(), BigDecimal.ZERO);
+        BigDecimal switchCapacity = capacityMaps[classIdx].getOrDefault(switchMachine.getMachineCode(), BigDecimal.ZERO);
         double switchRemaining = BigDecimalUtil.sub(switchMachineQuota, switchCapacity.doubleValue());
 
         if (switchRemaining <= 0) {
@@ -365,7 +365,7 @@ public class TqMachineAssignHandler extends AbsTqScheduleStepHandler {
         // 在切换机台上排产
         double assignQty = Math.min(overflowQty, switchRemaining);
         // 将部分计划量分配给切换机台（记录在scheduleVo的辅助字段或日志中）
-        capacityMaps[classIdx].put(switchMachine.getId(), capacityMaps[classIdx].getOrDefault(switchMachine.getId(), BigDecimal.ZERO)
+        capacityMaps[classIdx].put(switchMachine.getMachineCode(), capacityMaps[classIdx].getOrDefault(switchMachine.getMachineCode(), BigDecimal.ZERO)
                 .add(BigDecimalUtils.valueOf(assignQty)));
 
         double stillOverflow = BigDecimalUtil.sub(overflowQty, assignQty);
@@ -376,7 +376,7 @@ public class TqMachineAssignHandler extends AbsTqScheduleStepHandler {
 
         autoScheduleLogService.insertTqScheduleLog(scheduleVo.getBatchNo(), scheduleVo.getOrderNo(),
                 "步骤2-切换机台成功", "胎圈代码：" + scheduleVo.getBeadCode()
-                        + "，切换到机台" + switchMachine.getId() + "，排产量" + assignQty
+                        + "，切换到机台" + switchMachine.getMachineCode() + "，排产量" + assignQty
                         + (stillOverflow > 0 ? "，仍有" + stillOverflow + "延后" : ""));
         return true;
     }
@@ -451,11 +451,11 @@ public class TqMachineAssignHandler extends AbsTqScheduleStepHandler {
      * 检索符合条件的可选机台列表。
      */
     private List<TqMachineInfo> searchOptionalMachineList(TqScheduleResultVo scheduleVo, String classCode,
-                                                          Map<Long, BigDecimal> capacityMap,
+                                                          Map<String, BigDecimal> capacityMap,
                                                           List<TqMachineInfo> allMachineList,
                                                           TqScheduleContext context,
                                                           List<IMachineFilterStrategy> sortedStrategies,
-                                                          Map<String, Long> plannedMachineMap) {
+                                                          Map<String, String> plannedMachineMap) {
         // 1. 通过策略链过滤
         List<TqMachineInfo> filtered = new ArrayList<>(allMachineList);
         for (IMachineFilterStrategy strategy : sortedStrategies) {
@@ -474,21 +474,21 @@ public class TqMachineAssignHandler extends AbsTqScheduleStepHandler {
         String beadCode = scheduleVo.getBeadCode();
         filtered = filtered.stream().sorted((m1, m2) -> {
             // 同一个规格优先排在已排过相同规格的机台上
-            Long scheduleMachineId = plannedMachineMap.getOrDefault(beadCode, 0L);
-            Integer hasMachine1 = m1.getId().equals(scheduleMachineId) ? 0 : 1;
-            Integer hasMachine2 = m2.getId().equals(scheduleMachineId) ? 0 : 1;
+            String scheduleMachineCode = plannedMachineMap.getOrDefault(beadCode, "");
+            Integer hasMachine1 = m1.getMachineCode().equals(scheduleMachineCode) ? 0 : 1;
+            Integer hasMachine2 = m2.getMachineCode().equals(scheduleMachineCode) ? 0 : 1;
             int result = hasMachine1.compareTo(hasMachine2);
             if (result != 0) {
                 return result;
             }
             // 按剩余产能升序排序
-            BigDecimal capacity1 = capacityMap.getOrDefault(m1.getId(), BigDecimal.ZERO);
-            BigDecimal capacity2 = capacityMap.getOrDefault(m2.getId(), BigDecimal.ZERO);
+            BigDecimal capacity1 = capacityMap.getOrDefault(m1.getMachineCode(), BigDecimal.ZERO);
+            BigDecimal capacity2 = capacityMap.getOrDefault(m2.getMachineCode(), BigDecimal.ZERO);
             result = capacity1.compareTo(capacity2);
             if (result != 0) {
                 return result;
             }
-            return m1.getId().compareTo(m2.getId());
+            return m1.getMachineCode().compareTo(m2.getMachineCode());
         }).collect(Collectors.toList());
 
         return filtered;
@@ -542,17 +542,17 @@ public class TqMachineAssignHandler extends AbsTqScheduleStepHandler {
     /**
      * 将指定key分配给特定机台
      */
-    private void putMachineId(String key, Long machineId, Map<String, List<Long>> machineMap) {
+    private void putMachineCode(String key, String machineCode, Map<String, List<String>> machineMap) {
         if (StringUtils.isEmpty(key)) {
             return;
         }
-        List<Long> machineList = machineMap.get(key);
+        List<String> machineList = machineMap.get(key);
         if (machineList == null) {
             machineList = new ArrayList<>();
             machineMap.put(key, machineList);
         }
-        if (!machineList.contains(machineId)) {
-            machineList.add(machineId);
+        if (!machineList.contains(machineCode)) {
+            machineList.add(machineCode);
         }
     }
 
@@ -609,18 +609,18 @@ public class TqMachineAssignHandler extends AbsTqScheduleStepHandler {
      * <p>切换班次时，重新计算本班开始预计库存和库存保证班数。</p>
      */
     private void buildTaskChain(TqScheduleContext context) {
-        Map<Long, LinkedList<TqTaskNode>> taskChainMap = new HashMap<>();
+        Map<String, LinkedList<TqTaskNode>> taskChainMap = new HashMap<>();
         List<TqScheduleResultVo> scheduleList = context.getScheduleList();
         double coefficient = context.getParams().getDemandCoefficient() == null ? 2D : context.getParams().getDemandCoefficient();
 
         // 第一步：收集所有节点（不排序）
-        Map<Long, List<TqTaskNode>> machineNodeMap = new HashMap<>();
+        Map<String, List<TqTaskNode>> machineNodeMap = new HashMap<>();
         for (TqScheduleResultVo scheduleVo : scheduleList) {
-            if (StringUtils.isEmpty(scheduleVo.getMachineId())) {
+            if (StringUtils.isEmpty(scheduleVo.getMachineCode())) {
                 continue;
             }
-            Long machineId = Long.valueOf(scheduleVo.getMachineId());
-            List<TqTaskNode> nodeList = machineNodeMap.computeIfAbsent(machineId, k -> new ArrayList<>());
+            String machineCode = scheduleVo.getMachineCode();
+            List<TqTaskNode> nodeList = machineNodeMap.computeIfAbsent(machineCode, k -> new ArrayList<>());
 
             for (int classIdx = 1; classIdx <= 6; classIdx++) {
                 double planQty = getClassPlanQty(scheduleVo, classIdx);
@@ -630,7 +630,7 @@ public class TqMachineAssignHandler extends AbsTqScheduleStepHandler {
 
                 TqTaskNode node = new TqTaskNode();
                 node.setClassIndex(classIdx);
-                node.setMachineId(machineId);
+                node.setMachineCode(machineCode);
                 node.setBeadCode(scheduleVo.getBeadCode());
                 node.setPlanQty(planQty);
                 node.setProduceOrder(getClassProduceOrder(scheduleVo, classIdx));
@@ -641,8 +641,8 @@ public class TqMachineAssignHandler extends AbsTqScheduleStepHandler {
         }
 
         // 第二步：按机台分组，组内按 classIndex升序 → produceOrder升序 排序后构建链
-        for (Map.Entry<Long, List<TqTaskNode>> entry : machineNodeMap.entrySet()) {
-            Long machineId = entry.getKey();
+        for (Map.Entry<String, List<TqTaskNode>> entry : machineNodeMap.entrySet()) {
+            String machineCode = entry.getKey();
             List<TqTaskNode> nodeList = entry.getValue();
 
             // 排序：先按班次，同班次内按生产顺序
@@ -693,7 +693,7 @@ public class TqMachineAssignHandler extends AbsTqScheduleStepHandler {
                 chain.addLast(node);
             }
 
-            taskChainMap.put(machineId, chain);
+            taskChainMap.put(machineCode, chain);
         }
 
         context.setTaskChainMap(taskChainMap);
@@ -731,10 +731,10 @@ public class TqMachineAssignHandler extends AbsTqScheduleStepHandler {
                     .filter(s -> s.getId() != null && s.getId().equals(node.getScheduleId()))
                     .findFirst().orElse(null);
         }
-        // 兜底：按beadCode+machineId匹配
+        // 兜底：按beadCode+machineCode匹配
         return context.getScheduleList().stream()
                 .filter(s -> s.getBeadCode().equals(node.getBeadCode())
-                        && node.getMachineId().toString().equals(s.getMachineId()))
+                        && node.getMachineCode().equals(s.getMachineCode()))
                 .findFirst().orElse(null);
     }
 
@@ -755,11 +755,11 @@ public class TqMachineAssignHandler extends AbsTqScheduleStepHandler {
      * <p>从指定机台指定班次开始，重新计算库存、消耗量、保证班数等。</p>
      *
      * @param context 排程上下文
-     * @param machineId 需要刷新的机台ID，null表示刷新所有机台
+     * @param machineCode 需要刷新的机台编号，null表示刷新所有机台
      * @param fromClassIdx 起始班次索引（1~6），从该班次开始重算
      */
-    public void refreshTaskChain(TqScheduleContext context, Long machineId, int fromClassIdx) {
-        Map<Long, LinkedList<TqTaskNode>> taskChainMap = context.getTaskChainMap();
+    public void refreshTaskChain(TqScheduleContext context, String machineCode, int fromClassIdx) {
+        Map<String, LinkedList<TqTaskNode>> taskChainMap = context.getTaskChainMap();
         if (taskChainMap == null || taskChainMap.isEmpty()) {
             return;
         }
@@ -767,11 +767,11 @@ public class TqMachineAssignHandler extends AbsTqScheduleStepHandler {
         double coefficient = context.getParams().getDemandCoefficient() == null ? 2D : context.getParams().getDemandCoefficient();
 
         // 确定需要刷新的机台列表
-        List<Long> machineIds = machineId != null
-                ? Collections.singletonList(machineId)
+        List<String> machineCodes = machineCode != null
+                ? Collections.singletonList(machineCode)
                 : new ArrayList<>(taskChainMap.keySet());
 
-        for (Long mid : machineIds) {
+        for (String mid : machineCodes) {
             LinkedList<TqTaskNode> chain = taskChainMap.get(mid);
             if (chain == null || chain.isEmpty()) {
                 continue;
@@ -834,7 +834,7 @@ public class TqMachineAssignHandler extends AbsTqScheduleStepHandler {
             }
         }
 
-        log.info("[任务链刷新] 机台:{}, 起始班次:{}", machineId, fromClassIdx);
+        log.info("[任务链刷新] 机台:{}, 起始班次:{}", machineCode, fromClassIdx);
     }
 
     /**

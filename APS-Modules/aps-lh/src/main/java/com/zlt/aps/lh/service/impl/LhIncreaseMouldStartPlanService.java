@@ -8,6 +8,7 @@ import com.ruoyi.common.constant.HttpStatus;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.common.core.constant.ApsConstant;
+import com.zlt.aps.common.core.enums.MouldFinishStatusEnum;
 import com.zlt.aps.lh.api.constant.LhScheduleConstant;
 import com.zlt.aps.lh.api.constant.LhScheduleParamConstant;
 import com.zlt.aps.lh.api.domain.entity.LhMoldAlterPlanFinish;
@@ -50,7 +51,7 @@ public class LhIncreaseMouldStartPlanService {
     /**
      * 模具交替完成状态：已完成。
      */
-    private static final String MOULD_FINISH_COMPLETED = ApsConstant.APS_STRING_1;
+    private static final String MOULD_FINISH_COMPLETED = MouldFinishStatusEnum.COMPLETED.getCode();
 
     /**
      * 中班起始班次索引。

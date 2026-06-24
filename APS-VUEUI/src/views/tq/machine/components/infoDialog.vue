@@ -42,7 +42,7 @@ export default {
       form: {
         classShift: "2",
         openMachineClass: [],
-        status: "0",
+        status: "1",
       },
       rules: {
         machineCode: [
@@ -165,6 +165,8 @@ export default {
           label: this.$t("ui.data.column.machine.status"),
           prop: "status",
           type: "switch",
+          activeValue: "1",
+          inactiveValue: "0",
         },
         {
           label: this.$t("ui.common.column.remark"),

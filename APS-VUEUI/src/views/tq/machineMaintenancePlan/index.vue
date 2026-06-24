@@ -97,11 +97,11 @@ export default {
         },
         {
           label: this.$t("ui.tq.machineMaintenancePlan.column.machineName"),
-          prop: "machineId",
+          prop: "machineCode",
           type: "select",
           dictData: this.machineList,
           labelKey: "machineName",
-          valueKey: "id",
+          valueKey: "machineCode",
           filterable: true,
         },
       ];

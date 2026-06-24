@@ -255,10 +255,10 @@ public class TqRollingUpdateServiceImpl implements ITqRollingUpdateService {
             }
 
             // 计算预计结束时间 = 开始时间 + (计划量 / 生产速度) 小时
-            double speed = getProductionSpeed(context, node.getMachineId(), node.getBeadCode());
+            double speed = getProductionSpeed(context, node.getMachineCode(), node.getBeadCode());
             double planQty = node.getPlanQty();
             if (speed <= 0) {
-                throw new RuntimeException("机台[" + node.getMachineId() + "]胎圈[" + node.getBeadCode()
+                throw new RuntimeException("机台[" + node.getMachineCode() + "]胎圈[" + node.getBeadCode()
                         + "]生产速度配置异常：" + speed);
             }
             double hours = planQty / speed;
@@ -362,8 +362,6 @@ public class TqRollingUpdateServiceImpl implements ITqRollingUpdateService {
         node.setStartTime(startTime);
         node.setEndTime(endTime);
         node.setTaskStatus(StringUtils.isBlank(taskStatus) ? TASK_STATUS_NORMAL : taskStatus);
-        // machineId 需通过机台编号查询，此处暂用null，速度查询时按 machineCode 兜底
-        node.setMachineId(null);
         return node;
     }
 
@@ -606,13 +604,13 @@ public class TqRollingUpdateServiceImpl implements ITqRollingUpdateService {
      * </ul>
      *
      * @param context  滚动上下文
-     * @param machineId 机台ID（可能为null）
+     * @param machineCode 机台编号
      * @param beadCode 胎圈代码
      * @return 生产速度（个/小时）
      */
-    private double getProductionSpeed(TqRollingContext context, Long machineId, String beadCode) {
+    private double getProductionSpeed(TqRollingContext context, String machineCode, String beadCode) {
         // 优先读缓存
-        String cacheKey = (machineId == null ? "null" : machineId.toString()) + ":" + beadCode;
+        String cacheKey = machineCode + ":" + beadCode;
         Double cached = context.getSpeedCache().get(cacheKey);
         if (cached != null) {
             return cached;
@@ -620,15 +618,13 @@ public class TqRollingUpdateServiceImpl implements ITqRollingUpdateService {
 
         // 查数据库
         LambdaQueryWrapper<TqMachineSpecSpeed> wrapper = new LambdaQueryWrapper<>();
-        if (machineId != null) {
-            wrapper.eq(TqMachineSpecSpeed::getMachineId, machineId);
-        }
-        wrapper.eq(TqMachineSpecSpeed::getMaterialCode, beadCode);
+        wrapper.eq(TqMachineSpecSpeed::getMachineCode, machineCode);
+        wrapper.eq(TqMachineSpecSpeed::getBeadCode, beadCode);
         TqMachineSpecSpeed specSpeed = tqMachineSpecSpeedMapper.selectOne(wrapper);
 
         if (specSpeed == null || specSpeed.getStandardSpeed() == null
                 || specSpeed.getStandardSpeed().doubleValue() <= 0) {
-            throw new RuntimeException("机台[" + (machineId == null ? "未知" : machineId)
+            throw new RuntimeException("机台[" + machineCode
                     + "]胎圈[" + beadCode + "]未配置生产速度，请先维护机台规格速度");
         }
 
@@ -743,7 +739,7 @@ public class TqRollingUpdateServiceImpl implements ITqRollingUpdateService {
         try {
             // 1. 查询当前库存（取最新库存日期的数据）
             LambdaQueryWrapper<TqStock> stockWrapper = new LambdaQueryWrapper<>();
-            stockWrapper.eq(TqStock::getMaterialCode, beadCode)
+            stockWrapper.eq(TqStock::getBeadCode, beadCode)
                         .eq(TqStock::getIsDelete, 0)
                         .orderByDesc(TqStock::getStockDate)
                         .last("FETCH FIRST 1 ROWS ONLY");

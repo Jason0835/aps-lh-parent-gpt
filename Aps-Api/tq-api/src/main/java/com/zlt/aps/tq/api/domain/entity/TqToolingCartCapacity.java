@@ -17,17 +17,11 @@ import lombok.EqualsAndHashCode;
 public class TqToolingCartCapacity extends BaseEntity {
     private static final long serialVersionUID = 1L;
 
-    @Excel(name = "ui.tq.toolingCartCapacity.column.cartCode")
-    @ApiModelProperty(value = "工装车编码", position = 20)
-    @TableField("CART_CODE")
-    @ImportValidated(required = true, isCode = true, maxLength = 50)
-    private String cartCode;
-
-    @Excel(name = "ui.tq.toolingCartCapacity.column.materialCode")
+    @Excel(name = "ui.tq.toolingCartCapacity.column.beadCode")
     @ApiModelProperty(value = "胎圈编码", position = 30)
-    @TableField("MATERIAL_CODE")
+    @TableField("BEAD_CODE")
     @ImportValidated(required = true, isCode = true, maxLength = 60)
-    private String materialCode;
+    private String beadCode;
 
     @Excel(name = "ui.tq.toolingCartCapacity.column.cartCapacity")
     @ApiModelProperty(value = "整车容量", position = 40)

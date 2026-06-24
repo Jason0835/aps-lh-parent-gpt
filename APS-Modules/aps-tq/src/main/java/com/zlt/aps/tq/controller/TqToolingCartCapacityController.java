@@ -130,8 +130,7 @@ public class TqToolingCartCapacityController extends AbstractDocBizController<Tq
         List<TqToolingCartCapacityExportVO> voList = new ArrayList<>();
         for (TqToolingCartCapacity entity : list) {
             TqToolingCartCapacityExportVO vo = new TqToolingCartCapacityExportVO();
-            vo.setCartCode(entity.getCartCode());
-            vo.setMaterialCode(entity.getMaterialCode());
+            vo.setBeadCode(entity.getBeadCode());
             vo.setCartCapacity(entity.getCartCapacity());
             vo.setRemark(entity.getRemark());
             vo.setUpdateTime(entity.getUpdateTime());
@@ -143,9 +142,7 @@ public class TqToolingCartCapacityController extends AbstractDocBizController<Tq
     @Override
     protected void builderCondition(QueryWrapper<TqToolingCartCapacity> queryWrapper, TqToolingCartCapacity queryVO) {
         queryWrapper.eq("IS_DELETE", 0);
-        queryWrapper.like(queryVO.getCartCode() != null && !queryVO.getCartCode().isEmpty(),
-                "CART_CODE", queryVO.getCartCode());
-        queryWrapper.like(queryVO.getMaterialCode() != null && !queryVO.getMaterialCode().isEmpty(),
-                "MATERIAL_CODE", queryVO.getMaterialCode());
+        queryWrapper.like(queryVO.getBeadCode() != null && !queryVO.getBeadCode().isEmpty(),
+                "BEAD_CODE", queryVO.getBeadCode());
     }
 }

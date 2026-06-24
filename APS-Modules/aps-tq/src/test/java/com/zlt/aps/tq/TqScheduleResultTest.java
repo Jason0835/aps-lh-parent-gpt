@@ -15,7 +15,7 @@ class TqScheduleResultTest {
 	
 	@Test
 	public void test() throws IOException {
-	    tqEngineService.autoTqSchedule("2025-07-05");
+	    tqEngineService.autoTqSchedule("2025-07-05", "116");
 	}
 
 }

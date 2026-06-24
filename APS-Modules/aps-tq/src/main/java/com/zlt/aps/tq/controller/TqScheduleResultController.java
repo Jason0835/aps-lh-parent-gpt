@@ -45,11 +45,23 @@ import io.swagger.annotations.ApiImplicitParams;
 import io.swagger.annotations.ApiOperation;
 
 /**
- * 胎圈排程结果Controller
+ * 【已废弃】胎圈排程结果Controller（4班次制旧版）
+ *
+ * <p>废弃说明：
+ * <ul>
+ *   <li>本Controller为旧版4班次制胎圈排程接口，已由新版6班次制Controller替代</li>
+ *   <li>新版Controller：{@link com.zlt.aps.tq.controller.TqNewScheduleResultController}</li>
+ *   <li>新版接口前缀：/tq/newScheduleResult/*</li>
+ *   <li>新版算法依据：胎圈自动排程_v5.xmind（6班次制）</li>
+ *   <li>旧版4班次字段（midPlanQty/nightPlanQty/dayPlanQty/nextMidPlanQty）将逐步废弃</li>
+ *   <li>请勿在此Controller新增功能，所有新需求请到新版Controller实现</li>
+ *   <li>计划在前端完全切换到新版接口后，本Controller将一并删除</li>
+ * </ul>
  *
  * @author chen
  * @date 2021-06-21
  */
+@Deprecated
 @RestController
 @RequestMapping("/tq/scheduleResult")
 @Api(tags = "胎圈排程结果信息维护接口")
@@ -244,8 +256,8 @@ public class TqScheduleResultController extends BaseController {
         if (CollectionUtils.isEmpty(list)) {
             return AjaxResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.errorPublish"));
         }
-        // 获取机台id为空和多机台的记录
-        List<TqScheduleResultDto> collect = list.stream().filter(item -> StringUtil.isEmpty(item.getMachineId()) || item.getMachineId().contains(",")).collect(Collectors.toList());
+        // 获取机台编号为空和多机台的记录
+        List<TqScheduleResultDto> collect = list.stream().filter(item -> StringUtil.isEmpty(item.getMachineCode()) || item.getMachineCode().contains(",")).collect(Collectors.toList());
         if (collect.size() > 0) {
             return AjaxResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.hasMultipleIds"));
         }
@@ -301,7 +313,14 @@ public class TqScheduleResultController extends BaseController {
     @PostMapping("/autoPlan")
     public AjaxResult autoPlan(@RequestBody TqScheduleResultDto dto) {
         Date scheduleDate = dto.getScheduleDate();
-        tqEngineService.autoTqSchedule(DateUtils.parseDateToStr("yyyy-MM-dd", scheduleDate));
+        String factoryCode = dto.getFactoryCode();
+        if (scheduleDate == null) {
+            return AjaxResult.error("排程日期不能为空");
+        }
+        if (StringUtils.isEmpty(factoryCode)) {
+            return AjaxResult.error("分厂不能为空");
+        }
+        tqEngineService.autoTqSchedule(DateUtils.parseDateToStr("yyyy-MM-dd", scheduleDate), factoryCode);
         return AjaxResult.success();
     }
 
@@ -348,10 +367,10 @@ public class TqScheduleResultController extends BaseController {
     @PostMapping("/chooseMachine")
     public AjaxResult chooseMachine(@RequestBody TqScheduleResultDto schesduleResult) {
         TqScheduleResultDto scheduleResult0 = tqScheduleResultService.selectScheduleResultById(schesduleResult.getId());
-        if (compare(schesduleResult.getMachineId(), scheduleResult0.getMachineId())) {
+        if (compare(schesduleResult.getMachineCode(), scheduleResult0.getMachineCode())) {
             return AjaxResult.success();
         }
-        scheduleResult0.setMachineId(schesduleResult.getMachineId());
+        scheduleResult0.setMachineCode(schesduleResult.getMachineCode());
         return tqScheduleResultService.chooseMachine(scheduleResult0);
     }
 

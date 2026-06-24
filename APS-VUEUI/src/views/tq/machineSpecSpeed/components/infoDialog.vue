@@ -44,14 +44,14 @@ export default {
       form: {},
       machineList: [],
       rules: {
-        machineId: [
+        machineCode: [
           {
             required: true,
             message: this.$t("common.rule.select"),
             trigger: "change",
           },
         ],
-        materialCode: [
+        beadCode: [
           {
             required: true,
             message: this.$t("common.rule.input"),
@@ -74,7 +74,7 @@ export default {
       return [
         {
           label: this.$t("ui.tq.machineSpecSpeed.column.machineCode"),
-          prop: "machineId",
+          prop: "machineCode",
           span: 24,
           required: true,
           type: "select",
@@ -82,14 +82,14 @@ export default {
           filterable: true,
           loading: this.machineLoading,
           props: {
-            label: "machineCode",
-            value: "id",
+            label: "machineName",
+            value: "machineCode",
           },
           onFocus: this.handleMachineFocus,
         },
         {
-          label: this.$t("ui.tq.machineSpecSpeed.column.materialCode"),
-          prop: "materialCode",
+          label: this.$t("ui.tq.machineSpecSpeed.column.beadCode"),
+          prop: "beadCode",
           span: 24,
           required: true,
           maxlength: "20",

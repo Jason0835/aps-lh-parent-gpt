@@ -176,13 +176,13 @@ public class TqWarningServiceImpl implements ITqWarningService {
         try {
             String templateCode = MsgTemplateEnums.TQ_STOCK_WARNING.getCode();
             messageServiceUtils.sendWarning(templateCode, (String) null,
-                    stock.getMaterialCode(),
+                    stock.getBeadCode(),
                     stock.getStockNum() == null ? "0" : stock.getStockNum().toString(),
                     String.valueOf(threshold));
             log.info("胎圈库存预警消息已发送：物料={}，库存={}，阈值={}",
-                    stock.getMaterialCode(), stock.getStockNum(), threshold);
+                    stock.getBeadCode(), stock.getStockNum(), threshold);
         } catch (Exception e) {
-            log.error("胎圈库存预警消息发送失败：物料={}", stock.getMaterialCode(), e);
+            log.error("胎圈库存预警消息发送失败：物料={}", stock.getBeadCode(), e);
         }
     }
 
