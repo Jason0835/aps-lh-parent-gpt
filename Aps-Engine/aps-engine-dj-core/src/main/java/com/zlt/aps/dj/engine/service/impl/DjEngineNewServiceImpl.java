@@ -583,7 +583,7 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
             DjPaddingDemand demand = new DjPaddingDemand();
             demand.setPaddingCode(paddingCode);
 
-            // 从施工信息获取单耗、胶料等
+            // 从施工信息获取单耗、胶料、垫胶物料名等
             for (MdmConstructionInfo construction : constructionMap.values()) {
                 if (paddingCode.equals(construction.getPaddingCode())) {
                     if (demand.getUnitConsume() == null) {
@@ -591,6 +591,7 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
                                 : BigDecimal.ONE);
                         demand.setConstructionCode(construction.getConstructionCode());
                         demand.setProductionStatus(construction.getProductionStage());
+                        demand.setPaddingName(construction.getPaddingName());
                     }
                     break;
                 }
@@ -1331,6 +1332,7 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
             r.setMachineCode(machineCode);
             r.setPaddingCode(spec.getPaddingCode());
             r.setGlueCode(spec.getGlueCode());
+            r.setPaddingName(spec.getPaddingName());
             return r;
         });
 

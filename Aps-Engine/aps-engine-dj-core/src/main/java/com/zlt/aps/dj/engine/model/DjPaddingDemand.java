@@ -15,6 +15,9 @@ public class DjPaddingDemand {
     /** 垫胶代码 */
     private String paddingCode;
 
+    /** 垫胶物料名 */
+    private String paddingName;
+
     /** 净需求量（总需求 - 有效库存），单位：米 */
     private BigDecimal netDemand;
 

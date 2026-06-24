@@ -96,6 +96,7 @@
   "ui.data.column.dj.scheduleResult.mouthPlateCode": "Mouth Plate Code",
   "ui.data.column.dj.scheduleResult.releaseStatus": "Release Status",
   "ui.data.column.dj.scheduleResult.paddingCode": "Padding",
+  "ui.data.column.dj.scheduleResult.paddingName": "Padding",
   "ui.data.column.dj.scheduleResult.glueCode": "Glue",
   "ui.data.column.dj.scheduleResult.machineCode": "Machine",
   "ui.data.column.dj.scheduleResult.sequence": "Sequence",
