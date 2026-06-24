@@ -106,6 +106,10 @@
   "ui.data.column.dj.scheduleResult.planQty": "Plan Qty",
   "ui.data.column.dj.scheduleResult.finishQty": "Finish Qty",
   "ui.data.column.dj.scheduleResult.analysis": "Analysis",
+  "ui.data.column.dj.scheduleResult.statNightPlanQty": "Night Shift Total",
+  "ui.data.column.dj.scheduleResult.statMorningPlanQty": "Morning Shift Total",
+  "ui.data.column.dj.scheduleResult.statMiddlePlanQty": "Middle Shift Total",
+  "ui.data.column.dj.scheduleResult.prevDayClass3": "Prev Day Early Shift",
   "ui.data.column.cxScheduleResult.cxMachineCode": "Molding Machine",
   "ui.data.column.cxScheduleResult.lhMachineCode": "Curing Machine",
   "ui.data.column.cxScheduleResult.structureName": "Structure",
@@ -673,6 +677,11 @@
   "ui.data.column.dj.dispatcherlog.beforeClass3PlanQty": "Before operation Class3 plan qty",
   "ui.data.column.dj.dispatcherlog.afterMachineId": "After operation machine code",
   "ui.data.column.dj.dispatcherlog.afterDayPlan": "After operation Class1 plan qty",
-  "ui.data.column.dj.dispatcherlog.afterNightPlan": "After operation Class2 plan qty"
+  "ui.data.column.dj.dispatcherlog.afterNightPlan": "After operation Class2 plan qty",
+  "ui.data.column.combinationMiddleAndNight": "Merge Shifts",
+  "ui.data.column.djScheduleResult.modalName": "Padding Schedule Result",
+  "ui.data.column.djScheduleResult.importTitle": "Import padding schedule result data",
+  "ui.data.column.scheduleResult.djPlan2": "Padding plan qty",
+  "ui.biz.alter.makeSureRecreateDj": "Padding schedule already exists for today. Regenerating will overwrite existing records. Are you sure to regenerate?"
 
 }

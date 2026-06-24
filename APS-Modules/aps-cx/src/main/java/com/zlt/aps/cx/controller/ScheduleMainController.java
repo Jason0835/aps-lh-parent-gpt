@@ -976,17 +976,13 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
     }
 
     /**
-     * 从前端传入的params中提取动态排序参数并构建ORDER BY子句
+     * 从前端传入的排序参数构建ORDER BY子句
      * @param queryVO 查询参数对象
-     * @return ORDER BY子句，无动态排序参数时返回null
+     * @return ORDER BY子句，无排序参数时返回null
      */
     private String buildDynamicOrderBy(CxScheduleResult queryVO) {
-        Map<String, Object> params = queryVO.getParams();
-        if (params == null) {
-            return null;
-        }
-        String orderByColumn = (String) params.get("orderByColumn");
-        String isAsc = (String) params.get("isAsc");
+        String orderByColumn = queryVO.getOrderByColumn();
+        String isAsc = queryVO.getIsAsc();
         if (StringUtils.isBlank(orderByColumn)) {
             return null;
         }

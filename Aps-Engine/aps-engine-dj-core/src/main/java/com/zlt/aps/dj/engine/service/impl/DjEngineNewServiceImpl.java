@@ -30,7 +30,6 @@ import com.zlt.aps.dj.api.domain.entity.DjMachineInfo;
 import com.zlt.aps.dj.api.domain.entity.DjMachineMaintenance;
 import com.zlt.aps.dj.api.domain.entity.DjParams;
 import com.zlt.aps.dj.api.domain.entity.DjScheduleResult;
-import com.zlt.aps.dj.api.domain.entity.DjScheduleResultLog;
 import com.zlt.aps.dj.api.domain.entity.DjSpecifyMachine;
 import com.zlt.aps.dj.api.domain.entity.DjStock;
 import com.zlt.aps.dj.engine.constant.DjEngineConstants;
@@ -49,11 +48,13 @@ import com.zlt.aps.dj.engine.mapper.DjEngineStockMapper;
 import com.zlt.aps.dj.engine.model.DjPaddingDemand;
 import com.zlt.aps.dj.engine.model.DjScheduleContext;
 import com.zlt.aps.dj.engine.service.DjEngineNewService;
+import com.zlt.aps.exception.BusinessException;
 import com.zlt.aps.mdm.api.domain.entity.MdmConstructionInfo;
 import com.zlt.aps.mp.api.domain.entity.MpMonthPlanMonitor;
 import com.zlt.core.dao.basedao.BaseDao;
 
 import cn.hutool.core.date.DateUtil;
+import com.ruoyi.common.i18n.utils.I18nUtil;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -120,8 +121,7 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
         // ==================== 步骤1：加载成型计划 ====================
         List<CxScheduleResult> cxScheduleList = this.loadCxSchedule(factoryCode, scheduleDate);
         if (CollectionUtils.isEmpty(cxScheduleList)) {
-            log.warn("步骤1：未加载到成型计划数据，工厂：{}，排产日期：{}", factoryCode, scheduleDate);
-            return Collections.emptyList();
+            throw new BusinessException(I18nUtil.getMessage("ui.dj.engine.noCxSchedule"));
         }
         log.info("步骤1：加载成型计划 {} 条", cxScheduleList.size());
 
@@ -130,22 +130,44 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
         Set<String> constructionCodes = cxScheduleList.stream().map(CxScheduleResult::getEmbryoCode)
                 .filter(Objects::nonNull).collect(Collectors.toSet());
         if (constructionCodes.isEmpty()) {
-            log.warn("步骤2：成型计划中无胎胚代码");
-            return Collections.emptyList();
+            throw new BusinessException(I18nUtil.getMessage("ui.dj.engine.noEmbryoCode"));
         }
 
         // 加载施工数据
         List<MdmConstructionInfo> constructionList = this.loadConstructionInfo(factoryCode,
                 new ArrayList<>(constructionCodes));
         if (CollectionUtils.isEmpty(constructionList)) {
-            log.warn("步骤2：未加载到施工数据");
-            return Collections.emptyList();
+            throw new BusinessException(I18nUtil.getMessage("ui.dj.engine.noConstruction"));
         }
         log.info("步骤2.1：加载施工数据 {} 条", constructionList.size());
 
         // 构建施工号 -> 施工信息 Map
         Map<String, MdmConstructionInfo> constructionMap = constructionList.stream()
                 .collect(Collectors.toMap(MdmConstructionInfo::getConstructionCode, c -> c, (a, b) -> a));
+
+        // 校验：所有胎胚代码必须能匹配到施工数据
+        List<String> unmatchedCodes = constructionCodes.stream()
+                .filter(code -> !constructionMap.containsKey(code))
+                .collect(Collectors.toList());
+        if (!unmatchedCodes.isEmpty()) {
+            log.warn("步骤2：以下胎胚代码无对应施工数据：{}", unmatchedCodes);
+            throw new BusinessException(I18nUtil.getMessage("ui.dj.engine.noConstruction"));
+        }
+
+        // 校验：施工数据中垫胶代码和垫胶长度必须有效
+        List<String> invalidConstructionCodes = new ArrayList<>();
+        for (Map.Entry<String, MdmConstructionInfo> entry : constructionMap.entrySet()) {
+            MdmConstructionInfo construction = entry.getValue();
+            if (StringUtils.isEmpty(construction.getPaddingCode())
+                    || construction.getPaddingLength() == null
+                    || construction.getPaddingLength().compareTo(BigDecimal.ZERO) <= 0) {
+                invalidConstructionCodes.add(entry.getKey());
+            }
+        }
+        if (!invalidConstructionCodes.isEmpty()) {
+            log.warn("步骤2：以下胎胚代码施工数据中垫胶代码或垫胶长度无效：{}", invalidConstructionCodes);
+            throw new BusinessException(I18nUtil.getMessage("ui.dj.engine.invalidConstruction"));
+        }
 
         // 2.2 关联成型计划与施工数据，解析垫胶消耗量
         // 按垫胶规格统计对应的成型机台数量
@@ -226,11 +248,39 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
                 constructionMap, newSpecPaddingCodes);
         log.info("步骤3.3：生成垫胶需求清单 {} 个规格", demandList.size());
 
-        // 初始化交班库存（第1班接班库存 = 有效库存）
+        // 第1班接班库存不等同于有效库存（早上6点快照），需预估6:00~14:00（早班）的库存变化
+        // 公式：接班库存 = 有效库存 + 前日早班垫胶计划量 - 当日早班成型消耗量
+        // 前日早班垫胶计划量：T-1日排产结果中 class3（早班 6:00~14:00）的计划量
+        // 当日早班成型消耗量：CX T日 class1 计划量按单耗换算
         Map<String, BigDecimal> handoverInventory = new HashMap<>();
+        Date prevDate = DateUtil.offsetDay(scheduleDate, -1);
+        List<DjScheduleResult> prevDayResults = djEngineScheduleResultMapper.selectList(
+                new LambdaQueryWrapper<DjScheduleResult>()
+                        .eq(DjScheduleResult::getScheduleDate, prevDate));
+        Map<String, BigDecimal> prevDayClass3Plan = new HashMap<>();
+        if (!CollectionUtils.isEmpty(prevDayResults)) {
+            for (DjScheduleResult r : prevDayResults) {
+                BigDecimal class3Plan = r.getClass3PlanQty();
+                if (class3Plan != null && class3Plan.compareTo(BigDecimal.ZERO) > 0) {
+                    prevDayClass3Plan.merge(r.getPaddingCode(), class3Plan, BigDecimal::add);
+                }
+            }
+        }
         for (DjPaddingDemand demand : demandList) {
-            BigDecimal stock = effectiveStockMap.getOrDefault(demand.getPaddingCode(), BigDecimal.ZERO);
-            handoverInventory.put(demand.getPaddingCode(), stock);
+            String paddingCode = demand.getPaddingCode();
+            BigDecimal stock = effectiveStockMap.getOrDefault(paddingCode, BigDecimal.ZERO);
+            BigDecimal addPlan = prevDayClass3Plan.getOrDefault(paddingCode, BigDecimal.ZERO);
+            // CX class1（早班）消耗量
+            BigDecimal cxConsume = BigDecimal.ZERO;
+            Map<Integer, BigDecimal> shiftConsume = consumeQty.get(paddingCode);
+            if (shiftConsume != null) {
+                cxConsume = shiftConsume.getOrDefault(1, BigDecimal.ZERO);
+            }
+            BigDecimal inventory = stock.add(addPlan).subtract(cxConsume);
+            if (inventory.compareTo(BigDecimal.ZERO) < 0) {
+                inventory = BigDecimal.ZERO;
+            }
+            handoverInventory.put(paddingCode, inventory);
         }
         context.setHandoverInventory(handoverInventory);
 
@@ -238,8 +288,7 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
         // 4.1 加载垫胶机台
         List<DjMachineInfo> machineList = this.loadDjMachines(factoryCode);
         if (CollectionUtils.isEmpty(machineList)) {
-            log.warn("步骤4.1：未加载到垫胶机台数据");
-            return Collections.emptyList();
+            throw new BusinessException(I18nUtil.getMessage("ui.dj.engine.noMachine"));
         }
         Map<String, DjMachineInfo> machineMap = machineList.stream()
                 .collect(Collectors.toMap(DjMachineInfo::getMachineCode, m -> m));
@@ -262,8 +311,7 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
         // 步骤5.1~5.4 核心排产循环
         List<DjScheduleResult> scheduleResults = this.executeSchedule(demandList, context);
         if (CollectionUtils.isEmpty(scheduleResults)) {
-            log.warn("步骤5：排产结果为空");
-            return Collections.emptyList();
+            throw new BusinessException(I18nUtil.getMessage("ui.dj.engine.noScheduleResult"));
         }
         log.info("步骤5.1~5.4：排产完成，生成 {} 条排产结果", scheduleResults.size());
 
@@ -592,6 +640,7 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
                         demand.setConstructionCode(construction.getConstructionCode());
                         demand.setProductionStatus(construction.getProductionStage());
                         demand.setPaddingName(construction.getPaddingName());
+                        demand.setGlueCode(construction.getPaddingRubber());
                     }
                     break;
                 }
@@ -882,6 +931,9 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
                         spec.isTailFinished() ? DjEngineConstants.TAIL_FLAG_YES : DjEngineConstants.TAIL_FLAG_NO);
                 result.setReleaseStatus(DjEngineConstants.RELEASE_STATUS_UNPUBLISHED);
                 result.setDataSource(DjEngineConstants.DATA_SOURCE_AUTO);
+                // 记录排程时使用的有效库存
+                result.setStockQty(
+                        context.getEffectiveStockMap().getOrDefault(spec.getPaddingCode(), BigDecimal.ZERO));
                 results.add(result);
             }
         }
@@ -1336,13 +1388,19 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
             return r;
         });
 
-        // 设置对应班次的计划量和顺序
-        int order = context.getCurrentOrderSeq() + 1;
-        context.setCurrentOrderSeq(order);
+        // 各机台各班次使用独立的生产顺序计数器
+        Map<String, Map<Integer, Integer>> shiftSeqMap = context.getShiftSequenceMap();
+        if (shiftSeqMap == null) {
+            shiftSeqMap = new HashMap<>();
+            context.setShiftSequenceMap(shiftSeqMap);
+        }
+        Map<Integer, Integer> machineShiftSeq = shiftSeqMap.computeIfAbsent(machineCode, k -> new HashMap<>());
+        int seq = machineShiftSeq.getOrDefault(shiftIndex, 0) + 1;
+        machineShiftSeq.put(shiftIndex, seq);
 
         // 使用 setFieldValueByFieldName 动态设置对应班次的计划量和顺序
         result.setFieldValueByFieldName(String.format(DjEngineConstants.CLASS_PLAN_QTY_FIELD, shiftIndex), produceQty);
-        result.setFieldValueByFieldName(String.format(DjEngineConstants.CLASS_SEQUENCE_FIELD, shiftIndex), order);
+        result.setFieldValueByFieldName(String.format(DjEngineConstants.CLASS_SEQUENCE_FIELD, shiftIndex), seq);
     }
 
     /**
@@ -1407,11 +1465,11 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
         String dateStr = DateUtil.format(scheduleDate, DjEngineConstants.BATCH_NO_DATE_FORMAT);
         String prefix = DjEngineConstants.BATCH_NO_PREFIX + dateStr;
 
-        // 查询当天已使用的最大批次号序号（从日志表中查询最大批次号）
-        List<DjScheduleResultLog> logRecords = djEngineScheduleResultLogMapper.selectList(
-                new LambdaQueryWrapper<DjScheduleResultLog>().eq(DjScheduleResultLog::getScheduleDate, scheduleDate)
-                        .isNotNull(DjScheduleResultLog::getBatchNo));
-        String maxBatchNo = logRecords.stream().map(DjScheduleResultLog::getBatchNo).max(String::compareTo)
+        // 查询当天已使用的最大批次号序号（从排程结果主表中查询，归档在生成批次号之后执行）
+        List<DjScheduleResult> records = djEngineScheduleResultMapper.selectList(
+                new LambdaQueryWrapper<DjScheduleResult>().eq(DjScheduleResult::getScheduleDate, scheduleDate)
+                        .isNotNull(DjScheduleResult::getBatchNo));
+        String maxBatchNo = records.stream().map(DjScheduleResult::getBatchNo).max(String::compareTo)
                 .orElse(null);
         int seq = 1; // 默认从001开始
         if (maxBatchNo != null && maxBatchNo.startsWith(prefix)) {

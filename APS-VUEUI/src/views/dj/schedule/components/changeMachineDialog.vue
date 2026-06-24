@@ -46,7 +46,7 @@
 import moment from "moment";
 import { mapState } from "vuex";
 
-import { batchChangeMachine } from "@/api/nc/ncScheduleResult.js";
+import { batchChangeMachine } from "@/api/dj/djScheduleResult.js";
 
 export default {
   components: { },
@@ -74,7 +74,7 @@ export default {
       machines: (state) => state.insideLiner.machines,
     }),
     title: function () {
-      return this.$t("ui.data.column.ncScheduleResult.modalName");
+      return this.$t("ui.data.column.djScheduleResult.modalName");
     },
   },
   methods: {
