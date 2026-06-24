@@ -5,6 +5,7 @@ import cn.hutool.json.JSONObject;
 import cn.hutool.json.JSONUtil;
 import com.zlt.aps.common.engine.schedule.ScheduleScoreResult;
 import com.zlt.aps.tm.engine.domain.TmMachineCandidate;
+import com.zlt.aps.tm.engine.service.impl.TmSnapshotBuildService;
 import org.junit.Test;
 
 import java.math.BigDecimal;

@@ -6,6 +6,8 @@ import com.zlt.aps.mp.engine.enums.TbrRequireLogType;
 import com.zlt.aps.mp.engine.utils.TbrProductionLogUtils;
 import lombok.extern.slf4j.Slf4j;
 
+import java.math.BigDecimal;
+
 /**
  * 需求计算日志记录器
  * TBR-结构名
@@ -58,6 +60,26 @@ public class PlanRequireLogRecorder {
                 context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
                 groupKey, actualQuantity, sumNetQty, percent,
                 mouldCapacity, maxCycleQty);
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrRequireLogType.REQUIRE_ESTIMATE, logContent);
+        return logContent;
+    }
+
+    /**
+     * 增加结构高优先级需求量占比日志记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构 %s 高优先级需求量占比 %s 高优先级总需求量 %s 净需求总量 %s ====
+     *
+     * @param context                 排程上下文
+     * @param groupName               结构名称
+     * @param groupHeightRequireRatio 比例
+     * @param sumNetQty               总净需求
+     * @param sumHeightQty            总高优先级需求量
+     * @return
+     */
+    public static String addGroupHeightRequireRatioLog(Context context, String groupName, BigDecimal groupHeightRequireRatio, Integer sumNetQty, Integer sumHeightQty) {
+        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构 %s 高优先级需求量占比 %s 高优先级总需求量 %s 净需求总量 %s ====",
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
+                groupName, groupHeightRequireRatio, sumHeightQty, sumNetQty);
         ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
         TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrRequireLogType.REQUIRE_ESTIMATE, logContent);
         return logContent;

@@ -84,11 +84,31 @@
 <script>
 import {mapState} from "vuex";
 import {downloadLink} from "@/utils/request";
-import {autoPlan, listTmScheduleResult, publishScheduleResult, publishValidate, removeTmScheduleResult,} from "@/api/tm/scheduleResult";
+import {
+  autoPlan,
+  listScheduleShiftDates,
+  listTmScheduleResult,
+  publishScheduleResult,
+  publishValidate,
+  removeTmScheduleResult,
+} from "@/api/tm/scheduleResult";
 import tltUpload from "@/components/tltUpload/tltUpload.vue";
 import TltUploadForm from "@/views/components/tltUploadForm.vue";
 import infoDialog from "./components/infoDialog.vue";
 import changeMachineDialog from "./components/changeMachineDialog.vue";
+
+const formatDate = (date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const getOffsetDate = (offsetDay) => {
+  const date = new Date();
+  date.setDate(date.getDate() + offsetDay);
+  return formatDate(date);
+};
 
 export default {
   name: "TmScheduleResult",
@@ -135,6 +155,14 @@ export default {
       query: {},
       importDefaultValue: {},
       importRules: {},
+      dateList: [
+        { shift: 1, shiftType: "night", shiftDate: "" },
+        { shift: 2, shiftType: "morning", shiftDate: "" },
+        { shift: 3, shiftType: "afternoon", shiftDate: "" },
+        { shift: 4, shiftType: "night", shiftDate: "" },
+        { shift: 5, shiftType: "morning", shiftDate: "" },
+        { shift: 6, shiftType: "afternoon", shiftDate: "" },
+      ],
     };
   },
   computed: {
@@ -207,6 +235,144 @@ export default {
           },
         },
         {
+          label: this.getShiftLabel(1),
+          children: [
+            {
+              prop: "class1Sequence",
+              align: "center",
+              label: this.$t("ui.data.column.tm.scheduleResult.class1Sequence"),
+              minWidth: 70,
+            },
+            {
+              prop: "class1PlanQty",
+              align: "center",
+              label: this.$t("ui.data.column.tm.scheduleResult.class1PlanQty"),
+              minWidth: 70,
+            },
+            {
+              prop: "class1FinishQty",
+              align: "center",
+              label: this.$t("ui.data.column.tm.scheduleResult.class1FinishQty"),
+              minWidth: 70,
+            },
+          ],
+        },
+        {
+          label: this.getShiftLabel(2),
+          children: [
+            {
+              prop: "class2Sequence",
+              align: "center",
+              label: this.$t("ui.data.column.tm.scheduleResult.class2Sequence"),
+              minWidth: 70,
+            },
+            {
+              prop: "class2PlanQty",
+              align: "center",
+              label: this.$t("ui.data.column.tm.scheduleResult.class2PlanQty"),
+              minWidth: 70,
+            },
+            {
+              prop: "class2FinishQty",
+              align: "center",
+              label: this.$t("ui.data.column.tm.scheduleResult.class2FinishQty"),
+              minWidth: 70,
+            },
+          ],
+        },
+        {
+          label: this.getShiftLabel(3),
+          children: [
+            {
+              prop: "class3Sequence",
+              align: "center",
+              label: this.$t("ui.data.column.tm.scheduleResult.class3Sequence"),
+              minWidth: 70,
+            },
+            {
+              prop: "class3PlanQty",
+              align: "center",
+              label: this.$t("ui.data.column.tm.scheduleResult.class3PlanQty"),
+              minWidth: 70,
+            },
+            {
+              prop: "class3FinishQty",
+              align: "center",
+              label: this.$t("ui.data.column.tm.scheduleResult.class3FinishQty"),
+              minWidth: 70,
+            },
+          ],
+        },
+        {
+          label: this.getShiftLabel(4),
+          children: [
+            {
+              prop: "class4Sequence",
+              align: "center",
+              label: this.$t("ui.data.column.tm.scheduleResult.class4Sequence"),
+              minWidth: 70,
+            },
+            {
+              prop: "class4PlanQty",
+              align: "center",
+              label: this.$t("ui.data.column.tm.scheduleResult.class4PlanQty"),
+              minWidth: 70,
+            },
+            {
+              prop: "class4FinishQty",
+              align: "center",
+              label: this.$t("ui.data.column.tm.scheduleResult.class4FinishQty"),
+              minWidth: 70,
+            },
+          ],
+        },
+        {
+          label: this.getShiftLabel(5),
+          children: [
+            {
+              prop: "class5Sequence",
+              align: "center",
+              label: this.$t("ui.data.column.tm.scheduleResult.class5Sequence"),
+              minWidth: 70,
+            },
+            {
+              prop: "class5PlanQty",
+              align: "center",
+              label: this.$t("ui.data.column.tm.scheduleResult.class5PlanQty"),
+              minWidth: 70,
+            },
+            {
+              prop: "class5FinishQty",
+              align: "center",
+              label: this.$t("ui.data.column.tm.scheduleResult.class5FinishQty"),
+              minWidth: 70,
+            },
+          ],
+        },
+        {
+          label: this.getShiftLabel(6),
+          children: [
+            {
+              prop: "class6Sequence",
+              align: "center",
+              label: this.$t("ui.data.column.tm.scheduleResult.class6Sequence"),
+              minWidth: 70,
+            },
+            {
+              prop: "class6PlanQty",
+              align: "center",
+              label: this.$t("ui.data.column.tm.scheduleResult.class6PlanQty"),
+              minWidth: 70,
+            },
+            {
+              prop: "class6FinishQty",
+              align: "center",
+              label: this.$t("ui.data.column.tm.scheduleResult.class6FinishQty"),
+              minWidth: 70,
+            },
+          ],
+        },
+        {
           prop: "updateTime",
           label: this.$t("ui.data.column.updateTime"),
           width: 180,
@@ -261,10 +427,13 @@ export default {
           label: this.$t("ui.data.column.tm.scheduleResult.orderNo"),
         },
         {
-          prop: "scheduleDate",
           label: this.$t("ui.data.column.tm.scheduleResult.scheduleDate"),
-          type: "daterange",
+          prop: "scheduleDateQuery",
+          type: "date",
           valueFormat: "yyyy-MM-dd",
+          listeners: {
+            change: this.handleScheduleDateChange,
+          },
         },
         {
           prop: "treadCode",
@@ -290,6 +459,33 @@ export default {
     },
   },
   methods: {
+    getShiftLabel(shiftIndex) {
+      const item = this.dateList[shiftIndex - 1];
+      if (!item) return "";
+      const shiftNameMap = {
+        night: this.$t("ui.data.column.scheduleResult.nightShift"),
+        morning: this.$t("ui.data.column.scheduleResult.morningShift"),
+        afternoon: this.$t("ui.data.column.scheduleResult.middleShift"),
+      };
+      const shiftName = shiftNameMap[item.shiftType] || "";
+      return shiftName + " " + (item.shiftDate || "");
+    },
+    handleScheduleDateChange(val) {
+      this.query.scheduleDateQuery = val;
+      this.getDate();
+    },
+    async getDate() {
+      try {
+        let res = await listScheduleShiftDates({
+          scheduleDateQuery: this.query.scheduleDateQuery || this.search.scheduleDateQuery,
+        });
+        if (res && res.length > 0) {
+          this.dateList = res;
+        }
+      } catch (error) {
+        console.error(error);
+      }
+    },
     handleAdd() {
       if (this.$refs.infoRef) {
         this.$refs.infoRef.show();
@@ -432,7 +628,10 @@ export default {
         ...this.query,
         ...this.sort,
       };
-
+      if (!params.orderByColumn) {
+        params.orderByColumn = "scheduleDate,machineCode,class1Sequence";
+        params.isAsc = "asc,asc,asc";
+      }
       if (hasPage) {
         params.pageSize = this.page.pageSize;
         params.pageNum = this.page.current;
@@ -449,6 +648,7 @@ export default {
     async getList() {
       try {
         this.loading = true;
+        await this.getDate();
         const data = await listTmScheduleResult(this.formatParams());
         this.data = data.rows;
         this.page.total = data.total;
@@ -466,9 +666,11 @@ export default {
     };
     this.search = {
       ...defaultParams,
+      scheduleDateQuery: getOffsetDate(2),
     };
     this.query = {
       ...defaultParams,
+      scheduleDateQuery: getOffsetDate(2),
     };
     this.getList();
   },

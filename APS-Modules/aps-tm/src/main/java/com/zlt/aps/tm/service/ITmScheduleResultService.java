@@ -3,6 +3,7 @@ package com.zlt.aps.tm.service;
 import com.zlt.aps.tm.api.domain.entity.TmScheduleResult;
 import com.zlt.aps.tm.api.domain.vo.TmAutoScheduleRequestVo;
 import com.zlt.aps.tm.api.domain.vo.TmAutoScheduleResponseVo;
+import com.zlt.aps.tm.api.domain.vo.TmScheduleShiftDateVO;
 import com.zlt.bill.common.service.IDocService;
 
 import java.util.Date;
@@ -48,7 +49,20 @@ public interface ITmScheduleResultService extends IDocService<TmScheduleResult> 
      * @return 自动排程响应，包含批次、追踪号和校验消息
      * @throws com.ruoyi.common.exception.ServiceException 请求缺少工厂或排程日期时抛出
      */
-    TmAutoScheduleResponseVo validateAutoPlan(TmAutoScheduleRequestVo request);
+    TmAutoScheduleResponseVo validateTmAutoPlan(TmAutoScheduleRequestVo request);
+
+    /**
+     * 校验胎面自动排程请求。
+     *
+     * <p>兼容旧 Java 调用名，后续新代码请使用 {@link #validateTmAutoPlan(TmAutoScheduleRequestVo)}。</p>
+     *
+     * @param request 自动排程请求
+     * @return 自动排程校验响应
+     */
+    @Deprecated
+    default TmAutoScheduleResponseVo validateAutoPlan(TmAutoScheduleRequestVo request) {
+        return validateTmAutoPlan(request);
+    }
 
     /**
      * 执行胎面自动排程结构闭环。
@@ -59,7 +73,20 @@ public interface ITmScheduleResultService extends IDocService<TmScheduleResult> 
      * @return 自动排程响应
      * @throws com.ruoyi.common.exception.ServiceException 请求非法时抛出
      */
-    TmAutoScheduleResponseVo autoPlan(TmAutoScheduleRequestVo request);
+    TmAutoScheduleResponseVo tmAutoPlan(TmAutoScheduleRequestVo request);
+
+    /**
+     * 执行胎面自动排程。
+     *
+     * <p>兼容旧 Java 调用名，后续新代码请使用 {@link #tmAutoPlan(TmAutoScheduleRequestVo)}。</p>
+     *
+     * @param request 自动排程请求
+     * @return 自动排程响应
+     */
+    @Deprecated
+    default TmAutoScheduleResponseVo autoPlan(TmAutoScheduleRequestVo request) {
+        return tmAutoPlan(request);
+    }
 
     /**
      * 查询胎面排程看板数据。
@@ -88,6 +115,15 @@ public interface ITmScheduleResultService extends IDocService<TmScheduleResult> 
     int changeQty(TmScheduleResult scheduleResult);
 
     /**
+     * 调整排程机台。
+     *
+     * @param scheduleResult 转机台后的排程结果
+     * @return 更新行数
+     * @throws com.ruoyi.common.exception.ServiceException 记录不存在或处于不可调整状态时抛出
+     */
+    int changeMachine(TmScheduleResult scheduleResult);
+
+    /**
      * 校验排程结果是否允许发布。
      *
      * @param ids 排程结果ID列表
@@ -104,4 +140,13 @@ public interface ITmScheduleResultService extends IDocService<TmScheduleResult> 
      * @throws com.ruoyi.common.exception.ServiceException 参数非法或记录不可发布时抛出
      */
     int publish(List<Long> ids);
+
+    /**
+     * 胎面排程班次日期列表
+     * 根据排程日期构建6个班次的日期展示列表
+     *
+     * @param scheduleDate 排程日期
+     * @return 班次日期列表
+     */
+    List<TmScheduleShiftDateVO> listScheduleShiftDates(Date scheduleDate);
 }

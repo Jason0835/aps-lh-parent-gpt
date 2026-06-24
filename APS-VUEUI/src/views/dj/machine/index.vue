@@ -79,7 +79,7 @@ import TltUploadForm from "@/views/components/tltUploadForm.vue";
 export default {
  name: "djMachine",
   components: { InfoDialog, TltUploadForm },
-  dicts: ["STATUS", "CLASS_SHIFT", "CLASS_NUM_THREE", "CLASS_NUM", "biz_factory_name"],
+  dicts: ["STATUS", "CLASS_SHIFT", "class_num_three_plan", "biz_factory_name"],
 
   provide() {
     return {
@@ -224,13 +224,7 @@ export default {
             if (this.isEmpty(value)) {
               return "";
             }
-            if (row.classShift === "3") {
-              return this.selectDictLabels(
-                this.dict.type.CLASS_NUM_THREE,
-                value
-              );
-            }
-            return this.selectDictLabels(this.dict.type.CLASS_NUM, value);
+            return this.selectDictLabels(this.dict.type.class_num_three_plan, value);
           },
         },
         {

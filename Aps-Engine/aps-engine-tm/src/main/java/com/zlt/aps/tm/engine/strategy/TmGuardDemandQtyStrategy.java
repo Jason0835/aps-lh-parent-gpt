@@ -1,7 +1,11 @@
 package com.zlt.aps.tm.engine.strategy;
 
+import com.ruoyi.common.exception.ServiceException;
+import com.zlt.aps.tm.api.enums.TmScheduleErrorCodeEnum;
 import com.zlt.aps.tm.engine.domain.TmDemandQtyInput;
 import com.zlt.aps.tm.engine.domain.TmDemandQtyResult;
+import com.zlt.aps.tm.engine.domain.TmScheduleContext;
+import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -10,23 +14,37 @@ import java.math.RoundingMode;
  * 胎面库存保证需求量策略。
  *
  * <p>按“当前班需求”和“库存最低保证班数缺口”取大值生成基础应排需求。
- * 本策略只使用 6 点库存滚动余额，不接入来源未确认的已计划入库量、已占用量、不良量和调整量。</p>
+ * 本策略只使用 6 点库存滚动余额，不接入来源未确认的已计划入库量、已占用量、不良量和调整量。
+ * 通过 {@link Component} 注册为 Spring Bean，由 {@link TmStrategyRegistry} 按算法编码 "1" 收集。</p>
  */
-public class TmGuardDemandQtyStrategy {
+@Component
+public class TmGuardDemandQtyStrategy implements ITmDemandQtyStrategy {
 
     /** 库存最低保证班数缺省值 */
     public static final int DEFAULT_GUARD_SHIFT_COUNT = 2;
 
     /**
+     * 获取算法编码。
+     *
+     * @return 算法编码
+     */
+    @Override
+    public String getAlgorithmCode() {
+        return "1";
+    }
+
+    /**
      * 计算胎面基础应排需求。
      *
-     * @param input 需求量计算输入
+     * @param input   需求量计算输入
+     * @param context 胎面排程上下文（当前算法暂不使用，预留扩展）
      * @return 需求量计算结果
-     * @throws IllegalArgumentException 入参为空时抛出
+     * @throws ServiceException 入参为空时抛出
      */
-    public TmDemandQtyResult calculate(TmDemandQtyInput input) {
+    @Override
+    public TmDemandQtyResult calculate(TmDemandQtyInput input, TmScheduleContext context) {
         if (input == null) {
-            throw new IllegalArgumentException("需求量计算输入不能为空");
+            throw new ServiceException(TmScheduleErrorCodeEnum.TM_INVENTORY_PREDICT_INVALID.getDefaultMessage());
         }
         BigDecimal currentDemand = nvl(input.getCurrentShiftDemandQty());
         BigDecimal guardDemand = nvl(input.getGuardDemandQty());

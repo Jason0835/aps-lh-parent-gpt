@@ -16,6 +16,9 @@ public class TmPlanQtyResult {
     /** 基础应排需求量 */
     private BigDecimal baseDemandQty;
 
+    /** 损耗补偿量 */
+    private BigDecimal lossAddQty;
+
     /** 工装限制调整量 */
     private BigDecimal toolLimitAdjustQty;
 

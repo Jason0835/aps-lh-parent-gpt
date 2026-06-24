@@ -9,9 +9,9 @@ import com.zlt.aps.tm.api.domain.entity.TmScheduleResultExplain;
 import com.zlt.aps.tm.engine.domain.TmScheduleContext;
 import com.zlt.aps.tm.engine.domain.TmSnapshotBuildResult;
 import com.zlt.aps.tm.engine.domain.TmTaskDraft;
-import com.zlt.aps.tm.engine.service.TmPersistService;
-import com.zlt.aps.tm.engine.service.TmPlanBootstrapService;
-import com.zlt.aps.tm.engine.service.TmSnapshotBuildService;
+import com.zlt.aps.tm.engine.service.impl.TmPersistService;
+import com.zlt.aps.tm.engine.service.impl.TmPlanBootstrapService;
+import com.zlt.aps.tm.engine.service.impl.TmSnapshotBuildService;
 import com.zlt.aps.tm.mapper.TmScheduleResultExplainMapper;
 import com.zlt.aps.tm.mapper.TmScheduleResultMapper;
 import com.zlt.aps.tm.service.TmAutoScheduleDataLoadService;
@@ -79,6 +79,10 @@ public class TmScheduleBusinessStepServiceTest {
                 .thenReturn(Collections.singletonList(result));
         when(persistService.convertExplain(any(TmTaskDraft.class), any(TmSnapshotBuildResult.class), any(TmScheduleContext.class)))
                 .thenReturn(explain);
+        when(scheduleResultMapper.insert(result)).thenAnswer(invocation -> {
+            result.setId(1L);
+            return 1;
+        });
 
         new TmBizSnapshotAndPersistService(new TmSnapshotBuildService(), persistService,
                 scheduleResultMapper, scheduleResultExplainMapper).snapshotAndPersist(context);

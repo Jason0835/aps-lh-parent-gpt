@@ -33,6 +33,7 @@ public enum ClassNumThreePlanEnums {
     private ClassNumThreePlanEnums(String classIndex,String className, String nextClass){
         this.classIndex=classIndex;
         this.className=className;
+        this.nextClass = nextClass;
     }
 
     /**

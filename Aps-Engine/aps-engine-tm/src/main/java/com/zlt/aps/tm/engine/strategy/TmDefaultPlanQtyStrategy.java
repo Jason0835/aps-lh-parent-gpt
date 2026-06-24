@@ -1,7 +1,11 @@
 package com.zlt.aps.tm.engine.strategy;
 
+import com.ruoyi.common.exception.ServiceException;
+import com.zlt.aps.tm.api.enums.TmScheduleErrorCodeEnum;
 import com.zlt.aps.tm.engine.domain.TmPlanQtyResult;
+import com.zlt.aps.tm.engine.domain.TmScheduleContext;
 import com.zlt.aps.tm.engine.domain.TmTaskDraft;
+import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -10,20 +14,37 @@ import java.math.RoundingMode;
  * 胎面默认计划量策略。
  *
  * <p>按基础需求、工装限制、最小起排、卷数取整、产能压缩顺序计算计划量。
- * 本策略只依赖任务草稿中已明确的数据，不读取数据库，不修改任务链。</p>
+ * 本策略只依赖任务草稿中已明确的数据，不读取数据库，不修改任务链。
+ * 通过 {@link Component} 注册为 Spring Bean，由 {@link TmStrategyRegistry} 按编码 "DEFAULT" 收集。</p>
  */
-public class TmDefaultPlanQtyStrategy {
+@Component
+public class TmDefaultPlanQtyStrategy implements ITmPlanQtyStrategy {
+
+    /** 是 */
+    private static final String YES = "1";
+
+    /**
+     * 获取策略编码。
+     *
+     * @return 策略编码
+     */
+    @Override
+    public String getStrategyCode() {
+        return "DEFAULT";
+    }
 
     /**
      * 计算胎面计划量。
      *
      * @param taskDraft 胎面任务草稿
+     * @param context   胎面排程上下文（当前算法暂不使用，预留扩展）
      * @return 计划量分量和最终计划量
-     * @throws IllegalArgumentException 任务为空时抛出
+     * @throws ServiceException 任务为空时抛出
      */
-    public TmPlanQtyResult calculate(TmTaskDraft taskDraft) {
+    @Override
+    public TmPlanQtyResult calculate(TmTaskDraft taskDraft, TmScheduleContext context) {
         if (taskDraft == null) {
-            throw new IllegalArgumentException("计划量计算任务不能为空");
+            throw new ServiceException(TmScheduleErrorCodeEnum.TM_TASK_NOT_FOUND.getDefaultMessage());
         }
         // steve's TODO：试验胶版本化口径待确认后接入
         BigDecimal planQty = nvl(taskDraft.getCurrentShiftDemandQty())
@@ -31,25 +52,75 @@ public class TmDefaultPlanQtyStrategy {
         TmPlanQtyResult result = new TmPlanQtyResult();
         result.setBaseDemandQty(planQty);
 
+        boolean tailTask = isTailTask(taskDraft, planQty);
+        result.setLossAddQty(BigDecimal.ZERO);
+        result.setMinStartAdjustQty(BigDecimal.ZERO);
+        result.setTailRoundAdjustQty(BigDecimal.ZERO);
+
+        if (tailTask) {
+            BigDecimal beforeTail = planQty;
+            BigDecimal tailBaseQty = nvl(taskDraft.getTailBalanceQty()).multiply(nvl(taskDraft.getTreadShoulderLength()));
+            BigDecimal lossAddQty = calculateLossAddQty(tailBaseQty, taskDraft.getLossRate());
+            planQty = tailBaseQty.add(lossAddQty);
+            result.setLossAddQty(lossAddQty);
+            result.setTailRoundAdjustQty(planQty.subtract(beforeTail));
+        }
+
         BigDecimal beforeTool = planQty;
         planQty = applyToolLimit(taskDraft, planQty);
         result.setToolLimitAdjustQty(planQty.subtract(beforeTool));
 
-        BigDecimal beforeMinStart = planQty;
-        planQty = applyMinStartQty(taskDraft, planQty);
-        result.setMinStartAdjustQty(planQty.subtract(beforeMinStart));
+        if (!tailTask) {
+            BigDecimal beforeMinStart = planQty;
+            planQty = applyMinStartQty(taskDraft, planQty);
+            result.setMinStartAdjustQty(planQty.subtract(beforeMinStart));
 
-        BigDecimal beforeRound = planQty;
-        planQty = roundToCurlLength(taskDraft, planQty);
-        result.setTailRoundAdjustQty(planQty.subtract(beforeRound));
+            BigDecimal beforeRound = planQty;
+            planQty = roundToCurlLength(taskDraft, planQty);
+            result.setTailRoundAdjustQty(planQty.subtract(beforeRound));
+        }
 
         BigDecimal beforeCapacity = planQty;
         planQty = applyCapacity(taskDraft, planQty);
         result.setCapacityAdjustQty(planQty.subtract(beforeCapacity));
+
         result.setFinalPlanQty(planQty);
-        result.setCalcFormulaDesc("基础需求->工装限制->最小起排->卷数取整->产能压缩");
+        result.setCalcFormulaDesc(tailTask
+                ? "收尾余量->损耗补偿->工装限制->产能压缩"
+                : "基础需求->工装限制->最小起排->卷数取整->产能压缩");
         taskDraft.setPlanQty(planQty);
         return result;
+    }
+
+    /**
+     * 判断是否按收尾规格计算计划量。
+     *
+     * @param taskDraft     胎面任务草稿
+     * @param baseDemandQty 基础应排需求量
+     * @return true 表示收尾规格、成型余量和肩长有效，且收尾基础量不大于基础需求
+     */
+    private boolean isTailTask(TmTaskDraft taskDraft, BigDecimal baseDemandQty) {
+        BigDecimal tailBaseQty = nvl(taskDraft.getTailBalanceQty()).multiply(nvl(taskDraft.getTreadShoulderLength()));
+        return YES.equals(taskDraft.getTailFlag())
+                && nvl(taskDraft.getTailBalanceQty()).compareTo(BigDecimal.ZERO) > 0
+                && nvl(taskDraft.getTreadShoulderLength()).compareTo(BigDecimal.ZERO) > 0
+                && tailBaseQty.compareTo(nvl(baseDemandQty)) <= 0;
+    }
+
+    /**
+     * 计算收尾损耗补偿量。
+     *
+     * @param tailBaseQty 收尾基础量
+     * @param lossRate    损耗率，百分比
+     * @return 损耗补偿量
+     */
+    private BigDecimal calculateLossAddQty(BigDecimal tailBaseQty, BigDecimal lossRate) {
+        BigDecimal rate = nvl(lossRate).divide(BigDecimal.valueOf(100), 6, RoundingMode.HALF_UP);
+        if (tailBaseQty == null || tailBaseQty.compareTo(BigDecimal.ZERO) <= 0
+                || rate.compareTo(BigDecimal.ZERO) <= 0) {
+            return BigDecimal.ZERO;
+        }
+        return tailBaseQty.multiply(rate);
     }
 
     /**
@@ -64,7 +135,7 @@ public class TmDefaultPlanQtyStrategy {
         if (taskDraft.getTotalToolQty() == null || curlLength.compareTo(BigDecimal.ZERO) <= 0) {
             return planQty;
         }
-        BigDecimal usedToolQty = nvl(taskDraft.getSixClockStockQty()).divide(curlLength, 6, RoundingMode.HALF_UP);
+        BigDecimal usedToolQty = nvl(taskDraft.getRollingStockQty()).divide(curlLength, 6, RoundingMode.HALF_UP);
         BigDecimal availableToolQty = taskDraft.getTotalToolQty().subtract(usedToolQty).max(BigDecimal.ZERO);
         BigDecimal maxPlanQty = availableToolQty.multiply(curlLength);
         return planQty.min(maxPlanQty);

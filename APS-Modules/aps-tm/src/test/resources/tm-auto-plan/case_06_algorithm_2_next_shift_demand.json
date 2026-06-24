@@ -1,0 +1,100 @@
+{
+  "caseName": "case_06_algorithm_2_next_shift_demand",
+  "description": "参数 TM_ALGORITHM_SWITCH=2，完整入口按下个班成型计划量生成需求并完成排程",
+  "autoPlanRequest": {
+    "factoryCode": "F1",
+    "scheduleDate": "2026-06-18",
+    "operator": "tester",
+    "traceId": "TRACE-CASE-06",
+    "confirmOverwrite": false
+  },
+  "params": [
+    {
+      "factoryCode": "F1",
+      "paramCode": "TM_ALGORITHM_SWITCH",
+      "paramValue": "2",
+      "enableStatus": "1"
+    }
+  ],
+  "cxScheduleResults": [
+    {
+      "orderNo": "ORD-A2",
+      "embryoCode": "CX-A2",
+      "class1PlanQty": 10,
+      "class2PlanQty": 20,
+      "class3PlanQty": 30,
+      "class4PlanQty": 40,
+      "class5PlanQty": 50,
+      "class6PlanQty": 60,
+      "treadCode": "TR-A2",
+      "treadShoulderLength": 1,
+      "treadMouthPlate": "MP-A",
+      "treadRubberCategory": "GL-A"
+    }
+  ],
+  "stocks": [
+    {
+      "factoryCode": "F1",
+      "stockDate": "2026-06-17",
+      "treadCode": "TR-A2",
+      "stockQty": 1000
+    }
+  ],
+  "machineInfos": [
+    {
+      "factoryCode": "F1",
+      "machineCode": "TM01",
+      "machineStatus": "1",
+      "maxCapacity": 1000
+    }
+  ],
+  "machineSpeeds": [
+    {
+      "factoryCode": "F1",
+      "machineCode": "TM01",
+      "productSpeed": 100
+    }
+  ],
+  "mouthPlates": [
+    {
+      "factoryCode": "F1",
+      "machineCode": "TM01",
+      "mouthPlateCode": "MP-A"
+    }
+  ],
+  "expected": {
+    "success": true,
+    "messageContains": "胎面自动排程执行完成",
+    "resultCount": 1,
+    "assignedCount": 1,
+    "unassignedCount": 0,
+    "explainCount": 6,
+    "errorCount": 0,
+    "expectedResults": [
+      {
+        "orderNo": "ORD-A2-CLASS1",
+        "treadCode": "TR-A2",
+        "machineCode": "TM01",
+        "shiftOrder": 1,
+        "sequence": 1,
+        "planQty": 20
+      },
+      {
+        "orderNo": "ORD-A2-CLASS6",
+        "treadCode": "TR-A2",
+        "machineCode": "TM01",
+        "shiftOrder": 6,
+        "sequence": 1,
+        "planQty": 60
+      }
+    ],
+    "expectedExplains": [
+      {
+        "treadCode": "TR-A2",
+        "finalPlanQty": 20,
+        "ruleHitContains": "algorithmCode"
+      }
+    ]
+  }
+}
+

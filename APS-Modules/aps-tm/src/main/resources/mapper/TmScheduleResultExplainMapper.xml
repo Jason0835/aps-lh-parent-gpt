@@ -5,15 +5,15 @@
 <mapper namespace="com.zlt.aps.tm.mapper.TmScheduleResultExplainMapper">
 
     <update id="logicDeleteByFactoryCodeAndScheduleDate">
-        update T_TM_SCHEDULE_RESULT_EXPLAIN explain
-        inner join T_TM_SCHEDULE_RESULT result
-            on explain.RESULT_ID = result.ID
-           and result.IS_DELETE = 0
-        set explain.IS_DELETE = 1,
-            explain.UPDATE_TIME = now()
-        where explain.IS_DELETE = 0
-          and result.FACTORY_CODE = #{factoryCode}
-          and result.SCHEDULE_DATE = #{scheduleDate}
+        update T_TM_SCHEDULE_RESULT_EXPLAIN e
+        inner join T_TM_SCHEDULE_RESULT r
+            on e.RESULT_ID = r.ID
+           and r.IS_DELETE = 0
+        set e.IS_DELETE = 1,
+            e.UPDATE_TIME = now()
+        where e.IS_DELETE = 0
+          and r.FACTORY_CODE = #{factoryCode}
+          and r.SCHEDULE_DATE = #{scheduleDate}
     </update>
 
 </mapper>

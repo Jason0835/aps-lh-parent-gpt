@@ -1,11 +1,13 @@
-package com.zlt.aps.tm.engine.service;
+package com.zlt.aps.tm.engine.service.impl;
 
 import cn.hutool.core.date.DateUtil;
 import cn.hutool.core.util.StrUtil;
+import com.ruoyi.common.exception.ServiceException;
 import com.zlt.aps.common.engine.schedule.ScheduleChainChangeResult;
 import com.zlt.aps.common.engine.schedule.ScheduleOperationContext;
 import com.zlt.aps.common.engine.schedule.ScheduleTaskLinkedList;
 import com.zlt.aps.common.engine.schedule.ScheduleTaskNode;
+import com.zlt.aps.tm.api.enums.TmScheduleErrorCodeEnum;
 import com.zlt.aps.tm.engine.domain.*;
 import org.springframework.stereotype.Service;
 
@@ -33,13 +35,16 @@ public class TmTaskChainScheduleService {
                                                                  TmScheduleContext context) {
         validateTaskAndContext(task, context);
         if (machine == null || StrUtil.isBlank(machine.getMachineCode())) {
-            throw new IllegalArgumentException("自动排程追加任务缺少选中机台");
+            throw new ServiceException(TmScheduleErrorCodeEnum.TM_MACHINE_CANDIDATE_EMPTY.getDefaultMessage());
         }
         task.setMachineCode(machine.getMachineCode());
         Integer shiftOrder = task.getShiftOrder() == null ? 1 : task.getShiftOrder();
         ScheduleTaskLinkedList<TmTaskDraft> chain = context.getTaskChainGroup()
                 .getOrCreate(machine.getMachineCode(), toLocalDate(context), shiftOrder);
-        return chain.append(toNode(task, machine.getMachineCode(), shiftOrder, context), operationContext(context, "AUTO_APPEND"));
+        ScheduleTaskNode<TmTaskDraft> node = toNode(task, machine.getMachineCode(), shiftOrder, context);
+        ScheduleChainChangeResult<TmTaskDraft> result = chain.append(node, operationContext(context, "AUTO_APPEND"));
+        context.registerTaskNode(node.getTaskId(), node);
+        return result;
     }
 
     /**
@@ -54,14 +59,19 @@ public class TmTaskChainScheduleService {
                                                                    TmScheduleContext context) {
         validateTaskAndContext(task, context);
         if (position == null || StrUtil.isBlank(position.getMachineCode()) || position.getShiftOrder() == null) {
-            throw new IllegalArgumentException("人工插单缺少目标机台或班次");
+            throw new ServiceException(TmScheduleErrorCodeEnum.TM_PARAM_EMPTY.getDefaultMessage());
         }
         task.setMachineCode(position.getMachineCode());
         ScheduleTaskLinkedList<TmTaskDraft> chain = context.getTaskChainGroup()
                 .getOrCreate(position.getMachineCode(), toLocalDate(context), position.getShiftOrder());
-        ScheduleTaskNode<TmTaskDraft> anchor = chain.findByTaskId(position.getAnchorTaskId());
-        return chain.insertAfter(anchor, toNode(task, position.getMachineCode(), position.getShiftOrder(), context),
-                operationContext(context, "MANUAL_INSERT"));
+        ScheduleTaskNode<TmTaskDraft> anchor = findNode(position.getAnchorTaskId(), context);
+        if (anchor == null || anchor.getOwnerList() != chain) {
+            anchor = chain.findByTaskId(position.getAnchorTaskId());
+        }
+        ScheduleTaskNode<TmTaskDraft> node = toNode(task, position.getMachineCode(), position.getShiftOrder(), context);
+        ScheduleChainChangeResult<TmTaskDraft> result = chain.insertAfter(anchor, node, operationContext(context, "MANUAL_INSERT"));
+        context.registerTaskNode(node.getTaskId(), node);
+        return result;
     }
 
     /**
@@ -73,22 +83,23 @@ public class TmTaskChainScheduleService {
      * @param taskId  任务标识（对应TmTaskDraft.businessKey）
      * @param context 胎面排程上下文
      * @return 链表变更结果，包含被删除节点和受影响节点
-     * @throws IllegalArgumentException 任务ID为空或未找到目标节点时抛出
+     * @throws ServiceException 任务ID为空或未找到目标节点时抛出
      */
     public ScheduleChainChangeResult<TmTaskDraft> removeTask(String taskId, TmScheduleContext context) {
         if (StrUtil.isBlank(taskId)) {
-            throw new IllegalArgumentException("删除任务时任务ID不能为空");
+            throw new ServiceException(TmScheduleErrorCodeEnum.TM_TASK_NOT_FOUND.getDefaultMessage());
         }
         if (context == null || context.getTaskChainGroup() == null) {
-            throw new IllegalArgumentException("删除任务时排程上下文不能为空");
+            throw new ServiceException(TmScheduleErrorCodeEnum.TM_CONTEXT_EMPTY.getDefaultMessage());
         }
-        for (ScheduleTaskLinkedList<TmTaskDraft> chain : context.getTaskChainGroup().values()) {
-            ScheduleTaskNode<TmTaskDraft> node = chain.findByTaskId(taskId);
-            if (node != null) {
-                return chain.remove(node, operationContext(context, "MANUAL_DELETE"));
-            }
+        ScheduleTaskNode<TmTaskDraft> indexedNode = findNode(taskId, context);
+        if (indexedNode != null && indexedNode.getOwnerList() instanceof ScheduleTaskLinkedList) {
+            ScheduleTaskLinkedList<TmTaskDraft> ownerChain = (ScheduleTaskLinkedList<TmTaskDraft>) indexedNode.getOwnerList();
+            ScheduleChainChangeResult<TmTaskDraft> result = ownerChain.remove(indexedNode, operationContext(context, "MANUAL_DELETE"));
+            context.removeTaskNode(taskId);
+            return result;
         }
-        throw new IllegalArgumentException("未找到任务ID对应的任务节点:" + taskId);
+        throw new ServiceException(TmScheduleErrorCodeEnum.TM_TASK_NOT_FOUND.getDefaultMessage() + ":" + taskId);
     }
 
     /**
@@ -102,38 +113,32 @@ public class TmTaskChainScheduleService {
      * @param position          目标位置，包含目标班次顺序和锚点任务ID
      * @param context           胎面排程上下文
      * @return 链表变更结果，包含原链和目标链的受影响节点
-     * @throws IllegalArgumentException 参数缺失、任务未找到或目标链表不存在时抛出
+     * @throws ServiceException 参数缺失、任务未找到或目标链表不存在时抛出
      */
     public ScheduleChainChangeResult<TmTaskDraft> transferMachine(String taskId, String targetMachineCode,
                                                                    TmTransferPosition position, TmScheduleContext context) {
         if (StrUtil.isBlank(taskId)) {
-            throw new IllegalArgumentException("转机台时任务ID不能为空");
+            throw new ServiceException(TmScheduleErrorCodeEnum.TM_TASK_NOT_FOUND.getDefaultMessage());
         }
         if (StrUtil.isBlank(targetMachineCode)) {
-            throw new IllegalArgumentException("转机台时目标机台编码不能为空");
+            throw new ServiceException(TmScheduleErrorCodeEnum.TM_MACHINE_CANDIDATE_EMPTY.getDefaultMessage());
         }
         if (position == null || position.getShiftOrder() == null) {
-            throw new IllegalArgumentException("转机台时目标班次顺序不能为空");
+            throw new ServiceException(TmScheduleErrorCodeEnum.TM_SHIFT_INVALID.getDefaultMessage());
         }
         if (context == null || context.getTaskChainGroup() == null) {
-            throw new IllegalArgumentException("转机台时排程上下文不能为空");
+            throw new ServiceException(TmScheduleErrorCodeEnum.TM_CONTEXT_EMPTY.getDefaultMessage());
         }
         LocalDate localDate = toLocalDate(context);
         ScheduleOperationContext opCtx = operationContext(context, "MANUAL_TRANSFER");
 
         // 在原链中查找目标节点
-        ScheduleTaskNode<TmTaskDraft> sourceNode = null;
-        ScheduleTaskLinkedList<TmTaskDraft> sourceChain = null;
-        for (ScheduleTaskLinkedList<TmTaskDraft> chain : context.getTaskChainGroup().values()) {
-            ScheduleTaskNode<TmTaskDraft> found = chain.findByTaskId(taskId);
-            if (found != null) {
-                sourceNode = found;
-                sourceChain = chain;
-                break;
-            }
-        }
+        ScheduleTaskNode<TmTaskDraft> sourceNode = findNode(taskId, context);
+        ScheduleTaskLinkedList<TmTaskDraft> sourceChain = sourceNode != null
+                && sourceNode.getOwnerList() instanceof ScheduleTaskLinkedList
+                ? (ScheduleTaskLinkedList<TmTaskDraft>) sourceNode.getOwnerList() : null;
         if (sourceNode == null || sourceChain == null) {
-            throw new IllegalArgumentException("未找到任务ID对应的任务节点:" + taskId);
+            throw new ServiceException(TmScheduleErrorCodeEnum.TM_TASK_NOT_FOUND.getDefaultMessage() + ":" + taskId);
         }
 
         // 获取目标链表
@@ -145,7 +150,9 @@ public class TmTaskChainScheduleService {
         ScheduleTaskNode<TmTaskDraft> anchorNode = targetChain.findByTaskId(position.getAnchorTaskId());
 
         // 执行跨链转移
-        return sourceChain.transferTo(sourceNode, targetChain, anchorNode, opCtx);
+        ScheduleChainChangeResult<TmTaskDraft> result = sourceChain.transferTo(sourceNode, targetChain, anchorNode, opCtx);
+        context.registerTaskNode(taskId, sourceNode);
+        return result;
     }
 
     /**
@@ -159,36 +166,30 @@ public class TmTaskChainScheduleService {
      * @param shiftOrder 班次顺序，用于日志和操作上下文
      * @param context    胎面排程上下文
      * @return 链表变更结果
-     * @throws IllegalArgumentException 参数缺失、任务未找到或新计划量为空时抛出
+     * @throws ServiceException 参数缺失、任务未找到或新计划量为空时抛出
      */
     public ScheduleChainChangeResult<TmTaskDraft> changeQty(String taskId, BigDecimal newPlanQty, Integer shiftOrder,
                                                              TmScheduleContext context) {
         if (StrUtil.isBlank(taskId)) {
-            throw new IllegalArgumentException("调量时任务ID不能为空");
+            throw new ServiceException(TmScheduleErrorCodeEnum.TM_TASK_NOT_FOUND.getDefaultMessage());
         }
         if (newPlanQty == null) {
-            throw new IllegalArgumentException("调量时新计划量不能为空");
+            throw new ServiceException(TmScheduleErrorCodeEnum.TM_PARAM_EMPTY.getDefaultMessage());
         }
         if (shiftOrder == null) {
-            throw new IllegalArgumentException("调量时班次顺序不能为空");
+            throw new ServiceException(TmScheduleErrorCodeEnum.TM_SHIFT_INVALID.getDefaultMessage());
         }
         if (context == null || context.getTaskChainGroup() == null) {
-            throw new IllegalArgumentException("调量时排程上下文不能为空");
+            throw new ServiceException(TmScheduleErrorCodeEnum.TM_CONTEXT_EMPTY.getDefaultMessage());
         }
 
         // 遍历所有已加载链表查找目标节点
-        ScheduleTaskNode<TmTaskDraft> targetNode = null;
-        ScheduleTaskLinkedList<TmTaskDraft> targetChain = null;
-        for (ScheduleTaskLinkedList<TmTaskDraft> chain : context.getTaskChainGroup().values()) {
-            ScheduleTaskNode<TmTaskDraft> found = chain.findByTaskId(taskId);
-            if (found != null) {
-                targetNode = found;
-                targetChain = chain;
-                break;
-            }
-        }
+        ScheduleTaskNode<TmTaskDraft> targetNode = findNode(taskId, context);
+        ScheduleTaskLinkedList<TmTaskDraft> targetChain = targetNode != null
+                && targetNode.getOwnerList() instanceof ScheduleTaskLinkedList
+                ? (ScheduleTaskLinkedList<TmTaskDraft>) targetNode.getOwnerList() : null;
         if (targetNode == null || targetChain == null) {
-            throw new IllegalArgumentException("未找到任务ID对应的任务节点:" + taskId);
+            throw new ServiceException(TmScheduleErrorCodeEnum.TM_TASK_NOT_FOUND.getDefaultMessage() + ":" + taskId);
         }
 
         // 更新节点计划量和草稿计划量
@@ -207,23 +208,45 @@ public class TmTaskChainScheduleService {
                 "CLASS" + shiftOrder, shiftOrder, task.getPlanQty());
     }
 
+    /**
+     * 查找任务链节点，优先使用上下文索引，缺失时回退遍历并补建索引。
+     *
+     * @param taskId  任务标识
+     * @param context 排程上下文
+     * @return 任务链节点，不存在时返回 null
+     */
+    private ScheduleTaskNode<TmTaskDraft> findNode(String taskId, TmScheduleContext context) {
+        ScheduleTaskNode<TmTaskDraft> node = context.getTaskNode(taskId);
+        if (node != null) {
+            return node;
+        }
+        for (ScheduleTaskLinkedList<TmTaskDraft> chain : context.getTaskChainGroup().values()) {
+            ScheduleTaskNode<TmTaskDraft> found = chain.findByTaskId(taskId);
+            if (found != null) {
+                context.registerTaskNode(taskId, found);
+                return found;
+            }
+        }
+        return null;
+    }
+
     private ScheduleOperationContext operationContext(TmScheduleContext context, String reason) {
         return new ScheduleOperationContext(context.getOperator(), reason, context.getTraceId());
     }
 
     private LocalDate toLocalDate(TmScheduleContext context) {
         if (context.getScheduleDate() == null) {
-            throw new IllegalArgumentException("胎面任务链排程缺少排程日期");
+            throw new ServiceException(TmScheduleErrorCodeEnum.TM_SCHEDULE_DATE_EMPTY.getDefaultMessage());
         }
         return DateUtil.toLocalDateTime(context.getScheduleDate()).toLocalDate();
     }
 
     private void validateTaskAndContext(TmTaskDraft task, TmScheduleContext context) {
         if (task == null) {
-            throw new IllegalArgumentException("任务草稿不能为空");
+            throw new ServiceException(TmScheduleErrorCodeEnum.TM_TASK_NOT_FOUND.getDefaultMessage());
         }
         if (context == null) {
-            throw new IllegalArgumentException("胎面排程上下文不能为空");
+            throw new ServiceException(TmScheduleErrorCodeEnum.TM_CONTEXT_EMPTY.getDefaultMessage());
         }
     }
 }

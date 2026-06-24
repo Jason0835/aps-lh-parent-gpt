@@ -1,8 +1,12 @@
-package com.zlt.aps.tm.engine.service;
+package com.zlt.aps.tm.engine.service.impl;
 
 import cn.hutool.core.util.IdUtil;
 import cn.hutool.core.util.StrUtil;
+import com.ruoyi.common.exception.ServiceException;
+import com.zlt.aps.common.engine.constants.EngineConstants;
+import com.zlt.aps.tm.api.enums.TmScheduleErrorCodeEnum;
 import com.zlt.aps.tm.engine.domain.TmScheduleContext;
+import com.zlt.aps.tm.engine.service.ITmPlanBootstrapService;
 import org.springframework.stereotype.Service;
 
 /**
@@ -17,16 +21,16 @@ public class TmPlanBootstrapService implements ITmPlanBootstrapService {
     @Override
     public void bootstrap(TmScheduleContext context) {
         if (context == null) {
-            throw new IllegalArgumentException("胎面排程上下文不能为空");
+            throw new ServiceException(TmScheduleErrorCodeEnum.TM_CONTEXT_EMPTY.getDefaultMessage());
         }
         if (context.getScheduleDate() == null) {
-            throw new IllegalArgumentException("胎面排程日期不能为空");
+            throw new ServiceException(TmScheduleErrorCodeEnum.TM_SCHEDULE_DATE_EMPTY.getDefaultMessage());
         }
         if (StrUtil.isBlank(context.getOperator())) {
-            throw new IllegalArgumentException("胎面排程操作人不能为空");
+            throw new ServiceException(TmScheduleErrorCodeEnum.TM_OPERATOR_EMPTY.getDefaultMessage());
         }
         if (StrUtil.isBlank(context.getBatchNo())) {
-            context.setBatchNo("TM" + IdUtil.fastSimpleUUID());
+            context.setBatchNo(EngineConstants.TM_BATCH_NO_PREFIX + IdUtil.fastSimpleUUID());
         }
         if (StrUtil.isBlank(context.getTraceId())) {
             context.setTraceId(IdUtil.fastSimpleUUID());

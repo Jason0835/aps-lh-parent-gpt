@@ -1,5 +1,7 @@
 package com.zlt.aps.tm.engine.event;
 
+import com.ruoyi.common.exception.ServiceException;
+import com.zlt.aps.tm.api.enums.TmScheduleErrorCodeEnum;
 import com.zlt.aps.tm.api.enums.TmScheduleEventTypeEnum;
 import com.zlt.aps.tm.engine.domain.TmScheduleContext;
 import lombok.Data;
@@ -46,11 +48,11 @@ public class TmScheduleEvent {
      * @param eventEnum 事件类型枚举
      * @param summary   事件摘要
      * @return 胎面排程事件对象
-     * @throws IllegalArgumentException 事件类型为空时抛出
+     * @throws ServiceException 事件类型为空时抛出
      */
     public static TmScheduleEvent of(TmScheduleContext context, TmScheduleEventTypeEnum eventEnum, String summary) {
         if (eventEnum == null) {
-            throw new IllegalArgumentException("胎面排程事件类型不能为空");
+            throw new ServiceException(TmScheduleErrorCodeEnum.TM_PARAM_EMPTY.getDefaultMessage() + ":eventType");
         }
         TmScheduleEvent event = new TmScheduleEvent();
         if (context != null) {

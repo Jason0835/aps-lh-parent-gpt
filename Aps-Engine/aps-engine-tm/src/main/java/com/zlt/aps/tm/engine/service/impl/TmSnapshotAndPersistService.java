@@ -1,10 +1,13 @@
-package com.zlt.aps.tm.engine.service;
+package com.zlt.aps.tm.engine.service.impl;
 
 import cn.hutool.core.collection.CollUtil;
+import com.ruoyi.common.exception.ServiceException;
+import com.zlt.aps.tm.api.enums.TmScheduleErrorCodeEnum;
 import com.zlt.aps.tm.engine.domain.TmPersistResult;
 import com.zlt.aps.tm.engine.domain.TmScheduleContext;
 import com.zlt.aps.tm.engine.domain.TmSnapshotBuildResult;
 import com.zlt.aps.tm.engine.domain.TmTaskDraft;
+import com.zlt.aps.tm.engine.service.ITmSnapshotAndPersistService;
 import org.springframework.stereotype.Service;
 
 /**
@@ -34,7 +37,7 @@ public class TmSnapshotAndPersistService implements ITmSnapshotAndPersistService
     @Override
     public void snapshotAndPersist(TmScheduleContext context) {
         if (context == null) {
-            throw new IllegalArgumentException("胎面排程上下文不能为空");
+            throw new ServiceException(TmScheduleErrorCodeEnum.TM_CONTEXT_EMPTY.getDefaultMessage());
         }
         if (CollUtil.isNotEmpty(context.getTaskDraftList())) {
             for (TmTaskDraft task : context.getTaskDraftList()) {

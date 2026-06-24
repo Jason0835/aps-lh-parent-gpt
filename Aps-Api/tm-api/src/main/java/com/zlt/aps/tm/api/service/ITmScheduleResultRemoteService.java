@@ -5,6 +5,7 @@ import com.ruoyi.common.constant.ServiceNameConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.zlt.aps.tm.api.domain.entity.TmScheduleResult;
+import com.zlt.aps.tm.api.domain.vo.TmScheduleShiftDateVO;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.*;
@@ -48,4 +49,14 @@ public interface ITmScheduleResultRemoteService {
     @ApiOperation("转机台")
     @PostMapping("/tmScheduleResult/changeMachine")
     AjaxResult changeMachine(@RequestBody TmScheduleResult scheduleResult);
+
+    /**
+     * 获取胎面排程班次日期列表
+     *
+     * @param scheduleResult 排程日期
+     * @return 班次日期列表
+     */
+    @ApiOperation("获取胎面排程班次日期列表")
+    @PostMapping("/tmScheduleResult/listScheduleShiftDates")
+    List<TmScheduleShiftDateVO> listScheduleShiftDates(@RequestBody TmScheduleResult scheduleResult);
 }

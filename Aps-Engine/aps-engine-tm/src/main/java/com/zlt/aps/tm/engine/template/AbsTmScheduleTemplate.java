@@ -1,6 +1,8 @@
 package com.zlt.aps.tm.engine.template;
 
+import com.ruoyi.common.exception.ServiceException;
 import com.zlt.aps.tm.api.domain.vo.TmAutoScheduleResponseVo;
+import com.zlt.aps.tm.api.enums.TmScheduleErrorCodeEnum;
 import com.zlt.aps.tm.engine.domain.TmScheduleContext;
 
 /**
@@ -16,11 +18,11 @@ public abstract class AbsTmScheduleTemplate {
      *
      * @param context 胎面排程上下文，必须由调用方传入排程日期和操作人，步骤服务会补充运行态数据
      * @return 自动排程响应对象
-     * @throws IllegalArgumentException 上下文为空时抛出
+     * @throws ServiceException 上下文为空时抛出
      */
     public TmAutoScheduleResponseVo execute(TmScheduleContext context) {
         if (context == null) {
-            throw new IllegalArgumentException("胎面排程上下文不能为空");
+            throw new ServiceException(TmScheduleErrorCodeEnum.TM_CONTEXT_EMPTY.getDefaultMessage());
         }
         doBootstrap(context);
         doInventoryPredict(context);

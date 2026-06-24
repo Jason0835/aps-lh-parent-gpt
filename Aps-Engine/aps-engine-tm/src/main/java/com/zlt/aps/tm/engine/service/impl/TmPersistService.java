@@ -1,21 +1,22 @@
-package com.zlt.aps.tm.engine.service;
+package com.zlt.aps.tm.engine.service.impl;
 
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.StrUtil;
+import com.ruoyi.common.exception.ServiceException;
 import com.zlt.aps.common.engine.schedule.ScheduleTaskLinkedList;
 import com.zlt.aps.common.engine.schedule.ScheduleTaskNode;
 import com.zlt.aps.tm.api.domain.entity.TmScheduleResult;
 import com.zlt.aps.tm.api.domain.entity.TmScheduleResultExplain;
-import com.zlt.aps.tm.api.enums.TmScheduleReleaseStatusEnum;
-import com.zlt.aps.tm.api.enums.TmScheduleStepEnum;
-import com.zlt.aps.tm.api.enums.TmScheduleTaskStatusEnum;
+import com.zlt.aps.tm.api.enums.*;
 import com.zlt.aps.tm.engine.domain.TmPersistResult;
 import com.zlt.aps.tm.engine.domain.TmScheduleContext;
 import com.zlt.aps.tm.engine.domain.TmSnapshotBuildResult;
 import com.zlt.aps.tm.engine.domain.TmTaskDraft;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 
 /**
@@ -97,9 +98,24 @@ public class TmPersistService {
             explain.setTraceId(context.getTraceId());
         }
         if (task != null) {
-            explain.setBaseDemandQty(task.getDemandQty());
+            explain.setTaskBusinessKey(task.getBusinessKey());
+            explain.setTaskOrderNo(task.getOrderNo());
+            explain.setSourceOrderNos(task.getSourceOrderNos());
+            explain.setShiftOrder(task.getShiftOrder());
+            explain.setBaseDemandQty(task.getBaseDemandQty() == null ? task.getDemandQty() : task.getBaseDemandQty());
+            explain.setLossAddQty(task.getLossAddQty());
+            explain.setStockDeductQty(task.getRollingStockQty());
+            explain.setToolLimitAdjustQty(task.getToolLimitAdjustQty());
+            explain.setMinStartAdjustQty(task.getMinStartAdjustQty());
+            explain.setTailRoundAdjustQty(task.getTailRoundAdjustQty());
+            explain.setCapacityAdjustQty(task.getCapacityAdjustQty());
             explain.setRequiredQty(task.getDemandQty());
             explain.setFinalPlanQty(task.getPlanQty());
+            explain.setCalcFormulaDesc(task.getCalcFormulaDesc());
+            explain.setStockQty(task.getSixClockStockQty());
+            explain.setPlanStockQty(task.getRollingStockQty());
+            explain.setSupplyHours(task.getSupplyHours());
+            explain.setCoverageShiftCount(task.getGuardShiftCount());
             explain.setUnplannedReasonCode(task.getUnplannedReasonCode());
             explain.setUnplannedReasonDesc(task.getUnplannedReasonDesc());
             explain.setTaskStatus(task.isUnassigned() ? null : TmScheduleTaskStatusEnum.PLANNED.getCode());
@@ -110,10 +126,13 @@ public class TmPersistService {
         if (snapshot != null) {
             explain.setRuleHitJson(snapshot.getRuleHitJson());
             explain.setCandidateMachineJson(snapshot.getCandidateMachineJson());
+            explain.setSelectedMachineScore(snapshot.getSelectedMachineScore());
+            explain.setMachineSelectReason(snapshot.getMachineSelectReason());
+            explain.setAssignStatus(snapshot.getAssignStatus());
             explain.setUnplannedEvidenceJson(snapshot.getUnplannedEvidenceJson());
             explain.setSysAnalysis(snapshot.getSysAnalysis());
         }
-        explain.setGenerateMode("ENGINE_SKELETON");
+        explain.setGenerateMode(TmGenerateModeEnum.ENGINE_SKELETON.getCode());
         explain.setCurrentStepCode(TmScheduleStepEnum.PERSIST.getCode());
         return explain;
     }
@@ -129,10 +148,10 @@ public class TmPersistService {
      */
     public void persistUnplanned(TmTaskDraft task, TmSnapshotBuildResult snapshot, TmScheduleContext context) {
         if (task == null) {
-            throw new IllegalArgumentException("未排任务不能为空");
+            throw new ServiceException(TmScheduleErrorCodeEnum.TM_TASK_NOT_FOUND.getDefaultMessage());
         }
         if (context == null) {
-            throw new IllegalArgumentException("胎面排程上下文不能为空");
+            throw new ServiceException(TmScheduleErrorCodeEnum.TM_CONTEXT_EMPTY.getDefaultMessage());
         }
         convertUnplanned(task, context);
         convertExplain(task, snapshot, context);
@@ -154,7 +173,6 @@ public class TmPersistService {
         result.setBatchNo(context == null ? null : context.getBatchNo());
         result.setScheduleDate(context == null ? null : context.getScheduleDate());
         if (task != null) {
-            result.setOrderNo(task.getOrderNo());
             result.setTreadCode(task.getTreadCode());
             result.setGlueCode(task.getGlueCode());
             result.setMouthPlateCode(task.getMouthPlateCode());
@@ -172,7 +190,6 @@ public class TmPersistService {
         result.setFactoryCode(context == null ? null : context.getFactoryCode());
         result.setBatchNo(context == null ? null : context.getBatchNo());
         result.setScheduleDate(context == null ? null : context.getScheduleDate());
-        result.setOrderNo(task.getOrderNo());
         result.setMachineCode(node.getMachineCode());
         result.setTreadCode(task.getTreadCode());
         result.setGlueCode(task.getGlueCode());
@@ -183,85 +200,81 @@ public class TmPersistService {
         return result;
     }
 
+    /**
+     * 按任务班次写入未排任务的班次字段。
+     *
+     * @param result 排程结果
+     * @param task   未排任务
+     */
     private void applyTaskShiftFields(TmScheduleResult result, TmTaskDraft task) {
         Integer shiftOrder = task.getShiftOrder() == null ? 1 : task.getShiftOrder();
-        if (Integer.valueOf(1).equals(shiftOrder)) {
-            result.setClass1Sequence(1);
-            result.setClass1PlanQty(task.getPlanQty());
-            return;
-        }
-        if (Integer.valueOf(2).equals(shiftOrder)) {
-            result.setClass2Sequence(1);
-            result.setClass2PlanQty(task.getPlanQty());
-            return;
-        }
-        if (Integer.valueOf(3).equals(shiftOrder)) {
-            result.setClass3Sequence(1);
-            result.setClass3PlanQty(task.getPlanQty());
-            return;
-        }
-        if (Integer.valueOf(4).equals(shiftOrder)) {
-            result.setClass4Sequence(1);
-            result.setClass4PlanQty(task.getPlanQty());
-            return;
-        }
-        if (Integer.valueOf(5).equals(shiftOrder)) {
-            result.setClass5Sequence(1);
-            result.setClass5PlanQty(task.getPlanQty());
-            return;
-        }
-        if (Integer.valueOf(6).equals(shiftOrder)) {
-            result.setClass6Sequence(1);
-            result.setClass6PlanQty(task.getPlanQty());
-            return;
-        }
-        throw new IllegalArgumentException("不支持的胎面排程班次顺序:" + shiftOrder);
+        applyShiftFields(result, shiftOrder, 1, task.getPlanQty(), null, null);
     }
 
+    /**
+     * 按任务链节点班次写入排程结果字段。
+     *
+     * @param result 排程结果
+     * @param node   任务链节点
+     */
     private void applyShiftFields(TmScheduleResult result, ScheduleTaskNode<TmTaskDraft> node) {
-        Integer shiftOrder = node.getShiftOrder();
+        applyShiftFields(result, node.getShiftOrder(), node.getSequence(), node.getPlanQty(), node.getStartTime(), node.getEndTime());
+    }
+
+    /**
+     * 按班次顺序统一写入排程结果的横向班次字段。
+     *
+     * @param result     排程结果
+     * @param shiftOrder 班次顺序，支持 1-6
+     * @param sequence   班内顺序
+     * @param planQty    计划量
+     * @param startTime  开始时间，可为空
+     * @param endTime    结束时间，可为空
+     */
+    private void applyShiftFields(TmScheduleResult result, Integer shiftOrder, Integer sequence, BigDecimal planQty,
+                                  Date startTime, Date endTime) {
         if (Integer.valueOf(1).equals(shiftOrder)) {
-            result.setClass1Sequence(node.getSequence());
-            result.setClass1PlanQty(node.getPlanQty());
-            result.setClass1StartTime(node.getStartTime());
-            result.setClass1EndTime(node.getEndTime());
+            result.setClass1Sequence(sequence);
+            result.setClass1PlanQty(planQty);
+            result.setClass1StartTime(startTime);
+            result.setClass1EndTime(endTime);
             return;
         }
         if (Integer.valueOf(2).equals(shiftOrder)) {
-            result.setClass2Sequence(node.getSequence());
-            result.setClass2PlanQty(node.getPlanQty());
-            result.setClass2StartTime(node.getStartTime());
-            result.setClass2EndTime(node.getEndTime());
+            result.setClass2Sequence(sequence);
+            result.setClass2PlanQty(planQty);
+            result.setClass2StartTime(startTime);
+            result.setClass2EndTime(endTime);
             return;
         }
         if (Integer.valueOf(3).equals(shiftOrder)) {
-            result.setClass3Sequence(node.getSequence());
-            result.setClass3PlanQty(node.getPlanQty());
-            result.setClass3StartTime(node.getStartTime());
-            result.setClass3EndTime(node.getEndTime());
+            result.setClass3Sequence(sequence);
+            result.setClass3PlanQty(planQty);
+            result.setClass3StartTime(startTime);
+            result.setClass3EndTime(endTime);
             return;
         }
         if (Integer.valueOf(4).equals(shiftOrder)) {
-            result.setClass4Sequence(node.getSequence());
-            result.setClass4PlanQty(node.getPlanQty());
-            result.setClass4StartTime(node.getStartTime());
-            result.setClass4EndTime(node.getEndTime());
+            result.setClass4Sequence(sequence);
+            result.setClass4PlanQty(planQty);
+            result.setClass4StartTime(startTime);
+            result.setClass4EndTime(endTime);
             return;
         }
         if (Integer.valueOf(5).equals(shiftOrder)) {
-            result.setClass5Sequence(node.getSequence());
-            result.setClass5PlanQty(node.getPlanQty());
-            result.setClass5StartTime(node.getStartTime());
-            result.setClass5EndTime(node.getEndTime());
+            result.setClass5Sequence(sequence);
+            result.setClass5PlanQty(planQty);
+            result.setClass5StartTime(startTime);
+            result.setClass5EndTime(endTime);
             return;
         }
         if (Integer.valueOf(6).equals(shiftOrder)) {
-            result.setClass6Sequence(node.getSequence());
-            result.setClass6PlanQty(node.getPlanQty());
-            result.setClass6StartTime(node.getStartTime());
-            result.setClass6EndTime(node.getEndTime());
+            result.setClass6Sequence(sequence);
+            result.setClass6PlanQty(planQty);
+            result.setClass6StartTime(startTime);
+            result.setClass6EndTime(endTime);
             return;
         }
-        throw new IllegalArgumentException("不支持的胎面排程班次顺序:" + shiftOrder);
+        throw new ServiceException(TmScheduleErrorCodeEnum.TM_SHIFT_INVALID.getDefaultMessage() + ":" + shiftOrder);
     }
 }

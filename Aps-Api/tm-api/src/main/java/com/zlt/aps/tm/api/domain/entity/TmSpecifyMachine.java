@@ -33,7 +33,10 @@ public class TmSpecifyMachine extends BaseEntity {
     @TableField(value = "MACHINE_CODE")
     private String machineCode;
 
-    @Excel(name = "ui.data.column.tm.specifyMachine.jobType")
+    /**
+     * 作业类型，字典：JOB_TYPE，0-限制作业、1-不可作业
+     */
+    @Excel(name = "ui.data.column.tm.specifyMachine.jobType", dictType = "JOB_TYPE")
     @ImportValidated(required = true, maxLength = 10)
     @ApiModelProperty(value = "作业类型", name = "jobType")
     @TableField(value = "JOB_TYPE")
