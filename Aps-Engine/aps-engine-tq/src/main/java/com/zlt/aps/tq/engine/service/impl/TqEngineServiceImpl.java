@@ -40,7 +40,22 @@ import java.util.stream.Collectors;
 import static com.alibaba.fastjson.JSON.toJSONString;
 import static com.zlt.aps.common.core.utils.ApsCommonUtil.*;
 
+/**
+ * 【已废弃】胎圈胶自动排程引擎（4班次制旧版）
+ *
+ * <p>废弃说明：
+ * <ul>
+ *   <li>本排程引擎为旧版4班次制胎圈自动排程算法，已由新版6班次制排程算法替代</li>
+ *   <li>新版算法依据：胎圈自动排程_v5.xmind（6班次制）</li>
+ *   <li>旧版4班次字段（midPlanQty/nightPlanQty/dayPlanQty/nextMidPlanQty）将逐步废弃</li>
+ *   <li>请勿在此引擎新增功能，所有新需求请到新版排程算法实现</li>
+ *   <li>注意：当前 TqNewScheduleResultController.autoPlan 仍调用本引擎的 autoTqSchedule 方法，
+ *       属于待修复的过渡状态，后续将由v5新算法替代</li>
+ *   <li>计划在新版v5排程算法完整实现后，本引擎将一并删除</li>
+ * </ul>
+ */
 @Slf4j
+@Deprecated
 @Service
 public class TqEngineServiceImpl implements TqEngineService {
 
@@ -84,12 +99,14 @@ public class TqEngineServiceImpl implements TqEngineService {
      * 胎圈胶自动排程（重构后：构造Context → 调用Template → 检查中断）
      *
      * @param scheduleDate 排程日期，格式：yyyy-MM-dd
+     * @param factoryCode 分厂编码
      */
     @Transactional(rollbackFor=Exception.class)
-    public void autoTqSchedule(String scheduleDate) {
+    public void autoTqSchedule(String scheduleDate, String factoryCode) {
         // 1. 构造上下文
         TqScheduleContext context = new TqScheduleContext();
         context.setScheduleDate(scheduleDate);
+        context.setFactoryCode(factoryCode);
         context.setOperator(SecurityUtils.getUsername());
 
         // 2. 执行模板方法（S1→S2→S3→S4）
@@ -105,10 +122,11 @@ public class TqEngineServiceImpl implements TqEngineService {
      * 加载当天库存
      *
      * @param scheduleDate
+     * @param factoryCode 分厂编码（按工厂过滤库存）
      * @return
      */
-    private Map<String, Double> loadTqStock(String scheduleDate) {
-        return tqEngineStockMapper.listTqStock(scheduleDate).stream()
+    private Map<String, Double> loadTqStock(String scheduleDate, String factoryCode) {
+        return tqEngineStockMapper.listTqStock(scheduleDate, factoryCode).stream()
                 .filter(v -> StringUtils.isNotEmpty(v.getBeadCode()))
                 .collect(Collectors.toMap(TqStockVo::getBeadCode, TqStockVo::getStockNum));
     }
@@ -242,7 +260,7 @@ public class TqEngineServiceImpl implements TqEngineService {
         TqScheduleParams params = this.loadParams();  // 获取工序参数map
         String productionStage = params.getProductionStage();  //仅投产阶段规格排产标识
         Map<String, TqScheduleBaseInfoVo> scheduleBaseInfoMap = getScheduleBaseInfoMap(scheduleDate, beadCodes, productionStage);  //根据胎圈代码查询对应的胎圈基础信息
-        Map<String, Double> planStockMap = tqEngineStockService.getPlanStockMap(batchNo, scheduleDate, params.getStockLossRate());  //计算胎圈16点预计库存
+        Map<String, Double> planStockMap = tqEngineStockService.getPlanStockMap(batchNo, scheduleDate, params.getStockLossRate(), null);  //计算胎圈16点预计库存（插单场景不按工厂过滤）
         Map<String, TqMonthSurplusVo> monthSurplus = tqEngineMonthSurplusService.getMonthSurplus(scheduleDate);  //获得月度计划剩余量、完成量
         autoScheduleLogService.insertTqScheduleLog(batchNo, "", "插单或批量导入基础数据", logSplit("半部件基础数据信息:" + toJSONString(scheduleBaseInfoMap),
                 "16点预计库存：" + planStockMap, "月度计划剩余量、完成量：" + monthSurplus, "工序参数map：" + JSONObject.toJSONString(params)));  //添加日志
@@ -320,7 +338,7 @@ public class TqEngineServiceImpl implements TqEngineService {
 //
 //        //转机台后，不同机台的损耗率不一样，需要重新计算计划量
 //        double oldLossRate = tqEngineLossService.getLossRate(scheduleResult.getBeadCode(), oldMachineIds, lossRateMap, paramLossRate);  //计算出转机台前的耗损率
-//        double lossRate = tqEngineLossService.getLossRate(scheduleResult.getBeadCode(), scheduleResult.getMachineId(), lossRateMap, paramLossRate);  //计算出新机台的耗损率
+//        double lossRate = tqEngineLossService.getLossRate(scheduleResult.getBeadCode(), scheduleResult.getMachineCode(), lossRateMap, paramLossRate);  //计算出新机台的耗损率
 //        autoScheduleLogService.insertTqScheduleLog(batchNo, orderNo, "转机台需要根据不同机台耗损率重新计算计划量",
 //                logSplit("重新计算计划量规则：先要根据之前机台的耗损率推算出之前在没有加上耗损率之前的计划量A，然后再用计划量A * 当前机台对应的耗损率，计算出最终的计划量", "转机台前的耗损率：" + oldLossRate + "转机台后的耗损率：" + lossRate));  //添加日志
 //
@@ -352,7 +370,7 @@ public class TqEngineServiceImpl implements TqEngineService {
         double paramLossRate = params.getLossRate();
 
         //耗损率
-        double lossRate = tqEngineLossService.getLossRate(scheduleResult.getBeadCode(), scheduleResult.getMachineId(), lossRateMap, paramLossRate);  //计算出新机台的耗损率
+        double lossRate = tqEngineLossService.getLossRate(scheduleResult.getBeadCode(), scheduleResult.getMachineCode(), lossRateMap, paramLossRate);  //计算出新机台的耗损率
         autoScheduleLogService.insertTqScheduleLog(batchNo, orderNo, "确认机台耗损率", "耗损率：" + lossRate);  //添加日志
 
         Double midPlanQty = scheduleResult.getMidPlanQty();  //中班计划量
@@ -867,7 +885,7 @@ public class TqEngineServiceImpl implements TqEngineService {
                 autoSchedule.setPublishSuccessCount(existSchedule.getPublishSuccessCount());
                 autoSchedule.setNewestPublishTime(existSchedule.getNewestPublishTime());
                 autoSchedule.setIsRelease(ApsConstant.WAIT_RELEASING);  //发布状态修改
-                autoSchedule.setMachineId(existSchedule.getMachineId());  //机台沿用重排前的机台
+                autoSchedule.setMachineCode(existSchedule.getMachineCode());  //机台沿用重排前的机台
                 mergeList.add(autoSchedule);
             } else if(existScheduleGroupList != null && existScheduleGroupList.size() > 1) {
                 //对应规格重排前已经发布，并且此规格重排前只有多条排程记录（对应了多个机台）。那需要保留重排之前的排产，并且要把此规格重排后的各班的计划量，拼接到备注中
@@ -940,11 +958,11 @@ public class TqEngineServiceImpl implements TqEngineService {
             return;
         }
         TqScheduleMachineStatistics statistics = new TqScheduleMachineStatistics();
-        Map<Long, BigDecimal> midCapacityMap = new HashMap<>(); // 机台夜班已占用产能
-        Map<Long, BigDecimal> nightCapacityMap = new HashMap<>(); // 机台白班已占用产能
-        Map<String, List<Long>> glueMap = statistics.getGlueMap(); // 胶料分配机台
-        Map<String, List<Long>> mouthPlatMap = statistics.getMouthPlatMap(); // 口型版分配机台
-        Map<String, Long> plannedMachineMap = tqEngineMachineService
+        Map<String, BigDecimal> midCapacityMap = new HashMap<>(); // 机台夜班已占用产能
+        Map<String, BigDecimal> nightCapacityMap = new HashMap<>(); // 机台白班已占用产能
+        Map<String, List<String>> glueMap = statistics.getGlueMap(); // 胶料分配机台
+        Map<String, List<String>> mouthPlatMap = statistics.getMouthPlatMap(); // 口型版分配机台
+        Map<String, String> plannedMachineMap = tqEngineMachineService
                 .getLastDayPlanMachine(CollectionUtil.firstElement(scheduleList).getScheduleDate());// 已排规格，初始为上一个班的规格
 //        statistics.setGluePlanMap(scheduleList.stream().filter(r -> StringUtils.isNotEmpty(r.getGlueCode()))
 //                .collect(Collectors.groupingBy(TqScheduleResultVo::getGlueCode, Collectors.reducing(BigDecimal.ZERO,
@@ -1046,7 +1064,7 @@ public class TqEngineServiceImpl implements TqEngineService {
      * @param machineMap
      * @return
      */
-    private List<Long> getMachineId(String key, Map<String, List<Long>> machineMap) {
+    private List<String> getMachineId(String key, Map<String, List<String>> machineMap) {
         if (StringUtils.isEmpty(key) || machineMap.get(key) == null) {
             return new ArrayList<>(0);
         }
@@ -1059,11 +1077,11 @@ public class TqEngineServiceImpl implements TqEngineService {
      * @param machineMap
      * @return
      */
-    private void putMachineId(String key, Long machineId, Map<String, List<Long>> machineMap) {
+    private void putMachineId(String key, String machineId, Map<String, List<String>> machineMap) {
         if (StringUtils.isEmpty(key)) {
             return;
         }
-        List<Long> machineList = machineMap.get(key);
+        List<String> machineList = machineMap.get(key);
         if (machineList == null) {
             machineList = new ArrayList<>();
             machineMap.put(key, machineList);
@@ -1089,9 +1107,9 @@ public class TqEngineServiceImpl implements TqEngineService {
      * @return
      */
     private List<TqMachineInfo> searchOptionalMachineList(TqScheduleResultVo scheduleVo, String classCode,
-            Map<Long, BigDecimal> capacityMap, List<TqMachineInfo> allMachineList,
+            Map<String, BigDecimal> capacityMap, List<TqMachineInfo> allMachineList,
             Map<String, String> specifyCanMachineMap, Map<String, String> specifyNotMachineMap,
-            Map<String, String> mouthPlateMachineMap, TqScheduleMachineStatistics statistics, Map<String, Long> plannedMachineMap) {
+            Map<String, String> mouthPlateMachineMap, TqScheduleMachineStatistics statistics, Map<String, String> plannedMachineMap) {
 //        List<Long> glueMachineList = this.getMachineId(scheduleVo.getGlueCode(), statistics.getGlueMap()); // 胶料分配机台
 //        List<Long> mouthPlatMachineList = this.getMachineId(scheduleVo.getMouthPlateCode(), statistics.getMouthPlatMap()); // 口型版分配机台
 //        Map<String, BigDecimal> gluePlanMap = statistics.getGluePlanMap();
@@ -1180,7 +1198,7 @@ public class TqEngineServiceImpl implements TqEngineService {
 //                        }
 
                         // 同一个规格优先排在已排过相同规格的机台上
-                        Long scheduleMachineId = plannedMachineMap.getOrDefault(beadCode, 0L);
+                        Long scheduleMachineId = Long.valueOf(plannedMachineMap.getOrDefault(beadCode, String.valueOf(0L)));
                         Integer hasMachine1 = m1.getId().equals(scheduleMachineId) ? 0 : 1;
                         Integer hasMachine2 = m2.getId().equals(scheduleMachineId) ? 0 : 1;
                         int result = hasMachine1.compareTo(hasMachine2);

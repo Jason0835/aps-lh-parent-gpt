@@ -25,16 +25,13 @@ public class TqLossSetting extends BaseEntity {
 
     @Excel(name = "ui.data.column.loss.beadCode", sort = 10)
     @ApiModelProperty(value = "胎圈编码", position = 20)
-    @TableField("MATERIAL_CODE")
+    @TableField("BEAD_CODE")
     @ImportValidated(isCode = true, maxLength = 20)
-    private String materialCode;
+    private String beadCode;
 
-    @ApiModelProperty(value = "机台id", position = 30)
-    @TableField("MACHINE_ID")
-    private Long machineId;
-
-    @ApiModelProperty(value = "机台编号", position = 35)
-    @TableField(exist = false)
+    @Excel(name = "ui.data.column.loss.machineCode", sort = 15)
+    @ApiModelProperty(value = "机台编号", position = 30)
+    @TableField("MACHINE_CODE")
     private String machineCode;
 
     @Excel(name = "ui.data.column.loss.line", sort = 20)

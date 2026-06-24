@@ -136,11 +136,11 @@ public class TqMouthPlateController extends AbstractDocBizController<TqMouthPlat
         List<TqMouthPlate> list = tqMouthPlateMapper.selectList(wrapper);
 
         // 查询机台信息
-        Map<Long, String> machineMap = new HashMap<>();
+        Map<String, String> machineMap = new HashMap<>();
         if (!list.isEmpty()) {
             List<TqMachineInfo> machineList = tqMachineInfoService.selectMachineInfoList(new TqMachineInfo());
             machineMap = machineList.stream()
-                    .collect(Collectors.toMap(TqMachineInfo::getId, TqMachineInfo::getMachineName, (v1, v2) -> v1));
+                    .collect(Collectors.toMap(TqMachineInfo::getMachineCode, TqMachineInfo::getMachineName, (v1, v2) -> v1));
         }
 
         // 转换为VO
@@ -148,7 +148,7 @@ public class TqMouthPlateController extends AbstractDocBizController<TqMouthPlat
         for (TqMouthPlate plate : list) {
             TqMouthPlateExportVO vo = new TqMouthPlateExportVO();
             vo.setMouthPlateCode(plate.getMouthPlateCode());
-            vo.setMachineName(machineMap.getOrDefault(plate.getMachineId(), ""));
+            vo.setMachineName(machineMap.getOrDefault(plate.getMachineCode(), ""));
             vo.setStatus(plate.getStatus());
             vo.setRemark(plate.getRemark());
             vo.setUpdateTime(plate.getUpdateTime());
@@ -161,7 +161,7 @@ public class TqMouthPlateController extends AbstractDocBizController<TqMouthPlat
     protected void builderCondition(QueryWrapper<TqMouthPlate> queryWrapper, TqMouthPlate queryVO) {
         queryWrapper.eq("IS_DELETE", 0);
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getMouthPlateCode()), "MOUTH_PLATE_CODE", queryVO.getMouthPlateCode());
-        queryWrapper.eq(queryVO.getMachineId() != null, "MACHINE_ID", queryVO.getMachineId());
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getMachineCode()), "MACHINE_CODE", queryVO.getMachineCode());
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getStatus()), "STATUS", queryVO.getStatus());
     }
 }

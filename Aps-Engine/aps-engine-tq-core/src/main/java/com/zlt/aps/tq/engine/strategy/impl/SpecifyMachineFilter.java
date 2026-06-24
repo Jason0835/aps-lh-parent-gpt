@@ -33,11 +33,11 @@ public class SpecifyMachineFilter implements IMachineFilterStrategy {
         String beadCode = scheduleVo.getBeadCode();
 
         // 1. 限制作业：只保留指定机台
-        String canMachineIds = context.getSpecifyCanMachineMap().get(beadCode);
-        if (canMachineIds != null && !canMachineIds.isEmpty()) {
-            List<String> canIdList = Arrays.asList(canMachineIds.split(","));
+        String canMachineCodes = context.getSpecifyCanMachineMap().get(beadCode);
+        if (canMachineCodes != null && !canMachineCodes.isEmpty()) {
+            List<String> canCodeList = Arrays.asList(canMachineCodes.split(","));
             List<TqMachineInfo> filtered = candidateMachines.stream()
-                    .filter(m -> canIdList.contains(String.valueOf(m.getId())))
+                    .filter(m -> canCodeList.contains(m.getMachineCode()))
                     .collect(Collectors.toList());
             if (!CollectionUtils.isEmpty(filtered)) {
                 log.debug("[定点机台过滤] 胎圈{}有限制作业机台, 候选机台从{}个过滤到{}个", beadCode, candidateMachines.size(), filtered.size());
@@ -46,11 +46,11 @@ public class SpecifyMachineFilter implements IMachineFilterStrategy {
         }
 
         // 2. 不可作业：排除指定机台
-        String notMachineIds = context.getSpecifyNotMachineMap().get(beadCode);
-        if (notMachineIds != null && !notMachineIds.isEmpty()) {
-            List<String> notIdList = Arrays.asList(notMachineIds.split(","));
+        String notMachineCodes = context.getSpecifyNotMachineMap().get(beadCode);
+        if (notMachineCodes != null && !notMachineCodes.isEmpty()) {
+            List<String> notCodeList = Arrays.asList(notMachineCodes.split(","));
             List<TqMachineInfo> filtered = candidateMachines.stream()
-                    .filter(m -> !notIdList.contains(String.valueOf(m.getId())))
+                    .filter(m -> !notCodeList.contains(m.getMachineCode()))
                     .collect(Collectors.toList());
             log.debug("[定点机台过滤] 胎圈{}有不可作业机台, 候选机台从{}个过滤到{}个", beadCode, candidateMachines.size(), filtered.size());
             return filtered;

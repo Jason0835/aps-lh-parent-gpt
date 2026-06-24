@@ -503,4 +503,10 @@ public class EngineConstants {
      * 参数code：英寸切换时长（小时），默认1
      */
     public static String INCH_SWITCH_TIME = "SYS0301007";
+
+    /**
+     * 参数code：工装车总数（全局统一值），默认50
+     * 用于排程时计算可用工装数量限制：可用工装 = 工装车总数 - 库存占用工装
+     */
+    public static String TOOLING_TOTAL = "SYS0301023";
 }

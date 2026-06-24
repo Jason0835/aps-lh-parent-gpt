@@ -7,7 +7,7 @@
     <resultMap type="com.zlt.aps.tq.api.domain.entity.TqQuotaSetting" id="TqQuotaSettingResult">
         <result property="id" column="id"/>
         <result property="beadCode" column="bead_code"/>
-        <result property="machineId" column="machine_id"/>
+        <result property="machineCode" column="machine_code"/>
         <result property="quota" column="quota"/>
         <result property="createBy" column="create_by"/>
         <result property="createTime" column="create_time"/>
@@ -18,17 +18,17 @@
     </resultMap>
 
     <sql id="selectTqQuotaSettingVo">
-        select id, bead_code, machine_id, quota, create_by, create_time, update_by, update_time, del_flag, remark from t_tq_quota_setting
+        select id, bead_code, machine_code, quota, create_by, create_time, update_by, update_time, del_flag, remark from t_tq_quota_setting
     </sql>
 
     <select id="selectTqQuotaSettingList" parameterType="com.zlt.aps.tq.api.domain.entity.TqQuotaSetting"
             resultMap="TqQuotaSettingResult">
         select * from (
             select A.*,M.MACHINE_NAME from t_tq_quota_setting A LEFT JOIN T_TQ_MACHINE_INFO M
-            ON A.machine_id=M.ID
+            ON A.machine_code=M.MACHINE_CODE
             WHERE A.del_flag='0'
             <if test="beadCode != null  and beadCode != ''">and A.bead_code = #{beadCode,jdbcType=VARCHAR}</if>
-            <if test="machineId != null ">and A.machine_id = #{machineId,jdbcType=DECIMAL}</if>
+            <if test="machineCode != null and machineCode != ''">and A.machine_code = #{machineCode,jdbcType=VARCHAR}</if>
             <if test="orderStr == null">
                 order by A.create_time desc
             </if>
@@ -48,7 +48,7 @@
         <trim prefix="(" suffix=")" suffixOverrides=",">
             <if test="id != null">id,</if>
             <if test="beadCode != null">bead_code,</if>
-            <if test="machineId != null">machine_id,</if>
+            <if test="machineCode != null">machine_code,</if>
             <if test="quota != null">quota,</if>
             <if test="createBy != null">create_by,</if>
             <if test="createTime != null">create_time,</if>
@@ -60,7 +60,7 @@
         <trim prefix="values (" suffix=")" suffixOverrides=",">
             <if test="id != null">#{id},</if>
             <if test="beadCode != null">#{beadCode},</if>
-            <if test="machineId != null">#{machineId},</if>
+            <if test="machineCode != null">#{machineCode},</if>
             <if test="quota != null">#{quota},</if>
             <if test="createBy != null">#{createBy},</if>
             <if test="createTime != null">#{createTime},</if>
@@ -75,7 +75,7 @@
         update t_tq_quota_setting
         <trim prefix="SET" suffixOverrides=",">
             bead_code = #{beadCode,jdbcType=VARCHAR},
-            machine_id = #{machineId,jdbcType=DECIMAL},
+            machine_code = #{machineCode,jdbcType=VARCHAR},
             quota = #{quota,jdbcType=DECIMAL},
             remark = #{remark,jdbcType=VARCHAR},
             <if test="createBy != null">create_by = #{createBy},</if>
@@ -103,21 +103,21 @@
         <include refid="selectTqQuotaSettingVo"/>
         where del_flag='0'
         <if test="id != null and id !='' ">and id != #{id}</if>
-        <if test="machineId == null or machineId ==''">and machine_id is null</if>
-        <if test="machineId != null and machineId !=''">and machine_id = #{machineId,jdbcType=DECIMAL}</if>
+        <if test="machineCode == null or machineCode ==''">and machine_code is null</if>
+        <if test="machineCode != null and machineCode !=''">and machine_code = #{machineCode,jdbcType=VARCHAR}</if>
         <if test="beadCode == null or beadCode ==''">and bead_code is null</if>
         <if test="beadCode != null and beadCode !='' ">and bead_code = #{beadCode,jdbcType=VARCHAR}</if>
     </select>
 
     <insert id="mergeSql" parameterType="list">
         INSERT INTO t_tq_quota_setting (
-        bead_code, machine_id, quota, create_by, create_time, remark, del_flag
+        bead_code, machine_code, quota, create_by, create_time, remark, del_flag
         )
         VALUES
         <foreach collection="list" item="QuotaSetting" separator=",">
             (
             #{QuotaSetting.beadCode,jdbcType=VARCHAR},
-            #{QuotaSetting.machineId,jdbcType=DOUBLE},
+            #{QuotaSetting.machineCode,jdbcType=VARCHAR},
             #{QuotaSetting.quota,jdbcType=DOUBLE},
             #{QuotaSetting.createBy,jdbcType=VARCHAR},
             NOW(),

@@ -23,7 +23,7 @@ import java.util.Map;
  * <ul>
  *   <li>S1写入 → S2/S3/S4/S5/S6消费：基础数据（库存、机台、损耗率等）</li>
  *   <li>S2写入 → S3/S4/S5/S6消费：中间计算结果（计划量、供应时长等）</li>
- *   <li>S3写入 → S4/S5/S6消费：机台分配结果（直接修改scheduleList中的machineId）</li>
+ *   <li>S3写入 → S4/S5/S6消费：机台分配结果（直接修改scheduleList中的machineCode）</li>
  *   <li>S4写入 → S5/S6消费：停产协调结果</li>
  *   <li>S5写入 → S6消费：均衡调整结果</li>
  *   <li>S6写入：持久化结果</li>
@@ -89,17 +89,14 @@ public class TqScheduleContext {
     /** 全部机台列表 */
     private List<TqMachineInfo> allMachineList = new ArrayList<>();
 
-    /** 机台寸口映射，key=机台ID，value=该机台可做的寸口值列表（来自TqMachineChuck） */
-    private Map<Long, List<java.math.BigDecimal>> machineChuckMap = new HashMap<>();
+    /** 机台寸口映射，key=机台编号，value=该机台可做的寸口值列表（来自TqMachineChuck） */
+    private Map<String, List<java.math.BigDecimal>> machineChuckMap = new HashMap<>();
 
     /** 工装车整车容量，key=胎圈编码, value=整车容量 */
     private Map<String, Integer> cartCapacityMap = new HashMap<>();
 
-    /** 工装总数，key=胎圈编码, value=工装总数 */
-    private Map<String, Integer> toolingTotalMap = new HashMap<>();
-
-    /** 检修计划机台，key=日期班次(如"2025-01-01|3"), value=该班次检修中的机台ID列表 */
-    private Map<String, List<Long>> maintenanceMachineMap = new HashMap<>();
+    /** 检修计划机台，key=日期班次(如"2025-01-01|3"), value=该班次检修中的机台编号列表 */
+    private Map<String, List<String>> maintenanceMachineMap = new HashMap<>();
 
     /** 胎圈-胎胚关联关系，key=胎圈编码, value=关联胎胚编码列表（一个胎圈可能对应多个胎胚） */
     private Map<String, List<String>> beadEmbryoMap = new HashMap<>();
@@ -113,14 +110,14 @@ public class TqScheduleContext {
     /** 各规格各班次机台定额总产能，key=胎圈编码, value=Map<班次号(1~6), 定额总产能> */
     private Map<String, Map<Integer, Double>> specClassQuotaMap = new HashMap<>();
 
-    /** 任务链，key=机台ID, value=该机台的任务链（按班次顺序排列） */
-    private Map<Long, java.util.LinkedList<TqTaskNode>> taskChainMap = new HashMap<>();
+    /** 任务链，key=机台编号, value=该机台的任务链（按班次顺序排列） */
+    private Map<String, java.util.LinkedList<TqTaskNode>> taskChainMap = new HashMap<>();
 
     // ========== S1+S2写入 → S3/S4消费 ==========
 
     /**
      * 排程基础数据列表。
-     * S1写入基础数据，S2修改计划量字段，S3修改machineId字段，S4读取并持久化。
+     * S1写入基础数据，S2修改计划量字段，S3修改machineCode字段，S4读取并持久化。
      */
     private List<TqScheduleResultVo> scheduleList = new ArrayList<>();
 

@@ -59,4 +59,10 @@ public class TqMachineInfo extends BaseEntity {
     @Excel(name = "ui.data.column.machine.quota")
     @TableField("QUOTA")
     private Double quota;
+
+    @ApiModelProperty(value = "分厂编码", position = 90)
+    @Excel(name = "ui.data.column.factoryCode", dictType = "biz_factory_name")
+    @TableField("FACTORY_CODE")
+    @ImportValidated(maxLength = 20)
+    private String factoryCode;
 }

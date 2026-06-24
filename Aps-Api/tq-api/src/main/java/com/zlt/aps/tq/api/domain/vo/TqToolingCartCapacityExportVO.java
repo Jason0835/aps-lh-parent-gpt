@@ -11,11 +11,8 @@ import java.util.Date;
 public class TqToolingCartCapacityExportVO extends BaseEntity implements Serializable {
     private static final long serialVersionUID = 1L;
 
-    @Excel(name = "ui.tq.toolingCartCapacity.column.cartCode")
-    private String cartCode;
-
-    @Excel(name = "ui.tq.toolingCartCapacity.column.materialCode")
-    private String materialCode;
+    @Excel(name = "ui.tq.toolingCartCapacity.column.beadCode")
+    private String beadCode;
 
     @Excel(name = "ui.tq.toolingCartCapacity.column.cartCapacity")
     private Integer cartCapacity;

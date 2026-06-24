@@ -5,22 +5,19 @@
     <select id="listMachineSpecSpeed" parameterType="com.zlt.aps.tq.api.domain.entity.TqMachineSpecSpeed"
             resultType="com.zlt.aps.tq.api.domain.entity.TqMachineSpecSpeed">
         select * from (
-            select ms.ID, ms.MACHINE_ID, ms.MATERIAL_CODE, ms.STANDARD_SPEED,
+            select ms.ID, ms.MACHINE_CODE, ms.BEAD_CODE, ms.STANDARD_SPEED,
                    ms.QUOTA, ms.QUOTA_MES, ms.REMARK,
                    ms.IS_DELETE, ms.CREATE_BY, ms.CREATE_TIME, ms.UPDATE_BY, ms.UPDATE_TIME,
-                   m.machine_code, m.machine_name
+                   m.machine_name
             from T_TQ_MACHINE_SPEC_SPEED ms
-            left join T_TQ_MACHINE_INFO m on ms.MACHINE_ID = m.ID
+            left join T_TQ_MACHINE_INFO m on ms.MACHINE_CODE = m.MACHINE_CODE
             where ms.IS_DELETE = '0'
             and m.IS_DELETE = '0'
             <if test="machineCode != null and machineCode != ''">
-                and INSTR(m.MACHINE_CODE, #{machineCode}) > 0
+                and INSTR(ms.MACHINE_CODE, #{machineCode}) > 0
             </if>
-            <if test="materialCode != null and materialCode != ''">
-                and INSTR(ms.MATERIAL_CODE, #{materialCode}) > 0
-            </if>
-            <if test="machineId != null">
-                and ms.MACHINE_ID = #{machineId}
+            <if test="beadCode != null and beadCode != ''">
+                and INSTR(ms.BEAD_CODE, #{beadCode}) > 0
             </if>
             order by ms.create_time desc
         ) t
@@ -30,21 +27,21 @@
         SELECT count(1)
         FROM T_TQ_MACHINE_SPEC_SPEED
         where IS_DELETE = '0'
-        and MACHINE_ID = #{machineId}
-        and MATERIAL_CODE = #{materialCode}
+        and MACHINE_CODE = #{machineCode}
+        and BEAD_CODE = #{beadCode}
         <if test="id != null">and ID != #{id}</if>
     </select>
 
     <insert id="mergeSql" parameterType="list">
         INSERT INTO T_TQ_MACHINE_SPEC_SPEED (
-        machine_id, material_code, standard_speed, quota, quota_mes,
+        machine_code, bead_code, standard_speed, quota, quota_mes,
         create_by, create_time, update_by, update_time, remark, IS_DELETE
         )
         VALUES
         <foreach collection="list" item="MachineSpecSpeed" separator=",">
             (
-            #{MachineSpecSpeed.machineId,jdbcType=DOUBLE},
-            #{MachineSpecSpeed.materialCode,jdbcType=VARCHAR},
+            #{MachineSpecSpeed.machineCode,jdbcType=VARCHAR},
+            #{MachineSpecSpeed.beadCode,jdbcType=VARCHAR},
             #{MachineSpecSpeed.standardSpeed,jdbcType=DECIMAL},
             #{MachineSpecSpeed.quota,jdbcType=INTEGER},
             #{MachineSpecSpeed.quotaMes,jdbcType=INTEGER},

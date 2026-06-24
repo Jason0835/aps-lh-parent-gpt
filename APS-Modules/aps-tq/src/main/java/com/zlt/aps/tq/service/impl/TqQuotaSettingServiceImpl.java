@@ -129,7 +129,7 @@ public class TqQuotaSettingServiceImpl implements TqQuotaSettingService {
      * @param quotaSetting 要检查记录
      */
     private void checkParamAndUnique(TqQuotaSetting quotaSetting) {
-        if (quotaSetting.getMachineId() == null && StringUtils.isEmpty(quotaSetting.getBeadCode())) {
+        if (quotaSetting.getMachineCode() == null && StringUtils.isEmpty(quotaSetting.getBeadCode())) {
             throw new RuntimeException(I18nUtil.getMessage("ui.error.message.quota.isAllNull"));
         }
         String unique = checkTqQuotaSettingUnique(quotaSetting);
@@ -160,7 +160,7 @@ public class TqQuotaSettingServiceImpl implements TqQuotaSettingService {
             addImportErrorLog(importLogId, null, message, importErrorLogs);
             return AjaxResult.error(message, importErrorLogs);
         }
-        Map<String, Long> machineCodeMap = machineInfoList.stream().collect(Collectors.toMap(TqMachineInfo::getMachineCode, TqMachineInfo::getId));
+        Map<String, String> machineCodeMap = machineInfoList.stream().collect(Collectors.toMap(TqMachineInfo::getMachineName, TqMachineInfo::getMachineCode, (a, b) -> a));
 
         //按业务主键分组
         Map<String, Long> groupMap = list.stream().collect(Collectors.groupingBy(a -> (a.getBeadCode()+a.getMachineName()), Collectors.counting()));
@@ -183,7 +183,7 @@ public class TqQuotaSettingServiceImpl implements TqQuotaSettingService {
             }
 
             String machineName = quotaSetting.getMachineName();
-            Long machineId = machineCodeMap.get(machineName);
+            String machineCode = machineCodeMap.get(machineName);
             int errorNum = i + 2;
             List<ImportErrorLog> validated = ImportUtil.validated(importLogId, errorNum, quotaSetting);
             if (StringUtils.isEmpty(machineName) && StringUtils.isEmpty(quotaSetting.getBeadCode())) {
@@ -200,7 +200,7 @@ public class TqQuotaSettingServiceImpl implements TqQuotaSettingService {
                 quotaSetting.setId(-999L);
                 importErrorLogs.addAll(validated);
             } else {
-                quotaSetting.setMachineId(machineId);
+                quotaSetting.setMachineCode(machineCode);
                 quotaSetting.setBaseVale(null);
                 importList.add(quotaSetting);
             }

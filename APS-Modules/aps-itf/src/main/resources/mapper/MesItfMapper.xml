@@ -506,23 +506,44 @@
         <if test="queryParams != null and queryParams.scheduleDate != null">AND CONVERT(DATE, SCHEDULE_DATE) = CONVERT(DATE, #{queryParams.scheduleDate})</if>
     </select>
 
+    <!-- 查询模具交替计划完成回报同步数据（取每个唯一键组合的最新版本） -->
     <select id="selectMoldAlterPlanFinishList" resultType="com.zlt.aps.lh.api.domain.entity.LhMoldAlterPlanFinish">
         SELECT
-        LH_BATCH_NO,
-        ORDER_NO,
-        SCHEDULE_DATE,
-        LH_MACHINE_CODE,
-        LEFT_RIGHT_MOLD,
-        REMARK,
-        FINISH_STATUS,
-        DATA_VERSION,
-        COMPANY_CODE,
-        FACTORY_CODE
-        FROM MOLD_ALTER_PLAN_FINISH
+            t.LH_BATCH_NO,
+            t.ORDER_NO,
+            t.SCHEDULE_DATE,
+            t.LH_MACHINE_CODE,
+            t.LEFT_RIGHT_MOLD,
+            t.REMARK,
+            t.FINISH_STATUS,
+            t.DATA_VERSION,
+            t.COMPANY_CODE,
+            t.FACTORY_CODE
+        FROM MOLD_ALTER_PLAN_FINISH t
+        INNER JOIN (
+            SELECT
+                FACTORY_CODE,
+                LH_BATCH_NO,
+                ORDER_NO,
+                SCHEDULE_DATE,
+                LH_MACHINE_CODE,
+                LEFT_RIGHT_MOLD,
+                MAX(DATA_VERSION) AS MAX_VERSION
+            FROM MOLD_ALTER_PLAN_FINISH
+            WHERE 1 = 1
+            <if test="factoryCode != null and factoryCode != ''">AND FACTORY_CODE = #{factoryCode}</if>
+            <if test="companyCode != null and companyCode != ''">AND COMPANY_CODE = #{companyCode}</if>
+            GROUP BY FACTORY_CODE, LH_BATCH_NO, ORDER_NO, SCHEDULE_DATE, LH_MACHINE_CODE, LEFT_RIGHT_MOLD
+        ) latest ON t.FACTORY_CODE = latest.FACTORY_CODE
+                    AND t.LH_BATCH_NO = latest.LH_BATCH_NO
+                    AND t.ORDER_NO = latest.ORDER_NO
+                    AND t.SCHEDULE_DATE = latest.SCHEDULE_DATE
+                    AND t.LH_MACHINE_CODE = latest.LH_MACHINE_CODE
+                    AND t.LEFT_RIGHT_MOLD = latest.LEFT_RIGHT_MOLD
+                    AND t.DATA_VERSION = latest.MAX_VERSION
         WHERE 1 = 1
-        <if test="factoryCode != null and factoryCode != ''">AND FACTORY_CODE = #{factoryCode}</if>
-        <if test="companyCode != null and companyCode != ''">AND COMPANY_CODE = #{companyCode}</if>
-        <if test="dataVersion != null and dataVersion != ''">AND DATA_VERSION = #{dataVersion}</if>
+        <if test="factoryCode != null and factoryCode != ''">AND t.FACTORY_CODE = #{factoryCode}</if>
+        <if test="companyCode != null and companyCode != ''">AND t.COMPANY_CODE = #{companyCode}</if>
     </select>
 
     <select id="selectTreadStockList" resultType="com.zlt.aps.mp.api.domain.entity.MdmTreadStock">

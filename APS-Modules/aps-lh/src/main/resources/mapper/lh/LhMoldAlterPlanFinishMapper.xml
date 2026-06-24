@@ -20,4 +20,15 @@
         </foreach>
     </select>
 
+    <!-- 批量更新完成状态（仅更新finish_status、update_by、update_time） -->
+    <update id="batchUpdateFinishStatus">
+        <foreach collection="list" item="item" separator=";">
+            UPDATE T_LH_MOLD_ALTER_PLAN_FINISH
+            SET FINISH_STATUS = #{item.finishStatus},
+                UPDATE_BY     = #{item.updateBy},
+                UPDATE_TIME   = #{item.updateTime}
+            WHERE ID = #{item.id}
+        </foreach>
+    </update>
+
 </mapper>

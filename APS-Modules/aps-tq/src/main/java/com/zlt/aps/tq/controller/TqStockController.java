@@ -115,7 +115,7 @@ public class TqStockController extends AbstractDocBizController<TqStock> {
     @Override
     protected void builderCondition(QueryWrapper<TqStock> queryWrapper, TqStock queryVO) {
         queryWrapper.eq("IS_DELETE", 0);
-        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getMaterialCode()), "MATERIAL_CODE", queryVO.getMaterialCode());
+        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getBeadCode()), "BEAD_CODE", queryVO.getBeadCode());
         queryWrapper.ge(queryVO.getStockDateStart() != null, "STOCK_DATE", queryVO.getStockDateStart());
         queryWrapper.le(queryVO.getStockDateEnd() != null, "STOCK_DATE", queryVO.getStockDateEnd());
     }

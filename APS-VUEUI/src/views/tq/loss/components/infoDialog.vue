@@ -43,7 +43,7 @@ export default {
       form: {},
       machineList: [],
       rules: {
-        materialCode: [
+        beadCode: [
           {
             required: true,
             message: this.$t("common.rule.input"),
@@ -66,14 +66,14 @@ export default {
       return [
         {
           label: this.$t("ui.data.column.loss.beadCode"),
-          prop: "materialCode",
+          prop: "beadCode",
           span: 24,
           required: true,
           maxlength: "20",
         },
         {
           label: this.$t("ui.data.column.loss.line"),
-          prop: "machineId",
+          prop: "machineCode",
           span: 24,
           type: "select",
           dictData: this.machineList,
@@ -81,7 +81,7 @@ export default {
           loading: this.machineLoading,
           props: {
             label: "machineName",
-            value: "id",
+            value: "machineCode",
           },
           onFocus: this.handleMachineFocus,
         },
@@ -106,7 +106,7 @@ export default {
   },
   methods: {
     async save(params) {
-      if (!params.materialCode && !params.machineId) {
+      if (!params.beadCode && !params.machineCode) {
         this.$modal.msgWarning(
           this.$t("ui.error.message.loss.isAllNull") || "代码和机台不能全部为空"
         );
@@ -149,10 +149,10 @@ export default {
         this.form = {
           ...data,
         };
-        if (data.machineId && data.machineName) {
+        if (data.machineCode && data.machineName) {
           this.machineList = [
             {
-              id: data.machineId,
+              machineCode: data.machineCode,
               machineName: data.machineName,
             },
           ];

@@ -25,4 +25,22 @@
         </foreach>
     </insert>
 
+    <!-- 根据模具交替计划完成回报批量更新模具交替完成状态 -->
+    <update id="batchUpdateMouldStatusByFinish">
+        <foreach collection="list" item="item" separator=";">
+            UPDATE T_LH_MOULD_CHANGE_PLAN
+            SET MOULD_STATUS = '1',
+                UPDATE_TIME  = NOW()
+            WHERE FACTORY_CODE = #{item.factoryCode}
+              AND SCHEDULE_DATE = #{item.scheduleDate}
+              AND ORDER_NO = #{item.orderNo}
+              AND LH_MACHINE_CODE = #{item.lhMachineCode}
+              AND IS_DELETE = 0
+              AND MOULD_STATUS = '0'
+              <if test="item.leftRightMold != null and item.leftRightMold != ''">
+                  AND LEFT_RIGHT_MOULD = #{item.leftRightMold}
+              </if>
+        </foreach>
+    </update>
+
 </mapper>

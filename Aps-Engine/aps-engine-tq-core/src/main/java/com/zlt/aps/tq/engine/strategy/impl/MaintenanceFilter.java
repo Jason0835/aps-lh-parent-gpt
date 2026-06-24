@@ -33,18 +33,18 @@ public class MaintenanceFilter implements IMachineFilterStrategy {
             return candidateMachines;
         }
 
-        // 获取当前排程日期下所有检修中的机台ID
-        List<Long> allMaintenanceMachineIds = context.getMaintenanceMachineMap().values().stream()
+        // 获取当前排程日期下所有检修中的机台编号
+        List<String> allMaintenanceMachineCodes = context.getMaintenanceMachineMap().values().stream()
                 .flatMap(List::stream)
                 .distinct()
                 .collect(Collectors.toList());
 
-        if (allMaintenanceMachineIds.isEmpty()) {
+        if (allMaintenanceMachineCodes.isEmpty()) {
             return candidateMachines;
         }
 
         List<TqMachineInfo> filtered = candidateMachines.stream()
-                .filter(m -> !allMaintenanceMachineIds.contains(m.getId()))
+                .filter(m -> !allMaintenanceMachineCodes.contains(m.getMachineCode()))
                 .collect(Collectors.toList());
 
         if (filtered.size() < candidateMachines.size()) {

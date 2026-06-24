@@ -44,7 +44,7 @@ public class TqMouthPlateServiceImpl extends AbstractDocService<TqMouthPlate> im
         QueryWrapper<TqMouthPlate> wrapper = new QueryWrapper<>();
         wrapper.ne(mouthPlate.getId() != null, "ID", mouthPlate.getId());
         wrapper.eq("MOUTH_PLATE_CODE", mouthPlate.getMouthPlateCode());
-        wrapper.eq("MACHINE_ID", mouthPlate.getMachineId());
+        wrapper.eq("MACHINE_CODE", mouthPlate.getMachineCode());
         wrapper.eq("IS_DELETE", 0);
         if (tqMouthPlateMapper.selectCount(wrapper) > 0) {
             return UserConstants.NOT_UNIQUE;
@@ -54,7 +54,7 @@ public class TqMouthPlateServiceImpl extends AbstractDocService<TqMouthPlate> im
 
     @Override
     protected List<String> getCheckUniqueFields() {
-        return Arrays.asList("mouthPlateCode", "machineId");
+        return Arrays.asList("mouthPlateCode", "machineCode");
     }
 
     @Override
@@ -75,8 +75,8 @@ public class TqMouthPlateServiceImpl extends AbstractDocService<TqMouthPlate> im
             addImportErrorLog(importLogId, null, message, importErrorLogs);
             return AjaxResult.error(message, importErrorLogs);
         }
-        Map<String, Long> machineCodeMap = machineInfoList.stream()
-                .collect(Collectors.toMap(TqMachineInfo::getMachineName, TqMachineInfo::getId));
+        Map<String, String> machineCodeMap = machineInfoList.stream()
+                .collect(Collectors.toMap(TqMachineInfo::getMachineName, TqMachineInfo::getMachineCode));
 
         Map<String, Long> groupMap = list.stream()
                 .collect(Collectors.groupingBy(a -> (a.getMouthPlateCode() + a.getMachineName()), Collectors.counting()));
@@ -98,13 +98,13 @@ public class TqMouthPlateServiceImpl extends AbstractDocService<TqMouthPlate> im
 
             List<ImportErrorLog> validated = ImportUtil.validated(importLogId, i + 2, mouthPlate);
             String machineName = mouthPlate.getMachineName();
-            Long machineId = machineCodeMap.get(machineName);
-            if (machineId == null && !StringUtil.isEmpty(machineName)) {
+            String machineCode = machineCodeMap.get(machineName);
+            if (machineCode == null && !StringUtil.isEmpty(machineName)) {
                 addImportErrorLog(importLogId, i + 2,
                         I18nUtil.getMessage("ui.error.message.column.machineNotExist"), validated);
             }
             if (CollectionUtils.isEmpty(validated)) {
-                mouthPlate.setMachineId(machineId);
+                mouthPlate.setMachineCode(machineCode);
                 importList.add(mouthPlate);
             } else {
                 failureNum++;

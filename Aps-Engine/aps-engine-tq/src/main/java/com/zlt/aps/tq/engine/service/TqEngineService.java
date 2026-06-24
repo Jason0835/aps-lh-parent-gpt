@@ -10,8 +10,9 @@ public interface TqEngineService {
     /**
      * 胎圈胶自动排程
      * @param scheduleDate 排程日期，格式：yyyy-MM-dd
+     * @param factoryCode 分厂编码
      */
-    void autoTqSchedule(String scheduleDate);
+    void autoTqSchedule(String scheduleDate, String factoryCode);
 
     /**
      * 胎圈插单

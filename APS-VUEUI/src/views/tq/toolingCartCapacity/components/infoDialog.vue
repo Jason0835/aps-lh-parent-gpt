@@ -29,27 +29,17 @@
 <script>
 import infoForm from "@/views/components/infoForm.vue";
 import { saveToolingCartCapacity } from "@/api/tq/toolingCartCapacity";
-import { listAllTooling } from "@/api/tq/tooling";
 
 export default {
   components: { infoForm },
   data() {
     return {
       loading: false,
-      toolingLoading: false,
       visible: false,
       isEdit: false,
       form: {},
-      toolingList: [],
       rules: {
-        cartCode: [
-          {
-            required: true,
-            message: this.$t("common.rule.select"),
-            trigger: "change",
-          },
-        ],
-        materialCode: [
+        beadCode: [
           {
             required: true,
             message: this.$t("common.rule.input"),
@@ -71,22 +61,8 @@ export default {
     columns() {
       return [
         {
-          label: this.$t("ui.tq.toolingCartCapacity.column.cartCode"),
-          prop: "cartCode",
-          span: 24,
-          required: true,
-          type: "select",
-          dictData: this.toolingList,
-          filterable: true,
-          loading: this.toolingLoading,
-          props: {
-            label: "toolingCode",
-            value: "toolingCode",
-          },
-        },
-        {
-          label: this.$t("ui.tq.toolingCartCapacity.column.materialCode"),
-          prop: "materialCode",
+          label: this.$t("ui.tq.toolingCartCapacity.column.beadCode"),
+          prop: "beadCode",
           span: 24,
           required: true,
           maxlength: "60",
@@ -122,35 +98,13 @@ export default {
         this.loading = false;
       }
     },
-    async loadToolingList() {
-      this.toolingLoading = true;
-      try {
-        const res = await listAllTooling();
-        const list = Array.isArray(res) ? res : (res.data || res.rows || []);
-        this.toolingList = list;
-      } catch (error) {
-        console.log(error);
-      } finally {
-        this.toolingLoading = false;
-      }
-    },
-    async show(data) {
+    show(data) {
       this.visible = true;
-      await this.loadToolingList();
       if (data) {
         this.isEdit = true;
         this.form = {
           ...data,
         };
-        if (data.cartCode) {
-          const exists = this.toolingList.some(item => item.toolingCode === data.cartCode);
-          if (!exists) {
-            this.toolingList.unshift({
-              toolingCode: data.cartCode,
-              toolingName: data.cartCode,
-            });
-          }
-        }
       } else {
         this.isEdit = false;
         this.form = {

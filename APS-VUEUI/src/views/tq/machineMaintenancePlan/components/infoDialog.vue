@@ -51,7 +51,7 @@ export default {
             trigger: "change",
           },
         ],
-        machineId: [
+        machineCode: [
           {
             required: true,
             message: this.$t("common.rule.select"),
@@ -89,7 +89,7 @@ export default {
         },
         {
           label: this.$t("ui.tq.machineMaintenancePlan.column.machineName"),
-          prop: "machineId",
+          prop: "machineCode",
           span: 24,
           required: true,
           type: "select",
@@ -98,7 +98,7 @@ export default {
           loading: this.machineLoading,
           props: {
             label: "machineName",
-            value: "id",
+            value: "machineCode",
           },
           onFocus: this.handleMachineFocus,
         },
@@ -166,10 +166,10 @@ export default {
         this.form = {
           ...data,
         };
-        if (data.machineId && data.machineName) {
+        if (data.machineCode && data.machineName) {
           this.machineList = [
             {
-              id: data.machineId,
+              machineCode: data.machineCode,
               machineName: data.machineName,
             },
           ];

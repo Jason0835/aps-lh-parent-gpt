@@ -91,11 +91,11 @@ export default {
       return [
         {
           label: this.$t("ui.tq.machineChuck.column.machineCode"),
-          prop: "machineId",
+          prop: "machineCode",
           type: "select",
           dictData: this.machineList,
           labelKey: "machineName",
-          valueKey: "id",
+          valueKey: "machineCode",
           filterable: true,
         },
       ];

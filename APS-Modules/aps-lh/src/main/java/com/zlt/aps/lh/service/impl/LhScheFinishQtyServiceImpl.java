@@ -9,9 +9,7 @@ import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.api.domain.entity.LhScheFinishQty;
 import com.zlt.aps.lh.mapper.LhScheduleResultMapper;
 import com.zlt.aps.lh.mapper.LhScheFinishQtyMapper;
-import com.zlt.aps.lh.mapper.MdmSkuConstructionRefMapper;
 import com.zlt.aps.lh.service.ILhScheFinishQtyService;
-import com.zlt.aps.mdm.api.domain.entity.MdmSkuConstructionRef;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.core.dao.basedao.BaseDao;
 import lombok.extern.slf4j.Slf4j;
@@ -43,9 +41,6 @@ public class LhScheFinishQtyServiceImpl extends AbstractDocService<LhScheFinishQ
 
     @Autowired
     private LhScheFinishQtyMapper lhScheFinishQtyMapper;
-
-    @Autowired
-    private MdmSkuConstructionRefMapper mdmSkuConstructionRefMapper;
 
     @Override
     protected String getDocTypeCode() {
@@ -186,10 +181,14 @@ public class LhScheFinishQtyServiceImpl extends AbstractDocService<LhScheFinishQ
     }
 
     /**
-     * 构建汇总Key：工厂|机台|物料|排程日期
+     * 构建汇总Key：工厂|机台|物料|排程日期|示方类型
+     * <p>示方类型维度：不同示方类型的示方号可能相同，因此用示方类型而非示方号作为维度，
+     * 避免不同示方类型的数据被错误合并</p>
      */
     private String buildSummaryKey(LhScheFinishQty item) {
-        return item.getFactoryCode() + "|" + item.getLhMachineCode() + "|" + item.getMaterialCode() + "|" + DateUtil.formatDate(item.getScheduleDate());
+        return item.getFactoryCode() + "|" + item.getLhMachineCode() + "|" + item.getMaterialCode() + "|"
+                + DateUtil.formatDate(item.getScheduleDate()) + "|"
+                + item.getClass1LhType() + "|" + item.getClass2LhType() + "|" + item.getClass3LhType();
     }
 
     /**
@@ -235,8 +234,8 @@ public class LhScheFinishQtyServiceImpl extends AbstractDocService<LhScheFinishQ
      * 校验排程结果记录与完成量回报的示方类型是否一致
      * <p>
      * 校验规则：
-     * 通过 物料编码+各班的示方号 去SKU与示方关系表(T_MDM_SKU_CONSTRUCTION_REF)
-     * 查询示方类型，与完成量回报中的示方类型比对，不一致则不回填
+     * 直接比对排程结果中对应班次的示方类型与MES回报中的示方类型，
+     * 不一致则不回填。由于不同示方类型的示方号可能相同，不再通过示方号反查关系表校验。
      * </p>
      *
      * @param result    排程结果记录
@@ -245,44 +244,43 @@ public class LhScheFinishQtyServiceImpl extends AbstractDocService<LhScheFinishQ
      * @return true-校验通过可回填；false-校验不通过跳过
      */
     private boolean validateLhTypeConsistency(LhScheduleResult result, int dayOffset, LhScheFinishQty summary) {
-        String materialCode = summary.getMaterialCode();
         List<String> mismatchShifts = new ArrayList<>();
 
         if (dayOffset == -1) {
             // 排程日期D-1：6班(夜)=MES1班，7班(早)=MES2班，8班(中)=MES3班
-            if (!checkSingleShiftLhType(materialCode, summary.getClass1LhNo(), summary.getClass1LhType(), "6班(MES1班)")) {
+            if (!checkSingleShiftLhType(summary.getClass1LhType(), result.getClass6LhType(), "6班(MES1班)")) {
                 mismatchShifts.add("6班");
             }
-            if (!checkSingleShiftLhType(materialCode, summary.getClass2LhNo(), summary.getClass2LhType(), "7班(MES2班)")) {
+            if (!checkSingleShiftLhType(summary.getClass2LhType(), result.getClass7LhType(), "7班(MES2班)")) {
                 mismatchShifts.add("7班");
             }
-            if (!checkSingleShiftLhType(materialCode, summary.getClass3LhNo(), summary.getClass3LhType(), "8班(MES3班)")) {
+            if (!checkSingleShiftLhType(summary.getClass3LhType(), result.getClass8LhType(), "8班(MES3班)")) {
                 mismatchShifts.add("8班");
             }
         } else if (dayOffset == 0) {
             // 排程日期D：3班(夜)=MES1班，4班(早)=MES2班，5班(中)=MES3班
-            if (!checkSingleShiftLhType(materialCode, summary.getClass1LhNo(), summary.getClass1LhType(), "3班(MES1班)")) {
+            if (!checkSingleShiftLhType(summary.getClass1LhType(), result.getClass3LhType(), "3班(MES1班)")) {
                 mismatchShifts.add("3班");
             }
-            if (!checkSingleShiftLhType(materialCode, summary.getClass2LhNo(), summary.getClass2LhType(), "4班(MES2班)")) {
+            if (!checkSingleShiftLhType(summary.getClass2LhType(), result.getClass4LhType(), "4班(MES2班)")) {
                 mismatchShifts.add("4班");
             }
-            if (!checkSingleShiftLhType(materialCode, summary.getClass3LhNo(), summary.getClass3LhType(), "5班(MES3班)")) {
+            if (!checkSingleShiftLhType(summary.getClass3LhType(), result.getClass5LhType(), "5班(MES3班)")) {
                 mismatchShifts.add("5班");
             }
         } else if (dayOffset == 1) {
             // 排程日期D+1：1班(早)=MES2班，2班(中)=MES3班
-            if (!checkSingleShiftLhType(materialCode, summary.getClass2LhNo(), summary.getClass2LhType(), "1班(MES2班)")) {
+            if (!checkSingleShiftLhType(summary.getClass2LhType(), result.getClass1LhType(), "1班(MES2班)")) {
                 mismatchShifts.add("1班");
             }
-            if (!checkSingleShiftLhType(materialCode, summary.getClass3LhNo(), summary.getClass3LhType(), "2班(MES3班)")) {
+            if (!checkSingleShiftLhType(summary.getClass3LhType(), result.getClass2LhType(), "2班(MES3班)")) {
                 mismatchShifts.add("2班");
             }
         }
 
         if (!mismatchShifts.isEmpty()) {
             log.warn("【示方类型校验】以下班次校验不通过，物料={}，不一致班次：{}",
-                    materialCode, String.join(",", mismatchShifts));
+                    summary.getMaterialCode(), String.join(",", mismatchShifts));
             return false;
         }
         return true;
@@ -290,43 +288,31 @@ public class LhScheFinishQtyServiceImpl extends AbstractDocService<LhScheFinishQ
 
     /**
      * 单班次示方类型校验
-     * 用 物料编码+示方号 去T_MDM_SKU_CONSTRUCTION_REF查示方类型，与回报中的示方类型比较
+     * 直接比对MES回报的示方类型与排程结果中对应班次的示方类型
      * <p>
-     * 仅匹配LH_NO(硫化示方号)，不匹配制造示方号
+     * 由于不同示方类型的示方号可能相同，不再通过示方号反查关系表，
+     * 而是直接比对示方类型值
      * </p>
      *
-     * @param materialCode 物料编码
-     * @param mesLhNo      MES回报的示方号
-     * @param mesLhType    MES回报的示方类型
-     * @param shiftDesc    班次描述（用于日志）
+     * @param mesLhType       MES回报的示方类型
+     * @param resultLhType    排程结果中对应班次的示方类型
+     * @param shiftDesc       班次描述（用于日志）
      * @return true-一致或无需校验；false-不一致
      */
-    private boolean checkSingleShiftLhType(String materialCode, String mesLhNo, String mesLhType, String shiftDesc) {
-        // 如果MES回报的示方号为空，跳过该校验（兼容旧数据）
-        if (StringUtils.isEmpty(mesLhNo)) {
+    private boolean checkSingleShiftLhType(String mesLhType, String resultLhType, String shiftDesc) {
+        // 如果MES回报的示方类型为空，跳过该校验（兼容旧数据）
+        if (StringUtils.isEmpty(mesLhType)) {
             return true;
         }
 
-        // 查询SKU与示方关系表，仅匹配硫化示方号(LH_NO)
-        LambdaQueryWrapper<MdmSkuConstructionRef> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(MdmSkuConstructionRef::getMaterialCode, materialCode)
-               .eq(MdmSkuConstructionRef::getLhNo, mesLhNo)
-               .eq(MdmSkuConstructionRef::getIsDelete, "0")
-               .last("LIMIT 1");
-        MdmSkuConstructionRef ref = mdmSkuConstructionRefMapper.selectOne(wrapper);
-
-        if (ref == null) {
-            log.warn("【示方类型校验】未找到SKU示方关系记录，物料={}，示方号={}，班次={}",
-                    materialCode, mesLhNo, shiftDesc);
-            // 找不到关系记录时放行，仅打warn日志
+        // 如果排程结果中对应班次的示方类型为空，跳过校验（兼容旧数据）
+        if (StringUtils.isEmpty(resultLhType)) {
             return true;
         }
 
-        String dbLhType = ref.getLhType();
-        if (StringUtils.isNotEmpty(dbLhType) && StringUtils.isNotEmpty(mesLhType)
-                && !dbLhType.equals(mesLhType)) {
-            log.warn("【示方类型校验】类型不一致！物料={}，示方号={}，班次={}，MES类型={}，关系表类型={}",
-                    materialCode, mesLhNo, shiftDesc, mesLhType, dbLhType);
+        if (!mesLhType.equals(resultLhType)) {
+            log.warn("【示方类型校验】类型不一致！班次={}，MES类型={}，排程结果类型={}",
+                    shiftDesc, mesLhType, resultLhType);
             return false;
         }
 
@@ -348,15 +334,15 @@ public class LhScheFinishQtyServiceImpl extends AbstractDocService<LhScheFinishQ
         LambdaUpdateWrapper<LhScheduleResult> updateWrapper = new LambdaUpdateWrapper<>();
         updateWrapper.eq(LhScheduleResult::getId, result.getId());
         updateWrapper.eq(LhScheduleResult::getIsDelete, ApsConstant.APS_YES_NO_0);
-        // 示方号匹配条件：确保回填到正确的示方记录上
-        if (StringUtils.isNotEmpty(summary.getClass1LhNo())) {
-            updateWrapper.eq(LhScheduleResult::getClass6LhNo, summary.getClass1LhNo());  // 6班=MES1班
+        // 示方类型匹配条件：用示方类型而非示方号匹配，避免不同示方类型示方号相同时回填错误
+        if (StringUtils.isNotEmpty(summary.getClass1LhType())) {
+            updateWrapper.eq(LhScheduleResult::getClass6LhType, summary.getClass1LhType());  // 6班=MES1班
         }
-        if (StringUtils.isNotEmpty(summary.getClass2LhNo())) {
-            updateWrapper.eq(LhScheduleResult::getClass7LhNo, summary.getClass2LhNo());  // 7班=MES2班
+        if (StringUtils.isNotEmpty(summary.getClass2LhType())) {
+            updateWrapper.eq(LhScheduleResult::getClass7LhType, summary.getClass2LhType());  // 7班=MES2班
         }
-        if (StringUtils.isNotEmpty(summary.getClass3LhNo())) {
-            updateWrapper.eq(LhScheduleResult::getClass8LhNo, summary.getClass3LhNo());  // 8班=MES3班
+        if (StringUtils.isNotEmpty(summary.getClass3LhType())) {
+            updateWrapper.eq(LhScheduleResult::getClass8LhType, summary.getClass3LhType());  // 8班=MES3班
         }
         updateWrapper.set(LhScheduleResult::getClass6FinishQty, nightQty.intValue());
         updateWrapper.set(LhScheduleResult::getClass7FinishQty, morningQty.intValue());
@@ -382,15 +368,15 @@ public class LhScheFinishQtyServiceImpl extends AbstractDocService<LhScheFinishQ
         LambdaUpdateWrapper<LhScheduleResult> updateWrapper = new LambdaUpdateWrapper<>();
         updateWrapper.eq(LhScheduleResult::getId, result.getId());
         updateWrapper.eq(LhScheduleResult::getIsDelete, ApsConstant.APS_YES_NO_0);
-        // 示方号匹配条件：确保回填到正确的示方记录上
-        if (StringUtils.isNotEmpty(summary.getClass1LhNo())) {
-            updateWrapper.eq(LhScheduleResult::getClass3LhNo, summary.getClass1LhNo());  // 3班=MES1班
+        // 示方类型匹配条件：用示方类型而非示方号匹配，避免不同示方类型示方号相同时回填错误
+        if (StringUtils.isNotEmpty(summary.getClass1LhType())) {
+            updateWrapper.eq(LhScheduleResult::getClass3LhType, summary.getClass1LhType());  // 3班=MES1班
         }
-        if (StringUtils.isNotEmpty(summary.getClass2LhNo())) {
-            updateWrapper.eq(LhScheduleResult::getClass4LhNo, summary.getClass2LhNo());  // 4班=MES2班
+        if (StringUtils.isNotEmpty(summary.getClass2LhType())) {
+            updateWrapper.eq(LhScheduleResult::getClass4LhType, summary.getClass2LhType());  // 4班=MES2班
         }
-        if (StringUtils.isNotEmpty(summary.getClass3LhNo())) {
-            updateWrapper.eq(LhScheduleResult::getClass5LhNo, summary.getClass3LhNo());  // 5班=MES3班
+        if (StringUtils.isNotEmpty(summary.getClass3LhType())) {
+            updateWrapper.eq(LhScheduleResult::getClass5LhType, summary.getClass3LhType());  // 5班=MES3班
         }
         updateWrapper.set(LhScheduleResult::getClass3FinishQty, nightQty.intValue());
         updateWrapper.set(LhScheduleResult::getClass4FinishQty, morningQty.intValue());
@@ -416,12 +402,12 @@ public class LhScheFinishQtyServiceImpl extends AbstractDocService<LhScheFinishQ
         LambdaUpdateWrapper<LhScheduleResult> updateWrapper = new LambdaUpdateWrapper<>();
         updateWrapper.eq(LhScheduleResult::getId, result.getId());
         updateWrapper.eq(LhScheduleResult::getIsDelete, ApsConstant.APS_YES_NO_0);
-        // 示方号匹配条件：确保回填到正确的示方记录上
-        if (StringUtils.isNotEmpty(summary.getClass2LhNo())) {
-            updateWrapper.eq(LhScheduleResult::getClass1LhNo, summary.getClass2LhNo());  // 1班=MES2班
+        // 示方类型匹配条件：用示方类型而非示方号匹配，避免不同示方类型示方号相同时回填错误
+        if (StringUtils.isNotEmpty(summary.getClass2LhType())) {
+            updateWrapper.eq(LhScheduleResult::getClass1LhType, summary.getClass2LhType());  // 1班=MES2班
         }
-        if (StringUtils.isNotEmpty(summary.getClass3LhNo())) {
-            updateWrapper.eq(LhScheduleResult::getClass2LhNo, summary.getClass3LhNo());  // 2班=MES3班
+        if (StringUtils.isNotEmpty(summary.getClass3LhType())) {
+            updateWrapper.eq(LhScheduleResult::getClass2LhType, summary.getClass3LhType());  // 2班=MES3班
         }
         updateWrapper.set(LhScheduleResult::getClass1FinishQty, morningQty.intValue());
         updateWrapper.set(LhScheduleResult::getClass2FinishQty, middleQty.intValue());

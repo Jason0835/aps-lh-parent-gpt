@@ -55,6 +55,7 @@ import com.zlt.aps.lh.api.domain.entity.LhChipStock;
 import com.zlt.aps.lh.api.service.ILhPrecisionPlanRemoteService;
 import com.zlt.aps.cx.api.service.ICxPrecisionPlanRemoteService;
 
+import com.zlt.aps.common.core.enums.MouldFinishStatusEnum;
 import com.zlt.aps.utils.GenerageMapKeyUtils;
 import com.zlt.core.dao.basedao.BaseDao;
 import lombok.extern.slf4j.Slf4j;
@@ -1610,7 +1611,7 @@ public class MesItfServiceImpl implements MesItfService {
         List<TqStock> tqStockInsertList = syncList.stream().map(item -> {
             TqStock tqStock = new TqStock();
             tqStock.setStockDate(item.getStockDate());
-            tqStock.setMaterialCode(item.getMaterialCode());
+            tqStock.setBeadCode(item.getMaterialCode());
             tqStock.setStockNum(item.getAvailableStock() != null ? item.getAvailableStock() : BigDecimal.ZERO);
             tqStock.setCreateBy("MES");
             tqStock.setUpdateBy("MES");
@@ -2116,9 +2117,10 @@ public class MesItfServiceImpl implements MesItfService {
             return AjaxResult.success("MES中间表无数据可同步");
         }
 
+        // 分组去重：工厂|完成日期|物料|MES物料|示方类型（不同示方类型的示方号可能相同，需用示方类型做维度）
         Map<String, LhDayFinishQty> groupMap = syncList.stream()
                 .collect(Collectors.toMap(
-                        item -> item.getFactoryCode() + "|" + item.getFinishDate() + "|" + item.getMaterialCode() + "|" + item.getMesMaterialCode(),
+                        item -> item.getFactoryCode() + "|" + item.getFinishDate() + "|" + item.getMaterialCode() + "|" + item.getMesMaterialCode() + "|" + item.getLhType(),
                         Function.identity(),
                         (v1, v2) -> v1
                 ));
@@ -2190,9 +2192,10 @@ public class MesItfServiceImpl implements MesItfService {
             return AjaxResult.success("MES中间表无数据可同步");
         }
 
+        // 分组去重：工厂|完成日期|物料|MES物料|示方类型（不同示方类型的示方号可能相同，需用示方类型做维度）
         Map<String, LhDayFinishQty> groupMap = syncList.stream()
                 .collect(Collectors.toMap(
-                        item -> item.getFactoryCode() + "|" + item.getFinishDate() + "|" + item.getMaterialCode() + "|" + item.getMesMaterialCode(),
+                        item -> item.getFactoryCode() + "|" + item.getFinishDate() + "|" + item.getMaterialCode() + "|" + item.getMesMaterialCode() + "|" + item.getLhType(),
                         Function.identity(),
                         (v1, v2) -> v1
                 ));
@@ -2470,8 +2473,7 @@ public class MesItfServiceImpl implements MesItfService {
 
     /**
      * 同步模具交替计划完成回报
-     * 采用更新删除标识模式，而不是先删后插
-     * 同步完成后回填流程排程结果表的模具交替完成状态
+     * 调用合并接口：一次Feign调用完成"插入或更新完成状态 + 回填模具交替计划表"，在同一事务中
      * @param syncDataLogs 同步参数
      * @return 结果
      */
@@ -2496,6 +2498,9 @@ public class MesItfServiceImpl implements MesItfService {
             entity.setCreateBy("MES");
             entity.setUpdateBy("MES");
 
+            // MES回报的完成状态可能为中文（未完成/已完成），统一转换为数值编码（0/1）
+            entity.setFinishStatus(MouldFinishStatusEnum.convertToCode(entity.getFinishStatus()));
+
             if (entity.getIsDelete() == null) {
                 entity.setIsDelete(0);
             }
@@ -2505,31 +2510,11 @@ public class MesItfServiceImpl implements MesItfService {
 
         if (CollectionUtils.isNotEmpty(insertOrUpdateList)) {
             FeignTokenHelper.runWithToken(() -> {
-                List<LhMoldAlterPlanFinish> existsList = lhMesSyncRemoteService.selectMoldAlterPlanFinishExists(insertOrUpdateList);
-                Map<String, LhMoldAlterPlanFinish> existsMap = new HashMap<>(16);
-                if (CollectionUtils.isNotEmpty(existsList)) {
-                    existsMap = existsList.stream()
-                            .collect(Collectors.toMap(
-                                    item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), item.getLhBatchNo(), item.getOrderNo(), String.valueOf(item.getScheduleDate()), item.getLhMachineCode(), item.getLeftRightMold()),
-                                    Function.identity(),
-                                    (v1, v2) -> v1
-                            ));
-                }
-
-                for (LhMoldAlterPlanFinish entity : insertOrUpdateList) {
-                    String mapKey = GenerageMapKeyUtils.createMapKey(entity.getFactoryCode(), entity.getLhBatchNo(), entity.getOrderNo(), String.valueOf(entity.getScheduleDate()), entity.getLhMachineCode(), entity.getLeftRightMold());
-                    if (existsMap.containsKey(mapKey)) {
-                        LhMoldAlterPlanFinish existsData = existsMap.get(mapKey);
-                        entity.setId(existsData.getId());
-                    }
-                }
-
+                // 合并接口：一次调用完成"插入或更新 + 回填模具交替计划完成状态"，在同一事务中
                 List<List<LhMoldAlterPlanFinish>> splitList = ScmListUtils.getSplitList(insertOrUpdateList, 1000);
-                for (List<LhMoldAlterPlanFinish> saveList : splitList) {
-                    lhMesSyncRemoteService.saveMoldAlterPlanFinishBatch(saveList);
+                for (List<LhMoldAlterPlanFinish> subList : splitList) {
+                    lhMesSyncRemoteService.saveOrUpdateMoldAlterPlanFinishAndWriteBack(subList);
                 }
-
-                lhMesSyncRemoteService.writeBackMouldChangePlanFinishStatus(insertOrUpdateList);
             });
         }
         return AjaxResult.success();

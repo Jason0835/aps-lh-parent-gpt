@@ -14,8 +14,8 @@ import java.math.BigDecimal;
 @Data
 public class TqMachineChuckVo {
 
-    /** 机台ID */
-    private Long machineId;
+    /** 机台编号 */
+    private String machineCode;
 
     /** 英寸尺寸 */
     private BigDecimal inchSize;

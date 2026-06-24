@@ -314,6 +314,11 @@ public class ApsConstant {
     public static String DISPATCHER_OPER_INSERT_ORDER = "2";
 
     /**
+     * 调度员操作类型：删除
+     */
+    public static String DISPATCHER_OPER_DELETE = "3";
+
+    /**
      * 调度员角色编码
      */
     public static String DISPATCHER_ROLE = "dispatcher";
