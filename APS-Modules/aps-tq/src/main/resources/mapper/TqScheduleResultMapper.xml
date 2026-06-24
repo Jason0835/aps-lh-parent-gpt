@@ -16,7 +16,7 @@
         <result property="glueCode" column="glue_code"/>
         <result property="mouthPlateCode" column="mouth_plate_code"/>
         <result property="specSize" column="spec_size"/>
-        <result property="machineId" column="machine_id"/>
+        <result property="machineCode" column="machine_code"/>
         <result property="unitConsume" column="unit_consume"/>
         <result property="stockQty" column="stock_qty"/>
         <result property="supplyTime" column="supply_time"/>
@@ -78,7 +78,7 @@
         <result property="glueCode" column="glue_code"/>
         <result property="mouthPlateCode" column="mouth_plate_code"/>
         <result property="specSize" column="spec_size"/>
-        <result property="machineId" column="machine_id"/>
+        <result property="machineCode" column="machine_code"/>
         <result property="unitConsume" column="unit_consume"/>
         <result property="stockQty" column="stock_qty"/>
         <result property="supplyTime" column="supply_time"/>
@@ -142,7 +142,7 @@
                glue_code,
                mouth_plate_code,
                spec_size,
-               machine_id,
+               machine_code,
                unit_consume,
                stock_qty,
                supply_time,
@@ -182,7 +182,7 @@
     </sql>
 
     <sql id="column">
-        a.id, a.schedule_date, a.cx_batch_no, a.batch_no, a.order_no, a.bead_code, a.steel_ring_code, a.triangle_glue_code, a.glue_code, a.mouth_plate_code, a.spec_size, a.machine_id, a.unit_consume, a.stock_qty, a.supply_time, a.mid_plan_qty, a.mid_produce_order, a.mid_sys_analysis, a.mid_hand_analysis, a.night_plan_qty, a.night_produce_order, a.night_sys_analysis, a.night_hand_analysis, a.day_plan_qty, a.day_produce_order, a.day_sys_analysis, a.day_hand_analysis, a.next_mid_plan_qty, a.next_mid_produce_order, a.next_mid_sys_analysis, a.next_mid_hand_analysis, a.cx_class1_plan, a.cx_class2_plan, a.cx_class3_plan, a.cx_class4_plan, a.cx_class5_plan, a.is_release, a.mark_close_out_tip, a.close_out_spec_flag, a.production_status, a.remark, a.del_flag, a.create_by, a.create_time, a.update_by, a.update_time,a.data_source, a.publish_success_count, a.newest_publish_time, a.last_mid_plan_qty,
+        a.id, a.schedule_date, a.cx_batch_no, a.batch_no, a.order_no, a.bead_code, a.steel_ring_code, a.triangle_glue_code, a.glue_code, a.mouth_plate_code, a.spec_size, a.machine_code, a.unit_consume, a.stock_qty, a.supply_time, a.mid_plan_qty, a.mid_produce_order, a.mid_sys_analysis, a.mid_hand_analysis, a.night_plan_qty, a.night_produce_order, a.night_sys_analysis, a.night_hand_analysis, a.day_plan_qty, a.day_produce_order, a.day_sys_analysis, a.day_hand_analysis, a.next_mid_plan_qty, a.next_mid_produce_order, a.next_mid_sys_analysis, a.next_mid_hand_analysis, a.cx_class1_plan, a.cx_class2_plan, a.cx_class3_plan, a.cx_class4_plan, a.cx_class5_plan, a.is_release, a.mark_close_out_tip, a.close_out_spec_flag, a.production_status, a.remark, a.del_flag, a.create_by, a.create_time, a.update_by, a.update_time,a.data_source, a.publish_success_count, a.newest_publish_time, a.last_mid_plan_qty,
     </sql>
 
     <select id="getScheduleResult" parameterType="long" resultType="com.zlt.aps.tq.entity.TqScheduleResult">
@@ -221,16 +221,16 @@
                      ) b on a.BEAD_CODE=b.MATERIAL_CODE
             LEFT JOIN T_TQ_DAY_FINISH_QTY c ON a.order_no = c.order_no and c.del_flag = '0'
             LEFT JOIN (
-                        SELECT t1.BEAD_CODE, t1.machine_id,f1.MID_FINISH_QTY
+                        SELECT t1.BEAD_CODE, t1.machine_code,f1.MID_FINISH_QTY
                         FROM t_tq_schedule_result t1,T_TQ_DAY_FINISH_QTY f1
                         where t1.order_no = f1.order_no
                         and t1.del_flag = '0'
                         and f1.del_flag = '0'
                         and t1.schedule_date = #{scheduleDate} + 1
-                      ) d ON a.BEAD_CODE = d.BEAD_CODE AND a.machine_id = d.machine_id
+                      ) d ON a.BEAD_CODE = d.BEAD_CODE AND a.machine_code = d.machine_code
             LEFT JOIN (/*调度员操作日志，判断调度员是否有做“转机台”或“调量”操作*/
                         SELECT schedule_id,
-                               max(IF(BEFORE_MACHINE_ID = AFTER_MACHINE_ID,0,1)) change_machine,
+                               max(IF(BEFORE_MACHINE_CODE = AFTER_MACHINE_CODE,0,1)) change_machine,
                                max(IF(BEFORE_MID_PLAN = AFTER_MID_PLAN,0,1)) change_mid_plan,
                                max(IF(BEFORE_NIGHT_PLAN = AFTER_NIGHT_PLAN,0,1)) change_night_plan,
                                max(IF(BEFORE_DAY_PLAN = AFTER_DAY_PLAN,0,1)) change_day_plan,
@@ -257,9 +257,9 @@
             <if test="productionStatus != null  and productionStatus != ''">and a.production_status = #{productionStatus}</if>
             <if test="isRelease != null  and isRelease != ''">and a.IS_RELEASE = #{isRelease}</if>
             <if test="mouthPlateCode != null  and mouthPlateCode != ''">and INSTR(a.mouth_plate_code, #{mouthPlateCode}) > 0 </if>
-            <if test="machineId != null  and machineId != ''">and instr(concat(',',a.machine_id,','),  concat(',',#{machineId},','))>0</if>
+            <if test="machineCode != null  and machineCode != ''">and instr(concat(',',a.machine_code,','),  concat(',',#{machineCode},','))>0</if>
             <if test="ids != null and ids.length > 0">and a.id in <foreach item="scheduleId" collection="ids" open="(" separator="," close=")">#{scheduleId}</foreach></if>
-            order by (case when instr(a.machine_id,',') > 0 then a.machine_id when a.machine_id is null or a.machine_id = '' then '0' else '-1' end) desc/*多个机台 和 没有机台的排在前面*/,a.CREATE_TIME
+            order by (case when instr(a.machine_code,',') > 0 then a.machine_code when a.machine_code is null or a.machine_code = '' then '0' else '-1' end) desc/*多个机台 和 没有机台的排在前面*/,a.CREATE_TIME
         ) t
         <if test="orderStr != null">
             order by ${orderStr}
@@ -383,7 +383,7 @@
         where del_flag = '0'
         <if test="scheduleDate != null ">and schedule_date = #{scheduleDate}</if>
         <if test="beadCode != null and beadCode != ''">and bead_code = #{beadCode}</if>
-        <if test="machineId != null and machineId != ''">and machine_id = #{machineId}</if>
+        <if test="machineCode != null and machineCode != ''">and machine_code = #{machineCode}</if>
         <if test="id != null and id != ''">and id != #{id}</if>
     </select>
 
@@ -483,7 +483,7 @@
         #{factoryCode},
         #{companyCode}
         FROM T_TQ_SCHEDULE_RESULT r
-        LEFT JOIN T_TQ_MACHINE_INFO m ON r.machine_id = m.id
+        LEFT JOIN T_TQ_MACHINE_INFO m ON r.machine_code = m.machine_code
         LEFT JOIN (SELECT max(TIRE_RING_SAP) SAP_MATERIAL_CODE, TIRE_RING_CODE FROM T_CONSTRUCTION_VERSION_INFO WHERE DEL_FLAG = '0' GROUP BY TIRE_RING_CODE) p ON r.BEAD_CODE = p.TIRE_RING_CODE
         WHERE r.id in <foreach collection="ids" item="id" open="(" close=")" separator=",">#{id}</foreach>
     </insert>
@@ -602,8 +602,8 @@
         <if test="isRelease != null  and isRelease != ''">and IS_RELEASE = #{isRelease}</if>
         <if test="mouthPlateCode != null  and mouthPlateCode != ''">and INSTR(mouth_plate_code, #{mouthPlateCode}) > 0
         </if>
-        <if test="machineId != null  and machineId != ''">and instr(concat(',',machine_id,','),
-            concat(',',#{machineId},','))>0
+        <if test="machineCode != null  and machineCode != ''">and instr(concat(',',machine_code,','),
+            concat(',',#{machineCode},','))>0
         </if>
     </select>
 
@@ -626,8 +626,8 @@
         <if test="isRelease != null  and isRelease != ''">and IS_RELEASE = #{isRelease}</if>
         <if test="mouthPlateCode != null  and mouthPlateCode != ''">and INSTR(mouth_plate_code, #{mouthPlateCode}) > 0
         </if>
-        <if test="machineId != null  and machineId != ''">and instr(concat(',',machine_id,','),
-            concat(',',#{machineId},','))>0
+        <if test="machineCode != null  and machineCode != ''">and instr(concat(',',machine_code,','),
+            concat(',',#{machineCode},','))>0
         </if>
     </select>
 
@@ -673,8 +673,8 @@
         <if test="isRelease != null  and isRelease != ''">and IS_RELEASE = #{isRelease}</if>
         <if test="mouthPlateCode != null  and mouthPlateCode != ''">and INSTR(mouth_plate_code, #{mouthPlateCode}) > 0
         </if>
-        <if test="machineId != null  and machineId != ''">and instr(concat(',',machine_id,','),
-            concat(',',#{machineId},','))>0
+        <if test="machineCode != null  and machineCode != ''">and instr(concat(',',machine_code,','),
+            concat(',',#{machineCode},','))>0
         </if>
         GROUP BY bead_code
     </select>

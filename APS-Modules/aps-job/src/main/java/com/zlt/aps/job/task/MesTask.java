@@ -403,4 +403,12 @@ public class MesTask {
         }
         log.info("临时任务-按最新版本号抓取硫化排程日完成量回报完成");
     }
+
+    /**
+     * 同步设备停机计划
+     */
+    @ApiOperation("同步设备停机计划")
+    public void syncDevPlanClose() {
+        FeignTokenHelper.runWithToken(() -> iMesItfService.syncDevPlanClose(new AuxReqSyncDataLogs()));
+    }
 }

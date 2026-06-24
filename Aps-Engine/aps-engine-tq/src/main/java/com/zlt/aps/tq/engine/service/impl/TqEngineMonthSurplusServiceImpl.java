@@ -35,7 +35,7 @@ public class TqEngineMonthSurplusServiceImpl implements TqEngineMonthSurplusServ
             return monthSurplusMap;
         }
         for(TqMonthSurplusVo monthSurplusVo : list) {
-            monthSurplusMap.put(monthSurplusVo.getMaterialCode(), monthSurplusVo);
+            monthSurplusMap.put(monthSurplusVo.getBeadCode(), monthSurplusVo);
         }
         return monthSurplusMap;
     }

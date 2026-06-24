@@ -21,12 +21,15 @@
         group by cxr.TIRE_RING_CODE
     </select>
 
-    <select id="listTqStock" parameterType="string" resultType="com.zlt.aps.tq.engine.vo.TqStockVo">
-        select MATERIAL_CODE beadCode, SUM(IFNULL(STOCK_NUM,0)+IFNULL(MODIFY_NUM,0)-IFNULL(BAD_NUM,0)) STOCK_NUM
+    <select id="listTqStock" resultType="com.zlt.aps.tq.engine.vo.TqStockVo">
+        select BEAD_CODE, SUM(IFNULL(STOCK_NUM,0)+IFNULL(MODIFY_NUM,0)-IFNULL(BAD_NUM,0)) STOCK_NUM
         from T_TQ_STOCK
         where STOCK_DATE = DATE_ADD(#{stockDate}, INTERVAL -1 day) /*排程日期 要减1天，才是对应库存日期*/
         and DEL_FLAG = '0'
-        GROUP BY MATERIAL_CODE 
+        <if test="factoryCode != null and factoryCode != ''">
+            and FACTORY_CODE = #{factoryCode}
+        </if>
+        GROUP BY BEAD_CODE
     </select>
 
     <select id="listTodayMorningPlan" resultType="com.zlt.aps.tq.engine.vo.TqStockConsumeVo">
@@ -36,6 +39,9 @@
     FROM T_TQ_SCHEDULE_RESULT
     WHERE SCHEDULE_DATE = DATE_ADD(#{scheduleDate}, INTERVAL -1 day)
       AND DEL_FLAG = '0'
+      <if test="factoryCode != null and factoryCode != ''">
+          AND FACTORY_CODE = #{factoryCode}
+      </if>
     GROUP BY BEAD_CODE
 </select>
 

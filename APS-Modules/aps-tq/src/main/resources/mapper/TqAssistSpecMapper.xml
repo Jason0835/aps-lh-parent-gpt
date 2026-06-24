@@ -7,8 +7,8 @@
         select *
         from t_tq_assist_spec
         where DEL_FLAG = 0
-        <if test="materialCode != null and materialCode != ''">
-            and INSTR(MATERIAL_CODE, #{materialCode, jdbcType=VARCHAR}) > 0
+        <if test="beadCode != null and beadCode != ''">
+            and INSTR(BEAD_CODE, #{beadCode, jdbcType=VARCHAR}) > 0
         </if>
         <if test="orderStr == null">
             order by CREATE_TIME desc
@@ -21,12 +21,12 @@
 
     <insert id="mergeSql" parameterType="list">
         INSERT INTO t_tq_assist_spec (
-        MATERIAL_CODE, create_by, create_time, update_by, update_time, remark, del_flag
+        BEAD_CODE, create_by, create_time, update_by, update_time, remark, del_flag
         )
         VALUES
         <foreach collection="list" item="AssistSpec" separator=",">
             (
-            #{AssistSpec.materialCode,jdbcType=VARCHAR},
+            #{AssistSpec.beadCode,jdbcType=VARCHAR},
             #{AssistSpec.createBy,jdbcType=VARCHAR},
             NOW(),
             #{AssistSpec.updateBy,jdbcType=VARCHAR},

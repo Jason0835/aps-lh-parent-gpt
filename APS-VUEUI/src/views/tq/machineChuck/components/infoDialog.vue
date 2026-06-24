@@ -43,7 +43,7 @@ export default {
       form: {},
       machineList: [],
       rules: {
-        machineId: [
+        machineCode: [
           {
             required: true,
             message: this.$t("common.rule.select"),
@@ -73,7 +73,7 @@ export default {
       return [
         {
           label: this.$t("ui.tq.machineChuck.column.machineCode"),
-          prop: "machineId",
+          prop: "machineCode",
           span: 24,
           required: true,
           type: "select",
@@ -82,7 +82,7 @@ export default {
           loading: this.machineLoading,
           props: {
             label: "machineName",
-            value: "id",
+            value: "machineCode",
           },
           onFocus: this.handleMachineFocus,
         },
@@ -157,11 +157,11 @@ export default {
         // 先加载所有机台列表
         await this.loadMachineList();
         // 如果当前机台不在列表中，添加到列表
-        if (data.machineId && data.machineName) {
-          const exists = this.machineList.some(item => item.id === data.machineId);
+        if (data.machineCode && data.machineName) {
+          const exists = this.machineList.some(item => item.machineCode === data.machineCode);
           if (!exists) {
             this.machineList.unshift({
-              id: data.machineId,
+              machineCode: data.machineCode,
               machineName: data.machineName,
             });
           }

@@ -152,19 +152,19 @@ public class TqLossSettingController extends AbstractDocBizController<TqLossSett
         List<TqLossSetting> list = tqLossSettingMapper.selectList(wrapper);
 
         // 查询机台信息
-        Map<Long, String> machineMap = new HashMap<>();
+        Map<String, String> machineMap = new HashMap<>();
         if (!list.isEmpty()) {
             List<TqMachineInfo> machineList = tqMachineInfoService.selectMachineInfoList(new TqMachineInfo());
             machineMap = machineList.stream()
-                    .collect(Collectors.toMap(TqMachineInfo::getId, TqMachineInfo::getMachineName, (v1, v2) -> v1));
+                    .collect(Collectors.toMap(TqMachineInfo::getMachineCode, TqMachineInfo::getMachineName, (v1, v2) -> v1));
         }
 
         // 转换为VO
         List<TqLossSettingExportVO> voList = new ArrayList<>();
         for (TqLossSetting setting : list) {
             TqLossSettingExportVO vo = new TqLossSettingExportVO();
-            vo.setMaterialCode(setting.getMaterialCode());
-            vo.setMachineName(machineMap.getOrDefault(setting.getMachineId(), ""));
+            vo.setBeadCode(setting.getBeadCode());
+            vo.setMachineName(machineMap.getOrDefault(setting.getMachineCode(), ""));
             vo.setLossRate(setting.getLossRate());
             vo.setRemark(setting.getRemark());
             vo.setUpdateTime(setting.getUpdateTime());
@@ -176,7 +176,7 @@ public class TqLossSettingController extends AbstractDocBizController<TqLossSett
     @Override
     protected void builderCondition(QueryWrapper<TqLossSetting> queryWrapper, TqLossSetting queryVO) {
         queryWrapper.eq("IS_DELETE", 0);
-        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getMaterialCode()), "MATERIAL_CODE", queryVO.getMaterialCode());
-        queryWrapper.eq(queryVO.getMachineId() != null, "MACHINE_ID", queryVO.getMachineId());
+        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getBeadCode()), "BEAD_CODE", queryVO.getBeadCode());
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getMachineCode()), "MACHINE_CODE", queryVO.getMachineCode());
     }
 }

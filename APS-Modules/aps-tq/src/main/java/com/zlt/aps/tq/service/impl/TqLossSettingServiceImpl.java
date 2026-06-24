@@ -43,16 +43,16 @@ public class TqLossSettingServiceImpl extends AbstractDocService<TqLossSetting> 
 
     @Override
     protected List<String> getCheckUniqueFields() {
-        return Arrays.asList("materialCode", "machineId");
+        return Arrays.asList("beadCode", "machineCode");
     }
 
     @Override
     public String checkUnique(TqLossSetting lossSetting) {
         QueryWrapper<TqLossSetting> wrapper = new QueryWrapper<>();
         wrapper.ne(lossSetting.getId() != null, "ID", lossSetting.getId());
-        wrapper.eq("MATERIAL_CODE", lossSetting.getMaterialCode());
-        wrapper.eq(lossSetting.getMachineId() != null, "MACHINE_ID", lossSetting.getMachineId());
-        wrapper.isNull(lossSetting.getMachineId() == null, "MACHINE_ID");
+        wrapper.eq("BEAD_CODE", lossSetting.getBeadCode());
+        wrapper.eq(lossSetting.getMachineCode() != null, "MACHINE_CODE", lossSetting.getMachineCode());
+        wrapper.isNull(lossSetting.getMachineCode() == null, "MACHINE_CODE");
         wrapper.eq("IS_DELETE", 0);
         if (tqLossSettingMapper.selectCount(wrapper) > 0) {
             return UserConstants.NOT_UNIQUE;
@@ -91,14 +91,14 @@ public class TqLossSettingServiceImpl extends AbstractDocService<TqLossSetting> 
             addImportErrorLog(importLogId, null, message, importErrorLogs);
             return AjaxResult.error(message, importErrorLogs);
         }
-        Map<String, Long> machineNameMap = machineInfoList.stream().collect(Collectors.toMap(TqMachineInfo::getMachineName, TqMachineInfo::getId, (a, b) -> a));
+        Map<String, String> machineNameMap = machineInfoList.stream().collect(Collectors.toMap(TqMachineInfo::getMachineName, TqMachineInfo::getMachineCode, (a, b) -> a));
 
-        Map<String, Long> groupMap = list.stream().collect(Collectors.groupingBy(a -> (a.getMaterialCode() == null ? "" : a.getMaterialCode()) + "_" + (a.getMachineName() == null ? "" : a.getMachineName()), Collectors.counting()));
+        Map<String, Long> groupMap = list.stream().collect(Collectors.groupingBy(a -> (a.getBeadCode() == null ? "" : a.getBeadCode()) + "_" + (a.getMachineName() == null ? "" : a.getMachineName()), Collectors.counting()));
 
         for (int i = 0; i < list.size(); i++) {
             TqLossSetting lossSetting = list.get(i);
 
-            String groupKey = (lossSetting.getMaterialCode() == null ? "" : lossSetting.getMaterialCode()) + "_" + (lossSetting.getMachineName() == null ? "" : lossSetting.getMachineName());
+            String groupKey = (lossSetting.getBeadCode() == null ? "" : lossSetting.getBeadCode()) + "_" + (lossSetting.getMachineName() == null ? "" : lossSetting.getMachineName());
             Long hasValue = groupMap.get(groupKey);
             if (hasValue != null && hasValue > 1) {
                 failureNum++;
@@ -114,21 +114,21 @@ public class TqLossSettingServiceImpl extends AbstractDocService<TqLossSetting> 
             List<ImportErrorLog> validated = ImportUtil.validated(importLogId, i + 2, lossSetting);
 
             String machineName = lossSetting.getMachineName();
-            Long machineId = machineNameMap.get(machineName);
+            String machineCode = machineNameMap.get(machineName);
 
-            if (StringUtils.isEmpty(machineName) && StringUtils.isEmpty(lossSetting.getMaterialCode())) {
+            if (StringUtils.isEmpty(machineName) && StringUtils.isEmpty(lossSetting.getBeadCode())) {
                 addImportErrorLog(importLogId, i + 2,
                         I18nUtil.getMessage("ui.error.message.loss.isAllNull"), validated);
             }
-            if (machineId == null && StringUtils.isNotEmpty(machineName)) {
+            if (machineCode == null && StringUtils.isNotEmpty(machineName)) {
                 addImportErrorLog(importLogId, i + 2,
                         I18nUtil.getMessage("ui.error.message.column.machineNotExist"), validated);
             }
 
             if (CollectionUtils.isEmpty(validated)) {
-                lossSetting.setMachineId(machineId);
-                if (StringUtils.isBlank(lossSetting.getMaterialCode())) {
-                    lossSetting.setMaterialCode(null);
+                lossSetting.setMachineCode(machineCode);
+                if (StringUtils.isBlank(lossSetting.getBeadCode())) {
+                    lossSetting.setBeadCode(null);
                 }
                 lossSetting.setIsDelete(0);
                 importList.add(lossSetting);
@@ -150,9 +150,9 @@ public class TqLossSettingServiceImpl extends AbstractDocService<TqLossSetting> 
                         continue;
                     }
                     QueryWrapper<TqLossSetting> wrapper = new QueryWrapper<>();
-                    wrapper.eq("MATERIAL_CODE", excelItem.getMaterialCode());
-                    wrapper.eq(excelItem.getMachineId() != null, "MACHINE_ID", excelItem.getMachineId());
-                    wrapper.isNull(excelItem.getMachineId() == null, "MACHINE_ID");
+                    wrapper.eq("BEAD_CODE", excelItem.getBeadCode());
+                    wrapper.eq(excelItem.getMachineCode() != null, "MACHINE_CODE", excelItem.getMachineCode());
+                    wrapper.isNull(excelItem.getMachineCode() == null, "MACHINE_CODE");
                     wrapper.eq("IS_DELETE", 0);
                     Long unique = tqLossSettingMapper.selectCount(wrapper);
                     if (unique == 0) {

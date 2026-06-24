@@ -81,7 +81,7 @@ public class TqScheduleResultDto2 extends ApsBaseDto
     @ImportValidated(required = true,maxLength = 20)
     @Excel(name = "ui.data.column.scheduleResult.produceLine")
     @ApiModelProperty(value = "生产线")
-    private String machineId;
+    private String machineCode;
 
     /** 单耗 */
 //    @Excel(name = "ui.data.column.scheduleResult.unitConsume")

@@ -35,11 +35,12 @@ public class TqEngineStockServiceImpl implements TqEngineStockService {
      * @param batchNo 排程批次号
      * @param scheduleDate 排程日期
      * @param stockLossRate 库存损耗率（%）
+     * @param factoryCode 分厂编码（按工厂过滤库存）
      *
      * @return
      */
-    public Map<String, Double> getPlanStockMap(String batchNo, String scheduleDate, Double stockLossRate) {
-        return this.getStockMap(batchNo, scheduleDate, stockLossRate, true);
+    public Map<String, Double> getPlanStockMap(String batchNo, String scheduleDate, Double stockLossRate, String factoryCode) {
+        return this.getStockMap(batchNo, scheduleDate, stockLossRate, true, factoryCode);
     }
     
     /**
@@ -48,18 +49,19 @@ public class TqEngineStockServiceImpl implements TqEngineStockService {
      * @param batchNo 排程批次号
      * @param scheduleDate 排程日期
      * @param stockLossRate 库存损耗率（%）
+     * @param factoryCode 分厂编码（按工厂过滤库存）
      *
      * @return
      */
     @Override
-    public Map<String, Double> getNightStockMap(String batchNo, String scheduleDate, Double stockLossRate) {
-        return this.getStockMap(batchNo, scheduleDate, stockLossRate, false);
+    public Map<String, Double> getNightStockMap(String batchNo, String scheduleDate, Double stockLossRate, String factoryCode) {
+        return this.getStockMap(batchNo, scheduleDate, stockLossRate, false, factoryCode);
     }
-        
 
-    private Map<String, Double> getStockMap(String batchNo, String scheduleDate, Double stockLossRate, boolean isGetPlanStock) {
+
+    private Map<String, Double> getStockMap(String batchNo, String scheduleDate, Double stockLossRate, boolean isGetPlanStock, String factoryCode) {
         Map<String, Double> stockMap = new HashMap<>();
-        List<TqStockVo> list = tqEngineStockMapper.listTqStock(scheduleDate);  //查询指定日期的胎圈库存量
+        List<TqStockVo> list = tqEngineStockMapper.listTqStock(scheduleDate, factoryCode);  //查询指定日期的胎圈库存量（按工厂过滤）
         autoScheduleLogService.insertTqScheduleLog(batchNo, "", "①预计库存 = 7点胎圈库存 × (1-损耗率) + 当天早班计划量 - 成型一班消耗", "7点胎圈库存量：" + toJSONString(list));
         if (list.isEmpty()) {
             log.error("胎圈库存查询为空");
@@ -67,7 +69,7 @@ public class TqEngineStockServiceImpl implements TqEngineStockService {
         }
 
         // 计算胎圈预计库存 = 7点胎圈库存 × (1-损耗率) + 当天早班计划量 - 成型一班消耗
-        Map<String, Double> consumMap = this.getTqConsume(batchNo, scheduleDate, isGetPlanStock); // 成型一班消耗 - 当天早班计划量
+        Map<String, Double> consumMap = this.getTqConsume(batchNo, scheduleDate, isGetPlanStock, factoryCode); // 成型一班消耗 - 当天早班计划量
         for (TqStockVo stockVo : list) {
             double consum = consumMap.getOrDefault(stockVo.getBeadCode(), 0D);  //净消耗量
 
@@ -101,14 +103,15 @@ public class TqEngineStockServiceImpl implements TqEngineStockService {
      * @param batchNo 批次号
      * @param scheduleDate 排程日期
      * @param isGetPlanStock true取7点预计库存(成型一班消耗)，false取19点预计库存(成型二班消耗)
+     * @param factoryCode 分厂编码（按工厂过滤当天早班计划量）
      * @return 净消耗量Map，key=胎圈代码，value=净消耗量（负数表示当天早班产出大于成型消耗）
      */
-    private Map<String, Double> getTqConsume(String batchNo, String scheduleDate, boolean isGetPlanStock) {
+    private Map<String, Double> getTqConsume(String batchNo, String scheduleDate, boolean isGetPlanStock, String factoryCode) {
         Map<String, Double> result = new HashMap<>();
         List<TqStockConsumeVo> list = tqEngineStockMapper.listCxPlanAndConsume(scheduleDate);  //查询胎圈对应的成型一班/二班计划消耗量
         autoScheduleLogService.insertTqScheduleLog(batchNo, "", "②预计库存 = 7点胎圈库存 × (1-损耗率) + 当天早班计划量 - 成型一班消耗",
                 "成型一班/二班计划量对应胎圈计划消耗量：" + toJSONString(list));  //添加日志
-        List<TqStockConsumeVo> consumeVos = tqEngineStockMapper.listTodayMorningPlan(scheduleDate);  //查询当天早班(D日早班)计划量
+        List<TqStockConsumeVo> consumeVos = tqEngineStockMapper.listTodayMorningPlan(scheduleDate, factoryCode);  //查询当天早班(D日早班)计划量（按工厂过滤）
         autoScheduleLogService.insertTqScheduleLog(batchNo, "", "②预计库存 = 7点胎圈库存 × (1-损耗率) + 当天早班计划量 - 成型一班消耗",
                 "当天早班(D日早班)胎圈计划量：" + toJSONString(consumeVos));  //添加日志
         if (list.isEmpty() && consumeVos.isEmpty()) {

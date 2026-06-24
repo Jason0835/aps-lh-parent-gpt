@@ -6,8 +6,8 @@
 
     <resultMap type="com.zlt.aps.tq.api.domain.entity.TqLossSetting" id="TqLossSettingResult">
         <id property="id" column="ID"/>
-        <result property="materialCode" column="MATERIAL_CODE"/>
-        <result property="machineId" column="MACHINE_ID"/>
+        <result property="beadCode" column="BEAD_CODE"/>
+        <result property="machineCode" column="MACHINE_CODE"/>
         <result property="machineName" column="MACHINE_NAME"/>
         <result property="lossRate" column="LOSS_RATE"/>
         <result property="remark" column="REMARK"/>
@@ -19,26 +19,26 @@
 
     <select id="selectLossSettingList" parameterType="com.zlt.aps.tq.api.domain.entity.TqLossSetting"
             resultMap="TqLossSettingResult">
-        select a.ID, a.MATERIAL_CODE, a.MACHINE_ID, a.LOSS_RATE, a.REMARK,
+        select a.ID, a.BEAD_CODE, a.MACHINE_CODE, a.LOSS_RATE, a.REMARK,
                a.CREATE_BY, a.CREATE_TIME, a.UPDATE_BY, a.UPDATE_TIME,
                b.MACHINE_NAME
         from T_TQ_LOSS_SETTING a
-        left join T_TQ_MACHINE_INFO b on a.MACHINE_ID = b.ID and b.IS_DELETE = 0
+        left join T_TQ_MACHINE_INFO b on a.MACHINE_CODE = b.MACHINE_CODE and b.IS_DELETE = 0
         where a.IS_DELETE = 0
-        <if test="materialCode != null and materialCode != ''">and INSTR(a.MATERIAL_CODE, #{materialCode}) > 0</if>
-        <if test="machineId != null">and a.MACHINE_ID = #{machineId}</if>
+        <if test="beadCode != null and beadCode != ''">and INSTR(a.BEAD_CODE, #{beadCode}) > 0</if>
+        <if test="machineCode != null and machineCode != ''">and a.MACHINE_CODE = #{machineCode}</if>
         order by a.CREATE_TIME desc
     </select>
 
     <insert id="mergeSql" parameterType="list">
         INSERT INTO T_TQ_LOSS_SETTING (
-            MATERIAL_CODE, MACHINE_ID, LOSS_RATE, CREATE_BY, CREATE_TIME, REMARK, IS_DELETE
+            BEAD_CODE, MACHINE_CODE, LOSS_RATE, CREATE_BY, CREATE_TIME, REMARK, IS_DELETE
         )
         VALUES
         <foreach collection="list" item="item" separator=",">
             (
-            #{item.materialCode,jdbcType=VARCHAR},
-            #{item.machineId,jdbcType=BIGINT},
+            #{item.beadCode,jdbcType=VARCHAR},
+            #{item.machineCode,jdbcType=VARCHAR},
             #{item.lossRate,jdbcType=DOUBLE},
             #{item.createBy,jdbcType=VARCHAR},
             NOW(),

@@ -78,7 +78,7 @@ public class TqRollingContext {
     private Map<String, LinkedList<TqRollingTaskNode>> taskChainMap = new HashMap<>();
 
     /**
-     * 生产速度缓存：key=machineId:beadCode，value=速度（个/小时）
+     * 生产速度缓存：key=machineCode:beadCode，value=速度（个/小时）
      * <p>避免单次滚动更新内重复查询 T_TQ_MACHINE_SPEC_SPEED</p>
      */
     private Map<String, Double> speedCache = new HashMap<>();

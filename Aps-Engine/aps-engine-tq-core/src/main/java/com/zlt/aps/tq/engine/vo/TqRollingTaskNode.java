@@ -20,9 +20,6 @@ public class TqRollingTaskNode {
     /** 班次索引（1~6） */
     private int classIndex;
 
-    /** 机台ID */
-    private Long machineId;
-
     /** 机台编号 */
     private String machineCode;
 

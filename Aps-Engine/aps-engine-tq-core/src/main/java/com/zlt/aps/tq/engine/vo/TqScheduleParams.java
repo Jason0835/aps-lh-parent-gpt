@@ -18,6 +18,12 @@ public class TqScheduleParams {
      * 工装容量
      */
     private Double toolCapacity;
+
+    /**
+     * 工装车总数（全局统一值，用于排程时计算可用工装数量限制）
+     * 可用工装 = 工装车总数 - 库存占用工装（库存量/整车容量向上取整）
+     */
+    private Integer toolingTotal;
     /**
      * 损耗率
      */

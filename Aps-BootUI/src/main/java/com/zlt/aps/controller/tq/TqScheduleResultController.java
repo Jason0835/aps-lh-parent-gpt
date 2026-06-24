@@ -57,11 +57,21 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
- * 胎圈排程结果Controller
+ * 【已废弃】胎圈排程结果Controller（4班次制旧版，BootUI层）
+ *
+ * <p>废弃说明：
+ * <ul>
+ *   <li>本Controller为旧版4班次制胎圈排程BootUI接口，已由新版6班次制接口替代</li>
+ *   <li>新版接口前缀：/tq/newScheduleResult/*</li>
+ *   <li>新版算法依据：胎圈自动排程_v5.xmind（6班次制）</li>
+ *   <li>请勿在此Controller新增功能，所有新需求请到新版接口实现</li>
+ *   <li>计划在前端完全切换到新版接口后，本Controller将一并删除</li>
+ * </ul>
  *
  * @author chen
  * @date 2021-06-21
  */
+@Deprecated
 @Api(tags = "胎圈排程结果")
 @Controller
 @RequestMapping("/tq/scheduleResult")

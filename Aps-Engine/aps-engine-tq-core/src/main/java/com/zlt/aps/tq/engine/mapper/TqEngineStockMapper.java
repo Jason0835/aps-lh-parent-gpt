@@ -19,16 +19,18 @@ public interface TqEngineStockMapper {
     /**
      * 查询当天早班(D日早班)计划量
      * @param scheduleDate
+     * @param factoryCode 分厂编码（按工厂过滤）
      * @return
      */
-    List<TqStockConsumeVo> listTodayMorningPlan(@Param("scheduleDate") String scheduleDate);
+    List<TqStockConsumeVo> listTodayMorningPlan(@Param("scheduleDate") String scheduleDate, @Param("factoryCode") String factoryCode);
 
     /**
      * 查询指定日期的胎圈库存量
      * @param stockDate  日期，格式：yyyy-mm-dd
+     * @param factoryCode 分厂编码（按工厂过滤库存）
      * @return
      */
-    List<TqStockVo> listTqStock(@Param("stockDate") String stockDate);
+    List<TqStockVo> listTqStock(@Param("stockDate") String stockDate, @Param("factoryCode") String factoryCode);
 
     /**
      * 查询昨日早班半制品计划量（昨日排程的CLASS1_PLAN_QTY对应昨日早班生产量）

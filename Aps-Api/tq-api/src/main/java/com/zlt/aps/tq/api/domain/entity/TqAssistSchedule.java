@@ -75,12 +75,12 @@ public class TqAssistSchedule extends ApsBaseEntity{
     private String specSize;
 
     /**
-     * 生产线(机台名称)
+     * 机台编号
      */
     @ImportValidated(required = true,maxLength = 20)
     @Excel(name = "ui.data.column.scheduleResult.produceLine")
-    @ApiModelProperty(value = "生产线")
-    private String machineId;
+    @ApiModelProperty(value = "机台编号")
+    private String machineCode;
 
     /** 单耗 */
 //    @Excel(name = "ui.data.column.scheduleResult.unitConsume")

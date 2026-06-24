@@ -30,10 +30,10 @@ public class TqAssistSpec extends ApsBaseEntity {
 	@ApiModelProperty(value = "id")
 	private Long id;
 
-	@Excel(name = "ui.common.column.assist.tq.materialCode")
+	@Excel(name = "ui.common.column.assist.tq.beadCode")
 	@ImportValidated(required = true, isCode = true, maxLength = 30)
 	@ApiModelProperty(value = "胎圈代码")
-	private String materialCode;
+	private String beadCode;
 
 	/** 删除标识：0--正常，1-删除 */
 	@ApiModelProperty(value = "删除标识")

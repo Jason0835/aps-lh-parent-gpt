@@ -15,6 +15,7 @@ import com.zlt.aps.tq.service.ITqMachineInfoService;
 import com.zlt.aps.tq.service.ITqMachineMaintenancePlanService;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
+import com.zlt.common.utils.PubUtil;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
@@ -134,17 +135,17 @@ public class TqMachineMaintenancePlanController extends AbstractDocBizController
         wrapper.last("ORDER BY " + getOrderBy());
         List<TqMachineMaintenancePlan> list = tqMachineMaintenancePlanMapper.selectList(wrapper);
 
-        Map<Long, String> machineMap = new java.util.HashMap<>();
+        Map<String, String> machineMap = new java.util.HashMap<>();
         if (!list.isEmpty()) {
             List<TqMachineInfo> machineList = tqMachineInfoService.selectMachineInfoList(new TqMachineInfo());
             machineMap = machineList.stream()
-                    .collect(Collectors.toMap(TqMachineInfo::getId, TqMachineInfo::getMachineName, (v1, v2) -> v1));
+                    .collect(Collectors.toMap(TqMachineInfo::getMachineCode, TqMachineInfo::getMachineName, (v1, v2) -> v1));
         }
 
         List<TqMachineMaintenancePlanExportVO> voList = new ArrayList<>();
         for (TqMachineMaintenancePlan entity : list) {
             TqMachineMaintenancePlanExportVO vo = new TqMachineMaintenancePlanExportVO();
-            vo.setMachineName(machineMap.getOrDefault(entity.getMachineId(), ""));
+            vo.setMachineName(machineMap.getOrDefault(entity.getMachineCode(), ""));
             vo.setDowntimeDate(entity.getDowntimeDate());
             vo.setDowntimeShift(entity.getDowntimeShift());
             vo.setDowntimeHours(entity.getDowntimeHours());
@@ -160,6 +161,6 @@ public class TqMachineMaintenancePlanController extends AbstractDocBizController
         queryWrapper.eq("IS_DELETE", 0);
         queryWrapper.ge(queryVO.getDowntimeDateBegin() != null, "DOWNTIME_DATE", queryVO.getDowntimeDateBegin());
         queryWrapper.le(queryVO.getDowntimeDateEnd() != null, "DOWNTIME_DATE", queryVO.getDowntimeDateEnd());
-        queryWrapper.eq(queryVO.getMachineId() != null, "MACHINE_ID", queryVO.getMachineId());
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getMachineCode()), "MACHINE_CODE", queryVO.getMachineCode());
     }
 }

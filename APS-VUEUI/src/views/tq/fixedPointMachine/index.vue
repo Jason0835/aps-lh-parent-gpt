@@ -98,10 +98,10 @@ export default {
       return [
         { type: "selection", fixed: "left" },
         {
-          prop: "materialCode",
+          prop: "beadCode",
           align: "center",
           halign: "center",
-          label: this.$t("ui.tq.specifyMachine.column.materialCode"),
+          label: this.$t("ui.tq.specifyMachine.column.beadCode"),
         },
         {
           prop: "machineName",
@@ -173,20 +173,18 @@ export default {
     searchColumns() {
       return [
         {
-          label: this.$t("ui.tq.specifyMachine.column.materialCode"),
-          prop: "materialCode",
+          label: this.$t("ui.tq.specifyMachine.column.beadCode"),
+          prop: "beadCode",
         },
         {
           label: this.$t("ui.specifyMachine.column.machineName"),
-          prop: "machineId",
+          prop: "machineCode",
           type: "select",
           dictData: this.machineList,
           filterable: true,
           loading: this.machineLoading,
-          props: {
-            label: "machineName",
-            value: "id",
-          },
+          labelKey: "machineName",
+          valueKey: "machineCode",
           onFocus: this.handleMachineFocus,
         },
         {

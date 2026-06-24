@@ -90,7 +90,7 @@ export default {
         },
         {
           label: this.$t("ui.data.column.tq.scheduleResult.beadCode"),
-          prop: "materialCode",
+          prop: "beadCode",
         },
       ],
       loading: false,
@@ -118,7 +118,7 @@ export default {
           minWidth: 100,
         },
         {
-          prop: "materialCode",
+          prop: "beadCode",
           align: "center",
           halign: "center",
           label: this.$t("ui.data.column.tq.scheduleResult.beadCode"),

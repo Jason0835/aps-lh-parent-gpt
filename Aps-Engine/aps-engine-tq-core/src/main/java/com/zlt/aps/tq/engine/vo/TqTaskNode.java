@@ -17,9 +17,9 @@ public class TqTaskNode {
     private int classIndex;
 
     /**
-     * 机台ID
+     * 机台编号
      */
-    private Long machineId;
+    private String machineCode;
 
     /**
      * 胎圈编码

@@ -82,6 +82,8 @@
     <change-machine-dialog ref="changeMachineDialog" @success="getList" />
     <!-- 调量弹窗 -->
     <adjust-qty-dialog ref="adjustQtyDialog" @success="getList" />
+    <!-- 自动排程弹窗 -->
+    <auto-plan-dialog ref="autoPlanDialogRef" @success="getList" />
   </basic-container>
 </template>
 <script>
@@ -92,6 +94,7 @@ import TltUploadForm from "@/views/components/tltUploadForm.vue";
 import InsertOrderDialog from "./components/insertOrderDialog.vue";
 import ChangeMachineDialog from "./components/changeMachineDialog.vue";
 import AdjustQtyDialog from "./components/adjustQtyDialog.vue";
+import AutoPlanDialog from "./components/autoPlanDialog.vue";
 
 const formatDate = (date) => {
   const year = date.getFullYear();
@@ -113,8 +116,14 @@ export default {
     InsertOrderDialog,
     ChangeMachineDialog,
     AdjustQtyDialog,
+    AutoPlanDialog,
   },
-  dicts: ["IS_RELEASE"],
+  dicts: ["IS_RELEASE", "biz_factory_name"],
+  provide() {
+    return {
+      parentDict: this.dict,
+    };
+  },
   data() {
     return {
       importColumns: [
@@ -143,10 +152,10 @@ export default {
       },
       sort: {},
       search: {
-        scheduleDateQuery: getOffsetDate(2),
+        scheduleDateQuery: getOffsetDate(1),
       },
       query: {
-        scheduleDateQuery: getOffsetDate(2),
+        scheduleDateQuery: getOffsetDate(1),
       },
       dateList: [
         { shift: 1, shiftType: "night", shiftDate: "" },
@@ -470,14 +479,9 @@ export default {
       }
     },
     handleAutoPlan() {
-      this.$confirm(this.$t("ui.data.btn.tqNewScheduleResult.autoPlan") + "?", {
-        type: "warning",
-      }).then(() => {
-        autoPlan({ scheduleDateQuery: this.query.scheduleDateQuery || this.search.scheduleDateQuery }).then((res) => {
-          this.$modal.msgSuccess(res.msg);
-          this.getList();
-        });
-      }).catch(() => {});
+      this.$refs.autoPlanDialogRef.show({
+        scheduleDateQuery: this.query.scheduleDateQuery || this.search.scheduleDateQuery,
+      });
     },
     handleInsertOrder() {
       this.$refs.insertOrderDialog.show();

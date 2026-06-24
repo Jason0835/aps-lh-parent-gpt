@@ -15,8 +15,8 @@ public class TqMachineSpecSpeedExportVO extends BaseEntity implements Serializab
     @Excel(name = "ui.specifyMachine.column.machineName")
     private String machineName;
 
-    @Excel(name = "ui.tq.machineSpecSpeed.column.materialCode")
-    private String materialCode;
+    @Excel(name = "ui.tq.machineSpecSpeed.column.beadCode")
+    private String beadCode;
 
     @Excel(name = "ui.tq.machineSpecSpeed.column.standardSpeed")
     private BigDecimal standardSpeed;

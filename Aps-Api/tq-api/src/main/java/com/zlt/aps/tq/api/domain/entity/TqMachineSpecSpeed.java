@@ -19,16 +19,17 @@ import java.math.BigDecimal;
 public class TqMachineSpecSpeed extends BaseEntity {
     private static final long serialVersionUID = 1L;
 
-    @ApiModelProperty(value = "机台ID", position = 20)
-    @TableField("MACHINE_ID")
-    @ImportValidated(required = true)
-    private Long machineId;
+    @Excel(name = "ui.tq.machineSpecSpeed.column.machineCode")
+    @ApiModelProperty(value = "机台编号", position = 20)
+    @TableField("MACHINE_CODE")
+    @ImportValidated(required = true, isCode = true, maxLength = 50)
+    private String machineCode;
 
-    @Excel(name = "ui.tq.machineSpecSpeed.column.materialCode")
+    @Excel(name = "ui.tq.machineSpecSpeed.column.beadCode")
     @ApiModelProperty(value = "胎圈编码", position = 30)
-    @TableField("MATERIAL_CODE")
+    @TableField("BEAD_CODE")
     @ImportValidated(required = true, isCode = true, maxLength = 20)
-    private String materialCode;
+    private String beadCode;
 
     @Excel(name = "ui.tq.machineSpecSpeed.column.standardSpeed")
     @ApiModelProperty(value = "标准生产速度（个/小时）", position = 40)
@@ -51,10 +52,6 @@ public class TqMachineSpecSpeed extends BaseEntity {
     @TableField("REMARK")
     @ImportValidated(maxLength = 500)
     private String remark;
-
-    @ApiModelProperty(value = "机台编号", position = 70)
-    @TableField(exist = false)
-    private String machineCode;
 
     @Excel(name = "ui.specifyMachine.column.machineName")
     @ApiModelProperty(value = "机台名称", position = 80)

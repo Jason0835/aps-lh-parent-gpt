@@ -364,6 +364,10 @@ public class TqNewScheduleResult extends BaseEntity implements Serializable {
     @TableField(exist = false)
     private Date scheduleDateQuery;
 
+    /** 分厂编码（查询参数，非数据库字段） */
+    @TableField(exist = false)
+    private String factoryCode;
+
     /** 机台名称（反显） */
     @TableField(exist = false)
     private String machineName;

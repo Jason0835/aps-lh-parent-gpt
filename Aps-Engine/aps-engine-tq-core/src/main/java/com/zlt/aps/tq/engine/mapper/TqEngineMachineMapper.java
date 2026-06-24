@@ -13,9 +13,10 @@ import java.util.List;
 public interface TqEngineMachineMapper {
     /**
      * 查询胎圈机台
+     * @param factoryCode 分厂编码（按工厂过滤机台）
      * @return
      */
-    List<TqMachineInfo> listTqMachine();
+    List<TqMachineInfo> listTqMachine(@Param("factoryCode") String factoryCode);
 
     /**
      * 查询胎圈定点机台信息

@@ -9,12 +9,14 @@ import com.zlt.aps.common.engine.service.FactoryService;
 import com.zlt.aps.itf.mes.IMesItfService;
 import com.zlt.aps.tq.api.domain.dto.TqChangeMachineDTO;
 import com.zlt.aps.tq.api.domain.dto.TqInsertOrderDTO;
+import com.zlt.aps.tq.api.domain.entity.TqDispatcherLog;
 import com.zlt.aps.tq.api.domain.entity.TqNewScheduleResult;
 import com.zlt.aps.tq.api.domain.entity.TqScheduleResultIssue;
 import com.zlt.aps.tq.engine.vo.RollingUpdateResult;
 import com.zlt.aps.tq.mapper.TqNewScheduleResultMapper;
 import com.zlt.aps.tq.service.ITqNewScheduleResultService;
 import com.zlt.aps.tq.service.ITqRollingUpdateService;
+import com.zlt.aps.tq.service.TqDispatcherLogService;
 import com.zlt.bill.common.service.AbstractDocService;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
@@ -53,6 +55,12 @@ public class TqNewScheduleResultServiceImpl extends AbstractDocService<TqNewSche
      */
     @Resource
     private ITqRollingUpdateService tqRollingUpdateService;
+
+    /**
+     * 胎圈调度员排程操作日志服务（用于记录6班次制操作日志）
+     */
+    @Autowired
+    private TqDispatcherLogService tqDispatcherLogService;
 
     @Override
     public String getDocTypeCode() {
@@ -207,6 +215,9 @@ public class TqNewScheduleResultServiceImpl extends AbstractDocService<TqNewSche
         // 滚动更新：对每个有计划量的班次执行同班次内时间重算
         triggerRollingUpdateForAllShifts("1", entity.getId(), entity);
 
+        // 记录调度日志（6班次制，操作类型：2-插单，无操作前数据）
+        recordDispatcherLog(ApsConstant.DISPATCHER_OPER_INSERT_ORDER, entity, null, entity);
+
         log.info("胎圈排程插单成功，排程日期：{}，胎圈代码：{}，机台：{}",
                 dto.getScheduleDate(), dto.getBeadCode(), dto.getMachineCode());
 
@@ -289,6 +300,9 @@ public class TqNewScheduleResultServiceImpl extends AbstractDocService<TqNewSche
         newMachineRecord.setClass5PlanQty(record.getClass5PlanQty());
         newMachineRecord.setClass6PlanQty(record.getClass6PlanQty());
         triggerRollingUpdateForAllShifts("2", dto.getId(), newMachineRecord);
+
+        // 记录调度日志（6班次制，操作类型：0-转机台，操作前=原机台记录，操作后=新机台记录）
+        recordDispatcherLog(ApsConstant.DISPATCHER_OPER_MACHINE, record, record, newMachineRecord);
 
         log.info("胎圈排程转机台成功，id：{}，原机台：{}，新机台：{}",
                 dto.getId(), oldMachineCode, dto.getNewMachineCode());
@@ -442,6 +456,10 @@ public class TqNewScheduleResultServiceImpl extends AbstractDocService<TqNewSche
         // 8. 滚动更新：对每个被修改的班次执行同班次内时间重算
         triggerRollingUpdateForAllShifts("3", entity.getId(), record);
 
+        // 9. 记录调度日志（6班次制，操作类型：1-调量，操作前=原记录，操作后=更新后记录）
+        TqNewScheduleResult afterRecord = tqNewScheduleResultMapper.selectById(entity.getId());
+        recordDispatcherLog(ApsConstant.DISPATCHER_OPER_PLAN, record, record, afterRecord);
+
         return AjaxResult.success("调量成功");
     }
 
@@ -477,6 +495,9 @@ public class TqNewScheduleResultServiceImpl extends AbstractDocService<TqNewSche
 
             // 滚动更新：删除后对每个有计划量的班次执行同班次内时间重算
             triggerRollingUpdateForAllShifts("4", id, record);
+
+            // 记录调度日志（6班次制，操作类型：3-删除，操作前=原记录，操作后=null）
+            recordDispatcherLog(ApsConstant.DISPATCHER_OPER_DELETE, record, record, null);
 
             log.info("胎圈排程逻辑删除成功，id：{}，胎圈代码：{}", id, record.getBeadCode());
         }
@@ -710,6 +731,62 @@ public class TqNewScheduleResultServiceImpl extends AbstractDocService<TqNewSche
     }
 
     // ==================== 私有方法 ====================
+
+    /**
+     * 记录调度员排程操作日志（6班次制）
+     *
+     * <p>统一封装调度日志写入逻辑，覆盖4种操作类型：
+     * <ul>
+     *   <li>0-转机台：beforeRecord为原机台记录，afterRecord为新机台记录</li>
+     *   <li>1-调量：beforeRecord为原记录，afterRecord为更新后记录</li>
+     *   <li>2-插单：beforeRecord为null，afterRecord为新增记录</li>
+     *   <li>3-删除：beforeRecord为原记录，afterRecord为null</li>
+     * </ul>
+     * 日志异常不影响主操作，仅记录错误日志。
+     *
+     * @param operType     操作类型：0-转机台、1-调量、2-插单、3-删除
+     * @param baseRecord   基础记录（用于获取排程日期、胎圈代码、排程记录ID等公共字段）
+     * @param beforeRecord 操作前记录（用于填充before*字段，插单时为null）
+     * @param afterRecord  操作后记录（用于填充after*字段，删除时为null）
+     */
+    private void recordDispatcherLog(String operType, TqNewScheduleResult baseRecord,
+                                     TqNewScheduleResult beforeRecord, TqNewScheduleResult afterRecord) {
+        try {
+            if (baseRecord == null) {
+                log.warn("记录调度日志跳过：baseRecord为空");
+                return;
+            }
+            TqDispatcherLog dispatcherLog = new TqDispatcherLog();
+            dispatcherLog.setOperType(operType);
+            dispatcherLog.setScheduleId(baseRecord.getId());
+            dispatcherLog.setScheduleDate(baseRecord.getScheduleDate());
+            dispatcherLog.setBeadCode(baseRecord.getBeadCode());
+            // 操作前机台编码和6班次计划量
+            if (beforeRecord != null) {
+                dispatcherLog.setBeforeMachineCode(beforeRecord.getMachineCode());
+                dispatcherLog.setBeforeClass1Plan(beforeRecord.getClass1PlanQty());
+                dispatcherLog.setBeforeClass2Plan(beforeRecord.getClass2PlanQty());
+                dispatcherLog.setBeforeClass3Plan(beforeRecord.getClass3PlanQty());
+                dispatcherLog.setBeforeClass4Plan(beforeRecord.getClass4PlanQty());
+                dispatcherLog.setBeforeClass5Plan(beforeRecord.getClass5PlanQty());
+                dispatcherLog.setBeforeClass6Plan(beforeRecord.getClass6PlanQty());
+            }
+            // 操作后机台编码和6班次计划量
+            if (afterRecord != null) {
+                dispatcherLog.setAfterMachineCode(afterRecord.getMachineCode());
+                dispatcherLog.setAfterClass1Plan(afterRecord.getClass1PlanQty());
+                dispatcherLog.setAfterClass2Plan(afterRecord.getClass2PlanQty());
+                dispatcherLog.setAfterClass3Plan(afterRecord.getClass3PlanQty());
+                dispatcherLog.setAfterClass4Plan(afterRecord.getClass4PlanQty());
+                dispatcherLog.setAfterClass5Plan(afterRecord.getClass5PlanQty());
+                dispatcherLog.setAfterClass6Plan(afterRecord.getClass6PlanQty());
+            }
+            tqDispatcherLogService.insertTqDispatcherLog(dispatcherLog);
+        } catch (Exception e) {
+            // 日志记录失败不影响主操作
+            log.error("记录胎圈调度日志失败，operType：{}，scheduleId：{}", operType, baseRecord.getId(), e);
+        }
+    }
 
     /**
      * 根据班次索引获取DTO中的计划量
