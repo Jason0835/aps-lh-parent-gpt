@@ -43,6 +43,9 @@ Service    extends IDocService<Entity>
 ServiceImpl extends AbstractDocService<Entity> implements ICxEntityNameService
 UIController extends BaseUIController<Entity>
 ```
+### 后端规范：
+- 禁止使用单字母缩写作为变量名或方法参数名（如 `q`、`e`、`w`），必须使用有业务含义的完整命名（如 `queryVO`、`entity`、`wrapper`）。
+
 ### 数据库相关：
 - BaseEntity已经定义了 `id,createBy,createTime,updateBy,updateTime,isDelete,remark`，实体类不需要重复定义
 - 非数据库字段必须添加 `@TableField(exist = false)`
