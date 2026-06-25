@@ -32,8 +32,9 @@ public class DjDepthConfigServiceImpl extends AbstractDocService<DjDepthConfig> 
      * <p>
      * 规则说明：
      * - MACHINE_RANGE 与 MACHINE_QTY 组合构成范围条件
-     * - 不同规则的范围不允许有交集，确保任意台数值最多只命中一条规则
-     * - 例如：已有「GE 3」(≥3)，不允许再新增「LE 5」(≤5)，因为台数4同时满足两条规则
+     * - 不同规则的范围不允许有交集（除非备库班数 DEPTH_CLASS_QTY 相同）
+     * - 例如：已有「GE 3」备库班数=4，新增「LE 5」备库班数=4，虽然范围重叠但因备库班数相同允许
+     * - 反之：已有「GE 3」备库班数=4，新增「LE 5」备库班数=6，范围重叠且备库班数不同则拒绝
      * </p>
      */
     @Override
@@ -53,8 +54,9 @@ public class DjDepthConfigServiceImpl extends AbstractDocService<DjDepthConfig> 
 
         for (DjDepthConfig existing : existingList) {
             long[] existingRange = calculateRange(existing.getMachineRange(), existing.getMachineQty());
-            // 两个区间有交集则视为交叉
-            if (newRange[0] <= existingRange[1] && existingRange[0] <= newRange[1]) {
+            // 两个区间有交集且备库班数不同时视为交叉冲突
+            if (newRange[0] <= existingRange[1] && existingRange[0] <= newRange[1]
+                    && !entity.getDepthClassQty().equals(existing.getDepthClassQty())) {
                 return UserConstants.NOT_UNIQUE;
             }
         }

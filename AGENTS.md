@@ -28,6 +28,7 @@ utf-8 no bom
       return yyy;
   }
   ```
+- **国际化规则**：所有返回给前端的信息（包括错误提示、校验失败提示等）必须使用 `I18nUtil.getMessage()` 抽取国际化 key，禁止硬编码中文/英文/越南语字符串直接返回前端。i18n key 统一以模块前缀命名（如 `ui.dj.*`），并同步更新 `apsui.properties`、`apsui_zh_CN.properties`、`apsui_en_US.properties`、`apsui_vi_VN.properties` 四个语言文件。
 ### 注释规范
 - 优先重要,主要逻辑方法需加注释
 - 注释用中文，尽可能的详细

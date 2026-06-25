@@ -94,6 +94,6 @@ public class DjDepthConfigController extends AbstractDocBizController<DjDepthCon
 
     @Override
     protected String getOrderBy() {
-        return "MACHINE_QTY desc";
+        return "MACHINE_QTY";
     }
 }
