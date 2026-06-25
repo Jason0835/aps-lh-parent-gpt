@@ -1,8 +1,11 @@
 package com.zlt.aps.dj.controller;
 
+import java.util.List;
+
 import javax.annotation.Resource;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -87,6 +90,15 @@ public class DjDepthConfigController extends AbstractDocBizController<DjDepthCon
         return depthConfigService;
     }
 
+    /**
+     * 批量删除配置(逻辑删)
+     */
+    @ApiOperation("批量删除配置")
+    @PostMapping("/remove")
+    public AjaxResult removeByIds(@RequestBody List<Long> ids) {
+        return super.removeByIds(ids);
+    }
+
     @Override
     protected String getTypeCode() {
         return "0";
@@ -94,6 +106,6 @@ public class DjDepthConfigController extends AbstractDocBizController<DjDepthCon
 
     @Override
     protected String getOrderBy() {
-        return "MACHINE_QTY desc";
+        return "MACHINE_QTY";
     }
 }

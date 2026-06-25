@@ -21,9 +21,11 @@ import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.zlt.aps.common.engine.enums.MachineRangeEnum;
 import com.zlt.aps.common.core.utils.BigDecimalUtils;
 import com.zlt.aps.cx.entity.schedule.CxScheduleResult;
 import com.zlt.aps.dj.api.domain.entity.DjCurlRoll;
+import com.zlt.aps.dj.api.domain.entity.DjDepthConfig;
 import com.zlt.aps.dj.api.domain.entity.DjGlueOrder;
 import com.zlt.aps.dj.api.domain.entity.DjLossSetting;
 import com.zlt.aps.dj.api.domain.entity.DjMachineInfo;
@@ -32,10 +34,11 @@ import com.zlt.aps.dj.api.domain.entity.DjParams;
 import com.zlt.aps.dj.api.domain.entity.DjScheduleResult;
 import com.zlt.aps.dj.api.domain.entity.DjSpecifyMachine;
 import com.zlt.aps.dj.api.domain.entity.DjStock;
-import com.zlt.aps.dj.engine.constant.DjEngineConstants;
+import com.zlt.aps.dj.engine.util.DjEngineUtil;
 import com.zlt.aps.dj.engine.mapper.DjEngineConstructionInfoMapper;
 import com.zlt.aps.dj.engine.mapper.DjEngineCurlRollMapper;
 import com.zlt.aps.dj.engine.mapper.DjEngineCxScheduleResultMapper;
+import com.zlt.aps.dj.engine.mapper.DjEngineDepthConfigMapper;
 import com.zlt.aps.dj.engine.mapper.DjEngineGlueMapper;
 import com.zlt.aps.dj.engine.mapper.DjEngineLossMapper;
 import com.zlt.aps.dj.engine.mapper.DjEngineMachineMapper;
@@ -45,6 +48,7 @@ import com.zlt.aps.dj.engine.mapper.DjEngineScheduleResultLogMapper;
 import com.zlt.aps.dj.engine.mapper.DjEngineScheduleResultMapper;
 import com.zlt.aps.dj.engine.mapper.DjEngineSpecifyMachineMapper;
 import com.zlt.aps.dj.engine.mapper.DjEngineStockMapper;
+import com.zlt.aps.dj.engine.constant.DjEngineConstants;
 import com.zlt.aps.dj.engine.model.DjPaddingDemand;
 import com.zlt.aps.dj.engine.model.DjScheduleContext;
 import com.zlt.aps.dj.engine.service.DjEngineNewService;
@@ -101,6 +105,9 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
 
     @Autowired
     private DjEngineSpecifyMachineMapper djEngineSpecifyMachineMapper;
+
+    @Autowired
+    private DjEngineDepthConfigMapper djEngineDepthConfigMapper;
 
     @Autowired
     private BaseDao baseDao;
@@ -179,11 +186,18 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
         Map<String, String> paramsMap = this.loadParamsMap(factoryCode);
         context.setParamsMap(paramsMap);
 
+        // 根据排程首班班次参数构建班次索引映射
+        String startShiftClass = paramsMap.getOrDefault(DjEngineConstants.PARAM_SCHEDULE_START_SHIFT,
+                DjEngineConstants.DEFAULT_SCHEDULE_START_SHIFT);
+        String[] shiftClassMap = DjEngineUtil.buildShiftClassMap(startShiftClass);
+        context.setShiftClassMap(shiftClassMap);
+        log.info("步骤2.2：排程首班班次={}，班次映射={}", startShiftClass, String.join(",", shiftClassMap));
+
         // 按垫胶规格分别解析供应窗口（不同规格排产深度可能不同）
         Map<String, Integer> paddingSupplyDepth = new HashMap<>();
         int maxSupplyDepth = 0;
         for (Map.Entry<String, Integer> entry : paddingCxMachineCount.entrySet()) {
-            int depth = this.parseSupplyDepth(entry.getValue(), paramsMap);
+            int depth = this.parseSupplyDepth(factoryCode, entry.getValue());
             paddingSupplyDepth.put(entry.getKey(), depth);
             if (depth > maxSupplyDepth) {
                 maxSupplyDepth = depth;
@@ -240,6 +254,12 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
             if (!paddingMonthSurplus.isEmpty()) {
                 this.supplementOutOfRangeConsume(consumeQty, context, exceedPaddingMap, maxShiftConsume,
                         paddingMonthSurplus);
+            }
+            // 存储月度剩余量到上下文（用于净需求计算中 n>8 时的月计划约束）
+            Map<String, BigDecimal> rawPaddingRemaining = this.calcRawPaddingRemaining(monthPlanMonitors,
+                    constructionMap);
+            if (!rawPaddingRemaining.isEmpty()) {
+                context.setPaddingRemainingMap(rawPaddingRemaining);
             }
         }
 
@@ -453,28 +473,34 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
 
     /**
      * 解析供应窗口（排产深度）
+     * <p>
+     * 从 T_DJ_DEPTH_CONFIG（垫胶备库班数与供成型机数配置）表中获取排产深度。
+     * 匹配规则：按 MACHINE_QTY 降序排序，对给定的成型机台数逐行检查 MACHINE_RANGE 条件，
+     * 取第一个满足条件的配置行对应的 DEPTH_CLASS_QTY 值作为排产深度。
+     * 若所有行均不匹配，使用默认排产深度 1。
+     * </p>
      */
-    private int parseSupplyDepth(int cxMachineCount, Map<String, String> paramsMap) {
-        String depthMapStr = paramsMap.getOrDefault(DjEngineConstants.PARAM_CX_MACHINE_DEPTH_MAP,
-                DjEngineConstants.DEFAULT_CX_MACHINE_DEPTH_MAP);
-        // 格式："机台数1:班数1,机台数2:班数2"，如 "1:4,2:3,4:2"
-        String[] entries = depthMapStr.split(",");
-        int bestDepth = 4; // 默认值
-        for (String entry : entries) {
-            String[] parts = entry.split(":");
-            if (parts.length == 2) {
-                try {
-                    int machineCount = Integer.parseInt(parts[0].trim());
-                    int depth = Integer.parseInt(parts[1].trim());
-                    if (machineCount <= cxMachineCount) {
-                        bestDepth = Math.max(bestDepth, depth);
-                    }
-                } catch (NumberFormatException e) {
-                    log.warn("解析排产深度映射失败：{}", entry);
-                }
+    private int parseSupplyDepth(String factoryCode, int cxMachineCount) {
+        // 查询当前工厂的所有深度配置，按 MACHINE_QTY 降序
+        List<DjDepthConfig> configList = djEngineDepthConfigMapper.selectList(
+                new LambdaQueryWrapper<DjDepthConfig>()
+                        .eq(DjDepthConfig::getFactoryCode, factoryCode)
+                        .orderByDesc(DjDepthConfig::getMachineQty));
+        if (CollectionUtils.isEmpty(configList)) {
+            return 1;
+        }
+        for (DjDepthConfig config : configList) {
+            Integer configQty = config.getMachineQty();
+            if (configQty == null) {
+                continue;
+            }
+            MachineRangeEnum rangeEnum = MachineRangeEnum.getByCode(config.getMachineRange());
+            if (rangeEnum != null && rangeEnum.matches(cxMachineCount, configQty)) {
+                BigDecimal depth = config.getDepthClassQty();
+                return depth != null ? depth.intValue() : 1;
             }
         }
-        return bestDepth;
+        return 1;
     }
 
     /**
@@ -575,6 +601,37 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
                     estimatedTotal = paddingRemaining;
                 }
                 result.put(paddingCode, estimatedTotal);
+                break;
+            }
+        }
+        return result;
+    }
+
+    /**
+     * 计算垫胶月度剩余量（原始值，不按超出班次截断）
+     * <p>返回 Map<paddingCode, paddingRemaining>，paddingRemaining = lhMargin × unitConsume</p>
+     */
+    private Map<String, BigDecimal> calcRawPaddingRemaining(List<MpMonthPlanMonitor> monthPlanMonitors,
+            Map<String, MdmConstructionInfo> constructionMap) {
+        if (CollectionUtils.isEmpty(monthPlanMonitors)) {
+            return Collections.emptyMap();
+        }
+        Map<String, BigDecimal> result = new HashMap<>();
+        for (MpMonthPlanMonitor monitor : monthPlanMonitors) {
+            for (Map.Entry<String, MdmConstructionInfo> entry : constructionMap.entrySet()) {
+                MdmConstructionInfo construction = entry.getValue();
+                if (construction.getPaddingCode() == null) {
+                    continue;
+                }
+                String paddingCode = construction.getPaddingCode();
+                if (result.containsKey(paddingCode)) {
+                    continue;
+                }
+                BigDecimal unitConsume = construction.getPaddingLength() != null ? construction.getPaddingLength()
+                        : BigDecimal.ONE;
+                BigDecimal paddingRemaining = BigDecimal
+                        .valueOf(monitor.getLhMargin() != null ? monitor.getLhMargin() : 0).multiply(unitConsume);
+                result.put(paddingCode, paddingRemaining);
                 break;
             }
         }
@@ -827,7 +884,7 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
                 DjMachineInfo machine = machineEntry.getValue();
 
                 // 机台本班是否可用
-                if (!this.isMachineAvailable(machine, shiftIndex)) {
+                if (!this.isMachineAvailable(machine, shiftIndex, context.getShiftClassMap())) {
                     log.trace("机台 {} 班次 {} 不可用", machineCode, shiftIndex);
                     continue;
                 }
@@ -942,44 +999,130 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
     }
 
     /**
-     * 检查某班次各规格的库存缺口
+     * 检查各规格在当前班次是否需要排产，并计算净需求量
+     * <p>
+     * 算法逻辑（按设计文档步骤3.4/5.1）：
+     * 1. 计算当前接班库存可覆盖的成型生产班次数 coverableShiftCount
+     * 2. 若 coverableShiftCount > scheduleThreshold（默认1），库存充足，不排产
+     * 3. 若 coverableShiftCount ≤ scheduleThreshold，触发排产
+     *    3.1 根据 T_DJ_DEPTH_CONFIG 匹配备库班数 n
+     *    3.2 合计后续连续 n 个班的需求量计算净需求
+     *    3.3 n>8 时使用最后3个班平均值预估超出部分，受月计划余量约束
+     * 4. 已收尾规格净需求含损耗率
+     * </p>
      */
     private void checkDemandForShift(List<DjPaddingDemand> demandList, int shiftIndex, DjScheduleContext context) {
         Map<String, BigDecimal> handoverInventory = context.getHandoverInventory();
         Map<String, Map<Integer, BigDecimal>> consumeQty = context.getConsumeQty();
         Map<String, Integer> paddingSupplyDepth = context.getPaddingSupplyDepth();
+        Map<String, BigDecimal> paddingRemainingMap = context.getPaddingRemainingMap();
+
+        // 排产触发阈值：当前库存可覆盖班次数 ≤ 此值时触发排产（默认1）
+        int scheduleThreshold = this.getParamAsDecimal(context, DjEngineConstants.PARAM_SCHEDULE_THRESHOLD,
+                BigDecimal.valueOf(DjEngineConstants.DEFAULT_SCHEDULE_THRESHOLD)).intValue();
 
         for (DjPaddingDemand spec : demandList) {
             BigDecimal incomingInventory = handoverInventory.getOrDefault(spec.getPaddingCode(), BigDecimal.ZERO);
             spec.setIncomingInventory(incomingInventory);
 
-            // 使用该垫胶规格对应的排产深度
+            // 该规格的备库班数（排产深度）
             int specSupplyDepth = paddingSupplyDepth.getOrDefault(spec.getPaddingCode(),
                     DjEngineConstants.CX_SHIFT_COUNT);
 
-            // 计算供应窗口内的总消耗量
+            // ===== 步骤1：计算可覆盖班次数 coverableShiftCount =====
             Map<Integer, BigDecimal> shiftConsume = consumeQty.getOrDefault(spec.getPaddingCode(), new HashMap<>());
-            BigDecimal demandInWindow = BigDecimal.ZERO;
-            for (int i = shiftIndex; i < shiftIndex + specSupplyDepth; i++) {
-                demandInWindow = demandInWindow.add(shiftConsume.getOrDefault(i, BigDecimal.ZERO));
+            BigDecimal accumulateConsume = BigDecimal.ZERO;
+            int coverableShiftCount = 0;
+            int maxCheckShift = Math.min(shiftIndex + specSupplyDepth - 1, DjEngineConstants.CX_SHIFT_COUNT);
+            for (int k = shiftIndex; k <= maxCheckShift; k++) {
+                BigDecimal consume = shiftConsume.getOrDefault(k, BigDecimal.ZERO);
+                if (consume.compareTo(BigDecimal.ZERO) <= 0) {
+                    coverableShiftCount++; // 无消耗的班次视为可覆盖
+                    continue;
+                }
+                if (accumulateConsume.add(consume).compareTo(incomingInventory) <= 0) {
+                    accumulateConsume = accumulateConsume.add(consume);
+                    coverableShiftCount++;
+                } else {
+                    break; // 当前班次的消耗量已无法完全覆盖
+                }
+            }
+            spec.setCoverableShiftCount(coverableShiftCount);
+
+            // ===== 步骤2：判断是否触发排产 =====
+            if (coverableShiftCount > scheduleThreshold) {
+                spec.setNeedProduce(false); // 库存充足，不排产
+                continue;
             }
 
-            // 已收尾规格：需求量含损耗率
+            // ===== 步骤3：触发排产，计算净需求量 =====
+            spec.setNeedProduce(true);
+            BigDecimal netDemand;
+
+            if (shiftIndex + specSupplyDepth - 1 <= DjEngineConstants.CX_SHIFT_COUNT) {
+                // 全部在成型计划范围内（n ≤ 8）
+                BigDecimal demandInWindow = BigDecimal.ZERO;
+                for (int i = shiftIndex; i < shiftIndex + specSupplyDepth; i++) {
+                    demandInWindow = demandInWindow.add(shiftConsume.getOrDefault(i, BigDecimal.ZERO));
+                }
+                netDemand = demandInWindow.subtract(incomingInventory);
+                if (netDemand.compareTo(BigDecimal.ZERO) < 0) {
+                    netDemand = BigDecimal.ZERO;
+                }
+            } else {
+                // 超出成型计划的8个班（n > 8）
+                // part1: 第 shiftIndex~8 班部分
+                BigDecimal part1 = BigDecimal.ZERO;
+                for (int i = shiftIndex; i <= DjEngineConstants.CX_SHIFT_COUNT; i++) {
+                    part1 = part1.add(shiftConsume.getOrDefault(i, BigDecimal.ZERO));
+                }
+                part1 = part1.subtract(incomingInventory);
+                if (part1.compareTo(BigDecimal.ZERO) < 0) {
+                    part1 = BigDecimal.ZERO;
+                }
+
+                // 最后3个班次消耗量之和（第6/7/8班）
+                BigDecimal last3Sum = BigDecimal.ZERO;
+                for (int i = 6; i <= DjEngineConstants.CX_SHIFT_COUNT; i++) {
+                    last3Sum = last3Sum.add(shiftConsume.getOrDefault(i, BigDecimal.ZERO));
+                }
+                // 如果最后3班无数据，用当前班次到第8班的消耗量总计兜底
+                if (last3Sum.compareTo(BigDecimal.ZERO) <= 0) {
+                    for (int i = shiftIndex; i <= DjEngineConstants.CX_SHIFT_COUNT; i++) {
+                        last3Sum = last3Sum.add(shiftConsume.getOrDefault(i, BigDecimal.ZERO));
+                    }
+                }
+                BigDecimal avgLast3Shifts = last3Sum.divide(BigDecimal.valueOf(3), 2, RoundingMode.HALF_UP);
+
+                // 超出部分班次数
+                int exceedShiftCount = specSupplyDepth - DjEngineConstants.CX_SHIFT_COUNT;
+                BigDecimal estimatedExceed = avgLast3Shifts.multiply(BigDecimal.valueOf(exceedShiftCount));
+
+                // 月计划剩余量约束
+                BigDecimal paddingRemaining = paddingRemainingMap != null
+                        ? paddingRemainingMap.getOrDefault(spec.getPaddingCode(), BigDecimal.ZERO)
+                        : BigDecimal.ZERO;
+                BigDecimal part2 = estimatedExceed;
+                BigDecimal part1PlusPart2 = part1.add(part2);
+                if (part1PlusPart2.compareTo(paddingRemaining) > 0) {
+                    part2 = paddingRemaining.subtract(part1);
+                    if (part2.compareTo(BigDecimal.ZERO) < 0) {
+                        part2 = BigDecimal.ZERO;
+                    }
+                }
+                netDemand = part1.add(part2);
+            }
+
+            // ===== 步骤4：已收尾规格净需求含损耗率 =====
             if (spec.isTailFinished()) {
                 BigDecimal lossRate = this.getLossRate(spec.getPaddingCode(), spec.getMachineCode(), context);
-                demandInWindow = demandInWindow.multiply(BigDecimal.ONE.add(lossRate));
+                netDemand = netDemand.multiply(BigDecimal.ONE.add(lossRate)).setScale(2, RoundingMode.HALF_UP);
             }
 
-            // 判断库存是否充足
-            if (incomingInventory.compareTo(demandInWindow) >= 0) {
-                spec.setNeedProduce(false);
-            } else {
-                spec.setNeedProduce(true);
-                spec.setNetDemand(demandInWindow.subtract(incomingInventory));
-                // 如果 remainingDemand 还未设置或小于净需求，则更新
-                if (spec.getRemainingDemand() == null || spec.getRemainingDemand().compareTo(spec.getNetDemand()) < 0) {
-                    spec.setRemainingDemand(spec.getNetDemand());
-                }
+            spec.setNetDemand(netDemand);
+            // 剩余待排产量初始=净需求
+            if (spec.getRemainingDemand() == null || spec.getRemainingDemand().compareTo(netDemand) < 0) {
+                spec.setRemainingDemand(netDemand);
             }
         }
     }
@@ -1006,7 +1149,7 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
 
             for (int shiftIndex = 1; shiftIndex <= DjEngineConstants.SHIFT_COUNT; shiftIndex++) {
                 // 先判断是否可用
-                if (!this.isMachineAvailable(machine, shiftIndex)) {
+                if (!this.isMachineAvailable(machine, shiftIndex, context.getShiftClassMap())) {
                     shiftCapacities.put(shiftIndex, BigDecimal.ZERO);
                     continue;
                 }
@@ -1019,7 +1162,8 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
                     List<DjMachineMaintenance> maintenanceList = context.getMaintenanceMap().get(machineCode);
                     if (maintenanceList != null) {
                         for (DjMachineMaintenance maintenance : maintenanceList) {
-                            if (this.isMaintenanceInShift(maintenance, shiftIndex, context.getScheduleDate())) {
+                            if (this.isMaintenanceInShift(maintenance, shiftIndex, context.getScheduleDate(),
+                                    context.getShiftClassMap())) {
                                 BigDecimal stopHours = this.calcStopHours(maintenance);
                                 BigDecimal lossQty = stopHours
                                         .divide(DjEngineConstants.SHIFT_HOURS, 4, RoundingMode.HALF_UP)
@@ -1121,13 +1265,14 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
     /**
      * 判断检修计划是否落在某班次内
      */
-    private boolean isMaintenanceInShift(DjMachineMaintenance maintenance, int shiftIndex, Date scheduleDate) {
+    private boolean isMaintenanceInShift(DjMachineMaintenance maintenance, int shiftIndex, Date scheduleDate,
+            String[] shiftClassMap) {
         if (maintenance.getStopStartTime() == null || maintenance.getStopEndTime() == null) {
             return false;
         }
         // 通过停机班次字段匹配
         if (maintenance.getStopShift() != null) {
-            String shiftClass = DjEngineConstants.SHIFT_CLASS_MAP[shiftIndex - 1];
+            String shiftClass = shiftClassMap[shiftIndex - 1];
             return shiftClass.equals(maintenance.getStopShift());
         }
         return false;
@@ -1144,7 +1289,7 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
     /**
      * 判断机台在某班次是否可用
      */
-    private boolean isMachineAvailable(DjMachineInfo machine, int shiftIndex) {
+    private boolean isMachineAvailable(DjMachineInfo machine, int shiftIndex, String[] shiftClassMap) {
         if (machine.getStatus() != null && !DjEngineConstants.MACHINE_STATUS_ENABLED.equals(machine.getStatus())) {
             return false;
         }
@@ -1153,7 +1298,7 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
             return false;
         }
         // shiftIndex 对应 classIndex
-        String classIndex = DjEngineConstants.SHIFT_CLASS_MAP[shiftIndex - 1];
+        String classIndex = shiftClassMap[shiftIndex - 1];
         return openMachineClass.contains(classIndex);
     }
 
@@ -1385,6 +1530,10 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
             r.setPaddingCode(spec.getPaddingCode());
             r.setGlueCode(spec.getGlueCode());
             r.setPaddingName(spec.getPaddingName());
+            // 记录排程首班班次（class1 对应的班次）
+            if (context.getShiftClassMap() != null) {
+                r.setScheduleShiftClass(context.getShiftClassMap()[0]);
+            }
             return r;
         });
 

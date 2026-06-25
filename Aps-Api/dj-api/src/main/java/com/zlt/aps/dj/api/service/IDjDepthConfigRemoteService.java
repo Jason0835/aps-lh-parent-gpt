@@ -57,7 +57,7 @@ public interface IDjDepthConfigRemoteService {
     /**
      * 批量删除(逻辑删)
      */
-    @DeleteMapping("/dj/depthConfig/{ids}")
+    @PostMapping("/dj/depthConfig/remove")
     AjaxResult removeByIds(@RequestBody List<Long> ids);
 
     /**

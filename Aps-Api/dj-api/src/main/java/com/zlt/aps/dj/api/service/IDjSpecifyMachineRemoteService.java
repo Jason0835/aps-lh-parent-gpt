@@ -47,7 +47,7 @@ public interface IDjSpecifyMachineRemoteService {
      * @param ids
      * @return
      */
-    @DeleteMapping("/dj/specifyMachine/{ids}")
+    @PostMapping("/dj/specifyMachine/remove")
     AjaxResult removeByIds(@RequestBody List<Long> ids);
 
     /**

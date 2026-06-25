@@ -51,7 +51,7 @@ public interface IDjLossSettingRemoteService {
      * @param ids
      * @return
      */
-    @DeleteMapping("/dj/lossSetting/{ids}")
+    @PostMapping("/dj/lossSetting/remove")
     AjaxResult removeByIds(@RequestBody List<Long> ids);
 
     /**

@@ -10,6 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.ruoyi.common.constant.UserConstants;
+import com.zlt.aps.common.engine.enums.MachineRangeEnum;
 import com.zlt.aps.dj.api.domain.entity.DjDepthConfig;
 import com.zlt.aps.dj.mapper.DjDepthConfigMapper;
 import com.zlt.aps.dj.service.IDjDepthConfigService;
@@ -32,8 +33,11 @@ public class DjDepthConfigServiceImpl extends AbstractDocService<DjDepthConfig> 
      * <p>
      * 规则说明：
      * - MACHINE_RANGE 与 MACHINE_QTY 组合构成范围条件
-     * - 不同规则的范围不允许有交集，确保任意台数值最多只命中一条规则
-     * - 例如：已有「GE 3」(≥3)，不允许再新增「LE 5」(≤5)，因为台数4同时满足两条规则
+     * - 排程算法按 MACHINE_QTY 降序匹配（越大优先级越高），取第一个满足条件的配置行
+     * - 因此高优先级的规则会覆盖（隐藏）低优先级的重叠规则，低优先级规则的备库班数值不会生效
+     * - 交叉校验只需检查新规则与同等或更高优先级（MACHINE_QTY ≥ 自身）的现有规则是否有范围重叠且备库班数不同
+     * - 对于优先级更低（MACHINE_QTY < 自身）的现有规则，新规则会覆盖它们，无需校验
+     * - 例如：已有「EQ 1」备库班数=6，新增「LE 5」备库班数=4，LE 5 优先级更高（5 > 1），会覆盖 EQ 1，允许
      * </p>
      */
     @Override
@@ -48,13 +52,18 @@ public class DjDepthConfigServiceImpl extends AbstractDocService<DjDepthConfig> 
             return UserConstants.UNIQUE;
         }
 
-        // 计算新规则的范围区间 [start, end]
         long[] newRange = calculateRange(entity.getMachineRange(), entity.getMachineQty());
 
         for (DjDepthConfig existing : existingList) {
+            // 只检查优先级同等或更高的现有规则（MACHINE_QTY ≥ 自身）
+            // 优先级更低的规则会被新规则覆盖，其备库班数值不会生效
+            if (existing.getMachineQty() < entity.getMachineQty()) {
+                continue;
+            }
             long[] existingRange = calculateRange(existing.getMachineRange(), existing.getMachineQty());
-            // 两个区间有交集则视为交叉
-            if (newRange[0] <= existingRange[1] && existingRange[0] <= newRange[1]) {
+            // 范围有交集且备库班数不同 → 冲突
+            if (newRange[0] <= existingRange[1] && existingRange[0] <= newRange[1]
+                    && !entity.getDepthClassQty().equals(existing.getDepthClassQty())) {
                 return UserConstants.NOT_UNIQUE;
             }
         }
@@ -78,17 +87,21 @@ public class DjDepthConfigServiceImpl extends AbstractDocService<DjDepthConfig> 
      * @return 长度2的数组，[start, end]
      */
     private long[] calculateRange(String machineRange, Integer machineQty) {
+        MachineRangeEnum rangeEnum = MachineRangeEnum.getByCode(machineRange);
+        if (rangeEnum == null) {
+            return new long[]{0, 0};
+        }
         int qty = machineQty != null ? machineQty : 0;
-        switch (machineRange) {
-            case "LT": // 小于 N
+        switch (rangeEnum) {
+            case LT:
                 return new long[]{0, qty - 1L};
-            case "LE": // 小于等于 N
+            case LE:
                 return new long[]{0, qty};
-            case "EQ": // 等于 N
+            case EQ:
                 return new long[]{qty, qty};
-            case "GE": // 大于等于 N
+            case GE:
                 return new long[]{qty, Integer.MAX_VALUE};
-            case "GT": // 大于 N
+            case GT:
                 return new long[]{qty + 1L, Integer.MAX_VALUE};
             default:
                 return new long[]{0, 0};

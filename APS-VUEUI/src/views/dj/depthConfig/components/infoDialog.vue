@@ -34,7 +34,7 @@ import { saveDepthConfig } from "@/api/dj/depthConfig";
 
 export default {
   components: { infoForm },
-  inject: ["parentDict"],
+  dicts: ["machine_range"],
   data() {
     return {
       loading: false,
@@ -55,6 +55,16 @@ export default {
             message: this.$t("common.rule.input"),
             trigger: "blur",
           },
+          {
+            validator: (rule, value, callback) => {
+              if (value !== '' && value !== null && value !== undefined && Number(value) <= 0) {
+                callback(new Error('数值必须大于0'));
+              } else {
+                callback();
+              }
+            },
+            trigger: 'blur',
+          },
         ],
         machineRange: [
           {
@@ -69,36 +79,56 @@ export default {
             message: this.$t("common.rule.input"),
             trigger: "blur",
           },
+          {
+            validator: (rule, value, callback) => {
+              if (value !== '' && value !== null && value !== undefined && Number(value) <= 0) {
+                callback(new Error('数值必须大于0'));
+              } else {
+                callback();
+              }
+            },
+            trigger: 'blur',
+          },
         ],
       },
-      columns: [
+    };
+  },
+  computed: {
+    columns() {
+      const machineRangeDict = this.dict?.type?.machine_range || [];
+      return [
         {
           label: this.$t("ui.data.column.factoryCode"),
           prop: "factoryCode",
           span: 12,
           type: "select",
-          dictData: this.parentDict.type.biz_factory_name,
+          dictData: this.dict?.type?.biz_factory_name,
           filterable: true,
           required: true,
-        },
-        {
-          label: this.$t("ui.dj.depthConfig.column.machineQty"),
-          prop: "machineQty",
-          span: 12,
-          required: true,
+          hidden: true,
         },
         {
           label: this.$t("ui.dj.depthConfig.column.machineRange"),
           prop: "machineRange",
           span: 12,
           type: "select",
-          dictData: this.parentDict.type.machine_range,
+          dictData: machineRangeDict,
+          required: true,
+        },
+        {
+          label: this.$t("ui.dj.depthConfig.column.machineQty"),
+          prop: "machineQty",
+          span: 12,
+          type: "number",
+          min: 1,
           required: true,
         },
         {
           label: this.$t("ui.dj.depthConfig.column.depthClassQty"),
           prop: "depthClassQty",
-          span: 12,
+          span: 24,
+          type: "number",
+          min: 1,
           required: true,
         },
         {
@@ -108,10 +138,8 @@ export default {
           type: "textarea",
           maxlength: "300",
         },
-      ],
-    };
-  },
-  computed: {
+      ];
+    },
     title: function () {
       return (
         (this.isEdit
@@ -136,12 +164,18 @@ export default {
         this.loading = false;
       }
     },
-    show(data) {
+    show(data, defaultFactoryCode) {
       this.visible = true;
       if (data) {
         this.isEdit = true;
         this.form = {
           ...data,
+        };
+      } else {
+        this.isEdit = false;
+        this.form = {
+          factoryCode: defaultFactoryCode || '',
+          machineRange: 'EQ',
         };
       }
     },

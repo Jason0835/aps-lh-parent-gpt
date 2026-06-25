@@ -14,8 +14,8 @@
   "ui.dj.params.column.defauleValue": "Default value",
   "ui.dj.params.column.paramValue": "Param value",
   "ui.dj.params.column.modalName": "Padding rubber params",
-  "ui.dj.depthConfig.column.machineQty": "Machine qty",
-  "ui.dj.depthConfig.column.machineRange": "Machine range",
+  "ui.dj.depthConfig.column.machineQty": "Qty",
+  "ui.dj.depthConfig.column.machineRange": "Molding supply",
   "ui.dj.depthConfig.column.depthClassQty": "Depth class qty",
   "ui.dj.depthConfig.column.modalName": "Depth config",
   "ui.tm.stockCoverClass.column.modalName": "Stock Coverage Shift Config",
@@ -747,6 +747,13 @@
   "ui.data.column.cd90UnscheduleResult.unscheduledReason": "Reason Description",
   "ui.data.column.cd90UnscheduleResult.candidateMachineCodes": "Candidate Machines",
   "ui.data.column.cd90UnscheduleResult.batchNo": "Batch No",
+  "ui.data.column.cd90DepthConfig.modelName": "90 Degree Cutting Depth Config",
+  "ui.data.column.cd90DepthConfig.factoryCode": "Factory",
+  "ui.data.column.cd90DepthConfig.machineQty": "Machine Qty",
+  "ui.data.column.cd90DepthConfig.machineRange": "Machine Range",
+  "ui.data.column.cd90DepthConfig.depthClassQty": "Depth Class Qty",
+  "ui.data.column.cd90DepthConfig.checkUnique": "Duplicate depth config record",
+  "ui.data.column.cd90DepthConfig.rangeCross": "Range overlaps with existing rule",
   "ui.data.column.scheduleResult.unscheduleResult": "Unschedule Result"
 
 }

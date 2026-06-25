@@ -56,6 +56,14 @@ public class DjEngineConstants {
     public static final String PARAM_MOUTH_PLATE_SWITCH_TIME = "SYS1401008";
     /** SYS1401009 切换胶料时长 */
     public static final String PARAM_GLUE_SWITCH_TIME = "SYS1401009";
+    /** SYS1401010 排产触发阈值（个班次），当前库存可覆盖的成型班次数 ≤ 此值时触发排产 */
+    public static final String PARAM_SCHEDULE_THRESHOLD = "SYS1401010";
+    /** 默认排产触发阈值 */
+    public static final int DEFAULT_SCHEDULE_THRESHOLD = 1;
+    /** SYS1401011 排程首班班次（ClassNumThreePlanEnums.classIndex），如 "03"=中班、"01"=夜班、"02"=早班 */
+    public static final String PARAM_SCHEDULE_START_SHIFT = "SYS1401011";
+    /** 默认排程首班班次：中班 */
+    public static final String DEFAULT_SCHEDULE_START_SHIFT = "03";
 
     // ==================== 班次常量 ====================
 

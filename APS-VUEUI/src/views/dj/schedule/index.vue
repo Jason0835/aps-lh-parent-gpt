@@ -280,6 +280,7 @@ export default {
         ],
       },
       stat: {},
+      showPrevDayClass1: false,
     };
   },
   computed: {
@@ -385,6 +386,48 @@ export default {
             },
           ],
         },
+        // T-1 日中班栏位（仅首班班次为夜班时显示）
+        ...(this.showPrevDayClass1 ? [{
+          label: this.$t("ui.data.column.dj.scheduleResult.prevDayClass1"),
+          children: [
+            {
+              prop: "prevDayClass1Sequence",
+              valign: "middle",
+              halign: 'center',
+              align: 'center',
+              label: this.$t("ui.data.column.dj.scheduleResult.sequence"),
+            },
+            {
+              prop: "prevDayClass1PlanQty",
+              valign: "middle",
+              halign: 'center',
+              align: "right",
+              label: this.$t("ui.data.column.dj.scheduleResult.planQty"),
+            },
+            {
+              prop: "prevDayClass1FinishQty",
+              valign: "middle",
+              halign: 'center',
+              align: "right",
+              label: this.$t("ui.data.column.dj.scheduleResult.finishQty"),
+            },
+            {
+              prop: "prevDayClass1FinishRate",
+              valign: "middle",
+              halign: 'center',
+              align: "right",
+              label: this.$t("ui.data.column.scheduleResult.finish"),
+              formatter: finishRateFormatter,
+            },
+            {
+              prop: "prevDayClass1Analysis",
+              valign: "middle",
+              halign: 'center',
+              align: "left",
+              label: this.$t("ui.data.column.dj.scheduleResult.analysis"),
+            },
+          ],
+        }] : []),
         {
           label: this.classHeaders[1],
           children: [
@@ -869,6 +912,8 @@ export default {
         const data = await listScheduleResult(this.formatParams());
         console.log(data);
         this.data = data.rows;
+        // 根据首班班次决定是否展示 T-1 日中班栏位
+        this.showPrevDayClass1 = data.rows && data.rows.length > 0 && data.rows[0].scheduleShiftClass === '01';
         // this.page.total = data.total;
       } catch (error) {
         console.error(error);

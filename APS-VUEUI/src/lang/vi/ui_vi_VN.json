@@ -14,8 +14,8 @@
   "ui.dj.params.column.defauleValue": "Giá trị mặc định",
   "ui.dj.params.column.paramValue": "Giá trị tham số",
   "ui.dj.params.column.modalName": "Thông tin tham số đệm cao su",
-  "ui.dj.depthConfig.column.machineQty": "Số lượng máy",
-  "ui.dj.depthConfig.column.machineRange": "Phạm vi máy",
+  "ui.dj.depthConfig.column.machineQty": "Số lượng",
+  "ui.dj.depthConfig.column.machineRange": "Cấp máy ép",
   "ui.dj.depthConfig.column.depthClassQty": "Số ca dự trữ",
   "ui.dj.depthConfig.column.modalName": "Cấu hình dự trữ",
   "ui.tm.stockCoverClass.column.modalName": "Cài đặt số ca dự trữ",
@@ -1769,6 +1769,13 @@
   "ui.data.column.cd90UnscheduleResult.unscheduledReason": "Mô tả lý do",
   "ui.data.column.cd90UnscheduleResult.candidateMachineCodes": "Máy ứng cử",
   "ui.data.column.cd90UnscheduleResult.batchNo": "Số lô",
+  "ui.data.column.cd90DepthConfig.modelName": "Cấu hình độ sâu cắt 90 độ",
+  "ui.data.column.cd90DepthConfig.factoryCode": "Nhà máy",
+  "ui.data.column.cd90DepthConfig.machineQty": "Số lượng máy",
+  "ui.data.column.cd90DepthConfig.machineRange": "Phạm vi máy",
+  "ui.data.column.cd90DepthConfig.depthClassQty": "Số ca dự trữ",
+  "ui.data.column.cd90DepthConfig.checkUnique": "Bản ghi đã tồn tại",
+  "ui.data.column.cd90DepthConfig.rangeCross": "Phạm vi trùng với quy tắc hiện có",
   "ui.data.column.scheduleResult.unscheduleResult": "Kết quả chưa lập"
 
 }

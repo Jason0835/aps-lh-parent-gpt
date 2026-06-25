@@ -56,7 +56,7 @@ public interface IDjGlueOrderRemoteService {
     /**
      * 批量删除胶料顺序信息(逻辑删)
      */
-    @DeleteMapping("/dj/glueOrder/{ids}")
+    @PostMapping("/dj/glueOrder/remove")
     AjaxResult removeByIds(@RequestBody List<Long> ids);
 
     /**

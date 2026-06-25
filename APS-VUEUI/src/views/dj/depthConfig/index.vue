@@ -105,20 +105,15 @@ export default {
       let columns = [
         { type: "selection", fixed: "left" },
         {
-          prop: "factoryCode",
+          prop: "machineRange",
           halign: "center",
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.dj.depthConfig.column.machineRange"),
+          formatter: (row, column, value) => this.selectDictLabel(this.dict.type.machine_range, value),
         },
         {
           prop: "machineQty",
           halign: "center",
           label: this.$t("ui.dj.depthConfig.column.machineQty"),
-        },
-        {
-          prop: "machineRange",
-          halign: "center",
-          label: this.$t("ui.dj.depthConfig.column.machineRange"),
-          dictData: this.dict.type.machine_range,
         },
         {
           prop: "depthClassQty",
@@ -167,7 +162,7 @@ export default {
   methods: {
     handleAdd() {
       if (this.$refs.infoRef) {
-        this.$refs.infoRef.show();
+        this.$refs.infoRef.show(null, this.query.factoryCode);
       }
     },
     handleEdit(row) {
