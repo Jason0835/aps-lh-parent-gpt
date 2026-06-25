@@ -37,6 +37,10 @@ public class TmStockForecast {
         BigDecimal sixClock = sixClockStockQty != null ? sixClockStockQty : BigDecimal.ZERO;
         BigDecimal demand = firstShiftDemandQty != null ? firstShiftDemandQty : BigDecimal.ZERO;
         BigDecimal plan = firstShiftPlanQty != null ? firstShiftPlanQty : BigDecimal.ZERO;
-        this.rollingStockQty = sixClock.subtract(demand).add(plan);
+        BigDecimal rollingStockQty = sixClock.subtract(demand).add(plan);
+        if (rollingStockQty.compareTo(BigDecimal.ZERO) < 0) {
+            rollingStockQty = BigDecimal.ZERO;
+        }
+        this.rollingStockQty = rollingStockQty;
     }
 }

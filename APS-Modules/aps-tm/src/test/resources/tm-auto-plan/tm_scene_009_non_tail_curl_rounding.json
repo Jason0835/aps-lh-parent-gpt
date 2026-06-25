@@ -1,11 +1,11 @@
 {
-  "caseName": "case_10_non_tail_roll_rounding",
-  "description": "非收尾规格按卷曲长度向上取整，并满足最小起排量",
+  "caseName": "TM_SCENE_009_non_tail_curl_rounding",
+  "description": "TM_SCENE_009：非收尾规格卷曲长度取整",
   "autoPlanRequest": {
     "factoryCode": "F1",
-    "scheduleDate": "2026-06-18",
-    "operator": "tester",
-    "traceId": "TRACE-CASE-10",
+    "scheduleDate": "2026-07-09",
+    "operator": "TM_AUTO_PLAN_TEST",
+    "traceId": "TRACE-TM_SCENE_009",
     "confirmOverwrite": false
   },
   "params": [
@@ -47,7 +47,7 @@
   "stocks": [
     {
       "factoryCode": "F1",
-      "stockDate": "2026-06-17",
+      "stockDate": "2026-07-08",
       "treadCode": "TR-R",
       "stockQty": 0
     }
@@ -99,6 +99,10 @@
         "planQty": 100
       }
     ]
-  }
+  },
+  "sceneCode": "TM_SCENE_009",
+  "designSteps": [
+    "Step11"
+  ],
+  "mysqlVerificationStatus": "待用户执行 MySQL 验证"
 }
-

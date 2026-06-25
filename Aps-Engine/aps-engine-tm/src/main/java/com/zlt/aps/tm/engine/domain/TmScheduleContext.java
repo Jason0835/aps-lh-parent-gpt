@@ -9,6 +9,7 @@ import com.zlt.aps.common.engine.schedule.ScheduleTaskNode;
 import com.zlt.aps.tm.api.enums.TmScheduleErrorCodeEnum;
 import lombok.Data;
 
+import java.math.BigDecimal;
 import java.util.*;
 
 /**
@@ -58,6 +59,9 @@ public class TmScheduleContext {
 
     /** 库存预测结果，key=胎面编码 */
     private Map<String, TmStockForecast> stockForecastMap = new HashMap<>();
+
+    /** 胎面剩余可抵扣库存，key=胎面编码；初值为6点库存净值，逐班递减，避免同一库存被多班重复抵扣 */
+    private Map<String, BigDecimal> remainingStockMap = new HashMap<>();
 
     /** 工厂可用机台候选列表，由数据加载层填充，供机台分配步骤过滤评分使用 */
     private List<TmMachineCandidate> machineCandidateList = new ArrayList<>();
@@ -158,6 +162,10 @@ public class TmScheduleContext {
 
     public void setStockForecastMap(Map<String, TmStockForecast> stockForecastMap) {
         this.stockForecastMap = stockForecastMap == null ? new HashMap<>() : stockForecastMap;
+    }
+
+    public void setRemainingStockMap(Map<String, BigDecimal> remainingStockMap) {
+        this.remainingStockMap = remainingStockMap == null ? new HashMap<>() : remainingStockMap;
     }
 
     public void setCandidateTraceMap(Map<String, List<TmMachineCandidate>> candidateTraceMap) {

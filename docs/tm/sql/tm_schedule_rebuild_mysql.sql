@@ -114,6 +114,7 @@ CREATE TABLE `T_TM_SCHEDULE_RESULT_EXPLAIN` (
   `unplanned_reason_code` varchar(50) DEFAULT NULL COMMENT '未排原因编码',
   `unplanned_reason_desc` varchar(1000) DEFAULT NULL COMMENT '未排原因说明',
   `unplanned_evidence_json` longtext COMMENT '未排证据文本',
+  `task_status` varchar(30) DEFAULT NULL COMMENT '任务状态，字典：tm_task_status，PLANNED已计划/LOCKED已锁定/RUNNING生产中/PART_FINISHED部分完成/FINISHED已完成/CANCELLED已取消/SPLIT已拆分',
   `manual_locked_flag` char(1) NOT NULL DEFAULT '0' COMMENT '是否人工锁定，字典：biz_yes_no，0否，1是',
   `sequence_lock_flag` char(1) NOT NULL DEFAULT '0' COMMENT '是否顺序锁定，字典：biz_yes_no，0否，1是',
   `force_change_flag` char(1) NOT NULL DEFAULT '0' COMMENT '是否强制转机台，字典：biz_yes_no，0否，1是',

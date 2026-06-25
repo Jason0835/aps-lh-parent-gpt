@@ -1,0 +1,43 @@
+{
+  "caseName": "TM_SCENE_020_no_forming_demand",
+  "description": "TM_SCENE_020：无成型需求",
+  "autoPlanRequest": {
+    "factoryCode": "F1",
+    "scheduleDate": "2026-07-20",
+    "operator": "TM_AUTO_PLAN_TEST",
+    "traceId": "TRACE-TM_SCENE_020",
+    "confirmOverwrite": false
+  },
+  "params": [
+    {
+      "factoryCode": "F1",
+      "paramCode": "TM_ALGORITHM_SWITCH",
+      "paramValue": "1",
+      "enableStatus": "1"
+    }
+  ],
+  "cxScheduleResults": [],
+  "machineInfos": [
+    {
+      "factoryCode": "F1",
+      "machineCode": "TM01",
+      "machineStatus": "1",
+      "maxCapacity": 1000
+    }
+  ],
+  "expected": {
+    "success": true,
+    "messageContains": "胎面自动排程执行完成",
+    "resultCount": 0,
+    "assignedCount": 0,
+    "unassignedCount": 0,
+    "explainCount": 0,
+    "errorCount": 0
+  },
+  "sceneCode": "TM_SCENE_020",
+  "designSteps": [
+    "Step3",
+    "Step19"
+  ],
+  "mysqlVerificationStatus": "待用户执行 MySQL 验证"
+}

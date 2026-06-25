@@ -18,6 +18,7 @@ import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import static org.junit.Assert.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -169,15 +170,15 @@ public class TmAutoScheduleDataLoadServiceTest {
     }
 
     /**
-     * 测试内容：验证同胎面、同胶料、同口型板的成型需求会先聚合再生成胎面任务。
+     * 测试内容：验证同胎面、同胶料、同口型板的成型需求保留原来源任务。
      * 测试场景：两个成型工单对应同一个胎面规格，算法 2 按下一班需求生成任务。
-     * 预期结果：只生成 6 条胎面任务，需求量为两个成型工单聚合后的数量，来源工单号仅保留在追踪字段。
+     * 预期结果：生成 12 条胎面任务，同班次来源工单号和业务键均保持独立。
      *
      * @throws Exception 反射注入依赖或加载数据失败时由测试框架抛出
      */
     @Test
-    public void loadAllDataShouldAggregateSameTreadDemandBeforeTaskBuild() throws Exception {
-        // 准备算法 2 和两条同胎面成型需求，验证库存缺口后续不会按成型工单重复放大。
+    public void loadAllDataShouldKeepSameTreadSourceTasksBeforeResultMerge() throws Exception {
+        // 准备算法 2 和两条同胎面成型需求，验证解释追踪需要保留原成型来源粒度。
         TmAutoScheduleDataLoadService service = buildServiceWithCommonMocks(Collections.singletonList(algorithmParam("2")));
         when(tmAutoScheduleDataLoadMapper.selectFormingDemandRows(any(), any()))
                 .thenReturn(Arrays.asList(
@@ -190,14 +191,20 @@ public class TmAutoScheduleDataLoadServiceTest {
         // 执行数据加载。
         service.loadAllData(context);
 
-        // 断言同规格只生成 6 条任务，1 班按算法 2 读取聚合后的 2 班需求 27。
-        assertEquals(6, context.getTaskDraftList().size());
-        TmTaskDraft firstShiftTask = context.getTaskDraftList().get(0);
-        assertBigDecimalEquals(new BigDecimal("27"), firstShiftTask.getDemandQty());
-        assertEquals("CX-ORD-001,CX-ORD-002", firstShiftTask.getSourceOrderNos());
-        assertEquals("TR-215-001", firstShiftTask.getTreadCode());
-        assertEquals("GL-A", firstShiftTask.getGlueCode());
-        assertEquals("MP-A", firstShiftTask.getMouthPlateCode());
+        // 断言同规格不在数据加载阶段聚合，1 班保留两个来源任务，便于解释表追溯原成型排程。
+        assertEquals(12, context.getTaskDraftList().size());
+        List<TmTaskDraft> firstShiftTaskList = context.getTaskDraftList().stream()
+                .filter(task -> Integer.valueOf(1).equals(task.getShiftOrder()))
+                .collect(Collectors.toList());
+        assertEquals(2, firstShiftTaskList.size());
+        assertBigDecimalEquals(new BigDecimal("20"), firstShiftTaskList.get(0).getDemandQty());
+        assertBigDecimalEquals(new BigDecimal("7"), firstShiftTaskList.get(1).getDemandQty());
+        assertEquals("CX-ORD-001", firstShiftTaskList.get(0).getSourceOrderNos());
+        assertEquals("CX-ORD-002", firstShiftTaskList.get(1).getSourceOrderNos());
+        assertNotEquals(firstShiftTaskList.get(0).getBusinessKey(), firstShiftTaskList.get(1).getBusinessKey());
+        assertEquals("TR-215-001", firstShiftTaskList.get(0).getTreadCode());
+        assertEquals("GL-A", firstShiftTaskList.get(0).getGlueCode());
+        assertEquals("MP-A", firstShiftTaskList.get(0).getMouthPlateCode());
     }
 
     /**

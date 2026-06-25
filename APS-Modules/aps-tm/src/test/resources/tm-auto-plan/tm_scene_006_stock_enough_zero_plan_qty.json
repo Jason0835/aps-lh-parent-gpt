@@ -1,11 +1,11 @@
 {
-  "caseName": "case_10_non_tail_roll_rounding",
-  "description": "非收尾规格按卷曲长度向上取整，并满足最小起排量",
+  "caseName": "TM_SCENE_006_stock_enough_zero_plan_qty",
+  "description": "TM_SCENE_006：库存充足允许计划量为 0",
   "autoPlanRequest": {
     "factoryCode": "F1",
-    "scheduleDate": "2026-06-18",
-    "operator": "tester",
-    "traceId": "TRACE-CASE-10",
+    "scheduleDate": "2026-07-06",
+    "operator": "TM_AUTO_PLAN_TEST",
+    "traceId": "TRACE-TM_SCENE_006",
     "confirmOverwrite": false
   },
   "params": [
@@ -14,32 +14,20 @@
       "paramCode": "TM_ALGORITHM_SWITCH",
       "paramValue": "1",
       "enableStatus": "1"
-    },
-    {
-      "factoryCode": "F1",
-      "paramCode": "TM_DEFAULT_CURL_LENGTH",
-      "paramValue": "50",
-      "enableStatus": "1"
-    },
-    {
-      "factoryCode": "F1",
-      "paramCode": "TM_MIN_START_QTY",
-      "paramValue": "80",
-      "enableStatus": "1"
     }
   ],
   "cxScheduleResults": [
     {
-      "orderNo": "ORD-ROUND",
-      "embryoCode": "CX-R",
+      "orderNo": "ORD-STOCK-ENOUGH",
+      "embryoCode": "CX-S2",
       "class1PlanQty": 10,
       "class2PlanQty": 0,
       "class3PlanQty": 0,
       "class4PlanQty": 0,
       "class5PlanQty": 0,
       "class6PlanQty": 0,
-      "treadCode": "TR-R",
-      "treadShoulderLength": 3,
+      "treadCode": "TR-S2",
+      "treadShoulderLength": 1,
       "treadMouthPlate": "MP-A",
       "treadRubberCategory": "GL-A"
     }
@@ -47,9 +35,9 @@
   "stocks": [
     {
       "factoryCode": "F1",
-      "stockDate": "2026-06-17",
-      "treadCode": "TR-R",
-      "stockQty": 0
+      "stockDate": "2026-07-05",
+      "treadCode": "TR-S2",
+      "stockQty": 1000
     }
   ],
   "machineInfos": [
@@ -74,11 +62,12 @@
       "mouthPlateCode": "MP-A"
     }
   ],
-  "curlRolls": [
+  "taskOverrides": [
     {
-      "factoryCode": "F1",
-      "treadCode": "TR-R",
-      "curlLength": 50
+      "treadCode": "TR-S2",
+      "shiftOrder": 1,
+      "currentShiftDemandQty": 0,
+      "guardDemandQty": 100
     }
   ],
   "expected": {
@@ -91,14 +80,19 @@
     "errorCount": 0,
     "expectedResults": [
       {
-        "orderNo": "ORD-ROUND-CLASS1",
-        "treadCode": "TR-R",
+        "orderNo": "ORD-STOCK-ENOUGH-CLASS1",
+        "treadCode": "TR-S2",
         "machineCode": "TM01",
         "shiftOrder": 1,
         "sequence": 1,
-        "planQty": 100
+        "planQty": 0
       }
     ]
-  }
+  },
+  "sceneCode": "TM_SCENE_006",
+  "designSteps": [
+    "Step7",
+    "Step10"
+  ],
+  "mysqlVerificationStatus": "待用户执行 MySQL 验证"
 }
-

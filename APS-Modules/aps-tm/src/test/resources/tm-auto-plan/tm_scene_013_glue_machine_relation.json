@@ -1,11 +1,11 @@
 {
-  "caseName": "case_10_non_tail_roll_rounding",
-  "description": "非收尾规格按卷曲长度向上取整，并满足最小起排量",
+  "caseName": "TM_SCENE_013_glue_machine_relation",
+  "description": "TM_SCENE_013：胶料可投机台关系",
   "autoPlanRequest": {
     "factoryCode": "F1",
-    "scheduleDate": "2026-06-18",
-    "operator": "tester",
-    "traceId": "TRACE-CASE-10",
+    "scheduleDate": "2026-07-13",
+    "operator": "TM_AUTO_PLAN_TEST",
+    "traceId": "TRACE-TM_SCENE_013",
     "confirmOverwrite": false
   },
   "params": [
@@ -14,42 +14,30 @@
       "paramCode": "TM_ALGORITHM_SWITCH",
       "paramValue": "1",
       "enableStatus": "1"
-    },
-    {
-      "factoryCode": "F1",
-      "paramCode": "TM_DEFAULT_CURL_LENGTH",
-      "paramValue": "50",
-      "enableStatus": "1"
-    },
-    {
-      "factoryCode": "F1",
-      "paramCode": "TM_MIN_START_QTY",
-      "paramValue": "80",
-      "enableStatus": "1"
     }
   ],
   "cxScheduleResults": [
     {
-      "orderNo": "ORD-ROUND",
-      "embryoCode": "CX-R",
+      "orderNo": "ORD-GLUE",
+      "embryoCode": "CX-G",
       "class1PlanQty": 10,
       "class2PlanQty": 0,
       "class3PlanQty": 0,
       "class4PlanQty": 0,
       "class5PlanQty": 0,
       "class6PlanQty": 0,
-      "treadCode": "TR-R",
-      "treadShoulderLength": 3,
+      "treadCode": "TR-G",
+      "treadShoulderLength": 1,
       "treadMouthPlate": "MP-A",
-      "treadRubberCategory": "GL-A"
+      "treadRubberCategory": "GL-X"
     }
   ],
   "stocks": [
     {
       "factoryCode": "F1",
-      "stockDate": "2026-06-17",
-      "treadCode": "TR-R",
-      "stockQty": 0
+      "stockDate": "2026-07-12",
+      "treadCode": "TR-G",
+      "stockQty": 1000
     }
   ],
   "machineInfos": [
@@ -74,31 +62,27 @@
       "mouthPlateCode": "MP-A"
     }
   ],
-  "curlRolls": [
+  "glueMachineReals": [
     {
       "factoryCode": "F1",
-      "treadCode": "TR-R",
-      "curlLength": 50
+      "machineCode": "TM01",
+      "glueCode": "GL-X",
+      "allowFlag": "0",
+      "enableStatus": "1"
     }
   ],
   "expected": {
     "success": true,
     "messageContains": "胎面自动排程执行完成",
     "resultCount": 1,
-    "assignedCount": 1,
-    "unassignedCount": 0,
+    "assignedCount": 0,
+    "unassignedCount": 1,
     "explainCount": 6,
-    "errorCount": 0,
-    "expectedResults": [
-      {
-        "orderNo": "ORD-ROUND-CLASS1",
-        "treadCode": "TR-R",
-        "machineCode": "TM01",
-        "shiftOrder": 1,
-        "sequence": 1,
-        "planQty": 100
-      }
-    ]
-  }
+    "errorCount": 0
+  },
+  "sceneCode": "TM_SCENE_013",
+  "designSteps": [
+    "Step14"
+  ],
+  "mysqlVerificationStatus": "待用户执行 MySQL 验证"
 }
-

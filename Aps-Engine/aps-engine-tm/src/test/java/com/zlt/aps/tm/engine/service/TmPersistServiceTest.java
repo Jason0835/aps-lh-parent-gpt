@@ -71,6 +71,7 @@ public class TmPersistServiceTest {
         assertEquals(new BigDecimal("15"), resultList.get(4).getClass5PlanQty());
         assertEquals(Integer.valueOf(6), resultList.get(5).getClass6Sequence());
         assertEquals(new BigDecimal("16"), resultList.get(5).getClass6PlanQty());
+        assertEquals(TmScheduleReleaseStatusEnum.NOT_RELEASED.getCode(), resultList.get(0).getReleaseStatus());
     }
 
     /**
@@ -131,7 +132,7 @@ public class TmPersistServiceTest {
         assertEquals(snapshot.getCandidateMachineJson(), explain.getCandidateMachineJson());
         assertEquals(snapshot.getUnplannedEvidenceJson(), explain.getUnplannedEvidenceJson());
         assertEquals("系统分析", explain.getSysAnalysis());
-        assertEquals(TmScheduleReleaseStatusEnum.WAIT_RELEASE.getCode(), explain.getResultStatus());
+        assertEquals(TmScheduleReleaseStatusEnum.NOT_RELEASED.getCode(), explain.getResultStatus());
         assertEquals(TmScheduleStepEnum.PERSIST.getCode(), explain.getCurrentStepCode());
         assertEquals(TmGenerateModeEnum.ENGINE_SKELETON.getCode(), explain.getGenerateMode());
     }

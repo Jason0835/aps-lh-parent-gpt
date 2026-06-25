@@ -1,11 +1,11 @@
 {
-  "caseName": "case_10_non_tail_roll_rounding",
-  "description": "非收尾规格按卷曲长度向上取整，并满足最小起排量",
+  "caseName": "TM_SCENE_010_tail_no_curl_rounding",
+  "description": "TM_SCENE_010：收尾规格不按卷曲长度取整",
   "autoPlanRequest": {
     "factoryCode": "F1",
-    "scheduleDate": "2026-06-18",
-    "operator": "tester",
-    "traceId": "TRACE-CASE-10",
+    "scheduleDate": "2026-07-10",
+    "operator": "TM_AUTO_PLAN_TEST",
+    "traceId": "TRACE-TM_SCENE_010",
     "confirmOverwrite": false
   },
   "params": [
@@ -14,32 +14,22 @@
       "paramCode": "TM_ALGORITHM_SWITCH",
       "paramValue": "1",
       "enableStatus": "1"
-    },
-    {
-      "factoryCode": "F1",
-      "paramCode": "TM_DEFAULT_CURL_LENGTH",
-      "paramValue": "50",
-      "enableStatus": "1"
-    },
-    {
-      "factoryCode": "F1",
-      "paramCode": "TM_MIN_START_QTY",
-      "paramValue": "80",
-      "enableStatus": "1"
     }
   ],
   "cxScheduleResults": [
     {
-      "orderNo": "ORD-ROUND",
-      "embryoCode": "CX-R",
+      "orderNo": "ORD-TAIL",
+      "embryoCode": "CX-T",
       "class1PlanQty": 10,
       "class2PlanQty": 0,
       "class3PlanQty": 0,
       "class4PlanQty": 0,
       "class5PlanQty": 0,
       "class6PlanQty": 0,
-      "treadCode": "TR-R",
-      "treadShoulderLength": 3,
+      "markCloseOutTip": "0",
+      "cxRemainQty": 5,
+      "treadCode": "TR-TAIL",
+      "treadShoulderLength": 2,
       "treadMouthPlate": "MP-A",
       "treadRubberCategory": "GL-A"
     }
@@ -47,8 +37,8 @@
   "stocks": [
     {
       "factoryCode": "F1",
-      "stockDate": "2026-06-17",
-      "treadCode": "TR-R",
+      "stockDate": "2026-07-09",
+      "treadCode": "TR-TAIL",
       "stockQty": 0
     }
   ],
@@ -77,8 +67,18 @@
   "curlRolls": [
     {
       "factoryCode": "F1",
-      "treadCode": "TR-R",
-      "curlLength": 50
+      "treadCode": "TR-TAIL",
+      "curlLength": 10
+    }
+  ],
+  "lossSettings": [
+    {
+      "factoryCode": "F1",
+      "treadCode": "TR-TAIL",
+      "lossRate": 10,
+      "settingLevel": "TREAD",
+      "priority": 10,
+      "enableStatus": "1"
     }
   ],
   "expected": {
@@ -91,14 +91,25 @@
     "errorCount": 0,
     "expectedResults": [
       {
-        "orderNo": "ORD-ROUND-CLASS1",
-        "treadCode": "TR-R",
+        "orderNo": "ORD-TAIL-CLASS1",
+        "treadCode": "TR-TAIL",
         "machineCode": "TM01",
         "shiftOrder": 1,
         "sequence": 1,
-        "planQty": 100
+        "planQty": 11
+      }
+    ],
+    "expectedExplains": [
+      {
+        "treadCode": "TR-TAIL",
+        "finalPlanQty": 11,
+        "ruleHitContains": "收尾"
       }
     ]
-  }
+  },
+  "sceneCode": "TM_SCENE_010",
+  "designSteps": [
+    "Step11"
+  ],
+  "mysqlVerificationStatus": "待用户执行 MySQL 验证"
 }
-

@@ -1,0 +1,58 @@
+{
+  "sceneCode": "TM_SCENE_021",
+  "caseName": "TM_SCENE_021_missing_construction_bom",
+  "description": "TM_SCENE_021：无施工或 BOM 数据",
+  "designSteps": [
+    "Step3",
+    "Step19"
+  ],
+  "mysqlVerificationStatus": "待用户执行 MySQL 验证",
+  "autoPlanRequest": {
+    "factoryCode": "F1",
+    "scheduleDate": "2026-07-21",
+    "operator": "TM_AUTO_PLAN_TEST",
+    "traceId": "TRACE-TM_SCENE_021",
+    "confirmOverwrite": false
+  },
+  "params": [
+    {
+      "factoryCode": "F1",
+      "paramCode": "TM_ALGORITHM_SWITCH",
+      "paramValue": "2",
+      "enableStatus": "1"
+    }
+  ],
+  "cxScheduleResults": [
+    {
+      "orderNo": "TM_SCENE_021_001",
+      "embryoCode": "CX-MISSING-BOM",
+      "class1PlanQty": 0,
+      "class2PlanQty": 100,
+      "class3PlanQty": 0,
+      "class4PlanQty": 0,
+      "class5PlanQty": 0,
+      "class6PlanQty": 0,
+      "treadCode": "",
+      "treadShoulderLength": 0,
+      "treadMouthPlate": "",
+      "treadRubberCategory": ""
+    }
+  ],
+  "stocks": [],
+  "machineInfos": [
+    {
+      "factoryCode": "F1",
+      "machineCode": "TM01",
+      "machineStatus": "1",
+      "maxCapacity": 1000
+    }
+  ],
+  "machineSpeeds": [],
+  "mouthPlates": [],
+  "expected": {
+    "success": false,
+    "rejectMessageContains": "胎面代码为空",
+    "expectedResults": [],
+    "expectedExplains": []
+  }
+}

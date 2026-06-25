@@ -1,0 +1,154 @@
+{
+  "sceneCode": "TM_SCENE_002",
+  "caseName": "TM_SCENE_002_same_main_glue_continuous_plan",
+  "description": "TM_SCENE_002：同主胶料优先连续排产",
+  "designSteps": [
+    "Step8",
+    "Step9",
+    "Step15"
+  ],
+  "mysqlVerificationStatus": "待用户执行 MySQL 验证",
+  "autoPlanRequest": {
+    "factoryCode": "F1",
+    "scheduleDate": "2026-07-02",
+    "operator": "TM_AUTO_PLAN_TEST",
+    "traceId": "TRACE-TM_SCENE_002",
+    "confirmOverwrite": false
+  },
+  "params": [
+    {
+      "factoryCode": "F1",
+      "paramCode": "TM_ALGORITHM_SWITCH",
+      "paramValue": "2",
+      "enableStatus": "1"
+    }
+  ],
+  "cxScheduleResults": [
+    {
+      "orderNo": "TM_SCENE_002_201",
+      "embryoCode": "CX-TM_SCENE_002_201",
+      "class1PlanQty": 0.0,
+      "class2PlanQty": 120.0,
+      "class3PlanQty": 0.0,
+      "class4PlanQty": 0.0,
+      "class5PlanQty": 0.0,
+      "class6PlanQty": 0.0,
+      "treadCode": "TM_TREAD_201",
+      "treadShoulderLength": 1.0,
+      "treadMouthPlate": "MP_A",
+      "treadRubberCategory": "GLUE_A"
+    },
+    {
+      "orderNo": "TM_SCENE_002_202",
+      "embryoCode": "CX-TM_SCENE_002_202",
+      "class1PlanQty": 0.0,
+      "class2PlanQty": 80.0,
+      "class3PlanQty": 0.0,
+      "class4PlanQty": 0.0,
+      "class5PlanQty": 0.0,
+      "class6PlanQty": 0.0,
+      "treadCode": "TM_TREAD_202",
+      "treadShoulderLength": 1.0,
+      "treadMouthPlate": "MP_B",
+      "treadRubberCategory": "GLUE_A"
+    },
+    {
+      "orderNo": "TM_SCENE_002_203",
+      "embryoCode": "CX-TM_SCENE_002_203",
+      "class1PlanQty": 0.0,
+      "class2PlanQty": 90.0,
+      "class3PlanQty": 0.0,
+      "class4PlanQty": 0.0,
+      "class5PlanQty": 0.0,
+      "class6PlanQty": 0.0,
+      "treadCode": "TM_TREAD_203",
+      "treadShoulderLength": 1.0,
+      "treadMouthPlate": "MP_C",
+      "treadRubberCategory": "GLUE_B"
+    },
+    {
+      "orderNo": "TM_SCENE_002_204",
+      "embryoCode": "CX-TM_SCENE_002_204",
+      "class1PlanQty": 0.0,
+      "class2PlanQty": 70.0,
+      "class3PlanQty": 0.0,
+      "class4PlanQty": 0.0,
+      "class5PlanQty": 0.0,
+      "class6PlanQty": 0.0,
+      "treadCode": "TM_TREAD_204",
+      "treadShoulderLength": 1.0,
+      "treadMouthPlate": "MP_D",
+      "treadRubberCategory": "GLUE_C"
+    }
+  ],
+  "stocks": [
+    {
+      "factoryCode": "F1",
+      "stockDate": "2026-07-01",
+      "treadCode": "TM_TREAD_201",
+      "stockQty": 0
+    },
+    {
+      "factoryCode": "F1",
+      "stockDate": "2026-07-01",
+      "treadCode": "TM_TREAD_202",
+      "stockQty": 0
+    },
+    {
+      "factoryCode": "F1",
+      "stockDate": "2026-07-01",
+      "treadCode": "TM_TREAD_203",
+      "stockQty": 0
+    },
+    {
+      "factoryCode": "F1",
+      "stockDate": "2026-07-01",
+      "treadCode": "TM_TREAD_204",
+      "stockQty": 0
+    }
+  ],
+  "machineInfos": [
+    {
+      "factoryCode": "F1",
+      "machineCode": "TM01",
+      "machineStatus": "1",
+      "maxCapacity": 10000
+    }
+  ],
+  "machineSpeeds": [
+    {
+      "factoryCode": "F1",
+      "machineCode": "TM01",
+      "productSpeed": 100
+    }
+  ],
+  "mouthPlates": [
+    {
+      "factoryCode": "F1",
+      "machineCode": "TM01",
+      "mouthPlateCode": "MP_A"
+    },
+    {
+      "factoryCode": "F1",
+      "machineCode": "TM01",
+      "mouthPlateCode": "MP_B"
+    },
+    {
+      "factoryCode": "F1",
+      "machineCode": "TM01",
+      "mouthPlateCode": "MP_C"
+    },
+    {
+      "factoryCode": "F1",
+      "machineCode": "TM01",
+      "mouthPlateCode": "MP_D"
+    }
+  ],
+  "expected": {
+    "success": true,
+    "messageContains": "胎面自动排程执行完成",
+    "errorCount": 0,
+    "expectedResults": [],
+    "expectedExplains": []
+  }
+}

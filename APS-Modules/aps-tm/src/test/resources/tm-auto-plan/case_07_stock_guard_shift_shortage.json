@@ -17,7 +17,7 @@
     },
     {
       "factoryCode": "F1",
-      "paramCode": "TM_STOCK_GUARD_SHIFT_COUNT",
+      "paramCode": "TM_MIN_STOCK_CLASS",
       "paramValue": "2",
       "enableStatus": "1"
     }
@@ -83,9 +83,8 @@
         "machineCode": "TM01",
         "shiftOrder": 2,
         "sequence": 1,
-        "planQty": 60
+        "planQty": 50
       }
     ]
   }
 }
-

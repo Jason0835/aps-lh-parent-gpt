@@ -26,7 +26,7 @@
 
 - `id`：主键ID
 - `batch_no`：批次号
-- `order_no`：工单号
+- `order_no`：胎面自动排程工单号，自动排程结果按 `batch_no + "-" + 4位序号` 自行生成，作为下发 MES 的唯一键；成型来源工单号不写入该字段
 - `schedule_date`：排程日期
 - `machine_code`：机台编码，关联 `T_TM_MACHINE_INFO.machine_code`，未排任务允许为空
 - `tread_code`：胎面编码
@@ -38,13 +38,13 @@
 - `class1_plan_qty`~`class6_plan_qty`：六班计划量
 - `class1_finish_qty`~`class6_finish_qty`：六班完成量
 - `class1_analysis`~`class6_analysis`：六班原因分析
-- `release_status`：发布状态，统一使用字典 `IS_RELEASE`（`0` 未发布，`1` 已发布，`2` 发布失败，`3` 发布中，`4` 超时失败，`5` 待发布）
+- `release_status`：发布状态，统一使用字典 `IS_RELEASE`（`0` 未发布，`1` 已发布，`2` 发布失败，`3` 发布中，`4` 超时失败，`5` 待发布）。自动排程首次生成结果默认写 `0`，仅已发布结果被人工修改后才回退为 `5`。
 - `data_source`：数据来源
 - `tail_flag`：业务标识，使用 `biz_yes_no
 
 ### 3.3 `T_TM_SCHEDULE_RESULT_EXPLAIN`
 
-作用：保存任务当前有效解释信息，用于回答“计划量如何得出、候选机台如何筛选、为什么未排上”。
+作用：保存任务当前有效解释信息，用于回答“计划量如何得出、候选机台如何筛选、为什么未排上”，并按原成型来源任务追溯具体排产结果。
 
 关键字段：
 
@@ -52,7 +52,7 @@
 - `batch_no`：批次号
 - `base_demand_qty`：基础需求量
 - `loss_add_qty`：损耗补偿量
-- `stock_deduct_qty`：库存抵扣量
+- `stock_deduct_qty`：库存抵扣量，本次库存实际冲减当前班生产量的值（`min(剩余库存, max(当前班需求, 保证范围需求))`），取自上下文 `remainingStockMap` 逐班递减
 - `last_shift_supply_qty`：上班覆盖量
 - `month_surplus_deduct_qty`：月剩余抵扣量
 - `tool_limit_adjust_qty`：工装约束调整量
@@ -61,8 +61,10 @@
 - `capacity_adjust_qty`：产能均衡补正量
 - `final_plan_qty`：最终计划量
 - `calc_formula_desc`：计划量计算公式说明
-- `stock_qty`、`plan_stock_qty`、`supply_hours`、`coverage_shift_count`：库存测算依据
-- `rule_hit_json`：命中规则明细，记录参数编码、参数值、规则表来源、是否使用默认值
+- `stock_qty`：6 点库存净值，库存抵扣池初值来源
+- `plan_stock_qty`：抵扣后该胎面剩余库存（`remainingStockMap` 当前值）
+- `supply_hours`、`coverage_shift_count`：库存供应时长、库存最低保证班数
+- `rule_hit_json`：命中规则明细，记录参数编码、参数值、规则表来源、是否使用默认值，并保留 `sourceOrderNos` 等来源成型工单追踪信息
 - `candidate_machine_json`：候选机台明细，记录候选机台、过滤原因、排序和评分
 - `machine_select_reason`：最终选机说明
 - `assign_status`、`unplanned_reason_code`、`unplanned_reason_desc`、`unplanned_evidence_json`：未排解释
@@ -70,7 +72,7 @@
 - `manual_locked_flag`、`sequence_lock_flag`、`force_change_flag`：引擎行为约束标识，均使用 `biz_yes_no`
 - `sys_analysis`、`warning_msg`、`error_msg`：系统分析、告警和异常信息
 
-说明：参数表不做版本号，任务解释表记录当前有效解释和本次最终诊断信息，不承担完整事件历史追溯。
+说明：参数表不做版本号，任务解释表记录当前有效解释和本次最终诊断信息，不承担完整事件历史追溯；同一结果行可关联多条来源任务解释记录。
 
 ## 4. 基础资料表
 
@@ -193,7 +195,7 @@
 - `TM_TAIL_ROUND_RULE`：收尾取整规则
 - `TM_NORMAL_ROUND_RULE`：常规取整规则
 - `TM_LARGE_SMALL_THRESHOLD`：大小批量阈值
-- `TM_STOCK_GUARD_SHIFT_COUNT`：库存最低保证班数。用于控制自动排程至少保障当前班及后续若干班的胎面供应；缺省值按 2 班处理，并在解释信息中记录使用默认值。
+- `TM_MIN_STOCK_CLASS`：库存最低保证班数。用于控制自动排程至少保障当前班及后续若干班的胎面供应；缺省值按 1 班处理，并在解释信息中记录使用默认值。代码参数常量对齐为 `TM_MIN_STOCK_CLASS`（与 `t_tm_params` 表实际参数名一致）。
 - `TM_DEDUCT_PRIORITY`：需求抵扣优先级。用于后续配置库存余额、前序已排计划量等抵扣项的执行顺序；当前默认抵扣链只使用 6 点库存滚动余额和当前排程链前序胎面计划量，未定义来源的数据不进入默认公式。
 - `TM_ROLLING_SHIFT_COUNT`：局部滚动重算班次数，默认 3
 - `TM_MAX_LOOKAHEAD_SHIFT_COUNT`：需求前瞻班次数
@@ -205,7 +207,9 @@
 
 说明：
 - 库存预测以 6 点库存作为滚动计算起点。
-- `已计划入库量`、`已占用量`、`不良量`、`调整量` 的数据来源尚未定义，本版不参与库存公式；后续明确来源后再纳入扩展抵扣或修正项。
+- 库存直接抵扣当前班生产量：6 点库存净值（`sixClockStockQty = stock_qty - bad_qty - adjust_qty`）作为库存抵扣池初值，存于排程上下文 `remainingStockMap`（key=胎面编码），逐班递减。同一胎面按班次顺序（`shiftOrder` 升序）依次冲减，扣完为止，避免同一库存被多班重复抵扣。
+- 库存抵扣与"库存保证缺口"口径分离：保证缺口仍使用 14 点预计库存（`rollingStockQty`）判断保证范围内是否断供；库存抵扣使用 `remainingStockMap`（初值 6 点库存净值）冲减当前班生产量，两者不可共用同一变量。
+- `已计划入库量`、`已占用量` 的数据来源尚未定义，本版不参与库存公式；后续明确来源后再纳入扩展抵扣或修正项。
 
 ## 5. 班次建模
 
@@ -242,8 +246,8 @@
 
 - `TmPlanBootstrapService`：生成 `batch_no`、`trace_id`，加载全局上下文。
 - `TmInventoryPredictService`：读取 `T_TM_STOCK` 和损耗设置，计算预计库存和供应时长。
-- `TmPlanCalcService`：计算计划量、预计划、收尾、小批量补卷等。
-- `TmMachineAssignService`：基于机台、口型板、定点/禁排、胶料机台关系筛选候选机台。
+- `TmPlanCalcService`：计算计划量、预计划、收尾、小批量补卷等。计划量计算前从库存预测初始化 per-tread 剩余库存 `remainingStockMap`（初值6点库存净值），并按胎面编码、班次顺序稳定排序，保证库存逐班递减抵扣。
+- `TmMachineAssignService`：基于机台、口型板、定点/禁排、胶料机台关系筛选候选机台；选中机台后按 `machineCode + shiftOrder` 计算剩余产能，当前班产能不足时先压缩本班计划量，剩余计划量优先由同班次其他匹配且有剩余产能的机台承接；该班次所有匹配机台均不足时，再滚动到后续班次并继续按匹配机台剩余产能分配。全部候选机台被过滤时，按候选 `filterReasonCode` 归类未排原因：全部 `NO_REMAIN_CAPACITY`→`CAPACITY_NOT_ENOUGH`，全部 `MOUTH_PLATE_NOT_MATCH`→`MOUTH_PLATE_NOT_MATCH`，全部 `GLUE_MACHINE_NOT_MATCH`→`GLUE_MACHINE_NOT_ALLOWED`，`MACHINE_DISABLED`/定点规则/混合原因→`NO_AVAILABLE_MACHINE` 兜底。
 - `TmCapacityBalanceService`：做产能均衡、中夜班移量、次日回拉和任务顺序计算。当前本轮不实现生产级产能均衡算法，仅保留流程占位和风险记录。
 - `TmSnapshotBuildService`：生成 `T_TM_SCHEDULE_RESULT_EXPLAIN`。
 - `TmPersistService`：统一落结果和解释信息。
@@ -308,7 +312,7 @@
 
 典型操作：
 
-- 自动排程：从待排优先队列取出任务，经过候选机台过滤和评分后，追加到目标 `machineCode + scheduleDate + shiftOrder` 链表尾部，并重算该链表顺序和预计时间。
+- 自动排程：从待排优先队列取出任务，经过候选机台过滤和评分后，追加到目标 `machineCode + scheduleDate + shiftOrder` 链表尾部，并重算该链表顺序和预计时间。目标机台同班次剩余产能不足时，当前班仅写入可承接的计划量，溢出量优先由同班次其他匹配且有剩余产能的机台承接；当前班所有匹配机台均不足时，再滚动到后续班次并继续按匹配机台剩余产能分配，最多滚动到 6 班，6 班后仍未排完的数量写未排并记录产能不足原因。
 - 插单：根据前端传入的插入位置定位节点，调用链表插入方法放到指定节点之后；若位置为空，则追加到链尾。插入后只重排当前节点之后的任务。
 - 删除：从链表摘除目标节点，目标节点前驱和后继直接连接；删除后重排后续节点顺序。
 - 转机台：先从原机台链表摘除节点，再插入目标机台链表指定位置或链尾；原机台链和目标机台链分别重算。
@@ -321,7 +325,18 @@
 
 - 待排规格排序使用 `PriorityQueue<TmTaskDraft>` 或等价优先队列，比较器顺序为强紧急、库存紧急度、同在产胶料、胶料优先级、基部胶相似度、口型聚集、稳定兜底。稳定兜底按 `treadCode`、`machineCode` 等固定字段升序，保证相同输入重复运行结果一致。
 - 候选机台先通过责任链过滤硬约束，再通过评分策略排序。硬约束包括不开班、停用、整班检修、口型不匹配、胶料不允许、禁排机台、产能不足。评分项包括剩余产能、同胶料、同口型、切换成本、稳定兜底。
-- 运行态上下文使用 `Map<String, TmParamValue>` 保存参数快照，使用 `Map<String, MachineRuntimeState>` 保存机台剩余产能、链尾胶料、链尾口型、下一可开工时间，使用 `Map<MachineShiftKey, ScheduleTaskLinkedList<TmTaskDraft>>` 保存任务链。
+- 运行态上下文使用 `Map<String, TmParamValue>` 保存参数快照，使用 `Map<String, MachineRuntimeState>` 保存机台剩余产能、链尾胶料、链尾口型、下一可开工时间，使用 `Map<MachineShiftKey, ScheduleTaskLinkedList<TmTaskDraft>>` 保存任务链，使用 `Map<String, BigDecimal> remainingStockMap` 保存胎面剩余可抵扣库存（初值6点库存净值，逐班递减）。
+
+#### 7.4.1 库存直接抵扣当前班生产量
+
+计划量计算在基础需求环节新增"库存抵扣"步骤，位于收尾判断之前，公式为：
+
+- `grossDemand = max(currentShiftDemandQty, guardDemandQty)`：取当前班需求与保证范围需求的较大值。
+- `stockDeductQty = min(stock, grossDemand)`：本次实际抵扣量，`stock` 取自 `remainingStockMap`（per-tread，逐班递减）。
+- `baseDemandQty = max(currentShiftDemandQty - stock, guardDemandQty - stock, 0)`：库存对当前班需求与保证范围需求各冲减后取大，不低于 0。
+- 回写 `remainingStockMap`：`stock = stock - stockDeductQty`，供该胎面下一班继续抵扣。
+
+后续链路在 `baseDemandQty` 上继续：收尾判断 → 损耗补偿 → 工装限制 → 最小起排 → 卷数取整 → 产能压缩。库存抵扣后 `baseDemandQty` 为 0 时，最小起排不再补足，该班生成 0 计划量任务并保留落库。`TmGuardDemandQtyStrategy`/`TmNextShiftDemandQtyStrategy` 的需求量（`demandQty`，用于排序/解释）保持毛需求语义，不被库存抵扣拉低；库存抵扣只作用于计划量侧。
 
 ### 7.5 类与方法说明要求
 
@@ -565,7 +580,7 @@ AND enable_status = '1'
 - 看板查询测试：不同日期能取各自最新有效 `batch_no`。
 - 看板查询测试：未排任务进入 `unassignedTasks`，不混入机台单元格。
 - 看板查询测试：`open_flag='0'` 的班次不可作为可排班次。
-- 自动排程测试：覆盖多机台、多规格、库存不足、检修停机、定点冲突、禁排、胶料不匹配、外协、新规格。
+- 自动排程测试：覆盖多机台、多规格、库存不足、检修停机、定点冲突、禁排、胶料不匹配、外协、新规格。`machineCode + shiftOrder` 已排量接近最大班产时，新增任务必须按剩余产能压缩当前班，并将溢出量滚动顺延到同机台后续班次；6 班后仍不足时剩余量写未排。
 - 人工调整测试：覆盖插单、调量、转机台、删除、归并、合并班次；操作后重新查询看板能看到最新结果。
 - 发布测试：覆盖成功、失败、超时、重复回执和任务版本变更后的重发。
 - 追溯测试：任一任务必须能查到计划量计算依据、命中规则、候选机台、未排原因、人工事件和发布记录。
@@ -725,9 +740,9 @@ Load Data:
 Process:
   根据胎胚 BOM 解析成型计划，获取需要供应的胎面规格列表；
   从 T_MDM_CONSTRUCTION_INFO 获取胎面相关字段：TREAD_CODE（胎面编码）、TREAD_SHOULDER_LENGTH（胎面标准长度，单位米）、TREAD_MOUTH_PLATE（胎面口型板）；
-  按 6 个班展开每个胎面规格的成型需求，形成后续排程计算的需求明细。
+  不按胎面、胶料、口型板提前聚合成型需求，按原成型结果行保留来源明细；`sourceOrderNos` 仅用于解释追踪，不写入胎面结果 `order_no`；`taskBusinessKey` 需带来源任务维度，避免同规格同班次解释互相覆盖；`T_TM_SCHEDULE_RESULT` 在落库阶段再按 factoryCode + batchNo + scheduleDate + machineCode + treadCode 归并。
 Output:
-  TreadDemandList(tread_code, shift_code, construction_plan_qty, tread_standard_length, glue_code, mouth_plate_code)
+  TreadDemandList(source_order_no, task_business_key, tread_code, shift_code, construction_plan_qty, tread_standard_length, glue_code, mouth_plate_code)
 
 Step4 计算胎面每班需求量
 Load Data:
@@ -883,8 +898,9 @@ Persist:
 Process:
   将排产规格追加到本机台本班任务链末尾；
   生成本条排程记录的胎面、胶料、胶料序号、口型板、机台、月计划剩余量、库存等展示字段；
-  按班次写入计划量、顺序、完成量、完成率和原因分析字段；
-  已分配任务写入 `T_TM_SCHEDULE_RESULT`，解释信息写入 `T_TM_SCHEDULE_RESULT_EXPLAIN`；
+  按 `factoryCode + batchNo + scheduleDate + machineCode + treadCode` 归并结果行，同一归并行横向累加各班次计划量、顺序、完成量、完成率和原因分析字段；
+  自动排程结果 `order_no` 按胎面批次号生成，格式为 `batchNo-0001`，不使用成型来源工单号；
+  已分配任务写入 `T_TM_SCHEDULE_RESULT`，解释信息按来源任务写入 `T_TM_SCHEDULE_RESULT_EXPLAIN` 并关联归并后的 `result_id`；
   解释信息需包含计划量计算过程、库存依据、规则命中、候选机台和最终选机原因。
 Output:
   AssignedScheduleResult(result_id, machine_code, class{N}_plan_qty, class{N}_sequence)
@@ -911,8 +927,9 @@ Persist:
   T_TM_SCHEDULE_RESULT_EXPLAIN
 Process:
   如果某个规格没有可用机台，或因最低起排量、工装、检修、口型、胶料、定点/禁排、产能等规则无法排产，则写入未排列表；
+  自动排程首次生成的已排任务与未排任务统一写 `release_status = 0`，机台为空仅表示未排，不再额外写 `5`；
   未排任务仍写入 `T_TM_SCHEDULE_RESULT`，机台允许为空；
-  未排原因、规则证据和候选机台过滤过程写入 `T_TM_SCHEDULE_RESULT_EXPLAIN`；
+  未排原因、规则证据和候选机台过滤过程写入 `T_TM_SCHEDULE_RESULT_EXPLAIN`，解释表结果状态也同步记为 `0`；
   汇总已排数量、未排数量、异常数量和本次 batch_no，返回自动排程结果。
 Output:
   RunSummary(batch_no, assigned_count, unassigned_count, error_count)
@@ -1775,7 +1792,7 @@ graph LR
   - 默认实现按以下顺序调整：基础需求量 -> 工装限制 -> 最小起排量 -> 卷数取整 -> 产能压缩。
   - 工装限制按 `总工装数量 - (14点胎面预计库存 / 工装卷曲长度)` 计算当前可用工装数量，后续班次按 `上班次可用工装数量 - 当前班计划量 / 工装卷曲长度 + 成型对应班次胎面需求量 / 工装卷曲长度` 滚动。
   - 卷曲长度优先取胎面卷曲长度，没有时取默认工装卷曲长度；计划量不足整卷时向上补足到整倍数。
-  - 产能压缩按 `机台剩余产能 = 胎面机台表最大产能 - 扣减产能 - 已排计划量`，最终计划量不能超过剩余产能。
+  - 产能压缩按 `机台剩余产能 = 胎面机台表最大产能 - 扣减产能 - 已排计划量`，单个任务写入某机台某班次的计划量不能超过该机台该班次剩余产能；压缩后的剩余量优先在同班次匹配机台间分配，同班次均不足时再滚动到后续班次。
   - 涉及试验胶版本的位置只保留 `// steve's TODO：试验胶版本化口径待确认后接入` 注释，不实现版本化逻辑。
 
 - `ITmMachineFilterRule`：胎面候选机台过滤规则。
@@ -1841,12 +1858,13 @@ graph LR
 
 落库规则：
 
-- 按链表顺序写入 `class{N}_sequence`、`class{N}_plan_qty`、`class{N}_start_time`、`class{N}_end_time`。
-- 未排任务写入 `T_TM_SCHEDULE_RESULT`，`machine_code` 允许为空。
-- 解释信息写入 `T_TM_SCHEDULE_RESULT_EXPLAIN`。
+- 按 `factoryCode + batchNo + scheduleDate + machineCode + treadCode` 归并 `T_TM_SCHEDULE_RESULT`，未排任务 `machine_code` 为空时也按同一胎面归并。
+- 按链表顺序横向写入 `class{N}_sequence`、`class{N}_plan_qty`、`class{N}_start_time`、`class{N}_end_time`，同一归并行的同班计划量累加。
+- 自动排程结果 `order_no` 由 `batchNo + "-" + 4位序号` 生成，成型来源工单号只保存在解释追踪信息中。
+- 解释信息按来源任务写入 `T_TM_SCHEDULE_RESULT_EXPLAIN`，多条解释记录可以关联同一个归并结果 `result_id`。
 - 事务边界放在自动排程入口或操作门面，不在策略类、规则类中开启事务。
 
-验证点：同一批次结果和解释数量一致；未排任务可通过结果表和解释表追溯；落库失败不吞异常。
+验证点：同一批次结果按机台和胎面归并，解释数量可大于结果数量；未排任务可通过结果表和解释表追溯；落库失败不吞异常。
 
 ### 17.10 实现数据加载服务
 
@@ -1871,7 +1889,7 @@ graph LR
   - `void loadWorkCalendar(TmScheduleContext context)`：加载工作日历。从 T_MDM_WORK_CALENDAR 按 procCode="04" + 日期范围查询。
 
 - `TmTaskDraftFactory`：胎面任务草稿工厂。
-  - `List<TmTaskDraft> createTaskDrafts(TmScheduleContext context)`：根据成型计划和BOM信息生成待排任务草稿列表。遍历成型计划，关联BOM获取胎面编码，为每个胎面规格生成6个班次的任务草稿，计算需求量 = 成型计划量 × TREAD_SHOULDER_LENGTH。
+  - `List<TmTaskDraft> createTaskDrafts(TmScheduleContext context)`：根据成型计划和BOM信息生成待排任务草稿列表。遍历原成型计划行，关联BOM获取胎面编码，不按 `treadCode + 胶料 + 口型板` 提前聚合；为每条来源成型结果生成6个班次任务草稿，计算需求量 = 成型计划量 × TREAD_SHOULDER_LENGTH，并写入来源任务业务键后缀用于解释追踪。
 
 数据流转：
 
@@ -1892,7 +1910,7 @@ TmDataLoadService.loadAllData(context)
     └── loadWorkCalendar(context)          // T_MDM_WORK_CALENDAR (procCode="04")
 ```
 
-验证点：数据加载完成后，context.taskDraftList 不为空；每个任务草稿包含 treadCode、glueCode、mouthPlateCode、demandQty、curlRollLength 等字段。
+验证点：数据加载完成后，context.taskDraftList 不为空；每个任务草稿包含 treadCode、glueCode、mouthPlateCode、demandQty、curlRollLength、sourceOrderNos 和来源任务业务键后缀等字段；相同胎面、胶料、口型板和班次的不同来源任务业务键不能相同。
 
 ### 17.9 补充测试与验证
 
@@ -1914,4 +1932,3 @@ TmDataLoadService.loadAllData(context)
 - 通用接口不依赖胎面专用类。
 - 胎面专用实现能覆盖详设中的自动排程、人工操作、局部重算、解释和日志要求。
 - 所有新增类和方法有中文注释，说明作用、参数、返回值、异常和代码意图。
-
