@@ -81,8 +81,7 @@ public class Cd90SingleShiftScheduleExecutor implements Cd90SingleShiftScheduleS
                 shift.getClassField(), shift.getShiftCode(), candidates.size());
         while (!candidates.isEmpty()) {
             // 每提交一个任务后按最新链尾重新排序，使同规格优先规则能够连续生效。
-            Cd90MachineTailState latestTail = latestTail(state);
-            candidates = candidateSorter.sort(candidates, latestTail);
+            candidates = candidateSorter.sort(candidates, continuityTails(state));
             Cd90ScheduleCandidate candidate = candidates.remove(0);
             String clothCode = candidate == null ? null : candidate.getClothCode();
             if (!StringUtils.hasText(clothCode)) {
@@ -233,23 +232,25 @@ public class Cd90SingleShiftScheduleExecutor implements Cd90SingleShiftScheduleS
         }
     }
 
-    /** 取当前班次最后一个已提交任务作为连续生产参照；若班次刚开始无任务，则从上一班继承的机尾规格中取。 */
-    private Cd90MachineTailState latestTail(Cd90ShiftResourceState state) {
+    /**
+     * 当前班已有任务时只采用最后提交任务作为强连续参照；班次刚开始时使用全部跨班机台尾状态。
+     */
+    private List<Cd90MachineTailState> continuityTails(Cd90ShiftResourceState state) {
         if (state == null) {
-            return null;
+            return Collections.emptyList();
         }
-        // 当前班次已有任务时，取最后一个任务作为连续性参照
         if (state.getTasks() != null && !state.getTasks().isEmpty()) {
             com.zlt.aps.cd90.engine.model.Cd90ShiftScheduleTask task =
                     state.getTasks().get(state.getTasks().size() - 1);
-            return Cd90MachineTailState.builder().clothCode(task.getClothCode())
-                    .bigRollCode(task.getBigRollCode()).build();
+            return Collections.singletonList(Cd90MachineTailState.builder()
+                    .clothCode(task.getClothCode()).bigRollCode(task.getBigRollCode()).build());
         }
-        // 班次刚开始时 tasks 为空，回退到跨班继承的 tailByMachine，保持连续优先级不丢失
-        if (state.getTailByMachine() != null && !state.getTailByMachine().isEmpty()) {
-            return state.getTailByMachine().values().iterator().next();
+        if (state.getTailByMachine() == null || state.getTailByMachine().isEmpty()) {
+            return Collections.emptyList();
         }
-        return null;
+        return state.getTailByMachine().values().stream()
+                .filter(java.util.Objects::nonNull)
+                .collect(Collectors.toList());
     }
 
     private int occupiedVehicles(List<Cd90StorageLaneState> lanes) {
