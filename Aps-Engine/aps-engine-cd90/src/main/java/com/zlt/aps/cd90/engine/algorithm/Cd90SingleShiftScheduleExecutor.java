@@ -233,15 +233,23 @@ public class Cd90SingleShiftScheduleExecutor implements Cd90SingleShiftScheduleS
         }
     }
 
-    /** 当前班最后提交任务作为下一候选的连续生产参照。 */
+    /** 取当前班次最后一个已提交任务作为连续生产参照；若班次刚开始无任务，则从上一班继承的机尾规格中取。 */
     private Cd90MachineTailState latestTail(Cd90ShiftResourceState state) {
-        if (state == null || state.getTasks() == null || state.getTasks().isEmpty()) {
+        if (state == null) {
             return null;
         }
-        com.zlt.aps.cd90.engine.model.Cd90ShiftScheduleTask task =
-                state.getTasks().get(state.getTasks().size() - 1);
-        return Cd90MachineTailState.builder().clothCode(task.getClothCode())
-                .bigRollCode(task.getBigRollCode()).build();
+        // 当前班次已有任务时，取最后一个任务作为连续性参照
+        if (state.getTasks() != null && !state.getTasks().isEmpty()) {
+            com.zlt.aps.cd90.engine.model.Cd90ShiftScheduleTask task =
+                    state.getTasks().get(state.getTasks().size() - 1);
+            return Cd90MachineTailState.builder().clothCode(task.getClothCode())
+                    .bigRollCode(task.getBigRollCode()).build();
+        }
+        // 班次刚开始时 tasks 为空，回退到跨班继承的 tailByMachine，保持连续优先级不丢失
+        if (state.getTailByMachine() != null && !state.getTailByMachine().isEmpty()) {
+            return state.getTailByMachine().values().iterator().next();
+        }
+        return null;
     }
 
     private int occupiedVehicles(List<Cd90StorageLaneState> lanes) {
