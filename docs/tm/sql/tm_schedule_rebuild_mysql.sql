@@ -554,4 +554,24 @@ CREATE TABLE `T_TM_DISPATCHER_LOG` (
   KEY `idx_tm_dispatcher_log_oper` (`oper_type`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='胎面调度员排程操作日志表';
 
+-- =========================================================
+-- 16. 备库班数配置
+-- =========================================================
+DROP TABLE IF EXISTS `T_TM_STOCK_COVER_CLASS`;
+CREATE TABLE `T_TM_STOCK_COVER_CLASS` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+  `factory_code` varchar(50) NOT NULL DEFAULT '' COMMENT '工厂编码',
+  `machine_qty` int NOT NULL COMMENT '硫化机数量',
+  `machine_range` varchar(30) NOT NULL COMMENT '机台范围，字典machine_range',
+  `depth_class_qty` decimal(18,6) NOT NULL DEFAULT '0.000000' COMMENT '保证班数',
+  `remark` varchar(500) DEFAULT NULL COMMENT '备注',
+  `create_by` varchar(64) DEFAULT NULL COMMENT '创建人',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_by` varchar(64) DEFAULT NULL COMMENT '更新人',
+  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `is_delete` tinyint NOT NULL DEFAULT '0' COMMENT '是否删除，0否，1是',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_tm_stock_cover_class_factory_range` (`factory_code`, `machine_range`, `machine_qty`, `is_delete`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='备库班数配置表';
+
 SET FOREIGN_KEY_CHECKS = 1;
