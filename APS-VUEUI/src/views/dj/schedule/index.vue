@@ -253,9 +253,19 @@ export default {
       sort: {},
       search: {
         factoryCode: '',
+        scheduleDate: '',
+        paddingCode: '',
+        glueCode: '',
+        releaseStatus: '',
+        machineCode: '',
       },
       query: {
         factoryCode: '',
+        scheduleDate: '',
+        paddingCode: '',
+        glueCode: '',
+        releaseStatus: '',
+        machineCode: '',
       },
       importDefaultValue: {
         scheduleDate: moment().add(1, "days").format("YYYY-MM-DD"),
@@ -913,6 +923,9 @@ export default {
   },
   activated() {
     this.getList();
+    getWorkClass({ scheduleDate: this.query.scheduleDate }).then((res) => {
+      this.classHeaders = res;
+    });
   },
 };
 </script>

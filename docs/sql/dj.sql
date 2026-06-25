@@ -304,4 +304,26 @@ CREATE TABLE `t_dj_schedule_result_log`  (
   INDEX `IDX_LOG_BATCH_NO`(`batch_no` ASC) USING BTREE
 ) ENGINE = InnoDB AUTO_INCREMENT = 1 CHARACTER SET = utf8mb3 COLLATE = utf8mb3_general_ci COMMENT = '垫胶排程结果日志表' ROW_FORMAT = DYNAMIC;
 
+-- ----------------------------
+-- Table structure for t_dj_depth_config
+-- 垫胶备库班数与供成型机数配置表
+-- 根据成型工序生产某规格所使用的机台数量范围，确定对应的垫胶备库班数
+-- ----------------------------
+CREATE TABLE `t_dj_depth_config` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+  `factory_code` varchar(10) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NULL DEFAULT NULL COMMENT '工厂编码',
+  `machine_qty` int NULL DEFAULT NULL COMMENT '供成型机台数（成型工序生产某垫胶规格所使用的机台数量）',
+  `machine_range` varchar(10) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NULL DEFAULT NULL COMMENT '机台范围（数据字典machine_range，选项：LT-小于、LE-小于等于、EQ-等于、GE-大于等于、GT-大于）',
+  `depth_class_qty` decimal(10,2) NULL DEFAULT NULL COMMENT '垫胶备库班数（该机台数范围对应的排产深度/供应窗口班次数）',
+  `remark` varchar(900) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NULL DEFAULT NULL COMMENT '备注',
+  `is_delete` int NULL DEFAULT 0 COMMENT '删除标识：0--正常，1-删除',
+  `create_by` varchar(25) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NULL DEFAULT NULL COMMENT '创建者',
+  `create_time` datetime NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_by` varchar(25) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NULL DEFAULT NULL COMMENT '更新者',
+  `update_time` datetime NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`) USING BTREE,
+  INDEX `IDX_DJ_DEPTH_CONFIG_FACTORY`(`factory_code` ASC) USING BTREE,
+  INDEX `IDX_DJ_DEPTH_CONFIG_MACHINE_QTY`(`machine_qty` ASC) USING BTREE
+) ENGINE = InnoDB AUTO_INCREMENT = 1 CHARACTER SET = utf8mb3 COLLATE = utf8mb3_general_ci COMMENT = '垫胶备库班数与供成型机数配置表' ROW_FORMAT = DYNAMIC;
+
 SET FOREIGN_KEY_CHECKS = 1;
