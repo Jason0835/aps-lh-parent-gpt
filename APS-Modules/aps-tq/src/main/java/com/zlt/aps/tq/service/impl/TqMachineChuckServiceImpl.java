@@ -43,7 +43,7 @@ public class TqMachineChuckServiceImpl extends AbstractDocService<TqMachineChuck
     public String checkUnique(TqMachineChuck machineChuck) {
         QueryWrapper<TqMachineChuck> wrapper = new QueryWrapper<>();
         wrapper.ne(machineChuck.getId() != null, "ID", machineChuck.getId());
-        wrapper.eq("MACHINE_ID", machineChuck.getMachineId());
+        wrapper.eq("MACHINE_CODE", machineChuck.getMachineCode());
         wrapper.eq("CHUCK_CODE", machineChuck.getChuckCode());
         wrapper.eq("IS_DELETE", 0);
         if (tqMachineChuckMapper.selectCount(wrapper) > 0) {
@@ -54,7 +54,7 @@ public class TqMachineChuckServiceImpl extends AbstractDocService<TqMachineChuck
 
     @Override
     protected List<String> getCheckUniqueFields() {
-        return Arrays.asList("machineId", "chuckCode");
+        return Arrays.asList("machineCode", "chuckCode");
     }
 
     @Override
@@ -75,8 +75,8 @@ public class TqMachineChuckServiceImpl extends AbstractDocService<TqMachineChuck
             addImportErrorLog(importLogId, null, message, importErrorLogs);
             return AjaxResult.error(message, importErrorLogs);
         }
-        Map<String, Long> machineNameMap = machineInfoList.stream()
-                .collect(Collectors.toMap(TqMachineInfo::getMachineName, TqMachineInfo::getId, (v1, v2) -> v1));
+        Map<String, String> machineNameMap = machineInfoList.stream()
+                .collect(Collectors.toMap(TqMachineInfo::getMachineName, TqMachineInfo::getMachineCode, (v1, v2) -> v1));
 
         Map<String, Long> groupMap = list.stream()
                 .collect(Collectors.groupingBy(a -> (a.getMachineName() + a.getChuckCode()), Collectors.counting()));
@@ -98,13 +98,13 @@ public class TqMachineChuckServiceImpl extends AbstractDocService<TqMachineChuck
 
             List<ImportErrorLog> validated = ImportUtil.validated(importLogId, i + 2, machineChuck);
             String machineName = machineChuck.getMachineName();
-            Long machineId = machineNameMap.get(machineName);
-            if (machineId == null && !StringUtil.isEmpty(machineName)) {
+            String machineCode = machineNameMap.get(machineName);
+            if (machineCode == null && !StringUtil.isEmpty(machineName)) {
                 addImportErrorLog(importLogId, i + 2,
                         I18nUtil.getMessage("ui.error.message.column.machineNotExist"), validated);
             }
             if (CollectionUtils.isEmpty(validated)) {
-                machineChuck.setMachineId(machineId);
+                machineChuck.setMachineCode(machineCode);
                 importList.add(machineChuck);
             } else {
                 failureNum++;

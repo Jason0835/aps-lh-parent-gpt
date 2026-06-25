@@ -15,6 +15,13 @@ export function listTireFabricCodes() {
   })
 }
 
+export function listCordSpecs() {
+  return request({
+    url: '/cd90/common/cordSpecs',
+    method: 'post'
+  })
+}
+
 export function getSpecifyMachine(id) {
   return request({
     url: `/cd90/specifyMachine/getInfo/${id}`,

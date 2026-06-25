@@ -105,11 +105,11 @@ export default {
         },
         {
           label: this.$t("ui.specifyMachine.column.machineName"),
-          prop: "machineId",
+          prop: "machineCode",
           type: "select",
           dictData: this.machineList,
           labelKey: "machineName",
-          valueKey: "id",
+          valueKey: "machineCode",
           filterable: true,
         },
         {

@@ -19,13 +19,9 @@ import java.math.BigDecimal;
 public class TqMachineChuck extends BaseEntity {
     private static final long serialVersionUID = 1L;
 
-    @ApiModelProperty(value = "机台id", position = 20)
-    @TableField("MACHINE_ID")
-    private Long machineId;
-
     @Excel(name = "ui.tq.machineChuck.column.machineCode")
-    @ApiModelProperty(value = "机台编号", position = 25)
-    @TableField(exist = false)
+    @ApiModelProperty(value = "机台编号", position = 20)
+    @TableField("MACHINE_CODE")
     private String machineCode;
 
     @Excel(name = "ui.specifyMachine.column.machineName")

@@ -40,11 +40,11 @@ public class TqStock extends BaseEntity {
     @TableField(exist = false)
     private Date stockDateEnd;
 
-    @ApiModelProperty(value = "库存物料编号", position = 30)
+    @ApiModelProperty(value = "胎圈编码", position = 30)
     @Excel(name = "ui.data.column.tq.scheduleResult.beadCode")
-    @TableField("MATERIAL_CODE")
+    @TableField("BEAD_CODE")
     @ImportValidated(required = true, maxLength = 50, isCode = true)
-    private String materialCode;
+    private String beadCode;
 
     @ApiModelProperty(value = "库存量", position = 40)
     @Excel(name = "ui.data.column.stock.stockNum", scale = 1)
@@ -68,4 +68,10 @@ public class TqStock extends BaseEntity {
     @TableField("REMARK")
     @ImportValidated(maxLength = 300)
     private String remark;
+
+    @ApiModelProperty(value = "分厂编码", position = 70)
+    @Excel(name = "ui.data.column.factoryCode", dictType = "biz_factory_name")
+    @TableField("FACTORY_CODE")
+    @ImportValidated(maxLength = 20)
+    private String factoryCode;
 }

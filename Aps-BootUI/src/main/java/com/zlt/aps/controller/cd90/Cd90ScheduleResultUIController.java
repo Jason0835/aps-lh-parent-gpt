@@ -54,6 +54,36 @@ public class Cd90ScheduleResultUIController extends BaseUIController<Cd90Schedul
         return remoteService.autoSchedule(scheduleResult);
     }
 
+    /**
+     * 查询自动排程任务状态。
+     *
+     * @param taskId 对外任务ID
+     * @return 任务状态
+     */
+    @ApiOperation("查询自动排程任务状态")
+    @RequiresPermissions("cd90:scheduleResult:autoSchedule")
+    @GetMapping("/autoSchedule/task/{taskId}")
+    @ResponseBody
+    public AjaxResult getAutoScheduleTask(@PathVariable("taskId") String taskId) {
+        return remoteService.getAutoScheduleTask(taskId);
+    }
+
+    /**
+     * 查询最近自动排程任务。
+     *
+     * @param factoryCode 工厂编码
+     * @param scheduleDate 排程日期
+     * @return 最近任务
+     */
+    @ApiOperation("查询最近自动排程任务")
+    @RequiresPermissions("cd90:scheduleResult:autoSchedule")
+    @GetMapping("/autoSchedule/task/latest")
+    @ResponseBody
+    public AjaxResult getLatestAutoScheduleTask(@RequestParam("factoryCode") String factoryCode,
+                                                @RequestParam("scheduleDate") String scheduleDate) {
+        return remoteService.getLatestAutoScheduleTask(factoryCode, scheduleDate);
+    }
+
     @Override public String getExportTemplateFileName() { return getFunctionName(); }
     @Override public String getProcedureCode() { return "CD90"; }
     @Override public String getFunctionName() { return I18nUtil.getMessage("ui.data.column.cd90ScheduleResult.modelName"); }

@@ -66,6 +66,12 @@ public class DjScheduleResult extends BaseEntity {
     @TableField("PADDING_CODE")
     private String paddingCode;
 
+    /** 垫胶物料名 */
+    @Excel(name = "ui.data.column.dj.scheduleResult.paddingName")
+    @ApiModelProperty(value = "垫胶物料名", name = "paddingName")
+    @TableField(value = "PADDING_NAME")
+    private String paddingName;
+
     /**
      * 胶料代码
      */
@@ -251,12 +257,12 @@ public class DjScheduleResult extends BaseEntity {
     private Integer publishSuccessCount;
 
     /**
-     * 库存数量
+     * 库存数量（排程时使用的有效库存）
      */
     @Excel(name = "ui.data.column.scheduleResult.stockQty")
     @ApiModelProperty(value = "库存")
-    @TableField(exist = false)
-    private Double stockQty;
+    @TableField(value = "STOCK_QTY")
+    private BigDecimal stockQty;
 
     @Excel(name = "ui.data.column.scheduleResult.monthPlanOs")
     @ApiModelProperty(value = "月计划剩余量")
@@ -298,6 +304,32 @@ public class DjScheduleResult extends BaseEntity {
     
     @TableField(exist = false)
     private String month;
+
+    /** 机台名称（非数据库字段，用于前端展示） */
+    @ApiModelProperty(value = "机台名称", name = "machineName")
+    @TableField(exist = false)
+    private String machineName;
+
+    /** T-1日早班数据（非数据库字段，从 T-1 日排产结果 class3 加载） */
+    @ApiModelProperty(value = "T-1日早班顺序", name = "prevDayClass3Sequence")
+    @TableField(exist = false)
+    private Integer prevDayClass3Sequence;
+
+    @ApiModelProperty(value = "T-1日早班计划量", name = "prevDayClass3PlanQty")
+    @TableField(exist = false)
+    private BigDecimal prevDayClass3PlanQty;
+
+    @ApiModelProperty(value = "T-1日早班完成量", name = "prevDayClass3FinishQty")
+    @TableField(exist = false)
+    private BigDecimal prevDayClass3FinishQty;
+
+    @ApiModelProperty(value = "T-1日早班完成率", name = "prevDayClass3FinishRate")
+    @TableField(exist = false)
+    private BigDecimal prevDayClass3FinishRate;
+
+    @ApiModelProperty(value = "T-1日早班原因分析", name = "prevDayClass3Analysis")
+    @TableField(exist = false)
+    private String prevDayClass3Analysis;
 
     @TableField(exist = false)
     private Long[] ids;

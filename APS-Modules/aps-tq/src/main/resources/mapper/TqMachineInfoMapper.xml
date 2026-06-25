@@ -60,26 +60,26 @@
             resultMap="MachineInfoResult">
 
         <if test="id == 1">
-            select a.MACHINE_ID as ID,b.MACHINE_CODE,b.MACHINE_NAME
+            select a.MACHINE_CODE as ID,b.MACHINE_CODE,b.MACHINE_NAME
             from T_TQ_SPECIFY_MACHINE a
             inner JOIN T_TQ_MACHINE_INFO b
-            on a.MACHINE_ID=b.ID and b.STATUS = '0'
+            on a.MACHINE_CODE=b.MACHINE_CODE and b.STATUS = '0'
             where a.IS_DELETE='0' and a.JOB_TYPE='0'
-            and a.MATERIAL_CODE=#{machineCode,jdbcType=VARCHAR}
+            and a.BEAD_CODE=#{machineCode,jdbcType=VARCHAR}
         </if>
 
         <if test="id == 2">
-            select a.MACHINE_ID as ID,b.MACHINE_CODE,b.MACHINE_NAME
+            select a.MACHINE_CODE as ID,b.MACHINE_CODE,b.MACHINE_NAME
             from T_TQ_MOUTH_PLATE a
             inner JOIN T_TQ_MACHINE_INFO b
-            on a.MACHINE_ID=b.ID and b.STATUS = '0'
+            on a.MACHINE_CODE=b.MACHINE_CODE and b.STATUS = '0'
             where a.IS_DELETE='0' and a.STATUS='0'
             and a.MOUTH_PLATE_CODE=#{machineName,jdbcType=VARCHAR}
-            and a.MACHINE_ID not in (
-            select MACHINE_ID
+            and a.MACHINE_CODE not in (
+            select MACHINE_CODE
             from T_TQ_SPECIFY_MACHINE
             where IS_DELETE='0' and JOB_TYPE='0'
-            and MATERIAL_CODE=#{machineCode,jdbcType=VARCHAR}
+            and BEAD_CODE=#{machineCode,jdbcType=VARCHAR}
             )
         </if>
 
@@ -87,13 +87,13 @@
             select a.ID,a.MACHINE_CODE,a.MACHINE_NAME
             from T_TQ_MACHINE_INFO a
             where a.IS_DELETE='0' and a.STATUS='0'
-            and a.ID not in (
-            select MACHINE_ID
+            and a.MACHINE_CODE not in (
+            select MACHINE_CODE
             from T_TQ_SPECIFY_MACHINE
             where IS_DELETE='0' and JOB_TYPE='0'
-            and MATERIAL_CODE=#{machineCode,jdbcType=VARCHAR}
+            and BEAD_CODE=#{machineCode,jdbcType=VARCHAR}
             union
-            select MACHINE_ID
+            select MACHINE_CODE
             from T_TQ_MOUTH_PLATE
             where IS_DELETE='0' and STATUS='0'
             and MOUTH_PLATE_CODE=#{machineName,jdbcType=VARCHAR}

@@ -484,11 +484,12 @@ public class TqDemandCalcHandler extends AbsTqScheduleStepHandler {
             }
         }
 
-        // 工装限制：可用工装数量 = 工装总数 - 库存/整车个数；需排产量 = min(可用工装数量 × 整车个数, 需排产量)
+        // 工装限制：工装车总数从参数配置获取（全局统一值），整车容量按胎圈编码从容量表获取
+        // 可用工装数量 = 工装车总数 - 库存/整车个数；需排产量 = min(可用工装数量 × 整车个数, 需排产量)
         String beadCode = scheduleVo.getBeadCode();
-        Integer toolingTotal = context.getToolingTotalMap().get(beadCode);
+        Integer toolingTotal = context.getParams().getToolingTotal();
         Integer cartCapacity = context.getCartCapacityMap().get(beadCode);
-        if (toolingTotal != null && cartCapacity != null && cartCapacity > 0) {
+        if (toolingTotal != null && toolingTotal > 0 && cartCapacity != null && cartCapacity > 0) {
             double stockQty = scheduleVo.getStockQty() == null ? 0D : scheduleVo.getStockQty();
             double usedTooling = Math.ceil(stockQty / cartCapacity);
             double availableTooling = Math.max(0, toolingTotal - usedTooling);

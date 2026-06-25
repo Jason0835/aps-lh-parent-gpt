@@ -31,4 +31,15 @@ public class Cd90CommonController {
     public AjaxResult tireFabricCodes() {
         return AjaxResult.success(mdmConstructionInfoService.listTireFabricCodes());
     }
+
+    /**
+     * 大卷代码（CORD_SPEC）下拉。
+     *
+     * @return 去重后的大卷代码列表
+     */
+    @ApiOperation("大卷代码下拉")
+    @PostMapping("/cordSpecs")
+    public AjaxResult cordSpecs() {
+        return AjaxResult.success(mdmConstructionInfoService.listCordSpecs());
+    }
 }

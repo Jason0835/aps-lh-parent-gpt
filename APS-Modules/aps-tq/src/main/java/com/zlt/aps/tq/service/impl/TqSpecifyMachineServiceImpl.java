@@ -43,8 +43,8 @@ public class TqSpecifyMachineServiceImpl extends AbstractDocService<TqSpecifyMac
     public String checkUnique(TqSpecifyMachine specifyMachine) {
         QueryWrapper<TqSpecifyMachine> wrapper = new QueryWrapper<>();
         wrapper.ne(specifyMachine.getId() != null, "id", specifyMachine.getId());
-        wrapper.eq("material_code", specifyMachine.getMaterialCode());
-        wrapper.eq("machine_id", specifyMachine.getMachineId());
+        wrapper.eq("bead_code", specifyMachine.getBeadCode());
+        wrapper.eq("machine_code", specifyMachine.getMachineCode());
         wrapper.eq("is_delete", 0);
         if (tqSpecifyMachineMapper.selectCount(wrapper) > 0) {
             return UserConstants.NOT_UNIQUE;
@@ -54,7 +54,7 @@ public class TqSpecifyMachineServiceImpl extends AbstractDocService<TqSpecifyMac
 
     @Override
     protected List<String> getCheckUniqueFields() {
-        return Arrays.asList("materialCode", "machineId");
+        return Arrays.asList("beadCode", "machineCode");
     }
 
     @Override
@@ -75,21 +75,21 @@ public class TqSpecifyMachineServiceImpl extends AbstractDocService<TqSpecifyMac
             addImportErrorLog(importLogId, null, message, importErrorLogs);
             return AjaxResult.error(message, importErrorLogs);
         }
-        Map<String, Long> machineCodeMap = machineInfoList.stream()
-                .collect(Collectors.toMap(TqMachineInfo::getMachineName, TqMachineInfo::getId));
+        Map<String, String> machineCodeMap = machineInfoList.stream()
+                .collect(Collectors.toMap(TqMachineInfo::getMachineName, TqMachineInfo::getMachineCode));
 
         Map<String, Long> groupMap = list.stream()
-                .collect(Collectors.groupingBy(a -> (a.getMaterialCode() + a.getMachineName()), Collectors.counting()));
+                .collect(Collectors.groupingBy(a -> (a.getBeadCode() + a.getMachineName()), Collectors.counting()));
 
         for (int i = 0; i < list.size(); i++) {
             TqSpecifyMachine specifyMachine = list.get(i);
 
-            Long hasValue = groupMap.get(specifyMachine.getMaterialCode() + specifyMachine.getMachineName());
+            Long hasValue = groupMap.get(specifyMachine.getBeadCode() + specifyMachine.getMachineName());
             if (hasValue != null && hasValue > 1) {
                 failureNum++;
                 specifyMachine.setId(-999L);
                 String message = I18nUtil.getMessage("ui.data.column.all.conflictRecord");
-                String columnName = I18nUtil.getMessage("ui.data.column.quota.materialCode");
+                String columnName = I18nUtil.getMessage("ui.data.column.quota.beadCode");
                 String columnName2 = I18nUtil.getMessage("ui.specifyMachine.column.machineName");
                 message = String.format(message, columnName + "+" + columnName2);
                 addImportErrorLog(importLogId, i + 2, message, importErrorLogs);
@@ -98,13 +98,13 @@ public class TqSpecifyMachineServiceImpl extends AbstractDocService<TqSpecifyMac
 
             List<ImportErrorLog> validated = ImportUtil.validated(importLogId, i + 2, specifyMachine);
             String machineName = specifyMachine.getMachineName();
-            Long machineId = machineCodeMap.get(machineName);
-            if (machineId == null && !StringUtil.isEmpty(machineName)) {
+            String machineCode = machineCodeMap.get(machineName);
+            if (machineCode == null && !StringUtil.isEmpty(machineName)) {
                 addImportErrorLog(importLogId, i + 2,
                         I18nUtil.getMessage("ui.error.message.column.machineNotExist"), validated);
             }
             if (CollectionUtils.isEmpty(validated)) {
-                specifyMachine.setMachineId(machineId);
+                specifyMachine.setMachineCode(machineCode);
                 importList.add(specifyMachine);
             } else {
                 failureNum++;

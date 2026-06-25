@@ -7,14 +7,12 @@ import com.ruoyi.common.core.utils.SecurityUtils;
 import com.ruoyi.common.core.utils.uuid.IdUtils;
 import com.zlt.aps.tq.api.domain.dto.TqPostponeConfirmDTO;
 import com.zlt.aps.tq.api.domain.dto.TqPostponeRequestDTO;
-import com.zlt.aps.tq.api.domain.entity.TqMachineInfo;
 import com.zlt.aps.tq.api.domain.entity.TqMachineSpecSpeed;
 import com.zlt.aps.tq.api.domain.entity.TqNewScheduleResult;
 import com.zlt.aps.tq.api.domain.entity.TqRollingLog;
 import com.zlt.aps.tq.api.domain.entity.TqRollingLogDetail;
 import com.zlt.aps.tq.api.domain.vo.TqPostponePreviewVO;
 import com.zlt.aps.tq.engine.vo.RollingUpdateResult;
-import com.zlt.aps.tq.mapper.TqMachineInfoMapper;
 import com.zlt.aps.tq.mapper.TqMachineSpecSpeedMapper;
 import com.zlt.aps.tq.mapper.TqNewScheduleResultMapper;
 import com.zlt.aps.tq.mapper.TqRollingLogDetailMapper;
@@ -51,9 +49,6 @@ public class TqPostponeServiceImpl implements ITqPostponeService {
 
     @Resource
     private TqNewScheduleResultMapper tqNewScheduleResultMapper;
-
-    @Resource
-    private TqMachineInfoMapper tqMachineInfoMapper;
 
     @Resource
     private TqMachineSpecSpeedMapper tqMachineSpecSpeedMapper;
@@ -542,24 +537,12 @@ public class TqPostponeServiceImpl implements ITqPostponeService {
      * 获取生产速度（个/小时）
      */
     private double getProductionSpeed(String machineCode, String beadCode) {
-        // 先查询机台信息获取机台ID
-        LambdaQueryWrapper<TqMachineInfo> machineWrapper = new LambdaQueryWrapper<>();
-        machineWrapper.eq(TqMachineInfo::getMachineCode, machineCode);
-        TqMachineInfo machineInfo = tqMachineInfoMapper.selectOne(machineWrapper);
-        
-        Long machineId = null;
-        if (machineInfo != null) {
-            machineId = machineInfo.getId();
-        }
-        
-        // 查询生产速度
+        // 直接通过机台编号查询生产速度
         LambdaQueryWrapper<TqMachineSpecSpeed> wrapper = new LambdaQueryWrapper<>();
-        if (machineId != null) {
-            wrapper.eq(TqMachineSpecSpeed::getMachineId, machineId);
-        }
-        wrapper.eq(TqMachineSpecSpeed::getMaterialCode, beadCode);
+        wrapper.eq(TqMachineSpecSpeed::getMachineCode, machineCode);
+        wrapper.eq(TqMachineSpecSpeed::getBeadCode, beadCode);
         TqMachineSpecSpeed specSpeed = tqMachineSpecSpeedMapper.selectOne(wrapper);
-        
+
         if (specSpeed == null || specSpeed.getStandardSpeed() == null
                 || specSpeed.getStandardSpeed().doubleValue() <= 0) {
             log.warn("机台[{}]胎圈[{}]未配置生产速度，使用默认值100", machineCode, beadCode);

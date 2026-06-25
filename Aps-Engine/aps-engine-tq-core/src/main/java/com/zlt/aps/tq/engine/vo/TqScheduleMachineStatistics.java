@@ -16,11 +16,11 @@ public class TqScheduleMachineStatistics {
     /**
      * 胶料分配机台
      */
-    private Map<String, List<Long>> glueMap = new HashMap<>();
+    private Map<String, List<String>> glueMap = new HashMap<>();
     /**
      * 口型版分配机台
      */
-    private Map<String, List<Long>> mouthPlatMap = new HashMap<>();
+    private Map<String, List<String>> mouthPlatMap = new HashMap<>();
     
     /**
      * 按胶料统计计划量

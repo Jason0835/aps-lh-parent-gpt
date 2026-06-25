@@ -5,12 +5,12 @@
     <select id="listMachineMaintenancePlan" parameterType="com.zlt.aps.tq.api.domain.entity.TqMachineMaintenancePlan"
             resultType="com.zlt.aps.tq.api.domain.entity.TqMachineMaintenancePlan">
         select * from (
-            select mp.ID, mp.FACTORY_CODE, mp.MACHINE_ID, mp.DOWNTIME_DATE, mp.DOWNTIME_SHIFT,
+            select mp.ID, mp.FACTORY_CODE, mp.MACHINE_CODE, mp.DOWNTIME_DATE, mp.DOWNTIME_SHIFT,
                    mp.DOWNTIME_HOURS, mp.REMARK, mp.IS_DELETE, mp.CREATE_BY, mp.CREATE_TIME,
                    mp.UPDATE_BY, mp.UPDATE_TIME,
                    mi.MACHINE_NAME
             from T_TQ_MACHINE_MAINTENANCE_PLAN mp
-            left join T_TQ_MACHINE_INFO mi on mp.MACHINE_ID = mi.ID
+            left join T_TQ_MACHINE_INFO mi on mp.MACHINE_CODE = mi.MACHINE_CODE
             where mp.IS_DELETE = '0'
             <if test="downtimeDateBegin != null">
                 and mp.DOWNTIME_DATE &gt;= #{downtimeDateBegin}
@@ -18,8 +18,8 @@
             <if test="downtimeDateEnd != null">
                 and mp.DOWNTIME_DATE &lt;= #{downtimeDateEnd}
             </if>
-            <if test="machineId != null">
-                and mp.MACHINE_ID = #{machineId}
+            <if test="machineCode != null and machineCode != ''">
+                and mp.MACHINE_CODE = #{machineCode}
             </if>
             order by mp.DOWNTIME_DATE desc, mi.MACHINE_NAME
         ) t
@@ -30,21 +30,21 @@
         FROM T_TQ_MACHINE_MAINTENANCE_PLAN
         where IS_DELETE = '0'
         and DOWNTIME_DATE = #{downtimeDate}
-        and MACHINE_ID = #{machineId}
+        and MACHINE_CODE = #{machineCode}
         and DOWNTIME_SHIFT = #{downtimeShift}
         <if test="id != null">and ID != #{id}</if>
     </select>
 
     <insert id="mergeSql" parameterType="list">
         INSERT INTO T_TQ_MACHINE_MAINTENANCE_PLAN (
-            factory_code, machine_id, downtime_date, downtime_shift, downtime_hours, remark,
+            factory_code, machine_code, downtime_date, downtime_shift, downtime_hours, remark,
             create_by, create_time, update_by, update_time, is_delete
         )
         VALUES
         <foreach collection="list" item="Plan" separator=",">
             (
             #{Plan.factoryCode,jdbcType=VARCHAR},
-            #{Plan.machineId,jdbcType=BIGINT},
+            #{Plan.machineCode,jdbcType=VARCHAR},
             #{Plan.downtimeDate,jdbcType=DATE},
             #{Plan.downtimeShift,jdbcType=VARCHAR},
             #{Plan.downtimeHours,jdbcType=DECIMAL},

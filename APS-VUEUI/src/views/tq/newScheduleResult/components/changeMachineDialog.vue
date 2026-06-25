@@ -37,7 +37,7 @@
                 <el-option
                   v-for="item in machineOptions"
                   :key="item.machineCode"
-                  :label="item.machineCode"
+                  :label="item.machineName"
                   :value="item.machineCode"
                 />
               </el-select>

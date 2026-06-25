@@ -120,7 +120,7 @@ public class TqMachineSpecSpeedController extends AbstractDocBizController<TqMac
         for (TqMachineSpecSpeed speed : list) {
             TqMachineSpecSpeedExportVO vo = new TqMachineSpecSpeedExportVO();
             vo.setMachineName(speed.getMachineName());
-            vo.setMaterialCode(speed.getMaterialCode());
+            vo.setBeadCode(speed.getBeadCode());
             vo.setStandardSpeed(speed.getStandardSpeed());
             vo.setQuota(speed.getQuota());
             vo.setQuotaMes(speed.getQuotaMes());
@@ -135,6 +135,6 @@ public class TqMachineSpecSpeedController extends AbstractDocBizController<TqMac
     protected void builderCondition(QueryWrapper<TqMachineSpecSpeed> queryWrapper, TqMachineSpecSpeed queryVO) {
         queryWrapper.eq("IS_DELETE", 0);
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getMachineCode()), "MACHINE_CODE", queryVO.getMachineCode());
-        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getMaterialCode()), "MATERIAL_CODE", queryVO.getMaterialCode());
+        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getBeadCode()), "BEAD_CODE", queryVO.getBeadCode());
     }
 }

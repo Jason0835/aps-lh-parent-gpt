@@ -27,8 +27,8 @@ public class Cd90ScheduleResult extends BaseEntity implements Serializable {
     /** 排程日期 */
     @ApiModelProperty("排程日期")
     @TableField("SCHEDULE_DATE")
-    @Excel(name = "ui.data.column.cd90ScheduleResult.scheduleDate")
-    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
+    @Excel(name = "ui.data.column.cd90ScheduleResult.scheduleDate",dateFormat = "yyyy-MM-dd")
+    @JsonFormat(pattern = "yyyy-MM-dd")
     private Date scheduleDate;
     /** 成型批次号 */
     @ApiModelProperty("成型批次号")
@@ -65,8 +65,8 @@ public class Cd90ScheduleResult extends BaseEntity implements Serializable {
     @TableField("MACHINE_CODE")
     @Excel(name = "ui.data.column.cd90ScheduleResult.machineCode")
     private String machineCode;
-    /** 库排号 */
-    @ApiModelProperty("库排号")
+    /** 库排号,多库排用逗号拼接;完整分配见t_cd90_schedule_lane_allocation */
+    @ApiModelProperty("库排号,多库排用逗号拼接;完整分配见t_cd90_schedule_lane_allocation")
     @TableField("STORAGE_LANE_CODE")
     @Excel(name = "ui.data.column.cd90ScheduleResult.storageLaneCode")
     private String storageLaneCode;
@@ -83,7 +83,7 @@ public class Cd90ScheduleResult extends BaseEntity implements Serializable {
 
     // CLASS1
     @TableField("CLASS1_SCHEDULE_DATE")
-    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private Date class1ScheduleDate;
     @TableField("CLASS1_CX_PLAN_QTY")
     private Double class1CxPlanQty;
@@ -103,7 +103,7 @@ public class Cd90ScheduleResult extends BaseEntity implements Serializable {
 
     // CLASS2
     @TableField("CLASS2_SCHEDULE_DATE")
-    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private Date class2ScheduleDate;
     @TableField("CLASS2_CX_PLAN_QTY")
     private Double class2CxPlanQty;
@@ -123,7 +123,7 @@ public class Cd90ScheduleResult extends BaseEntity implements Serializable {
 
     // CLASS3
     @TableField("CLASS3_SCHEDULE_DATE")
-    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private Date class3ScheduleDate;
     @TableField("CLASS3_CX_PLAN_QTY")
     private Double class3CxPlanQty;
@@ -140,6 +140,101 @@ public class Cd90ScheduleResult extends BaseEntity implements Serializable {
     private String class3Analysis;
     @TableField("CLASS3_ANALYSIS_INPUT")
     private String class3AnalysisInput;
+
+    // CLASS4
+    @TableField("CLASS4_SCHEDULE_DATE")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private Date class4ScheduleDate;
+    @TableField("CLASS4_CX_PLAN_QTY")
+    private Double class4CxPlanQty;
+    @TableField("CLASS4_PLAN_QTY")
+    private Double class4PlanQty;
+    @TableField("CLASS4_FINISH_QTY")
+    private Double class4FinishQty;
+    @TableField("CLASS4_PRODUCE_ORDER")
+    private Integer class4ProduceOrder;
+    @TableField("CLASS4_FINISH_RATE")
+    private Double class4FinishRate;
+    @TableField("CLASS4_ANALYSIS")
+    private String class4Analysis;
+    @TableField("CLASS4_ANALYSIS_INPUT")
+    private String class4AnalysisInput;
+
+    // CLASS5
+    @TableField("CLASS5_SCHEDULE_DATE")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private Date class5ScheduleDate;
+    @TableField("CLASS5_CX_PLAN_QTY")
+    private Double class5CxPlanQty;
+    @TableField("CLASS5_PLAN_QTY")
+    private Double class5PlanQty;
+    @TableField("CLASS5_FINISH_QTY")
+    private Double class5FinishQty;
+    @TableField("CLASS5_PRODUCE_ORDER")
+    private Integer class5ProduceOrder;
+    @TableField("CLASS5_FINISH_RATE")
+    private Double class5FinishRate;
+    @TableField("CLASS5_ANALYSIS")
+    private String class5Analysis;
+    @TableField("CLASS5_ANALYSIS_INPUT")
+    private String class5AnalysisInput;
+
+    // CLASS6
+    @TableField("CLASS6_SCHEDULE_DATE")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private Date class6ScheduleDate;
+    @TableField("CLASS6_CX_PLAN_QTY")
+    private Double class6CxPlanQty;
+    @TableField("CLASS6_PLAN_QTY")
+    private Double class6PlanQty;
+    @TableField("CLASS6_FINISH_QTY")
+    private Double class6FinishQty;
+    @TableField("CLASS6_PRODUCE_ORDER")
+    private Integer class6ProduceOrder;
+    @TableField("CLASS6_FINISH_RATE")
+    private Double class6FinishRate;
+    @TableField("CLASS6_ANALYSIS")
+    private String class6Analysis;
+    @TableField("CLASS6_ANALYSIS_INPUT")
+    private String class6AnalysisInput;
+
+    // CLASS7
+    @TableField("CLASS7_SCHEDULE_DATE")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private Date class7ScheduleDate;
+    @TableField("CLASS7_CX_PLAN_QTY")
+    private Double class7CxPlanQty;
+    @TableField("CLASS7_PLAN_QTY")
+    private Double class7PlanQty;
+    @TableField("CLASS7_FINISH_QTY")
+    private Double class7FinishQty;
+    @TableField("CLASS7_PRODUCE_ORDER")
+    private Integer class7ProduceOrder;
+    @TableField("CLASS7_FINISH_RATE")
+    private Double class7FinishRate;
+    @TableField("CLASS7_ANALYSIS")
+    private String class7Analysis;
+    @TableField("CLASS7_ANALYSIS_INPUT")
+    private String class7AnalysisInput;
+
+    // CLASS8
+    @TableField("CLASS8_SCHEDULE_DATE")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private Date class8ScheduleDate;
+    @TableField("CLASS8_CX_PLAN_QTY")
+    private Double class8CxPlanQty;
+    @TableField("CLASS8_PLAN_QTY")
+    private Double class8PlanQty;
+    @TableField("CLASS8_FINISH_QTY")
+    private Double class8FinishQty;
+    @TableField("CLASS8_PRODUCE_ORDER")
+    private Integer class8ProduceOrder;
+    @TableField("CLASS8_FINISH_RATE")
+    private Double class8FinishRate;
+    @TableField("CLASS8_ANALYSIS")
+    private String class8Analysis;
+    @TableField("CLASS8_ANALYSIS_INPUT")
+    private String class8AnalysisInput;
 
     /** 发布状态 */
     @ApiModelProperty("发布状态")
@@ -158,6 +253,14 @@ public class Cd90ScheduleResult extends BaseEntity implements Serializable {
     @ApiModelProperty("数据来源")
     @TableField("DATA_SOURCE")
     private String dataSource;
+    /** 是否人工锁定：0否，1是 */
+    @ApiModelProperty("是否人工锁定：0否，1是")
+    @TableField("IS_LOCKED")
+    private Integer isLocked;
+    /** 是否确认覆盖可替换旧排程，仅用于自动排程请求 */
+    @ApiModelProperty("是否确认覆盖可替换旧排程")
+    @TableField(exist = false)
+    private Boolean forceRegenerate;
     /** 发布成功计数 */
     @ApiModelProperty("发布成功计数")
     @TableField("PUBLISH_SUCCESS_COUNT")
@@ -165,7 +268,7 @@ public class Cd90ScheduleResult extends BaseEntity implements Serializable {
     /** 最新发布时间 */
     @ApiModelProperty("最新发布时间")
     @TableField("NEWEST_PUBLISH_TIME")
-    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private Date newestPublishTime;
     /** 收尾规格标记 */
     @ApiModelProperty("收尾规格标记")

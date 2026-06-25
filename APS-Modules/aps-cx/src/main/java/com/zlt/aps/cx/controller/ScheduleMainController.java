@@ -41,6 +41,7 @@ import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
 import com.zlt.common.utils.PubUtil;
 import com.zlt.common.utils.ImportExcelUtils;
+import com.zlt.core.util.EntityUtil;
 import com.ruoyi.common.utils.StringUtils;
 import org.apache.commons.collections4.CollectionUtils;
 import io.swagger.annotations.Api;
@@ -48,6 +49,8 @@ import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.Map;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletResponse;
@@ -72,6 +75,9 @@ import java.util.stream.Collectors;
 @RestController
 @RequestMapping("/cxScheduleResult")
 public class ScheduleMainController extends AbstractDocBizController<CxScheduleResult> {
+
+    /** 动态排序参数（ThreadLocal保证线程安全） */
+    private static final ThreadLocal<String> THREAD_LOCAL_ORDER_BY = new ThreadLocal<>();
 
     @Autowired
     private ScheduleService scheduleService;
@@ -125,7 +131,10 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
     @PostMapping("/list")
     @Override
     public TableDataInfo list(@RequestBody CxScheduleResult queryVO) {
-        TableDataInfo tableDataInfo = super.list(queryVO);
+        // 从params中提取前端传入的动态排序参数，存入ThreadLocal供getOrderBy()使用
+        THREAD_LOCAL_ORDER_BY.set(buildDynamicOrderBy(queryVO));
+        try {
+            TableDataInfo tableDataInfo = super.list(queryVO);
 
         List<?> rows = tableDataInfo.getRows();
         if (rows == null || rows.isEmpty()) {
@@ -241,6 +250,9 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
         }
 
         return tableDataInfo;
+        } finally {
+            THREAD_LOCAL_ORDER_BY.remove();
+        }
     }
 
     /**
@@ -894,10 +906,12 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getCxMachineCode()), "CX_MACHINE_CODE", queryVO.getCxMachineCode());
         // 物料代码模糊查询
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getMaterialCode()), "MATERIAL_CODE", queryVO.getMaterialCode());
-        // 物料代码模糊查询
+        // 物料描述模糊查询
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getMaterialDesc()), "MATERIAL_DESC", queryVO.getMaterialDesc());
-        // 物料代码模糊查询
+        // 胎胚描述模糊查询
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getMainMaterialDesc()), "MAIN_MATERIAL_DESC", queryVO.getMainMaterialDesc());
+        // 结构名称模糊查询
+        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getStructureName()), "STRUCTURE_NAME", queryVO.getStructureName());
         // 订单号精确查询
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getOrderNo()), "ORDER_NO", queryVO.getOrderNo());
         // 生产状态精确查询
@@ -954,7 +968,30 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
 
     @Override
     protected String getOrderBy() {
+        String dynamic = THREAD_LOCAL_ORDER_BY.get();
+        if (StringUtils.isNotBlank(dynamic)) {
+            return dynamic;
+        }
         return "schedule_date desc, UPPER(cx_machine_code) asc";
+    }
+
+    /**
+     * 从前端传入的排序参数构建ORDER BY子句
+     * @param queryVO 查询参数对象
+     * @return ORDER BY子句，无排序参数时返回null
+     */
+    private String buildDynamicOrderBy(CxScheduleResult queryVO) {
+        String orderByColumn = queryVO.getOrderByColumn();
+        String isAsc = queryVO.getIsAsc();
+        if (StringUtils.isBlank(orderByColumn)) {
+            return null;
+        }
+        // 将实体字段名转换为数据库列名
+        String dbColumn = EntityUtil.getColumnNameByFieldName(getTClass(), orderByColumn);
+        if (StringUtils.isBlank(dbColumn)) {
+            return null;
+        }
+        return dbColumn + " " + ("asc".equalsIgnoreCase(isAsc) ? "asc" : "desc");
     }
 
     /**

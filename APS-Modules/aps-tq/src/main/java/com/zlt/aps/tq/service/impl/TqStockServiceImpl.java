@@ -43,7 +43,7 @@ public class TqStockServiceImpl extends AbstractDocService<TqStock> implements I
         QueryWrapper<TqStock> wrapper = new QueryWrapper<>();
         wrapper.ne(entity.getId() != null, "ID", entity.getId());
         wrapper.eq("STOCK_DATE", entity.getStockDate());
-        wrapper.eq("MATERIAL_CODE", entity.getMaterialCode());
+        wrapper.eq("BEAD_CODE", entity.getBeadCode());
         wrapper.eq("IS_DELETE", 0);
         if (tqStockMapper.selectCount(wrapper) > 0) {
             return UserConstants.NOT_UNIQUE;
@@ -89,7 +89,7 @@ public class TqStockServiceImpl extends AbstractDocService<TqStock> implements I
 
     @Override
     protected List<String> getCheckUniqueFields() {
-        return Arrays.asList("stockDate", "materialCode");
+        return Arrays.asList("stockDate", "beadCode");
     }
 
     @Override
@@ -99,12 +99,12 @@ public class TqStockServiceImpl extends AbstractDocService<TqStock> implements I
         List<ImportErrorLog> importErrorLogs = new ArrayList<>();
         List<TqStock> importList = new ArrayList<>();
 
-        Map<String, Long> groupMap = list.stream().collect(Collectors.groupingBy(a -> (a.getStockDate() + a.getMaterialCode()), Collectors.counting()));
+        Map<String, Long> groupMap = list.stream().collect(Collectors.groupingBy(a -> (a.getStockDate() + a.getBeadCode()), Collectors.counting()));
 
         for (int i = 0; i < list.size(); i++) {
             TqStock stock = list.get(i);
 
-            Long hasValue = groupMap.get(stock.getStockDate() + stock.getMaterialCode());
+            Long hasValue = groupMap.get(stock.getStockDate() + stock.getBeadCode());
             if (hasValue != null && hasValue > 1) {
                 failureNum++;
                 stock.setId(-999L);

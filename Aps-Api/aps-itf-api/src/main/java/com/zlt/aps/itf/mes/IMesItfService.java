@@ -502,4 +502,13 @@ public interface IMesItfService {
     @ApiOperation("按上一天最新版本号同步硫化排程完成量（临时任务）")
     @PostMapping("/mesItf/syncLhClassShiftFinishQtyByYesterday")
     public AjaxResult syncLhClassShiftFinishQtyByYesterday(@RequestBody AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 同步设备停机计划
+     * @param syncDataLogs 参数
+     * @return 结果
+     */
+    @ApiOperation("同步设备停机计划")
+    @PostMapping("/mesItf/syncDevPlanClose")
+    public AjaxResult syncDevPlanClose(@RequestBody AuxReqSyncDataLogs syncDataLogs);
 }

@@ -55,6 +55,10 @@ public class TqResultPersistHandler extends AbsTqScheduleStepHandler {
         String cxBatchNo = context.getCxBatchNo();
         Map<String, String> assistSpecMap = context.getAssistSpecMap();
         List<TqScheduleResultVo> scheduleList = context.getScheduleList();
+        String factoryCode = context.getFactoryCode();
+
+        // 给所有排程结果设置分厂编码
+        scheduleList.forEach(r -> r.setFactoryCode(factoryCode));
 
         // 1. 分离外协排程数据
         List<TqScheduleResultVo> assistScheduleList = scheduleList.stream()
@@ -153,7 +157,7 @@ public class TqResultPersistHandler extends AbsTqScheduleStepHandler {
                 autoSchedule.setPublishSuccessCount(existSchedule.getPublishSuccessCount());
                 autoSchedule.setNewestPublishTime(existSchedule.getNewestPublishTime());
                 autoSchedule.setIsRelease(ApsConstant.WAIT_RELEASING);
-                autoSchedule.setMachineId(existSchedule.getMachineId());
+                autoSchedule.setMachineCode(existSchedule.getMachineCode());
                 mergeList.add(autoSchedule);
             } else if (existScheduleGroupList != null && existScheduleGroupList.size() > 1) {
                 // 对应规格重排前已发布，且有多条排程记录（对应了多个机台）

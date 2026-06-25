@@ -191,7 +191,7 @@ export default {
       try {
         const res = await listEnabledMachines();
         this.tqMachines = (res || []).map((r) => ({
-          label: r.machineCode,
+          label: r.machineName,
           value: r.machineCode,
         }));
       } catch (error) {

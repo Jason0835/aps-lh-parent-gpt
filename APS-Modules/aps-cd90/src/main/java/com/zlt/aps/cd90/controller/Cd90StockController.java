@@ -107,6 +107,7 @@ public class Cd90StockController extends AbstractDocBizController<Cd90Stock> {
     protected void builderCondition(QueryWrapper<Cd90Stock> qw, Cd90Stock vo) {
         qw.eq(PubUtil.isNotEmpty(vo.getFactoryCode()), "FACTORY_CODE", vo.getFactoryCode());
         qw.eq(vo.getStockDate() != null, "STOCK_DATE", vo.getStockDate());
+        qw.eq(PubUtil.isNotEmpty(vo.getShiftCode()), "SHIFT_CODE", vo.getShiftCode());
         qw.like(PubUtil.isNotEmpty(vo.getMaterialCode()), "MATERIAL_CODE", vo.getMaterialCode());
     }
 

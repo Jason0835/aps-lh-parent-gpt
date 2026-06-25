@@ -298,16 +298,16 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
                 if (result.getMouldCavityQty() == null || result.getMouldCavityQty() == 0) {
                     result.setMouldCavityQty(cavityResults.getOrDefault(result.getStructureName() + result.getMainPattern(), 0));
                 }
-                // 2.1.2.5、记录胎胚的最大型腔数
-                Integer maxMouldCavityQty = maxMouldCavityQtyMap.getOrDefault(result.getMainMaterialDesc(), 0);
-                maxMouldCavityQtyMap.put(result.getMainMaterialDesc(), Math.max(maxMouldCavityQty, result.getMouldCavityQty()));
+//                // 2.1.2.5、记录胎胚的最大型腔数
+//                Integer maxMouldCavityQty = maxMouldCavityQtyMap.getOrDefault(result.getMainMaterialDesc(), 0);
+//                maxMouldCavityQtyMap.put(result.getMainMaterialDesc(), Math.max(maxMouldCavityQty, result.getMouldCavityQty()));
                 // 2.1.2.5 补充活块数
                 if (result.getTypeBlockQty() == null || result.getTypeBlockQty() == 0) {
                     result.setTypeBlockQty(insertResults.getOrDefault(result.getMaterialDesc(), 0));
                 }
-                // 2.1.2.6、记录胎胚的最大活块数
-                Integer maxTypeBlockQty = maxTypeBlockQtyMap.getOrDefault(result.getMainMaterialDesc(), 0);
-                maxTypeBlockQtyMap.put(result.getMainMaterialDesc(), Math.max(maxTypeBlockQty, result.getTypeBlockQty()));
+//                // 2.1.2.6、记录胎胚的最大活块数
+//                Integer maxTypeBlockQty = maxTypeBlockQtyMap.getOrDefault(result.getMainMaterialDesc(), 0);
+//                maxTypeBlockQtyMap.put(result.getMainMaterialDesc(), Math.max(maxTypeBlockQty, result.getTypeBlockQty()));
                 // 2.1.2.7、计算模具产能受限
                 Integer unRestrictedNetQty = result.getUnRestrictedNetQty();
                 if (unRestrictedNetQty != null) {
@@ -337,9 +337,9 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
                 s.setMaxTypeBlockQty(maxTypeBlockQtyMap.getOrDefault(s.getMainMaterialDesc(), 0));
             });
             //排序:最大型腔数倒序->胎胚描述->型腔数倒序->主花纹->活块数倒序->花纹->物料描述
-            structureList.sort(Comparator.comparing(FactoryMonthPlanMouldDayResultExportVo::getMaxMouldCavityQty, Comparator.reverseOrder())
+            structureList.sort(Comparator.comparing(FactoryMonthPlanMouldDayResultExportVo::getMouldCavityQty, Comparator.reverseOrder())
                     .thenComparing(FactoryMonthPlanMouldDayResultExportVo::getMainMaterialDesc)
-                    .thenComparing(FactoryMonthPlanMouldDayResultExportVo::getMouldCavityQty, Comparator.reverseOrder())
+//                    .thenComparing(FactoryMonthPlanMouldDayResultExportVo::getMouldCavityQty, Comparator.reverseOrder())
                     .thenComparing(FactoryMonthPlanMouldDayResultExportVo::getMainPattern, Comparator.nullsLast(String::compareTo))
                     .thenComparing(FactoryMonthPlanMouldDayResultExportVo::getTypeBlockQty, Comparator.reverseOrder())
                     .thenComparing(FactoryMonthPlanMouldDayResultExportVo::getPattern, Comparator.nullsLast(String::compareTo))

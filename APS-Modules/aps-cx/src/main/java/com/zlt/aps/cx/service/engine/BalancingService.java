@@ -1046,6 +1046,7 @@ public class BalancingService {
             sortCandidatesForDfs(candidates, embryoCode, forceKeepHistory, capacitySufficient, loadDiffThreshold);
 
             // 尝试给每个候选机台分配 k 个硫化机台数（k从1到min(remainingCount, 机台剩余容量)）
+            boolean anyRecursed = false;
             for (MachineState candidate : candidates) {
                 int maxCanAssign = Math.min(remainingCount,
                         candidate.getMaxCapacity() - candidate.getCurrentLoad());
@@ -1065,8 +1066,10 @@ public class BalancingService {
                         newTypes++;
                     }
 
-                    // 剪枝条件1：超过机台最大胎胚种类数限制（硬约束，必须剪枝）
-                    if (newTypes > candidate.getMaxTypes()) {
+                    // 剪枝条件1：新增种类超过机台最大胎胚种类数限制（硬约束，必须剪枝）
+                    // 注意：仅当胎胚是新种类时才检查，已有种类的追加分配不增加种类数
+                    // 与 findCandidateMachinesForSplit 的 isNewType && currentTypes >= maxTypes 逻辑一致
+                    if (isNewType && newTypes > candidate.getMaxTypes()) {
                         searchResult.pruneCount++;
                         continue;
                     }
@@ -1125,6 +1128,7 @@ public class BalancingService {
                     int newRemainingCount = remainingCount - assignQty;
 
                     // 如果当前胎胚还有剩余，继续分配；否则处理下一个任务
+                    anyRecursed = true;
                     if (newRemainingCount > 0) {
                         dfsAssign(tasks, taskIndex, newRemainingCount, machineStates, forceKeepHistory,
                                 typeDiffThreshold, loadDiffThreshold, totalDemand, searchResult, capacitySufficient, preOccupiedLoad);
@@ -1140,6 +1144,29 @@ public class BalancingService {
                         candidate.setCurrentTypes(candidate.getCurrentTypes() - 1);
                     }
                 }
+            }
+
+            // 所有候选机台都被剪枝（种类满或容量满）时，跳过当前任务继续处理后续任务
+            // 与 candidates.isEmpty() 的处理逻辑一致：记录部分解后递归下一个任务
+            if (!anyRecursed) {
+                int totalAssignedNow = machineStates.stream().mapToInt(MachineState::getCurrentLoad).sum() - preOccupiedLoad;
+                int totalRequiredAll = tasks.stream()
+                        .mapToInt(t -> t.getVulcanizeMachineCount() != null ? t.getVulcanizeMachineCount() : 0)
+                        .sum();
+                int partialScore = calculateBalancingScore(machineStates);
+                boolean currentBestIsComplete = (searchResult.bestAssignedCount == totalRequiredAll);
+                if (!currentBestIsComplete &&
+                        (totalAssignedNow > searchResult.bestAssignedCount ||
+                                (totalAssignedNow == searchResult.bestAssignedCount && partialScore < searchResult.bestScore))) {
+                    searchResult.bestScore = partialScore;
+                    searchResult.bestAssignedCount = totalAssignedNow;
+                    searchResult.bestIsBalanced = isBalanced(machineStates, typeDiffThreshold, loadDiffThreshold);
+                    searchResult.bestAssignments = copyAssignments(machineStates);
+                    searchResult.bestMachineCodes = copyMachineCodes(machineStates);
+                }
+                // 跳过当前任务，递归处理下一个
+                dfsAssign(tasks, taskIndex + 1, 0, machineStates, forceKeepHistory,
+                        typeDiffThreshold, loadDiffThreshold, totalDemand, searchResult, capacitySufficient, preOccupiedLoad);
             }
         } else {
             // remainingCount=0：当前任务刚完成或刚被跳过，需要处理 taskIndex 处的任务

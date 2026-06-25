@@ -41,7 +41,7 @@ public class Cd90StorageLaneLimit extends BaseEntity implements Serializable {
      * 胎体代码/规格
      */
     @ApiModelProperty("胎体代码/规格")
-    @ImportExcelValidated(required = true, maxLength = 60)
+    @ImportExcelValidated(required = false, maxLength = 60)
     @TableField("MATERIAL_CODE")
     @Excel(name = "ui.data.column.cd90StorageLaneLimit.materialCode")
     private String materialCode;
@@ -75,6 +75,7 @@ public class Cd90StorageLaneLimit extends BaseEntity implements Serializable {
      * 最大车数
      */
     @ApiModelProperty("最大车数")
+    @ImportExcelValidated(required = true)
     @TableField("MAX_CAR_NUM")
     @Excel(name = "ui.data.column.cd90StorageLaneLimit.maxCarNum")
     private Integer maxCarNum;

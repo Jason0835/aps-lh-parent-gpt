@@ -34,10 +34,10 @@ public class TqQuotaSetting extends ApsBaseEntity {
     private String beadCode;
 
     /**
-     * 机台id（对应T_TQ_MACHINE_INFO表id）
+     * 机台编号（对应T_TQ_MACHINE_INFO表MACHINE_CODE）
      */
-    @ApiModelProperty(value = "机台id")
-    private Long machineId;
+    @ApiModelProperty(value = "机台编号")
+    private String machineCode;
 
     /**
      * 机台名称
@@ -83,12 +83,12 @@ public class TqQuotaSetting extends ApsBaseEntity {
         return beadCode;
     }
 
-    public void setMachineId(Long machineId) {
-        this.machineId = machineId;
+    public void setMachineCode(String machineCode) {
+        this.machineCode = machineCode;
     }
 
-    public Long getMachineId() {
-        return machineId;
+    public String getMachineCode() {
+        return machineCode;
     }
 
     public void setDelFlag(String delFlag) {
@@ -130,7 +130,7 @@ public class TqQuotaSetting extends ApsBaseEntity {
         return "TqQuotaSetting{" +
                 "id=" + id +
                 ", beadCode='" + beadCode + '\'' +
-                ", machineId=" + machineId +
+                ", machineCode=" + machineCode +
                 ", machineName='" + machineName + '\'' +
                 ", quota=" + quota +
                 ", remark='" + remark + '\'' +

@@ -164,7 +164,13 @@ export default {
           halign: "center",
           label: this.$t("ui.data.column.cd90MachineInfo.openMachineClass"),
           minWidth: 130,
-          formatter: (row, column, value) => this.selectDictLabel(this.dict.type.class_num_three_plan, value),
+          render: ({ row }) => {
+            let value = row.openMachineClass;
+            if (this.isEmpty(value)) {
+              return "";
+            }
+            return this.selectDictLabels(this.dict.type.class_num_three_plan, value);
+          },
         },
         {
           prop: "status",

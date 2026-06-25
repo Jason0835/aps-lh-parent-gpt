@@ -9,7 +9,6 @@ import com.zlt.aps.tq.engine.vo.TqSpecifyMachineVo;
 import lombok.extern.slf4j.Slf4j;
 
 import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.math.NumberUtils;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
@@ -27,11 +26,12 @@ public class TqEngineMachineServiceImpl implements TqEngineMachineService {
 
     /**
      * 查询胎圈机台
+     * @param factoryCode 分厂编码（按工厂过滤机台）
      * @return
      */
     @Override
-    public List<TqMachineInfo> listTqMachine() {
-        return tqEngineMachineMapper.listTqMachine();
+    public List<TqMachineInfo> listTqMachine(String factoryCode) {
+        return tqEngineMachineMapper.listTqMachine(factoryCode);
     }
 
     /**
@@ -43,7 +43,7 @@ public class TqEngineMachineServiceImpl implements TqEngineMachineService {
         Map<String, String> specifyMachineMap = new HashMap<>();
         List<TqSpecifyMachineVo> list = tqEngineMachineMapper.listTqSpecifyMachine(jobType);  //查询胎圈定点机台信息
         for(TqSpecifyMachineVo specifyMachineVo : list) {
-            specifyMachineMap.put(specifyMachineVo.getBeadCode(), specifyMachineVo.getMachineIds());
+            specifyMachineMap.put(specifyMachineVo.getBeadCode(), specifyMachineVo.getMachineCodes());
         }
         return specifyMachineMap;
     }
@@ -56,20 +56,20 @@ public class TqEngineMachineServiceImpl implements TqEngineMachineService {
         Map<String, String> mouthPlateMachineMap = new HashMap<>();
         List<TqMouthPlateMachineVo> list = tqEngineMachineMapper.listTqMouthPlateMachine();  //查询胎圈口型板信息
         for(TqMouthPlateMachineVo mouthPlateMachineVo : list) {
-            mouthPlateMachineMap.put(mouthPlateMachineVo.getMouthPlateCode(), mouthPlateMachineVo.getMachineIds());
+            mouthPlateMachineMap.put(mouthPlateMachineVo.getMouthPlateCode(), mouthPlateMachineVo.getMachineCodes());
         }
         return mouthPlateMachineMap;
     }
 
     /**
-     * 获得机台寸口映射，key=机台ID，value=该机台可做的寸口值列表
+     * 获得机台寸口映射，key=机台编号，value=该机台可做的寸口值列表
      * @return
      */
     @Override
-    public Map<Long, List<BigDecimal>> getMachineChuckMap() {
+    public Map<String, List<BigDecimal>> getMachineChuckMap() {
         List<TqMachineChuckVo> list = tqEngineMachineMapper.listMachineChuck();
         return list.stream().collect(Collectors.groupingBy(
-                TqMachineChuckVo::getMachineId,
+                TqMachineChuckVo::getMachineCode,
                 Collectors.mapping(TqMachineChuckVo::getInchSize, Collectors.toList())
         ));
     }
@@ -81,9 +81,9 @@ public class TqEngineMachineServiceImpl implements TqEngineMachineService {
      * @return
      */
     @Override
-    public Map<String, Long> getLastDayPlanMachine(Date scheduleDate) {
+    public Map<String, String> getLastDayPlanMachine(Date scheduleDate) {
         return tqEngineMachineMapper.listLastDayPlanMachine(scheduleDate).stream()
-                .filter(r -> NumberUtils.isDigits(r.getMachineIds()) && StringUtils.isNotEmpty(r.getBeadCode()))
-                .collect(Collectors.toMap(TqSpecifyMachineVo::getBeadCode, r -> new Long(r.getMachineIds())));
+                .filter(r -> StringUtils.isNotEmpty(r.getMachineCodes()) && StringUtils.isNotEmpty(r.getBeadCode()))
+                .collect(Collectors.toMap(TqSpecifyMachineVo::getBeadCode, TqSpecifyMachineVo::getMachineCodes));
     }
 }

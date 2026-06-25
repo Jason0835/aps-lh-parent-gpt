@@ -70,6 +70,6 @@ public class DjScheduleContext {
     /** 当前批次号 */
     private String currentBatchNo;
 
-    /** 当前批次内的订单序号计数器 */
-    private int currentOrderSeq;
+    /** 各机台各班次的生产顺序计数器 Map<machineCode, Map<shiftIndex, sequence>> */
+    private Map<String, Map<Integer, Integer>> shiftSequenceMap;
 }

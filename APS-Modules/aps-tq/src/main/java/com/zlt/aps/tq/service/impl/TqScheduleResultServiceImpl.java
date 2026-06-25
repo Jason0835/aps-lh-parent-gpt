@@ -71,11 +71,22 @@ import com.zlt.aps.common.engine.service.FactoryService;
 import com.zlt.aps.mp.api.service.IRemoteImportErrorLogService;
 
 /**
- * 胎圈排程结果Service业务层处理
+ * 【已废弃】胎圈排程结果Service业务层处理（4班次制旧版）
+ *
+ * <p>废弃说明：
+ * <ul>
+ *   <li>本Service为旧版4班次制胎圈排程业务处理，已由新版6班次制Service替代</li>
+ *   <li>新版Service：{@link com.zlt.aps.tq.service.impl.TqNewScheduleResultServiceImpl}</li>
+ *   <li>新版算法依据：胎圈自动排程_v5.xmind（6班次制）</li>
+ *   <li>旧版4班次字段（midPlanQty/nightPlanQty/dayPlanQty/nextMidPlanQty）将逐步废弃</li>
+ *   <li>请勿在此Service新增功能，所有新需求请到新版Service实现</li>
+ *   <li>计划在前端完全切换到新版接口后，本Service将一并删除</li>
+ * </ul>
  *
  * @author chen
  * @date 2021-06-24
  */
+@Deprecated
 @Service
 public class TqScheduleResultServiceImpl extends ServiceImpl<TqScheduleResultMapper, TqScheduleResult> implements TqScheduleResultService {
     @Resource
@@ -136,20 +147,13 @@ public class TqScheduleResultServiceImpl extends ServiceImpl<TqScheduleResultMap
             }
 
             for (TqScheduleResultDto dto : list) {
-                String machineIdStr = dto.getMachineId();
-                if (StringUtils.isNotBlank(machineIdStr)) {
+                String machineCodeStr = dto.getMachineCode();
+                if (StringUtils.isNotBlank(machineCodeStr)) {
                     List<String> machineNameList = new ArrayList<>();
-                    String[] machineIdArr = machineIdStr.split(",");
-                    for (String machineId : machineIdArr) {
-                        Long key = null;
-                        try {
-                            key = Long.valueOf(machineId);
-                        } catch (NumberFormatException e) {
-                            e.printStackTrace();
-                            continue;
-                        }
-                        if (machineInfoMap.containsKey(key)) {
-                            TqMachineInfo machineInfo = machineInfoMap.get(key);
+                    String[] machineCodeArr = machineCodeStr.split(",");
+                    for (String machineCode : machineCodeArr) {
+                        if (machineInfoMap.containsKey(machineCode)) {
+                            TqMachineInfo machineInfo = machineInfoMap.get(machineCode);
                             machineNameList.add(machineInfo.getMachineName());
                         }
                     }
@@ -220,19 +224,19 @@ public class TqScheduleResultServiceImpl extends ServiceImpl<TqScheduleResultMap
         log.setScheduleId(newSchedule.getId());
         log.setOperType(operType);
         log.setScheduleDate(newSchedule.getScheduleDate());  //排程日期
-        log.setMaterialCode(newSchedule.getBeadCode());    //胎圈代码
-        //操作前的信息赋值
-        log.setBeforeMachineId(oldSchedule.getMachineId());
-        log.setBeforeMidPlan(oldSchedule.getMidPlanQty());
-        log.setBeforeNightPlan(oldSchedule.getNightPlanQty());
-        log.setBeforeDayPlan(oldSchedule.getDayPlanQty());
-        log.setBeforeNextMidPlan(oldSchedule.getNextMidPlanQty());
+        log.setBeadCode(newSchedule.getBeadCode());    //胎圈代码
+        //操作前的信息赋值（旧版4班次映射到新版6班次：中班→1班、夜班→2班、白班→3班、次日中班→4班）
+        log.setBeforeMachineCode(oldSchedule.getMachineCode());
+        log.setBeforeClass1Plan(this.toDoubleToInt(oldSchedule.getMidPlanQty()));
+        log.setBeforeClass2Plan(this.toDoubleToInt(oldSchedule.getNightPlanQty()));
+        log.setBeforeClass3Plan(this.toDoubleToInt(oldSchedule.getDayPlanQty()));
+        log.setBeforeClass4Plan(this.toDoubleToInt(oldSchedule.getNextMidPlanQty()));
         //操作后的信息赋值
-        log.setAfterMachineId(newSchedule.getMachineId());
-        log.setAfterMidPlan(newSchedule.getMidPlanQty());
-        log.setAfterNightPlan(newSchedule.getNightPlanQty());
-        log.setAfterDayPlan(newSchedule.getDayPlanQty());
-        log.setAfterNextMidPlan(newSchedule.getNextMidPlanQty());
+        log.setAfterMachineCode(newSchedule.getMachineCode());
+        log.setAfterClass1Plan(this.toDoubleToInt(newSchedule.getMidPlanQty()));
+        log.setAfterClass2Plan(this.toDoubleToInt(newSchedule.getNightPlanQty()));
+        log.setAfterClass3Plan(this.toDoubleToInt(newSchedule.getDayPlanQty()));
+        log.setAfterClass4Plan(this.toDoubleToInt(newSchedule.getNextMidPlanQty()));
         /** 调用插入日志方法 **/
         tqDispatcherLogService.insertTqDispatcherLog(log);
     }
@@ -254,27 +258,37 @@ public class TqScheduleResultServiceImpl extends ServiceImpl<TqScheduleResultMap
         log.setScheduleId(scheduleResultList.get(0).getId());
         log.setOperType(operType);
         log.setScheduleDate(newSchedule.getScheduleDate());  //排程日期
-        log.setMaterialCode(newSchedule.getBeadCode());    //胎圈代码
-        // 操作前的信息赋值，取创建时间最大的记录为操作前信息
+        log.setBeadCode(newSchedule.getBeadCode());    //胎圈代码
+        // 操作前的信息赋值，取创建时间最大的记录为操作前信息（旧版4班次映射到新版6班次：中班→1班、夜班→2班、白班→3班、次日中班→4班）
         if (CollectionUtils.isNotEmpty(scheduleResults)) {
             Optional<TqScheduleResult> max = scheduleResults.stream().max(Comparator.comparing(TqScheduleResult::getCreateTime));
             if (max.isPresent()) {
                 TqScheduleResult scheduleResult = max.get();
-                log.setBeforeMachineId(scheduleResult.getMachineId());
-                log.setBeforeMidPlan(scheduleResult.getMidPlanQty());
-                log.setBeforeNightPlan(scheduleResult.getNightPlanQty());
-                log.setBeforeDayPlan(scheduleResult.getDayPlanQty());
-                log.setBeforeDayPlan(scheduleResult.getNextMidPlanQty());
+                log.setBeforeMachineCode(scheduleResult.getMachineCode());
+                log.setBeforeClass1Plan(this.toDoubleToInt(scheduleResult.getMidPlanQty()));
+                log.setBeforeClass2Plan(this.toDoubleToInt(scheduleResult.getNightPlanQty()));
+                log.setBeforeClass3Plan(this.toDoubleToInt(scheduleResult.getDayPlanQty()));
+                log.setBeforeClass4Plan(this.toDoubleToInt(scheduleResult.getNextMidPlanQty()));
             }
         }
         //操作后的信息赋值
-        log.setAfterMachineId(newSchedule.getMachineId());
-        log.setAfterMidPlan(newSchedule.getMidPlanQty());
-        log.setAfterNightPlan(newSchedule.getNightPlanQty());
-        log.setAfterDayPlan(newSchedule.getDayPlanQty());
-        log.setAfterNextMidPlan(newSchedule.getNextMidPlanQty());
+        log.setAfterMachineCode(newSchedule.getMachineCode());
+        log.setAfterClass1Plan(this.toDoubleToInt(newSchedule.getMidPlanQty()));
+        log.setAfterClass2Plan(this.toDoubleToInt(newSchedule.getNightPlanQty()));
+        log.setAfterClass3Plan(this.toDoubleToInt(newSchedule.getDayPlanQty()));
+        log.setAfterClass4Plan(this.toDoubleToInt(newSchedule.getNextMidPlanQty()));
         /* 调用插入日志方法 **/
         tqDispatcherLogService.insertTqDispatcherLog(log);
+    }
+
+    /**
+     * 将 Double 类型安全转换为 Integer，用于旧版4班次制 Double 计划量映射到新版6班次制 Integer 计划量
+     *
+     * @param value Double 值（可能为 null）
+     * @return Integer 值（null 入参返回 null）
+     */
+    private Integer toDoubleToInt(Double value) {
+        return value == null ? null : value.intValue();
     }
 
     /**
@@ -345,8 +359,8 @@ public class TqScheduleResultServiceImpl extends ServiceImpl<TqScheduleResultMap
                 row.createCell(cellNum++).setCellValue(scheduleResult.getMouthPlateCode());
                 row.createCell(cellNum++).setCellValue(scheduleResult.getSpecSize());
                 StringBuilder produceLine = new StringBuilder();
-                if (StringUtils.isNotEmpty(scheduleResult.getMachineId()) && map != null) {
-                    String[] aa = scheduleResult.getMachineId().split(",");
+                if (StringUtils.isNotEmpty(scheduleResult.getMachineCode()) && map != null) {
+                    String[] aa = scheduleResult.getMachineCode().split(",");
                     for (String a : aa) {
                         produceLine.append(map.get(a)).append(",");
                     }
@@ -639,16 +653,16 @@ public class TqScheduleResultServiceImpl extends ServiceImpl<TqScheduleResultMap
             machineInfoList = new ArrayList<>(treeSet);
 
 
-            Map<String, Long> machineCodeMap = machineInfoList.stream().collect(Collectors.toMap(TqMachineInfo::getMachineName, TqMachineInfo::getId));
+            Map<String, String> machineCodeMap = machineInfoList.stream().collect(Collectors.toMap(TqMachineInfo::getMachineName, TqMachineInfo::getMachineCode));
             //按业务主键分组
-            Map<String, Long> groupMap = list.stream().collect(Collectors.groupingBy(item -> item.getBeadCode() + item.getMachineId(), Collectors.counting()));
+            Map<String, Long> groupMap = list.stream().collect(Collectors.groupingBy(item -> item.getBeadCode() + item.getMachineCode(), Collectors.counting()));
 
             for (int i = 0; i < list.size(); i++) {
                 TqScheduleResultDto scheduleResultDto = list.get(i);
                 scheduleResultDto.setDataSource("2");
                 scheduleResultDto.setScheduleDate(scheduleDate);
 
-                if (groupMap.get(scheduleResultDto.getBeadCode() + scheduleResultDto.getMachineId()) > 1) {
+                if (groupMap.get(scheduleResultDto.getBeadCode() + scheduleResultDto.getMachineCode()) > 1) {
                     failureNum++;
                     String message = I18nUtil.getMessage("ui.data.column.all.conflictRecord");
                     String columnName = I18nUtil.getMessage("ui.data.column.quota.beadCode");
@@ -661,13 +675,13 @@ public class TqScheduleResultServiceImpl extends ServiceImpl<TqScheduleResultMap
                 int errorNum = i + 3;
                 List<ImportErrorLog> validated = ImportUtil.validated(importLogId, errorNum, scheduleResultDto);
 
-                // 机台code 转为机台id
-                if(scheduleResultDto.getMachineId()!=null && scheduleResultDto.getMachineId().indexOf(",")>0){
+                // 机台名称校验
+                if(scheduleResultDto.getMachineCode()!=null && scheduleResultDto.getMachineCode().indexOf(",")>0){
                     String message = I18nUtil.getMessage("ui.data.column.machine.produceLineValidate");
                     message=String.format(message, i + 3, I18nUtil.getMessage("ui.data.column.scheduleResult.produceLine"));
                     addImportErrorLog(importLogId, i + 3,message, validated);
                 }
-                if (machineCodeMap.get(scheduleResultDto.getMachineId())==null) {
+                if (machineCodeMap.get(scheduleResultDto.getMachineCode())==null) {
                     addImportErrorLog(importLogId, i + 3, I18nUtil.getMessage("ui.error.message.column.produceLineNotExist"), validated);
                 }
 
@@ -676,7 +690,7 @@ public class TqScheduleResultServiceImpl extends ServiceImpl<TqScheduleResultMap
                     importErrorLogs.addAll(validated);
                 } else {
                     successNum++;
-                    scheduleResultDto.setMachineId(machineCodeMap.get(scheduleResultDto.getMachineId())+"");
+                    scheduleResultDto.setMachineCode(machineCodeMap.get(scheduleResultDto.getMachineCode()));
                     scheduleResultDto.setBaseVale(null);
                     importList.add(scheduleResultDto);
                 }
@@ -738,7 +752,7 @@ public class TqScheduleResultServiceImpl extends ServiceImpl<TqScheduleResultMap
      */
     private boolean compareFields(TqScheduleResult scheduleResult, TqScheduleResultDto resultDto) {
         boolean flag;
-        flag = compare(resultDto.getMachineId(), scheduleResult.getMachineId());
+        flag = compare(resultDto.getMachineCode(), scheduleResult.getMachineCode());
         flag = flag && compare(resultDto.getDayPlanQty(), scheduleResult.getDayPlanQty());
         flag = flag && compare(resultDto.getNightPlanQty(), scheduleResult.getNightPlanQty());
         flag = flag && compare(resultDto.getMidPlanQty(), scheduleResult.getMidPlanQty());
@@ -809,7 +823,7 @@ public class TqScheduleResultServiceImpl extends ServiceImpl<TqScheduleResultMap
     /**
      * 更改发布状态
      *
-     * @param scheduleDate 排程日期
+     * @param entity
      * @return 结果
      */
     @Override
@@ -1017,7 +1031,7 @@ public class TqScheduleResultServiceImpl extends ServiceImpl<TqScheduleResultMap
         }
         ScheduleSummaryVo cxConsumeSummaryVo = null;
         Double cxConsumeQty = null;
-        if (StringUtils.isBlank(scheduleResult.getIsRelease()) && StringUtils.isBlank(scheduleResult.getMachineId())) {
+        if (StringUtils.isBlank(scheduleResult.getIsRelease()) && StringUtils.isBlank(scheduleResult.getMachineCode())) {
             cxConsumeSummaryVo = scheduleResultMapper.getCxConsume(scheduleResult);
         }
         if (cxConsumeSummaryVo != null) {

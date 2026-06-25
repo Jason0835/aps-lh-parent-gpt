@@ -14,7 +14,7 @@ public class TqMouthPlateMachineVo {
     private String mouthPlateCode;
 
     /**
-     * 机台id，多个逗号分割
+     * 机台编号，多个逗号分割
      */
-    private String machineIds;
+    private String machineCodes;
 }

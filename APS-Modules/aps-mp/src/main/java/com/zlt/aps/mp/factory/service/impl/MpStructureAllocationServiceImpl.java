@@ -2808,20 +2808,20 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                 }
                 // 给开始日期、结束日期赋值
                 this.setBeginDayAndEndDay(item);
-                Integer resultBegingDay = item.getBeginDay();
+                Integer resultBeginDay = item.getBeginDay();
                 Integer resultEndDay = item.getEndDay();
-                if (resultBegingDay == null || resultEndDay == 0) { // 没有排产日的记录忽略，无需记录错误记录
+                if (resultBeginDay == null || resultEndDay == 0) { // 没有排产日的记录忽略，无需记录错误记录
                     continue;
                 }
                 // 校验月计划的排产日期是否在结构转产表的范围内
                 MpStructureAllocation mpStructureAllocation = structureDayMap.get(item.getStructureName());
                 if (mpStructureAllocation != null) {
-                    Integer structureBegingDay = mpStructureAllocation.getBeginDay();
+                    Integer structureBeginDay = mpStructureAllocation.getBeginDay();
                     Integer structureEndDay = mpStructureAllocation.getEndDay();
-                    if (resultBegingDay < structureBegingDay || resultEndDay > structureEndDay) { // 超范围则记录错误信息
+                    if (resultBeginDay < structureBeginDay || resultEndDay > structureEndDay) { // 超范围则记录错误信息
                         item.setId(errorImportId);
                         failureNum++;
-                        String errorMsg = String.format(outOfRangeStr, item.getMaterialDesc() + item.getMaterialCode(), structureBegingDay, structureEndDay);
+                        String errorMsg = String.format(outOfRangeStr, item.getMaterialDesc() + item.getMaterialCode(), structureBeginDay, structureEndDay);
                         addImportErrorLog(importLogId, errorNum, errorMsg, importErrorLogs);
                         continue;
                     }
@@ -3335,6 +3335,8 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
      * @param item
      */
     private void setBeginDayAndEndDay(FactoryMonthPlanMouldDayResult item) {
+        //20260624+ 先清除开始日期，再重新赋值
+        item.setBeginDay(null);
         for (int i = FactoryConstant.MONTH_START_DAY; i <= FactoryConstant.MONTH_MAX_DAY; i++) {
             Object fieldValue = item.getFieldValueByFieldName(FactoryConstant.DAY_FIELD + i);
             if (ObjUtil.isNotNull(fieldValue) && Integer.parseInt(fieldValue.toString()) > 0) {

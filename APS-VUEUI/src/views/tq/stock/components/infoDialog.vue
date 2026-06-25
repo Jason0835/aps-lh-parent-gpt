@@ -50,7 +50,7 @@ export default {
             trigger: "blur",
           },
         ],
-        materialCode: [
+        beadCode: [
           {
             required: true,
             message: this.$t("common.rule.input"),
@@ -88,7 +88,7 @@ export default {
         },
         {
           label: this.$t("ui.data.column.tq.scheduleResult.beadCode"),
-          prop: "materialCode",
+          prop: "beadCode",
           span: 24,
           required: true,
           maxlength: "50",

@@ -21,6 +21,10 @@ export default {
       type: Array,
       default: () => [],
     },
+    cordSpecOptions: {
+      type: Array,
+      default: () => [],
+    },
   },
   data() {
     const requiredSelect = { required: true, message: this.$t("common.rule.select"), trigger: "change" };
@@ -29,7 +33,7 @@ export default {
       loading: false, visible: false, isEdit: false, form: {}, machineOptions: [],
       rules: {
         factoryCode: [requiredSelect],
-        bigRollCode: [requiredInput],
+        bigRollCode: [requiredSelect],
         cordFabricCode: [requiredSelect],
         machineCode: [requiredInput],
       },
@@ -40,7 +44,7 @@ export default {
     columns() {
       return [
         { prop: "factoryCode", label: this.$t("ui.data.column.cd90MachineRollMapping.factoryCode"), type: "select", dictData: this.parentDict.type.biz_factory_name, filterable: true, change: () => this.loadMachineOptions() },
-        { prop: "bigRollCode", label: this.$t("ui.data.column.cd90MachineRollMapping.bigRollCode"), maxlength: 30 },
+        { prop: "bigRollCode", label: this.$t("ui.data.column.cd90MachineRollMapping.bigRollCode"), type: "select", dictData: this.cordSpecOptions, filterable: true, required: true },
         { prop: "cordFabricCode", label: this.$t("ui.data.column.cd90MachineRollMapping.cordFabricCode"), type: "select", dictData: this.clothOptions, filterable: true, required: true },
         { prop: "machineCode", label: this.$t("ui.data.column.cd90MachineRollMapping.machineCode"), type: "select", dictData: this.machineOptions, filterable: true },
         { prop: "remark", label: this.$t("ui.common.column.remark"), type: "textarea", rows: 3, maxlength: 900 },

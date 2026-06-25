@@ -8,7 +8,7 @@
                max(cxr.SCHEDULE_DATE) SCHEDULE_DATE, /*排程日期*/
                max(cxr.CX_BATCH_NO) CX_BATCH_NO, /*成型批次号*/
                ci.TIRE_RING_CODE BEAD_CODE,   /*胎圈代码*/
-               max(ci.Dimension) DIMENSION,   /*寸口*/
+               max(ci.PRO_SIZE) DIMENSION,   /*寸口*/
                max(ci.BEAD_CODE) STEEL_RING_CODE, /*钢丝圈代码*/
                max(ci.APEX_CODE) TRIANGLE_GLUE_CODE,  /*三角胶代码*/
                max(ci.HEXAGON_RUBBER_CODE) GLUE_CODE,  /*胶料代码*/
@@ -25,19 +25,17 @@
                IFNULL(sum(cxr.CLASS8_PLAN_QTY),0) CX_CLASS8_PLAN,  /*对应成型8班(D+2日中班)的消耗量，胎圈6班供应*/
                GROUP_CONCAT(DISTINCT concat(cxr.CX_MACHINE_CODE,'$',cxr.EMBRYO_CODE,'$',cxr.BOM_DATA_VERSION) order by cxr.CX_MACHINE_CODE,cxr.EMBRYO_CODE,cxr.BOM_DATA_VERSION SEPARATOR ',') as quotaKeys /*机台code$胎胚代码*/
         from T_CX_SCHEDULE_RESULT cxr /*成型排程结果表*/
-        inner join T_MDM_CONSTRUCTION_INFO ci on cxr.EMBRYO_CODE = ci.embryo_code and cxr.BOM_DATA_VERSION = ci.EMBRYO_VERSION  /*施工信息表*/
-        where schedule_date = STR_TO_DATE(#{scheduleDate}, '%Y-%m-%d')
+        inner join T_MDM_CONSTRUCTION_INFO ci on cxr.EMBRYO_CODE = ci.CONSTRUCTION_CODE and cxr.BOM_DATA_VERSION = ci.CONSTRUCTION_VERSION  /*施工信息表，关联条件：胎胚代码=施工号、施工版本=BOM版本*/
+        where cxr.SCHEDULE_DATE = STR_TO_DATE(#{scheduleDate}, '%Y-%m-%d')
         <if test="productionStage == '1'.toString()">
             and ci.PRODUCTION_STAGE = '0'
         </if>
-        and cxr.DEL_FLAG = 0
-        and ci.IS_DELETE = 0
         group by ci.TIRE_RING_CODE
     </select>
 
     <!-- 同步胎圈排程结果到日志表 -->
     <insert id="syncTqScheduleToLog">
-        insert into T_TQ_SCHEDULE_RESULT_LOG (ID, SCHEDULE_DATE, CX_BATCH_NO, BATCH_NO, ORDER_NO, BEAD_CODE, STEEL_RING_CODE, TRIANGLE_GLUE_CODE, GLUE_CODE, MOUTH_PLATE_CODE, SPEC_SIZE, MACHINE_ID, UNIT_CONSUME, STOCK_QTY, SUPPLY_TIME,
+        insert into T_TQ_SCHEDULE_RESULT_LOG (ID, SCHEDULE_DATE, CX_BATCH_NO, BATCH_NO, ORDER_NO, BEAD_CODE, STEEL_RING_CODE, TRIANGLE_GLUE_CODE, GLUE_CODE, MOUTH_PLATE_CODE, SPEC_SIZE, MACHINE_CODE, UNIT_CONSUME, STOCK_QTY, SUPPLY_TIME,
                                               CLASS1_PLAN_QTY, CLASS1_FINISH_QTY, CLASS1_SEQUENCE, CLASS1_FINISH_RATE, CLASS1_ANALYSIS,
                                               CLASS2_PLAN_QTY, CLASS2_FINISH_QTY, CLASS2_SEQUENCE, CLASS2_FINISH_RATE, CLASS2_ANALYSIS,
                                               CLASS3_PLAN_QTY, CLASS3_FINISH_QTY, CLASS3_SEQUENCE, CLASS3_FINISH_RATE, CLASS3_ANALYSIS,
@@ -46,7 +44,7 @@
                                               CLASS6_PLAN_QTY, CLASS6_FINISH_QTY, CLASS6_SEQUENCE, CLASS6_FINISH_RATE, CLASS6_ANALYSIS,
                                               CX_CLASS1_PLAN, CX_CLASS2_PLAN, CX_CLASS3_PLAN, CX_CLASS4_PLAN, CX_CLASS5_PLAN, CX_CLASS6_PLAN, CX_CLASS7_PLAN, CX_CLASS8_PLAN,
                                               IS_RELEASE, MARK_CLOSE_OUT_TIP, PRODUCTION_STATUS, REMARK, DEL_FLAG, CREATE_BY, CREATE_TIME, UPDATE_BY, UPDATE_TIME, DATA_SOURCE, PUBLISH_SUCCESS_COUNT, NEWEST_PUBLISH_TIME)
-        select ID, SCHEDULE_DATE, CX_BATCH_NO, BATCH_NO, ORDER_NO, BEAD_CODE, STEEL_RING_CODE, TRIANGLE_GLUE_CODE, GLUE_CODE, MOUTH_PLATE_CODE, SPEC_SIZE, MACHINE_ID, UNIT_CONSUME, STOCK_QTY, SUPPLY_TIME,
+        select ID, SCHEDULE_DATE, CX_BATCH_NO, BATCH_NO, ORDER_NO, BEAD_CODE, STEEL_RING_CODE, TRIANGLE_GLUE_CODE, GLUE_CODE, MOUTH_PLATE_CODE, SPEC_SIZE, MACHINE_CODE, UNIT_CONSUME, STOCK_QTY, SUPPLY_TIME,
                CLASS1_PLAN_QTY, CLASS1_FINISH_QTY, CLASS1_SEQUENCE, CLASS1_FINISH_RATE, CLASS1_ANALYSIS,
                CLASS2_PLAN_QTY, CLASS2_FINISH_QTY, CLASS2_SEQUENCE, CLASS2_FINISH_RATE, CLASS2_ANALYSIS,
                CLASS3_PLAN_QTY, CLASS3_FINISH_QTY, CLASS3_SEQUENCE, CLASS3_FINISH_RATE, CLASS3_ANALYSIS,
@@ -75,7 +73,7 @@
     <!-- 批量插入胎圈排程结果（6班次） -->
     <insert id="batchCreateScheduleResult" parameterType="list">
         insert into T_TQ_SCHEDULE_RESULT (ID, SCHEDULE_DATE, CX_BATCH_NO, BATCH_NO, ORDER_NO, BEAD_CODE, STEEL_RING_CODE, TRIANGLE_GLUE_CODE,
-                                          GLUE_CODE, MOUTH_PLATE_CODE, SPEC_SIZE, MACHINE_ID, UNIT_CONSUME, STOCK_QTY, SUPPLY_TIME,
+                                          GLUE_CODE, MOUTH_PLATE_CODE, SPEC_SIZE, MACHINE_CODE, UNIT_CONSUME, STOCK_QTY, SUPPLY_TIME,
                                           CLASS1_PLAN_QTY, CLASS1_SEQUENCE, CLASS1_ANALYSIS,
                                           CLASS2_PLAN_QTY, CLASS2_SEQUENCE, CLASS2_ANALYSIS,
                                           CLASS3_PLAN_QTY, CLASS3_SEQUENCE, CLASS3_ANALYSIS,
@@ -84,12 +82,12 @@
                                           CLASS6_PLAN_QTY, CLASS6_SEQUENCE, CLASS6_ANALYSIS,
                                           CX_CLASS1_PLAN, CX_CLASS2_PLAN, CX_CLASS3_PLAN, CX_CLASS4_PLAN, CX_CLASS5_PLAN, CX_CLASS6_PLAN, CX_CLASS7_PLAN, CX_CLASS8_PLAN,
                                           IS_RELEASE, MARK_CLOSE_OUT_TIP, PRODUCTION_STATUS, REMARK, DEL_FLAG, CREATE_BY,
-                                          CREATE_TIME, PUBLISH_SUCCESS_COUNT, NEWEST_PUBLISH_TIME, CLOSE_OUT_SPEC_FLAG, TODAY_MORNING_PLAN_QTY)
+                                          CREATE_TIME, PUBLISH_SUCCESS_COUNT, NEWEST_PUBLISH_TIME, CLOSE_OUT_SPEC_FLAG, TODAY_MORNING_PLAN_QTY, FACTORY_CODE)
         values
             <foreach collection="scheduleResultList" item="schedule" separator=",">
                   (NULL,
                           #{schedule.scheduleDate},#{schedule.cxBatchNo,jdbcType=VARCHAR},#{schedule.batchNo},#{schedule.orderNo},#{schedule.beadCode},#{schedule.steelRingCode,jdbcType=VARCHAR},#{schedule.triangleGlueCode,jdbcType=VARCHAR},
-                          #{schedule.glueCode,jdbcType=VARCHAR},#{schedule.mouthPlateCode,jdbcType=VARCHAR},#{schedule.specSize,jdbcType=VARCHAR},#{schedule.machineId,jdbcType=VARCHAR},#{schedule.unitConsume,jdbcType=DOUBLE},#{schedule.stockQty,jdbcType=DOUBLE},#{schedule.supplyTime,jdbcType=DOUBLE},
+                          #{schedule.glueCode,jdbcType=VARCHAR},#{schedule.mouthPlateCode,jdbcType=VARCHAR},#{schedule.specSize,jdbcType=VARCHAR},#{schedule.machineCode,jdbcType=VARCHAR},#{schedule.unitConsume,jdbcType=DOUBLE},#{schedule.stockQty,jdbcType=DOUBLE},#{schedule.supplyTime,jdbcType=DOUBLE},
                           #{schedule.class1PlanQty,jdbcType=DOUBLE},#{schedule.class1ProduceOrder,jdbcType=INTEGER},#{schedule.class1SysAnalysis,jdbcType=VARCHAR},
                           #{schedule.class2PlanQty,jdbcType=DOUBLE},#{schedule.class2ProduceOrder,jdbcType=INTEGER},#{schedule.class2SysAnalysis,jdbcType=VARCHAR},
                           #{schedule.class3PlanQty,jdbcType=DOUBLE},#{schedule.class3ProduceOrder,jdbcType=INTEGER},#{schedule.class3SysAnalysis,jdbcType=VARCHAR},
@@ -98,7 +96,7 @@
                           #{schedule.class6PlanQty,jdbcType=DOUBLE},#{schedule.class6ProduceOrder,jdbcType=INTEGER},#{schedule.class6SysAnalysis,jdbcType=VARCHAR},
                           #{schedule.cxClass1Plan,jdbcType=DOUBLE},#{schedule.cxClass2Plan,jdbcType=DOUBLE},#{schedule.cxClass3Plan,jdbcType=DOUBLE},#{schedule.cxClass4Plan,jdbcType=DOUBLE},#{schedule.cxClass5Plan,jdbcType=DOUBLE},#{schedule.cxClass6Plan,jdbcType=DOUBLE},#{schedule.cxClass7Plan,jdbcType=DOUBLE},#{schedule.cxClass8Plan,jdbcType=DOUBLE},
                           #{schedule.isRelease,jdbcType=VARCHAR},#{schedule.markCloseOutTip,jdbcType=VARCHAR},#{schedule.productionStatus,jdbcType=VARCHAR},#{schedule.remark,jdbcType=VARCHAR},#{schedule.delFlag,jdbcType=VARCHAR},#{schedule.createBy,jdbcType=VARCHAR},#{schedule.createTime},IFNULL(#{schedule.publishSuccessCount,jdbcType=DOUBLE},0),#{schedule.newestPublishTime,jdbcType=DATE},
-                          #{schedule.closeOutSpecFlag,jdbcType=VARCHAR}, #{schedule.todayMorningPlanQty,jdbcType=DOUBLE}
+                          #{schedule.closeOutSpecFlag,jdbcType=VARCHAR}, #{schedule.todayMorningPlanQty,jdbcType=DOUBLE}, #{schedule.factoryCode,jdbcType=VARCHAR}
                   )
             </foreach>
     </insert>
@@ -106,7 +104,7 @@
     <!-- 批量插入胎圈辅助排程结果（6班次） -->
     <insert id="batchCreateAssistScheduleResult" parameterType="list">
         insert into T_TQ_ASSIST_SCHEDULE (ID, SCHEDULE_DATE, CX_BATCH_NO, BATCH_NO, ORDER_NO, BEAD_CODE, STEEL_RING_CODE, TRIANGLE_GLUE_CODE,
-                                          GLUE_CODE, MOUTH_PLATE_CODE, SPEC_SIZE, MACHINE_ID, UNIT_CONSUME, STOCK_QTY, SUPPLY_TIME,
+                                          GLUE_CODE, MOUTH_PLATE_CODE, SPEC_SIZE, MACHINE_CODE, UNIT_CONSUME, STOCK_QTY, SUPPLY_TIME,
                                           CLASS1_PLAN_QTY, CLASS1_SEQUENCE, CLASS1_ANALYSIS,
                                           CLASS2_PLAN_QTY, CLASS2_SEQUENCE, CLASS2_ANALYSIS,
                                           CLASS3_PLAN_QTY, CLASS3_SEQUENCE, CLASS3_ANALYSIS,
@@ -114,12 +112,12 @@
                                           CLASS5_PLAN_QTY, CLASS5_SEQUENCE, CLASS5_ANALYSIS,
                                           CLASS6_PLAN_QTY, CLASS6_SEQUENCE, CLASS6_ANALYSIS,
                                           CX_CLASS1_PLAN, CX_CLASS2_PLAN, CX_CLASS3_PLAN, CX_CLASS4_PLAN, CX_CLASS5_PLAN, CX_CLASS6_PLAN, CX_CLASS7_PLAN, CX_CLASS8_PLAN,
-                                          IS_RELEASE, MARK_CLOSE_OUT_TIP, PRODUCTION_STATUS, REMARK, DEL_FLAG, CREATE_BY, CREATE_TIME)
+                                          IS_RELEASE, MARK_CLOSE_OUT_TIP, PRODUCTION_STATUS, REMARK, DEL_FLAG, CREATE_BY, CREATE_TIME, FACTORY_CODE)
         values
               <foreach collection="scheduleResultList" item="schedule" separator=",">
                    (NULL,
                           #{schedule.scheduleDate},#{schedule.cxBatchNo,jdbcType=VARCHAR},#{schedule.batchNo},#{schedule.orderNo},#{schedule.beadCode},#{schedule.steelRingCode,jdbcType=VARCHAR},#{schedule.triangleGlueCode,jdbcType=VARCHAR},
-                          #{schedule.glueCode,jdbcType=VARCHAR},#{schedule.mouthPlateCode,jdbcType=VARCHAR},#{schedule.specSize,jdbcType=VARCHAR},#{schedule.machineId,jdbcType=VARCHAR},#{schedule.unitConsume,jdbcType=DOUBLE},#{schedule.stockQty,jdbcType=DOUBLE},#{schedule.supplyTime,jdbcType=DOUBLE},
+                          #{schedule.glueCode,jdbcType=VARCHAR},#{schedule.mouthPlateCode,jdbcType=VARCHAR},#{schedule.specSize,jdbcType=VARCHAR},#{schedule.machineCode,jdbcType=VARCHAR},#{schedule.unitConsume,jdbcType=DOUBLE},#{schedule.stockQty,jdbcType=DOUBLE},#{schedule.supplyTime,jdbcType=DOUBLE},
                           #{schedule.class1PlanQty,jdbcType=DOUBLE},#{schedule.class1ProduceOrder,jdbcType=INTEGER},#{schedule.class1SysAnalysis,jdbcType=VARCHAR},
                           #{schedule.class2PlanQty,jdbcType=DOUBLE},#{schedule.class2ProduceOrder,jdbcType=INTEGER},#{schedule.class2SysAnalysis,jdbcType=VARCHAR},
                           #{schedule.class3PlanQty,jdbcType=DOUBLE},#{schedule.class3ProduceOrder,jdbcType=INTEGER},#{schedule.class3SysAnalysis,jdbcType=VARCHAR},
@@ -127,7 +125,7 @@
                           #{schedule.class5PlanQty,jdbcType=DOUBLE},#{schedule.class5ProduceOrder,jdbcType=INTEGER},#{schedule.class5SysAnalysis,jdbcType=VARCHAR},
                           #{schedule.class6PlanQty,jdbcType=DOUBLE},#{schedule.class6ProduceOrder,jdbcType=INTEGER},#{schedule.class6SysAnalysis,jdbcType=VARCHAR},
                           #{schedule.cxClass1Plan,jdbcType=DOUBLE},#{schedule.cxClass2Plan,jdbcType=DOUBLE},#{schedule.cxClass3Plan,jdbcType=DOUBLE},#{schedule.cxClass4Plan,jdbcType=DOUBLE},#{schedule.cxClass5Plan,jdbcType=DOUBLE},#{schedule.cxClass6Plan,jdbcType=DOUBLE},#{schedule.cxClass7Plan,jdbcType=DOUBLE},#{schedule.cxClass8Plan,jdbcType=DOUBLE},
-                          #{schedule.isRelease,jdbcType=VARCHAR},#{schedule.markCloseOutTip,jdbcType=VARCHAR},#{schedule.productionStatus,jdbcType=VARCHAR},#{schedule.remark,jdbcType=VARCHAR},#{schedule.delFlag,jdbcType=VARCHAR},#{schedule.createBy,jdbcType=VARCHAR},#{schedule.createTime}
+                          #{schedule.isRelease,jdbcType=VARCHAR},#{schedule.markCloseOutTip,jdbcType=VARCHAR},#{schedule.productionStatus,jdbcType=VARCHAR},#{schedule.remark,jdbcType=VARCHAR},#{schedule.delFlag,jdbcType=VARCHAR},#{schedule.createBy,jdbcType=VARCHAR},#{schedule.createTime}, #{schedule.factoryCode,jdbcType=VARCHAR}
                   )
               </foreach>
     </insert>
@@ -146,7 +144,7 @@
 
     <!-- 查询胎圈排程结果列表（6班次） -->
     <select id="listTqEnginSchedule" resultType="com.zlt.aps.tq.engine.vo.TqScheduleResultVo">
-        select ID, SCHEDULE_DATE, CX_BATCH_NO, BATCH_NO, ORDER_NO, BEAD_CODE, STEEL_RING_CODE, TRIANGLE_GLUE_CODE, GLUE_CODE, MOUTH_PLATE_CODE, SPEC_SIZE, MACHINE_ID, UNIT_CONSUME,
+        select ID, SCHEDULE_DATE, CX_BATCH_NO, BATCH_NO, ORDER_NO, BEAD_CODE, STEEL_RING_CODE, TRIANGLE_GLUE_CODE, GLUE_CODE, MOUTH_PLATE_CODE, SPEC_SIZE, MACHINE_CODE, UNIT_CONSUME,
                STOCK_QTY, SUPPLY_TIME,
                IFNULL(CLASS1_PLAN_QTY,0) CLASS1_PLAN_QTY, CLASS1_FINISH_QTY, CLASS1_SEQUENCE, CLASS1_FINISH_RATE, CLASS1_ANALYSIS,
                IFNULL(CLASS2_PLAN_QTY,0) CLASS2_PLAN_QTY, CLASS2_FINISH_QTY, CLASS2_SEQUENCE, CLASS2_FINISH_RATE, CLASS2_ANALYSIS,
@@ -205,7 +203,7 @@
             #{schedule.glueCode,jdbcType=VARCHAR},
             #{schedule.mouthPlateCode,jdbcType=VARCHAR},
             #{schedule.specSize,jdbcType=VARCHAR},
-            #{schedule.machineId,jdbcType=VARCHAR},
+            #{schedule.machineCode,jdbcType=VARCHAR},
             #{schedule.unitConsume,jdbcType=DOUBLE},
             #{schedule.stockQty,jdbcType=DOUBLE},
             #{schedule.supplyTime,jdbcType=DOUBLE},
@@ -296,7 +294,7 @@
     </select>
 
     <select id="listAssistSpec" resultType="string">
-        select MATERIAL_CODE
+        select BEAD_CODE
         from T_TQ_ASSIST_SPEC
         where DEL_FLAG='0'
     </select>
@@ -315,29 +313,23 @@
     </update>
     <!-- 查询胎圈工装车整车容量（按胎圈编码分组取最大值） -->
     <select id="listToolingCartCapacity" resultType="map">
-        select MATERIAL_CODE as materialCode, max(CART_CAPACITY) as cartCapacity
+        select BEAD_CODE as beadCode, max(CART_CAPACITY) as cartCapacity
         from T_TQ_TOOLING_CART_CAPACITY
         where DEL_FLAG = '0'
-        group by MATERIAL_CODE
-    </select>
-
-    <!-- 查询胎圈工装总数（按胎圈编码关联工装车容量表，取工装总数） -->
-    <select id="listToolingTotal" resultType="map">
-        select tcc.MATERIAL_CODE as materialCode, max(t.TOTAL_QTY) as totalQty
-        from T_TQ_TOOLING_CART_CAPACITY tcc
-        inner join T_TQ_TOOLING t on tcc.TOOLING_CODE = t.TOOLING_CODE and t.DEL_FLAG = '0'
-        where tcc.DEL_FLAG = '0'
-        group by tcc.MATERIAL_CODE
+        group by BEAD_CODE
     </select>
 
     <!-- 查询胎圈机台检修计划 -->
     <select id="listMaintenancePlan" resultType="map">
-        select MACHINE_ID as machineId, DOWNTIME_DATE as downtimeDate,
+        select MACHINE_CODE as machineCode, DOWNTIME_DATE as downtimeDate,
                DOWNTIME_SHIFT as downtimeShift, DOWNTIME_HOURS as downtimeHours
         from T_TQ_MACHINE_MAINTENANCE_PLAN
         where DEL_FLAG = '0'
         and DOWNTIME_DATE >= date_format(#{scheduleDate}, '%Y-%m-%d')
         and DOWNTIME_DATE &lt; date_format(date_add(#{scheduleDate}, interval 3 day), '%Y-%m-%d')
+        <if test="factoryCode != null and factoryCode != ''">
+            and FACTORY_CODE = #{factoryCode}
+        </if>
     </select>
 
     <!-- 查询胎圈工作日历（停产班次），proc_code='08'为胎圈工序 -->

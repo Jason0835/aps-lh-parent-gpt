@@ -40,7 +40,7 @@ public class InchRangeFilter implements IMachineFilterStrategy {
         }
 
         List<TqMachineInfo> filtered = candidateMachines.stream().filter(m -> {
-            List<BigDecimal> chuckList = context.getMachineChuckMap().get(m.getId());
+            List<BigDecimal> chuckList = context.getMachineChuckMap().get(m.getMachineCode());
             // 未配置寸口绑定关系的机台，默认保留（兼容未配置的情况）
             if (chuckList == null || chuckList.isEmpty()) {
                 return true;

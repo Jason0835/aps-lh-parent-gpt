@@ -120,17 +120,12 @@ public interface TqEngineMapper {
     List<Map<String, Object>> listToolingCartCapacity();
 
     /**
-     * 查询胎圈工装总数数据
-     * @return 胎圈编码→工装总数映射
-     */
-    List<Map<String, Object>> listToolingTotal();
-
-    /**
      * 查询胎圈机台检修计划数据
      * @param scheduleDate 排程日期
+     * @param factoryCode 分厂编码（按工厂过滤检修计划）
      * @return 检修计划列表
      */
-    List<Map<String, Object>> listMaintenancePlan(@Param("scheduleDate") String scheduleDate);
+    List<Map<String, Object>> listMaintenancePlan(@Param("scheduleDate") String scheduleDate, @Param("factoryCode") String factoryCode);
 
     /**
      * 查询胎圈工作日历（停产班次信息）

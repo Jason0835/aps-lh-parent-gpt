@@ -9,9 +9,9 @@ import lombok.Data;
 public class TqMonthSurplusVo {
 
     /**
-     * 物料代码
+     * 胎圈代码
      */
-    private String materialCode;
+    private String beadCode;
 
     /**
      * 月度计划完成量
