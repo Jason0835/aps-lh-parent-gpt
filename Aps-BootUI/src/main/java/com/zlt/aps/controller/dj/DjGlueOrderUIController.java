@@ -21,6 +21,7 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
+import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
@@ -95,6 +96,9 @@ public class DjGlueOrderUIController extends BaseUIController<DjGlueOrder> {
     @PostMapping("/save")
     @ResponseBody
     public AjaxResult save(DjGlueOrder djGlueOrder) {
+        if (UserConstants.NOT_UNIQUE.equals(iDjGlueOrderService.checkUnique(djGlueOrder))) {
+            return AjaxResult.error("新增胶料编码'" + djGlueOrder.getGlueCode() + "'失败，胶料编码已存在");
+        }
         return iDjGlueOrderService.save(djGlueOrder);
     }
 

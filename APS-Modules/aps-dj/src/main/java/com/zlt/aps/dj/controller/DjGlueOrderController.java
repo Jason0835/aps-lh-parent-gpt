@@ -71,7 +71,7 @@ public class DjGlueOrderController extends AbstractDocBizController<DjGlueOrder>
 
     @ApiOperation("批量删除胶料顺序信息(逻辑删)")
     @Log(title = "ui.dj.glueOrder.column.modalName", businessType = BusinessType.DELETE)
-    @DeleteMapping("/{ids}")
+    @PostMapping("/remove")
     public AjaxResult removeByIds(@RequestBody List<Long> ids) {
         return super.removeByIds(ids);
     }
