@@ -229,6 +229,10 @@ public enum MonthPlanEnums {
      */
     ADJUST_GET_ORDER_PRE_SCM_GRAPE("SYS0206008", "在生成净需求核算时，是否先进行订单抓取"),
     /**
+     * SYS0206009 上月超欠产人工确认阀值
+     */
+    LAST_MONTH_OVERDUE_CONFIRM_VALUE("SYS0206009", "上月超欠产人工确认阀值"),
+    /**
      * SYS0205001 单位：台，续作Sku排产硫化机台数超过该值时，需要考虑降膜排产
      */
     DEDUCT_MOULD_MIN_LH_MACHINE_COUNT("SYS0205001", "单位：台，续作Sku排产硫化机台数超过该值时，需要考虑降膜排产"),
