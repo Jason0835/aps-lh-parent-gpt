@@ -174,6 +174,6 @@ public class Cd90ScheduleResultController extends AbstractDocBizController<Cd90S
 
     @Override
     protected String getOrderBy() {
-        return " MACHINE_CODE asc,CLOTH_CODE asc,SCHEDULE_DATE desc";
+        return " MACHINE_CODE ASC,BIG_ROLL_CODE ASC,CLOTH_CODE ASC";
     }
 }

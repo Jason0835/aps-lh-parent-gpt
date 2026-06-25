@@ -146,6 +146,7 @@ public class Cd90MachineInfoController extends AbstractDocBizController<Cd90Mach
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getMachineName()), "MACHINE_NAME", queryVO.getMachineName());
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getStatus()), "STATUS", queryVO.getStatus());
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getClassShift()), "CLASS_SHIFT", queryVO.getClassShift());
+        queryWrapper.orderByAsc("MACHINE_CODE");
     }
 
     @Override
@@ -155,6 +156,6 @@ public class Cd90MachineInfoController extends AbstractDocBizController<Cd90Mach
 
     @Override
     protected String getOrderBy() {
-        return "MACHINE_CODE asc, UPDATE_TIME desc";
+        return "MACHINE_CODE ASC";
     }
 }

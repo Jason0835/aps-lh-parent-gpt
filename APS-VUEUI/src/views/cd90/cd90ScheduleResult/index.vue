@@ -409,6 +409,7 @@ export default {
       this.dateList = this.buildDateList(scheduleDate || this.query.scheduleDate || this.search.scheduleDate)
     },
     handleSearch(data) {
+      this.search = { ...this.search, ...data }
       this.query = Object.keys(data || {}).reduce((result, key) => {
         const value = data[key]
         if (value !== null && value !== undefined && value !== '') {
@@ -450,8 +451,8 @@ export default {
     },
     handleAutoSchedule() {
       this.$refs.autoScheduleRef.show({
-        factoryCode: this.query.factoryCode,
-        scheduleDate: this.query.scheduleDate
+        factoryCode: this.search.factoryCode,
+        scheduleDate: this.search.scheduleDate
       })
     },
     handleAutoScheduleSuccess(scheduleDate, payload) {
@@ -599,16 +600,16 @@ export default {
       getCd90MachineEnableOptions({ factoryCode: this.query.factoryCode || this.search.factoryCode }).then(res => {
         const rows = Array.isArray(res) ? res : (res.rows || res.data || [])
         this.machineOptions = rows.map(item => ({
-          label: item.label || item.machineName || item.machineCode || item.code || item,
-          value: item.value || item.machineCode || item.code || item
+          label: item.machineCode,
+          value: item.machineCode
         }))
       })
     },
     handleShowUnscheduleResult() {
       this.unscheduleResultDialogVisible = true
       this.unscheduleSearch = {
-        factoryCode: this.query.factoryCode || this.search.factoryCode,
-        scheduleDate: this.query.scheduleDate || this.search.scheduleDate
+        factoryCode: this.search.factoryCode,
+        scheduleDate: this.search.scheduleDate
       }
       this.unscheduleQuery = { ...this.unscheduleSearch }
       this.getUnscheduleList()
