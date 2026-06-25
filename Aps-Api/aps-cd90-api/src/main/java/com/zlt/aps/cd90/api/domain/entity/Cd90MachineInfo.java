@@ -77,7 +77,7 @@ public class Cd90MachineInfo extends BaseEntity implements Serializable {
     @Excel(name = "ui.data.column.cd90MachineInfo.openMachineClass", dictType = "class_num_three_plan")
     private String openMachineClass;
 
-    /** 机台状态：0 启用，1 禁用 */
+    /** 机台状态：1启用，0禁用 */
     @ApiModelProperty(value = "机台状态", name = "status")
     @ImportExcelValidated(required = true, maxLength = 1)
     @TableField("STATUS")

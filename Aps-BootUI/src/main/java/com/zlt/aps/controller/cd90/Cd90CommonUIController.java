@@ -33,4 +33,16 @@ public class Cd90CommonUIController {
     public AjaxResult tireFabricCodes() {
         return cd90CommonRemoteService.tireFabricCodes();
     }
+
+    /**
+     * 大卷代码（CORD_SPEC）下拉。
+     *
+     * @return 去重后的大卷代码列表
+     */
+    @ApiOperation("大卷代码下拉")
+    @PostMapping("/cordSpecs")
+    @ResponseBody
+    public AjaxResult cordSpecs() {
+        return cd90CommonRemoteService.cordSpecs();
+    }
 }

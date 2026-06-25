@@ -26,7 +26,7 @@ public class Cd90MachineRollMapping extends BaseEntity implements Serializable {
     @Excel(name = "ui.data.column.cd90MachineRollMapping.factoryCode", dictType = "biz_factory_name")
     private String factoryCode;
 
-    @ApiModelProperty(value = "钢压大卷代码", name = "bigRollCode")
+    @ApiModelProperty(value = "大卷代码，对应施工CORD_SPEC", name = "bigRollCode")
     @ImportExcelValidated(required = true, maxLength = 30)
     @TableField("BIG_ROLL_CODE")
     @Excel(name = "ui.data.column.cd90MachineRollMapping.bigRollCode")

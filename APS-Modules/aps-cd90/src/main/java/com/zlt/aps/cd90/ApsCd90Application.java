@@ -20,6 +20,7 @@ import java.net.InetAddress;
 @SpringBootApplication
 @EnableSwagger2
 @EnableRyFeignClients
+@EnableAsync
 @ComponentScan(value = {"com.ruoyi.*", "com.zlt.*", "com.zlt.*"})
 @MapperScan({"com.ruoyi.**.mapper,com.tlt.**.mapper,com.zlt.**.mapper,com.zlt.aps.**.mapper"})
 public class ApsCd90Application {
