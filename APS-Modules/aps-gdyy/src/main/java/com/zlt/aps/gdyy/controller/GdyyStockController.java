@@ -62,7 +62,7 @@ public class GdyyStockController extends BaseController {
     @ApiOperation("新增钢带压延库存信息（id不为空）")
     @PostMapping
     public AjaxResult add(@RequestBody GdyyStock stock) {
-        //唯一性校验（使用库存日期+物料编号为逻辑主键）
+        //唯一性校验（使用工厂+库存日期+大卷编号为逻辑主键）
         List<GdyyStock> list = stockService.checkStockListUnic(stock);
         if (CollectionUtils.isNotEmpty(list)) {
             return AjaxResult.error(I18nUtil.getMessage("ui.stock.message.unique"));
@@ -78,7 +78,7 @@ public class GdyyStockController extends BaseController {
     @ApiOperation("修改钢带压延库存信息（id不为空）")
     @PutMapping
     public AjaxResult edit(@RequestBody GdyyStock stock) {
-        //唯一性校验（使用库存日期+物料编号为逻辑主键）
+        //唯一性校验（使用工厂+库存日期+大卷编号为逻辑主键）
         List<GdyyStock> list = stockService.checkStockListUnic(stock);
         if (CollectionUtils.isNotEmpty(list)) {
             return AjaxResult.error(I18nUtil.getMessage("ui.stock.message.unique"));

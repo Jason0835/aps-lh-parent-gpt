@@ -100,7 +100,7 @@ public class GdyyStockServiceImpl implements GdyyStockService {
     }
 
     /**
-     * 校验钢带压延库存唯一性（根据库存日期+物料编号+id）
+     * 校验钢带压延库存唯一性（根据工厂+库存日期+大卷编号+id）
      */
     public List<GdyyStock> checkStockListUnic(GdyyStock stock) {
         return stockMapper.checkStockListUnic(stock);
@@ -122,45 +122,46 @@ public class GdyyStockServiceImpl implements GdyyStockService {
         //做校验
         List<ImportErrorLog> importErrorLogs = new ArrayList<>();
         List<GdyyStock> importList = new ArrayList<>();
-		// 按业务主键分组
-		Map<String, Long> groupMap = list.stream()
-				.collect(Collectors.groupingBy(v -> (v.getMaterialCode() + DateUtil.formatDate(v.getStockDate())), Collectors.counting()));
+        // 按业务主键分组
+        Map<String, Long> groupMap = list.stream()
+                .collect(Collectors.groupingBy(v -> (v.getBigRollCode() + DateUtil.formatDate(v.getStockDate())), Collectors.counting()));
         for (int i = 0; i < list.size(); i++) {
             GdyyStock stock = list.get(i);
-			// excel内业务主键唯一校验
-			Long hasValue = groupMap.get(stock.getMaterialCode() + DateUtil.formatDate(stock.getStockDate()));
-			// 输入空值当0处理
-			stock.setStockRollNum(Optional.ofNullable(stock.getStockRollNum()).orElse(BigDecimal.ZERO));
-			stock.setModifyNum(Optional.ofNullable(stock.getModifyNum()).orElse(BigDecimal.ZERO));
-			stock.setBadNum(Optional.ofNullable(stock.getBadNum()).orElse(BigDecimal.ZERO));
-			if (hasValue > 1) {
+            // excel内业务主键唯一校验
+            Long hasValue = groupMap.get(stock.getBigRollCode() + DateUtil.formatDate(stock.getStockDate()));
+            // 输入空值当0处理
+            stock.setStockRollNum(Optional.ofNullable(stock.getStockRollNum()).orElse(BigDecimal.ZERO));
+            stock.setStockMeters(Optional.ofNullable(stock.getStockMeters()).orElse(BigDecimal.ZERO));
+            stock.setModifyNum(Optional.ofNullable(stock.getModifyNum()).orElse(BigDecimal.ZERO));
+            stock.setBadNum(Optional.ofNullable(stock.getBadNum()).orElse(BigDecimal.ZERO));
+            if (hasValue > 1) {
                 stock.setId(-999L);
-				String columnName1 = I18nUtil.getMessage("ui.common.column.gy.bigRollCode");
-				String columnName2 = I18nUtil.getMessage("ui.data.column.stock.stockDate");
-				addImportErrorLog(importLogId, i + 2,
-						String.format(I18nUtil.getMessage("ui.data.column.all.conflictRecord"),
-								columnName1 + "+" + columnName2),
-						importErrorLogs);
-				failureNum++;
-				continue;
-			}
+                String columnName1 = I18nUtil.getMessage("ui.common.column.gy.bigRollCode");
+                String columnName2 = I18nUtil.getMessage("ui.data.column.stock.stockDate");
+                addImportErrorLog(importLogId, i + 2,
+                        String.format(I18nUtil.getMessage("ui.data.column.all.conflictRecord"),
+                                columnName1 + "+" + columnName2),
+                        importErrorLogs);
+                failureNum++;
+                continue;
+            }
             List<ImportErrorLog> validated = ImportUtil.validated(importLogId, i + 2, stock);
             if (CollectionUtils.isNotEmpty(validated)) {
                 stock.setId(-999L);
                 failureNum++;
                 importErrorLogs.addAll(validated);
-            } else{
-                BigDecimal StockNum =stock.getStockNum()==null?new BigDecimal(0):stock.getStockNum();
-                BigDecimal ModifyNum =stock.getModifyNum()==null?new BigDecimal(0):stock.getModifyNum();
-                BigDecimal BadNum =stock.getBadNum()==null?new BigDecimal(0):stock.getBadNum();
-                BigDecimal dd= StockNum.add(ModifyNum).subtract(BadNum);
-				if (dd.compareTo(new BigDecimal(0)) < 0) {
-					failureNum++;
-					stock.setId(-999L);
-					addImportErrorLog(importLogId, i + 2, I18nUtil.getMessage("ui.data.column.stock.stockNumValidate"),
-							importErrorLogs);
-					continue;
-				}
+            } else {
+                BigDecimal StockNum = stock.getStockNum() == null ? new BigDecimal(0) : stock.getStockNum();
+                BigDecimal ModifyNum = stock.getModifyNum() == null ? new BigDecimal(0) : stock.getModifyNum();
+                BigDecimal BadNum = stock.getBadNum() == null ? new BigDecimal(0) : stock.getBadNum();
+                BigDecimal dd = StockNum.add(ModifyNum).subtract(BadNum);
+                if (dd.compareTo(new BigDecimal(0)) < 0) {
+                    failureNum++;
+                    stock.setId(-999L);
+                    addImportErrorLog(importLogId, i + 2, I18nUtil.getMessage("ui.data.column.stock.stockNumValidate"),
+                            importErrorLogs);
+                    continue;
+                }
 
                 stock.setBaseVale(null);
                 importList.add(stock);
@@ -219,9 +220,9 @@ public class GdyyStockServiceImpl implements GdyyStockService {
      */
     @Override
     public boolean isRollStock() {
-    	GdyyParams params = new GdyyParams();
-    	params.setParamCode(EngineConstants.GDYY_STOCK_ROLL_SWITCH);
-    	String paramsValue = gdyyParamsMapper.listParams(params).stream().findFirst().map(GdyyParamsDto::getParamValue).orElse("");
+        GdyyParams params = new GdyyParams();
+        params.setParamCode(EngineConstants.GDYY_STOCK_ROLL_SWITCH);
+        String paramsValue = gdyyParamsMapper.listParams(params).stream().findFirst().map(GdyyParamsDto::getParamValue).orElse("");
         return EngineConstants.GDYY_STOCK_ROLL_SWITCH_ON.equals(paramsValue);
     }
 }
