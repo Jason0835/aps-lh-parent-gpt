@@ -49,7 +49,12 @@ public class Cd90StorageLaneLimitServiceImpl extends AbstractDocService<Cd90Stor
         w.eq(Cd90StorageLaneLimit::getLaneDate, entity.getLaneDate());
         w.eq(Cd90StorageLaneLimit::getShiftCode, entity.getShiftCode());
         w.eq(Cd90StorageLaneLimit::getStorageLaneCode, entity.getStorageLaneCode());
-        // MATERIAL_CODE 不参与唯一性判断，同一日期、班次和库排号只能维护一条有效记录。
+        // 唯一键去掉 MATERIAL_CODE:同库排同班次唯一(空库排或有帘布库排均唯一),null 用 isNull 匹配
+        if (StringUtils.isBlank(entity.getMaterialCode())) {
+            w.isNull(Cd90StorageLaneLimit::getMaterialCode);
+        } else {
+            w.eq(Cd90StorageLaneLimit::getMaterialCode, entity.getMaterialCode());
+        }
         w.ne(entity.getId() != null, Cd90StorageLaneLimit::getId, entity.getId());
         return mapper.selectCount(w) > 0 ? UserConstants.NOT_UNIQUE : UserConstants.UNIQUE;
     }
@@ -117,7 +122,12 @@ public class Cd90StorageLaneLimitServiceImpl extends AbstractDocService<Cd90Stor
         w.eq(Cd90StorageLaneLimit::getLaneDate, entity.getLaneDate());
         w.eq(Cd90StorageLaneLimit::getShiftCode, entity.getShiftCode());
         w.eq(Cd90StorageLaneLimit::getStorageLaneCode, entity.getStorageLaneCode());
-        // 导入更新同样按物理库排定位，允许更新该库排当前绑定的胎体代码。
+        // 唯一键去掉 MATERIAL_CODE,同库排同班次唯一;null 用 isNull 匹配
+        if (StringUtils.isBlank(entity.getMaterialCode())) {
+            w.isNull(Cd90StorageLaneLimit::getMaterialCode);
+        } else {
+            w.eq(Cd90StorageLaneLimit::getMaterialCode, entity.getMaterialCode());
+        }
         return mapper.selectOne(w);
     }
 

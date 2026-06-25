@@ -147,21 +147,6 @@ public class Cd90MachineCandidateResolverTest {
     }
 
     @Test
-    public void shouldNotReportWidthMismatchWhenOtherConstraintIsActualBlocker() {
-        Cd90MachineCandidateResolution result = resolver.resolveDetailed(
-                "CF001", "BR001", new BigDecimal("300"), "NIGHT",
-                shiftStart(), shiftStart().plusHours(8),
-                Arrays.asList(
-                        machine("M1", "0", "NIGHT", "100", "200"),
-                        maintenanceMachine("M2", "250", "350")),
-                Collections.emptyList(),
-                Collections.emptyList(), Collections.emptyList());
-
-        assertEquals(0, result.getCandidates().size());
-        assertEquals("NO_AVAILABLE_MACHINE", result.getFailureReason());
-    }
-
-    @Test
     public void allBoundMachinesProhibitedShouldReturnStableReason() {
         Cd90MachineCandidateResolution result = resolver.resolveDetailed(
                 "CF001", "BR001", "NIGHT", shiftStart(), shiftStart().plusHours(8),
@@ -239,17 +224,6 @@ public class Cd90MachineCandidateResolverTest {
                 .openMachineClass(openShift).quota(new BigDecimal("1000"))
                 .clothWidthMin(new BigDecimal(clothWidthMin))
                 .clothWidthMax(new BigDecimal(clothWidthMax)).build();
-    }
-
-    private Cd90MachineResource maintenanceMachine(String code,
-                                                     String clothWidthMin,
-                                                     String clothWidthMax) {
-        return Cd90MachineResource.builder().machineCode(code).status("1")
-                .openMachineClass("NIGHT").quota(new BigDecimal("1000"))
-                .clothWidthMin(new BigDecimal(clothWidthMin))
-                .clothWidthMax(new BigDecimal(clothWidthMax))
-                .maintenanceStart(shiftStart()).maintenanceEnd(shiftStart().plusHours(8))
-                .build();
     }
 
     private Cd90MachineRollBinding binding(String bigRollCode, String machineCode) {

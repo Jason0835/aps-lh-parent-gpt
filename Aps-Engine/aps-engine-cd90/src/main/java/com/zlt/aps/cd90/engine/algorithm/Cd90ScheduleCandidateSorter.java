@@ -7,8 +7,6 @@ import org.springframework.stereotype.Component;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
@@ -26,50 +24,31 @@ public class Cd90ScheduleCandidateSorter {
      * @return 新的有序列表，不修改输入列表
      */
     public List<Cd90ScheduleCandidate> sort(List<Cd90ScheduleCandidate> candidates) {
-        return sort(candidates, Collections.emptyList());
+        return sort(candidates, null);
     }
 
     /**
-     * 兼容单一连续生产参照；当前班已有任务时使用该入口。
+     * 相同缺料优先级内按直裁规格连续优先、大卷连续次之排序。
      */
     public List<Cd90ScheduleCandidate> sort(List<Cd90ScheduleCandidate> candidates,
                                             Cd90MachineTailState tail) {
-        return sort(candidates, tail == null
-                ? Collections.emptyList() : Collections.singletonList(tail));
-    }
-
-    /**
-     * 相同缺料优先级内，对每个候选取全部机台尾状态中可获得的最佳连续等级。
-     */
-    public List<Cd90ScheduleCandidate> sort(List<Cd90ScheduleCandidate> candidates,
-                                            Collection<Cd90MachineTailState> tails) {
         List<Cd90ScheduleCandidate> result = candidates == null
                 ? new ArrayList<>() : new ArrayList<>(candidates);
         result.sort(Comparator
                 .comparing(Cd90ScheduleCandidate::isShortageInCurrentShift).reversed()
                 .thenComparing(Cd90ScheduleCandidate::getEarliestShortageTime,
                         Comparator.nullsLast(LocalDateTime::compareTo))
-                .thenComparingInt(item -> continuityRank(item, tails))
+                .thenComparingInt(item -> continuityRank(item, tail))
                 .thenComparing(item -> value(item.getStockSupplyHours()))
                 .thenComparing(Cd90ScheduleCandidate::getClothCode,
                         Comparator.nullsLast(String::compareTo)));
         return result;
     }
 
-    /** 候选在任意一台机台上可连续生产时，采用其中最优的连续等级。 */
-    private int continuityRank(Cd90ScheduleCandidate item,
-                               Collection<Cd90MachineTailState> tails) {
-        if (item == null || tails == null || tails.isEmpty()) {
+    private int continuityRank(Cd90ScheduleCandidate item, Cd90MachineTailState tail) {
+        if (item == null || tail == null) {
             return 3;
         }
-        return tails.stream()
-                .filter(Objects::nonNull)
-                .mapToInt(tail -> continuityRank(item, tail))
-                .min()
-                .orElse(3);
-    }
-
-    private int continuityRank(Cd90ScheduleCandidate item, Cd90MachineTailState tail) {
         boolean sameSpec = Objects.equals(tail.getClothCode(), item.getClothCode());
         boolean sameRoll = Objects.equals(tail.getBigRollCode(), item.getBigRollCode());
         if (sameSpec && sameRoll) {

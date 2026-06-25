@@ -155,19 +155,6 @@ public class Cd90AutoScheduleOutputDraftBuilderTest {
         assertEquals("L1", draft.getPrimaryLaneCode());
     }
 
-    @Test
-    public void shouldMergeLaneCodesAcrossTasksOfSameScheduleResult() {
-        Cd90ShiftScheduleTask first = task("CLASS1", "M1", "100", 1,
-                allocation("L1", 1));
-        Cd90ShiftScheduleTask second = task("CLASS2", "M1", "100", 1,
-                allocation("L2", 1));
-
-        Cd90AutoScheduleOutputDraft result = builder.build(context(), execution(first, second));
-
-        Cd90ScheduleResultDraft draft = result.getScheduleResults().get(0);
-        assertEquals("L1,L2", draft.getPrimaryLaneCode());
-    }
-
     private Cd90AutoScheduleContext context() {
         return Cd90AutoScheduleContext.builder().shifts(Arrays.asList(
                 shift("CLASS1", LocalDateTime.of(2026, 6, 12, 14, 0)),

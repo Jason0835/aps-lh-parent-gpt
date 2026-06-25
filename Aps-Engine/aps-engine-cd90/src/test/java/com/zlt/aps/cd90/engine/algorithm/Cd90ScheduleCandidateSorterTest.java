@@ -60,24 +60,6 @@ public class Cd90ScheduleCandidateSorterTest {
     }
 
     /**
-     * 跨班存在多台机尾时，每个候选按所有机尾中可获得的最佳连续等级排序。
-     */
-    @Test
-    public void shouldUseBestContinuityRankAcrossMachineTails() {
-        LocalDateTime shortageTime = LocalDateTime.of(2026, 6, 13, 14, 0);
-        List<Cd90MachineTailState> tails = Arrays.asList(
-                Cd90MachineTailState.builder().clothCode("C1").bigRollCode("R1").build(),
-                Cd90MachineTailState.builder().clothCode("C2").bigRollCode("R2").build());
-
-        List<Cd90ScheduleCandidate> result = sorter.sort(Arrays.asList(
-                candidate("C3", "R1", true, shortageTime, "1"),
-                candidate("C2", "R2", true, shortageTime, "1")
-        ), tails);
-
-        assertEquals("R2/C2", key(result.get(0)));
-    }
-
-    /**
      * 连续生产规则不能覆盖更紧急的本班缺料候选。
      */
     @Test

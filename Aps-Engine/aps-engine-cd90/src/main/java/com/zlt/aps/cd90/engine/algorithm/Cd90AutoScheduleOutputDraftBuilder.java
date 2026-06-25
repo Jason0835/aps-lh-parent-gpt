@@ -24,7 +24,6 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
@@ -60,8 +59,6 @@ public class Cd90AutoScheduleOutputDraftBuilder {
             String resultKey = resultKey(task);
             Cd90ScheduleResultDraft result = resultByKey.computeIfAbsent(resultKey,
                     key -> newResultDraft(key, task));
-            // 同一主结果可能由多个任务段组成，每个任务段使用的库排都要汇总到主表展示字段。
-            mergePrimaryLaneCodes(result, task);
             mergeSlot(result, task, shiftDates.get(task.getClassField()));
             mergeAllocations(allocationByKey, resultKey, task);
         }
@@ -94,28 +91,18 @@ public class Cd90AutoScheduleOutputDraftBuilder {
     }
 
     private Cd90ScheduleResultDraft newResultDraft(String key, Cd90ShiftScheduleTask task) {
+        // 主表 STORAGE_LANE_CODE 拼接本任务所有分配库排(去重),完整分配见明细表 t_cd90_schedule_lane_allocation
+        String primaryLane = task.getLaneAllocations().isEmpty() ? null
+                : task.getLaneAllocations().stream()
+                        .map(Cd90StorageLaneAllocation::getLaneCode)
+                        .filter(StringUtils::hasText)
+                        .distinct()
+                        .collect(Collectors.joining(","));
         return Cd90ScheduleResultDraft.builder()
                 .resultKey(key).clothCode(task.getClothCode())
                 .bigRollCode(task.getBigRollCode()).cordSpec(task.getCordSpec())
-                .machineCode(task.getMachineCode())
+                .machineCode(task.getMachineCode()).primaryLaneCode(primaryLane)
                 .dataSource(AUTO_SOURCE).shiftSlots(new ArrayList<>()).build();
-    }
-
-    /** 按任务出现顺序汇总主结果使用过的库排号，并在跨任务场景下去重。 */
-    private void mergePrimaryLaneCodes(Cd90ScheduleResultDraft result,
-                                       Cd90ShiftScheduleTask task) {
-        LinkedHashSet<String> laneCodes = new LinkedHashSet<>();
-        if (StringUtils.hasText(result.getPrimaryLaneCode())) {
-            java.util.Arrays.stream(result.getPrimaryLaneCode().split(","))
-                    .map(String::trim)
-                    .filter(StringUtils::hasText)
-                    .forEach(laneCodes::add);
-        }
-        safe(task.getLaneAllocations()).stream()
-                .map(Cd90StorageLaneAllocation::getLaneCode)
-                .filter(StringUtils::hasText)
-                .forEach(laneCodes::add);
-        result.setPrimaryLaneCode(laneCodes.isEmpty() ? null : String.join(",", laneCodes));
     }
 
     private void mergeSlot(Cd90ScheduleResultDraft result,
