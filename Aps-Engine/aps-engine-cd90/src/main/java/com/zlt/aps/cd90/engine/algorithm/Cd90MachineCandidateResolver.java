@@ -159,7 +159,7 @@ public class Cd90MachineCandidateResolver {
 
     /**
      * 候选集合为空时按硬约束过滤原因细分失败编码。
-     * 若候选范围内所有机台均因宽度不匹配被排除（其它硬约束均通过），返回 WIDTH_MISMATCH；
+     * 若至少存在一台机台仅因宽度不匹配被排除（其它硬约束均通过），返回 WIDTH_MISMATCH；
      * 否则返回 NO_AVAILABLE_MACHINE，由上层按动态状态或产能约束兜底。
      */
     private String resolveEmptyFailureReason(List<Cd90MachineResource> machines,
@@ -173,16 +173,11 @@ public class Cd90MachineCandidateResolver {
         if (craftWidth == null) {
             return "NO_AVAILABLE_MACHINE";
         }
-        boolean anyInScope = false;
-        boolean anyWidthMismatch = false;
         for (Cd90MachineResource item : safe(machines)) {
             if (hasBinding && !boundMachines.contains(item.getMachineCode())) {
                 continue;
             }
-            anyInScope = true;
-            if (!widthMatched(item, craftWidth)) {
-                anyWidthMismatch = true;
-            }
+
             // 若有机台仅因宽度不匹配被排除，但其它硬约束均通过，则视为宽度不匹配场景。
             if (ApsConstant.APS_STRING_1.equals(item.getStatus())
                     && openShiftMatched(item.getOpenMachineClass(), shiftCode)
@@ -192,11 +187,8 @@ public class Cd90MachineCandidateResolver {
                 return "WIDTH_MISMATCH";
             }
         }
-        // 候选范围内没有机台时仍按无可用机台兜底，避免与无绑定场景混淆。
-        if (!anyInScope) {
-            return "NO_AVAILABLE_MACHINE";
-        }
-        return anyWidthMismatch ? "WIDTH_MISMATCH" : "NO_AVAILABLE_MACHINE";
+        return "NO_AVAILABLE_MACHINE";
+
     }
 
     /**
