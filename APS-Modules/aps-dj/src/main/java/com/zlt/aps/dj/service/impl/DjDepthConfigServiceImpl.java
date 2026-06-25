@@ -32,9 +32,11 @@ public class DjDepthConfigServiceImpl extends AbstractDocService<DjDepthConfig> 
      * <p>
      * 规则说明：
      * - MACHINE_RANGE 与 MACHINE_QTY 组合构成范围条件
-     * - 不同规则的范围不允许有交集（除非备库班数 DEPTH_CLASS_QTY 相同）
-     * - 例如：已有「GE 3」备库班数=4，新增「LE 5」备库班数=4，虽然范围重叠但因备库班数相同允许
-     * - 反之：已有「GE 3」备库班数=4，新增「LE 5」备库班数=6，范围重叠且备库班数不同则拒绝
+     * - 排程算法按 MACHINE_QTY 降序匹配（越大优先级越高），取第一个满足条件的配置行
+     * - 因此高优先级的规则会覆盖（隐藏）低优先级的重叠规则，低优先级规则的备库班数值不会生效
+     * - 交叉校验只需检查新规则与同等或更高优先级（MACHINE_QTY ≥ 自身）的现有规则是否有范围重叠且备库班数不同
+     * - 对于优先级更低（MACHINE_QTY < 自身）的现有规则，新规则会覆盖它们，无需校验
+     * - 例如：已有「EQ 1」备库班数=6，新增「LE 5」备库班数=4，LE 5 优先级更高（5 > 1），会覆盖 EQ 1，允许
      * </p>
      */
     @Override
@@ -49,12 +51,16 @@ public class DjDepthConfigServiceImpl extends AbstractDocService<DjDepthConfig> 
             return UserConstants.UNIQUE;
         }
 
-        // 计算新规则的范围区间 [start, end]
         long[] newRange = calculateRange(entity.getMachineRange(), entity.getMachineQty());
 
         for (DjDepthConfig existing : existingList) {
+            // 只检查优先级同等或更高的现有规则（MACHINE_QTY ≥ 自身）
+            // 优先级更低的规则会被新规则覆盖，其备库班数值不会生效
+            if (existing.getMachineQty() < entity.getMachineQty()) {
+                continue;
+            }
             long[] existingRange = calculateRange(existing.getMachineRange(), existing.getMachineQty());
-            // 两个区间有交集且备库班数不同时视为交叉冲突
+            // 范围有交集且备库班数不同 → 冲突
             if (newRange[0] <= existingRange[1] && existingRange[0] <= newRange[1]
                     && !entity.getDepthClassQty().equals(existing.getDepthClassQty())) {
                 return UserConstants.NOT_UNIQUE;
