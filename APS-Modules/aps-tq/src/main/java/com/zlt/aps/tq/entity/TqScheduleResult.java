@@ -12,13 +12,20 @@ import org.apache.ibatis.type.JdbcType;
 import java.util.Date;
 
 /**
- * <p>
- * 胎圈排程结果表
- * </p>
+ * 【已废弃】胎圈排程结果表（4班次制旧版实体）
+ *
+ * <p>废弃说明：
+ * <ul>
+ *   <li>本实体为旧版4班次制胎圈排程结果，已由新版6班次制实体替代</li>
+ *   <li>新版实体：{@link com.zlt.aps.tq.api.domain.entity.TqNewScheduleResult}</li>
+ *   <li>旧版4班次字段（midPlanQty/nightPlanQty/dayPlanQty/nextMidPlanQty）将逐步废弃</li>
+ *   <li>计划在前端完全切换到新版接口后，本实体将一并删除</li>
+ * </ul>
  *
  * @author chen
  * @since 2021-06-24
  */
+@Deprecated
 @Data
 @EqualsAndHashCode(callSuper = false)
 @TableName("T_TQ_SCHEDULE_RESULT")
@@ -72,9 +79,9 @@ public class TqScheduleResult extends ApsBaseEntity {
     @TableField("SPEC_SIZE")
     private String specSize;
 
-    @ApiModelProperty(value = "机台ID，多个逗号分割")
-    @TableField("MACHINE_ID")
-    private String machineId;
+    @ApiModelProperty(value = "机台编号，多个逗号分割")
+    @TableField("MACHINE_CODE")
+    private String machineCode;
 
     @ApiModelProperty(value = "单耗")
     @TableField("UNIT_CONSUME")
@@ -207,6 +214,10 @@ public class TqScheduleResult extends ApsBaseEntity {
     @ApiModelProperty(value = "收尾提示标识(0:提示收尾；1:不需要提示)")
     @TableField("MARK_CLOSE_OUT_TIP")
     private String markCloseOutTip;
+
+    @ApiModelProperty(value = "收尾规格标识(0:收尾；1:非收尾)")
+    @TableField("CLOSE_OUT_SPEC_FLAG")
+    private String closeOutSpecFlag;
 
     @ApiModelProperty(value = "是否发布，0--未发布，1--已发布。对应数据字典为：IS_RELEASE")
     @TableField("IS_RELEASE")

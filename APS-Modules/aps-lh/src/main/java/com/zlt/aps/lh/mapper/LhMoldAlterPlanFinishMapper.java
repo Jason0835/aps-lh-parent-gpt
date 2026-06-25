@@ -24,4 +24,12 @@ public interface LhMoldAlterPlanFinishMapper extends CommBaseMapper<LhMoldAlterP
      */
     List<LhMoldAlterPlanFinish> selectByUniqueKeyList(@Param("list") List<LhMoldAlterPlanFinish> list);
 
+    /**
+     * 批量更新完成状态（仅更新finish_status、update_by、update_time）
+     *
+     * @param list 需要更新的数据列表（必须包含id和finishStatus）
+     * @return 更新记录数
+     */
+    int batchUpdateFinishStatus(@Param("list") List<LhMoldAlterPlanFinish> list);
+
 }

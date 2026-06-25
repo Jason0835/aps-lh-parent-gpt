@@ -232,6 +232,7 @@ INSERT INTO `sys_menu` (`MENU_NAME`, `PARENT_ID`, `ORDER_NUM`, `TARGET`, `PATH`,
 ('导出', @parentId, 50, 'menuItem', '#', '#', NULL, 1, 0, 'F', '0', '0', 'tm:tmShiftConfig:export', 'tm:tmShiftConfig:export', '#', '#', 'admin', NOW(), 'admin', NOW(), NULL, '[{"zh_CN":"导出","en_US":"Export"}]', NULL, NULL);
 INSERT INTO `sys_menu` (`MENU_NAME`, `PARENT_ID`, `ORDER_NUM`, `TARGET`, `PATH`, `BT_URL`, `COMPONENT`, `IS_FRAME`, `IS_CACHE`, `MENU_TYPE`, `VISIBLE`, `STATUS`, `PERMS`, `BT_PERMS`, `ICON`, `BT_ICON`, `CREATE_BY`, `CREATE_TIME`, `UPDATE_BY`, `UPDATE_TIME`, `REMARK`, `LANG_JSON`, `IS_REFRESH`, `QUERY`) VALUES
 ('导入', @parentId, 60, 'menuItem', '#', '#', NULL, 1, 0, 'F', '0', '0', 'tm:tmShiftConfig:import', 'tm:tmShiftConfig:import', '#', '#', 'admin', NOW(), 'admin', NOW(), NULL, '[{"zh_CN":"导入","en_US":"Import"}]', NULL, NULL);
+
 -- 胎面调度员操作日志主菜单
 INSERT INTO `sys_menu` (`MENU_NAME`, `PARENT_ID`, `ORDER_NUM`, `TARGET`, `PATH`, `BT_URL`, `COMPONENT`, `IS_FRAME`, `IS_CACHE`, `MENU_TYPE`, `VISIBLE`, `STATUS`, `PERMS`, `BT_PERMS`, `ICON`, `BT_ICON`, `CREATE_BY`, `CREATE_TIME`, `UPDATE_BY`, `UPDATE_TIME`, `REMARK`, `LANG_JSON`, `IS_REFRESH`, `QUERY`) VALUES
 ('胎面调度员操作日志', 4, 120, 'menuItem', '/tm/tmDispatcherLog', '#', 'tm/dispatcherLog/index', 1, 0, 'M', '0', '0', 'tm:tmDispatcherLog:view', '', '#', '#', 'admin', NOW(), 'admin', NOW(), NULL, '[{"zh_CN":"胎面调度员操作日志","en_US":"Tread Dispatcher Log"}]', NULL, NULL);
@@ -242,3 +243,29 @@ INSERT INTO `sys_menu` (`MENU_NAME`, `PARENT_ID`, `ORDER_NUM`, `TARGET`, `PATH`,
 -- 导出
 INSERT INTO `sys_menu` (`MENU_NAME`, `PARENT_ID`, `ORDER_NUM`, `TARGET`, `PATH`, `BT_URL`, `COMPONENT`, `IS_FRAME`, `IS_CACHE`, `MENU_TYPE`, `VISIBLE`, `STATUS`, `PERMS`, `BT_PERMS`, `ICON`, `BT_ICON`, `CREATE_BY`, `CREATE_TIME`, `UPDATE_BY`, `UPDATE_TIME`, `REMARK`, `LANG_JSON`, `IS_REFRESH`, `QUERY`) VALUES
 ('导出', @parentId, 20, 'menuItem', '#', '#', NULL, 1, 0, 'F', '0', '0', 'tm:tmDispatcherLog:export', 'tm:tmDispatcherLog:export', '#', '#', 'admin', NOW(), 'admin', NOW(), NULL, '[{"zh_CN":"导出","en_US":"Export"}]', NULL, NULL);
+
+-- 胎面排程结果
+INSERT INTO `sys_menu` (`MENU_NAME`, `PARENT_ID`, `ORDER_NUM`, `TARGET`, `PATH`, `BT_URL`, `COMPONENT`, `IS_FRAME`, `IS_CACHE`, `MENU_TYPE`, `VISIBLE`, `STATUS`, `PERMS`, `BT_PERMS`, `ICON`, `BT_ICON`, `CREATE_BY`, `CREATE_TIME`, `UPDATE_BY`, `UPDATE_TIME`, `REMARK`, `LANG_JSON`, `IS_REFRESH`, `QUERY`) VALUES
+('胎面排程结果', 4, 130, 'menuItem', '/tm/tmScheduleResult', '#', 'tm/scheduleResult/index', 1, 0, 'M', '0', '0', 'tm:tmScheduleResult:view', '', '#', '#', 'admin', NOW(), 'admin', NOW(), NULL, '[{"zh_CN":"胎面排程结果","en_US":"Tread Schedule Result","vi_VN":"Kết quả lịch trình mặt lốp"}]', NULL, NULL);
+SET @parentId = LAST_INSERT_ID();
+-- 查询
+INSERT INTO `sys_menu` (`MENU_NAME`, `PARENT_ID`, `ORDER_NUM`, `TARGET`, `PATH`, `BT_URL`, `COMPONENT`, `IS_FRAME`, `IS_CACHE`, `MENU_TYPE`, `VISIBLE`, `STATUS`, `PERMS`, `BT_PERMS`, `ICON`, `BT_ICON`, `CREATE_BY`, `CREATE_TIME`, `UPDATE_BY`, `UPDATE_TIME`, `REMARK`, `LANG_JSON`, `IS_REFRESH`, `QUERY`) VALUES
+    ('查询列表', @parentId, 10, 'menuItem', '#', '#', NULL, 1, 0, 'F', '0', '0', 'tm:tmScheduleResult:query', 'tm:tmScheduleResult:list', '#', '#', 'admin', NOW(), 'admin', NOW(), NULL, '[{"zh_CN":"查询","en_US":"Query","vi_VN":"Truy vấn"}]', NULL, NULL);
+-- 插单
+INSERT INTO `sys_menu` (`MENU_NAME`, `PARENT_ID`, `ORDER_NUM`, `TARGET`, `PATH`, `BT_URL`, `COMPONENT`, `IS_FRAME`, `IS_CACHE`, `MENU_TYPE`, `VISIBLE`, `STATUS`, `PERMS`, `BT_PERMS`, `ICON`, `BT_ICON`, `CREATE_BY`, `CREATE_TIME`, `UPDATE_BY`, `UPDATE_TIME`, `REMARK`, `LANG_JSON`, `IS_REFRESH`, `QUERY`) VALUES
+    ('插单', @parentId, 20, 'menuItem', '#', '#', NULL, 1, 0, 'F', '0', '0', 'tm:tmScheduleResult:add', 'tm:tmScheduleResult:add', '#', '#', 'admin', NOW(), 'admin', NOW(), NULL, '[{"zh_CN":"插单","en_US":"Insert Order","vi_VN":"Thêm đơn hàng"}]', NULL, NULL);
+-- 调量
+INSERT INTO `sys_menu` (`MENU_NAME`, `PARENT_ID`, `ORDER_NUM`, `TARGET`, `PATH`, `BT_URL`, `COMPONENT`, `IS_FRAME`, `IS_CACHE`, `MENU_TYPE`, `VISIBLE`, `STATUS`, `PERMS`, `BT_PERMS`, `ICON`, `BT_ICON`, `CREATE_BY`, `CREATE_TIME`, `UPDATE_BY`, `UPDATE_TIME`, `REMARK`, `LANG_JSON`, `IS_REFRESH`, `QUERY`) VALUES
+    ('调量', @parentId, 30, 'menuItem', '#', '#', NULL, 1, 0, 'F', '0', '0', 'tm:tmScheduleResult:edit', 'tm:tmScheduleResult:edit', '#', '#', 'admin', NOW(), 'admin', NOW(), NULL, '[{"zh_CN":"调量","en_US":"Adjust Qty","vi_VN":"Điều chỉnh số lượng"}]', NULL, NULL);
+-- 转机台
+INSERT INTO `sys_menu` (`MENU_NAME`, `PARENT_ID`, `ORDER_NUM`, `TARGET`, `PATH`, `BT_URL`, `COMPONENT`, `IS_FRAME`, `IS_CACHE`, `MENU_TYPE`, `VISIBLE`, `STATUS`, `PERMS`, `BT_PERMS`, `ICON`, `BT_ICON`, `CREATE_BY`, `CREATE_TIME`, `UPDATE_BY`, `UPDATE_TIME`, `REMARK`, `LANG_JSON`, `IS_REFRESH`, `QUERY`) VALUES
+    ('转机台', @parentId, 40, 'menuItem', '#', '#', NULL, 1, 0, 'F', '0', '0', 'tm:tmScheduleResult:changeMachine', 'tm:tmScheduleResult:changeMachine', '#', '#', 'admin', NOW(), 'admin', NOW(), NULL, '[{"zh_CN":"转机台","en_US":"Change Machine","vi_VN":"Chuyển máy"}]', NULL, NULL);
+-- 删除
+INSERT INTO `sys_menu` (`MENU_NAME`, `PARENT_ID`, `ORDER_NUM`, `TARGET`, `PATH`, `BT_URL`, `COMPONENT`, `IS_FRAME`, `IS_CACHE`, `MENU_TYPE`, `VISIBLE`, `STATUS`, `PERMS`, `BT_PERMS`, `ICON`, `BT_ICON`, `CREATE_BY`, `CREATE_TIME`, `UPDATE_BY`, `UPDATE_TIME`, `REMARK`, `LANG_JSON`, `IS_REFRESH`, `QUERY`) VALUES
+    ('删除', @parentId, 50, 'menuItem', '#', '#', NULL, 1, 0, 'F', '0', '0', 'tm:tmScheduleResult:remove', 'tm:tmScheduleResult:remove', '#', '#', 'admin', NOW(), 'admin', NOW(), NULL, '[{"zh_CN":"删除","en_US":"Delete","vi_VN":"Xóa"}]', NULL, NULL);
+-- 导出
+INSERT INTO `sys_menu` (`MENU_NAME`, `PARENT_ID`, `ORDER_NUM`, `TARGET`, `PATH`, `BT_URL`, `COMPONENT`, `IS_FRAME`, `IS_CACHE`, `MENU_TYPE`, `VISIBLE`, `STATUS`, `PERMS`, `BT_PERMS`, `ICON`, `BT_ICON`, `CREATE_BY`, `CREATE_TIME`, `UPDATE_BY`, `UPDATE_TIME`, `REMARK`, `LANG_JSON`, `IS_REFRESH`, `QUERY`) VALUES
+    ('导出', @parentId, 60, 'menuItem', '#', '#', NULL, 1, 0, 'F', '0', '0', 'tm:tmScheduleResult:export', 'tm:tmScheduleResult:export', '#', '#', 'admin', NOW(), 'admin', NOW(), NULL, '[{"zh_CN":"导出","en_US":"Export","vi_VN":"Xuất"}]', NULL, NULL);
+-- 导入
+INSERT INTO `sys_menu` (`MENU_NAME`, `PARENT_ID`, `ORDER_NUM`, `TARGET`, `PATH`, `BT_URL`, `COMPONENT`, `IS_FRAME`, `IS_CACHE`, `MENU_TYPE`, `VISIBLE`, `STATUS`, `PERMS`, `BT_PERMS`, `ICON`, `BT_ICON`, `CREATE_BY`, `CREATE_TIME`, `UPDATE_BY`, `UPDATE_TIME`, `REMARK`, `LANG_JSON`, `IS_REFRESH`, `QUERY`) VALUES
+    ('导入', @parentId, 70, 'menuItem', '#', '#', NULL, 1, 0, 'F', '0', '0', 'tm:tmScheduleResult:import', 'tm:tmScheduleResult:import', '#', '#', 'admin', NOW(), 'admin', NOW(), NULL, '[{"zh_CN":"导入","en_US":"Import","vi_VN":"Nhập"}]', NULL, NULL);

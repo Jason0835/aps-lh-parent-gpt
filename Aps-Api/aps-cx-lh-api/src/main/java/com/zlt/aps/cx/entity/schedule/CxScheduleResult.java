@@ -535,4 +535,12 @@ public class CxScheduleResult extends BaseEntity implements Serializable {
     @ApiModelProperty(value = "子表明细列表")
     @TableField(exist = false)
     private List<CxScheduleDetail> details;
+
+    @ApiModelProperty(value = "排序字段名（前端传入，非数据库字段）")
+    @TableField(exist = false)
+    private String orderByColumn;
+
+    @ApiModelProperty(value = "排序方式：asc-升序，desc-降序（前端传入，非数据库字段）")
+    @TableField(exist = false)
+    private String isAsc;
 }

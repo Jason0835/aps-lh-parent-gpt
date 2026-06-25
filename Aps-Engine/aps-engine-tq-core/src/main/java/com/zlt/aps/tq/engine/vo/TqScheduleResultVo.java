@@ -63,8 +63,8 @@ public class TqScheduleResultVo extends ApsBaseDto {
     @ApiModelProperty(value = "尺寸")
     private String specSize;
 
-    @ApiModelProperty(value = "机台ID，多个逗号分割")
-    private String machineId;
+    @ApiModelProperty(value = "机台编号，多个逗号分割")
+    private String machineCode;
 
     @ApiModelProperty(value = "单耗")
     private Double unitConsume;
@@ -238,5 +238,14 @@ public class TqScheduleResultVo extends ApsBaseDto {
 
     @ApiModelProperty(value = "数据来源：0>自动排程；1>APS插单；2>导入；")
     private String dataSource;
+
+    @ApiModelProperty(value = "是否未排（0:已排 1:未排）")
+    private String unscheduledFlag;
+
+    @ApiModelProperty(value = "未排原因")
+    private String unscheduledReason;
+
+    @ApiModelProperty(value = "分厂编码")
+    private String factoryCode;
 
 }

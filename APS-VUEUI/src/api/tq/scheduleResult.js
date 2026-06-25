@@ -1,3 +1,17 @@
+/**
+ * ============================================================================
+ * 【已废弃】胎圈排程结果旧版API（4班次制）
+ *
+ * 废弃说明：
+ *   本文件为旧版4班次制胎圈排程API，已由新版6班次制API替代。
+ *   新版API文件：src/api/tq/tqNewScheduleResult.js
+ *   新版接口前缀：/tq/newScheduleResult/*
+ *   新版算法依据：胎圈自动排程_v5.xmind（6班次制）
+ *
+ *   请勿在新功能中引用本文件，所有新需求请使用新版API。
+ *   计划在阶段3后端旧版代码清理完成后，本文件将一并删除。
+ * ============================================================================
+ */
 import request from '@/utils/request'
 
 export function listScheduleResult(query) {
@@ -89,9 +103,9 @@ export function editScheduleResult(query) {
     data: query
   })
 }
-export function batchChangeMachine(machineId, query) {
+export function batchChangeMachine(machineCode, query) {
   return request({
-    url: 'tq/scheduleResult/batchChangeMachine/' + machineId,
+    url: 'tq/scheduleResult/batchChangeMachine/' + machineCode,
     method: 'post',
     data: query
   })

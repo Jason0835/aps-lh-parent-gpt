@@ -12,5 +12,5 @@ public interface DjEngineCurlRollService {
      * 获得垫胶卷曲长度，key
      * @return
      */
-	Map<String, BigDecimal> getNcCurlLengthMap();
+	Map<String, BigDecimal> getDjCurlLengthMap();
 }

@@ -44,7 +44,7 @@ public class TqMachineMaintenancePlanServiceImpl extends AbstractDocService<TqMa
         QueryWrapper<TqMachineMaintenancePlan> wrapper = new QueryWrapper<>();
         wrapper.ne(entity.getId() != null, "ID", entity.getId());
         wrapper.eq("DOWNTIME_DATE", entity.getDowntimeDate());
-        wrapper.eq("MACHINE_ID", entity.getMachineId());
+        wrapper.eq("MACHINE_CODE", entity.getMachineCode());
         wrapper.eq("DOWNTIME_SHIFT", entity.getDowntimeShift());
         wrapper.eq("IS_DELETE", 0);
         if (tqMachineMaintenancePlanMapper.selectCount(wrapper) > 0) {
@@ -55,7 +55,7 @@ public class TqMachineMaintenancePlanServiceImpl extends AbstractDocService<TqMa
 
     @Override
     protected List<String> getCheckUniqueFields() {
-        return Arrays.asList("downtimeDate", "machineId", "downtimeShift");
+        return Arrays.asList("downtimeDate", "machineCode", "downtimeShift");
     }
 
     @Override
@@ -76,8 +76,8 @@ public class TqMachineMaintenancePlanServiceImpl extends AbstractDocService<TqMa
             addImportErrorLog(importLogId, null, message, importErrorLogs);
             return AjaxResult.error(message, importErrorLogs);
         }
-        Map<String, Long> machineNameMap = machineInfoList.stream()
-                .collect(Collectors.toMap(TqMachineInfo::getMachineName, TqMachineInfo::getId, (v1, v2) -> v1));
+        Map<String, String> machineNameMap = machineInfoList.stream()
+                .collect(Collectors.toMap(TqMachineInfo::getMachineName, TqMachineInfo::getMachineCode, (v1, v2) -> v1));
 
         Map<String, Long> groupMap = list.stream()
                 .collect(Collectors.groupingBy(
@@ -103,13 +103,13 @@ public class TqMachineMaintenancePlanServiceImpl extends AbstractDocService<TqMa
 
             List<ImportErrorLog> validated = ImportUtil.validated(importLogId, i + 2, entity);
             String machineName = entity.getMachineName();
-            Long machineId = machineNameMap.get(machineName);
-            if (machineId == null && !StringUtil.isEmpty(machineName)) {
+            String machineCode = machineNameMap.get(machineName);
+            if (machineCode == null && !StringUtil.isEmpty(machineName)) {
                 addImportErrorLog(importLogId, i + 2,
                         I18nUtil.getMessage("ui.error.message.column.machineNotExist"), validated);
             }
             if (validated.isEmpty()) {
-                entity.setMachineId(machineId);
+                entity.setMachineCode(machineCode);
                 importList.add(entity);
             } else {
                 failureNum++;

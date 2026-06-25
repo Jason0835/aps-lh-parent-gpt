@@ -1,5 +1,6 @@
 package com.zlt.aps.cx.service.engine;
 
+import com.zlt.aps.cx.entity.config.CxParamConfig;
 import com.zlt.aps.cx.entity.config.CxShiftConfig;
 import com.zlt.aps.cx.vo.ScheduleContextVo;
 import com.zlt.aps.mp.api.domain.entity.MdmMoldingMachine;
@@ -43,7 +44,7 @@ public class NewTaskProcessor {
      * @param context           排程上下文
      * @param scheduleDate      排程日期
      * @param dayShifts         当天班次配置
-     * @param continueTasks     续作任务列表（剩余需求>0的重新均衡）
+     * @param dayShifts         当天班次配置
      * @param existAllocations  续作任务分配结果
      * @param trialAllocations 试制任务分配结果（用于量试约束）
      * @return 均衡分配结果
@@ -64,19 +65,26 @@ public class NewTaskProcessor {
                 CollectionUtils.isEmpty(newTasks) ? 0 : newTasks.size(),
                 CollectionUtils.isEmpty(continueTasks) ? 0 : continueTasks.size());
 
-        // Step 1: 按结构分组新增任务
+        // Step 1: 按结构分组新增任务（跳过计划量为0的任务，不参与均衡分配）
         Map<String, List<CoreScheduleAlgorithmService.DailyEmbryoTask>> structureTaskMap = new LinkedHashMap<>();
         if (!CollectionUtils.isEmpty(newTasks)) {
             for (CoreScheduleAlgorithmService.DailyEmbryoTask task : newTasks) {
+                // 计划量为0的任务不参与均衡分配，避免占用DFS搜索空间和机台槽位
+                Integer endingExtraInventory = task.getEndingExtraInventory();
+                if (endingExtraInventory == null || endingExtraInventory <= 0) {
+                    log.info("跳过计划量为0的新增任务: 胎胚={}, 物料={}", task.getEmbryoCode(), task.getMaterialCode());
+                    continue;
+                }
                 structureTaskMap.computeIfAbsent(task.getStructureName(), k -> new ArrayList<>()).add(task);
             }
         }
 
-        // Step 1.1: 将续作剩余 demand > 0 的任务也加入结构分组（补上只有续作没有新增的结构）
+        // Step 1.1: 将续作剩余 demand > 0 且 endingExtraInventory > 0 的任务也加入结构分组
         if (!CollectionUtils.isEmpty(continueTasks)) {
             for (CoreScheduleAlgorithmService.DailyEmbryoTask task : continueTasks) {
                 int demand = task.getVulcanizeMachineCount() != null ? task.getVulcanizeMachineCount() : 0;
-                if (demand > 0) {
+                Integer endingExtraInventory = task.getEndingExtraInventory();
+                if (demand > 0 && endingExtraInventory != null && endingExtraInventory > 0) {
                     structureTaskMap.computeIfAbsent(task.getStructureName(), k -> new ArrayList<>()).add(task);
                 }
             }
@@ -161,7 +169,7 @@ public class NewTaskProcessor {
             // Step 3.5: 参与均衡的任务 = balancedTasks（已包含新增任务和续作剩余任务）
             // 注意：续作剩余任务已在 Step 1.1 加入 structureTaskMap，此处不再重复添加
             List<CoreScheduleAlgorithmService.DailyEmbryoTask> allTasksForStructure = new ArrayList<>(balancedTasks);
-            
+
             // 统计续作剩余数量（仅用于日志）
             int continueRemaining = 0;
             if (!CollectionUtils.isEmpty(continueTasks)) {
@@ -217,7 +225,7 @@ public class NewTaskProcessor {
                 result.setTaskAllocations(new ArrayList<>());
 
                 int usedCapacity = 0;
-                
+
                 // 关键修复：不能简单遍历 embryoAssignments，因为同一个 embryoCode 可能对应多个不同的 task（不同物料）
                 // 需要保留每个独立的 EmbryoAssignment，而不是按 embryoCode 合并
                 for (BalancingService.EmbryoAssignment embryoAssignment
@@ -344,7 +352,7 @@ public class NewTaskProcessor {
                     context.getStructureAllocationMap().get(structureName);
             if (configs != null && !configs.isEmpty()) {
                 int dayOfMonth = scheduleDate.getDayOfMonth();
-                
+
                 // 获取可用成型机编码集合
                 Set<String> availableMachineCodes = new HashSet<>();
                 if (context.getAvailableMachines() != null) {
@@ -352,8 +360,8 @@ public class NewTaskProcessor {
                         availableMachineCodes.add(machine.getCxMachineCode());
                     }
                 }
-                
-                return configs.stream()
+
+                List<MpCxCapacityConfiguration> result = configs.stream()
                         .filter(c -> c.getBeginDay() != null && c.getEndDay() != null)
                         .filter(c -> c.getBeginDay() <= dayOfMonth && c.getEndDay() >= dayOfMonth)
                         .filter(c -> productionVersion == null
@@ -361,6 +369,42 @@ public class NewTaskProcessor {
                         // 过滤：只保留存在于 availableMachines 中的机台
                         .filter(c -> availableMachineCodes.contains(c.getCxMachineCode()))
                         .collect(Collectors.toList());
+                if (!result.isEmpty()) {
+                    return result;
+                }
+            }
+        }
+        // 提前生产回退：当日无机台时，使用 TaskGroupService 分配的未来机台（已剔除冲突）
+        return getAdvanceProductionMachines(structureName, context, productionVersion);
+    }
+
+    /**
+     * 获取提前生产机台（从 context.advanceProductionMachineMap 回退）
+     *
+     * <p>当结构在当日无可配置机台时，TaskGroupService 已从提前生产备用配置中查找并剔除冲突机台，
+     * 将结果存入 advanceProductionMachineMap。此处回退获取，确保提前生产机台在处理器中可用。
+     *
+     * <p>注意：advanceProductionMachineMap 中的机台已在加载阶段完成版本过滤
+     * （本月未来机台用当月版本过滤，跨月机台用次月版本过滤），此处不再重复过滤，
+     * 避免跨月机台因版本不同被错误剔除。
+     *
+     * @param structureName     结构名称
+     * @param context           排程上下文
+     * @param productionVersion 排产版本（未使用，保留参数兼容签名）
+     * @return 提前生产机台列表，无则返回空列表
+     */
+    private List<MpCxCapacityConfiguration> getAdvanceProductionMachines(
+            String structureName, ScheduleContextVo context, String productionVersion) {
+        if (context.getAdvanceProductionMachineMap() != null) {
+            List<MpCxCapacityConfiguration> advanceMachines =
+                    context.getAdvanceProductionMachineMap().get(structureName);
+            if (advanceMachines != null && !advanceMachines.isEmpty()) {
+                log.info("【提前生产】NewTaskProcessor 结构={} 使用提前生产机台={}",
+                        structureName,
+                        advanceMachines.stream()
+                                .map(MpCxCapacityConfiguration::getCxMachineCode)
+                                .collect(Collectors.toList()));
+                return new ArrayList<>(advanceMachines);
             }
         }
         return new ArrayList<>();

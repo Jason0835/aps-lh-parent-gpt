@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.tm.engine.mapper.TmEngineInventoryPredictMapper">
+
+    <select id="selectFirstShiftDemandRows" resultType="com.zlt.aps.tm.engine.domain.TmInventoryPredictQtyVo">
+        SELECT ci.TREAD_CODE AS treadCode,
+               SUM(IFNULL(cx.CLASS1_PLAN_QTY, 0) * IFNULL(ci.TREAD_SHOULDER_LENGTH, 0)) AS qty
+        FROM T_CX_SCHEDULE_RESULT cx
+        LEFT JOIN T_MDM_CONSTRUCTION_INFO ci
+               ON cx.EMBRYO_CODE = ci.CONSTRUCTION_CODE
+              AND (cx.BOM_DATA_VERSION = ci.CONSTRUCTION_VERSION
+                   OR (cx.BOM_DATA_VERSION IS NULL AND ci.CONSTRUCTION_VERSION IS NULL))
+              AND ci.IS_DELETE = 0
+        WHERE cx.FACTORY_CODE = #{factoryCode}
+          AND cx.SCHEDULE_DATE = #{scheduleDate}
+          AND ci.TREAD_CODE IN
+          <foreach collection="treadCodes" item="treadCode" open="(" separator="," close=")">
+              #{treadCode}
+          </foreach>
+        GROUP BY ci.TREAD_CODE
+    </select>
+
+    <select id="selectFirstShiftPlanRows" resultType="com.zlt.aps.tm.engine.domain.TmInventoryPredictQtyVo">
+        SELECT TREAD_CODE AS treadCode,
+               SUM(IFNULL(CLASS3_PLAN_QTY, 0)) AS qty
+        FROM T_TM_SCHEDULE_RESULT
+        WHERE FACTORY_CODE = #{factoryCode}
+          AND SCHEDULE_DATE = #{scheduleDate}
+          AND TREAD_CODE IN
+          <foreach collection="treadCodes" item="treadCode" open="(" separator="," close=")">
+              #{treadCode}
+          </foreach>
+        GROUP BY TREAD_CODE
+    </select>
+
+</mapper>

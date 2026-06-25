@@ -323,9 +323,9 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
         if (!planTableMap.containsKey("yearmonthday")) {
             planTableMap.put("yearmonthday", cn.hutool.core.date.DateUtil.format(scheduleDate, "yyyy年MM月dd日"));
             java.time.LocalDate baseDate = cn.hutool.core.date.DateUtil.toLocalDateTime(scheduleDate).toLocalDate();
-            java.time.LocalDate d1 = baseDate.minusDays(2);
-            java.time.LocalDate d2 = baseDate.minusDays(1);
-            java.time.LocalDate d3 = baseDate;
+            java.time.LocalDate d1 = baseDate.minusDays(1);
+            java.time.LocalDate d2 = baseDate;
+            java.time.LocalDate d3 = baseDate.plusDays(1);
             java.time.format.DateTimeFormatter fmt = java.time.format.DateTimeFormatter.ofPattern("MM/dd");
             planTableMap.put("shiftDate1", "早班 Ca sáng " + d1.format(fmt));
             planTableMap.put("shiftDate2", "中班 Ca chiều " + d1.format(fmt));
@@ -472,9 +472,9 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
 
         if (scheduleDate != null) {
             java.time.LocalDate baseDate = cn.hutool.core.date.DateUtil.toLocalDateTime(scheduleDate).toLocalDate();
-            java.time.LocalDate d1 = baseDate.minusDays(2);
-            java.time.LocalDate d2 = baseDate.minusDays(1);
-            java.time.LocalDate d3 = baseDate;
+            java.time.LocalDate d1 = baseDate.minusDays(1);
+            java.time.LocalDate d2 = baseDate;
+            java.time.LocalDate d3 = baseDate.plusDays(1);
             java.time.format.DateTimeFormatter fmt = java.time.format.DateTimeFormatter.ofPattern("MM/dd");
 
             tableMap.put("shiftDate1", "早班 Ca sáng " + d1.format(fmt));

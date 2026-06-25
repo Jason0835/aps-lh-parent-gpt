@@ -65,6 +65,7 @@ import com.zlt.aps.mp.factory.dto.MpStructureAllocationExportStatisticsVo;
 import com.zlt.aps.mp.factory.dto.MpStructureAllocationExportVo;
 import com.zlt.aps.mp.factory.dto.MpStructureAllocationImportHelper;
 import com.zlt.aps.mp.factory.mapper.*;
+import com.zlt.aps.mp.factory.service.IFactoryMonthPlanMouldDayResultService;
 import com.zlt.aps.mp.factory.service.IMpMonthPlanStatisticsService;
 import com.zlt.aps.mp.factory.service.IMpStructureAllocationService;
 import com.zlt.aps.mp.mdm.dto.DataDTO;
@@ -160,6 +161,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
     private final FactoryMonthPlanProductMouldMapper factoryMonthPlanProductMouldMapper;
     private final DataManager dataManager;
     private final IRawSpecialMaterialRecordService rawSpecialMaterialRecordService;
+    private final IFactoryMonthPlanMouldDayResultService iFactoryMonthPlanMouldDayResultService;
     private final Map<Long, Map<String, String>> importMachineMapCache = new ConcurrentHashMap<>();
     @Autowired
     @Lazy
@@ -2102,6 +2104,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         String monthPlanVersionNotMatchErrorStr = I18nUtil.getMessage("ui.data.column.mpStructureAllocation.import.monthPlanVersionNotMatch");
         ClassLoader classLoader = this.getClass().getClassLoader();
         DataFormatter dataFormatter = new DataFormatter();
+        int excelColumnCount = iFactoryMonthPlanMouldDayResultService.getExportTemplateColumnCount(false);
 
         // 加载月计划调整与结构转产表导出模板，用于获取页签名称
         if (StringUtils.isEmpty(sheetName) || StringUtils.isEmpty(sheetName4DayResult)) {
@@ -2173,7 +2176,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                 return helper;
             }
             // 解析需求计划版本
-            Cell monthPlanVersionCell4DayResult = sheet4DayResult.getRow(0).getCell(64);
+            Cell monthPlanVersionCell4DayResult = sheet4DayResult.getRow(0).getCell(excelColumnCount - 9);
             if (monthPlanVersionCell4DayResult == null) {
                 helper.setAjaxResult(AjaxResult.error(templateErrorStr));
                 return helper;
@@ -2805,20 +2808,20 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                 }
                 // 给开始日期、结束日期赋值
                 this.setBeginDayAndEndDay(item);
-                Integer resultBegingDay = item.getBeginDay();
+                Integer resultBeginDay = item.getBeginDay();
                 Integer resultEndDay = item.getEndDay();
-                if (resultBegingDay == null || resultEndDay == 0) { // 没有排产日的记录忽略，无需记录错误记录
+                if (resultBeginDay == null || resultEndDay == 0) { // 没有排产日的记录忽略，无需记录错误记录
                     continue;
                 }
                 // 校验月计划的排产日期是否在结构转产表的范围内
                 MpStructureAllocation mpStructureAllocation = structureDayMap.get(item.getStructureName());
                 if (mpStructureAllocation != null) {
-                    Integer structureBegingDay = mpStructureAllocation.getBeginDay();
+                    Integer structureBeginDay = mpStructureAllocation.getBeginDay();
                     Integer structureEndDay = mpStructureAllocation.getEndDay();
-                    if (resultBegingDay < structureBegingDay || resultEndDay > structureEndDay) { // 超范围则记录错误信息
+                    if (resultBeginDay < structureBeginDay || resultEndDay > structureEndDay) { // 超范围则记录错误信息
                         item.setId(errorImportId);
                         failureNum++;
-                        String errorMsg = String.format(outOfRangeStr, item.getMaterialDesc() + item.getMaterialCode(), structureBegingDay, structureEndDay);
+                        String errorMsg = String.format(outOfRangeStr, item.getMaterialDesc() + item.getMaterialCode(), structureBeginDay, structureEndDay);
                         addImportErrorLog(importLogId, errorNum, errorMsg, importErrorLogs);
                         continue;
                     }
@@ -3332,6 +3335,8 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
      * @param item
      */
     private void setBeginDayAndEndDay(FactoryMonthPlanMouldDayResult item) {
+        //20260624+ 先清除开始日期，再重新赋值
+        item.setBeginDay(null);
         for (int i = FactoryConstant.MONTH_START_DAY; i <= FactoryConstant.MONTH_MAX_DAY; i++) {
             Object fieldValue = item.getFieldValueByFieldName(FactoryConstant.DAY_FIELD + i);
             if (ObjUtil.isNotNull(fieldValue) && Integer.parseInt(fieldValue.toString()) > 0) {

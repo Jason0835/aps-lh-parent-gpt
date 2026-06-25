@@ -8,10 +8,14 @@ import com.zlt.aps.mp.api.domain.entity.*;
 import com.zlt.aps.cx.api.domain.entity.CxMesStock;
 import com.zlt.aps.cx.api.domain.entity.CxScheFinishQty;
 import com.zlt.aps.cx.api.domain.entity.CxDayFinishQty;
+import com.zlt.aps.cx.api.domain.entity.CxStock;
 import com.zlt.aps.lh.api.domain.entity.LhMachineOnlineInfo;
 import com.zlt.aps.lh.api.domain.entity.LhScheFinishQty;
 import com.zlt.aps.lh.api.domain.entity.LhDayFinishQty;
 import com.zlt.aps.lh.api.domain.entity.LhMoldAlterPlanFinish;
+import com.zlt.aps.tq.api.domain.entity.TqDayFinishQty;
+import com.zlt.aps.tq.api.domain.entity.TqMesStock;
+import com.zlt.aps.tq.api.domain.entity.TqScheFinishQty;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
@@ -124,12 +128,28 @@ public interface MesItfMapper {
     List<CxMesStock> selectMesCxStockList(AuxReqSyncDataLogs syncDataLogs);
 
     /**
+     * 实时查询MES生胎库存，直接映射为CxStock返回（不经过CxMesStock中间表）
+     *
+     * @param syncDataLogs 参数（可传factoryCode过滤分厂）
+     * @return 生胎库存列表
+     */
+    List<CxStock> selectCxStockFromMes(AuxReqSyncDataLogs syncDataLogs);
+
+    /**
      * 查询胎面库存同步数据
      *
      * @param syncDataLogs 参数
      * @return 列表
      */
     List<MdmTreadStock> selectTreadStockList(AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 查询胎圈库存同步数据
+     *
+     * @param syncDataLogs 参数
+     * @return 列表
+     */
+    List<TqMesStock> selectMesTqStockList(AuxReqSyncDataLogs syncDataLogs);
 
     /**
      * 查询成型排程完成量同步数据
@@ -179,6 +199,22 @@ public interface MesItfMapper {
      * @return 列表
      */
     List<LhDayFinishQty> selectLhScheDayFinishQtyList(AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 查询胎圈排程完成量同步数据
+     *
+     * @param syncDataLogs 参数
+     * @return 列表
+     */
+    List<TqScheFinishQty> selectTqClassShiftFinishQtyList(AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 查询胎圈排程日完成量同步数据
+     *
+     * @param syncDataLogs 参数
+     * @return 列表
+     */
+    List<TqDayFinishQty> selectTqScheDayFinishQtyList(AuxReqSyncDataLogs syncDataLogs);
 
 
 
@@ -304,4 +340,20 @@ public interface MesItfMapper {
      * @return 版本号列表，按升序排列
      */
     List<String> selectAllDataVersionsFromMouldCleanPlan(@Param("factoryCode") String factoryCode);
+
+    /**
+     * 查询设备计划停机同步数据（按版本号）
+     *
+     * @param syncDataLogs 参数
+     * @return 列表
+     */
+    List<DevPlanCloseVo> selectDevPlanCloseList(AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 查询设备计划停机中间表的最大版本号
+     *
+     * @param factoryCode 分厂编码（可选）
+     * @return 最大版本号，无数据时返回null
+     */
+    String selectMaxDataVersionFromDevPlanClose(@Param("factoryCode") String factoryCode);
 }

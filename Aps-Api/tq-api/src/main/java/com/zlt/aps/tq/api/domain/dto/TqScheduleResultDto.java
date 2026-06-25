@@ -79,12 +79,12 @@ public class TqScheduleResultDto extends ApsBaseDto
     private String specSize;
 
     /**
-     * 生产线(机台名称)
+     * 机台编号
      */
     @ImportValidated(required = true,maxLength = 20)
     @Excel(name = "ui.data.column.scheduleResult.produceLine")
-    @ApiModelProperty(value = "生产线")
-    private String machineId;
+    @ApiModelProperty(value = "机台编号")
+    private String machineCode;
 
     /** 单耗 */
 //    @Excel(name = "ui.data.column.scheduleResult.unitConsume")
@@ -275,6 +275,11 @@ public class TqScheduleResultDto extends ApsBaseDto
     @ApiModelProperty(value = "收尾提示标识(0:提示收尾；1:不需要提示)")
     private String markCloseOutTip;
 
+    /** 收尾规格标识(0:收尾；1:非收尾) */
+    @Excel(name = "ui.data.column.tq.scheduleResult.closeOutSpecFlag", dictType = "CLOSE_OUT_SPEC_FLAG")
+    @ApiModelProperty(value = "收尾规格标识(0:收尾；1:非收尾)")
+    private String closeOutSpecFlag;
+
     @ImportValidated(maxLength = 300)
     @Excel(name = "ui.common.column.remark")
     @ApiModelProperty(value = "备注", position = 500)
@@ -355,6 +360,13 @@ public class TqScheduleResultDto extends ApsBaseDto
     @ApiModelProperty(value = "理论交班库存")
     @TableField(exist = false)
     private Double theoreticClassStockQty = 0D;
+
+    /**
+     * 分厂编码（查询参数，非数据库字段）
+     */
+    @ApiModelProperty(value = "分厂编码")
+    @TableField(exist = false)
+    private String factoryCode;
 
     /**
      * 理论昨日早班计划量

@@ -106,7 +106,7 @@ export default {
       return [
         // {
         //     prop: "factoryCode",
-        //     label: this.$t("ui.data.column.factoryCode"),
+        //     label: this.$t("ui.data.column.demandPlan.factoryCode"),
         //     type: "select",
         //     disabled: true,
         //     dictData: this.parentDict.type.biz_factory_name,
@@ -114,7 +114,7 @@ export default {
 
         //   {
         //     prop: "productType",
-        //     label: this.$t("ui.data.column.monthplan.productType"),
+        //     label: this.$t("ui.data.column.demandPlan.productTypeCode"),
         //     type: "select",
         //     disabled: true,
         //     dictData: this.parentDict.type.biz_product_type,
@@ -122,12 +122,12 @@ export default {
         {
           prop: "structureName",
           disabled: true,
-          label: this.$t("ui.data.column.finishStock.structureName"),
+          label: this.$t("ui.data.column.demandPlan.structureName"),
 
         },
         {
           prop: "structurePriority",
-          label: this.$t("ui.data.DemandPlan.structurePriority"),
+          label: this.$t("ui.data.column.demandPlan.structurePriority"),
           type: "select",
           dictData: this.parentDict.type.biz_yes_no,
         },
@@ -153,7 +153,7 @@ export default {
         // },
         // {
         //   prop: "brand",
-        //   label: this.$t("common.brand"),
+        //   label: this.$t("ui.data.column.demandPlan.brand"),
         //   disabled: true,
         // },
 

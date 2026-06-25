@@ -58,6 +58,10 @@ public class LhParamsController extends AbstractDocBizController<LhParams> {
         return super.list(queryVO);
     }
 
+    @Override
+    protected String getOrderBy(LhParams queryVO) {
+        return "PARAM_CODE";
+    }
 
     /**
      * 保存

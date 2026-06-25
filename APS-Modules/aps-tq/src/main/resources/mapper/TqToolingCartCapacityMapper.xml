@@ -5,15 +5,12 @@
     <select id="listToolingCartCapacity" parameterType="com.zlt.aps.tq.api.domain.entity.TqToolingCartCapacity"
             resultType="com.zlt.aps.tq.api.domain.entity.TqToolingCartCapacity">
         select * from (
-            select ID, CART_CODE, MATERIAL_CODE, CART_CAPACITY,
+            select ID, BEAD_CODE, CART_CAPACITY,
                    REMARK, IS_DELETE, CREATE_BY, CREATE_TIME, UPDATE_BY, UPDATE_TIME
             from T_TQ_TOOLING_CART_CAPACITY
             where IS_DELETE = '0'
-            <if test="cartCode != null and cartCode != ''">
-                and CART_CODE like concat('%', #{cartCode}, '%')
-            </if>
-            <if test="materialCode != null and materialCode != ''">
-                and MATERIAL_CODE like concat('%', #{materialCode}, '%')
+            <if test="beadCode != null and beadCode != ''">
+                and BEAD_CODE like concat('%', #{beadCode}, '%')
             </if>
             order by CREATE_TIME desc
         ) t
@@ -23,21 +20,19 @@
         SELECT count(1)
         FROM T_TQ_TOOLING_CART_CAPACITY
         where IS_DELETE = '0'
-        and CART_CODE = #{cartCode}
-        and MATERIAL_CODE = #{materialCode}
+        and BEAD_CODE = #{beadCode}
         <if test="id != null">and ID != #{id}</if>
     </select>
 
     <insert id="mergeSql" parameterType="list">
         INSERT INTO T_TQ_TOOLING_CART_CAPACITY (
-            cart_code, material_code, cart_capacity, remark,
+            bead_code, cart_capacity, remark,
             create_by, create_time, update_by, update_time, is_delete
         )
         VALUES
         <foreach collection="list" item="CartCapacity" separator=",">
             (
-            #{CartCapacity.cartCode,jdbcType=VARCHAR},
-            #{CartCapacity.materialCode,jdbcType=VARCHAR},
+            #{CartCapacity.beadCode,jdbcType=VARCHAR},
             #{CartCapacity.cartCapacity,jdbcType=INTEGER},
             #{CartCapacity.remark,jdbcType=VARCHAR},
             #{CartCapacity.createBy,jdbcType=VARCHAR},

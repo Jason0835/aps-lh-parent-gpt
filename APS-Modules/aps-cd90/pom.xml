@@ -85,6 +85,15 @@
             <groupId>com.zlt.aps.cd90</groupId>
             <artifactId>aps-cd90-api</artifactId>
         </dependency>
+        <dependency>
+            <groupId>com.zlt.aps.cd90</groupId>
+            <artifactId>aps-engine-cd90</artifactId>
+            <version>1.0.3-SNAPSHOT</version>
+        </dependency>
+        <dependency>
+            <groupId>com.zlt.aps.cd90</groupId>
+            <artifactId>aps-engine-cd90</artifactId>
+        </dependency>
     </dependencies>
 
     <build>

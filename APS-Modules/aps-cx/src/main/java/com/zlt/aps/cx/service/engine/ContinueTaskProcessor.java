@@ -2,8 +2,12 @@ package com.zlt.aps.cx.service.engine;
 
 import com.zlt.aps.cx.entity.config.CxParamConfig;
 import com.zlt.aps.cx.entity.config.CxShiftConfig;
+import com.zlt.aps.cx.entity.schedule.LhScheduleResult;
+
+import com.zlt.aps.cx.service.engine.ScheduleDayTypeHelper.DayFlagInfo;
 import com.zlt.aps.cx.vo.ScheduleContextVo;
 import com.zlt.aps.mp.api.domain.entity.MdmMoldingMachine;
+import com.zlt.aps.mp.api.domain.entity.MdmStructureLhRatio;
 import com.zlt.aps.mp.api.domain.entity.MpCxCapacityConfiguration;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -16,14 +20,17 @@ import java.util.stream.Collectors;
 
 /**
  * 续作任务处理器
- * 
- * <p>负责续作任务的保底预留处理：
- * <ol>
- *   <li>标记所有续作任务 isContinueTask=true</li>
- *   <li>根据参数 SYS04070003 判断是否开启保底预留</li>
- *   <li>开启时：每个机台的每个历史胎胚保底预留1个硫化机在原机台</li>
- *   <li>剩余需求统一交给 NewTaskProcessor 做均衡分配</li>
- * </ol>
+ *
+ * <p>负责 S5.3 续作任务排产：
+ * <ul>
+ *   <li>按结构分组任务</li>
+ *   <li>使用 {@link BalancingService} 均衡分配胎胚到机台</li>
+ *   <li>S5.3.1 分配胎胚库存：按硫化需求占比分配</li>
+ *   <li>S5.3.2 计算待排产量：(日硫化量 - 库存) × (1 + 损耗率) + 异常平摊</li>
+ *   <li>S5.3.3 开停产特殊处理</li>
+ *   <li>S5.3.4 收尾余量处理：主要产品补到一整车</li>
+ *   <li>S5.3.5 补做逻辑：延误检测和补做计算</li>
+ * </ul>
  *
  * @author APS Team
  */
@@ -32,8 +39,24 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class ContinueTaskProcessor {
 
+    private final BalancingService balancingService;
+    private final ProductionCalculator productionCalculator;
+    private final ScheduleDayTypeHelper scheduleDayTypeHelper;
+
+    /** 胎胚库容上限比例 */
+    private static final double EMBRYO_STORAGE_RATIO = 0.9;
+
+    /** 默认整车容量（条/车） */
+    private static final int DEFAULT_TRIP_CAPACITY = 12;
+
+    /** 默认最大硫化机台数 */
+    private static final int DEFAULT_MAX_LH_MACHINE_COUNT = 10;
+
     /** 默认日产能（条/天），机台未配置时使用 */
     private static final int DEFAULT_DAILY_CAPACITY = 1200;
+
+    /** 默认机台小时产能（条/小时） */
+    private static final int DEFAULT_HOURLY_CAPACITY = 50;
 
     /** 参数编码：强制保留历史任务 */
     private static final String PARAM_FORCE_KEEP_HISTORY = "SYS04070003";
@@ -193,6 +216,21 @@ public class ContinueTaskProcessor {
 
     // ==================== 辅助方法 ====================
 
+    /**
+     * 按结构分组
+     */
+    private Map<String, List<CoreScheduleAlgorithmService.DailyEmbryoTask>> groupTasksByStructure(
+            List<CoreScheduleAlgorithmService.DailyEmbryoTask> tasks) {
+
+        // 先分组
+        return tasks.stream()
+                .filter(t -> t.getStructureName() != null)
+                .collect(Collectors.groupingBy(
+                        CoreScheduleAlgorithmService.DailyEmbryoTask::getStructureName,
+                        LinkedHashMap::new,
+                        Collectors.toList()));
+    }
+
     private boolean getForceKeepHistoryConfig(ScheduleContextVo context) {
         if (context.getParamConfigMap() != null) {
             CxParamConfig config = context.getParamConfigMap().get(PARAM_FORCE_KEEP_HISTORY);
@@ -227,18 +265,209 @@ public class ContinueTaskProcessor {
             if (configs != null && !configs.isEmpty()) {
                 int day = scheduleDate.getDayOfMonth();
                 // 过滤日期范围 + PRODUCTION_VERSION
-                return configs.stream()
+                List<MpCxCapacityConfiguration> result = configs.stream()
                         .filter(c -> c.getBeginDay() != null && c.getEndDay() != null)
                         .filter(c -> c.getBeginDay() <= day && c.getEndDay() >= day)
                         .filter(c -> productionVersion == null
                                 || productionVersion.equals(c.getProductionVersion()))
                         .collect(Collectors.toList());
+                if (!result.isEmpty()) {
+                    return result;
+                }
+            }
+        }
+        // 提前生产回退：当日无机台时，使用 TaskGroupService 分配的未来机台（已剔除冲突）
+        return getAdvanceProductionMachines(structureName, context, productionVersion);
+    }
+
+    /**
+     * 获取提前生产机台（从 context.advanceProductionMachineMap 回退）
+     *
+     * <p>当结构在当日无可配置机台时，TaskGroupService 已从提前生产备用配置中查找并剔除冲突机台，
+     * 将结果存入 advanceProductionMachineMap。此处回退获取，确保提前生产机台在处理器中可用。
+     *
+     * <p>注意：advanceProductionMachineMap 中的机台已在加载阶段完成版本过滤
+     * （本月未来机台用当月版本过滤，跨月机台用次月版本过滤），此处不再重复过滤，
+     * 避免跨月机台因版本不同被错误剔除。
+     *
+     * @param structureName     结构名称
+     * @param context           排程上下文
+     * @param productionVersion 排产版本（未使用，保留参数兼容签名）
+     * @return 提前生产机台列表，无则返回空列表
+     */
+    private List<MpCxCapacityConfiguration> getAdvanceProductionMachines(
+            String structureName, ScheduleContextVo context, String productionVersion) {
+        if (context.getAdvanceProductionMachineMap() != null) {
+            List<MpCxCapacityConfiguration> advanceMachines =
+                    context.getAdvanceProductionMachineMap().get(structureName);
+            if (advanceMachines != null && !advanceMachines.isEmpty()) {
+                log.info("【提前生产】ContinueTaskProcessor 结构={} 使用提前生产机台={}",
+                        structureName,
+                        advanceMachines.stream()
+                                .map(MpCxCapacityConfiguration::getCxMachineCode)
+                                .collect(Collectors.toList()));
+                return new ArrayList<>(advanceMachines);
             }
         }
         return new ArrayList<>();
     }
 
-    // ==================== 机台分配方法 ====================
+    /**
+     * 构建机台最大硫化机数映射
+     *
+     * <p>根据每台机台的机型 + 结构，从 MdmStructureLhRatio 获取对应的最大硫化机数
+     *
+     * @param machineConfigs  机台配置列表
+     * @param structureName   结构名称
+     * @param context         排程上下文
+     * @return 机台编码 -> 最大硫化机数
+     */
+    private Map<String, Integer> buildMachineMaxLhMap(
+            List<MpCxCapacityConfiguration> machineConfigs,
+            String structureName,
+            ScheduleContextVo context) {
+
+        Map<String, Integer> result = new HashMap<>();
+
+        // 构建机台编码 -> 机型 映射
+        Map<String, String> machineTypeMap = new HashMap<>();
+        if (context.getAvailableMachines() != null) {
+            for (MdmMoldingMachine machine : context.getAvailableMachines()) {
+                machineTypeMap.put(machine.getCxMachineCode(), machine.getCxMachineTypeCode());
+            }
+        }
+
+        // 构建 机型_结构 -> 最大硫化机数 映射
+        Map<String, Integer> typeStructureMap = new HashMap<>();
+        List<MdmStructureLhRatio> ratios = context.getStructureLhRatios();
+        if (ratios != null) {
+            for (MdmStructureLhRatio ratio : ratios) {
+                String key = ratio.getCxMachineTypeCode() + "_" + ratio.getStructureName();
+                if (ratio.getLhMachineMaxQty() != null) {
+                    typeStructureMap.put(key, ratio.getLhMachineMaxQty());
+                }
+            }
+        }
+
+        // 为每台机台获取对应的最大硫化机数
+        for (MpCxCapacityConfiguration config : machineConfigs) {
+            String machineCode = config.getCxMachineCode();
+            String machineType = machineTypeMap.get(machineCode);
+
+            // 根据机型+结构查找
+            String key = machineType + "_" + structureName;
+            Integer maxLh = typeStructureMap.get(key);
+
+            // 如果找不到，尝试只按结构查找（向后兼容）
+            if (maxLh == null && context.getStructureLhRatioMap() != null) {
+                MdmStructureLhRatio ratioConfig = context.getStructureLhRatioMap().get(structureName);
+                if (ratioConfig != null && ratioConfig.getLhMachineMaxQty() != null) {
+                    maxLh = ratioConfig.getLhMachineMaxQty();
+                }
+            }
+
+            // 兜底：使用默认值
+            if (maxLh == null) {
+                maxLh = DEFAULT_MAX_LH_MACHINE_COUNT;
+                log.debug("机台 {} 机型 {} 结构 {} 未找到配比配置，使用默认值 {}",
+                        machineCode, machineType, structureName);
+            }
+
+            result.put(machineCode, maxLh);
+        }
+
+        log.info("结构 {} 机台最大硫化机数映射：{}", structureName, result);
+        return result;
+    }
+
+    /**
+     * 构建机台最大胎胚种类数映射
+     *
+     * <p>根据每台机台的机型 + 结构，从 MdmStructureLhRatio 获取对应的最大胎胚种类数
+     *
+     * @param machineConfigs  机台配置列表
+     * @param structureName   结构名称
+     * @param context         排程上下文
+     * @return 机台编码 -> 最大胎胚种类数
+     */
+    private Map<String, Integer> buildMachineMaxEmbryoTypesMap(
+            List<MpCxCapacityConfiguration> machineConfigs,
+            String structureName,
+            ScheduleContextVo context) {
+
+        Map<String, Integer> result = new HashMap<>();
+
+        // 构建机台编码 -> 机型 映射
+        Map<String, String> machineTypeMap = new HashMap<>();
+        if (context.getAvailableMachines() != null) {
+            for (MdmMoldingMachine machine : context.getAvailableMachines()) {
+                machineTypeMap.put(machine.getCxMachineCode(), machine.getCxMachineTypeCode());
+            }
+        }
+
+        // 构建 机型_结构 -> 最大胎胚种类数 映射
+        Map<String, Integer> typeStructureMap = new HashMap<>();
+        List<MdmStructureLhRatio> ratios = context.getStructureLhRatios();
+        if (ratios != null) {
+            for (MdmStructureLhRatio ratio : ratios) {
+                String key = ratio.getCxMachineTypeCode() + "_" + ratio.getStructureName();
+                if (ratio.getMaxEmbryoQty() != null) {
+                    typeStructureMap.put(key, ratio.getMaxEmbryoQty());
+                }
+            }
+        }
+
+        // 自定义最大胎胚种类数：按机台前缀匹配，优先于配比默认值
+        Map<String, Integer> machineMaxEmbryoTypes = context.getMachineMaxEmbryoTypes();
+
+        // 为每台机台获取对应的最大胎胚种类数
+        for (MpCxCapacityConfiguration config : machineConfigs) {
+            String machineCode = config.getCxMachineCode();
+            String machineType = machineTypeMap.get(machineCode);
+
+            // 自定义机台前缀匹配：使用专用最大胎胚种类数
+            Integer maxTypes = null;
+            if (machineMaxEmbryoTypes != null && machineCode != null) {
+                for (Map.Entry<String, Integer> entry : machineMaxEmbryoTypes.entrySet()) {
+                    if (machineCode.startsWith(entry.getKey())) {
+                        maxTypes = entry.getValue();
+                        log.info("  机台 {} (机型={}): 使用{}专用最大胎胚种类数={}", machineCode, machineType, entry.getKey(), maxTypes);
+                        break;
+                    }
+                }
+            }
+            if (maxTypes != null) {
+                result.put(machineCode, maxTypes);
+                continue;
+            }
+
+            // 根据机型+结构查找
+            String key = machineType + "_" + structureName;
+            maxTypes = typeStructureMap.get(key);
+
+            // 如果找不到，尝试只按结构查找（向后兼容）
+            if (maxTypes == null && context.getStructureLhRatioMap() != null) {
+                MdmStructureLhRatio ratioConfig = context.getStructureLhRatioMap().get(structureName);
+                if (ratioConfig != null && ratioConfig.getMaxEmbryoQty() != null) {
+                    maxTypes = ratioConfig.getMaxEmbryoQty();
+                }
+            }
+
+            // 兜底：使用默认值
+            if (maxTypes == null) {
+                maxTypes = context.getMaxTypesPerMachine() != null ? context.getMaxTypesPerMachine() : BalancingService.DEFAULT_MAX_TYPES_PER_MACHINE;
+                log.debug("机台 {} 机型 {} 结构 {} 未找到胎胚种类数配置，使用默认值 {}",
+                        machineCode, machineType, structureName, maxTypes);
+            }
+
+            result.put(machineCode, maxTypes);
+        }
+
+        log.info("结构 {} 机台最大胎胚种类数映射：{}", structureName, result);
+        return result;
+    }
+
+    // ==================== 原有方法 ====================
 
     private CoreScheduleAlgorithmService.MachineAllocationResult createMachineAllocation(
             String machineCode, ScheduleContextVo context) {
@@ -259,5 +488,212 @@ public class ContinueTaskProcessor {
             }
         }
         return DEFAULT_DAILY_CAPACITY;
+    }
+
+    /**
+     * 从任务对象中读取当前库存，同步到 currentStock 字段
+     *
+     * <p>materialStockMap 的库存分配在 TaskGroupService.buildSingleTask 中已完成
+     * （按各硫化任务的需求比例预分配）。此处仅读取并同步到
+     * currentStock 字段，供后续 calculatePlannedProduction 使用。
+     *
+     * @param task         任务
+     * @param context      排程上下文
+     * @param scheduleDate 排程日期（未使用，为扩展预留）
+     */
+    public void allocateEmbryoStock(
+            CoreScheduleAlgorithmService.DailyEmbryoTask task,
+            ScheduleContextVo context,
+            LocalDate scheduleDate) {
+
+        // 库存已在 TaskGroupService.buildSingleTask 中按物料需求比例分配好
+        // 这里直接使用当前库存
+        int currentStock = task.getCurrentStock() != null ? task.getCurrentStock() : 0;
+        task.setCurrentStock(currentStock);
+        log.debug("胎胚 {} 当前库存：{}", task.getEmbryoCode(), currentStock);
+    }
+
+
+
+
+    /**
+     * 处理开产日和停产日对任务计划量的影响
+     *
+     * <p>判断逻辑：
+     * <ol>
+     *   <li>从当前排产日期往前找最近一个有 dayFlag 标识的日期（MdmWorkCalendar.dayFlag 不为 null）</li>
+     *   <li>若该日期是「停」（dayFlag="0"）→ 往后都是停产</li>
+     *   <li>若该日期是「开」（dayFlag="1"）→ 正常按硫化计划安排</li>
+     * </ol>
+     *
+     * <p>停产日处理：
+     * <ul>
+     *   <li>停产是今天：有量（库存必须为0），安排 = 硫化需要的量（不做整车取整）</li>
+     *   <li>停产不是今天（已停产）：plannedProduction = 0</li>
+     * </ul>
+     *
+     * <p>开产日处理：
+     * <ul>
+     *   <li>开产日有量但不多，严格按硫化计划安排，取整到整车</li>
+     * </ul>
+     *
+     * @param task         任务
+     * @param context      排程上下文
+     * @param dayShifts    当天班次配置（未使用，开产停产处理不需要分班次）
+     */
+    public void handleOpeningClosingDay(
+            CoreScheduleAlgorithmService.DailyEmbryoTask task,
+            ScheduleContextVo context,
+            List<CxShiftConfig> dayShifts) {
+
+        LocalDate scheduleDate = context.getCurrentScheduleDate();
+
+        // Step 1: 从当前日期往前找最近一个有 dayFlag 标识的日期
+        DayFlagInfo flagInfo = scheduleDayTypeHelper.findNearestDayFlag(scheduleDate, context.getFactoryCode());
+
+        if (flagInfo == null || flagInfo.dayFlag == null) {
+            // 没有找到任何标识，按正常日期处理
+            return;
+        }
+
+        if ("0".equals(flagInfo.dayFlag)) {
+            // 最近标识是「停」→ 停产标识日之后都是停产日
+            // 停产标识日当天有量（最后一天生产），只有停产日之后才算停产
+            task.setIsClosingDayTask(true);
+
+            if (scheduleDate.isAfter(flagInfo.nearestDate)) {
+                // 停产日之后：无法安排
+                task.setPlannedProduction(0);
+                log.debug("停产日（已停产），不安排：materialCode={}", task.getEmbryoCode());
+            }
+            // 停产标识日当天：有量，plannedProduction 保持原值
+            // 整车取整由 calculatePlannedProduction 完成
+        } else if ("1".equals(flagInfo.dayFlag)) {
+            // 最近标识是「开」→ 正常按硫化计划安排，取整到整车
+            task.setIsOpeningDayTask(true);
+            // 开产日有量但不多，整车取整由 calculatePlannedProduction 完成
+            log.debug("开产日，正常按硫化计划安排：materialCode={}", task.getEmbryoCode());
+        }
+        // 其他情况（dayFlag 未知）按正常处理，不做干预
+    }
+    /**
+     * 处理收尾任务的余量约束
+     *
+     * <p>前提：仅对 isEndingTask=true 或 isNearEnding=true 的任务生效
+     * <p>逻辑：
+     * <ol>
+     *   <li>计算剩余需生产量 = 收尾余量 - 已分配库存</li>
+     *   <li>调用 ProductionCalculator 计算收尾计划量（整车取整 + 非主销产品余量≤2条则舍弃）</li>
+     *   <li>若余量被舍弃 → 计划量=0，标记 abandoned</li>
+     *   <li>若主销产品多做了 → 记录 extraInventory</li>
+     *   <li>若本批完成全部收尾 → 标记 isLastEndingBatch</li>
+     * </ol>
+     *
+     * @param task         任务
+     * @param context      排程上下文
+     */
+    public void handleEndingRemainder(
+            CoreScheduleAlgorithmService.DailyEmbryoTask task,
+            ScheduleContextVo context) {
+
+        if (!Boolean.TRUE.equals(task.getIsEndingTask()) && !Boolean.TRUE.equals(task.getIsNearEnding())) {
+            return;
+        }
+
+        Integer endingSurplus = task.getEndingSurplusQty();
+        if (endingSurplus == null || endingSurplus <= 0) {
+            return;
+        }
+
+        int plannedProduction = task.getPlannedProduction() != null ? task.getPlannedProduction() : 0;
+        int currentStock = task.getCurrentStock() != null ? task.getCurrentStock() : 0;
+        int totalPlanned = plannedProduction + currentStock;
+
+        // 使用 ProductionCalculator 计算收尾计划量
+        boolean isMainProduct = Boolean.TRUE.equals(task.getIsMainProduct());
+        int remainingToProduce = Math.max(0, endingSurplus - currentStock);
+
+        ProductionCalculator.PlanQuantityResult endingResult = productionCalculator.calculateEndingQuantity(
+                remainingToProduce,
+                getTripCapacity(task.getStructureName(), task.getEmbryoCode(), context),
+                isMainProduct,
+                task.getEmbryoCode()
+        );
+
+        // 更新任务状态
+        if (endingResult.isAbandoned()) {
+            // 非主销产品余量≤2条，舍弃
+            task.setPlannedProduction(0);
+            task.setEndingAbandoned(true);
+            task.setEndingAbandonedQty(endingResult.getAbandonedQuantity());
+            log.info("收尾任务 {} 余量 {} 条被舍弃", task.getEmbryoCode(), endingResult.getAbandonedQuantity());
+        } else {
+            // 更新计划量
+            int newPlanQuantity = endingResult.getPlanQuantity();
+            task.setPlannedProduction(newPlanQuantity);
+
+            // 记录额外库存（主销产品多做的部分）
+            if (endingResult.getExtraInventory() > 0) {
+                task.setEndingExtraInventory(endingResult.getExtraInventory());
+                log.info("收尾任务 {} 主销产品，多做 {} 条当库存",
+                        task.getEmbryoCode(), endingResult.getExtraInventory());
+            }
+
+            // 标记是否为收尾最后一批
+            if (totalPlanned >= endingSurplus || newPlanQuantity >= remainingToProduce) {
+                task.setIsLastEndingBatch(true);
+            }
+        }
+
+        // 保存班次分配
+        if (endingResult.getShiftAllocation() != null) {
+            task.setShiftAllocation(endingResult.getShiftAllocation());
+        }
+    }
+
+
+    private int getTripCapacity(String structureCode, String embryoCode, ScheduleContextVo context) {
+        return productionCalculator.getTripCapacity(structureCode, embryoCode, context);
+    }
+
+    private void allocateTaskToMachine(
+            CoreScheduleAlgorithmService.MachineAllocationResult allocation,
+            CoreScheduleAlgorithmService.DailyEmbryoTask task,
+            ScheduleContextVo context) {
+
+        // 使用 endingExtraInventory（最终需要生产的量，经过收尾处理）
+        int quantity = task.getEndingExtraInventory() != null && task.getEndingExtraInventory() > 0
+                ? task.getEndingExtraInventory() : task.getDemandQuantity();
+
+        CoreScheduleAlgorithmService.TaskAllocation taskAllocation = new CoreScheduleAlgorithmService.TaskAllocation();
+        taskAllocation.setEmbryoCode(task.getEmbryoCode());
+        taskAllocation.setMaterialCode(task.getMaterialCode());
+        taskAllocation.setMaterialDesc(task.getMaterialDesc());
+        taskAllocation.setMainMaterialDesc(task.getMainMaterialDesc());
+        taskAllocation.setStructureName(task.getStructureName());
+        taskAllocation.setQuantity(quantity);
+        taskAllocation.setVulcanizeMachineCount(task.getVulcanizeMachineCount() != null ? task.getVulcanizeMachineCount() : 1);
+        taskAllocation.setPriority(task.getPriority());
+        taskAllocation.setStockHours(task.getStockHours());
+        taskAllocation.setIsTrialTask(task.getIsTrialTask());
+        taskAllocation.setIsProductionTrial(task.getIsProductionTrial());
+        taskAllocation.setIsEndingTask(task.getIsEndingTask());
+        taskAllocation.setEndingSurplusQty(task.getEndingSurplusQty());
+        taskAllocation.setEndingExtraInventory(task.getEndingExtraInventory());  // 设置收尾额外库存
+        taskAllocation.setIsLastEndingBatch(task.getIsLastEndingBatch());  // 设置是否收尾最后一批
+        taskAllocation.setIsEndProduction(task.getIsEndProduction());  // 设置是否结束生产
+        taskAllocation.setEndingAbandoned(task.getEndingAbandoned());  // 设置收尾是否被舍弃
+        taskAllocation.setIsOpeningDayTask(task.getIsOpeningDayTask());  // 设置是否开产日任务
+        taskAllocation.setIsClosingDayTask(task.getIsClosingDayTask());  // 设置是否停产日任务
+        taskAllocation.setIsMainProduct(task.getIsMainProduct());
+        taskAllocation.setLhId(task.getLhId());
+        taskAllocation.setConstructionStage(task.getConstructionStage());
+        taskAllocation.setIsFirstTask(task.getIsFirstTask());  // 传递是否首任务（新开规格）
+        taskAllocation.setIsUrgentEnding(task.getIsUrgentEnding());  // 传递是否紧急收尾
+        taskAllocation.setIsNearEnding(task.getIsNearEnding());  // 传递是否临近收尾
+
+        allocation.getTaskAllocations().add(taskAllocation);
+        allocation.setUsedCapacity(allocation.getUsedCapacity() + quantity);
+        allocation.setRemainingCapacity(allocation.getRemainingCapacity() - quantity);
     }
 }

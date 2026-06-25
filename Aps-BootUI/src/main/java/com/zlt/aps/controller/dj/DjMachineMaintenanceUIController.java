@@ -28,7 +28,7 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.text.Convert;
 import com.ruoyi.common4ui.core.controller.BaseUIController;
 import com.zlt.aps.dj.api.domain.entity.DjMachineMaintenance;
-import com.zlt.aps.dj.api.service.IDjMachineMaintenanceService;
+import com.zlt.aps.dj.api.service.IDjMachineMaintenanceRemoteService;
 import com.zlt.file.encryptbyll.FileEncryptUtils;
 
 import io.swagger.annotations.Api;
@@ -45,7 +45,7 @@ import io.swagger.annotations.ApiOperation;
 public class DjMachineMaintenanceUIController extends BaseUIController<DjMachineMaintenance> {
 
     @Autowired
-    private IDjMachineMaintenanceService iDjMachineMaintenanceService;
+    private IDjMachineMaintenanceRemoteService iDjMachineMaintenanceService;
 
     private final String prefix = "aps/dj/machineMaintenance";
 

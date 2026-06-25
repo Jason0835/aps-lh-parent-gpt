@@ -45,9 +45,11 @@ import com.zlt.aps.lh.mapper.MdmSkuMouldRelMapper;
 import com.zlt.aps.lh.mapper.MdmWorkCalendarMapper;
 import com.zlt.aps.lh.mapper.MpAdjustResultMapper;
 import com.zlt.aps.lh.mapper.MpFactoryProductionVersionMapper;
+import com.zlt.aps.lh.mapper.MpMonthPlanStatisticsMapper;
 import com.zlt.aps.lh.service.ILhBaseDataService;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.lh.util.MachineStatusUtil;
+import com.zlt.aps.lh.util.MonthPlanStatisticsDayUtil;
 import com.zlt.aps.mdm.api.domain.entity.MdmDevicePlanShut;
 import com.zlt.aps.mdm.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.mdm.api.domain.entity.MdmModelInfo;
@@ -60,6 +62,7 @@ import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import com.zlt.aps.mp.api.domain.entity.MdmCapsuleChuck;
 import com.zlt.aps.mp.api.domain.entity.MpAdjustResult;
 import com.zlt.aps.mp.api.domain.entity.MpFactoryProductionVersion;
+import com.zlt.aps.mp.api.domain.entity.MpMonthPlanStatistics;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
@@ -67,6 +70,8 @@ import org.springframework.util.CollectionUtils;
 
 import javax.annotation.Resource;
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collection;
@@ -109,6 +114,9 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
 
     @Resource
     private MpAdjustResultMapper mpAdjustResultMapper;
+
+    @Resource
+    private MpMonthPlanStatisticsMapper monthPlanStatisticsMapper;
 
     @Resource
     private MdmWorkCalendarMapper workCalendarMapper;
@@ -224,6 +232,9 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
         CompletableFuture<Void> monthPlanFuture = runDataInitTaskAsync("月生产计划",
                 () -> loadMonthPlan(context, factoryCode, year, month),
                 () -> sizeOf(context.getMonthPlanList()));
+        CompletableFuture<Void> monthPlanStatisticsFuture = runDataInitTaskAsync("月计划结构机台统计",
+                () -> loadMonthPlanStatistics(context, factoryCode, year, month, startDate, endDate),
+                () -> sizeOf(context.getStructurePlanMachineCountMap()));
         CompletableFuture<Void> specialMaterialBomFuture = runAfterDataInitTask(monthPlanFuture, "特殊物料清单",
                 () -> loadSpecialMaterialBom(context, factoryCode),
                 () -> sizeOf(context.getSpecialMaterialBomList()));
@@ -254,6 +265,7 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
         //      因此此处只需等待顶层 Future 完成即可（底层依赖链会自动传递完成状态）。
         waitForDataInitTasks(
                 monthPlanFuture,
+                monthPlanStatisticsFuture,
                 specialMaterialBomFuture,
                 embryoStockFuture,
                 runDataInitTaskAsync("周程滚动调整结果",
@@ -303,6 +315,9 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
                 runDataInitTaskAsync("前日硫化排程结果",
                         () -> loadPreviousScheduleResults(context, factoryCode, targetDate),
                         () -> sizeOf(context.getPreviousScheduleResultList())),
+                runDataInitTaskAsync("目标日前一日硫化排程结果",
+                        () -> loadTargetPreviousScheduleResults(context, factoryCode, targetDate),
+                        () -> sizeOf(context.getTargetPreviousScheduleResultList())),
                 runDataInitTaskAsync("前日模具交替计划",
                         () -> loadPreviousMouldChangePlans(context, factoryCode, targetDate),
                         () -> sizeOf(context.getPreviousMouldChangePlanList())),
@@ -314,6 +329,12 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
                         () -> sizeOf(context.getPreviousCureFormulaResultList()))
         );
 
+        if (context.isInterrupted()) {
+            log.warn("基础数据加载中断, 工厂: {}, 目标日: {}, T日: {}, 原因: {}",
+                    factoryCode, LhScheduleTimeUtil.formatDate(targetDate),
+                    LhScheduleTimeUtil.formatDate(scheduleDate), context.getInterruptReason());
+            return;
+        }
         log.info("基础数据加载完成, 工厂: {}, 目标日: {}, T日: {}",
                 factoryCode, LhScheduleTimeUtil.formatDate(targetDate), LhScheduleTimeUtil.formatDate(scheduleDate));
         log.info("[DataInit] 全部初始化完成：totalCost={}ms", System.currentTimeMillis() - totalStartTime);
@@ -461,6 +482,95 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
     }
 
     /**
+     * 加载月计划结构维度计划硫化机台数。
+     * <p>提前生产规则只需要 T～T+2 窗口内 dayN.lhMachines，按 structureName 聚合 SUM 后缓存到上下文。</p>
+     *
+     * @param context 排程上下文
+     * @param factoryCode 工厂编号
+     * @param year 年份
+     * @param month 月份
+     * @param startDate 窗口开始日期
+     * @param endDateExclusive 窗口结束日期，不含当天
+     */
+    private void loadMonthPlanStatistics(LhScheduleContext context,
+                                         String factoryCode,
+                                         int year,
+                                         int month,
+                                         Date startDate,
+                                         Date endDateExclusive) {
+        context.setStructurePlanMachineCountMap(new LinkedHashMap<LocalDate, Map<String, Integer>>(4));
+        if (StringUtils.isEmpty(context.getProductionVersion())) {
+            log.warn("月计划结构机台统计跳过加载，排产版本为空, factoryCode: {}, year: {}, month: {}",
+                    factoryCode, year, month);
+            return;
+        }
+        List<MpMonthPlanStatistics> statisticsList = monthPlanStatisticsMapper.selectList(
+                new LambdaQueryWrapper<MpMonthPlanStatistics>()
+                        .eq(MpMonthPlanStatistics::getFactoryCode, factoryCode)
+                        .eq(MpMonthPlanStatistics::getYear, year)
+                        .eq(MpMonthPlanStatistics::getMonth, month)
+                        .eq(MpMonthPlanStatistics::getProductionVersion, context.getProductionVersion())
+                        .eq(MpMonthPlanStatistics::getIsDelete, DeleteFlagEnum.NORMAL.getCode())
+                        .and(wrapper -> wrapper.eq(MpMonthPlanStatistics::getTempFlag, "0")
+                                .or().isNull(MpMonthPlanStatistics::getTempFlag)
+                                .or().eq(MpMonthPlanStatistics::getTempFlag, "")));
+        if (CollectionUtils.isEmpty(statisticsList)) {
+            log.warn("月计划结构机台统计无数据，按空缓存继续排程, factoryCode: {}, year: {}, month: {}, "
+                            + "productionVersion: {}",
+                    factoryCode, year, month, context.getProductionVersion());
+            return;
+        }
+        LocalDate startLocalDate = toLocalDate(startDate);
+        LocalDate endLocalDate = toLocalDate(endDateExclusive);
+        for (MpMonthPlanStatistics row : statisticsList) {
+            if (Objects.isNull(row) || StringUtils.isBlank(row.getStructureName())) {
+                continue;
+            }
+            for (LocalDate productionDate = startLocalDate; productionDate.isBefore(endLocalDate);
+                 productionDate = productionDate.plusDays(1)) {
+                if (productionDate.getYear() != year || productionDate.getMonthValue() != month) {
+                    continue;
+                }
+                int lhMachines;
+                try {
+                    lhMachines = MonthPlanStatisticsDayUtil.resolveLhMachines(row, productionDate);
+                } catch (IllegalArgumentException e) {
+                    // 月计划结构统计只用于提前生产机台数判断，非法JSON按0处理，不阻断排程主流程。
+                    lhMachines = 0;
+                    log.warn("月计划结构机台统计dayN解析失败，按0继续排程, factoryCode: {}, "
+                                    + "productionVersion: {}, structureName: {}, productionDate: {}, reason: {}",
+                            factoryCode, context.getProductionVersion(), row.getStructureName(), productionDate,
+                            e.getMessage());
+                }
+                context.addStructurePlanMachineCount(productionDate, row.getStructureName(), lhMachines);
+            }
+        }
+        if (CollectionUtils.isEmpty(context.getStructurePlanMachineCountMap())) {
+            log.warn("月计划结构机台统计无有效结构数据，按空缓存继续排程, factoryCode: {}, year: {}, month: {}, "
+                            + "productionVersion: {}, rowCount: {}",
+                    factoryCode, year, month, context.getProductionVersion(), statisticsList.size());
+            return;
+        }
+        log.info("月计划结构机台统计加载完成, factoryCode: {}, year: {}, month: {}, productionVersion: {}, "
+                        + "rowCount: {}, dateCount: {}",
+                factoryCode, year, month, context.getProductionVersion(), statisticsList.size(),
+                context.getStructurePlanMachineCountMap().size());
+    }
+
+    /**
+     * 转换为本地日期。
+     *
+     * @param date 日期
+     * @return 本地日期
+     */
+    private LocalDate toLocalDate(Date date) {
+        if (Objects.isNull(date)) {
+            return null;
+        }
+        return date.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+    }
+
+    /**
      * 加载当前排程目标日的上一轮排程结果（用于硫化示方历史保护）。
      * 仅当 ENABLE_CURE_FORMULA_HISTORY_PROTECT = 1 时加载，结果放入
      * context.previousCureFormulaResultList，供 S4.6 保护逻辑使用。
@@ -504,6 +614,27 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
         }
         context.setPreviousScheduleResultList(list);
         log.info("前日排程基础数据加载完成, 数量: {}, 日期: {}", list.size(), LhScheduleTimeUtil.formatDate(previousDate));
+    }
+
+    /**
+     * 加载业务目标日前一日硫化排程结果。
+     * <p>强制重排下 {@code previousScheduleResultList} 服务于窗口T日前一日滚动衔接；
+     * 新增历史欠产兜底判断需要按接口目标日前一日判断是否已排过，两者日期口径不能混用。</p>
+     *
+     * @param context 排程上下文
+     * @param factoryCode 分厂编号
+     * @param targetDate 排程目标日
+     */
+    private void loadTargetPreviousScheduleResults(LhScheduleContext context, String factoryCode, Date targetDate) {
+        Date targetPreviousDate = LhScheduleTimeUtil.clearTime(LhScheduleTimeUtil.addDays(targetDate, -1));
+        List<LhScheduleResult> list = lhScheduleResultMapper.selectList(new LambdaQueryWrapper<LhScheduleResult>()
+                .eq(LhScheduleResult::getFactoryCode, factoryCode)
+                .eq(LhScheduleResult::getScheduleDate, targetPreviousDate)
+                .eq(LhScheduleResult::getIsDelete, DeleteFlagEnum.NORMAL.getCode()));
+        context.setTargetPreviousScheduleResultList(list != null ? list : new ArrayList<>());
+        log.info("目标日前一日排程结果加载完成, 数量: {}, 日期: {}",
+                context.getTargetPreviousScheduleResultList().size(),
+                LhScheduleTimeUtil.formatDate(targetPreviousDate));
     }
 
     /**
@@ -1200,11 +1331,14 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
                         finishQty.getMaterialCode(),
                         resolveDayFinishedQty(finishQty),
                         Integer::sum);
-                materialMonthDailyFinishedQtyMap.merge(
-                        buildMaterialDayKey(finishQty.getMaterialCode(),
-                                LhScheduleTimeUtil.clearTime(finishQty.getFinishDate())),
-                        resolveDayFinishedQty(finishQty),
-                        Integer::sum);
+                // 逐日Map仅保留完成量非空的日期；0是有效数据，供“最近一次完成量”判断停止回溯。
+                if (Objects.nonNull(finishQty.getDayFinishQty())) {
+                    materialMonthDailyFinishedQtyMap.merge(
+                            buildMaterialDayKey(finishQty.getMaterialCode(),
+                                    LhScheduleTimeUtil.clearTime(finishQty.getFinishDate())),
+                            resolveDayFinishedQty(finishQty),
+                            Integer::sum);
+                }
             }
         }
 

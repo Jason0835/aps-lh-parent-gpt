@@ -615,7 +615,14 @@ public class LhInsertOrderValidateHandler {
 
         int totalQty = monthPlan.getTotalQty() != null ? monthPlan.getTotalQty() : 0;
         int todayNightFinishQty = calculateTodayNightFinishQty(dto.getFactoryCode(), materialCode, scheduleDate);
-        int surplusQty = Math.max(0, totalQty - todayNightFinishQty);
+        // 上月超欠产量：仅当有效标志为"1"时参与计算，否则按0处理
+        int lastMonthOverdue = 0;
+        if ("1".equals(monthPlan.getLastMonthValidFlag())
+                && Objects.nonNull(monthPlan.getLastMonthOverdueQty())) {
+            lastMonthOverdue = monthPlan.getLastMonthOverdueQty();
+        }
+        // 硫化余量 = MAX(月计划总量 - 已完成量 + 上月超欠产量, 0)
+        int surplusQty = Math.max(0, totalQty - todayNightFinishQty + lastMonthOverdue);
         result.setMouldSurplusQty(surplusQty);
 
         fillEmbryoStock(dto, result, monthPlan, year, month, finalVersion);

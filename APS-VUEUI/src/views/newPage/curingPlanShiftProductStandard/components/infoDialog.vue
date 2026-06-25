@@ -195,7 +195,7 @@ export default {
     columns() {
       return [
         {
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.mdmSkuLhCapacity.factoryCode"),
           prop: "factoryCode",
           type: "select",
           dictData: this.parentDict.type.biz_factory_name,
@@ -203,7 +203,7 @@ export default {
         },
         {
           prop: "materialCode",
-          label: this.$t("ui.data.column.monthplan.oriMaterialCode"),
+          label: this.$t("ui.data.column.mdmSkuLhCapacity.materialCode"),
           span: 12,
 
           render: (form) => {
@@ -219,20 +219,20 @@ export default {
         },
         {
           prop: "materialDesc",
-          label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
+          label: this.$t("ui.data.column.mdmSkuLhCapacity.materialDesc"),
           span: 12,
           disabled: true,
         },
         {
           prop: "classCapacity",
-          label: this.$t("ui.data.column.curingPlan.classCapacity"),
+          label: this.$t("ui.data.column.mdmSkuLhCapacity.classCapacity"),
           span: 12,
           type: "number",
           disabled:true
         },
         {
           prop: "standardCapacity",
-          label: this.$t("日标准产量"),
+          label: this.$t("ui.data.column.mdmSkuLhCapacity.standardCapacity"),
           span: 12,
           type: "number",
           required: true,
@@ -244,7 +244,7 @@ export default {
         },
         {
           prop: "sumVulcanization",
-          label: this.$t("ui.data.column.curingPlan.sumVulcanization"),
+          label: this.$t("ui.data.column.mdmSkuLhCapacity.sumVulcanization"),
           span: 12,
           type: "number",
           required: true,
@@ -253,7 +253,7 @@ export default {
         },
         {
           prop: "vulcanizationTime",
-          label: this.$t("ui.data.column.curingPlan.vulcanizationTime"),
+          label: this.$t("ui.data.column.mdmSkuLhCapacity.vulcanizationTime"),
           span: 12,
           type: "number",
           required: true,
@@ -262,7 +262,7 @@ export default {
         },
         {
           prop: "mechanicalTime",
-          label: this.$t("ui.data.column.curingPlan.mechanicalTime"),
+          label: this.$t("ui.data.column.mdmSkuLhCapacity.mechanicalTime"),
           type: "number",
           required: true,
           min: 0,
@@ -282,7 +282,7 @@ export default {
 
         {
           prop: "checkTime",
-          label: this.$t("ui.data.column.curingPlan.checkTime"),
+          label: this.$t("ui.data.column.mdmSkuLhCapacity.checkTime"),
           span: 12,
           type: "number",
           required: true,
@@ -291,7 +291,7 @@ export default {
         },
         {
           prop: "clearTime",
-          label: this.$t("ui.data.column.curingPlan.clearTime"),
+          label: this.$t("ui.data.column.mdmSkuLhCapacity.clearTime"),
           span: 12,
           type: "number",
           required: true,
@@ -300,7 +300,7 @@ export default {
         },
         {
           prop: "dineTime",
-          label: this.$t("ui.data.column.curingPlan.dineTime"),
+          label: this.$t("ui.data.column.mdmSkuLhCapacity.dineTime"),
           span: 12,
           type: "number",
           required: true,
@@ -310,7 +310,7 @@ export default {
 
         {
           prop: "standardTime",
-          label: this.$t("ui.data.column.curingPlan.standardTime"),
+          label: this.$t("ui.data.column.mdmSkuLhCapacity.standardTime"),
           span: 12,
           type: "number",
           required: true,
@@ -319,7 +319,7 @@ export default {
         },
         {
           prop: "productionTime",
-          label: this.$t("ui.data.column.curingPlan.productionTime"),
+          label: this.$t("ui.data.column.mdmSkuLhCapacity.productionTime"),
           span: 12,
           type: "number",
           required: true,
@@ -328,7 +328,7 @@ export default {
         },
         {
           prop: "remark",
-          label: this.$t("common.remark"),
+          label: this.$t("ui.common.column.remark"),
         },
       ];
     },

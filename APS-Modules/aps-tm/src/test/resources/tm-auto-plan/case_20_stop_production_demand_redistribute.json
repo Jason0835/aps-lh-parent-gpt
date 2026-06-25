@@ -1,0 +1,109 @@
+{
+  "caseName": "case_20_stop_production_demand_redistribute",
+  "description": "胎面停产但成型不停产，数据加载层先重分配需求，完整入口使用算法2完成排程",
+  "autoPlanRequest": {
+    "factoryCode": "F1",
+    "scheduleDate": "2026-06-18",
+    "operator": "tester",
+    "traceId": "TRACE-CASE-20",
+    "confirmOverwrite": false
+  },
+  "params": [
+    {
+      "factoryCode": "F1",
+      "paramCode": "TM_ALGORITHM_SWITCH",
+      "paramValue": "2",
+      "enableStatus": "1"
+    }
+  ],
+  "cxScheduleResults": [
+    {
+      "orderNo": "ORD-SHUTDOWN",
+      "embryoCode": "CX-SD",
+      "class1PlanQty": 10,
+      "class2PlanQty": 20,
+      "class3PlanQty": 30,
+      "class4PlanQty": 40,
+      "class5PlanQty": 50,
+      "class6PlanQty": 60,
+      "treadCode": "TR-SD",
+      "treadShoulderLength": 1,
+      "treadMouthPlate": "MP-A",
+      "treadRubberCategory": "GL-A"
+    }
+  ],
+  "stocks": [
+    {
+      "factoryCode": "F1",
+      "stockDate": "2026-06-17",
+      "treadCode": "TR-SD",
+      "stockQty": 0
+    }
+  ],
+  "machineInfos": [
+    {
+      "factoryCode": "F1",
+      "machineCode": "TM01",
+      "machineStatus": "1",
+      "maxCapacity": 1000
+    }
+  ],
+  "machineSpeeds": [
+    {
+      "factoryCode": "F1",
+      "machineCode": "TM01",
+      "productSpeed": 100
+    }
+  ],
+  "mouthPlates": [
+    {
+      "factoryCode": "F1",
+      "machineCode": "TM01",
+      "mouthPlateCode": "MP-A"
+    }
+  ],
+  "workCalendars": [
+    {
+      "procCode": "04",
+      "dayFlag": "0",
+      "oneShiftFlag": "0",
+      "twoShiftFlag": "1",
+      "threeShiftFlag": "1"
+    },
+    {
+      "procCode": "03",
+      "dayFlag": "1",
+      "oneShiftFlag": "1",
+      "twoShiftFlag": "1",
+      "threeShiftFlag": "1"
+    }
+  ],
+  "expected": {
+    "success": true,
+    "messageContains": "胎面自动排程执行完成",
+    "resultCount": 1,
+    "assignedCount": 1,
+    "unassignedCount": 0,
+    "explainCount": 5,
+    "errorCount": 0,
+    "expectedResults": [
+      {
+        "orderNo": "ORD-SHUTDOWN-CLASS1",
+        "treadCode": "TR-SD",
+        "machineCode": "TM01",
+        "shiftOrder": 1,
+        "sequence": 1,
+        "planQty": 32.500000
+      },
+      {
+        "orderNo": "ORD-SHUTDOWN-CLASS4",
+        "treadCode": "TR-SD",
+        "machineCode": "TM01",
+        "shiftOrder": 4,
+        "sequence": 1,
+        "planQty": 62.500000
+      }
+    ]
+  }
+}
+

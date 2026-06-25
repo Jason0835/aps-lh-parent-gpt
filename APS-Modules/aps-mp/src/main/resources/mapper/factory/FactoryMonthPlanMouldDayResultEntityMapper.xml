@@ -92,6 +92,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             r.ORIGINAL_TOTAL_QTY,
             ifnull(r.total_qty, 0) - ifnull(pm.PRODUCTION_QTY,0) PRODUCT_SURPLUS,
             si.LAST_MONTH_REMAIN_QTY,
+            r.LAST_MONTH_OVERDUE_QTY,
+            r.LAST_MONTH_VALID_FLAG,
             </when>
             <otherwise>
             mc.NET_QTY UN_RESTRICTED_NET_QTY,
@@ -129,6 +131,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             LEFT JOIN T_MP_MONTH_PLAN_PROD_FINAL f ON f.IS_DELETE = 0
             AND f.MATERIAL_CODE = m.MATERIAL_CODE
             AND f.`YEAR_MONTH` = DATE_FORMAT(DATE_SUB(concat(#{dayResult.year},'-',#{dayResult.month},'-1'),INTERVAL 1 month), '%Y%m')
+            AND f.CONSTRUCTION_STAGE = r.CONSTRUCTION_STAGE
             LEFT JOIN T_DP_CYCLE_STRUCT_CONFIG C ON C.STRUCTURE_NAME = M.STRUCTURE_NAME
             AND C.IS_DELETE = 0
         <choose>
@@ -169,9 +172,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 		    m.FACTORY_CODE = #{dayResult.factoryCode}
 		    AND m.IS_DELETE = 0 
 		    AND m.STRUCTURE_NAME IS NOT NULL 
-            AND (QUALITY_STATE_CODE != '2' or d.FACTORY_CODE = m.FACTORY_CODE)
+            AND (QUALITY_STATE_CODE != '2' or d.FACTORY_CODE = m.FACTORY_CODE OR r.FACTORY_CODE = m.FACTORY_CODE)
         <if test="!isAllMaterial">
-            AND d.FACTORY_CODE = m.FACTORY_CODE
+            AND (d.FACTORY_CODE = m.FACTORY_CODE OR r.FACTORY_CODE = m.FACTORY_CODE)
         </if>
         <if test="dayResult.structureName != null and dayResult.structureName != ''">
             AND m.STRUCTURE_NAME = #{dayResult.structureName}
@@ -253,6 +256,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             r.ORIGINAL_TOTAL_QTY,
             pm.PRODUCTION_QTY,
             si.LAST_MONTH_REMAIN_QTY,
+            r.LAST_MONTH_OVERDUE_QTY,
+            r.LAST_MONTH_VALID_FLAG,
             </when>
             <otherwise>
             mc.NET_QTY,

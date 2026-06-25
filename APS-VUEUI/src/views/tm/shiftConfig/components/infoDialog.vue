@@ -49,13 +49,7 @@ export default {
             trigger: "change",
           },
         ],
-        scheduleDate: [
-          {
-            required: true,
-            message: this.$t("common.rule.select"),
-            trigger: "change",
-          },
-        ],
+
         shiftCode: [
           {
             required: true,
@@ -86,10 +80,9 @@ export default {
           {
             validator: (rule, value, callback) => {
               if (value && this.form.planEndTime) {
-                if (new Date(value).getTime() > new Date(this.form.planEndTime).getTime()) {
+                if (value > this.form.planEndTime) {
                   callback(new Error("开始时间不能大于结束时间"));
                 } else {
-                  this.$refs.form.$refs.infoForm.validateField("planEndTime");
                   callback();
                 }
               } else {
@@ -108,10 +101,9 @@ export default {
           {
             validator: (rule, value, callback) => {
               if (value && this.form.planStartTime) {
-                if (new Date(value).getTime() < new Date(this.form.planStartTime).getTime()) {
+                if (value < this.form.planStartTime) {
                   callback(new Error("结束时间不能小于开始时间"));
                 } else {
-                  this.$refs.form.$refs.infoForm.validateField("planStartTime");
                   callback();
                 }
               } else {
@@ -157,13 +149,7 @@ export default {
           span: 12,
           required: true,
         },
-        {
-          prop: "scheduleDate",
-          label: this.$t("ui.data.column.tm.shiftConfig.scheduleDate"),
-          type: "date",
-          span: 12,
-          required: true,
-        },
+
         {
           prop: "shiftCode",
           label: this.$t("ui.data.column.tm.shiftConfig.shiftCode"),
@@ -189,40 +175,18 @@ export default {
         {
           prop: "planStartTime",
           label: this.$t("ui.data.column.tm.shiftConfig.planStartTime"),
-          type: "date",
-          dateType: "datetime",
-          valueFormat: "yyyy-MM-dd HH:mm:ss",
+          type: "time",
+          valueFormat: "HH:mm:ss",
           span: 12,
           required: true,
-          pickerOptions: {
-            disabledDate: (time) => {
-              if (this.form.planEndTime) {
-                const end = new Date(this.form.planEndTime);
-                end.setHours(0, 0, 0, 0);
-                return time.getTime() > end.getTime();
-              }
-              return false;
-            },
-          },
         },
         {
           prop: "planEndTime",
           label: this.$t("ui.data.column.tm.shiftConfig.planEndTime"),
-          type: "date",
-          dateType: "datetime",
-          valueFormat: "yyyy-MM-dd HH:mm:ss",
+          type: "time",
+          valueFormat: "HH:mm:ss",
           span: 12,
           required: true,
-          pickerOptions: {
-            disabledDate: (time) => {
-              if (this.form.planStartTime) {
-                const start = new Date(this.form.planStartTime);
-                start.setHours(0, 0, 0, 0);
-                return time.getTime() < start.getTime();
-              }
-              return false;
-            },
-          },
         },
         {
           prop: "crossDayFlag",

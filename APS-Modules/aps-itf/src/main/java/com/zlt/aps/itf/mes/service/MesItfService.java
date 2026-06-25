@@ -2,6 +2,7 @@ package com.zlt.aps.itf.mes.service;
 
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.cx.api.domain.entity.CxMachineOnlineInfo;
+import com.zlt.aps.cx.api.domain.entity.CxStock;
 import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
 import com.zlt.aps.itf.vo.MesBrandDict;
 import com.zlt.aps.lh.api.domain.entity.LhMachineOnlineInfo;
@@ -205,6 +206,14 @@ public interface MesItfService {
     AjaxResult syncMesCxStock(AuxReqSyncDataLogs syncDataLogs);
 
     /**
+     * 实时查询MES生胎库存（不写入APS本地表，仅供成型排程实时调用）
+     *
+     * @param syncDataLogs 查询参数（可传factoryCode过滤分厂）
+     * @return 生胎库存列表
+     */
+    List<CxStock> getCxStock(AuxReqSyncDataLogs syncDataLogs);
+
+    /**
      * 同步胎面库存
      * 采用更新删除标识模式，而不是先删后插
      *
@@ -212,6 +221,41 @@ public interface MesItfService {
      * @return 结果
      */
     AjaxResult syncTreadStock(AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 同步胎圈库存
+     * T_TQ_STOCK：采用逻辑删除+插入方案
+     *   步骤1：逻辑删除当天库存日期的所有数据（IS_DELETE置为1）
+     *   步骤2：将MES最新库存数据批量插入（新记录，IS_DELETE=0）
+     *   历史数据保留，只删当天库存日期的数据
+     *
+     * @param syncDataLogs 同步参数
+     * @return 结果
+     */
+    AjaxResult syncMesTqStock(AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 同步胎圈排程完成量
+     * T_TQ_SCHE_FINISH_QTY：采用逻辑删除+插入方案
+     *   步骤1：逻辑删除当天排程日期的所有数据（IS_DELETE置为1）
+     *   步骤2：将MES最新排程完成量数据批量插入（新记录，IS_DELETE=0）
+     *   步骤3：回写胎圈排程结果表各班次完成量
+     *
+     * @param syncDataLogs 同步参数
+     * @return 结果
+     */
+    AjaxResult syncTqClassShiftFinishQty(AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 同步胎圈排程日完成量
+     * T_TQ_DAY_FINISH_QTY：采用逻辑删除+插入方案
+     *   步骤1：逻辑删除当天排程日期的所有数据（IS_DELETE置为1）
+     *   步骤2：将MES最新排程日完成量数据批量插入（新记录，IS_DELETE=0）
+     *
+     * @param syncDataLogs 同步参数
+     * @return 结果
+     */
+    AjaxResult syncTqScheDayFinishQty(AuxReqSyncDataLogs syncDataLogs);
 
     /**
      * 同步成型排程完成量
@@ -382,4 +426,14 @@ public interface MesItfService {
     AjaxResult syncAllVersionsMouldCleanWarnAndGenPlan(AuxReqSyncDataLogs syncDataLogs);
 
     AjaxResult syncDayFinishQtyToChipStock();
+
+    /**
+     * 同步设备计划停机（MES→APS）
+     * 支持全量/增量同步，含删除标识处理
+     * 停机类型=06（临时性故障）时，MES会分步写入开始时间和结束时间，需按ID更新而非插入
+     *
+     * @param syncDataLogs 同步参数
+     * @return 结果
+     */
+    AjaxResult syncDevPlanClose(AuxReqSyncDataLogs syncDataLogs);
 }

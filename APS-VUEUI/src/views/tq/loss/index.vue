@@ -86,15 +86,15 @@ export default {
       return [
         {
           label: this.$t("ui.data.column.loss.beadCode"),
-          prop: "materialCode",
+          prop: "beadCode",
         },
         {
           label: this.$t("ui.data.column.loss.line"),
-          prop: "machineId",
+          prop: "machineCode",
           type: "select",
           dictData: this.machineList,
           labelKey: "machineName",
-          valueKey: "id",
+          valueKey: "machineCode",
           filterable: true,
         },
       ];
@@ -103,7 +103,7 @@ export default {
       return [
         { type: "selection", fixed: "left" },
         {
-          prop: "materialCode",
+          prop: "beadCode",
           align: "center",
           halign: "center",
           label: this.$t("ui.data.column.loss.beadCode"),

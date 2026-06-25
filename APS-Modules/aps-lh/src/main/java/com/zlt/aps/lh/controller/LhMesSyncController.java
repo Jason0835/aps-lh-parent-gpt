@@ -4,11 +4,13 @@ import cn.hutool.core.date.DateUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.zlt.aps.common.core.enums.MouldFinishStatusEnum;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.lh.api.domain.entity.*;
 import com.zlt.aps.lh.api.service.ILhMesSyncRemoteService;
 import com.zlt.aps.lh.mapper.*;
 import com.zlt.aps.lh.service.*;
+import com.zlt.aps.utils.GenerageMapKeyUtils;
 import com.zlt.core.dao.basedao.BaseDao;
 import io.seata.common.util.CollectionUtils;
 import io.swagger.annotations.Api;
@@ -234,10 +236,89 @@ public class LhMesSyncController implements ILhMesSyncRemoteService {
     @Override
     @ApiOperation("批量保存模具交替计划完成回报")
     @PostMapping("/saveMoldAlterPlanFinishBatch")
+    @Deprecated
     public AjaxResult saveMoldAlterPlanFinishBatch(@RequestBody List<LhMoldAlterPlanFinish> list) {
         if (list != null && !list.isEmpty()) {
             baseDao.saveBatch(list);
         }
+        return AjaxResult.success();
+    }
+
+    @Override
+    @ApiOperation("模具交替计划完成回报：批量插入或更新 + 回填模具交替计划完成状态")
+    @PostMapping("/saveOrUpdateMoldAlterPlanFinishAndWriteBack")
+    public AjaxResult saveOrUpdateMoldAlterPlanFinishAndWriteBack(@RequestBody List<LhMoldAlterPlanFinish> list) {
+        if (list == null || list.isEmpty()) {
+            return AjaxResult.success();
+        }
+
+        // ========== 步骤1：拆分为插入列表和更新列表 ==========
+        List<LhMoldAlterPlanFinish> existsList = lhMoldAlterPlanFinishMapper.selectByUniqueKeyList(list);
+        Map<String, LhMoldAlterPlanFinish> existsMap = new HashMap<>(16);
+        if (CollectionUtils.isNotEmpty(existsList)) {
+            existsMap = existsList.stream()
+                    .collect(Collectors.toMap(
+                            item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), item.getLhBatchNo(), item.getOrderNo(), String.valueOf(item.getScheduleDate()), item.getLhMachineCode(), item.getLeftRightMold()),
+                            item -> item,
+                            (v1, v2) -> v1
+                    ));
+        }
+
+        List<LhMoldAlterPlanFinish> insertList = new ArrayList<>();
+        List<LhMoldAlterPlanFinish> updateList = new ArrayList<>();
+        for (LhMoldAlterPlanFinish entity : list) {
+            String mapKey = GenerageMapKeyUtils.createMapKey(entity.getFactoryCode(), entity.getLhBatchNo(), entity.getOrderNo(), String.valueOf(entity.getScheduleDate()), entity.getLhMachineCode(), entity.getLeftRightMold());
+            if (existsMap.containsKey(mapKey)) {
+                // 已存在：设置id，仅更新完成状态
+                LhMoldAlterPlanFinish existsData = existsMap.get(mapKey);
+                entity.setId(existsData.getId());
+                entity.setUpdateTime(new Date());
+                updateList.add(entity);
+            } else {
+                // 不存在：新增
+                insertList.add(entity);
+            }
+        }
+
+        // ========== 步骤2：批量操作 T_LH_MOLD_ALTER_PLAN_FINISH 表 ==========
+        if (CollectionUtils.isNotEmpty(insertList)) {
+            baseDao.insertBatch(insertList);
+            log.info("模具交替计划完成回报-批量插入{}条", insertList.size());
+        }
+        if (CollectionUtils.isNotEmpty(updateList)) {
+            lhMoldAlterPlanFinishMapper.batchUpdateFinishStatus(updateList);
+            log.info("模具交替计划完成回报-批量更新{}条", updateList.size());
+        }
+
+        // ========== 步骤3：筛选已完成的数据，批量回填 t_lh_mould_change_plan ==========
+        List<LhMoldAlterPlanFinish> completedList = list.stream()
+                .filter(item -> Objects.nonNull(item) && MouldFinishStatusEnum.isCompleted(item.getFinishStatus())
+                        && item.getIsDelete() != null && item.getIsDelete() == 0)
+                .collect(Collectors.toList());
+        if (CollectionUtils.isNotEmpty(completedList)) {
+            lhMouldChangePlanEntityMapper.batchUpdateMouldStatusByFinish(completedList);
+            log.info("模具交替计划完成回报-批量回填模具交替计划完成状态{}条", completedList.size());
+        }
+
+        // ========== 步骤4：批量查询关联的 LhScheduleResult 并触发排程自动更新 ==========
+        if (CollectionUtils.isNotEmpty(completedList)) {
+            List<LhScheduleResult> allScheduleResults = new ArrayList<>();
+            for (LhMoldAlterPlanFinish finishItem : completedList) {
+                LambdaQueryWrapper<LhScheduleResult> queryWrapper = new LambdaQueryWrapper<>();
+                queryWrapper.eq(LhScheduleResult::getFactoryCode, finishItem.getFactoryCode());
+                queryWrapper.eq(LhScheduleResult::getScheduleDate, finishItem.getScheduleDate());
+                queryWrapper.eq(LhScheduleResult::getLhMachineCode, finishItem.getLhMachineCode());
+                queryWrapper.eq(LhScheduleResult::getIsDelete, YesOrNoEnum.NO.getCode());
+                List<LhScheduleResult> lhScheduleResultList = scheduleResultMapper.selectList(queryWrapper);
+                if (CollectionUtils.isNotEmpty(lhScheduleResultList)) {
+                    allScheduleResults.add(lhScheduleResultList.get(0));
+                }
+            }
+            if (CollectionUtils.isNotEmpty(allScheduleResults)) {
+                lhScheduleService.batchIncreaseMouldStartPlan(allScheduleResults);
+            }
+        }
+
         return AjaxResult.success();
     }
 
@@ -258,12 +339,13 @@ public class LhMesSyncController implements ILhMesSyncRemoteService {
     @Override
     @ApiOperation("模具交替回报回填流程排程结果表的模具交替完成状态")
     @PostMapping("/writeBackMouldChangePlanFinishStatus")
+    @Deprecated
     public AjaxResult writeBackMouldChangePlanFinishStatus(@RequestBody List<LhMoldAlterPlanFinish> list) {
         if (list == null || list.isEmpty()) {
             return AjaxResult.success();
         }
         List<LhMoldAlterPlanFinish> completedList = list.stream()
-                .filter(item -> Objects.nonNull(item) && "1".equals(item.getFinishStatus())
+                .filter(item -> Objects.nonNull(item) && MouldFinishStatusEnum.isCompleted(item.getFinishStatus())
                         && item.getIsDelete() != null && item.getIsDelete() == 0)
                 .collect(Collectors.toList());
         if (completedList.isEmpty()) {
@@ -272,7 +354,7 @@ public class LhMesSyncController implements ILhMesSyncRemoteService {
         // 批量更新模具交替计划完成状态
         for (LhMoldAlterPlanFinish finishItem : completedList) {
             LambdaUpdateWrapper<LhMouldChangePlan> updateWrapper = new LambdaUpdateWrapper<>();
-            updateWrapper.set(LhMouldChangePlan::getMouldStatus, "1");
+            updateWrapper.set(LhMouldChangePlan::getMouldStatus, MouldFinishStatusEnum.COMPLETED.getCode());
             updateWrapper.eq(LhMouldChangePlan::getFactoryCode, finishItem.getFactoryCode());
             updateWrapper.eq(LhMouldChangePlan::getScheduleDate, finishItem.getScheduleDate());
             updateWrapper.eq(LhMouldChangePlan::getOrderNo, finishItem.getOrderNo());

@@ -3,11 +3,20 @@
 <mapper namespace="com.zlt.aps.tq.engine.mapper.TqEngineMonthSurplusMapper">
 
     <select id="listTqMonthPlanSurplus" parameterType="string" resultType="com.zlt.aps.tq.engine.vo.TqMonthSurplusVo">
-        SELECT MATERIAL_CODE, IFNULL(MONTH_FINISH_QTY, 0) MONTH_FINISH_QTY, IFNULL(MONTH_REMAIN_QTY, 0) MONTH_REMAIN_QTY
-        FROM T_TQ_MONTH_PLAN_SURPLUS
-        where DEL_FLAG = '0'
-        and YEAR = #{year}
-        and MONTH = #{month}
+        SELECT
+            ms.MATERIAL_CODE as beadCode,
+            IFNULL(SUM(ms.PLAN_SURPLUS_QTY), 0) as monthRemainQty,
+            IFNULL(SUM(ppf.TOTAL_QTY), 0) as monthFinishQty
+        FROM t_mdm_month_surplus ms
+        INNER JOIN t_mp_month_plan_prod_final ppf
+            ON ms.MATERIAL_CODE = ppf.MATERIAL_CODE
+            AND ms.YEAR = ppf.YEAR
+            AND ms.MONTH = ppf.MONTH
+            AND ppf.DEL_FLAG = '0'
+        WHERE ms.IS_DELETE = 0
+        AND ms.YEAR = #{year}
+        AND ms.MONTH = #{month}
+        GROUP BY ms.MATERIAL_CODE
     </select>
 
 </mapper>

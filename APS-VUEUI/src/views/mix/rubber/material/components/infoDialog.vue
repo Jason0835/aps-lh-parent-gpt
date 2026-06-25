@@ -81,7 +81,7 @@ export default {
     columns() {
       return [
         {
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.mdmMaterialInfo.factoryCode"),
           prop: "factoryCode",
           maxlength: "10",
           required: true,
@@ -93,7 +93,7 @@ export default {
         {
           prop: "productTypeName",
           disabled: true,
-          label: this.$t("ui.data.column.monthplan.productType"),
+          label: this.$t("ui.data.column.mdmMaterialInfo.productTypeName"),
         },
         // {
         //   prop: "productCategory",
@@ -102,7 +102,7 @@ export default {
         //   dictData: this.parentDict.type.product_category,
         // },
         {
-          label: this.$t("ui.data.column.facMonthPlanInit.productSpecsName"),
+          label: this.$t("ui.data.column.mdmMaterialInfo.materialCategory"),
           prop: "materialCategory",
           maxlength: "50",
           required: true,
@@ -111,20 +111,20 @@ export default {
           disabled: true,
         },
         {
-          label: this.$t("ui.data.column.finishStock.structureName"),
+          label: this.$t("ui.data.column.mdmMaterialInfo.structureName"),
           prop: "structureName",
           maxlength: "20",
           required: true,
         },
         {
-          label: this.$t("ui.data.colume.wms.unused.productCode"),
+          label: this.$t("ui.data.column.mdmMaterialInfo.materialCode"),
           prop: "materialCode",
           maxlength: "50",
           required: true,
           disabled: true,
         },
         {
-          label: this.$t("ui.data.defectiveStock.mesMaterialCode"),
+          label: this.$t("ui.data.column.mdmMaterialInfo.mesMaterialCode"),
           prop: "mesMaterialCode",
           maxlength: "50",
           required: true,
@@ -138,57 +138,57 @@ export default {
         //   disabled: true,
         // },
         {
-          label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
+          label: this.$t("ui.data.column.mdmMaterialInfo.materialDesc"),
           prop: "materialDesc",
           disabled: true,
         },
         {
-          label: this.$t("ui.data.column.reportClassAccuracy.materialCode"),
+          label: this.$t("ui.data.column.mdmMaterialInfo.specifications"),
           prop: "specifications",
           maxlength: "50",
           disabled: true,
         },
         {
-          label: this.$t("ui.data.column.moldLedger.mainPattern"),
+          label: this.$t("ui.data.column.mdmMaterialInfo.mainPattern"),
           prop: "mainPattern",
           disabled: true,
         },
         {
-          label: this.$t("ui.data.column.confMinProd.pattern"),
+          label: this.$t("ui.data.column.mdmMaterialInfo.pattern"),
           prop: "pattern",
           disabled: true,
         },
         {
-          label: this.$t("ui.data.colume.plan.first.draft.brand"),
+          label: this.$t("ui.data.column.mdmMaterialInfo.brand"),
           prop: "brand",
           type: "select", //ISORNOT
           dictData: this.parentDict.type.biz_brand_type,
           disabled: true,
         },
         {
-          label: this.$t("ui.data.column.scheduleAdjust.seep"),
+          label: this.$t("ui.data.column.mdmMaterialInfo.speed"),
           prop: "speed",
 
           disabled: true,
         },
 
         {
-          label: this.$t("ui.data.column.scheduleAdjust.hierarchy"),
+          label: this.$t("ui.data.column.mdmMaterialInfo.hierarchy"),
           prop: "hierarchy",
           disabled: true,
         },
         {
-          label: this.$t("ui.data.column.scheduleAdjust.proSize"),
+          label: this.$t("ui.data.column.mdmMaterialInfo.proSize"),
           prop: "proSize",
           disabled: true,
         },
         {
-          label: this.$t("ui.data.column.lean.productinfo.ability"),
+          label: this.$t("ui.data.column.mdmMaterialInfo.ability"),
           prop: "ability",
           disabled: true,
         },
         {
-          label: this.$t("ui.data.column.scheduleAdjust.cantProduce"),
+          label: this.$t("ui.data.column.mdmMaterialInfo.cantProduce"),
           prop: "cantProduce",
           type: "select", //ISORNOT
           dictData: this.parentDict.type.biz_yes_no,
@@ -196,17 +196,17 @@ export default {
         {
           prop: "embryoCode",
           disabled: true,
-          label: this.$t("ui.data.rubberMaterial.embryoCode"),
+          label: this.$t("ui.data.column.mdmMaterialInfo.embryoCode"),
         },
         {
           prop: "embryoDesc",
           disabled: true,
-          label: this.$t("ui.data.rubberMaterial.embryoDesc"),
+          label: this.$t("ui.data.column.mdmMaterialInfo.embryoDesc"),
         },
         {
           prop: "sectionWidth",
           disabled: true,
-          label: this.$t("ui.data.rubberMaterial.sectionWidth"),
+          label: this.$t("ui.data.column.mdmMaterialInfo.sectionWidth"),
         },
         {
           prop: "remark",

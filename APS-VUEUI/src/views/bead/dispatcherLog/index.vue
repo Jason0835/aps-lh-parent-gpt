@@ -1,4 +1,3 @@
-
 <template>
   <basic-container>
     <page-table
@@ -20,25 +19,6 @@
       :cell-style="cellStyle"
     >
       <template slot="header">
-        <!-- <el-button
-          type="primary"
-          plain
-          v-hasPermi="['tq:dispatcherLog:add']"
-          @click="handleAdd"
-          >{{ $t("ui.frame.btn.add") }}</el-button
-        > -->
-        <!-- <el-button
-          type="primary"
-          plain
-          v-hasPermi="['tq:dispatcherLog:edit']"
-          @click="handleEdit(selection[0])"
-          >{{ $t("ui.frame.btn.modify") }}</el-button
-        > -->
-        <!-- <el-button
-          v-hasPermi="['tq:dispatcherLog:import']"
-          @click="$refs.tltUpload.handleImport()"
-          >{{ $t("ui.frame.btn.import") }}</el-button
-        > -->
         <el-button
           @click="handleExport"
           v-hasPermi="['tq:dispatcherLog:export']"
@@ -46,14 +26,6 @@
         >
       </template>
     </page-table>
-    <!-- <el-button style="display: none" ref="hidePopoverBtnRef"></el-button> -->
-    <!-- <tlt-upload
-      ref="tltUpload"
-      downloadUrl="/tq/dispatcherLog/importTemplate"
-      uploadUrl="/tq/dispatcherLog/importData"
-      @uploadSuccess="getList"
-    /> -->
-    <!-- <infoDialog ref="infoRef" @success="getList" /> -->
   </basic-container>
 </template>
 <script>
@@ -63,17 +35,21 @@ import { mapState } from "vuex";
 import { downloadLink } from "@/utils/request";
 //interface
 import { listDispatcherLog } from "@/api/tq/dispatcherLog";
-//components
-// import tltUpload from "@/components/tltUpload/tltUpload.vue";
 
-// import infoDialog from "./components/infoDialog.vue";
-
+/**
+ * 胎圈调度员排程操作日志页面（6班次制 v5）
+ *
+ * 班次定义：
+ *   1班：D日中班(16:00-24:00)
+ *   2班：D+1日夜班(00:00-08:00)
+ *   3班：D+1日早班(08:00-16:00)
+ *   4班：D+1日中班(16:00-24:00)
+ *   5班：D+2日夜班(00:00-08:00)
+ *   6班：D+2日早班(08:00-16:00)
+ */
 export default {
   name: "BeadDispatcherLog",
-  components: {
-    // tltUpload,
-    // infoDialog,
-  },
+  components: {},
   dicts: ["DISPATCHER_OPER_TYPE"],
   provide() {
     return {
@@ -101,13 +77,6 @@ export default {
     ...mapState({
       machines: (state) => state.bead.machines,
     }),
-    machineMap: function () {
-      let obj = {};
-      this.machines.forEach((machine) => {
-        obj[machine.id + ""] = machine.machineName;
-      });
-      return obj;
-    },
     columns() {
       let columns = [
         { type: "selection", fixed: "left" },
@@ -117,11 +86,10 @@ export default {
           children: [
             {
               prop: "operType",
-              label: this.$t("ui.data.column.dispatcherlog.operType"),
+              label: this.$t("ui.data.column.tq.dispatcherlog.operType"),
               valign: "middle",
               align: "center",
               halign: "center",
-             //  sortable: "custom",
               formatter: (row, column, value, index) => {
                 return this.selectDictLabel(
                   this.dict.type.DISPATCHER_OPER_TYPE,
@@ -131,20 +99,18 @@ export default {
             },
             {
               prop: "scheduleDate",
-              label: this.$t("ui.data.column.dispatcherlog.scheduleDate"),
+              label: this.$t("ui.data.column.tq.dispatcherlog.scheduleDate"),
               valign: "middle",
               align: "center",
               halign: "center",
               minWidth: 120,
-             //  sortable: "custom",
             },
             {
-              prop: "materialCode",
-              label: this.$t("ui.data.column.tq.dispatcherlog.materialCode"),
+              prop: "beadCode",
+              label: this.$t("ui.data.column.tq.dispatcherlog.beadCode"),
               valign: "middle",
               align: "center",
               halign: "center",
-             //  sortable: "custom",
             },
             {
               prop: "createBy",
@@ -153,7 +119,6 @@ export default {
               align: "center",
               halign: "center",
               width: 120,
-             //  sortable: "custom",
             },
             {
               prop: "createTime",
@@ -162,7 +127,6 @@ export default {
               align: "center",
               halign: "center",
               width: 180,
-             //  sortable: "custom",
             },
           ],
         },
@@ -171,34 +135,53 @@ export default {
           label: this.$t("ui.data.column.dispatcherlog.beforeOper"),
           children: [
             {
-              prop: "beforeMachineId",
-              label: this.$t("ui.data.column.dispatcherlog.line"),
+              prop: "beforeMachineCode",
+              label: this.$t("ui.data.column.tq.dispatcherlog.beforeMachineCode"),
               valign: "middle",
               align: "center",
               halign: "center",
-             //  sortable: "custom",
-              formatter: (row, column, value, index) => {
-                if (this.isEmpty(value)) {
-                  return "";
-                }
-                return this.selectMachineName(this.machineMap, value);
-              },
             },
             {
-              prop: "beforeMidPlan",
-              label: this.$t("ui.data.column.dispatcherlog.nightPlan"),
+              prop: "beforeClass1Plan",
+              label: this.$t("ui.data.column.tq.dispatcherlog.beforeClass1Plan"),
               valign: "middle",
               align: "center",
               halign: "center",
-             //  sortable: "custom",
             },
             {
-              prop: "beforeNightPlan",
-              label: this.$t("ui.data.column.dispatcherlog.midPlan"),
+              prop: "beforeClass2Plan",
+              label: this.$t("ui.data.column.tq.dispatcherlog.beforeClass2Plan"),
               valign: "middle",
-              align: "left",
+              align: "center",
               halign: "center",
-             //  sortable: "custom",
+            },
+            {
+              prop: "beforeClass3Plan",
+              label: this.$t("ui.data.column.tq.dispatcherlog.beforeClass3Plan"),
+              valign: "middle",
+              align: "center",
+              halign: "center",
+            },
+            {
+              prop: "beforeClass4Plan",
+              label: this.$t("ui.data.column.tq.dispatcherlog.beforeClass4Plan"),
+              valign: "middle",
+              align: "center",
+              halign: "center",
+            },
+            {
+              prop: "beforeClass5Plan",
+              label: this.$t("ui.data.column.tq.dispatcherlog.beforeClass5Plan"),
+              valign: "middle",
+              align: "center",
+              halign: "center",
+            },
+            {
+              prop: "beforeClass6Plan",
+              label: this.$t("ui.data.column.tq.dispatcherlog.beforeClass6Plan"),
+              valign: "middle",
+              align: "center",
+              halign: "center",
             },
           ],
         },
@@ -207,34 +190,53 @@ export default {
           label: this.$t("ui.data.column.dispatcherlog.AfterOper"),
           children: [
             {
-              prop: "afterMachineId",
-              label: this.$t("ui.data.column.dispatcherlog.line"),
+              prop: "afterMachineCode",
+              label: this.$t("ui.data.column.tq.dispatcherlog.afterMachineCode"),
               valign: "middle",
               align: "center",
               halign: "center",
-             //  sortable: "custom",
-              formatter: (row, column, value, index) => {
-                if (this.isEmpty(value)) {
-                  return "";
-                }
-                return this.selectMachineName(this.machineMap, value);
-              },
             },
             {
-              prop: "afterMidPlan",
-              label: this.$t("ui.data.column.dispatcherlog.nightPlan"),
+              prop: "afterClass1Plan",
+              label: this.$t("ui.data.column.tq.dispatcherlog.afterClass1Plan"),
               valign: "middle",
-              align: "left",
+              align: "center",
               halign: "center",
-             //  sortable: "custom",
             },
             {
-              prop: "afterNightPlan",
-              label: this.$t("ui.data.column.dispatcherlog.midPlan"),
+              prop: "afterClass2Plan",
+              label: this.$t("ui.data.column.tq.dispatcherlog.afterClass2Plan"),
               valign: "middle",
-              align: "left",
+              align: "center",
               halign: "center",
-             //  sortable: "custom",
+            },
+            {
+              prop: "afterClass3Plan",
+              label: this.$t("ui.data.column.tq.dispatcherlog.afterClass3Plan"),
+              valign: "middle",
+              align: "center",
+              halign: "center",
+            },
+            {
+              prop: "afterClass4Plan",
+              label: this.$t("ui.data.column.tq.dispatcherlog.afterClass4Plan"),
+              valign: "middle",
+              align: "center",
+              halign: "center",
+            },
+            {
+              prop: "afterClass5Plan",
+              label: this.$t("ui.data.column.tq.dispatcherlog.afterClass5Plan"),
+              valign: "middle",
+              align: "center",
+              halign: "center",
+            },
+            {
+              prop: "afterClass6Plan",
+              label: this.$t("ui.data.column.tq.dispatcherlog.afterClass6Plan"),
+              valign: "middle",
+              align: "center",
+              halign: "center",
             },
           ],
         },
@@ -245,16 +247,21 @@ export default {
     searchColumns() {
       return [
         {
-          label: this.$t("ui.data.column.dispatcherlog.operType"),
+          label: this.$t("ui.data.column.tq.dispatcherlog.operType"),
           prop: "operType",
-          type: "select", //DISPATCHER_OPER_TYPE
+          type: "select",
+          filterable: true,
           dictData: this.dict.type.DISPATCHER_OPER_TYPE,
         },
         {
-          label: this.$t("ui.data.column.dispatcherlog.scheduleDate"),
+          label: this.$t("ui.data.column.tq.dispatcherlog.scheduleDate"),
           prop: "scheduleDate",
           type: "date",
           valueFormat: "yyyy-MM-dd",
+        },
+        {
+          label: this.$t("ui.data.column.tq.dispatcherlog.beadCode"),
+          prop: "beadCode",
         },
         {
           label: this.$t("ui.data.column.dispatcherlog.createBy"),
@@ -271,35 +278,6 @@ export default {
     },
   },
   methods: {
-    handleAdd() {
-      if (this.$refs.infoRef) {
-        this.$refs.infoRef.show();
-      }
-    },
-    handleEdit(row) {
-      if (this.$refs.infoRef) {
-        this.$refs.infoRef.show(row);
-      }
-    },
-    handleDelete(row) {
-      this.$confirm(this.$t("common.confirm.delete"), {
-        type: "warning",
-      }).then(() => {
-        const ids = row.id;
-        this.loading = true;
-        removeQuota({ ids })
-          .then((data) => {
-            this.$modal.msgSuccess(data.msg);
-            this.$set(this.page, "current", 1);
-            this.getList();
-          })
-          .catch((error) => {
-            console.log(error);
-            this.loading = false;
-          });
-      });
-    },
-
     handleSearch(data) {
       this.query = data;
       this.$set(this.page, "current", 1);
@@ -320,7 +298,6 @@ export default {
           isAsc: order == "ascending" ? "asc" : "desc",
         };
       } else {
-        //默认排序
         this.sort = {};
       }
       this.getList();
@@ -331,38 +308,48 @@ export default {
     handleExport() {
       downloadLink("/tq/dispatcherLog/export", this.formatParams(false));
     },
-
-    // utils
-    selectMachineName(data, value) {
-      var arr = value.split(",");
-      let strArr = arr.map((val) => {
-        return data[val] || "";
-      });
-
-      return strArr.join(",");
-    },
+    /**
+     * 单元格样式：操作前后值不一致高亮显示（CORAL红色）
+     * 覆盖机台编码和6个班次计划量的比对
+     */
     cellStyle({ row, column, rowIndex, columnIndex }) {
-      if (column.property === "afterMachineId") {
-        if (row.beforeMachineId != row.afterMachineId) {
+      // 机台编码比对
+      if (column.property === "afterMachineCode") {
+        if (row.beforeMachineCode != row.afterMachineCode) {
           return { background: "#FF7B7B" };
         }
       }
-      if (column.property === "afterDayPlan") {
-        if (row.beforeDayPlan !== row.afterDayPlan) {
+      // 6班次计划量比对
+      if (column.property === "afterClass1Plan") {
+        if (row.beforeClass1Plan != row.afterClass1Plan) {
           return { background: "#FF7B7B" };
         }
       }
-      if (column.property === "afterNightPlan") {
-        if (row.beforeNightPlan != row.afterNightPlan) {
+      if (column.property === "afterClass2Plan") {
+        if (row.beforeClass2Plan != row.afterClass2Plan) {
           return { background: "#FF7B7B" };
         }
       }
-      if (column.property === "afterMidPlan") {
-        if (row.beforeMidPlan != row.afterMidPlan) {
+      if (column.property === "afterClass3Plan") {
+        if (row.beforeClass3Plan != row.afterClass3Plan) {
           return { background: "#FF7B7B" };
         }
       }
-
+      if (column.property === "afterClass4Plan") {
+        if (row.beforeClass4Plan != row.afterClass4Plan) {
+          return { background: "#FF7B7B" };
+        }
+      }
+      if (column.property === "afterClass5Plan") {
+        if (row.beforeClass5Plan != row.afterClass5Plan) {
+          return { background: "#FF7B7B" };
+        }
+      }
+      if (column.property === "afterClass6Plan") {
+        if (row.beforeClass6Plan != row.afterClass6Plan) {
+          return { background: "#FF7B7B" };
+        }
+      }
       return {};
     },
     formatParams(hasPage = true) {

@@ -98,9 +98,24 @@ public class MdmDevicePlanShut extends BaseEntity {
     @TableField(value = "END_DATE")
     private Date endDate;
 
+    /**
+     * 数据来源，字典：lh_precision_data_source；0-MES，1-系统
+     */
+    @Excel(name = "ui.data.column.mdmDevicePlanShut.dataSource", dictType = "lh_precision_data_source")
+    @ApiModelProperty(value = "数据来源，字典：lh_precision_data_source；0-MES，1-系统", name = "dataSource")
+    @TableField(value = "DATA_SOURCE")
+    private String dataSource;
+
     @ImportExcelValidated(maxLength = 500)
     @Excel(name = "ui.data.column.mdmMaterialInfo.remark")
     @ApiModelProperty("备注")
     @TableField("REMARK")
     private String remark;
+
+    /**
+     * 版本号（MES同步时携带，用于增量同步判断）
+     */
+    @ApiModelProperty(value = "版本号", name = "dataVersion")
+    @TableField(value = "DATA_VERSION")
+    private String dataVersion;
 }

@@ -89,8 +89,11 @@ public class TaskGroupService {
     /** 库存高水位阈值（小时）：超过此值降低优先级 */
     private static final int STOCK_HIGH_HOURS_THRESHOLD = 18;
 
-    /** 可供硫化时长封顶阈值（小时）：预计班后库存可供硫化时长超过此值即封顶产量 */
-    private static final int STOCK_HOURS_CAP = 6;
+    /** 参数编码：可供硫化时长封顶阈值（小时） */
+    private static final String PARAM_STOCK_HOURS_CAP = "SYS04080001";
+
+    /** 参数编码：可供硫化时长封顶开关（Y=开启，N=关闭） */
+    private static final String PARAM_STOCK_HOURS_CAP_ENABLED = "SYS04080005";
 
     /** 一天总秒数 */
     private static final int SECONDS_PER_DAY = 24 * 60 * 60;
@@ -206,6 +209,10 @@ public class TaskGroupService {
         log.info("【收尾参数配置】收尾舍弃阈值={}, 成型余量紧急阈值={}, 近期收尾天数={}, 紧急收尾天数={}",
                 endingDiscardThreshold, endingUrgentFormingRemainder, endingDaysThreshold, urgentEndingDays);
 
+        int stockHoursCap = getStockHoursCap(context);
+        boolean stockHoursCapEnabled = isStockHoursCapEnabled(context);
+        log.info("【立库管控参数】可供硫化时长封顶阈值={}h, 开关={}", stockHoursCap, stockHoursCapEnabled ? "开启" : "关闭");
+
         // 判断当前班次是否为开产班次（用于提前过滤关键产品）
         boolean isOpeningShift = false;
         if (dayShifts != null && !dayShifts.isEmpty()) {
@@ -280,9 +287,12 @@ public class TaskGroupService {
         int runningTotalProjectedStock = embryoTotalStockMap.values().stream().mapToInt(Integer::intValue).sum();
 
         if (warehouseCapacity > 0) {
-            log.info("【立库库容管控】参数: 立库总库容={}条, 预警比例={}%, 预警线={}条, 单胎胚可供硫化>{}h即封顶, 立库中有库存的胎胚种类={}种, 当前立库总库存={}条, 剩余可用={}条",
+            int cxStockRecordCount = context.getStocks() != null ? (int) context.getStocks().stream()
+                    .filter(s -> s.getEmbryoCode() != null && s.getStockNum() != null && s.getStockNum() > 0)
+                    .count() : 0;
+            log.info("【立库库容管控】参数: 立库总库容={}条, 预警比例={}%, 预警线={}条, 单胎胚可供硫化>{}h即封顶, 立库中有库存的胎胚种类={}种(来自{}条CxStock记录), 当前立库总库存={}条, 剩余可用={}条",
                     warehouseCapacity, (int)(warehouseCapacityRatio * 100), warehouseThreshold,
-                    STOCK_HOURS_CAP, embryoTotalStockMap.size(),
+                    stockHoursCap, embryoTotalStockMap.size(), cxStockRecordCount,
                     runningTotalProjectedStock, Math.max(0, warehouseThreshold - runningTotalProjectedStock));
         }
 
@@ -309,6 +319,10 @@ public class TaskGroupService {
                 }
             }
         }
+
+        // 预计算：当日所有结构已占用的机台编码集合（用于提前生产冲突检测）
+        // 当某结构当日无机台但需要提前生产时，从未来配置中查找的机台需剔除已被当日其他结构占用的机台
+        Set<String> currentDayUsedMachineCodes = precomputeCurrentDayUsedMachineCodes(context, scheduleDate);
 
         // 按三层优先级对 lhScheduleResults 排序（降序，高优先级先处理）
         // 多级排序：L1基础分层 → L2类型加成 → L3库存（库存少优先）
@@ -390,6 +404,12 @@ public class TaskGroupService {
                         .thenComparingInt(lh -> sortStockMap.get(lh)));
 
         log.info("按三层多级排序完成：L1(补充计划10000>有计划+紧急9000>有计划+近期8000>有计划+正常7000>无计划+紧急6000>无计划+近期5000>无计划+正常4000) → L2(试制量试1500>续作800>非续作0) → L3(库存少优先)");
+
+        // 预解析提前生产机台：在第一轮开始前，为当日无机台的结构从未来配置中查找机台
+        // 【重要】放在第一轮之前统一处理，避免内联解析导致提前占用后续结构的机台
+        // 冲突检测是动态的：每个结构解析时，能看到前面已分配的提前生产机台
+        resolveAdvanceProductionMachines(lhScheduleResults, scheduleDate, context,
+                currentDayUsedMachineCodes, structureRecommendedMachinesCache);
 
         for (LhScheduleResult lhResult : lhScheduleResults) {
             if (lhResult.getEmbryoCode() == null) {
@@ -529,11 +549,12 @@ public class TaskGroupService {
             // 检查4：月计划推荐的机台总产能管控（后置到计算待排产量之后，使用实际计划量）
             String structureName = lhResult.getStructureName();
             if (structureName != null && context.getStructureAllocationMap() != null) {
+                // 获取推荐机台：优先从缓存获取（提前生产已预解析），否则从当日配置查找
                 List<MpCxCapacityConfiguration> recommendedMachines = structureRecommendedMachinesCache
                         .computeIfAbsent(structureName, k -> getRecommendedMachinesForStructure(k, scheduleDate, context));
 
                 if (recommendedMachines == null || recommendedMachines.isEmpty()) {
-                    log.info("【机台产能管控】结构={}, 胎胚={}, 跳过：无推荐机台配置(结构未匹配到排产配置或生产版本)", structureName, lhResult.getEmbryoCode());
+                    log.info("【机台产能管控】结构={}, 胎胚={}, 跳过：无推荐机台配置(当日及未来均未匹配到排产配置)", structureName, lhResult.getEmbryoCode());
                 } else {
                     int totalMaxLh = structureTotalMaxLhCache
                             .computeIfAbsent(structureName, k -> calculateStructureTotalMaxLh(recommendedMachines, k, context));
@@ -643,12 +664,15 @@ public class TaskGroupService {
 
                 // 统一日志：每个任务都打印立库状态
                 //   入立库 = 成型产出 - 硫化消耗（净增量），当硫化消化全部成型产出时入立库=0
+                //   说明：净入立库 = 本任务成型产出(11) - 本任务硫化消耗(16) = -5，是单任务净增量；
+                //        与下方预计班后库存公式(currentStock+cumForming-cumConsumption)中的累计口径不同
                 if (warehouseCapacity > 0) {
                     int netStockChange = originalProduction - vulcanizingConsumption;
                     int warehouseRemainBefore = Math.max(0, warehouseThreshold - totalProjectedStockBefore);
                     int warehouseRemainAfter = Math.max(0, warehouseThreshold - totalProjectedStock);
-                    log.info("【立库库容管控】胎胚={}, 成型产出={}条, 硫化消耗={}条, 净入立库={}条, 立库预警线={}条(总容量={}×{}%), 加入前立库剩余={}条, 加入后立库剩余={}条",
-                            embryoCode, originalProduction, vulcanizingConsumption, netStockChange,
+                    log.info("【立库库容管控】胎胚={}, 胎胚总库存={}条, 本任务成型产出={}条, 本任务硫化消耗={}条, 净入立库={}条(本任务), 累计成型产出={}条, 累计硫化消耗={}条, 立库预警线={}条(总容量={}×{}%), 加入前立库剩余={}条, 加入后立库剩余={}条",
+                            embryoCode, currentStock, originalProduction, vulcanizingConsumption, netStockChange,
+                            cumFormingOutput, cumVulcanizingConsumption,
                             warehouseThreshold, warehouseCapacity, (int)(warehouseCapacityRatio * 100),
                             warehouseRemainBefore, warehouseRemainAfter);
                 }
@@ -672,46 +696,56 @@ public class TaskGroupService {
                             .append(")=").append(spaceLimit);
                 }
 
-                // 维度二（时间）：本胎胚预计库存可供硫化时长超过6小时
+                // 维度二（时间）：本任务自身分配库存预计班后库存可供硫化时长超过6小时
+                //   库存基准：materialStockMap[lhId]（按比例分配给本任务的库存，共用胎胚时小于胎胚总库存）
+                //   累计口径：本任务成型产出(可能被封顶) + 本任务硫化消耗（任务级，不与其他任务合并）
+                //   语义：管控的是"本任务自身分配库存的可供硫化时长"，避免共用胎胚被误封顶
                 int taskMoldQty = task.getVulcanizeMoldCount();
                 Integer materialDailyLhCapacity = getDailyLhCapacityForMaterial(materialCode, context);
                 // 日硫化量为双模值，需÷2得到单模产量（与S5.2.3一致）
                 materialDailyLhCapacity = materialDailyLhCapacity != null && materialDailyLhCapacity > 0 ? materialDailyLhCapacity / 2 : null;
                 BigDecimal projectedStockHours = null;
                 int capMaxStock = 0;
-                if (taskMoldQty > 0 && materialDailyLhCapacity != null && materialDailyLhCapacity > 0) {
+                int taskAllocatedStock = 0;
+                int taskProjectedStock = 0;
+                if (stockHoursCapEnabled && taskMoldQty > 0 && materialDailyLhCapacity != null && materialDailyLhCapacity > 0) {
+                    // 取本任务分配库存（共用胎胚按比例分配，可能小于胎胚总库存）
+                    taskAllocatedStock = getCurrentStock(context, lhResult.getId());
+                    // 任务级预计班后库存 = 任务分配库存 + 本任务成型产出(封顶后) - 本任务硫化消耗
+                    int taskActualProduction = task.getPlannedProduction() != null ? task.getPlannedProduction() : 0;
+                    taskProjectedStock = taskAllocatedStock + taskActualProduction - vulcanizingConsumption;
                     BigDecimal singleTireMoldSeconds = BigDecimal.valueOf(SECONDS_PER_DAY)
                             .divide(BigDecimal.valueOf(materialDailyLhCapacity), 2, BigDecimal.ROUND_HALF_UP);
-                    projectedStockHours = BigDecimal.valueOf(projectedStock)
+                    projectedStockHours = BigDecimal.valueOf(taskProjectedStock)
                             .multiply(singleTireMoldSeconds)
                             .divide(BigDecimal.valueOf(taskMoldQty), 2, BigDecimal.ROUND_HALF_UP)
                             .divide(BigDecimal.valueOf(SECONDS_PER_HOUR), 2, BigDecimal.ROUND_HALF_UP);
-                    if (projectedStockHours.compareTo(BigDecimal.valueOf(STOCK_HOURS_CAP)) > 0) {
-                        capMaxStock = BigDecimal.valueOf(STOCK_HOURS_CAP)
+                    if (projectedStockHours.compareTo(BigDecimal.valueOf(stockHoursCap)) > 0) {
+                        capMaxStock = BigDecimal.valueOf(stockHoursCap)
                                 .multiply(BigDecimal.valueOf(SECONDS_PER_HOUR))
                                 .multiply(BigDecimal.valueOf(taskMoldQty))
                                 .divide(singleTireMoldSeconds, 0, BigDecimal.ROUND_UP)
                                 .intValue();
-                        int stockHoursOver = projectedStock - capMaxStock;
+                        int stockHoursOver = taskProjectedStock - capMaxStock;
                         if (stockHoursOver > 0) {
                             int timeLimit = Math.max(0, originalProduction - stockHoursOver);
                             maxAllowedProduction = Math.min(maxAllowedProduction, timeLimit);
                             capped = true;
                             if (capDetail.length() > 0) capDetail.append("; ");
-                            capDetail.append("[时间] 本胎胚预计库存=").append(projectedStock)
+                            capDetail.append("[时间] 本任务预计库存=").append(taskProjectedStock)
                                     .append(", 可供硫化=").append(projectedStockHours.setScale(2, BigDecimal.ROUND_HALF_UP)).append("h")
-                                    .append(" > ").append(STOCK_HOURS_CAP).append("h")
-                                    .append(", 6h对应最大库存=").append(capMaxStock)
+                                    .append(" > ").append(stockHoursCap).append("h")
+                                    .append(", ").append(stockHoursCap).append("h对应最大库存=").append(capMaxStock)
                                     .append(", 超出=").append(stockHoursOver)
                                     .append(", 时间允许产量=max(0,").append(originalProduction).append("-").append(stockHoursOver)
                                     .append(")=").append(timeLimit);
                         }
                     }
-                    log.info("【可供硫化管控】胎胚={}, 预计班后库存={}, 可供硫化= {} × {} / {} / 3600 = {}h, 6h上限, {}",
-                            embryoCode, projectedStock,
-                            projectedStock, singleTireMoldSeconds.setScale(2, BigDecimal.ROUND_HALF_UP), taskMoldQty,
+                    log.info("【可供硫化管控】胎胚={}, 任务分配库存={}条(本任务), 本任务成型产出={}条, 本任务硫化消耗={}条, 任务预计班后库存={}条(分配库存+本任务成型-本任务硫化), 可供硫化= {} × {} / {} / 3600 = {}h, 6h上限, {}",
+                            embryoCode, taskAllocatedStock, taskActualProduction, vulcanizingConsumption, taskProjectedStock,
+                            taskProjectedStock, singleTireMoldSeconds.setScale(2, BigDecimal.ROUND_HALF_UP), taskMoldQty,
                             projectedStockHours.setScale(2, BigDecimal.ROUND_HALF_UP),
-                            projectedStockHours.compareTo(BigDecimal.valueOf(STOCK_HOURS_CAP)) > 0 ? "超限→封顶" : "未超限→通过");
+                            projectedStockHours.compareTo(BigDecimal.valueOf(stockHoursCap)) > 0 ? "超限→封顶" : "未超限→通过");
                 }
 
                 if (capped && maxAllowedProduction < originalProduction) {
@@ -976,25 +1010,30 @@ public class TaskGroupService {
                             String dtSkipReason = "";
                             int dtTotalProjected = runningTotalProjectedStock;
                             BigDecimal dtStockHoursAfterResult = null;
-                            if (dtTotalProjected >= warehouseThreshold) {
+                            if (warehouseCapacity > 0 && dtTotalProjected >= warehouseThreshold) {
                                 dtSkip = true;
                                 dtSkipReason = "[空间]全部预计=" + dtTotalProjected + ">=上限=" + warehouseThreshold;
                             }
                             // 维度二（时间）：预估本轮排产后的可供硫化时长，如果>6h则跳过本轮（事前检查）
+                            //   【任务级口径】库存基准改为 materialStockMap[lhId]（本任务分配库存），
+                            //   避免共用胎胚时错误汇总其他任务的库存导致误跳过
                             int dtTaskMoldQty = dt.getVulcanizeMoldCount();
                             Integer dtDailyLhCap = null;
                             BigDecimal dtSingleTireMoldSeconds = null;
                             int dtProjectedAfter = 0;
                             int dtFallbackProduction = 0;
+                            int dtTaskAllocatedStock = 0;
                             if (!dtSkip) {
                                 dtDailyLhCap = getDailyLhCapacityForMaterial(dtMaterialCode, context);
                                 // 日硫化量为双模值，需÷2得到单模产量（与S5.2.3一致）
                                 dtDailyLhCap = dtDailyLhCap != null && dtDailyLhCap > 0 ? dtDailyLhCap / 2 : null;
-                                if (dtTaskMoldQty > 0 && dtDailyLhCap != null && dtDailyLhCap > 0) {
+                                if (stockHoursCapEnabled && dtTaskMoldQty > 0 && dtDailyLhCap != null && dtDailyLhCap > 0) {
                                     int dtTripCapacity = getTripCapacity(structName, dtEmbryoCode, context);
                                     dtFallbackProduction = Math.min(dtTripCapacity, remainingDemand);
                                     if (dtFallbackProduction > 0) {
-                                        dtProjectedAfter = dtCurrentStock + dtCumFormingOutput + dtFallbackProduction - dtCumVulcanizingConsumption;
+                                        // 任务级：分配库存 + 本任务本轮船产
+                                        dtTaskAllocatedStock = getCurrentStock(context, dt.getLhId());
+                                        dtProjectedAfter = dtTaskAllocatedStock + dtFallbackProduction;
                                         dtSingleTireMoldSeconds = BigDecimal.valueOf(SECONDS_PER_DAY)
                                                 .divide(BigDecimal.valueOf(dtDailyLhCap), 2, BigDecimal.ROUND_HALF_UP);
                                         BigDecimal dtStockHoursAfter = BigDecimal.valueOf(dtProjectedAfter)
@@ -1002,19 +1041,20 @@ public class TaskGroupService {
                                                 .divide(BigDecimal.valueOf(dtTaskMoldQty), 2, BigDecimal.ROUND_HALF_UP)
                                                 .divide(BigDecimal.valueOf(SECONDS_PER_HOUR), 2, BigDecimal.ROUND_HALF_UP);
                                         dtStockHoursAfterResult = dtStockHoursAfter;
-                                        if (dtStockHoursAfter.compareTo(BigDecimal.valueOf(STOCK_HOURS_CAP)) > 0) {
+                                        if (dtStockHoursAfter.compareTo(BigDecimal.valueOf(stockHoursCap)) > 0) {
                                             dtSkip = true;
-                                            dtSkipReason = "[时间-事前]预估本轮排" + dtFallbackProduction + "条后=" + dtProjectedAfter
-                                                    + ",可供硫化=" + dtStockHoursAfter.setScale(2, BigDecimal.ROUND_HALF_UP) + "h>" + STOCK_HOURS_CAP + "h";
+                                            dtSkipReason = "[时间-事前]预估本轮排" + dtFallbackProduction + "条后,任务分配库存=" + dtTaskAllocatedStock
+                                                    + "+" + dtFallbackProduction + "=" + dtProjectedAfter
+                                                    + ",可供硫化=" + dtStockHoursAfter.setScale(2, BigDecimal.ROUND_HALF_UP) + "h>" + stockHoursCap + "h";
                                         }
                                     }
                                 }
                             }
                             if (dtSkip) {
-                                log.info("  [R2-{}] 跳过：胎胚={}, 本胎胚: {}+{}-{}={}, 原因: {}",
+                                log.info("  [R2-{}] 跳过：胎胚={}, 任务分配库存={}, 本任务成型产出={}条, 本任务硫化消耗={}条(事前: +{}), 原因: {}",
                                         dtSkipReason.startsWith("[空间]") ? "空间(库容超限)" : "时间(硫化超6h)",
-                                        dtEmbryoCode, dtCurrentStock, dtCumFormingOutput, dtCumVulcanizingConsumption,
-                                        dtProjectedStock, dtSkipReason);
+                                        dtEmbryoCode, dtTaskAllocatedStock, dtProjectedStock,
+                                        dtCumVulcanizingConsumption, dtFallbackProduction, dtSkipReason);
                                 deferredSkippedWarehouse++;
                                 skippedWarehouseList.add(dtEmbryoCode + "/" + dtMaterialCode);
                                 // 被立库管控跳过，但之前已分配过产量的任务需要收尾处理并加入结果
@@ -1077,8 +1117,9 @@ public class TaskGroupService {
                             BigDecimal afterAdd = structDeferredTime.add(itemTimeSeconds);
                             if (afterAdd.compareTo(remainingCapacity) > 0) {
                                 BigDecimal actualRemaining = remainingCapacity.subtract(structDeferredTime);
-                                log.info("  [R2-产能不足] 结构={}, 已用={}s({}h) + 本项={}s({}h) > 剩余={}s({}h)，本轮跳过",
-                                        structName, structDeferredTime.toBigInteger(),
+                                log.info("  [R2-产能不足] 结构={}, 胎胚={}, 物料={}, 第{}轮失败, 已用={}s({}h) + 本项={}s({}h) > 剩余={}s({}h)，本轮不分配",
+                                        structName, dt.getEmbryoCode(), dtMaterialCode, currentRound,
+                                        structDeferredTime.toBigInteger(),
                                         structDeferredTime.divide(BigDecimal.valueOf(3600), 1, BigDecimal.ROUND_HALF_UP),
                                         itemTimeSeconds.toBigInteger(),
                                         itemTimeSeconds.divide(BigDecimal.valueOf(3600), 1, BigDecimal.ROUND_HALF_UP),
@@ -1814,7 +1855,10 @@ public class TaskGroupService {
         } else {
             logDailyLhCapacity = "标准=" + dailyLhCapacity;
         }
-        log.info("物料 {} stockHours计算: 日硫化量({}), 单胎单模时长={}s, 模数={}, 库存={}, 库存可供时长={}h",
+        // 注意：这里的"库存"是分配给本硫化任务的库存（materialStockMap[lhId]），
+        //      共用胎胚时按各任务日硫化量比例分配，数值小于胎胚总库存；
+        //      立库管控日志中的"胎胚总库存"是 embryoTotalStockMap[embryoCode]，汇总该胎胚所有 CxStock 记录
+        log.info("物料 {} stockHours计算: 日硫化量({}), 单胎单模时长={}s, 模数={}, 任务分配库存={}, 库存可供时长={}h",
                 task.getEmbryoCode(), logDailyLhCapacity, singleTireMoldSeconds, taskMoldQty, currentStock, stockHours);
     }
 
@@ -2674,6 +2718,38 @@ public class TaskGroupService {
     }
 
     /**
+     * 获取可供硫化时长封顶阈值（小时）：预计班后库存可供硫化时长超过此值即封顶产量
+     * 优先使用参数配置 SYS04080001，否则使用默认值 6
+     */
+    private int getStockHoursCap(ScheduleContextVo context) {
+        if (context.getParamConfigMap() != null) {
+            CxParamConfig config = context.getParamConfigMap().get(PARAM_STOCK_HOURS_CAP);
+            if (config != null && config.getParamValue() != null) {
+                try {
+                    return Integer.parseInt(config.getParamValue());
+                } catch (NumberFormatException e) {
+                    log.warn("解析可供硫化时长封顶阈值配置失败: {}", config.getParamValue());
+                }
+            }
+        }
+        return 6;
+    }
+
+    /**
+     * 获取可供硫化时长封顶是否开启
+     * 优先使用参数配置 SYS04080005，Y=开启，N=关闭，默认开启
+     */
+    private boolean isStockHoursCapEnabled(ScheduleContextVo context) {
+        if (context.getParamConfigMap() != null) {
+            CxParamConfig config = context.getParamConfigMap().get(PARAM_STOCK_HOURS_CAP_ENABLED);
+            if (config != null && config.getParamValue() != null) {
+                return "Y".equalsIgnoreCase(config.getParamValue().trim());
+            }
+        }
+        return true;
+    }
+
+    /**
      * 获取成型余量紧急阈值：成型余量低于此值标记为紧急收尾
      * 优先使用参数配置，否则使用默认值
      */
@@ -2742,6 +2818,174 @@ public class TaskGroupService {
                 .filter(c -> c.getBeginDay() != null && c.getEndDay() != null
                         && c.getBeginDay() <= dayOfMonth && c.getEndDay() >= dayOfMonth)
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * 预计算当日所有结构已占用的机台编码集合
+     *
+     * <p>遍历 structureAllocationMap 中所有结构的当日有效配置，收集全部机台编码。
+     * 这些机台已被当日排产计划占用，提前生产时不能重复分配。
+     *
+     * @param context      排程上下文
+     * @param scheduleDate 排程日期
+     * @return 当日已占用的机台编码集合
+     */
+    private Set<String> precomputeCurrentDayUsedMachineCodes(ScheduleContextVo context, LocalDate scheduleDate) {
+        Set<String> usedCodes = new HashSet<>();
+        if (context.getStructureAllocationMap() == null) {
+            return usedCodes;
+        }
+        int dayOfMonth = scheduleDate.getDayOfMonth();
+        for (List<MpCxCapacityConfiguration> configs : context.getStructureAllocationMap().values()) {
+            if (configs == null) {
+                continue;
+            }
+            for (MpCxCapacityConfiguration config : configs) {
+                if (config.getBeginDay() != null && config.getEndDay() != null
+                        && config.getBeginDay() <= dayOfMonth && config.getEndDay() >= dayOfMonth
+                        && config.getCxMachineCode() != null) {
+                    usedCodes.add(config.getCxMachineCode());
+                }
+            }
+        }
+        if (!usedCodes.isEmpty()) {
+            log.info("【提前生产】当日已占用机台编码集合（{}台）: {}", usedCodes.size(), usedCodes);
+        }
+        return usedCodes;
+    }
+
+    /**
+     * 预解析提前生产机台：在第一轮开始前，为当日无机台的结构从提前生产备用配置中查找机台
+     *
+     * <p>提前生产业务规则：当结构在当日（BEGIN_DAY/END_DAY 日期范围内）无可配置机台时，
+     * 从提前生产备用配置（futureStructureAllocationMap，含本月 BEGIN_DAY > 当前日期 的机台，
+     * 跨月场景下含次月机台）中查找该结构的推荐机台，并剔除已被占用的机台（冲突检测），
+     * 将剩余可用机台分配给当前结构用于提前生产。
+     *
+     * <p>【重要】本方法在第一轮排产之前统一调用，而非在第一轮遍历中内联处理。
+     * 这样做的好处：
+     * <ol>
+     *   <li>所有当日有配置机台的结构先正常处理，不会被提前生产结构干扰</li>
+     *   <li>冲突检测是动态的：每解析一个提前生产结构，已分配的机台会加入已用集合，
+     *       后续提前生产结构能看到前面已占用的机台并自动剔除</li>
+     *   <li>避免高优先级无机台结构提前占用低优先级结构可能需要的机台</li>
+     * </ol>
+     *
+     * <p>结果存入 structureRecommendedMachinesCache 和 context.advanceProductionMachineMap，
+     * 确保 NewTaskProcessor/ContinueTaskProcessor/TrialTaskProcessor 的 getAvailableMachinesForStructure
+     * 能通过 advanceProductionMachineMap 回退获取到提前生产机台，避免数据不一致。
+     *
+     * @param lhScheduleResults          排序后的硫化排程结果列表（用于确定结构优先级顺序）
+     * @param scheduleDate               排程日期
+     * @param context                    排程上下文
+     * @param currentDayUsedMachineCodes 当日所有结构已占用的机台编码集合
+     * @param cache                      机台缓存（结构→机台列表），预解析结果存入此缓存
+     */
+    private void resolveAdvanceProductionMachines(
+            List<LhScheduleResult> lhScheduleResults,
+            LocalDate scheduleDate,
+            ScheduleContextVo context,
+            Set<String> currentDayUsedMachineCodes,
+            Map<String, List<MpCxCapacityConfiguration>> cache) {
+        if (context.getFutureStructureAllocationMap() == null
+                || context.getFutureStructureAllocationMap().isEmpty()) {
+            return;
+        }
+
+        // 动态已用机台集合：初始为当日已占用，每分配一个提前生产结构就追加其机台
+        // 这样后续提前生产结构能看到前面已分配的机台并自动剔除（动态冲突检测）
+        Set<String> usedMachineCodes = new HashSet<>(currentDayUsedMachineCodes);
+
+        // 按排序后的优先级顺序扫描，找出当日无机台的结构（每个结构只处理一次）
+        Set<String> processedStructures = new HashSet<>();
+        for (LhScheduleResult lh : lhScheduleResults) {
+            String struct = lh.getStructureName();
+            if (struct == null || processedStructures.contains(struct)) {
+                continue;
+            }
+            processedStructures.add(struct);
+
+            // 跳过当日有配置机台的结构（它们在第一轮正常处理）
+            List<MpCxCapacityConfiguration> currentDay =
+                    getRecommendedMachinesForStructure(struct, scheduleDate, context);
+            if (!currentDay.isEmpty()) {
+                continue;
+            }
+
+            // 提前生产：从未来配置查找并剔除冲突机台
+            List<MpCxCapacityConfiguration> futureMachines =
+                    getFutureMachinesForAdvanceProduction(struct, context, usedMachineCodes);
+            if (futureMachines.isEmpty()) {
+                continue;
+            }
+
+            // 存入缓存（第一轮和R2通过 computeIfAbsent 直接命中缓存）
+            cache.put(struct, futureMachines);
+
+            // 存入 advanceProductionMachineMap 供处理器回退使用
+            if (context.getAdvanceProductionMachineMap() == null) {
+                context.setAdvanceProductionMachineMap(new HashMap<>());
+            }
+            context.getAdvanceProductionMachineMap().put(struct, futureMachines);
+
+            // 将已分配机台加入已用集合（后续提前生产结构会看到这些机台已被占用）
+            for (MpCxCapacityConfiguration c : futureMachines) {
+                usedMachineCodes.add(c.getCxMachineCode());
+            }
+
+            log.info("【提前生产】结构={}, 分配未来机台={}", struct,
+                    futureMachines.stream()
+                            .map(MpCxCapacityConfiguration::getCxMachineCode)
+                            .collect(Collectors.toList()));
+        }
+    }
+
+    /**
+     * 获取提前生产用的未来机台列表（含冲突检测）
+     *
+     * <p>从 context.futureStructureAllocationMap 中查找该结构的提前生产备用机台
+     * （本月 BEGIN_DAY > 当前日期 的机台，跨月场景下含次月机台），
+     * 剔除已被占用的机台（usedMachineCodes），返回剩余可用机台。
+     *
+     * <p>冲突检测示例：结构B的未来推荐机台为L105、L106、L107，其中L107已被当日结构A占用，
+     * 则剔除L107，返回L105、L106分配给结构B用于提前生产。
+     *
+     * @param structureName     结构名称
+     * @param context           排程上下文
+     * @param usedMachineCodes  已占用的机台编码集合（当日已用 + 前面已分配的提前生产机台）
+     * @return 剔除冲突后的可用未来机台列表
+     */
+    private List<MpCxCapacityConfiguration> getFutureMachinesForAdvanceProduction(
+            String structureName,
+            ScheduleContextVo context,
+            Set<String> usedMachineCodes) {
+        Map<String, List<MpCxCapacityConfiguration>> futureMap = context.getFutureStructureAllocationMap();
+        if (futureMap == null || futureMap.isEmpty()) {
+            return Collections.emptyList();
+        }
+        List<MpCxCapacityConfiguration> futureConfigs = futureMap.get(structureName);
+        if (futureConfigs == null || futureConfigs.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        // 冲突检测：剔除已被占用的机台
+        List<MpCxCapacityConfiguration> available = futureConfigs.stream()
+                .filter(c -> c.getCxMachineCode() != null)
+                .filter(c -> !usedMachineCodes.contains(c.getCxMachineCode()))
+                .collect(Collectors.toList());
+
+        if (futureConfigs.size() != available.size()) {
+            Set<String> excluded = futureConfigs.stream()
+                    .map(MpCxCapacityConfiguration::getCxMachineCode)
+                    .filter(code -> code != null && usedMachineCodes.contains(code))
+                    .collect(Collectors.toSet());
+            log.info("【提前生产-冲突检测】结构={}, 未来推荐机台={}, 剔除已占用={}, 剩余可用={}",
+                    structureName,
+                    futureConfigs.stream().map(MpCxCapacityConfiguration::getCxMachineCode).collect(Collectors.toList()),
+                    excluded,
+                    available.stream().map(MpCxCapacityConfiguration::getCxMachineCode).collect(Collectors.toList()));
+        }
+        return available;
     }
 
     private int calculateStructureTotalMaxLh(

@@ -26,7 +26,7 @@ class ApsEngineTqApplicationTests {
      */
     @Test
     public void autoTqScheduleTest() {
-        tqEngineService.autoTqSchedule("2022-02-10");
+        tqEngineService.autoTqSchedule("2022-02-10", "116");
     }
 
     /**

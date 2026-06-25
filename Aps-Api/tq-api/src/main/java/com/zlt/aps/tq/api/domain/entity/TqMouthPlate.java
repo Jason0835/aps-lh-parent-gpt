@@ -25,9 +25,10 @@ public class TqMouthPlate extends BaseEntity {
     @ImportValidated(required = true, isCode = true, maxLength = 30)
     private String mouthPlateCode;
 
-    @ApiModelProperty(value = "机台id", position = 30)
-    @TableField("MACHINE_ID")
-    private Long machineId;
+    @Excel(name = "ui.tq.mouthPlate.column.machineCode")
+    @ApiModelProperty(value = "机台编号", position = 30)
+    @TableField("MACHINE_CODE")
+    private String machineCode;
 
     @Excel(name = "ui.data.column.mouthPlateStatus", dictType = "STATUS")
     @ApiModelProperty(value = "状态，0--启用，1--禁用", position = 40)

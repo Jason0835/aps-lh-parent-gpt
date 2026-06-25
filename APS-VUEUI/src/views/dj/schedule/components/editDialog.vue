@@ -36,7 +36,7 @@ import { numberEmpty } from "@/utils/index";
 
 import infoForm from "@/views/components/infoForm.vue";
 
-import { editScheduleResult } from "@/api/nc/ncScheduleResult.js";
+import { editScheduleResult } from "@/api/dj/djScheduleResult.js";
 
 export default {
   components: { infoForm },
@@ -65,7 +65,7 @@ export default {
       machines: (state) => state.insideLiner.machines,
     }),
     title: function () {
-      return this.$t("ui.data.column.ncScheduleResult.modalName");
+      return this.$t("ui.data.column.djScheduleResult.modalName");
     },
     columns() {
       return [
@@ -77,12 +77,10 @@ export default {
           label: this.$t("ui.data.column.scheduleResult.scheduleDate"),
           prop: "scheduleDate",
           span: 12,
-          // type: "date",
-          // valueFormat: "yyyy-MM-dd",
           disabled: true,
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.liningCode"),
+          label: this.$t("ui.data.column.dj.scheduleResult.paddingCode"),
           prop: "liningCode",
           span: 12,
           disabled: true,
@@ -100,19 +98,6 @@ export default {
           disabled: true,
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.glueSeq"),
-          prop: "glueSeq",
-          span: 12,
-          disabled: true,
-        },
-        {
-          label: this.$t("ui.data.column.scheduleResult.supplyTime"),
-          prop: "supplyTime",
-          span: 12,
-          disabled: true,
-        },
-
-        {
           label: this.$t("ui.data.column.scheduleResult.isRelease"),
           prop: "isRelease",
           span: 12,
@@ -121,7 +106,7 @@ export default {
           dictData: this.parentDict.type.IS_RELEASE,
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.produceLine"),
+          label: this.$t("ui.data.column.dj.scheduleResult.machineCode"),
           prop: "machineId",
           span: 12,
           type: "select",
@@ -132,211 +117,138 @@ export default {
           valueType: "string",
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.monthPlanOs"),
-          prop: "monthPlanOs",
-          span: 12,
-          disabled: true,
-        },
-        {
           label: this.$t("ui.common.column.remark"),
           prop: "remark",
           span: 12,
           type: "textarea",
           maxlength: "300",
         },
-        {
-          label: this.$t("ui.data.column.scheduleResult.nightPlan"),
-          type: "title",
-        },
 
+        // ============ 中班（class1） ============
         {
-          label: this.$t("ui.data.column.scheduleResult.nightPlanQty"),
-          prop: "dayPlanQty",
-          span: 12,
-          disabled: true,
-        },
-        {
-          label: this.$t("ui.data.column.scheduleResult.nightFinishQty"),
-          prop: "dayFinishQty",
-          span: 12,
-          disabled: true,
-        },
-
-        {
-          label: this.$t("ui.data.column.scheduleResult.nightFinishRate"),
-          prop: "dayFinishRate",
-          span: 12,
-          disabled: true,
-        },
-        {
-          label: this.$t("ui.data.column.scheduleResult.nightProduceOrder"),
-          prop: "dayProduceOrder",
-          span: 12,
-          type: "number",
-          min: 0,
-          max: 999999,
-          precision: 0,
-          disabled: true,
-        },
-        {
-          label: this.$t("ui.data.column.scheduleResult.nightHandAnalysis"),
-          prop: "dayHandAnalysis",
-          span: 12,
-          maxlength: "100",
-        },
-        {
-          label: this.$t("ui.data.column.scheduleResult.nightSysAnalysis"),
-          prop: "daySysAnalysis",
-          span: 12,
-          disabled: true,
-        },
-        {
-          label: this.$t("ui.data.column.scheduleResult.dayPlan"),
+          label: this.$t("ui.data.column.scheduleResult.class1PlanQty"),
           type: "title",
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.dayPlanQty"),
-          prop: "nightPlanQty",
+          label: this.$t("ui.data.column.dj.scheduleResult.planQty"),
+          prop: "class1PlanQty",
           span: 12,
-          disabled: true,
-        },
-        {
-          label: this.$t("ui.data.column.scheduleResult.dayFinishQty"),
-          prop: "nightFinishQty",
-          span: 12,
-          disabled: true,
-        },
-        {
-          label: this.$t("ui.data.column.scheduleResult.dayFinishRate"),
-          prop: "nightFinishRate",
-          span: 12,
-          disabled: true,
-        },
-        {
-          label: this.$t("ui.data.column.scheduleResult.dayProduceOrder"),
-          prop: "nightProduceOrder",
-          span: 12,
-          type: "number",
-          min: 0,
-          max: 999999,
-          precision: 0,
-          disabled: true,
-        },
-        {
-          label: this.$t("ui.data.column.scheduleResult.dayHandAnalysis"),
-          prop: "nightHandAnalysis",
-          span: 12,
-          maxlength: "100",
-        },
-        {
-          label: this.$t("ui.data.column.scheduleResult.daySysAnalysis"),
-          prop: "nightSysAnalysis",
-          span: 12,
-          disabled: true,
-        },
-        {
-          label: this.$t("中班计划（14:00-22:00)"),
-          type: "title",
-        },
-        {
-          label: this.$t("中班计划量"),
-          prop: "nightPlanQty",
-          span: 12,
-          disabled: true,
-        },
-        {
-          label: this.$t("中班完成量"),
-          prop: "nightFinishQty",
-          span: 12,
-          disabled: true,
-        },
-        {
-          label: this.$t("中班完成率"),
-          prop: "nightFinishRate",
-          span: 12,
-          disabled: true,
-        },
-        {
-          label: this.$t("中班顺序"),
-          prop: "nightProduceOrder",
-          span: 12,
-          disabled: this.nightDisabled,
           type: "number",
           min: 0,
           max: 999999,
           precision: 0,
         },
         {
-          label: this.$t("中班系统原因分析"),
-          prop: "nightSysAnalysis",
+          label: this.$t("ui.data.column.dj.scheduleResult.finishQty"),
+          prop: "class1FinishQty",
           span: 12,
           disabled: true,
         },
         {
-          label: this.$t("中班手动输入原因分析"),
-          prop: "nightHandAnalysis",
+          label: this.$t("ui.data.column.scheduleResult.finish"),
+          prop: "class1FinishRate",
+          span: 12,
+          disabled: true,
+        },
+        {
+          label: this.$t("ui.data.column.dj.scheduleResult.sequence"),
+          prop: "class1Sequence",
+          span: 12,
+          type: "number",
+          min: 0,
+          max: 999999,
+          precision: 0,
+        },
+        {
+          label: this.$t("ui.data.column.scheduleResult.class1Analysis"),
+          prop: "class1Analysis",
           span: 12,
           maxlength: "100",
         },
 
+        // ============ 夜班（class2） ============
         {
-          label: this.$t("ui.data.column.scheduleResult.prePlanQty"),
+          label: this.$t("ui.data.column.scheduleResult.class2PlanQty"),
           type: "title",
         },
         {
-          label: `${this.$t("ui.data.column.scheduleResult.plan")}(${this.$t(
-            "ui.data.column.scheduleResult.unit.meter"
-          )})`,
-          prop: "prePlanQty",
+          label: this.$t("ui.data.column.dj.scheduleResult.planQty"),
+          prop: "class2PlanQty",
+          span: 12,
+          type: "number",
+          min: 0,
+          max: 999999,
+          precision: 0,
+        },
+        {
+          label: this.$t("ui.data.column.dj.scheduleResult.finishQty"),
+          prop: "class2FinishQty",
           span: 12,
           disabled: true,
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.ncPlan2"),
+          label: this.$t("ui.data.column.scheduleResult.finish"),
+          prop: "class2FinishRate",
+          span: 12,
+          disabled: true,
+        },
+        {
+          label: this.$t("ui.data.column.dj.scheduleResult.sequence"),
+          prop: "class2Sequence",
+          span: 12,
+          type: "number",
+          min: 0,
+          max: 999999,
+          precision: 0,
+        },
+        {
+          label: this.$t("ui.data.column.scheduleResult.class2Analysis"),
+          prop: "class2Analysis",
+          span: 12,
+          maxlength: "100",
+        },
+
+        // ============ 早班（class3） ============
+        {
+          label: this.$t("ui.data.column.scheduleResult.class3PlanQty"),
           type: "title",
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.cxClass1Plan"),
-          prop: "cxClass2Plan",
+          label: this.$t("ui.data.column.dj.scheduleResult.planQty"),
+          prop: "class3PlanQty",
+          span: 12,
+          type: "number",
+          min: 0,
+          max: 999999,
+          precision: 0,
+        },
+        {
+          label: this.$t("ui.data.column.dj.scheduleResult.finishQty"),
+          prop: "class3FinishQty",
           span: 12,
           disabled: true,
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.class3Plan2"),
-          prop: "cxClass4Plan",
+          label: this.$t("ui.data.column.scheduleResult.finish"),
+          prop: "class3FinishRate",
           span: 12,
           disabled: true,
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.class2Plan2"),
-          prop: "cxClass3Plan",
+          label: this.$t("ui.data.column.dj.scheduleResult.sequence"),
+          prop: "class3Sequence",
           span: 12,
-          disabled: true,
+          type: "number",
+          min: 0,
+          max: 999999,
+          precision: 0,
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.cxClass4Plan"),
-          prop: "cxClass5Plan",
+          label: this.$t("ui.data.column.scheduleResult.class3Analysis"),
+          prop: "class3Analysis",
           span: 12,
-          disabled: true,
+          maxlength: "100",
         },
-        {
-          label: this.$t("中班计划量"),
-          prop: "cxClass3Plan",
-          span: 12,
-          disabled: true,
-        },
-        {
-          label: this.$t("次日中班计划量"),
-          prop: "cxClass5Plan",
-          span: 12,
-          disabled: true,
-        },
-        // {
-        //   label: this.$t("ui.data.column.scheduleResult.cxClass5Plan"),
-        //   prop: "cxClass5Plan",
-        //   span: 12,
-        //   disabled: true,
-        // },
       ];
     },
   },
@@ -363,10 +275,12 @@ export default {
         this.isEdit = true;
         this.form = {
           ...data,
-          dayPlanQty: numberEmpty(data.dayPlanQty),
-          dayProduceOrder: numberEmpty(data.dayProduceOrder),
-          nightPlanQty: numberEmpty(data.nightPlanQty),
-          nightProduceOrder: numberEmpty(data.nightProduceOrder),
+          class1PlanQty: numberEmpty(data.class1PlanQty),
+          class1Sequence: numberEmpty(data.class1Sequence),
+          class2PlanQty: numberEmpty(data.class2PlanQty),
+          class2Sequence: numberEmpty(data.class2Sequence),
+          class3PlanQty: numberEmpty(data.class3PlanQty),
+          class3Sequence: numberEmpty(data.class3Sequence),
         };
       }
     },

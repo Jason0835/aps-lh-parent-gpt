@@ -1569,16 +1569,39 @@ public class ExcelUtil<T> {
         try {
             Cell cell = row.getCell(column);
             if (StringUtils.isNotNull(cell)) {
-                if (cell.getCellType() == CellType.NUMERIC || cell.getCellType() == CellType.FORMULA) {
+                if (cell.getCellType() == CellType.NUMERIC) {
                     val = cell.getNumericCellValue();
                     if (DateUtil.isCellDateFormatted(cell)) {
-                        val = DateUtils.getJavaDate((Double) val, timeZone); // POI Excel 日期格式转换
+                        val = DateUtils.getJavaDate((Double) val, timeZone);
                     } else {
                         if ((Double) val % 1 != 0) {
                             val = new BigDecimal(val.toString());
                         } else {
                             val = new DecimalFormat("0").format(val);
                         }
+                    }
+                } else if (cell.getCellType() == CellType.FORMULA) {
+                    // 使用 FormulaEvaluator 主动计算公式，避免模板中缓存结果为默认值导致类型判断错误
+                    FormulaEvaluator evaluator = wb.getCreationHelper().createFormulaEvaluator();
+                    CellValue cellValue = evaluator.evaluate(cell);
+                    if (cellValue.getCellType() == CellType.STRING) {
+                        val = cellValue.getStringValue();
+                        val = StringUtils.trim(val.toString());
+                    } else if (cellValue.getCellType() == CellType.BOOLEAN) {
+                        val = cellValue.getBooleanValue();
+                    } else if (cellValue.getCellType() == CellType.NUMERIC) {
+                        val = cellValue.getNumberValue();
+                        if (DateUtil.isCellDateFormatted(cell)) {
+                            val = DateUtils.getJavaDate((Double) val, timeZone);
+                        } else {
+                            if ((Double) val % 1 != 0) {
+                                val = new BigDecimal(val.toString());
+                            } else {
+                                val = new DecimalFormat("0").format(val);
+                            }
+                        }
+                    } else {
+                        val = "";
                     }
                 } else if (cell.getCellType() == CellType.STRING) {
                     val = cell.getStringCellValue();
@@ -1589,7 +1612,6 @@ public class ExcelUtil<T> {
                     val = cell.getStringCellValue();
                     val = StringUtils.trim(val.toString());
                 }
-
             }
         } catch (Exception e) {
             return val;

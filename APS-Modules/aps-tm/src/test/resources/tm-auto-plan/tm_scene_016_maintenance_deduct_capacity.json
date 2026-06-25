@@ -1,0 +1,114 @@
+{
+  "caseName": "TM_SCENE_016_maintenance_deduct_capacity",
+  "description": "TM_SCENE_016：检修停机扣减产能",
+  "autoPlanRequest": {
+    "factoryCode": "F1",
+    "scheduleDate": "2026-07-16",
+    "operator": "TM_AUTO_PLAN_TEST",
+    "traceId": "TRACE-TM_SCENE_016",
+    "confirmOverwrite": false
+  },
+  "params": [
+    {
+      "factoryCode": "F1",
+      "paramCode": "TM_ALGORITHM_SWITCH",
+      "paramValue": "1",
+      "enableStatus": "1"
+    }
+  ],
+  "cxScheduleResults": [
+    {
+      "orderNo": "ORD-MAINT",
+      "embryoCode": "CX-M",
+      "class1PlanQty": 10,
+      "class2PlanQty": 0,
+      "class3PlanQty": 0,
+      "class4PlanQty": 0,
+      "class5PlanQty": 0,
+      "class6PlanQty": 0,
+      "treadCode": "TR-M",
+      "treadShoulderLength": 1,
+      "treadMouthPlate": "MP-A",
+      "treadRubberCategory": "GL-A"
+    }
+  ],
+  "stocks": [
+    {
+      "factoryCode": "F1",
+      "stockDate": "2026-07-15",
+      "treadCode": "TR-M",
+      "stockQty": 0
+    }
+  ],
+  "machineInfos": [
+    {
+      "factoryCode": "F1",
+      "machineCode": "TM01",
+      "machineStatus": "1",
+      "maxCapacity": 100
+    },
+    {
+      "factoryCode": "F1",
+      "machineCode": "TM02",
+      "machineStatus": "1",
+      "maxCapacity": 1000
+    }
+  ],
+  "machineSpeeds": [
+    {
+      "factoryCode": "F1",
+      "machineCode": "TM01",
+      "productSpeed": 100
+    },
+    {
+      "factoryCode": "F1",
+      "machineCode": "TM02",
+      "productSpeed": 100
+    }
+  ],
+  "machineMaintenances": [
+    {
+      "factoryCode": "F1",
+      "machineCode": "TM01",
+      "stopStartTime": "2026-07-16 10:00:00",
+      "stopEndTime": "2026-07-16 12:00:00"
+    }
+  ],
+  "mouthPlates": [
+    {
+      "factoryCode": "F1",
+      "machineCode": "TM01",
+      "mouthPlateCode": "MP-A"
+    },
+    {
+      "factoryCode": "F1",
+      "machineCode": "TM02",
+      "mouthPlateCode": "MP-A"
+    }
+  ],
+  "expected": {
+    "success": true,
+    "messageContains": "胎面自动排程执行完成",
+    "resultCount": 1,
+    "assignedCount": 1,
+    "unassignedCount": 0,
+    "explainCount": 6,
+    "errorCount": 0,
+    "expectedResults": [
+      {
+        "orderNo": "ORD-MAINT-CLASS1",
+        "treadCode": "TR-M",
+        "machineCode": "TM02",
+        "shiftOrder": 1,
+        "sequence": 1,
+        "planQty": 10
+      }
+    ]
+  },
+  "sceneCode": "TM_SCENE_016",
+  "designSteps": [
+    "Step14",
+    "Step15"
+  ],
+  "mysqlVerificationStatus": "待用户执行 MySQL 验证"
+}

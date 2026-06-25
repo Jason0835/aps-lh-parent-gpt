@@ -5,18 +5,18 @@
     <select id="listSpecifyMachine" parameterType="com.zlt.aps.tq.api.domain.entity.TqSpecifyMachine"
             resultType="com.zlt.aps.tq.api.domain.entity.TqSpecifyMachine">
         select * from (
-            select sm.ID, sm.MATERIAL_CODE, sm.MACHINE_ID, sm.LINE_TYPE, sm.JOB_TYPE,
+            select sm.ID, sm.BEAD_CODE, sm.MACHINE_CODE, sm.LINE_TYPE, sm.JOB_TYPE,
                    sm.REMARK, sm.IS_DELETE, sm.CREATE_BY, sm.CREATE_TIME, sm.UPDATE_BY, sm.UPDATE_TIME,
-                   m.machine_code, m.machine_name
+                   m.machine_name
             from T_TQ_SPECIFY_MACHINE sm
-            left join T_TQ_MACHINE_INFO m on sm.machine_id = m.id
+            left join T_TQ_MACHINE_INFO m on sm.machine_code = m.machine_code
             where sm.IS_DELETE = '0'
             and m.IS_DELETE = '0'
-            <if test="materialCode != null and materialCode != ''">
-                and INSTR(sm.MATERIAL_CODE, #{materialCode}) > 0
+            <if test="beadCode != null and beadCode != ''">
+                and INSTR(sm.BEAD_CODE, #{beadCode}) > 0
             </if>
-            <if test="machineId != null">
-                and sm.MACHINE_ID = #{machineId}
+            <if test="machineCode != null and machineCode != ''">
+                and sm.MACHINE_CODE = #{machineCode}
             </if>
             <if test="lineType != null and lineType != ''">
                 and sm.LINE_TYPE = #{lineType}
@@ -30,13 +30,13 @@
 
     <insert id="mergeSql" parameterType="list">
         INSERT INTO T_TQ_SPECIFY_MACHINE (
-        material_code, machine_id, line_type, job_type, create_by, create_time, remark, IS_DELETE
+        bead_code, machine_code, line_type, job_type, create_by, create_time, remark, IS_DELETE
         )
         VALUES
         <foreach collection="list" item="SpecifyMachine" separator=",">
             (
-            #{SpecifyMachine.materialCode,jdbcType=VARCHAR},
-            #{SpecifyMachine.machineId,jdbcType=DOUBLE},
+            #{SpecifyMachine.beadCode,jdbcType=VARCHAR},
+            #{SpecifyMachine.machineCode,jdbcType=VARCHAR},
             #{SpecifyMachine.lineType,jdbcType=VARCHAR},
             #{SpecifyMachine.jobType,jdbcType=VARCHAR},
             #{SpecifyMachine.createBy,jdbcType=VARCHAR},

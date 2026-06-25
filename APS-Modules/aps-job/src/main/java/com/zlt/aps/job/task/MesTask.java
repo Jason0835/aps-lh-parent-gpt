@@ -112,6 +112,14 @@ public class MesTask {
     }
 
     /**
+     * 同步胎圈库存
+     */
+    @ApiOperation("同步胎圈库存")
+    public void syncMesTqStock() {
+        FeignTokenHelper.runWithToken(() -> iMesItfService.syncMesTqStock(new AuxReqSyncDataLogs()));
+    }
+
+    /**
      * 同步结构整车胎面配置
      */
     @ApiOperation("同步结构整车胎面配置")
@@ -351,15 +359,15 @@ public class MesTask {
     }
 
     /**
-     * 临时任务：按指定版本号APS_MES_AH01_20260610174500002抓取硫化排程完成量回报数据
+     * 临时任务：按指定版本号APS_MES_AH01_20260622174000009抓取硫化排程完成量回报数据
      * 执行步骤：
      * 1. 从MES中间表按指定版本号查询硫化排程完成量数据（不限日期）
      * 2. 按排程日期分组，逐组逻辑删除APS旧数据并插入新数据
      * 3. 回填硫化排程结果表各班次完成量
      */
-    @ApiOperation("临时任务-按版本号APS_MES_AH01_20260610174500002抓取硫化排程完成量回报")
+    @ApiOperation("临时任务-按版本号APS_MES_AH01_20260622174000009抓取硫化排程完成量回报")
     public void syncLhClassShiftFinishQtyByVersion() {
-        String dataVersion = "APS_MES_AH01_20260610174500002";
+        String dataVersion = "APS_MES_AH01_20260622174000009";
         log.info("临时任务-开始按版本号{}抓取硫化排程完成量回报数据", dataVersion);
         try {
             FeignTokenHelper.runWithToken(() -> {
@@ -394,5 +402,13 @@ public class MesTask {
             log.error("临时任务-按最新版本号抓取硫化排程日完成量回报异常", e);
         }
         log.info("临时任务-按最新版本号抓取硫化排程日完成量回报完成");
+    }
+
+    /**
+     * 同步设备停机计划
+     */
+    @ApiOperation("同步设备停机计划")
+    public void syncDevPlanClose() {
+        FeignTokenHelper.runWithToken(() -> iMesItfService.syncDevPlanClose(new AuxReqSyncDataLogs()));
     }
 }

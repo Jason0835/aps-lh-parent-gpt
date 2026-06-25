@@ -231,6 +231,116 @@ public class TqNewScheduleResult extends BaseEntity implements Serializable {
     @TableField(value = "CLASS6_ANALYSIS")
     private String class6Analysis;
 
+    // ==================== 6个班次的预计开始/结束时间和任务状态（滚动更新使用） ====================
+
+    /** 1班预计开始时间 */
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    @ApiModelProperty(value = "1班预计开始时间", name = "class1StartTime")
+    @TableField(value = "CLASS1_START_TIME")
+    private Date class1StartTime;
+
+    /** 1班预计结束时间 */
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    @ApiModelProperty(value = "1班预计结束时间", name = "class1EndTime")
+    @TableField(value = "CLASS1_END_TIME")
+    private Date class1EndTime;
+
+    /** 1班任务状态（0-正常，1-已取消，2-已推迟，3-部分完成推迟） */
+    @Excel(name = "ui.data.column.tqNewScheduleResult.class1TaskStatus", dictType = "TQ_TASK_STATUS")
+    @ApiModelProperty(value = "1班任务状态（0-正常，1-已取消，2-已推迟，3-部分完成推迟）", name = "class1TaskStatus")
+    @TableField(value = "CLASS1_TASK_STATUS")
+    private String class1TaskStatus;
+
+    /** 2班预计开始时间 */
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    @ApiModelProperty(value = "2班预计开始时间", name = "class2StartTime")
+    @TableField(value = "CLASS2_START_TIME")
+    private Date class2StartTime;
+
+    /** 2班预计结束时间 */
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    @ApiModelProperty(value = "2班预计结束时间", name = "class2EndTime")
+    @TableField(value = "CLASS2_END_TIME")
+    private Date class2EndTime;
+
+    /** 2班任务状态（0-正常，1-已取消，2-已推迟，3-部分完成推迟） */
+    @Excel(name = "ui.data.column.tqNewScheduleResult.class2TaskStatus", dictType = "TQ_TASK_STATUS")
+    @ApiModelProperty(value = "2班任务状态（0-正常，1-已取消，2-已推迟，3-部分完成推迟）", name = "class2TaskStatus")
+    @TableField(value = "CLASS2_TASK_STATUS")
+    private String class2TaskStatus;
+
+    /** 3班预计开始时间 */
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    @ApiModelProperty(value = "3班预计开始时间", name = "class3StartTime")
+    @TableField(value = "CLASS3_START_TIME")
+    private Date class3StartTime;
+
+    /** 3班预计结束时间 */
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    @ApiModelProperty(value = "3班预计结束时间", name = "class3EndTime")
+    @TableField(value = "CLASS3_END_TIME")
+    private Date class3EndTime;
+
+    /** 3班任务状态（0-正常，1-已取消，2-已推迟，3-部分完成推迟） */
+    @Excel(name = "ui.data.column.tqNewScheduleResult.class3TaskStatus", dictType = "TQ_TASK_STATUS")
+    @ApiModelProperty(value = "3班任务状态（0-正常，1-已取消，2-已推迟，3-部分完成推迟）", name = "class3TaskStatus")
+    @TableField(value = "CLASS3_TASK_STATUS")
+    private String class3TaskStatus;
+
+    /** 4班预计开始时间 */
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    @ApiModelProperty(value = "4班预计开始时间", name = "class4StartTime")
+    @TableField(value = "CLASS4_START_TIME")
+    private Date class4StartTime;
+
+    /** 4班预计结束时间 */
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    @ApiModelProperty(value = "4班预计结束时间", name = "class4EndTime")
+    @TableField(value = "CLASS4_END_TIME")
+    private Date class4EndTime;
+
+    /** 4班任务状态（0-正常，1-已取消，2-已推迟，3-部分完成推迟） */
+    @Excel(name = "ui.data.column.tqNewScheduleResult.class4TaskStatus", dictType = "TQ_TASK_STATUS")
+    @ApiModelProperty(value = "4班任务状态（0-正常，1-已取消，2-已推迟，3-部分完成推迟）", name = "class4TaskStatus")
+    @TableField(value = "CLASS4_TASK_STATUS")
+    private String class4TaskStatus;
+
+    /** 5班预计开始时间 */
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    @ApiModelProperty(value = "5班预计开始时间", name = "class5StartTime")
+    @TableField(value = "CLASS5_START_TIME")
+    private Date class5StartTime;
+
+    /** 5班预计结束时间 */
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    @ApiModelProperty(value = "5班预计结束时间", name = "class5EndTime")
+    @TableField(value = "CLASS5_END_TIME")
+    private Date class5EndTime;
+
+    /** 5班任务状态（0-正常，1-已取消，2-已推迟，3-部分完成推迟） */
+    @Excel(name = "ui.data.column.tqNewScheduleResult.class5TaskStatus", dictType = "TQ_TASK_STATUS")
+    @ApiModelProperty(value = "5班任务状态（0-正常，1-已取消，2-已推迟，3-部分完成推迟）", name = "class5TaskStatus")
+    @TableField(value = "CLASS5_TASK_STATUS")
+    private String class5TaskStatus;
+
+    /** 6班预计开始时间 */
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    @ApiModelProperty(value = "6班预计开始时间", name = "class6StartTime")
+    @TableField(value = "CLASS6_START_TIME")
+    private Date class6StartTime;
+
+    /** 6班预计结束时间 */
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    @ApiModelProperty(value = "6班预计结束时间", name = "class6EndTime")
+    @TableField(value = "CLASS6_END_TIME")
+    private Date class6EndTime;
+
+    /** 6班任务状态（0-正常，1-已取消，2-已推迟，3-部分完成推迟） */
+    @Excel(name = "ui.data.column.tqNewScheduleResult.class6TaskStatus", dictType = "TQ_TASK_STATUS")
+    @ApiModelProperty(value = "6班任务状态（0-正常，1-已取消，2-已推迟，3-部分完成推迟）", name = "class6TaskStatus")
+    @TableField(value = "CLASS6_TASK_STATUS")
+    private String class6TaskStatus;
+
     /** 数据来源：0-自动排程，1-插单，2-导入 */
     @Excel(name = "ui.data.column.tqNewScheduleResult.dataSource", dictType = "TQ_DATA_SOURCE")
     @ApiModelProperty(value = "数据来源：0-自动排程，1-插单，2-导入", name = "dataSource")
@@ -253,6 +363,10 @@ public class TqNewScheduleResult extends BaseEntity implements Serializable {
     @JsonFormat(pattern = "yyyy-MM-dd")
     @TableField(exist = false)
     private Date scheduleDateQuery;
+
+    /** 分厂编码（查询参数，非数据库字段） */
+    @TableField(exist = false)
+    private String factoryCode;
 
     /** 机台名称（反显） */
     @TableField(exist = false)

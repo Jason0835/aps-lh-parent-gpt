@@ -136,34 +136,34 @@ export default {
         { type: "selection", fixed: "left" },
         {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.mdmStructureLhRatio.factoryCode"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
           },
         },
         {
           prop: "cxMachineTypeCode",
-          label: this.$t("ui.data.column.curingPlan.cxMachineTypeCode"),
+          label: this.$t("ui.data.column.mdmStructureLhRatio.cxMachineTypeCode"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.cx_machine_type_code, value);
           },
         },
         {
           prop: "structureName",
-          label: this.$t("ui.data.column.finishStock.structureName"),
+          label: this.$t("ui.data.column.mdmStructureLhRatio.structureName"),
           minWidth:180
         },
         {
           prop: "lhMachineMaxQty",
-          label: this.$t("ui.data.column.curingPlan.lhMachineMaxQty"),
+          label: this.$t("ui.data.column.mdmStructureLhRatio.lhMachineMaxQty"),
         },
         {
           prop: "maxEmbryoQty",
-          label: this.$t("ui.data.column.curingPlan.maxEmbryoQty"),
+          label: this.$t("ui.data.column.mdmStructureLhRatio.maxEmbryoQty"),
         },
         {
           prop: "remark",
-          label: this.$t("common.remark"),
+          label: this.$t("ui.data.column.mdmStructureLhRatio.remark"),
         },
         {
           prop: "updateTime",
@@ -204,21 +204,21 @@ export default {
     searchColumns() {
       return [
         {
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.mdmStructureLhRatio.factoryCode"),
           prop: "factoryCode",
           type: "select",
           dictData: this.dict.type.biz_factory_name,
         },
 
         {
-          label: this.$t("ui.data.column.curingPlan.cxMachineTypeCode"),
+          label: this.$t("ui.data.column.mdmStructureLhRatio.cxMachineTypeCode"),
           prop: "cxMachineTypeCode",
           type: "select",
           dictData: this.dict.type.cx_machine_type_code, // "JOB_TYPE",
         },
         {
           prop: "structureName",
-          label: this.$t("ui.data.column.finishStock.structureName"),
+          label: this.$t("ui.data.column.mdmStructureLhRatio.structureName"),
           type: "select",
           dictData:this.structureList,
           filterable: true

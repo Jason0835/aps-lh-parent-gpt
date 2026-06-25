@@ -1,18 +1,10 @@
 package com.zlt.aps.dj.engine.mapper;
 
-import java.util.List;
-
 import com.zlt.aps.dj.api.domain.entity.DjCurlRoll;
+import com.zlt.core.dao.basemapper.CommBaseMapper;
 
 /**
- * 垫胶卷曲设置mapper
+ * 垫胶卷曲信息 Mapper
  */
-public interface DjEngineCurlRollMapper {
-
-	/**
-	 * 查询垫胶卷曲设置列表
-	 * 
-	 * @return
-	 */
-	List<DjCurlRoll> getNcCurlRollList();
+public interface DjEngineCurlRollMapper extends CommBaseMapper<DjCurlRoll> {
 }

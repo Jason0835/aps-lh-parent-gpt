@@ -3,7 +3,7 @@ package com.zlt.aps.tq.service;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.tq.api.domain.dto.TqScheduleResultDto;
-import com.zlt.aps.tq.api.domain.entity.TqDayFinishQty;
+import com.zlt.aps.tq.api.domain.entity.TqScheFinishQty;
 import com.zlt.aps.tq.entity.TqScheduleResult;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -155,13 +155,13 @@ public interface TqScheduleResultService extends IService<TqScheduleResult> {
     List<TqScheduleResultDto> selectByIds(List<Long> ids2);
 
     /**
-     * 导入数据，并保存记录
+     * 导入完成量，并保存记录到T_TQ_SCHE_FINISH_QTY，再回写6班制排程结果表
      *
-     * @param list          要导入数据
+     * @param list          要导入的完成量数据（夜班/早班/中班）
      * @param importLogId   导入日志id
      * @return 导入后提示信息
      */
-    AjaxResult importFinishQty(List<TqDayFinishQty> list, Long importLogId);
+    AjaxResult importFinishQty(List<TqScheFinishQty> list, Long importLogId);
 
     /**
      * 获取排程日期的昨日早班合计，夜班合计，早班合计，库存合计，理论交班库存合计

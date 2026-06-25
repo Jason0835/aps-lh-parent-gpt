@@ -97,6 +97,26 @@ public class MdmConstructionInfoServiceImpl extends AbstractDocService<MdmConstr
         return collectTireFabricCodes(constructionInfos);
     }
 
+    @Override
+    public List<String> listCordSpecs() {
+        List<MdmConstructionInfo> constructionInfos = mdmConstructionInfoEntityMapper.selectList(null);
+        return collectCordSpecs(constructionInfos);
+    }
+
+    List<String> collectCordSpecs(List<MdmConstructionInfo> constructionInfos) {
+        if (constructionInfos == null || constructionInfos.isEmpty()) {
+            return new ArrayList<>();
+        }
+        return constructionInfos.stream()
+                .map(MdmConstructionInfo::getCordSpec)
+                .filter(Objects::nonNull)
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .collect(java.util.stream.Collectors.toCollection(TreeSet::new))
+                .stream()
+                .collect(java.util.stream.Collectors.toList());
+    }
+
     List<String> collectTireFabricCodes(List<MdmConstructionInfo> constructionInfos) {
         if (constructionInfos == null || constructionInfos.isEmpty()) {
             return new ArrayList<>();

@@ -94,11 +94,23 @@ public interface ILhMesSyncRemoteService {
 
     @ApiOperation("批量保存模具交替计划完成回报")
     @PostMapping("/mesSync/saveMoldAlterPlanFinishBatch")
+    @Deprecated
     AjaxResult saveMoldAlterPlanFinishBatch(@RequestBody List<LhMoldAlterPlanFinish> list);
 
     @ApiOperation("查询模具交替计划完成回报已存在数据")
     @PostMapping("/mesSync/selectMoldAlterPlanFinishExists")
     List<LhMoldAlterPlanFinish> selectMoldAlterPlanFinishExists(@RequestBody List<LhMoldAlterPlanFinish> list);
+
+    /**
+     * 模具交替计划完成回报：批量插入或更新 + 回填模具交替计划完成状态（同一事务）
+     * 不存在则插入，存在则更新完成状态；同时回填t_lh_mould_change_plan的mould_status
+     *
+     * @param list MES同步过来的模具交替计划完成回报数据（finishStatus已转为数值码）
+     * @return 结果
+     */
+    @ApiOperation("模具交替计划完成回报：批量插入或更新 + 回填模具交替计划完成状态")
+    @PostMapping("/mesSync/saveOrUpdateMoldAlterPlanFinishAndWriteBack")
+    AjaxResult saveOrUpdateMoldAlterPlanFinishAndWriteBack(@RequestBody List<LhMoldAlterPlanFinish> list);
 
     @ApiOperation("硫化排程完成量回写硫化排程结果表各班次完成量")
     @PostMapping("/mesSync/writeBackScheduleResultFinishQty")
@@ -106,6 +118,7 @@ public interface ILhMesSyncRemoteService {
 
     @ApiOperation("模具交替回报回填流程排程结果表的模具交替完成状态")
     @PostMapping("/mesSync/writeBackMouldChangePlanFinishStatus")
+    @Deprecated
     AjaxResult writeBackMouldChangePlanFinishStatus(@RequestBody List<LhMoldAlterPlanFinish> list);
 
     @ApiOperation("逻辑删除硫化在机今天及今天之前所有数据")

@@ -81,7 +81,7 @@ export default {
     infoDialog,
     TltUploadForm
   },
-  dicts: ["LINE_TYPE", "biz_yes_no", "biz_factory_name",'warn_level','warn_type'],
+  dicts: ["LINE_TYPE", "biz_available_status", "biz_factory_name",'warn_level','warn_type'],
   provide() {
     return {
       parentDict: this.dict,
@@ -130,7 +130,7 @@ export default {
         { type: "selection", fixed: "left" },
         {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.rawWarningConfig.factoryCode"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
           },
@@ -138,41 +138,41 @@ export default {
 
         {
           prop: "deviationUpper",
-          label: this.$t("ui.data.column.rawMaterial.deviationUpper"),
+          label: this.$t("ui.data.column.rawWarningConfig.deviationUpper"),
         },
         {
           prop: "deviationLower",
-          label: this.$t("ui.data.column.rawMaterial.deviationLower"),
+          label: this.$t("ui.data.column.rawWarningConfig.deviationLower"),
         },
         {
           prop: "enabled",
-          label: this.$t("ui.data.column.rawMaterial.enabled"),
+          label: this.$t("ui.data.column.rawWarningConfig.enabled"),
 
           formatter: (row, column, value) => {
-            return this.selectDictLabel(this.dict.type.biz_yes_no, value);
+            return this.selectDictLabel(this.dict.type.biz_available_status, value);
           },
         },
         {
           prop: "materialCode",
-          label: this.$t("ui.data.column.rawMaterial.materialCode"),
+          label: this.$t("ui.data.column.rawWarningConfig.materialCode"),
         },
         {
           prop: "materialDesc",
-          label: this.$t("ui.data.column.rawMaterial.materialName"),
+          label: this.$t("ui.data.column.rawWarningConfig.materialDesc"),
           align: "left",
           minWidth: 350,
         },
 
         {
           prop: "warningLevel",
-          label: this.$t("ui.data.column.rawMaterial.warningLevel"),
+          label: this.$t("ui.data.column.rawWarningConfig.warningLevel"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.warn_level, value);
           },
         },
         {
           prop: "warningType",
-          label: this.$t("ui.data.column.rawMaterial.warningType"),
+          label: this.$t("ui.data.column.rawWarningConfig.warningType"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.warn_type, value);
           },
@@ -224,18 +224,18 @@ export default {
     searchColumns() {
       return [
       {
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.rawWarningConfig.factoryCode"),
           prop: "factoryCode",
           type: "select",
           dictData: this.dict.type.biz_factory_name,
         },
         {
           prop: "materialCode",
-          label: this.$t("ui.data.column.rawMaterial.materialCode"),
+          label: this.$t("ui.data.column.rawWarningConfig.materialCode"),
         },
         {
           prop: "materialDesc",
-          label: this.$t("ui.data.column.rawMaterial.materialName"),
+          label: this.$t("ui.data.column.rawWarningConfig.materialDesc"),
           minWidth: 350,
           align: "left",
         },

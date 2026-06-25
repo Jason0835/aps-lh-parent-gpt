@@ -96,12 +96,18 @@ public class SkuScheduleDTO {
     private String priorityCode;
     /** 排产顺序；由 SKU 排序策略回写，最终用于排程结果 scheduleOrder */
     private int scheduleOrder;
+    /** SKU 排序名次（续作/新增列表内 1~N，与“SKU排序优先级汇总”日志 rank 字段一致），落库到排程结果 skuSortRank */
+    private int sortRank;
+    /** SKU 排序描述；由 SKU 排序策略统一生成，与“SKU排序优先级汇总”单行日志同源，落库到排程结果 skuSortDesc */
+    private String sortDesc;
     /** 是否有发货要求(锁定交期) */
     private boolean deliveryLocked;
     /** 延误天数，月计划开始日距T日的天数差（beginDate - scheduleDate），负数=延误，null=未知 */
     private Integer delayDays;
     /** 供应链优先级 */
     private String supplyChainPriority;
+    /** 排产分类，来自月计划 PRODUCTION_TYPE；01-主销产品，其他-普通产品 */
+    private String productionType;
     /** 高优先级待排量 */
     private int highPriorityPendingQty;
     /** 周期排产待排量 */
@@ -145,6 +151,9 @@ public class SkuScheduleDTO {
 
     /** 当前排程月份内、早于T日的历史欠产量，仅正向欠产进入新增排产判断 */
     private int monthlyHistoryShortageQty;
+
+    /** 有效上月超欠产量；正数为欠产，负数为超产，仅用于本轮排产准入判断 */
+    private int effectiveLastMonthOverdueQty;
 
     /** 已在初始化阶段实际追加到账本的本月历史欠产量 */
     private int effectiveCarryForwardQty;

@@ -36,7 +36,7 @@ import { numberEmpty } from "@/utils/index";
 
 import infoForm from "@/views/components/infoForm.vue";
 
-import { changeQty } from "@/api/nc/ncScheduleResult";
+import { changeQty } from "@/api/dj/djScheduleResult";
 
 export default {
   components: { infoForm },
@@ -68,7 +68,7 @@ export default {
       machines: (state) => state.insideLiner.machines,
     }),
     title: function () {
-      return this.$t("ui.data.column.ncScheduleResult.modalName");
+      return this.$t("ui.data.column.djScheduleResult.modalName");
     },
     columns() {
       return [
@@ -301,7 +301,7 @@ export default {
           disabled: true,
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.ncPlan2"),
+          label: this.$t("ui.data.column.scheduleResult.djPlan2"),
           type: "title",
         },
         {

@@ -3,6 +3,7 @@ package com.zlt.aps.lh.controller;
 import cn.hutool.core.date.DateUtil;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
+import com.ruoyi.common.core.utils.PageUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.i18n.utils.I18nUtil;
@@ -43,7 +44,13 @@ public class LhMouldCleanPlanController extends AbstractDocBizController<LhMould
     @PostMapping("/list")
     @Override
     public TableDataInfo list(@RequestBody LhMouldCleanPlan queryVO) {
-        return super.list(queryVO);
+        // 重写list方法，强制按机台编码升序排序，避免更新时间导致机台乱序
+        QueryWrapper<LhMouldCleanPlan> wrapper = new QueryWrapper<>();
+        this.builderCondition(wrapper, queryVO);
+        PageUtils.startPage(true, "LH_CODE ASC");
+        List<LhMouldCleanPlan> list = lhMouldCleanPlanMapper.selectList(wrapper);
+        PageUtils.clearPage();
+        return getDataTable(list);
     }
 
     @ApiOperation("获取详细信息")
@@ -156,6 +163,6 @@ public class LhMouldCleanPlanController extends AbstractDocBizController<LhMould
 
     @Override
     protected String getOrderBy() {
-        return "UPDATE_TIME desc,LH_CODE asc";
+        return "LH_CODE asc";
     }
 }

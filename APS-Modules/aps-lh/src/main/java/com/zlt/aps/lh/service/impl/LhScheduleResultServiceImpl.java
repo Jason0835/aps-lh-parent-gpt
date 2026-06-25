@@ -666,7 +666,7 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
     @Override
     public void fillScheduleResultFields(List<LhScheduleResult> lhScheduleResultList, Date scheduleDate) {
         if (CollectionUtils.isEmpty(lhScheduleResultList) || Objects.isNull(scheduleDate)) {
-            log.warn("fillScheduleResultFields: 传入参数为空, listSize={}, scheduleDate={}", 
+            log.warn("fillScheduleResultFields: 传入参数为空, listSize={}, scheduleDate={}",
                     lhScheduleResultList == null ? 0 : lhScheduleResultList.size(), scheduleDate);
             return;
         }
@@ -679,8 +679,8 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
         log.info("fillScheduleResultFields: 开始填充排程结果字段, 排程日期={}, 结果数量={}, year={}, month={}",
                 DateUtil.formatDate(scheduleDate), lhScheduleResultList.size(), year, month);
 
-        // scheduleDate 业务上为 T+2，计算 T 日用于完成量相关查询
-        Date tDay = DateUtil.offsetDay(scheduleDate, -2);
+        // scheduleDate 业务上为 T+1，计算 T 日用于完成量相关查询
+        Date tDay = DateUtil.offsetDay(scheduleDate, -1);
         log.info("fillScheduleResultFields: scheduleDate={}, T日={}",
                 DateUtil.formatDate(scheduleDate), DateUtil.formatDate(tDay));
 
@@ -922,20 +922,33 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
             }
             result.setDailyPlanQty(dailyPlanQty);
 
+            // ---------- TOTAL_FINISH_QTY：月累计已完成量 ----------
+            // total_finish_qty = 本月1日至T-1日日完成量汇总 + T日夜班完成量
+            int finishedQty = 0;
+            BigDecimal dayFinishSum = dayFinishSumMap.get(fcMatKey);
+            if (dayFinishSum != null) {
+                finishedQty += dayFinishSum.intValue();
+            }
+            BigDecimal nightFinish = scheNightFinishMap.get(fcMatKey);
+            if (nightFinish != null) {
+                finishedQty += nightFinish.intValue();
+            }
+            // 防御性非负保护，避免数据库异常负值导致余量计算错误
+            finishedQty = Math.max(finishedQty, 0);
+            result.setTotalFinishQty(finishedQty);
+
             // ---------- MOULD_SURPLUS_QTY：硫化余量 ----------
+            // 硫化余量 = MAX(月计划 totalQty - 已完成量 + LAST_MONTH_OVERDUE_QTY, 0)
+            // LAST_MONTH_OVERDUE_QTY：负数表示超产需扣减，正数表示欠产需加上
+            // 已完成量 = total_finish_qty（1号到T-1日日完成量汇总 + T日夜班完成量）
+            // 上月超欠产量：仅当 lastMonthValidFlag = "1" 时取 lastMonthOverdueQty，否则按 0 处理
             if (Objects.nonNull(monthPlan) && Objects.nonNull(monthPlan.getTotalQty())) {
-                int finishedQty = 0;
-                // 本月1日至T-1日累计完成量
-                BigDecimal dayFinishSum = dayFinishSumMap.get(fcMatKey);
-                if (dayFinishSum != null) {
-                    finishedQty += dayFinishSum.intValue();
+                int lastMonthOverdue = 0;
+                if ("1".equals(monthPlan.getLastMonthValidFlag())
+                        && Objects.nonNull(monthPlan.getLastMonthOverdueQty())) {
+                    lastMonthOverdue = monthPlan.getLastMonthOverdueQty();
                 }
-                // T日夜班完成量（class1代表夜班）
-                BigDecimal nightFinish = scheNightFinishMap.get(fcMatKey);
-                if (nightFinish != null) {
-                    finishedQty += nightFinish.intValue();
-                }
-                int surplus = monthPlan.getTotalQty() - finishedQty;
+                int surplus = monthPlan.getTotalQty() - finishedQty + lastMonthOverdue;
                 result.setMouldSurplusQty(Math.max(surplus, 0));
             }
 
@@ -1013,7 +1026,10 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
         // 设置1-8班次的硫化示方号，取值同lhNo
         if (StringUtils.isNotEmpty(result.getLhNo())) {
             for (int i = 1; i <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT; i++) {
-                BeanUtil.setProperty(result, "class" + i + "LhNo", result.getLhNo());
+                String classLhType = (String) BeanUtil.getProperty(result, "class" + i + "LhType");
+                if (StringUtils.isNotEmpty(classLhType)) {
+                    BeanUtil.setProperty(result, "class" + i + "LhNo", result.getLhNo());
+                }
             }
         }
 
@@ -1023,7 +1039,10 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
         }
         if (StringUtils.isNotEmpty(lhType)) {
             for (int i = 1; i <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT; i++) {
-                BeanUtil.setProperty(result, "class" + i + "LhType", lhType);
+                String classLhType = (String) BeanUtil.getProperty(result, "class" + i + "LhType");
+                if (StringUtils.isNotEmpty(classLhType)) {
+                    BeanUtil.setProperty(result, "class" + i + "LhType", lhType);
+                }
             }
         }
     }

@@ -28,6 +28,7 @@ import com.zlt.aps.mp.api.domain.entity.MpAdjustResult;
 import com.zlt.aps.mp.engine.adjust.MpWeekRollAdjustEngine;
 import com.zlt.aps.mp.factory.dto.MpStructureAllocationExportVo;
 import com.zlt.aps.mp.factory.dto.MpStructureAllocationImportHelper;
+import com.zlt.aps.mp.factory.service.IFactoryMonthPlanMouldDayResultService;
 import com.zlt.aps.mp.factory.service.IMpStructureAllocationService;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.common.utils.PubUtil;
@@ -89,6 +90,9 @@ public class MpAdjustResultServiceImpl extends AbstractDocService<MpAdjustResult
     
     @Autowired
     private IMpStructureAllocationService mpStructureAllocationService;
+    
+    @Autowired
+    private IFactoryMonthPlanMouldDayResultService iFactoryMonthPlanMouldDayResultService;
     /**
      * 导入页签名称，仅加载一次
      */
@@ -156,8 +160,14 @@ public class MpAdjustResultServiceImpl extends AbstractDocService<MpAdjustResult
         entity.setBeginDay(realBeginDay==FactoryConstant.MONTH_MAX_DAY+1 ? 0:realBeginDay);
         entity.setEndDay(realEndDay);
          //实际调整量 = 累计排产量 - 原实际排产量
-        int oriTotalQty = entity.getTotalQty()== null ? 0:entity.getTotalQty();
-        entity.setAdjustFlag(oriTotalQty != accTotalQty ? YesOrNoEnum.YES.getCode() : YesOrNoEnum.NO.getCode());
+        if (!YesOrNoEnum.YES.getCode().equals(entity.getAdjustFlag())){
+            int oriTotalQty = entity.getTotalQty()== null ? 0:entity.getTotalQty();
+            entity.setAdjustFlag(oriTotalQty != accTotalQty ? YesOrNoEnum.YES.getCode() : YesOrNoEnum.NO.getCode());
+        }
+       if (YesOrNoEnum.YES.getCode().equals(entity.getAdjustFlag())){
+            //若有调整过标志，将上月有效标志置为否
+            entity.setLastMonthValidFlag(YesOrNoEnum.NO.getCode());
+        }
         entity.setTotalQty(accTotalQty);
 
         if (StrUtil.isNotBlank(entity.getVersion())) {
@@ -192,6 +202,11 @@ public class MpAdjustResultServiceImpl extends AbstractDocService<MpAdjustResult
     @Override
     public void deleteAdjustResultByVersion(String factoryCode, String year, String month, String version,String structureName) {
         mpAdjustResultEntityMapper.deleteAdjustResultByVersion(factoryCode,year,month,version,structureName);
+    }
+
+    @Override
+    public void updateValidFlagBatchById(List<MpAdjustResult> list) {
+        mpAdjustResultEntityMapper.updateValidFlagBatchById(list);
     }
 
     /**
@@ -291,6 +306,7 @@ public class MpAdjustResultServiceImpl extends AbstractDocService<MpAdjustResult
         String productionVersionNotMatchErrorStr = I18nUtil.getMessage("ui.data.column.mpStructureAllocation.import.productionVersionNotMatch");
         ClassLoader classLoader = this.getClass().getClassLoader();
         DataFormatter dataFormatter = new DataFormatter();
+        int excelColumnCount = iFactoryMonthPlanMouldDayResultService.getExportTemplateColumnCount(true); // excel总列数
         
         // 加载月计划调整与结构转产表导出模板，用于获取页签名称
         if (StringUtils.isEmpty(sheetName) || StringUtils.isEmpty(sheetName4DayResult)) {
@@ -362,7 +378,7 @@ public class MpAdjustResultServiceImpl extends AbstractDocService<MpAdjustResult
                 return helper;
             }
             // 解析需求计划版本
-            Cell monthPlanVersionCell4DayResult = sheet4DayResult.getRow(0).getCell(64);
+            Cell monthPlanVersionCell4DayResult = sheet4DayResult.getRow(0).getCell(excelColumnCount - 9);
             if (monthPlanVersionCell4DayResult == null) {
                 helper.setAjaxResult(AjaxResult.error(templateErrorStr));
                 return helper;
@@ -374,7 +390,7 @@ public class MpAdjustResultServiceImpl extends AbstractDocService<MpAdjustResult
                 return helper;
             }
             // 解析生产版本
-            Cell productVersionCell4Day = sheet4DayResult.getRow(0).getCell(69);
+            Cell productVersionCell4Day = sheet4DayResult.getRow(0).getCell(excelColumnCount - 4);
             if (productVersionCell4Day == null) {
                 helper.setAjaxResult(AjaxResult.error(templateErrorStr));
                 return helper;

@@ -51,6 +51,7 @@
 <script>
 import { downloadLink } from "@/utils/request";
 import { listParams, removeParams } from "@/api/dj/params";
+import { getConfigKey } from "@/api/system/config";
 import infoDialog from "./components/infoDialog.vue";
 
 export default {
@@ -58,7 +59,7 @@ export default {
   components: {
     infoDialog,
   },
-  dicts: [],
+  dicts: ["biz_factory_name"],
   provide() {
     return {
       parentDict: this.dict,
@@ -66,16 +67,6 @@ export default {
   },
   data() {
     return {
-      searchColumns: [
-        {
-          label: this.$t("ui.dj.params.column.paramCode"),
-          prop: "paramCode",
-        },
-        {
-          label: this.$t("ui.dj.params.column.paramName"),
-          prop: "paramName",
-        },
-      ],
       loading: false,
       data: [],
       selection: [],
@@ -85,11 +76,34 @@ export default {
         total: 0,
       },
       sort: {},
-      search: {},
-      query: {},
+      search: {
+        factoryCode: '',
+      },
+      query: {
+        factoryCode: '',
+      },
     };
   },
   computed: {
+    searchColumns() {
+      return [
+        {
+          label: this.$t("ui.data.column.factoryCode"),
+          prop: "factoryCode",
+          type: "select",
+          dictData: this.dict.type.biz_factory_name,
+          filterable: true,
+        },
+        {
+          label: this.$t("ui.dj.params.column.paramCode"),
+          prop: "paramCode",
+        },
+        {
+          label: this.$t("ui.dj.params.column.paramName"),
+          prop: "paramName",
+        },
+      ];
+    },
     columns() {
       let columns = [
         { type: "selection", fixed: "left" },
@@ -253,7 +267,13 @@ export default {
     },
   },
   created() {
-    this.getList();
+    getConfigKey("sys.factory.code").then(response => {
+      this.search.factoryCode = response.msg;
+      this.query.factoryCode = response.msg;
+      this.getList();
+    }).catch(() => {
+      this.getList();
+    });
   },
 };
 </script>

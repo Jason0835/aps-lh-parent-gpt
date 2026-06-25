@@ -110,51 +110,51 @@ export default {
     columns() {
       return [
         {
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.rawSpecialMaterialRecord.factoryCode"),
           prop: "factoryCode",
           type: "select",
           dictData: this.parentDict.type.biz_factory_name,
         },
         {
-          label: this.$t("ui.data.column.masterdata.materialType"),
+          label: this.$t("ui.data.column.rawSpecialMaterialRecord.materialType"),
           prop: "materialType",
           type: "select",
           dictData: this.parentDict.type.biz_rawMaterial_type,
         },
         {
           prop: "materialCode",
-          label: this.$t("ui.data.specialMaterial.materialCode"),
+          label: this.$t("ui.data.column.rawSpecialMaterialRecord.materialCode"),
           maxlength:30
         },
         {
           prop: "materialDesc",
-          label: this.$t("物料名称"),
+          label: this.$t("ui.data.column.rawSpecialMaterialRecord.materialDesc"),
           maxlength:100
         },
         {
           prop: "rubberSpec",
-          label: this.$t("ui.data.specialMaterial.rubberSpec"),
+          label: this.$t("ui.data.column.rawSpecialMaterialRecord.rubberSpec"),
           maxlength:100
         },
         {
           prop: "quota",
-          label: this.$t("ui.data.column.quota.quota"),
+          label: this.$t("ui.data.column.rawSpecialMaterialRecord.quota"),
           type: "number",
           max:99999999
         },
         {
           prop: "unit",
-          label: this.$t("common.unit"),
+          label: this.$t("ui.data.column.rawSpecialMaterialRecord.unit"),
           maxlength:10
         },
         {
           prop: "partName",
-          label: this.$t("部件名称"),
+          label: this.$t("ui.data.column.rawSpecialMaterialRecord.partName"),
           maxlength: 100,
         },
         {
           prop: "remark",
-          label: this.$t("common.remark"),
+          label: this.$t("ui.data.column.rawSpecialMaterialRecord.remark"),
           maxlength:300
         },
       ];

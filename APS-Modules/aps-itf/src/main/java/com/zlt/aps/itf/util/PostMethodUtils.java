@@ -26,7 +26,7 @@ public class PostMethodUtils {
             closeableHttpClient = HttpClientBuilder.create().build();
             HttpPost httpPost = new HttpPost(uri);
     		httpPost.addHeader("Content-Type", "application/json");
-            log.info("请求地址：" + uri + "，参数：" + body);
+            log.info("post请求start，请求地址：" + uri + "，参数：" + body);
             if (header != null) {
             	for (Entry<String, String> entry: header.entrySet()) {
             		httpPost.addHeader(entry.getKey(), entry.getValue());
@@ -49,7 +49,7 @@ public class PostMethodUtils {
             } catch (IOException e) {
                 log.error(e.getMessage(), e);
             }
-//            log.info("返回结果: " + result);
+            log.info("post请求end，请求地址：" + uri + "，参数：" + body);
 
         } catch (Exception e) {
             log.error(e.getMessage(), e);

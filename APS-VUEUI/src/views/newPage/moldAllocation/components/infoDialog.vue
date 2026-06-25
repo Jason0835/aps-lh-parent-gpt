@@ -144,7 +144,7 @@ export default {
       return [
       {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.mdmMouldAllocation.factoryCode"),
           type: "select",
           dictData: this.parentDict.type.biz_factory_name,
         },
@@ -158,13 +158,13 @@ export default {
         },
         {
           prop: "productTypeCode",
-          label: this.$t("ui.data.column.monthplan.productType"),
+          label: this.$t("ui.data.column.mdmMouldAllocation.productTypeCode"),
           type: "select",
           dictData: this.parentDict.type.biz_product_type,
         },
         {
           prop: "structureName",
-          label: this.$t("ui.data.column.finishStock.structureName"),
+          label: this.$t("ui.data.column.mdmMouldAllocation.structureName"),
           maxlength: 64,
           render: (form) => {
             return (
@@ -179,24 +179,24 @@ export default {
         },
         {
           prop: "specifications",
-          label: this.$t("ui.data.column.trialPlan.specifications"),
+          label: this.$t("ui.data.column.mdmMouldAllocation.specifications"),
           maxlength: 64,
         },
         {
           prop: "mainPattern",
-          label: this.$t("ui.data.column.moldLedger.mainPattern"),
+          label: this.$t("ui.data.column.mdmMouldAllocation.mainPattern"),
           maxlength: 64,
         },
         {
           prop: "allocationQty",
-          label: this.$t("ui.data.column.capsuleChuck.allocationQty"),
+          label: this.$t("ui.data.column.mdmMouldAllocation.allocationQty"),
           type: "number",
         },
 
 
         {
           prop: "remark",
-          label: this.$t("common.remark"),
+          label: this.$t("ui.common.column.remark"),
           maxlength:256,
         },
       ];

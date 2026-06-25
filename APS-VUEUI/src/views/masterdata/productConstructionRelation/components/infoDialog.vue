@@ -81,49 +81,49 @@ export default {
       return [
       {
           prop: "productCode",
-          label: this.$t("ui.data.column.producconstructionrela.productCode"),
+          label: this.$t("ui.data.column.mdmProductConstruction.productCode"),
           disabled: true,
         },
         {
           prop: "factoryCode",
           label: this.$t(
-            "ui.data.column.producconstructionrela.factoryCode"
+            "ui.data.column.mdmProductConstruction.factoryCode"
           ),
           disabled: true,
         },
         {
           prop: "specCode",
-          label: this.$t("ui.data.column.productmodelrelation.specCode"),
+          label: this.$t("ui.data.column.mdmProductConstruction.specCode"),
         },
         {
           prop: "constructionCode",
-          label: this.$t("ui.data.column.producconstructionrela.constructionCode"),
+          label: this.$t("ui.data.column.mdmProductConstruction.constructionCode"),
         },
         {
           prop: "embryoCode",
-          label: this.$t("ui.data.column.producconstructionrela.embryoCode"),
+          label: this.$t("ui.data.column.mdmProductConstruction.embryoCode"),
         },
         {
           prop: "productionVersion",
-          label: this.$t("ui.data.column.producconstructionrela.productionVersion"),
+          label: this.$t("ui.data.column.mdmProductConstruction.productionVersion"),
         },
         {
           prop: "bomVersion",
-          label: this.$t("ui.data.column.producconstructionrela.bomVersion"),
+          label: this.$t("ui.data.column.mdmProductConstruction.bomVersion"),
         },
         {
           prop: "mouldClampingPressure",
-          label: this.$t("ui.data.column.producconstructionrela.mouldClampingPressure"),
+          label: this.$t("ui.data.column.mdmProductConstruction.mouldClampingPressure"),
         },
         {
           prop: "mouldMethod",
-          label: this.$t("ui.data.column.producconstructionrela.mouldMethod"),
+          label: this.$t("ui.data.column.mdmProductConstruction.mouldMethod"),
           type: "select",
           dictData: this.moldingMethodList,
         },
         {
           prop: "curingTime",
-          label: this.$t("ui.data.column.producconstructionrela.curingTime"),
+          label: this.$t("ui.data.column.mdmProductConstruction.summerCuringTime"),
           type: "number",
           min: 0,
           max: 999999,
@@ -131,7 +131,7 @@ export default {
         },
         {
           prop: "curingTime2",
-          label: this.$t("ui.data.column.producconstructionrela.curingTime2"),
+          label: this.$t("ui.data.column.mdmProductConstruction.winterCuringTime"),
           type: "number",
           min: 0,
           max: 999999,

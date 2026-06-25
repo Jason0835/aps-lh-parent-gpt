@@ -153,7 +153,7 @@ export default {
       return [
         {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.mdmMonCycleSchStruConf.factoryCode"),
           type: "select",
           dictData: this.parentDict.type.biz_factory_name,
           disabled: this.isEdit,
@@ -184,7 +184,7 @@ export default {
         // },
         {
           prop: "structureName",
-          label: this.$t("ui.data.column.finishStock.structureName"),
+          label: this.$t("ui.data.column.mdmMonCycleSchStruConf.structureName"),
           disabled: this.isEdit,
           type: "select",
           dictData: this.selectList,
@@ -192,14 +192,14 @@ export default {
         },
         {
           prop: "turnoverMonth",
-          label: this.$t("ui.data.column.curingPlan.turnoverMonth"),
+          label: this.$t("ui.data.column.mdmMonCycleSchStruConf.turnoverMonth"),
           type: "number",
           min: 0,
           max: 999999,
         },
         {
           prop: "minVulcanizingMachine",
-          label: this.$t("ui.data.column.curingPlan.minVulcanizingMachine"),
+          label: this.$t("ui.data.column.mdmMonCycleSchStruConf.minVulcanizingMachine"),
           type: "number",
           min: 0,
           max: 999999,

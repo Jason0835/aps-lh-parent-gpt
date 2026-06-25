@@ -125,12 +125,6 @@ public class ScheduleServiceImpl implements ScheduleService {
     /** 启用状态 */
     private static final Integer ACTIVE_STATUS = 1;
 
-    /** 收尾预警天数：紧急 */
-    private static final int URGENT_ENDING_DAYS = 3;
-
-    /** 收尾预警天数：临近 */
-    private static final int NEAR_ENDING_DAYS = 10;
-
     /** 追赶计划天数 */
     private static final int CATCH_UP_DAYS = 3;
 
@@ -182,7 +176,6 @@ public class ScheduleServiceImpl implements ScheduleService {
         LocalDate scheduleDate = request.getScheduleDate();
 
         // 获取排程执行锁（工厂+日期维度）
-        // todo 可以使用注解，代码简洁
         String lockToken = scheduleExecutionGuard.acquire(factoryCode, scheduleDate);
         if (lockToken == null) {
             result.setSuccess(false);
@@ -298,7 +291,7 @@ public class ScheduleServiceImpl implements ScheduleService {
     /**
      * 加载精度计划
      *
-     * <p>查询条件：planDate <= 排程起始日期 + 提前天数（可配置），且 actualDate 为空（未从MES回调），
+     * <p>查询条件：planDate <= 排程起始日期 + 班次排程天数 + 提前天数（可配置），且 actualDate 为空（未从MES回调），
      * 且 scheduleDate 为空（未执行），且 isDelete=0
      * <p>注意：此处使用排程起始日期一次性加载最大范围的数据，实际每日选择时会根据当天日期动态计算截止。
      * 例如：传入排程日期=5月20日，提前天数=3，查询 planDate <= 5月23日 的所有未执行精度计划，
@@ -322,23 +315,27 @@ public class ScheduleServiceImpl implements ScheduleService {
 
         context.setPrecisionAdvanceDays(precisionAdvanceDays);
 
-        LocalDate cutoffDate = scheduleDate.plusDays(precisionAdvanceDays);
-
         // 查询1：actualDate为空 AND scheduleDate为空 — 从未安排过的精度计划
+        // 限制 planDate <= 排程起始日期 + 班次排程天数 + 精度提前天数，避免全量加载
+        int planDateRangeDays = context.getScheduleDays() + precisionAdvanceDays;
+        java.sql.Timestamp planDateCutoff = java.sql.Timestamp.valueOf(
+                scheduleDate.plusDays(planDateRangeDays).atTime(23, 59, 59));
         List<CxPrecisionPlan> precisionPlans = precisionPlanMapper.selectList(
                 new LambdaQueryWrapper<CxPrecisionPlan>()
                         .isNull(CxPrecisionPlan::getActualDate)
                         .isNull(CxPrecisionPlan::getScheduleDate)
+                        .le(CxPrecisionPlan::getPlanDate, planDateCutoff)
                         .eq(CxPrecisionPlan::getIsDelete, "0"));
 
-        // 查询2：actualDate为空 AND scheduleDate已回填 AND planDate > 排程日期
+        // 查询2：actualDate为空 AND scheduleDate已回填 AND scheduleDate >= 排程起始日期 AND planDate <= 截止日期
         // 这种情况是：前一天排程时已经安排了精度计划并回填了scheduleDate，
-        // 但planDate在今天之后，今天还需要重新做精度（防止精度被提前消耗后当天无法再做）
+        // 当期排程会重排昨天的部分日期这，今天还需要重新纳入做精度（防止精度被提前消耗后当天无法再做）
         List<CxPrecisionPlan> reapplyPlans = precisionPlanMapper.selectList(
                 new LambdaQueryWrapper<CxPrecisionPlan>()
                         .isNull(CxPrecisionPlan::getActualDate)
                         .isNotNull(CxPrecisionPlan::getScheduleDate)
-                        .gt(CxPrecisionPlan::getPlanDate, java.sql.Timestamp.valueOf(scheduleDate.atTime(0, 0, 0)))
+                        .ge(CxPrecisionPlan::getScheduleDate, java.sql.Timestamp.valueOf(scheduleDate.atTime(0, 0, 0)))
+                        .le(CxPrecisionPlan::getPlanDate, planDateCutoff)
                         .eq(CxPrecisionPlan::getIsDelete, "0"));
 
         if (reapplyPlans != null && !reapplyPlans.isEmpty()) {
@@ -425,9 +422,9 @@ public class ScheduleServiceImpl implements ScheduleService {
             loadShiftConfigs(context, factoryCode);
             log.info("班次配置加载完成，班次数：{}", context.getShiftConfigList() != null ? context.getShiftConfigList().size() : 0);
 
-            // 2. 获取设备计划停机信息
+            // 2. 获取设备计划停机信息（使用排产起始日期，覆盖整个排程区间）
             try {
-                loadDevicePlanShuts(context, scheduleDate);
+                loadDevicePlanShuts(context, scheduleStartDate);
                 log.info("设备计划停机信息加载完成");
             } catch (Exception e) {
                 log.warn("加载设备计划停机信息失败，继续执行：{}", e.getMessage());
@@ -507,8 +504,9 @@ public class ScheduleServiceImpl implements ScheduleService {
             }
 
             // 13. 获取月度计划余量并计算成型余量（考虑共用胎胚）
+            // T日使用排产起始日期（scheduleStartDate），而非前端传入的中间天
             try {
-                loadMonthSurplusAndCalculateFormingRemainder(context, scheduleDate);
+                loadMonthSurplusAndCalculateFormingRemainder(context, scheduleStartDate);
             } catch (Exception e) {
                 log.warn("加载月度计划余量失败，继续执行：{}", e.getMessage());
             }
@@ -529,7 +527,7 @@ public class ScheduleServiceImpl implements ScheduleService {
 
             // 15.5 加载精度计划（planDate < 当前班次日期 - 3天 且 actualDate 为空）
             try {
-                loadPrecisionPlans(context, scheduleDate);
+                loadPrecisionPlans(context, scheduleStartDate);
             } catch (Exception e) {
                 log.warn("加载精度计划失败，继续执行：{}", e.getMessage());
             }
@@ -556,6 +554,16 @@ public class ScheduleServiceImpl implements ScheduleService {
                 supplementDelayMaterialInfo(context);
             } catch (Exception e) {
                 log.warn("补充延误物料信息失败，继续执行：{}", e.getMessage());
+            }
+
+            // 16.7 补充延误物料任务的库存分配
+            // supplementDelayMaterialTasks 在库存分配（步骤13）之后执行，
+            // 新增的延误物料任务未经 allocateStockByMaterialRatio 分配库存，
+            // 导致 TaskGroupService.buildSingleTask 中 currentStock=0，排产量计算忽略已有库存。
+            try {
+                supplementDelayMaterialStock(context);
+            } catch (Exception e) {
+                log.warn("补充延误物料库存分配失败，继续执行：{}", e.getMessage());
             }
 
             // 17. 过滤已收尾物料（成型余量<=0的物料不参与排程）
@@ -1041,6 +1049,99 @@ public class ScheduleServiceImpl implements ScheduleService {
 
         context.setStructureAllocationMap(structureAllocationMap);
         log.info("加载结构排产配置 {} 条，共 {} 个结构", allocations.size(), structureAllocationMap.size());
+
+        // 加载提前生产备用结构排产配置（本月 BEGIN_DAY > 当前日期 的机台 + 跨月场景下次月机台）
+        loadFutureStructureAllocations(context, scheduleDate);
+    }
+
+    /**
+     * 加载提前生产备用的结构排产配置
+     *
+     * <p>用于提前生产能力：当结构在当日（BEGIN_DAY/END_DAY 日期范围内）无可配置机台但需要提前生产时，
+     * 从本月后续日期的排产配置中查找可用机台。
+     *
+     * <p>数据来源分两部分：
+     * <ol>
+     *   <li><b>本月未来机台</b>：从已加载的当月 structureAllocationMap 中筛选 BEGIN_DAY > 当前日期 的机台记录，
+     *       这些机台在本月后续才会生效，可用于提前生产。</li>
+     *   <li><b>跨月场景下的次月机台</b>：当排程日期范围跨月时（如31号排程包含次月1日），
+     *       硫化任务存储的版本仍为当月版本，需从月计划表（t_mp_month_plan_prod_final）获取次月版本，
+     *       再用次月版本过滤次月的 T_MP_STRUCTURE_ALLOCATION 配置，作为跨月提前生产的机台来源。</li>
+     * </ol>
+     *
+     * <p>查询结果存入 context.futureStructureAllocationMap，供 TaskGroupService 使用。
+     *
+     * @param context      排程上下文
+     * @param scheduleDate 排程日期（中间天）
+     */
+    private void loadFutureStructureAllocations(ScheduleContextVo context, LocalDate scheduleDate) {
+        String factoryCode = context.getFactoryCode() != null ? context.getFactoryCode() : DEFAULT_FACTORY_CODE;
+
+        // 排产起始日期 = 中间天 - 1天（T日）
+        LocalDate scheduleStartDate = scheduleDate.minusDays(1);
+        int currentDay = scheduleStartDate.getDayOfMonth();
+
+        Map<String, List<MpCxCapacityConfiguration>> futureMap = new LinkedHashMap<>();
+
+        // 1. 本月未来机台：从已加载的当月配置中筛选 BEGIN_DAY > 当前日期的记录
+        if (context.getStructureAllocationMap() != null) {
+            for (Map.Entry<String, List<MpCxCapacityConfiguration>> entry : context.getStructureAllocationMap().entrySet()) {
+                String structureName = entry.getKey();
+                List<MpCxCapacityConfiguration> futureConfigs = entry.getValue().stream()
+                        .filter(c -> c.getBeginDay() != null && c.getBeginDay() > currentDay)
+                        .collect(Collectors.toList());
+                if (!futureConfigs.isEmpty()) {
+                    futureMap.computeIfAbsent(structureName, k -> new ArrayList<>()).addAll(futureConfigs);
+                }
+            }
+        }
+        log.info("本月未来机台（BEGIN_DAY > {}）加载完成，共 {} 个结构有未来机台配置", currentDay, futureMap.size());
+
+        // 2. 跨月场景：排程日期范围跨月时，加载次月结构配置
+        int scheduleDays = context.getScheduleDays() != null ? context.getScheduleDays() : DEFAULT_SCHEDULE_DAYS;
+        LocalDate scheduleEndDate = scheduleStartDate.plusDays(scheduleDays - 1);
+        boolean crossMonth = scheduleEndDate.getMonth() != scheduleStartDate.getMonth()
+                || scheduleEndDate.getYear() != scheduleStartDate.getYear();
+        if (crossMonth) {
+            // 跨月场景：硫化任务版本仍为当月版本，需从月计划表获取次月版本
+            LocalDate nextMonthDate = scheduleEndDate.withDayOfMonth(1);
+            int nextYear = nextMonthDate.getYear();
+            int nextMonth = nextMonthDate.getMonthValue();
+            int nextYearMonth = nextYear * 100 + nextMonth;
+
+            // 从月计划表获取次月排产版本
+            List<FactoryMonthPlanProductionFinalResult> nextMonthPlans =
+                    monthPlanMapper.selectByFactoryAndYearMonth(factoryCode, nextYearMonth);
+            String nextMonthVersion = nextMonthPlans.stream()
+                    .map(FactoryMonthPlanProductionFinalResult::getProductionVersion)
+                    .filter(Objects::nonNull)
+                    .findFirst()
+                    .orElse(null);
+
+            if (nextMonthVersion != null) {
+                List<MpCxCapacityConfiguration> nextMonthAllocations =
+                        capacityConfigurationMapper.selectByYearAndMonth(factoryCode, nextYear, nextMonth);
+                int before = nextMonthAllocations.size();
+                nextMonthAllocations = nextMonthAllocations.stream()
+                        .filter(a -> nextMonthVersion.equals(a.getProductionVersion()))
+                        .collect(Collectors.toList());
+
+                for (MpCxCapacityConfiguration config : nextMonthAllocations) {
+                    if (config.getStructureName() != null) {
+                        futureMap.computeIfAbsent(config.getStructureName(), k -> new ArrayList<>()).add(config);
+                    }
+                }
+                log.info("跨月场景：加载次月 {}-{} 结构排产配置 {} 条（版本={}, 过滤前={}）",
+                        nextYear, nextMonth, nextMonthAllocations.size(), nextMonthVersion, before);
+            } else {
+                log.warn("跨月场景：未从月计划表获取到次月 {}-{} 的排产版本，跳过次月结构配置加载", nextYear, nextMonth);
+            }
+        }
+
+        context.setFutureStructureAllocationMap(futureMap);
+        // 初始化提前生产机台分配映射（TaskGroupService 在分组过程中填充）
+        context.setAdvanceProductionMachineMap(new HashMap<>());
+        log.info("加载提前生产备用配置完成，共 {} 个结构有未来机台配置（跨月={}）", futureMap.size(), crossMonth);
     }
 
     /**
@@ -1098,13 +1199,19 @@ public class ScheduleServiceImpl implements ScheduleService {
         String factoryCode = context.getFactoryCode();
 
         // 1. 获取月计划数据，按物料汇总月计划总量（按工厂过滤）
+        // 当"上月超欠产有效标志"(lastMonthValidFlag)=1时，月计划总量需合并上月欠产数据(lastMonthOverdueQty)，
+        // 以纳入上个月的欠产（此前未被考虑）；标志非"1"或为空时，仅汇总本月计划总量(totalQty)。
         int yearMonth = year * 100 + month;
         List<FactoryMonthPlanProductionFinalResult> monthPlans = monthPlanMapper.selectByFactoryAndYearMonth(factoryCode, yearMonth);
         Map<String, Integer> materialTotalPlanQtyMap = monthPlans.stream()
-                .filter(p -> p.getMaterialCode() != null && p.getTotalQty() != null)
+                .filter(p -> p.getMaterialCode() != null)
                 .collect(Collectors.groupingBy(
                         FactoryMonthPlanProductionFinalResult::getMaterialCode,
-                        Collectors.summingInt(FactoryMonthPlanProductionFinalResult::getTotalQty)));
+                        Collectors.summingInt(ScheduleServiceImpl::calcEffectivePlanQty)));
+        long mergedOverdueCount = monthPlans.stream()
+                .filter(p -> p.getMaterialCode() != null && "1".equals(p.getLastMonthValidFlag()))
+                .count();
+        log.info("按物料汇总月计划总量 {} 条，其中合并上月欠产数据 {} 条", materialTotalPlanQtyMap.size(), mergedOverdueCount);
 
         // 2. 收集所有物料编码（月计划中的 + 硫化排程中的）
         Set<String> allMaterialCodes = new HashSet<>(materialTotalPlanQtyMap.keySet());
@@ -1192,6 +1299,30 @@ public class ScheduleServiceImpl implements ScheduleService {
         context.setMaterialStockMap(materialStockMap);
         context.setInitialMaterialStockMap(new HashMap<>(materialStockMap));
         log.info("计算成型余量映射 {} 条，物料库存分配 {} 条", formingRemainderMap.size(), materialStockMap.size());
+    }
+
+    /**
+     * 计算单条月计划记录的有效计划量。
+     *
+     * <p>当"上月超欠产有效标志"({@code lastMonthValidFlag})为"1"时，
+     * 月计划总量需合并上月欠产数据({@code lastMonthOverdueQty})，以纳入上个月的欠产
+     * （此前未被考虑）；标志非"1"或为空时，仅使用本月计划总量({@code totalQty})。
+     *
+     * <p>异常处理：所有数值字段为 null 时按 0 处理，避免空指针；标志字段为 null 时按非"1"处理。
+     *
+     * @param plan 月计划记录
+     * @return 有效计划量（totalQty，必要时叠加 lastMonthOverdueQty）
+     */
+    static int calcEffectivePlanQty(FactoryMonthPlanProductionFinalResult plan) {
+        int totalQty = plan.getTotalQty() != null ? plan.getTotalQty() : 0;
+        String validFlag = plan.getLastMonthValidFlag();
+        if ("1".equals(validFlag)) {
+            int overdueQty = plan.getLastMonthOverdueQty() != null ? plan.getLastMonthOverdueQty() : 0;
+            log.info("物料 {} 上月超欠产有效标志=1，合并上月欠产：本月计划={} + 上月欠产={}",
+                    plan.getMaterialCode(), totalQty, overdueQty);
+            return totalQty + overdueQty;
+        }
+        return totalQty;
     }
 
     /**
@@ -1952,16 +2083,20 @@ public class ScheduleServiceImpl implements ScheduleService {
                 int daysToEnding = (int) java.time.temporal.ChronoUnit.DAYS.between(scheduleDate, plannedEndingDate);
                 ending.setEstimatedEndingDays(BigDecimal.valueOf(daysToEnding));
 
+                // 从参数表读取收尾天数阈值（与TaskGroupService保持一致）
+                int urgentEndingDays = getEndingDaysFromParam(context, "SYS04050004", 3);
+                int nearEndingDays = getEndingDaysFromParam(context, "SYS04050003", 10);
+
                 // 设置收尾标记
-                if (daysToEnding >= 0 && daysToEnding <= URGENT_ENDING_DAYS) {
+                if (daysToEnding >= 0 && daysToEnding <= urgentEndingDays) {
                     ending.setIsUrgentEnding(1);
                 }
-                if (daysToEnding >= 0 && daysToEnding <= NEAR_ENDING_DAYS) {
+                if (daysToEnding >= 0 && daysToEnding <= nearEndingDays) {
                     ending.setIsNearEnding(1);
                 }
 
-                // 计算延误量（如果成型余量 > 0 且接近收尾日）
-                if (formingRemainder != null && formingRemainder > 0 && daysToEnding >= 0 && daysToEnding <= NEAR_ENDING_DAYS) {
+                // 计算延误量（如果成型余量 > 0）
+                if (formingRemainder != null && formingRemainder > 0 && daysToEnding >= 0) {
                     int producibleQty = calculateProducibleQty(plans, currentDay, endingDay);
 
                     if (formingRemainder > producibleQty) {
@@ -1973,6 +2108,9 @@ public class ScheduleServiceImpl implements ScheduleService {
                                 materialCode, daysToEnding, formingRemainder, currentDay, endingDay,
                                 producibleQty, delayQty,
                                 CATCH_UP_DAYS, delayQty / CATCH_UP_DAYS);
+                    } else {
+                        log.info("[延误量计算] 物料={}, 距收尾{}天, 成型余量={} <= 月计划第{}~第{}天可生产量={}, 无延误",
+                                materialCode, daysToEnding, formingRemainder, currentDay, endingDay, producibleQty);
                     }
                 }
             } else {
@@ -1997,14 +2135,37 @@ public class ScheduleServiceImpl implements ScheduleService {
     }
 
     /**
+     * 从参数配置中读取收尾天数阈值
+     *
+     * @param context      排程上下文
+     * @param paramCode    参数编码（SYS04050003/SYS04050004）
+     * @param defaultValue 默认值
+     * @return 收尾天数阈值
+     */
+    private int getEndingDaysFromParam(ScheduleContextVo context, String paramCode, int defaultValue) {
+        if (context.getParamConfigMap() != null) {
+            CxParamConfig config = context.getParamConfigMap().get(paramCode);
+            if (config != null && config.getParamValue() != null) {
+                try {
+                    return Integer.parseInt(config.getParamValue());
+                } catch (NumberFormatException e) {
+                    log.warn("参数 {} 值格式错误: {}，使用默认值 {}", paramCode, config.getParamValue(), defaultValue);
+                }
+            }
+        }
+        return defaultValue;
+    }
+
+    /**
      * 补充延误物料到硫化任务列表
      *
-     * <p>从物料收尾信息中找出 delayQuantity > 0 且不在当前 lhScheduleResults 中的物料，
+     * <p>从物料收尾信息中找出 近期收尾 + delayQuantity > 0 且不在当前 lhScheduleResults 中的物料，
      * 往前查找该物料最近一条硫化排程记录，加入今日硫化任务，使延误物料参与成型排程。
+     * 非近期收尾（距收尾日超过 SYS04050003 天数）的延误物料不增补。
      *
      * <p>流程：
      * <ol>
-     *   <li>获取 materialEndings 中 delayQuantity > 0 的物料</li>
+     *   <li>获取 materialEndings 中 isNearEnding=1 且 delayQuantity > 0 的物料</li>
      *   <li>排除已在 lhScheduleResults 中存在的物料</li>
      *   <li>对每个缺失物料，查询历史硫化排程中最近一条记录</li>
      *   <li>将历史记录调整日期后加入 lhScheduleResults</li>
@@ -2033,6 +2194,7 @@ public class ScheduleServiceImpl implements ScheduleService {
 
         List<CxMaterialEnding> delayEndings = materialEndings.stream()
                 .filter(e -> e.getDelayQuantity() != null && e.getDelayQuantity() > 0)
+                .filter(e -> e.getIsNearEnding() != null && e.getIsNearEnding() == 1)
                 .filter(e -> e.getMaterialCode() != null)
                 .filter(e -> !existingMaterialCodes.contains(e.getMaterialCode()))
                 .collect(Collectors.toList());
@@ -2046,6 +2208,9 @@ public class ScheduleServiceImpl implements ScheduleService {
 
         int supplemented = 0;
         int notFound = 0;
+        // 为补充任务生成唯一负数ID（避免与数据库正数ID冲突），
+        // 否则 getId()=null 会导致 getCurrentStock、supplementDailyRemainingMap 等无法按任务维度区分
+        long syntheticId = -1;
         for (CxMaterialEnding ending : delayEndings) {
             String materialCode = ending.getMaterialCode();
             LhScheduleResult historicalRecord = lhScheduleResultMapper.selectLatestBeforeDate(materialCode, scheduleDate, scheduleDate.withDayOfMonth(1));
@@ -2097,6 +2262,19 @@ public class ScheduleServiceImpl implements ScheduleService {
             newRecord.setDailyPlanQty(ending.getDistributedQuantity());
             newRecord.setTotalDailyPlanQty(ending.getDistributedQuantity());
             newRecord.setMouldSurplusQty(ending.getFormingRemainder());
+
+            // 补充的延误物料任务无硫化消耗，各班次计划量设为0
+            newRecord.setClass1PlanQty(0);
+            newRecord.setClass2PlanQty(0);
+            newRecord.setClass3PlanQty(0);
+            newRecord.setClass4PlanQty(0);
+            newRecord.setClass5PlanQty(0);
+            newRecord.setClass6PlanQty(0);
+            newRecord.setClass7PlanQty(0);
+            newRecord.setClass8PlanQty(0);
+
+            // 分配唯一负数ID，使后续库存分配、班次排量等逻辑能按任务维度正确处理
+            newRecord.setId(syntheticId--);
 
             lhScheduleResults.add(newRecord);
             supplemented++;
@@ -2174,6 +2352,217 @@ public class ScheduleServiceImpl implements ScheduleService {
         }
         if (!stillMissing.isEmpty()) {
             log.warn("以下延误物料在 T_MDM_MATERIAL_INFO 表中不存在：{}", stillMissing);
+        }
+    }
+
+    /**
+     * 补充延误物料任务的库存分配
+     *
+     * <p>supplementDelayMaterialTasks 在库存分配（步骤13 loadMonthSurplusAndCalculateFormingRemainder）
+     * 之后执行，新增的延误物料任务（dataSource="3"）未经过 allocateStockByMaterialRatio 分配库存。
+     * 此时该胎胚在步骤13因"没有对应的硫化任务"被跳过，库存未分配给任何任务，
+     * 导致 TaskGroupService.buildSingleTask 中 currentStock=0，排产量计算忽略已有库存。
+     *
+     * <p>本方法针对补充延误物料对应的胎胚，补充分配库存到 materialStockMap，
+     * 并同步更新 formingRemainderMap（成型余量 = 硫化余量 - 已分配库存）。
+     *
+     * <p>分配规则与 allocateStockByMaterialRatio 一致：
+     * <ul>
+     *   <li>单任务胎胚：直接分配全部有效库存</li>
+     *   <li>共用胎胚（多任务）：按日硫化量比例分配，最后一条倒扣</li>
+     * </ul>
+     *
+     * @param context 排程上下文
+     */
+    private void supplementDelayMaterialStock(ScheduleContextVo context) {
+        List<LhScheduleResult> lhScheduleResults = context.getLhScheduleResults();
+        if (lhScheduleResults == null || lhScheduleResults.isEmpty()) {
+            return;
+        }
+
+        // 找出补充计划任务（dataSource="3"）
+        List<LhScheduleResult> supplementTasks = lhScheduleResults.stream()
+                .filter(r -> "3".equals(r.getDataSource()))
+                .collect(Collectors.toList());
+        if (supplementTasks.isEmpty()) {
+            return;
+        }
+
+        Map<String, Integer> materialStockMap = context.getMaterialStockMap();
+        if (materialStockMap == null) {
+            materialStockMap = new HashMap<>();
+            context.setMaterialStockMap(materialStockMap);
+        }
+
+        // 构建胎胚 → 有效库存映射
+        Map<String, Integer> embryoStockMap = new HashMap<>();
+        if (context.getStocks() != null) {
+            for (CxStock stock : context.getStocks()) {
+                if (stock.getEmbryoCode() != null && stock.getEffectiveStock() > 0) {
+                    embryoStockMap.merge(stock.getEmbryoCode(), stock.getEffectiveStock(), Integer::sum);
+                }
+            }
+        }
+
+        Map<String, MdmMonthSurplus> monthSurplusMap = context.getMonthSurplusMap();
+        Map<String, MonthPlanProductLhCapacityVo> materialLhCapacityMap = context.getMaterialLhCapacityMap();
+        Set<String> affectedMaterials = new HashSet<>();
+        Set<String> processedEmbryos = new HashSet<>();
+        int supplementedCount = 0;
+
+        for (LhScheduleResult supplementTask : supplementTasks) {
+            String embryoCode = supplementTask.getEmbryoCode();
+            if (embryoCode == null || processedEmbryos.contains(embryoCode)) {
+                continue;
+            }
+
+            Integer totalStock = embryoStockMap.get(embryoCode);
+            if (totalStock == null || totalStock <= 0) {
+                continue;
+            }
+
+            String suppTaskKey = String.valueOf(supplementTask.getId());
+            // 该补充任务已有库存分配则跳过
+            if (materialStockMap.containsKey(suppTaskKey) && materialStockMap.get(suppTaskKey) > 0) {
+                processedEmbryos.add(embryoCode);
+                continue;
+            }
+
+            // 查找该胎胚对应的所有硫化任务
+            List<LhScheduleResult> relatedTasks = lhScheduleResults.stream()
+                    .filter(r -> embryoCode.equals(r.getEmbryoCode()))
+                    .collect(Collectors.toList());
+
+            if (relatedTasks.size() == 1) {
+                // === 单任务：直接分配全部库存（与 allocateStockByMaterialRatio 单任务分支一致） ===
+                if (isVulcanizeSurplusExhausted(supplementTask.getMaterialCode(), monthSurplusMap)) {
+                    log.debug("补充任务胎胚 {} 硫化余量<=0，跳过库存分配", embryoCode);
+                    processedEmbryos.add(embryoCode);
+                    continue;
+                }
+                materialStockMap.put(suppTaskKey, totalStock);
+                log.info("补充延误物料库存分配(单任务): 胎胚={}, 物料={}, 任务={}, 分配库存={}",
+                        embryoCode, supplementTask.getMaterialCode(), suppTaskKey, totalStock);
+                supplementedCount++;
+                if (supplementTask.getMaterialCode() != null) {
+                    affectedMaterials.add(supplementTask.getMaterialCode());
+                }
+            } else {
+                // === 共用胎胚：按日硫化量比例重新分配（与 allocateStockByMaterialRatio 共用分支一致） ===
+                List<TaskDemand> taskDemands = new ArrayList<>();
+                int totalDemand = 0;
+
+                for (LhScheduleResult lh : relatedTasks) {
+                    String materialCode = lh.getMaterialCode();
+                    if (isVulcanizeSurplusExhausted(materialCode, monthSurplusMap)) {
+                        continue;
+                    }
+                    int dayVulcanizationQty = 0;
+                    if (materialLhCapacityMap != null && materialCode != null) {
+                        MonthPlanProductLhCapacityVo capacityVo = materialLhCapacityMap.get(materialCode);
+                        if (capacityVo != null && capacityVo.getDayVulcanizationQty() != null) {
+                            dayVulcanizationQty = capacityVo.getDayVulcanizationQty();
+                        }
+                    }
+                    if (dayVulcanizationQty <= 0) {
+                        continue;
+                    }
+                    taskDemands.add(new TaskDemand(lh.getId(), dayVulcanizationQty, materialCode, "日硫化量"));
+                    totalDemand += dayVulcanizationQty;
+                }
+
+                if (taskDemands.isEmpty()) {
+                    log.debug("补充任务胎胚 {} 共用但无有效日硫化量，跳过", embryoCode);
+                    processedEmbryos.add(embryoCode);
+                    continue;
+                }
+
+                // 清除该胎胚所有任务的旧分配（重新按比例分配）
+                for (TaskDemand td : taskDemands) {
+                    materialStockMap.remove(td.taskKey);
+                }
+
+                if (totalDemand == 0) {
+                    int avgStock = totalStock / taskDemands.size();
+                    for (TaskDemand td : taskDemands) {
+                        materialStockMap.put(td.taskKey, avgStock);
+                    }
+                    log.info("补充延误物料库存分配(共用平均): 胎胚={}, 平均分配库存={}", embryoCode, avgStock);
+                } else {
+                    int allocatedTotal = 0;
+                    for (int i = 0; i < taskDemands.size(); i++) {
+                        TaskDemand td = taskDemands.get(i);
+                        int currentStock;
+                        if (i == taskDemands.size() - 1) {
+                            currentStock = totalStock - allocatedTotal;
+                        } else {
+                            currentStock = (int) ((long) totalStock * td.demand / totalDemand);
+                        }
+                        materialStockMap.put(td.taskKey, currentStock);
+                        allocatedTotal += currentStock;
+                    }
+                    log.info("补充延误物料库存分配(共用比例): 胎胚={}, 总库存={}, 任务数={}",
+                            embryoCode, totalStock, taskDemands.size());
+                }
+
+                for (TaskDemand td : taskDemands) {
+                    if (td.materialCode != null) {
+                        affectedMaterials.add(td.materialCode);
+                    }
+                }
+                supplementedCount++;
+            }
+            processedEmbryos.add(embryoCode);
+        }
+
+        if (supplementedCount > 0) {
+            log.info("补充延误物料库存分配完成：处理 {} 个胎胚", supplementedCount);
+            // 同步更新成型余量映射（受影响物料的成型余量 = 硫化余量 - 已分配库存）
+            recalculateFormingRemainderForMaterials(context, affectedMaterials);
+        }
+    }
+
+    /**
+     * 重算指定物料的成型余量
+     *
+     * <p>库存分配变更后，成型余量需同步更新：
+     * 成型余量 = Max(0, 硫化余量 - 该物料已分配库存总量)
+     *
+     * @param context           排程上下文
+     * @param affectedMaterials 受影响的物料编码集合
+     */
+    private void recalculateFormingRemainderForMaterials(ScheduleContextVo context, Set<String> affectedMaterials) {
+        Map<String, Integer> formingRemainderMap = context.getFormingRemainderMap();
+        if (formingRemainderMap == null) {
+            formingRemainderMap = new HashMap<>();
+            context.setFormingRemainderMap(formingRemainderMap);
+        }
+        Map<String, MdmMonthSurplus> monthSurplusMap = context.getMonthSurplusMap();
+        Map<String, Integer> materialStockMap = context.getMaterialStockMap();
+        List<LhScheduleResult> lhScheduleResults = context.getLhScheduleResults();
+
+        for (String materialCode : affectedMaterials) {
+            // 汇总该物料的已分配库存（按硫化任务维度）
+            int materialStock = 0;
+            if (lhScheduleResults != null && materialStockMap != null) {
+                for (LhScheduleResult lh : lhScheduleResults) {
+                    if (materialCode.equals(lh.getMaterialCode()) && lh.getId() != null) {
+                        materialStock += materialStockMap.getOrDefault(String.valueOf(lh.getId()), 0);
+                    }
+                }
+            }
+            // 硫化余量
+            int vulcanizingRemainder = 0;
+            if (monthSurplusMap != null) {
+                MdmMonthSurplus surplus = monthSurplusMap.get(materialCode);
+                if (surplus != null && surplus.getPlanSurplusQty() != null) {
+                    vulcanizingRemainder = surplus.getPlanSurplusQty().intValue();
+                }
+            }
+            int formingRemainder = Math.max(0, vulcanizingRemainder - materialStock);
+            formingRemainderMap.put(materialCode, formingRemainder);
+            log.info("更新成型余量: 物料={}, 硫化余量={}, 已分配库存={}, 成型余量={}",
+                    materialCode, vulcanizingRemainder, materialStock, formingRemainder);
         }
     }
 
@@ -2307,7 +2696,8 @@ public class ScheduleServiceImpl implements ScheduleService {
     /**
      * 找到该物料的最近一个收尾日
      *
-     * <p>从当前日期开始往后找，找到第一个连续排产区间的最后一天。
+     * <p>使用月计划的 END_DAY 确定收尾日，避免中间断产日（如 D20=NULL）导致提前截断。
+     * 多条计划时取最大的 END_DAY。
      *
      * @param plans         月计划列表
      * @param currentDay    当前日期（几号）
@@ -2315,22 +2705,27 @@ public class ScheduleServiceImpl implements ScheduleService {
      * @return 最近一个收尾日
      */
     private int findMaterialEndingDay(List<FactoryMonthPlanProductionFinalResult> plans, int currentDay, int lastDayOfMonth) {
-        Set<Integer> productionDays = collectProductionDays(plans, currentDay, lastDayOfMonth);
-
-        if (productionDays.isEmpty()) {
-            return lastDayOfMonth;
-        }
-
         int endingDay = currentDay;
-        for (int day = currentDay; day <= lastDayOfMonth; day++) {
-            if (productionDays.contains(day)) {
-                endingDay = day;
-            } else if (endingDay > currentDay) {
+        for (FactoryMonthPlanProductionFinalResult plan : plans) {
+            Integer planEndDay = plan.getEndDay();
+            if (planEndDay != null && planEndDay > endingDay && planEndDay >= currentDay) {
+                endingDay = planEndDay;
+            }
+        }
+        // 扫描DAY_X字段，找到最后一天有实际排产数据的日期（兜底：END_DAY可能不准确）
+        for (int day = lastDayOfMonth; day > endingDay && day >= currentDay; day--) {
+            for (FactoryMonthPlanProductionFinalResult plan : plans) {
+                Integer dayQty = plan.getDayQty(day);
+                if (dayQty != null && dayQty > 0) {
+                    endingDay = day;
+                    break;
+                }
+            }
+            if (endingDay == day) {
                 break;
             }
         }
-
-        return endingDay;
+        return endingDay > currentDay ? endingDay : lastDayOfMonth;
     }
 
     /**
@@ -2360,25 +2755,6 @@ public class ScheduleServiceImpl implements ScheduleService {
         return total;
     }
 
-    /**
-     * 收集所有有排产的日期
-     */
-    private Set<Integer> collectProductionDays(List<FactoryMonthPlanProductionFinalResult> plans, int currentDay, int lastDayOfMonth) {
-        Set<Integer> productionDays = new HashSet<>();
-        for (FactoryMonthPlanProductionFinalResult plan : plans) {
-            int planBegin = plan.getBeginDay() != null ? plan.getBeginDay() : 1;
-            int planEnd = plan.getEndDay() != null ? plan.getEndDay() : lastDayOfMonth;
-            int start = Math.max(currentDay, planBegin);
-            int end = Math.min(lastDayOfMonth, planEnd);
-            for (int day = start; day <= end; day++) {
-                Integer dayQty = plan.getDayQty(day);
-                if (dayQty != null && dayQty > 0) {
-                    productionDays.add(day);
-                }
-            }
-        }
-        return productionDays;
-    }
 
     /**
      * 灵活解析日期时间字符串，支持 HH:mm 和 H:mm 两种格式

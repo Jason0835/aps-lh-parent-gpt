@@ -133,7 +133,7 @@ export default {
     columns() {
       return [
         {
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.mdmStructureLhRatio.factoryCode"),
           prop: "factoryCode",
           type: "select",
           dictData: this.parentDict.type.biz_factory_name,
@@ -141,14 +141,14 @@ export default {
         },
         {
           prop: "cxMachineTypeCode",
-          label: this.$t("ui.data.column.curingPlan.cxMachineTypeCode"),
+          label: this.$t("ui.data.column.mdmStructureLhRatio.cxMachineTypeCode"),
           type: "select",
           dictData: this.parentDict.type.cx_machine_type_code,
 
         },
         {
           prop: "structureName",
-          label: this.$t("ui.data.column.finishStock.structureName"),
+          label: this.$t("ui.data.column.mdmStructureLhRatio.structureName"),
           render: (form) => {
             return (
               <structureSelect
@@ -161,19 +161,19 @@ export default {
         },
         {
           prop: "lhMachineMaxQty",
-          label: this.$t("ui.data.column.curingPlan.lhMachineMaxQty"),
+          label: this.$t("ui.data.column.mdmStructureLhRatio.lhMachineMaxQty"),
           type: "number",
           max:99
         },
         {
           prop: "maxEmbryoQty",
-          label: this.$t("ui.data.column.curingPlan.maxEmbryoQty"),
+          label: this.$t("ui.data.column.mdmStructureLhRatio.maxEmbryoQty"),
           type: "number",
           max:99
         },
         {
           prop: "remark",
-          label: this.$t("common.remark"),
+          label: this.$t("ui.data.column.mdmStructureLhRatio.remark"),
         },
       ];
     },

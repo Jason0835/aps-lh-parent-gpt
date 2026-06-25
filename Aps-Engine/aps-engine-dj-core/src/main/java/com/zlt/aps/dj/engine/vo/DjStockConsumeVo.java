@@ -8,7 +8,7 @@ public class DjStockConsumeVo {
     /**
      * 垫胶代码
      */
-    private String liningCode;
+    private String paddingCode;
 
     /**
      * 半制品对应成型(8点-16点)计划量的消耗量

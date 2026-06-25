@@ -104,10 +104,10 @@ export default {
           minWidth: 120,
         },
         {
-          prop: "materialCode",
+          prop: "beadCode",
           align: "center",
           halign: "center",
-          label: this.$t("ui.tq.machineSpecSpeed.column.materialCode"),
+          label: this.$t("ui.tq.machineSpecSpeed.column.beadCode"),
           minWidth: 120,
         },
         {
@@ -182,11 +182,11 @@ export default {
       return [
         {
           label: this.$t("ui.tq.machineSpecSpeed.column.machineCode"),
-          prop: "machineId",
+          prop: "machineCode",
           type: "select",
           dictData: this.machineList,
-          labelKey: "machineCode",
-          valueKey: "id",
+          labelKey: "machineName",
+          valueKey: "machineCode",
           filterable: true,
           clearable: true,
         },

@@ -4,21 +4,33 @@ import cn.hutool.core.date.DateUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.zlt.aps.common.core.constant.ApsConstant;
+import com.zlt.aps.common.engine.service.FactoryService;
+import com.zlt.aps.itf.mes.IMesItfService;
 import com.zlt.aps.tq.api.domain.dto.TqChangeMachineDTO;
 import com.zlt.aps.tq.api.domain.dto.TqInsertOrderDTO;
+import com.zlt.aps.tq.api.domain.entity.TqDispatcherLog;
 import com.zlt.aps.tq.api.domain.entity.TqNewScheduleResult;
+import com.zlt.aps.tq.api.domain.entity.TqScheduleResultIssue;
+import com.zlt.aps.tq.engine.vo.RollingUpdateResult;
 import com.zlt.aps.tq.mapper.TqNewScheduleResultMapper;
 import com.zlt.aps.tq.service.ITqNewScheduleResultService;
+import com.zlt.aps.tq.service.ITqRollingUpdateService;
+import com.zlt.aps.tq.service.TqDispatcherLogService;
 import com.zlt.bill.common.service.AbstractDocService;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.ObjectUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Date;
-import java.util.List;
-import java.util.Objects;
+import javax.annotation.Resource;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * 胎圈排程结果Service实现类（新版）
@@ -31,6 +43,24 @@ public class TqNewScheduleResultServiceImpl extends AbstractDocService<TqNewSche
 
     @Autowired
     private TqNewScheduleResultMapper tqNewScheduleResultMapper;
+
+    @Autowired
+    private IMesItfService mesItfService;
+
+    @Autowired
+    private FactoryService factoryService;
+
+    /**
+     * 胎圈排程滚动更新服务（用于插单/调量/转机台/删除后触发同班次内时间重算）
+     */
+    @Resource
+    private ITqRollingUpdateService tqRollingUpdateService;
+
+    /**
+     * 胎圈调度员排程操作日志服务（用于记录6班次制操作日志）
+     */
+    @Autowired
+    private TqDispatcherLogService tqDispatcherLogService;
 
     @Override
     public String getDocTypeCode() {
@@ -182,11 +212,14 @@ public class TqNewScheduleResultServiceImpl extends AbstractDocService<TqNewSche
         // 插入数据库
         tqNewScheduleResultMapper.insert(entity);
 
-        // TODO: 滚动更新后续排程
+        // 滚动更新：对每个有计划量的班次执行同班次内时间重算
+        triggerRollingUpdateForAllShifts("1", entity.getId(), entity);
+
+        // 记录调度日志（6班次制，操作类型：2-插单，无操作前数据）
+        recordDispatcherLog(ApsConstant.DISPATCHER_OPER_INSERT_ORDER, entity, null, entity);
+
         log.info("胎圈排程插单成功，排程日期：{}，胎圈代码：{}，机台：{}",
                 dto.getScheduleDate(), dto.getBeadCode(), dto.getMachineCode());
-
-        // TODO: 记录排程修改日志
 
         return AjaxResult.success("插单成功");
     }
@@ -251,26 +284,183 @@ public class TqNewScheduleResultServiceImpl extends AbstractDocService<TqNewSche
 
         tqNewScheduleResultMapper.update(null, updateWrapper);
 
-        // TODO: 记录排程修改日志（修改时间、修改人、修改栏位、修改前、修改后）
+        // 滚动更新：原机台和新机台都需要重算（每个有计划量的班次）
+        // 原机台：删除任务后重算
+        triggerRollingUpdateForAllShifts("2", dto.getId(), record);
+        // 新机台：新增任务后重算
+        TqNewScheduleResult newMachineRecord = new TqNewScheduleResult();
+        newMachineRecord.setId(record.getId());
+        newMachineRecord.setScheduleDate(record.getScheduleDate());
+        newMachineRecord.setMachineCode(dto.getNewMachineCode());
+        newMachineRecord.setBeadCode(record.getBeadCode());
+        newMachineRecord.setClass1PlanQty(record.getClass1PlanQty());
+        newMachineRecord.setClass2PlanQty(record.getClass2PlanQty());
+        newMachineRecord.setClass3PlanQty(record.getClass3PlanQty());
+        newMachineRecord.setClass4PlanQty(record.getClass4PlanQty());
+        newMachineRecord.setClass5PlanQty(record.getClass5PlanQty());
+        newMachineRecord.setClass6PlanQty(record.getClass6PlanQty());
+        triggerRollingUpdateForAllShifts("2", dto.getId(), newMachineRecord);
+
+        // 记录调度日志（6班次制，操作类型：0-转机台，操作前=原机台记录，操作后=新机台记录）
+        recordDispatcherLog(ApsConstant.DISPATCHER_OPER_MACHINE, record, record, newMachineRecord);
+
         log.info("胎圈排程转机台成功，id：{}，原机台：{}，新机台：{}",
                 dto.getId(), oldMachineCode, dto.getNewMachineCode());
-
-        // TODO: 滚动更新原机台和新机台的后续排程
 
         return AjaxResult.success("转机台成功");
     }
 
     /**
+     * 调量前校验
+     * 校验规则：
+     * 1. 排程记录必须存在且未删除
+     * 2. 至少有一个班次的计划量被修改
+     * 3. 计划量不能小于0
+     * 4. 历史班次不允许修改计划量（根据当前时间和排程日期判断）
+     * 5. 非历史班次的计划量不能小于完成量
+     *
+     * @param entity 调量数据
+     * @return 校验结果
+     */
+    @Override
+    public AjaxResult validateChangeQty(TqNewScheduleResult entity) {
+        if (entity == null || entity.getId() == null) {
+            return AjaxResult.error("请选择需要调量的排程记录");
+        }
+
+        TqNewScheduleResult record = tqNewScheduleResultMapper.selectById(entity.getId());
+        if (record == null || Objects.equals(record.getIsDelete(), 1)) {
+            return AjaxResult.error("排程记录不存在或已删除");
+        }
+
+        Date now = new Date();
+        boolean hasAdjustField = false;
+        List<String> errorMessages = new ArrayList<>();
+
+        for (int shiftIndex = 1; shiftIndex <= 6; shiftIndex++) {
+            Integer newPlanQty = getPlanQtyByShiftIndex(entity, shiftIndex);
+            Integer oldPlanQty = getPlanQtyByShiftIndex(record, shiftIndex);
+
+            // 只检查被修改的班次
+            if (newPlanQty == null || Objects.equals(newPlanQty, oldPlanQty)) {
+                continue;
+            }
+
+            hasAdjustField = true;
+
+            // 规则3：计划量不能小于0
+            if (newPlanQty < 0) {
+                errorMessages.add(String.format("第%d班计划量不能小于0", shiftIndex));
+                continue;
+            }
+
+            // 判断是否为历史班次
+            boolean historyShift = isHistoryShift(record, shiftIndex, now);
+
+            if (historyShift) {
+                // 规则4：历史班次不允许修改
+                errorMessages.add(String.format("不能修改历史班次（第%d班）的计划量", shiftIndex));
+            } else {
+                // 规则5：非历史班次计划量不能小于完成量
+                Integer finishQty = getFinishQtyByShiftIndex(record, shiftIndex);
+                if (finishQty != null && finishQty > 0 && newPlanQty < finishQty) {
+                    errorMessages.add(String.format("第%d班计划量不能小于完成量%d", shiftIndex, finishQty));
+                }
+            }
+        }
+
+        if (!hasAdjustField) {
+            errorMessages.add("未检测到需要调整的计划量");
+        }
+
+        if (!errorMessages.isEmpty()) {
+            return AjaxResult.error(String.join("；", errorMessages));
+        }
+
+        return AjaxResult.success("校验通过");
+    }
+
+    /**
      * 调量
+     * 业务逻辑：
+     * 1. 前置校验
+     * 2. 更新各班次计划量和原因分析
+     * 3. 如果原排程已发布成功，更新发布状态为待发布
+     * 4. 记录操作日志
      *
      * @param entity 调量数据
      * @return 结果
      */
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public AjaxResult changeQty(TqNewScheduleResult entity) {
-        // TODO 调量业务逻辑待实现
-        log.info("胎圈排程调量，id：{}", entity.getId());
-        return AjaxResult.success();
+        // 1. 前置校验
+        AjaxResult validateResult = validateChangeQty(entity);
+        if (!validateResult.get(AjaxResult.CODE_TAG).equals(200)) {
+            return validateResult;
+        }
+
+        // 2. 查询原记录
+        TqNewScheduleResult record = tqNewScheduleResultMapper.selectById(entity.getId());
+        if (record == null) {
+            return AjaxResult.error("排程记录不存在或已删除");
+        }
+
+        // 3. 构建更新wrapper
+        LambdaUpdateWrapper<TqNewScheduleResult> updateWrapper = new LambdaUpdateWrapper<>();
+        updateWrapper.eq(TqNewScheduleResult::getId, entity.getId());
+
+        boolean hasChange = false;
+
+        // 4. 更新各班次计划量和原因分析
+        for (int shiftIndex = 1; shiftIndex <= 6; shiftIndex++) {
+            Integer newPlanQty = getPlanQtyByShiftIndex(entity, shiftIndex);
+            Integer oldPlanQty = getPlanQtyByShiftIndex(record, shiftIndex);
+            String newAnalysis = getAnalysisByShiftIndex(entity, shiftIndex);
+            String oldAnalysis = getAnalysisByShiftIndex(record, shiftIndex);
+
+            // 更新被修改的计划量
+            if (newPlanQty != null && !Objects.equals(newPlanQty, oldPlanQty)) {
+                setPlanQtyToUpdateWrapper(updateWrapper, shiftIndex, newPlanQty);
+                hasChange = true;
+            }
+
+            // 更新原因分析（非空且与原值不同时更新）
+            if (newAnalysis != null && !newAnalysis.equals(oldAnalysis)) {
+                setAnalysisToUpdateWrapper(updateWrapper, shiftIndex, newAnalysis);
+                hasChange = true;
+            }
+        }
+
+        if (!hasChange) {
+            return AjaxResult.error("没有需要保存的修改内容");
+        }
+
+        // 5. 更新备注
+        if (entity.getRemark() != null && !entity.getRemark().equals(record.getRemark())) {
+            updateWrapper.set(TqNewScheduleResult::getRemark, entity.getRemark());
+        }
+
+        // 6. 状态更新：如果原排程已发布成功（isRelease=1），更新为待发布（isRelease=0）
+        // 发布状态：0-未发布，1-已发布，2-发布失败，3-待发布
+        if ("1".equals(record.getIsRelease())) {
+            updateWrapper.set(TqNewScheduleResult::getIsRelease, "3");
+        }
+
+        // 7. 执行更新
+        tqNewScheduleResultMapper.update(null, updateWrapper);
+
+        log.info("胎圈排程调量成功，id：{}，胎圈代码：{}，机台：{}",
+                entity.getId(), record.getBeadCode(), record.getMachineCode());
+
+        // 8. 滚动更新：对每个被修改的班次执行同班次内时间重算
+        triggerRollingUpdateForAllShifts("3", entity.getId(), record);
+
+        // 9. 记录调度日志（6班次制，操作类型：1-调量，操作前=原记录，操作后=更新后记录）
+        TqNewScheduleResult afterRecord = tqNewScheduleResultMapper.selectById(entity.getId());
+        recordDispatcherLog(ApsConstant.DISPATCHER_OPER_PLAN, record, record, afterRecord);
+
+        return AjaxResult.success("调量成功");
     }
 
     /**
@@ -303,8 +493,12 @@ public class TqNewScheduleResultServiceImpl extends AbstractDocService<TqNewSche
                     .set(TqNewScheduleResult::getIsDelete, 1);
             tqNewScheduleResultMapper.update(null, updateWrapper);
 
-            // TODO: 滚动更新后续排程
-            // TODO: 记录排程修改日志
+            // 滚动更新：删除后对每个有计划量的班次执行同班次内时间重算
+            triggerRollingUpdateForAllShifts("4", id, record);
+
+            // 记录调度日志（6班次制，操作类型：3-删除，操作前=原记录，操作后=null）
+            recordDispatcherLog(ApsConstant.DISPATCHER_OPER_DELETE, record, record, null);
+
             log.info("胎圈排程逻辑删除成功，id：{}，胎圈代码：{}", id, record.getBeadCode());
         }
 
@@ -313,15 +507,215 @@ public class TqNewScheduleResultServiceImpl extends AbstractDocService<TqNewSche
 
     /**
      * 发布排程到MES
+     * 业务流程：
+     * 1. 查询排程日期下所有未发布/发布失败/待发布的胎圈排程记录
+     * 2. 校验机台是否已分配
+     * 3. 将6班数据拆分为3天的TqScheduleResultIssue列表（D日/D+1日/D+2日）
+     * 4. 通过Feign调用itf服务的issueTqScheduleResult接口下发到MES
+     * 5. 根据返回结果更新发布状态
+     *
+     * 6班→3天拆分映射：
+     * Day1(D日)：MID=胎圈1班, NIGHT=null, DAY=null
+     * Day2(D+1日)：NIGHT=胎圈2班, DAY=胎圈3班, MID=胎圈4班
+     * Day3(D+2日)：NIGHT=胎圈5班, DAY=胎圈6班, MID=null
+     * CX_CLASS3~8_PLAN全量传递到每条记录
      *
      * @param queryVO 查询条件（含排程日期等）
      * @return 结果
      */
     @Override
     public AjaxResult publish(TqNewScheduleResult queryVO) {
-        // TODO 发布业务逻辑待实现
-        log.info("胎圈排程发布，排程日期：{}", queryVO.getScheduleDateQuery());
-        return AjaxResult.success();
+        Date scheduleDate = queryVO.getScheduleDateQuery();
+        if (scheduleDate == null) {
+            return AjaxResult.error("排程日期不能为空");
+        }
+        log.info("胎圈排程发布，排程日期：{}", scheduleDate);
+
+        // 1. 查询该排程日期下所有未发布/发布失败/待发布的记录
+        LambdaQueryWrapper<TqNewScheduleResult> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(TqNewScheduleResult::getIsDelete, 0);
+        wrapper.eq(TqNewScheduleResult::getScheduleDate, scheduleDate);
+        wrapper.in(TqNewScheduleResult::getIsRelease,
+                ApsConstant.NO_RELEASE, ApsConstant.FAILURE_RELEASE, ApsConstant.WAIT_RELEASING);
+        List<TqNewScheduleResult> scheduleList = tqNewScheduleResultMapper.selectList(wrapper);
+
+        if (CollectionUtils.isEmpty(scheduleList)) {
+            return AjaxResult.error("没有需要发布的排程数据");
+        }
+
+        // 2. 校验机台是否已分配
+        List<TqNewScheduleResult> noMachineList = scheduleList.stream()
+                .filter(s -> StringUtils.isBlank(s.getMachineCode()))
+                .collect(Collectors.toList());
+        if (CollectionUtils.isNotEmpty(noMachineList)) {
+            return AjaxResult.error("存在未分配机台的排程记录，请先分配机台");
+        }
+
+        // 3. 将6班数据拆分为3天的下发列表
+        List<TqScheduleResultIssue> issueList = new ArrayList<>();
+        for (TqNewScheduleResult source : scheduleList) {
+            // D日 = 排程日期 - 2
+            Date dDay = DateUtil.offsetDay(scheduleDate, -2);
+            Date dPlus1Day = DateUtil.offsetDay(scheduleDate, -1);
+            Date dPlus2Day = scheduleDate;
+
+            // Day1(D日)：胎圈1班→MES中班
+            TqScheduleResultIssue day1Issue = buildDay1Issue(source, dDay);
+            issueList.add(day1Issue);
+
+            // Day2(D+1日)：胎圈2班→MES夜班, 胎圈3班→MES早班, 胎圈4班→MES中班
+            TqScheduleResultIssue day2Issue = buildDay2Issue(source, dPlus1Day);
+            issueList.add(day2Issue);
+
+            // Day3(D+2日)：胎圈5班→MES夜班, 胎圈6班→MES早班
+            TqScheduleResultIssue day3Issue = buildDay3Issue(source, dPlus2Day);
+            issueList.add(day3Issue);
+        }
+
+        // 4. 更新发布状态为"发布中"
+        List<Long> ids = scheduleList.stream().map(TqNewScheduleResult::getId).collect(Collectors.toList());
+        LambdaUpdateWrapper<TqNewScheduleResult> updateWrapper = new LambdaUpdateWrapper<>();
+        updateWrapper.in(TqNewScheduleResult::getId, ids);
+        updateWrapper.set(TqNewScheduleResult::getIsRelease, ApsConstant.RELEASING);
+        tqNewScheduleResultMapper.update(null, updateWrapper);
+
+        // 5. 通过Feign调用itf服务下发到MES
+        AjaxResult ajaxResult;
+        try {
+            ajaxResult = mesItfService.issueTqScheduleResult(issueList);
+            // 根据返回结果更新发布状态
+            String status = ajaxResult.get(AjaxResult.CODE_TAG).equals(200)
+                    ? ApsConstant.IS_RELEASE
+                    : ApsConstant.FAILURE_RELEASE;
+            LambdaUpdateWrapper<TqNewScheduleResult> resultWrapper = new LambdaUpdateWrapper<>();
+            resultWrapper.in(TqNewScheduleResult::getId, ids);
+            resultWrapper.set(TqNewScheduleResult::getIsRelease, status);
+            tqNewScheduleResultMapper.update(null, resultWrapper);
+        } catch (Exception e) {
+            log.error("胎圈排程发布失败", e);
+            // 发布失败，更新状态
+            LambdaUpdateWrapper<TqNewScheduleResult> errorWrapper = new LambdaUpdateWrapper<>();
+            errorWrapper.in(TqNewScheduleResult::getId, ids);
+            errorWrapper.set(TqNewScheduleResult::getIsRelease, ApsConstant.FAILURE_RELEASE);
+            tqNewScheduleResultMapper.update(null, errorWrapper);
+            return AjaxResult.error("胎圈排程发布失败：" + e.getMessage());
+        }
+
+        return ajaxResult;
+    }
+
+    /**
+     * 构建D日（今天）下发数据
+     * 胎圈1班(D日中班) → MES中班(MID_PLAN_QTY)
+     * 夜班、早班已过不下发，NEXT_MID不下发
+     *
+     * @param source 胎圈排程结果
+     * @param dDay   D日日期
+     * @return D日下发对象
+     */
+    private TqScheduleResultIssue buildDay1Issue(TqNewScheduleResult source, Date dDay) {
+        TqScheduleResultIssue issue = buildBaseIssue(source, dDay);
+        // 胎圈1班→MES中班
+        issue.setMidPlanQty(source.getClass1PlanQty() != null ? source.getClass1PlanQty().doubleValue() : null);
+        issue.setMidProduceOrder(source.getClass1Sequence());
+        // 夜班、早班已过不下发
+        issue.setNightPlanQty(null);
+        issue.setNightProduceOrder(null);
+        issue.setDayPlanQty(null);
+        issue.setDayProduceOrder(null);
+        issue.setNextMidPlanQty(null);
+        issue.setNextMidProduceOrder(null);
+        return issue;
+    }
+
+    /**
+     * 构建D+1日（明天）下发数据
+     * 胎圈2班(D+1日夜班) → MES夜班(NIGHT_PLAN_QTY)
+     * 胎圈3班(D+1日早班) → MES早班(DAY_PLAN_QTY)
+     * 胎圈4班(D+1日中班) → MES中班(MID_PLAN_QTY)
+     * NEXT_MID不下发
+     *
+     * @param source    胎圈排程结果
+     * @param dPlus1Day D+1日日期
+     * @return D+1日下发对象
+     */
+    private TqScheduleResultIssue buildDay2Issue(TqNewScheduleResult source, Date dPlus1Day) {
+        TqScheduleResultIssue issue = buildBaseIssue(source, dPlus1Day);
+        // 胎圈2班→MES夜班
+        issue.setNightPlanQty(source.getClass2PlanQty() != null ? source.getClass2PlanQty().doubleValue() : null);
+        issue.setNightProduceOrder(source.getClass2Sequence());
+        // 胎圈3班→MES早班
+        issue.setDayPlanQty(source.getClass3PlanQty() != null ? source.getClass3PlanQty().doubleValue() : null);
+        issue.setDayProduceOrder(source.getClass3Sequence());
+        // 胎圈4班→MES中班
+        issue.setMidPlanQty(source.getClass4PlanQty() != null ? source.getClass4PlanQty().doubleValue() : null);
+        issue.setMidProduceOrder(source.getClass4Sequence());
+        // NEXT_MID不下发
+        issue.setNextMidPlanQty(null);
+        issue.setNextMidProduceOrder(null);
+        return issue;
+    }
+
+    /**
+     * 构建D+2日（后天）下发数据
+     * 胎圈5班(D+2日夜班) → MES夜班(NIGHT_PLAN_QTY)
+     * 胎圈6班(D+2日早班) → MES早班(DAY_PLAN_QTY)
+     * 中班尚未排产不下发，NEXT_MID不下发
+     *
+     * @param source    胎圈排程结果
+     * @param dPlus2Day D+2日日期
+     * @return D+2日下发对象
+     */
+    private TqScheduleResultIssue buildDay3Issue(TqNewScheduleResult source, Date dPlus2Day) {
+        TqScheduleResultIssue issue = buildBaseIssue(source, dPlus2Day);
+        // 胎圈5班→MES夜班
+        issue.setNightPlanQty(source.getClass5PlanQty() != null ? source.getClass5PlanQty().doubleValue() : null);
+        issue.setNightProduceOrder(source.getClass5Sequence());
+        // 胎圈6班→MES早班
+        issue.setDayPlanQty(source.getClass6PlanQty() != null ? source.getClass6PlanQty().doubleValue() : null);
+        issue.setDayProduceOrder(source.getClass6Sequence());
+        // 中班尚未排产不下发
+        issue.setMidPlanQty(null);
+        issue.setMidProduceOrder(null);
+        issue.setNextMidPlanQty(null);
+        issue.setNextMidProduceOrder(null);
+        return issue;
+    }
+
+    /**
+     * 构建基础下发对象（公共字段+成型3~8班计划量全量传递）
+     *
+     * @param source       胎圈排程结果
+     * @param scheduleDate MES目标日期
+     * @return 基础下发对象
+     */
+    private TqScheduleResultIssue buildBaseIssue(TqNewScheduleResult source, Date scheduleDate) {
+        TqScheduleResultIssue issue = new TqScheduleResultIssue();
+        // 日期转换：Date → LocalDate
+        issue.setScheduleDate(scheduleDate.toInstant().atZone(ZoneId.systemDefault()).toLocalDate());
+        // 基础信息
+        issue.setCxBatchNo(source.getCxBatchNo());
+        issue.setBatchNo(source.getBatchNo());
+        issue.setOrderNo(source.getOrderNo());
+        // 物料信息
+        issue.setBeadCode(source.getBeadCode());
+        issue.setSteelRingCode(source.getSteelRingCode());
+        issue.setTriangleGlueCode(source.getTriangleGlueCode());
+        issue.setSpecSize(source.getProSize());
+        issue.setMachineCode(source.getMachineCode());
+        // 库存信息
+        issue.setStockQty(source.getStockQty() != null ? source.getStockQty().doubleValue() : null);
+        // 成型3~8班计划量全量传递（MES通过这些字段理解胎圈与成型的供应关系）
+        // TODO: 成型3~8班计划量需从成型排程结果中获取，暂设为null
+        issue.setCxClass3Plan(null);
+        issue.setCxClass4Plan(null);
+        issue.setCxClass5Plan(null);
+        issue.setCxClass6Plan(null);
+        issue.setCxClass7Plan(null);
+        issue.setCxClass8Plan(null);
+        // 状态
+        issue.setProductionStatus(ApsConstant.NO_PRODUNTION);
+        return issue;
     }
 
     /**
@@ -337,6 +731,62 @@ public class TqNewScheduleResultServiceImpl extends AbstractDocService<TqNewSche
     }
 
     // ==================== 私有方法 ====================
+
+    /**
+     * 记录调度员排程操作日志（6班次制）
+     *
+     * <p>统一封装调度日志写入逻辑，覆盖4种操作类型：
+     * <ul>
+     *   <li>0-转机台：beforeRecord为原机台记录，afterRecord为新机台记录</li>
+     *   <li>1-调量：beforeRecord为原记录，afterRecord为更新后记录</li>
+     *   <li>2-插单：beforeRecord为null，afterRecord为新增记录</li>
+     *   <li>3-删除：beforeRecord为原记录，afterRecord为null</li>
+     * </ul>
+     * 日志异常不影响主操作，仅记录错误日志。
+     *
+     * @param operType     操作类型：0-转机台、1-调量、2-插单、3-删除
+     * @param baseRecord   基础记录（用于获取排程日期、胎圈代码、排程记录ID等公共字段）
+     * @param beforeRecord 操作前记录（用于填充before*字段，插单时为null）
+     * @param afterRecord  操作后记录（用于填充after*字段，删除时为null）
+     */
+    private void recordDispatcherLog(String operType, TqNewScheduleResult baseRecord,
+                                     TqNewScheduleResult beforeRecord, TqNewScheduleResult afterRecord) {
+        try {
+            if (baseRecord == null) {
+                log.warn("记录调度日志跳过：baseRecord为空");
+                return;
+            }
+            TqDispatcherLog dispatcherLog = new TqDispatcherLog();
+            dispatcherLog.setOperType(operType);
+            dispatcherLog.setScheduleId(baseRecord.getId());
+            dispatcherLog.setScheduleDate(baseRecord.getScheduleDate());
+            dispatcherLog.setBeadCode(baseRecord.getBeadCode());
+            // 操作前机台编码和6班次计划量
+            if (beforeRecord != null) {
+                dispatcherLog.setBeforeMachineCode(beforeRecord.getMachineCode());
+                dispatcherLog.setBeforeClass1Plan(beforeRecord.getClass1PlanQty());
+                dispatcherLog.setBeforeClass2Plan(beforeRecord.getClass2PlanQty());
+                dispatcherLog.setBeforeClass3Plan(beforeRecord.getClass3PlanQty());
+                dispatcherLog.setBeforeClass4Plan(beforeRecord.getClass4PlanQty());
+                dispatcherLog.setBeforeClass5Plan(beforeRecord.getClass5PlanQty());
+                dispatcherLog.setBeforeClass6Plan(beforeRecord.getClass6PlanQty());
+            }
+            // 操作后机台编码和6班次计划量
+            if (afterRecord != null) {
+                dispatcherLog.setAfterMachineCode(afterRecord.getMachineCode());
+                dispatcherLog.setAfterClass1Plan(afterRecord.getClass1PlanQty());
+                dispatcherLog.setAfterClass2Plan(afterRecord.getClass2PlanQty());
+                dispatcherLog.setAfterClass3Plan(afterRecord.getClass3PlanQty());
+                dispatcherLog.setAfterClass4Plan(afterRecord.getClass4PlanQty());
+                dispatcherLog.setAfterClass5Plan(afterRecord.getClass5PlanQty());
+                dispatcherLog.setAfterClass6Plan(afterRecord.getClass6PlanQty());
+            }
+            tqDispatcherLogService.insertTqDispatcherLog(dispatcherLog);
+        } catch (Exception e) {
+            // 日志记录失败不影响主操作
+            log.error("记录胎圈调度日志失败，operType：{}，scheduleId：{}", operType, baseRecord.getId(), e);
+        }
+    }
 
     /**
      * 根据班次索引获取DTO中的计划量
@@ -431,5 +881,202 @@ public class TqNewScheduleResultServiceImpl extends AbstractDocService<TqNewSche
             minSeq = Math.min(minSeq, secondRecord.getClass6Sequence());
         }
         return minSeq == Integer.MAX_VALUE ? 1 : minSeq;
+    }
+
+    /**
+     * 触发滚动更新（遍历6个班次，对有计划量的班次执行同班次内时间重算）
+     *
+     * <p>MVP阶段：仅同班次内时间重算，不跨班次推迟。</p>
+     * <p>异常处理：滚动更新失败不影响主操作（已插入/修改的数据保留），
+     * 仅记录日志，提示用户重试。</p>
+     *
+     * @param triggerType 触发类型：1-插单，2-转机台，3-调量，4-删除
+     * @param sourceId    触发源排程记录ID
+     * @param record      排程记录（含机台、胎圈、6班计划量）
+     */
+    private void triggerRollingUpdateForAllShifts(String triggerType, Long sourceId, TqNewScheduleResult record) {
+        if (record == null || record.getScheduleDate() == null || StringUtils.isBlank(record.getMachineCode())) {
+            log.warn("触发滚动更新跳过：排程记录信息不完整，sourceId={}", sourceId);
+            return;
+        }
+
+        for (int shiftIndex = 1; shiftIndex <= 6; shiftIndex++) {
+            Integer planQty = getPlanQtyByShiftIndex(record, shiftIndex);
+            // 仅对有计划量的班次触发滚动更新
+            if (planQty == null || planQty <= 0) {
+                continue;
+            }
+            try {
+                RollingUpdateResult result = tqRollingUpdateService.manualRollingUpdate(
+                        triggerType, sourceId, record.getScheduleDate(),
+                        shiftIndex, record.getMachineCode(), record.getBeadCode());
+                if (result.isSuccess()) {
+                    log.info("滚动更新成功，班次：{}，影响记录数：{}", shiftIndex, result.getAffectedCount());
+                } else {
+                    log.warn("滚动更新失败，班次：{}，原因：{}", shiftIndex, result.getErrorMsg());
+                }
+            } catch (Exception e) {
+                // 滚动更新失败不影响主操作，仅记录日志
+                log.error("滚动更新异常，班次：{}，sourceId：{}，原因：{}", shiftIndex, sourceId, e.getMessage(), e);
+            }
+        }
+    }
+
+    /**
+     * 根据班次索引获取实体中的计划量
+     *
+     * @param entity     排程结果实体
+     * @param shiftIndex 班次索引（1~6）
+     * @return 计划量
+     */
+    private Integer getPlanQtyByShiftIndex(TqNewScheduleResult entity, int shiftIndex) {
+        switch (shiftIndex) {
+            case 1: return entity.getClass1PlanQty();
+            case 2: return entity.getClass2PlanQty();
+            case 3: return entity.getClass3PlanQty();
+            case 4: return entity.getClass4PlanQty();
+            case 5: return entity.getClass5PlanQty();
+            case 6: return entity.getClass6PlanQty();
+            default: return null;
+        }
+    }
+
+    /**
+     * 根据班次索引获取实体中的完成量
+     *
+     * @param entity     排程结果实体
+     * @param shiftIndex 班次索引（1~6）
+     * @return 完成量
+     */
+    private Integer getFinishQtyByShiftIndex(TqNewScheduleResult entity, int shiftIndex) {
+        switch (shiftIndex) {
+            case 1: return entity.getClass1FinishQty();
+            case 2: return entity.getClass2FinishQty();
+            case 3: return entity.getClass3FinishQty();
+            case 4: return entity.getClass4FinishQty();
+            case 5: return entity.getClass5FinishQty();
+            case 6: return entity.getClass6FinishQty();
+            default: return null;
+        }
+    }
+
+    /**
+     * 根据班次索引获取实体中的原因分析
+     *
+     * @param entity     排程结果实体
+     * @param shiftIndex 班次索引（1~6）
+     * @return 原因分析
+     */
+    private String getAnalysisByShiftIndex(TqNewScheduleResult entity, int shiftIndex) {
+        switch (shiftIndex) {
+            case 1: return entity.getClass1Analysis();
+            case 2: return entity.getClass2Analysis();
+            case 3: return entity.getClass3Analysis();
+            case 4: return entity.getClass4Analysis();
+            case 5: return entity.getClass5Analysis();
+            case 6: return entity.getClass6Analysis();
+            default: return null;
+        }
+    }
+
+    /**
+     * 设置指定班次计划量到UpdateWrapper
+     *
+     * @param updateWrapper 更新条件
+     * @param shiftIndex    班次索引（1~6）
+     * @param planQty       计划量
+     */
+    private void setPlanQtyToUpdateWrapper(LambdaUpdateWrapper<TqNewScheduleResult> updateWrapper,
+                                           int shiftIndex, Integer planQty) {
+        switch (shiftIndex) {
+            case 1: updateWrapper.set(TqNewScheduleResult::getClass1PlanQty, planQty); break;
+            case 2: updateWrapper.set(TqNewScheduleResult::getClass2PlanQty, planQty); break;
+            case 3: updateWrapper.set(TqNewScheduleResult::getClass3PlanQty, planQty); break;
+            case 4: updateWrapper.set(TqNewScheduleResult::getClass4PlanQty, planQty); break;
+            case 5: updateWrapper.set(TqNewScheduleResult::getClass5PlanQty, planQty); break;
+            case 6: updateWrapper.set(TqNewScheduleResult::getClass6PlanQty, planQty); break;
+            default: break;
+        }
+    }
+
+    /**
+     * 设置指定班次原因分析到UpdateWrapper
+     *
+     * @param updateWrapper 更新条件
+     * @param shiftIndex    班次索引（1~6）
+     * @param analysis      原因分析
+     */
+    private void setAnalysisToUpdateWrapper(LambdaUpdateWrapper<TqNewScheduleResult> updateWrapper,
+                                            int shiftIndex, String analysis) {
+        switch (shiftIndex) {
+            case 1: updateWrapper.set(TqNewScheduleResult::getClass1Analysis, analysis); break;
+            case 2: updateWrapper.set(TqNewScheduleResult::getClass2Analysis, analysis); break;
+            case 3: updateWrapper.set(TqNewScheduleResult::getClass3Analysis, analysis); break;
+            case 4: updateWrapper.set(TqNewScheduleResult::getClass4Analysis, analysis); break;
+            case 5: updateWrapper.set(TqNewScheduleResult::getClass5Analysis, analysis); break;
+            case 6: updateWrapper.set(TqNewScheduleResult::getClass6Analysis, analysis); break;
+            default: break;
+        }
+    }
+
+    /**
+     * 判断指定班次是否已成为历史班次
+     * 胎圈排程6班次时间窗口：
+     * 1班：D日中班(16:00-24:00)
+     * 2班：D+1日夜班(00:00-08:00)
+     * 3班：D+1日早班(08:00-16:00)
+     * 4班：D+1日中班(16:00-24:00)
+     * 5班：D+2日夜班(00:00-08:00)
+     * 6班：D+2日早班(08:00-16:00)
+     * D = 排程日期 - 2（即今天）
+     *
+     * @param record     排程结果记录
+     * @param shiftIndex 班次索引（1~6）
+     * @param now        当前时间
+     * @return true表示班次已结束，属于历史班次
+     */
+    private boolean isHistoryShift(TqNewScheduleResult record, int shiftIndex, Date now) {
+        if (record.getScheduleDate() == null) {
+            return false;
+        }
+        // D = 排程日期 - 2
+        Date dDay = DateUtil.beginOfDay(DateUtil.offsetDay(record.getScheduleDate(), -2));
+        Date shiftEndTime = resolveShiftEndTime(dDay, shiftIndex);
+        if (shiftEndTime == null) {
+            return false;
+        }
+        return !now.before(shiftEndTime);
+    }
+
+    /**
+     * 根据D日和班次索引推导班次结束时间
+     *
+     * @param dDay       D日（排程日期-2）
+     * @param shiftIndex 班次索引（1~6）
+     * @return 班次结束时间
+     */
+    private Date resolveShiftEndTime(Date dDay, int shiftIndex) {
+        switch (shiftIndex) {
+            case 1:
+                // 1班：D日中班(16:00-24:00)，结束时间=D日24:00=D+1日00:00
+                return DateUtil.endOfDay(dDay);
+            case 2:
+                // 2班：D+1日夜班(00:00-08:00)，结束时间=D+1日08:00
+                return DateUtil.offsetHour(DateUtil.beginOfDay(DateUtil.offsetDay(dDay, 1)), 8);
+            case 3:
+                // 3班：D+1日早班(08:00-16:00)，结束时间=D+1日16:00
+                return DateUtil.offsetHour(DateUtil.beginOfDay(DateUtil.offsetDay(dDay, 1)), 16);
+            case 4:
+                // 4班：D+1日中班(16:00-24:00)，结束时间=D+1日24:00=D+2日00:00
+                return DateUtil.endOfDay(DateUtil.offsetDay(dDay, 1));
+            case 5:
+                // 5班：D+2日夜班(00:00-08:00)，结束时间=D+2日08:00
+                return DateUtil.offsetHour(DateUtil.beginOfDay(DateUtil.offsetDay(dDay, 2)), 8);
+            case 6:
+                // 6班：D+2日早班(08:00-16:00)，结束时间=D+2日16:00
+                return DateUtil.offsetHour(DateUtil.beginOfDay(DateUtil.offsetDay(dDay, 2)), 16);
+            default:
+                return null;
+        }
     }
 }

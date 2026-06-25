@@ -23,56 +23,51 @@
       <template slot="header">
         <el-button
           type="warning"
-          v-hasPermi="['nc:ncScheduleResult:autoPlan']"
+          v-hasPermi="['dj:djScheduleResult:autoPlan']"
           @click="handleAutoPlan"
           >{{ $t("ui.data.column.scheduleResult.autoPlan") }}</el-button
         >
         <el-button
           type="warning"
-          v-hasPermi="['nc:ncScheduleResult:add']"
+          v-hasPermi="['dj:djScheduleResult:add']"
           @click="handleAdd"
           >{{ $t("ui.data.column.scheduleResult.insertOrder") }}</el-button
         >
         <el-button
           type="warning"
-          @click="() => handleEdit(selection[0])"
-          v-hasPermi="['nc:ncScheduleResult:edit']"
+          @click="handleEdit()"
+          :disabled="selection.length !== 1"
+          v-hasPermi="['dj:djScheduleResult:edit']"
           >{{ $t("ui.frame.btn.modify") }}</el-button
         >
         <el-button
           type="danger"
           :disabled="selection.length === 0"
-          v-hasPermi="['nc:ncScheduleResult:remove']"
+          v-hasPermi="['dj:djScheduleResult:remove']"
           @click="handleDelete"
           >{{ $t("ui.frame.btn.delete") }}</el-button
         >
         <el-button
-          v-hasPermi="['nc:ncScheduleResult:changeMachine']"
+          v-hasPermi="['dj:djScheduleResult:changeMachine']"
           type="primary"
           :disabled="selection.length === 0"
           @click="handleChangeMachine"
           >{{ $t("ui.data.column.scheduleResult.changeMachine") }}</el-button
         >
         <el-button
-          v-hasPermi="['nc:ncScheduleResult:changePlan']"
-          type="primary"
-          @click="handleChangePlan"
-          >{{ $t("ui.data.column.scheduleResult.changePlan") }}</el-button
-        >
-        <el-button
-          v-hasPermi="['nc:ncScheduleResult:balance']"
+          v-hasPermi="['dj:djScheduleResult:balance']"
           type="primary"
           @click="handleBalance"
           >{{ $t("ui.data.column.scheduleResult.balance") }}</el-button
         >
         <el-button
-          v-hasPermi="['nc:ncScheduleResult:mergeProduct']"
+          v-hasPermi="['dj:djScheduleResult:mergeProduct']"
           type="primary"
           @click="handleMergeProduct"
           >{{ $t("ui.data.column.scheduleResult.mergeProduct") }}</el-button
         >
         <el-button
-          v-hasPermi="['nc:ncScheduleResult:combinationMiddleAndNight']"
+          v-hasPermi="['dj:djScheduleResult:combinationMiddleAndNight']"
           type="primary"
           :disabled="selection.length == 0"
           @click="handleCombinationMiddleAndNight"
@@ -80,103 +75,66 @@
         >
 
         <el-button
-          v-hasPermi="['nc:ncScheduleResult:publish']"
+          v-hasPermi="['dj:djScheduleResult:publish']"
           type="primary"
           :disabled="selection.length === 0"
           @click="handlePublish"
           >{{ $t("ui.data.column.scheduleResult.publish") }}</el-button
         >
-        <el-dropdown>
-          <el-button type="primary" style="margin-left: 10px">
-            更多按钮<i class="el-icon-arrow-down el-icon--right"></i>
-          </el-button>
-          <el-dropdown-menu slot="dropdown">
-            <el-dropdown-item>
-              <el-button
-                type="primary"
-                class="more-btn"
-                @click="handleExportUiExcel"
-              >
-                {{ $t("ui.frame.btn.export") }}
-              </el-button>
-            </el-dropdown-item>
-            <el-dropdown-item>
-              <el-button
-                type="primary"
-                class="more-btn"
-                @click="$refs.tltUploadForm.handleImport(importDefaultValue)"
-              >
-                {{ $t("ui.frame.btn.import") }}
-              </el-button>
-            </el-dropdown-item>
-            <el-dropdown-item>
-              <el-button
-                type="primary"
-                class="more-btn"
-                @click="$refs.tltUploadForm2.handleImport(importDefaultValue)"
-              >
-                {{ $t("导入2") }}
-              </el-button>
-            </el-dropdown-item>
-            <el-dropdown-item v-hasPermi="['nc:finishQty:import']">
-              <el-button
-                type="primary"
-                class="more-btn"
-                @click="$refs.tltUploadForm3.handleImport(importDefaultValue)"
-              >
-                {{ $t("完成量导入") }}
-              </el-button>
-            </el-dropdown-item>
-            <el-dropdown-item v-hasRole="['admin']">
-              <el-button
-                type="primary"
-                class="more-btn"
-                @click="handleChangeReleaseStatus"
-              >
-                {{ $t("ui.data.column.scheduleResult.changeReleaseStatus") }}
-              </el-button>
-            </el-dropdown-item>
-          </el-dropdown-menu>
-        </el-dropdown>
+        <el-button
+          type="primary"
+          @click="handleExportUiExcel"
+        >
+          {{ $t("ui.frame.btn.export") }}
+        </el-button>
+        <el-button
+          type="primary"
+          @click="$refs.tltUploadForm.handleImport(importDefaultValue)"
+        >
+          {{ $t("ui.frame.btn.import") }}
+        </el-button>
+        <el-button
+          type="primary"
+          v-hasPermi="['nc:finishQty:import']"
+          @click="$refs.tltUploadForm3.handleImport(importDefaultValue)"
+        >
+          {{ $t("完成量导入") }}
+        </el-button>
+        <el-button
+          type="primary"
+          v-hasRole="['admin']"
+          @click="handleChangeReleaseStatus"
+        >
+          {{ $t("ui.data.column.scheduleResult.changeReleaseStatus") }}
+        </el-button>
       </template>
       <template slot="headerRight">
         <span class="stat-info">
-          <span>
-            昨日早班合计：<span class="stat-value">{{
-              stat.lastDayPlanQty === null ? "--" : stat.lastDayPlanQty
-            }}</span
-            >，
-          </span>
-          <span
-            >夜班合计：<span class="stat-value">{{
+          <span>{{ $t("ui.data.column.dj.scheduleResult.statNightPlanQty") }}：<span class="stat-value">{{
               stat.dayPlanQty === null ? "--" : stat.dayPlanQty
             }}</span
             >，</span
           >
-          <span
-            >早班合计：<span class="stat-value">{{
+          <span>{{ $t("ui.data.column.dj.scheduleResult.statMorningPlanQty") }}：<span class="stat-value">{{
               stat.nightPlanQty === null ? "--" : stat.nightPlanQty
             }}</span
             >，</span
           >
-          <span
-            >库存合计：<span class="stat-value">{{
-              stat.stockQty === null ? "--" : stat.stockQty
+          <span>{{ $t("ui.data.column.dj.scheduleResult.statMiddlePlanQty") }}：<span class="stat-value">{{
+              stat.nextDayPlanQty === null ? "--" : stat.nextDayPlanQty
             }}</span
             >，</span
           >
-          <span
-            >理论交班库存合计：<span class="stat-value">{{
-              stat.theoreticClassStockQty === null
-                ? "--"
-                : stat.theoreticClassStockQty
-            }}</span></span
+          <span>{{ $t("ui.data.column.scheduleResult.stockQty") }}合计：<span class="stat-value">{{
+              stat.stockQty === null ? "--" : stat.stockQty
+            }}</span
+            ></span
           >
         </span>
       </template>
     </page-table>
     <!-- <el-button style="display: none" ref="hidePopoverBtnRef"></el-button> -->
-    <autoPlanDialog ref="autoPlanRef" @success="getList" />
+    <autoPlanDialog ref="autoPlanRef" @success="handleAutoPlanSuccess" />
     <addDialog ref="addRef" @success="getList" />
     <editDialog ref="editRef" @success="getList" />
     <changeMachineDialog ref="changeMachineRef" @success="getList" />
@@ -195,30 +153,15 @@
     />
     <tlt-upload-form
       ref="tltUploadForm"
-      title="导入内衬排程结果数据"
-      downloadUrl="/nc/ncScheduleResult/importTemplate"
-      uploadUrl="/nc/ncScheduleResult/importScheduleData"
+      :title="$t('ui.data.column.djScheduleResult.importTitle')"
+      downloadUrl="/dj/djScheduleResult/importTemplate"
+      uploadUrl="/dj/djScheduleResult/importScheduleData"
       @uploadSuccess="getList"
       :columns="[
         {
-          label: '排程日期',
+          label: this.$t('ui.data.column.scheduleResult.scheduleDate'),
           prop: 'scheduleDate',
-          align: "center",
-          minWidth: 120,
-        },
-      ]"
-      :rules="importRules"
-    />
-    <tlt-upload-form
-      ref="tltUploadForm2"
-      title="导入内衬排程结果数据"
-      uploadUrl="/nc/ncScheduleResult/importScheduleData2"
-      @uploadSuccess="getList"
-      :columns="[
-        {
-          label: '排程日期',
-          prop: 'scheduleDate',
-          align: "center",
+          align: 'center',
           minWidth: 120,
         },
       ]"
@@ -226,15 +169,15 @@
     />
     <tlt-upload-form
       ref="tltUploadForm3"
-      title="导入内衬排程结果数据"
-      uploadUrl="/nc/ncScheduleResult/importFinishQty"
-      downloadUrl="/nc/ncScheduleResult/importFinishQtyTemplate"
+      :title="$t('ui.data.column.djScheduleResult.importTitle')"
+      uploadUrl="/dj/djScheduleResult/importFinishQty"
+      downloadUrl="/dj/djScheduleResult/importFinishQtyTemplate"
       @uploadSuccess="getList"
       :columns="[
         {
-          label: '排程日期',
+          label: this.$t('ui.data.column.scheduleResult.scheduleDate'),
           prop: 'scheduleDate',
-          align: "center",
+          align: 'center',
           minWidth: 120,
         },
       ]"
@@ -259,7 +202,9 @@ import {
   producingIssue,
   validateConstruction,
   getSummaryVo,
-} from "@/api/nc/ncScheduleResult";
+  getWorkClass,
+} from "@/api/dj/djScheduleResult";
+import { getConfigKey } from "@/api/system/config";
 //components
 import TltUploadForm from "@/views/components/tltUploadForm.vue";
 
@@ -274,7 +219,7 @@ import allocateDialog from "./components/allocateDialog.vue";
 import mergeDialog from "./components/mergeDialog.vue";
 
 export default {
-  name: "InsideLinerSchedule",
+  name: "djSchedule",
   components: {
     allocateDialog,
     autoPlanDialog,
@@ -287,7 +232,7 @@ export default {
     TltUploadForm,
     mergeDialog,
   },
-  dicts: ["IS_RELEASE"],
+  dicts: ["IS_RELEASE", "biz_factory_name"],
   provide() {
     return {
       parentDict: this.dict,
@@ -298,6 +243,7 @@ export default {
       loading: false,
       data: [],
       selection: [],
+      classHeaders: [],
       // page: {
       //   current: 1,
       //   pageSize: 20,
@@ -305,8 +251,12 @@ export default {
       // },
       page: undefined,
       sort: {},
-      search: {},
-      query: {},
+      search: {
+        factoryCode: '',
+      },
+      query: {
+        factoryCode: '',
+      },
       importDefaultValue: {
         scheduleDate: moment().add(1, "days").format("YYYY-MM-DD"),
       },
@@ -324,679 +274,350 @@ export default {
   },
   computed: {
     ...mapState({
-      machines: (state) => state.insideLiner.machines,
+      machines: (state) => state.dj.machines,
     }),
     columns() {
+      let finishRateFormatter = function (row, column, value, index) {
+        if (value == 0 || value == null) {
+          return "0%";
+        }
+        var str = Number(value * 100).toFixed(2);
+        return (str += "%");
+      };
       let columns = [
         { type: "selection", fixed: "left" },
         {
           label: this.$t("ui.data.column.scheduleResult.baseInfo"),
           children: [
             {
-              prop: "isRelease",
+              prop: "releaseStatus",
               valign: "middle",
-              align: "center",
-              halign: "center",
-              label: this.$t("ui.data.column.scheduleResult.isRelease"),
+              align: 'center',
+              halign: 'center',
+              label: this.$t("ui.data.column.dj.scheduleResult.releaseStatus"),
               formatter: (row, column, value, index) => {
                 return this.selectDictLabel(this.dict.type.IS_RELEASE, value);
               },
             },
             {
-              prop: "liningCode",
+              prop: "paddingName",
               valign: "middle",
-              halign: "center",
-              align: "center",
-              minWidth: 100,
-              //  sortable: "custom",
-              label: this.$t("ui.data.column.scheduleResult.liningCode"),
-              // cellStyle: function (value, row, index) {
-              //   if (
-              //     $.common.isNotEmpty(row.colorCode) &&
-              //     $.common.isNotEmpty(row.colorType)
-              //   ) {
-              //     if (row.colorType == "0") {
-              //       return { css: { color: row.colorCode } };
-              //     } else if (row.colorType == "1") {
-              //       return { css: { background: row.colorCode } };
-              //     }
-              //   }
-              //   return {};
-              // },
+              halign: 'center',
+              align: 'center',
+              minWidth: 120,
+              label: this.$t("ui.data.column.dj.scheduleResult.paddingCode"),
             },
             {
-              prop: "wholeGlueCode",
+              prop: "glueCode",
               valign: "middle",
-              halign: "center",
+              halign: 'center',
               align: "left",
               minWidth: 120,
-              //  sortable: "custom",
-              label: this.$t("ui.data.column.scheduleResult.glueCode"),
+              label: this.$t("ui.data.column.dj.scheduleResult.glueCode"),
             },
             {
-              prop: "glueSeq",
+              prop: "machineCode",
               valign: "middle",
-              halign: "center",
-              align: "center",
-              //  sortable: "custom",
-              label: this.$t("ui.data.column.scheduleResult.glueSeq"),
-            },
-            {
-              prop: "machineId",
-              valign: "middle",
-              halign: "center",
+              halign: 'center',
               align: "left",
-              //  sortable: "custom",
-              label: this.$t("ui.data.column.scheduleResult.produceLine"),
+              label: this.$t("ui.data.column.dj.scheduleResult.machineCode"),
               formatter: (row, column, value, index) => {
-                // if ($.common.isEmpty(value)) {
-                //   var actions = [];
-                //   actions.push(
-                //     '<a href="javascript:void(0)" onclick="chooseMachine(\'' +
-                //       row.id +
-                //       "','" +
-                //       index +
-                //       "')\">" +
-                //       this.$t("ui.data.column.selectMachineName") +
-                //       "</a> "
-                //   );
-                //   return actions.join("");
-                // }
-                // let machineName = selectMachineName(machineNameList, value);
-                // if (value.indexOf(",") > 0) {
-                //   var actions = [];
-                //   actions.push(
-                //     '<a href="javascript:void(0)" onclick="chooseMachine(\'' +
-                //       row.id +
-                //       "','" +
-                //       index +
-                //       "')\">" +
-                //       machineName +
-                //       "</a> "
-                //   );
-                //   return actions.join("");
-                // }
                 return row.machineName;
               },
             },
             {
-              prop: "monthPlanOs",
-              valign: "middle",
-              halign: "center",
-              align: "right",
-              //  sortable: "custom",
-              label: this.$t(
-                "ui.data.column.scheduleResult.br.monthPlanOs.meter"
-              ),
-            },
-            {
               prop: "stockQty",
               valign: "middle",
-              halign: "center",
+              halign: 'center',
               align: "right",
-              //  sortable: "custom",
-              label: this.$t("ui.data.column.scheduleResult.stockQty.meter2"),
-            },
-            {
-              prop: "supplyTime",
-              valign: "middle",
-              halign: "center",
-              align: "right",
-              //  sortable: "custom",
-              label: this.$t(
-                "ui.data.column.scheduleResult.br.supplyTime.hour"
-              ),
-            },
-            {
-              prop: "dailyTotalQty",
-              valign: "middle",
-              halign: "center",
-              align: "right",
-              //  sortable: "custom",
-              label: this.$t(
-                "ui.data.column.scheduleResult.dailyTotalQty.meter"
-              ),
+              label: this.$t("ui.data.column.scheduleResult.stockQty"),
             },
           ],
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.nightPlan"),
+          label: this.classHeaders[0],
           children: [
             {
-              prop: "dayPlanQty",
+              prop: "prevDayClass3Sequence",
               valign: "middle",
-              halign: "center",
-              align: "right",
-              //  sortable: "custom",
-              label: this.$t("ui.data.column.scheduleResult.plan.meter"),
-              // editable: {
-              //   type: "text",
-              //   label:
-              //     this.$t("ui.data.column.scheduleResult.plan") +
-              //     "(" +
-              //     this.$t("ui.data.column.scheduleResult.unit.meter") +
-              //     ")",
-              //   validate: function (value) {
-              //     var regu = /^[0-9]+?$/;
-              //     if (!regu.test(value)) {
-              //       layer.msg(
-              //         this.$t(
-              //           "ui.data.column.scheduleResult.msg.nonNegativeInteger"
-              //         )
-              //       );
-              //       return this.$t(
-              //         "ui.data.column.scheduleResult.msg.nonNegativeInteger"
-              //       );
-              //     }
-              //     if (value > 9999999) {
-              //       layer.msg(
-              //         this.$t("ui.data.column.mdmMonthProdPlan.greatThan")
-              //       );
-              //       return this.$t("ui.data.column.mdmMonthProdPlan.greatThan");
-              //     }
-              //   },
-              // },
+              halign: 'center',
+              align: 'center',
+              label: this.$t("ui.data.column.dj.scheduleResult.sequence"),
             },
             {
-              prop: "dayFinishQty",
+              prop: "prevDayClass3PlanQty",
               valign: "middle",
-              halign: "center",
+              halign: 'center',
               align: "right",
-              //  sortable: "custom",
-              label: this.$t("ui.data.column.scheduleResult.finish.meter"),
+              label: this.$t("ui.data.column.dj.scheduleResult.planQty"),
             },
             {
-              prop: "dayProduceOrder",
+              prop: "prevDayClass3FinishQty",
               valign: "middle",
-              halign: "center",
+              halign: 'center',
               align: "right",
-              //  sortable: "custom",
-              label: this.$t("ui.data.column.scheduleResult.produceOrder"),
-              // editable: {
-              //   type: "text",
-              //   label: this.$t("ui.data.column.scheduleResult.produceOrder"),
-              //   validate: function (value) {
-              //     var regu = /^[0-9]+?$/;
-              //     if (!regu.test(value)) {
-              //       layer.msg(
-              //         this.$t(
-              //           "ui.data.column.scheduleResult.msg.nonNegativeInteger"
-              //         )
-              //       );
-              //       return this.$t(
-              //         "ui.data.column.scheduleResult.msg.nonNegativeInteger"
-              //       );
-              //     }
-              //     if (value > 999999) {
-              //       var str = this.$t(
-              //         "ui.data.column.mdmMonthProdPlan.greatThan"
-              //       );
-              //       layer.msg(String(str).substring(0, str.length - 1));
-              //       return String(str).substring(0, str.length - 1);
-              //     }
-              //   },
-              // },
+              label: this.$t("ui.data.column.dj.scheduleResult.finishQty"),
             },
             {
-          prop: "预计开始时间",
-          valign: "middle",
-          halign: "center",
-          align: "center",
-          label: this.$t("预计开始时间"),
-          width: 150,
-        },
-        {
-          prop: "预计完成时间",
-          valign: "middle",
-          halign: "center",
-          align: "center",
-          label: this.$t("预计完成时间"),
-          width: 150,
-        },
-            {
-              prop: "dayFinishRate",
+              prop: "prevDayClass3FinishRate",
               valign: "middle",
-              halign: "center",
+              halign: 'center',
               align: "right",
-              //  sortable: "custom",
-              label: this.$t("ui.data.column.scheduleResult.finishRate"),
-              formatter: function (row, column, value, index) {
-                if (value == 0 || value == null) {
-                  return "0%";
-                }
-                var str = Number(value * 100).toFixed(2);
-                return (str += "%");
-              },
+              label: this.$t("ui.data.column.scheduleResult.finish"),
+              formatter: finishRateFormatter,
             },
             {
-              prop: "dayHandAnalysis",
+              prop: "prevDayClass3Analysis",
               valign: "middle",
-              halign: "center",
+              halign: 'center',
               align: "left",
-              //  sortable: "custom",
-              label: this.$t("ui.data.column.scheduleResult.analysis"),
-              formatter: (row, column, value, index) => {
-                var reasion = "";
-                var SysAnalysis = row.daySysAnalysis;
-                if (value != null) {
-                  reasion = reasion + value;
-                }
-                if (SysAnalysis != null) {
-                  if (reasion != "") {
-                    reasion = reasion + "," + SysAnalysis;
-                  } else {
-                    reasion = SysAnalysis;
-                  }
-                }
-                return reasion;
-              },
+              label: this.$t("ui.data.column.dj.scheduleResult.analysis"),
             },
           ],
         },
-
         {
-          label: this.$t("ui.data.column.scheduleResult.dayPlan"),
+          label: this.classHeaders[1],
           children: [
             {
-              prop: "nightPlanQty",
+              prop: "class1Sequence",
               valign: "middle",
-              halign: "center",
-              align: "right",
-              //  sortable: "custom",
-              label: this.$t("ui.data.column.scheduleResult.plan.meter"),
-              // editable: {
-              //   type: "text",
-              //   label:
-              //     this.$t("ui.data.column.scheduleResult.plan") +
-              //     "(" +
-              //     this.$t("ui.data.column.scheduleResult.unit.meter") +
-              //     ")",
-              //   validate: function (value) {
-              //     var regu = /^[0-9]+?$/;
-              //     if (!regu.test(value)) {
-              //       layer.msg(
-              //         this.$t(
-              //           "ui.data.column.scheduleResult.msg.nonNegativeInteger"
-              //         )
-              //       );
-              //       return this.$t(
-              //         "ui.data.column.scheduleResult.msg.nonNegativeInteger"
-              //       );
-              //     }
-              //     if (value > 9999999) {
-              //       layer.msg(
-              //         this.$t("ui.data.column.mdmMonthProdPlan.greatThan")
-              //       );
-              //       return this.$t("ui.data.column.mdmMonthProdPlan.greatThan");
-              //     }
-              //   },
-              // },
+              halign: 'center',
+              align: 'center',
+              label: this.$t("ui.data.column.dj.scheduleResult.sequence"),
             },
             {
-              prop: "nightFinishQty",
+              prop: "class1PlanQty",
               valign: "middle",
-              halign: "center",
+              halign: 'center',
               align: "right",
-              //  sortable: "custom",
-              label: this.$t("ui.data.column.scheduleResult.finish.meter"),
+              label: this.$t("ui.data.column.dj.scheduleResult.planQty"),
             },
             {
-              prop: "nightProduceOrder",
+              prop: "class1FinishQty",
               valign: "middle",
-              halign: "center",
+              halign: 'center',
               align: "right",
-              //  sortable: "custom",
-              label: this.$t("ui.data.column.scheduleResult.produceOrder"),
-              // editable: {
-              //   type: "text",
-              //   label: this.$t("ui.data.column.scheduleResult.produceOrder"),
-              //   validate: function (value) {
-              //     var regu = /^[0-9]+?$/;
-              //     if (!regu.test(value)) {
-              //       layer.msg(
-              //         this.$t(
-              //           "ui.data.column.scheduleResult.msg.nonNegativeInteger"
-              //         )
-              //       );
-              //       return this.$t(
-              //         "ui.data.column.scheduleResult.msg.nonNegativeInteger"
-              //       );
-              //     }
-              //     if (value > 999999) {
-              //       var str = this.$t(
-              //         "ui.data.column.mdmMonthProdPlan.greatThan"
-              //       );
-              //       layer.msg(String(str).substring(0, str.length - 1));
-              //       return String(str).substring(0, str.length - 1);
-              //     }
-              //   },
-              // },
+              label: this.$t("ui.data.column.dj.scheduleResult.finishQty"),
             },
             {
-          prop: "预计开始时间",
-          valign: "middle",
-          halign: "center",
-          align: "center",
-          label: this.$t("预计开始时间"),
-          width: 150,
-        },
-        {
-          prop: "预计完成时间",
-          valign: "middle",
-          halign: "center",
-          align: "center",
-          label: this.$t("预计完成时间"),
-          width: 150,
-        },
-            {
-              prop: "nightFinishRate",
+              prop: "class1FinishRate",
               valign: "middle",
-              halign: "center",
+              halign: 'center',
               align: "right",
-              //  sortable: "custom",
-              label: this.$t("ui.data.column.scheduleResult.finishRate"),
-              formatter: function (row, column, value, index) {
-                if (value == 0 || value == null) {
-                  return "0%";
-                }
-                var str = Number(value * 100).toFixed(2);
-                return (str += "%");
-              },
+              label: this.$t("ui.data.column.scheduleResult.finish"),
+              formatter: finishRateFormatter,
             },
             {
-              prop: "nightSysAnalysis",
+              prop: "class1Analysis",
               valign: "middle",
-              halign: "center",
+              halign: 'center',
               align: "left",
-              //  sortable: "custom",
-              label: this.$t("ui.data.column.scheduleResult.analysis"),
-              formatter: (row, column, value, index) => {
-                var reasion = "";
-                var HandAnaly = row.nightHandAnalysis;
-                if (value != null) {
-                  reasion = reasion + value;
-                }
-                if (HandAnaly != null) {
-                  if (reasion != "") {
-                    reasion = reasion + "," + HandAnaly;
-                  } else {
-                    reasion = HandAnaly;
-                  }
-                }
-                return reasion;
-              },
+              label: this.$t("ui.data.column.dj.scheduleResult.analysis"),
             },
           ],
         },
-
         {
-          label: this.$t("中班计划（14:00-22:00)"),
+          label: this.classHeaders[2],
           children: [
             {
-              prop: "nightPlanQty",
+              prop: "class2Sequence",
               valign: "middle",
-              halign: "center",
-              align: "right",
-              //  sortable: "custom",
-              label: this.$t("ui.data.column.scheduleResult.plan.meter"),
-              // editable: {
-              //   type: "text",
-              //   label:
-              //     this.$t("ui.data.column.scheduleResult.plan") +
-              //     "(" +
-              //     this.$t("ui.data.column.scheduleResult.unit.meter") +
-              //     ")",
-              //   validate: function (value) {
-              //     var regu = /^[0-9]+?$/;
-              //     if (!regu.test(value)) {
-              //       layer.msg(
-              //         this.$t(
-              //           "ui.data.column.scheduleResult.msg.nonNegativeInteger"
-              //         )
-              //       );
-              //       return this.$t(
-              //         "ui.data.column.scheduleResult.msg.nonNegativeInteger"
-              //       );
-              //     }
-              //     if (value > 9999999) {
-              //       layer.msg(
-              //         this.$t("ui.data.column.mdmMonthProdPlan.greatThan")
-              //       );
-              //       return this.$t("ui.data.column.mdmMonthProdPlan.greatThan");
-              //     }
-              //   },
-              // },
+              halign: 'center',
+              align: 'center',
+              label: this.$t("ui.data.column.dj.scheduleResult.sequence"),
             },
             {
-              prop: "nightFinishQty",
+              prop: "class2PlanQty",
               valign: "middle",
-              halign: "center",
+              halign: 'center',
               align: "right",
-              //  sortable: "custom",
-              label: this.$t("ui.data.column.scheduleResult.finish.meter"),
+              label: this.$t("ui.data.column.dj.scheduleResult.planQty"),
             },
             {
-              prop: "nightProduceOrder",
+              prop: "class2FinishQty",
               valign: "middle",
-              halign: "center",
+              halign: 'center',
               align: "right",
-              //  sortable: "custom",
-              label: this.$t("ui.data.column.scheduleResult.produceOrder"),
-              // editable: {
-              //   type: "text",
-              //   label: this.$t("ui.data.column.scheduleResult.produceOrder"),
-              //   validate: function (value) {
-              //     var regu = /^[0-9]+?$/;
-              //     if (!regu.test(value)) {
-              //       layer.msg(
-              //         this.$t(
-              //           "ui.data.column.scheduleResult.msg.nonNegativeInteger"
-              //         )
-              //       );
-              //       return this.$t(
-              //         "ui.data.column.scheduleResult.msg.nonNegativeInteger"
-              //       );
-              //     }
-              //     if (value > 999999) {
-              //       var str = this.$t(
-              //         "ui.data.column.mdmMonthProdPlan.greatThan"
-              //       );
-              //       layer.msg(String(str).substring(0, str.length - 1));
-              //       return String(str).substring(0, str.length - 1);
-              //     }
-              //   },
-              // },
+              label: this.$t("ui.data.column.dj.scheduleResult.finishQty"),
             },
             {
-          prop: "预计开始时间",
-          valign: "middle",
-          halign: "center",
-          align: "center",
-          label: this.$t("预计开始时间"),
-          width: 150,
-        },
-        {
-          prop: "预计完成时间",
-          valign: "middle",
-          halign: "center",
-          align: "center",
-          label: this.$t("预计完成时间"),
-          width: 150,
-        },
-            {
-              prop: "nightFinishRate",
+              prop: "class2FinishRate",
               valign: "middle",
-              halign: "center",
+              halign: 'center',
               align: "right",
-              //  sortable: "custom",
-              label: this.$t("ui.data.column.scheduleResult.finishRate"),
-              formatter: function (row, column, value, index) {
-                if (value == 0 || value == null) {
-                  return "0%";
-                }
-                var str = Number(value * 100).toFixed(2);
-                return (str += "%");
-              },
+              label: this.$t("ui.data.column.scheduleResult.finish"),
+              formatter: finishRateFormatter,
             },
             {
-              prop: "nightSysAnalysis",
+              prop: "class2Analysis",
               valign: "middle",
-              halign: "center",
+              halign: 'center',
               align: "left",
-              //  sortable: "custom",
-              label: this.$t("ui.data.column.scheduleResult.analysis"),
-              formatter: (row, column, value, index) => {
-                var reasion = "";
-                var HandAnaly = row.nightHandAnalysis;
-                if (value != null) {
-                  reasion = reasion + value;
-                }
-                if (HandAnaly != null) {
-                  if (reasion != "") {
-                    reasion = reasion + "," + HandAnaly;
-                  } else {
-                    reasion = HandAnaly;
-                  }
-                }
-                return reasion;
-              },
+              label: this.$t("ui.data.column.dj.scheduleResult.analysis"),
             },
           ],
         },
-
         {
-          label: this.$t("ui.data.column.scheduleResult.prePlanQty"),
+          label: this.classHeaders[3],
           children: [
             {
-              prop: "prePlanQty",
+              prop: "class3Sequence",
               valign: "middle",
-              halign: "center",
+              halign: 'center',
+              align: 'center',
+              label: this.$t("ui.data.column.dj.scheduleResult.sequence"),
+            },
+            {
+              prop: "class3PlanQty",
+              valign: "middle",
+              halign: 'center',
               align: "right",
-              //  sortable: "custom",
-              label: this.$t("ui.data.column.scheduleResult.plan.meter"),
-              // editable: {
-              //   type: "text",
-              //   label:
-              //     this.$t("ui.data.column.scheduleResult.plan") +
-
-              //     "(" +
-              //     this.$t("ui.data.column.scheduleResult.unit.meter") +
-              //     ")",
-              //   validate: function (value) {
-              //     var regu = /^[0-9]+?$/;
-              //     if (!regu.test(value)) {
-              //       layer.msg(
-              //         this.$t(
-              //           "ui.data.column.scheduleResult.msg.nonNegativeInteger"
-              //         )
-              //       );
-              //       return this.$t(
-              //         "ui.data.column.scheduleResult.msg.nonNegativeInteger"
-              //       );
-              //     }
-              //     if (value > 9999999) {
-              //       layer.msg(
-              //         this.$t("ui.data.column.mdmMonthProdPlan.greatThan")
-              //       );
-              //       return this.$t("ui.data.column.mdmMonthProdPlan.greatThan");
-              //     }
-              //   },
-              // },
+              label: this.$t("ui.data.column.dj.scheduleResult.planQty"),
+            },
+            {
+              prop: "class3FinishQty",
+              valign: "middle",
+              halign: 'center',
+              align: "right",
+              label: this.$t("ui.data.column.dj.scheduleResult.finishQty"),
+            },
+            {
+              prop: "class3FinishRate",
+              valign: "middle",
+              halign: 'center',
+              align: "right",
+              label: this.$t("ui.data.column.scheduleResult.finish"),
+              formatter: finishRateFormatter,
+            },
+            {
+              prop: "class3Analysis",
+              valign: "middle",
+              halign: 'center',
+              align: "left",
+              label: this.$t("ui.data.column.dj.scheduleResult.analysis"),
             },
           ],
         },
-
         {
-          label: this.$t("ui.data.column.scheduleResult.ncPlan2"),
+          label: this.classHeaders[4],
           children: [
             {
-              prop: "cxClass2Plan",
+              prop: "class4Sequence",
               valign: "middle",
-              halign: "center",
-              align: "right",
-              //  sortable: "custom",
-              label: this.$t(
-                "ui.data.column.scheduleResult.br.class1Plan.meter"
-              ),
+              halign: 'center',
+              align: 'center',
+              label: this.$t("ui.data.column.dj.scheduleResult.sequence"),
             },
             {
-              prop: "cxClass3Plan",
+              prop: "class4PlanQty",
               valign: "middle",
-              halign: "center",
+              halign: 'center',
               align: "right",
-              //  sortable: "custom",
-              label: this.$t(
-                "ui.data.column.scheduleResult.br.class2Plan.meter"
-              ),
+              label: this.$t("ui.data.column.dj.scheduleResult.planQty"),
             },
             {
-              prop: "cxClass3Plan",
+              prop: "class4FinishQty",
               valign: "middle",
-              halign: "center",
+              halign: 'center',
               align: "right",
-              //  sortable: "custom",
-              label: this.$t(
-                "中班计划量(米)"
-              ),
+              label: this.$t("ui.data.column.dj.scheduleResult.finishQty"),
             },
             {
-              prop: "cxClass4Plan",
+              prop: "class4FinishRate",
               valign: "middle",
-              halign: "center",
+              halign: 'center',
               align: "right",
-              //  sortable: "custom",
-              label: this.$t(
-                "ui.data.column.scheduleResult.br.class3Plan.meter"
-              ),
+              label: this.$t("ui.data.column.scheduleResult.finish"),
+              formatter: finishRateFormatter,
             },
             {
-              prop: "cxClass5Plan",
+              prop: "class4Analysis",
               valign: "middle",
-              halign: "center",
-              align: "right",
-              //  sortable: "custom",
-              label: this.$t(
-                "ui.data.column.scheduleResult.br.cxClass4Plan.meter"
-              ),
+              halign: 'center',
+              align: "left",
+              label: this.$t("ui.data.column.dj.scheduleResult.analysis"),
             },
-            {
-              prop: "cxClass5Plan",
-              valign: "middle",
-              halign: "center",
-              align: "right",
-              //  sortable: "custom",
-              label: this.$t(
-                "次日中班计划量(米)"
-              ),
-            },
-            // {
-            //   prop: "cxClass5Plan",
-            //   valign: "middle",
-            //   halign: "center",
-            //   align: "right",
-            //   sortable: "custom",
-            //   label: this.$t(
-            //     "ui.data.column.scheduleResult.br.cxClass5Plan.meter"
-            //   ),
-            // },
-            ,
           ],
         },
         {
-          // label: this.$t("ui.biz.user.other.info"),
-          label: this.$t("其他信息"),
+          label: this.classHeaders[5],
           children: [
             {
-              prop: "remark",
+              prop: "class5Sequence",
               valign: "middle",
-              halign: "center",
-              align: "center",
-              minWidth: 100,
-              //  sortable: "custom",
-              label: this.$t("ui.common.column.remark"),
-              // formatter: (row, column, value, index) => {
-              //   return $.table.tooltip(value);
-              // },
+              halign: 'center',
+              align: 'center',
+              label: this.$t("ui.data.column.dj.scheduleResult.sequence"),
+            },
+            {
+              prop: "class5PlanQty",
+              valign: "middle",
+              halign: 'center',
+              align: "right",
+              label: this.$t("ui.data.column.dj.scheduleResult.planQty"),
+            },
+            {
+              prop: "class5FinishQty",
+              valign: "middle",
+              halign: 'center',
+              align: "right",
+              label: this.$t("ui.data.column.dj.scheduleResult.finishQty"),
+            },
+            {
+              prop: "class5FinishRate",
+              valign: "middle",
+              halign: 'center',
+              align: "right",
+              label: this.$t("ui.data.column.scheduleResult.finish"),
+              formatter: finishRateFormatter,
+            },
+            {
+              prop: "class5Analysis",
+              valign: "middle",
+              halign: 'center',
+              align: "left",
+              label: this.$t("ui.data.column.dj.scheduleResult.analysis"),
+            },
+          ],
+        },
+        {
+          label: this.classHeaders[6],
+          children: [
+            {
+              prop: "class6Sequence",
+              valign: "middle",
+              halign: 'center',
+              align: 'center',
+              label: this.$t("ui.data.column.dj.scheduleResult.sequence"),
+            },
+            {
+              prop: "class6PlanQty",
+              valign: "middle",
+              halign: 'center',
+              align: "right",
+              label: this.$t("ui.data.column.dj.scheduleResult.planQty"),
+            },
+            {
+              prop: "class6FinishQty",
+              valign: "middle",
+              halign: 'center',
+              align: "right",
+              label: this.$t("ui.data.column.dj.scheduleResult.finishQty"),
+            },
+            {
+              prop: "class6FinishRate",
+              valign: "middle",
+              halign: 'center',
+              align: "right",
+              label: this.$t("ui.data.column.scheduleResult.finish"),
+              formatter: finishRateFormatter,
+            },
+            {
+              prop: "class6Analysis",
+              valign: "middle",
+              halign: 'center',
+              align: "left",
+              label: this.$t("ui.data.column.dj.scheduleResult.analysis"),
             },
           ],
         },
@@ -1007,28 +628,35 @@ export default {
     searchColumns() {
       return [
         {
+          label: this.$t("ui.data.column.factoryCode"),
+          prop: "factoryCode",
+          type: "select",
+          dictData: this.dict.type.biz_factory_name,
+          filterable: true,
+        },
+        {
           label: this.$t("ui.data.column.scheduleResult.scheduleDate"),
           prop: "scheduleDate",
           type: "date",
           valueFormat: "yyyy-MM-dd",
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.liningCode"),
-          prop: "liningCode",
+          label: this.$t("ui.data.column.dj.scheduleResult.paddingCode"),
+          prop: "paddingCode",
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.glueCode"),
-          prop: "wholeGlueCode",
+          label: this.$t("ui.data.column.dj.scheduleResult.glueCode"),
+          prop: "glueCode",
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.isRelease"),
-          prop: "isRelease",
+          label: this.$t("ui.data.column.dj.scheduleResult.releaseStatus"),
+          prop: "releaseStatus",
           type: "select",
           dictData: this.dict.type.IS_RELEASE, // "IS_RELEASE",
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.produceLine"),
-          prop: "machineId",
+          label: this.$t("ui.data.column.dj.scheduleResult.machineCode"),
+          prop: "machineCode",
           type: "select",
           dictData: this.machines,
           valueKey: "id",
@@ -1050,9 +678,13 @@ export default {
         this.$refs.addRef.show();
       }
     },
-    handleEdit(row) {
+    handleEdit() {
+      if (this.selection.length !== 1) {
+        this.$modal.msgWarning("请选择一条记录");
+        return;
+      }
       if (this.$refs.editRef) {
-        this.$refs.editRef.show(row);
+        this.$refs.editRef.show(this.selection[0]);
       }
     },
     handleDelete(row) {
@@ -1109,6 +741,9 @@ export default {
       this.query = data;
       // this.$set(this.page, "current", 1);
       this.getList();
+      getWorkClass({ scheduleDate: this.query.scheduleDate }).then((res) => {
+        this.classHeaders = res;
+      });
     },
     handlePageChange(current, pageSize) {
       // this.$set(this.page, "current", current);
@@ -1133,12 +768,25 @@ export default {
     handleAutoPlan() {
       console.log("handleAutoPlan");
       if (this.$refs.autoPlanRef) {
-        this.$refs.autoPlanRef.show("", "1");
+        this.$refs.autoPlanRef.show("", "1", this.query.factoryCode);
+      }
+    },
+    // 自动排程成功后，更新排程日期并刷新列表
+    handleAutoPlanSuccess(scheduleDate) {
+      if (scheduleDate) {
+        this.$set(this.query, 'scheduleDate', scheduleDate);
+        this.search = { ...this.search, scheduleDate };
+      }
+      this.getList();
+      if (scheduleDate) {
+        getWorkClass({ scheduleDate }).then((res) => {
+          this.classHeaders = res;
+        });
       }
     },
 
     handleExportUiExcel() {
-      downloadLink("/nc/ncScheduleResult/export", this.formatParams(false));
+      downloadLink("/dj/djScheduleResult/export", this.formatParams(false));
     },
 
     handleChangeReleaseStatus() {
@@ -1250,7 +898,18 @@ export default {
     this.query.scheduleDate = date;
     this.search.scheduleDate = date;
 
-    this.$store.dispatch("insideLiner/getMachineList");
+    getConfigKey("sys.factory.code").then(response => {
+      this.search.factoryCode = response.msg;
+      this.query.factoryCode = response.msg;
+      this.$store.dispatch("dj/getMachineList");
+    }).catch(() => {
+      this.$store.dispatch("dj/getMachineList");
+    });
+
+    //获取班次表头
+    getWorkClass({ scheduleDate: this.query.scheduleDate }).then((res) => {
+      this.classHeaders = res;
+    });
   },
   activated() {
     this.getList();

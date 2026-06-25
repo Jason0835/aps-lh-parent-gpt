@@ -57,4 +57,10 @@ public interface MpAdjustResultEntityMapper extends CommBaseMapper<MpAdjustResul
      */
     List<MpAdjustResult> getAdjustVersionList(MpAdjustResult queryVO);
 
+    /**
+     * 批量更新超欠产有效标识
+     * @param list 调整结果列表
+     */
+    void updateValidFlagBatchById(@Param("list") List<MpAdjustResult> list);
+
 }

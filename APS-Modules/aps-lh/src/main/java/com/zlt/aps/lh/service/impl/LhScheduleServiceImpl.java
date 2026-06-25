@@ -2,7 +2,6 @@ package com.zlt.aps.lh.service.impl;
 
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.date.DateUtil;
-import cn.hutool.json.JSON;
 import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
@@ -36,8 +35,8 @@ import com.zlt.aps.lh.engine.observer.ScheduleEvent;
 import com.zlt.aps.lh.engine.observer.ScheduleEventPublisher;
 import com.zlt.aps.lh.exception.ScheduleException;
 import com.zlt.aps.lh.mapper.*;
-import com.zlt.aps.lh.service.ILhScheduleService;
 import com.zlt.aps.lh.service.ILhScheduleResultService;
+import com.zlt.aps.lh.service.ILhScheduleService;
 import com.zlt.aps.lh.service.IScheduleSummaryReportService;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.lh.util.MachineStatusUtil;
@@ -747,7 +746,8 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         AppUtils.formatData(mouldChangePlanList, lhMouldChangePlanController.getQueryFormulas());
         List<LhMouldChangePlanVo> mouldChangePlanExportList = lhMouldChangePlanController.buildLhMouldChangePlanVoList(mouldChangePlanList, mouldChangePlan);
 
-        Map<String, Object> mouldChangePlanTableMap = lhMouldChangePlanController.buildExportTableMap(mouldChangePlanExportList, result.getScheduleDate());
+        Map<String, Object> mouldChangePlanTableMap = lhMouldChangePlanController.buildExportTableMap(result.getScheduleDate());
+        lhMouldChangePlanController.setExportTitleFieldName(mouldChangePlanTableMap);
         List<List<Map<String, Object>>> mouldChangePlanExcelDataList = new ArrayList<>();
         mouldChangePlanExcelDataList.add(lhMouldChangePlanController.buildExportDataList(mouldChangePlanExportList, mouldChangePlan));
 
@@ -805,7 +805,8 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         byte[] exportBytes = ExcelUtils.writeMultiList(new ByteArrayInputStream(templateBytes), 0, scheduleTableMap, scheduleDataList);
 
         // Sheet 1 - 硫化换模计划：只填充表头占位符，不查询数据库，明细数据传空列表
-        Map<String, Object> mouldChangePlanTableMap = lhMouldChangePlanController.buildExportTableMap(Collections.emptyList(), result.getScheduleDate());
+        Map<String, Object> mouldChangePlanTableMap = new HashMap<>();
+        lhMouldChangePlanController.setExportTitleFieldName(mouldChangePlanTableMap);
         List<List<Map<String, Object>>> mouldChangePlanDataList = new ArrayList<>();
         mouldChangePlanDataList.add(new ArrayList<>());
         exportBytes = ExcelUtils.writeMultiList(new ByteArrayInputStream(exportBytes), 1, mouldChangePlanTableMap, mouldChangePlanDataList);
@@ -1362,6 +1363,9 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         // 复用排程结果服务中的字段补全逻辑，统一填充月计划版本、生产版本、规格、
         // 硫化时间、日计划量、硫化余量、示方号等导入模板没有直接提供的字段。
         lhScheduleResultService.fillScheduleResultFields(insertList, scheduleDate);
+
+        // 从物料表反显胎胚代码和产品结构
+        AppUtils.formatData(insertList, getQueryFormulas());
 
         this.baseDao.insertBatch(insertList);
         if (failureNum > 0) {
@@ -2969,8 +2973,8 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
     /**
      * 判断指定班次是否已经超过收尾位置。
      * <p>该逻辑对齐前端 curingSchedule/index.vue 中的 isShiftAfterEnding：
-     * 以硫化余量和胎胚库存的较大值作为需要覆盖的参考数量；如果 8 个班次总计划量不足参考数量，
-     * 则不隐藏任何后续班次；当累计计划量覆盖参考数量后，覆盖点之后的班次视为收尾之后，导出为空。</p>
+     * 以各班次的 classXIsEnd 字段作为收尾标识，值为 "1" 的班次视为收尾位置，
+     * 收尾位置之后的班次返回 true，导出时隐藏左右模等展示值。</p>
      *
      * @param result     排程结果明细
      * @param shiftIndex 当前班次序号
@@ -2980,21 +2984,10 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         if (Objects.isNull(result)) {
             return false;
         }
-        int referenceQty = Math.max(defaultZero(result.getMouldSurplusQty()), defaultZero(result.getEmbryoStock()));
-        if (referenceQty <= 0) {
-            return false;
-        }
-        int totalPlanQty = 0;
+        // 以 classXIsEnd = "1" 的班次作为收尾位置，收尾之后的班次返回 true
         for (int shift = 1; shift <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT; shift++) {
-            totalPlanQty += defaultZero(getClassPlanQty(result, shift));
-        }
-        if (totalPlanQty < referenceQty) {
-            return false;
-        }
-        int remaining = referenceQty;
-        for (int shift = 1; shift <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT; shift++) {
-            remaining -= defaultZero(getClassPlanQty(result, shift));
-            if (remaining <= 0) {
+            String isEnd = ShiftFieldUtil.getShiftIsEnd(result, shift);
+            if ("1".equals(isEnd)) {
                 return shiftIndex > shift;
             }
         }
@@ -3335,6 +3328,13 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
             default:
                 return null;
         }
+    }
+
+    @Override
+    public String[] getQueryFormulas() {
+        return new String[]{
+                "embryoCode,structureName->getcolsvaluewithcondition(T_MDM_MATERIAL_INFO, [EMBRYO_CODE,STRUCTURE_NAME], MATERIAL_CODE, materialCode, IS_DELETE=0)"
+        };
     }
 
 }

@@ -142,7 +142,7 @@ export default {
         { type: "selection", fixed: "left" },
         {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.mdmSkuLhCapacity.factoryCode"),
           width: 120,
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
@@ -150,22 +150,22 @@ export default {
         },
         {
           prop: "materialCode",
-          label: this.$t("ui.data.column.monthplan.oriMaterialCode"),
+          label: this.$t("ui.data.column.mdmSkuLhCapacity.materialCode"),
           width:120
         },
         {
           prop: "materialDesc",
-          label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
+          label: this.$t("ui.data.column.mdmSkuLhCapacity.materialDesc"),
           align: "left",
           minWidth: 350
         },
         {
           prop: "classCapacity",
-          label: this.$t("ui.data.column.curingPlan.classCapacity"),
+          label: this.$t("ui.data.column.mdmSkuLhCapacity.classCapacity"),
         },
         {
           prop: "standardCapacity",
-          label: this.$t("日标准产量"),
+          label: this.$t("ui.data.column.mdmSkuLhCapacity.standardCapacity"),
         },
         // {
         //   prop: "MES日硫化量",
@@ -173,19 +173,19 @@ export default {
         // },
         {
           prop: "apsCapacity",
-          label: this.$t("ui.data.column.curingPlan.apsCapacity"),
+          label: this.$t("ui.data.column.mdmSkuLhCapacity.apsCapacity"),
         },
         {
           prop: "sumVulcanization",
-          label: this.$t("ui.data.column.curingPlan.sumVulcanization"),
+          label: this.$t("ui.data.column.mdmSkuLhCapacity.sumVulcanization"),
         },
         {
           prop: "vulcanizationTime",
-          label: this.$t("ui.data.column.curingPlan.vulcanizationTime"),
+          label: this.$t("ui.data.column.mdmSkuLhCapacity.vulcanizationTime"),
         },
         {
           prop: "mechanicalTime",
-          label: this.$t("ui.data.column.curingPlan.mechanicalTime"),
+          label: this.$t("ui.data.column.mdmSkuLhCapacity.mechanicalTime"),
           // children: [
           //   {
           //     prop: "金宇越南",
@@ -199,29 +199,29 @@ export default {
           children: [
             {
               prop: "checkTime",
-              label: this.$t("ui.data.column.curingPlan.checkTime"),
+          label: this.$t("ui.data.column.mdmSkuLhCapacity.checkTime"),
             },
             {
               prop: "clearTime",
-              label: this.$t("ui.data.column.curingPlan.clearTime"),
+          label: this.$t("ui.data.column.mdmSkuLhCapacity.clearTime"),
             },
             {
               prop: "dineTime",
-              label: this.$t("ui.data.column.curingPlan.dineTime"),
+          label: this.$t("ui.data.column.mdmSkuLhCapacity.dineTime"),
             },
           ],
         },
         {
           prop: "standardTime",
-          label: this.$t("ui.data.column.curingPlan.standardTime"),
+          label: this.$t("ui.data.column.mdmSkuLhCapacity.standardTime"),
         },
         {
           prop: "productionTime",
-          label: this.$t("ui.data.column.curingPlan.productionTime"),
+          label: this.$t("ui.data.column.mdmSkuLhCapacity.productionTime"),
         },
         {
           prop: "remark",
-          label: this.$t("common.remark"),
+          label: this.$t("ui.common.column.remark"),
           width:180,
         },
         {
@@ -265,18 +265,18 @@ export default {
       return [
 
       {
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.mdmSkuLhCapacity.factoryCode"),
           prop: "factoryCode",
           type:'select',
           dictData: this.dict.type.biz_factory_name,
         },
         {
           prop: "materialCode",
-          label: this.$t("ui.data.column.monthplan.oriMaterialCode"),
+          label: this.$t("ui.data.column.mdmSkuLhCapacity.materialCode"),
         },
         {
           prop: "materialDesc",
-          label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
+          label: this.$t("ui.data.column.mdmSkuLhCapacity.materialDesc"),
           minWidth: 350,
           align: "left",
         },

@@ -34,6 +34,12 @@ public class TmScheduleResult extends BaseEntity {
     @TableField(value = "BATCH_NO")
     private String batchNo;
 
+    /** 工单号 */
+    @Excel(name = "ui.data.column.tm.scheduleResult.orderNo")
+    @ApiModelProperty(value = "工单号", name = "orderNo")
+    @TableField(value = "ORDER_NO")
+    private String orderNo;
+
     /** 排程日期 */
     @Excel(name = "ui.data.column.tm.scheduleResult.scheduleDate")
     @ApiModelProperty(value = "排程日期", name = "scheduleDate")
@@ -83,6 +89,20 @@ public class TmScheduleResult extends BaseEntity {
     @TableField(value = "CLASS1_SEQUENCE")
     private Integer class1Sequence;
 
+    /** 1班预计开始时间 */
+    @Excel(name = "ui.data.column.tm.scheduleResult.class1StartTime", width = 30, dateFormat = "yyyy-MM-dd HH:mm:ss")
+    @ApiModelProperty(value = "1班预计开始时间", name = "class1StartTime")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
+    @TableField(value = "CLASS1_START_TIME")
+    private Date class1StartTime;
+
+    /** 1班预计结束时间 */
+    @Excel(name = "ui.data.column.tm.scheduleResult.class1EndTime", width = 30, dateFormat = "yyyy-MM-dd HH:mm:ss")
+    @ApiModelProperty(value = "1班预计结束时间", name = "class1EndTime")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
+    @TableField(value = "CLASS1_END_TIME")
+    private Date class1EndTime;
+
     /** 1班计划量 */
     @Excel(name = "ui.data.column.tm.scheduleResult.class1PlanQty")
     @ApiModelProperty(value = "1班计划量", name = "class1PlanQty")
@@ -106,6 +126,20 @@ public class TmScheduleResult extends BaseEntity {
     @ApiModelProperty(value = "2班顺序", name = "class2Sequence")
     @TableField(value = "CLASS2_SEQUENCE")
     private Integer class2Sequence;
+
+    /** 2班预计开始时间 */
+    @Excel(name = "ui.data.column.tm.scheduleResult.class2StartTime", width = 30, dateFormat = "yyyy-MM-dd HH:mm:ss")
+    @ApiModelProperty(value = "2班预计开始时间", name = "class2StartTime")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
+    @TableField(value = "CLASS2_START_TIME")
+    private Date class2StartTime;
+
+    /** 2班预计结束时间 */
+    @Excel(name = "ui.data.column.tm.scheduleResult.class2EndTime", width = 30, dateFormat = "yyyy-MM-dd HH:mm:ss")
+    @ApiModelProperty(value = "2班预计结束时间", name = "class2EndTime")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
+    @TableField(value = "CLASS2_END_TIME")
+    private Date class2EndTime;
 
     /** 2班计划量 */
     @Excel(name = "ui.data.column.tm.scheduleResult.class2PlanQty")
@@ -131,6 +165,20 @@ public class TmScheduleResult extends BaseEntity {
     @TableField(value = "CLASS3_SEQUENCE")
     private Integer class3Sequence;
 
+    /** 3班预计开始时间 */
+    @Excel(name = "ui.data.column.tm.scheduleResult.class3StartTime", width = 30, dateFormat = "yyyy-MM-dd HH:mm:ss")
+    @ApiModelProperty(value = "3班预计开始时间", name = "class3StartTime")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
+    @TableField(value = "CLASS3_START_TIME")
+    private Date class3StartTime;
+
+    /** 3班预计结束时间 */
+    @Excel(name = "ui.data.column.tm.scheduleResult.class3EndTime", width = 30, dateFormat = "yyyy-MM-dd HH:mm:ss")
+    @ApiModelProperty(value = "3班预计结束时间", name = "class3EndTime")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
+    @TableField(value = "CLASS3_END_TIME")
+    private Date class3EndTime;
+
     /** 3班计划量 */
     @Excel(name = "ui.data.column.tm.scheduleResult.class3PlanQty")
     @ApiModelProperty(value = "3班计划量", name = "class3PlanQty")
@@ -154,6 +202,20 @@ public class TmScheduleResult extends BaseEntity {
     @ApiModelProperty(value = "4班顺序", name = "class4Sequence")
     @TableField(value = "CLASS4_SEQUENCE")
     private Integer class4Sequence;
+
+    /** 4班预计开始时间 */
+    @Excel(name = "ui.data.column.tm.scheduleResult.class4StartTime", width = 30, dateFormat = "yyyy-MM-dd HH:mm:ss")
+    @ApiModelProperty(value = "4班预计开始时间", name = "class4StartTime")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
+    @TableField(value = "CLASS4_START_TIME")
+    private Date class4StartTime;
+
+    /** 4班预计结束时间 */
+    @Excel(name = "ui.data.column.tm.scheduleResult.class4EndTime", width = 30, dateFormat = "yyyy-MM-dd HH:mm:ss")
+    @ApiModelProperty(value = "4班预计结束时间", name = "class4EndTime")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
+    @TableField(value = "CLASS4_END_TIME")
+    private Date class4EndTime;
 
     /** 4班计划量 */
     @Excel(name = "ui.data.column.tm.scheduleResult.class4PlanQty")
@@ -179,6 +241,20 @@ public class TmScheduleResult extends BaseEntity {
     @TableField(value = "CLASS5_SEQUENCE")
     private Integer class5Sequence;
 
+    /** 5班预计开始时间 */
+    @Excel(name = "ui.data.column.tm.scheduleResult.class5StartTime", width = 30, dateFormat = "yyyy-MM-dd HH:mm:ss")
+    @ApiModelProperty(value = "5班预计开始时间", name = "class5StartTime")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
+    @TableField(value = "CLASS5_START_TIME")
+    private Date class5StartTime;
+
+    /** 5班预计结束时间 */
+    @Excel(name = "ui.data.column.tm.scheduleResult.class5EndTime", width = 30, dateFormat = "yyyy-MM-dd HH:mm:ss")
+    @ApiModelProperty(value = "5班预计结束时间", name = "class5EndTime")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
+    @TableField(value = "CLASS5_END_TIME")
+    private Date class5EndTime;
+
     /** 5班计划量 */
     @Excel(name = "ui.data.column.tm.scheduleResult.class5PlanQty")
     @ApiModelProperty(value = "5班计划量", name = "class5PlanQty")
@@ -203,6 +279,20 @@ public class TmScheduleResult extends BaseEntity {
     @TableField(value = "CLASS6_SEQUENCE")
     private Integer class6Sequence;
 
+    /** 6班预计开始时间 */
+    @Excel(name = "ui.data.column.tm.scheduleResult.class6StartTime", width = 30, dateFormat = "yyyy-MM-dd HH:mm:ss")
+    @ApiModelProperty(value = "6班预计开始时间", name = "class6StartTime")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
+    @TableField(value = "CLASS6_START_TIME")
+    private Date class6StartTime;
+
+    /** 6班预计结束时间 */
+    @Excel(name = "ui.data.column.tm.scheduleResult.class6EndTime", width = 30, dateFormat = "yyyy-MM-dd HH:mm:ss")
+    @ApiModelProperty(value = "6班预计结束时间", name = "class6EndTime")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
+    @TableField(value = "CLASS6_END_TIME")
+    private Date class6EndTime;
+
     /** 6班计划量 */
     @Excel(name = "ui.data.column.tm.scheduleResult.class6PlanQty")
     @ApiModelProperty(value = "6班计划量", name = "class6PlanQty")
@@ -222,7 +312,7 @@ public class TmScheduleResult extends BaseEntity {
     private String class6Analysis;
 
     /** 发布状态 */
-    @Excel(name = "ui.data.column.tm.scheduleResult.releaseStatus")
+    @Excel(name = "ui.data.column.tm.scheduleResult.releaseStatus", dictType = "IS_RELEASE")
     @ApiModelProperty(value = "发布状态", name = "releaseStatus")
     @TableField(value = "RELEASE_STATUS")
     private String releaseStatus;

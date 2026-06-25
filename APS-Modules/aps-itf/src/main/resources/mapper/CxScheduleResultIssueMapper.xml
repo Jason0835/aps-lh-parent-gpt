@@ -173,6 +173,7 @@
             FACTORY_CODE = #{item.factoryCode}
         WHERE SCHEDULE_DATE = #{item.scheduleDate}
         AND MACHINE_CODE = #{item.machineCode}
+        AND EMBRYO_CODE = #{item.embryoCode}
         AND DATA_VERSION = #{item.dataVersion}
     </update>
 
@@ -212,17 +213,19 @@
                 FACTORY_CODE = #{item.factoryCode}
             WHERE SCHEDULE_DATE = #{item.scheduleDate}
             AND MACHINE_CODE = #{item.machineCode}
+            AND EMBRYO_CODE = #{item.embryoCode}
             AND DATA_VERSION = #{item.dataVersion}
         </foreach>
     </update>
 
     <select id="selectExistingByScheduleDateAndMachine" resultType="com.zlt.aps.itf.vo.MesCxScheduleResult">
-        SELECT SCHEDULE_DATE, MACHINE_CODE, DATA_VERSION
+        SELECT SCHEDULE_DATE, MACHINE_CODE, EMBRYO_CODE, DATA_VERSION
         FROM MES_CX_SCHEDULE_RESULT
         WHERE
         <foreach collection="list" item="item" separator=" OR ">
             (SCHEDULE_DATE = #{item.scheduleDate}
              AND MACHINE_CODE = #{item.machineCode}
+             AND EMBRYO_CODE = #{item.embryoCode}
              AND DATA_VERSION = #{item.dataVersion})
         </foreach>
     </select>

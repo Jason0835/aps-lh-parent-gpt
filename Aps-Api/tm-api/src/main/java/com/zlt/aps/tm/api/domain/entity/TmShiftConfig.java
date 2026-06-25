@@ -9,7 +9,6 @@ import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 
-import java.util.Date;
 
 @ApiModel(value = "胎面班制配置对象", description = "胎面班制配置对象")
 @Data
@@ -23,12 +22,6 @@ public class TmShiftConfig extends BaseEntity {
     @ApiModelProperty(value = "工厂编号", name = "factoryCode")
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;
-
-    @Excel(name = "ui.data.column.tm.shiftConfig.scheduleDate")
-    @ImportValidated(required = true, date = true)
-    @ApiModelProperty(value = "排程日期", name = "scheduleDate")
-    @TableField(value = "SCHEDULE_DATE")
-    private Date scheduleDate;
 
     @Excel(name = "ui.data.column.tm.shiftConfig.shiftCode")
     @ImportValidated(required = true, isCode = true, maxLength = 30)
@@ -49,16 +42,16 @@ public class TmShiftConfig extends BaseEntity {
     private Integer shiftOrder;
 
     @Excel(name = "ui.data.column.tm.shiftConfig.planStartTime")
-    @ImportValidated(required = true, date = true)
+    @ImportValidated(required = true, maxLength = 8)
     @ApiModelProperty(value = "计划开始时间", name = "planStartTime")
     @TableField(value = "PLAN_START_TIME")
-    private Date planStartTime;
+    private String planStartTime;
 
     @Excel(name = "ui.data.column.tm.shiftConfig.planEndTime")
-    @ImportValidated(required = true, date = true)
+    @ImportValidated(required = true, maxLength = 8)
     @ApiModelProperty(value = "计划结束时间", name = "planEndTime")
     @TableField(value = "PLAN_END_TIME")
-    private Date planEndTime;
+    private String planEndTime;
 
     @Excel(name = "ui.data.column.tm.shiftConfig.crossDayFlag", dictType = "biz_yes_no")
     @ImportValidated(required = true, dictType = "biz_yes_no", maxLength = 1)

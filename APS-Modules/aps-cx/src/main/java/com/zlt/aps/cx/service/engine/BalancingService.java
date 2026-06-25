@@ -430,12 +430,14 @@ public class BalancingService {
         log.info("任务数={}, 可用机台数={}", tasks.size(), availableMachines.size());
 
         // 过滤被收尾舍弃的任务（isLastEndingBatch=true 且 endingExtraInventory=0）
+        // 同时过滤计划量为0的任务（防御性过滤，正常情况下已在Processor层过滤）
         List<CoreScheduleAlgorithmService.DailyEmbryoTask> filteredTasks = tasks.stream()
                 .filter(t -> !(Boolean.TRUE.equals(t.getIsLastEndingBatch())
                         && (t.getEndingExtraInventory() == null || t.getEndingExtraInventory() <= 0)))
+                .filter(t -> t.getEndingExtraInventory() != null && t.getEndingExtraInventory() > 0)
                 .collect(Collectors.toList());
         if (filteredTasks.size() < tasks.size()) {
-            log.info("收尾舍弃过滤: {} 个任务被移除，剩余 {} 个", tasks.size() - filteredTasks.size(), filteredTasks.size());
+            log.info("收尾舍弃/零计划量过滤: {} 个任务被移除，剩余 {} 个", tasks.size() - filteredTasks.size(), filteredTasks.size());
             tasks = filteredTasks;
         }
 
@@ -530,7 +532,8 @@ public class BalancingService {
         }
 
         // 第零排序：约束量试任务优先（候选机台最少，必须先安排）
-        // 新增排序：续作任务优先（候选机台受限，必须先保住）
+        // 续作排序：续作任务优先（候选机台受限，必须先保住）
+        // 净需求排序：非零净需求优先于零净需求（库存已覆盖的任务在种类槽不足时让位给有实际缺口的任务）
         // 第一排序：胎胚总需求量降序（大需求优先占种类槽，产能不足时丢弃小需求更划算）
         // 第二排序：候选机台数升序（受限任务优先）
         final Set<String> availableMachineCodes = availableMachines.stream()
@@ -544,12 +547,19 @@ public class BalancingService {
                     boolean bConstrained = b.getConstrainedMachineCode() != null && !b.getConstrainedMachineCode().isEmpty();
                     if (aConstrained != bConstrained) return aConstrained ? -1 : 1;
 
-                    // 新增排序：续作任务优先（候选机台受限，必须先保住）
+                    // 续作排序：续作任务优先（候选机台受限，必须先保住）
                     boolean aContinue = a.getIsContinueTask() != null && a.getIsContinueTask()
                             && a.getContinueMachineCodes() != null && !a.getContinueMachineCodes().isEmpty();
                     boolean bContinue = b.getIsContinueTask() != null && b.getIsContinueTask()
                             && b.getContinueMachineCodes() != null && !b.getContinueMachineCodes().isEmpty();
                     if (aContinue != bContinue) return aContinue ? -1 : 1;
+
+                    // 净需求排序：非零净需求优先于零净需求
+                    // 零净需求/补充计划任务标记为 deferredRemainingDemand != null，库存已覆盖硫化需求，
+                    // 种类槽不足时应优先让位给有实际缺口的非零净需求任务
+                    boolean aZeroDemand = a.getDeferredRemainingDemand() != null;
+                    boolean bZeroDemand = b.getDeferredRemainingDemand() != null;
+                    if (aZeroDemand != bZeroDemand) return aZeroDemand ? 1 : -1;
 
                     // 第一排序：胎胚总需求量降序（大需求优先占种类槽）
                     int totalA = embryoTotalDemand.getOrDefault(a.getEmbryoCode(), 0);
@@ -1036,6 +1046,7 @@ public class BalancingService {
             sortCandidatesForDfs(candidates, embryoCode, forceKeepHistory, capacitySufficient, loadDiffThreshold);
 
             // 尝试给每个候选机台分配 k 个硫化机台数（k从1到min(remainingCount, 机台剩余容量)）
+            boolean anyRecursed = false;
             for (MachineState candidate : candidates) {
                 int maxCanAssign = Math.min(remainingCount,
                         candidate.getMaxCapacity() - candidate.getCurrentLoad());
@@ -1055,8 +1066,10 @@ public class BalancingService {
                         newTypes++;
                     }
 
-                    // 剪枝条件1：超过机台最大胎胚种类数限制（硬约束，必须剪枝）
-                    if (newTypes > candidate.getMaxTypes()) {
+                    // 剪枝条件1：新增种类超过机台最大胎胚种类数限制（硬约束，必须剪枝）
+                    // 注意：仅当胎胚是新种类时才检查，已有种类的追加分配不增加种类数
+                    // 与 findCandidateMachinesForSplit 的 isNewType && currentTypes >= maxTypes 逻辑一致
+                    if (isNewType && newTypes > candidate.getMaxTypes()) {
                         searchResult.pruneCount++;
                         continue;
                     }
@@ -1115,6 +1128,7 @@ public class BalancingService {
                     int newRemainingCount = remainingCount - assignQty;
 
                     // 如果当前胎胚还有剩余，继续分配；否则处理下一个任务
+                    anyRecursed = true;
                     if (newRemainingCount > 0) {
                         dfsAssign(tasks, taskIndex, newRemainingCount, machineStates, forceKeepHistory,
                                 typeDiffThreshold, loadDiffThreshold, totalDemand, searchResult, capacitySufficient, preOccupiedLoad);
@@ -1130,6 +1144,29 @@ public class BalancingService {
                         candidate.setCurrentTypes(candidate.getCurrentTypes() - 1);
                     }
                 }
+            }
+
+            // 所有候选机台都被剪枝（种类满或容量满）时，跳过当前任务继续处理后续任务
+            // 与 candidates.isEmpty() 的处理逻辑一致：记录部分解后递归下一个任务
+            if (!anyRecursed) {
+                int totalAssignedNow = machineStates.stream().mapToInt(MachineState::getCurrentLoad).sum() - preOccupiedLoad;
+                int totalRequiredAll = tasks.stream()
+                        .mapToInt(t -> t.getVulcanizeMachineCount() != null ? t.getVulcanizeMachineCount() : 0)
+                        .sum();
+                int partialScore = calculateBalancingScore(machineStates);
+                boolean currentBestIsComplete = (searchResult.bestAssignedCount == totalRequiredAll);
+                if (!currentBestIsComplete &&
+                        (totalAssignedNow > searchResult.bestAssignedCount ||
+                                (totalAssignedNow == searchResult.bestAssignedCount && partialScore < searchResult.bestScore))) {
+                    searchResult.bestScore = partialScore;
+                    searchResult.bestAssignedCount = totalAssignedNow;
+                    searchResult.bestIsBalanced = isBalanced(machineStates, typeDiffThreshold, loadDiffThreshold);
+                    searchResult.bestAssignments = copyAssignments(machineStates);
+                    searchResult.bestMachineCodes = copyMachineCodes(machineStates);
+                }
+                // 跳过当前任务，递归处理下一个
+                dfsAssign(tasks, taskIndex + 1, 0, machineStates, forceKeepHistory,
+                        typeDiffThreshold, loadDiffThreshold, totalDemand, searchResult, capacitySufficient, preOccupiedLoad);
             }
         } else {
             // remainingCount=0：当前任务刚完成或刚被跳过，需要处理 taskIndex 处的任务

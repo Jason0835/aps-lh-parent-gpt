@@ -118,11 +118,6 @@ export default {
           },
         },
         {
-          prop: "scheduleDate",
-          halign: "center",
-          label: this.$t("ui.data.column.tm.shiftConfig.scheduleDate"),
-        },
-        {
           prop: "shiftCode",
           halign: "center",
           label: this.$t("ui.data.column.tm.shiftConfig.shiftCode"),
@@ -141,11 +136,17 @@ export default {
           prop: "planStartTime",
           halign: "center",
           label: this.$t("ui.data.column.tm.shiftConfig.planStartTime"),
+          formatter: (row) => {
+            return row.planStartTime || "";
+          },
         },
         {
           prop: "planEndTime",
           halign: "center",
           label: this.$t("ui.data.column.tm.shiftConfig.planEndTime"),
+          formatter: (row) => {
+            return row.planEndTime || "";
+          },
         },
         {
           prop: "crossDayFlag",
@@ -213,11 +214,6 @@ export default {
           label: this.$t("ui.data.column.tm.shiftConfig.factoryCode"),
           type: "select",
           dictData: this.dict.type.biz_factory_name,
-        },
-        {
-          prop: "scheduleDate",
-          label: this.$t("ui.data.column.tm.shiftConfig.scheduleDate"),
-          type: "date",
         },
         {
           prop: "shiftCode",

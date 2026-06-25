@@ -21,6 +21,16 @@
         <el-button
           type="primary"
           plain
+          v-hasPermi="['tm:tmScheduleResult:autoPlan']"
+          @click="handleAutoPlan"
+        >{{ $t("ui.data.column.scheduleResult.autoPlan") }}</el-button>
+        <el-button
+          plain
+          @click="handleBoardRefresh"
+        >{{ $t("ui.frame.btn.refresh") }}</el-button>
+        <el-button
+          type="primary"
+          plain
           v-hasPermi="['tm:tmScheduleResult:edit']"
           @click="handleAdd"
         >{{ $t("ui.data.column.scheduleResult.insertOrder") }}</el-button>
@@ -40,6 +50,18 @@
           v-hasPermi="['tm:tmScheduleResult:changeMachine']"
           @click="handleChangeMachine"
         >{{ $t("ui.data.column.scheduleResult.changeMachine") }}</el-button>
+        <el-button
+          type="warning"
+          :disabled="selection.length !== 1"
+          v-hasPermi="['tm:tmScheduleResult:changeQty']"
+          @click="handleChangeQty"
+        >{{ $t("ui.data.column.scheduleResult.changePlan") }}</el-button>
+        <el-button
+          type="success"
+          :disabled="selection.length === 0"
+          v-hasPermi="['tm:tmScheduleResult:publish']"
+          @click="handlePublish"
+        >{{ $t("ui.data.column.scheduleResult.publish") }}</el-button>
         <el-button
           @click="handleExport"
           v-hasPermi="['tm:tmScheduleResult:export']"
@@ -62,11 +84,31 @@
 <script>
 import {mapState} from "vuex";
 import {downloadLink} from "@/utils/request";
-import {listTmScheduleResult, removeTmScheduleResult,} from "@/api/tm/scheduleResult";
+import {
+  autoPlan,
+  listScheduleShiftDates,
+  listTmScheduleResult,
+  publishScheduleResult,
+  publishValidate,
+  removeTmScheduleResult,
+} from "@/api/tm/scheduleResult";
 import tltUpload from "@/components/tltUpload/tltUpload.vue";
 import TltUploadForm from "@/views/components/tltUploadForm.vue";
 import infoDialog from "./components/infoDialog.vue";
 import changeMachineDialog from "./components/changeMachineDialog.vue";
+
+const formatDate = (date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const getOffsetDate = (offsetDay) => {
+  const date = new Date();
+  date.setDate(date.getDate() + offsetDay);
+  return formatDate(date);
+};
 
 export default {
   name: "TmScheduleResult",
@@ -76,7 +118,7 @@ export default {
     TltUploadForm,
     changeMachineDialog,
   },
-  dicts: ["biz_factory_name", "biz_yes_no", "tm_release_status", "tm_data_source"],
+  dicts: ["biz_factory_name", "biz_yes_no", "IS_RELEASE", "tm_data_source"],
   provide() {
     return {
       parentDict: this.dict,
@@ -113,6 +155,14 @@ export default {
       query: {},
       importDefaultValue: {},
       importRules: {},
+      dateList: [
+        { shift: 1, shiftType: "night", shiftDate: "" },
+        { shift: 2, shiftType: "morning", shiftDate: "" },
+        { shift: 3, shiftType: "afternoon", shiftDate: "" },
+        { shift: 4, shiftType: "night", shiftDate: "" },
+        { shift: 5, shiftType: "morning", shiftDate: "" },
+        { shift: 6, shiftType: "afternoon", shiftDate: "" },
+      ],
     };
   },
   computed: {
@@ -126,6 +176,7 @@ export default {
           prop: "factoryCode",
           label: this.$t("ui.data.column.tm.scheduleResult.factoryCode"),
           type: "select",
+          filterable: true,
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
           },
@@ -135,6 +186,12 @@ export default {
           align: "left",
           minWidth: 160,
           label: this.$t("ui.data.column.tm.scheduleResult.batchNo"),
+        },
+        {
+          prop: "orderNo",
+          align: "left",
+          minWidth: 160,
+          label: this.$t("ui.data.column.tm.scheduleResult.orderNo"),
         },
         {
           prop: "scheduleDate",
@@ -161,8 +218,10 @@ export default {
           prop: "releaseStatus",
           halign: "center",
           label: this.$t("ui.data.column.tm.scheduleResult.releaseStatus"),
+          type: "select",
+          filterable: true,
           formatter: (row, column, value) => {
-            return this.selectDictLabel(this.dict.type.tm_release_status, value);
+            return this.selectDictLabel(this.dict.type.IS_RELEASE, value);
           },
         },
         {
@@ -170,9 +229,148 @@ export default {
           halign: "center",
           label: this.$t("ui.data.column.tm.scheduleResult.tailFlag"),
           type: "select",
+          filterable: true,
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_yes_no, value);
           },
+        },
+        {
+          label: this.getShiftLabel(1),
+          children: [
+            {
+              prop: "class1Sequence",
+              align: "center",
+              label: this.$t("ui.data.column.tm.scheduleResult.class1Sequence"),
+              minWidth: 70,
+            },
+            {
+              prop: "class1PlanQty",
+              align: "center",
+              label: this.$t("ui.data.column.tm.scheduleResult.class1PlanQty"),
+              minWidth: 70,
+            },
+            {
+              prop: "class1FinishQty",
+              align: "center",
+              label: this.$t("ui.data.column.tm.scheduleResult.class1FinishQty"),
+              minWidth: 70,
+            },
+          ],
+        },
+        {
+          label: this.getShiftLabel(2),
+          children: [
+            {
+              prop: "class2Sequence",
+              align: "center",
+              label: this.$t("ui.data.column.tm.scheduleResult.class2Sequence"),
+              minWidth: 70,
+            },
+            {
+              prop: "class2PlanQty",
+              align: "center",
+              label: this.$t("ui.data.column.tm.scheduleResult.class2PlanQty"),
+              minWidth: 70,
+            },
+            {
+              prop: "class2FinishQty",
+              align: "center",
+              label: this.$t("ui.data.column.tm.scheduleResult.class2FinishQty"),
+              minWidth: 70,
+            },
+          ],
+        },
+        {
+          label: this.getShiftLabel(3),
+          children: [
+            {
+              prop: "class3Sequence",
+              align: "center",
+              label: this.$t("ui.data.column.tm.scheduleResult.class3Sequence"),
+              minWidth: 70,
+            },
+            {
+              prop: "class3PlanQty",
+              align: "center",
+              label: this.$t("ui.data.column.tm.scheduleResult.class3PlanQty"),
+              minWidth: 70,
+            },
+            {
+              prop: "class3FinishQty",
+              align: "center",
+              label: this.$t("ui.data.column.tm.scheduleResult.class3FinishQty"),
+              minWidth: 70,
+            },
+          ],
+        },
+        {
+          label: this.getShiftLabel(4),
+          children: [
+            {
+              prop: "class4Sequence",
+              align: "center",
+              label: this.$t("ui.data.column.tm.scheduleResult.class4Sequence"),
+              minWidth: 70,
+            },
+            {
+              prop: "class4PlanQty",
+              align: "center",
+              label: this.$t("ui.data.column.tm.scheduleResult.class4PlanQty"),
+              minWidth: 70,
+            },
+            {
+              prop: "class4FinishQty",
+              align: "center",
+              label: this.$t("ui.data.column.tm.scheduleResult.class4FinishQty"),
+              minWidth: 70,
+            },
+          ],
+        },
+        {
+          label: this.getShiftLabel(5),
+          children: [
+            {
+              prop: "class5Sequence",
+              align: "center",
+              label: this.$t("ui.data.column.tm.scheduleResult.class5Sequence"),
+              minWidth: 70,
+            },
+            {
+              prop: "class5PlanQty",
+              align: "center",
+              label: this.$t("ui.data.column.tm.scheduleResult.class5PlanQty"),
+              minWidth: 70,
+            },
+            {
+              prop: "class5FinishQty",
+              align: "center",
+              label: this.$t("ui.data.column.tm.scheduleResult.class5FinishQty"),
+              minWidth: 70,
+            },
+          ],
+        },
+        {
+          label: this.getShiftLabel(6),
+          children: [
+            {
+              prop: "class6Sequence",
+              align: "center",
+              label: this.$t("ui.data.column.tm.scheduleResult.class6Sequence"),
+              minWidth: 70,
+            },
+            {
+              prop: "class6PlanQty",
+              align: "center",
+              label: this.$t("ui.data.column.tm.scheduleResult.class6PlanQty"),
+              minWidth: 70,
+            },
+            {
+              prop: "class6FinishQty",
+              align: "center",
+              label: this.$t("ui.data.column.tm.scheduleResult.class6FinishQty"),
+              minWidth: 70,
+            },
+          ],
         },
         {
           prop: "updateTime",
@@ -218,16 +416,24 @@ export default {
           label: this.$t("ui.data.column.tm.scheduleResult.factoryCode"),
           type: "select",
           dictData: this.dict.type.biz_factory_name,
+          filterable: true,
         },
         {
           prop: "batchNo",
           label: this.$t("ui.data.column.tm.scheduleResult.batchNo"),
         },
         {
-          prop: "scheduleDate",
+          prop: "orderNo",
+          label: this.$t("ui.data.column.tm.scheduleResult.orderNo"),
+        },
+        {
           label: this.$t("ui.data.column.tm.scheduleResult.scheduleDate"),
-          type: "daterange",
+          prop: "scheduleDateQuery",
+          type: "date",
           valueFormat: "yyyy-MM-dd",
+          listeners: {
+            change: this.handleScheduleDateChange,
+          },
         },
         {
           prop: "treadCode",
@@ -246,17 +452,71 @@ export default {
           prop: "releaseStatus",
           label: this.$t("ui.data.column.tm.scheduleResult.releaseStatus"),
           type: "select",
-          dictData: this.dict.type.tm_release_status,
+          dictData: this.dict.type.IS_RELEASE,
           filterable: true,
         },
       ];
     },
   },
   methods: {
+    getShiftLabel(shiftIndex) {
+      const item = this.dateList[shiftIndex - 1];
+      if (!item) return "";
+      const shiftNameMap = {
+        night: this.$t("ui.data.column.scheduleResult.nightShift"),
+        morning: this.$t("ui.data.column.scheduleResult.morningShift"),
+        afternoon: this.$t("ui.data.column.scheduleResult.middleShift"),
+      };
+      const shiftName = shiftNameMap[item.shiftType] || "";
+      return shiftName + " " + (item.shiftDate || "");
+    },
+    handleScheduleDateChange(val) {
+      this.query.scheduleDateQuery = val;
+      this.getDate();
+    },
+    async getDate() {
+      try {
+        let res = await listScheduleShiftDates({
+          scheduleDateQuery: this.query.scheduleDateQuery || this.search.scheduleDateQuery,
+        });
+        if (res && res.length > 0) {
+          this.dateList = res;
+        }
+      } catch (error) {
+        console.error(error);
+      }
+    },
     handleAdd() {
       if (this.$refs.infoRef) {
         this.$refs.infoRef.show();
       }
+    },
+    // 自动排程入口：先校验旧批次，全部未发布时由用户确认后再覆盖。
+    handleAutoPlan() {
+      const params = this.buildAutoPlanParams();
+      validateAutoPlan(params).then((validateResult) => {
+        const result = validateResult.data || {};
+        if (result.confirmRequired) {
+          this.$confirm(result.message, {
+            type: "warning",
+          }).then(() => {
+            this.doAutoPlan({
+              ...params,
+              confirmOverwrite: true,
+            });
+          });
+          return;
+        }
+        this.doAutoPlan(params);
+      });
+    },
+    // 执行自动排程请求。
+    doAutoPlan(params) {
+      autoPlan(params).then((data) => {
+        const message = data.data && data.data.message ? data.data.message : data.msg;
+        this.$modal.msgSuccess(message);
+        this.getList();
+      });
     },
     // 转机台弹窗
     handleChangeMachine() {
@@ -264,6 +524,26 @@ export default {
         let row = this.selection;
         this.$refs.changeMachineRef.show(row);
       }
+    },
+    // 调量入口：复用编辑弹窗，由弹窗根据编辑状态调用调量接口。
+    handleChangeQty() {
+      if (this.$refs.infoRef && this.selection.length === 1) {
+        this.$refs.infoRef.show(this.selection[0]);
+      }
+    },
+    // 发布入口：先校验再标记待发布，真实 MES 发布由后续发布流程接入。
+    handlePublish() {
+      const ids = this.selection.map((item) => item.id);
+      this.$confirm(this.$t("ui.biz.alter.makeSurePublish"), {
+        type: "warning",
+      }).then(() => {
+        publishValidate(ids).then(() => {
+          publishScheduleResult(ids).then((data) => {
+            this.$modal.msgSuccess(data.msg);
+            this.getList();
+          });
+        });
+      });
     },
     handleEdit(row) {
       if (this.$refs.infoRef) {
@@ -332,12 +612,26 @@ export default {
       downloadLink("/tm/tmScheduleResult/export", this.formatParams(false));
     },
 
+    buildAutoPlanParams() {
+      const scheduleDate = Array.isArray(this.query.scheduleDate)
+        ? this.query.scheduleDate[0]
+        : this.query.scheduleDate;
+      return {
+        factoryCode: this.query.factoryCode || this.search.factoryCode,
+        scheduleDate,
+        dataSource: "AUTO",
+      };
+    },
+
     formatParams(hasPage = true) {
       const params = {
         ...this.query,
         ...this.sort,
       };
-
+      if (!params.orderByColumn) {
+        params.orderByColumn = "scheduleDate,machineCode,class1Sequence";
+        params.isAsc = "asc,asc,asc";
+      }
       if (hasPage) {
         params.pageSize = this.page.pageSize;
         params.pageNum = this.page.current;
@@ -354,6 +648,7 @@ export default {
     async getList() {
       try {
         this.loading = true;
+        await this.getDate();
         const data = await listTmScheduleResult(this.formatParams());
         this.data = data.rows;
         this.page.total = data.total;
@@ -371,9 +666,11 @@ export default {
     };
     this.search = {
       ...defaultParams,
+      scheduleDateQuery: getOffsetDate(2),
     };
     this.query = {
       ...defaultParams,
+      scheduleDateQuery: getOffsetDate(2),
     };
     this.getList();
   },

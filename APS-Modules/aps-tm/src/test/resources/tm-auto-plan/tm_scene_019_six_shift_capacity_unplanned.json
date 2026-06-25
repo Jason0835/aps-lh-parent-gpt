@@ -1,0 +1,94 @@
+{
+  "sceneCode": "TM_SCENE_019",
+  "caseName": "TM_SCENE_019_six_shift_capacity_unplanned",
+  "description": "TM_SCENE_019：6 班后仍不足写未排",
+  "designSteps": [
+    "Step15",
+    "Step18",
+    "Step19"
+  ],
+  "mysqlVerificationStatus": "待用户执行 MySQL 验证",
+  "autoPlanRequest": {
+    "factoryCode": "F1",
+    "scheduleDate": "2026-07-19",
+    "operator": "TM_AUTO_PLAN_TEST",
+    "traceId": "TRACE-TM_SCENE_019",
+    "confirmOverwrite": false
+  },
+  "params": [
+    {
+      "factoryCode": "F1",
+      "paramCode": "TM_ALGORITHM_SWITCH",
+      "paramValue": "2",
+      "enableStatus": "1"
+    }
+  ],
+  "cxScheduleResults": [
+    {
+      "orderNo": "TM_SCENE_019_001",
+      "embryoCode": "CX-TM_SCENE_019_001",
+      "class1PlanQty": 0,
+      "class2PlanQty": 2500,
+      "class3PlanQty": 0,
+      "class4PlanQty": 0,
+      "class5PlanQty": 0,
+      "class6PlanQty": 0,
+      "treadCode": "TM_TREAD_1901",
+      "treadShoulderLength": 1,
+      "treadMouthPlate": "MP_A",
+      "treadRubberCategory": "GLUE_A"
+    }
+  ],
+  "stocks": [
+    {
+      "factoryCode": "F1",
+      "stockDate": "2026-07-18",
+      "treadCode": "TM_TREAD_1901",
+      "stockQty": 0
+    }
+  ],
+  "machineInfos": [
+    {
+      "factoryCode": "F1",
+      "machineCode": "TM_M01",
+      "machineStatus": "1",
+      "maxCapacity": 100
+    },
+    {
+      "factoryCode": "F1",
+      "machineCode": "TM_M02",
+      "machineStatus": "1",
+      "maxCapacity": 100
+    }
+  ],
+  "machineSpeeds": [
+    {
+      "factoryCode": "F1",
+      "machineCode": "TM_M01",
+      "productSpeed": 100
+    },
+    {
+      "factoryCode": "F1",
+      "machineCode": "TM_M02",
+      "productSpeed": 100
+    }
+  ],
+  "mouthPlates": [
+    {
+      "factoryCode": "F1",
+      "machineCode": "TM_M01",
+      "mouthPlateCode": "MP_A"
+    },
+    {
+      "factoryCode": "F1",
+      "machineCode": "TM_M02",
+      "mouthPlateCode": "MP_A"
+    }
+  ],
+  "expected": {
+    "success": true,
+    "messageContains": "胎面自动排程执行完成",
+    "expectedResults": [],
+    "expectedExplains": []
+  }
+}

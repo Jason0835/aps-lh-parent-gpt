@@ -24,7 +24,7 @@
           type="primary"
              v-hasPermi="['monthplan:demandPlan:edit']"
           @click="handleEdit(selection[0])"
-          >{{ $t("ui.data.DemandPlan.structurePriority") }}
+          >{{ $t("ui.data.demandPlan.structurePriority") }}
         </el-button>
         <el-button
           type="primary"
@@ -32,7 +32,7 @@
           plain
           @click="generPlan"
           v-hasPermi="['monthplan:demandPlan:createMonthRequire']"
-          >{{ $t("ui.data.DemandPlan.createMonthRequire") }}
+          >{{ $t("ui.data.demandPlan.createMonthRequire") }}
         </el-button>
         <el-button
           type="primary"
@@ -40,7 +40,7 @@
           plain
            v-hasPermi="['monthplan:demandPlan:confirmSubmit']"
           @click="handleSubmit"
-          >{{ $t("ui.data.DemandPlan.submitConfirm") }}
+          >{{ $t("ui.data.demandPlan.submitConfirm") }}
         </el-button>
         <el-button
           type="primary"
@@ -48,7 +48,7 @@
           :loading="btnLoading"
            v-hasPermi="['monthplan:demandPlan:cancelSubmit']"
           @click="handleRevoke"
-          >{{ $t("ui.data.DemandPlan.revokeSubmit") }}
+          >{{ $t("ui.data.demandPlan.revokeSubmit") }}
         </el-button>
         <el-button
           type="primary"
@@ -56,14 +56,14 @@
           :loading="btnLoading"
            v-hasPermi="['monthplan:demandPlan:extendsConfiguration']"
           @click="handleExtends"
-          >{{ $t("ui.data.DemandPlan.inheritConfig") }}
+          >{{ $t("ui.data.demandPlan.inheritConfig") }}
         </el-button>
         <!-- <el-button
           type="success"
           plain
           v-hasPermi="['monthplan:productionMouldConfiguration:add']"
           @click="handleChanged"
-          >{{ $t("ui.data.DemandPlan.priorityAdjust") }}
+          >{{ $t("ui.data.demandPlan.priorityAdjust") }}
         </el-button> -->
         <!-- <el-button
           type="primary"
@@ -192,7 +192,7 @@ export default {
   data() {
     return {
       btnLoading:false,
-      title: this.$t("ui.data.DemandPlan.priorityAdjust"),
+      title: this.$t("ui.data.demandPlan.priorityAdjust"),
       versionList: [],
       createLoading: false,
       loading: false,
@@ -250,22 +250,22 @@ export default {
         { type: "selection", fixed: "left" },
         {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.demandPlan.factoryCode"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
           },
         },
         {
           prop: "year",
-          label: this.$t("ui.data.column.productionMouldConfiguration.year"),
+          label: this.$t("ui.data.column.demandPlan.year"),
         },
         {
           prop: "month",
-          label: this.$t("ui.data.column.productionMouldConfiguration.month"),
+          label: this.$t("ui.data.column.demandPlan.month"),
         },
         {
           prop: "productTypeCode",
-          label: this.$t("ui.data.column.monthplan.productType"),
+          label: this.$t("ui.data.column.demandPlan.productTypeCode"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_product_type, value);
           },
@@ -273,7 +273,7 @@ export default {
 
         {
           prop: "locationType",
-          label: this.$t("common.type"),
+          label: this.$t("ui.data.column.demandPlan.locationType"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_stor_type, value);
           },
@@ -285,7 +285,7 @@ export default {
         },
         {
           prop: "brand",
-          label: this.$t("common.brand"),
+          label: this.$t("ui.data.column.demandPlan.brand"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_brand_type, value);
           },
@@ -293,7 +293,7 @@ export default {
         },
         {
           prop: "scmPriority",
-          label: this.$t("ui.data.DemandPlan.materialPriority"),
+          label: this.$t("ui.data.column.demandPlan.scmPriority"),
           // width:120,
           // formatter: (row, column, value) => {
           //   return this.selectDictLabel(this.dict.type.biz_order_type, value);
@@ -331,7 +331,7 @@ export default {
         },
         {
           prop: "structurePriority",
-          label: this.$t("ui.data.DemandPlan.structurePriority"),
+          label: this.$t("ui.data.column.demandPlan.structurePriority"),
           width:120,
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_yes_no, value);
@@ -341,28 +341,28 @@ export default {
 
         {
           prop: "structureName",
-          label: this.$t("ui.data.column.finishStock.structureName"),
+          label: this.$t("ui.data.column.demandPlan.structureName"),
           width: 180,
         },
         {
           prop: "mainPattern",
-          label: this.$t("ui.data.column.moldLedger.mainPattern"),
+          label: this.$t("ui.data.column.demandPlan.mainPattern"),
           width: 120,
         },
         {
           prop: "materialCode",
-          label: this.$t("ui.data.column.monthplan.oriMaterialCode"),
+          label: this.$t("ui.data.column.demandPlan.materialCode"),
           width: 120,
         },
         {
           prop: "materialDesc",
-          label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
+          label: this.$t("ui.data.column.demandPlan.materialDesc"),
           align: "left",
           minWidth: 350,
         },
         {
           prop: "productionType",
-          label: this.$t("ui.data.DemandPlan.productionType"),
+          label: this.$t("ui.data.column.demandPlan.productionType"),
           width: 120,
           formatter: (row, column, value) => {
             return this.selectDictLabel(
@@ -373,22 +373,22 @@ export default {
         },
         {
           prop: "stockQty",
-          label: this.$t("ui.data.demandPlan.stockQtyTotal"),
+          label: this.$t("ui.data.column.demandPlan.stockQty"),
           width: 120,
         },
         {
           prop: "sub2YearStockQty",
-          label: this.$t("ui.data.DemandPlan.yearMinus2Dot"),
+          label: this.$t("ui.data.column.demandPlan.sub2YearStockQty"),
           width: 120,
         },
         {
           prop: "sub1YearStockQty",
-          label: this.$t("ui.data.DemandPlan.yearMinus1Dot"),
+          label: this.$t("ui.data.column.demandPlan.sub1YearStockQty"),
           width: 120,
         },
         {
           prop: "currentYearStockQty",
-          label: this.$t("ui.data.DemandPlan.year0Dot"),
+          label: this.$t("ui.data.column.demandPlan.currentYearStockQty"),
           width: 120,
         },
         // {
@@ -411,7 +411,7 @@ export default {
         // },
         {
           prop: "orderQty",
-          label: this.$t("ui.data.DemandPlan.orderQty"),
+          label: this.$t("ui.data.column.demandPlan.orderQty"),
         },
         // {
         //   prop: "stockQty",
@@ -419,15 +419,15 @@ export default {
         // },
         {
           prop: "plannedSurplus",
-          label: this.$t("ui.data.DemandPlan.plannedSurplus"),
+          label: this.$t("ui.data.column.demandPlan.plannedSurplus"),
         },
         {
           prop: "netQty",
-          label: this.$t("ui.data.DemandPlan.netQty"),
+          label: this.$t("ui.data.column.demandPlan.netQty"),
           renderColumnHeader: () => {
             return (
               <span>
-                {this.$t("ui.data.DemandPlan.netQty")}
+                {this.$t("ui.data.column.demandPlan.netQty")}
                 <el-tooltip
                   content={this.$t("ui.data.tooltip.netQty")}
                   placement="top"
@@ -440,7 +440,7 @@ export default {
         },
         {
           prop: "isProduction",
-          label: this.$t("ui.data.DemandPlan.isProduction"),
+          label: this.$t("ui.data.column.demandPlan.isProduction"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_yes_no, value);
           },
@@ -497,7 +497,7 @@ export default {
         },
         {
           prop: "isSchedule",
-          label: this.$t("ui.data.DemandPlan.isSchedule"),
+          label: this.$t("ui.data.column.demandPlan.isSchedule"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_yes_no, value);
           },
@@ -538,11 +538,11 @@ export default {
         },
         {
           prop: "postponeNetQty",
-          label: this.$t("ui.data.DemandPlan.postponeNetQty"),
+          label: this.$t("ui.data.column.demandPlan.postponeNetQty"),
           renderColumnHeader: () => {
             return (
               <span>
-                {this.$t("ui.data.DemandPlan.postponeNetQty")}
+                {this.$t("ui.data.column.demandPlan.postponeNetQty")}
                 <el-tooltip
                   content={this.$t("ui.data.tooltip.postponeNetQty")}
                   placement="top"
@@ -555,11 +555,11 @@ export default {
         },
         {
           prop: "unPostponeNetQty",
-          label: this.$t("ui.data.DemandPlan.unPostponeNetQty"),
+          label: this.$t("ui.data.column.demandPlan.unPostponeNetQty"),
           renderColumnHeader: () => {
             return (
               <span>
-                {this.$t("ui.data.DemandPlan.unPostponeNetQty")}
+                {this.$t("ui.data.column.demandPlan.unPostponeNetQty")}
                 <el-tooltip
                   content={this.$t("ui.data.tooltip.unPostponeNetQty")}
                   placement="top"
@@ -572,42 +572,42 @@ export default {
         },
         {
           prop: "heightQty",
-          label: this.$t("ui.data.DemandPlan.heightQty"),
+          label: this.$t("ui.data.column.demandPlan.heightQty"),
         },
         {
           prop: "midQty",
-          label: this.$t("ui.data.DemandPlan.midQty"),
+          label: this.$t("ui.data.column.demandPlan.midQty"),
         },
         {
           prop: "postponeQty",
-          label: this.$t("ui.data.DemandPlan.postponeQty"),
+          label: this.$t("ui.data.column.demandPlan.postponeQty"),
         },
         {
           prop: "cycleReserveQty",
-          label: this.$t("ui.data.DemandPlan.cycleReserveQty"),
+          label: this.$t("ui.data.column.demandPlan.cycleReserveQty"),
         },
         {
           prop: "conventionReserveQty",
-          label: this.$t("ui.data.DemandPlan.conventionReserveQty"),
+          label: this.$t("ui.data.column.demandPlan.conventionReserveQty"),
         },
         {
           prop: "isReachMinProductionQty",
-          label: this.$t("ui.data.DemandPlan.isReachMinProductionQty"),
+          label: this.$t("ui.data.column.demandPlan.isReachMinProductionQty"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_yes_no, value);
           },
         },
         {
           prop: "minProductionQty",
-          label: this.$t("ui.data.DemandPlan.minProductionQty"),
+          label: this.$t("ui.data.column.demandPlan.minProductionQty"),
         },
         {
           prop: "remark",
-          label: this.$t("common.remark"),
+          label: this.$t("ui.data.column.demandPlan.remark"),
         },
         {
           prop: "updateTime",
-          label: this.$t("ui.data.column.scheduleAdjust.updata"),
+          label: this.$t("ui.data.column.demandPlan.updateTime"),
           width: 180,
         },
       ];
@@ -618,7 +618,7 @@ export default {
       return [
         {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.demandPlan.factoryCode"),
           type: "select",
           dictData: this.dict.type.biz_factory_name,
           clearable: false,
@@ -648,13 +648,13 @@ export default {
         },
         {
           prop: "productTypeCode",
-          label: this.$t("ui.data.column.monthplan.productType"),
+          label: this.$t("ui.data.column.demandPlan.productTypeCode"),
           type: "select",
           dictData: this.dict.type.biz_product_type,
         },
         {
           prop: "structureName",
-          label: this.$t("ui.data.column.finishStock.structureName"),
+          label: this.$t("ui.data.column.demandPlan.structureName"),
           type: "select",
           dictData: this.structureList,
           filterable: true,
@@ -673,47 +673,47 @@ export default {
         },
         {
           prop: "isReachMinProductionQty",
-          label: this.$t("ui.data.DemandPlan.isReachMinProductionQty"),
+          label: this.$t("ui.data.column.demandPlan.isReachMinProductionQty"),
           type: "select",
           dictData: this.dict.type.biz_yes_no,
         },
         {
           prop: "materialCode",
-          label: this.$t("ui.data.column.monthplan.oriMaterialCode"),
+          label: this.$t("ui.data.column.demandPlan.materialCode"),
         },
         {
           prop: "materialDesc",
-          label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
+          label: this.$t("ui.data.column.demandPlan.materialDesc"),
           minWidth: 350,
           align: "left",
         },
         {
           prop: "scmPriority",
-          label: this.$t("ui.data.DemandPlan.materialPriority"),
+          label: this.$t("ui.data.column.demandPlan.scmPriority"),
           type: "select",
           dictData: this.dict.type.biz_yes_no,
         },
         {
           prop: "structurePriority",
-          label: this.$t("ui.data.DemandPlan.structurePriority"),
+          label: this.$t("ui.data.column.demandPlan.structurePriority"),
           type: "select",
           dictData: this.dict.type.biz_yes_no,
         },
         {
           prop: "isProduction",
-          label: this.$t("ui.data.DemandPlan.isProduction"),
+          label: this.$t("ui.data.column.demandPlan.isProduction"),
           type: "select",
           dictData: this.dict.type.biz_yes_no,
         },
         {
           prop: "viewFlag",
-          label: this.$t("ui.data.DemandPlan.showAllNetQty"),
+          label: this.$t("ui.data.demandPlan.showAllNetQty"),
           type: "select",
           dictData: this.dict.type.biz_yes_no,
         },
         {
           prop: "productionType",
-          label: this.$t("ui.data.DemandPlan.productionType"),
+          label: this.$t("ui.data.column.demandPlan.productionType"),
           type: "select",
           dictData: this.dict.type.biz_schedule_type,
         },
@@ -759,7 +759,7 @@ export default {
       }
     },
     async handleRevoke(){
-      this.$confirm(this.$t("ui.data.DemandPlan.confirmRevoke"), {
+      this.$confirm(this.$t("ui.data.demandPlan.confirmRevoke"), {
         type: "warning",
       }).then(() => {
         this.btnLoading=true
@@ -786,7 +786,7 @@ export default {
       });
     },
     async handleExtends(){
-      this.$confirm(this.$t("ui.data.DemandPlan.confirmInherit"), {
+      this.$confirm(this.$t("ui.data.demandPlan.confirmInherit"), {
         type: "warning",
       }).then(() => {
         this.btnLoading=true
@@ -899,18 +899,18 @@ export default {
           type: "select",
         },
       ]),
-        (this.title = this.$t("ui.data.DemandPlan.priorityAdjust"));
+        (this.title = this.$t("ui.data.demandPlan.priorityAdjust"));
       this.visible = true;
     },
     handleRow() {
       (this.formColumns = [
         {
-          prop: "ui.data.DemandPlan.isProduction",
-          label: this.$t("ui.data.DemandPlan.isProduction"),
+          prop: "ui.data.column.demandPlan.isProduction",
+          label: this.$t("ui.data.column.demandPlan.isProduction"),
           type: "select",
         },
       ]),
-        (this.title = this.$t("ui.data.DemandPlan.isProduction"));
+        (this.title = this.$t("ui.data.column.demandPlan.isProduction"));
       this.visible = true;
     },
     handleAdd() {

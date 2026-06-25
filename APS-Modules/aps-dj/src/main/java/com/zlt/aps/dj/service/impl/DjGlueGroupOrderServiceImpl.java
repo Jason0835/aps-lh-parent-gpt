@@ -19,19 +19,19 @@ import org.springframework.stereotype.Service;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.utils.SecurityUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.ruoyi.common.core.web.domain.BaseEntity;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.common.core.constant.ApsConstant;
-import com.zlt.aps.common.core.domain.ApsBaseEntity;
 import com.zlt.aps.common.core.utils.ImportUtil;
 import com.zlt.aps.dj.api.domain.dto.DjGlueGroupOrderDto;
 import com.zlt.aps.dj.api.domain.entity.DjGlueGroupOrder;
 import com.zlt.aps.dj.mapper.DjGlueGroupOrderMapper;
 import com.zlt.aps.dj.service.DjGlueGroupOrderService;
+import com.zlt.bill.common.service.AbstractDocService;
 
 
 /**
@@ -43,7 +43,7 @@ import com.zlt.aps.dj.service.DjGlueGroupOrderService;
  * @since 2021-05-25
  */
 @Service
-public class DjGlueGroupOrderServiceImpl extends ServiceImpl<DjGlueGroupOrderMapper, DjGlueGroupOrder> implements DjGlueGroupOrderService {
+public class DjGlueGroupOrderServiceImpl extends AbstractDocService<DjGlueGroupOrder> implements DjGlueGroupOrderService {
 
     @Resource
     private DjGlueGroupOrderMapper ncGlueGroupOrderMapper;
@@ -58,16 +58,6 @@ public class DjGlueGroupOrderServiceImpl extends ServiceImpl<DjGlueGroupOrderMap
     }
 
     /**
-     * 保存胶料组别顺序信息（id为空则新增，id不为空则修改）
-     *
-     * @param entity
-     */
-    public void saveGlueGroupOrder(DjGlueGroupOrder entity) {
-        entity.setBaseVale(entity.getId());  //根据id是否为空给创建时间，创建人，更新时间，更新人赋值
-        this.saveOrUpdate(entity);
-    }
-
-    /**
      * 根据code判断胶料组号是否已经存在
      */
     public String checkGlueGroupCodeUnique(DjGlueGroupOrderDto dto) {
@@ -76,9 +66,8 @@ public class DjGlueGroupOrderServiceImpl extends ServiceImpl<DjGlueGroupOrderMap
         }
         QueryWrapper<DjGlueGroupOrder> queryWrapper = new QueryWrapper<>();
         queryWrapper.eq("GLUE_GROUP_CODE", dto.getGlueGroupCode());
-        queryWrapper.eq("DEL_FLAG", ApsConstant.DEL_FLAG_NORMAL);
         if (dto.getId() != null) {
-            queryWrapper.ne("ID", dto.getId());  //编辑的时候校验，要过滤掉自身的id
+            queryWrapper.ne("ID", dto.getId());
         }
         List<DjGlueGroupOrder> list = ncGlueGroupOrderMapper.selectList(queryWrapper);
         if (list.size() > 0) {
@@ -88,24 +77,13 @@ public class DjGlueGroupOrderServiceImpl extends ServiceImpl<DjGlueGroupOrderMap
     }
 
     /**
-     * 批量删除(逻辑删)
+     * 查询出被使用了的胶料组别
      *
-     * @param ids 多个id逗号分割
+     * @param glueGroupIds
+     * @return
      */
-    public void deleteGlueGroupOrder(Long[] ids) {
-        List<Long> glueGroupIds = Arrays.asList(ids);
-        List<String> usedGlueGroupList = ncGlueGroupOrderMapper.listUserdGlueGroup(glueGroupIds);  //查询出已经被使用的胶料组别
-        if (usedGlueGroupList != null && !usedGlueGroupList.isEmpty()) {
-            String groupNames = "'" + String.join("'，'", usedGlueGroupList) + "'";
-            throw new RuntimeException(groupNames + I18nUtil.getMessage("胶料组别已被使用，禁止删除！"));
-        }
-
-        LambdaUpdateWrapper<DjGlueGroupOrder> wrapper = new LambdaUpdateWrapper<>();
-        wrapper.in(ApsBaseEntity::getId, Arrays.asList(ids));
-        wrapper.set(ApsBaseEntity::getDelFlag, null);
-        wrapper.set(ApsBaseEntity::getUpdateBy, SecurityUtils.getUsername());
-        wrapper.set(ApsBaseEntity::getUpdateTime, new Date());
-        super.getBaseMapper().update(null, wrapper);
+    public List<String> listUserdGlueGroup(List<Long> glueGroupIds) {
+        return ncGlueGroupOrderMapper.listUserdGlueGroup(glueGroupIds);
     }
 
     /**
@@ -117,7 +95,7 @@ public class DjGlueGroupOrderServiceImpl extends ServiceImpl<DjGlueGroupOrderMap
      * @return 导入后提示信息
      */
     @Override
-    public AjaxResult importData(List<DjGlueGroupOrderDto> list, boolean updateSupport, Long importLogId) {
+    public AjaxResult importData(List<DjGlueGroupOrder> list, boolean updateSupport, Long importLogId) {
         int successNum = 0;
         int failureNum = 0;
         // 校验
@@ -128,7 +106,7 @@ public class DjGlueGroupOrderServiceImpl extends ServiceImpl<DjGlueGroupOrderMap
         Map<String, Long> groupMap = list.stream().collect(Collectors.groupingBy(a -> a.getGlueGroupCode(), Collectors.counting()));
 
         for (int i = 0; i < list.size(); i++) {
-            DjGlueGroupOrderDto glueGroupOrder = list.get(i);
+            DjGlueGroupOrder glueGroupOrder = list.get(i);
 
             //重复记录校验
             Long hasValue = groupMap.get(glueGroupOrder.getGlueGroupCode());
@@ -144,8 +122,9 @@ public class DjGlueGroupOrderServiceImpl extends ServiceImpl<DjGlueGroupOrderMap
 
             List<ImportErrorLog> validated = ImportUtil.validated(importLogId, i + 2, glueGroupOrder);
             if (CollectionUtils.isEmpty(validated)) {
-                glueGroupOrder.setBaseVale(null);
-                importList.add(glueGroupOrder);
+                glueGroupOrder.setId(null);
+                importList.add(BeanUtils.instantiateClass(DjGlueGroupOrderDto.class));
+                BeanUtils.copyProperties(glueGroupOrder, importList.get(importList.size() - 1));
             } else {
                 failureNum++;
                 glueGroupOrder.setId(-999L);
@@ -160,12 +139,15 @@ public class DjGlueGroupOrderServiceImpl extends ServiceImpl<DjGlueGroupOrderMap
             } else {
                 //查询数据库已存在对象
                 for (int i = 0; i < list.size(); i++) {
-                    DjGlueGroupOrderDto excelItem = list.get(i);
+                    DjGlueGroupOrder excelItem = list.get(i);
                     if (excelItem.getId() != null && excelItem.getId().equals(-999L)) {
                         continue;
                     }
+                    // 拼接DTO用于唯一性校验
+                    DjGlueGroupOrderDto dto = new DjGlueGroupOrderDto();
+                    BeanUtils.copyProperties(excelItem, dto);
                     // 唯一性校验
-                    String unique = checkGlueGroupCodeUnique(excelItem);
+                    String unique = checkGlueGroupCodeUnique(dto);
                     if (UserConstants.UNIQUE.equals(unique)) {
                         //不存在插入
                         successNum++;
@@ -193,5 +175,10 @@ public class DjGlueGroupOrderServiceImpl extends ServiceImpl<DjGlueGroupOrderMap
         } else {
             return AjaxResult.success(I18nUtil.getMessage("ui.message.import.success") + "," + successNum);
         }
+    }
+
+    @Override
+    protected String getDocTypeCode() {
+        return "";
     }
 }

@@ -139,7 +139,11 @@ public class MdmSkuLhCapacityServiceImpl extends AbstractDocService<MdmSkuLhCapa
     }
 
     /**
-     * 计算日标准产量
+     * 计算班产量（向下取整后取最邻近的偶数）
+     * <p>先用向下取整计算班产量，然后判断整数部分是否为奇数：
+     * 奇数则+1变为偶数，偶数直接取。</p>
+     * <p>例如：20÷3=6.667 → 向下取整6(偶数不变) → 6; 21÷3=7 → 7(奇数+1) → 8</p>
+     *
      * @param billVO 要计算的对象
      */
     @Override
@@ -147,8 +151,14 @@ public class MdmSkuLhCapacityServiceImpl extends AbstractDocService<MdmSkuLhCapa
         int paramValue = this.getParamValue();
         Integer standardCapacity = billVO.getStandardCapacity();
         if (standardCapacity != null && paramValue != 0) {
-            BigDecimal result = new BigDecimal(standardCapacity).divide(new BigDecimal(paramValue), RoundingMode.UP);
-            billVO.setClassCapacity(result.intValue());
+            // 向下取整得到班产量
+            BigDecimal result = new BigDecimal(standardCapacity).divide(new BigDecimal(paramValue), RoundingMode.DOWN);
+            int classCapacity = result.intValue();
+            // 取最邻近的偶数：奇数+1，偶数不变
+            if (classCapacity % 2 != 0) {
+                classCapacity = classCapacity + 1;
+            }
+            billVO.setClassCapacity(classCapacity);
         } else {
             billVO.setClassCapacity(0);
         }

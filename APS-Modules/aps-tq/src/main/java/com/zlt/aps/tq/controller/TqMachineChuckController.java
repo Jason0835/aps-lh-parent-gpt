@@ -136,17 +136,17 @@ public class TqMachineChuckController extends AbstractDocBizController<TqMachine
         wrapper.last("ORDER BY " + getOrderBy());
         List<TqMachineChuck> list = tqMachineChuckMapper.selectList(wrapper);
 
-        Map<Long, String> machineMap = new HashMap<>();
+        Map<String, String> machineMap = new HashMap<>();
         if (!list.isEmpty()) {
             List<TqMachineInfo> machineList = tqMachineInfoService.selectMachineInfoList(new TqMachineInfo());
             machineMap = machineList.stream()
-                    .collect(Collectors.toMap(TqMachineInfo::getId, TqMachineInfo::getMachineName, (v1, v2) -> v1));
+                    .collect(Collectors.toMap(TqMachineInfo::getMachineCode, TqMachineInfo::getMachineName, (v1, v2) -> v1));
         }
 
         List<TqMachineChuckExportVO> voList = new ArrayList<>();
         for (TqMachineChuck chuck : list) {
             TqMachineChuckExportVO vo = new TqMachineChuckExportVO();
-            vo.setMachineName(machineMap.getOrDefault(chuck.getMachineId(), ""));
+            vo.setMachineName(machineMap.getOrDefault(chuck.getMachineCode(), ""));
             vo.setChuckCode(chuck.getChuckCode());
             vo.setChuckName(chuck.getChuckName());
             vo.setInchSize(chuck.getInchSize());
@@ -160,6 +160,6 @@ public class TqMachineChuckController extends AbstractDocBizController<TqMachine
     @Override
     protected void builderCondition(QueryWrapper<TqMachineChuck> queryWrapper, TqMachineChuck queryVO) {
         queryWrapper.eq("IS_DELETE", 0);
-        queryWrapper.eq(queryVO.getMachineId() != null, "MACHINE_ID", queryVO.getMachineId());
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getMachineCode()), "MACHINE_CODE", queryVO.getMachineCode());
     }
 }

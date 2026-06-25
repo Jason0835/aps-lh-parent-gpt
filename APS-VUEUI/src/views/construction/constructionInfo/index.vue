@@ -149,7 +149,7 @@ export default {
         { type: "selection", fixed: "left" },
         {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.mdmBomInfo.factoryCode"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
           },
@@ -157,28 +157,28 @@ export default {
 
         {
           prop: "parentMaterialCode",
-          label: this.$t("ui.data.column.boom.fatherCode"),
+          label: this.$t("ui.data.column.mdmBomInfo.parentMaterialCode"),
           width: 180,
         },
 
         {
           prop: "parentMaterialName",
-          label: this.$t("ui.data.column.boom.fatherName"),
+          label: this.$t("ui.data.column.mdmBomInfo.parentMaterialName"),
           width: 180,
         },
         {
           prop: "parentVersion",
-          label: this.$t("ui.data.column.boom.parentVersion"),
+          label: this.$t("ui.data.column.mdmBomInfo.parentVersion"),
           width: 180,
         },
         {
           prop: "bomVersion",
-          label: this.$t("ui.data.column.boom.boomVersion"),
+          label: this.$t("ui.data.column.mdmBomInfo.bomVersion"),
           width: 180,
         },
         {
           prop: "productionStage",
-          label: this.$t("ui.data.column.cx.bom.productionStage"),
+          label: this.$t("ui.data.column.mdmBomInfo.productionStage"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.production_stage, value);
           },
@@ -190,42 +190,42 @@ export default {
         // },
         {
           prop: "childMaterialCode",
-          label: this.$t("ui.data.column.boom.chirenCode"),
+          label: this.$t("ui.data.column.mdmBomInfo.childMaterialCode"),
           width: 180,
         },
         {
           prop: "childMaterialName",
-          label: this.$t("ui.data.column.boom.chirenName"),
+          label: this.$t("ui.data.column.mdmBomInfo.childMaterialName"),
           width: 180,
         },
         {
           prop: "childCode",
-          label: this.$t("ui.data.column.boom.chirenType"),
+          label: this.$t("ui.data.column.mdmBomInfo.childCode"),
           width: 180,
         },
         {
           prop: "childMaterialVersion",
-          label: this.$t("ui.data.column.boom.childMaterialVersion"),
+          label: this.$t("ui.data.column.mdmBomInfo.childMaterialVersion"),
           width: 180,
         },
         {
           prop: "unit",
-          label: this.$t("ui.data.column.boom.unit"),
+          label: this.$t("ui.data.column.mdmBomInfo.unit"),
           width: 180,
         },
         {
           prop: "dosage",
-          label: this.$t("ui.data.column.boom.dosage"),
+          label: this.$t("ui.data.column.mdmBomInfo.dosage"),
           width: 180,
         },
         {
           prop: "dosageForm",
-          label: this.$t("ui.data.column.boom.dosageForm"),
+          label: this.$t("ui.data.column.mdmBomInfo.dosageForm"),
           width: 180,
         },
         {
           prop: "status",
-          label: this.$t("common.status"),
+          label: this.$t("ui.data.column.mdmBomInfo.status"),
           render: ({ row }) => {
             return (
               <div>
@@ -250,29 +250,29 @@ export default {
     searchColumns() {
       let searchColumns = [
         {
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.mdmBomInfo.factoryCode"),
           prop: "factoryCode",
           type: "select",
           dictData: this.dict.type.biz_factory_name,
         },
         {
-          label: this.$t("ui.data.column.boom.fatherCode"),
+          label: this.$t("ui.data.column.mdmBomInfo.parentMaterialCode"),
           prop: "parentMaterialCode",
         },
         {
-          label: this.$t("ui.data.column.boom.fatherName"),
+          label: this.$t("ui.data.column.mdmBomInfo.parentMaterialName"),
           prop: "parentMaterialName",
         },
         {
-          label: this.$t("ui.data.column.boom.boomVersion"),
+          label: this.$t("ui.data.column.mdmBomInfo.bomVersion"),
           prop: "bomVersion",
         },
         {
-          label: this.$t("ui.data.column.boom.chirenCode"),
+          label: this.$t("ui.data.column.mdmBomInfo.childCode"),
           prop: "childCode",
         },
         {
-          label: this.$t("ui.data.column.boom.chirenName"),
+          label: this.$t("ui.data.column.mdmBomInfo.childMaterialName"),
           prop: "childMaterialName",
         },
       ];

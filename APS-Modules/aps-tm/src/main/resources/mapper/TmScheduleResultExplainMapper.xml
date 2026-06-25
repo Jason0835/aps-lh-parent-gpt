@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.tm.mapper.TmScheduleResultExplainMapper">
+
+    <update id="logicDeleteByFactoryCodeAndScheduleDate">
+        update T_TM_SCHEDULE_RESULT_EXPLAIN e
+        inner join T_TM_SCHEDULE_RESULT r
+            on e.RESULT_ID = r.ID
+           and r.IS_DELETE = 0
+        set e.IS_DELETE = 1,
+            e.UPDATE_TIME = now()
+        where e.IS_DELETE = 0
+          and r.FACTORY_CODE = #{factoryCode}
+          and r.SCHEDULE_DATE = #{scheduleDate}
+    </update>
+
+</mapper>

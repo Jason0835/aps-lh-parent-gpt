@@ -39,7 +39,7 @@ import moment from "moment";
 
 import infoForm from "@/views/components/infoForm.vue";
 
-import { combinationMiddleAndNight } from "@/api/nc/ncScheduleResult.js";
+import { combinationMiddleAndNight } from "@/api/dj/djScheduleResult.js";
 
 export default {
   components: { infoForm },

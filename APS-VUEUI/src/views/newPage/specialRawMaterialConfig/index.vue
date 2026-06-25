@@ -136,72 +136,72 @@ export default {
         { type: "selection", fixed: "left" },
         {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.rawSpecialMaterialStock.factoryCode"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
           },
         },
         {
           prop: "year",
-          label: this.$t("ui.data.colume.year"),
+          label: this.$t("ui.data.column.monthStock.year"),
           width: 120,
         },
         {
           prop: "month",
-          label: this.$t("ui.data.colume.month"),
+          label: this.$t("ui.data.column.monthStock.month"),
           width: 120,
         },
         {
           prop: "materialCode",
-          label: this.$t("ui.data.column.masterdata.materialCode"),
+          label: this.$t("ui.data.column.rawSpecialMaterialStock.materialCode"),
           width: 120,
         },
         {
           prop: "materialName",
-          label: this.$t("common.name"),
+          label: this.$t("ui.data.column.rawSpecialMaterialStock.materialName"),
           width:200
         },
         {
           prop: "standardLength",
-          label: this.$t("ui.data.column.masterdata.standardLength"),
+          label: this.$t("ui.data.column.rawSpecialMaterialStock.standardLength"),
         },
         {
           prop: "warehouseStock",
-          label: this.$t("原材料库存"),
+          label: this.$t("ui.data.column.rawSpecialMaterialStock.warehouseStock"),
         },
         {
           prop: "midStock",
-          label: this.$t("中间库库存"),
+          label: this.$t("ui.data.column.rawSpecialMaterialStock.midStock"),
         },
         {
           prop: "workshopStock",
-          label: this.$t("车间库存"),
+          label: this.$t("ui.data.column.rawSpecialMaterialStock.workshopStock"),
         },
         {
           prop: "packageNum",
-          label: this.$t("显示箱数"),
+          label: this.$t("ui.data.column.rawSpecialMaterialStock.packageNum"),
         },
         {
           prop: "totalStock",
-          label: this.$t("总库存"),
+          label: this.$t("ui.data.column.rawSpecialMaterialStock.totalStock"),
         },
         {
           prop: "stock",
-          label: this.$t("ui.data.column.masterdata.stock"),
+          label: this.$t("ui.data.column.rawSpecialMaterialStock.stock"),
           width: 120,
         },
         {
           prop: "unit",
-          label: this.$t("common.unit"),
+          label: this.$t("ui.data.column.rawSpecialMaterialStock.unit"),
         },
         {
           prop: "stockDate",
-          label: this.$t("ui.data.defectiveStock.stockDate"),
+          label: this.$t("ui.data.column.rawSpecialMaterialStock.stockDate"),
           width: 120,
         },
         {
           prop: "remark",
-          label: this.$t("common.remark"),
+          label: this.$t("ui.data.column.rawSpecialMaterialRecord.remark"),
         },
         {
           prop: "updateTime",
@@ -243,7 +243,7 @@ export default {
     searchColumns() {
       return [
         {
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.rawSpecialMaterialStock.factoryCode"),
           prop: "factoryCode",
           type: "select",
           dictData: this.dict.type.biz_factory_name,
@@ -259,11 +259,11 @@ export default {
         },
         {
           prop: "materialCode",
-          label: this.$t("ui.data.column.masterdata.materialCode"),
+          label: this.$t("ui.data.column.rawSpecialMaterialStock.materialCode"),
         },
         {
           prop: "materialName",
-          label: this.$t("common.name"),
+          label: this.$t("ui.data.column.rawSpecialMaterialStock.materialName"),
         }
       ];
     },

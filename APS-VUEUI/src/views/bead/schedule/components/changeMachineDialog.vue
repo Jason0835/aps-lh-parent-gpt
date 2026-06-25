@@ -17,17 +17,17 @@
     >
       <el-form-item
         :label="$t('ui.data.column.scheduleResult.produceLine')"
-        prop="machineId"
+        prop="machineCode"
       >
         <el-select
           class="w100"
           :placeholder="$t('ui.data.column.selectMachineName')"
-          v-model="form.machineId"
+          v-model="form.machineCode"
         >
           <el-option
             v-for="item in machines"
             :key="item.id"
-            :value="item.id"
+            :value="item.machineCode"
             :label="item.machineName"
           ></el-option>
         </el-select>
@@ -58,7 +58,7 @@ export default {
       editType: null,
       form: {},
       rules: {
-        machineId: [
+        machineCode: [
           {
             required: true,
             message: this.$t("common.rule.input"),
@@ -83,7 +83,7 @@ export default {
       try {
         this.loading = true;
 
-        const result = await batchChangeMachine(params.machineId, {
+        const result = await batchChangeMachine(params.machineCode, {
           selects: JSON.stringify(this.tableRows)
         });
         if (result.code == 200) {
@@ -115,7 +115,7 @@ export default {
 
     handleConfirm() {
       if(this.tableRows.length === 1) {
-        if(this.tableRows[0].machineId === this.form.machineId) {
+        if(this.tableRows[0].machineCode === this.form.machineCode) {
             this.hide();
             return
         }

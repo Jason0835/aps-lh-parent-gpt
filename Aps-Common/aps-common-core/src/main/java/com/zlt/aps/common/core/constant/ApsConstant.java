@@ -191,7 +191,12 @@ public class ApsConstant {
     /**
      * 系统管理模块
      */
-    public static String PROCEDURE_CODE_SYSTEM = "11";
+    public static String PROCEDURE_CODE_SYSTEM = "0";
+    
+    /**
+     * 系统管理模块
+     */
+    public static String PROCEDURE_CODE_DJ = "14";
 
     /**
      * 胎面排程下发接口同步key
@@ -249,6 +254,11 @@ public class ApsConstant {
     public static String LH_DEPLOY_SYNC_KEY = "VULCANIZE_SCHE_RST_FBK";
 
     /**
+     * 垫胶排程下发接口同步key
+     */
+    public static String DJ_DEPLOY_SYNC_KEY = "DJ_SCHE_FBK";
+
+    /**
      * APS模具计划下发接口
      */
     public static String APS_MOLD_PLAN_2_MES = "APS_MOLD_PLAN_2_MES";
@@ -302,6 +312,11 @@ public class ApsConstant {
      * 调度员操作类型：插单
      */
     public static String DISPATCHER_OPER_INSERT_ORDER = "2";
+
+    /**
+     * 调度员操作类型：删除
+     */
+    public static String DISPATCHER_OPER_DELETE = "3";
 
     /**
      * 调度员角色编码

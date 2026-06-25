@@ -1,13 +1,13 @@
 package com.zlt.aps.cx.service.engine;
 
-import com.zlt.aps.cx.api.domain.entity.CxPrecisionPlan;
-import com.zlt.aps.cx.api.domain.entity.CxStructureTreadConfig;
 import com.zlt.aps.cx.entity.config.CxShiftConfig;
 import com.zlt.aps.cx.entity.schedule.LhScheduleResult;
 import com.zlt.aps.cx.vo.MonthPlanProductLhCapacityVo;
 import com.zlt.aps.cx.vo.ScheduleContextVo;
 import com.zlt.aps.mp.api.domain.entity.MdmDevicePlanShut;
 import com.zlt.aps.mp.api.domain.entity.MdmStructureLhRatio;
+import com.zlt.aps.cx.api.domain.entity.CxPrecisionPlan;
+import com.zlt.aps.cx.api.domain.entity.CxStructureTreadConfig;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -18,7 +18,12 @@ import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Date;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * 班次排产服务 — 成型排程 S5.3.7 阶段
@@ -592,8 +597,8 @@ public class ShiftScheduleService {
         // 计算波浪分配
         int requiredCars = tripCapacity > 0 ? (totalQty + tripCapacity - 1) / tripCapacity : 1;
         int[] shiftCars = calculateWaveCars(requiredCars, dayShifts);
-        log.info("【波浪分配】胎胚={}, 待排={}条, 每车={}条, 需={}车, 各班分配={}", 
-                 task.getEmbryoCode(), totalQty, tripCapacity, requiredCars, Arrays.toString(shiftCars));
+        log.info("【波浪分配】胎胚={}, 待排={}条, 每车={}条, 需={}车, 各班分配={}",
+                task.getEmbryoCode(), totalQty, tripCapacity, requiredCars, Arrays.toString(shiftCars));
 
         // 收尾班次约束：只能在 maxShiftIndex 或之前的班次安排
         for (int i = maxShiftIndex + 1; i < shiftCars.length; i++) {
@@ -678,7 +683,7 @@ public class ShiftScheduleService {
         int requiredCars = tripCapacity > 0 ? (totalQty + tripCapacity - 1) / tripCapacity : 1;
         int[] shiftCars = calculateWaveCars(requiredCars, dayShifts);
         log.info("【波浪分配】胎胚={}, 待排={}条, 每车={}条, 需={}车, 各班分配={}",
-                 task.getEmbryoCode(), totalQty, tripCapacity, requiredCars, Arrays.toString(shiftCars));
+                task.getEmbryoCode(), totalQty, tripCapacity, requiredCars, Arrays.toString(shiftCars));
 
         int hourlyCapacity = getMachineHourlyCapacity(machineCode, task.getMaterialCode(), task.getStructureName(), context);
         int remainingCars = requiredCars;
@@ -720,8 +725,8 @@ public class ShiftScheduleService {
             // 根据 batchQty 重新计算实际车数（不足一车算1车）
             carsForShift = tripCapacity > 0 ? (batchQty + tripCapacity - 1) / tripCapacity : 1;
 
-            log.info("【硫化排产完成】胎胚={}, 班次={}, 产量={}条, 车数={}", 
-                     task.getEmbryoCode(), shiftConfig.getShiftCode(), batchQty, carsForShift);
+            log.info("【硫化排产完成】胎胚={}, 班次={}, 产量={}条, 车数={}",
+                    task.getEmbryoCode(), shiftConfig.getShiftCode(), batchQty, carsForShift);
             ShiftProductionResult result = buildResult(machineCode, shiftConfig, task, batchQty,
                     tripCapacity, carsForShift, startTime, endTime, false, false, task.getIsContinueTask());
 
@@ -875,7 +880,7 @@ public class ShiftScheduleService {
      * <p>从硫化排程结果中找到最后一个有计划量的班次
      */
     private String getVulcanizeEndingShift(CoreScheduleAlgorithmService.DailyEmbryoTask task,
-                                            ScheduleContextVo context) {
+                                           ScheduleContextVo context) {
         LhScheduleResult lhResult = findLhScheduleResult(task.getLhId(), context);
         if (lhResult == null) {
             return SHIFT_DAY; // 默认早班
@@ -966,7 +971,7 @@ public class ShiftScheduleService {
 
     /**
      * 计算班次精度计划扣减产能
-     * 
+     *
      * 根据精度计划的 precisionCycle（15/60分钟）和 completionStatus 判断：
      * - 未完成（completionStatus=0）的精度计划才扣减产能
      * - 精度计划不区分班次，当天有未完成计划即影响全天产能
@@ -992,7 +997,7 @@ public class ShiftScheduleService {
                 if ("1".equals(plan.getCompletionStatus())) {
                     continue;
                 }
-                
+
                 // 根据 precisionCycle 计算扣减时长
                 // precisionCycle: 15=15分钟, 60=60分钟
                 int precisionMinutes = 60; // 默认60分钟
@@ -1001,7 +1006,7 @@ public class ShiftScheduleService {
                 } else if ("60".equals(plan.getPrecisionCycle())) {
                     precisionMinutes = 60;
                 }
-                
+
                 // 精度时长(小时) × 机台小时产能
                 int precisionHours = (int) Math.ceil(precisionMinutes / 60.0);
                 // 至少扣减4小时（精度校验标准时长）
@@ -1072,7 +1077,7 @@ public class ShiftScheduleService {
      * @return 小时产能（条/小时）
      */
     public int getMachineHourlyCapacity(String machineCode, String materialCode,
-                                          String structureName, ScheduleContextVo context) {
+                                        String structureName, ScheduleContextVo context) {
         // 1. 获取日硫化量（materialLhCapacityMap 的 key 是 materialCode，不是 embryoCode）
         Integer dailyLhCapacity = null;
         Map<String, MonthPlanProductLhCapacityVo> lhCapacityMap = context.getMaterialLhCapacityMap();
@@ -1266,5 +1271,9 @@ public class ShiftScheduleService {
         private Boolean isEndProduction;
         /** 施工阶段（00 无工艺 01 试制 02 量试 03 正式），来自硫化任务 */
         private String constructionStage;
+        /** 合并的所有物料编码（用于判断是否全部收尾） */
+        private Set<String> allMaterialCodes;
+        /** 收尾物料编码集合（部分收尾时用于精确标记） */
+        private Set<String> endingMaterialCodes;
     }
 }

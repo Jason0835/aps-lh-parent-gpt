@@ -51,6 +51,25 @@ public class LhScheduleResultIssueServiceImpl implements ILhScheduleResultIssueS
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
     /**
+     * SQL Server单次请求参数上限2100，每条记录34个参数，安全批次大小为50
+     */
+    private static final int BATCH_SIZE = 50;
+
+    /**
+     * 将列表按BATCH_SIZE分批，避免SQL Server参数上限2100的问题
+     *
+     * @param list 待分批的列表
+     * @return 分批后的列表
+     */
+    private <T> List<List<T>> partitionList(List<T> list) {
+        List<List<T>> partitions = new ArrayList<>();
+        for (int i = 0; i < list.size(); i += BATCH_SIZE) {
+            partitions.add(list.subList(i, Math.min(i + BATCH_SIZE, list.size())));
+        }
+        return partitions;
+    }
+
+    /**
      * 下发硫化排程结果到MES
      * 业务规则：
      * 每条硫化排程结果自带8班数据，覆盖排程窗口T日到T+2日三天（排程日期为T+1日）：
@@ -177,18 +196,22 @@ public class LhScheduleResultIssueServiceImpl implements ILhScheduleResultIssueS
     /**
      * 更新或插入数据（存在则更新，不存在则插入）
      * 中间表MES_LH_SCHEDULE_RESULT建在MES分库，Mapper已通过@DS(DataSource.MES)指定数据源
+     * 分批处理避免SQL Server参数上限2100的问题
      */
     private void upsertLhScheduleResult(List<MesLhScheduleResult> mesList, String dataVersion) {
         if (CollectionUtils.isEmpty(mesList)) {
             return;
         }
+        List<MesLhScheduleResult> insertList = new ArrayList<>();
         for (MesLhScheduleResult mesItem : mesList) {
             int updateCount = lhScheduleResultIssueMapper.updateByScheduleDateAndMachine(mesItem);
             if (updateCount == 0) {
-                List<MesLhScheduleResult> insertList = new ArrayList<>();
                 insertList.add(mesItem);
-                lhScheduleResultIssueMapper.batchInsertLhScheduleResult(insertList);
             }
+        }
+        // 分批插入不存在的记录
+        for (List<MesLhScheduleResult> batch : partitionList(insertList)) {
+            lhScheduleResultIssueMapper.batchInsertLhScheduleResult(batch);
         }
     }
 
@@ -197,24 +220,29 @@ public class LhScheduleResultIssueServiceImpl implements ILhScheduleResultIssueS
      * 仅更新早中班（class2、class3），不覆盖夜班（class1）数据
      * 窗口首日无夜班排产数据，避免将MES已有的夜班数据覆盖为空
      * 中间表MES_LH_SCHEDULE_RESULT建在MES分库，Mapper已通过@DS(DataSource.MES)指定数据源
+     * 分批处理避免SQL Server参数上限2100的问题
      */
     private void upsertDay1LhScheduleResult(List<MesLhScheduleResult> mesList, String dataVersion) {
         if (CollectionUtils.isEmpty(mesList)) {
             return;
         }
+        List<MesLhScheduleResult> insertList = new ArrayList<>();
         for (MesLhScheduleResult mesItem : mesList) {
             int updateCount = lhScheduleResultIssueMapper.updateDay1ByScheduleDateAndMachine(mesItem);
             if (updateCount == 0) {
-                List<MesLhScheduleResult> insertList = new ArrayList<>();
                 insertList.add(mesItem);
-                lhScheduleResultIssueMapper.batchInsertLhScheduleResult(insertList);
             }
+        }
+        // 分批插入不存在的记录
+        for (List<MesLhScheduleResult> batch : partitionList(insertList)) {
+            lhScheduleResultIssueMapper.batchInsertLhScheduleResult(batch);
         }
     }
 
     /**
      * 插入数据（先删除指定日期的旧数据，再插入新数据）
      * 中间表MES_LH_SCHEDULE_RESULT建在MES分库，Mapper已通过@DS(DataSource.MES)指定数据源
+     * 分批插入避免SQL Server参数上限2100的问题
      */
     private void insertLhScheduleResult(List<MesLhScheduleResult> mesList, LocalDate scheduleDate, String dataVersion) {
         if (CollectionUtils.isEmpty(mesList)) {
@@ -222,7 +250,10 @@ public class LhScheduleResultIssueServiceImpl implements ILhScheduleResultIssueS
         }
         String dateStr = scheduleDate.format(DATE_FORMATTER);
         lhScheduleResultIssueMapper.deleteByScheduleDate(dateStr, dataVersion);
-        lhScheduleResultIssueMapper.batchInsertLhScheduleResult(mesList);
+        // 分批插入
+        for (List<MesLhScheduleResult> batch : partitionList(mesList)) {
+            lhScheduleResultIssueMapper.batchInsertLhScheduleResult(batch);
+        }
     }
 
     /**

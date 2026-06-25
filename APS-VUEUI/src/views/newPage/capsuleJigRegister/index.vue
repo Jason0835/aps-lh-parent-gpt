@@ -147,26 +147,26 @@ export default {
         { type: "selection", fixed: "left" },
         {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.mdmCapsuleChuck.factoryCode"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
           },
         },
         {
           prop: "specifications",
-          label: this.$t("ui.data.column.capsuleChuck.specifications"),
+          label: this.$t("ui.data.column.mdmCapsuleChuck.specifications"),
         },
         {
           prop: "proSize",
-          label: this.$t("ui.data.column.capsuleChuck.proSize"),
+          label: this.$t("ui.data.column.mdmCapsuleChuck.proSize"),
         },
         {
           prop: "internalQty",
-          label: this.$t("ui.data.column.capsuleChuck.internalQty"),
+          label: this.$t("ui.data.column.mdmCapsuleChuck.internalQty"),
         },
         {
           prop: "newChuckQty",
-          label: this.$t("新卡盘"),
+          label: this.$t("ui.data.column.mdmCapsuleChuck.newChuckQty"),
         },
         {
           prop: "totalQty",
@@ -177,7 +177,7 @@ export default {
         },
         {
           prop: "remark",
-          label: this.$t("common.remark"),
+          label: this.$t("ui.common.column.remark"),
         },
         {
           prop: "updateTime",
@@ -220,13 +220,13 @@ export default {
       return [
         {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.mdmCapsuleChuck.factoryCode"),
           type: "select",
           dictData: this.dict.type.biz_factory_name,
         },
         {
           prop: "specifications",
-          label: this.$t("ui.data.column.capsuleChuck.specifications"),
+          label: this.$t("ui.data.column.mdmCapsuleChuck.specifications"),
         },
       ];
     },

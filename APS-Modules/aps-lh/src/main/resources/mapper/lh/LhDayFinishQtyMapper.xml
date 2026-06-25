@@ -9,11 +9,12 @@
             ID,
             FINISH_DATE,
             MATERIAL_CODE,
-            FACTORY_CODE
+            FACTORY_CODE,
+            LH_TYPE
         FROM T_LH_DAY_FINISH_QTY
-        WHERE (FINISH_DATE, MATERIAL_CODE, FACTORY_CODE) IN
+        WHERE (FINISH_DATE, MATERIAL_CODE, FACTORY_CODE, LH_TYPE) IN
         <foreach collection="list" item="item" open="(" separator="," close=")">
-            (#{item.finishDate}, #{item.materialCode}, #{item.factoryCode})
+            (#{item.finishDate}, #{item.materialCode}, #{item.factoryCode}, #{item.lhType})
         </foreach>
     </select>
 

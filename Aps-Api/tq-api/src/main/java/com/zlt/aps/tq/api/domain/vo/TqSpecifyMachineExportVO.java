@@ -14,8 +14,8 @@ import java.util.Date;
 public class TqSpecifyMachineExportVO extends BaseEntity implements Serializable {
     private static final long serialVersionUID = 1L;
 
-    @Excel(name = "ui.tq.specifyMachine.column.materialCode")
-    private String materialCode;
+    @Excel(name = "ui.tq.specifyMachine.column.beadCode")
+    private String beadCode;
 
     @Excel(name = "ui.specifyMachine.column.machineName")
     private String machineName;

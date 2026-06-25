@@ -5,14 +5,14 @@
     <select id="listMachineChuck" parameterType="com.zlt.aps.tq.api.domain.entity.TqMachineChuck"
             resultType="com.zlt.aps.tq.api.domain.entity.TqMachineChuck">
         select * from (
-            select mc.ID, mc.MACHINE_ID, mc.CHUCK_CODE, mc.CHUCK_NAME, mc.INCH_SIZE,
+            select mc.ID, mc.MACHINE_CODE, mc.CHUCK_CODE, mc.CHUCK_NAME, mc.INCH_SIZE,
                    mc.REMARK, mc.IS_DELETE, mc.CREATE_BY, mc.CREATE_TIME, mc.UPDATE_BY, mc.UPDATE_TIME,
-                   mi.MACHINE_CODE, mi.MACHINE_NAME
+                   mi.MACHINE_NAME
             from T_TQ_MACHINE_CHUCK mc
-            left join T_TQ_MACHINE_INFO mi on mc.MACHINE_ID = mi.ID
+            left join T_TQ_MACHINE_INFO mi on mc.MACHINE_CODE = mi.MACHINE_CODE
             where mc.IS_DELETE = '0'
-            <if test="machineId != null">
-                and mc.MACHINE_ID = #{machineId}
+            <if test="machineCode != null and machineCode != ''">
+                and mc.MACHINE_CODE = #{machineCode}
             </if>
             order by mc.create_time desc
         ) t
@@ -22,20 +22,20 @@
         SELECT count(1)
         FROM T_TQ_MACHINE_CHUCK
         where IS_DELETE = '0'
-        and MACHINE_ID = #{machineId}
+        and MACHINE_CODE = #{machineCode}
         and CHUCK_CODE = #{chuckCode}
         <if test="id != null">and ID != #{id}</if>
     </select>
 
     <insert id="mergeSql" parameterType="list">
         INSERT INTO T_TQ_MACHINE_CHUCK (
-            machine_id, chuck_code, chuck_name, inch_size, remark,
+            machine_code, chuck_code, chuck_name, inch_size, remark,
             create_by, create_time, update_by, update_time, is_delete
         )
         VALUES
         <foreach collection="list" item="MachineChuck" separator=",">
             (
-            #{MachineChuck.machineId,jdbcType=DOUBLE},
+            #{MachineChuck.machineCode,jdbcType=VARCHAR},
             #{MachineChuck.chuckCode,jdbcType=VARCHAR},
             #{MachineChuck.chuckName,jdbcType=VARCHAR},
             #{MachineChuck.inchSize,jdbcType=DECIMAL},

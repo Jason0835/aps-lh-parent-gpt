@@ -140,12 +140,12 @@ export default {
 
         {
           prop: "structureName",
-          label: this.$t("ui.data.column.finishStock.structureName"),
+          label: this.$t("ui.data.column.mdmStructureName.structureName"),
           minWidth: 200,
         },
         {
           prop: "remark",
-          label: this.$t("common.remark"),
+          label: this.$t("ui.common.column.remark"),
         },
         {
           prop: "createTime",
@@ -192,7 +192,7 @@ export default {
       return [
         {
           prop: "structureName",
-          label: this.$t("ui.data.column.finishStock.structureName"),
+          label: this.$t("ui.data.column.mdmStructureName.structureName"),
         },
 
       ];

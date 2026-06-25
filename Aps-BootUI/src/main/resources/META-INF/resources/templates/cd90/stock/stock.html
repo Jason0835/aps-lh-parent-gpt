@@ -20,6 +20,10 @@
                         </li>
 
                         <li>
+                            <label>[[#{ui.data.column.cd90Stock.shiftCode}]]：</label>
+                            <input type="text" name="shiftCode"/>
+                        </li>
+                        <li>
                             <label>[[#{ui.common.column.lb.clothCode}]]：</label>
                             <input type="text" name="materialCode"/>
                         </li>
@@ -105,6 +109,20 @@
                     align: 'center',
                     halign:'center',
                     title: [[#{ui.data.column.stock.stockDate}]],
+                },
+                {
+                    field: 'shiftCode',
+                    sortable: true,
+                    align: 'center',
+                    halign:'center',
+                    title: [[#{ui.data.column.cd90Stock.shiftCode}]],
+                },
+                {
+                    field: 'snapshotTime',
+                    sortable: true,
+                    align: 'center',
+                    halign:'center',
+                    title: [[#{ui.data.column.cd90Stock.snapshotTime}]],
                 },
                 {
                     field: 'materialCode',

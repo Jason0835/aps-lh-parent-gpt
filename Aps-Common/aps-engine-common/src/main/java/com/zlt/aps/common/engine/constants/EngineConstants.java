@@ -1,5 +1,7 @@
 package com.zlt.aps.common.engine.constants;
 
+import com.zlt.aps.common.engine.enums.ClassNumThreePlanEnums;
+
 /**
   * 引擎常量类
 **/
@@ -8,7 +10,12 @@ public class EngineConstants {
     /**
      * 胎面批次号前缀
      */
-    public static String TM_BATCH_NO_PREFIX = "TM";
+    public static final String TM_BATCH_NO_PREFIX = "TM";
+
+    /**
+     * 胎面日期批次号前缀
+     */
+    public static final String TM_BATCH_DATE_PREFIX = "TM-";
 
     /**
      * 胎面批次号前缀
@@ -398,14 +405,19 @@ public class EngineConstants {
     public static final String CHANGE_MACHINE_DATA_SOURCE_SUPPLE="1";
 
     /**
-     * 机台开机班次：夜班，对应字典：CLASS_NUM
+     * 机台开机班次：夜班，对应 ClassNumThreePlanEnums.CLASS_NIGHT("01")
      */
-    public static final String NIGHT_CLASS_SHIFT = "2";
+    public static final String NIGHT_CLASS_SHIFT = ClassNumThreePlanEnums.CLASS_NIGHT.getClassIndex();
 
     /**
-     * 机台开机班次：早班，对应字典：CLASS_NUM
+     * 机台开机班次：早班，对应 ClassNumThreePlanEnums.CLASS_MORNING("02")
      */
-    public static final String DAY_CLASS_SHIFT = "3";
+    public static final String MORNING_CLASS_SHIFT = ClassNumThreePlanEnums.CLASS_MORNING.getClassIndex();
+
+    /**
+     * 机台开机班次：中班，对应 ClassNumThreePlanEnums.CLASS_DAY("03")
+     */
+    public static final String DAY_CLASS_SHIFT = ClassNumThreePlanEnums.CLASS_DAY.getClassIndex();
 
     /**
      * 一次生产卷数
@@ -466,4 +478,35 @@ public class EngineConstants {
      * 参数code：胎圈需求系数（胎圈消耗量=成型需求量×系数），默认2
      */
     public static String DEMAND_COEFFICIENT = "SYS0301002";
+
+    /**
+     * 参数code：胎圈需求算法模式，1=算法1(三班最大值)，2=算法2(逐班对应)，默认2
+     */
+    public static String DEMAND_CALC_MODE = "SYS0301003";
+
+    /**
+     * 参数code：库存供应时长阈值（小时），达到后切换规格，默认24
+     */
+    public static String SUPPLY_TIME_THRESHOLD = "SYS0301004";
+
+    /**
+     * 参数code：胎圈班产上限，默认3000
+     */
+    public static String MAX_CLASS_OUTPUT = "SYS0301005";
+
+    /**
+     * 参数code：规格切换时长（小时），默认0.5
+     */
+    public static String SPEC_SWITCH_TIME = "SYS0301006";
+
+    /**
+     * 参数code：英寸切换时长（小时），默认1
+     */
+    public static String INCH_SWITCH_TIME = "SYS0301007";
+
+    /**
+     * 参数code：工装车总数（全局统一值），默认50
+     * 用于排程时计算可用工装数量限制：可用工装 = 工装车总数 - 库存占用工装
+     */
+    public static String TOOLING_TOTAL = "SYS0301023";
 }

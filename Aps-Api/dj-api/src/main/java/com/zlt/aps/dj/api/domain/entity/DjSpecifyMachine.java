@@ -37,8 +37,9 @@ public class DjSpecifyMachine extends BaseEntity{
 
     @ApiModelProperty(value = "机台编码")
     @Excel(name="ui.specifyMachine.column.machineName")
+    @ImportValidated(name = "ui.specifyMachine.column.machineName", required = true, isCode = true, maxLength = 30)
     @TableField("MACHINE_CODE")
-    private Long machineCode;
+    private String machineCode;
 
     @ApiModelProperty(value = "线路，数据维护在数据字典：0-生产线、1-备用线")
     @Excel(name="ui.specifyMachine.column.lineType" ,dictType="LINE_TYPE")

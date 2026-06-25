@@ -6,7 +6,7 @@
 
     <select id="checkStockListUnic" parameterType="com.zlt.aps.tq.api.domain.entity.TqStock"
             resultType="com.zlt.aps.tq.api.domain.entity.TqStock">
-        select ID, STOCK_DATE, MATERIAL_CODE, STOCK_NUM, MODIFY_NUM, BAD_NUM, REMARK, IS_DELETE, CREATE_BY, CREATE_TIME, UPDATE_BY, UPDATE_TIME
+        select ID, STOCK_DATE, BEAD_CODE, STOCK_NUM, MODIFY_NUM, BAD_NUM, REMARK, IS_DELETE, CREATE_BY, CREATE_TIME, UPDATE_BY, UPDATE_TIME
         from t_tq_stock
         where IS_DELETE = '0'
         <if test="entity.id != null">
@@ -15,20 +15,20 @@
         <if test="entity.stockDate != null">
             and STOCK_DATE = #{entity.stockDate}
         </if>
-        <if test="entity.materialCode != null and entity.materialCode != ''">
-            and MATERIAL_CODE = #{entity.materialCode}
+        <if test="entity.beadCode != null and entity.beadCode != ''">
+            and BEAD_CODE = #{entity.beadCode}
         </if>
     </select>
 
     <insert id="mergeSql" parameterType="list">
         INSERT INTO t_tq_stock (
-            STOCK_DATE, MATERIAL_CODE, STOCK_NUM, MODIFY_NUM, BAD_NUM, CREATE_BY, CREATE_TIME, REMARK, IS_DELETE
+            STOCK_DATE, BEAD_CODE, STOCK_NUM, MODIFY_NUM, BAD_NUM, CREATE_BY, CREATE_TIME, REMARK, IS_DELETE
         )
         VALUES
         <foreach collection="list" item="STOCK" separator=",">
             (
                 #{STOCK.stockDate,jdbcType=DATE},
-                #{STOCK.materialCode,jdbcType=VARCHAR},
+                #{STOCK.beadCode,jdbcType=VARCHAR},
                 #{STOCK.stockNum,jdbcType=DOUBLE},
                 #{STOCK.modifyNum,jdbcType=DOUBLE},
                 #{STOCK.badNum,jdbcType=DOUBLE},
@@ -46,4 +46,14 @@
             UPDATE_TIME = NOW(),
             REMARK = VALUES(REMARK)
     </insert>
+
+    <!-- 根据库存日期逻辑删除胎圈库存，只删当天数据，历史数据保留 -->
+    <update id="logicDeleteByStockDate">
+        UPDATE t_tq_stock
+        SET IS_DELETE = 1,
+            UPDATE_BY = #{updateBy},
+            UPDATE_TIME = #{updateTime}
+        WHERE DATE(STOCK_DATE) = #{stockDate}
+          AND IS_DELETE = 0
+    </update>
 </mapper>

@@ -72,13 +72,14 @@ import {
   publishApsMoldAdjustPlan,
   removeApsMoldAdjustPlan,
 } from "@/api/dj/machine";
+import { getConfigKey } from "@/api/system/config";
 import InfoDialog from "./components/infoDialog.vue";
 import TltUploadForm from "@/views/components/tltUploadForm.vue";
 
 export default {
  name: "djMachine",
   components: { InfoDialog, TltUploadForm },
-  dicts: ["STATUS", "CLASS_SHIFT", "CLASS_NUM_THREE", "CLASS_NUM"],
+  dicts: ["STATUS", "CLASS_SHIFT", "class_num_three_plan", "biz_factory_name"],
 
   provide() {
     return {
@@ -128,9 +129,11 @@ export default {
       },
       sort: {},
       search: {
+        factoryCode: '',
         planDate: tomorrow,
       },
       query: {
+        factoryCode: '',
         planDate: tomorrow,
       },
       selection: [],
@@ -221,13 +224,7 @@ export default {
             if (this.isEmpty(value)) {
               return "";
             }
-            if (row.classShift === "3") {
-              return this.selectDictLabels(
-                this.dict.type.CLASS_NUM_THREE,
-                value
-              );
-            }
-            return this.selectDictLabels(this.dict.type.CLASS_NUM, value);
+            return this.selectDictLabels(this.dict.type.class_num_three_plan, value);
           },
         },
         {
@@ -259,6 +256,13 @@ export default {
     },
     searchColumns() {
       return [
+        {
+          label: this.$t("ui.data.column.factoryCode"),
+          prop: "factoryCode",
+          type: "select",
+          dictData: this.dict.type.biz_factory_name,
+          filterable: true,
+        },
         {
           label: this.$t("ui.data.column.machine.machineCode"),
           prop: "machineCode",
@@ -424,16 +428,13 @@ export default {
   },
   mounted() {},
   created() {
-    let defaultParams = {
-      factoryCode: "116",
-    };
-    this.search = {
-      ...defaultParams,
-    };
-    this.query = {
-      ...defaultParams,
-    };
-    this.getList();
+    getConfigKey("sys.factory.code").then(response => {
+      this.search.factoryCode = response.msg;
+      this.query.factoryCode = response.msg;
+      this.getList();
+    }).catch(() => {
+      this.getList();
+    });
   },
 };
 </script>

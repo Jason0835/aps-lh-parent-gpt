@@ -15,7 +15,7 @@ public class TqLossSettingExportVO extends BaseEntity implements Serializable {
     private static final long serialVersionUID = 1L;
 
     @Excel(name = "ui.data.column.loss.beadCode")
-    private String materialCode;
+    private String beadCode;
 
     @Excel(name = "ui.data.column.loss.line")
     private String machineName;

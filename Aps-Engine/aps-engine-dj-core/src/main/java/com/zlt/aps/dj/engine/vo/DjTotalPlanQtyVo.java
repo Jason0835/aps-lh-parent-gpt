@@ -1,5 +1,7 @@
 package com.zlt.aps.dj.engine.vo;
 
+import java.math.BigDecimal;
+
 import lombok.Data;
 
 /**
@@ -11,27 +13,27 @@ public class DjTotalPlanQtyVo {
     /**
      * 次日早班总计划量
      */
-    private Double totalNextDayPlanQty;
+    private BigDecimal totalNextDayPlanQty;
 
     /**
      * 中班总计划量
      */
-    private Double totalDayPlanQty;
+    private BigDecimal totalDayPlanQty;
 
     /**
      * 夜班总计划量
      */
-    private Double totalNightPlanQty;
+    private BigDecimal totalNightPlanQty;
 
     public DjTotalPlanQtyVo() {
-        this.totalDayPlanQty = 0D;
-        this.totalNightPlanQty = 0D;
-        this.totalPlanQty = 0D;
-        this.totalNextDayPlanQty = 0D;
+        this.totalDayPlanQty = BigDecimal.ZERO;
+        this.totalNightPlanQty = BigDecimal.ZERO;
+        this.totalPlanQty = BigDecimal.ZERO;
+        this.totalNextDayPlanQty = BigDecimal.ZERO;
     }
 
     /**
      * 总计划量
      */
-    private Double totalPlanQty;
+    private BigDecimal totalPlanQty;
 }

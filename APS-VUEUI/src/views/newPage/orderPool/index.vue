@@ -162,21 +162,21 @@ export default {
         // },
         {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.SalesOrderPool.factoryCode"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
           },
         },
         {
           prop: "productType",
-          label: this.$t("ui.data.column.monthplan.productType"),
+          label: this.$t("ui.data.column.SalesOrderPool.productType"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_product_type, value);
           },
         },
         {
           prop: "scmPriority",
-          label: this.$t("ui.data.column.monthplan.scmPriority"),
+          label: this.$t("ui.data.column.SalesOrderPool.scmPriority"),
           render: ({ row }) => {
             return (
               <el-select  v-model={row.scmPriority} onChange={(val) => this.handlePriorityChange(row, val)}>
@@ -193,7 +193,7 @@ export default {
         },
         {
           prop: "orderPriority",
-          label: this.$t("ui.data.column.monthplan.orderPriority"),
+          label: this.$t("ui.data.column.SalesOrderPool.orderPriority"),
           width: 150,
           // render: ({ row }) => {
           //   return (
@@ -214,7 +214,7 @@ export default {
         },
         {
           prop: "locationType",
-          label: this.$t("ui.data.column.mdmStockUpPlan.locationType"),
+          label: this.$t("ui.data.column.SalesOrderPool.locationType"),
           formatter: (row) => {
             return this.selectDictLabel(
               this.dict.type.biz_stor_type,
@@ -224,27 +224,27 @@ export default {
         },
         {
           prop: "area",
-          label: this.$t("common.area"),
+          label: this.$t("ui.data.column.SalesOrderPool.area"),
           width:120
         },
         {
           prop: "salCode",
-          label: this.$t("ui.data.column.monthplan.salCode"),
+          label: this.$t("ui.data.column.SalesOrderPool.salCode"),
           width: 120,
         },
         {
           prop: "salNCode",
-          label: this.$t("ui.data.column.monthplan.salNCode"),
+          label: this.$t("ui.data.column.SalesOrderPool.salNCode"),
           width:120
         },
         {
           prop: "natCode",
-          label: this.$t("ui.data.column.monthplan.natCode"),
+          label: this.$t("ui.data.column.SalesOrderPool.natCode"),
           width:120
         },
         {
           prop: "brand",
-          label: this.$t("common.brand"),
+          label: this.$t("ui.data.column.SalesOrderPool.brand"),
           width:120,
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_brand_type, value);
@@ -252,34 +252,34 @@ export default {
         },
         {
           prop: "salCodePo",
-          label: this.$t("ui.data.column.monthplan.salCodePo"),
+          label: this.$t("ui.data.column.SalesOrderPool.salCodePo"),
           width:150
         },
         {
           prop: "billDate",
-          label: this.$t("schedule.glueDecomposePlan.submissionDate"),
+          label: this.$t("ui.data.column.SalesOrderPool.billDate"),
           width: 120,
         },
         {
           prop: "oriMaterialCode",
-          label: this.$t("ui.data.column.monthplan.oriMaterialCode"),
+          label: this.$t("ui.data.column.SalesOrderPool.oriMaterialCode"),
           width:120
         },
         {
           prop: "materialDesc",
-          label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
+          label: this.$t("ui.data.column.SalesOrderPool.materialDesc"),
           align: "left",
           minWidth: 350,
         },
         {
           prop: "ordQty",
-          label: this.$t("common.num"),
+          label: this.$t("ui.data.column.SalesOrderPool.ordQty"),
           width:120,
           align:'left'
         },
         {
           prop: "weekYear",
-          label: this.$t("ui.data.column.monthplan.weekYear"),
+          label: this.$t("ui.data.column.SalesOrderPool.weekYear"),
           width:120
         },
         // {
@@ -310,7 +310,7 @@ export default {
         // },
         {
           prop: "isEudr",
-          label: this.$t("EUDR"),
+          label: this.$t("ui.data.column.SalesOrderPool.isEudr"),
           render: ({ row }) => {
             return (
               <div>
@@ -321,7 +321,7 @@ export default {
         },
         {
           prop: "deliverGoodsType",
-          label: this.$t("common.shipType"),
+          label: this.$t("ui.data.column.SalesOrderPool.deliverGoodsType"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(
               this.dict.type.biz_deliver_goods_type,
@@ -332,7 +332,7 @@ export default {
 
         {
           prop: "updateTime",
-          label: this.$t("ui.data.column.scheduleAdjust.updata"),
+          label: this.$t("ui.data.column.SalesOrderPool.updateTime"),
           width: 200,
         },
       ];
@@ -343,36 +343,36 @@ export default {
       return [
         {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.SalesOrderPool.factoryCode"),
           type: "select",
           dictData: this.dict.type.biz_factory_name,
         },
         {
           prop: "productType",
-          label: this.$t("ui.data.column.monthplan.productType"),
+          label: this.$t("ui.data.column.SalesOrderPool.productType"),
           type: "select",
           dictData: this.dict.type.biz_product_type,
         },
         {
           prop: "orderPriority",
-          label: this.$t("ui.data.column.monthplan.orderPriority"),
+          label: this.$t("ui.data.column.SalesOrderPool.orderPriority"),
           type: "select",
           dictData: this.dict.type.biz_order_type,
         },
         {
           prop: "area",
-          label: this.$t("common.area"),
+          label: this.$t("ui.data.column.SalesOrderPool.area"),
         },
         {
           prop: "salCode",
-          label: this.$t("ui.data.column.monthplan.salCode"),
+          label: this.$t("ui.data.column.SalesOrderPool.salCode"),
         },
         {
           prop: "salCodePo",
-          label: this.$t("ui.data.column.monthplan.salCodePo"),
+          label: this.$t("ui.data.column.SalesOrderPool.salCodePo"),
         },
         {
-          label: this.$t("schedule.glueDecomposePlan.submissionDate"),
+          label: this.$t("ui.data.column.SalesOrderPool.billDate"),
           prop: "billDate",
           type: "date",
           dateType: "daterange",
@@ -380,17 +380,17 @@ export default {
         },
         {
           prop: "oriMaterialCode",
-          label: this.$t("ui.data.column.monthplan.oriMaterialCode"),
+          label: this.$t("ui.data.column.SalesOrderPool.oriMaterialCode"),
         },
         {
           prop: "materialDesc",
-          label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
+          label: this.$t("ui.data.column.SalesOrderPool.materialDesc"),
           minWidth: 350,
           align: "left",
         },
         {
           prop: "deliverGoodsType",
-          label: this.$t("common.shipType"),
+          label: this.$t("ui.data.column.SalesOrderPool.deliverGoodsType"),
           type: "select",
           dictData: this.dict.type.biz_deliver_goods_type,
         },

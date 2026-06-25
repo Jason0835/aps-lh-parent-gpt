@@ -84,6 +84,36 @@
             <version>1.0.3-SNAPSHOT</version>
         </dependency>
 
+        <!--   基础模块（BusinessException）     -->
+        <dependency>
+            <groupId>com.zlt.aps</groupId>
+            <artifactId>aps-base</artifactId>
+            <version>1.0.3-SNAPSHOT</version>
+        </dependency>
+
+        <!--   API模块：成型计划（CxScheduleResult）     -->
+        <dependency>
+            <groupId>com.zlt.aps</groupId>
+            <artifactId>aps-cx-lh-api</artifactId>
+            <version>1.0.3-SNAPSHOT</version>
+        </dependency>
+
+        <!--   API模块：主数据（MdmConstructionInfo, MdmWorkCalendar）     -->
+        <dependency>
+            <groupId>com.zlt.aps.mdm</groupId>
+            <artifactId>aps-mdm-api</artifactId>
+            <version>1.0.3-SNAPSHOT</version>
+            <optional>true</optional>
+        </dependency>
+
+        <!--   API模块：月度计划（MpMonthPlanMonitor）     -->
+        <dependency>
+            <groupId>com.zlt.aps</groupId>
+            <artifactId>aps-mp-api</artifactId>
+            <version>1.0.3-SNAPSHOT</version>
+            <optional>true</optional>
+        </dependency>
+
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>

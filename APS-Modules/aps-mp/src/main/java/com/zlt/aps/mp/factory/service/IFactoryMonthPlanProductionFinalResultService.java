@@ -146,4 +146,13 @@ public interface IFactoryMonthPlanProductionFinalResultService extends IDocServi
      */
     List<FactoryMonthPlanFinalAdjustVo> list4Adjust(FactoryMonthPlanProductionFinalResult condition);
 
+    /**
+     * 定时计算上月超欠产
+     * 根据上月计划排产量和上月硫化日完成量(合格品)计算超欠产，
+     * 并置上月超欠产有效标志=是
+     *
+     * @return 计算结果
+     */
+    AjaxResult calcLastMonthOverProd();
+
 }

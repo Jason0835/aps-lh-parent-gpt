@@ -127,51 +127,51 @@ export default {
       let list= [
       {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.rawWarningConfig.factoryCode"),
           type: "select",
           dictData: this.parentDict.type.biz_factory_name,
         },
         {
           prop: "warningType",
-          label: this.$t("ui.data.column.rawMaterial.warningType"),
+          label: this.$t("ui.data.column.rawWarningConfig.warningType"),
           type: "select",
           dictData: this.parentDict.type.warn_type,
 
         },
         {
           prop: "enabled",
-          label: this.$t("ui.data.column.rawMaterial.enabled"),
+          label: this.$t("ui.data.column.rawWarningConfig.enabled"),
           type: "select",
-          dictData: this.parentDict.type.biz_yes_no,
+          dictData: this.parentDict.type.biz_available_status,
         },
 
         {
           prop: "materialCode",
-          label: this.$t("ui.data.column.rawMaterial.materialCode"),
+          label: this.$t("ui.data.column.rawWarningConfig.materialCode"),
           maxlength: 50,
         },
         {
           prop: "materialDesc",
-          label: this.$t("ui.data.column.rawMaterial.materialName"),
+          label: this.$t("ui.data.column.rawWarningConfig.materialDesc"),
           maxlength: 50,
         },
         {
           prop: "deviationUpper",
-          label: this.$t("ui.data.column.rawMaterial.deviationUpper"),
+          label: this.$t("ui.data.column.rawWarningConfig.deviationUpper"),
           type: "number",
           min: 0,
           max:999999,
         },
         {
           prop: "deviationLower",
-          label: this.$t("ui.data.column.rawMaterial.deviationLower"),
+          label: this.$t("ui.data.column.rawWarningConfig.deviationLower"),
           type: "number",
           min: 0,
           max:999999,
         },
         {
           prop: "warningLevel",
-          label: this.$t("ui.data.column.rawMaterial.warningLevel"),
+          label: this.$t("ui.data.column.rawWarningConfig.warningLevel"),
           type: "select",
           dictData: this.parentDict.type.warn_level,
         },
@@ -186,51 +186,51 @@ export default {
         list= [
       {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.rawWarningConfig.factoryCode"),
           type: "select",
           dictData: this.parentDict.type.biz_factory_name,
         },
         {
           prop: "warningType",
-          label: this.$t("ui.data.column.rawMaterial.warningType"),
+          label: this.$t("ui.data.column.rawWarningConfig.warningType"),
           type: "select",
           dictData: this.parentDict.type.warn_type,
 
         },
         // {
         //   prop: "enabled",
-        //   label: this.$t("ui.data.column.rawMaterial.enabled"),
+        //   label: this.$t("ui.data.column.rawWarningConfig.enabled"),
         //   type: "select",
-        //   dictData: this.parentDict.type.biz_yes_no,
+        //   dictData: this.parentDict.type.biz_available_status,
         // },
 
         // {
         //   prop: "materialCode",
-        //   label: this.$t("ui.data.column.rawMaterial.materialCode"),
+        //   label: this.$t("ui.data.column.rawWarningConfig.materialCode"),
         //   maxlength: 50,
         // },
         // {
         //   prop: "materialDesc",
-        //   label: this.$t("ui.data.column.rawMaterial.materialName"),
+        //   label: this.$t("ui.data.column.rawWarningConfig.materialDesc"),
         //   maxlength: 50,
         // },
         // {
         //   prop: "deviationUpper",
-        //   label: this.$t("ui.data.column.rawMaterial.deviationUpper"),
+        //   label: this.$t("ui.data.column.rawWarningConfig.deviationUpper"),
         //   type: "number",
         //   min: 0,
         //   max:999999,
         // },
         // {
         //   prop: "deviationLower",
-        //   label: this.$t("ui.data.column.rawMaterial.deviationLower"),
+        //   label: this.$t("ui.data.column.rawWarningConfig.deviationLower"),
         //   type: "number",
         //   min: 0,
         //   max:999999,
         // },
         {
           prop: "warningLevel",
-          label: this.$t("ui.data.column.rawMaterial.warningLevel"),
+          label: this.$t("ui.data.column.rawWarningConfig.warningLevel"),
           type: "select",
           dictData: this.parentDict.type.warn_level,
         },
@@ -245,51 +245,51 @@ export default {
         list= [
       {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.rawWarningConfig.factoryCode"),
           type: "select",
           dictData: this.parentDict.type.biz_factory_name,
         },
         {
           prop: "warningType",
-          label: this.$t("ui.data.column.rawMaterial.warningType"),
+          label: this.$t("ui.data.column.rawWarningConfig.warningType"),
           type: "select",
           dictData: this.parentDict.type.warn_type,
 
         },
         {
           prop: "enabled",
-          label: this.$t("ui.data.column.rawMaterial.enabled"),
+          label: this.$t("ui.data.column.rawWarningConfig.enabled"),
           type: "select",
-          dictData: this.parentDict.type.biz_yes_no,
+          dictData: this.parentDict.type.biz_available_status,
         },
 
         {
           prop: "materialCode",
-          label: this.$t("ui.data.column.rawMaterial.materialCode"),
+          label: this.$t("ui.data.column.rawWarningConfig.materialCode"),
           maxlength: 50,
         },
         {
           prop: "materialDesc",
-          label: this.$t("ui.data.column.rawMaterial.materialName"),
+          label: this.$t("ui.data.column.rawWarningConfig.materialDesc"),
           maxlength: 50,
         },
         {
           prop: "deviationUpper",
-          label: this.$t("ui.data.column.rawMaterial.deviationUpper"),
+          label: this.$t("ui.data.column.rawWarningConfig.deviationUpper"),
           type: "number",
           min: 0,
           max:999999,
         },
         {
           prop: "deviationLower",
-          label: this.$t("ui.data.column.rawMaterial.deviationLower"),
+          label: this.$t("ui.data.column.rawWarningConfig.deviationLower"),
           type: "number",
           min: 0,
           max:999999,
         },
         {
           prop: "warningLevel",
-          label: this.$t("ui.data.column.rawMaterial.warningLevel"),
+          label: this.$t("ui.data.column.rawWarningConfig.warningLevel"),
           type: "select",
           dictData: this.parentDict.type.warn_level,
         },

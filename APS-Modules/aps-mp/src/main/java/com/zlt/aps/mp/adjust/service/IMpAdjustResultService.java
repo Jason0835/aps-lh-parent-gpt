@@ -6,6 +6,8 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.mp.api.domain.entity.MpAdjustResult;
 import com.zlt.bill.common.service.IDocService;
 
+import java.util.List;
+
 /**
  * Copyright (c) 2022, All rights reserved。
  * 文件名称：IMpAdjustResultService.java
@@ -43,4 +45,10 @@ public interface IMpAdjustResultService  extends IDocService<MpAdjustResult>{
      * @return
      */
     AjaxResult importData(byte[] fileBytes, ImportLog importLog);
+
+    /**
+     * 批量更新超欠产有效标识
+     * @param list 调整结果列表
+     */
+    void updateValidFlagBatchById(List<MpAdjustResult> list);
 }

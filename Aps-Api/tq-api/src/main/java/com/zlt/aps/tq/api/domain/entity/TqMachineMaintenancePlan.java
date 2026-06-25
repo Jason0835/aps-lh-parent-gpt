@@ -26,9 +26,10 @@ public class TqMachineMaintenancePlan extends BaseEntity {
     @TableField("FACTORY_CODE")
     private String factoryCode;
 
-    @ApiModelProperty(value = "机台ID", position = 20)
-    @TableField("MACHINE_ID")
-    private Long machineId;
+    @Excel(name = "ui.tq.machineMaintenancePlan.column.machineCode")
+    @ApiModelProperty(value = "机台编号", position = 20)
+    @TableField("MACHINE_CODE")
+    private String machineCode;
 
     @Excel(name = "ui.tq.machineMaintenancePlan.column.machineName")
     @ApiModelProperty(value = "机台名称", position = 25)

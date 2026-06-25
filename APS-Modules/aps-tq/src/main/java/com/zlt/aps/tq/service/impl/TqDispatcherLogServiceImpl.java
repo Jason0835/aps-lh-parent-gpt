@@ -3,7 +3,6 @@ package com.zlt.aps.tq.service.impl;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -34,7 +33,9 @@ import com.zlt.aps.tq.service.TqDispatcherLogService;
 
 /**
  * 胎圈调度员排程操作日志Service业务层处理
- * 
+ *
+ * <p>6班次制（v5）：1班=D日中班、2班=D+1日夜班、3班=D+1日早班、4班=D+1日中班、5班=D+2日夜班、6班=D+2日早班</p>
+ *
  * @author Gim
  * @date 2022-02-25
  */
@@ -52,7 +53,7 @@ public class TqDispatcherLogServiceImpl implements TqDispatcherLogService
 
     /**
      * 查询胎圈调度员排程操作日志
-     * 
+     *
      * @param id 胎圈调度员排程操作日志ID
      * @return 胎圈调度员排程操作日志
      */
@@ -64,7 +65,7 @@ public class TqDispatcherLogServiceImpl implements TqDispatcherLogService
 
     /**
      * 查询胎圈调度员排程操作日志列表
-     * 
+     *
      * @param tqDispatcherLog 胎圈调度员排程操作日志
      * @return 胎圈调度员排程操作日志
      */
@@ -79,7 +80,7 @@ public class TqDispatcherLogServiceImpl implements TqDispatcherLogService
 
     /**
      * 新增胎圈调度员排程操作日志
-     * 
+     *
      * @param tqDispatcherLog 胎圈调度员排程操作日志
      * @return 结果
      */
@@ -91,7 +92,11 @@ public class TqDispatcherLogServiceImpl implements TqDispatcherLogService
     }
 
     /**
-     * 导出Excel
+     * 导出Excel（6班次制）
+     *
+     * <p>导出列顺序：操作类型、排程日期、胎圈代码、操作人、操作时间、
+     * 操作前机台编码、操作前1~6班计划量、操作后机台编码、操作后1~6班计划量。
+     * 操作前后值不一致的单元格高亮显示（CORAL色）。</p>
      *
      * @param dispatcherLog 参数
      * @return 字节数组
@@ -102,11 +107,6 @@ public class TqDispatcherLogServiceImpl implements TqDispatcherLogService
         //按用户语言读取模板
         InputStream in = this.getClass().getClassLoader().getResourceAsStream(excelModelPath +
                 I18nUtil.getMessage("ui.data.column.tq.dispatcherlog.modelName") + ".xlsx");
-        List<TqMachineInfo> machineInfoList = machineInfoService.selectMachineInfoList(new TqMachineInfo());
-        Map<String, String> machineMap = new HashMap<>();
-        if (CollectionUtils.isNotEmpty(machineInfoList)) {
-            machineMap = machineInfoList.stream().collect(Collectors.toMap(item -> item.getId().toString(), TqMachineInfo::getMachineName));
-        }
         Workbook webBook = ExcelUtils.readExcel(in);
         //填充数据
         if (CollectionUtils.isNotEmpty(list)) {
@@ -120,66 +120,78 @@ public class TqDispatcherLogServiceImpl implements TqDispatcherLogService
                 TqDispatcherLog log = list.get(i);
                 Row row = sheet.createRow(i + 2);
                 int cellNum = 0;
+                // 基础信息列
                 String operType = log.getOperType();
                 row.createCell(cellNum++).setCellValue(operType == null ? "" : operationTypeDictMap.getOrDefault(operType, ""));
                 row.createCell(cellNum++).setCellValue(log.getScheduleDate() == null ? "" : DateFormatUtils.format(log.getScheduleDate(), "yyyy-MM-dd"));
-                row.createCell(cellNum++).setCellValue(log.getMaterialCode() == null ? "" : log.getMaterialCode());
+                row.createCell(cellNum++).setCellValue(log.getBeadCode() == null ? "" : log.getBeadCode());
                 row.createCell(cellNum++).setCellValue(log.getCreateBy() == null ? "" : log.getCreateBy());
                 row.createCell(cellNum++).setCellValue(log.getCreateTime() == null ? "" : DateFormatUtils.format(log.getCreateTime(), "yyyy-MM-dd HH:mm:ss"));
-                String beforeMachine = log.getBeforeMachineId() == null ? "" : log.getBeforeMachineId();
-                String[] beforeMachineArr = beforeMachine.split(",");
-                StringBuilder beforeMachineStr = new StringBuilder();
-                for (String machineId : beforeMachineArr) {
-                    beforeMachineStr.append(machineMap.getOrDefault(machineId, "")).append(",");
-                }
-                row.createCell(cellNum++).setCellValue(beforeMachineStr.substring(0, beforeMachineStr.length() - 1));
-                double beforeMidPlan = log.getBeforeMidPlan() == null ? BigDecimal.ZERO.doubleValue() : log.getBeforeMidPlan();
-                row.createCell(cellNum++).setCellValue(beforeMidPlan);
-                double beforeNightPlan = log.getBeforeNightPlan() == null ? BigDecimal.ZERO.doubleValue() : log.getBeforeNightPlan();
-                row.createCell(cellNum++).setCellValue(beforeNightPlan);
-                double beforeDayPlan = log.getBeforeDayPlan() == null ? BigDecimal.ZERO.doubleValue() : log.getBeforeDayPlan();
-                row.createCell(cellNum++).setCellValue(beforeDayPlan);
-                double beforeNextMidPlan = log.getBeforeNextMidPlan() == null ? BigDecimal.ZERO.doubleValue() : log.getBeforeNextMidPlan();
-                row.createCell(cellNum++).setCellValue(beforeNextMidPlan);
+                // 操作前机台编码（v5直接使用机台编码，不再做ID→名称转换）
+                String beforeMachineCode = log.getBeforeMachineCode() == null ? "" : log.getBeforeMachineCode();
+                row.createCell(cellNum++).setCellValue(beforeMachineCode);
+                // 操作前6班次计划量
+                int beforeClass1 = log.getBeforeClass1Plan() == null ? 0 : log.getBeforeClass1Plan();
+                int beforeClass2 = log.getBeforeClass2Plan() == null ? 0 : log.getBeforeClass2Plan();
+                int beforeClass3 = log.getBeforeClass3Plan() == null ? 0 : log.getBeforeClass3Plan();
+                int beforeClass4 = log.getBeforeClass4Plan() == null ? 0 : log.getBeforeClass4Plan();
+                int beforeClass5 = log.getBeforeClass5Plan() == null ? 0 : log.getBeforeClass5Plan();
+                int beforeClass6 = log.getBeforeClass6Plan() == null ? 0 : log.getBeforeClass6Plan();
+                row.createCell(cellNum++).setCellValue(beforeClass1);
+                row.createCell(cellNum++).setCellValue(beforeClass2);
+                row.createCell(cellNum++).setCellValue(beforeClass3);
+                row.createCell(cellNum++).setCellValue(beforeClass4);
+                row.createCell(cellNum++).setCellValue(beforeClass5);
+                row.createCell(cellNum++).setCellValue(beforeClass6);
+                // 操作后机台编码
                 Cell afterMachineCell = row.createCell(cellNum++);
-                String afterMachine = log.getAfterMachineId() == null ? "" : log.getAfterMachineId();
-                String[] afterMachineArr = afterMachine.split(",");
-                StringBuilder afterMachineStr = new StringBuilder();
-                for (String machineId : afterMachineArr) {
-                    afterMachineStr.append(machineMap.getOrDefault(machineId, "")).append(",");
-                }
-                afterMachineCell.setCellValue(afterMachineStr.substring(0, afterMachineStr.length() - 1));
-                Cell afterMidPlanCell = row.createCell(cellNum++);
-                double afterMidPlan = log.getAfterMidPlan() == null ? BigDecimal.ZERO.doubleValue() : log.getAfterMidPlan();
-                afterMidPlanCell.setCellValue(afterMidPlan);
-                Cell afterNightPlanCell = row.createCell(cellNum++);
-                double afterNightPlan = log.getAfterNightPlan() == null ? BigDecimal.ZERO.doubleValue() : log.getAfterNightPlan();
-                afterNightPlanCell.setCellValue(afterNightPlan);
-                Cell afterDayPlanCell = row.createCell(cellNum++);
-                double afterDayPlan = log.getAfterDayPlan() == null ? BigDecimal.ZERO.doubleValue() : log.getAfterDayPlan();
-                afterDayPlanCell.setCellValue(afterDayPlan);
-                Cell afterNextMidPlanCell = row.createCell(cellNum);
-                double afterNextMidPlan = log.getAfterNextMidPlan() == null ? BigDecimal.ZERO.doubleValue() : log.getAfterNextMidPlan();
-                afterNextMidPlanCell.setCellValue(afterNextMidPlan);
+                String afterMachineCode = log.getAfterMachineCode() == null ? "" : log.getAfterMachineCode();
+                afterMachineCell.setCellValue(afterMachineCode);
+                // 操作后6班次计划量
+                Cell afterClass1Cell = row.createCell(cellNum++);
+                int afterClass1 = log.getAfterClass1Plan() == null ? 0 : log.getAfterClass1Plan();
+                afterClass1Cell.setCellValue(afterClass1);
+                Cell afterClass2Cell = row.createCell(cellNum++);
+                int afterClass2 = log.getAfterClass2Plan() == null ? 0 : log.getAfterClass2Plan();
+                afterClass2Cell.setCellValue(afterClass2);
+                Cell afterClass3Cell = row.createCell(cellNum++);
+                int afterClass3 = log.getAfterClass3Plan() == null ? 0 : log.getAfterClass3Plan();
+                afterClass3Cell.setCellValue(afterClass3);
+                Cell afterClass4Cell = row.createCell(cellNum++);
+                int afterClass4 = log.getAfterClass4Plan() == null ? 0 : log.getAfterClass4Plan();
+                afterClass4Cell.setCellValue(afterClass4);
+                Cell afterClass5Cell = row.createCell(cellNum++);
+                int afterClass5 = log.getAfterClass5Plan() == null ? 0 : log.getAfterClass5Plan();
+                afterClass5Cell.setCellValue(afterClass5);
+                Cell afterClass6Cell = row.createCell(cellNum);
+                int afterClass6 = log.getAfterClass6Plan() == null ? 0 : log.getAfterClass6Plan();
+                afterClass6Cell.setCellValue(afterClass6);
                 //设置单元格样式
                 int a = row.getPhysicalNumberOfCells();
                 for (int j = 0; j < a; j++) {
                     row.getCell(j).setCellStyle(cellStyle);
                 }
-                if (!beforeMachine.equals(afterMachine)) {
+                //操作前后值不一致的单元格高亮显示
+                if (!beforeMachineCode.equals(afterMachineCode)) {
                     afterMachineCell.setCellStyle(redCellStyle);
                 }
-                if (!(beforeMidPlan == afterMidPlan)) {
-                    afterMidPlanCell.setCellStyle(redCellStyle);
+                if (beforeClass1 != afterClass1) {
+                    afterClass1Cell.setCellStyle(redCellStyle);
                 }
-                if (!(beforeNightPlan == afterNightPlan)) {
-                    afterNightPlanCell.setCellStyle(redCellStyle);
+                if (beforeClass2 != afterClass2) {
+                    afterClass2Cell.setCellStyle(redCellStyle);
                 }
-                if (!(beforeDayPlan == afterDayPlan)) {
-                    afterDayPlanCell.setCellStyle(redCellStyle);
+                if (beforeClass3 != afterClass3) {
+                    afterClass3Cell.setCellStyle(redCellStyle);
                 }
-                if (!(beforeNextMidPlan == afterNextMidPlan)) {
-                    afterNextMidPlanCell.setCellStyle(redCellStyle);
+                if (beforeClass4 != afterClass4) {
+                    afterClass4Cell.setCellStyle(redCellStyle);
+                }
+                if (beforeClass5 != afterClass5) {
+                    afterClass5Cell.setCellStyle(redCellStyle);
+                }
+                if (beforeClass6 != afterClass6) {
+                    afterClass6Cell.setCellStyle(redCellStyle);
                 }
             }
         }

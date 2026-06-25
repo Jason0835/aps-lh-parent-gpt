@@ -109,12 +109,12 @@ export default {
       return [
         {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.mdmMaterialInfo.factoryCode"),
           type: "select",
           dictData: this.parentDict.type.biz_factory_name,
         },
         {
-          label: this.$t("ui.data.column.moldLedger.mouldCode"),
+          label: this.$t("ui.data.column.relation.mouldCode"),
           prop: "mouldCode",
           render: (form) => {
             return (
@@ -127,7 +127,7 @@ export default {
           },
         },
         {
-          label: this.$t("ui.data.rubberMaterial.shareMouldCode"),
+          label: this.$t("ui.data.column.relation.shareMouldCode"),
           prop: "shareMouldCode",
           render: (form) => {
             return (
@@ -140,7 +140,7 @@ export default {
         },
         {
           prop: "materialCode",
-          label: this.$t("ui.data.column.monthplan.oriMaterialCode"),
+          label: this.$t("ui.data.column.relation.materialCode"),
           render: (form) => {
             return (
               <materialCodeSelect
@@ -152,18 +152,18 @@ export default {
           },
         },
         {
-          label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
+          label: this.$t("ui.data.column.relation.materialDesc"),
           prop: "materialDesc",
           disabled:true
         },
         {
-          label: this.$t("ui.data.column.moldLedger.mainPattern"),
+          label: this.$t("ui.data.column.mdmMaterialInfo.mainPattern"),
           prop: "mainPattern",
           disabled:true
         },
         {
           prop: "isSamePatterPanel",
-          label: this.$t("ui.data.column.monthplan.samePatternPanel"),
+          label: this.$t("ui.data.column.relation.isSamePatternPanel"),
           type: "select",
           dictData: this.parentDict.type.biz_yes_no,
         },

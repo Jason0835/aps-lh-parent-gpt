@@ -13,7 +13,7 @@
                       sum(IFNULL(CLASS3_PLANNED_QTY, 0)) CLASS1_PLAN_QTY, /*7点-隔天7点成型计划量*/
                       sum(IFNULL(CLASS2_PLAN_QTY, 0)) CLASS2_PLAN_QTY /*7点-19点成型计划量*/
                from T_CX_SCHEDULE_RESULT r
-               inner join T_PRODUCT_CONSTRUCTION_INFO ci on r.EMBRYO_CODE = ci.embryo_code and r.BOM_DATA_VERSION = ci.EMBRYO_VERSION and ci.DEL_FLAG = 0 /*施工信息表*/
+               inner join T_MDM_CONSTRUCTION_INFO ci on r.EMBRYO_CODE = ci.embryo_code and r.BOM_DATA_VERSION = ci.EMBRYO_VERSION and ci.IS_DELETE = 0 /*施工信息表*/
                where schedule_date = STR_TO_DATE(#{scheduleDate}, '%Y-%m-%d')
                and r.DEL_FLAG = 0
                group by r.EMBRYO_CODE,r.BOM_DATA_VERSION
@@ -21,12 +21,15 @@
         group by cxr.TIRE_RING_CODE
     </select>
 
-    <select id="listTqStock" parameterType="string" resultType="com.zlt.aps.tq.engine.vo.TqStockVo">
-        select MATERIAL_CODE beadCode, SUM(IFNULL(STOCK_NUM,0)+IFNULL(MODIFY_NUM,0)-IFNULL(BAD_NUM,0)) STOCK_NUM
+    <select id="listTqStock" resultType="com.zlt.aps.tq.engine.vo.TqStockVo">
+        select BEAD_CODE, SUM(IFNULL(STOCK_NUM,0)+IFNULL(MODIFY_NUM,0)-IFNULL(BAD_NUM,0)) STOCK_NUM
         from T_TQ_STOCK
         where STOCK_DATE = DATE_ADD(#{stockDate}, INTERVAL -1 day) /*排程日期 要减1天，才是对应库存日期*/
         and DEL_FLAG = '0'
-        GROUP BY MATERIAL_CODE 
+        <if test="factoryCode != null and factoryCode != ''">
+            and FACTORY_CODE = #{factoryCode}
+        </if>
+        GROUP BY BEAD_CODE
     </select>
 
     <select id="listTodayMorningPlan" resultType="com.zlt.aps.tq.engine.vo.TqStockConsumeVo">
@@ -36,6 +39,9 @@
     FROM T_TQ_SCHEDULE_RESULT
     WHERE SCHEDULE_DATE = DATE_ADD(#{scheduleDate}, INTERVAL -1 day)
       AND DEL_FLAG = '0'
+      <if test="factoryCode != null and factoryCode != ''">
+          AND FACTORY_CODE = #{factoryCode}
+      </if>
     GROUP BY BEAD_CODE
 </select>
 

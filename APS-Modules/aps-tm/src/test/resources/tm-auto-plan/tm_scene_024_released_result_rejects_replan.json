@@ -1,0 +1,32 @@
+{
+  "caseName": "TM_SCENE_024_released_result_rejects_replan",
+  "description": "TM_SCENE_024：旧结果存在已发布拒绝重排",
+  "autoPlanRequest": {
+    "factoryCode": "F1",
+    "scheduleDate": "2026-07-24",
+    "operator": "TM_AUTO_PLAN_TEST",
+    "traceId": "TRACE-TM_SCENE_024",
+    "confirmOverwrite": true
+  },
+  "oldScheduleResults": [
+    {
+      "factoryCode": "F1",
+      "scheduleDate": "2026-07-24",
+      "releaseStatus": "1",
+      "treadCode": "TR-OLD"
+    }
+  ],
+  "expected": {
+    "success": false,
+    "rejectMessageContains": "已有发布过的生成计划",
+    "resultCount": 0,
+    "assignedCount": 0,
+    "unassignedCount": 0,
+    "explainCount": 0
+  },
+  "sceneCode": "TM_SCENE_024",
+  "designSteps": [
+    "Step2"
+  ],
+  "mysqlVerificationStatus": "待用户执行 MySQL 验证"
+}

@@ -1542,4 +1542,37 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
     private String buildDemandPlanSumMapKey(String monthPlanVersion, String materialCode) {
         return monthPlanVersion + "|" + materialCode;
     }
+
+    /**
+     * 定时计算上月超欠产
+     * 逻辑：
+     * 1. 获取上月年月和当月年月
+     * 2. 计算上月日期范围（1日~月末）
+     * 3. 从上月定稿表取计划量，从硫化日完成量表取上月完成量
+     * 4. 超欠产 = 上月计划量 - 上月完成量
+     * 5. 按分厂+物料编码匹配，回填到当月定稿记录
+     * 6. 上月有定稿数据则有效标志='1'，否则='0'
+     */
+    @Override
+    public AjaxResult calcLastMonthOverProd() {
+        // 获取上月和当月年月
+        YearMonth lastMonth = YearMonth.now().minusMonths(1);
+        YearMonth currentMonth = YearMonth.now();
+        Integer lastYear = lastMonth.getYear();
+        Integer lastMonthValue = lastMonth.getMonthValue();
+        Integer currentYear = currentMonth.getYear();
+        Integer currentMonthValue = currentMonth.getMonthValue();
+
+        // 上月日期范围
+        Date startDate = cn.hutool.core.date.DateUtil.beginOfMonth(cn.hutool.core.date.DateUtil.offsetMonth(new Date(), -1));
+        Date endDate = cn.hutool.core.date.DateUtil.endOfMonth(startDate);
+
+        log.info("开始计算上月超欠产, 上月: {}-{}, 当月: {}-{}, 日期范围: {} ~ {}",
+                lastYear, lastMonthValue, currentYear, currentMonthValue, startDate, endDate);
+
+        int count = finalMapper.updateLastMonthOverProd(lastYear, lastMonthValue, currentYear, currentMonthValue, startDate, endDate);
+
+        log.info("上月超欠产计算完成, 更新记录数: {}", count);
+        return AjaxResult.success("上月超欠产计算完成，更新记录数：" + count);
+    }
 }

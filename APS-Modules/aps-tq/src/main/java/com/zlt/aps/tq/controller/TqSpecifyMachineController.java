@@ -128,7 +128,7 @@ public class TqSpecifyMachineController extends AbstractDocBizController<TqSpeci
         List<TqSpecifyMachineExportVO> voList = new ArrayList<>();
         for (TqSpecifyMachine machine : list) {
             TqSpecifyMachineExportVO vo = new TqSpecifyMachineExportVO();
-            vo.setMaterialCode(machine.getMaterialCode());
+            vo.setBeadCode(machine.getBeadCode());
             vo.setMachineName(machine.getMachineName());
             vo.setLineType(machine.getLineType());
             vo.setJobType(machine.getJobType());
@@ -142,8 +142,8 @@ public class TqSpecifyMachineController extends AbstractDocBizController<TqSpeci
     @Override
     protected void builderCondition(QueryWrapper<TqSpecifyMachine> queryWrapper, TqSpecifyMachine queryVO) {
         queryWrapper.eq("is_delete", 0);
-        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getMaterialCode()), "material_code", queryVO.getMaterialCode());
-        queryWrapper.eq(queryVO.getMachineId() != null, "machine_id", queryVO.getMachineId());
+        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getBeadCode()), "bead_code", queryVO.getBeadCode());
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getMachineCode()), "machine_code", queryVO.getMachineCode());
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getLineType()), "line_type", queryVO.getLineType());
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getJobType()), "job_type", queryVO.getJobType());
     }
