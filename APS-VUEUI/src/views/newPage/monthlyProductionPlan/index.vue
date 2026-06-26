@@ -365,8 +365,8 @@ export default {
       currentAdjustBeginDay: "",
       /** 调整结束日期（来自 Redis） */
       currentAdjustEndDay: "",
-      /** 生产实际排产量合计（list4Adjust 返回 sumTotalQty） */
-      sumTotalQty: null,
+      /** 生产实际排产量合计（list4Adjust 列表首行 sumTotalQty） */
+      sumTotalQty: 0,
       /** 调整版本号（来自 Redis） */
       currentAdjustMonthPlanVersion: "",
       confirmAdjustLoading: false,
@@ -413,7 +413,7 @@ export default {
     /** 生产实际排产量合计展示值 */
     sumTotalQtyDisplay() {
       if (this.sumTotalQty == null || this.sumTotalQty === "") {
-        return "-";
+        return 0;
       }
       return this.sumTotalQty;
     },
@@ -2378,15 +2378,18 @@ export default {
         const res = await listMonthPlanFinal4Adjust(listParams);
         const rawRows = res.rows || [];
         this.page.total = res.total || 0;
+        const firstRow = rawRows.length ? rawRows[0] : null;
         this.sumTotalQty =
-          res.sumTotalQty != null && res.sumTotalQty !== ""
-            ? res.sumTotalQty
+          firstRow &&
+          firstRow.sumTotalQty != null &&
+          firstRow.sumTotalQty !== ""
+            ? firstRow.sumTotalQty
             : 0;
         await this.applyAdjustmentStatisticsRows(rawRows);
       } catch (e) {
         console.error(e);
         this.data = [];
-        this.sumTotalQty = null;
+        this.sumTotalQty = 0;
       } finally {
         this.loading = false;
         this.dayCellActive = null;
