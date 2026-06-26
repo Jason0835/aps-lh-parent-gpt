@@ -68,4 +68,7 @@ public class DjPaddingDemand {
 
     /** 本班是否需要排产（算法过程中动态标记） */
     private boolean needProduce;
+
+    /** 当前接班库存可覆盖的成型生产班次数（由 checkDemandForShift 计算） */
+    private int coverableShiftCount;
 }

@@ -67,7 +67,7 @@ public class DjParamsController extends BaseController<DjParams> {
      */
     @Log(title = "ui.dj.params.column.modalName", businessType = BusinessType.DELETE)
     @ApiOperation("删除垫胶参数信息")
-    @DeleteMapping("/{ids}")
+    @PostMapping("/remove")
     public AjaxResult remove(@RequestBody List<Long> ids) {
         return toAjax(paramsService.removeByIds(ids) ? 1 : 0);
     }

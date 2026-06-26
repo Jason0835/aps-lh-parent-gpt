@@ -105,7 +105,7 @@ public class DjMachineMaintenanceController extends AbstractDocBizController<DjM
     @Log(title = "ui.data.column.dj.machineMaintenance.modelName", businessType = BusinessType.DELETE)
     @RequiresPermissions("dj:machineMaintenance:remove")
     @ApiOperation("删除")
-    @DeleteMapping("/remove")
+    @PostMapping("/remove")
     @Override
     public AjaxResult removeByIds(@RequestBody List<Long> ids) {
         return super.removeByIds(ids);

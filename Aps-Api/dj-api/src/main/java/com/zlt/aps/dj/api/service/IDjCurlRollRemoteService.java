@@ -51,7 +51,7 @@ public interface IDjCurlRollRemoteService {
      * @param ids
      * @return
      */
-    @DeleteMapping("/dj/curlRoll/{ids}")
+    @PostMapping("/dj/curlRoll/remove")
     AjaxResult removeByIds(@RequestBody List<Long> ids);
 
     /**

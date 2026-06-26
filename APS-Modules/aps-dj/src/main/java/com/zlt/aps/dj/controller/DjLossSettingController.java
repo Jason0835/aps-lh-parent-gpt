@@ -77,7 +77,7 @@ public class DjLossSettingController extends AbstractDocBizController<DjLossSett
     @Log(title = "ui.dj.lossSetting.column.modalName", businessType = BusinessType.DELETE)
     @ApiOperation("根据id批量删除信息")
     @ApiImplicitParams({ @ApiImplicitParam(name = "ids", dataType = "Long[]", value = "主键ids") })
-    @DeleteMapping("/{ids}")
+    @PostMapping("/remove")
     public AjaxResult removeByIds(@RequestBody List<Long> ids) {
         return super.removeByIds(ids);
     }

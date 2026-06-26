@@ -10,6 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.ruoyi.common.constant.UserConstants;
+import com.zlt.aps.common.engine.enums.MachineRangeEnum;
 import com.zlt.aps.dj.api.domain.entity.DjDepthConfig;
 import com.zlt.aps.dj.mapper.DjDepthConfigMapper;
 import com.zlt.aps.dj.service.IDjDepthConfigService;
@@ -86,17 +87,21 @@ public class DjDepthConfigServiceImpl extends AbstractDocService<DjDepthConfig> 
      * @return 长度2的数组，[start, end]
      */
     private long[] calculateRange(String machineRange, Integer machineQty) {
+        MachineRangeEnum rangeEnum = MachineRangeEnum.getByCode(machineRange);
+        if (rangeEnum == null) {
+            return new long[]{0, 0};
+        }
         int qty = machineQty != null ? machineQty : 0;
-        switch (machineRange) {
-            case "LT": // 小于 N
+        switch (rangeEnum) {
+            case LT:
                 return new long[]{0, qty - 1L};
-            case "LE": // 小于等于 N
+            case LE:
                 return new long[]{0, qty};
-            case "EQ": // 等于 N
+            case EQ:
                 return new long[]{qty, qty};
-            case "GE": // 大于等于 N
+            case GE:
                 return new long[]{qty, Integer.MAX_VALUE};
-            case "GT": // 大于 N
+            case GT:
                 return new long[]{qty + 1L, Integer.MAX_VALUE};
             default:
                 return new long[]{0, 0};

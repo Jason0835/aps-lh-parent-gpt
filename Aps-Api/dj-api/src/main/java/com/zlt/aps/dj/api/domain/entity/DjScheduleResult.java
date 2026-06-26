@@ -236,6 +236,12 @@ public class DjScheduleResult extends BaseEntity {
     @TableField(value = "RELEASE_STATUS")
     private String releaseStatus;
 
+    /** 排程首班班次（ClassNumThreePlanEnums.classIndex），如 "03"=中班、"01"=夜班、"02"=早班 */
+    @Excel(name = "ui.data.column.dj.scheduleResult.scheduleShiftClass")
+    @ApiModelProperty(value = "排程首班班次")
+    @TableField(value = "SCHEDULE_SHIFT_CLASS")
+    private String scheduleShiftClass;
+
     /** 数据来源 */
     @ApiModelProperty(value = "数据来源", name = "dataSource")
     @TableField(value = "DATA_SOURCE")
@@ -330,6 +336,27 @@ public class DjScheduleResult extends BaseEntity {
     @ApiModelProperty(value = "T-1日早班原因分析", name = "prevDayClass3Analysis")
     @TableField(exist = false)
     private String prevDayClass3Analysis;
+
+    /** T-1日中班数据（非数据库字段，从 T-1 日排产结果加载，首班为夜班时使用） */
+    @ApiModelProperty(value = "T-1日中班顺序", name = "prevDayClass1Sequence")
+    @TableField(exist = false)
+    private Integer prevDayClass1Sequence;
+
+    @ApiModelProperty(value = "T-1日中班计划量", name = "prevDayClass1PlanQty")
+    @TableField(exist = false)
+    private BigDecimal prevDayClass1PlanQty;
+
+    @ApiModelProperty(value = "T-1日中班完成量", name = "prevDayClass1FinishQty")
+    @TableField(exist = false)
+    private BigDecimal prevDayClass1FinishQty;
+
+    @ApiModelProperty(value = "T-1日中班完成率", name = "prevDayClass1FinishRate")
+    @TableField(exist = false)
+    private BigDecimal prevDayClass1FinishRate;
+
+    @ApiModelProperty(value = "T-1日中班原因分析", name = "prevDayClass1Analysis")
+    @TableField(exist = false)
+    private String prevDayClass1Analysis;
 
     @TableField(exist = false)
     private Long[] ids;

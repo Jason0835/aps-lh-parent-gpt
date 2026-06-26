@@ -94,7 +94,7 @@ public class DjDepthConfigController extends AbstractDocBizController<DjDepthCon
      * 批量删除配置(逻辑删)
      */
     @ApiOperation("批量删除配置")
-    @DeleteMapping("/{ids}")
+    @PostMapping("/remove")
     public AjaxResult removeByIds(@RequestBody List<Long> ids) {
         return super.removeByIds(ids);
     }

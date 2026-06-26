@@ -37,6 +37,9 @@ public class DjScheduleContext {
     /** 有效库存 Map<paddingCode, stock> */
     private Map<String, BigDecimal> effectiveStockMap;
 
+    /** 月度剩余量 Map<paddingCode, paddingRemaining>（月计划硫化余量 × 单耗） */
+    private Map<String, BigDecimal> paddingRemainingMap;
+
     /** 机台 Map<machineCode, DjMachineInfo> */
     private Map<String, DjMachineInfo> machineMap;
 
@@ -72,4 +75,7 @@ public class DjScheduleContext {
 
     /** 各机台各班次的生产顺序计数器 Map<machineCode, Map<shiftIndex, sequence>> */
     private Map<String, Map<Integer, Integer>> shiftSequenceMap;
+
+    /** 班次索引→classIndex 映射数组（长度6），根据排程首班班次参数动态构建 */
+    private String[] shiftClassMap;
 }
