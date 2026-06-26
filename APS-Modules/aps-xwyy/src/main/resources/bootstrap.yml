@@ -1,22 +1,28 @@
+# Tomcat
 server:
-  port: 9009
+  port: 9013
 
 nacos:
-  #  server-addr: 192.168.2.93:8848
-  server-addr: 127.0.0.1:8848
+  server-addr: 192.168.10.145:8848
 
 # Spring
 spring:
-  # 添加了后端的swagger接口才会显示
   mvc:
     pathmatch:
       matching-strategy: ant_path_matcher
   application:
     # 应用名称
     name: aps-xwyy
+  # 文件上传
+  servlet:
+    multipart:
+      # 单个文件大小
+      max-file-size: 10MB
+      # 设置总上传的文件大小
+      max-request-size: 20MB
   profiles:
     # 环境配置
-    active: prod
+    active: test
   main:
     allow-bean-definition-overriding: true
   cloud:
@@ -46,8 +52,18 @@ spring:
         refresh-enabled: true
 mq:
   scheduleLog:
-    queue: dev.xwyy.schedule.log.queue
-    exchange: dev.xwyy.schedule.log.exchange
-    rutekey: dev.xwyy.schedule.log.rutekey
+    queue: dev.schedule.schedule.log.queue
+    exchange: dev.schedule.schedule.log.exchange
+    rutekey: dev.schedule.schedule.log.rutekey
+
 #模板文件的配置路径
 excelModelPath: excelModel/
+#分布式事务默认不开启
+seata:
+  enabled: false
+#排程引擎算法过程日志记录开关
+auto:
+  schedule:
+    logSwitch: true
+i18n_msg:
+  baseName: none
