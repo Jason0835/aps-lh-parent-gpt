@@ -59,6 +59,11 @@ public class TmAutoScheduleDataLoadServiceTest {
     @Mock
     private TmCurlRollMapper tmCurlRollMapper;
 
+    @Mock
+    private TmStockMapper tmStockMapper;
+
+    @Mock
+    private TmScheduleResultMapper tmScheduleResultMapper;
     /**
      * 测试内容：验证数据加载会补齐默认策略参数并生成候选机台。
      * 测试场景：参数表无配置，机台表返回一台启用机台，成型需求为空。
@@ -513,7 +518,12 @@ public class TmAutoScheduleDataLoadServiceTest {
         setField(service, "tmParamsMapper", tmParamsMapper);
         setField(service, "tmMachineInfoMapper", tmMachineInfoMapper);
         setField(service, "tmAutoScheduleDataLoadMapper", tmAutoScheduleDataLoadMapper);
+        setField(service, "tmStockMapper", tmStockMapper);
+        setField(service, "tmScheduleResultMapper", tmScheduleResultMapper);
         when(tmParamsMapper.selectList(any())).thenReturn(paramsList);
+        when(tmStockMapper.selectList(any())).thenReturn(Collections.emptyList());
+        when(tmScheduleResultMapper.selectList(any()))
+                .thenReturn(Collections.singletonList(historyScheduleResult("TR-215-001")));
         TmMachineInfo machineInfo = new TmMachineInfo();
         machineInfo.setFactoryCode("F1");
         machineInfo.setMachineCode("TM01");
@@ -538,6 +548,15 @@ public class TmAutoScheduleDataLoadServiceTest {
         return param("TM_ALGORITHM_SWITCH", value);
     }
 
+    private TmScheduleResult historyScheduleResult(String treadCode) {
+        TmScheduleResult result = new TmScheduleResult();
+        result.setFactoryCode("F1");
+        result.setTreadCode(treadCode);
+        result.setScheduleDate(DateUtil.parseDate("2026-06-17"));
+        result.setClass1PlanQty(BigDecimal.ONE);
+        result.setIsDelete(0);
+        return result;
+    }
     private TmParams param(String paramCode, String value) {
         TmParams params = new TmParams();
         params.setFactoryCode("F1");

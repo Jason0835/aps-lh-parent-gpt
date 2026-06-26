@@ -416,6 +416,7 @@ public class TmMachineAssignService implements ITmMachineAssignService {
         target.setPreviousGlueSwitchHours(source.getPreviousGlueSwitchHours());
         target.setFixedMachineMatched(source.getFixedMachineMatched());
         target.setDemandQty(source.getDemandQty());
+        target.setNewSpecInfo(source.getNewSpecInfo());
         target.setBusinessKeySuffix("OVERFLOW_FROM_CLASS" + sourceShift + "_TO_CLASS" + shiftOrder + "_" + machineCode + "_" + overflowIndex);
         return target;
     }
@@ -480,6 +481,37 @@ public class TmMachineAssignService implements ITmMachineAssignService {
         evidence.put("remainCapacity", remainCapacity);
         traceOf(context, task).addRuleHit("CAPACITY_OVERFLOW_SPLIT",
                 overflowQty.compareTo(BigDecimal.ZERO) > 0 ? "SPLIT" : "PASS", evidence);
+        this.addNewSpecAdvanceResultTrace(context, task, assignedQty, overflowQty, machineCode);
+    }
+
+    /**
+     * 写入新规格提前排产后的机台分配结果证据。
+     *
+     * @param context     排程上下文
+     * @param task        当前任务
+     * @param assignedQty 本班实际分配量
+     * @param overflowQty 顺延量
+     * @param machineCode 选中机台编码
+     */
+    private void addNewSpecAdvanceResultTrace(TmScheduleContext context, TmTaskDraft task, BigDecimal assignedQty,
+                                              BigDecimal overflowQty, String machineCode) {
+        TmNewSpecInfo newSpecInfo = task.getNewSpecInfo();
+        if (newSpecInfo == null || !newSpecInfo.isNewSpecHit()) {
+            return;
+        }
+        List<Integer> adjustedTargetWindow = newSpecInfo.getAdjustedTargetWindow();
+        boolean advancedWindowHit = adjustedTargetWindow != null && adjustedTargetWindow.contains(task.getShiftOrder());
+        Map<String, Object> evidence = new LinkedHashMap<>();
+        evidence.put("shiftOrder", task.getShiftOrder());
+        evidence.put("machineCode", machineCode);
+        evidence.put("normalTargetShift", newSpecInfo.getNormalTargetShift());
+        evidence.put("adjustedTargetShift", newSpecInfo.getAdjustedTargetShift());
+        evidence.put("adjustedTargetWindow", adjustedTargetWindow);
+        evidence.put("advancedWindowHit", advancedWindowHit);
+        evidence.put("assignedQty", assignedQty);
+        evidence.put("overflowQty", overflowQty);
+        traceOf(context, task).addRuleHit("NEW_SPEC_ADVANCE_RESULT",
+                advancedWindowHit ? "PASS" : "ROLLING", evidence);
     }
 
     /**
@@ -703,6 +735,18 @@ public class TmMachineAssignService implements ITmMachineAssignService {
             candidate.setFixedMachineSelected(!hasFixedAllowRule || fixedAllowMatched);
             candidate.setFixedMachineMatched(fixedAllowMatched);
             candidate.setFixedMachineExcluded(contains(candidate.getFixedForbidTreadCodes(), task.getTreadCode()));
+            // 打印机台速度选择来源
+            log.info("[TM_MACHINE_SPEED] treadCode={}, machineCode={}, 机台速度【{}】，来源={}",
+                    task.getTreadCode(), candidate.getMachineCode(), machineSpeed,
+                    candidate.getTreadSpeedMap().containsKey(task.getTreadCode()) ? "胎面规格速度" : "机台默认速度");
+            // 打印机台产能计算公式
+            log.info("[TM_MACHINE_CAPACITY] treadCode={}, machineCode={}, shiftOrder={}, 最大产能【maxCapacity】-检修时长*机台速度【maintenanceDeduct】-已排计划量【assignedPlanQty】=剩余产能【remainCapacity】",
+                    task.getTreadCode(), candidate.getMachineCode(), task.getShiftOrder());
+            log.info("[TM_MACHINE_CAPACITY_DETAIL] treadCode={}, machineCode={}, shiftOrder={}, maxCapacity={}, maintenanceHours={}, machineSpeed={}, assignedPlanQty={}, remainCapacity={}",
+                    task.getTreadCode(), candidate.getMachineCode(), task.getShiftOrder(),
+                    candidate.getMaxCapacity(), candidate.getMaintenanceHours(), machineSpeed,
+                    resolveAssignedPlanQty(context, candidate.getMachineCode(), task.getShiftOrder()),
+                    remainCapacity);
         }
     }
 

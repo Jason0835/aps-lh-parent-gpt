@@ -145,6 +145,9 @@ public class TmTaskDraft {
     /** 业务键后缀，用于拆分来源任务或顺延任务，避免同规格同班次任务业务键冲突 */
     private String businessKeySuffix;
 
+    /** 新规格判断与提前排产证据 */
+    private TmNewSpecInfo newSpecInfo;
+
     /**
      * 判断任务是否未分配机台。
      *
