@@ -339,7 +339,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                                 + ", 班产=" + PriorityTraceLogHelper.safeText(sku.getShiftCapacity())
                                 + ", 阶段=" + resolveConstructionStageDesc(sku)
                                 + ", 施工组=" + resolveNewSpecDisplayType(sku)
-                                + ", 收尾=" + PriorityTraceLogHelper.oneZero(endingJudgmentStrategy.isEnding(context, sku)));
+                                + ", 预计收尾=" + PriorityTraceLogHelper.oneZero(endingJudgmentStrategy.isExpectedEnding(context, sku)));
             }
         }
         PriorityTraceLogHelper.appendTitleFooter(detailBuilder);
@@ -387,7 +387,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
             SkuScheduleDTO sku = iterator.next();
             boolean currentSkuRemoved = false;
             // 续作、换活字块未消费完的 SKU 在此继续参与 S4.5，不因来源不同提前拦截。
-            boolean isEnding = endingJudgmentStrategy.isEnding(context, sku);
+            boolean isEnding = endingJudgmentStrategy.isCurrentWindowEnding(context, sku);
             Integer latestPreviousFinishedQty = resolveLatestPreviousFinishedQty(context, sku.getMaterialCode());
             if (shouldSkipHistoryShortageOnlyRecentlyProducedSku(context, sku,
                     latestPreviousFinishedQty)) {
@@ -2828,40 +2828,37 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
     }
 
     /**
-     * 解析新增排产正式/量试非收尾场景的最低目标量。
-     * <p>文档口径要求非收尾目标量按窗口 dayN 累计值推进，不直接使用理论窗口满产产能。</p>
+     * 解析新增排产正式/量试非收尾场景的业务目标量。
+     * <p>dayN 只参与排产节奏和增机台判断，不再作为非收尾 SKU 的实际排产硬目标。</p>
      *
      * @param context 排程上下文
      * @param sku SKU
      * @param policy 排产数量策略
-     * @return 最低目标量
+     * @return 业务目标量
      */
     private int resolveFormalNonEndingMinimumTargetQty(LhScheduleContext context,
                                                        SkuScheduleDTO sku,
                                                        ProductionQuantityPolicy policy) {
-        if (!shouldUseFormalNonEndingMinimumTarget(context, sku, policy)) {
-            return sku == null ? 0 : Math.max(0, sku.resolveTargetScheduleQty());
+        if (sku == null) {
+            return 0;
         }
-        int windowMinimumTargetQty = Math.max(0, sku.getWindowRemainingPlanQty());
-        if (windowMinimumTargetQty <= 0) {
-            windowMinimumTargetQty = Math.max(0, sku.getWindowPlanQty());
+        int businessTargetQty = Math.max(0, sku.resolveTargetScheduleQty());
+        if (shouldUseFormalNonEndingMinimumTarget(context, sku, policy)) {
+            log.info("新增SKU正式非收尾目标量按业务目标保留, materialCode: {}, businessTargetQty: {}, "
+                            + "windowRemainingPlanQty: {}, windowPlanQty: {}, dailyPlanRemainingQty: {}",
+                    sku.getMaterialCode(), businessTargetQty, sku.getWindowRemainingPlanQty(),
+                    sku.getWindowPlanQty(), SkuDailyPlanQuotaUtil.sumRemainingQty(sku.getDailyPlanQuotaMap()));
         }
-        if (windowMinimumTargetQty <= 0) {
-            windowMinimumTargetQty = SkuDailyPlanQuotaUtil.sumRemainingQty(sku.getDailyPlanQuotaMap());
-        }
-        if (windowMinimumTargetQty <= 0) {
-            return Math.max(0, sku.resolveTargetScheduleQty());
-        }
-        return windowMinimumTargetQty;
+        return businessTargetQty;
     }
 
     /**
-     * 判断当前是否使用新增排产正式/量试非收尾最低目标量口径。
+     * 判断当前是否使用新增排产正式/量试非收尾业务目标量口径。
      *
      * @param context 排程上下文
      * @param sku SKU
      * @param policy 排产数量策略
-     * @return true-使用 dayN 累计最低目标量
+     * @return true-使用业务目标量并保留 dayN 增机判断
      */
     private boolean shouldUseFormalNonEndingMinimumTarget(LhScheduleContext context,
                                                           SkuScheduleDTO sku,
@@ -3631,10 +3628,18 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                 context, sku, candidates, excludedMachineCodes, policy, segment, candidateMachine,
                 shifts, capacityCalculate, remainingTargetQty, availableMachineCount);
         if (requiredMachineCountByDailyCapacity == 0 && segment.isExistingSameMaterialSatisfied()) {
-            log.info("新增SKU dayN模拟判定已有同物料机台已满足, materialCode: {}, machineCode: {}, "
-                            + "remainingTargetQty: {}, existingSameMaterialSatisfied: true",
-                    sku.getMaterialCode(), segment.getMachineCode(), remainingTargetQty);
-            return 0;
+            if (!needMoreMachine(context, sku)) {
+                log.info("新增SKU dayN模拟判定已有同物料机台已满足, materialCode: {}, machineCode: {}, "
+                                + "remainingTargetQty: {}, existingSameMaterialSatisfied: true",
+                        sku.getMaterialCode(), segment.getMachineCode(), remainingTargetQty);
+                return 0;
+            }
+            // dayN 只作为节奏和资源判断依据，业务目标仍有剩余时不能直接阻断新增机台。
+            log.info("新增SKU已有同物料机台满足dayN节奏但目标仍需补量，继续尝试新增机台, "
+                            + "materialCode: {}, machineCode: {}, remainingTargetQty: {}, "
+                            + "remainingScheduleQty: {}",
+                    sku.getMaterialCode(), segment.getMachineCode(), remainingTargetQty,
+                    sku.getRemainingScheduleQty());
         }
         if (shouldFillMachineToWindowEndForFutureDayDemand(
                 context, sku, policy, segment, requiredMachineCountByDailyCapacity)) {
@@ -5321,7 +5326,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                 continue;
             }
             totalSkuCount++;
-            if (!endingJudgmentStrategy.isEnding(context, pendingSku)) {
+            if (!endingJudgmentStrategy.isStructureEndingForPriority(context, pendingSku)) {
                 continue;
             }
             endingSkuCount++;
@@ -5471,7 +5476,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
 
         // SKU基本信息
         String skuType = resolveNewSpecSkuType(sku);
-        boolean isEnding = endingJudgmentStrategy.isEnding(context, sku);
+        boolean isEnding = endingJudgmentStrategy.isExpectedEnding(context, sku);
         PriorityTraceLogHelper.appendLine(detailBuilder,
                 PriorityTraceLogHelper.kv("排程日期", PriorityTraceLogHelper.formatDateTime(context.getScheduleDate()))
                         + ", " + PriorityTraceLogHelper.kv("SKU", sku.getMaterialCode())
@@ -7150,7 +7155,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         }
         // 按物料编码汇总新增结果的总计划量（支持多机台同SKU排产）
         Map<String, Integer> materialTotalPlanQtyMap = new LinkedHashMap<>(16);
-        Map<String, Integer> materialEndingDemandQtyMap = new LinkedHashMap<>(16);
+        Map<String, SkuScheduleDTO> materialSkuMap = new LinkedHashMap<>(16);
         for (LhScheduleResult result : context.getScheduleResultList()) {
             if (result == null || !NEW_SPEC_SCHEDULE_TYPE.equals(result.getScheduleType())) {
                 continue;
@@ -7161,8 +7166,8 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
             }
             int planQty = resolveResultScheduledQty(result);
             materialTotalPlanQtyMap.merge(materialCode, planQty, Integer::sum);
-            if (!materialEndingDemandQtyMap.containsKey(materialCode)) {
-                materialEndingDemandQtyMap.put(materialCode, resolveEndingDemandQty(context, result));
+            if (!materialSkuMap.containsKey(materialCode)) {
+                materialSkuMap.put(materialCode, findSkuDto(context, materialCode));
             }
         }
         // 基于汇总计划量统一设置同物料所有结果的收尾标记
@@ -7172,8 +7177,8 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                 continue;
             }
             int totalPlanQty = materialTotalPlanQtyMap.getOrDefault(result.getMaterialCode(), 0);
-            int endingDemandQty = materialEndingDemandQtyMap.getOrDefault(result.getMaterialCode(), 0);
-            result.setIsEnd(totalPlanQty >= endingDemandQty && endingDemandQty > 0 ? "1" : "0");
+            SkuScheduleDTO sku = materialSkuMap.get(result.getMaterialCode());
+            result.setIsEnd(endingJudgmentStrategy.isFinalEnding(context, sku, totalPlanQty) ? "1" : "0");
         }
     }
 
@@ -8691,6 +8696,16 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
     private int resolveSchedulableRemainingQty(SkuScheduleDTO sku) {
         if (sku == null) {
             return 0;
+        }
+        ProductionQuantityPolicy policy = ProductionQuantityPolicy.from(sku, sku.isStrictTargetQty());
+        if (!policy.isStrictUpperLimit()) {
+            // 正规/量试非收尾的 dayN 只作为节奏与资源判断依据，不作为实际排产硬上限。
+            return sku.resolveTargetScheduleQty();
+        }
+        if (!StringUtils.equals(ConstructionStageEnum.TRIAL.getCode(), sku.getConstructionStage())
+                && !sku.isStrictNewSpecShortageOnly()) {
+            // 收尾目标、硫化余量、胎胚库存等严格业务目标不得被 dayN 或窗口计划改小。
+            return sku.resolveTargetScheduleQty();
         }
         int remainingQuotaQty = SkuDailyPlanQuotaUtil.sumRemainingQty(sku.getDailyPlanQuotaMap());
         if (remainingQuotaQty > 0) {
