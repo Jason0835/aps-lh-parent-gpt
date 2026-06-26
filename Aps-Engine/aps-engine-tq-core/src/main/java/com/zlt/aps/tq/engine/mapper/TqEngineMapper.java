@@ -2,6 +2,8 @@ package com.zlt.aps.tq.engine.mapper;
 
 
 import com.zlt.aps.common.engine.domain.EngineConstructionInfo;
+import com.zlt.aps.tq.api.domain.entity.TqStockShiftConfig;
+import com.zlt.aps.tq.engine.vo.BeadMachineCountVo;
 import com.zlt.aps.tq.engine.vo.TqParamsVo;
 import com.zlt.aps.tq.engine.vo.TqScheduleBaseInfoVo;
 import com.zlt.aps.tq.engine.vo.TqScheduleResultVo;
@@ -133,4 +135,19 @@ public interface TqEngineMapper {
      * @return 工作日历列表
      */
     List<Map<String, Object>> listWorkCalendar(@Param("scheduleDate") String scheduleDate);
+
+    /**
+     * 查询胎圈备库班数配置列表（按工厂过滤）
+     * @param factoryCode 分厂编码（可选，为空则查询全部）
+     * @return 备库班数配置列表
+     */
+    List<TqStockShiftConfig> listStockShiftConfig(@Param("factoryCode") String factoryCode);
+
+    /**
+     * 统计胎圈规格对应的成型机台数
+     * 通过成型排程结果表与施工信息表关联，按胎圈编码分组统计DISTINCT成型机台数
+     * @param scheduleDate 排程日期
+     * @return 胎圈编码→成型机台数列表
+     */
+    List<BeadMachineCountVo> statBeadMachineCount(@Param("scheduleDate") String scheduleDate);
 }

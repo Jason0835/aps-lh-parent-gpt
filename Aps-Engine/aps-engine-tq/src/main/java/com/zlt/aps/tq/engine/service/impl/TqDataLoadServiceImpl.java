@@ -4,6 +4,7 @@ import com.ruoyi.common.core.utils.SecurityUtils;
 import com.zlt.aps.common.engine.constants.EngineConstants;
 import com.zlt.aps.common.engine.service.AutoScheduleLogService;
 import com.zlt.aps.common.engine.service.impl.IncrementService;
+import com.zlt.aps.tq.api.domain.entity.TqStockShiftConfig;
 import com.zlt.aps.tq.engine.context.TqScheduleContext;
 import com.zlt.aps.tq.engine.mapper.TqEngineMapper;
 import com.zlt.aps.tq.engine.mapper.TqEngineStockMapper;
@@ -12,6 +13,7 @@ import com.zlt.aps.tq.engine.service.TqEngineLossService;
 import com.zlt.aps.tq.engine.service.TqEngineMachineService;
 import com.zlt.aps.tq.engine.service.TqEngineMonthSurplusService;
 import com.zlt.aps.tq.engine.service.TqEngineStockService;
+import com.zlt.aps.tq.engine.vo.BeadMachineCountVo;
 import com.zlt.aps.tq.engine.vo.TqScheduleParams;
 import com.zlt.aps.tq.engine.vo.TqScheduleResultVo;
 import com.zlt.aps.tq.engine.vo.TqStockConsumeVo;
@@ -141,7 +143,10 @@ public class TqDataLoadServiceImpl implements ITqDataLoadService {
         // 11. 加载工作日历（停产班次）
         loadWorkCalendar(context, scheduleDate);
 
-        // 12. 记录基础数据日志
+        // 12. 加载胎圈备库班数配置（按工厂过滤）+ 胎圈规格→成型机台数映射
+        loadStockShiftConfigData(context, scheduleDate, factoryCode);
+
+        // 13. 记录基础数据日志
         baseDataLog(batchNo, context);
 
         log.info("[数据加载] 排程基础数据加载完成, 批次号:{}, 排程记录数:{}", batchNo, scheduleList.size());
@@ -325,6 +330,37 @@ public class TqDataLoadServiceImpl implements ITqDataLoadService {
         context.setCxStopShiftMap(cxStopShiftMap);
         context.setTqStopShiftMap(tqStopShiftMap);
         log.info("[数据加载] 工作日历加载完成, 成型停产班次数:{}, 胎圈停产班次数:{}", cxStopShiftMap.size(), tqStopShiftMap.size());
+    }
+
+    /**
+     * 加载胎圈备库班数配置（按工厂过滤）+ 胎圈规格→成型机台数映射
+     *
+     * <p>加载两份数据供 S2 阶段 TqDemandCalcHandler 使用：</p>
+     * <ul>
+     *   <li>备库配置列表：按工厂过滤T_TQ_STOCK_SHIFT_CONFIG</li>
+     *   <li>胎圈→机台数映射：通过成型排程结果表统计每个胎圈规格对应的DISTINCT成型机台数</li>
+     * </ul>
+     *
+     * @param context 排程上下文
+     * @param scheduleDate 排程日期
+     * @param factoryCode 分厂编码
+     */
+    private void loadStockShiftConfigData(TqScheduleContext context, String scheduleDate, String factoryCode) {
+        // 加载备库班数配置（按工厂过滤）
+        List<TqStockShiftConfig> stockShiftConfigList = tqEngineMapper.listStockShiftConfig(factoryCode);
+        context.setStockShiftConfigList(stockShiftConfigList);
+
+        // 统计胎圈规格对应的成型机台数
+        List<BeadMachineCountVo> beadMachineCountList = tqEngineMapper.statBeadMachineCount(scheduleDate);
+        Map<String, Integer> beadMachineCountMap = beadMachineCountList.stream()
+                .collect(Collectors.toMap(
+                        BeadMachineCountVo::getBeadCode,
+                        BeadMachineCountVo::getMachineCount,
+                        (existing, replacement) -> existing));
+        context.setBeadMachineCountMap(beadMachineCountMap);
+
+        log.info("[数据加载] 备库班数配置加载完成, 工厂:{}, 配置规则数:{}, 胎圈→机台数映射规格数:{}",
+                factoryCode, stockShiftConfigList.size(), beadMachineCountMap.size());
     }
 
     /**

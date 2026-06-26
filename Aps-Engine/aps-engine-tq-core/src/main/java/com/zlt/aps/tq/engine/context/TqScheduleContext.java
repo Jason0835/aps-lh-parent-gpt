@@ -1,6 +1,7 @@
 package com.zlt.aps.tq.engine.context;
 
 import com.zlt.aps.tq.api.domain.entity.TqMachineInfo;
+import com.zlt.aps.tq.api.domain.entity.TqStockShiftConfig;
 import com.zlt.aps.tq.engine.vo.TqMonthSurplusVo;
 import com.zlt.aps.tq.engine.vo.TqScheduleParams;
 import com.zlt.aps.tq.engine.vo.TqScheduleResultVo;
@@ -100,6 +101,12 @@ public class TqScheduleContext {
 
     /** 胎圈-胎胚关联关系，key=胎圈编码, value=关联胎胚编码列表（一个胎圈可能对应多个胎胚） */
     private Map<String, List<String>> beadEmbryoMap = new HashMap<>();
+
+    /** 胎圈备库班数配置列表（按工厂过滤），S2阶段匹配用 */
+    private List<TqStockShiftConfig> stockShiftConfigList = new ArrayList<>();
+
+    /** 胎圈规格→成型机台数映射，key=胎圈编码, value=正在生产该胎圈规格的成型机台数量 */
+    private Map<String, Integer> beadMachineCountMap = new HashMap<>();
 
     /** 成型停产班次，key=日期班次(如"2025-01-01|中班"), value=true表示成型停产 */
     private Map<String, Boolean> cxStopShiftMap = new HashMap<>();

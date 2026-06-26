@@ -42,13 +42,15 @@ public interface FactoryMonthPlanProductionFinalResultEntityMapper extends CommB
     /**
      * 计算上月超欠产并回填到当月定稿表
      * 超欠产 = 上月硫化日完成量(合格品) - 上月计划排产量
+     * 有效标志判定：|超欠产值|(绝对值)大于阈值参数则置否('0')，否则置是('1')
      *
-     * @param lastYear     上月年份
-     * @param lastMonth    上月月份
-     * @param currentYear  当月年份
-     * @param currentMonth 当月月份
-     * @param startDate    上月开始日期
-     * @param endDate      上月结束日期
+     * @param lastYear                 上月年份
+     * @param lastMonth                上月月份
+     * @param currentYear              当月年份
+     * @param currentMonth             当月月份
+     * @param startDate                上月开始日期
+     * @param endDate                  上月结束日期
+     * @param overdueThresholdParamCode 超欠产有效标志判定阈值参数编码
      * @return 更新记录数
      */
     int updateLastMonthOverProd(@Param("lastYear") Integer lastYear,
@@ -56,5 +58,6 @@ public interface FactoryMonthPlanProductionFinalResultEntityMapper extends CommB
                                 @Param("currentYear") Integer currentYear,
                                 @Param("currentMonth") Integer currentMonth,
                                 @Param("startDate") Date startDate,
-                                @Param("endDate") Date endDate);
+                                @Param("endDate") Date endDate,
+                                @Param("overdueThresholdParamCode") String overdueThresholdParamCode);
 }

@@ -81,15 +81,51 @@ public class TqPreValidationHandler extends AbsTqScheduleStepHandler {
 
         List<EngineConstructionInfo> list = tqEngineMapper.listTqNeedConstruction(scheduleDate, productionStage);
         // 校验忽略掉外协规格，只校验不是外协的规格
-        list = list.stream()
-                .filter(r -> !context.getAssistSpecMap().containsKey(r.getTireRingCode()))
-                .collect(Collectors.toList());
+//        list = list.stream()
+//                .filter(r -> !context.getAssistSpecMap().containsKey(r.getTireRingCode()))
+//                .collect(Collectors.toList());
 
         for (EngineConstructionInfo construction : list) {
             List<String> errorColumns = new ArrayList<>();
-            String embryoCode = construction.getEmbryoCode().split(",")[0];
-            String[] versionArray = construction.getBomDataVersion().split(",");
+
+            // 源数据（成型排程结果 T_CX_SCHEDULE_RESULT）胎胚代码/版本为空防护：
+            // 此时 construction.getEmbryoCode()/getBomDataVersion() 可能为 null，
+            // 直接 split(",") 会触发 NPE；且这属于成型排程源数据脏数据，需单独报错让用户感知，
+            // 而非走下游"施工表无匹配"的 length<2 校验，避免错误归因。
+            String embryoCodeRaw = construction.getEmbryoCode();
+            String bomDataVersionRaw = construction.getBomDataVersion();
+            if (StringUtils.isBlank(embryoCodeRaw) || StringUtils.isBlank(bomDataVersionRaw)) {
+                List<String> sourceErrorColumns = new ArrayList<>();
+                if (StringUtils.isBlank(embryoCodeRaw)) {
+                    sourceErrorColumns.add("\"" + I18nUtil.getMessage("ui.construction.embryoCode") + "\"");
+                }
+                if (StringUtils.isBlank(bomDataVersionRaw)) {
+                    sourceErrorColumns.add("\"" + I18nUtil.getMessage("ui.construction.embryoVersion") + "\"");
+                }
+                String tip = StringUtils.format(
+                        I18nUtil.getMessage("engine.auto.scheule.construction.validate"),
+                        StringUtils.defaultString(embryoCodeRaw, ""),
+                        StringUtils.defaultString(bomDataVersionRaw, ""),
+                        String.join(",", sourceErrorColumns));
+                autoScheduleLogService.insertTqScheduleLog(batchNo, "", "自动排程失败", tip);
+                context.interruptSchedule(tip);
+                return;
+            }
+
+            String embryoCode = embryoCodeRaw.split(",")[0];
+            String[] versionArray = bomDataVersionRaw.split(",");
             String embryoVersion = versionArray.length > 0 ? versionArray[0] : "";
+
+            // 胎圈代码为空说明成型排程的胎胚在施工表中找不到匹配记录，直接中断排程
+            if (StringUtils.isBlank(construction.getTireRingCode())) {
+                String tip = StringUtils.format(
+                        I18nUtil.getMessage("engine.auto.scheule.construction.validate"),
+                        embryoCode, embryoVersion,
+                        "\"" + I18nUtil.getMessage("ui.construction.tireRingCode") + "\"");
+                autoScheduleLogService.insertTqScheduleLog(batchNo, "", "自动排程失败", tip);
+                context.interruptSchedule(tip);
+                return;
+            }
 
             if (construction.getEmbryoCode().split(",").length < 2) {
                 errorColumns.add("\"" + I18nUtil.getMessage("ui.construction.embryoCode") + "\"");

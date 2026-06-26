@@ -233,6 +233,11 @@ public enum MonthPlanEnums {
      */
     LAST_MONTH_OVERDUE_CONFIRM_VALUE("SYS0206009", "上月超欠产人工确认阀值"),
     /**
+     * SYS0206009 上月超欠产有效标志判定阈值
+     * 定时计算上月超欠产时，|超欠产值|(绝对值)大于该阈值则有效标志置否，否则置是
+     */
+    LAST_MONTH_OVERDUE_THRESHOLD("SYS0206009", "上月超欠产有效标志判定阈值"),
+    /**
      * SYS0205001 单位：台，续作Sku排产硫化机台数超过该值时，需要考虑降膜排产
      */
     DEDUCT_MOULD_MIN_LH_MACHINE_COUNT("SYS0205001", "单位：台，续作Sku排产硫化机台数超过该值时，需要考虑降膜排产"),

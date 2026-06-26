@@ -2,48 +2,50 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.zlt.aps.tq.engine.mapper.TqEngineMachineMapper">
 
+    <!-- 查询胎圈机台列表（按工厂过滤），STATUS='1'为启用，IS_DELETE为逻辑删除字段 -->
     <select id="listTqMachine" resultType="com.zlt.aps.tq.api.domain.entity.TqMachineInfo" >
         select ID,
                MACHINE_CODE,
                MACHINE_NAME,
-               EFFICIENCY,
-               TOOLING_INFO,
-               QUATA,
                CLASS_SHIFT,
                OPEN_MACHINE_CLASS,
                STATUS,
-               REMARK
+               REMARK,
+               QUOTA,
+               FACTORY_CODE
          from T_TQ_MACHINE_INFO
-        where STATUS = '0'
-          and DEL_FLAG = '0'
+        where STATUS = '1'
+          and IS_DELETE = '0'
         <if test="factoryCode != null and factoryCode != ''">
             and FACTORY_CODE = #{factoryCode}
         </if>
     </select>
 
+    <!-- 查询胎圈定点机台（按胎圈编码聚合），T_TQ_SPECIFY_MACHINE/T_TQ_MACHINE_INFO 均使用 IS_DELETE 逻辑删除 -->
     <select id="listTqSpecifyMachine" resultType="com.zlt.aps.tq.engine.vo.TqSpecifyMachineVo" >
         select BEAD_CODE,
                GROUP_CONCAT(sm.MACHINE_CODE ORDER BY sm.MACHINE_CODE SEPARATOR ',') as machine_codes
         from T_TQ_SPECIFY_MACHINE sm
         inner join T_TQ_MACHINE_INFO m on sm.machine_code = m.machine_code
-        where sm.DEL_FLAG = '0'
+        where sm.IS_DELETE = '0'
         <if test="jobType != null and jobType != ''">
             and sm.JOB_TYPE = #{jobType}  /*限制作业 类型*/
         </if>
         and m.STATUS = '0'
-        and m.DEL_FLAG = '0'
+        and m.IS_DELETE = '0'
         group by BEAD_CODE
     </select>
 
+    <!-- 查询口型板对应机台（按口型板代码聚合），T_TQ_MOUTH_PLATE/T_TQ_MACHINE_INFO 均使用 IS_DELETE 逻辑删除 -->
     <select id="listTqMouthPlateMachine" resultType="com.zlt.aps.tq.engine.vo.TqMouthPlateMachineVo" >
         select mouth_plate_code,
                GROUP_CONCAT(sm.MACHINE_CODE ORDER BY sm.MACHINE_CODE SEPARATOR ',') as machine_codes
         from T_TQ_MOUTH_PLATE sm
         inner join T_TQ_MACHINE_INFO m on sm.machine_code = m.machine_code
-        where sm.DEL_FLAG = '0'
+        where sm.IS_DELETE = '0'
         and sm.status = '0'
         and m.STATUS = '0'
-        and m.DEL_FLAG = '0'
+        and m.IS_DELETE = '0'
         group by MOUTH_PLATE_CODE
     </select>
 
@@ -57,14 +59,15 @@
         GROUP BY BEAD_CODE
     </select>
 
+    <!-- 查询机台寸口映射，T_TQ_MACHINE_CHUCK/T_TQ_MACHINE_INFO 均使用 IS_DELETE 逻辑删除 -->
     <select id="listMachineChuck" resultType="com.zlt.aps.tq.engine.vo.TqMachineChuckVo">
         select mc.MACHINE_CODE as machineCode,
                mc.INCH_SIZE  as inchSize
         from T_TQ_MACHINE_CHUCK mc
         inner join T_TQ_MACHINE_INFO m on mc.MACHINE_CODE = m.MACHINE_CODE
-        where mc.DEL_FLAG = '0'
+        where mc.IS_DELETE = '0'
           and m.STATUS = '0'
-          and m.DEL_FLAG = '0'
+          and m.IS_DELETE = '0'
           and mc.INCH_SIZE is not null
     </select>
 </mapper>
