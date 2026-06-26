@@ -236,6 +236,12 @@ public class DjScheduleResult extends BaseEntity {
     @TableField(value = "RELEASE_STATUS")
     private String releaseStatus;
 
+    /** 排程首班班次（ClassNumThreePlanEnums.classIndex），如 "03"=中班、"01"=夜班、"02"=早班 */
+    @Excel(name = "ui.data.column.dj.scheduleResult.scheduleShiftClass")
+    @ApiModelProperty(value = "排程首班班次")
+    @TableField(value = "SCHEDULE_SHIFT_CLASS")
+    private String scheduleShiftClass;
+
     /** 数据来源 */
     @ApiModelProperty(value = "数据来源", name = "dataSource")
     @TableField(value = "DATA_SOURCE")
@@ -257,12 +263,12 @@ public class DjScheduleResult extends BaseEntity {
     private Integer publishSuccessCount;
 
     /**
-     * 库存数量
+     * 库存数量（排程时使用的有效库存）
      */
     @Excel(name = "ui.data.column.scheduleResult.stockQty")
     @ApiModelProperty(value = "库存")
-    @TableField(exist = false)
-    private Double stockQty;
+    @TableField(value = "STOCK_QTY")
+    private BigDecimal stockQty;
 
     @Excel(name = "ui.data.column.scheduleResult.monthPlanOs")
     @ApiModelProperty(value = "月计划剩余量")
@@ -304,6 +310,53 @@ public class DjScheduleResult extends BaseEntity {
     
     @TableField(exist = false)
     private String month;
+
+    /** 机台名称（非数据库字段，用于前端展示） */
+    @ApiModelProperty(value = "机台名称", name = "machineName")
+    @TableField(exist = false)
+    private String machineName;
+
+    /** T-1日早班数据（非数据库字段，从 T-1 日排产结果 class3 加载） */
+    @ApiModelProperty(value = "T-1日早班顺序", name = "prevDayClass3Sequence")
+    @TableField(exist = false)
+    private Integer prevDayClass3Sequence;
+
+    @ApiModelProperty(value = "T-1日早班计划量", name = "prevDayClass3PlanQty")
+    @TableField(exist = false)
+    private BigDecimal prevDayClass3PlanQty;
+
+    @ApiModelProperty(value = "T-1日早班完成量", name = "prevDayClass3FinishQty")
+    @TableField(exist = false)
+    private BigDecimal prevDayClass3FinishQty;
+
+    @ApiModelProperty(value = "T-1日早班完成率", name = "prevDayClass3FinishRate")
+    @TableField(exist = false)
+    private BigDecimal prevDayClass3FinishRate;
+
+    @ApiModelProperty(value = "T-1日早班原因分析", name = "prevDayClass3Analysis")
+    @TableField(exist = false)
+    private String prevDayClass3Analysis;
+
+    /** T-1日中班数据（非数据库字段，从 T-1 日排产结果加载，首班为夜班时使用） */
+    @ApiModelProperty(value = "T-1日中班顺序", name = "prevDayClass1Sequence")
+    @TableField(exist = false)
+    private Integer prevDayClass1Sequence;
+
+    @ApiModelProperty(value = "T-1日中班计划量", name = "prevDayClass1PlanQty")
+    @TableField(exist = false)
+    private BigDecimal prevDayClass1PlanQty;
+
+    @ApiModelProperty(value = "T-1日中班完成量", name = "prevDayClass1FinishQty")
+    @TableField(exist = false)
+    private BigDecimal prevDayClass1FinishQty;
+
+    @ApiModelProperty(value = "T-1日中班完成率", name = "prevDayClass1FinishRate")
+    @TableField(exist = false)
+    private BigDecimal prevDayClass1FinishRate;
+
+    @ApiModelProperty(value = "T-1日中班原因分析", name = "prevDayClass1Analysis")
+    @TableField(exist = false)
+    private String prevDayClass1Analysis;
 
     @TableField(exist = false)
     private Long[] ids;

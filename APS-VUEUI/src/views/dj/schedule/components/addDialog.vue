@@ -34,7 +34,7 @@ import { mapState } from "vuex";
 
 import infoForm from "@/views/components/infoForm.vue";
 
-import { validateAdd, editScheduleResult } from "@/api/nc/ncScheduleResult";
+import { validateAdd, editScheduleResult } from "@/api/dj/djScheduleResult";
 
 export default {
   components: { infoForm },
@@ -77,7 +77,7 @@ export default {
       machines: (state) => state.insideLiner.machines,
     }),
     title: function () {
-      return this.$t("ui.data.column.ncScheduleResult.modalName");
+      return this.$t("ui.data.column.djScheduleResult.modalName");
     },
     columns() {
       return [
@@ -89,7 +89,7 @@ export default {
           valueFormat: "yyyy-MM-dd",
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.liningCode"),
+          label: this.$t("ui.data.column.dj.scheduleResult.paddingCode"),
           prop: "liningCode",
           span: 24,
           maxlength: "20",
@@ -98,7 +98,7 @@ export default {
           },
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.produceLine"),
+          label: this.$t("ui.data.column.dj.scheduleResult.machineCode"),
           prop: "machineId",
           span: 24,
           type: "select",

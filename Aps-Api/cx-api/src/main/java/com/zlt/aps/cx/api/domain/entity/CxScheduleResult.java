@@ -93,11 +93,11 @@ public class CxScheduleResult extends BaseEntity {
     private String materialDesc;
 
     @ApiModelProperty(value = "外胎代码")
-    @TableField("SAP_CODE")
+    @TableField(exist = false)
     private String sapCode;
 
     @ApiModelProperty(value = "外胎规格描述")
-    @TableField("SPEC_DESC")
+    @TableField(exist = false)
     private String specDesc;
 
     @ApiModelProperty(value = "胎胚代码")

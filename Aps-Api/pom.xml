@@ -16,8 +16,8 @@
         <module>dj-api</module>
         <module>aps-cd15-api</module>
         <module>aps-cd90-api</module>
-        <module>gdyy-api</module>
-        <module>xwyy-api</module>
+        <module>aps-gdyy-api</module>
+        <module>aps-xwyy-api</module>
         <module>tq-api</module>
         <module>gsq-api</module>
         <module>file-api</module>

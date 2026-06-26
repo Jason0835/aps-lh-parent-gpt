@@ -200,7 +200,7 @@ public class MpAdjustResultUIController extends BaseUIController<MpAdjustResult>
     @GetMapping({"/exportFinal"})
     @ResponseBody
     public void exportFinal(HttpServletResponse response, FactoryMonthPlanMouldDayResult entity) throws IOException {
-        String fileName = I18nUtil.getMessage("ui.data.column.FactoryMonthPlanFinalResult.modelName") + DateUtil.format(LocalDateTime.now(),"yyyyMMdd");
+        String fileName = I18nUtil.getMessage("ui.data.column.FactoryMonthPlanFinalResult.modelName") + DateUtil.format(LocalDateTime.now(),"yyyyMMddHHmmss");
         byte[] excelBytes = iFactoryMonthPlanMouldDayResultService.exportFinal(entity,fileName);
         ByteArrayInputStream in = new ByteArrayInputStream(excelBytes);
         ExcelUtil.setResponseHeader(response, fileName, ".xlsx");
@@ -212,7 +212,7 @@ public class MpAdjustResultUIController extends BaseUIController<MpAdjustResult>
     @GetMapping({"/exportAllMaterial"})
     @ResponseBody
     public void exportAllMaterial(HttpServletResponse response, FactoryMonthPlanMouldDayResult entity) throws IOException {
-        String fileName = I18nUtil.getMessage("ui.data.column.FactoryMonthPlanFinalResult.modelName") + DateUtil.format(LocalDateTime.now(),"yyyyMMdd");
+        String fileName = I18nUtil.getMessage("ui.data.column.FactoryMonthPlanFinalResult.modelName") + DateUtil.format(LocalDateTime.now(),"yyyyMMddHHmmss");
         byte[] excelBytes = iFactoryMonthPlanMouldDayResultService.exportFinalAllMaterial(entity,fileName);
         ByteArrayInputStream in = new ByteArrayInputStream(excelBytes);
         ExcelUtil.setResponseHeader(response, fileName, ".xlsx");

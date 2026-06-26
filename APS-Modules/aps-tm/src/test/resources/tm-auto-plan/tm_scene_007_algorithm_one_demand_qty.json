@@ -1,0 +1,95 @@
+{
+  "caseName": "TM_SCENE_007_algorithm_one_demand_qty",
+  "description": "TM_SCENE_007：算法 1 需求量计算",
+  "autoPlanRequest": {
+    "factoryCode": "F1",
+    "scheduleDate": "2026-07-07",
+    "operator": "TM_AUTO_PLAN_TEST",
+    "traceId": "TRACE-TM_SCENE_007",
+    "confirmOverwrite": false
+  },
+  "params": [
+    {
+      "factoryCode": "F1",
+      "paramCode": "TM_ALGORITHM_SWITCH",
+      "paramValue": "1",
+      "enableStatus": "1"
+    },
+    {
+      "factoryCode": "F1",
+      "paramCode": "TM_MIN_STOCK_CLASS",
+      "paramValue": "2",
+      "enableStatus": "1"
+    }
+  ],
+  "cxScheduleResults": [
+    {
+      "orderNo": "ORD-A1",
+      "embryoCode": "CX-A1",
+      "class1PlanQty": 10,
+      "class2PlanQty": 25,
+      "class3PlanQty": 15,
+      "class4PlanQty": 0,
+      "class5PlanQty": 0,
+      "class6PlanQty": 0,
+      "treadCode": "TR-A1",
+      "treadShoulderLength": 2,
+      "treadMouthPlate": "MP-A",
+      "treadRubberCategory": "GL-A"
+    }
+  ],
+  "stocks": [
+    {
+      "factoryCode": "F1",
+      "stockDate": "2026-07-06",
+      "treadCode": "TR-A1",
+      "stockQty": 0
+    }
+  ],
+  "machineInfos": [
+    {
+      "factoryCode": "F1",
+      "machineCode": "TM01",
+      "machineStatus": "1",
+      "maxCapacity": 1000
+    }
+  ],
+  "machineSpeeds": [
+    {
+      "factoryCode": "F1",
+      "machineCode": "TM01",
+      "productSpeed": 100
+    }
+  ],
+  "mouthPlates": [
+    {
+      "factoryCode": "F1",
+      "machineCode": "TM01",
+      "mouthPlateCode": "MP-A"
+    }
+  ],
+  "expected": {
+    "success": true,
+    "messageContains": "胎面自动排程执行完成",
+    "resultCount": 1,
+    "assignedCount": 1,
+    "unassignedCount": 0,
+    "explainCount": 6,
+    "errorCount": 0,
+    "expectedResults": [
+      {
+        "orderNo": "ORD-A1-CLASS1",
+        "treadCode": "TR-A1",
+        "machineCode": "TM01",
+        "shiftOrder": 1,
+        "sequence": 1,
+        "planQty": 70
+      }
+    ]
+  },
+  "sceneCode": "TM_SCENE_007",
+  "designSteps": [
+    "Step4"
+  ],
+  "mysqlVerificationStatus": "待用户执行 MySQL 验证"
+}

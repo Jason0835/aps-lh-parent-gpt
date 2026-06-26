@@ -80,6 +80,11 @@ public class DjGlueOrderServiceImpl extends AbstractDocService<DjGlueOrder> impl
         return UserConstants.UNIQUE;
     }
 
+    @Override
+    protected List<String> getCheckUniqueFields() {
+        return new ArrayList<>(Arrays.asList("glueCode"));
+    }
+
     /**
      * 导入数据，并保存记录
      *

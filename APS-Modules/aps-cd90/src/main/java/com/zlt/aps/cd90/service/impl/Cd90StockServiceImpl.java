@@ -47,6 +47,7 @@ public class Cd90StockServiceImpl extends AbstractDocService<Cd90Stock> implemen
         LambdaQueryWrapper<Cd90Stock> w = new LambdaQueryWrapper<>();
         w.eq(Cd90Stock::getFactoryCode, entity.getFactoryCode());
         w.eq(Cd90Stock::getStockDate, entity.getStockDate());
+        w.eq(Cd90Stock::getShiftCode, entity.getShiftCode());
         w.eq(Cd90Stock::getMaterialCode, entity.getMaterialCode());
         w.ne(entity.getId() != null, Cd90Stock::getId, entity.getId());
         return cd90StockMapper.selectCount(w) > 0 ? UserConstants.NOT_UNIQUE : UserConstants.UNIQUE;
@@ -67,7 +68,8 @@ public class Cd90StockServiceImpl extends AbstractDocService<Cd90Stock> implemen
             int en = i + 2;
             Cd90Stock de = list.get(i);
             List<ImportErrorLog> v = ImportExcelValidatedUtils.validated(importLogId, en, de);
-            ImportExcelValidatedUtils.validatedRepeat(list, de, i, 2, importLogId, v);
+            ImportExcelValidatedUtils.validatedRepeat(list, de, i, 2, importLogId, v,
+                    this.getCheckUniqueFields().toArray(new String[0]));
             if (!isTireFabricCodeExists(de, tireFabricCodes)) {
                 ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(),
                         en, I18nUtil.getMessage("ui.data.column.cd90SpecifyMachine.clothInvalid"), v);
@@ -87,6 +89,7 @@ public class Cd90StockServiceImpl extends AbstractDocService<Cd90Stock> implemen
                 de.setRowState(RowStateEnum.ADDED);
                 il.add(de);
             } else if (updateSupport) {
+                ex.setSnapshotTime(de.getSnapshotTime());
                 ex.setStockNum(de.getStockNum());
                 ex.setModifyNum(de.getModifyNum());
                 ex.setBadNum(de.getBadNum());
@@ -116,6 +119,7 @@ public class Cd90StockServiceImpl extends AbstractDocService<Cd90Stock> implemen
         LambdaQueryWrapper<Cd90Stock> w = new LambdaQueryWrapper<>();
         w.eq(Cd90Stock::getFactoryCode, entity.getFactoryCode());
         w.eq(Cd90Stock::getStockDate, entity.getStockDate());
+        w.eq(Cd90Stock::getShiftCode, entity.getShiftCode());
         w.eq(Cd90Stock::getMaterialCode, entity.getMaterialCode());
         return cd90StockMapper.selectOne(w);
     }
@@ -129,6 +133,6 @@ public class Cd90StockServiceImpl extends AbstractDocService<Cd90Stock> implemen
 
     @Override
     protected List<String> getCheckUniqueFields() {
-        return Arrays.asList("factoryCode", "stockDate", "materialCode");
+        return Arrays.asList("factoryCode", "stockDate", "shiftCode", "materialCode");
     }
 }

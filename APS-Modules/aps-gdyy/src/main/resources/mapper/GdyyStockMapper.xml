@@ -5,39 +5,50 @@
 <mapper namespace="com.zlt.aps.gdyy.mapper.GdyyStockMapper">
 
     <resultMap type="com.zlt.aps.gdyy.api.domain.entity.GdyyStock" id="StockResult">
-        <result property="id" column="id"/>
-        <result property="stockDate" column="stock_date"/>
-        <result property="materialCode" column="material_code"/>
-        <result property="stockNum" column="stock_num"/>
-        <result property="stockRollNum" column="stock_roll_num"/>
-        <result property="modifyNum" column="modify_num"/>
-        <result property="badNum" column="bad_num"/>
-        <result property="remark" column="remark"/>
-        <result property="delFlag" column="del_flag"/>
-        <result property="createBy" column="create_by"/>
-        <result property="createTime" column="create_time"/>
-        <result property="updateBy" column="update_by"/>
-        <result property="updateTime" column="update_time"/>
+        <result property="id" column="ID"/>
+        <result property="factoryCode" column="FACTORY_CODE"/>
+        <result property="stockDate" column="STOCK_DATE"/>
+        <result property="bigRollCode" column="BIG_ROLL_CODE"/>
+        <result property="bigRollBarcode" column="BIG_ROLL_BARCODE"/>
+        <result property="inboundTime" column="INBOUND_TIME"/>
+        <result property="stockNum" column="STOCK_NUM"/>
+        <result property="stockRollNum" column="STOCK_ROLL_NUM"/>
+        <result property="stockMeters" column="STOCK_METERS"/>
+        <result property="modifyNum" column="MODIFY_NUM"/>
+        <result property="badNum" column="BAD_NUM"/>
+        <result property="estimateStockFlag" column="ESTIMATE_STOCK_FLAG"/>
+        <result property="remark" column="REMARK"/>
+        <result property="isDelete" column="IS_DELETE"/>
+        <result property="createBy" column="CREATE_BY"/>
+        <result property="createTime" column="CREATE_TIME"/>
+        <result property="updateBy" column="UPDATE_BY"/>
+        <result property="updateTime" column="UPDATE_TIME"/>
     </resultMap>
 
     <sql id="selectStockVo">
-        select id, stock_date, material_code, stock_num, stock_roll_num, modify_num, bad_num, remark, del_flag, create_by, create_time, update_by, update_time from t_gdyy_stock
+        select ID, FACTORY_CODE, STOCK_DATE, BIG_ROLL_CODE, BIG_ROLL_BARCODE, INBOUND_TIME,
+               STOCK_NUM, STOCK_ROLL_NUM, STOCK_METERS, MODIFY_NUM, BAD_NUM, ESTIMATE_STOCK_FLAG,
+               REMARK, IS_DELETE, CREATE_BY, CREATE_TIME, UPDATE_BY, UPDATE_TIME
+        from T_GDYY_STOCK
     </sql>
 
     <select id="selectStockList" parameterType="com.zlt.aps.gdyy.api.domain.entity.GdyyStock" resultMap="StockResult">
         <include refid="selectStockVo"/>
-        where del_flag='0'
+        where IS_DELETE = 0
+        <if test="factoryCode != null and factoryCode != ''">
+            and FACTORY_CODE = #{factoryCode}
+        </if>
         <if test="startTime != null and startTime !='' ">
-            and stock_date  <![CDATA[  >=  ]]> STR_TO_DATE(#{startTime},'%Y-%m-%d')
+            and STOCK_DATE <![CDATA[ >= ]]> STR_TO_DATE(#{startTime},'%Y-%m-%d')
         </if>
         <if test="endTime != null and endTime !='' ">
-            and stock_date  <![CDATA[   <=  ]]> STR_TO_DATE(#{endTime},'%Y-%m-%d %H:%i:%s')
+            and STOCK_DATE <![CDATA[ <= ]]> STR_TO_DATE(#{endTime},'%Y-%m-%d %H:%i:%s')
         </if>
-        <if test="materialCode != null  and materialCode != ''">
-            and INSTR(material_code, #{materialCode,jdbcType=VARCHAR}) > 0
+        <if test="bigRollCode != null and bigRollCode != ''">
+            and BIG_ROLL_CODE like concat('%', #{bigRollCode,jdbcType=VARCHAR}, '%')
         </if>
         <if test="orderStr == null">
-            order by stock_date desc
+            order by STOCK_DATE desc
         </if>
         <if test="orderStr != null">
             order by ${orderStr}
@@ -47,31 +58,40 @@
     <select id="checkStockListUnic" parameterType="com.zlt.aps.gdyy.api.domain.entity.GdyyStock"
             resultMap="StockResult">
         <include refid="selectStockVo"/>
-        where del_flag='0'
+        where IS_DELETE = 0
         <if test="id != null and id !='' ">
-            and id != #{id}
+            and ID != #{id}
+        </if>
+        <if test="factoryCode != null and factoryCode != ''">
+            and FACTORY_CODE = #{factoryCode}
         </if>
         <if test="stockDate != null ">
-            and stock_date =#{stockDate}
+            and STOCK_DATE = #{stockDate}
         </if>
-        <if test="materialCode != null  and materialCode != ''">
-            and material_code = #{materialCode}
+        <if test="bigRollCode != null and bigRollCode != ''">
+            and BIG_ROLL_CODE = #{bigRollCode}
         </if>
     </select>
 
     <insert id="mergeSql" parameterType="list">
-        INSERT INTO t_gdyy_stock (
-        stock_date, material_code, stock_num, stock_roll_num, modify_num, bad_num,
-        create_by, create_time, update_by, update_time, remark, del_flag
+        INSERT INTO T_GDYY_STOCK (
+        FACTORY_CODE, STOCK_DATE, BIG_ROLL_CODE, BIG_ROLL_BARCODE, INBOUND_TIME,
+        STOCK_NUM, STOCK_ROLL_NUM, STOCK_METERS, MODIFY_NUM, BAD_NUM, ESTIMATE_STOCK_FLAG,
+        CREATE_BY, CREATE_TIME, UPDATE_BY, UPDATE_TIME, REMARK, IS_DELETE
         ) VALUES
         <foreach collection="list" item="STOCK" separator=",">
             (
+            #{STOCK.factoryCode,jdbcType=VARCHAR},
             #{STOCK.stockDate,jdbcType=DATE},
-            #{STOCK.materialCode,jdbcType=VARCHAR},
-            #{STOCK.stockNum,jdbcType=DOUBLE},
-            #{STOCK.stockRollNum,jdbcType=DOUBLE},
-            #{STOCK.modifyNum,jdbcType=DOUBLE},
-            #{STOCK.badNum,jdbcType=DOUBLE},
+            #{STOCK.bigRollCode,jdbcType=VARCHAR},
+            #{STOCK.bigRollBarcode,jdbcType=VARCHAR},
+            #{STOCK.inboundTime,jdbcType=TIMESTAMP},
+            #{STOCK.stockNum,jdbcType=DECIMAL},
+            #{STOCK.stockRollNum,jdbcType=DECIMAL},
+            #{STOCK.stockMeters,jdbcType=DECIMAL},
+            #{STOCK.modifyNum,jdbcType=DECIMAL},
+            #{STOCK.badNum,jdbcType=DECIMAL},
+            #{STOCK.estimateStockFlag,jdbcType=VARCHAR},
             #{STOCK.createBy,jdbcType=VARCHAR},
             NOW(),
             #{STOCK.updateBy,jdbcType=VARCHAR},
@@ -81,48 +101,59 @@
             )
         </foreach>
         ON DUPLICATE KEY UPDATE
-        stock_num = VALUES(stock_num),
-        stock_roll_num = VALUES(stock_roll_num),
-        modify_num = VALUES(modify_num),
-        bad_num = VALUES(bad_num),
-        update_by = VALUES(create_by),
-        update_time = NOW(),
-        remark = VALUES(remark)
+        STOCK_NUM = VALUES(STOCK_NUM),
+        STOCK_ROLL_NUM = VALUES(STOCK_ROLL_NUM),
+        STOCK_METERS = VALUES(STOCK_METERS),
+        MODIFY_NUM = VALUES(MODIFY_NUM),
+        BAD_NUM = VALUES(BAD_NUM),
+        ESTIMATE_STOCK_FLAG = VALUES(ESTIMATE_STOCK_FLAG),
+        UPDATE_BY = VALUES(CREATE_BY),
+        UPDATE_TIME = NOW(),
+        REMARK = VALUES(REMARK)
     </insert>
-
 
     <select id="selectStockById" parameterType="Long" resultMap="StockResult">
         <include refid="selectStockVo"/>
-        where id = #{id}
+        where ID = #{id}
     </select>
 
     <insert id="insertStock" parameterType="com.zlt.aps.gdyy.api.domain.entity.GdyyStock">
-        insert into t_gdyy_stock
+        insert into T_GDYY_STOCK
         <trim prefix="(" suffix=")" suffixOverrides=",">
-            <if test="id != null">id,</if>
-            <if test="stockDate != null">stock_date,</if>
-            <if test="materialCode != null">material_code,</if>
-            <if test="stockNum != null">stock_num,</if>
-            <if test="stockRollNum != null">stock_roll_num,</if>
-            <if test="modifyNum != null">modify_num,</if>
-            <if test="badNum != null">bad_num,</if>
-            <if test="remark != null">remark,</if>
-            <if test="delFlag != null">del_flag,</if>
-            <if test="createBy != null">create_by,</if>
-            <if test="createTime != null">create_time,</if>
-            <if test="updateBy != null">update_by,</if>
-            <if test="updateTime != null">update_time,</if>
+            <if test="id != null">ID,</if>
+            <if test="factoryCode != null">FACTORY_CODE,</if>
+            <if test="stockDate != null">STOCK_DATE,</if>
+            <if test="bigRollCode != null">BIG_ROLL_CODE,</if>
+            <if test="bigRollBarcode != null">BIG_ROLL_BARCODE,</if>
+            <if test="inboundTime != null">INBOUND_TIME,</if>
+            <if test="stockNum != null">STOCK_NUM,</if>
+            <if test="stockRollNum != null">STOCK_ROLL_NUM,</if>
+            <if test="stockMeters != null">STOCK_METERS,</if>
+            <if test="modifyNum != null">MODIFY_NUM,</if>
+            <if test="badNum != null">BAD_NUM,</if>
+            <if test="estimateStockFlag != null">ESTIMATE_STOCK_FLAG,</if>
+            <if test="remark != null">REMARK,</if>
+            <if test="isDelete != null">IS_DELETE,</if>
+            <if test="createBy != null">CREATE_BY,</if>
+            <if test="createTime != null">CREATE_TIME,</if>
+            <if test="updateBy != null">UPDATE_BY,</if>
+            <if test="updateTime != null">UPDATE_TIME,</if>
         </trim>
         <trim prefix="values (" suffix=")" suffixOverrides=",">
             <if test="id != null">#{id},</if>
+            <if test="factoryCode != null">#{factoryCode},</if>
             <if test="stockDate != null">#{stockDate},</if>
-            <if test="materialCode != null">#{materialCode},</if>
+            <if test="bigRollCode != null">#{bigRollCode},</if>
+            <if test="bigRollBarcode != null">#{bigRollBarcode},</if>
+            <if test="inboundTime != null">#{inboundTime},</if>
             <if test="stockNum != null">#{stockNum},</if>
             <if test="stockRollNum != null">#{stockRollNum},</if>
+            <if test="stockMeters != null">#{stockMeters},</if>
             <if test="modifyNum != null">#{modifyNum},</if>
             <if test="badNum != null">#{badNum},</if>
+            <if test="estimateStockFlag != null">#{estimateStockFlag},</if>
             <if test="remark != null">#{remark},</if>
-            <if test="delFlag != null">#{delFlag},</if>
+            <if test="isDelete != null">#{isDelete},</if>
             <if test="createBy != null">#{createBy},</if>
             <if test="createTime != null">#{createTime},</if>
             <if test="updateBy != null">#{updateBy},</if>
@@ -131,26 +162,31 @@
     </insert>
 
     <update id="updateStock" parameterType="com.zlt.aps.gdyy.api.domain.entity.GdyyStock">
-        update t_gdyy_stock
+        update T_GDYY_STOCK
         <trim prefix="SET" suffixOverrides=",">
-            <if test="stockDate != null">stock_date = #{stockDate},</if>
-            <if test="materialCode != null">material_code = #{materialCode},</if>
-            <if test="stockNum != null">stock_num = #{stockNum},</if>
-            <if test="stockRollNum != null">stock_roll_num = #{stockRollNum},</if>
-            modify_num = #{modifyNum,jdbcType=DECIMAL},
-            bad_num = #{badNum,jdbcType=DECIMAL},
-            <if test="remark != null">remark = #{remark},</if>
-            <if test="delFlag != null">del_flag = #{delFlag},</if>
-            <if test="createBy != null">create_by = #{createBy},</if>
-            <if test="createTime != null">create_time = #{createTime},</if>
-            <if test="updateBy != null">update_by = #{updateBy},</if>
-            <if test="updateTime != null">update_time = #{updateTime},</if>
+            <if test="factoryCode != null">FACTORY_CODE = #{factoryCode},</if>
+            <if test="stockDate != null">STOCK_DATE = #{stockDate},</if>
+            <if test="bigRollCode != null">BIG_ROLL_CODE = #{bigRollCode},</if>
+            <if test="bigRollBarcode != null">BIG_ROLL_BARCODE = #{bigRollBarcode},</if>
+            <if test="inboundTime != null">INBOUND_TIME = #{inboundTime},</if>
+            <if test="stockNum != null">STOCK_NUM = #{stockNum},</if>
+            <if test="stockRollNum != null">STOCK_ROLL_NUM = #{stockRollNum},</if>
+            <if test="stockMeters != null">STOCK_METERS = #{stockMeters},</if>
+            MODIFY_NUM = #{modifyNum,jdbcType=DECIMAL},
+            BAD_NUM = #{badNum,jdbcType=DECIMAL},
+            <if test="estimateStockFlag != null">ESTIMATE_STOCK_FLAG = #{estimateStockFlag},</if>
+            <if test="remark != null">REMARK = #{remark},</if>
+            <if test="isDelete != null">IS_DELETE = #{isDelete},</if>
+            <if test="createBy != null">CREATE_BY = #{createBy},</if>
+            <if test="createTime != null">CREATE_TIME = #{createTime},</if>
+            <if test="updateBy != null">UPDATE_BY = #{updateBy},</if>
+            <if test="updateTime != null">UPDATE_TIME = #{updateTime},</if>
         </trim>
-        where id = #{id}
+        where ID = #{id}
     </update>
 
     <delete id="deleteStockByIds" parameterType="String">
-        update t_gdyy_stock set del_flag = NULL where id in
+        update T_GDYY_STOCK set IS_DELETE = 1 where ID in
         <foreach item="id" collection="array" open="(" separator="," close=")">
             #{id}
         </foreach>
@@ -158,8 +194,8 @@
 
     <delete id="deleteStockByDate">
         delete
-        from t_gdyy_stock
-        where del_flag = '0'
-          and stock_date = #{scheduleDate}
+        from T_GDYY_STOCK
+        where IS_DELETE = 0
+          and STOCK_DATE = #{scheduleDate}
     </delete>
 </mapper>

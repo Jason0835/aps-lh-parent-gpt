@@ -141,4 +141,26 @@ public interface ILhScheduleResultService {
      * @param scheduleDate         排程目标日期
      */
     void fillScheduleResultFields(List<LhScheduleResult> lhScheduleResultList, Date scheduleDate);
+
+    /**
+     * 根据工厂编码和排程日期查询未删除的硫化排程结果列表
+     *
+     * @param factoryCode  工厂编码
+     * @param scheduleDate 排程日期
+     * @return 硫化排程结果列表
+     */
+    List<LhScheduleResult> selectByFactoryCodeAndScheduleDate(String factoryCode, Date scheduleDate);
+
+    /**
+     * 导入后补全模具交替计划的批次号、交替类型、交替时间。
+     * <p>
+     * 匹配逻辑：通过机台编码(lhMachineCode) + 物料编码(afterMaterialCode=materialCode) + 排程日期(scheduleDate)
+     * 关联模具交替计划与硫化排程结果，将排程结果的批次号写入模具交替计划的lhResultBatchNo，
+     * 将模具交替计划的planDate写入changeTime，根据排程结果的isTypeBlock判断changeMouldType。
+     * </p>
+     *
+     * @param factoryCode  工厂编码
+     * @param scheduleDate 排程日期
+     */
+    void fillMouldChangePlanFieldsAfterImport(String factoryCode, Date scheduleDate);
 }

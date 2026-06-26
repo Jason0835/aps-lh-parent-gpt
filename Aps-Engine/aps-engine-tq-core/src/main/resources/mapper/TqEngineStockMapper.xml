@@ -13,45 +13,48 @@
                       sum(IFNULL(CLASS3_PLANNED_QTY, 0)) CLASS1_PLAN_QTY, /*7点-隔天7点成型计划量*/
                       sum(IFNULL(CLASS2_PLAN_QTY, 0)) CLASS2_PLAN_QTY /*7点-19点成型计划量*/
                from T_CX_SCHEDULE_RESULT r
-               inner join T_MDM_CONSTRUCTION_INFO ci on r.EMBRYO_CODE = ci.embryo_code and r.BOM_DATA_VERSION = ci.EMBRYO_VERSION and ci.IS_DELETE = 0 /*施工信息表*/
+               inner join T_MDM_CONSTRUCTION_INFO ci on r.EMBRYO_CODE = ci.CONSTRUCTION_CODE and r.BOM_DATA_VERSION = ci.CONSTRUCTION_VERSION and ci.IS_DELETE = 0 /*施工信息表*/
                where schedule_date = STR_TO_DATE(#{scheduleDate}, '%Y-%m-%d')
-               and r.DEL_FLAG = 0
+               and r.IS_DELETE = 0
                group by r.EMBRYO_CODE,r.BOM_DATA_VERSION
               ) cxr /*成型排程结果表*/
         group by cxr.TIRE_RING_CODE
     </select>
 
+    <!-- 查询胎圈库存（排程日期减1天为对应库存日期），IS_DELETE为逻辑删除字段 -->
     <select id="listTqStock" resultType="com.zlt.aps.tq.engine.vo.TqStockVo">
         select BEAD_CODE, SUM(IFNULL(STOCK_NUM,0)+IFNULL(MODIFY_NUM,0)-IFNULL(BAD_NUM,0)) STOCK_NUM
         from T_TQ_STOCK
         where STOCK_DATE = DATE_ADD(#{stockDate}, INTERVAL -1 day) /*排程日期 要减1天，才是对应库存日期*/
-        and DEL_FLAG = '0'
+        and IS_DELETE = '0'
         <if test="factoryCode != null and factoryCode != ''">
             and FACTORY_CODE = #{factoryCode}
         </if>
         GROUP BY BEAD_CODE
     </select>
 
-    <select id="listTodayMorningPlan" resultType="com.zlt.aps.tq.engine.vo.TqStockConsumeVo">
     <!-- 查询当天早班(D日早班)计划量：昨天排程的CLASS3_PLAN_QTY对应今天早班 -->
     <!-- 昨天排程日期 = 排程日期 - 1天，昨天排程的CLASS3 = D日早班(今天早班) -->
-    SELECT BEAD_CODE, IFNULL(SUM(CLASS3_PLAN_QTY), 0) consume
-    FROM T_TQ_SCHEDULE_RESULT
-    WHERE SCHEDULE_DATE = DATE_ADD(#{scheduleDate}, INTERVAL -1 day)
-      AND DEL_FLAG = '0'
-      <if test="factoryCode != null and factoryCode != ''">
-          AND FACTORY_CODE = #{factoryCode}
-      </if>
-    GROUP BY BEAD_CODE
-</select>
+    <!-- T_TQ_SCHEDULE_RESULT 表逻辑删除字段为 DEL_FLAG -->
+    <select id="listTodayMorningPlan" resultType="com.zlt.aps.tq.engine.vo.TqStockConsumeVo">
+        SELECT BEAD_CODE, IFNULL(SUM(CLASS3_PLAN_QTY), 0) consume
+        FROM T_TQ_SCHEDULE_RESULT
+        WHERE SCHEDULE_DATE = DATE_ADD(#{scheduleDate}, INTERVAL -1 day)
+          AND IS_DELETE = 0
+          <if test="factoryCode != null and factoryCode != ''">
+              AND FACTORY_CODE = #{factoryCode}
+          </if>
+        GROUP BY BEAD_CODE
+    </select>
 
-    <select id="listLastDayMidPlan" resultType="com.zlt.aps.tq.engine.vo.TqStockConsumeVo">
     <!-- 查询昨日早班半制品计划量：昨天排程的CLASS1_PLAN_QTY对应昨日早班生产量 -->
     <!-- 昨天排程日期 = 排程日期 - 1天，昨天排程的CLASS1_PLAN_QTY = 昨日早班半制品生产量 -->
-    SELECT BEAD_CODE, IFNULL(SUM(CLASS1_PLAN_QTY), 0) consume
-    FROM T_TQ_SCHEDULE_RESULT
-    WHERE SCHEDULE_DATE = DATE_ADD(#{scheduleDate}, INTERVAL -1 day)
-      AND DEL_FLAG = '0'
-    GROUP BY BEAD_CODE
-</select>
+    <!-- T_TQ_SCHEDULE_RESULT 表逻辑删除字段为 DEL_FLAG -->
+    <select id="listLastDayMidPlan" resultType="com.zlt.aps.tq.engine.vo.TqStockConsumeVo">
+        SELECT BEAD_CODE, IFNULL(SUM(CLASS1_PLAN_QTY), 0) consume
+        FROM T_TQ_SCHEDULE_RESULT
+        WHERE SCHEDULE_DATE = DATE_ADD(#{scheduleDate}, INTERVAL -1 day)
+          AND IS_DELETE = 0
+        GROUP BY BEAD_CODE
+    </select>
 </mapper>

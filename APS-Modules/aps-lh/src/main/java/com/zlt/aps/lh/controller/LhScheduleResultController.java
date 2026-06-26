@@ -292,6 +292,11 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
         AjaxResult ajaxResult = lhScheduleService.importScheduleTemplate(list, result, updateSupport, importLog.getId());
         // 硫化换模计划导入
         AjaxResult lhMouldChangePlanAjaxResult = lhMouldChangePlanController.importData(importDTO, Boolean.TRUE);
+        // 两次导入都成功后，补全模具交替计划的批次号、交替类型、交替时间
+        if (ajaxResult.get(AjaxResult.CODE_TAG).equals(AjaxResult.Type.SUCCESS.value())
+                && lhMouldChangePlanAjaxResult.get(AjaxResult.CODE_TAG).equals(AjaxResult.Type.SUCCESS.value())) {
+            lhScheduleResultService.fillMouldChangePlanFieldsAfterImport(result.getFactoryCode(), result.getScheduleDate());
+        }
 
         Date endTime = DateUtils.getNowDate();
         importLog.setRowCount(list.size());

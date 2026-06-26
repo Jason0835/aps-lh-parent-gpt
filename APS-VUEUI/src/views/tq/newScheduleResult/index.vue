@@ -76,6 +76,8 @@
       labelWidth="0"
       :columns="importColumns"
     ></tlt-upload-form>
+    <!-- 自动排程弹窗 -->
+    <auto-plan-dialog ref="autoPlanDialog" @success="getList" />
     <!-- 插单弹窗 -->
     <insert-order-dialog ref="insertOrderDialog" @success="getList" />
     <!-- 转机台弹窗 -->

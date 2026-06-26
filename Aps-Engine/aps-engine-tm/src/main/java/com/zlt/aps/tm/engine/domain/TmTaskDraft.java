@@ -61,6 +61,12 @@ public class TmTaskDraft {
     /** 库存保证缺口，单位米 */
     private BigDecimal stockGapQty;
 
+    /** 本次库存实际抵扣量，单位米（剩余库存冲减当前班生产量） */
+    private BigDecimal stockDeductQty;
+
+    /** 抵扣后该胎面剩余库存，单位米，供解释表落库 */
+    private BigDecimal planStockQty;
+
     /** 计划量，单位米 */
     private BigDecimal planQty;
 
@@ -136,6 +142,9 @@ public class TmTaskDraft {
     /** 未排原因描述 */
     private String unplannedReasonDesc;
 
+    /** 业务键后缀，用于拆分来源任务或顺延任务，避免同规格同班次任务业务键冲突 */
+    private String businessKeySuffix;
+
     /**
      * 判断任务是否未分配机台。
      *
@@ -148,10 +157,14 @@ public class TmTaskDraft {
     /**
      * 生成任务业务键。
      *
-     * @return 稳定业务键；按胎面、胶料、口型和班次定位任务，避免成型工单号影响胎面结果合并
+     * @return 稳定业务键；按胎面、胶料、口型、班次和可选后缀定位任务，避免解释追踪互相覆盖
      */
     public String getBusinessKey() {
-        return String.join("|", safe(treadCode), safe(glueCode), safe(mouthPlateCode), safe(shiftOrder));
+        String businessKey = String.join("|", safe(treadCode), safe(glueCode), safe(mouthPlateCode), safe(shiftOrder));
+        if (businessKeySuffix == null || businessKeySuffix.trim().isEmpty()) {
+            return businessKey;
+        }
+        return businessKey + "|" + businessKeySuffix;
     }
 
     /**

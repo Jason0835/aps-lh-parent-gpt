@@ -109,7 +109,7 @@ public class TqEngineServiceImpl implements TqEngineService {
         context.setFactoryCode(factoryCode);
         context.setOperator(SecurityUtils.getUsername());
 
-        // 2. 执行模板方法（S1→S2→S3→S4）
+        // 2. 执行模板方法（S1→S2→S3→S4→S5→S6）
         tqScheduleTemplate.execute(context);
 
         // 3. 检查中断

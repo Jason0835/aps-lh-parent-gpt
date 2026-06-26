@@ -772,6 +772,8 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
         dto.setConstructionStage(plan.getConstructionStage());
         dto.setTrialDemandQty(safeInt(plan.getTrialQty()));
         dto.setBeginDay(plan.getBeginDay());
+        // 月计划结构结束日，仅用于全量SKU排序日志展示，不参与排序与排产
+        dto.setEndDay(plan.getEndDay());
         // 月计划模具变化信息只在 S4.5 窗口无日计划历史欠产补排时用于判断计划使用模数。
         dto.setMouldChangeInfo(plan.getMouldChangeInfo());
         dto.setTrial(isTrialStage(plan.getConstructionStage()));
@@ -1610,7 +1612,7 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
         int endingCount = 0;
         for (List<SkuScheduleDTO> skuList : context.getStructureSkuMap().values()) {
             for (SkuScheduleDTO sku : skuList) {
-                if (endingJudgmentStrategy.isEnding(context, sku)) {
+                if (endingJudgmentStrategy.isExpectedEnding(context, sku)) {
                     sku.setSkuTag(SkuTagEnum.ENDING.getCode());
                     int endingDays = endingJudgmentStrategy.calculateEndingDays(context, sku);
                     if (endingDays < 0) {

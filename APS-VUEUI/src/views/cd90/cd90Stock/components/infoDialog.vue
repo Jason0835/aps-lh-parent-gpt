@@ -29,6 +29,7 @@ export default {
       rules: {
         factoryCode: [requiredSelect],
         stockDate: [requiredInput],
+        shiftCode: [requiredInput],
         materialCode: [requiredSelect],
         stockNum: [requiredInput, { validator: (rule, value, callback) => { if (value === undefined || value === null || value === "") { callback(new Error(this.$t("common.rule.input"))); } else { callback(); } }, trigger: "blur" }],
       },
@@ -40,6 +41,7 @@ export default {
       return [
         { prop: "factoryCode", label: this.$t("ui.data.column.cd90Stock.factoryCode"), type: "select", dictData: this.parentDict.type.biz_factory_name, filterable: true },
         { prop: "stockDate", label: this.$t("ui.data.column.cd90Stock.stockDate"), type: "date" },
+        { prop: "shiftCode", label: this.$t("ui.data.column.cd90Stock.shiftCode"), type: "select", dictData: this.parentDict.type.class_num_three_plan, filterable: true },
         { prop: "materialCode", label: this.$t("ui.data.column.cd90Stock.materialCode"), type: "select", dictData: this.clothOptions, filterable: true },
         { prop: "stockNum", label: this.$t("ui.data.column.cd90Stock.stockNum"), type: "number" },
         { prop: "modifyNum", label: this.$t("ui.data.column.cd90Stock.modifyNum"), type: "number" },

@@ -32,7 +32,7 @@
 </template>
 
 <script>
-import { changeReleaseStatus } from "@/api/nc/ncScheduleResult";
+import { changeReleaseStatus } from "@/api/dj/djScheduleResult";
 
 export default {
   components: {},
@@ -62,7 +62,7 @@ export default {
   },
   computed: {
     title: function () {
-      return this.$t("ui.data.column.ncScheduleResult.modalName");
+      return this.$t("ui.data.column.djScheduleResult.modalName");
     },
   },
   methods: {

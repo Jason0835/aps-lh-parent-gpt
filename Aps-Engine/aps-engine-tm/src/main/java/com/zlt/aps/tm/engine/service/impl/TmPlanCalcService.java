@@ -11,6 +11,9 @@ import com.zlt.aps.tm.engine.strategy.ITmPlanQtyStrategy;
 import com.zlt.aps.tm.engine.strategy.TmStrategyRegistry;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -64,6 +67,21 @@ public class TmPlanCalcService implements ITmPlanCalcService {
         ITmPlanQtyStrategy planQtyStrategy = strategyRegistry.getPlanQtyStrategy(planQtyStrategyCode);
         String demandQtyAlgorithmCode = readAlgorithmCode(context);
         ITmDemandQtyStrategy demandQtyStrategy = strategyRegistry.getDemandQtyStrategy(demandQtyAlgorithmCode);
+
+        // 初始化 per-tread 剩余可抵扣库存（初值取6点库存净值），逐班递减供库存抵扣使用
+        Map<String, BigDecimal> remainingStockMap = new HashMap<>();
+        if (stockForecastMap != null) {
+            for (Map.Entry<String, TmStockForecast> entry : stockForecastMap.entrySet()) {
+                BigDecimal sixClock = entry.getValue().getSixClockStockQty();
+                remainingStockMap.put(entry.getKey(), sixClock != null ? sixClock : BigDecimal.ZERO);
+            }
+        }
+        context.setRemainingStockMap(remainingStockMap);
+
+        // 防御性稳定排序：按胎面编码、班次顺序升序，保证同胎面任务按班次递进抵扣库存（最终排产顺序由 TASK_SORT 步骤重排）
+        context.getTaskDraftList().sort(Comparator
+                .comparing(TmTaskDraft::getTreadCode, Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparing(TmTaskDraft::getShiftOrder, Comparator.nullsLast(Comparator.naturalOrder())));
 
         for (TmTaskDraft task : context.getTaskDraftList()) {
             // 从库存预测结果中获取 rollingStockQty 并设置到任务中
@@ -125,6 +143,8 @@ public class TmPlanCalcService implements ITmPlanCalcService {
         evidence.put("strategyCode", planQtyStrategyCode);
         evidence.put("planQty", task.getPlanQty());
         evidence.put("demandQty", task.getDemandQty());
+        evidence.put("stockDeductQty", task.getStockDeductQty());
+        evidence.put("planStockQty", task.getPlanStockQty());
         evidence.put("tailFlag", task.getTailFlag());
         evidence.put("lossRate", task.getLossRate());
         evidence.put("calcFormulaDesc", task.getCalcFormulaDesc());

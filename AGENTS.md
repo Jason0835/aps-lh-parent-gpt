@@ -28,6 +28,7 @@ utf-8 no bom
       return yyy;
   }
   ```
+- **国际化规则**：所有返回给前端的信息（包括错误提示、校验失败提示等）必须使用 `I18nUtil.getMessage()` 抽取国际化 key，禁止硬编码中文/英文/越南语字符串直接返回前端。i18n key 统一以模块前缀命名（如 `ui.dj.*`），并同步更新 `apsui.properties`、`apsui_zh_CN.properties`、`apsui_en_US.properties`、`apsui_vi_VN.properties` 四个语言文件。
 ### 注释规范
 - 优先重要,主要逻辑方法需加注释
 - 注释用中文，尽可能的详细
@@ -42,6 +43,9 @@ Service    extends IDocService<Entity>
 ServiceImpl extends AbstractDocService<Entity> implements ICxEntityNameService
 UIController extends BaseUIController<Entity>
 ```
+### 后端规范：
+- 禁止使用单字母缩写作为变量名或方法参数名（如 `q`、`e`、`w`），必须使用有业务含义的完整命名（如 `queryVO`、`entity`、`wrapper`）。
+
 ### 数据库相关：
 - BaseEntity已经定义了 `id,createBy,createTime,updateBy,updateTime,isDelete,remark`，实体类不需要重复定义
 - 非数据库字段必须添加 `@TableField(exist = false)`
@@ -86,3 +90,6 @@ UIController extends BaseUIController<Entity>
 - 如果当前模块依赖 `tm-api`、`api`、`common` 等上游模块，必须带 `-am`。
 - 仓库存在无测试模块时，必须带 `-DfailIfNoTests=false`。
 - 命令失败时，先判断是 shell 参数解析问题、Maven 模块依赖问题，还是代码编译/测试问题，不要直接认定代码失败。
+
+### 胎面部分调整
+- 有涉及到胎面业务调整的部分，都需要同步更新到详设文档：docs/tm/tm_schedule_detailed_design.md

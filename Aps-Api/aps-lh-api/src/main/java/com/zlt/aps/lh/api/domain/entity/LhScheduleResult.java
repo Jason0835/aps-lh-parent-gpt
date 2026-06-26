@@ -1067,6 +1067,48 @@ public class LhScheduleResult extends BaseEntity implements Serializable {
     @TableField(value = "IS_EARLY_PRODUCTION")
     private String isEarlyProduction;
 
+
+    /**
+     * SKU 排序名次。
+     */
+    @Excel(name = "ui.data.column.lhScheduleResult.skuSortRank")
+    @ApiModelProperty(value = "SKU排序名次", name = "skuSortRank")
+    @TableField(value = "SKU_SORT_RANK")
+    private Integer skuSortRank;
+
+    /**
+     * SKU 排序描述。
+     */
+    @Excel(name = "ui.data.column.lhScheduleResult.skuSortDesc")
+    @ApiModelProperty(value = "SKU排序描述", name = "skuSortDesc")
+    @TableField(value = "SKU_SORT_DESC")
+    private String skuSortDesc;
+
+    /**
+     * 结构计划硫化机台数，格式 {@code T=2,T+1=2,T+2=3}。
+     */
+    @Excel(name = "ui.data.column.lhScheduleResult.structurePlanMachineCountRange")
+    @ApiModelProperty(value = "结构计划硫化机台数", name = "structurePlanMachineCountRange")
+    @TableField(value = "STRUCTURE_PLAN_MACHINE_COUNT_RANGE")
+    private String structurePlanMachineCountRange;
+
+    /**
+     * 结构已排硫化机台数，格式 {@code T=2,T+1=2,T+2=3}。
+     */
+    @Excel(name = "ui.data.column.lhScheduleResult.structureScheduledMachineCountRange")
+    @ApiModelProperty(value = "结构已排硫化机台数", name = "structureScheduledMachineCountRange")
+    @TableField(value = "STRUCTURE_SCHEDULED_MACHINE_COUNT_RANGE")
+    private String structureScheduledMachineCountRange;
+
+    /**
+     * SKU 已排硫化机台数，格式 {@code T=2,T+1=2,T+2=3}。
+     */
+    @Excel(name = "ui.data.column.lhScheduleResult.skuScheduledMachineCountRange")
+    @ApiModelProperty(value = "SKU已排硫化机台数", name = "skuScheduledMachineCountRange")
+    @TableField(value = "SKU_SCHEDULED_MACHINE_COUNT_RANGE")
+    private String skuScheduledMachineCountRange;
+
+
     /**
      * 是否为滚动排程继承结果，仅用于本次排程运行期识别，不落库。
      */

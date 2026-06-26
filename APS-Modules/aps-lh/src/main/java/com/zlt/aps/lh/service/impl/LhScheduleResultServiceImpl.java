@@ -1,60 +1,37 @@
 package com.zlt.aps.lh.service.impl;
 
+import cn.hutool.core.bean.BeanUtil;
+import cn.hutool.core.date.DateUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.zlt.aps.lh.api.constant.LhScheduleConstant;
 import com.zlt.aps.lh.api.domain.dto.LhInsertOrderValidateResultDTO;
 import com.zlt.aps.lh.api.domain.dto.LhOrderInsertDTO;
+import com.zlt.aps.lh.api.domain.entity.LhDayFinishQty;
 import com.zlt.aps.lh.api.domain.entity.LhMouldChangePlan;
+import com.zlt.aps.lh.api.domain.entity.LhScheFinishQty;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.api.enums.DeleteFlagEnum;
 import com.zlt.aps.lh.api.enums.ReleaseStatusEnum;
 import com.zlt.aps.lh.component.LhBatchNoRedisGenerator;
 import com.zlt.aps.lh.handler.LhInsertOrderValidateHandler;
-import com.zlt.aps.lh.mapper.CxLhScheduleResultMapper;
-import com.zlt.aps.lh.mapper.LhMouldChangePlanEntityMapper;
-import com.zlt.aps.lh.mapper.LhScheduleResultMapper;
-import com.zlt.aps.lh.mapper.LhDayFinishQtyMapper;
-import com.zlt.aps.lh.mapper.LhScheFinishQtyMapper;
-import com.zlt.aps.lh.mapper.MdmMaterialInfoMapper;
-import com.zlt.aps.lh.mapper.MdmSkuConstructionRefMapper;
-import com.zlt.aps.lh.mapper.MdmSkuLhCapacityMapper;
-import com.zlt.aps.lh.mapper.MdmSkuMouldRelMapper;
-import com.zlt.aps.lh.mapper.LhMachineInfoMapper;
-import com.zlt.aps.lh.mapper.FactoryMonthPlanProductionFinalResultMapper;
-import com.zlt.aps.lh.mapper.MpFactoryProductionVersionMapper;
+import com.zlt.aps.lh.mapper.*;
 import com.zlt.aps.lh.service.ILhScheduleResultService;
 import com.zlt.aps.lh.util.LeftRightMouldUtil;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.lh.util.ShiftFieldUtil;
-import cn.hutool.core.bean.BeanUtil;
-import cn.hutool.core.date.DateUtil;
-import com.zlt.aps.lh.api.constant.LhScheduleConstant;
-import com.zlt.aps.lh.api.domain.entity.LhDayFinishQty;
-import com.zlt.aps.lh.api.domain.entity.LhScheFinishQty;
-import com.zlt.aps.mdm.api.domain.entity.LhMachineInfo;
-import com.zlt.aps.mdm.api.domain.entity.MdmMaterialInfo;
-import com.zlt.aps.mdm.api.domain.entity.MdmSkuConstructionRef;
-import com.zlt.aps.mdm.api.domain.entity.MdmSkuLhCapacity;
-import com.zlt.aps.mdm.api.domain.entity.MdmSkuMouldRel;
+import com.zlt.aps.mdm.api.domain.entity.*;
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import com.zlt.aps.mp.api.domain.entity.MpFactoryProductionVersion;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
 import java.math.BigDecimal;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
@@ -1045,5 +1022,120 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
                 }
             }
         }
+    }
+
+    /**
+     * 根据工厂编码和排程日期查询未删除的硫化排程结果列表
+     *
+     * @param factoryCode  工厂编码
+     * @param scheduleDate 排程日期
+     * @return 硫化排程结果列表
+     */
+    @Override
+    public List<LhScheduleResult> selectByFactoryCodeAndScheduleDate(String factoryCode, Date scheduleDate) {
+        LambdaQueryWrapper<LhScheduleResult> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(LhScheduleResult::getFactoryCode, factoryCode)
+                .eq(LhScheduleResult::getScheduleDate, DateUtil.beginOfDay(scheduleDate))
+                .isNotNull(LhScheduleResult::getBatchNo)
+                .ne(LhScheduleResult::getBatchNo, "");
+        return mapper.selectList(wrapper);
+    }
+
+    /**
+     * 导入后补全模具交替计划的批次号、交替类型、交替时间
+     *
+     * @param factoryCode  工厂编码
+     * @param scheduleDate 排程日期
+     */
+    @Override
+    public void fillMouldChangePlanFieldsAfterImport(String factoryCode, Date scheduleDate) {
+        // 1. 查询本次导入的硫化排程结果，构建匹配Map
+        List<LhScheduleResult> scheduleResults = this.selectByFactoryCodeAndScheduleDate(factoryCode, scheduleDate);
+        if (CollectionUtils.isEmpty(scheduleResults)) {
+            return;
+        }
+        // key: machineCode|materialCode|scheduleDate -> LhScheduleResult
+        Map<String, LhScheduleResult> scheduleResultMap = scheduleResults.stream()
+                .collect(Collectors.toMap(
+                        sr -> this.buildMatchKey(sr.getLhMachineCode(), sr.getMaterialCode(), sr.getScheduleDate()),
+                        sr -> sr,
+                        (v1, v2) -> v1
+                ));
+
+        // 2. 查询本次导入的模具交替计划（批次号为空的记录）
+        LambdaQueryWrapper<LhMouldChangePlan> planWrapper = new LambdaQueryWrapper<>();
+        planWrapper.eq(LhMouldChangePlan::getFactoryCode, factoryCode)
+                .eq(LhMouldChangePlan::getScheduleDate, DateUtil.beginOfDay(scheduleDate))
+                .and(w -> w.isNull(LhMouldChangePlan::getLhResultBatchNo)
+                        .or().eq(LhMouldChangePlan::getLhResultBatchNo, ""));
+        List<LhMouldChangePlan> mouldChangePlans = mouldChangePlanMapper.selectList(planWrapper);
+        if (CollectionUtils.isEmpty(mouldChangePlans)) {
+            return;
+        }
+
+        // 3. 逐条匹配并补全字段
+        List<LhMouldChangePlan> updateList = new ArrayList<>();
+        for (LhMouldChangePlan plan : mouldChangePlans) {
+            String matchKey = this.buildMatchKey(plan.getLhMachineCode(), plan.getAfterMaterialCode(), plan.getScheduleDate());
+            LhScheduleResult matchedResult = scheduleResultMap.get(matchKey);
+            if (matchedResult == null) {
+                continue;
+            }
+            boolean updated = false;
+            // 补全批次号
+            if (StringUtils.isBlank(plan.getLhResultBatchNo()) && StringUtils.isNotBlank(matchedResult.getBatchNo())) {
+                plan.setLhResultBatchNo(matchedResult.getBatchNo());
+                updated = true;
+            }
+            // 补全交替时间：取Excel导入的计划日期
+            if (plan.getChangeTime() == null && plan.getPlanDate() != null) {
+                plan.setChangeTime(plan.getPlanDate());
+                updated = true;
+            }
+            // 补全交替类型：根据排程结果判断
+            if (StringUtils.isBlank(plan.getChangeMouldType())) {
+                String changeMouldType = this.determineChangeMouldType(matchedResult);
+                plan.setChangeMouldType(changeMouldType);
+                updated = true;
+            }
+            if (updated) {
+                updateList.add(plan);
+            }
+        }
+
+        // 4. 批量更新
+        if (CollectionUtils.isNotEmpty(updateList)) {
+            for (LhMouldChangePlan plan : updateList) {
+                mouldChangePlanMapper.updateById(plan);
+            }
+            log.info("导入后补全模具交替计划字段, 工厂: {}, 排程日期: {}, 更新条数: {}", factoryCode, scheduleDate, updateList.size());
+        }
+    }
+
+    /**
+     * 构建匹配键：机台编码|物料编码|排程日期
+     *
+     * @param machineCode  机台编码
+     * @param materialCode 物料编码
+     * @param scheduleDate 排程日期
+     * @return 匹配键字符串
+     */
+    private String buildMatchKey(String machineCode, String materialCode, Date scheduleDate) {
+        return StringUtils.defaultString(machineCode).trim() + "|"
+                + StringUtils.defaultString(materialCode).trim() + "|"
+                + (scheduleDate != null ? DateUtil.format(DateUtil.beginOfDay(scheduleDate), "yyyy-MM-dd") : "");
+    }
+
+    /**
+     * 根据硫化排程结果判断模具交替类型
+     *
+     * @param result 硫化排程结果
+     * @return 交替类型编码
+     */
+    private String determineChangeMouldType(LhScheduleResult result) {
+        if ("1".equals(result.getIsTypeBlock())) {
+            return "02";
+        }
+        return "01";
     }
 }

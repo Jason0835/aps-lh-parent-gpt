@@ -275,6 +275,128 @@ public class TmBizSnapshotAndPersistServiceTest {
         assertEquals(Integer.valueOf(2), explainList.get(1).getShiftOrder());
     }
 
+
+    /**
+     * 测试内容：验证产能顺延任务进入下一班后，仍按同机台同胎面结果行归并计划量。
+     * 测试场景：顺延任务和已有任务都落在 TM001 的 2 班，胎面规格相同但来源业务键不同。
+     * 预期结果：结果表只插入一行，class2_plan_qty 等于两条任务计划量之和。
+     */
+    @Test
+    public void snapshotAndPersistShouldMergeOverflowTaskWithExistingNextShiftTreadRow() {
+        TmTaskDraft overflowTask = buildTask();
+        overflowTask.setOrderNo("CX-ORD-OVERFLOW");
+        overflowTask.setSourceOrderNos("CX-ORD-OVERFLOW");
+        overflowTask.setShiftOrder(2);
+        overflowTask.setPlanQty(new BigDecimal("3844"));
+        TmTaskDraft existingNextShiftTask = buildTask();
+        existingNextShiftTask.setOrderNo("CX-ORD-NEXT");
+        existingNextShiftTask.setSourceOrderNos("CX-ORD-NEXT");
+        existingNextShiftTask.setShiftOrder(2);
+        existingNextShiftTask.setMouthPlateCode("MP-002");
+        existingNextShiftTask.setPlanQty(new BigDecimal("500"));
+        TmScheduleContext context = new TmScheduleContext();
+        context.setFactoryCode("116");
+        context.setBatchNo("TM20260625143025123");
+        context.setScheduleDate(java.sql.Date.valueOf(LocalDate.of(2026, 6, 25)));
+        context.setTaskDraftList(Arrays.asList(overflowTask, existingNextShiftTask));
+
+        TmScheduleResult overflowResult = buildResult(overflowTask);
+        overflowResult.setFactoryCode(context.getFactoryCode());
+        overflowResult.setBatchNo(context.getBatchNo());
+        overflowResult.setScheduleDate(context.getScheduleDate());
+        overflowResult.setMachineCode("TM001");
+        overflowResult.setClass2PlanQty(new BigDecimal("3844"));
+        TmScheduleResult existingResult = buildResult(existingNextShiftTask);
+        existingResult.setFactoryCode(context.getFactoryCode());
+        existingResult.setBatchNo(context.getBatchNo());
+        existingResult.setScheduleDate(context.getScheduleDate());
+        existingResult.setMachineCode("TM001");
+        existingResult.setClass2PlanQty(new BigDecimal("500"));
+
+        when(snapshotBuildService.buildTaskExplain(eq(overflowTask), eq(context))).thenReturn(new TmSnapshotBuildResult());
+        when(snapshotBuildService.buildTaskExplain(eq(existingNextShiftTask), eq(context))).thenReturn(new TmSnapshotBuildResult());
+        when(persistService.convertUnplanned(overflowTask, context)).thenReturn(overflowResult);
+        when(persistService.convertUnplanned(existingNextShiftTask, context)).thenReturn(existingResult);
+        when(persistService.convertExplain(eq(overflowTask), any(), eq(context))).thenReturn(buildExplain(overflowTask));
+        when(persistService.convertExplain(eq(existingNextShiftTask), any(), eq(context))).thenReturn(buildExplain(existingNextShiftTask));
+        when(scheduleResultMapper.insert(any(TmScheduleResult.class))).thenAnswer(invocation -> {
+            TmScheduleResult result = invocation.getArgument(0);
+            result.setId(601L);
+            return 1;
+        });
+        when(scheduleResultExplainMapper.insert(any(TmScheduleResultExplain.class))).thenReturn(1);
+
+        new TmBizSnapshotAndPersistService(snapshotBuildService, persistService, scheduleResultMapper,
+                scheduleResultExplainMapper).snapshotAndPersist(context);
+
+        ArgumentCaptor<TmScheduleResult> resultCaptor = ArgumentCaptor.forClass(TmScheduleResult.class);
+        verify(scheduleResultMapper, times(1)).insert(resultCaptor.capture());
+        TmScheduleResult mergedResult = resultCaptor.getValue();
+        assertEquals("TM001", mergedResult.getMachineCode());
+        assertEquals(overflowTask.getTreadCode(), mergedResult.getTreadCode());
+        assertEquals(new BigDecimal("4344"), mergedResult.getClass2PlanQty());
+    }
+
+    /**
+     * 测试内容：验证同胎面拆分到不同机台后，不会被结果落库逻辑合并成同一行。
+     * 测试场景：同一胎面同一班分别落到 TM001 和 TM002。
+     * 预期结果：结果表插入两行，保持不同机台各自的班次计划量。
+     */
+    @Test
+    public void snapshotAndPersistShouldNotMergeSameTreadRowsAcrossDifferentMachines() {
+        TmTaskDraft tm001Task = buildTask();
+        tm001Task.setOrderNo("CX-ORD-TM001");
+        tm001Task.setSourceOrderNos("CX-ORD-TM001");
+        tm001Task.setShiftOrder(1);
+        tm001Task.setPlanQty(new BigDecimal("2300"));
+        TmTaskDraft tm002Task = buildTask();
+        tm002Task.setOrderNo("CX-ORD-TM002");
+        tm002Task.setSourceOrderNos("CX-ORD-TM002");
+        tm002Task.setShiftOrder(1);
+        tm002Task.setPlanQty(new BigDecimal("3844"));
+        TmScheduleContext context = new TmScheduleContext();
+        context.setFactoryCode("116");
+        context.setBatchNo("TM20260625143025123");
+        context.setScheduleDate(java.sql.Date.valueOf(LocalDate.of(2026, 6, 25)));
+        context.setTaskDraftList(Arrays.asList(tm001Task, tm002Task));
+
+        TmScheduleResult tm001Result = buildResult(tm001Task);
+        tm001Result.setFactoryCode(context.getFactoryCode());
+        tm001Result.setBatchNo(context.getBatchNo());
+        tm001Result.setScheduleDate(context.getScheduleDate());
+        tm001Result.setMachineCode("TM001");
+        tm001Result.setClass1PlanQty(new BigDecimal("2300"));
+        TmScheduleResult tm002Result = buildResult(tm002Task);
+        tm002Result.setFactoryCode(context.getFactoryCode());
+        tm002Result.setBatchNo(context.getBatchNo());
+        tm002Result.setScheduleDate(context.getScheduleDate());
+        tm002Result.setMachineCode("TM002");
+        tm002Result.setClass1PlanQty(new BigDecimal("3844"));
+
+        when(snapshotBuildService.buildTaskExplain(eq(tm001Task), eq(context))).thenReturn(new TmSnapshotBuildResult());
+        when(snapshotBuildService.buildTaskExplain(eq(tm002Task), eq(context))).thenReturn(new TmSnapshotBuildResult());
+        when(persistService.convertUnplanned(tm001Task, context)).thenReturn(tm001Result);
+        when(persistService.convertUnplanned(tm002Task, context)).thenReturn(tm002Result);
+        when(persistService.convertExplain(eq(tm001Task), any(), eq(context))).thenReturn(buildExplain(tm001Task));
+        when(persistService.convertExplain(eq(tm002Task), any(), eq(context))).thenReturn(buildExplain(tm002Task));
+        when(scheduleResultMapper.insert(any(TmScheduleResult.class))).thenAnswer(invocation -> {
+            TmScheduleResult result = invocation.getArgument(0);
+            result.setId("TM001".equals(result.getMachineCode()) ? 701L : 702L);
+            return 1;
+        });
+        when(scheduleResultExplainMapper.insert(any(TmScheduleResultExplain.class))).thenReturn(1);
+
+        new TmBizSnapshotAndPersistService(snapshotBuildService, persistService, scheduleResultMapper,
+                scheduleResultExplainMapper).snapshotAndPersist(context);
+
+        ArgumentCaptor<TmScheduleResult> resultCaptor = ArgumentCaptor.forClass(TmScheduleResult.class);
+        verify(scheduleResultMapper, times(2)).insert(resultCaptor.capture());
+        List<TmScheduleResult> resultList = resultCaptor.getAllValues();
+        assertEquals("TM001", resultList.get(0).getMachineCode());
+        assertEquals(new BigDecimal("2300"), resultList.get(0).getClass1PlanQty());
+        assertEquals("TM002", resultList.get(1).getMachineCode());
+        assertEquals(new BigDecimal("3844"), resultList.get(1).getClass1PlanQty());
+    }
     /**
      * 测试内容：验证解释表写入前找不到结果表主键时中断落库。
      * 测试场景：结果表 insert 返回成功但未回填 id。

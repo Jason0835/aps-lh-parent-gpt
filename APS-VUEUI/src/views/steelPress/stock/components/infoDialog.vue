@@ -45,6 +45,13 @@ export default {
       editType: null,
       form: {},
       rules: {
+        factoryCode: [
+          {
+            required: true,
+            message: this.$t("common.rule.input"),
+            trigger: "blur",
+          },
+        ],
         stockDate: [
           {
             required: true,
@@ -52,7 +59,7 @@ export default {
             trigger: "blur",
           },
         ],
-        materialCode: [
+        bigRollCode: [
           {
             required: true,
             message: this.$t("common.rule.input"),
@@ -76,6 +83,14 @@ export default {
     columns() {
       return [
         {
+          label: this.$t("ui.data.column.gdyy.stock.factoryCode"),
+          prop: "factoryCode",
+          span: 24,
+          required: true,
+          maxlength: "50",
+          disabled: this.editType === "2",
+        },
+        {
           label: this.$t("ui.data.column.stock.stockDate"),
           prop: "stockDate",
           span: 24,
@@ -86,10 +101,25 @@ export default {
         },
         {
           label: this.$t("ui.data.column.loss.gdyy.bigRollCode"),
-          prop: "materialCode",
+          prop: "bigRollCode",
           span: 24,
           required: true,
+          maxlength: "30",
+          disabled: this.editType === "2",
+        },
+        {
+          label: this.$t("ui.data.column.gdyy.stock.bigRollBarcode"),
+          prop: "bigRollBarcode",
+          span: 24,
           maxlength: "50",
+          disabled: this.editType === "2",
+        },
+        {
+          label: this.$t("ui.data.column.gdyy.stock.inboundTime"),
+          prop: "inboundTime",
+          span: 24,
+          type: "datetime",
+          valueFormat: "yyyy-MM-dd HH:mm:ss",
           disabled: this.editType === "2",
         },
         {
@@ -102,6 +132,16 @@ export default {
           min: 0,
           max: 999999,
           precision: 0,
+        },
+        {
+          label: this.$t("ui.data.column.gdyy.stock.stockMeters"),
+          prop: "stockMeters",
+          span: 24,
+          disabled: this.editType === "2",
+          type: "number",
+          min: 0,
+          max: 999999,
+          precision: 2,
         },
         {
           label: this.$t("ui.data.column.stock.modifyNum"),

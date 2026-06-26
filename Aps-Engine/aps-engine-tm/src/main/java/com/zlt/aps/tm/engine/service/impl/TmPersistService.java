@@ -104,7 +104,7 @@ public class TmPersistService {
             explain.setShiftOrder(task.getShiftOrder());
             explain.setBaseDemandQty(task.getBaseDemandQty() == null ? task.getDemandQty() : task.getBaseDemandQty());
             explain.setLossAddQty(task.getLossAddQty());
-            explain.setStockDeductQty(task.getRollingStockQty());
+            explain.setStockDeductQty(task.getStockDeductQty());
             explain.setToolLimitAdjustQty(task.getToolLimitAdjustQty());
             explain.setMinStartAdjustQty(task.getMinStartAdjustQty());
             explain.setTailRoundAdjustQty(task.getTailRoundAdjustQty());
@@ -113,15 +113,13 @@ public class TmPersistService {
             explain.setFinalPlanQty(task.getPlanQty());
             explain.setCalcFormulaDesc(task.getCalcFormulaDesc());
             explain.setStockQty(task.getSixClockStockQty());
-            explain.setPlanStockQty(task.getRollingStockQty());
+            explain.setPlanStockQty(task.getPlanStockQty());
             explain.setSupplyHours(task.getSupplyHours());
             explain.setCoverageShiftCount(task.getGuardShiftCount());
             explain.setUnplannedReasonCode(task.getUnplannedReasonCode());
             explain.setUnplannedReasonDesc(task.getUnplannedReasonDesc());
             explain.setTaskStatus(task.isUnassigned() ? null : TmScheduleTaskStatusEnum.PLANNED.getCode());
-            explain.setResultStatus(task.isUnassigned()
-                    ? TmScheduleReleaseStatusEnum.NOT_RELEASED.getCode()
-                    : TmScheduleReleaseStatusEnum.WAIT_RELEASE.getCode());
+            explain.setResultStatus(TmScheduleReleaseStatusEnum.NOT_RELEASED.getCode());
         }
         if (snapshot != null) {
             explain.setRuleHitJson(snapshot.getRuleHitJson());
@@ -194,7 +192,7 @@ public class TmPersistService {
         result.setTreadCode(task.getTreadCode());
         result.setGlueCode(task.getGlueCode());
         result.setMouthPlateCode(task.getMouthPlateCode());
-        result.setReleaseStatus(TmScheduleReleaseStatusEnum.WAIT_RELEASE.getCode());
+        result.setReleaseStatus(TmScheduleReleaseStatusEnum.NOT_RELEASED.getCode());
         result.setDataSource("AUTO");
         applyShiftFields(result, node);
         return result;

@@ -47,7 +47,7 @@ public interface IDjStockRemoteService {
      * @param ids
      * @return
      */
-    @DeleteMapping("/dj/stock/{ids}")
+    @PostMapping("/dj/stock/remove")
     AjaxResult removeByIds(@RequestBody List<Long> ids);
 
     /**

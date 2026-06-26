@@ -128,6 +128,7 @@ public class TmBusinessRuleStrategyTest {
     public void planShouldApplyToolMinRoundAndCapacityInOrder() {
         // 准备综合计划量计算任务，覆盖多个调整分量同时存在的场景。
         TmTaskDraft task = new TmTaskDraft();
+        task.setTreadCode("TR-PLAN-1");
         task.setCurrentShiftDemandQty(new BigDecimal("380"));
         task.setGuardDemandQty(new BigDecimal("900"));
         task.setRollingStockQty(new BigDecimal("200"));
@@ -142,8 +143,12 @@ public class TmBusinessRuleStrategyTest {
         task.setPreviousSpecSwitchHours(new BigDecimal("0.5"));
         task.setPreviousGlueSwitchHours(new BigDecimal("0.5"));
 
+        // 准备上下文剩余库存 200，库存抵扣后基础需求=max(380-200,900-200,0)=700。
+        TmScheduleContext context = new TmScheduleContext();
+        context.getRemainingStockMap().put("TR-PLAN-1", new BigDecimal("200"));
+
         // 执行默认计划量策略。
-        TmPlanQtyResult result = new TmDefaultPlanQtyStrategy().calculate(task, null);
+        TmPlanQtyResult result = new TmDefaultPlanQtyStrategy().calculate(task, context);
 
         // 断言基础需求、工装、取整、产能调整和最终计划量。
         assertBigDecimalEquals(new BigDecimal("700"), result.getBaseDemandQty());
@@ -223,6 +228,77 @@ public class TmBusinessRuleStrategyTest {
     @Test(expected = ServiceException.class)
     public void planShouldRejectNullTask() {
         new TmDefaultPlanQtyStrategy().calculate(null, null);
+    }
+
+    /**
+     * 测试内容：验证库存抵扣当前班生产量，库存不足时只抵扣到库存量。
+     * 测试场景：当前班需求 600、保证范围需求 600，剩余库存 200。
+     * 预期结果：库存抵扣 200，基础需求=max(600-200,600-200,0)=400。
+     */
+    @Test
+    public void planShouldDeductStockUpToRemainingWhenStockInsufficient() {
+        TmTaskDraft task = new TmTaskDraft();
+        task.setTreadCode("TR-DEDUCT-1");
+        task.setCurrentShiftDemandQty(new BigDecimal("600"));
+        task.setGuardDemandQty(new BigDecimal("600"));
+        TmScheduleContext context = new TmScheduleContext();
+        context.getRemainingStockMap().put("TR-DEDUCT-1", new BigDecimal("200"));
+
+        TmPlanQtyResult result = new TmDefaultPlanQtyStrategy().calculate(task, context);
+
+        assertBigDecimalEquals(new BigDecimal("200"), task.getStockDeductQty());
+        assertBigDecimalEquals(new BigDecimal("400"), result.getBaseDemandQty());
+    }
+
+    /**
+     * 测试内容：验证同一胎面多班次库存逐班递减，避免库存被重复抵扣。
+     * 测试场景：两班任务当前班需求各 600，剩余库存 500；按班次顺序抵扣。
+     * 预期结果：首班抵扣 500（基础需求 100），剩余库存 0；二班抵扣 0（基础需求 600）。
+     */
+    @Test
+    public void planShouldDecrementStockAcrossShiftsWithoutRepeatDeduct() {
+        TmScheduleContext context = new TmScheduleContext();
+        context.getRemainingStockMap().put("TR-DEDUCT-2", new BigDecimal("500"));
+        TmDefaultPlanQtyStrategy strategy = new TmDefaultPlanQtyStrategy();
+
+        TmTaskDraft firstShift = new TmTaskDraft();
+        firstShift.setTreadCode("TR-DEDUCT-2");
+        firstShift.setCurrentShiftDemandQty(new BigDecimal("600"));
+        firstShift.setGuardDemandQty(new BigDecimal("600"));
+        TmPlanQtyResult firstResult = strategy.calculate(firstShift, context);
+
+        TmTaskDraft secondShift = new TmTaskDraft();
+        secondShift.setTreadCode("TR-DEDUCT-2");
+        secondShift.setCurrentShiftDemandQty(new BigDecimal("600"));
+        secondShift.setGuardDemandQty(new BigDecimal("600"));
+        TmPlanQtyResult secondResult = strategy.calculate(secondShift, context);
+
+        assertBigDecimalEquals(new BigDecimal("500"), firstShift.getStockDeductQty());
+        assertBigDecimalEquals(new BigDecimal("100"), firstResult.getBaseDemandQty());
+        assertBigDecimalEquals(BigDecimal.ZERO, secondShift.getStockDeductQty());
+        assertBigDecimalEquals(new BigDecimal("600"), secondResult.getBaseDemandQty());
+    }
+
+    /**
+     * 测试内容：验证库存充足时当前班基础需求被抵扣为 0。
+     * 测试场景：当前班需求 300、保证范围需求 300，剩余库存 1000。
+     * 预期结果：库存抵扣 300，基础需求为 0。
+     */
+    @Test
+    public void planShouldDeductAllDemandWhenStockSufficient() {
+        TmTaskDraft task = new TmTaskDraft();
+        task.setTreadCode("TR-DEDUCT-3");
+        task.setCurrentShiftDemandQty(new BigDecimal("300"));
+        task.setGuardDemandQty(new BigDecimal("300"));
+        TmScheduleContext context = new TmScheduleContext();
+        context.getRemainingStockMap().put("TR-DEDUCT-3", new BigDecimal("1000"));
+
+        TmPlanQtyResult result = new TmDefaultPlanQtyStrategy().calculate(task, context);
+
+        assertBigDecimalEquals(new BigDecimal("300"), task.getStockDeductQty());
+        assertBigDecimalEquals(BigDecimal.ZERO, result.getBaseDemandQty());
+        // 库存扣减后剩余 700
+        assertBigDecimalEquals(new BigDecimal("700"), context.getRemainingStockMap().get("TR-DEDUCT-3"));
     }
 
     /**

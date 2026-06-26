@@ -43,7 +43,8 @@
                                               CLASS5_PLAN_QTY, CLASS5_FINISH_QTY, CLASS5_SEQUENCE, CLASS5_FINISH_RATE, CLASS5_ANALYSIS,
                                               CLASS6_PLAN_QTY, CLASS6_FINISH_QTY, CLASS6_SEQUENCE, CLASS6_FINISH_RATE, CLASS6_ANALYSIS,
                                               CX_CLASS1_PLAN, CX_CLASS2_PLAN, CX_CLASS3_PLAN, CX_CLASS4_PLAN, CX_CLASS5_PLAN, CX_CLASS6_PLAN, CX_CLASS7_PLAN, CX_CLASS8_PLAN,
-                                              IS_RELEASE, MARK_CLOSE_OUT_TIP, PRODUCTION_STATUS, REMARK, DEL_FLAG, CREATE_BY, CREATE_TIME, UPDATE_BY, UPDATE_TIME, DATA_SOURCE, PUBLISH_SUCCESS_COUNT, NEWEST_PUBLISH_TIME)
+                                              IS_RELEASE, MARK_CLOSE_OUT_TIP, PRODUCTION_STATUS, REMARK, DEL_FLAG, CREATE_BY, CREATE_TIME, UPDATE_BY, UPDATE_TIME, DATA_SOURCE, PUBLISH_SUCCESS_COUNT, NEWEST_PUBLISH_TIME,
+                                              USE_BACKUP_CONFIG_FLAG, BACKUP_SHIFT_COUNT, BACKUP_TRIGGER_CLASS)
         select ID, SCHEDULE_DATE, CX_BATCH_NO, BATCH_NO, ORDER_NO, BEAD_CODE, STEEL_RING_CODE, TRIANGLE_GLUE_CODE, GLUE_CODE, MOUTH_PLATE_CODE, SPEC_SIZE, MACHINE_CODE, UNIT_CONSUME, STOCK_QTY, SUPPLY_TIME,
                CLASS1_PLAN_QTY, CLASS1_FINISH_QTY, CLASS1_SEQUENCE, CLASS1_FINISH_RATE, CLASS1_ANALYSIS,
                CLASS2_PLAN_QTY, CLASS2_FINISH_QTY, CLASS2_SEQUENCE, CLASS2_FINISH_RATE, CLASS2_ANALYSIS,
@@ -52,7 +53,8 @@
                CLASS5_PLAN_QTY, CLASS5_FINISH_QTY, CLASS5_SEQUENCE, CLASS5_FINISH_RATE, CLASS5_ANALYSIS,
                CLASS6_PLAN_QTY, CLASS6_FINISH_QTY, CLASS6_SEQUENCE, CLASS6_FINISH_RATE, CLASS6_ANALYSIS,
                CX_CLASS1_PLAN, CX_CLASS2_PLAN, CX_CLASS3_PLAN, CX_CLASS4_PLAN, CX_CLASS5_PLAN, CX_CLASS6_PLAN, CX_CLASS7_PLAN, CX_CLASS8_PLAN,
-               IS_RELEASE, MARK_CLOSE_OUT_TIP, PRODUCTION_STATUS, REMARK, DEL_FLAG, CREATE_BY, CREATE_TIME, UPDATE_BY, UPDATE_TIME, DATA_SOURCE, PUBLISH_SUCCESS_COUNT, NEWEST_PUBLISH_TIME
+               IS_RELEASE, MARK_CLOSE_OUT_TIP, PRODUCTION_STATUS, REMARK, DEL_FLAG, CREATE_BY, CREATE_TIME, UPDATE_BY, UPDATE_TIME, DATA_SOURCE, PUBLISH_SUCCESS_COUNT, NEWEST_PUBLISH_TIME,
+               USE_BACKUP_CONFIG_FLAG, BACKUP_SHIFT_COUNT, BACKUP_TRIGGER_CLASS
         from T_TQ_SCHEDULE_RESULT
         where schedule_date = STR_TO_DATE(#{scheduleDate}, '%Y-%m-%d')
     </insert>
@@ -82,7 +84,8 @@
                                           CLASS6_PLAN_QTY, CLASS6_SEQUENCE, CLASS6_ANALYSIS,
                                           CX_CLASS1_PLAN, CX_CLASS2_PLAN, CX_CLASS3_PLAN, CX_CLASS4_PLAN, CX_CLASS5_PLAN, CX_CLASS6_PLAN, CX_CLASS7_PLAN, CX_CLASS8_PLAN,
                                           IS_RELEASE, MARK_CLOSE_OUT_TIP, PRODUCTION_STATUS, REMARK, DEL_FLAG, CREATE_BY,
-                                          CREATE_TIME, PUBLISH_SUCCESS_COUNT, NEWEST_PUBLISH_TIME, CLOSE_OUT_SPEC_FLAG, TODAY_MORNING_PLAN_QTY, FACTORY_CODE)
+                                          CREATE_TIME, PUBLISH_SUCCESS_COUNT, NEWEST_PUBLISH_TIME, CLOSE_OUT_SPEC_FLAG, TODAY_MORNING_PLAN_QTY, FACTORY_CODE,
+                                          USE_BACKUP_CONFIG_FLAG, BACKUP_SHIFT_COUNT, BACKUP_TRIGGER_CLASS)
         values
             <foreach collection="scheduleResultList" item="schedule" separator=",">
                   (NULL,
@@ -96,7 +99,8 @@
                           #{schedule.class6PlanQty,jdbcType=DOUBLE},#{schedule.class6ProduceOrder,jdbcType=INTEGER},#{schedule.class6SysAnalysis,jdbcType=VARCHAR},
                           #{schedule.cxClass1Plan,jdbcType=DOUBLE},#{schedule.cxClass2Plan,jdbcType=DOUBLE},#{schedule.cxClass3Plan,jdbcType=DOUBLE},#{schedule.cxClass4Plan,jdbcType=DOUBLE},#{schedule.cxClass5Plan,jdbcType=DOUBLE},#{schedule.cxClass6Plan,jdbcType=DOUBLE},#{schedule.cxClass7Plan,jdbcType=DOUBLE},#{schedule.cxClass8Plan,jdbcType=DOUBLE},
                           #{schedule.isRelease,jdbcType=VARCHAR},#{schedule.markCloseOutTip,jdbcType=VARCHAR},#{schedule.productionStatus,jdbcType=VARCHAR},#{schedule.remark,jdbcType=VARCHAR},#{schedule.delFlag,jdbcType=VARCHAR},#{schedule.createBy,jdbcType=VARCHAR},#{schedule.createTime},IFNULL(#{schedule.publishSuccessCount,jdbcType=DOUBLE},0),#{schedule.newestPublishTime,jdbcType=DATE},
-                          #{schedule.closeOutSpecFlag,jdbcType=VARCHAR}, #{schedule.todayMorningPlanQty,jdbcType=DOUBLE}, #{schedule.factoryCode,jdbcType=VARCHAR}
+                          #{schedule.closeOutSpecFlag,jdbcType=VARCHAR}, #{schedule.todayMorningPlanQty,jdbcType=DOUBLE}, #{schedule.factoryCode,jdbcType=VARCHAR},
+                          #{schedule.useBackupConfigFlag,jdbcType=VARCHAR}, #{schedule.backupShiftCount,jdbcType=DOUBLE}, #{schedule.backupTriggerClass,jdbcType=INTEGER}
                   )
             </foreach>
     </insert>
@@ -168,8 +172,8 @@
                max(ci.HEXAGON_RUBBER_CODE) GLUE_CODE,  /*胶料代码*/
                max(ci.HEXAGON_MOUTH_PLATE) MOUTH_PLATE_CODE,  /*口型板代码*/
                max(ci.HEXAGON_RUBBER_DIMENSION) SPEC_SIZE  /*尺寸*/
-        from T_CONSTRUCTION_VERSION_INFO ci
-        where ci.Del_Flag = '0'
+        from T_MDM_CONSTRUCTION_INFO ci
+        where ci.IS_DELETE = 0
         <if test="productionStage == '1'.toString()">
             and PRODUCTION_STAGE = '0'
         </if>
@@ -180,7 +184,7 @@
     <!-- 合并胎圈排程结果（6班次），用于插单等场景 -->
     <insert id="mergeTqScheduleResult">
         INSERT INTO t_tq_schedule_result (
-        schedule_date, cx_batch_no, batch_no, order_no, bead_code, steel_ring_code, triangle_glue_code, glue_code, mouth_plate_code, spec_size, machine_id, unit_consume, stock_qty, supply_time,
+        schedule_date, cx_batch_no, batch_no, order_no, bead_code, steel_ring_code, triangle_glue_code, glue_code, mouth_plate_code, spec_size, machine_code, unit_consume, stock_qty, supply_time,
         class1_plan_qty, class1_sequence, class1_analysis,
         class2_plan_qty, class2_sequence, class2_analysis,
         class3_plan_qty, class3_sequence, class3_analysis,
@@ -188,7 +192,8 @@
         class5_plan_qty, class5_sequence, class5_analysis,
         class6_plan_qty, class6_sequence, class6_analysis,
         cx_class1_plan, cx_class2_plan, cx_class3_plan, cx_class4_plan, cx_class5_plan, cx_class6_plan, cx_class7_plan, cx_class8_plan,
-        is_release, mark_close_out_tip, production_status, remark, del_flag, create_by, create_time, data_Source, CLOSE_OUT_SPEC_FLAG
+        is_release, mark_close_out_tip, production_status, remark, del_flag, create_by, create_time, data_Source, CLOSE_OUT_SPEC_FLAG,
+        USE_BACKUP_CONFIG_FLAG, BACKUP_SHIFT_COUNT, BACKUP_TRIGGER_CLASS
         )
         VALUES
         <foreach collection="scheduleResultList" item="schedule" separator=",">
@@ -241,7 +246,10 @@
             #{schedule.createBy,jdbcType=VARCHAR},
             NOW(),
             #{schedule.dataSource,jdbcType=VARCHAR},
-            #{schedule.closeOutSpecFlag,jdbcType=VARCHAR}
+            #{schedule.closeOutSpecFlag,jdbcType=VARCHAR},
+            #{schedule.useBackupConfigFlag,jdbcType=VARCHAR},
+            #{schedule.backupShiftCount,jdbcType=DOUBLE},
+            #{schedule.backupTriggerClass,jdbcType=INTEGER}
             )
         </foreach>
         ON DUPLICATE KEY UPDATE
@@ -268,12 +276,15 @@
         cx_class5_plan = VALUES(cx_class5_plan),
         cx_class6_plan = VALUES(cx_class6_plan),
         cx_class7_plan = VALUES(cx_class7_plan),
-        cx_class8_plan = VALUES(cx_class8_plan)
+        cx_class8_plan = VALUES(cx_class8_plan),
+        USE_BACKUP_CONFIG_FLAG = VALUES(USE_BACKUP_CONFIG_FLAG),
+        BACKUP_SHIFT_COUNT = VALUES(BACKUP_SHIFT_COUNT),
+        BACKUP_TRIGGER_CLASS = VALUES(BACKUP_TRIGGER_CLASS)
     </insert>
 
     <select id="listTqNeedConstruction" resultType="com.zlt.aps.common.engine.domain.EngineConstructionInfo">
-        select concat(cxr.EMBRYO_CODE , ',' ,ci.EMBRYO_CODE) EMBRYO_CODE,  /*成型排程胎胚代码，施工表的胎胚代码*/
-               concat(cxr.BOM_DATA_VERSION , ',' , ci.EMBRYO_VERSION) as BOM_DATA_VERSION, /*成型排程胎胚版本，施工表的胎胚版本*/
+        select concat(cxr.EMBRYO_CODE , ',' , IFNULL(ci.CONSTRUCTION_CODE, '')) EMBRYO_CODE,  /*成型排程胎胚代码，施工表的胎胚代码。使用IFNULL防止施工表无匹配时CONCAT结果为NULL*/
+               concat(cxr.BOM_DATA_VERSION , ',' , IFNULL(ci.CONSTRUCTION_VERSION, '')) as BOM_DATA_VERSION, /*成型排程胎胚版本，施工表的胎胚版本。使用IFNULL防止施工表无匹配时CONCAT结果为NULL*/
                ci.TIRE_RING_CODE,   /*胎圈代码*/
                ci.BEAD_CODE,  /*钢丝圈代码*/
                ci.APEX_CODE,   /*三角胶代码*/
@@ -282,11 +293,10 @@
                ci.HEXAGON_RUBBER_DIMENSION  /*胎圈尺寸*/
         from (select EMBRYO_CODE,BOM_DATA_VERSION
               from T_CX_SCHEDULE_RESULT
-              where DEL_FLAG = 0
-              and schedule_date = STR_TO_DATE(#{scheduleDate}, '%Y-%m-%d')
+              where schedule_date = STR_TO_DATE(#{scheduleDate}, '%Y-%m-%d')
               group by EMBRYO_CODE, BOM_DATA_VERSION
               ) cxr /*成型排程结果表*/
-        left join T_MDM_CONSTRUCTION_INFO ci on cxr.EMBRYO_CODE = ci.embryo_code and cxr.BOM_DATA_VERSION = ci.EMBRYO_VERSION and ci.IS_DELETE = 0
+        left join T_MDM_CONSTRUCTION_INFO ci on cxr.EMBRYO_CODE = ci.CONSTRUCTION_CODE and cxr.BOM_DATA_VERSION = ci.CONSTRUCTION_VERSION and ci.IS_DELETE = 0
         where 1=1
         <if test="productionStage == '1'.toString()">
             and (ci.PRODUCTION_STAGE = '0' or ci.PRODUCTION_STAGE is null)
@@ -311,20 +321,20 @@
         a.order_no = tempTable.order_no
         where a.del_flag = '0'
     </update>
-    <!-- 查询胎圈工装车整车容量（按胎圈编码分组取最大值） -->
+    <!-- 查询胎圈工装车整车容量（按胎圈编码分组取最大值），IS_DELETE为逻辑删除字段 -->
     <select id="listToolingCartCapacity" resultType="map">
         select BEAD_CODE as beadCode, max(CART_CAPACITY) as cartCapacity
         from T_TQ_TOOLING_CART_CAPACITY
-        where DEL_FLAG = '0'
+        where IS_DELETE = '0'
         group by BEAD_CODE
     </select>
 
-    <!-- 查询胎圈机台检修计划 -->
+    <!-- 查询胎圈机台检修计划，IS_DELETE为逻辑删除字段 -->
     <select id="listMaintenancePlan" resultType="map">
         select MACHINE_CODE as machineCode, DOWNTIME_DATE as downtimeDate,
                DOWNTIME_SHIFT as downtimeShift, DOWNTIME_HOURS as downtimeHours
         from T_TQ_MACHINE_MAINTENANCE_PLAN
-        where DEL_FLAG = '0'
+        where IS_DELETE = '0'
         and DOWNTIME_DATE >= date_format(#{scheduleDate}, '%Y-%m-%d')
         and DOWNTIME_DATE &lt; date_format(date_add(#{scheduleDate}, interval 3 day), '%Y-%m-%d')
         <if test="factoryCode != null and factoryCode != ''">
@@ -332,7 +342,8 @@
         </if>
     </select>
 
-    <!-- 查询胎圈工作日历（停产班次），proc_code='08'为胎圈工序 -->
+    <!-- 查询胎圈工作日历（停产班次），proc_code='08'为胎圈工序，IS_DELETE为逻辑删除字段 -->
+    <!-- 注：CX_/TQ_前缀停产标志字段尚未在表中存在，代码已做容错回退到通用标志 -->
     <select id="listWorkCalendar" resultType="map">
         select PRODUCTION_DATE as productionDate,
                ONE_SHIFT_FLAG as oneShiftFlag,
@@ -340,10 +351,41 @@
                THREE_SHIFT_FLAG as threeShiftFlag,
                DAY_FLAG as dayFlag
         from T_MDM_WORK_CALENDAR
-        where DEL_FLAG = '0'
+        where IS_DELETE = '0'
         and PROC_CODE = '08'
         and PRODUCTION_DATE >= date_format(#{scheduleDate}, '%Y-%m-%d')
         and PRODUCTION_DATE &lt; date_format(date_add(#{scheduleDate}, interval 3 day), '%Y-%m-%d')
+    </select>
+
+    <!-- 查询胎圈备库班数配置列表（按工厂过滤） -->
+    <select id="listStockShiftConfig" resultType="com.zlt.aps.tq.api.domain.entity.TqStockShiftConfig">
+        select ID,
+               FACTORY_CODE,
+               MACHINE_RANGE,
+               MACHINE_COUNT,
+               SHIFT_COUNT
+        from T_TQ_STOCK_SHIFT_CONFIG
+        where IS_DELETE = 0
+        <if test="factoryCode != null and factoryCode != ''">
+            and FACTORY_CODE = #{factoryCode}
+        </if>
+        order by MACHINE_COUNT
+    </select>
+
+    <!-- 统计胎圈规格对应的成型机台数 -->
+    <select id="statBeadMachineCount" resultType="com.zlt.aps.tq.engine.vo.BeadMachineCountVo">
+        select
+            ci.TIRE_RING_CODE as beadCode,
+            count(DISTINCT cxr.CX_MACHINE_CODE) as machineCount
+        from T_CX_SCHEDULE_RESULT cxr
+        inner join T_MDM_CONSTRUCTION_INFO ci
+            on cxr.EMBRYO_CODE = ci.CONSTRUCTION_CODE
+            and cxr.BOM_DATA_VERSION = ci.CONSTRUCTION_VERSION
+        where cxr.SCHEDULE_DATE = STR_TO_DATE(#{scheduleDate}, '%Y-%m-%d')
+            and ci.IS_DELETE = 0
+            and cxr.CX_MACHINE_CODE is not null
+            and cxr.CX_MACHINE_CODE != ''
+        group by ci.TIRE_RING_CODE
     </select>
 
 </mapper>

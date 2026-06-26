@@ -339,7 +339,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                                 + ", 班产=" + PriorityTraceLogHelper.safeText(sku.getShiftCapacity())
                                 + ", 阶段=" + resolveConstructionStageDesc(sku)
                                 + ", 施工组=" + resolveNewSpecDisplayType(sku)
-                                + ", 收尾=" + PriorityTraceLogHelper.oneZero(endingJudgmentStrategy.isEnding(context, sku)));
+                                + ", 预计收尾=" + PriorityTraceLogHelper.oneZero(endingJudgmentStrategy.isExpectedEnding(context, sku)));
             }
         }
         PriorityTraceLogHelper.appendTitleFooter(detailBuilder);
@@ -387,7 +387,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
             SkuScheduleDTO sku = iterator.next();
             boolean currentSkuRemoved = false;
             // 续作、换活字块未消费完的 SKU 在此继续参与 S4.5，不因来源不同提前拦截。
-            boolean isEnding = endingJudgmentStrategy.isEnding(context, sku);
+            boolean isEnding = endingJudgmentStrategy.isCurrentWindowEnding(context, sku);
             Integer latestPreviousFinishedQty = resolveLatestPreviousFinishedQty(context, sku.getMaterialCode());
             if (shouldSkipHistoryShortageOnlyRecentlyProducedSku(context, sku,
                     latestPreviousFinishedQty)) {
@@ -449,6 +449,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
 
             // 1. 匹配候选机台：只做硬性准入和候选排序，换模/首检/产能在后续逐台试算。
             context.getNewSpecTypeRuleBlockedMap().remove(sku);
+            refreshNewSpecEarlyProductionAdmission(context, sku, shifts, isEnding);
             List<MachineScheduleDTO> candidates = machineMatch.matchMachines(context, sku);
             logNewSpecMachineCandidateSnapshot(context, sku, candidates, EMPTY_STRING_SET, null);
             if (candidates.isEmpty()) {
@@ -619,6 +620,25 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                             failReason, switchAllocateFailReason == null
                                     ? NewSpecFailReasonEnum.MOULD_CHANGE_SHIFT_ALLOCATE_FAILED
                                     : switchAllocateFailReason);
+                    continue;
+                }
+                if (shouldSkipCompensationEarlySingleControlCandidate(context, sku, candidateMachine,
+                        productionStartTime, shifts)) {
+                    rollbackMouldChangeAllocation(context, sku, mouldChangeBalance, mouldChangeStartTime);
+                    rollbackMouldResourceAllocation(context, sku, mouldResourceAllocationResult);
+                    excludedMachineCodes.add(machineCode);
+                    candidateCache.removeMachine(machineCode);
+                    recordExcludedMachineReason(excludedMachineReasonMap, machineCode,
+                            "提前生产开产未落在当前业务日", machineReadyTime, switchReadyTime,
+                            mouldChangeStartTime, mouldChangeCompleteTime, inspectionTime,
+                            productionStartTime, null, null, null);
+                    failReason = selectHigherPriorityFailReason(
+                            failReason, NewSpecFailReasonEnum.NO_CAPACITY_IN_SCHEDULE_WINDOW);
+                    log.info("续作补偿提前生产单控候选跳过, materialCode: {}, machineCode: {}, "
+                                    + "productionStartTime: {}, firstWorkDate: {}, reason: {}",
+                            sku.getMaterialCode(), machineCode,
+                            LhScheduleTimeUtil.formatDateTime(productionStartTime),
+                            resolveFirstShiftDate(context), "开产业务日不在当前业务日");
                     continue;
                 }
 
@@ -1533,6 +1553,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                                          SkuScheduleDTO sku) {
         iterator.remove();
         context.getNewSpecTypeRuleBlockedMap().remove(sku);
+        context.getNewSpecEarlyProductionAllowedMap().remove(sku);
         refreshPendingNewSpecSkuTypeCounts(context);
     }
 
@@ -2204,6 +2225,33 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
     }
 
     /**
+     * 判断续作补偿提前生产的单控候选是否应跳过。
+     * <p>补偿 SKU 按既有选机顺序试算到单控候选时，真实开产业务日仍需落在窗口首日；
+     * 若落到下一业务日夜班，则不属于提前生产，应继续尝试其他单控候选。</p>
+     *
+     * @param context 排程上下文
+     * @param sku 当前 SKU
+     * @param machine 候选机台
+     * @param productionStartTime 开产时间
+     * @param shifts 排程窗口班次
+     * @return true-跳过当前候选
+     */
+    private boolean shouldSkipCompensationEarlySingleControlCandidate(LhScheduleContext context,
+                                                                     SkuScheduleDTO sku,
+                                                                     MachineScheduleDTO machine,
+                                                                     Date productionStartTime,
+                                                                     List<LhShiftConfigVO> shifts) {
+        if (!isCompensationEarlyProductionAllowed(context, sku)
+                || machine == null
+                || !isSingleControlMachine(context, machine.getMachineCode())) {
+            return false;
+        }
+        LocalDate firstWorkDate = resolveFirstShiftDate(context);
+        LocalDate productionWorkDate = resolveProductionWorkDate(shifts, productionStartTime);
+        return firstWorkDate != null && productionWorkDate != null && !firstWorkDate.equals(productionWorkDate);
+    }
+
+    /**
      * 解析候选机台对齐后的待排起点。
      *
      * @param context 排程上下文
@@ -2238,6 +2286,20 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
     }
 
     /**
+     * 判断续作补偿SKU是否已通过新增提前生产准入。
+     *
+     * @param context 排程上下文
+     * @param sku 当前 SKU
+     * @return true-续作补偿提前生产准入通过
+     */
+    private boolean isCompensationEarlyProductionAllowed(LhScheduleContext context, SkuScheduleDTO sku) {
+        return context != null
+                && sku != null
+                && sku.isContinuousCompensationSku()
+                && Boolean.TRUE.equals(context.getNewSpecEarlyProductionAllowedMap().get(sku));
+    }
+
+    /**
      * 判断 SKU 是否需要在窗口首日排产。
      *
      * @param context 排程上下文
@@ -2256,6 +2318,10 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
             }
         }
         if (sku.getDailyPlanQty() > 0) {
+            return true;
+        }
+        if (isCompensationEarlyProductionAllowed(context, sku)) {
+            // 续作补偿已通过提前生产准入时，应参与窗口首日选机判断，避免无日计划量被直接顺延。
             return true;
         }
         if (sku.getEffectiveCarryForwardQty() > 0 || sku.getMonthlyHistoryShortageQty() > 0) {
@@ -2762,40 +2828,37 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
     }
 
     /**
-     * 解析新增排产正式/量试非收尾场景的最低目标量。
-     * <p>文档口径要求非收尾目标量按窗口 dayN 累计值推进，不直接使用理论窗口满产产能。</p>
+     * 解析新增排产正式/量试非收尾场景的业务目标量。
+     * <p>dayN 只参与排产节奏和增机台判断，不再作为非收尾 SKU 的实际排产硬目标。</p>
      *
      * @param context 排程上下文
      * @param sku SKU
      * @param policy 排产数量策略
-     * @return 最低目标量
+     * @return 业务目标量
      */
     private int resolveFormalNonEndingMinimumTargetQty(LhScheduleContext context,
                                                        SkuScheduleDTO sku,
                                                        ProductionQuantityPolicy policy) {
-        if (!shouldUseFormalNonEndingMinimumTarget(context, sku, policy)) {
-            return sku == null ? 0 : Math.max(0, sku.resolveTargetScheduleQty());
+        if (sku == null) {
+            return 0;
         }
-        int windowMinimumTargetQty = Math.max(0, sku.getWindowRemainingPlanQty());
-        if (windowMinimumTargetQty <= 0) {
-            windowMinimumTargetQty = Math.max(0, sku.getWindowPlanQty());
+        int businessTargetQty = Math.max(0, sku.resolveTargetScheduleQty());
+        if (shouldUseFormalNonEndingMinimumTarget(context, sku, policy)) {
+            log.info("新增SKU正式非收尾目标量按业务目标保留, materialCode: {}, businessTargetQty: {}, "
+                            + "windowRemainingPlanQty: {}, windowPlanQty: {}, dailyPlanRemainingQty: {}",
+                    sku.getMaterialCode(), businessTargetQty, sku.getWindowRemainingPlanQty(),
+                    sku.getWindowPlanQty(), SkuDailyPlanQuotaUtil.sumRemainingQty(sku.getDailyPlanQuotaMap()));
         }
-        if (windowMinimumTargetQty <= 0) {
-            windowMinimumTargetQty = SkuDailyPlanQuotaUtil.sumRemainingQty(sku.getDailyPlanQuotaMap());
-        }
-        if (windowMinimumTargetQty <= 0) {
-            return Math.max(0, sku.resolveTargetScheduleQty());
-        }
-        return windowMinimumTargetQty;
+        return businessTargetQty;
     }
 
     /**
-     * 判断当前是否使用新增排产正式/量试非收尾最低目标量口径。
+     * 判断当前是否使用新增排产正式/量试非收尾业务目标量口径。
      *
      * @param context 排程上下文
      * @param sku SKU
      * @param policy 排产数量策略
-     * @return true-使用 dayN 累计最低目标量
+     * @return true-使用业务目标量并保留 dayN 增机判断
      */
     private boolean shouldUseFormalNonEndingMinimumTarget(LhScheduleContext context,
                                                           SkuScheduleDTO sku,
@@ -2963,15 +3026,16 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         if (Objects.isNull(nextPlanDate)) {
             return firstProductionStartTime;
         }
-        if (!sku.isContinuousCompensationSku()) {
-            if (isAllowedFuturePlanEarlyProduction(earlyProductionDecision)) {
-                log.info("新增SKU提前生产准入通过，保留当前业务日开产, materialCode: {}, "
-                                + "fromProductionDate: {}, futurePlanDate: {}, firstProductionStartTime: {}",
-                        sku.getMaterialCode(), productionDate, nextPlanDate,
-                        LhScheduleTimeUtil.formatDateTime(firstProductionStartTime));
-                return firstProductionStartTime;
-            }
-        } else if (!shouldDelayFirstProductionForNoPlanDate(sku, firstProductionStartTime, isEnding)) {
+        // 提前生产准入优先于“首日无 dayN 顺延”，续作补偿复用同一判定结果。
+        if (isAllowedFuturePlanEarlyProduction(earlyProductionDecision)) {
+            log.info("新增SKU提前生产准入通过，保留当前业务日开产, materialCode: {}, "
+                            + "fromProductionDate: {}, futurePlanDate: {}, firstProductionStartTime: {}",
+                    sku.getMaterialCode(), productionDate, nextPlanDate,
+                    LhScheduleTimeUtil.formatDateTime(firstProductionStartTime));
+            return firstProductionStartTime;
+        }
+        if (sku.isContinuousCompensationSku()
+                && !shouldDelayFirstProductionForNoPlanDate(sku, firstProductionStartTime, isEnding)) {
             return firstProductionStartTime;
         }
         Date nextPlanDateStartTime = resolveFirstShiftStartTime(shifts, nextPlanDate);
@@ -3018,24 +3082,32 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         if (Objects.isNull(nextPlanDate)) {
             return switchReadyTime;
         }
-        if (!sku.isContinuousCompensationSku()) {
-            EarlyProductionDecision earlyProductionDecision = resolveEarlyProductionDecision(
-                    context, sku, switchReadyTime, shifts, isEnding);
-            if (isAllowedFuturePlanEarlyProduction(earlyProductionDecision)) {
-                Date targetDaySwitchReadyTime = resolveTargetDaySwitchReadyTime(
-                        context, shifts, productionDate, switchReadyTime);
-                if (Objects.nonNull(targetDaySwitchReadyTime)) {
-                    log.info("新增SKU提前生产换模日期按目标业务日顺延, materialCode: {}, "
-                                    + "fromProductionDate: {}, targetProductionDate: {}, "
-                                    + "fromSwitchReadyTime: {}, toSwitchReadyTime: {}",
-                            sku.getMaterialCode(), productionDate, resolveScheduleBusinessLocalDate(context),
-                            LhScheduleTimeUtil.formatDateTime(switchReadyTime),
-                            LhScheduleTimeUtil.formatDateTime(targetDaySwitchReadyTime));
-                    return targetDaySwitchReadyTime;
-                }
+        EarlyProductionDecision earlyProductionDecision = resolveEarlyProductionDecision(
+                context, sku, switchReadyTime, shifts, isEnding);
+        if (isAllowedFuturePlanEarlyProduction(earlyProductionDecision)) {
+            if (isEnding || sku.isContinuousCompensationSku()) {
+                log.info("新增SKU提前生产准入通过，保留当前业务日首台换模, materialCode: {}, isEnding: {}, "
+                                + "compensationSku: {}, fromProductionDate: {}, futurePlanDate: {}, switchReadyTime: {}",
+                        sku.getMaterialCode(), isEnding, sku.isContinuousCompensationSku(),
+                        productionDate, earlyProductionDecision.getFuturePlanDate(),
+                        LhScheduleTimeUtil.formatDateTime(switchReadyTime));
                 return switchReadyTime;
             }
-        } else if (!shouldDelayFirstProductionForNoPlanDate(sku, switchReadyTime, isEnding)) {
+            Date targetDaySwitchReadyTime = resolveTargetDaySwitchReadyTime(
+                    context, shifts, productionDate, switchReadyTime);
+            if (Objects.nonNull(targetDaySwitchReadyTime)) {
+                log.info("新增SKU提前生产换模日期按目标业务日顺延, materialCode: {}, "
+                                + "fromProductionDate: {}, targetProductionDate: {}, "
+                                + "fromSwitchReadyTime: {}, toSwitchReadyTime: {}",
+                        sku.getMaterialCode(), productionDate, resolveScheduleBusinessLocalDate(context),
+                        LhScheduleTimeUtil.formatDateTime(switchReadyTime),
+                        LhScheduleTimeUtil.formatDateTime(targetDaySwitchReadyTime));
+                return targetDaySwitchReadyTime;
+            }
+            return switchReadyTime;
+        }
+        if (sku.isContinuousCompensationSku()
+                && !shouldDelayFirstProductionForNoPlanDate(sku, switchReadyTime, isEnding)) {
             return switchReadyTime;
         }
         Date nextSwitchReadyTime = resolveFirstAllowMouldChangeShiftStartTime(shifts, nextPlanDate);
@@ -3157,7 +3229,6 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                                                                     List<LhShiftConfigVO> shifts,
                                                                     boolean isEnding) {
         if (Objects.isNull(context) || Objects.isNull(sku) || Objects.isNull(firstProductionStartTime)
-                || isEnding || sku.isContinuousCompensationSku()
                 || CollectionUtils.isEmpty(sku.getDailyPlanQuotaMap())) {
             return EarlyProductionDecision.notEarlyProduction(true, "非提前生产判定范围");
         }
@@ -3169,6 +3240,41 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         return EarlyProductionChecker.checkEarlyProduction(context, sku, productionDate,
                 resolveScheduleWindowStartLocalDate(context), resolveScheduleTargetLocalDate(context),
                 resolveNewSpecShortageAddMachineThreshold(context));
+    }
+
+    /**
+     * 刷新新增SKU提前生产选机准入结果。
+     *
+     * @param context 排程上下文
+     * @param sku 当前 SKU
+     * @param shifts 排程窗口班次
+     * @param isEnding 是否按 SKU 收尾
+     */
+    private void refreshNewSpecEarlyProductionAdmission(LhScheduleContext context,
+                                                        SkuScheduleDTO sku,
+                                                        List<LhShiftConfigVO> shifts,
+                                                        boolean isEnding) {
+        if (Objects.isNull(context) || Objects.isNull(sku)) {
+            return;
+        }
+        context.getNewSpecEarlyProductionAllowedMap().remove(sku);
+        if (!sku.isContinuousCompensationSku() && !isEnding) {
+            return;
+        }
+        LocalDate windowStartDate = resolveScheduleWindowStartLocalDate(context);
+        if (Objects.isNull(windowStartDate)) {
+            return;
+        }
+        Date windowStartTime = Date.from(windowStartDate.atStartOfDay(ZoneId.systemDefault()).toInstant());
+        EarlyProductionDecision decision = resolveEarlyProductionDecision(context, sku, windowStartTime, shifts, isEnding);
+        if (!isAllowedFuturePlanEarlyProduction(decision)) {
+            return;
+        }
+        context.getNewSpecEarlyProductionAllowedMap().put(sku, Boolean.TRUE);
+        log.info("新增SKU提前生产选机准入通过, materialCode: {}, isEnding: {}, compensationSku: {}, "
+                        + "windowStartDate: {}, futurePlanDate: {}, sceneType: {}",
+                sku.getMaterialCode(), isEnding, sku.isContinuousCompensationSku(), windowStartDate,
+                decision.getFuturePlanDate(), decision.getSceneType());
     }
 
     /**
@@ -3522,10 +3628,18 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                 context, sku, candidates, excludedMachineCodes, policy, segment, candidateMachine,
                 shifts, capacityCalculate, remainingTargetQty, availableMachineCount);
         if (requiredMachineCountByDailyCapacity == 0 && segment.isExistingSameMaterialSatisfied()) {
-            log.info("新增SKU dayN模拟判定已有同物料机台已满足, materialCode: {}, machineCode: {}, "
-                            + "remainingTargetQty: {}, existingSameMaterialSatisfied: true",
-                    sku.getMaterialCode(), segment.getMachineCode(), remainingTargetQty);
-            return 0;
+            if (!needMoreMachine(context, sku)) {
+                log.info("新增SKU dayN模拟判定已有同物料机台已满足, materialCode: {}, machineCode: {}, "
+                                + "remainingTargetQty: {}, existingSameMaterialSatisfied: true",
+                        sku.getMaterialCode(), segment.getMachineCode(), remainingTargetQty);
+                return 0;
+            }
+            // dayN 只作为节奏和资源判断依据，业务目标仍有剩余时不能直接阻断新增机台。
+            log.info("新增SKU已有同物料机台满足dayN节奏但目标仍需补量，继续尝试新增机台, "
+                            + "materialCode: {}, machineCode: {}, remainingTargetQty: {}, "
+                            + "remainingScheduleQty: {}",
+                    sku.getMaterialCode(), segment.getMachineCode(), remainingTargetQty,
+                    sku.getRemainingScheduleQty());
         }
         if (shouldFillMachineToWindowEndForFutureDayDemand(
                 context, sku, policy, segment, requiredMachineCountByDailyCapacity)) {
@@ -5212,7 +5326,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                 continue;
             }
             totalSkuCount++;
-            if (!endingJudgmentStrategy.isEnding(context, pendingSku)) {
+            if (!endingJudgmentStrategy.isStructureEndingForPriority(context, pendingSku)) {
                 continue;
             }
             endingSkuCount++;
@@ -5362,7 +5476,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
 
         // SKU基本信息
         String skuType = resolveNewSpecSkuType(sku);
-        boolean isEnding = endingJudgmentStrategy.isEnding(context, sku);
+        boolean isEnding = endingJudgmentStrategy.isExpectedEnding(context, sku);
         PriorityTraceLogHelper.appendLine(detailBuilder,
                 PriorityTraceLogHelper.kv("排程日期", PriorityTraceLogHelper.formatDateTime(context.getScheduleDate()))
                         + ", " + PriorityTraceLogHelper.kv("SKU", sku.getMaterialCode())
@@ -7041,7 +7155,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         }
         // 按物料编码汇总新增结果的总计划量（支持多机台同SKU排产）
         Map<String, Integer> materialTotalPlanQtyMap = new LinkedHashMap<>(16);
-        Map<String, Integer> materialEndingDemandQtyMap = new LinkedHashMap<>(16);
+        Map<String, SkuScheduleDTO> materialSkuMap = new LinkedHashMap<>(16);
         for (LhScheduleResult result : context.getScheduleResultList()) {
             if (result == null || !NEW_SPEC_SCHEDULE_TYPE.equals(result.getScheduleType())) {
                 continue;
@@ -7052,8 +7166,8 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
             }
             int planQty = resolveResultScheduledQty(result);
             materialTotalPlanQtyMap.merge(materialCode, planQty, Integer::sum);
-            if (!materialEndingDemandQtyMap.containsKey(materialCode)) {
-                materialEndingDemandQtyMap.put(materialCode, resolveEndingDemandQty(context, result));
+            if (!materialSkuMap.containsKey(materialCode)) {
+                materialSkuMap.put(materialCode, findSkuDto(context, materialCode));
             }
         }
         // 基于汇总计划量统一设置同物料所有结果的收尾标记
@@ -7063,8 +7177,8 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                 continue;
             }
             int totalPlanQty = materialTotalPlanQtyMap.getOrDefault(result.getMaterialCode(), 0);
-            int endingDemandQty = materialEndingDemandQtyMap.getOrDefault(result.getMaterialCode(), 0);
-            result.setIsEnd(totalPlanQty >= endingDemandQty && endingDemandQty > 0 ? "1" : "0");
+            SkuScheduleDTO sku = materialSkuMap.get(result.getMaterialCode());
+            result.setIsEnd(endingJudgmentStrategy.isFinalEnding(context, sku, totalPlanQty) ? "1" : "0");
         }
     }
 
@@ -7904,9 +8018,9 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
             return false;
         }
         LocalDate productionDate = resolveProductionWorkDate(context.getScheduleWindowShifts(), switchReadyTime);
-        LocalDate targetBusinessDate = resolveScheduleBusinessLocalDate(context);
-        if (Objects.isNull(productionDate) || Objects.isNull(targetBusinessDate)
-                || !targetBusinessDate.equals(productionDate)) {
+        LocalDate windowStartDate = resolveScheduleWindowStartLocalDate(context);
+        if (Objects.isNull(productionDate) || Objects.isNull(windowStartDate)
+                || !windowStartDate.equals(productionDate)) {
             return false;
         }
         SkuDailyPlanQuotaDTO currentQuota = sku.getDailyPlanQuotaMap().get(productionDate);
@@ -8582,6 +8696,16 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
     private int resolveSchedulableRemainingQty(SkuScheduleDTO sku) {
         if (sku == null) {
             return 0;
+        }
+        ProductionQuantityPolicy policy = ProductionQuantityPolicy.from(sku, sku.isStrictTargetQty());
+        if (!policy.isStrictUpperLimit()) {
+            // 正规/量试非收尾的 dayN 只作为节奏与资源判断依据，不作为实际排产硬上限。
+            return sku.resolveTargetScheduleQty();
+        }
+        if (!StringUtils.equals(ConstructionStageEnum.TRIAL.getCode(), sku.getConstructionStage())
+                && !sku.isStrictNewSpecShortageOnly()) {
+            // 收尾目标、硫化余量、胎胚库存等严格业务目标不得被 dayN 或窗口计划改小。
+            return sku.resolveTargetScheduleQty();
         }
         int remainingQuotaQty = SkuDailyPlanQuotaUtil.sumRemainingQty(sku.getDailyPlanQuotaMap());
         if (remainingQuotaQty > 0) {

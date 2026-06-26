@@ -2,20 +2,41 @@ package com.zlt.aps.gdyy;
 
 import com.ruoyi.common.core.annotation.EnableRyFeignClients;
 import com.ruoyi.common.security.annotation.EnableCustomConfig;
-import com.ruoyi.common.swagger.annotation.EnableCustomSwagger2;
+import lombok.extern.slf4j.Slf4j;
+import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.annotation.ComponentScan;
+import org.springframework.core.env.Environment;
+import org.springframework.scheduling.annotation.EnableAsync;
+import springfox.documentation.swagger2.annotations.EnableSwagger2;
 
+import java.net.InetAddress;
+
+@Slf4j
 @EnableCustomConfig
 @SpringBootApplication
-@EnableCustomSwagger2
+@EnableSwagger2
 @EnableRyFeignClients
-@ComponentScan(value={"com.zlt.*"})
+@EnableAsync
+@ComponentScan(value = {"com.ruoyi.*", "com.zlt.*", "com.zlt.*"})
+@MapperScan({"com.ruoyi.**.mapper,com.tlt.**.mapper,com.zlt.**.mapper,com.zlt.aps.**.mapper"})
 public class ApsGdyyApplication {
+    /** main启动函数 **/
+    public static void main(String[] args) throws Exception {
+        ConfigurableApplicationContext application = SpringApplication.run(ApsGdyyApplication.class, args);
+        String ip = InetAddress.getLocalHost().getHostAddress();
+        Environment env = application.getEnvironment();
+        String port = env.getProperty("server.port");
 
-    public static void main(String[] args) {
-        SpringApplication.run(ApsGdyyApplication.class, args);
+        log.info("\n----------------------------------------------------------\n\t" +
+                "Application APS-GDYY is running!\n\t" +
+                "APS-GDYY接口文档 URLs:\n\t" +
+                "APS-GDYY接口文档1: \thttp://" + ip + ":" + port + "/swagger-ui/index.html\n\t" +
+                "APS-GDYY接口文档1: \thttp://" + ip + ":" + port + "/doc.html\n" +
+                "----------------------------------------------------------\n\t"
+        );
     }
 
 }

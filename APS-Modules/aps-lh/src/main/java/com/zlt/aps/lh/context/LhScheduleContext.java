@@ -225,12 +225,16 @@ public class LhScheduleContext {
     private int pendingSmallBatchNewSpecSkuCount;
     /** 新增SKU最近一次选机是否被单控/普通机台让位规则清空候选，使用对象身份避免同物料编码互相覆盖 */
     private Map<SkuScheduleDTO, Boolean> newSpecTypeRuleBlockedMap = new IdentityHashMap<>();
+    /** 新增SKU提前生产准入结果，供选机和首日排产判断识别提前生产场景，使用对象身份避免同物料编码互相覆盖 */
+    private Map<SkuScheduleDTO, Boolean> newSpecEarlyProductionAllowedMap = new IdentityHashMap<>();
     /** 新增SKU进入S4.5时是否命中结构五天内收尾层级快照，使用对象身份避免SKU出队后判定漂移 */
     private Map<SkuScheduleDTO, Boolean> newSpecSingleControlStructureEndingLayerMap = new IdentityHashMap<>();
     /** 续作结果日额度账本是否已完成最终同步，防止同一上下文重复扣账 */
     private boolean continuousDailyQuotaSynced;
     /** 续作首日/窗口无计划释放的机台集合，仅用于S4.5选机降优先级，不代表禁止生产 */
     private Set<String> releasedContinuousMachineCodeSet = new LinkedHashSet<>();
+    /** 已按降模规则释放过续作机台的物料集合，避免后续补偿链路把降模机台重新补回 */
+    private Set<String> reducedContinuationGroupKeySet = new LinkedHashSet<>();
     /** 已按降模规则只保留单台续作机台的分组集合，避免后续补偿链路把已释放机台重新补回 */
     private Set<String> singleMachineReducedContinuationGroupKeySet = new LinkedHashSet<>();
     /** 续作收尾小余量释放后可优先进入换活字块匹配的机台集合 */

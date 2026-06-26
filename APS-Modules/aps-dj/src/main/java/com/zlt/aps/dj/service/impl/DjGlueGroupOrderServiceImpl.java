@@ -86,6 +86,11 @@ public class DjGlueGroupOrderServiceImpl extends AbstractDocService<DjGlueGroupO
         return ncGlueGroupOrderMapper.listUserdGlueGroup(glueGroupIds);
     }
 
+    @Override
+    protected List<String> getCheckUniqueFields() {
+        return new ArrayList<>(Arrays.asList("glueGroupCode"));
+    }
+
     /**
      * 导入数据，并保存记录
      *

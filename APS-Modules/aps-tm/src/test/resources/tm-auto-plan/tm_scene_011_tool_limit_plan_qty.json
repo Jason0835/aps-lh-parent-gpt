@@ -1,0 +1,109 @@
+{
+  "caseName": "TM_SCENE_011_tool_limit_plan_qty",
+  "description": "TM_SCENE_011：工装数量限制计划量",
+  "autoPlanRequest": {
+    "factoryCode": "F1",
+    "scheduleDate": "2026-07-11",
+    "operator": "TM_AUTO_PLAN_TEST",
+    "traceId": "TRACE-TM_SCENE_011",
+    "confirmOverwrite": false
+  },
+  "params": [
+    {
+      "factoryCode": "F1",
+      "paramCode": "TM_ALGORITHM_SWITCH",
+      "paramValue": "1",
+      "enableStatus": "1"
+    },
+    {
+      "factoryCode": "F1",
+      "paramCode": "TM_DEFAULT_CURL_LENGTH",
+      "paramValue": "50",
+      "enableStatus": "1"
+    }
+  ],
+  "cxScheduleResults": [
+    {
+      "orderNo": "ORD-TOOL",
+      "embryoCode": "CX-TOOL",
+      "class1PlanQty": 100,
+      "class2PlanQty": 0,
+      "class3PlanQty": 0,
+      "class4PlanQty": 0,
+      "class5PlanQty": 0,
+      "class6PlanQty": 0,
+      "treadCode": "TR-TOOL",
+      "treadShoulderLength": 1,
+      "treadMouthPlate": "MP-A",
+      "treadRubberCategory": "GL-A"
+    }
+  ],
+  "stocks": [
+    {
+      "factoryCode": "F1",
+      "stockDate": "2026-07-10",
+      "treadCode": "TR-TOOL",
+      "stockQty": 0
+    }
+  ],
+  "machineInfos": [
+    {
+      "factoryCode": "F1",
+      "machineCode": "TM01",
+      "machineStatus": "1",
+      "maxCapacity": 1000
+    }
+  ],
+  "machineSpeeds": [
+    {
+      "factoryCode": "F1",
+      "machineCode": "TM01",
+      "productSpeed": 100
+    }
+  ],
+  "mouthPlates": [
+    {
+      "factoryCode": "F1",
+      "machineCode": "TM01",
+      "mouthPlateCode": "MP-A"
+    }
+  ],
+  "curlRolls": [
+    {
+      "factoryCode": "F1",
+      "treadCode": "TR-TOOL",
+      "curlLength": 50
+    }
+  ],
+  "taskOverrides": [
+    {
+      "treadCode": "TR-TOOL",
+      "shiftOrder": 1,
+      "totalToolQty": 1
+    }
+  ],
+  "expected": {
+    "success": true,
+    "messageContains": "胎面自动排程执行完成",
+    "resultCount": 1,
+    "assignedCount": 1,
+    "unassignedCount": 0,
+    "explainCount": 6,
+    "errorCount": 0,
+    "expectedResults": [
+      {
+        "orderNo": "ORD-TOOL-CLASS1",
+        "treadCode": "TR-TOOL",
+        "machineCode": "TM01",
+        "shiftOrder": 1,
+        "sequence": 1,
+        "planQty": 50
+      }
+    ]
+  },
+  "sceneCode": "TM_SCENE_011",
+  "designSteps": [
+    "Step12"
+  ],
+  "mysqlVerificationStatus": "待用户执行 MySQL 验证"
+}

@@ -20,4 +20,13 @@ public interface ICd90CommonRemoteService {
     @ApiOperation("胎体布代号下拉")
     @PostMapping("/common/tireFabricCodes")
     AjaxResult tireFabricCodes();
+
+    /**
+     * 大卷代码（CORD_SPEC）下拉。
+     *
+     * @return 去重后的大卷代码列表
+     */
+    @ApiOperation("大卷代码下拉")
+    @PostMapping("/common/cordSpecs")
+    AjaxResult cordSpecs();
 }

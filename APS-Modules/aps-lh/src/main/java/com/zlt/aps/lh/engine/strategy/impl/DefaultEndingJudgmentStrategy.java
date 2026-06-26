@@ -6,10 +6,12 @@ import com.zlt.aps.lh.api.enums.SkuTagEnum;
 import com.zlt.aps.lh.component.TargetScheduleQtyResolver;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.strategy.IEndingJudgmentStrategy;
+import com.zlt.aps.lh.util.ShiftCapacityResolverUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.Resource;
+import java.util.Objects;
 
 /**
  * 默认收尾判定策略实现
@@ -26,6 +28,14 @@ public class DefaultEndingJudgmentStrategy implements IEndingJudgmentStrategy {
 
     @Override
     public boolean isEnding(LhScheduleContext context, SkuScheduleDTO sku) {
+        return isCurrentWindowEnding(context, sku);
+    }
+
+    @Override
+    public boolean isExpectedEnding(LhScheduleContext context, SkuScheduleDTO sku) {
+        if (Objects.isNull(sku)) {
+            return false;
+        }
         // 规则1：已明确标记为收尾
         if (SkuTagEnum.ENDING.getCode().equals(sku.getSkuTag())) {
             return true;
@@ -40,9 +50,10 @@ public class DefaultEndingJudgmentStrategy implements IEndingJudgmentStrategy {
         // 满排模式下可选"按余量判定"开关，避免目标量封顶导致误判。
         int rule2CandidateQty = resolveRule2CandidateQty(context, sku, targetScheduleQty, fullCapacityMode,
                 endingBySurplusInFullModeEnabled);
-        if (rule2CandidateQty > 0
-                && !shouldSkipRule2ByWindowRemainingPlanQty(sku, fullCapacityMode,
-                endingBySurplusInFullModeEnabled, rule2CandidateQty)) {
+        boolean skipRule2ByWindowRemainingPlanQty = rule2CandidateQty > 0
+                && shouldSkipRule2ByWindowRemainingPlanQty(sku, fullCapacityMode,
+                endingBySurplusInFullModeEnabled, rule2CandidateQty);
+        if (rule2CandidateQty > 0 && !skipRule2ByWindowRemainingPlanQty) {
             int totalAvailableCapacity = getTargetScheduleQtyResolver()
                     .calcSkuTotalAvailableCapacityInWindow(context, sku);
             if (totalAvailableCapacity > 0 && rule2CandidateQty <= totalAvailableCapacity) {
@@ -52,13 +63,19 @@ public class DefaultEndingJudgmentStrategy implements IEndingJudgmentStrategy {
                 return true;
             }
         }
+        if (skipRule2ByWindowRemainingPlanQty
+                && getTargetScheduleQtyResolver().canFinishSurplusInActualWindow(context, sku)) {
+            log.debug("SKU[{}]判定为收尾(满排余量窗口产能): 硫化余量可在当前排程窗口内完成",
+                    sku.getMaterialCode());
+            return true;
+        }
 
         // 规则3：待排量 < 日产能。
         // 满排模式且启用"按余量判收尾"时，优先按实际收尾需求量（max(余量,胎胚库存)）判断，
         // 避免全月待排量过大导致收尾漏判。
         int dailyCapacity = sku.getDailyCapacity();
         int rule3CandidateQty = (fullCapacityMode && endingBySurplusInFullModeEnabled)
-                ? resolveMaxDemandQty(context, sku)
+                ? resolveTailTargetQty(context, sku)
                 : targetScheduleQty;
         if (dailyCapacity > 0 && rule3CandidateQty < dailyCapacity && rule3CandidateQty > 0) {
             log.debug("SKU[{}]判定为收尾(规则3): 比较量{} < 日产能{} (满排模式:{}, 满排余量开关:{})",
@@ -68,6 +85,61 @@ public class DefaultEndingJudgmentStrategy implements IEndingJudgmentStrategy {
         }
 
         return false;
+    }
+
+    @Override
+    public boolean isCurrentWindowEnding(LhScheduleContext context, SkuScheduleDTO sku) {
+        if (Objects.isNull(context) || Objects.isNull(sku)) {
+            return false;
+        }
+        int tailTargetQty = resolveTailTargetQty(context, sku);
+        if (tailTargetQty <= 0) {
+            log.info("SKU当前窗口收尾判断, materialCode: {}, tailTargetQty: {}, currentWindowTailFlag: false",
+                    sku.getMaterialCode(), tailTargetQty);
+            return false;
+        }
+        int totalAvailableCapacity = getTargetScheduleQtyResolver()
+                .calcSkuTotalAvailableCapacityInWindow(context, sku);
+        boolean currentWindowTailFlag = totalAvailableCapacity >= tailTargetQty;
+        boolean sharedEmbryo = getTargetScheduleQtyResolver().isSharedEmbryoInWindow(context, sku);
+        log.info("SKU当前窗口收尾判断, materialCode: {}, window: 3天/8班, sharedEmbryo: {}, "
+                        + "surplusQty: {}, embryoStock: {}, tailTargetQty: {}, totalAvailableCapacity: {}, "
+                        + "currentWindowTailFlag: {}",
+                sku.getMaterialCode(), sharedEmbryo, Math.max(0, sku.getSurplusQty()),
+                Math.max(0, sku.getEmbryoStock()), tailTargetQty, totalAvailableCapacity,
+                currentWindowTailFlag);
+        return currentWindowTailFlag;
+    }
+
+    @Override
+    public boolean isFinalEnding(LhScheduleContext context, SkuScheduleDTO sku, int actualScheduledQty) {
+        if (Objects.isNull(sku)) {
+            return false;
+        }
+        int tailTargetQty = resolveTailTargetQty(context, sku);
+        boolean finalTailFlag = tailTargetQty > 0 && Math.max(0, actualScheduledQty) >= tailTargetQty;
+        log.info("SKU排后最终收尾判断, materialCode: {}, actualScheduledQty: {}, tailTargetQty: {}, finalTailFlag: {}",
+                sku.getMaterialCode(), Math.max(0, actualScheduledQty), tailTargetQty, finalTailFlag);
+        return finalTailFlag;
+    }
+
+    @Override
+    public boolean isStructureEndingForPriority(LhScheduleContext context, SkuScheduleDTO sku) {
+        if (Objects.isNull(context) || Objects.isNull(sku)) {
+            return false;
+        }
+        int structureEndingDays = context.getScheduleConfig() != null
+                ? context.getScheduleConfig().getStructureEndingDays()
+                : LhScheduleConstant.DEFAULT_STRUCTURE_ENDING_DAYS;
+        int actualEndingDays = calculateEndingDaysForStructurePriority(context, sku);
+        boolean expectedTailFlag = isExpectedEnding(context, sku);
+        boolean structureTailFlag = expectedTailFlag
+                && actualEndingDays >= 0
+                && actualEndingDays <= structureEndingDays;
+        log.debug("SKU结构收尾排序判断, materialCode: {}, structureEndingDays: {}, actualEndingDays: {}, "
+                        + "expectedTailFlag: {}, structureTailFlag: {}",
+                sku.getMaterialCode(), structureEndingDays, actualEndingDays, expectedTailFlag, structureTailFlag);
+        return structureTailFlag;
     }
 
     @Override
@@ -156,7 +228,7 @@ public class DefaultEndingJudgmentStrategy implements IEndingJudgmentStrategy {
         if (!endingBySurplusInFullModeEnabled) {
             return 0;
         }
-        return resolveMaxDemandQty(context, sku);
+        return resolveTailTargetQty(context, sku);
     }
 
     /**
@@ -193,9 +265,10 @@ public class DefaultEndingJudgmentStrategy implements IEndingJudgmentStrategy {
      * @param sku SKU排程DTO
      * @return 收尾比较量
      */
-    private int resolveMaxDemandQty(LhScheduleContext context, SkuScheduleDTO sku) {
+    private int resolveTailTargetQty(LhScheduleContext context, SkuScheduleDTO sku) {
         int surplusQty = Math.max(0, sku.getSurplusQty());
         int embryoStock = Math.max(0, sku.getEmbryoStock());
+        int baseTargetQty;
         // 共用胎胚收尾只按硫化余量，不按胎胚库存
         if (getTargetScheduleQtyResolver().isSharedEmbryoInWindow(context, sku)) {
             if (embryoStock > surplusQty) {
@@ -205,9 +278,12 @@ public class DefaultEndingJudgmentStrategy implements IEndingJudgmentStrategy {
                         Math.max(surplusQty, embryoStock), surplusQty,
                         Math.max(surplusQty, embryoStock) - surplusQty);
             }
-            return surplusQty;
+            baseTargetQty = surplusQty;
+        } else {
+            baseTargetQty = Math.max(surplusQty, embryoStock);
         }
-        return Math.max(surplusQty, embryoStock);
+        // 收尾目标量沿用项目既有模台数归整口径，保证奇数余量和多模目标量前后一致。
+        return ShiftCapacityResolverUtil.roundUpQtyToMouldMultiple(baseTargetQty, sku.getMouldQty());
     }
 
     /**
