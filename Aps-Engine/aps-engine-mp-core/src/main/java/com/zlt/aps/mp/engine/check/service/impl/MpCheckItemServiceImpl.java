@@ -9,6 +9,7 @@ import com.zlt.aps.enums.MonthPlanNoProductionReasonEnum;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.mp.api.domain.entity.MpCheckItemRecord;
 import com.zlt.aps.mp.api.domain.vo.MpCheckItemVo;
+import com.zlt.aps.mp.engine.basedata.assemble.calendar.WorkerCalendarHandler;
 import com.zlt.aps.mp.engine.basedata.assemble.cyclegroup.CycleGroupDataHandler;
 import com.zlt.aps.mp.engine.basedata.assemble.history.ProductionHistoryHandler;
 import com.zlt.aps.mp.engine.check.service.IMpCheckItemRecordService;
@@ -52,14 +53,18 @@ public class MpCheckItemServiceImpl extends AbstractDataLoaderService implements
 
     private final CycleGroupDataHandler cycleGroupDataHandler;
 
+    private final WorkerCalendarHandler workerCalendarHandler;
+
     public MpCheckItemServiceImpl(ProductionMdmDataService dataService,
                                   DpRequireDataService dpRequireDataService,
                                   CycleGroupDataHandler cycleGroupDataHandler,
-                                  MonthProductionDataService monthProductionDataService,
+                                  WorkerCalendarHandler workerCalendarHandler,
                                   ProductionHistoryHandler productionHistoryHandler,
-                                  IMpCheckItemRecordService iMpCheckItemRecordService) {
-        super(dataService, dpRequireDataService, monthProductionDataService, productionHistoryHandler);
+                                  IMpCheckItemRecordService iMpCheckItemRecordService,
+                                  MonthProductionDataService monthProductionDataService) {
+        super(dataService, dpRequireDataService, cycleGroupDataHandler, productionHistoryHandler, monthProductionDataService);
         this.cycleGroupDataHandler = cycleGroupDataHandler;
+        this.workerCalendarHandler = workerCalendarHandler;
         this.iMpCheckItemRecordService = iMpCheckItemRecordService;
     }
 
@@ -260,7 +265,9 @@ public class MpCheckItemServiceImpl extends AbstractDataLoaderService implements
             Map<String, List<MonthPlanProductMouldInfoVo>> mouldInfoMap = getProductionMouldInfo(productionContext);
             Map<String, MonthPlanProductLhCapacityVo> lhCapacityMap = getProductLhCapacityInfo(productionContext, paramConfiguration.getDayVulcanizationQtyConfiguration());
             //20260403+ 月周期排产清单
-            Set<String> monthProductionCycleList = cycleGroupDataHandler.getMonthCycleGroupInfo(productionContext);
+            Set<String> monthProductionCycleList = getMonthProductionCycleList(productionContext);
+            //20260626+ 续作结构信息
+            Set<String> continueGroupList = workerCalendarHandler.getContinueGroupList(productionContext);
             requirePlanList.forEach(requirePlan -> {
                 String materialCode = requirePlan.getMaterialCode();
                 String materialDesc = requirePlan.getMaterialDesc();
@@ -281,7 +288,7 @@ public class MpCheckItemServiceImpl extends AbstractDataLoaderService implements
             Map<String, List<MonthPlanProductionRequirePlanVo>> monthPlanProductionRequirePlanVoMaps = validCheckList.stream().collect(Collectors.groupingBy(MonthPlanProductionRequirePlanVo::getMaterialCode));
             for (Map.Entry<String, List<MonthPlanProductionRequirePlanVo>> monthPlanProductionRequirePlanVoMap : monthPlanProductionRequirePlanVoMaps.entrySet()) {
                 MonthPlanProductionRequirePlanVo plan = monthPlanProductionRequirePlanVoMap.getValue().get(0);
-                plan.checkProductionConditionByBase(monthProductionCycleList);
+                plan.checkProductionConditionByBase(monthProductionCycleList, continueGroupList);
                 if (YesOrNoEnum.NO.getCode().equals(plan.getIsProduction())) {
                     isInitDataPass = false;
                     failReason = StringUtils.isBlank(plan.getNoProductionReason()) ? "未知原因导致无法排产" : plan.getNoProductionReason();

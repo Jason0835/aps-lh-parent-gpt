@@ -1,6 +1,7 @@
 package com.zlt.aps.mp.engine.scheduling.cxcapacity;
 
 import com.zlt.aps.enums.MonthPlanNoProductionReasonEnum;
+import com.zlt.aps.enums.ProductionGroupTypeEnum;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.mp.api.domain.capacity.MpDailyCapacityLimitVo;
 import com.zlt.aps.mp.api.domain.entity.MpStructureAllocation;
@@ -14,6 +15,7 @@ import com.zlt.aps.mp.engine.enums.ContinueTypeEnum;
 import com.zlt.aps.mp.engine.enums.FormalRoundEnum;
 import com.zlt.aps.mp.engine.enums.LogRecorderStageEnum;
 import com.zlt.aps.mp.engine.enums.ProductionStageEnum;
+import com.zlt.aps.mp.engine.handler.ContinueSkuCalculator;
 import com.zlt.aps.mp.engine.handler.GroupPlanPrioritySelector;
 import com.zlt.aps.mp.engine.handler.SkuMouldSelector;
 import com.zlt.aps.mp.engine.handler.SkuProductionCounter;
@@ -27,10 +29,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -74,6 +73,8 @@ public class FormalProductionHandler extends OnLineGroupOnLineMachineHandler {
             log.info(TbrMouldFormalProductionLogRecorder.addDataEmptyLog(context));
             return;
         }
+        //20260626+ 续作排产计划量重新计算(因周期结构不在月周期结构可能因切换结构限制导致的延长)
+        resetPlanQty(context, allGroupPlanInfo, allContinueInfo);
         TbrProductionContext productionContext = (TbrProductionContext) context;
         //没有分配到产能的结构，直接设置未排原因
         setNoConfigurationCapacityReasonByGroup(productionContext, allGroupPlanInfo);
@@ -170,6 +171,42 @@ public class FormalProductionHandler extends OnLineGroupOnLineMachineHandler {
                 String noProductionReason = NoProductionReasonUtils.getNoProductionReasonByLimit(generalNoProductionReason, limitInfoList, defaultReason);
                 singlePlan.singleAddNoProductionReason(noProductionReason);
             });
+        });
+    }
+
+    /**
+     * 20260626+ 续作结构，不在月周期结构清单，又因切换结构限制导致的延长
+     * 需要重新调整续作Sku的计划量信息
+     *
+     * @param context          排产上下文
+     * @param allGroupPlanInfo 所有结构
+     * @param allContinueInfo  续作Sku信息
+     */
+    private void resetPlanQty(Context context, Map<String, ProductionPlanGroupInfo> allGroupPlanInfo, Map<String, CxContinueInfoHelper> allContinueInfo) {
+        if (CollectionUtils.isEmpty(allContinueInfo) || CollectionUtils.isEmpty(allGroupPlanInfo)) {
+            return;
+        }
+        TbrProductionContext productionContext = (TbrProductionContext) context;
+        Set<String> monthProductionCycleSet = productionContext.getBaseDataContainer().getMonthProductionCycleList();
+        allContinueInfo.forEach((structureName, cxContinueInfo) -> {
+            ProductionPlanGroupInfo continueGroup = allGroupPlanInfo.get(structureName);
+            if (null == continueGroup) {
+                return;
+            }
+            if (!ProductionGroupTypeEnum.CYCLE.getGroupType().equals(continueGroup.getStructureType())) {
+                //不是周期结构
+                return;
+            }
+            if (monthProductionCycleSet.contains(structureName)) {
+                //在月周期清单中
+                return;
+            }
+            Set<String> realAllocationCxMachineInfo = continueGroup.getAllocationCxMachineCodeSet();
+            if (CollectionUtils.isEmpty(realAllocationCxMachineInfo)) {
+                //没有实际分配机台，跳过
+                return;
+            }
+            ContinueSkuCalculator.setContinueSkuPlanDemandQty(context, continueGroup, cxContinueInfo);
         });
     }
 

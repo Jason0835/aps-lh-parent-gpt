@@ -7,10 +7,7 @@ import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.mp.engine.constant.ProductionConstant;
 import com.zlt.aps.mp.engine.daylimit.*;
 import com.zlt.aps.mp.engine.domain.Context;
-import com.zlt.aps.mp.engine.domain.dto.CxLhProductionHelper;
-import com.zlt.aps.mp.engine.domain.dto.CxMachineAllocationPlanHelper;
-import com.zlt.aps.mp.engine.domain.dto.ProductionPlanGroupInfo;
-import com.zlt.aps.mp.engine.domain.dto.SkuDayProductionInfoHelper;
+import com.zlt.aps.mp.engine.domain.dto.*;
 import com.zlt.aps.mp.engine.enums.GroupCxMachinePriorityEnum;
 import com.zlt.aps.mp.engine.handler.ContinuousProductionDayHandler;
 import com.zlt.aps.mp.engine.handler.CxMachineGroupPriorityValueHelper;
@@ -19,6 +16,7 @@ import com.zlt.aps.mp.engine.logrecorder.TbrMouldProductionLogRecorder;
 import com.zlt.aps.mp.engine.logrecorder.TbrProductionGroupLogRecorder;
 import com.zlt.aps.mp.engine.scheduling.BaseDataContainer;
 import com.zlt.aps.mp.engine.scheduling.TbrProductionContext;
+import com.zlt.aps.mp.engine.scheduling.cxcapacity.CxCapacityAllocationHandler;
 import com.zlt.aps.mp.engine.utils.CollectValueUtils;
 import com.zlt.common.utils.StringUtil;
 import lombok.Data;
@@ -1197,8 +1195,12 @@ public class CxMachineBaseInfoVo implements Serializable {
      * @return
      */
     private CxMachineAllocationPlanHelper getBeforeTimeExtensionDayConclusion(TbrProductionContext productionContext, CxMachineAllocationPlanHelper last, Integer afterStartDay) {
-        if (null == last || null == afterStartDay) {
+        if (null == afterStartDay) {
             return null;
+        }
+        //20260626+ 补充last没有时，构建续作延长
+        if (null == last) {
+            return createEmptyContinueGroupTimeExtension(productionContext, afterStartDay);
         }
         Integer beforeEndDay = last.getEndDay();
         Integer theoryConnectionDay = afterStartDay - BigDecimal.ONE.intValue();
@@ -1210,6 +1212,46 @@ public class CxMachineBaseInfoVo implements Serializable {
             return last;
         }
         return null;
+    }
+
+    /**
+     * 20260626+ 构建前结构自动延长：
+     * 周期结构不在月周期清单时，切换时间导致前结构自动延长
+     *
+     * @param productionContext 排产上下文
+     * @param afterStartDay     后结构日期
+     * @return
+     */
+    private CxMachineAllocationPlanHelper createEmptyContinueGroupTimeExtension(TbrProductionContext productionContext, Integer afterStartDay) {
+        Map<String, String> continueGroupInfoMap = productionContext.getContinueStructureMap();
+        if (CollectionUtils.isEmpty(continueGroupInfoMap)) {
+            return null;
+        }
+        Integer endDay = afterStartDay - BigDecimal.ONE.intValue();
+        Integer startDay = ProductionConstant.MONTH_START_DAY;
+        if (startDay > endDay) {
+            return null;
+        }
+        int allocationDays = BigDecimal.ZERO.intValue();
+        for (Integer index = startDay; index <= endDay; index++) {
+            if (this.stopDayInfo.contains(index)) {
+                continue;
+            }
+            allocationDays = allocationDays + BigDecimal.ONE.intValue();
+        }
+        String continueGroupName = continueGroupInfoMap.get(cxMachineCode);
+        if (StringUtils.isBlank(continueGroupName)) {
+            return null;
+        }
+        ProductionPlanGroupInfo continueGroup = productionContext.getGroupProductionInfo().get(continueGroupName);
+        if (null == continueGroup) {
+            return null;
+        }
+        ProductGroupCxCapacityInfo lhRatioInfo = continueGroup.getLhRatioByCxMachine(this);
+        CxMachineAllocationPlanHelper before = CxCapacityAllocationHandler.createAllocationPlanHelper(this, lhRatioInfo, continueGroup, null, allocationDays, startDay, endDay);
+        allocationList.add(before);
+        allocationList.sort(Comparator.comparing(CxMachineAllocationPlanHelper::getStartDay));
+        return before;
     }
 
     /**
