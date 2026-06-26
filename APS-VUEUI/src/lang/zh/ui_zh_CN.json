@@ -3512,6 +3512,21 @@
   "ui.data.column.cd90UnscheduleResult.unscheduledReason": "原因说明",
   "ui.data.column.cd90UnscheduleResult.candidateMachineCodes": "候选机台",
   "ui.data.column.cd90UnscheduleResult.batchNo": "批次号",
-  "ui.data.column.scheduleResult.unscheduleResult": "未排结果"
-
+  "ui.data.column.scheduleResult.unscheduleResult": "未排结果",
+  "ui.data.column.gdyyShiftConfig.modelName": "班次配置",
+  "ui.data.column.gdyyShiftConfig.factoryCode": "工厂",
+  "ui.data.column.gdyyShiftConfig.shiftCode": "班次编码",
+  "ui.data.column.gdyyShiftConfig.shiftName": "班次名称",
+  "ui.data.column.gdyyShiftConfig.shiftOrder": "班次序号",
+  "ui.data.column.gdyyShiftConfig.startTime": "开始时间",
+  "ui.data.column.gdyyShiftConfig.endTime": "结束时间",
+  "ui.data.column.gdyyShiftConfig.shiftHours": "班次时长",
+  "ui.data.column.gdyyShiftConfig.isCrossDay": "是否跨天",
+  "ui.data.column.gdyyShiftConfig.scheduleDay": "排程天数",
+  "ui.data.column.gdyyShiftConfig.dayShiftOrder": "当天班次序号",
+  "ui.data.column.gdyyShiftConfig.classField": "对应结果表字段",
+  "ui.data.column.gdyyShiftConfig.isActive": "是否启用",
+  "ui.data.column.gdyyShiftConfig.remark": "备注",
+  "ui.data.column.gdyyShiftConfig.checkUnique": "校验不通过，已存在相同工厂和班次编码的数据",
+  "ui.data.alert.gdyyShiftConfig.shiftHoursPositive": "班次时长必须大于0"
 }

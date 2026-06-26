@@ -95,6 +95,10 @@ export default {
     return {
       searchColumns: [
         {
+          label: this.$t("ui.data.column.gdyy.stock.factoryCode"),
+          prop: "factoryCode",
+        },
+        {
           label: this.$t("ui.data.column.stock.stockDate"),
           prop: "stockDate",
           type: "date",
@@ -103,7 +107,7 @@ export default {
         },
         {
           label: this.$t("ui.data.column.loss.gdyy.bigRollCode"),
-          prop: "materialCode",
+          prop: "bigRollCode",
         },
       ],
       loading: false,
@@ -126,6 +130,13 @@ export default {
       let columns = [
         { type: "selection", fixed: "left" },
         {
+          prop: "factoryCode",
+          align: "center",
+          halign: "center",
+          label: this.$t("ui.data.column.gdyy.stock.factoryCode"),
+          minWidth: 80,
+        },
+        {
           prop: "stockDate",
           align: "center",
           halign: "center",
@@ -135,7 +146,7 @@ export default {
         },
 
         {
-          prop: "materialCode",
+          prop: "bigRollCode",
           align: "center",
           halign: "center",
           label: this.$t("ui.data.column.loss.gdyy.bigRollCode"),
@@ -146,6 +157,13 @@ export default {
           align: "right",
           halign: "center",
           label: this.$t("ui.data.column.stock.stockRollNum"),
+          // sortable: "custom",
+        },
+        {
+          prop: "stockMeters",
+          align: "right",
+          halign: "center",
+          label: this.$t("ui.data.column.gdyy.stock.stockMeters"),
           // sortable: "custom",
         },
         {
@@ -160,14 +178,21 @@ export default {
           prop: "modifyNum",
           align: "right",
           halign: "center",
-          label: this.$t("ui.data.column.gdyy.stock.stockNum"),
+          label: this.$t("ui.data.column.stock.modifyNum"),
           // sortable: "custom",
         },
         {
           prop: "badNum",
           align: "right",
           halign: "center",
-          label: this.$t("ui.data.column.gdyy.stock.stockNum"),
+          label: this.$t("ui.data.column.stock.badNum"),
+          // sortable: "custom",
+        },
+        {
+          prop: "estimateStockFlag",
+          align: "center",
+          halign: "center",
+          label: this.$t("ui.data.column.gdyy.stock.estimateStockFlag"),
           // sortable: "custom",
         },
         {

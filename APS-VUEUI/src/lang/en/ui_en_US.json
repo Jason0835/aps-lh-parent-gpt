@@ -754,6 +754,21 @@
   "ui.data.column.cd90DepthConfig.depthClassQty": "Depth Class Qty",
   "ui.data.column.cd90DepthConfig.checkUnique": "Duplicate depth config record",
   "ui.data.column.cd90DepthConfig.rangeCross": "Range overlaps with existing rule",
-  "ui.data.column.scheduleResult.unscheduleResult": "Unschedule Result"
-
+  "ui.data.column.scheduleResult.unscheduleResult": "Unschedule Result",
+  "ui.data.column.gdyyShiftConfig.modelName": "Shift Config",
+  "ui.data.column.gdyyShiftConfig.factoryCode": "Factory",
+  "ui.data.column.gdyyShiftConfig.shiftCode": "Shift Code",
+  "ui.data.column.gdyyShiftConfig.shiftName": "Shift Name",
+  "ui.data.column.gdyyShiftConfig.shiftOrder": "Shift Order",
+  "ui.data.column.gdyyShiftConfig.startTime": "Start Time",
+  "ui.data.column.gdyyShiftConfig.endTime": "End Time",
+  "ui.data.column.gdyyShiftConfig.shiftHours": "Shift Hours",
+  "ui.data.column.gdyyShiftConfig.isCrossDay": "Cross Day",
+  "ui.data.column.gdyyShiftConfig.scheduleDay": "Schedule Day",
+  "ui.data.column.gdyyShiftConfig.dayShiftOrder": "Day Shift Order",
+  "ui.data.column.gdyyShiftConfig.classField": "Class Field",
+  "ui.data.column.gdyyShiftConfig.isActive": "Is Active",
+  "ui.data.column.gdyyShiftConfig.remark": "Remark",
+  "ui.data.column.gdyyShiftConfig.checkUnique": "Validation failed, same factory and shift code already exists",
+  "ui.data.alert.gdyyShiftConfig.shiftHoursPositive": "Shift hours must be greater than 0"
 }
