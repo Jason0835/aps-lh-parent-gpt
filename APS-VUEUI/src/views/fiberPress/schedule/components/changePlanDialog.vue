@@ -36,7 +36,7 @@ import { numberEmpty } from "@/utils/index";
 
 import infoForm from "@/views/components/infoForm.vue";
 
-import { changeQty } from "@/api/xwyy/scheduleResult";
+import { changeQty } from "@/api/xwyy/xwyyScheduleResult";
 
 export default {
   components: { infoForm },

@@ -3556,5 +3556,18 @@
   "ui.data.column.gdyyScheduleResult.productionStatus": "生产状态",
   "ui.data.column.gdyyScheduleResult.remark": "备注",
   "ui.data.column.gdyyScheduleResult.checkUnique": "校验不通过，已存在相同工厂、排程日期、大卷编号和机台编码的数据",
-  "ui.data.column.gdyyScheduleResult.hasPublishedCanNotDelete": "已发布成功的记录不允许删除"
+  "ui.data.column.gdyyScheduleResult.hasPublishedCanNotDelete": "已发布成功的记录不允许删除",
+  "ui.data.column.xwyyStock.modelName": "纤维压延库存管理",
+  "ui.data.column.xwyyStock.factoryCode": "工厂",
+  "ui.data.column.xwyyStock.stockDate": "库存日期",
+  "ui.data.column.xwyyStock.bigRollCode": "大卷编号",
+  "ui.data.column.xwyyStock.bigRollBarcode": "大卷条码",
+  "ui.data.column.xwyyStock.stockNum": "库存量(个)",
+  "ui.data.column.xwyyStock.stockRollNum": "库存量(卷)",
+  "ui.data.column.xwyyStock.modifyNum": "修正数量",
+  "ui.data.column.xwyyStock.rollModifyNum": "修正数量(卷)",
+  "ui.data.column.xwyyStock.badNum": "不良数量",
+  "ui.data.column.xwyyStock.rollBadNum": "不良数量(卷)",
+  "ui.data.column.xwyyStock.estimateStockFlag": "预计库存标记",
+  "ui.data.column.xwyyStock.checkUnique": "同一工厂下已存在相同日期和大卷编号的库存记录"
 }

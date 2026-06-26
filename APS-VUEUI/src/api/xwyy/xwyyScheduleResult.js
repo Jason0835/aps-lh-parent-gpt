@@ -2,14 +2,14 @@ import request from '@/utils/request'
 
 export function listScheduleResult(query) {
   return request({
-    url: 'xwyy/scheduleResult/list',
+    url: 'xwyy/xwyyScheduleResult/list',
     method: 'post',
     data: query
   })
 }
 export function removeScheduleResult(query) {
   return request({
-    url: 'xwyy/scheduleResult/remove',
+    url: 'xwyy/xwyyScheduleResult/remove',
     method: 'post',
     data: query
   })
@@ -18,35 +18,35 @@ export function removeScheduleResult(query) {
 //
 export function validateAutoPlan(query) {
   return request({
-    url: 'xwyy/scheduleResult/validateAutoPlan',
+    url: 'xwyy/xwyyScheduleResult/validateAutoPlan',
     method: 'post',
     data: query
   })
 }
 export function autoPlan(query) {
   return request({
-    url: 'xwyy/scheduleResult/autoPlan',
+    url: 'xwyy/xwyyScheduleResult/autoPlan',
     method: 'post',
     data: query
   })
 }
 export function balance(query) {
   return request({
-    url: 'xwyy/scheduleResult/balance',
+    url: 'xwyy/xwyyScheduleResult/balance',
     method: 'post',
     data: query
   })
 }
 // export function modelChange(query) {
 //   return request({
-//     url: 'xwyy/scheduleResult/modelChange',
+//     url: 'xwyy/xwyyScheduleResult/modelChange',
 //     method: 'post',
 //     data: query
 //   })
 // }
 // export function modelAdjustPlan(query) {
 //   return request({
-//     url: 'xwyy/scheduleResult/modelAdjustPlan',
+//     url: 'xwyy/xwyyScheduleResult/modelAdjustPlan',
 //     method: 'post',
 //     data: query
 //   })
@@ -55,28 +55,28 @@ export function balance(query) {
 // // 获取胎胚版本
 // export function getProductEmbryoVersions(query) {
 //   return request({
-//     url: 'xwyy/scheduleResult/getProductEmbryoVersions',
+//     url: 'xwyy/xwyyScheduleResult/getProductEmbryoVersions',
 //     method: 'post',
 //     data: query
 //   })
 // }
 // export function getCxMachines(query) {
 //   return request({
-//     url: 'xwyy/scheduleResult/getCxMachines',
+//     url: 'xwyy/xwyyScheduleResult/getCxMachines',
 //     method: 'post',
 //     data: query
 //   })
 // }
 // export function validateBeforeAdd(query) {
 //   return request({
-//     url: 'xwyy/scheduleResult/validateBeforeAdd',
+//     url: 'xwyy/xwyyScheduleResult/validateBeforeAdd',
 //     method: 'post',
 //     data: query
 //   })
 // }
 export function validateAdd(query) {
   return request({
-    url: 'xwyy/scheduleResult/validateAdd',
+    url: 'xwyy/xwyyScheduleResult/validateAdd',
     method: 'post',
     data: query
   })
@@ -84,28 +84,28 @@ export function validateAdd(query) {
 
 export function editScheduleResult(query) {
   return request({
-    url: 'xwyy/scheduleResult/edit',
+    url: 'xwyy/xwyyScheduleResult/edit',
     method: 'post',
     data: query
   })
 }
 export function batchChangeMachine(machineId, query) {
   return request({
-    url: 'xwyy/scheduleResult/batchChangeMachine/' + machineId,
+    url: 'xwyy/xwyyScheduleResult/batchChangeMachine/' + machineId,
     method: 'post',
     data: query
   })
 }
 export function chooseMachine(query) {
   return request({
-    url: 'xwyy/scheduleResult/chooseMachine',
+    url: 'xwyy/xwyyScheduleResult/chooseMachine',
     method: 'post',
     data: query
   })
 }
 export function mergeProduct(query) {
   return request({
-    url: 'xwyy/scheduleResult/mergeProduct',
+    url: 'xwyy/xwyyScheduleResult/mergeProduct',
     method: 'post',
     data: query
   })
@@ -116,14 +116,14 @@ export function mergeProduct(query) {
 // //
 // export function modifyMoldsValidate(query) {
 //   return request({
-//     url: 'xwyy/scheduleResult/modifyMoldsValidate',
+//     url: 'xwyy/xwyyScheduleResult/modifyMoldsValidate',
 //     method: 'post',
 //     data: query
 //   })
 // }
 // export function modifyMolds(query) {
 //   return request({
-//     url: 'xwyy/scheduleResult/modifyMolds',
+//     url: 'xwyy/xwyyScheduleResult/modifyMolds',
 //     method: 'post',
 //     data: query
 //   })
@@ -132,21 +132,21 @@ export function mergeProduct(query) {
 
 // export function validateChangeMachine(query) {
 //   return request({
-//     url: 'xwyy/scheduleResult/validateChangeMachine',
+//     url: 'xwyy/xwyyScheduleResult/validateChangeMachine',
 //     method: 'post',
 //     data: query
 //   })
 // }
 export function publishValidate(query) {
   return request({
-    url: 'xwyy/scheduleResult/publishValidate',
+    url: 'xwyy/xwyyScheduleResult/publishValidate',
     method: 'post',
     data: query
   })
 }
 export function publishScheduleResult(query) {
   return request({
-    url: 'xwyy/scheduleResult/publish',
+    url: 'xwyy/xwyyScheduleResult/publish',
     method: 'post',
     data: query
   })
@@ -154,7 +154,7 @@ export function publishScheduleResult(query) {
 
 // export function hasRecordValidate(query) {
 //   return request({
-//     url: 'xwyy/scheduleResult/hasRecordValidate',
+//     url: 'xwyy/xwyyScheduleResult/hasRecordValidate',
 //     method: 'post',
 //     data: query
 //   })
@@ -162,7 +162,7 @@ export function publishScheduleResult(query) {
 
 // export function modifyQty(query) {
 //   return request({
-//     url: `xwyy/scheduleResult/modifyQty/${query}`,
+//     url: `xwyy/xwyyScheduleResult/modifyQty/${query}`,
 //     method: 'post',
 //     // data: query
 //   })
@@ -170,7 +170,7 @@ export function publishScheduleResult(query) {
 
 // export function manualClose(query) {
 //   return request({
-//     url: `xwyy/scheduleResult/manualClose`,
+//     url: `xwyy/xwyyScheduleResult/manualClose`,
 //     method: 'post',
 //     data: query
 //   })
@@ -178,28 +178,28 @@ export function publishScheduleResult(query) {
 
 // export function listFinished(query) {
 //   return request({
-//     url: `xwyy/scheduleResult/finished/list`,
+//     url: `xwyy/xwyyScheduleResult/finished/list`,
 //     method: 'post',
 //     data: query
 //   })
 // }
 // export function producingIssue(query) {
 //   return request({
-//    url: `xwyy/scheduleResult/producingIssue`,
+//    url: `xwyy/xwyyScheduleResult/producingIssue`,
 //     method: 'post',
 //     data: query
 //   })
 // }
 // export function validateConstruction(query) {
 //   return request({
-//    url: `xwyy/scheduleResult/validateConstruction`,
+//    url: `xwyy/xwyyScheduleResult/validateConstruction`,
 //     method: 'post',
 //     data: query
 //   })
 // }
 export function changeReleaseStatus(query) {
   return request({
-   url: `xwyy/scheduleResult/changeReleaseStatus`,
+   url: `xwyy/xwyyScheduleResult/changeReleaseStatus`,
     method: 'post',
     data: query
   })
@@ -208,7 +208,7 @@ export function changeReleaseStatus(query) {
 
 export function changeQty(query) {
   return request({
-    url: 'xwyy/scheduleResult/changeQty',
+    url: 'xwyy/xwyyScheduleResult/changeQty',
     method: 'post',
     data: query
   })
@@ -216,7 +216,7 @@ export function changeQty(query) {
 
 export function combinationMiddleAndNight(query) {
   return request({
-   url: `xwyy/scheduleResult/combinationMiddleAndNight`,
+   url: `xwyy/xwyyScheduleResult/combinationMiddleAndNight`,
     method: 'post',
     data: query
   })
@@ -224,7 +224,7 @@ export function combinationMiddleAndNight(query) {
 
 export function getSummaryVo(query) {
   return request({
-   url: `xwyy/scheduleResult/getSummaryVo`,
+   url: `xwyy/xwyyScheduleResult/getSummaryVo`,
     method: 'post',
     data: query
   })

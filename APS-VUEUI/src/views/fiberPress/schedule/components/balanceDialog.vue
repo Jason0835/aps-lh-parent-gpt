@@ -32,7 +32,7 @@ import moment from "moment";
 
 import infoForm from "@/views/components/infoForm.vue";
 
-import { balance } from "@/api/xwyy/scheduleResult.js";
+import { balance } from "@/api/xwyy/xwyyScheduleResult.js";
 
 export default {
   components: { infoForm },

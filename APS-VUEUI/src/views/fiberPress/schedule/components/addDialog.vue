@@ -34,7 +34,7 @@ import { mapState } from "vuex";
 
 import infoForm from "@/views/components/infoForm.vue";
 
-import { validateAdd, editScheduleResult } from "@/api/xwyy/scheduleResult";
+import { validateAdd, editScheduleResult } from "@/api/xwyy/xwyyScheduleResult";
 
 export default {
   components: { infoForm },

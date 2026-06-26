@@ -32,7 +32,7 @@
 </template>
 
 <script>
-import { changeReleaseStatus } from "@/api/xwyy/scheduleResult";
+import { changeReleaseStatus } from "@/api/xwyy/xwyyScheduleResult";
 
 export default {
   components: {},

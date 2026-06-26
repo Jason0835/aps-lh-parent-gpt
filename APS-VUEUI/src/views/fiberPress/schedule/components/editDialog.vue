@@ -36,7 +36,7 @@ import { numberEmpty } from "@/utils/index";
 
 import infoForm from "@/views/components/infoForm.vue";
 
-import { editScheduleResult } from "@/api/xwyy/scheduleResult.js";
+import { editScheduleResult } from "@/api/xwyy/xwyyScheduleResult.js";
 
 export default {
   components: { infoForm },

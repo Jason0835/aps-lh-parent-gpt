@@ -255,7 +255,7 @@ import {
   validateConstruction,
   removeScheduleResult,
   getSummaryVo,
-} from "@/api/xwyy/scheduleResult";
+} from "@/api/xwyy/xwyyScheduleResult";
 //components
 import TltUploadForm from "@/views/components/tltUploadForm.vue";
 

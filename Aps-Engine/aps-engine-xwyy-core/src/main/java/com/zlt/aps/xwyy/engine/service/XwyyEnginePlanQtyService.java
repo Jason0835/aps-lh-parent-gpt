@@ -12,7 +12,7 @@ import com.zlt.aps.xwyy.engine.vo.XwyyStockVo;
 
 /**
  * 纤维压延计划量信息处理服务接口
- * 
+ *
  * @Description
  * @Author hakimrayn
  * @Date 2021-7-22 11:30:42
@@ -21,7 +21,7 @@ import com.zlt.aps.xwyy.engine.vo.XwyyStockVo;
 public interface XwyyEnginePlanQtyService {
 	/**
 	 * 计算计划量
-	 * 
+	 *
 	 * @Author hakimryan
 	 * @Description
 	 * @Date 2021-7-22 11:31:01
@@ -41,7 +41,7 @@ public interface XwyyEnginePlanQtyService {
 
 	/**
 	 * 获取指定日期的半部件库存量
-	 * 
+	 *
 	 * @param scheduleDate  库存日期
 	 * @param isAssistStock 是否使用外厂需求的库存
 	 * @return key：大卷编号，value：库存量
@@ -50,7 +50,7 @@ public interface XwyyEnginePlanQtyService {
 
 	/**
 	 * 计算成型可供时长
-	 * 
+	 *
 	 * @param resultVo 排产结果
 	 * @param stockVo  库存信息
 	 * @return
@@ -59,7 +59,7 @@ public interface XwyyEnginePlanQtyService {
 
 	/**
 	 * 获取排产日的16点半部件库存
-	 * 
+	 *
 	 * @param scheduleDate 排产日期
 	 * @Param stockLossRate 库存损耗率
 	 * @param breadth 幅宽

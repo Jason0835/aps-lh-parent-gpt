@@ -32,7 +32,7 @@ import moment from "moment";
 
 import infoForm from "@/views/components/infoForm.vue";
 
-import { autoPlan, validateAutoPlan } from "@/api/xwyy/scheduleResult";
+import { autoPlan, validateAutoPlan } from "@/api/xwyy/xwyyScheduleResult";
 
 export default {
   components: { infoForm },
