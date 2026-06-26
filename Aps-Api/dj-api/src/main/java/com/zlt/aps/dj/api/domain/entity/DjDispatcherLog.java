@@ -16,12 +16,12 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 
 /**
- * 垫胶调度员排程操作日志对象 t_nc_dispatcher_log
+ * 垫胶排程操作日志对象 t_nc_dispatcher_log
  * 
  * @author zlt
  * @date 2026-05-25
  */
-@ApiModel(value = "垫胶调度员排程操作日志对象", description = "垫胶调度员排程操作日志对象 ")
+@ApiModel(value = "垫胶排程操作日志对象", description = "垫胶排程操作日志对象 ")
 @Data
 @TableName("T_DJ_DISPATCHER_LOG")
 @EqualsAndHashCode(callSuper = false)

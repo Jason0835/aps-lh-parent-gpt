@@ -35,9 +35,9 @@ import com.zlt.aps.dj.api.domain.entity.DjDayFinishQty;
 import com.zlt.aps.dj.api.domain.entity.DjDispatcherLog;
 import com.zlt.aps.dj.api.domain.entity.DjScheduleResult;
 import com.zlt.aps.dj.engine.service.DjEngineNewService;
-import com.zlt.aps.dj.engine.service.DjEngineService;
 import com.zlt.aps.dj.service.DjMachineInfoService;
 import com.zlt.aps.dj.service.DjScheduleResultService;
+import com.zlt.aps.dj.service.IDjScheduleAdjustService;
 import com.zlt.aps.itf.vo.SyncDataLogs;
 import com.zlt.bill.common.controller.AbstractBillBizController;
 import com.zlt.bill.common.service.IBillService;
@@ -68,6 +68,8 @@ public class DjScheduleResultController extends AbstractBillBizController<DjSche
     private FactoryService factoryService;
 	@Resource
 	private ISyncDataLogsApiService syncDataLogsService;
+    @Autowired
+    private IDjScheduleAdjustService iDjScheduleAdjustService;
 	
 
     @ApiOperation("按条件分页查询")
@@ -87,19 +89,12 @@ public class DjScheduleResultController extends AbstractBillBizController<DjSche
     }
 
     /**
-     * 新增垫胶排程结果
+     * 新增垫胶排程结果（插单）
      */
     @Log(title = "ui.data.column.djScheduleResult.modalName", businessType = BusinessType.INSERT)
-    @PostMapping
+    @PostMapping("/add")
     public AjaxResult add(@RequestBody DjScheduleResult djScheduleResult) {
-        int exist = djScheduleResultService.checkDjCodeExist(djScheduleResult);
-        if (exist == 0) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.specNotExist"));
-        }
-        List<DjScheduleResult> scheduleResults = djScheduleResultService.selectByScheduleDateAndCode(djScheduleResult);
-        int rows = djScheduleResultService.insertDjScheduleResult(djScheduleResult);
-        djScheduleResultService.insertDispatcherLogInsertOrder(ApsConstant.DISPATCHER_OPER_INSERT_ORDER, scheduleResults, djScheduleResult);
-        return toAjax(rows);
+        return iDjScheduleAdjustService.insertOrder(djScheduleResult);
     }
 
     /**
@@ -114,7 +109,7 @@ public class DjScheduleResultController extends AbstractBillBizController<DjSche
                 return AjaxResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.release.isReleasingOrTimeoutById"));
             }
         }
-        return toAjax(djScheduleResultService.updateDjScheduleResult(djScheduleResult));
+        return iDjScheduleAdjustService.changeQty(djScheduleResult);
     }
     
     /**
@@ -123,13 +118,7 @@ public class DjScheduleResultController extends AbstractBillBizController<DjSche
     @Log(title = "ui.data.column.djScheduleResult.modalName", businessType = BusinessType.CHANGE_MACHINE)
     @PostMapping("/changeMachine")
     public AjaxResult changeMachine(@RequestBody DjScheduleResult scheduleResult) {
-        int releasingOrTimeoutByDate = djScheduleResultService.isReleasingOrTimeoutByIds(new Long[]{scheduleResult.getId()});
-        if (releasingOrTimeoutByDate > 0) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.release.isReleasingOrTimeoutById"));
-        }
-        scheduleResult.setBaseVale(scheduleResult.getId());
-        djScheduleResultService.insertDispatcherLog(ApsConstant.DISPATCHER_OPER_MACHINE, scheduleResult);  //如果是调度员操作，则需要增加操作日志
-        return toAjax(djScheduleResultService.updateDjScheduleResult(scheduleResult));
+        return iDjScheduleAdjustService.changeMachine(scheduleResult);
     }
 
     /**
@@ -138,14 +127,7 @@ public class DjScheduleResultController extends AbstractBillBizController<DjSche
     @Log(title = "ui.data.column.djScheduleResult.modalName", businessType = BusinessType.DELETE)
     @DeleteMapping("/{ids}")
     public AjaxResult remove(@PathVariable Long[] ids) {
-//        int releasingOrTimeoutByIds = djScheduleResultService.isReleasingOrTimeoutByIds(ids);
-//        if (releasingOrTimeoutByIds > 0) {
-//            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.release.isReleasingOrTimeoutById"));
-//        }
-        if (djScheduleResultService.isPublishByIds(ids) != ids.length) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.release.isPublishById"));
-        }
-        return toAjax(djScheduleResultService.deleteDjScheduleResultByIds(ids));
+        return iDjScheduleAdjustService.deleteByIds(ids);
     }
 
     /**

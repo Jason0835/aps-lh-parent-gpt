@@ -523,6 +523,7 @@
   "ui.data.column.dj.scheduleResult.statMorningPlanQty": "早班合计",
   "ui.data.column.dj.scheduleResult.statMiddlePlanQty": "中班合计",
   "ui.data.column.dj.scheduleResult.prevDayClass3": "前日早班",
+  "ui.data.column.dj.scheduleResult.prevDayClass1": "前日中班",
   "ui.data.column.scheduleResult.unschedule": "未排产",
   "ui.data.column.scheduleResult.insertOrder": "插单",
   "ui.data.column.scheduleResult.onlyUnreleasedEditable": "仅未发布数据允许修改",

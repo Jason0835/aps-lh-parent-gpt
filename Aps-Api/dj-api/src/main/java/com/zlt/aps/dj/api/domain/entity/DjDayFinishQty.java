@@ -20,8 +20,8 @@ import java.util.Date;
  */
 @Data
 @EqualsAndHashCode(callSuper=false)
-@TableName(value = "T_DJ_MACHINE_INFO")
-public class DjDayFinishQty extends BaseEntity implements IFinishQtyImport {
+@TableName(value = "T_DJ_DAY_FINISH_QTY")
+public class DjDayFinishQty extends BaseEntity {
 
     @ApiModelProperty(value = "工厂编码")
     @TableField(value = "FACTORY_CODE")
@@ -41,28 +41,34 @@ public class DjDayFinishQty extends BaseEntity implements IFinishQtyImport {
      * 垫胶代码
      */
     @ImportExcelValidated(required = true)
-    @Excel(name = "ui.data.column.dayFinishQty.nc.code")
-    @ApiModelProperty(value = "垫胶代码", name = "liningCode")
+    @Excel(name = "ui.data.column.dayFinishQty.dj.code")
+    @ApiModelProperty(value = "垫胶代码", name = "paddingCode")
     @TableField(value = "LINING_CODE")
-    private String liningCode;
+    private String paddingCode;
 
     /**
-     * 中班(12点-24点)完成量
+     * 中班完成量
      */
-//    @ImportExcelValidated(required = true)
-    @Excel(name = "ui.data.column.dayFinishQty.class1Plan.metre")
-    @ApiModelProperty(value = "中班(12点-24点)完成量", name = "dayFinishQty")
+    @Excel(name = "ui.data.column.dayFinishQty.nightFinishQty")
+    @ApiModelProperty(value = "夜班完成量", name = "nightFinishQty")
+    @TableField(value = "NIGHT_FINISH_QTY")
+    private BigDecimal nightFinishQty = BigDecimal.ZERO;
+
+    /**
+     * 夜班完成量
+     */
+    @Excel(name = "ui.data.column.dayFinishQty.dayFinishQty")
+    @ApiModelProperty(value = "早班完成量", name = "dayFinishQty")
     @TableField(value = "DAY_FINISH_QTY")
     private BigDecimal dayFinishQty = BigDecimal.ZERO;
 
     /**
-     * 夜班(0点-12点)完成量
+     * 早班完成量
      */
-//    @ImportExcelValidated(required = true)
-    @Excel(name = "ui.data.column.dayFinishQty.class2Plan.metre")
-    @ApiModelProperty(value = "中班(12点-24点)完成量", name = "nightFinishQty")
-    @TableField(value = "NIGHT_FINISH_QTY")
-    private BigDecimal nightFinishQty = BigDecimal.ZERO;
+    @Excel(name = "ui.data.column.dayFinishQty.midFinishQty")
+    @ApiModelProperty(value = "中班完成量", name = "midFinishQty")
+    @TableField(value = "MID_FINISH_QTY")
+    private BigDecimal midFinishQty = BigDecimal.ZERO;
 
     /**
      * 工单号
@@ -75,43 +81,4 @@ public class DjDayFinishQty extends BaseEntity implements IFinishQtyImport {
 
     private static final long serialVersionUID = 1L;
 
-    /**
-     * 获取夜班计划量
-     *
-     * @return 夜班计划量
-     */
-    @Override
-    public BigDecimal getClass1FinishQty() {
-        return dayFinishQty;
-    }
-
-    /**
-     * 获取早班计划量
-     *
-     * @return 早班计划量
-     */
-    @Override
-    public BigDecimal getClass2FinishQty() {
-        return nightFinishQty;
-    }
-
-    /**
-     * 获取代码对应的字段值
-     *
-     * @return 结果
-     */
-    @Override
-    public String getCodeField() {
-        return liningCode;
-    }
-
-    /**
-     * 获取代码对应的字段值
-     *
-     * @return 结果
-     */
-    @Override
-    public String getCodeField1() {
-        return "";
-    }
 }

@@ -30,9 +30,9 @@ public interface IDjScheduleResultRemoteService {
 
 
     /**
-     * 新增垫胶排程结果
+     * 垫胶排程插单
      */
-    @PostMapping("/djScheduleResult")
+    @PostMapping("/djScheduleResult/add")
     AjaxResult add(@RequestBody DjScheduleResult djScheduleResult);
 
 
