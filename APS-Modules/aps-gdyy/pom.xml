@@ -69,6 +69,10 @@
             <groupId>com.ruoyi</groupId>
             <artifactId>ruoyi-common-swagger</artifactId>
         </dependency>
+        <dependency>
+            <groupId>com.zlt.aps</groupId>
+            <artifactId>aps-base</artifactId>
+        </dependency>
     </dependencies>
 
 <!--    <build>-->
