@@ -82,7 +82,7 @@ public class MpSkuAdjustInfoVo implements Serializable {
     /**
      * 生胎代码
      */
-    @ApiModelProperty(value = "生胎代码", name = "embryoCode")
+    @ApiModelProperty(value = "胎胚号", name = "embryoCode")
     private String embryoCode;
     /**
      * 施工阶段 0 无工艺 1 试制 2 量试 3 正式

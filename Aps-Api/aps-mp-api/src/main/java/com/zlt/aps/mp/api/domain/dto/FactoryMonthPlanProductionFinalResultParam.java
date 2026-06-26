@@ -84,7 +84,7 @@ public class FactoryMonthPlanProductionFinalResultParam implements Serializable 
     /**
      * 生胎代码
      */
-    @ApiModelProperty(value = "生胎代码", name = "embryoCode")
+    @ApiModelProperty(value = "胎胚号", name = "embryoCode")
     private String embryoCode;
     /**
      * 产品结构
@@ -112,7 +112,7 @@ public class FactoryMonthPlanProductionFinalResultParam implements Serializable 
     /**
      * 主物料(胎胚号)
      */
-    @ApiModelProperty(value = "主物料(胎胚号)", name = "mainMaterialDesc")
+    @ApiModelProperty(value = "胎胚描述", name = "mainMaterialDesc")
     private String mainMaterialDesc;
 
     /**

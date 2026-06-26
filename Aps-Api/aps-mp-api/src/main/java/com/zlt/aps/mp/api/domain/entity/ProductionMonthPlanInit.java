@@ -196,7 +196,7 @@ public class ProductionMonthPlanInit extends BaseEntity {
      * 生胎代码
      */
     @Excel(name = "ui.data.column.productionMonthPlanInit.embryoCode")
-    @ApiModelProperty(value = "生胎代码", name = "embryoCode")
+    @ApiModelProperty(value = "胎胚号", name = "embryoCode")
     @TableField(value = "EMBRYO_CODE")
     private String embryoCode;
 
@@ -204,7 +204,7 @@ public class ProductionMonthPlanInit extends BaseEntity {
      * 主物料(胎胚描述)
      */
     @Excel(name = "ui.data.column.productionMonthPlanInit.mainMaterialDesc")
-    @ApiModelProperty(value = "主物料(胎胚描述)", name = "mainMaterialDesc")
+    @ApiModelProperty(value = "胎胚描述", name = "mainMaterialDesc")
     @TableField(value = "MAIN_MATERIAL_DESC")
     private String mainMaterialDesc;
 

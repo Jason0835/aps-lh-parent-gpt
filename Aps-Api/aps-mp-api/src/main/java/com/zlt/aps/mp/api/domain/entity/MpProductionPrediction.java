@@ -157,7 +157,7 @@ public class MpProductionPrediction extends BaseEntity {
     private String mainPattern;
 
     /** 主物料 */
-    @ApiModelProperty(value = "主物料", name = "mainMaterialDesc")
+    @ApiModelProperty(value = "胎胚描述", name = "mainMaterialDesc")
     @TableField(value = "MAIN_MATERIAL_DESC")
     private String mainMaterialDesc;
 

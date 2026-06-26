@@ -77,7 +77,7 @@ public class TrialProductionPlanDto extends BaseEntity {
      */
     @Excel(name = "ui.data.column.monthPlanProductionFinalResult.embryoCode", sort = 9)
     @ImportExcelValidated(required = true, maxLength = 20)
-    @ApiModelProperty(value = "生胎代码", name = "embryoCode")
+    @ApiModelProperty(value = "胎胚号", name = "embryoCode")
     private String embryoCode;
 
     /**
