@@ -63,6 +63,8 @@ public class SupplementCxMachineDistributionHandler {
         }
         String supplementCxMachineInfo = hasLeftOverCxMachineList.stream().map(CxMachineBaseInfoVo::getCxMachineCode).collect(Collectors.joining(StringConstant.COMMA));
         SupplementCxMachineDistributionLogRecorder.addNeedSupplementAllocationInfoLog(productionContext, supplementCxMachineInfo);
+        String leftOverRequireGroupInfo = hasLeftOverGroupList.stream().map(ProductionPlanGroupInfo::getGroupName).collect(Collectors.joining(StringConstant.COMMA));
+        SupplementCxMachineDistributionLogRecorder.addHasLeftOverRequireGroupInfoLog(productionContext, leftOverRequireGroupInfo);
         //按结构优先级排序，进行分配
         productionTailCapacity(productionContext, hasLeftOverCxMachineList, hasLeftOverGroupList);
         //最后还有剩余机台产能的机台，则将前结构顺延到底
@@ -295,7 +297,7 @@ public class SupplementCxMachineDistributionHandler {
      * @return
      */
     private CxMachineAllocationPlanHelper handlerAllocation(TbrProductionContext productionContext, ProductionPlanGroupInfo addPlanGroup, CxMachineBaseInfoVo selectCxMachine) {
-        if(null == selectCxMachine){
+        if (null == selectCxMachine) {
             return null;
         }
         //判断切换结构的点
