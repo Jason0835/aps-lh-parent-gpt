@@ -306,6 +306,15 @@ public class TqScheduleResultDto extends ApsBaseDto
     @ApiModelProperty(value = "数据来源：0>自动排程；1>APS插单；2>导入；")
     private String dataSource;
 
+    /** 是否走胎圈备库班数配置逻辑（0：否 1：是） */
+    private String useBackupConfigFlag;
+
+    /** 命中的备库班数（来自 T_TQ_STOCK_SHIFT_CONFIG 配置的 SHIFT_COUNT） */
+    private Integer backupShiftCount;
+
+    /** 触发备库的胎圈班次（1-5） */
+    private Integer backupTriggerClass;
+
     @ApiModelProperty(value = "排程记录id数组")
     private Long[] ids;
 

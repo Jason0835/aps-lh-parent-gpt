@@ -77,10 +77,7 @@ public class MaterialValidationStrategy extends BaseValidationStrategy {
         allMissing.addAll(missingByEmbryoCode);
 
         if (!allMissing.isEmpty()) {
-            String missingList = String.join(", ",
-                    allMissing.size() > 5
-                        ? Arrays.asList(allMissing.iterator().next() + "...")
-                        : allMissing);
+            String missingList = String.join(", ", allMissing);
             addError(result,
                     String.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.material.materialMissing"),
                             allMissing.size(), missingByMaterialCode.size(), missingByEmbryoCode.size()),

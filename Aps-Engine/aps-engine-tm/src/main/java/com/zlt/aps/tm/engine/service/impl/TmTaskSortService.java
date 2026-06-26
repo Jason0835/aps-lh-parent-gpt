@@ -11,6 +11,7 @@ import com.zlt.aps.tm.engine.domain.TmTaskDraft;
 import com.zlt.aps.tm.engine.service.ITmTaskSortService;
 import com.zlt.aps.tm.engine.strategy.ITmTaskSortStrategy;
 import com.zlt.aps.tm.engine.strategy.TmStrategyRegistry;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.Comparator;
@@ -23,6 +24,7 @@ import java.util.Map;
  * <p>通过 {@link TmStrategyRegistry} 获取排序策略，替代直接按 businessKey 排序。
  * 排序策略编码从上下文参数读取（参数码 {@code TM_TASK_SORT_STRATEGY}，缺省 {@code "DEFAULT"}）。</p>
  */
+@Slf4j
 @Service
 public class TmTaskSortService implements ITmTaskSortService {
 
@@ -56,12 +58,15 @@ public class TmTaskSortService implements ITmTaskSortService {
         ITmTaskSortStrategy sortStrategy = strategyRegistry.getTaskSortStrategy(strategyCode);
         Comparator<TmTaskDraft> comparator = sortStrategy.buildComparator(context);
         context.getTaskDraftList().sort(comparator);
+        log.info("[TM_TASK_SORT] 排序策略编码={}, 排序完成，共{}个任务", strategyCode, context.getTaskDraftList().size());
         for (int i = 0; i < context.getTaskDraftList().size(); i++) {
             TmTaskDraft task = context.getTaskDraftList().get(i);
             Map<String, Object> evidence = new LinkedHashMap<>();
             evidence.put("strategyCode", strategyCode);
             evidence.put("sortIndex", i + 1);
             traceOf(context, task).addRuleHit("TASK_SORT", "PASS", evidence);
+            log.info("[TM_TASK_SORT_DETAIL] sortIndex={}, treadCode={}, shiftOrder={}, businessKey={}",
+                    i + 1, task.getTreadCode(), task.getShiftOrder(), task.getBusinessKey());
         }
     }
 

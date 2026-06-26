@@ -14,7 +14,10 @@ import com.zlt.aps.mp.engine.domain.dto.CxLhProductionHelper;
 import com.zlt.aps.mp.engine.domain.dto.CxMachineAllocationPlanHelper;
 import com.zlt.aps.mp.engine.domain.dto.ProductionPlanGroupInfo;
 import com.zlt.aps.mp.engine.domain.dto.SkuDayProductionInfoHelper;
-import com.zlt.aps.mp.engine.domain.vo.*;
+import com.zlt.aps.mp.engine.domain.vo.CxMachineBaseInfoVo;
+import com.zlt.aps.mp.engine.domain.vo.CxMachineUsedLhInfo;
+import com.zlt.aps.mp.engine.domain.vo.GroupConclusionInfoVo;
+import com.zlt.aps.mp.engine.domain.vo.MonthPlanStructureLhRatioVo;
 import com.zlt.aps.mp.engine.logrecorder.GroupPlanConclusionLogRecorder;
 import com.zlt.aps.mp.engine.logrecorder.TbrSimulateProductionLogRecorder;
 import com.zlt.aps.mp.engine.scheduling.TbrProductionContext;
@@ -460,11 +463,7 @@ public class GroupPlanConclusionHandler {
             return heightQtyMap;
         }
         //累计各sku的高优先级需求量
-        Map<String, Integer> heightQtyMap = groupPlanInfo.getGroupPlanData().stream()
-                .collect(Collectors.groupingBy(MonthPlanProductionRequirePlanVo::getMaterialDesc,
-                        Collectors.collectingAndThen(Collectors.toList(),
-                                l -> l.stream().mapToInt(MonthPlanProductionRequirePlanVo::getHeightQty).sum())));
-        return heightQtyMap;
+        return groupPlanInfo.getSkuHeightQty();
     }
 
     /**
@@ -626,6 +625,10 @@ public class GroupPlanConclusionHandler {
         if (null == conclusionAllocationRange) {
             return;
         }
+        //20260624+ 结构优先，不处理最低实单连续排产天数
+//        if (YesOrNoEnum.YES.getValue().equals(conclusionAllocationRange.getProductionPlanInfo().isStructurePriority())) {
+//            return;
+//        }
         //最低硫化配比 >= 最大硫化配比，则跳过
         Integer minLhMachineCount = conclusionAllocationRange.getMinRatio();
         if (null == minLhMachineCount || minLhMachineCount >= conclusionAllocationRange.getMaxRatio()) {

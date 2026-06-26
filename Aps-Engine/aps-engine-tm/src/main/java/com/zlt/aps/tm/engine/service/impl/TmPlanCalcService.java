@@ -9,6 +9,7 @@ import com.zlt.aps.tm.engine.service.ITmPlanCalcService;
 import com.zlt.aps.tm.engine.strategy.ITmDemandQtyStrategy;
 import com.zlt.aps.tm.engine.strategy.ITmPlanQtyStrategy;
 import com.zlt.aps.tm.engine.strategy.TmStrategyRegistry;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -24,6 +25,7 @@ import java.util.Map;
  * 计划量策略编码从上下文参数读取（参数码 {@code TM_PLAN_QTY_STRATEGY}，缺省 {@code "DEFAULT"}）。
  * 计划量计算使用库存预测中的 rollingStockQty（14点预计库存）。</p>
  */
+@Slf4j
 @Service
 public class TmPlanCalcService implements ITmPlanCalcService {
 
@@ -101,7 +103,22 @@ public class TmPlanCalcService implements ITmPlanCalcService {
             // 通过需求量策略计算库存保证缺口、基础需求量和供应时长，供排序和计划量策略复用。
             TmDemandQtyResult demandQtyResult = demandQtyStrategy.calculate(buildDemandQtyInput(task), context);
             applyDemandQtyResult(task, demandQtyResult);
+            addNewSpecTrace(context, task);
             addDemandTrace(context, task, demandQtyAlgorithmCode);
+            // 打印需求量计算公式
+            log.info("[TM_DEMAND_QTY_CALC] treadCode={}, shiftOrder={}, 算法编码={}, 保证范围内成型胎面需求量【guardDemandQty】-当前班开始滚动库存【rollingStockQty】=库存保证缺口【stockGapQty】，max(当前班成型胎面需求量【currentShiftDemandQty】，库存保证缺口【stockGapQty】)=需求量【demandQty】",
+                    task.getTreadCode(), task.getShiftOrder(), demandQtyAlgorithmCode);
+            log.info("[TM_DEMAND_QTY_CALC_DETAIL] treadCode={}, shiftOrder={}, guardDemandQty={}, rollingStockQty={}, stockGapQty={}, currentShiftDemandQty={}, demandQty={}",
+                    task.getTreadCode(), task.getShiftOrder(),
+                    task.getGuardDemandQty(), task.getRollingStockQty(), task.getStockGapQty(),
+                    task.getCurrentShiftDemandQty(), task.getDemandQty());
+            // 打印供应时长计算公式
+            log.info("[TM_DEMAND_QTY_SUPPLY] treadCode={}, shiftOrder={}, 供应时长【supplyHours】小时=当前班开始滚动库存【rollingStockQty】/(保证范围内成型胎面需求量【guardDemandQty】/保证范围总小时数【guardRangeHours】)",
+                    task.getTreadCode(), task.getShiftOrder());
+            log.info("[TM_DEMAND_QTY_SUPPLY_DETAIL] treadCode={}, shiftOrder={}, supplyHours={}, rollingStockQty={}, guardDemandQty={}, guardRangeHours={}",
+                    task.getTreadCode(), task.getShiftOrder(),
+                    task.getSupplyHours(), task.getRollingStockQty(),
+                    task.getGuardDemandQty(), task.getGuardRangeHours());
 
             // 已有计划量表示上游已完成特殊业务调整，此处保持不变。
             if (task.getPlanQty() == null) {
@@ -109,7 +126,55 @@ public class TmPlanCalcService implements ITmPlanCalcService {
                 applyPlanQtyResult(task, planQtyResult);
             }
             addPlanQtyTrace(context, task, planQtyStrategyCode);
+            // 打印计划量计算公式
+            if (task.getPlanQty() != null) {
+                log.info("[TM_PLAN_QTY_CALC] treadCode={}, shiftOrder={}, 策略编码={}, 计划量计算路径={}",
+                        task.getTreadCode(), task.getShiftOrder(), planQtyStrategyCode, task.getCalcFormulaDesc());
+                log.info("[TM_PLAN_QTY_CALC_DETAIL] treadCode={}, shiftOrder={}, demandQty={}, stockDeductQty={}, baseDemandQty={}, lossAddQty={}, toolLimitAdjustQty={}, minStartAdjustQty={}, tailRoundAdjustQty={}, capacityAdjustQty={}, planQty={}",
+                        task.getTreadCode(), task.getShiftOrder(),
+                        task.getDemandQty(), task.getStockDeductQty(), task.getBaseDemandQty(),
+                        task.getLossAddQty(), task.getToolLimitAdjustQty(),
+                        task.getMinStartAdjustQty(), task.getTailRoundAdjustQty(),
+                        task.getCapacityAdjustQty(), task.getPlanQty());
+            }
         }
+    }
+
+    /**
+     * 写入新规格判断和提前排产窗口证据。
+     *
+     * @param context 排程上下文
+     * @param task    任务草稿
+     */
+    private void addNewSpecTrace(TmScheduleContext context, TmTaskDraft task) {
+        TmNewSpecInfo info = task.getNewSpecInfo();
+        if (info == null) {
+            return;
+        }
+        Map<String, Object> detectEvidence = new LinkedHashMap<>();
+        detectEvidence.put("newSpec", info.getNewSpec());
+        detectEvidence.put("lookbackDays", info.getLookbackDays());
+        detectEvidence.put("lookbackDaysSource", info.getLookbackDaysSource());
+        detectEvidence.put("previousStockDate", info.getPreviousStockDate());
+        detectEvidence.put("previousDayStockQty", info.getPreviousDayStockQty());
+        detectEvidence.put("previousDayStockExists", info.getPreviousDayStockExists());
+        detectEvidence.put("historyStartDate", info.getHistoryStartDate());
+        detectEvidence.put("historyEndDate", info.getHistoryEndDate());
+        detectEvidence.put("historySchedulePlanExists", info.getHistorySchedulePlanExists());
+        detectEvidence.put("reason", info.getReason());
+        traceOf(context, task).addRuleHit("NEW_SPEC_DETECT", Boolean.TRUE.equals(info.getNewSpec()) ? "PASS" : "SKIP", detectEvidence);
+        if (!info.isNewSpecHit()) {
+            return;
+        }
+        Map<String, Object> windowEvidence = new LinkedHashMap<>();
+        windowEvidence.put("advanceShiftCount", info.getAdvanceShiftCount());
+        windowEvidence.put("advanceShiftCountSource", info.getAdvanceShiftCountSource());
+        windowEvidence.put("normalTargetShift", info.getNormalTargetShift());
+        windowEvidence.put("adjustedTargetShift", info.getAdjustedTargetShift());
+        windowEvidence.put("adjustedTargetWindow", info.getAdjustedTargetWindow());
+        windowEvidence.put("demandShift", info.getDemandShift());
+        windowEvidence.put("demandQty", info.getDemandQty());
+        traceOf(context, task).addRuleHit("NEW_SPEC_ADVANCE_WINDOW", "PASS", windowEvidence);
     }
 
     /**

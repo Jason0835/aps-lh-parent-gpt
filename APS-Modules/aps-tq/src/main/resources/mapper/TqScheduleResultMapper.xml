@@ -62,6 +62,9 @@
         <result property="monthPlan" column="monthPlan"/>
         <result property="monthPlanOs" column="monthPlanOs"/>
         <result property="dataSource" column="data_source"/>
+        <result property="useBackupConfigFlag" column="use_backup_config_flag"/>
+        <result property="backupShiftCount" column="backup_shift_count"/>
+        <result property="backupTriggerClass" column="backup_trigger_class"/>
         <result property="publishSuccessCount" column="publish_success_count"/>
         <result property="newestPublishTime" column="newest_publish_time"/>
         <result property="lastMidPlanQty" column="last_mid_plan_qty"/>
@@ -124,6 +127,9 @@
         <result property="monthPlan" column="monthPlan"/>
         <result property="monthPlanOs" column="monthPlanOs"/>
         <result property="dataSource" column="data_source"/>
+        <result property="useBackupConfigFlag" column="use_backup_config_flag"/>
+        <result property="backupShiftCount" column="backup_shift_count"/>
+        <result property="backupTriggerClass" column="backup_trigger_class"/>
         <result property="dailyTotalQty" column="daily_total_qty"/>
         <result property="publishSuccessCount" column="publish_success_count"/>
         <result property="newestPublishTime" column="newest_publish_time"/>
@@ -177,12 +183,15 @@
                publish_success_count,
                newest_publish_time,
                last_mid_plan_qty,
-               next_mid_plan_qty
+               next_mid_plan_qty,
+               use_backup_config_flag,
+               backup_shift_count,
+               backup_trigger_class
         from t_tq_schedule_result
     </sql>
 
     <sql id="column">
-        a.id, a.schedule_date, a.cx_batch_no, a.batch_no, a.order_no, a.bead_code, a.steel_ring_code, a.triangle_glue_code, a.glue_code, a.mouth_plate_code, a.spec_size, a.machine_code, a.unit_consume, a.stock_qty, a.supply_time, a.mid_plan_qty, a.mid_produce_order, a.mid_sys_analysis, a.mid_hand_analysis, a.night_plan_qty, a.night_produce_order, a.night_sys_analysis, a.night_hand_analysis, a.day_plan_qty, a.day_produce_order, a.day_sys_analysis, a.day_hand_analysis, a.next_mid_plan_qty, a.next_mid_produce_order, a.next_mid_sys_analysis, a.next_mid_hand_analysis, a.cx_class1_plan, a.cx_class2_plan, a.cx_class3_plan, a.cx_class4_plan, a.cx_class5_plan, a.is_release, a.mark_close_out_tip, a.close_out_spec_flag, a.production_status, a.remark, a.del_flag, a.create_by, a.create_time, a.update_by, a.update_time,a.data_source, a.publish_success_count, a.newest_publish_time, a.last_mid_plan_qty,
+        a.id, a.schedule_date, a.cx_batch_no, a.batch_no, a.order_no, a.bead_code, a.steel_ring_code, a.triangle_glue_code, a.glue_code, a.mouth_plate_code, a.spec_size, a.machine_code, a.unit_consume, a.stock_qty, a.supply_time, a.mid_plan_qty, a.mid_produce_order, a.mid_sys_analysis, a.mid_hand_analysis, a.night_plan_qty, a.night_produce_order, a.night_sys_analysis, a.night_hand_analysis, a.day_plan_qty, a.day_produce_order, a.day_sys_analysis, a.day_hand_analysis, a.next_mid_plan_qty, a.next_mid_produce_order, a.next_mid_sys_analysis, a.next_mid_hand_analysis, a.cx_class1_plan, a.cx_class2_plan, a.cx_class3_plan, a.cx_class4_plan, a.cx_class5_plan, a.is_release, a.mark_close_out_tip, a.close_out_spec_flag, a.production_status, a.remark, a.del_flag, a.create_by, a.create_time, a.update_by, a.update_time,a.data_source, a.publish_success_count, a.newest_publish_time, a.last_mid_plan_qty, a.use_backup_config_flag, a.backup_shift_count, a.backup_trigger_class,
     </sql>
 
     <select id="getScheduleResult" parameterType="long" resultType="com.zlt.aps.tq.entity.TqScheduleResult">

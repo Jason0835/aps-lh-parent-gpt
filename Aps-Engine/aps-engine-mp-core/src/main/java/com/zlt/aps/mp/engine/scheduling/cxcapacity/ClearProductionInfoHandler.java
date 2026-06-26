@@ -51,7 +51,7 @@ public class ClearProductionInfoHandler {
     public void beforeSimulateProductionHandler(Context context, Map<String, ProductionPlanGroupInfo> allGroupPlanMap, List<CxMachineAllocationPlanHelper> continueAllocationList, Map<String, CxContinueInfoHelper> allContinueMap) {
         TbrProductionContext productionContext = (TbrProductionContext) context;
         //对测算成型产能分配的续作部分进行重排-先清空已排信息
-        clearProductionInfo(productionContext);
+        clearProductionInfo(productionContext, false);
         //清除日排产限制使用量，保留成型每日分配量及每日结构切换次数
         productionContext.clearAllDayLimitUsed();
         //在机结构对在产机台构建硫化组限制
@@ -72,7 +72,7 @@ public class ClearProductionInfoHandler {
     public void resetProductionBySimulateProductionHandler(Context context, Map<String, ProductionPlanGroupInfo> allGroupPlanMap, List<CxMachineAllocationPlanHelper> continueAllocationList, Map<String, CxContinueInfoHelper> allContinueMap) {
         TbrProductionContext productionContext = (TbrProductionContext) context;
         //1、对测算成型产能分配的续作部分进行重排-先清空已排信息
-        clearProductionInfo(productionContext);
+        clearProductionInfo(productionContext, false);
         //清除日排产限制使用量--包含成型分配量和每日切换结构次数、成型工装占用量清空
         productionContext.clearAllDayUsedInfo();
         //2、成型产能分配-还原到在产机台的初始分配
@@ -92,7 +92,7 @@ public class ClearProductionInfoHandler {
     public void resetBeforeFormalProduction(Context context, Map<String, ProductionPlanGroupInfo> allGroupPlanInfo, List<MpStructureAllocation> allAllocationList) {
         TbrProductionContext productionContext = (TbrProductionContext) context;
         //1、清除模拟排产信息
-        clearProductionInfo(productionContext);
+        clearProductionInfo(productionContext, true);
         //清除日排产限制使用量，保留成型每日分配量及每日结构切换次数
         productionContext.clearAllDayLimitUsed();
         //2、根据分组转产配置，重新构建分组的限制信息
@@ -129,13 +129,14 @@ public class ClearProductionInfoHandler {
      * 7、胶囊卡盘每日使用量清空
      * 8、特殊原材料的库存消耗量清空
      *
-     * @param productionContext
+     * @param productionContext 排产上下文
+     * @param isFormal          是否正式排产
      */
-    private void clearProductionInfo(TbrProductionContext productionContext) {
+    private void clearProductionInfo(TbrProductionContext productionContext, boolean isFormal) {
         //物料已排产量及损耗量清空
         productionContext.resetSkuProductionAndWastageQty();
         //处理计划的待排产量及排产标记重置
-        resetProductionPlanInfo(productionContext);
+        resetProductionPlanInfo(productionContext, isFormal);
         BaseDataContainer baseDataContainer = productionContext.getBaseDataContainer();
         //重新构建模具排产信息，全部清空
         clearMouldProductionInfo(baseDataContainer);
@@ -155,13 +156,22 @@ public class ClearProductionInfoHandler {
      * 重置计划的排产量信息--还原
      *
      * @param productionContext 排产上下文
+     * @param isFormal          是否正式排产
      */
-    private void resetProductionPlanInfo(TbrProductionContext productionContext) {
+    private void resetProductionPlanInfo(TbrProductionContext productionContext, boolean isFormal) {
         Map<Long, MonthPlanProductionRequirePlanVo> allSinglePlanMap = productionContext.getAllProductionPlan();
         if (CollectionUtils.isEmpty(allSinglePlanMap)) {
             return;
         }
-        allSinglePlanMap.forEach((monthPlanId, singlePlan) -> singlePlan.resetProductionDataInfo());
+        allSinglePlanMap.forEach((monthPlanId, singlePlan) -> {
+            boolean isFlagFalse;
+            if (isFormal) {
+                isFlagFalse = false;
+            } else {
+                isFlagFalse = singlePlan.isFlagFalse(productionContext);
+            }
+            singlePlan.resetProductionDataInfo(isFlagFalse);
+        });
     }
 
     /**

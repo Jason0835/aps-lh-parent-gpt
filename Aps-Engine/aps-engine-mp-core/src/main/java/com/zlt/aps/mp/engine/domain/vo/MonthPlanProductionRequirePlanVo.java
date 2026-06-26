@@ -1,5 +1,6 @@
 package com.zlt.aps.mp.engine.domain.vo;
 
+import com.google.common.collect.Sets;
 import com.zlt.aps.enums.*;
 import com.zlt.aps.mp.api.domain.entity.DpDemandPlan;
 import com.zlt.aps.mp.api.domain.entity.ProductionMonthPlanInit;
@@ -7,6 +8,7 @@ import com.zlt.aps.mp.engine.basedata.assemble.construction.ConstructionSelector
 import com.zlt.aps.mp.engine.constant.ProductionConstant;
 import com.zlt.aps.mp.engine.domain.Context;
 import com.zlt.aps.mp.engine.domain.dto.CxContinueSkuInfoHelper;
+import com.zlt.aps.mp.engine.scheduling.TbrProductionContext;
 import com.zlt.aps.mp.engine.utils.NoProductionReasonUtils;
 import com.zlt.common.utils.PubUtil;
 import lombok.Data;
@@ -177,6 +179,30 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
     }
 
     /**
+     * 是否需要标记不排产
+     * 在非正式阶段使用
+     * true 表示需要
+     * false表示不需要
+     *
+     * @param context
+     * @return
+     */
+    public boolean isFlagFalse(Context context) {
+        String structureType = getStructureType();
+        if (!ProductionGroupTypeEnum.CYCLE.getGroupType().equals(structureType)) {
+            //非周期结构
+            return false;
+        }
+        TbrProductionContext productionContext = (TbrProductionContext) context;
+        Set<String> monthProductionCycleSet = productionContext.getBaseDataContainer().getMonthProductionCycleList();
+        if (CollectionUtils.isEmpty(monthProductionCycleSet)) {
+            return true;
+        }
+        //不在月周期清单中
+        return !monthProductionCycleSet.contains(getStructureName());
+    }
+
+    /**
      * 判断日硫化量是否有效
      * 日硫化量有值，且大于零
      *
@@ -208,12 +234,18 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
      * 高优级待排产量
      * 总需求排量量
      * 初始的库销比
+     *
+     * @param isFlagFalse 是否处理不排产
      */
-    public void resetProductionDataInfo() {
+    public void resetProductionDataInfo(boolean isFlagFalse) {
         productionFlag = getIsProduction();
         heightProductionQty = originHeightProductionQty;
         productionQty = originProductionQty;
         calculateInventorySalesRatio(BigDecimal.ZERO.intValue());
+        //需要将排产标记置为false
+        if (isFlagFalse) {
+            productionFlag = YesOrNoEnum.NO.getCode();
+        }
     }
 
     /**
@@ -710,15 +742,16 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
      * 初始化阶段使用
      *
      * @param monthProductionCycleList 月周期排产结果清单
+     * @param continueGroupList        续作结构集合
      */
-    public void checkProductionConditionByBase(Set<String> monthProductionCycleList) {
+    public void checkProductionConditionByBase(Set<String> monthProductionCycleList, Set<String> continueGroupList) {
         //检测是否符合不排产，且不用往下继续检测的业务场景
         String isProduction = checkNoContinueCondition();
         if (YesOrNoEnum.NO.getCode().equals(isProduction)) {
             return;
         }
         //检查物料基础业务
-        isProduction = checkMaterialCondition(isProduction, monthProductionCycleList);
+        isProduction = checkMaterialCondition(isProduction, monthProductionCycleList, continueGroupList);
         //检查施工业务
         isProduction = checkConstructionCondition(isProduction);
         //检查模具业务
@@ -840,9 +873,10 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
      *
      * @param isProduction
      * @param monthProductionCycleList 月周期排产结果清单
+     * @param continueGroupList        续作结构清单
      * @return
      */
-    private String checkMaterialCondition(String isProduction, Set<String> monthProductionCycleList) {
+    private String checkMaterialCondition(String isProduction, Set<String> monthProductionCycleList, Set<String> continueGroupList) {
         //没有英寸
         if (StringUtils.isBlank(getProSize())) {
             isProduction = YesOrNoEnum.NO.getCode();
@@ -860,8 +894,8 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
             String noStructureNameReason = NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.NO_STRUCTURE_NAME);
             addNoProductionReason(noStructureNameReason);
         } else {
-            //20260403+ 周期结构需判断是否在月周期清单中
-            if (ProductionGroupTypeEnum.CYCLE.getGroupType().equals(getStructureType()) && !monthProductionCycleList.contains(structureName)) {
+            //20260626+ 周期结构需判断即不在月周期结构清单中又不是续作结构则直接不排
+            if (isRejectGroup(monthProductionCycleList, continueGroupList)) {
                 isProduction = YesOrNoEnum.NO.getCode();
                 String noProductionListReason = NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.NO_PRODUCTION_NO_MONTH_LIST);
                 addNoProductionReason(noProductionListReason);
@@ -874,6 +908,35 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
             addNoProductionReason(noMainPatternReason);
         }
         return isProduction;
+    }
+
+    /**
+     * 20260626 是否需要剔除排产的结构(周期结构即不在月周期清单中也不在续作结构中则无需排产)
+     * 不能直接将周期结构不在月周期结构清单就不排，因为可能会因为结构切换原因导致续作需要延长
+     * 1、周期结构
+     * 2、不在月周期结构清单中
+     * 3、也不在续作结构清单中
+     *
+     * @param monthProductionCycleList 月周期结构清单
+     * @param continueGroupList        续作结构清单
+     * @return
+     */
+    private boolean isRejectGroup(Set<String> monthProductionCycleList, Set<String> continueGroupList) {
+        String groupType = getStructureType();
+        if (!ProductionGroupTypeEnum.CYCLE.getGroupType().equals(groupType)) {
+            //不是周期结构
+            return false;
+        }
+        //是周期结构
+        String structureName = getStructureName();
+        Set<String> existences = Sets.newHashSet();
+        if (!CollectionUtils.isEmpty(monthProductionCycleList)) {
+            existences.addAll(monthProductionCycleList);
+        }
+        if (!CollectionUtils.isEmpty(continueGroupList)) {
+            existences.addAll(continueGroupList);
+        }
+        return !existences.contains(structureName);
     }
 
     /**

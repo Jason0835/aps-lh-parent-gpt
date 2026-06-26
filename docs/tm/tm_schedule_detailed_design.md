@@ -200,6 +200,8 @@
 - `TM_ROLLING_SHIFT_COUNT`：局部滚动重算班次数，默认 3
 - `TM_MAX_LOOKAHEAD_SHIFT_COUNT`：需求前瞻班次数
 - `TM_ALGORITHM_SWITCH`：需求量计算类型，1=算法1,2=算法2
+- `TM_NEW_SPEC_LOOKBACK_DAYS`：新规格历史排程回看天数，默认 7。用于按 `factoryCode + treadCode + scheduleDate` 判断排程日前 N 天内是否已有胎面排程计划量。
+- `TM_NEW_SPEC_ADVANCE_SHIFT_COUNT`：新规格提前排产班次数，默认 2。只在当前实现计算出的正常目标班次基础上前移，不修改成型班次到胎面班次的既有映射口径。
 
 ### 4.11 `T_TM_STOCK`
 
@@ -338,6 +340,15 @@
 
 后续链路在 `baseDemandQty` 上继续：收尾判断 → 损耗补偿 → 工装限制 → 最小起排 → 卷数取整 → 产能压缩。库存抵扣后 `baseDemandQty` 为 0 时，最小起排不再补足，该班生成 0 计划量任务并保留落库。`TmGuardDemandQtyStrategy`/`TmNextShiftDemandQtyStrategy` 的需求量（`demandQty`，用于排序/解释）保持毛需求语义，不被库存抵扣拉低；库存抵扣只作用于计划量侧。
 
+#### 7.4.2 新规格提前排产窗口
+
+新规格提前排产只调整任务进入待排班次的时机，不改变 `BOOTSTRAP -> INVENTORY_PREDICT -> PLAN_CALC -> TASK_SORT -> MACHINE_ASSIGN -> SNAPSHOT_BUILD` 的主链路，也不绕过口型、胶料、定点/禁排、产能、最小起排量、卷曲取整、收尾和未排逻辑。
+
+判定口径：按 `factoryCode + treadCode + scheduleDate` 查询排程日前一天 `T_TM_STOCK`，净库存使用 `stock_qty - bad_qty - adjust_qty`，无记录或净库存小于等于 0 视为前一天无有效库存；再按 `[scheduleDate - TM_NEW_SPEC_LOOKBACK_DAYS, scheduleDate - 1]` 查询 `T_TM_SCHEDULE_RESULT`，任一班次计划量大于 0 视为已有历史排程。两项同时满足“无有效库存、无历史排程”时判定为新规格。历史排程查询必须带工厂维度，并显式排除 `is_delete = 1` 的历史结果，避免已删结果误判。
+
+提前窗口：先按当前实现计算出正常目标班次 `normalTargetShift`，不修正常规规格的班次映射；若命中新规格，则目标班次调整为 `max(CLASS1, normalTargetShift - TM_NEW_SPEC_ADVANCE_SHIFT_COUNT)`。解释对象记录 `normalTargetShift`、`adjustedTargetShift`、`adjustedTargetWindow`、需求班次和需求量。非新规格仍使用原 `shiftOrder`，规则只记录检测证据。
+
+分配规则：新规格任务仍进入现有 `MACHINE_ASSIGN`，由机台剩余产能承接。提前窗口内产能不足时，沿用现有同班次多机台拆分和后续班次滚动逻辑；滚动到 6 班后仍不足的数量写未排。解释表 `rule_hit_json` 增加 `NEW_SPEC_DETECT`、`NEW_SPEC_ADVANCE_WINDOW`、`NEW_SPEC_ADVANCE_RESULT`：分别记录判定依据、目标班次调整依据和实际机台分配/滚动结果。
 ### 7.5 类与方法说明要求
 
 后续 Java 实现时，每个新增类和核心方法必须写中文注释，说明具体作用、参数传法、返回值、异常场景和是否修改任务链。

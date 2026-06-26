@@ -211,7 +211,12 @@ public enum MonthPlanEnums {
     /**
      *  SYS0206006 周程滚动调整日
      */
-    WEEK_ROLL_ADJUST_DATE("SYS0206006","周程滚动调整日");
+    WEEK_ROLL_ADJUST_DATE("SYS0206006","周程滚动调整日"),
+    /**
+     * SYS0206009 上月超欠产有效标志判定阈值
+     * 定时计算上月超欠产时，|超欠产值|(绝对值)大于该阈值则有效标志置否，否则置是
+     */
+    LAST_MONTH_OVERDUE_THRESHOLD("SYS0206009", "上月超欠产有效标志判定阈值");
 
     private final String code;
     private final String name;

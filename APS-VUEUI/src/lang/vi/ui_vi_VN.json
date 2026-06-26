@@ -437,6 +437,7 @@
   "ui.data.column.dj.scheduleResult.statMorningPlanQty": "Tổng ca sáng",
   "ui.data.column.dj.scheduleResult.statMiddlePlanQty": "Tổng ca trưa",
   "ui.data.column.dj.scheduleResult.prevDayClass3": "Ca sớm hôm trước",
+  "ui.data.column.dj.scheduleResult.prevDayClass1": "Ca giữa hôm trước",
   "ui.data.column.scheduleResult.sapCode": "Mã SAP",
   "ui.data.column.scheduleResult.lhMachineCode": "Máy lưu hóa",
   "ui.data.column.scheduleResult.lhMachineName": "Tên máy lưu hóa",

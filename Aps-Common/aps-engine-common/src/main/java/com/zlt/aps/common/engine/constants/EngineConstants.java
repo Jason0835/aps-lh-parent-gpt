@@ -470,7 +470,9 @@ public class EngineConstants {
     public static String LESS_SUPPLY_TIME = "LESS_SUPPLY_TIME";
 
     /**
-     * 参数code：胎圈备库班数（保证成型的班次排产数），默认1
+     * 参数code：胎圈备库触发阈值（1个班的成型消耗量阈值）
+     * <p>语义：当胎圈交接班库存不足以支撑1个班的成型消耗量时，触发胎圈备库班数配置逻辑</p>
+     * <p>历史含义：保证成型的班次排产数，默认1</p>
      */
     public static String BACKUP_SHIFT_COUNT = "SYS0301001";
 

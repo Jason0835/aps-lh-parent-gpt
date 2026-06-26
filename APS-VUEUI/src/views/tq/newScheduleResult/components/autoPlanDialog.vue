@@ -114,7 +114,12 @@ export default {
         }
         return;
       }
-      this.$modal.msgSuccess(tip || this.$t("ui.data.column.tqNewScheduleResult.scheduleCompleted"));
+      this.$modal.msgSuccess(
+        tip ||
+          this.$t(
+            "ui.data.column.tqNewScheduleResult.scheduleCompleted"
+          )
+      );
       this.$emit("success", { ...params });
     },
     /**
