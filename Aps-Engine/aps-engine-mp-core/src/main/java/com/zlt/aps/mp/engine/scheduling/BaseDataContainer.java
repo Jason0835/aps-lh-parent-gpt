@@ -40,6 +40,10 @@ public class BaseDataContainer implements Serializable {
      */
     private ProductionCapacityParamConfiguration paramConfiguration;
     /**
+     * 月周期结构清单
+     */
+    private Set<String> monthProductionCycleList;
+    /**
      * 成型产能信息集合
      * key=cxMachineCode : value=成型机信息
      */

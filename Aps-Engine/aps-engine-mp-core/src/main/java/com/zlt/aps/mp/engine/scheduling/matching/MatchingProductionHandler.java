@@ -13,6 +13,7 @@ import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.mp.api.domain.capacity.MpDailyCapacityLimitVo;
 import com.zlt.aps.mp.api.domain.entity.*;
 import com.zlt.aps.mp.api.domain.vo.MpDayProductionStatisticsDetailVo;
+import com.zlt.aps.mp.engine.basedata.assemble.cyclegroup.CycleGroupDataHandler;
 import com.zlt.aps.mp.engine.basedata.assemble.history.ProductionHistoryHandler;
 import com.zlt.aps.mp.engine.capacity.MpMonthPlanDailyCapacityLimit;
 import com.zlt.aps.mp.engine.check.SkuSecondChecker;
@@ -71,9 +72,12 @@ import static com.zlt.aps.common.core.utils.ApsNumberUtils.*;
 @Component
 public class MatchingProductionHandler extends AbstractDataLoaderService {
 
-    public MatchingProductionHandler(ProductionMdmDataService dataService, DpRequireDataService dpRequireDataService,
-                                     MonthProductionDataService monthProductionDataService, ProductionHistoryHandler productionHistoryHandler) {
-        super(dataService, dpRequireDataService, monthProductionDataService, productionHistoryHandler);
+    public MatchingProductionHandler(ProductionMdmDataService dataService,
+                                     DpRequireDataService dpRequireDataService,
+                                     CycleGroupDataHandler cycleGroupDataHandler,
+                                     ProductionHistoryHandler productionHistoryHandler,
+                                     MonthProductionDataService monthProductionDataService) {
+        super(dataService, dpRequireDataService, cycleGroupDataHandler, productionHistoryHandler, monthProductionDataService);
     }
 
     @Autowired
@@ -2414,7 +2418,7 @@ public class MatchingProductionHandler extends AbstractDataLoaderService {
             requirePlan.setOriginHeightProductionQty(demandPlan.getHeightQty());
             requirePlan.setProductionQty(0);
             requirePlan.setProducedQty(productionQty);
-            requirePlan.resetProductionDataInfo();
+            requirePlan.resetProductionDataInfo(false);
             requirePlanList.add(requirePlan);
         }
         return requirePlanList;

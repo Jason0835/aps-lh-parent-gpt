@@ -1,6 +1,5 @@
 package com.zlt.aps.mp.engine.scheduling.mouldproduction;
 
-import com.google.common.collect.Lists;
 import com.ruoyi.api.gateway.system.service.ISysDictDataCacheService;
 import com.ruoyi.common.core.domain.SysDictData;
 import com.ruoyi.common.core.utils.SecurityUtils;
@@ -11,9 +10,9 @@ import com.zlt.aps.exception.BusinessException;
 import com.zlt.aps.mp.api.domain.entity.*;
 import com.zlt.aps.mp.api.enums.ProductionProcessStage;
 import com.zlt.aps.mp.engine.basedata.assemble.continueinfo.ContinueGroupInfoHandler;
+import com.zlt.aps.mp.engine.basedata.assemble.cyclegroup.CycleGroupDataHandler;
 import com.zlt.aps.mp.engine.basedata.assemble.history.ProductionHistoryHandler;
 import com.zlt.aps.mp.engine.domain.Context;
-import com.zlt.aps.mp.engine.domain.ProductionStageLogRecorder;
 import com.zlt.aps.mp.engine.domain.dto.*;
 import com.zlt.aps.mp.engine.domain.vo.*;
 import com.zlt.aps.mp.engine.enums.LogRecorderStageEnum;
@@ -84,6 +83,7 @@ public class TbrMouldProductionService extends AbstractDataLoaderService {
 
     public TbrMouldProductionService(ProductionMdmDataService dataService,
                                      DpRequireDataService dpRequireDataService,
+                                     CycleGroupDataHandler cycleGroupDataHandler,
                                      ProductionHistoryHandler productionHistoryHandler,
                                      FormalProductionHandler formalProductionHandler,
                                      ISysDictDataCacheService iSysDictDataCacheService,
@@ -97,7 +97,7 @@ public class TbrMouldProductionService extends AbstractDataLoaderService {
                                      CalculateStructureCxMachineNumber calculateStructureCxMachineNumber,
                                      ProductionCxMachineCalculationHandler productionCxMachineCalculationHandler,
                                      AdjustContinueSkuProductionQtyHandler adjustContinueSkuProductionQtyHandler) {
-        super(dataService, dpRequireDataService, monthProductionDataService, productionHistoryHandler);
+        super(dataService, dpRequireDataService, cycleGroupDataHandler, productionHistoryHandler, monthProductionDataService);
         this.formalProductionHandler = formalProductionHandler;
         this.iSysDictDataCacheService = iSysDictDataCacheService;
         this.continueGroupInfoHandler = continueGroupInfoHandler;
@@ -139,6 +139,12 @@ public class TbrMouldProductionService extends AbstractDataLoaderService {
         log.info(TbrBeforeProductionGroupLogRecorder.addStartBeforeProductionDataLog(productionContext));
         initProductionBaseData(productionContext, requirePlanList);
         saveMouldUsedLog(productionContext);
+        //20260626+ 非月周期结构清单中置为不排产
+        requirePlanList.forEach(singlePlan -> {
+            if (singlePlan.isFlagFalse(productionContext)) {
+                singlePlan.setProductionFlag(YesOrNoEnum.NO.getCode());
+            }
+        });
         //3、按结构分组，汇总结构净需求量，粗算需要的机台数 记录日志-粗算成型机台数，并赋值结构指定的机台集合
         log.info(TbrProductionGroupLogRecorder.addStartGroupCalculateCapacityLog(productionContext));
         Map<String, ProductionPlanGroupInfo> estimateGroupCxAllocationMap = calculateStructureCxMachineNumber.calculateStructureCxMachineNumber(productionContext, requirePlanList, true);
