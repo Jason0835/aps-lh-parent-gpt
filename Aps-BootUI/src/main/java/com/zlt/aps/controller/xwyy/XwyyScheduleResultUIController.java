@@ -29,21 +29,21 @@ import java.util.Arrays;
 @RequestMapping("/xwyy/xwyyScheduleResult")
 public class XwyyScheduleResultUIController extends BaseUIController<XwyyScheduleResult> {
     @Resource
-    private IXwyyScheduleResultRemoteService remote;
+    private IXwyyScheduleResultRemoteService xwyyScheduleResultRemoteService;
 
     @ApiOperation("查询列表")
     @RequiresPermissions("xwyy:scheduleResult:list")
     @PostMapping("/list")
     @ResponseBody
-    public TableDataInfo list(XwyyScheduleResult q) {
-        return remote.list(q);
+    public TableDataInfo list(XwyyScheduleResult query) {
+        return xwyyScheduleResultRemoteService.list(query);
     }
 
     @ApiOperation("获取详情")
     @GetMapping("/getInfo/{id}")
     @ResponseBody
     public XwyyScheduleResult getInfo(@PathVariable("id") Long id) {
-        return remote.getInfo(id);
+        return xwyyScheduleResultRemoteService.getInfo(id);
     }
 
     @ApiOperation("删除")
@@ -51,7 +51,7 @@ public class XwyyScheduleResultUIController extends BaseUIController<XwyySchedul
     @PostMapping("/remove")
     @ResponseBody
     public AjaxResult remove(String ids) {
-        return remote.removeByIds(Arrays.asList(Convert.toLongArray(ids)));
+        return xwyyScheduleResultRemoteService.removeByIds(Arrays.asList(Convert.toLongArray(ids)));
     }
 
     @ApiOperation("自动排程")
@@ -59,7 +59,7 @@ public class XwyyScheduleResultUIController extends BaseUIController<XwyySchedul
     @PostMapping("/autoSchedule")
     @ResponseBody
     public AjaxResult autoSchedule(@RequestBody XwyyScheduleResult entity) {
-        return remote.autoSchedule(entity);
+        return xwyyScheduleResultRemoteService.autoSchedule(entity);
     }
 
     @ApiOperation("插单")
@@ -67,7 +67,7 @@ public class XwyyScheduleResultUIController extends BaseUIController<XwyySchedul
     @PostMapping("/insert")
     @ResponseBody
     public AjaxResult insert(@RequestBody XwyyScheduleResult entity) {
-        return remote.insert(entity);
+        return xwyyScheduleResultRemoteService.insert(entity);
     }
 
     @ApiOperation("转机台")
@@ -75,7 +75,7 @@ public class XwyyScheduleResultUIController extends BaseUIController<XwyySchedul
     @PostMapping("/changeMachine")
     @ResponseBody
     public AjaxResult changeMachine(@RequestBody XwyyScheduleResult entity) {
-        return remote.changeMachine(entity);
+        return xwyyScheduleResultRemoteService.changeMachine(entity);
     }
 
     @ApiOperation("调量")
@@ -83,7 +83,7 @@ public class XwyyScheduleResultUIController extends BaseUIController<XwyySchedul
     @PostMapping("/adjustQty")
     @ResponseBody
     public AjaxResult adjustQty(@RequestBody XwyyScheduleResult entity) {
-        return remote.adjustQty(entity);
+        return xwyyScheduleResultRemoteService.adjustQty(entity);
     }
 
     @ApiOperation("发布")
@@ -91,7 +91,7 @@ public class XwyyScheduleResultUIController extends BaseUIController<XwyySchedul
     @PostMapping("/publish")
     @ResponseBody
     public AjaxResult publish(@RequestBody XwyyScheduleResult entity) {
-        return remote.publish(entity);
+        return xwyyScheduleResultRemoteService.publish(entity);
     }
 
     @Override
@@ -111,9 +111,9 @@ public class XwyyScheduleResultUIController extends BaseUIController<XwyySchedul
 
     @ApiOperation("下载导入模板")
     @Override
-    public AjaxResult importTemplate(HttpServletResponse r) throws IOException {
-        ExcelUtil<XwyyScheduleResult> u = new ExcelUtil<>(XwyyScheduleResult.class);
-        u.exportExcel(r, null, getExportTemplateFileName(), getExportTemplateFileName());
+    public AjaxResult importTemplate(HttpServletResponse response) throws IOException {
+        ExcelUtil<XwyyScheduleResult> excelUtil = new ExcelUtil<>(XwyyScheduleResult.class);
+        excelUtil.exportExcel(response, null, getExportTemplateFileName(), getExportTemplateFileName());
         return AjaxResult.success();
     }
 
@@ -122,11 +122,11 @@ public class XwyyScheduleResultUIController extends BaseUIController<XwyySchedul
     @GetMapping("/export")
     @ResponseBody
     @Override
-    public void export(HttpServletResponse r, XwyyScheduleResult e) throws IOException {
-        byte[] b = remote.exportData(e, getExportTemplateFileName());
-        ExcelUtil.setResponseHeader(r, getExportTemplateFileName(), ".xlsx");
-        IOUtils.copy(new ByteArrayInputStream(b), r.getOutputStream());
-        r.flushBuffer();
+    public void export(HttpServletResponse response, XwyyScheduleResult entity) throws IOException {
+        byte[] data = xwyyScheduleResultRemoteService.exportData(entity, getExportTemplateFileName());
+        ExcelUtil.setResponseHeader(response, getExportTemplateFileName(), ".xlsx");
+        IOUtils.copy(new ByteArrayInputStream(data), response.getOutputStream());
+        response.flushBuffer();
     }
 
     @ApiOperation("导入")
@@ -134,14 +134,14 @@ public class XwyyScheduleResultUIController extends BaseUIController<XwyySchedul
     @PostMapping("/importData")
     @ResponseBody
     @Override
-    public AjaxResult importData(@RequestPart("file") MultipartFile f, boolean updateSupport) throws Exception {
-        byte[] d = this.useFileEncrypt ? FileEncryptUtils.DecodeFile(f) : f.getBytes();
-        ImportContext c = new ImportContext();
-        c.setImportFilePath(this.importFilePath);
-        c.setFunctionName(getFunctionName());
-        c.setProcedureCode(getProcedureCode());
-        c.setOriFileName(f.getOriginalFilename());
-        c.setFileBytes(d);
-        return remote.importData(c, updateSupport);
+    public AjaxResult importData(@RequestPart("file") MultipartFile file, boolean updateSupport) throws Exception {
+        byte[] decodedBytes = this.useFileEncrypt ? FileEncryptUtils.DecodeFile(file) : file.getBytes();
+        ImportContext context = new ImportContext();
+        context.setImportFilePath(this.importFilePath);
+        context.setFunctionName(getFunctionName());
+        context.setProcedureCode(getProcedureCode());
+        context.setOriFileName(file.getOriginalFilename());
+        context.setFileBytes(decodedBytes);
+        return xwyyScheduleResultRemoteService.importData(context, updateSupport);
     }
 }

@@ -38,6 +38,7 @@ export default {
         { type: "selection", fixed: "left" },
         { prop: "factoryCode", align: "center", halign: "center", label: this.$t("ui.data.column.xwyyStock.factoryCode"), minWidth: 120, formatter: (row, column, value) => this.selectDictLabel(this.dict.type.biz_factory_name, value) },
         { prop: "stockDate", align: "center", halign: "center", label: this.$t("ui.data.column.xwyyStock.stockDate"), minWidth: 120 },
+        { prop: "stockInTime", align: "center", halign: "center", label: this.$t("ui.data.column.xwyyStock.stockInTime"), minWidth: 160 },
         { prop: "bigRollCode", align: "center", halign: "center", label: this.$t("ui.data.column.xwyyStock.bigRollCode"), minWidth: 160 },
         { prop: "bigRollBarcode", align: "center", halign: "center", label: this.$t("ui.data.column.xwyyStock.bigRollBarcode"), minWidth: 130 },
         { prop: "stockNum", align: "center", halign: "center", label: this.$t("ui.data.column.xwyyStock.stockNum"), minWidth: 130 },

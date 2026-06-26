@@ -34,6 +34,7 @@ export default {
       return [
         { prop: "factoryCode", label: this.$t("ui.data.column.xwyyStock.factoryCode"), type: "select", dictData: this.parentDict.type.biz_factory_name, filterable: true },
         { prop: "stockDate", label: this.$t("ui.data.column.xwyyStock.stockDate"), type: "date" },
+        { prop: "stockInTime", label: this.$t("ui.data.column.xwyyStock.stockInTime"), type: "date", dateType: "datetime", valueFormat: "yyyy-MM-dd HH:mm:ss" },
         { prop: "bigRollCode", label: this.$t("ui.data.column.xwyyStock.bigRollCode"), type: "input" },
         { prop: "bigRollBarcode", label: this.$t("ui.data.column.xwyyStock.bigRollBarcode"), type: "input" },
         { prop: "stockNum", label: this.$t("ui.data.column.xwyyStock.stockNum"), type: "number" },

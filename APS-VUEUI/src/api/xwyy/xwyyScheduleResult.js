@@ -1,4 +1,4 @@
-import request from '@/utils/request'
+import request, { downloadLink } from '@/utils/request'
 
 export function listScheduleResult(query) {
   return request({
@@ -13,6 +13,16 @@ export function removeScheduleResult(query) {
     method: 'post',
     data: query
   })
+}
+export function exportScheduleResult(query) {
+  return downloadLink('/xwyy/xwyyScheduleResult/export', query)
+}
+
+export function autoScheduleResult(data) {
+  return request({ url: '/xwyy/xwyyScheduleResult/autoSchedule', method: 'post', data })
+}
+export function getAutoScheduleTask(taskId) {
+  return request({ url: `/xwyy/xwyyScheduleResult/autoSchedule/task/${taskId}`, method: 'get' })
 }
 
 //

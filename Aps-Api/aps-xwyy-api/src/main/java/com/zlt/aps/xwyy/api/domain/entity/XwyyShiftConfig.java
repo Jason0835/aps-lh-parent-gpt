@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.ruoyi.common.core.annotation.Excel;
+import com.ruoyi.common.core.web.domain.BaseEntity;
 import com.zlt.aps.common.core.domain.ApsBaseEntity;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
@@ -15,7 +16,7 @@ import lombok.EqualsAndHashCode;
 @EqualsAndHashCode(callSuper = false)
 @ApiModel(value = "纤维压延班次配置", description = "纤维压延班次配置")
 @TableName("t_xwyy_shift_config")
-public class XwyyShiftConfig extends ApsBaseEntity {
+public class XwyyShiftConfig extends BaseEntity {
     private static final long serialVersionUID = 1L;
 
     @ApiModelProperty(value = "主键ID")

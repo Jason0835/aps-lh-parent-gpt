@@ -43,7 +43,7 @@ Service    extends IDocService<Entity>
 ServiceImpl extends AbstractDocService<Entity> implements ICxEntityNameService
 UIController extends BaseUIController<Entity>
 ```
-### 后端规范：
+### bootui 后端规范：
 - 禁止使用单字母缩写作为变量名或方法参数名（如 `q`、`e`、`w`），必须使用有业务含义的完整命名（如 `queryVO`、`entity`、`wrapper`）。
 
 ### 数据库相关：

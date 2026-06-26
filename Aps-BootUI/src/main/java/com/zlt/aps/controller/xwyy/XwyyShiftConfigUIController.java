@@ -15,6 +15,7 @@ import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import org.apache.commons.io.IOUtils;
 import org.apache.shiro.authz.annotation.RequiresPermissions;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -30,41 +31,43 @@ import java.util.Arrays;
 @RequestMapping("/xwyy/xwyyShiftConfig")
 public class XwyyShiftConfigUIController extends BaseUIController<XwyyShiftConfig> {
     @Resource
-    private IXwyyShiftConfigRemoteService remote;
+    private IXwyyShiftConfigRemoteService xwyyShiftConfigRemoteService;
+
+
 
     @ApiOperation("查询列表")
     @RequiresPermissions("xwyy:shiftConfig:list")
     @PostMapping("/list")
     @ResponseBody
-    public TableDataInfo list(XwyyShiftConfig q) {
-        return remote.list(q);
+    public TableDataInfo list(XwyyShiftConfig query) {
+        return xwyyShiftConfigRemoteService.list(query);
     }
 
     @ApiOperation("获取详情")
     @GetMapping("/getInfo/{id}")
     @ResponseBody
     public XwyyShiftConfig getInfo(@PathVariable("id") Long id) {
-        return remote.getInfo(id);
+        return xwyyShiftConfigRemoteService.getInfo(id);
     }
 
     @ApiOperation("新增")
     @RequiresPermissions("xwyy:shiftConfig:add")
     @PostMapping("/add")
     @ResponseBody
-    public AjaxResult add(@RequestBody XwyyShiftConfig e) {
-        if (UserConstants.NOT_UNIQUE.equals(remote.checkUnique(e)))
+    public AjaxResult add(@RequestBody XwyyShiftConfig entity) {
+        if (UserConstants.NOT_UNIQUE.equals(xwyyShiftConfigRemoteService.checkUnique(entity)))
             return AjaxResult.error(I18nUtil.getMessage("ui.data.column.xwyyShiftConfig.checkUnique"));
-        return remote.add(e);
+        return xwyyShiftConfigRemoteService.add(entity);
     }
 
     @ApiOperation("编辑")
     @RequiresPermissions("xwyy:shiftConfig:edit")
     @PostMapping("/edit")
     @ResponseBody
-    public AjaxResult edit(@RequestBody XwyyShiftConfig e) {
-        if (UserConstants.NOT_UNIQUE.equals(remote.checkUnique(e)))
+    public AjaxResult edit(@RequestBody XwyyShiftConfig entity) {
+        if (UserConstants.NOT_UNIQUE.equals(xwyyShiftConfigRemoteService.checkUnique(entity)))
             return AjaxResult.error(I18nUtil.getMessage("ui.data.column.xwyyShiftConfig.checkUnique"));
-        return remote.edit(e);
+        return xwyyShiftConfigRemoteService.edit(entity);
     }
 
     @ApiOperation("删除")
@@ -72,15 +75,15 @@ public class XwyyShiftConfigUIController extends BaseUIController<XwyyShiftConfi
     @PostMapping("/remove")
     @ResponseBody
     public AjaxResult remove(String ids) {
-        return remote.removeByIds(Arrays.asList(Convert.toLongArray(ids)));
+        return xwyyShiftConfigRemoteService.removeByIds(Arrays.asList(Convert.toLongArray(ids)));
     }
 
     @ApiOperation("启用/禁用")
     @RequiresPermissions("xwyy:shiftConfig:edit")
     @PostMapping("/changeStatus")
     @ResponseBody
-    public AjaxResult changeStatus(@RequestBody XwyyShiftConfig e) {
-        return remote.changeStatus(e);
+    public AjaxResult changeStatus(@RequestBody XwyyShiftConfig entity) {
+        return xwyyShiftConfigRemoteService.changeStatus(entity);
     }
 
     @Override
@@ -100,9 +103,9 @@ public class XwyyShiftConfigUIController extends BaseUIController<XwyyShiftConfi
 
     @ApiOperation("下载导入模板")
     @Override
-    public AjaxResult importTemplate(HttpServletResponse r) throws IOException {
-        ExcelUtil<XwyyShiftConfig> u = new ExcelUtil<>(XwyyShiftConfig.class);
-        u.exportExcel(r, null, getExportTemplateFileName(), getExportTemplateFileName());
+    public AjaxResult importTemplate(HttpServletResponse response) throws IOException {
+        ExcelUtil<XwyyShiftConfig> excelUtil = new ExcelUtil<>(XwyyShiftConfig.class);
+        excelUtil.exportExcel(response, null, getExportTemplateFileName(), getExportTemplateFileName());
         return AjaxResult.success();
     }
 
@@ -111,11 +114,11 @@ public class XwyyShiftConfigUIController extends BaseUIController<XwyyShiftConfi
     @GetMapping("/export")
     @ResponseBody
     @Override
-    public void export(HttpServletResponse r, XwyyShiftConfig e) throws IOException {
-        byte[] b = remote.exportData(e, getExportTemplateFileName());
-        ExcelUtil.setResponseHeader(r, getExportTemplateFileName(), ".xlsx");
-        IOUtils.copy(new ByteArrayInputStream(b), r.getOutputStream());
-        r.flushBuffer();
+    public void export(HttpServletResponse response, XwyyShiftConfig entity) throws IOException {
+        byte[] data = xwyyShiftConfigRemoteService.exportData(entity, getExportTemplateFileName());
+        ExcelUtil.setResponseHeader(response, getExportTemplateFileName(), ".xlsx");
+        IOUtils.copy(new ByteArrayInputStream(data), response.getOutputStream());
+        response.flushBuffer();
     }
 
     @ApiOperation("导入")
@@ -123,14 +126,14 @@ public class XwyyShiftConfigUIController extends BaseUIController<XwyyShiftConfi
     @PostMapping("/importData")
     @ResponseBody
     @Override
-    public AjaxResult importData(@RequestPart("file") MultipartFile f, boolean updateSupport) throws Exception {
-        byte[] d = this.useFileEncrypt ? FileEncryptUtils.DecodeFile(f) : f.getBytes();
-        ImportContext c = new ImportContext();
-        c.setImportFilePath(this.importFilePath);
-        c.setFunctionName(getFunctionName());
-        c.setProcedureCode(getProcedureCode());
-        c.setOriFileName(f.getOriginalFilename());
-        c.setFileBytes(d);
-        return remote.importData(c, updateSupport);
+    public AjaxResult importData(@RequestPart("file") MultipartFile file, boolean updateSupport) throws Exception {
+        byte[] decodedBytes = this.useFileEncrypt ? FileEncryptUtils.DecodeFile(file) : file.getBytes();
+        ImportContext context = new ImportContext();
+        context.setImportFilePath(this.importFilePath);
+        context.setFunctionName(getFunctionName());
+        context.setProcedureCode(getProcedureCode());
+        context.setOriFileName(file.getOriginalFilename());
+        context.setFileBytes(decodedBytes);
+        return xwyyShiftConfigRemoteService.importData(context, updateSupport);
     }
 }

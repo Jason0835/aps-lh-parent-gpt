@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.ruoyi.common.core.annotation.Excel;
+import com.ruoyi.common.core.web.domain.BaseEntity;
 import com.zlt.aps.common.core.annotation.ImportValidated;
 import com.zlt.aps.common.core.domain.ApsBaseEntity;
 import io.swagger.annotations.ApiModel;
@@ -16,7 +17,7 @@ import java.util.Date;
 @Data
 @ApiModel(value = "纤维压延库存", description = "纤维压延库存")
 @TableName("t_xwyy_stock")
-public class XwyyStock extends ApsBaseEntity {
+public class XwyyStock extends BaseEntity {
     private static final long serialVersionUID = 1L;
 
     @ApiModelProperty("工厂编码")
@@ -31,6 +32,12 @@ public class XwyyStock extends ApsBaseEntity {
     @TableField("STOCK_DATE")
     @Excel(name = "ui.data.column.xwyyStock.stockDate", width = 30, dateFormat = "yyyy-MM-dd")
     private Date stockDate;
+
+    @ApiModelProperty("入库时间")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    @TableField("STOCK_IN_TIME")
+    @Excel(name = "ui.data.column.xwyyStock.stockInTime", width = 30, dateFormat = "yyyy-MM-dd HH:mm:ss")
+    private Date stockInTime;
 
     @ApiModelProperty("帘线大卷编号")
     @ImportValidated(required = true, maxLength = 30)

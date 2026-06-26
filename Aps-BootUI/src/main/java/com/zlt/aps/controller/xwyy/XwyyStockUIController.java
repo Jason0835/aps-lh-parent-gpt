@@ -30,41 +30,41 @@ import java.util.Arrays;
 @RequestMapping("/xwyy/xwyyStock")
 public class XwyyStockUIController extends BaseUIController<XwyyStock> {
     @Resource
-    private IXwyyStockRemoteService remote;
+    private IXwyyStockRemoteService xwyyStockRemoteService;
 
     @ApiOperation("查询列表")
     @RequiresPermissions("xwyy:stock:list")
     @PostMapping("/list")
     @ResponseBody
-    public TableDataInfo list(XwyyStock q) {
-        return remote.list(q);
+    public TableDataInfo list(XwyyStock query) {
+        return xwyyStockRemoteService.list(query);
     }
 
     @ApiOperation("获取详情")
     @GetMapping("/getInfo/{id}")
     @ResponseBody
     public XwyyStock getInfo(@PathVariable("id") Long id) {
-        return remote.getInfo(id);
+        return xwyyStockRemoteService.getInfo(id);
     }
 
     @ApiOperation("新增")
     @RequiresPermissions("xwyy:stock:add")
     @PostMapping("/add")
     @ResponseBody
-    public AjaxResult add(@RequestBody XwyyStock e) {
-        if (UserConstants.NOT_UNIQUE.equals(remote.checkUnique(e)))
+    public AjaxResult add(@RequestBody XwyyStock entity) {
+        if (UserConstants.NOT_UNIQUE.equals(xwyyStockRemoteService.checkUnique(entity)))
             return AjaxResult.error(I18nUtil.getMessage("ui.data.column.xwyyStock.checkUnique"));
-        return remote.add(e);
+        return xwyyStockRemoteService.add(entity);
     }
 
     @ApiOperation("编辑")
     @RequiresPermissions("xwyy:stock:edit")
     @PostMapping("/edit")
     @ResponseBody
-    public AjaxResult edit(@RequestBody XwyyStock e) {
-        if (UserConstants.NOT_UNIQUE.equals(remote.checkUnique(e)))
+    public AjaxResult edit(@RequestBody XwyyStock entity) {
+        if (UserConstants.NOT_UNIQUE.equals(xwyyStockRemoteService.checkUnique(entity)))
             return AjaxResult.error(I18nUtil.getMessage("ui.data.column.xwyyStock.checkUnique"));
-        return remote.edit(e);
+        return xwyyStockRemoteService.edit(entity);
     }
 
     @ApiOperation("删除")
@@ -72,7 +72,7 @@ public class XwyyStockUIController extends BaseUIController<XwyyStock> {
     @PostMapping("/remove")
     @ResponseBody
     public AjaxResult remove(String ids) {
-        return remote.removeByIds(Arrays.asList(Convert.toLongArray(ids)));
+        return xwyyStockRemoteService.removeByIds(Arrays.asList(Convert.toLongArray(ids)));
     }
 
     @Override
@@ -92,9 +92,9 @@ public class XwyyStockUIController extends BaseUIController<XwyyStock> {
 
     @ApiOperation("下载导入模板")
     @Override
-    public AjaxResult importTemplate(HttpServletResponse r) throws IOException {
-        ExcelUtil<XwyyStock> u = new ExcelUtil<>(XwyyStock.class);
-        u.exportExcel(r, null, getExportTemplateFileName(), getExportTemplateFileName());
+    public AjaxResult importTemplate(HttpServletResponse response) throws IOException {
+        ExcelUtil<XwyyStock> excelUtil = new ExcelUtil<>(XwyyStock.class);
+        excelUtil.exportExcel(response, null, getExportTemplateFileName(), getExportTemplateFileName());
         return AjaxResult.success();
     }
 
@@ -103,11 +103,11 @@ public class XwyyStockUIController extends BaseUIController<XwyyStock> {
     @GetMapping("/export")
     @ResponseBody
     @Override
-    public void export(HttpServletResponse r, XwyyStock e) throws IOException {
-        byte[] b = remote.exportData(e, getExportTemplateFileName());
-        ExcelUtil.setResponseHeader(r, getExportTemplateFileName(), ".xlsx");
-        IOUtils.copy(new ByteArrayInputStream(b), r.getOutputStream());
-        r.flushBuffer();
+    public void export(HttpServletResponse response, XwyyStock entity) throws IOException {
+        byte[] data = xwyyStockRemoteService.exportData(entity, getExportTemplateFileName());
+        ExcelUtil.setResponseHeader(response, getExportTemplateFileName(), ".xlsx");
+        IOUtils.copy(new ByteArrayInputStream(data), response.getOutputStream());
+        response.flushBuffer();
     }
 
     @ApiOperation("导入")
@@ -115,14 +115,14 @@ public class XwyyStockUIController extends BaseUIController<XwyyStock> {
     @PostMapping("/importData")
     @ResponseBody
     @Override
-    public AjaxResult importData(@RequestPart("file") MultipartFile f, boolean updateSupport) throws Exception {
-        byte[] d = this.useFileEncrypt ? FileEncryptUtils.DecodeFile(f) : f.getBytes();
-        ImportContext c = new ImportContext();
-        c.setImportFilePath(this.importFilePath);
-        c.setFunctionName(getFunctionName());
-        c.setProcedureCode(getProcedureCode());
-        c.setOriFileName(f.getOriginalFilename());
-        c.setFileBytes(d);
-        return remote.importData(c, updateSupport);
+    public AjaxResult importData(@RequestPart("file") MultipartFile file, boolean updateSupport) throws Exception {
+        byte[] decodedBytes = this.useFileEncrypt ? FileEncryptUtils.DecodeFile(file) : file.getBytes();
+        ImportContext context = new ImportContext();
+        context.setImportFilePath(this.importFilePath);
+        context.setFunctionName(getFunctionName());
+        context.setProcedureCode(getProcedureCode());
+        context.setOriFileName(file.getOriginalFilename());
+        context.setFileBytes(decodedBytes);
+        return xwyyStockRemoteService.importData(context, updateSupport);
     }
 }
