@@ -154,6 +154,10 @@ public class FactoryMonthPlanProductionFinalResultController extends AbstractDoc
     @PostMapping("/list4Adjust")
     public TableDataInfo list4Adjust(@RequestBody FactoryMonthPlanProductionFinalResult queryCondition) {
         List<FactoryMonthPlanFinalAdjustVo> list = factoryMonthPlanProductionFinalResultService.list4Adjust(queryCondition);
+        //合计生产实际排产量 sandy+ 2026.6.26
+        int sumTotalQty = list.stream().mapToInt(v -> v.getTotalQty() == null ? 0 : v.getTotalQty()).sum();
+        list.forEach(v -> v.setSumTotalQty(sumTotalQty));
+
         // 排序 按英寸->结构->最大型腔数->主花纹->活块数->物料描述
         mpWeekRollAdjustController.sortAdjustResultList(list);
         Integer pageNum = Convert.toInt(StringUtils.defaultIfBlank(ServletUtils.getParameter("pageNum"), ServletUtils.getHeader("pageNum")));
