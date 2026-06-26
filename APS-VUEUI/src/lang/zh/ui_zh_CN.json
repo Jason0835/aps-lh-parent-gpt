@@ -3071,6 +3071,7 @@
   "ui.data.column.monthPlanFinalAdjustQuery.issueScmMesOk": "确定",
   "ui.data.column.monthPlanFinalAdjustQuery.adjustStartDay": "调整开始时间",
   "ui.data.column.monthPlanFinalAdjustQuery.adjustEndDay": "调整结束时间",
+  "ui.data.column.monthPlanFinalAdjustQuery.sumTotalQty": "生产实际排产量合计",
   "plan.planProduction.detail": "明细",
   "plan.planProduction.planVersion": "计划版本",
   "ui.data.column.mdmOutbountOrdersNotScan.saleBillNo": "DN号",

@@ -79,6 +79,7 @@
   "ui.data.column.monthPlanFinalAdjustQuery.issueScmMesOk": "Xác nhận",
   "ui.data.column.monthPlanFinalAdjustQuery.adjustStartDay": "Ngày bắt đầu điều chỉnh",
   "ui.data.column.monthPlanFinalAdjustQuery.adjustEndDay": "Ngày kết thúc điều chỉnh",
+  "ui.data.column.monthPlanFinalAdjustQuery.sumTotalQty": "Tổng sản lượng sản xuất thực tế",
   "common.confirm.submit": "Có xác nhận không?",
   "common.confirm.delete": "Có xóa không?",
   "common.confirm.deleteSelected": "Có xóa các mục đã chọn không?",

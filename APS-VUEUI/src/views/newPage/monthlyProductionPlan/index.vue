@@ -132,6 +132,14 @@
           </div>
         </div>
       </template>
+      <template slot="headerRight">
+        <span class="stat-info">
+          <span>
+            {{ $t("ui.data.column.monthPlanFinalAdjustQuery.sumTotalQty") }}：
+            <span class="stat-value">{{ sumTotalQtyDisplay }}</span>
+          </span>
+        </span>
+      </template>
       <template slot="footer">
         <div class="footer-actions">
           <el-button
@@ -357,6 +365,8 @@ export default {
       currentAdjustBeginDay: "",
       /** 调整结束日期（来自 Redis） */
       currentAdjustEndDay: "",
+      /** 生产实际排产量合计（list4Adjust 返回 sumTotalQty） */
+      sumTotalQty: null,
       /** 调整版本号（来自 Redis） */
       currentAdjustMonthPlanVersion: "",
       confirmAdjustLoading: false,
@@ -399,6 +409,13 @@ export default {
     /** 当前调整机台有值则视为「调整进行中」 */
     adjustFlowInProgress() {
       return (this.currentAdjustMachine || "").trim() !== "";
+    },
+    /** 生产实际排产量合计展示值 */
+    sumTotalQtyDisplay() {
+      if (this.sumTotalQty == null || this.sumTotalQty === "") {
+        return "-";
+      }
+      return this.sumTotalQty;
     },
     /** 无机台或已清空：结构内调整、结构调整、确认、重新计算可用 */
     canUsePrimaryAdjustActions() {
@@ -2361,10 +2378,15 @@ export default {
         const res = await listMonthPlanFinal4Adjust(listParams);
         const rawRows = res.rows || [];
         this.page.total = res.total || 0;
+        this.sumTotalQty =
+          res.sumTotalQty != null && res.sumTotalQty !== ""
+            ? res.sumTotalQty
+            : 0;
         await this.applyAdjustmentStatisticsRows(rawRows);
       } catch (e) {
         console.error(e);
         this.data = [];
+        this.sumTotalQty = null;
       } finally {
         this.loading = false;
         this.dayCellActive = null;

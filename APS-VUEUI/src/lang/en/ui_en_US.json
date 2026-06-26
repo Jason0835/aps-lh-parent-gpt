@@ -66,6 +66,7 @@
   "ui.data.column.monthPlanFinalAdjustQuery.issueScmMesOk": "Confirm",
   "ui.data.column.monthPlanFinalAdjustQuery.adjustStartDay": "Adjust Start Date",
   "ui.data.column.monthPlanFinalAdjustQuery.adjustEndDay": "Adjust End Date",
+  "ui.data.column.monthPlanFinalAdjustQuery.sumTotalQty": "Total Actual Production Qty",
   "ui.common.column.remark": "Remark",
   "common.loading.downloading": "Downloading data, please wait",
   "common.loading.downloadError": "Error downloading file, please contact administrator!",
