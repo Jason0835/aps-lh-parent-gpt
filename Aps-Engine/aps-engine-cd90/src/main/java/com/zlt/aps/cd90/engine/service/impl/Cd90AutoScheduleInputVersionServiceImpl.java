@@ -6,8 +6,12 @@ import com.zlt.aps.cd90.api.domain.entity.Cd90StorageLaneLimit;
 import com.zlt.aps.cd90.engine.mapper.Cd90EngineCxScheduleMapper;
 import com.zlt.aps.cd90.engine.mapper.Cd90EngineStockMapper;
 import com.zlt.aps.cd90.engine.mapper.Cd90EngineStorageLaneMapper;
+import com.zlt.aps.cd90.engine.mapper.Cd90EngineXwyyScheduleResultMapper;
+import com.zlt.aps.cd90.engine.mapper.Cd90EngineXwyyStockMapper;
 import com.zlt.aps.cd90.engine.service.Cd90AutoScheduleInputVersionService;
 import com.zlt.aps.cx.api.domain.entity.CxScheduleResult;
+import com.zlt.aps.xwyy.api.domain.entity.XwyyScheduleResult;
+import com.zlt.aps.xwyy.api.domain.entity.XwyyStock;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
@@ -24,13 +28,19 @@ public class Cd90AutoScheduleInputVersionServiceImpl implements Cd90AutoSchedule
     private final Cd90EngineCxScheduleMapper cxMapper;
     private final Cd90EngineStockMapper stockMapper;
     private final Cd90EngineStorageLaneMapper laneMapper;
+    private final Cd90EngineXwyyStockMapper xwyyStockMapper;
+    private final Cd90EngineXwyyScheduleResultMapper xwyyScheduleResultMapper;
 
     public Cd90AutoScheduleInputVersionServiceImpl(Cd90EngineCxScheduleMapper cxMapper,
                                                    Cd90EngineStockMapper stockMapper,
-                                                   Cd90EngineStorageLaneMapper laneMapper) {
+                                                   Cd90EngineStorageLaneMapper laneMapper,
+                                                   Cd90EngineXwyyStockMapper xwyyStockMapper,
+                                                   Cd90EngineXwyyScheduleResultMapper xwyyScheduleResultMapper) {
         this.cxMapper = cxMapper;
         this.stockMapper = stockMapper;
         this.laneMapper = laneMapper;
+        this.xwyyStockMapper = xwyyStockMapper;
+        this.xwyyScheduleResultMapper = xwyyScheduleResultMapper;
     }
 
     @Override
@@ -57,13 +67,44 @@ public class Cd90AutoScheduleInputVersionServiceImpl implements Cd90AutoSchedule
                         .orderByAsc(Cd90Stock::getId))
                 .stream().map(item -> item.getId() + ":" + item.getShiftCode() + ":" + item.getSnapshotTime() + ":" + item.getUpdateTime())
                 .collect(Collectors.joining("|"));
+        String xwyyStock = xwyyStockMapper.selectList(Wrappers.<XwyyStock>lambdaQuery()
+                        .select(XwyyStock::getId,
+                                XwyyStock::getBigRollCode,
+                                XwyyStock::getBigRollBarcode,
+                                XwyyStock::getStockInTime,
+                                XwyyStock::getStockNum,
+                                XwyyStock::getModifyNum,
+                                XwyyStock::getBadNum,
+                                XwyyStock::getStockMeters,
+                                XwyyStock::getEstimateStockFlag,
+                                XwyyStock::getUpdateTime)
+                        .eq(XwyyStock::getFactoryCode, factoryCode)
+                        .eq(XwyyStock::getStockDate, Date.valueOf(scheduleDate))
+                        .orderByAsc(XwyyStock::getId))
+                .stream().map(item -> item.getId() + ":" + item.getBigRollCode() + ":"
+                        + item.getBigRollBarcode() + ":" + item.getStockInTime() + ":"
+                        + item.getStockNum() + ":" + item.getModifyNum() + ":" + item.getBadNum() + ":"
+                        + item.getStockMeters() + ":" + item.getEstimateStockFlag() + ":" + item.getUpdateTime())
+                .collect(Collectors.joining("|"));
+        String xwyyPlan = xwyyScheduleResultMapper.selectList(
+                        Wrappers.<XwyyScheduleResult>lambdaQuery()
+                                .select(XwyyScheduleResult::getId,
+                                        XwyyScheduleResult::getBatchNo,
+                                        XwyyScheduleResult::getUpdateTime)
+                                .eq(XwyyScheduleResult::getFactoryCode, factoryCode)
+                                .between(XwyyScheduleResult::getScheduleDate,
+                                        Date.valueOf(scheduleDate.minusDays(1)),
+                                        Date.valueOf(scheduleDate.plusDays(2)))
+                                .orderByAsc(XwyyScheduleResult::getId))
+                .stream().map(item -> item.getId() + ":" + item.getBatchNo() + ":" + item.getUpdateTime())
+                .collect(Collectors.joining("|"));
         String lanes = laneMapper.selectList(Wrappers.<Cd90StorageLaneLimit>lambdaQuery()
                         .eq(Cd90StorageLaneLimit::getFactoryCode, factoryCode)
                         .eq(Cd90StorageLaneLimit::getLaneDate, Date.valueOf(scheduleDate))
                         .orderByAsc(Cd90StorageLaneLimit::getId))
                 .stream().map(item -> item.getId() + ":" + item.getShiftCode() + ":" + item.getUpdateTime())
                 .collect(Collectors.joining("|"));
-        return sha256(forming + "#" + stock + "#" + lanes);
+        return sha256(forming + "#" + stock + "#" + lanes + "#" + xwyyStock + "#" + xwyyPlan);
     }
 
     private String sha256(String value) {

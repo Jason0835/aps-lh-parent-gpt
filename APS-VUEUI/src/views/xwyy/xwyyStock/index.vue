@@ -47,6 +47,7 @@ export default {
         { prop: "rollModifyNum", align: "center", halign: "center", label: this.$t("ui.data.column.xwyyStock.rollModifyNum"), minWidth: 130 },
         { prop: "badNum", align: "center", halign: "center", label: this.$t("ui.data.column.xwyyStock.badNum"), minWidth: 130 },
         { prop: "rollBadNum", align: "center", halign: "center", label: this.$t("ui.data.column.xwyyStock.rollBadNum"), minWidth: 130 },
+        { prop: "stockMeters", align: "center", halign: "center", label: this.$t("ui.data.column.xwyyStock.stockMeters"), minWidth: 130 },
         { prop: "remark", halign: "center", label: this.$t("ui.common.column.remark"), minWidth: 120 },
         { prop: "updateTime", align: "center", halign: "center", label: this.$t("common.updateTime"), minWidth: 160 },
         { align: "center", halign: "center", label: this.$t("ui.data.btn.option"), prop: "option", minWidth: 150, fixed: "right",

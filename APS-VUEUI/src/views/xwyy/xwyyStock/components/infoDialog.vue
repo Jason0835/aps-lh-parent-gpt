@@ -43,6 +43,7 @@ export default {
         { prop: "rollModifyNum", label: this.$t("ui.data.column.xwyyStock.rollModifyNum"), type: "number" },
         { prop: "badNum", label: this.$t("ui.data.column.xwyyStock.badNum"), type: "number" },
         { prop: "rollBadNum", label: this.$t("ui.data.column.xwyyStock.rollBadNum"), type: "number" },
+        { prop: "stockMeters", label: this.$t("ui.data.column.xwyyStock.stockMeters"), type: "number" },
         { prop: "remark", label: this.$t("ui.common.column.remark"), type: "textarea", rows: 3, maxlength: 900 },
       ];
     },

@@ -79,6 +79,7 @@ public class XwyyStockServiceImpl extends AbstractDocService<XwyyStock> implemen
                 ex.setRollModifyNum(de.getRollModifyNum());
                 ex.setBadNum(de.getBadNum());
                 ex.setRollBadNum(de.getRollBadNum());
+                ex.setStockMeters(de.getStockMeters());
                 ex.setBigRollBarcode(de.getBigRollBarcode());
                 ex.setRemark(de.getRemark());
                 xwyyStockMapper.updateById(ex);

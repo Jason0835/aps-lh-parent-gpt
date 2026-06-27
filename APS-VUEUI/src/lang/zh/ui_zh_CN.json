@@ -3592,6 +3592,7 @@
   "ui.data.column.xwyyStock.rollModifyNum": "修正数量(卷)",
   "ui.data.column.xwyyStock.badNum": "不良数量",
   "ui.data.column.xwyyStock.rollBadNum": "不良数量(卷)",
+  "ui.data.column.xwyyStock.stockMeters": "单卷米数（米/卷）",
   "ui.data.column.xwyyStock.estimateStockFlag": "预计库存标记",
   "ui.data.column.xwyyStock.checkUnique": "同一工厂下已存在相同日期和大卷编号的库存记录"
 }

@@ -54,6 +54,11 @@
             <version>1.0.3-SNAPSHOT</version>
         </dependency>
         <dependency>
+            <groupId>com.zlt.aps.xwyy</groupId>
+            <artifactId>aps-xwyy-api</artifactId>
+            <version>1.0.3-SNAPSHOT</version>
+        </dependency>
+        <dependency>
             <groupId>com.zlt.aps.common.engine</groupId>
             <artifactId>aps-engine-common</artifactId>
             <version>1.0.3-SNAPSHOT</version>

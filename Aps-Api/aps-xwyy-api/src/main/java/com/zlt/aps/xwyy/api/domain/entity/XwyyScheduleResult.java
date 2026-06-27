@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.ruoyi.common.core.annotation.Excel;
+import com.ruoyi.common.core.web.domain.BaseEntity;
 import com.zlt.aps.common.core.domain.ApsBaseEntity;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
@@ -19,7 +20,7 @@ import java.util.Date;
 @EqualsAndHashCode(callSuper = false)
 @ApiModel(value = "纤维压延排程结果", description = "纤维压延排程结果")
 @TableName("t_xwyy_schedule_result")
-public class XwyyScheduleResult extends ApsBaseEntity {
+public class XwyyScheduleResult extends BaseEntity {
     private static final long serialVersionUID = 1L;
 
     @ApiModelProperty(value = "主键ID")

@@ -4,6 +4,7 @@ import lombok.Builder;
 import lombok.Data;
 
 import java.util.List;
+import java.util.Set;
 
 /**
  * 第1至5步所需的自动排程统一输入模型。
@@ -29,4 +30,8 @@ public class Cd90AutoScheduleInput {
     private List<Cd90StorageLaneState> storageLanesAtSix;
     /** 班次开始前的实际或计划直裁入库。 */
     private List<Cd90InboundRecord> inboundRecords;
+    /** 实际库存和压延计划转换后的大卷成熟流水。 */
+    private List<Cd90BigRollAgingStock> bigRollAgingStocks;
+    /** 无法确定成熟时间的大卷编码，候选规格按DATA_MISSING处理。 */
+    private Set<String> bigRollAgingDataMissingCodes;
 }

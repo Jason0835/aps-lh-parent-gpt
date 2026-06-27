@@ -4,6 +4,7 @@ import lombok.Builder;
 import lombok.Data;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 
 /**
  * 候选机台纯试算结果。
@@ -40,6 +41,12 @@ public class Cd90MachineTrial {
     private int productionSeconds;
     /** 排入后的班次剩余秒数。 */
     private int remainingSeconds;
+    /** 考虑大卷成熟后的任务开裁时间。 */
+    private LocalDateTime taskStartTime;
+    /** 大卷成熟导致的整体等待秒数。 */
+    private int agingDelaySeconds;
+    /** 本次任务的大卷成熟流水试算结果。 */
+    private Cd90BigRollAgingAllocation agingAllocation;
     /** 试算受限原因：TOOLING_LIMIT表示工装不足，CAPACITY_LIMIT表示机台产能不足；未受限时为空。 */
     private String limitReason;
 }

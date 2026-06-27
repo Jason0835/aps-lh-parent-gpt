@@ -87,6 +87,12 @@ public class XwyyStock extends BaseEntity {
     @Excel(name = "ui.data.column.xwyyStock.rollBadNum")
     private BigDecimal rollBadNum;
 
+    @ApiModelProperty("单卷米数（米/卷）")
+    @ImportValidated(number = true, min = 0, max = 999999)
+    @TableField("STOCK_METERS")
+    @Excel(name = "ui.data.column.xwyyStock.stockMeters")
+    private BigDecimal stockMeters;
+
     @ApiModelProperty("预计库存标记")
     @TableField("ESTIMATE_STOCK_FLAG")
     @Excel(name = "ui.data.column.xwyyStock.estimateStockFlag")

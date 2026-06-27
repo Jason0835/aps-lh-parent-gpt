@@ -17,8 +17,9 @@ public interface Cd90AutoScheduleInputService {
      * @param scheduleDate 排程日期
      * @param classField 直裁结果班次字段
      * @param shiftCode 业务班次编码，用于读取班次基础数据
+     * @param agingPeriodHours 大卷静置时长（小时）
      * @return 标准化输入数据
      */
     Cd90AutoScheduleInput load(String factoryCode, LocalDate scheduleDate,
-                               String classField, String shiftCode);
+                               String classField, String shiftCode, int agingPeriodHours);
 }
