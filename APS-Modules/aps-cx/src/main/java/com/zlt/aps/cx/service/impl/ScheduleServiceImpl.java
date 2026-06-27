@@ -125,9 +125,6 @@ public class ScheduleServiceImpl implements ScheduleService {
     /** 启用状态 */
     private static final Integer ACTIVE_STATUS = 1;
 
-    /** 追赶计划天数 */
-    private static final int CATCH_UP_DAYS = 3;
-
     // ==================== 依赖注入 ====================
 
     private final CoreScheduleAlgorithmService coreScheduleAlgorithmService;
@@ -286,6 +283,25 @@ public class ScheduleServiceImpl implements ScheduleService {
         return monthSurplus != null
                 && monthSurplus.getPlanSurplusQty() != null
                 && monthSurplus.getPlanSurplusQty().compareTo(BigDecimal.ZERO) <= 0;
+    }
+
+    /**
+     * 从monthSurplusMap读取物料的硫化余量数值。
+     *
+     * @param materialCode    物料编码
+     * @param monthSurplusMap 月度硫化余量映射
+     * @return 硫化余量，无记录时返回 Integer.MAX_VALUE（无上限约束）
+     */
+    private int getVulcanizingSurplus(String materialCode,
+                                      Map<String, MdmMonthSurplus> monthSurplusMap) {
+        if (materialCode == null || monthSurplusMap == null) {
+            return Integer.MAX_VALUE;
+        }
+        MdmMonthSurplus monthSurplus = monthSurplusMap.get(materialCode);
+        if (monthSurplus != null && monthSurplus.getPlanSurplusQty() != null) {
+            return monthSurplus.getPlanSurplusQty().intValue();
+        }
+        return Integer.MAX_VALUE;
     }
 
     /**
@@ -537,33 +553,6 @@ public class ScheduleServiceImpl implements ScheduleService {
                 loadMaterialEndings(context, scheduleStartDate);
             } catch (Exception e) {
                 log.warn("加载物料收尾信息失败，继续执行：{}", e.getMessage());
-            }
-
-            // 16.5 补充延误物料到硫化任务
-            try {
-                supplementDelayMaterialTasks(context, scheduleDate);
-            } catch (Exception e) {
-                log.warn("补充延误物料任务失败，继续执行：{}", e.getMessage());
-            }
-
-            // 16.6 补充加载延误物料的物料信息
-            // 补充延误物料后，lhScheduleResults中可能新增了materialCode，
-            // 但loadMaterials已经在步骤4执行完毕，context.getMaterials()中不包含这些延误物料的信息
-            // 需要补充加载，否则校验会报"物料在T_MDM_MATERIAL_INFO中没有配置"
-            try {
-                supplementDelayMaterialInfo(context);
-            } catch (Exception e) {
-                log.warn("补充延误物料信息失败，继续执行：{}", e.getMessage());
-            }
-
-            // 16.7 补充延误物料任务的库存分配
-            // supplementDelayMaterialTasks 在库存分配（步骤13）之后执行，
-            // 新增的延误物料任务未经 allocateStockByMaterialRatio 分配库存，
-            // 导致 TaskGroupService.buildSingleTask 中 currentStock=0，排产量计算忽略已有库存。
-            try {
-                supplementDelayMaterialStock(context);
-            } catch (Exception e) {
-                log.warn("补充延误物料库存分配失败，继续执行：{}", e.getMessage());
             }
 
             // 17. 过滤已收尾物料（成型余量<=0的物料不参与排程）
@@ -1659,6 +1648,56 @@ public class ScheduleServiceImpl implements ScheduleService {
     }
 
     /**
+     * 单轮分配：将剩余库存按比例分配给尚有硫化余量容量的物料，最后一个倒扣，受硫化余量封顶。
+     *
+     * @param allocations    分配追踪列表
+     * @param remainingStock 本轮可用库存
+     * @param demandZero     总需求是否为0（是则等权分配）
+     * @return 本轮实际分配量
+     */
+    private int distributeRound(List<TaskAllocation> allocations, int remainingStock, boolean demandZero) {
+        // 筛选尚有容量的物料
+        List<TaskAllocation> withCapacity = allocations.stream()
+                .filter(a -> a.allocated < a.surplus)
+                .collect(Collectors.toList());
+
+        if (withCapacity.isEmpty()) {
+            return 0;
+        }
+
+        int totalCapacityDemand;
+        if (demandZero) {
+            totalCapacityDemand = withCapacity.size();
+        } else {
+            totalCapacityDemand = withCapacity.stream().mapToInt(a -> a.demand).sum();
+            if (totalCapacityDemand == 0) {
+                totalCapacityDemand = withCapacity.size();
+            }
+        }
+
+        int roundAllocated = 0;
+        for (int i = 0; i < withCapacity.size(); i++) {
+            TaskAllocation a = withCapacity.get(i);
+            int add;
+            if (i == withCapacity.size() - 1) {
+                // 最后一个：倒扣，确保库存不丢失
+                add = remainingStock - roundAllocated;
+            } else {
+                if (demandZero) {
+                    add = remainingStock / withCapacity.size();
+                } else {
+                    add = (int) ((long) remainingStock * a.demand / totalCapacityDemand);
+                }
+            }
+            int cap = a.surplus - a.allocated;
+            int actual = Math.min(add, cap);
+            a.allocated += actual;
+            roundAllocated += actual;
+        }
+        return roundAllocated;
+    }
+
+    /**
      * 从硫化记录获取对应班次的计划量
      *
      * @param lhResult   硫化记录
@@ -1913,35 +1952,36 @@ public class ScheduleServiceImpl implements ScheduleService {
                     continue;
                 }
 
-                if (totalDemand == 0) {
-                    // 总需求为0，平均分配
-                    int avgStock = totalStock / taskDemands.size();
-                    for (TaskDemand td : taskDemands) {
-                        materialStockMap.merge(td.taskKey, avgStock, Integer::sum);
+                // 构建分配追踪列表，每个任务记录硫化余量上限
+                List<TaskAllocation> allocations = new ArrayList<>();
+                for (TaskDemand td : taskDemands) {
+                    int surplus = getVulcanizingSurplus(td.materialCode, monthSurplusMap);
+                    allocations.add(new TaskAllocation(td, 0, surplus));
+                }
+
+                // 多轮分配：每轮按日硫化量比例分配给尚有容量的物料，最后一个倒扣
+                boolean demandZero = (totalDemand == 0);
+                int remaining = totalStock;
+                for (int round = 1; remaining > 0; round++) {
+                    int roundAllocated = distributeRound(allocations, remaining, demandZero);
+                    if (roundAllocated == 0) {
+                        // 所有物料已达硫化余量上限，剩余库存倒扣给最后一个物料（库存不丢失）
+                        TaskAllocation last = allocations.get(allocations.size() - 1);
+                        last.allocated += remaining;
+                        log.debug("胎胚 {} 所有物料已达硫化余量上限，剩余库存 {} 倒扣给物料 {}",
+                                embryoCode, remaining, last.materialCode);
+                        remaining = 0;
+                        break;
                     }
-                    log.debug("胎胚 {} 对应多个硫化任务但总日硫化量为0，平均分配库存 {}", embryoCode, avgStock);
-                } else {
-                    // 按日硫化量比例分配，最后一条用倒扣
-                    int allocatedTotal = 0;
+                    remaining -= roundAllocated;
+                    log.debug("胎胚 {} 第{}轮分配完成，本轮分配 {}，剩余 {}", embryoCode, round, roundAllocated, remaining);
+                }
 
-                    for (int i = 0; i < taskDemands.size(); i++) {
-                        TaskDemand td = taskDemands.get(i);
-                        int currentStock;
-
-                        if (i == taskDemands.size() - 1) {
-                            // 最后一个硫化任务分配剩余库存（倒扣）
-                            currentStock = totalStock - allocatedTotal;
-                        } else {
-                            // 按日硫化量比例分配
-                            currentStock = (int) ((long) totalStock * td.demand / totalDemand);
-                        }
-
-                        materialStockMap.merge(td.taskKey, currentStock, Integer::sum);
-                        allocatedTotal += currentStock;
-
-                        log.debug("物料编码 {}，胎胚 {} 共用分配：硫化任务 {} 日硫化量 {}，分配库存 {}",
-                                td.materialCode, embryoCode, td.taskKey, td.demand, currentStock);
-                    }
+                // 写回分配结果
+                for (TaskAllocation a : allocations) {
+                    materialStockMap.merge(a.taskKey, a.allocated, Integer::sum);
+                    log.debug("物料编码 {}，胎胚 {} 共用分配：硫化任务 {} 日硫化量 {}，分配库存 {}（硫化余量上限={}）",
+                            a.materialCode, embryoCode, a.taskKey, a.demand, a.allocated, a.surplus);
                 }
             }
         }
@@ -1976,6 +2016,25 @@ public class ScheduleServiceImpl implements ScheduleService {
         ShiftPlanResult(int planQty, String shiftName) {
             this.planQty = planQty;
             this.shiftName = shiftName;
+        }
+    }
+
+    /**
+     * 任务分配追踪（内部类），用于多任务胎胚的多轮分配。
+     */
+    private static class TaskAllocation {
+        String taskKey;
+        int demand;
+        String materialCode;
+        int surplus;      // 硫化余量上限
+        int allocated;    // 已分配量
+
+        TaskAllocation(TaskDemand td, int allocated, int surplus) {
+            this.taskKey = td.taskKey;
+            this.demand = td.demand;
+            this.materialCode = td.materialCode;
+            this.allocated = allocated;
+            this.surplus = surplus;
         }
     }
 
@@ -2094,25 +2153,6 @@ public class ScheduleServiceImpl implements ScheduleService {
                 if (daysToEnding >= 0 && daysToEnding <= nearEndingDays) {
                     ending.setIsNearEnding(1);
                 }
-
-                // 计算延误量（如果成型余量 > 0）
-                if (formingRemainder != null && formingRemainder > 0 && daysToEnding >= 0) {
-                    int producibleQty = calculateProducibleQty(plans, currentDay, endingDay);
-
-                    if (formingRemainder > producibleQty) {
-                        int delayQty = formingRemainder - producibleQty;
-                        ending.setDelayQuantity(delayQty);
-                        ending.setDistributedQuantity(delayQty / CATCH_UP_DAYS);
-                        log.info("[延误量计算] 物料={}, 距收尾{}天, 成型余量={} > 月计划第{}~第{}天可生产量={}, "
-                                        + "延误量={}条(成型余量-可生产量), 未来{}天每天必须生产量={}条(才能消化完毕)",
-                                materialCode, daysToEnding, formingRemainder, currentDay, endingDay,
-                                producibleQty, delayQty,
-                                CATCH_UP_DAYS, delayQty / CATCH_UP_DAYS);
-                    } else {
-                        log.info("[延误量计算] 物料={}, 距收尾{}天, 成型余量={} <= 月计划第{}~第{}天可生产量={}, 无延误",
-                                materialCode, daysToEnding, formingRemainder, currentDay, endingDay, producibleQty);
-                    }
-                }
             } else {
                 // 没有月计划，默认月末收尾
                 ending.setPlannedEndingDate(scheduleDate.withDayOfMonth(lastDayOfMonth));
@@ -2154,416 +2194,6 @@ public class ScheduleServiceImpl implements ScheduleService {
             }
         }
         return defaultValue;
-    }
-
-    /**
-     * 补充延误物料到硫化任务列表
-     *
-     * <p>从物料收尾信息中找出 近期收尾 + delayQuantity > 0 且不在当前 lhScheduleResults 中的物料，
-     * 往前查找该物料最近一条硫化排程记录，加入今日硫化任务，使延误物料参与成型排程。
-     * 非近期收尾（距收尾日超过 SYS04050003 天数）的延误物料不增补。
-     *
-     * <p>流程：
-     * <ol>
-     *   <li>获取 materialEndings 中 isNearEnding=1 且 delayQuantity > 0 的物料</li>
-     *   <li>排除已在 lhScheduleResults 中存在的物料</li>
-     *   <li>对每个缺失物料，查询历史硫化排程中最近一条记录</li>
-     *   <li>将历史记录调整日期后加入 lhScheduleResults</li>
-     * </ol>
-     *
-     * @param context      排程上下文
-     * @param scheduleDate 排程日期
-     */
-    private void supplementDelayMaterialTasks(ScheduleContextVo context, LocalDate scheduleDate) {
-        List<CxMaterialEnding> materialEndings = context.getMaterialEndings();
-        if (materialEndings == null || materialEndings.isEmpty()) {
-            log.debug("物料收尾信息为空，无需补充延误物料");
-            return;
-        }
-
-        List<LhScheduleResult> lhScheduleResults = context.getLhScheduleResults();
-        if (lhScheduleResults == null) {
-            lhScheduleResults = new ArrayList<>();
-            context.setLhScheduleResults(lhScheduleResults);
-        }
-
-        Set<String> existingMaterialCodes = lhScheduleResults.stream()
-                .filter(r -> r.getMaterialCode() != null)
-                .map(LhScheduleResult::getMaterialCode)
-                .collect(Collectors.toSet());
-
-        List<CxMaterialEnding> delayEndings = materialEndings.stream()
-                .filter(e -> e.getDelayQuantity() != null && e.getDelayQuantity() > 0)
-                .filter(e -> e.getIsNearEnding() != null && e.getIsNearEnding() == 1)
-                .filter(e -> e.getMaterialCode() != null)
-                .filter(e -> !existingMaterialCodes.contains(e.getMaterialCode()))
-                .collect(Collectors.toList());
-
-        if (delayEndings.isEmpty()) {
-            log.debug("没有需要补充的延误物料");
-            return;
-        }
-
-        log.info("发现 {} 个延误物料不在今日硫化任务中，尝试补充", delayEndings.size());
-
-        int supplemented = 0;
-        int notFound = 0;
-        // 为补充任务生成唯一负数ID（避免与数据库正数ID冲突），
-        // 否则 getId()=null 会导致 getCurrentStock、supplementDailyRemainingMap 等无法按任务维度区分
-        long syntheticId = -1;
-        for (CxMaterialEnding ending : delayEndings) {
-            String materialCode = ending.getMaterialCode();
-            LhScheduleResult historicalRecord = lhScheduleResultMapper.selectLatestBeforeDate(materialCode, scheduleDate, scheduleDate.withDayOfMonth(1));
-
-            if (historicalRecord == null) {
-                log.warn("延误物料 {} 在历史硫化排程中未找到记录，无法补充", materialCode);
-                notFound++;
-                continue;
-            }
-
-            // 校验历史记录必填字段是否完整，缺失则为人工导入无效数据，不纳入
-            if (!LhScheduleResultValidationStrategy.isValidRecord(historicalRecord)) {
-                log.warn("延误物料 {} 的历史记录必填字段不完整（人工导入无效数据），跳过补充", materialCode);
-                notFound++;
-                continue;
-            }
-
-            LhScheduleResult newRecord = new LhScheduleResult();
-            newRecord.setFactoryCode(historicalRecord.getFactoryCode());
-            newRecord.setMaterialCode(materialCode);
-            newRecord.setEmbryoCode(historicalRecord.getEmbryoCode());
-            newRecord.setStructureName(historicalRecord.getStructureName());
-            newRecord.setMaterialDesc(historicalRecord.getMaterialDesc());
-            newRecord.setMainMaterialDesc(historicalRecord.getMainMaterialDesc());
-            newRecord.setSpecCode(historicalRecord.getSpecCode());
-            newRecord.setSpecDesc(historicalRecord.getSpecDesc());
-            newRecord.setLhTime(historicalRecord.getLhTime());
-            newRecord.setMouldQty(historicalRecord.getMouldQty());
-            newRecord.setSingleMouldShiftQty(historicalRecord.getSingleMouldShiftQty());
-            newRecord.setMouldInfo(historicalRecord.getMouldInfo());
-            newRecord.setMouldMethod(historicalRecord.getMouldMethod());
-            newRecord.setConstructionStage(historicalRecord.getConstructionStage());
-            newRecord.setEmbryoNo(historicalRecord.getEmbryoNo());
-            newRecord.setTextNo(historicalRecord.getTextNo());
-            newRecord.setLhNo(historicalRecord.getLhNo());
-            newRecord.setProductionVersion(historicalRecord.getProductionVersion());
-            newRecord.setMouldCode(historicalRecord.getMouldCode());
-            newRecord.setIsTrial(historicalRecord.getIsTrial());
-
-            newRecord.setScheduleDate(java.sql.Date.valueOf(scheduleDate));
-            newRecord.setProductionStatus("0");
-            newRecord.setIsDelivery("0");
-            newRecord.setIsRelease("0");
-            newRecord.setIsEnd("0");
-            newRecord.setIsSplit("0");
-            newRecord.setIsFirst("0");
-            newRecord.setDataSource("3");
-
-            newRecord.setDailyPlanQty(ending.getDistributedQuantity());
-            newRecord.setTotalDailyPlanQty(ending.getDistributedQuantity());
-            newRecord.setMouldSurplusQty(ending.getFormingRemainder());
-
-            // 补充的延误物料任务无硫化消耗，各班次计划量设为0
-            newRecord.setClass1PlanQty(0);
-            newRecord.setClass2PlanQty(0);
-            newRecord.setClass3PlanQty(0);
-            newRecord.setClass4PlanQty(0);
-            newRecord.setClass5PlanQty(0);
-            newRecord.setClass6PlanQty(0);
-            newRecord.setClass7PlanQty(0);
-            newRecord.setClass8PlanQty(0);
-
-            // 分配唯一负数ID，使后续库存分配、班次排量等逻辑能按任务维度正确处理
-            newRecord.setId(syntheticId--);
-
-            lhScheduleResults.add(newRecord);
-            supplemented++;
-            log.info("补充延误物料: 物料={}, 胎胚={}, 历史排程日期={}, 延误量={}条(成型余量-可生产量), 未来{}天每天必须生产量={}条(才能消化完毕)",
-                    materialCode, historicalRecord.getEmbryoCode(),
-                    historicalRecord.getScheduleDate(),
-                    ending.getDelayQuantity(), CATCH_UP_DAYS, ending.getDistributedQuantity());
-        }
-
-        log.info("延误物料补充完成：成功补充 {} 个，未找到历史记录 {} 个", supplemented, notFound);
-    }
-
-    /**
-     * 补充加载延误物料的物料信息
-     *
-     * <p>supplementDelayMaterialTasks 会往 lhScheduleResults 中新增延误物料记录，
-     * 但 loadMaterials 在补充之前已执行完毕，context.getMaterials() 中不包含这些延误物料。
-     * 本方法查找新增的 materialCode，从 T_MDM_MATERIAL_INFO 补充加载到 context.getMaterials() 中，
-     * 避免校验报"物料在T_MDM_MATERIAL_INFO中没有配置"。
-     */
-    private void supplementDelayMaterialInfo(ScheduleContextVo context) {
-        List<LhScheduleResult> lhScheduleResults = context.getLhScheduleResults();
-        List<MdmMaterialInfo> materials = context.getMaterials();
-
-        if (lhScheduleResults == null || lhScheduleResults.isEmpty()) {
-            return;
-        }
-
-        // 已加载的物料编码集合
-        Set<String> loadedMaterialCodes = new HashSet<>();
-        if (materials != null) {
-            for (MdmMaterialInfo m : materials) {
-                if (m.getMaterialCode() != null) {
-                    loadedMaterialCodes.add(m.getMaterialCode());
-                }
-            }
-        }
-
-        // 找出硫化任务中未加载的物料编码
-        Set<String> missingMaterialCodes = new HashSet<>();
-        for (LhScheduleResult lh : lhScheduleResults) {
-            String mc = lh.getMaterialCode();
-            if (mc != null && !loadedMaterialCodes.contains(mc)) {
-                missingMaterialCodes.add(mc);
-            }
-        }
-
-        if (missingMaterialCodes.isEmpty()) {
-            return;
-        }
-
-        log.info("补充加载 {} 个延误物料的物料信息：{}", missingMaterialCodes.size(), missingMaterialCodes);
-
-        // 从 T_MDM_MATERIAL_INFO 查询缺失的物料
-        List<MdmMaterialInfo> supplementMaterials = materialInfoMapper.selectList(
-                new LambdaQueryWrapper<MdmMaterialInfo>()
-                        .in(MdmMaterialInfo::getMaterialCode, missingMaterialCodes)
-                        .eq(MdmMaterialInfo::getIsDelete, "0"));
-
-        if (supplementMaterials != null && !supplementMaterials.isEmpty()) {
-            if (materials == null) {
-                materials = new ArrayList<>();
-                context.setMaterials(materials);
-            }
-            materials.addAll(supplementMaterials);
-            log.info("成功补充加载 {} 条物料信息", supplementMaterials.size());
-        }
-
-        // 仍然缺失的物料（T_MDM_MATERIAL_INFO 中确实没有）
-        Set<String> stillMissing = new HashSet<>(missingMaterialCodes);
-        if (supplementMaterials != null) {
-            for (MdmMaterialInfo m : supplementMaterials) {
-                stillMissing.remove(m.getMaterialCode());
-            }
-        }
-        if (!stillMissing.isEmpty()) {
-            log.warn("以下延误物料在 T_MDM_MATERIAL_INFO 表中不存在：{}", stillMissing);
-        }
-    }
-
-    /**
-     * 补充延误物料任务的库存分配
-     *
-     * <p>supplementDelayMaterialTasks 在库存分配（步骤13 loadMonthSurplusAndCalculateFormingRemainder）
-     * 之后执行，新增的延误物料任务（dataSource="3"）未经过 allocateStockByMaterialRatio 分配库存。
-     * 此时该胎胚在步骤13因"没有对应的硫化任务"被跳过，库存未分配给任何任务，
-     * 导致 TaskGroupService.buildSingleTask 中 currentStock=0，排产量计算忽略已有库存。
-     *
-     * <p>本方法针对补充延误物料对应的胎胚，补充分配库存到 materialStockMap，
-     * 并同步更新 formingRemainderMap（成型余量 = 硫化余量 - 已分配库存）。
-     *
-     * <p>分配规则与 allocateStockByMaterialRatio 一致：
-     * <ul>
-     *   <li>单任务胎胚：直接分配全部有效库存</li>
-     *   <li>共用胎胚（多任务）：按日硫化量比例分配，最后一条倒扣</li>
-     * </ul>
-     *
-     * @param context 排程上下文
-     */
-    private void supplementDelayMaterialStock(ScheduleContextVo context) {
-        List<LhScheduleResult> lhScheduleResults = context.getLhScheduleResults();
-        if (lhScheduleResults == null || lhScheduleResults.isEmpty()) {
-            return;
-        }
-
-        // 找出补充计划任务（dataSource="3"）
-        List<LhScheduleResult> supplementTasks = lhScheduleResults.stream()
-                .filter(r -> "3".equals(r.getDataSource()))
-                .collect(Collectors.toList());
-        if (supplementTasks.isEmpty()) {
-            return;
-        }
-
-        Map<String, Integer> materialStockMap = context.getMaterialStockMap();
-        if (materialStockMap == null) {
-            materialStockMap = new HashMap<>();
-            context.setMaterialStockMap(materialStockMap);
-        }
-
-        // 构建胎胚 → 有效库存映射
-        Map<String, Integer> embryoStockMap = new HashMap<>();
-        if (context.getStocks() != null) {
-            for (CxStock stock : context.getStocks()) {
-                if (stock.getEmbryoCode() != null && stock.getEffectiveStock() > 0) {
-                    embryoStockMap.merge(stock.getEmbryoCode(), stock.getEffectiveStock(), Integer::sum);
-                }
-            }
-        }
-
-        Map<String, MdmMonthSurplus> monthSurplusMap = context.getMonthSurplusMap();
-        Map<String, MonthPlanProductLhCapacityVo> materialLhCapacityMap = context.getMaterialLhCapacityMap();
-        Set<String> affectedMaterials = new HashSet<>();
-        Set<String> processedEmbryos = new HashSet<>();
-        int supplementedCount = 0;
-
-        for (LhScheduleResult supplementTask : supplementTasks) {
-            String embryoCode = supplementTask.getEmbryoCode();
-            if (embryoCode == null || processedEmbryos.contains(embryoCode)) {
-                continue;
-            }
-
-            Integer totalStock = embryoStockMap.get(embryoCode);
-            if (totalStock == null || totalStock <= 0) {
-                continue;
-            }
-
-            String suppTaskKey = String.valueOf(supplementTask.getId());
-            // 该补充任务已有库存分配则跳过
-            if (materialStockMap.containsKey(suppTaskKey) && materialStockMap.get(suppTaskKey) > 0) {
-                processedEmbryos.add(embryoCode);
-                continue;
-            }
-
-            // 查找该胎胚对应的所有硫化任务
-            List<LhScheduleResult> relatedTasks = lhScheduleResults.stream()
-                    .filter(r -> embryoCode.equals(r.getEmbryoCode()))
-                    .collect(Collectors.toList());
-
-            if (relatedTasks.size() == 1) {
-                // === 单任务：直接分配全部库存（与 allocateStockByMaterialRatio 单任务分支一致） ===
-                if (isVulcanizeSurplusExhausted(supplementTask.getMaterialCode(), monthSurplusMap)) {
-                    log.debug("补充任务胎胚 {} 硫化余量<=0，跳过库存分配", embryoCode);
-                    processedEmbryos.add(embryoCode);
-                    continue;
-                }
-                materialStockMap.put(suppTaskKey, totalStock);
-                log.info("补充延误物料库存分配(单任务): 胎胚={}, 物料={}, 任务={}, 分配库存={}",
-                        embryoCode, supplementTask.getMaterialCode(), suppTaskKey, totalStock);
-                supplementedCount++;
-                if (supplementTask.getMaterialCode() != null) {
-                    affectedMaterials.add(supplementTask.getMaterialCode());
-                }
-            } else {
-                // === 共用胎胚：按日硫化量比例重新分配（与 allocateStockByMaterialRatio 共用分支一致） ===
-                List<TaskDemand> taskDemands = new ArrayList<>();
-                int totalDemand = 0;
-
-                for (LhScheduleResult lh : relatedTasks) {
-                    String materialCode = lh.getMaterialCode();
-                    if (isVulcanizeSurplusExhausted(materialCode, monthSurplusMap)) {
-                        continue;
-                    }
-                    int dayVulcanizationQty = 0;
-                    if (materialLhCapacityMap != null && materialCode != null) {
-                        MonthPlanProductLhCapacityVo capacityVo = materialLhCapacityMap.get(materialCode);
-                        if (capacityVo != null && capacityVo.getDayVulcanizationQty() != null) {
-                            dayVulcanizationQty = capacityVo.getDayVulcanizationQty();
-                        }
-                    }
-                    if (dayVulcanizationQty <= 0) {
-                        continue;
-                    }
-                    taskDemands.add(new TaskDemand(lh.getId(), dayVulcanizationQty, materialCode, "日硫化量"));
-                    totalDemand += dayVulcanizationQty;
-                }
-
-                if (taskDemands.isEmpty()) {
-                    log.debug("补充任务胎胚 {} 共用但无有效日硫化量，跳过", embryoCode);
-                    processedEmbryos.add(embryoCode);
-                    continue;
-                }
-
-                // 清除该胎胚所有任务的旧分配（重新按比例分配）
-                for (TaskDemand td : taskDemands) {
-                    materialStockMap.remove(td.taskKey);
-                }
-
-                if (totalDemand == 0) {
-                    int avgStock = totalStock / taskDemands.size();
-                    for (TaskDemand td : taskDemands) {
-                        materialStockMap.put(td.taskKey, avgStock);
-                    }
-                    log.info("补充延误物料库存分配(共用平均): 胎胚={}, 平均分配库存={}", embryoCode, avgStock);
-                } else {
-                    int allocatedTotal = 0;
-                    for (int i = 0; i < taskDemands.size(); i++) {
-                        TaskDemand td = taskDemands.get(i);
-                        int currentStock;
-                        if (i == taskDemands.size() - 1) {
-                            currentStock = totalStock - allocatedTotal;
-                        } else {
-                            currentStock = (int) ((long) totalStock * td.demand / totalDemand);
-                        }
-                        materialStockMap.put(td.taskKey, currentStock);
-                        allocatedTotal += currentStock;
-                    }
-                    log.info("补充延误物料库存分配(共用比例): 胎胚={}, 总库存={}, 任务数={}",
-                            embryoCode, totalStock, taskDemands.size());
-                }
-
-                for (TaskDemand td : taskDemands) {
-                    if (td.materialCode != null) {
-                        affectedMaterials.add(td.materialCode);
-                    }
-                }
-                supplementedCount++;
-            }
-            processedEmbryos.add(embryoCode);
-        }
-
-        if (supplementedCount > 0) {
-            log.info("补充延误物料库存分配完成：处理 {} 个胎胚", supplementedCount);
-            // 同步更新成型余量映射（受影响物料的成型余量 = 硫化余量 - 已分配库存）
-            recalculateFormingRemainderForMaterials(context, affectedMaterials);
-        }
-    }
-
-    /**
-     * 重算指定物料的成型余量
-     *
-     * <p>库存分配变更后，成型余量需同步更新：
-     * 成型余量 = Max(0, 硫化余量 - 该物料已分配库存总量)
-     *
-     * @param context           排程上下文
-     * @param affectedMaterials 受影响的物料编码集合
-     */
-    private void recalculateFormingRemainderForMaterials(ScheduleContextVo context, Set<String> affectedMaterials) {
-        Map<String, Integer> formingRemainderMap = context.getFormingRemainderMap();
-        if (formingRemainderMap == null) {
-            formingRemainderMap = new HashMap<>();
-            context.setFormingRemainderMap(formingRemainderMap);
-        }
-        Map<String, MdmMonthSurplus> monthSurplusMap = context.getMonthSurplusMap();
-        Map<String, Integer> materialStockMap = context.getMaterialStockMap();
-        List<LhScheduleResult> lhScheduleResults = context.getLhScheduleResults();
-
-        for (String materialCode : affectedMaterials) {
-            // 汇总该物料的已分配库存（按硫化任务维度）
-            int materialStock = 0;
-            if (lhScheduleResults != null && materialStockMap != null) {
-                for (LhScheduleResult lh : lhScheduleResults) {
-                    if (materialCode.equals(lh.getMaterialCode()) && lh.getId() != null) {
-                        materialStock += materialStockMap.getOrDefault(String.valueOf(lh.getId()), 0);
-                    }
-                }
-            }
-            // 硫化余量
-            int vulcanizingRemainder = 0;
-            if (monthSurplusMap != null) {
-                MdmMonthSurplus surplus = monthSurplusMap.get(materialCode);
-                if (surplus != null && surplus.getPlanSurplusQty() != null) {
-                    vulcanizingRemainder = surplus.getPlanSurplusQty().intValue();
-                }
-            }
-            int formingRemainder = Math.max(0, vulcanizingRemainder - materialStock);
-            formingRemainderMap.put(materialCode, formingRemainder);
-            log.info("更新成型余量: 物料={}, 硫化余量={}, 已分配库存={}, 成型余量={}",
-                    materialCode, vulcanizingRemainder, materialStock, formingRemainder);
-        }
     }
 
     /**
