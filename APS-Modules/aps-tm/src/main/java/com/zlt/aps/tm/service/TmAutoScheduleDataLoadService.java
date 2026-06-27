@@ -9,10 +9,7 @@ import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.tm.api.domain.entity.*;
 import com.zlt.aps.tm.domain.vo.TmFormingDemandRowVo;
 import com.zlt.aps.tm.domain.vo.TmWorkCalendarRowVo;
-import com.zlt.aps.tm.engine.domain.TmMachineCandidate;
-import com.zlt.aps.tm.engine.domain.TmParamValue;
-import com.zlt.aps.tm.engine.domain.TmScheduleContext;
-import com.zlt.aps.tm.engine.domain.TmTaskDraft;
+import com.zlt.aps.tm.engine.domain.*;
 import com.zlt.aps.tm.mapper.*;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -48,6 +45,10 @@ public class TmAutoScheduleDataLoadService {
     private static final String PARAM_PLAN_QTY_STRATEGY = "TM_PLAN_QTY_STRATEGY";
 
     private static final String PARAM_TASK_SORT_STRATEGY = "TM_TASK_SORT_STRATEGY";
+
+    private static final String PARAM_NEW_SPEC_LOOKBACK_DAYS = "TM_NEW_SPEC_LOOKBACK_DAYS";
+
+    private static final String PARAM_NEW_SPEC_ADVANCE_SHIFT_COUNT = "TM_NEW_SPEC_ADVANCE_SHIFT_COUNT";
 
     private static final String PROC_CODE_CX = "03";
 
@@ -105,6 +106,12 @@ public class TmAutoScheduleDataLoadService {
     @Resource
     private TmAutoScheduleDataLoadMapper tmAutoScheduleDataLoadMapper;
 
+    @Resource
+    private TmStockMapper tmStockMapper;
+
+    @Resource
+    private TmScheduleResultMapper tmScheduleResultMapper;
+
     /**
      * 加载自动排程所需数据。
      *
@@ -153,6 +160,8 @@ public class TmAutoScheduleDataLoadService {
         putDefaultParam(paramMap, PARAM_SHUTDOWN_REDISTRIBUTION_ENABLED, "1");
         putDefaultParam(paramMap, PARAM_PLAN_QTY_STRATEGY, "DEFAULT");
         putDefaultParam(paramMap, PARAM_TASK_SORT_STRATEGY, "DEFAULT");
+        putDefaultParam(paramMap, PARAM_NEW_SPEC_LOOKBACK_DAYS, "7");
+        putDefaultParam(paramMap, PARAM_NEW_SPEC_ADVANCE_SHIFT_COUNT, "2");
         context.setParamMap(paramMap);
     }
 
@@ -436,6 +445,10 @@ public class TmAutoScheduleDataLoadService {
         BigDecimal minStartQty = getDecimalParam(context, PARAM_MIN_START_QTY);
         BigDecimal defaultCurlLength = getDecimalParam(context, PARAM_DEFAULT_CURL_LENGTH);
         Integer guardShiftCount = getIntegerParam(context, PARAM_STOCK_GUARD_SHIFT_COUNT, 1);
+        Integer newSpecLookbackDays = getPositiveIntegerParam(context, PARAM_NEW_SPEC_LOOKBACK_DAYS, 7);
+        Integer newSpecAdvanceShiftCount = getPositiveIntegerParam(context, PARAM_NEW_SPEC_ADVANCE_SHIFT_COUNT, 2);
+        Map<String, TmNewSpecInfo> newSpecInfoMap = buildNewSpecInfoMap(context, demandRowList,
+                newSpecLookbackDays, newSpecAdvanceShiftCount);
         List<TmLossSetting> lossSettingList = loadLossSettings(context);
         TmWorkCalendarRowVo tmCalendar = loadWorkCalendar(context, PROC_CODE_TM);
         TmWorkCalendarRowVo cxCalendar = loadWorkCalendar(context, PROC_CODE_CX);
@@ -456,6 +469,8 @@ public class TmAutoScheduleDataLoadService {
                 if (demandQty.compareTo(BigDecimal.ZERO) <= 0) {
                     continue;
                 }
+                TmNewSpecInfo taskNewSpecInfo = buildTaskNewSpecInfo(newSpecInfoMap.get(treadCode), shiftOrder, demandQty);
+                int targetShiftOrder = resolveTargetShiftOrder(taskNewSpecInfo, shiftOrder);
                 TmTaskDraft taskDraft = new TmTaskDraft();
                 taskDraft.setOrderNo(row.getOrderNo() + "-CLASS" + shiftOrder);
                 taskDraft.setSourceOrderNos(row.getOrderNo());
@@ -463,7 +478,8 @@ public class TmAutoScheduleDataLoadService {
                 taskDraft.setTreadCode(treadCode);
                 taskDraft.setGlueCode(row.getTreadRubberCategory());
                 taskDraft.setMouthPlateCode(row.getTreadMouthPlate());
-                taskDraft.setShiftOrder(shiftOrder);
+                taskDraft.setShiftOrder(targetShiftOrder);
+                taskDraft.setNewSpecInfo(taskNewSpecInfo);
                 taskDraft.setTreadShoulderLength(treadLength);
                 taskDraft.setTailFlag(CLOSE_OUT_TIP.equals(row.getMarkCloseOutTip()) ? YES : NO);
                 taskDraft.setTailBalanceQty(nvl(row.getCxRemainQty()));
@@ -474,7 +490,7 @@ public class TmAutoScheduleDataLoadService {
                 taskDraft.setGuardShiftCount(guardShiftCount);
                 taskDraft.setMinStartQty(minStartQty);
                 taskDraft.setDefaultCurlRollLength(defaultCurlLength);
-                if (noShutdownAvailableShift && !isShiftOpen(tmCalendar, shiftOrder) && isShiftOpen(cxCalendar, shiftOrder)) {
+                if (noShutdownAvailableShift && !isShiftOpen(tmCalendar, targetShiftOrder) && isShiftOpen(cxCalendar, shiftOrder)) {
                     taskDraft.setUnplannedReasonCode("TM_SHUTDOWN_NO_AVAILABLE_SHIFT");
                     taskDraft.setUnplannedReasonDesc("胎面停产且无可分配班次，成型需求无法重分配");
                 }
@@ -500,6 +516,196 @@ public class TmAutoScheduleDataLoadService {
         return sourceKey + "-CLASS" + shiftOrder + "-ROW" + sourceRowIndex;
     }
 
+    /**
+     * 构建胎面新规格判断结果。
+     *
+     * @param context 自动排程上下文
+     * @param demandRowList 成型需求行
+     * @param lookbackDays 回看天数
+     * @param advanceShiftCount 提前班次数
+     * @return 胎面编码到新规格证据的映射
+     */
+    private Map<String, TmNewSpecInfo> buildNewSpecInfoMap(TmScheduleContext context,
+                                                           List<TmFormingDemandRowVo> demandRowList,
+                                                           Integer lookbackDays,
+                                                           Integer advanceShiftCount) {
+        Map<String, TmNewSpecInfo> resultMap = new HashMap<>();
+        if (CollUtil.isEmpty(demandRowList)) {
+            return resultMap;
+        }
+        List<String> treadCodes = demandRowList.stream()
+                .map(TmFormingDemandRowVo::getTreadCode)
+                .filter(StrUtil::isNotBlank)
+                .distinct()
+                .collect(Collectors.toList());
+        if (CollUtil.isEmpty(treadCodes)) {
+            return resultMap;
+        }
+        Date previousDate = DateUtil.offsetDay(context.getScheduleDate(), -1);
+        Date historyStartDate = DateUtil.offsetDay(context.getScheduleDate(), -lookbackDays);
+        Map<String, BigDecimal> previousStockMap = queryPreviousDayStockMap(context, treadCodes, previousDate);
+        Map<String, Boolean> historyPlanMap = queryHistoryPlanExistsMap(context, treadCodes, historyStartDate, previousDate);
+        String lookbackSource = getPositiveIntegerParamSource(context, PARAM_NEW_SPEC_LOOKBACK_DAYS, 7);
+        String advanceSource = getPositiveIntegerParamSource(context, PARAM_NEW_SPEC_ADVANCE_SHIFT_COUNT, 2);
+        for (String treadCode : treadCodes) {
+            BigDecimal previousStockQty = previousStockMap.getOrDefault(treadCode, BigDecimal.ZERO);
+            boolean previousStockExists = previousStockQty.compareTo(BigDecimal.ZERO) > 0;
+            boolean historyPlanExists = Boolean.TRUE.equals(historyPlanMap.get(treadCode));
+            TmNewSpecInfo info = new TmNewSpecInfo();
+            info.setNewSpec(!previousStockExists && !historyPlanExists);
+            info.setLookbackDays(lookbackDays);
+            info.setLookbackDaysSource(lookbackSource);
+            info.setAdvanceShiftCount(advanceShiftCount);
+            info.setAdvanceShiftCountSource(advanceSource);
+            info.setPreviousStockDate(previousDate);
+            info.setPreviousDayStockQty(previousStockQty);
+            info.setPreviousDayStockExists(previousStockExists);
+            info.setHistoryStartDate(historyStartDate);
+            info.setHistoryEndDate(previousDate);
+            info.setHistorySchedulePlanExists(historyPlanExists);
+            info.setReason(Boolean.TRUE.equals(info.getNewSpec())
+                    ? "新规格前一天无有效库存且历史回看期无排程计划量"
+                    : "非新规格，存在前一天有效库存或历史回看期排程计划量");
+            resultMap.put(treadCode, info);
+        }
+        return resultMap;
+    }
+
+    /**
+     * 查询前一天胎面净库存。
+     *
+     * @param context 自动排程上下文
+     * @param treadCodes 胎面编码集合
+     * @param previousDate 前一天库存日期
+     * @return 胎面编码到净库存的映射
+     */
+    private Map<String, BigDecimal> queryPreviousDayStockMap(TmScheduleContext context, List<String> treadCodes, Date previousDate) {
+        Map<String, BigDecimal> stockMap = new HashMap<>();
+        if (tmStockMapper == null || CollUtil.isEmpty(treadCodes)) {
+            return stockMap;
+        }
+        LambdaQueryWrapper<TmStock> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(TmStock::getFactoryCode, context.getFactoryCode());
+        wrapper.eq(TmStock::getStockDate, previousDate);
+        wrapper.in(TmStock::getTreadCode, treadCodes);
+        wrapper.eq(TmStock::getIsDelete, 0);
+        List<TmStock> stockList = Optional.ofNullable(tmStockMapper.selectList(wrapper)).orElse(Collections.emptyList());
+        for (TmStock stock : stockList) {
+            if (stock == null || StrUtil.isBlank(stock.getTreadCode())) {
+                continue;
+            }
+            BigDecimal stockQty = nvl(stock.getStockQty()).subtract(nvl(stock.getBadQty())).subtract(nvl(stock.getAdjustQty()));
+            stockMap.merge(stock.getTreadCode(), stockQty, BigDecimal::add);
+        }
+        return stockMap;
+    }
+
+    /**
+     * 查询历史回看期是否存在胎面排程计划量。
+     *
+     * @param context 自动排程上下文
+     * @param treadCodes 胎面编码集合
+     * @param historyStartDate 回看开始日期
+     * @param historyEndDate 回看结束日期
+     * @return 胎面编码到是否存在计划量的映射
+     */
+    private Map<String, Boolean> queryHistoryPlanExistsMap(TmScheduleContext context, List<String> treadCodes,
+                                                           Date historyStartDate, Date historyEndDate) {
+        Map<String, Boolean> historyPlanMap = new HashMap<>();
+        if (tmScheduleResultMapper == null || CollUtil.isEmpty(treadCodes)) {
+            return historyPlanMap;
+        }
+        LambdaQueryWrapper<TmScheduleResult> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(TmScheduleResult::getFactoryCode, context.getFactoryCode());
+        wrapper.between(TmScheduleResult::getScheduleDate, historyStartDate, historyEndDate);
+        wrapper.in(TmScheduleResult::getTreadCode, treadCodes);
+        wrapper.eq(TmScheduleResult::getIsDelete, 0);
+        List<TmScheduleResult> resultList = Optional.ofNullable(tmScheduleResultMapper.selectList(wrapper)).orElse(Collections.emptyList());
+        for (TmScheduleResult result : resultList) {
+            if (result == null || StrUtil.isBlank(result.getTreadCode()) || !hasAnyPlanQty(result)) {
+                continue;
+            }
+            historyPlanMap.put(result.getTreadCode(), Boolean.TRUE);
+        }
+        return historyPlanMap;
+    }
+
+    /**
+     * 构建单任务的新规格证据副本。
+     *
+     * @param source 胎面级新规格证据
+     * @param normalShiftOrder 原正常目标班次
+     * @param demandQty 当前任务需求量
+     * @return 单任务新规格证据
+     */
+    private TmNewSpecInfo buildTaskNewSpecInfo(TmNewSpecInfo source, int normalShiftOrder, BigDecimal demandQty) {
+        if (source == null) {
+            return null;
+        }
+        TmNewSpecInfo target = new TmNewSpecInfo();
+        target.setNewSpec(source.getNewSpec());
+        target.setLookbackDays(source.getLookbackDays());
+        target.setLookbackDaysSource(source.getLookbackDaysSource());
+        target.setAdvanceShiftCount(source.getAdvanceShiftCount());
+        target.setAdvanceShiftCountSource(source.getAdvanceShiftCountSource());
+        target.setPreviousStockDate(source.getPreviousStockDate());
+        target.setPreviousDayStockQty(source.getPreviousDayStockQty());
+        target.setPreviousDayStockExists(source.getPreviousDayStockExists());
+        target.setHistoryStartDate(source.getHistoryStartDate());
+        target.setHistoryEndDate(source.getHistoryEndDate());
+        target.setHistorySchedulePlanExists(source.getHistorySchedulePlanExists());
+        target.setNormalTargetShift(normalShiftOrder);
+        target.setDemandShift(normalShiftOrder);
+        target.setDemandQty(demandQty);
+        int adjustedShiftOrder = resolveTargetShiftOrder(target, normalShiftOrder);
+        target.setAdjustedTargetShift(adjustedShiftOrder);
+        target.setAdjustedTargetWindow(buildAdvanceWindow(adjustedShiftOrder));
+        target.setReason(source.getReason());
+        return target;
+    }
+
+    /**
+     * 根据新规格证据解析最终目标班次。
+     *
+     * @param newSpecInfo 新规格证据
+     * @param normalShiftOrder 原正常目标班次
+     * @return 最终目标班次
+     */
+    private int resolveTargetShiftOrder(TmNewSpecInfo newSpecInfo, int normalShiftOrder) {
+        if (newSpecInfo == null || !newSpecInfo.isNewSpecHit()) {
+            return normalShiftOrder;
+        }
+        return Math.max(1, normalShiftOrder - Math.max(newSpecInfo.getAdvanceShiftCount(), 1));
+    }
+
+    /**
+     * 构建从一班开始到调整目标班次的提前窗口。
+     *
+     * @param adjustedShiftOrder 调整后的目标班次
+     * @return 提前窗口班次集合
+     */
+    private List<Integer> buildAdvanceWindow(int adjustedShiftOrder) {
+        List<Integer> shiftWindow = new ArrayList<>();
+        for (int shiftOrder = 1; shiftOrder <= adjustedShiftOrder; shiftOrder++) {
+            shiftWindow.add(shiftOrder);
+        }
+        return shiftWindow;
+    }
+
+    /**
+     * 判断排程结果六个班次是否存在计划量。
+     *
+     * @param result 胎面排程结果
+     * @return true 表示存在任一班次计划量大于0
+     */
+    private boolean hasAnyPlanQty(TmScheduleResult result) {
+        return nvl(result.getClass1PlanQty()).compareTo(BigDecimal.ZERO) > 0
+                || nvl(result.getClass2PlanQty()).compareTo(BigDecimal.ZERO) > 0
+                || nvl(result.getClass3PlanQty()).compareTo(BigDecimal.ZERO) > 0
+                || nvl(result.getClass4PlanQty()).compareTo(BigDecimal.ZERO) > 0
+                || nvl(result.getClass5PlanQty()).compareTo(BigDecimal.ZERO) > 0
+                || nvl(result.getClass6PlanQty()).compareTo(BigDecimal.ZERO) > 0;
+    }
     /**
      * 加载启用的胎面损耗率配置。
      *
@@ -787,6 +993,47 @@ public class TmAutoScheduleDataLoadService {
             return Integer.valueOf(value);
         } catch (NumberFormatException ex) {
             return defaultValue;
+        }
+    }
+    /**
+     * 读取正整数参数，非法时返回默认值。
+     *
+     * @param context 自动排程上下文
+     * @param paramCode 参数编码
+     * @param defaultValue 默认值
+     * @return 正整数参数值
+     */
+    private Integer getPositiveIntegerParam(TmScheduleContext context, String paramCode, Integer defaultValue) {
+        String value = getParamValue(context, paramCode, String.valueOf(defaultValue));
+        try {
+            Integer parsedValue = Integer.valueOf(value);
+            if (parsedValue.compareTo(0) > 0) {
+                return parsedValue;
+            }
+            return defaultValue;
+        } catch (NumberFormatException ex) {
+            return defaultValue;
+        }
+    }
+
+    /**
+     * 读取正整数参数来源，非法或缺失时标记为默认值。
+     *
+     * @param context 自动排程上下文
+     * @param paramCode 参数编码
+     * @param defaultValue 默认值
+     * @return PARAM 或 DEFAULT
+     */
+    private String getPositiveIntegerParamSource(TmScheduleContext context, String paramCode, Integer defaultValue) {
+        TmParamValue value = context.getParamMap().get(paramCode);
+        if (value == null || StrUtil.isBlank(value.getParamValue())) {
+            return "DEFAULT";
+        }
+        try {
+            Integer parsedValue = Integer.valueOf(value.getParamValue());
+            return parsedValue.compareTo(0) > 0 ? "PARAM" : "DEFAULT";
+        } catch (NumberFormatException ex) {
+            return "DEFAULT";
         }
     }
 

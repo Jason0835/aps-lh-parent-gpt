@@ -215,6 +215,13 @@ public class FactoryMonthPlanFinalAdjustVo extends FactoryMonthPlanProductionFin
     private Integer pendingQty;
 
     /**
+     * 生产实际排产量合计,
+     */
+    @ApiModelProperty(value = "生产实际排产量合计", name = "sumTotalQty")
+    @TableField(exist = false)
+    private Integer sumTotalQty;
+
+    /**
      * 获取待调整量的key
      *
      * @return

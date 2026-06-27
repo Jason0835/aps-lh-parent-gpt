@@ -88,7 +88,7 @@ public class MpSimulatedResult extends BaseEntity {
     /**
      * 生胎代码
      */
-    @ApiModelProperty(value = "生胎代码", name = "embryoCode")
+    @ApiModelProperty(value = "胎胚号", name = "embryoCode")
     @TableField(value = "EMBRYO_CODE")
     private String embryoCode;
 

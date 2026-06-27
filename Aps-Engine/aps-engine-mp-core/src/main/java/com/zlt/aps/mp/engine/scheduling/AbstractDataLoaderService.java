@@ -9,13 +9,13 @@ import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.constant.StringConstant;
 import com.zlt.aps.enums.CheckItemTypeEnums;
 import com.zlt.aps.enums.MonthPlanNoProductionReasonEnum;
-import com.zlt.aps.enums.ProductionGroupTypeEnum;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.exception.BusinessException;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.mdm.api.domain.entity.LhMachineInfo;
 import com.zlt.aps.mp.api.domain.entity.*;
 import com.zlt.aps.mp.api.domain.vo.MpCheckItemVo;
+import com.zlt.aps.mp.engine.basedata.assemble.cyclegroup.CycleGroupDataHandler;
 import com.zlt.aps.mp.engine.basedata.assemble.history.CxMachineProductionHistoryInfo;
 import com.zlt.aps.mp.engine.basedata.assemble.history.GroupPlanProductionHistoryInfo;
 import com.zlt.aps.mp.engine.basedata.assemble.history.ProductionHistoryHandler;
@@ -57,8 +57,12 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
 
     private final ProductionHistoryHandler productionHistoryHandler;
 
-    public AbstractDataLoaderService(ProductionMdmDataService dataService, DpRequireDataService dpRequireDataService, MonthProductionDataService monthProductionDataService, ProductionHistoryHandler productionHistoryHandler) {
-        super(dataService, dpRequireDataService, monthProductionDataService);
+    public AbstractDataLoaderService(ProductionMdmDataService dataService,
+                                     DpRequireDataService dpRequireDataService,
+                                     CycleGroupDataHandler cycleGroupDataHandler,
+                                     ProductionHistoryHandler productionHistoryHandler,
+                                     MonthProductionDataService monthProductionDataService) {
+        super(dataService, dpRequireDataService, cycleGroupDataHandler, monthProductionDataService);
         this.productionHistoryHandler = productionHistoryHandler;
     }
 
@@ -117,6 +121,9 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
             paramConfiguration = new ProductionCapacityParamConfiguration();
         }
         productionContext.getBaseDataContainer().setParamConfiguration(paramConfiguration);
+        //20260626+ 加载月周期结构清单
+        Set<String> monthProductionCycleList = getMonthProductionCycleList(productionContext);
+        productionContext.getBaseDataContainer().setMonthProductionCycleList(monthProductionCycleList);
         //2、特殊材料的胎胚配置信息
         specialMaterialInfoHandler(productionContext);
         //3、超6个成品库存信息
@@ -519,6 +526,7 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
         paramCodeList.add(MonthPlanEnums.LAST_NEAR_DEAD_LINE_MAX_LH_MACHINE_COUNT.getCode());
         //Sku排产顺序相关
         paramCodeList.add(MonthPlanEnums.HEIGHT_PRIORITY_SKU_LIST_COUNT.getCode());
+        paramCodeList.add(MonthPlanEnums.SHARE_MOLD_EMBRYO_PRIORITY.getCode());
         //其他
         paramCodeList.add(MonthPlanEnums.SECTION_WIDTH_DIFF_VALUE.getCode());
         paramCodeList.add(MonthPlanEnums.CHANGE_STRUCT_DEC_LH_MACHINES.getCode());
@@ -612,7 +620,7 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
         configuration.setLastNearDeadLineDay((Integer) paramConfigurationMap.get(MonthPlanEnums.LAST_NEAR_DEAD_LINE_DAY.getCode()));
         //Sku排产顺序相关
         configuration.setHeightPrioritySkuPreCount((Integer) paramConfigurationMap.get(MonthPlanEnums.HEIGHT_PRIORITY_SKU_LIST_COUNT.getCode()));
-
+        configuration.setShareMoldOrEmbryoPriorityRange((Integer) paramConfigurationMap.get(MonthPlanEnums.SHARE_MOLD_EMBRYO_PRIORITY.getCode()));
         //其它
         configuration.setSectionWidthDiffValue((Integer) paramConfigurationMap.get(MonthPlanEnums.SECTION_WIDTH_DIFF_VALUE.getCode()));
         Object deductionLhMachineValue = paramConfigurationMap.get(MonthPlanEnums.CHANGE_STRUCT_DEC_LH_MACHINES.getCode());
@@ -690,18 +698,6 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
     }
 
     /**
-     * 2.1.2：根据排产信息，获取特殊原材料的配置信息-基于月计划初始化表 包含：
-     * 1、特殊原材料的胎胚
-     * 2、特殊原材料的库存及可转化的轮胎条数
-     *
-     * @param productionContext 排产单位
-     */
-//    private void specialMaterialInfoByRequireHandler(TbrProductionContext productionContext) {
-//        List<EmbryoSpecialMaterialInfoVo> specialMaterialInfoList = getDataService().getEmbryoSpecialMaterialInfo(productionContext);
-//        buildSpecialMaterialInfo(productionContext, specialMaterialInfoList);
-//    }
-
-    /**
      * 2.1.3：加载超6个月的库存信息
      *
      * @param productionContext
@@ -770,14 +766,7 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
                 productionPlanList.forEach(requirePlan -> requirePlan.setIsProductionBySum(Constant.TRUE));
             }
         });
-        //周期结构-按总需求排产
-        requirePlanList.forEach(requirePlan -> {
-            //周期排产按总量排产
-            if (ProductionGroupTypeEnum.CYCLE.getGroupType().equals(requirePlan.getStructureType())) {
-                requirePlan.setIsProductionBySum(Constant.TRUE);
-            }
-        });
-        //计算初始的库销比
+        //计算初始的库销比 20260624+ 去除周期结构-按总需求排产
         requirePlanList.forEach(requirePlan -> requirePlan.calculateInventorySalesRatio(BigDecimal.ZERO.intValue()));
     }
 

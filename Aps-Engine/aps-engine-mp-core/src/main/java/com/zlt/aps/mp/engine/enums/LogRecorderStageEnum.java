@@ -28,6 +28,34 @@ public enum LogRecorderStageEnum {
      */
     SIMULATE_PRODUCTION("03", "模拟排产阶段"),
     /**
+     * 030101 模拟交付优先-预排排产阶段
+     */
+    SIMULATE_DELIVERY_PRIORITY_PRODUCTION("030101", "模拟交付优先-预排排产阶段"),
+    /**
+     * 030102 模拟交付优先-重排在产分组阶段
+     */
+    SIMULATE_RESET_CONTINUE_PRODUCTION("030102", "模拟交付优先-重排在产分组阶段"),
+    /**
+     * 030103 模拟交付优先-指定、多段优先阶段
+     */
+    SIMULATE_FIXED_PRODUCTION("030103", "模拟交付优先-指定、多段优先阶段"),
+    /**
+     * 030104 模拟交付优先-后续阶段排产阶段
+     */
+    SIMULATE_LAST_PRODUCTION("030104", "模拟交付优先-最后分配阶段"),
+    /**
+     * 030201 模拟效率优先-在产机台收尾排产阶段
+     */
+    SIMULATE_EFFICIENCY_PRIORITY_PRODUCTION("030201", "模拟效率优先-在产机台收尾排产阶段"),
+    /**
+     * 030202 模拟效率优先-新增分组排产阶段
+     */
+    SIMULATE_EFFICIENCY_ADD_PRODUCTION("030202", "模拟效率优先-新增分组排产阶段"),
+    /**
+     * 0303 模拟排产-月末补充分配阶段
+     */
+    SIMULATE_SUPPLEMENT_PRODUCTION("0303", "模拟排产-月末补充分配阶段"),
+    /**
      * 04 正式排产阶段-续作
      */
     FORMAL_PRODUCTION("04", "正式排产阶段"),

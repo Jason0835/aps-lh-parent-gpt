@@ -32,6 +32,19 @@ public class AjaxResultUtils {
 		return Collections.EMPTY_LIST;
 	}
 
+    /**
+     * 获取Ajax请求返回的提示信息
+     *
+     * @param ajaxResult Ajax请求
+     * @return 结果
+     */
+    public static String getMsg(AjaxResult ajaxResult) {
+        if (ajaxResult != null && ajaxResult.get(AjaxResult.MSG_TAG) != null) {
+            return String.valueOf(ajaxResult.get(AjaxResult.MSG_TAG));
+        }
+        return "";
+    }
+
 	/**
 	 * 判断Ajax请求是否成功
 	 *

@@ -71,7 +71,7 @@ public class MonthPlanProductConstructionInfoVo implements Serializable {
     /**
      * 主物料(胎胚描述)
      */
-    @ApiModelProperty(value = "主物料(胎胚描述)", name = "mainMaterialDesc")
+    @ApiModelProperty(value = "胎胚描述", name = "mainMaterialDesc")
     private String mainMaterialDesc;
 
     /**

@@ -37,6 +37,12 @@ public class TmAutoPlanScenario {
     /** 指定日期已有旧结果 */
     private List<TmScheduleResult> oldScheduleResults = new ArrayList<>();
 
+    /** 历史胎面排程结果，用于新规格回看判断 */
+    private List<TmScheduleResult> historyScheduleResults = new ArrayList<>();
+
+    /** 是否强制使用空历史排程结果，验证参数缺省的新规格场景时使用 */
+    private Boolean forceEmptyHistoryScheduleResults = Boolean.FALSE;
+
     /** 成型计划与施工信息关联后的测试行 */
     private List<TmFormingDemandRowVo> cxScheduleResults = new ArrayList<>();
 

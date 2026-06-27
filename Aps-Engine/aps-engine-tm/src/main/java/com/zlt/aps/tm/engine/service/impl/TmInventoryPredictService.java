@@ -91,6 +91,13 @@ public class TmInventoryPredictService implements ITmInventoryPredictService {
             forecast.setFirstShiftPlanQty(firstShiftPlanMap.getOrDefault(treadCode, BigDecimal.ZERO));
             forecast.calculateRollingStockQty();
             stockForecastMap.put(treadCode, forecast);
+            // 打印6点库存计算公式
+            log.info("[TM_INVENTORY_PREDICT] treadCode={}, 6点库存【stockQty】-不良数量【badQty】-调整数量【adjustQty】=实际库存【{}】",
+                    treadCode, forecast.getSixClockStockQty());
+            // 打印14点预计库存计算公式
+            log.info("[TM_INVENTORY_PREDICT] treadCode={}, 14点预计库存【rollingStockQty】=6点库存【{}】-早班需求量【{}】+早班计划量【{}】=【{}】",
+                    treadCode, forecast.getSixClockStockQty(), forecast.getFirstShiftDemandQty(),
+                    forecast.getFirstShiftPlanQty(), forecast.getRollingStockQty());
         }
 
         context.setStockForecastMap(stockForecastMap);

@@ -126,6 +126,8 @@ public class TmAutoPlanMockFactory {
         TmParamsMapper paramsMapper = mock(TmParamsMapper.class);
         TmMachineInfoMapper machineInfoMapper = mock(TmMachineInfoMapper.class);
         TmAutoScheduleDataLoadMapper dataLoadMapper = mock(TmAutoScheduleDataLoadMapper.class);
+        TmStockMapper stockMapper = mock(TmStockMapper.class);
+        TmScheduleResultMapper scheduleResultMapper = mock(TmScheduleResultMapper.class);
         TmMouthPlateMapper mouthPlateMapper = mock(TmMouthPlateMapper.class);
         TmGlueMachineRealMapper glueMachineRealMapper = mock(TmGlueMachineRealMapper.class);
         TmSpecifyMachineMapper specifyMachineMapper = mock(TmSpecifyMachineMapper.class);
@@ -137,6 +139,8 @@ public class TmAutoPlanMockFactory {
         when(paramsMapper.selectList(any())).thenReturn(nullToEmpty(scenario.getParams()));
         when(machineInfoMapper.selectList(any())).thenReturn(nullToEmpty(scenario.getMachineInfos()));
         when(dataLoadMapper.selectFormingDemandRows(any(), any())).thenReturn(nullToEmpty(scenario.getCxScheduleResults()));
+        when(stockMapper.selectList(any())).thenReturn(nullToEmpty(scenario.getStocks()));
+        when(scheduleResultMapper.selectList(any())).thenReturn(resolveHistoryScheduleResults(scenario));
         when(dataLoadMapper.selectWorkCalendarRows(any(), any(), any())).thenAnswer(invocation ->
                 workCalendarRows(scenario, invocation.getArgument(1)));
         when(mouthPlateMapper.selectList(any())).thenReturn(nullToEmpty(scenario.getMouthPlates()));
@@ -150,6 +154,8 @@ public class TmAutoPlanMockFactory {
         setField(service, "tmParamsMapper", paramsMapper);
         setField(service, "tmMachineInfoMapper", machineInfoMapper);
         setField(service, "tmAutoScheduleDataLoadMapper", dataLoadMapper);
+        setField(service, "tmStockMapper", stockMapper);
+        setField(service, "tmScheduleResultMapper", scheduleResultMapper);
         setField(service, "tmMouthPlateMapper", mouthPlateMapper);
         setField(service, "tmGlueMachineRealMapper", glueMachineRealMapper);
         setField(service, "tmSpecifyMachineMapper", specifyMachineMapper);
@@ -205,6 +211,31 @@ public class TmAutoPlanMockFactory {
         }).collect(Collectors.toList());
     }
 
+    private List<TmScheduleResult> resolveHistoryScheduleResults(TmAutoPlanScenario scenario) {
+        if (Boolean.TRUE.equals(scenario.getForceEmptyHistoryScheduleResults()) || hasNewSpecParam(scenario)
+                || !nullToEmpty(scenario.getHistoryScheduleResults()).isEmpty()) {
+            return nullToEmpty(scenario.getHistoryScheduleResults());
+        }
+        Map<String, TmScheduleResult> historyMap = new LinkedHashMap<>();
+        for (com.zlt.aps.tm.domain.vo.TmFormingDemandRowVo demandRow : nullToEmpty(scenario.getCxScheduleResults())) {
+            if (StrUtil.isBlank(demandRow.getTreadCode())) {
+                continue;
+            }
+            TmScheduleResult result = new TmScheduleResult();
+            result.setFactoryCode(scenario.getAutoPlanRequest().getFactoryCode());
+            result.setScheduleDate(DateUtil.offsetDay(scenario.getAutoPlanRequest().getScheduleDate(), -1));
+            result.setTreadCode(demandRow.getTreadCode());
+            result.setClass1PlanQty(BigDecimal.ONE);
+            historyMap.put(demandRow.getTreadCode(), result);
+        }
+        return new ArrayList<>(historyMap.values());
+    }
+
+    private boolean hasNewSpecParam(TmAutoPlanScenario scenario) {
+        return nullToEmpty(scenario.getParams()).stream()
+                .anyMatch(param -> "TM_NEW_SPEC_LOOKBACK_DAYS".equals(param.getParamCode())
+                        || "TM_NEW_SPEC_ADVANCE_SHIFT_COUNT".equals(param.getParamCode()));
+    }
     private List<TmWorkCalendarRowVo> workCalendarRows(TmAutoPlanScenario scenario, String procCode) {
         return nullToEmpty(scenario.getWorkCalendars()).stream()
                 .filter(item -> procCode == null || procCode.equals(item.getProcCode()))

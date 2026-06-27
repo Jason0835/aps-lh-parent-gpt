@@ -6,6 +6,7 @@ import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.exception.BusinessException;
 import com.zlt.aps.mp.api.domain.entity.MpFactoryProductionVersion;
 import com.zlt.aps.mp.api.enums.ProductionProcessStage;
+import com.zlt.aps.mp.engine.basedata.assemble.calendar.WorkerCalendarHandler;
 import com.zlt.aps.mp.engine.basedata.assemble.cyclegroup.CycleGroupDataHandler;
 import com.zlt.aps.mp.engine.constant.ProductionConstant;
 import com.zlt.aps.mp.engine.domain.Context;
@@ -44,14 +45,15 @@ import java.util.stream.Collectors;
 @Service(value = "tbrProductionInitService")
 public class TbrProductionInitService extends AbstractInitDataLoadService {
 
-    private final CycleGroupDataHandler cycleGroupDataHandler;
+    private final WorkerCalendarHandler workerCalendarHandler;
 
     public TbrProductionInitService(ProductionMdmDataService dataService,
                                     DpRequireDataService dpRequireDataService,
                                     CycleGroupDataHandler cycleGroupDataHandler,
+                                    WorkerCalendarHandler workerCalendarHandler,
                                     MonthProductionDataService monthProductionDataService) {
-        super(dataService, dpRequireDataService, monthProductionDataService);
-        this.cycleGroupDataHandler = cycleGroupDataHandler;
+        super(dataService, dpRequireDataService, cycleGroupDataHandler, monthProductionDataService);
+        this.workerCalendarHandler = workerCalendarHandler;
     }
 
     /**
@@ -106,8 +108,10 @@ public class TbrProductionInitService extends AbstractInitDataLoadService {
         Map<String, List<MonthPlanProductMouldInfoVo>> mouldInfoMap = getProductionMouldInfo(productionContext);
         //SKU-日硫化产能
         Map<String, MonthPlanProductLhCapacityVo> lhCapacityMap = getProductLhCapacityInfo(productionContext, paramConfiguration.getDayVulcanizationQtyConfiguration());
-        //20260403+ 月周期排产清单，检测周期结构不在月周期排产清单中则不排
-        Set<String> monthProductionCycleList = cycleGroupDataHandler.getMonthCycleGroupInfo(productionContext);
+        //20260403+ 月周期排产清单，检测周期结构不在月周期排产清单中且不是在产结构则不排
+        Set<String> monthProductionCycleList = getMonthProductionCycleList(productionContext);
+        //20260626+ 续作结构信息
+        Set<String> continueGroupList = workerCalendarHandler.getContinueGroupList(productionContext);
         //赋值施工信息，模具，日硫化产能
         requirePlanList.forEach(requirePlan -> {
             String materialCode = requirePlan.getMaterialCode();
@@ -137,7 +141,7 @@ public class TbrProductionInitService extends AbstractInitDataLoadService {
             }
             requirePlan.setVulcanizationInfo(lhCapacity);
             //不排产检测
-            requirePlan.checkProductionConditionByBase(monthProductionCycleList);
+            requirePlan.checkProductionConditionByBase(monthProductionCycleList, continueGroupList);
         });
         //模具预占参数
         if (FactoryConstant.YES_VALUE.equalsIgnoreCase(paramConfiguration.getOpenPreemptionMouldCapacity())) {

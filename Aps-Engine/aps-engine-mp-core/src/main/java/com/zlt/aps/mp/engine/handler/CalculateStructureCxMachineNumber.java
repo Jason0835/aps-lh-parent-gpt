@@ -315,8 +315,8 @@ public class CalculateStructureCxMachineNumber {
         if (CollectionUtils.isEmpty(maxEnableMouldNumberMap)) {
             return BigDecimal.ZERO.intValue();
         }
-        //剔除不排产的计划
-        List<MonthPlanProductionRequirePlanVo> productionPlanList = groupDatas.stream().filter(productionPlan -> YesOrNoEnum.YES.getCode().equals(productionPlan.getProductionFlag()) && StringUtils.isNotBlank(productionPlan.getMainPattern())).collect(Collectors.toList());
+        //剔除不排产的计划 20260626+ 不使用productionFlag(因周期结构不在月周期清单但为续作结构有可能因切换结构限制导致需要延长)
+        List<MonthPlanProductionRequirePlanVo> productionPlanList = groupDatas.stream().filter(productionPlan -> YesOrNoEnum.YES.getCode().equals(productionPlan.getIsProduction()) && StringUtils.isNotBlank(productionPlan.getMainPattern())).collect(Collectors.toList());
         if (CollectionUtils.isEmpty(productionPlanList)) {
             return BigDecimal.ZERO.intValue();
         }

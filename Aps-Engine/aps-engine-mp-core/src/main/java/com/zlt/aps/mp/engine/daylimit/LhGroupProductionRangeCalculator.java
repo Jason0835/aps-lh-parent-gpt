@@ -1,5 +1,6 @@
 package com.zlt.aps.mp.engine.daylimit;
 
+import com.google.common.collect.Lists;
 import com.zlt.aps.constant.StringConstant;
 import com.zlt.aps.mp.engine.domain.vo.MonthPlanProductionRequirePlanVo;
 import com.zlt.aps.mp.engine.domain.vo.ProductionMouldInfoVo;
@@ -129,7 +130,7 @@ public class LhGroupProductionRangeCalculator {
             return new MouldProductionDayLimitHelper(Collections.emptySet(), MouldProductionLimitTypeEnum.DAY_CAPACITY_DOUBLE_LIMIT);
         }
         //7、取得与贴牌产能上限的排产范围的交集 sandy+ 2026.3.23
-        Set<Integer> oemBrandCapacityLimitSet = productionContext.getOemBrandCapacityLimitRange(productionContext,addSkuInfo);
+        Set<Integer> oemBrandCapacityLimitSet = productionContext.getOemBrandCapacityLimitRange(productionContext, addSkuInfo);
         if (CollectionUtils.isEmpty(oemBrandCapacityLimitSet)) {
             productionContext.addSkuProductionLimitInfo(materialDesc, MouldProductionLimitTypeEnum.OEM_BRAND_CAPACITY_LIMIT);
             return new MouldProductionDayLimitHelper(Collections.emptySet(), MouldProductionLimitTypeEnum.OEM_BRAND_CAPACITY_LIMIT);
@@ -235,7 +236,7 @@ public class LhGroupProductionRangeCalculator {
             return new MouldProductionDayLimitHelper(earliestContinuousSet, MouldProductionLimitTypeEnum.CONTINUE_DAY_LIMIT);
         }
         //7、20260313 换模能力
-        MouldProductionDayLimitHelper handlerMould = handlerChangeMouldCapacity(isChangeMould, productionContext, materialDesc, earliestContinuousSet);
+        MouldProductionDayLimitHelper handlerMould = handlerChangeMouldCapacity(isChangeMould, productionContext, continueDays, materialDesc, earliestContinuousSet, stopDaySet);
         if (MouldProductionLimitTypeEnum.NO_LIMIT == handlerMould.getLimitType()) {
             return handlerMould;
         }
@@ -299,7 +300,7 @@ public class LhGroupProductionRangeCalculator {
      *
      * @param isChangeMould     是否换模
      * @param productionContext 排产上下文
-     * @param continueDays      可连续排产天数
+     * @param continueDays      最低连续排产天数
      * @param materialDesc      物料描述
      * @param intersectionSet   已经有的交集
      * @param stopDays          停产天数集合
@@ -341,12 +342,17 @@ public class LhGroupProductionRangeCalculator {
             productionContext.addSkuProductionLimitInfo(materialDesc, MouldProductionLimitTypeEnum.CHANGE_MOULD_CAPACITY_DOUBLE_LIMIT);
             return new MouldProductionDayLimitHelper(Collections.emptySet(), MouldProductionLimitTypeEnum.CHANGE_MOULD_CAPACITY_DOUBLE_LIMIT);
         }
-        Set<Integer> realDaySet = ContinuousProductionDayHandler.getGreaterDayRange(productionContext, newProductionDaySet, continueDays);
-        if (CollectionUtils.isEmpty(realDaySet)) {
-            productionContext.addSkuProductionLimitInfo(materialDesc, MouldProductionLimitTypeEnum.CHANGE_MOULD_CAPACITY_DOUBLE_LIMIT);
-            return new MouldProductionDayLimitHelper(Collections.emptySet(), MouldProductionLimitTypeEnum.CHANGE_MOULD_CAPACITY_DOUBLE_LIMIT);
+        if (newProductionDaySet.size() >= continueDays) {
+            return new MouldProductionDayLimitHelper(newProductionDaySet, MouldProductionLimitTypeEnum.NO_LIMIT);
         }
-        return new MouldProductionDayLimitHelper(realDaySet, MouldProductionLimitTypeEnum.NO_LIMIT);
+        //只有一天，看是否月末最后一天
+        List<Integer> productionDayList = Lists.newArrayList(newProductionDaySet);
+        Integer onlyProductionDay = productionDayList.get(BigDecimal.ZERO.intValue());
+        if (productionContext.isProductionEndDay(onlyProductionDay)) {
+            return new MouldProductionDayLimitHelper(newProductionDaySet, MouldProductionLimitTypeEnum.NO_LIMIT);
+        }
+        productionContext.addSkuProductionLimitInfo(materialDesc, MouldProductionLimitTypeEnum.CHANGE_MOULD_CAPACITY_DOUBLE_LIMIT);
+        return new MouldProductionDayLimitHelper(Collections.emptySet(), MouldProductionLimitTypeEnum.CHANGE_MOULD_CAPACITY_DOUBLE_LIMIT);
     }
 
 }

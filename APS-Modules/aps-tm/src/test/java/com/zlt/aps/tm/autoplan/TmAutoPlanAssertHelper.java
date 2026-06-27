@@ -37,6 +37,7 @@ public class TmAutoPlanAssertHelper {
             }
             assertResponse(scenario, response);
             assertPersistedResults(scenario, mockContext.getInsertedResults());
+            assertWindowPlanQty(scenario, mockContext.getInsertedResults());
             assertPersistedExplains(scenario, mockContext.getInsertedExplains());
             assertPersistSummary(scenario, mockContext.getLastContext());
         } catch (RuntimeException ex) {
@@ -170,6 +171,31 @@ public class TmAutoPlanAssertHelper {
         }
     }
 
+    private void assertWindowPlanQty(TmAutoPlanScenario scenario, List<TmScheduleResult> resultList) {
+        for (TmAutoPlanExpectedResult.ExpectedWindowPlanQty expectedWindow : scenario.getExpected().getExpectedWindowPlanQtyList()) {
+            BigDecimal actualPlanQty = BigDecimal.ZERO;
+            for (TmScheduleResult result : resultList) {
+                if (StrUtil.isNotBlank(expectedWindow.getTreadCode())
+                        && !expectedWindow.getTreadCode().equals(result.getTreadCode())) {
+                    continue;
+                }
+                for (int shiftOrder = expectedWindow.getStartShiftOrder(); shiftOrder <= expectedWindow.getEndShiftOrder(); shiftOrder++) {
+                    BigDecimal shiftPlanQty = readPlanQty(result, shiftOrder);
+                    if (shiftPlanQty != null) {
+                        actualPlanQty = actualPlanQty.add(shiftPlanQty);
+                    }
+                }
+            }
+            if (expectedWindow.getMinPlanQty() != null) {
+                assertTrue("提前窗口累计计划量不足：" + scenario.getCaseName(),
+                        actualPlanQty.compareTo(expectedWindow.getMinPlanQty()) >= 0);
+            }
+            if (expectedWindow.getMaxPlanQty() != null) {
+                assertTrue("提前窗口累计计划量超过预期：" + scenario.getCaseName(),
+                        actualPlanQty.compareTo(expectedWindow.getMaxPlanQty()) <= 0);
+            }
+        }
+    }
     private void assertPersistSummary(TmAutoPlanScenario scenario, TmScheduleContext context) {
         Integer expectedErrorCount = scenario.getExpected().getErrorCount();
         if (expectedErrorCount == null || context == null || context.getPersistResult() == null) {

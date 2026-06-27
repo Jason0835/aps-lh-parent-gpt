@@ -1,5 +1,6 @@
 package com.zlt.aps.mp.engine.domain.dto;
 
+import com.google.common.collect.Maps;
 import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.enums.MonthPlanNoProductionReasonEnum;
 import com.zlt.aps.enums.ProductTypeEnum;
@@ -54,6 +55,10 @@ public class ProductionPlanGroupInfo {
      * 分组值 TBR为结构
      */
     private String groupName;
+    /**
+     * 结构类型 01 周期结构 02 常规结构
+     */
+    private String structureType;
     /**
      * 是否零度结构 1 是 0 否
      */
@@ -212,7 +217,7 @@ public class ProductionPlanGroupInfo {
         groupInfo.setPriorityFixedCxMachineSet(new HashSet<>());
         groupInfo.setIsLatestSpecialMaterial(false);
         groupInfo.setHasBeforeConclusionHandler(true);
-
+        groupInfo.setStructureType(groupInfo.getStructureTypeByPlan());
         //默认不含特殊材料信息
         groupInfo.setEmbryoSpecialMaterialInfoMap(Collections.emptyMap());
         if (CollectionUtils.isEmpty(groupPlanData)) {
@@ -343,6 +348,40 @@ public class ProductionPlanGroupInfo {
             return BigDecimal.ZERO.intValue();
         }
         return effectiveList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getProductionQty).sum();
+    }
+
+    /**
+     * 20260625+
+     * 获取分组中高优先级需求量
+     * 续作结构在产机台-原始的高需求量
+     *
+     * @return
+     */
+    public Map<String, Integer> getSkuHeightQty() {
+        if (CollectionUtils.isEmpty(groupPlanData)) {
+            return Collections.emptyMap();
+        }
+        Map<String, Integer> heightQtyMap = Maps.newHashMap();
+        //按Sku分组
+        Map<String, List<MonthPlanProductionRequirePlanVo>> skuProductionPlanMap = groupPlanData.stream().collect(Collectors.groupingBy(MonthPlanProductionRequirePlanVo::getMaterialDesc));
+        skuProductionPlanMap.forEach((materialDesc, preProductionList) -> {
+            if (CollectionUtils.isEmpty(preProductionList)) {
+                return;
+            }
+            //是否按总量排产
+            boolean isBySum = preProductionList.stream().anyMatch(single -> YesOrNoEnum.YES.getValue().equals(single.getIsProductionBySum()));
+            Integer sumOriginHeightProductionQty = preProductionList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getOriginHeightProductionQty).sum();
+            Integer sumProductionQty = preProductionList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getOriginProductionQty).sum();
+            Integer sumHeightProductionQty;
+            if (isBySum && sumOriginHeightProductionQty > BigDecimal.ZERO.intValue()) {
+                //如果是按总量排产，且有高优先级量需求，则所有的都当做高 高优先级量 = 净需求量
+                sumHeightProductionQty = sumProductionQty;
+            } else {
+                sumHeightProductionQty = preProductionList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getOriginHeightProductionQty).sum();
+            }
+            heightQtyMap.put(materialDesc, sumHeightProductionQty);
+        });
+        return heightQtyMap;
     }
 
     /**
@@ -2186,5 +2225,21 @@ public class ProductionPlanGroupInfo {
         TbrProductionContext productionContext = (TbrProductionContext) context;
         Integer skuShortestProductionDays = productionContext.getBaseDataContainer().getParamConfiguration().getSkuShortestProductionDays();
         return maxDaySize >= skuShortestProductionDays;
+    }
+
+    /**
+     * 获取结构类型：根据计划
+     *
+     * @return
+     */
+    private String getStructureTypeByPlan() {
+        if (CollectionUtils.isEmpty(groupPlanData)) {
+            return StringUtils.EMPTY;
+        }
+        List<MonthPlanProductionRequirePlanVo> effectiveList = groupPlanData.stream().filter(single -> StringUtils.isNotBlank(single.getStructureType())).collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(effectiveList)) {
+            return StringUtils.EMPTY;
+        }
+        return effectiveList.get(BigDecimal.ZERO.intValue()).getStructureType();
     }
 }

@@ -35,12 +35,18 @@ public abstract class AbstractInitDataLoadService extends AbstractBaseProduction
      * 需求计划服务数据提供接口
      */
     private final DpRequireDataService dpRequireDataService;
+    /**
+     * 周期结构业务加载处理器
+     */
+    private final CycleGroupDataHandler cycleGroupDataHandler;
 
     public AbstractInitDataLoadService(ProductionMdmDataService dataService,
                                        DpRequireDataService dpRequireDataService,
+                                       CycleGroupDataHandler cycleGroupDataHandler,
                                        MonthProductionDataService monthProductionDataService) {
         super(dataService, monthProductionDataService);
         this.dpRequireDataService = dpRequireDataService;
+        this.cycleGroupDataHandler = cycleGroupDataHandler;
     }
 
     public DpRequireDataService getDpRequireDataService() {
@@ -66,6 +72,16 @@ public abstract class AbstractInitDataLoadService extends AbstractBaseProduction
             productionPlanList.add(productionPlan);
         });
         return productionPlanList;
+    }
+
+    /**
+     * 20260626 月周期结构清单信息
+     *
+     * @param productionContext
+     * @return
+     */
+    protected Set<String> getMonthProductionCycleList(TbrProductionContext productionContext) {
+        return cycleGroupDataHandler.getMonthCycleGroupInfo(productionContext);
     }
 
     /**

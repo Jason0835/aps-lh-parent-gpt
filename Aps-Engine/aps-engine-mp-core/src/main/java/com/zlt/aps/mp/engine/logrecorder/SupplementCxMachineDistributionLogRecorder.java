@@ -69,10 +69,25 @@ public class SupplementCxMachineDistributionLogRecorder {
      * @return
      */
     public static String addNeedSupplementAllocationInfoLog(Context context, String cxMachineInfo) {
-        String logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，机台：[%s]需要进行月尾补充分配 ====";
-        String logContent = String.format(logContentFormat,
+        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，机台：[%s]需要进行月尾补充分配 ====",
                 context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion()
                 , cxMachineInfo);
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.SUPPLEMENT_CX_MACHINE_DISTRIBUTION, logContent);
+        return logContent;
+    }
+
+    /**
+     * 增加需要补充分配的机台需求信息日志记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，还需分配的分组计划：[%s] ====
+     *
+     * @param context 排程上下文
+     * @return
+     */
+    public static String addHasLeftOverRequireGroupInfoLog(Context context, String leftOverGroupInfo) {
+        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，还需分配的分组计划：[%s] ====",
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion()
+                , leftOverGroupInfo);
         ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
         TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.SUPPLEMENT_CX_MACHINE_DISTRIBUTION, logContent);
         return logContent;

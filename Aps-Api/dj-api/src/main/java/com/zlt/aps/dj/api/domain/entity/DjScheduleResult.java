@@ -360,4 +360,7 @@ public class DjScheduleResult extends BaseEntity {
 
     @TableField(exist = false)
     private Long[] ids;
+
+    @TableField(exist = false)
+    private Date newestPublishTime;
 }

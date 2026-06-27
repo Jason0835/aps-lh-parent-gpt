@@ -1,6 +1,7 @@
 package com.zlt.aps.mp.engine.handler;
 
 import com.google.common.collect.Maps;
+import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.mp.engine.domain.Context;
 import com.zlt.aps.mp.engine.domain.dto.CxMachineAllocationPlanHelper;
 import com.zlt.aps.mp.engine.domain.dto.ProductionPlanGroupInfo;
@@ -10,6 +11,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 
+import java.math.BigDecimal;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -61,8 +63,17 @@ public class SimulateProductionSnapshotHandler {
             if (CollectionUtils.isEmpty(preProductionList)) {
                 return;
             }
-            Integer sumHeightProductionQty = preProductionList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getHeightProductionQty).sum();
+            //是否按总量排产
+            boolean isBySum = preProductionList.stream().anyMatch(single -> YesOrNoEnum.YES.getValue().equals(single.getIsProductionBySum()));
+            Integer sumOriginHeightProductionQty = preProductionList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getOriginHeightProductionQty).sum();
             Integer sumProductionQty = preProductionList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getProductionQty).sum();
+            Integer sumHeightProductionQty;
+            if (isBySum && sumOriginHeightProductionQty > BigDecimal.ZERO.intValue()) {
+                //20260625+ 如果是按总量排产，且有高优先级量需求，则所有的都当做高 高优先级量 = 净需求量
+                sumHeightProductionQty = sumProductionQty;
+            } else {
+                sumHeightProductionQty = preProductionList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getHeightProductionQty).sum();
+            }
             SkuProductionSnapshot snapshot = SkuProductionSnapshot.buildSnapshot(materialDesc, sumHeightProductionQty, sumProductionQty);
             if (null == snapshot) {
                 return;

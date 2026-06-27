@@ -328,8 +328,8 @@ public class GroupTimeExtensionHandler extends OnLineGroupOnLineMachineHandler {
         }
         //20260511+ 因加入高优先级强制收尾业务，导致延长探测会出现跳跃，故而获取截止nextDay连续有效探测日
         Set<String> effectiveDetectKey = getEffectiveDetectDayInfo(context, earliestConclusion, handledDayInfo, nextDay);
-        if(CollectionUtils.isEmpty(effectiveDetectKey)){
-            return ;
+        if (CollectionUtils.isEmpty(effectiveDetectKey)) {
+            return;
         }
         String prefix = earliestConclusion.getTimeExtensionPrefix();
         Integer startIndex = prefix.length();
@@ -477,7 +477,8 @@ public class GroupTimeExtensionHandler extends OnLineGroupOnLineMachineHandler {
         //处理计划的待排产量及排产标记重置
         List<MonthPlanProductionRequirePlanVo> groupAllPlanList = groupPlan.getGroupPlanData();
         if (!CollectionUtils.isEmpty(groupAllPlanList)) {
-            groupAllPlanList.forEach(singlePlan -> singlePlan.resetProductionDataInfo());
+            //20260626+ 非正式阶段不在月周期清单中标记不排
+            groupAllPlanList.forEach(singlePlan -> singlePlan.resetProductionDataInfo(singlePlan.isFlagFalse(context)));
         }
         groupPlan.setDayProductionLimitInfo(Maps.newHashMap());
         groupPlan.buildDayProductionLimitInfoByContinue(context, newAllocationInfoList);
