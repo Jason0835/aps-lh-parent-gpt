@@ -7,7 +7,7 @@ import com.ruoyi.common.core.utils.SecurityUtils;
 import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.redissonLock.annotation.DistributedLock;
 import com.zlt.aps.tq.api.domain.entity.TqMachineSpecSpeed;
-import com.zlt.aps.tq.api.domain.entity.TqNewScheduleResult;
+import com.zlt.aps.tq.api.domain.entity.TqScheduleResult;
 import com.zlt.aps.tq.api.domain.entity.TqRollingLog;
 import com.zlt.aps.tq.api.domain.entity.TqRollingLogDetail;
 import com.zlt.aps.tq.api.domain.entity.TqStock;
@@ -15,7 +15,7 @@ import com.zlt.aps.tq.engine.vo.RollingUpdateResult;
 import com.zlt.aps.tq.engine.vo.TqRollingContext;
 import com.zlt.aps.tq.engine.vo.TqRollingTaskNode;
 import com.zlt.aps.tq.mapper.TqMachineSpecSpeedMapper;
-import com.zlt.aps.tq.mapper.TqNewScheduleResultMapper;
+import com.zlt.aps.tq.mapper.TqScheduleResultMapper;
 import com.zlt.aps.tq.mapper.TqRollingLogDetailMapper;
 import com.zlt.aps.tq.mapper.TqRollingLogMapper;
 import com.zlt.aps.tq.mapper.TqStockMapper;
@@ -25,6 +25,7 @@ import com.zlt.aps.tq.service.ITqRollingUpdateService;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
@@ -64,7 +65,7 @@ import java.util.stream.Collectors;
 public class TqRollingUpdateServiceImpl implements ITqRollingUpdateService {
 
     @Resource
-    private TqNewScheduleResultMapper tqNewScheduleResultMapper;
+    private TqScheduleResultMapper tqScheduleResultMapper;
 
     @Resource
     private TqMachineSpecSpeedMapper tqMachineSpecSpeedMapper;
@@ -128,7 +129,9 @@ public class TqRollingUpdateServiceImpl implements ITqRollingUpdateService {
      * @return 滚动更新结果
      */
     @Override
-    @Transactional(rollbackFor = Exception.class)
+    // 使用REQUIRES_NEW独立事务：滚动更新作为辅助操作，失败时仅回滚自身事务，
+    // 不应污染调用方（如删除/插单等）的主事务，与triggerRollingUpdateForAllShifts的try-catch容错意图保持一致
+    @Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
     @DistributedLock(
             key = "'TQ:ROLLING:' + T(cn.hutool.core.date.DateUtil).format(#scheduleDate, 'yyyyMMdd')",
             waitTime = 3,
@@ -189,11 +192,14 @@ public class TqRollingUpdateServiceImpl implements ITqRollingUpdateService {
                     context.getBeforeStockQty(), context.getAfterStockQty());
 
         } catch (Exception e) {
-            log.error("胎圈排程滚动更新失败，批次号：{}", batchNo, e);
+            // 滚动更新作为辅助操作，失败时返回失败结果而非抛异常，
+            // 由调用方走 WARN 分支处理（调用方均有 isSuccess() 判断），
+            // 避免双重 ERROR 日志污染；REQUIRES_NEW 事务提交日志记录，
+            // persistChanges 未执行，无业务数据被修改或残留
+            log.warn("胎圈排程滚动更新失败，批次号：{}，原因：{}", batchNo, e.getMessage());
             // 更新日志为失败
             updateRollingLogFailure(rollingLog, e.getMessage());
-            // 抛出异常，事务回滚
-            throw new RuntimeException("胎圈排程滚动更新失败：" + e.getMessage(), e);
+            return RollingUpdateResult.fail(batchNo, e.getMessage());
         }
     }
 
@@ -306,20 +312,20 @@ public class TqRollingUpdateServiceImpl implements ITqRollingUpdateService {
      */
     private LinkedList<TqRollingTaskNode> loadTaskChainFromDb(String machineCode, Date scheduleDate, int shiftIndex) {
         // 查询该机台在该排程日期的所有排程记录
-        LambdaQueryWrapper<TqNewScheduleResult> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(TqNewScheduleResult::getMachineCode, machineCode)
-               .eq(TqNewScheduleResult::getScheduleDate, DateUtil.beginOfDay(scheduleDate))
-               .eq(TqNewScheduleResult::getIsDelete, 0)
-               .orderByAsc(TqNewScheduleResult::getId);
+        LambdaQueryWrapper<TqScheduleResult> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(TqScheduleResult::getMachineCode, machineCode)
+               .eq(TqScheduleResult::getScheduleDate, DateUtil.beginOfDay(scheduleDate))
+               .eq(TqScheduleResult::getIsDelete, 0)
+               .orderByAsc(TqScheduleResult::getId);
 
-        List<TqNewScheduleResult> scheduleList = tqNewScheduleResultMapper.selectList(wrapper);
+        List<TqScheduleResult> scheduleList = tqScheduleResultMapper.selectList(wrapper);
         if (scheduleList == null || scheduleList.isEmpty()) {
             return new LinkedList<>();
         }
 
         // 转换为任务节点（仅提取指定班次的数据）
         LinkedList<TqRollingTaskNode> taskChain = new LinkedList<>();
-        for (TqNewScheduleResult schedule : scheduleList) {
+        for (TqScheduleResult schedule : scheduleList) {
             TqRollingTaskNode node = convertToTaskNode(schedule, shiftIndex);
             if (node != null) {
                 taskChain.add(node);
@@ -338,7 +344,7 @@ public class TqRollingUpdateServiceImpl implements ITqRollingUpdateService {
      * @param shiftIndex 班次索引（1~6）
      * @return 任务节点（若该班次无计划则返回null）
      */
-    private TqRollingTaskNode convertToTaskNode(TqNewScheduleResult schedule, int shiftIndex) {
+    private TqRollingTaskNode convertToTaskNode(TqScheduleResult schedule, int shiftIndex) {
         Integer planQty = getPlanQtyByShiftIndex(schedule, shiftIndex);
         Integer sequence = getSequenceByShiftIndex(schedule, shiftIndex);
         Integer finishQty = getFinishQtyByShiftIndex(schedule, shiftIndex);
@@ -400,17 +406,17 @@ public class TqRollingUpdateServiceImpl implements ITqRollingUpdateService {
             }
 
             // 查询变更前的原值（用于对比记录明细）
-            TqNewScheduleResult original = tqNewScheduleResultMapper.selectById(node.getScheduleId());
+            TqScheduleResult original = tqScheduleResultMapper.selectById(node.getScheduleId());
 
             // 构建更新条件
-            LambdaUpdateWrapper<TqNewScheduleResult> updateWrapper = new LambdaUpdateWrapper<>();
-            updateWrapper.eq(TqNewScheduleResult::getId, node.getScheduleId());
+            LambdaUpdateWrapper<TqScheduleResult> updateWrapper = new LambdaUpdateWrapper<>();
+            updateWrapper.eq(TqScheduleResult::getId, node.getScheduleId());
 
             // 按班次设置开始时间、结束时间、任务状态
             setUpdateTimeFields(updateWrapper, shiftIndex, node.getStartTime(), node.getEndTime(),
                     node.getTaskStatus(), node.getProduceOrder());
 
-            int rows = tqNewScheduleResultMapper.update(null, updateWrapper);
+            int rows = tqScheduleResultMapper.update(null, updateWrapper);
             if (rows > 0) {
                 affectedCount += rows;
                 // 记录变更明细（仅当有变更时）
@@ -443,7 +449,7 @@ public class TqRollingUpdateServiceImpl implements ITqRollingUpdateService {
      * @param context   滚动上下文
      * @return 变更明细列表
      */
-    private List<TqRollingLogDetail> buildChangeDetails(Long logId, TqNewScheduleResult original,
+    private List<TqRollingLogDetail> buildChangeDetails(Long logId, TqScheduleResult original,
                                                          TqRollingTaskNode newNode, int shiftIndex,
                                                          TqRollingContext context) {
         List<TqRollingLogDetail> detailList = new ArrayList<>();
@@ -491,7 +497,7 @@ public class TqRollingUpdateServiceImpl implements ITqRollingUpdateService {
     /**
      * 构建单条变更明细
      */
-    private TqRollingLogDetail buildDetail(Long logId, TqNewScheduleResult original, TqRollingTaskNode newNode,
+    private TqRollingLogDetail buildDetail(Long logId, TqScheduleResult original, TqRollingTaskNode newNode,
                                             int shiftIndex, String fieldName, String beforeValue,
                                             String afterValue, String changeType, String changeReason) {
         TqRollingLogDetail detail = new TqRollingLogDetail();
@@ -547,44 +553,44 @@ public class TqRollingUpdateServiceImpl implements ITqRollingUpdateService {
     /**
      * 按班次设置时间字段到 UpdateWrapper
      */
-    private void setUpdateTimeFields(LambdaUpdateWrapper<TqNewScheduleResult> wrapper, int shiftIndex,
+    private void setUpdateTimeFields(LambdaUpdateWrapper<TqScheduleResult> wrapper, int shiftIndex,
                                       Date startTime, Date endTime, String taskStatus, int produceOrder) {
         switch (shiftIndex) {
             case 1:
-                wrapper.set(TqNewScheduleResult::getClass1StartTime, startTime)
-                       .set(TqNewScheduleResult::getClass1EndTime, endTime)
-                       .set(TqNewScheduleResult::getClass1TaskStatus, taskStatus)
-                       .set(TqNewScheduleResult::getClass1Sequence, produceOrder);
+                wrapper.set(TqScheduleResult::getClass1StartTime, startTime)
+                       .set(TqScheduleResult::getClass1EndTime, endTime)
+                       .set(TqScheduleResult::getClass1TaskStatus, taskStatus)
+                       .set(TqScheduleResult::getClass1Sequence, produceOrder);
                 break;
             case 2:
-                wrapper.set(TqNewScheduleResult::getClass2StartTime, startTime)
-                       .set(TqNewScheduleResult::getClass2EndTime, endTime)
-                       .set(TqNewScheduleResult::getClass2TaskStatus, taskStatus)
-                       .set(TqNewScheduleResult::getClass2Sequence, produceOrder);
+                wrapper.set(TqScheduleResult::getClass2StartTime, startTime)
+                       .set(TqScheduleResult::getClass2EndTime, endTime)
+                       .set(TqScheduleResult::getClass2TaskStatus, taskStatus)
+                       .set(TqScheduleResult::getClass2Sequence, produceOrder);
                 break;
             case 3:
-                wrapper.set(TqNewScheduleResult::getClass3StartTime, startTime)
-                       .set(TqNewScheduleResult::getClass3EndTime, endTime)
-                       .set(TqNewScheduleResult::getClass3TaskStatus, taskStatus)
-                       .set(TqNewScheduleResult::getClass3Sequence, produceOrder);
+                wrapper.set(TqScheduleResult::getClass3StartTime, startTime)
+                       .set(TqScheduleResult::getClass3EndTime, endTime)
+                       .set(TqScheduleResult::getClass3TaskStatus, taskStatus)
+                       .set(TqScheduleResult::getClass3Sequence, produceOrder);
                 break;
             case 4:
-                wrapper.set(TqNewScheduleResult::getClass4StartTime, startTime)
-                       .set(TqNewScheduleResult::getClass4EndTime, endTime)
-                       .set(TqNewScheduleResult::getClass4TaskStatus, taskStatus)
-                       .set(TqNewScheduleResult::getClass4Sequence, produceOrder);
+                wrapper.set(TqScheduleResult::getClass4StartTime, startTime)
+                       .set(TqScheduleResult::getClass4EndTime, endTime)
+                       .set(TqScheduleResult::getClass4TaskStatus, taskStatus)
+                       .set(TqScheduleResult::getClass4Sequence, produceOrder);
                 break;
             case 5:
-                wrapper.set(TqNewScheduleResult::getClass5StartTime, startTime)
-                       .set(TqNewScheduleResult::getClass5EndTime, endTime)
-                       .set(TqNewScheduleResult::getClass5TaskStatus, taskStatus)
-                       .set(TqNewScheduleResult::getClass5Sequence, produceOrder);
+                wrapper.set(TqScheduleResult::getClass5StartTime, startTime)
+                       .set(TqScheduleResult::getClass5EndTime, endTime)
+                       .set(TqScheduleResult::getClass5TaskStatus, taskStatus)
+                       .set(TqScheduleResult::getClass5Sequence, produceOrder);
                 break;
             case 6:
-                wrapper.set(TqNewScheduleResult::getClass6StartTime, startTime)
-                       .set(TqNewScheduleResult::getClass6EndTime, endTime)
-                       .set(TqNewScheduleResult::getClass6TaskStatus, taskStatus)
-                       .set(TqNewScheduleResult::getClass6Sequence, produceOrder);
+                wrapper.set(TqScheduleResult::getClass6StartTime, startTime)
+                       .set(TqScheduleResult::getClass6EndTime, endTime)
+                       .set(TqScheduleResult::getClass6TaskStatus, taskStatus)
+                       .set(TqScheduleResult::getClass6Sequence, produceOrder);
                 break;
             default:
                 throw new IllegalArgumentException("无效的班次索引：" + shiftIndex);
@@ -742,20 +748,20 @@ public class TqRollingUpdateServiceImpl implements ITqRollingUpdateService {
             stockWrapper.eq(TqStock::getBeadCode, beadCode)
                         .eq(TqStock::getIsDelete, 0)
                         .orderByDesc(TqStock::getStockDate)
-                        .last("FETCH FIRST 1 ROWS ONLY");
+                        .last("LIMIT 1");
             TqStock stock = tqStockMapper.selectOne(stockWrapper);
             double currentStock = (stock != null && stock.getStockNum() != null)
                     ? stock.getStockNum().doubleValue() : 0;
 
             // 2. 查询当天所有班次的计划量合计
-            LambdaQueryWrapper<TqNewScheduleResult> scheduleWrapper = new LambdaQueryWrapper<>();
-            scheduleWrapper.eq(TqNewScheduleResult::getScheduleDate, scheduleDate)
-                           .eq(TqNewScheduleResult::getBeadCode, beadCode)
-                           .eq(TqNewScheduleResult::getIsDelete, 0);
-            List<TqNewScheduleResult> scheduleList = tqNewScheduleResultMapper.selectList(scheduleWrapper);
+            LambdaQueryWrapper<TqScheduleResult> scheduleWrapper = new LambdaQueryWrapper<>();
+            scheduleWrapper.eq(TqScheduleResult::getScheduleDate, scheduleDate)
+                           .eq(TqScheduleResult::getBeadCode, beadCode)
+                           .eq(TqScheduleResult::getIsDelete, 0);
+            List<TqScheduleResult> scheduleList = tqScheduleResultMapper.selectList(scheduleWrapper);
 
             double totalPlanQty = 0;
-            for (TqNewScheduleResult schedule : scheduleList) {
+            for (TqScheduleResult schedule : scheduleList) {
                 totalPlanQty += sumAllShiftPlanQty(schedule);
             }
 
@@ -770,7 +776,7 @@ public class TqRollingUpdateServiceImpl implements ITqRollingUpdateService {
     /**
      * 汇总排程记录所有班次的计划量
      */
-    private double sumAllShiftPlanQty(TqNewScheduleResult schedule) {
+    private double sumAllShiftPlanQty(TqScheduleResult schedule) {
         double total = 0;
         if (schedule.getClass1PlanQty() != null) total += schedule.getClass1PlanQty();
         if (schedule.getClass2PlanQty() != null) total += schedule.getClass2PlanQty();
@@ -858,7 +864,7 @@ public class TqRollingUpdateServiceImpl implements ITqRollingUpdateService {
 
     // ==================== 反射式字段访问（按班次索引） ====================
 
-    private Integer getPlanQtyByShiftIndex(TqNewScheduleResult entity, int shiftIndex) {
+    private Integer getPlanQtyByShiftIndex(TqScheduleResult entity, int shiftIndex) {
         switch (shiftIndex) {
             case 1: return entity.getClass1PlanQty();
             case 2: return entity.getClass2PlanQty();
@@ -870,7 +876,7 @@ public class TqRollingUpdateServiceImpl implements ITqRollingUpdateService {
         }
     }
 
-    private Integer getSequenceByShiftIndex(TqNewScheduleResult entity, int shiftIndex) {
+    private Integer getSequenceByShiftIndex(TqScheduleResult entity, int shiftIndex) {
         switch (shiftIndex) {
             case 1: return entity.getClass1Sequence();
             case 2: return entity.getClass2Sequence();
@@ -882,7 +888,7 @@ public class TqRollingUpdateServiceImpl implements ITqRollingUpdateService {
         }
     }
 
-    private Integer getFinishQtyByShiftIndex(TqNewScheduleResult entity, int shiftIndex) {
+    private Integer getFinishQtyByShiftIndex(TqScheduleResult entity, int shiftIndex) {
         switch (shiftIndex) {
             case 1: return entity.getClass1FinishQty();
             case 2: return entity.getClass2FinishQty();
@@ -894,7 +900,7 @@ public class TqRollingUpdateServiceImpl implements ITqRollingUpdateService {
         }
     }
 
-    private Date getStartTimeByShiftIndex(TqNewScheduleResult entity, int shiftIndex) {
+    private Date getStartTimeByShiftIndex(TqScheduleResult entity, int shiftIndex) {
         switch (shiftIndex) {
             case 1: return entity.getClass1StartTime();
             case 2: return entity.getClass2StartTime();
@@ -906,7 +912,7 @@ public class TqRollingUpdateServiceImpl implements ITqRollingUpdateService {
         }
     }
 
-    private Date getEndTimeByShiftIndex(TqNewScheduleResult entity, int shiftIndex) {
+    private Date getEndTimeByShiftIndex(TqScheduleResult entity, int shiftIndex) {
         switch (shiftIndex) {
             case 1: return entity.getClass1EndTime();
             case 2: return entity.getClass2EndTime();
@@ -918,7 +924,7 @@ public class TqRollingUpdateServiceImpl implements ITqRollingUpdateService {
         }
     }
 
-    private String getTaskStatusByShiftIndex(TqNewScheduleResult entity, int shiftIndex) {
+    private String getTaskStatusByShiftIndex(TqScheduleResult entity, int shiftIndex) {
         switch (shiftIndex) {
             case 1: return entity.getClass1TaskStatus();
             case 2: return entity.getClass2TaskStatus();

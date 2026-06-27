@@ -1,9 +1,9 @@
 package com.zlt.aps.tq.task;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.zlt.aps.tq.api.domain.entity.TqNewScheduleResult;
+import com.zlt.aps.tq.api.domain.entity.TqScheduleResult;
 import com.zlt.aps.tq.engine.vo.RollingUpdateResult;
-import com.zlt.aps.tq.mapper.TqNewScheduleResultMapper;
+import com.zlt.aps.tq.mapper.TqScheduleResultMapper;
 import com.zlt.aps.tq.service.ITqRollingUpdateService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -36,7 +36,7 @@ public class TqRollingTask {
     private ITqRollingUpdateService tqRollingUpdateService;
 
     @Resource
-    private TqNewScheduleResultMapper tqNewScheduleResultMapper;
+    private TqScheduleResultMapper tqScheduleResultMapper;
 
     /**
      * 自动滚动更新（当天所有机台）
@@ -51,11 +51,11 @@ public class TqRollingTask {
             Date today = new Date();
 
             // 查询当天所有机台编号
-            LambdaQueryWrapper<TqNewScheduleResult> wrapper = new LambdaQueryWrapper<>();
-            wrapper.eq(TqNewScheduleResult::getScheduleDate, today)
-                   .eq(TqNewScheduleResult::getIsDelete, 0)
-                   .select(TqNewScheduleResult::getMachineCode, TqNewScheduleResult::getBeadCode);
-            List<TqNewScheduleResult> scheduleList = tqNewScheduleResultMapper.selectList(wrapper);
+            LambdaQueryWrapper<TqScheduleResult> wrapper = new LambdaQueryWrapper<>();
+            wrapper.eq(TqScheduleResult::getScheduleDate, today)
+                   .eq(TqScheduleResult::getIsDelete, 0)
+                   .select(TqScheduleResult::getMachineCode, TqScheduleResult::getBeadCode);
+            List<TqScheduleResult> scheduleList = tqScheduleResultMapper.selectList(wrapper);
 
             if (scheduleList.isEmpty()) {
                 log.info("胎圈排程自动滚动更新：当天无排程数据，跳过执行");
@@ -64,7 +64,7 @@ public class TqRollingTask {
 
             // 按机台编号去重
             List<String> machineCodes = scheduleList.stream()
-                    .map(TqNewScheduleResult::getMachineCode)
+                    .map(TqScheduleResult::getMachineCode)
                     .filter(machineCode -> machineCode != null && !machineCode.isEmpty())
                     .distinct()
                     .collect(Collectors.toList());
@@ -78,7 +78,7 @@ public class TqRollingTask {
             for (String machineCode : machineCodes) {
                 try {
                     // 获取该机台当天第一个排程的胎圈代码和班次
-                    TqNewScheduleResult firstSchedule = getFirstSchedule(today, machineCode);
+                    TqScheduleResult firstSchedule = getFirstSchedule(today, machineCode);
                     if (firstSchedule == null) {
                         continue;
                     }
@@ -122,7 +122,7 @@ public class TqRollingTask {
         long startTime = System.currentTimeMillis();
         try {
             Date today = new Date();
-            TqNewScheduleResult firstSchedule = getFirstSchedule(today, machineCode);
+            TqScheduleResult firstSchedule = getFirstSchedule(today, machineCode);
             if (firstSchedule == null) {
                 log.info("胎圈排程自动滚动更新：机台{}当天无排程数据", machineCode);
                 return;
@@ -145,14 +145,14 @@ public class TqRollingTask {
     /**
      * 获取指定机台当天的第一条排程记录
      */
-    private TqNewScheduleResult getFirstSchedule(Date scheduleDate, String machineCode) {
-        LambdaQueryWrapper<TqNewScheduleResult> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(TqNewScheduleResult::getScheduleDate, scheduleDate)
-               .eq(TqNewScheduleResult::getMachineCode, machineCode)
-               .eq(TqNewScheduleResult::getIsDelete, 0)
-               .orderByAsc(TqNewScheduleResult::getClass1Sequence)
-               .last("FETCH FIRST 1 ROWS ONLY");
-        List<TqNewScheduleResult> list = tqNewScheduleResultMapper.selectList(wrapper);
+    private TqScheduleResult getFirstSchedule(Date scheduleDate, String machineCode) {
+        LambdaQueryWrapper<TqScheduleResult> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(TqScheduleResult::getScheduleDate, scheduleDate)
+               .eq(TqScheduleResult::getMachineCode, machineCode)
+               .eq(TqScheduleResult::getIsDelete, 0)
+               .orderByAsc(TqScheduleResult::getClass1Sequence)
+               .last("LIMIT 1");
+        List<TqScheduleResult> list = tqScheduleResultMapper.selectList(wrapper);
         return list.isEmpty() ? null : list.get(0);
     }
 }

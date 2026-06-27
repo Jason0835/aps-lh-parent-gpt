@@ -1,7 +1,7 @@
 <template>
   <basic-container>
     <page-table
-      tableRef="tqNewScheduleResultMainTable"
+      tableRef="tqScheduleResultMainTable"
       :calcHeight="true"
       v-loading="loading"
       :columns="columns"
@@ -21,57 +21,57 @@
         <el-button
           type="primary"
           plain
-          v-hasPermi="['tq:newScheduleResult:autoPlan']"
+          v-hasPermi="['tq:scheduleResult:autoPlan']"
           @click="handleAutoPlan"
-        >{{ $t("ui.data.btn.tqNewScheduleResult.autoPlan") }}</el-button>
+        >{{ $t("ui.data.btn.tqScheduleResult.autoPlan") }}</el-button>
         <el-button
           type="warning"
           plain
-          v-hasPermi="['tq:newScheduleResult:insertOrder']"
+          v-hasPermi="['tq:scheduleResult:insertOrder']"
           @click="handleInsertOrder"
-        >{{ $t("ui.data.btn.tqNewScheduleResult.insertOrder") }}</el-button>
+        >{{ $t("ui.data.btn.tqScheduleResult.insertOrder") }}</el-button>
         <el-button
           type="danger"
-          v-hasPermi="['tq:newScheduleResult:remove']"
+          v-hasPermi="['tq:scheduleResult:remove']"
           @click="handleBatchDelete"
           :disabled="selection.length == 0"
         >{{ $t("ui.frame.btn.delete") }}</el-button>
         <el-button
           type="primary"
           plain
-          v-hasPermi="['tq:newScheduleResult:changeMachine']"
+          v-hasPermi="['tq:scheduleResult:changeMachine']"
           @click="handleChangeMachine"
           :disabled="selection.length == 0"
-        >{{ $t("ui.data.btn.tqNewScheduleResult.changeMachine") }}</el-button>
+        >{{ $t("ui.data.btn.tqScheduleResult.changeMachine") }}</el-button>
         <el-button
           type="primary"
           plain
-          v-hasPermi="['tq:newScheduleResult:adjustQty']"
+          v-hasPermi="['tq:scheduleResult:adjustQty']"
           @click="handleAdjustQty"
           :disabled="selection.length == 0"
-        >{{ $t("ui.data.btn.tqNewScheduleResult.adjustQty") }}</el-button>
+        >{{ $t("ui.data.btn.tqScheduleResult.adjustQty") }}</el-button>
         <el-button
-          v-hasPermi="['tq:newScheduleResult:import']"
+          v-hasPermi="['tq:scheduleResult:import']"
           @click="$refs.tltUpload.handleImport()"
         >{{ $t("ui.frame.btn.import") }}</el-button>
         <el-button
           @click="handleExport"
-          v-hasPermi="['tq:newScheduleResult:export']"
+          v-hasPermi="['tq:scheduleResult:export']"
         >{{ $t("ui.frame.btn.export") }}</el-button>
         <el-button
           type="success"
           plain
-          v-hasPermi="['tq:newScheduleResult:release']"
+          v-hasPermi="['tq:scheduleResult:release']"
           @click="handleRelease"
           :disabled="selection.length == 0"
-        >{{ $t("ui.data.btn.tqNewScheduleResult.release") }}</el-button>
+        >{{ $t("ui.data.btn.tqScheduleResult.release") }}</el-button>
       </template>
     </page-table>
     <tlt-upload-form
       ref="tltUpload"
       :updateSupport="true"
-      downloadUrl="/tq/newScheduleResult/importTemplate"
-      uploadUrl="/tq/newScheduleResult/importData"
+      downloadUrl="/tq/scheduleResult/importTemplate"
+      uploadUrl="/tq/scheduleResult/importData"
       @uploadSuccess="getList"
       labelWidth="0"
       :columns="importColumns"
@@ -90,7 +90,7 @@
 </template>
 <script>
 import { downloadLink } from "@/utils/request";
-import { listNewScheduleResult, logicDeleteNewScheduleResult, listScheduleShiftDates, autoPlan, insertOrder, changeMachine, changeQty, publishSchedule } from "@/api/tq/tqNewScheduleResult";
+import { listScheduleResult, logicDeleteScheduleResult, listScheduleShiftDates, autoPlan, insertOrder, changeMachine, changeQty, publishSchedule } from "@/api/tq/scheduleResult";
 import { mapState } from "vuex";
 import TltUploadForm from "@/views/components/tltUploadForm.vue";
 import InsertOrderDialog from "./components/insertOrderDialog.vue";
@@ -112,7 +112,7 @@ const getOffsetDate = (offsetDay) => {
 };
 
 export default {
-  name: "TqNewScheduleResult",
+  name: "tqScheduleResult",
   components: {
     TltUploadForm,
     InsertOrderDialog,
@@ -180,70 +180,70 @@ export default {
           prop: "scheduleDate",
           align: "center",
           halign: "center",
-          label: this.$t("ui.data.column.tqNewScheduleResult.scheduleDate"),
+          label: this.$t("ui.data.column.tqScheduleResult.scheduleDate"),
           minWidth: 110,
         },
         {
           prop: "cxBatchNo",
           align: "center",
           halign: "center",
-          label: this.$t("ui.data.column.tqNewScheduleResult.cxBatchNo"),
+          label: this.$t("ui.data.column.tqScheduleResult.cxBatchNo"),
           minWidth: 140,
         },
         {
           prop: "batchNo",
           align: "center",
           halign: "center",
-          label: this.$t("ui.data.column.tqNewScheduleResult.batchNo"),
+          label: this.$t("ui.data.column.tqScheduleResult.batchNo"),
           minWidth: 140,
         },
         {
           prop: "orderNo",
           align: "center",
           halign: "center",
-          label: this.$t("ui.data.column.tqNewScheduleResult.orderNo"),
+          label: this.$t("ui.data.column.tqScheduleResult.orderNo"),
           minWidth: 140,
         },
         {
           prop: "beadCode",
           align: "center",
           halign: "center",
-          label: this.$t("ui.data.column.tqNewScheduleResult.beadCode"),
+          label: this.$t("ui.data.column.tqScheduleResult.beadCode"),
           minWidth: 120,
         },
         {
           prop: "steelRingCode",
           align: "center",
           halign: "center",
-          label: this.$t("ui.data.column.tqNewScheduleResult.steelRingCode"),
+          label: this.$t("ui.data.column.tqScheduleResult.steelRingCode"),
           minWidth: 130,
         },
         {
           prop: "triangleGlueCode",
           align: "center",
           halign: "center",
-          label: this.$t("ui.data.column.tqNewScheduleResult.triangleGlueCode"),
+          label: this.$t("ui.data.column.tqScheduleResult.triangleGlueCode"),
           minWidth: 140,
         },
         {
           prop: "proSize",
           align: "center",
           halign: "center",
-          label: this.$t("ui.data.column.tqNewScheduleResult.proSize"),
+          label: this.$t("ui.data.column.tqScheduleResult.proSize"),
           minWidth: 80,
         },
         {
           prop: "machineCode",
           align: "center",
           halign: "center",
-          label: this.$t("ui.data.column.tqNewScheduleResult.machineCode"),
+          label: this.$t("ui.data.column.tqScheduleResult.machineCode"),
           minWidth: 120,
         },
         {
           prop: "monthSurplusQty",
           align: "center",
           halign: "center",
-          label: this.$t("ui.data.column.tqNewScheduleResult.monthSurplusQty"),
+          label: this.$t("ui.data.column.tqScheduleResult.monthSurplusQty"),
           minWidth: 110,
         },
         {
@@ -252,19 +252,19 @@ export default {
             {
               prop: "class1Sequence",
               align: "center",
-              label: this.$t("ui.data.column.tqNewScheduleResult.sequence"),
+              label: this.$t("ui.data.column.tqScheduleResult.sequence"),
               minWidth: 70,
             },
             {
               prop: "class1PlanQty",
               align: "center",
-              label: this.$t("ui.data.column.tqNewScheduleResult.planQty"),
+              label: this.$t("ui.data.column.tqScheduleResult.planQty"),
               minWidth: 70,
             },
             {
               prop: "class1FinishQty",
               align: "center",
-              label: this.$t("ui.data.column.tqNewScheduleResult.finishQty"),
+              label: this.$t("ui.data.column.tqScheduleResult.finishQty"),
               minWidth: 70,
             },
           ],
@@ -275,19 +275,19 @@ export default {
             {
               prop: "class2Sequence",
               align: "center",
-              label: this.$t("ui.data.column.tqNewScheduleResult.sequence"),
+              label: this.$t("ui.data.column.tqScheduleResult.sequence"),
               minWidth: 70,
             },
             {
               prop: "class2PlanQty",
               align: "center",
-              label: this.$t("ui.data.column.tqNewScheduleResult.planQty"),
+              label: this.$t("ui.data.column.tqScheduleResult.planQty"),
               minWidth: 70,
             },
             {
               prop: "class2FinishQty",
               align: "center",
-              label: this.$t("ui.data.column.tqNewScheduleResult.finishQty"),
+              label: this.$t("ui.data.column.tqScheduleResult.finishQty"),
               minWidth: 70,
             },
           ],
@@ -298,19 +298,19 @@ export default {
             {
               prop: "class3Sequence",
               align: "center",
-              label: this.$t("ui.data.column.tqNewScheduleResult.sequence"),
+              label: this.$t("ui.data.column.tqScheduleResult.sequence"),
               minWidth: 70,
             },
             {
               prop: "class3PlanQty",
               align: "center",
-              label: this.$t("ui.data.column.tqNewScheduleResult.planQty"),
+              label: this.$t("ui.data.column.tqScheduleResult.planQty"),
               minWidth: 70,
             },
             {
               prop: "class3FinishQty",
               align: "center",
-              label: this.$t("ui.data.column.tqNewScheduleResult.finishQty"),
+              label: this.$t("ui.data.column.tqScheduleResult.finishQty"),
               minWidth: 70,
             },
           ],
@@ -321,19 +321,19 @@ export default {
             {
               prop: "class4Sequence",
               align: "center",
-              label: this.$t("ui.data.column.tqNewScheduleResult.sequence"),
+              label: this.$t("ui.data.column.tqScheduleResult.sequence"),
               minWidth: 70,
             },
             {
               prop: "class4PlanQty",
               align: "center",
-              label: this.$t("ui.data.column.tqNewScheduleResult.planQty"),
+              label: this.$t("ui.data.column.tqScheduleResult.planQty"),
               minWidth: 70,
             },
             {
               prop: "class4FinishQty",
               align: "center",
-              label: this.$t("ui.data.column.tqNewScheduleResult.finishQty"),
+              label: this.$t("ui.data.column.tqScheduleResult.finishQty"),
               minWidth: 70,
             },
           ],
@@ -344,19 +344,19 @@ export default {
             {
               prop: "class5Sequence",
               align: "center",
-              label: this.$t("ui.data.column.tqNewScheduleResult.sequence"),
+              label: this.$t("ui.data.column.tqScheduleResult.sequence"),
               minWidth: 70,
             },
             {
               prop: "class5PlanQty",
               align: "center",
-              label: this.$t("ui.data.column.tqNewScheduleResult.planQty"),
+              label: this.$t("ui.data.column.tqScheduleResult.planQty"),
               minWidth: 70,
             },
             {
               prop: "class5FinishQty",
               align: "center",
-              label: this.$t("ui.data.column.tqNewScheduleResult.finishQty"),
+              label: this.$t("ui.data.column.tqScheduleResult.finishQty"),
               minWidth: 70,
             },
           ],
@@ -367,19 +367,19 @@ export default {
             {
               prop: "class6Sequence",
               align: "center",
-              label: this.$t("ui.data.column.tqNewScheduleResult.sequence"),
+              label: this.$t("ui.data.column.tqScheduleResult.sequence"),
               minWidth: 70,
             },
             {
               prop: "class6PlanQty",
               align: "center",
-              label: this.$t("ui.data.column.tqNewScheduleResult.planQty"),
+              label: this.$t("ui.data.column.tqScheduleResult.planQty"),
               minWidth: 70,
             },
             {
               prop: "class6FinishQty",
               align: "center",
-              label: this.$t("ui.data.column.tqNewScheduleResult.finishQty"),
+              label: this.$t("ui.data.column.tqScheduleResult.finishQty"),
               minWidth: 70,
             },
           ],
@@ -388,7 +388,7 @@ export default {
           prop: "isRelease",
           align: "center",
           halign: "center",
-          label: this.$t("ui.data.column.tqNewScheduleResult.isRelease"),
+          label: this.$t("ui.data.column.tqScheduleResult.isRelease"),
           minWidth: 100,
           formatter: (row, column, value, index) => {
             return this.selectDictLabel(this.dict.type.IS_RELEASE, value);
@@ -398,7 +398,7 @@ export default {
           prop: "stockQty",
           align: "center",
           halign: "center",
-          label: this.$t("ui.data.column.tqNewScheduleResult.stockQty"),
+          label: this.$t("ui.data.column.tqScheduleResult.stockQty"),
           minWidth: 80,
         },
         {
@@ -413,7 +413,7 @@ export default {
     searchColumns() {
       return [
         {
-          label: this.$t("ui.data.column.tqNewScheduleResult.scheduleDate"),
+          label: this.$t("ui.data.column.tqScheduleResult.scheduleDate"),
           prop: "scheduleDateQuery",
           type: "date",
           valueFormat: "yyyy-MM-dd",
@@ -422,26 +422,26 @@ export default {
           },
         },
         {
-          label: this.$t("ui.data.column.tqNewScheduleResult.beadCode"),
+          label: this.$t("ui.data.column.tqScheduleResult.beadCode"),
           prop: "beadCode",
         },
         {
-          label: this.$t("ui.data.column.tqNewScheduleResult.proSize"),
+          label: this.$t("ui.data.column.tqScheduleResult.proSize"),
           prop: "proSize",
         },
         {
-          label: this.$t("ui.data.column.tqNewScheduleResult.triangleGlueCode"),
+          label: this.$t("ui.data.column.tqScheduleResult.triangleGlueCode"),
           prop: "triangleGlueCode",
         },
         {
-          label: this.$t("ui.data.column.tqNewScheduleResult.isRelease"),
+          label: this.$t("ui.data.column.tqScheduleResult.isRelease"),
           prop: "isRelease",
           type: "select",
           dictData: this.dict.type.IS_RELEASE,
           filterable: true,
         },
         {
-          label: this.$t("ui.data.column.tqNewScheduleResult.machineCode"),
+          label: this.$t("ui.data.column.tqScheduleResult.machineCode"),
           prop: "machineCode",
           type: "select",
           dictData: this.tqMachines,
@@ -486,7 +486,11 @@ export default {
       });
     },
     handleInsertOrder() {
-      this.$refs.insertOrderDialog.show();
+      if (this.selection.length !== 1) {
+        this.$modal.msgWarning(this.$t("common.tip.selectOne"));
+        return;
+      }
+      this.$refs.insertOrderDialog.show(this.selection[0]);
     },
     handleChangeMachine() {
       if (this.selection.length !== 1) {
@@ -507,7 +511,7 @@ export default {
         this.$modal.msgWarning(this.$t("common.tip.selectOne"));
         return;
       }
-      this.$confirm(this.$t("ui.data.btn.tqNewScheduleResult.release") + "?", {
+      this.$confirm(this.$t("ui.data.btn.tqScheduleResult.release") + "?", {
         type: "warning",
       }).then(() => {
         publishSchedule({ scheduleDateQuery: this.query.scheduleDateQuery || this.search.scheduleDateQuery }).then((res) => {
@@ -521,11 +525,11 @@ export default {
         this.$modal.msgWarning(this.$t("common.tip.selectOne"));
         return;
       }
-      const ids = this.selection.map(item => item.id);
+      const ids = this.selection.map(item => item.id).join(",");
       this.$confirm(this.$t("common.confirm.delete"), {
         type: "warning",
       }).then(() => {
-        logicDeleteNewScheduleResult(ids).then((data) => {
+        logicDeleteScheduleResult(ids).then((data) => {
           this.$modal.msgSuccess(data.msg);
           this.$set(this.page, "current", 1);
           this.getList();
@@ -533,7 +537,7 @@ export default {
       });
     },
     handleExport() {
-      downloadLink("/tq/newScheduleResult/export", this.formatParams(false));
+      downloadLink("/tq/scheduleResult/export", this.formatParams(false));
     },
     handleSearch(data) {
       this.query = { ...data };
@@ -564,10 +568,8 @@ export default {
         ...this.query,
         ...this.sort,
       };
-      if (!params.orderByColumn) {
-        params.orderByColumn = "scheduleDate,machineCode,class1Sequence";
-        params.isAsc = "desc,asc,asc";
-      }
+      // 默认排序由后端 wrapper 处理，前端仅在用户主动点列头排序时传递单列参数
+      // 避免多列逗号分隔参数与 RuoYi PageDomain.getOrderBy() 不兼容导致 SQL 语法错误
       if (hasPage) {
         params.pageSize = this.page.pageSize;
         params.pageNum = this.page.current;
@@ -578,7 +580,7 @@ export default {
       try {
         this.loading = true;
         await this.getDate();
-        const data = await listNewScheduleResult(this.formatParams());
+        const data = await listScheduleResult(this.formatParams());
         this.data = data.rows;
         this.page.total = data.total;
       } catch (error) {

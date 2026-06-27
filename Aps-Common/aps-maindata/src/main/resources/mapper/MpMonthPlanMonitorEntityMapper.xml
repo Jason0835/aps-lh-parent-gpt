@@ -93,30 +93,58 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 		    SELECT
 		        f.MATERIAL_CODE,
 		        f.production_version,
-		        sum( q.DAY_FINISH_QTY ) production_qty 
+		        sum( q.DAY_FINISH_QTY ) production_qty
 		    FROM
 		        T_MP_MONTH_PLAN_PROD_FINAL f
-		        INNER JOIN t_lh_day_finish_qty q ON q.FACTORY_CODE = f.FACTORY_CODE 
-		        AND q.MATERIAL_CODE = f.MATERIAL_CODE 
-		        AND q.FINISH_DATE BETWEEN concat( #{year}, '-', #{month}, '-1' ) 
-		        AND DATE_SUB( DATE_ADD( concat( #{year}, '-', #{month}, '-1' ), INTERVAL 1 MONTH ), INTERVAL 1 DAY ) 
+		        INNER JOIN t_lh_day_finish_qty q ON q.FACTORY_CODE = f.FACTORY_CODE
+		        AND q.MATERIAL_CODE = f.MATERIAL_CODE
+		        AND q.FINISH_DATE BETWEEN concat( #{year}, '-', #{month}, '-1' )
+		        AND DATE_SUB( DATE_ADD( concat( #{year}, '-', #{month}, '-1' ), INTERVAL 1 MONTH ), INTERVAL 1 DAY )
                 AND q.IS_DELETE = 0
 		    WHERE
-		        f.IS_DELETE = 0 
+		        f.IS_DELETE = 0
 		        AND f.FACTORY_CODE = #{factoryCode}
-		        AND f.YEAR = #{year} 
-		        AND f.MONTH = #{month} 
+		        AND f.YEAR = #{year}
+		        AND f.MONTH = #{month}
 		    GROUP BY
 		        f.MATERIAL_CODE,
-		        f.production_version 
-		    ) f ON f.production_version = t.production_version 
-		    AND f.MATERIAL_CODE = t.MATERIAL_CODE 
+		        f.production_version
+		    ) f ON f.production_version = t.production_version
+		    AND f.MATERIAL_CODE = t.MATERIAL_CODE
 		    SET t.PRODUCTION_QTY = f.production_qty,
-                t.LH_MARGIN = t.SCHEDULE_QTY - ifnull(f.production_qty ,0) 
+                t.LH_MARGIN = t.SCHEDULE_QTY - ifnull(f.production_qty ,0)
 		WHERE
-		    t.is_delete = 0 
+		    t.is_delete = 0
 		    AND t.FACTORY_CODE = #{factoryCode}
-		    AND t.YEAR = #{year} 
+		    AND t.YEAR = #{year}
 		    AND t.MONTH = #{month}
     </update>
+
+    <!--
+        查询当月存在正规计划(productStatus=S)的物料及其月计划监控记录。
+        用于量试合格品充抵正规订单场景：按 工厂+年月+物料 查询，一个物料只会有一条正规记录。
+    -->
+    <select id="selectFormalPlanByMaterials" resultType="com.zlt.aps.mp.api.domain.entity.MpMonthPlanMonitor">
+        SELECT
+            ID,
+            FACTORY_CODE,
+            YEAR,
+            MONTH,
+            MATERIAL_CODE,
+            PRODUCTION_VERSION,
+            SCHEDULE_QTY,
+            PRODUCTION_QTY,
+            PRODUCT_STATUS,
+            CONSTRUCTION_STAGE
+        FROM T_MP_MONTH_PLAN_MONITOR
+        WHERE IS_DELETE = 0
+          AND FACTORY_CODE = #{factoryCode}
+          AND YEAR = #{year}
+          AND MONTH = #{month}
+          AND PRODUCT_STATUS = 'S'
+          AND MATERIAL_CODE IN
+          <foreach collection="materialCodes" item="code" open="(" separator="," close=")">
+              #{code}
+          </foreach>
+    </select>
 </mapper>

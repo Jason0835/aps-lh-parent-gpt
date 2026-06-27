@@ -12,7 +12,6 @@ import com.zlt.aps.tq.engine.service.ITqDataLoadService;
 import com.zlt.aps.tq.engine.service.TqEngineLossService;
 import com.zlt.aps.tq.engine.service.TqEngineMachineService;
 import com.zlt.aps.tq.engine.service.TqEngineMonthSurplusService;
-import com.zlt.aps.tq.engine.service.TqEngineStockService;
 import com.zlt.aps.tq.engine.vo.BeadMachineCountVo;
 import com.zlt.aps.tq.engine.vo.TqScheduleParams;
 import com.zlt.aps.tq.engine.vo.TqScheduleResultVo;
@@ -60,8 +59,6 @@ public class TqDataLoadServiceImpl implements ITqDataLoadService {
     private TqEngineStockMapper tqEngineStockMapper;
     @Resource
     private TqEngineMachineService tqEngineMachineService;
-    @Resource
-    private TqEngineStockService tqEngineStockService;
     @Resource
     private TqEngineLossService tqEngineLossService;
     @Resource
@@ -112,9 +109,9 @@ public class TqDataLoadServiceImpl implements ITqDataLoadService {
         autoScheduleLogService.insertTqScheduleLog(batchNo, "", "根据'成型排程记录'统计出胎圈胶排程记录基础数据",
                 toJSONString(scheduleList));
 
-        // 4. 加载外协规格
-        Map<String, String> assistSpecMap = loadAssistSpecMap();
-        context.setAssistSpecMap(assistSpecMap);
+        // 4. 加载外协规格（外协逻辑已废弃，6班次排程不再使用外协规格）
+        // Map<String, String> assistSpecMap = loadAssistSpecMap();
+        // context.setAssistSpecMap(assistSpecMap);
 
         // 5. 加载机台相关数据（按工厂过滤机台）
         context.setAllMachineList(tqEngineMachineService.listTqMachine(factoryCode));
@@ -124,8 +121,9 @@ public class TqDataLoadServiceImpl implements ITqDataLoadService {
         context.setMachineChuckMap(tqEngineMachineService.getMachineChuckMap());
 
         // 6. 加载库存数据（按工厂过滤库存）
+        // 注：旧4班次算法的 planStockMap（16点预计库存）已废弃，新6班次算法改用
+        // stockMap（7点实际库存）+ todayMorningPlanMap（昨日排程CLASS3=今日早班）逐班滚动计算
         context.setStockMap(loadTqStock(scheduleDate, factoryCode));
-        context.setPlanStockMap(tqEngineStockService.getPlanStockMap(batchNo, scheduleDate, params.getStockLossRate(), factoryCode));
         context.setTodayMorningPlanMap(loadTodayMorningPlan(scheduleDate, factoryCode));
 
         // 7. 加载损耗率
@@ -201,19 +199,19 @@ public class TqDataLoadServiceImpl implements ITqDataLoadService {
     }
 
     /**
-     * 加载外协规格Map
+     * 加载外协规格Map（外协逻辑已废弃，6班次排程不再使用外协规格，方法整体注释保留）
      */
-    private Map<String, String> loadAssistSpecMap() {
-        Map<String, String> map = new HashMap<>();
-        List<String> listAssistSpec = tqEngineMapper.listAssistSpec();
-        if (listAssistSpec == null || listAssistSpec.isEmpty()) {
-            return map;
-        }
-        for (String assistSpec : listAssistSpec) {
-            map.put(assistSpec, "1");
-        }
-        return map;
-    }
+    // private Map<String, String> loadAssistSpecMap() {
+    //     Map<String, String> map = new HashMap<>();
+    //     List<String> listAssistSpec = tqEngineMapper.listAssistSpec();
+    //     if (listAssistSpec == null || listAssistSpec.isEmpty()) {
+    //         return map;
+    //     }
+    //     for (String assistSpec : listAssistSpec) {
+    //         map.put(assistSpec, "1");
+    //     }
+    //     return map;
+    // }
 
     /**
      * 加载当天库存（按工厂过滤）
@@ -372,7 +370,6 @@ public class TqDataLoadServiceImpl implements ITqDataLoadService {
         logDetail.append("口型板和机台关系集合：").append(toJSONString(context.getMouthPlateMachineMap())).append(division);
         logDetail.append("定点机台和机台的限制作业集合：").append(toJSONString(context.getSpecifyCanMachineMap())).append(division);
         logDetail.append("定点集合和机台的不可作业集合：").append(toJSONString(context.getSpecifyNotMachineMap())).append(division);
-        logDetail.append("16点预计库存集合：").append(toJSONString(context.getPlanStockMap())).append(division);
         logDetail.append("耗损率集合：").append(toJSONString(context.getLossRateMap())).append(division);
         logDetail.append("月度计划剩余量、完成量集合：").append(toJSONString(context.getMonthSurplusMap())).append(division);
         logDetail.append("参数设置集合：").append(toJSONString(context.getParams())).append(division);

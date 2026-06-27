@@ -17,17 +17,17 @@
       >
         <el-row :gutter="16">
           <el-col :span="8">
-            <el-form-item :label="$t('ui.data.column.tqNewScheduleResult.scheduleDate')">
+            <el-form-item :label="$t('ui.data.column.tqScheduleResult.scheduleDate')">
               <el-input v-model="form.scheduleDate" disabled />
             </el-form-item>
           </el-col>
           <el-col :span="8">
-            <el-form-item :label="$t('ui.data.column.tqNewScheduleResult.oldMachine')">
+            <el-form-item :label="$t('ui.data.column.tqScheduleResult.oldMachine')">
               <el-input v-model="form.oldMachineCode" disabled />
             </el-form-item>
           </el-col>
           <el-col :span="8">
-            <el-form-item :label="$t('ui.data.column.tqNewScheduleResult.newMachine')" prop="newMachineCode">
+            <el-form-item :label="$t('ui.data.column.tqScheduleResult.newMachine')" prop="newMachineCode">
               <el-select
                 v-model="form.newMachineCode"
                 class="w100"
@@ -37,7 +37,7 @@
                 <el-option
                   v-for="item in machineOptions"
                   :key="item.machineCode"
-                  :label="item.machineName"
+                  :label="item.machineCode"
                   :value="item.machineCode"
                 />
               </el-select>
@@ -64,7 +64,7 @@
 
 <script>
 import PageTable from "@/components/Table/PageTable.vue";
-import { changeMachine, validateChangeMachine, listScheduleShiftDates } from "@/api/tq/tqNewScheduleResult";
+import { changeMachine, validateChangeMachine, listScheduleShiftDates } from "@/api/tq/scheduleResult";
 import { listEnabledMachines } from "@/api/tq/machine";
 
 export default {
@@ -98,28 +98,28 @@ export default {
   },
   computed: {
     title: function () {
-      return this.$t("ui.data.btn.tqNewScheduleResult.changeMachine");
+      return this.$t("ui.data.btn.tqScheduleResult.changeMachine");
     },
     tableColumns() {
       return [
         {
-          label: this.$t("ui.data.column.tqNewScheduleResult.machineCode"),
+          label: this.$t("ui.data.column.tqScheduleResult.machineCode"),
           prop: "machineCode",
         },
         {
-          label: this.$t("ui.data.column.tqNewScheduleResult.beadCode"),
+          label: this.$t("ui.data.column.tqScheduleResult.beadCode"),
           prop: "beadCode",
         },
         {
-          label: this.$t("ui.data.column.tqNewScheduleResult.steelRingCode"),
+          label: this.$t("ui.data.column.tqScheduleResult.steelRingCode"),
           prop: "steelRingCode",
         },
         {
-          label: this.$t("ui.data.column.tqNewScheduleResult.proSize"),
+          label: this.$t("ui.data.column.tqScheduleResult.proSize"),
           prop: "proSize",
         },
         {
-          label: this.$t("ui.data.column.tqNewScheduleResult.isRelease"),
+          label: this.$t("ui.data.column.tqScheduleResult.isRelease"),
           prop: "isRelease",
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.parentDict.type.IS_RELEASE, value);
@@ -162,7 +162,7 @@ export default {
           children: [
             {
               prop: `class${classIndex}Sequence`,
-              label: this.$t("ui.data.column.tqNewScheduleResult.sequence"),
+              label: this.$t("ui.data.column.tqScheduleResult.sequence"),
               formatter: (row, column, value) => {
                 if (value == null || value === 0) return "";
                 return value;
@@ -170,7 +170,7 @@ export default {
             },
             {
               prop: `class${classIndex}PlanQty`,
-              label: this.$t("ui.data.column.tqNewScheduleResult.planQty"),
+              label: this.$t("ui.data.column.tqScheduleResult.planQty"),
               formatter: (row, column, value) => {
                 if (value == null || value === 0) return "";
                 return value;
@@ -178,7 +178,7 @@ export default {
             },
             {
               prop: `class${classIndex}FinishQty`,
-              label: this.$t("ui.data.column.tqNewScheduleResult.finishQty"),
+              label: this.$t("ui.data.column.tqScheduleResult.finishQty"),
               formatter: (row, column, value) => {
                 if (value == null || value === 0) return "";
                 return value;
@@ -186,7 +186,7 @@ export default {
             },
             {
               prop: `class${classIndex}Analysis`,
-              label: this.$t("ui.data.column.tqNewScheduleResult.analysis"),
+              label: this.$t("ui.data.column.tqScheduleResult.analysis"),
               formatter: (row, column, value) => {
                 if (value != null && value !== "") return value;
                 return "";

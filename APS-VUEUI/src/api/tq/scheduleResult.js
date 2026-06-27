@@ -1,244 +1,144 @@
-/**
- * ============================================================================
- * 【已废弃】胎圈排程结果旧版API（4班次制）
- *
- * 废弃说明：
- *   本文件为旧版4班次制胎圈排程API，已由新版6班次制API替代。
- *   新版API文件：src/api/tq/tqNewScheduleResult.js
- *   新版接口前缀：/tq/newScheduleResult/*
- *   新版算法依据：胎圈自动排程_v5.xmind（6班次制）
- *
- *   请勿在新功能中引用本文件，所有新需求请使用新版API。
- *   计划在阶段3后端旧版代码清理完成后，本文件将一并删除。
- * ============================================================================
- */
-import request from '@/utils/request'
+import request, { downloadLink } from '@/utils/request'
 
 export function listScheduleResult(query) {
   return request({
-    url: 'tq/scheduleResult/list',
-    method: 'post',
-    data: query
-  })
-}
-export function removeScheduleResult(query) {
-  return request({
-    url: 'tq/scheduleResult/remove',
+    url: '/tq/scheduleResult/list',
     method: 'post',
     data: query
   })
 }
 
-//
-export function validateAutoPlan(query) {
+export function saveScheduleResult(query) {
   return request({
-    url: 'tq/scheduleResult/validateAutoPlan',
-    method: 'post',
-    data: query
-  })
-}
-export function autoPlan(query) {
-  return request({
-    url: 'tq/scheduleResult/autoPlan',
-    method: 'post',
-    data: query
-  })
-}
-export function balance(query) {
-  return request({
-    url: 'tq/scheduleResult/balance',
-    method: 'post',
-    data: query
-  })
-}
-// export function modelChange(query) {
-//   return request({
-//     url: 'tq/scheduleResult/modelChange',
-//     method: 'post',
-//     data: query
-//   })
-// }
-// export function modelAdjustPlan(query) {
-//   return request({
-//     url: 'tq/scheduleResult/modelAdjustPlan',
-//     method: 'post',
-//     data: query
-//   })
-// }
-
-// // 获取胎胚版本
-// export function getProductEmbryoVersions(query) {
-//   return request({
-//     url: 'tq/scheduleResult/getProductEmbryoVersions',
-//     method: 'post',
-//     data: query
-//   })
-// }
-// export function getCxMachines(query) {
-//   return request({
-//     url: 'tq/scheduleResult/getCxMachines',
-//     method: 'post',
-//     data: query
-//   })
-// }
-// export function validateBeforeAdd(query) {
-//   return request({
-//     url: 'tq/scheduleResult/validateBeforeAdd',
-//     method: 'post',
-//     data: query
-//   })
-// }
-export function validateAdd(query) {
-  return request({
-    url: 'tq/scheduleResult/validateAdd',
+    url: '/tq/scheduleResult/save',
     method: 'post',
     data: query
   })
 }
 
-export function editScheduleResult(query) {
+export function removeScheduleResult(ids) {
   return request({
-    url: 'tq/scheduleResult/edit',
+    url: '/tq/scheduleResult/remove',
     method: 'post',
-    data: query
-  })
-}
-export function batchChangeMachine(machineCode, query) {
-  return request({
-    url: 'tq/scheduleResult/batchChangeMachine/' + machineCode,
-    method: 'post',
-    data: query
-  })
-}
-export function chooseMachine(query) {
-  return request({
-    url: 'tq/scheduleResult/chooseMachine',
-    method: 'post',
-    data: query
-  })
-}
-export function mergeProduct(query) {
-  return request({
-    url: 'tq/scheduleResult/mergeProduct',
-    method: 'post',
-    data: query
+    params: { ids: ids }
   })
 }
 
+export function exportScheduleResult(query) {
+  return downloadLink("/tq/scheduleResult/export", query)
+}
 
-
-// //
-// export function modifyMoldsValidate(query) {
-//   return request({
-//     url: 'tq/scheduleResult/modifyMoldsValidate',
-//     method: 'post',
-//     data: query
-//   })
-// }
-// export function modifyMolds(query) {
-//   return request({
-//     url: 'tq/scheduleResult/modifyMolds',
-//     method: 'post',
-//     data: query
-//   })
-// }
-
-
-// export function validateChangeMachine(query) {
-//   return request({
-//     url: 'tq/scheduleResult/validateChangeMachine',
-//     method: 'post',
-//     data: query
-//   })
-// }
-export function publishValidate(query) {
+export function importScheduleResult(data) {
   return request({
-    url: 'tq/scheduleResult/publishValidate',
+    url: '/tq/scheduleResult/importData',
     method: 'post',
-    data: query
+    data: data
   })
 }
-export function publishScheduleResult(query) {
+
+export function listScheduleShiftDates(query) {
   return request({
-    url: 'tq/scheduleResult/publish',
-    method: 'post',
-    data: query
-  })
-}
-export function changeQty(query) {
-  return request({
-    url: 'tq/scheduleResult/changeQty',
+    url: '/tq/scheduleResult/listScheduleShiftDates',
     method: 'post',
     data: query
   })
 }
 
-// export function hasRecordValidate(query) {
-//   return request({
-//     url: 'tq/scheduleResult/hasRecordValidate',
-//     method: 'post',
-//     data: query
-//   })
-// }
-
-// export function modifyQty(query) {
-//   return request({
-//     url: `tq/scheduleResult/modifyQty/${query}`,
-//     method: 'post',
-//     // data: query
-//   })
-// }
-
-// export function manualClose(query) {
-//   return request({
-//     url: `tq/scheduleResult/manualClose`,
-//     method: 'post',
-//     data: query
-//   })
-// }
-
-// export function listFinished(query) {
-//   return request({
-//     url: `tq/scheduleResult/finished/list`,
-//     method: 'post',
-//     data: query
-//   })
-// }
-// export function producingIssue(query) {
-//   return request({
-//    url: `tq/scheduleResult/producingIssue`,
-//     method: 'post',
-//     data: query
-//   })
-// }
-// export function validateConstruction(query) {
-//   return request({
-//    url: `tq/scheduleResult/validateConstruction`,
-//     method: 'post',
-//     data: query
-//   })
-// }
-export function changeReleaseStatus(query) {
+/** 自动排程 */
+export function autoPlan(data) {
   return request({
-   url: `tq/scheduleResult/changeReleaseStatus`,
+    url: '/tq/scheduleResult/autoPlan',
     method: 'post',
-    data: query
+    data: data
   })
 }
 
-
-export function combinationMiddleAndNight(query) {
+/** 插单 */
+export function insertOrder(data) {
   return request({
-   url: `tq/scheduleResult/combinationMiddleAndNight`,
+    url: '/tq/scheduleResult/insertOrder',
     method: 'post',
-    data: query
+    data: data
   })
 }
 
-export function getSummaryVo(query) {
+/** 插单前校验 */
+export function validateInsertOrder(data) {
   return request({
-   url: `tq/scheduleResult/getSummaryVo`,
+    url: '/tq/scheduleResult/validateInsertOrder',
     method: 'post',
-    data: query
+    data: data
+  })
+}
+
+/** 转机台 */
+export function changeMachine(data) {
+  return request({
+    url: '/tq/scheduleResult/changeMachine',
+    method: 'post',
+    data: data
+  })
+}
+
+/** 转机台前校验 */
+export function validateChangeMachine(data) {
+  return request({
+    url: '/tq/scheduleResult/validateChangeMachine',
+    method: 'post',
+    data: data
+  })
+}
+
+/** 调量前校验 */
+export function validateChangeQty(data) {
+  return request({
+    url: '/tq/scheduleResult/validateChangeQty',
+    method: 'post',
+    data: data
+  })
+}
+
+/** 调量 */
+export function changeQty(data) {
+  return request({
+    url: '/tq/scheduleResult/changeQty',
+    method: 'post',
+    data: data
+  })
+}
+
+/** 发布排程 */
+export function publishSchedule(data) {
+  return request({
+    url: '/tq/scheduleResult/publish',
+    method: 'post',
+    data: data
+  })
+}
+
+/** 查询排程日期是否已发布 */
+export function isPublish(data) {
+  return request({
+    url: '/tq/scheduleResult/isPublish',
+    method: 'post',
+    data: data
+  })
+}
+
+/** 唯一性校验 */
+export function checkUnique(data) {
+  return request({
+    url: '/tq/scheduleResult/checkUnique',
+    method: 'post',
+    data: data
+  })
+}
+
+/** 逻辑删除排程记录 */
+export function logicDeleteScheduleResult(ids) {
+  return request({
+    url: '/tq/scheduleResult/logicDelete',
+    method: 'post',
+    params: { ids: ids }
   })
 }
