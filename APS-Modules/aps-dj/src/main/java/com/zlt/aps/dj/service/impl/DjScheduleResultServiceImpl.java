@@ -581,7 +581,13 @@ public class DjScheduleResultServiceImpl extends AbstractBillService<DjScheduleR
      */
     @Override
     public List<DjScheduleResult> checkUnique(DjScheduleResult entity) {
-        return djScheduleResultMapper.selectList(BillUtils.builderCondition(entity));
+        Long id = entity.getId();
+        entity.setId(null);
+        QueryWrapper<DjScheduleResult> queryWrapper = BillUtils.builderCondition(entity);
+        if (id != null) {
+            queryWrapper.ne("id", id);
+        }
+        return djScheduleResultMapper.selectList(queryWrapper);
     }
 
     /**
