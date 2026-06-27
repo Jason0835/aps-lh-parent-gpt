@@ -267,6 +267,12 @@ export default {
               label: this.$t("ui.data.column.tqScheduleResult.finishQty"),
               minWidth: 70,
             },
+            {
+              prop: "class1Analysis",
+              align: "center",
+              label: this.$t("ui.data.column.tqScheduleResult.analysis"),
+              minWidth: 100,
+            },
           ],
         },
         {
@@ -289,6 +295,12 @@ export default {
               align: "center",
               label: this.$t("ui.data.column.tqScheduleResult.finishQty"),
               minWidth: 70,
+            },
+            {
+              prop: "class2Analysis",
+              align: "center",
+              label: this.$t("ui.data.column.tqScheduleResult.analysis"),
+              minWidth: 100,
             },
           ],
         },
@@ -313,6 +325,12 @@ export default {
               label: this.$t("ui.data.column.tqScheduleResult.finishQty"),
               minWidth: 70,
             },
+            {
+              prop: "class3Analysis",
+              align: "center",
+              label: this.$t("ui.data.column.tqScheduleResult.analysis"),
+              minWidth: 100,
+            },
           ],
         },
         {
@@ -335,6 +353,12 @@ export default {
               align: "center",
               label: this.$t("ui.data.column.tqScheduleResult.finishQty"),
               minWidth: 70,
+            },
+            {
+              prop: "class4Analysis",
+              align: "center",
+              label: this.$t("ui.data.column.tqScheduleResult.analysis"),
+              minWidth: 100,
             },
           ],
         },
@@ -359,6 +383,12 @@ export default {
               label: this.$t("ui.data.column.tqScheduleResult.finishQty"),
               minWidth: 70,
             },
+            {
+              prop: "class5Analysis",
+              align: "center",
+              label: this.$t("ui.data.column.tqScheduleResult.analysis"),
+              minWidth: 100,
+            },
           ],
         },
         {
@@ -381,6 +411,12 @@ export default {
               align: "center",
               label: this.$t("ui.data.column.tqScheduleResult.finishQty"),
               minWidth: 70,
+            },
+            {
+              prop: "class6Analysis",
+              align: "center",
+              label: this.$t("ui.data.column.tqScheduleResult.analysis"),
+              minWidth: 100,
             },
           ],
         },

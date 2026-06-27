@@ -100,6 +100,7 @@ export default {
           dateType: "date",
           valueFormat: "yyyy-MM-dd",
           clearable: false,
+          disabled: true,
           listeners: {
             change: this.handleScheduleDateChange,
           },
@@ -119,10 +120,16 @@ export default {
         },
       ];
 
-      // 动态生成6个班次表单区域（插单仅需计划量、顺序，不需要原因分析）
+      // 动态生成6个班次表单区域（顺序、计划量、原因分析）
       for (let i = 1; i <= 6; i++) {
         columns.push(
           { type: "title", label: this.shiftBannerTitle(i) },
+          {
+            label: this.$t("ui.data.column.tqScheduleResult.sequence"),
+            prop: `class${i}Sequence`,
+            span: 8,
+            type: "number",
+          },
           {
             label: this.$t("ui.data.column.tqScheduleResult.planQty"),
             prop: `class${i}PlanQty`,
@@ -130,10 +137,9 @@ export default {
             type: "number",
           },
           {
-            label: this.$t("ui.data.column.tqScheduleResult.sequence"),
-            prop: `class${i}Sequence`,
+            label: this.$t("ui.data.column.tqScheduleResult.analysis"),
+            prop: `class${i}Analysis`,
             span: 8,
-            type: "number",
           }
         );
       }
@@ -244,10 +250,10 @@ export default {
           ? moment(data.scheduleDate).format("YYYY-MM-DD")
           : "";
         form.scheduleDate = scheduleDateStr;
-        // 回填机台编号、胎圈代码、6个班的计划量与顺序（插单不需要原因分析）
+        // 回填机台编号、胎圈代码、6个班的计划量、顺序与原因分析
         const keys = ["machineCode", "beadCode"];
         for (let i = 1; i <= 6; i++) {
-          keys.push(`class${i}PlanQty`, `class${i}Sequence`);
+          keys.push(`class${i}PlanQty`, `class${i}Sequence`, `class${i}Analysis`);
         }
         keys.forEach((k) => {
           if (data[k] !== undefined && data[k] !== null) {
