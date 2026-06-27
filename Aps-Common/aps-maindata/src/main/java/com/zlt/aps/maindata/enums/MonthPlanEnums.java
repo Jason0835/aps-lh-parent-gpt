@@ -284,6 +284,10 @@ public enum MonthPlanEnums {
      */
     HEIGHT_PRIORITY_SKU_LIST_COUNT("SYS0207001", "参与Sku排产竞争的优先级高的Sku列表个数"),
     /**
+     * SYS0207002 参与Sku排产竞争共用模具或是共用胎胚优先
+     */
+    SHARE_MOLD_EMBRYO_PRIORITY("SYS0207002","参与Sku排产竞争共用模具或是共用胎胚优先"),
+    /**
      * SYS0209003 APS通用班制
      */
     APS_GENERAL_SHIFT("SYS0209003", "SKU双模日硫化量，倒算班产使用"),
