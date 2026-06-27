@@ -526,6 +526,7 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
         paramCodeList.add(MonthPlanEnums.LAST_NEAR_DEAD_LINE_MAX_LH_MACHINE_COUNT.getCode());
         //Sku排产顺序相关
         paramCodeList.add(MonthPlanEnums.HEIGHT_PRIORITY_SKU_LIST_COUNT.getCode());
+        paramCodeList.add(MonthPlanEnums.SHARE_MOLD_EMBRYO_PRIORITY.getCode());
         //其他
         paramCodeList.add(MonthPlanEnums.SECTION_WIDTH_DIFF_VALUE.getCode());
         paramCodeList.add(MonthPlanEnums.CHANGE_STRUCT_DEC_LH_MACHINES.getCode());
@@ -619,7 +620,7 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
         configuration.setLastNearDeadLineDay((Integer) paramConfigurationMap.get(MonthPlanEnums.LAST_NEAR_DEAD_LINE_DAY.getCode()));
         //Sku排产顺序相关
         configuration.setHeightPrioritySkuPreCount((Integer) paramConfigurationMap.get(MonthPlanEnums.HEIGHT_PRIORITY_SKU_LIST_COUNT.getCode()));
-
+        configuration.setShareMoldOrEmbryoPriorityRange((Integer) paramConfigurationMap.get(MonthPlanEnums.SHARE_MOLD_EMBRYO_PRIORITY.getCode()));
         //其它
         configuration.setSectionWidthDiffValue((Integer) paramConfigurationMap.get(MonthPlanEnums.SECTION_WIDTH_DIFF_VALUE.getCode()));
         Object deductionLhMachineValue = paramConfigurationMap.get(MonthPlanEnums.CHANGE_STRUCT_DEC_LH_MACHINES.getCode());

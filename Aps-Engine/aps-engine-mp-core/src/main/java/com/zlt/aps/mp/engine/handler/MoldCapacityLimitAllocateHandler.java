@@ -78,12 +78,8 @@ public class MoldCapacityLimitAllocateHandler {
             }
             List<SkuMoldCapacityInfoVo> skuList = Lists.newArrayList();
             //所有净需求量 20260626+ 周期结构使用实单量
-            Integer sumNetQty;
-            if (ProductionGroupTypeEnum.CYCLE.getGroupType().equals(groupInfo.getStructureType())) {
-                sumNetQty = requirePlanList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getActualQuantity).sum();
-            } else {
-                sumNetQty = requirePlanList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getOriginProductionQty).sum();
-            }
+            boolean isCycleGroup = ProductionGroupTypeEnum.CYCLE.getGroupType().equals(groupInfo.getStructureType());
+            Integer sumNetQty = getSumNetQty(isCycleGroup, requirePlanList);
             //所有高需求量
             Integer sumHeightQty = requirePlanList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getOriginHeightProductionQty).sum();
             Map<String, List<MonthPlanProductionRequirePlanVo>> skuGroupMap = requirePlanList.stream().collect(Collectors.groupingBy(MonthPlanProductionRequirePlanVo::getMaterialDesc));
@@ -92,8 +88,9 @@ public class MoldCapacityLimitAllocateHandler {
                     return;
                 }
                 MonthPlanProductionRequirePlanVo skuInfo = singleSkuPlanList.get(BigDecimal.ZERO.intValue());
+                //所有净需求量 20260626+ 周期结构使用实单量
+                Integer skuNetQty = getSumNetQty(isCycleGroup, singleSkuPlanList);
                 Integer skuHeightQty = singleSkuPlanList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getOriginHeightProductionQty).sum();
-                Integer skuNetQty = singleSkuPlanList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getOriginProductionQty).sum();
                 SkuMoldCapacityInfoVo skuRequireInfo = SkuMoldCapacityInfoVo.buildByBaseInfo(skuInfo);
                 skuRequireInfo.setMaxMoldCapacity(maxMouldCapacity);
                 skuRequireInfo.setSumProductionQty(sumNetQty);
@@ -242,6 +239,25 @@ public class MoldCapacityLimitAllocateHandler {
         }
         Integer dayCapacityQty = singleMainPatternList.get(BigDecimal.ZERO.intValue()).getDayVulcanizationQty();
         return dayCapacityQty * lhMachineCount * ProductionConstant.DOUBLE_MOULD_PRODUCTION * productionContext.getMaxProductionDays();
+    }
+
+    /**
+     * 获取总的净需求量
+     * 周期结构只看实单量 = 高 + 中
+     * 非周期结构看总净需求量
+     *
+     * @param isCycleGroup  是否周期结构
+     * @param groupPlanList 分组计划集合(正常为结构+主花纹 | 单Sku计划)
+     * @return
+     */
+    private Integer getSumNetQty(boolean isCycleGroup, List<MonthPlanProductionRequirePlanVo> groupPlanList) {
+        if (CollectionUtils.isEmpty(groupPlanList)) {
+            return BigDecimal.ZERO.intValue();
+        }
+        if (isCycleGroup) {
+            return groupPlanList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getActualQuantity).sum();
+        }
+        return groupPlanList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getOriginProductionQty).sum();
     }
 
 }

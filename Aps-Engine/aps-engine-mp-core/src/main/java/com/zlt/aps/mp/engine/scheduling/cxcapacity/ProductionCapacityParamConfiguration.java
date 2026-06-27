@@ -215,6 +215,10 @@ public class ProductionCapacityParamConfiguration {
      */
     private Integer heightPrioritySkuPreCount;
     /**
+     * SYS0207002 参与Sku排产竞争共用模具或是共用胎胚优先
+     */
+    private Integer shareMoldOrEmbryoPriorityRange;
+    /**
      * SYS0209006 正式排产优先级排产分段日
      */
     private Integer formalFirstHalfDay;
