@@ -12,7 +12,6 @@
       :search="search"
       @refresh="getList"
       @search="handleSearch"
-      @reset="handleReset"
       @pageChange="handlePageChange"
       @sort-change="handleSortChange"
       @selection-change="handleSelectionChange"
@@ -1066,18 +1065,6 @@ export default {
         filteredData.cxMachineCode = filteredData.cxMachineCode.join(',');
       }
       this.query = filteredData;
-      this.$set(this.page, "current", 1);
-      this.getList();
-    },
-    handleReset() {
-      // 数据加载中时禁止重复重置，避免触发"数据正在处理，请勿重复提交"提示
-      if (this.loading) {
-        return;
-      }
-      // 重置查询条件到初始状态
-      const date = moment().add(1, "days").format("YYYY-MM-DD");
-      this.query = { scheduleDate: date };
-      this.search = { scheduleDate: date };
       this.$set(this.page, "current", 1);
       this.getList();
     },
