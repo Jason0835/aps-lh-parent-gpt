@@ -21,62 +21,68 @@
       "paramCode": "TM_ALGORITHM_SWITCH",
       "paramValue": "2",
       "enableStatus": "1"
+    },
+    {
+      "factoryCode": "F1",
+      "paramCode": "TM_FORMING_SHIFT_OFFSET",
+      "paramValue": "0",
+      "enableStatus": "1"
     }
   ],
   "cxScheduleResults": [
     {
       "orderNo": "TM_SCENE_004_401",
       "embryoCode": "CX-TM_SCENE_004_401",
-      "class1PlanQty": 0.0,
-      "class2PlanQty": 100.0,
-      "class3PlanQty": 0.0,
-      "class4PlanQty": 0.0,
-      "class5PlanQty": 0.0,
-      "class6PlanQty": 0.0,
+      "class1PlanQty": 100,
+      "class2PlanQty": 100,
+      "class3PlanQty": 100,
+      "class4PlanQty": 100,
+      "class5PlanQty": 100,
+      "class6PlanQty": 100,
       "treadCode": "TM_TREAD_401",
-      "treadShoulderLength": 1.0,
+      "treadShoulderLength": 1,
       "treadMouthPlate": "MP_A",
       "treadRubberCategory": "GLUE_A"
     },
     {
       "orderNo": "TM_SCENE_004_402",
       "embryoCode": "CX-TM_SCENE_004_402",
-      "class1PlanQty": 0.0,
-      "class2PlanQty": 120.0,
-      "class3PlanQty": 0.0,
-      "class4PlanQty": 0.0,
-      "class5PlanQty": 0.0,
-      "class6PlanQty": 0.0,
+      "class1PlanQty": 120,
+      "class2PlanQty": 120,
+      "class3PlanQty": 120,
+      "class4PlanQty": 120,
+      "class5PlanQty": 120,
+      "class6PlanQty": 120,
       "treadCode": "TM_TREAD_402",
-      "treadShoulderLength": 1.0,
+      "treadShoulderLength": 1,
       "treadMouthPlate": "MP_A",
       "treadRubberCategory": "GLUE_B"
     },
     {
       "orderNo": "TM_SCENE_004_403",
       "embryoCode": "CX-TM_SCENE_004_403",
-      "class1PlanQty": 0.0,
-      "class2PlanQty": 80.0,
-      "class3PlanQty": 0.0,
-      "class4PlanQty": 0.0,
-      "class5PlanQty": 0.0,
-      "class6PlanQty": 0.0,
+      "class1PlanQty": 80,
+      "class2PlanQty": 80,
+      "class3PlanQty": 80,
+      "class4PlanQty": 80,
+      "class5PlanQty": 80,
+      "class6PlanQty": 80,
       "treadCode": "TM_TREAD_403",
-      "treadShoulderLength": 1.0,
+      "treadShoulderLength": 1,
       "treadMouthPlate": "MP_C",
       "treadRubberCategory": "GLUE_C"
     },
     {
       "orderNo": "TM_SCENE_004_404",
       "embryoCode": "CX-TM_SCENE_004_404",
-      "class1PlanQty": 0.0,
-      "class2PlanQty": 90.0,
-      "class3PlanQty": 0.0,
-      "class4PlanQty": 0.0,
-      "class5PlanQty": 0.0,
-      "class6PlanQty": 0.0,
+      "class1PlanQty": 90,
+      "class2PlanQty": 90,
+      "class3PlanQty": 90,
+      "class4PlanQty": 90,
+      "class5PlanQty": 90,
+      "class6PlanQty": 90,
       "treadCode": "TM_TREAD_404",
-      "treadShoulderLength": 1.0,
+      "treadShoulderLength": 1,
       "treadMouthPlate": "MP_D",
       "treadRubberCategory": "GLUE_A"
     }
@@ -151,7 +157,7 @@
       "treadCode": "TM_TREAD_401",
       "shiftOrder": 1,
       "baseGlueCode": "BASE_A",
-      "supplyHours": 1.0
+      "supplyHours": 1
     },
     {
       "treadCode": "TM_TREAD_402",
@@ -163,7 +169,7 @@
       "treadCode": "TM_TREAD_403",
       "shiftOrder": 1,
       "baseGlueCode": "BASE_C",
-      "supplyHours": 2.0
+      "supplyHours": 2
     },
     {
       "treadCode": "TM_TREAD_404",

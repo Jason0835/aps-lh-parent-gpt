@@ -1,7 +1,7 @@
 <template>
   <basic-container>
     <page-table
-      tableRef="tmStockCoverClassMainTable"
+      tableRef="tmDepthConfigMainTable"
       :calcHeight="true"
       v-loading="loading"
       :columns="columns"
@@ -20,27 +20,27 @@
       <template slot="header">
         <el-button
           type="primary"
-          v-hasPermi="['tm:tmStockCoverClass:add']"
+          v-hasPermi="['tm:depthConfig:add']"
           @click="handleAdd"
           >{{ $t("ui.frame.btn.add") }}</el-button
         >
         <el-button
           type="warning"
-          v-hasPermi="['tm:tmStockCoverClass:edit']"
+          v-hasPermi="['tm:depthConfig:edit']"
           @click="handleEdit(selection[0])"
           :disabled="selection.length !== 1"
           >{{ $t("ui.frame.btn.modify") }}</el-button
         >
         <el-button
           type="danger"
-          v-hasPermi="['tm:tmStockCoverClass:remove']"
+          v-hasPermi="['tm:depthConfig:remove']"
           @click="handleDelete(selection)"
           :disabled="selection.length === 0"
           >{{ $t("ui.frame.btn.delete") }}</el-button
         >
         <el-button
           @click="handleExport"
-          v-hasPermi="['tm:tmStockCoverClass:export']"
+          v-hasPermi="['tm:depthConfig:export']"
           >{{ $t("ui.frame.btn.export") }}</el-button
         >
       </template>
@@ -50,12 +50,12 @@
 </template>
 <script>
 import {downloadLink} from "@/utils/request";
-import {listStockCoverClass, removeStockCoverClass} from "@/api/tm/stockCoverClass";
+import {listDepthConfig, removeDepthConfig} from "@/api/tm/depthConfig";
 import {getConfigKey} from "@/api/system/config";
 import infoDialog from "./components/infoDialog.vue";
 
 export default {
-  name: "TmStockCoverClass",
+  name: "TmDepthConfig",
   components: {
     infoDialog,
   },
@@ -95,7 +95,7 @@ export default {
           filterable: true,
         },
         {
-          label: this.$t("ui.tm.stockCoverClass.column.machineQty"),
+          label: this.$t("ui.tm.depthConfig.column.machineQty"),
           prop: "machineQty",
           type: "input",
         },
@@ -112,18 +112,18 @@ export default {
         {
           prop: "machineQty",
           halign: "center",
-          label: this.$t("ui.tm.stockCoverClass.column.machineQty"),
+          label: this.$t("ui.tm.depthConfig.column.machineQty"),
         },
         {
           prop: "machineRange",
           halign: "center",
-          label: this.$t("ui.tm.stockCoverClass.column.machineRange"),
+          label: this.$t("ui.tm.depthConfig.column.machineRange"),
           dictData: this.dict.type.machine_range,
         },
         {
           prop: "depthClassQty",
           halign: "center",
-          label: this.$t("ui.tm.stockCoverClass.column.depthClassQty"),
+          label: this.$t("ui.tm.depthConfig.column.depthClassQty"),
         },
         {
           prop: "remark",
@@ -167,7 +167,7 @@ export default {
   methods: {
     handleAdd() {
       if (this.$refs.infoRef) {
-        this.$refs.infoRef.show();
+        this.$refs.infoRef.show(null, this.query.factoryCode);
       }
     },
     handleEdit(row) {
@@ -181,7 +181,7 @@ export default {
         type: "warning",
       }).then(() => {
         this.loading = true;
-        removeStockCoverClass(ids)
+        removeDepthConfig(ids)
           .then((data) => {
             this.$modal.msgSuccess(data.msg);
             this.$set(this.page, "current", 1);
@@ -219,7 +219,7 @@ export default {
       this.selection = rows;
     },
     handleExport() {
-      downloadLink("/tm/tmStockCoverClass/export", this.formatParams(false));
+      downloadLink("/tm/depthConfig/export", this.formatParams(false));
     },
 
     formatParams(hasPage = true) {
@@ -238,7 +238,7 @@ export default {
     async getList() {
       try {
         this.loading = true;
-        const data = await listStockCoverClass(this.formatParams());
+        const data = await listDepthConfig(this.formatParams());
         this.data = data.rows;
         this.page.total = data.total;
       } catch (error) {

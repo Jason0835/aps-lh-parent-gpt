@@ -92,7 +92,7 @@ public class TmInventoryPredictService implements ITmInventoryPredictService {
             forecast.calculateRollingStockQty();
             stockForecastMap.put(treadCode, forecast);
             // 打印6点库存计算公式
-            log.info("[TM_INVENTORY_PREDICT] treadCode={}, 6点库存【stockQty】-不良数量【badQty】-调整数量【adjustQty】=实际库存【{}】",
+            log.info("[TM_INVENTORY_PREDICT] treadCode={}, 6点库存【stockQty】-不良数量【badQty】+调整数量【adjustQty】=实际库存【{}】",
                     treadCode, forecast.getSixClockStockQty());
             // 打印14点预计库存计算公式
             log.info("[TM_INVENTORY_PREDICT] treadCode={}, 14点预计库存【rollingStockQty】=6点库存【{}】-早班需求量【{}】+早班计划量【{}】=【{}】",
@@ -134,7 +134,7 @@ public class TmInventoryPredictService implements ITmInventoryPredictService {
                             BigDecimal badQty = stock.getBadQty() != null ? stock.getBadQty() : BigDecimal.ZERO;
                             BigDecimal adjustQty = stock.getAdjustQty() != null ? stock.getAdjustQty() : BigDecimal.ZERO;
                             result = BigDecimalUtils.sub(result, badQty);
-                            result = BigDecimalUtils.sub(result, adjustQty);
+                            result = BigDecimalUtils.add(result, adjustQty);
                             return result;
                         },
                         (existing, replacement) -> existing

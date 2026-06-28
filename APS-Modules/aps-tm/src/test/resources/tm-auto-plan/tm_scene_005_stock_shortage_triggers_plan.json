@@ -20,6 +20,12 @@
       "paramCode": "TM_MIN_STOCK_CLASS",
       "paramValue": "2",
       "enableStatus": "1"
+    },
+    {
+      "factoryCode": "F1",
+      "paramCode": "TM_FORMING_SHIFT_OFFSET",
+      "paramValue": "0",
+      "enableStatus": "1"
     }
   ],
   "cxScheduleResults": [
@@ -29,9 +35,9 @@
       "class1PlanQty": 10,
       "class2PlanQty": 20,
       "class3PlanQty": 30,
-      "class4PlanQty": 0,
-      "class5PlanQty": 0,
-      "class6PlanQty": 0,
+      "class4PlanQty": 10,
+      "class5PlanQty": 10,
+      "class6PlanQty": 10,
       "treadCode": "TR-S1",
       "treadShoulderLength": 1,
       "treadMouthPlate": "MP-A",

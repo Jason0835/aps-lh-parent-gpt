@@ -312,6 +312,29 @@ public class TmAutoPlanTestReportScenarioTest {
     }
 
     /**
+     * 测试内容：TM_SCENE_035 实验规格无成型需求时新增独立一班任务。
+     */
+    @Test
+    public void shouldReportScene035ExperimentSpecCreatesIndependentTask() {
+        executeScene("tm_scene_035_experiment_spec_independent_task.json");
+    }
+
+    /**
+     * 测试内容：TM_SCENE_036 实验规格命中同胎面时叠加到一班任务。
+     */
+    @Test
+       public void shouldReportScene036ExperimentSpecMergeSameTreadTask() {
+        executeScene("tm_scene_036_experiment_spec_merge_same_tread.json");
+    }
+
+    /**
+     * 测试内容：TM_SCENE_037 实验规格自定义参数和非实验跳过。
+     */
+    @Test
+    public void shouldReportScene037ExperimentSpecCustomParamsAndSkipNonExperiment() {
+        executeScene("tm_scene_037_experiment_spec_custom_params_skip.json");
+    }
+    /**
      * 读取并执行单个报告场景。
      *
      * @param fileName 场景 JSON 文件名

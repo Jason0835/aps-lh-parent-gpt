@@ -14,6 +14,12 @@
       "paramCode": "TM_ALGORITHM_SWITCH",
       "paramValue": "1",
       "enableStatus": "1"
+    },
+    {
+      "factoryCode": "F1",
+      "paramCode": "TM_FORMING_SHIFT_OFFSET",
+      "paramValue": "0",
+      "enableStatus": "1"
     }
   ],
   "oldScheduleResults": [],

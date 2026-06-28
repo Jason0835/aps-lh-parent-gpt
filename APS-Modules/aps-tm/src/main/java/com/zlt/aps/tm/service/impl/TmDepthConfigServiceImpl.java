@@ -2,9 +2,9 @@ package com.zlt.aps.tm.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ruoyi.common.constant.UserConstants;
-import com.zlt.aps.tm.api.domain.entity.TmStockCoverClass;
-import com.zlt.aps.tm.mapper.TmStockCoverClassMapper;
-import com.zlt.aps.tm.service.ITmStockCoverClassService;
+import com.zlt.aps.tm.api.domain.entity.TmDepthConfig;
+import com.zlt.aps.tm.mapper.TmDepthConfigMapper;
+import com.zlt.aps.tm.service.ITmDepthConfigService;
 import com.zlt.bill.common.service.AbstractDocService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,39 +19,47 @@ import java.util.List;
  */
 @Service
 @Transactional(rollbackFor = Exception.class)
-public class TmStockCoverClassServiceImpl extends AbstractDocService<TmStockCoverClass> implements ITmStockCoverClassService {
+public class TmDepthConfigServiceImpl extends AbstractDocService<TmDepthConfig> implements ITmDepthConfigService {
 
     @Resource
-    private TmStockCoverClassMapper tmStockCoverClassMapper;
+    private TmDepthConfigMapper tmDepthConfigMapper;
 
     /**
      * 校验配置规则的交叉情况
      * <p>
      * 规则说明：
      * - MACHINE_RANGE 与 MACHINE_QTY 组合构成范围条件
-     * - 不同规则的范围不允许有交集，确保任意台数值最多只命中一条规则
-     * - 例如：已有「GE 3」(≥3)，不允许再新增「LE 5」(≤5)，因为台数4同时满足两条规则
+     * - 排程算法按 MACHINE_QTY 降序匹配（越大优先级越高），取第一个满足条件的配置行
+     * - 因此高优先级的规则会覆盖（隐藏）低优先级的重叠规则，低优先级规则的备库班数值不会生效
+     * - 交叉校验只需检查新规则与同等或更高优先级（MACHINE_QTY ≥ 自身）的现有规则是否有范围重叠且备库班数不同
+     * - 对于优先级更低（MACHINE_QTY < 自身）的现有规则，新规则会覆盖它们，无需校验
+     * - 例如：已有「EQ 1」备库班数=6，新增「LE 5」备库班数=4，LE 5 优先级更高（5 > 1），会覆盖 EQ 1，允许
      * </p>
      */
     @Override
-    public String checkRangeCross(TmStockCoverClass entity) {
+    public String checkRangeCross(TmDepthConfig entity) {
         // 查询同一工厂下的所有配置（排除自身）
-        LambdaQueryWrapper<TmStockCoverClass> queryWrapper = new LambdaQueryWrapper<>();
-        queryWrapper.eq(TmStockCoverClass::getFactoryCode, entity.getFactoryCode());
-        queryWrapper.ne(entity.getId() != null, TmStockCoverClass::getId, entity.getId());
-        List<TmStockCoverClass> existingList = tmStockCoverClassMapper.selectList(queryWrapper);
+        LambdaQueryWrapper<TmDepthConfig> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(TmDepthConfig::getFactoryCode, entity.getFactoryCode());
+        queryWrapper.ne(entity.getId() != null, TmDepthConfig::getId, entity.getId());
+        List<TmDepthConfig> existingList = tmDepthConfigMapper.selectList(queryWrapper);
 
         if (existingList.isEmpty()) {
             return UserConstants.UNIQUE;
         }
 
-        // 计算新规则的范围区间 [start, end]
         long[] newRange = calculateRange(entity.getMachineRange(), entity.getMachineQty());
 
-        for (TmStockCoverClass existing : existingList) {
+        for (TmDepthConfig existing : existingList) {
+            // 只检查优先级同等或更高的现有规则（MACHINE_QTY ≥ 自身）
+            // 优先级更低的规则会被新规则覆盖，其备库班数值不会生效
+            if (existing.getMachineQty() < entity.getMachineQty()) {
+                continue;
+            }
             long[] existingRange = calculateRange(existing.getMachineRange(), existing.getMachineQty());
-            // 两个区间有交集则视为交叉
-            if (newRange[0] <= existingRange[1] && existingRange[0] <= newRange[1]) {
+            // 范围有交集且备库班数不同 → 冲突
+            if (newRange[0] <= existingRange[1] && existingRange[0] <= newRange[1]
+                    && !entity.getDepthClassQty().equals(existing.getDepthClassQty())) {
                 return UserConstants.NOT_UNIQUE;
             }
         }

@@ -23,7 +23,7 @@ import java.util.Map;
  *
  * <p>通过 {@link TmStrategyRegistry} 获取计划量策略，替代直接 new 策略对象。
  * 计划量策略编码从上下文参数读取（参数码 {@code TM_PLAN_QTY_STRATEGY}，缺省 {@code "DEFAULT"}）。
- * 计划量计算使用库存预测中的 rollingStockQty（14点预计库存）。</p>
+ * 计划量计算使用当前任务班初 rollingStockQty，同一胎面按班次逐班回写交接班库存。</p>
  */
 @Slf4j
 @Service
@@ -70,31 +70,37 @@ public class TmPlanCalcService implements ITmPlanCalcService {
         String demandQtyAlgorithmCode = readAlgorithmCode(context);
         ITmDemandQtyStrategy demandQtyStrategy = strategyRegistry.getDemandQtyStrategy(demandQtyAlgorithmCode);
 
-        // 初始化 per-tread 剩余可抵扣库存（初值取6点库存净值），逐班递减供库存抵扣使用
+        // 初始化 per-tread 班初滚动库存（初值取14点预计库存），逐班回写交接班库存。
         Map<String, BigDecimal> remainingStockMap = new HashMap<>();
         if (stockForecastMap != null) {
             for (Map.Entry<String, TmStockForecast> entry : stockForecastMap.entrySet()) {
-                BigDecimal sixClock = entry.getValue().getSixClockStockQty();
-                remainingStockMap.put(entry.getKey(), sixClock != null ? sixClock : BigDecimal.ZERO);
+                BigDecimal rollingStock = entry.getValue().getRollingStockQty();
+                remainingStockMap.put(entry.getKey(), rollingStock != null ? rollingStock : BigDecimal.ZERO);
             }
         }
         context.setRemainingStockMap(remainingStockMap);
 
-        // 防御性稳定排序：按胎面编码、班次顺序升序，保证同胎面任务按班次递进抵扣库存（最终排产顺序由 TASK_SORT 步骤重排）
+        // 防御性稳定排序：按胎面编码、班次顺序升序，保证同胎面任务按班次递进滚动库存（最终排产顺序由 TASK_SORT 步骤重排）
         context.getTaskDraftList().sort(Comparator
                 .comparing(TmTaskDraft::getTreadCode, Comparator.nullsLast(Comparator.naturalOrder()))
                 .thenComparing(TmTaskDraft::getShiftOrder, Comparator.nullsLast(Comparator.naturalOrder())));
 
         for (TmTaskDraft task : context.getTaskDraftList()) {
-            // 从库存预测结果中获取 rollingStockQty 并设置到任务中
+            // 6点库存保留预测快照；班初滚动库存必须从上一任务回写的交接班库存读取。
             if (stockForecastMap != null && task.getTreadCode() != null) {
                 TmStockForecast forecast = stockForecastMap.get(task.getTreadCode());
                 if (forecast != null) {
-                    task.setRollingStockQty(forecast.getRollingStockQty());
                     task.setSixClockStockQty(forecast.getSixClockStockQty());
                 }
             }
-
+            if (task.getTreadCode() != null) {
+                BigDecimal rollingStock = remainingStockMap.get(task.getTreadCode());
+                if (rollingStock == null) {
+                    rollingStock = nvl(task.getRollingStockQty());
+                    remainingStockMap.put(task.getTreadCode(), rollingStock);
+                }
+                task.setRollingStockQty(rollingStock);
+            }
             // 旧骨架数据只提供 demandQty 时，将其作为当前班基础需求，避免默认策略按空值计算为 0。
             if (task.getCurrentShiftDemandQty() == null && task.getDemandQty() != null) {
                 task.setCurrentShiftDemandQty(task.getDemandQty());
@@ -104,13 +110,14 @@ public class TmPlanCalcService implements ITmPlanCalcService {
             TmDemandQtyResult demandQtyResult = demandQtyStrategy.calculate(buildDemandQtyInput(task), context);
             applyDemandQtyResult(task, demandQtyResult);
             addNewSpecTrace(context, task);
+            addExperimentSpecTrace(context, task);
             addDemandTrace(context, task, demandQtyAlgorithmCode);
             // 打印需求量计算公式
-            log.info("[TM_DEMAND_QTY_CALC] treadCode={}, shiftOrder={}, 算法编码={}, 保证范围内成型胎面需求量【guardDemandQty】-当前班开始滚动库存【rollingStockQty】=库存保证缺口【stockGapQty】，max(当前班成型胎面需求量【currentShiftDemandQty】，库存保证缺口【stockGapQty】)=需求量【demandQty】",
+            log.info("[TM_DEMAND_QTY_CALC] treadCode={}, shiftOrder={}, 算法编码={}, 当前班成型胎面需求量【currentShiftDemandQty】-当前班开始滚动库存【rollingStockQty】=当前班库存缺口【currentShiftStockGapQty】，保证范围内成型胎面需求量【guardDemandQty】-当前班开始滚动库存【rollingStockQty】=库存保证缺口【stockGapQty】，max(当前班库存缺口【currentShiftStockGapQty】，库存保证缺口【stockGapQty】)=需求量【demandQty】",
                     task.getTreadCode(), task.getShiftOrder(), demandQtyAlgorithmCode);
-            log.info("[TM_DEMAND_QTY_CALC_DETAIL] treadCode={}, shiftOrder={}, guardDemandQty={}, rollingStockQty={}, stockGapQty={}, currentShiftDemandQty={}, demandQty={}",
+            log.info("[TM_DEMAND_QTY_CALC_DETAIL] treadCode={}, shiftOrder={}, guardDemandQty={}, rollingStockQty={}, currentShiftStockGapQty={}, stockGapQty={}, currentShiftDemandQty={}, demandQty={}",
                     task.getTreadCode(), task.getShiftOrder(),
-                    task.getGuardDemandQty(), task.getRollingStockQty(), task.getStockGapQty(),
+                    task.getGuardDemandQty(), task.getRollingStockQty(), task.getCurrentShiftStockGapQty(), task.getStockGapQty(),
                     task.getCurrentShiftDemandQty(), task.getDemandQty());
             // 打印供应时长计算公式
             log.info("[TM_DEMAND_QTY_SUPPLY] treadCode={}, shiftOrder={}, 供应时长【supplyHours】小时=当前班开始滚动库存【rollingStockQty】/(保证范围内成型胎面需求量【guardDemandQty】/保证范围总小时数【guardRangeHours】)",
@@ -125,6 +132,7 @@ public class TmPlanCalcService implements ITmPlanCalcService {
                 TmPlanQtyResult planQtyResult = planQtyStrategy.calculate(task, context);
                 applyPlanQtyResult(task, planQtyResult);
             }
+            updateRollingStockState(context, task);
             addPlanQtyTrace(context, task, planQtyStrategyCode);
             // 打印计划量计算公式
             if (task.getPlanQty() != null) {
@@ -178,6 +186,42 @@ public class TmPlanCalcService implements ITmPlanCalcService {
     }
 
     /**
+     * 写入实验规格判断和固定计划量证据。
+     *
+     * @param context 排程上下文
+     * @param task    任务草稿
+     */
+    private void addExperimentSpecTrace(TmScheduleContext context, TmTaskDraft task) {
+        TmExperimentSpecInfo info = task.getExperimentSpecInfo();
+        if (info == null) {
+            return;
+        }
+        Map<String, Object> detectEvidence = new LinkedHashMap<>();
+        detectEvidence.put("experimentSpec", info.getExperimentSpec());
+        detectEvidence.put("lookbackDays", info.getLookbackDays());
+        detectEvidence.put("lookbackDaysSource", info.getLookbackDaysSource());
+        detectEvidence.put("scheduleDate", info.getScheduleDate());
+        detectEvidence.put("experimentPlanDate", info.getExperimentPlanDate());
+        detectEvidence.put("monthPlanDayQty", info.getMonthPlanDayQty());
+        detectEvidence.put("monthPlanIds", info.getMonthPlanIds());
+        detectEvidence.put("productionNos", info.getProductionNos());
+        detectEvidence.put("embryoCodes", info.getEmbryoCodes());
+        detectEvidence.put("mergedToExistingTask", info.getMergedToExistingTask());
+        detectEvidence.put("reason", info.getReason());
+        traceOf(context, task).addRuleHit("EXPERIMENT_SPEC_DETECT",
+                info.isExperimentSpecHit() ? "PASS" : "SKIP", detectEvidence);
+        if (!info.isExperimentSpecHit()) {
+            return;
+        }
+        Map<String, Object> planQtyEvidence = new LinkedHashMap<>();
+        planQtyEvidence.put("planQty", info.getPlanQty());
+        planQtyEvidence.put("planQtySource", info.getPlanQtySource());
+        planQtyEvidence.put("finalTaskPlanQty", task.getPlanQty());
+        planQtyEvidence.put("currentShiftDemandQty", task.getCurrentShiftDemandQty());
+        planQtyEvidence.put("guardDemandQty", task.getGuardDemandQty());
+        traceOf(context, task).addRuleHit("EXPERIMENT_SPEC_PLAN_QTY", "PASS", planQtyEvidence);
+    }
+    /**
      * 写入需求量计算规则证据。
      *
      * @param context              排程上下文
@@ -190,6 +234,7 @@ public class TmPlanCalcService implements ITmPlanCalcService {
         evidence.put("currentShiftDemandQty", task.getCurrentShiftDemandQty());
         evidence.put("guardDemandQty", task.getGuardDemandQty());
         evidence.put("rollingStockQty", task.getRollingStockQty());
+        evidence.put("currentShiftStockGapQty", task.getCurrentShiftStockGapQty());
         evidence.put("stockGapQty", task.getStockGapQty());
         evidence.put("demandQty", task.getDemandQty());
         evidence.put("sourceOrderNos", task.getSourceOrderNos());
@@ -230,7 +275,7 @@ public class TmPlanCalcService implements ITmPlanCalcService {
     /**
      * 根据任务草稿构建需求量策略输入。
      *
-     * @param task 任务草稿
+     * @param task    任务草稿
      * @return 需求量策略输入
      */
     private TmDemandQtyInput buildDemandQtyInput(TmTaskDraft task) {
@@ -257,6 +302,7 @@ public class TmPlanCalcService implements ITmPlanCalcService {
         task.setCurrentShiftDemandQty(result.getCurrentShiftDemandQty());
         task.setGuardDemandQty(result.getGuardDemandQty());
         task.setRollingStockQty(result.getRollingStockQty());
+        task.setCurrentShiftStockGapQty(result.getCurrentShiftStockGapQty());
         task.setStockGapQty(result.getStockGapQty());
         task.setDemandQty(result.getDemandQty());
         task.setGuardShiftCount(result.getGuardShiftCount());
@@ -281,6 +327,35 @@ public class TmPlanCalcService implements ITmPlanCalcService {
         task.setCapacityAdjustQty(result.getCapacityAdjustQty());
         task.setPlanQty(result.getFinalPlanQty());
         task.setCalcFormulaDesc(result.getCalcFormulaDesc());
+    }
+
+
+    /**
+     * 回写同一胎面的下一任务班初库存状态。
+     *
+     * @param context 胎面排程上下文
+     * @param task    任务草稿
+     */
+    private void updateRollingStockState(TmScheduleContext context, TmTaskDraft task) {
+        if (context == null || context.getRemainingStockMap() == null || task == null || task.getTreadCode() == null) {
+            return;
+        }
+        BigDecimal handoverStock = task.getPlanStockQty();
+        if (handoverStock == null && task.getPlanQty() != null) {
+            handoverStock = nvl(task.getRollingStockQty()).add(nvl(task.getPlanQty()))
+                    .subtract(nvl(task.getCurrentShiftDemandQty())).max(BigDecimal.ZERO);
+            task.setPlanStockQty(handoverStock);
+        }
+        context.getRemainingStockMap().put(task.getTreadCode(), nvl(handoverStock));
+    }
+    /**
+     * 空值转 0。
+     *
+     * @param value 原始数值
+     * @return 非空数值
+     */
+    private BigDecimal nvl(BigDecimal value) {
+        return value == null ? BigDecimal.ZERO : value;
     }
 
     /**

@@ -119,9 +119,9 @@ public class TmInventoryPredictServiceTest {
     }
 
     /**
-     * 测试内容：验证 6 点库存会扣减不良量和调整量。
+     * 测试内容：验证 6 点库存会扣减不良量并叠加调整量。
      * 测试场景：库存 1000，不良 50，调整 30。
-     * 预期结果：参与滚动预测的 6 点库存为 920。
+     * 预期结果：参与滚动预测的 6 点库存为 980（1000-50+30）。
      */
     @Test
     public void predictShouldSubtractBadQtyAndAdjustQtyFromSixClockStock() {
@@ -141,8 +141,8 @@ public class TmInventoryPredictServiceTest {
         inventoryPredictService.predict(context);
 
         TmStockForecast forecast = context.getStockForecastMap().get("TR-001");
-        assertEquals(new BigDecimal("920"), forecast.getSixClockStockQty());
-        assertEquals(new BigDecimal("920"), forecast.getRollingStockQty());
+        assertEquals(new BigDecimal("980"), forecast.getSixClockStockQty());
+        assertEquals(new BigDecimal("980"), forecast.getRollingStockQty());
     }
 
     /**

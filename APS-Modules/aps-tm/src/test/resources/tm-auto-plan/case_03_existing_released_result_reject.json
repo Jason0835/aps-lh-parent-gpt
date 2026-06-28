@@ -23,6 +23,13 @@
     "assignedCount": 0,
     "unassignedCount": 0,
     "explainCount": 0
-  }
+  },
+  "params": [
+    {
+      "factoryCode": "F1",
+      "paramCode": "TM_FORMING_SHIFT_OFFSET",
+      "paramValue": "0",
+      "enableStatus": "1"
+    }
+  ]
 }
-

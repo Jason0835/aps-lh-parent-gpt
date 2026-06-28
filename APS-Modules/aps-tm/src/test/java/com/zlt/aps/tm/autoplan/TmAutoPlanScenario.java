@@ -2,6 +2,7 @@ package com.zlt.aps.tm.autoplan;
 
 import com.zlt.aps.tm.api.domain.entity.*;
 import com.zlt.aps.tm.api.domain.vo.TmAutoScheduleRequestVo;
+import com.zlt.aps.tm.domain.vo.TmExperimentSpecMonthPlanRowVo;
 import com.zlt.aps.tm.domain.vo.TmFormingDemandRowVo;
 import lombok.Data;
 
@@ -45,6 +46,9 @@ public class TmAutoPlanScenario {
 
     /** 成型计划与施工信息关联后的测试行 */
     private List<TmFormingDemandRowVo> cxScheduleResults = new ArrayList<>();
+
+    /** 月计划定稿实验规格行 */
+    private List<TmExperimentSpecMonthPlanRowVo> experimentSpecMonthPlans = new ArrayList<>();
 
     /** 原始施工信息扩展字段，当前测试保留用于可读性和后续扩展 */
     private List<Map<String, Object>> constructionInfos = new ArrayList<>();

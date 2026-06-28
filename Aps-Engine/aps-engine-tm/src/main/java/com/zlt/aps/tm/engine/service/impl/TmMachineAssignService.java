@@ -396,6 +396,7 @@ public class TmMachineAssignService implements ITmMachineAssignService {
         target.setGuardShiftCount(source.getGuardShiftCount());
         target.setGuardRangeHours(source.getGuardRangeHours());
         target.setSupplyHours(source.getSupplyHours());
+        target.setCurrentShiftStockGapQty(source.getCurrentShiftStockGapQty());
         target.setStockGapQty(source.getStockGapQty());
         target.setPlanQty(planQty);
         target.setTreadShoulderLength(source.getTreadShoulderLength());
@@ -417,6 +418,7 @@ public class TmMachineAssignService implements ITmMachineAssignService {
         target.setFixedMachineMatched(source.getFixedMachineMatched());
         target.setDemandQty(source.getDemandQty());
         target.setNewSpecInfo(source.getNewSpecInfo());
+        target.setExperimentSpecInfo(source.getExperimentSpecInfo());
         target.setBusinessKeySuffix("OVERFLOW_FROM_CLASS" + sourceShift + "_TO_CLASS" + shiftOrder + "_" + machineCode + "_" + overflowIndex);
         return target;
     }

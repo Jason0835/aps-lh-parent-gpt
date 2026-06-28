@@ -8,8 +8,8 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.text.Convert;
 import com.ruoyi.common4ui.constant.UserConstants;
 import com.ruoyi.common4ui.core.controller.BaseUIController;
-import com.zlt.aps.tm.api.domain.entity.TmStockCoverClass;
-import com.zlt.aps.tm.api.service.ITmStockCoverClassRemoteService;
+import com.zlt.aps.tm.api.domain.entity.TmDepthConfig;
+import com.zlt.aps.tm.api.service.ITmDepthConfigRemoteService;
 import com.zlt.file.encryptbyll.FileEncryptUtils;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
@@ -33,21 +33,21 @@ import java.util.Arrays;
  */
 @Api(tags = "备库班数配置")
 @Controller
-@RequestMapping("/tm/tmStockCoverClass")
-public class TmStockCoverClassUIController extends BaseUIController<TmStockCoverClass> {
+@RequestMapping("/tm/depthConfig")
+public class TmDepthConfigUIController extends BaseUIController<TmDepthConfig> {
 
     @Autowired
-    private ITmStockCoverClassRemoteService iTmStockCoverClassService;
+    private ITmDepthConfigRemoteService iTmDepthConfigService;
 
-    private final String prefix = "aps/tm/tmStockCoverClass";
+    private final String prefix = "aps/tm/depthConfig";
 
     /**
      * 跳转至主页面
      */
-    @RequiresPermissions("tm:tmStockCoverClass:view")
+    @RequiresPermissions("tm:depthConfig:view")
     @GetMapping()
     public String toIndex() {
-        return prefix + "/tmStockCoverClass";
+        return prefix + "/tmDepthConfig";
     }
 
     /**
@@ -55,7 +55,7 @@ public class TmStockCoverClassUIController extends BaseUIController<TmStockCover
      */
     @GetMapping("/add")
     public String add(ModelMap mmap) {
-        mmap.put("tmStockCoverClass", new TmStockCoverClass());
+        mmap.put("tmDepthConfig", new TmDepthConfig());
         return prefix + "/add";
     }
 
@@ -64,7 +64,7 @@ public class TmStockCoverClassUIController extends BaseUIController<TmStockCover
      */
     @GetMapping("/edit/{id}")
     public String edit(@PathVariable("id") Long id, ModelMap mmap) {
-        mmap.put("tmStockCoverClass", iTmStockCoverClassService.getInfo(id));
+        mmap.put("tmDepthConfig", iTmDepthConfigService.getInfo(id));
         return prefix + "/edit";
     }
 
@@ -72,41 +72,41 @@ public class TmStockCoverClassUIController extends BaseUIController<TmStockCover
      * 根据条件查询主表数据
      */
     @ApiOperation("根据条件查询主表数据")
-    @RequiresPermissions("tm:tmStockCoverClass:list")
+    @RequiresPermissions("tm:depthConfig:list")
     @PostMapping("/list")
     @ResponseBody
-    public TableDataInfo list(TmStockCoverClass tmStockCoverClass) {
-        return iTmStockCoverClassService.list(tmStockCoverClass);
+    public TableDataInfo list(TmDepthConfig tmDepthConfig) {
+        return iTmDepthConfigService.list(tmDepthConfig);
     }
 
     /**
      * 修改或新增
      */
     @ApiOperation("修改或新增")
-    @RequiresPermissions("tm:tmStockCoverClass:edit")
+    @RequiresPermissions("tm:depthConfig:edit")
     @PostMapping("/save")
     @ResponseBody
-    public AjaxResult save(TmStockCoverClass tmStockCoverClass) {
-        if (UserConstants.NOT_UNIQUE.equals(iTmStockCoverClassService.checkUnique(tmStockCoverClass))) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.tm.stockCoverClass.notUnique"));
+    public AjaxResult save(TmDepthConfig tmDepthConfig) {
+        if (UserConstants.NOT_UNIQUE.equals(iTmDepthConfigService.checkUnique(tmDepthConfig))) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.tm.depthConfig.notUnique"));
         }
         // 校验范围交叉
-        if (UserConstants.NOT_UNIQUE.equals(iTmStockCoverClassService.checkRangeCross(tmStockCoverClass))) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.tm.stockCoverClass.rangeCross"));
+        if (UserConstants.NOT_UNIQUE.equals(iTmDepthConfigService.checkRangeCross(tmDepthConfig))) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.tm.depthConfig.rangeCross"));
         }
-        return iTmStockCoverClassService.save(tmStockCoverClass);
+        return iTmDepthConfigService.save(tmDepthConfig);
     }
 
     /**
      * 删除
      */
     @ApiOperation("删除,id不为空")
-    @RequiresPermissions("tm:tmStockCoverClass:remove")
+    @RequiresPermissions("tm:depthConfig:remove")
     @PostMapping("/remove")
     @ResponseBody
     public AjaxResult remove(@RequestParam String ids) {
         Long[] arr = Convert.toLongArray(ids);
-        return iTmStockCoverClassService.removeByIds(Arrays.asList(arr));
+        return iTmDepthConfigService.removeByIds(Arrays.asList(arr));
     }
 
     /**
@@ -115,8 +115,8 @@ public class TmStockCoverClassUIController extends BaseUIController<TmStockCover
     @ApiOperation("校验唯一性")
     @PostMapping("/checkUnique")
     @ResponseBody
-    public String checkUnique(TmStockCoverClass tmStockCoverClass) {
-        return iTmStockCoverClassService.checkUnique(tmStockCoverClass);
+    public String checkUnique(TmDepthConfig tmDepthConfig) {
+        return iTmDepthConfigService.checkUnique(tmDepthConfig);
     }
 
     @Override
@@ -131,7 +131,7 @@ public class TmStockCoverClassUIController extends BaseUIController<TmStockCover
 
     @Override
     public String getFunctionName() {
-        return I18nUtil.getMessage("ui.tm.stockCoverClass.column.modalName");
+        return I18nUtil.getMessage("ui.tm.depthConfig.column.modalName");
     }
 
     /**
@@ -141,7 +141,7 @@ public class TmStockCoverClassUIController extends BaseUIController<TmStockCover
     @Override
     public AjaxResult importTemplate(HttpServletResponse response) throws IOException {
         String fileName = this.getExportTemplateFileName();
-        ExcelUtil<TmStockCoverClass> util = new ExcelUtil<>(TmStockCoverClass.class);
+        ExcelUtil<TmDepthConfig> util = new ExcelUtil<>(TmDepthConfig.class);
         util.exportExcel(response, null, fileName, fileName);
         return AjaxResult.success();
     }
@@ -150,9 +150,9 @@ public class TmStockCoverClassUIController extends BaseUIController<TmStockCover
     @GetMapping({ "/export" })
     @ResponseBody
     @Override
-    public void export(HttpServletResponse response, TmStockCoverClass entity) throws IOException {
+    public void export(HttpServletResponse response, TmDepthConfig entity) throws IOException {
         String fileName = this.getExportTemplateFileName();
-        byte[] excelBytes = iTmStockCoverClassService.exportData(entity, fileName);
+        byte[] excelBytes = iTmDepthConfigService.exportData(entity, fileName);
         ByteArrayInputStream in = new ByteArrayInputStream(excelBytes);
         ExcelUtil.setResponseHeader(response, fileName, ".xlsx");
         IOUtils.copy(in, response.getOutputStream());
@@ -172,7 +172,7 @@ public class TmStockCoverClassUIController extends BaseUIController<TmStockCover
         context.setProcedureCode(this.getProcedureCode());
         context.setOriFileName(file.getOriginalFilename());
         context.setFileBytes(data);
-        AjaxResult ajaxResult = iTmStockCoverClassService.importData(context, updateSupport);
+        AjaxResult ajaxResult = iTmDepthConfigService.importData(context, updateSupport);
         return ajaxResult;
     }
 }

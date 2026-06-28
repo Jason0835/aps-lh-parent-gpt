@@ -30,7 +30,7 @@
 
 <script>
 import infoForm from "@/views/components/infoForm.vue";
-import {saveStockCoverClass} from "@/api/tm/stockCoverClass";
+import {saveDepthConfig} from "@/api/tm/depthConfig";
 
 export default {
   components: { infoForm },
@@ -82,13 +82,13 @@ export default {
           required: true,
         },
         {
-          label: this.$t("ui.tm.stockCoverClass.column.machineQty"),
+          label: this.$t("ui.tm.depthConfig.column.machineQty"),
           prop: "machineQty",
           span: 12,
           required: true,
         },
         {
-          label: this.$t("ui.tm.stockCoverClass.column.machineRange"),
+          label: this.$t("ui.tm.depthConfig.column.machineRange"),
           prop: "machineRange",
           span: 12,
           type: "select",
@@ -96,7 +96,7 @@ export default {
           required: true,
         },
         {
-          label: this.$t("ui.tm.stockCoverClass.column.depthClassQty"),
+          label: this.$t("ui.tm.depthConfig.column.depthClassQty"),
           prop: "depthClassQty",
           span: 12,
           required: true,
@@ -117,7 +117,7 @@ export default {
         (this.isEdit
           ? this.$t("common.button.edit")
           : this.$t("common.button.add")) +
-        this.$t("ui.tm.stockCoverClass.column.modalName")
+        this.$t("ui.tm.depthConfig.column.modalName")
       );
     },
   },
@@ -126,7 +126,7 @@ export default {
       try {
         this.loading = true;
         let res;
-        res = await saveStockCoverClass(params);
+        res = await saveDepthConfig(params);
         this.$modal.msgSuccess(res.msg);
         this.$emit("success");
         this.hide();
@@ -136,12 +136,18 @@ export default {
         this.loading = false;
       }
     },
-    show(data) {
+    show(data, defaultFactoryCode) {
       this.visible = true;
       if (data) {
         this.isEdit = true;
         this.form = {
           ...data,
+        };
+      } else {
+        this.isEdit = false;
+        this.form = {
+          factoryCode: defaultFactoryCode || '',
+          machineRange: 'EQ',
         };
       }
     },

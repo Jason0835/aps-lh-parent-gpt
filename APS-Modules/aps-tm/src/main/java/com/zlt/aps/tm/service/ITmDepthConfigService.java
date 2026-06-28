@@ -1,6 +1,6 @@
 package com.zlt.aps.tm.service;
 
-import com.zlt.aps.tm.api.domain.entity.TmStockCoverClass;
+import com.zlt.aps.tm.api.domain.entity.TmDepthConfig;
 import com.zlt.bill.common.service.IDocService;
 
 /**
@@ -8,7 +8,7 @@ import com.zlt.bill.common.service.IDocService;
  *
  * @author zlt
  */
-public interface ITmStockCoverClassService extends IDocService<TmStockCoverClass> {
+public interface ITmDepthConfigService extends IDocService<TmDepthConfig> {
 
     /**
      * 校验配置规则的交叉情况
@@ -17,5 +17,5 @@ public interface ITmStockCoverClassService extends IDocService<TmStockCoverClass
      * @param entity 备库班数配置实体
      * @return UserConstants.UNIQUE 表示无交叉（校验通过），UserConstants.NOT_UNIQUE 表示存在交叉
      */
-    String checkRangeCross(TmStockCoverClass entity);
+    String checkRangeCross(TmDepthConfig entity);
 }

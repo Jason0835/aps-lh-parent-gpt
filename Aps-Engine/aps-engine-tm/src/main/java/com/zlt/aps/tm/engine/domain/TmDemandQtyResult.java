@@ -22,6 +22,9 @@ public class TmDemandQtyResult {
     /** 当前班开始滚动库存，单位米 */
     private BigDecimal rollingStockQty;
 
+    /** 当前班库存缺口，单位米 */
+    private BigDecimal currentShiftStockGapQty;
+
     /** 库存保证缺口，单位米 */
     private BigDecimal stockGapQty;
 

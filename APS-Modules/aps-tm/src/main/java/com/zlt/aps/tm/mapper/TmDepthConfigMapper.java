@@ -1,6 +1,6 @@
 package com.zlt.aps.tm.mapper;
 
-import com.zlt.aps.tm.api.domain.entity.TmStockCoverClass;
+import com.zlt.aps.tm.api.domain.entity.TmDepthConfig;
 import com.zlt.core.dao.basemapper.CommBaseMapper;
 import org.apache.ibatis.annotations.Mapper;
 
@@ -10,6 +10,6 @@ import org.apache.ibatis.annotations.Mapper;
  * @author zlt
  */
 @Mapper
-public interface TmStockCoverClassMapper extends CommBaseMapper<TmStockCoverClass> {
+public interface TmDepthConfigMapper extends CommBaseMapper<TmDepthConfig> {
 
 }

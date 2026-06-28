@@ -66,7 +66,7 @@ public class TmAutoPlanStepTest {
     }
 
     /**
-     * 测试内容：验证算法 1 在数据加载层按前三班最大成型量生成胎面需求。
+     * 测试内容：验证算法 1 在数据加载层按配置的成型班次偏移量取未来三班最大成型量生成胎面需求。
      */
     @Test
     public void shouldCalculateAlgorithmOneMaxClassDemandFromJson() {
@@ -78,13 +78,13 @@ public class TmAutoPlanStepTest {
 
         // Then
         TmTaskDraft firstShiftTask = assertHelper.findTask(context, "TR-A1", 1);
-        assertBigDecimalEquals("50", firstShiftTask.getCurrentShiftDemandQty());
-        assertBigDecimalEquals("70", firstShiftTask.getGuardDemandQty());
+        assertBigDecimalEquals("70", firstShiftTask.getCurrentShiftDemandQty());
+        assertBigDecimalEquals("100", firstShiftTask.getGuardDemandQty());
         assertEquals("ORD-A1-CLASS1", firstShiftTask.getOrderNo());
     }
 
     /**
-     * 测试内容：验证算法 2 在数据加载层按下一班成型量生成胎面需求。
+     * 测试内容：验证算法 2 在数据加载层按配置的成型班次偏移量生成胎面需求。
      */
     @Test
     public void shouldCalculateAlgorithmTwoNextShiftDemand() {
@@ -96,9 +96,68 @@ public class TmAutoPlanStepTest {
 
         // Then
         TmTaskDraft firstShiftTask = assertHelper.findTask(context, "TR-A2", 1);
+        TmTaskDraft secondShiftTask = assertHelper.findTask(context, "TR-A2", 2);
         TmTaskDraft sixthShiftTask = assertHelper.findTask(context, "TR-A2", 6);
-        assertBigDecimalEquals("20", firstShiftTask.getCurrentShiftDemandQty());
-        assertBigDecimalEquals("60", sixthShiftTask.getCurrentShiftDemandQty());
+        assertBigDecimalEquals("30", firstShiftTask.getCurrentShiftDemandQty());
+        assertBigDecimalEquals("40", secondShiftTask.getCurrentShiftDemandQty());
+        assertBigDecimalEquals("80", sixthShiftTask.getCurrentShiftDemandQty());
+    }
+
+    /**
+     * 测试内容：验证成型班次偏移参数为 0 时，胎面班次直接取同序号成型班次。
+     */
+    @Test
+    public void shouldUseConfiguredZeroFormingShiftOffset() {
+        // Given
+        TmAutoPlanMockFactory.MockContext mockContext = buildContext("case_06_algorithm_2_next_shift_demand.json");
+        mockContext.getScenario().getParams().stream()
+                .filter(param -> "TM_FORMING_SHIFT_OFFSET".equals(param.getParamCode()))
+                .findFirst()
+                .ifPresent(param -> param.setParamValue("0"));
+
+        // When
+        TmScheduleContext context = mockFactory.loadContextOnly(mockContext);
+
+        // Then
+        TmTaskDraft firstShiftTask = assertHelper.findTask(context, "TR-A2", 1);
+        assertBigDecimalEquals("10", firstShiftTask.getCurrentShiftDemandQty());
+    }
+
+    /**
+     * 测试内容：验证成型班次偏移参数非法时，按默认偏移 2 计算。
+     */
+    @Test
+    public void shouldFallbackToDefaultFormingShiftOffsetWhenParamInvalid() {
+        // Given
+        TmAutoPlanMockFactory.MockContext mockContext = buildContext("case_06_algorithm_2_next_shift_demand.json");
+        mockContext.getScenario().getParams().stream()
+                .filter(param -> "TM_FORMING_SHIFT_OFFSET".equals(param.getParamCode()))
+                .findFirst()
+                .ifPresent(param -> param.setParamValue("-1"));
+
+        // When
+        TmScheduleContext context = mockFactory.loadContextOnly(mockContext);
+
+        // Then
+        TmTaskDraft firstShiftTask = assertHelper.findTask(context, "TR-A2", 1);
+        assertBigDecimalEquals("30", firstShiftTask.getCurrentShiftDemandQty());
+    }
+
+    /**
+     * 测试内容：验证成型班次偏移参数缺失时，按默认偏移 2 计算。
+     */
+    @Test
+    public void shouldFallbackToDefaultFormingShiftOffsetWhenParamMissing() {
+        // Given
+        TmAutoPlanMockFactory.MockContext mockContext = buildContext("case_06_algorithm_2_next_shift_demand.json");
+        mockContext.getScenario().getParams().removeIf(param -> "TM_FORMING_SHIFT_OFFSET".equals(param.getParamCode()));
+
+        // When
+        TmScheduleContext context = mockFactory.loadContextOnly(mockContext);
+
+        // Then
+        TmTaskDraft firstShiftTask = assertHelper.findTask(context, "TR-A2", 1);
+        assertBigDecimalEquals("30", firstShiftTask.getCurrentShiftDemandQty());
     }
 
     /**
@@ -201,9 +260,9 @@ public class TmAutoPlanStepTest {
         TmScheduleContext context = mockFactory.loadContextOnly(mockContext);
 
         // Then
-        assertEquals(5, context.getTaskDraftList().size());
-        assertBigDecimalEquals("32.500000", assertHelper.findTask(context, "TR-SD", 1).getCurrentShiftDemandQty());
-        assertBigDecimalEquals("62.500000", assertHelper.findTask(context, "TR-SD", 4).getCurrentShiftDemandQty());
+        assertEquals(4, context.getTaskDraftList().size());
+        assertBigDecimalEquals("32.500000", assertHelper.findTask(context, "TR-SD", 2).getCurrentShiftDemandQty());
+        assertBigDecimalEquals("62.500000", assertHelper.findTask(context, "TR-SD", 5).getCurrentShiftDemandQty());
     }
 
     /**
