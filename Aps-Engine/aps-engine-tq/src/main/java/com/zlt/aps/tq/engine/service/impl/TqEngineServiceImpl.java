@@ -49,7 +49,7 @@ import static com.zlt.aps.common.core.utils.ApsCommonUtil.*;
  *   <li>新版算法依据：胎圈自动排程_v5.xmind（6班次制）</li>
  *   <li>旧版4班次字段（midPlanQty/nightPlanQty/dayPlanQty/nextMidPlanQty）将逐步废弃</li>
  *   <li>请勿在此引擎新增功能，所有新需求请到新版排程算法实现</li>
- *   <li>注意：当前 TqNewScheduleResultController.autoPlan 仍调用本引擎的 autoTqSchedule 方法，
+ *   <li>注意：当前 TqScheduleResultController.autoPlan 仍调用本引擎的 autoTqSchedule 方法，
  *       属于待修复的过渡状态，后续将由v5新算法替代</li>
  *   <li>计划在新版v5排程算法完整实现后，本引擎将一并删除</li>
  * </ul>
@@ -145,73 +145,77 @@ public class TqEngineServiceImpl implements TqEngineService {
 
     /**
      * 验证成型排程记录的胎胚code在施工表中是否都能找到对应记录，如果不能则提示
+     *
+     * <p>注：外协规格逻辑已废弃（2026-06-27），6班次排程不再使用外协规格。
+     * 该方法依赖 mapAssistSpec 参数过滤外协规格，已整体注释保留。</p>
+     *
      * @param scheduleDate 排程日志
      * @param batchNo 批次号
      * @param productionStage 仅投产阶段规格排产标识
      */
-    private void ValidatedConstruction(String scheduleDate, String batchNo, String productionStage, Map<String, String> mapAssistSpec) {
-        List<EngineConstructionInfo> list = tqEngineMapper.listTqNeedConstruction(scheduleDate, productionStage);
-        list = list.stream().filter(r -> !mapAssistSpec.containsKey(r.getTireRingCode())).collect(Collectors.toList());  //校验忽略掉 外协规格，只校验 不是外协的规格
-        for(EngineConstructionInfo construction : list) {
-            List<String> errorColumns = new ArrayList<>();
-            String embryoCode = construction.getEmbryoCode().split(",")[0];  //成型排程结果对应的胎胚代码
-            String[] versionArray = construction.getBomDataVersion().split(",");
-            String embryoVersion = versionArray.length > 0 ? versionArray[0] : "";  //施工版本
-            if(construction.getEmbryoCode().split(",").length < 2) {
-                //施工表胎胚代码为空
-                errorColumns.add("\"" + I18nUtil.getMessage("ui.construction.embryoCode") + "\"");
-            }
-            if(versionArray.length < 2) {
-                //施工表版本为空
-                errorColumns.add("\"" + I18nUtil.getMessage("ui.construction.embryoVersion") + "\"");
-            }
-            if(StringUtils.isBlank(construction.getTireRingCode())) {
-                //施工表胎圈代码为空
-                errorColumns.add("\"" + I18nUtil.getMessage("ui.construction.tireRingCode") + "\"");
-            }
-            if(StringUtils.isBlank(construction.getBeadCode())) {
-                //施工表钢丝圈代码为空
-                errorColumns.add("\"" + I18nUtil.getMessage("ui.construction.beadCode") + "\"");
-            }
-            if(StringUtils.isBlank(construction.getApexCode())) {
-                //施工表三角胶为空
-                errorColumns.add("\"" + I18nUtil.getMessage("ui.construction.apexCode") + "\"");
-            }
-            if(StringUtils.isBlank(construction.getHexagonRubberCode())) {
-                //施工表胎圈胶料为空
-                errorColumns.add("\"" + I18nUtil.getMessage("ui.construction.hexagonRubberCode") + "\"");
-            }
-            if(StringUtils.isBlank(construction.getHexagonMouthPlate())) {
-                //施工表胎圈口型板为空
-                errorColumns.add("\"" + I18nUtil.getMessage("ui.construction.hexagonMouthPlate") + "\"");
-            }
-            if(StringUtils.isBlank(construction.getHexagonRubberDimension())) {
-                //施工表胎圈尺寸为空
-                errorColumns.add("\"" + I18nUtil.getMessage("ui.construction.hexagonRubberDimension") + "\"");
-            }
-            if(!errorColumns.isEmpty()) {
-                String tip = StringUtils.format(I18nUtil.getMessage("engine.auto.scheule.construction.validate"), embryoCode, embryoVersion, String.join(",", errorColumns));
-                autoScheduleLogService.insertTqScheduleLog(batchNo, "", "自动排程失败", tip); //添加日志
-                throw new RuntimeException(tip);
-            }
-        }
-    }
+    // private void ValidatedConstruction(String scheduleDate, String batchNo, String productionStage, Map<String, String> mapAssistSpec) {
+    //     List<EngineConstructionInfo> list = tqEngineMapper.listTqNeedConstruction(scheduleDate, productionStage);
+    //     list = list.stream().filter(r -> !mapAssistSpec.containsKey(r.getTireRingCode())).collect(Collectors.toList());  //校验忽略掉 外协规格，只校验 不是外协的规格
+    //     for(EngineConstructionInfo construction : list) {
+    //         List<String> errorColumns = new ArrayList<>();
+    //         String embryoCode = construction.getEmbryoCode().split(",")[0];  //成型排程结果对应的胎胚代码
+    //         String[] versionArray = construction.getBomDataVersion().split(",");
+    //         String embryoVersion = versionArray.length > 0 ? versionArray[0] : "";  //施工版本
+    //         if(construction.getEmbryoCode().split(",").length < 2) {
+    //             //施工表胎胚代码为空
+    //             errorColumns.add("\"" + I18nUtil.getMessage("ui.construction.embryoCode") + "\"");
+    //         }
+    //         if(versionArray.length < 2) {
+    //             //施工表版本为空
+    //             errorColumns.add("\"" + I18nUtil.getMessage("ui.construction.embryoVersion") + "\"");
+    //         }
+    //         if(StringUtils.isBlank(construction.getTireRingCode())) {
+    //             //施工表胎圈代码为空
+    //             errorColumns.add("\"" + I18nUtil.getMessage("ui.construction.tireRingCode") + "\"");
+    //         }
+    //         if(StringUtils.isBlank(construction.getBeadCode())) {
+    //             //施工表钢丝圈代码为空
+    //             errorColumns.add("\"" + I18nUtil.getMessage("ui.construction.beadCode") + "\"");
+    //         }
+    //         if(StringUtils.isBlank(construction.getApexCode())) {
+    //             //施工表三角胶为空
+    //             errorColumns.add("\"" + I18nUtil.getMessage("ui.construction.apexCode") + "\"");
+    //         }
+    //         if(StringUtils.isBlank(construction.getHexagonRubberCode())) {
+    //             //施工表胎圈胶料为空
+    //             errorColumns.add("\"" + I18nUtil.getMessage("ui.construction.hexagonRubberCode") + "\"");
+    //         }
+    //         if(StringUtils.isBlank(construction.getHexagonMouthPlate())) {
+    //             //施工表胎圈口型板为空
+    //             errorColumns.add("\"" + I18nUtil.getMessage("ui.construction.hexagonMouthPlate") + "\"");
+    //         }
+    //         if(StringUtils.isBlank(construction.getHexagonRubberDimension())) {
+    //             //施工表胎圈尺寸为空
+    //             errorColumns.add("\"" + I18nUtil.getMessage("ui.construction.hexagonRubberDimension") + "\"");
+    //         }
+    //         if(!errorColumns.isEmpty()) {
+    //             String tip = StringUtils.format(I18nUtil.getMessage("engine.auto.scheule.construction.validate"), embryoCode, embryoVersion, String.join(",", errorColumns));
+    //             autoScheduleLogService.insertTqScheduleLog(batchNo, "", "自动排程失败", tip); //添加日志
+    //             throw new RuntimeException(tip);
+    //         }
+    //     }
+    // }
 
     /**
-     * 把外协规格列表转成Map
+     * 把外协规格列表转成Map（外协逻辑已废弃，6班次排程不再使用外协规格，方法整体注释保留）
      * @return
      */
-    private Map<String, String> mapAssistSpec() {
-        Map<String, String> map = new HashMap<>();
-        List<String> listAssistSpec = this.tqEngineMapper.listAssistSpec();
-        if(listAssistSpec == null || listAssistSpec.size() == 0) {
-            return map;
-        }
-        for(String assistSpec : listAssistSpec) {
-            map.put(assistSpec, "1");
-        }
-        return map;
-    }
+    // private Map<String, String> mapAssistSpec() {
+    //     Map<String, String> map = new HashMap<>();
+    //     List<String> listAssistSpec = this.tqEngineMapper.listAssistSpec();
+    //     if(listAssistSpec == null || listAssistSpec.size() == 0) {
+    //         return map;
+    //     }
+    //     for(String assistSpec : listAssistSpec) {
+    //         map.put(assistSpec, "1");
+    //     }
+    //     return map;
+    // }
 
     /**
      * 胎圈插单
@@ -937,7 +941,8 @@ public class TqEngineServiceImpl implements TqEngineService {
     private void syncTqScheduleToLog(String scheduleDate) {
         tqEngineMapper.syncTqScheduleToLog(scheduleDate);
         tqEngineMapper.deleteTqSchedule(scheduleDate);
-        tqEngineMapper.deleteTqAssistSchedule(scheduleDate);
+        // 外协逻辑已废弃，6班次排程不再删除外协排程数据
+        // tqEngineMapper.deleteTqAssistSchedule(scheduleDate);
 
     }
 

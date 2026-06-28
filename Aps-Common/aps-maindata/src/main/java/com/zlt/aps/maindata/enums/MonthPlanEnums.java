@@ -132,6 +132,10 @@ public enum MonthPlanEnums {
     ADD_CHANGE_MOLD_COUNT_BY_SAME_PATTERN("SYS0203016", "前后两个SKU，同规格同花纹换活字块时是否算换模能力次数"),
 
     /**
+     * SYS0203017 同机台是否允许分组二次上机
+     */
+    GROUP_SECOND_ON_LINE_BY_SAME_CX_MACHINE("SYS0203017", "同机台是否允许分组二次上机"),
+    /**
      * SYS0203021 月计划日产上限预警阀值
      */
     DAY_MAX_ALARM_LIMIT("SYS0203021", "月计划日产上限预警阀值"),
@@ -283,6 +287,10 @@ public enum MonthPlanEnums {
      * SYS0207001 参与Sku排产竞争的优先级高的Sku列表个数
      */
     HEIGHT_PRIORITY_SKU_LIST_COUNT("SYS0207001", "参与Sku排产竞争的优先级高的Sku列表个数"),
+    /**
+     * SYS0207002 参与Sku排产竞争共用模具或是共用胎胚优先
+     */
+    SHARE_MOLD_EMBRYO_PRIORITY("SYS0207002", "参与Sku排产竞争共用模具或是共用胎胚优先"),
     /**
      * SYS0209003 APS通用班制
      */

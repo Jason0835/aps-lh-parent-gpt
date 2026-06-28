@@ -80,7 +80,7 @@ export default {
           filterable: true,
           loading: this.machineLoading,
           props: {
-            label: "machineName",
+            label: "machineCode",
             value: "machineCode",
           },
           onFocus: this.handleMachineFocus,

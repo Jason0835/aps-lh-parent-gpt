@@ -65,7 +65,7 @@ public class JsonUtils {
     public static List<String> getLanguageList() {
         List<String> languageList = new ArrayList<>();
         languageList.add(I18nConstant.ZH_CN);
-        languageList.add(I18nConstant.EN_US);
+        //20260627+ 先不加入英文 languageList.add(I18nConstant.EN_US);
         languageList.add(I18nConstant.VI_VN);
         return languageList;
     }

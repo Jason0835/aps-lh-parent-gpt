@@ -60,7 +60,13 @@ public class TqScheduleContext {
     /** 工序参数（13项） */
     private TqScheduleParams params;
 
-    /** 外协规格Map，key=胎圈代码，value="1" */
+    /**
+     * 外协规格Map，key=胎圈代码，value="1"
+     *
+     * @deprecated 外协规格逻辑已废弃（2026-06-27），6班次排程不再区分外协/非外协。
+     *             字段保留仅为兼容已有 getter/setter 调用，不再被写入和读取。
+     */
+    @Deprecated
     private Map<String, String> assistSpecMap = new HashMap<>();
 
     /** 口型板→机台映射，key=口型板代码，value=机台ID列表(逗号分隔) */
@@ -135,10 +141,22 @@ public class TqScheduleContext {
 
     // ========== S4写入 ==========
 
-    /** 外协排程数据 */
+    /**
+     * 外协排程数据
+     *
+     * @deprecated 外协规格逻辑已废弃（2026-06-27），6班次排程不再区分外协/非外协。
+     *             字段保留仅为兼容已有 getter/setter 调用，不再被写入和读取。
+     */
+    @Deprecated
     private List<TqScheduleResultVo> assistScheduleList = new ArrayList<>();
 
-    /** 非外协排程数据 */
+    /**
+     * 非外协排程数据
+     *
+     * @deprecated 外协规格逻辑已废弃（2026-06-27），6班次排程不再区分外协/非外协。
+     *             字段保留仅为兼容已有 getter/setter 调用，不再被写入和读取。
+     */
+    @Deprecated
     private List<TqScheduleResultVo> normalScheduleList = new ArrayList<>();
 
     /** 已有排程记录（当天已存在的排产记录） */

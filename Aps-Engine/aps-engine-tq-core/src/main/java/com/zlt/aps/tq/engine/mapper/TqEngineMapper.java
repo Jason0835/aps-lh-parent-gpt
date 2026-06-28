@@ -35,10 +35,10 @@ public interface TqEngineMapper {
     void deleteTqSchedule(@Param("scheduleDate") String scheduleDate);
 
     /**
-     * 删除指定日期的外协排程数据
+     * 删除指定日期的外协排程数据（外协逻辑已废弃，6班次排程不再使用）
      * @param scheduleDate
      */
-    void deleteTqAssistSchedule(@Param("scheduleDate") String scheduleDate);
+    // void deleteTqAssistSchedule(@Param("scheduleDate") String scheduleDate);
 
     /**
      * 把排程数据同步到log表
@@ -53,10 +53,10 @@ public interface TqEngineMapper {
     void batchCreateScheduleResult(@Param("scheduleResultList") List<TqScheduleResultVo> scheduleResultList);
 
     /**
-     * 批量新增外协排程结果数据
+     * 批量新增外协排程结果数据（外协逻辑已废弃，6班次排程不再使用）
      * @param scheduleResultList
      */
-    void batchCreateAssistScheduleResult(@Param("scheduleResultList") List<TqScheduleResultVo> scheduleResultList);
+    // void batchCreateAssistScheduleResult(@Param("scheduleResultList") List<TqScheduleResultVo> scheduleResultList);
 
     /**
      * 返回胎圈参数计划
@@ -108,10 +108,10 @@ public interface TqEngineMapper {
     List<EngineConstructionInfo> listTqNeedConstruction(@Param("scheduleDate") String scheduleDate, @Param("productionStage") String productionStage);
 
     /**
-     * 获得外协规格列表
+     * 获得外协规格列表（外协逻辑已废弃，6班次排程不再使用）
      * @return
      */
-    List<String> listAssistSpec();
+    // List<String> listAssistSpec();
 
     int batchUpdateBatchNoAndOrderNo(@Param("list") List<TqScheduleResultVo> scheduleResultVoList);
 

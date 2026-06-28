@@ -120,6 +120,11 @@ public class ProductionCapacityParamConfiguration {
      */
     private boolean addChangeMoldCountBySameSpecificationsPattern;
     /**
+     * SYS0203017
+     * 同机台是否允许结构二次上机
+     */
+    private boolean secondOnLineBySameCxMachine;
+    /**
      * 最小批量值
      */
     private Integer minQty;
@@ -214,6 +219,10 @@ public class ProductionCapacityParamConfiguration {
      * SYS0207001 参与Sku排产竞争的优先级高的Sku列表个数
      */
     private Integer heightPrioritySkuPreCount;
+    /**
+     * SYS0207002 参与Sku排产竞争共用模具或是共用胎胚优先
+     */
+    private Integer shareMoldOrEmbryoPriorityRange;
     /**
      * SYS0209006 正式排产优先级排产分段日
      */

@@ -28,8 +28,9 @@
 </template>
 
 <script>
+import moment from "moment";
 import infoForm from "@/views/components/infoForm.vue";
-import { insertOrder, validateInsertOrder, listScheduleShiftDates } from "@/api/tq/tqNewScheduleResult";
+import { insertOrder, validateInsertOrder, listScheduleShiftDates } from "@/api/tq/scheduleResult";
 import { listEnabledMachines } from "@/api/tq/machine";
 
 export default {
@@ -76,57 +77,67 @@ export default {
   },
   computed: {
     title: function () {
-      return this.$t("ui.data.btn.tqNewScheduleResult.insertOrder");
+      return this.$t("ui.data.btn.tqScheduleResult.insertOrder");
     },
     columns() {
       const columns = [
         {
           type: "title",
-          label: this.$t("ui.data.column.tqNewScheduleResult.baseInfo"),
+          label: this.$t("ui.data.column.tqScheduleResult.baseInfo"),
         },
         {
-          label: this.$t("ui.data.column.tqNewScheduleResult.scheduleDate"),
+          label: this.$t("ui.data.column.factoryCode"),
+          prop: "factoryCode",
+          type: "select",
+          dictData: this.parentDict.type.biz_factory_name,
+          filterable: true,
+          disabled: true,
+        },
+        {
+          label: this.$t("ui.data.column.tqScheduleResult.scheduleDate"),
           prop: "scheduleDate",
           type: "date",
           dateType: "date",
           valueFormat: "yyyy-MM-dd",
           clearable: false,
+          disabled: true,
           listeners: {
             change: this.handleScheduleDateChange,
           },
         },
         {
-          label: this.$t("ui.data.column.tqNewScheduleResult.machineCode"),
+          label: this.$t("ui.data.column.tqScheduleResult.machineCode"),
           prop: "machineCode",
           type: "select",
           dictData: this.tqMachines,
           filterable: true,
           clearable: true,
+          disabled: true,
         },
         {
-          label: this.$t("ui.data.column.tqNewScheduleResult.beadCode"),
+          label: this.$t("ui.data.column.tqScheduleResult.beadCode"),
           prop: "beadCode",
         },
       ];
 
-      // 动态生成6个班次表单区域
+      // 动态生成6个班次表单区域（顺序、计划量、原因分析）
       for (let i = 1; i <= 6; i++) {
         columns.push(
           { type: "title", label: this.shiftBannerTitle(i) },
           {
-            label: this.$t("ui.data.column.tqNewScheduleResult.planQty"),
-            prop: `class${i}PlanQty`,
-            span: 8,
-            type: "number",
-          },
-          {
-            label: this.$t("ui.data.column.tqNewScheduleResult.sequence"),
+            label: this.$t("ui.data.column.tqScheduleResult.sequence"),
             prop: `class${i}Sequence`,
             span: 8,
             type: "number",
           },
           {
-            label: this.$t("ui.data.column.tqNewScheduleResult.analysis"),
+            label: this.$t("ui.data.column.tqScheduleResult.planQty"),
+            prop: `class${i}PlanQty`,
+            span: 8,
+            type: "number",
+          },
+          {
+            label: this.$t("ui.data.column.tqScheduleResult.analysis"),
             prop: `class${i}Analysis`,
             span: 8,
           }
@@ -190,8 +201,9 @@ export default {
     async loadMachines() {
       try {
         const res = await listEnabledMachines();
+        // 下拉显示机台编号（而非中文名称）
         this.tqMachines = (res || []).map((r) => ({
-          label: r.machineName,
+          label: r.machineCode,
           value: r.machineCode,
         }));
       } catch (error) {
@@ -227,18 +239,19 @@ export default {
     /** 打开弹窗 */
     async show(data) {
       this.visible = true;
-      const nowDate = new Date();
-      const offsetDate = new Date(nowDate);
-      offsetDate.setDate(nowDate.getDate() + 2);
-      const defaultScheduleDate = offsetDate.toISOString().slice(0, 10);
-
+      // 工厂默认越南（与自动排程弹窗保持一致）
       const form = {
-        scheduleDate: defaultScheduleDate,
+        factoryCode: "116",
       };
 
       if (data) {
-        // 从列表行数据中回填
-        const keys = ["scheduleDate", "machineCode", "beadCode"];
+        // 排程日期回填选中行数据（格式化为 yyyy-MM-dd）
+        const scheduleDateStr = data.scheduleDate
+          ? moment(data.scheduleDate).format("YYYY-MM-DD")
+          : "";
+        form.scheduleDate = scheduleDateStr;
+        // 回填机台编号、胎圈代码、6个班的计划量、顺序与原因分析
+        const keys = ["machineCode", "beadCode"];
         for (let i = 1; i <= 6; i++) {
           keys.push(`class${i}PlanQty`, `class${i}Sequence`, `class${i}Analysis`);
         }

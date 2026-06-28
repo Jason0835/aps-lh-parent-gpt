@@ -3,18 +3,18 @@ package com.zlt.aps.tq.service;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.tq.api.domain.dto.TqChangeMachineDTO;
 import com.zlt.aps.tq.api.domain.dto.TqInsertOrderDTO;
-import com.zlt.aps.tq.api.domain.entity.TqNewScheduleResult;
+import com.zlt.aps.tq.api.domain.entity.TqScheduleResult;
 import com.zlt.bill.common.service.IDocService;
 
 import java.util.Date;
 import java.util.List;
 
 /**
- * 胎圈排程结果Service接口（新版）
+ * 胎圈排程结果Service接口
  *
  * @author APS
  */
-public interface ITqNewScheduleResultService extends IDocService<TqNewScheduleResult> {
+public interface ITqScheduleResultService extends IDocService<TqScheduleResult> {
 
     /**
      * 插单前校验
@@ -54,7 +54,7 @@ public interface ITqNewScheduleResultService extends IDocService<TqNewScheduleRe
      * @param entity 调量数据
      * @return 校验结果
      */
-    AjaxResult validateChangeQty(TqNewScheduleResult entity);
+    AjaxResult validateChangeQty(TqScheduleResult entity);
 
     /**
      * 调量
@@ -62,7 +62,7 @@ public interface ITqNewScheduleResultService extends IDocService<TqNewScheduleRe
      * @param entity 调量数据
      * @return 结果
      */
-    AjaxResult changeQty(TqNewScheduleResult entity);
+    AjaxResult changeQty(TqScheduleResult entity);
 
     /**
      * 逻辑删除排程记录
@@ -78,7 +78,7 @@ public interface ITqNewScheduleResultService extends IDocService<TqNewScheduleRe
      * @param queryVO 查询条件（含排程日期等）
      * @return 结果
      */
-    AjaxResult publish(TqNewScheduleResult queryVO);
+    AjaxResult publish(TqScheduleResult queryVO);
 
     /**
      * 查询排程日期是否已发布

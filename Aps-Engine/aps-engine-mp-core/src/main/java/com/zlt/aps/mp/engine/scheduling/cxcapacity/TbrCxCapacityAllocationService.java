@@ -373,21 +373,6 @@ public class TbrCxCapacityAllocationService extends AbstractDataLoaderService {
     }
 
     /**
-     * 9：根据成型信息，得到结构排产结果
-     * 即结构转产信息
-     *
-     * @param productionContext
-     */
-    private List<MpStructureAllocation> saveStructureInfo(TbrProductionContext productionContext) {
-        List<MpStructureAllocation> allAllocationList = GroupProductionConversionHandler.getFinalResult(productionContext);
-        if (CollectionUtils.isEmpty(allAllocationList)) {
-            return Collections.emptyList();
-        }
-        getMonthProductionDataService().saveGroupConversionResult(allAllocationList);
-        return allAllocationList;
-    }
-
-    /**
      * 12：根据模具信息，保存模具排产结果
      *
      * @param productionContext 排产上下文

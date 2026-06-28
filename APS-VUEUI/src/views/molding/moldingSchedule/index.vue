@@ -12,7 +12,6 @@
       :search="search"
       @refresh="getList"
       @search="handleSearch"
-      @reset="handleReset"
       @pageChange="handlePageChange"
       @sort-change="handleSortChange"
       @selection-change="handleSelectionChange"
@@ -865,6 +864,9 @@ export default {
           prop: "scheduleDate",
           type: "date",
           valueFormat: "yyyy-MM-dd",
+          listeners: {
+            change: this.handleScheduleDateChange,
+          },
         },
         {
           label: this.$t("ui.data.column.scheduleResult.isRelease"),
@@ -1036,6 +1038,19 @@ export default {
     handleQuery() {},
     handleHistoryQuery() {},
 
+    // 排程时间变更后自动查询
+    handleScheduleDateChange(val) {
+      this.search = {
+        ...this.search,
+        scheduleDate: val,
+      };
+      this.query = {
+        ...this.query,
+        scheduleDate: val,
+      };
+      this.$set(this.page, "current", 1);
+      this.getList();
+    },
     handleSearch(data) {
       // 过滤掉 null、undefined 和空字符串，但保留 0、false 等有效值
       const filteredData = {};
@@ -1050,14 +1065,6 @@ export default {
         filteredData.cxMachineCode = filteredData.cxMachineCode.join(',');
       }
       this.query = filteredData;
-      this.$set(this.page, "current", 1);
-      this.getList();
-    },
-    handleReset() {
-      // 重置查询条件到初始状态
-      const date = moment().add(1, "days").format("YYYY-MM-DD");
-      this.query = { scheduleDate: date };
-      this.search = { scheduleDate: date };
       this.$set(this.page, "current", 1);
       this.getList();
     },

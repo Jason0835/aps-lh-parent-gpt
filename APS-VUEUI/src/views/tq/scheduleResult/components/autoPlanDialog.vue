@@ -31,7 +31,7 @@
 import moment from "moment";
 
 import infoForm from "@/views/components/infoForm.vue";
-import { autoPlan } from "@/api/tq/tqNewScheduleResult";
+import { autoPlan } from "@/api/tq/scheduleResult";
 
 export default {
   components: { infoForm },
@@ -67,7 +67,7 @@ export default {
           filterable: true,
         },
         {
-          label: this.$t("ui.data.column.tqNewScheduleResult.scheduleDate"),
+          label: this.$t("ui.data.column.tqScheduleResult.scheduleDate"),
           prop: "scheduleDateQuery",
           type: "date",
           dateType: "date",
@@ -80,7 +80,7 @@ export default {
   },
   computed: {
     title: function () {
-      return this.$t("ui.data.btn.tqNewScheduleResult.autoPlan");
+      return this.$t("ui.data.btn.tqScheduleResult.autoPlan");
     },
   },
   methods: {
@@ -117,7 +117,7 @@ export default {
       this.$modal.msgSuccess(
         tip ||
           this.$t(
-            "ui.data.column.tqNewScheduleResult.scheduleCompleted"
+            "ui.data.column.tqScheduleResult.scheduleCompleted"
           )
       );
       this.$emit("success", { ...params });
@@ -129,7 +129,7 @@ export default {
     handleAutoPlan(params) {
       this.$modal.msgSuccess(
         this.$t(
-          "ui.data.column.tqNewScheduleResult.scheduleExecuting"
+          "ui.data.column.tqScheduleResult.scheduleExecuting"
         )
       );
       this.hide();
@@ -139,7 +139,7 @@ export default {
           console.error(error);
           this.$modal.msgWarning(
             this.$t(
-              "ui.data.column.tqNewScheduleResult.scheduleTimeout"
+              "ui.data.column.tqScheduleResult.scheduleTimeout"
             )
           );
         });

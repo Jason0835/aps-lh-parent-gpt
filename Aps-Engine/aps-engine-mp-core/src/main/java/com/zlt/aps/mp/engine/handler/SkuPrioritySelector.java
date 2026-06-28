@@ -3,6 +3,7 @@ package com.zlt.aps.mp.engine.handler;
 import com.google.common.collect.Sets;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.mp.engine.constant.ProductionConstant;
+import com.zlt.aps.mp.engine.daylimit.GroupPlanCxLhCapacityLimitHelper;
 import com.zlt.aps.mp.engine.domain.Context;
 import com.zlt.aps.mp.engine.domain.dto.CxLhProductionHelper;
 import com.zlt.aps.mp.engine.domain.dto.EarliestConclusionLhGroupHelper;
@@ -49,7 +50,15 @@ public class SkuPrioritySelector {
      * @param allLhMachineLhGroup 所有的最早收尾日
      * @return
      */
-    public static String getHighestPrioritySku(Context context, ProductionStageEnum productionStage, FormalRoundEnum formalRound, ProductionPlanGroupInfo groupPlanInfo, EarliestConclusionLhGroupHelper lhGroup, ContinueTypeEnum continueType, List<MonthPlanProductionRequirePlanVo> allSkuList, Set<String> excludeSkuSet, EarliestConclusionLhGroupHelper allLhMachineLhGroup) {
+    public static String getHighestPrioritySku(Context context,
+                                               ProductionStageEnum productionStage,
+                                               FormalRoundEnum formalRound,
+                                               ProductionPlanGroupInfo groupPlanInfo,
+                                               EarliestConclusionLhGroupHelper lhGroup,
+                                               ContinueTypeEnum continueType,
+                                               List<MonthPlanProductionRequirePlanVo> allSkuList,
+                                               Set<String> excludeSkuSet,
+                                               EarliestConclusionLhGroupHelper allLhMachineLhGroup) {
         List<MonthPlanProductionRequirePlanVo> effectiveSkuList = getEffectiveSkuList(allSkuList, excludeSkuSet);
         if (CollectionUtils.isEmpty(effectiveSkuList)) {
             return StringUtils.EMPTY;
@@ -75,24 +84,29 @@ public class SkuPrioritySelector {
             return StringUtils.EMPTY;
         }
         //20260422+ 供应链优先-即物料优先
-        List<ProductionSkuPriorityVo> finalSelectedList = getFinalSelectedList(selectedSkuPriorityList);
+        List<ProductionSkuPriorityVo> finalSelectedList = DayProductionControlHandler.getFinalSelectedList(selectedSkuPriorityList);
         if (CollectionUtils.isEmpty(finalSelectedList)) {
             return StringUtils.EMPTY;
         }
         if (finalSelectedList.size() == BigDecimal.ONE.intValue()) {
             return finalSelectedList.get(BigDecimal.ZERO.intValue()).getMaterialDesc();
         }
+        //20260627+ 共用模具、共用胎胚优先
+        List<ProductionSkuPriorityVo> shareSelectedList = DayProductionControlHandler.getShareMoldOrShareEmbryo(productionContext, finalSelectedList, groupPlanInfo.getDayProductionLimitInfo(), startDay, endDay);
+        if (shareSelectedList.size() == BigDecimal.ONE.intValue()) {
+            return shareSelectedList.get(BigDecimal.ZERO.intValue()).getMaterialDesc();
+        }
         //最低实单硫化机台
         if (FormalRoundEnum.ACTUAL_MIN_LH_MACHINE == formalRound) {
-            return getCoveredMostSku(finalSelectedList);
+            return getCoveredMostSku(shareSelectedList);
         }
-        String coveredResult = getCoveredMostSku(finalSelectedList);
+        String coveredResult = getCoveredMostSku(shareSelectedList);
         if (!StringUtils.EMPTY.equals(coveredResult)) {
             return coveredResult;
         }
         //不可覆盖，挑选剩余量最少的
-        finalSelectedList.sort(Comparator.comparing(ProductionSkuPriorityVo::getDiffValueByNoCovered));
-        return finalSelectedList.get(BigDecimal.ZERO.intValue()).getMaterialDesc();
+        shareSelectedList.sort(Comparator.comparing(ProductionSkuPriorityVo::getDiffValueByNoCovered));
+        return shareSelectedList.get(BigDecimal.ZERO.intValue()).getMaterialDesc();
     }
 
     /**
@@ -112,7 +126,14 @@ public class SkuPrioritySelector {
      * @param endDay          结束排产日
      * @return
      */
-    public static String getHighestPrioritySku(Context context, ProductionStageEnum productionStage, CxMachineBaseInfoVo cxMachineInfo, CxLhProductionHelper cxLhGroup, List<MonthPlanProductionRequirePlanVo> allSkuList, Set<String> excludeSkuSet, Integer startDay, Integer endDay) {
+    public static String getHighestPrioritySku(Context context,
+                                               ProductionStageEnum productionStage,
+                                               CxMachineBaseInfoVo cxMachineInfo,
+                                               CxLhProductionHelper cxLhGroup,
+                                               List<MonthPlanProductionRequirePlanVo> allSkuList,
+                                               Set<String> excludeSkuSet,
+                                               Integer startDay,
+                                               Integer endDay) {
         List<MonthPlanProductionRequirePlanVo> effectiveSkuList = getEffectiveSkuList(allSkuList, excludeSkuSet);
         if (CollectionUtils.isEmpty(effectiveSkuList)) {
             return StringUtils.EMPTY;
@@ -136,51 +157,27 @@ public class SkuPrioritySelector {
             return StringUtils.EMPTY;
         }
         //20260422+ 供应链优先-即物料优先
-        List<ProductionSkuPriorityVo> finalSelectedList = getFinalSelectedList(selectedSkuPriorityList);
+        List<ProductionSkuPriorityVo> finalSelectedList = DayProductionControlHandler.getFinalSelectedList(selectedSkuPriorityList);
         if (CollectionUtils.isEmpty(finalSelectedList)) {
             return StringUtils.EMPTY;
         }
         if (finalSelectedList.size() == BigDecimal.ONE.intValue()) {
             return finalSelectedList.get(BigDecimal.ZERO.intValue()).getMaterialDesc();
         }
+        //20260627+ 共用模具、共用胎胚优先
+        List<ProductionSkuPriorityVo> shareSelectedList = DayProductionControlHandler.getShareMoldOrShareEmbryo(productionContext, finalSelectedList, cxMachineInfo.getDayProductionLimitInfo(), startDay, endDay);
+        if (shareSelectedList.size() == BigDecimal.ONE.intValue()) {
+            return shareSelectedList.get(BigDecimal.ZERO.intValue()).getMaterialDesc();
+        }
         //可覆盖--挑选可排产量多的
-        List<ProductionSkuPriorityVo> coveredList = finalSelectedList.stream().filter(single -> single.isCovered()).collect(Collectors.toList());
+        List<ProductionSkuPriorityVo> coveredList = shareSelectedList.stream().filter(single -> single.isCovered()).collect(Collectors.toList());
         if (!CollectionUtils.isEmpty(coveredList)) {
             coveredList.sort(Comparator.comparing(ProductionSkuPriorityVo::getNeedDays, Comparator.reverseOrder()));
             return coveredList.get(BigDecimal.ZERO.intValue()).getMaterialDesc();
         }
         //不可覆盖，挑选剩余量最少的
-        finalSelectedList.sort(Comparator.comparing(ProductionSkuPriorityVo::getDiffValueByNoCovered));
-        return finalSelectedList.get(BigDecimal.ZERO.intValue()).getMaterialDesc();
-    }
-
-    /**
-     * 主方法：选择最高优先级的SKU
-     *
-     * @param skuPlanMap SKU到需求计划列表的映射
-     * @return 最高优先级的SKU，如果没有则返回Optional.empty()
-     */
-    public static Optional<String> selectHighestPrioritySku(
-            Map<String, List<MonthPlanProductionRequirePlanVo>> skuPlanMap, TbrProductionContext productionContext, Integer startDay, Integer endDay) {
-        if (CollectionUtils.isEmpty(skuPlanMap)) {
-            return Optional.empty();
-        }
-        // 1. 转换数据为SKU信息对象
-        List<SkuPriorityInfo> allSkuInfos = convertToSkuPriorityInfo(skuPlanMap, productionContext, startDay, endDay);
-        if (allSkuInfos.isEmpty()) {
-            return Optional.empty();
-        }
-        // 2. 执行嵌套优先级筛选
-        List<SkuPriorityInfo> filteredSkuInfos = applyNestedPriorityFilters(allSkuInfos);
-        // 3. 如果还有多个SKU，按照净需求降序排序取第一个
-        if (!CollectionUtils.isEmpty(filteredSkuInfos) && filteredSkuInfos.size() > 1) {
-            filteredSkuInfos.sort((a, b) ->
-                    Integer.compare(b.getTotalNetRequirement(), a.getTotalNetRequirement()));
-        }
-        // 4. 返回结果
-        return CollectionUtils.isEmpty(filteredSkuInfos) ?
-                Optional.empty() :
-                Optional.of(filteredSkuInfos.get(0).getSku());
+        shareSelectedList.sort(Comparator.comparing(ProductionSkuPriorityVo::getDiffValueByNoCovered));
+        return shareSelectedList.get(BigDecimal.ZERO.intValue()).getMaterialDesc();
     }
 
     /**
@@ -233,7 +230,11 @@ public class SkuPrioritySelector {
      * @param endDay            结束排产日
      * @return
      */
-    private static SkuPriorityInfo buildSkuPriorityInfo(TbrProductionContext productionContext, String skuMaterialDesc, List<MonthPlanProductionRequirePlanVo> planList, Integer startDay, Integer endDay) {
+    private static SkuPriorityInfo buildSkuPriorityInfo(TbrProductionContext productionContext,
+                                                        String skuMaterialDesc,
+                                                        List<MonthPlanProductionRequirePlanVo> planList,
+                                                        Integer startDay,
+                                                        Integer endDay) {
         if (CollectionUtils.isEmpty(planList)) {
             return null;
         }
@@ -263,7 +264,15 @@ public class SkuPrioritySelector {
      * @return
      * @
      */
-    private static List<ProductionSkuPriorityVo> getEffectiveHighestPriorityCount(Context context, ProductionPlanGroupInfo groupPlanInfo, FormalRoundEnum formalRound, ContinueTypeEnum continueType, List<SkuPriorityInfo> skuPriorityList, Integer maxCount, List<MonthPlanProductionRequirePlanVo> allSkuList, EarliestConclusionLhGroupHelper lhGroup, EarliestConclusionLhGroupHelper allLhMachineLhGroup) {
+    private static List<ProductionSkuPriorityVo> getEffectiveHighestPriorityCount(Context context,
+                                                                                  ProductionPlanGroupInfo groupPlanInfo,
+                                                                                  FormalRoundEnum formalRound,
+                                                                                  ContinueTypeEnum continueType,
+                                                                                  List<SkuPriorityInfo> skuPriorityList,
+                                                                                  Integer maxCount,
+                                                                                  List<MonthPlanProductionRequirePlanVo> allSkuList,
+                                                                                  EarliestConclusionLhGroupHelper lhGroup,
+                                                                                  EarliestConclusionLhGroupHelper allLhMachineLhGroup) {
         if (CollectionUtils.isEmpty(skuPriorityList) || null == maxCount || maxCount < BigDecimal.ZERO.intValue()) {
             return Collections.emptyList();
         }
@@ -329,7 +338,14 @@ public class SkuPrioritySelector {
      * @return
      * @
      */
-    private static List<ProductionSkuPriorityVo> getEffectiveHighestPriorityCount(Context context, CxMachineBaseInfoVo cxMachineInfo, List<SkuPriorityInfo> skuPriorityList, Integer maxCount, List<MonthPlanProductionRequirePlanVo> allSkuList, CxLhProductionHelper cxLhGroup, Integer startDay, Integer endDay) {
+    private static List<ProductionSkuPriorityVo> getEffectiveHighestPriorityCount(Context context,
+                                                                                  CxMachineBaseInfoVo cxMachineInfo,
+                                                                                  List<SkuPriorityInfo> skuPriorityList,
+                                                                                  Integer maxCount,
+                                                                                  List<MonthPlanProductionRequirePlanVo> allSkuList,
+                                                                                  CxLhProductionHelper cxLhGroup,
+                                                                                  Integer startDay,
+                                                                                  Integer endDay) {
         if (CollectionUtils.isEmpty(skuPriorityList) || null == maxCount || maxCount < BigDecimal.ZERO.intValue()) {
             return Collections.emptyList();
         }
@@ -441,7 +457,15 @@ public class SkuPrioritySelector {
      * @param endDay         排产结束日
      * @return
      */
-    private static ProductionSkuPriorityVo buildProductionSkuPriorityInfo(Context context, SkuPriorityInfo singlePriority, ProductionPlanGroupInfo groupPlanInfo, ContinueTypeEnum continueType, List<MonthPlanProductionRequirePlanVo> allSkuList, EarliestConclusionLhGroupHelper lhGroup, Integer maxLhDays, Integer startDay, Integer endDay) {
+    private static ProductionSkuPriorityVo buildProductionSkuPriorityInfo(Context context,
+                                                                          SkuPriorityInfo singlePriority,
+                                                                          ProductionPlanGroupInfo groupPlanInfo,
+                                                                          ContinueTypeEnum continueType,
+                                                                          List<MonthPlanProductionRequirePlanVo> allSkuList,
+                                                                          EarliestConclusionLhGroupHelper lhGroup,
+                                                                          Integer maxLhDays,
+                                                                          Integer startDay,
+                                                                          Integer endDay) {
         String materialDesc = singlePriority.getSku();
         //选择模具
         List<ProductionMouldInfoVo> doubleMouldList = SkuMouldSelector.selectedDoubleMouldByRange(context, materialDesc, startDay, endDay);
@@ -461,7 +485,7 @@ public class SkuPrioritySelector {
         if (CollectionUtils.isEmpty(productionDaySet)) {
             return null;
         }
-        return new ProductionSkuPriorityVo(materialDesc, productionDaySet, maxLhDays, productionDaySet.size(), needProductionInfo.getMaxNeedDays(), singlePriority.isHasSupplyChainPriority());
+        return new ProductionSkuPriorityVo(materialDesc, needProductionInfo.getSumNeedProductionQty(), productionDaySet, maxLhDays, productionDaySet.size(), needProductionInfo.getMaxNeedDays(), singlePriority.isHasSupplyChainPriority());
     }
 
     /**
@@ -480,7 +504,14 @@ public class SkuPrioritySelector {
      * @param endDay         排产结束日
      * @return
      */
-    private static ProductionSkuPriorityVo buildProductionSkuPriorityInfo(Context context, SkuPriorityInfo singlePriority, CxMachineBaseInfoVo cxMachineInfo, List<MonthPlanProductionRequirePlanVo> allSkuList, CxLhProductionHelper cxLhGroup, Integer maxLhDays, Integer startDay, Integer endDay) {
+    private static ProductionSkuPriorityVo buildProductionSkuPriorityInfo(Context context,
+                                                                          SkuPriorityInfo singlePriority,
+                                                                          CxMachineBaseInfoVo cxMachineInfo,
+                                                                          List<MonthPlanProductionRequirePlanVo> allSkuList,
+                                                                          CxLhProductionHelper cxLhGroup,
+                                                                          Integer maxLhDays,
+                                                                          Integer startDay,
+                                                                          Integer endDay) {
         String materialDesc = singlePriority.getSku();
         //选择模具
         List<ProductionMouldInfoVo> doubleMouldList = SkuMouldSelector.selectedDoubleMouldByRange(context, materialDesc, startDay, endDay);
@@ -500,27 +531,7 @@ public class SkuPrioritySelector {
         if (CollectionUtils.isEmpty(productionDaySet)) {
             return null;
         }
-        return new ProductionSkuPriorityVo(materialDesc, productionDaySet, maxLhDays, productionDaySet.size(), needProductionInfo.getMaxNeedDays(), singlePriority.isHasSupplyChainPriority());
-    }
-
-    /**
-     * 20260422+
-     * 获取最终可挑选的级别
-     * 单独将供应链优先最先
-     *
-     * @param selectedTopList 符合条件的Top3列表
-     * @return
-     */
-    private static List<ProductionSkuPriorityVo> getFinalSelectedList(List<ProductionSkuPriorityVo> selectedTopList) {
-        if (CollectionUtils.isEmpty(selectedTopList)) {
-            return Collections.emptyList();
-        }
-        //20260422+ 供应链优先-即物料优先
-        List<ProductionSkuPriorityVo> hasSupplyChainPriorityList = selectedTopList.stream().filter(singleSelected -> singleSelected.isHasSupplyChainPriority()).collect(Collectors.toList());
-        if (CollectionUtils.isEmpty(hasSupplyChainPriorityList)) {
-            return selectedTopList;
-        }
-        return hasSupplyChainPriorityList;
+        return new ProductionSkuPriorityVo(materialDesc, needProductionInfo.getSumNeedProductionQty(), productionDaySet, maxLhDays, productionDaySet.size(), needProductionInfo.getMaxNeedDays(), singlePriority.isHasSupplyChainPriority());
     }
 
     /**
@@ -678,27 +689,19 @@ public class SkuPrioritySelector {
     }
 
     /**
-     * 转换为SKU优先级信息对象
-     */
-    private static List<SkuPriorityInfo> convertToSkuPriorityInfo(
-            Map<String, List<MonthPlanProductionRequirePlanVo>> skuPlanMap, TbrProductionContext productionContext, Integer startDay, Integer endDay) {
-
-        return skuPlanMap.entrySet().stream()
-                .map(entry -> {
-                    String sku = entry.getKey();
-                    List<MonthPlanProductionRequirePlanVo> plans = entry.getValue();
-
-                    return createSkuPriorityInfo(sku, plans, productionContext, startDay, endDay);
-                })
-                .filter(Objects::nonNull)
-                .collect(Collectors.toList());
-    }
-
-    /**
      * 创建SKU优先级信息
+     *
+     * @param sku               排产Sku
+     * @param plans             排产Sku的排产计划
+     * @param productionContext 排产上下文
+     * @param startDay          开始排产日
+     * @param endDay            排产结束日
      */
-    private static SkuPriorityInfo createSkuPriorityInfo(
-            String sku, List<MonthPlanProductionRequirePlanVo> plans, TbrProductionContext productionContext, Integer startDay, Integer endDay) {
+    private static SkuPriorityInfo createSkuPriorityInfo(String sku,
+                                                         List<MonthPlanProductionRequirePlanVo> plans,
+                                                         TbrProductionContext productionContext,
+                                                         Integer startDay,
+                                                         Integer endDay) {
         if (CollectionUtils.isEmpty(plans)) {
             return null;
         }
@@ -707,7 +710,6 @@ public class SkuPrioritySelector {
 
         // 计算聚合指标
         calculateAggregateMetrics(info, plans, productionContext, startDay, endDay);
-
         return info;
     }
 
@@ -781,41 +783,27 @@ public class SkuPrioritySelector {
         info.setPlans(new ArrayList<>(plans));
     }
 
-    private static boolean hasMoldCapacityLimitBySku(SkuPriorityInfo singlePriority, List<MonthPlanProductionRequirePlanVo> plans, TbrProductionContext productionContext, Integer startDay, Integer endDay) {
-        //模具受限是指：两幅共用模具下，按照模具数整月在机计算模具产能，与所有用此模具SKU的净需求总和（取数当日）进行对比，如果净需求大于模具产能，则认为模具受限）
+    /**
+     * 是否模具产能受限
+     * 模具受限是指：两幅共用模具下，按照模具数整月在机计算模具产能，与所有用此模具SKU的净需求总和（取数当日）进行对比，如果净需求大于模具产能，则认为模具受限）
+     *
+     * @param singlePriority
+     * @param plans
+     * @param productionContext
+     * @param startDay
+     * @param endDay
+     * @return
+     */
+    private static boolean hasMoldCapacityLimitBySku(SkuPriorityInfo singlePriority,
+                                                     List<MonthPlanProductionRequirePlanVo> plans,
+                                                     TbrProductionContext productionContext,
+                                                     Integer startDay,
+                                                     Integer endDay) {
         // 2. 模具产能受限情况 是否共用模具受限？--最后两副
         Set<String> limitShareMouldSet = productionContext.getLimitShareMouldOtherSku(singlePriority.getSku(), startDay, endDay);
         if (CollectionUtils.isEmpty(limitShareMouldSet)) {
             return false;
         }
-        /*String materialDesc = singlePriority.getSku();
-        //选择模具
-        List<ProductionMouldInfoVo> doubleMouldList = SkuMouldSelector.selectedDoubleMouldByRange(productionContext, materialDesc, startDay, endDay);
-        if(CollectionUtils.isEmpty(doubleMouldList)) {
-            return false;
-        }
-        List<ProductionMouldInfoVo> enableMouldList = new ArrayList<>();
-        Set<Integer> hasLeftOverDaySet = new HashSet<>();
-        doubleMouldList.forEach(mouldInfo -> {
-            if (!mouldInfo.hasCapacity()) {
-                return;
-            }
-            Set<Integer> finishDaySet = mouldInfo.getFinishDaySet();
-            mouldInfo.getProductionDaySet().forEach(productionDay -> {
-                if (!CollectionUtils.isEmpty(finishDaySet) && finishDaySet.contains(productionDay)) {
-                    return;
-                }
-                hasLeftOverDaySet.add(productionDay);
-            });
-            enableMouldList.add(mouldInfo);
-        });
-        if (CollectionUtils.isEmpty(enableMouldList) || CollectionUtils.isEmpty(hasLeftOverDaySet)) {
-            return false;
-        }*/
-       /* if (enableMouldList.size() < ProductionConstant.DOUBLE_MOULD_PRODUCTION) {
-            return false;
-        }*/
-
         // 共用模且只有两副，检查主花纹下所有SKU需求量
         String mainPattern = plans.get(0).getMainPattern();
         if (StringUtils.isBlank(mainPattern)) {
@@ -911,7 +899,11 @@ public class SkuPrioritySelector {
      * @param isSameProductionRange 是否相同排产时间范围
      * @return
      */
-    private static boolean isSkipActualMinLhMachine(Context context, ProductionPlanGroupInfo groupPlanInfo, ProductionSkuPriorityVo priority, FormalRoundEnum formalRound, boolean isSameProductionRange) {
+    private static boolean isSkipActualMinLhMachine(Context context,
+                                                    ProductionPlanGroupInfo groupPlanInfo,
+                                                    ProductionSkuPriorityVo priority,
+                                                    FormalRoundEnum formalRound,
+                                                    boolean isSameProductionRange) {
         if (FormalRoundEnum.ACTUAL_MIN_LH_MACHINE != formalRound) {
             return false;
         }

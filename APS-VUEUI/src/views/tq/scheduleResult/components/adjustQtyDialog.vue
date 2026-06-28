@@ -25,7 +25,7 @@
 
           <el-col :span="12">
             <el-form-item
-              :label="$t('ui.data.column.tqNewScheduleResult.scheduleDate')"
+              :label="$t('ui.data.column.tqScheduleResult.scheduleDate')"
               prop="scheduleDate"
             >
               <el-input v-model="form.scheduleDate" disabled></el-input>
@@ -34,7 +34,7 @@
 
           <el-col :span="12">
             <el-form-item
-              :label="$t('ui.data.column.tqNewScheduleResult.beadCode')"
+              :label="$t('ui.data.column.tqScheduleResult.beadCode')"
               prop="beadCode"
             >
               <el-input v-model="form.beadCode" disabled></el-input>
@@ -43,7 +43,7 @@
 
           <el-col :span="12">
             <el-form-item
-              :label="$t('ui.data.column.tqNewScheduleResult.machineCode')"
+              :label="$t('ui.data.column.tqScheduleResult.machineCode')"
               prop="machineCode"
             >
               <el-input v-model="form.machineCode" disabled></el-input>
@@ -52,7 +52,7 @@
 
           <el-col :span="12">
             <el-form-item
-              :label="$t('ui.data.column.tqNewScheduleResult.isRelease')"
+              :label="$t('ui.data.column.tqScheduleResult.isRelease')"
               prop="isRelease"
             >
               <dict-select
@@ -137,7 +137,7 @@
 
 <script>
 import moment from "moment";
-import { changeQty, validateChangeQty, listScheduleShiftDates } from "@/api/tq/tqNewScheduleResult";
+import { changeQty, validateChangeQty, listScheduleShiftDates } from "@/api/tq/scheduleResult";
 
 export default {
   inject: ["parentDict"],
@@ -163,7 +163,7 @@ export default {
   },
   computed: {
     title() {
-      return this.$t("ui.data.btn.tqNewScheduleResult.adjustQty");
+      return this.$t("ui.data.btn.tqScheduleResult.adjustQty");
     },
   },
   methods: {

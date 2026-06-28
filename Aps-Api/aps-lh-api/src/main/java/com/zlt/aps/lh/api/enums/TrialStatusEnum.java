@@ -12,9 +12,9 @@ import lombok.Getter;
 @AllArgsConstructor
 public enum TrialStatusEnum {
 
-    TRIAL("X", "试验示方"),
-    MASS_TRIAL("T", "量试示方"),
-    FORMAL("S", "正规示方");
+    TRIAL("X", "试验"),
+    MASS_TRIAL("T", "量试"),
+    FORMAL("S", "正规");
 
     /** 状态编码 */
     private final String code;

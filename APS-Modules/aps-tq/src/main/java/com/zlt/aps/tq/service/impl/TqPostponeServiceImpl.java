@@ -8,13 +8,13 @@ import com.ruoyi.common.core.utils.uuid.IdUtils;
 import com.zlt.aps.tq.api.domain.dto.TqPostponeConfirmDTO;
 import com.zlt.aps.tq.api.domain.dto.TqPostponeRequestDTO;
 import com.zlt.aps.tq.api.domain.entity.TqMachineSpecSpeed;
-import com.zlt.aps.tq.api.domain.entity.TqNewScheduleResult;
+import com.zlt.aps.tq.api.domain.entity.TqScheduleResult;
 import com.zlt.aps.tq.api.domain.entity.TqRollingLog;
 import com.zlt.aps.tq.api.domain.entity.TqRollingLogDetail;
 import com.zlt.aps.tq.api.domain.vo.TqPostponePreviewVO;
 import com.zlt.aps.tq.engine.vo.RollingUpdateResult;
 import com.zlt.aps.tq.mapper.TqMachineSpecSpeedMapper;
-import com.zlt.aps.tq.mapper.TqNewScheduleResultMapper;
+import com.zlt.aps.tq.mapper.TqScheduleResultMapper;
 import com.zlt.aps.tq.mapper.TqRollingLogDetailMapper;
 import com.zlt.aps.tq.mapper.TqRollingLogMapper;
 import com.zlt.aps.tq.service.ITqPostponeService;
@@ -48,7 +48,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class TqPostponeServiceImpl implements ITqPostponeService {
 
     @Resource
-    private TqNewScheduleResultMapper tqNewScheduleResultMapper;
+    private TqScheduleResultMapper tqScheduleResultMapper;
 
     @Resource
     private TqMachineSpecSpeedMapper tqMachineSpecSpeedMapper;
@@ -106,7 +106,7 @@ public class TqPostponeServiceImpl implements ITqPostponeService {
         preview.setTargetMachineCode(request.getMachineCode());
 
         // 查询源班次需要推迟的任务
-        List<TqNewScheduleResult> sourceTasks = querySourceTasks(request);
+        List<TqScheduleResult> sourceTasks = querySourceTasks(request);
         if (sourceTasks.isEmpty()) {
             preview.setCanPostpone(false);
             preview.setCannotReason("源班次没有可推迟的任务");
@@ -138,7 +138,7 @@ public class TqPostponeServiceImpl implements ITqPostponeService {
         double totalUsedHours = 0;
         int targetSequence = getMaxSequence(request.getMachineCode(), targetScheduleDate, targetShift) + 1;
 
-        for (TqNewScheduleResult task : sourceTasks) {
+        for (TqScheduleResult task : sourceTasks) {
             TqPostponePreviewVO.PostponeDetail detail = buildPostponeDetail(task, request, targetShift,
                     targetScheduleDate, targetSequence);
             details.add(detail);
@@ -243,31 +243,31 @@ public class TqPostponeServiceImpl implements ITqPostponeService {
      *   <li>按生产顺序排序</li>
      * </ul>
      */
-    private List<TqNewScheduleResult> querySourceTasks(TqPostponeRequestDTO request) {
-        LambdaQueryWrapper<TqNewScheduleResult> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(TqNewScheduleResult::getScheduleDate, request.getScheduleDate())
-               .eq(TqNewScheduleResult::getMachineCode, request.getMachineCode());
+    private List<TqScheduleResult> querySourceTasks(TqPostponeRequestDTO request) {
+        LambdaQueryWrapper<TqScheduleResult> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(TqScheduleResult::getScheduleDate, request.getScheduleDate())
+               .eq(TqScheduleResult::getMachineCode, request.getMachineCode());
 
         // 按班次过滤任务状态（排除已取消）
         int sourceShiftIndex = request.getSourceShiftIndex();
         switch (sourceShiftIndex) {
             case 1:
-                wrapper.ne(TqNewScheduleResult::getClass1TaskStatus, TASK_STATUS_CANCELLED);
+                wrapper.ne(TqScheduleResult::getClass1TaskStatus, TASK_STATUS_CANCELLED);
                 break;
             case 2:
-                wrapper.ne(TqNewScheduleResult::getClass2TaskStatus, TASK_STATUS_CANCELLED);
+                wrapper.ne(TqScheduleResult::getClass2TaskStatus, TASK_STATUS_CANCELLED);
                 break;
             case 3:
-                wrapper.ne(TqNewScheduleResult::getClass3TaskStatus, TASK_STATUS_CANCELLED);
+                wrapper.ne(TqScheduleResult::getClass3TaskStatus, TASK_STATUS_CANCELLED);
                 break;
             case 4:
-                wrapper.ne(TqNewScheduleResult::getClass4TaskStatus, TASK_STATUS_CANCELLED);
+                wrapper.ne(TqScheduleResult::getClass4TaskStatus, TASK_STATUS_CANCELLED);
                 break;
             case 5:
-                wrapper.ne(TqNewScheduleResult::getClass5TaskStatus, TASK_STATUS_CANCELLED);
+                wrapper.ne(TqScheduleResult::getClass5TaskStatus, TASK_STATUS_CANCELLED);
                 break;
             case 6:
-                wrapper.ne(TqNewScheduleResult::getClass6TaskStatus, TASK_STATUS_CANCELLED);
+                wrapper.ne(TqScheduleResult::getClass6TaskStatus, TASK_STATUS_CANCELLED);
                 break;
             default:
                 break;
@@ -275,45 +275,45 @@ public class TqPostponeServiceImpl implements ITqPostponeService {
 
         // 指定胎圈代码
         if (StringUtils.isNotBlank(request.getBeadCode())) {
-            wrapper.eq(TqNewScheduleResult::getBeadCode, request.getBeadCode());
+            wrapper.eq(TqScheduleResult::getBeadCode, request.getBeadCode());
         }
 
         // 指定排程记录ID
         if (request.getScheduleId() != null) {
-            wrapper.eq(TqNewScheduleResult::getId, request.getScheduleId());
+            wrapper.eq(TqScheduleResult::getId, request.getScheduleId());
         }
 
         // 按生产顺序排序
         switch (sourceShiftIndex) {
             case 1:
-                wrapper.orderByAsc(TqNewScheduleResult::getClass1Sequence);
+                wrapper.orderByAsc(TqScheduleResult::getClass1Sequence);
                 break;
             case 2:
-                wrapper.orderByAsc(TqNewScheduleResult::getClass2Sequence);
+                wrapper.orderByAsc(TqScheduleResult::getClass2Sequence);
                 break;
             case 3:
-                wrapper.orderByAsc(TqNewScheduleResult::getClass3Sequence);
+                wrapper.orderByAsc(TqScheduleResult::getClass3Sequence);
                 break;
             case 4:
-                wrapper.orderByAsc(TqNewScheduleResult::getClass4Sequence);
+                wrapper.orderByAsc(TqScheduleResult::getClass4Sequence);
                 break;
             case 5:
-                wrapper.orderByAsc(TqNewScheduleResult::getClass5Sequence);
+                wrapper.orderByAsc(TqScheduleResult::getClass5Sequence);
                 break;
             case 6:
-                wrapper.orderByAsc(TqNewScheduleResult::getClass6Sequence);
+                wrapper.orderByAsc(TqScheduleResult::getClass6Sequence);
                 break;
             default:
                 break;
         }
 
-        return tqNewScheduleResultMapper.selectList(wrapper);
+        return tqScheduleResultMapper.selectList(wrapper);
     }
 
     /**
      * 构建推迟明细
      */
-    private TqPostponePreviewVO.PostponeDetail buildPostponeDetail(TqNewScheduleResult task,
+    private TqPostponePreviewVO.PostponeDetail buildPostponeDetail(TqScheduleResult task,
                                                                     TqPostponeRequestDTO request,
                                                                     int targetShift,
                                                                     Date targetScheduleDate,
@@ -369,7 +369,7 @@ public class TqPostponeServiceImpl implements ITqPostponeService {
                                        Long logId,
                                        List<TqRollingLogDetail> logDetails) {
         Long scheduleId = detail.getScheduleId();
-        TqNewScheduleResult original = tqNewScheduleResultMapper.selectById(scheduleId);
+        TqScheduleResult original = tqScheduleResultMapper.selectById(scheduleId);
         if (original == null) {
             log.warn("推迟执行：排程记录不存在，scheduleId={}", scheduleId);
             return 0;
@@ -383,11 +383,11 @@ public class TqPostponeServiceImpl implements ITqPostponeService {
             // 1. 更新源班次：计划量=完成量，状态=部分完成推迟
             int sourceShift = detail.getSourceShiftIndex();
             Integer finishQty = getFinishQtyByShiftIndex(original, sourceShift);
-            LambdaUpdateWrapper<TqNewScheduleResult> sourceWrapper = new LambdaUpdateWrapper<>();
-            sourceWrapper.eq(TqNewScheduleResult::getId, scheduleId);
+            LambdaUpdateWrapper<TqScheduleResult> sourceWrapper = new LambdaUpdateWrapper<>();
+            sourceWrapper.eq(TqScheduleResult::getId, scheduleId);
             setPlanQtyByShiftIndex(sourceWrapper, sourceShift, finishQty);
             setTaskStatusByShiftIndex(sourceWrapper, sourceShift, TASK_STATUS_PARTIAL_POSTPONED);
-            int rows = tqNewScheduleResultMapper.update(null, sourceWrapper);
+            int rows = tqScheduleResultMapper.update(null, sourceWrapper);
             affectedCount += rows;
 
             // 记录源班次变更明细
@@ -401,8 +401,8 @@ public class TqPostponeServiceImpl implements ITqPostponeService {
             }
 
             // 2. 新增一条记录到目标班次（复制源记录，修改班次字段）
-            TqNewScheduleResult newRecord = copyForTargetShift(original, detail, preview);
-            tqNewScheduleResultMapper.insert(newRecord);
+            TqScheduleResult newRecord = copyForTargetShift(original, detail, preview);
+            tqScheduleResultMapper.insert(newRecord);
             affectedCount++;
 
             // 记录目标班次新增明细
@@ -418,8 +418,8 @@ public class TqPostponeServiceImpl implements ITqPostponeService {
             int sourceShift = detail.getSourceShiftIndex();
             int targetShift = detail.getTargetShiftIndex();
 
-            LambdaUpdateWrapper<TqNewScheduleResult> wrapper = new LambdaUpdateWrapper<>();
-            wrapper.eq(TqNewScheduleResult::getId, scheduleId);
+            LambdaUpdateWrapper<TqScheduleResult> wrapper = new LambdaUpdateWrapper<>();
+            wrapper.eq(TqScheduleResult::getId, scheduleId);
 
             // 源班次：状态改为已推迟
             setTaskStatusByShiftIndex(wrapper, sourceShift, TASK_STATUS_POSTPONED);
@@ -431,7 +431,7 @@ public class TqPostponeServiceImpl implements ITqPostponeService {
             setSequenceByShiftIndex(wrapper, targetShift, detail.getTargetSequence());
             setTaskStatusByShiftIndex(wrapper, targetShift, TASK_STATUS_NORMAL);
 
-            int rows = tqNewScheduleResultMapper.update(null, wrapper);
+            int rows = tqScheduleResultMapper.update(null, wrapper);
             affectedCount += rows;
 
             // 记录变更明细
@@ -464,10 +464,10 @@ public class TqPostponeServiceImpl implements ITqPostponeService {
     /**
      * 复制源记录用于目标班次（部分推迟时新增记录）
      */
-    private TqNewScheduleResult copyForTargetShift(TqNewScheduleResult source,
+    private TqScheduleResult copyForTargetShift(TqScheduleResult source,
                                                     TqPostponePreviewVO.PostponeDetail detail,
                                                     TqPostponePreviewVO preview) {
-        TqNewScheduleResult target = new TqNewScheduleResult();
+        TqScheduleResult target = new TqScheduleResult();
         // 复制基本字段
         target.setScheduleDate(preview.getTargetScheduleDate());
         target.setOrderNo(source.getOrderNo());
@@ -501,13 +501,13 @@ public class TqPostponeServiceImpl implements ITqPostponeService {
      */
     private double calculateTargetRemainHours(String machineCode, Date scheduleDate, int targetShift) {
         // 查询目标班次现有任务
-        LambdaQueryWrapper<TqNewScheduleResult> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(TqNewScheduleResult::getScheduleDate, scheduleDate)
-               .eq(TqNewScheduleResult::getMachineCode, machineCode);
+        LambdaQueryWrapper<TqScheduleResult> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(TqScheduleResult::getScheduleDate, scheduleDate)
+               .eq(TqScheduleResult::getMachineCode, machineCode);
 
-        List<TqNewScheduleResult> tasks = tqNewScheduleResultMapper.selectList(wrapper);
+        List<TqScheduleResult> tasks = tqScheduleResultMapper.selectList(wrapper);
         double usedHours = 0;
-        for (TqNewScheduleResult task : tasks) {
+        for (TqScheduleResult task : tasks) {
             usedHours += calculateTaskHours(task, targetShift);
         }
 
@@ -520,7 +520,7 @@ public class TqPostponeServiceImpl implements ITqPostponeService {
     /**
      * 计算任务在指定班次的占用时长（小时）
      */
-    private double calculateTaskHours(TqNewScheduleResult task, int shiftIndex) {
+    private double calculateTaskHours(TqScheduleResult task, int shiftIndex) {
         Integer planQty = getPlanQtyByShiftIndex(task, shiftIndex);
         String taskStatus = getTaskStatusByShiftIndex(task, shiftIndex);
         if (planQty == null || planQty <= 0 || TASK_STATUS_CANCELLED.equals(taskStatus)) {
@@ -569,7 +569,7 @@ public class TqPostponeServiceImpl implements ITqPostponeService {
     /**
      * 获取班次开始时间（从同机台同班次的其他任务获取）
      */
-    private Date getShiftStartTime(TqNewScheduleResult task, int shiftIndex) {
+    private Date getShiftStartTime(TqScheduleResult task, int shiftIndex) {
         Date startTime = getStartTimeByShiftIndex(task, shiftIndex);
         if (startTime != null) {
             return startTime;
@@ -582,13 +582,13 @@ public class TqPostponeServiceImpl implements ITqPostponeService {
      * 获取指定机台、班次的最大生产顺序
      */
     private int getMaxSequence(String machineCode, Date scheduleDate, int shiftIndex) {
-        LambdaQueryWrapper<TqNewScheduleResult> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(TqNewScheduleResult::getScheduleDate, scheduleDate)
-               .eq(TqNewScheduleResult::getMachineCode, machineCode);
-        List<TqNewScheduleResult> tasks = tqNewScheduleResultMapper.selectList(wrapper);
+        LambdaQueryWrapper<TqScheduleResult> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(TqScheduleResult::getScheduleDate, scheduleDate)
+               .eq(TqScheduleResult::getMachineCode, machineCode);
+        List<TqScheduleResult> tasks = tqScheduleResultMapper.selectList(wrapper);
 
         int maxSeq = 0;
-        for (TqNewScheduleResult task : tasks) {
+        for (TqScheduleResult task : tasks) {
             Integer seq = getSequenceByShiftIndex(task, shiftIndex);
             if (seq != null && seq > maxSeq) {
                 maxSeq = seq;
@@ -609,7 +609,7 @@ public class TqPostponeServiceImpl implements ITqPostponeService {
 
     // ==================== 辅助方法：按班次取值 ====================
 
-    private Integer getPlanQtyByShiftIndex(TqNewScheduleResult entity, int shiftIndex) {
+    private Integer getPlanQtyByShiftIndex(TqScheduleResult entity, int shiftIndex) {
         switch (shiftIndex) {
             case 1: return entity.getClass1PlanQty();
             case 2: return entity.getClass2PlanQty();
@@ -621,7 +621,7 @@ public class TqPostponeServiceImpl implements ITqPostponeService {
         }
     }
 
-    private Integer getFinishQtyByShiftIndex(TqNewScheduleResult entity, int shiftIndex) {
+    private Integer getFinishQtyByShiftIndex(TqScheduleResult entity, int shiftIndex) {
         switch (shiftIndex) {
             case 1: return entity.getClass1FinishQty();
             case 2: return entity.getClass2FinishQty();
@@ -633,7 +633,7 @@ public class TqPostponeServiceImpl implements ITqPostponeService {
         }
     }
 
-    private Integer getSequenceByShiftIndex(TqNewScheduleResult entity, int shiftIndex) {
+    private Integer getSequenceByShiftIndex(TqScheduleResult entity, int shiftIndex) {
         switch (shiftIndex) {
             case 1: return entity.getClass1Sequence();
             case 2: return entity.getClass2Sequence();
@@ -645,7 +645,7 @@ public class TqPostponeServiceImpl implements ITqPostponeService {
         }
     }
 
-    private Date getStartTimeByShiftIndex(TqNewScheduleResult entity, int shiftIndex) {
+    private Date getStartTimeByShiftIndex(TqScheduleResult entity, int shiftIndex) {
         switch (shiftIndex) {
             case 1: return entity.getClass1StartTime();
             case 2: return entity.getClass2StartTime();
@@ -657,7 +657,7 @@ public class TqPostponeServiceImpl implements ITqPostponeService {
         }
     }
 
-    private Date getEndTimeByShiftIndex(TqNewScheduleResult entity, int shiftIndex) {
+    private Date getEndTimeByShiftIndex(TqScheduleResult entity, int shiftIndex) {
         switch (shiftIndex) {
             case 1: return entity.getClass1EndTime();
             case 2: return entity.getClass2EndTime();
@@ -669,7 +669,7 @@ public class TqPostponeServiceImpl implements ITqPostponeService {
         }
     }
 
-    private String getTaskStatusByShiftIndex(TqNewScheduleResult entity, int shiftIndex) {
+    private String getTaskStatusByShiftIndex(TqScheduleResult entity, int shiftIndex) {
         switch (shiftIndex) {
             case 1: return entity.getClass1TaskStatus();
             case 2: return entity.getClass2TaskStatus();
@@ -683,69 +683,69 @@ public class TqPostponeServiceImpl implements ITqPostponeService {
 
     // ==================== 辅助方法：按班次设值到UpdateWrapper ====================
 
-    private void setPlanQtyByShiftIndex(LambdaUpdateWrapper<TqNewScheduleResult> wrapper, int shiftIndex, Integer qty) {
+    private void setPlanQtyByShiftIndex(LambdaUpdateWrapper<TqScheduleResult> wrapper, int shiftIndex, Integer qty) {
         switch (shiftIndex) {
-            case 1: wrapper.set(TqNewScheduleResult::getClass1PlanQty, qty); break;
-            case 2: wrapper.set(TqNewScheduleResult::getClass2PlanQty, qty); break;
-            case 3: wrapper.set(TqNewScheduleResult::getClass3PlanQty, qty); break;
-            case 4: wrapper.set(TqNewScheduleResult::getClass4PlanQty, qty); break;
-            case 5: wrapper.set(TqNewScheduleResult::getClass5PlanQty, qty); break;
-            case 6: wrapper.set(TqNewScheduleResult::getClass6PlanQty, qty); break;
+            case 1: wrapper.set(TqScheduleResult::getClass1PlanQty, qty); break;
+            case 2: wrapper.set(TqScheduleResult::getClass2PlanQty, qty); break;
+            case 3: wrapper.set(TqScheduleResult::getClass3PlanQty, qty); break;
+            case 4: wrapper.set(TqScheduleResult::getClass4PlanQty, qty); break;
+            case 5: wrapper.set(TqScheduleResult::getClass5PlanQty, qty); break;
+            case 6: wrapper.set(TqScheduleResult::getClass6PlanQty, qty); break;
             default: throw new IllegalArgumentException("无效的班次索引：" + shiftIndex);
         }
     }
 
-    private void setStartTimeByShiftIndex(LambdaUpdateWrapper<TqNewScheduleResult> wrapper, int shiftIndex, Date time) {
+    private void setStartTimeByShiftIndex(LambdaUpdateWrapper<TqScheduleResult> wrapper, int shiftIndex, Date time) {
         switch (shiftIndex) {
-            case 1: wrapper.set(TqNewScheduleResult::getClass1StartTime, time); break;
-            case 2: wrapper.set(TqNewScheduleResult::getClass2StartTime, time); break;
-            case 3: wrapper.set(TqNewScheduleResult::getClass3StartTime, time); break;
-            case 4: wrapper.set(TqNewScheduleResult::getClass4StartTime, time); break;
-            case 5: wrapper.set(TqNewScheduleResult::getClass5StartTime, time); break;
-            case 6: wrapper.set(TqNewScheduleResult::getClass6StartTime, time); break;
+            case 1: wrapper.set(TqScheduleResult::getClass1StartTime, time); break;
+            case 2: wrapper.set(TqScheduleResult::getClass2StartTime, time); break;
+            case 3: wrapper.set(TqScheduleResult::getClass3StartTime, time); break;
+            case 4: wrapper.set(TqScheduleResult::getClass4StartTime, time); break;
+            case 5: wrapper.set(TqScheduleResult::getClass5StartTime, time); break;
+            case 6: wrapper.set(TqScheduleResult::getClass6StartTime, time); break;
             default: throw new IllegalArgumentException("无效的班次索引：" + shiftIndex);
         }
     }
 
-    private void setEndTimeByShiftIndex(LambdaUpdateWrapper<TqNewScheduleResult> wrapper, int shiftIndex, Date time) {
+    private void setEndTimeByShiftIndex(LambdaUpdateWrapper<TqScheduleResult> wrapper, int shiftIndex, Date time) {
         switch (shiftIndex) {
-            case 1: wrapper.set(TqNewScheduleResult::getClass1EndTime, time); break;
-            case 2: wrapper.set(TqNewScheduleResult::getClass2EndTime, time); break;
-            case 3: wrapper.set(TqNewScheduleResult::getClass3EndTime, time); break;
-            case 4: wrapper.set(TqNewScheduleResult::getClass4EndTime, time); break;
-            case 5: wrapper.set(TqNewScheduleResult::getClass5EndTime, time); break;
-            case 6: wrapper.set(TqNewScheduleResult::getClass6EndTime, time); break;
+            case 1: wrapper.set(TqScheduleResult::getClass1EndTime, time); break;
+            case 2: wrapper.set(TqScheduleResult::getClass2EndTime, time); break;
+            case 3: wrapper.set(TqScheduleResult::getClass3EndTime, time); break;
+            case 4: wrapper.set(TqScheduleResult::getClass4EndTime, time); break;
+            case 5: wrapper.set(TqScheduleResult::getClass5EndTime, time); break;
+            case 6: wrapper.set(TqScheduleResult::getClass6EndTime, time); break;
             default: throw new IllegalArgumentException("无效的班次索引：" + shiftIndex);
         }
     }
 
-    private void setSequenceByShiftIndex(LambdaUpdateWrapper<TqNewScheduleResult> wrapper, int shiftIndex, Integer seq) {
+    private void setSequenceByShiftIndex(LambdaUpdateWrapper<TqScheduleResult> wrapper, int shiftIndex, Integer seq) {
         switch (shiftIndex) {
-            case 1: wrapper.set(TqNewScheduleResult::getClass1Sequence, seq); break;
-            case 2: wrapper.set(TqNewScheduleResult::getClass2Sequence, seq); break;
-            case 3: wrapper.set(TqNewScheduleResult::getClass3Sequence, seq); break;
-            case 4: wrapper.set(TqNewScheduleResult::getClass4Sequence, seq); break;
-            case 5: wrapper.set(TqNewScheduleResult::getClass5Sequence, seq); break;
-            case 6: wrapper.set(TqNewScheduleResult::getClass6Sequence, seq); break;
+            case 1: wrapper.set(TqScheduleResult::getClass1Sequence, seq); break;
+            case 2: wrapper.set(TqScheduleResult::getClass2Sequence, seq); break;
+            case 3: wrapper.set(TqScheduleResult::getClass3Sequence, seq); break;
+            case 4: wrapper.set(TqScheduleResult::getClass4Sequence, seq); break;
+            case 5: wrapper.set(TqScheduleResult::getClass5Sequence, seq); break;
+            case 6: wrapper.set(TqScheduleResult::getClass6Sequence, seq); break;
             default: throw new IllegalArgumentException("无效的班次索引：" + shiftIndex);
         }
     }
 
-    private void setTaskStatusByShiftIndex(LambdaUpdateWrapper<TqNewScheduleResult> wrapper, int shiftIndex, String status) {
+    private void setTaskStatusByShiftIndex(LambdaUpdateWrapper<TqScheduleResult> wrapper, int shiftIndex, String status) {
         switch (shiftIndex) {
-            case 1: wrapper.set(TqNewScheduleResult::getClass1TaskStatus, status); break;
-            case 2: wrapper.set(TqNewScheduleResult::getClass2TaskStatus, status); break;
-            case 3: wrapper.set(TqNewScheduleResult::getClass3TaskStatus, status); break;
-            case 4: wrapper.set(TqNewScheduleResult::getClass4TaskStatus, status); break;
-            case 5: wrapper.set(TqNewScheduleResult::getClass5TaskStatus, status); break;
-            case 6: wrapper.set(TqNewScheduleResult::getClass6TaskStatus, status); break;
+            case 1: wrapper.set(TqScheduleResult::getClass1TaskStatus, status); break;
+            case 2: wrapper.set(TqScheduleResult::getClass2TaskStatus, status); break;
+            case 3: wrapper.set(TqScheduleResult::getClass3TaskStatus, status); break;
+            case 4: wrapper.set(TqScheduleResult::getClass4TaskStatus, status); break;
+            case 5: wrapper.set(TqScheduleResult::getClass5TaskStatus, status); break;
+            case 6: wrapper.set(TqScheduleResult::getClass6TaskStatus, status); break;
             default: throw new IllegalArgumentException("无效的班次索引：" + shiftIndex);
         }
     }
 
     // ==================== 辅助方法：按班次设值到Entity ====================
 
-    private void setPlanQtyToEntity(TqNewScheduleResult entity, int shiftIndex, Integer qty) {
+    private void setPlanQtyToEntity(TqScheduleResult entity, int shiftIndex, Integer qty) {
         switch (shiftIndex) {
             case 1: entity.setClass1PlanQty(qty); break;
             case 2: entity.setClass2PlanQty(qty); break;
@@ -757,7 +757,7 @@ public class TqPostponeServiceImpl implements ITqPostponeService {
         }
     }
 
-    private void setStartTimeToEntity(TqNewScheduleResult entity, int shiftIndex, Date time) {
+    private void setStartTimeToEntity(TqScheduleResult entity, int shiftIndex, Date time) {
         switch (shiftIndex) {
             case 1: entity.setClass1StartTime(time); break;
             case 2: entity.setClass2StartTime(time); break;
@@ -769,7 +769,7 @@ public class TqPostponeServiceImpl implements ITqPostponeService {
         }
     }
 
-    private void setEndTimeToEntity(TqNewScheduleResult entity, int shiftIndex, Date time) {
+    private void setEndTimeToEntity(TqScheduleResult entity, int shiftIndex, Date time) {
         switch (shiftIndex) {
             case 1: entity.setClass1EndTime(time); break;
             case 2: entity.setClass2EndTime(time); break;
@@ -781,7 +781,7 @@ public class TqPostponeServiceImpl implements ITqPostponeService {
         }
     }
 
-    private void setSequenceToEntity(TqNewScheduleResult entity, int shiftIndex, Integer seq) {
+    private void setSequenceToEntity(TqScheduleResult entity, int shiftIndex, Integer seq) {
         switch (shiftIndex) {
             case 1: entity.setClass1Sequence(seq); break;
             case 2: entity.setClass2Sequence(seq); break;
@@ -793,7 +793,7 @@ public class TqPostponeServiceImpl implements ITqPostponeService {
         }
     }
 
-    private void setTaskStatusToEntity(TqNewScheduleResult entity, int shiftIndex, String status) {
+    private void setTaskStatusToEntity(TqScheduleResult entity, int shiftIndex, String status) {
         switch (shiftIndex) {
             case 1: entity.setClass1TaskStatus(status); break;
             case 2: entity.setClass2TaskStatus(status); break;
@@ -854,7 +854,7 @@ public class TqPostponeServiceImpl implements ITqPostponeService {
         tqRollingLogMapper.update(null, wrapper);
     }
 
-    private TqRollingLogDetail buildLogDetail(Long logId, Long scheduleId, TqNewScheduleResult task,
+    private TqRollingLogDetail buildLogDetail(Long logId, Long scheduleId, TqScheduleResult task,
                                                String fieldName, String beforeValue, String afterValue,
                                                String changeType, String changeReason,
                                                TqPostponePreviewVO.PostponeDetail detail) {

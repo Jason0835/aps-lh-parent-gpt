@@ -24,12 +24,18 @@ import static com.alibaba.fastjson.JSON.toJSONString;
  *
  * <p>职责：</p>
  * <ol>
- *   <li>分离外协排程数据和非外协排程数据</li>
  *   <li>同步排程数据到日志表，删除历史数据</li>
  *   <li>创建自动排程记录</li>
  *   <li>合并已有排程记录（重排场景下保留已发布数据）</li>
- *   <li>批量保存排程结果</li>
+ *   <li>批量保存排程结果（统一写入主表T_TQ_SCHEDULE_RESULT）</li>
  * </ol>
+ *
+ * <p>变更说明（2026-06-27）：</p>
+ * <ul>
+ *   <li>外协规格相关逻辑已废弃（旧4班次算法遗留），6班次排程不再区分外协/非外协</li>
+ *   <li>所有排程结果统一写入 T_TQ_SCHEDULE_RESULT，不再写入 T_TQ_ASSIST_SCHEDULE</li>
+ *   <li>原外协分离逻辑已注释保留，便于追溯</li>
+ * </ul>
  *
  * @author APS
  */
@@ -53,24 +59,27 @@ public class TqResultPersistHandler extends AbsTqScheduleStepHandler {
         String scheduleDate = context.getScheduleDate();
         String batchNo = context.getBatchNo();
         String cxBatchNo = context.getCxBatchNo();
-        Map<String, String> assistSpecMap = context.getAssistSpecMap();
+        // 外协规格逻辑已废弃，assistSpecMap 不再使用
+        // Map<String, String> assistSpecMap = context.getAssistSpecMap();
         List<TqScheduleResultVo> scheduleList = context.getScheduleList();
         String factoryCode = context.getFactoryCode();
 
         // 给所有排程结果设置分厂编码
         scheduleList.forEach(r -> r.setFactoryCode(factoryCode));
 
-        // 1. 分离外协排程数据
-        List<TqScheduleResultVo> assistScheduleList = scheduleList.stream()
-                .filter(r -> assistSpecMap.containsKey(r.getBeadCode()))
-                .collect(Collectors.toList());
-        List<TqScheduleResultVo> normalScheduleList = scheduleList.stream()
-                .filter(r -> !assistSpecMap.containsKey(r.getBeadCode()))
-                .collect(Collectors.toList());
-        context.setAssistScheduleList(assistScheduleList);
-        context.setNormalScheduleList(normalScheduleList);
+        // 1. 分离外协排程数据（外协逻辑已废弃，所有数据统一作为非外协处理）
+        // List<TqScheduleResultVo> assistScheduleList = scheduleList.stream()
+        //         .filter(r -> assistSpecMap.containsKey(r.getBeadCode()))
+        //         .collect(Collectors.toList());
+        // List<TqScheduleResultVo> normalScheduleList = scheduleList.stream()
+        //         .filter(r -> !assistSpecMap.containsKey(r.getBeadCode()))
+        //         .collect(Collectors.toList());
+        // context.setAssistScheduleList(assistScheduleList);
+        // context.setNormalScheduleList(normalScheduleList);
+        // log.info("[S4] 外协排程数据:{}条, 非外协排程数据:{}条", assistScheduleList.size(), normalScheduleList.size());
 
-        log.info("[S4] 外协排程数据:{}条, 非外协排程数据:{}条", assistScheduleList.size(), normalScheduleList.size());
+        List<TqScheduleResultVo> normalScheduleList = scheduleList;
+        log.info("[S4] 排程数据:{}条（外协分离逻辑已废弃，统一写入主表）", normalScheduleList.size());
 
         // 2. 同步排程数据到日志表，删除历史数据
         syncTqScheduleToLog(scheduleDate);
@@ -78,28 +87,27 @@ public class TqResultPersistHandler extends AbsTqScheduleStepHandler {
         // 3. 创建自动排程记录
         createScheduleRecord(scheduleDate, cxBatchNo, batchNo);
 
-        // 4. 批量新增外协排程结果数据
-        if (CollectionUtils.isNotEmpty(assistScheduleList)) {
-            tqEngineMapper.batchCreateAssistScheduleResult(assistScheduleList);
-            log.info("[S4] 外协排程结果保存完成, 记录数:{}", assistScheduleList.size());
-        }
+        // 4. 批量新增外协排程结果数据（外协逻辑已废弃，不再写入 T_TQ_ASSIST_SCHEDULE）
+        // if (CollectionUtils.isNotEmpty(assistScheduleList)) {
+        //     tqEngineMapper.batchCreateAssistScheduleResult(assistScheduleList);
+        //     log.info("[S4] 外协排程结果保存完成, 记录数:{}", assistScheduleList.size());
+        // }
 
         // 5. 查询已有排程记录并合并
         List<TqScheduleResultVo> existScheduleList = tqEngineMapper.listTqEnginSchedule(scheduleDate);
         context.setExistScheduleList(existScheduleList);
         normalScheduleList = mergeExistSchedule(batchNo, normalScheduleList, existScheduleList);
 
-        // 6. 批量新增非外协排程结果数据
+        // 6. 批量新增排程结果数据（统一写入主表）
         if (CollectionUtils.isNotEmpty(normalScheduleList)) {
             tqEngineMapper.batchCreateScheduleResult(normalScheduleList);
             context.setInsertedCount(normalScheduleList.size());
-            log.info("[S4] 非外协排程结果保存完成, 记录数:{}", normalScheduleList.size());
+            log.info("[S4] 排程结果保存完成, 记录数:{}", normalScheduleList.size());
         }
 
         autoScheduleLogService.insertTqScheduleLog(batchNo, "",
                 "自动排程完成", "排程记录数:" + scheduleList.size()
-                        + ", 外协:" + assistScheduleList.size()
-                        + ", 非外协:" + normalScheduleList.size());
+                        + ", 保存记录数:" + normalScheduleList.size());
     }
 
     /**
@@ -108,7 +116,6 @@ public class TqResultPersistHandler extends AbsTqScheduleStepHandler {
     private void syncTqScheduleToLog(String scheduleDate) {
         tqEngineMapper.syncTqScheduleToLog(scheduleDate);
         tqEngineMapper.deleteTqSchedule(scheduleDate);
-        tqEngineMapper.deleteTqAssistSchedule(scheduleDate);
     }
 
     /**

@@ -100,7 +100,7 @@ export default {
           prop: "machineCode",
           type: "select",
           dictData: this.machineList,
-          labelKey: "machineName",
+          labelKey: "machineCode",
           valueKey: "machineCode",
           filterable: true,
         },

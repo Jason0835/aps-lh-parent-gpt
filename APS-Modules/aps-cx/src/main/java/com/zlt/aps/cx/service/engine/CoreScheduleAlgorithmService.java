@@ -1,5 +1,6 @@
 package com.zlt.aps.cx.service.engine;
 
+import com.zlt.aps.cx.entity.config.CxShiftConfig;
 import com.zlt.aps.cx.entity.schedule.CxScheduleResult;
 import com.zlt.aps.cx.vo.ScheduleContextVo;
 
@@ -7,6 +8,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * 核心排程算法服务接口
@@ -127,7 +129,7 @@ public interface CoreScheduleAlgorithmService {
         private Integer requiredCars;
         /** 月计划排产版本（来自硫化排程结果） */
         private String productionVersion;
-        
+
 
         // ==================== S5.3 开停产处理新增字段 ====================
         /** 开产班次产能（首班只排6小时） */
@@ -178,8 +180,6 @@ public interface CoreScheduleAlgorithmService {
         private List<String> recommendedMachines;
         /** 施工阶段（00 无工艺 01 试制 02 量试 03 正式），来自硫化任务 */
         private String constructionStage;
-        /** 是否补充计划任务（从延误物料补充进来的硫化任务，dataSource=3） */
-        private Boolean isSupplementTask;
         /** 暂存任务的剩余待排产需求量（第二轮一车一车分配时递减） */
         private Integer deferredRemainingDemand;
     }
@@ -259,5 +259,16 @@ public interface CoreScheduleAlgorithmService {
         private Boolean isUrgentEnding;
         /** 是否临近收尾（10天内收尾） */
         private Boolean isNearEnding;
+    }
+
+    /**
+     * 班次分配结果
+     */
+    @lombok.Data
+    class ShiftAllocationResult {
+        private String machineCode;
+        private String machineName;
+        private Map<String, Integer> shiftPlanQty;
+        private List<TaskAllocation> tasks;
     }
 }

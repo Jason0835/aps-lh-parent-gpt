@@ -196,7 +196,6 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             if (day != lastDay) {
                 context.setDailyTrialAssignedMaterialCodes(new HashSet<>());
                 context.setPrecisionPlanApplied(false);
-                context.setSupplementDailyRemainingMap(new HashMap<>());
             }
 
             // 执行该班次的排程
@@ -1375,12 +1374,13 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                                 // ---- 合并 endingAbandoned：任一记录有 endingAbandoned=true 则保留 ----
                                 mergedTask.setEndingAbandoned((existingTask != null && Boolean.TRUE.equals(existingTask.getEndingAbandoned()))
                                         || (sprTask != null && Boolean.TRUE.equals(sprTask.getEndingAbandoned())));
-                                // ---- 合并 isLastEndingBatch：任一记录有 isLastEndingBatch=true 则保留 ----
+                                // ---- 合并 isLastEndingBatch：从 SPR 自身标记合并（而非 sourceTask），
+                                // scheduleEndingTask 已按 isLastProductive 精确设置每个班次的 SPR 标记
+                                // sourceTask 层面的 isLastEndingBatch 不再作为判断依据
                                 mergedTask.setIsLastEndingBatch(
-                                        Boolean.TRUE.equals(existingTask != null ? existingTask.getIsLastEndingBatch() : null)
-                                                || Boolean.TRUE.equals(sprTask != null ? sprTask.getIsLastEndingBatch() : null));
+                                        Boolean.TRUE.equals(existing.getIsLastEndingBatch())
+                                                || Boolean.TRUE.equals(spr.getIsLastEndingBatch()));
                                 merged.setSourceTask(mergedTask);
-                                // 同时设置 spr 的 isLastEndingBatch（buildTaskAnalysis 使用 spr.getIsLastEndingBatch()）
                                 merged.setIsLastEndingBatch(mergedTask.getIsLastEndingBatch());
                             } else if (sprTask != null) {
                                 merged.setSourceTask(sprTask);
@@ -1423,6 +1423,11 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                 }
             }
         }
+
+        // ==================== 收尾标记修正：只有每个 taskKey 最后一个有产量的班次才保留收尾标记 ====================
+        // scheduleEndingTask 在单班次模式下 isLastProductive 恒为 true，
+        // 导致所有班次 SPR 都被标记为收尾。此处汇总后按 CLASS 索引找出真正的最后班次。
+        fixEndingFlagsPerClass(taskClassSprMap);
 
         // 从 ShiftScheduleResult 的 allAllocations 中收集 lhId 信息
         for (ShiftScheduleResult shiftResult : shiftResults) {
@@ -1504,6 +1509,52 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         String dateStr = startDate.format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd"));
         String cxBatchNo = "CXPC" + dateStr;  // 同一批次共用批次号
         int orderSeq = 0;
+
+        // ==================== 预计算：机台维度新开规格判定 ====================
+        // 定义：同一机台内出现2+种结构时，按班次顺序(CLASS1~8)判定
+        //       最早有产量的班次所属结构=前结构，其余结构=后结构(新开规格)
+        Set<String> newSpecKeys = new HashSet<>();  // machineCode|structureName
+        {
+            // 1. 收集每个机台每个结构的最早有产量班次序号
+            Map<String, Map<String, Integer>> machineStructEarliestClass = new LinkedHashMap<>();
+            for (Map.Entry<String, Map<String, ShiftScheduleService.ShiftProductionResult>> e : taskClassSprMap.entrySet()) {
+                String[] kParts = e.getKey().split("\\|", 3);
+                String mCode = kParts[0];
+                String structName = taskStructureMap.get(e.getKey());
+                if (structName == null || structName.isEmpty()) {
+                    continue;
+                }
+                int earliestClass = Integer.MAX_VALUE;
+                for (Map.Entry<String, ShiftScheduleService.ShiftProductionResult> ce : e.getValue().entrySet()) {
+                    ShiftScheduleService.ShiftProductionResult spr = ce.getValue();
+                    if (spr != null && spr.getQuantity() != null && spr.getQuantity() > 0) {
+                        int classNum = extractClassNumber(ce.getKey());
+                        if (classNum > 0 && classNum < earliestClass) {
+                            earliestClass = classNum;
+                        }
+                    }
+                }
+                if (earliestClass == Integer.MAX_VALUE) {
+                    continue;
+                }
+                machineStructEarliestClass
+                        .computeIfAbsent(mCode, k -> new LinkedHashMap<>())
+                        .merge(structName, earliestClass, Math::min);
+            }
+            // 2. 每个机台：2+种结构时，按最早班次序号排序，第一个=前结构，其余=新开规格
+            for (Map.Entry<String, Map<String, Integer>> me : machineStructEarliestClass.entrySet()) {
+                Map<String, Integer> structClassMap = me.getValue();
+                if (structClassMap.size() < 2) {
+                    continue;
+                }
+                List<Map.Entry<String, Integer>> sorted = new ArrayList<>(structClassMap.entrySet());
+                sorted.sort(Map.Entry.comparingByValue());
+                for (int i = 1; i < sorted.size(); i++) {
+                    newSpecKeys.add(me.getKey() + "|" + sorted.get(i).getKey());
+                }
+            }
+            log.info("新开规格预计算完成: newSpecKeys={}", newSpecKeys);
+        }
 
         for (Map.Entry<String, Map<String, ShiftScheduleService.ShiftProductionResult>> entry : taskClassSprMap.entrySet()) {
             String taskKey = entry.getKey();
@@ -1704,60 +1755,80 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             result.setCxBatchNo(cxBatchNo);
             result.setOrderNo(orderNo);
 
-            // ---- 收尾提示 ----
-            boolean isUrgentEnding = false;
+            // ---- 收尾提示 & 颜色标记：遍历班次判断是否有"全部收尾" ----
+            boolean hasEndingShift = false;       // 任一班次标记"全部收尾"（与 ANALYSIS="收尾" 口径一致）
             boolean hasTrialOrProductionTrial = false;
-            boolean hasFirstTask = false;
-            boolean hasNearEnding = false;
             log.info("开始遍历classSprMap.values()设置颜色标记: machineCode={}, embryoCode={}, materialCode={}, classSprMap.size={}",
                     machineCode, embryoCode, materialCode, classSprMap.size());
             int sprIndex = 0;
             for (ShiftScheduleService.ShiftProductionResult spr : classSprMap.values()) {
                 sprIndex++;
-                if (spr != null) {
-                    CoreScheduleAlgorithmService.DailyEmbryoTask srcTask = spr.getSourceTask();
-                    if (srcTask != null) {
-                        log.info("  spr[{}] sourceTask: isFirstTask={}, isUrgentEnding={}, isNearEnding={}, isTrialTask={}, isProductionTrial={}",
-                                sprIndex, srcTask.getIsFirstTask(), srcTask.getIsUrgentEnding(), srcTask.getIsNearEnding(),
-                                srcTask.getIsTrialTask(), srcTask.getIsProductionTrial());
-                        if (Boolean.TRUE.equals(srcTask.getIsUrgentEnding())) {
-                            isUrgentEnding = true;
-                        }
-                        if (Boolean.TRUE.equals(srcTask.getIsNearEnding())) {
-                            hasNearEnding = true;
-                        }
-                        if (Boolean.TRUE.equals(srcTask.getIsTrialTask()) || Boolean.TRUE.equals(srcTask.getIsProductionTrial())) {
-                            hasTrialOrProductionTrial = true;
-                        }
-                        if (Boolean.TRUE.equals(srcTask.getIsFirstTask())) {
-                            hasFirstTask = true;
-                        }
+                if (spr == null) {
+                    continue;
+                }
+                // 班次级"全部收尾"判定：endingMaterialCodes 包含 allMaterialCodes（与 buildTaskAnalysis 生成"收尾"文本口径一致）
+                Set<String> endingMats = spr.getEndingMaterialCodes();
+                if (endingMats != null && !endingMats.isEmpty()) {
+                    Set<String> allMats = spr.getAllMaterialCodes();
+                    boolean allEnding = (allMats == null || allMats.isEmpty() || endingMats.containsAll(allMats));
+                    log.info("  spr[{}] 班次={} endingMats={}, allMats={}, allEnding={}",
+                            sprIndex, spr.getShiftCode(), endingMats, allMats, allEnding);
+                    if (allEnding) {
+                        hasEndingShift = true;
+                    }
+                }
+                // 试制/量试标记从 sourceTask 获取
+                CoreScheduleAlgorithmService.DailyEmbryoTask srcTask = spr.getSourceTask();
+                if (srcTask != null) {
+                    log.info("  spr[{}] sourceTask: isTrialTask={}, isProductionTrial={}",
+                            sprIndex, srcTask.getIsTrialTask(), srcTask.getIsProductionTrial());
+                    if (Boolean.TRUE.equals(srcTask.getIsTrialTask()) || Boolean.TRUE.equals(srcTask.getIsProductionTrial())) {
+                        hasTrialOrProductionTrial = true;
                     }
                 }
             }
-            if (isUrgentEnding || (result.getCxRemainQty() != null && result.getCxRemainQty().compareTo(BigDecimal.ZERO) <= 0)) {
+            // 收尾提示：班次全部收尾 或 成型余量<=0
+            if (hasEndingShift || (result.getCxRemainQty() != null && result.getCxRemainQty().compareTo(BigDecimal.ZERO) <= 0)) {
                 result.setMarkCloseOutTip("0");
             } else {
                 result.setMarkCloseOutTip("1");
             }
 
+            // ---- 新开规格判定（机台维度：同机台2+种结构时，后结构=新开规格） ----
+            String effectiveStructName = result.getStructureName() != null ? result.getStructureName() : structureName;
+            boolean hasNewSpec = effectiveStructName != null
+                    && newSpecKeys.contains(machineCode + "|" + effectiveStructName);
+
             // ---- 颜色标记（前端展示用） ----
-            log.info("设置颜色标记: machineCode={}, embryoCode={}, materialCode={}, hasTrialOrProductionTrial={}, isUrgentEnding={}, hasNearEnding={}, hasFirstTask={}",
-                    machineCode, embryoCode, materialCode, hasTrialOrProductionTrial, isUrgentEnding, hasNearEnding, hasFirstTask);
+            // orange: 任一班次"全部收尾"（对应 ANALYSIS="收尾"），部分收尾(物料XXX收尾)不标记
+            // yellow: 新开规格（机台内2+种结构，后结构）
+            log.info("设置颜色标记: machineCode={}, embryoCode={}, materialCode={}, structureName={}, hasTrialOrProductionTrial={}, hasEndingShift={}, hasNewSpec={}, newSpecKeys={}",
+                    machineCode, embryoCode, materialCode, effectiveStructName, hasTrialOrProductionTrial, hasEndingShift, hasNewSpec, newSpecKeys);
             if (hasTrialOrProductionTrial) {
                 result.setColorTag("blue");
-            } else if (isUrgentEnding || hasNearEnding) {
+            } else if (hasEndingShift) {
                 result.setColorTag("orange");
-            } else if (hasFirstTask) {
+            } else if (hasNewSpec) {
                 result.setColorTag("yellow");
             }
 
             // ---- 示方书类型从SKU与示方书关系获取（constructionStage映射为trialStatus后匹配） ----
             String recipeType = resolveRecipeType(skuRecipeTypeMap, materialCode, constructionStage);
 
+            // ---- 找到第一个有排量的班次（头班），"新增"文本仅在头班标识 ----
+            String firstProductiveClass = null;
+            for (Map.Entry<String, ShiftScheduleService.ShiftProductionResult> classEntry : classSprMap.entrySet()) {
+                ShiftScheduleService.ShiftProductionResult spr = classEntry.getValue();
+                if (spr != null && spr.getQuantity() != null && spr.getQuantity() > 0) {
+                    firstProductiveClass = classEntry.getKey();
+                    break;
+                }
+            }
+
             // ---- 映射班次排量到 CLASS1~8 ----
             for (Map.Entry<String, ShiftScheduleService.ShiftProductionResult> classEntry : classSprMap.entrySet()) {
-                setClassFieldValue(result, classEntry.getKey(), classEntry.getValue(), primaryLh, recipeType);
+                boolean isFirstProductive = classEntry.getKey().equals(firstProductiveClass);
+                setClassFieldValue(result, classEntry.getKey(), classEntry.getValue(), primaryLh, recipeType, newSpecKeys, isFirstProductive);
             }
 
             // ---- 班次未排量的栏位补零 ----
@@ -2412,15 +2483,18 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
      * @param result    排程结果记录
      * @param classField CLASS1~CLASS8 班次字段标识
      * @param spr       班次排产结果
+     * @param newSpecKeys 新开规格集合（透传给 buildTaskAnalysis）
+     * @param isFirstProductive 是否为第一个有排量的班次（头班）
      */
     private void setClassFieldValue(CxScheduleResult result, String classField, ShiftScheduleService.ShiftProductionResult spr,
-                                    LhScheduleResult primaryLh, String recipeType) {
+                                    LhScheduleResult primaryLh, String recipeType, Set<String> newSpecKeys,
+                                    boolean isFirstProductive) {
         if (classField == null || spr == null) {
             return;
         }
 
         // 构建原因分析字符串
-        String analysis = buildTaskAnalysis(spr);
+        String analysis = buildTaskAnalysis(spr, newSpecKeys, isFirstProductive);
 
         // 计划量（无值给0）
         BigDecimal planQty = spr.getQuantity() != null ? new BigDecimal(spr.getQuantity()) : BigDecimal.ZERO;
@@ -2507,27 +2581,93 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
     }
 
     /**
+     * 收尾标记修正：单班次调度模式下 scheduleEndingTask 的 isLastProductive 恒为 true，
+     * 导致每个班次的 SPR 都被打上收尾标记。该方法在汇总后找出每个 taskKey 真正最后一个
+     * 有产量的班次（CLASS索引最大者），清除其他班次的收尾标记。
+     */
+    private void fixEndingFlagsPerClass(
+            Map<String, Map<String, ShiftScheduleService.ShiftProductionResult>> taskClassSprMap) {
+        if (taskClassSprMap == null) return;
+
+        for (Map.Entry<String, Map<String, ShiftScheduleService.ShiftProductionResult>> entry : taskClassSprMap.entrySet()) {
+            Map<String, ShiftScheduleService.ShiftProductionResult> classSprMap = entry.getValue();
+            if (classSprMap == null || classSprMap.isEmpty()) continue;
+
+            // 找出最后一个有产量（quantity > 0）的 CLASS
+            String lastEndingClass = null;
+            int lastClassIndex = -1;
+            for (int i = 1; i <= 8; i++) {
+                String classField = "CLASS" + i;
+                ShiftScheduleService.ShiftProductionResult spr = classSprMap.get(classField);
+                if (spr != null && spr.getQuantity() != null && spr.getQuantity() > 0) {
+                    lastEndingClass = classField;
+                    lastClassIndex = i;
+                }
+            }
+
+            if (lastEndingClass == null) continue;
+
+            // 清除非最后班次的收尾标记
+            for (Map.Entry<String, ShiftScheduleService.ShiftProductionResult> classEntry : classSprMap.entrySet()) {
+                if (classEntry.getKey().equals(lastEndingClass)) continue;
+                ShiftScheduleService.ShiftProductionResult spr = classEntry.getValue();
+                if (spr != null) {
+                    spr.setIsEndingTask(false);
+                    spr.setIsLastEndingBatch(false);
+                    if (spr.getEndingMaterialCodes() != null) {
+                        spr.getEndingMaterialCodes().clear();
+                    }
+                }
+            }
+        }
+    }
+
+    /**
      * 判断班次排产结果是否为收尾任务
      * <p>检查 isLastEndingBatch、isEndingTask、endingAbandoned 等标记
      */
     private boolean isSprEnding(ShiftScheduleService.ShiftProductionResult spr) {
         if (spr == null) return false;
-        if (Boolean.TRUE.equals(spr.getIsLastEndingBatch())) return true;
-        if (Boolean.TRUE.equals(spr.getIsEndingTask())) return true;
+        boolean isLastEndingBatch = Boolean.TRUE.equals(spr.getIsLastEndingBatch());
+        boolean isEndingTask = Boolean.TRUE.equals(spr.getIsEndingTask());
+        if (isLastEndingBatch) return true;
+        if (isEndingTask) return true;
+        // 回退到 sourceTask 检查：仅保留 endingAbandoned（收尾舍弃），
+        // isLastEndingBatch 和 isEndingTask 由班次级 SPR 标记决定（scheduleEndingTask 已按 isLastProductive 精确设置）
         CoreScheduleAlgorithmService.DailyEmbryoTask task = spr.getSourceTask();
         if (task != null) {
-            if (Boolean.TRUE.equals(task.getIsLastEndingBatch())) return true;
-            if (Boolean.TRUE.equals(task.getIsEndingTask())) return true;
-            if (Boolean.TRUE.equals(task.getEndingAbandoned())) return true;
+            boolean endingAbandoned = Boolean.TRUE.equals(task.getEndingAbandoned());
+            if (endingAbandoned) {
+                return true;
+            }
         }
         return false;
     }
 
     /**
+     * 从班次字段名提取班次序号
+     * <p>例如 "CLASS1" → 1, "CLASS8" → 8, 无法解析返回 0
+     */
+    private int extractClassNumber(String classField) {
+        if (classField == null) return 0;
+        String num = classField.replaceAll("[^0-9]", "");
+        try {
+            return Integer.parseInt(num);
+        } catch (NumberFormatException e) {
+            return 0;
+        }
+    }
+
+    /**
      * 构建任务原因分析字符串
      * <p>根据任务类型组合原因标记，多个原因用逗号分隔
+     *
+     * @param spr         班次排产结果
+     * @param newSpecKeys 新开规格集合（machineCode|structureName），同机台2+种结构时后结构为新开规格
+     * @param isFirstProductive 是否为第一个有排量的班次（头班），"新增"仅在头班标识
      */
-    private String buildTaskAnalysis(ShiftScheduleService.ShiftProductionResult spr) {
+    private String buildTaskAnalysis(ShiftScheduleService.ShiftProductionResult spr, Set<String> newSpecKeys,
+                                     boolean isFirstProductive) {
         if (spr == null) {
             return null;
         }
@@ -2536,9 +2676,6 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
 
         // 从 sourceTask 获取详细任务类型
         CoreScheduleAlgorithmService.DailyEmbryoTask task = spr.getSourceTask();
-        // 调试日志：打印isLastEndingBatch值
-        log.info("buildTaskAnalysis: embryo={}, spr.isLastEndingBatch={}, task.isLastEndingBatch={}",
-                spr.getEmbryoCode(), spr.getIsLastEndingBatch(), task != null ? task.getIsLastEndingBatch() : "task is null");
         if (task != null) {
             if (Boolean.TRUE.equals(task.getIsTrialTask())) {
                 reasons.add("试制");
@@ -2555,8 +2692,9 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             if (Boolean.TRUE.equals(task.getIsEndProduction())) {
                 reasons.add("结束生产");
             }
-            if (Boolean.TRUE.equals(task.getIsFirstTask()) && !Boolean.TRUE.equals(task.getIsContinueTask())) {
-                // 新增任务（非续作的首次任务）
+            // 新增：机台维度新开规格判定（同机台2+种结构时，后结构=新开规格），仅在头班标识
+            if (isFirstProductive && newSpecKeys != null && spr.getMachineCode() != null && spr.getStructureName() != null
+                    && newSpecKeys.contains(spr.getMachineCode() + "|" + spr.getStructureName())) {
                 reasons.add("新增");
             }
             if (Boolean.TRUE.equals(task.getPrecisionDeducted())) {
@@ -2589,13 +2727,10 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         }
 
         if (reasons.isEmpty()) {
-            log.info("buildTaskAnalysis: embryo={}, analysis=null (reasons empty)", spr.getEmbryoCode());
             return null;
         }
 
-        String result = String.join(",", reasons);
-        log.info("buildTaskAnalysis: embryo={}, analysis={}", spr.getEmbryoCode(), result);
-        return result;
+        return String.join(",", reasons);
     }
 
     /**
@@ -2939,7 +3074,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                 continue;
             }
 
-            int totalStock = stock.getStockNum() != null ? stock.getStockNum() : 0;
+            int totalStock = stock.getEffectiveStock();
             if (totalStock <= 0) {
                 continue;
             }
@@ -2971,7 +3106,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                 materialStockMap.merge(taskKey, totalStock, Integer::sum);
                 log.debug("胎胚 {} 只对应硫化任务 {}，分配库存 {}", embryoCode, taskKey, totalStock);
             } else {
-                // 胎胚对应多个硫化任务，按物料的日硫化量比例分配
+                // 胎胚对应多个硫化任务，按物料的日硫化量比例分配（与ScheduleServiceImpl.allocateStockByMaterialRatio一致）
                 int totalDemand = 0;
                 List<TaskDemandSimple> taskDemands = new ArrayList<>();
 
@@ -3016,40 +3151,118 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                     continue;
                 }
 
-                if (totalDemand == 0) {
-                    // 总需求为0，平均分配
-                    int avgStock = totalStock / taskDemands.size();
-                    for (TaskDemandSimple td : taskDemands) {
-                        materialStockMap.merge(td.taskKey, avgStock, Integer::sum);
+                // 构建分配追踪列表，每个任务记录硫化余量上限
+                List<TaskAllocationR> allocations = new ArrayList<>();
+                for (TaskDemandSimple td : taskDemands) {
+                    int surplus = getVulcanizingSurplusSimple(td.materialCode, monthSurplusMap);
+                    allocations.add(new TaskAllocationR(td, 0, surplus));
+                }
+
+                // 多轮分配：每轮按日硫化量比例分配给尚有容量的物料，最后一个倒扣
+                boolean demandZero = (totalDemand == 0);
+                int remaining = totalStock;
+                for (int round = 1; remaining > 0; round++) {
+                    int roundAllocated = distributeRoundSimple(allocations, remaining, demandZero);
+                    if (roundAllocated == 0) {
+                        // 所有物料已达硫化余量上限，剩余库存倒扣给最后一个物料（库存不丢失）
+                        TaskAllocationR last = allocations.get(allocations.size() - 1);
+                        last.allocated += remaining;
+                        log.debug("胎胚 {} 所有物料已达硫化余量上限，剩余库存 {} 倒扣给物料 {}",
+                                embryoCode, remaining, last.materialCode);
+                        remaining = 0;
+                        break;
                     }
-                    log.debug("胎胚 {} 对应多个硫化任务但总日硫化量为0，平均分配库存 {}", embryoCode, avgStock);
-                } else {
-                    // 按日硫化量比例分配，最后一条用倒扣
-                    int allocatedTotal = 0;
+                    remaining -= roundAllocated;
+                    log.debug("胎胚 {} 第{}轮分配完成，本轮分配 {}，剩余 {}", embryoCode, round, roundAllocated, remaining);
+                }
 
-                    for (int i = 0; i < taskDemands.size(); i++) {
-                        TaskDemandSimple td = taskDemands.get(i);
-                        int currentStock;
-
-                        if (i == taskDemands.size() - 1) {
-                            // 最后一个硫化任务分配剩余库存（倒扣）
-                            currentStock = totalStock - allocatedTotal;
-                        } else {
-                            // 按日硫化量比例分配
-                            currentStock = (int) ((long) totalStock * td.demand / totalDemand);
-                        }
-
-                        materialStockMap.merge(td.taskKey, currentStock, Integer::sum);
-                        allocatedTotal += currentStock;
-
-                        log.debug("物料编码 {}，胎胚 {} 共用分配：硫化任务 {} 日硫化量 {}，分配库存 {}",
-                                td.materialCode, embryoCode, td.taskKey, td.demand, currentStock);
-                    }
+                // 写回分配结果
+                for (TaskAllocationR a : allocations) {
+                    materialStockMap.merge(a.taskKey, a.allocated, Integer::sum);
+                    log.debug("物料编码 {}，胎胚 {} 共用分配：硫化任务 {} 日硫化量 {}，分配库存 {}（硫化余量上限={}）",
+                            a.materialCode, embryoCode, a.taskKey, a.demand, a.allocated, a.surplus);
                 }
             }
         }
 
         return materialStockMap;
+    }
+
+    /**
+     * 获取物料的硫化余量（作为库存分配上限）
+     */
+    private int getVulcanizingSurplusSimple(String materialCode,
+                                            Map<String, MdmMonthSurplus> monthSurplusMap) {
+        if (materialCode == null || monthSurplusMap == null) {
+            return Integer.MAX_VALUE;
+        }
+        MdmMonthSurplus monthSurplus = monthSurplusMap.get(materialCode);
+        if (monthSurplus != null && monthSurplus.getPlanSurplusQty() != null) {
+            return monthSurplus.getPlanSurplusQty().intValue();
+        }
+        return Integer.MAX_VALUE;
+    }
+
+    /**
+     * 多轮分配：每轮按日硫化量比例分配给尚有容量的物料，最后一个倒扣
+     */
+    private int distributeRoundSimple(List<TaskAllocationR> allocations, int remainingStock, boolean demandZero) {
+        List<TaskAllocationR> withCapacity = allocations.stream()
+                .filter(a -> a.allocated < a.surplus)
+                .collect(Collectors.toList());
+
+        if (withCapacity.isEmpty()) {
+            return 0;
+        }
+
+        int totalCapacityDemand;
+        if (demandZero) {
+            totalCapacityDemand = withCapacity.size();
+        } else {
+            totalCapacityDemand = withCapacity.stream().mapToInt(a -> a.demand).sum();
+            if (totalCapacityDemand == 0) {
+                totalCapacityDemand = withCapacity.size();
+            }
+        }
+
+        int roundAllocated = 0;
+        for (int i = 0; i < withCapacity.size(); i++) {
+            TaskAllocationR a = withCapacity.get(i);
+            int add;
+            if (i == withCapacity.size() - 1) {
+                add = remainingStock - roundAllocated;
+            } else {
+                if (demandZero) {
+                    add = remainingStock / withCapacity.size();
+                } else {
+                    add = (int) ((long) remainingStock * a.demand / totalCapacityDemand);
+                }
+            }
+            int cap = a.surplus - a.allocated;
+            int actual = Math.min(add, cap);
+            a.allocated += actual;
+            roundAllocated += actual;
+        }
+        return roundAllocated;
+    }
+
+    /**
+     * 任务分配追踪（内部类），用于多任务胎胚的多轮分配。
+     */
+    private static class TaskAllocationR {
+        String taskKey;
+        int demand;
+        String materialCode;
+        int surplus;      // 硫化余量上限
+        int allocated;    // 已分配量
+
+        TaskAllocationR(TaskDemandSimple td, int allocated, int surplus) {
+            this.taskKey = td.taskKey;
+            this.demand = td.demand;
+            this.materialCode = td.materialCode;
+            this.allocated = allocated;
+            this.surplus = surplus;
+        }
     }
 
     /**

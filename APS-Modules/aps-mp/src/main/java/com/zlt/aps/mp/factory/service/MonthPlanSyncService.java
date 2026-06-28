@@ -92,7 +92,8 @@ public class MonthPlanSyncService {
             }
 
             MonthPlanFinalizedEventDto eventDto = buildAdjustedEventDto(param, finalList);
-            mpMonthPlanMonitorService.insertMonitorByFinalList(eventDto.getParam(), finalList);
+            //这里不需要同步到监控表
+            //mpMonthPlanMonitorService.insertMonitorByFinalList(eventDto.getParam(), finalList);
             syncMonthPlanToScmAndMes(eventDto, "月计划调整手动推送", Boolean.TRUE);
             return AjaxResult.success();
         } catch (Exception e) {
