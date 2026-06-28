@@ -229,11 +229,22 @@ public class MpStructureAllocation extends BaseEntity {
     }
 
     /**
+     * 分组：结构+机台
+     *
+     * @return 分组
+     */
+    public String getGroupKey() {
+        String keyFormat = "%s|*|%s";
+        return String.format(keyFormat, structureName, cxMachineCode);
+    }
+
+    /**
      * 从结构信息中解析出英寸
+     *
      * @return 英寸
      */
-    public String tbrProSize(){
-        if (StringUtil.isEmptyWithTrim(this.structureName)){
+    public String tbrProSize() {
+        if (StringUtil.isEmptyWithTrim(this.structureName)) {
             return "";
         }
         // 正则：R后面跟数字（可能带小数点）

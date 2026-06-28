@@ -2,6 +2,7 @@ package com.zlt.aps.mp.engine.scheduling;
 
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.constant.Constant;
@@ -25,6 +26,7 @@ import com.zlt.aps.mp.engine.domain.Context;
 import com.zlt.aps.mp.engine.domain.ProductionStageLogRecorder;
 import com.zlt.aps.mp.engine.domain.dto.ProductionPlanGroupInfo;
 import com.zlt.aps.mp.engine.domain.vo.*;
+import com.zlt.aps.mp.engine.handler.GroupProductionConversionHandler;
 import com.zlt.aps.mp.engine.handler.LhMachineInfoCalculateHelper;
 import com.zlt.aps.mp.engine.logrecorder.TbrBeforeProductionGroupLogRecorder;
 import com.zlt.aps.mp.engine.scheduling.cxcapacity.ProductionCapacityParamConfiguration;
@@ -34,6 +36,7 @@ import com.zlt.aps.mp.engine.service.ProductionMdmDataService;
 import com.zlt.aps.mp.engine.utils.DateUtils;
 import com.zlt.aps.mp.engine.utils.MouldRelationDeduplicator;
 import com.zlt.aps.mp.engine.utils.NoProductionReasonUtils;
+import com.zlt.aps.mp.engine.utils.ProductionProcessUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;
@@ -409,6 +412,38 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
     }
 
     /**
+     * 9：根据成型信息，得到结构排产结果
+     * 即结构转产信息
+     *
+     * @param productionContext
+     */
+    protected List<MpStructureAllocation> saveStructureInfo(TbrProductionContext productionContext) {
+        List<MpStructureAllocation> allAllocationList = GroupProductionConversionHandler.getFinalResult(productionContext);
+        if (CollectionUtils.isEmpty(allAllocationList)) {
+            return Collections.emptyList();
+        }
+        //同结构，同机台前后衔接则合并为一条
+        Map<String, List<MpStructureAllocation>> groupMap = allAllocationList.stream().collect(Collectors.groupingBy(MpStructureAllocation::getGroupKey));
+        if (CollectionUtils.isEmpty(groupMap)) {
+            return Collections.emptyList();
+        }
+        List<MpStructureAllocation> resultList = Lists.newArrayList();
+        groupMap.forEach((groupKey, allocationList) -> {
+            if (CollectionUtils.isEmpty(allocationList)) {
+                return;
+            }
+            if (allocationList.size() == BigDecimal.ONE.intValue()) {
+                resultList.add(allocationList.get(BigDecimal.ZERO.intValue()));
+                return;
+            }
+            //前后可衔接则合并
+            resultList.addAll(merge(allocationList));
+        });
+        getMonthProductionDataService().saveGroupConversionResult(resultList);
+        return resultList;
+    }
+
+    /**
      * 辅助方法：添加检测结果
      */
     private void addCheckResult(boolean isPass, CheckItemTypeEnums checkItemType, String failReason, List<MpCheckItemVo> mpCheckItemVos, List<MpCheckItemRecord> mpCheckItemRecords) {
@@ -499,6 +534,7 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
         paramCodeList.add(MonthPlanEnums.DAY_MIN_ALARM_LIMIT.getCode());
         paramCodeList.add(MonthPlanEnums.PRODUCTION_MODE.getCode());
         paramCodeList.add(MonthPlanEnums.SINGLE_CX_MACHINE_CHANGE_PRO_SIZE_REPEAT_COUNT.getCode());
+        paramCodeList.add(MonthPlanEnums.GROUP_SECOND_ON_LINE_BY_SAME_CX_MACHINE.getCode());
         //排产控制相关
         paramCodeList.add(MonthPlanEnums.SUM_PRODUCTION_QTY.getCode());
         paramCodeList.add(MonthPlanEnums.HEIGHT_DIFF_QTY.getCode());
@@ -579,7 +615,18 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
         configuration.setOemJoinStructurePriority(FactoryConstant.YES_VALUE.equals(oemJoinStructurePriority));
         //20260522+ 同规格同花纹换活字块是否算换模次数
         String isAddChangeMoldCount = (String) paramConfigurationMap.get(MonthPlanEnums.ADD_CHANGE_MOLD_COUNT_BY_SAME_PATTERN.getCode());
-        configuration.setAddChangeMoldCountBySameSpecificationsPattern(ProductionConstant.YES_VALUE.equals(isAddChangeMoldCount));
+        if (ProductionProcessUtils.isYesValue(isAddChangeMoldCount)) {
+            configuration.setAddChangeMoldCountBySameSpecificationsPattern(true);
+        } else {
+            configuration.setAddChangeMoldCountBySameSpecificationsPattern(false);
+        }
+        //20260628+ 同机台是否允许分组二次上机
+        String isSecondOnLineValue = (String) paramConfigurationMap.get(MonthPlanEnums.GROUP_SECOND_ON_LINE_BY_SAME_CX_MACHINE.getCode());
+        if (ProductionProcessUtils.isYesValue(isSecondOnLineValue)) {
+            configuration.setSecondOnLineBySameCxMachine(true);
+        } else {
+            configuration.setSecondOnLineBySameCxMachine(false);
+        }
         configuration.setMaxBoostDay((Integer) paramConfigurationMap.get(MonthPlanEnums.MAX_BOOST_DAY.getCode()));
         configuration.setMatchingBoostDay((Integer) paramConfigurationMap.get(MonthPlanEnums.MATCHING_BOOST_DAY.getCode()));
         configuration.setSkuSecondProduction((Integer) paramConfigurationMap.get(MonthPlanEnums.SKU_SECOND_PRODUCTION.getCode()));
@@ -1203,4 +1250,49 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
         productionContext.setSpecialMaterialStructureRelationMap(new HashMap<>());
     }
 
+    /**
+     * 同机台同结构没有断开时，合并
+     *
+     * @param originAllocationList
+     * @return
+     */
+    private List<MpStructureAllocation> merge(List<MpStructureAllocation> originAllocationList) {
+        if (CollectionUtils.isEmpty(originAllocationList)) {
+            return Collections.emptyList();
+        }
+        //排序，按起始日从小到大
+        originAllocationList.sort(Comparator.comparing(MpStructureAllocation::getBeginDay));
+        Set<MpStructureAllocation> mergeResult = Sets.newHashSet();
+        int size = originAllocationList.size();
+        int startIndex = BigDecimal.ZERO.intValue();
+        for (; startIndex < size; startIndex++) {
+            MpStructureAllocation previous = originAllocationList.get(startIndex);
+            //后一个配置
+            int nextStartIndex = startIndex + BigDecimal.ONE.intValue();
+            for (; nextStartIndex < size; nextStartIndex++) {
+                MpStructureAllocation next = originAllocationList.get(nextStartIndex);
+                Integer previousEndDay = previous.getEndDay();
+                Integer nextStartDay = next.getBeginDay();
+                //说明前后衔接
+                if (previousEndDay + BigDecimal.ONE.intValue() == nextStartDay) {
+                    previous.setEndDay(next.getEndDay());
+                    Integer allotDays = previous.getAllotDays() + next.getAllotDays();
+                    previous.setAllotDays(allotDays);
+                } else {
+                    if (!mergeResult.contains(previous)) {
+                        mergeResult.add(previous);
+                    }
+                    startIndex = nextStartIndex;
+                    break;
+                }
+            }
+            if (mergeResult.contains(previous)) {
+                mergeResult.add(previous);
+            }
+        }
+        if (CollectionUtils.isEmpty(mergeResult)) {
+            return Collections.emptyList();
+        }
+        return Lists.newArrayList(mergeResult);
+    }
 }
