@@ -177,7 +177,7 @@ public class Cd90DepthConfigServiceImpl extends AbstractDocService<Cd90DepthConf
     }
 
     /**
-     * 业务校验：机台数 >= 0；备库班数 >= 0；机台范围不能为空
+     * 业务校验：机台数 >= 0；备库班数 > 0；机台范围不能为空
      */
     private void validateBusiness(Cd90DepthConfig entity) {
         if (entity == null) {
@@ -187,8 +187,8 @@ public class Cd90DepthConfigServiceImpl extends AbstractDocService<Cd90DepthConf
         if (machineQty == null || machineQty < 0) {
             throw new IllegalArgumentException("供成型机台数必须为大于等于0的整数");
         }
-        if (entity.getDepthClassQty() == null || entity.getDepthClassQty().compareTo(java.math.BigDecimal.ZERO) < 0) {
-            throw new IllegalArgumentException("备库班数必须为大于等于0的数字");
+        if (entity.getDepthClassQty() == null || entity.getDepthClassQty().compareTo(java.math.BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("备库班数必须为大于0的数字");
         }
         if (entity.getMachineRange() == null || entity.getMachineRange().trim().isEmpty()) {
             throw new IllegalArgumentException("机台范围不能为空");

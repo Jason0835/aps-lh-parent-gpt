@@ -27,6 +27,8 @@ public class Cd90DemandShift {
     private BigDecimal clothDemandQuantity;
     /** 班次时长，单位小时。 */
     private BigDecimal shiftHours;
+    /** 当前窗口计入该自然班次的比例，普通整班为1，半班为0.5。 */
+    private BigDecimal windowWeight;
     /** 是否参与本次需求计算。 */
     private boolean included;
     /** 是否为停产班次。 */

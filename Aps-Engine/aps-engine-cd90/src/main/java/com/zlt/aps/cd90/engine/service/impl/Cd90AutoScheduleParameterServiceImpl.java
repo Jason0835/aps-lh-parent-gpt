@@ -35,8 +35,8 @@ public class Cd90AutoScheduleParameterServiceImpl implements Cd90AutoSchedulePar
             List<Cd90Params> params = paramsMapper.selectList(wrapper);
             Cd90AutoScheduleParameters result = parameterParser.parse(factoryCode, params, enabledShiftCount);
 
-            log.info("[直裁自动排程] 参数加载完成, factoryCode={}, scheduleWindow={}, demandWindow={}, fingerprint={}",
-                    factoryCode, result.getScheduleWindow(), result.getDemandWindow(), result.getFingerprint());
+            log.info("[直裁自动排程] 参数加载完成, factoryCode={}, scheduleWindow={}, fingerprint={}",
+                    factoryCode, result.getScheduleWindow(), result.getFingerprint());
             return result;
         } catch (RuntimeException exception) {
             log.error("[直裁自动排程] 参数加载或校验失败, factoryCode={}, message={}",

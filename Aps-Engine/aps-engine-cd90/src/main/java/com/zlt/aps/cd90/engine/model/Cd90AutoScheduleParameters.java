@@ -20,12 +20,8 @@ public class Cd90AutoScheduleParameters {
     private String factoryCode;
     /** 需求计算方式：AVERAGE或SUM。 */
     private String demandCalcMode;
-    /** 成型需求窗口班数。 */
-    private int demandWindow;
     /** 直裁排程输出窗口班数。 */
     private int scheduleWindow;
-    /** 库存保证班数。 */
-    private BigDecimal stockGuaranteeShifts;
     /** 每班大卷切换提醒次数。 */
     private int maxRollChangePerShift;
     /** 非收尾规格最小起排量。 */

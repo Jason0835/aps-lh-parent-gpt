@@ -3,7 +3,9 @@ package com.zlt.aps.cd90.engine.model;
 import lombok.Builder;
 import lombok.Data;
 
+import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -26,6 +28,8 @@ public class Cd90AutoScheduleInput {
 
     /** 当前班次需求窗口明细。 */
     private List<Cd90DemandShift> demandShifts;
+    /** 按帘布代码匹配的备库班数，同时作为需求深度和库存保证阈值。 */
+    private Map<String, BigDecimal> depthClassQtyByCloth;
     /** 6点库排原始快照。 */
     private List<Cd90StorageLaneState> storageLanesAtSix;
     /** 班次开始前的实际或计划直裁入库。 */
