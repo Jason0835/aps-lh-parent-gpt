@@ -2957,8 +2957,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
     private void applyExportRowStyle(Map<String, Object> row, LhScheduleResult result) {
         if (isPreChangeSku(result)) {
             row.put("style_lhMachineCode", GRAY_STYLE);
-        }
-        if (isPostChangeSku(result)) {
+        } else if (isPostChangeSku(result)) {
             row.put("style_lhMachineCode", GRAY_STYLE);
             row.put("style_materialCode", GRAY_STYLE);
             row.put("style_materialDesc", GRAY_STYLE);
@@ -2985,6 +2984,13 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
      * 其前面所有班次（class3~8 范围内）计划量都为 0 或空。
      */
     private boolean isPostChangeSku(LhScheduleResult result) {
+        // class1~2（今天）如果不为空，说明是延续品，不是交替后
+        for (int shift = 1; shift <= 2; shift++) {
+            Integer planQty = getClassPlanQty(result, shift);
+            if (Objects.nonNull(planQty) && planQty > 0) {
+                return false;
+            }
+        }
         int firstPlannedShift = 0;
         for (int shift = 3; shift <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT; shift++) {
             Integer planQty = getClassPlanQty(result, shift);
