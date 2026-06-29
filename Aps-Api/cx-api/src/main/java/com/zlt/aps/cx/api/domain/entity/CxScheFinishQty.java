@@ -90,4 +90,28 @@ public class CxScheFinishQty extends BaseEntity implements Serializable {
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;
 
+    @ApiModelProperty(value = "一班(夜班)示方号")
+    @TableField(value = "CLASS1_CX_NO")
+    private String class1CxNo;
+
+    @ApiModelProperty(value = "一班(夜班)示方类型")
+    @TableField(value = "CLASS1_CX_TYPE")
+    private String class1CxType;
+
+    @ApiModelProperty(value = "二班(早班)示方号")
+    @TableField(value = "CLASS2_CX_NO")
+    private String class2CxNo;
+
+    @ApiModelProperty(value = "二班(早班)示方类型")
+    @TableField(value = "CLASS2_CX_TYPE")
+    private String class2CxType;
+
+    @ApiModelProperty(value = "三班(中班)示方号")
+    @TableField(value = "CLASS3_CX_NO")
+    private String class3CxNo;
+
+    @ApiModelProperty(value = "三班(中班)示方类型")
+    @TableField(value = "CLASS3_CX_TYPE")
+    private String class3CxType;
+
 }

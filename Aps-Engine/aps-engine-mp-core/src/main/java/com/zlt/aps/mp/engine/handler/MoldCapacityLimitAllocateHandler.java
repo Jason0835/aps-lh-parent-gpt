@@ -1,6 +1,7 @@
 package com.zlt.aps.mp.engine.handler;
 
 import com.google.common.collect.Lists;
+import com.zlt.aps.enums.ProductionGroupTypeEnum;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.mp.api.domain.entity.MpSkuMoldCapacityAllocateLog;
 import com.zlt.aps.mp.engine.constant.ProductionConstant;
@@ -35,7 +36,7 @@ public class MoldCapacityLimitAllocateHandler {
     private final MonthProductionDataService monthProductionDataService;
 
     /**
-     * 对模具产能受限是，对各Sku进行产能分配
+     * 对模具产能受限时，对各Sku进行产能分配
      * 按同分组+主花纹估算模具产能
      * 1、先计算同分组+主花纹下的最大模具产能、同分组+主花纹下的高优先级需求量、同分组+主花纹下的净需求需求量
      * 1.1、如果最大模具产能 >= 总需求量，则保持，不用分配
@@ -54,8 +55,8 @@ public class MoldCapacityLimitAllocateHandler {
         if (null == groupInfo || CollectionUtils.isEmpty(maxEnableMouldNumberMap)) {
             return Collections.emptyList();
         }
-        //剔除不排产的计划
-        List<MonthPlanProductionRequirePlanVo> productionPlanList = groupPlanList.stream().filter(productionPlan -> YesOrNoEnum.YES.getCode().equals(productionPlan.getProductionFlag()) && StringUtils.isNotBlank(productionPlan.getMainPattern())).collect(Collectors.toList());
+        //剔除不排产的计划 20260626+ 不使用productionFlag(因周期结构不在月周期清单但为续作结构有可能因切换结构限制导致需要延长)
+        List<MonthPlanProductionRequirePlanVo> productionPlanList = groupPlanList.stream().filter(productionPlan -> YesOrNoEnum.YES.getCode().equals(productionPlan.getIsProduction()) && StringUtils.isNotBlank(productionPlan.getMainPattern())).collect(Collectors.toList());
         if (CollectionUtils.isEmpty(productionPlanList)) {
             return Collections.emptyList();
         }
@@ -76,8 +77,9 @@ public class MoldCapacityLimitAllocateHandler {
                 return;
             }
             List<SkuMoldCapacityInfoVo> skuList = Lists.newArrayList();
-            //所有净需求量
-            Integer sumNetQty = requirePlanList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getOriginProductionQty).sum();
+            //所有净需求量 20260626+ 周期结构使用实单量
+            boolean isCycleGroup = ProductionGroupTypeEnum.CYCLE.getGroupType().equals(groupInfo.getStructureType());
+            Integer sumNetQty = getSumNetQty(isCycleGroup, requirePlanList);
             //所有高需求量
             Integer sumHeightQty = requirePlanList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getOriginHeightProductionQty).sum();
             Map<String, List<MonthPlanProductionRequirePlanVo>> skuGroupMap = requirePlanList.stream().collect(Collectors.groupingBy(MonthPlanProductionRequirePlanVo::getMaterialDesc));
@@ -86,8 +88,9 @@ public class MoldCapacityLimitAllocateHandler {
                     return;
                 }
                 MonthPlanProductionRequirePlanVo skuInfo = singleSkuPlanList.get(BigDecimal.ZERO.intValue());
+                //所有净需求量 20260626+ 周期结构使用实单量
+                Integer skuNetQty = getSumNetQty(isCycleGroup, singleSkuPlanList);
                 Integer skuHeightQty = singleSkuPlanList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getOriginHeightProductionQty).sum();
-                Integer skuNetQty = singleSkuPlanList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getOriginProductionQty).sum();
                 SkuMoldCapacityInfoVo skuRequireInfo = SkuMoldCapacityInfoVo.buildByBaseInfo(skuInfo);
                 skuRequireInfo.setMaxMoldCapacity(maxMouldCapacity);
                 skuRequireInfo.setSumProductionQty(sumNetQty);
@@ -236,6 +239,25 @@ public class MoldCapacityLimitAllocateHandler {
         }
         Integer dayCapacityQty = singleMainPatternList.get(BigDecimal.ZERO.intValue()).getDayVulcanizationQty();
         return dayCapacityQty * lhMachineCount * ProductionConstant.DOUBLE_MOULD_PRODUCTION * productionContext.getMaxProductionDays();
+    }
+
+    /**
+     * 获取总的净需求量
+     * 周期结构只看实单量 = 高 + 中
+     * 非周期结构看总净需求量
+     *
+     * @param isCycleGroup  是否周期结构
+     * @param groupPlanList 分组计划集合(正常为结构+主花纹 | 单Sku计划)
+     * @return
+     */
+    private Integer getSumNetQty(boolean isCycleGroup, List<MonthPlanProductionRequirePlanVo> groupPlanList) {
+        if (CollectionUtils.isEmpty(groupPlanList)) {
+            return BigDecimal.ZERO.intValue();
+        }
+        if (isCycleGroup) {
+            return groupPlanList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getActualQuantity).sum();
+        }
+        return groupPlanList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getOriginProductionQty).sum();
     }
 
 }

@@ -47,6 +47,9 @@ public class TmAutoPlanExpectedResult {
     /** 期望解释信息明细 */
     private List<ExpectedExplain> expectedExplains = new ArrayList<>();
 
+    /** 期望提前窗口累计计划量 */
+    private List<ExpectedWindowPlanQty> expectedWindowPlanQtyList = new ArrayList<>();
+
     /**
      * 排程结果期望。
      */
@@ -104,5 +107,26 @@ public class TmAutoPlanExpectedResult {
 
         /** 选中机台评分 */
         private BigDecimal selectedMachineScore;
+    }
+    /**
+     * 提前窗口累计计划量期望。
+     */
+    @Data
+    public static class ExpectedWindowPlanQty {
+
+        /** 胎面编码 */
+        private String treadCode;
+
+        /** 起始班次 */
+        private Integer startShiftOrder;
+
+        /** 结束班次 */
+        private Integer endShiftOrder;
+
+        /** 最小累计计划量 */
+        private BigDecimal minPlanQty;
+
+        /** 最大累计计划量 */
+        private BigDecimal maxPlanQty;
     }
 }

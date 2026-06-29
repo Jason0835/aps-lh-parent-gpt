@@ -3,6 +3,7 @@ package com.zlt.aps.mp.engine.handler;
 import com.zlt.aps.constant.StringConstant;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.mp.engine.domain.Context;
+import com.zlt.aps.mp.engine.domain.dto.CxMachineAllocationPlanHelper;
 import com.zlt.aps.mp.engine.domain.dto.ProductionPlanGroupInfo;
 import com.zlt.aps.mp.engine.domain.vo.CxMachineBaseInfoVo;
 import com.zlt.aps.mp.engine.domain.vo.MonthPlanProductionRequirePlanVo;
@@ -125,6 +126,12 @@ public class GroupPlanCxMachineSelector {
             TbrProductionGroupLogRecorder.addGroupNoSelectedNoRatioLog(context, structureName, isZeroRack, cxMachineCode, machineTypeCode);
             return false;
         }
+        //20260627+ 增加结构同机台二次上机判断
+        if (isMatchSecondOnLine(context, groupPlanInfo, cxMachineInfo)) {
+            //记录日志
+            TbrProductionGroupLogRecorder.addGroupNoSelectSecondOnLineLog(context, structureName, isZeroRack, cxMachineCode, machineTypeCode);
+            return false;
+        }
         cxMachineInfo.setRatio(lhRatioInfo.getLhMachineMaxQty());
         Set<String> fixedCxMachineSet = Optional.ofNullable(groupPlanInfo.getFixedCxMachineSet()).orElse(Collections.emptySet());
         if (CollectionUtils.isEmpty(fixedCxMachineSet)) {
@@ -208,5 +215,35 @@ public class GroupPlanCxMachineSelector {
             TbrProductionGroupLogRecorder.addGroupNoSelectedRepeatProSizeLimitLog(context, structureName, isZeroRack, cxMachineCode, machineTypeCode, repeatMaxCount);
         }
         return isLimit;
+    }
+
+    /**
+     * 增加分组在同一机台上二次上机校验
+     *
+     * @param context       排产上下文
+     * @param groupPlanInfo 分组信息
+     * @param cxMachineInfo 成型机台
+     * @return
+     */
+    private static boolean isMatchSecondOnLine(Context context, ProductionPlanGroupInfo groupPlanInfo, CxMachineBaseInfoVo cxMachineInfo) {
+        TbrProductionContext productionContext = (TbrProductionContext) context;
+        //允许同机台二次上机
+        if (productionContext.getBaseDataContainer().getParamConfiguration().isSecondOnLineBySameCxMachine()) {
+            return false;
+        }
+        if (null == groupPlanInfo || null == cxMachineInfo) {
+            return false;
+        }
+        List<CxMachineAllocationPlanHelper> allocationList = cxMachineInfo.getAllocationList();
+        if (CollectionUtils.isEmpty(allocationList)) {
+            return false;
+        }
+        String groupName = groupPlanInfo.getGroupName();
+        CxMachineAllocationPlanHelper last = cxMachineInfo.getLastAllocationInfo();
+        if (groupName.equals(last.getProductionPlanInfo().getGroupName())) {
+            return false;
+        }
+        Set<String> allocationGroupSet = allocationList.stream().map(CxMachineAllocationPlanHelper::getAllocationGroup).collect(Collectors.toSet());
+        return allocationGroupSet.contains(groupName);
     }
 }

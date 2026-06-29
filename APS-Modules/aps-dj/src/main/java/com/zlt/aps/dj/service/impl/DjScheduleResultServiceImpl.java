@@ -53,6 +53,7 @@ import com.zlt.aps.dj.mapper.DjParamsMapper;
 import com.zlt.aps.dj.service.DjDispatcherLogService;
 import com.zlt.aps.dj.service.DjMachineInfoService;
 import com.zlt.aps.dj.service.DjScheduleResultService;
+import com.zlt.aps.dj.service.IDjScheduleAdjustService;
 import com.zlt.aps.utils.BillUtils;
 import com.zlt.bill.common.service.AbstractBillService;
 
@@ -79,6 +80,9 @@ public class DjScheduleResultServiceImpl extends AbstractBillService<DjScheduleR
 
     @Autowired
     private DjParamsMapper djParamsMapper;
+
+    @Autowired
+    private IDjScheduleAdjustService iDjScheduleAdjustService;
 
     /**
      * 查询垫胶排程结果
@@ -577,7 +581,13 @@ public class DjScheduleResultServiceImpl extends AbstractBillService<DjScheduleR
      */
     @Override
     public List<DjScheduleResult> checkUnique(DjScheduleResult entity) {
-        return djScheduleResultMapper.selectList(BillUtils.builderCondition(entity));
+        Long id = entity.getId();
+        entity.setId(null);
+        QueryWrapper<DjScheduleResult> queryWrapper = BillUtils.builderCondition(entity);
+        if (id != null) {
+            queryWrapper.ne("id", id);
+        }
+        return djScheduleResultMapper.selectList(queryWrapper);
     }
 
     /**
@@ -788,7 +798,8 @@ public class DjScheduleResultServiceImpl extends AbstractBillService<DjScheduleR
      */
     @Override
     public AjaxResult importFinishQty(List<DjDayFinishQty> list, Long importLogId) {
-        return baseFinishQtyImportService.importFinishQty(list, importLogId, HalfComponentFinishTableEnum.DJ);
+//        return baseFinishQtyImportService.importFinishQty(list, importLogId, HalfComponentFinishTableEnum.DJ);
+        return AjaxResult.error();
     }
 
     /**

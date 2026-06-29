@@ -1,0 +1,132 @@
+{
+  "sceneCode": "TM_SCENE_029",
+  "caseName": "TM_SCENE_029_not_new_spec_stock_and_history_exists",
+  "description": "TM_SCENE_029：前一天有有效库存且历史排程有计划量，保持正常班次",
+  "designSteps": [
+    "Step3",
+    "Step4",
+    "Step14",
+    "Step16"
+  ],
+  "mysqlVerificationStatus": "待用户执行 MySQL 验证",
+  "autoPlanRequest": {
+    "factoryCode": "F1",
+    "scheduleDate": "2026-07-26",
+    "operator": "TM_AUTO_PLAN_TEST",
+    "traceId": "TRACE-TM-SCENE-029",
+    "confirmOverwrite": false
+  },
+  "params": [
+    {
+      "factoryCode": "F1",
+      "paramCode": "TM_ALGORITHM_SWITCH",
+      "paramValue": "2",
+      "enableStatus": "1"
+    },
+    {
+      "factoryCode": "F1",
+      "paramCode": "TM_NEW_SPEC_LOOKBACK_DAYS",
+      "paramValue": "7",
+      "enableStatus": "1"
+    },
+    {
+      "factoryCode": "F1",
+      "paramCode": "TM_NEW_SPEC_ADVANCE_SHIFT_COUNT",
+      "paramValue": "2",
+      "enableStatus": "1"
+    },
+    {
+      "factoryCode": "F1",
+      "paramCode": "TM_FORMING_SHIFT_OFFSET",
+      "paramValue": "0",
+      "enableStatus": "1"
+    }
+  ],
+  "cxScheduleResults": [
+    {
+      "orderNo": "TM_SCENE_029_001",
+      "embryoCode": "CX-TM_SCENE_029_001",
+      "class1PlanQty": 0,
+      "class2PlanQty": 0,
+      "class3PlanQty": 0,
+      "class4PlanQty": 0,
+      "class5PlanQty": 500,
+      "class6PlanQty": 0,
+      "treadCode": "TM_NEW_SPEC_2601",
+      "treadShoulderLength": 1,
+      "treadMouthPlate": "MP_NEW",
+      "treadRubberCategory": "GLUE_NEW"
+    }
+  ],
+  "stocks": [
+    {
+      "factoryCode": "F1",
+      "stockDate": "2026-07-25",
+      "treadCode": "TM_NEW_SPEC_2601",
+      "stockQty": 100,
+      "badQty": 0,
+      "adjustQty": 0
+    }
+  ],
+  "historyScheduleResults": [
+    {
+      "factoryCode": "F1",
+      "scheduleDate": "2026-07-24",
+      "treadCode": "TM_NEW_SPEC_2601",
+      "machineCode": "TM_NEW_01",
+      "class1PlanQty": 1
+    }
+  ],
+  "machineInfos": [
+    {
+      "factoryCode": "F1",
+      "machineCode": "TM_NEW_01",
+      "machineStatus": "1",
+      "maxCapacity": 1000
+    }
+  ],
+  "machineSpeeds": [
+    {
+      "factoryCode": "F1",
+      "machineCode": "TM_NEW_01",
+      "productSpeed": 100
+    }
+  ],
+  "mouthPlates": [
+    {
+      "factoryCode": "F1",
+      "machineCode": "TM_NEW_01",
+      "mouthPlateCode": "MP_NEW"
+    }
+  ],
+  "expected": {
+    "success": true,
+    "messageContains": "胎面自动排程执行完成",
+    "resultCount": 1,
+    "assignedCount": 1,
+    "unassignedCount": 0,
+    "explainCount": 1,
+    "errorCount": 0,
+    "expectedWindowPlanQtyList": [
+      {
+        "treadCode": "TM_NEW_SPEC_2601",
+        "startShiftOrder": 1,
+        "endShiftOrder": 3,
+        "maxPlanQty": 0
+      }
+    ],
+    "expectedResults": [
+      {
+        "treadCode": "TM_NEW_SPEC_2601",
+        "machineCode": "TM_NEW_01",
+        "shiftOrder": 5,
+        "sequence": 1
+      }
+    ],
+    "expectedExplains": [
+      {
+        "ruleHitContains": "NEW_SPEC_DETECT"
+      }
+    ]
+  }
+}

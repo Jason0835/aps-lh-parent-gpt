@@ -3,6 +3,7 @@ package com.zlt.aps.itf.mes.service.impl;
 import com.alibaba.fastjson.JSONObject;
 import com.baomidou.dynamic.datasource.toolkit.DynamicDataSourceContextHolder;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.zlt.aps.autoLogin.feign.FeignTokenHelper;
 import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
@@ -19,6 +20,7 @@ import com.zlt.aps.itf.mes.enums.ItfSyncKeyEnum;
 import com.zlt.aps.itf.mes.mapper.MesItfMapper;
 import com.zlt.aps.itf.mes.mapper.MoldAlterPlanIssueMapper;
 import com.zlt.aps.itf.mes.mapper.MesViewMapper;
+import com.zlt.aps.itf.mes.mapper.LhScheduleResultQueryMapper;
 import com.zlt.aps.itf.mes.service.IPrecisionPlanIssueService;
 import com.zlt.aps.itf.mes.service.MesItfService;
 import com.zlt.aps.itf.mes.vo.MoldAlterPlanIssue;
@@ -28,6 +30,7 @@ import com.zlt.sync.handle.SyncDataHandle;
 import com.zlt.sync.povo.SyncParamsVO;
 import com.zlt.sync.service.SyncDataLogsService;
 import com.zlt.aps.lh.api.domain.entity.*;
+import com.zlt.aps.lh.api.enums.TrialStatusEnum;
 import com.zlt.aps.lh.api.constant.LhScheduleParamConstant;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.maindata.mapper.*;
@@ -157,6 +160,12 @@ public class MesItfServiceImpl implements MesItfService {
 
     @Autowired
     private MpMonthPlanMonitorEntityMapper mpMonthPlanMonitorEntityMapper;
+
+    /**
+     * 硫化排程结果查询Mapper（APS数据源），用于试制/量试完成量回报规则查询当日计划量
+     */
+    @Autowired
+    private LhScheduleResultQueryMapper lhScheduleResultQueryMapper;
 
     /**
      * 同步SKU与模具关系
@@ -2138,6 +2147,13 @@ public class MesItfServiceImpl implements MesItfService {
             insertList.add(entity);
         }
 
+        // 处理试制/量试完成量回报规则（完成量为0忽略、≤日计划量按计划量回报、>日计划量按实际回报）
+        handleTrialFinishQtyRule(insertList, syncDataLogs.getFactoryCode());
+        if (CollectionUtils.isEmpty(insertList)) {
+            log.info("硫化排程日完成量同步：试制/量试规则处理后待同步列表为空，factoryCode={}", syncDataLogs.getFactoryCode());
+            return AjaxResult.success("试制/量试规则处理后无数据可同步");
+        }
+
         try {
             String factoryCode = syncDataLogs.getFactoryCode();
             Date finishDate = insertList.stream().map(LhDayFinishQty::getFinishDate).filter(Objects::nonNull).findFirst().orElse(DateUtils.getNowDate());
@@ -2164,6 +2180,11 @@ public class MesItfServiceImpl implements MesItfService {
         } finally {
             DynamicDataSourceContextHolder.poll();
         }
+
+        // 量试合格品充抵正规订单：在updateByDayFinish之后执行，使用调整后的完成量累加到正规计划productionQty
+        // 注意：传入insertList（已含试制/量试规则调整后的值），不传syncList（原始值）
+        mergeMassTrialFinishToFormal(syncDataLogs.getFactoryCode(), insertList,
+                DateUtils.getYear(lastDate), DateUtils.getMonth(lastDate));
 
         updateChipStockFinishQty(syncDataLogs.getFactoryCode(), syncList);
         return AjaxResult.success();
@@ -2213,6 +2234,15 @@ public class MesItfServiceImpl implements MesItfService {
             insertList.add(entity);
         }
 
+        // 处理试制/量试完成量回报规则（完成量为0忽略、≤日计划量按计划量回报、>日计划量按实际回报）
+        // 注意：此处统一处理所有日期的试制/量试数据，规则处理后再按完成日期分组同步
+        String trialFactoryCode = insertList.get(0).getFactoryCode();
+        handleTrialFinishQtyRule(insertList, trialFactoryCode);
+        if (CollectionUtils.isEmpty(insertList)) {
+            log.info("硫化排程日完成量按最新版本号同步：试制/量试规则处理后待同步列表为空，dataVersion={}", dataVersion);
+            return AjaxResult.success("试制/量试规则处理后无数据可同步");
+        }
+
         // 按完成日期分组，逐组同步（原逻辑按单个完成日期做逻辑删除+插入）
         Map<String, List<LhDayFinishQty>> groupByFinishDate = insertList.stream()
                 .collect(Collectors.groupingBy(item -> {
@@ -2252,22 +2282,233 @@ public class MesItfServiceImpl implements MesItfService {
             }
         }
         for (String yearMonth : yearMonthSet) {
+            String[] parts = yearMonth.split("-");
+            Integer year = Integer.parseInt(parts[0]);
+            Integer month = Integer.parseInt(parts[1]);
             try {
-                String[] parts = yearMonth.split("-");
                 MpMonthPlanMonitor paramVo = new MpMonthPlanMonitor();
                 paramVo.setFactoryCode(insertList.get(0).getFactoryCode());
-                paramVo.setYear(Integer.parseInt(parts[0]));
-                paramVo.setMonth(Integer.parseInt(parts[1]));
+                paramVo.setYear(year);
+                paramVo.setMonth(month);
                 DynamicDataSourceContextHolder.push(DataSource.APS);
                 mpMonthPlanMonitorEntityMapper.updateByDayFinish(paramVo);
             } finally {
                 DynamicDataSourceContextHolder.poll();
             }
+
+            // 量试合格品充抵正规订单：每个年月的updateByDayFinish之后触发，
+            // 按该年月过滤insertList（已含试制/量试规则调整后的值）传给充抵逻辑
+            List<LhDayFinishQty> yearMonthInsertList = insertList.stream()
+                    .filter(item -> item.getFinishDate() != null
+                            && DateUtils.getYear(item.getFinishDate()) == year
+                            && DateUtils.getMonth(item.getFinishDate()) == month)
+                    .collect(Collectors.toList());
+            mergeMassTrialFinishToFormal(insertList.get(0).getFactoryCode(), yearMonthInsertList, year, month);
         }
 
         // 增量更新芯片库存完成量
         updateChipStockFinishQty(insertList.get(0).getFactoryCode(), syncList);
         return AjaxResult.success();
+    }
+
+    /**
+     * 处理试制(X)/量试(T)数据的日完成量回报规则。
+     * <p>规则：
+     * <ul>
+     *   <li>3.1) 完成量为0：从待同步列表中移除（忽略不同步）</li>
+     *   <li>3.2) 完成量 ≤ 当日计划量：将完成量调整为当日计划量进行回报</li>
+     *   <li>3.3) 完成量 > 当日计划量：保持原实际完成量不变</li>
+     * </ul>
+     * 当日计划量取自T_LH_SCHEDULE_RESULT中 SCHEDULE_DATE = FINISH_DATE 的记录，
+     * 合计班次3(夜)+班次4(早)+班次5(中)的计划量。</p>
+     * <p>匹配维度：物料编码 + 示方类型。查不到日计划量时按0处理（完成量&gt;0则按实际回报）。</p>
+     * <p>正规(S)数据不做处理，原样同步。</p>
+     *
+     * @param insertList 待同步的日完成量列表（会被原地修改：调整dayFinishQty或移除元素）
+     * @param factoryCode 工厂编码
+     */
+    private void handleTrialFinishQtyRule(List<LhDayFinishQty> insertList, String factoryCode) {
+        if (CollectionUtils.isEmpty(insertList)) {
+            return;
+        }
+        // 过滤出试制(X)/量试(T)数据，正规(S)数据保持原样不同步处理
+        List<LhDayFinishQty> trialList = insertList.stream()
+                .filter(item -> isTrialOrMassTrial(item.getLhType()))
+                .collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(trialList)) {
+            return;
+        }
+
+        // 按完成日期分组（用LocalDate避免Date精度问题），逐日查询当日计划量
+        Map<java.time.LocalDate, List<LhDayFinishQty>> dateGroupedMap = trialList.stream()
+                .filter(item -> item.getFinishDate() != null)
+                .collect(Collectors.groupingBy(item ->
+                        DateUtil.date(item.getFinishDate()).toLocalDateTime().toLocalDate()));
+
+        // 收集所有涉及的物料编码（试制/量试数据全集）
+        List<String> allMaterialCodes = trialList.stream()
+                .map(LhDayFinishQty::getMaterialCode)
+                .filter(StringUtils::isNotBlank)
+                .distinct()
+                .collect(Collectors.toList());
+
+        // 需要忽略的记录（完成量为0）
+        List<LhDayFinishQty> toRemove = new ArrayList<>();
+
+        for (Map.Entry<java.time.LocalDate, List<LhDayFinishQty>> dateEntry : dateGroupedMap.entrySet()) {
+            java.time.LocalDate scheduleLocalDate = dateEntry.getKey();
+            List<LhDayFinishQty> dayItems = dateEntry.getValue();
+            // 取该日期下任意一条数据的finishDate作为查询参数（同一天任意一条都行）
+            Date finishDate = dayItems.get(0).getFinishDate();
+
+            // 查询当日日计划量（APS数据源）；物料编码列表为空时跳过查询，按日计划量=0处理
+            List<LhDayPlanQtyVo> planQtyList = Collections.emptyList();
+            if (!allMaterialCodes.isEmpty()) {
+                try {
+                    DynamicDataSourceContextHolder.push(DataSource.APS);
+                    planQtyList = lhScheduleResultQueryMapper.sumDayPlanQtyByFinishDate(
+                            factoryCode, finishDate, allMaterialCodes);
+                } finally {
+                    DynamicDataSourceContextHolder.poll();
+                }
+            }
+
+            // 构建 (物料编码 + "|" + 示方类型) -> 日计划量 映射
+            Map<String, Integer> planQtyMap = new HashMap<>();
+            if (CollectionUtils.isNotEmpty(planQtyList)) {
+                for (LhDayPlanQtyVo vo : planQtyList) {
+                    if (vo.getMaterialCode() == null || vo.getLhType() == null) {
+                        continue;
+                    }
+                    String key = vo.getMaterialCode() + "|" + vo.getLhType();
+                    // 同key理论上不重复（SQL已按物料+示方类型分组），出现重复时累加
+                    planQtyMap.merge(key, vo.getDayPlanQty() == null ? 0 : vo.getDayPlanQty(), Integer::sum);
+                }
+            }
+
+            // 逐条应用试制/量试完成量回报规则
+            for (LhDayFinishQty item : dayItems) {
+                BigDecimal finishQty = item.getDayFinishQty();
+                // 3.1) 完成量为0或空，忽略（不同步）
+                if (finishQty == null || finishQty.compareTo(BigDecimal.ZERO) == 0) {
+                    toRemove.add(item);
+                    continue;
+                }
+                // 获取当日计划量，查不到按0处理
+                String key = item.getMaterialCode() + "|" + item.getLhType();
+                Integer dayPlanQtyInt = planQtyMap.getOrDefault(key, 0);
+                BigDecimal dayPlanQty = BigDecimal.valueOf(dayPlanQtyInt);
+                // 3.2) 完成量 ≤ 日计划量：按当日计划量回报
+                if (finishQty.compareTo(dayPlanQty) <= 0) {
+                    item.setDayFinishQty(dayPlanQty);
+                }
+                // 3.3) 完成量 > 日计划量：按实际完成量回报（保持原值，无需处理）
+            }
+
+            log.info("试制/量试完成量回报规则处理：factoryCode={}, finishDate={}, 当日计划量匹配数={}, 当日试制/量试数据数={}",
+                    factoryCode, scheduleLocalDate, planQtyMap.size(), dayItems.size());
+        }
+
+        // 从待同步列表中移除被忽略的记录（完成量为0）
+        if (!toRemove.isEmpty()) {
+            insertList.removeAll(toRemove);
+            log.info("试制/量试完成量回报规则处理：忽略完成量为0的记录数={}, 剩余待同步数量={}",
+                    toRemove.size(), insertList.size());
+        }
+    }
+
+    /**
+     * 判断示方类型是否为试制(X)或量试(T)
+     *
+     * @param lhType 示方类型编码
+     * @return true表示试制或量试，false表示正规或其他
+     */
+    private boolean isTrialOrMassTrial(String lhType) {
+        TrialStatusEnum status = TrialStatusEnum.getByCode(lhType);
+        return TrialStatusEnum.TRIAL == status || TrialStatusEnum.MASS_TRIAL == status;
+    }
+
+    /**
+     * 量试合格品充抵正规订单。
+     * <p>业务规则：在月计划不调整的情况下，量试合格品可充抵正规订单需求。
+     * 若 SKU 是量试(T)且同物料存在正规计划(productStatus=S)，则将量试当月实际完成量
+     * （已按试制/量试回报规则调整后的值）累加到正规计划的累计生产量(productionQty)上。</p>
+     * <p>规则细节：
+     * <ul>
+     *   <li>仅处理量试(T)数据，试制(X)和正规(S)不参与</li>
+     *   <li>使用调整后的完成量（与T_LH_DAY_FINISH_QTY中的值一致）</li>
+     *   <li>一个物料只会有一条正规计划记录</li>
+     *   <li>不扣除量试计划自身的productionQty（不重复计算）</li>
+     *   <li>不设上限，全部累加</li>
+     *   <li>不更新lhMargin（硫化余量由原updateByDayFinish逻辑维护）</li>
+     * </ul>
+     * </p>
+     *
+     * @param factoryCode 工厂编码
+     * @param insertList 已同步到T_LH_DAY_FINISH_QTY的日完成量列表（含试制/量试规则处理后的值）
+     * @param year 完成日期所在年
+     * @param month 完成日期所在月
+     */
+    private void mergeMassTrialFinishToFormal(String factoryCode, List<LhDayFinishQty> insertList,
+                                              Integer year, Integer month) {
+        if (CollectionUtils.isEmpty(insertList) || year == null || month == null) {
+            return;
+        }
+
+        // Step1: 筛选量试(T)数据（使用调整后的完成量），按物料汇总当月量试完成量
+        Map<String, Integer> materialFinishMap = insertList.stream()
+                .filter(item -> TrialStatusEnum.MASS_TRIAL.getCode().equals(item.getLhType()))
+                .filter(item -> item.getDayFinishQty() != null
+                        && item.getDayFinishQty().compareTo(BigDecimal.ZERO) > 0)
+                .collect(Collectors.groupingBy(
+                        LhDayFinishQty::getMaterialCode,
+                        Collectors.summingInt(item -> item.getDayFinishQty().intValue())
+                ));
+        if (materialFinishMap.isEmpty()) {
+            return;
+        }
+
+        // Step2: 查询同物料是否存在正规计划（APS数据源）
+        List<String> materialCodes = new ArrayList<>(materialFinishMap.keySet());
+        List<MpMonthPlanMonitor> formalPlans;
+        try {
+            DynamicDataSourceContextHolder.push(DataSource.APS);
+            formalPlans = mpMonthPlanMonitorEntityMapper.selectFormalPlanByMaterials(
+                    factoryCode, year, month, materialCodes);
+        } finally {
+            DynamicDataSourceContextHolder.poll();
+        }
+        if (CollectionUtils.isEmpty(formalPlans)) {
+            log.info("量试充抵正规：未查询到正规计划记录，factoryCode={}, year={}, month={}, 量试物料数={}",
+                    factoryCode, year, month, materialCodes.size());
+            return;
+        }
+
+        // Step3: 将量试完成量累加到正规计划的productionQty（不设上限、不更新lhMargin）
+        int updatedCount = 0;
+        for (MpMonthPlanMonitor formalPlan : formalPlans) {
+            String materialCode = formalPlan.getMaterialCode();
+            Integer massTrialFinish = materialFinishMap.get(materialCode);
+            if (massTrialFinish == null || massTrialFinish <= 0) {
+                continue;
+            }
+            // 累加正规计划的累计生产量
+            int currentProductionQty = formalPlan.getProductionQty() == null ? 0 : formalPlan.getProductionQty();
+            int newProductionQty = currentProductionQty + massTrialFinish;
+            // 使用LambdaUpdateWrapper更新，避免字符串字段名硬编码；仅更新productionQty，不更新lhMargin
+            LambdaUpdateWrapper<MpMonthPlanMonitor> updateWrapper = new LambdaUpdateWrapper<>();
+            updateWrapper.eq(MpMonthPlanMonitor::getId, formalPlan.getId())
+                    .set(MpMonthPlanMonitor::getProductionQty, newProductionQty);
+            int rows = mpMonthPlanMonitorEntityMapper.update(null, updateWrapper);
+            if (rows > 0) {
+                updatedCount++;
+                log.info("量试充抵正规：累加成功，factoryCode={}, materialCode={}, yearMonth={}{}-{}, "
+                                + "量试完成量={}, 原正规productionQty={}, 新正规productionQty={}",
+                        factoryCode, materialCode, year, month, massTrialFinish, currentProductionQty, newProductionQty);
+            }
+        }
+        log.info("量试充抵正规：处理完成，factoryCode={}, yearMonth={}{}-{}, 量试物料数={}, 正规计划数={}, 累加成功数={}",
+                factoryCode, year, month, materialFinishMap.size(), formalPlans.size(), updatedCount);
     }
 
     /**

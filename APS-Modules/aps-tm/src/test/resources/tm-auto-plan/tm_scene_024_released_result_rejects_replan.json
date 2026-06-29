@@ -28,5 +28,13 @@
   "designSteps": [
     "Step2"
   ],
-  "mysqlVerificationStatus": "待用户执行 MySQL 验证"
+  "mysqlVerificationStatus": "待用户执行 MySQL 验证",
+  "params": [
+    {
+      "factoryCode": "F1",
+      "paramCode": "TM_FORMING_SHIFT_OFFSET",
+      "paramValue": "0",
+      "enableStatus": "1"
+    }
+  ]
 }

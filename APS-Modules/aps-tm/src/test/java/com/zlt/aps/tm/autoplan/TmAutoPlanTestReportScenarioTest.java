@@ -240,6 +240,101 @@ public class TmAutoPlanTestReportScenarioTest {
     }
 
     /**
+     * 测试内容：TM_SCENE_026 新规格额外提前排产。
+     */
+    @Test
+    public void shouldReportScene026NewSpecAdvancePlan() {
+        executeScene("tm_scene_026_new_spec_advance_plan.json");
+    }
+
+    /**
+     * 测试内容：TM_SCENE_027 前一天有有效库存时不按新规格提前。
+     */
+    @Test
+    public void shouldReportScene027NotNewSpecStockExists() {
+        executeScene("tm_scene_027_not_new_spec_stock_exists.json");
+    }
+
+    /**
+     * 测试内容：TM_SCENE_028 前一天无库存但历史有计划量时不按新规格提前。
+     */
+    @Test
+    public void shouldReportScene028NotNewSpecHistoryExists() {
+        executeScene("tm_scene_028_not_new_spec_history_exists.json");
+    }
+
+    /**
+     * 测试内容：TM_SCENE_029 前一天有库存且历史有计划量时保持正常班次。
+     */
+    @Test
+    public void shouldReportScene029NotNewSpecStockAndHistoryExists() {
+        executeScene("tm_scene_029_not_new_spec_stock_and_history_exists.json");
+    }
+
+    /**
+     * 测试内容：TM_SCENE_030 新规格参数缺失时使用默认值。
+     */
+    @Test
+    public void shouldReportScene030NewSpecDefaultParams() {
+        executeScene("tm_scene_030_new_spec_default_params.json");
+    }
+
+    /**
+     * 测试内容：TM_SCENE_031 新规格参数配置为 10 天和 3 班。
+     */
+    @Test
+    public void shouldReportScene031NewSpecCustomParams() {
+        executeScene("tm_scene_031_new_spec_custom_params.json");
+    }
+
+    /**
+     * 测试内容：TM_SCENE_032 提前窗口产能不足时剩余滚动。
+     */
+    @Test
+    public void shouldReportScene032NewSpecWindowCapacityShortageRoll() {
+        executeScene("tm_scene_032_new_spec_window_capacity_shortage_roll.json");
+    }
+
+    /**
+     * 测试内容：TM_SCENE_033 六班总产能不足时写未排。
+     */
+    @Test
+    public void shouldReportScene033NewSpecSixShiftCapacityUnplanned() {
+        executeScene("tm_scene_033_new_spec_six_shift_capacity_unplanned.json");
+    }
+
+    /**
+     * 测试内容：TM_SCENE_034 新规格与非新规格混合排产。
+     */
+    @Test
+    public void shouldReportScene034NewAndOldSpecMixed() {
+        executeScene("tm_scene_034_new_and_old_spec_mixed.json");
+    }
+
+    /**
+     * 测试内容：TM_SCENE_035 实验规格无成型需求时新增独立一班任务。
+     */
+    @Test
+    public void shouldReportScene035ExperimentSpecCreatesIndependentTask() {
+        executeScene("tm_scene_035_experiment_spec_independent_task.json");
+    }
+
+    /**
+     * 测试内容：TM_SCENE_036 实验规格命中同胎面时叠加到一班任务。
+     */
+    @Test
+       public void shouldReportScene036ExperimentSpecMergeSameTreadTask() {
+        executeScene("tm_scene_036_experiment_spec_merge_same_tread.json");
+    }
+
+    /**
+     * 测试内容：TM_SCENE_037 实验规格自定义参数和非实验跳过。
+     */
+    @Test
+    public void shouldReportScene037ExperimentSpecCustomParamsAndSkipNonExperiment() {
+        executeScene("tm_scene_037_experiment_spec_custom_params_skip.json");
+    }
+    /**
      * 读取并执行单个报告场景。
      *
      * @param fileName 场景 JSON 文件名

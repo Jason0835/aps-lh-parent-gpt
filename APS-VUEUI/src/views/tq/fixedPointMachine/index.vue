@@ -183,7 +183,7 @@ export default {
           dictData: this.machineList,
           filterable: true,
           loading: this.machineLoading,
-          labelKey: "machineName",
+          labelKey: "machineCode",
           valueKey: "machineCode",
           onFocus: this.handleMachineFocus,
         },

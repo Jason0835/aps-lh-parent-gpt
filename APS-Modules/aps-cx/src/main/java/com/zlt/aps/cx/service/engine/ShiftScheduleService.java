@@ -651,8 +651,14 @@ public class ShiftScheduleService {
 
             int cars = tripCapacity > 0 ? (shiftQty + tripCapacity - 1) / tripCapacity : 1;
 
+            // 🔧 isEndingTask 应反映成型余量是否真正耗尽（task.getIsEndingTask()），
+            // 而非是否为最后一个有产量的班次（isLastProductive 在单班次模式下恒为true）
+            // isUrgentEnding（紧急收尾）仅影响排程策略，不应在 ANALYSIS 中标记"收尾"
+            boolean isMaterialEnding = Boolean.TRUE.equals(task.getIsEndingTask());
             ShiftProductionResult result = buildResult(machineCode, shiftConfig, task, shiftQty,
-                    tripCapacity, cars, startTime, endTime, false, true, task.getIsContinueTask());
+                    tripCapacity, cars, startTime, endTime, false, isMaterialEnding, task.getIsContinueTask());
+            // buildResult会从task拷贝isLastEndingBatch，此处覆盖为仅最后一个有产量的班次
+            result.setIsLastEndingBatch(isLastProductive && Boolean.TRUE.equals(task.getIsLastEndingBatch()));
 
             results.add(result);
             remainingQty -= shiftQty;

@@ -14,6 +14,12 @@
       "paramCode": "TM_ALGORITHM_SWITCH",
       "paramValue": "1",
       "enableStatus": "1"
+    },
+    {
+      "factoryCode": "F1",
+      "paramCode": "TM_FORMING_SHIFT_OFFSET",
+      "paramValue": "0",
+      "enableStatus": "1"
     }
   ],
   "cxScheduleResults": [
@@ -21,11 +27,11 @@
       "orderNo": "ORD-SPECIFY",
       "embryoCode": "CX-SP",
       "class1PlanQty": 10,
-      "class2PlanQty": 0,
-      "class3PlanQty": 0,
-      "class4PlanQty": 0,
-      "class5PlanQty": 0,
-      "class6PlanQty": 0,
+      "class2PlanQty": 10,
+      "class3PlanQty": 10,
+      "class4PlanQty": 10,
+      "class5PlanQty": 10,
+      "class6PlanQty": 10,
       "treadCode": "TR-SP",
       "treadShoulderLength": 1,
       "treadMouthPlate": "MP-A",

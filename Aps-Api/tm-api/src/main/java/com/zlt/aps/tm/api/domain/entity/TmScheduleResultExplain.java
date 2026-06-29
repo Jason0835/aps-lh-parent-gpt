@@ -147,8 +147,8 @@ public class TmScheduleResultExplain extends BaseEntity {
     @TableField(value = "MONTH_SURPLUS_QTY")
     private BigDecimal monthSurplusQty;
 
-    /** 应排需求量 */
-    @ApiModelProperty(value = "应排需求量", name = "requiredQty")
+    /** 库存抵扣前当前班成型胎面需求量 */
+    @ApiModelProperty(value = "库存抵扣前当前班成型胎面需求量", name = "requiredQty")
     @TableField(value = "REQUIRED_QTY")
     private BigDecimal requiredQty;
 

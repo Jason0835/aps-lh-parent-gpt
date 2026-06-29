@@ -20,18 +20,24 @@
       "paramCode": "TM_ALGORITHM_SWITCH",
       "paramValue": "2",
       "enableStatus": "1"
+    },
+    {
+      "factoryCode": "F1",
+      "paramCode": "TM_FORMING_SHIFT_OFFSET",
+      "paramValue": "0",
+      "enableStatus": "1"
     }
   ],
   "cxScheduleResults": [
     {
       "orderNo": "TM_SCENE_021_001",
       "embryoCode": "CX-MISSING-BOM",
-      "class1PlanQty": 0,
+      "class1PlanQty": 100,
       "class2PlanQty": 100,
-      "class3PlanQty": 0,
-      "class4PlanQty": 0,
-      "class5PlanQty": 0,
-      "class6PlanQty": 0,
+      "class3PlanQty": 100,
+      "class4PlanQty": 100,
+      "class5PlanQty": 100,
+      "class6PlanQty": 100,
       "treadCode": "",
       "treadShoulderLength": 0,
       "treadMouthPlate": "",

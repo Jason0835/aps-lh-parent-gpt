@@ -1,6 +1,7 @@
 package com.zlt.aps.mp.engine.handler;
 
 import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
 import com.zlt.aps.common.core.utils.BigDecimalUtil;
 import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.constant.StringConstant;
@@ -377,6 +378,8 @@ public class MouldProductionResultHandler {
         }
         //未排原因去重
         String reason = "";
+        //20260627+ 储存，去重处理
+        Set<String> reasonSet = Sets.newHashSet();
         for (MonthPlanProductionRequirePlanVo requirement : requireList) {
             String noProductionReason = requirement.getNoProductionReason();
             if (StringUtils.isBlank(noProductionReason)) {
@@ -388,8 +391,13 @@ public class MouldProductionResultHandler {
             }
             if (StringUtils.isBlank(reason)) {
                 reason = leftOverNoProductionReason;
+                reasonSet.add(leftOverNoProductionReason);
             } else {
+                if(reasonSet.contains(leftOverNoProductionReason)){
+                    continue;
+                }
                 reason = String.format("%s,%s", reason, leftOverNoProductionReason);
+                reasonSet.add(leftOverNoProductionReason);
             }
         }
         if (!StringUtils.isBlank(reason)) {

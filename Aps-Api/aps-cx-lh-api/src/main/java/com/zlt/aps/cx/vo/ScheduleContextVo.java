@@ -73,13 +73,6 @@ public class ScheduleContextVo {
     private Set<String> dailyTrialAssignedMaterialCodes;
 
     /**
-     * 补充计划任务当日已排产量追踪（跨班次共享）
-     * Key: LhScheduleResult.id（补充任务的硫化记录ID）
-     * Value: 当日剩余应排量（班次间递减，每日重置为 dailyPlanQty）
-     */
-    private Map<Long, Integer> supplementDailyRemainingMap;
-
-    /**
      * 所有班次配置列表（按排程天数分组）
      * 用于核心算法按天获取班次配置
      */
@@ -518,6 +511,15 @@ public class ScheduleContextVo {
      * <p>供 NewTaskProcessor/ContinueTaskProcessor/TrialTaskProcessor 的 getAvailableMachinesForStructure 回退使用
      */
     private Map<String, List<MpCxCapacityConfiguration>> advanceProductionMachineMap;
+
+    /**
+     * 跨班次机台切换剩余耗时（机台编码 → 剩余切换秒数）
+     * <p>当切换耗时超过本班次剩余可用时间时，记录剩余切换耗时，下个班次继续扣除
+     * <p>场景：班次1不同英寸切换8h，但只剩6h可用，剩余2h记录到此处；
+     *        班次2该机台无前结构占用时，可用产能 = 8h - 2h = 6h
+     * <p>切换完成后立即清除该机台的记录
+     */
+    private Map<String, Long> machineSwitchRemainingMap;
 
     /**
      * 月计划排产版本

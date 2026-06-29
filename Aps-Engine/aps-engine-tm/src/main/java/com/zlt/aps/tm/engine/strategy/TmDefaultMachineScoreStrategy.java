@@ -16,7 +16,7 @@ import java.util.Map;
 /**
  * 胎面默认机台评分策略。
  *
- * <p>仅对未过滤候选机台评分，按剩余产能适配(35)、主胶料连续(20)、基部胶相似(15)、
+ * <p>仅对未过滤候选机台评分，按剩余产能适配(10)、主胶料连续(10)、基部胶相似(8)、
  * 同口型连续(10)、切换成本(10)和定点生产(10)加权求和。方法会修改候选机台评分，不修改任务链。
  * 通过 {@link Component} 注册为 Spring Bean，由 {@link TmStrategyRegistry} 按编码 "DEFAULT" 收集。</p>
  */
@@ -57,15 +57,15 @@ public class TmDefaultMachineScoreStrategy implements ITmMachineScoreStrategy {
             return result;
         }
         TmTaskDraft task = context.getTaskDraft();
-        // 1. 剩余产能适配分（权重 35）
+        // 1. 剩余产能适配分（权重 10）
         BigDecimal capacityScore = capacityFitScore(task, candidate);
-        // 2. 主胶料连续分（权重 20）
+        // 2. 主胶料连续分（权重 10）
         BigDecimal mainGlueScore = same(task.getGlueCode(), candidate.getTailMainGlueCode())
-                ? BigDecimal.valueOf(20) : BigDecimal.ZERO;
-        // 3. 基部胶相似分（权重 15）：主胶料相同时不再计基部胶分；只能取得一个基部胶编码时退化为 0 或 1
+                ? BigDecimal.TEN : BigDecimal.ZERO;
+        // 3. 基部胶相似分（权重 8）：主胶料相同时不再计基部胶分；只能取得一个基部胶编码时退化为 0 或 1
         BigDecimal baseGlueScore = mainGlueScore.compareTo(BigDecimal.ZERO) > 0
                 ? BigDecimal.ZERO
-                : (same(task.getBaseGlueCode(), candidate.getTailBaseGlueCode()) ? BigDecimal.valueOf(15) : BigDecimal.ZERO);
+                : (same(task.getBaseGlueCode(), candidate.getTailBaseGlueCode()) ? BigDecimal.valueOf(8) : BigDecimal.ZERO);
         // 4. 同口型连续分（权重 10）
         BigDecimal mouthPlateScore = same(task.getMouthPlateCode(), candidate.getTailMouthPlateCode())
                 ? BigDecimal.TEN : BigDecimal.ZERO;
@@ -86,7 +86,7 @@ public class TmDefaultMachineScoreStrategy implements ITmMachineScoreStrategy {
         scoreItems.put("fixedScore", fixedScore);
         result.setScoreItems(scoreItems);
         result.setTotalScore(totalScore);
-        result.setDescription("默认评分：产能35/主胶料20/基部胶15/口型10/切换10/定点10");
+        result.setDescription("默认评分：产能10/主胶料10/基部胶8/口型10/切换10/定点10");
         candidate.setScore(totalScore);
         candidate.getEvidence().putAll(scoreItems);
         candidate.applyScore(result);
@@ -98,7 +98,7 @@ public class TmDefaultMachineScoreStrategy implements ITmMachineScoreStrategy {
      *
      * @param task      胎面任务草稿
      * @param candidate 候选机台
-     * @return 产能适配分，最高 35
+     * @return 产能适配分，最高 10
      */
     private BigDecimal capacityFitScore(TmTaskDraft task, TmMachineCandidate candidate) {
         if (task == null) {
@@ -110,10 +110,10 @@ public class TmDefaultMachineScoreStrategy implements ITmMachineScoreStrategy {
                 || remainCapacity.compareTo(planQty) < 0) {
             return BigDecimal.ZERO;
         }
-        // 产能利用率越高分越高：产能完全利用得满分 35，剩余越多浪费越多分越低
+        // 产能利用率越高分越高：产能完全利用得满分 10，剩余越多浪费越多分越低
         BigDecimal wasteRatio = remainCapacity.subtract(planQty)
                 .divide(remainCapacity, 6, RoundingMode.HALF_UP);
-        return BigDecimal.valueOf(35).multiply(BigDecimal.ONE.subtract(wasteRatio))
+        return BigDecimal.TEN.multiply(BigDecimal.ONE.subtract(wasteRatio))
                 .max(BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP);
     }
 

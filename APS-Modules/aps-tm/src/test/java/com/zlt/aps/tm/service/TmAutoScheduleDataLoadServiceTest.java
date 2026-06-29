@@ -15,6 +15,7 @@ import org.mockito.junit.MockitoJUnitRunner;
 
 import java.lang.reflect.Field;
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -59,6 +60,11 @@ public class TmAutoScheduleDataLoadServiceTest {
     @Mock
     private TmCurlRollMapper tmCurlRollMapper;
 
+    @Mock
+    private TmStockMapper tmStockMapper;
+
+    @Mock
+    private TmScheduleResultMapper tmScheduleResultMapper;
     /**
      * 测试内容：验证数据加载会补齐默认策略参数并生成候选机台。
      * 测试场景：参数表无配置，机台表返回一台启用机台，成型需求为空。
@@ -138,15 +144,15 @@ public class TmAutoScheduleDataLoadServiceTest {
     }
 
     /**
-     * 测试内容：验证算法 2 会为 1-6 班生成对应胎面任务。
+     * 测试内容：验证算法 2 在成型班次偏移量为 0 时会为 1-6 班生成对应胎面任务。
      * 测试场景：成型需求返回一条订单，6 个班次计划量分别为 10 到 60，工作日历为空表示默认开班。
-     * 预期结果：生成 6 条任务，班次、订单号和需求量按当前算法映射正确。
+     * 预期结果：生成 6 条任务，班次、订单号和需求量按同序号成型班次映射正确。
      *
      * @throws Exception 反射注入依赖或加载数据失败时由测试框架抛出
      */
     @Test
     public void loadAllDataShouldBuildTasksForEveryShift() throws Exception {
-        // 准备算法 2 参数和公共机台 mock。
+        // 准备算法 2 参数、同序号成型班次偏移量和公共机台 mock。
         TmAutoScheduleDataLoadService service = buildServiceWithCommonMocks(Collections.singletonList(algorithmParam("2")));
         // 成型需求返回 1-6 班数量，用于验证任务拆分。
         when(tmAutoScheduleDataLoadMapper.selectFormingDemandRows(any(), any()))
@@ -159,13 +165,13 @@ public class TmAutoScheduleDataLoadServiceTest {
         // 执行数据加载和任务生成。
         service.loadAllData(context);
 
-        // 断言 1-6 班都生成任务，并按算法 2 当前口径映射需求量。
+        // 断言 1-6 班都生成任务，并按同序号成型班次映射需求量。
         assertEquals(6, context.getTaskDraftList().size());
         for (int shiftOrder = 1; shiftOrder <= 6; shiftOrder++) {
             TmTaskDraft task = context.getTaskDraftList().get(shiftOrder - 1);
             assertEquals(Integer.valueOf(shiftOrder), task.getShiftOrder());
             assertEquals("ORD-ALL-CLASS" + shiftOrder, task.getOrderNo());
-            assertBigDecimalEquals(new BigDecimal(Math.min(shiftOrder + 1, 6) * 10), task.getDemandQty());
+            assertBigDecimalEquals(new BigDecimal(shiftOrder * 10), task.getDemandQty());
         }
     }
 
@@ -197,8 +203,8 @@ public class TmAutoScheduleDataLoadServiceTest {
                 .filter(task -> Integer.valueOf(1).equals(task.getShiftOrder()))
                 .collect(Collectors.toList());
         assertEquals(2, firstShiftTaskList.size());
-        assertBigDecimalEquals(new BigDecimal("20"), firstShiftTaskList.get(0).getDemandQty());
-        assertBigDecimalEquals(new BigDecimal("7"), firstShiftTaskList.get(1).getDemandQty());
+        assertBigDecimalEquals(new BigDecimal("10"), firstShiftTaskList.get(0).getDemandQty());
+        assertBigDecimalEquals(new BigDecimal("5"), firstShiftTaskList.get(1).getDemandQty());
         assertEquals("CX-ORD-001", firstShiftTaskList.get(0).getSourceOrderNos());
         assertEquals("CX-ORD-002", firstShiftTaskList.get(1).getSourceOrderNos());
         assertNotEquals(firstShiftTaskList.get(0).getBusinessKey(), firstShiftTaskList.get(1).getBusinessKey());
@@ -208,9 +214,9 @@ public class TmAutoScheduleDataLoadServiceTest {
     }
 
     /**
-     * 测试内容：验证算法 1 使用前三班最大值生成每班需求。
+     * 测试内容：验证算法 1 从需求起点连续 3 个成型班次取最大值生成每班需求。
      * 测试场景：成型需求 1-6 班分别为 10 到 60，算法开关为 1。
-     * 预期结果：6 个排程班次的当前需求量都等于前三班最大值 30。
+     * 预期结果：6 个排程班次的当前需求量按同序号起点连续 3 班最大值计算。
      *
      * @throws Exception 反射注入依赖或加载数据失败时由测试框架抛出
      */
@@ -227,10 +233,14 @@ public class TmAutoScheduleDataLoadServiceTest {
         // 执行数据加载。
         service.loadAllData(context);
 
-        // 断言算法 1 对每个班次都取前三班最大成型量 30。
+        // 断言算法 1 从每个班次的需求起点开始连续 3 班取最大成型量。
         assertEquals(6, context.getTaskDraftList().size());
-        for (TmTaskDraft task : context.getTaskDraftList()) {
-            assertBigDecimalEquals(new BigDecimal("30"), task.getCurrentShiftDemandQty());
+        BigDecimal[] expectedDemandQtyArray = new BigDecimal[]{
+                new BigDecimal("30"), new BigDecimal("40"), new BigDecimal("50"),
+                new BigDecimal("60"), new BigDecimal("60"), new BigDecimal("60")
+        };
+        for (int index = 0; index < expectedDemandQtyArray.length; index++) {
+            assertBigDecimalEquals(expectedDemandQtyArray[index], context.getTaskDraftList().get(index).getCurrentShiftDemandQty());
         }
     }
 
@@ -382,8 +392,8 @@ public class TmAutoScheduleDataLoadServiceTest {
 
     /**
      * 测试内容：验证胎面某班停产时，需求会重分配到同日其他可排班次。
-     * 测试场景：胎面日历关闭 1 班对应班次，成型日历全部开班。
-     * 预期结果：关闭班次不生成正常任务，停产需求均摊到可排班次。
+     * 测试场景：胎面日历关闭 1 班和 4 班对应班次，成型日历全部开班。
+     * 预期结果：关闭班次不生成正常任务，停产需求均摊到 2、3、5、6 班。
      *
      * @throws Exception 反射注入依赖或加载数据失败时由测试框架抛出
      */
@@ -393,7 +403,7 @@ public class TmAutoScheduleDataLoadServiceTest {
         TmAutoScheduleDataLoadService service = buildServiceWithCommonMocks(Collections.singletonList(algorithmParam("2")));
         when(tmAutoScheduleDataLoadMapper.selectFormingDemandRows(any(), any()))
                 .thenReturn(Collections.singletonList(buildDemandRow("ORD-SHUT", "10", "20", "30", "40", "50", "60")));
-        // 第一次返回胎面日历，第二次返回成型日历；胎面 1 班关闭，成型全部开班。
+        // 第一次返回胎面日历，第二次返回成型日历；胎面 1 班和 4 班关闭，成型全部开班。
         when(tmAutoScheduleDataLoadMapper.selectWorkCalendarRows(any(), any(), any()))
                 .thenReturn(Collections.singletonList(workCalendar("0", "0", "1", "1")),
                         Collections.singletonList(workCalendar("1", "1", "1", "1")));
@@ -403,11 +413,10 @@ public class TmAutoScheduleDataLoadServiceTest {
         service.loadAllData(context);
 
         // 断言仅生成可排班次任务，并验证停产需求均摊后的需求量。
-        assertEquals(5, context.getTaskDraftList().size());
-        assertShiftDemand(context.getTaskDraftList(), 1, new BigDecimal("32.500000"));
-        assertShiftDemand(context.getTaskDraftList(), 2, new BigDecimal("42.500000"));
-        assertShiftDemand(context.getTaskDraftList(), 4, new BigDecimal("62.500000"));
-        assertShiftDemand(context.getTaskDraftList(), 5, new BigDecimal("72.500000"));
+        assertEquals(4, context.getTaskDraftList().size());
+        assertShiftDemand(context.getTaskDraftList(), 2, new BigDecimal("32.500000"));
+        assertShiftDemand(context.getTaskDraftList(), 3, new BigDecimal("42.500000"));
+        assertShiftDemand(context.getTaskDraftList(), 5, new BigDecimal("62.500000"));
         assertShiftDemand(context.getTaskDraftList(), 6, new BigDecimal("72.500000"));
     }
 
@@ -513,7 +522,12 @@ public class TmAutoScheduleDataLoadServiceTest {
         setField(service, "tmParamsMapper", tmParamsMapper);
         setField(service, "tmMachineInfoMapper", tmMachineInfoMapper);
         setField(service, "tmAutoScheduleDataLoadMapper", tmAutoScheduleDataLoadMapper);
-        when(tmParamsMapper.selectList(any())).thenReturn(paramsList);
+        setField(service, "tmStockMapper", tmStockMapper);
+        setField(service, "tmScheduleResultMapper", tmScheduleResultMapper);
+        when(tmParamsMapper.selectList(any())).thenReturn(withLegacyFormingShiftOffset(paramsList));
+        when(tmStockMapper.selectList(any())).thenReturn(Collections.emptyList());
+        when(tmScheduleResultMapper.selectList(any()))
+                .thenReturn(Collections.singletonList(historyScheduleResult("TR-215-001")));
         TmMachineInfo machineInfo = new TmMachineInfo();
         machineInfo.setFactoryCode("F1");
         machineInfo.setMachineCode("TM01");
@@ -534,10 +548,34 @@ public class TmAutoScheduleDataLoadServiceTest {
         return service;
     }
 
+    /**
+     * 为旧数据加载单测补齐成型班次偏移量。
+     *
+     * @param paramsList 原始参数列表
+     * @return 带同序号偏移参数的测试参数列表
+     */
+    private List<TmParams> withLegacyFormingShiftOffset(List<TmParams> paramsList) {
+        List<TmParams> effectiveParamsList = new ArrayList<>(paramsList);
+        boolean configured = effectiveParamsList.stream()
+                .anyMatch(params -> "TM_FORMING_SHIFT_OFFSET".equals(params.getParamCode()));
+        if (!configured) {
+            effectiveParamsList.add(param("TM_FORMING_SHIFT_OFFSET", "0"));
+        }
+        return effectiveParamsList;
+    }
     private TmParams algorithmParam(String value) {
         return param("TM_ALGORITHM_SWITCH", value);
     }
 
+    private TmScheduleResult historyScheduleResult(String treadCode) {
+        TmScheduleResult result = new TmScheduleResult();
+        result.setFactoryCode("F1");
+        result.setTreadCode(treadCode);
+        result.setScheduleDate(DateUtil.parseDate("2026-06-17"));
+        result.setClass1PlanQty(BigDecimal.ONE);
+        result.setIsDelete(0);
+        return result;
+    }
     private TmParams param(String paramCode, String value) {
         TmParams params = new TmParams();
         params.setFactoryCode("F1");

@@ -153,8 +153,7 @@ public class BalancingService {
 
         // 打印每个胎胚任务详情
         for (CoreScheduleAlgorithmService.DailyEmbryoTask task : tasks) {
-            String taskType = Boolean.TRUE.equals(task.getIsSupplementTask()) ? "补充"
-                    : Boolean.TRUE.equals(task.getIsTrialTask()) ? "试制"
+            String taskType = Boolean.TRUE.equals(task.getIsTrialTask()) ? "试制"
                     : Boolean.TRUE.equals(task.getIsContinueTask()) ? "续作" : "新增";
             String zeroDemandFlag = task.getDeferredRemainingDemand() != null ? "(零净需求)" : "";
             log.info("  胎胚任务: embryoCode={}, materialCode={}, vulcanizeMachineCount={}, structureName={}, 类型={}{}",
@@ -450,8 +449,7 @@ public class BalancingService {
 
         // 打印每个胎胚任务详情（关键诊断）
         for (CoreScheduleAlgorithmService.DailyEmbryoTask task : tasks) {
-            String taskType = Boolean.TRUE.equals(task.getIsSupplementTask()) ? "补充"
-                    : Boolean.TRUE.equals(task.getIsTrialTask()) ? "试制"
+            String taskType = Boolean.TRUE.equals(task.getIsTrialTask()) ? "试制"
                     : Boolean.TRUE.equals(task.getIsContinueTask()) ? "续作" : "新增";
             String zeroDemandFlag = task.getDeferredRemainingDemand() != null ? "(零净需求)" : "";
             log.info("  胎胚任务: embryoCode={}, materialCode={}, vulcanizeMachineCount={}, 类型={}{}",
@@ -555,7 +553,7 @@ public class BalancingService {
                     if (aContinue != bContinue) return aContinue ? -1 : 1;
 
                     // 净需求排序：非零净需求优先于零净需求
-                    // 零净需求/补充计划任务标记为 deferredRemainingDemand != null，库存已覆盖硫化需求，
+                    // 零净需求任务标记为 deferredRemainingDemand != null，库存已覆盖硫化需求，
                     // 种类槽不足时应优先让位给有实际缺口的非零净需求任务
                     boolean aZeroDemand = a.getDeferredRemainingDemand() != null;
                     boolean bZeroDemand = b.getDeferredRemainingDemand() != null;

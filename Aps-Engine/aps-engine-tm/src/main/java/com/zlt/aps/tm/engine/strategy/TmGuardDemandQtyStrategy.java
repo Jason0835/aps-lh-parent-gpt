@@ -13,8 +13,8 @@ import java.math.RoundingMode;
 /**
  * 胎面库存保证需求量策略。
  *
- * <p>按“当前班需求”和“库存最低保证班数缺口”取大值生成基础应排需求。
- * 本策略只使用 6 点库存滚动余额，不接入来源未确认的已计划入库量、已占用量、不良量和调整量。
+ * <p>按“当前班库存缺口”和“库存最低保证班数缺口”取大值生成基础应排需求。
+ * 本策略只使用 当前班初滚动库存，不接入来源未确认的已计划入库量、已占用量、不良量和调整量。
  * 通过 {@link Component} 注册为 Spring Bean，由 {@link TmStrategyRegistry} 按算法编码 "1" 收集。</p>
  */
 @Component
@@ -51,18 +51,20 @@ public class TmGuardDemandQtyStrategy implements ITmDemandQtyStrategy {
         BigDecimal rollingStock = nvl(input.getRollingStockQty());
         int guardShiftCount = input.getGuardShiftCount() == null || input.getGuardShiftCount() <= 0
                 ? DEFAULT_GUARD_SHIFT_COUNT : input.getGuardShiftCount();
+        BigDecimal currentShiftStockGap = currentDemand.subtract(rollingStock).max(BigDecimal.ZERO);
         BigDecimal stockGap = guardDemand.subtract(rollingStock).max(BigDecimal.ZERO);
-        BigDecimal demandQty = currentDemand.max(stockGap);
+        BigDecimal demandQty = currentShiftStockGap.max(stockGap);
 
         TmDemandQtyResult result = new TmDemandQtyResult();
         result.setCurrentShiftDemandQty(currentDemand);
         result.setGuardDemandQty(guardDemand);
         result.setRollingStockQty(rollingStock);
+        result.setCurrentShiftStockGapQty(currentShiftStockGap);
         result.setStockGapQty(stockGap);
         result.setDemandQty(demandQty);
         result.setGuardShiftCount(guardShiftCount);
         result.setSupplyHours(calculateSupplyHours(rollingStock, guardDemand, input.getGuardRangeHours()));
-        result.setCalcDesc("按6点库存滚动余额计算，基础需求=max(当前班需求, 保证范围库存缺口)");
+        result.setCalcDesc("按当前班初滚动库存计算，需求=max(当前班库存缺口, 保证范围库存缺口)");
         return result;
     }
 

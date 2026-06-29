@@ -154,6 +154,10 @@ public class FactoryMonthPlanProductionFinalResultController extends AbstractDoc
     @PostMapping("/list4Adjust")
     public TableDataInfo list4Adjust(@RequestBody FactoryMonthPlanProductionFinalResult queryCondition) {
         List<FactoryMonthPlanFinalAdjustVo> list = factoryMonthPlanProductionFinalResultService.list4Adjust(queryCondition);
+        //合计生产实际排产量 sandy+ 2026.6.26
+        int sumTotalQty = list.stream().mapToInt(v -> v.getTotalQty() == null ? 0 : v.getTotalQty()).sum();
+        list.forEach(v -> v.setSumTotalQty(sumTotalQty));
+
         // 排序 按英寸->结构->最大型腔数->主花纹->活块数->物料描述
         mpWeekRollAdjustController.sortAdjustResultList(list);
         Integer pageNum = Convert.toInt(StringUtils.defaultIfBlank(ServletUtils.getParameter("pageNum"), ServletUtils.getHeader("pageNum")));
@@ -729,7 +733,8 @@ public class FactoryMonthPlanProductionFinalResultController extends AbstractDoc
     /**
      * 定时计算上月超欠产
      * 根据上月计划排产量和上月硫化日完成量(合格品)计算超欠产，
-     * 并置上月超欠产有效标志=是
+     * 并按阈值参数(SYS0206009)判定上月超欠产有效标志：
+     * |超欠产值|(绝对值) > 阈值 → 否('0')，否则 → 是('1')
      */
     @ApiOperation("定时计算上月超欠产")
     @PostMapping("/calcLastMonthOverProd")

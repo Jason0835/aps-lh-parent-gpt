@@ -902,8 +902,11 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
     protected void builderCondition(QueryWrapper<CxScheduleResult> queryWrapper, CxScheduleResult queryVO) {
         // 排程日期查询
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getScheduleDate()), "SCHEDULE_DATE", queryVO.getScheduleDate());
-        // 机台代码模糊查询
-        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getCxMachineCode()), "CX_MACHINE_CODE", queryVO.getCxMachineCode());
+        // 机台代码多选查询：支持逗号分隔的多个机台
+        if (PubUtil.isNotEmpty(queryVO.getCxMachineCode())) {
+            String[] machineCodes = queryVO.getCxMachineCode().split(",");
+            queryWrapper.in("CX_MACHINE_CODE", (Object[]) machineCodes);
+        }
         // 物料代码模糊查询
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getMaterialCode()), "MATERIAL_CODE", queryVO.getMaterialCode());
         // 物料描述模糊查询

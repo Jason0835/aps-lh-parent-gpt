@@ -1,6 +1,5 @@
 package com.zlt.aps.mp.engine.scheduling.groupproduction;
 
-import com.google.common.collect.Lists;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.enums.ProductTypeEnum;
 import com.zlt.aps.enums.YesOrNoEnum;
@@ -10,10 +9,10 @@ import com.zlt.aps.mp.api.domain.entity.MpMouldUsedStatusLog;
 import com.zlt.aps.mp.api.domain.entity.MpStructureAllocation;
 import com.zlt.aps.mp.api.enums.ProductionProcessStage;
 import com.zlt.aps.mp.engine.basedata.assemble.continueinfo.ContinueGroupInfoHandler;
+import com.zlt.aps.mp.engine.basedata.assemble.cyclegroup.CycleGroupDataHandler;
 import com.zlt.aps.mp.engine.basedata.assemble.fixed.GroupFixedInfoHandler;
 import com.zlt.aps.mp.engine.basedata.assemble.history.ProductionHistoryHandler;
 import com.zlt.aps.mp.engine.domain.Context;
-import com.zlt.aps.mp.engine.domain.ProductionStageLogRecorder;
 import com.zlt.aps.mp.engine.domain.dto.*;
 import com.zlt.aps.mp.engine.domain.vo.*;
 import com.zlt.aps.mp.engine.enums.LogRecorderStageEnum;
@@ -71,6 +70,7 @@ public class TbrStructureNameCapacityProductionService extends AbstractDataLoade
 
     public TbrStructureNameCapacityProductionService(ProductionMdmDataService dataService,
                                                      DpRequireDataService dpRequireDataService,
+                                                     CycleGroupDataHandler cycleGroupDataHandler,
                                                      GroupFixedInfoHandler groupFixedInfoHandler,
                                                      ContinueGroupInfoHandler continueGroupInfoHandler,
                                                      ProductionHistoryHandler productionHistoryHandler,
@@ -79,7 +79,7 @@ public class TbrStructureNameCapacityProductionService extends AbstractDataLoade
                                                      CalculateStructureCxMachineNumber calculateStructureCxMachineNumber,
                                                      ProductionCxMachineCalculationHandler productionCxMachineCalculationHandler,
                                                      AdjustContinueSkuProductionQtyHandler adjustContinueSkuProductionQtyHandler) {
-        super(dataService, dpRequireDataService, monthProductionDataService, productionHistoryHandler);
+        super(dataService, dpRequireDataService, cycleGroupDataHandler, productionHistoryHandler, monthProductionDataService);
         this.groupFixedInfoHandler = groupFixedInfoHandler;
         this.continueGroupInfoHandler = continueGroupInfoHandler;
         this.simulateProductionHandler = simulateProductionHandler;
@@ -117,6 +117,12 @@ public class TbrStructureNameCapacityProductionService extends AbstractDataLoade
         log.info(TbrBeforeProductionGroupLogRecorder.addStartBeforeProductionDataLog(productionContext));
         initProductionBaseData(productionContext, requirePlanList);
         saveMouldUsedLog(productionContext);
+        //20260626+ 非月周期结构清单中置为不排产
+        requirePlanList.forEach(singlePlan -> {
+            if (singlePlan.isFlagFalse(productionContext)) {
+                singlePlan.setProductionFlag(YesOrNoEnum.NO.getCode());
+            }
+        });
         //3、按结构分组，汇总结构净需求量，粗算需要的机台数 记录日志-粗算成型机台数，并赋值结构指定的机台集合
         log.info(TbrProductionGroupLogRecorder.addStartGroupCalculateCapacityLog(productionContext));
         Map<String, ProductionPlanGroupInfo> estimateGroupCxAllocationMap = calculateStructureCxMachineNumber.calculateStructureCxMachineNumber(productionContext, requirePlanList, true);
@@ -299,20 +305,6 @@ public class TbrStructureNameCapacityProductionService extends AbstractDataLoade
             ContinueSkuCalculator.setContinueSkuPlanDemandQty(context, groupPlanInfo, cxContinueInfoHelper);
             ContinueSkuCalculator.initContinueCxMachineLimit(context, groupPlanInfo, cxContinueInfoHelper);
         });
-    }
-
-    /**
-     * 9：根据成型信息，得到结构排产结果
-     * 即结构转产信息
-     *
-     * @param productionContext
-     */
-    private void saveStructureInfo(TbrProductionContext productionContext) {
-        List<MpStructureAllocation> allAllocationList = GroupProductionConversionHandler.getFinalResult(productionContext);
-        if (CollectionUtils.isEmpty(allAllocationList)) {
-            return;
-        }
-        getMonthProductionDataService().saveGroupConversionResult(allAllocationList);
     }
 
     /**

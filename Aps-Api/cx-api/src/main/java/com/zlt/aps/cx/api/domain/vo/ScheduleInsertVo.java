@@ -44,7 +44,7 @@ public class ScheduleInsertVo {
     @ApiModelProperty(value = "成型批次号")
     private String cxBatchNo;
 
-    @ApiModelProperty(value = "主物料(胎胚描述)")
+    @ApiModelProperty(value = "胎胚描述")
     private String mainMaterialDesc;
 
     @ApiModelProperty(value = "结构")

@@ -14,7 +14,7 @@ import java.math.RoundingMode;
  * 胎面默认计划量策略。
  *
  * <p>按基础需求、库存抵扣、工装限制、最小起排、卷数取整、产能压缩顺序计算计划量。
- * 库存抵扣使用上下文中 per-tread 剩余库存（初值6点库存净值，逐班递减），对当前班需求与保证范围需求各冲减后取大。
+ * 库存抵扣使用任务草稿中的当前班初滚动库存，对当前班需求与保证范围需求各冲减后取大。
  * 本策略只依赖任务草稿中已明确的数据，不读取数据库，不修改任务链。
  * 通过 {@link Component} 注册为 Spring Bean，由 {@link TmStrategyRegistry} 按编码 "DEFAULT" 收集。</p>
  */
@@ -51,16 +51,13 @@ public class TmDefaultPlanQtyStrategy implements ITmPlanQtyStrategy {
         BigDecimal currentDemand = nvl(taskDraft.getCurrentShiftDemandQty());
         BigDecimal guardDemand = nvl(taskDraft.getGuardDemandQty());
         BigDecimal grossDemand = currentDemand.max(guardDemand);
-        // 库存直接抵扣当前班生产量：per-tread 剩余库存逐班递减，对当前班需求与保证范围需求各冲减后取大
-        BigDecimal stock = resolveRemainingStock(taskDraft, context);
+        // 库存直接抵扣当前班生产量：当前班初滚动库存对当前班需求与保证范围需求各冲减后取大。
+        BigDecimal stock = nvl(taskDraft.getRollingStockQty());
         BigDecimal stockDeductQty = stock.min(grossDemand);
         BigDecimal planQty = currentDemand.subtract(stock)
                 .max(guardDemand.subtract(stock))
                 .max(BigDecimal.ZERO);
         taskDraft.setStockDeductQty(stockDeductQty);
-        taskDraft.setPlanStockQty(stock.subtract(stockDeductQty).max(BigDecimal.ZERO));
-        // 回写剩余库存，供该胎面下一班继续抵扣，避免同一库存被多班重复抵扣
-        writeBackRemainingStock(taskDraft, context, stock.subtract(stockDeductQty).max(BigDecimal.ZERO));
         TmPlanQtyResult result = new TmPlanQtyResult();
         result.setBaseDemandQty(planQty);
 
@@ -97,6 +94,7 @@ public class TmDefaultPlanQtyStrategy implements ITmPlanQtyStrategy {
         result.setCapacityAdjustQty(planQty.subtract(beforeCapacity));
 
         result.setFinalPlanQty(planQty);
+        taskDraft.setPlanStockQty(calculateHandoverStock(stock, currentDemand, planQty));
         result.setCalcFormulaDesc(tailTask
                 ? "收尾余量->损耗补偿->工装限制->产能压缩"
                 : "基础需求->库存抵扣->工装限制->最小起排->卷数取整->产能压缩");
@@ -217,31 +215,15 @@ public class TmDefaultPlanQtyStrategy implements ITmPlanQtyStrategy {
     }
 
     /**
-     * 读取该胎面当前剩余可抵扣库存。
+     * 计算当前任务完成后的交接班预计库存。
      *
-     * @param taskDraft 任务草稿
-     * @param context   胎面排程上下文
-     * @return 剩余库存；上下文或映射为空时返回 0
+     * @param shiftStartStock 当前班初滚动库存
+     * @param currentDemand 当前班成型胎面需求量
+     * @param finalPlanQty 最终计划量
+     * @return 交接班预计库存，低于 0 时按 0 处理
      */
-    private BigDecimal resolveRemainingStock(TmTaskDraft taskDraft, TmScheduleContext context) {
-        if (context == null || context.getRemainingStockMap() == null || taskDraft.getTreadCode() == null) {
-            return BigDecimal.ZERO;
-        }
-        return nvl(context.getRemainingStockMap().get(taskDraft.getTreadCode()));
-    }
-
-    /**
-     * 回写该胎面抵扣后的剩余库存，供下一班继续抵扣。
-     *
-     * @param taskDraft      任务草稿
-     * @param context        胎面排程上下文
-     * @param remainingStock 抵扣后剩余库存
-     */
-    private void writeBackRemainingStock(TmTaskDraft taskDraft, TmScheduleContext context, BigDecimal remainingStock) {
-        if (context == null || context.getRemainingStockMap() == null || taskDraft.getTreadCode() == null) {
-            return;
-        }
-        context.getRemainingStockMap().put(taskDraft.getTreadCode(), remainingStock);
+    private BigDecimal calculateHandoverStock(BigDecimal shiftStartStock, BigDecimal currentDemand, BigDecimal finalPlanQty) {
+        return nvl(shiftStartStock).add(nvl(finalPlanQty)).subtract(nvl(currentDemand)).max(BigDecimal.ZERO);
     }
 
     /**

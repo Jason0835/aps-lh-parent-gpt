@@ -50,18 +50,20 @@ public class TmNextShiftDemandQtyStrategy implements ITmDemandQtyStrategy {
         BigDecimal rollingStock = nvl(input.getRollingStockQty());
         int guardShiftCount = input.getGuardShiftCount() == null || input.getGuardShiftCount() <= 0
                 ? DEFAULT_GUARD_SHIFT_COUNT : input.getGuardShiftCount();
+        BigDecimal currentShiftStockGap = nextShiftDemand.subtract(rollingStock).max(BigDecimal.ZERO);
         BigDecimal stockGap = guardDemand.subtract(rollingStock).max(BigDecimal.ZERO);
-        BigDecimal demandQty = nextShiftDemand.max(stockGap);
+        BigDecimal demandQty = currentShiftStockGap.max(stockGap);
 
         TmDemandQtyResult result = new TmDemandQtyResult();
         result.setCurrentShiftDemandQty(nextShiftDemand);
         result.setGuardDemandQty(guardDemand);
         result.setRollingStockQty(rollingStock);
+        result.setCurrentShiftStockGapQty(currentShiftStockGap);
         result.setStockGapQty(stockGap);
         result.setDemandQty(demandQty);
         result.setGuardShiftCount(guardShiftCount);
         result.setSupplyHours(this.calculateSupplyHours(rollingStock, guardDemand, input.getGuardRangeHours()));
-        result.setCalcDesc("算法2按下个成型班次需求计算，基础需求=max(下班成型需求, 保证范围库存缺口)");
+        result.setCalcDesc("算法2按下个成型班次需求计算，需求=max(下班成型库存缺口, 保证范围库存缺口)");
         return result;
     }
 

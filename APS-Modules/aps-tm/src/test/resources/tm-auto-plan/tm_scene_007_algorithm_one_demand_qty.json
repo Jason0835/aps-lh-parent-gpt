@@ -1,6 +1,6 @@
 {
   "caseName": "TM_SCENE_007_algorithm_one_demand_qty",
-  "description": "TM_SCENE_007：算法 1 需求量计算",
+  "description": "TM_SCENE_007：算法 1 按配置的成型班次偏移量计算需求量",
   "autoPlanRequest": {
     "factoryCode": "F1",
     "scheduleDate": "2026-07-07",
@@ -20,6 +20,12 @@
       "paramCode": "TM_MIN_STOCK_CLASS",
       "paramValue": "2",
       "enableStatus": "1"
+    },
+    {
+      "factoryCode": "F1",
+      "paramCode": "TM_FORMING_SHIFT_OFFSET",
+      "paramValue": "2",
+      "enableStatus": "1"
     }
   ],
   "cxScheduleResults": [
@@ -29,13 +35,15 @@
       "class1PlanQty": 10,
       "class2PlanQty": 25,
       "class3PlanQty": 15,
-      "class4PlanQty": 0,
-      "class5PlanQty": 0,
+      "class4PlanQty": 35,
+      "class5PlanQty": 10,
       "class6PlanQty": 0,
       "treadCode": "TR-A1",
       "treadShoulderLength": 2,
       "treadMouthPlate": "MP-A",
-      "treadRubberCategory": "GL-A"
+      "treadRubberCategory": "GL-A",
+      "class7PlanQty": 0,
+      "class8PlanQty": 0
     }
   ],
   "stocks": [
@@ -74,7 +82,7 @@
     "resultCount": 1,
     "assignedCount": 1,
     "unassignedCount": 0,
-    "explainCount": 6,
+    "explainCount": 3,
     "errorCount": 0,
     "expectedResults": [
       {
@@ -83,7 +91,7 @@
         "machineCode": "TM01",
         "shiftOrder": 1,
         "sequence": 1,
-        "planQty": 70
+        "planQty": 100
       }
     ]
   },

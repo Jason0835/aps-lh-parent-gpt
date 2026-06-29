@@ -2,6 +2,7 @@ package com.zlt.aps.mp.engine.scheduling;
 
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.constant.Constant;
@@ -9,13 +10,13 @@ import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.constant.StringConstant;
 import com.zlt.aps.enums.CheckItemTypeEnums;
 import com.zlt.aps.enums.MonthPlanNoProductionReasonEnum;
-import com.zlt.aps.enums.ProductionGroupTypeEnum;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.exception.BusinessException;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.mdm.api.domain.entity.LhMachineInfo;
 import com.zlt.aps.mp.api.domain.entity.*;
 import com.zlt.aps.mp.api.domain.vo.MpCheckItemVo;
+import com.zlt.aps.mp.engine.basedata.assemble.cyclegroup.CycleGroupDataHandler;
 import com.zlt.aps.mp.engine.basedata.assemble.history.CxMachineProductionHistoryInfo;
 import com.zlt.aps.mp.engine.basedata.assemble.history.GroupPlanProductionHistoryInfo;
 import com.zlt.aps.mp.engine.basedata.assemble.history.ProductionHistoryHandler;
@@ -25,6 +26,7 @@ import com.zlt.aps.mp.engine.domain.Context;
 import com.zlt.aps.mp.engine.domain.ProductionStageLogRecorder;
 import com.zlt.aps.mp.engine.domain.dto.ProductionPlanGroupInfo;
 import com.zlt.aps.mp.engine.domain.vo.*;
+import com.zlt.aps.mp.engine.handler.GroupProductionConversionHandler;
 import com.zlt.aps.mp.engine.handler.LhMachineInfoCalculateHelper;
 import com.zlt.aps.mp.engine.logrecorder.TbrBeforeProductionGroupLogRecorder;
 import com.zlt.aps.mp.engine.scheduling.cxcapacity.ProductionCapacityParamConfiguration;
@@ -34,6 +36,7 @@ import com.zlt.aps.mp.engine.service.ProductionMdmDataService;
 import com.zlt.aps.mp.engine.utils.DateUtils;
 import com.zlt.aps.mp.engine.utils.MouldRelationDeduplicator;
 import com.zlt.aps.mp.engine.utils.NoProductionReasonUtils;
+import com.zlt.aps.mp.engine.utils.ProductionProcessUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;
@@ -57,8 +60,12 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
 
     private final ProductionHistoryHandler productionHistoryHandler;
 
-    public AbstractDataLoaderService(ProductionMdmDataService dataService, DpRequireDataService dpRequireDataService, MonthProductionDataService monthProductionDataService, ProductionHistoryHandler productionHistoryHandler) {
-        super(dataService, dpRequireDataService, monthProductionDataService);
+    public AbstractDataLoaderService(ProductionMdmDataService dataService,
+                                     DpRequireDataService dpRequireDataService,
+                                     CycleGroupDataHandler cycleGroupDataHandler,
+                                     ProductionHistoryHandler productionHistoryHandler,
+                                     MonthProductionDataService monthProductionDataService) {
+        super(dataService, dpRequireDataService, cycleGroupDataHandler, monthProductionDataService);
         this.productionHistoryHandler = productionHistoryHandler;
     }
 
@@ -117,6 +124,9 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
             paramConfiguration = new ProductionCapacityParamConfiguration();
         }
         productionContext.getBaseDataContainer().setParamConfiguration(paramConfiguration);
+        //20260626+ 加载月周期结构清单
+        Set<String> monthProductionCycleList = getMonthProductionCycleList(productionContext);
+        productionContext.getBaseDataContainer().setMonthProductionCycleList(monthProductionCycleList);
         //2、特殊材料的胎胚配置信息
         specialMaterialInfoHandler(productionContext);
         //3、超6个成品库存信息
@@ -402,6 +412,38 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
     }
 
     /**
+     * 9：根据成型信息，得到结构排产结果
+     * 即结构转产信息
+     *
+     * @param productionContext
+     */
+    protected List<MpStructureAllocation> saveStructureInfo(TbrProductionContext productionContext) {
+        List<MpStructureAllocation> allAllocationList = GroupProductionConversionHandler.getFinalResult(productionContext);
+        if (CollectionUtils.isEmpty(allAllocationList)) {
+            return Collections.emptyList();
+        }
+        //同结构，同机台前后衔接则合并为一条
+        Map<String, List<MpStructureAllocation>> groupMap = allAllocationList.stream().collect(Collectors.groupingBy(MpStructureAllocation::getGroupKey));
+        if (CollectionUtils.isEmpty(groupMap)) {
+            return Collections.emptyList();
+        }
+        List<MpStructureAllocation> resultList = Lists.newArrayList();
+        groupMap.forEach((groupKey, allocationList) -> {
+            if (CollectionUtils.isEmpty(allocationList)) {
+                return;
+            }
+            if (allocationList.size() == BigDecimal.ONE.intValue()) {
+                resultList.add(allocationList.get(BigDecimal.ZERO.intValue()));
+                return;
+            }
+            //前后可衔接则合并
+            resultList.addAll(merge(allocationList));
+        });
+        getMonthProductionDataService().saveGroupConversionResult(resultList);
+        return resultList;
+    }
+
+    /**
      * 辅助方法：添加检测结果
      */
     private void addCheckResult(boolean isPass, CheckItemTypeEnums checkItemType, String failReason, List<MpCheckItemVo> mpCheckItemVos, List<MpCheckItemRecord> mpCheckItemRecords) {
@@ -492,6 +534,7 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
         paramCodeList.add(MonthPlanEnums.DAY_MIN_ALARM_LIMIT.getCode());
         paramCodeList.add(MonthPlanEnums.PRODUCTION_MODE.getCode());
         paramCodeList.add(MonthPlanEnums.SINGLE_CX_MACHINE_CHANGE_PRO_SIZE_REPEAT_COUNT.getCode());
+        paramCodeList.add(MonthPlanEnums.GROUP_SECOND_ON_LINE_BY_SAME_CX_MACHINE.getCode());
         //排产控制相关
         paramCodeList.add(MonthPlanEnums.SUM_PRODUCTION_QTY.getCode());
         paramCodeList.add(MonthPlanEnums.HEIGHT_DIFF_QTY.getCode());
@@ -519,6 +562,7 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
         paramCodeList.add(MonthPlanEnums.LAST_NEAR_DEAD_LINE_MAX_LH_MACHINE_COUNT.getCode());
         //Sku排产顺序相关
         paramCodeList.add(MonthPlanEnums.HEIGHT_PRIORITY_SKU_LIST_COUNT.getCode());
+        paramCodeList.add(MonthPlanEnums.SHARE_MOLD_EMBRYO_PRIORITY.getCode());
         //其他
         paramCodeList.add(MonthPlanEnums.SECTION_WIDTH_DIFF_VALUE.getCode());
         paramCodeList.add(MonthPlanEnums.CHANGE_STRUCT_DEC_LH_MACHINES.getCode());
@@ -571,7 +615,18 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
         configuration.setOemJoinStructurePriority(FactoryConstant.YES_VALUE.equals(oemJoinStructurePriority));
         //20260522+ 同规格同花纹换活字块是否算换模次数
         String isAddChangeMoldCount = (String) paramConfigurationMap.get(MonthPlanEnums.ADD_CHANGE_MOLD_COUNT_BY_SAME_PATTERN.getCode());
-        configuration.setAddChangeMoldCountBySameSpecificationsPattern(ProductionConstant.YES_VALUE.equals(isAddChangeMoldCount));
+        if (ProductionProcessUtils.isYesValue(isAddChangeMoldCount)) {
+            configuration.setAddChangeMoldCountBySameSpecificationsPattern(true);
+        } else {
+            configuration.setAddChangeMoldCountBySameSpecificationsPattern(false);
+        }
+        //20260628+ 同机台是否允许分组二次上机
+        String isSecondOnLineValue = (String) paramConfigurationMap.get(MonthPlanEnums.GROUP_SECOND_ON_LINE_BY_SAME_CX_MACHINE.getCode());
+        if (ProductionProcessUtils.isYesValue(isSecondOnLineValue)) {
+            configuration.setSecondOnLineBySameCxMachine(true);
+        } else {
+            configuration.setSecondOnLineBySameCxMachine(false);
+        }
         configuration.setMaxBoostDay((Integer) paramConfigurationMap.get(MonthPlanEnums.MAX_BOOST_DAY.getCode()));
         configuration.setMatchingBoostDay((Integer) paramConfigurationMap.get(MonthPlanEnums.MATCHING_BOOST_DAY.getCode()));
         configuration.setSkuSecondProduction((Integer) paramConfigurationMap.get(MonthPlanEnums.SKU_SECOND_PRODUCTION.getCode()));
@@ -612,7 +667,7 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
         configuration.setLastNearDeadLineDay((Integer) paramConfigurationMap.get(MonthPlanEnums.LAST_NEAR_DEAD_LINE_DAY.getCode()));
         //Sku排产顺序相关
         configuration.setHeightPrioritySkuPreCount((Integer) paramConfigurationMap.get(MonthPlanEnums.HEIGHT_PRIORITY_SKU_LIST_COUNT.getCode()));
-
+        configuration.setShareMoldOrEmbryoPriorityRange((Integer) paramConfigurationMap.get(MonthPlanEnums.SHARE_MOLD_EMBRYO_PRIORITY.getCode()));
         //其它
         configuration.setSectionWidthDiffValue((Integer) paramConfigurationMap.get(MonthPlanEnums.SECTION_WIDTH_DIFF_VALUE.getCode()));
         Object deductionLhMachineValue = paramConfigurationMap.get(MonthPlanEnums.CHANGE_STRUCT_DEC_LH_MACHINES.getCode());
@@ -690,18 +745,6 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
     }
 
     /**
-     * 2.1.2：根据排产信息，获取特殊原材料的配置信息-基于月计划初始化表 包含：
-     * 1、特殊原材料的胎胚
-     * 2、特殊原材料的库存及可转化的轮胎条数
-     *
-     * @param productionContext 排产单位
-     */
-//    private void specialMaterialInfoByRequireHandler(TbrProductionContext productionContext) {
-//        List<EmbryoSpecialMaterialInfoVo> specialMaterialInfoList = getDataService().getEmbryoSpecialMaterialInfo(productionContext);
-//        buildSpecialMaterialInfo(productionContext, specialMaterialInfoList);
-//    }
-
-    /**
      * 2.1.3：加载超6个月的库存信息
      *
      * @param productionContext
@@ -770,14 +813,7 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
                 productionPlanList.forEach(requirePlan -> requirePlan.setIsProductionBySum(Constant.TRUE));
             }
         });
-        //周期结构-按总需求排产
-        requirePlanList.forEach(requirePlan -> {
-            //周期排产按总量排产
-            if (ProductionGroupTypeEnum.CYCLE.getGroupType().equals(requirePlan.getStructureType())) {
-                requirePlan.setIsProductionBySum(Constant.TRUE);
-            }
-        });
-        //计算初始的库销比
+        //计算初始的库销比 20260624+ 去除周期结构-按总需求排产
         requirePlanList.forEach(requirePlan -> requirePlan.calculateInventorySalesRatio(BigDecimal.ZERO.intValue()));
     }
 
@@ -1214,4 +1250,49 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
         productionContext.setSpecialMaterialStructureRelationMap(new HashMap<>());
     }
 
+    /**
+     * 同机台同结构没有断开时，合并
+     *
+     * @param originAllocationList
+     * @return
+     */
+    private List<MpStructureAllocation> merge(List<MpStructureAllocation> originAllocationList) {
+        if (CollectionUtils.isEmpty(originAllocationList)) {
+            return Collections.emptyList();
+        }
+        //排序，按起始日从小到大
+        originAllocationList.sort(Comparator.comparing(MpStructureAllocation::getBeginDay));
+        Set<MpStructureAllocation> mergeResult = Sets.newHashSet();
+        int size = originAllocationList.size();
+        int startIndex = BigDecimal.ZERO.intValue();
+        for (; startIndex < size; startIndex++) {
+            MpStructureAllocation previous = originAllocationList.get(startIndex);
+            //后一个配置
+            int nextStartIndex = startIndex + BigDecimal.ONE.intValue();
+            for (; nextStartIndex < size; nextStartIndex++) {
+                MpStructureAllocation next = originAllocationList.get(nextStartIndex);
+                Integer previousEndDay = previous.getEndDay();
+                Integer nextStartDay = next.getBeginDay();
+                //说明前后衔接
+                if (previousEndDay + BigDecimal.ONE.intValue() == nextStartDay) {
+                    previous.setEndDay(next.getEndDay());
+                    Integer allotDays = previous.getAllotDays() + next.getAllotDays();
+                    previous.setAllotDays(allotDays);
+                } else {
+                    if (!mergeResult.contains(previous)) {
+                        mergeResult.add(previous);
+                    }
+                    startIndex = nextStartIndex;
+                    break;
+                }
+            }
+            if (mergeResult.contains(previous)) {
+                mergeResult.add(previous);
+            }
+        }
+        if (CollectionUtils.isEmpty(mergeResult)) {
+            return Collections.emptyList();
+        }
+        return Lists.newArrayList(mergeResult);
+    }
 }

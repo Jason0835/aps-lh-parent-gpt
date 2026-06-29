@@ -10,6 +10,7 @@ import com.zlt.aps.mp.engine.domain.dto.ProductionPlanGroupInfo;
 import com.zlt.aps.mp.engine.domain.vo.CxMachineBaseInfoVo;
 import com.zlt.aps.mp.engine.domain.vo.MonthPlanProductionRequirePlanVo;
 import com.zlt.aps.mp.engine.domain.vo.MonthPlanStructureLhRatioVo;
+import com.zlt.aps.mp.engine.handler.DayProductionStatisticsHandler;
 import com.zlt.aps.mp.engine.handler.SimulateProductionSnapshotHandler;
 import com.zlt.aps.mp.engine.logrecorder.TbrMouldProductionLogRecorder;
 import com.zlt.aps.mp.engine.scheduling.TbrProductionContext;
@@ -49,6 +50,8 @@ public class CxMouldProductionHandler {
      */
     private final GroupPlanBeforeConclusionHandler groupPlanBeforeConclusionHandler;
 
+    private final DayProductionStatisticsHandler dayProductionStatisticsHandler;
+
     /**
      * 非在机结构，模具排产
      *
@@ -62,6 +65,7 @@ public class CxMouldProductionHandler {
         ProductionPlanGroupInfo productionPlanInfo = productionPlan.getProductionPlanInfo();
         String groupName = productionPlanInfo.getGroupName();
         TbrMouldProductionLogRecorder.addStartCxMachineMouldProductionPlanLog(context, cxMachineCode, groupName);
+        dayProductionStatisticsHandler.printDayLimitKeyInformationLog(productionContext);
         List<MonthPlanProductionRequirePlanVo> groupPlanData = productionPlanInfo.getGroupPlanData();
         List<MonthPlanProductionRequirePlanVo> hasProductionPlanList = groupPlanData.stream().filter(groupPlan -> groupPlan.hasProduction()).collect(Collectors.toList());
         if (CollectionUtils.isEmpty(hasProductionPlanList)) {

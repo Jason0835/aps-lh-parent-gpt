@@ -1,319 +1,150 @@
 package com.zlt.aps.tq.controller;
 
-import java.util.Arrays;
-import java.util.Date;
-import java.util.List;
-import java.util.stream.Collectors;
-
-import javax.annotation.Resource;
-
-import org.apache.commons.collections4.CollectionUtils;
-import org.apache.commons.lang3.time.DateFormatUtils;
-import org.springframework.beans.BeanUtils;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
-
-import com.alibaba.fastjson.JSONObject;
-import com.github.pagehelper.util.StringUtil;
+import cn.hutool.core.date.DateUtil;
+import com.alibaba.cloud.commons.lang.StringUtils;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.core.utils.DateUtils;
-import com.ruoyi.common.core.web.controller.BaseController;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
-import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
-import com.ruoyi.common.utils.StringUtils;
-import com.zlt.aps.common.core.constant.ApsConstant;
-import com.zlt.aps.common.engine.service.FactoryService;
-import com.zlt.aps.itf.vo.SyncDataLogs;
-import com.zlt.aps.tq.api.domain.dto.TqScheduleResultDto;
-import com.zlt.aps.tq.api.domain.entity.TqScheFinishQty;
+import com.zlt.aps.tq.api.domain.dto.TqChangeMachineDTO;
+import com.zlt.aps.tq.api.domain.dto.TqInsertOrderDTO;
+import com.zlt.aps.tq.api.domain.entity.TqScheduleResult;
+import com.zlt.aps.tq.api.domain.vo.TqScheduleShiftDateVO;
 import com.zlt.aps.tq.engine.service.TqEngineService;
-import com.zlt.aps.tq.entity.TqScheduleResult;
-import com.zlt.aps.tq.service.TqScheduleResultService;
-import com.zlt.sync.api.service.ISyncDataLogsApiService;
-
+import com.zlt.aps.tq.mapper.TqScheduleResultMapper;
+import com.zlt.aps.tq.service.ITqScheduleResultService;
+import com.zlt.bill.common.controller.AbstractDocBizController;
+import com.zlt.bill.common.service.IDocService;
+import com.zlt.common.utils.PubUtil;
 import io.swagger.annotations.Api;
-import io.swagger.annotations.ApiImplicitParam;
-import io.swagger.annotations.ApiImplicitParams;
 import io.swagger.annotations.ApiOperation;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.*;
+
+import javax.annotation.Resource;
+import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
 
 /**
- * 【已废弃】胎圈排程结果Controller（4班次制旧版）
+ * 胎圈排程结果Controller
  *
- * <p>废弃说明：
- * <ul>
- *   <li>本Controller为旧版4班次制胎圈排程接口，已由新版6班次制Controller替代</li>
- *   <li>新版Controller：{@link com.zlt.aps.tq.controller.TqNewScheduleResultController}</li>
- *   <li>新版接口前缀：/tq/newScheduleResult/*</li>
- *   <li>新版算法依据：胎圈自动排程_v5.xmind（6班次制）</li>
- *   <li>旧版4班次字段（midPlanQty/nightPlanQty/dayPlanQty/nextMidPlanQty）将逐步废弃</li>
- *   <li>请勿在此Controller新增功能，所有新需求请到新版Controller实现</li>
- *   <li>计划在前端完全切换到新版接口后，本Controller将一并删除</li>
- * </ul>
- *
- * @author chen
- * @date 2021-06-21
+ * @author APS
  */
-@Deprecated
+@Slf4j
+@Api(tags = "胎圈排程结果")
 @RestController
-@RequestMapping("/tq/scheduleResult")
-@Api(tags = "胎圈排程结果信息维护接口")
-public class TqScheduleResultController extends BaseController {
-    @Autowired
-    private TqScheduleResultService tqScheduleResultService;
-    @Resource
-    private TqEngineService tqEngineService;
-    @Autowired
-    private FactoryService factoryService;
-	@Resource
-	private ISyncDataLogsApiService syncDataLogsService;
+@RequestMapping("/scheduleResult")
+public class TqScheduleResultController extends AbstractDocBizController<TqScheduleResult> {
 
-    /**
-     * 查询胎圈排程结果列表
-     */
+    @Autowired
+    private ITqScheduleResultService tqScheduleResultService;
+
+    @Resource
+    private TqScheduleResultMapper tqScheduleResultMapper;
+
+    @Autowired
+    private TqEngineService tqEngineService;
+
     @ApiOperation("查询胎圈排程结果列表")
     @PostMapping("/list")
-    public TableDataInfo list(@RequestBody TqScheduleResultDto dto) {
-//        startPage("a.CREATE_TIME");
-        TqScheduleResult scheduleResult = new TqScheduleResult();
-        BeanUtils.copyProperties(dto, scheduleResult);
-        scheduleResult.setOrderStr(orderStr());  //拿到前端传的排序字段+排序方式
-        List<TqScheduleResultDto> list = tqScheduleResultService.selectScheduleResultList(scheduleResult);
+    @Override
+    public TableDataInfo list(@RequestBody TqScheduleResult queryVO) {
+        startPage();
+        LambdaQueryWrapper<TqScheduleResult> wrapper = buildQueryWrapper(queryVO);
+        List<TqScheduleResult> list = tqScheduleResultMapper.selectList(wrapper);
         return getDataTable(list);
     }
 
-    /**
-     * 获取胎圈排程结果详细信息
-     */
-    @ApiOperation("获取胎圈排程结果详细信息")
-    @GetMapping(value = "/{id}")
-    @ApiImplicitParams({
-            @ApiImplicitParam(name = "id", dataType = "int", value = "主键id", paramType = "query")
-    })
-    public TqScheduleResultDto getInfo(@PathVariable("id") Long id) {
-        return tqScheduleResultService.selectScheduleResultById(id);
+    @Log(title = "胎圈排程结果", businessType = BusinessType.INSERT_OR_UPDATE)
+    @ApiOperation("保存")
+    @PostMapping("/save")
+    @Override
+    public AjaxResult save(@RequestBody TqScheduleResult billVO) {
+        return super.save(billVO);
     }
 
-    @PostMapping(value = "/getInfos")
-    public List<TqScheduleResultDto> getInfos(@RequestBody TqScheduleResultDto scheduleResult) {
-        return tqScheduleResultService.selectByIds(scheduleResult.getIds2());
+    @Log(title = "胎圈排程结果", businessType = BusinessType.DELETE)
+    @ApiOperation("删除")
+    @PostMapping("/delete/{ids}")
+    public AjaxResult deleteByIds(@PathVariable("ids") List<Long> ids) {
+        return super.removeByIds(ids);
     }
 
-    /**
-     * 修改胎圈排程结果
-     */
-    @Log(title = "ui.data.column.tq.scheduleResult.modelName", businessType = BusinessType.INSERT_OR_UPDATE)
-    @PostMapping("/edit")
-    @ApiOperation("修改胎圈排程结果（id为空则插单，id不为空则修改）")
-    public AjaxResult edit(@RequestBody TqScheduleResultDto dto) {
-        if (dto.getId() == null) {
-            int exist = tqScheduleResultService.checkTqCodeExist(dto);
-            if (exist == 0) {
-                return AjaxResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.specNotExist"));
-            }
-        }
-        TqScheduleResult scheduleResult = new TqScheduleResult();
-        BeanUtils.copyProperties(dto, scheduleResult);
-        if (scheduleResult.getId() != null) {
-            int releasingOrTimeoutByIds = tqScheduleResultService.isReleasingOrTimeoutByIds(new long[]{scheduleResult.getId()});
-            if (releasingOrTimeoutByIds > 0) {
-                return AjaxResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.release.isReleasingOrTimeoutById"));
-            }
-        }
-        // 根据传入的日期查询是否已有对应排程记录
-        Boolean unique = tqScheduleResultService.checkUnique(scheduleResult);
-        if (!unique) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.already.exists"));
-        }
-        tqScheduleResultService.saveScheduleResult(scheduleResult);
-        return AjaxResult.success();
+    @ApiOperation("获取详细信息")
+    @GetMapping("/{id}")
+    @Override
+    public TqScheduleResult getInfo(@PathVariable("id") Long id) {
+        return super.getInfo(id);
     }
 
-    /**
-     * 转机台
-     */
-    @Log(title = "ui.data.column.tq.scheduleResult.modelName", businessType = BusinessType.CHANGE_MACHINE)
-    @PostMapping("/changeMachine")
-    @ApiOperation("转机台")
-    public AjaxResult changeMachine(@RequestBody TqScheduleResultDto dto) {
-        TqScheduleResult scheduleResult = new TqScheduleResult();
-        BeanUtils.copyProperties(dto, scheduleResult);
-        int releasingOrTimeoutByIds = tqScheduleResultService.isReleasingOrTimeoutByIds(new long[]{scheduleResult.getId()});
-        if (releasingOrTimeoutByIds > 0) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.release.isReleasingOrTimeoutById"));
-        }
-        // 根据传入的日期查询是否已有对应排程记录
-        Boolean unique = tqScheduleResultService.checkUnique(scheduleResult);
-        if (!unique) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.already.exists"));
-        }
-        tqScheduleResultService.insetDispatcherLog(ApsConstant.DISPATCHER_OPER_MACHINE, scheduleResult);  //如果是调度员操作，则需要增加操作日志
-        tqScheduleResultService.saveScheduleResult(scheduleResult);
-        return AjaxResult.success();
+    @Log(title = "胎圈排程结果", businessType = BusinessType.IMPORT)
+    @ApiOperation("导入数据")
+    @PostMapping("/importData")
+    @Override
+    public AjaxResult importData(@RequestBody ImportContext importContext, @RequestParam("updateSupport") boolean updateSupport) throws Exception {
+        return super.importData(importContext, updateSupport);
+    }
+
+    @Log(title = "胎圈排程结果", businessType = BusinessType.EXPORT)
+    @ApiOperation("导出数据")
+    @PostMapping("/exportData/{fileName}")
+    @Override
+    public byte[] exportData(@RequestBody TqScheduleResult queryVO, @PathVariable("fileName") String fileName,
+                             HttpServletResponse response) throws IOException {
+        return super.exportData(queryVO, fileName, response);
+    }
+
+    @Override
+    protected IDocService getDocService() {
+        return tqScheduleResultService;
+    }
+
+    @Override
+    protected String getTypeCode() {
+        return "0";
+    }
+
+    @Override
+    protected String getOrderBy() {
+        // 默认排序：排程日期倒序、机台号正序、一班次顺序正序（用于导出等场景）
+        return "SCHEDULE_DATE desc, MACHINE_CODE asc, CLASS1_SEQUENCE asc";
     }
 
     /**
-     * 调量
+     * 构建查询条件
+     * 注意：isDelete 已由框架通过注解自动过滤，禁止手动追加条件
      */
-    @Log(title = "ui.data.column.tq.scheduleResult.modelName", businessType = BusinessType.CHANGE_QTY)
-    @PostMapping("/changeQty")
-    @ApiOperation("调量")
-    public AjaxResult changeQty(@RequestBody TqScheduleResultDto dto) {
-        TqScheduleResult scheduleResult = new TqScheduleResult();
-        BeanUtils.copyProperties(dto, scheduleResult);
-        int releasingOrTimeoutByIds = tqScheduleResultService.isReleasingOrTimeoutByIds(new long[]{scheduleResult.getId()});
-        if (releasingOrTimeoutByIds > 0) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.release.isReleasingOrTimeoutById"));
-        }
-        scheduleResult.setMidPlanQty(scheduleResult.getMidPlanQty() == null ? 0D : scheduleResult.getMidPlanQty());
-        scheduleResult.setNightPlanQty(scheduleResult.getNightPlanQty() == null ? 0D : scheduleResult.getNightPlanQty());
-        scheduleResult.setDayPlanQty(scheduleResult.getDayPlanQty() == null ? 0D : scheduleResult.getDayPlanQty());
-        scheduleResult.setNextMidPlanQty(scheduleResult.getNextMidPlanQty() == null ? 0D : scheduleResult.getNextMidPlanQty());
-        tqScheduleResultService.insetDispatcherLog(ApsConstant.DISPATCHER_OPER_PLAN, scheduleResult);  //如果是调度员操作，则需要增加操作日志
-        tqScheduleResultService.saveScheduleResult(scheduleResult);
-        return AjaxResult.success();
-    }
-
-    /**
-     * 删除胎圈排程结果
-     */
-    @Log(title = "ui.data.column.tq.scheduleResult.modelName", businessType = BusinessType.DELETE)
-    @PostMapping("/{ids}")
-    @ApiOperation("删除胎圈排程结果信息")
-    @ApiImplicitParams({
-            @ApiImplicitParam(name = "ids", dataType = "Array", value = "id数组", paramType = "query")
-    })
-    public AjaxResult remove(@PathVariable("ids") long[] ids) {
-//        int releasingOrTimeoutByIds = tqScheduleResultService.isReleasingOrTimeoutByIds(ids);
-//        if (releasingOrTimeoutByIds > 0) {
-//            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.release.isReleasingOrTimeoutById"));
-//        }
-        if (tqScheduleResultService.isPublishByIds(ids) != ids.length) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.release.isPublishById"));
-        }
-        tqScheduleResultService.deleteScheduleResultByIds(ids);
-        return AjaxResult.success();
-    }
-
-    /**
-     * 导出胎圈排程结果列表
-     */
-    @Log(title = "ui.data.column.tq.scheduleResult.modelName", businessType = BusinessType.EXPORT)
-    @ApiOperation("导出胎圈排程结果列表")
-    @PostMapping("/export")
-    public byte[] export(@RequestBody TqScheduleResultDto dto) {
-//        startPage("a.CREATE_TIME");
-        TqScheduleResult scheduleResult = new TqScheduleResult();
-        BeanUtils.copyProperties(dto, scheduleResult);
-        scheduleResult.setYear(DateFormatUtils.format(dto.getScheduleDate(), "yyyy"));
-        scheduleResult.setMonth(DateFormatUtils.format(dto.getScheduleDate(), "MM"));
-        scheduleResult.setOrderStr(orderStr());  //拿到前端传的排序字段+排序方式
-        List<TqScheduleResultDto> list = tqScheduleResultService.selectScheduleResultList(scheduleResult);
-        return tqScheduleResultService.export(list);
-    }
-
-    /**
-     * 查询胎圈排程结果列表
-     */
-    @ApiOperation("查询胎圈排程结果列表")
-    @PostMapping("/getList")
-    public List<TqScheduleResultDto> getList(@RequestBody TqScheduleResultDto dto) {
-        TqScheduleResult scheduleResult = new TqScheduleResult();
-        BeanUtils.copyProperties(dto, scheduleResult);
-        return tqScheduleResultService.selectScheduleResultList(scheduleResult);
-    }
-
-    /**
-     * 查询胎圈排程结果列表
-     */
-    @Log(title = "ui.data.column.tq.scheduleResult.modelName", businessType = BusinessType.PUBLISH)
-    @ApiOperation("发布排程")
-    @PostMapping("/publish")
-    public AjaxResult publish(@RequestBody TqScheduleResultDto dto) {
-    	// 发布前需要先获得同步锁，防止在集群环境下出现一个前端命令发送两次mes请求，modify by hak 20220708
-    	if (syncDataLogsService.checkPublishLocking("tq:publish:lock", dto.getIds())) {
-    		return AjaxResult.success(); // 如果已经被锁定了，则直接返回
-    	}
-        TqScheduleResult scheduleResult = new TqScheduleResult();
-        BeanUtils.copyProperties(dto, scheduleResult);
-        int releasingOrTimeoutByIds = tqScheduleResultService.isReleasingOrTimeoutByIds(Arrays.stream(scheduleResult.getIds()).mapToLong(Long::longValue).toArray());
-        if (releasingOrTimeoutByIds > 0) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.release.isReleasingOrTimeoutById"));
-        }
-        scheduleResult.setYear(DateFormatUtils.format(dto.getScheduleDate(), "yyyy"));
-        scheduleResult.setMonth(DateFormatUtils.format(dto.getScheduleDate(), "MM"));
-
-        // 过滤未发布及发布失败的数据
-        List<TqScheduleResultDto> list = tqScheduleResultService.selectScheduleResultList(scheduleResult).stream()
-                .filter(item -> ApsConstant.NO_RELEASE.equals(item.getIsRelease()) || ApsConstant.FAILURE_RELEASE.equals(item.getIsRelease()) || ApsConstant.WAIT_RELEASING.equals(item.getIsRelease())).collect(Collectors.toList());
-        if (CollectionUtils.isEmpty(list)) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.errorPublish"));
-        }
-        // 获取机台编号为空和多机台的记录
-        List<TqScheduleResultDto> collect = list.stream().filter(item -> StringUtil.isEmpty(item.getMachineCode()) || item.getMachineCode().contains(",")).collect(Collectors.toList());
-        if (collect.size() > 0) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.hasMultipleIds"));
-        }
-        long[] arr = list.stream().mapToLong(TqScheduleResultDto::getId).toArray();
-        // 获取下发接口版本号
-        String dataVersion = syncDataLogsService.getDataVersion(ApsConstant.TQ_DEPLOY_SYNC_KEY);
-        // 厂别、分公司编号
-        String factoryCode = factoryService.getFactoryCode();
-        String companyCode = factoryService.getCompanyCode();
-        AjaxResult ajaxResult = null;
-        try {
-            //ids为空或数组大小为0，发布今日所有未发布的排程记录
-            tqScheduleResultService.publish(scheduleResult, arr, dataVersion, factoryCode, companyCode);
-            // TODO 调整成itf接口
-            //数据同步到中间库后，往 mq中发送消息通知 MES去取数据
-//            SyncParamsVO syncParamsVO = new SyncParamsVO();
-//            syncParamsVO.setSyncKey(ApsConstant.TQ_DEPLOY_SYNC_KEY);
-//            syncParamsVO.setDataVersion(dataVersion);
-//            // 请求参数
-//            JSONObject params = new JSONObject();
-//            params.put("scheduleDate", DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD, scheduleResult.getScheduleDate()));
-//			params.put("rowCount", arr.length);
-//            syncParamsVO.setParams(params);
-//            syncParamsVO.setFactoryCode(factoryCode);
-//            syncParamsVO.setCompanyCode(companyCode);
-//            //往消息队列发送消息
-//            tqSyncDataHandle.syncNotice(syncParamsVO);
-
-			// 取回mes的反馈结果
-			SyncDataLogs logs = syncDataLogsService.getSyncDataResult(dataVersion);
-			String status = logs.getStatus();
-			// 更新状态
-			tqScheduleResultService.updateRelaseStatus(dataVersion, arr, status);
-			if (ApsConstant.IS_RELEASE.equals(status)) {
-				// 成功
-				ajaxResult = AjaxResult.success(I18nUtil.getMessage("ui.data.column.scheduleResult.successPublish"));
-			} else {
-				// 失败，需要返回异常信息
-				ajaxResult = AjaxResult.error(logs.getMsg());
-			}
-        } catch (Exception e) {
-            e.printStackTrace();
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.failedPublish"));
-        }
-        return ajaxResult;
+    private LambdaQueryWrapper<TqScheduleResult> buildQueryWrapper(TqScheduleResult queryVO) {
+        LambdaQueryWrapper<TqScheduleResult> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(queryVO.getScheduleDateQuery() != null, TqScheduleResult::getScheduleDate, queryVO.getScheduleDateQuery());
+        wrapper.like(PubUtil.isNotEmpty(queryVO.getBeadCode()), TqScheduleResult::getBeadCode, queryVO.getBeadCode());
+        wrapper.like(PubUtil.isNotEmpty(queryVO.getProSize()), TqScheduleResult::getProSize, queryVO.getProSize());
+        wrapper.like(PubUtil.isNotEmpty(queryVO.getTriangleGlueCode()), TqScheduleResult::getTriangleGlueCode, queryVO.getTriangleGlueCode());
+        wrapper.eq(PubUtil.isNotEmpty(queryVO.getIsRelease()), TqScheduleResult::getIsRelease, queryVO.getIsRelease());
+        wrapper.eq(PubUtil.isNotEmpty(queryVO.getMachineCode()), TqScheduleResult::getMachineCode, queryVO.getMachineCode());
+        // 默认排序：排程日期倒序、机台号正序、一班次顺序正序
+        wrapper.orderByDesc(TqScheduleResult::getScheduleDate);
+        wrapper.orderByAsc(TqScheduleResult::getMachineCode);
+        wrapper.orderByAsc(TqScheduleResult::getClass1Sequence);
+        return wrapper;
     }
 
     /**
      * 自动排程
      */
-    @Log(title = "ui.data.column.tq.scheduleResult.modelName", businessType = BusinessType.AUTOPLAN)
+    @Log(title = "胎圈排程结果", businessType = BusinessType.AUTOPLAN)
     @ApiOperation("自动排程")
     @PostMapping("/autoPlan")
-    public AjaxResult autoPlan(@RequestBody TqScheduleResultDto dto) {
-        Date scheduleDate = dto.getScheduleDate();
-        String factoryCode = dto.getFactoryCode();
+    public AjaxResult autoPlan(@RequestBody TqScheduleResult queryVO) {
+        Date scheduleDate = queryVO.getScheduleDateQuery();
+        String factoryCode = queryVO.getFactoryCode();
         if (scheduleDate == null) {
             return AjaxResult.error("排程日期不能为空");
         }
@@ -325,125 +156,139 @@ public class TqScheduleResultController extends BaseController {
     }
 
     /**
+     * 插单前校验
+     */
+    @ApiOperation("插单前校验")
+    @PostMapping("/validateInsertOrder")
+    public AjaxResult validateInsertOrder(@RequestBody TqInsertOrderDTO dto) {
+        return tqScheduleResultService.validateInsertOrder(dto);
+    }
+
+    /**
+     * 插单
+     */
+    @Log(title = "胎圈排程结果", businessType = BusinessType.INSERT_OR_UPDATE)
+    @ApiOperation("插单")
+    @PostMapping("/insertOrder")
+    public AjaxResult insertOrder(@RequestBody TqInsertOrderDTO dto) {
+        return tqScheduleResultService.insertOrder(dto);
+    }
+
+    /**
+     * 转机台前校验
+     */
+    @ApiOperation("转机台前校验")
+    @PostMapping("/validateChangeMachine")
+    public AjaxResult validateChangeMachine(@RequestBody TqChangeMachineDTO dto) {
+        return tqScheduleResultService.validateChangeMachine(dto);
+    }
+
+    /**
+     * 转机台
+     */
+    @Log(title = "胎圈排程结果", businessType = BusinessType.CHANGE_MACHINE)
+    @ApiOperation("转机台")
+    @PostMapping("/changeMachine")
+    public AjaxResult changeMachine(@RequestBody TqChangeMachineDTO dto) {
+        return tqScheduleResultService.changeMachine(dto);
+    }
+
+    /**
+     * 调量前校验
+     */
+    @ApiOperation("调量前校验")
+    @PostMapping("/validateChangeQty")
+    public AjaxResult validateChangeQty(@RequestBody TqScheduleResult entity) {
+        return tqScheduleResultService.validateChangeQty(entity);
+    }
+
+    /**
+     * 调量
+     */
+    @Log(title = "胎圈排程结果", businessType = BusinessType.CHANGE_QTY)
+    @ApiOperation("调量")
+    @PostMapping("/changeQty")
+    public AjaxResult changeQty(@RequestBody TqScheduleResult entity) {
+        // 先校验，校验通过再执行调量
+        AjaxResult validateResult = tqScheduleResultService.validateChangeQty(entity);
+        if (!validateResult.get(AjaxResult.CODE_TAG).equals(200)) {
+            return validateResult;
+        }
+        return tqScheduleResultService.changeQty(entity);
+    }
+
+    /**
+     * 逻辑删除排程记录
+     * 只能删除发布成功次数等于0的计划
+     */
+    @Log(title = "胎圈排程结果", businessType = BusinessType.DELETE)
+    @ApiOperation("逻辑删除排程记录")
+    @PostMapping("/logicDelete")
+    public AjaxResult logicDelete(@RequestBody List<Long> ids) {
+        return tqScheduleResultService.logicDeleteByIds(ids);
+    }
+
+    /**
+     * 发布排程到MES
+     */
+    @Log(title = "胎圈排程结果", businessType = BusinessType.PUBLISH)
+    @ApiOperation("发布排程")
+    @PostMapping("/publish")
+    public AjaxResult publish(@RequestBody TqScheduleResult queryVO) {
+        // TODO 发布业务逻辑待实现：同步锁、状态校验、MES数据同步等
+        return tqScheduleResultService.publish(queryVO);
+    }
+
+    /**
      * 查询排程日期是否已发布
-     *
-     * @param dto 排程日期
-     * @return 是否已经发布
      */
     @ApiOperation("查询排程日期是否已发布")
     @PostMapping("/isPublish")
-    public Boolean isPublish(@RequestBody TqScheduleResultDto dto) {
-        return tqScheduleResultService.isPublish(dto.getScheduleDate());
+    public Boolean isPublish(@RequestBody TqScheduleResult queryVO) {
+        return tqScheduleResultService.isPublish(queryVO.getScheduleDateQuery());
     }
 
     /**
-     * 根据排程日期、物料编号、机台id校验唯一性
+     * 根据排程日期构建6个班次的日期展示列表
+     * 胎圈排程6个班次覆盖D日中班、D+1日夜早中、D+2日夜早（D=排程日期-2，即今天）：
+     * 班次1：D日中班，班次2~4：D+1日夜早中，班次5~6：D+2日夜早
      *
-     * @param dto 要校验记录
-     * @return 查询到的记录数
+     * @param queryVO 查询条件
+     * @return 班次日期列表
      */
-    @ApiOperation("根据排程日期、物料编号、机台id校验唯一性")
-    @PostMapping("/checkUnique")
-    public Boolean checkUnique(@RequestBody TqScheduleResultDto dto) {
-        TqScheduleResult scheduleResult = new TqScheduleResult();
-        BeanUtils.copyProperties(dto, scheduleResult);
-        return tqScheduleResultService.checkUnique(scheduleResult);
-    }
-
-    @Log(title = "ui.data.column.tq.scheduleResult.modelName", businessType = BusinessType.IMPORT)
-    @PostMapping("/importData")
-    @ApiOperation("导入胎圈排程结果信息")
-    public AjaxResult importData(@RequestBody List<TqScheduleResultDto> list, @RequestParam("importLogId") Long importLogId, @RequestParam("scheduleDate") String scheduleDate) {
-        if (StringUtils.isNull(list) || list.size() == 0) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.import.nodata"));
+    @ApiOperation("获取胎圈排程班次日期列表")
+    @PostMapping("/listScheduleShiftDates")
+    public List<TqScheduleShiftDateVO> listScheduleShiftDates(@RequestBody TqScheduleResult queryVO) {
+        Date scheduleDate = queryVO.getScheduleDateQuery();
+        if (scheduleDate == null) {
+            scheduleDate = DateUtil.offsetDay(new Date(), 2);
         }
-        return tqScheduleResultService.importData(list, importLogId, DateUtils.parseDate(scheduleDate));
+        // D = 排程日期 - 2（即今天）
+        Date dDay = DateUtil.offsetDay(scheduleDate, -2);
+        Date dPlus1Day = DateUtil.offsetDay(dDay, 1);
+        Date dPlus2Day = DateUtil.offsetDay(dDay, 2);
+        String dDateStr = DateUtil.format(dDay, "MM/dd");
+        String dPlus1DateStr = DateUtil.format(dPlus1Day, "MM/dd");
+        String dPlus2DateStr = DateUtil.format(dPlus2Day, "MM/dd");
+
+        List<TqScheduleShiftDateVO> result = new ArrayList<>(6);
+        result.add(buildShiftDateVO(1, "afternoon", dDateStr));       // D日中班
+        result.add(buildShiftDateVO(2, "night", dPlus1DateStr));      // D+1日夜班
+        result.add(buildShiftDateVO(3, "morning", dPlus1DateStr));    // D+1日早班
+        result.add(buildShiftDateVO(4, "afternoon", dPlus1DateStr));  // D+1日中班
+        result.add(buildShiftDateVO(5, "night", dPlus2DateStr));      // D+2日夜班
+        result.add(buildShiftDateVO(6, "morning", dPlus2DateStr));    // D+2日早班
+        return result;
     }
 
     /**
-     * 选机台
+     * 构建班次日期VO
      */
-    @Log(title = "ui.data.column.tq.scheduleResult.modelName", businessType = BusinessType.CHOOSE_MACHINE)
-    @PostMapping("/chooseMachine")
-    public AjaxResult chooseMachine(@RequestBody TqScheduleResultDto schesduleResult) {
-        TqScheduleResultDto scheduleResult0 = tqScheduleResultService.selectScheduleResultById(schesduleResult.getId());
-        if (compare(schesduleResult.getMachineCode(), scheduleResult0.getMachineCode())) {
-            return AjaxResult.success();
-        }
-        scheduleResult0.setMachineCode(schesduleResult.getMachineCode());
-        return tqScheduleResultService.chooseMachine(scheduleResult0);
-    }
-
-    /**
-     * 对比
-     */
-    public boolean compare(String str1, String str2) {
-        return (StringUtils.isEmpty(str1) ? StringUtils.isEmpty(str2) : str1.equals(str2));
-    }
-
-    /**
-     * 根据排程日期查询当前日期发布状态为"发布中"或"超时失败"的记录
-     * @param scheduleResult 排程日期
-     * @return 查询到的记录数
-     */
-    @PostMapping("/isReleasingOrTimeoutByDate")
-    public int isReleasingOrTimeoutByDate(@RequestBody TqScheduleResultDto scheduleResult){
-        return tqScheduleResultService.isReleasingOrTimeoutByDate(scheduleResult.getScheduleDate());
-    }
-
-    /**
-     * 更改发布状态
-     * @param entity 排程日期
-     * @return 结果
-     */
-    @Log(title = "ui.data.column.tq.scheduleResult.modelName")
-    @PostMapping("/changeReleaseStatus")
-    public AjaxResult changeReleaseStatus(@RequestBody TqScheduleResultDto entity){
-        TqScheduleResult tqScheduleResult = new TqScheduleResult();
-        BeanUtils.copyProperties(entity, tqScheduleResult);
-        tqScheduleResultService.changeReleaseStatus(tqScheduleResult);
-        return AjaxResult.success();
-    }
-
-    /**
-     * 导入完成量（6班制，夜班/早班/中班）
-     * @param list 完成量集合
-     * @param importLogId 导入记录id
-     * @return 结果
-     */
-    @PostMapping("/importFinishQty")
-    @ApiOperation("导入完成量")
-    public AjaxResult importFinishQty(@RequestBody List<TqScheFinishQty> list, @RequestParam("importLogId") Long importLogId) {
-        if (StringUtils.isNull(list) || list.isEmpty()) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.import.nodata"));
-        }
-        return tqScheduleResultService.importFinishQty(list, importLogId);
-    }
-
-    /**
-     * 获取排程日期的昨日早班合计，夜班合计，早班合计，库存合计，理论交班库存合计
-     *
-     * @param scheduleResult 排程日期
-     * @return 结果
-     */
-    @PostMapping("/getSummaryVo")
-    @ApiOperation("获取排程日期的排程结果合计")
-    public AjaxResult getSummaryVo(@RequestBody TqScheduleResultDto scheduleResult) {
-        TqScheduleResult result = new TqScheduleResult();
-        BeanUtils.copyProperties(scheduleResult, result);
-        return tqScheduleResultService.getSummaryVo(result);
-    }
-
-    /**
-     * 批量更新批次号和工单号
-     *
-     * @param scheduleDate 排程日期，格式：yyyy-MM-dd
-     * @return 结果
-     */
-    @PostMapping("/batchUpdateBatchNoAndOrderNo")
-    @ApiOperation("批量更新批次号和工单号")
-    public AjaxResult batchUpdateBatchNoAndOrderNo(@RequestParam("scheduleDate") String scheduleDate) {
-        tqEngineService.batchUpdateBatchNoAndOrderNo(scheduleDate);
-        return AjaxResult.success();
+    private TqScheduleShiftDateVO buildShiftDateVO(int shift, String shiftType, String shiftDate) {
+        TqScheduleShiftDateVO vo = new TqScheduleShiftDateVO();
+        vo.setShift(shift);
+        vo.setShiftType(shiftType);
+        vo.setShiftDate(shiftDate);
+        return vo;
     }
 }

@@ -1,12 +1,16 @@
 package com.zlt.aps.cx.service.impl.validation;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.cx.api.domain.entity.CxStructureTreadConfig;
 import com.zlt.aps.cx.entity.schedule.LhScheduleResult;
+import com.zlt.aps.cx.mapper.MdmSkuConstructionRefMapper;
 import com.zlt.aps.cx.vo.ScheduleContextVo;
 import com.zlt.aps.mp.api.domain.entity.MdmMaterialInfo;
+import com.zlt.aps.mp.api.domain.entity.MdmSkuConstructionRef;
 import com.zlt.aps.mp.api.domain.entity.MpCxCapacityConfiguration;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
@@ -16,6 +20,9 @@ import java.util.stream.Collectors;
 @Slf4j
 @Component
 public class LhScheduleResultValidationStrategy extends BaseValidationStrategy {
+
+    @Autowired
+    private MdmSkuConstructionRefMapper skuConstructionRefMapper;
 
     private static final Set<String> REQUIRED_FIELDS = new HashSet<>(Arrays.asList(
             "MATERIAL_CODE",
@@ -60,6 +67,7 @@ public class LhScheduleResultValidationStrategy extends BaseValidationStrategy {
         validateMaterialInfoConfig(context, lhResults, result);
         validateStructureAllocationConfig(context, lhResults, result);
         validateStructureTreadConfig(context, lhResults, result);
+        validateRecipeTypeMatching(lhResults, result);
     }
 
     private void validateRequiredFields(List<LhScheduleResult> lhResults, int totalCount,
@@ -259,6 +267,172 @@ public class LhScheduleResultValidationStrategy extends BaseValidationStrategy {
 
         log.info("结构整车配置校验完成：配置结构数={}, 硫化任务结构数={}, 缺失数={}",
                 configuredStructures.size(), lhStructures.size(), missingStructures.size());
+    }
+
+    /**
+     * 校验示方书类型（embryoType）匹配有效性
+     *
+     * <p>业务强制要求：所有硫化排程记录必须能从SKU与示方书关系表（T_MDM_SKU_CONSTRUCTION_REF）
+     * 中匹配到有效的embryoType，不允许返回null。
+     *
+     * <p>匹配规则（与CoreScheduleAlgorithmServiceImpl.resolveRecipeType一致）：
+     * <ul>
+     *   <li>constructionStage → trialStatus 映射：01→X, 02→T, 其他→S</li>
+     *   <li>降级顺序：S级尝试 S→T→X，T级尝试 T→X，X级仅尝试 X</li>
+     *   <li>多物料（含逗号）仅取第一个物料编码</li>
+     * </ul>
+     *
+     * @param lhResults 硫化排程结果列表
+     * @param result    校验结果
+     */
+    private void validateRecipeTypeMatching(List<LhScheduleResult> lhResults,
+                                            ScheduleDataValidationResult result) {
+        // ---- 加载SKU与示方书关系映射 ----
+        Map<String, String> skuRecipeTypeMap = new HashMap<>();
+        try {
+            LambdaQueryWrapper<MdmSkuConstructionRef> skuQueryWrapper = new LambdaQueryWrapper<>();
+            skuQueryWrapper.select(
+                    MdmSkuConstructionRef::getMaterialCode,
+                    MdmSkuConstructionRef::getTrialStatus,
+                    MdmSkuConstructionRef::getEmbryoType);
+            List<MdmSkuConstructionRef> skuRefList = skuConstructionRefMapper.selectList(skuQueryWrapper);
+            if (skuRefList != null) {
+                for (MdmSkuConstructionRef ref : skuRefList) {
+                    if (ref.getMaterialCode() != null && ref.getTrialStatus() != null && ref.getEmbryoType() != null) {
+                        String mapKey = ref.getMaterialCode() + "|" + ref.getTrialStatus();
+                        skuRecipeTypeMap.putIfAbsent(mapKey, ref.getEmbryoType());
+                    }
+                }
+            }
+            log.info("示方书类型校验：SKU与示方书关系映射加载完成，共 {} 条记录", skuRecipeTypeMap.size());
+        } catch (Exception e) {
+            log.error("示方书类型校验：加载SKU与示方书关系映射失败", e);
+            addError(result,
+                    I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.lhResult.recipeTypeMapLoadError"),
+                    I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.lhResult.recipeTypeMapLoadError.suggestion"));
+            return;
+        }
+
+        if (skuRecipeTypeMap.isEmpty()) {
+            addError(result,
+                    I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.lhResult.recipeTypeMapEmpty"),
+                    I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.lhResult.recipeTypeMapEmpty.suggestion"));
+            return;
+        }
+
+        // ---- 逐条校验匹配有效性 ----
+        List<String> unmatchedMaterials = new ArrayList<>();
+        Set<String> processedKeys = new HashSet<>();
+
+        for (LhScheduleResult lh : lhResults) {
+            String materialCode = lh.getMaterialCode();
+            String constructionStage = lh.getConstructionStage();
+
+            if (materialCode == null || materialCode.trim().isEmpty()) {
+                continue;
+            }
+            if (constructionStage == null || constructionStage.trim().isEmpty()) {
+                continue;
+            }
+
+            // 去重：同一物料+施工阶段只校验一次
+            String deduplicateKey = materialCode + "|" + constructionStage;
+            if (processedKeys.contains(deduplicateKey)) {
+                continue;
+            }
+            processedKeys.add(deduplicateKey);
+
+            String recipeType = resolveRecipeType(skuRecipeTypeMap, materialCode, constructionStage);
+            if (recipeType == null) {
+                String trialStatus = mapConstructionStageToTrialStatus(constructionStage);
+                unmatchedMaterials.add(materialCode + "(施工阶段:" + constructionStage + ",trialStatus:" + trialStatus + ")");
+                log.warn("示方书类型匹配失败：物料={}, 施工阶段={}, trialStatus={}, 已尝试降级匹配仍未找到有效embryoType",
+                        materialCode, constructionStage, trialStatus);
+            }
+        }
+
+        if (!unmatchedMaterials.isEmpty()) {
+            String message = String.format(
+                    I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.lhResult.recipeTypeNotFound"),
+                    unmatchedMaterials.size(), String.join(", ", unmatchedMaterials));
+            addError(result, message,
+                    I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.lhResult.recipeTypeNotFound.suggestion"));
+        } else {
+            addInfo(result,
+                    String.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.lhResult.recipeTypeMatchComplete"),
+                            processedKeys.size()),
+                    null);
+        }
+
+        log.info("示方书类型匹配校验完成：需校验物料数={}, 匹配失败数={}", processedKeys.size(), unmatchedMaterials.size());
+    }
+
+    /**
+     * 解析示方书类型（与CoreScheduleAlgorithmServiceImpl.resolveRecipeType逻辑一致）
+     *
+     * <p>匹配规则：
+     * <ul>
+     *   <li>constructionStage → trialStatus 映射：01→X, 02→T, 其他→S</li>
+     *   <li>降级顺序：S级尝试 S→T→X，T级尝试 T→X，X级仅尝试 X</li>
+     *   <li>多物料（含逗号）仅取第一个物料编码</li>
+     *   <li>匹配不上返回 null</li>
+     * </ul>
+     *
+     * @param skuRecipeTypeMap  SKU关系映射（materialCode|trialStatus → embryoType）
+     * @param materialCode      物料编码（多个逗号分隔时仅取第一个）
+     * @param constructionStage 施工阶段（01/02/03）
+     * @return 示方书类型，匹配不上则返回 null
+     */
+    private String resolveRecipeType(Map<String, String> skuRecipeTypeMap, String materialCode, String constructionStage) {
+        if (materialCode == null || materialCode.isEmpty()) {
+            return null;
+        }
+
+        String trialStatus = mapConstructionStageToTrialStatus(constructionStage);
+
+        // 定义降级顺序
+        String[] stagesToTry;
+        if ("S".equals(trialStatus)) {
+            stagesToTry = new String[]{"S", "T", "X"};
+        } else if ("T".equals(trialStatus)) {
+            stagesToTry = new String[]{"T", "X"};
+        } else {
+            stagesToTry = new String[]{"X"};
+        }
+
+        // 多物料合并时仅取第一个
+        String firstMaterial = materialCode;
+        int commaIdx = materialCode.indexOf(',');
+        if (commaIdx > 0) {
+            firstMaterial = materialCode.substring(0, commaIdx);
+        }
+
+        for (String stage : stagesToTry) {
+            String skuKey = firstMaterial + "|" + stage;
+            String embryoType = skuRecipeTypeMap.get(skuKey);
+            if (embryoType != null) {
+                return embryoType;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * 施工阶段映射为trialStatus
+     * 01→X（试制）, 02→T（量试）, 其他→S（正式）
+     *
+     * @param constructionStage 施工阶段
+     * @return trialStatus
+     */
+    private String mapConstructionStageToTrialStatus(String constructionStage) {
+        if ("01".equals(constructionStage)) {
+            return "X";
+        } else if ("02".equals(constructionStage)) {
+            return "T";
+        } else {
+            return "S";
+        }
     }
 
     private void checkField(String value, String field, String materialCode,

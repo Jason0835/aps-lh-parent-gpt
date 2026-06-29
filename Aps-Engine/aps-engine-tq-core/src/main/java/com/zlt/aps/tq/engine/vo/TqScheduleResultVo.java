@@ -236,6 +236,24 @@ public class TqScheduleResultVo extends ApsBaseDto {
      */
     private String closeOutSpecFlag;
 
+    /**
+     * 是否走胎圈备库班数配置逻辑（0：否 1：是）
+     * 触发条件：当前交接班库存不足以支撑1个班的量时触发
+     */
+    private String useBackupConfigFlag;
+
+    /**
+     * 命中的备库班数（来自 T_TQ_STOCK_SHIFT_CONFIG 配置的 SHIFT_COUNT）
+     * 触发备库时一次性计算N个班的库存加到触发班次上
+     */
+    private Integer backupShiftCount;
+
+    /**
+     * 触发备库的胎圈班次（1-5）
+     * 触发后该班次后续所有班次（K+1~6班）计划量置0
+     */
+    private Integer backupTriggerClass;
+
     @ApiModelProperty(value = "数据来源：0>自动排程；1>APS插单；2>导入；")
     private String dataSource;
 

@@ -2,6 +2,8 @@ package com.zlt.aps.tq.engine.mapper;
 
 
 import com.zlt.aps.common.engine.domain.EngineConstructionInfo;
+import com.zlt.aps.tq.api.domain.entity.TqStockShiftConfig;
+import com.zlt.aps.tq.engine.vo.BeadMachineCountVo;
 import com.zlt.aps.tq.engine.vo.TqParamsVo;
 import com.zlt.aps.tq.engine.vo.TqScheduleBaseInfoVo;
 import com.zlt.aps.tq.engine.vo.TqScheduleResultVo;
@@ -33,10 +35,10 @@ public interface TqEngineMapper {
     void deleteTqSchedule(@Param("scheduleDate") String scheduleDate);
 
     /**
-     * 删除指定日期的外协排程数据
+     * 删除指定日期的外协排程数据（外协逻辑已废弃，6班次排程不再使用）
      * @param scheduleDate
      */
-    void deleteTqAssistSchedule(@Param("scheduleDate") String scheduleDate);
+    // void deleteTqAssistSchedule(@Param("scheduleDate") String scheduleDate);
 
     /**
      * 把排程数据同步到log表
@@ -51,10 +53,10 @@ public interface TqEngineMapper {
     void batchCreateScheduleResult(@Param("scheduleResultList") List<TqScheduleResultVo> scheduleResultList);
 
     /**
-     * 批量新增外协排程结果数据
+     * 批量新增外协排程结果数据（外协逻辑已废弃，6班次排程不再使用）
      * @param scheduleResultList
      */
-    void batchCreateAssistScheduleResult(@Param("scheduleResultList") List<TqScheduleResultVo> scheduleResultList);
+    // void batchCreateAssistScheduleResult(@Param("scheduleResultList") List<TqScheduleResultVo> scheduleResultList);
 
     /**
      * 返回胎圈参数计划
@@ -106,10 +108,10 @@ public interface TqEngineMapper {
     List<EngineConstructionInfo> listTqNeedConstruction(@Param("scheduleDate") String scheduleDate, @Param("productionStage") String productionStage);
 
     /**
-     * 获得外协规格列表
+     * 获得外协规格列表（外协逻辑已废弃，6班次排程不再使用）
      * @return
      */
-    List<String> listAssistSpec();
+    // List<String> listAssistSpec();
 
     int batchUpdateBatchNoAndOrderNo(@Param("list") List<TqScheduleResultVo> scheduleResultVoList);
 
@@ -133,4 +135,19 @@ public interface TqEngineMapper {
      * @return 工作日历列表
      */
     List<Map<String, Object>> listWorkCalendar(@Param("scheduleDate") String scheduleDate);
+
+    /**
+     * 查询胎圈备库班数配置列表（按工厂过滤）
+     * @param factoryCode 分厂编码（可选，为空则查询全部）
+     * @return 备库班数配置列表
+     */
+    List<TqStockShiftConfig> listStockShiftConfig(@Param("factoryCode") String factoryCode);
+
+    /**
+     * 统计胎圈规格对应的成型机台数
+     * 通过成型排程结果表与施工信息表关联，按胎圈编码分组统计DISTINCT成型机台数
+     * @param scheduleDate 排程日期
+     * @return 胎圈编码→成型机台数列表
+     */
+    List<BeadMachineCountVo> statBeadMachineCount(@Param("scheduleDate") String scheduleDate);
 }

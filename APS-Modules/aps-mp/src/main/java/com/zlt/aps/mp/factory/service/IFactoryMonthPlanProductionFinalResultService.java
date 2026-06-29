@@ -149,7 +149,8 @@ public interface IFactoryMonthPlanProductionFinalResultService extends IDocServi
     /**
      * 定时计算上月超欠产
      * 根据上月计划排产量和上月硫化日完成量(合格品)计算超欠产，
-     * 并置上月超欠产有效标志=是
+     * 并按阈值参数(SYS0206009)判定上月超欠产有效标志：
+     * |超欠产值|(绝对值) > 阈值 → 否('0')，否则 → 是('1')
      *
      * @return 计算结果
      */

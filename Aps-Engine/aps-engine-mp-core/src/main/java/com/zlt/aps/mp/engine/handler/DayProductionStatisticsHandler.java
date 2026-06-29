@@ -149,6 +149,20 @@ public class DayProductionStatisticsHandler {
     }
 
     /**
+     * 打印关键统计信息
+     * 1、日换模次数信息
+     * 2、日排产量信息
+     *
+     * @param productionContext
+     */
+    public void printDayLimitKeyInformationLog(TbrProductionContext productionContext) {
+        //打印 日换模次数
+        getDayChangeMouldInfoAndPrint(productionContext);
+        //打印 日排产量
+        printDayCapacityStatisticsInfo(productionContext);
+    }
+
+    /**
      * 打印每日换模次数信息
      *
      * @param productionContext
@@ -284,6 +298,39 @@ public class DayProductionStatisticsHandler {
         if (!CollectionUtils.isEmpty(dayChangeGroupValue)) {
             String dayChangeContentInfo = JSON.toJSONString(dayChangeGroupValue);
             DayLimitLogRecorder.addChangeGroupStatisticsInfo(productionContext, dayChangeContentInfo);
+        }
+    }
+
+    /**
+     * 打印日排产量统计
+     *
+     * @param context
+     */
+    private void printDayCapacityStatisticsInfo(Context context) {
+        TbrProductionContext productionContext = (TbrProductionContext) context;
+        BaseDataContainer baseDataContainer = productionContext.getBaseDataContainer();
+        if (null == baseDataContainer) {
+            return;
+        }
+        DayCapacityLimitVo dayCapacityLimit = baseDataContainer.getDayCapacityLimit();
+        if (null == dayCapacityLimit) {
+            return;
+        }
+        Map<Integer, DayCapacityLimitHelper> dayCapacityLimitMap = dayCapacityLimit.getDayCapacityLimitMap();
+        if (CollectionUtils.isEmpty(dayCapacityLimitMap)) {
+            return;
+        }
+        Map<Integer, Integer> dayCapacityValue = new HashMap<>();
+        dayCapacityLimitMap.forEach((day, dayCapacityLimitInfo) -> {
+            if (null == dayCapacityLimitInfo) {
+                return;
+            }
+            Integer sumDayCapacity = Optional.ofNullable(dayCapacityLimitInfo.getSumProductionCapacityQty()).orElse(BigDecimal.ZERO.intValue());
+            dayCapacityValue.put(day, sumDayCapacity);
+        });
+        if (!CollectionUtils.isEmpty(dayCapacityValue)) {
+            String dayCapacityContentInfo = JSON.toJSONString(dayCapacityValue);
+            DayLimitLogRecorder.addDayCapacityStatisticsInfo(productionContext, dayCapacityContentInfo);
         }
     }
 

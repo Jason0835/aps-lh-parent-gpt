@@ -116,7 +116,7 @@ public class FactoryMonthPlanMouldDayDetail extends BaseEntity {
      * 主物料(胎胚号)
      */
     @Excel(name = "ui.data.column.FactoryMonthPlanMouldDayDetail.mainMaterialDesc")
-    @ApiModelProperty(value = "主物料(胎胚号)", name = "mainMaterialDesc")
+    @ApiModelProperty(value = "胎胚描述", name = "mainMaterialDesc")
     @TableField(value = "MAIN_MATERIAL_DESC")
     private String mainMaterialDesc;
 

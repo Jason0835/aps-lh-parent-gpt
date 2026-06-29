@@ -66,7 +66,7 @@ flowchart TD
     BB --> CC{能选出下一个胎面规格?}
     
     CC -->|否| DD[写未排<br/>原因:无符合条件规格或胶料库存不足]
-    CC -->|是| EE["计算需排产量<br/>──────────────<br/>stockGapQty = max(guardDemandQty - rollingStockQty, 0)<br/>baseDemandQty = max(currentShiftDemandQty, stockGapQty)<br/>──────────────<br/>planQty初始值 = baseDemandQty"]
+    CC -->|是| EE["计算需排产量<br/>──────────────<br/>currentShiftStockGapQty = max(currentShiftDemandQty - rollingStockQty, 0)<br/>stockGapQty = max(guardDemandQty - rollingStockQty, 0)<br/>demandQty = max(currentShiftStockGapQty, stockGapQty)<br/>baseDemandQty = max(currentShiftDemandQty - rollingStockQty, guardDemandQty - rollingStockQty, 0)<br/>──────────────<br/>planQty初始值 = baseDemandQty"]
     
     EE --> FF["按工装限制计划量<br/>──────────────<br/>当前可用工装数量 = 总工装 - (6点库存 / 工装卷曲长度)<br/>工装限制最大可排米数 = 当前可用工装数量 * 工装卷曲长度<br/>planQty = min(planQty, 工装限制最大可排米数)<br/>──────────────<br/>下班次可用工装数量 =<br/>  上班次可用工装数量<br/>  - 当前班计划量 / 工装卷曲长度<br/>  + 成型对应班次需求量 / 工装卷曲长度"]
     

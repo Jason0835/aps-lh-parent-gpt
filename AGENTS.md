@@ -93,3 +93,4 @@ UIController extends BaseUIController<Entity>
 
 ### 胎面部分调整
 - 有涉及到胎面业务调整的部分，都需要同步更新到详设文档：docs/tm/tm_schedule_detailed_design.md
+- 扩展 JSON 场景测试框架和断言，新增对应的测试场景

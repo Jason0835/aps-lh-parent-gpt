@@ -1551,7 +1551,8 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
      * 3. 从上月定稿表取计划量，从硫化日完成量表取上月完成量
      * 4. 超欠产 = 上月计划量 - 上月完成量
      * 5. 按分厂+物料编码匹配，回填到当月定稿记录
-     * 6. 上月有定稿数据则有效标志='1'，否则='0'
+     * 6. 有效标志判定：|超欠产值|(绝对值) > 阈值参数(SYS0206009) → 否('0')，否则 → 是('1')；
+     *    上月无定稿数据时有效标志置否('0')
      */
     @Override
     public AjaxResult calcLastMonthOverProd() {
@@ -1567,10 +1568,14 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
         Date startDate = cn.hutool.core.date.DateUtil.beginOfMonth(cn.hutool.core.date.DateUtil.offsetMonth(new Date(), -1));
         Date endDate = cn.hutool.core.date.DateUtil.endOfMonth(startDate);
 
-        log.info("开始计算上月超欠产, 上月: {}-{}, 当月: {}-{}, 日期范围: {} ~ {}",
-                lastYear, lastMonthValue, currentYear, currentMonthValue, startDate, endDate);
+        // 超欠产有效标志判定阈值参数编码（SYS0206009）
+        String overdueThresholdParamCode = MonthPlanEnums.LAST_MONTH_OVERDUE_THRESHOLD.getCode();
 
-        int count = finalMapper.updateLastMonthOverProd(lastYear, lastMonthValue, currentYear, currentMonthValue, startDate, endDate);
+        log.info("开始计算上月超欠产, 上月: {}-{}, 当月: {}-{}, 日期范围: {} ~ {}, 有效标志阈值参数: {}",
+                lastYear, lastMonthValue, currentYear, currentMonthValue, startDate, endDate, overdueThresholdParamCode);
+
+        int count = finalMapper.updateLastMonthOverProd(lastYear, lastMonthValue, currentYear, currentMonthValue,
+                startDate, endDate, overdueThresholdParamCode);
 
         log.info("上月超欠产计算完成, 更新记录数: {}", count);
         return AjaxResult.success("上月超欠产计算完成，更新记录数：" + count);

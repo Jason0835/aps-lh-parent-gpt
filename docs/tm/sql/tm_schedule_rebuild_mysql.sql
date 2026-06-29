@@ -104,7 +104,7 @@ CREATE TABLE `T_TM_SCHEDULE_RESULT_EXPLAIN` (
   `coverage_shift_count` decimal(18,6) DEFAULT NULL COMMENT '库存覆盖班次数',
   `last_shift_plan_qty` decimal(18,6) DEFAULT NULL COMMENT '上班计划量',
   `month_surplus_qty` decimal(18,6) DEFAULT NULL COMMENT '月剩余量',
-  `required_qty` decimal(18,6) DEFAULT NULL COMMENT '理论需求量',
+  `required_qty` decimal(18,6) DEFAULT NULL COMMENT '库存抵扣前当前班成型胎面需求量',
   `rule_hit_json` longtext COMMENT '命中规则明细文本，记录最终生效的规则集合',
   `rule_summary_desc` varchar(1000) DEFAULT NULL COMMENT '规则摘要说明',
   `candidate_machine_json` longtext COMMENT '候选机台明细文本，记录候选机台、排序、过滤原因和评分',
@@ -557,8 +557,8 @@ CREATE TABLE `T_TM_DISPATCHER_LOG` (
 -- =========================================================
 -- 16. 备库班数配置
 -- =========================================================
-DROP TABLE IF EXISTS `T_TM_STOCK_COVER_CLASS`;
-CREATE TABLE `T_TM_STOCK_COVER_CLASS` (
+DROP TABLE IF EXISTS `T_TM_DEPTH_CONFIG`;
+CREATE TABLE `T_TM_DEPTH_CONFIG` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
   `factory_code` varchar(50) NOT NULL DEFAULT '' COMMENT '工厂编码',
   `machine_qty` int NOT NULL COMMENT '硫化机数量',
@@ -571,7 +571,7 @@ CREATE TABLE `T_TM_STOCK_COVER_CLASS` (
   `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   `is_delete` tinyint NOT NULL DEFAULT '0' COMMENT '是否删除，0否，1是',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_tm_stock_cover_class_factory_range` (`factory_code`, `machine_range`, `machine_qty`, `is_delete`)
+  UNIQUE KEY `uk_tm_depth_config_factory_range` (`factory_code`, `machine_range`, `machine_qty`, `is_delete`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='备库班数配置表';
 
 SET FOREIGN_KEY_CHECKS = 1;

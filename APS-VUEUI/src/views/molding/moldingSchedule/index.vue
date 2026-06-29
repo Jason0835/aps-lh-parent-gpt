@@ -12,7 +12,6 @@
       :search="search"
       @refresh="getList"
       @search="handleSearch"
-      @reset="handleReset"
       @pageChange="handlePageChange"
       @sort-change="handleSortChange"
       @selection-change="handleSelectionChange"
@@ -306,12 +305,14 @@ export default {
         {
           label: this.$t("ui.data.column.cxScheduleResult.structureName"),
           prop: "structureName",
+          sortable: true,
           visible: false,
         },
         {
           label: this.$t("ui.data.column.cxScheduleResult.cxMachineCode"),
           prop: "cxMachineCode",
           align: "center",
+          sortable: true,
         },
         {
           label: this.$t("ui.data.column.cxScheduleResult.lhMachineCode"),
@@ -324,12 +325,14 @@ export default {
           prop: "embryoCode",
           minWidth: 120,
           align: "center",
+          sortable: true,
         },
         {
           label: this.$t("ui.data.column.scheduleResult.embryoDesc"),
           align: "left",
           prop: "mainMaterialDesc",
           minWidth: 350,
+          sortable: true,
         },
         // {
         //   label: this.$t("ui.data.column.scheduleResult.materialCode"),
@@ -861,6 +864,9 @@ export default {
           prop: "scheduleDate",
           type: "date",
           valueFormat: "yyyy-MM-dd",
+          listeners: {
+            change: this.handleScheduleDateChange,
+          },
         },
         {
           label: this.$t("ui.data.column.scheduleResult.isRelease"),
@@ -896,30 +902,7 @@ export default {
           labelKey: "cxMachineCode",
           valueKey: "cxMachineCode",
           filterable: true,
-        },
-        {
-          label: this.$t("ui.data.column.scheduleResult.sortByStructure"),
-          prop: "sortStructure",
-          type: "select",
-          dictData: this.sortOrderOptions,
-        },
-        {
-          label: this.$t("ui.data.column.scheduleResult.sortByMachine"),
-          prop: "sortMachine",
-          type: "select",
-          dictData: this.sortOrderOptions,
-        },
-        {
-          label: this.$t("ui.data.column.scheduleResult.sortByEmbryoDesc"),
-          prop: "sortEmbryoDesc",
-          type: "select",
-          dictData: this.sortOrderOptions,
-        },
-        {
-          label: this.$t("ui.data.column.scheduleResult.sortByEmbryoCode"),
-          prop: "sortEmbryoCode",
-          type: "select",
-          dictData: this.sortOrderOptions,
+          multiple: true,
         },
       ];
     },
@@ -928,13 +911,6 @@ export default {
         return false;
       }
       return String(this.selection[0]?.isRelease) === "0";
-    },
-    sortOrderOptions() {
-      return [
-        { label: this.$t("ui.data.column.scheduleResult.sortNone"), value: "" },
-        { label: this.$t("ui.data.column.scheduleResult.sortOrderAsc"), value: "asc" },
-        { label: this.$t("ui.data.column.scheduleResult.sortOrderDesc"), value: "desc" },
-      ];
     },
   },
   methods: {
@@ -1062,6 +1038,19 @@ export default {
     handleQuery() {},
     handleHistoryQuery() {},
 
+    // 排程时间变更后自动查询
+    handleScheduleDateChange(val) {
+      this.search = {
+        ...this.search,
+        scheduleDate: val,
+      };
+      this.query = {
+        ...this.query,
+        scheduleDate: val,
+      };
+      this.$set(this.page, "current", 1);
+      this.getList();
+    },
     handleSearch(data) {
       // 过滤掉 null、undefined 和空字符串，但保留 0、false 等有效值
       const filteredData = {};
@@ -1071,36 +1060,11 @@ export default {
           filteredData[key] = value;
         }
       });
-      // 排序字段映射：sortXXX prop → orderByColumn entity字段名 + isAsc
-      const sortMap = {
-        sortStructure: "structureName",
-        sortMachine: "cxMachineCode",
-        sortEmbryoDesc: "mainMaterialDesc",
-        sortEmbryoCode: "embryoCode",
-      };
-      // 取第一个非空的排序条件（互斥，只有一个排序字段生效）
-      let activeSort = null;
-      for (const [prop, entityField] of Object.entries(sortMap)) {
-        const val = filteredData[prop];
-        if (val === "asc" || val === "desc") {
-          activeSort = { orderByColumn: entityField, isAsc: val };
-          break;
-        }
+      // 多选机台：数组转为逗号分隔字符串传给后端
+      if (Array.isArray(filteredData.cxMachineCode)) {
+        filteredData.cxMachineCode = filteredData.cxMachineCode.join(',');
       }
-      this.sort = activeSort || {};
-      // 排序参数从query中移除
-      Object.keys(sortMap).forEach(k => delete filteredData[k]);
-      console.log('Search params:', filteredData);
-      // 完全替换query，不保留旧的条件
       this.query = filteredData;
-      this.$set(this.page, "current", 1);
-      this.getList();
-    },
-    handleReset() {
-      // 重置查询条件到初始状态
-      const date = moment().add(1, "days").format("YYYY-MM-DD");
-      this.query = { scheduleDate: date };
-      this.search = { scheduleDate: date };
       this.$set(this.page, "current", 1);
       this.getList();
     },

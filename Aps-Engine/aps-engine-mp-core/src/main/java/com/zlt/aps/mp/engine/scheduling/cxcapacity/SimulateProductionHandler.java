@@ -14,11 +14,9 @@ import com.zlt.aps.mp.engine.domain.dto.ProductGroupCxCapacityInfo;
 import com.zlt.aps.mp.engine.domain.dto.ProductionPlanGroupInfo;
 import com.zlt.aps.mp.engine.domain.vo.CxMachineBaseInfoVo;
 import com.zlt.aps.mp.engine.enums.ContinueTypeEnum;
+import com.zlt.aps.mp.engine.enums.LogRecorderStageEnum;
 import com.zlt.aps.mp.engine.enums.ProductionStageEnum;
-import com.zlt.aps.mp.engine.handler.GroupPlanPrioritySelector;
-import com.zlt.aps.mp.engine.handler.GroupPreAllocationInfoHelper;
-import com.zlt.aps.mp.engine.handler.GroupPriorityProductionScheduler;
-import com.zlt.aps.mp.engine.handler.SupplementCxMachineDistributionHandler;
+import com.zlt.aps.mp.engine.handler.*;
 import com.zlt.aps.mp.engine.logrecorder.KeyInformationLogRecorder;
 import com.zlt.aps.mp.engine.logrecorder.TbrProductionGroupLogRecorder;
 import com.zlt.aps.mp.engine.logrecorder.TbrSimulateProductionLogRecorder;
@@ -67,6 +65,8 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
 
     private final DifferentGroupMoldAllocationAdjustHandler differentGroupMoldAllocationAdjustHandler;
 
+    private final DayProductionStatisticsHandler dayProductionStatisticsHandler;
+
     /**
      * 模拟排产计划
      * 1、在机结构对在产成型机台进行模拟模具排产
@@ -88,6 +88,8 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
         mouldProductionByContinueGroup(productionContext, allGroupPlanMap, continueAllocationList, allContinueMap);
         KeyInformationLogRecorder.recorderContinueCxMachineProductionLog(productionContext, allGroupPlanMap, allContinueMap);
         TbrSimulateProductionLogRecorder.addProductionModeLog(productionContext, productionMode);
+        //打印在产-日产和换膜信息
+        dayProductionStatisticsHandler.printDayLimitKeyInformationLog(productionContext);
         if (YesOrNoEnum.YES.getValue().equals(productionMode)) {
             //交付优先，在机分组之后，按分组的高优先级排序，优先级高的分组先进行排产
             deliveryPriorityProduction(productionContext, allGroupPlanMap, continueAllocationList, allContinueMap);
@@ -97,6 +99,7 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
         }
         KeyInformationLogRecorder.recorderAllAllocationGroupInfoLog(productionContext);
         //6、对成型剩余不满足最短上机天数的机台进行分配结构处理
+        productionContext.addStageLogBuilder(LogRecorderStageEnum.SIMULATE_SUPPLEMENT_PRODUCTION);
         supplementCxMachineDistributionHandler.handlerTailCapacity(productionContext, allGroupPlanMap);
     }
 
@@ -124,6 +127,7 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
      */
     private void deliveryPriorityProduction(TbrProductionContext productionContext, Map<String, ProductionPlanGroupInfo> allGroupPlanMap, List<CxMachineAllocationPlanHelper> continueAllocationList, Map<String, CxContinueInfoHelper> allContinueMap) {
         //1、按高优先级，获取预期排产的分组信息
+        productionContext.addStageLogBuilder(LogRecorderStageEnum.SIMULATE_DELIVERY_PRIORITY_PRODUCTION);
         Set<String> preSelectedGroupSet = Sets.newHashSet();
         Map<String, Set<CxMachineAllocationPlanHelper>> preSelectedGroupAllocationMap = Maps.newHashMap();
         TbrSimulateProductionLogRecorder.addStartDeliveryPriorityLog(productionContext);
@@ -139,8 +143,10 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
         }
         Set<String> discontinueGroupSet = discontinueGroupList.stream().map(ProductionPlanGroupInfo::getGroupName).collect(Collectors.toSet());
         //3、开始重排在产分组在产机台续作
+        productionContext.addStageLogBuilder(LogRecorderStageEnum.SIMULATE_RESET_CONTINUE_PRODUCTION);
         resetProduction(productionContext, allGroupPlanMap, continueAllocationList, allContinueMap);
         //4、对固定分组进行排产
+        productionContext.addStageLogBuilder(LogRecorderStageEnum.SIMULATE_FIXED_PRODUCTION);
         TbrSimulateProductionLogRecorder.addDeliveryPriorityFixedCxMachineGroupLog(productionContext);
         //4.1、多固定同一成型机台，时间在前的先排
         groupPriorityProductionScheduler.allocationFixedGroupSameCxMachineEarlyGroup(productionContext, Sets.newHashSet(), hasFixedPriorityCxMachineList, discontinueGroupSet);
@@ -173,6 +179,7 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
             groupPriorityProductionScheduler.productionAppointGroupCxMachine(productionContext, Sets.newHashSet(), otherFixedPriorityCxMachineList, discontinueGroupSet, true);
         }
         //5、在对剩余的进行Top3排产
+        productionContext.addStageLogBuilder(LogRecorderStageEnum.SIMULATE_LAST_PRODUCTION);
         TbrSimulateProductionLogRecorder.addDeliveryPriorityLeftOverGroupLog(productionContext);
         //5.2 剩余排产
         groupPriorityProductionScheduler.allocationCxMachine(productionContext, Sets.newHashSet(), Sets.newHashSet(), Maps.newHashMap(), discontinueGroupSet);
@@ -191,10 +198,12 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
      */
     private void efficiencyPriorityProduction(TbrProductionContext productionContext, Map<String, ProductionPlanGroupInfo> allGroupPlanMap, List<CxMachineAllocationPlanHelper> continueAllocationList, Map<String, CxContinueInfoHelper> allContinueMap) {
         //1、对在产机台-收尾成型机台，反向匹配待排结构
+        productionContext.addStageLogBuilder(LogRecorderStageEnum.SIMULATE_EFFICIENCY_PRIORITY_PRODUCTION);
         cxCapacityAllocationHandler.reverseMachineAllocation(productionContext, allGroupPlanMap);
         //2、对结构重新标记分配完成情况--还需分配量>最小上机时间的结构，重新标记没有分配完成
         resetFlagAllocationFinish(productionContext, allGroupPlanMap);
         //3、对还需排产结构，获取优先级最高的结构--结构新增
+        productionContext.addStageLogBuilder(LogRecorderStageEnum.SIMULATE_EFFICIENCY_ADD_PRODUCTION);
         addNewGroupPlanHandler(productionContext, allGroupPlanMap, new HashSet<>());
     }
 
@@ -219,6 +228,7 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
         //3、在机结构对在产成型机台进行模拟模具排产
         mouldProductionByContinueGroup(productionContext, allGroupPlanMap, continueAllocationList, allContinueMap);
         KeyInformationLogRecorder.recorderContinueCxMachineProductionLog(productionContext, allGroupPlanMap, allContinueMap);
+        dayProductionStatisticsHandler.printDayLimitKeyInformationLog(productionContext);
     }
 
     /**

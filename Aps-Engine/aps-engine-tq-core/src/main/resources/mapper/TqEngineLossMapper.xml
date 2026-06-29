@@ -2,10 +2,11 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.zlt.aps.tq.engine.mapper.TqEngineLossMapper">
 
+    <!-- 查询损耗率设置，IS_DELETE为逻辑删除字段 -->
     <select id="listLossRate" parameterType="string" resultType="com.zlt.aps.tq.engine.vo.TqLossVo">
         select concat(IFNULL(machine_code,'') , '#' , IFNULL(BEAD_CODE,'')) LOSS_KEY, LOSS_RATE
         from T_TQ_LOSS_SETTING
-        where DEL_FLAG = 0
+        where IS_DELETE = 0
     </select>
 
 </mapper>

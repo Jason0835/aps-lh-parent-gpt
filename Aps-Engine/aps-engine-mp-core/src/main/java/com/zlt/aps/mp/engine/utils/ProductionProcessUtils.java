@@ -4,6 +4,7 @@ import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.mp.engine.constant.ProductionConstant;
 import com.zlt.aps.mp.engine.scheduling.ProductionContext;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 
 import java.math.BigDecimal;
 
@@ -15,6 +16,20 @@ import java.math.BigDecimal;
  */
 @Slf4j
 public class ProductionProcessUtils {
+
+    /**
+     * 判断参数值是否为Y
+     * 为空或是非Y/y则为false
+     *
+     * @param paramValue
+     * @return
+     */
+    public static boolean isYesValue(String paramValue) {
+        if (StringUtils.isBlank(paramValue)) {
+            return false;
+        }
+        return ProductionConstant.YES_VALUE.equalsIgnoreCase(paramValue);
+    }
 
     /**
      * 获取每日工作时长

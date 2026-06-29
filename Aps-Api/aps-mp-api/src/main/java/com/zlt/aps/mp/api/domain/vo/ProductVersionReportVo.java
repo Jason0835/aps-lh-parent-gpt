@@ -36,7 +36,7 @@ public class ProductVersionReportVo extends BaseEntity {
      * 生胎代码
      */
     @Excel(name = "ui.data.column.monthPlanMouldingDayResult.embryoCode")
-    @ApiModelProperty(value = "生胎代码", name = "embryoCode")
+    @ApiModelProperty(value = "胎胚号", name = "embryoCode")
     private String embryoCode;
 
     /**
