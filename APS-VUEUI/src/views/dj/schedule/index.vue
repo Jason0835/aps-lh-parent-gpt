@@ -2,7 +2,7 @@
 <template>
   <basic-container>
     <page-table
-      tableRef="insideLinerScheduleMainTable"
+      tableRef="djScheduleMainTable"
       :calcHeight="true"
       v-loading="loading"
       :columns="columns"
@@ -947,6 +947,8 @@ export default {
     },
   },
   created() {
+    // 清除之前持久化的错误列顺序，保留拖拽功能但不再恢复错误状态
+    localStorage.removeItem("djScheduleMainTable");
     //设置默认排程时间
     let date = moment().add(1, "days").format("YYYY-MM-DD");
     // date = "2023-06-01"; //test

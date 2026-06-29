@@ -114,8 +114,8 @@ public class DjScheduleResultUIController extends BaseController<DjScheduleResul
         query.setScheduleDate(entity.getScheduleDate());
         query.setMachineCode(entity.getMachineCode());
         query.setPaddingCode(entity.getPaddingCode());
-        List<DjScheduleResult> list = iDjScheduleResultService.checkUnique(query);
-        if (CollectionUtils.isNotEmpty(list)) {
+        Boolean isUnique = iDjScheduleResultService.checkUnique(query);
+        if (!isUnique) {
             return AjaxResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.already.exists"));
         }
 
@@ -148,8 +148,8 @@ public class DjScheduleResultUIController extends BaseController<DjScheduleResul
         query.setScheduleDate(scheduleResult.getScheduleDate());
         query.setMachineCode(scheduleResult.getMachineCode());
         query.setPaddingCode(scheduleResult.getPaddingCode());
-        List<DjScheduleResult> list = iDjScheduleResultService.checkUnique(query);
-        if (CollectionUtils.isNotEmpty(list)) {
+        Boolean isUnique = iDjScheduleResultService.checkUnique(query);
+        if (!isUnique) {
             return AjaxResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.already.exists"));
         }
         AjaxResult ajaxResult = iDjScheduleResultService.changeMachine(scheduleResult);
@@ -172,8 +172,8 @@ public class DjScheduleResultUIController extends BaseController<DjScheduleResul
             query.setScheduleDate(scheduleResult.getScheduleDate());
             query.setMachineCode(machineId);
             query.setPaddingCode(scheduleResult.getPaddingCode());
-            List<DjScheduleResult> list = iDjScheduleResultService.checkUnique(query);
-            if (CollectionUtils.isNotEmpty(list)) {
+            Boolean isUnique = iDjScheduleResultService.checkUnique(query);
+            if (!isUnique) {
                 if (sb1.length() > 0) {
                     sb1.append(",").append(query.getPaddingCode());
                 } else {
@@ -304,9 +304,9 @@ public class DjScheduleResultUIController extends BaseController<DjScheduleResul
         if (releasingOrTimeoutByDate > 0) {
             return AjaxResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.release.isReleasingOrTimeoutByDate"));
         }
-        List<DjScheduleResult> list = iDjScheduleResultService.checkUnique(entity);
+        Boolean isUnique = iDjScheduleResultService.checkUnique(entity);
         String msg = "";
-        if (CollectionUtils.isEmpty(list)) {
+        if (isUnique) {
             //未生成，直接生成
             msg = "2";
         } else {
@@ -331,8 +331,8 @@ public class DjScheduleResultUIController extends BaseController<DjScheduleResul
         if (releasingOrTimeoutByDate > 0) {
             return AjaxResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.release.isReleasingOrTimeoutByDate"));
         }
-        List<DjScheduleResult> list = iDjScheduleResultService.checkUnique(entity);
-        if (CollectionUtils.isEmpty(list)) {
+        Boolean isUnique = iDjScheduleResultService.checkUnique(entity);
+        if (isUnique) {
             return AjaxResult.success("0");
         }
         return AjaxResult.success();

@@ -242,7 +242,7 @@ public class DjScheduleResult extends BaseEntity {
     @TableField(value = "SCHEDULE_SHIFT_CLASS")
     private String scheduleShiftClass;
 
-    /** 数据来源 */
+    /** 数据来源，1=自动生成，2=插单，3=导入 */
     @ApiModelProperty(value = "数据来源", name = "dataSource")
     @TableField(value = "DATA_SOURCE")
     private String dataSource;

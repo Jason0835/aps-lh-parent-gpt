@@ -127,7 +127,13 @@ public class DjEngineConstants {
     public static final String RELEASE_STATUS_UNPUBLISHED = "0";
 
     /** 数据来源：自动排程 */
-    public static final String DATA_SOURCE_AUTO = "auto";
+    public static final String DATA_SOURCE_AUTO = "1";
+
+    /** 数据来源： 插单*/
+    public static final String DATA_SOURCE_INSERT = "2";
+
+    /** 数据来源： 导入*/
+    public static final String DATA_SOURCE_IMPORT = "3";
 
     // ==================== 动态字段名格式模板 ====================
 
@@ -136,4 +142,7 @@ public class DjEngineConstants {
 
     /** 班次顺序字段名模板，format: shiftIndex → class1Sequence */
     public static final String CLASS_SEQUENCE_FIELD = "class%dSequence";
+
+    /** 班次原因分析字段名模板，format: classIndex → class1Analysis */
+    public static final String CLASS_ANALYSIS_FIELD = "class%dAnalysis";
 }

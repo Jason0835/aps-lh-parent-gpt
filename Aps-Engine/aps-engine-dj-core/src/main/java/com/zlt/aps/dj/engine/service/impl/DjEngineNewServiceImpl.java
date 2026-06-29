@@ -52,6 +52,7 @@ import com.zlt.aps.dj.engine.constant.DjEngineConstants;
 import com.zlt.aps.dj.engine.model.DjPaddingDemand;
 import com.zlt.aps.dj.engine.model.DjScheduleContext;
 import com.zlt.aps.dj.engine.service.DjEngineNewService;
+import com.zlt.aps.dj.engine.service.IDjOrderGeneratorService;
 import com.zlt.aps.exception.BusinessException;
 import com.zlt.aps.mdm.api.domain.entity.MdmConstructionInfo;
 import com.zlt.aps.mp.api.domain.entity.MpMonthPlanMonitor;
@@ -111,6 +112,9 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
 
     @Autowired
     private BaseDao baseDao;
+
+    @Autowired
+    private IDjOrderGeneratorService iDjOrderGeneratorService;
 
     // ==================== 主入口 ====================
 
@@ -339,19 +343,11 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
         // 5.5.1 损耗率转换（未收尾规格）
         this.convertPlanQtyWithLoss(scheduleResults, context);
 
-        // 5.5.2 生成批次号
-        String batchNo = this.generateBatchNo(factoryCode, scheduleDate);
+        // 5.5.2 生成批次号并设置批次号和订单号
+        String batchNo = iDjOrderGeneratorService.fillOrderInfo(scheduleResults, factoryCode, scheduleDate);
         context.setCurrentBatchNo(batchNo);
 
-        // 5.5.3 设置批次号和订单号
-        int orderSeq = 0;
-        for (DjScheduleResult result : scheduleResults) {
-            result.setBatchNo(batchNo);
-            orderSeq++;
-            result.setOrderNo(batchNo + String.format(DjEngineConstants.ORDER_NO_SEQ_FORMAT, orderSeq));
-        }
-
-        // 5.5.4 归档旧数据 + 写入新数据
+        // 5.5.3 归档旧数据 + 写入新数据
         this.archiveAndSave(factoryCode, scheduleDate, scheduleResults);
 
         log.info("===== 垫胶自动排程结束，共生成 {} 条排产结果 =====", scheduleResults.size());
@@ -1605,31 +1601,6 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
      */
     private void setClassPlanQtyToResult(DjScheduleResult result, int classIndex, BigDecimal planQty) {
         result.setFieldValueByFieldName(String.format(DjEngineConstants.CLASS_PLAN_QTY_FIELD, classIndex), planQty);
-    }
-
-    /**
-     * 生成批次号
-     */
-    private String generateBatchNo(String factoryCode, Date scheduleDate) {
-        String dateStr = DateUtil.format(scheduleDate, DjEngineConstants.BATCH_NO_DATE_FORMAT);
-        String prefix = DjEngineConstants.BATCH_NO_PREFIX + dateStr;
-
-        // 查询当天已使用的最大批次号序号（从排程结果主表中查询，归档在生成批次号之后执行）
-        List<DjScheduleResult> records = djEngineScheduleResultMapper.selectList(
-                new LambdaQueryWrapper<DjScheduleResult>().eq(DjScheduleResult::getScheduleDate, scheduleDate)
-                        .isNotNull(DjScheduleResult::getBatchNo));
-        String maxBatchNo = records.stream().map(DjScheduleResult::getBatchNo).max(String::compareTo)
-                .orElse(null);
-        int seq = 1; // 默认从001开始
-        if (maxBatchNo != null && maxBatchNo.startsWith(prefix)) {
-            try {
-                String seqStr = maxBatchNo.substring(prefix.length());
-                seq = Integer.parseInt(seqStr) + 1;
-            } catch (NumberFormatException e) {
-                seq = 1;
-            }
-        }
-        return prefix + String.format(DjEngineConstants.BATCH_NO_SEQ_FORMAT, seq);
     }
 
     /**
