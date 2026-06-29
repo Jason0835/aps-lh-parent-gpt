@@ -139,8 +139,13 @@ public class Cd90SingleShiftScheduleExecutor implements Cd90SingleShiftScheduleS
             }
             // 只有完整通过机台、库排和工装校验后，才用新状态替换当前班资源。
             state = commit.getState();
+            BigDecimal scheduledQuantity = commit.getTask().getPlanQuantity();
+            String partialReason = commit.getPartialReason();
+            if (scheduledQuantity.compareTo(netDemand) < 0 && !StringUtils.hasText(partialReason)) {
+                partialReason = "EQUAL_SHARE";
+            }
             attemptTraces.add(trace(shift, clothCode, construction.getBigRollCode(),
-                    netDemand, commit.getTask().getPlanQuantity(), null,
+                    netDemand, scheduledQuantity, null, partialReason,
                     attemptTraces.size() + 1));
         }
         log.info("[直裁自动排程] 当前班次执行完成, classField={}, taskCount={}, failureCount={}",
@@ -157,11 +162,24 @@ public class Cd90SingleShiftScheduleExecutor implements Cd90SingleShiftScheduleS
                                            BigDecimal scheduled,
                                            String failureReason,
                                            int sequence) {
+        return trace(shift, clothCode, bigRollCode, netDemand, scheduled,
+                failureReason, null, sequence);
+    }
+
+    private Cd90ScheduleAttemptTrace trace(Cd90ShiftDescriptor shift,
+                                           String clothCode,
+                                           String bigRollCode,
+                                           BigDecimal netDemand,
+                                           BigDecimal scheduled,
+                                           String failureReason,
+                                           String partialReason,
+                                           int sequence) {
         return Cd90ScheduleAttemptTrace.builder()
                 .classField(shift.getClassField()).shiftCode(shift.getShiftCode())
                 .clothCode(clothCode).bigRollCode(bigRollCode)
                 .netDemandQuantity(netDemand).scheduledQuantity(scheduled)
-                .failureReason(failureReason).sequence(sequence).build();
+                .failureReason(failureReason).partialReason(partialReason)
+                .sequence(sequence).build();
     }
 
     private Cd90MachineTrialRequest trialRequest(Cd90AutoScheduleContext context,

@@ -11,6 +11,8 @@ public class Cd90ShiftCommitResult {
     private boolean success;
     /** 失败原因编码。 */
     private String failureReason;
+    /** 成功但仅部分排产时的实际限制原因编码。 */
+    private String partialReason;
     /** 成功后的新资源状态；失败时为原状态。 */
     private Cd90ShiftResourceState state;
     /** 本次追加的任务。 */

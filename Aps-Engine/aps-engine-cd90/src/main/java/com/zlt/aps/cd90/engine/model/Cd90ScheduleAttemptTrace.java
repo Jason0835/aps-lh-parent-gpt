@@ -24,6 +24,8 @@ public class Cd90ScheduleAttemptTrace {
     private BigDecimal scheduledQuantity;
     /** 内部失败原因；成功时为空。 */
     private String failureReason;
+    /** 成功但仅部分排产时的实际限制原因编码。 */
+    private String partialReason;
     /** 多班循环内的实际发生顺序。 */
     private int sequence;
 }
