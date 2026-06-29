@@ -201,17 +201,13 @@ public class TaskGroupService {
         TaskGroupResult result = new TaskGroupResult();
 
         List<LhScheduleResult> lhScheduleResults = context.getLhScheduleResults();
-        if (lhScheduleResults == null || lhScheduleResults.isEmpty()) {
-            log.warn("硫化排程结果为空，无法分组任务");
-            return result;
-        }
         log.info("【任务分组】收到 {} 条硫化记录", lhScheduleResults.size());
 
         // 构建基础映射
         Map<String, MdmMaterialInfo> materialMap = buildMaterialMap(context);
         Map<String, CxStock> stockMap = buildStockMap(context);
 
-        // 一次性加载所有阈值配置（避免循环中重复打印日志）
+        // 一次性加载所有参数配置
         int endingDiscardThreshold = getEndingDiscardThreshold(context);
         int endingUrgentFormingRemainder = getEndingUrgentFormingRemainder(context);
         int endingDaysThreshold = getEndingDaysThreshold(context);
@@ -3354,10 +3350,18 @@ public class TaskGroupService {
             return Collections.emptyList();
         }
         int dayOfMonth = scheduleDate.getDayOfMonth();
+        int dateYear = scheduleDate.getYear();
+        int dateMonth = scheduleDate.getMonthValue();
         return configs.stream()
                 .filter(c -> c.getBeginDay() != null && c.getEndDay() != null
                         && c.getBeginDay() <= dayOfMonth && c.getEndDay() >= dayOfMonth)
-                .collect(Collectors.toList());
+                // 年月匹配：确保取到排程日期所在月份的配置
+                .filter(c -> c.getYear() != null && c.getYear() == dateYear
+                        && c.getMonth() != null && c.getMonth() == dateMonth)
+                // 按机台编码去重（同一机台可能有多条配置记录）
+                .collect(Collectors.collectingAndThen(
+                        Collectors.toMap(MpCxCapacityConfiguration::getCxMachineCode, c -> c, (a, b) -> a, LinkedHashMap::new),
+                        m -> new ArrayList<>(m.values())));
     }
 
     /**
@@ -3386,11 +3390,30 @@ public class TaskGroupService {
             LocalDate scheduleDate,
             Map<String, BigDecimal> structureAdvanceAvailableCapacityMap) {
 
-        // 1. 从未来配置取候选机台
+        // 1. 从未来配置取候选机台（按实际排程日期过滤）
         Map<String, List<MpCxCapacityConfiguration>> futureMap = context.getFutureStructureAllocationMap();
         if (futureMap == null || futureMap.isEmpty()) return Collections.emptyList();
-        List<MpCxCapacityConfiguration> futureConfigs = futureMap.get(structureName);
-        if (futureConfigs == null || futureConfigs.isEmpty()) return Collections.emptyList();
+        List<MpCxCapacityConfiguration> allFutureConfigs = futureMap.get(structureName);
+        if (allFutureConfigs == null || allFutureConfigs.isEmpty()) return Collections.emptyList();
+
+        // 按实际排程日期过滤未来机台：
+        // - 同月：BEGIN_DAY > 当天
+        // - 未来月：全部包含
+        int dayOfMonth = scheduleDate.getDayOfMonth();
+        int dateYearMonth = scheduleDate.getYear() * 100 + scheduleDate.getMonthValue();
+        List<MpCxCapacityConfiguration> futureConfigs = allFutureConfigs.stream()
+                .filter(c -> {
+                    if (c.getBeginDay() == null || c.getYear() == null || c.getMonth() == null) {
+                        return false;
+                    }
+                    int configYearMonth = c.getYear() * 100 + c.getMonth();
+                    if (configYearMonth == dateYearMonth) {
+                        return c.getBeginDay() > dayOfMonth;
+                    }
+                    return configYearMonth > dateYearMonth;
+                })
+                .collect(Collectors.toList());
+        if (futureConfigs.isEmpty()) return Collections.emptyList();
 
         // 2. 获取未来结构任意任务的物料英寸
         String advanceProSize = null;

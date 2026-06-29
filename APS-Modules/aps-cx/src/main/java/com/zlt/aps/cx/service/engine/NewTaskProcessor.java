@@ -355,43 +355,27 @@ public class NewTaskProcessor {
             }
         }
 
-        // 跨月判断：排程日期年月 ≠ 当月配置年月时，使用 futureStructureAllocationMap（含次月配置）
-        int dateYearMonth = scheduleDate.getYear() * 100 + scheduleDate.getMonthValue();
-        Integer baseYearMonth = context.getStructureAllocationYearMonth();
-        boolean crossMonth = baseYearMonth != null && baseYearMonth != dateYearMonth;
-
-        if (crossMonth) {
-            // 跨月场景：从 futureStructureAllocationMap 取（次月数据已按次月版本过滤，不再重复过滤版本）
-            if (context.getFutureStructureAllocationMap() != null) {
-                List<MpCxCapacityConfiguration> configs =
-                        context.getFutureStructureAllocationMap().get(structureName);
-                if (configs != null && !configs.isEmpty()) {
-                    int dayOfMonth = scheduleDate.getDayOfMonth();
-                    List<MpCxCapacityConfiguration> result = configs.stream()
-                            .filter(c -> c.getBeginDay() != null && c.getEndDay() != null)
-                            .filter(c -> c.getBeginDay() <= dayOfMonth && c.getEndDay() >= dayOfMonth)
-                            // 过滤：只保留存在于 availableMachines 中的机台
-                            .filter(c -> availableMachineCodes.contains(c.getCxMachineCode()))
-                            .collect(Collectors.toList());
-                    if (!result.isEmpty()) {
-                        return result;
-                    }
-                }
-            }
-        } else if (context.getStructureAllocationMap() != null) {
+        // 从 structureAllocationMap 取当日可用机台（跨月时两个月配置均在此Map，靠年月过滤选择）
+        if (context.getStructureAllocationMap() != null) {
             List<MpCxCapacityConfiguration> configs =
                     context.getStructureAllocationMap().get(structureName);
             if (configs != null && !configs.isEmpty()) {
                 int dayOfMonth = scheduleDate.getDayOfMonth();
+                int dateYear = scheduleDate.getYear();
+                int dateMonth = scheduleDate.getMonthValue();
 
                 List<MpCxCapacityConfiguration> result = configs.stream()
                         .filter(c -> c.getBeginDay() != null && c.getEndDay() != null)
                         .filter(c -> c.getBeginDay() <= dayOfMonth && c.getEndDay() >= dayOfMonth)
-                        .filter(c -> productionVersion == null
-                                || productionVersion.equals(c.getProductionVersion()))
+                        // 年月匹配：确保取到排程日期所在月份的配置（各月配置已按各自排产版本过滤）
+                        .filter(c -> c.getYear() != null && c.getYear() == dateYear
+                                && c.getMonth() != null && c.getMonth() == dateMonth)
                         // 过滤：只保留存在于 availableMachines 中的机台
                         .filter(c -> availableMachineCodes.contains(c.getCxMachineCode()))
-                        .collect(Collectors.toList());
+                        // 按机台编码去重（同一机台可能有多条配置记录）
+                        .collect(Collectors.collectingAndThen(
+                                Collectors.toMap(MpCxCapacityConfiguration::getCxMachineCode, c -> c, (a, b) -> a, LinkedHashMap::new),
+                                m -> new ArrayList<>(m.values())));
                 if (!result.isEmpty()) {
                     return result;
                 }
