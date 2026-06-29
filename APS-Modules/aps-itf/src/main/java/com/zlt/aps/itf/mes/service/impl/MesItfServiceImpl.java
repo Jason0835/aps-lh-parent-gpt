@@ -2510,17 +2510,32 @@ public class MesItfServiceImpl implements MesItfService {
 
         // Step2: 查询同物料是否存在正规计划（APS数据源）
         List<String> materialCodes = new ArrayList<>(materialFinishMap.keySet());
+        log.info("量试充抵正规：开始查询正规计划，factoryCode={}, year={}, month={}, 量试物料数={}, 物料列表={}",
+                factoryCode, year, month, materialCodes.size(), materialCodes);
+        
         List<MpMonthPlanMonitor> formalPlans;
         try {
             DynamicDataSourceContextHolder.push(DataSource.APS);
+            log.info("量试充抵正规：当前数据源={}", DynamicDataSourceContextHolder.peek());
             formalPlans = mpMonthPlanMonitorEntityMapper.selectFormalPlanByMaterials(
                     factoryCode, year, month, materialCodes);
         } finally {
             DynamicDataSourceContextHolder.poll();
         }
+        
+        log.info("量试充抵正规：查询正规计划完成，返回记录数={}", 
+                formalPlans != null ? formalPlans.size() : 0);
+        if (formalPlans != null && !formalPlans.isEmpty()) {
+            for (MpMonthPlanMonitor plan : formalPlans) {
+                log.info("量试充抵正规：正规计划记录，materialCode={}, productStatus={}, constructionStage={}, scheduleQty={}, productionQty={}",
+                        plan.getMaterialCode(), plan.getProductStatus(), plan.getConstructionStage(), 
+                        plan.getScheduleQty(), plan.getProductionQty());
+            }
+        }
+        
         if (CollectionUtils.isEmpty(formalPlans)) {
-            log.info("量试充抵正规：未查询到正规计划记录，factoryCode={}, year={}, month={}, 量试物料数={}",
-                    factoryCode, year, month, materialCodes.size());
+            log.warn("量试充抵正规：未查询到正规计划记录，factoryCode={}, year={}, month={}, 量试物料数={}, 物料列表={}",
+                    factoryCode, year, month, materialCodes.size(), materialCodes);
             return Collections.emptyList();
         }
 
