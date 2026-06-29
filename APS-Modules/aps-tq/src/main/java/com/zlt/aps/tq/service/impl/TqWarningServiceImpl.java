@@ -12,11 +12,12 @@ import com.zlt.aps.tq.entity.TqParams;
 import com.zlt.aps.tq.mapper.TqScheduleResultMapper;
 import com.zlt.aps.tq.mapper.TqScheFinishQtyMapper;
 import com.zlt.aps.tq.mapper.TqStockMapper;
+import com.zlt.aps.tq.mapper.TqWarningRecordMapper;
 import com.zlt.aps.tq.service.ITqWarningRecordService;
 import com.zlt.aps.tq.service.ITqWarningService;
 import com.zlt.aps.tq.service.TqParamsService;
+import com.ruoyi.common.utils.StringUtils;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
@@ -65,6 +66,9 @@ public class TqWarningServiceImpl implements ITqWarningService {
 
     @Resource
     private ITqWarningRecordService tqWarningRecordService;
+
+    @Resource
+    private TqWarningRecordMapper tqWarningRecordMapper;
 
     /** 预警类型：库存预警 */
     private static final String WARNING_TYPE_STOCK = "1";
@@ -373,7 +377,7 @@ public class TqWarningServiceImpl implements ITqWarningService {
             wrapper.eq(TqWarningRecord::getId, recordId)
                    .set(TqWarningRecord::getNotified, NOTIFIED_YES)
                    .set(TqWarningRecord::getNotifyTime, new Date());
-            tqWarningRecordService.update(wrapper);
+            tqWarningRecordMapper.update(null, wrapper);
         } catch (Exception e) {
             log.warn("更新预警记录通知状态失败：id={}", recordId, e);
         }
