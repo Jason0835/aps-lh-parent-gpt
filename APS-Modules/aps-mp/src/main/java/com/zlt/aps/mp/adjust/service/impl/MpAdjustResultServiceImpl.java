@@ -41,6 +41,7 @@ import org.apache.poi.ss.usermodel.DataFormatter;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.ss.usermodel.WorkbookFactory;
+import org.apache.poi.xssf.usermodel.XSSFSheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -94,10 +95,12 @@ public class MpAdjustResultServiceImpl extends AbstractDocService<MpAdjustResult
     @Autowired
     private IFactoryMonthPlanMouldDayResultService iFactoryMonthPlanMouldDayResultService;
     /**
-     * 导入页签名称，仅加载一次
+     * 导入模板信息，仅加载一次
      */
     private static String sheetName = null;
-    private static String sheetName4DayResult= null;
+    private static String sheetName4DayResult = null;
+    private static int columnCount = 0;
+    private static int columnCount4DayResult = 0;
 
     @Override
     protected String getDocTypeCode() {
@@ -304,23 +307,12 @@ public class MpAdjustResultServiceImpl extends AbstractDocService<MpAdjustResult
         String templateTitleErrorStr = I18nUtil.getMessage("ui.data.column.mpStructureAllocation.import.templateTitleError");
         String monthPlanVersionNotMatchErrorStr = I18nUtil.getMessage("ui.data.column.mpStructureAllocation.import.monthPlanVersionNotMatch");
         String productionVersionNotMatchErrorStr = I18nUtil.getMessage("ui.data.column.mpStructureAllocation.import.productionVersionNotMatch");
-        ClassLoader classLoader = this.getClass().getClassLoader();
         DataFormatter dataFormatter = new DataFormatter();
-        int excelColumnCount = iFactoryMonthPlanMouldDayResultService.getExportTemplateColumnCount(true); // excel总列数
         
-        // 加载月计划调整与结构转产表导出模板，用于获取页签名称
-        if (StringUtils.isEmpty(sheetName) || StringUtils.isEmpty(sheetName4DayResult)) {
-            try (InputStream inputStream = classLoader.getResourceAsStream("excelModel/mpStructureAllocationExportTemp.xlsx");
-                    InputStream dayInputStream = classLoader.getResourceAsStream("excelModel/factoryMonthPlanMouldFinalResultExportTemp.xlsx");
-                    XSSFWorkbook workbook = new XSSFWorkbook(inputStream);
-                    XSSFWorkbook dayWorkbook = new XSSFWorkbook(dayInputStream);) {
-                sheetName = workbook.getSheetName(0);
-                sheetName4DayResult = dayWorkbook.getSheetName(0);
-            } catch (Exception e) {
-                log.warn("importDataStructureAllocation workbook parse failed", e);
-                helper.setAjaxResult(AjaxResult.error(templateErrorStr));
-                return helper;
-            }
+        // 初始化月计划调整与结构转产表导出模板信息
+        if (!this.initExcelData()) {
+            helper.setAjaxResult(AjaxResult.error(templateErrorStr));
+            return helper;
         }
         
         try (Workbook wb = WorkbookFactory.create(new ByteArrayInputStream(fileBytes))) {
@@ -344,14 +336,14 @@ public class MpAdjustResultServiceImpl extends AbstractDocService<MpAdjustResult
             }
             // 解析需求计划版本
             String monthPlanVersionLabel = I18nUtil.getMessage("ui.data.column.mpStructureAllocation.monthPlanVersion") + ":";
-            Cell monthPlanVersionCell = sheet.getRow(0).getCell(27);
+            Cell monthPlanVersionCell = sheet.getRow(0).getCell(columnCount - 17);
             if (monthPlanVersionCell == null) {
                 helper.setAjaxResult(AjaxResult.error(templateErrorStr));
                 return helper;
             }
             helper.setMonthPlanVersion(dataFormatter.formatCellValue(monthPlanVersionCell).replace(monthPlanVersionLabel, "").trim());
             // 解析生产版本
-            Cell productVersionCell = sheet.getRow(0).getCell(35);
+            Cell productVersionCell = sheet.getRow(0).getCell(columnCount - 9);
             if (productVersionCell == null) {
                 helper.setAjaxResult(AjaxResult.error(templateErrorStr));
                 return helper;
@@ -378,7 +370,7 @@ public class MpAdjustResultServiceImpl extends AbstractDocService<MpAdjustResult
                 return helper;
             }
             // 解析需求计划版本
-            Cell monthPlanVersionCell4DayResult = sheet4DayResult.getRow(0).getCell(excelColumnCount - 9);
+            Cell monthPlanVersionCell4DayResult = sheet4DayResult.getRow(0).getCell(columnCount4DayResult - 9);
             if (monthPlanVersionCell4DayResult == null) {
                 helper.setAjaxResult(AjaxResult.error(templateErrorStr));
                 return helper;
@@ -390,7 +382,7 @@ public class MpAdjustResultServiceImpl extends AbstractDocService<MpAdjustResult
                 return helper;
             }
             // 解析生产版本
-            Cell productVersionCell4Day = sheet4DayResult.getRow(0).getCell(excelColumnCount - 4);
+            Cell productVersionCell4Day = sheet4DayResult.getRow(0).getCell(columnCount4DayResult - 4);
             if (productVersionCell4Day == null) {
                 helper.setAjaxResult(AjaxResult.error(templateErrorStr));
                 return helper;
@@ -406,6 +398,34 @@ public class MpAdjustResultServiceImpl extends AbstractDocService<MpAdjustResult
             helper.setAjaxResult(AjaxResult.error(templateErrorStr));
         }
         return helper;
+    }
+    
+
+    /**
+     * 初始化月计划调整与结构转产表导出模板信息
+     */
+    private boolean initExcelData() {
+        if (StringUtils.isNotEmpty(sheetName) && StringUtils.isNotEmpty(sheetName4DayResult)) {
+            return true;
+        }
+        ClassLoader classLoader = this.getClass().getClassLoader();
+        try (InputStream inputStream = classLoader.getResourceAsStream("excelModel/mpStructureAllocationExportTemp.xlsx");
+                InputStream dayInputStream = classLoader.getResourceAsStream("excelModel/factoryMonthPlanMouldFinalResultExportTemp.xlsx");
+                XSSFWorkbook workbook = new XSSFWorkbook(inputStream);
+                XSSFWorkbook dayWorkbook = new XSSFWorkbook(dayInputStream);) {
+            // 结构转产表页签
+            XSSFSheet sheet = workbook.getSheetAt(0);
+            columnCount = sheet.getRow(1).getLastCellNum();
+            sheetName = sheet.getSheetName();
+            // 月计划页签
+            XSSFSheet daySheet = dayWorkbook.getSheetAt(0);
+            columnCount4DayResult = daySheet.getRow(1).getLastCellNum();
+            sheetName4DayResult = daySheet.getSheetName();
+        } catch (Exception e) {
+            log.error("importDataStructureAllocation workbook parse failed", e);
+            return false;
+        }
+        return true;
     }
     
     /**

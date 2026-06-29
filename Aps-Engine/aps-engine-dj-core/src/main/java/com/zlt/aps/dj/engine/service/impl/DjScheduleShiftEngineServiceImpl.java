@@ -1,6 +1,7 @@
 package com.zlt.aps.dj.engine.service.impl;
 
 import java.math.BigDecimal;
+import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -22,6 +23,7 @@ import com.zlt.aps.common.engine.enums.ClassNumThreePlanEnums;
 import com.zlt.aps.dj.api.domain.entity.DjDayFinishQty;
 import com.zlt.aps.dj.api.domain.entity.DjMachineInfo;
 import com.zlt.aps.dj.api.domain.entity.DjScheduleResult;
+import com.zlt.aps.dj.engine.constant.DjEngineConstants;
 import com.zlt.aps.dj.engine.mapper.DjEngineDayFinishQtyMapper;
 import com.zlt.aps.dj.engine.mapper.DjEngineMachineMapper;
 import com.zlt.aps.dj.engine.mapper.DjEngineScheduleResultMapper;
@@ -97,7 +99,7 @@ public class DjScheduleShiftEngineServiceImpl implements IDjScheduleShiftEngineS
         for (DjScheduleResult result : machineResults) {
             if (result.getOrderNo() != null && finishedOrderNos.contains(result.getOrderNo())) {
                 // 该规格有完成量，检查其生产班次和顺位
-                for (int c = 1; c <= 6; c++) {
+                for (int c = 1; c <= DjEngineConstants.SHIFT_COUNT; c++) {
                     BigDecimal planQty = getPlanQtyByIndex(result, c);
                     if (planQty != null && planQty.compareTo(BigDecimal.ZERO) > 0) {
                         // 验证：如果已完成规格的班次比目标班次早，或同班次但顺位更早
@@ -162,7 +164,7 @@ public class DjScheduleShiftEngineServiceImpl implements IDjScheduleShiftEngineS
             if (sr.getOrderNo() == null || !finishedOrderNos.contains(sr.getOrderNo())) {
                 continue;
             }
-            for (int c = 1; c <= 6; c++) {
+            for (int c = 1; c <= DjEngineConstants.SHIFT_COUNT; c++) {
                 BigDecimal planQty = getPlanQtyByIndex(sr, c);
                 if (planQty != null && planQty.compareTo(BigDecimal.ZERO) > 0) {
                     Integer seq = getSequenceByIndex(sr, c);
@@ -177,20 +179,20 @@ public class DjScheduleShiftEngineServiceImpl implements IDjScheduleShiftEngineS
             }
         }
 
-        if (earliestClass > 6) {
+        if (earliestClass > DjEngineConstants.SHIFT_COUNT) {
             return result; // 没有已完成规格
         }
 
         // 4. 校验：插单班次必须 >= 已完成规格的班次
         if (targetClass < earliestClass) {
             result.setPassed(false);
-            result.setErrorMsg(String.format(I18nUtil.getMessage("ui.data.column.scheduleResult.validate.shift.earlier"), earliestClass));
+            result.setErrorMsg(MessageFormat.format(I18nUtil.getMessage("ui.data.column.scheduleResult.validate.shift.earlier"), earliestClass));
             return result;
         }
         // 5. 同班次时，插单顺位必须 > 已完成规格的顺位
         if (targetClass == earliestClass && targetSeq <= earliestSeq) {
             result.setPassed(false);
-            result.setErrorMsg(String.format(I18nUtil.getMessage("ui.data.column.scheduleResult.validate.seq.earlier"), earliestClass, earliestSeq));
+            result.setErrorMsg(MessageFormat.format(I18nUtil.getMessage("ui.data.column.scheduleResult.validate.seq.earlier"), earliestClass, earliestSeq));
             return result;
         }
 
@@ -198,29 +200,45 @@ public class DjScheduleShiftEngineServiceImpl implements IDjScheduleShiftEngineS
     }
 
     /**
-     * 2.3 约束二校验 — 产能校验
+     * 2.3 约束二校验 — 产能校验（三档判断）
+     * <p>
+     * 三档产能判断逻辑：
+     * <ol>
+     *   <li><b>withinQuota=true</b>：插单量 ≤ 剩余产能（机台定额 - 当班原有计划量），
+     *       无产能问题，可直接执行插单</li>
+     *   <li><b>withinQuota=false, passed=true</b>：剩余产能 &lt; 插单量 ≤ 实际剩余产能（机台定额 - 已生产量），
+     *       插单会导致延后规格，需提示用户确认</li>
+     *   <li><b>passed=false</b>：插单量 > 实际剩余产能，超当班剩余产能，拒绝插单</li>
+     * </ol>
+     * overflowSpecs 只包含生产顺序 >= targetSeq 的规格（顺位前的规格不受影响）。
+     * </p>
      *
-     * @param machineCode  机台编码
-     * @param classIndex   目标班次索引（1~6）
-     * @param insertPlanQty 插单计划量
-     * @param currentResults 当前排程结果列表
-     * @return 产能校验结果（是否通过、溢出规格列表）
+     * @param machineCode     机台编码
+     * @param classIndex      目标班次索引（1~6）
+     * @param targetSeq       目标生产顺位
+     * @param insertPlanQty   插单计划量
+     * @param currentResults  当前排程结果列表
+     * @param factoryCode     工厂编码
+     * @param scheduleDate    排产日期
+     * @return 产能校验结果（含三档判断标志）
      */
     @Override
-    public CapacityValidateResult validateCapacity(String machineCode, int classIndex,
+    public CapacityValidateResult validateCapacity(String machineCode, int classIndex, int targetSeq,
                                                    BigDecimal insertPlanQty,
-                                                   List<DjScheduleResult> currentResults) {
+                                                   List<DjScheduleResult> currentResults,
+                                                   String factoryCode, Date scheduleDate) {
         CapacityValidateResult result = new CapacityValidateResult();
 
         // 获取机台定额
         BigDecimal quota = getMachineQuota(machineCode);
         if (quota == null || quota.compareTo(BigDecimal.ZERO) <= 0) {
             result.setPassed(false);
+            result.setWithinQuota(false);
             result.setErrorMsg(I18nUtil.getMessage("ui.data.column.scheduleResult.validate.quota.zero"));
             return result;
         }
 
-        // 计算目标班次已有计划量之和
+        // 计算目标班次已有计划量之和，同时收集生产顺序 >= targetSeq 的规格作为受影响的溢出列表
         BigDecimal currentTotal = BigDecimal.ZERO;
         List<String> overflowSpecs = new ArrayList<>();
 
@@ -228,25 +246,51 @@ public class DjScheduleShiftEngineServiceImpl implements IDjScheduleShiftEngineS
             BigDecimal planQty = getPlanQtyByIndex(sr, classIndex);
             if (planQty != null && planQty.compareTo(BigDecimal.ZERO) > 0) {
                 currentTotal = currentTotal.add(planQty);
-                overflowSpecs.add(sr.getPaddingCode() + "(" + planQty + I18nUtil.getMessage("ui.data.column.scheduleResult.analysis.unit.meter") + ")");
+                // 只有生产顺序 >= 插单顺位的规格才会受影响
+                Integer seq = getSequenceByIndex(sr, classIndex);
+                if (seq != null && seq >= targetSeq) {
+                    overflowSpecs.add(sr.getPaddingName());
+                }
             }
         }
 
-        // 校验：该班次已有计划量 + 插单计划量 ≤ 机台定额
+        // 计算当前班次已生产量（完成量）
+        BigDecimal finishQty = this.calculateClassFinishQty(machineCode, classIndex, currentResults, factoryCode, scheduleDate);
+        // 实际剩余产能 = 机台定额 - 已生产量
+        BigDecimal remainingCapacity = quota.subtract(BigDecimalUtils.valueOf(finishQty));
+        if (remainingCapacity.compareTo(BigDecimal.ZERO) < 0) {
+            remainingCapacity = BigDecimal.ZERO;
+        }
+
         BigDecimal newTotal = currentTotal.add(BigDecimalUtils.valueOf(insertPlanQty));
         result.setQuota(quota);
         result.setCurrentTotal(currentTotal);
         result.setNewTotal(newTotal);
+        result.setFinishQty(finishQty);
+        result.setRemainingCapacity(remainingCapacity);
 
-        if (newTotal.compareTo(quota) <= 0) {
+        // 第一档：插单量 ≤ 剩余产能（机台定额 - 当班原有计划量）→ 无溢出，可直接执行
+        BigDecimal plannedRemaining = quota.subtract(currentTotal);
+        if (insertPlanQty.compareTo(plannedRemaining) <= 0) {
+            result.setWithinQuota(true);
             result.setPassed(true);
             return result;
         }
 
-        // 产能超出，标记受影响的规格
+        // 第二档：插单量 ≤ 实际剩余产能（机台定额 - 已生产量）→ 超定额但在剩余产能内，需提示用户
+        result.setWithinQuota(false);
+        if (insertPlanQty.compareTo(remainingCapacity) <= 0) {
+            result.setPassed(true);
+            result.setOverflowQty(newTotal.subtract(quota));
+            result.setOverflowSpecs(overflowSpecs);
+            return result;
+        }
+
+        // 第三档：插单量 > 实际剩余产能 → 拒绝插单
         result.setPassed(false);
-        result.setOverflowQty(newTotal.subtract(quota));
+        result.setOverflowQty(insertPlanQty.subtract(remainingCapacity));
         result.setOverflowSpecs(overflowSpecs);
+        result.setErrorMsg(I18nUtil.getMessage("ui.data.column.scheduleResult.validate.exceed.remaining"));
         return result;
     }
 
@@ -276,7 +320,7 @@ public class DjScheduleShiftEngineServiceImpl implements IDjScheduleShiftEngineS
             if (seq != null && seq >= targetSeq) {
                 // 记录原因：因XX插单推迟生产次序i->j
                 String analysis = getAnalysisByIndex(sr, targetClass);
-                String record = String.format(I18nUtil.getMessage("ui.data.column.scheduleResult.analysis.insert.seq.shift"), specName, seq, seq + 1);
+                String record = MessageFormat.format(I18nUtil.getMessage("ui.data.column.scheduleResult.analysis.insert.seq.shift"), specName, seq, seq + 1);
                 setAnalysisByIndex(sr, targetClass,
                         StringUtils.isNotBlank(analysis) ? analysis + record : record);
                 // 顺位 +1
@@ -285,7 +329,7 @@ public class DjScheduleShiftEngineServiceImpl implements IDjScheduleShiftEngineS
         }
 
         // 3. 从目标班次开始，逐班检查产能溢出
-        for (int i = targetClass; i <= 6; i++) {
+        for (int i = targetClass; i <= DjEngineConstants.SHIFT_COUNT; i++) {
             BigDecimal quota = getMachineQuota(machineCode);
             if (quota == null) {
                 quota = BigDecimal.valueOf(999999);
@@ -331,7 +375,7 @@ public class DjScheduleShiftEngineServiceImpl implements IDjScheduleShiftEngineS
                 break;
             }
 
-            if (i < 6) {
+            if (i < DjEngineConstants.SHIFT_COUNT) {
                 // 顺延到下一个班次
                 int nextClass = i + 1;
                 // 反转保持相对顺序
@@ -343,7 +387,7 @@ public class DjScheduleShiftEngineServiceImpl implements IDjScheduleShiftEngineS
                     String analysis = getAnalysisByIndex(sr, i);
 
                     // 原班次清理：计划量、顺位置NULL，原因分析保留并追加记录
-                    String shiftRecord = ";因" + specName + "插单，该规格推迟生产班次class" + i + "->class" + nextClass;
+                    String shiftRecord = MessageFormat.format(I18nUtil.getMessage("ui.data.column.scheduleResult.analysis.insert.class.shift"), specName, i, nextClass);
                     setAnalysisByIndex(sr, i,
                             StringUtils.isNotBlank(analysis) ? analysis + shiftRecord : shiftRecord);
                     setPlanQtyByIndex(sr, i, null);
@@ -357,7 +401,7 @@ public class DjScheduleShiftEngineServiceImpl implements IDjScheduleShiftEngineS
                     setPlanQtyByIndex(sr, nextClass, planQty);
                     setSequenceByIndex(sr, nextClass, maxSeqInNext + 1);
                     String nextAnalysis = getAnalysisByIndex(sr, nextClass);
-                    String nextShiftRecord = String.format(I18nUtil.getMessage("ui.data.column.scheduleResult.analysis.insert.to.current"), specName, i);
+                    String nextShiftRecord = MessageFormat.format(I18nUtil.getMessage("ui.data.column.scheduleResult.analysis.insert.to.current"), specName, i);
                     setAnalysisByIndex(sr, nextClass,
                             StringUtils.isNotBlank(nextAnalysis) ? nextAnalysis + ";" + nextShiftRecord : nextShiftRecord);
                 }
@@ -383,7 +427,7 @@ public class DjScheduleShiftEngineServiceImpl implements IDjScheduleShiftEngineS
                     if (available.compareTo(BigDecimal.ZERO) <= 0) {
                         // 整条规格移除
                         String analysis = getAnalysisByIndex(sr, i);
-                        String reduceRecord = ";因" + specName + "插单减量" + planQty;
+                        String reduceRecord = MessageFormat.format(I18nUtil.getMessage("ui.data.column.scheduleResult.analysis.insert.reduce"), specName, planQty);
                         setAnalysisByIndex(sr, i,
                                 StringUtils.isNotBlank(analysis) ? analysis + reduceRecord : reduceRecord);
                         setPlanQtyByIndex(sr, i, null);
@@ -392,7 +436,7 @@ public class DjScheduleShiftEngineServiceImpl implements IDjScheduleShiftEngineS
                         // 部分减量
                         BigDecimal reduceQty = planQty.subtract(available);
                         String analysis = getAnalysisByIndex(sr, i);
-                        String reduceRecord = ";因" + specName + "插单减量" + reduceQty;
+                        String reduceRecord = MessageFormat.format(I18nUtil.getMessage("ui.data.column.scheduleResult.analysis.insert.reduce"), specName, reduceQty);
                         setAnalysisByIndex(sr, i,
                                 StringUtils.isNotBlank(analysis) ? analysis + reduceRecord : reduceRecord);
                         setPlanQtyByIndex(sr, i, available);
@@ -405,26 +449,16 @@ public class DjScheduleShiftEngineServiceImpl implements IDjScheduleShiftEngineS
         }
 
         // 4. 重新整理顺位：确保每个班次顺位从1开始连续递增
-        for (int c = 1; c <= 6; c++) {
-            reorganizeSequences(machineResults, c);
+        // 目标班次要保留 targetSeq 顺位空洞（留给新插单记录），避免被重整填充
+        for (int c = 1; c <= DjEngineConstants.SHIFT_COUNT; c++) {
+            if (c == context.getTargetClass()) {
+                reorganizeAfterReduce(machineResults, c, context.getTargetSeq());
+            } else {
+                reorganizeAfterReduce(machineResults, c);
+            }
         }
 
         return machineResults;
-    }
-
-    /**
-     * 顺位空洞整理：确保班次内顺位从1开始连续递增
-     */
-    private void reorganizeSequences(List<DjScheduleResult> results, int classIndex) {
-        List<DjScheduleResult> withSeq = results.stream()
-                .filter(r -> getSequenceByIndex(r, classIndex) != null)
-                .sorted(Comparator.comparingInt(r -> getSequenceByIndex(r, classIndex)))
-                .collect(Collectors.toList());
-
-        int newSeq = 1;
-        for (DjScheduleResult sr : withSeq) {
-            setSequenceByIndex(sr, classIndex, newSeq++);
-        }
     }
 
     /**
@@ -432,7 +466,33 @@ public class DjScheduleShiftEngineServiceImpl implements IDjScheduleShiftEngineS
      */
     @Override
     public void reorganizeAfterReduce(List<DjScheduleResult> machineResults, int classIndex) {
-        this.reorganizeSequences(machineResults, classIndex);
+        reorganizeAfterReduce(machineResults, classIndex, null);
+    }
+
+    /**
+     * 3.4 减量后顺位空洞整理（支持保留指定顺位空洞，用于插单场景）
+     * <p>
+     * 当 skipSeq 不为 null 时，该顺位会被保留（不分配给任何已有记录），
+     * 留给后续新插入的排程记录使用。这解决了 processInsertAndCascade 中
+     * step 2 已创建顺位空洞（因 targetSeq 被留空），但 step 4 重整顺位时
+     * 又把它填充掉的问题。
+     * </p>
+     */
+    @Override
+    public void reorganizeAfterReduce(List<DjScheduleResult> machineResults, int classIndex, Integer skipSeq) {
+        List<DjScheduleResult> withSeq = machineResults.stream()
+                .filter(r -> getSequenceByIndex(r, classIndex) != null)
+                .sorted(Comparator.comparingInt(r -> getSequenceByIndex(r, classIndex)))
+                .collect(Collectors.toList());
+
+        int newSeq = 1;
+        for (DjScheduleResult sr : withSeq) {
+            // 如果当前顺位需要保留（留给新插单记录），则跳过该顺位
+            if (skipSeq != null && skipSeq == newSeq) {
+                newSeq++;
+            }
+            setSequenceByIndex(sr, classIndex, newSeq++);
+        }
     }
 
     // ==================== 班次字段访问工具方法 ====================
@@ -442,15 +502,8 @@ public class DjScheduleShiftEngineServiceImpl implements IDjScheduleShiftEngineS
      */
     @Override
     public Integer getSequenceByIndex(DjScheduleResult sr, int classIndex) {
-        switch (classIndex) {
-            case 1: return sr.getClass1Sequence();
-            case 2: return sr.getClass2Sequence();
-            case 3: return sr.getClass3Sequence();
-            case 4: return sr.getClass4Sequence();
-            case 5: return sr.getClass5Sequence();
-            case 6: return sr.getClass6Sequence();
-            default: return null;
-        }
+        String fieldName = String.format(DjEngineConstants.CLASS_SEQUENCE_FIELD, classIndex);
+        return (Integer) sr.getFieldValueByFieldName(fieldName);
     }
 
     /**
@@ -458,15 +511,8 @@ public class DjScheduleShiftEngineServiceImpl implements IDjScheduleShiftEngineS
      */
     @Override
     public void setSequenceByIndex(DjScheduleResult sr, int classIndex, Integer seq) {
-        switch (classIndex) {
-            case 1: sr.setClass1Sequence(seq); break;
-            case 2: sr.setClass2Sequence(seq); break;
-            case 3: sr.setClass3Sequence(seq); break;
-            case 4: sr.setClass4Sequence(seq); break;
-            case 5: sr.setClass5Sequence(seq); break;
-            case 6: sr.setClass6Sequence(seq); break;
-            default: break;
-        }
+        String fieldName = String.format(DjEngineConstants.CLASS_SEQUENCE_FIELD, classIndex);
+        sr.setFieldValueByFieldName(fieldName, seq);
     }
 
     /**
@@ -474,15 +520,8 @@ public class DjScheduleShiftEngineServiceImpl implements IDjScheduleShiftEngineS
      */
     @Override
     public BigDecimal getPlanQtyByIndex(DjScheduleResult sr, int classIndex) {
-        switch (classIndex) {
-            case 1: return sr.getClass1PlanQty();
-            case 2: return sr.getClass2PlanQty();
-            case 3: return sr.getClass3PlanQty();
-            case 4: return sr.getClass4PlanQty();
-            case 5: return sr.getClass5PlanQty();
-            case 6: return sr.getClass6PlanQty();
-            default: return null;
-        }
+        String fieldName = String.format(DjEngineConstants.CLASS_PLAN_QTY_FIELD, classIndex);
+        return BigDecimalUtils.valueOf(sr.getFieldValueByFieldName(fieldName));
     }
 
     /**
@@ -490,15 +529,8 @@ public class DjScheduleShiftEngineServiceImpl implements IDjScheduleShiftEngineS
      */
     @Override
     public void setPlanQtyByIndex(DjScheduleResult sr, int classIndex, BigDecimal qty) {
-        switch (classIndex) {
-            case 1: sr.setClass1PlanQty(qty); break;
-            case 2: sr.setClass2PlanQty(qty); break;
-            case 3: sr.setClass3PlanQty(qty); break;
-            case 4: sr.setClass4PlanQty(qty); break;
-            case 5: sr.setClass5PlanQty(qty); break;
-            case 6: sr.setClass6PlanQty(qty); break;
-            default: break;
-        }
+        String fieldName = String.format(DjEngineConstants.CLASS_PLAN_QTY_FIELD, classIndex);
+        sr.setFieldValueByFieldName(fieldName, qty);
     }
 
     /**
@@ -506,15 +538,8 @@ public class DjScheduleShiftEngineServiceImpl implements IDjScheduleShiftEngineS
      */
     @Override
     public String getAnalysisByIndex(DjScheduleResult sr, int classIndex) {
-        switch (classIndex) {
-            case 1: return sr.getClass1Analysis();
-            case 2: return sr.getClass2Analysis();
-            case 3: return sr.getClass3Analysis();
-            case 4: return sr.getClass4Analysis();
-            case 5: return sr.getClass5Analysis();
-            case 6: return sr.getClass6Analysis();
-            default: return null;
-        }
+        String fieldName = String.format(DjEngineConstants.CLASS_ANALYSIS_FIELD, classIndex);
+        return (String) sr.getFieldValueByFieldName(fieldName);
     }
 
     /**
@@ -522,15 +547,8 @@ public class DjScheduleShiftEngineServiceImpl implements IDjScheduleShiftEngineS
      */
     @Override
     public void setAnalysisByIndex(DjScheduleResult sr, int classIndex, String analysis) {
-        switch (classIndex) {
-            case 1: sr.setClass1Analysis(analysis); break;
-            case 2: sr.setClass2Analysis(analysis); break;
-            case 3: sr.setClass3Analysis(analysis); break;
-            case 4: sr.setClass4Analysis(analysis); break;
-            case 5: sr.setClass5Analysis(analysis); break;
-            case 6: sr.setClass6Analysis(analysis); break;
-            default: break;
-        }
+        String fieldName = String.format(DjEngineConstants.CLASS_ANALYSIS_FIELD, classIndex);
+        sr.setFieldValueByFieldName(fieldName, analysis);
     }
 
     /**
@@ -542,7 +560,7 @@ public class DjScheduleShiftEngineServiceImpl implements IDjScheduleShiftEngineS
         if (current == null) {
             current = ClassNumThreePlanEnums.CLASS_DAY; // 默认中班
         }
-        for (int i = 0; i < 6; i++) {
+        for (int i = 0; i < DjEngineConstants.SHIFT_COUNT; i++) {
             mapping[i] = current.getClassIndex();
             current = current.getNextClass();
         }
@@ -563,6 +581,55 @@ public class DjScheduleShiftEngineServiceImpl implements IDjScheduleShiftEngineS
             case "03": return BigDecimalUtils.valueOf(finishQty.getMidFinishQty());
             default: return BigDecimal.ZERO;
         }
+    }
+
+    /**
+     * 计算机台当前班次的已生产量（完成量）
+     * <p>
+     * 根据该机台所有排程结果的工单号，查询完成量表中对应班次的完成量之和。
+     * classIndex 通过 {@link DjEngineConstants#SHIFT_CLASS_MAP} 映射到真实班次。
+     * </p>
+     *
+     * @param machineCode    机台编码
+     * @param classIndex     目标班次索引（1~6）
+     * @param currentResults 当前排程结果列表
+     * @param factoryCode    工厂编码
+     * @param scheduleDate   排产日期
+     * @return 该机台当前班次已生产量总和
+     */
+    private BigDecimal calculateClassFinishQty(String machineCode, int classIndex,
+                                                List<DjScheduleResult> currentResults,
+                                                String factoryCode, Date scheduleDate) {
+        // 获取该机台所有排程结果的工单号
+        Set<String> orderNos = currentResults.stream()
+                .filter(r -> machineCode.equals(r.getMachineCode()))
+                .map(DjScheduleResult::getOrderNo)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        if (orderNos.isEmpty()) {
+            return BigDecimal.ZERO;
+        }
+
+        // 查询这些工单的完成量记录
+        List<DjDayFinishQty> finishQtyList = djEngineDayFinishQtyMapper.selectList(
+                new LambdaQueryWrapper<DjDayFinishQty>()
+                        .eq(DjDayFinishQty::getFactoryCode, factoryCode)
+                        .eq(DjDayFinishQty::getScheduleDate, scheduleDate)
+                        .in(DjDayFinishQty::getOrderNo, orderNos));
+
+        if (CollectionUtils.isEmpty(finishQtyList)) {
+            return BigDecimal.ZERO;
+        }
+
+        // 根据 classIndex 获取对应的真实班次
+        String realShiftClass = DjEngineConstants.SHIFT_CLASS_MAP[classIndex - 1];
+
+        // 累加该班次的完成量
+        BigDecimal totalFinishQty = BigDecimal.ZERO;
+        for (DjDayFinishQty fq : finishQtyList) {
+            totalFinishQty = totalFinishQty.add(this.getFinishQtyByRealShift(fq, realShiftClass));
+        }
+        return totalFinishQty;
     }
 
     /**

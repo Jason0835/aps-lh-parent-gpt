@@ -5,8 +5,10 @@ import com.zlt.aps.tq.api.domain.entity.TqWarningRecord;
 import com.zlt.aps.tq.mapper.TqWarningRecordMapper;
 import com.zlt.aps.tq.service.ITqWarningRecordService;
 import com.zlt.bill.common.service.AbstractDocService;
+import com.zlt.core.dao.basedao.BaseDao;
 import com.zlt.sysdef.domain.SysDocType;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,6 +31,9 @@ public class TqWarningRecordServiceImpl extends AbstractDocService<TqWarningReco
 
     @Resource
     private TqWarningRecordMapper tqWarningRecordMapper;
+
+    @Autowired
+    private BaseDao baseDao;
 
     @Override
     protected String getDocTypeCode() {
@@ -59,9 +64,9 @@ public class TqWarningRecordServiceImpl extends AbstractDocService<TqWarningReco
         if (warningRecords == null || warningRecords.isEmpty()) {
             return 0;
         }
-        // 使用框架的saveBatch方法批量保存
-        boolean success = this.saveBatch(warningRecords);
-        return success ? warningRecords.size() : 0;
+        // 使用BaseDao批量保存
+        baseDao.saveBatch(warningRecords);
+        return warningRecords.size();
     }
 
     /**

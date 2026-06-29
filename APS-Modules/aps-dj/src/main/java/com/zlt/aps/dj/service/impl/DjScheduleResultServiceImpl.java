@@ -47,6 +47,7 @@ import com.zlt.aps.dj.api.domain.entity.DjDispatcherLog;
 import com.zlt.aps.dj.api.domain.entity.DjMachineInfo;
 import com.zlt.aps.dj.api.domain.entity.DjParams;
 import com.zlt.aps.dj.api.domain.entity.DjScheduleResult;
+import com.zlt.aps.dj.engine.constant.DjEngineConstants;
 import com.zlt.aps.dj.engine.vo.DjScheduleResultVo;
 import com.zlt.aps.dj.mapper.DjScheduleResultMapper;
 import com.zlt.aps.dj.mapper.DjParamsMapper;
@@ -629,7 +630,7 @@ public class DjScheduleResultServiceImpl extends AbstractBillService<DjScheduleR
         // 遍历校验
         for (int i = 0; i < list.size(); i++) {
             DjScheduleResult entity = list.get(i);
-            entity.setDataSource("2");
+            entity.setDataSource(DjEngineConstants.DATA_SOURCE_IMPORT);
             entity.setScheduleDate(DateUtils.dateTime("yyyy-MM-dd", scheduleDate));
 
             // 重复记录校验
