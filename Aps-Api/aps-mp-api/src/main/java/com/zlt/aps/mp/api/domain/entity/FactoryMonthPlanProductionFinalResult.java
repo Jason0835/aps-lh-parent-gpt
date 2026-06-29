@@ -349,6 +349,11 @@ public class FactoryMonthPlanProductionFinalResult extends BaseEntity implements
     @TableField(value = "UNIFORMITY_QTY")
     private Integer uniformityQty;
 
+    /** 是否锁定上机日期：0-否，1-是 */
+    @ApiModelProperty(value = "是否锁定上机日期：0-否，1-是", name = "isLockSchedule")
+    @TableField(value = "IS_LOCK_SCHEDULE")
+    private String isLockSchedule;
+
     /**
      * 是否EXCEL导入（0：默认不是，1：是）
      */
