@@ -60,9 +60,7 @@ import com.zlt.aps.mp.engine.handler.LhMachineInfoCalculateHelper;
 import com.zlt.aps.mp.engine.mapper.FactoryMonthPlanProductMouldMapper;
 import com.zlt.aps.mp.engine.mapper.FactoryMouldingDayResultMapper;
 import com.zlt.aps.mp.engine.utils.DateUtils;
-import com.zlt.aps.mp.enums.MonthPlanExportDataTypeEnum;
 import com.zlt.aps.mp.enums.StructureAllocationExportDataTypeEnum;
-import com.zlt.aps.mp.factory.dto.FactoryMonthPlanMouldDayResultExportVo;
 import com.zlt.aps.mp.factory.dto.MpStructureAllocationExportChangeCountVo;
 import com.zlt.aps.mp.factory.dto.MpStructureAllocationExportStatisticsVo;
 import com.zlt.aps.mp.factory.dto.MpStructureAllocationExportVo;
@@ -84,6 +82,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.xssf.usermodel.XSSFSheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
@@ -151,6 +150,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
 
     private final FactoryMouldingDayResultMapper factoryMouldingDayResultMapper;
     private final LhMachineInfoEntityMapper lhMachineInfoEntityMapper;
+    private final MdmMoldingMachineEntityMapper moldingMachineEntityMapper;
     private final DpDemandPlanEntityMapper dpDemandPlanEntityMapper;
     private final FactoryMonthPlanProductionFinalResultEntityMapper factoryMonthPlanProductionFinalResultEntityMapper;
     private final ISysDictDataCacheService sysDictDataCacheService;
@@ -190,10 +190,12 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
      */
     private final static Integer LAST_MONTH_DAY = 10;
     /**
-     * 导入页签名称，仅加载一次
+     * 导入模板信息，仅加载一次
      */
     private static String sheetName = null;
     private static String sheetName4DayResult = null;
+    private static int columnCount = 0;
+    private static int columnCount4DayResult = 0;
 
     /**
      * 导入错误记录的缺省ID
@@ -1666,10 +1668,14 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         // 按结构 + 日期 统计硫化机台数
         Map<String, Map<Integer, Integer>> lhMachineStatisticsMap = this.buildLhMachineStatiseicsMap(statisticsMap,
                 FactoryConstant.MONTH_MAX_DAY);
-        // 1.6、加载周期结构
+        // 加载周期结构
         LambdaQueryWrapper<MdmCycleSchStruConf> mdmCycleSchStruConfQueryWrapper = new LambdaQueryWrapper<>();
         mdmCycleSchStruConfQueryWrapper.eq(MdmCycleSchStruConf::getFactoryCode, factoryCode);
         Set<String> cycleSchStruSet = mdmCycleSchStruConfEntityMapper.selectList(mdmCycleSchStruConfQueryWrapper).stream().map(MdmCycleSchStruConf::getStructureName).distinct().collect(Collectors.toSet());
+        // 加载成型机
+        LambdaQueryWrapper<MdmMoldingMachine> moldingMachineQueryWrapper = new LambdaQueryWrapper<>();
+        moldingMachineQueryWrapper.eq(MdmMoldingMachine::getFactoryCode, factoryCode);
+        Map<String, MdmMoldingMachine> machineMap = moldingMachineEntityMapper.selectList(moldingMachineQueryWrapper).stream().collect(Collectors.toMap(MdmMoldingMachine::getMachineCode, Function.identity(), (m1, m2) -> m1));
         
         
         // 未匹配的 lastFinalResult 新增到 recordList
@@ -1691,8 +1697,11 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                 }
                 record.setStructureType(structureType);
                 record.setDataType(StructureAllocationExportDataTypeEnum.RECORD.getCode());
+                MdmMoldingMachine machine = machineMap.get(record.getCxMachineCode());
+                if (machine != null) {
+                    record.setCxMachineTypeCode(machine.getCxMachineTypeCode());
+                }
             }
-        
             
             String structureName = structureAllocation.getStructureName();
             Map<Integer, Integer> dayLhMachinesMap = lhMachineStatisticsMap.get(structureName);
@@ -2336,25 +2345,13 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         String templateErrorStr = I18nUtil.getMessage("ui.data.column.mpStructureAllocation.import.templateError");
         String templateTitleErrorStr = I18nUtil.getMessage("ui.data.column.mpStructureAllocation.import.templateTitleError");
         String monthPlanVersionNotMatchErrorStr = I18nUtil.getMessage("ui.data.column.mpStructureAllocation.import.monthPlanVersionNotMatch");
-        ClassLoader classLoader = this.getClass().getClassLoader();
         DataFormatter dataFormatter = new DataFormatter();
-        int excelColumnCount = iFactoryMonthPlanMouldDayResultService.getExportTemplateColumnCount(false);
 
-        // 加载月计划调整与结构转产表导出模板，用于获取页签名称
-        if (StringUtils.isEmpty(sheetName) || StringUtils.isEmpty(sheetName4DayResult)) {
-            try (InputStream inputStream = classLoader.getResourceAsStream("excelModel/mpStructureAllocationExportTemp.xlsx");
-                 InputStream dayInputStream = classLoader.getResourceAsStream("excelModel/factoryMonthPlanMouldFinalResultExportTemp.xlsx");
-                 XSSFWorkbook workbook = new XSSFWorkbook(inputStream);
-                 XSSFWorkbook dayWorkbook = new XSSFWorkbook(dayInputStream);) {
-                sheetName = workbook.getSheetName(0);
-                sheetName4DayResult = dayWorkbook.getSheetName(0);
-            } catch (Exception e) {
-                log.warn("importDataStructureAllocation workbook parse failed", e);
-                helper.setAjaxResult(AjaxResult.error(templateErrorStr));
-                return helper;
-            }
+        // 初始化月计划调整与结构转产表导出模板信息
+        if (!this.initExcelData()) {
+            helper.setAjaxResult(AjaxResult.error(templateErrorStr));
+            return helper;
         }
-
         try (Workbook wb = WorkbookFactory.create(new ByteArrayInputStream(fileBytes))) {
             Sheet sheet = wb.getSheet(sheetName);
             if (sheet == null || sheet.getRow(0) == null) {
@@ -2376,14 +2373,14 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
             }
             // 解析需求计划版本
             String monthPlanVersionLabel = I18nUtil.getMessage("ui.data.column.mpStructureAllocation.monthPlanVersion") + ":";
-            Cell monthPlanVersionCell = sheet.getRow(0).getCell(27);
+            Cell monthPlanVersionCell = sheet.getRow(0).getCell(columnCount - 17);
             if (monthPlanVersionCell == null) {
                 helper.setAjaxResult(AjaxResult.error(templateErrorStr));
                 return helper;
             }
             helper.setMonthPlanVersion(dataFormatter.formatCellValue(monthPlanVersionCell).replace(monthPlanVersionLabel, "").trim());
             // 解析生产版本
-            Cell productVersionCell = sheet.getRow(0).getCell(35);
+            Cell productVersionCell = sheet.getRow(0).getCell(columnCount - 9);
             if (productVersionCell == null) {
                 helper.setAjaxResult(AjaxResult.error(templateErrorStr));
                 return helper;
@@ -2410,7 +2407,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                 return helper;
             }
             // 解析需求计划版本
-            Cell monthPlanVersionCell4DayResult = sheet4DayResult.getRow(0).getCell(excelColumnCount - 9);
+            Cell monthPlanVersionCell4DayResult = sheet4DayResult.getRow(0).getCell(columnCount4DayResult - 9);
             if (monthPlanVersionCell4DayResult == null) {
                 helper.setAjaxResult(AjaxResult.error(templateErrorStr));
                 return helper;
@@ -2437,6 +2434,33 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
             helper.setAjaxResult(AjaxResult.error(templateErrorStr));
         }
         return helper;
+    }
+
+    /**
+     * 初始化月计划调整与结构转产表导出模板信息
+     */
+    private boolean initExcelData() {
+        if (StringUtils.isNotEmpty(sheetName) && StringUtils.isNotEmpty(sheetName4DayResult)) {
+            return true;
+        }
+        ClassLoader classLoader = this.getClass().getClassLoader();
+        try (InputStream inputStream = classLoader.getResourceAsStream("excelModel/mpStructureAllocationExportTemp.xlsx");
+                InputStream dayInputStream = classLoader.getResourceAsStream("excelModel/factoryMonthPlanMouldDayResultExportTemp.xlsx");
+                XSSFWorkbook workbook = new XSSFWorkbook(inputStream);
+                XSSFWorkbook dayWorkbook = new XSSFWorkbook(dayInputStream);) {
+            // 结构转产表页签
+            XSSFSheet sheet = workbook.getSheetAt(0);
+            columnCount = sheet.getRow(1).getLastCellNum();
+            sheetName = sheet.getSheetName();
+            // 月计划页签
+            XSSFSheet daySheet = dayWorkbook.getSheetAt(0);
+            columnCount4DayResult = daySheet.getRow(1).getLastCellNum();
+            sheetName4DayResult = daySheet.getSheetName();
+        } catch (Exception e) {
+            log.error("importDataStructureAllocation workbook parse failed", e);
+            return false;
+        }
+        return true;
     }
 
     private int[] parseImportMsg(AjaxResult ajaxResult) {
