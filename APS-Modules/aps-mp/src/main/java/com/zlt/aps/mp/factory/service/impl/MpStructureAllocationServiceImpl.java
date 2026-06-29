@@ -1675,9 +1675,10 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         // 加载成型机
         LambdaQueryWrapper<MdmMoldingMachine> moldingMachineQueryWrapper = new LambdaQueryWrapper<>();
         moldingMachineQueryWrapper.eq(MdmMoldingMachine::getFactoryCode, factoryCode);
-        Map<String, MdmMoldingMachine> machineMap = moldingMachineEntityMapper.selectList(moldingMachineQueryWrapper).stream().collect(Collectors.toMap(MdmMoldingMachine::getMachineCode, Function.identity(), (m1, m2) -> m1));
-        
-        
+        Map<String, String> cxMachineTypeCodeMap = moldingMachineEntityMapper.selectList(moldingMachineQueryWrapper)
+                .stream().collect(Collectors.toMap(MdmMoldingMachine::getCxMachineCode,
+                        MdmMoldingMachine::getCxMachineTypeCode, (m1, m2) -> m1));
+
         // 未匹配的 lastFinalResult 新增到 recordList
         for (MpStructureAllocation structureAllocation : lastStructureList) {
             String key = GenerageMapKeyUtils.createMapKey(structureAllocation.getStructureName(), structureAllocation.getCxMachineCode());
@@ -1697,10 +1698,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                 }
                 record.setStructureType(structureType);
                 record.setDataType(StructureAllocationExportDataTypeEnum.RECORD.getCode());
-                MdmMoldingMachine machine = machineMap.get(record.getCxMachineCode());
-                if (machine != null) {
-                    record.setCxMachineTypeCode(machine.getCxMachineTypeCode());
-                }
+                record.setCxMachineTypeCode(cxMachineTypeCodeMap.get(record.getCxMachineCode()));
             }
             
             String structureName = structureAllocation.getStructureName();
