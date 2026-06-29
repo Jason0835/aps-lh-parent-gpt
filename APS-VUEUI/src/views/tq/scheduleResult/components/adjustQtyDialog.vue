@@ -137,7 +137,7 @@
 
 <script>
 import moment from "moment";
-import { changeQty, validateChangeQty, listScheduleShiftDates } from "@/api/tq/scheduleResult";
+import { changeQty, listScheduleShiftDates } from "@/api/tq/scheduleResult";
 
 export default {
   inject: ["parentDict"],
@@ -295,9 +295,7 @@ export default {
     async save(params) {
       try {
         this.loading = true;
-        // 先调用后端校验接口
-        await validateChangeQty(params);
-        // 校验通过，执行保存
+        // 后端 changeQty 接口内部已执行 validateChangeQty 校验，无需重复调用
         const res = await changeQty(params);
         this.loading = false;
         this.$modal.msgSuccess(this.$t("common.msg.ajax.operation.success"));
