@@ -186,32 +186,32 @@ public class MesTqScheduleResult implements Serializable {
     /** 对应成型3班计划量 */
     @ApiModelProperty(value = "对应成型3班计划量", name = "cxClass3Plan")
     @TableField(value = "CX_CLASS3_PLAN")
-    private Double cxClass3Plan;
+    private Integer cxClass3Plan;
 
     /** 对应成型4班计划量 */
     @ApiModelProperty(value = "对应成型4班计划量", name = "cxClass4Plan")
     @TableField(value = "CX_CLASS4_PLAN")
-    private Double cxClass4Plan;
+    private Integer cxClass4Plan;
 
     /** 对应成型5班计划量 */
     @ApiModelProperty(value = "对应成型5班计划量", name = "cxClass5Plan")
     @TableField(value = "CX_CLASS5_PLAN")
-    private Double cxClass5Plan;
+    private Integer cxClass5Plan;
 
     /** 对应成型6班计划量 */
     @ApiModelProperty(value = "对应成型6班计划量", name = "cxClass6Plan")
     @TableField(value = "CX_CLASS6_PLAN")
-    private Double cxClass6Plan;
+    private Integer cxClass6Plan;
 
     /** 对应成型7班计划量 */
     @ApiModelProperty(value = "对应成型7班计划量", name = "cxClass7Plan")
     @TableField(value = "CX_CLASS7_PLAN")
-    private Double cxClass7Plan;
+    private Integer cxClass7Plan;
 
     /** 对应成型8班计划量 */
     @ApiModelProperty(value = "对应成型8班计划量", name = "cxClass8Plan")
     @TableField(value = "CX_CLASS8_PLAN")
-    private Double cxClass8Plan;
+    private Integer cxClass8Plan;
 
     // ========== 状态与公共字段 ==========
     /** 是否发布 */

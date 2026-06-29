@@ -150,30 +150,38 @@ public class TqScheduleResultIssue extends BaseEntity {
     @ApiModelProperty(value = "次日中班手工输入原因分析", name = "nextMidHandAnalysis")
     private String nextMidHandAnalysis;
 
-    // ========== 对应成型3~8班计划量 ==========
+    // ========== 对应成型1~8班计划量 ==========
+    /** 对应成型1班计划量（D日早班库存直接供应） */
+    @ApiModelProperty(value = "对应成型1班计划量", name = "cxClass1Plan")
+    private Integer cxClass1Plan;
+
+    /** 对应成型2班计划量（D日中班库存+当天早班产出供应） */
+    @ApiModelProperty(value = "对应成型2班计划量", name = "cxClass2Plan")
+    private Integer cxClass2Plan;
+
     /** 对应成型3班计划量 */
     @ApiModelProperty(value = "对应成型3班计划量", name = "cxClass3Plan")
-    private Double cxClass3Plan;
+    private Integer cxClass3Plan;
 
     /** 对应成型4班计划量 */
     @ApiModelProperty(value = "对应成型4班计划量", name = "cxClass4Plan")
-    private Double cxClass4Plan;
+    private Integer cxClass4Plan;
 
     /** 对应成型5班计划量 */
     @ApiModelProperty(value = "对应成型5班计划量", name = "cxClass5Plan")
-    private Double cxClass5Plan;
+    private Integer cxClass5Plan;
 
     /** 对应成型6班计划量 */
     @ApiModelProperty(value = "对应成型6班计划量", name = "cxClass6Plan")
-    private Double cxClass6Plan;
+    private Integer cxClass6Plan;
 
     /** 对应成型7班计划量 */
     @ApiModelProperty(value = "对应成型7班计划量", name = "cxClass7Plan")
-    private Double cxClass7Plan;
+    private Integer cxClass7Plan;
 
     /** 对应成型8班计划量 */
     @ApiModelProperty(value = "对应成型8班计划量", name = "cxClass8Plan")
-    private Double cxClass8Plan;
+    private Integer cxClass8Plan;
 
     // ========== 状态字段 ==========
     /** 收尾提示标识(0:提示收尾；1:不需要提示) */

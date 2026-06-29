@@ -359,6 +359,46 @@ public class TqScheduleResult extends BaseEntity implements Serializable {
     @TableField(value = "STOCK_QTY")
     private Integer stockQty;
 
+    /** 对应成型1班计划量（下发MES使用，D日早班库存直接供应） */
+    @ApiModelProperty(value = "对应成型1班计划量", name = "cxClass1Plan")
+    @TableField(value = "CX_CLASS1_PLAN")
+    private Integer cxClass1Plan;
+
+    /** 对应成型2班计划量（下发MES使用，D日中班库存+当天早班产出供应） */
+    @ApiModelProperty(value = "对应成型2班计划量", name = "cxClass2Plan")
+    @TableField(value = "CX_CLASS2_PLAN")
+    private Integer cxClass2Plan;
+
+    /** 对应成型3班计划量（下发MES使用，表达胎圈与成型的供应关系） */
+    @ApiModelProperty(value = "对应成型3班计划量", name = "cxClass3Plan")
+    @TableField(value = "CX_CLASS3_PLAN")
+    private Integer cxClass3Plan;
+
+    /** 对应成型4班计划量（下发MES使用，表达胎圈与成型的供应关系） */
+    @ApiModelProperty(value = "对应成型4班计划量", name = "cxClass4Plan")
+    @TableField(value = "CX_CLASS4_PLAN")
+    private Integer cxClass4Plan;
+
+    /** 对应成型5班计划量（下发MES使用，表达胎圈与成型的供应关系） */
+    @ApiModelProperty(value = "对应成型5班计划量", name = "cxClass5Plan")
+    @TableField(value = "CX_CLASS5_PLAN")
+    private Integer cxClass5Plan;
+
+    /** 对应成型6班计划量（下发MES使用，表达胎圈与成型的供应关系） */
+    @ApiModelProperty(value = "对应成型6班计划量", name = "cxClass6Plan")
+    @TableField(value = "CX_CLASS6_PLAN")
+    private Integer cxClass6Plan;
+
+    /** 对应成型7班计划量（下发MES使用，表达胎圈与成型的供应关系） */
+    @ApiModelProperty(value = "对应成型7班计划量", name = "cxClass7Plan")
+    @TableField(value = "CX_CLASS7_PLAN")
+    private Integer cxClass7Plan;
+
+    /** 对应成型8班计划量（下发MES使用，表达胎圈与成型的供应关系） */
+    @ApiModelProperty(value = "对应成型8班计划量", name = "cxClass8Plan")
+    @TableField(value = "CX_CLASS8_PLAN")
+    private Integer cxClass8Plan;
+
     /** 排程日期查询（精确匹配） */
     @JsonFormat(pattern = "yyyy-MM-dd")
     @TableField(exist = false)
@@ -367,8 +407,4 @@ public class TqScheduleResult extends BaseEntity implements Serializable {
     /** 分厂编码（查询参数，非数据库字段） */
     @TableField(exist = false)
     private String factoryCode;
-
-    /** 机台名称（反显） */
-    @TableField(exist = false)
-    private String machineName;
 }

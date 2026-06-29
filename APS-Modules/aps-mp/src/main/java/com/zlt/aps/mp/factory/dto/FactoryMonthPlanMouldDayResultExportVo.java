@@ -53,48 +53,66 @@ public class FactoryMonthPlanMouldDayResultExportVo extends FactoryMonthPlanMoul
      */
     @ApiModelProperty(value = "上个月定稿版本", name = "lastProductionVersion")
     private String lastProductionVersion;
-
-    /**
-     * 上个月27号计划量
-     */
-    @ApiModelProperty(value = "上个月27号计划量", name = "last27")
-    private Integer last27;
-
-    /**
-     * 上个月28号计划量
-     */
-    @ApiModelProperty(value = "上个月28号计划量", name = "last28")
-    private Integer last28;
-
-    /**
-     * 上个月29号计划量
-     */
-    @ApiModelProperty(value = "上个月29号计划量", name = "last29")
-    private Integer last29;
-
-    /**
-     * 上个月30号计划量
-     */
-    @ApiModelProperty(value = "上个月30号计划量", name = "last30")
-    private Integer last30;
-
-    /**
-     * 上个月31号计划量
-     */
-    @ApiModelProperty(value = "上个月31号计划量", name = "last31")
-    private Integer last31;
     
     /**
      * 上月末最后一天计划量
      */
-    @ApiModelProperty(value = "上月末最后一天计划量", name = "lastDay1")
+    @ApiModelProperty(value = "上月末最后1天计划量", name = "lastDay1")
     private Integer lastDay1;
     
     /**
-     * 上月末第二天计划量
+     * 上月末倒数第2天计划量
      */
-    @ApiModelProperty(value = "上月末第二天计划量", name = "lastDay2")
+    @ApiModelProperty(value = "上月末倒数第2天计划量", name = "lastDay2")
     private Integer lastDay2;
+
+    /**
+     * 上月末倒数第3天计划量
+     */
+    @ApiModelProperty(value = "上月末倒数第3天计划量", name = "lastDay3")
+    private Integer lastDay3;
+
+    /**
+     * 上月末倒数第4天计划量
+     */
+    @ApiModelProperty(value = "上月末倒数第4天计划量", name = "lastDay4")
+    private Integer lastDay4;
+
+    /**
+     * 上月末倒数第5天计划量
+     */
+    @ApiModelProperty(value = "上月末倒数第5天计划量", name = "lastDay5")
+    private Integer lastDay5;
+
+    /**
+     * 上月末倒数第6天计划量
+     */
+    @ApiModelProperty(value = "上月末倒数第6天计划量", name = "lastDay6")
+    private Integer lastDay6;
+
+    /**
+     * 上月末倒数第7天计划量
+     */
+    @ApiModelProperty(value = "上月末倒数第7天计划量", name = "lastDay7")
+    private Integer lastDay7;
+
+    /**
+     * 上月末倒数第8天计划量
+     */
+    @ApiModelProperty(value = "上月末倒数第8天计划量", name = "lastDay8")
+    private Integer lastDay8;
+
+    /**
+     * 上月末倒数第9天计划量
+     */
+    @ApiModelProperty(value = "上月末倒数第9天计划量", name = "lastDay9")
+    private Integer lastDay9;
+
+    /**
+     * 上月末倒数第10天计划量
+     */
+    @ApiModelProperty(value = "上月末倒数第10天计划量", name = "lastDay10")
+    private Integer lastDay10;
     
     /**
      * 实单未排产量

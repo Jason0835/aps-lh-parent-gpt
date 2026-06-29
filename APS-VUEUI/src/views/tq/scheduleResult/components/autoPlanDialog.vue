@@ -100,7 +100,7 @@ export default {
       );
     },
     /**
-     * 处理胎圈自动排程接口响应（后台异步回调）
+     * 处理胎圈自动排程接口响应（同步等待返回）
      * @param {Object} data 接口响应
      * @param {Object} params 排程参数
      */
@@ -121,18 +121,14 @@ export default {
           )
       );
       this.$emit("success", { ...params });
+      this.hide();
     },
     /**
-     * 提交胎圈自动排程：先提示用户后台执行中，再调用后端接口
+     * 提交胎圈自动排程：同步等待后端返回结果（loading期间禁用按钮）
      * @param {Object} params 排程参数
      */
     handleAutoPlan(params) {
-      this.$modal.msgSuccess(
-        this.$t(
-          "ui.data.column.tqScheduleResult.scheduleExecuting"
-        )
-      );
-      this.hide();
+      this.loading = true;
       autoPlan(params)
         .then((data) => this.handleAutoPlanResponse(data, params))
         .catch((error) => {
@@ -142,6 +138,9 @@ export default {
               "ui.data.column.tqScheduleResult.scheduleTimeout"
             )
           );
+        })
+        .finally(() => {
+          this.loading = false;
         });
     },
 

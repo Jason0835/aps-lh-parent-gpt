@@ -1,15 +1,18 @@
 package com.zlt.aps.tq.service.impl;
 
+import com.alibaba.fastjson.JSON;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.zlt.aps.maindata.enums.MsgTemplateEnums;
 import com.zlt.aps.maindata.utils.MessageServiceUtils;
 import com.zlt.aps.tq.api.domain.entity.TqScheduleResult;
 import com.zlt.aps.tq.api.domain.entity.TqScheFinishQty;
 import com.zlt.aps.tq.api.domain.entity.TqStock;
+import com.zlt.aps.tq.api.domain.entity.TqWarningRecord;
 import com.zlt.aps.tq.entity.TqParams;
 import com.zlt.aps.tq.mapper.TqScheduleResultMapper;
 import com.zlt.aps.tq.mapper.TqScheFinishQtyMapper;
 import com.zlt.aps.tq.mapper.TqStockMapper;
+import com.zlt.aps.tq.service.ITqWarningRecordService;
 import com.zlt.aps.tq.service.ITqWarningService;
 import com.zlt.aps.tq.service.TqParamsService;
 import lombok.extern.slf4j.Slf4j;
@@ -18,8 +21,11 @@ import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 胎圈排程预警Service实现类
@@ -57,6 +63,26 @@ public class TqWarningServiceImpl implements ITqWarningService {
     @Resource
     private MessageServiceUtils messageServiceUtils;
 
+    @Resource
+    private ITqWarningRecordService tqWarningRecordService;
+
+    /** 预警类型：库存预警 */
+    private static final String WARNING_TYPE_STOCK = "1";
+    /** 预警类型：完成量预警 */
+    private static final String WARNING_TYPE_FINISH_QTY = "2";
+    /** 预警级别：低 */
+    private static final String WARNING_LEVEL_LOW = "1";
+    /** 预警级别：中 */
+    private static final String WARNING_LEVEL_MIDDLE = "2";
+    /** 预警级别：高 */
+    private static final String WARNING_LEVEL_HIGH = "3";
+    /** 处理状态：未处理 */
+    private static final String STATUS_UNHANDLED = "0";
+    /** 未通知 */
+    private static final Integer NOTIFIED_NO = 0;
+    /** 已通知 */
+    private static final Integer NOTIFIED_YES = 1;
+
     /** 库存预警阈值参数代码 */
     private static final String PARAM_STOCK_WARNING_THRESHOLD = "TQ_STOCK_WARNING_THRESHOLD";
     /** 完成量预警比例参数代码 */
@@ -88,21 +114,30 @@ public class TqWarningServiceImpl implements ITqWarningService {
                 return;
             }
 
-            // 检查每条库存是否低于阈值
-            int warningCount = 0;
+            // 检查每条库存是否低于阈值，收集预警记录
+            List<TqWarningRecord> warningRecords = new ArrayList<>();
             for (TqStock stock : stockList) {
                 BigDecimal stockNum = stock.getStockNum();
                 if (stockNum == null) {
                     continue;
                 }
                 if (stockNum.doubleValue() < threshold) {
-                    // 发送库存预警消息
-                    sendStockWarning(stock, threshold);
-                    warningCount++;
+                    // 构建库存预警记录
+                    TqWarningRecord record = this.buildStockWarningRecord(stock, threshold);
+                    warningRecords.add(record);
                 }
             }
 
-            log.info("胎圈库存预警检查完成：共检查{}条库存，预警{}条", stockList.size(), warningCount);
+            // 批量保存预警记录
+            if (!warningRecords.isEmpty()) {
+                tqWarningRecordService.saveBatchWarningRecords(warningRecords);
+                // 逐条发送预警消息，发送成功后更新通知状态
+                for (TqWarningRecord record : warningRecords) {
+                    this.sendStockWarning(record);
+                }
+            }
+
+            log.info("胎圈库存预警检查完成：共检查{}条库存，预警{}条", stockList.size(), warningRecords.size());
 
         } catch (Exception e) {
             log.error("胎圈库存预警检查失败", e);
@@ -138,8 +173,8 @@ public class TqWarningServiceImpl implements ITqWarningService {
                          .eq(TqScheFinishQty::getIsDelete, 0);
             List<TqScheFinishQty> finishList = tqScheFinishQtyMapper.selectList(finishWrapper);
 
-            // 检查每条排程的完成情况
-            int warningCount = 0;
+            // 检查每条排程的完成情况，收集预警记录
+            List<TqWarningRecord> warningRecords = new ArrayList<>();
             for (TqScheduleResult schedule : scheduleList) {
                 Integer planQty = getPlanQtyByShiftIndex(schedule, shiftIndex);
                 if (planQty == null || planQty <= 0) {
@@ -156,13 +191,23 @@ public class TqWarningServiceImpl implements ITqWarningService {
                 // 计算完成率
                 double finishRate = finishQty.doubleValue() / planQty;
                 if (finishRate < warningRatio) {
-                    // 发送完成量预警消息
-                    sendFinishQtyWarning(schedule, shiftIndex, planQty, finishQty, warningRatio);
-                    warningCount++;
+                    // 构建完成量预警记录
+                    TqWarningRecord record = this.buildFinishQtyWarningRecord(
+                            schedule, shiftIndex, planQty, finishQty, finishRate, warningRatio);
+                    warningRecords.add(record);
                 }
             }
 
-            log.info("胎圈班次完成量预警检查完成：共检查{}条排程，预警{}条", scheduleList.size(), warningCount);
+            // 批量保存预警记录
+            if (!warningRecords.isEmpty()) {
+                tqWarningRecordService.saveBatchWarningRecords(warningRecords);
+                // 逐条发送预警消息，发送成功后更新通知状态
+                for (TqWarningRecord record : warningRecords) {
+                    this.sendFinishQtyWarning(record);
+                }
+            }
+
+            log.info("胎圈班次完成量预警检查完成：共检查{}条排程，预警{}条", scheduleList.size(), warningRecords.size());
 
         } catch (Exception e) {
             log.error("胎圈班次完成量预警检查失败", e);
@@ -170,42 +215,167 @@ public class TqWarningServiceImpl implements ITqWarningService {
     }
 
     /**
-     * 发送库存预警消息
+     * 构建库存预警记录
+     *
+     * @param stock     库存数据
+     * @param threshold 预警阈值
+     * @return 预警记录对象
      */
-    private void sendStockWarning(TqStock stock, double threshold) {
+    private TqWarningRecord buildStockWarningRecord(TqStock stock, double threshold) {
+        TqWarningRecord record = new TqWarningRecord();
+        record.setFactoryCode(stock.getFactoryCode());
+        record.setWarningType(WARNING_TYPE_STOCK);
+        record.setBeadCode(stock.getBeadCode());
+        record.setWarningLevel(WARNING_LEVEL_MIDDLE);
+        record.setWarningTitle("胎圈库存预警");
+        record.setWarningContent(StringUtils.format(
+                "胎圈[{}]库存量[{}]低于预警阈值[{}]",
+                stock.getBeadCode(),
+                stock.getStockNum() == null ? "0" : stock.getStockNum().toString(),
+                threshold));
+        record.setStockNum(stock.getStockNum());
+        record.setThreshold(BigDecimal.valueOf(threshold));
+        record.setStatus(STATUS_UNHANDLED);
+        record.setNotified(NOTIFIED_NO);
+
+        // 构建预警数据JSON
+        Map<String, Object> dataMap = new HashMap<>();
+        dataMap.put("beadCode", stock.getBeadCode());
+        dataMap.put("stockNum", stock.getStockNum());
+        dataMap.put("threshold", threshold);
+        dataMap.put("stockDate", stock.getStockDate());
+        record.setWarningData(JSON.toJSONString(dataMap));
+
+        return record;
+    }
+
+    /**
+     * 构建完成量预警记录
+     *
+     * @param schedule     排程结果
+     * @param shiftIndex   班次索引
+     * @param planQty      计划量
+     * @param finishQty    完成量
+     * @param finishRate   完成率
+     * @param warningRatio 预警比例
+     * @return 预警记录对象
+     */
+    private TqWarningRecord buildFinishQtyWarningRecord(TqScheduleResult schedule, int shiftIndex,
+                                                         int planQty, BigDecimal finishQty,
+                                                         double finishRate, double warningRatio) {
+        TqWarningRecord record = new TqWarningRecord();
+        record.setFactoryCode(schedule.getFactoryCode());
+        record.setWarningType(WARNING_TYPE_FINISH_QTY);
+        record.setBeadCode(schedule.getBeadCode());
+        record.setMachineCode(schedule.getMachineCode());
+        record.setScheduleDate(schedule.getScheduleDate());
+        record.setShiftIndex(shiftIndex);
+        // 根据完成率设置预警级别：完成率<50%为高，<70%为中，其他为低
+        if (finishRate < 0.5) {
+            record.setWarningLevel(WARNING_LEVEL_HIGH);
+        } else if (finishRate < 0.7) {
+            record.setWarningLevel(WARNING_LEVEL_MIDDLE);
+        } else {
+            record.setWarningLevel(WARNING_LEVEL_LOW);
+        }
+        record.setWarningTitle("胎圈完成量预警");
+        record.setWarningContent(StringUtils.format(
+                "机台[{}]胎圈[{}]班次[{}]计划量[{}]，实际完成量[{}]，完成率[{}]%，低于预警比例[{}]%",
+                schedule.getMachineCode(),
+                schedule.getBeadCode(),
+                shiftIndex,
+                planQty,
+                finishQty,
+                String.format("%.2f", finishRate * 100),
+                String.format("%.2f", warningRatio * 100)));
+        record.setPlanQty(planQty);
+        record.setFinishQty(finishQty);
+        record.setFinishRate(BigDecimal.valueOf(finishRate));
+        record.setThreshold(BigDecimal.valueOf(warningRatio));
+        record.setStatus(STATUS_UNHANDLED);
+        record.setNotified(NOTIFIED_NO);
+
+        // 构建预警数据JSON
+        Map<String, Object> dataMap = new HashMap<>();
+        dataMap.put("machineCode", schedule.getMachineCode());
+        dataMap.put("beadCode", schedule.getBeadCode());
+        dataMap.put("shiftIndex", shiftIndex);
+        dataMap.put("planQty", planQty);
+        dataMap.put("finishQty", finishQty);
+        dataMap.put("finishRate", finishRate);
+        dataMap.put("warningRatio", warningRatio);
+        dataMap.put("scheduleDate", schedule.getScheduleDate());
+        record.setWarningData(JSON.toJSONString(dataMap));
+
+        return record;
+    }
+
+    /**
+     * 发送库存预警消息
+     *
+     * @param record 预警记录
+     */
+    private void sendStockWarning(TqWarningRecord record) {
         try {
             String templateCode = MsgTemplateEnums.TQ_STOCK_WARNING.getCode();
             messageServiceUtils.sendWarning(templateCode, (String) null,
-                    stock.getBeadCode(),
-                    stock.getStockNum() == null ? "0" : stock.getStockNum().toString(),
-                    String.valueOf(threshold));
+                    record.getBeadCode(),
+                    record.getStockNum() == null ? "0" : record.getStockNum().toString(),
+                    record.getThreshold() == null ? "0" : record.getThreshold().toString());
+            // 更新通知状态为已通知
+            this.updateNotifiedStatus(record.getId());
             log.info("胎圈库存预警消息已发送：物料={}，库存={}，阈值={}",
-                    stock.getBeadCode(), stock.getStockNum(), threshold);
+                    record.getBeadCode(), record.getStockNum(), record.getThreshold());
         } catch (Exception e) {
-            log.error("胎圈库存预警消息发送失败：物料={}", stock.getBeadCode(), e);
+            log.error("胎圈库存预警消息发送失败：物料={}", record.getBeadCode(), e);
         }
     }
 
     /**
      * 发送完成量预警消息
+     *
+     * @param record 预警记录
      */
-    private void sendFinishQtyWarning(TqScheduleResult schedule, int shiftIndex,
-                                       int planQty, BigDecimal finishQty, double warningRatio) {
+    private void sendFinishQtyWarning(TqWarningRecord record) {
         try {
             String templateCode = MsgTemplateEnums.TQ_FINISH_QTY_WARNING.getCode();
             messageServiceUtils.sendWarning(templateCode, (String) null,
-                    schedule.getMachineCode(),
-                    schedule.getBeadCode(),
-                    String.valueOf(shiftIndex),
-                    String.valueOf(planQty),
-                    finishQty.toString(),
-                    String.format("%.2f%%", finishQty.doubleValue() / planQty * 100),
-                    String.format("%.2f%%", warningRatio * 100));
+                    record.getMachineCode(),
+                    record.getBeadCode(),
+                    String.valueOf(record.getShiftIndex()),
+                    String.valueOf(record.getPlanQty()),
+                    record.getFinishQty().toString(),
+                    String.format("%.2f%%", record.getFinishRate().doubleValue() * 100),
+                    String.format("%.2f%%", record.getThreshold().doubleValue() * 100));
+            // 更新通知状态为已通知
+            this.updateNotifiedStatus(record.getId());
             log.info("胎圈完成量预警消息已发送：机台={}，胎圈={}，班次={}，计划量={}，完成量={}",
-                    schedule.getMachineCode(), schedule.getBeadCode(), shiftIndex, planQty, finishQty);
+                    record.getMachineCode(), record.getBeadCode(), record.getShiftIndex(),
+                    record.getPlanQty(), record.getFinishQty());
         } catch (Exception e) {
             log.error("胎圈完成量预警消息发送失败：机台={}，胎圈={}",
-                    schedule.getMachineCode(), schedule.getBeadCode(), e);
+                    record.getMachineCode(), record.getBeadCode(), e);
+        }
+    }
+
+    /**
+     * 更新预警记录的通知状态为已通知
+     *
+     * @param recordId 预警记录ID
+     */
+    private void updateNotifiedStatus(Long recordId) {
+        try {
+            if (recordId == null) {
+                return;
+            }
+            com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<TqWarningRecord> wrapper =
+                    new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<>();
+            wrapper.eq(TqWarningRecord::getId, recordId)
+                   .set(TqWarningRecord::getNotified, NOTIFIED_YES)
+                   .set(TqWarningRecord::getNotifyTime, new Date());
+            tqWarningRecordService.update(wrapper);
+        } catch (Exception e) {
+            log.warn("更新预警记录通知状态失败：id={}", recordId, e);
         }
     }
 

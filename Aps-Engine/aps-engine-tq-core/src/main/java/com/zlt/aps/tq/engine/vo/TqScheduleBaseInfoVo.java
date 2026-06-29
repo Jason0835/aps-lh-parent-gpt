@@ -35,27 +35,27 @@ public class TqScheduleBaseInfoVo {
     /**
      * 对应成型一班的胎圈计划量
      */
-    private Double cxClass1Plan;
+    private Integer cxClass1Plan;
 
     /**
      * 对应成型二班的胎圈计划量
      */
-    private Double cxClass2Plan;
+    private Integer cxClass2Plan;
 
     /**
      * 对应成型三班的胎圈计划量
      */
-    private Double cxClass3Plan;
+    private Integer cxClass3Plan;
 
     /**
      * 对应成型次一班的胎圈计划量
      */
-    private Double cxClass4Plan;
+    private Integer cxClass4Plan;
 
     /**
      * 对应成型次二班的胎圈计划量
      */
-    private Double cxClass5Plan;
+    private Integer cxClass5Plan;
 
     /**
      * 机台code$胎胚代码，多个逗号分割， 用来计算成型平均定额使用

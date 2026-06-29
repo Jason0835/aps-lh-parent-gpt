@@ -84,8 +84,6 @@
     <change-machine-dialog ref="changeMachineDialog" @success="getList" />
     <!-- 调量弹窗 -->
     <adjust-qty-dialog ref="adjustQtyDialog" @success="getList" />
-    <!-- 自动排程弹窗 -->
-    <auto-plan-dialog ref="autoPlanDialogRef" @success="getList" />
   </basic-container>
 </template>
 <script>
@@ -517,7 +515,7 @@ export default {
       }
     },
     handleAutoPlan() {
-      this.$refs.autoPlanDialogRef.show({
+      this.$refs.autoPlanDialog.show({
         scheduleDateQuery: this.query.scheduleDateQuery || this.search.scheduleDateQuery,
       });
     },

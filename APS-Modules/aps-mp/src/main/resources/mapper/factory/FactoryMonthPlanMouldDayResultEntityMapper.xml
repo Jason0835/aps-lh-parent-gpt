@@ -9,14 +9,14 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 		    m.MES_MATERIAL_CODE,
 		    m.MATERIAL_DESC,
 		    m.STRUCTURE_NAME,
-            MAX(IF(C.ID IS NULL, '02', '01')) STRUCTURE_TYPE,
-            MAX(IFNULL(i.PRODUCT_STATUS, IFNULL(r.PRODUCT_STATUS, CASE WHEN REF.CONSTRUCTION_STAGE = '03' THEN 'S' 
+            IF(C.ID IS NULL, '02', '01') STRUCTURE_TYPE,
+            IFNULL(i.PRODUCT_STATUS, IFNULL(r.PRODUCT_STATUS, CASE WHEN REF.CONSTRUCTION_STAGE = '03' THEN 'S' 
                                                                        WHEN REF.CONSTRUCTION_STAGE = '02' THEN 'T' 
                                                                        WHEN REF.CONSTRUCTION_STAGE = '01' THEN 'X'
-                                                                       ELSE null END ))) PRODUCT_STATUS,
+                                                                       ELSE null END )) PRODUCT_STATUS,
             m.EMBRYO_CODE,
             m.EMBRYO_DESC MAIN_MATERIAL_DESC,
-		    MAX(IFNULL(i.CONSTRUCTION_STAGE, IFNULL(r.CONSTRUCTION_STAGE, REF.CONSTRUCTION_STAGE))) CONSTRUCTION_STAGE,
+		    IFNULL(i.CONSTRUCTION_STAGE, IFNULL(r.CONSTRUCTION_STAGE, REF.CONSTRUCTION_STAGE)) CONSTRUCTION_STAGE,
 		    m.BRAND,
 		    m.SPECIFICATIONS,
 		    m.MAIN_PATTERN,
@@ -27,17 +27,17 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 		    m.SECTION_WIDTH,
 		    r.MOULD_CAVITY_QTY,
 		    r.TYPE_BLOCK_QTY,
-		    max( d.AVERAGE_SALE_QTY ) AVERAGE_SALE_QTY,
-            if(max(d.AVERAGE_SALE_QTY) > 0, round(max(d.STOCK_QTY) / max(d.AVERAGE_SALE_QTY), 1), 0) INVENTORY_SALES_RATIO,
-		    max( IFNULL(r.DAY_VULCANIZATION_QTY, CASE WHEN IFNULL(FP.PARAM_VALUE, FP.DEFAULE_VALUE) = 'M' THEN lc.MES_CAPACITY / 2
+		    d.AVERAGE_SALE_QTY AVERAGE_SALE_QTY,
+            if(d.AVERAGE_SALE_QTY > 0, round(d.STOCK_QTY / d.AVERAGE_SALE_QTY, 1), 0) INVENTORY_SALES_RATIO,
+		    IFNULL(r.DAY_VULCANIZATION_QTY, CASE WHEN IFNULL(FP.PARAM_VALUE, FP.DEFAULE_VALUE) = 'M' THEN lc.MES_CAPACITY / 2
 		                                              WHEN IFNULL(FP.PARAM_VALUE, FP.DEFAULE_VALUE) = 'A' THEN lc.APS_CAPACITY / 2
-		                                              ELSE lc.STANDARD_CAPACITY / 2 END)
+		                                              ELSE lc.STANDARD_CAPACITY / 2 END
 		    ) DAY_VULCANIZATION_QTY,
-            sum( ifnull(d.ORI_HEIGHT_QTY, d.HEIGHT_QTY) ) HEIGHT_QTY,
-            sum( ifnull(d.ORI_MID_QTY, d.MID_QTY) ) MID_QTY,
-		    sum( d.CYCLE_RESERVE_QTY ) CYCLE_RESERVE_QTY,
-		    sum( d.POSTPONE_QTY ) POSTPONE_QTY,
-		    sum( case when d.IS_SCHEDULE = '1' then d.CONVENTION_RESERVE_QTY else 0 end) CONVENTION_RESERVE_QTY,
+            ifnull(d.ORI_HEIGHT_QTY, d.HEIGHT_QTY) HEIGHT_QTY,
+            ifnull(d.ORI_MID_QTY, d.MID_QTY) MID_QTY,
+		    d.CYCLE_RESERVE_QTY CYCLE_RESERVE_QTY,
+		    d.POSTPONE_QTY POSTPONE_QTY,
+		    case when d.IS_SCHEDULE = '1' then d.CONVENTION_RESERVE_QTY else 0 end CONVENTION_RESERVE_QTY,
 		    r.MOULD_CHANGE_INFO,
             r.TOTAL_QTY,
 		    r.HEIGHT_PRODUCTION_QTY,
@@ -78,11 +78,6 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 		    r.DAY_29,
 		    r.DAY_30,
 		    r.DAY_31,
-		    F.DAY_27 LAST_27,
-		    F.DAY_28 LAST_28,
-		    F.DAY_29 LAST_29,
-		    F.DAY_30 LAST_30,
-		    F.DAY_31 LAST_31,
         <choose>
             <when test="isFinal">
             r.ADJUST_QTY1,
@@ -99,7 +94,6 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             mc.NET_QTY UN_RESTRICTED_NET_QTY,
             </otherwise>
         </choose>
-		    F.PRODUCTION_VERSION LAST_PRODUCTION_VERSION,
 		    '1' DATA_TYPE,
 		    '2' LOCATION_TYPE /*内外销，目前没有地方取，暂时固定外销*/
 		FROM
@@ -109,7 +103,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                           WHERE M.FACTORY_CODE = '116' 
                             AND M.IS_DELETE = 0 
                           GROUP BY STRUCTURE_NAME ) MM ON MM.STRUCTURE_NAME = M.STRUCTURE_NAME
-		    LEFT JOIN T_DP_DEMAND_PLAN d ON d.MONTH_PLAN_VERSION = #{dayResult.monthPlanVersion}
+		    LEFT JOIN T_DP_DEMAND_PLAN_SUM d ON d.MONTH_PLAN_VERSION = #{dayResult.monthPlanVersion}
 		    AND d.FACTORY_CODE = m.FACTORY_CODE 
 		    AND d.MATERIAL_CODE = m.MATERIAL_CODE 
 		    AND d.is_delete = 0
@@ -121,17 +115,13 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <when test="isFinal">
             LEFT JOIN T_MP_MONTH_PLAN_PROD_FINAL r ON m.MATERIAL_CODE = r.MATERIAL_CODE
             </when>
-	        <otherwise>
+            <otherwise>
             LEFT JOIN T_MP_MOULDING_DAY_RESULT r ON m.MATERIAL_CODE = r.MATERIAL_CODE
             </otherwise>
         </choose>
             AND m.FACTORY_CODE = r.FACTORY_CODE 
             AND r.production_version = #{dayResult.productionVersion}
             AND r.IS_DELETE = 0 
-            LEFT JOIN T_MP_MONTH_PLAN_PROD_FINAL f ON f.IS_DELETE = 0
-            AND f.MATERIAL_CODE = m.MATERIAL_CODE
-            AND f.`YEAR_MONTH` = DATE_FORMAT(DATE_SUB(concat(#{dayResult.year},'-',#{dayResult.month},'-1'),INTERVAL 1 month), '%Y%m')
-            AND f.CONSTRUCTION_STAGE = r.CONSTRUCTION_STAGE
             LEFT JOIN T_DP_CYCLE_STRUCT_CONFIG C ON C.STRUCTURE_NAME = M.STRUCTURE_NAME
             AND C.IS_DELETE = 0
         <choose>
@@ -159,19 +149,19 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             LEFT JOIN T_MP_FACTORY_PARAM FP ON FP.IS_DELETE = 0
             AND PARAM_CODE = 'SYS0202002'
             LEFT JOIN (
-	            SELECT MATERIAL_CODE,
-			    MAX(CASE WHEN t.TRIAL_STATUS = 'S' THEN '03' 
-			             WHEN t.TRIAL_STATUS = 'T' THEN '02' 
-			             WHEN t.TRIAL_STATUS = 'X' THEN '01'
-			             ELSE '00' END ) CONSTRUCTION_STAGE
-			    FROM t_mdm_sku_construction_ref t 
-			    WHERE is_delete = 0 
-			    GROUP BY material_code
-		    ) REF ON REF.MATERIAL_CODE = m.MATERIAL_CODE
-		WHERE
-		    m.FACTORY_CODE = #{dayResult.factoryCode}
-		    AND m.IS_DELETE = 0 
-		    AND m.STRUCTURE_NAME IS NOT NULL 
+                SELECT MATERIAL_CODE,
+                MAX(CASE WHEN t.TRIAL_STATUS = 'S' THEN '03' 
+                         WHEN t.TRIAL_STATUS = 'T' THEN '02' 
+                         WHEN t.TRIAL_STATUS = 'X' THEN '01'
+                         ELSE '00' END ) CONSTRUCTION_STAGE
+                FROM t_mdm_sku_construction_ref t 
+                WHERE is_delete = 0 
+                GROUP BY material_code
+            ) REF ON REF.MATERIAL_CODE = m.MATERIAL_CODE
+        WHERE
+            m.FACTORY_CODE = #{dayResult.factoryCode}
+            AND m.IS_DELETE = 0 
+            AND m.STRUCTURE_NAME IS NOT NULL 
             AND (QUALITY_STATE_CODE != '2' or d.FACTORY_CODE = m.FACTORY_CODE OR r.FACTORY_CODE = m.FACTORY_CODE)
         <if test="!isAllMaterial">
             AND (d.FACTORY_CODE = m.FACTORY_CODE OR r.FACTORY_CODE = m.FACTORY_CODE)
@@ -179,100 +169,15 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <if test="dayResult.structureName != null and dayResult.structureName != ''">
             AND m.STRUCTURE_NAME = #{dayResult.structureName}
         </if>
-		GROUP BY
-		    MM.MIN_PRO_SIZE,
-		    m.MATERIAL_CODE,
-		    m.MES_MATERIAL_CODE,
-		    m.MATERIAL_DESC,
-		    m.STRUCTURE_NAME,
-		    d.STRUCTURE_TYPE,
-            m.EMBRYO_CODE,
-            m.EMBRYO_DESC,
-		    m.BRAND,
-		    m.SPECIFICATIONS,
-		    m.MAIN_PATTERN,
-		    m.PATTERN,
-		    m.PRO_SIZE,
-		    m.SINGLE_TIRE_WEIGHT,
-		    m.PRODUCT_CATEGORY,
-            m.SECTION_WIDTH,
-		    r.MOULD_CAVITY_QTY,
-		    r.TYPE_BLOCK_QTY,
-		    r.MOULD_CHANGE_INFO,
-		    r.TOTAL_QTY,
-		    r.HEIGHT_PRODUCTION_QTY,
-		    r.MID_PRODUCTION_QTY,
-		    r.CYCLE_PRODUCTION_QTY,
-		    r.CONVENTION_PRODUCTION_QTY,
-		    r.POSTPONE_PRODUCTION_QTY,
-		    r.TOTAL_QTY,
-		    r.BEGIN_DAY,
-		    r.END_DAY,
-		    r.DAY_1,
-		    r.DAY_2,
-		    r.DAY_3,
-		    r.DAY_4,
-		    r.DAY_5,
-		    r.DAY_6,
-		    r.DAY_7,
-		    r.DAY_8,
-		    r.DAY_9,
-		    r.DAY_10,
-		    r.DAY_11,
-		    r.DAY_12,
-		    r.DAY_13,
-		    r.DAY_14,
-		    r.DAY_15,
-		    r.DAY_16,
-		    r.DAY_17,
-		    r.DAY_18,
-		    r.DAY_19,
-		    r.DAY_20,
-		    r.DAY_21,
-		    r.DAY_22,
-		    r.DAY_23,
-		    r.DAY_24,
-		    r.DAY_25,
-		    r.DAY_26,
-		    r.DAY_27,
-		    r.DAY_28,
-		    r.DAY_29,
-		    r.DAY_30,
-		    r.DAY_31,
-		    F.YEAR ,
-		    F.MONTH ,
-		    F.DAY_27 ,
-		    F.DAY_28 ,
-		    F.DAY_29 ,
-		    F.DAY_30 ,
-		    F.DAY_31 ,
-            F.total_qty,
-        <choose>
-            <when test="isFinal">
-            r.ADJUST_QTY1,
-            r.ADJUST_QTY2,
-            r.ADJUST_QTY3,
-            r.ADJUST_QTY4,
-            r.ORIGINAL_TOTAL_QTY,
-            pm.PRODUCTION_QTY,
-            si.LAST_MONTH_REMAIN_QTY,
-            r.LAST_MONTH_OVERDUE_QTY,
-            r.LAST_MONTH_VALID_FLAG,
-            </when>
-            <otherwise>
-            mc.NET_QTY,
-            </otherwise>
-        </choose>
-		    F.PRODUCTION_VERSION
-		ORDER BY
+        ORDER BY
             MM.MIN_PRO_SIZE,
             SPECIFICATIONS,
             STRUCTURE_NAME,
-		    PRO_SIZE,
-		    SECTION_WIDTH,
-		    MOULD_CAVITY_QTY DESC,
-		    TYPE_BLOCK_QTY DESC,
-		    MAIN_PATTERN 
+            PRO_SIZE,
+            SECTION_WIDTH,
+            MOULD_CAVITY_QTY DESC,
+            TYPE_BLOCK_QTY DESC,
+            MAIN_PATTERN 
     </select>
 
 	<update id="deletedOldBackUp" parameterType="com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult">
