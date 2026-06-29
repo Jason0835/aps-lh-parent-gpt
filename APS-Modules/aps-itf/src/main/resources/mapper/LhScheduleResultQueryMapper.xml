@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.itf.mes.mapper.LhScheduleResultQueryMapper">
+
+    <!--
+        按工厂+完成日期+物料+示方类型，汇总硫化排程结果当日计划量。
+        当日计划量 = 班次3(夜) + 班次4(早) + 班次5(中) 的计划量合计。
+        匹配维度：物料编码 + 示方类型（同一行排程结果三班示方类型一致，取CLASS3_LH_TYPE作为代表）。
+        查询的SCHEDULE_DATE对应MES完成量回报的FINISH_DATE（凌晨同步前一天数据）。
+    -->
+    <select id="sumDayPlanQtyByFinishDate" resultType="com.zlt.aps.itf.vo.LhDayPlanQtyVo">
+        SELECT
+            FACTORY_CODE    AS factoryCode,
+            MATERIAL_CODE   AS materialCode,
+            CLASS3_LH_TYPE  AS lhType,
+            SUM(IFNULL(CLASS3_PLAN_QTY, 0) + IFNULL(CLASS4_PLAN_QTY, 0) + IFNULL(CLASS5_PLAN_QTY, 0)) AS dayPlanQty
+        FROM T_LH_SCHEDULE_RESULT
+        WHERE IS_DELETE = 0
+          AND FACTORY_CODE = #{factoryCode}
+          AND DATE_FORMAT(SCHEDULE_DATE, '%Y-%m-%d') = DATE_FORMAT(#{finishDate}, '%Y-%m-%d')
+          AND MATERIAL_CODE IN
+          <foreach collection="materialCodes" item="code" open="(" separator="," close=")">
+              #{code}
+          </foreach>
+          AND CLASS3_LH_TYPE IS NOT NULL
+        GROUP BY FACTORY_CODE, MATERIAL_CODE, CLASS3_LH_TYPE
+    </select>
+
+</mapper>
