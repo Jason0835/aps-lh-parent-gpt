@@ -3,8 +3,7 @@ server:
   port: 9102
 
 nacos:
-  #server-addr: 10.135.55.216:8848
-  server-addr: 172.21.7.167:8848,172.21.7.168:8848,172.21.7.169:8848
+  server-addr: 10.135.55.216:8848
   run-group: APS_PROD_GROUP
   cfg-group: APS_PROD_GROUP
   run-namespace: prod
@@ -48,16 +47,8 @@ spring:
           data-id: seata-client-${spring.profiles.active}.${spring.cloud.nacos.config.file-extension}
           group: ${nacos.cfg-group}
         refresh-enabled: true
-
-cache:
-  caffeine:
-    # 开启缓存
-    cache-enabled: true
-
-logging:
-  level:
-    com.zlt.aps.mp: DEBUG
-    
-#debug:
-#  ignorSkip:
-#    matching: true
+mq:
+  scheduleLog:
+    queue: prod.cx.schedule.log.queue
+    exchange: prod.cx.schedule.log.exchange
+    rutekey: prod.cx.schedule.log.rutekey
