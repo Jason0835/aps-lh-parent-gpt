@@ -336,11 +336,11 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
                 s.setMaxTypeBlockQty(maxTypeBlockQtyMap.getOrDefault(s.getMainMaterialDesc(), 0));
             });
             //排序:最大型腔数倒序->胎胚描述->型腔数倒序->主花纹->活块数倒序->花纹->物料描述
-            structureList.sort(Comparator.comparing(FactoryMonthPlanMouldDayResultExportVo::getMouldCavityQty, Comparator.reverseOrder())
-                    .thenComparing(FactoryMonthPlanMouldDayResultExportVo::getMainMaterialDesc)
+            structureList.sort(Comparator.comparing(FactoryMonthPlanMouldDayResultExportVo::getMouldCavityQty, Comparator.nullsLast(Comparator.reverseOrder()))
+                    .thenComparing(FactoryMonthPlanMouldDayResultExportVo::getMainMaterialDesc, Comparator.nullsLast(String::compareTo))
 //                    .thenComparing(FactoryMonthPlanMouldDayResultExportVo::getMouldCavityQty, Comparator.reverseOrder())
                     .thenComparing(FactoryMonthPlanMouldDayResultExportVo::getMainPattern, Comparator.nullsLast(String::compareTo))
-                    .thenComparing(FactoryMonthPlanMouldDayResultExportVo::getTypeBlockQty, Comparator.reverseOrder())
+                    .thenComparing(FactoryMonthPlanMouldDayResultExportVo::getTypeBlockQty, Comparator.nullsLast(Comparator.reverseOrder()))
                     .thenComparing(FactoryMonthPlanMouldDayResultExportVo::getPattern, Comparator.nullsLast(String::compareTo))
                     .thenComparing(FactoryMonthPlanMouldDayResultExportVo::getMaterialDesc, Comparator.nullsLast(String::compareTo))
             );
@@ -509,7 +509,6 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
                 newRecord.setProductionType(finalResult.getProductionType());
                 newRecord.setHeightQty(0);
                 newRecord.setMidQty(0);
-                newRecord.setMidQty(0);
                 newRecord.setCycleReserveQty(0);
                 newRecord.setPostponeQty(0);
                 newRecord.setConventionReserveQty(0);
@@ -519,6 +518,8 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
                 newRecord.setDayVulcanizationQty(finalResult.getDayVulcanizationQty());
                 newRecord.setAverageSaleQty(finalResult.getAverageSaleQty());
                 newRecord.setInventorySalesRatio(finalResult.getInventorySalesRatio());
+                newRecord.setMouldCavityQty(0);
+                newRecord.setTypeBlockQty(0);
                 MdmMaterialInfo material = materialInfoMap.get(key);
                 if (material != null) {
                     newRecord.setSingleTireWeight(material.getSingleTireWeight());
