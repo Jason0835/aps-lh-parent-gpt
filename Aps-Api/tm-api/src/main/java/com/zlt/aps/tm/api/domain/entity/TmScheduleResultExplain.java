@@ -246,4 +246,24 @@ public class TmScheduleResultExplain extends BaseEntity {
     @ApiModelProperty(value = "异常信息", name = "errorMsg")
     @TableField(value = "ERROR_MSG")
     private String errorMsg;
+
+    /** 胎面编码 */
+    @ApiModelProperty(value = "胎面编码", name = "treadCode")
+    @TableField(value = "TREAD_CODE")
+    private String treadCode;
+
+    /** 主胶料编码 */
+    @ApiModelProperty(value = "主胶料编码", name = "glueCode")
+    @TableField(value = "GLUE_CODE")
+    private String glueCode;
+
+    /** 基部胶编码 */
+    @ApiModelProperty(value = "基部胶编码", name = "baseGlueCode")
+    @TableField(value = "BASE_GLUE_CODE")
+    private String baseGlueCode;
+
+    /** 口型板编码 */
+    @ApiModelProperty(value = "口型板编码", name = "mouthPlateCode")
+    @TableField(value = "MOUTH_PLATE_CODE")
+    private String mouthPlateCode;
 }

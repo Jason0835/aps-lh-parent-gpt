@@ -120,6 +120,10 @@ public class TmPersistService {
             explain.setUnplannedReasonDesc(task.getUnplannedReasonDesc());
             explain.setTaskStatus(task.isUnassigned() ? null : TmScheduleTaskStatusEnum.PLANNED.getCode());
             explain.setResultStatus(TmScheduleReleaseStatusEnum.NOT_RELEASED.getCode());
+            explain.setTreadCode(task.getTreadCode());
+            explain.setGlueCode(task.getGlueCode());
+            explain.setBaseGlueCode(task.getBaseGlueCode());
+            explain.setMouthPlateCode(task.getMouthPlateCode());
         }
         if (snapshot != null) {
             explain.setRuleHitJson(snapshot.getRuleHitJson());

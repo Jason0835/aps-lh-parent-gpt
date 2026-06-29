@@ -70,6 +70,10 @@
 - `machine_select_reason`：最终选机说明
 - `assign_status`、`unplanned_reason_code`、`unplanned_reason_desc`、`unplanned_evidence_json`：未排解释
 - `task_status`：任务状态
+- `tread_code`：胎面编码，关联 `T_TM_SCHEDULE_RESULT.tread_code`
+- `glue_code`：主胶料编码，关联 `T_TM_SCHEDULE_RESULT.glue_code`
+- `base_glue_code`：基部胶编码
+- `mouth_plate_code`：口型板编码，关联 `T_TM_SCHEDULE_RESULT.mouth_plate_code`
 - `manual_locked_flag`、`sequence_lock_flag`、`force_change_flag`：引擎行为约束标识，均使用 `biz_yes_no`
 - `sys_analysis`、`warning_msg`、`error_msg`：系统分析、告警和异常信息
 
