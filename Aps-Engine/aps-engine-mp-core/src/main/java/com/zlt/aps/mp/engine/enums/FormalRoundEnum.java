@@ -38,9 +38,17 @@ public enum FormalRoundEnum {
      */
     GROUP_SHARE_MOULD("04", "分组下同模具"),
     /**
-     * 05 实单最低硫化机台数
+     * 0501 实单最低硫化机台数
      */
-    ACTUAL_MIN_LH_MACHINE("05", "实单最低硫化机台数"),
+    FIRST_ACTUAL_MIN_LH_MACHINE("0501", "首轮实单最低硫化机台数"),
+    /**
+     * 0502 实单最低硫化机台数
+     */
+    SECOND_ACTUAL_MIN_LH_MACHINE("0502", "第二轮实单最低硫化机台数"),
+    /**
+     * 0503 实单最低硫化机台数
+     */
+    THIRD_ACTUAL_MIN_LH_MACHINE("0503", "第三轮实单最低硫化机台数"),
     /**
      * 06 结构优先级排产前半段
      */
@@ -66,6 +74,24 @@ public enum FormalRoundEnum {
     FormalRoundEnum(String roundCode, String roundDesc) {
         this.roundCode = roundCode;
         this.roundDesc = roundDesc;
+    }
+
+    /**
+     * 是否为最低实单排产轮次阶段
+     *
+     * @return
+     */
+    public static boolean isActualMinLhMachine(FormalRoundEnum formalRound) {
+        if (FIRST_ACTUAL_MIN_LH_MACHINE == formalRound) {
+            return true;
+        }
+        if (SECOND_ACTUAL_MIN_LH_MACHINE == formalRound) {
+            return true;
+        }
+        if (THIRD_ACTUAL_MIN_LH_MACHINE == formalRound) {
+            return true;
+        }
+        return false;
     }
 
     /**
@@ -101,7 +127,8 @@ public enum FormalRoundEnum {
      */
     private static List<FormalRoundEnum> noContinueRoundInfo() {
         List<FormalRoundEnum> noContinueRoundList = Lists.newArrayList();
-        noContinueRoundList.add(ACTUAL_MIN_LH_MACHINE);
+        noContinueRoundList.add(FIRST_ACTUAL_MIN_LH_MACHINE);
+        noContinueRoundList.add(SECOND_ACTUAL_MIN_LH_MACHINE);
         noContinueRoundList.add(FIRST_HALF_PRIORITY);
         noContinueRoundList.add(LATTER_HALF_PRIORITY);
         noContinueRoundList.add(DISPOSABLE_LH_MACHINE);
