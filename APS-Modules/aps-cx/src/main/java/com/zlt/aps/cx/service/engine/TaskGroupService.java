@@ -635,6 +635,9 @@ public class TaskGroupService {
                     log.info("暂存待第二轮分配: 胎胚={}, 物料={}, 原因=零净需求, 剩余需求={}, 收尾余量={}",
                             embryoCode, materialCode,
                             deferredQty, task.getEndingSurplusQty());
+                    // 记录硫化消耗，供R2预处理/R2退出/R3动态stockHours使用
+                    int deferredVulcConsumption = getShiftPlanQty(lhResult, dayShifts);
+                    taskVulcConsumptionMap.put(lhResult.getId(), deferredVulcConsumption);
                     deferredTasks.add(task);
                     continue;
                 }
@@ -1176,12 +1179,26 @@ public class TaskGroupService {
                         structGlobalRound++;
                         int currentRound = structGlobalRound;
 
-                        // 找 stockHours 最小的任务
+                        // 找动态可供硫化时长最小的任务（与预处理/6h退出公式一致：分配库存 + 已排产量 - 硫化消耗）
                         CoreScheduleAlgorithmService.DailyEmbryoTask minTask = null;
                         BigDecimal minStockHours = null;
                         for (CoreScheduleAlgorithmService.DailyEmbryoTask dt : structTasks) {
-                            BigDecimal sh = dt.getStockHours();
-                            if (sh == null) sh = BigDecimal.ZERO;
+                            BigDecimal sh = BigDecimal.ZERO;
+                            Integer dtLhCap = getDailyLhCapacityForMaterial(dt.getMaterialCode(), context);
+                            dtLhCap = dtLhCap != null && dtLhCap > 0 ? dtLhCap / 2 : null;
+                            Integer dtMoldQty = dt.getVulcanizeMoldCount();
+                            if (dtMoldQty != null && dtMoldQty > 0 && dtLhCap != null && dtLhCap > 0) {
+                                int dtAllocatedStock = getCurrentStock(context, dt.getLhId());
+                                int dtProduction = dt.getPlannedProduction() != null ? dt.getPlannedProduction() : 0;
+                                int dtVulcCons = taskVulcConsumptionMap.getOrDefault(dt.getLhId(), 0);
+                                int dtProjectedStock = dtAllocatedStock + dtProduction - dtVulcCons;
+                                BigDecimal dtSingleTireMoldSeconds = BigDecimal.valueOf(SECONDS_PER_DAY)
+                                        .divide(BigDecimal.valueOf(dtLhCap), 2, BigDecimal.ROUND_HALF_UP);
+                                sh = BigDecimal.valueOf(dtProjectedStock)
+                                        .multiply(dtSingleTireMoldSeconds)
+                                        .divide(BigDecimal.valueOf(dtMoldQty), 2, BigDecimal.ROUND_HALF_UP)
+                                        .divide(BigDecimal.valueOf(SECONDS_PER_HOUR), 2, BigDecimal.ROUND_HALF_UP);
+                            }
                             if (minStockHours == null || sh.compareTo(minStockHours) < 0) {
                                 minStockHours = sh;
                                 minTask = dt;

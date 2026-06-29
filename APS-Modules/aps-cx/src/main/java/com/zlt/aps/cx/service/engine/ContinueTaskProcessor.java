@@ -42,24 +42,14 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class ContinueTaskProcessor {
 
-    private final BalancingService balancingService;
     private final ProductionCalculator productionCalculator;
     private final ScheduleDayTypeHelper scheduleDayTypeHelper;
-
-    /** 胎胚库容上限比例 */
-    private static final double EMBRYO_STORAGE_RATIO = 0.9;
-
-    /** 默认整车容量（条/车） */
-    private static final int DEFAULT_TRIP_CAPACITY = 12;
 
     /** 默认最大硫化机台数 */
     private static final int DEFAULT_MAX_LH_MACHINE_COUNT = 10;
 
     /** 默认日产能（条/天），机台未配置时使用 */
     private static final int DEFAULT_DAILY_CAPACITY = 1200;
-
-    /** 默认机台小时产能（条/小时） */
-    private static final int DEFAULT_HOURLY_CAPACITY = 50;
 
     /** 参数编码：强制保留历史任务 */
     private static final String PARAM_FORCE_KEEP_HISTORY = "SYS04070003";
