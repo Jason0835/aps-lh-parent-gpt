@@ -13,6 +13,7 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.common.core.constant.ApsConstant;
+import com.zlt.aps.common.core.domain.ExcelStyleVo;
 import com.zlt.aps.common.core.utils.ExcelUtils;
 import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.cx.entity.schedule.CxScheduleResult;
@@ -2359,6 +2360,10 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
                 row.put("class" + shift + "Analysis", getClassAnalysis(result, shift));
                 row.put("class" + shift + "Dot", "");
             }
+
+            // 导出着色规则
+            applyExportRowStyle(row, result);
+
             dataList.add(row);
         }
         return dataList;
@@ -2913,6 +2918,92 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
             }
         }
         return lastShift;
+    }
+
+    // ==================== 导出着色规则 ====================
+
+    /**
+     * 灰底样式（交替前后标识）。
+     */
+    private static final ExcelStyleVo GRAY_STYLE = createGrayStyle();
+
+    /**
+     * 淡橙底样式（余量不足标识）。
+     */
+    private static final ExcelStyleVo ORANGE_STYLE = createOrangeStyle();
+
+    private static ExcelStyleVo createGrayStyle() {
+        ExcelStyleVo vo = new ExcelStyleVo();
+        vo.setRgbColor(new ExcelStyleVo.RgbColor(0xD9, 0xD9, 0xD9));
+        return vo;
+    }
+
+    private static ExcelStyleVo createOrangeStyle() {
+        ExcelStyleVo vo = new ExcelStyleVo();
+        vo.setRgbColor(new ExcelStyleVo.RgbColor(0xFC, 0xD5, 0xB4));
+        return vo;
+    }
+
+    /**
+     * 为导出明细行应用着色规则。
+     *
+     * <p>规则 1：交替前 SKU — class3~8 中有收尾班次（classXIsEnd="1"），机台列涂灰。</p>
+     * <p>规则 2：交替后 SKU — class3~8 中第一个有计划量的班次之前全空，机台/物料号/物料描述列涂灰。</p>
+     * <p>规则 3：硫化余量低于等于 400 条，合计余量列涂淡橙。</p>
+     *
+     * @param row    导出行数据
+     * @param result 排程结果
+     */
+    private void applyExportRowStyle(Map<String, Object> row, LhScheduleResult result) {
+        if (isPreChangeSku(result)) {
+            row.put("style_lhMachineCode", GRAY_STYLE);
+        }
+        if (isPostChangeSku(result)) {
+            row.put("style_lhMachineCode", GRAY_STYLE);
+            row.put("style_materialCode", GRAY_STYLE);
+            row.put("style_materialDesc", GRAY_STYLE);
+        }
+        if (result.getMouldSurplusQty() != null && result.getMouldSurplusQty() <= 400) {
+            row.put("style_dailyPlanQty", ORANGE_STYLE);
+        }
+    }
+
+    /**
+     * 判断是否为交替前 SKU：class3~8 中存在某个班次为收尾（classXIsEnd = "1"）。
+     */
+    private boolean isPreChangeSku(LhScheduleResult result) {
+        for (int shift = 3; shift <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT; shift++) {
+            if ("1".equals(ShiftFieldUtil.getShiftIsEnd(result, shift))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * 判断是否为交替后 SKU：class3~8 中第一个有计划量（>0）的班次，
+     * 其前面所有班次（class3~8 范围内）计划量都为 0 或空。
+     */
+    private boolean isPostChangeSku(LhScheduleResult result) {
+        int firstPlannedShift = 0;
+        for (int shift = 3; shift <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT; shift++) {
+            Integer planQty = getClassPlanQty(result, shift);
+            if (Objects.nonNull(planQty) && planQty > 0) {
+                firstPlannedShift = shift;
+                break;
+            }
+        }
+        if (firstPlannedShift == 0) {
+            return false;
+        }
+        // 第一个有计划量的班次之前（class3~8 范围内）必须全空
+        for (int shift = 3; shift < firstPlannedShift; shift++) {
+            Integer planQty = getClassPlanQty(result, shift);
+            if (Objects.nonNull(planQty) && planQty > 0) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /**
