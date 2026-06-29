@@ -1629,21 +1629,6 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
         return StringUtils.equals("1", StringUtils.trimToEmpty(plan.getIsLockSchedule()));
     }
 
-    /**
-     * 判断周程调整结果是否属于目标月计划。
-     *
-     * @param plan 目标月计划
-     * @param adjustResult 周程调整结果
-     * @return true-同年月调整结果
-     */
-    private boolean isTargetMonthAdjustResult(FactoryMonthPlanProductionFinalResult plan, MpAdjustResult adjustResult) {
-        if (Objects.isNull(plan) || Objects.isNull(adjustResult)
-                || Objects.isNull(plan.getYear()) || Objects.isNull(plan.getMonth())) {
-            return false;
-        }
-        return Objects.equals(plan.getYear(), adjustResult.getYear())
-                && Objects.equals(plan.getMonth(), adjustResult.getMonth());
-    }
 
     /**
      * 基于月计划 day1～day31 中最早有计划量的日期计算延迟上机天数。
