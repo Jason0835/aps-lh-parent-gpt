@@ -492,6 +492,14 @@ public class ScheduleContextVo {
     private List<MpCxCapacityConfiguration> structureAllocations;
 
     /**
+     * 结构排产配置对应的年月（格式 year*100+month，如 202605）
+     * <p>标识 structureAllocationMap / structureAllocations 所属的月份，
+     * 用于处理器判断排程日期是否跨月：若排程日期年月 ≠ 此值，则应改用
+     * futureStructureAllocationMap（含次月配置）。
+     */
+    private Integer structureAllocationYearMonth;
+
+    /**
      * 结构排产配置映射（结构编码 -> 可分配机台列表）
      * 快速查询用
      */

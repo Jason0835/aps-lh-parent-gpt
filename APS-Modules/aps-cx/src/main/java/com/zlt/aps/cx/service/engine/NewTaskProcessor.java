@@ -347,19 +347,42 @@ public class NewTaskProcessor {
     private List<MpCxCapacityConfiguration> getAvailableMachinesForStructure(
             String structureName, LocalDate scheduleDate, ScheduleContextVo context,
             String productionVersion) {
-        if (context.getStructureAllocationMap() != null) {
+        // 获取可用成型机编码集合
+        Set<String> availableMachineCodes = new HashSet<>();
+        if (context.getAvailableMachines() != null) {
+            for (MdmMoldingMachine machine : context.getAvailableMachines()) {
+                availableMachineCodes.add(machine.getCxMachineCode());
+            }
+        }
+
+        // 跨月判断：排程日期年月 ≠ 当月配置年月时，使用 futureStructureAllocationMap（含次月配置）
+        int dateYearMonth = scheduleDate.getYear() * 100 + scheduleDate.getMonthValue();
+        Integer baseYearMonth = context.getStructureAllocationYearMonth();
+        boolean crossMonth = baseYearMonth != null && baseYearMonth != dateYearMonth;
+
+        if (crossMonth) {
+            // 跨月场景：从 futureStructureAllocationMap 取（次月数据已按次月版本过滤，不再重复过滤版本）
+            if (context.getFutureStructureAllocationMap() != null) {
+                List<MpCxCapacityConfiguration> configs =
+                        context.getFutureStructureAllocationMap().get(structureName);
+                if (configs != null && !configs.isEmpty()) {
+                    int dayOfMonth = scheduleDate.getDayOfMonth();
+                    List<MpCxCapacityConfiguration> result = configs.stream()
+                            .filter(c -> c.getBeginDay() != null && c.getEndDay() != null)
+                            .filter(c -> c.getBeginDay() <= dayOfMonth && c.getEndDay() >= dayOfMonth)
+                            // 过滤：只保留存在于 availableMachines 中的机台
+                            .filter(c -> availableMachineCodes.contains(c.getCxMachineCode()))
+                            .collect(Collectors.toList());
+                    if (!result.isEmpty()) {
+                        return result;
+                    }
+                }
+            }
+        } else if (context.getStructureAllocationMap() != null) {
             List<MpCxCapacityConfiguration> configs =
                     context.getStructureAllocationMap().get(structureName);
             if (configs != null && !configs.isEmpty()) {
                 int dayOfMonth = scheduleDate.getDayOfMonth();
-
-                // 获取可用成型机编码集合
-                Set<String> availableMachineCodes = new HashSet<>();
-                if (context.getAvailableMachines() != null) {
-                    for (MdmMoldingMachine machine : context.getAvailableMachines()) {
-                        availableMachineCodes.add(machine.getCxMachineCode());
-                    }
-                }
 
                 List<MpCxCapacityConfiguration> result = configs.stream()
                         .filter(c -> c.getBeginDay() != null && c.getEndDay() != null)

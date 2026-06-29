@@ -49,6 +49,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.*;
+import java.time.YearMonth;
 import java.util.stream.Collectors;
 
 /**
@@ -255,7 +256,7 @@ public class ScheduleServiceImpl implements ScheduleService {
             // 注意：排程算法返回的结果中，scheduleDate 只有 request.getScheduleDate() 这一天
             deleteExistingScheduleResults(request.getScheduleDate());
 
-            // 4. 保存新的排程结果（主表+子表）
+            // 4. 保存新排程结果（主表+子表）
             saveScheduleResults(scheduleResults);
 
             log.info("重排程完成，日期：{}，结果数量：{}", request.getScheduleDate(), scheduleResults.size());
@@ -1007,26 +1008,40 @@ public class ScheduleServiceImpl implements ScheduleService {
      * <p>用于续作任务的均衡分配
      */
     private void loadStructureAllocations(ScheduleContextVo context, LocalDate scheduleDate) {
-        int year = scheduleDate.getYear();
-        int month = scheduleDate.getMonthValue();
+        // 以 T日（中间天-1）所在月份为当月，与 loadFutureStructureAllocations 的基准一致
+        LocalDate tDay = scheduleDate.minusDays(1);
+        int year = tDay.getYear();
+        int month = tDay.getMonthValue();
         String factoryCode = context.getFactoryCode() != null ? context.getFactoryCode() : DEFAULT_FACTORY_CODE;
 
         // 查询当月的结构排产配置（添加is_delete和工厂过滤）
         List<MpCxCapacityConfiguration> allocations = capacityConfigurationMapper.selectByYearAndMonth(factoryCode, year, month);
 
-        // 按排产版本过滤：只保留与硫化排程相同版本的数据
-        String productionVersion = context.getProductionVersion();
-        if (productionVersion != null && !allocations.isEmpty()) {
+        // 按排产版本过滤：从月计划表获取当月排产版本（与次月版本获取方式统一）
+        int currentYearMonth = year * 100 + month;
+        List<FactoryMonthPlanProductionFinalResult> currentMonthPlans =
+                monthPlanMapper.selectByFactoryAndYearMonth(factoryCode, currentYearMonth);
+        String currentMonthVersion = currentMonthPlans.stream()
+                .filter(p -> "1".equals(p.getIsRelease()))
+                .map(FactoryMonthPlanProductionFinalResult::getProductionVersion)
+                .filter(Objects::nonNull)
+                .findFirst()
+                .orElse(null);
+
+        if (currentMonthVersion != null && !allocations.isEmpty()) {
             int before = allocations.size();
             allocations = allocations.stream()
-                    .filter(a -> productionVersion.equals(a.getProductionVersion()))
+                    .filter(a -> currentMonthVersion.equals(a.getProductionVersion()))
                     .collect(Collectors.toList());
-            log.info("结构排产配置按排产版本 {} 过滤: {} 条 -> {} 条", productionVersion, before, allocations.size());
+            log.info("结构排产配置按当月排产版本 {} 过滤: {} 条 -> {} 条", currentMonthVersion, before, allocations.size());
         } else {
-            log.warn("排产版本为空，结构排产配置未按版本过滤，共 {} 条", allocations.size());
+            log.warn("未从月计划表获取到当月 {}-{} 的排产版本，结构排产配置未按版本过滤，共 {} 条",
+                    year, month, allocations.size());
         }
 
         context.setStructureAllocations(allocations);
+        // 记录当月配置所属年月（year*100+month），供处理器跨月判断使用
+        context.setStructureAllocationYearMonth(year * 100 + month);
 
         // 按结构分组
         Map<String, List<MpCxCapacityConfiguration>> structureAllocationMap = allocations.stream()
@@ -1102,6 +1117,7 @@ public class ScheduleServiceImpl implements ScheduleService {
             List<FactoryMonthPlanProductionFinalResult> nextMonthPlans =
                     monthPlanMapper.selectByFactoryAndYearMonth(factoryCode, nextYearMonth);
             String nextMonthVersion = nextMonthPlans.stream()
+                    .filter(p -> "1".equals(p.getIsRelease()))
                     .map(FactoryMonthPlanProductionFinalResult::getProductionVersion)
                     .filter(Objects::nonNull)
                     .findFirst()
@@ -1177,33 +1193,54 @@ public class ScheduleServiceImpl implements ScheduleService {
     /**
      * 加载月度计划余量并计算成型余量
      * <p>
-     * 硫化余量计算逻辑参考 ScheduleAdjustHandler#calculateSurplusQty：
-     * 硫化余量 = Max(月度计划总量 - (月累计完成量 + T日班次完成量), 0)
-     * 不再从 T_MDM_MONTH_SURPLUS 表读取，改为从月计划表 + 日完成量表 + 班次完成量表动态计算。
+     * 硫化余量计算逻辑（支持跨月与月计划断点场景）：
+     * 硫化余量 = Max(Σ(day1~断点日)计划量 + 上月超欠产 - 已完成量, 0)
+     * <ul>
+     *   <li>断点定义：月计划前日有值、当日无值 → 前日为断点日</li>
+     *   <li>跨月时分别计算当月和次月硫化余量后相加</li>
+     *   <li>不再使用 totalQty 字段，改为按 day1~断点日 逐日累加</li>
+     * </ul>
      * </p>
      */
     private void loadMonthSurplusAndCalculateFormingRemainder(ScheduleContextVo context, LocalDate scheduleDate) {
-        int year = scheduleDate.getYear();
-        int month = scheduleDate.getMonthValue();
         String factoryCode = context.getFactoryCode();
+        int scheduleDays = context.getScheduleDays() != null ? context.getScheduleDays() : DEFAULT_SCHEDULE_DAYS;
+        LocalDate scheduleEndDate = scheduleDate.plusDays(scheduleDays - 1);
 
-        // 1. 获取月计划数据，按物料汇总月计划总量（按工厂过滤）
-        // 当"上月超欠产有效标志"(lastMonthValidFlag)=1时，月计划总量需合并上月欠产数据(lastMonthOverdueQty)，
-        // 以纳入上个月的欠产（此前未被考虑）；标志非"1"或为空时，仅汇总本月计划总量(totalQty)。
-        int yearMonth = year * 100 + month;
-        List<FactoryMonthPlanProductionFinalResult> monthPlans = monthPlanMapper.selectByFactoryAndYearMonth(factoryCode, yearMonth);
-        Map<String, Integer> materialTotalPlanQtyMap = monthPlans.stream()
+        // 跨月判定：排程结束日的年月 ≠ T日年月
+        boolean crossMonth = scheduleEndDate.getMonth() != scheduleDate.getMonth()
+                || scheduleEndDate.getYear() != scheduleDate.getYear();
+
+        // 当月（排程起始日所在月）年月
+        int prevYear = scheduleDate.getYear();
+        int prevMonth = scheduleDate.getMonthValue();
+        int prevYearMonth = prevYear * 100 + prevMonth;
+
+        // 次月（排程结束日所在月）年月
+        LocalDate nextMonthBase = scheduleEndDate.withDayOfMonth(1);
+        int nextYear = nextMonthBase.getYear();
+        int nextMonth = nextMonthBase.getMonthValue();
+        int nextYearMonth = nextYear * 100 + nextMonth;
+
+        // 1. 查询月计划数据（跨月时查当月+次月两份）
+        List<FactoryMonthPlanProductionFinalResult> prevMonthPlans = monthPlanMapper.selectByFactoryAndYearMonth(factoryCode, prevYearMonth);
+        List<FactoryMonthPlanProductionFinalResult> nextMonthPlans = crossMonth
+                ? monthPlanMapper.selectByFactoryAndYearMonth(factoryCode, nextYearMonth)
+                : Collections.emptyList();
+
+        // 按物料分组（同一物料可能有多条记录）
+        Map<String, List<FactoryMonthPlanProductionFinalResult>> prevPlansByMaterial = prevMonthPlans.stream()
                 .filter(p -> p.getMaterialCode() != null)
-                .collect(Collectors.groupingBy(
-                        FactoryMonthPlanProductionFinalResult::getMaterialCode,
-                        Collectors.summingInt(ScheduleServiceImpl::calcEffectivePlanQty)));
-        long mergedOverdueCount = monthPlans.stream()
-                .filter(p -> p.getMaterialCode() != null && "1".equals(p.getLastMonthValidFlag()))
-                .count();
-        log.info("按物料汇总月计划总量 {} 条，其中合并上月欠产数据 {} 条", materialTotalPlanQtyMap.size(), mergedOverdueCount);
+                .collect(Collectors.groupingBy(FactoryMonthPlanProductionFinalResult::getMaterialCode));
+        Map<String, List<FactoryMonthPlanProductionFinalResult>> nextPlansByMaterial = nextMonthPlans.stream()
+                .filter(p -> p.getMaterialCode() != null)
+                .collect(Collectors.groupingBy(FactoryMonthPlanProductionFinalResult::getMaterialCode));
 
-        // 2. 收集所有物料编码（月计划中的 + 硫化排程中的）
-        Set<String> allMaterialCodes = new HashSet<>(materialTotalPlanQtyMap.keySet());
+        // 2. 收集所有物料编码（当月 + 次月 + 硫化排程结果）
+        Set<String> allMaterialCodes = new HashSet<>(prevPlansByMaterial.keySet());
+        if (crossMonth) {
+            allMaterialCodes.addAll(nextPlansByMaterial.keySet());
+        }
         if (context.getLhScheduleResults() != null) {
             context.getLhScheduleResults().stream()
                     .filter(r -> r.getMaterialCode() != null)
@@ -1213,44 +1250,75 @@ public class ScheduleServiceImpl implements ScheduleService {
         List<String> materialCodeList = new ArrayList<>(allMaterialCodes);
         List<String> factoryCodeList = Collections.singletonList(factoryCode);
 
-        // 3. 查询月累计完成量（本月1日 ~ T-1日，不含T日）
-        Date monthStart = Date.from(scheduleDate.withDayOfMonth(1).atStartOfDay(ZoneId.systemDefault()).toInstant());
+        // 3. 查询已完成量
+        // 当月：当月1日 ~ T-1日（不含T日）的月累计完成量 + T日班次完成量
+        Date prevMonthStart = Date.from(scheduleDate.withDayOfMonth(1).atStartOfDay(ZoneId.systemDefault()).toInstant());
         Date scheduleDateStart = Date.from(scheduleDate.atStartOfDay(ZoneId.systemDefault()).toInstant());
         Date nextDayStart = Date.from(scheduleDate.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant());
 
-        Map<String, Integer> materialDayFinishedQtyMap = new HashMap<>();
+        Map<String, Integer> prevDayFinishedQtyMap = new HashMap<>();
+        Map<String, Integer> prevScheFinishedQtyMap = new HashMap<>();
         if (!materialCodeList.isEmpty()) {
+            // 当月月累计完成量（当月1日 ~ T-1日）
             List<Map<String, Object>> dayFinishList = lhFinishQtyMapper.sumDayFinishQty(
-                    factoryCodeList, materialCodeList, monthStart, scheduleDateStart);
+                    factoryCodeList, materialCodeList, prevMonthStart, scheduleDateStart);
             for (Map<String, Object> row : dayFinishList) {
                 String mc = (String) row.get("MATERIAL_CODE");
                 Object qtyObj = row.get("TOTAL_FINISH_QTY");
                 int qty = qtyObj != null ? ((Number) qtyObj).intValue() : 0;
-                materialDayFinishedQtyMap.merge(mc, qty, Integer::sum);
+                prevDayFinishedQtyMap.merge(mc, qty, Integer::sum);
             }
-        }
-
-        // 4. 查询T日排程班次完成量（T_LH_SCHE_FINISH_QTY 的 CLASS1_FINISH_QTY）
-        Map<String, Integer> materialScheFinishedQtyMap = new HashMap<>();
-        if (!materialCodeList.isEmpty()) {
+            // T日班次完成量
             List<Map<String, Object>> scheFinishList = lhFinishQtyMapper.sumScheFinishQty(
                     factoryCodeList, materialCodeList, scheduleDateStart, nextDayStart);
             for (Map<String, Object> row : scheFinishList) {
                 String mc = (String) row.get("MATERIAL_CODE");
                 Object qtyObj = row.get("TOTAL_FINISH_QTY");
                 int qty = qtyObj != null ? ((Number) qtyObj).intValue() : 0;
-                materialScheFinishedQtyMap.merge(mc, qty, Integer::sum);
+                prevScheFinishedQtyMap.merge(mc, qty, Integer::sum);
             }
         }
 
-        // 5. 计算每个物料的硫化余量并构建 MdmMonthSurplus 列表
-        // 硫化余量 = Max(月度计划总量 - (月累计完成量 + T日班次完成量), 0)
+        // 次月已完成量（仅当T日落在次月时才需要查询；T日=排程起始日，正常情况下在当月）
+        Map<String, Integer> nextDayFinishedQtyMap = new HashMap<>();
+        Map<String, Integer> nextScheFinishedQtyMap = new HashMap<>();
+        boolean tInNextMonth = crossMonth && scheduleDate.getYear() == nextYear && scheduleDate.getMonthValue() == nextMonth;
+        if (tInNextMonth && !materialCodeList.isEmpty()) {
+            Date nextMonthStart = Date.from(nextMonthBase.atStartOfDay(ZoneId.systemDefault()).toInstant());
+            // 次月月累计完成量（次月1日 ~ T-1日）
+            List<Map<String, Object>> nextDayFinishList = lhFinishQtyMapper.sumDayFinishQty(
+                    factoryCodeList, materialCodeList, nextMonthStart, scheduleDateStart);
+            for (Map<String, Object> row : nextDayFinishList) {
+                String mc = (String) row.get("MATERIAL_CODE");
+                Object qtyObj = row.get("TOTAL_FINISH_QTY");
+                int qty = qtyObj != null ? ((Number) qtyObj).intValue() : 0;
+                nextDayFinishedQtyMap.merge(mc, qty, Integer::sum);
+            }
+            // T日班次完成量与当月查询结果相同（同一个T日）
+            nextScheFinishedQtyMap = new HashMap<>(prevScheFinishedQtyMap);
+        }
+
+        log.info("硫化余量计算：跨月={}, 当月={}-{}, 次月={}, T日在次月={}, 物料数={}",
+                crossMonth, prevYear, prevMonth, crossMonth ? nextYear + "-" + nextMonth : "无",
+                tInNextMonth, materialCodeList.size());
+
+        // 4. 计算每个物料的硫化余量（按断点日累加计划量，支持跨月）
         List<MdmMonthSurplus> monthSurplusList = new ArrayList<>();
         for (String materialCode : materialCodeList) {
-            int totalPlanQty = materialTotalPlanQtyMap.getOrDefault(materialCode, 0);
-            int dayFinishedQty = materialDayFinishedQtyMap.getOrDefault(materialCode, 0);
-            int scheFinishedQty = materialScheFinishedQtyMap.getOrDefault(materialCode, 0);
-            int surplusQty = Math.max(0, totalPlanQty - (dayFinishedQty + scheFinishedQty));
+            List<FactoryMonthPlanProductionFinalResult> prevPlans = prevPlansByMaterial.getOrDefault(materialCode, Collections.emptyList());
+            List<FactoryMonthPlanProductionFinalResult> nextPlans = crossMonth
+                    ? nextPlansByMaterial.getOrDefault(materialCode, Collections.emptyList())
+                    : Collections.emptyList();
+
+            int prevDayFinishedQty = prevDayFinishedQtyMap.getOrDefault(materialCode, 0);
+            int prevScheFinishedQty = prevScheFinishedQtyMap.getOrDefault(materialCode, 0);
+            int nextDayFinishedQty = nextDayFinishedQtyMap.getOrDefault(materialCode, 0);
+            int nextScheFinishedQty = nextScheFinishedQtyMap.getOrDefault(materialCode, 0);
+
+            int surplusQty = calculateSurplusQtyWithBreakpoint(
+                    prevPlans, nextPlans, scheduleDate, scheduleEndDate, crossMonth,
+                    prevYear, prevMonth, nextYear, nextMonth,
+                    prevDayFinishedQty, prevScheFinishedQty, nextDayFinishedQty, nextScheFinishedQty);
 
             MdmMonthSurplus surplus = new MdmMonthSurplus();
             surplus.setMaterialCode(materialCode);
@@ -1266,7 +1334,7 @@ public class ScheduleServiceImpl implements ScheduleService {
         context.setInitialMonthSurplusMap(monthSurplusList.stream()
                 .filter(s -> s.getMaterialCode() != null && s.getPlanSurplusQty() != null)
                 .collect(Collectors.toMap(MdmMonthSurplus::getMaterialCode, MdmMonthSurplus::getPlanSurplusQty, (a, b) -> a)));
-        log.info("加载月度计划余量 {} 条（根据月计划总量-完成量动态计算）", monthSurplusList.size());
+        log.info("加载月度计划余量 {} 条（按断点日累加计划量-完成量动态计算，支持跨月）", monthSurplusList.size());
 
         // 获取当前天的班次配置（用于获取硫化任务的班次计划量）
         List<CxShiftConfig> currentDayShifts = getCurrentDayShifts(context);
@@ -1312,6 +1380,276 @@ public class ScheduleServiceImpl implements ScheduleService {
             return totalQty + overdueQty;
         }
         return totalQty;
+    }
+
+    /**
+     * 计算单个物料的硫化余量（支持跨月与月计划断点）。
+     * <p>
+     * 三种情况：
+     * <ul>
+     *   <li>A：排程范围内最晚有计划量的日期在当月 → 从该日往后在当月找断点，按 day1~断点日 累加</li>
+     *   <li>B：最晚有计划量的日期在次月 → 当月部分(若当月范围内有计划量则找断点，否则0) + 次月部分(从该日往后找断点)</li>
+     *   <li>C：排程范围内均无计划量 → 前余量>0取前余量；否则从T日往后找断点，跨月时再检查次月</li>
+     * </ul>
+     * </p>
+     *
+     * @param prevPlans           当月月计划记录（按物料过滤）
+     * @param nextPlans           次月月计划记录（按物料过滤，非跨月时为空）
+     * @param scheduleDate        T日（排程起始日）
+     * @param scheduleEndDate     排程结束日
+     * @param crossMonth          是否跨月
+     * @param prevYear/prevMonth  当月年月
+     * @param nextYear/nextMonth  次月年月
+     * @param prevDayFinishedQty  当月月累计完成量（当月1日~T-1日）
+     * @param prevScheFinishedQty 当月T日班次完成量
+     * @param nextDayFinishedQty  次月月累计完成量（T日在次月时）
+     * @param nextScheFinishedQty 次月T日班次完成量（T日在次月时）
+     * @return 硫化余量
+     */
+    private int calculateSurplusQtyWithBreakpoint(
+            List<FactoryMonthPlanProductionFinalResult> prevPlans,
+            List<FactoryMonthPlanProductionFinalResult> nextPlans,
+            LocalDate scheduleDate, LocalDate scheduleEndDate, boolean crossMonth,
+            int prevYear, int prevMonth, int nextYear, int nextMonth,
+            int prevDayFinishedQty, int prevScheFinishedQty,
+            int nextDayFinishedQty, int nextScheFinishedQty) {
+
+        // 1. 找排程范围内最晚有计划量的日期
+        LocalDate lastPlanDate = findLastPlanDateInRange(prevPlans, nextPlans, scheduleDate, scheduleEndDate,
+                crossMonth, prevYear, prevMonth, nextYear, nextMonth);
+
+        if (lastPlanDate != null) {
+            boolean lastPlanInNextMonth = crossMonth
+                    && lastPlanDate.getYear() == nextYear && lastPlanDate.getMonthValue() == nextMonth;
+
+            if (!lastPlanInNextMonth) {
+                // 情况A：lastPlanDate 在当月
+                int breakpointDay = findBreakpointDay(prevPlans, lastPlanDate.getDayOfMonth(), prevYear, prevMonth);
+                if (breakpointDay == 0) {
+                    return 0;
+                }
+                int planQty = sumPlanQtyByDayRange(prevPlans, breakpointDay);
+                int overdueQty = getEffectiveOverdueQty(prevPlans);
+                int finishedQty = prevDayFinishedQty + prevScheFinishedQty;
+                return Math.max(0, planQty + overdueQty - finishedQty);
+            } else {
+                // 情况B：lastPlanDate 在次月
+                // 当月部分：在排程范围内找当月最晚有计划量的日期
+                LocalDate prevLastPlanDate = findLastPlanDateInMonthInRange(prevPlans, scheduleDate, scheduleEndDate,
+                        prevYear, prevMonth);
+                int prevSurplus;
+                if (prevLastPlanDate != null) {
+                    int prevBreakpointDay = findBreakpointDay(prevPlans, prevLastPlanDate.getDayOfMonth(), prevYear, prevMonth);
+                    if (prevBreakpointDay > 0) {
+                        int prevPlanQty = sumPlanQtyByDayRange(prevPlans, prevBreakpointDay);
+                        int prevOverdueQty = getEffectiveOverdueQty(prevPlans);
+                        int prevFinishedQty = prevDayFinishedQty + prevScheFinishedQty;
+                        prevSurplus = Math.max(0, prevPlanQty + prevOverdueQty - prevFinishedQty);
+                    } else {
+                        prevSurplus = 0;
+                    }
+                } else {
+                    // 当月排程范围内无计划量 → 当月硫化余量 = 0
+                    prevSurplus = 0;
+                }
+
+                // 次月部分：从 lastPlanDate 往后在次月找断点
+                int nextBreakpointDay = findBreakpointDay(nextPlans, lastPlanDate.getDayOfMonth(), nextYear, nextMonth);
+                int nextSurplus = 0;
+                if (nextBreakpointDay > 0) {
+                    int nextPlanQty = sumPlanQtyByDayRange(nextPlans, nextBreakpointDay);
+                    int nextOverdueQty = getEffectiveOverdueQty(nextPlans);
+                    int nextFinishedQty = nextDayFinishedQty + nextScheFinishedQty;
+                    nextSurplus = Math.max(0, nextPlanQty + nextOverdueQty - nextFinishedQty);
+                }
+
+                return prevSurplus + nextSurplus;
+            }
+        } else {
+            // 情况C：排程范围内均无计划量
+            int tDayOfMonth = scheduleDate.getDayOfMonth();
+            // 前余量 = Σ(当月 day1 ~ T日) + 当月超欠产 - 当月已完成量
+            int prevPlanQtyToT = sumPlanQtyByDayRange(prevPlans, tDayOfMonth);
+            int prevOverdueQty = getEffectiveOverdueQty(prevPlans);
+            int prevFinishedQty = prevDayFinishedQty + prevScheFinishedQty;
+            int preRemainder = prevPlanQtyToT + prevOverdueQty - prevFinishedQty;
+
+            if (preRemainder > 0) {
+                // C1：前余量 > 0（当日之前还有余量）
+                return preRemainder;
+            } else {
+                // C2：前余量 <= 0（当日之前没有余量）
+                // 从 T日 往后在当月找断点
+                int breakpointDay = findBreakpointDay(prevPlans, tDayOfMonth, prevYear, prevMonth);
+                int prevSurplus = 0;
+                if (breakpointDay > 0) {
+                    int planQty = sumPlanQtyByDayRange(prevPlans, breakpointDay);
+                    prevSurplus = Math.max(0, planQty + prevOverdueQty - prevFinishedQty);
+                }
+
+                if (!crossMonth) {
+                    return prevSurplus;
+                }
+
+                // 跨月，检查次月：从次月1日往后找断点
+                int nextBreakpointDay = findBreakpointDay(nextPlans, 1, nextYear, nextMonth);
+                int nextSurplus = 0;
+                if (nextBreakpointDay > 0) {
+                    int nextPlanQty = sumPlanQtyByDayRange(nextPlans, nextBreakpointDay);
+                    int nextOverdueQty = getEffectiveOverdueQty(nextPlans);
+                    int nextFinishedQty = nextDayFinishedQty + nextScheFinishedQty;
+                    nextSurplus = Math.max(0, nextPlanQty + nextOverdueQty - nextFinishedQty);
+                }
+
+                return prevSurplus + nextSurplus;
+            }
+        }
+    }
+
+    /**
+     * 查找排程范围内最晚有计划量的日期。
+     *
+     * @param prevPlans   当月月计划记录
+     * @param nextPlans   次月月计划记录
+     * @param rangeStart  排程起始日（T日）
+     * @param rangeEnd    排程结束日
+     * @param crossMonth  是否跨月
+     * @return 最晚有计划量的日期；均无计划量返回 null
+     */
+    private LocalDate findLastPlanDateInRange(
+            List<FactoryMonthPlanProductionFinalResult> prevPlans,
+            List<FactoryMonthPlanProductionFinalResult> nextPlans,
+            LocalDate rangeStart, LocalDate rangeEnd, boolean crossMonth,
+            int prevYear, int prevMonth, int nextYear, int nextMonth) {
+        LocalDate lastPlanDate = null;
+        for (LocalDate d = rangeStart; !d.isAfter(rangeEnd); d = d.plusDays(1)) {
+            boolean inNextMonth = crossMonth && d.getYear() == nextYear && d.getMonthValue() == nextMonth;
+            List<FactoryMonthPlanProductionFinalResult> plans = inNextMonth ? nextPlans : prevPlans;
+            if (sumDayQty(plans, d.getDayOfMonth()) > 0) {
+                lastPlanDate = d;
+            }
+        }
+        return lastPlanDate;
+    }
+
+    /**
+     * 查找指定月份在排程范围内最晚有计划量的日期。
+     * 用于情况B当月部分：在排程范围内找当月最晚有计划量的日期。
+     *
+     * @param plans      月计划记录
+     * @param rangeStart 排程起始日
+     * @param rangeEnd   排程结束日
+     * @param year/month 目标月份
+     * @return 最晚有计划量的日期；无返回 null
+     */
+    private LocalDate findLastPlanDateInMonthInRange(
+            List<FactoryMonthPlanProductionFinalResult> plans,
+            LocalDate rangeStart, LocalDate rangeEnd, int year, int month) {
+        LocalDate lastPlanDate = null;
+        for (LocalDate d = rangeStart; !d.isAfter(rangeEnd); d = d.plusDays(1)) {
+            if (d.getYear() == year && d.getMonthValue() == month) {
+                if (sumDayQty(plans, d.getDayOfMonth()) > 0) {
+                    lastPlanDate = d;
+                }
+            }
+        }
+        return lastPlanDate;
+    }
+
+    /**
+     * 查找断点日：从 startDay 开始往后扫描，跳过无值日，找到第一个"有值→无值"转折点。
+     * <p>
+     * 断点定义：月计划前日有值、当日无值 → 前日为断点日。
+     * 一直有值到月末 → 断点日 = 月末。全无值 → 返回0。
+     * </p>
+     *
+     * @param plans    月计划记录列表（同一物料，可能多条）
+     * @param startDay 开始扫描的日序号(1-31)
+     * @param year/month 用于确定月份天数
+     * @return 断点日序号；全无值返回0
+     */
+    private int findBreakpointDay(List<FactoryMonthPlanProductionFinalResult> plans, int startDay, int year, int month) {
+        if (plans == null || plans.isEmpty()) {
+            return 0;
+        }
+        int maxDay = YearMonth.of(year, month).lengthOfMonth();
+        // 跳过无值日，找第一个有值日
+        int firstValidDay = 0;
+        for (int day = startDay; day <= maxDay; day++) {
+            if (sumDayQty(plans, day) > 0) {
+                firstValidDay = day;
+                break;
+            }
+        }
+        if (firstValidDay == 0) {
+            return 0;
+        }
+        // 从 firstValidDay 往后找断点：有值→无值 的转折点
+        for (int day = firstValidDay; day < maxDay; day++) {
+            if (sumDayQty(plans, day) > 0 && sumDayQty(plans, day + 1) <= 0) {
+                return day;
+            }
+        }
+        // 一直有值到月末
+        return maxDay;
+    }
+
+    /**
+     * 累加某日所有记录的计划量（同一物料可能有多条记录）。
+     *
+     * @param plans 月计划记录列表
+     * @param day   日序号(1-31)
+     * @return 该日计划量合计；无值返回0
+     */
+    private int sumDayQty(List<FactoryMonthPlanProductionFinalResult> plans, int day) {
+        if (plans == null || plans.isEmpty()) {
+            return 0;
+        }
+        int sum = 0;
+        for (FactoryMonthPlanProductionFinalResult p : plans) {
+            Integer qty = p.getDayQty(day);
+            if (qty != null && qty > 0) {
+                sum += qty;
+            }
+        }
+        return sum;
+    }
+
+    /**
+     * 累加 day1 ~ toDay 的计划量。
+     *
+     * @param plans 月计划记录列表
+     * @param toDay 截止日序号(1-31)
+     * @return 计划量合计
+     */
+    private int sumPlanQtyByDayRange(List<FactoryMonthPlanProductionFinalResult> plans, int toDay) {
+        if (plans == null || plans.isEmpty() || toDay <= 0) {
+            return 0;
+        }
+        int sum = 0;
+        for (int day = 1; day <= toDay; day++) {
+            sum += sumDayQty(plans, day);
+        }
+        return sum;
+    }
+
+    /**
+     * 获取有效上月超欠产量（lastMonthValidFlag="1"时累加 lastMonthOverdueQty）。
+     *
+     * @param plans 月计划记录列表
+     * @return 上月超欠产合计
+     */
+    private int getEffectiveOverdueQty(List<FactoryMonthPlanProductionFinalResult> plans) {
+        if (plans == null || plans.isEmpty()) {
+            return 0;
+        }
+        int sum = 0;
+        for (FactoryMonthPlanProductionFinalResult p : plans) {
+            if ("1".equals(p.getLastMonthValidFlag())) {
+                sum += p.getLastMonthOverdueQty() != null ? p.getLastMonthOverdueQty() : 0;
+            }
+        }
+        return sum;
     }
 
     /**
