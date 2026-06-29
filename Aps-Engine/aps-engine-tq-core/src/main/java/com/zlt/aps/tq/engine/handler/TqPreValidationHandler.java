@@ -203,7 +203,7 @@ public class TqPreValidationHandler extends AbsTqScheduleStepHandler {
             // 早班胎圈预计消耗量 = 成型1班消耗 × 需求系数
             double coefficient = context.getParams().getDemandCoefficient() == null ? 2D : context.getParams().getDemandCoefficient();
             double morningTqConsume = BigDecimalUtil.mul(
-                    scheduleVo.getCxClass1Plan() == null ? 0D : scheduleVo.getCxClass1Plan(), coefficient);
+                    scheduleVo.getCxClass1Plan() == null ? 0 : scheduleVo.getCxClass1Plan(), coefficient);
             double planStockQty = BigDecimalUtil.sub(
                     BigDecimalUtil.add(scheduleVo.getStockQty(), scheduleVo.getTodayMorningPlanQty()),
                     morningTqConsume);

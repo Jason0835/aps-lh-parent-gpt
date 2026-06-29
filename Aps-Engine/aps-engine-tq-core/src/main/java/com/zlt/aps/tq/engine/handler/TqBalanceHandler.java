@@ -350,8 +350,8 @@ public class TqBalanceHandler extends AbsTqScheduleStepHandler {
     /**
      * 成型消耗量乘以需求系数
      */
-    private double mulCxPlan(Double cxPlan, double coefficient) {
-        double plan = cxPlan == null ? 0D : cxPlan;
+    private double mulCxPlan(Integer cxPlan, double coefficient) {
+        double plan = cxPlan == null ? 0 : cxPlan;
         return BigDecimalUtil.mul(plan, coefficient);
     }
 
