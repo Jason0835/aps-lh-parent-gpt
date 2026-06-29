@@ -21,13 +21,13 @@ import static org.junit.Assert.*;
 public class TmBusinessRuleStrategyTest {
 
     /**
-     * 测试内容：验证库存缺口小于当前班需求时，需求量取当前班需求。
-     * 测试场景：最低保障需求 1100、滚动库存 1000，库存缺口 100，小于当前班需求 600。
-     * 预期结果：库存缺口为 100，最终需求量为 600，并计算出保障班次数。
+     * 测试内容：验证当前班库存充足但保证范围存在缺口时，需求量取保证范围缺口。
+     * 测试场景：当前班需求 600、最低保障需求 1100、滚动库存 1000。
+     * 预期结果：当前班缺口为 0，库存保证缺口为 100，最终需求量为 100。
      */
     @Test
-    public void demandShouldUseGuardStockGapWhenCurrentDemandIsLower() {
-        // 准备需求量输入，构造库存缺口小于当前班需求的场景。
+    public void demandShouldUseGuardStockGapWhenCurrentShiftIsCovered() {
+        // 准备需求量输入，构造当前班已被库存覆盖但保证范围仍有缺口的场景。
         TmDemandQtyInput input = new TmDemandQtyInput();
         input.setCurrentShiftDemandQty(new BigDecimal("600"));
         input.setGuardDemandQty(new BigDecimal("1100"));
@@ -37,32 +37,32 @@ public class TmBusinessRuleStrategyTest {
         // 执行最低库存保障需求量策略。
         TmDemandQtyResult result = new TmGuardDemandQtyStrategy().calculate(input, null);
 
-        // 断言最终需求量取当前班需求，而不是较小的库存缺口。
+        // 断言最终需求量取保证范围缺口，而不是当前班毛需求。
         assertEquals(new BigDecimal("100"), result.getStockGapQty());
-        assertEquals(new BigDecimal("600"), result.getDemandQty());
+        assertEquals(new BigDecimal("100"), result.getDemandQty());
         assertEquals(Integer.valueOf(2), result.getGuardShiftCount());
     }
 
     /**
-     * 测试内容：验证库存缺口大于当前班需求时，需求量取库存缺口。
-     * 测试场景：最低保障需求 1500、滚动库存 1000，库存缺口 500，大于当前班需求 200。
-     * 预期结果：库存缺口和最终需求量都为 500。
+     * 测试内容：验证当前班缺口大于保证范围缺口时，需求量取当前班缺口。
+     * 测试场景：当前班需求 600、最低保障需求 500、滚动库存 300。
+     * 预期结果：当前班缺口 300 大于库存保证缺口 200，最终需求量为 300。
      */
     @Test
-    public void demandShouldUseStockGapWhenGapIsGreaterThanCurrentDemand() {
-        // 准备库存缺口大于当前班需求的数据。
+    public void demandShouldUseCurrentShiftGapWhenItIsGreaterThanGuardGap() {
+        // 准备当前班缺口大于保证范围缺口的数据。
         TmDemandQtyInput input = new TmDemandQtyInput();
-        input.setCurrentShiftDemandQty(new BigDecimal("200"));
-        input.setGuardDemandQty(new BigDecimal("1500"));
-        input.setRollingStockQty(new BigDecimal("1000"));
+        input.setCurrentShiftDemandQty(new BigDecimal("600"));
+        input.setGuardDemandQty(new BigDecimal("500"));
+        input.setRollingStockQty(new BigDecimal("300"));
         input.setGuardRangeHours(new BigDecimal("16"));
 
-        // 执行需求量策略，验证会补足更大的库存缺口。
+        // 执行需求量策略，验证会补足更大的当前班缺口。
         TmDemandQtyResult result = new TmGuardDemandQtyStrategy().calculate(input, null);
 
-        // 断言最终需求量使用库存缺口。
-        assertEquals(new BigDecimal("500"), result.getStockGapQty());
-        assertEquals(new BigDecimal("500"), result.getDemandQty());
+        // 断言最终需求量使用当前班库存缺口。
+        assertEquals(new BigDecimal("200"), result.getStockGapQty());
+        assertEquals(new BigDecimal("300"), result.getDemandQty());
     }
 
     /**
@@ -143,9 +143,8 @@ public class TmBusinessRuleStrategyTest {
         task.setPreviousSpecSwitchHours(new BigDecimal("0.5"));
         task.setPreviousGlueSwitchHours(new BigDecimal("0.5"));
 
-        // 准备上下文剩余库存 200，库存抵扣后基础需求=max(380-200,900-200,0)=700。
+        // 准备班初滚动库存 200，库存抵扣后基础需求=max(380-200,900-200,0)=700。
         TmScheduleContext context = new TmScheduleContext();
-        context.getRemainingStockMap().put("TR-PLAN-1", new BigDecimal("200"));
 
         // 执行默认计划量策略。
         TmPlanQtyResult result = new TmDefaultPlanQtyStrategy().calculate(task, context);
@@ -232,7 +231,7 @@ public class TmBusinessRuleStrategyTest {
 
     /**
      * 测试内容：验证库存抵扣当前班生产量，库存不足时只抵扣到库存量。
-     * 测试场景：当前班需求 600、保证范围需求 600，剩余库存 200。
+     * 测试场景：当前班需求 600、保证范围需求 600，班初滚动库存 200。
      * 预期结果：库存抵扣 200，基础需求=max(600-200,600-200,0)=400。
      */
     @Test
@@ -241,47 +240,37 @@ public class TmBusinessRuleStrategyTest {
         task.setTreadCode("TR-DEDUCT-1");
         task.setCurrentShiftDemandQty(new BigDecimal("600"));
         task.setGuardDemandQty(new BigDecimal("600"));
-        TmScheduleContext context = new TmScheduleContext();
-        context.getRemainingStockMap().put("TR-DEDUCT-1", new BigDecimal("200"));
+        task.setRollingStockQty(new BigDecimal("200"));
 
-        TmPlanQtyResult result = new TmDefaultPlanQtyStrategy().calculate(task, context);
+        TmPlanQtyResult result = new TmDefaultPlanQtyStrategy().calculate(task, null);
 
         assertBigDecimalEquals(new BigDecimal("200"), task.getStockDeductQty());
         assertBigDecimalEquals(new BigDecimal("400"), result.getBaseDemandQty());
     }
 
     /**
-     * 测试内容：验证同一胎面多班次库存逐班递减，避免库存被重复抵扣。
-     * 测试场景：两班任务当前班需求各 600，剩余库存 500；按班次顺序抵扣。
-     * 预期结果：首班抵扣 500（基础需求 100），剩余库存 0；二班抵扣 0（基础需求 600）。
+     * 测试内容：验证计划量策略把任务完成后的库存写为交接班预计库存。
+     * 测试场景：班初滚动库存 500、当前班需求 600、最终计划量按基础需求得到 100。
+     * 预期结果：交接班预计库存=max(500+100-600,0)=0。
      */
     @Test
-    public void planShouldDecrementStockAcrossShiftsWithoutRepeatDeduct() {
-        TmScheduleContext context = new TmScheduleContext();
-        context.getRemainingStockMap().put("TR-DEDUCT-2", new BigDecimal("500"));
-        TmDefaultPlanQtyStrategy strategy = new TmDefaultPlanQtyStrategy();
+    public void planShouldWritePlanStockQtyAsShiftHandoverStock() {
+        TmTaskDraft task = new TmTaskDraft();
+        task.setTreadCode("TR-DEDUCT-2");
+        task.setCurrentShiftDemandQty(new BigDecimal("600"));
+        task.setGuardDemandQty(new BigDecimal("600"));
+        task.setRollingStockQty(new BigDecimal("500"));
 
-        TmTaskDraft firstShift = new TmTaskDraft();
-        firstShift.setTreadCode("TR-DEDUCT-2");
-        firstShift.setCurrentShiftDemandQty(new BigDecimal("600"));
-        firstShift.setGuardDemandQty(new BigDecimal("600"));
-        TmPlanQtyResult firstResult = strategy.calculate(firstShift, context);
+        TmPlanQtyResult result = new TmDefaultPlanQtyStrategy().calculate(task, null);
 
-        TmTaskDraft secondShift = new TmTaskDraft();
-        secondShift.setTreadCode("TR-DEDUCT-2");
-        secondShift.setCurrentShiftDemandQty(new BigDecimal("600"));
-        secondShift.setGuardDemandQty(new BigDecimal("600"));
-        TmPlanQtyResult secondResult = strategy.calculate(secondShift, context);
-
-        assertBigDecimalEquals(new BigDecimal("500"), firstShift.getStockDeductQty());
-        assertBigDecimalEquals(new BigDecimal("100"), firstResult.getBaseDemandQty());
-        assertBigDecimalEquals(BigDecimal.ZERO, secondShift.getStockDeductQty());
-        assertBigDecimalEquals(new BigDecimal("600"), secondResult.getBaseDemandQty());
+        assertBigDecimalEquals(new BigDecimal("500"), task.getStockDeductQty());
+        assertBigDecimalEquals(new BigDecimal("100"), result.getBaseDemandQty());
+        assertBigDecimalEquals(BigDecimal.ZERO, task.getPlanStockQty());
     }
 
     /**
      * 测试内容：验证库存充足时当前班基础需求被抵扣为 0。
-     * 测试场景：当前班需求 300、保证范围需求 300，剩余库存 1000。
+     * 测试场景：当前班需求 300、保证范围需求 300，班初滚动库存 1000。
      * 预期结果：库存抵扣 300，基础需求为 0。
      */
     @Test
@@ -290,15 +279,14 @@ public class TmBusinessRuleStrategyTest {
         task.setTreadCode("TR-DEDUCT-3");
         task.setCurrentShiftDemandQty(new BigDecimal("300"));
         task.setGuardDemandQty(new BigDecimal("300"));
-        TmScheduleContext context = new TmScheduleContext();
-        context.getRemainingStockMap().put("TR-DEDUCT-3", new BigDecimal("1000"));
+        task.setRollingStockQty(new BigDecimal("1000"));
 
-        TmPlanQtyResult result = new TmDefaultPlanQtyStrategy().calculate(task, context);
+        TmPlanQtyResult result = new TmDefaultPlanQtyStrategy().calculate(task, null);
 
         assertBigDecimalEquals(new BigDecimal("300"), task.getStockDeductQty());
         assertBigDecimalEquals(BigDecimal.ZERO, result.getBaseDemandQty());
-        // 库存扣减后剩余 700
-        assertBigDecimalEquals(new BigDecimal("700"), context.getRemainingStockMap().get("TR-DEDUCT-3"));
+        // 库存扣减后交接班预计库存为 700
+        assertBigDecimalEquals(new BigDecimal("700"), task.getPlanStockQty());
     }
 
     /**

@@ -72,7 +72,7 @@
 //utils
 import { downloadLink } from "@/utils/request";
 //interface
-import { listStock, removeStock, releaseStock } from "@/api/xwyy/stock";
+import { listStock, removeStock, releaseStock } from "@/api/xwyy/xwyyStock";
 //components
 import tltUpload from "@/components/tltUpload/tltUpload.vue";
 

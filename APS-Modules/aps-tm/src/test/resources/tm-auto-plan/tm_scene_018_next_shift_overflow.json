@@ -21,14 +21,20 @@
       "paramCode": "TM_ALGORITHM_SWITCH",
       "paramValue": "2",
       "enableStatus": "1"
+    },
+    {
+      "factoryCode": "F1",
+      "paramCode": "TM_FORMING_SHIFT_OFFSET",
+      "paramValue": "0",
+      "enableStatus": "1"
     }
   ],
   "cxScheduleResults": [
     {
       "orderNo": "TM_SCENE_018_001",
       "embryoCode": "CX-TM_SCENE_018_001",
-      "class1PlanQty": 0,
-      "class2PlanQty": 1200,
+      "class1PlanQty": 1200,
+      "class2PlanQty": 0,
       "class3PlanQty": 0,
       "class4PlanQty": 0,
       "class5PlanQty": 0,

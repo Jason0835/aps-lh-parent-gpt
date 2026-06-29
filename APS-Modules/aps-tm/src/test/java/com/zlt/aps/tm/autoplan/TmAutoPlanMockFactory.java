@@ -139,6 +139,8 @@ public class TmAutoPlanMockFactory {
         when(paramsMapper.selectList(any())).thenReturn(nullToEmpty(scenario.getParams()));
         when(machineInfoMapper.selectList(any())).thenReturn(nullToEmpty(scenario.getMachineInfos()));
         when(dataLoadMapper.selectFormingDemandRows(any(), any())).thenReturn(nullToEmpty(scenario.getCxScheduleResults()));
+        when(dataLoadMapper.selectExperimentSpecMonthPlanRows(any(), any(), any(), any()))
+                .thenReturn(nullToEmpty(scenario.getExperimentSpecMonthPlans()));
         when(stockMapper.selectList(any())).thenReturn(nullToEmpty(scenario.getStocks()));
         when(scheduleResultMapper.selectList(any())).thenReturn(resolveHistoryScheduleResults(scenario));
         when(dataLoadMapper.selectWorkCalendarRows(any(), any(), any())).thenAnswer(invocation ->

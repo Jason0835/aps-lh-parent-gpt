@@ -72,7 +72,7 @@ public class Cd90MultiShiftScheduleExecutor {
             // 每班重新读取需求、库存和库排，不能复用首班输入，否则滚动数据变化无法生效。
             Cd90AutoScheduleInput input = inputService.load(
                     context.getFactoryCode(), context.getScheduleDate(),
-                    shift.getClassField(), shift.getShiftCode());
+                    shift.getClassField(), shift.getShiftCode(), context.getParameters().getAgingPeriodHours());
             if (rolling == null) {
                 // 仅首班使用6点库排建立基线，后续班次都从同一滚动上下文重建资源。
                 rolling = rollingContextManager.initialize(input.getStorageLanesAtSix());
@@ -85,6 +85,8 @@ public class Cd90MultiShiftScheduleExecutor {
                     rolling, shift, buildCurlLengthByCloth(input, context.getParameters().getRollCoilMeter()),
                     context.getParameters().getRollCoilMeter(), context.getParameters().getRollTotalCount(),
                     Collections.emptyList());
+            initialState.setBigRollAgingStocks(rollingContextManager.restoreBigRollAllocations(
+                    rolling, input.getBigRollAgingStocks()));
             // 单班执行只修改当前班的内存副本；完成后才推进跨班滚动状态。
             Cd90ShiftExecutionResult result = singleShiftScheduleService.execute(
                     context, input, shift, initialState, rolling);

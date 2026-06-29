@@ -32,7 +32,7 @@ public class TmNewSpecInfo {
     /** 前一天库存日期 */
     private Date previousStockDate;
 
-    /** 前一天净库存，口径为库存数量减不良数量减调整数量 */
+    /** 前一天净库存，口径为库存数量减不良数量加调整数量 */
     private BigDecimal previousDayStockQty;
 
     /** 前一天是否存在有效库存 */

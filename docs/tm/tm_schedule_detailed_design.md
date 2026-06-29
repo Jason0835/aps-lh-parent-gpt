@@ -50,9 +50,10 @@
 
 - `result_id`：结果ID，关联 `T_TM_SCHEDULE_RESULT.id`
 - `batch_no`：批次号
-- `base_demand_qty`：基础需求量
+- `base_demand_qty`：库存抵扣后的基础应排需求量（`max(currentShiftDemandQty - rollingStockQty, guardDemandQty - rollingStockQty, 0)`）
+- `required_qty`：库存抵扣前当前班成型胎面需求量，取 `currentShiftDemandQty`；旧骨架任务缺失该字段时回退 `demandQty`
 - `loss_add_qty`：损耗补偿量
-- `stock_deduct_qty`：库存抵扣量，本次库存实际冲减当前班生产量的值（`min(剩余库存, max(当前班需求, 保证范围需求))`），取自上下文 `remainingStockMap` 逐班递减
+- `stock_deduct_qty`：库存抵扣量，本次库存实际冲减当前任务毛需求的值（`min(rollingStockQty, max(currentShiftDemandQty, guardDemandQty))`），其中 `rollingStockQty` 为当前任务班初滚动库存
 - `last_shift_supply_qty`：上班覆盖量
 - `month_surplus_deduct_qty`：月剩余抵扣量
 - `tool_limit_adjust_qty`：工装约束调整量
@@ -61,8 +62,8 @@
 - `capacity_adjust_qty`：产能均衡补正量
 - `final_plan_qty`：最终计划量
 - `calc_formula_desc`：计划量计算公式说明
-- `stock_qty`：6 点库存净值，库存抵扣池初值来源
-- `plan_stock_qty`：抵扣后该胎面剩余库存（`remainingStockMap` 当前值）
+- `stock_qty`：6 点库存净值，库存预测来源
+- `plan_stock_qty`：当前任务完成后的交接班预计库存（`max(rollingStockQty + finalPlanQty - currentShiftDemandQty, 0)`）
 - `supply_hours`、`coverage_shift_count`：库存供应时长、库存最低保证班数
 - `rule_hit_json`：命中规则明细，记录参数编码、参数值、规则表来源、是否使用默认值，并保留 `sourceOrderNos` 等来源成型工单追踪信息
 - `candidate_machine_json`：候选机台明细，记录候选机台、过滤原因、排序和评分
@@ -196,21 +197,24 @@
 - `TM_NORMAL_ROUND_RULE`：常规取整规则
 - `TM_LARGE_SMALL_THRESHOLD`：大小批量阈值
 - `TM_MIN_STOCK_CLASS`：库存最低保证班数。用于控制自动排程至少保障当前班及后续若干班的胎面供应；缺省值按 1 班处理，并在解释信息中记录使用默认值。代码参数常量对齐为 `TM_MIN_STOCK_CLASS`（与 `t_tm_params` 表实际参数名一致）。
-- `TM_DEDUCT_PRIORITY`：需求抵扣优先级。用于后续配置库存余额、前序已排计划量等抵扣项的执行顺序；当前默认抵扣链只使用 6 点库存滚动余额和当前排程链前序胎面计划量，未定义来源的数据不进入默认公式。
+- `TM_DEDUCT_PRIORITY`：需求抵扣优先级。用于后续配置库存余额、前序已排计划量等抵扣项的执行顺序；当前默认抵扣链使用首班 14 点预计库存并按交接班库存逐班滚动，未定义来源的数据不进入默认公式。
 - `TM_ROLLING_SHIFT_COUNT`：局部滚动重算班次数，默认 3
 - `TM_MAX_LOOKAHEAD_SHIFT_COUNT`：需求前瞻班次数
 - `TM_ALGORITHM_SWITCH`：需求量计算类型，1=算法1,2=算法2
 - `TM_NEW_SPEC_LOOKBACK_DAYS`：新规格历史排程回看天数，默认 7。用于按 `factoryCode + treadCode + scheduleDate` 判断排程日前 N 天内是否已有胎面排程计划量。
 - `TM_NEW_SPEC_ADVANCE_SHIFT_COUNT`：新规格提前排产班次数，默认 2。只在当前实现计算出的正常目标班次基础上前移，不修改成型班次到胎面班次的既有映射口径。
+- `TM_FORMING_SHIFT_OFFSET`：胎面需求计算时，胎面班次到成型班次的偏移量，默认 2。胎面 `CLASS{N}` 对应成型 `CLASS{N + TM_FORMING_SHIFT_OFFSET}`；配置 0 表示同序号班次，未配置、空值、非数字或负数按默认 2 处理，超过成型 `CLASS8` 的班次按 0 处理。
+- `TM_EXPERIMENT_SPEC_LOOKBACK_DAYS`：实验规格月计划回看天数，默认 5。执行排程日期 `D` 时，查询 `D-N` 的月计划定稿实验记录。
+- `TM_EXPERIMENT_SPEC_PLAN_QTY`：实验规格胎面计划量，默认 30，单位米。月计划 `DAY_x > 0` 只作为实验规格命中条件，不按月计划数量放大胎面计划量。
 
 ### 4.11 `T_TM_STOCK`
 
 作用：维护胎面库存。自动排程通过 `stock_date + tread_code` 获取库存数量，当前口径下该库存值代表当日 6 点库存快照，建议在代码或接口对象中命名为 `sixClockStockQty`，解释表仍可落到 `stock_qty`。
 
 说明：
-- 库存预测以 6 点库存作为滚动计算起点。
-- 库存直接抵扣当前班生产量：6 点库存净值（`sixClockStockQty = stock_qty - bad_qty - adjust_qty`）作为库存抵扣池初值，存于排程上下文 `remainingStockMap`（key=胎面编码），逐班递减。同一胎面按班次顺序（`shiftOrder` 升序）依次冲减，扣完为止，避免同一库存被多班重复抵扣。
-- 库存抵扣与"库存保证缺口"口径分离：保证缺口仍使用 14 点预计库存（`rollingStockQty`）判断保证范围内是否断供；库存抵扣使用 `remainingStockMap`（初值 6 点库存净值）冲减当前班生产量，两者不可共用同一变量。
+- 库存预测以 6 点库存作为基础，先计算首个胎面班次的 14 点预计库存：`rollingStockQty = sixClockStockQty - firstShiftDemandQty + firstShiftPlanQty`。
+- `remainingStockMap` 保存同一胎面的班初滚动库存状态，初值为 14 点预计库存；每个任务计算前写入 `task.rollingStockQty`，任务完成后按 `planStockQty = max(rollingStockQty + finalPlanQty - currentShiftDemandQty, 0)` 回写，供下一班继续使用。
+- 库存抵扣、当前班缺口和库存保证缺口统一使用当前任务的 `rollingStockQty`，避免同一胎面跨班重复使用固定库存快照。
 - `已计划入库量`、`已占用量` 的数据来源尚未定义，本版不参与库存公式；后续明确来源后再纳入扩展抵扣或修正项。
 
 ## 5. 班次建模
@@ -248,7 +252,7 @@
 
 - `TmPlanBootstrapService`：生成 `batch_no`、`trace_id`，加载全局上下文。
 - `TmInventoryPredictService`：读取 `T_TM_STOCK` 和损耗设置，计算预计库存和供应时长。
-- `TmPlanCalcService`：计算计划量、预计划、收尾、小批量补卷等。计划量计算前从库存预测初始化 per-tread 剩余库存 `remainingStockMap`（初值6点库存净值），并按胎面编码、班次顺序稳定排序，保证库存逐班递减抵扣。
+- `TmPlanCalcService`：计算计划量、预计划、收尾、小批量补卷等。计划量计算前从库存预测初始化 per-tread 班初滚动库存 `remainingStockMap`（初值14点预计库存），并按胎面编码、班次顺序稳定排序，任务完成后回写交接班预计库存。
 - `TmMachineAssignService`：基于机台、口型板、定点/禁排、胶料机台关系筛选候选机台；选中机台后按 `machineCode + shiftOrder` 计算剩余产能，当前班产能不足时先压缩本班计划量，剩余计划量优先由同班次其他匹配且有剩余产能的机台承接；该班次所有匹配机台均不足时，再滚动到后续班次并继续按匹配机台剩余产能分配。全部候选机台被过滤时，按候选 `filterReasonCode` 归类未排原因：全部 `NO_REMAIN_CAPACITY`→`CAPACITY_NOT_ENOUGH`，全部 `MOUTH_PLATE_NOT_MATCH`→`MOUTH_PLATE_NOT_MATCH`，全部 `GLUE_MACHINE_NOT_MATCH`→`GLUE_MACHINE_NOT_ALLOWED`，`MACHINE_DISABLED`/定点规则/混合原因→`NO_AVAILABLE_MACHINE` 兜底。
 - `TmCapacityBalanceService`：做产能均衡、中夜班移量、次日回拉和任务顺序计算。当前本轮不实现生产级产能均衡算法，仅保留流程占位和风险记录。
 - `TmSnapshotBuildService`：生成 `T_TM_SCHEDULE_RESULT_EXPLAIN`。
@@ -273,6 +277,7 @@
 
 - 成型计划：`T_CX_SCHEDULE_RESULT`（通过 `schedule_date` + `factory_code` 查询）
 - BOM施工信息：`T_MDM_CONSTRUCTION_INFO`（通过 `EMBRYO_CODE + BOM_DATA_VERSION` 关联 `CONSTRUCTION_CODE + CONSTRUCTION_VERSION`）
+- 实验规格月计划：`T_MP_MONTH_PLAN_PROD_FINAL`（通过 `factory_code + year_month + DAY_x + CONSTRUCTION_STAGE='01'` 查询排程日前 N 天的月计划定稿实验记录，再通过 `EMBRYO_CODE -> T_MDM_CONSTRUCTION_INFO.CONSTRUCTION_CODE` 映射胎面基础资料）
 - 胎面标准长度：`T_MDM_CONSTRUCTION_INFO.TREAD_SHOULDER_LENGTH`（单位：米，成型生产一个胎胚需要多少米的胎面量）
 - 胎面口型板：`T_MDM_CONSTRUCTION_INFO.TREAD_MOUTH_PLATE`
 - 卷曲长度：`T_TM_CURL_ROLL.CURL_LENGTH`（优先取胎面卷曲长度，没有时取参数默认值；卷曲长度是指一个工装能卷曲多少米的胎面）
@@ -327,28 +332,41 @@
 
 - 待排规格排序使用 `PriorityQueue<TmTaskDraft>` 或等价优先队列，比较器顺序为强紧急、库存紧急度、同在产胶料、胶料优先级、基部胶相似度、口型聚集、稳定兜底。稳定兜底按 `treadCode`、`machineCode` 等固定字段升序，保证相同输入重复运行结果一致。
 - 候选机台先通过责任链过滤硬约束，再通过评分策略排序。硬约束包括不开班、停用、整班检修、口型不匹配、胶料不允许、禁排机台、产能不足。评分项包括剩余产能、同胶料、同口型、切换成本、稳定兜底。
-- 运行态上下文使用 `Map<String, TmParamValue>` 保存参数快照，使用 `Map<String, MachineRuntimeState>` 保存机台剩余产能、链尾胶料、链尾口型、下一可开工时间，使用 `Map<MachineShiftKey, ScheduleTaskLinkedList<TmTaskDraft>>` 保存任务链，使用 `Map<String, BigDecimal> remainingStockMap` 保存胎面剩余可抵扣库存（初值6点库存净值，逐班递减）。
+- 运行态上下文使用 `Map<String, TmParamValue>` 保存参数快照，使用 `Map<String, MachineRuntimeState>` 保存机台剩余产能、链尾胶料、链尾口型、下一可开工时间，使用 `Map<MachineShiftKey, ScheduleTaskLinkedList<TmTaskDraft>>` 保存任务链，使用 `Map<String, BigDecimal> remainingStockMap` 保存胎面班初滚动库存状态（初值14点预计库存，逐班回写交接班库存）。
 
 #### 7.4.1 库存直接抵扣当前班生产量
 
 计划量计算在基础需求环节新增"库存抵扣"步骤，位于收尾判断之前，公式为：
 
 - `grossDemand = max(currentShiftDemandQty, guardDemandQty)`：取当前班需求与保证范围需求的较大值。
-- `stockDeductQty = min(stock, grossDemand)`：本次实际抵扣量，`stock` 取自 `remainingStockMap`（per-tread，逐班递减）。
-- `baseDemandQty = max(currentShiftDemandQty - stock, guardDemandQty - stock, 0)`：库存对当前班需求与保证范围需求各冲减后取大，不低于 0。
-- 回写 `remainingStockMap`：`stock = stock - stockDeductQty`，供该胎面下一班继续抵扣。
+- `stockDeductQty = min(rollingStockQty, grossDemand)`：本次实际抵扣量，`rollingStockQty` 为当前任务班初滚动库存。
+- `baseDemandQty = max(currentShiftDemandQty - rollingStockQty, guardDemandQty - rollingStockQty, 0)`：库存对当前班需求与保证范围需求各冲减后取大，不低于 0。
+- 回写 `remainingStockMap`：`planStockQty = max(rollingStockQty + finalPlanQty - currentShiftDemandQty, 0)`，供该胎面下一班作为班初滚动库存。
 
-后续链路在 `baseDemandQty` 上继续：收尾判断 → 损耗补偿 → 工装限制 → 最小起排 → 卷数取整 → 产能压缩。库存抵扣后 `baseDemandQty` 为 0 时，最小起排不再补足，该班生成 0 计划量任务并保留落库。`TmGuardDemandQtyStrategy`/`TmNextShiftDemandQtyStrategy` 的需求量（`demandQty`，用于排序/解释）保持毛需求语义，不被库存抵扣拉低；库存抵扣只作用于计划量侧。
+后续链路在 `baseDemandQty` 上继续：收尾判断 → 损耗补偿 → 工装限制 → 最小起排 → 卷数取整 → 产能压缩。库存抵扣后 `baseDemandQty` 为 0 时，最小起排不再补足，该班生成 0 计划量任务并保留落库。`TmGuardDemandQtyStrategy`/`TmNextShiftDemandQtyStrategy` 的需求量（`demandQty`，用于排序/解释）使用库存缺口语义：`demandQty = max(currentShiftStockGapQty, stockGapQty)`。
 
 #### 7.4.2 新规格提前排产窗口
 
 新规格提前排产只调整任务进入待排班次的时机，不改变 `BOOTSTRAP -> INVENTORY_PREDICT -> PLAN_CALC -> TASK_SORT -> MACHINE_ASSIGN -> SNAPSHOT_BUILD` 的主链路，也不绕过口型、胶料、定点/禁排、产能、最小起排量、卷曲取整、收尾和未排逻辑。
 
-判定口径：按 `factoryCode + treadCode + scheduleDate` 查询排程日前一天 `T_TM_STOCK`，净库存使用 `stock_qty - bad_qty - adjust_qty`，无记录或净库存小于等于 0 视为前一天无有效库存；再按 `[scheduleDate - TM_NEW_SPEC_LOOKBACK_DAYS, scheduleDate - 1]` 查询 `T_TM_SCHEDULE_RESULT`，任一班次计划量大于 0 视为已有历史排程。两项同时满足“无有效库存、无历史排程”时判定为新规格。历史排程查询必须带工厂维度，并显式排除 `is_delete = 1` 的历史结果，避免已删结果误判。
+判定口径：按 `factoryCode + treadCode + scheduleDate` 查询排程日前一天 `T_TM_STOCK`，净库存使用 `stock_qty - bad_qty + adjust_qty`，无记录或净库存小于等于 0 视为前一天无有效库存；再按 `[scheduleDate - TM_NEW_SPEC_LOOKBACK_DAYS, scheduleDate - 1]` 查询 `T_TM_SCHEDULE_RESULT`，任一班次计划量大于 0 视为已有历史排程。两项同时满足“无有效库存、无历史排程”时判定为新规格。历史排程查询必须带工厂维度，并显式排除 `is_delete = 1` 的历史结果，避免已删结果误判。
 
-提前窗口：先按当前实现计算出正常目标班次 `normalTargetShift`，不修正常规规格的班次映射；若命中新规格，则目标班次调整为 `max(CLASS1, normalTargetShift - TM_NEW_SPEC_ADVANCE_SHIFT_COUNT)`。解释对象记录 `normalTargetShift`、`adjustedTargetShift`、`adjustedTargetWindow`、需求班次和需求量。非新规格仍使用原 `shiftOrder`，规则只记录检测证据。
+提前窗口：先按 `TM_FORMING_SHIFT_OFFSET` 计算成型需求偏移后的正常目标班次 `normalTargetShift`，不改变需求量对应的成型班次口径；若命中新规格，则目标班次调整为 `max(CLASS1, normalTargetShift - TM_NEW_SPEC_ADVANCE_SHIFT_COUNT)`。`TM_NEW_SPEC_ADVANCE_SHIFT_COUNT` 只影响新规格提前排产目标班次，不替代或覆盖 `TM_FORMING_SHIFT_OFFSET`。解释对象记录 `normalTargetShift`、`adjustedTargetShift`、`adjustedTargetWindow`、需求班次和需求量。非新规格仍使用原 `shiftOrder`，规则只记录检测证据。
 
 分配规则：新规格任务仍进入现有 `MACHINE_ASSIGN`，由机台剩余产能承接。提前窗口内产能不足时，沿用现有同班次多机台拆分和后续班次滚动逻辑；滚动到 6 班后仍不足的数量写未排。解释表 `rule_hit_json` 增加 `NEW_SPEC_DETECT`、`NEW_SPEC_ADVANCE_WINDOW`、`NEW_SPEC_ADVANCE_RESULT`：分别记录判定依据、目标班次调整依据和实际机台分配/滚动结果。
+
+#### 7.4.3 实验规格补充需求
+
+实验规格补充需求发生在数据加载阶段，位于成型需求加载之后、库存预测和计划量计算之前。该规则只补充胎面待排任务，不修改自动排程模板主链路，后续仍统一经过 `PLAN_CALC -> TASK_SORT -> MACHINE_ASSIGN -> SNAPSHOT_BUILD`，继续复用库存、损耗、工装、最小起排、口型、胶料、产能、未排和落库逻辑。
+
+判定口径：执行排程日期 `D` 时，读取参数 `TM_EXPERIMENT_SPEC_LOOKBACK_DAYS`，缺省值为 5，计算实验月计划日期 `D-N`。按 `factoryCode + yearMonth(D-N) + DAY_day(D-N)` 查询 `T_MP_MONTH_PLAN_PROD_FINAL`，只保留 `CONSTRUCTION_STAGE = '01'` 且对应 `DAY_x > 0` 的月计划定稿记录。`DAY_x` 只表示该日期存在实验规格需求，不参与计划量放大。
+
+胎面映射：月计划记录通过 `EMBRYO_CODE -> T_MDM_CONSTRUCTION_INFO.CONSTRUCTION_CODE` 映射胎面编码、肩长、口型板和胶料信息；同一胎胚存在多个有效施工版本时，默认取最新有效记录。若命中的实验月计划无法映射到完整胎面基础资料，按现有数据校验路径中断排程并抛出明确异常，不静默跳过。
+
+任务生成：读取参数 `TM_EXPERIMENT_SPEC_PLAN_QTY`，缺省值为 30 米。若排程日 `D` 当天已存在同 `treadCode` 的一班任务，则把实验规格计划量叠加到最早一班任务的 `currentShiftDemandQty`、`guardDemandQty`、`demandQty`，并追加入来源月计划记录；若不存在同胎面任务，则新增一条一班独立任务，`orderNo` 使用 `EXP-<月计划ID或工单号>-CLASS1`，`businessKeySuffix` 带实验来源，避免解释表按业务键覆盖。
+
+解释证据：解释表 `rule_hit_json` 增加 `EXPERIMENT_SPEC_DETECT` 和 `EXPERIMENT_SPEC_PLAN_QTY`。前者记录实验月计划日期、回看天数及来源、月计划 ID、月计划工单、胎胚编码、月计划 `DAY_x` 值、是否合并到已有任务；后者记录实验规格计划量、参数来源、最终任务计划量和当前班/保证范围需求量。
+
 ### 7.5 类与方法说明要求
 
 后续 Java 实现时，每个新增类和核心方法必须写中文注释，说明具体作用、参数传法、返回值、异常场景和是否修改任务链。
@@ -757,11 +775,13 @@ Output:
 
 Step4 计算胎面每班需求量
 Load Data:
-  TmParams(TM_ALGORITHM_SWITCH)
+  TmParams(TM_ALGORITHM_SWITCH, TM_FORMING_SHIFT_OFFSET)
 Process:
-  需求量计算公式：胎面需求量 = 成型计划 class{N}_plan_qty × TREAD_SHOULDER_LENGTH（胎面标准长度）
-  如果参数选择算法1（TM_ALGORITHM_SWITCH=1），则胎面每班需求量 = 成型三班最大计划量 × TREAD_SHOULDER_LENGTH；
-  如果参数选择算法2（TM_ALGORITHM_SWITCH=2），则胎面每班需求量 = 下个班成型计划量 × TREAD_SHOULDER_LENGTH；
+  成型班次偏移量 `TM_FORMING_SHIFT_OFFSET` 默认 2，未配置、空值、非数字或负数按 2 处理，配置 0 表示胎面班次与成型班次同序号；
+  胎面 `CLASS{N}` 的需求起点成型班次 = 成型 `CLASS{N + TM_FORMING_SHIFT_OFFSET}`，超过成型 `CLASS8` 的计划量按 0 处理；
+  如果参数选择算法1（TM_ALGORITHM_SWITCH=1），则胎面每班需求量 = 从需求起点开始连续 3 个成型班次最大计划量 × TREAD_SHOULDER_LENGTH；例如默认偏移 2 时，胎面 CLASS1 使用 MAX(成型 CLASS3, CLASS4, CLASS5)；
+  如果参数选择算法2（TM_ALGORITHM_SWITCH=2），则胎面每班需求量 = 需求起点单个成型班次计划量 × TREAD_SHOULDER_LENGTH；例如默认偏移 2 时，胎面 CLASS1 使用成型 CLASS3；
+  库存最低保证范围需求从同一个需求起点开始累计，避免库存缺口和当前班需求使用不同班次口径；
   计算每个胎面规格在 6 个班中的需求量。
 Output:
   ShiftDemandQtyMap(tread_code, shift_code, demand_qty)
@@ -792,7 +812,7 @@ Output:
 
 Step7 计算库存保证班数和库存供应成型时长
 Process:
-  参数 TM_STOCK_GUARD_SHIFT_COUNT 表示库存最低保证班数，缺省值为 2 班，保证范围包含当前班，即当前班 + 后续 N-1 班；
+  参数 TM_MIN_STOCK_CLASS 表示库存最低保证班数，缺省值为 1 班，保证范围包含当前班，即当前班 + 后续 N-1 班；
   guardDemandQty = 保证范围内成型胎面需求量合计；
   currentShiftDemandQty = 当前班成型胎面需求量；
   从当前班开始顺次检查库存，每满足一个班的成型消耗，库存满足成型消耗的班数加 1；
@@ -831,10 +851,12 @@ Output:
 
 Step10 计算需排产量
 Process:
+  currentShiftStockGapQty = max(currentShiftDemandQty - rollingStockQty, 0)；
   stockGapQty = max(guardDemandQty - rollingStockQty, 0)；
-  baseDemandQty = max(currentShiftDemandQty, stockGapQty)；
+  demandQty = max(currentShiftStockGapQty, stockGapQty)；
+  baseDemandQty = max(currentShiftDemandQty - rollingStockQty, guardDemandQty - rollingStockQty, 0)；
   如果库存足够覆盖最低保证班数，则 baseDemandQty 允许为 0，后续只按其他业务规则补量；
-  抵扣优先级通过 TM_DEDUCT_PRIORITY 扩展，当前默认抵扣项只使用 6 点库存滚动余额和已排入当前排程链的前序胎面计划量；
+  抵扣优先级通过 TM_DEDUCT_PRIORITY 扩展，当前默认抵扣项使用首班 14 点预计库存并按交接班库存逐班滚动；
   月结余、上班供应量等字段如数据源未明确，仅保留解释字段，不参与公式。
 Output:
   NeedQtyResult(tread_code, shift_code, guard_demand_qty, stock_gap_qty, base_demand_qty)
@@ -889,7 +911,7 @@ Output:
 Step15 选择机台并扣减产能
 Process:
   只对过滤通过的候选机台评分，总分越高越优先；
-  默认评分项和权重：剩余产能适配 35、主胶料连续 20、基部胶相似 15、同口型连续 10、切换成本 10、定点生产 10；
+  默认评分项和权重：剩余产能适配 10、主胶料连续 10、基部胶相似 8、同口型连续 10、切换成本 10、定点生产 10；
   主胶料连续：链尾主胶料与当前任务主胶料相同，加最高连续分；
   基部胶相似：主胶料不同但基部胶相同个数越多分越高；如果只能取得一个基部胶编码，则匹配个数退化为 0 或 1；
   同口型连续：链尾口型与当前任务口型相同加分；
@@ -1266,8 +1288,8 @@ Output:
 
 - 旧批次覆盖：同一 `factory_code + schedule_date` 无旧结果允许生成；旧结果全部未发布时前端确认后允许重新生成；存在任一非未发布结果时拒绝生成。
 - 库存计算起点：使用 6 点库存作为滚动库存起点；如 `T_TM_STOCK` 当前只有日期维度，则该日期库存代表 6 点库存快照。
-- 库存最低保证班数：参数 `TM_STOCK_GUARD_SHIFT_COUNT` 缺省按 2 班，保证范围包含当前班，即当前班 + 后续 N-1 班。
-- 需求量公式：`baseDemandQty = max(当前班需求, 保证范围库存缺口)`；库存足够覆盖保证范围时，计划量允许为 0。
+- 库存最低保证班数：参数 `TM_MIN_STOCK_CLASS` 缺省按 1 班，保证范围包含当前班，即当前班 + 后续 N-1 班。
+- 需求量公式：`currentShiftStockGapQty = max(currentShiftDemandQty - rollingStockQty, 0)`，`stockGapQty = max(guardDemandQty - rollingStockQty, 0)`，`demandQty = max(currentShiftStockGapQty, stockGapQty)`；计划量基础需求为 `baseDemandQty = max(currentShiftDemandQty - rollingStockQty, guardDemandQty - rollingStockQty, 0)`。
 - 插单第二个在产规格：判定范围为同排程日期、同机台、同班次、第二顺序之后。
 - 事务边界：自动排程结果、未排结果、解释表、调度日志在同一事务内处理，任一失败整批回滚。
 - MES 发布：本轮仍按简单状态处理，真实 MES 发布行为后续单独接入。
@@ -1795,8 +1817,8 @@ graph LR
 - `ITmDemandQtyStrategy`：胎面需求量算法策略。
   - `String getAlgorithmCode()`：返回算法编码，例如 `1`、`2`。
   - `TmDemandQtyResult calculate(TmDemandQtyInput input, TmScheduleContext context)`：计算需求量。`input` 传成型计划、胎面长度、班次；`context` 传参数和日志上下文；返回每班需求量。
-  - 默认实现应支持库存最低保证班数：读取 `TM_STOCK_GUARD_SHIFT_COUNT`，缺省 2 班；计算 `guardDemandQty`、`currentShiftDemandQty`、`stockGapQty` 和 `baseDemandQty`；未来需求为 0 时不得除零，供应时长标记为空或 `NO_FUTURE_DEMAND`。
-  - 抵扣优先级通过 `TM_DEDUCT_PRIORITY` 扩展，当前默认抵扣链只使用 6 点库存滚动余额和当前排程链前序胎面计划量，不使用来源未定义字段。
+  - 默认实现应支持库存最低保证班数：读取 `TM_MIN_STOCK_CLASS`，缺省 1 班；计算 `guardDemandQty`、`currentShiftDemandQty`、`currentShiftStockGapQty`、`stockGapQty` 和 `demandQty`；未来需求为 0 时不得除零，供应时长标记为空或 `NO_FUTURE_DEMAND`。
+  - 抵扣优先级通过 `TM_DEDUCT_PRIORITY` 扩展，当前默认抵扣链使用首班 14 点预计库存并按交接班库存逐班滚动，不使用来源未定义字段。
 
 - `ITmPlanQtyStrategy`：胎面计划量算法策略。
   - `TmPlanQtyResult calculate(TmTaskDraft draft, TmScheduleContext context)`：计算计划量。`draft` 传待排任务；返回基础需求、库存抵扣、损耗、工装限制、收尾补正、最终计划量。
@@ -1813,7 +1835,7 @@ graph LR
 
 - `ITmMachineScoreStrategy`：胎面机台评分策略。
   - `TmMachineScoreResult score(TmMachineCandidate candidate, TmMachineRuleContext context)`：对候选机台评分。返回评分项和总分。
-  - 默认评分权重：剩余产能适配 35、主胶料连续 20、基部胶相似 15、同口型连续 10、切换成本 10、定点生产 10。
+  - 默认评分权重：剩余产能适配 10、主胶料连续 10、基部胶相似 8、同口型连续 10、切换成本 10、定点生产 10。
   - 同胶料连续优先判断链尾主胶料与当前任务主胶料是否相同；主胶料不同但基部胶相同个数越多分越高；如果只能拿到一个基部胶编码，则相同个数退化为 0 或 1。
   - 完全同分时按机台编码升序排序，保证同输入结果稳定。
 

@@ -17,12 +17,8 @@ public final class Cd90AutoScheduleParamCode {
     public static final String CRIMP_LENGTH = "SYS0701011";
     /** 需求计算方式：AVERAGE（按班次平均值）或 SUM（各班需求相加）。 */
     public static final String DEMAND_CALC_MODE = "SYS0701012";
-    /** 成型需求窗口班数：计算需排产量时向前取多少个班的成型计划。 */
-    public static final String DEMAND_WINDOW = "SYS0701013";
     /** 直裁排程输出窗口班数：一次排程输出多少班的排产结果，取值 1~6。 */
     public static final String SCHEDULE_WINDOW = "SYS0701014";
-    /** 库存保证班数：库存能保证供应的班数大于此值时，当前直裁班次无需排该规格。 */
-    public static final String STOCK_GUARANTEE_SHIFTS = "SYS0701015";
     /** 每班大卷切换提醒次数：切换超过此数时仅记录告警日志，不限制排产。 */
     public static final String MAX_ROLL_CHANGE_PER_SHIFT = "SYS0701016";
     /** 最小起排量（米）：非收尾规格排产量低于此值时自动补足。 */
@@ -57,6 +53,8 @@ public final class Cd90AutoScheduleParamCode {
     public static final String SPECIAL_ROLL_EXTRA_STOCK_LIMIT = "SYS0701030";
     /** 非收尾部分排最小车数：库排不足时，实际分配车数达到该值才允许提交部分排。 */
     public static final String PARTIAL_MIN_VEHICLE_COUNT = "SYS0701031";
+    /** 大卷静置成熟时长，单位小时，默认 24。 */
+    public static final String AGING_PERIOD_LIMIT = "SYS0701032";
     /** 通用损耗率兜底（百分比）：t_cd90_loss_setting 四层优先级均未命中时使用，对应参数 LOSS_RATE。 */
     public static final String LOSS_RATE = "SYS0701003";
 
@@ -64,9 +62,7 @@ public final class Cd90AutoScheduleParamCode {
             EQUAL_SHARE_THRESHOLD,
             CRIMP_LENGTH,
             DEMAND_CALC_MODE,
-            DEMAND_WINDOW,
             SCHEDULE_WINDOW,
-            STOCK_GUARANTEE_SHIFTS,
             MAX_ROLL_CHANGE_PER_SHIFT,
             MIN_START_QTY,
             MACHINE_PRIORITY,
@@ -83,6 +79,7 @@ public final class Cd90AutoScheduleParamCode {
             SPECIAL_ROLL_LOOKAHEAD_SHIFTS,
             SPECIAL_ROLL_EXTRA_STOCK_LIMIT,
             PARTIAL_MIN_VEHICLE_COUNT,
+            AGING_PERIOD_LIMIT,
             LOSS_RATE
     ));
 

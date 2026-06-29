@@ -31,6 +31,19 @@
         <result column="THREE_SHIFT_FLAG" property="threeShiftFlag"/>
     </resultMap>
 
+    <resultMap id="TmExperimentSpecMonthPlanRowResult" type="com.zlt.aps.tm.domain.vo.TmExperimentSpecMonthPlanRowVo">
+        <result column="MONTH_PLAN_ID" property="monthPlanId"/>
+        <result column="PRODUCTION_NO" property="productionNo"/>
+        <result column="FACTORY_CODE" property="factoryCode"/>
+        <result column="EXPERIMENT_PLAN_DATE" property="experimentPlanDate"/>
+        <result column="DAY_QTY" property="dayQty"/>
+        <result column="EMBRYO_CODE" property="embryoCode"/>
+        <result column="CONSTRUCTION_STAGE" property="constructionStage"/>
+        <result column="TREAD_CODE" property="treadCode"/>
+        <result column="TREAD_SHOULDER_LENGTH" property="treadShoulderLength"/>
+        <result column="TREAD_MOUTH_PLATE" property="treadMouthPlate"/>
+        <result column="TREAD_RUBBER_CATEGORY" property="treadRubberCategory"/>
+    </resultMap>
     <select id="selectFormingDemandRows" resultMap="TmFormingDemandRowResult">
         SELECT cx.ORDER_NO,
                cx.EMBRYO_CODE,
@@ -59,6 +72,37 @@
           AND cx.SCHEDULE_DATE = #{scheduleDate}
     </select>
 
+    <select id="selectExperimentSpecMonthPlanRows" resultMap="TmExperimentSpecMonthPlanRowResult">
+        SELECT final_plan.ID AS MONTH_PLAN_ID,
+               final_plan.PRODUCTION_NO,
+               final_plan.FACTORY_CODE,
+               #{experimentPlanDate} AS EXPERIMENT_PLAN_DATE,
+               final_plan.${dayColumn} AS DAY_QTY,
+               final_plan.EMBRYO_CODE,
+               final_plan.CONSTRUCTION_STAGE,
+               construction_info.TREAD_CODE,
+               construction_info.TREAD_SHOULDER_LENGTH,
+               construction_info.TREAD_MOUTH_PLATE,
+               construction_info.TREAD_RUBBER_CATEGORY
+        FROM T_MP_MONTH_PLAN_PROD_FINAL final_plan
+                 LEFT JOIN (
+                     SELECT ranked_info.*
+                     FROM (
+                              SELECT ci.*,
+                                     ROW_NUMBER() OVER (PARTITION BY ci.CONSTRUCTION_CODE ORDER BY ci.UPDATE_TIME DESC, ci.ID DESC) AS rn
+                              FROM T_MDM_CONSTRUCTION_INFO ci
+                              WHERE ci.IS_DELETE = 0
+                          ) ranked_info
+                     WHERE ranked_info.rn = 1
+                 ) construction_info
+                           ON final_plan.EMBRYO_CODE = construction_info.CONSTRUCTION_CODE
+        WHERE final_plan.FACTORY_CODE = #{factoryCode}
+          AND final_plan.YEAR_MONTH = #{yearMonth}
+          AND final_plan.CONSTRUCTION_STAGE = '01'
+          AND final_plan.IS_DELETE = 0
+          AND final_plan.${dayColumn} > 0
+        ORDER BY final_plan.PRODUCTION_SEQUENCE, final_plan.ID
+    </select>
     <select id="selectWorkCalendarRows" resultMap="TmWorkCalendarRowResult">
         SELECT DAY_FLAG,
                ONE_SHIFT_FLAG,

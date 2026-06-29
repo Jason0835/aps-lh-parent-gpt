@@ -120,6 +120,11 @@ public class ProductionCapacityParamConfiguration {
      */
     private boolean addChangeMoldCountBySameSpecificationsPattern;
     /**
+     * SYS0203017
+     * 同机台是否允许结构二次上机
+     */
+    private boolean secondOnLineBySameCxMachine;
+    /**
      * 最小批量值
      */
     private Integer minQty;

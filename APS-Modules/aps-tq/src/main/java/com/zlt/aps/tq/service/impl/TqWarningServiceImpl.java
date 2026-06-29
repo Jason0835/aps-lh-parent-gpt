@@ -3,11 +3,11 @@ package com.zlt.aps.tq.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.zlt.aps.maindata.enums.MsgTemplateEnums;
 import com.zlt.aps.maindata.utils.MessageServiceUtils;
-import com.zlt.aps.tq.api.domain.entity.TqNewScheduleResult;
+import com.zlt.aps.tq.api.domain.entity.TqScheduleResult;
 import com.zlt.aps.tq.api.domain.entity.TqScheFinishQty;
 import com.zlt.aps.tq.api.domain.entity.TqStock;
 import com.zlt.aps.tq.entity.TqParams;
-import com.zlt.aps.tq.mapper.TqNewScheduleResultMapper;
+import com.zlt.aps.tq.mapper.TqScheduleResultMapper;
 import com.zlt.aps.tq.mapper.TqScheFinishQtyMapper;
 import com.zlt.aps.tq.mapper.TqStockMapper;
 import com.zlt.aps.tq.service.ITqWarningService;
@@ -46,7 +46,7 @@ public class TqWarningServiceImpl implements ITqWarningService {
     private TqStockMapper tqStockMapper;
 
     @Resource
-    private TqNewScheduleResultMapper tqNewScheduleResultMapper;
+    private TqScheduleResultMapper tqScheduleResultMapper;
 
     @Resource
     private TqScheFinishQtyMapper tqScheFinishQtyMapper;
@@ -122,10 +122,10 @@ public class TqWarningServiceImpl implements ITqWarningService {
             double warningRatio = getParamValue(PARAM_FINISH_QTY_WARNING_RATIO, DEFAULT_FINISH_QTY_WARNING_RATIO);
 
             // 查询当天该班次的排程计划
-            LambdaQueryWrapper<TqNewScheduleResult> scheduleWrapper = new LambdaQueryWrapper<>();
-            scheduleWrapper.eq(TqNewScheduleResult::getScheduleDate, scheduleDate)
-                           .eq(TqNewScheduleResult::getIsDelete, 0);
-            List<TqNewScheduleResult> scheduleList = tqNewScheduleResultMapper.selectList(scheduleWrapper);
+            LambdaQueryWrapper<TqScheduleResult> scheduleWrapper = new LambdaQueryWrapper<>();
+            scheduleWrapper.eq(TqScheduleResult::getScheduleDate, scheduleDate)
+                           .eq(TqScheduleResult::getIsDelete, 0);
+            List<TqScheduleResult> scheduleList = tqScheduleResultMapper.selectList(scheduleWrapper);
 
             if (scheduleList.isEmpty()) {
                 log.info("胎圈完成量预警：当天无排程数据，跳过检查");
@@ -140,7 +140,7 @@ public class TqWarningServiceImpl implements ITqWarningService {
 
             // 检查每条排程的完成情况
             int warningCount = 0;
-            for (TqNewScheduleResult schedule : scheduleList) {
+            for (TqScheduleResult schedule : scheduleList) {
                 Integer planQty = getPlanQtyByShiftIndex(schedule, shiftIndex);
                 if (planQty == null || planQty <= 0) {
                     continue;
@@ -189,7 +189,7 @@ public class TqWarningServiceImpl implements ITqWarningService {
     /**
      * 发送完成量预警消息
      */
-    private void sendFinishQtyWarning(TqNewScheduleResult schedule, int shiftIndex,
+    private void sendFinishQtyWarning(TqScheduleResult schedule, int shiftIndex,
                                        int planQty, BigDecimal finishQty, double warningRatio) {
         try {
             String templateCode = MsgTemplateEnums.TQ_FINISH_QTY_WARNING.getCode();
@@ -212,7 +212,7 @@ public class TqWarningServiceImpl implements ITqWarningService {
     /**
      * 查找排程对应的完成量
      */
-    private BigDecimal findFinishQty(TqNewScheduleResult schedule, List<TqScheFinishQty> finishList, int shiftIndex) {
+    private BigDecimal findFinishQty(TqScheduleResult schedule, List<TqScheFinishQty> finishList, int shiftIndex) {
         // 按胎圈代码或工单号匹配
         for (TqScheFinishQty finish : finishList) {
             if (StringUtils.equals(finish.getBeadCode(), schedule.getBeadCode())) {
@@ -250,7 +250,7 @@ public class TqWarningServiceImpl implements ITqWarningService {
     /**
      * 按班次索引获取计划量
      */
-    private Integer getPlanQtyByShiftIndex(TqNewScheduleResult entity, int shiftIndex) {
+    private Integer getPlanQtyByShiftIndex(TqScheduleResult entity, int shiftIndex) {
         switch (shiftIndex) {
             case 1: return entity.getClass1PlanQty();
             case 2: return entity.getClass2PlanQty();

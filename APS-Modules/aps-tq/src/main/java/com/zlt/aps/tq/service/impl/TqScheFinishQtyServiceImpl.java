@@ -5,9 +5,9 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.common.core.constant.ApsConstant;
-import com.zlt.aps.tq.api.domain.entity.TqNewScheduleResult;
+import com.zlt.aps.tq.api.domain.entity.TqScheduleResult;
 import com.zlt.aps.tq.api.domain.entity.TqScheFinishQty;
-import com.zlt.aps.tq.mapper.TqNewScheduleResultMapper;
+import com.zlt.aps.tq.mapper.TqScheduleResultMapper;
 import com.zlt.aps.tq.mapper.TqScheFinishQtyMapper;
 import com.zlt.aps.tq.service.ITqScheFinishQtyService;
 import com.zlt.bill.common.service.AbstractDocService;
@@ -37,7 +37,7 @@ public class TqScheFinishQtyServiceImpl extends AbstractDocService<TqScheFinishQ
     private BaseDao baseDao;
 
     @Autowired
-    private TqNewScheduleResultMapper tqNewScheduleResultMapper;
+    private TqScheduleResultMapper tqScheduleResultMapper;
 
     @Autowired
     private TqScheFinishQtyMapper tqScheFinishQtyMapper;
@@ -94,17 +94,17 @@ public class TqScheFinishQtyServiceImpl extends AbstractDocService<TqScheFinishQ
             return AjaxResult.success();
         }
 
-        LambdaQueryWrapper<TqNewScheduleResult> queryWrapper = new LambdaQueryWrapper<>();
-        queryWrapper.eq(TqNewScheduleResult::getIsDelete, ApsConstant.APS_YES_NO_0);
-        queryWrapper.in(TqNewScheduleResult::getOrderNo, orderNos);
-        List<TqNewScheduleResult> resultList = tqNewScheduleResultMapper.selectList(queryWrapper);
+        LambdaQueryWrapper<TqScheduleResult> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(TqScheduleResult::getIsDelete, ApsConstant.APS_YES_NO_0);
+        queryWrapper.in(TqScheduleResult::getOrderNo, orderNos);
+        List<TqScheduleResult> resultList = tqScheduleResultMapper.selectList(queryWrapper);
         if (CollectionUtils.isEmpty(resultList)) {
             log.warn("【胎圈完成量回写】未找到排程结果数据，工单号集合：{}", orderNos);
             return AjaxResult.success();
         }
 
         // 按 胎圈代码|工单号 分组排程结果
-        Map<String, List<TqNewScheduleResult>> resultMap = resultList.stream()
+        Map<String, List<TqScheduleResult>> resultMap = resultList.stream()
                 .collect(Collectors.groupingBy(this::buildResultGroupKey));
 
         int totalUpdateCount = 0;
@@ -117,7 +117,7 @@ public class TqScheFinishQtyServiceImpl extends AbstractDocService<TqScheFinishQ
             }
 
             String groupKey = buildSummaryGroupKey(summary);
-            List<TqNewScheduleResult> results = resultMap.get(groupKey);
+            List<TqScheduleResult> results = resultMap.get(groupKey);
             if (CollectionUtils.isEmpty(results)) {
                 log.info("【胎圈完成量回写】未找到排程结果数据，工厂：{}，胎圈代码：{}，工单号：{}",
                         summary.getFactoryCode(), summary.getBeadCode(), summary.getOrderNo());
@@ -129,7 +129,7 @@ public class TqScheFinishQtyServiceImpl extends AbstractDocService<TqScheFinishQ
             BigDecimal midQty = summary.getMidFinishQty() != null ? summary.getMidFinishQty() : BigDecimal.ZERO;
             Date mesDate = DateUtil.beginOfDay(scheduleDate);
 
-            for (TqNewScheduleResult result : results) {
+            for (TqScheduleResult result : results) {
                 Date resultScheduleDate = result.getScheduleDate();
                 if (resultScheduleDate == null) {
                     continue;
@@ -204,7 +204,7 @@ public class TqScheFinishQtyServiceImpl extends AbstractDocService<TqScheFinishQ
     /**
      * 构建排程结果分组Key：胎圈代码|工单号
      */
-    private String buildResultGroupKey(TqNewScheduleResult result) {
+    private String buildResultGroupKey(TqScheduleResult result) {
         return result.getBeadCode() + "|" + result.getOrderNo();
     }
 
@@ -263,30 +263,30 @@ public class TqScheFinishQtyServiceImpl extends AbstractDocService<TqScheFinishQ
      * @param midQty    中班完成量
      * @return 更新行数
      */
-    private int updateFinishQtyByDayOffset(TqNewScheduleResult result, int dayOffset,
+    private int updateFinishQtyByDayOffset(TqScheduleResult result, int dayOffset,
                                            BigDecimal nightQty, BigDecimal dayQty, BigDecimal midQty) {
-        LambdaUpdateWrapper<TqNewScheduleResult> updateWrapper = new LambdaUpdateWrapper<>();
-        updateWrapper.eq(TqNewScheduleResult::getId, result.getId());
-        updateWrapper.eq(TqNewScheduleResult::getIsDelete, ApsConstant.APS_YES_NO_0);
+        LambdaUpdateWrapper<TqScheduleResult> updateWrapper = new LambdaUpdateWrapper<>();
+        updateWrapper.eq(TqScheduleResult::getId, result.getId());
+        updateWrapper.eq(TqScheduleResult::getIsDelete, ApsConstant.APS_YES_NO_0);
 
         String shiftDesc;
         switch (dayOffset) {
             case -1:
                 // MES日期=排程日期-1=D日：中班→1班完成量
-                updateWrapper.set(TqNewScheduleResult::getClass1FinishQty, midQty.intValue());
+                updateWrapper.set(TqScheduleResult::getClass1FinishQty, midQty.intValue());
                 shiftDesc = "1班(中班)";
                 break;
             case 0:
                 // MES日期=排程日期=D+1日：夜班→2班，早班→3班，中班→4班完成量
-                updateWrapper.set(TqNewScheduleResult::getClass2FinishQty, nightQty.intValue());
-                updateWrapper.set(TqNewScheduleResult::getClass3FinishQty, dayQty.intValue());
-                updateWrapper.set(TqNewScheduleResult::getClass4FinishQty, midQty.intValue());
+                updateWrapper.set(TqScheduleResult::getClass2FinishQty, nightQty.intValue());
+                updateWrapper.set(TqScheduleResult::getClass3FinishQty, dayQty.intValue());
+                updateWrapper.set(TqScheduleResult::getClass4FinishQty, midQty.intValue());
                 shiftDesc = "2班(夜班)/3班(早班)/4班(中班)";
                 break;
             case 1:
                 // MES日期=排程日期+1=D+2日：夜班→5班，早班→6班完成量
-                updateWrapper.set(TqNewScheduleResult::getClass5FinishQty, nightQty.intValue());
-                updateWrapper.set(TqNewScheduleResult::getClass6FinishQty, dayQty.intValue());
+                updateWrapper.set(TqScheduleResult::getClass5FinishQty, nightQty.intValue());
+                updateWrapper.set(TqScheduleResult::getClass6FinishQty, dayQty.intValue());
                 shiftDesc = "5班(夜班)/6班(早班)";
                 break;
             default:
@@ -295,7 +295,7 @@ public class TqScheFinishQtyServiceImpl extends AbstractDocService<TqScheFinishQ
                 return 0;
         }
 
-        int count = tqNewScheduleResultMapper.update(null, updateWrapper);
+        int count = tqScheduleResultMapper.update(null, updateWrapper);
         log.info("【胎圈完成量回写】排程日期偏移{}天更新，ID：{}，班次：{}，夜班={}，早班={}，中班={}，更新行数：{}",
                 dayOffset, result.getId(), shiftDesc, nightQty, dayQty, midQty, count);
         return count;

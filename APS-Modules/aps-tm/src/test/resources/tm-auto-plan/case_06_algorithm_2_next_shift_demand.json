@@ -1,6 +1,6 @@
 {
   "caseName": "case_06_algorithm_2_next_shift_demand",
-  "description": "参数 TM_ALGORITHM_SWITCH=2，完整入口按下个班成型计划量生成需求并完成排程",
+  "description": "参数 TM_ALGORITHM_SWITCH=2，完整入口按配置的成型班次偏移量生成需求并完成排程",
   "autoPlanRequest": {
     "factoryCode": "F1",
     "scheduleDate": "2026-06-18",
@@ -12,6 +12,12 @@
     {
       "factoryCode": "F1",
       "paramCode": "TM_ALGORITHM_SWITCH",
+      "paramValue": "2",
+      "enableStatus": "1"
+    },
+    {
+      "factoryCode": "F1",
+      "paramCode": "TM_FORMING_SHIFT_OFFSET",
       "paramValue": "2",
       "enableStatus": "1"
     }
@@ -29,7 +35,9 @@
       "treadCode": "TR-A2",
       "treadShoulderLength": 1,
       "treadMouthPlate": "MP-A",
-      "treadRubberCategory": "GL-A"
+      "treadRubberCategory": "GL-A",
+      "class7PlanQty": 70,
+      "class8PlanQty": 80
     }
   ],
   "stocks": [
@@ -77,7 +85,15 @@
         "machineCode": "TM01",
         "shiftOrder": 1,
         "sequence": 1,
-        "planQty": 20
+        "planQty": 30
+      },
+      {
+        "orderNo": "ORD-A2-CLASS2",
+        "treadCode": "TR-A2",
+        "machineCode": "TM01",
+        "shiftOrder": 2,
+        "sequence": 1,
+        "planQty": 40
       },
       {
         "orderNo": "ORD-A2-CLASS6",
@@ -85,16 +101,15 @@
         "machineCode": "TM01",
         "shiftOrder": 6,
         "sequence": 1,
-        "planQty": 60
+        "planQty": 80
       }
     ],
     "expectedExplains": [
       {
         "treadCode": "TR-A2",
-        "finalPlanQty": 20,
+        "finalPlanQty": 30,
         "ruleHitContains": "algorithmCode"
       }
     ]
   }
 }
-

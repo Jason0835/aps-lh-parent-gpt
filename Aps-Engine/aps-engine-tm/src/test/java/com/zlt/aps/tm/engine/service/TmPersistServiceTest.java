@@ -101,6 +101,7 @@ public class TmPersistServiceTest {
         TmPersistService service = new TmPersistService();
         TmScheduleContext context = buildContext();
         TmTaskDraft task = buildTask(1);
+        task.setCurrentShiftDemandQty(new BigDecimal("100"));
         task.setDemandQty(new BigDecimal("21"));
         task.setMachineCode("TM01");
         task.setUnplannedReasonCode("NO_MACHINE");
@@ -124,7 +125,7 @@ public class TmPersistServiceTest {
         assertEquals("SRC-ORD-1", explain.getSourceOrderNos());
         assertEquals(Integer.valueOf(1), explain.getShiftOrder());
         assertEquals(new BigDecimal("21"), explain.getBaseDemandQty());
-        assertEquals(new BigDecimal("21"), explain.getRequiredQty());
+        assertEquals(new BigDecimal("100"), explain.getRequiredQty());
         assertEquals(new BigDecimal("11"), explain.getFinalPlanQty());
         assertEquals("NO_MACHINE", explain.getUnplannedReasonCode());
         assertEquals("无可用机台", explain.getUnplannedReasonDesc());
@@ -137,6 +138,29 @@ public class TmPersistServiceTest {
         assertEquals(TmGenerateModeEnum.ENGINE_SKELETON.getCode(), explain.getGenerateMode());
     }
 
+    /**
+     * 测试内容：验证解释表应排需求量保存库存抵扣前的当前班成型需求。
+     * 测试场景：当前班成型需求为 100，库存足够导致需求缺口和基础应排需求均为 0。
+     * 预期结果：requiredQty 仍保存 100，避免落成库存抵扣后的 0。
+     */
+    @Test
+    public void convertExplainShouldUseCurrentShiftDemandBeforeStockDeductAsRequiredQty() {
+        // 准备库存充足任务，模拟库存抵扣后不需要排产但仍存在成型需求。
+        TmPersistService service = new TmPersistService();
+        TmTaskDraft task = buildTask(1);
+        task.setCurrentShiftDemandQty(new BigDecimal("100"));
+        task.setDemandQty(BigDecimal.ZERO);
+        task.setBaseDemandQty(BigDecimal.ZERO);
+        task.setStockDeductQty(new BigDecimal("100"));
+
+        // 执行解释实体转换。
+        TmScheduleResultExplain explain = service.convertExplain(task, new TmSnapshotBuildResult(), buildContext());
+
+        // 断言 requiredQty 取库存抵扣前当前班成型需求，不取抵扣后的需求缺口。
+        assertEquals(new BigDecimal("100"), explain.getRequiredQty());
+        assertEquals(BigDecimal.ZERO, explain.getBaseDemandQty());
+        assertEquals(new BigDecimal("100"), explain.getStockDeductQty());
+    }
     /**
      * 测试内容：验证持久化结果对象能累计错误信息并返回最后一条错误。
      * 测试场景：连续添加结果表和解释表写入失败信息。

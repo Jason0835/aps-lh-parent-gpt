@@ -9,6 +9,7 @@ import com.zlt.aps.tm.engine.strategy.*;
 import org.junit.Test;
 
 import java.math.BigDecimal;
+import java.util.Arrays;
 import java.util.Collections;
 
 import static org.junit.Assert.assertEquals;
@@ -139,6 +140,44 @@ public class TmPlanCalcServiceTest {
         assertTrue(context.getRuleTraceMap().get(task.getBusinessKey()).toExplainJson().contains("PLAN_QTY_CALC"));
     }
 
+    /**
+     * 测试内容：验证同一胎面跨班使用交接班库存滚动。
+     * 测试场景：同一胎面两个班，输入顺序故意反向，14点预计库存为 500，两班当前需求均为 600。
+     * 预期结果：第 1 班班初库存为 500，计算后交接班库存为 0；第 2 班班初库存承接为 0。
+     */
+    @Test
+    public void calculateShouldRollStockAcrossSameTreadShifts() {
+        TmPlanCalcService service = buildRealService();
+        TmScheduleContext context = new TmScheduleContext();
+        TmTaskDraft firstShiftTask = buildTask("ORD-ROLL-1", "TR-ROLL");
+        firstShiftTask.setShiftOrder(1);
+        firstShiftTask.setCurrentShiftDemandQty(new BigDecimal("600"));
+        firstShiftTask.setGuardDemandQty(new BigDecimal("600"));
+        TmTaskDraft secondShiftTask = buildTask("ORD-ROLL-2", "TR-ROLL");
+        secondShiftTask.setShiftOrder(2);
+        secondShiftTask.setCurrentShiftDemandQty(new BigDecimal("600"));
+        secondShiftTask.setGuardDemandQty(new BigDecimal("600"));
+        context.setTaskDraftList(Arrays.asList(secondShiftTask, firstShiftTask));
+        TmStockForecast forecast = new TmStockForecast();
+        forecast.setTreadCode("TR-ROLL");
+        forecast.setSixClockStockQty(new BigDecimal("1000"));
+        forecast.setRollingStockQty(new BigDecimal("500"));
+        context.getStockForecastMap().put("TR-ROLL", forecast);
+
+        service.calculate(context);
+
+        assertEquals(new BigDecimal("500"), firstShiftTask.getRollingStockQty());
+        assertEquals(new BigDecimal("500"), firstShiftTask.getStockDeductQty());
+        assertEquals(new BigDecimal("100"), firstShiftTask.getBaseDemandQty());
+        assertEquals(new BigDecimal("100"), firstShiftTask.getPlanQty());
+        assertEquals(BigDecimal.ZERO, firstShiftTask.getPlanStockQty());
+        assertEquals(BigDecimal.ZERO, secondShiftTask.getRollingStockQty());
+        assertEquals(BigDecimal.ZERO, secondShiftTask.getStockDeductQty());
+        assertEquals(new BigDecimal("600"), secondShiftTask.getBaseDemandQty());
+        assertEquals(new BigDecimal("600"), secondShiftTask.getPlanQty());
+        assertEquals(BigDecimal.ZERO, secondShiftTask.getPlanStockQty());
+        assertEquals(BigDecimal.ZERO, context.getRemainingStockMap().get("TR-ROLL"));
+    }
     /**
      * 测试内容：验证收尾余量大于基础需求时不按收尾量覆盖计划量。
      * 测试场景：MARK_CLOSE_OUT_TIP 已折算为收尾标识，但收尾余量乘胎面肩长大于基础需求。

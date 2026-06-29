@@ -308,20 +308,6 @@ public class TbrStructureNameCapacityProductionService extends AbstractDataLoade
     }
 
     /**
-     * 9：根据成型信息，得到结构排产结果
-     * 即结构转产信息
-     *
-     * @param productionContext
-     */
-    private void saveStructureInfo(TbrProductionContext productionContext) {
-        List<MpStructureAllocation> allAllocationList = GroupProductionConversionHandler.getFinalResult(productionContext);
-        if (CollectionUtils.isEmpty(allAllocationList)) {
-            return;
-        }
-        getMonthProductionDataService().saveGroupConversionResult(allAllocationList);
-    }
-
-    /**
      * 0.1：构建全钢排产上下文
      * 设置排产版本号：为空时生产排产版本号
      * 设置操作批次号

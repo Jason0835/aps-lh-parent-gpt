@@ -58,13 +58,16 @@ public class TmTaskDraft {
     /** 库存供应成型时长，单位小时；越小表示库存越紧急 */
     private BigDecimal supplyHours;
 
+    /** 当前班库存缺口，单位米 */
+    private BigDecimal currentShiftStockGapQty;
+
     /** 库存保证缺口，单位米 */
     private BigDecimal stockGapQty;
 
-    /** 本次库存实际抵扣量，单位米（剩余库存冲减当前班生产量） */
+    /** 本次库存实际抵扣量，单位米（当前班初滚动库存冲减当前任务毛需求） */
     private BigDecimal stockDeductQty;
 
-    /** 抵扣后该胎面剩余库存，单位米，供解释表落库 */
+    /** 当前任务完成后的交接班预计库存，单位米，供解释表落库 */
     private BigDecimal planStockQty;
 
     /** 计划量，单位米 */
@@ -147,6 +150,9 @@ public class TmTaskDraft {
 
     /** 新规格判断与提前排产证据 */
     private TmNewSpecInfo newSpecInfo;
+
+    /** 实验规格判断与固定计划量证据 */
+    private TmExperimentSpecInfo experimentSpecInfo;
 
     /**
      * 判断任务是否未分配机台。

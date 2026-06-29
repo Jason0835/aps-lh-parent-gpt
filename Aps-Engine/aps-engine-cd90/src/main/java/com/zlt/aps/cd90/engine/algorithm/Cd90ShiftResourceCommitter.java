@@ -1,5 +1,7 @@
 package com.zlt.aps.cd90.engine.algorithm;
 
+import com.zlt.aps.cd90.engine.model.Cd90BigRollAgingAllocation;
+import com.zlt.aps.cd90.engine.model.Cd90BigRollAgingStock;
 import com.zlt.aps.cd90.engine.model.Cd90MachineTailState;
 import com.zlt.aps.cd90.engine.model.Cd90MachineTrial;
 import com.zlt.aps.cd90.engine.model.Cd90ShiftCommitRequest;
@@ -32,6 +34,7 @@ public class Cd90ShiftResourceCommitter {
 
     private final Cd90StorageLaneAllocator laneAllocator;
     private final Cd90MachineTrialSelector trialSelector;
+    private final Cd90BigRollAgingAllocator agingAllocator;
 
     /**
      * 按试算优先级逐方案尝试，并原子提交当前班次内存资源。
@@ -87,8 +90,15 @@ public class Cd90ShiftResourceCommitter {
             BigDecimal committedQuantity = committedQuantity(trial, request.getCoilMeter(), allocatedVehicles);
             int afterSeconds = adjustedRemainingSeconds(request, trial, beforeSeconds, committedQuantity);
             int elapsedBefore = Math.max(0, fullShiftSeconds(request) - beforeSeconds);
-            int occupiedSeconds = Math.max(0, beforeSeconds - afterSeconds);
-            LocalDateTime expectedStart = request.getShiftStart().plusSeconds(elapsedBefore);
+            int productionDurationSeconds = Math.max(0, beforeSeconds - afterSeconds - trial.getAgingDelaySeconds());
+            LocalDateTime originalStart = request.getShiftStart().plusSeconds(elapsedBefore);
+            Cd90BigRollAgingAllocation agingAllocation = commitAgingAllocation(
+                    working, request.getBigRollCode(), committedQuantity, originalStart);
+            if (agingAllocation != null && !agingAllocation.isSuccess()) {
+                lastFailureReason = Cd90BigRollAgingAllocator.AGING_PERIOD_LIMIT;
+                continue;
+            }
+            LocalDateTime expectedStart = agingAllocation == null ? originalStart : agingAllocation.getTaskStartTime();
             int produceOrder = (int) working.getTasks().stream()
                     .filter(item -> trial.getMachineCode().equals(item.getMachineCode())).count() + 1;
             Cd90ShiftScheduleTask task = Cd90ShiftScheduleTask.builder()
@@ -98,7 +108,7 @@ public class Cd90ShiftResourceCommitter {
                     .planQuantity(committedQuantity)
                     .vehicleCount(allocatedVehicles)
                     .produceOrder(produceOrder).expectedStartTime(expectedStart)
-                    .expectedEndTime(expectedStart.plusSeconds(occupiedSeconds))
+                    .expectedEndTime(expectedStart.plusSeconds(productionDurationSeconds))
                     .laneAllocations(allocation.getAllocations()).build();
 
             // 以下资源变更必须与任务一起提交，不能只扣减部分资源。
@@ -153,7 +163,8 @@ public class Cd90ShiftResourceCommitter {
         }
         int productionSeconds = committedQuantity.multiply(BigDecimal.valueOf(trial.getProductionSeconds()))
                 .divide(trialQuantity, 0, RoundingMode.CEILING).intValueExact();
-        return Math.max(0, beforeSeconds - trial.getChangeSeconds() - productionSeconds);
+        return Math.max(0, beforeSeconds - trial.getAgingDelaySeconds()
+                - trial.getChangeSeconds() - productionSeconds);
     }
 
     private BigDecimal normalize(BigDecimal value) {
@@ -177,6 +188,7 @@ public class Cd90ShiftResourceCommitter {
                 .tailSpecByMachine(copyMap(source.getTailSpecByMachine()))
                 .tailByMachine(copyTailMap(source.getTailByMachine()))
                 .tasks(source.getTasks() == null ? new ArrayList<>() : new ArrayList<>(source.getTasks()))
+                .bigRollAgingStocks(copyAgingStocks(source.getBigRollAgingStocks()))
                 .build();
     }
 
@@ -190,6 +202,31 @@ public class Cd90ShiftResourceCommitter {
         return result;
     }
 
+    private Cd90BigRollAgingAllocation commitAgingAllocation(Cd90ShiftResourceState working,
+                                                             String bigRollCode,
+                                                             BigDecimal committedQuantity,
+                                                             LocalDateTime originalStart) {
+        if (working.getBigRollAgingStocks() == null || working.getBigRollAgingStocks().isEmpty()) {
+            return null;
+        }
+        return agingAllocator.allocate(working.getBigRollAgingStocks(), bigRollCode, committedQuantity, originalStart);
+    }
+
+    private List<Cd90BigRollAgingStock> copyAgingStocks(List<Cd90BigRollAgingStock> source) {
+        if (source == null) {
+            return new ArrayList<>();
+        }
+        return source.stream().map(item -> Cd90BigRollAgingStock.builder()
+                .sourceType(item.getSourceType())
+                .sourceId(item.getSourceId())
+                .clothCode(item.getClothCode())
+                .bigRollCode(item.getBigRollCode())
+                .availableQuantity(item.getAvailableQuantity())
+                .allocatedQuantity(item.getAllocatedQuantity())
+                .stockInTime(item.getStockInTime())
+                .releaseTime(item.getReleaseTime())
+                .build()).collect(Collectors.toList());
+    }
     private <K, V> Map<K, V> copyMap(Map<K, V> source) {
         return source == null ? new HashMap<>() : new HashMap<>(source);
     }

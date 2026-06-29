@@ -58,7 +58,7 @@ public class Cd90ScheduleCandidatePreparationServiceImpl
                 .plusHours((classIndex - 1L) * 8L);
         List<Cd90ScheduleCandidate> candidates = candidateBuilder.build(
                 input.getDemandShifts(), input.getStocksAtSix(), currentDemandStart,
-                context.getParameters().getDemandWindow());
+                input.getDepthClassQtyByCloth());
 
         log.info("[直裁自动排程] 当前班次候选准备完成, factoryCode={}, scheduleDate={}, "
                         + "classField={}, demandStart={}, candidateCount={}",

@@ -1,1049 +1,1082 @@
 package com.zlt.aps.tq.service.impl;
 
-import static com.zlt.aps.common.core.utils.ApsCommonUtil.getDoubleOrDefault;
-import static com.zlt.aps.common.core.utils.ImportUtil.addImportErrorLog;
-
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.math.BigDecimal;
-import java.text.DecimalFormat;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Comparator;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Optional;
-import java.util.TreeSet;
-import java.util.function.Function;
-import java.util.stream.Collectors;
-
-import javax.annotation.Resource;
-
-import com.ruoyi.common.core.utils.SecurityUtils;
+import cn.hutool.core.date.DateUtil;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.zlt.aps.common.core.constant.ApsConstant;
+import com.zlt.aps.common.engine.service.FactoryService;
+import com.zlt.aps.itf.mes.IMesItfService;
+import com.zlt.aps.tq.api.domain.dto.TqChangeMachineDTO;
+import com.zlt.aps.tq.api.domain.dto.TqInsertOrderDTO;
+import com.zlt.aps.tq.api.domain.entity.TqDispatcherLog;
+import com.zlt.aps.tq.api.domain.entity.TqScheduleResult;
+import com.zlt.aps.tq.api.domain.entity.TqScheduleResultIssue;
+import com.zlt.aps.tq.engine.vo.RollingUpdateResult;
+import com.zlt.aps.tq.mapper.TqScheduleResultMapper;
+import com.zlt.aps.tq.service.ITqScheduleResultService;
+import com.zlt.aps.tq.service.ITqRollingUpdateService;
+import com.zlt.aps.tq.service.TqDispatcherLogService;
+import com.zlt.bill.common.service.AbstractDocService;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.ObjectUtils;
-import org.apache.poi.ss.usermodel.Cell;
-import org.apache.poi.ss.usermodel.CellStyle;
-import org.apache.poi.ss.usermodel.DataFormat;
-import org.apache.poi.ss.usermodel.Row;
-import org.apache.poi.ss.usermodel.Sheet;
-import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
-import com.ruoyi.common.core.utils.DateUtils;
-import com.ruoyi.common.core.utils.ServletUtils;
-import com.ruoyi.common.core.utils.bean.BeanUtils;
-import com.ruoyi.common.core.utils.reflect.ReflectUtils;
-import com.ruoyi.common.core.web.domain.AjaxResult;
-import com.ruoyi.common.i18n.utils.I18nUtil;
-import com.ruoyi.common.security.aspect.PreAuthorizeAspect;
-import com.ruoyi.common.utils.StringUtils;
-import com.zlt.aps.common.core.constant.ApsConstant;
-import com.zlt.aps.common.core.domain.SchedulePublishRecord;
-import com.zlt.aps.common.core.utils.BigDecimalUtil;
-import com.zlt.aps.common.core.utils.BigDecimalUtils;
-import com.zlt.aps.common.core.utils.ExcelUtils;
-import com.zlt.aps.common.core.utils.ImportUtil;
-import com.zlt.aps.common.engine.domain.ScheduleSummaryVo;
-
-import com.zlt.aps.common.engine.utils.DateUtil;
-import com.zlt.aps.tq.api.domain.dto.TqScheduleResultDto;
-import com.zlt.aps.tq.api.domain.entity.TqScheFinishQty;
-import com.zlt.aps.tq.api.domain.entity.TqDispatcherLog;
-import com.zlt.aps.tq.api.domain.entity.TqMachineInfo;
-import com.zlt.aps.tq.engine.service.TqEngineService;
-import com.zlt.aps.tq.engine.vo.TqScheduleResultVo;
-import com.zlt.aps.tq.entity.TqScheduleResult;
-import com.zlt.aps.tq.mapper.TqScheduleResultMapper;
-import com.zlt.aps.tq.service.ITqMachineInfoService;
-import com.zlt.aps.tq.service.ITqScheFinishQtyService;
-import com.zlt.aps.tq.service.TqDispatcherLogService;
-import com.zlt.aps.tq.service.TqScheduleResultService;
-import com.zlt.aps.common.engine.service.FactoryService;
-import com.zlt.aps.mp.api.service.IRemoteImportErrorLogService;
+import javax.annotation.Resource;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.util.*;
+import java.util.stream.Collectors;
 
 /**
- * 【已废弃】胎圈排程结果Service业务层处理（4班次制旧版）
+ * 胎圈排程结果Service实现类
  *
- * <p>废弃说明：
- * <ul>
- *   <li>本Service为旧版4班次制胎圈排程业务处理，已由新版6班次制Service替代</li>
- *   <li>新版Service：{@link com.zlt.aps.tq.service.impl.TqNewScheduleResultServiceImpl}</li>
- *   <li>新版算法依据：胎圈自动排程_v5.xmind（6班次制）</li>
- *   <li>旧版4班次字段（midPlanQty/nightPlanQty/dayPlanQty/nextMidPlanQty）将逐步废弃</li>
- *   <li>请勿在此Service新增功能，所有新需求请到新版Service实现</li>
- *   <li>计划在前端完全切换到新版接口后，本Service将一并删除</li>
- * </ul>
- *
- * @author chen
- * @date 2021-06-24
+ * @author APS
  */
-@Deprecated
+@Slf4j
 @Service
-public class TqScheduleResultServiceImpl extends ServiceImpl<TqScheduleResultMapper, TqScheduleResult> implements TqScheduleResultService {
-    @Resource
-    private TqScheduleResultMapper scheduleResultMapper;
-    @Value("${excelModelPath}")
-    private String excelModelPath;
+public class TqScheduleResultServiceImpl extends AbstractDocService<TqScheduleResult> implements ITqScheduleResultService {
+
     @Autowired
-    private ITqMachineInfoService machineInfoService;
-    @Resource
-    private TqEngineService tqEngineService;
-    @Resource
-    private PreAuthorizeAspect preAuthorizeAspect;
-    @Resource
-    private TqDispatcherLogService tqDispatcherLogService;
+    private TqScheduleResultMapper tqScheduleResultMapper;
+
+    @Autowired
+    private IMesItfService mesItfService;
+
     @Autowired
     private FactoryService factoryService;
+
+    /**
+     * 胎圈排程滚动更新服务（用于插单/调量/转机台/删除后触发同班次内时间重算）
+     */
     @Resource
-    private IRemoteImportErrorLogService remoteImportErrorLogService;
-
+    private ITqRollingUpdateService tqRollingUpdateService;
 
     /**
-     * 赋值成型消耗量(成型昨日早班消耗量+成型夜班消耗量)、交接班库存、计划量对应卷数
-     *
-     * @param scheduleResult 排程结果
-     * @param cxConsumeMap   成型消耗量map
+     * 胎圈调度员排程操作日志服务（用于记录6班次制操作日志）
      */
-    private static void setLastDayAndCalculate(TqScheduleResultDto scheduleResult, Map<String, Double> cxConsumeMap) {
-        String code = scheduleResult.getBeadCode();
-        if (cxConsumeMap.containsKey(code)) {
-            Double cxConsumeQty = cxConsumeMap.get(code);
-            scheduleResult.setCxConsumeQty(cxConsumeQty);
-        }
-        ReflectUtils.invokeMethodByName(scheduleResult, "calculateTheoreticClassLastDayPlanQty", new Object[]{});
+    @Autowired
+    private TqDispatcherLogService tqDispatcherLogService;
+
+    @Override
+    public String getDocTypeCode() {
+        return "TQ_SCHEDULE_RESULT";
     }
 
     /**
-     * 查询胎圈排程结果信息维护列表
+     * 插单前校验
+     * 校验规则：
+     * 1. 排程日期不能为空，且需在生产周期内
+     * 2. 胎圈代码不能为空，施工必须存在
+     * 3. 机台编号不能为空
+     * 4. 6个班次中至少有一个班次的计划量有值
+     * 5. 有计划量的班次，顺序也必须有值；反之亦然
+     * 6. 只能往当前班次或后续班次插单
+     * 7. 插单只能加到第二个在产规格之后
      *
-     * @param scheduleResult 胎圈排程结果信息维护
-     * @return 胎圈排程结果信息维护集合
+     * @param dto 插单数据
+     * @return 校验结果
      */
     @Override
-    public List<TqScheduleResultDto> selectScheduleResultList(TqScheduleResult scheduleResult) {
-        List<TqScheduleResultDto> list = scheduleResultMapper.selectScheduleResultList(scheduleResult);
-        if (CollectionUtils.isEmpty(list)) {
-            return new ArrayList<>();
-        }
-        List<TqMachineInfo> machineInfoList = machineInfoService.selectMachineInfoList(new TqMachineInfo());
-        Map<Long, TqMachineInfo> machineInfoMap = machineInfoList.stream().collect(Collectors.toMap(TqMachineInfo::getId, Function.identity(), (s1, s2) -> s1));
-        if (CollectionUtils.isNotEmpty(list)) {
-
-            List<String> codeList = list.stream().map(TqScheduleResultDto::getBeadCode).collect(Collectors.toList());
-            scheduleResult.getParams().put("codeList", codeList);
-            Map<String, Double> cxConsumeMap = new HashMap<>(16);
-            List<TqScheduleResultDto> cxConsumeList = scheduleResultMapper.getCxConsume4List(scheduleResult);
-            if (CollectionUtils.isNotEmpty(cxConsumeList)) {
-                cxConsumeMap = cxConsumeList.stream().collect(Collectors.toMap(TqScheduleResultDto::getBeadCode, TqScheduleResultDto::getCxConsumeQty));
-            }
-
-            for (TqScheduleResultDto dto : list) {
-                String machineCodeStr = dto.getMachineCode();
-                if (StringUtils.isNotBlank(machineCodeStr)) {
-                    List<String> machineNameList = new ArrayList<>();
-                    String[] machineCodeArr = machineCodeStr.split(",");
-                    for (String machineCode : machineCodeArr) {
-                        if (machineInfoMap.containsKey(machineCode)) {
-                            TqMachineInfo machineInfo = machineInfoMap.get(machineCode);
-                            machineNameList.add(machineInfo.getMachineName());
-                        }
-                    }
-                    dto.setMachineName(String.join(",", machineNameList));
-                }
-
-                // 赋值卷曲长度、计算计划量对应卷数
-                setLastDayAndCalculate(dto, cxConsumeMap);
-            }
-        }
-        return list;
-    }
-
-    /**
-     * 查询胎圈排程结果信息维护列表
-     *
-     * @param id 要查询的id
-     * @return 胎圈排程结果信息维护集合
-     */
-    @Override
-    public TqScheduleResultDto selectScheduleResultById(Long id) {
-        return scheduleResultMapper.selectScheduleResultById(id);
-    }
-
-    /**
-     * 保存胎圈排程结果信息维护
-     *
-     * @param scheduleResult 胎圈排程结果信息维护
-     */
-    @Override
-    public void saveScheduleResult(TqScheduleResult scheduleResult) {
-        // 校验字段是否修改，修改则改状态为未发布
-        if (scheduleResult.getId() != null) {
-            boolean flag;
-            TqScheduleResultDto resultDto = scheduleResultMapper.selectScheduleResultById(scheduleResult.getId());
-            flag = compareFields(scheduleResult, resultDto);
-            if (!flag) {
-                scheduleResult.setIsRelease(scheduleResult.getPublishSuccessCount() == 0 ? ApsConstant.NO_RELEASE : ApsConstant.WAIT_RELEASING);
-            }
-            scheduleResult.setBaseVale(scheduleResult.getId());
-            saveOrUpdate(scheduleResult);
-        } else {
-            // 插单操作
-            TqScheduleResultVo scheduleVo = new TqScheduleResultVo();
-            BeanUtils.copyProperties(scheduleResult, scheduleVo);
-            List<TqScheduleResult> scheduleResults = this.selectByScheduleDateAndCode(scheduleResult);
-            tqEngineService.inertTqOrder(scheduleVo);
-            this.insetDispatcherLogInsertOrder(ApsConstant.DISPATCHER_OPER_INSERT_ORDER, scheduleResults, scheduleResult);
-            BeanUtils.copyProperties(scheduleVo, scheduleResult);
+    public AjaxResult validateInsertOrder(TqInsertOrderDTO dto) {
+        // 1. 排程日期校验
+        if (dto.getScheduleDate() == null) {
+            return AjaxResult.error("排程日期不能为空");
         }
 
-    }
+        // 2. 胎圈代码校验
+        if (ObjectUtils.isEmpty(dto.getBeadCode())) {
+            return AjaxResult.error("胎圈代码不能为空");
+        }
+        // TODO 校验施工是否存在（需查询施工表 T_TQ_CONSTRUCTION_INFO）
+        // List<TqScheduleBaseInfoVo> baseInfoList = tqEngineMapper.listTqScheduleBaseInfo(
+        //     Collections.singletonList(dto.getBeadCode()), "");
+        // if (baseInfoList == null || baseInfoList.isEmpty()) {
+        //     return AjaxResult.error("胎圈规格有误，施工不存在");
+        // }
 
-    /**
-     * 判断是否是“调度员”，如果调度员，则需要需要记录操作日志
-     * @param operType 操作类型：0--转机台、1--调量
-     * @param newSchedule
-     */
-    @Override
-    public void insetDispatcherLog(String operType, TqScheduleResult newSchedule) {
-        // 20231018 需求确认单各个工序中，调度员操作日志，改成排程操作日志，统计全部人员的操作记录，调度员字段改为“操作人员”字段
-        //        if(!preAuthorizeAspect.hasRole(ApsConstant.DISPATCHER_ROLE)) {
-        //            return;
-        //        }
-        TqScheduleResultDto oldSchedule = this.scheduleResultMapper.selectScheduleResultById(newSchedule.getId());  //操作前的排程数据
-        TqDispatcherLog log = new TqDispatcherLog();
-        //基础信息赋值
-        log.setScheduleId(newSchedule.getId());
-        log.setOperType(operType);
-        log.setScheduleDate(newSchedule.getScheduleDate());  //排程日期
-        log.setBeadCode(newSchedule.getBeadCode());    //胎圈代码
-        //操作前的信息赋值（旧版4班次映射到新版6班次：中班→1班、夜班→2班、白班→3班、次日中班→4班）
-        log.setBeforeMachineCode(oldSchedule.getMachineCode());
-        log.setBeforeClass1Plan(this.toDoubleToInt(oldSchedule.getMidPlanQty()));
-        log.setBeforeClass2Plan(this.toDoubleToInt(oldSchedule.getNightPlanQty()));
-        log.setBeforeClass3Plan(this.toDoubleToInt(oldSchedule.getDayPlanQty()));
-        log.setBeforeClass4Plan(this.toDoubleToInt(oldSchedule.getNextMidPlanQty()));
-        //操作后的信息赋值
-        log.setAfterMachineCode(newSchedule.getMachineCode());
-        log.setAfterClass1Plan(this.toDoubleToInt(newSchedule.getMidPlanQty()));
-        log.setAfterClass2Plan(this.toDoubleToInt(newSchedule.getNightPlanQty()));
-        log.setAfterClass3Plan(this.toDoubleToInt(newSchedule.getDayPlanQty()));
-        log.setAfterClass4Plan(this.toDoubleToInt(newSchedule.getNextMidPlanQty()));
-        /** 调用插入日志方法 **/
-        tqDispatcherLogService.insertTqDispatcherLog(log);
-    }
+        // 3. 机台编号校验
+        if (ObjectUtils.isEmpty(dto.getMachineCode())) {
+            return AjaxResult.error("机台编号不能为空");
+        }
 
-    /**
-     * 判断是否是“调度员”，如果调度员，则需要需要记录操作日志
-     *
-     * @param operType        操作类型：0--转机台、1--调量、2--插单
-     */
-    @Override
-    public void insetDispatcherLogInsertOrder(String operType, List<TqScheduleResult> scheduleResults, TqScheduleResult newSchedule) {
-        // 20231018 需求确认单各个工序中，调度员操作日志，改成排程操作日志，统计全部人员的操作记录，调度员字段改为“操作人员”字段
-        //        if(!preAuthorizeAspect.hasRole(ApsConstant.DISPATCHER_ROLE)) {
-        //            return;
-        //        }
-        List<TqScheduleResult> scheduleResultList = this.selectByScheduleDateAndCode(newSchedule);
-        TqDispatcherLog log = new TqDispatcherLog();
-        //基础信息赋值
-        log.setScheduleId(scheduleResultList.get(0).getId());
-        log.setOperType(operType);
-        log.setScheduleDate(newSchedule.getScheduleDate());  //排程日期
-        log.setBeadCode(newSchedule.getBeadCode());    //胎圈代码
-        // 操作前的信息赋值，取创建时间最大的记录为操作前信息（旧版4班次映射到新版6班次：中班→1班、夜班→2班、白班→3班、次日中班→4班）
-        if (CollectionUtils.isNotEmpty(scheduleResults)) {
-            Optional<TqScheduleResult> max = scheduleResults.stream().max(Comparator.comparing(TqScheduleResult::getCreateTime));
-            if (max.isPresent()) {
-                TqScheduleResult scheduleResult = max.get();
-                log.setBeforeMachineCode(scheduleResult.getMachineCode());
-                log.setBeforeClass1Plan(this.toDoubleToInt(scheduleResult.getMidPlanQty()));
-                log.setBeforeClass2Plan(this.toDoubleToInt(scheduleResult.getNightPlanQty()));
-                log.setBeforeClass3Plan(this.toDoubleToInt(scheduleResult.getDayPlanQty()));
-                log.setBeforeClass4Plan(this.toDoubleToInt(scheduleResult.getNextMidPlanQty()));
+        // 4. 至少一个班次有计划量
+        boolean hasAnyPlanQty = false;
+        for (int i = 1; i <= 6; i++) {
+            Integer planQty = getPlanQtyByClassIndex(dto, i);
+            if (planQty != null && planQty > 0) {
+                hasAnyPlanQty = true;
+                break;
             }
         }
-        //操作后的信息赋值
-        log.setAfterMachineCode(newSchedule.getMachineCode());
-        log.setAfterClass1Plan(this.toDoubleToInt(newSchedule.getMidPlanQty()));
-        log.setAfterClass2Plan(this.toDoubleToInt(newSchedule.getNightPlanQty()));
-        log.setAfterClass3Plan(this.toDoubleToInt(newSchedule.getDayPlanQty()));
-        log.setAfterClass4Plan(this.toDoubleToInt(newSchedule.getNextMidPlanQty()));
-        /* 调用插入日志方法 **/
-        tqDispatcherLogService.insertTqDispatcherLog(log);
-    }
-
-    /**
-     * 将 Double 类型安全转换为 Integer，用于旧版4班次制 Double 计划量映射到新版6班次制 Integer 计划量
-     *
-     * @param value Double 值（可能为 null）
-     * @return Integer 值（null 入参返回 null）
-     */
-    private Integer toDoubleToInt(Double value) {
-        return value == null ? null : value.intValue();
-    }
-
-    /**
-     * 根据排程日期和代码查询排程结果
-     * @param scheduleResult 排程日期、代码
-     * @return 查询到的数据
-     */
-    @Override
-    public List<TqScheduleResult> selectByScheduleDateAndCode(TqScheduleResult scheduleResult) {
-        return scheduleResultMapper.selectByScheduleDateAndCode(scheduleResult);
-    }
-
-    /**
-     * 批量删除胎圈排程结果信息维护
-     *
-     * @param ids 需要删除的胎圈排程结果信息维护ID
-     */
-    @Override
-    public void deleteScheduleResultByIds(long[] ids) {
-        scheduleResultMapper.deleteByIds(Arrays.stream(ids)
-                .boxed()
-                .collect(Collectors.toList()));
-    }
-
-    @Override
-    public byte[] export(List<TqScheduleResultDto> list) {
-        TqScheduleResultDto summarySchedule = this.summaryExport(list);  //给导出的数据增加汇总行
-        // 按用户语言读取模板
-        Locale lang = ServletUtils.getUserLang();
-        InputStream inputStream = null;
-        if (Locale.SIMPLIFIED_CHINESE.equals(lang) || lang == null) {
-            // 中文
-            inputStream = this.getClass().getClassLoader().getResourceAsStream(excelModelPath + "tqScheduleResult.xlsx");
-        } else if (Locale.US.equals(lang)) {
-            // 英文
-            inputStream = this.getClass().getClassLoader().getResourceAsStream(excelModelPath + "tqScheduleResult_en.xlsx");
+        if (!hasAnyPlanQty) {
+            return AjaxResult.error("至少一个班次的计划量必须有值");
         }
-        Workbook webBook = ExcelUtils.readExcel(inputStream);
-        CellStyle cellStyle = ExcelUtils.createCellStyle(webBook);
-        DataFormat format = webBook.createDataFormat();
-        cellStyle.setDataFormat(format.getFormat("[=0]\"\""));  //导出的单元格如果值为0，则显示空白
-        //填充数据
-        if (CollectionUtils.isNotEmpty(list)) {
-            // 添加导出生产线
-            List<TqMachineInfo> tmMachineInfoList = machineInfoService.selectMachineInfoList(new TqMachineInfo());
-            Map<String, String> map = null;
-            if (CollectionUtils.isNotEmpty(tmMachineInfoList)) {
-                map = tmMachineInfoList.stream().collect(Collectors.toMap(item -> item.getId() + "", TqMachineInfo::getMachineName));
+
+        // 5. 有计划量的班次顺序必须有值，反之亦然
+        for (int i = 1; i <= 6; i++) {
+            Integer planQty = getPlanQtyByClassIndex(dto, i);
+            Integer sequence = getSequenceByClassIndex(dto, i);
+            boolean hasPlanQty = planQty != null && planQty > 0;
+            boolean hasSequence = sequence != null && sequence > 0;
+            if (hasPlanQty && !hasSequence) {
+                return AjaxResult.error("第" + i + "班有计划量，顺序也必须有值");
             }
-            DecimalFormat df = new DecimalFormat("0.00%");
-            Sheet sheet = webBook.getSheetAt(0);
-            int month = DateUtil.getMonth(list.get(0).getScheduleDate());
-            int day = DateUtil.getDay(list.get(0).getScheduleDate());
-            Row row1 = sheet.getRow(0);
-            BigDecimal midPlan = new BigDecimal(summarySchedule.getMidPlanQty());
-            BigDecimal nightPlan = new BigDecimal(summarySchedule.getNightPlanQty());
-            BigDecimal dayPlan = new BigDecimal(summarySchedule.getDayPlanQty());
-            BigDecimal nextMidPlan = new BigDecimal(summarySchedule.getNextMidPlanQty());
-            for (int i = 0; i < list.size(); i++) {
-                int cellNum = 0;
-                TqScheduleResultDto scheduleResult = list.get(i);
-                Row row = sheet.createRow(i + 2);
-//                row.createCell(cellNum++).setCellValue(DateFormatUtils.format(scheduleResult.getScheduleDate(), "yyyy-MM-dd"));
-                row.createCell(cellNum++).setCellValue(scheduleResult.getBeadCode());
-                row.createCell(cellNum++).setCellValue(scheduleResult.getBeadCode());
-                row.createCell(cellNum++).setCellValue(scheduleResult.getTriangleGlueCode());
-                row.createCell(cellNum++).setCellValue(scheduleResult.getGlueCode());
-                row.createCell(cellNum++).setCellValue(scheduleResult.getMouthPlateCode());
-                row.createCell(cellNum++).setCellValue(scheduleResult.getSpecSize());
-                StringBuilder produceLine = new StringBuilder();
-                if (StringUtils.isNotEmpty(scheduleResult.getMachineCode()) && map != null) {
-                    String[] aa = scheduleResult.getMachineCode().split(",");
-                    for (String a : aa) {
-                        produceLine.append(map.get(a)).append(",");
-                    }
-                }
-                if (StringUtils.isNotEmpty(produceLine.toString())) {
-                    produceLine = new StringBuilder(produceLine.substring(0, produceLine.length() - 1));
-                }
-                row.createCell(cellNum++).setCellValue(produceLine.toString());
-                String monthPlanOs = scheduleResult.getMonthPlanOs();
-                row.createCell(cellNum++).setCellValue(monthPlanOs == null ? 0 : Integer.parseInt(monthPlanOs));
-                row.createCell(cellNum++).setCellValue(scheduleResult.getStockQty() == null ? 0 : scheduleResult.getStockQty());
-                Double supplyTime = scheduleResult.getSupplyTime() == null ? 0 : scheduleResult.getSupplyTime() ;
-                row.createCell(cellNum++).setCellValue(supplyTime);
-                row.createCell(cellNum++).setCellValue(scheduleResult.getDailyTotalQty() == null ? 0 : scheduleResult.getDailyTotalQty());
-                row.createCell(cellNum++).setCellValue(scheduleResult.getMidPlanQty() == null ? 0 : scheduleResult.getMidPlanQty());
-                row.createCell(cellNum++).setCellValue(scheduleResult.getMidFinishQty() == null ? 0 : scheduleResult.getMidFinishQty());
-                String midFinishRate = scheduleResult.getMidFinishRate() == null ? "" : df.format(scheduleResult.getMidFinishRate());
-                row.createCell(cellNum++).setCellValue(midFinishRate);
-                row.createCell(cellNum++).setCellValue(scheduleResult.getMidProduceOrder() == null ? 0 : scheduleResult.getMidProduceOrder());
-                String midSysAnalysis = scheduleResult.getMidSysAnalysis();
-                String midHandAnalysis = scheduleResult.getMidHandAnalysis();
-                String midAnalysis = "";
-                if (StringUtils.isNotEmpty(midSysAnalysis)) {
-                    midAnalysis = midAnalysis + midSysAnalysis;
-                }
-                if (StringUtils.isNotEmpty(midHandAnalysis)) {
-                    if (StringUtils.isNotEmpty(midAnalysis)) {
-                        midAnalysis = midAnalysis + "," + midHandAnalysis;
-                    } else {
-                        midAnalysis = midHandAnalysis;
-                    }
-                }
-                row.createCell(cellNum++).setCellValue(midAnalysis);
-                row.createCell(cellNum++).setCellValue(scheduleResult.getNightPlanQty() == null ? 0 : scheduleResult.getNightPlanQty());
-                row.createCell(cellNum++).setCellValue(scheduleResult.getNightFinishQty() == null ? 0 : scheduleResult.getNightFinishQty());
-                String nightFinishRate = scheduleResult.getNightFinishRate() == null ? "" : df.format(scheduleResult.getNightFinishRate());
-                row.createCell(cellNum++).setCellValue(nightFinishRate);
-                row.createCell(cellNum++).setCellValue(scheduleResult.getNightProduceOrder() == null ? 0 : scheduleResult.getNightProduceOrder());
-                String nightSysAnaly = scheduleResult.getNightSysAnalysis();
-                String nightHandAnaly = scheduleResult.getNightHandAnalysis();
-                String nightAnly = "";
-                if (StringUtils.isNotEmpty(nightSysAnaly)) {
-                    nightAnly = nightAnly + nightSysAnaly;
-                }
-                if (StringUtils.isNotEmpty(nightHandAnaly)) {
-                    if (StringUtils.isNotEmpty(nightAnly)) {
-                        nightAnly = nightAnly + "," + nightHandAnaly;
-                    } else {
-                        nightAnly = nightHandAnaly;
-                    }
-                }
-                row.createCell(cellNum++).setCellValue(nightAnly);
-                row.createCell(cellNum++).setCellValue(scheduleResult.getDayPlanQty() == null ? 0 : scheduleResult.getDayPlanQty()); // 次日夜班
-                /*row.createCell(cellNum++).setCellValue(scheduleResult.getDayPlanQty() == null ? 0 : scheduleResult.getDayPlanQty());
-                row.createCell(cellNum++).setCellValue(scheduleResult.getDayFinishQty() == null ? 0 : scheduleResult.getDayFinishQty());
-                String dayFinishRate = scheduleResult.getDayFinishRate() == null ? "" : df.format(scheduleResult.getDayFinishRate().doubleValue());
-                row.createCell(cellNum++).setCellValue(dayFinishRate);
-                row.createCell(cellNum++).setCellValue(scheduleResult.getDayProduceOrder() == null ? 0 : scheduleResult.getDayProduceOrder());
-                String sysAnaly = scheduleResult.getDaySysAnalysis();
-                String handAnaly = scheduleResult.getDayHandAnalysis();
-                String anly = "";
-                if (StringUtils.isNotEmpty(sysAnaly)) {
-                    anly = anly + sysAnaly;
-                }
-                if (StringUtils.isNotEmpty(handAnaly)) {
-                    if (StringUtils.isNotEmpty(anly)) {
-                        anly = anly + "," + handAnaly;
-                    } else {
-                        anly = handAnaly;
-                    }
-                }
-                row.createCell(cellNum++).setCellValue(anly);
-                row.createCell(cellNum++).setCellValue(scheduleResult.getNextMidPlanQty() == null ? 0 : scheduleResult.getNextMidPlanQty());
-                row.createCell(cellNum++).setCellValue(scheduleResult.getNextMidFinishQty() == null ? 0 : scheduleResult.getNextMidFinishQty());
-                String nextMidFinishRate = scheduleResult.getNextMidFinishRate() == null ? "" : df.format(scheduleResult.getNextMidFinishRate());
-                row.createCell(cellNum++).setCellValue(nextMidFinishRate);
-                row.createCell(cellNum++).setCellValue(scheduleResult.getNextMidProduceOrder() == null ? 0 : scheduleResult.getNextMidProduceOrder());
-                String nextMidSysAnalysis = scheduleResult.getNextMidSysAnalysis();
-                String nextMidHandAnalysis = scheduleResult.getNextMidHandAnalysis();
-                String nextMidAnalysis = "";
-                if (StringUtils.isNotEmpty(nextMidSysAnalysis)) {
-                    nextMidAnalysis = nextMidAnalysis + nextMidSysAnalysis;
-                }
-                if (StringUtils.isNotEmpty(nextMidHandAnalysis)) {
-                    if (StringUtils.isNotEmpty(nextMidAnalysis)) {
-                        nextMidAnalysis = nextMidAnalysis + "," + nextMidHandAnalysis;
-                    } else {
-                        nextMidAnalysis = nextMidHandAnalysis;
-                    }
-                }
-                row.createCell(cellNum++).setCellValue(nextMidAnalysis);*/
-                row.createCell(cellNum++).setCellValue(scheduleResult.getCxClass1Plan() == null ? 0 : scheduleResult.getCxClass1Plan());
-                row.createCell(cellNum++).setCellValue(scheduleResult.getCxClass2Plan() == null ? 0 : scheduleResult.getCxClass2Plan());
-                row.createCell(cellNum++).setCellValue(scheduleResult.getCxClass3Plan() == null ? 0 : scheduleResult.getCxClass3Plan());
-                row.createCell(cellNum++).setCellValue(scheduleResult.getCxClass4Plan() == null ? 0 : scheduleResult.getCxClass4Plan());
-                row.createCell(cellNum++).setCellValue(scheduleResult.getCxClass5Plan() == null ? 0 : scheduleResult.getCxClass5Plan());
-                row.createCell(cellNum).setCellValue(scheduleResult.getRemark() == null ? "" : scheduleResult.getRemark());
-                setCellStyle(row, row.getPhysicalNumberOfCells(), cellStyle);
+            if (hasSequence && !hasPlanQty) {
+                return AjaxResult.error("第" + i + "班有顺序，计划量也必须有值");
             }
-            //重置表头基本信息
-            String dateStr="";
-            if("zh_CN".equals(lang.toString())){
-                dateStr=DateUtils.parseDateToStr("MM月dd日",list.get(0).getScheduleDate());
-            }else{
-                String monthStr=month+"";
-                String dayStr=day+"";
-                if(monthStr.length()<=1){
-                    monthStr="0"+month;
-                }
-                if(dayStr.length()<=1){
-                    dayStr="0"+day;
-                }
-                dateStr=DateUtil.getEngMonthDay(monthStr+dayStr) + " ";
-            }
-            String baseInfo=I18nUtil.getMessage("ui.data.column.scheduleResult.tq.baseInfo");
-            String class1Plan=I18nUtil.getMessage("ui.data.column.scheduleResult.heji.zhongban");
-            String class2Plan=I18nUtil.getMessage("ui.data.column.scheduleResult.heji.yeban");
-//            String class3Plan=I18nUtil.getMessage("ui.data.column.scheduleResult.heji.baiban");
-//            String class4Plan=I18nUtil.getMessage("ui.data.column.scheduleResult.heji.cirizhongban");
-            String totalQty=I18nUtil.getMessage("ui.data.column.scheduleResult.totalQty");
-            String planInfo = '：'+class1Plan+'：'+midPlan.setScale(0,BigDecimal.ROUND_HALF_UP)+'，'+class2Plan+'：'+nightPlan.setScale(0,BigDecimal.ROUND_HALF_UP)+'，'
-//                    +class3Plan+'：'+dayPlan.setScale(0,BigDecimal.ROUND_HALF_UP)+'，'+class4Plan+'：'+nextMidPlan.setScale(0,BigDecimal.ROUND_HALF_UP)+'，'
-                    +totalQty+'：'+(midPlan.add(nightPlan)).setScale(0,BigDecimal.ROUND_HALF_UP);
-            baseInfo=dateStr+baseInfo+planInfo;
-            Cell cell0=sheet.getRow(0).getCell(0);
-            CellStyle cellStyle0=cell0.getCellStyle();
-            cell0.setCellValue(baseInfo);
-            cell0.setCellStyle(cellStyle0);
         }
-        //写出字节流
-        ByteArrayOutputStream out = null;
-        byte[] data = null;
+
+        // 6. 只能往当前班次或后续班次插单
+        int currentShiftIndex = resolveCurrentShiftIndex();
+        for (int i = 1; i < currentShiftIndex; i++) {
+            Integer planQty = getPlanQtyByClassIndex(dto, i);
+            if (planQty != null && planQty > 0) {
+                return AjaxResult.error("不能往历史班次插单，当前班次为第" + currentShiftIndex + "班");
+            }
+        }
+
+        // 7. 插单只能加到第二个在产规格之后
+        // 查询该机台该日期已有排程记录
+        LambdaQueryWrapper<TqScheduleResult> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(TqScheduleResult::getScheduleDate, dto.getScheduleDate());
+        wrapper.eq(TqScheduleResult::getMachineCode, dto.getMachineCode());
+        wrapper.eq(TqScheduleResult::getIsDelete, 0);
+        wrapper.orderByAsc(TqScheduleResult::getClass1Sequence);
+        List<TqScheduleResult> existingList = tqScheduleResultMapper.selectList(wrapper);
+        if (existingList.size() >= 2) {
+            // 第二个在产规格的最大顺序号
+            int secondSpecMaxSeq = getMinSequenceFromSecondSpec(existingList);
+            for (int i = 1; i <= 6; i++) {
+                Integer sequence = getSequenceByClassIndex(dto, i);
+                if (sequence != null && sequence < secondSpecMaxSeq) {
+                    return AjaxResult.error("插单只能加到第二个在产规格之后，顺序号不能小于" + secondSpecMaxSeq);
+                }
+            }
+        }
+
+        return AjaxResult.success("校验通过");
+    }
+
+    /**
+     * 插单
+     *
+     * @param dto 插单数据
+     * @return 结果
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public AjaxResult insertOrder(TqInsertOrderDTO dto) {
+        // 先执行校验
+        AjaxResult validateResult = validateInsertOrder(dto);
+        if (!validateResult.get(AjaxResult.CODE_TAG).equals(200)) {
+            return validateResult;
+        }
+
+        // 构建排程记录实体
+        TqScheduleResult entity = new TqScheduleResult();
+        entity.setScheduleDate(dto.getScheduleDate());
+        entity.setBeadCode(dto.getBeadCode());
+        entity.setMachineCode(dto.getMachineCode());
+        entity.setDataSource("1"); // 插单
+        entity.setIsRelease("0"); // 未发布
+
+        // 填充6个班次字段
+        entity.setClass1PlanQty(dto.getClass1PlanQty());
+        entity.setClass1Sequence(dto.getClass1Sequence());
+        entity.setClass1Analysis(dto.getClass1Analysis());
+        entity.setClass2PlanQty(dto.getClass2PlanQty());
+        entity.setClass2Sequence(dto.getClass2Sequence());
+        entity.setClass2Analysis(dto.getClass2Analysis());
+        entity.setClass3PlanQty(dto.getClass3PlanQty());
+        entity.setClass3Sequence(dto.getClass3Sequence());
+        entity.setClass3Analysis(dto.getClass3Analysis());
+        entity.setClass4PlanQty(dto.getClass4PlanQty());
+        entity.setClass4Sequence(dto.getClass4Sequence());
+        entity.setClass4Analysis(dto.getClass4Analysis());
+        entity.setClass5PlanQty(dto.getClass5PlanQty());
+        entity.setClass5Sequence(dto.getClass5Sequence());
+        entity.setClass5Analysis(dto.getClass5Analysis());
+        entity.setClass6PlanQty(dto.getClass6PlanQty());
+        entity.setClass6Sequence(dto.getClass6Sequence());
+        entity.setClass6Analysis(dto.getClass6Analysis());
+
+        entity.setRemark(dto.getRemark());
+
+        // TODO 生成批次号、工单号
+
+        // 插入数据库
+        tqScheduleResultMapper.insert(entity);
+
+        // 滚动更新：对每个有计划量的班次执行同班次内时间重算
+        triggerRollingUpdateForAllShifts("1", entity.getId(), entity);
+
+        // 记录调度日志（6班次制，操作类型：2-插单，无操作前数据）
+        recordDispatcherLog(ApsConstant.DISPATCHER_OPER_INSERT_ORDER, entity, null, entity);
+
+        log.info("胎圈排程插单成功，排程日期：{}，胎圈代码：{}，机台：{}",
+                dto.getScheduleDate(), dto.getBeadCode(), dto.getMachineCode());
+
+        return AjaxResult.success("插单成功");
+    }
+
+    /**
+     * 转机台前校验
+     *
+     * @param dto 转机台数据
+     * @return 校验结果
+     */
+    @Override
+    public AjaxResult validateChangeMachine(TqChangeMachineDTO dto) {
+        if (dto.getId() == null) {
+            return AjaxResult.error("请选择需要转机台的记录");
+        }
+        if (ObjectUtils.isEmpty(dto.getNewMachineCode())) {
+            return AjaxResult.error("新机台编号不能为空");
+        }
+        if (dto.getNewMachineCode().equals(dto.getOldMachineCode())) {
+            return AjaxResult.error("新机台与原机台不能相同");
+        }
+
+        // 校验排程记录是否存在
+        TqScheduleResult record = tqScheduleResultMapper.selectById(dto.getId());
+        if (record == null || Objects.equals(record.getIsDelete(), 1)) {
+            return AjaxResult.error("排程记录不存在或已删除");
+        }
+
+        // TODO 校验新机台是否在胎圈机台管理中存在
+
+        return AjaxResult.success("校验通过");
+    }
+
+    /**
+     * 转机台
+     *
+     * @param dto 转机台数据
+     * @return 结果
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public AjaxResult changeMachine(TqChangeMachineDTO dto) {
+        // 先执行校验
+        AjaxResult validateResult = validateChangeMachine(dto);
+        if (!validateResult.get(AjaxResult.CODE_TAG).equals(200)) {
+            return validateResult;
+        }
+
+        // 查询原记录
+        TqScheduleResult record = tqScheduleResultMapper.selectById(dto.getId());
+        String oldMachineCode = record.getMachineCode();
+
+        // 更新机台编号
+        LambdaUpdateWrapper<TqScheduleResult> updateWrapper = new LambdaUpdateWrapper<>();
+        updateWrapper.eq(TqScheduleResult::getId, dto.getId())
+                .set(TqScheduleResult::getMachineCode, dto.getNewMachineCode());
+
+        // 如果原排程已发布成功，更新发布状态为待发布
+        if ("1".equals(record.getIsRelease())) {
+            updateWrapper.set(TqScheduleResult::getIsRelease, "0");
+        }
+
+        tqScheduleResultMapper.update(null, updateWrapper);
+
+        // 滚动更新：原机台和新机台都需要重算（每个有计划量的班次）
+        // 原机台：删除任务后重算
+        triggerRollingUpdateForAllShifts("2", dto.getId(), record);
+        // 新机台：新增任务后重算
+        TqScheduleResult newMachineRecord = new TqScheduleResult();
+        newMachineRecord.setId(record.getId());
+        newMachineRecord.setScheduleDate(record.getScheduleDate());
+        newMachineRecord.setMachineCode(dto.getNewMachineCode());
+        newMachineRecord.setBeadCode(record.getBeadCode());
+        newMachineRecord.setClass1PlanQty(record.getClass1PlanQty());
+        newMachineRecord.setClass2PlanQty(record.getClass2PlanQty());
+        newMachineRecord.setClass3PlanQty(record.getClass3PlanQty());
+        newMachineRecord.setClass4PlanQty(record.getClass4PlanQty());
+        newMachineRecord.setClass5PlanQty(record.getClass5PlanQty());
+        newMachineRecord.setClass6PlanQty(record.getClass6PlanQty());
+        triggerRollingUpdateForAllShifts("2", dto.getId(), newMachineRecord);
+
+        // 记录调度日志（6班次制，操作类型：0-转机台，操作前=原机台记录，操作后=新机台记录）
+        recordDispatcherLog(ApsConstant.DISPATCHER_OPER_MACHINE, record, record, newMachineRecord);
+
+        log.info("胎圈排程转机台成功，id：{}，原机台：{}，新机台：{}",
+                dto.getId(), oldMachineCode, dto.getNewMachineCode());
+
+        return AjaxResult.success("转机台成功");
+    }
+
+    /**
+     * 调量前校验
+     * 校验规则：
+     * 1. 排程记录必须存在且未删除
+     * 2. 至少有一个班次的计划量被修改
+     * 3. 计划量不能小于0
+     * 4. 历史班次不允许修改计划量（根据当前时间和排程日期判断）
+     * 5. 非历史班次的计划量不能小于完成量
+     *
+     * @param entity 调量数据
+     * @return 校验结果
+     */
+    @Override
+    public AjaxResult validateChangeQty(TqScheduleResult entity) {
+        if (entity == null || entity.getId() == null) {
+            return AjaxResult.error("请选择需要调量的排程记录");
+        }
+
+        TqScheduleResult record = tqScheduleResultMapper.selectById(entity.getId());
+        if (record == null || Objects.equals(record.getIsDelete(), 1)) {
+            return AjaxResult.error("排程记录不存在或已删除");
+        }
+
+        Date now = new Date();
+        boolean hasAdjustField = false;
+        List<String> errorMessages = new ArrayList<>();
+
+        for (int shiftIndex = 1; shiftIndex <= 6; shiftIndex++) {
+            Integer newPlanQty = getPlanQtyByShiftIndex(entity, shiftIndex);
+            Integer oldPlanQty = getPlanQtyByShiftIndex(record, shiftIndex);
+
+            // 只检查被修改的班次
+            if (newPlanQty == null || Objects.equals(newPlanQty, oldPlanQty)) {
+                continue;
+            }
+
+            hasAdjustField = true;
+
+            // 规则3：计划量不能小于0
+            if (newPlanQty < 0) {
+                errorMessages.add(String.format("第%d班计划量不能小于0", shiftIndex));
+                continue;
+            }
+
+            // 判断是否为历史班次
+            boolean historyShift = isHistoryShift(record, shiftIndex, now);
+
+            if (historyShift) {
+                // 规则4：历史班次不允许修改
+                errorMessages.add(String.format("不能修改历史班次（第%d班）的计划量", shiftIndex));
+            } else {
+                // 规则5：非历史班次计划量不能小于完成量
+                Integer finishQty = getFinishQtyByShiftIndex(record, shiftIndex);
+                if (finishQty != null && finishQty > 0 && newPlanQty < finishQty) {
+                    errorMessages.add(String.format("第%d班计划量不能小于完成量%d", shiftIndex, finishQty));
+                }
+            }
+        }
+
+        if (!hasAdjustField) {
+            errorMessages.add("未检测到需要调整的计划量");
+        }
+
+        if (!errorMessages.isEmpty()) {
+            return AjaxResult.error(String.join("；", errorMessages));
+        }
+
+        return AjaxResult.success("校验通过");
+    }
+
+    /**
+     * 调量
+     * 业务逻辑：
+     * 1. 前置校验
+     * 2. 更新各班次计划量和原因分析
+     * 3. 如果原排程已发布成功，更新发布状态为待发布
+     * 4. 记录操作日志
+     *
+     * @param entity 调量数据
+     * @return 结果
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public AjaxResult changeQty(TqScheduleResult entity) {
+        // 1. 前置校验
+        AjaxResult validateResult = validateChangeQty(entity);
+        if (!validateResult.get(AjaxResult.CODE_TAG).equals(200)) {
+            return validateResult;
+        }
+
+        // 2. 查询原记录
+        TqScheduleResult record = tqScheduleResultMapper.selectById(entity.getId());
+        if (record == null) {
+            return AjaxResult.error("排程记录不存在或已删除");
+        }
+
+        // 3. 构建更新wrapper
+        LambdaUpdateWrapper<TqScheduleResult> updateWrapper = new LambdaUpdateWrapper<>();
+        updateWrapper.eq(TqScheduleResult::getId, entity.getId());
+
+        boolean hasChange = false;
+
+        // 4. 更新各班次计划量和原因分析
+        for (int shiftIndex = 1; shiftIndex <= 6; shiftIndex++) {
+            Integer newPlanQty = getPlanQtyByShiftIndex(entity, shiftIndex);
+            Integer oldPlanQty = getPlanQtyByShiftIndex(record, shiftIndex);
+            String newAnalysis = getAnalysisByShiftIndex(entity, shiftIndex);
+            String oldAnalysis = getAnalysisByShiftIndex(record, shiftIndex);
+
+            // 更新被修改的计划量
+            if (newPlanQty != null && !Objects.equals(newPlanQty, oldPlanQty)) {
+                setPlanQtyToUpdateWrapper(updateWrapper, shiftIndex, newPlanQty);
+                hasChange = true;
+            }
+
+            // 更新原因分析（非空且与原值不同时更新）
+            if (newAnalysis != null && !newAnalysis.equals(oldAnalysis)) {
+                setAnalysisToUpdateWrapper(updateWrapper, shiftIndex, newAnalysis);
+                hasChange = true;
+            }
+        }
+
+        if (!hasChange) {
+            return AjaxResult.error("没有需要保存的修改内容");
+        }
+
+        // 5. 更新备注
+        if (entity.getRemark() != null && !entity.getRemark().equals(record.getRemark())) {
+            updateWrapper.set(TqScheduleResult::getRemark, entity.getRemark());
+        }
+
+        // 6. 状态更新：如果原排程已发布成功（isRelease=1），更新为待发布（isRelease=0）
+        // 发布状态：0-未发布，1-已发布，2-发布失败，3-待发布
+        if ("1".equals(record.getIsRelease())) {
+            updateWrapper.set(TqScheduleResult::getIsRelease, "3");
+        }
+
+        // 7. 执行更新
+        tqScheduleResultMapper.update(null, updateWrapper);
+
+        log.info("胎圈排程调量成功，id：{}，胎圈代码：{}，机台：{}",
+                entity.getId(), record.getBeadCode(), record.getMachineCode());
+
+        // 8. 滚动更新：对每个被修改的班次执行同班次内时间重算
+        triggerRollingUpdateForAllShifts("3", entity.getId(), record);
+
+        // 9. 记录调度日志（6班次制，操作类型：1-调量，操作前=原记录，操作后=更新后记录）
+        TqScheduleResult afterRecord = tqScheduleResultMapper.selectById(entity.getId());
+        recordDispatcherLog(ApsConstant.DISPATCHER_OPER_PLAN, record, record, afterRecord);
+
+        return AjaxResult.success("调量成功");
+    }
+
+    /**
+     * 逻辑删除排程记录
+     * 只能删除发布成功次数等于0的计划
+     *
+     * @param ids 需要删除的记录ID列表
+     * @return 结果
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public AjaxResult logicDeleteByIds(List<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return AjaxResult.error("请选择需要删除的记录");
+        }
+
+        for (Long id : ids) {
+            TqScheduleResult record = tqScheduleResultMapper.selectById(id);
+            if (record == null) {
+                continue;
+            }
+            // 校验：已发布成功的计划不允许删除
+            if ("1".equals(record.getIsRelease())) {
+                return AjaxResult.error("已发布成功的计划不允许删除，只能调量。胎圈代码：" + record.getBeadCode());
+            }
+
+            // 逻辑删除：更新 is_delete = 1
+            LambdaUpdateWrapper<TqScheduleResult> updateWrapper = new LambdaUpdateWrapper<>();
+            updateWrapper.eq(TqScheduleResult::getId, id)
+                    .set(TqScheduleResult::getIsDelete, 1);
+            tqScheduleResultMapper.update(null, updateWrapper);
+
+            // 滚动更新：删除后对每个有计划量的班次执行同班次内时间重算
+            triggerRollingUpdateForAllShifts("4", id, record);
+
+            // 记录调度日志（6班次制，操作类型：3-删除，操作前=原记录，操作后=null）
+            recordDispatcherLog(ApsConstant.DISPATCHER_OPER_DELETE, record, record, null);
+
+            log.info("胎圈排程逻辑删除成功，id：{}，胎圈代码：{}", id, record.getBeadCode());
+        }
+
+        return AjaxResult.success("删除成功");
+    }
+
+    /**
+     * 发布排程到MES
+     * 业务流程：
+     * 1. 查询排程日期下所有未发布/发布失败/待发布的胎圈排程记录
+     * 2. 校验机台是否已分配
+     * 3. 将6班数据拆分为3天的TqScheduleResultIssue列表（D日/D+1日/D+2日）
+     * 4. 通过Feign调用itf服务的issueTqScheduleResult接口下发到MES
+     * 5. 根据返回结果更新发布状态
+     *
+     * 6班→3天拆分映射：
+     * Day1(D日)：MID=胎圈1班, NIGHT=null, DAY=null
+     * Day2(D+1日)：NIGHT=胎圈2班, DAY=胎圈3班, MID=胎圈4班
+     * Day3(D+2日)：NIGHT=胎圈5班, DAY=胎圈6班, MID=null
+     * CX_CLASS3~8_PLAN全量传递到每条记录
+     *
+     * @param queryVO 查询条件（含排程日期等）
+     * @return 结果
+     */
+    @Override
+    public AjaxResult publish(TqScheduleResult queryVO) {
+        Date scheduleDate = queryVO.getScheduleDateQuery();
+        if (scheduleDate == null) {
+            return AjaxResult.error("排程日期不能为空");
+        }
+        log.info("胎圈排程发布，排程日期：{}", scheduleDate);
+
+        // 1. 查询该排程日期下所有未发布/发布失败/待发布的记录
+        LambdaQueryWrapper<TqScheduleResult> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(TqScheduleResult::getIsDelete, 0);
+        wrapper.eq(TqScheduleResult::getScheduleDate, scheduleDate);
+        wrapper.in(TqScheduleResult::getIsRelease,
+                ApsConstant.NO_RELEASE, ApsConstant.FAILURE_RELEASE, ApsConstant.WAIT_RELEASING);
+        List<TqScheduleResult> scheduleList = tqScheduleResultMapper.selectList(wrapper);
+
+        if (CollectionUtils.isEmpty(scheduleList)) {
+            return AjaxResult.error("没有需要发布的排程数据");
+        }
+
+        // 2. 校验机台是否已分配
+        List<TqScheduleResult> noMachineList = scheduleList.stream()
+                .filter(s -> StringUtils.isBlank(s.getMachineCode()))
+                .collect(Collectors.toList());
+        if (CollectionUtils.isNotEmpty(noMachineList)) {
+            return AjaxResult.error("存在未分配机台的排程记录，请先分配机台");
+        }
+
+        // 3. 将6班数据拆分为3天的下发列表
+        List<TqScheduleResultIssue> issueList = new ArrayList<>();
+        for (TqScheduleResult source : scheduleList) {
+            // D日 = 排程日期 - 2
+            Date dDay = DateUtil.offsetDay(scheduleDate, -2);
+            Date dPlus1Day = DateUtil.offsetDay(scheduleDate, -1);
+            Date dPlus2Day = scheduleDate;
+
+            // Day1(D日)：胎圈1班→MES中班
+            TqScheduleResultIssue day1Issue = buildDay1Issue(source, dDay);
+            issueList.add(day1Issue);
+
+            // Day2(D+1日)：胎圈2班→MES夜班, 胎圈3班→MES早班, 胎圈4班→MES中班
+            TqScheduleResultIssue day2Issue = buildDay2Issue(source, dPlus1Day);
+            issueList.add(day2Issue);
+
+            // Day3(D+2日)：胎圈5班→MES夜班, 胎圈6班→MES早班
+            TqScheduleResultIssue day3Issue = buildDay3Issue(source, dPlus2Day);
+            issueList.add(day3Issue);
+        }
+
+        // 4. 更新发布状态为"发布中"
+        List<Long> ids = scheduleList.stream().map(TqScheduleResult::getId).collect(Collectors.toList());
+        LambdaUpdateWrapper<TqScheduleResult> updateWrapper = new LambdaUpdateWrapper<>();
+        updateWrapper.in(TqScheduleResult::getId, ids);
+        updateWrapper.set(TqScheduleResult::getIsRelease, ApsConstant.RELEASING);
+        tqScheduleResultMapper.update(null, updateWrapper);
+
+        // 5. 通过Feign调用itf服务下发到MES
+        AjaxResult ajaxResult;
         try {
-            out = new ByteArrayOutputStream();
-            webBook.write(out);
-            data = out.toByteArray();
-        } catch (IOException e) {
-            e.printStackTrace();
-        } finally {
-            try {
-                assert out != null;
-                out.close();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
+            ajaxResult = mesItfService.issueTqScheduleResult(issueList);
+            // 根据返回结果更新发布状态
+            String status = ajaxResult.get(AjaxResult.CODE_TAG).equals(200)
+                    ? ApsConstant.IS_RELEASE
+                    : ApsConstant.FAILURE_RELEASE;
+            LambdaUpdateWrapper<TqScheduleResult> resultWrapper = new LambdaUpdateWrapper<>();
+            resultWrapper.in(TqScheduleResult::getId, ids);
+            resultWrapper.set(TqScheduleResult::getIsRelease, status);
+            tqScheduleResultMapper.update(null, resultWrapper);
+        } catch (Exception e) {
+            log.error("胎圈排程发布失败", e);
+            // 发布失败，更新状态
+            LambdaUpdateWrapper<TqScheduleResult> errorWrapper = new LambdaUpdateWrapper<>();
+            errorWrapper.in(TqScheduleResult::getId, ids);
+            errorWrapper.set(TqScheduleResult::getIsRelease, ApsConstant.FAILURE_RELEASE);
+            tqScheduleResultMapper.update(null, errorWrapper);
+            return AjaxResult.error("胎圈排程发布失败：" + e.getMessage());
         }
-        return data;
+
+        return ajaxResult;
     }
 
     /**
-     * 给导出的数据增加汇总行
-     * @param list
-     */
-    private TqScheduleResultDto summaryExport(List<TqScheduleResultDto> list) {
-        if(list == null || list.isEmpty()) {
-            return null;
-        }
-        TqScheduleResultDto summary = new  TqScheduleResultDto();
-        summary.setBeadCode(I18nUtil.getMessage("ui.data.column.scheduleResult.totalQty"));
-        summary.setMidPlanQty(list.stream().mapToDouble(r->getDoubleOrDefault(r.getMidPlanQty())).sum());
-        summary.setMidFinishQty(list.stream().mapToDouble(r->getDoubleOrDefault(r.getMidFinishQty())).sum());
-        summary.setNightPlanQty(list.stream().mapToDouble(r->getDoubleOrDefault(r.getNightPlanQty())).sum());
-        summary.setNightFinishQty(list.stream().mapToDouble(r->getDoubleOrDefault(r.getNightFinishQty())).sum());
-        summary.setDayPlanQty(list.stream().mapToDouble(r->getDoubleOrDefault(r.getDayPlanQty())).sum());
-        summary.setDayFinishQty(list.stream().mapToDouble(r->getDoubleOrDefault(r.getDayFinishQty())).sum());
-        summary.setNextMidPlanQty(list.stream().mapToDouble(r->getDoubleOrDefault(r.getNextMidPlanQty())).sum());
-        summary.setNextMidFinishQty(list.stream().mapToDouble(r->getDoubleOrDefault(r.getNextMidFinishQty())).sum());
-        summary.setDailyTotalQty(BigDecimalUtil.add(summary.getMidPlanQty(), summary.getNightPlanQty()
-//                , summary.getDayPlanQty()
-        ));
-
-        summary.setCxClass1Plan(list.stream().mapToDouble(r->getDoubleOrDefault(r.getCxClass1Plan())).sum());
-        summary.setCxClass2Plan(list.stream().mapToDouble(r->getDoubleOrDefault(r.getCxClass2Plan())).sum());
-        summary.setCxClass3Plan(list.stream().mapToDouble(r->getDoubleOrDefault(r.getCxClass3Plan())).sum());
-        summary.setCxClass4Plan(list.stream().mapToDouble(r->getDoubleOrDefault(r.getCxClass4Plan())).sum());
-        summary.setCxClass5Plan(list.stream().mapToDouble(r->getDoubleOrDefault(r.getCxClass5Plan())).sum());
-        list.add(summary);
-        return summary;
-    }
-
-    @Override
-    public void publish(TqScheduleResult scheduleResult, long[] ids, String dataVersion, String factoryCode, String companyCode) {
-        //把排程数据发布到中间库
-        this.deployScheduleToMid(ids, dataVersion, factoryCode, companyCode);
-        //保存发布日志
-        SchedulePublishRecord record = new SchedulePublishRecord();
-        record.setBaseVale(null);
-        record.setProcedureCode(ApsConstant.PROCEDURE_CODE_TQ);
-        record.setScheduleDate(scheduleResult.getScheduleDate());
-        record.setPublishStatus(ApsConstant.RELEASING);
-        record.setDataVersion(dataVersion);
-        scheduleResultMapper.insertPublishRecord(record);
-        if (ids == null || ids.length == 0) {
-            //设置更新人和更新时间
-            scheduleResult.setBaseVale(0L);
-            scheduleResult.setIsRelease("1");
-            scheduleResultMapper.publishAll(scheduleResult);
-        }
-        // ids不为空，发布指定记录，需求暂未变更，变更后测试
-        scheduleResultMapper.batchUpdate(Arrays.stream(ids)
-                .boxed().collect(Collectors.toList()), ApsConstant.RELEASING);
-    }
-
-	/**
-	 * 更新指定相关数据记录的发布状态
-	 *
-	 * @param dataVersion 数据版本
-	 * @param ids         排程ID列表
-	 * @param status      更新的状态
-	 */
-    @Override
-    public void updateRelaseStatus(String dataVersion, long[] ids, String status) {
-        scheduleResultMapper.batchUpdate(Arrays.stream(ids)
-                .boxed().collect(Collectors.toList()), status);
-        scheduleResultMapper.updatePublishRecordVersion(dataVersion, status);
-    }
-
-    /**
-     * 发布排程数据到中间库,并通知 MES
+     * 构建D日（今天）下发数据
+     * 胎圈1班(D日中班) → MES中班(MID_PLAN_QTY)
+     * 夜班、早班已过不下发，NEXT_MID不下发
      *
-     * @param ids 发布的排程记录id
+     * @param source 胎圈排程结果
+     * @param dDay   D日日期
+     * @return D日下发对象
      */
-    private void deployScheduleToMid(long[] ids, String dataVersion, String factoryCode, String companyCode) {
-        if (ids == null) {
-            return;
-        }
-        //把排程数据同步到接口中间库中
-        scheduleResultMapper.deployTqScheduleToMid(dataVersion, ids, factoryCode, companyCode);
+    private TqScheduleResultIssue buildDay1Issue(TqScheduleResult source, Date dDay) {
+        TqScheduleResultIssue issue = buildBaseIssue(source, dDay);
+        // 胎圈1班→MES中班
+        issue.setMidPlanQty(source.getClass1PlanQty() != null ? source.getClass1PlanQty().doubleValue() : null);
+        issue.setMidProduceOrder(source.getClass1Sequence());
+        // 夜班、早班已过不下发
+        issue.setNightPlanQty(null);
+        issue.setNightProduceOrder(null);
+        issue.setDayPlanQty(null);
+        issue.setDayProduceOrder(null);
+        issue.setNextMidPlanQty(null);
+        issue.setNextMidProduceOrder(null);
+        return issue;
+    }
+
+    /**
+     * 构建D+1日（明天）下发数据
+     * 胎圈2班(D+1日夜班) → MES夜班(NIGHT_PLAN_QTY)
+     * 胎圈3班(D+1日早班) → MES早班(DAY_PLAN_QTY)
+     * 胎圈4班(D+1日中班) → MES中班(MID_PLAN_QTY)
+     * NEXT_MID不下发
+     *
+     * @param source    胎圈排程结果
+     * @param dPlus1Day D+1日日期
+     * @return D+1日下发对象
+     */
+    private TqScheduleResultIssue buildDay2Issue(TqScheduleResult source, Date dPlus1Day) {
+        TqScheduleResultIssue issue = buildBaseIssue(source, dPlus1Day);
+        // 胎圈2班→MES夜班
+        issue.setNightPlanQty(source.getClass2PlanQty() != null ? source.getClass2PlanQty().doubleValue() : null);
+        issue.setNightProduceOrder(source.getClass2Sequence());
+        // 胎圈3班→MES早班
+        issue.setDayPlanQty(source.getClass3PlanQty() != null ? source.getClass3PlanQty().doubleValue() : null);
+        issue.setDayProduceOrder(source.getClass3Sequence());
+        // 胎圈4班→MES中班
+        issue.setMidPlanQty(source.getClass4PlanQty() != null ? source.getClass4PlanQty().doubleValue() : null);
+        issue.setMidProduceOrder(source.getClass4Sequence());
+        // NEXT_MID不下发
+        issue.setNextMidPlanQty(null);
+        issue.setNextMidProduceOrder(null);
+        return issue;
+    }
+
+    /**
+     * 构建D+2日（后天）下发数据
+     * 胎圈5班(D+2日夜班) → MES夜班(NIGHT_PLAN_QTY)
+     * 胎圈6班(D+2日早班) → MES早班(DAY_PLAN_QTY)
+     * 中班尚未排产不下发，NEXT_MID不下发
+     *
+     * @param source    胎圈排程结果
+     * @param dPlus2Day D+2日日期
+     * @return D+2日下发对象
+     */
+    private TqScheduleResultIssue buildDay3Issue(TqScheduleResult source, Date dPlus2Day) {
+        TqScheduleResultIssue issue = buildBaseIssue(source, dPlus2Day);
+        // 胎圈5班→MES夜班
+        issue.setNightPlanQty(source.getClass5PlanQty() != null ? source.getClass5PlanQty().doubleValue() : null);
+        issue.setNightProduceOrder(source.getClass5Sequence());
+        // 胎圈6班→MES早班
+        issue.setDayPlanQty(source.getClass6PlanQty() != null ? source.getClass6PlanQty().doubleValue() : null);
+        issue.setDayProduceOrder(source.getClass6Sequence());
+        // 中班尚未排产不下发
+        issue.setMidPlanQty(null);
+        issue.setMidProduceOrder(null);
+        issue.setNextMidPlanQty(null);
+        issue.setNextMidProduceOrder(null);
+        return issue;
+    }
+
+    /**
+     * 构建基础下发对象（公共字段+成型3~8班计划量全量传递）
+     *
+     * @param source       胎圈排程结果
+     * @param scheduleDate MES目标日期
+     * @return 基础下发对象
+     */
+    private TqScheduleResultIssue buildBaseIssue(TqScheduleResult source, Date scheduleDate) {
+        TqScheduleResultIssue issue = new TqScheduleResultIssue();
+        // 日期转换：Date → LocalDate
+        issue.setScheduleDate(scheduleDate.toInstant().atZone(ZoneId.systemDefault()).toLocalDate());
+        // 基础信息
+        issue.setCxBatchNo(source.getCxBatchNo());
+        issue.setBatchNo(source.getBatchNo());
+        issue.setOrderNo(source.getOrderNo());
+        // 物料信息
+        issue.setBeadCode(source.getBeadCode());
+        issue.setSteelRingCode(source.getSteelRingCode());
+        issue.setTriangleGlueCode(source.getTriangleGlueCode());
+        issue.setSpecSize(source.getProSize());
+        issue.setMachineCode(source.getMachineCode());
+        // 库存信息
+        issue.setStockQty(source.getStockQty() != null ? source.getStockQty().doubleValue() : null);
+        // 成型3~8班计划量全量传递（MES通过这些字段理解胎圈与成型的供应关系）
+        // TODO: 成型3~8班计划量需从成型排程结果中获取，暂设为null
+        issue.setCxClass3Plan(null);
+        issue.setCxClass4Plan(null);
+        issue.setCxClass5Plan(null);
+        issue.setCxClass6Plan(null);
+        issue.setCxClass7Plan(null);
+        issue.setCxClass8Plan(null);
+        // 状态
+        issue.setProductionStatus(ApsConstant.NO_PRODUNTION);
+        return issue;
     }
 
     /**
      * 查询排程日期是否已发布
      *
      * @param scheduleDate 排程日期
-     * @return 是否已经发布
+     * @return 是否已发布
      */
     @Override
     public Boolean isPublish(Date scheduleDate) {
-        SchedulePublishRecord record = new SchedulePublishRecord();
-        record.setProcedureCode(ApsConstant.PROCEDURE_CODE_TQ);
-        record.setScheduleDate(scheduleDate);
-        return scheduleResultMapper.isPublish(record) > 0;
+        // TODO 待实现：查询该排程日期下是否所有记录都已发布
+        return false;
     }
 
-    /**
-     * 根据排程日期、物料编号、机台id校验唯一性
-     *
-     * @param scheduleResult 要校验记录
-     * @return 查询到的记录数
-     */
-    @Override
-    public Boolean checkUnique(TqScheduleResult scheduleResult) {
-        return scheduleResultMapper.checkUnique(scheduleResult) == 0;
-    }
+    // ==================== 私有方法 ====================
 
     /**
-     * 导入数据，并保存记录
+     * 记录调度员排程操作日志（6班次制）
      *
-     * @param list          要导入数据
-     * @param importLogId   导入日志id
-     * @return 导入后提示信息
+     * <p>统一封装调度日志写入逻辑，覆盖4种操作类型：
+     * <ul>
+     *   <li>0-转机台：beforeRecord为原机台记录，afterRecord为新机台记录</li>
+     *   <li>1-调量：beforeRecord为原记录，afterRecord为更新后记录</li>
+     *   <li>2-插单：beforeRecord为null，afterRecord为新增记录</li>
+     *   <li>3-删除：beforeRecord为原记录，afterRecord为null</li>
+     * </ul>
+     * 日志异常不影响主操作，仅记录错误日志。
+     *
+     * @param operType     操作类型：0-转机台、1-调量、2-插单、3-删除
+     * @param baseRecord   基础记录（用于获取排程日期、胎圈代码、排程记录ID等公共字段）
+     * @param beforeRecord 操作前记录（用于填充before*字段，插单时为null）
+     * @param afterRecord  操作后记录（用于填充after*字段，删除时为null）
      */
-    @Override
-    public AjaxResult importData(List<TqScheduleResultDto> list, Long importLogId, Date scheduleDate) {
-        int successNum = 0;
-        int failureNum = 0;
-        List<ImportErrorLog> importErrorLogs = new ArrayList<>();
-        List<TqScheduleResultDto> importList = new ArrayList<>();
-
+    private void recordDispatcherLog(String operType, TqScheduleResult baseRecord,
+                                     TqScheduleResult beforeRecord, TqScheduleResult afterRecord) {
         try {
-            //将机台名称转为机台code
-            TqMachineInfo tqMachineInfo= new TqMachineInfo();
-            tqMachineInfo.setStatus("0");
-            List<TqMachineInfo> machineInfoList = machineInfoService.selectMachineInfoList(tqMachineInfo);
-            if (CollectionUtils.isEmpty(machineInfoList)) {
-                // 未查询到机台信息
-                String message = I18nUtil.getMessage("ui.error.message.column.machineIsNull");
-                addImportErrorLog(importLogId, null, message, importErrorLogs);
-                return AjaxResult.error(message, importErrorLogs);
+            if (baseRecord == null) {
+                log.warn("记录调度日志跳过：baseRecord为空");
+                return;
             }
-
-            //根据机台名称去重
-            TreeSet<TqMachineInfo> treeSet = new TreeSet<TqMachineInfo>(new Comparator<TqMachineInfo>() {
-                @Override
-                public int compare(TqMachineInfo o1, TqMachineInfo o2) {
-                    return o1.getMachineName().compareTo(o2.getMachineName());
-                }
-            });
-            treeSet.addAll(machineInfoList);
-            machineInfoList = new ArrayList<>(treeSet);
-
-
-            Map<String, String> machineCodeMap = machineInfoList.stream().collect(Collectors.toMap(TqMachineInfo::getMachineName, TqMachineInfo::getMachineCode));
-            //按业务主键分组
-            Map<String, Long> groupMap = list.stream().collect(Collectors.groupingBy(item -> item.getBeadCode() + item.getMachineCode(), Collectors.counting()));
-
-            for (int i = 0; i < list.size(); i++) {
-                TqScheduleResultDto scheduleResultDto = list.get(i);
-                scheduleResultDto.setDataSource("2");
-                scheduleResultDto.setScheduleDate(scheduleDate);
-
-                if (groupMap.get(scheduleResultDto.getBeadCode() + scheduleResultDto.getMachineCode()) > 1) {
-                    failureNum++;
-                    String message = I18nUtil.getMessage("ui.data.column.all.conflictRecord");
-                    String columnName = I18nUtil.getMessage("ui.data.column.quota.beadCode");
-                    String columnName2 = I18nUtil.getMessage("ui.data.column.scheduleResult.produceLine");
-                    message=String.format(message,columnName+"+"+columnName2);
-                    addImportErrorLog(importLogId, i + 3,message, importErrorLogs);
-                    continue;
-                }
-
-                int errorNum = i + 3;
-                List<ImportErrorLog> validated = ImportUtil.validated(importLogId, errorNum, scheduleResultDto);
-
-                // 机台名称校验
-                if(scheduleResultDto.getMachineCode()!=null && scheduleResultDto.getMachineCode().indexOf(",")>0){
-                    String message = I18nUtil.getMessage("ui.data.column.machine.produceLineValidate");
-                    message=String.format(message, i + 3, I18nUtil.getMessage("ui.data.column.scheduleResult.produceLine"));
-                    addImportErrorLog(importLogId, i + 3,message, validated);
-                }
-                if (machineCodeMap.get(scheduleResultDto.getMachineCode())==null) {
-                    addImportErrorLog(importLogId, i + 3, I18nUtil.getMessage("ui.error.message.column.produceLineNotExist"), validated);
-                }
-
-                if (CollectionUtils.isNotEmpty(validated)) {
-                    failureNum++;
-                    importErrorLogs.addAll(validated);
-                } else {
-                    successNum++;
-                    scheduleResultDto.setMachineCode(machineCodeMap.get(scheduleResultDto.getMachineCode()));
-                    scheduleResultDto.setBaseVale(null);
-                    importList.add(scheduleResultDto);
-                }
+            TqDispatcherLog dispatcherLog = new TqDispatcherLog();
+            dispatcherLog.setOperType(operType);
+            dispatcherLog.setScheduleId(baseRecord.getId());
+            dispatcherLog.setScheduleDate(baseRecord.getScheduleDate());
+            dispatcherLog.setBeadCode(baseRecord.getBeadCode());
+            // 操作前机台编码和6班次计划量
+            if (beforeRecord != null) {
+                dispatcherLog.setBeforeMachineCode(beforeRecord.getMachineCode());
+                dispatcherLog.setBeforeClass1Plan(beforeRecord.getClass1PlanQty());
+                dispatcherLog.setBeforeClass2Plan(beforeRecord.getClass2PlanQty());
+                dispatcherLog.setBeforeClass3Plan(beforeRecord.getClass3PlanQty());
+                dispatcherLog.setBeforeClass4Plan(beforeRecord.getClass4PlanQty());
+                dispatcherLog.setBeforeClass5Plan(beforeRecord.getClass5PlanQty());
+                dispatcherLog.setBeforeClass6Plan(beforeRecord.getClass6PlanQty());
             }
-            this.batchSaveTqSchedule(DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD, scheduleDate), importList);  //把验证成功的记录进行导入
-
+            // 操作后机台编码和6班次计划量
+            if (afterRecord != null) {
+                dispatcherLog.setAfterMachineCode(afterRecord.getMachineCode());
+                dispatcherLog.setAfterClass1Plan(afterRecord.getClass1PlanQty());
+                dispatcherLog.setAfterClass2Plan(afterRecord.getClass2PlanQty());
+                dispatcherLog.setAfterClass3Plan(afterRecord.getClass3PlanQty());
+                dispatcherLog.setAfterClass4Plan(afterRecord.getClass4PlanQty());
+                dispatcherLog.setAfterClass5Plan(afterRecord.getClass5PlanQty());
+                dispatcherLog.setAfterClass6Plan(afterRecord.getClass6PlanQty());
+            }
+            tqDispatcherLogService.insertTqDispatcherLog(dispatcherLog);
         } catch (Exception e) {
-            e.printStackTrace();
-            // 执行sql失败，插入导入失败记录
-            successNum = 0;
-            failureNum = list.size();
-            importErrorLogs.clear();
-            addImportErrorLog(importLogId, null, e.getMessage(), importErrorLogs);
+            // 日志记录失败不影响主操作
+            log.error("记录胎圈调度日志失败，operType：{}，scheduleId：{}", operType, baseRecord.getId(), e);
         }
-        if (failureNum > 0) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.message.import.fail") + "," + successNum + "," + failureNum, importErrorLogs);
+    }
+
+    /**
+     * 根据班次索引获取DTO中的计划量
+     */
+    private Integer getPlanQtyByClassIndex(TqInsertOrderDTO dto, int classIndex) {
+        switch (classIndex) {
+            case 1: return dto.getClass1PlanQty();
+            case 2: return dto.getClass2PlanQty();
+            case 3: return dto.getClass3PlanQty();
+            case 4: return dto.getClass4PlanQty();
+            case 5: return dto.getClass5PlanQty();
+            case 6: return dto.getClass6PlanQty();
+            default: return null;
+        }
+    }
+
+    /**
+     * 根据班次索引获取DTO中的顺序
+     */
+    private Integer getSequenceByClassIndex(TqInsertOrderDTO dto, int classIndex) {
+        switch (classIndex) {
+            case 1: return dto.getClass1Sequence();
+            case 2: return dto.getClass2Sequence();
+            case 3: return dto.getClass3Sequence();
+            case 4: return dto.getClass4Sequence();
+            case 5: return dto.getClass5Sequence();
+            case 6: return dto.getClass6Sequence();
+            default: return null;
+        }
+    }
+
+    /**
+     * 解析当前班次索引（1~6）
+     * 胎圈排程6班次时间窗口：
+     * 1班：D日中班(16:00-24:00)
+     * 2班：D+1日夜班(00:00-08:00)
+     * 3班：D+1日早班(08:00-16:00)
+     * 4班：D+1日中班(16:00-24:00)
+     * 5班：D+2日夜班(00:00-08:00)
+     * 6班：D+2日早班(08:00-16:00)
+     * D = 排程日期 - 2（即今天）
+     *
+     * @return 当前班次索引
+     */
+    private int resolveCurrentShiftIndex() {
+        Date now = new Date();
+        int hour = DateUtil.hour(now, true);
+        // D日就是今天
+        if (hour >= 16) {
+            // 16:00-24:00 属于中班（1班或4班）
+            // 简化处理：返回1，表示当前处于中班时段
+            return 1;
+        } else if (hour >= 8) {
+            // 08:00-16:00 属于早班（3班或6班）
+            return 3;
         } else {
-            return AjaxResult.success(I18nUtil.getMessage("ui.message.import.success") + "," + successNum);
+            // 00:00-08:00 属于夜班（2班或5班）
+            return 2;
         }
     }
 
     /**
-     * 批量更新或新增排程记录信息
+     * 获取第二个在产规格的最小顺序号
+     * 用于校验插单只能加到第二个在产规格之后
      *
-     * @param scheduleDate 排程日志，格式：yyyy-MM-dd
-     * @param importList   导入数据
+     * @param existingList 已有排程记录列表（按顺序排序）
+     * @return 第二个在产规格的最小顺序号
      */
-    private void batchSaveTqSchedule(String scheduleDate, List<TqScheduleResultDto> importList) {
-        List<TqScheduleResultVo> scheduleList = new ArrayList<>();
-        for (TqScheduleResultDto result : importList) {
-            TqScheduleResultVo vo = new TqScheduleResultVo();
-            BeanUtils.copyProperties(result, vo);
-            scheduleList.add(vo);
+    private int getMinSequenceFromSecondSpec(List<TqScheduleResult> existingList) {
+        if (existingList.size() < 2) {
+            return 1;
         }
-        if (!scheduleList.isEmpty()) {
-            this.tqEngineService.batchSaveTqSchedule(scheduleDate, scheduleList);
+        // 取第二条记录的顺序号（取所有班次顺序中最小的非空值）
+        TqScheduleResult secondRecord = existingList.get(1);
+        int minSeq = Integer.MAX_VALUE;
+        if (secondRecord.getClass1Sequence() != null && secondRecord.getClass1Sequence() > 0) {
+            minSeq = Math.min(minSeq, secondRecord.getClass1Sequence());
         }
+        if (secondRecord.getClass2Sequence() != null && secondRecord.getClass2Sequence() > 0) {
+            minSeq = Math.min(minSeq, secondRecord.getClass2Sequence());
+        }
+        if (secondRecord.getClass3Sequence() != null && secondRecord.getClass3Sequence() > 0) {
+            minSeq = Math.min(minSeq, secondRecord.getClass3Sequence());
+        }
+        if (secondRecord.getClass4Sequence() != null && secondRecord.getClass4Sequence() > 0) {
+            minSeq = Math.min(minSeq, secondRecord.getClass4Sequence());
+        }
+        if (secondRecord.getClass5Sequence() != null && secondRecord.getClass5Sequence() > 0) {
+            minSeq = Math.min(minSeq, secondRecord.getClass5Sequence());
+        }
+        if (secondRecord.getClass6Sequence() != null && secondRecord.getClass6Sequence() > 0) {
+            minSeq = Math.min(minSeq, secondRecord.getClass6Sequence());
+        }
+        return minSeq == Integer.MAX_VALUE ? 1 : minSeq;
     }
 
     /**
-     * 设置单元格样式
+     * 触发滚动更新（遍历6个班次，对有计划量的班次执行同班次内时间重算）
      *
-     * @param row       单元行对象
-     * @param cellNum   列数
-     * @param cellStyle 样式
-     */
-    private void setCellStyle(Row row, int cellNum, CellStyle cellStyle) {
-        for (int i = 0; i < cellNum; i++) {
-            row.getCell(i).setCellStyle(cellStyle);
-        }
-    }
-
-    /**
-     * 比较指定字段是否有被修改
+     * <p>MVP阶段：仅同班次内时间重算，不跨班次推迟。</p>
+     * <p>异常处理：滚动更新失败不影响主操作（已插入/修改的数据保留），
+     * 仅记录日志，提示用户重试。</p>
      *
-     * @param scheduleResult 前端传入对象
-     * @param resultDto      查询到的数据
-     * @return 是否被修改
+     * @param triggerType 触发类型：1-插单，2-转机台，3-调量，4-删除
+     * @param sourceId    触发源排程记录ID
+     * @param record      排程记录（含机台、胎圈、6班计划量）
      */
-    private boolean compareFields(TqScheduleResult scheduleResult, TqScheduleResultDto resultDto) {
-        boolean flag;
-        flag = compare(resultDto.getMachineCode(), scheduleResult.getMachineCode());
-        flag = flag && compare(resultDto.getDayPlanQty(), scheduleResult.getDayPlanQty());
-        flag = flag && compare(resultDto.getNightPlanQty(), scheduleResult.getNightPlanQty());
-        flag = flag && compare(resultDto.getMidPlanQty(), scheduleResult.getMidPlanQty());
-        flag = flag && compare(resultDto.getNextMidPlanQty(), scheduleResult.getNextMidPlanQty());
-        flag = flag && compare(resultDto.getDayHandAnalysis(), scheduleResult.getDayHandAnalysis());
-        flag = flag && compare(resultDto.getNightHandAnalysis(), scheduleResult.getNightHandAnalysis());
-        flag = flag && compare(resultDto.getMidHandAnalysis(), scheduleResult.getMidHandAnalysis());
-        flag = flag && compare(resultDto.getNextMidHandAnalysis(), scheduleResult.getNextMidHandAnalysis());
-        flag = flag && compare(resultDto.getDayProduceOrder(), scheduleResult.getDayProduceOrder());
-        flag = flag && compare(resultDto.getNightProduceOrder(), scheduleResult.getNightProduceOrder());
-        flag = flag && compare(resultDto.getMidProduceOrder(), scheduleResult.getMidProduceOrder());
-        flag = flag && compare(resultDto.getNextMidProduceOrder(), scheduleResult.getNextMidProduceOrder());
-        flag = flag && compare(resultDto.getRemark(), scheduleResult.getRemark());
-        return flag;
-    }
-
-    public boolean compare(String str1, String str2) {
-        return (StringUtils.isEmpty(str1) ? StringUtils.isEmpty(str2) : str1.equals(str2));
-    }
-
-    public boolean compare(Integer str1, Integer str2) {
-        return (ObjectUtils.isEmpty(str1) ? ObjectUtils.isEmpty(str2) : str1.equals(str2));
-    }
-
-    /**
-     * 选机台
-     */
-    public AjaxResult chooseMachine(TqScheduleResultDto dto) {
-        TqScheduleResult scheduleResult = new TqScheduleResult();
-        BeanUtils.copyProperties(dto, scheduleResult);
-        if (scheduleResultMapper.checkUnique(scheduleResult) > 0) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.already.exists"));
+    private void triggerRollingUpdateForAllShifts(String triggerType, Long sourceId, TqScheduleResult record) {
+        if (record == null || record.getScheduleDate() == null || StringUtils.isBlank(record.getMachineCode())) {
+            log.warn("触发滚动更新跳过：排程记录信息不完整，sourceId={}", sourceId);
+            return;
         }
 
-        scheduleResult = new TqScheduleResult();
-        this.tqEngineService.confirmTqMachine(dto); //最终确认机台
-        BeanUtils.copyProperties(dto, scheduleResult);
-
-        scheduleResult.setIsRelease(scheduleResult.getPublishSuccessCount() == 0 ? ApsConstant.NO_RELEASE : ApsConstant.WAIT_RELEASING);
-        scheduleResult.setBaseVale(scheduleResult.getId());
-        saveOrUpdate(scheduleResult);
-        return AjaxResult.success();
-    }
-
-
-    /**
-     * 根据排程日期查询当前日期发布状态为"发布中"或"超时失败"的记录
-     *
-     * @param scheduleDate 排程日期
-     * @return 查询到的记录数
-     */
-    @Override
-    public int isReleasingOrTimeoutByDate(Date scheduleDate) {
-        return scheduleResultMapper.isReleasingOrTimeoutByDate(scheduleDate);
-    }
-
-    /**
-     * 根据id查询当前日期发布状态为"发布中"或"超时失败"的记录
-     *
-     * @param ids id
-     * @return 查询到的记录数
-     */
-    @Override
-    public int isReleasingOrTimeoutByIds(long[] ids) {
-        return scheduleResultMapper.isReleasingOrTimeoutByIds(ids);
-    }
-
-    /**
-     * 更改发布状态
-     *
-     * @param entity
-     * @return 结果
-     */
-    @Override
-    public int changeReleaseStatus(TqScheduleResult entity) {
-        SchedulePublishRecord record = new SchedulePublishRecord();
-        record.setBaseVale(1L);
-        record.setProcedureCode(ApsConstant.PROCEDURE_CODE_TQ);
-        record.setScheduleDate(entity.getScheduleDate());
-        record.setPublishStatus(entity.getIsRelease());
-        scheduleResultMapper.updatePublishRecord(record);
-        return scheduleResultMapper.changeReleaseStatus(entity);
-    }
-
-    @Override
-    public int checkTqCodeExist(TqScheduleResultDto dto) {
-        return scheduleResultMapper.checkTqCodeExist(dto);
-    }
-
-    @Override
-    public int isPublishByIds(long[] ids) {
-        return scheduleResultMapper.isPublishByIds(ids);
-    }
-
-    @Override
-    public List<TqScheduleResultDto> selectByIds(List<Long> ids2) {
-        return scheduleResultMapper.selectByIds(ids2);
-    }
-
-    public boolean compare(Double d1, Double d2) {
-        d1 = ObjectUtils.isEmpty(d1) ? 0D : d1;
-        d2 = ObjectUtils.isEmpty(d2) ? 0D : d2;
-        return d1.equals(d2);
-    }
-
-    @Autowired
-    private ITqScheFinishQtyService tqScheFinishQtyService;
-
-    /**
-     * 导入完成量，保存到T_TQ_SCHE_FINISH_QTY，再回写6班制排程结果表
-     * <p>
-     * 6班制处理流程：
-     * 1. 校验导入数据（排程日期、胎圈代码、工单号必填）
-     * 2. 按工厂+排程日期分组，逐组逻辑删除旧数据并批量插入新数据
-     * 3. 调用回写方法，按3班→6班映射关系更新排程结果表完成量
-     * </p>
-     *
-     * @param list        要导入的完成量数据（夜班/早班/中班）
-     * @param importLogId 导入日志id
-     * @return 导入后提示信息
-     */
-    @Override
-    @org.springframework.transaction.annotation.Transactional(rollbackFor = Exception.class)
-    public AjaxResult importFinishQty(List<TqScheFinishQty> list, Long importLogId) {
-        if (CollectionUtils.isEmpty(list)) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.import.nodata"));
-        }
-
-        // 1. 校验导入数据
-        List<ImportErrorLog> errorLogs = new ArrayList<>();
-        int successNum = 0;
-        int failureNum = 0;
-        String updateBy = SecurityUtils.getUsername();
-
-        for (int i = 0; i < list.size(); i++) {
-            TqScheFinishQty item = list.get(i);
-            int rowNum = i + 2; // Excel行号（第1行为表头）
-            // 必填校验：排程日期、胎圈代码、工单号
-            if (item.getScheduleDate() == null) {
-                failureNum++;
-                addImportErrorLog(importLogId, rowNum, "排程日期不能为空", errorLogs);
+        for (int shiftIndex = 1; shiftIndex <= 6; shiftIndex++) {
+            Integer planQty = getPlanQtyByShiftIndex(record, shiftIndex);
+            // 仅对有计划量的班次触发滚动更新
+            if (planQty == null || planQty <= 0) {
                 continue;
             }
-            if (StringUtils.isEmpty(item.getBeadCode())) {
-                failureNum++;
-                addImportErrorLog(importLogId, rowNum, "胎圈代码不能为空", errorLogs);
-                continue;
+            try {
+                RollingUpdateResult result = tqRollingUpdateService.manualRollingUpdate(
+                        triggerType, sourceId, record.getScheduleDate(),
+                        shiftIndex, record.getMachineCode(), record.getBeadCode());
+                if (result.isSuccess()) {
+                    log.info("滚动更新成功，班次：{}，影响记录数：{}", shiftIndex, result.getAffectedCount());
+                } else {
+                    log.warn("滚动更新失败，班次：{}，原因：{}", shiftIndex, result.getErrorMsg());
+                }
+            } catch (Exception e) {
+                // 滚动更新失败不影响主操作，仅记录日志
+                log.error("滚动更新异常，班次：{}，sourceId：{}，原因：{}", shiftIndex, sourceId, e.getMessage(), e);
             }
-            if (StringUtils.isEmpty(item.getOrderNo())) {
-                failureNum++;
-                addImportErrorLog(importLogId, rowNum, "工单号不能为空", errorLogs);
-                continue;
-            }
-            // 设置默认工厂编码
-            if (StringUtils.isEmpty(item.getFactoryCode())) {
-                item.setFactoryCode(factoryService.getFactoryCode());
-            }
-            item.setUpdateBy(updateBy);
-            successNum++;
         }
-
-        // 2. 过滤校验通过的数据
-        List<TqScheFinishQty> validList = list.stream()
-                .filter(item -> item.getScheduleDate() != null
-                        && StringUtils.isNotEmpty(item.getBeadCode())
-                        && StringUtils.isNotEmpty(item.getOrderNo()))
-                .collect(Collectors.toList());
-
-        if (CollectionUtils.isNotEmpty(validList)) {
-            // 按工厂+排程日期分组，逐组逻辑删除旧数据并批量插入
-            Map<String, List<TqScheFinishQty>> groupMap = validList.stream()
-                    .collect(Collectors.groupingBy(item ->
-                            item.getFactoryCode() + "|" + cn.hutool.core.date.DateUtil.formatDate(item.getScheduleDate())));
-
-            for (Map.Entry<String, List<TqScheFinishQty>> entry : groupMap.entrySet()) {
-                List<TqScheFinishQty> groupList = entry.getValue();
-                TqScheFinishQty first = groupList.get(0);
-                tqScheFinishQtyService.logicDeleteAndSaveBatch(
-                        first.getFactoryCode(), first.getScheduleDate(), updateBy, groupList);
-            }
-
-            // 3. 回写6班完成量到排程结果表
-            tqScheFinishQtyService.writeBackScheduleResultFinishQty(validList);
-        }
-
-        // 4. 保存错误日志
-        if (CollectionUtils.isNotEmpty(errorLogs)) {
-            remoteImportErrorLogService.insertImportErrorLogList(errorLogs);
-        }
-
-        // 5. 返回结果
-        if (failureNum > 0) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.import.fail") + "," + successNum + "," + failureNum);
-        }
-        return AjaxResult.success(I18nUtil.getMessage("ui.data.column.import.success") + "," + successNum);
     }
 
     /**
-     * 获取排程日期的昨日早班合计，夜班合计，早班合计，库存合计，理论交班库存合计
+     * 根据班次索引获取实体中的计划量
      *
-     * @param scheduleResult 排程日期
-     * @return 结果
+     * @param entity     排程结果实体
+     * @param shiftIndex 班次索引（1~6）
+     * @return 计划量
      */
-    @Override
-    public AjaxResult getSummaryVo(TqScheduleResult scheduleResult) {
-        List<TqScheduleResultDto> list = selectScheduleResultList(scheduleResult);
-        List<TqScheduleResultDto> lastDayPlanQty4List = scheduleResultMapper.getLastDayPlanQty4List(scheduleResult);
-        // 添加昨日排程有，今日排程没有的物料对象，用于后续计算理论交接班库存合计
-        List<String> resultCodeList = list.stream().map(TqScheduleResultDto::getBeadCode).collect(Collectors.toList());
-        List<String> notExistCodeList = lastDayPlanQty4List.stream().map(TqScheduleResultDto::getBeadCode)
-                .filter(item -> !resultCodeList.contains(item)).collect(Collectors.toList());
-        for (String code : notExistCodeList) {
-            TqScheduleResultDto result = new TqScheduleResultDto();
-            result.setSteelRingCode(code);
-            list.add(result);
+    private Integer getPlanQtyByShiftIndex(TqScheduleResult entity, int shiftIndex) {
+        switch (shiftIndex) {
+            case 1: return entity.getClass1PlanQty();
+            case 2: return entity.getClass2PlanQty();
+            case 3: return entity.getClass3PlanQty();
+            case 4: return entity.getClass4PlanQty();
+            case 5: return entity.getClass5PlanQty();
+            case 6: return entity.getClass6PlanQty();
+            default: return null;
         }
-        Map<String, TqScheduleResultDto> lastDayPlanMap = new HashMap<>(16);
-        if (CollectionUtils.isNotEmpty(lastDayPlanQty4List)) {
-            lastDayPlanMap = lastDayPlanQty4List.stream().collect(Collectors.toMap(TqScheduleResultDto::getBeadCode, Function.identity()));
-        }
-        List<TqScheduleResultDto> cxConsume4List = scheduleResultMapper.getCxConsume4List(scheduleResult);
-        Map<String, TqScheduleResultDto> cxConsumeMap = new HashMap<>(16);
-        if (CollectionUtils.isNotEmpty(cxConsume4List)) {
-            cxConsumeMap = cxConsume4List.stream().collect(Collectors.toMap(TqScheduleResultDto::getBeadCode, Function.identity()));
-        }
-        BigDecimal totalDayPlanQty = BigDecimal.ZERO;
-        BigDecimal totalNightPlanQty = BigDecimal.ZERO;
-        BigDecimal totalNextDayPlanQty = BigDecimal.ZERO;
-        BigDecimal totalStockQty = BigDecimal.ZERO;
-        BigDecimal totalLastDayPlanQty = BigDecimal.ZERO;
-        BigDecimal totalTheoreticClassStockQty = BigDecimal.ZERO;
+    }
 
-        for (TqScheduleResultDto result : list) {
-            Double nightPlanQty = ObjectUtils.defaultIfNull(result.getNightPlanQty(), 0D);
-            Double stockQty = ObjectUtils.defaultIfNull(result.getStockQty(), 0D);
-            String code = result.getBeadCode();
-            if (lastDayPlanMap.containsKey(code)) {
-                TqScheduleResultDto lastDayResult = lastDayPlanMap.get(code);
-                result.setLastMidPlanQty(lastDayResult.getLastMidPlanQty());
-            }
-            if (cxConsumeMap.containsKey(code)) {
-                TqScheduleResultDto cxConsumeResult = cxConsumeMap.get(code);
-                result.setCxConsumeQty(cxConsumeResult.getCxConsumeQty());
-            }
-            Double lastMidPlanQty = result.getLastMidPlanQty();
-            Double cxConsumeQty = result.getCxConsumeQty();
-            // 理论交班库存计算,理论交班库存 = 库存 + 昨日早班 + 夜班 - 成型消耗量
-            if (lastMidPlanQty != null && cxConsumeQty != null) {
-                result.setTheoreticClassStockQty(stockQty + lastMidPlanQty + nightPlanQty - cxConsumeQty);
-            }
+    /**
+     * 根据班次索引获取实体中的完成量
+     *
+     * @param entity     排程结果实体
+     * @param shiftIndex 班次索引（1~6）
+     * @return 完成量
+     */
+    private Integer getFinishQtyByShiftIndex(TqScheduleResult entity, int shiftIndex) {
+        switch (shiftIndex) {
+            case 1: return entity.getClass1FinishQty();
+            case 2: return entity.getClass2FinishQty();
+            case 3: return entity.getClass3FinishQty();
+            case 4: return entity.getClass4FinishQty();
+            case 5: return entity.getClass5FinishQty();
+            case 6: return entity.getClass6FinishQty();
+            default: return null;
+        }
+    }
 
-            totalDayPlanQty = BigDecimalUtils.add(ObjectUtils.defaultIfNull(result.getMidPlanQty(), 0D), totalDayPlanQty);
-            totalNightPlanQty = BigDecimalUtils.add(ObjectUtils.defaultIfNull(result.getNightPlanQty(), 0D), totalNightPlanQty);
-            totalNextDayPlanQty = BigDecimalUtils.add(ObjectUtils.defaultIfNull(result.getDayPlanQty(), 0D), totalNightPlanQty);
-            totalStockQty = BigDecimalUtils.add(ObjectUtils.defaultIfNull(result.getStockQty(), 0D), totalStockQty);
-            totalLastDayPlanQty = BigDecimalUtils.add(ObjectUtils.defaultIfNull(result.getLastMidPlanQty(), 0D), totalLastDayPlanQty);
-            totalTheoreticClassStockQty = BigDecimalUtils.add(ObjectUtils.defaultIfNull(result.getTheoreticClassStockQty(), 0D), totalTheoreticClassStockQty);
+    /**
+     * 根据班次索引获取实体中的原因分析
+     *
+     * @param entity     排程结果实体
+     * @param shiftIndex 班次索引（1~6）
+     * @return 原因分析
+     */
+    private String getAnalysisByShiftIndex(TqScheduleResult entity, int shiftIndex) {
+        switch (shiftIndex) {
+            case 1: return entity.getClass1Analysis();
+            case 2: return entity.getClass2Analysis();
+            case 3: return entity.getClass3Analysis();
+            case 4: return entity.getClass4Analysis();
+            case 5: return entity.getClass5Analysis();
+            case 6: return entity.getClass6Analysis();
+            default: return null;
         }
-        ScheduleSummaryVo scheduleSummaryVo = new ScheduleSummaryVo();
-        scheduleSummaryVo.setDayPlanQty(totalDayPlanQty.doubleValue());
-        scheduleSummaryVo.setNightPlanQty(totalNightPlanQty.doubleValue());
-        scheduleSummaryVo.setNextDayPlanQty(totalNextDayPlanQty.doubleValue());
-        scheduleSummaryVo.setStockQty(totalStockQty.doubleValue());
-        scheduleSummaryVo.setLastDayPlanQty(totalLastDayPlanQty.doubleValue());
-        scheduleSummaryVo.setTheoreticClassStockQty(totalTheoreticClassStockQty.doubleValue());
-        /*ScheduleSummaryVo summaryVo = scheduleResultMapper.getSummaryVo(scheduleResult);
-        if (summaryVo == null) {
-            summaryVo = new ScheduleSummaryVo();
-            summaryVo.setScheduleDate(scheduleResult.getScheduleDate());
+    }
+
+    /**
+     * 设置指定班次计划量到UpdateWrapper
+     *
+     * @param updateWrapper 更新条件
+     * @param shiftIndex    班次索引（1~6）
+     * @param planQty       计划量
+     */
+    private void setPlanQtyToUpdateWrapper(LambdaUpdateWrapper<TqScheduleResult> updateWrapper,
+                                           int shiftIndex, Integer planQty) {
+        switch (shiftIndex) {
+            case 1: updateWrapper.set(TqScheduleResult::getClass1PlanQty, planQty); break;
+            case 2: updateWrapper.set(TqScheduleResult::getClass2PlanQty, planQty); break;
+            case 3: updateWrapper.set(TqScheduleResult::getClass3PlanQty, planQty); break;
+            case 4: updateWrapper.set(TqScheduleResult::getClass4PlanQty, planQty); break;
+            case 5: updateWrapper.set(TqScheduleResult::getClass5PlanQty, planQty); break;
+            case 6: updateWrapper.set(TqScheduleResult::getClass6PlanQty, planQty); break;
+            default: break;
         }
-        ScheduleSummaryVo lastDayPlanQtySummaryVo = scheduleResultMapper.getLastDayPlanQty(scheduleResult);
-        Double lastDayPlanQty = null;
-        if (lastDayPlanQtySummaryVo != null) {
-            lastDayPlanQty = lastDayPlanQtySummaryVo.getNightPlanQty();
-            summaryVo.setLastDayPlanQty(lastDayPlanQty);
+    }
+
+    /**
+     * 设置指定班次原因分析到UpdateWrapper
+     *
+     * @param updateWrapper 更新条件
+     * @param shiftIndex    班次索引（1~6）
+     * @param analysis      原因分析
+     */
+    private void setAnalysisToUpdateWrapper(LambdaUpdateWrapper<TqScheduleResult> updateWrapper,
+                                            int shiftIndex, String analysis) {
+        switch (shiftIndex) {
+            case 1: updateWrapper.set(TqScheduleResult::getClass1Analysis, analysis); break;
+            case 2: updateWrapper.set(TqScheduleResult::getClass2Analysis, analysis); break;
+            case 3: updateWrapper.set(TqScheduleResult::getClass3Analysis, analysis); break;
+            case 4: updateWrapper.set(TqScheduleResult::getClass4Analysis, analysis); break;
+            case 5: updateWrapper.set(TqScheduleResult::getClass5Analysis, analysis); break;
+            case 6: updateWrapper.set(TqScheduleResult::getClass6Analysis, analysis); break;
+            default: break;
         }
-        ScheduleSummaryVo cxConsumeSummaryVo = null;
-        Double cxConsumeQty = null;
-        if (StringUtils.isBlank(scheduleResult.getIsRelease()) && StringUtils.isBlank(scheduleResult.getMachineCode())) {
-            cxConsumeSummaryVo = scheduleResultMapper.getCxConsume(scheduleResult);
+    }
+
+    /**
+     * 判断指定班次是否已成为历史班次
+     * 胎圈排程6班次时间窗口：
+     * 1班：D日中班(16:00-24:00)
+     * 2班：D+1日夜班(00:00-08:00)
+     * 3班：D+1日早班(08:00-16:00)
+     * 4班：D+1日中班(16:00-24:00)
+     * 5班：D+2日夜班(00:00-08:00)
+     * 6班：D+2日早班(08:00-16:00)
+     * D = 排程日期 - 2（即今天）
+     *
+     * @param record     排程结果记录
+     * @param shiftIndex 班次索引（1~6）
+     * @param now        当前时间
+     * @return true表示班次已结束，属于历史班次
+     */
+    private boolean isHistoryShift(TqScheduleResult record, int shiftIndex, Date now) {
+        if (record.getScheduleDate() == null) {
+            return false;
         }
-        if (cxConsumeSummaryVo != null) {
-            cxConsumeQty = cxConsumeSummaryVo.getCxConsumeQty();
-            summaryVo.setCxConsumeQty(cxConsumeQty);
+        // D = 排程日期 - 2
+        Date dDay = DateUtil.beginOfDay(DateUtil.offsetDay(record.getScheduleDate(), -2));
+        Date shiftEndTime = resolveShiftEndTime(dDay, shiftIndex);
+        if (shiftEndTime == null) {
+            return false;
         }
-        // 理论交班库存计算,理论交班库存 = 库存 + 昨日早班 + 夜班 - 成型消耗量
-        Double stockQty = ObjectUtils.defaultIfNull(summaryVo.getStockQty(), 0D);
-        Double nightPlanQty = ObjectUtils.defaultIfNull(summaryVo.getNightPlanQty(), 0D);
-        if (lastDayPlanQty != null && cxConsumeQty != null) {
-            summaryVo.setTheoreticClassStockQty(stockQty + lastDayPlanQty + nightPlanQty - cxConsumeQty);
-        }*/
-        return AjaxResult.success(scheduleSummaryVo);
+        return !now.before(shiftEndTime);
+    }
+
+    /**
+     * 根据D日和班次索引推导班次结束时间
+     *
+     * @param dDay       D日（排程日期-2）
+     * @param shiftIndex 班次索引（1~6）
+     * @return 班次结束时间
+     */
+    private Date resolveShiftEndTime(Date dDay, int shiftIndex) {
+        switch (shiftIndex) {
+            case 1:
+                // 1班：D日中班(16:00-24:00)，结束时间=D日24:00=D+1日00:00
+                return DateUtil.endOfDay(dDay);
+            case 2:
+                // 2班：D+1日夜班(00:00-08:00)，结束时间=D+1日08:00
+                return DateUtil.offsetHour(DateUtil.beginOfDay(DateUtil.offsetDay(dDay, 1)), 8);
+            case 3:
+                // 3班：D+1日早班(08:00-16:00)，结束时间=D+1日16:00
+                return DateUtil.offsetHour(DateUtil.beginOfDay(DateUtil.offsetDay(dDay, 1)), 16);
+            case 4:
+                // 4班：D+1日中班(16:00-24:00)，结束时间=D+1日24:00=D+2日00:00
+                return DateUtil.endOfDay(DateUtil.offsetDay(dDay, 1));
+            case 5:
+                // 5班：D+2日夜班(00:00-08:00)，结束时间=D+2日08:00
+                return DateUtil.offsetHour(DateUtil.beginOfDay(DateUtil.offsetDay(dDay, 2)), 8);
+            case 6:
+                // 6班：D+2日早班(08:00-16:00)，结束时间=D+2日16:00
+                return DateUtil.offsetHour(DateUtil.beginOfDay(DateUtil.offsetDay(dDay, 2)), 16);
+            default:
+                return null;
+        }
     }
 }

@@ -37,6 +37,7 @@ public class Cd90DefaultShiftDemandProvider implements Cd90ShiftDemandProvider {
 
     private final Cd90DemandCalculator demandCalculator;
     private final Cd90InboundResolver inboundResolver;
+    private final Cd90FractionalDemandWindowSelector demandWindowSelector;
 
     /**
      * 计算当前候选规格的窗口需求、库存缺口和前序有效计划抵扣。
@@ -55,11 +56,12 @@ public class Cd90DefaultShiftDemandProvider implements Cd90ShiftDemandProvider {
                 .filter(item -> item.getStartTime() != null)
                 .sorted(Comparator.comparing(Cd90DemandShift::getStartTime))
                 .collect(Collectors.toList());
-        // 当前班只承担参数窗口内的成型需求，窗口外需求留给后续班次滚动处理。
-        List<Cd90DemandShift> window = clothShifts.stream()
+        // 当前班按该帘布动态深度承担成型需求，半班由窗口选择器按比例计入。
+        List<Cd90DemandShift> availableShifts = clothShifts.stream()
                 .filter(item -> !item.getStartTime().isBefore(demandStart))
-                .limit(context.getParameters().getDemandWindow())
                 .collect(Collectors.toList());
+        List<Cd90DemandShift> window = demandWindowSelector.select(availableShifts,
+                this.requiredDepth(input, candidate.getClothCode()));
         BigDecimal demandQuantity = calculateWindowDemand(
                 window, context.getParameters().getDemandCalcMode());
         // 窗口前成型消耗用于重算6点库存余额，不属于本次待排需求。
@@ -125,23 +127,41 @@ public class Cd90DefaultShiftDemandProvider implements Cd90ShiftDemandProvider {
     }
 
     private BigDecimal calculateWindowDemand(List<Cd90DemandShift> window, String mode) {
-        List<BigDecimal> effective = window.stream()
+        List<Cd90DemandShift> effective = window.stream()
                 .filter(Cd90DemandShift::isIncluded)
-                .map(item -> value(item.getClothDemandQuantity()))
-                .filter(item -> item.signum() > 0)
+                .filter(item -> value(item.getClothDemandQuantity()).signum() > 0)
                 .collect(Collectors.toList());
         if (effective.isEmpty()) {
             return BigDecimal.ZERO;
         }
-        BigDecimal total = effective.stream().reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal total = effective.stream()
+                .map(item -> value(item.getClothDemandQuantity()))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
         if ("AVERAGE".equals(mode)) {
-            return total.divide(BigDecimal.valueOf(effective.size()), 10, RoundingMode.HALF_UP)
+            BigDecimal totalWeight = effective.stream()
+                    .map(this::windowWeight)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            return total.divide(totalWeight, 10, RoundingMode.HALF_UP)
                     .stripTrailingZeros();
         }
         if (!"SUM".equals(mode)) {
             throw new IllegalArgumentException("需求计算方式只能取AVERAGE或SUM");
         }
         return total;
+    }
+
+    /** 获取当前候选帘布的必填动态深度。 */
+    private BigDecimal requiredDepth(Cd90AutoScheduleInput input, String clothCode) {
+        BigDecimal depthClassQty = input.getDepthClassQtyByCloth() == null
+                ? null : input.getDepthClassQtyByCloth().get(clothCode);
+        if (depthClassQty == null || depthClassQty.signum() <= 0) {
+            throw new IllegalArgumentException("帘布未匹配有效备库深度, clothCode=" + clothCode);
+        }
+        return depthClassQty;
+    }
+
+    private BigDecimal windowWeight(Cd90DemandShift shift) {
+        return shift.getWindowWeight() == null ? BigDecimal.ONE : shift.getWindowWeight();
     }
 
     private List<Cd90InboundRecord> effectiveInbound(Cd90RollingScheduleContext rolling) {

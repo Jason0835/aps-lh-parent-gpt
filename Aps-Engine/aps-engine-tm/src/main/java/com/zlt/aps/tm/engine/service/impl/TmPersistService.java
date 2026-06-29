@@ -109,7 +109,7 @@ public class TmPersistService {
             explain.setMinStartAdjustQty(task.getMinStartAdjustQty());
             explain.setTailRoundAdjustQty(task.getTailRoundAdjustQty());
             explain.setCapacityAdjustQty(task.getCapacityAdjustQty());
-            explain.setRequiredQty(task.getDemandQty());
+            explain.setRequiredQty(resolveRequiredQty(task));
             explain.setFinalPlanQty(task.getPlanQty());
             explain.setCalcFormulaDesc(task.getCalcFormulaDesc());
             explain.setStockQty(task.getSixClockStockQty());
@@ -135,6 +135,18 @@ public class TmPersistService {
         return explain;
     }
 
+    /**
+     * 解析解释表应排需求量。
+     *
+     * @param task 待排任务草稿
+     * @return 库存抵扣前的当前班成型胎面需求量；旧骨架缺失当前班需求时回退需求量
+     */
+    private BigDecimal resolveRequiredQty(TmTaskDraft task) {
+        if (task == null) {
+            return null;
+        }
+        return task.getCurrentShiftDemandQty() == null ? task.getDemandQty() : task.getCurrentShiftDemandQty();
+    }
     /**
      * 写入未排任务入口。
      *

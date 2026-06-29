@@ -34,6 +34,12 @@
       "paramCode": "TM_NEW_SPEC_ADVANCE_SHIFT_COUNT",
       "paramValue": "2",
       "enableStatus": "1"
+    },
+    {
+      "factoryCode": "F1",
+      "paramCode": "TM_FORMING_SHIFT_OFFSET",
+      "paramValue": "0",
+      "enableStatus": "1"
     }
   ],
   "cxScheduleResults": [
@@ -44,8 +50,8 @@
       "class2PlanQty": 0,
       "class3PlanQty": 0,
       "class4PlanQty": 0,
-      "class5PlanQty": 0,
-      "class6PlanQty": 500,
+      "class5PlanQty": 500,
+      "class6PlanQty": 0,
       "treadCode": "TM_NEW_SPEC_2601",
       "treadShoulderLength": 1,
       "treadMouthPlate": "MP_NEW",
@@ -58,8 +64,8 @@
       "class2PlanQty": 0,
       "class3PlanQty": 0,
       "class4PlanQty": 0,
-      "class5PlanQty": 0,
-      "class6PlanQty": 500,
+      "class5PlanQty": 500,
+      "class6PlanQty": 0,
       "treadCode": "TM_OLD_SPEC_3402",
       "treadShoulderLength": 1,
       "treadMouthPlate": "MP_OLD",
@@ -129,7 +135,7 @@
     "resultCount": 2,
     "assignedCount": 2,
     "unassignedCount": 0,
-    "explainCount": 4,
+    "explainCount": 2,
     "errorCount": 0,
     "expectedWindowPlanQtyList": [
       {

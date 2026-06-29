@@ -51,8 +51,11 @@ public class Cd90DemandWindowCalculator {
                 .map(item -> value(item.getFormingQuantity()))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         if ("AVERAGE".equals(mode)) {
+            BigDecimal totalWeight = effective.stream()
+                    .map(this::windowWeight)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
             formingQuantity = formingQuantity.divide(
-                    BigDecimal.valueOf(effective.size()), 10, RoundingMode.HALF_UP);
+                    totalWeight, 10, RoundingMode.HALF_UP);
         } else if (!"SUM".equals(mode)) {
             throw new IllegalArgumentException("需求计算方式只能取AVERAGE或SUM");
         }
@@ -63,6 +66,10 @@ public class Cd90DemandWindowCalculator {
                 .effectiveShiftCount(effective.size())
                 .shiftDetails(details)
                 .build();
+    }
+
+    private BigDecimal windowWeight(Cd90DemandShift shift) {
+        return shift.getWindowWeight() == null ? BigDecimal.ONE : shift.getWindowWeight();
     }
 
     private BigDecimal value(BigDecimal value) {

@@ -33,7 +33,7 @@ import moment from "moment";
 
 import infoForm from "@/views/components/infoForm.vue";
 
-import { editStock } from "@/api/xwyy/stock";
+import { editStock } from "@/api/xwyy/xwyyStock";
 
 export default {
   components: { infoForm },

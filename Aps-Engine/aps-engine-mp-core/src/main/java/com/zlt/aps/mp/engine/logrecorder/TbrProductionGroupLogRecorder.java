@@ -693,12 +693,33 @@ public class TbrProductionGroupLogRecorder {
      * @return
      */
     public static String addGroupNoSelectedNoRatioLog(Context context, String groupName, String isZeroRack, String cxMachineCode, String machineTypeCode) {
-        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s, 结构：%s 零度：%s 成型机台：%s 机型：%s 没有成型硫化配比配置====", context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(), groupName, isZeroRack, cxMachineCode, machineTypeCode);
+        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s, 结构：%s 零度：%s 成型机台：%s 机型：%s 没有成型硫化配比配置====",
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
+                groupName, isZeroRack, cxMachineCode, machineTypeCode);
         ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
         TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.GROUP_CX_MACHINE_BASE_MACHE, logContent);
         return logContent;
     }
 
+    /**
+     * 增加结构没有匹配到成型机-二次上机日志信息记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s, 结构：%s 零度：%s 成型机台：%s 机型：%s 同机台二次上机====
+     *
+     * @param context         排程上下文
+     * @param groupName       分组名
+     * @param isZeroRack      分组是否要求零度
+     * @param cxMachineCode   成型机台
+     * @param machineTypeCode 机型
+     * @return
+     */
+    public static String addGroupNoSelectSecondOnLineLog(Context context, String groupName, String isZeroRack, String cxMachineCode, String machineTypeCode) {
+        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s, 结构：%s 零度：%s 成型机台：%s 机型：%s 同机台二次上机====",
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
+                groupName, isZeroRack, cxMachineCode, machineTypeCode);
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.GROUP_CX_MACHINE_BASE_MACHE, logContent);
+        return logContent;
+    }
     /**
      * 增加结构没有匹配到成型机-重复切换英寸次数限制日志信息记录
      * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s, 结构：%s 零度：%s 成型机台：%s 机型：%s 达到重复切换英寸次数限制%s====

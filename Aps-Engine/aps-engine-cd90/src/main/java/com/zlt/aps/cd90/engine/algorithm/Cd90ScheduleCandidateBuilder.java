@@ -31,6 +31,7 @@ public class Cd90ScheduleCandidateBuilder {
     private final Cd90InventoryCalculator inventoryCalculator;
     private final Cd90StockGuaranteeCalculator stockGuaranteeCalculator;
     private final Cd90ScheduleCandidateSorter candidateSorter;
+    private final Cd90FractionalDemandWindowSelector demandWindowSelector;
 
     /**
      * 构建并排序当前供应窗口的候选规格。
@@ -38,18 +39,18 @@ public class Cd90ScheduleCandidateBuilder {
      * @param demandShifts 帘布逐自然班次需求
      * @param stocksAtSix 6点库存快照
      * @param currentDemandStart 当前直裁班次对应的首个成型供应班次
-     * @param demandWindow 成型需求窗口班数
+     * @param depthClassQtyByCloth 按帘布匹配的备库班数
      * @return 已按缺料优先级稳定排序的候选规格
      */
     public List<Cd90ScheduleCandidate> build(List<Cd90DemandShift> demandShifts,
                                              List<Cd90StockSource> stocksAtSix,
                                              LocalDateTime currentDemandStart,
-                                             int demandWindow) {
+                                             Map<String, BigDecimal> depthClassQtyByCloth) {
         if (currentDemandStart == null) {
             throw new IllegalArgumentException("当前成型供应班次不能为空");
         }
-        if (demandWindow <= 0) {
-            throw new IllegalArgumentException("成型需求窗口班数必须大于0");
+        if (depthClassQtyByCloth == null) {
+            throw new IllegalArgumentException("逐帘布备库深度不能为空");
         }
 
         // 先将多条6点库存按帘布汇总，后续所有窗口投影都使用同一库存基准。
@@ -71,11 +72,19 @@ public class Cd90ScheduleCandidateBuilder {
                     .filter(item -> item.getStartTime().isBefore(currentDemandStart))
                     .map(item -> value(item.getClothDemandQuantity()))
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
-            // 只截取参数指定的成型需求窗口，窗口外需求不影响当前班候选排序。
-            List<Cd90DemandShift> windowShifts = allShifts.stream()
+            List<Cd90DemandShift> availableShifts = allShifts.stream()
                     .filter(item -> !item.getStartTime().isBefore(currentDemandStart))
-                    .limit(demandWindow)
                     .collect(Collectors.toList());
+            boolean hasAnyPositiveDemand = availableShifts.stream()
+                    .anyMatch(item -> item.isIncluded()
+                            && value(item.getClothDemandQuantity()).signum() > 0);
+            if (!hasAnyPositiveDemand) {
+                continue;
+            }
+            // 每个帘布按自身供成型机台数匹配需求深度，小数末班由选择器按比例换算。
+            BigDecimal depthClassQty = this.requiredDepth(depthClassQtyByCloth, entry.getKey());
+            List<Cd90DemandShift> windowShifts = demandWindowSelector.select(
+                    availableShifts, depthClassQty);
             boolean hasPositiveDemand = windowShifts.stream()
                     .anyMatch(item -> item.isIncluded()
                             && value(item.getClothDemandQuantity()).signum() > 0);
@@ -104,10 +113,19 @@ public class Cd90ScheduleCandidateBuilder {
 
         // 排序器负责稳定处理同缺料时间候选，避免重复执行时结果顺序抖动。
         List<Cd90ScheduleCandidate> sorted = candidateSorter.sort(candidates);
-        log.info("[直裁自动排程] 当前班次候选规格构建完成, demandStart={}, demandWindow={}, "
+        log.info("[直裁自动排程] 当前班次候选规格构建完成, demandStart={}, depthByCloth={}, "
                         + "clothCount={}, candidateCount={}",
-                currentDemandStart, demandWindow, shiftsByCloth.size(), sorted.size());
+                currentDemandStart, depthClassQtyByCloth, shiftsByCloth.size(), sorted.size());
         return sorted;
+    }
+
+    /** 获取当前帘布的必填备库深度。 */
+    private BigDecimal requiredDepth(Map<String, BigDecimal> depthClassQtyByCloth, String clothCode) {
+        BigDecimal depthClassQty = depthClassQtyByCloth.get(clothCode);
+        if (depthClassQty == null || depthClassQty.signum() <= 0) {
+            throw new IllegalArgumentException("帘布未匹配有效备库深度, clothCode=" + clothCode);
+        }
+        return depthClassQty;
     }
 
     private Map<String, BigDecimal> aggregateStock(List<Cd90StockSource> stocksAtSix) {

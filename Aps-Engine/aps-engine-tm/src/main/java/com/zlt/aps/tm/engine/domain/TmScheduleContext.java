@@ -60,7 +60,7 @@ public class TmScheduleContext {
     /** 库存预测结果，key=胎面编码 */
     private Map<String, TmStockForecast> stockForecastMap = new HashMap<>();
 
-    /** 胎面剩余可抵扣库存，key=胎面编码；初值为6点库存净值，逐班递减，避免同一库存被多班重复抵扣 */
+    /** 胎面班初滚动库存状态，key=胎面编码；初值为14点预计库存，任务完成后回写交接班预计库存 */
     private Map<String, BigDecimal> remainingStockMap = new HashMap<>();
 
     /** 工厂可用机台候选列表，由数据加载层填充，供机台分配步骤过滤评分使用 */

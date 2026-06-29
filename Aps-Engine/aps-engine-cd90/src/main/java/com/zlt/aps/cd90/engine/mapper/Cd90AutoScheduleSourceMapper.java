@@ -31,6 +31,7 @@ public class Cd90AutoScheduleSourceMapper {
                 .cxBatchNo(source.getCxBatchNo())
                 .scheduleDate(toLocalDate(source.getScheduleDate()))
                 .embryoCode(source.getEmbryoCode())
+                .cxMachineCode(source.getCxMachineCode())
                 .classPlanQuantities(Arrays.asList(
                         zeroIfNull(source.getClass1PlanQty()),
                         zeroIfNull(source.getClass2PlanQty()),
