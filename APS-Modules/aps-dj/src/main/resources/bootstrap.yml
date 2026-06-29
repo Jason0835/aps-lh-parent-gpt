@@ -58,3 +58,6 @@ mq:
     rutekey: dev.schedule.schedule.log.rutekey
 #模板文件的配置路径
 excelModelPath: excelModel/
+#分布式事务默认不开启
+seata:
+  enabled: false
