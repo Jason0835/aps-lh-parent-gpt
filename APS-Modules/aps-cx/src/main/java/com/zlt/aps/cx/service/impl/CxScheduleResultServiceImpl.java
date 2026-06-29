@@ -1534,7 +1534,10 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
         if (PubUtil.isEmpty(rows)) {
             return entityList;
         }
+        // Feign反序列化时实体类的getter方法（如getGroupKey）会被序列化为字段，
+        // 反向convertValue时目标实体无对应字段会报错，需关闭未知字段失败校验
         com.fasterxml.jackson.databind.ObjectMapper objectMapper = new com.fasterxml.jackson.databind.ObjectMapper();
+        objectMapper.configure(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
         for (Object obj : rows) {
             if (obj instanceof MpStructureAllocation) {
                 entityList.add((MpStructureAllocation) obj);
