@@ -9,11 +9,14 @@ import com.zlt.aps.cx.vo.ScheduleContextVo;
 import com.zlt.aps.mp.api.domain.entity.MdmMoldingMachine;
 import com.zlt.aps.mp.api.domain.entity.MdmStructureLhRatio;
 import com.zlt.aps.mp.api.domain.entity.MpCxCapacityConfiguration;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
 
+import java.math.BigDecimal;
+import java.sql.Date;
 import java.time.LocalDate;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -260,7 +263,28 @@ public class ContinueTaskProcessor {
     private List<MpCxCapacityConfiguration> getAvailableMachinesForStructure(
             String structureName, LocalDate scheduleDate, ScheduleContextVo context,
             String productionVersion) {
-        if (context.getStructureAllocationMap() != null) {
+        // 跨月判断：排程日期年月 ≠ 当月配置年月时，使用 futureStructureAllocationMap（含次月配置）
+        int dateYearMonth = scheduleDate.getYear() * 100 + scheduleDate.getMonthValue();
+        Integer baseYearMonth = context.getStructureAllocationYearMonth();
+        boolean crossMonth = baseYearMonth != null && baseYearMonth != dateYearMonth;
+
+        if (crossMonth) {
+            // 跨月场景：从 futureStructureAllocationMap 取（次月数据已按次月版本过滤，不再重复过滤版本）
+            if (context.getFutureStructureAllocationMap() != null) {
+                List<MpCxCapacityConfiguration> configs =
+                        context.getFutureStructureAllocationMap().get(structureName);
+                if (configs != null && !configs.isEmpty()) {
+                    int day = scheduleDate.getDayOfMonth();
+                    List<MpCxCapacityConfiguration> result = configs.stream()
+                            .filter(c -> c.getBeginDay() != null && c.getEndDay() != null)
+                            .filter(c -> c.getBeginDay() <= day && c.getEndDay() >= day)
+                            .collect(Collectors.toList());
+                    if (!result.isEmpty()) {
+                        return result;
+                    }
+                }
+            }
+        } else if (context.getStructureAllocationMap() != null) {
             List<MpCxCapacityConfiguration> configs = context.getStructureAllocationMap().get(structureName);
             if (configs != null && !configs.isEmpty()) {
                 int day = scheduleDate.getDayOfMonth();
