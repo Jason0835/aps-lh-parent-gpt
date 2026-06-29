@@ -145,7 +145,6 @@ public class Cd90AutoScheduleInputServiceImpl implements Cd90AutoScheduleInputSe
         List<XwyyStock> xwyyActualStocks = xwyyStockMapper.selectList(
                 Wrappers.<XwyyStock>lambdaQuery()
                         .eq(XwyyStock::getFactoryCode, factoryCode)
-                        .eq(XwyyStock::getStockDate, Date.valueOf(scheduleDate))
                         .orderByAsc(XwyyStock::getStockInTime)
                         .orderByAsc(XwyyStock::getBigRollCode)
                         .orderByAsc(XwyyStock::getId));

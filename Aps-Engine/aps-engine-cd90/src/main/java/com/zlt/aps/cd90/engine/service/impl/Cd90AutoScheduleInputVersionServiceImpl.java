@@ -98,7 +98,6 @@ public class Cd90AutoScheduleInputVersionServiceImpl implements Cd90AutoSchedule
                                 XwyyStock::getEstimateStockFlag,
                                 XwyyStock::getUpdateTime)
                         .eq(XwyyStock::getFactoryCode, factoryCode)
-                        .eq(XwyyStock::getStockDate, Date.valueOf(scheduleDate))
                         .orderByAsc(XwyyStock::getId))
                 .stream().map(item -> item.getId() + ":" + item.getBigRollCode() + ":"
                         + item.getBigRollBarcode() + ":" + item.getStockInTime() + ":"
