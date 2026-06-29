@@ -1,0 +1,122 @@
+{
+  "sceneCode": "TM_SCENE_036",
+  "caseName": "TM_SCENE_036_experiment_spec_merge_same_tread",
+  "description": "TM_SCENE_036：实验规格命中当天同胎面任务时，叠加30米到一班最早任务",
+  "designSteps": [
+    "Step3",
+    "Step4",
+    "Step14",
+    "Step16"
+  ],
+  "mysqlVerificationStatus": "待用户执行 MySQL 验证",
+  "autoPlanRequest": {
+    "factoryCode": "F1",
+    "scheduleDate": "2026-08-11",
+    "operator": "TM_AUTO_PLAN_TEST",
+    "traceId": "TRACE-TM_SCENE_036",
+    "confirmOverwrite": false
+  },
+  "params": [
+    {
+      "factoryCode": "F1",
+      "paramCode": "TM_ALGORITHM_SWITCH",
+      "paramValue": "1",
+      "enableStatus": "1"
+    },
+    {
+      "factoryCode": "F1",
+      "paramCode": "TM_FORMING_SHIFT_OFFSET",
+      "paramValue": "0",
+      "enableStatus": "1"
+    }
+  ],
+  "cxScheduleResults": [
+    {
+      "orderNo": "TM_SCENE_036_001",
+      "embryoCode": "CX-EXP-036",
+      "class1PlanQty": 10,
+      "class2PlanQty": 0,
+      "class3PlanQty": 0,
+      "class4PlanQty": 0,
+      "class5PlanQty": 0,
+      "class6PlanQty": 0,
+      "treadCode": "TM_EXP_3601",
+      "treadShoulderLength": 1,
+      "treadMouthPlate": "MP_EXP",
+      "treadRubberCategory": "GLUE_EXP"
+    }
+  ],
+  "experimentSpecMonthPlans": [
+    {
+      "monthPlanId": 36001,
+      "productionNo": "MP26080600001",
+      "factoryCode": "F1",
+      "experimentPlanDate": "2026-08-06",
+      "dayQty": 8,
+      "embryoCode": "CX-EXP-036",
+      "constructionStage": "01",
+      "treadCode": "TM_EXP_3601",
+      "treadShoulderLength": 1,
+      "treadMouthPlate": "MP_EXP",
+      "treadRubberCategory": "GLUE_EXP"
+    }
+  ],
+  "stocks": [
+    {
+      "factoryCode": "F1",
+      "stockDate": "2026-08-10",
+      "treadCode": "TM_EXP_3601",
+      "stockQty": 0,
+      "badQty": 0,
+      "adjustQty": 0
+    }
+  ],
+  "machineInfos": [
+    {
+      "factoryCode": "F1",
+      "machineCode": "TM_EXP_01",
+      "machineStatus": "1",
+      "maxCapacity": 1000
+    }
+  ],
+  "machineSpeeds": [
+    {
+      "factoryCode": "F1",
+      "machineCode": "TM_EXP_01",
+      "productSpeed": 100
+    }
+  ],
+  "mouthPlates": [
+    {
+      "factoryCode": "F1",
+      "machineCode": "TM_EXP_01",
+      "mouthPlateCode": "MP_EXP"
+    }
+  ],
+  "expected": {
+    "success": true,
+    "messageContains": "胎面自动排程执行完成",
+    "resultCount": 1,
+    "assignedCount": 1,
+    "unassignedCount": 0,
+    "explainCount": 1,
+    "errorCount": 0,
+    "expectedResults": [
+      {
+        "treadCode": "TM_EXP_3601",
+        "machineCode": "TM_EXP_01",
+        "shiftOrder": 1,
+        "sequence": 1,
+        "planQty": 40
+      }
+    ],
+    "expectedExplains": [
+      {
+        "ruleHitContains": "EXPERIMENT_SPEC_DETECT"
+      },
+      {
+        "ruleHitContains": "EXPERIMENT_SPEC_PLAN_QTY"
+      }
+    ]
+  }
+}
