@@ -66,9 +66,9 @@ public class Cd90SingleShiftScheduleExecutor implements Cd90SingleShiftScheduleS
                                             Cd90ShiftResourceState initialState,
                                             Cd90RollingScheduleContext rolling) {
         validate(context, input, shift, initialState);
-        // 候选已按当前班缺料时间和库存保障时长排序，后续必须保持该稳定顺序执行。
+        // 候选已按当前班缺料时间、续作优先和库存保障时长排序，后续必须保持该稳定顺序执行。
         List<Cd90ScheduleCandidate> candidates = new ArrayList<>(candidatePreparationService.prepare(
-                context, input, shift.getClassField()));
+                context, input, shift.getClassField(), rolling));
         attachBigRollCodes(candidates, input.getConstructionMaterials());
         // 机台快照在班次开始时一次加载，规格之间通过state扣减剩余秒数，避免重复查询造成漂移。
         Cd90MachineResourceSnapshot machineSnapshot = machineResourceService.load(

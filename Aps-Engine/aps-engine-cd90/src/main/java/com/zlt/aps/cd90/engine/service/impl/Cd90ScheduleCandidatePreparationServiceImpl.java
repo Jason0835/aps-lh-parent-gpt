@@ -3,6 +3,7 @@ package com.zlt.aps.cd90.engine.service.impl;
 import com.zlt.aps.cd90.engine.algorithm.Cd90ScheduleCandidateBuilder;
 import com.zlt.aps.cd90.engine.model.Cd90AutoScheduleContext;
 import com.zlt.aps.cd90.engine.model.Cd90AutoScheduleInput;
+import com.zlt.aps.cd90.engine.model.Cd90RollingScheduleContext;
 import com.zlt.aps.cd90.engine.model.Cd90ScheduleCandidate;
 import com.zlt.aps.cd90.engine.service.Cd90ScheduleCandidatePreparationService;
 import lombok.RequiredArgsConstructor;
@@ -12,6 +13,7 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -35,12 +37,14 @@ public class Cd90ScheduleCandidatePreparationServiceImpl
      * @param context 自动排程上下文
      * @param input 自动排程输入快照
      * @param classField 当前直裁班次字段
+     * @param rolling 多班滚动排程共享的内存上下文，提供累计成型消耗用于续作判定
      * @return 已排序候选规格
      */
     @Override
     public List<Cd90ScheduleCandidate> prepare(Cd90AutoScheduleContext context,
                                                Cd90AutoScheduleInput input,
-                                               String classField) {
+                                               String classField,
+                                               Cd90RollingScheduleContext rolling) {
         if (context == null || context.getScheduleDate() == null || context.getParameters() == null) {
             throw new IllegalArgumentException("自动排程上下文及参数不能为空");
         }
@@ -56,9 +60,12 @@ public class Cd90ScheduleCandidatePreparationServiceImpl
         LocalDateTime currentDemandStart = context.getScheduleDate().minusDays(1)
                 .atTime(FIRST_FORMING_DEMAND_TIME)
                 .plusHours((classIndex - 1L) * 8L);
+        Map<String, java.math.BigDecimal> cumulativeConsumptionByCloth = rolling == null
+                ? java.util.Collections.emptyMap()
+                : rolling.getCumulativeConsumptionByCloth();
         List<Cd90ScheduleCandidate> candidates = candidateBuilder.build(
                 input.getDemandShifts(), input.getStocksAtSix(), currentDemandStart,
-                input.getDepthClassQtyByCloth());
+                input.getDepthClassQtyByCloth(), cumulativeConsumptionByCloth);
 
         log.info("[直裁自动排程] 当前班次候选准备完成, factoryCode={}, scheduleDate={}, "
                         + "classField={}, demandStart={}, candidateCount={}",

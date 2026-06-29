@@ -19,6 +19,8 @@ public class Cd90ScheduleCandidate {
     private String bigRollCode;
     /** 当前直裁班次是否会发生缺料。 */
     private boolean shortageInCurrentShift;
+    /** 是否续作规格：6点至本班开始前累计成型消耗 > 0，表示前序班次已为该规格排过产。 */
+    private boolean continueFromPreviousShift;
     /** 最早缺料时点。 */
     private LocalDateTime earliestShortageTime;
     /** 库存供应成型时长。 */
