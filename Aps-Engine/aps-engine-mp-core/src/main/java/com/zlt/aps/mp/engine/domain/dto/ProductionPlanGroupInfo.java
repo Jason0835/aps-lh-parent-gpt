@@ -1245,7 +1245,7 @@ public class ProductionPlanGroupInfo {
     }
 
     /**
-     * 根据结构转产配置表，重新构建真个分组几乎的日产能限制信息
+     * 根据结构转产配置表，重新构建各分组真实日产能限制信息
      *
      * @param context             排产上下文
      * @param groupAllocationList 结构转产配置集合

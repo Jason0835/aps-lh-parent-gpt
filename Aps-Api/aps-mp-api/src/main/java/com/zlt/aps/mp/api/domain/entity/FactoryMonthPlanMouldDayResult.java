@@ -37,7 +37,9 @@ import java.util.Optional;
 public class FactoryMonthPlanMouldDayResult extends BaseEntity {
 
     private static final long serialVersionUID = 1L;
-    // 正常需求计划
+    /**
+     * 正常需求计划
+     */
     private static final String NORMAL_PLAN_TYPE = "01";
 
 
