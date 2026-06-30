@@ -24,4 +24,6 @@ public class Cd90ShiftResourceState {
     private Map<String, Cd90MachineTailState> tailByMachine;
     /** 当前班次已提交任务链。 */
     private List<Cd90ShiftScheduleTask> tasks;
+    /** 当前排程上下文内的大卷成熟流水，提交成功后滚动扣减。 */
+    private List<Cd90BigRollAgingStock> bigRollAgingStocks;
 }

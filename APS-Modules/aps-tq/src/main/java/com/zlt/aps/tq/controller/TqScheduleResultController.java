@@ -235,7 +235,6 @@ public class TqScheduleResultController extends AbstractDocBizController<TqSched
     @ApiOperation("发布排程")
     @PostMapping("/publish")
     public AjaxResult publish(@RequestBody TqScheduleResult queryVO) {
-        // TODO 发布业务逻辑待实现：同步锁、状态校验、MES数据同步等
         return tqScheduleResultService.publish(queryVO);
     }
 

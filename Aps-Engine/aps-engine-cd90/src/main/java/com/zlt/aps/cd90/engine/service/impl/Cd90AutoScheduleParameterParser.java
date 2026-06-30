@@ -64,9 +64,7 @@ public class Cd90AutoScheduleParameterParser {
         return Cd90AutoScheduleParameters.builder()
                 .factoryCode(factoryCode)
                 .demandCalcMode(demandCalcMode)
-                .demandWindow(positiveInt(values, Cd90AutoScheduleParamCode.DEMAND_WINDOW))
                 .scheduleWindow(scheduleWindow)
-                .stockGuaranteeShifts(nonNegativeDecimal(values, Cd90AutoScheduleParamCode.STOCK_GUARANTEE_SHIFTS))
                 .maxRollChangePerShift(nonNegativeInt(values, Cd90AutoScheduleParamCode.MAX_ROLL_CHANGE_PER_SHIFT))
                 .minStartQty(positiveDecimal(values, Cd90AutoScheduleParamCode.MIN_START_QTY))
                 .machinePriority(parseMachinePriority(values.get(Cd90AutoScheduleParamCode.MACHINE_PRIORITY)))
@@ -92,6 +90,8 @@ public class Cd90AutoScheduleParameterParser {
                         Cd90AutoScheduleParamCode.SPECIAL_ROLL_EXTRA_STOCK_LIMIT))
                 .partialMinVehicleCount(positiveInt(values,
                         Cd90AutoScheduleParamCode.PARTIAL_MIN_VEHICLE_COUNT))
+                .agingPeriodHours(positiveInt(values,
+                        Cd90AutoScheduleParamCode.AGING_PERIOD_LIMIT))
                 .fallbackLossRatePercent(nonNegativeDecimal(values, Cd90AutoScheduleParamCode.LOSS_RATE))
                 .taskTimeoutMinutes(positiveInt(values, Cd90AutoScheduleParamCode.TASK_TIMEOUT_MINUTES))
                 .autoScheduleCron(values.getOrDefault(Cd90AutoScheduleParamCode.AUTO_SCHEDULE_CRON, ""))

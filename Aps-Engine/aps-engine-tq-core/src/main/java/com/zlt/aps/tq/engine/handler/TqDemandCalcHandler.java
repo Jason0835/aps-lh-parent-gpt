@@ -132,9 +132,9 @@ public class TqDemandCalcHandler extends AbsTqScheduleStepHandler {
         if (demandCalcMode != null && demandCalcMode == 1) {
             // 算法1：库存保证班数 = 14点预计库存 / 胎圈每班需求量（简单除法）
             // 胎圈每班需求量 = 成型三班最大计划量 × 系数
-            double cxClass1 = scheduleVo.getCxClass1Plan() == null ? 0D : scheduleVo.getCxClass1Plan();
-            double cxClass2 = scheduleVo.getCxClass2Plan() == null ? 0D : scheduleVo.getCxClass2Plan();
-            double cxClass3 = scheduleVo.getCxClass3Plan() == null ? 0D : scheduleVo.getCxClass3Plan();
+            double cxClass1 = scheduleVo.getCxClass1Plan() == null ? 0 : scheduleVo.getCxClass1Plan();
+            double cxClass2 = scheduleVo.getCxClass2Plan() == null ? 0 : scheduleVo.getCxClass2Plan();
+            double cxClass3 = scheduleVo.getCxClass3Plan() == null ? 0 : scheduleVo.getCxClass3Plan();
             double maxCxPlan = Math.max(Math.max(cxClass1, cxClass2), cxClass3);
             double tqPerClassDemand = BigDecimalUtil.mul(maxCxPlan, coefficient);
 
@@ -213,8 +213,8 @@ public class TqDemandCalcHandler extends AbsTqScheduleStepHandler {
     /**
      * 成型消耗量乘以需求系数
      */
-    private double mulCxPlan(Double cxPlan, double coefficient) {
-        double plan = cxPlan == null ? 0D : cxPlan;
+    private double mulCxPlan(Integer cxPlan, double coefficient) {
+        double plan = cxPlan == null ? 0 : cxPlan;
         return BigDecimalUtil.mul(plan, coefficient);
     }
 
@@ -285,16 +285,16 @@ public class TqDemandCalcHandler extends AbsTqScheduleStepHandler {
         // 收尾判断（基于胎胚关联汇总）：月计划余量 <= 6班总需排产量 → 收尾规格
         double coefficient = params.getDemandCoefficient() == null ? 2D : params.getDemandCoefficient();
         double totalCxConsume = BigDecimalUtil.add(
-                scheduleVo.getCxClass3Plan() == null ? 0D : scheduleVo.getCxClass3Plan(),
+                scheduleVo.getCxClass3Plan() == null ? 0 : scheduleVo.getCxClass3Plan(),
                 BigDecimalUtil.add(
-                        scheduleVo.getCxClass4Plan() == null ? 0D : scheduleVo.getCxClass4Plan(),
+                        scheduleVo.getCxClass4Plan() == null ? 0 : scheduleVo.getCxClass4Plan(),
                         BigDecimalUtil.add(
-                                scheduleVo.getCxClass5Plan() == null ? 0D : scheduleVo.getCxClass5Plan(),
+                                scheduleVo.getCxClass5Plan() == null ? 0 : scheduleVo.getCxClass5Plan(),
                                 BigDecimalUtil.add(
-                                        scheduleVo.getCxClass6Plan() == null ? 0D : scheduleVo.getCxClass6Plan(),
+                                        scheduleVo.getCxClass6Plan() == null ? 0 : scheduleVo.getCxClass6Plan(),
                                         BigDecimalUtil.add(
-                                                scheduleVo.getCxClass7Plan() == null ? 0D : scheduleVo.getCxClass7Plan(),
-                                                scheduleVo.getCxClass8Plan() == null ? 0D : scheduleVo.getCxClass8Plan())))));
+                                                scheduleVo.getCxClass7Plan() == null ? 0 : scheduleVo.getCxClass7Plan(),
+                                                scheduleVo.getCxClass8Plan() == null ? 0 : scheduleVo.getCxClass8Plan())))));
         double totalTqDemand = BigDecimalUtil.mul(totalCxConsume, coefficient);
         boolean isCloseOutSpec = checkCloseOutByEmbryo(scheduleVo, context, totalTqDemand);
         scheduleVo.setCloseOutSpecFlag(isCloseOutSpec ? "0" : "1"); // 0=收尾，1=非收尾
@@ -311,14 +311,14 @@ public class TqDemandCalcHandler extends AbsTqScheduleStepHandler {
         Double todayMorningPlanQty = scheduleVo.getTodayMorningPlanQty() == null ? 0D : scheduleVo.getTodayMorningPlanQty();
 
         // 成型各班消耗量（原始值）
-        double cxClass1 = scheduleVo.getCxClass1Plan() == null ? 0D : scheduleVo.getCxClass1Plan();
-        double cxClass2 = scheduleVo.getCxClass2Plan() == null ? 0D : scheduleVo.getCxClass2Plan();
-        double cxClass3 = scheduleVo.getCxClass3Plan() == null ? 0D : scheduleVo.getCxClass3Plan();
-        double cxClass4 = scheduleVo.getCxClass4Plan() == null ? 0D : scheduleVo.getCxClass4Plan();
-        double cxClass5 = scheduleVo.getCxClass5Plan() == null ? 0D : scheduleVo.getCxClass5Plan();
-        double cxClass6 = scheduleVo.getCxClass6Plan() == null ? 0D : scheduleVo.getCxClass6Plan();
-        double cxClass7 = scheduleVo.getCxClass7Plan() == null ? 0D : scheduleVo.getCxClass7Plan();
-        double cxClass8 = scheduleVo.getCxClass8Plan() == null ? 0D : scheduleVo.getCxClass8Plan();
+        double cxClass1 = scheduleVo.getCxClass1Plan() == null ? 0 : scheduleVo.getCxClass1Plan();
+        double cxClass2 = scheduleVo.getCxClass2Plan() == null ? 0 : scheduleVo.getCxClass2Plan();
+        double cxClass3 = scheduleVo.getCxClass3Plan() == null ? 0 : scheduleVo.getCxClass3Plan();
+        double cxClass4 = scheduleVo.getCxClass4Plan() == null ? 0 : scheduleVo.getCxClass4Plan();
+        double cxClass5 = scheduleVo.getCxClass5Plan() == null ? 0 : scheduleVo.getCxClass5Plan();
+        double cxClass6 = scheduleVo.getCxClass6Plan() == null ? 0 : scheduleVo.getCxClass6Plan();
+        double cxClass7 = scheduleVo.getCxClass7Plan() == null ? 0 : scheduleVo.getCxClass7Plan();
+        double cxClass8 = scheduleVo.getCxClass8Plan() == null ? 0 : scheduleVo.getCxClass8Plan();
 
         // 成型各班消耗量 × 需求系数 = 胎圈消耗量
         double tqConsume1 = BigDecimalUtil.mul(cxClass1, coefficient);

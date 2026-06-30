@@ -42,22 +42,24 @@ public class Cd90StockGuaranteeCalculator {
             }
             BigDecimal demand = value(shift.getClothDemandQuantity());
             BigDecimal hours = value(shift.getShiftHours());
+            BigDecimal weight = shift.getWindowWeight() == null
+                    ? BigDecimal.ONE : shift.getWindowWeight();
             // 需求为0的班次不消耗库存，跳过计数。
             if (demand.signum() <= 0) {
                 continue;
             }
             if (remaining.compareTo(demand) >= 0) {
-                // 库存足够覆盖整个班需求：完整扣减，班次数+1，时长为该班完整时长。
+                // 库存足够覆盖当前窗口份额：按窗口权重累计保证班数和供应时长。
                 remaining = remaining.subtract(demand);
-                guaranteedShifts = guaranteedShifts.add(BigDecimal.ONE);
-                supplyHours = supplyHours.add(hours);
+                guaranteedShifts = guaranteedShifts.add(weight);
+                supplyHours = supplyHours.add(hours.multiply(weight));
                 continue;
             }
             // 库存不足以覆盖整个班需求：按剩余库存占该班需求的比例，计算部分保证。
             // 例如剩余100米，该班需求400米，则算0.25班、2小时（8h×0.25）。
             BigDecimal ratio = remaining.divide(demand, 10, RoundingMode.HALF_UP);
-            guaranteedShifts = guaranteedShifts.add(ratio);
-            supplyHours = supplyHours.add(hours.multiply(ratio));
+            guaranteedShifts = guaranteedShifts.add(weight.multiply(ratio));
+            supplyHours = supplyHours.add(hours.multiply(weight).multiply(ratio));
             remaining = BigDecimal.ZERO;
             break;
         }

@@ -238,6 +238,9 @@ public class Cd90AutoScheduleOutputDraftBuilder {
         if ("STORAGE_LANE_LIMIT".equals(failureReason)) {
             return "库排容量不足";
         }
+        if ("AGING_PERIOD_LIMIT".equals(failureReason)) {
+            return "大卷静置期未满";
+        }
         if ("ROLL_TOOL_LIMIT".equals(failureReason) || "TOOLING_LIMIT".equals(failureReason)) {
             return "工装不足";
         }

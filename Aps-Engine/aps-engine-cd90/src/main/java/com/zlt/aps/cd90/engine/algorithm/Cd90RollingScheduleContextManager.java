@@ -1,6 +1,7 @@
 package com.zlt.aps.cd90.engine.algorithm;
 
 import com.zlt.aps.cd90.engine.model.Cd90InboundRecord;
+import com.zlt.aps.cd90.engine.model.Cd90BigRollAgingStock;
 import com.zlt.aps.cd90.engine.model.Cd90ResourceSnapshot;
 import com.zlt.aps.cd90.engine.model.Cd90RollingScheduleContext;
 import com.zlt.aps.cd90.engine.model.Cd90ShiftDescriptor;
@@ -43,6 +44,7 @@ public class Cd90RollingScheduleContextManager {
                 .cumulativeConsumptionByCloth(new HashMap<>())
                 .actualInboundRecords(new ArrayList<>())
                 .plannedInboundRecords(new ArrayList<>())
+                .bigRollAgingStocks(new ArrayList<>())
                 .committedTasks(new ArrayList<>())
                 .tailSpecByMachine(new HashMap<>())
                 .tailByMachine(new HashMap<>())
@@ -129,6 +131,7 @@ public class Cd90RollingScheduleContextManager {
             appendPlannedInbound(context, task, taskOffset + index + 1);
         }
         // 机尾规格跨班继承，用于下一班判断是否发生规格切换和相应耗时。
+        context.setBigRollAgingStocks(copyAgingStocks(completedState.getBigRollAgingStocks()));
         context.setTailSpecByMachine(completedState.getTailSpecByMachine() == null
                 ? new HashMap<>() : new HashMap<>(completedState.getTailSpecByMachine()));
         context.setTailByMachine(copyTails(completedState.getTailByMachine()));
@@ -185,6 +188,47 @@ public class Cd90RollingScheduleContextManager {
                 .filter(record -> record.getInboundTime() == null
                         || !record.getInboundTime().isAfter(shiftStart))
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * 将前序班次已分配米数恢复到本班重新加载的XWYY成熟流水。
+     *
+     * @param context 滚动上下文
+     * @param currentStocks 当前班重新加载的成熟流水
+     * @return 带跨班已分配水位的成熟流水副本
+     */
+    public List<Cd90BigRollAgingStock> restoreBigRollAllocations(
+            Cd90RollingScheduleContext context, List<Cd90BigRollAgingStock> currentStocks) {
+        Map<String, BigDecimal> allocatedBySource = copyAgingStocks(
+                context == null ? null : context.getBigRollAgingStocks()).stream()
+                .collect(Collectors.toMap(this::agingSourceKey,
+                        this::allocatedQuantity, BigDecimal::max));
+        return copyAgingStocks(currentStocks).stream()
+                .peek(item -> item.setAllocatedQuantity(allocatedQuantity(item)
+                        .max(allocatedBySource.getOrDefault(agingSourceKey(item), BigDecimal.ZERO))))
+                .collect(Collectors.toList());
+    }
+
+    private List<Cd90BigRollAgingStock> copyAgingStocks(List<Cd90BigRollAgingStock> stocks) {
+        if (stocks == null) {
+            return new ArrayList<>();
+        }
+        return stocks.stream().map(item -> Cd90BigRollAgingStock.builder()
+                .sourceType(item.getSourceType()).sourceId(item.getSourceId())
+                .clothCode(item.getClothCode()).bigRollCode(item.getBigRollCode())
+                .availableQuantity(item.getAvailableQuantity())
+                .allocatedQuantity(item.getAllocatedQuantity())
+                .stockInTime(item.getStockInTime()).releaseTime(item.getReleaseTime())
+                .build()).collect(Collectors.toList());
+    }
+
+    private BigDecimal allocatedQuantity(Cd90BigRollAgingStock stock) {
+        return stock.getAllocatedQuantity() == null ? BigDecimal.ZERO : stock.getAllocatedQuantity();
+    }
+
+    private String agingSourceKey(Cd90BigRollAgingStock stock) {
+        return (stock.getSourceType() == null ? "" : stock.getSourceType()) + "#"
+                + (stock.getSourceId() == null ? "" : stock.getSourceId());
     }
 
     private List<Cd90StorageLaneState> copyLanes(List<Cd90StorageLaneState> lanes) {

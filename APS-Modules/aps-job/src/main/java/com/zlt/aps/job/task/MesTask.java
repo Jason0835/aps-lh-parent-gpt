@@ -367,7 +367,7 @@ public class MesTask {
      */
     @ApiOperation("临时任务-按版本号APS_MES_AH01_20260622174000009抓取硫化排程完成量回报")
     public void syncLhClassShiftFinishQtyByVersion() {
-        String dataVersion = "APS_MES_AH01_20260622174000009";
+        String dataVersion = "APS_MES_AH01_20260601000000083";
         log.info("临时任务-开始按版本号{}抓取硫化排程完成量回报数据", dataVersion);
         try {
             FeignTokenHelper.runWithToken(() -> {
@@ -391,7 +391,7 @@ public class MesTask {
      */
     @ApiOperation("临时任务-按最新版本号抓取硫化排程日完成量回报（不限日期）")
     public void syncLhScheDayFinishQtyByLatestVersion() {
-        String dataVersion = "APS_MES_AH01_20260625154409527";
+        String dataVersion = "APS_MES_AH01_20260601000000089";
         log.info("临时任务-开始按最新版本号抓取硫化排程日完成量回报（不限日期）");
         try {
             FeignTokenHelper.runWithToken(() -> {

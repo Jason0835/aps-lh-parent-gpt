@@ -37,17 +37,26 @@ public interface IDjScheduleShiftEngineService {
                                                  String machineCode, int targetClass, int targetSeq);
 
     /**
-     * 2.3 约束二校验 — 产能校验
+     * 2.3 约束二校验 — 产能校验（三档判断）
+     * <p>
+     * 校验规则：插单/调整后该班次计划量总和不能超过机台当前班的实际剩余产能。
+     * 实际剩余产能 = 机台定额 - 当前班次已生产量（完成量）。
+     * overflowSpecs 只包含生产顺序 >= targetSeq 的规格（顺位前的规格不受影响）。
+     * </p>
      *
      * @param machineCode     机台编码
      * @param classIndex      目标班次索引（1~6）
+     * @param targetSeq       目标生产顺位
      * @param insertPlanQty   插单计划量
      * @param currentResults  当前排程结果列表
-     * @return 产能校验结果
+     * @param factoryCode     工厂编码
+     * @param scheduleDate    排产日期
+     * @return 产能校验结果（含三档判断标志）
      */
-    CapacityValidateResult validateCapacity(String machineCode, int classIndex,
+    CapacityValidateResult validateCapacity(String machineCode, int classIndex, int targetSeq,
                                             BigDecimal insertPlanQty,
-                                            List<DjScheduleResult> currentResults);
+                                            List<DjScheduleResult> currentResults,
+                                            String factoryCode, Date scheduleDate);
 
     // ==================== 顺延处理 ====================
 
@@ -66,6 +75,15 @@ public interface IDjScheduleShiftEngineService {
      * @param classIndex     班次索引
      */
     void reorganizeAfterReduce(List<DjScheduleResult> machineResults, int classIndex);
+
+    /**
+     * 3.4 减量后顺位空洞整理（支持保留指定顺位空洞，用于插单场景）
+     *
+     * @param machineResults 当前机台排程结果列表
+     * @param classIndex     班次索引
+     * @param skipSeq        需要保留的顺位（该位置不会被分配，留给新插单记录）
+     */
+    void reorganizeAfterReduce(List<DjScheduleResult> machineResults, int classIndex, Integer skipSeq);
 
     // ==================== 班次字段访问工具方法 ====================
 

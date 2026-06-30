@@ -20,6 +20,8 @@ public class Cd90FormingScheduleSource {
     private LocalDate scheduleDate;
     /** 胎胚代码，对应施工信息CONSTRUCTION_CODE。 */
     private String embryoCode;
+    /** 成型机台代码，用于按帘布统计去重供成型机台数。 */
+    private String cxMachineCode;
     /** CLASS1至CLASS8成型计划量。 */
     private List<BigDecimal> classPlanQuantities;
     /** CLASS1至CLASS8对应的施工版本号，来自成型排程CLASSn_RECIPE_NO。 */

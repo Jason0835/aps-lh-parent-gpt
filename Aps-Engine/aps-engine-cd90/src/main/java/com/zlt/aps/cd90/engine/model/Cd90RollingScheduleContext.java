@@ -26,6 +26,8 @@ public class Cd90RollingScheduleContext {
     private List<Cd90InboundRecord> plannedInboundRecords;
     /** 已提交的全部班次任务。 */
     private List<Cd90ShiftScheduleTask> committedTasks;
+    /** 跨班保留的大卷成熟库存及已分配米数。 */
+    private List<Cd90BigRollAgingStock> bigRollAgingStocks;
     /** 各机台最近一次已提交任务的机尾规格。 */
     private Map<String, String> tailSpecByMachine;
     /** 各机台最近一次已提交任务的机尾大卷与直裁规格。 */

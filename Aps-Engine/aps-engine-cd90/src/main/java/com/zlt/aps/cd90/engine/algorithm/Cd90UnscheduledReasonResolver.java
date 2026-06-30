@@ -32,6 +32,9 @@ public class Cd90UnscheduledReasonResolver {
         if ("STORAGE_LANE_LIMIT".equals(failureReason)) {
             return reason("STORAGE_LANE_LIMIT", "STORAGE_LANE", "库排容量不足");
         }
+        if ("AGING_PERIOD_LIMIT".equals(failureReason)) {
+            return reason("AGING_PERIOD_LIMIT", "BIG_ROLL_AGING", "大卷静置期未满");
+        }
         if ("SPEC_START_COUNT_LIMIT".equals(failureReason)) {
             return reason("SPEC_START_COUNT_LIMIT", "SPEC_START_COUNT", "连续四班上机次数达到上限");
         }

@@ -65,7 +65,7 @@ public class LhScheduleResultValidationStrategy extends BaseValidationStrategy {
 
         validateRequiredFields(lhResults, totalCount, result);
         validateMaterialInfoConfig(context, lhResults, result);
-        validateStructureAllocationConfig(context, lhResults, result);
+        //validateStructureAllocationConfig(context, lhResults, result);
         validateStructureTreadConfig(context, lhResults, result);
         validateRecipeTypeMatching(lhResults, result);
     }
@@ -175,47 +175,6 @@ public class LhScheduleResultValidationStrategy extends BaseValidationStrategy {
 
         log.info("物料信息配置校验完成：配置物料数={}, 硫化任务物料数={}, 缺失数={}",
                 configuredMaterialCodes.size(), lhMaterialCodes.size(), missingMaterials.size());
-    }
-
-    private void validateStructureAllocationConfig(ScheduleContextVo context, List<LhScheduleResult> lhResults,
-                                                  ScheduleDataValidationResult result) {
-        Map<String, List<MpCxCapacityConfiguration>> structureAllocationMap = context.getStructureAllocationMap();
-
-        if (structureAllocationMap == null || structureAllocationMap.isEmpty()) {
-            addError(result,
-                    I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.lhResult.structureAllocationEmpty"),
-                    I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.lhResult.structureAllocationEmpty.suggestion"));
-            return;
-        }
-
-        Set<String> lhStructures = lhResults.stream()
-                .map(LhScheduleResult::getStructureName)
-                .filter(Objects::nonNull)
-                .filter(s -> !s.trim().isEmpty())
-                .collect(Collectors.toSet());
-
-        List<String> missingStructures = new ArrayList<>();
-        for (String structure : lhStructures) {
-            if (!structureAllocationMap.containsKey(structure)) {
-                missingStructures.add(structure);
-            }
-        }
-
-        if (!missingStructures.isEmpty()) {
-            String message = String.format(
-                    I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.lhResult.structureMissing"),
-                    missingStructures.size(), String.join(", ", missingStructures));
-            addError(result, message,
-                    I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.lhResult.structureMissing.suggestion"));
-        } else {
-            addInfo(result,
-                    String.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.lhResult.structureAllocationComplete"),
-                            structureAllocationMap.size(), lhStructures.size()),
-                    null);
-        }
-
-        log.info("结构排产配置校验完成：配置结构数={}, 硫化任务结构数={}, 缺失数={}",
-                structureAllocationMap.size(), lhStructures.size(), missingStructures.size());
     }
 
     private void validateStructureTreadConfig(ScheduleContextVo context, List<LhScheduleResult> lhResults,

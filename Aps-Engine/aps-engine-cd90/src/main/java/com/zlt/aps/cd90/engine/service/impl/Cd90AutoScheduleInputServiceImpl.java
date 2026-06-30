@@ -2,18 +2,25 @@ package com.zlt.aps.cd90.engine.service.impl;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.zlt.aps.cd90.api.domain.entity.Cd90CurlLength;
+import com.zlt.aps.cd90.api.domain.entity.Cd90DepthConfig;
 import com.zlt.aps.cd90.api.domain.entity.Cd90Stock;
 import com.zlt.aps.cd90.api.domain.entity.Cd90StorageLaneLimit;
+import com.zlt.aps.cd90.engine.algorithm.Cd90BigRollAgingStockBuilder;
+import com.zlt.aps.cd90.engine.algorithm.Cd90ClothDepthResolver;
 import com.zlt.aps.cd90.engine.mapper.Cd90AutoScheduleSourceMapper;
 import com.zlt.aps.cd90.engine.mapper.Cd90ConstructionMaterialMapper;
 import com.zlt.aps.cd90.engine.algorithm.Cd90FormingDemandExpander;
 import com.zlt.aps.cd90.engine.mapper.Cd90EngineConstructionMapper;
 import com.zlt.aps.cd90.engine.mapper.Cd90EngineCurlLengthMapper;
+import com.zlt.aps.cd90.engine.mapper.Cd90EngineDepthConfigMapper;
 import com.zlt.aps.cd90.engine.mapper.Cd90EngineCxScheduleMapper;
 import com.zlt.aps.cd90.engine.mapper.Cd90EngineStockMapper;
 import com.zlt.aps.cd90.engine.mapper.Cd90EngineStorageLaneMapper;
 import com.zlt.aps.cd90.engine.mapper.Cd90EngineMonthSurplusMapper;
+import com.zlt.aps.cd90.engine.mapper.Cd90EngineXwyyScheduleResultMapper;
+import com.zlt.aps.cd90.engine.mapper.Cd90EngineXwyyStockMapper;
 import com.zlt.aps.cd90.engine.model.Cd90AutoScheduleInput;
+import com.zlt.aps.cd90.engine.model.Cd90BigRollAgingBuildResult;
 import com.zlt.aps.cd90.engine.model.Cd90ConstructionMaterial;
 import com.zlt.aps.cd90.engine.model.Cd90DemandShift;
 import com.zlt.aps.cd90.engine.model.Cd90FormingScheduleSource;
@@ -24,6 +31,8 @@ import com.zlt.aps.cd90.engine.service.Cd90AutoScheduleInputService;
 import com.zlt.aps.cx.api.domain.entity.CxScheduleResult;
 import com.zlt.aps.mdm.api.domain.entity.MdmConstructionInfo;
 import com.zlt.aps.mdm.api.domain.entity.MdmMonthSurplus;
+import com.zlt.aps.xwyy.api.domain.entity.XwyyScheduleResult;
+import com.zlt.aps.xwyy.api.domain.entity.XwyyStock;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -53,9 +62,14 @@ public class Cd90AutoScheduleInputServiceImpl implements Cd90AutoScheduleInputSe
     private final Cd90EngineStorageLaneMapper storageLaneMapper;
     private final Cd90EngineMonthSurplusMapper monthSurplusMapper;
     private final Cd90EngineCurlLengthMapper curlLengthMapper;
+    private final Cd90EngineDepthConfigMapper depthConfigMapper;
     private final Cd90ConstructionMaterialMapper constructionMaterialMapper;
+    private final Cd90EngineXwyyStockMapper xwyyStockMapper;
+    private final Cd90EngineXwyyScheduleResultMapper xwyyScheduleResultMapper;
+    private final Cd90BigRollAgingStockBuilder bigRollAgingStockBuilder;
     private final Cd90AutoScheduleSourceMapper sourceMapper;
     private final Cd90FormingDemandExpander formingDemandExpander;
+    private final Cd90ClothDepthResolver clothDepthResolver;
 
     /**
      * 加载第1至5步所需的成型计划、施工、6点库存和当前班次库排快照。
@@ -68,7 +82,7 @@ public class Cd90AutoScheduleInputServiceImpl implements Cd90AutoScheduleInputSe
      */
     @Override
     public Cd90AutoScheduleInput load(String factoryCode, LocalDate scheduleDate,
-                                      String classField, String shiftCode) {
+                                      String classField, String shiftCode, int agingPeriodHours) {
         Assert.hasText(factoryCode, "工厂编码不能为空");
         Assert.notNull(scheduleDate, "排程日期不能为空");
         Assert.hasText(classField, "班次字段不能为空");
@@ -97,6 +111,13 @@ public class Cd90AutoScheduleInputServiceImpl implements Cd90AutoScheduleInputSe
         List<Cd90ConstructionMaterial> constructionMaterials = loadConstructionMaterials(
                 factoryCode, embryoCodes, constructionVersions);
         fillStandardCurlLength(factoryCode, constructionMaterials);
+        List<Cd90DepthConfig> depthConfigs = depthConfigMapper.selectList(
+                Wrappers.<Cd90DepthConfig>lambdaQuery()
+                        .eq(Cd90DepthConfig::getFactoryCode, factoryCode)
+                        .orderByDesc(Cd90DepthConfig::getMachineQty)
+                        .orderByAsc(Cd90DepthConfig::getMachineRange));
+        Map<String, BigDecimal> depthClassQtyByCloth = clothDepthResolver.resolve(
+                formingSchedules, constructionMaterials, depthConfigs);
         List<Cd90DemandShift> demandShifts = formingDemandExpander.expand(
                 formingSchedules, constructionMaterials);
         List<Cd90EmbryoPlanSurplus> embryoPlanSurpluses = loadEmbryoPlanSurpluses(
@@ -121,11 +142,30 @@ public class Cd90AutoScheduleInputServiceImpl implements Cd90AutoScheduleInputSe
                 .map(sourceMapper::mapStorageLane)
                 .collect(Collectors.toList());
 
+        List<XwyyStock> xwyyActualStocks = xwyyStockMapper.selectList(
+                Wrappers.<XwyyStock>lambdaQuery()
+                        .eq(XwyyStock::getFactoryCode, factoryCode)
+                        .orderByAsc(XwyyStock::getStockInTime)
+                        .orderByAsc(XwyyStock::getBigRollCode)
+                        .orderByAsc(XwyyStock::getId));
+        List<XwyyScheduleResult> xwyyPlans = xwyyScheduleResultMapper.selectList(
+                Wrappers.<XwyyScheduleResult>lambdaQuery()
+                        .eq(XwyyScheduleResult::getFactoryCode, factoryCode)
+                        .between(XwyyScheduleResult::getScheduleDate,
+                                Date.valueOf(scheduleDate.minusDays(1)),
+                                Date.valueOf(scheduleDate.plusDays(2)))
+                        .orderByAsc(XwyyScheduleResult::getScheduleDate)
+                        .orderByAsc(XwyyScheduleResult::getId));
+        Cd90BigRollAgingBuildResult agingResult = bigRollAgingStockBuilder.build(
+                xwyyActualStocks, xwyyPlans, agingPeriodHours);
+
         log.info("[直裁自动排程] 输入数据加载完成, factoryCode={}, scheduleDate={}, classField={}, shiftCode={}, "
                         + "formingRange={}~{}, formingCount={}, constructionMaterialCount={}, "
-                        + "demandShiftCount={}, resourceBaselineShiftCode={}, stockCount={}, storageLaneCount={}",
+                        + "demandShiftCount={}, depthClothCount={}, resourceBaselineShiftCode={}, "
+                        + "stockCount={}, storageLaneCount={}",
                 factoryCode, scheduleDate, classField, shiftCode, formingStartDate, formingEndDate,
-                formingSchedules.size(), constructionMaterials.size(), demandShifts.size(), shiftCode, stocksAtSix.size(),
+                formingSchedules.size(), constructionMaterials.size(), demandShifts.size(),
+                depthClassQtyByCloth.size(), shiftCode, stocksAtSix.size(),
                 storageLanesAtSix.size());
 
         return Cd90AutoScheduleInput.builder()
@@ -134,7 +174,10 @@ public class Cd90AutoScheduleInputServiceImpl implements Cd90AutoScheduleInputSe
                 .stocksAtSix(stocksAtSix)
                 .embryoPlanSurpluses(embryoPlanSurpluses)
                 .demandShifts(demandShifts)
+                .depthClassQtyByCloth(depthClassQtyByCloth)
                 .storageLanesAtSix(storageLanesAtSix)
+                .bigRollAgingStocks(agingResult.getStocks())
+                .bigRollAgingDataMissingCodes(agingResult.getDataMissingBigRollCodes())
                 .inboundRecords(Collections.emptyList())
                 .build();
     }
@@ -167,6 +210,7 @@ public class Cd90AutoScheduleInputServiceImpl implements Cd90AutoScheduleInputSe
                 .select(CxScheduleResult::getCxBatchNo,
                         CxScheduleResult::getScheduleDate,
                         CxScheduleResult::getEmbryoCode,
+                        CxScheduleResult::getCxMachineCode,
                         CxScheduleResult::getClass1PlanQty,
                         CxScheduleResult::getClass1RecipeNo,
                         CxScheduleResult::getClass2PlanQty,

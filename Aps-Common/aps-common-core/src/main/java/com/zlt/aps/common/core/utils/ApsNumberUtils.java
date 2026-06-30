@@ -23,6 +23,27 @@ public class ApsNumberUtils {
     }
     
     /**
+     * 安全相加
+     * @param val1
+     * @param val2
+     * @return
+     */
+    public static Integer safeAddDefaultNull(Integer... val) {
+        Integer result = null;
+        for (Integer valItem: val) {
+            if (val == null && result == null) {
+                continue;
+            }
+            if (result == null) {
+                result = valItem;
+            } else {
+                result += intValue(valItem);
+            }
+        }
+        return result;
+    }
+    
+    /**
      * 空值自动转0
      * @param val
      * @return

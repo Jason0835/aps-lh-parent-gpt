@@ -1822,5 +1822,20 @@
   "ui.data.column.gdyyScheduleResult.productionStatus": "Trạng thái sản xuất",
   "ui.data.column.gdyyScheduleResult.remark": "Ghi chú",
   "ui.data.column.gdyyScheduleResult.checkUnique": "Xác minh không thành công, bản ghi đã tồn tại",
-  "ui.data.column.gdyyScheduleResult.hasPublishedCanNotDelete": "Bản ghi đã phát hành không thể xóa"
+  "ui.data.column.gdyyScheduleResult.hasPublishedCanNotDelete": "Bản ghi đã phát hành không thể xóa",
+  "ui.data.column.xwyyStock.modelName": "Quản lý tồn kho cán sợi",
+  "ui.data.column.xwyyStock.factoryCode": "Nhà máy",
+    "ui.data.column.xwyyStock.stockDate": "Ngày tồn kho",
+    "ui.data.column.xwyyStock.stockInTime": "Giờ nhập kho",
+    "ui.data.column.xwyyStock.bigRollCode": "Mã cuộn lớn",
+  "ui.data.column.xwyyStock.bigRollBarcode": "Mã vạch cuộn lớn",
+  "ui.data.column.xwyyStock.stockNum": "SL tồn(cái)",
+  "ui.data.column.xwyyStock.stockRollNum": "SL tồn(cuộn)",
+  "ui.data.column.xwyyStock.modifyNum": "SL điều chỉnh",
+  "ui.data.column.xwyyStock.rollModifyNum": "SL điều chỉnh(cuộn)",
+  "ui.data.column.xwyyStock.badNum": "SL lỗi",
+  "ui.data.column.xwyyStock.rollBadNum": "SL lỗi(cuộn)",
+  "ui.data.column.xwyyStock.stockMeters": "Số mét mỗi cuộn",
+  "ui.data.column.xwyyStock.estimateStockFlag": "Cờ ước tính tồn kho",
+  "ui.data.column.xwyyStock.checkUnique": "Bản ghi tồn kho đã tồn tại cho cùng nhà máy, ngày và mã cuộn lớn"
 }

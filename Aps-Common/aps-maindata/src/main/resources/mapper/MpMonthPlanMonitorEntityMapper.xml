@@ -141,10 +141,10 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
           AND FACTORY_CODE = #{factoryCode}
           AND YEAR = #{year}
           AND MONTH = #{month}
-          AND PRODUCT_STATUS = 'S'
+          AND (PRODUCT_STATUS = 'S' OR CONSTRUCTION_STAGE = '03')
           AND MATERIAL_CODE IN
-          <foreach collection="materialCodes" item="code" open="(" separator="," close=")">
-              #{code}
-          </foreach>
+        <foreach collection="materialCodes" item="code" open="(" separator="," close=")">
+            #{code}
+        </foreach>
     </select>
 </mapper>

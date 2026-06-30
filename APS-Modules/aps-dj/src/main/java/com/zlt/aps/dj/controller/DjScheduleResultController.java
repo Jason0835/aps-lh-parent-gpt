@@ -425,12 +425,11 @@ public class DjScheduleResultController extends AbstractBillBizController<DjSche
     }
 
     /**
-     * 唯一性校验
+     * 唯一性校验，true=唯一，false=不唯一
      */
     @PostMapping("/checkUnique")
-    public List<DjScheduleResult> checkUnique(@RequestBody DjScheduleResult entity) {
-        List<DjScheduleResult> list = djScheduleResultService.checkUnique(entity);
-        return list;
+    public Boolean checkUnique(@RequestBody DjScheduleResult entity) {
+        return CollectionUtils.isEmpty(djScheduleResultService.checkUnique(entity));
     }
 
     /**

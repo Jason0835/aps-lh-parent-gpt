@@ -4,6 +4,7 @@ import lombok.Builder;
 import lombok.Data;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 
 /**
@@ -13,6 +14,8 @@ import java.util.List;
 @Builder
 public class Cd90CandidateMachineTrialInput {
 
+    /** XWYY库存使用的帘线大卷编码。 */
+    private String bigRollCode;
     /** 帘布代码。 */
     private String clothCode;
     /** 候选机台代码。 */
@@ -37,6 +40,10 @@ public class Cd90CandidateMachineTrialInput {
     private int shiftHours;
     /** 已扣除检修和前序任务后的剩余秒数。 */
     private int remainingSeconds;
+    /** 机台原预计可上机时间。 */
+    private LocalDateTime originalStartTime;
+    /** 当前班次可参与试算的大卷成熟流水。 */
+    private List<Cd90BigRollAgingStock> bigRollAgingStocks;
     /** 机台任务链上一规格。 */
     private String previousSpec;
     /** 当前帘线规格。 */

@@ -107,6 +107,14 @@ public class Cd90SingleShiftScheduleExecutor implements Cd90SingleShiftScheduleS
                         BigDecimal.ZERO, reason, attemptTraces.size() + 1));
                 continue;
             }
+            if (input.getBigRollAgingDataMissingCodes() != null
+                    && input.getBigRollAgingDataMissingCodes().contains(construction.getBigRollCode())) {
+                String reason = "DATA_MISSING";
+                recordFailure(failures, shift, clothCode, reason);
+                attemptTraces.add(trace(shift, clothCode, construction.getBigRollCode(),
+                        netDemand, BigDecimal.ZERO, reason, attemptTraces.size() + 1));
+                continue;
+            }
             Cd90CloseOutDecision closeOut = closeOutCalculator.decide(
                     closeOutItems(clothCode, input));
             if (closeOut.isMissingPlanSurplusWarning()) {
@@ -176,6 +184,7 @@ public class Cd90SingleShiftScheduleExecutor implements Cd90SingleShiftScheduleS
                 .remainingSecondsByMachine(state.getRemainingSecondsByMachine())
                 .previousSpecByMachine(state.getTailSpecByMachine())
                 .previousTailByMachine(state.getTailByMachine())
+                .bigRollAgingStocks(state.getBigRollAgingStocks())
                 .parameters(context.getParameters()).build();
     }
 

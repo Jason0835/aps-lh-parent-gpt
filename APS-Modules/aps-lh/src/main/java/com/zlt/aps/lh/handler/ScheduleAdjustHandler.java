@@ -26,7 +26,6 @@ import com.zlt.aps.lh.util.ShiftFieldUtil;
 import com.zlt.aps.lh.util.SkuDailyPlanQuotaUtil;
 import com.zlt.aps.mdm.api.domain.entity.MdmSkuLhCapacity;
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
-import com.zlt.aps.mp.api.domain.entity.MpAdjustResult;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
@@ -519,6 +518,18 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
         }
         List<String> activeSkuList = context.getActiveEmbryoSkuMap().get(sku.getEmbryoCode());
         return CollectionUtils.isEmpty(activeSkuList) ? 0 : activeSkuList.size();
+    }
+
+    /**
+     * 计算指定月计划记录的硫化余量（只读计算，不修改上下文）。
+     * <p>供基础数据初始化阶段以胎胚维度合并余量使用，口径与排程阶段 {@link #calculateSurplusQty} 完全一致。</p>
+     *
+     * @param context 排程上下文
+     * @param plan    月生产计划记录
+     * @return 硫化余量（Max(月度计划总量 - 已完成量 + 有效上月超欠产量, 0)）
+     */
+    public int calculatePlanSurplusQty(LhScheduleContext context, FactoryMonthPlanProductionFinalResult plan) {
+        return this.calculateSurplusQty(context, plan).getSurplusQty();
     }
 
     /**
@@ -1616,45 +1627,20 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
     }
 
     /**
-     * 判断SKU目标月是否有交期锁定（周程滚动调整有锁定上机日期）。
-     * <p>跨月时同一物料可能存在多个月份的调整结果，锁交期只允许目标月计划对应年月生效。</p>
+     * 判断SKU目标月是否有交期锁定。
+     * <p>从月计划 IS_LOCK_SCHEDULE 字段取值：1-锁定，0-未锁定。</p>
      *
      * @param context 排程上下文
      * @param plan 目标月计划
      * @return true-有锁定交期
      */
     private boolean isDeliveryLocked(LhScheduleContext context, FactoryMonthPlanProductionFinalResult plan) {
-        if (Objects.isNull(context) || Objects.isNull(plan) || StringUtils.isEmpty(plan.getMaterialCode())) {
+        if (Objects.isNull(context) || Objects.isNull(plan)) {
             return false;
         }
-        List<MpAdjustResult> adjustResults = context.getMpAdjustResultMap().get(plan.getMaterialCode());
-        if (CollectionUtils.isEmpty(adjustResults)) {
-            return false;
-        }
-        for (MpAdjustResult adjustResult : adjustResults) {
-            if (isTargetMonthAdjustResult(plan, adjustResult)
-                    && StringUtils.equals("1", StringUtils.trimToEmpty(adjustResult.getIsLockSchedule()))) {
-                return true;
-            }
-        }
-        return false;
+        return StringUtils.equals("1", StringUtils.trimToEmpty(plan.getIsLockSchedule()));
     }
 
-    /**
-     * 判断周程调整结果是否属于目标月计划。
-     *
-     * @param plan 目标月计划
-     * @param adjustResult 周程调整结果
-     * @return true-同年月调整结果
-     */
-    private boolean isTargetMonthAdjustResult(FactoryMonthPlanProductionFinalResult plan, MpAdjustResult adjustResult) {
-        if (Objects.isNull(plan) || Objects.isNull(adjustResult)
-                || Objects.isNull(plan.getYear()) || Objects.isNull(plan.getMonth())) {
-            return false;
-        }
-        return Objects.equals(plan.getYear(), adjustResult.getYear())
-                && Objects.equals(plan.getMonth(), adjustResult.getMonth());
-    }
 
     /**
      * 基于月计划 day1～day31 中最早有计划量的日期计算延迟上机天数。

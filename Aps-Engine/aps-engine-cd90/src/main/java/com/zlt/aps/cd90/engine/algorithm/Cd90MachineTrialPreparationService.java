@@ -58,6 +58,7 @@ public class Cd90MachineTrialPreparationService {
         List<Cd90MachineTrial> trials = candidates.stream()
                 .map(candidate -> trialCalculator.calculate(Cd90CandidateMachineTrialInput.builder()
                         // 帘布与机台标识
+                        .bigRollCode(request.getBigRollCode())
                         .clothCode(request.getClothCode())
                         .machineCode(candidate.getMachineCode())
                         // 本次排程净需求量（已扣除已排量）
@@ -80,6 +81,8 @@ public class Cd90MachineTrialPreparationService {
                         // 机台班次剩余秒数（扣除前序任务后）
                         .remainingSeconds(seconds.getOrDefault(candidate.getMachineCode(),
                                 request.getShiftHours() * 3600))
+                        .originalStartTime(originalStartTime(request, candidate.getMachineCode()))
+                        .bigRollAgingStocks(request.getBigRollAgingStocks())
                         // 机台上次规格（用于计算换规格耗时）
                         .previousSpec(previousSpecs.get(candidate.getMachineCode()))
                         .currentSpec(request.getCordSpec())
@@ -119,6 +122,16 @@ public class Cd90MachineTrialPreparationService {
     }
 
     /** 兼容未补充三类参数的旧测试构造器，正式参数快照始终使用新字段。 */
+
+    private java.time.LocalDateTime originalStartTime(Cd90MachineTrialRequest request, String machineCode) {
+        if (request.getShiftStart() == null) {
+            return null;
+        }
+        int fullSeconds = Math.max(1, request.getShiftHours()) * 3600;
+        int remainingSeconds = request.getRemainingSecondsByMachine() == null
+                ? fullSeconds : request.getRemainingSecondsByMachine().getOrDefault(machineCode, fullSeconds);
+        return request.getShiftStart().plusSeconds(Math.max(0, fullSeconds - remainingSeconds));
+    }
     private int changeMinutes(Cd90AutoScheduleParameters parameters, int configuredMinutes) {
         return configuredMinutes == 0 && parameters.getSourceValues() == null
                 ? parameters.getSpecChangeMinutes() : configuredMinutes;

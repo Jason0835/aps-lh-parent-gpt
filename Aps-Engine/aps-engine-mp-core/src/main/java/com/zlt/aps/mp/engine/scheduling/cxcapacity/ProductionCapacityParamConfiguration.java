@@ -265,6 +265,21 @@ public class ProductionCapacityParamConfiguration {
     private Integer minProductionQty;
 
     /**
+     * 是否需要考虑需求天数
+     * skuShortestProductionDays>=2
+     * 且needDays>skuShortestProductionDays
+     *
+     * @param needDays 可排产天数
+     * @return
+     */
+    public boolean isProductionSecondActualMinLhMachine(int needDays) {
+        if (null == skuShortestProductionDays && skuShortestProductionDays <= BigDecimal.ONE.intValue()) {
+            return false;
+        }
+        return needDays >= skuShortestProductionDays;
+    }
+
+    /**
      * 设置额外处理的配比值
      *
      * @param cxLhRatioExtraValue

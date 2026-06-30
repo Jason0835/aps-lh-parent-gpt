@@ -79,7 +79,7 @@ public interface IDjScheduleResultRemoteService {
      * 唯一性校验
      */
     @PostMapping("/djScheduleResult/checkUnique")
-    List<DjScheduleResult> checkUnique(@RequestBody DjScheduleResult entity);
+    Boolean checkUnique(@RequestBody DjScheduleResult entity);
 
     /**
      * 导出列表

@@ -294,7 +294,13 @@ public class ExcelUtils {
                                     setCellValue(newCell, newValue);
                                     // 设置样式
 
-                                    if(map.containsKey("style")){
+                                    // 按列样式优先（style_{key}），其次整行样式（style）
+                                    String columnStyleKey = "style_" + key;
+                                    Object cellStyleObj = map.get(columnStyleKey);
+                                    if (cellStyleObj == null) {
+                                        cellStyleObj = map.get("style");
+                                    }
+                                    if (cellStyleObj != null) {
                                         // 为当前单元格创建独立样式，避免修改模板共享样式后导致其它行一起变色。
                                         CellStyle style = workbook.createCellStyle();
                                         style.cloneStyleFrom(newCell.getCellStyle());
@@ -312,7 +318,6 @@ public class ExcelUtils {
 
                                         //true为加粗，默认为不加粗
 
-                                        Object cellStyleObj = map.get("style");
                                         ExcelStyleVo excelStyleVo = null;
                                         if (cellStyleObj != null) {
                                             String jsonStr = com.alibaba.fastjson.JSON.toJSONString(cellStyleObj);

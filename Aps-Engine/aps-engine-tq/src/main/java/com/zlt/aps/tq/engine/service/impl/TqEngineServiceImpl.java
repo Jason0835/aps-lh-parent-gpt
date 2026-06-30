@@ -1249,11 +1249,11 @@ public class TqEngineServiceImpl implements TqEngineService {
      * @param stockQty
      */
     private void newComputeSupplyTime(TqScheduleResultVo scheduleVo,  Double stockQty) {
-        Double cxClass1Plan = (scheduleVo.getCxClass1Plan() == null ? 0D : scheduleVo.getCxClass1Plan());  //对应成型一班的计划量
-        Double cxClass2Plan = (scheduleVo.getCxClass2Plan() == null ? 0D : scheduleVo.getCxClass2Plan());  //对应成型二班的计划量
-        Double cxClass3Plan = (scheduleVo.getCxClass3Plan() == null ? 0D : scheduleVo.getCxClass3Plan());  //对应成型三班的计划量
-        Double cxClass4Plan = (scheduleVo.getCxClass4Plan() == null ? 0D : scheduleVo.getCxClass4Plan());  //对应成型次日一班的计划量
-        Double cxClass5Plan = (scheduleVo.getCxClass5Plan() == null ? 0D : scheduleVo.getCxClass5Plan());  //对应成型次日一班的计划量
+        Double cxClass1Plan = (scheduleVo.getCxClass1Plan() == null ? 0D : scheduleVo.getCxClass1Plan().doubleValue());  //对应成型一班的计划量
+        Double cxClass2Plan = (scheduleVo.getCxClass2Plan() == null ? 0D : scheduleVo.getCxClass2Plan().doubleValue());  //对应成型二班的计划量
+        Double cxClass3Plan = (scheduleVo.getCxClass3Plan() == null ? 0D : scheduleVo.getCxClass3Plan().doubleValue());  //对应成型三班的计划量
+        Double cxClass4Plan = (scheduleVo.getCxClass4Plan() == null ? 0D : scheduleVo.getCxClass4Plan().doubleValue());  //对应成型次日一班的计划量
+        Double cxClass5Plan = (scheduleVo.getCxClass5Plan() == null ? 0D : scheduleVo.getCxClass5Plan().doubleValue());  //对应成型次日一班的计划量
         autoScheduleLogService.insertTqScheduleLog(scheduleVo.getBatchNo(), scheduleVo.getOrderNo(), "计算库存供应时长前数据",
                 logSplit("具体算法：从1班开始判断，预计库存-1班的计划大于等于0时，供应时长+12小时；预计库存-1班计划-2班计划大于等于0时，供应时长+24小时；预计库存-1班计划-2班计划-3班计划小于0，供应时长=24个小时+（((预计库存-1班计划-2班计划)/3班计划)*12）；以此类推到第5班",
                         "物料编号：" + scheduleVo.getBeadCode() + ",7点预计库存：" + stockQty + "，对应成型一班的计划量：" + 0 + "，对应成型二班的计划量：" + cxClass2Plan + "，对应成型三班的计划量：" + cxClass3Plan + "，对应成型次日一班的计划量：" + cxClass4Plan + "，对应成型次日二班的计划量：" + cxClass5Plan));
@@ -1572,11 +1572,11 @@ public class TqEngineServiceImpl implements TqEngineService {
      * @return
      */
     private Double getCxClassPlanCumulative(TqScheduleResultVo scheduleVo, OpenMachineClassEnums classNum) {
-        Double cxClass1Plan = (scheduleVo.getCxClass1Plan() == null ? 0D : scheduleVo.getCxClass1Plan());  //对应成型前日早班的计划量
-        Double cxClass2Plan = (scheduleVo.getCxClass2Plan() == null ? 0D : scheduleVo.getCxClass2Plan());  //对应成型夜班的计划量
-        Double cxClass3Plan = (scheduleVo.getCxClass3Plan() == null ? 0D : scheduleVo.getCxClass3Plan());  //对应成型早班的计划量
-        Double cxClass4Plan = (scheduleVo.getCxClass4Plan() == null ? 0D : scheduleVo.getCxClass4Plan());  //对应成型次日夜班的计划量
-        Double cxClass5Plan = (scheduleVo.getCxClass5Plan() == null ? 0D : scheduleVo.getCxClass5Plan());  //对应成型次日早班的计划量
+        Double cxClass1Plan = (scheduleVo.getCxClass1Plan() == null ? 0D : scheduleVo.getCxClass1Plan().doubleValue());  //对应成型前日早班的计划量
+        Double cxClass2Plan = (scheduleVo.getCxClass2Plan() == null ? 0D : scheduleVo.getCxClass2Plan().doubleValue());  //对应成型夜班的计划量
+        Double cxClass3Plan = (scheduleVo.getCxClass3Plan() == null ? 0D : scheduleVo.getCxClass3Plan().doubleValue());  //对应成型早班的计划量
+        Double cxClass4Plan = (scheduleVo.getCxClass4Plan() == null ? 0D : scheduleVo.getCxClass4Plan().doubleValue());  //对应成型次日夜班的计划量
+        Double cxClass5Plan = (scheduleVo.getCxClass5Plan() == null ? 0D : scheduleVo.getCxClass5Plan().doubleValue());  //对应成型次日早班的计划量
         Double planQty = 0D;
         if (classNum == null) {
             return planQty;
@@ -1716,5 +1716,39 @@ public class TqEngineServiceImpl implements TqEngineService {
         if (CollectionUtils.isNotEmpty(scheduleResultVoList)) {
             tqEngineMapper.batchUpdateBatchNoAndOrderNo(scheduleResultVoList);
         }
+    }
+
+    /**
+     * 为插单记录生成批次号和工单号
+     * 复用当前排程日期已有的批次号（若有），否则生成新批次号并创建排程记录；
+     * 工单号基于批次号生成。不会影响其他记录的批次号/工单号。
+     *
+     * @param scheduleDate 排程日期，格式：yyyy-MM-dd
+     * @return 长度为2的数组，[0]=批次号batchNo，[1]=工单号orderNo
+     */
+    @Override
+    public String[] generateBatchNoAndOrderNo(String scheduleDate) {
+        // 复用当前排程日期已有的批次号
+        String batchNo = tqEngineMapper.getTqCurrentBatchNo(scheduleDate);
+        if (StringUtils.isBlank(batchNo)) {
+            // 当前无批次号，说明尚未"自动排程"，生成新批次号并创建排程记录
+            batchNo = this.createBatchNo(scheduleDate);
+            this.createScheduleRecord(scheduleDate, "", batchNo);
+        }
+        // 基于批次号生成新工单号
+        String orderNo = this.createOrderNo(batchNo);
+        return new String[]{batchNo, orderNo};
+    }
+
+    /**
+     * 查询胎圈施工基础信息（委托给Mapper）
+     *
+     * @param beadCodes       胎圈代码集合
+     * @param productionStage 生产阶段过滤（空串表示不过滤）
+     * @return 施工基础信息列表
+     */
+    @Override
+    public List<TqScheduleBaseInfoVo> listTqScheduleBaseInfo(List<String> beadCodes, String productionStage) {
+        return tqEngineMapper.listTqScheduleBaseInfo(beadCodes, productionStage);
     }
 }

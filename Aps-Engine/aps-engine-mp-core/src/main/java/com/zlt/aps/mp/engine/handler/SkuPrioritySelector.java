@@ -3,7 +3,6 @@ package com.zlt.aps.mp.engine.handler;
 import com.google.common.collect.Sets;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.mp.engine.constant.ProductionConstant;
-import com.zlt.aps.mp.engine.daylimit.GroupPlanCxLhCapacityLimitHelper;
 import com.zlt.aps.mp.engine.domain.Context;
 import com.zlt.aps.mp.engine.domain.dto.CxLhProductionHelper;
 import com.zlt.aps.mp.engine.domain.dto.EarliestConclusionLhGroupHelper;
@@ -13,6 +12,7 @@ import com.zlt.aps.mp.engine.enums.ContinueTypeEnum;
 import com.zlt.aps.mp.engine.enums.FormalRoundEnum;
 import com.zlt.aps.mp.engine.enums.ProductionStageEnum;
 import com.zlt.aps.mp.engine.scheduling.TbrProductionContext;
+import com.zlt.aps.mp.engine.scheduling.cxcapacity.ProductionCapacityParamConfiguration;
 import com.zlt.aps.mp.engine.scheduling.cxcapacity.SkuNeedProductionInfo;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;
@@ -97,7 +97,7 @@ public class SkuPrioritySelector {
             return shareSelectedList.get(BigDecimal.ZERO.intValue()).getMaterialDesc();
         }
         //最低实单硫化机台
-        if (FormalRoundEnum.ACTUAL_MIN_LH_MACHINE == formalRound) {
+        if (FormalRoundEnum.isActualMinLhMachine(formalRound)) {
             return getCoveredMostSku(shareSelectedList);
         }
         String coveredResult = getCoveredMostSku(shareSelectedList);
@@ -301,7 +301,7 @@ public class SkuPrioritySelector {
                 continue;
             }
             boolean isSameProductionRange = false;
-            if (FormalRoundEnum.ACTUAL_MIN_LH_MACHINE == formalRound && null != allLhMachineLhGroup) {
+            if (FormalRoundEnum.isActualMinLhMachine(formalRound) && null != allLhMachineLhGroup) {
                 Integer allLhStartDay = allLhMachineLhGroup.getClosingDay();
                 Integer allLhEndDay = allLhMachineLhGroup.getEndDay();
                 Integer allMaxLhDays = getLhMaxDays(productionContext, allLhStartDay, allLhEndDay);
@@ -890,7 +890,13 @@ public class SkuPrioritySelector {
     }
 
     /**
-     * 判断需求是否可以排产整段，在最低实单阶段
+     * 是否在最短实单硫化机台阶段排产计划 true 忽略 false 忽略
+     * 判断排产段范围是否可以排产完整个需求量，在最低实单阶段
+     * 1、formalRound轮次在最低实单阶段，不是则为false
+     * 2、如果排产范围为整个结构排产范围，则false
+     * 3、如果最低实单硫化机台排产范围与整个结构硫化机台排产范围一样，则false
+     * 4、硫化排产天数 大于等于需求天数，则false
+     * 否则true
      *
      * @param context               排产上下文
      * @param groupPlanInfo         结构分组
@@ -904,9 +910,14 @@ public class SkuPrioritySelector {
                                                     ProductionSkuPriorityVo priority,
                                                     FormalRoundEnum formalRound,
                                                     boolean isSameProductionRange) {
-        if (FormalRoundEnum.ACTUAL_MIN_LH_MACHINE != formalRound) {
+        if (!FormalRoundEnum.isActualMinLhMachine(formalRound)) {
             return false;
         }
+        //第三轮实单最低
+        if (FormalRoundEnum.THIRD_ACTUAL_MIN_LH_MACHINE == formalRound) {
+            return false;
+        }
+        TbrProductionContext productionContext = (TbrProductionContext) context;
         //整个结构排产段都要排
         Set<Integer> productionDaySet = groupPlanInfo.getDayProductionLimitInfo().keySet();
         Integer lhDays = Math.min(priority.getMaxLhDays(), priority.getMaxMouldDays());
@@ -918,6 +929,16 @@ public class SkuPrioritySelector {
         if (isSameProductionRange) {
             return false;
         }
-        return lhDays < requireNeedDays;
+        //第一轮实单最低
+        if (FormalRoundEnum.FIRST_ACTUAL_MIN_LH_MACHINE == formalRound) {
+            return lhDays < requireNeedDays;
+        }
+        //第二轮最低
+        ProductionCapacityParamConfiguration paramConfiguration = productionContext.getBaseDataContainer().getParamConfiguration();
+        int shortestDay = paramConfiguration.getSkuShortestProductionDays();
+        if (paramConfiguration.isProductionSecondActualMinLhMachine(requireNeedDays)) {
+            return lhDays < shortestDay;
+        }
+        return true;
     }
 }
