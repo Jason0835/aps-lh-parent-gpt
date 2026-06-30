@@ -228,6 +228,12 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
         String templateErrorStr = I18nUtil.getMessage("ui.data.column.mpStructureAllocation.import.templateError");
         String[] params = new String[]{};
         Date scheduleDate = null;
+
+        LhScheduleResult scheduleResult = lhImportContext.getScheduleResult();
+        if (scheduleResult == null) {
+            scheduleResult = new LhScheduleResult();
+        }
+
         try (Workbook wb = WorkbookFactory.create(new ByteArrayInputStream(fileBytes))) {
             Sheet sheet = wb.getSheet(sheetName);
             if (sheet == null || sheet.getRow(0) == null) {
@@ -242,10 +248,15 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
                 return AjaxResult.error(I18nUtil.getMessage("ui.data.column.mpStructureAllocation.import.templateTitleError"));
             }
             scheduleDate = DateUtil.parse(params[0], "yyyy年MM月dd日");
+            scheduleResult.setScheduleDate(scheduleDate);
+            if (StringUtils.isBlank(scheduleResult.getFactoryCode())) {
+                scheduleResult.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
+            }
         } catch (Exception e) {
             log.warn("importDataStructureAllocation workbook parse failed", e);
             return AjaxResult.error(templateErrorStr);
         }
+        lhImportContext.setScheduleResult(scheduleResult);
         List<LhMouldChangePlanVo> list = util.importExcel(
                 sheetName, new ByteArrayInputStream(fileBytes), 0, 4, -1);
         List<LhMouldChangePlan> mouldChangePlanList = buildLhMouldChangePlanList(list, scheduleDate);
