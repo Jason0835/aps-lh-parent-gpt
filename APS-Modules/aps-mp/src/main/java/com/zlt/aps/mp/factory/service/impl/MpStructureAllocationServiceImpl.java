@@ -3438,9 +3438,12 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                 insertItem.setProdReqPlan(demandPlan.getNetQty());
                 insertItem.setStructureType(demandPlan.getStructureType());
                 insertItem.setMainPattern(demandPlan.getMainPattern());
-                Integer netQty = safeAdd(demandPlan.getHeightQty(), demandPlan.getMidQty(), demandPlan.getPostponeQty()); // 总需求
-                Integer lossQty = (netQty & 1) == 0?ProductionConstant.ADD_LOSS_QTY_EVEN_NUMBER : ProductionConstant.ADD_LOSS_QTY_ODD_NUMBER;
-                Integer factProdReqQty = netQty + lossQty; // 总需求+(奇数+3/偶数+2)
+                // 总需求+(奇数+3/偶数+2)
+                Integer factProdReqQty = safeAdd(demandPlan.getHeightQty(), demandPlan.getMidQty(), demandPlan.getPostponeQty()); // 总需求
+                if (factProdReqQty > 0) {
+                    Integer lossQty = (factProdReqQty & 1) == 0?ProductionConstant.ADD_LOSS_QTY_EVEN_NUMBER : ProductionConstant.ADD_LOSS_QTY_ODD_NUMBER;
+                    factProdReqQty = factProdReqQty + lossQty;
+                }
                 insertItem.setFactProdReqQty(factProdReqQty);
                 // 计算库销比
                 insertItem.setInventorySalesRatio(BigDecimalUtils.div(demandPlan.getStockQty(), demandPlan.getAverageSaleQty(), 1));
