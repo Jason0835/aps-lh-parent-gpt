@@ -242,6 +242,9 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
         for (int day = FactoryConstant.MONTH_START_DAY; day <= FactoryConstant.MONTH_MAX_DAY; day++) {
             changeMouldMap.put(day, 0);
         }
+        for (int day = FactoryConstant.MONTH_START_DAY; day <= LAST_MONTH_DAY; day++) {
+            lastChangeMouldMap.put(day, 0);
+        }
         for (Integer i = 0, size = recordList.size(); i < size; i++) {
             // 2.1.1、把同结构的排产记录添加到列表中，全部添加完后开始处理这一批数据
             FactoryMonthPlanMouldDayResultExportVo record = recordList.get(i);
@@ -409,11 +412,7 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
         for (Entry<Integer, Integer> entry : lastChangeMouldMap.entrySet()) {
             Integer day = entry.getKey();
             Integer mould = entry.getValue();
-            Integer realDay = lastDayOfMonth - day + 1; // 日期映射为倒数第n天
-            if (realDay <= 0 || realDay > LAST_MONTH_DAY) {
-                continue;
-            }
-            changeMouldStatisticsRecord.setFieldValueByFieldName(String.format(LAST_FIELD_NAME_FORMAT, realDay), mould);
+            changeMouldStatisticsRecord.setFieldValueByFieldName(String.format(LAST_FIELD_NAME_FORMAT, day), mould);
         }
         totalRecordList.add(changeMouldStatisticsRecord);
         return totalRecordList;
@@ -689,6 +688,7 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
         for (int day = startDay; day <= FactoryConstant.MONTH_MAX_DAY; day++) {
             String dayFieldGetterName = String.format(DAY_FIELD_NAME_FORMAT, day);
             String dayFieldSetterName;
+            Integer mapKey;
             if (LAST_FIELD_NAME_FORMAT.equals(preFix)) {
                 // 上个月统计数据：将日序号映射为月末倒数第n天
                 Integer realDay = day - startDay + 1;
@@ -696,8 +696,10 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
                     continue;
                 }
                 dayFieldSetterName = String.format(LAST_FIELD_NAME_FORMAT, realDay);
+                mapKey = realDay;
             } else {
                 dayFieldSetterName = String.format(preFix, day);
+                mapKey = day;
             }
             String dayStatisticsStr = (String) statistics.getFieldValueByFieldName(dayFieldGetterName);
             if (StringUtils.isNotEmpty(dayStatisticsStr) && JSONValidator.from(dayStatisticsStr).validate()) {
@@ -707,7 +709,7 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
                 lhMachinesStatisticsRecord.setFieldValueByFieldName(dayFieldSetterName, dayStatistics.getLhMachines());
                 Integer changeMould = Optional.ofNullable(dayStatistics.getChangeMould()).orElse(0);
                 if (changeMould > 0) {
-                    changeMouldMap.put(day, changeMouldMap.getOrDefault(day, 0) + Optional.ofNullable(dayStatistics.getChangeMould()).orElse(0));
+                    changeMouldMap.put(mapKey, changeMouldMap.getOrDefault(mapKey, 0) + Optional.ofNullable(dayStatistics.getChangeMould()).orElse(0));
                 }
             }
         }
