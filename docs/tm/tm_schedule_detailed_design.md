@@ -10,7 +10,7 @@
 
 - 底层采用“六班一行”横向存储模型，一班次字段为 CLASS1~CLASS6 列族，不再使用纵向单班次模型。
 - 不单独建设排程方案表，同一天多次排程默认先删除旧结果，再写入新 `batch_no` 作为当前结果。
-- 未排任务仍写入 `T_TM_SCHEDULE_RESULT`，未排原因和规则证据写入 `T_TM_SCHEDULE_RESULT_EXPLAIN`。
+- 未排任务写入 `T_TM_SCHEDULE_UNPLANNED`，不写入 `T_TM_SCHEDULE_RESULT`；未排原因和规则证据继续写入 `T_TM_SCHEDULE_RESULT_EXPLAIN`。
 - 任务解释信息统一承载计划量计算、库存依据、候选机台、规则命中、未排证据，不再拆多张诊断表。
 - 基础资料字段如与用户 SQL 语义重叠，统一使用用户 SQL 中已有字段名。
 - 新增业务启停字段统一使用 `enable_status`，字典为 `biz_yes_no`，`0` 否、`1` 是。
@@ -20,7 +20,7 @@
 
 ### 3.1 `T_TM_SCHEDULE_RESULT`
 
-作用：排程结果主表，采用“六班一行”横向模型。一条记录表示一个机台-胎面组合在当天的六个班次生产任务；已排和未排任务都存放在此表。
+作用：排程结果主表，采用“六班一行”横向模型。一条记录表示一个机台-胎面组合在当天的六个班次生产任务；仅存放已经安排到机台产能的任务，未排任务不写入此表。
 
 关键字段：
 
@@ -28,7 +28,7 @@
 - `batch_no`：批次号
 - `order_no`：胎面自动排程工单号，自动排程结果按 `batch_no + "-" + 4位序号` 自行生成，作为下发 MES 的唯一键；成型来源工单号不写入该字段
 - `schedule_date`：排程日期
-- `machine_code`：机台编码，关联 `T_TM_MACHINE_INFO.machine_code`，未排任务允许为空
+- `machine_code`：机台编码，关联 `T_TM_MACHINE_INFO.machine_code`；自动排程有效结果必须有机台，未排任务写入 `T_TM_SCHEDULE_UNPLANNED`
 - `tread_code`：胎面编码
 - `glue_code`：主胶料编码
 - `whole_glue_code`：整条胶料组合编码
@@ -48,7 +48,7 @@
 
 关键字段：
 
-- `result_id`：结果ID，关联 `T_TM_SCHEDULE_RESULT.id`
+- `result_id`：结果ID，已排任务关联 `T_TM_SCHEDULE_RESULT.id`；未排任务为空，通过 `batch_no + task_business_key` 追溯任务级解释
 - `batch_no`：批次号
 - `base_demand_qty`：库存抵扣后的基础应排需求量（`max(currentShiftDemandQty - rollingStockQty, guardDemandQty - rollingStockQty, 0)`）
 - `required_qty`：库存抵扣前当前班成型胎面需求量，取 `currentShiftDemandQty`；旧骨架任务缺失该字段时回退 `demandQty`
@@ -70,10 +70,10 @@
 - `machine_select_reason`：最终选机说明
 - `assign_status`、`unplanned_reason_code`、`unplanned_reason_desc`、`unplanned_evidence_json`：未排解释
 - `task_status`：任务状态
-- `tread_code`：胎面编码，关联 `T_TM_SCHEDULE_RESULT.tread_code`
-- `glue_code`：主胶料编码，关联 `T_TM_SCHEDULE_RESULT.glue_code`
+- `tread_code`：胎面编码，已排解释可关联 `T_TM_SCHEDULE_RESULT.tread_code`，未排解释关联未排任务胎面编码
+- `glue_code`：主胶料编码，已排解释可关联 `T_TM_SCHEDULE_RESULT.glue_code`，未排解释关联未排任务胶料编码
 - `base_glue_code`：基部胶编码
-- `mouth_plate_code`：口型板编码，关联 `T_TM_SCHEDULE_RESULT.mouth_plate_code`
+- `mouth_plate_code`：口型板编码，已排解释可关联 `T_TM_SCHEDULE_RESULT.mouth_plate_code`，未排解释关联未排任务口型板编码
 - `manual_locked_flag`、`sequence_lock_flag`、`force_change_flag`：引擎行为约束标识，均使用 `biz_yes_no`
 - `sys_analysis`、`warning_msg`、`error_msg`：系统分析、告警和异常信息
 
@@ -260,7 +260,7 @@
 - `TmMachineAssignService`：基于机台、口型板、定点/禁排、胶料机台关系筛选候选机台；选中机台后按 `machineCode + shiftOrder` 计算真实剩余产能。当前班只写入该机台可承接的计划量，产能受限溢出量与计划量策略产生的工装溢出量统一从下一班开始顺延；下一班同机台同胎面已有任务时先合并计划量，没有同胎面任务时创建顺延任务。顺延仍必须满足开班、停机、口型、胶料、定点/禁排和产能过滤，6 班后仍未排完的数量写未排。全部候选机台被过滤时，按候选 `filterReasonCode` 归类未排原因：全部 `NO_REMAIN_CAPACITY`→`CAPACITY_NOT_ENOUGH`，全部 `MOUTH_PLATE_NOT_MATCH`→`MOUTH_PLATE_NOT_MATCH`，全部 `GLUE_MACHINE_NOT_MATCH`→`GLUE_MACHINE_NOT_ALLOWED`，`MACHINE_DISABLED`/定点规则/混合原因→`NO_AVAILABLE_MACHINE` 兜底。
 - `TmCapacityBalanceService`：做产能均衡、中夜班移量、次日回拉和任务顺序计算。当前本轮不实现生产级产能均衡算法，仅保留流程占位和风险记录。
 - `TmSnapshotBuildService`：生成 `T_TM_SCHEDULE_RESULT_EXPLAIN`。
-- `TmPersistService`：统一落结果和解释信息。
+- `TmPersistService`：统一转换结果和解释信息；`TmBizSnapshotAndPersistService` 负责将已排结果写入 `T_TM_SCHEDULE_RESULT`、未排摘要写入 `T_TM_SCHEDULE_UNPLANNED`、任务级解释写入 `T_TM_SCHEDULE_RESULT_EXPLAIN`。
 
 规则上下文来源：
 
@@ -297,7 +297,7 @@
 胎面排程和胎侧排程可能共享部分排程基础能力，但两者的业务规则、数据来源和落库对象不同。后续实现时按以下边界拆分：
 
 - 通用排程能力：任务链、班次游标、参数快照、规则过滤接口、评分接口、策略注册接口、过程日志接口。这些能力不引用 `TmScheduleResult`、`TmTaskDraft`、胎面胶料、口型板等 TM 专用对象。
-- 胎面专用能力：胎面需求量计算、胎面库存供应时长、胶料机台关系、口型板约束、卷曲长度、收尾取整、胎面结果解释和 `T_TM_SCHEDULE_RESULT` 落库。
+- 胎面专用能力：胎面需求量计算、胎面库存供应时长、胶料机台关系、口型板约束、卷曲长度、收尾取整、胎面结果解释、已排结果落库和未排列表落库。
 - 胎侧专用能力：后续由胎侧模块实现相同通用接口，差异逻辑放在胎侧自己的实现类中，不通过修改胎面实现来兼容胎侧。
 
 建议通用能力放在 `Aps-Common/aps-engine-common/src/main/java/com/zlt/aps/common/engine/schedule/`；胎面实现放在 `APS-Modules/aps-tm` 或 `Aps-Api/tm-api` 对应的 `com.zlt.aps.tm.engine` 包下。公共接口只依赖泛型任务对象和上下文对象，不反向依赖具体业务模块。
@@ -446,7 +446,7 @@
 
 核心原则：
 
-- `T_TM_SCHEDULE_RESULT` 作为唯一排程结果主表，六班数据已在一行内。
+- `T_TM_SCHEDULE_RESULT` 作为已排结果主表，六班数据已在一行内；`T_TM_SCHEDULE_UNPLANNED` 作为未排任务列表。
 - 看板 VO 直接映射横向字段，无需聚合转换。
 - 前端不再自行拼两天后的横向班次数据。
 - 前端操作只传 `result_id` 或业务化 DTO，由后端完成重排、重算和事件记录。
@@ -476,7 +476,7 @@ POST /tm/schedule/board
 - `dateColumns`：动态日期班次列，来源于 `T_TM_SHIFT_CONFIG`。
 - `machineRows`：机台行。
 - `cells`：每个机台、日期、班次下的任务集合。
-- `unassignedTasks`：未排任务集合。
+- `unassignedTasks`：未排任务集合，来源为 `T_TM_SCHEDULE_UNPLANNED`，明细原因可按 `batch_no` 追溯 `T_TM_SCHEDULE_RESULT_EXPLAIN`。
 - `batchMap`：每个日期当前使用的 `batch_no`。
 - `summary`：总计划量、未排数、发布成功数、异常数。
 
@@ -490,9 +490,9 @@ POST /tm/schedule/board
 
 1. 从 `T_TM_SHIFT_CONFIG` 读取日期范围内班次列，按 `schedule_date + shift_order` 排序。
 2. 从 `T_TM_SCHEDULE_RESULT` 按 `schedule_date` 分组取最新 `batch_no`，形成 `batchMap`。
-3. 从 `T_TM_SCHEDULE_RESULT` 读取这些批次下的任务。
-4. `machine_code is null` 的任务放入 `unassignedTasks`。
-5. 已分配任务按 `machine_code + schedule_date` 分组为机台行，每行的 CLASS1~CLASS6 列直接映射到对应班次单元格。
+3. 从 `T_TM_SCHEDULE_RESULT` 读取这些批次下的已排任务。
+4. 从 `T_TM_SCHEDULE_UNPLANNED` 读取这些批次下的未排任务，放入 `unassignedTasks`；如需任务级计划量、原因和证据，按 `batch_no` 关联 `T_TM_SCHEDULE_RESULT_EXPLAIN`。
+5. 已排任务按 `machine_code + schedule_date` 分组为机台行，每行的 CLASS1~CLASS6 列直接映射到对应班次单元格。
 6. 各单元格内任务按 `class{N}_sequence` 升序排列。
 
 `dateColumns` 单项字段：`scheduleDate`、`shiftCode`、`shiftName`、`shiftOrder`、`planStartTime`、`planEndTime`、`openFlag`、`crossDayFlag`。
@@ -534,6 +534,7 @@ POST /tm/schedule/changeMachine
 - 读取班次日历。
 - 读取日期范围内当前有效批次。
 - 查询 `T_TM_SCHEDULE_RESULT`，横向字段直接映射为看板行列。
+- 查询 `T_TM_SCHEDULE_UNPLANNED` 组装未排任务，必要时关联解释表补充未排原因、计划量和证据。
 - 组装动态列、机台行、单元格、未排任务和汇总信息。
 
 新增 `TmScheduleOperationFacade`：
@@ -548,9 +549,26 @@ POST /tm/schedule/changeMachine
 
 - `T_TM_SCHEDULE_RESULT.idx_tm_schedule_result_batch(batch_no, schedule_date, is_delete)`
 - `T_TM_SHIFT_CONFIG.idx_tm_shift_config_date_order(schedule_date, shift_order, open_flag)`
-- `T_TM_SCHEDULE_RESULT_EXPLAIN` 诊断查询索引（按 `result_id` / `trace_id` / `schedule_date` 实际实现补充）
+- `T_TM_SCHEDULE_RESULT_EXPLAIN` 诊断查询索引（已排按 `result_id`，未排按 `batch_no + task_business_key`，其他按 `trace_id` / `schedule_date` 实际实现补充）
 
 若后续看板查询性能不足，再考虑新增读模型缓存表或 Redis 缓存。缓存只能作为查询加速，不作为排程主存储。
+### 9.8 自动排程基础资料 Redis 缓存
+
+自动排程数据加载阶段会跨请求复用部分基础资料，缓存只用于减少重复查询，不作为排程主存储，不缓存单次运行态的 `TmScheduleContext`、任务链、规则证据或排程结果。
+
+缓存范围：
+
+- 参数缓存：`aps:tm:autoSchedule:baseData:params:{factoryCode}`，对应启用的 `T_TM_PARAMS`。
+- 机台缓存：`aps:tm:autoSchedule:baseData:machine:{factoryCode}`，对应启用的 `T_TM_MACHINE_INFO`。
+- 工作日历缓存：`aps:tm:autoSchedule:baseData:calendar:{factoryCode}:{procCode}:{yyyy-MM-dd}`，对应胎面/成型工序排程日工作日历。
+
+缓存 TTL 统一为 5 分钟。Redis 读取或写入异常时，自动排程应记录告警并回源查询数据库，避免缓存服务短时不可用导致排程入口不可用；数据库查询和后续排程异常仍按原业务异常处理，不允许吞掉。
+
+清理接口：`POST /tmScheduleResult/clearAutoPlanRedisCache`，Swagger 名称为“清除胎面自动排程Redis缓存”。请求体复用自动排程请求对象，可选传入 `factoryCode`、`scheduleDate`：
+
+- `factoryCode` 为空：清理全部胎面自动排程基础资料 Redis 缓存。
+- 仅传 `factoryCode`：清理该工厂参数、机台和全部工作日历缓存。
+- 同时传 `factoryCode`、`scheduleDate`：清理该工厂参数、机台和指定日期工作日历缓存。
 
 ## 10. 统一码值设计
 
@@ -577,11 +595,11 @@ AND enable_status = '1'
 
 ## 11. 可解释性与问题排查
 
-问题排查以 `T_TM_SCHEDULE_RESULT` 和 `T_TM_SCHEDULE_RESULT_EXPLAIN` 为主：
+问题排查以 `T_TM_SCHEDULE_RESULT`、`T_TM_SCHEDULE_UNPLANNED` 和 `T_TM_SCHEDULE_RESULT_EXPLAIN` 为主：
 
 - 计划量如何得出：查看计划量分量字段和 `calc_formula_desc`
 - 为什么选某台机：查看 `candidate_machine_json` 和 `machine_select_reason`
-- 为什么未排上：查看 `T_TM_SCHEDULE_RESULT_EXPLAIN` 的 `assign_status`、`unplanned_reason_code`、`unplanned_evidence_json`
+- 为什么未排上：先查看 `T_TM_SCHEDULE_UNPLANNED` 的未排摘要，再查看 `T_TM_SCHEDULE_RESULT_EXPLAIN` 的 `assign_status`、`unplanned_reason_code`、`unplanned_evidence_json`
 - 命中了哪些参数和规则：查看 `rule_hit_json`
 - 整次运行是否异常：查看 `T_TM_SCHEDULE_RESULT_EXPLAIN` 的 `result_status`、`error_msg`
 - 人工是否干预：查看 `t_tm_dispatcher_log`
@@ -613,7 +631,7 @@ AND enable_status = '1'
 - 基础资料测试：参数、胶料机台、损耗设置、定点/禁排停用后不得参与自动排程。
 - 看板查询测试：查询今天到两天后，返回多个 `schedule_date + shift_code` 动态列。
 - 看板查询测试：不同日期能取各自最新有效 `batch_no`。
-- 看板查询测试：未排任务进入 `unassignedTasks`，不混入机台单元格。
+- 看板查询测试：未排任务从 `T_TM_SCHEDULE_UNPLANNED` 进入 `unassignedTasks`，不写入 `T_TM_SCHEDULE_RESULT`，不混入机台单元格。
 - 看板查询测试：`open_flag='0'` 的班次不可作为可排班次。
 - 自动排程测试：覆盖多机台、多规格、库存不足、检修停机、定点冲突、禁排、胶料不匹配、外协、新规格。`machineCode + shiftOrder` 已排量接近最大班产时，新增任务必须按真实剩余产能截断当前班，并将溢出量从下一班开始优先滚动顺延到同机台后续班次；6 班后仍不足时剩余量写未排。
 - 人工调整测试：覆盖插单、调量、转机台、删除、归并、合并班次；操作后重新查询看板能看到最新结果。
@@ -942,7 +960,7 @@ Process:
   生成本条排程记录的胎面、胶料、胶料序号、口型板、机台、月计划剩余量、库存等展示字段；
   按 `factoryCode + batchNo + scheduleDate + machineCode + treadCode` 归并结果行，同一归并行横向累加各班次计划量、顺序、完成量、完成率和原因分析字段；
   自动排程结果 `order_no` 按胎面批次号生成，格式为 `batchNo-0001`，不使用成型来源工单号；
-  已分配任务写入 `T_TM_SCHEDULE_RESULT`，解释信息按来源任务写入 `T_TM_SCHEDULE_RESULT_EXPLAIN` 并关联归并后的 `result_id`；
+  已分配任务写入 `T_TM_SCHEDULE_RESULT`，未排任务写入 `T_TM_SCHEDULE_UNPLANNED`；解释信息按来源任务写入 `T_TM_SCHEDULE_RESULT_EXPLAIN`，已排解释关联归并后的 `result_id`，未排解释 `result_id` 为空；
   解释信息需包含计划量计算过程、库存依据、规则命中、候选机台和最终选机原因。
 Output:
   AssignedScheduleResult(result_id, machine_code, class{N}_plan_qty, class{N}_sequence)
@@ -966,11 +984,12 @@ Output:
 Step19 记录未排和汇总结果
 Persist:
   T_TM_SCHEDULE_RESULT
+  T_TM_SCHEDULE_UNPLANNED
   T_TM_SCHEDULE_RESULT_EXPLAIN
 Process:
   如果某个规格没有可用机台，或因最低起排量、工装、检修、口型、胶料、定点/禁排、产能等规则无法排产，则写入未排列表；
-  自动排程首次生成的已排任务与未排任务统一写 `release_status = 0`，机台为空仅表示未排，不再额外写 `5`；
-  未排任务仍写入 `T_TM_SCHEDULE_RESULT`，机台允许为空；
+  自动排程首次生成的已排任务写 `release_status = 0`；
+  未排任务写入 `T_TM_SCHEDULE_UNPLANNED`，不写入 `T_TM_SCHEDULE_RESULT`，因此结果表不再出现空机台未排记录；
   未排原因、规则证据和候选机台过滤过程写入 `T_TM_SCHEDULE_RESULT_EXPLAIN`，解释表结果状态也同步记为 `0`；
   汇总已排数量、未排数量、异常数量和本次 batch_no，返回自动排程结果。
 Output:
@@ -1896,17 +1915,17 @@ graph LR
   - `TmPersistResult persist(TmScheduleContext context)`：统一落库。`context` 传完整排程上下文；返回写入结果数、解释数、未排数和异常数；方法由上层编排控制事务。
   - `List<TmScheduleResult> convertChainToResult(ScheduleTaskLinkedList<TmTaskDraft> chain, TmScheduleContext context)`：将链表转换为结果实体。参数传任务链和上下文；返回结果实体列表。
   - `TmScheduleResultExplain convertExplain(TmTaskDraft task, TmSnapshotBuildResult snapshot)`：转换解释实体。参数传任务和解释快照；返回解释实体。
-  - `void persistUnplanned(TmTaskDraft task, TmSnapshotBuildResult snapshot, TmScheduleContext context)`：写入未排任务。未排任务仍写入 `T_TM_SCHEDULE_RESULT`，机台为空，原因写解释表。
+  - `TmScheduleUnplanned buildScheduleUnplanned(TmTaskDraft task, TmSnapshotBuildResult snapshot, TmScheduleContext context)`：转换未排列表实体。未排任务写入 `T_TM_SCHEDULE_UNPLANNED`，原因和任务级证据继续写解释表。
 
 落库规则：
 
-- 按 `factoryCode + batchNo + scheduleDate + machineCode + treadCode` 归并 `T_TM_SCHEDULE_RESULT`，未排任务 `machine_code` 为空时也按同一胎面归并。
+- 只将已排任务链转换为 `T_TM_SCHEDULE_RESULT`，并按 `factoryCode + batchNo + scheduleDate + machineCode + treadCode` 归并；未排任务不参与结果表归并，按未排表字段写入 `T_TM_SCHEDULE_UNPLANNED`。
 - 按链表顺序横向写入 `class{N}_sequence`、`class{N}_plan_qty`、`class{N}_start_time`、`class{N}_end_time`，同一归并行的同班计划量累加。
 - 自动排程结果 `order_no` 由 `batchNo + "-" + 4位序号` 生成，成型来源工单号只保存在解释追踪信息中。
-- 解释信息按来源任务写入 `T_TM_SCHEDULE_RESULT_EXPLAIN`，多条解释记录可以关联同一个归并结果 `result_id`。
+- 解释信息按来源任务写入 `T_TM_SCHEDULE_RESULT_EXPLAIN`，多条已排解释记录可以关联同一个归并结果 `result_id`；未排解释不关联结果表，`result_id` 为空，并通过 `batch_no + task_business_key` 保持唯一追溯。
 - 事务边界放在自动排程入口或操作门面，不在策略类、规则类中开启事务。
 
-验证点：同一批次结果按机台和胎面归并，解释数量可大于结果数量；未排任务可通过结果表和解释表追溯；落库失败不吞异常。
+验证点：同一批次已排结果按机台和胎面归并，解释数量可大于结果数量；未排任务可通过未排表和解释表追溯，结果表不出现空机台未排记录；落库失败不吞异常。
 
 ### 17.10 实现数据加载服务
 

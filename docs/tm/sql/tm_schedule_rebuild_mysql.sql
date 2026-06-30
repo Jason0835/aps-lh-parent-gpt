@@ -85,7 +85,7 @@ DROP TABLE IF EXISTS `T_TM_SCHEDULE_RESULT_EXPLAIN`;
 CREATE TABLE `T_TM_SCHEDULE_RESULT_EXPLAIN` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
   `factory_code` varchar(50) NOT NULL DEFAULT '' COMMENT '工厂编号',
-  `result_id` bigint NOT NULL COMMENT '结果ID，关联T_TM_SCHEDULE_RESULT.id',
+  `result_id` bigint DEFAULT NULL COMMENT '结果ID，已排任务关联T_TM_SCHEDULE_RESULT.id，未排任务为空',
   `batch_no` varchar(64) NOT NULL COMMENT '批次号',
   `base_demand_qty` decimal(18,6) DEFAULT NULL COMMENT '基础需求量，表示直接来源于成型拉动的原始需求',
   `loss_add_qty` decimal(18,6) DEFAULT NULL COMMENT '损耗补偿量，表示按损耗规则补加的数量',
@@ -140,7 +140,7 @@ CREATE TABLE `T_TM_SCHEDULE_RESULT_EXPLAIN` (
   `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   `is_delete` tinyint NOT NULL DEFAULT '0' COMMENT '是否删除，0否，1是',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_tm_schedule_result_explain_task` (`result_id`, `task_business_key`, `is_delete`),
+  UNIQUE KEY `uk_tm_schedule_result_explain_task` (`batch_no`, `task_business_key`, `is_delete`),
   KEY `idx_tm_schedule_result_explain_batch` (`batch_no`, `is_delete`),
   KEY `idx_tm_schedule_result_explain_assign` (`assign_status`, `unplanned_reason_code`, `is_delete`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='胎面排程结果解释信息表';

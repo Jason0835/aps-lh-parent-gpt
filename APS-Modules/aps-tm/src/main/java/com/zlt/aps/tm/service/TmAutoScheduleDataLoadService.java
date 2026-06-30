@@ -19,8 +19,6 @@ import javax.annotation.Resource;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 /**
@@ -77,17 +75,6 @@ public class TmAutoScheduleDataLoadService {
 
     private static final int EXPERIMENT_SPEC_SHIFT_ORDER = 1;
 
-    /** 基础数据本地缓存有效期，单位毫秒 */
-    private static final long BASE_DATA_CACHE_TTL_MILLIS = 5 * 60 * 1000L;
-
-    /** 参数缓存，key=工厂 */
-    private final Map<String, TmLocalCacheEntry<List<TmParams>>> paramsCacheMap = new ConcurrentHashMap<>();
-
-    /** 机台缓存，key=工厂 */
-    private final Map<String, TmLocalCacheEntry<List<TmMachineInfo>>> machineCacheMap = new ConcurrentHashMap<>();
-
-    /** 工作日历缓存，key=工厂+工序+日期 */
-    private final Map<String, TmLocalCacheEntry<List<TmWorkCalendarRowVo>>> calendarCacheMap = new ConcurrentHashMap<>();
 
     @Resource
     private TmParamsMapper tmParamsMapper;
@@ -125,6 +112,9 @@ public class TmAutoScheduleDataLoadService {
     @Resource
     private TmScheduleResultMapper tmScheduleResultMapper;
 
+    @Resource
+    private TmAutoScheduleRedisCacheService tmAutoScheduleRedisCacheService = new TmAutoScheduleRedisCacheService();
+
     /**
      * 加载自动排程所需数据。
      *
@@ -153,7 +143,7 @@ public class TmAutoScheduleDataLoadService {
         LambdaQueryWrapper<TmParams> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(TmParams::getFactoryCode, context.getFactoryCode());
         wrapper.eq(TmParams::getEnableStatus, YES);
-        List<TmParams> paramsList = getCachedList(paramsCacheMap, context.getFactoryCode(),
+        List<TmParams> paramsList = tmAutoScheduleRedisCacheService.getCachedList("params:" + context.getFactoryCode(),
                 () -> tmParamsMapper.selectList(wrapper));
         Map<String, TmParamValue> paramMap = new HashMap<>();
         if (CollUtil.isNotEmpty(paramsList)) {
@@ -193,7 +183,7 @@ public class TmAutoScheduleDataLoadService {
         wrapper.eq(TmMachineInfo::getFactoryCode, context.getFactoryCode());
         wrapper.eq(TmMachineInfo::getMachineStatus, ApsConstant.APS_YES_NO_1);
         wrapper.orderByAsc(TmMachineInfo::getMachineCode);
-        return getCachedList(machineCacheMap, context.getFactoryCode(),
+        return tmAutoScheduleRedisCacheService.getCachedList("machine:" + context.getFactoryCode(),
                 () -> tmMachineInfoMapper.selectList(wrapper)).stream()
                 .filter(machine -> StrUtil.isNotBlank(machine.getMachineCode()))
                 .collect(Collectors.toList());
@@ -1128,8 +1118,8 @@ public class TmAutoScheduleDataLoadService {
     private TmWorkCalendarRowVo loadWorkCalendar(TmScheduleContext context, String procCode) {
         try {
             Date calendarDate = DateUtil.beginOfDay(context.getScheduleDate());
-            String cacheKey = context.getFactoryCode() + ":" + procCode + ":" + DateUtil.formatDate(calendarDate);
-            List<TmWorkCalendarRowVo> rowList = getCachedList(calendarCacheMap, cacheKey,
+            String cacheKey = "calendar:" + context.getFactoryCode() + ":" + procCode + ":" + DateUtil.formatDate(calendarDate);
+            List<TmWorkCalendarRowVo> rowList = tmAutoScheduleRedisCacheService.getCachedList(cacheKey,
                     () -> tmAutoScheduleDataLoadMapper.selectWorkCalendarRows(context.getFactoryCode(), procCode, calendarDate));
             return CollUtil.isEmpty(rowList) ? null : rowList.get(0);
         } catch (RuntimeException ex) {
@@ -1137,27 +1127,6 @@ public class TmAutoScheduleDataLoadService {
                     procCode, DateUtil.formatDate(context.getScheduleDate()), ex.getMessage());
             return null;
         }
-    }
-
-    /**
-     * 读取带短 TTL 的本地集合缓存。
-     *
-     * @param cacheMap 缓存容器
-     * @param cacheKey 缓存 key
-     * @param loader   缓存失效时的数据加载器
-     * @param <T>      集合元素类型
-     * @return 集合副本
-     */
-    private <T> List<T> getCachedList(Map<String, TmLocalCacheEntry<List<T>>> cacheMap, String cacheKey,
-                                      Supplier<List<T>> loader) {
-        long now = System.currentTimeMillis();
-        TmLocalCacheEntry<List<T>> entry = cacheMap.get(cacheKey);
-        if (entry == null || entry.isExpired(now)) {
-            List<T> value = Optional.ofNullable(loader.get()).orElse(Collections.emptyList());
-            entry = new TmLocalCacheEntry<>(new ArrayList<>(value), now + BASE_DATA_CACHE_TTL_MILLIS);
-            cacheMap.put(cacheKey, entry);
-        }
-        return new ArrayList<>(entry.getValue());
     }
 
     private boolean isShutdownDay(TmWorkCalendarRowVo calendar) {

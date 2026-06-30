@@ -14,6 +14,7 @@ import com.zlt.aps.tm.engine.service.impl.TmPlanBootstrapService;
 import com.zlt.aps.tm.engine.service.impl.TmSnapshotBuildService;
 import com.zlt.aps.tm.mapper.TmScheduleResultExplainMapper;
 import com.zlt.aps.tm.mapper.TmScheduleResultMapper;
+import com.zlt.aps.tm.mapper.TmScheduleUnplannedMapper;
 import com.zlt.aps.tm.service.TmAutoScheduleDataLoadService;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -46,6 +47,9 @@ public class TmScheduleBusinessStepServiceTest {
 
     @Mock
     private TmScheduleResultExplainMapper scheduleResultExplainMapper;
+
+    @Mock
+    private TmScheduleUnplannedMapper scheduleUnplannedMapper;
 
     @Mock
     private TmPersistService persistService;
@@ -85,7 +89,7 @@ public class TmScheduleBusinessStepServiceTest {
         });
 
         new TmBizSnapshotAndPersistService(new TmSnapshotBuildService(), persistService,
-                scheduleResultMapper, scheduleResultExplainMapper).snapshotAndPersist(context);
+                scheduleResultMapper, scheduleResultExplainMapper, scheduleUnplannedMapper).snapshotAndPersist(context);
 
         verify(scheduleResultMapper).insert(result);
         verify(scheduleResultExplainMapper).insert(explain);

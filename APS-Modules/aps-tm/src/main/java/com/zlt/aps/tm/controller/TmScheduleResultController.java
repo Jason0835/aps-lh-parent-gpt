@@ -108,6 +108,19 @@ public class TmScheduleResultController extends AbstractDocBizController<TmSched
     public AjaxResult autoPlan(@RequestBody TmAutoScheduleRequestVo request) {
         return AjaxResult.success(tmScheduleResultService.tmAutoPlan(request));
     }
+    /**
+     * 清除胎面自动排程 Redis 缓存。
+     *
+     * @param request 自动排程请求，可选传入工厂和排程日期
+     * @return 清理结果，返回实际删除的 Redis key 数量
+     */
+    @ApiOperation("清除胎面自动排程Redis缓存")
+    @PostMapping("/clearAutoPlanRedisCache")
+    public AjaxResult clearAutoPlanRedisCache(@RequestBody(required = false) TmAutoScheduleRequestVo request) {
+        String factoryCode = request == null ? null : request.getFactoryCode();
+        java.util.Date scheduleDate = request == null ? null : request.getScheduleDate();
+        return AjaxResult.success(tmScheduleResultService.clearAutoPlanRedisCache(factoryCode, scheduleDate));
+    }
 
     /**
      * 查询排程看板数据。

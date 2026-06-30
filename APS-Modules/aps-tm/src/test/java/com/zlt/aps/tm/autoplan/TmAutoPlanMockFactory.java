@@ -4,6 +4,7 @@ import cn.hutool.core.date.DateUtil;
 import cn.hutool.core.util.StrUtil;
 import com.zlt.aps.tm.api.domain.entity.TmScheduleResult;
 import com.zlt.aps.tm.api.domain.entity.TmScheduleResultExplain;
+import com.zlt.aps.tm.api.domain.entity.TmScheduleUnplanned;
 import com.zlt.aps.tm.domain.vo.TmWorkCalendarRowVo;
 import com.zlt.aps.tm.engine.domain.TmInventoryPredictQtyVo;
 import com.zlt.aps.tm.engine.domain.TmScheduleContext;
@@ -74,9 +75,15 @@ public class TmAutoPlanMockFactory {
             mockContext.getInsertedExplains().add(explain);
             return 1;
         });
+        when(unplannedMapper.insert(any(TmScheduleUnplanned.class))).thenAnswer(invocation -> {
+            TmScheduleUnplanned unplanned = invocation.getArgument(0);
+            unplanned.setId((long) mockContext.getInsertedUnplannedList().size() + 1L);
+            mockContext.getInsertedUnplannedList().add(unplanned);
+            return 1;
+        });
 
         TmScheduleTemplateImpl template = buildTemplate(scenario, dataLoadService, scheduleResultMapper,
-                explainMapper, mockContext);
+                explainMapper, unplannedMapper, mockContext);
 
         TmScheduleResultServiceImpl service = new TmScheduleResultServiceImpl();
         setField(service, "tmScheduleResultMapper", scheduleResultMapper);
@@ -94,6 +101,7 @@ public class TmAutoPlanMockFactory {
                                                  TmAutoScheduleDataLoadService dataLoadService,
                                                  TmScheduleResultMapper scheduleResultMapper,
                                                  TmScheduleResultExplainMapper explainMapper,
+                                                 TmScheduleUnplannedMapper unplannedMapper,
                                                  MockContext mockContext) {
         TmEngineStockMapper stockMapper = mock(TmEngineStockMapper.class);
         TmEngineInventoryPredictMapper inventoryPredictMapper = mock(TmEngineInventoryPredictMapper.class);
@@ -117,7 +125,7 @@ public class TmAutoPlanMockFactory {
                 new TmTaskSortService(registry),
                 new TmMachineAssignService(taskChainScheduleService, registry),
                 new TmBizSnapshotAndPersistService(new TmSnapshotBuildService(), new TmPersistService(),
-                        scheduleResultMapper, explainMapper),
+                        scheduleResultMapper, explainMapper, unplannedMapper),
                 new TmScheduleProcessLogger());
     }
 
@@ -379,6 +387,8 @@ public class TmAutoPlanMockFactory {
 
         private final List<TmScheduleResultExplain> insertedExplains = new ArrayList<>();
 
+        private final List<TmScheduleUnplanned> insertedUnplannedList = new ArrayList<>();
+
         private TmScheduleResultServiceImpl service;
 
         private TmAutoScheduleDataLoadService dataLoadService;
@@ -399,6 +409,10 @@ public class TmAutoPlanMockFactory {
 
         public List<TmScheduleResultExplain> getInsertedExplains() {
             return insertedExplains;
+        }
+
+        public List<TmScheduleUnplanned> getInsertedUnplannedList() {
+            return insertedUnplannedList;
         }
 
         public TmScheduleResultServiceImpl getService() {
