@@ -278,6 +278,7 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
             BeanUtil.copyProperties(lhMouldChangePlanVo, lhMouldChangePlan);
 
             lhMouldChangePlan.setScheduleDate(scheduleDate);
+            lhMouldChangePlan.setChangeTime(lhMouldChangePlan.getPlanDate());
 
             if (StringUtil.isBlank(lhMouldChangePlan.getFactoryCode())) {
                 lhMouldChangePlan.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
@@ -288,6 +289,8 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
                 lhMouldChangePlan.setChangeMouldType(MouldChangeTypeEnum.SAND_BLAST.getCode());
             } else if (YesOrNoEnum.YES.getValue().equals(lhMouldChangePlanVo.getIsDryIceClean())) {
                 lhMouldChangePlan.setChangeMouldType(MouldChangeTypeEnum.DRY_ICE.getCode());
+            } else {
+                lhMouldChangePlan.setChangeMouldType(MouldChangeTypeEnum.REGULAR.getCode());
             }
             String endType = lhMouldChangePlanVo.getEndType();
             if ("是Có".equals(endType)) {

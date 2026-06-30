@@ -1042,25 +1042,22 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
     }
 
     /**
-     * 导入后补全模具交替计划的批次号、交替类型、交替时间
+     * 导入后回写硫化排程结果的批次号到模具交替计划
      *
      * @param factoryCode  工厂编码
      * @param scheduleDate 排程日期
      */
     @Override
     public void fillMouldChangePlanFieldsAfterImport(String factoryCode, Date scheduleDate) {
-        // 1. 查询本次导入的硫化排程结果，构建匹配Map
+        // 1. 查询本次导入的硫化排程结果，取其中一条的批次号
         List<LhScheduleResult> scheduleResults = this.selectByFactoryCodeAndScheduleDate(factoryCode, scheduleDate);
         if (CollectionUtils.isEmpty(scheduleResults)) {
             return;
         }
-        // key: machineCode|materialCode|scheduleDate -> LhScheduleResult
-        Map<String, LhScheduleResult> scheduleResultMap = scheduleResults.stream()
-                .collect(Collectors.toMap(
-                        sr -> this.buildMatchKey(sr.getLhMachineCode(), sr.getMaterialCode(), sr.getScheduleDate()),
-                        sr -> sr,
-                        (v1, v2) -> v1
-                ));
+        String batchNo = scheduleResults.get(0).getBatchNo();
+        if (StringUtils.isBlank(batchNo)) {
+            return;
+        }
 
         // 2. 查询本次导入的模具交替计划（批次号为空的记录）
         LambdaQueryWrapper<LhMouldChangePlan> planWrapper = new LambdaQueryWrapper<>();
@@ -1073,69 +1070,12 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
             return;
         }
 
-        // 3. 逐条匹配并补全字段
-        List<LhMouldChangePlan> updateList = new ArrayList<>();
+        // 3. 批量回写批次号
         for (LhMouldChangePlan plan : mouldChangePlans) {
-            String matchKey = this.buildMatchKey(plan.getLhMachineCode(), plan.getAfterMaterialCode(), plan.getScheduleDate());
-            LhScheduleResult matchedResult = scheduleResultMap.get(matchKey);
-            if (matchedResult == null) {
-                continue;
-            }
-            boolean updated = false;
-            // 补全批次号
-            if (StringUtils.isBlank(plan.getLhResultBatchNo()) && StringUtils.isNotBlank(matchedResult.getBatchNo())) {
-                plan.setLhResultBatchNo(matchedResult.getBatchNo());
-                updated = true;
-            }
-            // 补全交替时间：取Excel导入的计划日期
-            if (plan.getChangeTime() == null && plan.getPlanDate() != null) {
-                plan.setChangeTime(plan.getPlanDate());
-                updated = true;
-            }
-            // 补全交替类型：根据排程结果判断
-            if (StringUtils.isBlank(plan.getChangeMouldType())) {
-                String changeMouldType = this.determineChangeMouldType(matchedResult);
-                plan.setChangeMouldType(changeMouldType);
-                updated = true;
-            }
-            if (updated) {
-                updateList.add(plan);
-            }
+            plan.setLhResultBatchNo(batchNo);
+            mouldChangePlanMapper.updateById(plan);
         }
-
-        // 4. 批量更新
-        if (CollectionUtils.isNotEmpty(updateList)) {
-            for (LhMouldChangePlan plan : updateList) {
-                mouldChangePlanMapper.updateById(plan);
-            }
-            log.info("导入后补全模具交替计划字段, 工厂: {}, 排程日期: {}, 更新条数: {}", factoryCode, scheduleDate, updateList.size());
-        }
+        log.info("导入后回写模具交替计划批次号: {}, 工厂: {}, 排程日期: {}, 更新条数: {}", batchNo, factoryCode, scheduleDate, mouldChangePlans.size());
     }
 
-    /**
-     * 构建匹配键：机台编码|物料编码|排程日期
-     *
-     * @param machineCode  机台编码
-     * @param materialCode 物料编码
-     * @param scheduleDate 排程日期
-     * @return 匹配键字符串
-     */
-    private String buildMatchKey(String machineCode, String materialCode, Date scheduleDate) {
-        return StringUtils.defaultString(machineCode).trim() + "|"
-                + StringUtils.defaultString(materialCode).trim() + "|"
-                + (scheduleDate != null ? DateUtil.format(DateUtil.beginOfDay(scheduleDate), "yyyy-MM-dd") : "");
-    }
-
-    /**
-     * 根据硫化排程结果判断模具交替类型
-     *
-     * @param result 硫化排程结果
-     * @return 交替类型编码
-     */
-    private String determineChangeMouldType(LhScheduleResult result) {
-        if ("1".equals(result.getIsTypeBlock())) {
-            return "02";
-        }
-        return "01";
-    }
 }
