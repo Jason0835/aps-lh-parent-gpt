@@ -17,6 +17,7 @@ import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.utils.BigDecimalUtils;
 import com.zlt.aps.common.core.utils.ExcelUtils;
 import com.zlt.aps.constant.FactoryConstant;
+import com.zlt.aps.enums.ProductionPlanType;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.maindata.mapper.MdmMaterialInfoEntityMapper;
@@ -62,9 +63,7 @@ import java.util.Map.Entry;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-import static com.zlt.aps.common.core.utils.ApsNumberUtils.intValue;
-import static com.zlt.aps.common.core.utils.ApsNumberUtils.safeAdd;
-import static com.zlt.aps.common.core.utils.ApsNumberUtils.safeAddDefaultNull;
+import static com.zlt.aps.common.core.utils.ApsNumberUtils.*;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -285,7 +284,8 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
                 Integer differenceQty = prodReqPlan - intValue(result.getTotalQty());
                 result.setDifferenceQty(differenceQty >= 0 ? differenceQty : 0);
                 result.setProdReqPlan(prodReqPlan);
-
+                //20260630+ 设置计划类型
+                result.setPlanType(params.getPlanType());
                 // 2.1.2.3、实单未排产 = 高优先级 + 中优先级 - 高优先级实际 - 中优先级实际，如果为负数则设为0
                 Integer heightQty = intValue(result.getHeightQty());
                 Integer midQty = intValue(result.getMidQty());
@@ -342,12 +342,12 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
             });
             //排序:最大型腔数倒序->胎胚描述->型腔数倒序->主花纹->活块数倒序->花纹->物料描述
             structureList.sort(Comparator.comparing(FactoryMonthPlanMouldDayResultExportVo::getMouldCavityQty, Comparator.nullsLast(Comparator.reverseOrder()))
-                    .thenComparing(FactoryMonthPlanMouldDayResultExportVo::getMainMaterialDesc, Comparator.nullsLast(String::compareTo))
+                            .thenComparing(FactoryMonthPlanMouldDayResultExportVo::getMainMaterialDesc, Comparator.nullsLast(String::compareTo))
 //                    .thenComparing(FactoryMonthPlanMouldDayResultExportVo::getMouldCavityQty, Comparator.reverseOrder())
-                    .thenComparing(FactoryMonthPlanMouldDayResultExportVo::getMainPattern, Comparator.nullsLast(String::compareTo))
-                    .thenComparing(FactoryMonthPlanMouldDayResultExportVo::getTypeBlockQty, Comparator.nullsLast(Comparator.reverseOrder()))
-                    .thenComparing(FactoryMonthPlanMouldDayResultExportVo::getPattern, Comparator.nullsLast(String::compareTo))
-                    .thenComparing(FactoryMonthPlanMouldDayResultExportVo::getMaterialDesc, Comparator.nullsLast(String::compareTo))
+                            .thenComparing(FactoryMonthPlanMouldDayResultExportVo::getMainPattern, Comparator.nullsLast(String::compareTo))
+                            .thenComparing(FactoryMonthPlanMouldDayResultExportVo::getTypeBlockQty, Comparator.nullsLast(Comparator.reverseOrder()))
+                            .thenComparing(FactoryMonthPlanMouldDayResultExportVo::getPattern, Comparator.nullsLast(String::compareTo))
+                            .thenComparing(FactoryMonthPlanMouldDayResultExportVo::getMaterialDesc, Comparator.nullsLast(String::compareTo))
             );
             totalRecordList.addAll(structureList);
 
@@ -421,11 +421,12 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
 
     /**
      * 填充上个月的定稿记录信息，并返回上个月最后一天的日期
+     *
      * @param params
      * @param recordList
      */
     private Integer fillLastFinalResultList(FactoryMonthPlanMouldDayResult params,
-            List<FactoryMonthPlanMouldDayResultExportVo> recordList) {
+                                            List<FactoryMonthPlanMouldDayResultExportVo> recordList) {
         // 加载上个月的定稿记录
         Calendar calendar = Calendar.getInstance();
         calendar.set(params.getYear(), params.getMonth() - 1, 1); // 通过日历获取上本月一号的日历
@@ -642,6 +643,8 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
             params.setYearMonth(head.getYearMonth());
             params.setProductTypeCode(head.getProductTypeCode());
             params.setMonthPlanVersion(head.getMonthPlanVersion());
+            //20260630+ 计划类型
+            params.setPlanType(head.getPlanType());
         }
     }
 
@@ -662,6 +665,8 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
             params.setProductTypeCode(head.getProductTypeCode());
             params.setMonthPlanVersion(params.getProductionVersion());
             params.setProductionVersion(head.getProductionVersion());
+            //20260630+ 定稿数据计划类型统一为正常
+            params.setPlanType(ProductionPlanType.NORMAL.getPlanType());
         }
     }
 
@@ -784,7 +789,7 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
         // 是否字典
         List<SysDictData> yesNoDatas = sysDictDataCacheService.getType("biz_yes_no");
         Map<String, String> yesNoMap = yesNoDatas.stream().collect(Collectors.toMap(SysDictData::getDictValue, SysDictData::getDictLabel));
-        
+
         //20260604+ 预警配置
         MpMonthPlanExportWarningConfigVo warningConfiguration = getWarningConfiguration(queryResult);
 
@@ -886,10 +891,10 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
         // 3.5、写到文件
         return ExcelUtils.writeMultiList(inputStream, 0, tableMap, excelDataList);
     }
-    
+
     /**
      * 获取导出模板行数
-     * 
+     *
      * @param isFinal 是否定稿版本导出的模板
      * @return
      */
@@ -1069,7 +1074,7 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
             tableMap.put("adjustProductQty2", I18nUtil.getMessage("ui.data.column.FactoryMonthPlanFinalResult.adjustProductQty2"));
             tableMap.put("adjustProductQty3", I18nUtil.getMessage("ui.data.column.FactoryMonthPlanFinalResult.adjustProductQty3"));
             tableMap.put("adjustProductQty4", I18nUtil.getMessage("ui.data.column.FactoryMonthPlanFinalResult.adjustProductQty4"));
-            
+
         } else {
             tableMap.put("prodReqPlan", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.prodReqPlan"));
             tableMap.put("unRestrictedNetQty", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.unRestrictedNetQty"));
