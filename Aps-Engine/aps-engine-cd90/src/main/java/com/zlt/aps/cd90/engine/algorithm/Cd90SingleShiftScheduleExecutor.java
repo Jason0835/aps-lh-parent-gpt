@@ -208,10 +208,12 @@ public class Cd90SingleShiftScheduleExecutor implements Cd90SingleShiftScheduleS
                     shift.getClassField(), clothCode, rawDemand);
             return rawDemand;
         }
-        BigDecimal stripCount = rawDemand.divide(craftWidth, 0, RoundingMode.CEILING);
-        BigDecimal roundedDemand = this.normalize(stripCount.multiply(craftWidth));
+        // craftWidth来源施工表TIRE_FABRIC_CRAFT1/2/3，单位毫米，需转为米后与rawDemand（单位米）运算。
+        BigDecimal craftWidthInMeters = craftWidth.divide(BigDecimal.valueOf(1000), 10, RoundingMode.HALF_UP);
+        BigDecimal stripCount = rawDemand.divide(craftWidthInMeters, 0, RoundingMode.CEILING);
+        BigDecimal roundedDemand = this.normalize(stripCount.multiply(craftWidthInMeters));
         if (roundedDemand.compareTo(rawDemand) != 0) {
-            log.info("[直裁自动排程] 净需求按直裁宽度向上取整, classField={}, clothCode={}, rawDemand={}, craftWidth={}, roundedDemand={}",
+            log.info("[直裁自动排程] 净需求按直裁宽度向上取整, classField={}, clothCode={}, rawDemand={}, craftWidth={}mm, roundedDemand={}",
                     shift.getClassField(), clothCode, rawDemand, craftWidth, roundedDemand);
         }
         return roundedDemand;
