@@ -131,6 +131,11 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
      * 上月需加载的天数
      */
     private final static Integer LAST_MONTH_DAY = 10;
+    /**
+     * 警告列偏移值
+     */
+    private final static Integer WARNING_COLUMN_OFFSET = 33;
+    private final static Integer WARNING_COLUMN_OFFSET_FINAL = 32;
 
     @Override
     protected String getDocTypeCode() {
@@ -742,10 +747,13 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
         //20260604+ 日排产量预警处理
         int warningHeaderRowIndex = DAY_TOTAL_WARNING_ROW_INDEX;
         InputStream inputStream;
+//        int warningColumnOffset; // 警告列偏移值
         if (isFinal) {
             inputStream = classLoader.getResourceAsStream("excelModel/factoryMonthPlanMouldFinalResultExportTemp.xlsx");
+//            warningColumnOffset = WARNING_COLUMN_OFFSET_FINAL;
         } else {
             inputStream = classLoader.getResourceAsStream("excelModel/factoryMonthPlanMouldDayResultExportTemp.xlsx");
+//            warningColumnOffset = WARNING_COLUMN_OFFSET;
         }
 
         // 2、加载字典数据
@@ -812,7 +820,7 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
                     .filter(r -> MonthPlanExportDataTypeEnum.CHANGE_MOULDS.getCode().equals(r.getDataType()) // 换模统计
                             || MonthPlanExportDataTypeEnum.TOTAL.getCode().equals(r.getDataType())) // 计划量统计
                     .collect(Collectors.toList());
-            int warningHeaderStartColumnIndex = tableMap.size() - 32;
+            int warningHeaderStartColumnIndex = tableMap.size() - WARNING_COLUMN_OFFSET;
             for (FactoryMonthPlanMouldDayResultExportVo exportVo : headList) {
                 this.setLastDayValue(exportVo, dayFieldNames); // 设置上月最后十天的值
                 Map<String, Object> listDataMap = this.buildListDataMap(exportVo, storTypeMap, productCategoryMap,

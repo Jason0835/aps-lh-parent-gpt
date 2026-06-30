@@ -52,6 +52,11 @@ public class MpStructureAllocationExportVo extends MpStructureAllocation {
      * 高优先级净需求
      */
     private Integer heightQty;
+    
+    /**
+     * 是否仅上月定稿的记录
+     */
+    private Boolean isOnlyLast = false;
 
     /**
      * 实际排产
