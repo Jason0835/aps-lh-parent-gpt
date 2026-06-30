@@ -60,12 +60,12 @@ public class Cd90ScheduleCandidatePreparationServiceImpl
         LocalDateTime currentDemandStart = context.getScheduleDate().minusDays(1)
                 .atTime(FIRST_FORMING_DEMAND_TIME)
                 .plusHours((classIndex - 1L) * 8L);
-        Map<String, java.math.BigDecimal> cumulativeConsumptionByCloth = rolling == null
+        Map<String, java.math.BigDecimal> continueDemandByCloth = rolling == null
                 ? java.util.Collections.emptyMap()
-                : rolling.getCumulativeConsumptionByCloth();
+                : rolling.getContinueDemandByCloth();
         List<Cd90ScheduleCandidate> candidates = candidateBuilder.build(
                 input.getDemandShifts(), input.getStocksAtSix(), currentDemandStart,
-                input.getDepthClassQtyByCloth(), cumulativeConsumptionByCloth);
+                input.getDepthClassQtyByCloth(), continueDemandByCloth);
 
         log.info("[直裁自动排程] 当前班次候选准备完成, factoryCode={}, scheduleDate={}, "
                         + "classField={}, demandStart={}, candidateCount={}",

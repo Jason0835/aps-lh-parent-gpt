@@ -47,7 +47,7 @@ public class Cd90ScheduleCandidateBuilder {
                                              List<Cd90StockSource> stocksAtSix,
                                              LocalDateTime currentDemandStart,
                                              Map<String, BigDecimal> depthClassQtyByCloth,
-                                             Map<String, BigDecimal> cumulativeConsumptionByCloth) {
+                                             Map<String, BigDecimal> continueDemandByCloth) {
         if (currentDemandStart == null) {
             throw new IllegalArgumentException("当前成型供应班次不能为空");
         }
@@ -108,7 +108,7 @@ public class Cd90ScheduleCandidateBuilder {
             candidates.add(Cd90ScheduleCandidate.builder()
                     .clothCode(entry.getKey())
                     .shortageInCurrentShift(firstWindowStart.equals(earliestShortageTime))
-                    .continueFromPreviousShift(isContinueFromPrevious(cumulativeConsumptionByCloth, entry.getKey()))
+                    .continueFromPreviousShift(isContinueFromPrevious(continueDemandByCloth, entry.getKey()))
                     .earliestShortageTime(earliestShortageTime)
                     .stockSupplyHours(guarantee.getSupplyHours())
                     .build());

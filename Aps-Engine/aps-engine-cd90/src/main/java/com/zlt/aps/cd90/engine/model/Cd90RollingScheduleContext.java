@@ -26,10 +26,14 @@ public class Cd90RollingScheduleContext {
     private List<Cd90InboundRecord> plannedInboundRecords;
     /** 已提交的全部班次任务。 */
     private List<Cd90ShiftScheduleTask> committedTasks;
+    /** 前序班次真实部分排后尚未覆盖的续作需求量，按帘布代号分组。 */
+    private Map<String, BigDecimal> continueDemandByCloth;
     /** 跨班保留的大卷成熟库存及已分配米数。 */
     private List<Cd90BigRollAgingStock> bigRollAgingStocks;
     /** 各机台最近一次已提交任务的机尾规格。 */
     private Map<String, String> tailSpecByMachine;
+    /** 每个直裁规格最近一次实际生产机台，用于跨班续作优先回原机台。 */
+    private Map<String, String> lastMachineByCloth;
     /** 各机台最近一次已提交任务的机尾大卷与直裁规格。 */
     private Map<String, Cd90MachineTailState> tailByMachine;
 }

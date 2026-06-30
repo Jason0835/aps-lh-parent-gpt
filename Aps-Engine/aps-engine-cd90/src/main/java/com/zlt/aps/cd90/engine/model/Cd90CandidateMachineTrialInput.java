@@ -66,6 +66,8 @@ public class Cd90CandidateMachineTrialInput {
     private BigDecimal fallbackLossRatePercent;
     /** 是否为定点优先机台。 */
     private boolean preferredMachine;
+    /** 是否为该规格上一次生产/本次续作的原机台。 */
+    private boolean historyMachine;
     /** 配置的机台优先顺序。 */
     private int priorityOrder;
 }

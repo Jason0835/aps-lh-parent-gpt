@@ -46,8 +46,8 @@ public class Cd90ScheduleCandidateSorter {
         List<Cd90ScheduleCandidate> result = candidates == null
                 ? new ArrayList<>() : new ArrayList<>(candidates);
         result.sort(Comparator
-                .comparing(Cd90ScheduleCandidate::isShortageInCurrentShift).reversed()
-                .thenComparing(Cd90ScheduleCandidate::isContinueFromPreviousShift).reversed()
+                .comparing(Cd90ScheduleCandidate::isShortageInCurrentShift, Comparator.reverseOrder())
+                .thenComparing(Cd90ScheduleCandidate::isContinueFromPreviousShift, Comparator.reverseOrder())
                 .thenComparing(Cd90ScheduleCandidate::getEarliestShortageTime,
                         Comparator.nullsLast(LocalDateTime::compareTo))
                 .thenComparingInt(item -> continuityRank(item, tails))

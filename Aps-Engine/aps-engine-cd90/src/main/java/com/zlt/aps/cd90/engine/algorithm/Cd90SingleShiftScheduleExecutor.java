@@ -31,10 +31,13 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.Collections;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Deque;
 import java.util.Map;
 import java.util.Set;
 import java.util.HashSet;
@@ -70,6 +73,11 @@ public class Cd90SingleShiftScheduleExecutor implements Cd90SingleShiftScheduleS
         List<Cd90ScheduleCandidate> candidates = new ArrayList<>(candidatePreparationService.prepare(
                 context, input, shift.getClassField(), rolling));
         attachBigRollCodes(candidates, input.getConstructionMaterials());
+        Map<String, BigDecimal> continueDemandByCloth = copyContinueDemand(rolling);
+        Map<String, String> lastMachineByCloth = copyLastMachineByCloth(rolling);
+        appendContinueCandidates(candidates, continueDemandByCloth, lastMachineByCloth);
+        attachBigRollCodes(candidates, input.getConstructionMaterials());
+        Deque<Cd90ScheduleCandidate> immediateContinueCandidates = new ArrayDeque<>();
         // 机台快照在班次开始时一次加载，规格之间通过state扣减剩余秒数，避免重复查询造成漂移。
         Cd90MachineResourceSnapshot machineSnapshot = machineResourceService.load(
                 context.getFactoryCode(), shift.getStartTime(), shift.getEndTime());
@@ -79,22 +87,21 @@ public class Cd90SingleShiftScheduleExecutor implements Cd90SingleShiftScheduleS
 
         log.info("[直裁自动排程] 当前班次执行开始, classField={}, shiftCode={}, candidateCount={}",
                 shift.getClassField(), shift.getShiftCode(), candidates.size());
-        while (!candidates.isEmpty()) {
-            // 每提交一个任务后按最新链尾重新排序，使同规格优先规则能够连续生效。
-            candidates = candidateSorter.sort(candidates, continuityTails(state));
-            Cd90ScheduleCandidate candidate = candidates.remove(0);
+        while (!candidates.isEmpty() || !immediateContinueCandidates.isEmpty()) {
+            // 本班真实部分排产生的续作要尽量贴在上一段任务尾部继续排，避免被普通候选插队。
+            Cd90ScheduleCandidate candidate = selectCandidate(candidates, immediateContinueCandidates, state);
             String clothCode = candidate == null ? null : candidate.getClothCode();
             if (!StringUtils.hasText(clothCode)) {
                 continue;
             }
-            // 净需求会扣除库存和前序计划入库；没有正需求的规格不进入资源试算。
-            Cd90ShiftDemandDecision demand = demandProvider.resolve(
-                    context, input, shift, candidate, rolling);
-            BigDecimal netDemand = demand == null || demand.getNetDemandQuantity() == null
-                    ? BigDecimal.ZERO : demand.getNetDemandQuantity();
-            if (netDemand.signum() <= 0) {
+            // 优先使用前序真实部分排留下的续作需求；没有续作时再按库存和前序入库计算本班净需求。
+            attachSourceMachine(candidate, lastMachineByCloth);
+            boolean continueDemand = isContinueDemand(candidate, continueDemandByCloth);
+            BigDecimal rawDemand = resolveDemandQuantity(
+                    context, input, shift, candidate, rolling, continueDemandByCloth);
+            if (rawDemand.signum() <= 0) {
                 log.info("[直裁自动排程] 当前班次规格净需求为0，跳过资源试算, classField={}, shiftCode={}, clothCode={}, netDemand={}",
-                        shift.getClassField(), shift.getShiftCode(), clothCode, netDemand);
+                        shift.getClassField(), shift.getShiftCode(), clothCode, rawDemand);
                 continue;
             }
             Cd90ConstructionMaterial construction = findConstruction(
@@ -103,10 +110,12 @@ public class Cd90SingleShiftScheduleExecutor implements Cd90SingleShiftScheduleS
                 // 数据缺失只终止当前规格，保留轨迹后继续处理后续候选。
                 String reason = "CONSTRUCTION_MISSING";
                 recordFailure(failures, shift, clothCode, reason);
-                attemptTraces.add(trace(shift, clothCode, null, netDemand,
+                attemptTraces.add(trace(shift, clothCode, null, rawDemand,
                         BigDecimal.ZERO, reason, attemptTraces.size() + 1));
                 continue;
             }
+            BigDecimal netDemand = continueDemand ? normalize(rawDemand)
+                    : roundUpByCraftWidth(shift, clothCode, rawDemand, construction.getCraftWidth());
             if (input.getBigRollAgingDataMissingCodes() != null
                     && input.getBigRollAgingDataMissingCodes().contains(construction.getBigRollCode())) {
                 String reason = "DATA_MISSING";
@@ -125,7 +134,7 @@ public class Cd90SingleShiftScheduleExecutor implements Cd90SingleShiftScheduleS
                     shift.getClassField(), clothCode, closeOut.isCloseOut(), closeOut.getEmbryoItems());
             // 先生成全部可行机台试算，再由资源提交器按优先级逐个尝试库排和工装占用。
             Cd90MachineTrialPlan trialPlan = trialPreparationService.prepare(
-                    trialRequest(context, shift, state, construction, netDemand, closeOut.isCloseOut()),
+                    trialRequest(context, shift, state, construction, netDemand, closeOut.isCloseOut(), candidate, rolling),
                     machineSnapshot);
             Cd90ShiftCommitResult commit = resourceCommitter.commit(
                     commitRequest(context, shift, construction, trialPlan, closeOut.isCloseOut()), state);
@@ -147,12 +156,188 @@ public class Cd90SingleShiftScheduleExecutor implements Cd90SingleShiftScheduleS
             attemptTraces.add(trace(shift, clothCode, construction.getBigRollCode(),
                     netDemand, scheduledQuantity, null, partialReason,
                     attemptTraces.size() + 1));
+            handleContinueDemand(shift, candidate, netDemand, scheduledQuantity, commit.getTask().getMachineCode(), partialReason,
+                    continueDemandByCloth, immediateContinueCandidates);
         }
+        saveContinueDemand(rolling, continueDemandByCloth);
         log.info("[直裁自动排程] 当前班次执行完成, classField={}, taskCount={}, failureCount={}",
                 shift.getClassField(), state.getTasks().size(), failures.size());
         return Cd90ShiftExecutionResult.builder().shift(shift).state(state)
                 .tasks(state.getTasks()).failures(failures)
                 .attemptTraces(attemptTraces).build();
+    }
+
+    private Cd90ScheduleCandidate selectCandidate(List<Cd90ScheduleCandidate> candidates,
+                                                  Deque<Cd90ScheduleCandidate> immediateContinueCandidates,
+                                                  Cd90ShiftResourceState state) {
+        if (immediateContinueCandidates != null && !immediateContinueCandidates.isEmpty()) {
+            return immediateContinueCandidates.removeFirst();
+        }
+        List<Cd90ScheduleCandidate> sorted = candidateSorter.sort(candidates, this.continuityTails(state));
+        candidates.clear();
+        candidates.addAll(sorted);
+        return candidates.remove(0);
+    }
+
+    private BigDecimal resolveDemandQuantity(Cd90AutoScheduleContext context,
+                                             Cd90AutoScheduleInput input,
+                                             Cd90ShiftDescriptor shift,
+                                             Cd90ScheduleCandidate candidate,
+                                             Cd90RollingScheduleContext rolling,
+                                             Map<String, BigDecimal> continueDemandByCloth) {
+        BigDecimal continueDemand = continueDemandByCloth.get(candidate.getClothCode());
+        if (continueDemand != null && continueDemand.signum() > 0) {
+            log.info("[直裁自动排程] 使用续作需求进入本班试算, classField={}, shiftCode={}, clothCode={}, continueDemand={}",
+                    shift.getClassField(), shift.getShiftCode(), candidate.getClothCode(), continueDemand);
+            return continueDemand;
+        }
+        Cd90ShiftDemandDecision demand = demandProvider.resolve(context, input, shift, candidate, rolling);
+        return demand == null || demand.getNetDemandQuantity() == null
+                ? BigDecimal.ZERO : demand.getNetDemandQuantity();
+    }
+
+    private BigDecimal roundUpByCraftWidth(Cd90ShiftDescriptor shift,
+                                           String clothCode,
+                                           BigDecimal rawDemand,
+                                           BigDecimal craftWidth) {
+        if (rawDemand == null || rawDemand.signum() <= 0) {
+            return BigDecimal.ZERO;
+        }
+        if (craftWidth == null || craftWidth.signum() <= 0) {
+            log.warn("[直裁自动排程] 直裁宽度缺失，无法按整条取整，沿用原始净需求, classField={}, clothCode={}, rawDemand={}",
+                    shift.getClassField(), clothCode, rawDemand);
+            return rawDemand;
+        }
+        BigDecimal stripCount = rawDemand.divide(craftWidth, 0, RoundingMode.CEILING);
+        BigDecimal roundedDemand = this.normalize(stripCount.multiply(craftWidth));
+        if (roundedDemand.compareTo(rawDemand) != 0) {
+            log.info("[直裁自动排程] 净需求按直裁宽度向上取整, classField={}, clothCode={}, rawDemand={}, craftWidth={}, roundedDemand={}",
+                    shift.getClassField(), clothCode, rawDemand, craftWidth, roundedDemand);
+        }
+        return roundedDemand;
+    }
+
+    private void handleContinueDemand(Cd90ShiftDescriptor shift,
+                                      Cd90ScheduleCandidate candidate,
+                                      BigDecimal netDemand,
+                                      BigDecimal scheduledQuantity,
+                                      String sourceMachineCode,
+                                      String partialReason,
+                                      Map<String, BigDecimal> continueDemandByCloth,
+                                      Deque<Cd90ScheduleCandidate> immediateContinueCandidates) {
+        BigDecimal remainingDemand = this.remainingDemand(netDemand, scheduledQuantity);
+        if (remainingDemand.signum() <= 0 || "EQUAL_SHARE".equals(partialReason)) {
+            continueDemandByCloth.remove(candidate.getClothCode());
+            return;
+        }
+        continueDemandByCloth.put(candidate.getClothCode(), remainingDemand);
+        candidate.setContinueFromPreviousShift(true);
+        if (!StringUtils.hasText(candidate.getSourceMachineCode())) {
+            candidate.setSourceMachineCode(sourceMachineCode);
+        }
+        // 机台产能不足时，本班不再把剩余量切到其他机台，留到后续班次优先回原机台续作。
+        if (!"CAPACITY_LIMIT".equals(partialReason)) {
+            immediateContinueCandidates.addFirst(candidate);
+        }
+        log.info("[直裁自动排程] 当前规格部分排后进入续作队列, classField={}, clothCode={}, sourceMachineCode={}, scheduledQuantity={}, remainingDemand={}, partialReason={}",
+                shift.getClassField(), candidate.getClothCode(), candidate.getSourceMachineCode(), scheduledQuantity, remainingDemand, partialReason);
+    }
+
+    private BigDecimal remainingDemand(BigDecimal netDemand, BigDecimal scheduledQuantity) {
+        BigDecimal safeNetDemand = netDemand == null ? BigDecimal.ZERO : netDemand;
+        BigDecimal safeScheduledQuantity = scheduledQuantity == null ? BigDecimal.ZERO : scheduledQuantity;
+        BigDecimal remaining = safeNetDemand.subtract(safeScheduledQuantity);
+        return remaining.signum() <= 0 ? BigDecimal.ZERO : this.normalize(remaining);
+    }
+
+    private Map<String, BigDecimal> copyContinueDemand(Cd90RollingScheduleContext rolling) {
+        if (rolling == null || rolling.getContinueDemandByCloth() == null) {
+            return new LinkedHashMap<>();
+        }
+        return rolling.getContinueDemandByCloth().entrySet().stream()
+                .filter(entry -> StringUtils.hasText(entry.getKey()))
+                .filter(entry -> entry.getValue() != null && entry.getValue().signum() > 0)
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue,
+                        (first, second) -> second, LinkedHashMap::new));
+    }
+    private Map<String, String> copyLastMachineByCloth(Cd90RollingScheduleContext rolling) {
+        if (rolling == null || rolling.getLastMachineByCloth() == null) {
+            return new LinkedHashMap<>();
+        }
+        return rolling.getLastMachineByCloth().entrySet().stream()
+                .filter(entry -> StringUtils.hasText(entry.getKey()))
+                .filter(entry -> StringUtils.hasText(entry.getValue()))
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue,
+                        (first, second) -> second, LinkedHashMap::new));
+    }
+
+    private boolean isContinueDemand(Cd90ScheduleCandidate candidate,
+                                     Map<String, BigDecimal> continueDemandByCloth) {
+        BigDecimal continueDemand = candidate == null || continueDemandByCloth == null
+                ? null : continueDemandByCloth.get(candidate.getClothCode());
+        return continueDemand != null && continueDemand.signum() > 0;
+    }
+
+    private void attachSourceMachine(Cd90ScheduleCandidate candidate,
+                                     Map<String, String> lastMachineByCloth) {
+        if (candidate == null || StringUtils.hasText(candidate.getSourceMachineCode())
+                || lastMachineByCloth == null) {
+            return;
+        }
+        candidate.setSourceMachineCode(lastMachineByCloth.get(candidate.getClothCode()));
+    }
+
+    private String preferredHistoryMachineCode(Cd90ScheduleCandidate candidate,
+                                               Cd90RollingScheduleContext rolling) {
+        if (candidate == null) {
+            return null;
+        }
+        if (StringUtils.hasText(candidate.getSourceMachineCode())) {
+            return candidate.getSourceMachineCode();
+        }
+        if (rolling == null || rolling.getLastMachineByCloth() == null) {
+            return null;
+        }
+        return rolling.getLastMachineByCloth().get(candidate.getClothCode());
+    }
+
+    private void appendContinueCandidates(List<Cd90ScheduleCandidate> candidates,
+                                          Map<String, BigDecimal> continueDemandByCloth,
+                                          Map<String, String> lastMachineByCloth) {
+        if (continueDemandByCloth.isEmpty()) {
+            return;
+        }
+        Set<String> existingClothCodes = this.safe(candidates).stream()
+                .map(Cd90ScheduleCandidate::getClothCode)
+                .filter(StringUtils::hasText)
+                .collect(Collectors.toCollection(HashSet::new));
+        continueDemandByCloth.keySet().stream()
+                .filter(clothCode -> !existingClothCodes.contains(clothCode))
+                .map(clothCode -> Cd90ScheduleCandidate.builder()
+                        .clothCode(clothCode).continueFromPreviousShift(true)
+                        .sourceMachineCode(lastMachineByCloth.get(clothCode)).build())
+                .forEach(candidates::add);
+    }
+
+    private void saveContinueDemand(Cd90RollingScheduleContext rolling,
+                                    Map<String, BigDecimal> continueDemandByCloth) {
+        if (rolling == null) {
+            return;
+        }
+        Map<String, BigDecimal> validContinueDemand = continueDemandByCloth.entrySet().stream()
+                .filter(entry -> StringUtils.hasText(entry.getKey()))
+                .filter(entry -> entry.getValue() != null && entry.getValue().signum() > 0)
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue,
+                        (first, second) -> second, LinkedHashMap::new));
+        rolling.setContinueDemandByCloth(validContinueDemand);
+        log.info("[直裁自动排程] 当前班次续作需求已保存, continueDemandByCloth={}", validContinueDemand);
+    }
+
+    private BigDecimal normalize(BigDecimal value) {
+        if (value == null) {
+            return BigDecimal.ZERO;
+        }
+        return value.stripTrailingZeros().scale() < 0 ? value.setScale(0) : value.stripTrailingZeros();
     }
 
     private Cd90ScheduleAttemptTrace trace(Cd90ShiftDescriptor shift,
@@ -165,7 +350,6 @@ public class Cd90SingleShiftScheduleExecutor implements Cd90SingleShiftScheduleS
         return trace(shift, clothCode, bigRollCode, netDemand, scheduled,
                 failureReason, null, sequence);
     }
-
     private Cd90ScheduleAttemptTrace trace(Cd90ShiftDescriptor shift,
                                            String clothCode,
                                            String bigRollCode,
@@ -187,7 +371,9 @@ public class Cd90SingleShiftScheduleExecutor implements Cd90SingleShiftScheduleS
                                                   Cd90ShiftResourceState state,
                                                   Cd90ConstructionMaterial construction,
                                                   BigDecimal netDemand,
-                                                  boolean closeOut) {
+                                                  boolean closeOut,
+                                                  Cd90ScheduleCandidate candidate,
+                                                  Cd90RollingScheduleContext rolling) {
         return Cd90MachineTrialRequest.builder()
                 .clothCode(construction.getClothCode())
                 .bigRollCode(construction.getBigRollCode())
@@ -203,6 +389,7 @@ public class Cd90SingleShiftScheduleExecutor implements Cd90SingleShiftScheduleS
                 .previousSpecByMachine(state.getTailSpecByMachine())
                 .previousTailByMachine(state.getTailByMachine())
                 .bigRollAgingStocks(state.getBigRollAgingStocks())
+                .preferredHistoryMachineCode(preferredHistoryMachineCode(candidate, rolling))
                 .parameters(context.getParameters()).build();
     }
 
