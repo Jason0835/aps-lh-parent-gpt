@@ -210,7 +210,7 @@ public class TqPreValidationHandler extends AbsTqScheduleStepHandler {
             scheduleVo.setPlanStockQty(planStockQty);
 
             // 大尺寸规格阈值
-            scheduleVo.getParams().put(com.zlt.aps.common.engine.constants.EngineConstants.BIG_SIZE_SPEC,
+            scheduleVo.getParams().put(com.zlt.aps.common.engine.constants.EngineConstants.TQ_BIG_SIZE_SPEC,
                     context.getParams().getBigSizeSpec());
 
             // 发布状态
