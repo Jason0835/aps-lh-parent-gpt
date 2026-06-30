@@ -2971,7 +2971,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
      * 判断是否为交替前 SKU：class3~8 中存在某个班次为收尾（classXIsEnd = "1"）。
      */
     private boolean isPreChangeSku(LhScheduleResult result) {
-        for (int shift = 3; shift <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT; shift++) {
+        for (int shift = 1; shift <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT; shift++) {
             if ("1".equals(ShiftFieldUtil.getShiftIsEnd(result, shift))) {
                 return true;
             }
@@ -2985,14 +2985,14 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
      */
     private boolean isPostChangeSku(LhScheduleResult result) {
         // class1~2（今天）如果不为空，说明是延续品，不是交替后
-        for (int shift = 1; shift <= 2; shift++) {
-            Integer planQty = getClassPlanQty(result, shift);
-            if (Objects.nonNull(planQty) && planQty > 0) {
+        //for (int shift = 1; shift <= 1; shift++) {
+            Integer planQty1 = getClassPlanQty(result, 1);
+            if (Objects.nonNull(planQty1) && planQty1 > 0) {
                 return false;
             }
-        }
+        //}
         int firstPlannedShift = 0;
-        for (int shift = 3; shift <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT; shift++) {
+        for (int shift = 1; shift <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT; shift++) {
             Integer planQty = getClassPlanQty(result, shift);
             if (Objects.nonNull(planQty) && planQty > 0) {
                 firstPlannedShift = shift;
@@ -3003,7 +3003,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
             return false;
         }
         // 第一个有计划量的班次之前（class3~8 范围内）必须全空
-        for (int shift = 3; shift < firstPlannedShift; shift++) {
+        for (int shift = 1; shift < firstPlannedShift; shift++) {
             Integer planQty = getClassPlanQty(result, shift);
             if (Objects.nonNull(planQty) && planQty > 0) {
                 return false;
