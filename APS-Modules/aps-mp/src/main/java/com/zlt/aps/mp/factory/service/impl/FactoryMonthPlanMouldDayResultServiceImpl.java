@@ -55,7 +55,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.*;
@@ -749,18 +752,26 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
     public byte[] getFactoryMonthPlanMouldDayResultExportByte(FactoryMonthPlanMouldDayResult queryResult,
                                                               List<FactoryMonthPlanMouldDayResultExportVo> list,
                                                               boolean isFinal) {
-        // 1、获取模板
+        // 1、获取模板（立即读取为字节数组，避免 Spring Boot 嵌套 JAR 的 ZipInflaterInputStream 延迟读取报错）
         ClassLoader classLoader = this.getClass().getClassLoader();
         //20260604+ 日排产量预警处理
         int warningHeaderRowIndex = DAY_TOTAL_WARNING_ROW_INDEX;
         InputStream inputStream;
 //        int warningColumnOffset; // 警告列偏移值
-        if (isFinal) {
-            inputStream = classLoader.getResourceAsStream("excelModel/factoryMonthPlanMouldFinalResultExportTemp.xlsx");
-//            warningColumnOffset = WARNING_COLUMN_OFFSET_FINAL;
-        } else {
-            inputStream = classLoader.getResourceAsStream("excelModel/factoryMonthPlanMouldDayResultExportTemp.xlsx");
-//            warningColumnOffset = WARNING_COLUMN_OFFSET;
+        try {
+            String templatePath = isFinal ? "excelModel/factoryMonthPlanMouldFinalResultExportTemp.xlsx"
+                    : "excelModel/factoryMonthPlanMouldDayResultExportTemp.xlsx";
+            try (InputStream templateIs = classLoader.getResourceAsStream(templatePath);
+                 ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
+                byte[] buffer = new byte[8192];
+                int len;
+                while ((len = templateIs.read(buffer)) != -1) {
+                    baos.write(buffer, 0, len);
+                }
+                inputStream = new ByteArrayInputStream(baos.toByteArray());
+            }
+        } catch (IOException e) {
+            throw new RuntimeException("读取Excel模板失败", e);
         }
 
         // 2、加载字典数据

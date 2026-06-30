@@ -92,7 +92,9 @@ import org.springframework.util.CollectionUtils;
 import org.springframework.util.StopWatch;
 
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
+import java.io.IOException;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.temporal.TemporalAdjusters;
@@ -1926,9 +1928,22 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
     public byte[] getMpStructureAllocationExportByte(MpStructureAllocationExportStatisticsVo statisticsVo) {
 
 
-        // 获取模板
+        // 获取模板（立即读取为字节数组，避免 Spring Boot 嵌套 JAR 的 ZipInflaterInputStream 延迟读取报错）
         ClassLoader classLoader = this.getClass().getClassLoader();
-        InputStream inputStream = classLoader.getResourceAsStream("excelModel/mpStructureAllocationExportTemp.xlsx");
+        InputStream inputStream;
+        try {
+            try (InputStream templateIs = classLoader.getResourceAsStream("excelModel/mpStructureAllocationExportTemp.xlsx");
+                 ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
+                byte[] buffer = new byte[8192];
+                int len;
+                while ((len = templateIs.read(buffer)) != -1) {
+                    baos.write(buffer, 0, len);
+                }
+                inputStream = new ByteArrayInputStream(baos.toByteArray());
+            }
+        } catch (IOException e) {
+            throw new RuntimeException("读取Excel模板失败", e);
+        }
 
         // 表头信息
         Map<String, Object> tableMap = new HashMap<>(16);
