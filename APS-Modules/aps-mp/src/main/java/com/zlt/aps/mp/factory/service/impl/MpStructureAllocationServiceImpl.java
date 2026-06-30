@@ -3460,6 +3460,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                 insertItem.setPostponeQty(0);
                 insertItem.setAverageSaleQty(0);
                 insertItem.setProdReqPlan(0);
+                insertItem.setFactProdReqQty(0);
                 insertItem.setMainPattern(materialInfo.getMainPattern());
                 // 结构类型
                 String structureType;
