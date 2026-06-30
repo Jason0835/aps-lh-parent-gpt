@@ -3121,13 +3121,6 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                         continue;
                     }
 
-                    // 优先用班次计划量来判断当前班次是否排产
-                    ShiftPlanResultSimple shiftResult = getShiftPlanQtyWithShiftNameSimple(lh, dayShifts, scheduleDate);
-                    if (shiftResult.planQty <= 0) {
-                        log.debug("胎胚 {} 硫化任务 {} 当前班次计划量为0，跳过分配", embryoCode, lh.getId());
-                        continue;
-                    }
-
                     // 从 materialLhCapacityMap 获取日硫化量（用于比例计算）
                     if (materialLhCapacityMap != null && materialCode != null) {
                         MonthPlanProductLhCapacityVo capacityVo = materialLhCapacityMap.get(materialCode);

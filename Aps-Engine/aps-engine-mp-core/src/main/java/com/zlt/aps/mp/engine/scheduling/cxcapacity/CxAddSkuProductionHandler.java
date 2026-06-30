@@ -120,6 +120,10 @@ public class CxAddSkuProductionHandler {
     public void productionAddSkuByContinueCxMachine(Context context, ProductionStageEnum productionStage, FormalRoundEnum formalRound, ProductionPlanGroupInfo groupPlanInfo, Set<Integer> excludeDays) {
         //基础校验 有可排产计划且能找到最早收尾的硫化组
         EarliestConclusionLhGroupHelper lhGroup = checkBaseProductionCondition(context, formalRound, groupPlanInfo, excludeDays);
+        //20260629+ 第三轮最低实单--还有不满足时，扩展到最大硫化机台数
+        if (FormalRoundEnum.THIRD_ACTUAL_MIN_LH_MACHINE == formalRound && null != lhGroup) {
+            lhGroup = checkBaseProductionCondition(context, FormalRoundEnum.DISPOSABLE_LH_MACHINE, groupPlanInfo, excludeDays);
+        }
         if (null == lhGroup) {
             return;
         }
@@ -136,7 +140,7 @@ public class CxAddSkuProductionHandler {
         List<MonthPlanProductionRequirePlanVo> leftOverHasProductionList = groupPlanData.stream().filter(groupPlan -> groupPlan.hasProductionThisRound()).collect(Collectors.toList());
         //获取优先级最高的Sku信息 getSelectedAddSku(productionContext, startDay, endDay, leftOverHasProductionList)
         EarliestConclusionLhGroupHelper allLhMachine = null;
-        if (FormalRoundEnum.ACTUAL_MIN_LH_MACHINE == formalRound) {
+        if (FormalRoundEnum.isActualMinLhMachine(formalRound) && FormalRoundEnum.THIRD_ACTUAL_MIN_LH_MACHINE != formalRound) {
             allLhMachine = checkBaseProductionCondition(context, FormalRoundEnum.DISPOSABLE_LH_MACHINE, groupPlanInfo, excludeDays);
         }
         String materialDesc = SkuPrioritySelector.getHighestPrioritySku(context, productionStage, formalRound, groupPlanInfo, lhGroup, ContinueTypeEnum.NO_CONTINUE, leftOverHasProductionList, new HashSet<>(), allLhMachine);

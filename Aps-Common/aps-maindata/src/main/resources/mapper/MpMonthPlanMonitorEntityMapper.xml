@@ -119,32 +119,4 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 		    AND t.YEAR = #{year}
 		    AND t.MONTH = #{month}
     </update>
-
-    <!--
-        查询当月存在正规计划(productStatus=S)的物料及其月计划监控记录。
-        用于量试合格品充抵正规订单场景：按 工厂+年月+物料 查询，一个物料只会有一条正规记录。
-    -->
-    <select id="selectFormalPlanByMaterials" resultType="com.zlt.aps.mp.api.domain.entity.MpMonthPlanMonitor">
-        SELECT
-            ID,
-            FACTORY_CODE,
-            YEAR,
-            MONTH,
-            MATERIAL_CODE,
-            PRODUCTION_VERSION,
-            SCHEDULE_QTY,
-            PRODUCTION_QTY,
-            PRODUCT_STATUS,
-            CONSTRUCTION_STAGE
-        FROM T_MP_MONTH_PLAN_MONITOR
-        WHERE IS_DELETE = 0
-          AND FACTORY_CODE = #{factoryCode}
-          AND YEAR = #{year}
-          AND MONTH = #{month}
-          AND PRODUCT_STATUS = 'S'
-          AND MATERIAL_CODE IN
-          <foreach collection="materialCodes" item="code" open="(" separator="," close=")">
-              #{code}
-          </foreach>
-    </select>
 </mapper>

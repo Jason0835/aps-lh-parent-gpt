@@ -469,46 +469,89 @@ public class EngineConstants {
      */
     public static String LESS_SUPPLY_TIME = "LESS_SUPPLY_TIME";
 
-    /**
-     * 参数code：胎圈备库触发阈值（1个班的成型消耗量阈值）
-     * <p>语义：当胎圈交接班库存不足以支撑1个班的成型消耗量时，触发胎圈备库班数配置逻辑</p>
-     * <p>历史含义：保证成型的班次排产数，默认1</p>
-     */
-    public static String BACKUP_SHIFT_COUNT = "SYS0301001";
+    // ==================== 胎圈排程专用参数（SYS0301XXX 系列，按编码升序排列）====================
 
-    /**
-     * 参数code：胎圈需求系数（胎圈消耗量=成型需求量×系数），默认2
-     */
-    public static String DEMAND_COEFFICIENT = "SYS0301002";
+    /** SYS0301001：胎圈备库班数（保证成型的班次排产数），默认1 */
+    public static String TQ_BACKUP_SHIFT_COUNT = "SYS0301001";
 
-    /**
-     * 参数code：胎圈需求算法模式，1=算法1(三班最大值)，2=算法2(逐班对应)，默认2
-     */
-    public static String DEMAND_CALC_MODE = "SYS0301003";
+    /** SYS0301002：胎圈需求系数（胎圈消耗量=成型需求量×系数），默认2 */
+    public static String TQ_DEMAND_COEFFICIENT = "SYS0301002";
 
-    /**
-     * 参数code：库存供应时长阈值（小时），达到后切换规格，默认24
-     */
-    public static String SUPPLY_TIME_THRESHOLD = "SYS0301004";
+    /** SYS0301003：单班时长（小时），默认8 */
+    public static String TQ_CLASS_HOURS = "SYS0301003";
 
-    /**
-     * 参数code：胎圈班产上限，默认3000
-     */
-    public static String MAX_CLASS_OUTPUT = "SYS0301005";
+    /** SYS0301004：工装容量，默认500 */
+    public static String TQ_TOOL_CAPACITY = "SYS0301004";
 
-    /**
-     * 参数code：规格切换时长（小时），默认0.5
-     */
-    public static String SPEC_SWITCH_TIME = "SYS0301006";
+    /** SYS0301005：损耗率，默认0.02 */
+    public static String TQ_LOSS_RATE = "SYS0301005";
 
-    /**
-     * 参数code：英寸切换时长（小时），默认1
-     */
-    public static String INCH_SWITCH_TIME = "SYS0301007";
+    /** SYS0301006：往前一班合并计划量阈值，默认100 */
+    public static String TQ_MERGE_THRESHOLD = "SYS0301006";
 
-    /**
-     * 参数code：工装车总数（全局统一值），默认50
-     * 用于排程时计算可用工装数量限制：可用工装 = 工装车总数 - 库存占用工装
-     */
-    public static String TOOLING_TOTAL = "SYS0301023";
+    /** SYS0301007：预生产库存天数，默认1 */
+    public static String TQ_PRODUCT_STOCK_DAY = "SYS0301007";
+
+    /** SYS0301008：大需求量阈值，默认3000 */
+    public static String TQ_LARGE_DEMAND = "SYS0301008";
+
+    /** SYS0301009：收尾提醒数量，默认50 */
+    public static String TQ_CLOSE_OUT_NUM = "SYS0301009";
+
+    /** SYS0301010：单最少排产量，默认10 */
+    public static String TQ_MIN_PLAN_QTY = "SYS0301010";
+
+    /** SYS0301011：班产上限，默认3000 */
+    public static String TQ_MAX_CLASS_OUTPUT = "SYS0301011";
+
+    /** SYS0301012：需求算法模式，1=算法1(三班最大值)，2=算法2(逐班对应)，默认2 */
+    public static String TQ_DEMAND_CALC_MODE = "SYS0301012";
+
+    /** SYS0301013：库存供应时长阈值（小时），达到后切换规格，默认24 */
+    public static String TQ_SUPPLY_TIME_THRESHOLD = "SYS0301013";
+
+    /** SYS0301014：钢丝圈切换时长（小时），默认0.5 */
+    public static String TQ_SPEC_SWITCH_TIME = "SYS0301014";
+
+    /** SYS0301015：三角胶切换时长（小时），默认0.8 */
+    public static String TQ_APEX_SWITCH_TIME = "SYS0301015";
+
+    /** SYS0301016：切英寸时长（小时），默认1.5 */
+    public static String TQ_INCH_SWITCH_TIME = "SYS0301016";
+
+    /** SYS0301017：库消比高阈值，默认2.0 */
+    public static String TQ_STOCK_CONSUME_RATIO_HIGH = "SYS0301017";
+
+    /** SYS0301018：库消比低阈值，默认0.5 */
+    public static String TQ_STOCK_CONSUME_RATIO_LOW = "SYS0301018";
+
+    /** SYS0301019：成型停产开产阈值天数，默认2 */
+    public static String TQ_STOP_INTERSECTION_DAYS = "SYS0301019";
+
+    /** SYS0301020：开产库存补量阈值，默认0 */
+    public static String TQ_REOPEN_STOCK_THRESHOLD = "SYS0301020";
+
+    /** SYS0301021：成型停产预排班数，默认2 */
+    public static String TQ_MOLDING_STOP_PRE_SHIFT_COUNT = "SYS0301021";
+
+    /** SYS0301022：工装车总数（全局统一值），默认50 */
+    public static String TQ_TOOLING_TOTAL = "SYS0301022";
+
+    /** SYS0301023：仅投产阶段规格排产标识，值为1时仅投产阶段规格排产，默认1 */
+    public static String TQ_PRODUCTION_STAGE_PRODUCE = "SYS0301023";
+
+    /** SYS0301024：大尺寸规格阈值，寸口大于此值为大尺寸规格，默认35 */
+    public static String TQ_BIG_SIZE_SPEC = "SYS0301024";
+
+    /** SYS0301025：库存损耗率，默认0 */
+    public static String TQ_STOCK_LOSS_RATE = "SYS0301025";
+
+    /** SYS0301026：各班计划量均分阈值，默认300 */
+    public static String TQ_EQUAL_SHARE_THRESHOLD = "SYS0301026";
+
+    /** SYS0301027：交接班库存基准值，默认22500 */
+    public static String TQ_CLASS_STOCK_REFERENCE = "SYS0301027";
+
+    /** SYS0301028：一次生产卷数，默认220 */
+    public static String TQ_ONE_ROLL_NUM = "SYS0301028";
 }

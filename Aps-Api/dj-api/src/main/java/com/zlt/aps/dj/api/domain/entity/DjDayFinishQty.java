@@ -43,7 +43,7 @@ public class DjDayFinishQty extends BaseEntity {
     @ImportExcelValidated(required = true)
     @Excel(name = "ui.data.column.dayFinishQty.dj.code")
     @ApiModelProperty(value = "垫胶代码", name = "paddingCode")
-    @TableField(value = "LINING_CODE")
+    @TableField(value = "PADDING_CODE")
     private String paddingCode;
 
     /**

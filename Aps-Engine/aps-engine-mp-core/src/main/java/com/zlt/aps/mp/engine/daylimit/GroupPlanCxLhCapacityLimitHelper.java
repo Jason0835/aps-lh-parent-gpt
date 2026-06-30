@@ -386,7 +386,7 @@ public class GroupPlanCxLhCapacityLimitHelper {
     public boolean isReachLimitByMouldNumber(Context context, FormalRoundEnum round, GroupPlanCxLhCapacityLimitHelper previousDayLimitInfo, GroupPlanCxLhCapacityLimitHelper nextDayLimitInfo) {
         //20260416+ 实单最低硫化机台数轮次以实单最低硫化机台数来计算
         Integer theoryMaxLhMachineCount = maxLhMachineCount;
-        if (FormalRoundEnum.ACTUAL_MIN_LH_MACHINE == round) {
+        if (FormalRoundEnum.isActualMinLhMachine(round)) {
             theoryMaxLhMachineCount = dayMinLhMachineCount;
         }
         //实际的最大硫化机台数 = min(初始的最大硫化机台数,结构剩余可用的最大硫化机台数 sandy+ 2026.03.22

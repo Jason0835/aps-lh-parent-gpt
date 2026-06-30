@@ -152,28 +152,28 @@ public class TqScheduleResultVo extends ApsBaseDto {
     // ==================== 成型消耗量字段（对应成型CLASS1~CLASS8） ====================
 
     @ApiModelProperty(value = "对应成型1班(D日早班)的计划量，库存直接供应")
-    private Double cxClass1Plan;
+    private Integer cxClass1Plan;
 
     @ApiModelProperty(value = "对应成型2班(D日中班)的计划量，库存+当天早班产出供应")
-    private Double cxClass2Plan;
+    private Integer cxClass2Plan;
 
     @ApiModelProperty(value = "对应成型3班(D+1日夜班)的计划量，胎圈1班供应")
-    private Double cxClass3Plan;
+    private Integer cxClass3Plan;
 
     @ApiModelProperty(value = "对应成型4班(D+1日早班)的计划量，胎圈2班供应")
-    private Double cxClass4Plan;
+    private Integer cxClass4Plan;
 
     @ApiModelProperty(value = "对应成型5班(D+1日中班)的计划量，胎圈3班供应")
-    private Double cxClass5Plan;
+    private Integer cxClass5Plan;
 
     @ApiModelProperty(value = "对应成型6班(D+2日夜班)的计划量，胎圈4班供应")
-    private Double cxClass6Plan;
+    private Integer cxClass6Plan;
 
     @ApiModelProperty(value = "对应成型7班(D+2日早班)的计划量，胎圈5班供应")
-    private Double cxClass7Plan;
+    private Integer cxClass7Plan;
 
     @ApiModelProperty(value = "对应成型8班(D+2日中班)的计划量，胎圈6班供应")
-    private Double cxClass8Plan;
+    private Integer cxClass8Plan;
 
     // ==================== 其他业务字段 ====================
 

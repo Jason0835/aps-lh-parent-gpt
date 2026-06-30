@@ -843,12 +843,12 @@ public class TqMachineAssignHandler extends AbsTqScheduleStepHandler {
     private double getCxConsume(TqScheduleResultVo scheduleVo, int classIdx, double coefficient) {
         double cxPlan;
         switch (classIdx) {
-            case 1: cxPlan = scheduleVo.getCxClass3Plan() == null ? 0D : scheduleVo.getCxClass3Plan(); break;
-            case 2: cxPlan = scheduleVo.getCxClass4Plan() == null ? 0D : scheduleVo.getCxClass4Plan(); break;
-            case 3: cxPlan = scheduleVo.getCxClass5Plan() == null ? 0D : scheduleVo.getCxClass5Plan(); break;
-            case 4: cxPlan = scheduleVo.getCxClass6Plan() == null ? 0D : scheduleVo.getCxClass6Plan(); break;
-            case 5: cxPlan = scheduleVo.getCxClass7Plan() == null ? 0D : scheduleVo.getCxClass7Plan(); break;
-            case 6: cxPlan = scheduleVo.getCxClass8Plan() == null ? 0D : scheduleVo.getCxClass8Plan(); break;
+            case 1: cxPlan = scheduleVo.getCxClass3Plan() == null ? 0 : scheduleVo.getCxClass3Plan(); break;
+            case 2: cxPlan = scheduleVo.getCxClass4Plan() == null ? 0 : scheduleVo.getCxClass4Plan(); break;
+            case 3: cxPlan = scheduleVo.getCxClass5Plan() == null ? 0 : scheduleVo.getCxClass5Plan(); break;
+            case 4: cxPlan = scheduleVo.getCxClass6Plan() == null ? 0 : scheduleVo.getCxClass6Plan(); break;
+            case 5: cxPlan = scheduleVo.getCxClass7Plan() == null ? 0 : scheduleVo.getCxClass7Plan(); break;
+            case 6: cxPlan = scheduleVo.getCxClass8Plan() == null ? 0 : scheduleVo.getCxClass8Plan(); break;
             default: cxPlan = 0D;
         }
         return BigDecimalUtil.mul(cxPlan, coefficient);

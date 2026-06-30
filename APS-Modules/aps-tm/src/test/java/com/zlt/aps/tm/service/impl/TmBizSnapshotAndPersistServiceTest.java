@@ -1,11 +1,13 @@
 package com.zlt.aps.tm.service.impl;
 
+import cn.hutool.core.date.DateUtil;
 import com.ruoyi.common.exception.ServiceException;
 import com.zlt.aps.common.engine.schedule.ScheduleOperationContext;
 import com.zlt.aps.common.engine.schedule.ScheduleTaskLinkedList;
 import com.zlt.aps.common.engine.schedule.ScheduleTaskNode;
 import com.zlt.aps.tm.api.domain.entity.TmScheduleResult;
 import com.zlt.aps.tm.api.domain.entity.TmScheduleResultExplain;
+import com.zlt.aps.tm.api.domain.entity.TmScheduleUnplanned;
 import com.zlt.aps.tm.engine.domain.TmPersistResult;
 import com.zlt.aps.tm.engine.domain.TmScheduleContext;
 import com.zlt.aps.tm.engine.domain.TmSnapshotBuildResult;
@@ -14,6 +16,7 @@ import com.zlt.aps.tm.engine.service.impl.TmPersistService;
 import com.zlt.aps.tm.engine.service.impl.TmSnapshotBuildService;
 import com.zlt.aps.tm.mapper.TmScheduleResultExplainMapper;
 import com.zlt.aps.tm.mapper.TmScheduleResultMapper;
+import com.zlt.aps.tm.mapper.TmScheduleUnplannedMapper;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.ArgumentCaptor;
@@ -50,6 +53,9 @@ public class TmBizSnapshotAndPersistServiceTest {
     @Mock
     private TmScheduleResultExplainMapper scheduleResultExplainMapper;
 
+    @Mock
+    private TmScheduleUnplannedMapper scheduleUnplannedMapper;
+
     /**
      * 测试内容：验证快照落库服务拒绝空上下文。
      * 测试场景：直接调用 snapshotAndPersist(null)。
@@ -58,7 +64,7 @@ public class TmBizSnapshotAndPersistServiceTest {
     @Test(expected = IllegalArgumentException.class)
     public void snapshotAndPersistShouldRejectNullContext() {
         new TmBizSnapshotAndPersistService(snapshotBuildService, persistService, scheduleResultMapper,
-                scheduleResultExplainMapper).snapshotAndPersist(null);
+                scheduleResultExplainMapper, scheduleUnplannedMapper).snapshotAndPersist(null);
     }
 
     /**
@@ -72,7 +78,7 @@ public class TmBizSnapshotAndPersistServiceTest {
         context.setTaskDraftList(Collections.emptyList());
 
         new TmBizSnapshotAndPersistService(snapshotBuildService, persistService, scheduleResultMapper,
-                scheduleResultExplainMapper).snapshotAndPersist(context);
+                scheduleResultExplainMapper, scheduleUnplannedMapper).snapshotAndPersist(context);
 
         TmPersistResult persistResult = context.getPersistResult();
         assertEquals(0, persistResult.getResultCount());
@@ -89,20 +95,19 @@ public class TmBizSnapshotAndPersistServiceTest {
      */
     @Test(expected = ServiceException.class)
     public void snapshotAndPersistShouldThrowWhenResultInsertError() {
-        TmTaskDraft task = buildTask();
-        TmScheduleContext context = new TmScheduleContext();
-        context.setTaskDraftList(Collections.singletonList(task));
+        TmTaskDraft task = buildAssignedTask();
+        TmScheduleContext context = buildAssignedContext(task);
         TmSnapshotBuildResult snapshot = new TmSnapshotBuildResult();
         TmScheduleResult result = new TmScheduleResult();
         result.setOrderNo(task.getOrderNo());
         result.setTreadCode(task.getTreadCode());
 
         when(snapshotBuildService.buildTaskExplain(task, context)).thenReturn(snapshot);
-        when(persistService.convertUnplanned(task, context)).thenReturn(result);
+        when(persistService.convertChainToResult(any(), any())).thenReturn(Collections.singletonList(result));
         when(scheduleResultMapper.insert(result)).thenThrow(new RuntimeException("结果写入失败"));
 
         new TmBizSnapshotAndPersistService(snapshotBuildService, persistService, scheduleResultMapper,
-                scheduleResultExplainMapper).snapshotAndPersist(context);
+                scheduleResultExplainMapper, scheduleUnplannedMapper).snapshotAndPersist(context);
     }
 
     /**
@@ -122,48 +127,40 @@ public class TmBizSnapshotAndPersistServiceTest {
         TmScheduleResultExplain explain = new TmScheduleResultExplain();
 
         when(snapshotBuildService.buildTaskExplain(task, context)).thenReturn(snapshot);
-        when(persistService.convertUnplanned(task, context)).thenReturn(result);
         when(persistService.convertExplain(task, snapshot, context)).thenReturn(explain);
-        when(scheduleResultMapper.insert(result)).thenAnswer(invocation -> {
-            result.setId(301L);
-            return 1;
-        });
         when(scheduleResultExplainMapper.insert(any(TmScheduleResultExplain.class)))
                 .thenThrow(new RuntimeException("解释写入失败"));
 
         new TmBizSnapshotAndPersistService(snapshotBuildService, persistService, scheduleResultMapper,
-                scheduleResultExplainMapper).snapshotAndPersist(context);
+                scheduleResultExplainMapper, scheduleUnplannedMapper).snapshotAndPersist(context);
     }
 
     /**
-     * 测试内容：验证未排任务解释表写入前会回填结果表主键。
-     * 测试场景：未排任务先转换并插入 T_TM_SCHEDULE_RESULT，Mapper 模拟回填 result.id。
-     * 预期结果：写入 T_TM_SCHEDULE_RESULT_EXPLAIN 时 resultId 等于结果表回填主键。
+     * 测试内容：验证未排任务解释表不再强依赖结果表主键。
+     * 测试场景：未排任务写入 T_TM_SCHEDULE_UNPLANNED，解释表继续保留任务追溯。
+     * 预期结果：写入 T_TM_SCHEDULE_RESULT_EXPLAIN 时 resultId 为空。
      */
     @Test
-    public void snapshotAndPersistShouldFillExplainResultIdForUnplannedTask() {
+    public void snapshotAndPersistShouldKeepExplainResultIdNullForUnplannedTask() {
         TmTaskDraft task = buildTask();
         TmScheduleContext context = new TmScheduleContext();
         context.setTaskDraftList(Collections.singletonList(task));
         TmSnapshotBuildResult snapshot = new TmSnapshotBuildResult();
-        TmScheduleResult result = buildResult(task);
         TmScheduleResultExplain explain = new TmScheduleResultExplain();
 
         when(snapshotBuildService.buildTaskExplain(task, context)).thenReturn(snapshot);
-        when(persistService.convertUnplanned(task, context)).thenReturn(result);
         when(persistService.convertExplain(task, snapshot, context)).thenReturn(explain);
-        when(scheduleResultMapper.insert(result)).thenAnswer(invocation -> {
-            result.setId(101L);
-            return 1;
-        });
+        when(scheduleUnplannedMapper.insert(any(TmScheduleUnplanned.class))).thenReturn(1);
         when(scheduleResultExplainMapper.insert(any(TmScheduleResultExplain.class))).thenReturn(1);
 
         new TmBizSnapshotAndPersistService(snapshotBuildService, persistService, scheduleResultMapper,
-                scheduleResultExplainMapper).snapshotAndPersist(context);
+                scheduleResultExplainMapper, scheduleUnplannedMapper).snapshotAndPersist(context);
 
         ArgumentCaptor<TmScheduleResultExplain> explainCaptor = ArgumentCaptor.forClass(TmScheduleResultExplain.class);
         verify(scheduleResultExplainMapper).insert(explainCaptor.capture());
-        assertEquals(Long.valueOf(101L), explainCaptor.getValue().getResultId());
+        verify(scheduleResultMapper, never()).insert(any(TmScheduleResult.class));
+        verify(scheduleUnplannedMapper).insert(any(TmScheduleUnplanned.class));
+        assertEquals(null, explainCaptor.getValue().getResultId());
     }
 
     /**
@@ -193,7 +190,7 @@ public class TmBizSnapshotAndPersistServiceTest {
         assertEquals(null, persistResult);
 
         new TmBizSnapshotAndPersistService(snapshotBuildService, persistService, scheduleResultMapper,
-                scheduleResultExplainMapper).snapshotAndPersist(context);
+                scheduleResultExplainMapper, scheduleUnplannedMapper).snapshotAndPersist(context);
 
         ArgumentCaptor<TmScheduleResultExplain> explainCaptor = ArgumentCaptor.forClass(TmScheduleResultExplain.class);
         verify(scheduleResultExplainMapper).insert(explainCaptor.capture());
@@ -222,6 +219,8 @@ public class TmBizSnapshotAndPersistServiceTest {
         context.setBatchNo("TM20260625143025123");
         context.setScheduleDate(java.sql.Date.valueOf(LocalDate.of(2026, 6, 25)));
         context.setTaskDraftList(Arrays.asList(firstTask, secondTask));
+        appendAssignedTask(context, firstTask, "TM001", 1, new BigDecimal("100"));
+        appendAssignedTask(context, secondTask, "TM001", 2, new BigDecimal("200"));
 
         TmSnapshotBuildResult firstSnapshot = new TmSnapshotBuildResult();
         TmSnapshotBuildResult secondSnapshot = new TmSnapshotBuildResult();
@@ -229,17 +228,20 @@ public class TmBizSnapshotAndPersistServiceTest {
         firstResult.setFactoryCode(context.getFactoryCode());
         firstResult.setBatchNo(context.getBatchNo());
         firstResult.setScheduleDate(context.getScheduleDate());
+        firstResult.setMachineCode("TM001");
         firstResult.setClass1PlanQty(new BigDecimal("100"));
         TmScheduleResult secondResult = buildResult(secondTask);
         secondResult.setFactoryCode(context.getFactoryCode());
         secondResult.setBatchNo(context.getBatchNo());
         secondResult.setScheduleDate(context.getScheduleDate());
+        secondResult.setMachineCode("TM001");
         secondResult.setClass2PlanQty(new BigDecimal("200"));
 
         when(snapshotBuildService.buildTaskExplain(firstTask, context)).thenReturn(firstSnapshot);
         when(snapshotBuildService.buildTaskExplain(secondTask, context)).thenReturn(secondSnapshot);
-        when(persistService.convertUnplanned(firstTask, context)).thenReturn(firstResult);
-        when(persistService.convertUnplanned(secondTask, context)).thenReturn(secondResult);
+        when(persistService.convertChainToResult(any(), any()))
+                .thenReturn(Collections.singletonList(firstResult))
+                .thenReturn(Collections.singletonList(secondResult));
         when(persistService.convertExplain(firstTask, firstSnapshot, context)).thenReturn(buildExplain(firstTask));
         when(persistService.convertExplain(secondTask, secondSnapshot, context)).thenReturn(buildExplain(secondTask));
         when(scheduleResultMapper.insert(any(TmScheduleResult.class))).thenAnswer(invocation -> {
@@ -250,7 +252,7 @@ public class TmBizSnapshotAndPersistServiceTest {
         when(scheduleResultExplainMapper.insert(any(TmScheduleResultExplain.class))).thenReturn(1);
 
         new TmBizSnapshotAndPersistService(snapshotBuildService, persistService, scheduleResultMapper,
-                scheduleResultExplainMapper).snapshotAndPersist(context);
+                scheduleResultExplainMapper, scheduleUnplannedMapper).snapshotAndPersist(context);
 
         ArgumentCaptor<TmScheduleResult> resultCaptor = ArgumentCaptor.forClass(TmScheduleResult.class);
         verify(scheduleResultMapper, times(1)).insert(resultCaptor.capture());
@@ -299,6 +301,8 @@ public class TmBizSnapshotAndPersistServiceTest {
         context.setBatchNo("TM20260625143025123");
         context.setScheduleDate(java.sql.Date.valueOf(LocalDate.of(2026, 6, 25)));
         context.setTaskDraftList(Arrays.asList(overflowTask, existingNextShiftTask));
+        appendAssignedTask(context, overflowTask, "TM001", 2, new BigDecimal("3844"));
+        appendAssignedTask(context, existingNextShiftTask, "TM001", 2, new BigDecimal("500"));
 
         TmScheduleResult overflowResult = buildResult(overflowTask);
         overflowResult.setFactoryCode(context.getFactoryCode());
@@ -315,8 +319,8 @@ public class TmBizSnapshotAndPersistServiceTest {
 
         when(snapshotBuildService.buildTaskExplain(eq(overflowTask), eq(context))).thenReturn(new TmSnapshotBuildResult());
         when(snapshotBuildService.buildTaskExplain(eq(existingNextShiftTask), eq(context))).thenReturn(new TmSnapshotBuildResult());
-        when(persistService.convertUnplanned(overflowTask, context)).thenReturn(overflowResult);
-        when(persistService.convertUnplanned(existingNextShiftTask, context)).thenReturn(existingResult);
+        when(persistService.convertChainToResult(any(), any()))
+                .thenReturn(Arrays.asList(overflowResult, existingResult));
         when(persistService.convertExplain(eq(overflowTask), any(), eq(context))).thenReturn(buildExplain(overflowTask));
         when(persistService.convertExplain(eq(existingNextShiftTask), any(), eq(context))).thenReturn(buildExplain(existingNextShiftTask));
         when(scheduleResultMapper.insert(any(TmScheduleResult.class))).thenAnswer(invocation -> {
@@ -327,7 +331,7 @@ public class TmBizSnapshotAndPersistServiceTest {
         when(scheduleResultExplainMapper.insert(any(TmScheduleResultExplain.class))).thenReturn(1);
 
         new TmBizSnapshotAndPersistService(snapshotBuildService, persistService, scheduleResultMapper,
-                scheduleResultExplainMapper).snapshotAndPersist(context);
+                scheduleResultExplainMapper, scheduleUnplannedMapper).snapshotAndPersist(context);
 
         ArgumentCaptor<TmScheduleResult> resultCaptor = ArgumentCaptor.forClass(TmScheduleResult.class);
         verify(scheduleResultMapper, times(1)).insert(resultCaptor.capture());
@@ -359,6 +363,8 @@ public class TmBizSnapshotAndPersistServiceTest {
         context.setBatchNo("TM20260625143025123");
         context.setScheduleDate(java.sql.Date.valueOf(LocalDate.of(2026, 6, 25)));
         context.setTaskDraftList(Arrays.asList(tm001Task, tm002Task));
+        appendAssignedTask(context, tm001Task, "TM001", 1, new BigDecimal("2300"));
+        appendAssignedTask(context, tm002Task, "TM002", 1, new BigDecimal("3844"));
 
         TmScheduleResult tm001Result = buildResult(tm001Task);
         tm001Result.setFactoryCode(context.getFactoryCode());
@@ -375,8 +381,9 @@ public class TmBizSnapshotAndPersistServiceTest {
 
         when(snapshotBuildService.buildTaskExplain(eq(tm001Task), eq(context))).thenReturn(new TmSnapshotBuildResult());
         when(snapshotBuildService.buildTaskExplain(eq(tm002Task), eq(context))).thenReturn(new TmSnapshotBuildResult());
-        when(persistService.convertUnplanned(tm001Task, context)).thenReturn(tm001Result);
-        when(persistService.convertUnplanned(tm002Task, context)).thenReturn(tm002Result);
+        when(persistService.convertChainToResult(any(), any()))
+                .thenReturn(Collections.singletonList(tm001Result))
+                .thenReturn(Collections.singletonList(tm002Result));
         when(persistService.convertExplain(eq(tm001Task), any(), eq(context))).thenReturn(buildExplain(tm001Task));
         when(persistService.convertExplain(eq(tm002Task), any(), eq(context))).thenReturn(buildExplain(tm002Task));
         when(scheduleResultMapper.insert(any(TmScheduleResult.class))).thenAnswer(invocation -> {
@@ -387,7 +394,7 @@ public class TmBizSnapshotAndPersistServiceTest {
         when(scheduleResultExplainMapper.insert(any(TmScheduleResultExplain.class))).thenReturn(1);
 
         new TmBizSnapshotAndPersistService(snapshotBuildService, persistService, scheduleResultMapper,
-                scheduleResultExplainMapper).snapshotAndPersist(context);
+                scheduleResultExplainMapper, scheduleUnplannedMapper).snapshotAndPersist(context);
 
         ArgumentCaptor<TmScheduleResult> resultCaptor = ArgumentCaptor.forClass(TmScheduleResult.class);
         verify(scheduleResultMapper, times(2)).insert(resultCaptor.capture());
@@ -398,28 +405,97 @@ public class TmBizSnapshotAndPersistServiceTest {
         assertEquals(new BigDecimal("3844"), resultList.get(1).getClass1PlanQty());
     }
     /**
-     * 测试内容：验证解释表写入前找不到结果表主键时中断落库。
-     * 测试场景：结果表 insert 返回成功但未回填 id。
-     * 预期结果：抛出 ServiceException，避免写入 resultId 为空的解释记录。
+     * 测试内容：验证未排任务只写未排表，不写排程结果表。
+     * 测试场景：任务没有可用机台，快照中存在未排证据。
+     * 预期结果：未排表写入一条，结果表不写入，解释表保留未排任务且 resultId 为空。
      */
-    @Test(expected = ServiceException.class)
-    public void snapshotAndPersistShouldThrowWhenResultIdMissingBeforeExplainInsert() {
+    @Test
+    public void snapshotAndPersistShouldPersistUnplannedTaskWithoutScheduleResult() {
         TmTaskDraft task = buildTask();
         TmScheduleContext context = new TmScheduleContext();
+        context.setFactoryCode("116");
+        context.setBatchNo("TM20260625143025123");
+        context.setScheduleDate(java.sql.Date.valueOf(LocalDate.of(2026, 6, 25)));
         context.setTaskDraftList(Collections.singletonList(task));
         TmSnapshotBuildResult snapshot = new TmSnapshotBuildResult();
-        TmScheduleResult result = buildResult(task);
+        snapshot.setUnplannedEvidenceJson("{\"reason\":\"NO_MACHINE\"}");
         TmScheduleResultExplain explain = new TmScheduleResultExplain();
 
         when(snapshotBuildService.buildTaskExplain(task, context)).thenReturn(snapshot);
-        when(persistService.convertUnplanned(task, context)).thenReturn(result);
         when(persistService.convertExplain(task, snapshot, context)).thenReturn(explain);
-        when(scheduleResultMapper.insert(result)).thenReturn(1);
+        when(scheduleUnplannedMapper.insert(any(TmScheduleUnplanned.class))).thenAnswer(invocation -> {
+            TmScheduleUnplanned unplanned = invocation.getArgument(0);
+            unplanned.setId(801L);
+            return 1;
+        });
+        when(scheduleResultExplainMapper.insert(any(TmScheduleResultExplain.class))).thenReturn(1);
 
         new TmBizSnapshotAndPersistService(snapshotBuildService, persistService, scheduleResultMapper,
-                scheduleResultExplainMapper).snapshotAndPersist(context);
+                scheduleResultExplainMapper, scheduleUnplannedMapper).snapshotAndPersist(context);
+
+        verify(persistService, never()).convertUnplanned(any(), any());
+        verify(scheduleResultMapper, never()).insert(any(TmScheduleResult.class));
+        ArgumentCaptor<TmScheduleUnplanned> unplannedCaptor = ArgumentCaptor.forClass(TmScheduleUnplanned.class);
+        verify(scheduleUnplannedMapper).insert(unplannedCaptor.capture());
+        TmScheduleUnplanned unplanned = unplannedCaptor.getValue();
+        assertEquals("116", unplanned.getFactoryCode());
+        assertEquals("TM20260625143025123", unplanned.getBatchNo());
+        assertEquals(context.getScheduleDate(), unplanned.getScheduleDate());
+        assertEquals(task.getTreadCode(), unplanned.getTreadCode());
+        assertEquals(task.getGlueCode(), unplanned.getGlueCode());
+        assertEquals(task.getMouthPlateCode(), unplanned.getMouthPlateCode());
+        assertEquals(task.getUnplannedReasonCode(), unplanned.getUnplannedReasonCode());
+        assertEquals("{\"reason\":\"NO_MACHINE\"}", unplanned.getUnplannedEvidenceJson());
+
+        ArgumentCaptor<TmScheduleResultExplain> explainCaptor = ArgumentCaptor.forClass(TmScheduleResultExplain.class);
+        verify(scheduleResultExplainMapper).insert(explainCaptor.capture());
+        assertEquals(null, explainCaptor.getValue().getResultId());
+        assertEquals(0, context.getPersistResult().getResultCount());
+        assertEquals(1, context.getPersistResult().getUnplannedCount());
+        assertEquals(1, context.getPersistResult().getExplainCount());
     }
 
+    /**
+     * 测试内容：验证已排结果中计划量为 0 的班次不会保留顺序字段。
+     * 测试场景：任务已分配机台，但转换出的 1 班计划量为 0 且带有顺序。
+     * 预期结果：结果表插入前清空 1 班顺序和起止时间，避免看板展示空计划顺序。
+     */
+    @Test
+    public void snapshotAndPersistShouldClearSequenceWhenAssignedShiftPlanQtyIsZero() {
+        TmTaskDraft task = buildAssignedTask();
+        TmScheduleContext context = buildAssignedContext(task);
+        TmSnapshotBuildResult snapshot = new TmSnapshotBuildResult();
+        TmScheduleResult result = buildResult(task);
+        result.setFactoryCode("116");
+        result.setBatchNo("TM20260625143025123");
+        result.setScheduleDate(java.sql.Date.valueOf(LocalDate.of(2026, 6, 25)));
+        result.setMachineCode("TM-01");
+        result.setClass1PlanQty(BigDecimal.ZERO);
+        result.setClass1Sequence(1);
+        result.setClass1StartTime(new java.util.Date());
+        result.setClass1EndTime(new java.util.Date());
+        TmScheduleResultExplain explain = new TmScheduleResultExplain();
+
+        when(snapshotBuildService.buildTaskExplain(task, context)).thenReturn(snapshot);
+        when(persistService.convertChainToResult(any(), any())).thenReturn(Collections.singletonList(result));
+        when(persistService.convertExplain(task, snapshot, context)).thenReturn(explain);
+        when(scheduleResultMapper.insert(any(TmScheduleResult.class))).thenAnswer(invocation -> {
+            TmScheduleResult inserted = invocation.getArgument(0);
+            inserted.setId(901L);
+            return 1;
+        });
+        when(scheduleResultExplainMapper.insert(any(TmScheduleResultExplain.class))).thenReturn(1);
+
+        new TmBizSnapshotAndPersistService(snapshotBuildService, persistService, scheduleResultMapper,
+                scheduleResultExplainMapper, scheduleUnplannedMapper).snapshotAndPersist(context);
+
+        ArgumentCaptor<TmScheduleResult> resultCaptor = ArgumentCaptor.forClass(TmScheduleResult.class);
+        verify(scheduleResultMapper).insert(resultCaptor.capture());
+        TmScheduleResult insertedResult = resultCaptor.getValue();
+        assertEquals(null, insertedResult.getClass1Sequence());
+        assertEquals(null, insertedResult.getClass1StartTime());
+        assertEquals(null, insertedResult.getClass1EndTime());
+    }
     /**
      * 构造未排任务草稿。
      *
@@ -479,6 +555,29 @@ public class TmBizSnapshotAndPersistServiceTest {
     }
 
     /**
+     * 将任务追加到已分配任务链。
+     *
+     * @param context    排程上下文
+     * @param task       任务草稿
+     * @param machineCode 机台编码
+     * @param shiftOrder 班次顺序
+     * @param planQty    计划量
+     */
+    private void appendAssignedTask(TmScheduleContext context, TmTaskDraft task, String machineCode,
+                                    Integer shiftOrder, BigDecimal planQty) {
+        task.setUnplannedReasonCode(null);
+        task.setMachineCode(machineCode);
+        task.setShiftOrder(shiftOrder);
+        LocalDate scheduleDate = context.getScheduleDate() instanceof java.sql.Date
+                ? ((java.sql.Date) context.getScheduleDate()).toLocalDate()
+                : DateUtil.toLocalDateTime(context.getScheduleDate()).toLocalDate();
+        ScheduleTaskLinkedList<TmTaskDraft> chain = context.getTaskChainGroup().getOrCreate(machineCode, scheduleDate, shiftOrder);
+        int sequence = chain.toList().size() + 1;
+        chain.append(new ScheduleTaskNode<>(task.getBusinessKey(), task, machineCode, scheduleDate,
+                        "CLASS" + shiftOrder, sequence, planQty),
+                new ScheduleOperationContext("tester", "append", "TRACE-1"));
+    }
+    /**
      * 构造包含已分配任务链的排程上下文。
      *
      * @param task 已分配任务草稿
@@ -494,3 +593,4 @@ public class TmBizSnapshotAndPersistServiceTest {
         return context;
     }
 }
+

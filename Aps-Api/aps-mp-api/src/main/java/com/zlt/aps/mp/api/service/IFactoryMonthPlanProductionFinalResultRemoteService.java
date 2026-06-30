@@ -127,10 +127,17 @@ public interface IFactoryMonthPlanProductionFinalResultRemoteService {
     TableDataInfo listSkuScheduleItems(@RequestBody FactoryMonthPlanProductionFinalResultParam queryVO);
 
     /**
-     * 定时计算上月超欠产
+     * 定时计算上月超欠产（每月1号凌晨3点触发）
      */
     @ApiOperation("定时计算上月超欠产")
     @PostMapping("/factoryMonthPlanFinalResult/calcLastMonthOverProd")
     AjaxResult calcLastMonthOverProd();
+
+    /**
+     * 计算当月超欠产写入下月（月末倒数2天触发）
+     */
+    @ApiOperation("计算当月超欠产写入下月")
+    @PostMapping("/factoryMonthPlanFinalResult/calcCurrentMonthOverProdForNextMonth")
+    AjaxResult calcCurrentMonthOverProdForNextMonth();
 
 }

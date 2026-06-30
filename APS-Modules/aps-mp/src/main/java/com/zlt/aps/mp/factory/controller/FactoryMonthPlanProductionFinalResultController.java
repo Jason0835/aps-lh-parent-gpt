@@ -731,7 +731,7 @@ public class FactoryMonthPlanProductionFinalResultController extends AbstractDoc
     }
 
     /**
-     * 定时计算上月超欠产
+     * 定时计算上月超欠产（每月1号凌晨3点触发，cron: 0 0 3 1 * ?）
      * 根据上月计划排产量和上月硫化日完成量(合格品)计算超欠产，
      * 并按阈值参数(SYS0206009)判定上月超欠产有效标志：
      * |超欠产值|(绝对值) > 阈值 → 否('0')，否则 → 是('1')
@@ -740,5 +740,16 @@ public class FactoryMonthPlanProductionFinalResultController extends AbstractDoc
     @PostMapping("/calcLastMonthOverProd")
     public AjaxResult calcLastMonthOverProd() {
         return factoryMonthPlanProductionFinalResultService.calcLastMonthOverProd();
+    }
+
+    /**
+     * 计算当月超欠产写入下月（月末倒数2天触发）
+     * cron: 0 0 3 L-1 * ?（倒数第2天）、0 0 3 L * ?（最后一天）
+     * 用当月数据写入下月月计划的"上月超欠产"栏位
+     */
+    @ApiOperation("计算当月超欠产写入下月")
+    @PostMapping("/calcCurrentMonthOverProdForNextMonth")
+    public AjaxResult calcCurrentMonthOverProdForNextMonth() {
+        return factoryMonthPlanProductionFinalResultService.calcCurrentMonthOverProdForNextMonth();
     }
 }

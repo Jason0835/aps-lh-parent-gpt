@@ -1,6 +1,7 @@
 package com.zlt.aps.dj.service.impl;
 
 import java.math.BigDecimal;
+import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -27,9 +28,14 @@ import com.zlt.aps.dj.api.domain.entity.DjDispatcherLog;
 import com.zlt.aps.dj.api.domain.entity.DjMachineInfo;
 import com.zlt.aps.dj.api.domain.entity.DjScheduleResult;
 import com.zlt.aps.dj.api.domain.entity.DjSpecifyMachine;
+import com.zlt.aps.dj.api.domain.entity.DjStock;
+import com.zlt.aps.dj.engine.constant.DjEngineConstants;
+import com.zlt.aps.dj.engine.mapper.DjEngineConstructionInfoMapper;
+import com.zlt.aps.dj.engine.mapper.DjEngineStockMapper;
 import com.zlt.aps.dj.engine.model.CapacityValidateResult;
 import com.zlt.aps.dj.engine.model.ShiftContext;
 import com.zlt.aps.dj.engine.model.ShiftValidateResult;
+import com.zlt.aps.dj.engine.service.IDjOrderGeneratorService;
 import com.zlt.aps.dj.engine.service.IDjScheduleShiftEngineService;
 import com.zlt.aps.dj.mapper.DjDayFinishQtyMapper;
 import com.zlt.aps.dj.mapper.DjScheduleResultMapper;
@@ -39,6 +45,7 @@ import com.zlt.aps.dj.service.DjDispatcherLogService;
 import com.zlt.aps.dj.service.DjMachineInfoService;
 import com.zlt.aps.dj.service.DjScheduleResultService;
 import com.zlt.aps.dj.service.IDjScheduleAdjustService;
+import com.zlt.aps.mdm.api.domain.entity.MdmConstructionInfo;
 import com.zlt.aps.redissonLock.annotation.DistributedLock;
 import com.zlt.core.dao.basedao.BaseDao;
 
@@ -82,6 +89,15 @@ public class DjScheduleAdjustServiceImpl implements IDjScheduleAdjustService {
 
     @Resource
     private BaseDao baseDao;
+
+    @Resource
+    private DjEngineConstructionInfoMapper djEngineConstructionInfoMapper;
+
+    @Resource
+    private DjEngineStockMapper djEngineStockMapper;
+
+    @Resource
+    private IDjOrderGeneratorService iDjOrderGeneratorService;
 
     // ==================== 1. 公共数据预加载 ====================
 
@@ -175,23 +191,29 @@ public class DjScheduleAdjustServiceImpl implements IDjScheduleAdjustService {
             return AjaxResult.error(shiftResult.getErrorMsg());
         }
 
-        // 2.3 约束二校验 — 产能校验
+        // 2.3 约束二校验 — 产能校验（三档判断）
         BigDecimal insertPlanQty = getPlanQtyByClass(insertVO, targetClass);
         CapacityValidateResult capacityResult = iDjScheduleShiftEngineService.validateCapacity(machineCode, targetClass,
-                insertPlanQty, ctx.getScheduleResults());
-        if (!capacityResult.isPassed()) {
-            // 告知用户受影响的规格
-            String overflowSpecsStr = "";
-            if (CollectionUtils.isNotEmpty(capacityResult.getOverflowSpecs())) {
-                overflowSpecsStr = String.join(",", capacityResult.getOverflowSpecs());
-            }
-            // 前端弹窗用特殊标记返回，前端识别后弹窗让用户确认
-            log.info("插单产能溢出，受影响规格：{}", overflowSpecsStr);
-            return AjaxResult.error("CAPACITY_OVERFLOW:" + overflowSpecsStr);
+                targetSeq, insertPlanQty, ctx.getScheduleResults(), factoryCode, scheduleDate);
+
+        // 第一档：插单量 ≤ 剩余产能（定额 - 当班原有计划量），无产能问题直接执行插单
+        if (capacityResult.isWithinQuota()) {
+            return executeInsertInternal(insertVO, targetClass, targetSeq, ctx);
         }
 
-        // 2.4 执行插单
-        return executeInsertInternal(insertVO, targetClass, targetSeq, ctx);
+        // 第三档：插单量 > 实际剩余产能（定额 - 已生产量），超当班剩余产能，拒绝插单
+        if (!capacityResult.isPassed()) {
+            log.warn("插单量 {} 超出实际剩余产能 {}", insertPlanQty, capacityResult.getRemainingCapacity());
+            return AjaxResult.error(capacityResult.getErrorMsg());
+        }
+
+        // 第二档：插单量 > 剩余产能 但 ≤ 实际剩余产能，需提示用户确认
+        String overflowSpecsStr = "";
+        if (CollectionUtils.isNotEmpty(capacityResult.getOverflowSpecs())) {
+            overflowSpecsStr = String.join(",", capacityResult.getOverflowSpecs());
+        }
+        log.info("插单产能溢出，受影响规格：{}", overflowSpecsStr);
+        return AjaxResult.error("CAPACITY_OVERFLOW:" + overflowSpecsStr);
     }
 
     /**
@@ -233,19 +255,67 @@ public class DjScheduleAdjustServiceImpl implements IDjScheduleAdjustService {
         }
 
         // 2.4.1：生成工单号
-        String orderNo = generateOrderNo(factoryCode, scheduleDate);
+        // 批次号取当前排产日其余记录的值（同一排产日内所有记录批次号一致）
+        String batchNoFromExisting = "";
+        for (DjScheduleResult r : ctx.getScheduleResults()) {
+            if (StringUtils.isNotBlank(r.getBatchNo())) {
+                batchNoFromExisting = r.getBatchNo();
+                break;
+            }
+        }
+        // 计算当前最大工单流水号
+        int maxOrderSeq = 0;
+        for (DjScheduleResult r : ctx.getScheduleResults()) {
+            if (r.getOrderNo() != null && r.getOrderNo().endsWith("-")) {
+                String seqPart = r.getOrderNo().substring(r.getOrderNo().lastIndexOf("-") + 1);
+                try {
+                    int seq = Integer.parseInt(seqPart);
+                    if (seq > maxOrderSeq) {
+                        maxOrderSeq = seq;
+                    }
+                } catch (NumberFormatException ignored) {
+                }
+            }
+        }
+        String orderNo = iDjOrderGeneratorService.generateOrderNo(batchNoFromExisting, maxOrderSeq);
         insertVO.setOrderNo(orderNo);
-        insertVO.setBatchNo(orderNo.substring(0, orderNo.lastIndexOf("-")));
-        insertVO.setDataSource(ApsConstant.DISPATCHER_OPER_INSERT_ORDER); // "2"=插单
+        insertVO.setBatchNo(batchNoFromExisting);
+        insertVO.setDataSource(DjEngineConstants.DATA_SOURCE_INSERT); // "2"=插单
         insertVO.setReleaseStatus(ApsConstant.NO_RELEASE);
         insertVO.setPublishSuccessCount(0);
         insertVO.setFactoryCode(factoryCode);
         insertVO.setScheduleDate(scheduleDate);
 
+        // 加载施工表数据，填充胶料等字段
+        MdmConstructionInfo construction = loadConstructionByPadding(factoryCode, insertVO.getPaddingCode());
+        if (construction != null) {
+            if (StringUtils.isBlank(insertVO.getPaddingName())) {
+                insertVO.setPaddingName(construction.getPaddingName());
+            }
+            if (StringUtils.isBlank(insertVO.getGlueCode())) {
+                insertVO.setGlueCode(construction.getPaddingRubber());
+            }
+        }
+
+        // 加载 T-1 日库存数据
+        BigDecimal stockQty = loadPaddingStock(factoryCode, scheduleDate, insertVO.getPaddingCode());
+        insertVO.setStockQty(BigDecimalUtils.valueOf(stockQty));
+
+        // 开产班次取当前排产日其余记录的值（同一批数据值都一样）
+        for (DjScheduleResult r : ctx.getScheduleResults()) {
+            if (StringUtils.isNotBlank(r.getScheduleShiftClass())) {
+                insertVO.setScheduleShiftClass(r.getScheduleShiftClass());
+                break;
+            }
+        }
+
+        // 收尾标记默认 0（否）
+        insertVO.setTailFlag("0");
+
         // 确保只有目标班次有计划量
-        for (int c = 1; c <= 6; c++) {
+        for (int c = 1; c <= DjEngineConstants.SHIFT_COUNT; c++) {
             if (c == targetClass) {
-                setPlanQtyByClass(insertVO, c, insertVO.getClass1PlanQty()); // 需从insertVO提取实际值
+                setPlanQtyByClass(insertVO, c, getPlanQtyByClass(insertVO, c)); // 需从insertVO提取实际值
                 setSeqByClass(insertVO, c, targetSeq);
             } else {
                 setPlanQtyByClass(insertVO, c, null);
@@ -303,10 +373,13 @@ public class DjScheduleAdjustServiceImpl implements IDjScheduleAdjustService {
             return lockedCheck;
         }
 
-        // 查询原始记录
-        DjScheduleResult original = djScheduleResultMapper.selectById(adjustVO.getId());
+        // 从已加载的排程结果中获取原始记录（确保与 ctx.getScheduleResults() 中为同一对象引用，
+        // 避免后续 processInsertAndCascade 使用不同的实例导致数据不一致）
+        DjScheduleResult original = ctx.getScheduleResults().stream()
+                .filter(r -> r.getId().equals(adjustVO.getId()))
+                .findFirst().orElse(null);
         if (original == null) {
-            log.info("调量记录未找到，id={}", adjustVO.getId());
+            log.info("调量记录未找到（不在当前排程结果中），id={}", adjustVO.getId());
             return AjaxResult.error(I18nUtil.getMessage("ui.message.data.not.found"));
         }
 
@@ -360,16 +433,24 @@ public class DjScheduleAdjustServiceImpl implements IDjScheduleAdjustService {
 
         // 记录原因分析
         String analysis = iDjScheduleShiftEngineService.getAnalysisByIndex(original, targetClass);
-        String record = String.format(I18nUtil.getMessage("ui.data.column.scheduleResult.analysis.adjust.increase"),
+        String record = MessageFormat.format(I18nUtil.getMessage("ui.data.column.scheduleResult.analysis.adjust.increase"),
                 original.getPaddingName(), deltaQty);
         iDjScheduleShiftEngineService.setAnalysisByIndex(original, targetClass,
                 StringUtils.isNotBlank(analysis) ? analysis + record : record);
 
-        // 产能校验
+        // 产能校验（三档判断）
+        int originSeq = iDjScheduleShiftEngineService.getSequenceByIndex(original, targetClass);
         CapacityValidateResult capResult = iDjScheduleShiftEngineService.validateCapacity(machineCode, targetClass,
-                deltaQty, ctx.getScheduleResults());
-        if (!capResult.isPassed()) {
-            // 触发顺延
+                originSeq, deltaQty, ctx.getScheduleResults(), ctx.getFactoryCode(), ctx.getScheduleDate());
+        List<DjScheduleResult> updateList = new ArrayList<>();
+        if (capResult.isWithinQuota()) {
+            // 第一档：增量在定额内，直接保存
+            updateReleaseStatusAfterAdjust(original);
+            updateList.add(original);
+        } else if (capResult.isPassed()) {
+            // 第二档：增量超出定额但在实际剩余产能内，触发顺延
+            // processInsertAndCascade 会处理 ctx.getScheduleResults() 中所有相关实体（含 original 对应的记录），
+            // 因此不要重复添加 separate instance 的 original，避免同名记录被更新两次
             ShiftContext shiftCtx = new ShiftContext().setFactoryCode(ctx.getFactoryCode())
                     .setScheduleDate(ctx.getScheduleDate()).setMachineCode(machineCode)
                     .setTargetClass(targetClass)
@@ -377,16 +458,12 @@ public class DjScheduleAdjustServiceImpl implements IDjScheduleAdjustService {
                     .setInsertSpecName(original.getPaddingName()).setInsertPlanQty(newTotal)
                     .setScheduleResults(ctx.getScheduleResults()).setOperType("adjust");
             List<DjScheduleResult> updated = iDjScheduleShiftEngineService.processInsertAndCascade(shiftCtx);
-            for (DjScheduleResult r : updated) {
-                if (r.getId() != null) {
-                    djScheduleResultMapper.updateById(r);
-                }
-            }
+            updateList.addAll(updated);
         } else {
-            // 未超出产能，直接保存
-            updateReleaseStatusAfterAdjust(original);
-            djScheduleResultMapper.updateById(original);
+            // 第三档：增量超出实际剩余产能，拒绝调整
+            return AjaxResult.error(capResult.getErrorMsg());
         }
+        baseDao.saveBatch(updateList);
 
         this.recordDispatcherLog(ApsConstant.DISPATCHER_OPER_PLAN, original, ctx.getScheduleResults(), original);
         return AjaxResult.success(I18nUtil.getMessage("ui.message.operation.success"));
@@ -402,7 +479,7 @@ public class DjScheduleAdjustServiceImpl implements IDjScheduleAdjustService {
         if (finishQty != null && newPlanQty.compareTo(finishQty) < 0) {
             log.info("减量不能低于已生产量，orderNo={}, 已生产={}, 目标={}", original.getOrderNo(), finishQty, newPlanQty);
             return AjaxResult.error(
-                    String.format(I18nUtil.getMessage("ui.data.column.scheduleResult.reduce.not.less.than.finish"),
+                    MessageFormat.format(I18nUtil.getMessage("ui.data.column.scheduleResult.reduce.not.less.than.finish"),
                             finishQty.toString()));
         }
 
@@ -676,22 +753,22 @@ public class DjScheduleAdjustServiceImpl implements IDjScheduleAdjustService {
                     successCount++;
                 } else {
                     failCount++;
-                    errorMsgs.add(String.format(I18nUtil.getMessage("ui.message.import.row.error"), (i + 1),
+                    errorMsgs.add(MessageFormat.format(I18nUtil.getMessage("ui.message.import.row.error"), (i + 1),
                             AjaxResultUtils.getMsg(result)));
                 }
             } catch (Exception e) {
                 failCount++;
                 errorMsgs.add(
-                        String.format(I18nUtil.getMessage("ui.message.import.row.error"), (i + 1), e.getMessage()));
+                        MessageFormat.format(I18nUtil.getMessage("ui.message.import.row.error"), (i + 1), e.getMessage()));
             }
         }
 
         if (failCount > 0) {
             return AjaxResult.error(
-                    String.format(I18nUtil.getMessage("ui.message.import.result"), successCount, failCount), errorMsgs);
+                    MessageFormat.format(I18nUtil.getMessage("ui.message.import.result"), successCount, failCount), errorMsgs);
         }
         return AjaxResult
-                .success(String.format(I18nUtil.getMessage("ui.message.import.result"), successCount, failCount));
+                .success(MessageFormat.format(I18nUtil.getMessage("ui.message.import.result"), successCount, failCount));
     }
 
     // ==================== 内部工具方法 ====================
@@ -705,30 +782,7 @@ public class DjScheduleAdjustServiceImpl implements IDjScheduleAdjustService {
         }
     }
 
-    /**
-     * 生成工单号 格式：DJ + 排产日期(YYYYMMDD) + "-" + 工厂代码 + "-" + 4位自增序号
-     */
-    private String generateOrderNo(String factoryCode, Date scheduleDate) {
-        String dateStr = DateUtil.format(scheduleDate, DatePattern.PURE_DATE_FORMAT);
-        // 查询当前排产日已使用的最大序号
-        List<DjScheduleResult> todayResults = djScheduleResultMapper
-                .selectList(new LambdaQueryWrapper<DjScheduleResult>().eq(DjScheduleResult::getFactoryCode, factoryCode)
-                        .eq(DjScheduleResult::getScheduleDate, scheduleDate));
-        int maxSeq = 0;
-        for (DjScheduleResult r : todayResults) {
-            if (r.getOrderNo() != null && r.getOrderNo().endsWith("-")) {
-                String seqPart = r.getOrderNo().substring(r.getOrderNo().lastIndexOf("-") + 1);
-                try {
-                    int seq = Integer.parseInt(seqPart);
-                    if (seq > maxSeq) {
-                        maxSeq = seq;
-                    }
-                } catch (NumberFormatException ignored) {
-                }
-            }
-        }
-        return "DJ" + dateStr + "-" + factoryCode + "-" + String.format("%04d", maxSeq + 1);
-    }
+
 
     /**
      * 记录操作日志到 T_DJ_DISPATCHER_LOG
@@ -751,7 +805,7 @@ public class DjScheduleAdjustServiceImpl implements IDjScheduleAdjustService {
      * 获取目标班次索引（从插入对象中解析）
      */
     private int resolveTargetClass(DjScheduleResult vo) {
-        for (int c = 1; c <= 6; c++) {
+        for (int c = 1; c <= DjEngineConstants.SHIFT_COUNT; c++) {
             BigDecimal planQty = getPlanQtyByClass(vo, c);
             if (planQty != null && planQty.compareTo(BigDecimal.ZERO) > 0) {
                 return c;
@@ -769,22 +823,75 @@ public class DjScheduleAdjustServiceImpl implements IDjScheduleAdjustService {
     }
 
     /**
+     * 根据垫胶编码查询施工信息
+     * <p>
+     * 从 T_MDM_CONSTRUCTION_INFO 表中查询对应垫胶编码的施工数据，
+     * 用于填充插单记录的胶料代码、物料名称等字段。
+     * </p>
+     *
+     * @param factoryCode 工厂编码
+     * @param paddingCode 垫胶编码
+     * @return 施工信息，未查到返回 null
+     */
+    private MdmConstructionInfo loadConstructionByPadding(String factoryCode, String paddingCode) {
+        if (StringUtils.isBlank(paddingCode)) {
+            return null;
+        }
+        List<MdmConstructionInfo> list = djEngineConstructionInfoMapper.selectList(
+                new LambdaQueryWrapper<MdmConstructionInfo>()
+                        .eq(MdmConstructionInfo::getFactoryCode, factoryCode)
+                        .eq(MdmConstructionInfo::getPaddingCode, paddingCode)
+                        .last("LIMIT 1"));
+        return CollectionUtils.isNotEmpty(list) ? list.get(0) : null;
+    }
+
+    /**
+     * 加载垫胶 T-1 日库存
+     * <p>
+     * 从 T_DJ_STOCK 表中查询对应垫胶编码在排产日前一天的库存量，
+     * 有效库存 = 库存量 + 修正数量 - 不良数量。
+     * </p>
+     *
+     * @param factoryCode  工厂编码
+     * @param scheduleDate 排产日期
+     * @param paddingCode  垫胶编码
+     * @return 有效库存量，查不到返回 null
+     */
+    private BigDecimal loadPaddingStock(String factoryCode, Date scheduleDate, String paddingCode) {
+        if (StringUtils.isBlank(paddingCode)) {
+            return null;
+        }
+        List<DjStock> stockList = djEngineStockMapper.selectList(new LambdaQueryWrapper<DjStock>()
+                .eq(DjStock::getFactoryCode, factoryCode)
+                .eq(DjStock::getStockDate, DateUtil.offsetDay(scheduleDate, -1))
+                .eq(DjStock::getMaterialCode, paddingCode)
+                .last("LIMIT 1"));
+        if (CollectionUtils.isEmpty(stockList)) {
+            return null;
+        }
+        DjStock stock = stockList.get(0);
+        return BigDecimalUtils.valueOf(stock.getStockNum())
+                .add(BigDecimalUtils.valueOf(stock.getModifyNum()))
+                .subtract(BigDecimalUtils.valueOf(stock.getBadNum()));
+    }
+
+    /**
      * 入参校验
      */
     private AjaxResult validateInsertParams(DjScheduleResult vo, DjAdjustScheduleContext ctx) {
         if (vo.getScheduleDate() == null) {
             return AjaxResult
-                    .error(String.format(I18nUtil.getMessage("ui.message.parameter.required"), "scheduleDate"));
+                    .error(MessageFormat.format(I18nUtil.getMessage("ui.message.parameter.required"), "scheduleDate"));
         }
         if (StringUtils.isBlank(vo.getMachineCode())) {
-            return AjaxResult.error(String.format(I18nUtil.getMessage("ui.message.parameter.required"), "machineCode"));
+            return AjaxResult.error(MessageFormat.format(I18nUtil.getMessage("ui.message.parameter.required"), "machineCode"));
         }
         if (StringUtils.isBlank(vo.getPaddingCode())) {
-            return AjaxResult.error(String.format(I18nUtil.getMessage("ui.message.parameter.required"), "paddingCode"));
+            return AjaxResult.error(MessageFormat.format(I18nUtil.getMessage("ui.message.parameter.required"), "paddingCode"));
         }
         // 校验至少一个班次有计划量
         boolean hasPlanQty = false;
-        for (int c = 1; c <= 6; c++) {
+        for (int c = 1; c <= DjEngineConstants.SHIFT_COUNT; c++) {
             BigDecimal qty = getPlanQtyByClass(vo, c);
             if (qty != null && qty.compareTo(BigDecimal.ZERO) > 0) {
                 hasPlanQty = true;
@@ -793,7 +900,7 @@ public class DjScheduleAdjustServiceImpl implements IDjScheduleAdjustService {
         }
         if (!hasPlanQty) {
             log.info("入参校验失败：未设置任何班次计划量");
-            return AjaxResult.error(String.format(I18nUtil.getMessage("ui.message.parameter.required"), "planQty"));
+            return AjaxResult.error(MessageFormat.format(I18nUtil.getMessage("ui.message.parameter.required"), "planQty"));
         }
         return null;
     }
@@ -845,7 +952,7 @@ public class DjScheduleAdjustServiceImpl implements IDjScheduleAdjustService {
      * 合并导入数据到已有记录
      */
     private void mergeClassData(DjScheduleResult target, DjScheduleResult source) {
-        for (int c = 1; c <= 6; c++) {
+        for (int c = 1; c <= DjEngineConstants.SHIFT_COUNT; c++) {
             BigDecimal srcPlanQty = getPlanQtyByClass(source, c);
             if (srcPlanQty != null) {
                 setPlanQtyByClass(target, c, srcPlanQty);

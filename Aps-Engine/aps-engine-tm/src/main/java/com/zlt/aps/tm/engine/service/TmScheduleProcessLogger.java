@@ -59,8 +59,11 @@ public class TmScheduleProcessLogger implements IScheduleProcessLogger<TmSchedul
      * @param context 胎面排程上下文
      */
     public void logUnplanned(TmTaskDraft task, TmRuleTrace trace, TmScheduleContext context) {
-        log.warn("[TM_SCHEDULE_UNPLANNED] batchNo={}, traceId={}, treadCode={}, reasonCode={}, evidence={}",
+        log.warn("[TM_SCHEDULE_UNPLANNED] batchNo={}, traceId={}, treadCode={}, glueCode={}, baseGlueCode={}, mouthPlateCode={}, reasonCode={}, evidence={}",
                 batchNo(context), traceId(context), task == null ? null : task.getTreadCode(),
+                task == null ? null : task.getGlueCode(),
+                task == null ? null : task.getBaseGlueCode(),
+                task == null ? null : task.getMouthPlateCode(),
                 task == null ? null : task.getUnplannedReasonCode(), trace == null ? null : trace.toExplainJson());
     }
 

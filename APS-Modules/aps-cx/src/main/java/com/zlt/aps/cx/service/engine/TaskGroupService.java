@@ -201,17 +201,13 @@ public class TaskGroupService {
         TaskGroupResult result = new TaskGroupResult();
 
         List<LhScheduleResult> lhScheduleResults = context.getLhScheduleResults();
-        if (lhScheduleResults == null || lhScheduleResults.isEmpty()) {
-            log.warn("硫化排程结果为空，无法分组任务");
-            return result;
-        }
         log.info("【任务分组】收到 {} 条硫化记录", lhScheduleResults.size());
 
         // 构建基础映射
         Map<String, MdmMaterialInfo> materialMap = buildMaterialMap(context);
         Map<String, CxStock> stockMap = buildStockMap(context);
 
-        // 一次性加载所有阈值配置（避免循环中重复打印日志）
+        // 一次性加载所有参数配置
         int endingDiscardThreshold = getEndingDiscardThreshold(context);
         int endingUrgentFormingRemainder = getEndingUrgentFormingRemainder(context);
         int endingDaysThreshold = getEndingDaysThreshold(context);
@@ -639,6 +635,9 @@ public class TaskGroupService {
                     log.info("暂存待第二轮分配: 胎胚={}, 物料={}, 原因=零净需求, 剩余需求={}, 收尾余量={}",
                             embryoCode, materialCode,
                             deferredQty, task.getEndingSurplusQty());
+                    // 记录硫化消耗，供R2预处理/R2退出/R3动态stockHours使用
+                    int deferredVulcConsumption = getShiftPlanQty(lhResult, dayShifts);
+                    taskVulcConsumptionMap.put(lhResult.getId(), deferredVulcConsumption);
                     deferredTasks.add(task);
                     continue;
                 }
@@ -1180,12 +1179,26 @@ public class TaskGroupService {
                         structGlobalRound++;
                         int currentRound = structGlobalRound;
 
-                        // 找 stockHours 最小的任务
+                        // 找动态可供硫化时长最小的任务（与预处理/6h退出公式一致：分配库存 + 已排产量 - 硫化消耗）
                         CoreScheduleAlgorithmService.DailyEmbryoTask minTask = null;
                         BigDecimal minStockHours = null;
                         for (CoreScheduleAlgorithmService.DailyEmbryoTask dt : structTasks) {
-                            BigDecimal sh = dt.getStockHours();
-                            if (sh == null) sh = BigDecimal.ZERO;
+                            BigDecimal sh = BigDecimal.ZERO;
+                            Integer dtLhCap = getDailyLhCapacityForMaterial(dt.getMaterialCode(), context);
+                            dtLhCap = dtLhCap != null && dtLhCap > 0 ? dtLhCap / 2 : null;
+                            Integer dtMoldQty = dt.getVulcanizeMoldCount();
+                            if (dtMoldQty != null && dtMoldQty > 0 && dtLhCap != null && dtLhCap > 0) {
+                                int dtAllocatedStock = getCurrentStock(context, dt.getLhId());
+                                int dtProduction = dt.getPlannedProduction() != null ? dt.getPlannedProduction() : 0;
+                                int dtVulcCons = taskVulcConsumptionMap.getOrDefault(dt.getLhId(), 0);
+                                int dtProjectedStock = dtAllocatedStock + dtProduction - dtVulcCons;
+                                BigDecimal dtSingleTireMoldSeconds = BigDecimal.valueOf(SECONDS_PER_DAY)
+                                        .divide(BigDecimal.valueOf(dtLhCap), 2, BigDecimal.ROUND_HALF_UP);
+                                sh = BigDecimal.valueOf(dtProjectedStock)
+                                        .multiply(dtSingleTireMoldSeconds)
+                                        .divide(BigDecimal.valueOf(dtMoldQty), 2, BigDecimal.ROUND_HALF_UP)
+                                        .divide(BigDecimal.valueOf(SECONDS_PER_HOUR), 2, BigDecimal.ROUND_HALF_UP);
+                            }
                             if (minStockHours == null || sh.compareTo(minStockHours) < 0) {
                                 minStockHours = sh;
                                 minTask = dt;
@@ -3354,10 +3367,18 @@ public class TaskGroupService {
             return Collections.emptyList();
         }
         int dayOfMonth = scheduleDate.getDayOfMonth();
+        int dateYear = scheduleDate.getYear();
+        int dateMonth = scheduleDate.getMonthValue();
         return configs.stream()
                 .filter(c -> c.getBeginDay() != null && c.getEndDay() != null
                         && c.getBeginDay() <= dayOfMonth && c.getEndDay() >= dayOfMonth)
-                .collect(Collectors.toList());
+                // 年月匹配：确保取到排程日期所在月份的配置
+                .filter(c -> c.getYear() != null && c.getYear() == dateYear
+                        && c.getMonth() != null && c.getMonth() == dateMonth)
+                // 按机台编码去重（同一机台可能有多条配置记录）
+                .collect(Collectors.collectingAndThen(
+                        Collectors.toMap(MpCxCapacityConfiguration::getCxMachineCode, c -> c, (a, b) -> a, LinkedHashMap::new),
+                        m -> new ArrayList<>(m.values())));
     }
 
     /**
@@ -3386,11 +3407,30 @@ public class TaskGroupService {
             LocalDate scheduleDate,
             Map<String, BigDecimal> structureAdvanceAvailableCapacityMap) {
 
-        // 1. 从未来配置取候选机台
+        // 1. 从未来配置取候选机台（按实际排程日期过滤）
         Map<String, List<MpCxCapacityConfiguration>> futureMap = context.getFutureStructureAllocationMap();
         if (futureMap == null || futureMap.isEmpty()) return Collections.emptyList();
-        List<MpCxCapacityConfiguration> futureConfigs = futureMap.get(structureName);
-        if (futureConfigs == null || futureConfigs.isEmpty()) return Collections.emptyList();
+        List<MpCxCapacityConfiguration> allFutureConfigs = futureMap.get(structureName);
+        if (allFutureConfigs == null || allFutureConfigs.isEmpty()) return Collections.emptyList();
+
+        // 按实际排程日期过滤未来机台：
+        // - 同月：BEGIN_DAY > 当天
+        // - 未来月：全部包含
+        int dayOfMonth = scheduleDate.getDayOfMonth();
+        int dateYearMonth = scheduleDate.getYear() * 100 + scheduleDate.getMonthValue();
+        List<MpCxCapacityConfiguration> futureConfigs = allFutureConfigs.stream()
+                .filter(c -> {
+                    if (c.getBeginDay() == null || c.getYear() == null || c.getMonth() == null) {
+                        return false;
+                    }
+                    int configYearMonth = c.getYear() * 100 + c.getMonth();
+                    if (configYearMonth == dateYearMonth) {
+                        return c.getBeginDay() > dayOfMonth;
+                    }
+                    return configYearMonth > dateYearMonth;
+                })
+                .collect(Collectors.toList());
+        if (futureConfigs.isEmpty()) return Collections.emptyList();
 
         // 2. 获取未来结构任意任务的物料英寸
         String advanceProSize = null;

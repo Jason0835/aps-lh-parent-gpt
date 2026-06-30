@@ -90,8 +90,7 @@
         "treadCode": "TR-S2",
         "machineCode": "TM01",
         "shiftOrder": 1,
-        "sequence": 1,
-        "planQty": 0
+"planQty": 0
       }
     ]
   },

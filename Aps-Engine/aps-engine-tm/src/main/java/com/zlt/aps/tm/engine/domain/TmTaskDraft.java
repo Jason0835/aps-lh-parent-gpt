@@ -94,6 +94,17 @@ public class TmTaskDraft {
     /** 工装限制调整量，单位米 */
     private BigDecimal toolLimitAdjustQty;
 
+    /** 工装限制压掉的待顺延量，单位米 */
+    private BigDecimal toolOverflowQty;
+
+    /** 当前任务计算前全局可用工装数量 */
+    private BigDecimal availableToolQty;
+
+    /** 当前任务占用的工装数量 */
+    private BigDecimal toolUsedQty;
+
+    /** 当前任务计算后全局剩余工装数量 */
+    private BigDecimal remainingToolQty;
     /** 最小起排调整量，单位米 */
     private BigDecimal minStartAdjustQty;
 

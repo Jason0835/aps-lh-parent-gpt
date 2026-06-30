@@ -328,4 +328,26 @@ CREATE TABLE `t_dj_depth_config` (
   INDEX `IDX_DJ_DEPTH_CONFIG_MACHINE_QTY`(`machine_qty` ASC) USING BTREE
 ) ENGINE = InnoDB AUTO_INCREMENT = 1 CHARACTER SET = utf8mb3 COLLATE = utf8mb3_general_ci COMMENT = '垫胶备库班数与供成型机数配置表' ROW_FORMAT = DYNAMIC;
 
+-- ----------------------------
+-- Table structure for t_dj_day_finish_qty
+-- ----------------------------
+DROP TABLE IF EXISTS `t_dj_day_finish_qty`;
+CREATE TABLE `t_dj_day_finish_qty` (
+  `ID`              BIGINT       NOT NULL COMMENT '主键ID',
+  `FACTORY_CODE`    VARCHAR(50)  NOT NULL DEFAULT '' COMMENT '工厂编码',
+  `SCHEDULE_DATE`   DATE         NOT NULL COMMENT '排程日期',
+  `PADDING_CODE`    VARCHAR(100) NOT NULL DEFAULT '' COMMENT '垫胶代码',
+  `NIGHT_FINISH_QTY` DECIMAL(18,2) DEFAULT 0.00 COMMENT '夜班完成量',
+  `DAY_FINISH_QTY`  DECIMAL(18,2) DEFAULT 0.00 COMMENT '早班完成量',
+  `MID_FINISH_QTY`  DECIMAL(18,2) DEFAULT 0.00 COMMENT '中班完成量',
+  `ORDER_NO`        VARCHAR(100) NOT NULL DEFAULT '' COMMENT '工单号',
+  `CREATE_BY`       VARCHAR(64)  DEFAULT '' COMMENT '创建者',
+  `CREATE_TIME`     DATETIME     DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `UPDATE_BY`       VARCHAR(64)  DEFAULT '' COMMENT '更新者',
+  `UPDATE_TIME`     DATETIME     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `IS_DELETE`       CHAR(1)      DEFAULT '0' COMMENT '删除标记（0=正常，1=删除）',
+  `REMARK`          VARCHAR(500) DEFAULT NULL COMMENT '备注',
+  PRIMARY KEY (`ID`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3 COMMENT='垫胶排程计划每日各班完成量';
+
 SET FOREIGN_KEY_CHECKS = 1;

@@ -22,6 +22,9 @@ public class TmPlanQtyResult {
     /** 工装限制调整量 */
     private BigDecimal toolLimitAdjustQty;
 
+    /** 工装限制压掉的待顺延量 */
+    private BigDecimal toolOverflowQty;
+
     /** 最小起排量调整量 */
     private BigDecimal minStartAdjustQty;
 

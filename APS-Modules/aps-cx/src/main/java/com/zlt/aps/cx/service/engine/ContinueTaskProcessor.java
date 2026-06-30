@@ -42,24 +42,14 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class ContinueTaskProcessor {
 
-    private final BalancingService balancingService;
     private final ProductionCalculator productionCalculator;
     private final ScheduleDayTypeHelper scheduleDayTypeHelper;
-
-    /** 胎胚库容上限比例 */
-    private static final double EMBRYO_STORAGE_RATIO = 0.9;
-
-    /** 默认整车容量（条/车） */
-    private static final int DEFAULT_TRIP_CAPACITY = 12;
 
     /** 默认最大硫化机台数 */
     private static final int DEFAULT_MAX_LH_MACHINE_COUNT = 10;
 
     /** 默认日产能（条/天），机台未配置时使用 */
     private static final int DEFAULT_DAILY_CAPACITY = 1200;
-
-    /** 默认机台小时产能（条/小时） */
-    private static final int DEFAULT_HOURLY_CAPACITY = 50;
 
     /** 参数编码：强制保留历史任务 */
     private static final String PARAM_FORCE_KEEP_HISTORY = "SYS04070003";
@@ -263,38 +253,24 @@ public class ContinueTaskProcessor {
     private List<MpCxCapacityConfiguration> getAvailableMachinesForStructure(
             String structureName, LocalDate scheduleDate, ScheduleContextVo context,
             String productionVersion) {
-        // 跨月判断：排程日期年月 ≠ 当月配置年月时，使用 futureStructureAllocationMap（含次月配置）
-        int dateYearMonth = scheduleDate.getYear() * 100 + scheduleDate.getMonthValue();
-        Integer baseYearMonth = context.getStructureAllocationYearMonth();
-        boolean crossMonth = baseYearMonth != null && baseYearMonth != dateYearMonth;
-
-        if (crossMonth) {
-            // 跨月场景：从 futureStructureAllocationMap 取（次月数据已按次月版本过滤，不再重复过滤版本）
-            if (context.getFutureStructureAllocationMap() != null) {
-                List<MpCxCapacityConfiguration> configs =
-                        context.getFutureStructureAllocationMap().get(structureName);
-                if (configs != null && !configs.isEmpty()) {
-                    int day = scheduleDate.getDayOfMonth();
-                    List<MpCxCapacityConfiguration> result = configs.stream()
-                            .filter(c -> c.getBeginDay() != null && c.getEndDay() != null)
-                            .filter(c -> c.getBeginDay() <= day && c.getEndDay() >= day)
-                            .collect(Collectors.toList());
-                    if (!result.isEmpty()) {
-                        return result;
-                    }
-                }
-            }
-        } else if (context.getStructureAllocationMap() != null) {
-            List<MpCxCapacityConfiguration> configs = context.getStructureAllocationMap().get(structureName);
+        // 从 structureAllocationMap 取当日可用机台（跨月时两个月配置均在此Map，靠年月过滤选择）
+        if (context.getStructureAllocationMap() != null) {
+            List<MpCxCapacityConfiguration> configs =
+                    context.getStructureAllocationMap().get(structureName);
             if (configs != null && !configs.isEmpty()) {
                 int day = scheduleDate.getDayOfMonth();
-                // 过滤日期范围 + PRODUCTION_VERSION
+                int dateYear = scheduleDate.getYear();
+                int dateMonth = scheduleDate.getMonthValue();
+                // 过滤日期范围 + 年月匹配（各月配置已按各自排产版本过滤，不再重复过滤版本）
                 List<MpCxCapacityConfiguration> result = configs.stream()
                         .filter(c -> c.getBeginDay() != null && c.getEndDay() != null)
                         .filter(c -> c.getBeginDay() <= day && c.getEndDay() >= day)
-                        .filter(c -> productionVersion == null
-                                || productionVersion.equals(c.getProductionVersion()))
-                        .collect(Collectors.toList());
+                        .filter(c -> c.getYear() != null && c.getYear() == dateYear
+                                && c.getMonth() != null && c.getMonth() == dateMonth)
+                        // 按机台编码去重（同一机台可能有多条配置记录）
+                        .collect(Collectors.collectingAndThen(
+                                Collectors.toMap(MpCxCapacityConfiguration::getCxMachineCode, c -> c, (a, b) -> a, LinkedHashMap::new),
+                                m -> new ArrayList<>(m.values())));
                 if (!result.isEmpty()) {
                     return result;
                 }

@@ -52,6 +52,11 @@ public class MpStructureAllocationExportVo extends MpStructureAllocation {
      * 高优先级净需求
      */
     private Integer heightQty;
+    
+    /**
+     * 是否仅上月定稿的记录
+     */
+    private Boolean isOnlyLast = false;
 
     /**
      * 实际排产
@@ -255,4 +260,59 @@ public class MpStructureAllocationExportVo extends MpStructureAllocation {
      */
     @Excel(name = "ui.data.column.facMonthPlanProdResult.day31", cellType = Excel.ColumnType.NUMERIC)
     private Integer day31;
+    
+    /**
+     * 上月21日
+     */
+    private Integer lastDay21;
+
+    /**
+     * 上月22日
+     */
+    private Integer lastDay22;
+
+    /**
+     * 上月23日
+     */
+    private Integer lastDay23;
+
+    /**
+     * 上月24日
+     */
+    private Integer lastDay24;
+
+    /**
+     * 上月25日
+     */
+    private Integer lastDay25;
+
+    /**
+     * 上月26日
+     */
+    private Integer lastDay26;
+
+    /**
+     * 上月27日
+     */
+    private Integer lastDay27;
+
+    /**
+     * 上月28日
+     */
+    private Integer lastDay28;
+
+    /**
+     * 上月29日
+     */
+    private Integer lastDay29;
+
+    /**
+     * 上月30日
+     */
+    private Integer lastDay30;
+
+    /**
+     * 上月31日
+     */
+    private Integer lastDay31;
 }

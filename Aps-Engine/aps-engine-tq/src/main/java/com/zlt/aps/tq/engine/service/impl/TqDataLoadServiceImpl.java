@@ -172,29 +172,37 @@ public class TqDataLoadServiceImpl implements ITqDataLoadService {
                         com.zlt.aps.tq.engine.vo.TqParamsVo::getParamValue));
 
         TqScheduleParams params = new TqScheduleParams();
-        params.setProductionStage(paramsMap.get(EngineConstants.PRODUCTION_STAGE_PRODUCE));
-        params.setLossRate(getDouble(paramsMap.get(EngineConstants.LOSS_RATE)));
-        params.setMergeThreshold(getDouble(paramsMap.get(EngineConstants.MERGE_PLAN_THRESHOLD)));
-        params.setCloseOutNum(getDouble(paramsMap.get(EngineConstants.CLOSE_OUT_NUM)));
-        params.setToolCapacity(getDouble(paramsMap.getOrDefault(EngineConstants.TOOL_CAPACITY, DEFAULT_TOOL_CAPACITY)));
+        // 胎圈排程专用参数（SYS0301XXX 系列）
+        params.setBackupShiftCount(getDouble(paramsMap.getOrDefault(EngineConstants.TQ_BACKUP_SHIFT_COUNT, "1")));
+        params.setDemandCoefficient(getDouble(paramsMap.getOrDefault(EngineConstants.TQ_DEMAND_COEFFICIENT, "2")));
+        params.setClassHours(getDouble(paramsMap.getOrDefault(EngineConstants.TQ_CLASS_HOURS, "8")));
+        params.setToolCapacity(getDouble(paramsMap.getOrDefault(EngineConstants.TQ_TOOL_CAPACITY, DEFAULT_TOOL_CAPACITY)));
+        params.setLossRate(getDouble(paramsMap.getOrDefault(EngineConstants.TQ_LOSS_RATE, "0.02")));
+        params.setMergeThreshold(getDouble(paramsMap.getOrDefault(EngineConstants.TQ_MERGE_THRESHOLD, "100")));
+        // 预生产库存天数（SYS0301007直接配置天数，无需再除以24）
+        params.setProductStockDay(getDouble(paramsMap.getOrDefault(EngineConstants.TQ_PRODUCT_STOCK_DAY, "1")));
+        params.setLargeDemand(getDouble(paramsMap.getOrDefault(EngineConstants.TQ_LARGE_DEMAND, DEFAULT_LARGE_DEMAND)));
+        params.setCloseOutNum(getDouble(paramsMap.getOrDefault(EngineConstants.TQ_CLOSE_OUT_NUM, "50")));
+        params.setMinPlanQty(getDouble(paramsMap.getOrDefault(EngineConstants.TQ_MIN_PLAN_QTY, "10")));
+        params.setMaxClassOutput(getDouble(paramsMap.getOrDefault(EngineConstants.TQ_MAX_CLASS_OUTPUT, "3000")));
+        params.setDemandCalcMode(getInt(paramsMap.getOrDefault(EngineConstants.TQ_DEMAND_CALC_MODE, "2")));
+        params.setSupplyTimeThreshold(getDouble(paramsMap.getOrDefault(EngineConstants.TQ_SUPPLY_TIME_THRESHOLD, "24")));
+        params.setSpecSwitchTime(getDouble(paramsMap.getOrDefault(EngineConstants.TQ_SPEC_SWITCH_TIME, "0.5")));
+        params.setApexSwitchTime(getDouble(paramsMap.getOrDefault(EngineConstants.TQ_APEX_SWITCH_TIME, "0.8")));
+        params.setInchSwitchTime(getDouble(paramsMap.getOrDefault(EngineConstants.TQ_INCH_SWITCH_TIME, "1.5")));
+        params.setStockConsumeRatioHigh(getDouble(paramsMap.getOrDefault(EngineConstants.TQ_STOCK_CONSUME_RATIO_HIGH, "2.0")));
+        params.setStockConsumeRatioLow(getDouble(paramsMap.getOrDefault(EngineConstants.TQ_STOCK_CONSUME_RATIO_LOW, "0.5")));
+        params.setStopIntersectionDays(getDouble(paramsMap.getOrDefault(EngineConstants.TQ_STOP_INTERSECTION_DAYS, "2")));
+        params.setReopenStockThreshold(getDouble(paramsMap.getOrDefault(EngineConstants.TQ_REOPEN_STOCK_THRESHOLD, "0")));
+        params.setMoldingStopPreShiftCount(getDouble(paramsMap.getOrDefault(EngineConstants.TQ_MOLDING_STOP_PRE_SHIFT_COUNT, "2")));
         // 工装车总数（全局统一值，从参数表加载，默认50）
-        params.setToolingTotal(getInt(paramsMap.getOrDefault(EngineConstants.TOOLING_TOTAL, "50")));
-        BigDecimal productStockHour = new BigDecimal(paramsMap.getOrDefault(EngineConstants.PRODUCT_STOCK_HOUR, DEFAULT_PRODUCT_STOCK_HOUR));
-        params.setProductStockDay(productStockHour.divide(HOUR24, 2, RoundingMode.HALF_UP).doubleValue());
-        params.setLargeDemand(getDouble(paramsMap.getOrDefault(EngineConstants.LARGE_DEMAND, DEFAULT_LARGE_DEMAND)));
-        params.setBigSizeSpec(com.zlt.aps.common.core.utils.BigDecimalUtils.valueOf(paramsMap.getOrDefault(EngineConstants.BIG_SIZE_SPEC, DEFAULT_BIG_SIZE_SPEC)));
-        params.setMinPlanQty(getDouble(paramsMap.getOrDefault(EngineConstants.MIN_PLAN_QTY, DEFAULT_MIN_PLAN_QTY)));
-        params.setStockLossRate(getDouble(paramsMap.getOrDefault(EngineConstants.STOCK_LOSS_RATE, "0")));
-        params.setEqualShareThreshold(new BigDecimal(paramsMap.getOrDefault(EngineConstants.EQUAL_SHARE_THRESHOLD, DEFAULT_EQUAL_SHARE_THRESHOLD)));
-        params.setClassStockReference(getDouble(paramsMap.getOrDefault(EngineConstants.CLASS_STOCK_REFERENCE, DEFAULT_CLASS_STOCK_REFERENCE)));
-        params.setOneRollNum(new BigDecimal(paramsMap.getOrDefault(EngineConstants.ONE_ROLL_NUM, DEFAULT_ONE_ROLL_NUM)));
-        params.setBackupShiftCount(getDouble(paramsMap.getOrDefault(EngineConstants.BACKUP_SHIFT_COUNT, "1")));
-        params.setDemandCoefficient(getDouble(paramsMap.getOrDefault(EngineConstants.DEMAND_COEFFICIENT, "2")));
-        params.setDemandCalcMode(getInt(paramsMap.getOrDefault(EngineConstants.DEMAND_CALC_MODE, "2")));
-        params.setSupplyTimeThreshold(getDouble(paramsMap.getOrDefault(EngineConstants.SUPPLY_TIME_THRESHOLD, "24")));
-        params.setMaxClassOutput(getDouble(paramsMap.getOrDefault(EngineConstants.MAX_CLASS_OUTPUT, "3000")));
-        params.setSpecSwitchTime(getDouble(paramsMap.getOrDefault(EngineConstants.SPEC_SWITCH_TIME, "0.5")));
-        params.setInchSwitchTime(getDouble(paramsMap.getOrDefault(EngineConstants.INCH_SWITCH_TIME, "1")));
+        params.setToolingTotal(getInt(paramsMap.getOrDefault(EngineConstants.TQ_TOOLING_TOTAL, "50")));
+        params.setProductionStage(paramsMap.getOrDefault(EngineConstants.TQ_PRODUCTION_STAGE_PRODUCE, "1"));
+        params.setBigSizeSpec(com.zlt.aps.common.core.utils.BigDecimalUtils.valueOf(paramsMap.getOrDefault(EngineConstants.TQ_BIG_SIZE_SPEC, DEFAULT_BIG_SIZE_SPEC)));
+        params.setStockLossRate(getDouble(paramsMap.getOrDefault(EngineConstants.TQ_STOCK_LOSS_RATE, "0")));
+        params.setEqualShareThreshold(new BigDecimal(paramsMap.getOrDefault(EngineConstants.TQ_EQUAL_SHARE_THRESHOLD, DEFAULT_EQUAL_SHARE_THRESHOLD)));
+        params.setClassStockReference(getDouble(paramsMap.getOrDefault(EngineConstants.TQ_CLASS_STOCK_REFERENCE, DEFAULT_CLASS_STOCK_REFERENCE)));
+        params.setOneRollNum(new BigDecimal(paramsMap.getOrDefault(EngineConstants.TQ_ONE_ROLL_NUM, DEFAULT_ONE_ROLL_NUM)));
         return params;
     }
 

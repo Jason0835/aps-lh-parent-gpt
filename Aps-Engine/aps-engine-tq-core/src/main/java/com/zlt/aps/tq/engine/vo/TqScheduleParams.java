@@ -119,4 +119,24 @@ public class TqScheduleParams {
      * 成型停产后胎圈预排班数
      */
     private Double moldingStopPreShiftCount;
+
+    /**
+     * 单班时长（小时），默认8
+     */
+    private Double classHours;
+
+    /**
+     * 三角胶切换时长（小时），默认0.8
+     */
+    private Double apexSwitchTime;
+
+    /**
+     * 库消比高阈值，默认2.0
+     */
+    private Double stockConsumeRatioHigh;
+
+    /**
+     * 库消比低阈值，默认0.5
+     */
+    private Double stockConsumeRatioLow;
 }

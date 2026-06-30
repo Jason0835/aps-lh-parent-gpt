@@ -1,7 +1,7 @@
 {
   "sceneCode": "TM_SCENE_017",
   "caseName": "TM_SCENE_017_same_shift_other_machine_overflow",
-  "description": "TM_SCENE_017：当前班产能不足，同班其他机台承接",
+  "description": "TM_SCENE_017：当前班产能不足，未排量顺延到下一班同机台承接",
   "designSteps": [
     "Step15",
     "Step16"
@@ -93,8 +93,8 @@
   "expected": {
     "success": true,
     "messageContains": "胎面自动排程执行完成",
-    "resultCount": 2,
-    "assignedCount": 2,
+    "resultCount": 1,
+    "assignedCount": 1,
     "unassignedCount": 0,
     "explainCount": 2,
     "errorCount": 0,
@@ -108,8 +108,8 @@
       },
       {
         "treadCode": "TM_TREAD_1701",
-        "machineCode": "TM_M02",
-        "shiftOrder": 1,
+        "machineCode": "TM_M01",
+        "shiftOrder": 2,
         "sequence": 1,
         "planQty": 300
       }

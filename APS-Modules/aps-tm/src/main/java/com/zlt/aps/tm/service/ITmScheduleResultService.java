@@ -74,6 +74,15 @@ public interface ITmScheduleResultService extends IDocService<TmScheduleResult> 
      * @throws com.ruoyi.common.exception.ServiceException 请求非法时抛出
      */
     TmAutoScheduleResponseVo tmAutoPlan(TmAutoScheduleRequestVo request);
+    /**
+     * 清理胎面自动排程 Redis 基础资料缓存。
+     *
+     * @param factoryCode 工厂编码，为空时清理全部胎面自动排程缓存
+     * @param scheduleDate 排程日期，和工厂同时传入时清理该日期相关缓存
+     * @return 实际删除的 Redis key 数量
+     */
+    long clearAutoPlanRedisCache(String factoryCode, Date scheduleDate);
+
 
     /**
      * 执行胎面自动排程。

@@ -10,9 +10,17 @@ import org.springframework.stereotype.Component;
 
 /**
  * 上月超欠产定时任务
- * 每月1号凌晨3点执行，自动根据上月计划排产量和上月硫化日完成量(合格品)计算超欠产，
+ * 包含3个定时触发入口，分别对应3个cron表达式：
+ * 1. calcLastMonthOverProd()        — 每月1号凌晨3点（cron: 0 0 3 1 * ?）
+ *    用上月数据写入当月月计划的"上月超欠产"栏位
+ * 2. calcOverProdOnSecondLastDay()  — 每月倒数第2天凌晨3点（cron: 0 0 3 L-1 * ?）
+ *    用当月数据写入下月月计划的"上月超欠产"栏位
+ * 3. calcOverProdOnLastDay()        — 每月最后一天凌晨3点（cron: 0 0 3 L * ?）
+ *    用当月数据写入下月月计划的"上月超欠产"栏位
+ *
  * 并按阈值参数(SYS0206009)判定上月超欠产有效标志：
  * |超欠产值|(绝对值) > 阈值 → 否('0')，否则 → 是('1')
+ * 三次触发天然幂等，UPDATE直接覆盖写入
  *
  * @author APS Team
  */
@@ -24,22 +32,56 @@ public class MonthOverProdTask {
     private IFactoryMonthPlanProductionFinalResultRemoteService factoryMonthPlanProdFinalRemoteService;
 
     /**
-     * 定时计算上月超欠产
-     * 根据上月计划排产量和上月硫化日完成量(合格品)计算超欠产，
-     * 并按阈值参数(SYS0206009)判定上月超欠产有效标志：
-     * |超欠产值|(绝对值) > 阈值 → 否('0')，否则 → 是('1')
+     * 定时计算上月超欠产（每月1号凌晨3点触发，cron: 0 0 3 1 * ?）
+     * 用上月数据写入当月月计划的"上月超欠产"栏位
      */
-    @ApiOperation("定时计算上月超欠产")
+    @ApiOperation("定时计算上月超欠产-1号触发")
     public void calcLastMonthOverProd() {
-        log.info("定时任务-开始计算上月超欠产");
+        log.info("定时任务-开始计算上月超欠产(1号触发)");
         try {
             FeignTokenHelper.runWithToken(() -> {
                 AjaxResult result = factoryMonthPlanProdFinalRemoteService.calcLastMonthOverProd();
-                log.info("定时任务-计算上月超欠产结果：{}", result);
+                log.info("定时任务-计算上月超欠产(1号触发)结果：{}", result);
             });
         } catch (Exception e) {
-            log.error("定时任务-计算上月超欠产异常", e);
+            log.error("定时任务-计算上月超欠产(1号触发)异常", e);
         }
-        log.info("定时任务-计算上月超欠产完成");
+        log.info("定时任务-计算上月超欠产(1号触发)完成");
+    }
+
+    /**
+     * 定时计算超欠产（每月倒数第2天凌晨3点触发，cron: 0 0 3 L-1 * ?）
+     * 用当月数据写入下月月计划的"上月超欠产"栏位
+     */
+    @ApiOperation("定时计算超欠产-倒数第2天触发")
+    public void calcOverProdOnSecondLastDay() {
+        log.info("定时任务-开始计算超欠产(倒数第2天触发)");
+        try {
+            FeignTokenHelper.runWithToken(() -> {
+                AjaxResult result = factoryMonthPlanProdFinalRemoteService.calcCurrentMonthOverProdForNextMonth();
+                log.info("定时任务-计算超欠产(倒数第2天触发)结果：{}", result);
+            });
+        } catch (Exception e) {
+            log.error("定时任务-计算超欠产(倒数第2天触发)异常", e);
+        }
+        log.info("定时任务-计算超欠产(倒数第2天触发)完成");
+    }
+
+    /**
+     * 定时计算超欠产（每月最后一天凌晨3点触发，cron: 0 0 3 L * ?）
+     * 用当月数据写入下月月计划的"上月超欠产"栏位
+     */
+    @ApiOperation("定时计算超欠产-最后一天触发")
+    public void calcOverProdOnLastDay() {
+        log.info("定时任务-开始计算超欠产(最后一天触发)");
+        try {
+            FeignTokenHelper.runWithToken(() -> {
+                AjaxResult result = factoryMonthPlanProdFinalRemoteService.calcCurrentMonthOverProdForNextMonth();
+                log.info("定时任务-计算超欠产(最后一天触发)结果：{}", result);
+            });
+        } catch (Exception e) {
+            log.error("定时任务-计算超欠产(最后一天触发)异常", e);
+        }
+        log.info("定时任务-计算超欠产(最后一天触发)完成");
     }
 }

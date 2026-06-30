@@ -19,8 +19,6 @@ import javax.annotation.Resource;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 /**
@@ -40,6 +38,8 @@ public class TmAutoScheduleDataLoadService {
     private static final String PARAM_MIN_START_QTY = "TM_MIN_START_QTY";
 
     private static final String PARAM_DEFAULT_CURL_LENGTH = "TM_DEFAULT_CURL_LENGTH";
+
+    private static final String PARAM_TOOL_TOTAL_QTY = "TM_TOOL_TOTAL_QTY";
 
     private static final String PARAM_SHUTDOWN_REDISTRIBUTION_ENABLED = "TM_SHUTDOWN_REDISTRIBUTION_ENABLED";
 
@@ -75,17 +75,6 @@ public class TmAutoScheduleDataLoadService {
 
     private static final int EXPERIMENT_SPEC_SHIFT_ORDER = 1;
 
-    /** 基础数据本地缓存有效期，单位毫秒 */
-    private static final long BASE_DATA_CACHE_TTL_MILLIS = 5 * 60 * 1000L;
-
-    /** 参数缓存，key=工厂 */
-    private final Map<String, TmLocalCacheEntry<List<TmParams>>> paramsCacheMap = new ConcurrentHashMap<>();
-
-    /** 机台缓存，key=工厂 */
-    private final Map<String, TmLocalCacheEntry<List<TmMachineInfo>>> machineCacheMap = new ConcurrentHashMap<>();
-
-    /** 工作日历缓存，key=工厂+工序+日期 */
-    private final Map<String, TmLocalCacheEntry<List<TmWorkCalendarRowVo>>> calendarCacheMap = new ConcurrentHashMap<>();
 
     @Resource
     private TmParamsMapper tmParamsMapper;
@@ -123,6 +112,9 @@ public class TmAutoScheduleDataLoadService {
     @Resource
     private TmScheduleResultMapper tmScheduleResultMapper;
 
+    @Resource
+    private TmAutoScheduleRedisCacheService tmAutoScheduleRedisCacheService = new TmAutoScheduleRedisCacheService();
+
     /**
      * 加载自动排程所需数据。
      *
@@ -151,7 +143,7 @@ public class TmAutoScheduleDataLoadService {
         LambdaQueryWrapper<TmParams> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(TmParams::getFactoryCode, context.getFactoryCode());
         wrapper.eq(TmParams::getEnableStatus, YES);
-        List<TmParams> paramsList = getCachedList(paramsCacheMap, context.getFactoryCode(),
+        List<TmParams> paramsList = tmAutoScheduleRedisCacheService.getCachedList("params:" + context.getFactoryCode(),
                 () -> tmParamsMapper.selectList(wrapper));
         Map<String, TmParamValue> paramMap = new HashMap<>();
         if (CollUtil.isNotEmpty(paramsList)) {
@@ -168,6 +160,7 @@ public class TmAutoScheduleDataLoadService {
         putDefaultParam(paramMap, PARAM_MIN_STOCK_CLASS, "1");
         putDefaultParam(paramMap, PARAM_MIN_START_QTY, "0");
         putDefaultParam(paramMap, PARAM_DEFAULT_CURL_LENGTH, "0");
+        putDefaultParam(paramMap, PARAM_TOOL_TOTAL_QTY, "0");
         putDefaultParam(paramMap, PARAM_SHUTDOWN_REDISTRIBUTION_ENABLED, "1");
         putDefaultParam(paramMap, PARAM_PLAN_QTY_STRATEGY, "DEFAULT");
         putDefaultParam(paramMap, PARAM_TASK_SORT_STRATEGY, "DEFAULT");
@@ -190,7 +183,7 @@ public class TmAutoScheduleDataLoadService {
         wrapper.eq(TmMachineInfo::getFactoryCode, context.getFactoryCode());
         wrapper.eq(TmMachineInfo::getMachineStatus, ApsConstant.APS_YES_NO_1);
         wrapper.orderByAsc(TmMachineInfo::getMachineCode);
-        return getCachedList(machineCacheMap, context.getFactoryCode(),
+        return tmAutoScheduleRedisCacheService.getCachedList("machine:" + context.getFactoryCode(),
                 () -> tmMachineInfoMapper.selectList(wrapper)).stream()
                 .filter(machine -> StrUtil.isNotBlank(machine.getMachineCode()))
                 .collect(Collectors.toList());
@@ -458,6 +451,7 @@ public class TmAutoScheduleDataLoadService {
         String algorithmCode = getParamValue(context, PARAM_ALGORITHM_SWITCH, "1");
         BigDecimal minStartQty = getDecimalParam(context, PARAM_MIN_START_QTY);
         BigDecimal defaultCurlLength = getDecimalParam(context, PARAM_DEFAULT_CURL_LENGTH);
+        BigDecimal toolTotalQty = getDecimalParam(context, PARAM_TOOL_TOTAL_QTY);
         Integer guardShiftCount = getIntegerParam(context, PARAM_MIN_STOCK_CLASS, 1);
         Integer newSpecLookbackDays = getPositiveIntegerParam(context, PARAM_NEW_SPEC_LOOKBACK_DAYS, 7);
         Integer newSpecAdvanceShiftCount = getPositiveIntegerParam(context, PARAM_NEW_SPEC_ADVANCE_SHIFT_COUNT, 2);
@@ -506,6 +500,9 @@ public class TmAutoScheduleDataLoadService {
                 taskDraft.setGuardShiftCount(guardShiftCount);
                 taskDraft.setMinStartQty(minStartQty);
                 taskDraft.setDefaultCurlRollLength(defaultCurlLength);
+                if (toolTotalQty.compareTo(BigDecimal.ZERO) > 0) {
+                    taskDraft.setTotalToolQty(toolTotalQty);
+                }
                 if (noShutdownAvailableShift && !isShiftOpen(tmCalendar, targetShiftOrder) && isShiftOpen(cxCalendar, shiftOrder)) {
                     taskDraft.setUnplannedReasonCode("TM_SHUTDOWN_NO_AVAILABLE_SHIFT");
                     taskDraft.setUnplannedReasonDesc("胎面停产且无可分配班次，成型需求无法重分配");
@@ -513,7 +510,7 @@ public class TmAutoScheduleDataLoadService {
                 taskDraftList.add(taskDraft);
             }
         }
-        appendExperimentSpecTasks(context, taskDraftList, lossSettingList, minStartQty, defaultCurlLength);
+        appendExperimentSpecTasks(context, taskDraftList, lossSettingList, minStartQty, defaultCurlLength, toolTotalQty);
         return taskDraftList;
     }
 
@@ -525,10 +522,11 @@ public class TmAutoScheduleDataLoadService {
      * @param lossSettingList 损耗配置列表
      * @param minStartQty 最小起排量
      * @param defaultCurlLength 默认卷曲长度
+     * @param toolTotalQty 总工装数量
      */
     private void appendExperimentSpecTasks(TmScheduleContext context, List<TmTaskDraft> taskDraftList,
                                            List<TmLossSetting> lossSettingList, BigDecimal minStartQty,
-                                           BigDecimal defaultCurlLength) {
+                                           BigDecimal defaultCurlLength, BigDecimal toolTotalQty) {
         Integer lookbackDays = getPositiveIntegerParam(context, PARAM_EXPERIMENT_SPEC_LOOKBACK_DAYS, 5);
         BigDecimal experimentPlanQty = getPositiveDecimalParam(context, PARAM_EXPERIMENT_SPEC_PLAN_QTY, BigDecimal.valueOf(30));
         if (experimentPlanQty.compareTo(BigDecimal.ZERO) <= 0) {
@@ -563,7 +561,7 @@ public class TmAutoScheduleDataLoadService {
                 continue;
             }
             taskDraftList.add(buildExperimentSpecTask(treadRows.get(0), experimentPlanQty, experimentSpecInfo,
-                    lossSettingList, minStartQty, defaultCurlLength));
+                    lossSettingList, minStartQty, defaultCurlLength, toolTotalQty));
         }
     }
 
@@ -715,7 +713,7 @@ public class TmAutoScheduleDataLoadService {
     private TmTaskDraft buildExperimentSpecTask(TmExperimentSpecMonthPlanRowVo row, BigDecimal experimentPlanQty,
                                                 TmExperimentSpecInfo experimentSpecInfo,
                                                 List<TmLossSetting> lossSettingList, BigDecimal minStartQty,
-                                                BigDecimal defaultCurlLength) {
+                                                BigDecimal defaultCurlLength, BigDecimal toolTotalQty) {
         TmTaskDraft taskDraft = new TmTaskDraft();
         taskDraft.setOrderNo("EXP-" + StrUtil.blankToDefault(row.getProductionNo(), String.valueOf(row.getMonthPlanId()))
                 + "-CLASS" + EXPERIMENT_SPEC_SHIFT_ORDER);
@@ -737,6 +735,9 @@ public class TmAutoScheduleDataLoadService {
         taskDraft.setBaseDemandQty(experimentPlanQty);
         taskDraft.setMinStartQty(minStartQty);
         taskDraft.setDefaultCurlRollLength(defaultCurlLength);
+        if (toolTotalQty.compareTo(BigDecimal.ZERO) > 0) {
+            taskDraft.setTotalToolQty(toolTotalQty);
+        }
         taskDraft.setExperimentSpecInfo(experimentSpecInfo);
         experimentSpecInfo.setMergedToExistingTask(Boolean.FALSE);
         return taskDraft;
@@ -1117,8 +1118,8 @@ public class TmAutoScheduleDataLoadService {
     private TmWorkCalendarRowVo loadWorkCalendar(TmScheduleContext context, String procCode) {
         try {
             Date calendarDate = DateUtil.beginOfDay(context.getScheduleDate());
-            String cacheKey = context.getFactoryCode() + ":" + procCode + ":" + DateUtil.formatDate(calendarDate);
-            List<TmWorkCalendarRowVo> rowList = getCachedList(calendarCacheMap, cacheKey,
+            String cacheKey = "calendar:" + context.getFactoryCode() + ":" + procCode + ":" + DateUtil.formatDate(calendarDate);
+            List<TmWorkCalendarRowVo> rowList = tmAutoScheduleRedisCacheService.getCachedList(cacheKey,
                     () -> tmAutoScheduleDataLoadMapper.selectWorkCalendarRows(context.getFactoryCode(), procCode, calendarDate));
             return CollUtil.isEmpty(rowList) ? null : rowList.get(0);
         } catch (RuntimeException ex) {
@@ -1126,27 +1127,6 @@ public class TmAutoScheduleDataLoadService {
                     procCode, DateUtil.formatDate(context.getScheduleDate()), ex.getMessage());
             return null;
         }
-    }
-
-    /**
-     * 读取带短 TTL 的本地集合缓存。
-     *
-     * @param cacheMap 缓存容器
-     * @param cacheKey 缓存 key
-     * @param loader   缓存失效时的数据加载器
-     * @param <T>      集合元素类型
-     * @return 集合副本
-     */
-    private <T> List<T> getCachedList(Map<String, TmLocalCacheEntry<List<T>>> cacheMap, String cacheKey,
-                                      Supplier<List<T>> loader) {
-        long now = System.currentTimeMillis();
-        TmLocalCacheEntry<List<T>> entry = cacheMap.get(cacheKey);
-        if (entry == null || entry.isExpired(now)) {
-            List<T> value = Optional.ofNullable(loader.get()).orElse(Collections.emptyList());
-            entry = new TmLocalCacheEntry<>(new ArrayList<>(value), now + BASE_DATA_CACHE_TTL_MILLIS);
-            cacheMap.put(cacheKey, entry);
-        }
-        return new ArrayList<>(entry.getValue());
     }
 
     private boolean isShutdownDay(TmWorkCalendarRowVo calendar) {

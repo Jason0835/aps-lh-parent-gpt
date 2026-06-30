@@ -188,7 +188,7 @@ public class MonthPlanIssueServiceImpl implements IMonthPlanIssueService {
                 monthPlanIssue.setPattern(finalResult.getPattern());
                 monthPlanIssue.setCavity(finalResult.getMouldCavityQty());
                 monthPlanIssue.setLiveBlock(finalResult.getTypeBlockQty());
-                monthPlanIssue.setNetDemand(finalResult.getFactProdReqQty());
+                monthPlanIssue.setNetDemand(finalResult.getTotalQty());
                 monthPlanIssue.setAdvNum(finalResult.getHeightProductionQty());
                 //monthPlanIssue.setMonthAvgNum(finalResult.getAverageQty());
                 monthPlanIssue.setStockSaleRatio(finalResult.getInventorySalesRatio());

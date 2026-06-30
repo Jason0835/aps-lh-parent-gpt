@@ -244,27 +244,27 @@ public class TqScheduleResultDto extends ApsBaseDto
     /** 对应成型一班的计划量 */
 //    @Excel(name = "ui.data.column.scheduleResult.cxClass1Plan")
     @ApiModelProperty(value = "对应成型一班的计划量")
-    private Double cxClass1Plan;
+    private Integer cxClass1Plan;
 
     /** 对应成型二班的计划量 */
 //    @Excel(name = "ui.data.column.scheduleResult.cxClass2Plan")
     @ApiModelProperty(value = "对应成型二班的计划量")
-    private Double cxClass2Plan;
+    private Integer cxClass2Plan;
 
     /** 对应成型三班的计划量 */
 //    @Excel(name = "ui.data.column.scheduleResult.cxClass3Plan")
     @ApiModelProperty(value = "对应成型三班的计划量")
-    private Double cxClass3Plan;
+    private Integer cxClass3Plan;
 
     /** 对应成型次一班的计划量 */
 //    @Excel(name = "ui.data.column.scheduleResult.cxClass4Plan")
     @ApiModelProperty(value = "对应成型次一班的计划量")
-    private Double cxClass4Plan;
+    private Integer cxClass4Plan;
 
     /** 对应成型次二班的计划量 */
 //    @Excel(name = "ui.data.column.scheduleResult.cxClass5Plan")
     @ApiModelProperty(value = "对应成型次二班的计划量")
-    private Double cxClass5Plan;
+    private Integer cxClass5Plan;
 
     /** 是否发布，0--未发布，1--已发布。对应数据字典为：IS_RELEASE */
 //    @Excel(name = "ui.data.column.scheduleResult.isRelease", dictType = "IS_RELEASE")

@@ -22,6 +22,7 @@ import com.zlt.aps.lh.component.MonthPlanDateResolver;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.exception.ScheduleDomainExceptionHelper;
 import com.zlt.aps.lh.exception.ScheduleErrorCode;
+import com.zlt.aps.lh.handler.ScheduleAdjustHandler;
 import com.zlt.aps.lh.mapper.CxStockMapper;
 import com.zlt.aps.lh.mapper.FactoryMonthPlanProductionFinalResultMapper;
 import com.zlt.aps.lh.mapper.LhDayFinishQtyMapper;
@@ -39,12 +40,11 @@ import com.zlt.aps.lh.mapper.MdmCapsuleChuckMapper;
 import com.zlt.aps.lh.mapper.MdmDevicePlanShutMapper;
 import com.zlt.aps.lh.mapper.MdmMaterialInfoMapper;
 import com.zlt.aps.lh.mapper.MdmModelInfoMapper;
-import com.zlt.aps.lh.mapper.MdmMonthSurplusMapper;
 import com.zlt.aps.lh.mapper.MdmSkuConstructionRefMapper;
 import com.zlt.aps.lh.mapper.MdmSkuLhCapacityMapper;
 import com.zlt.aps.lh.mapper.MdmSkuMouldRelMapper;
+import com.zlt.aps.lh.mapper.MdmSkuScheduleCategoryMapper;
 import com.zlt.aps.lh.mapper.MdmWorkCalendarMapper;
-import com.zlt.aps.lh.mapper.MpAdjustResultMapper;
 import com.zlt.aps.lh.mapper.MpFactoryProductionVersionMapper;
 import com.zlt.aps.lh.mapper.MpMonthPlanStatisticsMapper;
 import com.zlt.aps.lh.service.ILhBaseDataService;
@@ -55,14 +55,13 @@ import com.zlt.aps.lh.util.MonthPlanStatisticsDayUtil;
 import com.zlt.aps.mdm.api.domain.entity.MdmDevicePlanShut;
 import com.zlt.aps.mdm.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.mdm.api.domain.entity.MdmModelInfo;
-import com.zlt.aps.mdm.api.domain.entity.MdmMonthSurplus;
 import com.zlt.aps.mdm.api.domain.entity.MdmSkuConstructionRef;
 import com.zlt.aps.mdm.api.domain.entity.MdmSkuLhCapacity;
 import com.zlt.aps.mdm.api.domain.entity.MdmSkuMouldRel;
+import com.zlt.aps.mdm.api.domain.entity.MdmSkuScheduleCategory;
 import com.zlt.aps.mdm.api.domain.entity.MdmWorkCalendar;
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import com.zlt.aps.mp.api.domain.entity.MdmCapsuleChuck;
-import com.zlt.aps.mp.api.domain.entity.MpAdjustResult;
 import com.zlt.aps.mp.api.domain.entity.MpFactoryProductionVersion;
 import com.zlt.aps.mp.api.domain.entity.MpMonthPlanStatistics;
 import lombok.extern.slf4j.Slf4j;
@@ -108,14 +107,27 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
 
     /** 查询最新排产版本时返回前两条，用于判断是否存在多条数据 */
     private static final String FINAL_PRODUCTION_VERSION_LIMIT_TWO = "LIMIT 2";
+
+    /** 主销产品排产类型（与 t_mdm_sku_schedule_category.SCHEDULE_TYPE='01' 一致） */
+    private static final String MAIN_PRODUCT_SCHEDULE_TYPE = "01";
+
+    /** 非主销合并胎胚的收尾余量阈值：胎胚余量 <= 该值视为收尾 */
+    private static final int NON_MAIN_PRODUCT_ENDING_THRESHOLD = 2;
+
+    /** 主销合并胎胚的收尾余量阈值：胎胚余量 <= 该值视为收尾 */
+    private static final int MAIN_PRODUCT_ENDING_THRESHOLD = 0;
+
+    /** 胎胚收尾标识：收尾 */
+    private static final int EMBRYO_ENDING_FLAG_YES = 1;
+
+    /** 胎胚收尾标识：非收尾 */
+    private static final int EMBRYO_ENDING_FLAG_NO = 0;
+
     @Resource
     private FactoryMonthPlanProductionFinalResultMapper monthPlanMapper;
 
     @Resource
     private MpFactoryProductionVersionMapper mpFactoryProductionVersionMapper;
-
-    @Resource
-    private MpAdjustResultMapper mpAdjustResultMapper;
 
     @Resource
     private MpMonthPlanStatisticsMapper monthPlanStatisticsMapper;
@@ -140,9 +152,6 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
 
     @Resource
     private LhMouldCleanPlanMapper lhMouldCleanPlanMapper;
-
-    @Resource
-    private MdmMonthSurplusMapper monthSurplusMapper;
 
     @Resource
     private LhDayFinishQtyMapper lhDayFinishQtyMapper;
@@ -182,6 +191,12 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
 
     @Resource
     private MdmSkuConstructionRefMapper skuConstructionRefMapper;
+
+    @Resource
+    private MdmSkuScheduleCategoryMapper skuScheduleCategoryMapper;
+
+    @Resource
+    private ScheduleAdjustHandler scheduleAdjustHandler;
 
     @Resource(name = "lhDataInitExecutor")
     private Executor lhDataInitExecutor;
@@ -273,9 +288,6 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
                 monthPlanStatisticsFuture,
                 specialMaterialBomFuture,
                 embryoStockFuture,
-                runDataInitTaskAsync("周程滚动调整结果",
-                        () -> loadAdjustResult(context, factoryCode, requiredMonthMap),
-                        () -> sizeOf(context.getMpAdjustResultMap())),
                 runDataInitTaskAsync("工作日历",
                         () -> loadWorkCalendar(context, factoryCode, calendarControlStartDate, endDate),
                         () -> sizeOf(context.getWorkCalendarList())),
@@ -289,9 +301,6 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
                 modelInfoFuture,
                 machineInfoFuture,
                 cleaningPlanFuture,
-                runDataInitTaskAsync("月底计划余量",
-                        () -> loadMonthSurplus(context, factoryCode, year, month),
-                        () -> sizeOf(context.getMonthSurplusMap())),
                 runDataInitTaskAsync("前日物料日完成量",
                         () -> loadDayFinishQty(context, factoryCode, previousDataDate),
                         () -> sizeOf(context.getMaterialDayFinishedQtyMap())),
@@ -333,6 +342,10 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
                         () -> loadHistoryCureFormulaResults(context, factoryCode, targetDate),
                         () -> sizeOf(context.getPreviousCureFormulaResultList()))
         );
+
+        // 4. 胎胚收尾标识：依赖月计划、胎胚库存、月累计完成量、T日班次完成量、前日排程结果等均已就绪，
+        //    故在屏障同步之后计算；以胎胚维度合并硫化余量并按主销参与情况判定收尾。
+        this.loadEmbryoEndingFlagMap(context);
 
         if (context.isInterrupted()) {
             log.warn("基础数据加载中断, 工厂: {}, 目标日: {}, T日: {}, 原因: {}",
@@ -1078,83 +1091,6 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
     }
 
     /**
-     * 加载周程滚动调整结果，按物料编码聚合。
-     *
-     * @param context 排程上下文
-     * @param factoryCode 分厂编号
-     * @param year 年份
-     * @param month 月份
-     */
-    private void loadAdjustResult(LhScheduleContext context,
-                                  String factoryCode,
-                                  Map<String, LocalDate> requiredMonthMap) {
-        Map<String, List<MpAdjustResult>> adjustResultMap = new HashMap<>(64);
-        if (CollectionUtils.isEmpty(requiredMonthMap)) {
-            Calendar calendar = Calendar.getInstance();
-            calendar.setTime(context.getScheduleTargetDate());
-            mergeAdjustResult(context, factoryCode, calendar.get(Calendar.YEAR),
-                    calendar.get(Calendar.MONTH) + 1, adjustResultMap);
-        } else {
-            for (LocalDate monthStartDate : requiredMonthMap.values()) {
-                mergeAdjustResult(context, factoryCode, monthStartDate.getYear(), monthStartDate.getMonthValue(),
-                        adjustResultMap);
-            }
-        }
-        context.setMpAdjustResultMap(adjustResultMap);
-        log.debug("周程滚动调整结果加载完成, 物料数: {}, requiredMonths: {}",
-                adjustResultMap.size(),
-                CollectionUtils.isEmpty(requiredMonthMap) ? new ArrayList<String>(0) : requiredMonthMap.keySet());
-    }
-
-    private void loadAdjustResult(LhScheduleContext context, String factoryCode, int year, int month) {
-        Map<String, List<MpAdjustResult>> adjustResultMap = new HashMap<>(64);
-        mergeAdjustResult(context, factoryCode, year, month, adjustResultMap);
-        context.setMpAdjustResultMap(adjustResultMap);
-    }
-
-    /**
-     * 合并指定月份周程滚动调整结果。
-     *
-     * @param context 排程上下文
-     * @param factoryCode 工厂编码
-     * @param year 年份
-     * @param month 月份
-     * @param adjustResultMap 聚合结果
-     */
-    private void mergeAdjustResult(LhScheduleContext context,
-                                   String factoryCode,
-                                   int year,
-                                   int month,
-                                   Map<String, List<MpAdjustResult>> adjustResultMap) {
-        String monthPlanVersion = resolveMonthPlanVersion(context, year, month);
-        String productionVersion = resolveProductionVersion(context, year, month);
-        if (StringUtils.isEmpty(monthPlanVersion) || StringUtils.isEmpty(productionVersion)) {
-            log.warn("月计划版本或排产版本为空，跳过周程滚动调整结果加载, 工厂: {}, year: {}, month: {}, "
-                            + "monthPlanVersion: {}, productionVersion: {}",
-                    factoryCode, year, month, monthPlanVersion, productionVersion);
-            return;
-        }
-
-        List<MpAdjustResult> adjustResults = mpAdjustResultMapper.selectList(new LambdaQueryWrapper<MpAdjustResult>()
-                .eq(MpAdjustResult::getFactoryCode, factoryCode)
-                .eq(MpAdjustResult::getYear, year)
-                .eq(MpAdjustResult::getMonth, month)
-                .eq(MpAdjustResult::getMonthPlanVersion, monthPlanVersion)
-                .eq(MpAdjustResult::getProductionVersion, productionVersion)
-                .eq(MpAdjustResult::getIsDelete, DeleteFlagEnum.NORMAL.getCode()));
-        if (!CollectionUtils.isEmpty(adjustResults)) {
-            for (MpAdjustResult adjustResult : adjustResults) {
-                if (StringUtils.isEmpty(adjustResult.getMaterialCode())) {
-                    continue;
-                }
-                adjustResultMap.computeIfAbsent(adjustResult.getMaterialCode(), key -> new ArrayList<>()).add(adjustResult);
-            }
-        }
-        log.debug("周程滚动调整结果加载完成, year: {}, month: {}, 记录数: {}, 累计物料数: {}",
-                year, month, CollectionUtils.isEmpty(adjustResults) ? 0 : adjustResults.size(), adjustResultMap.size());
-    }
-
-    /**
      * 加载工作日历
      *
      * @param context     排程上下文
@@ -1206,6 +1142,78 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
         }
         context.setEmbryoRealtimeStockMap(stockMap);
         log.debug("胎胚实时库存加载完成, 数量: {}", stockMap.size());
+    }
+
+    /**
+     * 加载胎胚收尾标识Map。
+     * <p>以胎胚维度合并硫化余量（口径与排程阶段 {@link ScheduleAdjustHandler#calculatePlanSurplusQty} 一致），
+     * 结合胎胚实时库存计算胎胚余量，按主销产品参与情况判定收尾标识：
+     * <ul>
+     *   <li>合并余量中含主销产品：胎胚余量 &lt;= 0 标识收尾(1)</li>
+     *   <li>合并余量全为非主销：胎胚余量 &lt;= 2 标识收尾(1)</li>
+     *   <li>其余标识非收尾(0)</li>
+     * </ul>
+     * 胎胚余量 = 合并后硫化余量 - 胎胚库存；key取月计划中所有胎胚代码全集，无库存记录默认0。</p>
+     *
+     * @param context 排程上下文
+     */
+    private void loadEmbryoEndingFlagMap(LhScheduleContext context) {
+        List<FactoryMonthPlanProductionFinalResult> monthPlanList = context.getMonthPlanList();
+        Map<String, Integer> embryoEndingFlagMap = new LinkedHashMap<>();
+        if (CollectionUtils.isEmpty(monthPlanList)) {
+            context.setEmbryoEndingFlagMap(embryoEndingFlagMap);
+            log.debug("月生产计划为空，胎胚收尾标识Map为空");
+            return;
+        }
+
+        // 1. 查询主销产品物料集合（SCHEDULE_TYPE='01'），逻辑删除由框架自动过滤
+        Set<String> mainProductCodes = skuScheduleCategoryMapper.selectList(
+                new LambdaQueryWrapper<MdmSkuScheduleCategory>()
+                        .eq(MdmSkuScheduleCategory::getScheduleType, MAIN_PRODUCT_SCHEDULE_TYPE))
+                .stream()
+                .map(MdmSkuScheduleCategory::getMaterialCode)
+                .filter(StringUtils::isNotEmpty)
+                .collect(Collectors.toSet());
+
+        // 2. 以胎胚维度合并硫化余量，并记录该胎胚下是否含主销产品
+        Map<String, Integer> embryoSurplusMap = new LinkedHashMap<>();
+        Map<String, Boolean> embryoHasMainMap = new LinkedHashMap<>();
+        for (FactoryMonthPlanProductionFinalResult plan : monthPlanList) {
+            String embryoCode = plan.getEmbryoCode();
+            if (StringUtils.isEmpty(embryoCode)) {
+                continue;
+            }
+            // 复用排程阶段余量计算口径，保证基础数据与排程判定一致
+            int surplusQty = scheduleAdjustHandler.calculatePlanSurplusQty(context, plan);
+            embryoSurplusMap.merge(embryoCode, surplusQty, Integer::sum);
+            // 任一主销参与合并即标记为含主销，否则保持默认false
+            if (mainProductCodes.contains(plan.getMaterialCode())) {
+                embryoHasMainMap.put(embryoCode, Boolean.TRUE);
+            } else {
+                embryoHasMainMap.putIfAbsent(embryoCode, Boolean.FALSE);
+            }
+        }
+
+        // 3. 按主销参与情况判定收尾标识：胎胚余量 = 合并硫化余量 - 胎胚库存
+        Map<String, Integer> embryoStockMap = context.getEmbryoRealtimeStockMap();
+        for (Map.Entry<String, Integer> entry : embryoSurplusMap.entrySet()) {
+            String embryoCode = entry.getKey();
+            int mergedSurplusQty = entry.getValue();
+            int embryoStock = embryoStockMap.getOrDefault(embryoCode, 0);
+            int embryoRemainQty = mergedSurplusQty - embryoStock;
+            boolean hasMain = embryoHasMainMap.getOrDefault(embryoCode, Boolean.FALSE);
+            int threshold = hasMain ? MAIN_PRODUCT_ENDING_THRESHOLD : NON_MAIN_PRODUCT_ENDING_THRESHOLD;
+            int endingFlag = embryoRemainQty <= threshold ? EMBRYO_ENDING_FLAG_YES : EMBRYO_ENDING_FLAG_NO;
+            embryoEndingFlagMap.put(embryoCode, endingFlag);
+        }
+
+        context.setEmbryoEndingFlagMap(embryoEndingFlagMap);
+        int endingCount = embryoEndingFlagMap.values().stream()
+                .mapToInt(Integer::intValue)
+                .filter(v -> v == EMBRYO_ENDING_FLAG_YES)
+                .sum();
+        log.info("胎胚收尾标识加载完成, 胎胚数量: {}, 主销产品数量: {}, 收尾胎胚数量: {}",
+                embryoSurplusMap.size(), mainProductCodes.size(), endingCount);
     }
 
     /**
@@ -1559,35 +1567,9 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
                         .collect(java.util.stream.Collectors.joining("; ")));
     }
 
-    /**
-     * 加载月底计划余量，按物料编号建立Map
-     *
-     * @param context     排程上下文
-     * @param factoryCode 分厂编号
-     * @param year        年份
-     * @param month       月份
-     */
-    private void loadMonthSurplus(LhScheduleContext context, String factoryCode, int year, int month) {
-        List<MdmMonthSurplus> monthSurplusList = monthSurplusMapper.selectList(
-                new LambdaQueryWrapper<MdmMonthSurplus>()
-                        .eq(MdmMonthSurplus::getFactoryCode, factoryCode)
-                        .eq(MdmMonthSurplus::getYear, year)
-                        .eq(MdmMonthSurplus::getMonth, month)
-                        .eq(MdmMonthSurplus::getIsDelete, DeleteFlagEnum.NORMAL.getCode()));
-        Map<String, MdmMonthSurplus> monthSurplusMap = new HashMap<>(64);
-        if (monthSurplusList != null) {
-            for (MdmMonthSurplus surplus : monthSurplusList) {
-                if (StringUtils.isNotEmpty(surplus.getMaterialCode())) {
-                    monthSurplusMap.put(surplus.getMaterialCode(), surplus);
-                }
-            }
-        }
-        context.setMonthSurplusMap(monthSurplusMap);
-        log.debug("月底计划余量加载完成, 数量: {}", monthSurplusMap.size());
-    }
 
     /**
-     * 加载指定日期的物料日完成量，按"物料+完成日期"建立Map。
+     * 加载指定日期的物料日完成量，按"物料+示方类型+完成日期"建立Map。
      *
      * @param context     排程上下文
      * @param factoryCode 分厂编号
@@ -1610,7 +1592,7 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
                 if (StringUtils.isEmpty(finishQty.getMaterialCode())) {
                     continue;
                 }
-                String key = buildMaterialDayKey(finishQty.getMaterialCode(), dayStart);
+                String key = buildMaterialDayKey(finishQty.getMaterialCode(), finishQty.getLhType(), dayStart);
                 materialDayFinishedQtyMap.merge(key, resolveDayFinishedQty(finishQty), Integer::sum);
             }
         }
@@ -1620,7 +1602,7 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
     }
 
     /**
-     * 加载月累计完成量（截至排产T-1日（包含）），按物料编号建立Map。
+     * 加载月累计完成量（截至排产T-1日（包含）），按物料编号+示方类型建立Map。
      *
      * @param context     排程上下文
      * @param factoryCode 分厂编号
@@ -1731,14 +1713,12 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
                 if (StringUtils.isEmpty(finishQty.getMaterialCode())) {
                     continue;
                 }
-                monthFinishedQtyMap.merge(
-                        finishQty.getMaterialCode(),
-                        resolveDayFinishedQty(finishQty),
-                        Integer::sum);
+                String materialStatusKey = buildMaterialStatusKey(finishQty.getMaterialCode(), finishQty.getLhType());
+                monthFinishedQtyMap.merge(materialStatusKey, resolveDayFinishedQty(finishQty), Integer::sum);
                 // 逐日Map仅保留完成量非空的日期；0是有效数据，供“最近一次完成量”判断停止回溯。
                 if (Objects.nonNull(finishQty.getDayFinishQty())) {
                     materialMonthDailyFinishedQtyMap.merge(
-                            buildMaterialDayKey(finishQty.getMaterialCode(),
+                            buildMaterialDayKey(finishQty.getMaterialCode(), finishQty.getLhType(),
                                     LhScheduleTimeUtil.clearTime(finishQty.getFinishDate())),
                             resolveDayFinishedQty(finishQty),
                             Integer::sum);
@@ -1754,7 +1734,7 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
     }
 
     /**
-     * 按月计划物料初始化月累计完成量，确保目标月无完成记录时下游按0处理，不回退到上月完成量。
+     * 按月计划物料+产品状态初始化月累计完成量，确保目标月无完成记录时下游按0处理，不回退到上月完成量。
      *
      * @param context 排程上下文
      * @return 月计划物料完成量Map
@@ -1768,13 +1748,14 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
             if (Objects.isNull(plan) || StringUtils.isEmpty(plan.getMaterialCode())) {
                 continue;
             }
-            materialMonthFinishedQtyMap.putIfAbsent(plan.getMaterialCode(), 0);
+            materialMonthFinishedQtyMap.putIfAbsent(
+                    buildMaterialStatusKey(plan.getMaterialCode(), plan.getProductStatus()), 0);
         }
         return materialMonthFinishedQtyMap;
     }
 
     /**
-     * 按指定年月的已加载月计划物料初始化月累计完成量。
+     * 按指定年月的已加载月计划物料+产品状态初始化月累计完成量。
      *
      * @param context 排程上下文
      * @param year 年份
@@ -1791,7 +1772,8 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
                     || !isMonthPlanBelongToMonth(plan, year, month)) {
                 continue;
             }
-            materialMonthFinishedQtyMap.putIfAbsent(plan.getMaterialCode(), 0);
+            materialMonthFinishedQtyMap.putIfAbsent(
+                    buildMaterialStatusKey(plan.getMaterialCode(), plan.getProductStatus()), 0);
         }
         return materialMonthFinishedQtyMap;
     }
@@ -1816,10 +1798,10 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
     }
 
     /**
-     * 将单月物料完成量写入物料+年月维度Map。
+     * 将单月物料+产品状态完成量写入物料+产品状态+年月维度Map。
      *
-     * @param monthFinishedQtyMap 单月物料完成量
-     * @param materialMonthFinishedQtyByMonthMap 物料+年月维度完成量
+     * @param monthFinishedQtyMap 单月物料+产品状态完成量
+     * @param materialMonthFinishedQtyByMonthMap 物料+产品状态+年月维度完成量
      * @param year 年份
      * @param month 月份
      */
@@ -1881,14 +1863,31 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
     }
 
     /**
-     * 生成"物料+完成日期"聚合Key。
+     * 构建"物料+产品状态"聚合Key。
      *
      * @param materialCode 物料编码
+     * @param productStatus 产品状态或示方类型
+     * @return 聚合Key
+     */
+    private String buildMaterialStatusKey(String materialCode, String productStatus) {
+        String trimmedProductStatus = StringUtils.trimToEmpty(productStatus);
+        if (StringUtils.isEmpty(trimmedProductStatus)) {
+            return materialCode;
+        }
+        return materialCode + "_" + trimmedProductStatus;
+    }
+
+    /**
+     * 生成"物料+产品状态+完成日期"聚合Key。
+     *
+     * @param materialCode 物料编码
+     * @param productStatus 产品状态或示方类型
      * @param finishDate 完成日期
      * @return 聚合Key
      */
-    private String buildMaterialDayKey(String materialCode, Date finishDate) {
-        return materialCode + "_" + LhScheduleTimeUtil.formatDate(LhScheduleTimeUtil.clearTime(finishDate));
+    private String buildMaterialDayKey(String materialCode, String productStatus, Date finishDate) {
+        return buildMaterialStatusKey(materialCode, productStatus) + "_"
+                + LhScheduleTimeUtil.formatDate(LhScheduleTimeUtil.clearTime(finishDate));
     }
 
     /**

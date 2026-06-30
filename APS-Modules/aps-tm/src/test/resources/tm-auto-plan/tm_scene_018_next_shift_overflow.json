@@ -1,7 +1,7 @@
 {
   "sceneCode": "TM_SCENE_018",
   "caseName": "TM_SCENE_018_next_shift_overflow",
-  "description": "TM_SCENE_018：同班全部不足，滚动到后续班次",
+  "description": "TM_SCENE_018：当前机台产能不足，下一班同机台优先后继续顺延承接",
   "designSteps": [
     "Step15",
     "Step17",
@@ -111,6 +111,13 @@
         "treadCode": "TM_TREAD_1801",
         "machineCode": "TM_M02",
         "shiftOrder": 2,
+        "sequence": 1,
+        "planQty": 300
+      },
+      {
+        "treadCode": "TM_TREAD_1801",
+        "machineCode": "TM_M01",
+        "shiftOrder": 3,
         "sequence": 1,
         "planQty": 100
       }
