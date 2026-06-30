@@ -154,7 +154,7 @@ public class Cd90ShiftResourceCommitter {
         BigDecimal trialQuantity = trial.getFinalSchedulableQuantity() == null
                 ? BigDecimal.ZERO : trial.getFinalSchedulableQuantity();
         BigDecimal result = trialQuantity.signum() > 0 ? laneQuantity.min(trialQuantity) : laneQuantity;
-        return normalize(result);
+        return normalizeCommittedQuantity(result);
     }
 
     private int adjustedRemainingSeconds(Cd90ShiftCommitRequest request, Cd90MachineTrial trial,
@@ -168,6 +168,16 @@ public class Cd90ShiftResourceCommitter {
                 .divide(trialQuantity, 0, RoundingMode.CEILING).intValueExact();
         return Math.max(0, beforeSeconds - trial.getAgingDelaySeconds()
                 - trial.getChangeSeconds() - productionSeconds);
+    }
+
+    /**
+     * 归一化最终提交计划量。当前过渡规则按整数米向上取整，后续改为整卷/整车/整条时只替换本方法。
+     */
+    private BigDecimal normalizeCommittedQuantity(BigDecimal quantity) {
+        if (quantity == null || quantity.signum() <= 0) {
+            return BigDecimal.ZERO;
+        }
+        return quantity.setScale(0, RoundingMode.CEILING);
     }
 
     private BigDecimal normalize(BigDecimal value) {
