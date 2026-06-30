@@ -114,8 +114,9 @@ public class Cd90SingleShiftScheduleExecutor implements Cd90SingleShiftScheduleS
                         BigDecimal.ZERO, reason, attemptTraces.size() + 1));
                 continue;
             }
-            BigDecimal netDemand = continueDemand ? normalize(rawDemand)
-                    : roundUpByCraftWidth(shift, clothCode, rawDemand, construction.getCraftWidth());
+            BigDecimal netDemand = continueDemand ? this.normalize(rawDemand)
+                    : roundUpByUnitLength(shift, clothCode, rawDemand,
+                    construction.getUnitConsumeMillimeter(), construction.getCraftWidth());
             if (input.getBigRollAgingDataMissingCodes() != null
                     && input.getBigRollAgingDataMissingCodes().contains(construction.getBigRollCode())) {
                 String reason = "DATA_MISSING";
@@ -196,26 +197,31 @@ public class Cd90SingleShiftScheduleExecutor implements Cd90SingleShiftScheduleS
                 ? BigDecimal.ZERO : demand.getNetDemandQuantity();
     }
 
-    private BigDecimal roundUpByCraftWidth(Cd90ShiftDescriptor shift,
+    private BigDecimal roundUpByUnitLength(Cd90ShiftDescriptor shift,
                                            String clothCode,
                                            BigDecimal rawDemand,
+                                           BigDecimal unitConsumeMillimeter,
                                            BigDecimal craftWidth) {
         if (rawDemand == null || rawDemand.signum() <= 0) {
             return BigDecimal.ZERO;
         }
-        if (craftWidth == null || craftWidth.signum() <= 0) {
-            log.warn("[直裁自动排程] 直裁宽度缺失，无法按整条取整，沿用原始净需求, classField={}, clothCode={}, rawDemand={}",
+        if (unitConsumeMillimeter == null || unitConsumeMillimeter.signum() <= 0) {
+            log.warn("[直裁自动排程] 单片直裁长度缺失，无法按胎体片数取整，沿用原始净需求, classField={}, clothCode={}, rawDemand={}",
                     shift.getClassField(), clothCode, rawDemand);
-            return rawDemand;
+            return this.normalize(rawDemand);
         }
-        // craftWidth来源施工表TIRE_FABRIC_CRAFT1/2/3，单位毫米，需转为米后与rawDemand（单位米）运算。
+        if (craftWidth == null || craftWidth.signum() <= 0) {
+            log.warn("[直裁自动排程] 单片直裁宽度缺失，无法按胎体片数换算需求，沿用原始净需求, classField={}, clothCode={}, rawDemand={}",
+                    shift.getClassField(), clothCode, rawDemand);
+            return this.normalize(rawDemand);
+        }
+        // rawDemand 是按胎体长度累计的需求米数；先按单片长度算片数，再用单片直裁宽换算为直裁排程净需求。
+        BigDecimal unitLengthInMeters = unitConsumeMillimeter.divide(BigDecimal.valueOf(1000), 10, RoundingMode.HALF_UP);
         BigDecimal craftWidthInMeters = craftWidth.divide(BigDecimal.valueOf(1000), 10, RoundingMode.HALF_UP);
-        BigDecimal stripCount = rawDemand.divide(craftWidthInMeters, 0, RoundingMode.CEILING);
-        BigDecimal roundedDemand = this.normalize(stripCount.multiply(craftWidthInMeters));
-        if (roundedDemand.compareTo(rawDemand) != 0) {
-            log.info("[直裁自动排程] 净需求按直裁宽度向上取整, classField={}, clothCode={}, rawDemand={}, craftWidth={}mm, roundedDemand={}",
-                    shift.getClassField(), clothCode, rawDemand, craftWidth, roundedDemand);
-        }
+        BigDecimal pieceCount = rawDemand.divide(unitLengthInMeters, 0, RoundingMode.CEILING);
+        BigDecimal roundedDemand = this.normalize(pieceCount.multiply(craftWidthInMeters));
+        log.info("[直裁自动排程] 净需求按单片长度取整并按直裁宽度换算, classField={}, clothCode={}, rawDemand={}, unitLength={}mm, craftWidth={}mm, pieceCount={}, roundedDemand={}",
+                shift.getClassField(), clothCode, rawDemand, unitConsumeMillimeter, craftWidth, pieceCount, roundedDemand);
         return roundedDemand;
     }
 
