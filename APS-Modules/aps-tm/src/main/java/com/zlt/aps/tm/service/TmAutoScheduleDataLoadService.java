@@ -41,6 +41,8 @@ public class TmAutoScheduleDataLoadService {
 
     private static final String PARAM_DEFAULT_CURL_LENGTH = "TM_DEFAULT_CURL_LENGTH";
 
+    private static final String PARAM_TOOL_TOTAL_QTY = "TM_TOOL_TOTAL_QTY";
+
     private static final String PARAM_SHUTDOWN_REDISTRIBUTION_ENABLED = "TM_SHUTDOWN_REDISTRIBUTION_ENABLED";
 
     private static final String PARAM_PLAN_QTY_STRATEGY = "TM_PLAN_QTY_STRATEGY";
@@ -168,6 +170,7 @@ public class TmAutoScheduleDataLoadService {
         putDefaultParam(paramMap, PARAM_MIN_STOCK_CLASS, "1");
         putDefaultParam(paramMap, PARAM_MIN_START_QTY, "0");
         putDefaultParam(paramMap, PARAM_DEFAULT_CURL_LENGTH, "0");
+        putDefaultParam(paramMap, PARAM_TOOL_TOTAL_QTY, "0");
         putDefaultParam(paramMap, PARAM_SHUTDOWN_REDISTRIBUTION_ENABLED, "1");
         putDefaultParam(paramMap, PARAM_PLAN_QTY_STRATEGY, "DEFAULT");
         putDefaultParam(paramMap, PARAM_TASK_SORT_STRATEGY, "DEFAULT");
@@ -458,6 +461,7 @@ public class TmAutoScheduleDataLoadService {
         String algorithmCode = getParamValue(context, PARAM_ALGORITHM_SWITCH, "1");
         BigDecimal minStartQty = getDecimalParam(context, PARAM_MIN_START_QTY);
         BigDecimal defaultCurlLength = getDecimalParam(context, PARAM_DEFAULT_CURL_LENGTH);
+        BigDecimal toolTotalQty = getDecimalParam(context, PARAM_TOOL_TOTAL_QTY);
         Integer guardShiftCount = getIntegerParam(context, PARAM_MIN_STOCK_CLASS, 1);
         Integer newSpecLookbackDays = getPositiveIntegerParam(context, PARAM_NEW_SPEC_LOOKBACK_DAYS, 7);
         Integer newSpecAdvanceShiftCount = getPositiveIntegerParam(context, PARAM_NEW_SPEC_ADVANCE_SHIFT_COUNT, 2);
@@ -506,6 +510,9 @@ public class TmAutoScheduleDataLoadService {
                 taskDraft.setGuardShiftCount(guardShiftCount);
                 taskDraft.setMinStartQty(minStartQty);
                 taskDraft.setDefaultCurlRollLength(defaultCurlLength);
+                if (toolTotalQty.compareTo(BigDecimal.ZERO) > 0) {
+                    taskDraft.setTotalToolQty(toolTotalQty);
+                }
                 if (noShutdownAvailableShift && !isShiftOpen(tmCalendar, targetShiftOrder) && isShiftOpen(cxCalendar, shiftOrder)) {
                     taskDraft.setUnplannedReasonCode("TM_SHUTDOWN_NO_AVAILABLE_SHIFT");
                     taskDraft.setUnplannedReasonDesc("胎面停产且无可分配班次，成型需求无法重分配");
@@ -513,7 +520,7 @@ public class TmAutoScheduleDataLoadService {
                 taskDraftList.add(taskDraft);
             }
         }
-        appendExperimentSpecTasks(context, taskDraftList, lossSettingList, minStartQty, defaultCurlLength);
+        appendExperimentSpecTasks(context, taskDraftList, lossSettingList, minStartQty, defaultCurlLength, toolTotalQty);
         return taskDraftList;
     }
 
@@ -525,10 +532,11 @@ public class TmAutoScheduleDataLoadService {
      * @param lossSettingList 损耗配置列表
      * @param minStartQty 最小起排量
      * @param defaultCurlLength 默认卷曲长度
+     * @param toolTotalQty 总工装数量
      */
     private void appendExperimentSpecTasks(TmScheduleContext context, List<TmTaskDraft> taskDraftList,
                                            List<TmLossSetting> lossSettingList, BigDecimal minStartQty,
-                                           BigDecimal defaultCurlLength) {
+                                           BigDecimal defaultCurlLength, BigDecimal toolTotalQty) {
         Integer lookbackDays = getPositiveIntegerParam(context, PARAM_EXPERIMENT_SPEC_LOOKBACK_DAYS, 5);
         BigDecimal experimentPlanQty = getPositiveDecimalParam(context, PARAM_EXPERIMENT_SPEC_PLAN_QTY, BigDecimal.valueOf(30));
         if (experimentPlanQty.compareTo(BigDecimal.ZERO) <= 0) {
@@ -563,7 +571,7 @@ public class TmAutoScheduleDataLoadService {
                 continue;
             }
             taskDraftList.add(buildExperimentSpecTask(treadRows.get(0), experimentPlanQty, experimentSpecInfo,
-                    lossSettingList, minStartQty, defaultCurlLength));
+                    lossSettingList, minStartQty, defaultCurlLength, toolTotalQty));
         }
     }
 
@@ -715,7 +723,7 @@ public class TmAutoScheduleDataLoadService {
     private TmTaskDraft buildExperimentSpecTask(TmExperimentSpecMonthPlanRowVo row, BigDecimal experimentPlanQty,
                                                 TmExperimentSpecInfo experimentSpecInfo,
                                                 List<TmLossSetting> lossSettingList, BigDecimal minStartQty,
-                                                BigDecimal defaultCurlLength) {
+                                                BigDecimal defaultCurlLength, BigDecimal toolTotalQty) {
         TmTaskDraft taskDraft = new TmTaskDraft();
         taskDraft.setOrderNo("EXP-" + StrUtil.blankToDefault(row.getProductionNo(), String.valueOf(row.getMonthPlanId()))
                 + "-CLASS" + EXPERIMENT_SPEC_SHIFT_ORDER);
@@ -737,6 +745,9 @@ public class TmAutoScheduleDataLoadService {
         taskDraft.setBaseDemandQty(experimentPlanQty);
         taskDraft.setMinStartQty(minStartQty);
         taskDraft.setDefaultCurlRollLength(defaultCurlLength);
+        if (toolTotalQty.compareTo(BigDecimal.ZERO) > 0) {
+            taskDraft.setTotalToolQty(toolTotalQty);
+        }
         taskDraft.setExperimentSpecInfo(experimentSpecInfo);
         experimentSpecInfo.setMergedToExistingTask(Boolean.FALSE);
         return taskDraft;

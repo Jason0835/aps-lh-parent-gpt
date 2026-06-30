@@ -256,8 +256,8 @@
 
 - `TmPlanBootstrapService`：生成 `batch_no`、`trace_id`，加载全局上下文。
 - `TmInventoryPredictService`：读取 `T_TM_STOCK` 和损耗设置，计算预计库存和供应时长。
-- `TmPlanCalcService`：计算计划量、预计划、收尾、小批量补卷等。计划量计算前从库存预测初始化 per-tread 班初滚动库存 `remainingStockMap`（初值14点预计库存），并按胎面编码、班次顺序稳定排序，任务完成后回写交接班预计库存。
-- `TmMachineAssignService`：基于机台、口型板、定点/禁排、胶料机台关系筛选候选机台；选中机台后按 `machineCode + shiftOrder` 计算剩余产能，当前班产能不足时先压缩本班计划量，剩余计划量优先由同班次其他匹配且有剩余产能的机台承接；该班次所有匹配机台均不足时，再滚动到后续班次并继续按匹配机台剩余产能分配。全部候选机台被过滤时，按候选 `filterReasonCode` 归类未排原因：全部 `NO_REMAIN_CAPACITY`→`CAPACITY_NOT_ENOUGH`，全部 `MOUTH_PLATE_NOT_MATCH`→`MOUTH_PLATE_NOT_MATCH`，全部 `GLUE_MACHINE_NOT_MATCH`→`GLUE_MACHINE_NOT_ALLOWED`，`MACHINE_DISABLED`/定点规则/混合原因→`NO_AVAILABLE_MACHINE` 兜底。
+- `TmPlanCalcService`：计算计划量、预计划、收尾、小批量补卷等。计划量计算前从库存预测初始化 per-tread 班初滚动库存 `remainingStockMap`（初值14点预计库存），同时初始化全局可用工装池 `availableToolQty = 总工装数量 - sum(各胎面14点预计库存 / 对应卷曲长度)`；任务按班次、胎面编码稳定排序，完成后分别回写交接班预计库存和全局剩余工装。
+- `TmMachineAssignService`：基于机台、口型板、定点/禁排、胶料机台关系筛选候选机台；选中机台后按 `machineCode + shiftOrder` 计算真实剩余产能。当前班只写入该机台可承接的计划量，产能受限溢出量与计划量策略产生的工装溢出量统一从下一班开始顺延；下一班同机台同胎面已有任务时先合并计划量，没有同胎面任务时创建顺延任务。顺延仍必须满足开班、停机、口型、胶料、定点/禁排和产能过滤，6 班后仍未排完的数量写未排。全部候选机台被过滤时，按候选 `filterReasonCode` 归类未排原因：全部 `NO_REMAIN_CAPACITY`→`CAPACITY_NOT_ENOUGH`，全部 `MOUTH_PLATE_NOT_MATCH`→`MOUTH_PLATE_NOT_MATCH`，全部 `GLUE_MACHINE_NOT_MATCH`→`GLUE_MACHINE_NOT_ALLOWED`，`MACHINE_DISABLED`/定点规则/混合原因→`NO_AVAILABLE_MACHINE` 兜底。
 - `TmCapacityBalanceService`：做产能均衡、中夜班移量、次日回拉和任务顺序计算。当前本轮不实现生产级产能均衡算法，仅保留流程占位和风险记录。
 - `TmSnapshotBuildService`：生成 `T_TM_SCHEDULE_RESULT_EXPLAIN`。
 - `TmPersistService`：统一落结果和解释信息。
@@ -323,7 +323,7 @@
 
 典型操作：
 
-- 自动排程：从待排优先队列取出任务，经过候选机台过滤和评分后，追加到目标 `machineCode + scheduleDate + shiftOrder` 链表尾部，并重算该链表顺序和预计时间。目标机台同班次剩余产能不足时，当前班仅写入可承接的计划量，溢出量优先由同班次其他匹配且有剩余产能的机台承接；当前班所有匹配机台均不足时，再滚动到后续班次并继续按匹配机台剩余产能分配，最多滚动到 6 班，6 班后仍未排完的数量写未排并记录产能不足原因。
+- 自动排程：从待排优先队列取出任务，经过候选机台过滤和评分后，追加到目标 `machineCode + scheduleDate + shiftOrder` 链表。目标机台同班次剩余产能不足时，当前班仅写入可承接的计划量；工装限制溢出量和产能溢出量统一从下一班开始顺延，优先合并同机台同胎面既有任务，没有同胎面任务时创建顺延任务继续承接，最多滚动到 6 班，6 班后仍未排完的数量写未排并记录产能不足原因。顺延任务的 `businessKeySuffix` 必须包含来源工单标识、来源班次、目标班次、目标机台或未排标识和顺延序号，避免多个同胎面、同胶料、同口型、同班次来源任务写解释表时触发 `task_business_key` 唯一键冲突。
 - 插单：根据前端传入的插入位置定位节点，调用链表插入方法放到指定节点之后；若位置为空，则追加到链尾。插入后只重排当前节点之后的任务。
 - 删除：从链表摘除目标节点，目标节点前驱和后继直接连接；删除后重排后续节点顺序。
 - 转机台：先从原机台链表摘除节点，再插入目标机台链表指定位置或链尾；原机台链和目标机台链分别重算。
@@ -347,7 +347,9 @@
 - `baseDemandQty = max(currentShiftDemandQty - rollingStockQty, guardDemandQty - rollingStockQty, 0)`：库存对当前班需求与保证范围需求各冲减后取大，不低于 0。
 - 回写 `remainingStockMap`：`planStockQty = max(rollingStockQty + finalPlanQty - currentShiftDemandQty, 0)`，供该胎面下一班作为班初滚动库存。
 
-后续链路在 `baseDemandQty` 上继续：收尾判断 → 损耗补偿 → 工装限制 → 最小起排 → 卷数取整 → 产能压缩。库存抵扣后 `baseDemandQty` 为 0 时，最小起排不再补足，该班生成 0 计划量任务并保留落库。`TmGuardDemandQtyStrategy`/`TmNextShiftDemandQtyStrategy` 的需求量（`demandQty`，用于排序/解释）使用库存缺口语义：`demandQty = max(currentShiftStockGapQty, stockGapQty)`。
+后续链路在 `baseDemandQty` 上继续：非收尾规格执行最小起排 → 卷数取整 → 工装限制；收尾规格执行收尾余量 → 损耗补偿 → 工装限制，不走最小起排和卷数取整。工装限制是硬上限，限制后的最终计划量允许低于最小起排量，也允许不是卷曲长度整倍数；被工装压掉的 `toolOverflowQty` 进入机台分配阶段统一顺延。机台产能不在计划量策略内提前压缩，统一由 `TmMachineAssignService` 按真实机台班次剩余产能处理。库存抵扣后 `baseDemandQty` 为 0 时，最小起排不再补足，该班生成 0 计划量任务并保留落库。`TmGuardDemandQtyStrategy`/`TmNextShiftDemandQtyStrategy` 的需求量（`demandQty`，用于排序/解释）使用库存缺口语义：`demandQty = max(currentShiftStockGapQty, stockGapQty)`。
+
+工装滚动字段说明：`availableToolQty` 为当前任务计算前的全局可用工装数量；`toolUsedQty` 为当前任务按 `(finalPlanQty + currentShiftDemandQty) / curlRollLength` 折算的占用工装数量；`remainingToolQty` 为当前任务计算后的全局剩余工装数量，传递给下一任务继续滚动。示例：总工装 6，TR-A 和 TR-Z 的 14 点预计库存均为 100 米，卷曲长度均为 100 米，则首个任务 `availableToolQty = 6 - 100/100 - 100/100 = 4`；一班 TR-Z 最终计划量 100、当前班成型需求 200，则 `toolUsedQty = (100 + 200) / 100 = 3`，`remainingToolQty = 1`；二班 TR-A 计算前 `availableToolQty = 1`，若最终计划量 0、当前班成型需求 100，则 `toolUsedQty = 1`，`remainingToolQty = 0`。
 
 #### 7.4.2 新规格提前排产窗口
 
@@ -357,7 +359,7 @@
 
 提前窗口：先按 `TM_FORMING_SHIFT_OFFSET` 计算成型需求偏移后的正常目标班次 `normalTargetShift`，不改变需求量对应的成型班次口径；若命中新规格，则目标班次调整为 `max(CLASS1, normalTargetShift - TM_NEW_SPEC_ADVANCE_SHIFT_COUNT)`。`TM_NEW_SPEC_ADVANCE_SHIFT_COUNT` 只影响新规格提前排产目标班次，不替代或覆盖 `TM_FORMING_SHIFT_OFFSET`。解释对象记录 `normalTargetShift`、`adjustedTargetShift`、`adjustedTargetWindow`、需求班次和需求量。非新规格仍使用原 `shiftOrder`，规则只记录检测证据。
 
-分配规则：新规格任务仍进入现有 `MACHINE_ASSIGN`，由机台剩余产能承接。提前窗口内产能不足时，沿用现有同班次多机台拆分和后续班次滚动逻辑；滚动到 6 班后仍不足的数量写未排。解释表 `rule_hit_json` 增加 `NEW_SPEC_DETECT`、`NEW_SPEC_ADVANCE_WINDOW`、`NEW_SPEC_ADVANCE_RESULT`：分别记录判定依据、目标班次调整依据和实际机台分配/滚动结果。
+分配规则：新规格任务仍进入现有 `MACHINE_ASSIGN`，由机台剩余产能承接。提前窗口内产能不足时，当前班只写入可承接量，溢出量从下一班开始顺延并优先合并同机台同胎面计划；滚动到 6 班后仍不足的数量写未排。解释表 `rule_hit_json` 增加 `NEW_SPEC_DETECT`、`NEW_SPEC_ADVANCE_WINDOW`、`NEW_SPEC_ADVANCE_RESULT`：分别记录判定依据、目标班次调整依据和实际机台分配/滚动结果。
 
 #### 7.4.3 实验规格补充需求
 
@@ -613,7 +615,7 @@ AND enable_status = '1'
 - 看板查询测试：不同日期能取各自最新有效 `batch_no`。
 - 看板查询测试：未排任务进入 `unassignedTasks`，不混入机台单元格。
 - 看板查询测试：`open_flag='0'` 的班次不可作为可排班次。
-- 自动排程测试：覆盖多机台、多规格、库存不足、检修停机、定点冲突、禁排、胶料不匹配、外协、新规格。`machineCode + shiftOrder` 已排量接近最大班产时，新增任务必须按剩余产能压缩当前班，并将溢出量滚动顺延到同机台后续班次；6 班后仍不足时剩余量写未排。
+- 自动排程测试：覆盖多机台、多规格、库存不足、检修停机、定点冲突、禁排、胶料不匹配、外协、新规格。`machineCode + shiftOrder` 已排量接近最大班产时，新增任务必须按真实剩余产能截断当前班，并将溢出量从下一班开始优先滚动顺延到同机台后续班次；6 班后仍不足时剩余量写未排。
 - 人工调整测试：覆盖插单、调量、转机台、删除、归并、合并班次；操作后重新查询看板能看到最新结果。
 - 发布测试：覆盖成功、失败、超时、重复回执和任务版本变更后的重发。
 - 追溯测试：任一任务必须能查到计划量计算依据、命中规则、候选机台、未排原因、人工事件和发布记录。
@@ -872,22 +874,25 @@ Process:
   卷曲长度来源：T_TM_CURL_ROLL.CURL_LENGTH（优先取胎面卷曲长度，没有时取参数默认值）；
   标准长度来源：T_MDM_CONSTRUCTION_INFO.TREAD_SHOULDER_LENGTH（成型生产一个胎胚需要多少米的胎面量）；
   损耗率来源：T_TM_LOSS_SETTING.LOSS_RATE（优先级：机台+胎面 > 胎面 > 机台 > 默认值）；
-  非收尾规格：实际排产 = 向上取整(baseDemandQty / 卷曲长度) × 卷曲长度（卷曲长度是指一个工装能卷曲多少米的胎面）；
-  收尾规格：实际排产 = 成型余量 × TREAD_SHOULDER_LENGTH × (100% + 损耗率)（不需要按卷曲长度向上取整）；
-  如果 0 < baseDemandQty < TM_MIN_START_QTY，则补足到最小起排量；
-  非收尾规格需补够最低起排量并补成工装卷曲长度的整倍数，收尾规格严格按余量排产并补加损耗率。
+  非收尾规格：若 0 < baseDemandQty < TM_MIN_START_QTY，先补足到最小起排量，再按卷曲长度向上取整；
+  收尾规格：实际排产 = 成型余量 × TREAD_SHOULDER_LENGTH × (100% + 损耗率)，不执行最小起排和卷曲长度向上取整；
+  非收尾规格在工装限制前形成待排量，工装限制作为最终硬上限。
+  工装限制后允许低于最小起排量或非整卷倍数，差额作为 `toolOverflowQty` 顺延。
 Output:
   ActualPlanQty(tread_code, shift_code, actual_plan_qty, tail_flag)
 
-Step12 按可用工装限制计划量
+Step12 按全局滚动可用工装限制计划量
 Process:
   planQty 初始值 = actual_plan_qty；
-  当前可用工装数量 = 总工装数量 - (14点胎面预计库存 / 工装卷曲长度)；
-  下班次可用工装数量 = 上班次可用工装数量 - 当前班计划量 / 工装卷曲长度 + 成型对应班次胎面需求量 / 工装卷曲长度；
-  每个班次计划量调整时，都重新计算该班次可用工装数量；
-  工装不足时，按可用工装数量 * 工装卷曲长度反推最大可排米数并截断计划量。
+  工装数量是本轮排程的全局池，不按胎面分别重复使用；同一轮待排任务携带的总工装数量必须一致，否则拒绝排程；
+  首个任务班初可用工装数量 availableToolQty = 总工装数量 - sum(各胎面14点预计库存 / 对应卷曲长度)；
+  任务按 shiftOrder 升序、treadCode 升序稳定计算，同班多个任务也逐任务扣减工装池；
+  当前任务工装限制上限 = 当前任务班初 availableToolQty * 当前胎面卷曲长度；
+  工装不足时截断计划量；截断差额记为 `toolOverflowQty`，不丢弃，进入下一班顺延合并；
+  当前任务占用工装 toolUsedQty = (当前任务最终计划量 finalPlanQty + 当前班成型胎面需求 currentShiftDemandQty) / 当前胎面卷曲长度；
+  当前任务后剩余工装 remainingToolQty = max(availableToolQty - toolUsedQty, 0)，作为下一任务的班初 `availableToolQty`。
 Output:
-  ToolLimitedQty(tread_code, shift_code, plan_qty)
+  ToolLimitedQty(tread_code, shift_code, plan_qty, available_tool_qty, tool_used_qty, remaining_tool_qty)
 
 Step13 处理停产收尾和开产阈值
 Process:
@@ -924,7 +929,7 @@ Process:
   完全同分时按机台编码升序排序，保证相同输入结果稳定；
   扣减产能 = (检修时长H + 上个规格切换时长H + 上个胶料切换时长H) * 机台生产速度；
   机台剩余产能 = 胎面机台表最大产能 - 扣减产能 - 已排计划量；
-  如果 planQty > 机台剩余产能，则压到机台剩余产能；调整后允许低于需求量，但不能超过产能。
+  如果 planQty > 机台剩余产能，则当前班压到机台剩余产能；产能受限差额不在计划量策略中丢弃，而是从下一班开始顺延，优先合并同机台同胎面既有计划。
 Output:
   SelectedMachine(machine_code, remain_capacity, score_result)
 
@@ -942,12 +947,12 @@ Process:
 Output:
   AssignedScheduleResult(result_id, machine_code, class{N}_plan_qty, class{N}_sequence)
 
-Step17 滚动到下一班
+Step17 库存与未排量滚动到下一班
 Process:
   切换班次后，重新计算本班开始预计库存和库存保证班数；
-  rollingStockQty(下班开始) = rollingStockQty(当前班开始) + 当前班胎面计划量 - 当前班成型胎面需求量；
+  rollingStockQty(下班开始) = max(rollingStockQty(当前班开始) + 当前班胎面计划量 - 当前班成型胎面需求量, 0)；
   创建本机台下一个班的任务链，并继承必要的上班次任务链信息；
-  更新机台剩余产能、胎面库存预测和待排规格优先级。
+  工装限制和产能受限产生的未排量从下一班开始继续承接，优先合并同机台同胎面既有任务；更新机台剩余产能、胎面库存预测和待排规格优先级。
 Output:
   NextShiftCtx
 
@@ -1826,10 +1831,10 @@ graph LR
 
 - `ITmPlanQtyStrategy`：胎面计划量算法策略。
   - `TmPlanQtyResult calculate(TmTaskDraft draft, TmScheduleContext context)`：计算计划量。`draft` 传待排任务；返回基础需求、库存抵扣、损耗、工装限制、收尾补正、最终计划量。
-  - 默认实现按以下顺序调整：基础需求量 -> 工装限制 -> 最小起排量 -> 卷数取整 -> 产能压缩。
-  - 工装限制按 `总工装数量 - (14点胎面预计库存 / 工装卷曲长度)` 计算当前可用工装数量，后续班次按 `上班次可用工装数量 - 当前班计划量 / 工装卷曲长度 + 成型对应班次胎面需求量 / 工装卷曲长度` 滚动。
-  - 卷曲长度优先取胎面卷曲长度，没有时取默认工装卷曲长度；计划量不足整卷时向上补足到整倍数。
-  - 产能压缩按 `机台剩余产能 = 胎面机台表最大产能 - 扣减产能 - 已排计划量`，单个任务写入某机台某班次的计划量不能超过该机台该班次剩余产能；压缩后的剩余量优先在同班次匹配机台间分配，同班次均不足时再滚动到后续班次。
+  - 默认实现按以下顺序调整：非收尾为基础需求量 -> 库存抵扣 -> 最小起排量 -> 卷数取整 -> 工装限制；收尾为收尾余量 -> 损耗补偿 -> 工装限制。
+  - 工装限制使用 `TmPlanCalcService` 逐任务滚动下发的全局 `availableToolQty`，当前任务硬上限为 `availableToolQty * 当前胎面卷曲长度`；限制后的差额写入 `toolOverflowQty`，进入机台分配顺延。任务完成后按 `(finalPlanQty + currentShiftDemandQty) / 当前胎面卷曲长度` 扣减全局工装池，得到下一任务的 `remainingToolQty`。
+  - 卷曲长度优先取胎面卷曲长度，没有时取默认工装卷曲长度；非收尾计划量不足整卷时先向上补足到整倍数，再执行工装限制。
+  - 机台产能不在计划量策略内提前压缩；`TmMachineAssignService` 按 `机台剩余产能 = 胎面机台表最大产能 - 扣减产能 - 已排计划量` 计算真实可排量，产能受限差额从下一班开始顺延，优先合并同机台同胎面任务。
   - 涉及试验胶版本的位置只保留 `// steve's TODO：试验胶版本化口径待确认后接入` 注释，不实现版本化逻辑。
 
 - `ITmMachineFilterRule`：胎面候选机台过滤规则。
@@ -1960,7 +1965,7 @@ TmDataLoadService.loadAllData(context)
 5. 人工操作链表测试：插单、删除、调量、转机台后顺序重算正确。
 6. 解释与日志测试：同一 `batchNo + traceId` 能串起参数、库存、排序、过滤、评分、落库全过程。
 7. 旧批次与插单测试：全未发布旧批次确认后可重排；存在非未发布旧批次拒绝；插单位置不在第二顺序之后拒绝。
-8. 场景测试数据：具体模拟数据放在 `docs/tm` 目录，至少覆盖 6 点库存 1000 米、未来 2 班需求 600/500 米、未来需求为 0、工装限制、最小起排、卷数取整、产能压缩、主胶料/基部胶评分和同分机台编码排序。
+8. 场景测试数据：具体模拟数据放在 `docs/tm` 目录，至少覆盖 6 点库存 1000 米、未来 2 班需求 600/500 米、未来需求为 0、工装限制、最小起排、卷数取整、工装/产能顺延合并、主胶料/基部胶评分和同分机台编码排序。
 9. 编译验证：实现代码后优先执行 `mvn -pl APS-Modules/aps-tm -am -DskipTests compile`；若改动 API 层，补跑 `mvn -pl Aps-Api/tm-api -am -DskipTests compile`。
 
 验收标准：

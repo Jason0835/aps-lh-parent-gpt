@@ -168,7 +168,7 @@ public class TmAutoPlanTestReportScenarioTest {
     }
 
     /**
-     * 测试内容：TM_SCENE_017 当前班产能不足，同班其他机台承接。
+     * 测试内容：TM_SCENE_017 当前班产能不足，未排量顺延到下一班同机台承接。
      */
     @Test
     public void shouldReportScene017SameShiftOtherMachineOverflow() {
@@ -176,7 +176,7 @@ public class TmAutoPlanTestReportScenarioTest {
     }
 
     /**
-     * 测试内容：TM_SCENE_018 同班全部不足，滚动到后续班次。
+     * 测试内容：TM_SCENE_018 当前机台产能不足，下一班同机台优先后继续顺延承接。
      */
     @Test
     public void shouldReportScene018NextShiftOverflow() {

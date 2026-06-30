@@ -13,9 +13,9 @@ import java.math.RoundingMode;
 /**
  * 胎面默认计划量策略。
  *
- * <p>按基础需求、库存抵扣、工装限制、最小起排、卷数取整、产能压缩顺序计算计划量。
+ * <p>非收尾按基础需求、库存抵扣、最小起排、卷数取整、工装限制顺序计算计划量。
  * 库存抵扣使用任务草稿中的当前班初滚动库存，对当前班需求与保证范围需求各冲减后取大。
- * 本策略只依赖任务草稿中已明确的数据，不读取数据库，不修改任务链。
+ * 本策略只依赖任务草稿中已明确的数据，不读取数据库，不修改任务链；机台产能由机台分配步骤统一处理。
  * 通过 {@link Component} 注册为 Spring Bean，由 {@link TmStrategyRegistry} 按编码 "DEFAULT" 收集。</p>
  */
 @Component
@@ -51,21 +51,24 @@ public class TmDefaultPlanQtyStrategy implements ITmPlanQtyStrategy {
         BigDecimal currentDemand = nvl(taskDraft.getCurrentShiftDemandQty());
         BigDecimal guardDemand = nvl(taskDraft.getGuardDemandQty());
         BigDecimal grossDemand = currentDemand.max(guardDemand);
-        // 库存直接抵扣当前班生产量：当前班初滚动库存对当前班需求与保证范围需求各冲减后取大。
+        // 库存抵扣以当前班初滚动库存为准，基础应排量取当前班缺口和保证缺口的较大值。
         BigDecimal stock = nvl(taskDraft.getRollingStockQty());
         BigDecimal stockDeductQty = stock.min(grossDemand);
         BigDecimal planQty = currentDemand.subtract(stock)
                 .max(guardDemand.subtract(stock))
                 .max(BigDecimal.ZERO);
         taskDraft.setStockDeductQty(stockDeductQty);
+
         TmPlanQtyResult result = new TmPlanQtyResult();
         result.setBaseDemandQty(planQty);
-
-        boolean tailTask = isTailTask(taskDraft, planQty);
         result.setLossAddQty(BigDecimal.ZERO);
         result.setMinStartAdjustQty(BigDecimal.ZERO);
         result.setTailRoundAdjustQty(BigDecimal.ZERO);
+        result.setToolLimitAdjustQty(BigDecimal.ZERO);
+        result.setToolOverflowQty(BigDecimal.ZERO);
+        result.setCapacityAdjustQty(BigDecimal.ZERO);
 
+        boolean tailTask = isTailTask(taskDraft, planQty);
         if (tailTask) {
             BigDecimal beforeTail = planQty;
             BigDecimal tailBaseQty = nvl(taskDraft.getTailBalanceQty()).multiply(nvl(taskDraft.getTreadShoulderLength()));
@@ -73,13 +76,7 @@ public class TmDefaultPlanQtyStrategy implements ITmPlanQtyStrategy {
             planQty = tailBaseQty.add(lossAddQty);
             result.setLossAddQty(lossAddQty);
             result.setTailRoundAdjustQty(planQty.subtract(beforeTail));
-        }
-
-        BigDecimal beforeTool = planQty;
-        planQty = applyToolLimit(taskDraft, planQty);
-        result.setToolLimitAdjustQty(planQty.subtract(beforeTool));
-
-        if (!tailTask) {
+        } else {
             BigDecimal beforeMinStart = planQty;
             planQty = applyMinStartQty(taskDraft, planQty);
             result.setMinStartAdjustQty(planQty.subtract(beforeMinStart));
@@ -89,15 +86,16 @@ public class TmDefaultPlanQtyStrategy implements ITmPlanQtyStrategy {
             result.setTailRoundAdjustQty(planQty.subtract(beforeRound));
         }
 
-        BigDecimal beforeCapacity = planQty;
-        planQty = applyCapacity(taskDraft, planQty);
-        result.setCapacityAdjustQty(planQty.subtract(beforeCapacity));
+        BigDecimal beforeTool = planQty;
+        planQty = applyToolLimit(taskDraft, planQty);
+        result.setToolLimitAdjustQty(planQty.subtract(beforeTool));
+        result.setToolOverflowQty(beforeTool.subtract(planQty).max(BigDecimal.ZERO));
 
         result.setFinalPlanQty(planQty);
         taskDraft.setPlanStockQty(calculateHandoverStock(stock, currentDemand, planQty));
         result.setCalcFormulaDesc(tailTask
-                ? "收尾余量->损耗补偿->工装限制->产能压缩"
-                : "基础需求->库存抵扣->工装限制->最小起排->卷数取整->产能压缩");
+                ? "收尾余量->损耗补偿->工装限制"
+                : "基础需求->库存抵扣->最小起排->卷数取整->工装限制");
         taskDraft.setPlanQty(planQty);
         return result;
     }
@@ -142,12 +140,18 @@ public class TmDefaultPlanQtyStrategy implements ITmPlanQtyStrategy {
      */
     private BigDecimal applyToolLimit(TmTaskDraft taskDraft, BigDecimal planQty) {
         BigDecimal curlLength = resolveCurlLength(taskDraft);
-        if (taskDraft.getTotalToolQty() == null || curlLength.compareTo(BigDecimal.ZERO) <= 0) {
+        if (curlLength.compareTo(BigDecimal.ZERO) <= 0) {
             return planQty;
         }
-        BigDecimal usedToolQty = nvl(taskDraft.getRollingStockQty()).divide(curlLength, 6, RoundingMode.HALF_UP);
-        BigDecimal availableToolQty = taskDraft.getTotalToolQty().subtract(usedToolQty).max(BigDecimal.ZERO);
-        BigDecimal maxPlanQty = availableToolQty.multiply(curlLength);
+        BigDecimal availableToolQty = taskDraft.getAvailableToolQty();
+        if (availableToolQty == null) {
+            if (taskDraft.getTotalToolQty() == null) {
+                return planQty;
+            }
+            BigDecimal usedToolQty = nvl(taskDraft.getRollingStockQty()).divide(curlLength, 6, RoundingMode.HALF_UP);
+            availableToolQty = taskDraft.getTotalToolQty().subtract(usedToolQty);
+        }
+        BigDecimal maxPlanQty = availableToolQty.max(BigDecimal.ZERO).multiply(curlLength);
         return planQty.min(maxPlanQty);
     }
 

@@ -151,16 +151,15 @@ public class TmMachineAssignService implements ITmMachineAssignService {
                 task.getBusinessKey(), bestCandidate.getMachineCode(), bestCandidate.getScore());
         addAssignTrace(context, task, "PASS", bestCandidate.getMachineCode(), null, null);
 
-        // 按同班次匹配机台优先拆分任务，当前班全部匹配机台不足时再滚动到后续班次。
+        // 当前班只按选中机台真实产能排，工装和产能溢出量统一从下一班开始顺延承接。
         this.appendTaskWithCapacityOverflow(task, bestCandidate, passedCandidates, filterRule, scoreStrategy, context);
     }
 
     /**
-     * 按同班次匹配机台优先拆分并追加任务。
+     * 按当前班真实产能分配，并将工装或产能溢出量从下一班开始顺延承接。
      *
-     * <p>首段仍使用本轮评分选中的机台；当该机台当前班剩余产能不足时，
-     * 剩余量先在当前班其他匹配机台中继续分配。当前班所有匹配机台均无剩余产能后，
-     * 再滚动到下一班并重复同样逻辑，最多滚动到六班。</p>
+     * <p>首段只使用本轮评分选中的机台，避免同班其他机台抢先承接导致下班计划丢失。
+     * 未排上的产能溢出量与工装限制溢出量合并为统一顺延量，后续班次优先合并同机台同胎面任务。</p>
      *
      * @param task 当前待排任务
      * @param selectedCandidate 已选中候选机台
@@ -174,31 +173,81 @@ public class TmMachineAssignService implements ITmMachineAssignService {
                                                 ITmMachineFilterRule filterRule,
                                                 ITmMachineScoreStrategy scoreStrategy,
                                                 TmScheduleContext context) {
-        BigDecimal remainingQty = nvl(task.getPlanQty());
+        BigDecimal currentShiftPlanQty = nvl(task.getPlanQty());
+        BigDecimal toolOverflowQty = nvl(task.getToolOverflowQty());
         Integer startShiftOrder = task.getShiftOrder() == null ? 1 : task.getShiftOrder();
-        if (remainingQty.compareTo(BigDecimal.ZERO) <= 0) {
+        if (currentShiftPlanQty.compareTo(BigDecimal.ZERO) <= 0 && toolOverflowQty.compareTo(BigDecimal.ZERO) <= 0) {
             this.appendZeroPlanTask(task, selectedCandidate, context, startShiftOrder);
             return;
         }
-        boolean plannedAny = false;
+
+        BigDecimal capacityOverflowQty = BigDecimal.ZERO;
+        task.setShiftOrder(startShiftOrder);
+        if (currentShiftPlanQty.compareTo(BigDecimal.ZERO) > 0) {
+            BigDecimal machineSpeed = this.resolveMachineSpeed(task, selectedCandidate);
+            TmMachineCandidate runtimeCandidate = this.copyCandidate(selectedCandidate);
+            runtimeCandidate.setMachineSpeed(machineSpeed);
+            runtimeCandidate.setRemainCapacity(this.resolveRemainCapacity(task, context, runtimeCandidate, machineSpeed));
+            BigDecimal remainCapacity = nvl(runtimeCandidate.getRemainCapacity());
+            BigDecimal assignedQty = currentShiftPlanQty.min(remainCapacity);
+            capacityOverflowQty = currentShiftPlanQty.subtract(assignedQty);
+            if (assignedQty.compareTo(BigDecimal.ZERO) > 0) {
+                this.applyCapacitySplitResult(task, currentShiftPlanQty, assignedQty, remainCapacity, machineSpeed,
+                        capacityOverflowQty.compareTo(BigDecimal.ZERO) > 0 ? "当前班产能受限" : "当前班选中机台承接");
+                this.addContextTask(context, task);
+                context.getCandidateTraceMap().put(task.getBusinessKey(), Collections.singletonList(runtimeCandidate));
+                this.addCapacitySplitTrace(context, task, currentShiftPlanQty, assignedQty, capacityOverflowQty,
+                        remainCapacity, runtimeCandidate.getMachineCode(), true);
+                this.addAssignTrace(context, task, "PASS", runtimeCandidate.getMachineCode(), null, null);
+                this.taskChainScheduleService.appendAutoTask(task, runtimeCandidate, context);
+            }
+        }
+
+        BigDecimal carryoverQty = capacityOverflowQty.add(toolOverflowQty);
+        if (carryoverQty.compareTo(BigDecimal.ZERO) > 0) {
+            this.appendCarryoverQty(task, selectedCandidate, firstShiftCandidates, filterRule, scoreStrategy, context,
+                    carryoverQty, capacityOverflowQty, toolOverflowQty, startShiftOrder);
+        }
+    }
+
+    /**
+     * 从来源班次下一班开始承接顺延量，优先合并同机台同胎面任务。
+     *
+     * @param sourceTask 来源任务
+     * @param selectedCandidate 来源任务选中机台
+     * @param firstShiftCandidates 来源班次已通过过滤候选机台
+     * @param filterRule 机台过滤规则
+     * @param scoreStrategy 机台评分策略
+     * @param context 排程上下文
+     * @param carryoverQty 顺延总量
+     * @param capacityOverflowQty 产能溢出量
+     * @param toolOverflowQty 工装溢出量
+     * @param sourceShiftOrder 来源班次
+     */
+    private void appendCarryoverQty(TmTaskDraft sourceTask, TmMachineCandidate selectedCandidate,
+                                    List<TmMachineCandidate> firstShiftCandidates,
+                                    ITmMachineFilterRule filterRule, ITmMachineScoreStrategy scoreStrategy,
+                                    TmScheduleContext context, BigDecimal carryoverQty,
+                                    BigDecimal capacityOverflowQty, BigDecimal toolOverflowQty,
+                                    Integer sourceShiftOrder) {
+        BigDecimal remainingQty = nvl(carryoverQty);
+        String sourceType = this.resolveCarryoverSourceType(capacityOverflowQty, toolOverflowQty);
         int overflowIndex = 1;
-        for (int shiftOrder = startShiftOrder; shiftOrder <= 6 && remainingQty.compareTo(BigDecimal.ZERO) > 0; shiftOrder++) {
-            List<TmMachineCandidate> shiftCandidates = this.resolveShiftAssignableCandidates(task, context, filterRule,
-                    scoreStrategy, firstShiftCandidates, selectedCandidate, shiftOrder, remainingQty, startShiftOrder,
-                    plannedAny, overflowIndex);
+        for (int shiftOrder = sourceShiftOrder + 1; shiftOrder <= 6 && remainingQty.compareTo(BigDecimal.ZERO) > 0; shiftOrder++) {
+            List<TmMachineCandidate> shiftCandidates = this.resolveShiftAssignableCandidates(sourceTask, context,
+                    filterRule, scoreStrategy, firstShiftCandidates, selectedCandidate, shiftOrder, remainingQty,
+                    sourceShiftOrder, overflowIndex);
             for (TmMachineCandidate candidate : shiftCandidates) {
                 if (remainingQty.compareTo(BigDecimal.ZERO) <= 0) {
                     break;
                 }
-                TmTaskDraft currentTask = plannedAny
-                        ? this.copyOverflowTask(task, shiftOrder, remainingQty, startShiftOrder, overflowIndex,
-                        candidate.getMachineCode()) : task;
-                currentTask.setShiftOrder(shiftOrder);
-                BigDecimal machineSpeed = this.resolveMachineSpeed(currentTask, candidate);
+                BigDecimal machineSpeed = this.resolveMachineSpeed(sourceTask, candidate);
                 TmMachineCandidate runtimeCandidate = this.copyCandidate(candidate);
                 runtimeCandidate.setMachineSpeed(machineSpeed);
-                runtimeCandidate.setRemainCapacity(this.resolveRemainCapacity(currentTask, context, runtimeCandidate,
-                        machineSpeed));
+                TmTaskDraft capacityProbeTask = this.copyOverflowTask(sourceTask, shiftOrder, remainingQty,
+                        sourceShiftOrder, overflowIndex, candidate.getMachineCode());
+                runtimeCandidate.setRemainCapacity(this.resolveRemainCapacity(capacityProbeTask, context,
+                        runtimeCandidate, machineSpeed));
                 BigDecimal remainCapacity = nvl(runtimeCandidate.getRemainCapacity());
                 if (remainCapacity.compareTo(BigDecimal.ZERO) <= 0) {
                     continue;
@@ -206,22 +255,36 @@ public class TmMachineAssignService implements ITmMachineAssignService {
                 BigDecimal beforeAssignQty = remainingQty;
                 BigDecimal assignedQty = remainingQty.min(remainCapacity);
                 BigDecimal overflowQty = remainingQty.subtract(assignedQty);
-                this.applyCapacitySplitResult(currentTask, beforeAssignQty, assignedQty, remainCapacity, machineSpeed,
-                        Objects.equals(shiftOrder, startShiftOrder) ? "同班次匹配机台承接" : "产能不足顺延到后续班次承接");
-                this.addContextTask(context, currentTask);
-                context.getCandidateTraceMap().put(currentTask.getBusinessKey(), Collections.singletonList(runtimeCandidate));
-                this.addCapacitySplitTrace(context, currentTask, beforeAssignQty, assignedQty, overflowQty,
-                        remainCapacity, runtimeCandidate.getMachineCode(), Objects.equals(shiftOrder, startShiftOrder));
-                this.addAssignTrace(context, currentTask, "PASS", runtimeCandidate.getMachineCode(), null, null);
-                this.taskChainScheduleService.appendAutoTask(currentTask, runtimeCandidate, context);
-                plannedAny = true;
+                TmTaskDraft mergeTarget = this.findMergeTarget(context, candidate.getMachineCode(), shiftOrder, sourceTask);
+                if (mergeTarget != null) {
+                    BigDecimal beforeMergeQty = nvl(mergeTarget.getPlanQty());
+                    BigDecimal afterMergeQty = beforeMergeQty.add(assignedQty);
+                    this.taskChainScheduleService.changeQty(mergeTarget.getBusinessKey(), afterMergeQty, shiftOrder, context);
+                    context.getCandidateTraceMap().put(mergeTarget.getBusinessKey(), Collections.singletonList(runtimeCandidate));
+                    this.addCarryoverTrace(context, mergeTarget, sourceTask, sourceType, assignedQty, sourceShiftOrder,
+                            shiftOrder, candidate.getMachineCode(), beforeMergeQty, afterMergeQty, true);
+                    this.addAssignTrace(context, mergeTarget, "PASS", candidate.getMachineCode(), null, null);
+                } else {
+                    TmTaskDraft overflowTask = this.copyOverflowTask(sourceTask, shiftOrder, assignedQty,
+                            sourceShiftOrder, overflowIndex, candidate.getMachineCode());
+                    this.applyCapacitySplitResult(overflowTask, beforeAssignQty, assignedQty, remainCapacity,
+                            machineSpeed, "顺延量承接");
+                    this.addContextTask(context, overflowTask);
+                    context.getCandidateTraceMap().put(overflowTask.getBusinessKey(), Collections.singletonList(runtimeCandidate));
+                    this.addCapacitySplitTrace(context, overflowTask, beforeAssignQty, assignedQty, overflowQty,
+                            remainCapacity, runtimeCandidate.getMachineCode(), false);
+                    this.addCarryoverTrace(context, overflowTask, sourceTask, sourceType, assignedQty, sourceShiftOrder,
+                            shiftOrder, candidate.getMachineCode(), BigDecimal.ZERO, assignedQty, false);
+                    this.addAssignTrace(context, overflowTask, "PASS", runtimeCandidate.getMachineCode(), null, null);
+                    this.taskChainScheduleService.prependAutoTask(overflowTask, runtimeCandidate, context);
+                }
                 remainingQty = overflowQty;
                 overflowIndex++;
             }
         }
         if (remainingQty.compareTo(BigDecimal.ZERO) > 0) {
-            TmTaskDraft unplannedTask = plannedAny
-                    ? this.copyOverflowTask(task, 6, remainingQty, startShiftOrder, overflowIndex, "UNPLANNED") : task;
+            TmTaskDraft unplannedTask = this.copyOverflowTask(sourceTask, 6, remainingQty, sourceShiftOrder,
+                    overflowIndex, "UNPLANNED");
             unplannedTask.setPlanQty(remainingQty);
             unplannedTask.setShiftOrder(6);
             unplannedTask.setMachineCode(null);
@@ -229,6 +292,8 @@ public class TmMachineAssignService implements ITmMachineAssignService {
             unplannedTask.setUnplannedReasonDesc(TmUnplannedReasonEnum.CAPACITY_NOT_ENOUGH.getDesc());
             this.addContextTask(context, unplannedTask);
             this.addCapacityUnplannedTrace(context, unplannedTask, remainingQty);
+            this.addCarryoverTrace(context, unplannedTask, sourceTask, sourceType, remainingQty, sourceShiftOrder,
+                    6, null, BigDecimal.ZERO, BigDecimal.ZERO, false);
             this.addAssignTrace(context, unplannedTask, "REJECT", null,
                     TmUnplannedReasonEnum.CAPACITY_NOT_ENOUGH.getCode(),
                     TmUnplannedReasonEnum.CAPACITY_NOT_ENOUGH.getDesc());
@@ -236,18 +301,17 @@ public class TmMachineAssignService implements ITmMachineAssignService {
     }
 
     /**
-     * 获取指定班次可承接当前剩余计划量的候选机台列表。
+     * 获取指定班次可承接顺延量的候选机台列表。
      *
      * @param sourceTask 来源任务
      * @param context 排程上下文
      * @param filterRule 机台过滤规则
      * @param scoreStrategy 机台评分策略
-     * @param firstShiftCandidates 当前班已评分候选机台
+     * @param firstShiftCandidates 来源班次已评分候选机台
      * @param selectedCandidate 首选机台
      * @param shiftOrder 当前处理班次
      * @param remainingQty 当前剩余待排量
-     * @param startShiftOrder 来源班次
-     * @param plannedAny 是否已经生成过分配段
+     * @param sourceShiftOrder 来源班次
      * @param overflowIndex 当前拆分序号
      * @return 已排序候选机台列表
      */
@@ -258,20 +322,18 @@ public class TmMachineAssignService implements ITmMachineAssignService {
                                                                       TmMachineCandidate selectedCandidate,
                                                                       Integer shiftOrder,
                                                                       BigDecimal remainingQty,
-                                                                      Integer startShiftOrder,
-                                                                      boolean plannedAny,
+                                                                      Integer sourceShiftOrder,
                                                                       int overflowIndex) {
-        if (Objects.equals(shiftOrder, startShiftOrder) && CollUtil.isNotEmpty(firstShiftCandidates)) {
-            return this.sortCandidatesWithSelectedFirst(firstShiftCandidates, selectedCandidate);
-        }
-        TmTaskDraft probeTask = plannedAny
-                ? this.copyOverflowTask(sourceTask, shiftOrder, remainingQty, startShiftOrder, overflowIndex, "PROBE")
-                : sourceTask;
+        TmTaskDraft probeTask = this.copyOverflowTask(sourceTask, shiftOrder, remainingQty, sourceShiftOrder,
+                overflowIndex, "PROBE");
         probeTask.setShiftOrder(shiftOrder);
         probeTask.setPlanQty(remainingQty);
-        return this.buildPassedAndScoredCandidates(probeTask, context, filterRule, scoreStrategy);
+        List<TmMachineCandidate> candidates = this.buildPassedAndScoredCandidates(probeTask, context, filterRule, scoreStrategy);
+        if (CollUtil.isEmpty(candidates) && CollUtil.isNotEmpty(firstShiftCandidates)) {
+            candidates = this.buildPassedAndScoredCandidates(probeTask, context, filterRule, scoreStrategy);
+        }
+        return this.sortCandidatesWithSelectedFirst(candidates, selectedCandidate);
     }
-
     /**
      * 重新执行候选机台过滤和评分，用于溢出量进入后续班次后的跨机台承接判断。
      *
@@ -398,6 +460,8 @@ public class TmMachineAssignService implements ITmMachineAssignService {
         target.setSupplyHours(source.getSupplyHours());
         target.setCurrentShiftStockGapQty(source.getCurrentShiftStockGapQty());
         target.setStockGapQty(source.getStockGapQty());
+        target.setStockDeductQty(source.getStockDeductQty());
+        target.setPlanStockQty(source.getPlanStockQty());
         target.setPlanQty(planQty);
         target.setTreadShoulderLength(source.getTreadShoulderLength());
         target.setTailFlag(source.getTailFlag());
@@ -406,6 +470,7 @@ public class TmMachineAssignService implements ITmMachineAssignService {
         target.setBaseDemandQty(source.getBaseDemandQty());
         target.setLossAddQty(source.getLossAddQty());
         target.setToolLimitAdjustQty(source.getToolLimitAdjustQty());
+        target.setToolOverflowQty(BigDecimal.ZERO);
         target.setMinStartAdjustQty(source.getMinStartAdjustQty());
         target.setTailRoundAdjustQty(source.getTailRoundAdjustQty());
         target.setCalcFormulaDesc(source.getCalcFormulaDesc());
@@ -419,8 +484,45 @@ public class TmMachineAssignService implements ITmMachineAssignService {
         target.setDemandQty(source.getDemandQty());
         target.setNewSpecInfo(source.getNewSpecInfo());
         target.setExperimentSpecInfo(source.getExperimentSpecInfo());
-        target.setBusinessKeySuffix("OVERFLOW_FROM_CLASS" + sourceShift + "_TO_CLASS" + shiftOrder + "_" + machineCode + "_" + overflowIndex);
+        target.setBusinessKeySuffix(this.buildOverflowBusinessKeySuffix(source, sourceShift, shiftOrder, machineCode, overflowIndex));
         return target;
+    }
+    /**
+     * 构建顺延任务业务键后缀，来源工单参与唯一性，避免同规格同班次多个未排副本冲突。
+     *
+     * @param source        来源任务
+     * @param sourceShift   来源班次
+     * @param shiftOrder    顺延后的班次
+     * @param machineCode   承接机台编码或未排标识
+     * @param overflowIndex 顺延序号
+     * @return 顺延任务业务键后缀
+     */
+    private String buildOverflowBusinessKeySuffix(TmTaskDraft source, Integer sourceShift, Integer shiftOrder,
+                                                  String machineCode, int overflowIndex) {
+        String sourceOrderToken = this.normalizeBusinessKeyToken(source == null ? null : source.getOrderNo());
+        if (StrUtil.isBlank(sourceOrderToken) && source != null) {
+            sourceOrderToken = this.normalizeBusinessKeyToken(source.getSourceOrderNos());
+        }
+        if (StrUtil.isBlank(sourceOrderToken)) {
+            sourceOrderToken = "UNKNOWN";
+        }
+        return "OVERFLOW_SRC_" + sourceOrderToken + "_FROM_CLASS" + sourceShift
+                + "_TO_CLASS" + shiftOrder + "_" + machineCode + "_" + overflowIndex;
+    }
+
+    /**
+     * 标准化业务键片段，保留可读前缀并追加哈希，控制长度且降低不同来源工单冲突概率。
+     *
+     * @param value 原始业务值
+     * @return 可用于业务键后缀的片段
+     */
+    private String normalizeBusinessKeyToken(String value) {
+        if (StrUtil.isBlank(value)) {
+            return null;
+        }
+        String normalizedValue = value.trim().replaceAll("[^A-Za-z0-9]", "_");
+        String readablePrefix = normalizedValue.length() > 24 ? normalizedValue.substring(0, 24) : normalizedValue;
+        return readablePrefix + "_" + Integer.toHexString(value.hashCode());
     }
 
     /**
@@ -431,6 +533,7 @@ public class TmMachineAssignService implements ITmMachineAssignService {
      * @param assignedQty     本班实际分配量
      * @param remainCapacity  本班分配前剩余产能
      * @param machineSpeed    机台速度
+     * @param splitDesc       拆分说明
      */
     private void applyCapacitySplitResult(TmTaskDraft task, BigDecimal beforeAssignQty, BigDecimal assignedQty,
                                           BigDecimal remainCapacity, BigDecimal machineSpeed, String splitDesc) {
@@ -460,6 +563,83 @@ public class TmMachineAssignService implements ITmMachineAssignService {
         }
     }
 
+    /**
+     * 查找目标机台班次内可合并的同胎面任务。
+     *
+     * @param context 排程上下文
+     * @param machineCode 目标机台编码
+     * @param shiftOrder 目标班次
+     * @param sourceTask 来源任务
+     * @return 可合并任务；不存在时返回 null
+     */
+    private TmTaskDraft findMergeTarget(TmScheduleContext context, String machineCode, Integer shiftOrder,
+                                        TmTaskDraft sourceTask) {
+        ScheduleTaskLinkedList<TmTaskDraft> chain = context.getTaskChain(machineCode, shiftOrder);
+        if (chain == null || CollUtil.isEmpty(chain.toList())) {
+            return null;
+        }
+        for (ScheduleTaskNode<TmTaskDraft> node : chain.toList()) {
+            TmTaskDraft targetTask = node.getTask();
+            if (targetTask != null
+                    && Objects.equals(targetTask.getTreadCode(), sourceTask.getTreadCode())
+                    && Objects.equals(targetTask.getGlueCode(), sourceTask.getGlueCode())
+                    && Objects.equals(targetTask.getMouthPlateCode(), sourceTask.getMouthPlateCode())) {
+                return targetTask;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * 解析顺延来源类型。
+     *
+     * @param capacityOverflowQty 产能溢出量
+     * @param toolOverflowQty 工装溢出量
+     * @return 来源类型编码
+     */
+    private String resolveCarryoverSourceType(BigDecimal capacityOverflowQty, BigDecimal toolOverflowQty) {
+        boolean capacityOverflow = nvl(capacityOverflowQty).compareTo(BigDecimal.ZERO) > 0;
+        boolean toolOverflow = nvl(toolOverflowQty).compareTo(BigDecimal.ZERO) > 0;
+        if (capacityOverflow && toolOverflow) {
+            return "CAPACITY_LIMIT,TOOL_LIMIT";
+        }
+        if (toolOverflow) {
+            return "TOOL_LIMIT";
+        }
+        return "CAPACITY_LIMIT";
+    }
+
+    /**
+     * 写入统一顺延承接证据。
+     *
+     * @param context 排程上下文
+     * @param targetTask 目标任务
+     * @param sourceTask 来源任务
+     * @param sourceType 来源类型
+     * @param carryoverQty 本次承接顺延量
+     * @param sourceShiftOrder 来源班次
+     * @param targetShiftOrder 目标班次
+     * @param targetMachineCode 目标机台
+     * @param beforeMergeQty 合并前计划量
+     * @param afterMergeQty 合并后计划量
+     * @param merged 是否合并既有任务
+     */
+    private void addCarryoverTrace(TmScheduleContext context, TmTaskDraft targetTask, TmTaskDraft sourceTask,
+                                   String sourceType, BigDecimal carryoverQty, Integer sourceShiftOrder,
+                                   Integer targetShiftOrder, String targetMachineCode, BigDecimal beforeMergeQty,
+                                   BigDecimal afterMergeQty, boolean merged) {
+        Map<String, Object> evidence = new LinkedHashMap<>();
+        evidence.put("sourceType", sourceType);
+        evidence.put("sourceShiftOrder", sourceShiftOrder);
+        evidence.put("sourceTask", sourceTask == null ? null : sourceTask.getBusinessKey());
+        evidence.put("carryoverQty", carryoverQty);
+        evidence.put("targetShiftOrder", targetShiftOrder);
+        evidence.put("targetMachineCode", targetMachineCode);
+        evidence.put("merged", merged);
+        evidence.put("beforeMergePlanQty", beforeMergeQty);
+        evidence.put("afterMergePlanQty", afterMergeQty);
+        traceOf(context, targetTask).addRuleHit("PLAN_QTY_CARRYOVER", "PASS", evidence);
+    }
     /**
      * 写入产能拆分证据。
      *

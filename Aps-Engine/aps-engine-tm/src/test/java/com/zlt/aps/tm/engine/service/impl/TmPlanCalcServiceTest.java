@@ -179,6 +179,50 @@ public class TmPlanCalcServiceTest {
         assertEquals(BigDecimal.ZERO, context.getRemainingStockMap().get("TR-ROLL"));
     }
     /**
+     * 测试内容：验证全局工装池按班次顺序滚动，不被胎面编码排序打乱。
+     * 测试场景：二班胎面编码排序在一班之前，两个胎面共用 6 个工装，首班初始库存共占 2 个工装。
+     * 预期结果：先处理一班任务并扣减工装，二班任务只能使用一班扣减后的剩余工装。
+     */
+    @Test
+    public void calculateShouldRollGlobalToolQtyByShiftOrderBeforeTreadCode() {
+        TmPlanCalcService service = buildRealService();
+        TmScheduleContext context = new TmScheduleContext();
+        TmTaskDraft secondShiftTask = buildToolTask("ORD-TOOL-A2", "TR-A", 2, "100", "6", "100");
+        TmTaskDraft firstShiftTask = buildToolTask("ORD-TOOL-Z1", "TR-Z", 1, "200", "6", "100");
+        context.setTaskDraftList(Arrays.asList(secondShiftTask, firstShiftTask));
+        context.getStockForecastMap().put("TR-A", buildForecast("TR-A", "100"));
+        context.getStockForecastMap().put("TR-Z", buildForecast("TR-Z", "100"));
+
+        service.calculate(context);
+
+        assertEquals(new BigDecimal("4.000000"), firstShiftTask.getAvailableToolQty());
+        assertEquals(new BigDecimal("100"), firstShiftTask.getPlanQty());
+        assertEquals(new BigDecimal("3.000000"), firstShiftTask.getToolUsedQty());
+        assertEquals(new BigDecimal("1.000000"), firstShiftTask.getRemainingToolQty());
+        assertEquals(new BigDecimal("1.000000"), secondShiftTask.getAvailableToolQty());
+        assertEquals(BigDecimal.ZERO, secondShiftTask.getPlanQty());
+        assertEquals(new BigDecimal("1.000000"), secondShiftTask.getToolUsedQty());
+        assertEquals(BigDecimal.ZERO.setScale(6), secondShiftTask.getRemainingToolQty());
+    }
+
+    /**
+     * 测试内容：验证全局工装池发现任务总工装数不一致时拒绝排程。
+     * 测试场景：两个待排任务分别携带 6 和 5 的总工装数量。
+     * 预期结果：计划计算阶段抛出业务异常，避免使用不确定的全局工装池基准。
+     */
+    @Test(expected = ServiceException.class)
+    public void calculateShouldRejectInconsistentTotalToolQtyForGlobalToolPool() {
+        TmPlanCalcService service = buildRealService();
+        TmScheduleContext context = new TmScheduleContext();
+        TmTaskDraft firstTask = buildToolTask("ORD-TOOL-1", "TR-A", 1, "100", "6", "100");
+        TmTaskDraft secondTask = buildToolTask("ORD-TOOL-2", "TR-B", 1, "100", "5", "100");
+        context.setTaskDraftList(Arrays.asList(firstTask, secondTask));
+        context.getStockForecastMap().put("TR-A", buildForecast("TR-A", "0"));
+        context.getStockForecastMap().put("TR-B", buildForecast("TR-B", "0"));
+
+        service.calculate(context);
+    }
+    /**
      * 测试内容：验证收尾余量大于基础需求时不按收尾量覆盖计划量。
      * 测试场景：MARK_CLOSE_OUT_TIP 已折算为收尾标识，但收尾余量乘胎面肩长大于基础需求。
      * 预期结果：计划量保持基础需求量，不被更大的收尾余量放大。
@@ -241,6 +285,50 @@ public class TmPlanCalcServiceTest {
         task.setGlueCode("GL-" + orderNo);
         task.setMouthPlateCode("MP-" + orderNo);
         return task;
+    }
+
+    /**
+     * 构建排程参数快照值。
+     *
+     * @param paramCode  参数编码
+     * @param paramValue 参数值
+     * @return 参数快照值
+     */
+    /**
+     * 构建带工装数据的待排任务。
+     *
+     * @param orderNo 订单号
+     * @param treadCode 胎面编码
+     * @param shiftOrder 班次顺序
+     * @param currentDemand 当前班成型胎面需求
+     * @param totalToolQty 总工装数量
+     * @param curlRollLength 卷曲长度
+     * @return 待排任务草稿
+     */
+    private TmTaskDraft buildToolTask(String orderNo, String treadCode, int shiftOrder, String currentDemand,
+                                      String totalToolQty, String curlRollLength) {
+        TmTaskDraft task = buildTask(orderNo, treadCode);
+        task.setShiftOrder(shiftOrder);
+        task.setCurrentShiftDemandQty(new BigDecimal(currentDemand));
+        task.setGuardDemandQty(new BigDecimal(currentDemand));
+        task.setTotalToolQty(new BigDecimal(totalToolQty));
+        task.setCurlRollLength(new BigDecimal(curlRollLength));
+        return task;
+    }
+
+    /**
+     * 构建库存预测。
+     *
+     * @param treadCode 胎面编码
+     * @param rollingStockQty 14点预计库存
+     * @return 库存预测对象
+     */
+    private TmStockForecast buildForecast(String treadCode, String rollingStockQty) {
+        TmStockForecast forecast = new TmStockForecast();
+        forecast.setTreadCode(treadCode);
+        forecast.setSixClockStockQty(new BigDecimal(rollingStockQty));
+        forecast.setRollingStockQty(new BigDecimal(rollingStockQty));
+        return forecast;
     }
 
     /**
