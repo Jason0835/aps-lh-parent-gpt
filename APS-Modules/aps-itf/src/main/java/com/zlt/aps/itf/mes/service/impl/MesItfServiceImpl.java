@@ -2458,6 +2458,8 @@ public class MesItfServiceImpl implements MesItfService {
      * <p>业务规则：若 SKU 是量试(T)且同物料存在正规计划(productStatus=S)，
      * 则在日完成量表额外插入一条正规(S)记录，完成量取 MES 原始回传值（未经试制/量试规则调整），
      * 用于让量试合格品充抵正规订单需求。</p>
+     * <p>维度规则：所有比对、汇总、生成均以【完成日期+物料编码+示方类型】为维度。
+     * 同一物料不同完成日期的量试数据，会分别生成对应日期的正规充抵记录。</p>
      * <p>规则细节：
      * <ul>
      *   <li>仅处理量试(T)数据，试制(X)和正规(S)不参与</li>
@@ -2465,8 +2467,9 @@ public class MesItfServiceImpl implements MesItfService {
      *   <li>新增记录的 lhType = S（正规），后续 handleTrialFinishQtyRule 会跳过</li>
      *   <li>新增记录的 lhNo = 量试记录的 lhNo</li>
      *   <li>新增记录的 mesMaterialCode = 量试记录的 mesMaterialCode</li>
-     *   <li>同一物料当天多条量试记录时，按物料汇总只生成一条正规记录（完成量=sum）</li>
-     *   <li>仅当 MES 回传量试数据且 APS 存在正规计划时才新增</li>
+     *   <li>同一【完成日期+物料编码】下多条量试记录时，按该维度汇总只生成一条正规记录（完成量=sum）</li>
+     *   <li>不同完成日期的同物料量试数据，分别生成对应日期的正规记录</li>
+     *   <li>仅当 MES 回传量试数据且 APS 存在该物料的正规计划时才新增</li>
      * </ul>
      * </p>
      *
@@ -2484,10 +2487,11 @@ public class MesItfServiceImpl implements MesItfService {
             return Collections.emptyList();
         }
 
-        // Step1: 筛选量试(T)数据（使用MES原始完成量，不经试制/量试规则调整），按物料汇总完成量
-        // 同时保留每物料的任意一条量试记录作为模板（用于复制 lhNo、mesMaterialCode 等字段）
-        Map<String, Integer> materialFinishMap = new HashMap<>();
-        Map<String, LhDayFinishQty> materialTemplateMap = new HashMap<>();
+        // Step1: 筛选量试(T)数据（使用MES原始完成量，不经试制/量试规则调整）
+        // 维度：完成日期(yyyy-MM-dd) + 物料编码
+        // 同一【完成日期+物料编码】下的多条量试记录汇总完成量，并保留第一条作为模板
+        Map<String, Integer> dateMaterialFinishMap = new HashMap<>();
+        Map<String, LhDayFinishQty> dateMaterialTemplateMap = new HashMap<>();
         for (LhDayFinishQty item : syncList) {
             if (!TrialStatusEnum.MASS_TRIAL.getCode().equals(item.getLhType())) {
                 continue;
@@ -2496,43 +2500,81 @@ public class MesItfServiceImpl implements MesItfService {
                     || item.getDayFinishQty().compareTo(BigDecimal.ZERO) <= 0) {
                 continue;
             }
+            if (item.getFinishDate() == null) {
+                continue;
+            }
             String materialCode = item.getMaterialCode();
             if (StringUtils.isBlank(materialCode)) {
                 continue;
             }
-            materialFinishMap.merge(materialCode, item.getDayFinishQty().intValue(), Integer::sum);
-            // 保留第一条作为模板（同一物料的多条量试记录 lhNo/mesMaterialCode 一致）
-            materialTemplateMap.putIfAbsent(materialCode, item);
+            // 维度key：完成日期 + "|" + 物料编码
+            String dateStr = DateUtil.formatDate(item.getFinishDate());
+            String dimKey = dateStr + "|" + materialCode;
+            dateMaterialFinishMap.merge(dimKey, item.getDayFinishQty().intValue(), Integer::sum);
+            // 保留第一条作为模板（同一【完成日期+物料编码】的多条量试记录 lhNo/mesMaterialCode 一致）
+            dateMaterialTemplateMap.putIfAbsent(dimKey, item);
         }
-        if (materialFinishMap.isEmpty()) {
+        if (dateMaterialFinishMap.isEmpty()) {
             return Collections.emptyList();
         }
 
         // Step2: 查询同物料是否存在正规计划（APS数据源）
-        List<String> materialCodes = new ArrayList<>(materialFinishMap.keySet());
+        // 去重提取所有涉及的物料编码（一个物料可能跨多个完成日期）
+        List<String> materialCodes = dateMaterialFinishMap.keySet().stream()
+                .map(key -> key.split("\\|")[1])
+                .distinct()
+                .collect(Collectors.toList());
+        log.info("量试充抵正规：开始查询正规计划，factoryCode={}, year={}, month={}, 量试维度数={}, 物料数={}, 物料列表={}",
+                factoryCode, year, month, dateMaterialFinishMap.size(), materialCodes.size(), materialCodes);
+
         List<MpMonthPlanMonitor> formalPlans;
         try {
             DynamicDataSourceContextHolder.push(DataSource.APS);
+            log.info("量试充抵正规：当前数据源={}", DynamicDataSourceContextHolder.peek());
             formalPlans = mpMonthPlanMonitorEntityMapper.selectFormalPlanByMaterials(
                     factoryCode, year, month, materialCodes);
         } finally {
             DynamicDataSourceContextHolder.poll();
         }
+
+        log.info("量试充抵正规：查询正规计划完成，返回记录数={}",
+                formalPlans != null ? formalPlans.size() : 0);
+        if (formalPlans != null && !formalPlans.isEmpty()) {
+            for (MpMonthPlanMonitor plan : formalPlans) {
+                log.info("量试充抵正规：正规计划记录，materialCode={}, productStatus={}, constructionStage={}, scheduleQty={}, productionQty={}",
+                        plan.getMaterialCode(), plan.getProductStatus(), plan.getConstructionStage(),
+                        plan.getScheduleQty(), plan.getProductionQty());
+            }
+        }
+
         if (CollectionUtils.isEmpty(formalPlans)) {
-            log.info("量试充抵正规：未查询到正规计划记录，factoryCode={}, year={}, month={}, 量试物料数={}",
-                    factoryCode, year, month, materialCodes.size());
+            log.warn("量试充抵正规：未查询到正规计划记录，factoryCode={}, year={}, month={}, 量试物料数={}, 物料列表={}",
+                    factoryCode, year, month, materialCodes.size(), materialCodes);
             return Collections.emptyList();
         }
 
-        // Step3: 为每个存在正规计划的物料构造一条正规充抵记录（lhType=S，完成量=MES原始值汇总）
+        // 构建正规计划物料编码集合，用于快速判断某物料是否存在正规计划
+        Set<String> formalMaterialSet = formalPlans.stream()
+                .map(MpMonthPlanMonitor::getMaterialCode)
+                .collect(Collectors.toSet());
+
+        // Step3: 遍历【完成日期+物料编码】维度汇总结果，为存在正规计划的物料按日期生成正规充抵记录
         List<LhDayFinishQty> extraList = new ArrayList<>();
-        for (MpMonthPlanMonitor formalPlan : formalPlans) {
-            String materialCode = formalPlan.getMaterialCode();
-            Integer massTrialFinish = materialFinishMap.get(materialCode);
+        for (Map.Entry<String, Integer> entry : dateMaterialFinishMap.entrySet()) {
+            String dimKey = entry.getKey();
+            Integer massTrialFinish = entry.getValue();
             if (massTrialFinish == null || massTrialFinish <= 0) {
                 continue;
             }
-            LhDayFinishQty template = materialTemplateMap.get(materialCode);
+            // 从维度key解析出完成日期和物料编码
+            String[] parts = dimKey.split("\\|", 2);
+            String dateStr = parts[0];
+            String materialCode = parts[1];
+            // 仅当该物料存在正规计划时才生成充抵记录
+            if (!formalMaterialSet.contains(materialCode)) {
+                continue;
+            }
+            LhDayFinishQty template = dateMaterialTemplateMap.get(dimKey);
             if (template == null) {
                 continue;
             }
@@ -2544,7 +2586,7 @@ public class MesItfServiceImpl implements MesItfService {
             formalRecord.setLhType(TrialStatusEnum.FORMAL.getCode());
             // 完成量取 MES 原始汇总值（不经试制/量试规则调整）
             formalRecord.setDayFinishQty(BigDecimal.valueOf(massTrialFinish));
-            // lhNo、mesMaterialCode 已通过 copyProperties 从量试记录复制
+            // lhNo、mesMaterialCode、finishDate 已通过 copyProperties 从量试记录复制
             // 清除主键，作为新增记录
             formalRecord.setId(null);
 
@@ -2554,8 +2596,8 @@ public class MesItfServiceImpl implements MesItfService {
                     factoryCode, materialCode, year, month,
                     template.getFinishDate(), massTrialFinish, template.getLhNo());
         }
-        log.info("量试充抵正规：构造完成，factoryCode={}, yearMonth={}{}-{}, 量试物料数={}, 正规计划数={}, 新增正规记录数={}",
-                factoryCode, year, month, materialFinishMap.size(), formalPlans.size(), extraList.size());
+        log.info("量试充抵正规：构造完成，factoryCode={}, yearMonth={}{}-{}, 量试维度数={}, 正规计划数={}, 新增正规记录数={}",
+                factoryCode, year, month, dateMaterialFinishMap.size(), formalPlans.size(), extraList.size());
         return extraList;
     }
 

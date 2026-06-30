@@ -131,6 +131,11 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
      * 上月需加载的天数
      */
     private final static Integer LAST_MONTH_DAY = 10;
+    /**
+     * 警告列偏移值
+     */
+    private final static Integer WARNING_COLUMN_OFFSET = 33;
+    private final static Integer WARNING_COLUMN_OFFSET_FINAL = 32;
 
     @Override
     protected String getDocTypeCode() {
@@ -336,11 +341,11 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
                 s.setMaxTypeBlockQty(maxTypeBlockQtyMap.getOrDefault(s.getMainMaterialDesc(), 0));
             });
             //排序:最大型腔数倒序->胎胚描述->型腔数倒序->主花纹->活块数倒序->花纹->物料描述
-            structureList.sort(Comparator.comparing(FactoryMonthPlanMouldDayResultExportVo::getMouldCavityQty, Comparator.reverseOrder())
-                    .thenComparing(FactoryMonthPlanMouldDayResultExportVo::getMainMaterialDesc)
+            structureList.sort(Comparator.comparing(FactoryMonthPlanMouldDayResultExportVo::getMouldCavityQty, Comparator.nullsLast(Comparator.reverseOrder()))
+                    .thenComparing(FactoryMonthPlanMouldDayResultExportVo::getMainMaterialDesc, Comparator.nullsLast(String::compareTo))
 //                    .thenComparing(FactoryMonthPlanMouldDayResultExportVo::getMouldCavityQty, Comparator.reverseOrder())
                     .thenComparing(FactoryMonthPlanMouldDayResultExportVo::getMainPattern, Comparator.nullsLast(String::compareTo))
-                    .thenComparing(FactoryMonthPlanMouldDayResultExportVo::getTypeBlockQty, Comparator.reverseOrder())
+                    .thenComparing(FactoryMonthPlanMouldDayResultExportVo::getTypeBlockQty, Comparator.nullsLast(Comparator.reverseOrder()))
                     .thenComparing(FactoryMonthPlanMouldDayResultExportVo::getPattern, Comparator.nullsLast(String::compareTo))
                     .thenComparing(FactoryMonthPlanMouldDayResultExportVo::getMaterialDesc, Comparator.nullsLast(String::compareTo))
             );
@@ -509,7 +514,6 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
                 newRecord.setProductionType(finalResult.getProductionType());
                 newRecord.setHeightQty(0);
                 newRecord.setMidQty(0);
-                newRecord.setMidQty(0);
                 newRecord.setCycleReserveQty(0);
                 newRecord.setPostponeQty(0);
                 newRecord.setConventionReserveQty(0);
@@ -519,6 +523,8 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
                 newRecord.setDayVulcanizationQty(finalResult.getDayVulcanizationQty());
                 newRecord.setAverageSaleQty(finalResult.getAverageSaleQty());
                 newRecord.setInventorySalesRatio(finalResult.getInventorySalesRatio());
+                newRecord.setMouldCavityQty(0);
+                newRecord.setTypeBlockQty(0);
                 MdmMaterialInfo material = materialInfoMap.get(key);
                 if (material != null) {
                     newRecord.setSingleTireWeight(material.getSingleTireWeight());
@@ -741,10 +747,13 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
         //20260604+ 日排产量预警处理
         int warningHeaderRowIndex = DAY_TOTAL_WARNING_ROW_INDEX;
         InputStream inputStream;
+//        int warningColumnOffset; // 警告列偏移值
         if (isFinal) {
             inputStream = classLoader.getResourceAsStream("excelModel/factoryMonthPlanMouldFinalResultExportTemp.xlsx");
+//            warningColumnOffset = WARNING_COLUMN_OFFSET_FINAL;
         } else {
             inputStream = classLoader.getResourceAsStream("excelModel/factoryMonthPlanMouldDayResultExportTemp.xlsx");
+//            warningColumnOffset = WARNING_COLUMN_OFFSET;
         }
 
         // 2、加载字典数据
@@ -811,7 +820,7 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
                     .filter(r -> MonthPlanExportDataTypeEnum.CHANGE_MOULDS.getCode().equals(r.getDataType()) // 换模统计
                             || MonthPlanExportDataTypeEnum.TOTAL.getCode().equals(r.getDataType())) // 计划量统计
                     .collect(Collectors.toList());
-            int warningHeaderStartColumnIndex = tableMap.size() - 32;
+            int warningHeaderStartColumnIndex = tableMap.size() - WARNING_COLUMN_OFFSET;
             for (FactoryMonthPlanMouldDayResultExportVo exportVo : headList) {
                 this.setLastDayValue(exportVo, dayFieldNames); // 设置上月最后十天的值
                 Map<String, Object> listDataMap = this.buildListDataMap(exportVo, storTypeMap, productCategoryMap,

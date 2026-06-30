@@ -1318,6 +1318,9 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
             // 3.2.3、处理列表明细的数据
             Integer changeRank = 1; // 切换序号，用于导出的切换颜色渲染
             for (MpStructureAllocationExportVo machineRecord : machineStructureList) {
+                if (machineRecord.getIsOnlyLast()) { // 仅上月定稿数据的记录跳过不处理
+                    continue;
+                }
                 String structureName = machineRecord.getStructureName();
                 Map<Integer, Integer> dayLhMachinesMap = lhMachineStatisticsMap.get(structureName);
                 if (dayLhMachinesMap == null) {
@@ -1696,11 +1699,15 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                 } else {
                     structureType = ProductionGroupTypeEnum.CONVENTION.getGroupType();
                 }
+                record.setBeginDay(null);
+                record.setEndDay(null);
                 record.setStructureType(structureType);
                 record.setDataType(StructureAllocationExportDataTypeEnum.RECORD.getCode());
                 record.setCxMachineTypeCode(cxMachineTypeCodeMap.get(record.getCxMachineCode()));
+                record.setIsOnlyLast(true);
             }
-            
+            Integer beginDady = intValue(structureAllocation.getBeginDay());
+            Integer endDady = intValue(structureAllocation.getEndDay());
             String structureName = structureAllocation.getStructureName();
             Map<Integer, Integer> dayLhMachinesMap = lhMachineStatisticsMap.get(structureName);
             if (dayLhMachinesMap == null) {
@@ -1709,6 +1716,10 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
             // 处理在机天数区间内的硫化机数
             Integer totalQty = 0;
             for (Integer day: totalMap.keySet()) {
+                // 非分配日的跳过
+                if (day < beginDady || endDady < day) {
+                    continue;
+                }
                 Integer lhMachines = dayLhMachinesMap.getOrDefault(day, 0);
                 if (lhMachines != null && lhMachines > 0) {
                     Integer realLhMachines = Math.min(record.getMaxLhMachineCount(), lhMachines);
