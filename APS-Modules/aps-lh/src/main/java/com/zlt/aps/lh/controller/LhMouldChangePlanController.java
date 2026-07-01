@@ -499,15 +499,15 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
             } else {
                 row.put("endType", "");
             }
-            Integer isDryIceClean = item.getIsDryIceClean();
-            if (YesOrNoEnum.YES.getValue().equals(isDryIceClean)) {
+            String isDryIceClean = item.getIsDryIceClean();
+            if (YesOrNoEnum.YES.getCode().equals(isDryIceClean)) {
                 row.put("isDryIceClean", "是Có");
                 row.put("endType", "");
             } else {
                 row.put("isDryIceClean", "");
             }
-            Integer isSandblastingClean = item.getIsSandblastingClean();
-            if (YesOrNoEnum.YES.getValue().equals(isSandblastingClean)) {
+            String isSandblastingClean = item.getIsSandblastingClean();
+            if (YesOrNoEnum.YES.getCode().equals(isSandblastingClean)) {
                 row.put("isSandblastingClean", "是Có");
                 row.put("endType", "");
             } else {
@@ -516,8 +516,8 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
 
             List<String> mouldCodeList = new ArrayList<>();
 
-            Integer isReplaceBlock = item.getIsReplaceBlock();
-            if (YesOrNoEnum.YES.getValue().equals(isReplaceBlock)) {
+            String isReplaceBlock = item.getIsReplaceBlock();
+            if (YesOrNoEnum.YES.getCode().equals(isReplaceBlock)) {
                 row.put("isReplaceBlock", "是Có");
                 row.put("endType", "");
                 mouldCodeList.add(item.getMouldCode());
@@ -602,13 +602,13 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
 
             String changeMouldType = lhMouldChangePlan.getChangeMouldType();
             if (MouldChangeTypeEnum.TYPE_BLOCK.getCode().equals(changeMouldType)) {
-                lhMouldChangePlanVo.setIsReplaceBlock(YesOrNoEnum.YES.getValue());
+                lhMouldChangePlanVo.setIsReplaceBlock(YesOrNoEnum.YES.getCode());
             }
             if (MouldChangeTypeEnum.SAND_BLAST.getCode().equals(changeMouldType)) {
-                lhMouldChangePlanVo.setIsSandblastingClean(YesOrNoEnum.YES.getValue());
+                lhMouldChangePlanVo.setIsSandblastingClean(YesOrNoEnum.YES.getCode());
             }
             if (MouldChangeTypeEnum.DRY_ICE.getCode().equals(changeMouldType)) {
-                lhMouldChangePlanVo.setIsDryIceClean(YesOrNoEnum.YES.getValue());
+                lhMouldChangePlanVo.setIsDryIceClean(YesOrNoEnum.YES.getCode());
             }
             resultList.add(lhMouldChangePlanVo);
         }
