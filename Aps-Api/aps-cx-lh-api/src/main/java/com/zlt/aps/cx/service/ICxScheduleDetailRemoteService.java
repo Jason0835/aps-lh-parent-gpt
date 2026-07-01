@@ -113,4 +113,11 @@ public interface ICxScheduleDetailRemoteService {
     @ApiOperation("批量删除排程明细")
     @DeleteMapping("/cxScheduleDetail/batchRemove")
     AjaxResult batchRemove(@RequestBody List<Long> detailIds);
+
+    /**
+     * 导出成型顺位数据
+     */
+    @ApiOperation("导出成型顺位数据")
+    @PostMapping("/cxScheduleDetail/export")
+    byte[] exportDetail(@RequestBody ScheduleDetailQueryVo query);
 }
