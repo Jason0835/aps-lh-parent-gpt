@@ -22,14 +22,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 
 import javax.annotation.Resource;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Comparator;
-import java.util.IdentityHashMap;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 
 /**
  * 默认SKU排产优先级策略实现。
@@ -51,9 +44,13 @@ import java.util.Objects;
 @Component
 public class DefaultSkuPriorityStrategy implements ISkuPriorityStrategy {
 
-    /** 特殊材料标识 */
+    /**
+     * 特殊材料标识
+     */
     private static final String SPECIAL_MATERIAL_YES_FLAG = "1";
-    /** 雪地胎关键词分隔正则 */
+    /**
+     * 雪地胎关键词分隔正则
+     */
     private static final String WINTER_TIRE_KEYWORD_SEPARATOR_REGEX = "[,，]";
 
     @Resource
@@ -152,10 +149,10 @@ public class DefaultSkuPriorityStrategy implements ISkuPriorityStrategy {
      */
     private Comparator<SkuScheduleDTO> buildTailComparator(LhScheduleContext context) {
         return Comparator
-                // 顺序4：供应链优先按四类待排量逐级比较。
+                // 顺序4：供应链优先按四类待排量逐级比较。20260701+ 中优先级量比周期量优先
                 .comparingInt((SkuScheduleDTO s) -> -s.getHighPriorityPendingQty())
-                .thenComparingInt((SkuScheduleDTO s) -> -s.getCycleProductionPendingQty())
                 .thenComparingInt((SkuScheduleDTO s) -> -s.getMidPriorityPendingQty())
+                .thenComparingInt((SkuScheduleDTO s) -> -s.getCycleProductionPendingQty())
                 .thenComparingInt((SkuScheduleDTO s) -> -s.getConventionProductionPendingQty())
                 // 顺序5：开产模式下雪地胎、不同英寸、特殊材料仅在同等条件下靠后。
                 .thenComparingInt((SkuScheduleDTO s) -> resolveOpenProductionLateScore(context, s));
@@ -165,9 +162,10 @@ public class DefaultSkuPriorityStrategy implements ISkuPriorityStrategy {
      * 构建新增SKU比较器。
      * <p>试制、量试、小批量不参与主排序越级，仅在新增SKU主排序和供应链数量完全一致时作为补充排序。</p>
      *
-     * @param context 排程上下文
-     * @param priorityComparator 锁交期/延期/结构优先比较器
-     * @param tailComparator 供应链及尾部比较器
+     * @param context                排程上下文
+     * @param structurePriorityMap   锁交期/延期/结构优先比较器
+     * @param structureEndingDaysMap 结构收尾比较器
+     * @param tailComparator         供应链及尾部比较器
      * @return 新增SKU比较器
      */
     private Comparator<SkuScheduleDTO> buildNewSpecComparator(LhScheduleContext context,
@@ -458,7 +456,7 @@ public class DefaultSkuPriorityStrategy implements ISkuPriorityStrategy {
      * 解析开产模式 SKU 靠后分。
      *
      * @param context 排程上下文
-     * @param sku SKU
+     * @param sku     SKU
      * @return 靠后分
      */
     private int resolveOpenProductionLateScore(LhScheduleContext context, SkuScheduleDTO sku) {
@@ -479,7 +477,7 @@ public class DefaultSkuPriorityStrategy implements ISkuPriorityStrategy {
      * 判断是否为雪地胎。
      *
      * @param context 排程上下文
-     * @param sku SKU
+     * @param sku     SKU
      * @return true-雪地胎，false-非雪地胎
      */
     private boolean isWinterTire(LhScheduleContext context, SkuScheduleDTO sku) {
@@ -512,7 +510,7 @@ public class DefaultSkuPriorityStrategy implements ISkuPriorityStrategy {
      * 判断 SKU 是否与当前在机或续作英寸不同。
      *
      * @param context 排程上下文
-     * @param sku SKU
+     * @param sku     SKU
      * @return true-不同英寸，false-相同或无比较基准
      */
     private boolean isDifferentInch(LhScheduleContext context, SkuScheduleDTO sku) {
@@ -593,7 +591,7 @@ public class DefaultSkuPriorityStrategy implements ISkuPriorityStrategy {
      * 判断是否为特殊材料。
      *
      * @param context 排程上下文
-     * @param sku SKU
+     * @param sku     SKU
      * @return true-特殊材料，false-非特殊材料
      */
     private boolean isSpecialMaterial(LhScheduleContext context, SkuScheduleDTO sku) {
@@ -625,7 +623,7 @@ public class DefaultSkuPriorityStrategy implements ISkuPriorityStrategy {
     /**
      * 输出开产模式 SKU 靠后排序原因。
      *
-     * @param context 排程上下文
+     * @param context        排程上下文
      * @param orderedSkuList 排序后 SKU 列表
      * @return void
      */
@@ -654,7 +652,7 @@ public class DefaultSkuPriorityStrategy implements ISkuPriorityStrategy {
     /**
      * 输出排序后的SKU优先级跟踪日志（含汇总标题、TOP N、SortKey、HitLevel）。
      *
-     * @param context 排程上下文
+     * @param context              排程上下文
      * @param structurePriorityMap 结构收尾优先级快照
      */
     private void traceSortedSkuList(LhScheduleContext context,
@@ -726,9 +724,9 @@ public class DefaultSkuPriorityStrategy implements ISkuPriorityStrategy {
      * beginDay 非空且小于等于阈值的SKU，命中筛选的全部输出（不做 TOP N 截断）。
      * 单行内容复用 {@link #buildSkuSortDesc}，并额外追加结构名称、起产日、结束日，便于聚焦排查。</p>
      *
-     * @param context 排程上下文
-     * @param orderedSkuList 续作+新增统一排序后的全量候选列表
-     * @param structurePriorityMap 结构收尾优先级快照
+     * @param context                排程上下文
+     * @param orderedSkuList         续作+新增统一排序后的全量候选列表
+     * @param structurePriorityMap   结构收尾优先级快照
      * @param structureEndingDaysMap 结构收尾天数快照
      */
     private void traceFullSortedSkuList(LhScheduleContext context,
@@ -792,10 +790,10 @@ public class DefaultSkuPriorityStrategy implements ISkuPriorityStrategy {
      * 描述与日志单行内容完全一致，便于排程结果落库后按 SKU 还原排序原因。
      * 调用方通过 {@code currentStep} 保证每个列表仅在所属步骤回写一次。</p>
      *
-     * @param context 排程上下文
-     * @param skuList 排序后的 SKU 列表
-     * @param isNewSpec 是否为新增 SKU 列表
-     * @param structurePriorityMap 结构收尾优先级快照
+     * @param context                排程上下文
+     * @param skuList                排序后的 SKU 列表
+     * @param isNewSpec              是否为新增 SKU 列表
+     * @param structurePriorityMap   结构收尾优先级快照
      * @param structureEndingDaysMap 结构收尾天数快照
      */
     private void writeSkuSortRankAndDesc(LhScheduleContext context,
@@ -824,11 +822,11 @@ public class DefaultSkuPriorityStrategy implements ISkuPriorityStrategy {
      * <p>与原 traceSortedSkuList 拼装的“[新增排产SKU排序] rank=… 描述=… SortKey=… HitLevel=…”单行内容完全一致，
      * 续作场景使用“N. 物料编码=…”形式（与原日志一致）。新增 SKU 走两种 SortKey 维度：试制/量试组与普通组。</p>
      *
-     * @param context 排程上下文
-     * @param sku SKU
-     * @param rank 排序名次（1~N）
-     * @param isNewSpec 是否为新增 SKU 列表
-     * @param structurePriorityMap 结构收尾优先级快照
+     * @param context                排程上下文
+     * @param sku                    SKU
+     * @param rank                   排序名次（1~N）
+     * @param isNewSpec              是否为新增 SKU 列表
+     * @param structurePriorityMap   结构收尾优先级快照
      * @param structureEndingDaysMap 结构收尾天数快照
      * @return 单行描述
      */
@@ -982,8 +980,8 @@ public class DefaultSkuPriorityStrategy implements ISkuPriorityStrategy {
     /**
      * 输出重点SKU的全局排序位置和前序SKU列表。
      *
-     * @param detailBuilder 日志明细
-     * @param traceSkuList 排序后SKU列表
+     * @param detailBuilder      日志明细
+     * @param traceSkuList       排序后SKU列表
      * @param targetMaterialCode 目标物料编码
      */
     private void appendTargetSkuSortTrace(StringBuilder detailBuilder,
@@ -1164,15 +1162,25 @@ public class DefaultSkuPriorityStrategy implements ISkuPriorityStrategy {
      */
     @lombok.Data
     private static class StructurePriorityMeta {
-        /** 结构内SKU总数 */
+        /**
+         * 结构内SKU总数
+         */
         private int totalSkuCount;
-        /** 结构内收尾SKU数量 */
+        /**
+         * 结构内收尾SKU数量
+         */
         private int endingSkuCount;
-        /** 结构内是否全部SKU收尾 */
+        /**
+         * 结构内是否全部SKU收尾
+         */
         private boolean allSkusEnding;
-        /** 结构是否进入未来全收尾优先级 */
+        /**
+         * 结构是否进入未来全收尾优先级
+         */
         private boolean allSkusEndingPriority;
-        /** 结构内最晚收尾天数 */
+        /**
+         * 结构内最晚收尾天数
+         */
         private int latestEndingDays;
     }
 }
