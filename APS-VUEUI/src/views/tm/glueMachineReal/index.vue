@@ -67,7 +67,7 @@ export default {
     infoDialog,
     TltUploadForm,
   },
-  dicts: ["biz_factory_name", "biz_yes_no"],
+  dicts: ["biz_factory_name", "biz_yes_no", "class_num_three_plan"],
   provide() {
     return {
       parentDict: this.dict,
@@ -225,6 +225,12 @@ export default {
           labelKey: "machineCode",
           valueKey: "machineCode",
           filterable: true,
+        },
+        {
+          prop: "shiftCode",
+          label: this.$t("ui.data.column.tmGlueMachineReal.shiftCode"),
+          type: "select",
+          dictData: this.dict.type.class_num_three_plan,
         },
         {
           prop: "enableStatus",
