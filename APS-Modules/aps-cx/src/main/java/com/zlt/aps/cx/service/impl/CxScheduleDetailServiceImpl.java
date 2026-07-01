@@ -27,6 +27,7 @@ import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.io.File;
 import java.io.InputStream;
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -597,34 +598,50 @@ public class CxScheduleDetailServiceImpl extends ServiceImpl<CxScheduleDetailMap
 
     @Override
     public byte[] exportDetail(ScheduleDetailQueryVo query) {
-        // 1. 查询数据
-        List<CxScheduleDetailVo> voList = this.listVoByQuery(query);
+        InputStream inputStream = null;
+        try {
+            // 1. 查询数据
+            List<CxScheduleDetailVo> voList = this.listVoByQuery(query);
 
-        // 2. 加载模板
-        InputStream inputStream = this.getClass().getClassLoader()
-                .getResourceAsStream("excelModel/CxDetail.xlsx");
-        if (inputStream == null) {
-            log.error("成型顺位导出模板不存在: excelModel/CxDetail.xlsx");
-            throw new RuntimeException("成型顺位导出模板不存在");
+            // 2. 加载模板
+            inputStream = this.getClass().getClassLoader()
+                    .getResourceAsStream("excelModel/CxDetail.xlsx");
+            if (inputStream == null) {
+                log.error("成型顺位导出模板不存在: excelModel/CxDetail.xlsx");
+                throw new RuntimeException("成型顺位导出模板不存在");
+            }
+
+            // 3. 加载关键产品胚编码集合（用于计算 classXRemark = "SPQT"）
+            Set<String> keyProductEmbryoCodes = this.loadKeyProductEmbryoCodes();
+
+            // 4. 加载示方类型字典（码值 → 标签）
+            Map<String, String> recipeTypeMap = this.loadRecipeTypeDictMap();
+
+            // 5. 构建数据行
+            List<Map<String, Object>> dataRows = new ArrayList<>(voList.size());
+            for (CxScheduleDetailVo vo : voList) {
+                dataRows.add(this.buildDetailExportRow(vo, keyProductEmbryoCodes, recipeTypeMap));
+            }
+
+            // 6. 将模板 InputStream 转为临时文件，使用 File 版本 writeMultiList
+            File tempTemplate = ExcelUtils.convertInputStreamToFile(inputStream,
+                    "CxDetail", ".xlsx");
+            List<List<Map<String, Object>>> dataLists = new ArrayList<>();
+            dataLists.add(dataRows);
+
+            log.info("成型顺位导出，数据行数: {}", dataRows.size());
+            return ExcelUtils.writeMultiList(tempTemplate, 0, new HashMap<>(), dataLists);
+        } catch (Exception e) {
+            log.error("导出成型顺位Excel失败", e);
+            throw new RuntimeException("导出成型顺位Excel失败: " + e.getMessage(), e);
+        } finally {
+            if (inputStream != null) {
+                try {
+                    inputStream.close();
+                } catch (Exception ignored) {
+                }
+            }
         }
-
-        // 3. 加载关键产品胚编码集合（用于计算 classXRemark = "SPQT"）
-        Set<String> keyProductEmbryoCodes = this.loadKeyProductEmbryoCodes();
-
-        // 4. 加载示方类型字典（码值 → 标签）
-        Map<String, String> recipeTypeMap = this.loadRecipeTypeDictMap();
-
-        // 5. 构建数据行
-        List<Map<String, Object>> dataRows = new ArrayList<>(voList.size());
-        for (CxScheduleDetailVo vo : voList) {
-            dataRows.add(this.buildDetailExportRow(vo, keyProductEmbryoCodes, recipeTypeMap));
-        }
-
-        // 6. 使用 ExcelUtils 填充模板（Sheet 0）
-        List<List<Map<String, Object>>> dataLists = new ArrayList<>();
-        dataLists.add(dataRows);
-
-        return ExcelUtils.writeMultiList(inputStream, 0, new HashMap<>(), dataLists);
     }
 
     /**
