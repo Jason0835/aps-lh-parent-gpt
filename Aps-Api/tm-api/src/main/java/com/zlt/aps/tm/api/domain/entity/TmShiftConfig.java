@@ -64,4 +64,10 @@ public class TmShiftConfig extends BaseEntity {
     @ApiModelProperty(value = "是否开班", name = "openFlag")
     @TableField(value = "OPEN_FLAG")
     private String openFlag;
+
+    @Excel(name = "ui.common.column.remark")
+    @ImportValidated(maxLength = 500)
+    @ApiModelProperty("备注")
+    @TableField("REMARK")
+    private String remark;
 }

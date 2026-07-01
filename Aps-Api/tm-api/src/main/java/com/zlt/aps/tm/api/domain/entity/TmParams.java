@@ -85,4 +85,10 @@ public class TmParams extends BaseEntity {
     @ApiModelProperty(value = "是否启用", name = "enableStatus")
     @TableField(value = "ENABLE_STATUS")
     private String enableStatus;
+
+    @Excel(name = "ui.common.column.remark")
+    @ImportValidated(maxLength = 500)
+    @ApiModelProperty("备注")
+    @TableField("REMARK")
+    private String remark;
 }

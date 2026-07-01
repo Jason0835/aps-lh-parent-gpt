@@ -73,4 +73,10 @@ public class TmMachineInfo extends BaseEntity {
     @ApiModelProperty(value = "班次编码", name = "shiftCode")
     @TableField(value = "SHIFT_CODE")
     private String shiftCode;
+
+    @Excel(name = "ui.common.column.remark")
+    @ImportValidated(maxLength = 500)
+    @ApiModelProperty("备注")
+    @TableField("REMARK")
+    private String remark;
 }

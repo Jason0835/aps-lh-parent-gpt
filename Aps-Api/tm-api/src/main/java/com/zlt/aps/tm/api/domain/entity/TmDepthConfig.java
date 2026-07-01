@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.ruoyi.common.core.annotation.Excel;
 import com.ruoyi.common.core.web.domain.BaseEntity;
+import com.zlt.aps.common.core.annotation.ImportValidated;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
@@ -56,4 +57,10 @@ public class TmDepthConfig extends BaseEntity implements Serializable {
     @ApiModelProperty(value = "保证班数")
     @TableField("DEPTH_CLASS_QTY")
     private BigDecimal depthClassQty;
+
+    @Excel(name = "ui.common.column.remark")
+    @ImportValidated(maxLength = 500)
+    @ApiModelProperty("备注")
+    @TableField("REMARK")
+    private String remark;
 }

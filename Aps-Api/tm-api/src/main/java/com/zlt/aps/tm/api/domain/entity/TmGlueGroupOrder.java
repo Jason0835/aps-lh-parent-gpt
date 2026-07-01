@@ -40,4 +40,9 @@ public class TmGlueGroupOrder extends BaseEntity {
     @TableField(value = "ORDER_NUM")
     private Integer orderNum;
 
+    @Excel(name = "ui.common.column.remark")
+    @ImportValidated(maxLength = 500)
+    @ApiModelProperty("备注")
+    @TableField("REMARK")
+    private String remark;
 }

@@ -54,4 +54,10 @@ public class TmStock extends BaseEntity {
     @ApiModelProperty(value = "调整数量", name = "adjustQty")
     @TableField(value = "ADJUST_QTY")
     private BigDecimal adjustQty;
+
+    @Excel(name = "ui.common.column.remark")
+    @ImportValidated(maxLength = 500)
+    @ApiModelProperty("备注")
+    @TableField("REMARK")
+    private String remark;
 }

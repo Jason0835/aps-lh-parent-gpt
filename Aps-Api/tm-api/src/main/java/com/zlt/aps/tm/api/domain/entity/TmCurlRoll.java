@@ -35,4 +35,10 @@ public class TmCurlRoll extends BaseEntity {
     @ApiModelProperty(value = "卷曲长度", name = "curlLength")
     @TableField(value = "CURL_LENGTH")
     private BigDecimal curlLength;
+
+    @Excel(name = "ui.common.column.remark")
+    @ImportValidated(maxLength = 500)
+    @ApiModelProperty("备注")
+    @TableField("REMARK")
+    private String remark;
 }

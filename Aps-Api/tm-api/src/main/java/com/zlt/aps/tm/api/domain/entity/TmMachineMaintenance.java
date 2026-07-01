@@ -41,4 +41,10 @@ public class TmMachineMaintenance extends BaseEntity {
     @ApiModelProperty(value = "停机结束时间", name = "stopEndTime")
     @TableField(value = "STOP_END_TIME")
     private Date stopEndTime;
+
+    @Excel(name = "ui.common.column.remark")
+    @ImportValidated(maxLength = 500)
+    @ApiModelProperty("备注")
+    @TableField("REMARK")
+    private String remark;
 }
