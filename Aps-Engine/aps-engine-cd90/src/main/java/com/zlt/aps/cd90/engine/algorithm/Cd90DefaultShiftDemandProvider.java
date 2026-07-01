@@ -60,10 +60,10 @@ public class Cd90DefaultShiftDemandProvider implements Cd90ShiftDemandProvider {
         List<Cd90DemandShift> availableShifts = clothShifts.stream()
                 .filter(item -> !item.getStartTime().isBefore(demandStart))
                 .collect(Collectors.toList());
-        List<Cd90DemandShift> window = demandWindowSelector.select(availableShifts,
-                this.requiredDepth(input, candidate.getClothCode()));
+        BigDecimal depthClassQty = this.requiredDepth(input, candidate.getClothCode());
+        List<Cd90DemandShift> window = demandWindowSelector.select(availableShifts, depthClassQty);
         BigDecimal demandQuantity = calculateWindowDemand(
-                window, context.getParameters().getDemandCalcMode());
+                window, context.getParameters().getDemandCalcMode(), depthClassQty);
         // 窗口前成型消耗用于重算6点库存余额，不属于本次待排需求。
         BigDecimal consumedBeforeWindow = clothShifts.stream()
                 .filter(item -> item.getStartTime().isBefore(demandStart))
@@ -126,7 +126,9 @@ public class Cd90DefaultShiftDemandProvider implements Cd90ShiftDemandProvider {
                                 Collectors.reducing(BigDecimal.ZERO, BigDecimal::add))));
     }
 
-    private BigDecimal calculateWindowDemand(List<Cd90DemandShift> window, String mode) {
+    private BigDecimal calculateWindowDemand(List<Cd90DemandShift> window,
+                                             String mode,
+                                             BigDecimal depthClassQty) {
         List<Cd90DemandShift> effective = window.stream()
                 .filter(Cd90DemandShift::isIncluded)
                 .filter(item -> value(item.getClothDemandQuantity()).signum() > 0)
@@ -137,20 +139,31 @@ public class Cd90DefaultShiftDemandProvider implements Cd90ShiftDemandProvider {
         BigDecimal total = effective.stream()
                 .map(item -> value(item.getClothDemandQuantity()))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal totalWeight = effective.stream()
+                .map(this::windowWeight)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        if (totalWeight.signum() <= 0) {
+            return BigDecimal.ZERO;
+        }
+        BigDecimal missingWeight = depthClassQty == null
+                ? BigDecimal.ZERO : depthClassQty.subtract(totalWeight).max(BigDecimal.ZERO);
         if ("AVERAGE".equals(mode)) {
-            BigDecimal totalWeight = effective.stream()
-                    .map(this::windowWeight)
-                    .reduce(BigDecimal.ZERO, BigDecimal::add);
-            return total.divide(totalWeight, 10, RoundingMode.HALF_UP)
-                    .stripTrailingZeros();
+            BigDecimal average = total.divide(totalWeight, 10, RoundingMode.HALF_UP);
+            return missingWeight.signum() > 0
+                    ? this.normalize(average.multiply(depthClassQty))
+                    : this.normalize(average);
         }
         if (!"SUM".equals(mode)) {
             throw new IllegalArgumentException("需求计算方式只能取AVERAGE或SUM");
         }
-        return total;
+        if (missingWeight.signum() <= 0) {
+            return this.normalize(total);
+        }
+        BigDecimal maxShiftDemand = effective.stream()
+                .map(item -> value(item.getClothDemandQuantity()))
+                .max(BigDecimal::compareTo).orElse(BigDecimal.ZERO);
+        return this.normalize(total.add(maxShiftDemand.multiply(missingWeight)));
     }
-
-    /** 获取当前候选帘布的必填动态深度。 */
     private BigDecimal requiredDepth(Cd90AutoScheduleInput input, String clothCode) {
         BigDecimal depthClassQty = input.getDepthClassQtyByCloth() == null
                 ? null : input.getDepthClassQtyByCloth().get(clothCode);
@@ -215,6 +228,10 @@ public class Cd90DefaultShiftDemandProvider implements Cd90ShiftDemandProvider {
         }
     }
 
+    private BigDecimal normalize(BigDecimal value) {
+        BigDecimal normalized = value.stripTrailingZeros();
+        return normalized.scale() < 0 ? normalized.setScale(0) : normalized;
+    }
     private BigDecimal value(BigDecimal value) {
         return value == null ? BigDecimal.ZERO : value;
     }

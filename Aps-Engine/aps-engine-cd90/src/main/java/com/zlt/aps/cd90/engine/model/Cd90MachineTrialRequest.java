@@ -45,6 +45,8 @@ public class Cd90MachineTrialRequest {
     private Map<String, String> previousSpecByMachine;
     /** 各机台上次尾匹状态，key=机台编码 */
     private Map<String, Cd90MachineTailState> previousTailByMachine;
+    /** 当前规格的历史/续作原机台，原机台有可排量时不得切换到其他机台。 */
+    private String preferredHistoryMachineCode;
     /** 大卷库存时效信息列表 */
     private List<Cd90BigRollAgingStock> bigRollAgingStocks;
     /** 自动排程参数配置 */

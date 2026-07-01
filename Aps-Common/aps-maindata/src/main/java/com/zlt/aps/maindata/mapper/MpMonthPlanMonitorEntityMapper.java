@@ -36,19 +36,4 @@ public interface MpMonthPlanMonitorEntityMapper extends CommBaseMapper<MpMonthPl
      * @return
      */
     int updateByDayFinish(MpMonthPlanMonitor paramVo);
-
-    /**
-     * 查询当月存在正规计划(productStatus=S)的物料及其月计划监控记录。
-     * <p>用于量试合格品充抵正规订单场景：同物料在月计划中只存在一条正规记录。</p>
-     *
-     * @param factoryCode 工厂编码
-     * @param year 年
-     * @param month 月
-     * @param materialCodes 物料编码列表
-     * @return 正规计划记录列表
-     */
-    List<MpMonthPlanMonitor> selectFormalPlanByMaterials(@Param("factoryCode") String factoryCode,
-                                                        @Param("year") Integer year,
-                                                        @Param("month") Integer month,
-                                                        @Param("materialCodes") List<String> materialCodes);
 }

@@ -129,6 +129,7 @@ public enum FormalRoundEnum {
         List<FormalRoundEnum> noContinueRoundList = Lists.newArrayList();
         noContinueRoundList.add(FIRST_ACTUAL_MIN_LH_MACHINE);
         noContinueRoundList.add(SECOND_ACTUAL_MIN_LH_MACHINE);
+        noContinueRoundList.add(THIRD_ACTUAL_MIN_LH_MACHINE);
         noContinueRoundList.add(FIRST_HALF_PRIORITY);
         noContinueRoundList.add(LATTER_HALF_PRIORITY);
         noContinueRoundList.add(DISPOSABLE_LH_MACHINE);

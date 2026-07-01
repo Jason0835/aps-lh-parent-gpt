@@ -230,8 +230,28 @@ public class Cd90AutoScheduleOutputDraftBuilder {
             return null;
         }
         BigDecimal remaining = netDemand.subtract(scheduled);
-        return trace.getClassField() + "：库排容量不足，仅部分排" + plain(scheduled)
+        return trace.getClassField() + "：" + partialReasonDescription(trace.getPartialReason())
+                + "，仅部分排" + plain(scheduled)
                 + "m，剩余" + plain(remaining) + "m转后续班次重算";
+    }
+
+    private String partialReasonDescription(String partialReason) {
+        if ("STORAGE_LANE_LIMIT".equals(partialReason)) {
+            return "库排容量不足";
+        }
+        if ("TOOLING_LIMIT".equals(partialReason) || "ROLL_TOOL_LIMIT".equals(partialReason)) {
+            return "工装不足";
+        }
+        if ("CAPACITY_LIMIT".equals(partialReason)) {
+            return "机台产能不足";
+        }
+        if ("AGING_PERIOD_LIMIT".equals(partialReason)) {
+            return "大卷静置期限制";
+        }
+        if ("EQUAL_SHARE".equals(partialReason)) {
+            return "按均分策略拆分";
+        }
+        return "资源限制";
     }
 
     private String failureDescription(String failureReason) {

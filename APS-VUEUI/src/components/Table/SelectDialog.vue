@@ -1,7 +1,27 @@
 <template>
   <div>
     <div>
+      <el-input
+        v-if="allowInput"
+        :placeholder="$t('common.rule.input')"
+        style="width: 100%"
+        ref="inputRef"
+        :value="value"
+        :maxlength="maxlength"
+        clearable
+        :disabled="disabled"
+        @input="handleInputChange"
+        @clear="handleClear"
+      >
+        <el-button
+          slot="append"
+          icon="el-icon-search"
+          :disabled="disabled"
+          @click="handleVisible"
+        />
+      </el-input>
       <el-select
+        v-else
         :placeholder="$t('common.rule.select')"
         style="width: 100%"
         ref="inputRef"
@@ -65,6 +85,15 @@ export default {
       type: Boolean,
       default: true,
     },
+    /** 是否允许手动输入（同时保留弹窗选择） */
+    allowInput: {
+      type: Boolean,
+      default: false,
+    },
+    maxlength: {
+      type: Number,
+      default: undefined,
+    },
   },
   data() {
     return {
@@ -97,6 +126,9 @@ export default {
     },
     handleClear() {
       this.$emit("clear");
+    },
+    handleInputChange(val) {
+      this.$emit("input-change", val);
     },
 
     hide() {

@@ -103,15 +103,17 @@ public class Cd90MachineTrialPreparationService {
                         .fallbackLossRatePercent(parameters.getFallbackLossRatePercent())
                         // 首选机台标志与优先级顺序
                         .preferredMachine(candidate.isPreferredMachine())
+                        .historyMachine(candidate.getMachineCode() != null
+                                && candidate.getMachineCode().equals(request.getPreferredHistoryMachineCode()))
                         .priorityOrder(candidate.getPriorityOrder())
                         .build()))
                 .collect(Collectors.toList());
         // 选择器只给出当前最优方案；提交阶段仍会在库排失败时继续尝试其余方案。
         Cd90MachineTrial selected = trialSelector.select(trials);
         log.info("[直裁自动排程] 规格机台试算准备完成, clothCode={}, bigRollCode={}, "
-                        + "candidateCount={}, selectedMachine={}",
+                        + "candidateCount={}, selectedMachine={}, preferredHistoryMachine={}",
                 request.getClothCode(), request.getBigRollCode(), trials.size(),
-                selected == null ? null : selected.getMachineCode());
+                selected == null ? null : selected.getMachineCode(), request.getPreferredHistoryMachineCode());
         if ("MACHINE_PROHIBITED".equals(resolution.getFailureReason())) {
             log.warn("[直裁自动排程] 大卷绑定机台均不可作业, clothCode={}, bigRollCode={}, machines={}",
                     request.getClothCode(), request.getBigRollCode(), resolution.getBoundMachineCodes());

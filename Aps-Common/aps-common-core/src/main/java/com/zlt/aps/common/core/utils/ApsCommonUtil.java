@@ -50,6 +50,34 @@ public class ApsCommonUtil {
     }
 
     /**
+     * 字符串转成int，如果无法转换或字符串为空，则返回0
+     * @param value 字符类型
+     * @return 转换后的整数，转换失败返回0
+     */
+    public static Integer getInt(String value) {
+        return getIntOrDefault(value, 0);
+    }
+
+    /**
+     * 字符串转成int，如果无法转换或字符串为空，则返回默认值
+     * @param value 字符类型
+     * @param defaultValue 默认值
+     * @return 转换后的整数，转换失败返回默认值
+     */
+    public static Integer getIntOrDefault(String value, Integer defaultValue) {
+        if(StringUtils.isBlank(value)) {
+            return defaultValue;
+        }
+        Integer num = defaultValue;
+        try {
+            num = Integer.parseInt(value);
+        } catch (Exception e) {
+            log.error("字符串转整数错误");
+        }
+        return num;
+    }
+
+    /**
      * 日志字符串拼接并分割
      * @param value
      * @return
