@@ -598,13 +598,12 @@ public class CxScheduleDetailServiceImpl extends ServiceImpl<CxScheduleDetailMap
 
     @Override
     public byte[] exportDetail(ScheduleDetailQueryVo query) {
-        InputStream inputStream = null;
         try {
             // 1. 查询数据
             List<CxScheduleDetailVo> voList = this.listVoByQuery(query);
 
-            // 2. 加载模板
-            inputStream = this.getClass().getClassLoader()
+            // 2. 加载模板（注意：每次都要重新打开 InputStream）
+            InputStream inputStream = this.getClass().getClassLoader()
                     .getResourceAsStream("excelModel/CxDetail.xlsx");
             if (inputStream == null) {
                 log.error("成型顺位导出模板不存在: excelModel/CxDetail.xlsx");
@@ -623,24 +622,15 @@ public class CxScheduleDetailServiceImpl extends ServiceImpl<CxScheduleDetailMap
                 dataRows.add(this.buildDetailExportRow(vo, keyProductEmbryoCodes, recipeTypeMap));
             }
 
-            // 6. 将模板 InputStream 转为临时文件，使用 File 版本 writeMultiList
-            File tempTemplate = ExcelUtils.convertInputStreamToFile(inputStream,
-                    "CxDetail", ".xlsx");
+            // 6. 使用 ExcelUtils 填充模板（Sheet 0）- 与主表导出保持一致的调用方式
             List<List<Map<String, Object>>> dataLists = new ArrayList<>();
             dataLists.add(dataRows);
 
             log.info("成型顺位导出，数据行数: {}", dataRows.size());
-            return ExcelUtils.writeMultiList(tempTemplate, 0, new HashMap<>(), dataLists);
+            return ExcelUtils.writeMultiList(inputStream, 0, new HashMap<>(), dataLists);
         } catch (Exception e) {
             log.error("导出成型顺位Excel失败", e);
             throw new RuntimeException("导出成型顺位Excel失败: " + e.getMessage(), e);
-        } finally {
-            if (inputStream != null) {
-                try {
-                    inputStream.close();
-                } catch (Exception ignored) {
-                }
-            }
         }
     }
 
