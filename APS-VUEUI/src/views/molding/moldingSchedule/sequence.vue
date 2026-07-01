@@ -12,12 +12,13 @@
       @refresh="getList"
       @search="handleSearch"
       @reset="handleReset"
-      @page-change="handlePageChange"
+      @pageChange="handlePageChange"
       @sort-change="handleSortChange"
       :showSummary="false"
       :selectArea="false"
       :row-style="rowStyle"
       :cell-style="cellStyle"
+      :span-method="spanMethod"
     >
       <template slot="header">
         <!-- <el-button
@@ -90,6 +91,32 @@ export default {
       const start = (this.page.current - 1) * this.page.pageSize;
       const end = start + this.page.pageSize;
       return this.data.slice(start, end);
+    },
+    // 按成型机台+胎胚描述分组，计算每行在合并后的 rowspan
+    groupSpanArr() {
+      const data = this.pagedData;
+      const spanArr = [];
+      for (let i = 0; i < data.length; i++) {
+        if (i === 0) {
+          spanArr.push(1);
+        } else if (this.getGroupKey(data[i]) === this.getGroupKey(data[i - 1])) {
+          spanArr.push(0);
+        } else {
+          spanArr.push(1);
+        }
+      }
+      // 将每组首行的 rowspan 设置为该组的行数
+      for (let i = 0; i < spanArr.length; i++) {
+        if (spanArr[i] === 0) {
+          continue;
+        }
+        let count = 1;
+        for (let j = i + 1; j < spanArr.length && spanArr[j] === 0; j++) {
+          count++;
+        }
+        spanArr[i] = count;
+      }
+      return spanArr;
     },
     columns() {
       const fixedColumns = [
@@ -374,6 +401,20 @@ export default {
       }
       return {};
     },
+    // 分组键：成型机台+胎胚描述
+    getGroupKey(row) {
+      return `${row.cxMachineCode || ""}_${row.mainMaterialDesc || ""}`;
+    },
+    // 合并相同成型机台+胎胚描述的连续行
+    spanMethod({ column, rowIndex }) {
+      if (column.property === "cxMachineCode" || column.property === "mainMaterialDesc") {
+        const span = this.groupSpanArr[rowIndex] || 1;
+        return {
+          rowspan: span,
+          colspan: span > 0 ? 1 : 0,
+        };
+      }
+    },
     formatParams(hasPage = false) {
       const params = {
         ...this.query,
@@ -405,6 +446,17 @@ export default {
           ? res
           : res?.rows || res?.data?.rows || res?.data || [];
         this.data = Array.isArray(rows) ? rows : [];
+        // 按成型机台+胎胚描述分组排序，同组内按车次号排序，确保合并单元格正确
+        this.data.sort((a, b) => {
+          const keyA = this.getGroupKey(a);
+          const keyB = this.getGroupKey(b);
+          if (keyA !== keyB) {
+            return keyA < keyB ? -1 : 1;
+          }
+          const tripA = Number(a.tripNo) || 0;
+          const tripB = Number(b.tripNo) || 0;
+          return tripA - tripB;
+        });
         this.page.total = this.data.length;
         this.originEditMap = {};
         this.data.forEach((row) => {
