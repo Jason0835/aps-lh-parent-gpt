@@ -20,6 +20,14 @@ public interface IScheduleTaskLinkedList<T> {
     ScheduleChainChangeResult<T> append(ScheduleTaskNode<T> node, ScheduleOperationContext context);
 
     /**
+     * 将节点插入到链头。
+     *
+     * @param node    待插入节点，不能已经属于其他链表
+     * @param context 操作上下文，包含操作人、原因和追踪号
+     * @return 链表变更结果，包含受影响节点和新顺序
+     */
+    ScheduleChainChangeResult<T> prepend(ScheduleTaskNode<T> node, ScheduleOperationContext context);
+    /**
      * 将新节点插入指定节点之后。
      *
      * @param anchorNode 锚点节点；为空时按追加链尾处理

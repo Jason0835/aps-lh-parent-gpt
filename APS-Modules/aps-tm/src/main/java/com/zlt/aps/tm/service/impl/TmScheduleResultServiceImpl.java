@@ -30,6 +30,7 @@ import com.zlt.aps.tm.engine.template.TmScheduleTemplateImpl;
 import com.zlt.aps.tm.engine.validator.TmInsertPositionValidator;
 import com.zlt.aps.tm.mapper.*;
 import com.zlt.aps.tm.service.ITmScheduleResultService;
+import com.zlt.aps.tm.service.TmAutoScheduleRedisCacheService;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.common.enums.ImportErrorTypeEnums;
 import com.zlt.common.utils.ImportExcelValidatedUtils;
@@ -81,6 +82,9 @@ public class TmScheduleResultServiceImpl extends AbstractDocService<TmScheduleRe
 
     @Resource
     private TmScheduleOperationFacade tmScheduleOperationFacade;
+
+    @Resource
+    private TmAutoScheduleRedisCacheService tmAutoScheduleRedisCacheService;
 
     @Override
     protected String getDocTypeCode() {
@@ -440,6 +444,18 @@ public class TmScheduleResultServiceImpl extends AbstractDocService<TmScheduleRe
             return 0;
         }
         return context.getTaskChainGroup().values().size();
+    }
+
+    /**
+     * 清理胎面自动排程 Redis 基础资料缓存。
+     *
+     * @param factoryCode 工厂编码，为空时清理全部胎面自动排程缓存
+     * @param scheduleDate 排程日期，和工厂同时传入时清理该日期相关缓存
+     * @return 实际删除的 Redis key 数量
+     */
+    @Override
+    public long clearAutoPlanRedisCache(String factoryCode, Date scheduleDate) {
+        return tmAutoScheduleRedisCacheService.clear(factoryCode, scheduleDate);
     }
 
     /**

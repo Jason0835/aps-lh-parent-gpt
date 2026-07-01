@@ -3,6 +3,7 @@ package com.zlt.aps.tm.autoplan;
 import cn.hutool.core.util.StrUtil;
 import com.zlt.aps.tm.api.domain.entity.TmScheduleResult;
 import com.zlt.aps.tm.api.domain.entity.TmScheduleResultExplain;
+import com.zlt.aps.tm.api.domain.entity.TmScheduleUnplanned;
 import com.zlt.aps.tm.api.domain.vo.TmAutoScheduleResponseVo;
 import com.zlt.aps.tm.engine.domain.TmScheduleContext;
 import com.zlt.aps.tm.engine.domain.TmTaskDraft;
@@ -37,6 +38,7 @@ public class TmAutoPlanAssertHelper {
             }
             assertResponse(scenario, response);
             assertPersistedResults(scenario, mockContext.getInsertedResults());
+            assertPersistedUnplanned(scenario, mockContext.getInsertedUnplannedList());
             assertWindowPlanQty(scenario, mockContext.getInsertedResults());
             assertPersistedExplains(scenario, mockContext.getInsertedExplains());
             assertPersistSummary(scenario, mockContext.getLastContext());
@@ -117,10 +119,6 @@ public class TmAutoPlanAssertHelper {
             long assignedCount = resultList.stream().filter(item -> StrUtil.isNotBlank(item.getMachineCode())).count();
             assertEquals(expected.getAssignedCount().intValue(), (int) assignedCount);
         }
-        if (expected.getUnassignedCount() != null) {
-            long unassignedCount = resultList.stream().filter(item -> StrUtil.isBlank(item.getMachineCode())).count();
-            assertEquals(expected.getUnassignedCount().intValue(), (int) unassignedCount);
-        }
         for (TmScheduleResult result : resultList) {
             assertTrue("自动排程结果工单号格式不符合胎面唯一键要求：" + result.getOrderNo(),
                     result.getOrderNo() != null && result.getOrderNo().matches("TM\\d{17}-\\d{4}"));
@@ -134,6 +132,14 @@ public class TmAutoPlanAssertHelper {
             if (expectedResult.getSequence() != null) {
                 assertEquals(expectedResult.getSequence(), readSequence(result, expectedResult.getShiftOrder()));
             }
+        }
+    }
+
+    private void assertPersistedUnplanned(TmAutoPlanScenario scenario, List<TmScheduleUnplanned> unplannedList) {
+        TmAutoPlanExpectedResult expected = scenario.getExpected();
+        if (expected.getUnassignedCount() != null) {
+            assertEquals("未排表写入数量不符合预期：" + scenario.getCaseName(),
+                    expected.getUnassignedCount().intValue(), unplannedList.size());
         }
     }
 

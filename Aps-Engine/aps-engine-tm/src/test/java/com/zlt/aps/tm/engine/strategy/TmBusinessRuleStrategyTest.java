@@ -120,48 +120,38 @@ public class TmBusinessRuleStrategyTest {
     }
 
     /**
-     * 测试内容：验证计划量策略按基础需求、工装、最小起排、尾数取整、产能限制顺序计算。
-     * 测试场景：构造有滚动库存、工装、最小起排、换规格、换胶和检修时间的任务。
+     * 测试内容：验证计划量策略按基础需求、最小起排、尾数取整、工装限制顺序计算。
+     * 测试场景：基础需求 100，最小起排补到 450，卷曲长度向上取整到 600，工装上限压到 400。
      * 预期结果：各调整分量和最终计划量符合当前策略顺序。
      */
     @Test
     public void planShouldApplyToolMinRoundAndCapacityInOrder() {
-        // 准备综合计划量计算任务，覆盖多个调整分量同时存在的场景。
-        TmTaskDraft task = new TmTaskDraft();
-        task.setTreadCode("TR-PLAN-1");
-        task.setCurrentShiftDemandQty(new BigDecimal("380"));
-        task.setGuardDemandQty(new BigDecimal("900"));
-        task.setRollingStockQty(new BigDecimal("200"));
-        task.setSixClockStockQty(new BigDecimal("1000"));
-        task.setTotalToolQty(new BigDecimal("8"));
+        // 准备先补最小起排和整卷，再由工装硬上限压缩的任务。
+        TmTaskDraft task = buildPlanTask("100");
+        task.setTotalToolQty(new BigDecimal("2"));
         task.setCurlRollLength(new BigDecimal("200"));
         task.setDefaultCurlRollLength(new BigDecimal("180"));
         task.setMinStartQty(new BigDecimal("450"));
-        task.setMachineRemainCapacity(new BigDecimal("650"));
-        task.setMachineSpeed(new BigDecimal("100"));
-        task.setMaintenanceHours(new BigDecimal("1"));
-        task.setPreviousSpecSwitchHours(new BigDecimal("0.5"));
-        task.setPreviousGlueSwitchHours(new BigDecimal("0.5"));
 
-        // 准备班初滚动库存 200，库存抵扣后基础需求=max(380-200,900-200,0)=700。
+        // 准备排程上下文，计划量策略当前不依赖上下文。
         TmScheduleContext context = new TmScheduleContext();
 
         // 执行默认计划量策略。
         TmPlanQtyResult result = new TmDefaultPlanQtyStrategy().calculate(task, context);
 
-        // 断言基础需求、工装、取整、产能调整和最终计划量。
-        assertBigDecimalEquals(new BigDecimal("700"), result.getBaseDemandQty());
-        assertBigDecimalEquals(BigDecimal.ZERO, result.getToolLimitAdjustQty());
-        assertBigDecimalEquals(BigDecimal.ZERO, result.getMinStartAdjustQty());
-        assertBigDecimalEquals(new BigDecimal("100"), result.getTailRoundAdjustQty());
-        assertBigDecimalEquals(new BigDecimal("-350"), result.getCapacityAdjustQty());
-        assertBigDecimalEquals(new BigDecimal("450"), result.getFinalPlanQty());
+        // 断言先从 100 补到 450，再取整到 600，最后被 400 工装上限压缩。
+        assertBigDecimalEquals(new BigDecimal("100"), result.getBaseDemandQty());
+        assertBigDecimalEquals(new BigDecimal("350"), result.getMinStartAdjustQty());
+        assertBigDecimalEquals(new BigDecimal("150"), result.getTailRoundAdjustQty());
+        assertBigDecimalEquals(new BigDecimal("-200"), result.getToolLimitAdjustQty());
+        assertBigDecimalEquals(BigDecimal.ZERO, result.getCapacityAdjustQty());
+        assertBigDecimalEquals(new BigDecimal("400"), result.getFinalPlanQty());
+        assertBigDecimalEquals(new BigDecimal("200"), result.getToolOverflowQty());
     }
-
     /**
      * 测试内容：验证可用工装限制会压低最终计划量。
-     * 测试场景：需求 700，但 3 个工装和 200 卷曲长度最多支持 600。
-     * 预期结果：工装调整量为 -100，最终计划量为 600。
+     * 测试场景：需求 700 先按 200 卷曲长度取整到 800，但 3 个工装最多支持 600。
+     * 预期结果：工装调整量为 -200，工装顺延量为 200，最终计划量为 600。
      */
     @Test
     public void planShouldLimitByAvailableTools() {
@@ -175,7 +165,8 @@ public class TmBusinessRuleStrategyTest {
 
         // 断言工装限制生效并压低最终计划量。
         assertBigDecimalEquals(new BigDecimal("700"), result.getBaseDemandQty());
-        assertBigDecimalEquals(new BigDecimal("-100"), result.getToolLimitAdjustQty());
+        assertBigDecimalEquals(new BigDecimal("-200"), result.getToolLimitAdjustQty());
+        assertBigDecimalEquals(new BigDecimal("200"), result.getToolOverflowQty());
         assertBigDecimalEquals(new BigDecimal("600"), result.getFinalPlanQty());
     }
 
@@ -199,12 +190,12 @@ public class TmBusinessRuleStrategyTest {
     }
 
     /**
-     * 测试内容：验证检修等不可用时间会扣减机台剩余产能。
+     * 测试内容：验证计划量策略不再提前按机台产能压缩。
      * 测试场景：剩余产能 500，机台速度 100，检修 1 小时后可用产能为 400。
-     * 预期结果：产能调整量为 -200，最终计划量限制为 400。
+     * 预期结果：计划量仍保持 600，产能压缩交由机台分配阶段处理。
      */
     @Test
-    public void planShouldCapByRemainCapacityAfterDeductingUnavailableHours() {
+    public void planShouldNotCapByRemainCapacityBeforeMachineAssign() {
         // 准备需求超过扣减后可用产能的任务。
         TmTaskDraft task = buildPlanTask("600");
         task.setMachineRemainCapacity(new BigDecimal("500"));
@@ -214,11 +205,61 @@ public class TmBusinessRuleStrategyTest {
         // 执行计划量策略。
         TmPlanQtyResult result = new TmDefaultPlanQtyStrategy().calculate(task, null);
 
-        // 断言最终计划量被扣减后的产能上限限制。
-        assertBigDecimalEquals(new BigDecimal("-200"), result.getCapacityAdjustQty());
-        assertBigDecimalEquals(new BigDecimal("400"), result.getFinalPlanQty());
+        // 断言策略阶段不再提前压缩产能，避免丢失后续顺延量。
+        assertBigDecimalEquals(BigDecimal.ZERO, result.getCapacityAdjustQty());
+        assertBigDecimalEquals(new BigDecimal("600"), result.getFinalPlanQty());
     }
 
+    /**
+     * 测试内容：验证工装上限低于最小起排量时，工装限制作为硬上限。
+     * 测试场景：基础需求 100，最小起排 450，工装上限 200。
+     * 预期结果：最终计划量为 200，低于最小起排的 250 作为工装顺延量。
+     */
+    @Test
+    public void planShouldAllowFinalQtyBelowMinStartWhenToolLimitIsLower() {
+        // 准备工装上限低于最小起排量的任务。
+        TmTaskDraft task = buildPlanTask("100");
+        task.setMinStartQty(new BigDecimal("450"));
+        task.setTotalToolQty(BigDecimal.ONE);
+        task.setCurlRollLength(new BigDecimal("200"));
+
+        // 执行计划量策略。
+        TmPlanQtyResult result = new TmDefaultPlanQtyStrategy().calculate(task, null);
+
+        // 断言工装限制在最小起排和卷数取整之后执行，可压到低于最小起排量。
+        assertBigDecimalEquals(new BigDecimal("350"), result.getMinStartAdjustQty());
+        assertBigDecimalEquals(new BigDecimal("-400"), result.getToolLimitAdjustQty());
+        assertBigDecimalEquals(new BigDecimal("200"), result.getFinalPlanQty());
+        assertBigDecimalEquals(new BigDecimal("400"), result.getToolOverflowQty());
+    }
+
+    /**
+     * 测试内容：验证收尾规格在损耗补偿后受工装上限压缩。
+     * 测试场景：收尾余量 10 条，肩长 50，损耗 10%，工装上限 400。
+     * 预期结果：收尾量 550 被压到 400，不执行最小起排和卷数取整。
+     */
+    @Test
+    public void planShouldApplyToolLimitAfterTailLossWithoutMinStartAndRound() {
+        // 准备收尾规格任务，收尾损耗后超过工装上限。
+        TmTaskDraft task = buildPlanTask("600");
+        task.setTailFlag("1");
+        task.setTailBalanceQty(new BigDecimal("10"));
+        task.setTreadShoulderLength(new BigDecimal("50"));
+        task.setLossRate(new BigDecimal("10"));
+        task.setMinStartQty(new BigDecimal("700"));
+        task.setTotalToolQty(new BigDecimal("2"));
+        task.setCurlRollLength(new BigDecimal("200"));
+
+        // 执行计划量策略。
+        TmPlanQtyResult result = new TmDefaultPlanQtyStrategy().calculate(task, null);
+
+        // 断言收尾损耗后直接受工装硬上限压缩，不再补最小起排和整卷。
+        assertBigDecimalEquals(new BigDecimal("50.000000"), result.getLossAddQty());
+        assertBigDecimalEquals(BigDecimal.ZERO, result.getMinStartAdjustQty());
+        assertBigDecimalEquals(new BigDecimal("-150.000000"), result.getToolLimitAdjustQty());
+        assertBigDecimalEquals(new BigDecimal("400"), result.getFinalPlanQty());
+        assertBigDecimalEquals(new BigDecimal("150.000000"), result.getToolOverflowQty());
+    }
     /**
      * 测试内容：验证计划量策略任务为空时直接拒绝。
      * 测试场景：调用默认计划量策略时传入 null 任务。

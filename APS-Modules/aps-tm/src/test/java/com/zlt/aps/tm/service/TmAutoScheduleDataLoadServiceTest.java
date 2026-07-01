@@ -1,6 +1,7 @@
 package com.zlt.aps.tm.service;
 
 import cn.hutool.core.date.DateUtil;
+import com.ruoyi.common.redis.service.RedisService;
 import com.zlt.aps.tm.api.domain.entity.*;
 import com.zlt.aps.tm.domain.vo.TmFormingDemandRowVo;
 import com.zlt.aps.tm.domain.vo.TmWorkCalendarRowVo;
@@ -15,10 +16,8 @@ import org.mockito.junit.MockitoJUnitRunner;
 
 import java.lang.reflect.Field;
 import java.math.BigDecimal;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import static org.junit.Assert.*;
@@ -65,6 +64,9 @@ public class TmAutoScheduleDataLoadServiceTest {
 
     @Mock
     private TmScheduleResultMapper tmScheduleResultMapper;
+
+    @Mock
+    private RedisService redisService;
     /**
      * 测试内容：验证数据加载会补齐默认策略参数并生成候选机台。
      * 测试场景：参数表无配置，机台表返回一台启用机台，成型需求为空。
@@ -121,6 +123,7 @@ public class TmAutoScheduleDataLoadServiceTest {
         setField(service, "tmParamsMapper", tmParamsMapper);
         setField(service, "tmMachineInfoMapper", tmMachineInfoMapper);
         setField(service, "tmAutoScheduleDataLoadMapper", tmAutoScheduleDataLoadMapper);
+        setField(service, "tmAutoScheduleRedisCacheService", buildRedisCacheService());
         // 参数和机台数据固定返回，用于验证重复调用时不会重复查询。
         when(tmParamsMapper.selectList(any())).thenReturn(Collections.emptyList());
         TmMachineInfo machineInfo = new TmMachineInfo();
@@ -141,6 +144,38 @@ public class TmAutoScheduleDataLoadServiceTest {
         // 断言公共基础数据只查询一次，说明缓存生效。
         verify(tmParamsMapper, times(1)).selectList(any());
         verify(tmMachineInfoMapper, times(1)).selectList(any());
+    }
+
+    /**
+     * 测试内容：验证清理指定工厂缓存后，参数和机台基础数据会重新回源加载。
+     * 测试场景：先连续两次加载命中 Redis 缓存，再清理工厂缓存后第三次加载。
+     * 预期结果：清理前只回源一次，清理后再次回源。
+     *
+     * @throws Exception 反射注入依赖或加载数据失败时由测试框架抛出
+     */
+    @Test
+    public void loadAllDataShouldReloadFactoryDataAfterRedisCacheClear() throws Exception {
+        TmAutoScheduleRedisCacheService cacheService = buildRedisCacheService();
+        TmAutoScheduleDataLoadService service = new TmAutoScheduleDataLoadService();
+        setField(service, "tmParamsMapper", tmParamsMapper);
+        setField(service, "tmMachineInfoMapper", tmMachineInfoMapper);
+        setField(service, "tmAutoScheduleDataLoadMapper", tmAutoScheduleDataLoadMapper);
+        setField(service, "tmAutoScheduleRedisCacheService", cacheService);
+        when(tmParamsMapper.selectList(any())).thenReturn(Collections.emptyList());
+        TmMachineInfo machineInfo = new TmMachineInfo();
+        machineInfo.setFactoryCode("F1");
+        machineInfo.setMachineCode("TM01");
+        machineInfo.setMachineStatus("1");
+        when(tmMachineInfoMapper.selectList(any())).thenReturn(Collections.singletonList(machineInfo));
+        when(tmAutoScheduleDataLoadMapper.selectFormingDemandRows(any(), any())).thenReturn(Collections.emptyList());
+
+        service.loadAllData(buildContext());
+        service.loadAllData(buildContext());
+        cacheService.clear("F1", null);
+        service.loadAllData(buildContext());
+
+        verify(tmParamsMapper, times(2)).selectList(any());
+        verify(tmMachineInfoMapper, times(2)).selectList(any());
     }
 
     /**
@@ -524,6 +559,7 @@ public class TmAutoScheduleDataLoadServiceTest {
         setField(service, "tmAutoScheduleDataLoadMapper", tmAutoScheduleDataLoadMapper);
         setField(service, "tmStockMapper", tmStockMapper);
         setField(service, "tmScheduleResultMapper", tmScheduleResultMapper);
+        setField(service, "tmAutoScheduleRedisCacheService", buildRedisCacheService());
         when(tmParamsMapper.selectList(any())).thenReturn(withLegacyFormingShiftOffset(paramsList));
         when(tmStockMapper.selectList(any())).thenReturn(Collections.emptyList());
         when(tmScheduleResultMapper.selectList(any()))
@@ -535,6 +571,38 @@ public class TmAutoScheduleDataLoadServiceTest {
         machineInfo.setMaxCapacity(new BigDecimal("1000"));
         when(tmMachineInfoMapper.selectList(any())).thenReturn(Collections.singletonList(machineInfo));
         return service;
+    }
+
+    /**
+     * 构建使用 Mockito RedisService 的胎面 Redis 缓存服务。
+     *
+     * @return 胎面自动排程 Redis 缓存服务
+     */
+    private TmAutoScheduleRedisCacheService buildRedisCacheService() {
+        Map<String, Object> redisStore = new HashMap<>();
+        lenient().when(redisService.getCacheObject(anyString())).thenAnswer(invocation -> redisStore.get(invocation.getArgument(0)));
+        lenient().doAnswer(invocation -> {
+            redisStore.put(invocation.getArgument(0), invocation.getArgument(1));
+            return null;
+        }).when(redisService).setCacheObject(anyString(), any(), anyLong(), any(TimeUnit.class));
+        lenient().when(redisService.keys(anyString())).thenAnswer(invocation -> {
+            String pattern = invocation.getArgument(0);
+            String prefix = pattern.replace("*", "");
+            return redisStore.keySet().stream()
+                    .filter(key -> key.startsWith(prefix))
+                    .collect(Collectors.toList());
+        });
+        lenient().when(redisService.deleteObject(any(java.util.Collection.class))).thenAnswer(invocation -> {
+            java.util.Collection<String> keyCollection = invocation.getArgument(0);
+            long deleteCount = 0L;
+            for (String key : keyCollection) {
+                if (redisStore.remove(key) != null) {
+                    deleteCount++;
+                }
+            }
+            return deleteCount;
+        });
+        return new TmAutoScheduleRedisCacheService(redisService);
     }
 
     private TmAutoScheduleDataLoadService buildServiceWithCandidateMocks(List<TmParams> paramsList) throws Exception {

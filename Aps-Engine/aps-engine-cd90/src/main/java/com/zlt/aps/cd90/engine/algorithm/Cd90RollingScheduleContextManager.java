@@ -46,7 +46,9 @@ public class Cd90RollingScheduleContextManager {
                 .plannedInboundRecords(new ArrayList<>())
                 .bigRollAgingStocks(new ArrayList<>())
                 .committedTasks(new ArrayList<>())
+                .continueDemandByCloth(new HashMap<>())
                 .tailSpecByMachine(new HashMap<>())
+                .lastMachineByCloth(new HashMap<>())
                 .tailByMachine(new HashMap<>())
                 .build();
     }
@@ -123,10 +125,16 @@ public class Cd90RollingScheduleContextManager {
         if (completedState == null || completedState.getTasks() == null) {
             return;
         }
+        if (context.getLastMachineByCloth() == null) {
+            context.setLastMachineByCloth(new HashMap<>());
+        }
         int taskOffset = context.getCommittedTasks().size();
         for (int index = 0; index < completedState.getTasks().size(); index++) {
             Cd90ShiftScheduleTask task = completedState.getTasks().get(index);
             context.getCommittedTasks().add(task);
+            if (task.getClothCode() != null && task.getMachineCode() != null) {
+                context.getLastMachineByCloth().put(task.getClothCode(), task.getMachineCode());
+            }
             // 当前班计划任务按预计结束时间转为计划入库，供后续班次净需求和库排重建使用。
             appendPlannedInbound(context, task, taskOffset + index + 1);
         }
@@ -136,9 +144,9 @@ public class Cd90RollingScheduleContextManager {
                 ? new HashMap<>() : new HashMap<>(completedState.getTailSpecByMachine()));
         context.setTailByMachine(copyTails(completedState.getTailByMachine()));
         log.info("[直裁自动排程] 当前班次滚动上下文已保存, taskCount={}, "
-                        + "plannedInboundCount={}, machineTailCount={}",
+                        + "plannedInboundCount={}, machineTailCount={}, lastMachineByCloth={}",
                 completedState.getTasks().size(), context.getPlannedInboundRecords().size(),
-                context.getTailSpecByMachine().size());
+                context.getTailSpecByMachine().size(), context.getLastMachineByCloth());
     }
 
     private void appendPlannedInbound(Cd90RollingScheduleContext context,

@@ -123,13 +123,13 @@ public class LhScheduleContext {
     private List<FactoryMonthPlanProductionFinalResult> monthPlanList = new ArrayList<>();
     /** 本次排程加载的全部月计划列表，跨月时包含多个自然月；供按业务日期解析 dayN 使用 */
     private List<FactoryMonthPlanProductionFinalResult> loadedMonthPlanList = new ArrayList<>();
-    /** 物料+年月 -> 月计划记录索引，跨月时避免按物料编码误取其他月份计划 */
+    /** 物料+产品状态+年月 -> 月计划记录索引，跨月或同物料多产品状态时避免误取其他计划 */
     private Map<String, FactoryMonthPlanProductionFinalResult> monthPlanByMaterialMonthMap = new LinkedHashMap<>();
     /** 年月 -> 定稿需求版本，跨月加载月计划和周程调整时按自然月取版本 */
     private Map<String, String> monthPlanVersionByYearMonthMap = new LinkedHashMap<>();
     /** 年月 -> 定稿排产版本，跨月加载月计划和结构机台统计时按自然月取版本 */
     private Map<String, String> productionVersionByYearMonthMap = new LinkedHashMap<>();
-    /** 物料+年月 -> 月累计完成量，避免同一物料跨月时完成量串月 */
+    /** 物料+产品状态+年月 -> 月累计完成量，避免同一物料不同产品状态或跨月时完成量串月 */
     private Map<String, Integer> materialMonthFinishedQtyByMonthMap = new HashMap<>();
     /** 工作日历列表 */
     private List<MdmWorkCalendar> workCalendarList = new ArrayList<>();
@@ -151,11 +151,11 @@ public class LhScheduleContext {
     private Map<String, Integer> embryoRealtimeStockMap = new HashMap<>();
     /** 胎胚收尾标识Map, key=embryoCode, value=1-收尾/0-非收尾；以胎胚维度合并硫化余量后按主销参与情况判定 */
     private Map<String, Integer> embryoEndingFlagMap = new HashMap<>();
-    /** 日完成量Map（按物料+完成日期聚合）, key=materialCode_finishDate(yyyy-MM-dd) */
+    /** 日完成量Map（按物料+产品状态+完成日期聚合）, key=materialCode_productStatus_finishDate(yyyy-MM-dd) */
     private Map<String, Integer> materialDayFinishedQtyMap = new HashMap<>();
-    /** 本月日完成量Map（按物料+完成日期聚合）, key=materialCode_finishDate(yyyy-MM-dd)，仅覆盖当前排程月份截至T-1 */
+    /** 本月日完成量Map（按物料+产品状态+完成日期聚合）, key=materialCode_productStatus_finishDate(yyyy-MM-dd)，仅覆盖当前排程月份截至T-1 */
     private Map<String, Integer> materialMonthDailyFinishedQtyMap = new HashMap<>();
-    /** 月累计完成量Map（按月计划所属月份统计，截至排程窗口T日前一日）, key=materialCode */
+    /** 月累计完成量Map（按月计划所属月份统计，截至排程窗口T日前一日）, key=materialCode_productStatus */
     private Map<String, Integer> materialMonthFinishedQtyMap = new HashMap<>();
     /** T日排程班次完成量Map, key=materialCode, value=T日class1FinishQty按物料汇总值 */
     private Map<String, Integer> materialScheDayFinishQtyMap = new HashMap<>();
@@ -198,7 +198,7 @@ public class LhScheduleContext {
     private List<LhMouldChangePlan> previousMouldChangePlanList = new ArrayList<>();
     /** 滚动排程继承结果列表，仅存放本批次继承的排程结果 */
     private List<LhScheduleResult> rollingInheritedScheduleResultList = new ArrayList<>();
-    /** 滚动排程继承计划量Map，key=materialCode；ScheduleAdjustHandler据此从待排量中扣减 */
+    /** 滚动排程继承计划量Map，key=materialCode_productStatus；ScheduleAdjustHandler据此从同状态待排量中扣减 */
     private Map<String, Integer> inheritedPlanQtyMap = new HashMap<>();
     /** 是否已执行滚动排程衔接，影响结转口径和前日日期解析 */
     private boolean rollingScheduleHandoff;
@@ -217,7 +217,7 @@ public class LhScheduleContext {
     private List<SkuScheduleDTO> continuousSkuList = new ArrayList<>();
     /** 新增SKU列表，续作和换活字块未消费完的 SKU 会继续保留到 S4.5 新增链路 */
     private List<SkuScheduleDTO> newSpecSkuList = new ArrayList<>();
-    /** 本月历史欠产向当前排程窗口传导的数量，key=materialCode */
+    /** 本月历史欠产向当前排程窗口传导的数量，key=materialCode_productStatus */
     private Map<String, Integer> carryForwardQtyMap = new HashMap<>();
     /** 满班补齐超排量累加器，key=materialCode，供最终汇总日志使用（不受SKU从待排列表中移除影响） */
     private Map<String, Integer> skuShiftFillOverQtyMap = new LinkedHashMap<>();

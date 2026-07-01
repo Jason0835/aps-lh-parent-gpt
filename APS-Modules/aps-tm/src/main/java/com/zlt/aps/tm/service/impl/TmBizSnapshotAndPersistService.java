@@ -7,6 +7,7 @@ import com.zlt.aps.common.engine.schedule.ScheduleTaskLinkedList;
 import com.zlt.aps.common.engine.schedule.ScheduleTaskNode;
 import com.zlt.aps.tm.api.domain.entity.TmScheduleResult;
 import com.zlt.aps.tm.api.domain.entity.TmScheduleResultExplain;
+import com.zlt.aps.tm.api.domain.entity.TmScheduleUnplanned;
 import com.zlt.aps.tm.engine.domain.TmPersistResult;
 import com.zlt.aps.tm.engine.domain.TmScheduleContext;
 import com.zlt.aps.tm.engine.domain.TmSnapshotBuildResult;
@@ -16,6 +17,7 @@ import com.zlt.aps.tm.engine.service.impl.TmPersistService;
 import com.zlt.aps.tm.engine.service.impl.TmSnapshotBuildService;
 import com.zlt.aps.tm.mapper.TmScheduleResultExplainMapper;
 import com.zlt.aps.tm.mapper.TmScheduleResultMapper;
+import com.zlt.aps.tm.mapper.TmScheduleUnplannedMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Service;
@@ -41,6 +43,8 @@ public class TmBizSnapshotAndPersistService implements ITmSnapshotAndPersistServ
 
     private final TmScheduleResultExplainMapper scheduleResultExplainMapper;
 
+    private final TmScheduleUnplannedMapper scheduleUnplannedMapper;
+
     /**
      * 创建胎面自动排程业务快照和落库步骤服务。
      *
@@ -48,15 +52,18 @@ public class TmBizSnapshotAndPersistService implements ITmSnapshotAndPersistServ
      * @param persistService             落库实体转换服务
      * @param scheduleResultMapper       胎面排程结果 Mapper
      * @param scheduleResultExplainMapper 胎面排程解释 Mapper
+     * @param scheduleUnplannedMapper     胎面未排任务 Mapper
      */
     public TmBizSnapshotAndPersistService(TmSnapshotBuildService snapshotBuildService,
                                           TmPersistService persistService,
                                           TmScheduleResultMapper scheduleResultMapper,
-                                          TmScheduleResultExplainMapper scheduleResultExplainMapper) {
+                                          TmScheduleResultExplainMapper scheduleResultExplainMapper,
+                                          TmScheduleUnplannedMapper scheduleUnplannedMapper) {
         this.snapshotBuildService = snapshotBuildService;
         this.persistService = persistService;
         this.scheduleResultMapper = scheduleResultMapper;
         this.scheduleResultExplainMapper = scheduleResultExplainMapper;
+        this.scheduleUnplannedMapper = scheduleUnplannedMapper;
     }
 
     /**
@@ -100,13 +107,12 @@ public class TmBizSnapshotAndPersistService implements ITmSnapshotAndPersistServ
             return persistResult;
         }
         List<TmScheduleResult> resultList = new ArrayList<>();
+        List<TmTaskDraft> unplannedTaskList = new ArrayList<>();
         Map<TmScheduleResult, List<String>> resultBusinessKeyMap = new IdentityHashMap<>();
         Map<String, Long> resultIdMap = new HashMap<>();
         for (TmTaskDraft taskDraft : context.getTaskDraftList()) {
-            if (taskDraft.isUnassigned() || StrUtil.isNotBlank(taskDraft.getUnplannedReasonCode())) {
-                TmScheduleResult result = persistService.convertUnplanned(taskDraft, context);
-                resultList.add(result);
-                addResultBusinessKey(resultBusinessKeyMap, result, taskDraft.getBusinessKey());
+            if (isUnplannedTask(taskDraft)) {
+                unplannedTaskList.add(taskDraft);
             }
         }
         for (ScheduleTaskLinkedList<TmTaskDraft> chain : context.getTaskChainGroup().values()) {
@@ -115,23 +121,29 @@ public class TmBizSnapshotAndPersistService implements ITmSnapshotAndPersistServ
             registerChainResultBusinessKey(nodeList, chainResultList, resultBusinessKeyMap);
             resultList.addAll(chainResultList);
         }
-        if (CollUtil.isEmpty(resultList)) {
-            return persistResult;
-        }
         Map<TmScheduleResult, List<String>> mergedResultBusinessKeyMap = new IdentityHashMap<>();
         List<TmScheduleResult> mergedResultList = mergeScheduleResults(resultList, resultBusinessKeyMap, mergedResultBusinessKeyMap);
         assignTmOrderNo(mergedResultList, context.getBatchNo());
         for (TmScheduleResult result : mergedResultList) {
+            normalizeResultShiftFields(result);
             try {
                 scheduleResultMapper.insert(result);
                 registerInsertedResultId(result, mergedResultBusinessKeyMap, resultIdMap);
                 persistResult.setResultCount(persistResult.getResultCount() + 1);
-                if (StrUtil.isBlank(result.getMachineCode())) {
-                    persistResult.setUnplannedCount(persistResult.getUnplannedCount() + 1);
-                }
             } catch (RuntimeException ex) {
                 String errorMsg = buildResultErrorMsg(result, ex);
                 log.error("[TM_SCHEDULE_PERSIST_RESULT_FAIL] {}", errorMsg, ex);
+                throw new ServiceException(errorMsg);
+            }
+        }
+        Map<String, TmScheduleUnplanned> unplannedMap = buildMergedUnplannedMap(unplannedTaskList, context);
+        for (TmScheduleUnplanned unplanned : unplannedMap.values()) {
+            try {
+                scheduleUnplannedMapper.insert(unplanned);
+                persistResult.setUnplannedCount(persistResult.getUnplannedCount() + 1);
+            } catch (RuntimeException ex) {
+                String errorMsg = buildUnplannedErrorMsg(unplanned, ex);
+                log.error("[TM_SCHEDULE_PERSIST_UNPLANNED_FAIL] {}", errorMsg, ex);
                 throw new ServiceException(errorMsg);
             }
         }
@@ -139,7 +151,9 @@ public class TmBizSnapshotAndPersistService implements ITmSnapshotAndPersistServ
             TmSnapshotBuildResult snapshot = context.getSnapshotMap().get(taskDraft.getBusinessKey());
             TmScheduleResultExplain explain = persistService.convertExplain(taskDraft, snapshot, context);
             try {
-                explain.setResultId(resolveResultId(taskDraft, resultIdMap));
+                if (!isUnplannedTask(taskDraft)) {
+                    explain.setResultId(resolveResultId(taskDraft, resultIdMap));
+                }
                 scheduleResultExplainMapper.insert(explain);
                 persistResult.setExplainCount(persistResult.getExplainCount() + 1);
             } catch (RuntimeException ex) {
@@ -150,7 +164,214 @@ public class TmBizSnapshotAndPersistService implements ITmSnapshotAndPersistServ
         }
         return persistResult;
     }
+    /**
+     * 判断任务是否属于未排任务。
+     *
+     * @param taskDraft 待排任务草稿
+     * @return true 表示任务未分配到机台，需要写入未排表
+     */
+    private boolean isUnplannedTask(TmTaskDraft taskDraft) {
+        return taskDraft != null && (taskDraft.isUnassigned() || StrUtil.isNotBlank(taskDraft.getUnplannedReasonCode()));
+    }
 
+    /**
+     * 按未排列表表结构归并未排任务。
+     *
+     * <p>未排表没有班次和来源工单字段，因此同一工厂、批次、日期、胎面、胶料、口型和原因只写一行；
+     * 任务级班次和计划量追溯继续写入解释表。</p>
+     *
+     * @param unplannedTaskList 未排任务列表
+     * @param context           胎面排程上下文
+     * @return 未排列表归并结果
+     */
+    private Map<String, TmScheduleUnplanned> buildMergedUnplannedMap(List<TmTaskDraft> unplannedTaskList,
+                                                                     TmScheduleContext context) {
+        Map<String, TmScheduleUnplanned> unplannedMap = new LinkedHashMap<>();
+        if (CollUtil.isEmpty(unplannedTaskList)) {
+            return unplannedMap;
+        }
+        for (TmTaskDraft taskDraft : unplannedTaskList) {
+            TmSnapshotBuildResult snapshot = context.getSnapshotMap().get(taskDraft.getBusinessKey());
+            TmScheduleUnplanned unplanned = buildScheduleUnplanned(taskDraft, snapshot, context);
+            unplannedMap.putIfAbsent(buildUnplannedMergeKey(unplanned), unplanned);
+        }
+        return unplannedMap;
+    }
+
+    /**
+     * 构建未排列表归并键。
+     *
+     * @param unplanned 未排列表实体
+     * @return 归并键
+     */
+    private String buildUnplannedMergeKey(TmScheduleUnplanned unplanned) {
+        Date scheduleDate = unplanned == null ? null : unplanned.getScheduleDate();
+        return StrUtil.blankToDefault(unplanned == null ? null : unplanned.getFactoryCode(), "")
+                + "|" + StrUtil.blankToDefault(unplanned == null ? null : unplanned.getBatchNo(), "")
+                + "|" + (scheduleDate == null ? "" : String.valueOf(scheduleDate.getTime()))
+                + "|" + StrUtil.blankToDefault(unplanned == null ? null : unplanned.getTreadCode(), "")
+                + "|" + StrUtil.blankToDefault(unplanned == null ? null : unplanned.getGlueCode(), "")
+                + "|" + StrUtil.blankToDefault(unplanned == null ? null : unplanned.getMouthPlateCode(), "")
+                + "|" + StrUtil.blankToDefault(unplanned == null ? null : unplanned.getUnplannedReasonCode(), "");
+    }
+    /**
+     * 构建胎面未排任务实体。
+     *
+     * @param taskDraft 未排任务草稿
+     * @param snapshot  解释快照，可为空
+     * @param context   胎面排程上下文
+     * @return 胎面未排任务实体
+     */
+    private TmScheduleUnplanned buildScheduleUnplanned(TmTaskDraft taskDraft, TmSnapshotBuildResult snapshot,
+                                                       TmScheduleContext context) {
+        TmScheduleUnplanned unplanned = new TmScheduleUnplanned();
+        unplanned.setFactoryCode(context == null ? null : context.getFactoryCode());
+        unplanned.setBatchNo(context == null ? null : context.getBatchNo());
+        unplanned.setScheduleDate(context == null ? null : context.getScheduleDate());
+        if (taskDraft != null) {
+            unplanned.setTreadCode(taskDraft.getTreadCode());
+            unplanned.setGlueCode(taskDraft.getGlueCode());
+            unplanned.setMouthPlateCode(taskDraft.getMouthPlateCode());
+            unplanned.setUnplannedReasonCode(taskDraft.getUnplannedReasonCode());
+            unplanned.setUnplannedReasonDesc(taskDraft.getUnplannedReasonDesc());
+        }
+        if (snapshot != null) {
+            unplanned.setUnplannedEvidenceJson(snapshot.getUnplannedEvidenceJson());
+        }
+        return unplanned;
+    }
+
+    /**
+     * 归一化结果表班次字段。
+     *
+     * <p>结果表只表示已经安排到机台产能的任务。机台为空或班次计划量为空/小于等于 0 时，
+     * 对应班次顺序和起止时间必须清空，避免看板展示无产能承接的顺序。</p>
+     *
+     * @param result 排程结果
+     */
+    private void normalizeResultShiftFields(TmScheduleResult result) {
+        if (result == null) {
+            return;
+        }
+        if (StrUtil.isBlank(result.getMachineCode())) {
+            clearAllShiftFields(result);
+            result.setClass1PlanQty(BigDecimal.ZERO);
+            result.setClass2PlanQty(BigDecimal.ZERO);
+            result.setClass3PlanQty(BigDecimal.ZERO);
+            result.setClass4PlanQty(BigDecimal.ZERO);
+            result.setClass5PlanQty(BigDecimal.ZERO);
+            result.setClass6PlanQty(BigDecimal.ZERO);
+            return;
+        }
+        if (!isPositiveQty(result.getClass1PlanQty())) {
+            clearClass1ShiftFields(result);
+        }
+        if (!isPositiveQty(result.getClass2PlanQty())) {
+            clearClass2ShiftFields(result);
+        }
+        if (!isPositiveQty(result.getClass3PlanQty())) {
+            clearClass3ShiftFields(result);
+        }
+        if (!isPositiveQty(result.getClass4PlanQty())) {
+            clearClass4ShiftFields(result);
+        }
+        if (!isPositiveQty(result.getClass5PlanQty())) {
+            clearClass5ShiftFields(result);
+        }
+        if (!isPositiveQty(result.getClass6PlanQty())) {
+            clearClass6ShiftFields(result);
+        }
+    }
+
+    /**
+     * 判断计划量是否大于 0。
+     *
+     * @param planQty 班次计划量
+     * @return true 表示计划量大于 0
+     */
+    private boolean isPositiveQty(BigDecimal planQty) {
+        return planQty != null && planQty.compareTo(BigDecimal.ZERO) > 0;
+    }
+
+    /**
+     * 清空全部班次顺序和时间字段。
+     *
+     * @param result 排程结果
+     */
+    private void clearAllShiftFields(TmScheduleResult result) {
+        clearClass1ShiftFields(result);
+        clearClass2ShiftFields(result);
+        clearClass3ShiftFields(result);
+        clearClass4ShiftFields(result);
+        clearClass5ShiftFields(result);
+        clearClass6ShiftFields(result);
+    }
+
+    /**
+     * 清空 1 班顺序和时间字段。
+     *
+     * @param result 排程结果
+     */
+    private void clearClass1ShiftFields(TmScheduleResult result) {
+        result.setClass1Sequence(null);
+        result.setClass1StartTime(null);
+        result.setClass1EndTime(null);
+    }
+
+    /**
+     * 清空 2 班顺序和时间字段。
+     *
+     * @param result 排程结果
+     */
+    private void clearClass2ShiftFields(TmScheduleResult result) {
+        result.setClass2Sequence(null);
+        result.setClass2StartTime(null);
+        result.setClass2EndTime(null);
+    }
+
+    /**
+     * 清空 3 班顺序和时间字段。
+     *
+     * @param result 排程结果
+     */
+    private void clearClass3ShiftFields(TmScheduleResult result) {
+        result.setClass3Sequence(null);
+        result.setClass3StartTime(null);
+        result.setClass3EndTime(null);
+    }
+
+    /**
+     * 清空 4 班顺序和时间字段。
+     *
+     * @param result 排程结果
+     */
+    private void clearClass4ShiftFields(TmScheduleResult result) {
+        result.setClass4Sequence(null);
+        result.setClass4StartTime(null);
+        result.setClass4EndTime(null);
+    }
+
+    /**
+     * 清空 5 班顺序和时间字段。
+     *
+     * @param result 排程结果
+     */
+    private void clearClass5ShiftFields(TmScheduleResult result) {
+        result.setClass5Sequence(null);
+        result.setClass5StartTime(null);
+        result.setClass5EndTime(null);
+    }
+
+    /**
+     * 清空 6 班顺序和时间字段。
+     *
+     * @param result 排程结果
+     */
+    private void clearClass6ShiftFields(TmScheduleResult result) {
+        result.setClass6Sequence(null);
+        result.setClass6StartTime(null);
+        result.setClass6EndTime(null);
+    }
     /**
      * 将任务链转换后的结果实体与原任务业务键建立关联。
      *
@@ -419,6 +640,18 @@ public class TmBizSnapshotAndPersistService implements ITmSnapshotAndPersistServ
                 + "，原因=" + ex.getMessage();
     }
 
+    /**
+     * 构建未排表落库失败信息。
+     *
+     * @param taskDraft 未排任务
+     * @param ex        异常
+     * @return 错误信息
+     */
+    private String buildUnplannedErrorMsg(TmScheduleUnplanned unplanned, RuntimeException ex) {
+        return "未排表写入失败，batchNo=" + (unplanned == null ? null : unplanned.getBatchNo())
+                + "，treadCode=" + (unplanned == null ? null : unplanned.getTreadCode())
+                + "，原因=" + ex.getMessage();
+    }
     /**
      * 构建解释表落库失败信息。
      *

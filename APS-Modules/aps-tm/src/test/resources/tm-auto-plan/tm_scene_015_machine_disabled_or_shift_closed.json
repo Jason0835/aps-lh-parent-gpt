@@ -50,7 +50,7 @@
   "expected": {
     "success": true,
     "messageContains": "胎面自动排程执行完成",
-    "resultCount": 1,
+    "resultCount": 0,
     "assignedCount": 0,
     "unassignedCount": 1,
     "explainCount": 6,

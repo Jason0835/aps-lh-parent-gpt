@@ -13,6 +13,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -80,10 +81,11 @@ public class TmPlanCalcService implements ITmPlanCalcService {
         }
         context.setRemainingStockMap(remainingStockMap);
 
-        // 防御性稳定排序：按胎面编码、班次顺序升序，保证同胎面任务按班次递进滚动库存（最终排产顺序由 TASK_SORT 步骤重排）
+        // 防御性稳定排序：先按班次、再按胎面编码升序，保证全局工装池和同胎面库存都按任务顺序滚动。
         context.getTaskDraftList().sort(Comparator
-                .comparing(TmTaskDraft::getTreadCode, Comparator.nullsLast(Comparator.naturalOrder()))
-                .thenComparing(TmTaskDraft::getShiftOrder, Comparator.nullsLast(Comparator.naturalOrder())));
+                .comparing(TmTaskDraft::getShiftOrder, Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparing(TmTaskDraft::getTreadCode, Comparator.nullsLast(Comparator.naturalOrder())));
+        BigDecimal remainingToolQty = this.initializeGlobalAvailableToolQty(context, stockForecastMap);
 
         for (TmTaskDraft task : context.getTaskDraftList()) {
             // 6点库存保留预测快照；班初滚动库存必须从上一任务回写的交接班库存读取。
@@ -105,6 +107,9 @@ public class TmPlanCalcService implements ITmPlanCalcService {
             if (task.getCurrentShiftDemandQty() == null && task.getDemandQty() != null) {
                 task.setCurrentShiftDemandQty(task.getDemandQty());
             }
+
+            // 计划量策略只读取当前任务班初全局可用工装，工装池滚动状态由本服务统一维护。
+            task.setAvailableToolQty(remainingToolQty);
 
             // 通过需求量策略计算库存保证缺口、基础需求量和供应时长，供排序和计划量策略复用。
             TmDemandQtyResult demandQtyResult = demandQtyStrategy.calculate(buildDemandQtyInput(task), context);
@@ -132,18 +137,20 @@ public class TmPlanCalcService implements ITmPlanCalcService {
                 TmPlanQtyResult planQtyResult = planQtyStrategy.calculate(task, context);
                 applyPlanQtyResult(task, planQtyResult);
             }
+            remainingToolQty = this.updateGlobalToolState(task, remainingToolQty);
             updateRollingStockState(context, task);
             addPlanQtyTrace(context, task, planQtyStrategyCode);
             // 打印计划量计算公式
             if (task.getPlanQty() != null) {
                 log.info("[TM_PLAN_QTY_CALC] treadCode={}, shiftOrder={}, 策略编码={}, 计划量计算路径={}",
                         task.getTreadCode(), task.getShiftOrder(), planQtyStrategyCode, task.getCalcFormulaDesc());
-                log.info("[TM_PLAN_QTY_CALC_DETAIL] treadCode={}, shiftOrder={}, demandQty={}, stockDeductQty={}, baseDemandQty={}, lossAddQty={}, toolLimitAdjustQty={}, minStartAdjustQty={}, tailRoundAdjustQty={}, capacityAdjustQty={}, planQty={}",
+                log.info("[TM_PLAN_QTY_CALC_DETAIL] treadCode={}, shiftOrder={}, demandQty={}, stockDeductQty={}, baseDemandQty={}, lossAddQty={}, toolLimitAdjustQty={}, minStartAdjustQty={}, tailRoundAdjustQty={}, capacityAdjustQty={}, availableToolQty={}, toolUsedQty={}, remainingToolQty={}, planQty={}",
                         task.getTreadCode(), task.getShiftOrder(),
                         task.getDemandQty(), task.getStockDeductQty(), task.getBaseDemandQty(),
                         task.getLossAddQty(), task.getToolLimitAdjustQty(),
                         task.getMinStartAdjustQty(), task.getTailRoundAdjustQty(),
-                        task.getCapacityAdjustQty(), task.getPlanQty());
+                        task.getCapacityAdjustQty(), task.getAvailableToolQty(),
+                        task.getToolUsedQty(), task.getRemainingToolQty(), task.getPlanQty());
             }
         }
     }
@@ -256,6 +263,12 @@ public class TmPlanCalcService implements ITmPlanCalcService {
         evidence.put("stockDeductQty", task.getStockDeductQty());
         evidence.put("planStockQty", task.getPlanStockQty());
         evidence.put("tailFlag", task.getTailFlag());
+        evidence.put("toolOverflowQty", task.getToolOverflowQty());
+        evidence.put("totalToolQty", task.getTotalToolQty());
+        evidence.put("availableToolQty", task.getAvailableToolQty());
+        evidence.put("toolUsedQty", task.getToolUsedQty());
+        evidence.put("remainingToolQty", task.getRemainingToolQty());
+        evidence.put("curlRollLength", task.getCurlRollLength());
         evidence.put("lossRate", task.getLossRate());
         evidence.put("calcFormulaDesc", task.getCalcFormulaDesc());
         traceOf(context, task).addRuleHit("PLAN_QTY_CALC", "PASS", evidence);
@@ -310,6 +323,118 @@ public class TmPlanCalcService implements ITmPlanCalcService {
     }
 
     /**
+     * 初始化全局可用工装数量。
+     *
+     * <p>首个任务的可用工装数量等于总工装数量减去所有胎面14点预计库存折算的占用工装数量。工装数量是全局池，
+     * 因此不能按单个胎面重复使用总工装数量。</p>
+     *
+     * @param context          排程上下文
+     * @param stockForecastMap 胎面库存预测结果
+     * @return 首个任务计算前的全局可用工装数量；未配置总工装时返回 null 表示不启用工装限制
+     */
+    private BigDecimal initializeGlobalAvailableToolQty(TmScheduleContext context, Map<String, TmStockForecast> stockForecastMap) {
+        BigDecimal totalToolQty = this.resolveGlobalTotalToolQty(context);
+        if (totalToolQty == null) {
+            return null;
+        }
+        Map<String, TmTaskDraft> representativeTaskMap = new LinkedHashMap<>();
+        for (TmTaskDraft task : context.getTaskDraftList()) {
+            if (task.getTreadCode() != null && !representativeTaskMap.containsKey(task.getTreadCode())) {
+                representativeTaskMap.put(task.getTreadCode(), task);
+            }
+        }
+        BigDecimal initialUsedToolQty = BigDecimal.ZERO;
+        for (Map.Entry<String, TmTaskDraft> entry : representativeTaskMap.entrySet()) {
+            BigDecimal curlLength = this.resolveCurlLength(entry.getValue());
+            if (curlLength.compareTo(BigDecimal.ZERO) <= 0) {
+                continue;
+            }
+            BigDecimal forecastStockQty = this.resolveForecastRollingStock(entry.getKey(), entry.getValue(), stockForecastMap);
+            initialUsedToolQty = initialUsedToolQty.add(forecastStockQty.divide(curlLength, 6, RoundingMode.HALF_UP));
+        }
+        return totalToolQty.subtract(initialUsedToolQty).max(BigDecimal.ZERO).setScale(6, RoundingMode.HALF_UP);
+    }
+
+    /**
+     * 解析全局总工装数量，并校验同一轮排程携带的总工装数量一致。
+     *
+     * @param context 排程上下文
+     * @return 全局总工装数量；未配置时返回 null
+     */
+    private BigDecimal resolveGlobalTotalToolQty(TmScheduleContext context) {
+        BigDecimal totalToolQty = null;
+        for (TmTaskDraft task : context.getTaskDraftList()) {
+            if (task.getTotalToolQty() == null) {
+                continue;
+            }
+            if (totalToolQty == null) {
+                totalToolQty = task.getTotalToolQty();
+                continue;
+            }
+            if (totalToolQty.compareTo(task.getTotalToolQty()) != 0) {
+                throw new ServiceException("胎面自动排程总工装数量不一致，无法计算全局工装池");
+            }
+        }
+        return totalToolQty;
+    }
+
+    /**
+     * 解析胎面14点预计库存。
+     *
+     * @param treadCode        胎面编码
+     * @param task             任务草稿
+     * @param stockForecastMap 胎面库存预测结果
+     * @return 14点预计库存，空值按0处理
+     */
+    private BigDecimal resolveForecastRollingStock(String treadCode, TmTaskDraft task, Map<String, TmStockForecast> stockForecastMap) {
+        if (stockForecastMap != null) {
+            TmStockForecast forecast = stockForecastMap.get(treadCode);
+            if (forecast != null && forecast.getRollingStockQty() != null) {
+                return forecast.getRollingStockQty();
+            }
+        }
+        return nvl(task.getRollingStockQty());
+    }
+
+    /**
+     * 按当前任务计划量和当前班成型需求量扣减全局工装池。
+     *
+     * @param task                    任务草稿
+     * @param currentAvailableToolQty 当前任务计算前全局可用工装数量
+     * @return 当前任务计算后的全局剩余工装数量
+     */
+    private BigDecimal updateGlobalToolState(TmTaskDraft task, BigDecimal currentAvailableToolQty) {
+        if (currentAvailableToolQty == null) {
+            return null;
+        }
+        BigDecimal curlLength = this.resolveCurlLength(task);
+        if (curlLength.compareTo(BigDecimal.ZERO) <= 0) {
+            task.setToolUsedQty(BigDecimal.ZERO.setScale(6, RoundingMode.HALF_UP));
+            task.setRemainingToolQty(currentAvailableToolQty);
+            return currentAvailableToolQty;
+        }
+        BigDecimal usedToolQty = nvl(task.getPlanQty()).add(nvl(task.getCurrentShiftDemandQty()))
+                .divide(curlLength, 6, RoundingMode.HALF_UP);
+        BigDecimal remainingToolQty = currentAvailableToolQty.subtract(usedToolQty).max(BigDecimal.ZERO)
+                .setScale(6, RoundingMode.HALF_UP);
+        task.setToolUsedQty(usedToolQty);
+        task.setRemainingToolQty(remainingToolQty);
+        return remainingToolQty;
+    }
+
+    /**
+     * 解析卷曲长度。
+     *
+     * @param task 任务草稿
+     * @return 卷曲长度，无法取得时返回0
+     */
+    private BigDecimal resolveCurlLength(TmTaskDraft task) {
+        if (task.getCurlRollLength() != null && task.getCurlRollLength().compareTo(BigDecimal.ZERO) > 0) {
+            return task.getCurlRollLength();
+        }
+        return nvl(task.getDefaultCurlRollLength());
+    }
+    /**
      * 将计划量策略结果回填到任务草稿，便于解释表落库。
      *
      * @param task   任务草稿
@@ -322,6 +447,7 @@ public class TmPlanCalcService implements ITmPlanCalcService {
         task.setBaseDemandQty(result.getBaseDemandQty());
         task.setLossAddQty(result.getLossAddQty());
         task.setToolLimitAdjustQty(result.getToolLimitAdjustQty());
+        task.setToolOverflowQty(result.getToolOverflowQty());
         task.setMinStartAdjustQty(result.getMinStartAdjustQty());
         task.setTailRoundAdjustQty(result.getTailRoundAdjustQty());
         task.setCapacityAdjustQty(result.getCapacityAdjustQty());

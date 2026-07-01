@@ -256,8 +256,8 @@ export default {
           render: (form) => {
             return (
               <embryoNoSelect
-                key={form.embryoNo}
                 v-model={form.embryoNo}
+                allowInput={true}
                 onChange={this.handleEmBryNoChange}
                 materialCode={form.materialCode}
                 trialStatus={form.trialStatus}
@@ -373,13 +373,20 @@ export default {
       this.$refs.form.triggerConfirm(this.save);
     },
     handleEmBryNoChange(val, row) {
-      if (val && row) {
+      if (row) {
         this.$set(this.form, "embryoNo", row.embryoNo);
         this.$set(this.form, "embryoReleaseDate", row.embryoReleaseDate);
         this.$set(this.form, "textNo", row.textNo);
         this.$set(this.form, "textReleaseDate", row.textReleaseDate);
         this.$set(this.form, "lhNo", row.lhNo);
         this.$set(this.form, "lhReleaseDate", row.lhReleaseDate);
+      } else if (val) {
+        this.$set(this.form, "embryoNo", val);
+        this.$set(this.form, "embryoReleaseDate", "");
+        this.$set(this.form, "textNo", "");
+        this.$set(this.form, "textReleaseDate", "");
+        this.$set(this.form, "lhNo", "");
+        this.$set(this.form, "lhReleaseDate", "");
       } else {
         this.$set(this.form, "embryoNo", "");
         this.$set(this.form, "embryoReleaseDate", "");

@@ -40,12 +40,14 @@ public class Cd90ScheduleCandidateBuilder {
      * @param stocksAtSix 6点库存快照
      * @param currentDemandStart 当前直裁班次对应的首个成型供应班次
      * @param depthClassQtyByCloth 按帘布匹配的备库班数
+     * @param cumulativeConsumptionByCloth 6点至本班开始前的累计成型消耗，按帘布代号分组；> 0 表示续作规格
      * @return 已按缺料优先级稳定排序的候选规格
      */
     public List<Cd90ScheduleCandidate> build(List<Cd90DemandShift> demandShifts,
                                              List<Cd90StockSource> stocksAtSix,
                                              LocalDateTime currentDemandStart,
-                                             Map<String, BigDecimal> depthClassQtyByCloth) {
+                                             Map<String, BigDecimal> depthClassQtyByCloth,
+                                             Map<String, BigDecimal> continueDemandByCloth) {
         if (currentDemandStart == null) {
             throw new IllegalArgumentException("当前成型供应班次不能为空");
         }
@@ -106,6 +108,7 @@ public class Cd90ScheduleCandidateBuilder {
             candidates.add(Cd90ScheduleCandidate.builder()
                     .clothCode(entry.getKey())
                     .shortageInCurrentShift(firstWindowStart.equals(earliestShortageTime))
+                    .continueFromPreviousShift(isContinueFromPrevious(continueDemandByCloth, entry.getKey()))
                     .earliestShortageTime(earliestShortageTime)
                     .stockSupplyHours(guarantee.getSupplyHours())
                     .build());
@@ -113,10 +116,19 @@ public class Cd90ScheduleCandidateBuilder {
 
         // 排序器负责稳定处理同缺料时间候选，避免重复执行时结果顺序抖动。
         List<Cd90ScheduleCandidate> sorted = candidateSorter.sort(candidates);
+        long continueCount = sorted.stream()
+                .filter(Cd90ScheduleCandidate::isContinueFromPreviousShift)
+                .count();
         log.info("[直裁自动排程] 当前班次候选规格构建完成, demandStart={}, depthByCloth={}, "
-                        + "clothCount={}, candidateCount={}",
-                currentDemandStart, depthClassQtyByCloth, shiftsByCloth.size(), sorted.size());
+                        + "clothCount={}, candidateCount={}, continueCount={}",
+                currentDemandStart, depthClassQtyByCloth, shiftsByCloth.size(), sorted.size(), continueCount);
         return sorted;
+    }
+
+    /** 续作判定：6点至本班开始前累计成型消耗 > 0 表示前序班次已为该规格排过产。 */
+    private boolean isContinueFromPrevious(Map<String, BigDecimal> cumulative, String clothCode) {
+        BigDecimal value = cumulative == null ? null : cumulative.get(clothCode);
+        return value != null && value.signum() > 0;
     }
 
     /** 获取当前帘布的必填备库深度。 */

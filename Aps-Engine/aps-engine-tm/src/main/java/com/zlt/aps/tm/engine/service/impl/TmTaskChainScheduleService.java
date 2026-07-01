@@ -48,6 +48,32 @@ public class TmTaskChainScheduleService {
     }
 
     /**
+     * 自动排程前插任务。
+     *
+     * <p>用于顺延量新建任务时抢占目标机台目标班次的第一优先顺序，避免后续普通任务先占用产能。</p>
+     *
+     * @param task    待排任务草稿
+     * @param machine 选中候选机台
+     * @param context 胎面排程上下文
+     * @return 链表变更结果
+     */
+    public ScheduleChainChangeResult<TmTaskDraft> prependAutoTask(TmTaskDraft task, TmMachineCandidate machine,
+                                                                  TmScheduleContext context) {
+        validateTaskAndContext(task, context);
+        if (machine == null || StrUtil.isBlank(machine.getMachineCode())) {
+            throw new ServiceException(TmScheduleErrorCodeEnum.TM_MACHINE_CANDIDATE_EMPTY.getDefaultMessage());
+        }
+        task.setMachineCode(machine.getMachineCode());
+        Integer shiftOrder = task.getShiftOrder() == null ? 1 : task.getShiftOrder();
+        ScheduleTaskLinkedList<TmTaskDraft> chain = context.getTaskChainGroup()
+                .getOrCreate(machine.getMachineCode(), toLocalDate(context), shiftOrder);
+        ScheduleTaskNode<TmTaskDraft> node = toNode(task, machine.getMachineCode(), shiftOrder, context);
+        ScheduleChainChangeResult<TmTaskDraft> result = chain.prepend(node, operationContext(context, "AUTO_PREPEND"));
+        context.registerTaskNode(node.getTaskId(), node);
+        return result;
+    }
+
+    /**
      * 人工插单。
      *
      * @param task     插单任务草稿

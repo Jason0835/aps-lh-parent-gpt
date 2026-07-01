@@ -44,6 +44,23 @@ public class ScheduleTaskLinkedList<T> implements IScheduleTaskLinkedList<T> {
     }
 
     @Override
+    public ScheduleChainChangeResult<T> prepend(ScheduleTaskNode<T> node, ScheduleOperationContext context) {
+        validateNewNode(node);
+        if (head == null) {
+            head = node;
+            tail = node;
+        } else {
+            node.setNextNode(head);
+            head.setPreviousNode(node);
+            head = node;
+        }
+        node.setOwnerList(this);
+        size++;
+        ScheduleChainChangeResult<T> result = resequence(context);
+        result.setOperationType("PREPEND");
+        return result;
+    }
+    @Override
     public ScheduleChainChangeResult<T> insertAfter(ScheduleTaskNode<T> anchorNode, ScheduleTaskNode<T> newNode,
                                                     ScheduleOperationContext context) {
         if (anchorNode == null) {

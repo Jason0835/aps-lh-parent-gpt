@@ -91,7 +91,7 @@ public class ProductionConstant {
     public final static Integer ADD_LOSS_QTY_EVEN_NUMBER = 2;
 
     /**
-     * 偶数增加的损耗量 3
+     * 奇数增加的损耗量 3
      */
     public final static Integer ADD_LOSS_QTY_ODD_NUMBER = 3;
     /**

@@ -3,6 +3,7 @@ package com.zlt.aps.cd90.engine.algorithm;
 import com.zlt.aps.cd90.engine.model.Cd90BigRollAgingAllocation;
 import com.zlt.aps.cd90.engine.model.Cd90BigRollAgingAllocationItem;
 import com.zlt.aps.cd90.engine.model.Cd90BigRollAgingStock;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
@@ -23,6 +24,7 @@ import java.util.stream.Collectors;
  * 若最晚释放时间晚于机台原开工时间，则产生延迟。</p>
  */
 @Component
+@Slf4j
 public class Cd90BigRollAgingAllocator {
 
     /** 大卷时效不足限制标识 */
@@ -78,6 +80,16 @@ public class Cd90BigRollAgingAllocator {
             }
         }
         // 遍历完所有可用大卷仍未满足需求，返回失败
+        BigDecimal totalAvailable = requestQty.subtract(remaining);
+        log.warn("[直裁自动排程] 大卷静置库存不足, bigRollCode={}, requestedQuantity={}, "
+                        + "totalAvailableInStocks={}, shortfall={}, stockDetails={}",
+                bigRollCode, requestQty, totalAvailable, remaining,
+                stocks == null ? "[]" : stocks.stream()
+                        .filter(s -> s != null && bigRollCode.equals(s.getBigRollCode()))
+                        .map(s -> String.format("{source=%s, available=%s, allocated=%s, remaining=%s, releaseTime=%s}",
+                                s.getSourceId(), s.getAvailableQuantity(), s.getAllocatedQuantity(),
+                                s.getRemainingQuantity(), s.getReleaseTime()))
+                        .collect(java.util.stream.Collectors.joining(", ")));
         return failure(requestQty, originalStartTime);
     }
 

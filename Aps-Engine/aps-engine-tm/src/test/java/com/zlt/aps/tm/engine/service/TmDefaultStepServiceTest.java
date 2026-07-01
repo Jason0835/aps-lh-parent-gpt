@@ -196,12 +196,12 @@ public class TmDefaultStepServiceTest {
     }
 
     /**
-     * 测试内容：验证同班次首选机台产能不足时，剩余量优先由同班次匹配机台承接。
-     * 测试场景：TM001 一班已排 3000，机台最大班产 5300，新任务计划量 6144，TM002 同班仍有 3844 产能。
-     * 预期结果：新任务一班先在 TM001 排 2300，剩余 3844 进入 TM002 一班，不生成二班任务。
+     * 测试内容：验证当前班产能不足时，剩余量优先顺延到下一班同机台。
+     * 测试场景：TM001 一班已排 3000，机台最大班产 5300，新任务计划量 6144，TM002 同班仍有产能。
+     * 预期结果：新任务一班先在 TM001 排 2300，剩余 3844 进入 TM001 二班，不再进入 TM002 一班。
      */
     @Test
-    public void machineAssignShouldSplitOverflowQtyToSameShiftMatchedMachineFirst() {
+    public void machineAssignShouldCarryCapacityOverflowToNextShiftBeforeSameShiftOtherMachine() {
         TmScheduleContext context = buildContext();
         TmMachineAssignService service = new TmMachineAssignService(new TmTaskChainScheduleService(), buildRegistry());
         TmTaskDraft existing = buildTask("ORD-EXISTING", "TM001");
@@ -230,22 +230,21 @@ public class TmDefaultStepServiceTest {
         assertEquals(2, shiftOneChain.getSize());
         assertEquals(new BigDecimal("2300"), shiftOneChain.toList().get(1).getTask().getPlanQty());
 
-        ScheduleTaskLinkedList<TmTaskDraft> tm002ShiftOneChain = context.getTaskChain("TM002", 1);
-        assertNotNull(tm002ShiftOneChain);
-        assertEquals(1, tm002ShiftOneChain.getSize());
-        assertEquals(new BigDecimal("3844"), tm002ShiftOneChain.toList().get(0).getTask().getPlanQty());
-        assertEquals(Integer.valueOf(1), tm002ShiftOneChain.toList().get(0).getTask().getShiftOrder());
-        assertEquals("TM002", tm002ShiftOneChain.toList().get(0).getTask().getMachineCode());
-        assertNull(context.getTaskChain("TM001", 2));
+        ScheduleTaskLinkedList<TmTaskDraft> shiftTwoChain = context.getTaskChain("TM001", 2);
+        assertNotNull(shiftTwoChain);
+        assertEquals(1, shiftTwoChain.getSize());
+        assertEquals(new BigDecimal("3844"), shiftTwoChain.toList().get(0).getTask().getPlanQty());
+        assertEquals(Integer.valueOf(2), shiftTwoChain.toList().get(0).getTask().getShiftOrder());
+        assertEquals("TM001", shiftTwoChain.toList().get(0).getTask().getMachineCode());
+        assertNull(context.getTaskChain("TM002", 1));
     }
-
     /**
-     * 测试内容：验证当前班匹配机台均不足时，进入下一班后仍继续优先使用该班匹配机台剩余产能。
+     * 测试内容：验证当前班产能溢出后，从下一班开始优先使用匹配机台剩余产能。
      * 测试场景：任务从 5 班开始排，TM001/TM002 每班最大产能 100，任务计划量 350。
-     * 预期结果：5 班 TM001/TM002 各排 100，6 班 TM001 排 100、TM002 排 50，不产生未排。
+     * 预期结果：5 班只在选中 TM001 排 100，6 班 TM001/TM002 各排 100，剩余 50 产能不足未排。
      */
     @Test
-    public void machineAssignShouldUseMatchedMachinesBeforeRollingToNextShift() {
+    public void machineAssignShouldCarryOverflowToNextShiftMatchedMachines() {
         TmScheduleContext context = buildContext();
         TmMachineAssignService service = new TmMachineAssignService(new TmTaskChainScheduleService(), buildRegistry());
         TmTaskDraft overflowTask = buildTask("ORD-ROLL", null);
@@ -263,23 +262,100 @@ public class TmDefaultStepServiceTest {
         ScheduleTaskLinkedList<TmTaskDraft> tm001ShiftFiveChain = context.getTaskChain("TM001", 5);
         assertNotNull(tm001ShiftFiveChain);
         assertEquals(new BigDecimal("100"), tm001ShiftFiveChain.toList().get(0).getTask().getPlanQty());
-        ScheduleTaskLinkedList<TmTaskDraft> tm002ShiftFiveChain = context.getTaskChain("TM002", 5);
-        assertNotNull(tm002ShiftFiveChain);
-        assertEquals(new BigDecimal("100"), tm002ShiftFiveChain.toList().get(0).getTask().getPlanQty());
+        assertNull(context.getTaskChain("TM002", 5));
 
         ScheduleTaskLinkedList<TmTaskDraft> tm001ShiftSixChain = context.getTaskChain("TM001", 6);
         assertNotNull(tm001ShiftSixChain);
         assertEquals(new BigDecimal("100"), tm001ShiftSixChain.toList().get(0).getTask().getPlanQty());
         ScheduleTaskLinkedList<TmTaskDraft> tm002ShiftSixChain = context.getTaskChain("TM002", 6);
         assertNotNull(tm002ShiftSixChain);
-        assertEquals(new BigDecimal("50"), tm002ShiftSixChain.toList().get(0).getTask().getPlanQty());
+        assertEquals(new BigDecimal("100"), tm002ShiftSixChain.toList().get(0).getTask().getPlanQty());
 
         List<TmTaskDraft> unplannedTasks = context.getTaskDraftList().stream()
                 .filter(task -> TmUnplannedReasonEnum.CAPACITY_NOT_ENOUGH.getCode().equals(task.getUnplannedReasonCode()))
                 .collect(java.util.stream.Collectors.toList());
-        assertTrue(unplannedTasks.isEmpty());
+        assertEquals(1, unplannedTasks.size());
+        assertEquals(new BigDecimal("50"), unplannedTasks.get(0).getPlanQty());
     }
 
+    /**
+     * 测试内容：验证工装限制压掉的顺延量会优先合并到下一班同机台同胎面任务。
+     * 测试场景：当前班工装限制后计划 400，工装溢出 200；下一班 TM001 已有同胎面计划 300。
+     * 预期结果：当前班只排 400，下一班同机台同胎面任务合并为 500。
+     */
+    @Test
+    public void machineAssignShouldMergeToolOverflowToNextShiftSameMachineSameTreadTask() {
+        TmScheduleContext context = buildContext();
+        TmMachineAssignService service = new TmMachineAssignService(new TmTaskChainScheduleService(), buildRegistry());
+        TmTaskDraft nextShiftExisting = buildTask("ORD-TOOL-NEXT", "TM001");
+        nextShiftExisting.setTreadCode("TR-CARRY");
+        nextShiftExisting.setGlueCode("GL-CARRY");
+        nextShiftExisting.setMouthPlateCode("MP-CARRY");
+        nextShiftExisting.setShiftOrder(2);
+        nextShiftExisting.setPlanQty(new BigDecimal("300"));
+        service.assignPrepared(context, Collections.singletonList(nextShiftExisting));
+        TmTaskDraft currentTask = buildTask("ORD-TOOL-CURRENT", null);
+        currentTask.setTreadCode("TR-CARRY");
+        currentTask.setGlueCode("GL-CARRY");
+        currentTask.setMouthPlateCode("MP-CARRY");
+        currentTask.setPlanQty(new BigDecimal("400"));
+        currentTask.setToolOverflowQty(new BigDecimal("200"));
+        TmMachineCandidate tm001 = enabledCandidate("TM001", "1000");
+        tm001.setMaxCapacity(new BigDecimal("1000"));
+        context.setMachineCandidateList(Collections.singletonList(tm001));
+        context.setTaskDraftList(Collections.singletonList(currentTask));
+
+        service.assign(context);
+
+        ScheduleTaskLinkedList<TmTaskDraft> shiftOneChain = context.getTaskChain("TM001", 1);
+        assertNotNull(shiftOneChain);
+        assertEquals(new BigDecimal("400"), shiftOneChain.toList().get(0).getTask().getPlanQty());
+        ScheduleTaskLinkedList<TmTaskDraft> shiftTwoChain = context.getTaskChain("TM001", 2);
+        assertNotNull(shiftTwoChain);
+        assertEquals(1, shiftTwoChain.getSize());
+        assertEquals(new BigDecimal("500"), shiftTwoChain.toList().get(0).getTask().getPlanQty());
+    }
+
+    /**
+     * 测试内容：验证当前班产能不足产生的顺延量会优先合并到下一班同机台同胎面任务。
+     * 测试场景：TM001 一班剩余产能 400，当前任务计划 600；下一班 TM001 已有同胎面计划 300。
+     * 预期结果：当前班只排 400，产能溢出 200 合并到下一班同胎面任务，下一班计划量变为 500。
+     */
+    @Test
+    public void machineAssignShouldMergeCapacityOverflowToNextShiftSameMachineSameTreadTask() {
+        TmScheduleContext context = buildContext();
+        TmMachineAssignService service = new TmMachineAssignService(new TmTaskChainScheduleService(), buildRegistry());
+        TmTaskDraft shiftOneExisting = buildTask("ORD-CAP-EXISTING-1", "TM001");
+        shiftOneExisting.setTreadCode("TR-OTHER");
+        shiftOneExisting.setPlanQty(new BigDecimal("200"));
+        TmTaskDraft nextShiftExisting = buildTask("ORD-CAP-EXISTING-2", "TM001");
+        nextShiftExisting.setTreadCode("TR-CAP");
+        nextShiftExisting.setGlueCode("GL-CAP");
+        nextShiftExisting.setMouthPlateCode("MP-CAP");
+        nextShiftExisting.setShiftOrder(2);
+        nextShiftExisting.setPlanQty(new BigDecimal("300"));
+        service.assignPrepared(context, Arrays.asList(shiftOneExisting, nextShiftExisting));
+        TmTaskDraft currentTask = buildTask("ORD-CAP-CURRENT", null);
+        currentTask.setTreadCode("TR-CAP");
+        currentTask.setGlueCode("GL-CAP");
+        currentTask.setMouthPlateCode("MP-CAP");
+        currentTask.setPlanQty(new BigDecimal("600"));
+        TmMachineCandidate tm001 = enabledCandidate("TM001", "600");
+        tm001.setMaxCapacity(new BigDecimal("600"));
+        context.setMachineCandidateList(Collections.singletonList(tm001));
+        context.setTaskDraftList(Collections.singletonList(currentTask));
+
+        service.assign(context);
+
+        ScheduleTaskLinkedList<TmTaskDraft> shiftOneChain = context.getTaskChain("TM001", 1);
+        assertNotNull(shiftOneChain);
+        assertEquals(2, shiftOneChain.getSize());
+        assertEquals(new BigDecimal("400"), shiftOneChain.toList().get(1).getTask().getPlanQty());
+        ScheduleTaskLinkedList<TmTaskDraft> shiftTwoChain = context.getTaskChain("TM001", 2);
+        assertNotNull(shiftTwoChain);
+        assertEquals(1, shiftTwoChain.getSize());
+        assertEquals(new BigDecimal("500"), shiftTwoChain.toList().get(0).getTask().getPlanQty());
+    }
     /**
      * 测试内容：验证滚动到六班后匹配机台产能仍不足时，剩余计划量写入产能不足未排。
      * 测试场景：任务从 5 班开始排，TM001/TM002 每班最大产能 100，任务计划量 450。
@@ -302,7 +378,7 @@ public class TmDefaultStepServiceTest {
         service.assign(context);
 
         assertEquals(new BigDecimal("100"), context.getTaskChain("TM001", 5).toList().get(0).getTask().getPlanQty());
-        assertEquals(new BigDecimal("100"), context.getTaskChain("TM002", 5).toList().get(0).getTask().getPlanQty());
+        assertNull(context.getTaskChain("TM002", 5));
         assertEquals(new BigDecimal("100"), context.getTaskChain("TM001", 6).toList().get(0).getTask().getPlanQty());
         assertEquals(new BigDecimal("100"), context.getTaskChain("TM002", 6).toList().get(0).getTask().getPlanQty());
 
@@ -310,7 +386,7 @@ public class TmDefaultStepServiceTest {
                 .filter(task -> TmUnplannedReasonEnum.CAPACITY_NOT_ENOUGH.getCode().equals(task.getUnplannedReasonCode()))
                 .collect(java.util.stream.Collectors.toList());
         assertEquals(1, unplannedTasks.size());
-        assertEquals(new BigDecimal("50"), unplannedTasks.get(0).getPlanQty());
+        assertEquals(new BigDecimal("150"), unplannedTasks.get(0).getPlanQty());
         assertEquals(Integer.valueOf(6), unplannedTasks.get(0).getShiftOrder());
     }
     private TmScheduleContext buildContext() {
@@ -364,6 +440,49 @@ public class TmDefaultStepServiceTest {
         new TmMachineAssignService(new TmTaskChainScheduleService(), buildRegistry()).assign(context);
 
         assertEquals(TmUnplannedReasonEnum.CAPACITY_NOT_ENOUGH.getCode(), task.getUnplannedReasonCode());
+    }
+
+    /**
+     * 测试内容：验证多个来源工单滚动到六班后仍未排完时，未排顺延任务业务键保持唯一。
+     * 测试场景：两个不同来源工单使用同胎面、同胶料、同口型，均在六班部分承接后仍有剩余未排。
+     * 预期结果：两个产能不足未排任务的业务键不同，避免解释表唯一键冲突。
+     */
+    @Test
+    public void machineAssignShouldKeepUnplannedCarryoverBusinessKeyUniqueForDifferentSourceOrders() {
+        TmScheduleContext context = buildContext();
+        TmMachineAssignService service = new TmMachineAssignService(new TmTaskChainScheduleService(), buildRegistry());
+        TmTaskDraft firstTask = buildSameSpecCarryoverTask("ORD-SAME-1");
+        TmTaskDraft secondTask = buildSameSpecCarryoverTask("ORD-SAME-2");
+        TmMachineCandidate tm001 = enabledCandidate("TM001", "100");
+        tm001.setMaxCapacity(new BigDecimal("100"));
+        TmMachineCandidate tm002 = enabledCandidate("TM002", "100");
+        tm002.setMaxCapacity(new BigDecimal("100"));
+        context.setMachineCandidateList(Arrays.asList(tm001, tm002));
+        context.setTaskDraftList(Arrays.asList(firstTask, secondTask));
+
+        service.assign(context);
+
+        List<TmTaskDraft> unplannedTasks = context.getTaskDraftList().stream()
+                .filter(task -> TmUnplannedReasonEnum.CAPACITY_NOT_ENOUGH.getCode().equals(task.getUnplannedReasonCode()))
+                .collect(java.util.stream.Collectors.toList());
+        assertEquals(2, unplannedTasks.size());
+        assertNotEquals(unplannedTasks.get(0).getBusinessKey(), unplannedTasks.get(1).getBusinessKey());
+    }
+
+    /**
+     * 构建同规格顺延测试任务。
+     *
+     * @param orderNo 来源工单号
+     * @return 同胎面、同胶料、同口型的六班待排任务
+     */
+    private TmTaskDraft buildSameSpecCarryoverTask(String orderNo) {
+        TmTaskDraft task = buildTask(orderNo, null);
+        task.setTreadCode("TR-SAME");
+        task.setGlueCode("GL-SAME");
+        task.setMouthPlateCode("MP-SAME");
+        task.setShiftOrder(6);
+        task.setPlanQty(new BigDecimal("250"));
+        return task;
     }
 
     private TmStrategyRegistry buildRegistry() {

@@ -64,6 +64,7 @@ public class Cd90CandidateMachineTrialCalculator {
                     .finalSchedulableQuantity(BigDecimal.ZERO)
                     .fullyAccommodated(false)
                     .preferredMachine(input.isPreferredMachine())
+                    .historyMachine(input.isHistoryMachine())
                     .priorityOrder(input.getPriorityOrder())
                     .remainingSeconds(input.getRemainingSeconds())
                     .taskStartTime(input.getOriginalStartTime())
@@ -117,7 +118,8 @@ public class Cd90CandidateMachineTrialCalculator {
                                     && input.getPreviousTail().getClothCode() != null
                                     && input.getPreviousTail().getClothCode()
                                             .equals(input.getCurrentTail().getClothCode()))
-                    .remainingSeconds(capacity.getRemainingSeconds())
+                .historyMachine(input.isHistoryMachine())
+                .remainingSeconds(capacity.getRemainingSeconds())
                     .taskStartTime(agingAllocation == null ? input.getOriginalStartTime()
                             : agingAllocation.getTaskStartTime())
                 .agingDelaySeconds(agingDelaySeconds)

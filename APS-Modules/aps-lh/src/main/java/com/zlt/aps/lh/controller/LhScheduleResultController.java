@@ -1,5 +1,6 @@
 package com.zlt.aps.lh.controller;
 
+import cn.hutool.core.date.DateUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.ruoyi.api.gateway.system.domain.ExportLog;
@@ -268,6 +269,35 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
     }
 
 
+    @NotNull
+    private static LhChangePlanImportResult getLhChangePlanImportResult(AjaxResult ajaxResult, AjaxResult lhMouldChangePlanAjaxResult, ImportLog importLog) {
+        List<ImportErrorLog> importErrorLogs = (List<ImportErrorLog>) ajaxResult.get(AjaxResult.DATA_TAG);
+        importErrorLogs = importErrorLogs == null ? new ArrayList<>() : importErrorLogs;
+        List<ImportErrorLog> lhMouldChangePlanImportErrorLogs = (List<ImportErrorLog>) lhMouldChangePlanAjaxResult.get(AjaxResult.DATA_TAG);
+        lhMouldChangePlanImportErrorLogs = lhMouldChangePlanImportErrorLogs == null ? new ArrayList<>() : lhMouldChangePlanImportErrorLogs;
+        importErrorLogs.addAll(lhMouldChangePlanImportErrorLogs);
+        String msg = (String) ajaxResult.get(AjaxResult.MSG_TAG);
+        String lhMouldChangePlanMsg = (String) lhMouldChangePlanAjaxResult.get(AjaxResult.MSG_TAG);
+        String[] lhMouldChangePlanMessage = lhMouldChangePlanAjaxResult.get(AjaxResult.MSG_TAG).toString().split(",");
+        switch (lhMouldChangePlanMessage.length) {
+            case 2:
+                importLog.setSuccessNum(importLog.getSuccessNum() + Long.parseLong(lhMouldChangePlanMessage[1]));
+                importLog.setFailNum(importLog.getFailNum());
+                lhMouldChangePlanAjaxResult.put("msg", com.ruoyi.common.utils.StringUtils.format(lhMouldChangePlanMessage[0], new Object[]{lhMouldChangePlanMessage[1]}));
+                break;
+            case 3:
+                importLog.setSuccessNum(importLog.getSuccessNum() + Long.parseLong(lhMouldChangePlanMessage[1]));
+                importLog.setFailNum(importLog.getFailNum() + Long.parseLong(lhMouldChangePlanMessage[2]));
+                lhMouldChangePlanAjaxResult.put("msg", com.ruoyi.common.utils.StringUtils.format(lhMouldChangePlanMessage[0], new Object[]{lhMouldChangePlanMessage[1], lhMouldChangePlanMessage[2]}));
+        }
+        msg = StringUtils.defaultIfBlank(msg, "");
+        String lhMouldChangePlanTitle = I18nUtil.getMessage("ui.data.column.lhMouldChangePlan.import.modelName");
+        String lhResultPlanTitle = I18nUtil.getMessage("ui.data.column.lhScheduleResult.exportFileName");
+        String message = lhResultPlanTitle + ":" + msg + "<br>" + lhMouldChangePlanTitle + ":" + lhMouldChangePlanMsg;
+        LhChangePlanImportResult changePlanResult = new LhChangePlanImportResult(importErrorLogs, message);
+        return changePlanResult;
+    }
+
     /**
      * 导入数据
      *
@@ -292,10 +322,14 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
         AjaxResult ajaxResult = lhScheduleService.importScheduleTemplate(list, result, updateSupport, importLog.getId());
         // 硫化换模计划导入
         AjaxResult lhMouldChangePlanAjaxResult = lhMouldChangePlanController.importData(importDTO, Boolean.TRUE);
-        // 两次导入都成功后，补全模具交替计划的批次号、交替类型、交替时间
-        if (ajaxResult.get(AjaxResult.CODE_TAG).equals(AjaxResult.Type.SUCCESS.value())
-                && lhMouldChangePlanAjaxResult.get(AjaxResult.CODE_TAG).equals(AjaxResult.Type.SUCCESS.value())) {
-            lhScheduleResultService.fillMouldChangePlanFieldsAfterImport(result.getFactoryCode(), result.getScheduleDate());
+        // 导入成功后，补全模具交替计划的批次号、交替类型、交替时间
+        if (!lhMouldChangePlanAjaxResult.get(AjaxResult.CODE_TAG).equals(AjaxResult.Type.ERROR.value())) {
+            if (CollectionUtils.isNotEmpty(list)) {
+                LhScheduleResult scheduleResult = importDTO.getScheduleResult();
+                Date scheduleDate = DateUtil.beginOfDay(scheduleResult.getScheduleDate());
+                String factoryCode = scheduleResult.getFactoryCode().trim();
+                lhScheduleResultService.fillMouldChangePlanFieldsAfterImport(factoryCode, scheduleDate);
+            }
         }
 
         Date endTime = DateUtils.getNowDate();
@@ -311,34 +345,6 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
         ajaxResult.put(AjaxResult.DATA_TAG, changePlanResult.importErrorLogs);
         ajaxResult.put(AjaxResult.MSG_TAG, changePlanResult.message);
         return ajaxResult;
-    }
-
-    @NotNull
-    private static LhChangePlanImportResult getLhChangePlanImportResult(AjaxResult ajaxResult, AjaxResult lhMouldChangePlanAjaxResult, ImportLog importLog) {
-        List<ImportErrorLog> importErrorLogs = (List<ImportErrorLog>) ajaxResult.get(AjaxResult.DATA_TAG);
-        importErrorLogs = importErrorLogs == null ? new ArrayList<>() : importErrorLogs;
-        List<ImportErrorLog> lhMouldChangePlanImportErrorLogs = (List<ImportErrorLog>) lhMouldChangePlanAjaxResult.get(AjaxResult.DATA_TAG);
-        lhMouldChangePlanImportErrorLogs = lhMouldChangePlanImportErrorLogs == null ? new ArrayList<>() : lhMouldChangePlanImportErrorLogs;
-        importErrorLogs.addAll(lhMouldChangePlanImportErrorLogs);
-        String msg = (String) lhMouldChangePlanAjaxResult.get(AjaxResult.MSG_TAG);
-        String lhMouldChangePlanMsg = (String) lhMouldChangePlanAjaxResult.get(AjaxResult.MSG_TAG);
-        String[] lhMouldChangePlanMessage = lhMouldChangePlanAjaxResult.get(AjaxResult.MSG_TAG).toString().split(",");
-        switch (lhMouldChangePlanMessage.length) {
-            case 2:
-                importLog.setSuccessNum(importLog.getSuccessNum() + Long.parseLong(lhMouldChangePlanMessage[1]));
-                importLog.setFailNum(importLog.getFailNum());
-                lhMouldChangePlanAjaxResult.put("msg", com.ruoyi.common.utils.StringUtils.format(lhMouldChangePlanMessage[0], new Object[]{lhMouldChangePlanMessage[1]}));
-                break;
-            case 3:
-                importLog.setSuccessNum(importLog.getSuccessNum() + Long.parseLong(lhMouldChangePlanMessage[1]));
-                importLog.setFailNum(importLog.getFailNum() + Long.parseLong(lhMouldChangePlanMessage[2]));
-                lhMouldChangePlanAjaxResult.put("msg", com.ruoyi.common.utils.StringUtils.format(lhMouldChangePlanMessage[0], new Object[]{lhMouldChangePlanMessage[1], lhMouldChangePlanMessage[2]}));
-        }
-        msg = StringUtils.defaultIfBlank(msg, "");
-        String lhMouldChangePlanTitle = I18nUtil.getMessage("ui.data.column.lhMouldChangePlan.import.modelName");
-        String message = msg + "<br>" + lhMouldChangePlanTitle + ":" + lhMouldChangePlanMsg;
-        LhChangePlanImportResult changePlanResult = new LhChangePlanImportResult(importErrorLogs, message);
-        return changePlanResult;
     }
 
     private static class LhChangePlanImportResult {

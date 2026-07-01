@@ -71,10 +71,10 @@ public class Cd90ScheduleResult extends BaseEntity implements Serializable {
     @Excel(name = "ui.data.column.cd90ScheduleResult.storageLaneCode")
     private String storageLaneCode;
 //    /** 库存数量 */
-    @ApiModelProperty("库存数量")
-    @TableField("STOCK_QTY")
+//    @ApiModelProperty("库存数量")
+//    @TableField("STOCK_QTY")
 //    @Excel(name = "ui.data.column.cd90ScheduleResult.stockQty")
-    private Double stockQty;
+//    private Double stockQty;
     /** 供应时长 */
     @ApiModelProperty("供应时长")
     @TableField("SUPPLY_TIME")

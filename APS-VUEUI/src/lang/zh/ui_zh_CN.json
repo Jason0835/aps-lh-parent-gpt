@@ -3341,7 +3341,6 @@
   "ui.data.column.cd90ScheduleResult.unitConsume": "单耗",
   "ui.data.column.cd90ScheduleResult.machineCode": "机台编码",
   "ui.data.column.cd90ScheduleResult.storageLaneCode": "库排号",
-  "ui.data.column.cd90ScheduleResult.stockQty": "库存数量",
   "ui.data.column.cd90ScheduleResult.supplyTime": "供应时长",
   "ui.data.column.cd90ScheduleResult.class1PlanQty": "一班计划量",
   "ui.data.column.cd90ScheduleResult.class2PlanQty": "二班计划量",

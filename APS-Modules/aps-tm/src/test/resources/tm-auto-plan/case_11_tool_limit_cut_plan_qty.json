@@ -1,6 +1,6 @@
 {
   "caseName": "case_11_tool_limit_cut_plan_qty",
-  "description": "工装不足，按可用工装数量截断计划量",
+  "description": "工装不足，按全局滚动可用工装数量截断计划量，截断差额进入后续班次顺延",
   "autoPlanRequest": {
     "factoryCode": "F1",
     "scheduleDate": "2026-06-18",
@@ -93,8 +93,8 @@
     "messageContains": "胎面自动排程执行完成",
     "resultCount": 1,
     "assignedCount": 1,
-    "unassignedCount": 0,
-    "explainCount": 6,
+    "unassignedCount": 2,
+    "explainCount": 12,
     "errorCount": 0,
     "expectedResults": [
       {

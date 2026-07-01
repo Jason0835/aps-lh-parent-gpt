@@ -24,11 +24,11 @@ public class Cd90ConstructionMaterial {
     private String cordSpec;
     /** 施工层位，取1至3。 */
     private int layerNo;
-    /** 帘布单耗，单位毫米/条。 */
+    /** 单片直裁长度/胎体长度，单位毫米/条，对应TIRE_FABRIC_LENGTH1/2/3。 */
     private BigDecimal unitConsumeMillimeter;
-    /** 大卷幅宽，同时作为单片直裁长度。 */
+    /** 大卷幅宽，保留给大卷面积换算等其他口径使用。 */
     private BigDecimal cordWidth;
-    /** 当前层位单片直裁宽度。 */
+    /** 当前层位单片直裁宽度，对应TIRE_FABRIC_CRAFT1/2/3。 */
     private BigDecimal craftWidth;
     /** 当前层位直裁宽度原始值，用于解析失败时复盘。 */
     private String craftWidthRaw;
