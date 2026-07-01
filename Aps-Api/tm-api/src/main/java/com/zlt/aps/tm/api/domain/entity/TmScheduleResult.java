@@ -65,6 +65,12 @@ public class TmScheduleResult extends BaseEntity {
     @TableField(value = "GLUE_CODE")
     private String glueCode;
 
+    /** 基部胶编码 */
+    @Excel(name = "ui.data.column.tm.scheduleResult.baseGlueCode")
+    @ApiModelProperty(value = "基部胶编码", name = "baseGlueCode")
+    @TableField(value = "BASE_GLUE_CODE")
+    private String baseGlueCode;
+
     /** 整条胶料组合编码 */
     @Excel(name = "ui.data.column.tm.scheduleResult.wholeGlueCode")
     @ApiModelProperty(value = "整条胶料组合编码", name = "wholeGlueCode")

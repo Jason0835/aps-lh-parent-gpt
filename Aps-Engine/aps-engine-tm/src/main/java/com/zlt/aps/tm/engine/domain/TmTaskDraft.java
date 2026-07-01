@@ -100,7 +100,7 @@ public class TmTaskDraft {
     /** 当前任务计算前全局可用工装数量 */
     private BigDecimal availableToolQty;
 
-    /** 当前任务占用的工装数量 */
+    /** 当前任务净占用的工装数量，生产为正、成型消耗库存释放占用为负 */
     private BigDecimal toolUsedQty;
 
     /** 当前任务计算后全局剩余工装数量 */

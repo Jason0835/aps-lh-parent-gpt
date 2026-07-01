@@ -1,6 +1,7 @@
 package com.zlt.aps.tm.engine.service.impl;
 
 import cn.hutool.core.collection.CollUtil;
+import cn.hutool.core.date.DateUtil;
 import cn.hutool.core.util.StrUtil;
 import com.ruoyi.common.exception.ServiceException;
 import com.zlt.aps.common.engine.schedule.ScheduleRuleResult;
@@ -62,19 +63,278 @@ public class TmMachineAssignService implements ITmMachineAssignService {
         if (CollUtil.isEmpty(context.getTaskDraftList())) {
             return;
         }
-        for (TmTaskDraft task : new ArrayList<>(context.getTaskDraftList())) {
-            if (task.isUnassigned()) {
-                // 未预置机台的任务走完整过滤评分流程
-                assignByFilterAndScore(task, context);
+        Map<Integer, List<TmTaskDraft>> shiftTaskMap = new ArrayList<>(context.getTaskDraftList()).stream()
+                .collect(Collectors.groupingBy(task -> this.normalizeShiftOrder(task.getShiftOrder()),
+                        TreeMap::new, Collectors.toList()));
+        for (Map.Entry<Integer, List<TmTaskDraft>> entry : shiftTaskMap.entrySet()) {
+            List<TmTaskDraft> remainingTaskList = new ArrayList<>(entry.getValue());
+            while (CollUtil.isNotEmpty(remainingTaskList)) {
+                TmTaskDraft task = this.selectNextTaskByMachinePredecessor(remainingTaskList, context);
+                remainingTaskList.remove(task);
+                this.assignSingleTask(task, context);
+            }
+        }
+    }
+
+    /**
+     * 执行单个任务的机台分配。
+     *
+     * @param task 当前待排任务
+     * @param context 胎面排程上下文
+     */
+    private void assignSingleTask(TmTaskDraft task, TmScheduleContext context) {
+        if (task.isUnassigned()) {
+            // 未预置机台的任务走完整过滤评分流程
+            this.assignByFilterAndScore(task, context);
+            return;
+        }
+        // 已预置机台的任务直接追加到对应机台任务链
+        TmMachineCandidate candidate = new TmMachineCandidate();
+        candidate.setMachineCode(task.getMachineCode());
+        context.getCandidateTraceMap().put(task.getBusinessKey(), Collections.singletonList(candidate));
+        this.addAssignTrace(context, task, "PASS", task.getMachineCode(), null, null);
+        this.taskChainScheduleService.appendAutoTask(task, candidate, context);
+    }
+
+    /**
+     * 根据同机台前置任务连续性选择下一个待排任务。
+     *
+     * <p>同一班次内每排入一个任务后都会重新计算剩余任务的连续性得分；一班没有当前链尾时使用
+     * 前一天同机台链尾，二到六班没有当前链尾时使用上一已排班次链尾。</p>
+     *
+     * @param remainingTaskList 当前班次尚未分配的任务
+     * @param context 胎面排程上下文
+     * @return 本轮应优先分配的任务
+     */
+    private TmTaskDraft selectNextTaskByMachinePredecessor(List<TmTaskDraft> remainingTaskList,
+                                                           TmScheduleContext context) {
+        for (TmTaskDraft task : remainingTaskList) {
+            if (!task.isUnassigned()) {
+                return task;
+            }
+        }
+        Map<String, BigDecimal> scoreMap = new LinkedHashMap<>();
+        for (TmTaskDraft task : remainingTaskList) {
+            scoreMap.put(task.getBusinessKey(), this.calculateBestChainSortScore(task, context));
+        }
+        List<TmTaskDraft> orderedTaskList = new ArrayList<>(remainingTaskList);
+        orderedTaskList.sort(Comparator
+                .comparing((TmTaskDraft task) -> scoreMap.getOrDefault(task.getBusinessKey(), BigDecimal.ZERO),
+                        Comparator.reverseOrder())
+                .thenComparing(task -> StrUtil.blankToDefault(task.getBusinessKey(), "")));
+        TmTaskDraft selectedTask = orderedTaskList.get(0);
+        log.info("[TM_CHAIN_TASK_ORDER] batchNo={}, traceId={}, factoryCode={}, scheduleDate={}, shiftOrder={}, predecessorSnapshot={}, selectedBusinessKey={}, selectedTreadCode={}, selectedGlueCode={}, chainSortScores={}",
+                context.getBatchNo(), context.getTraceId(), context.getFactoryCode(), this.formatScheduleDate(context),
+                this.normalizeShiftOrder(selectedTask.getShiftOrder()), this.summarizeMachinePredecessors(context,
+                        this.normalizeShiftOrder(selectedTask.getShiftOrder())), selectedTask.getBusinessKey(),
+                selectedTask.getTreadCode(), selectedTask.getGlueCode(), scoreMap);
+        return selectedTask;
+    }
+
+    /**
+     * 计算任务在所有候选机台上的最佳链式连续性排序分。
+     *
+     * @param task 当前任务
+     * @param context 胎面排程上下文
+     * @return 最佳排序分
+     */
+    private BigDecimal calculateBestChainSortScore(TmTaskDraft task, TmScheduleContext context) {
+        if (CollUtil.isEmpty(context.getMachineCandidateList())) {
+            return BigDecimal.ZERO;
+        }
+        BigDecimal bestScore = BigDecimal.ZERO;
+        for (TmMachineCandidate candidate : context.getMachineCandidateList()) {
+            bestScore = bestScore.max(this.calculateChainSortScore(task, context, candidate));
+        }
+        return bestScore;
+    }
+
+    /**
+     * 计算任务相对单台机台当前链尾的连续性排序分。
+     *
+     * @param task 当前任务
+     * @param context 胎面排程上下文
+     * @param candidate 候选机台
+     * @return 排序分
+     */
+    private BigDecimal calculateChainSortScore(TmTaskDraft task, TmScheduleContext context,
+                                               TmMachineCandidate candidate) {
+        if (Boolean.FALSE.equals(candidate.getEnabled())) {
+            return BigDecimal.ZERO;
+        }
+        TmTaskPredecessor predecessor = this.resolveEffectivePredecessor(context, candidate.getMachineCode(),
+                task.getShiftOrder());
+        String tailMainGlueCode = predecessor == null ? candidate.getTailMainGlueCode() : predecessor.getGlueCode();
+        String tailBaseGlueCode = predecessor == null ? candidate.getTailBaseGlueCode() : predecessor.getBaseGlueCode();
+        String tailMouthPlateCode = predecessor == null ? candidate.getTailMouthPlateCode() : predecessor.getMouthPlateCode();
+        BigDecimal machineSpeed = this.resolveMachineSpeed(task, candidate);
+        BigDecimal remainCapacity = this.resolveRemainCapacity(task, context, candidate, machineSpeed);
+        BigDecimal capacityScore = this.capacityFitScore(task, remainCapacity);
+        BigDecimal mainGlueScore = this.same(task.getGlueCode(), tailMainGlueCode) ? BigDecimal.TEN : BigDecimal.ZERO;
+        BigDecimal baseGlueScore = mainGlueScore.compareTo(BigDecimal.ZERO) > 0 ? BigDecimal.ZERO
+                : (this.same(task.getBaseGlueCode(), tailBaseGlueCode) ? BigDecimal.valueOf(8) : BigDecimal.ZERO);
+        BigDecimal mouthPlateScore = this.same(task.getMouthPlateCode(), tailMouthPlateCode)
+                ? BigDecimal.TEN : BigDecimal.ZERO;
+        BigDecimal switchCostScore = BigDecimal.TEN.subtract(nvl(candidate.getSwitchCostHours())).max(BigDecimal.ZERO);
+        BigDecimal fixedScore = Boolean.TRUE.equals(candidate.getFixedMachineMatched()) ? BigDecimal.TEN : BigDecimal.ZERO;
+        return capacityScore.add(mainGlueScore).add(baseGlueScore).add(mouthPlateScore).add(switchCostScore).add(fixedScore);
+    }
+
+    /**
+     * 将当前有效前置任务写入候选机台链尾字段，供既有评分策略复用。
+     *
+     * @param task 当前任务
+     * @param context 胎面排程上下文
+     * @param candidate 候选机台
+     */
+    private void applyEffectivePredecessor(TmTaskDraft task, TmScheduleContext context, TmMachineCandidate candidate) {
+        TmTaskPredecessor predecessor = this.resolveEffectivePredecessor(context, candidate.getMachineCode(),
+                task.getShiftOrder());
+        if (predecessor == null) {
+            return;
+        }
+        candidate.setTailMainGlueCode(predecessor.getGlueCode());
+        candidate.setTailBaseGlueCode(predecessor.getBaseGlueCode());
+        candidate.setTailMouthPlateCode(predecessor.getMouthPlateCode());
+        candidate.getEvidence().put("predecessorTreadCode", predecessor.getTreadCode());
+        candidate.getEvidence().put("predecessorGlueCode", predecessor.getGlueCode());
+        candidate.getEvidence().put("predecessorBaseGlueCode", predecessor.getBaseGlueCode());
+        candidate.getEvidence().put("predecessorMouthPlateCode", predecessor.getMouthPlateCode());
+        candidate.getEvidence().put("predecessorShiftOrder", predecessor.getShiftOrder());
+        candidate.getEvidence().put("predecessorSequence", predecessor.getSequence());
+    }
+
+    /**
+     * 解析当前任务相对指定机台的有效前置任务。
+     *
+     * @param context 胎面排程上下文
+     * @param machineCode 机台编码
+     * @param shiftOrder 当前任务班次
+     * @return 有效前置任务；没有链尾时返回 null
+     */
+    private TmTaskPredecessor resolveEffectivePredecessor(TmScheduleContext context, String machineCode,
+                                                          Integer shiftOrder) {
+        Integer normalizedShiftOrder = this.normalizeShiftOrder(shiftOrder);
+        TmTaskDraft currentShiftTail = this.findChainTailTask(context, machineCode, normalizedShiftOrder);
+        if (currentShiftTail != null) {
+            return this.buildPredecessorFromTask(machineCode, normalizedShiftOrder, currentShiftTail);
+        }
+        for (int previousShiftOrder = normalizedShiftOrder - 1; previousShiftOrder >= 1; previousShiftOrder--) {
+            TmTaskDraft previousShiftTail = this.findChainTailTask(context, machineCode, previousShiftOrder);
+            if (previousShiftTail != null) {
+                return this.buildPredecessorFromTask(machineCode, previousShiftOrder, previousShiftTail);
+            }
+        }
+        return context.getMachinePredecessorMap().get(machineCode);
+    }
+
+    /**
+     * 查找指定机台班次的任务链尾。
+     *
+     * @param context 胎面排程上下文
+     * @param machineCode 机台编码
+     * @param shiftOrder 班次序号
+     * @return 链尾任务；任务链为空时返回 null
+     */
+    private TmTaskDraft findChainTailTask(TmScheduleContext context, String machineCode, Integer shiftOrder) {
+        if (StrUtil.isBlank(machineCode)) {
+            return null;
+        }
+        ScheduleTaskLinkedList<TmTaskDraft> chain = context.getTaskChain(machineCode, shiftOrder);
+        if (chain == null || CollUtil.isEmpty(chain.toList())) {
+            return null;
+        }
+        List<ScheduleTaskNode<TmTaskDraft>> nodeList = chain.toList();
+        ScheduleTaskNode<TmTaskDraft> tailNode = nodeList.get(nodeList.size() - 1);
+        return tailNode == null ? null : tailNode.getTask();
+    }
+
+    /**
+     * 将任务草稿转换为前置任务快照。
+     *
+     * @param machineCode 机台编码
+     * @param shiftOrder 班次序号
+     * @param task 任务草稿
+     * @return 前置任务快照
+     */
+    private TmTaskPredecessor buildPredecessorFromTask(String machineCode, Integer shiftOrder, TmTaskDraft task) {
+        TmTaskPredecessor predecessor = new TmTaskPredecessor();
+        predecessor.setMachineCode(machineCode);
+        predecessor.setTreadCode(task.getTreadCode());
+        predecessor.setGlueCode(task.getGlueCode());
+        predecessor.setBaseGlueCode(task.getBaseGlueCode());
+        predecessor.setMouthPlateCode(task.getMouthPlateCode());
+        predecessor.setShiftOrder(shiftOrder);
+        predecessor.setBusinessKey(task.getBusinessKey());
+        return predecessor;
+    }
+
+    /**
+     * 汇总当前班次各机台有效前置任务，供日志解释排序依据。
+     *
+     * @param context 胎面排程上下文
+     * @param shiftOrder 班次序号
+     * @return 机台前置任务摘要
+     */
+    private Map<String, String> summarizeMachinePredecessors(TmScheduleContext context, Integer shiftOrder) {
+        if (CollUtil.isEmpty(context.getMachineCandidateList())) {
+            return Collections.emptyMap();
+        }
+        Map<String, String> summary = new LinkedHashMap<>();
+        for (TmMachineCandidate candidate : context.getMachineCandidateList()) {
+            TmTaskPredecessor predecessor = this.resolveEffectivePredecessor(context, candidate.getMachineCode(), shiftOrder);
+            if (predecessor == null) {
+                summary.put(candidate.getMachineCode(), null);
                 continue;
             }
-            // 已预置机台的任务直接追加到对应机台任务链
-            TmMachineCandidate candidate = new TmMachineCandidate();
-            candidate.setMachineCode(task.getMachineCode());
-            context.getCandidateTraceMap().put(task.getBusinessKey(), Collections.singletonList(candidate));
-            addAssignTrace(context, task, "PASS", task.getMachineCode(), null, null);
-            this.taskChainScheduleService.appendAutoTask(task, candidate, context);
+            summary.put(candidate.getMachineCode(), predecessor.getTreadCode() + "/" + predecessor.getGlueCode()
+                    + "/" + predecessor.getMouthPlateCode());
         }
+        return summary;
+    }
+
+    /**
+     * 计算产能适配排序分。
+     *
+     * @param task 当前任务
+     * @param remainCapacity 剩余产能
+     * @return 产能适配分
+     */
+    private BigDecimal capacityFitScore(TmTaskDraft task, BigDecimal remainCapacity) {
+        BigDecimal planQty = nvl(task.getPlanQty());
+        BigDecimal normalizedRemainCapacity = nvl(remainCapacity);
+        if (normalizedRemainCapacity.compareTo(BigDecimal.ZERO) <= 0 || planQty.compareTo(BigDecimal.ZERO) <= 0
+                || normalizedRemainCapacity.compareTo(planQty) < 0) {
+            return BigDecimal.ZERO;
+        }
+        BigDecimal wasteRatio = normalizedRemainCapacity.subtract(planQty)
+                .divide(normalizedRemainCapacity, 6, java.math.RoundingMode.HALF_UP);
+        return BigDecimal.TEN.multiply(BigDecimal.ONE.subtract(wasteRatio))
+                .max(BigDecimal.ZERO).setScale(2, java.math.RoundingMode.HALF_UP);
+    }
+
+    /**
+     * 判断两个编码是否非空且相同。
+     *
+     * @param left 左侧编码
+     * @param right 右侧编码
+     * @return true 表示相同
+     */
+    private boolean same(String left, String right) {
+        return StrUtil.isNotBlank(left) && left.equals(right);
+    }
+
+    /**
+     * 规范化班次序号。
+     *
+     * @param shiftOrder 原始班次序号
+     * @return 1到6之间的班次序号
+     */
+    private Integer normalizeShiftOrder(Integer shiftOrder) {
+        if (shiftOrder == null || shiftOrder < 1) {
+            return 1;
+        }
+        return Math.min(shiftOrder, 6);
     }
 
     /**
@@ -90,6 +350,8 @@ public class TmMachineAssignService implements ITmMachineAssignService {
             context.getCandidateTraceMap().put(task.getBusinessKey(), Collections.emptyList());
             addAssignTrace(context, task, "REJECT", null, TmUnplannedReasonEnum.NO_AVAILABLE_MACHINE.getCode(),
                     TmUnplannedReasonEnum.NO_AVAILABLE_MACHINE.getDesc());
+            this.logMachineAssignSummary(context, task, Collections.emptyList(), Collections.emptyList(), null,
+                    "REJECT", TmUnplannedReasonEnum.NO_AVAILABLE_MACHINE);
             markNoAvailableMachine(task);
             return;
         }
@@ -127,6 +389,7 @@ public class TmMachineAssignService implements ITmMachineAssignService {
             TmUnplannedReasonEnum unplannedReason = this.resolveUnplannedReasonFromCandidates(candidates);
             log.info("[TM_MACHINE_ASSIGN] 任务[{}]所有候选机台均被过滤，未排原因={}",
                     task.getBusinessKey(), unplannedReason.getCode());
+            this.logMachineAssignSummary(context, task, candidates, passedCandidates, null, "REJECT", unplannedReason);
             context.getCandidateTraceMap().put(task.getBusinessKey(), candidates);
             this.addAssignTrace(context, task, "REJECT", null, unplannedReason.getCode(), unplannedReason.getDesc());
             this.markUnplanned(task, unplannedReason);
@@ -147,8 +410,12 @@ public class TmMachineAssignService implements ITmMachineAssignService {
                 .comparing(TmMachineCandidate::getScore, Comparator.nullsLast(Comparator.reverseOrder()))
                 .thenComparing(TmMachineCandidate::getMachineCode, Comparator.nullsLast(Comparator.naturalOrder())));
         TmMachineCandidate bestCandidate = passedCandidates.get(0);
+        if (task.getShiftOrder() == null) {
+            task.setShiftOrder(1);
+        }
         log.info("[TM_MACHINE_ASSIGN] 任务[{}]选中机台[{}]，评分={}",
                 task.getBusinessKey(), bestCandidate.getMachineCode(), bestCandidate.getScore());
+        this.logMachineAssignSummary(context, task, candidates, passedCandidates, bestCandidate, "PASS", null);
         addAssignTrace(context, task, "PASS", bestCandidate.getMachineCode(), null, null);
 
         // 当前班只按选中机台真实产能排，工装和产能溢出量统一从下一班开始顺延承接。
@@ -263,6 +530,9 @@ public class TmMachineAssignService implements ITmMachineAssignService {
                     context.getCandidateTraceMap().put(mergeTarget.getBusinessKey(), Collections.singletonList(runtimeCandidate));
                     this.addCarryoverTrace(context, mergeTarget, sourceTask, sourceType, assignedQty, sourceShiftOrder,
                             shiftOrder, candidate.getMachineCode(), beforeMergeQty, afterMergeQty, true);
+                    this.logCarryoverSummary(context, mergeTarget, sourceTask, sourceType, assignedQty,
+                            capacityOverflowQty, toolOverflowQty, sourceShiftOrder, shiftOrder,
+                            candidate.getMachineCode(), beforeMergeQty, afterMergeQty, beforeAssignQty, true);
                     this.addAssignTrace(context, mergeTarget, "PASS", candidate.getMachineCode(), null, null);
                 } else {
                     TmTaskDraft overflowTask = this.copyOverflowTask(sourceTask, shiftOrder, assignedQty,
@@ -275,6 +545,9 @@ public class TmMachineAssignService implements ITmMachineAssignService {
                             remainCapacity, runtimeCandidate.getMachineCode(), false);
                     this.addCarryoverTrace(context, overflowTask, sourceTask, sourceType, assignedQty, sourceShiftOrder,
                             shiftOrder, candidate.getMachineCode(), BigDecimal.ZERO, assignedQty, false);
+                    this.logCarryoverSummary(context, overflowTask, sourceTask, sourceType, assignedQty,
+                            capacityOverflowQty, toolOverflowQty, sourceShiftOrder, shiftOrder,
+                            candidate.getMachineCode(), BigDecimal.ZERO, assignedQty, beforeAssignQty, false);
                     this.addAssignTrace(context, overflowTask, "PASS", runtimeCandidate.getMachineCode(), null, null);
                     this.taskChainScheduleService.prependAutoTask(overflowTask, runtimeCandidate, context);
                 }
@@ -294,10 +567,107 @@ public class TmMachineAssignService implements ITmMachineAssignService {
             this.addCapacityUnplannedTrace(context, unplannedTask, remainingQty);
             this.addCarryoverTrace(context, unplannedTask, sourceTask, sourceType, remainingQty, sourceShiftOrder,
                     6, null, BigDecimal.ZERO, BigDecimal.ZERO, false);
+            this.logCarryoverSummary(context, unplannedTask, sourceTask, sourceType, remainingQty,
+                    capacityOverflowQty, toolOverflowQty, sourceShiftOrder, 6, null,
+                    BigDecimal.ZERO, BigDecimal.ZERO, remainingQty, false);
             this.addAssignTrace(context, unplannedTask, "REJECT", null,
                     TmUnplannedReasonEnum.CAPACITY_NOT_ENOUGH.getCode(),
                     TmUnplannedReasonEnum.CAPACITY_NOT_ENOUGH.getDesc());
         }
+    }
+
+
+    /**
+     * 打印单任务机台分配摘要，info层只保留候选统计、选中结果和产能承接结论。
+     *
+     * @param context 排程上下文
+     * @param task 当前任务
+     * @param candidates 全量候选机台
+     * @param passedCandidates 过滤通过候选机台
+     * @param selectedCandidate 选中候选机台
+     * @param result 分配结果
+     * @param unplannedReason 未排原因
+     */
+    private void logMachineAssignSummary(TmScheduleContext context, TmTaskDraft task,
+                                         List<TmMachineCandidate> candidates,
+                                         List<TmMachineCandidate> passedCandidates,
+                                         TmMachineCandidate selectedCandidate,
+                                         String result, TmUnplannedReasonEnum unplannedReason) {
+        BigDecimal planQty = task == null ? BigDecimal.ZERO : nvl(task.getPlanQty());
+        BigDecimal remainCapacity = selectedCandidate == null ? null : nvl(selectedCandidate.getRemainCapacity());
+        BigDecimal assignedQty = remainCapacity == null ? null : planQty.min(remainCapacity);
+        BigDecimal overflowQty = assignedQty == null ? null : planQty.subtract(assignedQty).max(BigDecimal.ZERO);
+        Object scoreItems = selectedCandidate == null || selectedCandidate.getScoreResult() == null
+                ? null : selectedCandidate.getScoreResult().getScoreItems();
+        log.info("[TM_MACHINE_ASSIGN_SUMMARY] batchNo={}, traceId={}, factoryCode={}, scheduleDate={}, businessKey={}, treadCode={}, shiftOrder={}, result={}, candidateCount={}, passedCount={}, rejectedCount={}, rejectReasonSummary={}, selectedMachineCode={}, selectedScore={}, scoreItems={}, planQty={}, remainCapacity={}, assignedQty={}, overflowQty={}, reasonCode={}, reasonDesc={}",
+                context == null ? null : context.getBatchNo(), context == null ? null : context.getTraceId(),
+                context == null ? null : context.getFactoryCode(), formatScheduleDate(context),
+                task == null ? null : task.getBusinessKey(), task == null ? null : task.getTreadCode(),
+                task == null ? null : task.getShiftOrder(), result,
+                candidates == null ? 0 : candidates.size(), passedCandidates == null ? 0 : passedCandidates.size(),
+                candidates == null || passedCandidates == null ? 0 : candidates.size() - passedCandidates.size(),
+                summarizeRejectReasons(candidates), selectedCandidate == null ? null : selectedCandidate.getMachineCode(),
+                selectedCandidate == null ? null : selectedCandidate.getScore(), scoreItems, planQty, remainCapacity,
+                assignedQty, overflowQty, unplannedReason == null ? null : unplannedReason.getCode(),
+                unplannedReason == null ? null : unplannedReason.getDesc());
+    }
+
+    /**
+     * 打印顺延、合并和六班后未排摘要，便于还原计划量如何跨班承接。
+     *
+     * @param context 排程上下文
+     * @param targetTask 目标任务
+     * @param sourceTask 来源任务
+     * @param sourceType 顺延来源类型
+     * @param carryoverQty 本次承接或未排数量
+     * @param capacityOverflowQty 产能溢出量
+     * @param toolOverflowQty 工装溢出量
+     * @param sourceShiftOrder 来源班次
+     * @param targetShiftOrder 目标班次
+     * @param targetMachineCode 目标机台
+     * @param beforeMergeQty 合并前计划量
+     * @param afterMergeQty 合并后计划量
+     * @param remainingQty 本轮处理前剩余量
+     * @param merged 是否合并到既有任务
+     */
+    private void logCarryoverSummary(TmScheduleContext context, TmTaskDraft targetTask, TmTaskDraft sourceTask,
+                                     String sourceType, BigDecimal carryoverQty, BigDecimal capacityOverflowQty,
+                                     BigDecimal toolOverflowQty, Integer sourceShiftOrder, Integer targetShiftOrder,
+                                     String targetMachineCode, BigDecimal beforeMergeQty, BigDecimal afterMergeQty,
+                                     BigDecimal remainingQty, boolean merged) {
+        log.info("[TM_MACHINE_CARRYOVER] batchNo={}, traceId={}, factoryCode={}, scheduleDate={}, sourceBusinessKey={}, targetBusinessKey={}, sourceType={}, sourceShiftOrder={}, targetShiftOrder={}, targetMachineCode={}, carryoverQty={}, capacityOverflowQty={}, toolOverflowQty={}, beforeMergePlanQty={}, afterMergePlanQty={}, remainingQty={}, merged={}, reasonCode={}",
+                context == null ? null : context.getBatchNo(), context == null ? null : context.getTraceId(),
+                context == null ? null : context.getFactoryCode(), formatScheduleDate(context),
+                sourceTask == null ? null : sourceTask.getBusinessKey(), targetTask == null ? null : targetTask.getBusinessKey(),
+                sourceType, sourceShiftOrder, targetShiftOrder, targetMachineCode, carryoverQty, capacityOverflowQty,
+                toolOverflowQty, beforeMergeQty, afterMergeQty, remainingQty, merged,
+                targetTask == null ? null : targetTask.getUnplannedReasonCode());
+    }
+
+    /**
+     * 汇总候选机台过滤原因。
+     *
+     * @param candidates 候选机台列表
+     * @return 原因编码到数量的映射
+     */
+    private Map<String, Long> summarizeRejectReasons(List<TmMachineCandidate> candidates) {
+        if (CollUtil.isEmpty(candidates)) {
+            return Collections.emptyMap();
+        }
+        return candidates.stream()
+                .filter(TmMachineCandidate::isFiltered)
+                .collect(Collectors.groupingBy(candidate -> StrUtil.blankToDefault(candidate.getFilterReasonCode(), "UNKNOWN"),
+                        LinkedHashMap::new, Collectors.counting()));
+    }
+
+    /**
+     * 格式化排程日期，避免日志中直接打印Date对象造成排查口径不统一。
+     *
+     * @param context 排程上下文
+     * @return yyyy-MM-dd格式日期；日期为空时返回null
+     */
+    private String formatScheduleDate(TmScheduleContext context) {
+        return context == null || context.getScheduleDate() == null ? null : DateUtil.formatDate(context.getScheduleDate());
     }
 
     /**
@@ -907,6 +1277,7 @@ public class TmMachineAssignService implements ITmMachineAssignService {
         boolean hasFixedAllowRule = candidates.stream()
                 .anyMatch(candidate -> contains(candidate.getFixedAllowTreadCodes(), task.getTreadCode()));
         for (TmMachineCandidate candidate : candidates) {
+            this.applyEffectivePredecessor(task, context, candidate);
             BigDecimal machineSpeed = resolveMachineSpeed(task, candidate);
             BigDecimal remainCapacity = resolveRemainCapacity(task, context, candidate, machineSpeed);
             candidate.setMachineSpeed(machineSpeed);
