@@ -274,6 +274,76 @@ public class TmDefaultStepServiceTest {
     }
 
     /**
+     * 测试内容：验证一班链式排序中主胶料连续优先于口型连续和产能适配。
+     * 测试场景：TM001 前一天链尾为 GLUE07/SW007，当前一班同时存在口型匹配且计划量更大的 GLUE10
+     * 和主胶料匹配但口型不匹配的 GLUE07。
+     * 预期结果：机台分配时优先排 GLUE07，避免口型和产能分反超前置任务主胶料连续性。
+     */
+    @Test
+    public void machineAssignShouldPreferPredecessorMainGlueBeforeMouthPlateAndCapacityForFirstShiftOrder() {
+        TmScheduleContext context = buildContext();
+        context.setScheduleDate(DateUtil.parseDate("2026-06-25"));
+        context.getMachinePredecessorMap().put("TM001",
+                buildPredecessor("TM001", "210400584", "GLUE07", "SW007"));
+        TmTaskDraft mouthPlateAndCapacityTask = buildTask("ORD-GLUE10", null);
+        mouthPlateAndCapacityTask.setTreadCode("210400584");
+        mouthPlateAndCapacityTask.setGlueCode("GLUE10");
+        mouthPlateAndCapacityTask.setMouthPlateCode("SW007");
+        mouthPlateAndCapacityTask.setPlanQty(new BigDecimal("1200"));
+        TmTaskDraft mainGlueTask = buildTask("ORD-GLUE07", null);
+        mainGlueTask.setTreadCode("210400277");
+        mainGlueTask.setGlueCode("GLUE07");
+        mainGlueTask.setMouthPlateCode("SW001");
+        mainGlueTask.setPlanQty(new BigDecimal("1000"));
+        context.setTaskDraftList(Arrays.asList(mouthPlateAndCapacityTask, mainGlueTask));
+        TmMachineCandidate tm001 = enabledCandidate("TM001", "5300");
+        tm001.setMaxCapacity(new BigDecimal("5300"));
+        context.setMachineCandidateList(Collections.singletonList(tm001));
+
+        new TmMachineAssignService(new TmTaskChainScheduleService(), buildRegistry()).assign(context);
+
+        ScheduleTaskLinkedList<TmTaskDraft> chain = context.getTaskChain("TM001", 1);
+        assertNotNull(chain);
+        assertEquals("210400277", chain.toList().get(0).getTask().getTreadCode());
+        assertEquals("GLUE07", chain.toList().get(0).getTask().getGlueCode());
+        assertEquals("210400584", chain.toList().get(1).getTask().getTreadCode());
+        assertEquals("GLUE10", chain.toList().get(1).getTask().getGlueCode());
+    }
+
+    /**
+     * 测试内容：验证没有任务匹配前置主胶料时仍保留口型和产能等原有排序能力。
+     * 测试场景：TM001 前一天链尾为 GLUE07/SW007，当前一班两个任务都不匹配 GLUE07，
+     * 其中一个任务匹配口型 SW007。
+     * 预期结果：机台分配时仍优先排口型连续的任务，避免排序退化为只看主胶料。
+     */
+    @Test
+    public void machineAssignShouldStillUseMouthPlateAndCapacityWhenNoTaskMatchesPredecessorMainGlue() {
+        TmScheduleContext context = buildContext();
+        context.getMachinePredecessorMap().put("TM001",
+                buildPredecessor("TM001", "210400584", "GLUE07", "SW007"));
+        TmTaskDraft mouthPlateTask = buildTask("ORD-MP", null);
+        mouthPlateTask.setTreadCode("210400584");
+        mouthPlateTask.setGlueCode("GLUE10");
+        mouthPlateTask.setMouthPlateCode("SW007");
+        mouthPlateTask.setPlanQty(new BigDecimal("1000"));
+        TmTaskDraft otherTask = buildTask("ORD-OTHER", null);
+        otherTask.setTreadCode("210400999");
+        otherTask.setGlueCode("GLUE11");
+        otherTask.setMouthPlateCode("SW001");
+        otherTask.setPlanQty(new BigDecimal("1000"));
+        context.setTaskDraftList(Arrays.asList(otherTask, mouthPlateTask));
+        TmMachineCandidate tm001 = enabledCandidate("TM001", "5300");
+        tm001.setMaxCapacity(new BigDecimal("5300"));
+        context.setMachineCandidateList(Collections.singletonList(tm001));
+
+        new TmMachineAssignService(new TmTaskChainScheduleService(), buildRegistry()).assign(context);
+
+        ScheduleTaskLinkedList<TmTaskDraft> chain = context.getTaskChain("TM001", 1);
+        assertNotNull(chain);
+        assertEquals("210400584", chain.toList().get(0).getTask().getTreadCode());
+        assertEquals("GLUE10", chain.toList().get(0).getTask().getGlueCode());
+    }
+    /**
      * 测试内容：验证二班排序继承同机台上一班链尾，而不是继续使用前一天尾部任务。
      * 测试场景：TM001 前一天链尾为 GL-OLD，一班排入 GL-A，二班同时存在 GL-OLD 和 GL-A。
      * 预期结果：二班优先排 GL-A，说明前置任务已切换为一班链尾。

@@ -113,13 +113,13 @@ public class TmMachineAssignService implements ITmMachineAssignService {
                 return task;
             }
         }
-        Map<String, BigDecimal> scoreMap = new LinkedHashMap<>();
+        Map<String, TmChainSortScore> scoreMap = new LinkedHashMap<>();
         for (TmTaskDraft task : remainingTaskList) {
             scoreMap.put(task.getBusinessKey(), this.calculateBestChainSortScore(task, context));
         }
         List<TmTaskDraft> orderedTaskList = new ArrayList<>(remainingTaskList);
         orderedTaskList.sort(Comparator
-                .comparing((TmTaskDraft task) -> scoreMap.getOrDefault(task.getBusinessKey(), BigDecimal.ZERO),
+                .comparing((TmTaskDraft task) -> scoreMap.getOrDefault(task.getBusinessKey(), TmChainSortScore.ZERO),
                         Comparator.reverseOrder())
                 .thenComparing(task -> StrUtil.blankToDefault(task.getBusinessKey(), "")));
         TmTaskDraft selectedTask = orderedTaskList.get(0);
@@ -138,13 +138,16 @@ public class TmMachineAssignService implements ITmMachineAssignService {
      * @param context 胎面排程上下文
      * @return 最佳排序分
      */
-    private BigDecimal calculateBestChainSortScore(TmTaskDraft task, TmScheduleContext context) {
+    private TmChainSortScore calculateBestChainSortScore(TmTaskDraft task, TmScheduleContext context) {
         if (CollUtil.isEmpty(context.getMachineCandidateList())) {
-            return BigDecimal.ZERO;
+            return TmChainSortScore.ZERO;
         }
-        BigDecimal bestScore = BigDecimal.ZERO;
+        TmChainSortScore bestScore = TmChainSortScore.ZERO;
         for (TmMachineCandidate candidate : context.getMachineCandidateList()) {
-            bestScore = bestScore.max(this.calculateChainSortScore(task, context, candidate));
+            TmChainSortScore currentScore = this.calculateChainSortScore(task, context, candidate);
+            if (currentScore.compareTo(bestScore) > 0) {
+                bestScore = currentScore;
+            }
         }
         return bestScore;
     }
@@ -157,10 +160,10 @@ public class TmMachineAssignService implements ITmMachineAssignService {
      * @param candidate 候选机台
      * @return 排序分
      */
-    private BigDecimal calculateChainSortScore(TmTaskDraft task, TmScheduleContext context,
-                                               TmMachineCandidate candidate) {
+    private TmChainSortScore calculateChainSortScore(TmTaskDraft task, TmScheduleContext context,
+                                                     TmMachineCandidate candidate) {
         if (Boolean.FALSE.equals(candidate.getEnabled())) {
-            return BigDecimal.ZERO;
+            return TmChainSortScore.ZERO;
         }
         TmTaskPredecessor predecessor = this.resolveEffectivePredecessor(context, candidate.getMachineCode(),
                 task.getShiftOrder());
@@ -170,14 +173,17 @@ public class TmMachineAssignService implements ITmMachineAssignService {
         BigDecimal machineSpeed = this.resolveMachineSpeed(task, candidate);
         BigDecimal remainCapacity = this.resolveRemainCapacity(task, context, candidate, machineSpeed);
         BigDecimal capacityScore = this.capacityFitScore(task, remainCapacity);
-        BigDecimal mainGlueScore = this.same(task.getGlueCode(), tailMainGlueCode) ? BigDecimal.TEN : BigDecimal.ZERO;
-        BigDecimal baseGlueScore = mainGlueScore.compareTo(BigDecimal.ZERO) > 0 ? BigDecimal.ZERO
-                : (this.same(task.getBaseGlueCode(), tailBaseGlueCode) ? BigDecimal.valueOf(8) : BigDecimal.ZERO);
-        BigDecimal mouthPlateScore = this.same(task.getMouthPlateCode(), tailMouthPlateCode)
-                ? BigDecimal.TEN : BigDecimal.ZERO;
+        boolean mainGlueMatched = this.same(task.getGlueCode(), tailMainGlueCode);
+        boolean baseGlueMatched = !mainGlueMatched && this.same(task.getBaseGlueCode(), tailBaseGlueCode);
+        boolean mouthPlateMatched = this.same(task.getMouthPlateCode(), tailMouthPlateCode);
+        BigDecimal mainGlueScore = mainGlueMatched ? BigDecimal.TEN : BigDecimal.ZERO;
+        BigDecimal baseGlueScore = baseGlueMatched ? BigDecimal.valueOf(8) : BigDecimal.ZERO;
+        BigDecimal mouthPlateScore = mouthPlateMatched ? BigDecimal.TEN : BigDecimal.ZERO;
         BigDecimal switchCostScore = BigDecimal.TEN.subtract(nvl(candidate.getSwitchCostHours())).max(BigDecimal.ZERO);
         BigDecimal fixedScore = Boolean.TRUE.equals(candidate.getFixedMachineMatched()) ? BigDecimal.TEN : BigDecimal.ZERO;
-        return capacityScore.add(mainGlueScore).add(baseGlueScore).add(mouthPlateScore).add(switchCostScore).add(fixedScore);
+        return new TmChainSortScore(mainGlueMatched ? 1 : 0, baseGlueMatched ? 1 : 0,
+                mouthPlateMatched ? 1 : 0, capacityScore, mainGlueScore, baseGlueScore, mouthPlateScore,
+                switchCostScore, fixedScore);
     }
 
     /**

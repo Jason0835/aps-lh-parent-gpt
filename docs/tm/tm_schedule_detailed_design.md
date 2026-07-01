@@ -259,7 +259,7 @@
 - `TmInventoryPredictService`：读取 `T_TM_STOCK` 和损耗设置，计算预计库存和供应时长。
 - `TmPlanCalcService`：计算计划量、预计划、收尾、小批量补卷等。计划量计算前从库存预测初始化 per-tread 班初滚动库存 `remainingStockMap`（初值14点预计库存），同时初始化全局可用工装池 `availableToolQty = 总工装数量 - sum(各胎面14点预计库存 / 对应卷曲长度)`；任务按班次、胎面编码稳定排序，完成后分别回写交接班预计库存和全局剩余工装。
 - `TmMachineAssignService`：基于机台、口型板、定点/禁排、胶料机台关系筛选候选机台；选中机台后按 `machineCode + shiftOrder` 计算真实剩余产能。当前班只写入该机台可承接的计划量，产能受限溢出量与计划量策略产生的工装溢出量统一从下一班开始顺延；下一班同机台同胎面已有任务时先合并计划量，没有同胎面任务时创建顺延任务。顺延仍必须满足开班、停机、口型、胶料、定点/禁排和产能过滤，6 班后仍未排完的数量写未排。全部候选机台被过滤时，按候选 `filterReasonCode` 归类未排原因：全部 `NO_REMAIN_CAPACITY`→`CAPACITY_NOT_ENOUGH`，全部 `MOUTH_PLATE_NOT_MATCH`→`MOUTH_PLATE_NOT_MATCH`，全部 `GLUE_MACHINE_NOT_MATCH`→`GLUE_MACHINE_NOT_ALLOWED`，`MACHINE_DISABLED`/定点规则/混合原因→`NO_AVAILABLE_MACHINE` 兜底。
-- 机台分配按班次处理待排任务，并把同机台已有链尾作为前置任务参与排序：一班优先继承上一排程日同机台最后有效排程任务，二到六班优先继承同机台上一已排班次的最后任务；同班次内每追加一个任务后，剩余任务会基于新的链尾重新计算连续性优先级。上一排程日前置任务从 `T_TM_SCHEDULE_RESULT.base_glue_code` 读取独立基部胶字段，旧历史结果为空时仅跳过基部胶连续评分，不能回退使用 `whole_glue_code`。
+- 机台分配按班次处理待排任务，并把同机台已有链尾作为前置任务参与排序：一班优先继承上一排程日同机台最后有效排程任务，二到六班优先继承同机台上一已排班次的最后任务；同班次内每追加一个任务后，剩余任务会基于新的链尾重新计算连续性优先级。链式任务排序按分层优先级比较：先比较主胶料连续，再比较基部胶连续，再比较口型连续，最后在连续性层级相同的任务之间比较产能适配、切换成本、定点生产等业务分；口型连续和产能适配不得反超主胶料连续。上一排程日前置任务从 `T_TM_SCHEDULE_RESULT.base_glue_code` 读取独立基部胶字段，旧历史结果为空时仅跳过基部胶连续评分，不能回退使用 `whole_glue_code`。
 - `TmCapacityBalanceService`：做产能均衡、中夜班移量、次日回拉和任务顺序计算。当前本轮不实现生产级产能均衡算法，仅保留流程占位和风险记录。
 - `TmSnapshotBuildService`：生成 `T_TM_SCHEDULE_RESULT_EXPLAIN`。
 - `TmPersistService`：统一转换结果和解释信息；`TmBizSnapshotAndPersistService` 负责将已排结果写入 `T_TM_SCHEDULE_RESULT`、未排摘要写入 `T_TM_SCHEDULE_UNPLANNED`、任务级解释写入 `T_TM_SCHEDULE_RESULT_EXPLAIN`。
@@ -1887,7 +1887,7 @@ graph LR
 - `ITmMachineScoreStrategy`：胎面机台评分策略。
   - `TmMachineScoreResult score(TmMachineCandidate candidate, TmMachineRuleContext context)`：对候选机台评分。返回评分项和总分。
   - 默认评分权重：剩余产能适配 10、主胶料连续 10、基部胶相似 8、同口型连续 10、切换成本 10、定点生产 10。
-  - 同胶料连续优先判断链尾主胶料与当前任务主胶料是否相同；主胶料不同但基部胶相同个数越多分越高；如果只能拿到一个基部胶编码，则相同个数退化为 0 或 1。
+  - 候选机台评分仍按总分选择机台；同班次待排任务的链式排序另按主胶料连续、基部胶连续、口型连续、业务分的分层优先级选择下一个任务。
   - 完全同分时按机台编码升序排序，保证同输入结果稳定。
 
 - `ITmTaskSortStrategy`：待排任务排序策略。
