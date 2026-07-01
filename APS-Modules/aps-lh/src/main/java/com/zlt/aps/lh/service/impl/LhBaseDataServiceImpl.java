@@ -91,6 +91,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.Executor;
 import java.util.function.IntSupplier;
+import java.util.stream.Collectors;
 
 /**
  * 硫化排程基础数据服务实现
@@ -1018,9 +1019,11 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
             if (Objects.isNull(plan) || StringUtils.isEmpty(plan.getMaterialCode())) {
                 continue;
             }
-            FactoryMonthPlanProductionFinalResult selectedPlan = selectedPlanMap.get(plan.getMaterialCode());
+            String materialStatusKey = MonthPlanDateResolver.buildMaterialStatusKey(
+                    plan.getMaterialCode(), plan.getProductStatus());
+            FactoryMonthPlanProductionFinalResult selectedPlan = selectedPlanMap.get(materialStatusKey);
             if (Objects.isNull(selectedPlan) || shouldReplaceSchedulingPlan(context, selectedPlan, plan)) {
-                selectedPlanMap.put(plan.getMaterialCode(), plan);
+                selectedPlanMap.put(materialStatusKey, plan);
             }
         }
         return new ArrayList<FactoryMonthPlanProductionFinalResult>(selectedPlanMap.values());
@@ -1122,7 +1125,7 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
                 .map(FactoryMonthPlanProductionFinalResult::getEmbryoCode)
                 .filter(StringUtils::isNotEmpty)
                 .distinct()
-                .collect(java.util.stream.Collectors.toList());
+                .collect(Collectors.toList());
         Map<String, Integer> stockMap = new HashMap<>(Math.max(16, embryoCodeList.size()));
         if (CollectionUtils.isEmpty(embryoCodeList)) {
             context.setEmbryoRealtimeStockMap(stockMap);
@@ -1216,6 +1219,7 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
                 embryoSurplusMap.size(), mainProductCodes.size(), endingCount);
     }
 
+
     /**
      * 加载特殊物料清单，并按当前月计划范围构建分类Map。
      *
@@ -1274,7 +1278,7 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
                 .map(FactoryMonthPlanProductionFinalResult::getMaterialCode)
                 .map(this::normalizeText)
                 .filter(StringUtils::isNotEmpty)
-                .collect(java.util.stream.Collectors.toSet());
+                .collect(Collectors.toSet());
     }
 
     /**
@@ -1288,7 +1292,7 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
                 .map(FactoryMonthPlanProductionFinalResult::getStructureName)
                 .map(this::normalizeText)
                 .filter(StringUtils::isNotEmpty)
-                .collect(java.util.stream.Collectors.toSet());
+                .collect(Collectors.toSet());
     }
 
     /**
