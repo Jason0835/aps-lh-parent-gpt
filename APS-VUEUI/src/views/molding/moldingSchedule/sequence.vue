@@ -29,6 +29,11 @@
         <el-button v-if="hasDirtyData" type="primary" @click="handleSubmit"
           >{{ $t("ui.frame.btn.submit") }}</el-button
         >
+        <el-button
+          v-hasPermi="['cx:productConstruction:export']"
+          @click="handleExport"
+          >{{ $t("ui.frame.btn.export") }}</el-button
+        >
       </template>
     </page-table>
     <editDialog ref="editRef" @success="getList" />
@@ -47,6 +52,7 @@ import {
 } from "@/api/cx/cxScheduleDetail";
 import { listStructureName } from "@/api/mdm/mdmStructureName";
 import { getScheduleDate } from "@/api/lh/scheduleResult";
+import { downloadLink } from "@/utils/request";
 import editDialog from "./components/editDialog.vue";
 
 const SHIFT_COUNT = 8;
@@ -380,6 +386,9 @@ export default {
       const res = await updateCxScheduleDetailPlanQty(payload);
       this.$modal.msgSuccess(res.msg || this.$t("common.msg.success.operate"));
       this.getList();
+    },
+    handleExport() {
+      downloadLink("/cx/cxScheduleDetail/export", this.formatParams(false));
     },
     rowStyle({ row }) {
       if (row.markCloseOutTip == "0") return { "background-color": "#FFFFBF" };

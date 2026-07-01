@@ -30,11 +30,11 @@
 
 <script>
 import moment from "moment";
-import { mapState } from "vuex";
 
 import infoForm from "@/views/components/infoForm.vue";
 
-import { validateAdd, editScheduleResult } from "@/api/dj/djScheduleResult";
+import { listMachine } from "@/api/dj/machine";
+import { validateAdd, editScheduleResult, getPaddingDistList } from "@/api/dj/djScheduleResult";
 
 export default {
   components: { infoForm },
@@ -44,6 +44,8 @@ export default {
       visible: false,
       isEdit: false,
       editType: null,
+      machines: [],
+      paddingList: [],
       form: {
         scheduleDate: moment().add(1, "days").format("yyyy-MM-DD"),
       },
@@ -55,14 +57,14 @@ export default {
             trigger: "blur",
           },
         ],
-        liningCode: [
+        paddingCode: [
           {
             required: true,
             message: this.$t("common.rule.input"),
             trigger: "blur",
           },
         ],
-        machineId: [
+        machineCode: [
           {
             required: true,
             message: this.$t("common.rule.select"),
@@ -73,9 +75,6 @@ export default {
     };
   },
   computed: {
-    ...mapState({
-      machines: (state) => state.insideLiner.machines,
-    }),
     title: function () {
       return this.$t("ui.data.column.djScheduleResult.modalName");
     },
@@ -90,58 +89,77 @@ export default {
         },
         {
           label: this.$t("ui.data.column.dj.scheduleResult.paddingCode"),
-          prop: "liningCode",
+          prop: "paddingCode",
           span: 24,
-          maxlength: "20",
-          listeners: {
-            blur: this.toUpperCase,
-          },
+          type: "select",
+          dictData: this.paddingList,
+          filterable: true,
         },
         {
           label: this.$t("ui.data.column.dj.scheduleResult.machineCode"),
-          prop: "machineId",
+          prop: "machineCode",
           span: 24,
           type: "select",
           dictData: this.machines,
-          labelKey: "machineName",
-          valueKey: "id",
+          props: {
+            label: "machineName",
+            value: "id",
+          },
         },
+        // ============ 夜班计划量 ============
         {
           label: this.$t("ui.data.column.scheduleResult.nightPlanQty"),
-          prop: "dayPlanQty",
-          span: 24,
+          prop: "class2PlanQty",
+          span: 12,
+        },
+        {
+          label: this.$t("ui.data.column.dj.scheduleResult.sequence"),
+          prop: "class2Sequence",
+          span: 12,
         },
         {
           label: this.$t("ui.data.column.scheduleResult.nightHandAnalysis"),
-          prop: "dayHandAnalysis",
+          prop: "class2Analysis",
           span: 24,
           maxlength: "100",
         },
+        // ============ 早班计划量 ============
         {
           label: this.$t("ui.data.column.scheduleResult.dayPlanQty"),
-          prop: "nightPlanQty",
-          span: 24,
+          prop: "class3PlanQty",
+          span: 12,
+        },
+        {
+          label: this.$t("ui.data.column.dj.scheduleResult.sequence"),
+          prop: "class3Sequence",
+          span: 12,
         },
         {
           label: this.$t("ui.data.column.scheduleResult.dayHandAnalysis"),
-          prop: "nightHandAnalysis",
+          prop: "class3Analysis",
           span: 24,
           maxlength: "100",
         },
+        // ============ 中班计划量 ============
         {
-          label: this.$t("中班计划量"),
-          prop: "nightPlanQty",
-          span: 24,
+          label: this.$t("ui.data.column.scheduleResult.midPlanQty"),
+          prop: "class1PlanQty",
+          span: 12,
         },
         {
-          label: this.$t("中班手动输入原因分析"),
-          prop: "nightHandAnalysis",
+          label: this.$t("ui.data.column.dj.scheduleResult.sequence"),
+          prop: "class1Sequence",
+          span: 12,
+        },
+        {
+          label: this.$t("ui.data.column.scheduleResult.midHandAnalysis"),
+          prop: "class1Analysis",
           span: 24,
           maxlength: "100",
         },
         {
           label: this.$t("ui.common.column.remark"),
-          prop: "class1PlanQty",
+          prop: "remark",
           span: 24,
           type: "textarea",
         },
@@ -191,8 +209,20 @@ export default {
     },
 
     //utils
+    loadMachines() {
+      listMachine().then((res) => {
+        this.machines = res.rows || [];
+      });
+    },
+    loadPaddingList() {
+      getPaddingDistList().then((res) => {
+        this.paddingList = res.data || [];
+      });
+    },
     show(data, editType) {
       this.visible = true;
+      this.loadMachines();
+      this.loadPaddingList();
       if (data) {
         this.isEdit = true;
         this.form = {
@@ -220,15 +250,28 @@ export default {
 
     handleConfirm() {
       this.$refs.form.triggerConfirm((params) => {
+        // 自定义校验：至少一个班有录入计划量
+        const shifts = [
+          { qtyProp: "class2PlanQty", seqProp: "class2Sequence", label: this.$t("ui.data.column.scheduleResult.nightPlanQty") },
+          { qtyProp: "class3PlanQty", seqProp: "class3Sequence", label: this.$t("ui.data.column.scheduleResult.dayPlanQty") },
+          { qtyProp: "class1PlanQty", seqProp: "class1Sequence", label: this.$t("ui.data.column.scheduleResult.midPlanQty") },
+        ];
+
+        const hasQty = shifts.filter((s) => params[s.qtyProp] != null && params[s.qtyProp] !== "");
+        if (hasQty.length === 0) {
+          this.$modal.msgWarning(this.$t("ui.dj.schedule.validate.atLeastOneShiftQty"));
+          return;
+        }
+
+        for (const s of hasQty) {
+          if (!params[s.seqProp] || params[s.seqProp] === "") {
+            this.$modal.msgWarning(this.$t("ui.dj.schedule.validate.seqRequired", { shift: s.label }));
+            return;
+          }
+        }
+
         this.save(params);
       });
-      // this.$refs.form.validate((valid) => {
-      //   if (valid) {
-      //     this.save({
-      //       ...this.form,
-      //     });
-      //   }
-      // });
     },
   },
 };

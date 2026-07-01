@@ -2,7 +2,9 @@ package com.zlt.aps.dj.controller;
 
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 import javax.annotation.Resource;
@@ -34,11 +36,13 @@ import com.zlt.aps.common.engine.service.FactoryService;
 import com.zlt.aps.dj.api.domain.entity.DjDayFinishQty;
 import com.zlt.aps.dj.api.domain.entity.DjDispatcherLog;
 import com.zlt.aps.dj.api.domain.entity.DjScheduleResult;
+import com.zlt.aps.dj.engine.mapper.DjEngineConstructionInfoMapper;
 import com.zlt.aps.dj.engine.service.DjEngineNewService;
 import com.zlt.aps.dj.service.DjMachineInfoService;
 import com.zlt.aps.dj.service.DjScheduleResultService;
 import com.zlt.aps.dj.service.IDjScheduleAdjustService;
 import com.zlt.aps.itf.vo.SyncDataLogs;
+import com.zlt.aps.mdm.api.domain.entity.MdmConstructionInfo;
 import com.zlt.bill.common.controller.AbstractBillBizController;
 import com.zlt.bill.common.service.IBillService;
 import com.zlt.common.utils.StringUtil;
@@ -70,6 +74,8 @@ public class DjScheduleResultController extends AbstractBillBizController<DjSche
 	private ISyncDataLogsApiService syncDataLogsService;
     @Autowired
     private IDjScheduleAdjustService iDjScheduleAdjustService;
+    @Resource
+    private DjEngineConstructionInfoMapper djEngineConstructionInfoMapper;
 	
 
     @ApiOperation("按条件分页查询")
@@ -615,6 +621,28 @@ public class DjScheduleResultController extends AbstractBillBizController<DjSche
         headers.add(I18nUtil.getMessage(currentWorkClass.getClassName()) + nextDayStr);
 
         return AjaxResult.success(headers);
+    }
+
+    /**
+     * 获取垫胶下拉列表（去重，按垫胶名称排序）
+     */
+    @GetMapping("/getPaddingDistList")
+    @ApiOperation("获取垫胶下拉列表")
+    public AjaxResult getPaddingDistList() {
+        QueryWrapper<MdmConstructionInfo> wrapper = new QueryWrapper<>();
+        wrapper.select("DISTINCT PADDING_CODE, PADDING_NAME")
+                .isNotNull("PADDING_CODE")
+                .orderByAsc("PADDING_NAME");
+        List<MdmConstructionInfo> list = djEngineConstructionInfoMapper.selectList(wrapper);
+
+        List<Map<String, String>> result = new ArrayList<>();
+        for (MdmConstructionInfo item : list) {
+            Map<String, String> map = new HashMap<>();
+            map.put("value", item.getPaddingCode());
+            map.put("label", item.getPaddingName());
+            result.add(map);
+        }
+        return AjaxResult.success(result);
     }
 
     @Override

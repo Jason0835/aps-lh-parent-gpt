@@ -107,6 +107,16 @@ public class CxScheduleDetailUIController {
     }
 
     /**
+     * 导出成型顺位数据
+     */
+    @ApiOperation("导出成型顺位数据")
+    @PostMapping("/export")
+    @ResponseBody
+    public byte[] exportDetail(@RequestBody ScheduleDetailQueryVo query) {
+        return iCxScheduleDetailService.exportDetail(query);
+    }
+
+    /**
      * 根据ID获取详细信息
      */
     @ApiOperation("获取详细信息")
