@@ -1,5 +1,6 @@
 package com.zlt.aps.controller.cx;
 
+import com.ruoyi.common.core.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.cx.entity.schedule.CxScheduleDetail;
@@ -9,6 +10,7 @@ import com.zlt.aps.cx.vo.ScheduleUpdateDetailPlanQtyVo;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.io.IOUtils;
 import org.apache.shiro.authz.annotation.RequiresPermissions;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -16,6 +18,9 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.ModelMap;
 import org.springframework.web.bind.annotation.*;
 
+import javax.servlet.http.HttpServletResponse;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -103,8 +108,16 @@ public class CxScheduleDetailUIController {
     @ApiOperation("导出成型顺位数据")
     @GetMapping("/export")
     @ResponseBody
-    public byte[] exportDetail(ScheduleDetailQueryVo query) {
-        return iCxScheduleDetailService.exportDetail(query);
+    public void exportDetail(HttpServletResponse response, ScheduleDetailQueryVo query) throws IOException {
+        LocalDate scheduleDate = query.getScheduleDate() != null ? query.getScheduleDate() : LocalDate.now();
+        String fileName = I18nUtil.getMessage("ui.cx.cxScheduleDetail.exportFileName")
+                + cn.hutool.core.date.DateUtil.format(
+                cn.hutool.core.date.DateUtil.date(scheduleDate), "yyyyMMdd");
+        byte[] excelBytes = iCxScheduleDetailService.exportDetail(query);
+        ByteArrayInputStream in = new ByteArrayInputStream(excelBytes);
+        ExcelUtil.setResponseHeader(response, fileName, ".xlsx");
+        IOUtils.copy(in, response.getOutputStream());
+        response.flushBuffer();
     }
 
     /**
