@@ -38,8 +38,9 @@ export function editParams(data) {
 // 删除垫胶参数信息
 export function removeParams(ids) {
   return request({
-    url: '/dj/params/' + ids,
-    method: 'delete'
+    url: '/dj/params/remove',
+    method: 'post',
+    params: { ids: ids instanceof Array ? ids.join(',') : ids }
   })
 }
 

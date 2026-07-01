@@ -2,6 +2,7 @@ package com.zlt.aps.dj.engine.model;
 
 import com.zlt.aps.dj.api.domain.entity.DjMachineInfo;
 import com.zlt.aps.dj.api.domain.entity.DjMachineMaintenance;
+import com.zlt.aps.dj.api.domain.entity.DjParams;
 import com.zlt.aps.mdm.api.domain.entity.MdmWorkCalendar;
 import lombok.Data;
 
@@ -58,8 +59,8 @@ public class DjScheduleContext {
     /** 胶料组顺序 Map<glueGroupCode, orderNum> */
     private Map<String, Integer> glueGroupOrderMap;
 
-    /** 排产参数 Map<paramCode, paramValue> */
-    private Map<String, String> paramsMap;
+    /** 排产参数 Map<paramCode, DjParams> */
+    private Map<String, DjParams> paramsMap;
 
     /** 机台维修计划 Map<machineCode, List<DjMachineMaintenance>> */
     private Map<String, List<DjMachineMaintenance>> maintenanceMap;

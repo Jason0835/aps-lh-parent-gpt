@@ -7,35 +7,6 @@ import java.math.BigDecimal;
  */
 public class DjEngineConstants {
 
-    // ==================== 排产参数默认值 ====================
-
-    /** 卷曲标准长度（米/卷），当 DjCurlRoll 未配置时使用 */
-    public static final BigDecimal DEFAULT_CURL_LENGTH = new BigDecimal("84");
-
-    /** 工装（台车）总数 */
-    public static final int DEFAULT_TOOL_TOTAL_NUM = 10;
-
-    /** 整车率，取值范围 0~1 */
-    public static final BigDecimal DEFAULT_TROLLEY_FULL_RATE = new BigDecimal("0.8");
-
-    /** 成型机台数与排产深度映射，格式 "机台数1:班数1,机台数2:班数2" */
-    public static final String DEFAULT_CX_MACHINE_DEPTH_MAP = "1:4";
-
-    /** 全局默认损耗率 */
-    public static final BigDecimal DEFAULT_LOSS_RATE = BigDecimal.ZERO;
-
-    /** 切换口型时长（小时） */
-    public static final BigDecimal DEFAULT_MOUTH_PLATE_SWITCH_TIME = new BigDecimal("0.5");
-
-    /** 停产天数阈值（天） */
-    public static final int DEFAULT_SHUTDOWN_DAYS_THRESHOLD = 2;
-
-    /** 安全水位线（个班次） */
-    public static final int DEFAULT_SAFETY_STOCK_LEVEL = 2;
-
-    /** 切换胶料时长（小时） */
-    public static final BigDecimal DEFAULT_GLUE_SWITCH_TIME = BigDecimal.ONE;
-
     // ==================== 参数编码常量（对应 DjParams.PARAM_CODE） ====================
     // 编码规则：SYS + 工序号(14) + 分组号(01) + 3位流水号
     /** SYS1401001 卷曲标准长度 */
@@ -44,8 +15,6 @@ public class DjEngineConstants {
     public static final String PARAM_TOOL_TOTAL_NUM = "SYS1401002";
     /** SYS1401003 整车率 */
     public static final String PARAM_TROLLEY_FULL_RATE = "SYS1401003";
-    /** SYS1401004 成型机台数与排产深度映射 */
-    public static final String PARAM_CX_MACHINE_DEPTH_MAP = "SYS1401004";
     /** SYS1401005 安全水位线 */
     public static final String PARAM_SAFETY_STOCK_LEVEL = "SYS1401005";
     /** SYS1401006 停产天数阈值 */
@@ -58,12 +27,9 @@ public class DjEngineConstants {
     public static final String PARAM_GLUE_SWITCH_TIME = "SYS1401009";
     /** SYS1401010 排产触发阈值（个班次），当前库存可覆盖的成型班次数 ≤ 此值时触发排产 */
     public static final String PARAM_SCHEDULE_THRESHOLD = "SYS1401010";
-    /** 默认排产触发阈值 */
-    public static final int DEFAULT_SCHEDULE_THRESHOLD = 1;
+    
     /** SYS1401011 排程首班班次（ClassNumThreePlanEnums.classIndex），如 "03"=中班、"01"=夜班、"02"=早班 */
     public static final String PARAM_SCHEDULE_START_SHIFT = "SYS1401011";
-    /** 默认排程首班班次：中班 */
-    public static final String DEFAULT_SCHEDULE_START_SHIFT = "03";
 
     // ==================== 班次常量 ====================
 
@@ -127,13 +93,13 @@ public class DjEngineConstants {
     public static final String RELEASE_STATUS_UNPUBLISHED = "0";
 
     /** 数据来源：自动排程 */
-    public static final String DATA_SOURCE_AUTO = "1";
+    public static final String DATA_SOURCE_AUTO = "0";
 
     /** 数据来源： 插单*/
-    public static final String DATA_SOURCE_INSERT = "2";
+    public static final String DATA_SOURCE_INSERT = "1";
 
     /** 数据来源： 导入*/
-    public static final String DATA_SOURCE_IMPORT = "3";
+    public static final String DATA_SOURCE_IMPORT = "2";
 
     // ==================== 动态字段名格式模板 ====================
 
