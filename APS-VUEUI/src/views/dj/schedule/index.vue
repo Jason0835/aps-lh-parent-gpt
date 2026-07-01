@@ -821,7 +821,7 @@ export default {
         this.$set(this.page, "current", 1);
       }
       this.getList();
-      getWorkClass({ scheduleDate: this.query.scheduleDate }).then((res) => {
+      getWorkClass({ scheduleDate: this.getEffectiveScheduleDate() }).then((res) => {
         this.classHeaders = res;
       });
     },
@@ -829,7 +829,7 @@ export default {
       this.query = data;
       // this.$set(this.page, "current", 1);
       this.getList();
-      getWorkClass({ scheduleDate: this.query.scheduleDate }).then((res) => {
+      getWorkClass({ scheduleDate: this.getEffectiveScheduleDate() }).then((res) => {
         this.classHeaders = res;
       });
     },
@@ -885,6 +885,10 @@ export default {
     },
 
     // utils
+    /** 获取有效排程日期：查询条件为空时默认 T-1 */
+    getEffectiveScheduleDate() {
+      return this.query.scheduleDate || moment().add(1, "days").format("YYYY-MM-DD");
+    },
     updateTableHeaderTitle() {
       //  TODO 更新表头标题
     },
@@ -930,6 +934,11 @@ export default {
         ...this.query,
         ...this.sort,
       };
+
+      // 排程日期为空时默认 T-1
+      if (!params.scheduleDate) {
+        params.scheduleDate = this.getEffectiveScheduleDate();
+      }
 
       if (params.createTime && params.createTime[0]) {
         params.createTimeStart = params.createTime[0];
@@ -999,13 +1008,13 @@ export default {
     });
 
     //获取班次表头
-    getWorkClass({ scheduleDate: this.query.scheduleDate }).then((res) => {
+    getWorkClass({ scheduleDate: this.getEffectiveScheduleDate() }).then((res) => {
       this.classHeaders = res;
     });
   },
   activated() {
     this.getList();
-    getWorkClass({ scheduleDate: this.query.scheduleDate }).then((res) => {
+    getWorkClass({ scheduleDate: this.getEffectiveScheduleDate() }).then((res) => {
       this.classHeaders = res;
     });
   },

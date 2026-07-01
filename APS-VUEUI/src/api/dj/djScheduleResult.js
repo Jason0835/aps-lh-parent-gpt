@@ -237,3 +237,10 @@ export function getWorkClass(query) {
     params: query
   })
 }
+
+export function getPaddingDistList() {
+  return request({
+   url: `dj/djScheduleResult/getPaddingDistList`,
+    method: 'get'
+  })
+}

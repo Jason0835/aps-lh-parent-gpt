@@ -194,4 +194,11 @@ public interface IDjScheduleResultRemoteService {
     @GetMapping("/djScheduleResult/getWorkClass")
     @ApiOperation("获取连续6个班次的表头")
     public AjaxResult getWorkClass(@RequestParam(value = "scheduleDate", required = false) String scheduleDate);
+
+    /**
+     * 获取垫胶下拉列表
+     */
+    @GetMapping("/djScheduleResult/getPaddingDistList")
+    @ApiOperation("获取垫胶下拉列表")
+    AjaxResult getPaddingDistList();
 }
