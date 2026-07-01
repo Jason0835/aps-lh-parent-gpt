@@ -23,6 +23,8 @@ public class Cd90MachineTrialRequest {
     private String cordSpec;
     /** 当前层位直裁宽度，来自施工表TIRE_FABRIC_CRAFT1/2/3 */
     private BigDecimal craftWidth;
+    /** 单片胎体长度，单位毫米/片，来自施工表TIRE_FABRIC_LENGTH1/2/3。 */
+    private BigDecimal unitConsumeMillimeter;
     /** 本规格采用的标准卷曲长度，单位米；标准表缺失时由CRIMP_LENGTH兜底 */
     private BigDecimal curlLength;
     /** 班次代码 */
