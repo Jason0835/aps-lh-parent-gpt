@@ -143,13 +143,14 @@ public class DefaultSkuPriorityStrategy implements ISkuPriorityStrategy {
 
     /**
      * 构建结构优先级后的尾部比较器。
+     * 分：高优先级、中优先级、周期储备、常规储备、特殊情况(开产模式下雪地胎、不同英寸、特殊材料)
      *
      * @param context 排程上下文
      * @return 尾部比较器
      */
     private Comparator<SkuScheduleDTO> buildTailComparator(LhScheduleContext context) {
         return Comparator
-                // 顺序4：供应链优先按四类待排量逐级比较。20260701+ 中优先级量比周期量优先
+                // 顺序4：供应链优先按四类待排量逐级比较。20260701+ 高优先级量->中优先级量->周期排产量->常规储备排产量->特殊情况
                 .comparingInt((SkuScheduleDTO s) -> -s.getHighPriorityPendingQty())
                 .thenComparingInt((SkuScheduleDTO s) -> -s.getMidPriorityPendingQty())
                 .thenComparingInt((SkuScheduleDTO s) -> -s.getCycleProductionPendingQty())
