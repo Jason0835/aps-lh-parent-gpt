@@ -101,8 +101,6 @@ export default {
         },
         { label: this.$t("ui.data.column.cxScheduleResult.cxMachineCode"), prop: "cxMachineCode", align: "center" },
         { label: this.$t("ui.data.column.cxScheduleResult.lhMachineCode"), prop: "lhMachineCode", align: "center", minWidth: 180, },
-        { label: this.$t("ui.data.column.scheduleResult.materialCode"), prop: "materialCode", minWidth: 130, align: "center" },
-        { label: this.$t("ui.data.column.scheduleResult.materialDesc"), prop: "materialDesc", minWidth: 300 },
         { label: this.$t("ui.data.column.scheduleResult.embryoDesc"), prop: "mainMaterialDesc", minWidth: 320 },
         {
           label: this.$t("ui.data.column.cxScheduleResult.tripNo"),

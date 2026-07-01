@@ -531,7 +531,8 @@ public class ShiftScheduleService {
         if (lhCapacityMap != null && task.getMaterialCode() != null) {
             MonthPlanProductLhCapacityVo capacityVo = lhCapacityMap.get(task.getMaterialCode());
             if (capacityVo != null) {
-                dailyLhCapacity = capacityVo.getDefaultDayVulcanizationQty();
+                // 按日硫化量计算模式（DAY_VULCANIZATION_MODE）取值，与计划量计算口径保持一致
+                dailyLhCapacity = capacityVo.getDayVulcanizationQty();
             }
         }
 
@@ -1090,7 +1091,8 @@ public class ShiftScheduleService {
         if (lhCapacityMap != null && materialCode != null) {
             MonthPlanProductLhCapacityVo capacityVo = lhCapacityMap.get(materialCode);
             if (capacityVo != null) {
-                dailyLhCapacity = capacityVo.getDefaultDayVulcanizationQty();
+                // 按日硫化量计算模式（DAY_VULCANIZATION_MODE）取值，与计划量计算口径保持一致
+                dailyLhCapacity = capacityVo.getDayVulcanizationQty();
             }
         }
 

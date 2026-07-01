@@ -443,6 +443,9 @@ public class ScheduleContextVo {
      */
     private Integer stockHoursWarningThreshold;
 
+    /** 子表车次合并数（默认1车一条，配置N则N车合并一条） */
+    private Integer detailTripGroupSize;
+
     /** 单日试制+量试SKU上限（按胎胚编码计，默认2） */
     private Integer maxTrialSkuPerDay;
 
