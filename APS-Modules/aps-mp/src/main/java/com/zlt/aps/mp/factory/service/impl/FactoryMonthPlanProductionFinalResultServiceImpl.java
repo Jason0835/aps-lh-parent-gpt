@@ -256,6 +256,7 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
             entity.setMonth(value.get(0).getMonth());
             entity.setRequireVersion(requireVersion);
             entity.setProductTypeCode(value.get(0).getProductTypeCode());
+            entity.setStockCapTureDate(maxDate);
             if (materialInfoMap.containsKey(value.get(0).getMaterialCode())) {
                 entity.setBrand(materialInfoMap.get(value.get(0).getMaterialCode()).getBrand());
             }
