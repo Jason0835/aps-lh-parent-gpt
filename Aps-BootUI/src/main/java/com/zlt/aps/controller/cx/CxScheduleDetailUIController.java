@@ -101,9 +101,9 @@ public class CxScheduleDetailUIController {
      * 注意：路径必须放在 /{detailId} 之前，否则 export 会被当作 detailId 参数导致 NumberFormatException
      */
     @ApiOperation("导出成型顺位数据")
-    @PostMapping("/export")
+    @GetMapping("/export")
     @ResponseBody
-    public byte[] exportDetail(@RequestBody ScheduleDetailQueryVo query) {
+    public byte[] exportDetail(ScheduleDetailQueryVo query) {
         return iCxScheduleDetailService.exportDetail(query);
     }
 
