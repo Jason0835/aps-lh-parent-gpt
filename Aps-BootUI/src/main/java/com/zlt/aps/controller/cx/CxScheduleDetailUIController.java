@@ -97,6 +97,17 @@ public class CxScheduleDetailUIController {
     }
 
     /**
+     * 导出成型顺位数据
+     * 注意：路径必须放在 /{detailId} 之前，否则 export 会被当作 detailId 参数导致 NumberFormatException
+     */
+    @ApiOperation("导出成型顺位数据")
+    @PostMapping("/export")
+    @ResponseBody
+    public byte[] exportDetail(@RequestBody ScheduleDetailQueryVo query) {
+        return iCxScheduleDetailService.exportDetail(query);
+    }
+
+    /**
      * 批量修改明细计划量（同步更新主表）
      */
     @ApiOperation("批量修改明细计划量")
@@ -104,16 +115,6 @@ public class CxScheduleDetailUIController {
     @ResponseBody
     public AjaxResult updatePlanQty(@RequestBody List<ScheduleUpdateDetailPlanQtyVo> voList) {
         return iCxScheduleDetailService.updatePlanQty(voList);
-    }
-
-    /**
-     * 导出成型顺位数据
-     */
-    @ApiOperation("导出成型顺位数据")
-    @PostMapping("/export")
-    @ResponseBody
-    public byte[] exportDetail(@RequestBody ScheduleDetailQueryVo query) {
-        return iCxScheduleDetailService.exportDetail(query);
     }
 
     /**
