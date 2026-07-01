@@ -685,4 +685,14 @@ public class DjScheduleResultUIController extends BaseController<DjScheduleResul
     public AjaxResult getWorkClass(String scheduleDate) {
         return iDjScheduleResultService.getWorkClass(scheduleDate);
     }
+
+    /**
+     * 获取垫胶下拉列表
+     */
+    @ApiOperation("获取垫胶下拉列表")
+    @GetMapping("/getPaddingDistList")
+    @ResponseBody
+    public AjaxResult getPaddingDistList() {
+        return iDjScheduleResultService.getPaddingDistList();
+    }
 }
