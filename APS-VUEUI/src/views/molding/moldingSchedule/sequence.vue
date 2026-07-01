@@ -18,7 +18,6 @@
       :selectArea="false"
       :row-style="rowStyle"
       :cell-style="cellStyle"
-      :span-method="spanMethod"
     >
       <template slot="header">
         <!-- <el-button
@@ -92,31 +91,23 @@ export default {
       const end = start + this.page.pageSize;
       return this.data.slice(start, end);
     },
-    // 按成型机台+胎胚描述分组，计算每行在合并后的 rowspan
-    groupSpanArr() {
-      const data = this.pagedData;
-      const spanArr = [];
-      for (let i = 0; i < data.length; i++) {
-        if (i === 0) {
-          spanArr.push(1);
-        } else if (this.getGroupKey(data[i]) === this.getGroupKey(data[i - 1])) {
-          spanArr.push(0);
-        } else {
-          spanArr.push(1);
+    // 当前页内每个分组（成型机台+胎胚描述）对应的交替背景色索引
+    // 颜色足够区分相邻分组即可，使用浅色系不影响阅读
+    groupColorMap() {
+      // 相邻分组交替两种浅色
+      const colors = ["#F5F7FA", "#FFF7E6"];
+      const map = new Map();
+      let colorIndex = 0;
+      let lastKey = null;
+      for (let i = 0; i < this.pagedData.length; i++) {
+        const key = this.getGroupKey(this.pagedData[i]);
+        if (key !== lastKey) {
+          colorIndex = colorIndex === 0 ? 1 : 0;
+          lastKey = key;
         }
+        map.set(i, colors[colorIndex]);
       }
-      // 将每组首行的 rowspan 设置为该组的行数
-      for (let i = 0; i < spanArr.length; i++) {
-        if (spanArr[i] === 0) {
-          continue;
-        }
-        let count = 1;
-        for (let j = i + 1; j < spanArr.length && spanArr[j] === 0; j++) {
-          count++;
-        }
-        spanArr[i] = count;
-      }
-      return spanArr;
+      return map;
     },
     columns() {
       const fixedColumns = [
@@ -395,25 +386,22 @@ export default {
       if (row.dataSource == "1") return { "background-color": "#BFE0F7" };
       return {};
     },
-    cellStyle({ row, column }) {
+    cellStyle({ row, column, rowIndex }) {
       if (column.property === "cxMachineCode" && row.changeCxMachine == 1) {
         return { background: "#ef6776" };
+      }
+      // 成型机台与胎胚描述列按分组（成型机台+胎胚描述）显示交替背景色，用于直观区分组
+      if (column.property === "cxMachineCode" || column.property === "mainMaterialDesc") {
+        const bg = this.groupColorMap.get(rowIndex);
+        if (bg) {
+          return { background: bg };
+        }
       }
       return {};
     },
     // 分组键：成型机台+胎胚描述
     getGroupKey(row) {
       return `${row.cxMachineCode || ""}_${row.mainMaterialDesc || ""}`;
-    },
-    // 合并相同成型机台+胎胚描述的连续行
-    spanMethod({ column, rowIndex }) {
-      if (column.property === "cxMachineCode" || column.property === "mainMaterialDesc") {
-        const span = this.groupSpanArr[rowIndex] || 1;
-        return {
-          rowspan: span,
-          colspan: span > 0 ? 1 : 0,
-        };
-      }
     },
     formatParams(hasPage = false) {
       const params = {
@@ -446,17 +434,39 @@ export default {
           ? res
           : res?.rows || res?.data?.rows || res?.data || [];
         this.data = Array.isArray(rows) ? rows : [];
-        // 按成型机台+胎胚描述分组排序，同组内按车次号排序，确保合并单元格正确
-        this.data.sort((a, b) => {
-          const keyA = this.getGroupKey(a);
-          const keyB = this.getGroupKey(b);
-          if (keyA !== keyB) {
-            return keyA < keyB ? -1 : 1;
+        // 数据回填：后端返回数据中只有"主行"有 cxMachineCode/mainMaterialDesc，同组明细行这两个字段为空
+        // 按原始顺序遍历，把上一组有值的成型机台和胎胚描述回填到本组所有空行
+        let lastMachineCode = null;
+        let lastMaterialDesc = null;
+        for (let i = 0; i < this.data.length; i++) {
+          const row = this.data[i];
+          const currentMachine = row.cxMachineCode && row.cxMachineCode.trim() ? row.cxMachineCode.trim() : null;
+          const currentMaterial = row.mainMaterialDesc && row.mainMaterialDesc.trim() ? row.mainMaterialDesc.trim() : null;
+          if (currentMachine) {
+            lastMachineCode = currentMachine;
+          } else if (lastMachineCode) {
+            row.cxMachineCode = lastMachineCode;
           }
-          const tripA = Number(a.tripNo) || 0;
-          const tripB = Number(b.tripNo) || 0;
-          return tripA - tripB;
-        });
+          if (currentMaterial) {
+            lastMaterialDesc = currentMaterial;
+          } else if (lastMaterialDesc) {
+            row.mainMaterialDesc = lastMaterialDesc;
+          }
+        }
+        // 默认按成型机台+胎胚描述分组排序，同组内按车次号排序，确保分组相邻展示；
+        // 若用户点击列排序，则使用后端返回的顺序
+        if (!this.sort || !this.sort.orderByColumn) {
+          this.data.sort((a, b) => {
+            const keyA = this.getGroupKey(a);
+            const keyB = this.getGroupKey(b);
+            if (keyA !== keyB) {
+              return keyA < keyB ? -1 : 1;
+            }
+            const tripA = Number(a.tripNo) || 0;
+            const tripB = Number(b.tripNo) || 0;
+            return tripA - tripB;
+          });
+        }
         this.page.total = this.data.length;
         this.originEditMap = {};
         this.data.forEach((row) => {
