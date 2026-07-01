@@ -7,7 +7,6 @@ import cn.hutool.core.bean.BeanUtil;
 import com.zlt.aps.lh.api.constant.LhScheduleConstant;
 import com.zlt.aps.lh.api.constant.LhScheduleParamConstant;
 import com.zlt.aps.lh.api.domain.dto.MachineCleaningWindowDTO;
-import com.zlt.aps.lh.api.enums.CleaningTypeEnum;
 import com.zlt.aps.lh.api.domain.dto.MachineMaintenanceWindowDTO;
 import com.zlt.aps.lh.api.domain.dto.MachineScheduleDTO;
 import com.zlt.aps.lh.api.domain.dto.ShiftProductionControlDTO;
@@ -118,8 +117,6 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
             "共用胎胚且硫化余量为0";
     private static final String SMALL_ENDING_SURPLUS_UNSCHEDULED_REASON =
             SmallEndingSurplusSkipRule.UNSCHEDULED_REASON;
-    private static final String NEW_SPEC_SAND_BLAST_MOULD_CHANGE_ANALYSIS = "喷砂清洗+换模";
-    private static final String NEW_SPEC_DRY_ICE_MOULD_CHANGE_ANALYSIS = "干冰清洗+换模";
     private static final String NEW_SPEC_CLEANING_ANALYSIS = "模具清洗+换模";
     private static final int NEW_SPEC_CHANGEOVER_PROBE_LIMIT = 16;
     private static final Set<String> EMPTY_STRING_SET = Collections.emptySet();
@@ -390,7 +387,8 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
             // 续作、换活字块未消费完的 SKU 在此继续参与 S4.5，不因来源不同提前拦截。
             boolean isEnding = endingJudgmentStrategy.isCurrentWindowEnding(context, sku);
             Integer latestPreviousFinishedQty = resolveLatestPreviousFinishedQty(context, sku.getMaterialCode());
-            if (shouldSkipHistoryShortageOnlyRecentlyProducedSku(context, sku,
+            if (!getTargetScheduleQtyResolver().isEmbryoStockEnding(context, sku)
+                    && shouldSkipHistoryShortageOnlyRecentlyProducedSku(context, sku,
                     latestPreviousFinishedQty)) {
                 int historyShortageQty = Math.max(0, sku.getMonthlyHistoryShortageQty());
                 addUnscheduledResult(context, sku, historyShortageQty,
@@ -419,14 +417,17 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                  */
                 isEnding = false;
             }
-            if (handleSmallEndingSurplusSkipIfNecessary(context, iterator, sku,
-                    smallEndingSurplusRuleEnding, unscheduledReasonCountMap)) {
+            // 成型胎胚库存收尾优先于SKU收尾判断，直接按胎胚库存严格控量。
+            boolean embryoStockEndingTargetApplied = getTargetScheduleQtyResolver()
+                    .applyEmbryoStockEndingTargetQtyIfNecessary(context, sku, "新增排产");
+            if (!embryoStockEndingTargetApplied
+                    && handleSmallEndingSurplusSkipIfNecessary(context, iterator, sku, smallEndingSurplusRuleEnding, unscheduledReasonCountMap)) {
                 progressed = true;
                 continue;
             }
             // 收尾SKU在排产前上调目标量（考虑胎胚库存），非收尾SKU保持按余量计算的目标量
             boolean sharedEmbryoZeroSurplusEnding = false;
-            if (isEnding) {
+            if (isEnding && !embryoStockEndingTargetApplied) {
                 sharedEmbryoZeroSurplusEnding = getTargetScheduleQtyResolver()
                         .isSharedEmbryoZeroSurplusEnding(context, sku);
                 getTargetScheduleQtyResolver().upsizeEndingTargetQty(context, sku);
@@ -437,6 +438,11 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                 }
             }
             ProductionQuantityPolicy quantityPolicy = ProductionQuantityPolicy.from(sku, isEnding);
+            if (embryoStockEndingTargetApplied) {
+                quantityPolicy.setAllowFillStartedShift(false);
+                quantityPolicy.setStrictUpperLimit(true);
+                quantityPolicy.setFullRunForNonTailMachine(false);
+            }
             sku.setStrictTargetQty(quantityPolicy.isStrictUpperLimit());
             log.info("新增SKU开始排产, materialCode: {}, 结构: {}, 规格: {}, 月计划量: {}, 目标量: {}, "
                             + "day1/day2/day3窗口量: {}, 余量: {}, 胎胚库存: {}, 是否收尾: {}, "
@@ -7952,8 +7958,8 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                 }
             }
 
-            int shiftQty = ShiftCapacityResolverUtil.normalizeAllocatedShiftQty(
-                    Math.min(remaining, shiftMaxQty), shiftMaxQty, mouldQty);
+            int shiftQty = getTargetScheduleQtyResolver().resolveAllocatedShiftQty(
+                    context, sku, Math.min(remaining, shiftMaxQty), shiftMaxQty, mouldQty);
             if (shiftQty > 0) {
                 Date shiftPlanEndTime = ShiftCapacityResolverUtil.resolveShiftPlanEndTime(
                         context.getDevicePlanShutList(),
