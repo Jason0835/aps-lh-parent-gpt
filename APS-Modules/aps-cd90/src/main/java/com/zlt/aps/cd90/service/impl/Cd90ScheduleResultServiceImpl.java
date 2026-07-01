@@ -12,18 +12,22 @@ import com.zlt.aps.cd90.model.Cd90ScheduleOverwriteDecision;
 import com.zlt.aps.cd90.service.Cd90AutoScheduleAsyncExecutor;
 import com.zlt.aps.cd90.service.Cd90ScheduleOverwriteValidator;
 import com.zlt.aps.cd90.service.ICd90ScheduleResultService;
+import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.sysdef.domain.SysDocType;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 @Service
 @Transactional(rollbackFor = Exception.class)
@@ -129,5 +133,49 @@ public class Cd90ScheduleResultServiceImpl extends AbstractDocService<Cd90Schedu
             result.add(item);
         }
         return result;
+    }
+
+    @Override
+    public List<Cd90ScheduleResult> selectByDateAndFactory(Date scheduleDate, String factoryCode) {
+        if (scheduleDate == null || factoryCode == null || factoryCode.isEmpty()) {
+            return new ArrayList<>();
+        }
+        LambdaQueryWrapper<Cd90ScheduleResult> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(Cd90ScheduleResult::getScheduleDate, scheduleDate)
+                .eq(Cd90ScheduleResult::getFactoryCode, factoryCode);
+        return cd90ScheduleResultMapper.selectList(wrapper);
+    }
+
+    @Override
+    public List<Cd90ScheduleResult> getCd90ScheduleResultListByIds(List<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return new ArrayList<>();
+        }
+        LambdaQueryWrapper<Cd90ScheduleResult> wrapper = new LambdaQueryWrapper<>();
+        wrapper.in(Cd90ScheduleResult::getId, ids);
+        return cd90ScheduleResultMapper.selectList(wrapper);
+    }
+
+    /**
+     * 批量更新发布状态。REQUIRES_NEW 独立短事务：
+     * 即便外层 MES 调用 try 块抛异常，失败状态回写也能独立提交，避免状态丢失。
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class, propagation = Propagation.REQUIRES_NEW)
+    public int batchUpdateReleaseStatus(List<Cd90ScheduleResult> list, String targetStatus) {
+        if (list == null || list.isEmpty()) {
+            return 0;
+        }
+        Date now = new Date();
+        for (Cd90ScheduleResult entity : list) {
+            entity.setIsRelease(targetStatus);
+            if (ApsConstant.IS_RELEASE.equals(targetStatus)) {
+                entity.setPublishSuccessCount(
+                        Optional.ofNullable(entity.getPublishSuccessCount()).orElse(0) + 1);
+                entity.setNewestPublishTime(now);
+            }
+        }
+        this.baseDao.updateBatch(list);
+        return list.size();
     }
 }
