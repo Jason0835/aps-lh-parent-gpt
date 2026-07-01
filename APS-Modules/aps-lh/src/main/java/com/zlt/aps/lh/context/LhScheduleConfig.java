@@ -213,6 +213,11 @@ public class LhScheduleConfig {
                 LhScheduleConstant.FIRST_INSPECTION_QTY));
     }
 
+    public int getClassTotalQtyUpLimit() {
+        return Math.max(0, getParamIntValue(LhScheduleParamConstant.CLASS_TOTAL_QTY_UP_LIMIT,
+                LhScheduleConstant.CLASS_TOTAL_QTY_UP_LIMIT));
+    }
+
     public int getEndingDetectDays() {
         return getParamIntValue(LhScheduleParamConstant.ENDING_DETECT_DAYS, LhScheduleConstant.DEFAULT_ENDING_DAYS);
     }

@@ -5,6 +5,7 @@ import com.zlt.aps.cx.entity.CxStock;
 import com.zlt.aps.lh.api.constant.LhScheduleConstant;
 import com.zlt.aps.lh.api.constant.LhScheduleParamConstant;
 import com.zlt.aps.lh.api.domain.entity.LhDayFinishQty;
+import com.zlt.aps.maindata.mapper.MpMouldDeliveryPlanEntityMapper;
 import com.zlt.aps.mdm.api.domain.entity.LhMachineInfo;
 import com.zlt.aps.lh.api.domain.entity.LhMachineOnlineInfo;
 import com.zlt.aps.lh.api.domain.entity.LhMouldChangePlan;
@@ -64,6 +65,7 @@ import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import com.zlt.aps.mp.api.domain.entity.MdmCapsuleChuck;
 import com.zlt.aps.mp.api.domain.entity.MpFactoryProductionVersion;
 import com.zlt.aps.mp.api.domain.entity.MpMonthPlanStatistics;
+import com.zlt.aps.mp.api.domain.entity.MpMouldDeliveryPlan;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
@@ -76,6 +78,7 @@ import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.stream.Collectors;
 import java.util.Collections;
 import java.util.Date;
@@ -144,6 +147,9 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
 
     @Resource
     private MdmSkuMouldRelMapper skuMouldRelMapper;
+
+    @Resource
+    private MpMouldDeliveryPlanEntityMapper mouldDeliveryPlanEntityMapper;
 
     @Resource
     private MdmModelInfoMapper mdmModelInfoMapper;
@@ -1423,11 +1429,38 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
                         .in(MdmSkuMouldRel::getMaterialCode, materialCodeSet)
                         .eq(MdmSkuMouldRel::getIsDelete, DeleteFlagEnum.NORMAL.getCode()));
         Map<String, List<MdmSkuMouldRel>> skuMouldRelMap = new HashMap<>(64);
+        Set<String> mouldCodeSet = new HashSet<>(64);
         if (skuMouldRelList != null) {
             for (MdmSkuMouldRel rel : skuMouldRelList) {
                 if (rel.getMaterialCode() != null && materialCodeSet.contains(rel.getMaterialCode())) {
                     skuMouldRelMap.computeIfAbsent(rel.getMaterialCode(), k -> new ArrayList<MdmSkuMouldRel>())
                             .add(rel);
+                    mouldCodeSet.add(rel.getMouldCode());
+                }
+            }
+        }
+
+        //加载模具到货计划 到 SKU与模具关系表 sandy+20260701
+        List<MpMouldDeliveryPlan> mouldDeliveryPlanList = mouldDeliveryPlanEntityMapper.selectList(
+                new LambdaQueryWrapper<MpMouldDeliveryPlan>()
+                        .eq(MpMouldDeliveryPlan::getFactoryCode, factoryCode)
+                        .le(MpMouldDeliveryPlan::getBoardingDate, context.getWindowEndDate())
+                        .in(MpMouldDeliveryPlan::getMaterialCode, materialCodeSet)
+                        .eq(MpMouldDeliveryPlan::getIsDelete, DeleteFlagEnum.NORMAL.getCode()));
+        if (mouldDeliveryPlanList != null) {
+            MdmSkuMouldRel skuMouldRel1;
+            for (MpMouldDeliveryPlan mouldDelivery : mouldDeliveryPlanList) {
+                if (mouldDelivery.getMaterialCode() != null && materialCodeSet.contains(mouldDelivery.getMaterialCode()) &&
+                        !mouldCodeSet.contains(mouldDelivery.getMouldCode())) {
+                    skuMouldRel1 = new MdmSkuMouldRel();
+                    skuMouldRel1.setFactoryCode(mouldDelivery.getMouldCode());
+                    skuMouldRel1.setMouldCode(mouldDelivery.getMouldCode());
+                    skuMouldRel1.setMaterialCode(mouldDelivery.getMaterialCode());
+                    skuMouldRel1.setMaterialDesc(mouldDelivery.getMaterialDesc());
+                    skuMouldRel1.setMainPattern(mouldDelivery.getMainPattern());
+                    skuMouldRel1.setBoardingDate(mouldDelivery.getBoardingDate());
+                    skuMouldRelMap.computeIfAbsent(mouldDelivery.getMaterialCode(), k -> new ArrayList<MdmSkuMouldRel>())
+                            .add(skuMouldRel1);
                 }
             }
         }

@@ -85,6 +85,11 @@ public class LhScheduleContext {
      * 与仅用于业务保存/查询的 {@link #scheduleTargetDate}（T+1）分离。
      */
     private Date windowEndDate;
+
+    /**
+     * 当前排程日期，滚动变化
+     */
+    private Date currentScheduleDate;
     /** 批次号 */
     private String batchNo;
     /** 月计划需求版本 */
