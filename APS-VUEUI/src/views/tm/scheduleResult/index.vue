@@ -19,18 +19,12 @@
     >
       <template slot="header">
         <el-button
-          type="primary"
-          plain
+          type="warning"
           v-hasPermi="['tm:tmScheduleResult:autoPlan']"
           @click="handleAutoPlan"
         >{{ $t("ui.data.column.scheduleResult.autoPlan") }}</el-button>
         <el-button
-          plain
-          @click="handleBoardRefresh"
-        >{{ $t("ui.frame.btn.refresh") }}</el-button>
-        <el-button
-          type="primary"
-          plain
+          type="warning"
           v-hasPermi="['tm:tmScheduleResult:edit']"
           @click="handleAdd"
         >{{ $t("ui.data.column.scheduleResult.insertOrder") }}</el-button>
@@ -41,6 +35,7 @@
           @click="handleDeleteAll"
         >{{ $t("ui.frame.btn.delete") }}</el-button>
         <el-button
+          type="primary"
           v-hasPermi="['tm:tmScheduleResult:import']"
           @click="$refs.tltUpload.handleImport()"
         >{{ $t("ui.frame.btn.import") }}</el-button>
@@ -57,12 +52,13 @@
           @click="handleChangeQty"
         >{{ $t("ui.data.column.scheduleResult.changePlan") }}</el-button>
         <el-button
-          type="success"
+          type="primary"
           :disabled="selection.length === 0"
           v-hasPermi="['tm:tmScheduleResult:publish']"
           @click="handlePublish"
         >{{ $t("ui.data.column.scheduleResult.publish") }}</el-button>
         <el-button
+          type="primary"
           @click="handleExport"
           v-hasPermi="['tm:tmScheduleResult:export']"
         >{{ $t("ui.frame.btn.export") }}</el-button>
@@ -77,6 +73,7 @@
       labelWidth="0"
       :columns="importColumns"
     ></tlt-upload-form>
+    <autoPlanDialog ref="autoPlanRef" @success="handleAutoPlanSuccess" />
     <infoDialog ref="infoRef" @success="getList" />
     <changeMachineDialog ref="changeMachineRef" @success="getList" />
   </basic-container>
@@ -84,16 +81,10 @@
 <script>
 import {mapState} from "vuex";
 import {downloadLink} from "@/utils/request";
-import {
-  autoPlan,
-  listScheduleShiftDates,
-  listTmScheduleResult,
-  publishScheduleResult,
-  publishValidate,
-  removeTmScheduleResult,
-} from "@/api/tm/scheduleResult";
+import {listScheduleShiftDates, listTmScheduleResult, publishScheduleResult, publishValidate, removeTmScheduleResult,} from "@/api/tm/scheduleResult";
 import tltUpload from "@/components/tltUpload/tltUpload.vue";
 import TltUploadForm from "@/views/components/tltUploadForm.vue";
+import autoPlanDialog from "./components/autoPlanDialog.vue";
 import infoDialog from "./components/infoDialog.vue";
 import changeMachineDialog from "./components/changeMachineDialog.vue";
 
@@ -114,6 +105,7 @@ export default {
   name: "TmScheduleResult",
   components: {
     tltUpload,
+    autoPlanDialog,
     infoDialog,
     TltUploadForm,
     changeMachineDialog,
@@ -491,32 +483,25 @@ export default {
         this.$refs.infoRef.show();
       }
     },
-    // 自动排程入口：先校验旧批次，全部未发布时由用户确认后再覆盖。
+    // 自动排程入口：打开弹窗选择工厂和排程日期，具体接口由弹窗调用胎面接口。
     handleAutoPlan() {
-      const params = this.buildAutoPlanParams();
-      validateAutoPlan(params).then((validateResult) => {
-        const result = validateResult.data || {};
-        if (result.confirmRequired) {
-          this.$confirm(result.message, {
-            type: "warning",
-          }).then(() => {
-            this.doAutoPlan({
-              ...params,
-              confirmOverwrite: true,
-            });
-          });
-          return;
-        }
-        this.doAutoPlan(params);
-      });
+      if (this.$refs.autoPlanRef) {
+        this.$refs.autoPlanRef.show(
+          this.query.factoryCode || this.search.factoryCode,
+          this.query.scheduleDateQuery || this.search.scheduleDateQuery
+        );
+      }
     },
-    // 执行自动排程请求。
-    doAutoPlan(params) {
-      autoPlan(params).then((data) => {
-        const message = data.data && data.data.message ? data.data.message : data.msg;
-        this.$modal.msgSuccess(message);
-        this.getList();
-      });
+    // 自动排程成功后同步查询日期并刷新列表。
+    handleAutoPlanSuccess(scheduleDate) {
+      if (scheduleDate) {
+        this.$set(this.query, "scheduleDateQuery", scheduleDate);
+        this.search = {
+          ...this.search,
+          scheduleDateQuery: scheduleDate
+        };
+      }
+      this.getList();
     },
     // 转机台弹窗
     handleChangeMachine() {
@@ -610,17 +595,6 @@ export default {
     },
     handleExport() {
       downloadLink("/tm/tmScheduleResult/export", this.formatParams(false));
-    },
-
-    buildAutoPlanParams() {
-      const scheduleDate = Array.isArray(this.query.scheduleDate)
-        ? this.query.scheduleDate[0]
-        : this.query.scheduleDate;
-      return {
-        factoryCode: this.query.factoryCode || this.search.factoryCode,
-        scheduleDate,
-        dataSource: "AUTO",
-      };
     },
 
     formatParams(hasPage = true) {
