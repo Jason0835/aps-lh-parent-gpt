@@ -16,7 +16,7 @@ public class TmGlueMachineReal extends BaseEntity {
 
     private static final long serialVersionUID = 1L;
 
-    @Excel(name = "ui.data.column.tm.glueMachineReal.factoryCode")
+    @Excel(name = "ui.data.column.tm.glueMachineReal.factoryCode", dictType = "biz_factory_name")
     @ImportValidated(required = true, isCode = true, maxLength = 50)
     @ApiModelProperty(value = "工厂编号", name = "factoryCode")
     @TableField(value = "FACTORY_CODE")
