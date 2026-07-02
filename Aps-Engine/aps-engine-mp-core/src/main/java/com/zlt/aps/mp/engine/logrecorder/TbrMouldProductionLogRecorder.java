@@ -137,6 +137,29 @@ public class TbrMouldProductionLogRecorder {
     }
 
     /**
+     * 增加 查找衔接续作Sku排产物料信息
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 在[%s~%s]时间段内获取%s 物料 %s====
+     *
+     * @param context              排程上下文
+     * @param productionStage      排产阶段
+     * @param groupName            分组名-结构
+     * @param continueType         排产类型
+     * @param selectedMaterialDesc 选择的Sku信息
+     * @param closingDay           收尾时间点
+     * @param endDay               结构收尾点
+     * @return
+     */
+    public static String addFindContinueSkuInfo(Context context, ProductionStageEnum productionStage, String groupName, String selectedMaterialDesc, ContinueTypeEnum continueType, Integer closingDay, Integer endDay) {
+        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s %s 在[%s~%s]时间段内获取%s 物料 %s====",
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
+                groupName, productionStage.getStageDesc(), closingDay, endDay, continueType.getDesc(),
+                selectedMaterialDesc);
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.CONTINUE_SKU_PRODUCTION, logContent);
+        return logContent;
+    }
+
+    /**
      * 增加 在机结构续作Sku 同规格同花纹/同模具日志信息记录
      * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 在产机台: %s %s 没有找到可排产计划====
      *

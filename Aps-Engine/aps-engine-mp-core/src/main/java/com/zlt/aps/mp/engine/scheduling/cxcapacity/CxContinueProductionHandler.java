@@ -14,7 +14,6 @@ import com.zlt.aps.mp.engine.domain.dto.EarliestConclusionLhGroupHelper;
 import com.zlt.aps.mp.engine.domain.dto.LhProductionQtyHelper;
 import com.zlt.aps.mp.engine.domain.dto.ProductionPlanGroupInfo;
 import com.zlt.aps.mp.engine.domain.vo.ContinueSkuNextSkuInfo;
-import com.zlt.aps.mp.engine.domain.vo.MonthPlanProductMouldInfoVo;
 import com.zlt.aps.mp.engine.domain.vo.MonthPlanProductionRequirePlanVo;
 import com.zlt.aps.mp.engine.domain.vo.ProductionMouldInfoVo;
 import com.zlt.aps.mp.engine.enums.ContinueTypeEnum;
@@ -277,6 +276,7 @@ public class CxContinueProductionHandler {
             //todo 记录日志
             return null;
         }
+        TbrMouldProductionLogRecorder.addFindContinueSkuInfo(productionContext, productionStage, groupName, selectedMaterialDesc, continueType, startDay, endDay);
         //选择模具
         List<ProductionMouldInfoVo> selectedMouldList = SkuMouldSelector.selectedDoubleMouldByRange(productionContext, selectedMaterialDesc, startDay, endDay);
         if (CollectionUtils.isEmpty(selectedMouldList)) {
@@ -303,6 +303,8 @@ public class CxContinueProductionHandler {
         TbrMouldProductionLogRecorder.addContinueGroupContinueMachineCorrectLhGroupRangeLog(productionContext, groupName, onLineMachineInfo, newStartDay, endDay, beforeSku);
         if (null == newStartDay || null == endDay || !startDay.equals(newStartDay)) {
             excludeSkuSet.add(selectedMaterialDesc);
+            //20260702+ 还原初始的排产范围，不能按修正后的时间范围
+            lhGroup.updateProductionDateRange(startDay, endDay);
             return getNextSku(productionContext, lhGroup, productionPlanInfo, productionStage, continueType, matchList, excludeSkuSet);
         }
         BeforeSkuProductionInfo lhBeforeSkuInfo = ConclusionLhMachineHandler.findChangeTypeBlockBeforeSkuByAddSku(productionContext, addSkuInfo, productionPlanInfo, startDay);

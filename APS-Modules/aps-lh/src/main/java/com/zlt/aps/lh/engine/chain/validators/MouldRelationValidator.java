@@ -69,6 +69,9 @@ public class MouldRelationValidator implements IDataValidator {
                 if (StringUtils.isEmpty(mouldCode)) {
                     continue;
                 }
+                if (Objects.nonNull(mouldRel.getBoardingDate())) {
+                    continue;
+                }
                 MdmModelInfo modelInfo = modelInfoMap.get(mouldCode);
                 if (Objects.isNull(modelInfo)) {
                     missingModelInfoMouldCodeSet.add(mouldCode);
