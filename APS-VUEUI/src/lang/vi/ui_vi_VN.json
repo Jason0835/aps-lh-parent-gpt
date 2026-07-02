@@ -856,6 +856,7 @@
   "ui.tq.machineMaintenancePlan.column.downtimeShift": "Ca dừng máy",
   "ui.tq.machineMaintenancePlan.column.downtimeHours": "Thời gian dừng máy (Giờ)",
   "ui.tq.machineMaintenancePlan.column.machineName": "Tên máy",
+  "ui.tq.machineMaintenancePlan.column.machineCode": "Mã máy",
   "ui.tq.machineMaintenancePlan.column.updateDate": "Ngày cập nhật",
   "ui.tq.machineMaintenancePlan.column.modalName": "Kế hoạch bảo trì máy vòng lốp",
   "ui.tq.machineMaintenancePlan.confirm.export": "Xác nhận xuất tất cả thông tin kế hoạch bảo trì máy?",

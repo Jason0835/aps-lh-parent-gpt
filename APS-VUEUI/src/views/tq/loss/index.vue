@@ -89,7 +89,7 @@ export default {
           prop: "beadCode",
         },
         {
-          label: this.$t("ui.data.column.loss.line"),
+          label: this.$t("ui.data.column.loss.machineCode"),
           prop: "machineCode",
           type: "select",
           dictData: this.machineList,
@@ -110,10 +110,10 @@ export default {
           minWidth: 120,
         },
         {
-          prop: "machineName",
+          prop: "machineCode",
           align: "center",
           halign: "center",
-          label: this.$t("ui.data.column.loss.line"),
+          label: this.$t("ui.data.column.loss.machineCode"),
           minWidth: 120,
         },
         {
@@ -123,7 +123,7 @@ export default {
           label: this.$t("ui.data.column.loss.lossRate"),
           minWidth: 100,
           formatter: (row) => {
-            return row.lossRate != null ? row.lossRate + "%" : "-";
+            return row.lossRate != null ? (row.lossRate * 100).toFixed(2) + "%" : "-";
           },
         },
         {

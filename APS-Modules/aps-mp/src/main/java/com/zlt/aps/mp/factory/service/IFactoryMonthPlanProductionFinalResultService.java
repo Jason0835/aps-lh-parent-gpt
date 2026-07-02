@@ -148,9 +148,11 @@ public interface IFactoryMonthPlanProductionFinalResultService extends IDocServi
 
     /**
      * 定时计算上月超欠产（每月1号凌晨3点触发）
-     * 根据上月计划排产量和上月硫化日完成量(合格品)计算超欠产，
+     * 新公式：上月超欠产 = 定稿需求版本对应的月计划月底余量 - (库存抓取日 ~ 月底)的硫化日完成量
+     * 月底余量(PLAN_SURPLUS_QTY)、库存抓取日(STOCK_CAPTURE_DATE) 取自 T_MDM_MONTH_SURPLUS，
+     * 按需求版本号(MONTH_PLAN_VERSION=REQUIRE_VERSION) 匹配；
      * 并按阈值参数(SYS0206009)判定上月超欠产有效标志：
-     * |超欠产值|(绝对值) > 阈值 → 否('0')，否则 → 是('1')
+     * |超欠产值|(绝对值) > 阈值 → 否('0')，否则 → 是('1')；无月底余量记录 → 否('0')
      *
      * @return 计算结果
      */
@@ -158,7 +160,7 @@ public interface IFactoryMonthPlanProductionFinalResultService extends IDocServi
 
     /**
      * 计算当月超欠产写入下月（月末倒数2天触发）
-     * 用当月数据写入下月月计划的"上月超欠产"栏位
+     * 用当月数据写入下月月计划的"上月超欠产"栏位，公式同 {@link #calcLastMonthOverProd()}
      *
      * @return 计算结果
      */

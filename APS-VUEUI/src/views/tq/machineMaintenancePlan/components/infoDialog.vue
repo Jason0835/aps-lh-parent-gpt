@@ -88,7 +88,7 @@ export default {
           valueFormat: "yyyy-MM-dd",
         },
         {
-          label: this.$t("ui.tq.machineMaintenancePlan.column.machineName"),
+          label: this.$t("ui.tq.machineMaintenancePlan.column.machineCode"),
           prop: "machineCode",
           span: 24,
           required: true,

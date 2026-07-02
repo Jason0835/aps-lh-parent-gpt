@@ -172,13 +172,21 @@
     </select>
 
     <!-- 计算上月超欠产并回填到当月定稿表
-         逻辑：
-         1. 从上月定稿表取计划量(TOTAL_QTY)，从硫化日完成量表取上月完成量
-         2. 超欠产 = 上月完成量 - 上月计划量
-         3. 按分厂+物料编码匹配，回填到当月定稿记录的LAST_MONTH_OVERDUE_QTY
-         4. 有效标志判定：|超欠产值|(绝对值) > 阈值参数(overdueThresholdParamCode) → 否('0')，
-            否则(绝对值 <= 阈值或上月无定稿数据) → 是('1')；
-            上月无定稿数据(calc.OVERDUE_QTY IS NULL)时有效标志置否('0')
+         新公式：
+           上月超欠产 = 定稿需求版本对应的月计划月底余量 - (库存抓取日 ~ 月底)的硫化日完成量
+         数据来源：
+           1. 月计划月底余量(PLAN_SURPLUS_QTY)、库存抓取日(STOCK_CAPTURE_DATE)：
+              取自 T_MDM_MONTH_SURPLUS（当月生产余量同步页面），按
+              (分厂+物料+年+月+需求版本号 MONTH_PLAN_VERSION=REQUIRE_VERSION) 匹配；
+              业务保证 (FACTORY_CODE, MATERIAL_CODE, YEAR, MONTH, REQUIRE_VERSION) 唯一
+           2. 已完成量：取自 T_LH_DAY_FINISH_QTY，日期范围 = IFNULL(STOCK_CAPTURE_DATE, 月初) ~ 月底
+         性能优化（两段式）：
+           - 第一段：派生表 fin 按 (分厂+物料+完成日期) 预聚合硫化日完成量，全月范围只扫描一次
+           - 第二段：派生表 calc 内部 LEFT JOIN fin 后，按行用 STOCK_CAPTURE_DATE 过滤日期再 SUM
+         回填规则：
+           - 按分厂+物料编码匹配，回填到写入目标月定稿记录
+           - 无月底余量记录(PLAN_SURPLUS_QTY IS NULL) → LAST_MONTH_OVERDUE_QTY=NULL，LAST_MONTH_VALID_FLAG='0'
+           - 有效标志判定：|超欠产值|(绝对值) > 阈值参数(overdueThresholdParamCode) → '0'(否)，否则 → '1'(是)
     -->
     <update id="updateLastMonthOverProd">
         UPDATE T_MP_MONTH_PLAN_PROD_FINAL f
@@ -186,27 +194,47 @@
             SELECT
                 f5.FACTORY_CODE,
                 f5.MATERIAL_CODE,
-                IFNULL(f5.TOTAL_QTY, 0) - IFNULL(fin.FINISH_QTY, 0) AS OVERDUE_QTY
+                surplus.PLAN_SURPLUS_QTY AS PLAN_SURPLUS_QTY,
+                IFNULL(SUM(fin.DAY_QTY), 0) AS FINISH_QTY
             FROM T_MP_MONTH_PLAN_PROD_FINAL f5
+            LEFT JOIN T_MDM_MONTH_SURPLUS surplus
+                ON surplus.FACTORY_CODE = f5.FACTORY_CODE
+               AND surplus.MATERIAL_CODE = f5.MATERIAL_CODE
+               AND surplus.YEAR = f5.YEAR
+               AND surplus.MONTH = f5.MONTH
+               AND surplus.REQUIRE_VERSION = f5.MONTH_PLAN_VERSION
+               AND surplus.IS_DELETE = 0
             LEFT JOIN (
-                SELECT FACTORY_CODE, MATERIAL_CODE, IFNULL(SUM(DAY_FINISH_QTY), 0) AS FINISH_QTY
+                SELECT
+                    FACTORY_CODE,
+                    MATERIAL_CODE,
+                    FINISH_DATE,
+                    IFNULL(SUM(DAY_FINISH_QTY), 0) AS DAY_QTY
                 FROM T_LH_DAY_FINISH_QTY
-                WHERE FINISH_DATE BETWEEN #{startDate} AND #{endDate}
-                  AND IS_DELETE = 0
-                GROUP BY FACTORY_CODE, MATERIAL_CODE
-            ) fin ON f5.FACTORY_CODE = fin.FACTORY_CODE AND f5.MATERIAL_CODE = fin.MATERIAL_CODE
+                WHERE IS_DELETE = 0
+                  AND FINISH_DATE BETWEEN #{startDate} AND #{endDate}
+                GROUP BY FACTORY_CODE, MATERIAL_CODE, FINISH_DATE
+            ) fin ON fin.FACTORY_CODE = f5.FACTORY_CODE
+                  AND fin.MATERIAL_CODE = f5.MATERIAL_CODE
+                  AND fin.FINISH_DATE &gt;= IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})
+                  AND fin.FINISH_DATE &lt;= #{endDate}
             WHERE f5.IS_DELETE = 0
               AND f5.YEAR = #{lastYear}
               AND f5.MONTH = #{lastMonth}
+            GROUP BY f5.FACTORY_CODE, f5.MATERIAL_CODE, surplus.PLAN_SURPLUS_QTY
         ) calc ON f.FACTORY_CODE = calc.FACTORY_CODE AND f.MATERIAL_CODE = calc.MATERIAL_CODE
         LEFT JOIN T_MP_FACTORY_PARAM fp ON fp.FACTORY_CODE = f.FACTORY_CODE
             AND fp.PRODUCT_TYPE_CODE = f.PRODUCT_TYPE_CODE
             AND fp.PARAM_CODE = #{overdueThresholdParamCode}
             AND fp.IS_DELETE = 0
-        SET f.LAST_MONTH_OVERDUE_QTY = calc.OVERDUE_QTY,
+        SET f.LAST_MONTH_OVERDUE_QTY = CASE
+                WHEN calc.PLAN_SURPLUS_QTY IS NULL THEN NULL
+                ELSE IFNULL(calc.PLAN_SURPLUS_QTY, 0) - IFNULL(calc.FINISH_QTY, 0)
+            END,
             f.LAST_MONTH_VALID_FLAG = CASE
-                WHEN calc.OVERDUE_QTY IS NULL THEN '0'
-                WHEN ABS(calc.OVERDUE_QTY) &gt; IFNULL(CAST(IFNULL(fp.PARAM_VALUE, fp.DEFAULE_VALUE) AS SIGNED), 0) THEN '0'
+                WHEN calc.PLAN_SURPLUS_QTY IS NULL THEN '0'
+                WHEN ABS(IFNULL(calc.PLAN_SURPLUS_QTY, 0) - IFNULL(calc.FINISH_QTY, 0))
+                     &gt; IFNULL(CAST(IFNULL(fp.PARAM_VALUE, fp.DEFAULE_VALUE) AS SIGNED), 0) THEN '0'
                 ELSE '1'
             END,
             f.UPDATE_TIME = NOW()
@@ -215,4 +243,67 @@
           AND f.MONTH = #{currentMonth}
     </update>
 
+    <!-- 定稿时补更新上月定稿记录的上月超欠产有效标识（只更新标识，不更新值）
+         计算逻辑同 updateLastMonthOverProd，仅 SET 子句移除 LAST_MONTH_OVERDUE_QTY：
+         1. 月计划月底余量(PLAN_SURPLUS_QTY)、库存抓取日(STOCK_CAPTURE_DATE)：
+            取自 T_MDM_MONTH_SURPLUS，按 (分厂+物料+年+月+需求版本号 MONTH_PLAN_VERSION=REQUIRE_VERSION) 匹配
+         2. 已完成量：取自 T_LH_DAY_FINISH_QTY，日期范围 = IFNULL(STOCK_CAPTURE_DATE, 月初) ~ 月底
+         3. 超欠产 = 月底余量 - 完成量（仅用于标识判定，不写回值字段）
+         4. 按分厂+物料编码匹配，回填到写入目标月定稿记录的 LAST_MONTH_VALID_FLAG
+         5. 有效标志判定：|超欠产值|(绝对值) > 阈值参数(overdueThresholdParamCode) → '0'(否)，
+            否则 → '1'(是)；无月底余量记录(PLAN_SURPLUS_QTY IS NULL) → '0'(否)
+         场景：次月定稿时（如6.25定稿7月），数据来源月=写入目标月=上月（6月），
+         用6月数据补更新6月定稿记录的标识，覆盖月初定时任务（6.1用5月数据）写入的旧标识。
+         性能优化（两段式）：派生表 fin 按 (分厂+物料+完成日期) 预聚合，外层按 STOCK_CAPTURE_DATE 过滤后 SUM
+    -->
+    <update id="updateLastMonthOverProdFlag">
+        UPDATE T_MP_MONTH_PLAN_PROD_FINAL f
+        LEFT JOIN (
+            SELECT
+                f5.FACTORY_CODE,
+                f5.MATERIAL_CODE,
+                surplus.PLAN_SURPLUS_QTY AS PLAN_SURPLUS_QTY,
+                IFNULL(SUM(fin.DAY_QTY), 0) AS FINISH_QTY
+            FROM T_MP_MONTH_PLAN_PROD_FINAL f5
+            LEFT JOIN T_MDM_MONTH_SURPLUS surplus
+                ON surplus.FACTORY_CODE = f5.FACTORY_CODE
+               AND surplus.MATERIAL_CODE = f5.MATERIAL_CODE
+               AND surplus.YEAR = f5.YEAR
+               AND surplus.MONTH = f5.MONTH
+               AND surplus.REQUIRE_VERSION = f5.MONTH_PLAN_VERSION
+               AND surplus.IS_DELETE = 0
+            LEFT JOIN (
+                SELECT
+                    FACTORY_CODE,
+                    MATERIAL_CODE,
+                    FINISH_DATE,
+                    IFNULL(SUM(DAY_FINISH_QTY), 0) AS DAY_QTY
+                FROM T_LH_DAY_FINISH_QTY
+                WHERE IS_DELETE = 0
+                  AND FINISH_DATE BETWEEN #{startDate} AND #{endDate}
+                GROUP BY FACTORY_CODE, MATERIAL_CODE, FINISH_DATE
+            ) fin ON fin.FACTORY_CODE = f5.FACTORY_CODE
+                  AND fin.MATERIAL_CODE = f5.MATERIAL_CODE
+                  AND fin.FINISH_DATE &gt;= IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})
+                  AND fin.FINISH_DATE &lt;= #{endDate}
+            WHERE f5.IS_DELETE = 0
+              AND f5.YEAR = #{lastYear}
+              AND f5.MONTH = #{lastMonth}
+            GROUP BY f5.FACTORY_CODE, f5.MATERIAL_CODE, surplus.PLAN_SURPLUS_QTY
+        ) calc ON f.FACTORY_CODE = calc.FACTORY_CODE AND f.MATERIAL_CODE = calc.MATERIAL_CODE
+        LEFT JOIN T_MP_FACTORY_PARAM fp ON fp.FACTORY_CODE = f.FACTORY_CODE
+            AND fp.PRODUCT_TYPE_CODE = f.PRODUCT_TYPE_CODE
+            AND fp.PARAM_CODE = #{overdueThresholdParamCode}
+            AND fp.IS_DELETE = 0
+        SET f.LAST_MONTH_VALID_FLAG = CASE
+                WHEN calc.PLAN_SURPLUS_QTY IS NULL THEN '0'
+                WHEN ABS(IFNULL(calc.PLAN_SURPLUS_QTY, 0) - IFNULL(calc.FINISH_QTY, 0))
+                     &gt; IFNULL(CAST(IFNULL(fp.PARAM_VALUE, fp.DEFAULE_VALUE) AS SIGNED), 0) THEN '0'
+                ELSE '1'
+            END,
+            f.UPDATE_TIME = NOW()
+        WHERE f.IS_DELETE = 0
+          AND f.YEAR = #{currentYear}
+          AND f.MONTH = #{currentMonth}
+    </update>
 </mapper>

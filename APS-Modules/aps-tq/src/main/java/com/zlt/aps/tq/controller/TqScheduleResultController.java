@@ -260,10 +260,12 @@ public class TqScheduleResultController extends AbstractDocBizController<TqSched
     public List<TqScheduleShiftDateVO> listScheduleShiftDates(@RequestBody TqScheduleResult queryVO) {
         Date scheduleDate = queryVO.getScheduleDateQuery();
         if (scheduleDate == null) {
-            scheduleDate = DateUtil.offsetDay(new Date(), 2);
+            // 默认排程日期 = 今天 + 1（T+1），与前端默认值保持一致
+            scheduleDate = DateUtil.offsetDay(new Date(), 1);
         }
-        // D = 排程日期 - 2（即今天）
-        Date dDay = DateUtil.offsetDay(scheduleDate, -2);
+        // D = 排程日期 - 1（即今天）
+        // 胎圈1班=D日中班，胎圈2-4班=D+1日(夜/早/中)，胎圈5-6班=D+2日(夜/早)
+        Date dDay = DateUtil.offsetDay(scheduleDate, -1);
         Date dPlus1Day = DateUtil.offsetDay(dDay, 1);
         Date dPlus2Day = DateUtil.offsetDay(dDay, 2);
         String dDateStr = DateUtil.format(dDay, "MM/dd");
