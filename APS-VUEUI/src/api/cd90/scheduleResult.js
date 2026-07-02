@@ -15,6 +15,33 @@ export function autoScheduleResult(data) {
 export function getAutoScheduleTask(taskId) {
   return request({ url: `/cd90/cd90ScheduleResult/autoSchedule/task/${taskId}`, method: 'get' })
 }
+export function shiftDates(data) {
+  return request({
+    url: '/cd90/cd90ScheduleResult/shiftDates',
+    method: 'post',
+    headers: { 'Content-Type': 'application/json;charset=UTF-8' },
+    data
+  })
+}
+export function validateInsert(data) {
+  return request({
+    url: '/cd90/cd90ScheduleResult/validateInsert',
+    method: 'post',
+    headers: { 'Content-Type': 'application/json;charset=UTF-8' },
+    data
+  })
+}
+export function insertOrder(data) {
+  return request({
+    url: '/cd90/cd90ScheduleResult/insert',
+    method: 'post',
+    headers: { 'Content-Type': 'application/json;charset=UTF-8' },
+    data
+  })
+}
+export function getInsertTask(taskId) {
+  return request({ url: `/cd90/cd90ScheduleResult/insert/task/${taskId}`, method: 'get' })
+}
 export function publishScheduleResult(data) {
   return request({ url: '/cd90/cd90ScheduleResult/publish', method: 'post', data })
 }
