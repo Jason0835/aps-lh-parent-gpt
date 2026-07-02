@@ -98,13 +98,6 @@ export default {
             trigger: "change",
           },
         ],
-        stopShift: [
-          {
-            required: true,
-            message: this.$t("common.rule.select"),
-            trigger: "change",
-          },
-        ],
       },
     };
   },
@@ -181,7 +174,7 @@ export default {
           label: this.$t("ui.data.column.tm.machineMaintenance.stopShift"),
           span: 12,
           type: "select",
-          required: true,
+          disabled: true,
           dictData: this.parentDict.type.class_num_three_plan,
         },
         {

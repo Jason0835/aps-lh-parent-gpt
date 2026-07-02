@@ -52,6 +52,8 @@ public class TmMachineMaintenanceController extends AbstractDocBizController<TmM
         if (StringUtil.isBlank(billVO.getFactoryCode())) {
             billVO.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
         }
+        // 自动计算停机班次
+        billVO.setStopShift(tmMachineMaintenanceService.resolveStopShift(billVO.getStopStartTime()));
         return super.save(billVO);
     }
 

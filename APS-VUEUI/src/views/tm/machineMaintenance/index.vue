@@ -32,7 +32,7 @@
         >{{ $t("ui.frame.btn.delete") }}</el-button>
         <el-button
           v-hasPermi="['tm:tmMachineMaintenance:import']"
-          @click="$refs.tltUpload.handleImport()"
+          @click="$refs.tltUpload.handleImport({ updateSupport: false })"
         >{{ $t("ui.frame.btn.import") }}</el-button>
         <el-button
           @click="handleExport"
