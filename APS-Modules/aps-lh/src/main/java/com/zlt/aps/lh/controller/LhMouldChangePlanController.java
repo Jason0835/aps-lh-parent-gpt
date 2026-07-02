@@ -283,11 +283,12 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
             if (StringUtil.isBlank(lhMouldChangePlan.getFactoryCode())) {
                 lhMouldChangePlan.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
             }
-            if (YesOrNoEnum.YES.getValue().equals(lhMouldChangePlanVo.getIsReplaceBlock())) {
+
+            if (YesOrNoEnum.YES.getCode().equals(lhMouldChangePlanVo.getIsReplaceBlock())) {
                 lhMouldChangePlan.setChangeMouldType(MouldChangeTypeEnum.TYPE_BLOCK.getCode());
-            } else if (YesOrNoEnum.YES.getValue().equals(lhMouldChangePlanVo.getIsSandblastingClean())) {
+            } else if (YesOrNoEnum.YES.getCode().equals(lhMouldChangePlanVo.getIsSandblastingClean())) {
                 lhMouldChangePlan.setChangeMouldType(MouldChangeTypeEnum.SAND_BLAST.getCode());
-            } else if (YesOrNoEnum.YES.getValue().equals(lhMouldChangePlanVo.getIsDryIceClean())) {
+            } else if (YesOrNoEnum.YES.getCode().equals(lhMouldChangePlanVo.getIsDryIceClean())) {
                 lhMouldChangePlan.setChangeMouldType(MouldChangeTypeEnum.DRY_ICE.getCode());
             } else {
                 lhMouldChangePlan.setChangeMouldType(MouldChangeTypeEnum.REGULAR.getCode());
@@ -600,15 +601,20 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
 
             lhMouldChangePlanVo.setSeq(seq++);
 
+            // 如果换模类型是喷砂清洗或干冰清洗，前规格不导出
             String changeMouldType = lhMouldChangePlan.getChangeMouldType();
             if (MouldChangeTypeEnum.TYPE_BLOCK.getCode().equals(changeMouldType)) {
                 lhMouldChangePlanVo.setIsReplaceBlock(YesOrNoEnum.YES.getCode());
             }
             if (MouldChangeTypeEnum.SAND_BLAST.getCode().equals(changeMouldType)) {
                 lhMouldChangePlanVo.setIsSandblastingClean(YesOrNoEnum.YES.getCode());
+                lhMouldChangePlanVo.setBeforeMaterialCode("---");
+                lhMouldChangePlanVo.setBeforeMaterialDesc("---");
             }
             if (MouldChangeTypeEnum.DRY_ICE.getCode().equals(changeMouldType)) {
                 lhMouldChangePlanVo.setIsDryIceClean(YesOrNoEnum.YES.getCode());
+                lhMouldChangePlanVo.setBeforeMaterialCode("---");
+                lhMouldChangePlanVo.setBeforeMaterialDesc("---");
             }
             resultList.add(lhMouldChangePlanVo);
         }
