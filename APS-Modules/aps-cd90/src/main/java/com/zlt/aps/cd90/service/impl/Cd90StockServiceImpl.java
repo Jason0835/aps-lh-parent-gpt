@@ -15,6 +15,7 @@ import com.zlt.common.enums.ImportErrorTypeEnums;
 import com.zlt.common.utils.ImportExcelValidatedUtils;
 import com.zlt.common.utils.PubUtil;
 import com.zlt.sysdef.domain.SysDocType;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
@@ -23,10 +24,12 @@ import org.springframework.transaction.annotation.Transactional;
 import javax.annotation.Resource;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+@Slf4j
 @Service
 @Transactional(rollbackFor = Exception.class)
 public class Cd90StockServiceImpl extends AbstractDocService<Cd90Stock> implements ICd90StockService {
@@ -134,5 +137,26 @@ public class Cd90StockServiceImpl extends AbstractDocService<Cd90Stock> implemen
     @Override
     protected List<String> getCheckUniqueFields() {
         return Arrays.asList("factoryCode", "stockDate", "shiftCode", "materialCode");
+    }
+
+    @Override
+    public void logicDeleteAndSaveBatch(String factoryCode, String dataSource, Date stockDate, String shiftCode,
+                                        String updateBy, List<Cd90Stock> insertList) {
+        log.info("直裁库存同步-事务开始：逻辑删除分厂{}数据来源{}库存日期{}班次{}的旧数据，待插入数量={}",
+                factoryCode, dataSource, stockDate, shiftCode, CollectionUtils.size(insertList));
+        cd90StockMapper.logicDeleteByFactoryCodeAndDataSourceAndShiftCode(factoryCode, dataSource, stockDate, shiftCode, updateBy, new Date());
+        log.info("直裁库存同步-逻辑删除完成，开始批量插入");
+        if (CollectionUtils.isNotEmpty(insertList)) {
+            int batchSize = 1000;
+            for (int i = 0; i < insertList.size(); i += batchSize) {
+                int end = Math.min(i + batchSize, insertList.size());
+                List<Cd90Stock> subList = insertList.subList(i, end);
+                baseDao.saveBatch(subList);
+                log.info("直裁库存同步-插入批次：{}/{}, 本批数量={}", (i / batchSize + 1),
+                        (insertList.size() + batchSize - 1) / batchSize, subList.size());
+            }
+        }
+        log.info("直裁库存同步-事务完成：分厂{}，库存日期={}，班次={}，插入数量={}",
+                factoryCode, stockDate, shiftCode, CollectionUtils.size(insertList));
     }
 }

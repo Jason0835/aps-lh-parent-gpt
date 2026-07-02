@@ -44,4 +44,13 @@ public interface ICd90StockRemoteService {
     @ApiOperation("导入")
     @PostMapping("/cd90Stock/importData")
     AjaxResult importData(@RequestBody ImportContext importContext, @RequestParam("updateSupport") boolean updateSupport);
+
+    @ApiOperation("逻辑删除并批量保存直裁库存（MES同步专用，事务性操作）")
+    @PostMapping("/cd90Stock/logicDeleteAndSaveCd90StockByDataSource")
+    AjaxResult logicDeleteAndSaveCd90StockByDataSource(@RequestParam("factoryCode") String factoryCode,
+                                                       @RequestParam("dataSource") String dataSource,
+                                                       @RequestParam("stockDate") String stockDate,
+                                                       @RequestParam("shiftCode") String shiftCode,
+                                                       @RequestParam("updateBy") String updateBy,
+                                                       @RequestBody List<Cd90Stock> list);
 }
