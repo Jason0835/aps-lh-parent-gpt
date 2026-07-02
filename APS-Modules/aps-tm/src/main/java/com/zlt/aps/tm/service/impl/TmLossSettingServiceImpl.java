@@ -97,7 +97,7 @@ public class TmLossSettingServiceImpl extends AbstractDocService<TmLossSetting> 
             List<String> machineCodeList = (List<String>) serviceCheckParams.get("tmMachineCodeList");
             String machineCode = importDocEntity.getMachineCode();
             if (!machineCodeList.contains(machineCode)) {
-                String message = String.format(I18nUtil.getMessage("ui.data.alert.tm.machineCodeNotExist"), machineCode);
+                String message = I18nUtil.getMessage("ui.data.alert.tm.machineCodeNotExist");
                 ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(), errorRowNum, message, importErrorLogs);
                 return Boolean.FALSE;
             }
