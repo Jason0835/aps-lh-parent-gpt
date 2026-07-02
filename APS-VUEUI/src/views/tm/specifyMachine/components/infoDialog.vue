@@ -96,7 +96,6 @@ export default {
           span: 12,
           maxlength: 50,
           required: true,
-          disabled: this.isEdit,
         },
         {
           prop: "machineCode",
@@ -123,10 +122,7 @@ export default {
           label: this.$t("ui.data.column.tm.specifyMachine.jobType"),
           type: "select",
           span: 12,
-          options: [
-            { label: "定点", value: "SPECIFY" },
-            { label: "禁排", value: "FORBIDDEN" },
-          ],
+          dictData: this.parentDict.type.JOB_TYPE,
         },
         {
           prop: "priority",

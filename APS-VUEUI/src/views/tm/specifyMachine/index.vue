@@ -71,7 +71,7 @@ export default {
     infoDialog,
     TltUploadForm,
   },
-  dicts: ["biz_factory_name", "biz_yes_no"],
+  dicts: ["biz_factory_name", "biz_yes_no", "JOB_TYPE"],
   provide() {
     return {
       parentDict: this.dict,
@@ -139,6 +139,9 @@ export default {
           prop: "jobType",
           halign: "center",
           label: this.$t("ui.data.column.tm.specifyMachine.jobType"),
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(this.dict.type.JOB_TYPE, value);
+          },
         },
         {
           prop: "priority",
@@ -250,6 +253,7 @@ export default {
         {
           prop: "jobType",
           label: this.$t("ui.data.column.tm.specifyMachine.jobType"),
+          dictData: this.dict.type.JOB_TYPE,
         },
         {
           prop: "enableStatus",
