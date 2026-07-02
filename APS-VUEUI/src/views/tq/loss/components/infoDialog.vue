@@ -72,7 +72,7 @@ export default {
           maxlength: "20",
         },
         {
-          label: this.$t("ui.data.column.loss.line"),
+          label: this.$t("ui.data.column.loss.machineCode"),
           prop: "machineCode",
           span: 24,
           type: "select",
@@ -91,8 +91,9 @@ export default {
           span: 24,
           type: "number",
           min: 0,
-          max: 99.99,
+          max: 100,
           precision: 2,
+          append: "%",
         },
         {
           label: this.$t("ui.common.column.remark"),
@@ -114,6 +115,10 @@ export default {
       }
       try {
         this.loading = true;
+        // 将百分比转换为小数存储（如 2 → 0.02）
+        if (params.lossRate != null) {
+          params.lossRate = parseFloat((params.lossRate / 100).toFixed(4));
+        }
         const res = await saveLoss(params);
         this.$modal.msgSuccess(res.msg);
         this.$emit("success");
@@ -148,6 +153,7 @@ export default {
         this.isEdit = true;
         this.form = {
           ...data,
+          lossRate: data.lossRate != null ? parseFloat((data.lossRate * 100).toFixed(2)) : null,
         };
         if (data.machineCode && data.machineName) {
           this.machineList = [

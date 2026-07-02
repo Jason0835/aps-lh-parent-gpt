@@ -116,6 +116,17 @@ public class GsqMachineInfoController extends BaseController {
         return list;
     }
 
+    /**
+     * 获取所有启用的钢丝圈机台信息（status=0），供下拉框数据源使用
+     */
+    @ApiOperation("获取所有启用的钢丝圈机台信息")
+    @GetMapping("/listEnabledMachines")
+    public List<GsqMachineInfo> listEnabledMachines() {
+        GsqMachineInfo query = new GsqMachineInfo();
+        query.setStatus("0");
+        return machineInfoService.selectMachineInfoList(query);
+    }
+
     @Log(title = "ui.data.column.machine.info", businessType = BusinessType.IMPORT)
     @PostMapping("/importData")
     @ApiOperation("导入钢丝圈机台信息")

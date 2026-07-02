@@ -104,10 +104,10 @@ export default {
       return [
         { type: "selection", fixed: "left" },
         {
-          prop: "machineName",
+          prop: "machineCode",
           align: "center",
           halign: "center",
-          label: this.$t("ui.specifyMachine.column.machineName"),
+          label: this.$t("ui.tq.machineChuck.column.machineCode"),
           minWidth: 120,
         },
         {

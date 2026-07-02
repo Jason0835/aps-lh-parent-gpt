@@ -32,6 +32,17 @@ export function checkMachineCodeUnique(query) {
   })
 }
 
+/**
+ * 获取所有启用的钢丝圈机台信息（status=0），供下拉框数据源使用
+ * @returns
+ */
+export function listEnabledMachines() {
+  return request({
+    url: 'gsq/machine/listEnabledMachines',
+    method: 'get'
+  })
+}
+
 export function exportData(params) {
   return downloadLink("/gsq/machine/export", params);
 }

@@ -18,8 +18,12 @@ import org.springframework.stereotype.Component;
  * 3. calcOverProdOnLastDay()        — 每月最后一天凌晨3点（cron: 0 0 3 L * ?）
  *    用当月数据写入下月月计划的"上月超欠产"栏位
  *
+ * 公式：上月超欠产 = 定稿需求版本对应的月计划月底余量 - (库存抓取日 ~ 月底)的硫化日完成量
+ *   - 月底余量(PLAN_SURPLUS_QTY)、库存抓取日(STOCK_CAPTURE_DATE) 取自 T_MDM_MONTH_SURPLUS，
+ *     按需求版本号(MONTH_PLAN_VERSION=REQUIRE_VERSION) 匹配
+ *   - 已完成量取自硫化日完成量表，日期范围 = IFNULL(STOCK_CAPTURE_DATE, 月初) ~ 月底
  * 并按阈值参数(SYS0206009)判定上月超欠产有效标志：
- * |超欠产值|(绝对值) > 阈值 → 否('0')，否则 → 是('1')
+ * |超欠产值|(绝对值) > 阈值 → 否('0')，否则 → 是('1')；无月底余量记录 → 否('0')
  * 三次触发天然幂等，UPDATE直接覆盖写入
  *
  * @author APS Team

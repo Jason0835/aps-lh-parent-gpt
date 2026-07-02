@@ -104,7 +104,7 @@ export default {
           prop: "mouthPlateCode",
         },
         {
-          label: this.$t("ui.specifyMachine.column.machineName"),
+          label: this.$t("ui.specifyMachine.column.machineCode"),
           prop: "machineCode",
           type: "select",
           dictData: this.machineList,
@@ -131,10 +131,10 @@ export default {
           minWidth: 120,
         },
         {
-          prop: "machineName",
+          prop: "machineCode",
           align: "center",
           halign: "center",
-          label: this.$t("ui.specifyMachine.column.machineName"),
+          label: this.$t("ui.specifyMachine.column.machineCode"),
           minWidth: 120,
         },
         {

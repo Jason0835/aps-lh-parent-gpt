@@ -3,7 +3,6 @@ package com.zlt.aps.tq.engine.handler;
 import com.ruoyi.common.utils.StringUtils;
 import com.zlt.aps.common.core.utils.BigDecimalUtil;
 import com.zlt.aps.common.core.utils.BigDecimalUtils;
-import com.zlt.aps.common.engine.enums.OpenMachineClassEnums;
 import com.zlt.aps.common.engine.service.AutoScheduleLogService;
 import com.zlt.aps.common.engine.utils.CollectionUtil;
 import com.zlt.aps.tq.api.domain.entity.TqMachineInfo;
@@ -44,6 +43,23 @@ import static com.alibaba.fastjson.JSON.toJSONString;
 @Slf4j
 @Component
 public class TqMachineAssignHandler extends AbsTqScheduleStepHandler {
+
+    /**
+     * 排程6班次与 ClassNumThreePlanEnums.classIndex（即 CLASS_NUM_THREE 字典值）的映射。
+     * <p>排程以三班制为基础（班制固定为 中班→夜班→早班 循环）：</p>
+     * <ul>
+     *   <li>1班 = D日中班   → "03"（中班）</li>
+     *   <li>2班 = D+1日夜班 → "01"（夜班）</li>
+     *   <li>3班 = D+1日早班 → "02"（早班）</li>
+     *   <li>4班 = D+1日中班 → "03"（中班）</li>
+     *   <li>5班 = D+2日夜班 → "01"（夜班）</li>
+     *   <li>6班 = D+2日早班 → "02"（早班）</li>
+     * </ul>
+     * 注意：此处使用与 CLASS_NUM_THREE 字典值一致的两位字符串（"01"/"02"/"03"），
+     * 与机台 T_TQ_MACHINE_INFO.OPEN_MACHINE_CLASS 字段存储格式一致，
+     * 不再使用旧的 OpenMachineClassEnums 枚举值（1/2/3/4/5）。
+     */
+    private static final String[] SHIFT_CLASS_MAP = {"03", "01", "02", "03", "01", "02"};
 
     @Resource
     private List<IMachineFilterStrategy> filterStrategies;
@@ -129,17 +145,9 @@ public class TqMachineAssignHandler extends AbsTqScheduleStepHandler {
         }).collect(Collectors.toList());
 
         // 逐班分配机台（1班→2班→3班→4班→5班→6班）
-        // 班次对应的OpenMachineClass索引（D=排程日期-2，即今天）：
-        // 1班=D日中班→CLASS_FOUR(中班), 2班=D+1日夜班→CLASS_TWO(夜班), 3班=D+1日早班→CLASS_THREE(早班)
-        // 4班=D+1日中班→CLASS_FOUR(中班), 5班=D+2日夜班→CLASS_TWO(夜班), 6班=D+2日早班→CLASS_THREE(早班)
-        int[] classIndexes = {
-                OpenMachineClassEnums.CLASS_FOUR.getClassIndex(),   // 1班=D日中班
-                OpenMachineClassEnums.CLASS_TWO.getClassIndex(),    // 2班=D+1日夜班
-                OpenMachineClassEnums.CLASS_THREE.getClassIndex(),  // 3班=D+1日早班
-                OpenMachineClassEnums.CLASS_FOUR.getClassIndex(),   // 4班=D+1日中班
-                OpenMachineClassEnums.CLASS_TWO.getClassIndex(),    // 5班=D+2日夜班
-                OpenMachineClassEnums.CLASS_THREE.getClassIndex()   // 6班=D+2日早班
-        };
+        // 班次对应的 CLASS_NUM_THREE 字典值（三班制 中班/夜班/早班 循环），见 SHIFT_CLASS_MAP 注释
+        // 1班=D日中班→"03", 2班=D+1日夜班→"01", 3班=D+1日早班→"02",
+        // 4班=D+1日中班→"03", 5班=D+2日夜班→"01", 6班=D+2日早班→"02"
 
         Map<String, BigDecimal>[] capacityMaps = new Map[]{
                 class1CapacityMap, class2CapacityMap, class3CapacityMap,
@@ -147,7 +155,7 @@ public class TqMachineAssignHandler extends AbsTqScheduleStepHandler {
         };
 
         for (int classIdx = 0; classIdx < 6; classIdx++) {
-            String classCode = String.valueOf(classIndexes[classIdx]);
+            String classCode = SHIFT_CLASS_MAP[classIdx];
 
             // 阈值切换生产：供应时长未达阈值的规格优先排产，已达阈值的规格排后面
             double supplyTimeThreshold = context.getParams().getSupplyTimeThreshold() == null ? 24D
@@ -190,6 +198,7 @@ public class TqMachineAssignHandler extends AbsTqScheduleStepHandler {
 
                     // 机台不支持当前班次，延后到下一班
                     if (existingMachine != null && !existingMachine.getOpenMachineClass().contains(classCode)) {
+                        setClassPlanQty(scheduleVo, classIdx + 1, 0D);
                         deferToNextClass(scheduleVo, classIdx + 1, planQty);
                         continue;
                     }
@@ -245,6 +254,7 @@ public class TqMachineAssignHandler extends AbsTqScheduleStepHandler {
                         scheduleVo, classCode, capacityMaps[classIdx], allMachineList, context, sortedStrategies, plannedMachineMap);
                 if (CollectionUtil.isEmpty(optionalMachineList)) {
                     // 无可用机台，延后至下一班次（步骤3）
+                    setClassPlanQty(scheduleVo, classIdx + 1, 0D);
                     deferToNextClass(scheduleVo, classIdx + 1, planQty);
                     autoScheduleLogService.insertTqScheduleLog(scheduleVo.getBatchNo(), scheduleVo.getOrderNo(),
                             "无可用机台-延后至下一班", "胎圈代码：" + scheduleVo.getBeadCode()
@@ -364,9 +374,12 @@ public class TqMachineAssignHandler extends AbsTqScheduleStepHandler {
 
         // 在切换机台上排产
         double assignQty = Math.min(overflowQty, switchRemaining);
-        // 将部分计划量分配给切换机台（记录在scheduleVo的辅助字段或日志中）
         capacityMaps[classIdx].put(switchMachine.getMachineCode(), capacityMaps[classIdx].getOrDefault(switchMachine.getMachineCode(), BigDecimal.ZERO)
                 .add(BigDecimalUtils.valueOf(assignQty)));
+
+        // 将切换机台排产量加回当前班次计划量（调用方已将当前班次设为原始机台的排产量，此处累加切换机台的排产量）
+        double currentQty = getClassPlanQty(scheduleVo, classIdx + 1);
+        setClassPlanQty(scheduleVo, classIdx + 1, BigDecimalUtil.add(currentQty, assignQty));
 
         double stillOverflow = BigDecimalUtil.sub(overflowQty, assignQty);
         if (stillOverflow > 0) {
@@ -395,12 +408,9 @@ public class TqMachineAssignHandler extends AbsTqScheduleStepHandler {
             log.warn("[S3] 胎圈{}的6班溢出量{}无法延后", scheduleVo.getBeadCode(), overflowQty);
             return;
         }
-        // 延后至下一班次累加
+        // 延后至下一班次累加（当前班次的值已由调用方正确设置，此处不再扣减）
         double nextClassQty = getClassPlanQty(scheduleVo, currentClass + 1);
         setClassPlanQty(scheduleVo, currentClass + 1, BigDecimalUtil.add(nextClassQty, overflowQty));
-        // 当前班次减去溢出量
-        double currentQty = getClassPlanQty(scheduleVo, currentClass);
-        setClassPlanQty(scheduleVo, currentClass, BigDecimalUtil.sub(currentQty, overflowQty));
 
         autoScheduleLogService.insertTqScheduleLog(scheduleVo.getBatchNo(), scheduleVo.getOrderNo(),
                 "步骤3-延后至下一班", "胎圈代码：" + scheduleVo.getBeadCode()

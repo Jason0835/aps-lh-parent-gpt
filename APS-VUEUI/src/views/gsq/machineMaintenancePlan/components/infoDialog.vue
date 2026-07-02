@@ -29,12 +29,12 @@
 
 <script>
 import infoForm from "@/views/components/infoForm.vue";
-import { saveSpecifyMachine } from "@/api/tq/specifyMachine";
-import { listEnabledMachines } from "@/api/tq/machine";
+import { saveMachineMaintenancePlan } from "@/api/gsq/machineMaintenancePlan";
+import { listEnabledMachines } from "@/api/gsq/machine";
 
 export default {
+  dicts: ["class_num_three_plan"],
   components: { infoForm },
-  inject: ["parentDict"],
   data() {
     return {
       loading: false,
@@ -44,17 +44,31 @@ export default {
       form: {},
       machineList: [],
       rules: {
-        beadCode: [
+        downtimeDate: [
           {
             required: true,
-            message: this.$t("common.rule.input"),
-            trigger: "blur",
+            message: this.$t("common.rule.select"),
+            trigger: "change",
           },
         ],
         machineCode: [
           {
             required: true,
             message: this.$t("common.rule.select"),
+            trigger: "change",
+          },
+        ],
+        downtimeShift: [
+          {
+            required: true,
+            message: this.$t("common.rule.select"),
+            trigger: "change",
+          },
+        ],
+        downtimeHours: [
+          {
+            required: true,
+            message: this.$t("common.rule.input"),
             trigger: "blur",
           },
         ],
@@ -67,19 +81,21 @@ export default {
         (this.isEdit
           ? this.$t("common.button.edit")
           : this.$t("common.button.add")) +
-        this.$t("ui.tq.specifyMachine.column.modalName")
+        this.$t("ui.data.column.gsq.machineMaintenancePlan.modalName")
       );
     },
     columns() {
       return [
         {
-          label: this.$t("ui.tq.specifyMachine.column.beadCode"),
-          prop: "beadCode",
+          label: this.$t("ui.data.column.gsq.machineMaintenancePlan.downtimeDate"),
+          prop: "downtimeDate",
           span: 24,
           required: true,
+          type: "date",
+          valueFormat: "yyyy-MM-dd",
         },
         {
-          label: this.$t("ui.specifyMachine.column.machineCode"),
+          label: this.$t("ui.data.column.gsq.machineMaintenancePlan.machineName"),
           prop: "machineCode",
           span: 24,
           required: true,
@@ -88,30 +104,33 @@ export default {
           filterable: true,
           loading: this.machineLoading,
           props: {
-            label: "machineCode",
+            label: "machineName",
             value: "machineCode",
           },
           onFocus: this.handleMachineFocus,
         },
         {
-          label: this.$t("ui.specifyMachine.column.lineType"),
-          prop: "lineType",
+          label: this.$t("ui.data.column.gsq.machineMaintenancePlan.downtimeShift"),
+          prop: "downtimeShift",
           span: 24,
+          required: true,
           type: "select",
-          dictData: this.parentDict.type.LINE_TYPE,
+          dictData: this.dict.type.class_num_three_plan,
+          filterable: true,
         },
         {
-          label: this.$t("ui.specifyMachine.column.jobType"),
-          prop: "jobType",
+          label: this.$t("ui.data.column.gsq.machineMaintenancePlan.downtimeHours"),
+          prop: "downtimeHours",
           span: 24,
-          type: "select",
-          dictData: this.parentDict.type.JOB_TYPE,
+          required: true,
+          type: "number",
         },
         {
           label: this.$t("ui.common.column.remark"),
           prop: "remark",
           span: 24,
           type: "textarea",
+          maxlength: "900",
         },
       ];
     },
@@ -120,7 +139,7 @@ export default {
     async save(params) {
       try {
         this.loading = true;
-        const res = await saveSpecifyMachine(params);
+        const res = await saveMachineMaintenancePlan(params);
         this.$modal.msgSuccess(res.msg);
         this.$emit("success");
         this.hide();
@@ -155,7 +174,6 @@ export default {
         this.form = {
           ...data,
         };
-        // 编辑模式下，将当前选中的机台加入下拉选项
         if (data.machineCode && data.machineName) {
           this.machineList = [
             {

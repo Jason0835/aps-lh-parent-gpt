@@ -456,6 +456,14 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
         backUpGroupAllocationInfo(param);
         // 3、将排产结果表数据新增到定稿表
         List<FactoryMonthPlanProductionFinalResult> finalList = insertFinalList(param);
+        // 3.1、补更新上月定稿记录的上月超欠产有效标识（只更新标识，不更新值）
+        // 场景：次月定稿时（如6.25定稿7月），用上月（6月）数据补更新上月（6月）定稿记录的标识，
+        // 覆盖月初定时任务（6.1用5月数据）写入的旧标识；失败不阻断定稿主流程
+        try {
+            this.updateLastMonthOverProdFlagOnFinalized(param.getYear(), param.getMonth());
+        } catch (Exception e) {
+            log.error("定稿补更新上月超欠产标识失败, 定稿月: {}-{}", param.getYear(), param.getMonth(), e);
+        }
         // 4、调用世超的分摊接口
         // 4.1、OrderAllocationServiceImpl.allocateProductionByMonth
         // 4.2、调用生成原材料需求计划 -- TODO
@@ -1546,14 +1554,16 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
 
     /**
      * 定时计算上月超欠产（每月1号凌晨3点触发，cron: 0 0 3 1 * ?）
+     * 新公式：上月超欠产 = 定稿需求版本对应的月计划月底余量 - (库存抓取日 ~ 月底)的硫化日完成量
      * 逻辑：
      * 1. 获取上月年月和当月年月
-     * 2. 计算上月日期范围（1日~月末）
-     * 3. 从上月定稿表取计划量，从硫化日完成量表取上月完成量
-     * 4. 超欠产 = 上月计划量 - 上月完成量
+     * 2. 计算上月日期范围（1日~月末，startDate 用于 STOCK_CAPTURE_DATE 为空时回退，endDate 为月底边界）
+     * 3. 月计划月底余量(PLAN_SURPLUS_QTY)、库存抓取日(STOCK_CAPTURE_DATE) 取自 T_MDM_MONTH_SURPLUS，
+     *    按 (分厂+物料+年+月+需求版本号 MONTH_PLAN_VERSION=REQUIRE_VERSION) 匹配
+     * 4. 已完成量取自硫化日完成量表，日期范围 = IFNULL(STOCK_CAPTURE_DATE, 月初) ~ 月底
      * 5. 按分厂+物料编码匹配，回填到当月定稿记录
      * 6. 有效标志判定：|超欠产值|(绝对值) > 阈值参数(SYS0206009) → 否('0')，否则 → 是('1')；
-     *    上月无定稿数据时有效标志置否('0')
+     *    无月底余量记录时值置NULL、标志置否('0')
      */
     @Override
     public AjaxResult calcLastMonthOverProd() {
@@ -1568,6 +1578,7 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
      * 计算当月超欠产写入下月（月末倒数2天触发）
      * cron: 0 0 3 L-1 * ?（倒数第2天）、0 0 3 L * ?（最后一天）
      * 逻辑：用当月数据写入下月月计划的"上月超欠产"栏位
+     * 公式同 {@link #calcLastMonthOverProd()}：月底余量 - (库存抓取日~月底)的硫化日完成量
      */
     @Override
     public AjaxResult calcCurrentMonthOverProdForNextMonth() {
@@ -1580,7 +1591,8 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
 
     /**
      * 计算超欠产的公共方法
-     * 根据数据来源月份的计划量和完成量计算超欠产，回填到写入目标月份的定稿记录
+     * 根据数据来源月份的月计划月底余量和硫化日完成量计算超欠产，回填到写入目标月份的定稿记录
+     * 公式：超欠产 = 月底余量 - (库存抓取日~月底)的硫化日完成量
      *
      * @param lastMonth    数据来源月份（上月或当月）
      * @param currentMonth 写入目标月份（当月或下月）
@@ -1592,7 +1604,7 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
         Integer currentYear = currentMonth.getYear();
         Integer currentMonthValue = currentMonth.getMonthValue();
 
-        // 数据来源月份的日期范围
+        // 数据来源月份的日期范围（startDate 用于 STOCK_CAPTURE_DATE 为空时回退，endDate 为月底边界）
         Date startDate = cn.hutool.core.date.DateUtil.beginOfMonth(cn.hutool.core.date.DateUtil.parse(lastMonth.toString() + "-01"));
         Date endDate = cn.hutool.core.date.DateUtil.endOfMonth(startDate);
 
@@ -1607,5 +1619,51 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
 
         log.info("超欠产计算完成, 更新记录数: {}", count);
         return AjaxResult.success("超欠产计算完成，更新记录数：" + count);
+    }
+
+    /**
+     * 定稿时补更新上月定稿记录的上月超欠产有效标识（只更新标识，不更新值）
+     * <p>
+     * 场景：月初定时任务（每月1号，{@link #calcLastMonthOverProd()}）用上上月数据
+     * 写入上月定稿记录的"上月超欠产"标识+值。但月初时上月完成数据通常不完整，
+     * 因此在次月定稿时（如6.25定稿7月）补更新一次上月（6月）定稿记录的标识，
+     * 使标识反映上月（6月）最新的完成情况。本方法仅更新 LAST_MONTH_VALID_FLAG，
+     * 不更新 LAST_MONTH_OVERDUE_QTY，值字段保持月初定时任务写入的原值不动。
+     * </p>
+     * <p>
+     * 数据来源月 = 写入目标月 = 定稿月的上月。例如7月定稿时：
+     * 数据来源月=6月（取6月月底余量+6月硫化日完成量），写入目标月=6月（更新6月定稿记录标识）。
+     * 公式同定时任务：超欠产 = 月底余量 - (库存抓取日~月底)的硫化日完成量，
+     * 标识判定逻辑与 MonthOverProdTask 定时任务完全一致：
+     * |超欠产值| > 阈值参数(SYS0206009) → '0'（否），否则 → '1'（是）；无月底余量记录 → '0'。
+     * </p>
+     *
+     * @param finalizedYear  定稿年份（如 2026）
+     * @param finalizedMonth 定稿月份（如 7）
+     */
+    private void updateLastMonthOverProdFlagOnFinalized(Integer finalizedYear, Integer finalizedMonth) {
+        // 写入目标月 = 定稿月的上月（如 7月定稿 → 6月）；数据来源月 = 写入目标月（如 6月）
+        YearMonth currentMonth = YearMonth.of(finalizedYear, finalizedMonth).minusMonths(1);
+        YearMonth lastMonth = currentMonth;
+
+        Integer lastYear = lastMonth.getYear();
+        Integer lastMonthValue = lastMonth.getMonthValue();
+        Integer currentYear = currentMonth.getYear();
+        Integer currentMonthValue = currentMonth.getMonthValue();
+
+        // 数据来源月份的日期范围（startDate 用于 STOCK_CAPTURE_DATE 为空时回退，endDate 为月底边界）
+        Date startDate = cn.hutool.core.date.DateUtil.beginOfMonth(cn.hutool.core.date.DateUtil.parse(lastMonth.toString() + "-01"));
+        Date endDate = cn.hutool.core.date.DateUtil.endOfMonth(startDate);
+
+        // 超欠产有效标志判定阈值参数编码（SYS0206009）
+        String overdueThresholdParamCode = MonthPlanEnums.LAST_MONTH_OVERDUE_THRESHOLD.getCode();
+
+        log.info("定稿补更新上月超欠产标识开始, 定稿月: {}-{}, 数据来源/写入目标: {}-{}, 日期范围: {} ~ {}, 有效标志阈值参数: {}",
+                finalizedYear, finalizedMonth, lastYear, lastMonthValue, startDate, endDate, overdueThresholdParamCode);
+
+        int count = finalMapper.updateLastMonthOverProdFlag(lastYear, lastMonthValue, currentYear, currentMonthValue,
+                startDate, endDate, overdueThresholdParamCode);
+
+        log.info("定稿补更新上月超欠产标识完成, 更新记录数: {}", count);
     }
 }
