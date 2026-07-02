@@ -58,7 +58,7 @@ import {mapState} from "vuex";
 //utils
 import {downloadLink} from "@/utils/request";
 //interface
-import {listTmSpecifyMachine, removeTmSpecifyMachine} from "@/api/tm/specifyMachine";
+import {listTmSpecifyMachine, removeTmSpecifyMachine, saveTmSpecifyMachine} from "@/api/tm/specifyMachine";
 //components
 import tltUpload from "@/components/tltUpload/tltUpload.vue";
 import TltUploadForm from "@/views/components/tltUploadForm.vue";
@@ -149,8 +149,37 @@ export default {
           prop: "enableStatus",
           halign: "center",
           label: this.$t("ui.data.column.tm.specifyMachine.enableStatus"),
-          formatter: (row, column, value) => {
-            return this.selectDictLabel(this.dict.type.biz_yes_no, value);
+          render: ({ row }) => {
+            return (
+              <el-switch
+                active-value="1"
+                inactive-value="0"
+                disabled={this.loading}
+                value={row.enableStatus}
+                onChange={(val) => {
+                  let confirmMsg = val == "0"
+                    ? this.$t("ui.lhMachineInfo.confirm.disable")
+                    : this.$t("ui.lhMachineInfo.confirm.enable");
+                  this.$confirm(confirmMsg, { type: "warning" }).then(
+                    async () => {
+                      try {
+                        this.loading = true;
+                        const data = await saveTmSpecifyMachine({
+                          ...row,
+                          enableStatus: val,
+                        });
+                        this.$modal.msgSuccess(data.msg);
+                        this.getList();
+                      } catch (error) {
+                        console.error(error);
+                      } finally {
+                        this.loading = false;
+                      }
+                    }
+                  );
+                }}
+              ></el-switch>
+            );
           },
         },
         {

@@ -113,20 +113,6 @@ export default {
             trigger: "change",
           },
         ],
-        crossDayFlag: [
-          {
-            required: true,
-            message: this.$t("common.rule.select"),
-            trigger: "change",
-          },
-        ],
-        openFlag: [
-          {
-            required: true,
-            message: this.$t("common.rule.select"),
-            trigger: "change",
-          },
-        ],
       },
     };
   },
@@ -191,18 +177,18 @@ export default {
         {
           prop: "crossDayFlag",
           label: this.$t("ui.data.column.tm.shiftConfig.crossDayFlag"),
-          type: "select",
+          type: "switch",
           span: 12,
-          required: true,
-          dictData: this.parentDict.type.biz_yes_no,
+          activeValue: "1",
+          inactiveValue: "0",
         },
         {
           prop: "openFlag",
           label: this.$t("ui.data.column.tm.shiftConfig.openFlag"),
-          type: "select",
+          type: "switch",
           span: 12,
-          required: true,
-          dictData: this.parentDict.type.biz_yes_no,
+          activeValue: "1",
+          inactiveValue: "0",
         },
         {
           prop: "remark",
@@ -235,10 +221,14 @@ export default {
         this.isEdit = true;
         this.form = {
           ...data,
+          crossDayFlag: data.crossDayFlag || "0",
+          openFlag: data.openFlag || "0",
         };
       } else {
         this.form = {
           factoryCode: "116",
+          crossDayFlag: "1",
+          openFlag: "1",
         };
       }
     },
