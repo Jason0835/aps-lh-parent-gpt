@@ -2,6 +2,7 @@ package com.zlt.aps.cd90.service;
 
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.cd90.api.domain.entity.Cd90ScheduleResult;
+import com.zlt.aps.cd90.api.domain.vo.Cd90InsertOrderRequest;
 import com.zlt.bill.common.service.IDocService;
 
 import java.util.Date;
@@ -16,6 +17,18 @@ public interface ICd90ScheduleResultService extends IDocService<Cd90ScheduleResu
      * @return 自动排程结果
      */
     AjaxResult autoSchedule(Cd90ScheduleResult scheduleResult);
+
+    /** 查询插单弹窗使用的启用班次日期。 */
+    AjaxResult shiftDates(Cd90InsertOrderRequest request);
+
+    /** 校验插单请求及锁定顺位。 */
+    AjaxResult validateInsert(Cd90InsertOrderRequest request);
+
+    /** 创建插单异步任务。 */
+    AjaxResult insertOrder(Cd90InsertOrderRequest request);
+
+    /** 查询插单异步任务。 */
+    AjaxResult getInsertTask(String taskId);
 
     /**
      * 按排程日期 + 工厂编码查询未删除的排程结果。

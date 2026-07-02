@@ -71,6 +71,7 @@ public class Cd90RollingScheduleContextManager {
                 .bigRollAgingStocks(new ArrayList<>())
                 .committedTasks(new ArrayList<>())
                 .continueDemandByCloth(new HashMap<>())
+                .pendingTasks(new ArrayList<>())
                 .newSpecAdvanceInfoByCloth(copiedInfo)
                 .newSpecAdvanceRemainingByCloth(remainingByCloth)
                 .normalizedNewSpecAdvanceClothCodes(new HashSet<>())

@@ -29,6 +29,8 @@ public class Cd90RollingScheduleContext {
     private List<Cd90ShiftScheduleTask> committedTasks;
     /** 前序班次真实部分排后尚未覆盖的续作需求量，按帘布代号分组。 */
     private Map<String, BigDecimal> continueDemandByCloth;
+    /** 跨班待排任务，保留来源记录、原顺序、机台约束和剩余量。 */
+    private List<Cd90RollingPendingTask> pendingTasks;
     /** 首班锁定的新增规格提前生产证据。 */
     private Map<String, Cd90NewSpecAdvanceInfo> newSpecAdvanceInfoByCloth;
     /** 尚未转入真实续作的新增规格提前需求剩余量。 */

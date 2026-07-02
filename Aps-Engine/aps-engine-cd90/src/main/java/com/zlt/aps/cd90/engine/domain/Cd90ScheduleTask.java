@@ -26,6 +26,9 @@ public class Cd90ScheduleTask extends BaseEntity implements Serializable {
     /** 排程日期。 */
     @TableField("SCHEDULE_DATE")
     private Date scheduleDate;
+    /** 任务类型：自动排程或插单滚动重排。 */
+    @TableField("TASK_TYPE")
+    private String taskType;
     /** 触发类型：TIMER或MANUAL。 */
     @TableField("TRIGGER_TYPE")
     private String triggerType;
