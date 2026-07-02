@@ -608,13 +608,13 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
             }
             if (MouldChangeTypeEnum.SAND_BLAST.getCode().equals(changeMouldType)) {
                 lhMouldChangePlanVo.setIsSandblastingClean(YesOrNoEnum.YES.getCode());
-                lhMouldChangePlanVo.setBeforeMaterialCode("---");
-                lhMouldChangePlanVo.setBeforeMaterialDesc("---");
+                lhMouldChangePlanVo.setBeforeMaterialCode("");
+                lhMouldChangePlanVo.setBeforeMaterialDesc("");
             }
             if (MouldChangeTypeEnum.DRY_ICE.getCode().equals(changeMouldType)) {
                 lhMouldChangePlanVo.setIsDryIceClean(YesOrNoEnum.YES.getCode());
-                lhMouldChangePlanVo.setBeforeMaterialCode("---");
-                lhMouldChangePlanVo.setBeforeMaterialDesc("---");
+                lhMouldChangePlanVo.setBeforeMaterialCode("");
+                lhMouldChangePlanVo.setBeforeMaterialDesc("");
             }
             resultList.add(lhMouldChangePlanVo);
         }
