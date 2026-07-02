@@ -89,6 +89,14 @@ public interface IGsqMachineInfoService {
     @PostMapping("/gsq/machine/listMachineInfo")
     List<GsqMachineInfo> listMachineInfo(@RequestBody GsqMachineInfo machineInfo);
 
+    /**
+     * 获取所有启用的钢丝圈机台信息（status=0），供下拉框数据源使用
+     *
+     * @return 启用状态的机台列表
+     */
+    @GetMapping("/gsq/machine/listEnabledMachines")
+    List<GsqMachineInfo> listEnabledMachines();
+
     @PostMapping("/gsq/machine/importData")
     @ApiOperation("导入钢丝圈机台信息")
     public AjaxResult importData(@RequestBody List<GsqMachineInfo> list, @RequestParam("updateSupport") boolean updateSupport, @RequestParam("importLogId") Long importLogId);

@@ -1,7 +1,7 @@
 <template>
   <basic-container>
     <page-table
-      tableRef="tqFixedPointMachineMainTable"
+      tableRef="gsqMachineMaintenancePlanMainTable"
       :calcHeight="true"
       v-loading="loading"
       :columns="columns"
@@ -21,33 +21,29 @@
         <el-button
           type="primary"
           plain
-          v-hasPermi="['tq:specifyMachine:add']"
+          v-hasPermi="['gsq:machineMaintenancePlan:add']"
           @click="handleAdd"
-          >{{ $t("ui.frame.btn.add") }}</el-button
-        >
+        >{{ $t("ui.frame.btn.add") }}</el-button>
         <el-button
           type="danger"
           plain
-          v-hasPermi="['tq:specifyMachine:remove']"
+          v-hasPermi="['gsq:machineMaintenancePlan:remove']"
           @click="handleBatchDelete"
-          >{{ $t("ui.frame.btn.delete") }}</el-button
-        >
+        >{{ $t("ui.frame.btn.delete") }}</el-button>
         <el-button
-          v-hasPermi="['tq:specifyMachine:import']"
+          v-hasPermi="['gsq:machineMaintenancePlan:import']"
           @click="$refs.tltUpload.handleImport()"
-          >{{ $t("ui.frame.btn.import") }}</el-button
-        >
+        >{{ $t("ui.frame.btn.import") }}</el-button>
         <el-button
           @click="handleExport"
-          v-hasPermi="['tq:specifyMachine:export']"
-          >{{ $t("ui.frame.btn.export") }}</el-button
-        >
+          v-hasPermi="['gsq:machineMaintenancePlan:export']"
+        >{{ $t("ui.frame.btn.export") }}</el-button>
       </template>
     </page-table>
     <tlt-upload
       ref="tltUpload"
-      downloadUrl="/tq/specifyMachine/importTemplate"
-      uploadUrl="/tq/specifyMachine/importData"
+      downloadUrl="/gsq/machineMaintenancePlan/importTemplate"
+      uploadUrl="/gsq/machineMaintenancePlan/importData"
       @uploadSuccess="getList"
     />
     <InfoDialog ref="infoRef" @success="getList" />
@@ -55,26 +51,20 @@
 </template>
 <script>
 import {
-  listSpecifyMachine,
-  saveSpecifyMachine,
-  removeSpecifyMachine,
-  exportSpecifyMachine,
-} from "@/api/tq/specifyMachine";
-import { listEnabledMachines } from "@/api/tq/machine";
+  listMachineMaintenancePlan,
+  removeMachineMaintenancePlan,
+  exportMachineMaintenancePlan,
+} from "@/api/gsq/machineMaintenancePlan";
+import { listEnabledMachines } from "@/api/gsq/machine";
 import tltUpload from "@/components/tltUpload/tltUpload.vue";
 import InfoDialog from "./components/infoDialog.vue";
 
 export default {
-  name: "TqFixedPointMachine",
+  name: "GsqMachineMaintenancePlan",
+  dicts: ["class_num_three_plan"],
   components: {
     tltUpload,
     InfoDialog,
-  },
-  dicts: ["LINE_TYPE", "JOB_TYPE"],
-  provide() {
-    return {
-      parentDict: this.dict,
-    };
   },
   data() {
     return {
@@ -82,6 +72,7 @@ export default {
       machineLoading: false,
       data: [],
       selection: [],
+      machineList: [],
       page: {
         current: 1,
         pageSize: 20,
@@ -90,54 +81,80 @@ export default {
       sort: {},
       search: {},
       query: {},
-      machineList: [],
     };
   },
   computed: {
+    searchColumns() {
+      return [
+        {
+          label: this.$t("ui.data.column.gsq.machineMaintenancePlan.downtimeDate"),
+          prop: "downtimeDate",
+          type: "daterange",
+        },
+        {
+          label: this.$t("ui.data.column.gsq.machineMaintenancePlan.machineName"),
+          prop: "machineCode",
+          type: "select",
+          dictData: this.machineList,
+          labelKey: "machineName",
+          valueKey: "machineCode",
+          filterable: true,
+        },
+      ];
+    },
     columns() {
       return [
         { type: "selection", fixed: "left" },
         {
-          prop: "beadCode",
+          prop: "downtimeDate",
           align: "center",
           halign: "center",
-          label: this.$t("ui.tq.specifyMachine.column.beadCode"),
-        },
-        {
-          prop: "machineCode",
-          align: "center",
-          halign: "center",
-          label: this.$t("ui.specifyMachine.column.machineCode"),
-          width: 120,
-        },
-        {
-          prop: "lineType",
-          align: "center",
-          halign: "center",
-          label: this.$t("ui.specifyMachine.column.lineType"),
-          formatter: (row, column, value, index) => {
-            return this.selectDictLabel(this.dict.type.LINE_TYPE, value);
+          label: this.$t("ui.data.column.gsq.machineMaintenancePlan.downtimeDate"),
+          minWidth: 120,
+          formatter: (row) => {
+            return row.downtimeDate || "-";
           },
         },
         {
-          prop: "jobType",
+          prop: "machineName",
           align: "center",
           halign: "center",
-          label: this.$t("ui.specifyMachine.column.jobType"),
-          formatter: (row, column, value, index) => {
-            return this.selectDictLabel(this.dict.type.JOB_TYPE, value);
+          label: this.$t("ui.data.column.gsq.machineMaintenancePlan.machineName"),
+          minWidth: 120,
+          formatter: (row) => {
+            return row.machineName || "-";
           },
+        },
+        {
+          prop: "downtimeShift",
+          align: "center",
+          halign: "center",
+          label: this.$t("ui.data.column.gsq.machineMaintenancePlan.downtimeShift"),
+          minWidth: 100,
+          formatter: (row) => {
+            return this.selectDictLabel(this.dict.type.class_num_three_plan, row.downtimeShift) || "-";
+          },
+        },
+        {
+          prop: "downtimeHours",
+          align: "center",
+          halign: "center",
+          label: this.$t("ui.data.column.gsq.machineMaintenancePlan.downtimeHours"),
+          minWidth: 120,
         },
         {
           prop: "remark",
           halign: "center",
           label: this.$t("ui.common.column.remark"),
           minWidth: 100,
+          formatter: (row) => {
+            return row.remark || "-";
+          },
         },
         {
           prop: "updateTime",
           halign: "center",
-          label: this.$t("ui.data.column.updateTime"),
+          label: this.$t("ui.data.column.gsq.machineMaintenancePlan.updateDate"),
           minWidth: 150,
         },
         {
@@ -145,11 +162,13 @@ export default {
           halign: "center",
           label: this.$t("ui.data.btn.option"),
           prop: "option",
+          width: 180,
+          fixed: "right",
           render: ({ row }) => {
             return (
               <div>
                 <el-button
-                  v-hasPermi={["tq:specifyMachine:edit"]}
+                  v-hasPermi={["gsq:machineMaintenancePlan:edit"]}
                   class="minus"
                   type="primary"
                   onClick={() => this.handleEdit(row)}
@@ -157,7 +176,7 @@ export default {
                   {this.$t("ui.frame.btn.modify")}
                 </el-button>
                 <el-button
-                  v-hasPermi={["tq:specifyMachine:remove"]}
+                  v-hasPermi={["gsq:machineMaintenancePlan:remove"]}
                   class="minus"
                   type="danger"
                   onClick={() => this.handleDelete(row)}
@@ -167,37 +186,6 @@ export default {
               </div>
             );
           },
-        },
-      ];
-    },
-    searchColumns() {
-      return [
-        {
-          label: this.$t("ui.tq.specifyMachine.column.beadCode"),
-          prop: "beadCode",
-        },
-        {
-          label: this.$t("ui.specifyMachine.column.machineCode"),
-          prop: "machineCode",
-          type: "select",
-          dictData: this.machineList,
-          filterable: true,
-          loading: this.machineLoading,
-          labelKey: "machineCode",
-          valueKey: "machineCode",
-          onFocus: this.handleMachineFocus,
-        },
-        {
-          label: this.$t("ui.data.column.specifyMachine.lineType"),
-          prop: "lineType",
-          type: "select",
-          dictData: this.dict.type.LINE_TYPE,
-        },
-        {
-          label: this.$t("ui.data.column.specifyMachine.jobType"),
-          prop: "jobType",
-          type: "select",
-          dictData: this.dict.type.JOB_TYPE,
         },
       ];
     },
@@ -218,7 +206,7 @@ export default {
         type: "warning",
       }).then(() => {
         const ids = row.id;
-        removeSpecifyMachine(ids).then((data) => {
+        removeMachineMaintenancePlan(ids).then((data) => {
           this.$modal.msgSuccess(data.msg);
           this.$set(this.page, "current", 1);
           this.getList();
@@ -236,7 +224,7 @@ export default {
         type: "warning",
       }).then(() => {
         const ids = this.selection.map((row) => row.id).join(",");
-        removeSpecifyMachine(ids).then((data) => {
+        removeMachineMaintenancePlan(ids).then((data) => {
           this.$modal.msgSuccess(data.msg);
           this.$set(this.page, "current", 1);
           this.getList();
@@ -244,7 +232,7 @@ export default {
       });
     },
     handleExport() {
-      this.$confirm(this.$t("确定导出所有定点机台信息？"), {
+      this.$confirm(this.$t("ui.data.column.gsq.machineMaintenancePlan.confirm.export"), {
         type: "warning",
       }).then(() => {
         try {
@@ -255,7 +243,7 @@ export default {
             pageSize: undefined,
             pageNum: undefined,
           };
-          exportSpecifyMachine(params);
+          exportMachineMaintenancePlan(params);
         } catch (error) {
           console.error(error);
         } finally {
@@ -265,6 +253,15 @@ export default {
     },
     handleSearch(data) {
       this.query = data;
+      if (data.downtimeDate && data.downtimeDate.length === 2) {
+        this.query.downtimeDateBegin = data.downtimeDate[0];
+        this.query.downtimeDateEnd = data.downtimeDate[1];
+        delete this.query.downtimeDate;
+      } else {
+        this.query.downtimeDateBegin = undefined;
+        this.query.downtimeDateEnd = undefined;
+        delete this.query.downtimeDate;
+      }
       this.$set(this.page, "current", 1);
       this.getList();
     },
@@ -301,7 +298,7 @@ export default {
     async getList() {
       try {
         this.loading = true;
-        const data = await listSpecifyMachine(this.formatParams());
+        const data = await listMachineMaintenancePlan(this.formatParams());
         this.data = data.rows;
         this.page.total = data.total;
       } catch (error) {
@@ -336,9 +333,3 @@ export default {
   },
 };
 </script>
-<style lang="scss" scoped>
-.more-btn {
-  margin: 2px 0;
-  width: 100%;
-}
-</style>

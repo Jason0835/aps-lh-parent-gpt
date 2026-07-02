@@ -77,7 +77,7 @@ import java.util.stream.Collectors;
  * <p>列表占位符清单：</p>
  * <ul>
  *   <li>{.rubberTypeName} - 胶种名称</li>
- *   <li>{.specPattern} - 规格+花纹（按示方类型分组，每组前加标题前缀，如"正规 Chinh quy：规格 花纹"）</li>
+ *   <li>{.specPattern} - 主胎胚描述（按示方类型分组，每组前加标题前缀，如"正规 Chinh quy：胎胚描述"，多个用","隔开）</li>
  * </ul>
  *
  * @author APS Team
@@ -91,6 +91,14 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
     private static final int SMALL_RUBBER_START_COL = 0;
 
     private static final int SMALL_RUBBER_END_COL = 0;
+
+    /**
+     * 新模板（T+2）小胶种列表起始列：G 列（索引6）
+     * 原模板（T+1）小胶种列表在 A 列（索引0），新模板在 G 列左右分布
+     */
+    private static final int SMALL_RUBBER_START_COL_T2 = 6;
+
+    private static final int SMALL_RUBBER_END_COL_T2 = 6;
 
     @Resource
     private CxLhScheduleResultMapper cxLhScheduleResultMapper;
@@ -169,29 +177,50 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
         log.info("构建排产小结导出数据, 排程日期(报告日期): {}, 分厂: {}",
                 DateUtil.formatDate(scheduleDate), factoryCode);
 
-        List<LhShiftConfig> shiftConfigs = loadShiftConfigs(factoryCode);
-        Map<Integer, String> classShiftTypeMap = buildClassShiftTypeMap(shiftConfigs);
+        List<LhShiftConfig> shiftConfigs = this.loadShiftConfigs(factoryCode);
+        Map<Integer, String> classShiftTypeMap = this.buildClassShiftTypeMap(shiftConfigs);
 
-        Map<String, Object> tableMap = buildTableMap(scheduleDate, scheduleDate, factoryCode, classShiftTypeMap);
-        // TD胶种列表使用排程日期查询成型日计划数据，过滤3/4/5班次有排计划量的胎胚，再取TD胶种
-        List<List<Map<String, Object>>> dataList = buildDataList(scheduleDate, factoryCode);
+        // 原模板（左侧，无后缀）：查 T+1（排程日期）数据
+        Map<String, Object> tableMap = this.buildTableMapForDate(
+                scheduleDate, scheduleDate, factoryCode, classShiftTypeMap, "");
 
-        // 小胶种列表数据处理：无数据时隐藏第7行，有数据时合并B7到B列结束行
-        List<Map<String, Object>> smallRubberList = dataList.isEmpty() ? Collections.emptyList() : dataList.get(0);
+        // 新模板（右侧，后缀2）：查 T+2（排程日期+1天）数据，所有 key 加 "2" 后缀
+        Date scheduleDateT2 = DateUtil.offsetDay(scheduleDate, 1);
+        Map<String, Object> tableMapT2 = this.buildTableMapForDate(
+                scheduleDateT2, scheduleDateT2, factoryCode, classShiftTypeMap, "2");
+        tableMap.putAll(tableMapT2);
+
+        // 小胶种列表：T+1 和 T+2 按胶种做 full outer join，
+        // 同一行 Map 同时包含 T+1（rubberTypeName/specPattern）和 T+2（rubberTypeName2/specPattern2）的 key，
+        // 这样模板第7行左侧 {.rubberTypeName}/{.specPattern} 和右侧 {.rubberTypeName2}/{.specPattern2} 可同时填充
+        List<Map<String, Object>> smallRubberList = this.buildMergedSmallRubberList(scheduleDate, scheduleDateT2, factoryCode);
+        List<List<Map<String, Object>>> dataList = new ArrayList<>();
+        dataList.add(smallRubberList);
+
+        // 小胶种列表数据处理：
+        // - 两边都无数据时隐藏第7行
+        // - 有数据时按合并后行数同时合并 A 列（T+1）和 G 列（T+2）区域
         if (smallRubberList.isEmpty()) {
             // 小胶种列表无数据，隐藏第7行（索引6）
             List<Integer> hiddenRows = new ArrayList<>();
             hiddenRows.add(SMALL_RUBBER_TITLE_ROW_INDEX);
             tableMap.put(ExcelUtils.HIDDEN_ROWS, hiddenRows);
         } else {
-            // 小胶种列表有数据，合并B7到B列结束行
+            // 小胶种列表有数据，合并 A 列和 G 列的标题行到结束行
             List<ExcelCellRangeAddress> rangeAddressList = new ArrayList<>();
             int endRowIndex = SMALL_RUBBER_TITLE_ROW_INDEX + smallRubberList.size() - 1;
+            // T+1 区域（A 列）
             rangeAddressList.add(new ExcelCellRangeAddress(
                     SMALL_RUBBER_TITLE_ROW_INDEX,
                     endRowIndex,
                     SMALL_RUBBER_START_COL,
                     SMALL_RUBBER_END_COL));
+            // T+2 区域（G 列）
+            rangeAddressList.add(new ExcelCellRangeAddress(
+                    SMALL_RUBBER_TITLE_ROW_INDEX,
+                    endRowIndex,
+                    SMALL_RUBBER_START_COL_T2,
+                    SMALL_RUBBER_END_COL_T2));
             tableMap.put(ExcelUtils.RANGE_ADDRESS, rangeAddressList);
         }
 
@@ -202,19 +231,79 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
     }
 
     /**
-     * 构建模板参数映射表（普通占位符）
+     * 构建合并后的小胶种列表（T+1 与 T+2 按胶种 full outer join）。
      *
-     * @param reportDate         报告日期（即排程日期，如6/12，T+1日）
-     * @param actualScheduleDate 实际排程日期（如6/12，T+1日，与reportDate相同）
+     * <p>同一行 Map 同时包含两套 key：</p>
+     * <ul>
+     *   <li>T+1: rubberTypeName、specPattern（填到模板 A 列起始区域）</li>
+     *   <li>T+2: rubberTypeName2、specPattern2（填到模板 G 列起始区域）</li>
+     * </ul>
+     *
+     * <p>按胶种编码做合并：T+1 和 T+2 出现的胶种取并集，T+1 缺失时仅填 T+2 的 key，
+     * T+2 缺失时仅填 T+1 的 key，两边都有则同时填充。height 字段两个模板共用一行高度。</p>
+     *
+     * @param scheduleDateT1 T+1 排程日期
+     * @param scheduleDateT2 T+2 排程日期（排程日期+1天）
+     * @param factoryCode    分厂编码
+     * @return 合并后的小胶种行数据列表（两边都无数据返回空列表）
+     */
+    private List<Map<String, Object>> buildMergedSmallRubberList(Date scheduleDateT1, Date scheduleDateT2, String factoryCode) {
+        List<Map<String, Object>> listT1 = this.buildSmallRubberList(scheduleDateT1, factoryCode);
+        List<Map<String, Object>> listT2 = this.buildSmallRubberList(scheduleDateT2, factoryCode);
+
+        if (listT1.isEmpty() && listT2.isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        // 按胶种编码做 full outer join，保留 T+1 的胶种顺序，T+2 独有的胶种追加在末尾
+        Map<String, Map<String, Object>> mergedByRubber = new LinkedHashMap<>();
+
+        // 先放入 T+1 的数据
+        for (Map<String, Object> item : listT1) {
+            String rubberType = String.valueOf(item.get("rubberTypeName"));
+            Map<String, Object> row = new HashMap<>();
+            row.put("rubberTypeName", item.get("rubberTypeName"));
+            row.put("specPattern", item.get("specPattern"));
+            row.put("height", 30);
+            mergedByRubber.put(rubberType, row);
+        }
+
+        // 再合并 T+2 的数据，T+2 独有的胶种追加在末尾
+        for (Map<String, Object> item : listT2) {
+            String rubberType = String.valueOf(item.get("rubberTypeName"));
+            Map<String, Object> row = mergedByRubber.computeIfAbsent(rubberType, k -> {
+                Map<String, Object> r = new HashMap<>();
+                r.put("height", 30);
+                return r;
+            });
+            row.put("rubberTypeName2", item.get("rubberTypeName"));
+            row.put("specPattern2", item.get("specPattern"));
+        }
+
+        return new ArrayList<>(mergedByRubber.values());
+    }
+
+    /**
+     * 构建指定日期的模板参数映射表。
+     *
+     * <p>同一份查询逻辑，通过 keySuffix 区分两份模板的参数：</p>
+     * <ul>
+     *   <li>keySuffix="" → 原模板参数（无后缀，查T+1数据），如 cxNightQty、lhMorningQty</li>
+     *   <li>keySuffix="2" → 新模板参数（后缀2，查T+2数据），如 cxNightQty2、lhMorningQty2</li>
+     * </ul>
+     *
+     * @param reportDate         报告日期（标题日期、精度计划等用此日期）
+     * @param actualScheduleDate 排程数据查询日期（成型/硫化排程结果按此日期查）
      * @param factoryCode        分厂编码
      * @param classShiftTypeMap  班次类型映射
+     * @param keySuffix          key 后缀（"" 或 "2"）
      * @return 模板参数映射
      */
-    private Map<String, Object> buildTableMap(Date reportDate, Date actualScheduleDate, String factoryCode,
-                                              Map<Integer, String> classShiftTypeMap) {
+    private Map<String, Object> buildTableMapForDate(Date reportDate, Date actualScheduleDate, String factoryCode,
+                                                     Map<Integer, String> classShiftTypeMap, String keySuffix) {
         Map<String, Object> map = new HashMap<>(32);
 
-        map.put("titleDate", DateUtil.format(reportDate, "MM月dd日") + "计划排产\n"
+        map.put("titleDate" + keySuffix, DateUtil.format(reportDate, "MM月dd日") + "计划排产\n"
                 + "Ke hoach san xuat ngay " + DateUtil.format(reportDate, "dd/MM"));
 
         // 成型排程结果：查询排程日期（actualScheduleDate）的数据，
@@ -224,8 +313,8 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
                 new LambdaQueryWrapper<CxScheduleResult>()
                         .eq(CxScheduleResult::getScheduleDate, actualScheduleDate)
                         .eq(CxScheduleResult::getFactoryCode, factoryCode));
-        log.info("成型排程结果查询完成, 排程日期: {}, 报告日期: {}, 数量: {}",
-                DateUtil.formatDate(actualScheduleDate), DateUtil.formatDate(reportDate), cxResults.size());
+        log.info("成型排程结果查询完成[keySuffix={}], 排程日期: {}, 报告日期: {}, 数量: {}",
+                keySuffix, DateUtil.formatDate(actualScheduleDate), DateUtil.formatDate(reportDate), cxResults.size());
 
         BigDecimal cxNightTotal = BigDecimal.ZERO;
         BigDecimal cxMorningTotal = BigDecimal.ZERO;
@@ -237,13 +326,13 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
             cxMiddleTotal = cxMiddleTotal.add(nvl(result.getClass5PlanQty()));
         }
 
-        map.put("cxNightQty", cxNightTotal.toString());
-        map.put("cxMorningQty", cxMorningTotal.toString());
-        map.put("cxMiddleQty", cxMiddleTotal.toString());
-        map.put("cxTotalQty", cxNightTotal.add(cxMorningTotal).add(cxMiddleTotal).toString());
+        map.put("cxNightQty" + keySuffix, cxNightTotal.toString());
+        map.put("cxMorningQty" + keySuffix, cxMorningTotal.toString());
+        map.put("cxMiddleQty" + keySuffix, cxMiddleTotal.toString());
+        map.put("cxTotalQty" + keySuffix, cxNightTotal.add(cxMorningTotal).add(cxMiddleTotal).toString());
 
-        log.info("成型排程汇总 - 夜班: {}, 早班: {}, 中班: {}, 合计: {}",
-                cxNightTotal, cxMorningTotal, cxMiddleTotal,
+        log.info("成型排程汇总[keySuffix={}] - 夜班: {}, 早班: {}, 中班: {}, 合计: {}",
+                keySuffix, cxNightTotal, cxMorningTotal, cxMiddleTotal,
                 cxNightTotal.add(cxMorningTotal).add(cxMiddleTotal));
 
         // 硫化排程结果：查询排程日期（actualScheduleDate）的数据
@@ -252,7 +341,8 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
                         .eq(LhScheduleResult::getScheduleDate, actualScheduleDate)
                         .eq(LhScheduleResult::getFactoryCode, factoryCode)
                         .eq(LhScheduleResult::getIsDelete, DeleteFlagEnum.NORMAL.getCode()));
-        log.info("硫化排程结果查询完成, 日期: {}, 数量: {}", DateUtil.formatDate(actualScheduleDate), lhResults.size());
+        log.info("硫化排程结果查询完成[keySuffix={}], 日期: {}, 数量: {}",
+                keySuffix, DateUtil.formatDate(actualScheduleDate), lhResults.size());
 
         // 试制/量试信息：根据成型排程结果3/4/5班次有排计划量的示方书类型归集（T=量试，X=试制）
         Set<String> trialSpecs = new LinkedHashSet<>();
@@ -285,11 +375,11 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
                 setupSpecs.add(specDesc);
             }
         }
-        map.put("cxSetupInfo", setupSpecs.isEmpty() ? "无 Không" : String.join("，", setupSpecs));
-        map.put("cxTrialInfo", trialSpecs.isEmpty() ? "无 Không" : String.join("，", trialSpecs));
+        map.put("cxSetupInfo" + keySuffix, setupSpecs.isEmpty() ? "无 Không" : String.join("，", setupSpecs));
+        map.put("cxTrialInfo" + keySuffix, trialSpecs.isEmpty() ? "无 Không" : String.join("，", trialSpecs));
         // 成型规格切换：从T_MP_STRUCTURE_ALLOCATION取切换结构数据
         // 需同时传入reportDate和scheduleDate，支持非跨月和跨月两种场景
-        map.put("cxSpecSwitch", buildCxSpecSwitch(reportDate, actualScheduleDate, factoryCode));
+        map.put("cxSpecSwitch" + keySuffix, this.buildCxSpecSwitch(reportDate, actualScheduleDate, factoryCode));
 
         BigDecimal lhNightTotal = BigDecimal.ZERO;
         BigDecimal lhMorningTotal = BigDecimal.ZERO;
@@ -305,32 +395,32 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
         long morningMachines = countLhMachinesByShiftType(lhResults, classShiftTypeMap, "02");
         long middleMachines = countLhMachinesByShiftType(lhResults, classShiftTypeMap, "03");
 
-        map.put("lhNightQty", lhNightTotal.toString());
-        map.put("lhMorningQty", lhMorningTotal.toString());
-        map.put("lhMiddleQty", lhMiddleTotal.toString());
-        map.put("lhTotalQty", lhNightTotal.add(lhMorningTotal).add(lhMiddleTotal).toString());
-        map.put("lhNightMachines", String.valueOf(nightMachines));
-        map.put("lhMorningMachines", String.valueOf(morningMachines));
-        map.put("lhMiddleMachines", String.valueOf(middleMachines));
-        map.put("lhTotalMachines", String.valueOf(nightMachines + morningMachines + middleMachines));
+        map.put("lhNightQty" + keySuffix, lhNightTotal.toString());
+        map.put("lhMorningQty" + keySuffix, lhMorningTotal.toString());
+        map.put("lhMiddleQty" + keySuffix, lhMiddleTotal.toString());
+        map.put("lhTotalQty" + keySuffix, lhNightTotal.add(lhMorningTotal).add(lhMiddleTotal).toString());
+        map.put("lhNightMachines" + keySuffix, String.valueOf(nightMachines));
+        map.put("lhMorningMachines" + keySuffix, String.valueOf(morningMachines));
+        map.put("lhMiddleMachines" + keySuffix, String.valueOf(middleMachines));
+        map.put("lhTotalMachines" + keySuffix, String.valueOf(nightMachines + morningMachines + middleMachines));
 
-        log.info("硫化排程汇总 - 夜班: {}, 早班: {}, 中班: {}, 合计: {}, 开动机台 - 夜: {}, 早: {}, 中: {}, 合计: {}",
-                lhNightTotal, lhMorningTotal, lhMiddleTotal,
+        log.info("硫化排程汇总[keySuffix={}] - 夜班: {}, 早班: {}, 中班: {}, 合计: {}, 开动机台 - 夜: {}, 早: {}, 中: {}, 合计: {}",
+                keySuffix, lhNightTotal, lhMorningTotal, lhMiddleTotal,
                 lhNightTotal.add(lhMorningTotal).add(lhMiddleTotal),
                 nightMachines, morningMachines, middleMachines,
                 nightMachines + morningMachines + middleMachines);
 
         // 模具交替信息：取计划日期=reportDate且排程日期=actualScheduleDate且更换类型01/02的硫化机台(去重)
-        map.put("mouldChangeInfo", buildMouldChangeInfo(reportDate, actualScheduleDate, factoryCode));
+        map.put("mouldChangeInfo" + keySuffix, this.buildMouldChangeInfo(reportDate, actualScheduleDate, factoryCode));
 
         // 模具清洗日期和清洗信息：取计划日期=reportDate且排程日期=actualScheduleDate且更换类型03/04的硫化机台(去重)
-        map.put("mouldCleanDate", DateUtil.format(reportDate, "MM月dd日"));
-        map.put("mouldCleanInfo", buildMouldCleanInfo(reportDate, actualScheduleDate, factoryCode));
+        map.put("mouldCleanDate" + keySuffix, DateUtil.format(reportDate, "MM月dd日"));
+        map.put("mouldCleanInfo" + keySuffix, this.buildMouldCleanInfo(reportDate, actualScheduleDate, factoryCode));
 
         // 成型备注：取成型精度计划的排程日期在报告日期时间范围内要做的机台，成型精度做的时间固定在6:00~14:00
-        map.put("cxRemark", buildCxRemark(reportDate, factoryCode));
+        map.put("cxRemark" + keySuffix, this.buildCxRemark(reportDate, factoryCode));
         // 硫化备注：取硫化精度计划的排程日期在报告日期时间范围内要做的机台，时间及开产时间根据参数计算
-        map.put("lhRemark", buildLhRemark(reportDate, factoryCode));
+        map.put("lhRemark" + keySuffix, this.buildLhRemark(reportDate, factoryCode));
 
         return map;
     }
@@ -505,40 +595,40 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
     }
 
     /**
-     * 构建列表数据（小胶种列表，使用 {.xxx} 占位符）
+     * 构建小胶种列表数据（按胶种分组的行数据）。
      *
      * <p>取数逻辑：</p>
      * <ol>
      *   <li>从系统参数表读取TD胶种类型编码（PARAM_CODE=SYS04010002）</li>
      *   <li>从原材料消耗明细表按胶种类型查对应的胎胚（CHILD_MATERIAL_NAME='AQ'+胶种类型）</li>
      *   <li>匹配本次成型排程结果中的胎胚</li>
-     *   <li>通过胎胚编号关联物料主数据取规格+花纹，仅保留本次实际排产的物料</li>
-     *   <li>按胶种分组，同规格多花纹用"/"隔开，不同规格用","隔开</li>
-     *   <li>按示方类型（正规/量试/试制）在物料级别分组，每组规格花纹前加标题前缀，不同组用换行隔开</li>
+     *   <li>通过胎胚编号关联物料主数据取主胎胚描述(embryoDesc)，仅保留本次实际排产的物料</li>
+     *   <li>按胶种分组，多个主胎胚描述用","隔开</li>
+     *   <li>按示方类型（正规/量试/试制）在物料级别分组，每组主胎胚描述前加标题前缀，不同组用换行隔开</li>
      * </ol>
+     *
+     * <p>返回的每行 Map 仅包含 T+1 的 key（rubberTypeName、specPattern、height），
+     * 调用方可在此基础上补充 T+2 的 key（rubberTypeName2、specPattern2）。</p>
      *
      * @param scheduleDate 排程日期
      * @param factoryCode  分厂编码
-     * @return 列表数据
+     * @return 小胶种行数据列表（无数据返回空列表）
      */
-    private List<List<Map<String, Object>>> buildDataList(Date scheduleDate, String factoryCode) {
+    private List<Map<String, Object>> buildSmallRubberList(Date scheduleDate, String factoryCode) {
         List<Map<String, Object>> smallRubberList = new ArrayList<>();
 
-        List<String> rubberTypeCodes = loadRubberTypeCodes(factoryCode);
+        List<String> rubberTypeCodes = this.loadRubberTypeCodes(factoryCode);
         if (rubberTypeCodes.isEmpty()) {
             log.warn("未配置TD胶种类型编码（SYS04010002），小胶种列表为空");
-            List<List<Map<String, Object>>> dataList = new ArrayList<>();
-            dataList.add(smallRubberList);
-            return dataList;
+            return smallRubberList;
         }
 
         // 成型排程结果按排程日期查询，过滤掉3、4、5班次都没排计划量的胎胚
-        Date cxScheduleDate = scheduleDate;
         log.info("查询成型排程结果，排程日期: {}", scheduleDate);
 
         List<CxScheduleResult> cxResults = cxScheduleResultMapper.selectList(
                 new LambdaQueryWrapper<CxScheduleResult>()
-                        .eq(CxScheduleResult::getScheduleDate, cxScheduleDate)
+                        .eq(CxScheduleResult::getScheduleDate, scheduleDate)
                         .eq(CxScheduleResult::getFactoryCode, factoryCode));
         Set<String> scheduleEmbryoCodes = cxResults.stream()
                 .filter(this::hasAnyPlanQtyInShift345)
@@ -556,14 +646,12 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
 
         if (scheduleEmbryoCodes.isEmpty()) {
             log.warn("成型排程结果中无胎胚代码，小胶种列表为空");
-            List<List<Map<String, Object>>> dataList = new ArrayList<>();
-            dataList.add(smallRubberList);
-            return dataList;
+            return smallRubberList;
         }
 
         // 构建物料→示方类型集合映射（基于成型排程结果3/4/5班次的示方书类型，按物料级别映射）
         // 同一物料可能同时属于多种示方类型（如正规和量试），保留所有类型以便分别展示
-        Map<String, Set<String>> materialRecipeTypeMap = buildMaterialRecipeTypeMap(cxResults);
+        Map<String, Set<String>> materialRecipeTypeMap = this.buildMaterialRecipeTypeMap(cxResults);
         log.info("物料示方类型映射构建完成, 映射数量: {}", materialRecipeTypeMap.size());
 
         // 按胶种类型查询对应的胎胚，构建胶种→胎胚映射
@@ -647,7 +735,8 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
                 }
             }
 
-            // 按示方类型顺序构建规格花纹字符串：正规 → 量试 → 试制
+            // 按示方类型顺序构建主胎胚描述字符串：正规 → 量试 → 试制
+            // 取数口径：取物料主数据中的胎胚描述(embryoDesc)作为主胎胚描述，按胎胚描述去重
             List<String> recipeTypeOrder = Arrays.asList("S", "T", "X");
             List<String> groupParts = new ArrayList<>();
 
@@ -657,34 +746,22 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
                     continue;
                 }
 
-                Map<String, Set<String>> specPatternMap = new LinkedHashMap<>();
+                // 按主胎胚描述去重（同一胎胚下多条物料记录的胎胚描述相同，去重后保留唯一值）
+                Set<String> embryoDescSet = new LinkedHashSet<>();
                 for (MdmMaterialInfo materialInfo : materialsForType) {
-                    String spec = StringUtils.defaultString(materialInfo.getSpecifications()).trim();
-                    String pattern = StringUtils.defaultString(materialInfo.getPattern()).trim();
-                    if (StringUtils.isBlank(spec)) {
+                    String embryoDesc = StringUtils.defaultString(materialInfo.getEmbryoDesc()).trim();
+                    if (StringUtils.isBlank(embryoDesc)) {
                         continue;
                     }
-                    specPatternMap.computeIfAbsent(spec, k -> new LinkedHashSet<>());
-                    if (StringUtils.isNotBlank(pattern)) {
-                        specPatternMap.get(spec).add(pattern);
-                    }
+                    embryoDescSet.add(embryoDesc);
                 }
 
-                if (specPatternMap.isEmpty()) {
+                if (embryoDescSet.isEmpty()) {
                     continue;
                 }
 
-                List<String> specParts = new ArrayList<>();
-                for (Map.Entry<String, Set<String>> entry : specPatternMap.entrySet()) {
-                    StringBuilder sb = new StringBuilder(entry.getKey());
-                    if (!entry.getValue().isEmpty()) {
-                        sb.append(" ").append(String.join("/", entry.getValue()));
-                    }
-                    specParts.add(sb.toString());
-                }
-
-                String title = getRecipeTypeTitle(recipeType);
-                groupParts.add(title + String.join(",", specParts));
+                String title = this.getRecipeTypeTitle(recipeType);
+                groupParts.add(title + String.join(",", embryoDescSet));
             }
 
             Map<String, Object> item = new HashMap<>();
@@ -694,9 +771,7 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
             smallRubberList.add(item);
         }
 
-        List<List<Map<String, Object>>> dataList = new ArrayList<>();
-        dataList.add(smallRubberList);
-        return dataList;
+        return smallRubberList;
     }
 
     /**
