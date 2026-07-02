@@ -96,7 +96,7 @@ export default {
           type: "daterange",
         },
         {
-          label: this.$t("ui.tq.machineMaintenancePlan.column.machineName"),
+          label: this.$t("ui.tq.machineMaintenancePlan.column.machineCode"),
           prop: "machineCode",
           type: "select",
           dictData: this.machineList,
@@ -120,10 +120,10 @@ export default {
           },
         },
         {
-          prop: "machineName",
+          prop: "machineCode",
           align: "center",
           halign: "center",
-          label: this.$t("ui.tq.machineMaintenancePlan.column.machineName"),
+          label: this.$t("ui.tq.machineMaintenancePlan.column.machineCode"),
           minWidth: 120,
         },
         {

@@ -20,33 +20,29 @@
     </properties>
 
     <dependencies>
-<!--        <dependency>-->
-<!--            <groupId>com.zlt</groupId>-->
-<!--            <artifactId>zlt-module-starter</artifactId>-->
-<!--        </dependency>-->
-<!--        &lt;!&ndash; 使用第三方swagger的ui  范围地址：http://localhost:8080/doc.html &ndash;&gt;-->
-<!--        <dependency>-->
-<!--            <groupId>com.github.xiaoymin</groupId>-->
-<!--            <artifactId>swagger-bootstrap-ui</artifactId>-->
-<!--            <version>1.9.6</version>-->
-<!--        </dependency>-->
-
+        <dependency>
+            <groupId>com.zlt</groupId>
+            <artifactId>zlt-module-starter</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.baomidou</groupId>
+            <artifactId>mybatis-plus-boot-starter</artifactId>
+        </dependency>
         <dependency>
             <groupId>com.zlt.aps.gsq</groupId>
             <artifactId>aps-gsq-api</artifactId>
         </dependency>
-
-		<dependency>
-		    <groupId>org.springframework.boot</groupId>
-		    <artifactId>spring-boot-starter-test</artifactId>
-		</dependency>
 
         <!-- APS公共模块 -->
         <dependency>
             <groupId>com.zlt.aps</groupId>
             <artifactId>aps-common-core</artifactId>
         </dependency>
-
+        <!-- APS基础模块（提供分布式锁等基础设施） -->
+        <dependency>
+            <groupId>com.zlt.aps</groupId>
+            <artifactId>aps-base</artifactId>
+        </dependency>
         <!-- 算法引擎模块 -->
         <dependency>
             <groupId>com.zlt.aps.gsq</groupId>
@@ -63,51 +59,35 @@
             <artifactId>ruoyi-common-log</artifactId>
         </dependency>
         <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
             <groupId>com.ruoyi</groupId>
             <artifactId>ruoyi-common-swagger</artifactId>
         </dependency>
+        <!-- APS主数据 -->
+        <dependency>
+            <groupId>com.zlt.aps</groupId>
+            <artifactId>aps-maindata</artifactId>
+        </dependency>
     </dependencies>
 
-<!--    <build>-->
-<!--        <finalName>${project.artifactId}</finalName>-->
-<!--        <plugins>-->
-<!--            <plugin>-->
-<!--                <groupId>org.springframework.boot</groupId>-->
-<!--                <artifactId>spring-boot-maven-plugin</artifactId>-->
-<!--                <executions>-->
-<!--                    <execution>-->
-<!--                        <goals>-->
-<!--                            <goal>repackage</goal>-->
-<!--                        </goals>-->
-<!--                    </execution>-->
-<!--                </executions>-->
-<!--            </plugin>-->
-<!--        </plugins>-->
-<!--    </build>-->
-
-<!--    <distributionManagement>-->
-<!--        <snapshotRepository>-->
-<!--            <id>local-snapshot</id>-->
-<!--            <url>http://192.168.2.95:8081/nexus/content/repositories/snapshots/</url>-->
-<!--        </snapshotRepository>-->
-
-<!--        <repository>-->
-<!--            <id>local-release</id>-->
-<!--            <url>http://192.168.2.95:8081/nexus/content/repositories/releases/</url>-->
-<!--        </repository>-->
-<!--    </distributionManagement>-->
-
-<!--    <repositories>-->
-<!--        <repository>-->
-<!--            <id>local-snapshot</id>-->
-<!--            <url>http://192.168.2.95:8081/nexus/content/groups/public</url>-->
-<!--            <releases>-->
-<!--                <enabled>true</enabled>-->
-<!--            </releases>-->
-<!--            <snapshots>-->
-<!--                &lt;!&ndash; 默认不下载快照版本，这里开启下载快照版本到本地仓库 &ndash;&gt;-->
-<!--                <enabled>true</enabled>-->
-<!--            </snapshots>-->
-<!--        </repository>-->
-<!--    </repositories>-->
+    <build>
+        <finalName>${project.artifactId}</finalName>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>repackage</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
 </project>

@@ -90,8 +90,9 @@ export default {
           required: true,
           type: "number",
           min: 0,
-          max: 99.99,
+          max: 100,
           precision: 2,
+          append: "%",
         },
         {
           label: this.$t("ui.common.column.remark"),
@@ -108,7 +109,10 @@ export default {
     async save(params) {
       try {
         this.loading = true;
-
+        // 将百分比转换为小数存储（如 2 → 0.02）
+        if (params.lossRate != null) {
+          params.lossRate = parseFloat((params.lossRate / 100).toFixed(4));
+        }
         const res = await editLoss(params);
         this.$modal.msgSuccess(res.msg);
         this.$emit("success");
@@ -128,6 +132,7 @@ export default {
         this.isEdit = true;
         this.form = {
           ...data,
+          lossRate: data.lossRate != null ? parseFloat((data.lossRate * 100).toFixed(2)) : null,
         };
       }
     },

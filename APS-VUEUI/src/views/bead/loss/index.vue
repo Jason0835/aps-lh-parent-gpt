@@ -129,8 +129,7 @@ export default {
             if (value == 0 || value == null) {
               return "0%";
             }
-            var str = value.toFixed(2);
-            return (str += "%");
+            return (value * 100).toFixed(2) + "%";
           },
         },
         {

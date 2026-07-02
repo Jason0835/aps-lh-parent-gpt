@@ -158,12 +158,12 @@ export default {
         scheduleDateQuery: getOffsetDate(1),
       },
       dateList: [
-        { shift: 1, shiftType: "night", shiftDate: "" },
-        { shift: 2, shiftType: "morning", shiftDate: "" },
-        { shift: 3, shiftType: "afternoon", shiftDate: "" },
-        { shift: 4, shiftType: "night", shiftDate: "" },
-        { shift: 5, shiftType: "morning", shiftDate: "" },
-        { shift: 6, shiftType: "afternoon", shiftDate: "" },
+        { shift: 1, shiftType: "afternoon", shiftDate: "" },
+        { shift: 2, shiftType: "night", shiftDate: "" },
+        { shift: 3, shiftType: "morning", shiftDate: "" },
+        { shift: 4, shiftType: "afternoon", shiftDate: "" },
+        { shift: 5, shiftType: "night", shiftDate: "" },
+        { shift: 6, shiftType: "morning", shiftDate: "" },
       ],
     };
   },
@@ -623,6 +623,11 @@ export default {
         this.loading = false;
       }
     },
+  },
+  created() {
+    // 首次进入页面时初始化班次日期并加载数据
+    this.$store.dispatch("tqBead/getMachineList");
+    this.getList();
   },
   activated() {
     this.$store.dispatch("tqBead/getMachineList");
