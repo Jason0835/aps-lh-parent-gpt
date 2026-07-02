@@ -2,7 +2,6 @@ package com.zlt.aps.lh.handler;
 
 import com.zlt.aps.lh.api.constant.LhScheduleConstant;
 import com.zlt.aps.lh.api.constant.LhScheduleParamConstant;
-import com.zlt.aps.lh.api.domain.dto.CuringMonthPlanTotalResult;
 import com.zlt.aps.lh.api.domain.dto.MachineScheduleDTO;
 import com.zlt.aps.lh.api.domain.dto.SkuDailyPlanQuotaDTO;
 import com.zlt.aps.lh.api.domain.dto.SkuScheduleDTO;
@@ -14,16 +13,11 @@ import com.zlt.aps.lh.api.enums.ConstructionStageEnum;
 import com.zlt.aps.lh.api.enums.ScheduleStepEnum;
 import com.zlt.aps.lh.api.enums.ScheduleTypeEnum;
 import com.zlt.aps.lh.api.enums.SkuTagEnum;
-import com.zlt.aps.lh.component.CuringMonthPlanTotalCalculator;
 import com.zlt.aps.lh.component.MonthPlanDateResolver;
 import com.zlt.aps.lh.component.TargetScheduleQtyResolver;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.strategy.IEndingJudgmentStrategy;
-import com.zlt.aps.lh.util.LhScheduleTimeUtil;
-import com.zlt.aps.lh.util.MonthPlanDayQtyUtil;
-import com.zlt.aps.lh.util.PriorityTraceLogHelper;
-import com.zlt.aps.lh.util.ShiftFieldUtil;
-import com.zlt.aps.lh.util.SkuDailyPlanQuotaUtil;
+import com.zlt.aps.lh.util.*;
 import com.zlt.aps.mdm.api.domain.entity.MdmSkuLhCapacity;
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import lombok.extern.slf4j.Slf4j;
@@ -36,16 +30,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.ZoneId;
-import java.util.ArrayList;
-import java.util.Calendar;
-import java.util.Date;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
+import java.util.*;
 
 /**
  * S4.3 排程调整与SKU归集处理器。
@@ -67,37 +52,63 @@ import java.util.Set;
 @Component
 public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
 
-    /** 无排产目标量未排产提示 */
+    /**
+     * 无排产目标量未排产提示
+     */
     private static final String NO_PLAN_QTY_REASON_TEMPLATE = "物料：%s 没有排产目标量，不进行排产";
-    /** 余量与胎胚库存均为0时的未排产提示 */
+    /**
+     * 余量与胎胚库存均为0时的未排产提示
+     */
     private static final String ZERO_SURPLUS_AND_EMBRYO_REASON_TEMPLATE =
             "物料：%s 余量为0且胎胚库存为0，不需要排产";
-    /** 无窗口计划量但存在余量/正向结转目标量提示 */
+    /**
+     * 无窗口计划量但存在余量/正向结转目标量提示
+     */
     private static final String TARGET_QTY_ONLY_WARN_TEMPLATE =
             "物料：%s 当前排程窗口没有计划量，但存在月计划余量/正向结转目标量[%d]，继续排产";
-    /** 开产管控缺口未排提示 */
+    /**
+     * 开产管控缺口未排提示
+     */
     private static final String OPEN_PRODUCTION_SHORTAGE_REASON_TEMPLATE =
             "物料：%s 开产管控导致排产目标量低于待排量，待排量[%d]，目标量[%d]，缺口[%d]，缺口比例[%s]，阈值[%s]";
-    /** 满排模式下无窗口计划量仍继续排产提示 */
+    /**
+     * 满排模式下无窗口计划量仍继续排产提示
+     */
     private static final String FULL_CAPACITY_WARN_TEMPLATE =
             "物料：%s 当前排程窗口没有计划量，但按产能满排模式生成排产目标量[%d]，继续排产";
-    /** 共用胎胚余量为0未排提示 */
+    /**
+     * 共用胎胚余量为0未排提示
+     */
     private static final String SHARED_EMBRYO_ZERO_SURPLUS_UNSCHEDULED_REASON =
             "共用胎胚且硫化余量为0";
-    /** 窗口无日计划且无本月历史欠产的新增SKU未排提示 */
+    /**
+     * 窗口无日计划且无本月历史欠产的新增SKU未排提示
+     */
     private static final String WINDOW_NO_PLAN_NO_SHORTAGE_UNSCHEDULED_REASON =
             "当前排程窗口无日计划，后续远期有计划，禁止提前消耗未来计划";
-    /** 上月超欠产有效标识 */
+    /**
+     * 上月超欠产有效标识
+     */
     private static final String LAST_MONTH_OVERDUE_VALID_FLAG = "1";
-    /** 自动排程数据来源 */
+    /**
+     * 自动排程数据来源
+     */
     private static final String DATA_SOURCE_AUTO = "0";
-    /** 正常删除标识 */
+    /**
+     * 正常删除标识
+     */
     private static final int DELETE_FLAG_NORMAL = 0;
-    /** 比例展示小数位 */
+    /**
+     * 比例展示小数位
+     */
     private static final int RATE_DISPLAY_SCALE = 4;
-    /** 月计划最小自然日 */
+    /**
+     * 月计划最小自然日
+     */
     private static final int MIN_DAY_OF_MONTH = 1;
-    /** 月计划最大自然日 */
+    /**
+     * 月计划最大自然日
+     */
     private static final int MAX_DAY_OF_MONTH = 31;
 
     @Resource
@@ -366,7 +377,7 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
      * 判断是否为共用胎胚零余量SKU。
      *
      * @param context 排程上下文
-     * @param sku SKU排程DTO
+     * @param sku     SKU排程DTO
      * @return true-命中共用胎胚零余量；false-未命中
      */
     private boolean isSharedEmbryoZeroSurplusSku(LhScheduleContext context, SkuScheduleDTO sku) {
@@ -381,7 +392,7 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
      * 写入共用胎胚零余量未排结果。
      *
      * @param context 排程上下文
-     * @param sku SKU排程DTO
+     * @param sku     SKU排程DTO
      */
     private void addSharedEmbryoZeroSurplusUnscheduledResult(LhScheduleContext context, SkuScheduleDTO sku) {
         LhUnscheduledResult unscheduled = buildBaseUnscheduledResult(context, sku);
@@ -421,7 +432,7 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
     /**
      * 记录共用胎胚剔除后的动态归一化结果。
      *
-     * @param context 排程上下文
+     * @param context           排程上下文
      * @param affectedEmbryoSet 发生剔除的胎胚集合
      */
     private void logNormalizedEmbryoGroups(LhScheduleContext context, Set<String> affectedEmbryoSet) {
@@ -442,9 +453,9 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
      * <p>该场景必须复用单胎胚收尾目标量口径：MAX(硫化余量, 胎胚库存)，
      * 同时由目标量解析器同步日计划账本，避免后续 S4.4/S4.5 回裁为原窗口量。</p>
      *
-     * @param context 排程上下文
+     * @param context           排程上下文
      * @param affectedEmbryoSet 发生剔除的胎胚集合
-     * @param remainingSkuList 剩余可排SKU
+     * @param remainingSkuList  剩余可排SKU
      */
     private void normalizeDynamicSingleEmbryoEndingSkus(LhScheduleContext context,
                                                         Set<String> affectedEmbryoSet,
@@ -484,7 +495,7 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
      * 统计同胎胚原始SKU数量。
      *
      * @param context 排程上下文
-     * @param sku SKU排程DTO
+     * @param sku     SKU排程DTO
      * @return 同胎胚SKU数量
      */
     private int resolveOriginalSharedEmbryoSkuCount(LhScheduleContext context, SkuScheduleDTO sku) {
@@ -511,7 +522,7 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
      * 统计当前胎胚有效SKU数量。
      *
      * @param context 排程上下文
-     * @param sku SKU排程DTO
+     * @param sku     SKU排程DTO
      * @return 有效SKU数量
      */
     private int resolveActiveEmbryoSkuCount(LhScheduleContext context, SkuScheduleDTO sku) {
@@ -532,7 +543,11 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
      * @return 硫化余量（Max(月度计划总量 - 已完成量 + 有效上月超欠产量, 0)）
      */
     public int calculatePlanSurplusQty(LhScheduleContext context, FactoryMonthPlanProductionFinalResult plan) {
-        return this.calculateSurplusQty(context, plan).getSurplusQty();
+        SurplusCalculation surplusCalculation = calculateSurplusQty(context, plan);
+        if (null == surplusCalculation) {
+            return BigDecimal.ZERO.intValue();
+        }
+        return surplusCalculation.getSurplusQty();
     }
 
     /**
@@ -550,23 +565,41 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
     private SurplusCalculation calculateSurplusQty(LhScheduleContext context, FactoryMonthPlanProductionFinalResult plan) {
         int actualFinishedQty = calculateFinishedQty(context, plan);
         int scheDayFinishQty = resolveScheDayFinishQty(context, plan.getMaterialCode());
-        int lastMonthOverdueQty = resolveEffectiveLastMonthOverdueQty(plan);
-        CuringMonthPlanTotalResult monthPlanTotalResult = CuringMonthPlanTotalCalculator.calculate(
-                context, plan, toLocalDate(context.getScheduleDate()), toLocalDate(context.getWindowEndDate()),
-                actualFinishedQty, lastMonthOverdueQty);
-        int totalPlanQty = monthPlanTotalResult.getMonthPlanTotal();
+        //20260702+ 欠产都只看当月
+        int lastMonthOverdueQty;
+        FactoryMonthPlanProductionFinalResult firstMonthPlan = context.getSkuYearMonthFinal(plan, context.getFirstYearMonth());
+        if (null == firstMonthPlan) {
+            lastMonthOverdueQty = BigDecimal.ZERO.intValue();
+        } else {
+            lastMonthOverdueQty = resolveEffectiveLastMonthOverdueQty(firstMonthPlan);
+
+        }
+//        CuringMonthPlanTotalResult monthPlanTotalResult = CuringMonthPlanTotalCalculator.calculate(
+//                context, plan, toLocalDate(context.getScheduleDate()), toLocalDate(context.getWindowEndDate()),
+//                actualFinishedQty, lastMonthOverdueQty);
+//        int totalPlanQty = monthPlanTotalResult.getMonthPlanTotal();
+        //20260702+ 计划量，支持跨月连续
+        int totalPlanQty = context.getPlanQty(plan);
         int remainingDemandQty = Math.max(0, totalPlanQty - actualFinishedQty + lastMonthOverdueQty);
         // 保留逐日超产统计用于诊断日志，不参与余量计算
         int ignoredOverProductionQty = calculateIgnoredOverProductionQty(context, plan);
-        if (lastMonthOverdueQty != 0 || scheDayFinishQty > 0 || monthPlanTotalResult.isCrossMonth()) {
+//        if (lastMonthOverdueQty != 0 || scheDayFinishQty > 0 || monthPlanTotalResult.isCrossMonth()) {
+//            log.info("硫化余量计算完成, materialCode: {}, monthPlanQty: {}, monthFinishedAndScheDayQty: {}, "
+//                            + "scheDayFinishQty: {}, lastMonthValidFlag: {}, lastMonthOverdueQty: {}, surplusQty: {}, "
+//                            + "crossMonth: {}, breakPointDate: {}, currentMonthPlanTotal: {}, crossMonthPlanTotal: {}, scene: {}",
+//                    plan.getMaterialCode(), totalPlanQty, actualFinishedQty, scheDayFinishQty,
+//                    plan.getLastMonthValidFlag(), lastMonthOverdueQty, remainingDemandQty,
+//                    monthPlanTotalResult.isCrossMonth(), monthPlanTotalResult.getBreakPointDate(),
+//                    monthPlanTotalResult.getCurrentMonthPlanTotal(), monthPlanTotalResult.getCrossMonthPlanTotal(),
+//                    monthPlanTotalResult.getCalculateScene());
+//        }
+        if (lastMonthOverdueQty != 0 || scheDayFinishQty > 0 || context.isCrossMonthByProductionDateInfo()) {
             log.info("硫化余量计算完成, materialCode: {}, monthPlanQty: {}, monthFinishedAndScheDayQty: {}, "
                             + "scheDayFinishQty: {}, lastMonthValidFlag: {}, lastMonthOverdueQty: {}, surplusQty: {}, "
-                            + "crossMonth: {}, breakPointDate: {}, currentMonthPlanTotal: {}, crossMonthPlanTotal: {}, scene: {}",
+                            + "crossMonth: {}",
                     plan.getMaterialCode(), totalPlanQty, actualFinishedQty, scheDayFinishQty,
                     plan.getLastMonthValidFlag(), lastMonthOverdueQty, remainingDemandQty,
-                    monthPlanTotalResult.isCrossMonth(), monthPlanTotalResult.getBreakPointDate(),
-                    monthPlanTotalResult.getCurrentMonthPlanTotal(), monthPlanTotalResult.getCrossMonthPlanTotal(),
-                    monthPlanTotalResult.getCalculateScene());
+                    context.isCrossMonthByProductionDateInfo());
         }
         return new SurplusCalculation(remainingDemandQty, actualFinishedQty, ignoredOverProductionQty,
                 lastMonthOverdueQty, totalPlanQty);
@@ -626,7 +659,7 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
      * 按月计划所属年月解析月累计完成量。
      *
      * @param context 排程上下文
-     * @param plan 月计划
+     * @param plan    月计划
      * @return 月累计完成量，未初始化时返回null
      */
     private Integer resolveMaterialMonthFinishedQty(LhScheduleContext context,
@@ -651,7 +684,7 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
      * 统计本月已发生日期和 T 日晚班中的逐日超产量（仅用于诊断日志，不参与硫化余量计算）。
      *
      * @param context 排程上下文
-     * @param plan 月生产计划记录
+     * @param plan    月生产计划记录
      * @return 被忽略的超产量
      */
     private int calculateIgnoredOverProductionQty(LhScheduleContext context,
@@ -684,8 +717,8 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
     /**
      * 获取指定物料的T日排程班次完成量（class1FinishQty汇总值）。
      *
-     * @param context       排程上下文
-     * @param materialCode  物料编码
+     * @param context      排程上下文
+     * @param materialCode 物料编码
      * @return T日班次完成量，无记录时返回0
      */
     private int resolveScheDayFinishQty(LhScheduleContext context, String materialCode) {
@@ -715,8 +748,8 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
     /**
      * 根据月生产计划构建SKU排程DTO
      *
-     * @param context    排程上下文
-     * @param plan       月生产计划记录
+     * @param context 排程上下文
+     * @param plan    月生产计划记录
      * @param surplus 硫化余量
      * @return SKU排程DTO
      */
@@ -876,7 +909,7 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
      * 需要对齐到 scheduleTargetDate 所属月份，避免跨月保存时串到基础计划月份。</p>
      *
      * @param context 排程上下文
-     * @param plan SKU归集基础月计划
+     * @param plan    SKU归集基础月计划
      * @return 目标月月计划，缺失时回退基础计划
      */
     private FactoryMonthPlanProductionFinalResult resolveTargetMonthPlan(LhScheduleContext context,
@@ -923,7 +956,7 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
      * <p>共用胎胚是否分摊依赖收尾标注结果，不能在DTO构建阶段提前分摊。</p>
      *
      * @param context 排程上下文
-     * @param plan 月计划
+     * @param plan    月计划
      * @return SKU原始胎胚库存，-1表示库存未知
      */
     private int resolveRawEmbryoStock(LhScheduleContext context,
@@ -944,8 +977,8 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
      * <p>按排程窗口覆盖的每个自然日，读取月计划对应 dayN 的日计划量，初始化每日额度。</p>
      * <p>依赖 {@link MonthPlanDateResolver#resolveDayQty} 按业务日期所属年月和产品状态读取 dayN 字段。</p>
      *
-     * @param context 排程上下文
-     * @param plan 月计划记录
+     * @param context      排程上下文
+     * @param plan         月计划记录
      * @param materialCode 物料编码
      * @return 按日期排序的日计划额度Map，key=生产日期
      */
@@ -1000,7 +1033,7 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
      * 扣减策略：从最早日期开始依次扣减，直到继承量全部扣完。</p>
      *
      * @param dailyPlanQuotaMap 日计划额度账本
-     * @param inheritedPlanQty 待扣减的继承量
+     * @param inheritedPlanQty  待扣减的继承量
      */
     private void deductInheritedFromDailyQuota(Map<LocalDate, SkuDailyPlanQuotaDTO> dailyPlanQuotaMap,
                                                int inheritedPlanQty) {
@@ -1030,9 +1063,9 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
      * 从日计划额度账本中扣减T日排程晚班完成量。
      * <p>T日晚班完成量已经计入月计划完成量，日计划账本也必须同步扣减，避免续作首日重复排产。</p>
      *
-     * @param context 排程上下文
+     * @param context           排程上下文
      * @param dailyPlanQuotaMap 日计划额度账本
-     * @param materialCode 物料编码
+     * @param materialCode      物料编码
      */
     private void deductScheDayFinishFromDailyQuota(LhScheduleContext context,
                                                    Map<LocalDate, SkuDailyPlanQuotaDTO> dailyPlanQuotaMap,
@@ -1057,8 +1090,8 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
      * <p>只处理当前排程月份内、早于 T 日的历史欠产；上月欠产和超产都不参与当前窗口。</p>
      *
      * @param dailyPlanQuotaMap 日计划额度账本
-     * @param carryForwardQty 本月历史欠产量
-     * @param materialCode 物料编码
+     * @param carryForwardQty   本月历史欠产量
+     * @param materialCode      物料编码
      */
     private void applyCarryForwardToDailyQuota(Map<LocalDate, SkuDailyPlanQuotaDTO> dailyPlanQuotaMap,
                                                int carryForwardQty,
@@ -1078,8 +1111,8 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
      * 解析当前窗口实际生效的本月历史欠产量。
      * <p>只允许正向欠产进入当前窗口；超产和上月欠产已经在归集阶段被过滤。</p>
      *
-     * @param context 排程上下文
-     * @param materialCode 物料编码
+     * @param context            排程上下文
+     * @param materialCode       物料编码
      * @param rawCarryForwardQty 原始本月历史欠产量
      * @return 生效净值
      */
@@ -1113,7 +1146,7 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
      * 按日期顺序扣减日计划额度。
      *
      * @param dailyPlanQuotaMap 日计划额度账本
-     * @param qty 待扣减数量
+     * @param qty               待扣减数量
      * @return 实际扣减数量
      */
     private int deductQuotaByDateOrder(Map<LocalDate, SkuDailyPlanQuotaDTO> dailyPlanQuotaMap, int qty) {
@@ -1142,8 +1175,8 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
     /**
      * 解析停产收尾需求量。
      *
-     * @param context 排程上下文
-     * @param plan 月计划
+     * @param context     排程上下文
+     * @param plan        月计划
      * @param embryoStock 胎胚库存
      * @return 停产收尾需求量
      */
@@ -1162,9 +1195,9 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
      * 解析常规待排需求量。
      * <p>待排需求 = Max(月计划余量 - 已继承量, 0) 与胎胚库存取大。</p>
      *
-     * @param surplusQty 月计划余量
+     * @param surplusQty       月计划余量
      * @param inheritedPlanQty 已继承量
-     * @param embryoStock 胎胚库存
+     * @param embryoStock      胎胚库存
      * @return 待排需求量
      */
     private int resolveBasePendingQty(int surplusQty,
@@ -1179,7 +1212,7 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
      * 解析停产日月计划量。
      *
      * @param context 排程上下文
-     * @param plan 月计划
+     * @param plan    月计划
      * @return 停产日计划量
      */
     private int resolveStopDayPlanQty(LhScheduleContext context, FactoryMonthPlanProductionFinalResult plan) {
@@ -1203,7 +1236,7 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
      * <p>仅用于 S4.5 新增排产区分“本月整体收尾”和“当前窗口仅补欠产”，不参与 S4.4 续作。</p>
      *
      * @param context 排程上下文
-     * @param plan 月计划记录
+     * @param plan    月计划记录
      * @return 窗口结束后到已加载覆盖末日的后续日计划汇总
      */
     private int resolveFutureMonthPlanQtyAfterWindow(LhScheduleContext context,
@@ -1232,9 +1265,9 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
      * 解析后续计划扫描上界。
      * <p>优先以当前已加载月计划的最晚自然月月末为上界，避免读取未加载月份时把真实未来计划误判为 0。</p>
      *
-     * @param context 排程上下文
-     * @param materialCode 物料编码
-     * @param productStatus 产品状态
+     * @param context        排程上下文
+     * @param materialCode   物料编码
+     * @param productStatus  产品状态
      * @param defaultEndDate 默认扫描上界
      * @return 实际扫描上界
      */
@@ -1280,7 +1313,7 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
      * 只作为增机台和窗口内满班保留依据，不写入 T～T+2 日计划扣账账本。</p>
      *
      * @param context 排程上下文
-     * @param plan 月计划记录
+     * @param plan    月计划记录
      * @return 窗口后第一天日计划量
      */
     private int resolveNextDayPlanQtyAfterWindow(LhScheduleContext context,
@@ -1298,7 +1331,7 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
     /**
      * 按月计划含损耗需求折算停产日计划量。
      *
-     * @param plan 月计划
+     * @param plan           月计划
      * @param stopDayPlanQty 停产日计划量
      * @return 含损耗停产日计划量
      */
@@ -1320,7 +1353,7 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
      * 达到开产欠产阈值时写入现有未排结果链路。
      *
      * @param context 排程上下文
-     * @param sku SKU排程DTO
+     * @param sku     SKU排程DTO
      * @return void
      */
     private void appendOpenProductionShortageIfNecessary(LhScheduleContext context, SkuScheduleDTO sku) {
@@ -1356,7 +1389,7 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
      * 追加"无计划量不排产"的未排结果。
      *
      * @param context 排程上下文
-     * @param sku SKU排程DTO
+     * @param sku     SKU排程DTO
      */
     private void addNoPlanUnscheduledResult(LhScheduleContext context, SkuScheduleDTO sku) {
         String reason = resolveNoPlanUnscheduledReason(sku);
@@ -1398,7 +1431,7 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
      * 构建未排结果公共字段。
      *
      * @param context 排程上下文
-     * @param sku SKU排程DTO
+     * @param sku     SKU排程DTO
      * @return 未排结果
      */
     private LhUnscheduledResult buildBaseUnscheduledResult(LhScheduleContext context, SkuScheduleDTO sku) {
@@ -1436,7 +1469,7 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
      * 解析欠/超产传导使用的计划量。
      *
      * @param context 排程上下文
-     * @param result 前批次排程结果
+     * @param result  前批次排程结果
      * @return 参与传导的计划量
      */
     private int resolveCarryForwardPlanQty(LhScheduleContext context, LhScheduleResult result) {
@@ -1473,8 +1506,8 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
     /**
      * 获取指定日期的物料日完成量（按"物料+产品状态+日期"聚合）。
      *
-     * @param context 排程上下文
-     * @param plan 月计划
+     * @param context    排程上下文
+     * @param plan       月计划
      * @param finishDate 完成日期
      * @return 日完成量
      */
@@ -1492,16 +1525,16 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
     /**
      * 统计当前排程月份内、且早于 T 日的历史欠产摘要。
      *
-     * @param context 排程上下文
-     * @param plan 月计划
+     * @param context        排程上下文
+     * @param plan           月计划
      * @param monthStartDate 当前排程月份起始日
      * @param historyEndDate 历史统计截止日（T-1）
      * @return 历史欠产摘要
      */
     private MonthlyShortageSummary calculateCurrentMonthShortageSummary(LhScheduleContext context,
-                                                                       FactoryMonthPlanProductionFinalResult plan,
-                                                                       LocalDate monthStartDate,
-                                                                       LocalDate historyEndDate) {
+                                                                        FactoryMonthPlanProductionFinalResult plan,
+                                                                        LocalDate monthStartDate,
+                                                                        LocalDate historyEndDate) {
         if (Objects.isNull(context) || Objects.isNull(plan) || StringUtils.isEmpty(plan.getMaterialCode())
                 || Objects.isNull(monthStartDate) || Objects.isNull(historyEndDate)
                 || historyEndDate.isBefore(monthStartDate)) {
@@ -1539,7 +1572,7 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
     /**
      * 记录被忽略的上月欠产边界，便于核对月初不跨月追补。
      *
-     * @param context 排程上下文
+     * @param context        排程上下文
      * @param monthStartDate 当前排程月份起始日
      */
     private void logIgnoredPreviousMonthCarryForward(LhScheduleContext context, LocalDate monthStartDate) {
@@ -1558,8 +1591,8 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
     /**
      * 获取当前排程月份内某个物料+产品状态在指定自然日的完成量。
      *
-     * @param context 排程上下文
-     * @param plan 月计划
+     * @param context        排程上下文
+     * @param plan           月计划
      * @param productionDate 自然日
      * @return 日完成量
      */
@@ -1578,7 +1611,7 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
     /**
      * 构建"物料+产品状态"聚合Key。
      *
-     * @param materialCode 物料编码
+     * @param materialCode  物料编码
      * @param productStatus 产品状态
      * @return 聚合Key
      */
@@ -1593,9 +1626,9 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
     /**
      * 构建"物料+产品状态+日期"聚合Key。
      *
-     * @param materialCode 物料编码
+     * @param materialCode  物料编码
      * @param productStatus 产品状态
-     * @param date 日期
+     * @param date          日期
      * @return 聚合Key
      */
     private String buildMaterialDayKey(String materialCode, String productStatus, Date date) {
@@ -1640,7 +1673,7 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
     private boolean isPreviousBaselineFromScheduleDate(LhScheduleContext context) {
         return context.isRollingScheduleHandoff()
                 || context.getParamIntValue(LhScheduleParamConstant.FORCE_RESCHEDULE,
-                        LhScheduleConstant.FORCE_RESCHEDULE) == LhScheduleConstant.FORCE_RESCHEDULE_ENABLED;
+                LhScheduleConstant.FORCE_RESCHEDULE) == LhScheduleConstant.FORCE_RESCHEDULE_ENABLED;
     }
 
     /**
@@ -1672,7 +1705,7 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
      * <p>从月计划 IS_LOCK_SCHEDULE 字段取值：1-锁定，0-未锁定。</p>
      *
      * @param context 排程上下文
-     * @param plan 目标月计划
+     * @param plan    目标月计划
      * @return true-有锁定交期
      */
     private boolean isDeliveryLocked(LhScheduleContext context, FactoryMonthPlanProductionFinalResult plan) {
@@ -1850,7 +1883,7 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
      * 追加窗口无计划且无本月历史欠产的新增SKU未排结果和排程过程日志。
      *
      * @param context 排程上下文
-     * @param sku SKU排程DTO
+     * @param sku     SKU排程DTO
      */
     private void appendWindowNoPlanNewSkuUnscheduledResult(LhScheduleContext context, SkuScheduleDTO sku) {
         LhUnscheduledResult unscheduled = buildBaseUnscheduledResult(context, sku);
@@ -1910,10 +1943,11 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
     /**
      * 按机台最近MES在机记录匹配续作SKU
      *
-     * @param machineCode      机台编码
-     * @param onlineInfo       机台最近MES在机记录
-     * @param skuByMaterialMap 物料编码 -> 待匹配SKU列表
-     * @param continuousSkuList 续作SKU列表
+     * @param machineCode         机台编码
+     * @param materialCode        Sku编码
+     * @param skuByMaterialMap    物料编码 -> 待匹配SKU列表
+     * @param materialSkuCountMap
+     * @param continuousSkuList   续作SKU列表
      */
     private void assignContinuousSku(String machineCode,
                                      String materialCode,
@@ -1960,7 +1994,7 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
      * <p>副本复制源SKU的核心计划量、产能、状态字段，并<b>共享</b> {@code dailyPlanQuotaMap}，
      * 确保多台机台排产时共用同一个日计划额度账本。</p>
      *
-     * @param source 源SKU（模板）
+     * @param source      源SKU（模板）
      * @param machineCode 目标机台编码
      * @return 副本SKU，sharedDailyPlanQuotaMap 指向源SKU的同一实例
      */
@@ -2048,10 +2082,10 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
      * 解析机台本轮续作应承接的物料编码。
      * <p>滚动衔接已继承且未收尾时，以继承后的机台当前物料为准；否则沿用 MES 在机物料。</p>
      *
-     * @param context 排程上下文
+     * @param context     排程上下文
      * @param machineCode 机台编码
-     * @param machine 机台状态
-     * @param onlineInfo MES 在机快照
+     * @param machine     机台状态
+     * @param onlineInfo  MES 在机快照
      * @return 续作物料编码
      */
     private String resolveContinuousMaterialCode(LhScheduleContext context,
@@ -2068,9 +2102,9 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
     /**
      * 解析滚动衔接后机台应继续承接的当前物料。
      *
-     * @param context 排程上下文
+     * @param context     排程上下文
      * @param machineCode 机台编码
-     * @param machine 机台状态
+     * @param machine     机台状态
      * @return 未收尾的继承当前物料；不存在时返回 null
      */
     private String resolveRollingContinuousMaterialCode(LhScheduleContext context,

@@ -245,8 +245,9 @@ export default {
       this.page.current = 1;
       this.getList();
     },
-    handlePageChange(page) {
-      this.page.current = page;
+    handlePageChange(current, pageSize) {
+      this.page.current = current;
+      this.page.pageSize = pageSize;
       this.getList();
     },
     handleSortChange({ prop, order }) {

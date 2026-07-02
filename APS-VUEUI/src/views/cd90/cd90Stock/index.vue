@@ -68,7 +68,7 @@ export default {
     handleBatchDelete() { if (!this.selection || this.selection.length === 0) return; this.$confirm(this.$t("common.confirm.delete"), { type: "warning" }).then(() => { const ids = this.selection.map(item => item.id).join(","); delStock({ ids }).then((data) => { this.$modal.msgSuccess(data.msg); this.selection = []; this.$set(this.page, "current", 1); this.getList(); }); }); },
     handleExport() { exportStock(this.query); },
     handleSearch(params) { this.page.current = 1; this.query = { ...params }; this.getList(); },
-    handlePageChange(page) { this.page = page; this.getList(); },
+    handlePageChange(current, pageSize) { this.page.current = current; this.page.pageSize = pageSize; this.getList(); },
     handleSortChange(sort) { this.sort = sort; this.getList(); },
     handleSelectionChange(selection) { this.selection = selection || []; },
     async getList() { this.loading = true; try { const params = { ...this.query, pageNum: this.page.current, pageSize: this.page.pageSize, orderByColumn: this.sort.prop, isAsc: this.sort.order }; const res = await listStock(params); this.data = res.rows || []; this.page.total = res.total || 0; } finally { this.loading = false; } },

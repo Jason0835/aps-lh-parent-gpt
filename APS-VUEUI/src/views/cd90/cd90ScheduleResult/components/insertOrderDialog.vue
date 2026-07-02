@@ -2,7 +2,7 @@
   <el-dialog
     :title="$t('ui.data.column.scheduleResult.insertOrder')"
     :visible.sync="visible"
-    width="820px"
+    width="860px"
     append-to-body
     :close-on-click-modal="false"
     @close="hide"
@@ -23,13 +23,13 @@
         </el-col>
         <el-col :span="8">
           <el-form-item :label="$t('ui.data.column.cd90ScheduleResult.machineCode')" prop="machineCode">
-            <el-select v-model="form.machineCode" filterable style="width:100%">
+            <el-select v-model="form.machineCode" filterable style="width:100%" @change="onMachineChange">
               <el-option v-for="item in machineOptions" :key="item.value" :label="item.label" :value="item.value" />
             </el-select>
           </el-form-item>
         </el-col>
       </el-row>
-      <el-row :gutter="16">
+      <el-row :gutter="16" style="margin-bottom:18px;">
         <el-col :span="12">
           <el-form-item :label="$t('ui.data.column.cd90ScheduleResult.clothCode')" prop="clothCode">
             <el-select v-model="form.clothCode" filterable style="width:100%">
@@ -39,29 +39,62 @@
         </el-col>
         <el-col :span="12">
           <el-form-item :label="$t('ui.data.column.cd90ScheduleResult.remark')">
-            <el-input v-model="form.remark" maxlength="900" />
+            <el-input v-model="form.remark" maxlength="900" show-word-limit />
           </el-form-item>
         </el-col>
       </el-row>
-      <el-table :data="shiftRows" border size="small">
-        <el-table-column :label="$t('ui.data.column.scheduleResult.shiftName')" min-width="150">
-          <template slot-scope="scope">{{ scope.row.shiftName }} {{ scope.row.shiftDate }}</template>
-        </el-table-column>
-        <el-table-column :label="$t('ui.data.column.scheduleResult.produceOrder')" width="150">
+
+      <!-- 班次明细表格 -->
+      <el-table
+        :data="shiftRows"
+        border
+        size="small"
+        style="width:100%"
+        :empty-text="loading ? $t('common.message.loading') : $t('common.message.noData')"
+      >
+        <el-table-column :label="$t('ui.data.column.scheduleResult.shiftName')" min-width="160">
           <template slot-scope="scope">
-            <el-input-number v-model="scope.row.produceOrder" :min="1" :precision="0" controls-position="right" style="width:120px" />
+            <span>{{ scope.row.shiftName }}</span>
+            <span v-if="scope.row.shiftDate" style="margin-left:4px;color:#909399;">{{ scope.row.shiftDate }}</span>
           </template>
         </el-table-column>
-        <el-table-column :label="$t('ui.data.column.scheduleResult.planQty')" width="170">
+        <el-table-column :label="$t('ui.data.column.scheduleResult.produceOrder')" width="150" align="center">
           <template slot-scope="scope">
-            <el-input-number v-model="scope.row.planQty" :min="0" :precision="3" controls-position="right" style="width:140px" />
+            <el-input-number
+              v-model="scope.row.produceOrder"
+              :min="1"
+              :precision="0"
+              controls-position="right"
+              style="width:120px"
+              :placeholder="$t('common.placeholder.input')"
+            />
+          </template>
+        </el-table-column>
+        <el-table-column :label="$t('ui.data.column.scheduleResult.planQty')" width="170" align="center">
+          <template slot-scope="scope">
+            <el-input-number
+              v-model="scope.row.planQty"
+              :min="0"
+              :precision="3"
+              controls-position="right"
+              style="width:140px"
+              :placeholder="$t('common.placeholder.input')"
+            />
           </template>
         </el-table-column>
         <el-table-column :label="$t('ui.data.column.scheduleResult.analysis')" min-width="220">
-          <template slot-scope="scope"><el-input v-model="scope.row.analysisInput" maxlength="500" /></template>
+          <template slot-scope="scope">
+            <el-input v-model="scope.row.analysisInput" maxlength="500" show-word-limit />
+          </template>
         </el-table-column>
       </el-table>
+
+      <!-- 填写提示 -->
+      <div v-if="shiftRows.length > 0" style="margin-top:6px;font-size:12px;color:#909399;">
+        {{ $t('common.tip.atLeastOneShift') || '至少填写一班次的生产顺序和计划数量' }}
+      </div>
     </el-form>
+
     <template slot="footer">
       <el-button @click="hide">{{ $t('common.button.cancel') }}</el-button>
       <el-button type="primary" :loading="loading" @click="handleConfirm">{{ $t('common.button.confirm') }}</el-button>
@@ -78,6 +111,14 @@ const CLASS_PLAN_FIELDS = ['class1PlanQty', 'class2PlanQty', 'class3PlanQty', 'c
 const CLASS_ORDER_FIELDS = ['class1ProduceOrder', 'class2ProduceOrder', 'class3ProduceOrder', 'class4ProduceOrder', 'class5ProduceOrder', 'class6ProduceOrder']
 const CLASS_ANALYSIS_FIELDS = ['class1AnalysisInput', 'class2AnalysisInput', 'class3AnalysisInput', 'class4AnalysisInput', 'class5AnalysisInput', 'class6AnalysisInput']
 
+const DEFAULT_FORM = () => ({
+  factoryCode: '',
+  scheduleDate: '',
+  machineCode: '',
+  clothCode: '',
+  remark: ''
+})
+
 export default {
   name: 'Cd90InsertOrderDialog',
   inject: ['parentDict'],
@@ -85,7 +126,7 @@ export default {
     return {
       visible: false,
       loading: false,
-      form: {},
+      form: DEFAULT_FORM(),
       shiftRows: [],
       machineOptions: [],
       clothOptions: [],
@@ -109,17 +150,24 @@ export default {
     async show(data) {
       this.visible = true
       this.form = {
+        ...DEFAULT_FORM(),
         factoryCode: (data && data.factoryCode) || '116',
-        scheduleDate: data && data.scheduleDate
+        scheduleDate: (data && data.scheduleDate) || ''
       }
       await Promise.all([this.loadMachines(), this.loadCloths(), this.loadShiftDates()])
     },
     hide() {
       this.visible = false
       this.loading = false
-      this.form = {}
+      this.form = DEFAULT_FORM()
       this.shiftRows = []
+      this.machineOptions = []
+      this.clothOptions = []
       if (this.$refs.form) this.$refs.form.resetFields()
+    },
+    onMachineChange() {
+      // 机台切换时清空帘布选择，避免选错组合
+      this.form.clothCode = ''
     },
     async loadMachines() {
       const res = await getCd90MachineEnableOptions({ factoryCode: this.form.factoryCode })
@@ -140,18 +188,23 @@ export default {
       this.shiftRows = rows.map((item, index) => ({
         classField: item.classField || `CLASS${index + 1}`,
         shiftName: item.shiftName || item.shiftCode,
-        shiftDate: item.shiftDate,
-        produceOrder: null,
-        planQty: null,
+        shiftDate: item.shiftDate || '',
+        produceOrder: undefined,
+        planQty: undefined,
         analysisInput: ''
       }))
     },
     handleConfirm() {
       this.$refs.form.validate(async valid => {
         if (!valid) return
-        const hasPlan = this.shiftRows.some(item => item.planQty > 0 && item.produceOrder > 0)
+        // 至少有一行同时填写了 produceOrder 和 planQty > 0
+        const hasPlan = this.shiftRows.some(
+          item => item.planQty > 0 && item.produceOrder > 0
+        )
         if (!hasPlan) {
-          this.$modal.msgWarning(this.$t('common.rule.input'))
+          this.$modal.msgWarning(
+            this.$t('common.tip.atLeastOneShift') || '请至少填写一个班次的生产顺序和计划数量'
+          )
           return
         }
         await this.submit()
@@ -160,9 +213,11 @@ export default {
     buildRequest() {
       const params = { ...this.form }
       this.shiftRows.forEach((item, index) => {
-        params[CLASS_PLAN_FIELDS[index]] = item.planQty
-        params[CLASS_ORDER_FIELDS[index]] = item.produceOrder
-        params[CLASS_ANALYSIS_FIELDS[index]] = item.analysisInput
+        // 只有同时有 planQty 和 produceOrder 的行才传值，否则传 null
+        const hasValue = item.planQty > 0 && item.produceOrder > 0
+        params[CLASS_PLAN_FIELDS[index]] = hasValue ? item.planQty : null
+        params[CLASS_ORDER_FIELDS[index]] = hasValue ? item.produceOrder : null
+        params[CLASS_ANALYSIS_FIELDS[index]] = hasValue ? (item.analysisInput || '') : null
       })
       return params
     },

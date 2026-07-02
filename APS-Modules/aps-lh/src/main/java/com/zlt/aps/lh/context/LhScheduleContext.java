@@ -515,6 +515,7 @@ public class LhScheduleContext {
      * 优先级跟踪日志静默深度（局部搜索模拟分支时递增）
      */
     private int priorityTraceMuteDepth = 0;
+
     /**
      * 20260701+ 判断当前排程周期是否存在跨月
      * true 跨月 false 不跨月
@@ -526,51 +527,31 @@ public class LhScheduleContext {
         if (CollectionUtils.isEmpty(allProductionDateList)) {
             return false;
         }
-        int size = allProductionDateList.size();
-        if (size == BigDecimal.ONE.intValue()) {
-            return false;
-        }
-        allProductionDateList.sort(Comparator.naturalOrder());
-        Date first = allProductionDateList.get(BigDecimal.ZERO.intValue());
-        int lastIndex = allProductionDateList.size() - BigDecimal.ONE.intValue();
-        Date last = allProductionDateList.get(lastIndex);
-        YearMonth firstInfo = SkuMonthPlanCalculator.getProductionYearAndMonth(first);
-        YearMonth lastInfo = SkuMonthPlanCalculator.getProductionYearAndMonth(last);
-        return firstInfo.equals(lastInfo);
+        return SkuMonthPlanCalculator.isCrossMonthByProductionDateInfo(allProductionDateList);
     }
 
     /**
-     * 获20260701+ 取前一个月的年份-月份
+     * 20260701+ 获取前一个月的年份-月份
      *
      * @return
      */
     public YearMonth getFirstYearMonth() {
         List<Date> allProductionDateList = Lists.newArrayList(getAllProductionDateInfo());
-        if (CollectionUtils.isEmpty(allProductionDateList)) {
-            return null;
-        }
-        allProductionDateList.sort(Comparator.naturalOrder());
-        Date first = allProductionDateList.get(BigDecimal.ZERO.intValue());
-        return SkuMonthPlanCalculator.getProductionYearAndMonth(first);
+        return SkuMonthPlanCalculator.getFirstYearMonth(allProductionDateList);
     }
 
     /**
-     * 获20260701+ 取后一个月的年份-月份
+     * 20260701+ 获取后一个月的年份-月份
      *
      * @return
      */
     public YearMonth getLastYearMonth() {
         List<Date> allProductionDateList = Lists.newArrayList(getAllProductionDateInfo());
-        if (CollectionUtils.isEmpty(allProductionDateList)) {
-            return null;
-        }
-        allProductionDateList.sort(Comparator.naturalOrder());
-        Date last = allProductionDateList.get(allProductionDateList.size() - BigDecimal.ONE.intValue());
-        return SkuMonthPlanCalculator.getProductionYearAndMonth(last);
+        return SkuMonthPlanCalculator.getLastYearMonth(allProductionDateList);
     }
 
     /**
-     * 获取对应年、月的月计划排产计划
+     * 20260701+ 获取对应年、月的月计划排产计划
      *
      * @param skuMonthProductionInfo 需要查找的Sku信息
      * @param yearMonth              年、月
@@ -580,21 +561,29 @@ public class LhScheduleContext {
         if (null == skuMonthProductionInfo || null == yearMonth || CollectionUtils.isEmpty(loadedMonthPlanList)) {
             return null;
         }
-        List<FactoryMonthPlanProductionFinalResult> resultList = Lists.newArrayList();
-        loadedMonthPlanList.forEach(singlePlan -> {
-            if (!singlePlan.isSameYearMonth(yearMonth)) {
-                //不同年月
-                return;
-            }
-            if (!skuMonthProductionInfo.getMaterialStatusKey().equals(singlePlan.getMaterialStatusKey())) {
-                return;
-            }
-            resultList.add(singlePlan);
-        });
-        if (CollectionUtils.isEmpty(resultList)) {
-            return null;
-        }
-        return resultList.get(BigDecimal.ZERO.intValue());
+        return SkuMonthPlanCalculator.getSkuYearMonthFinal(loadedMonthPlanList, skuMonthProductionInfo, yearMonth);
+    }
+
+    /**
+     * 20260701+ 根据Sku日排产周期内的月计划安排情况，获取Sku对应的计划量
+     * 需要看日排产周期是否存在跨月
+     * 1、不存在跨月
+     * 1.1、看日排产周期内是否有计划量
+     * 1.1.1、没有计划量，则取当前周期日之前的所有月计划量
+     * 1.1.2、有计划量，则取得最晚计划量日，从最晚日往后找，找到第一个没有计划量日前一日，统计从月周期起始日~找到的日之间的计划量
+     * 2、存在跨月
+     * 2.1、日排产周期内是否有计划量
+     * 2.1.1、没有计划量，则取前一个月的所有计划量
+     * 2.1.2、有计划量，则看最晚一个计划量所处月
+     * 2.1.2.1、如果最晚日计划量所处月份为后一个月，则从最晚日开始，查找后一个月最晚日往后，第一个没有计划量日前一日，统计前一个月的所有计划量+后一个月开始日~找到的日之间的计划量
+     * 2.1.2.2、如果最晚日计划量所处月份为前一个月，则统计前一个月的所有计划量
+     *
+     * @param skuProductionInfo Sku信息
+     * @return
+     */
+    public Integer getPlanQty(FactoryMonthPlanProductionFinalResult skuProductionInfo) {
+        List<Date> allProductionDateList = Lists.newArrayList(getAllProductionDateInfo());
+        return SkuMonthPlanCalculator.getPlanQty(allProductionDateList, loadedMonthPlanList, skuProductionInfo);
     }
 
     /**
@@ -615,6 +604,7 @@ public class LhScheduleContext {
         }
         return allProductionDateSet;
     }
+
     /**
      * 累加结构计划硫化机台数。
      *
