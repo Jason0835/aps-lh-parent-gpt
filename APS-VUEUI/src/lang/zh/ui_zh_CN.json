@@ -3431,6 +3431,7 @@
   "ui.data.column.tm.machineMaintenance.machineCode": "机台编码",
   "ui.data.column.tm.machineMaintenance.stopStartTime": "停机开始时间",
   "ui.data.column.tm.machineMaintenance.stopEndTime": "停机结束时间",
+  "ui.data.column.tm.machineMaintenance.stopShift": "停机班次",
   "ui.data.column.tm.machineSpeed.modelName": "胎面机台生产速度管理",
   "ui.data.column.tm.machineSpeed.factoryCode": "工厂",
   "ui.data.column.tm.machineSpeed.machineCode": "机台编码",

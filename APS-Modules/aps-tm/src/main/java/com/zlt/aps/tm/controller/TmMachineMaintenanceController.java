@@ -111,6 +111,7 @@ public class TmMachineMaintenanceController extends AbstractDocBizController<TmM
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("machineCode")), "MACHINE_CODE", queryVO.getFieldValueByFieldName("machineCode"));
         queryWrapper.ge(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("stopStartTime")), "STOP_START_TIME", queryVO.getFieldValueByFieldName("stopStartTime"));
         queryWrapper.le(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("stopEndTime")), "STOP_END_TIME", queryVO.getFieldValueByFieldName("stopEndTime"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("stopShift")), "STOP_SHIFT", queryVO.getFieldValueByFieldName("stopShift"));
     }
 
     @Override

@@ -206,6 +206,7 @@ CREATE TABLE `T_TM_MACHINE_MAINTENANCE` (
   `machine_code` varchar(50) DEFAULT NULL COMMENT '机台编码，关联T_TM_MACHINE_INFO.machine_code',
   `stop_start_time` datetime DEFAULT NULL COMMENT '停机开始时间',
   `stop_end_time` datetime DEFAULT NULL COMMENT '停机结束时间',
+  `stop_shift` varchar(20) DEFAULT NULL COMMENT '停机班次，字典：class_num_three_plan',
   `remark` varchar(900) DEFAULT NULL COMMENT '备注',
   `is_delete` tinyint NOT NULL DEFAULT '0' COMMENT '是否删除，0否，1是',
   `create_by` varchar(30) DEFAULT NULL COMMENT '创建人',

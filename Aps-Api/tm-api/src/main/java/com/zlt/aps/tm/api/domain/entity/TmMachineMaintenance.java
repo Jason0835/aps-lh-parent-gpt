@@ -42,6 +42,12 @@ public class TmMachineMaintenance extends BaseEntity {
     @TableField(value = "STOP_END_TIME")
     private Date stopEndTime;
 
+    @Excel(name = "ui.data.column.tm.machineMaintenance.stopShift", dictType = "class_num_three_plan")
+    @ImportValidated(maxLength = 20)
+    @ApiModelProperty(value = "停机班次", name = "stopShift")
+    @TableField(value = "STOP_SHIFT")
+    private String stopShift;
+
     @Excel(name = "ui.common.column.remark")
     @ImportValidated(maxLength = 500)
     @ApiModelProperty("备注")

@@ -1627,6 +1627,7 @@
   "ui.data.column.tm.machineMaintenance.machineCode": "Mã máy",
   "ui.data.column.tm.machineMaintenance.stopStartTime": "Thời gian bắt đầu dừng",
   "ui.data.column.tm.machineMaintenance.stopEndTime": "Thời gian kết thúc dừng",
+  "ui.data.column.tm.machineMaintenance.stopShift": "Ca dừng",
   "ui.data.column.tm.machineSpeed.modelName": "Quản lý tốc độ máy mặt lốp",
   "ui.data.column.tm.machineSpeed.factoryCode": "Nhà máy",
   "ui.data.column.tm.machineSpeed.machineCode": "Mã máy",
