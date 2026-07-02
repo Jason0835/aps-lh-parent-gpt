@@ -9,8 +9,7 @@ import com.zlt.aps.itf.vo.MesBrandDict;
 import com.zlt.aps.lh.api.domain.entity.LhMachineOnlineInfo;
 import com.zlt.aps.mdm.api.domain.entity.MdmMoldAlterPlan;
 import com.zlt.aps.mp.api.domain.entity.*;
-import com.zlt.aps.tq.api.domain.entity.TqScheduleResultIssue;
-import io.swagger.annotations.ApiOperation;
+import com.zlt.aps.tq.api.domain.entity.TqScheduleResultIssue;import io.swagger.annotations.ApiOperation;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -354,6 +353,20 @@ public interface IMesItfService {
     @ApiOperation("胎圈排程结果下发到MES")
     @PostMapping("/mesItf/issueTqScheduleResult")
     public AjaxResult issueTqScheduleResult(@RequestBody List<TqScheduleResultIssue> tqScheduleResultIssueList);
+
+    /**
+     * 直裁排程结果下发到MES
+     * 业务规则：
+     * 1. 班次配置由 t_cd90_shift_config 启用项决定，默认 CLASS1~CLASS6
+     * 2. 每条 issue 携带 classField / scheduleDay / dayShiftOrder / shiftName，由 MES 侧按班次槽位映射
+     * 3. APS 侧按 SCHEDULE_DAY 推导排班日期，day1=T-1，day2=T，day3=T+1
+     *
+     * @param cd90ScheduleResultIssueList 直裁排程结果列表（已按班次展开）
+     * @return 结果
+     */
+    @ApiOperation("直裁排程结果下发到MES")
+    @PostMapping("/mesItf/issueCd90ScheduleResult")
+    public AjaxResult issueCd90ScheduleResult(@RequestBody List<Cd90ScheduleResultIssue> cd90ScheduleResultIssueList);
 
     /**
      * 同步出库未扫描订单

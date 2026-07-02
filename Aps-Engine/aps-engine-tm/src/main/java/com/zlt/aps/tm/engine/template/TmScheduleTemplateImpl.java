@@ -159,11 +159,14 @@ public class TmScheduleTemplateImpl extends AbsTmScheduleTemplate {
             case MACHINE_ASSIGN:
                 return input ? "taskCount=" + context.getTaskDraftList().size()
                         : "assignedTaskCount=" + context.getTaskDraftList().stream().filter(task -> !task.isUnassigned()).count()
-                        + ",unplannedCount=" + context.getTaskDraftList().stream().filter(TmTaskDraft::isUnassigned).count();
+                        + ",unplannedCount=" + context.getTaskDraftList().stream().filter(TmTaskDraft::isUnassigned).count()
+                        + ",chainCount=" + context.getTaskChainGroup().values().size();
             case SNAPSHOT_BUILD:
                 return input ? "taskCount=" + context.getTaskDraftList().size()
                         : "snapshotCount=" + context.getSnapshotMap().size()
-                        + ",persistResultCount=" + (context.getPersistResult() == null ? 0 : context.getPersistResult().getResultCount());
+                        + ",persistResultCount=" + (context.getPersistResult() == null ? 0 : context.getPersistResult().getResultCount())
+                        + ",unplannedCount=" + (context.getPersistResult() == null ? 0 : context.getPersistResult().getUnplannedCount())
+                        + ",errorCount=" + (context.getPersistResult() == null ? 0 : context.getPersistResult().getErrorCount());
             default:
                 return stepEnum.getDesc();
         }

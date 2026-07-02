@@ -1,5 +1,8 @@
 package com.zlt.aps.tm.engine.service.impl;
 
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import com.ruoyi.common.exception.ServiceException;
 import com.zlt.aps.tm.engine.domain.TmParamValue;
 import com.zlt.aps.tm.engine.domain.TmScheduleContext;
@@ -7,6 +10,7 @@ import com.zlt.aps.tm.engine.domain.TmStockForecast;
 import com.zlt.aps.tm.engine.domain.TmTaskDraft;
 import com.zlt.aps.tm.engine.strategy.*;
 import org.junit.Test;
+import org.slf4j.LoggerFactory;
 
 import java.math.BigDecimal;
 import java.util.Arrays;
@@ -141,6 +145,51 @@ public class TmPlanCalcServiceTest {
     }
 
     /**
+     * 测试内容：验证计划量日志包含排查计划量所需的上下文和中间量。
+     * 测试场景：单个任务完成需求量、库存抵扣、计划量和交接班库存计算。
+     * 预期结果：info日志可通过traceId和businessKey直接还原计划量计算链路。
+     */
+    @Test
+    public void calculateShouldWriteTraceablePlanQtyLogs() {
+        Logger logger = (Logger) LoggerFactory.getLogger(TmPlanCalcService.class);
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+        try {
+            TmPlanCalcService service = buildRealService();
+            TmScheduleContext context = new TmScheduleContext();
+            context.setFactoryCode("116");
+            context.setBatchNo("BATCH-LOG");
+            context.setTraceId("TRACE-LOG");
+            TmTaskDraft task = buildTask("ORD-LOG", "TR-LOG");
+            task.setCurrentShiftDemandQty(new BigDecimal("600"));
+            task.setGuardDemandQty(new BigDecimal("600"));
+            task.setRollingStockQty(new BigDecimal("100"));
+            context.setTaskDraftList(Collections.singletonList(task));
+
+            service.calculate(context);
+
+            assertTrue(appender.list.stream().map(ILoggingEvent::getFormattedMessage)
+                    .anyMatch(message -> message.contains("[TM_PLAN_QTY_CALC_DETAIL]")
+                            && message.contains("batchNo=BATCH-LOG")
+                            && message.contains("traceId=TRACE-LOG")
+                            && message.contains("factoryCode=116")
+                            && message.contains("businessKey=" + task.getBusinessKey())
+                            && message.contains("demandQty=500")
+                            && message.contains("stockDeductQty=100")
+                            && message.contains("planQty=500")
+                            && message.contains("planStockQty=0")
+                            && message.contains("calcFormulaDesc=")));
+            assertTrue(appender.list.stream().map(ILoggingEvent::getFormattedMessage)
+                    .anyMatch(message -> message.contains("[TM_PLAN_QTY_STATE]")
+                            && message.contains("beforeRollingStockQty=100")
+                            && message.contains("afterRollingStockQty=0")));
+        } finally {
+            logger.detachAppender(appender);
+        }
+    }
+
+    /**
      * 测试内容：验证同一胎面跨班使用交接班库存滚动。
      * 测试场景：同一胎面两个班，输入顺序故意反向，14点预计库存为 500，两班当前需求均为 600。
      * 预期结果：第 1 班班初库存为 500，计算后交接班库存为 0；第 2 班班初库存承接为 0。
@@ -179,9 +228,9 @@ public class TmPlanCalcServiceTest {
         assertEquals(BigDecimal.ZERO, context.getRemainingStockMap().get("TR-ROLL"));
     }
     /**
-     * 测试内容：验证全局工装池按班次顺序滚动，不被胎面编码排序打乱。
+     * 测试内容：验证全局工装池按班次顺序滚动，且当前班消耗会释放库存占用的工装。
      * 测试场景：二班胎面编码排序在一班之前，两个胎面共用 6 个工装，首班初始库存共占 2 个工装。
-     * 预期结果：先处理一班任务并扣减工装，二班任务只能使用一班扣减后的剩余工装。
+     * 预期结果：先处理一班任务，当前班消耗释放工装后，二班任务可使用释放后的剩余工装。
      */
     @Test
     public void calculateShouldRollGlobalToolQtyByShiftOrderBeforeTreadCode() {
@@ -197,12 +246,12 @@ public class TmPlanCalcServiceTest {
 
         assertEquals(new BigDecimal("4.000000"), firstShiftTask.getAvailableToolQty());
         assertEquals(new BigDecimal("100"), firstShiftTask.getPlanQty());
-        assertEquals(new BigDecimal("3.000000"), firstShiftTask.getToolUsedQty());
-        assertEquals(new BigDecimal("1.000000"), firstShiftTask.getRemainingToolQty());
-        assertEquals(new BigDecimal("1.000000"), secondShiftTask.getAvailableToolQty());
+        assertEquals(new BigDecimal("-1.000000"), firstShiftTask.getToolUsedQty());
+        assertEquals(new BigDecimal("5.000000"), firstShiftTask.getRemainingToolQty());
+        assertEquals(new BigDecimal("5.000000"), secondShiftTask.getAvailableToolQty());
         assertEquals(BigDecimal.ZERO, secondShiftTask.getPlanQty());
-        assertEquals(new BigDecimal("1.000000"), secondShiftTask.getToolUsedQty());
-        assertEquals(BigDecimal.ZERO.setScale(6), secondShiftTask.getRemainingToolQty());
+        assertEquals(new BigDecimal("-1.000000"), secondShiftTask.getToolUsedQty());
+        assertEquals(new BigDecimal("6.000000"), secondShiftTask.getRemainingToolQty());
     }
 
     /**

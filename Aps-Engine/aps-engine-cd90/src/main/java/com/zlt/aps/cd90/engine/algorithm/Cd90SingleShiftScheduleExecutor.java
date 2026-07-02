@@ -114,9 +114,27 @@ public class Cd90SingleShiftScheduleExecutor implements Cd90SingleShiftScheduleS
                         BigDecimal.ZERO, reason, attemptTraces.size() + 1));
                 continue;
             }
-            BigDecimal netDemand = continueDemand ? this.normalize(rawDemand)
-                    : roundUpByUnitLength(shift, clothCode, rawDemand,
-                    construction.getUnitConsumeMillimeter(), construction.getCraftWidth());
+            BigDecimal netDemand;
+            BigDecimal vehicleDemand;
+            if (continueDemand) {
+                netDemand = this.normalize(rawDemand);
+                vehicleDemand = netDemand;
+            } else {
+                BigDecimal unitLengthMm = construction.getUnitConsumeMillimeter();
+                BigDecimal craftWidthMm = construction.getCraftWidth();
+                BigDecimal unitLengthM = unitLengthMm.divide(BigDecimal.valueOf(1000), 10, RoundingMode.HALF_UP);
+                BigDecimal craftWidthM = craftWidthMm.divide(BigDecimal.valueOf(1000), 10, RoundingMode.HALF_UP);
+                BigDecimal pieceCount = rawDemand.divide(unitLengthM, 0, RoundingMode.CEILING);
+                // netDemand: 帘布纵向消耗米数 = pieceCount x craftWidth (直裁宽度方向)
+                // 用于 closeOut 判断、续作剩余量计算和 trace 日志，方向为帘布走料方向。
+                netDemand = this.normalize(pieceCount.multiply(craftWidthM));
+                // vehicleDemand: 小车实际卷取米数 = pieceCount x unitLength (胎体长度方向)
+                // 小车收取是头尾相连沿 TIRE_FABRIC_LENGTH 方向，不是 craftWidth 方向。
+                // 此值传给 calculateActualQuantity -> laneAllocator 用于计算所需车数。
+                vehicleDemand = this.normalize(pieceCount.multiply(unitLengthM));
+                log.info("[直裁自动排程] 净需求按单片长度取整并按直裁宽度换算, classField={}, clothCode={}, rawDemand={}, unitLength={}mm, craftWidth={}mm, pieceCount={}, roundedDemand={}, vehicleDemand={}",
+                        shift.getClassField(), clothCode, rawDemand, unitLengthMm, craftWidthMm, pieceCount, netDemand, vehicleDemand);
+            }
             if (input.getBigRollAgingDataMissingCodes() != null
                     && input.getBigRollAgingDataMissingCodes().contains(construction.getBigRollCode())) {
                 String reason = "DATA_MISSING";
@@ -135,7 +153,7 @@ public class Cd90SingleShiftScheduleExecutor implements Cd90SingleShiftScheduleS
                     shift.getClassField(), clothCode, closeOut.isCloseOut(), closeOut.getEmbryoItems());
             // 先生成全部可行机台试算，再由资源提交器按优先级逐个尝试库排和工装占用。
             Cd90MachineTrialPlan trialPlan = trialPreparationService.prepare(
-                    trialRequest(context, shift, state, construction, netDemand, closeOut.isCloseOut(), candidate, rolling),
+                    trialRequest(context, shift, state, construction, vehicleDemand, closeOut.isCloseOut(), candidate, rolling),
                     machineSnapshot);
             Cd90ShiftCommitResult commit = resourceCommitter.commit(
                     commitRequest(context, shift, construction, trialPlan, closeOut.isCloseOut()), state);
@@ -387,6 +405,7 @@ public class Cd90SingleShiftScheduleExecutor implements Cd90SingleShiftScheduleS
                 .bigRollCode(construction.getBigRollCode())
                 .cordSpec(construction.getCordSpec())
                 .craftWidth(construction.getCraftWidth())
+                .unitConsumeMillimeter(construction.getUnitConsumeMillimeter())
                 .curlLength(effectiveCurlLength(context, construction))
                 .shiftCode(shift.getShiftCode())
                 .shiftStart(shift.getStartTime()).shiftEnd(shift.getEndTime())
@@ -412,7 +431,6 @@ public class Cd90SingleShiftScheduleExecutor implements Cd90SingleShiftScheduleS
                 .cordSpec(construction.getCordSpec())
                 .classField(shift.getClassField())
                 .shiftStart(shift.getStartTime()).shiftEnd(shift.getEndTime())
-                .coilMeter(effectiveCurlLength(context, construction))
                 .closeOut(closeOut)
                 .partialMinVehicleCount(context.getParameters().getPartialMinVehicleCount())
                 .trialPlan(trialPlan).build();

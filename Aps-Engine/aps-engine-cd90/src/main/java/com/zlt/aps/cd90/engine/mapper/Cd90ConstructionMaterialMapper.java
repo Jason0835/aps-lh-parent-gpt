@@ -29,30 +29,29 @@ public class Cd90ConstructionMaterialMapper {
             return Collections.emptyList();
         }
         List<Cd90ConstructionMaterial> result = new ArrayList<>();
-        add(result, construction.getConstructionCode(), construction.getConstructionVersion(),
+        addLayer(result, construction.getConstructionCode(), construction.getConstructionVersion(),
                 construction.getCordSpec(),
-                construction.getCordWidth(), 1, construction.getTireFabricCode1(),
+                1, construction.getTireFabricCode1(),
                 construction.getTireFabricCraft1(), construction.getTireFabricLength1());
-        add(result, construction.getConstructionCode(), construction.getConstructionVersion(),
+        addLayer(result, construction.getConstructionCode(), construction.getConstructionVersion(),
                 construction.getCordSpec(),
-                construction.getCordWidth(), 2, construction.getTireFabricCode2(),
+                2, construction.getTireFabricCode2(),
                 construction.getTireFabricCraft2(), construction.getTireFabricLength2());
-        add(result, construction.getConstructionCode(), construction.getConstructionVersion(),
+        addLayer(result, construction.getConstructionCode(), construction.getConstructionVersion(),
                 construction.getCordSpec(),
-                construction.getCordWidth(), 3, construction.getTireFabricCode3(),
+                3, construction.getTireFabricCode3(),
                 construction.getTireFabricCraft3(), construction.getTireFabricLength3());
         return result;
     }
 
-    private void add(List<Cd90ConstructionMaterial> result,
-                     String constructionCode,
-                     String constructionVersion,
-                     String bigRollCode,
-                     BigDecimal cordWidth,
-                     int layerNo,
-                     String clothCode,
-                     String craftWidthRaw,
-                     BigDecimal unitConsumeMillimeter) {
+    private void addLayer(List<Cd90ConstructionMaterial> result,
+                          String constructionCode,
+                          String constructionVersion,
+                          String bigRollCode,
+                          int layerNo,
+                          String clothCode,
+                          String craftWidthRaw,
+                          BigDecimal unitConsumeMillimeter) {
         if (!StringUtils.hasText(clothCode) || unitConsumeMillimeter == null) {
             return;
         }
@@ -70,7 +69,6 @@ public class Cd90ConstructionMaterialMapper {
                 .cordSpec(clothCode)
                 .layerNo(layerNo)
                 .unitConsumeMillimeter(unitConsumeMillimeter)
-                .cordWidth(cordWidth)
                 .craftWidth(craftWidth)
                 .craftWidthRaw(craftWidthRaw)
                 .build());

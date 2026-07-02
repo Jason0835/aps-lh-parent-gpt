@@ -55,6 +55,21 @@ public class Cd90ScheduleResultUIController extends BaseUIController<Cd90Schedul
     }
 
     /**
+     * 发布直裁排程结果到 MES。
+     *
+     * @param dto 包含 scheduleDate、factoryCode 的请求体
+     * @param ids 选中记录 ID 列表（逗号分隔），为空时按日期全量发布
+     * @return 发布结果
+     */
+    @ApiOperation("发布排程")
+    @RequiresPermissions("cd90:scheduleResult:publish")
+    @PostMapping("/publish")
+    @ResponseBody
+    public AjaxResult publish(Cd90ScheduleResult dto, String ids) {
+        return remoteService.publish(dto, ids);
+    }
+
+    /**
      * 查询自动排程任务状态。
      *
      * @param taskId 对外任务ID

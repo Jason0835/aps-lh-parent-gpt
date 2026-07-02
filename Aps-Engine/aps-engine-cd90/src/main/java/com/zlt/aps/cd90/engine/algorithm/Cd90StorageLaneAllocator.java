@@ -30,21 +30,21 @@ public class Cd90StorageLaneAllocator {
      *
      * @param clothCode 帘布代码
      * @param planQuantity 计划量,单位米
-     * @param coilMeter 单车卷曲米数
+     * @param vehiclePlanQuantity 单车对应的直裁排程米数
      * @param originalLanes 原库排状态
      * @return 分配结果
      */
     public Cd90StorageLaneAllocationResult allocate(String clothCode,
                                                      BigDecimal planQuantity,
-                                                     BigDecimal coilMeter,
+                                                     BigDecimal vehiclePlanQuantity,
                                                      List<Cd90StorageLaneState> originalLanes) {
         if (planQuantity == null || planQuantity.signum() <= 0) {
             throw new IllegalArgumentException("库排分配计划量必须大于0");
         }
-        if (coilMeter == null || coilMeter.signum() <= 0) {
-            throw new IllegalArgumentException("工装卷曲米数必须大于0");
+        if (vehiclePlanQuantity == null || vehiclePlanQuantity.signum() <= 0) {
+            throw new IllegalArgumentException("单车直裁排程米数必须大于0");
         }
-        int required = planQuantity.divide(coilMeter, 0, RoundingMode.CEILING).intValueExact();
+        int required = planQuantity.divide(vehiclePlanQuantity, 0, RoundingMode.CEILING).intValueExact();
         List<Cd90StorageLaneState> lanes = originalLanes == null ? new ArrayList<>()
                 : originalLanes.stream().map(this::copy).collect(Collectors.toList());
 

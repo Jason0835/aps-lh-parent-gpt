@@ -66,6 +66,9 @@ public class TmScheduleContext {
     /** 工厂可用机台候选列表，由数据加载层填充，供机台分配步骤过滤评分使用 */
     private List<TmMachineCandidate> machineCandidateList = new ArrayList<>();
 
+    /** 当前排程日一班开始前的同机台前置任务快照，key=机台编码 */
+    private Map<String, TmTaskPredecessor> machinePredecessorMap = new HashMap<>();
+
     /** 单任务候选机台过滤和评分快照，key=任务业务键 */
     private Map<String, List<TmMachineCandidate>> candidateTraceMap = new HashMap<>();
 
@@ -166,6 +169,10 @@ public class TmScheduleContext {
 
     public void setRemainingStockMap(Map<String, BigDecimal> remainingStockMap) {
         this.remainingStockMap = remainingStockMap == null ? new HashMap<>() : remainingStockMap;
+    }
+
+    public void setMachinePredecessorMap(Map<String, TmTaskPredecessor> machinePredecessorMap) {
+        this.machinePredecessorMap = machinePredecessorMap == null ? new HashMap<>() : machinePredecessorMap;
     }
 
     public void setCandidateTraceMap(Map<String, List<TmMachineCandidate>> candidateTraceMap) {

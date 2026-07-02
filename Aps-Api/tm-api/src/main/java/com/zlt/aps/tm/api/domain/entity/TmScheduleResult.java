@@ -23,7 +23,7 @@ public class TmScheduleResult extends BaseEntity {
     private static final long serialVersionUID = 1L;
 
     /** 工厂编号 */
-    @Excel(name = "ui.data.column.tm.scheduleResult.factoryCode")
+    @Excel(name = "ui.data.column.tm.scheduleResult.factoryCode", dictType = "biz_factory_name")
     @ApiModelProperty(value = "工厂编号", name = "factoryCode")
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;
@@ -64,6 +64,12 @@ public class TmScheduleResult extends BaseEntity {
     @ApiModelProperty(value = "主胶料编码", name = "glueCode")
     @TableField(value = "GLUE_CODE")
     private String glueCode;
+
+    /** 基部胶编码 */
+    @Excel(name = "ui.data.column.tm.scheduleResult.baseGlueCode")
+    @ApiModelProperty(value = "基部胶编码", name = "baseGlueCode")
+    @TableField(value = "BASE_GLUE_CODE")
+    private String baseGlueCode;
 
     /** 整条胶料组合编码 */
     @Excel(name = "ui.data.column.tm.scheduleResult.wholeGlueCode")

@@ -18,7 +18,7 @@ public class TmCurlRoll extends BaseEntity {
 
     private static final long serialVersionUID = 1L;
 
-    @Excel(name = "ui.data.column.tm.curlRoll.factoryCode")
+    @Excel(name = "ui.data.column.tm.curlRoll.factoryCode", dictType = "biz_factory_name")
     @ImportValidated(required = true, isCode = true, maxLength = 50)
     @ApiModelProperty(value = "工厂编号", name = "factoryCode")
     @TableField(value = "FACTORY_CODE")
@@ -35,4 +35,10 @@ public class TmCurlRoll extends BaseEntity {
     @ApiModelProperty(value = "卷曲长度", name = "curlLength")
     @TableField(value = "CURL_LENGTH")
     private BigDecimal curlLength;
+
+    @Excel(name = "ui.common.column.remark")
+    @ImportValidated(maxLength = 500)
+    @ApiModelProperty("备注")
+    @TableField("REMARK")
+    private String remark;
 }

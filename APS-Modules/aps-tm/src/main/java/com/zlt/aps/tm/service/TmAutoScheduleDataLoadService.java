@@ -6,6 +6,7 @@ import cn.hutool.core.date.DateUtil;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.zlt.aps.common.core.constant.ApsConstant;
+import com.zlt.aps.common.core.utils.BigDecimalUtils;
 import com.zlt.aps.tm.api.domain.entity.*;
 import com.zlt.aps.tm.domain.vo.TmExperimentSpecMonthPlanRowVo;
 import com.zlt.aps.tm.domain.vo.TmFormingDemandRowVo;
@@ -223,6 +224,7 @@ public class TmAutoScheduleDataLoadService {
         fillCandidateSpecifyRule(context, candidateMap);
         fillCandidateSpeed(context, candidateMap);
         fillCandidateMaintenance(context, candidateMap);
+        fillCandidatePredecessor(context, candidateMap);
         return new ArrayList<>(candidateMap.values());
     }
 
@@ -384,6 +386,145 @@ public class TmAutoScheduleDataLoadService {
     }
 
     /**
+     * 填充当前排程日一班开始前的同机台前置任务快照。
+     *
+     * <p>前置任务只取当前排程日前一天同工厂、同机台有效排程结果中有顺序且计划量大于0的最后任务，
+     * 作为一班链式连续排序的虚拟链尾。</p>
+     *
+     * @param context 自动排程上下文
+     * @param candidateMap 候选机台映射
+     */
+    private void fillCandidatePredecessor(TmScheduleContext context, Map<String, TmMachineCandidate> candidateMap) {
+        if (tmScheduleResultMapper == null || candidateMap.isEmpty()) {
+            context.setMachinePredecessorMap(Collections.emptyMap());
+            return;
+        }
+        Date previousDate = DateUtil.offsetDay(DateUtil.beginOfDay(context.getScheduleDate()), -1);
+        LambdaQueryWrapper<TmScheduleResult> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(TmScheduleResult::getFactoryCode, context.getFactoryCode());
+        wrapper.eq(TmScheduleResult::getScheduleDate, previousDate);
+        wrapper.in(TmScheduleResult::getMachineCode, candidateMap.keySet());
+        List<TmScheduleResult> resultList = Optional.ofNullable(tmScheduleResultMapper.selectList(wrapper))
+                .orElse(Collections.emptyList());
+        Map<String, TmTaskPredecessor> predecessorMap = new LinkedHashMap<>();
+        for (TmScheduleResult result : resultList) {
+            if (result == null || StrUtil.isBlank(result.getMachineCode())) {
+                continue;
+            }
+            TmTaskPredecessor predecessor = this.resolveLatestPredecessor(result);
+            if (predecessor == null) {
+                continue;
+            }
+            TmTaskPredecessor exists = predecessorMap.get(predecessor.getMachineCode());
+            if (exists == null || this.isLaterPredecessor(predecessor, exists)) {
+                predecessorMap.put(predecessor.getMachineCode(), predecessor);
+            }
+        }
+        for (Map.Entry<String, TmTaskPredecessor> entry : predecessorMap.entrySet()) {
+            TmMachineCandidate candidate = candidateMap.get(entry.getKey());
+            if (candidate == null) {
+                continue;
+            }
+            TmTaskPredecessor predecessor = entry.getValue();
+            candidate.setTailMainGlueCode(predecessor.getGlueCode());
+            candidate.setTailBaseGlueCode(predecessor.getBaseGlueCode());
+            candidate.setTailMouthPlateCode(predecessor.getMouthPlateCode());
+        }
+        context.setMachinePredecessorMap(predecessorMap);
+        log.info("[TM_MACHINE_PREDECESSOR_LOAD] factoryCode={}, scheduleDate={}, previousDate={}, predecessorCount={}, predecessors={}",
+                context.getFactoryCode(), DateUtil.formatDate(context.getScheduleDate()), DateUtil.formatDate(previousDate),
+                predecessorMap.size(), predecessorMap);
+    }
+
+    /**
+     * 从单条排程结果中解析最后一个有效班次任务。
+     *
+     * @param result 历史排程结果
+     * @return 最后有效前置任务；不存在时返回 null
+     */
+    private TmTaskPredecessor resolveLatestPredecessor(TmScheduleResult result) {
+        for (int shiftOrder = 6; shiftOrder >= 1; shiftOrder--) {
+            BigDecimal planQty = this.toBigDecimal(result.getFieldValueByFieldName(
+                    String.format("class%dPlanQty", shiftOrder)));
+            Integer sequence = this.toInteger(result.getFieldValueByFieldName(
+                    String.format("class%dSequence", shiftOrder)));
+            if (planQty.compareTo(BigDecimal.ZERO) <= 0 || sequence == null) {
+                continue;
+            }
+            TmTaskPredecessor predecessor = new TmTaskPredecessor();
+            predecessor.setMachineCode(result.getMachineCode());
+            predecessor.setTreadCode(result.getTreadCode());
+            predecessor.setGlueCode(result.getGlueCode());
+            predecessor.setBaseGlueCode(result.getBaseGlueCode());
+            predecessor.setMouthPlateCode(result.getMouthPlateCode());
+            predecessor.setShiftOrder(shiftOrder);
+            predecessor.setSequence(sequence);
+            predecessor.setBusinessKey(String.valueOf(result.getId()));
+            return predecessor;
+        }
+        return null;
+    }
+
+    /**
+     * 判断候选前置任务是否晚于当前前置任务。
+     *
+     * @param candidatePredecessor 候选前置任务
+     * @param currentPredecessor 当前前置任务
+     * @return true 表示候选任务更靠后
+     */
+    private boolean isLaterPredecessor(TmTaskPredecessor candidatePredecessor,
+                                       TmTaskPredecessor currentPredecessor) {
+        int candidateShiftOrder = candidatePredecessor.getShiftOrder() == null ? 0 : candidatePredecessor.getShiftOrder();
+        int currentShiftOrder = currentPredecessor.getShiftOrder() == null ? 0 : currentPredecessor.getShiftOrder();
+        if (candidateShiftOrder != currentShiftOrder) {
+            return candidateShiftOrder > currentShiftOrder;
+        }
+        int candidateSequence = candidatePredecessor.getSequence() == null ? 0 : candidatePredecessor.getSequence();
+        int currentSequence = currentPredecessor.getSequence() == null ? 0 : currentPredecessor.getSequence();
+        return candidateSequence > currentSequence;
+    }
+
+    /**
+     * 将动态字段值转换为计划量数值。
+     *
+     * @param value 原始字段值
+     * @return 计划量；空值或非法值返回0
+     */
+    private BigDecimal toBigDecimal(Object value) {
+        if (value instanceof String && StrUtil.isBlank((String) value)) {
+            return BigDecimal.ZERO;
+        }
+        try {
+            return BigDecimalUtils.valueOf(value);
+        } catch (NumberFormatException ex) {
+            return BigDecimal.ZERO;
+        }
+    }
+
+    /**
+     * 将动态字段值转换为顺序号。
+     *
+     * @param value 原始字段值
+     * @return 顺序号；空值或非法值返回 null
+     */
+    private Integer toInteger(Object value) {
+        if (value instanceof Integer) {
+            return (Integer) value;
+        }
+        if (value instanceof Number) {
+            return ((Number) value).intValue();
+        }
+        if (value instanceof String && StrUtil.isNotBlank((String) value)) {
+            try {
+                return Integer.valueOf((String) value);
+            } catch (NumberFormatException ex) {
+                return null;
+            }
+        }
+        return null;
+    }
+
+    /**
      * 从成型计划和施工信息构造胎面待排任务。
      *
      * @param context     自动排程上下文
@@ -485,7 +626,20 @@ public class TmAutoScheduleDataLoadService {
                 taskDraft.setSourceOrderNos(row.getOrderNo());
                 taskDraft.setBusinessKeySuffix(buildSourceTaskBusinessKeySuffix(row, sourceRowIndex, shiftOrder));
                 taskDraft.setTreadCode(treadCode);
-                taskDraft.setGlueCode(row.getTreadRubberCategory());
+                // 拆分胶料类别：第一个值为主胶料编码，其余值为基部胶编码
+                String rubberCategory = row.getTreadRubberCategory();
+                if (StrUtil.isNotBlank(rubberCategory)) {
+                    String[] glueParts = rubberCategory.split(",");
+                    taskDraft.setGlueCode(glueParts[0]);
+                    if (glueParts.length > 1) {
+                        // 使用英文逗号拼接剩余部分作为基部胶编码
+                        String baseGlueCode = String.join(",", Arrays.copyOfRange(glueParts, 1, glueParts.length));
+                        taskDraft.setBaseGlueCode(baseGlueCode);
+                    }
+                } else {
+                    taskDraft.setGlueCode(null);
+                    taskDraft.setBaseGlueCode(null);
+                }
                 taskDraft.setMouthPlateCode(row.getTreadMouthPlate());
                 taskDraft.setShiftOrder(targetShiftOrder);
                 taskDraft.setNewSpecInfo(taskNewSpecInfo);
@@ -721,7 +875,20 @@ public class TmAutoScheduleDataLoadService {
         taskDraft.setBusinessKeySuffix("EXP-" + StrUtil.blankToDefault(row.getProductionNo(), String.valueOf(row.getMonthPlanId()))
                 + "-CLASS" + EXPERIMENT_SPEC_SHIFT_ORDER);
         taskDraft.setTreadCode(row.getTreadCode());
-        taskDraft.setGlueCode(row.getTreadRubberCategory());
+        // 拆分胶料类别：第一个值为主胶料编码，其余值为基部胶编码
+        String rubberCategory = row.getTreadRubberCategory();
+        if (StrUtil.isNotBlank(rubberCategory)) {
+            String[] glueParts = rubberCategory.split(",");
+            taskDraft.setGlueCode(glueParts[0]);
+            if (glueParts.length > 1) {
+                // 使用英文逗号拼接剩余部分作为基部胶编码
+                String baseGlueCode = String.join(",", Arrays.copyOfRange(glueParts, 1, glueParts.length));
+                taskDraft.setBaseGlueCode(baseGlueCode);
+            }
+        } else {
+            taskDraft.setGlueCode(null);
+            taskDraft.setBaseGlueCode(null);
+        }
         taskDraft.setMouthPlateCode(row.getTreadMouthPlate());
         taskDraft.setShiftOrder(EXPERIMENT_SPEC_SHIFT_ORDER);
         taskDraft.setTreadShoulderLength(nvl(row.getTreadShoulderLength()));

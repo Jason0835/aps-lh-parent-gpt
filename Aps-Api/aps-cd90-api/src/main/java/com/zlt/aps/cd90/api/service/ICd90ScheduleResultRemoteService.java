@@ -29,6 +29,11 @@ public interface ICd90ScheduleResultRemoteService {
     @PostMapping("/cd90ScheduleResult/autoSchedule")
     AjaxResult autoSchedule(@RequestBody Cd90ScheduleResult scheduleResult);
 
+    @ApiOperation("发布排程")
+    @PostMapping("/cd90ScheduleResult/publish")
+    AjaxResult publish(@RequestBody Cd90ScheduleResult dto,
+                       @RequestParam(value = "ids", required = false) String ids);
+
     @ApiOperation("查询自动排程任务状态")
     @GetMapping("/cd90ScheduleResult/autoSchedule/task/{taskId}")
     AjaxResult getAutoScheduleTask(@PathVariable("taskId") String taskId);
