@@ -16,7 +16,7 @@ public class TmGlueMachineReal extends BaseEntity {
 
     private static final long serialVersionUID = 1L;
 
-    @Excel(name = "ui.data.column.tm.glueMachineReal.factoryCode")
+    @Excel(name = "ui.data.column.tm.glueMachineReal.factoryCode", dictType = "biz_factory_name")
     @ImportValidated(required = true, isCode = true, maxLength = 50)
     @ApiModelProperty(value = "工厂编号", name = "factoryCode")
     @TableField(value = "FACTORY_CODE")
@@ -40,7 +40,7 @@ public class TmGlueMachineReal extends BaseEntity {
     @TableField(value = "MACHINE_CODE")
     private String machineCode;
 
-    @Excel(name = "ui.data.column.tm.glueMachineReal.shiftCode")
+    @Excel(name = "ui.data.column.tm.glueMachineReal.shiftCode", dictType = "class_num_three_plan")
     @ImportValidated(maxLength = 10)
     @ApiModelProperty(value = "机台班次编码", name = "shiftCode")
     @TableField(value = "SHIFT_CODE")
@@ -63,6 +63,12 @@ public class TmGlueMachineReal extends BaseEntity {
     @ApiModelProperty(value = "是否启用", name = "enableStatus")
     @TableField(value = "ENABLE_STATUS")
     private String enableStatus;
+
+    @Excel(name = "ui.common.column.remark")
+    @ImportValidated(maxLength = 500)
+    @ApiModelProperty("备注")
+    @TableField("REMARK")
+    private String remark;
 
     @ApiModelProperty(value = "机台名称", name = "machineName")
     @TableField(exist = false)

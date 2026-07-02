@@ -590,6 +590,7 @@
   "ui.data.column.tm.machineMaintenance.machineCode": "Machine Code",
   "ui.data.column.tm.machineMaintenance.stopStartTime": "Stop Start Time",
   "ui.data.column.tm.machineMaintenance.stopEndTime": "Stop End Time",
+  "ui.data.column.tm.machineMaintenance.stopShift": "Stop Shift",
   "ui.data.column.tm.machineSpeed.modelName": "Tread Machine Speed",
   "ui.data.column.tm.machineSpeed.factoryCode": "Factory",
   "ui.data.column.tm.machineSpeed.machineCode": "Machine Code",

@@ -16,7 +16,7 @@ public class TmGlueOrder extends BaseEntity {
 
     private static final long serialVersionUID = 1L;
 
-    @Excel(name = "ui.data.column.tm.glueOrder.factoryCode")
+    @Excel(name = "ui.data.column.tm.glueOrder.factoryCode", dictType = "biz_factory_name")
     @ImportValidated(required = true, isCode = true, maxLength = 50)
     @ApiModelProperty(value = "工厂编号", name = "factoryCode")
     @TableField(value = "FACTORY_CODE")
@@ -46,4 +46,9 @@ public class TmGlueOrder extends BaseEntity {
     @TableField(value = "ORDER_NUM")
     private Integer orderNum;
 
+    @Excel(name = "ui.common.column.remark")
+    @ImportValidated(maxLength = 500)
+    @ApiModelProperty("备注")
+    @TableField("REMARK")
+    private String remark;
 }

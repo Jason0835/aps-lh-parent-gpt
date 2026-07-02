@@ -189,6 +189,7 @@ public class TmPersistService {
         if (task != null) {
             result.setTreadCode(task.getTreadCode());
             result.setGlueCode(task.getGlueCode());
+            result.setBaseGlueCode(task.getBaseGlueCode());
             result.setMouthPlateCode(task.getMouthPlateCode());
             result.setMachineCode(null);
             applyTaskShiftFields(result, task);
@@ -207,6 +208,7 @@ public class TmPersistService {
         result.setMachineCode(node.getMachineCode());
         result.setTreadCode(task.getTreadCode());
         result.setGlueCode(task.getGlueCode());
+        result.setBaseGlueCode(task.getBaseGlueCode());
         result.setMouthPlateCode(task.getMouthPlateCode());
         result.setReleaseStatus(TmScheduleReleaseStatusEnum.NOT_RELEASED.getCode());
         result.setDataSource("AUTO");

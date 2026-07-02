@@ -12,6 +12,7 @@ import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
 import com.zlt.aps.maindata.mapper.*;
 import com.zlt.aps.maindata.utils.ScmListUtils;
 import com.zlt.aps.mdm.api.domain.entity.MdmConstructionProcess;
+import com.zlt.aps.mdm.api.enums.BomTypeEnum;
 import com.zlt.aps.mp.api.domain.entity.MdmBomInfo;
 import com.zlt.aps.mp.api.domain.entity.MdmConstructionInfo;
 import com.zlt.aps.mp.api.domain.entity.MdmMaterialConsumeDetail;
@@ -285,11 +286,26 @@ public class MesBomItfServiceImpl implements MesBomItfService {
 
             // 5.2、判断如果路径上有任意一个节点是本次更新的bom，则需要新生成一笔消耗明细，
             if (pathList.stream().anyMatch(b -> updateIdSet.contains(b.getId()))) {
-                // 5.2.1、取胎胚，必然是路径的最后一个元素
+                // 5.2.1、取胎胚信息，必然是路径的最后一个元素或者其父节点
                 MdmBomInfo embryoBom = pathList.getLast();
-                if (StringUtils.isEmpty(embryoBom.getParentCode())) { // 胎胚号为空说明有问题，跳过
-                    continue;
+                String embryoCode = null;
+                String embryoVersion = null;
+                // 先检查本节点是否胎胚
+                if (!BomTypeEnum.EMBRYO.getMesCode().equals(embryoBom.getChildMaterialType())) { // 本节点型不是胎胚说明有问题，跳过
+                    if (StringUtils.isEmpty(embryoBom.getParentCode())) { // 胎胚号为空说明有问题，跳过
+                        continue;
+                    }
+                    // 类型不是胎胚，跳过
+                    if (!BomTypeEnum.EMBRYO.getMesCode().equals(embryoBom.getParentMaterialType())) { // 父类型不是胎胚说明有问题，跳过
+                        continue;
+                    }
+                    embryoCode = embryoBom.getParentCode();
+                    embryoVersion = embryoBom.getParentVersion();
+                } else {
+                    embryoCode = embryoBom.getChildCode();
+                    embryoVersion = embryoBom.getChildMaterialVersion();
                 }
+                
                 // 5.2.2、初始化消耗量
                 MdmMaterialConsumeDetail consumeDetail = new MdmMaterialConsumeDetail();
                 consumeDetail.setFactoryCode(factoryCode);
@@ -297,8 +313,8 @@ public class MesBomItfServiceImpl implements MesBomItfService {
                 consumeDetail.setChildMaterialName(bom.getChildMaterialName());
                 consumeDetail.setChildMaterialVersion(bom.getChildMaterialVersion());
                 consumeDetail.setUnit(bom.getUnit());
-                consumeDetail.setEmbryoCode(embryoBom.getParentCode()); // 20260302，由于胎胚在bom里没有单独的记录，需要关联出最上级的物料后
-                consumeDetail.setEmbryoVersion(embryoBom.getParentVersion());
+                consumeDetail.setEmbryoCode(embryoCode); // 20260302，由于胎胚在bom里没有单独的记录，需要关联出最上级的物料后
+                consumeDetail.setEmbryoVersion(embryoVersion);
                 // 5.2.3、计算用量，用量为每一层bom的用量乘数
 //                BigDecimal dosage = pathList.stream().map(node -> BigDecimalUtils.valueOf(node.getDosage()))
 //                        .reduce(BigDecimal.ONE, BigDecimal::multiply);

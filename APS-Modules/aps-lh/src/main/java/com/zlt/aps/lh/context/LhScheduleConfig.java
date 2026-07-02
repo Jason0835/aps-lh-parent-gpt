@@ -213,6 +213,12 @@ public class LhScheduleConfig {
                 LhScheduleConstant.FIRST_INSPECTION_QTY));
     }
 
+    /**
+     * 获取同班次总计划量上限。
+     * <p>该参数只由新增排产入口消费，配置为0或负数时由策略入口按不限制处理。</p>
+     *
+     * @return 同班次总计划量上限
+     */
     public int getClassTotalQtyUpLimit() {
         return Math.max(0, getParamIntValue(LhScheduleParamConstant.CLASS_TOTAL_QTY_UP_LIMIT,
                 LhScheduleConstant.CLASS_TOTAL_QTY_UP_LIMIT));
@@ -519,6 +525,21 @@ public class LhScheduleConfig {
                     LhScheduleConstant.NEW_SPEC_SHORTAGE_ADD_MACHINE_THRESHOLD);
             return LhScheduleConstant.NEW_SPEC_SHORTAGE_ADD_MACHINE_THRESHOLD;
         }
+    }
+
+    /**
+     * 获取SKU提前生产天数阈值。
+     * <p>该阈值只控制新增排产提前生产准入向后查找的自然日范围，实际排程窗口仍保持T～T+2。</p>
+     *
+     * @return 提前生产天数阈值，范围1～31
+     */
+    public int getEarlyProductionDaysThreshold() {
+        int threshold = getParamIntValue(LhScheduleParamConstant.EARLY_PRODUCTION_DAYS_THRESHOLD,
+                LhScheduleConstant.DEFAULT_EARLY_PRODUCTION_DAYS_THRESHOLD);
+        if (threshold <= 0) {
+            return LhScheduleConstant.DEFAULT_EARLY_PRODUCTION_DAYS_THRESHOLD;
+        }
+        return Math.min(threshold, LhScheduleConstant.MAX_EARLY_PRODUCTION_DAYS_THRESHOLD);
     }
 
     /**

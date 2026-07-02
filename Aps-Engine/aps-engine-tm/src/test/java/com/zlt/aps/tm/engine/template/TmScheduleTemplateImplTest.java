@@ -1,19 +1,26 @@
 package com.zlt.aps.tm.engine.template;
 
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import cn.hutool.core.date.DateUtil;
 import com.ruoyi.common.exception.ServiceException;
 import com.zlt.aps.common.engine.schedule.IScheduleProcessLogger;
 import com.zlt.aps.common.engine.schedule.ScheduleChainChangeResult;
 import com.zlt.aps.common.engine.schedule.ScheduleRuleResult;
 import com.zlt.aps.tm.api.domain.vo.TmAutoScheduleResponseVo;
+import com.zlt.aps.tm.engine.domain.TmMachineCandidate;
 import com.zlt.aps.tm.engine.domain.TmRuleTrace;
 import com.zlt.aps.tm.engine.domain.TmScheduleContext;
 import com.zlt.aps.tm.engine.domain.TmTaskDraft;
+import com.zlt.aps.tm.engine.service.TmScheduleProcessLogger;
 import org.junit.Test;
+import org.slf4j.LoggerFactory;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 import static org.junit.Assert.assertEquals;
@@ -125,6 +132,51 @@ public class TmScheduleTemplateImplTest {
      * 测试场景：传入测试用过程日志实现，执行时新增 1 条任务并生成 1 条快照。
      * 预期结果：开始摘要包含工厂和排程日期，结束摘要包含任务数量和快照数量。
      */
+    /**
+     * 测试内容：验证过程日志记录未排任务时包含业务键、计划量和候选拒绝摘要。
+     * 测试场景：任务因候选机台产能不足未排，候选跟踪中有过滤原因。
+     * 预期结果：warn日志可直接定位任务和被拒绝原因统计。
+     */
+    @Test
+    public void processLoggerShouldWriteUnplannedBusinessAndCandidateSummary() {
+        Logger logger = (Logger) LoggerFactory.getLogger(TmScheduleProcessLogger.class);
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+        try {
+            TmScheduleContext context = new TmScheduleContext();
+            context.setBatchNo("BATCH-UNPLANNED");
+            context.setTraceId("TRACE-UNPLANNED");
+            context.setFactoryCode("116");
+            context.setScheduleDate(DateUtil.parseDate("2026-06-18"));
+            TmTaskDraft task = new TmTaskDraft();
+            task.setTreadCode("TR-U");
+            task.setGlueCode("GL-U");
+            task.setMouthPlateCode("MP-U");
+            task.setShiftOrder(3);
+            task.setPlanQty(new BigDecimal("120"));
+            task.setUnplannedReasonCode("CAPACITY_NOT_ENOUGH");
+            TmMachineCandidate candidate = new TmMachineCandidate();
+            candidate.setMachineCode("TM01");
+            candidate.setFiltered(Boolean.TRUE);
+            candidate.setFilterReasonCode("NO_REMAIN_CAPACITY");
+            context.getCandidateTraceMap().put(task.getBusinessKey(), Collections.singletonList(candidate));
+
+            new TmScheduleProcessLogger().logUnplanned(task, new TmRuleTrace(), context);
+
+            assertTrue(appender.list.stream().map(ILoggingEvent::getFormattedMessage)
+                    .anyMatch(message -> message.contains("[TM_SCHEDULE_UNPLANNED]")
+                            && message.contains("batchNo=BATCH-UNPLANNED")
+                            && message.contains("traceId=TRACE-UNPLANNED")
+                            && message.contains("businessKey=" + task.getBusinessKey())
+                            && message.contains("shiftOrder=3")
+                            && message.contains("planQty=120")
+                            && message.contains("candidateRejectSummary={NO_REMAIN_CAPACITY=1}")));
+        } finally {
+            logger.detachAppender(appender);
+        }
+    }
+
     @Test
     public void executeShouldLogStepInputAndOutputSummary() {
         RecordingProcessLogger logger = new RecordingProcessLogger();

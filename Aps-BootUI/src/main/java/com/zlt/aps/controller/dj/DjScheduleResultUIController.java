@@ -695,4 +695,14 @@ public class DjScheduleResultUIController extends BaseController<DjScheduleResul
     public AjaxResult getPaddingDistList() {
         return iDjScheduleResultService.getPaddingDistList();
     }
+
+    /**
+     * 获取当前服务器时间对应的班次信息
+     */
+    @ApiOperation("获取当前班次信息")
+    @GetMapping("/getCurrentShift")
+    @ResponseBody
+    public AjaxResult getCurrentShift() {
+        return iDjScheduleResultService.getCurrentShift();
+    }
 }
