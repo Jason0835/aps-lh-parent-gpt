@@ -1,31 +1,14 @@
 package com.zlt.aps.lh.context;
 
-import com.zlt.aps.lh.api.domain.dto.MachineScheduleDTO;
-import com.zlt.aps.lh.api.domain.dto.ShiftProductionControlDTO;
-import com.zlt.aps.lh.api.domain.dto.ShiftRuntimeState;
-import com.zlt.aps.lh.api.domain.dto.SkuScheduleDTO;
-import com.zlt.aps.lh.api.domain.dto.MouldValidationErrorDetail;
-import com.zlt.aps.mdm.api.domain.entity.LhMachineInfo;
-import com.zlt.aps.lh.api.domain.entity.LhMachineOnlineInfo;
-import com.zlt.aps.lh.api.domain.entity.LhMouldChangePlan;
-import com.zlt.aps.lh.api.domain.entity.LhMouldCleanPlan;
-import com.zlt.aps.lh.api.domain.entity.LhPrecisionPlan;
-import com.zlt.aps.lh.api.domain.entity.LhRepairCapsule;
-import com.zlt.aps.lh.api.domain.entity.LhScheduleProcessLog;
-import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
-import com.zlt.aps.lh.api.domain.entity.LhSpecialMaterialBom;
-import com.zlt.aps.lh.api.domain.entity.LhSpecifyMachine;
-import com.zlt.aps.lh.api.domain.entity.LhUnscheduledResult;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
+import com.zlt.aps.lh.api.domain.dto.*;
+import com.zlt.aps.lh.api.domain.entity.*;
 import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
 import com.zlt.aps.lh.engine.strategy.support.MouldResourceContext;
+import com.zlt.aps.lh.handler.SkuMonthPlanCalculator;
 import com.zlt.aps.lh.util.SkuConstructionRefResolverUtil;
-import com.zlt.aps.mdm.api.domain.entity.MdmDevicePlanShut;
-import com.zlt.aps.mdm.api.domain.entity.MdmMaterialInfo;
-import com.zlt.aps.mdm.api.domain.entity.MdmModelInfo;
-import com.zlt.aps.mdm.api.domain.entity.MdmSkuConstructionRef;
-import com.zlt.aps.mdm.api.domain.entity.MdmSkuLhCapacity;
-import com.zlt.aps.mdm.api.domain.entity.MdmSkuMouldRel;
-import com.zlt.aps.mdm.api.domain.entity.MdmWorkCalendar;
+import com.zlt.aps.mdm.api.domain.entity.*;
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import lombok.Data;
 import org.apache.commons.lang3.StringUtils;
@@ -33,17 +16,8 @@ import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.IdentityHashMap;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
+import java.time.YearMonth;
+import java.util.*;
 
 /**
  * 硫化排程上下文。
@@ -66,11 +40,17 @@ public class LhScheduleContext {
 
     // ========== 排程基本参数 ==========
 
-    /** 分厂编号 */
+    /**
+     * 分厂编号
+     */
     private String factoryCode;
-    /** 分厂名称 */
+    /**
+     * 分厂名称
+     */
     private String factoryName;
-    /** 排程目标日/业务保存日期（与请求体日期一致，业务口径为 T+1），仅用于结果保存、查询、日志等业务归属 */
+    /**
+     * 排程目标日/业务保存日期（与请求体日期一致，业务口径为 T+1），仅用于结果保存、查询、日志等业务归属
+     */
     private Date scheduleTargetDate;
     /**
      * 排程窗口起点 T 日：由 {@link #scheduleTargetDate} 减去 (排程天数 - 2) 得到，
@@ -90,246 +70,557 @@ public class LhScheduleContext {
      * 当前排程日期，滚动变化
      */
     private Date currentScheduleDate;
-    /** 批次号 */
+    /**
+     * 批次号
+     */
     private String batchNo;
-    /** 月计划需求版本 */
+    /**
+     * 月计划需求版本
+     */
     private String monthPlanVersion;
-    /** 月计划排产版本 */
+    /**
+     * 月计划排产版本
+     */
     private String productionVersion;
-    /** 操作人 */
+    /**
+     * 操作人
+     */
     private String operator;
-    /** 本次排程配置快照 */
+    /**
+     * 本次排程配置快照
+     */
     private LhScheduleConfig scheduleConfig;
-    /** 硫化开模时间 */
+    /**
+     * 硫化开模时间
+     */
     private Date curingOpenMoldTime;
-    /** 硫化停锅时间 */
+    /**
+     * 硫化停锅时间
+     */
     private Date curingStopPotTime;
-    /** 开产班次 */
+    /**
+     * 开产班次
+     */
     private ShiftProductionControlDTO openProductionShift;
-    /** 停产班次 */
+    /**
+     * 停产班次
+     */
     private ShiftProductionControlDTO stopProductionShift;
-    /** 是否启用开停产管控 */
+    /**
+     * 是否启用开停产管控
+     */
     private boolean enableOpenStopProductionControl;
-    /** 是否处于开产模式 */
+    /**
+     * 是否处于开产模式
+     */
     private boolean openProductionMode;
-    /** 是否处于停产模式 */
+    /**
+     * 是否处于停产模式
+     */
     private boolean stopProductionMode;
-    /** 开产欠产阈值比例 */
+    /**
+     * 开产欠产阈值比例
+     */
     private BigDecimal openProductionShortageThresholdRate;
 
     // ========== 硫化参数(从LhParams加载) ==========
 
-    /** 硫化参数Map, key=paramCode, value=paramValue */
+    /**
+     * 硫化参数Map, key=paramCode, value=paramValue
+     */
     private Map<String, String> lhParamsMap = new HashMap<>();
 
     // ========== 基础数据(S4.2加载) ==========
 
-    /** 月生产计划列表，来源于月计划最终结果表，是 SKU 归集和 day1/day2/day3 窗口计划量的主数据来源 */
+    /**
+     * 月生产计划列表，来源于月计划最终结果表，是 SKU 归集和 day1/day2/day3 窗口计划量的主数据来源
+     */
     private List<FactoryMonthPlanProductionFinalResult> monthPlanList = new ArrayList<>();
-    /** 本次排程加载的全部月计划列表，跨月时包含多个自然月；供按业务日期解析 dayN 使用 */
+    /**
+     * 本次排程加载的全部月计划列表，跨月时包含多个自然月；供按业务日期解析 dayN 使用
+     */
     private List<FactoryMonthPlanProductionFinalResult> loadedMonthPlanList = new ArrayList<>();
-    /** 物料+产品状态+年月 -> 月计划记录索引，跨月或同物料多产品状态时避免误取其他计划 */
+    /**
+     * 物料+产品状态+年月 -> 月计划记录索引，跨月或同物料多产品状态时避免误取其他计划
+     */
     private Map<String, FactoryMonthPlanProductionFinalResult> monthPlanByMaterialMonthMap = new LinkedHashMap<>();
-    /** 年月 -> 定稿需求版本，跨月加载月计划和周程调整时按自然月取版本 */
+    /**
+     * 年月 -> 定稿需求版本，跨月加载月计划和周程调整时按自然月取版本
+     */
     private Map<String, String> monthPlanVersionByYearMonthMap = new LinkedHashMap<>();
-    /** 年月 -> 定稿排产版本，跨月加载月计划和结构机台统计时按自然月取版本 */
+    /**
+     * 年月 -> 定稿排产版本，跨月加载月计划和结构机台统计时按自然月取版本
+     */
     private Map<String, String> productionVersionByYearMonthMap = new LinkedHashMap<>();
-    /** 物料+产品状态+年月 -> 月累计完成量，避免同一物料不同产品状态或跨月时完成量串月 */
+    /**
+     * 物料+产品状态+年月 -> 月累计完成量，避免同一物料不同产品状态或跨月时完成量串月
+     */
     private Map<String, Integer> materialMonthFinishedQtyByMonthMap = new HashMap<>();
-    /** 工作日历列表 */
+    /**
+     * 工作日历列表
+     */
     private List<MdmWorkCalendar> workCalendarList = new ArrayList<>();
-    /** SKU日硫化产能Map, key=materialCode */
+    /**
+     * SKU日硫化产能Map, key=materialCode
+     */
     private Map<String, MdmSkuLhCapacity> skuLhCapacityMap = new HashMap<>();
-    /** 设备停机计划列表 */
+    /**
+     * 设备停机计划列表
+     */
     private List<MdmDevicePlanShut> devicePlanShutList = new ArrayList<>();
-    /** SKU与模具关系Map, key=materialCode */
+    /**
+     * SKU与模具关系Map, key=materialCode
+     */
     private Map<String, List<MdmSkuMouldRel>> skuMouldRelMap = new HashMap<>();
-    /** 模具台账Map, key=mouldCode */
+    /**
+     * 模具台账Map, key=mouldCode
+     */
     private Map<String, MdmModelInfo> modelInfoMap = new HashMap<>();
-    /** 硫化机台信息Map, key=machineCode */
+    /**
+     * 硫化机台信息Map, key=machineCode
+     */
     private Map<String, LhMachineInfo> machineInfoMap = new LinkedHashMap<>();
-    /** 模具清洗计划列表 */
+    /**
+     * 模具清洗计划列表
+     */
     private List<LhMouldCleanPlan> cleaningPlanList = new ArrayList<>();
-    /** 因有可换模具而跳过的喷砂清洗计划, key=machineCode, value=计划清洗时间 */
+    /**
+     * 因有可换模具而跳过的喷砂清洗计划, key=machineCode, value=计划清洗时间
+     */
     private Map<String, Date> skippedSandblastCleaningMap = new HashMap<>();
-    /** 胎胚实时库存Map, key=embryoCode；S4.3 会按同胎胚 SKU 标准产能占比分摊到 SKU 维度 */
+    /**
+     * 胎胚实时库存Map, key=embryoCode；S4.3 会按同胎胚 SKU 标准产能占比分摊到 SKU 维度
+     */
     private Map<String, Integer> embryoRealtimeStockMap = new HashMap<>();
-    /** 胎胚收尾标识Map, key=embryoCode, value=1-收尾/0-非收尾；以胎胚维度合并硫化余量后按主销参与情况判定 */
+    /**
+     * 胎胚收尾标识Map, key=embryoCode, value=1-收尾/0-非收尾；以胎胚维度合并硫化余量后按主销参与情况判定
+     */
     private Map<String, Integer> embryoEndingFlagMap = new HashMap<>();
-    /** 日完成量Map（按物料+产品状态+完成日期聚合）, key=materialCode_productStatus_finishDate(yyyy-MM-dd) */
+    /**
+     * 日完成量Map（按物料+产品状态+完成日期聚合）, key=materialCode_productStatus_finishDate(yyyy-MM-dd)
+     */
     private Map<String, Integer> materialDayFinishedQtyMap = new HashMap<>();
-    /** 本月日完成量Map（按物料+产品状态+完成日期聚合）, key=materialCode_productStatus_finishDate(yyyy-MM-dd)，仅覆盖当前排程月份截至T-1 */
+    /**
+     * 本月日完成量Map（按物料+产品状态+完成日期聚合）, key=materialCode_productStatus_finishDate(yyyy-MM-dd)，仅覆盖当前排程月份截至T-1
+     */
     private Map<String, Integer> materialMonthDailyFinishedQtyMap = new HashMap<>();
-    /** 月累计完成量Map（按月计划所属月份统计，截至排程窗口T日前一日）, key=materialCode_productStatus */
+    /**
+     * 月累计完成量Map（按月计划所属月份统计，截至排程窗口T日前一日）, key=materialCode_productStatus
+     */
     private Map<String, Integer> materialMonthFinishedQtyMap = new HashMap<>();
-    /** T日排程班次完成量Map, key=materialCode, value=T日class1FinishQty按物料汇总值 */
+    /**
+     * T日排程班次完成量Map, key=materialCode, value=T日class1FinishQty按物料汇总值
+     */
     private Map<String, Integer> materialScheDayFinishQtyMap = new HashMap<>();
-    /** 物料信息Map, key=materialCode */
+    /**
+     * 物料信息Map, key=materialCode
+     */
     private Map<String, MdmMaterialInfo> materialInfoMap = new HashMap<>();
-    /** 胶囊规格分组Map, key=规格, value=归一化后的分组编码 */
+    /**
+     * 胶囊规格分组Map, key=规格, value=归一化后的分组编码
+     */
     private Map<String, String> capsuleSpecPeerMap = new HashMap<>();
-    /** 胶囊英寸分组Map, key=英寸, value=归一化后的分组编码 */
+    /**
+     * 胶囊英寸分组Map, key=英寸, value=归一化后的分组编码
+     */
     private Map<String, String> capsuleProSizePeerMap = new HashMap<>();
-    /** 胎胚描述对应物料数量Map, key=胎胚描述 */
+    /**
+     * 胎胚描述对应物料数量Map, key=胎胚描述
+     */
     private Map<String, Integer> embryoDescMaterialCountMap = new HashMap<>();
-    /** MES硫化在机信息Map, key=machineCode */
+    /**
+     * MES硫化在机信息Map, key=machineCode
+     */
     private Map<String, LhMachineOnlineInfo> machineOnlineInfoMap = new HashMap<>();
-    /** 硫化定点机台Map, key=materialCode（表字段SPEC_CODE实际维护物料编码） */
+    /**
+     * 硫化定点机台Map, key=materialCode（表字段SPEC_CODE实际维护物料编码）
+     */
     private Map<String, List<LhSpecifyMachine>> specifyMachineMap = new HashMap<>();
-    /** 硫化机胶囊已使用次数Map, key=machineCode */
+    /**
+     * 硫化机胶囊已使用次数Map, key=machineCode
+     */
     private Map<String, LhRepairCapsule> capsuleUsageMap = new HashMap<>();
-    /** 硫化精度保养计划Map, key=machineCode */
+    /**
+     * 硫化精度保养计划Map, key=machineCode
+     */
     private Map<String, LhPrecisionPlan> maintenancePlanMap = new HashMap<>();
-    /** 特殊物料清单配置列表 */
+    /**
+     * 特殊物料清单配置列表
+     */
     private List<LhSpecialMaterialBom> specialMaterialBomList = new ArrayList<>();
-    /** 特殊物料分类Map, key=物料编码, value=分类集合 */
+    /**
+     * 特殊物料分类Map, key=物料编码, value=分类集合
+     */
     private Map<String, Set<String>> specialMaterialCategoryByMaterialCode = new HashMap<>();
-    /** 特殊物料分类Map, key=结构名称, value=分类集合 */
+    /**
+     * 特殊物料分类Map, key=结构名称, value=分类集合
+     */
     private Map<String, Set<String>> specialMaterialCategoryByStructureName = new HashMap<>();
-    /** SKU与示方书关系Map, key=materialCode */
+    /**
+     * SKU与示方书关系Map, key=materialCode
+     */
     private Map<String, MdmSkuConstructionRef> skuConstructionRefMap = new HashMap<>();
-    /** SKU与示方书关系Map(复合key), key=materialCode + "::" + trialStatus */
+    /**
+     * SKU与示方书关系Map(复合key), key=materialCode + "::" + trialStatus
+     */
     private Map<String, MdmSkuConstructionRef> skuConstructionRefCompositeKeyMap = new HashMap<>();
 
     // ========== 中间计算结果(S4.3) ==========
 
-    /** 前日排程结果列表(修正后) */
+    /**
+     * 前日排程结果列表(修正后)
+     */
     private List<LhScheduleResult> previousScheduleResultList = new ArrayList<>();
-    /** 业务目标日前一日排程结果列表，仅供新增历史欠产跳过规则兜底判断 */
+    /**
+     * 业务目标日前一日排程结果列表，仅供新增历史欠产跳过规则兜底判断
+     */
     private List<LhScheduleResult> targetPreviousScheduleResultList = new ArrayList<>();
-    /** 当前排程目标日上一轮排程结果（用于硫化示方历史保护） */
+    /**
+     * 当前排程目标日上一轮排程结果（用于硫化示方历史保护）
+     */
     private List<LhScheduleResult> previousCureFormulaResultList = new ArrayList<>();
-    /** 前日模具交替计划列表，供滚动衔接继承到本批次 */
+    /**
+     * 前日模具交替计划列表，供滚动衔接继承到本批次
+     */
     private List<LhMouldChangePlan> previousMouldChangePlanList = new ArrayList<>();
-    /** 滚动排程继承结果列表，仅存放本批次继承的排程结果 */
+    /**
+     * 滚动排程继承结果列表，仅存放本批次继承的排程结果
+     */
     private List<LhScheduleResult> rollingInheritedScheduleResultList = new ArrayList<>();
-    /** 滚动排程继承计划量Map，key=materialCode_productStatus；ScheduleAdjustHandler据此从同状态待排量中扣减 */
+    /**
+     * 滚动排程继承计划量Map，key=materialCode_productStatus；ScheduleAdjustHandler据此从同状态待排量中扣减
+     */
     private Map<String, Integer> inheritedPlanQtyMap = new HashMap<>();
-    /** 是否已执行滚动排程衔接，影响结转口径和前日日期解析 */
+    /**
+     * 是否已执行滚动排程衔接，影响结转口径和前日日期解析
+     */
     private boolean rollingScheduleHandoff;
-    /** SKU按结构归集, key=structureName, value=SKU排程DTO列表 */
+    /**
+     * SKU按结构归集, key=structureName, value=SKU排程DTO列表
+     */
     private Map<String, List<SkuScheduleDTO>> structureSkuMap = new LinkedHashMap<>();
-    /** 业务日期 -> 产品结构 -> 计划硫化机台数，来源于月计划统计表 dayN.lhMachines */
+    /**
+     * 业务日期 -> 产品结构 -> 计划硫化机台数，来源于月计划统计表 dayN.lhMachines
+     */
     private Map<LocalDate, Map<String, Integer>> structurePlanMachineCountMap =
             new LinkedHashMap<LocalDate, Map<String, Integer>>(4);
-    /** 业务日期 -> 产品结构 -> 已排硫化机台编码集合，按 Set 去重后用于提前生产准入判断 */
+    /**
+     * 业务日期 -> 产品结构 -> 已排硫化机台编码集合，按 Set 去重后用于提前生产准入判断
+     */
     private Map<LocalDate, Map<String, Set<String>>> structureScheduledMachineCodeMap =
             new LinkedHashMap<LocalDate, Map<String, Set<String>>>(4);
-    /** 业务日期 -> SKU物料编码 -> 已排硫化机台编码集合，用于结构收尾大余量强制加机台判断 */
+    /**
+     * 业务日期 -> SKU物料编码 -> 已排硫化机台编码集合，用于结构收尾大余量强制加机台判断
+     */
     private Map<LocalDate, Map<String, Set<String>>> skuScheduledMachineCodeMap =
             new LinkedHashMap<LocalDate, Map<String, Set<String>>>(4);
-    /** 续作SKU列表，来源于 MES 在机/前批次状态，S4.4 优先排产 */
+    /**
+     * 续作SKU列表，来源于 MES 在机/前批次状态，S4.4 优先排产
+     */
     private List<SkuScheduleDTO> continuousSkuList = new ArrayList<>();
-    /** 新增SKU列表，续作和换活字块未消费完的 SKU 会继续保留到 S4.5 新增链路 */
+    /**
+     * 新增SKU列表，续作和换活字块未消费完的 SKU 会继续保留到 S4.5 新增链路
+     */
     private List<SkuScheduleDTO> newSpecSkuList = new ArrayList<>();
-    /** 本月历史欠产向当前排程窗口传导的数量，key=materialCode_productStatus */
+    /**
+     * 本月历史欠产向当前排程窗口传导的数量，key=materialCode_productStatus
+     */
     private Map<String, Integer> carryForwardQtyMap = new HashMap<>();
-    /** 满班补齐超排量累加器，key=materialCode，供最终汇总日志使用（不受SKU从待排列表中移除影响） */
+    /**
+     * 满班补齐超排量累加器，key=materialCode，供最终汇总日志使用（不受SKU从待排列表中移除影响）
+     */
     private Map<String, Integer> skuShiftFillOverQtyMap = new LinkedHashMap<>();
-    /** SKU实际排产剩余账本，key=materialCode；dayN只做节奏判断，实际排产按该账本扣减 */
+    /**
+     * SKU实际排产剩余账本，key=materialCode；dayN只做节奏判断，实际排产按该账本扣减
+     */
     private Map<String, Integer> skuProductionRemainingQtyMap = new LinkedHashMap<>();
-    /** S4.5当前待排正规新增SKU数量，供选机阶段判断普通机台让位规则 */
+    /**
+     * S4.5当前待排正规新增SKU数量，供选机阶段判断普通机台让位规则
+     */
     private int pendingFormalNewSpecSkuCount;
-    /** S4.5当前待排试制新增SKU数量，供单控机台内部资源竞争判断 */
+    /**
+     * S4.5当前待排试制新增SKU数量，供单控机台内部资源竞争判断
+     */
     private int pendingTrialNewSpecSkuCount;
-    /** S4.5当前待排量试新增SKU数量，供单控机台内部资源竞争判断 */
+    /**
+     * S4.5当前待排量试新增SKU数量，供单控机台内部资源竞争判断
+     */
     private int pendingMassTrialNewSpecSkuCount;
-    /** S4.5当前待排小批量新增SKU数量，供单控机台内部资源竞争判断 */
+    /**
+     * S4.5当前待排小批量新增SKU数量，供单控机台内部资源竞争判断
+     */
     private int pendingSmallBatchNewSpecSkuCount;
-    /** 新增SKU最近一次选机是否被单控/普通机台让位规则清空候选，使用对象身份避免同物料编码互相覆盖 */
+    /**
+     * 新增SKU最近一次选机是否被单控/普通机台让位规则清空候选，使用对象身份避免同物料编码互相覆盖
+     */
     private Map<SkuScheduleDTO, Boolean> newSpecTypeRuleBlockedMap = new IdentityHashMap<>();
-    /** 新增SKU提前生产准入结果，供选机和首日排产判断识别提前生产场景，使用对象身份避免同物料编码互相覆盖 */
+    /**
+     * 新增SKU提前生产准入结果，供选机和首日排产判断识别提前生产场景，使用对象身份避免同物料编码互相覆盖
+     */
     private Map<SkuScheduleDTO, Boolean> newSpecEarlyProductionAllowedMap = new IdentityHashMap<>();
-    /** 新增SKU进入S4.5时是否命中结构五天内收尾层级快照，使用对象身份避免SKU出队后判定漂移 */
+    /**
+     * 新增SKU进入S4.5时是否命中结构五天内收尾层级快照，使用对象身份避免SKU出队后判定漂移
+     */
     private Map<SkuScheduleDTO, Boolean> newSpecSingleControlStructureEndingLayerMap = new IdentityHashMap<>();
-    /** 续作结果日额度账本是否已完成最终同步，防止同一上下文重复扣账 */
+    /**
+     * 续作结果日额度账本是否已完成最终同步，防止同一上下文重复扣账
+     */
     private boolean continuousDailyQuotaSynced;
-    /** 续作首日/窗口无计划释放的机台集合，仅用于S4.5选机降优先级，不代表禁止生产 */
+    /**
+     * 续作首日/窗口无计划释放的机台集合，仅用于S4.5选机降优先级，不代表禁止生产
+     */
     private Set<String> releasedContinuousMachineCodeSet = new LinkedHashSet<>();
-    /** 已按降模规则释放过续作机台的物料集合，避免后续补偿链路把降模机台重新补回 */
+    /**
+     * 已按降模规则释放过续作机台的物料集合，避免后续补偿链路把降模机台重新补回
+     */
     private Set<String> reducedContinuationGroupKeySet = new LinkedHashSet<>();
-    /** 已按降模规则只保留单台续作机台的分组集合，避免后续补偿链路把已释放机台重新补回 */
+    /**
+     * 已按降模规则只保留单台续作机台的分组集合，避免后续补偿链路把已释放机台重新补回
+     */
     private Set<String> singleMachineReducedContinuationGroupKeySet = new LinkedHashSet<>();
-    /** 续作收尾小余量释放后可优先进入换活字块匹配的机台集合 */
+    /**
+     * 续作收尾小余量释放后可优先进入换活字块匹配的机台集合
+     */
     private Set<String> typeBlockReleasedContinuousMachineCodeSet = new LinkedHashSet<>();
-    /** 首日无计划但后续有计划的续作释放机台集合，供S4.4/S4.5稳定识别占位结果，不受后续账本扣减影响 */
+    /**
+     * 首日无计划但后续有计划的续作释放机台集合，供S4.4/S4.5稳定识别占位结果，不受后续账本扣减影响
+     */
     private Set<String> firstDayNoPlanReleasedContinuousMachineCodeSet = new LinkedHashSet<>();
-    /** 运行态结果来源SKU映射，使用对象身份避免结果行可变字段影响Map命中，供后置校验回到原始日计划账本 */
+    /**
+     * 运行态结果来源SKU映射，使用对象身份避免结果行可变字段影响Map命中，供后置校验回到原始日计划账本
+     */
     private Map<LhScheduleResult, SkuScheduleDTO> scheduleResultSourceSkuMap = new IdentityHashMap<>();
-    /** S4.5新增链路模具资源运行态，只限制新增机台数量，不反向裁剪S4.4续作结果 */
+    /**
+     * S4.5新增链路模具资源运行态，只限制新增机台数量，不反向裁剪S4.4续作结果
+     */
     private MouldResourceContext mouldResourceContext;
 
     // ========== 机台分配状态 ==========
 
-    /** 机台排程DTO Map, key=machineCode */
+    /**
+     * 机台排程DTO Map, key=machineCode
+     */
     private Map<String, MachineScheduleDTO> machineScheduleMap = new LinkedHashMap<>();
-    /** 机台初始状态快照，供换模计划和回归校验使用 */
+    /**
+     * 机台初始状态快照，供换模计划和回归校验使用
+     */
     private Map<String, MachineScheduleDTO> initialMachineScheduleMap = new LinkedHashMap<>();
-    /** 机台剩余产能Map, key=machineCode, value=各班次剩余产能 */
+    /**
+     * 机台剩余产能Map, key=machineCode, value=各班次剩余产能
+     */
     private Map<String, int[]> machineShiftCapacityMap = new LinkedHashMap<>();
-    /** 班次运行态，key=班次索引 1～N（N≤8），承载开停产、工作日历和历史班次保护后的可排状态 */
+    /**
+     * 班次运行态，key=班次索引 1～N（N≤8），承载开停产、工作日历和历史班次保护后的可排状态
+     */
     private Map<Integer, ShiftRuntimeState> shiftRuntimeStateMap = new LinkedHashMap<>(8);
-    /** 本次排程解析后的班次窗口 */
+    /**
+     * 本次排程解析后的班次窗口
+     */
     private List<LhShiftConfigVO> scheduleWindowShifts = new ArrayList<>();
-    /** 班次排产管控，key=班次索引 */
+    /**
+     * 班次排产管控，key=班次索引
+     */
     private Map<Integer, ShiftProductionControlDTO> shiftProductionControlMap = new LinkedHashMap<>(8);
-    /** 机台已分配SKU Map, key=machineCode, value=已分配的排程结果 */
+    /**
+     * 机台已分配SKU Map, key=machineCode, value=已分配的排程结果
+     */
     private Map<String, List<LhScheduleResult>> machineAssignmentMap = new LinkedHashMap<>();
-    /** 定点机台挤量预留切换开始时间, key=machineCode；用于续作非收尾给后续定点新增留出换模窗口 */
+    /**
+     * 定点机台挤量预留切换开始时间, key=machineCode；用于续作非收尾给后续定点新增留出换模窗口
+     */
     private Map<String, Date> specifyMachineReservedSwitchStartTimeMap = new LinkedHashMap<>();
-    /** 定点机台挤量预留物料编码, key=machineCode */
+    /**
+     * 定点机台挤量预留物料编码, key=machineCode
+     */
     private Map<String, String> specifyMachineReservedMaterialMap = new LinkedHashMap<>();
-    /** 每日模具切换计数, key=dateString, value=[早班切换数, 中班切换数] */
+    /**
+     * 每日模具切换计数, key=dateString, value=[早班切换数, 中班切换数]
+     */
     private Map<String, int[]> dailyMouldChangeCountMap = new LinkedHashMap<>();
-    /** 同胎胚换模班次占用, key=胎胚编码, value=已安排换模班次索引集合 */
+    /**
+     * 同胎胚换模班次占用, key=胎胚编码, value=已安排换模班次索引集合
+     */
     private Map<String, Set<Integer>> greenTireChangeoverShiftMap = new LinkedHashMap<>();
-    /** 本月待排物料胎胚共用关系, key=materialCode, value=true表示与其他待排物料共用胎胚 */
+    /**
+     * 本月待排物料胎胚共用关系, key=materialCode, value=true表示与其他待排物料共用胎胚
+     */
     private Map<String, Boolean> materialSharedEmbryoMap = new LinkedHashMap<>();
-    /** 当前仍有效参与排产的胎胚SKU集合, key=embryoCode, value=有效待排物料编码列表 */
+    /**
+     * 当前仍有效参与排产的胎胚SKU集合, key=embryoCode, value=有效待排物料编码列表
+     */
     private Map<String, List<String>> activeEmbryoSkuMap = new LinkedHashMap<>();
-    /** 共用胎胚剔除零余量SKU后动态转为单胎胚收尾的物料编码集合 */
+    /**
+     * 共用胎胚剔除零余量SKU后动态转为单胎胚收尾的物料编码集合
+     */
     private Set<String> dynamicSingleEmbryoEndingMaterialSet = new LinkedHashSet<>();
-    /** 换模/换活字块日上限阻塞原因, key=materialCode, value=未排原因 */
+    /**
+     * 换模/换活字块日上限阻塞原因, key=materialCode, value=未排原因
+     */
     private Map<String, String> mouldChangeLimitBlockedReasonMap = new LinkedHashMap<>();
-    /** 每日首检计数, key=dateString, value=[早班首检数, 中班首检数] */
+    /**
+     * 每日首检计数, key=dateString, value=[早班首检数, 中班首检数]
+     */
     private Map<String, int[]> dailyFirstInspectionCountMap = new LinkedHashMap<>();
-    /** 班次首检数量顺序计数, key=业务日期#班次索引, value=已计入首检数量的机台数 */
+    /**
+     * 班次首检数量顺序计数, key=业务日期#班次索引, value=已计入首检数量的机台数
+     */
     private Map<String, Integer> shiftFirstInspectionCountMap = new LinkedHashMap<>(8);
-    /** 每日精度保养计数, key=dateString, value=已安排保养机台数 */
+    /**
+     * 每日精度保养计数, key=dateString, value=已安排保养机台数
+     */
     private Map<String, Integer> dailyMaintenanceCountMap = new LinkedHashMap<>();
 
     // ========== 排程输出结果 ==========
 
-    /** 硫化排程结果列表 */
+    /**
+     * 硫化排程结果列表
+     */
     private List<LhScheduleResult> scheduleResultList = new ArrayList<>();
-    /** 硫化未排结果列表 */
+    /**
+     * 硫化未排结果列表
+     */
     private List<LhUnscheduledResult> unscheduledResultList = new ArrayList<>();
-    /** 模具交替计划列表 */
+    /**
+     * 模具交替计划列表
+     */
     private List<LhMouldChangePlan> mouldChangePlanList = new ArrayList<>();
-    /** 排程日志列表 */
+    /**
+     * 排程日志列表
+     */
     private List<LhScheduleProcessLog> scheduleLogList = new ArrayList<>();
 
     // ========== 流程控制 ==========
 
-    /** 是否中断排程 */
+    /**
+     * 是否中断排程
+     */
     private boolean interrupted = false;
-    /** 中断原因 */
+    /**
+     * 中断原因
+     */
     private String interruptReason;
-    /** 当前执行步骤 */
+    /**
+     * 当前执行步骤
+     */
     private String currentStep;
-    /** 校验错误信息集合 */
+    /**
+     * 校验错误信息集合
+     */
     private List<String> validationErrorList = new ArrayList<>();
-    /** 校验错误明细（结构化，如模具禁用/缺失的详细信息） */
+    /**
+     * 校验错误明细（结构化，如模具禁用/缺失的详细信息）
+     */
     private List<MouldValidationErrorDetail> validationErrorDetailList = new ArrayList<>();
-    /** 优先级跟踪日志静默深度（局部搜索模拟分支时递增） */
+    /**
+     * 优先级跟踪日志静默深度（局部搜索模拟分支时递增）
+     */
     private int priorityTraceMuteDepth = 0;
+    /**
+     * 20260701+ 判断当前排程周期是否存在跨月
+     * true 跨月 false 不跨月
+     *
+     * @return
+     */
+    public boolean isCrossMonthByProductionDateInfo() {
+        List<Date> allProductionDateList = Lists.newArrayList(getAllProductionDateInfo());
+        if (CollectionUtils.isEmpty(allProductionDateList)) {
+            return false;
+        }
+        int size = allProductionDateList.size();
+        if (size == BigDecimal.ONE.intValue()) {
+            return false;
+        }
+        allProductionDateList.sort(Comparator.naturalOrder());
+        Date first = allProductionDateList.get(BigDecimal.ZERO.intValue());
+        int lastIndex = allProductionDateList.size() - BigDecimal.ONE.intValue();
+        Date last = allProductionDateList.get(lastIndex);
+        YearMonth firstInfo = SkuMonthPlanCalculator.getProductionYearAndMonth(first);
+        YearMonth lastInfo = SkuMonthPlanCalculator.getProductionYearAndMonth(last);
+        return firstInfo.equals(lastInfo);
+    }
 
+    /**
+     * 获20260701+ 取前一个月的年份-月份
+     *
+     * @return
+     */
+    public YearMonth getFirstYearMonth() {
+        List<Date> allProductionDateList = Lists.newArrayList(getAllProductionDateInfo());
+        if (CollectionUtils.isEmpty(allProductionDateList)) {
+            return null;
+        }
+        allProductionDateList.sort(Comparator.naturalOrder());
+        Date first = allProductionDateList.get(BigDecimal.ZERO.intValue());
+        return SkuMonthPlanCalculator.getProductionYearAndMonth(first);
+    }
+
+    /**
+     * 获20260701+ 取后一个月的年份-月份
+     *
+     * @return
+     */
+    public YearMonth getLastYearMonth() {
+        List<Date> allProductionDateList = Lists.newArrayList(getAllProductionDateInfo());
+        if (CollectionUtils.isEmpty(allProductionDateList)) {
+            return null;
+        }
+        allProductionDateList.sort(Comparator.naturalOrder());
+        Date last = allProductionDateList.get(allProductionDateList.size() - BigDecimal.ONE.intValue());
+        return SkuMonthPlanCalculator.getProductionYearAndMonth(last);
+    }
+
+    /**
+     * 获取对应年、月的月计划排产计划
+     *
+     * @param skuMonthProductionInfo 需要查找的Sku信息
+     * @param yearMonth              年、月
+     * @return
+     */
+    public FactoryMonthPlanProductionFinalResult getSkuYearMonthFinal(FactoryMonthPlanProductionFinalResult skuMonthProductionInfo, YearMonth yearMonth) {
+        if (null == skuMonthProductionInfo || null == yearMonth || CollectionUtils.isEmpty(loadedMonthPlanList)) {
+            return null;
+        }
+        List<FactoryMonthPlanProductionFinalResult> resultList = Lists.newArrayList();
+        loadedMonthPlanList.forEach(singlePlan -> {
+            if (!singlePlan.isSameYearMonth(yearMonth)) {
+                //不同年月
+                return;
+            }
+            if (!skuMonthProductionInfo.getMaterialStatusKey().equals(singlePlan.getMaterialStatusKey())) {
+                return;
+            }
+            resultList.add(singlePlan);
+        });
+        if (CollectionUtils.isEmpty(resultList)) {
+            return null;
+        }
+        return resultList.get(BigDecimal.ZERO.intValue());
+    }
+
+    /**
+     * 20260701+ 当前所有排产日集合
+     *
+     * @return
+     */
+    public Set<Date> getAllProductionDateInfo() {
+        Set<Date> allProductionDateSet = Sets.newHashSet();
+        if (null != scheduleDate) {
+            allProductionDateSet.add(scheduleDate);
+        }
+        if (null != scheduleTargetDate) {
+            allProductionDateSet.add(scheduleTargetDate);
+        }
+        if (null != windowEndDate) {
+            allProductionDateSet.add(windowEndDate);
+        }
+        return allProductionDateSet;
+    }
     /**
      * 累加结构计划硫化机台数。
      *
      * @param productionDate 业务日期
-     * @param structureName 产品结构
-     * @param machineCount 计划硫化机台数
+     * @param structureName  产品结构
+     * @param machineCount   计划硫化机台数
      */
     public void addStructurePlanMachineCount(LocalDate productionDate, String structureName, int machineCount) {
         if (Objects.isNull(productionDate) || StringUtils.isEmpty(structureName)) {
@@ -346,7 +637,7 @@ public class LhScheduleContext {
      * 获取指定业务日、指定结构的计划硫化机台数。
      *
      * @param productionDate 业务日期
-     * @param structureName 产品结构
+     * @param structureName  产品结构
      * @return 计划硫化机台数
      */
     public int getStructurePlanMachineCount(LocalDate productionDate, String structureName) {
@@ -375,9 +666,9 @@ public class LhScheduleContext {
      * <p>结构与 SKU 均按“业务日 + 机台编码”去重，避免同一机台多个班次重复计数。</p>
      *
      * @param productionDate 业务日期
-     * @param structureName 产品结构
-     * @param materialCode SKU物料编码
-     * @param machineCode 机台编码
+     * @param structureName  产品结构
+     * @param materialCode   SKU物料编码
+     * @param machineCode    机台编码
      */
     public void recordScheduledMachine(LocalDate productionDate,
                                        String structureName,
@@ -398,7 +689,7 @@ public class LhScheduleContext {
      * 获取指定业务日、指定结构的已排机台数。
      *
      * @param productionDate 业务日期
-     * @param structureName 产品结构
+     * @param structureName  产品结构
      * @return 已排机台数
      */
     public int getStructureScheduledMachineCount(LocalDate productionDate, String structureName) {
@@ -409,7 +700,7 @@ public class LhScheduleContext {
      * 获取指定业务日、指定 SKU 的已排机台数。
      *
      * @param productionDate 业务日期
-     * @param materialCode SKU物料编码
+     * @param materialCode   SKU物料编码
      * @return 已排机台数
      */
     public int getSkuScheduledMachineCount(LocalDate productionDate, String materialCode) {
@@ -419,10 +710,10 @@ public class LhScheduleContext {
     /**
      * 登记指定维度的机台编码。
      *
-     * @param targetMap 目标统计Map
+     * @param targetMap      目标统计Map
      * @param productionDate 业务日期
-     * @param dimensionKey 结构或SKU编码
-     * @param machineCode 机台编码
+     * @param dimensionKey   结构或SKU编码
+     * @param machineCode    机台编码
      */
     private void recordMachine(Map<LocalDate, Map<String, Set<String>>> targetMap,
                                LocalDate productionDate,
@@ -438,9 +729,9 @@ public class LhScheduleContext {
     /**
      * 获取指定维度已排机台数。
      *
-     * @param sourceMap 来源统计Map
+     * @param sourceMap      来源统计Map
      * @param productionDate 业务日期
-     * @param dimensionKey 结构或SKU编码
+     * @param dimensionKey   结构或SKU编码
      * @return 已排机台数
      */
     private int getScheduledMachineCount(Map<LocalDate, Map<String, Set<String>>> sourceMap,
@@ -655,7 +946,7 @@ public class LhScheduleContext {
      * <p>用于排产结果写入前回写文字/硫化/制造示方书号，未命中时返回 null，
      * 由调用方决定是否回退到其他来源或置空。</p>
      *
-     * @param materialCode 物料编码
+     * @param materialCode  物料编码
      * @param productStatus 产品状态（S-正规、T-量试、X-试制）
      * @return SKU与示方书关系，未命中返回 null
      */

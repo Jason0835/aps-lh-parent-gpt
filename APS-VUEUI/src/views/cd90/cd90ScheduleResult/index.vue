@@ -81,6 +81,10 @@
       ref="autoScheduleRef"
       @success="handleAutoScheduleSuccess"
     />
+    <insert-order-dialog
+      ref="insertOrderRef"
+      @success="handleInsertSuccess"
+    />
     <el-dialog
       :title="$t('ui.data.column.cd90ScheduleResult.autoScheduleProgress')"
       :visible.sync="autoScheduleProgressVisible"
@@ -129,12 +133,13 @@
 
 <script>
 import moment from 'moment'
-import { getAutoScheduleTask, listScheduleResult, delScheduleResult, exportScheduleResult, publishScheduleResult } from '@/api/cd90/scheduleResult'
+import { getAutoScheduleTask, getInsertTask, listScheduleResult, delScheduleResult, exportScheduleResult, publishScheduleResult } from '@/api/cd90/scheduleResult'
 import { listTireFabricCodes } from '@/api/cd90/specifyMachine'
 import { getCd90MachineEnableOptions } from '@/api/cd90/cd90MachineInfo'
 import { listUnscheduleResult, exportUnscheduleResult } from '@/api/cd90/unscheduleResult'
 import TltUploadForm from '@/views/components/tltUploadForm.vue'
 import AutoScheduleDialog from './components/autoScheduleDialog.vue'
+import InsertOrderDialog from './components/insertOrderDialog.vue'
 
 const SHIFT_CONFIG = [
   { classField: 'class1', shiftKey: 'middleShift', dayOffset: -1 },
@@ -147,7 +152,7 @@ const SHIFT_CONFIG = [
 
 export default {
   name: 'Cd90ScheduleResult',
-  components: { TltUploadForm, AutoScheduleDialog },
+  components: { TltUploadForm, AutoScheduleDialog, InsertOrderDialog },
   dicts: ['biz_factory_name', 'IS_RELEASE'],
   provide() {
     return {
@@ -463,6 +468,9 @@ export default {
       }
     },
     pollAutoScheduleTask(taskId) {
+      this.pollScheduleTask(taskId, getAutoScheduleTask)
+    },
+    pollScheduleTask(taskId, taskGetter) {
       this.clearAutoScheduleTimer()
       this.autoSchedulePollTimes = 0
       this.autoScheduleProgressVisible = true
@@ -471,7 +479,7 @@ export default {
       this.autoScheduleProgressStatus = null
       this.autoScheduleProgressHint = this.$t('ui.data.column.cd90ScheduleResult.autoScheduleProgressHint')
       const poll = () => {
-        getAutoScheduleTask(taskId).then(res => {
+        taskGetter(taskId).then(res => {
           this.autoSchedulePollTimes += 1
           // 兼容响应拦截器两种返回形态：
           //   - 剥离后：res = { taskId, progress, taskStatus, currentStageName, ... }
@@ -537,7 +545,23 @@ export default {
       }
     },
     handleInsert() {
-      this.showPendingActionMessage()
+      this.$refs.insertOrderRef.show({
+        factoryCode: this.search.factoryCode,
+        scheduleDate: this.search.scheduleDate
+      })
+    },
+    handleInsertSuccess(scheduleDate, payload) {
+      if (scheduleDate) {
+        this.query = { ...this.query, scheduleDate }
+        this.search = { ...this.search, scheduleDate }
+        this.updateDateList(scheduleDate)
+      }
+      const data = payload || {}
+      if (data.taskId) {
+        this.pollScheduleTask(data.taskId, getInsertTask)
+      } else {
+        this.getList()
+      }
     },
     handleChangeMachine() {
       this.showPendingActionMessage()

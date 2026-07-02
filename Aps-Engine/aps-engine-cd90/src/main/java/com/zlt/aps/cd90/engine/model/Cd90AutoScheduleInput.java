@@ -28,6 +28,10 @@ public class Cd90AutoScheduleInput {
 
     /** 当前班次需求窗口明细。 */
     private List<Cd90DemandShift> demandShifts;
+    /** 去除新增规格提前需求后的计划需求视图，原始需求仍用于成型消耗。 */
+    private List<Cd90DemandShift> planningDemandShifts;
+    /** 新增规格提前生产证据，按帘布代号分组。 */
+    private Map<String, Cd90NewSpecAdvanceInfo> newSpecAdvanceInfoByCloth;
     /** 按帘布代码匹配的备库班数，同时作为需求深度和库存保证阈值。 */
     private Map<String, BigDecimal> depthClassQtyByCloth;
     /** 6点库排原始快照。 */

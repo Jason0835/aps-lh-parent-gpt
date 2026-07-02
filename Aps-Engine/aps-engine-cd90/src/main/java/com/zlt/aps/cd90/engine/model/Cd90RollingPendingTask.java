@@ -1,0 +1,51 @@
+package com.zlt.aps.cd90.engine.model;
+
+import lombok.Builder;
+import lombok.Data;
+
+import java.math.BigDecimal;
+
+/**
+ * 跨班滚动时保留任务身份的待排节点。
+ */
+@Data
+@Builder
+public class Cd90RollingPendingTask {
+
+    /** 任务稳定唯一键。 */
+    private String taskKey;
+    /** 来源排程结果ID。 */
+    private Long sourceResultId;
+    /** 来源批次号。 */
+    private String sourceBatchNo;
+    /** 来源工单号。 */
+    private String sourceOrderNo;
+    /** 原班次字段。 */
+    private String originalClassField;
+    /** 原生产顺序。 */
+    private Integer originalProduceOrder;
+    /** 当前目标班次字段。 */
+    private String targetClassField;
+    /** 帘布代号。 */
+    private String clothCode;
+    /** 大卷代码。 */
+    private String bigRollCode;
+    /** 来源机台。 */
+    private String sourceMachineCode;
+    /** 插单指定的硬约束机台。 */
+    private String requiredMachineCode;
+    /** 原计划量。 */
+    private BigDecimal originalQuantity;
+    /** 已排数量。 */
+    private BigDecimal scheduledQuantity;
+    /** 尚待排数量。 */
+    private BigDecimal remainingQuantity;
+    /** 是否人工插单硬约束。 */
+    private boolean hardInsert;
+    /** 是否锁定不可移动。 */
+    private boolean locked;
+    /** 是否从上一班连续生产。 */
+    private boolean continueFromPreviousShift;
+    /** 最近一次真实限制原因。 */
+    private String lastLimitReason;
+}

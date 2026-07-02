@@ -9,6 +9,7 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.zlt.aps.cd90.api.domain.entity.Cd90ScheduleResult;
+import com.zlt.aps.cd90.api.domain.vo.Cd90InsertOrderRequest;
 import com.zlt.aps.cd90.engine.domain.Cd90ScheduleTask;
 import com.zlt.aps.cd90.engine.service.Cd90ScheduleTaskService;
 import com.zlt.aps.cd90.mapper.Cd90ScheduleResultMapper;
@@ -87,6 +88,34 @@ public class Cd90ScheduleResultController extends AbstractDocBizController<Cd90S
     @PostMapping("/autoSchedule")
     public AjaxResult autoSchedule(@RequestBody Cd90ScheduleResult scheduleResult) {
         return cd90ScheduleResultService.autoSchedule(scheduleResult);
+    }
+
+    /** 查询插单弹窗班次日期。 */
+    @ApiOperation("查询插单班次日期")
+    @PostMapping("/shiftDates")
+    public AjaxResult shiftDates(@RequestBody Cd90InsertOrderRequest request) {
+        return cd90ScheduleResultService.shiftDates(request);
+    }
+
+    /** 插单预校验。 */
+    @ApiOperation("插单预校验")
+    @PostMapping("/validateInsert")
+    public AjaxResult validateInsert(@RequestBody Cd90InsertOrderRequest request) {
+        return cd90ScheduleResultService.validateInsert(request);
+    }
+
+    /** 提交插单滚动重排任务。 */
+    @ApiOperation("提交插单滚动重排")
+    @PostMapping("/insert")
+    public AjaxResult insertOrder(@RequestBody Cd90InsertOrderRequest request) {
+        return cd90ScheduleResultService.insertOrder(request);
+    }
+
+    /** 查询插单滚动重排任务。 */
+    @ApiOperation("查询插单滚动重排任务")
+    @GetMapping("/insert/task/{taskId}")
+    public AjaxResult getInsertTask(@PathVariable("taskId") String taskId) {
+        return cd90ScheduleResultService.getInsertTask(taskId);
     }
 
     /**

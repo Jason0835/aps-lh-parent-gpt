@@ -4,12 +4,14 @@ import com.zlt.aps.cd90.engine.model.Cd90AutoScheduleContext;
 import com.zlt.aps.cd90.engine.model.Cd90AutoScheduleInput;
 import com.zlt.aps.cd90.engine.model.Cd90ConstructionMaterial;
 import com.zlt.aps.cd90.engine.model.Cd90MultiShiftExecutionResult;
+import com.zlt.aps.cd90.engine.model.Cd90NewSpecAdvanceResult;
 import com.zlt.aps.cd90.engine.model.Cd90RollingScheduleContext;
 import com.zlt.aps.cd90.engine.model.Cd90ScheduleAttemptTrace;
 import com.zlt.aps.cd90.engine.model.Cd90ShiftDescriptor;
 import com.zlt.aps.cd90.engine.model.Cd90ShiftExecutionResult;
 import com.zlt.aps.cd90.engine.model.Cd90ShiftResourceState;
 import com.zlt.aps.cd90.engine.service.Cd90AutoScheduleInputService;
+import com.zlt.aps.cd90.engine.service.impl.Cd90NewSpecAdvanceInputPreparer;
 import com.zlt.aps.cd90.engine.service.Cd90ShiftDemandProvider;
 import com.zlt.aps.cd90.engine.service.Cd90SingleShiftScheduleService;
 import com.zlt.aps.cd90.engine.service.Cd90ScheduleProgressListener;
@@ -34,6 +36,7 @@ import java.util.stream.Collectors;
 public class Cd90MultiShiftScheduleExecutor {
 
     private final Cd90AutoScheduleInputService inputService;
+    private final Cd90NewSpecAdvanceInputPreparer newSpecAdvanceInputPreparer;
     private final Cd90SingleShiftScheduleService singleShiftScheduleService;
     private final Cd90ShiftDemandProvider demandProvider;
     private final Cd90RollingScheduleContextManager rollingContextManager;
@@ -74,8 +77,18 @@ public class Cd90MultiShiftScheduleExecutor {
                     context.getFactoryCode(), context.getScheduleDate(),
                     shift.getClassField(), shift.getShiftCode(), context.getParameters().getAgingPeriodHours());
             if (rolling == null) {
-                // 仅首班使用6点库排建立基线，后续班次都从同一滚动上下文重建资源。
-                rolling = rollingContextManager.initialize(input.getStorageLanesAtSix());
+                // 首班锁定新增规格判定与需求搬移快照，后续班次不得重查历史改变同批次口径。
+                Cd90NewSpecAdvanceResult advanceResult = this.newSpecAdvanceInputPreparer
+                        .prepare(context, input);
+                input.setPlanningDemandShifts(advanceResult.getAdjustedDemandShifts());
+                input.setNewSpecAdvanceInfoByCloth(advanceResult.getAdvanceInfoByCloth());
+                // 仅首班使用6点库排和新增规格证据建立基线。
+                rolling = this.rollingContextManager.initialize(
+                        input.getStorageLanesAtSix(), advanceResult.getAdvanceInfoByCloth());
+            } else {
+                // 每班重载原始需求后，使用首班证据重建去重计划视图。
+                this.newSpecAdvanceInputPreparer.applySnapshot(
+                        input, rolling.getNewSpecAdvanceInfoByCloth());
             }
             // 先累计成型消耗，再叠加前序实际/计划入库，得到当前班开始时可见的资源状态。
             Map<String, BigDecimal> cumulativeConsumptionByCloth = demandProvider
