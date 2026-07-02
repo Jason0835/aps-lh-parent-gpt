@@ -137,7 +137,6 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
      * 警告列偏移值
      */
     private final static Integer WARNING_COLUMN_OFFSET = 33;
-    private final static Integer WARNING_COLUMN_OFFSET_FINAL = 32;
 
     @Override
     protected String getDocTypeCode() {
@@ -186,25 +185,23 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
         if (CollectionUtils.isEmpty(recordList)) {
             return recordList;
         }
+        
+        // 计算上个月的天数
+        // 加载上个月的定稿记录
+        Calendar lastMonthCalendar = Calendar.getInstance();
+        lastMonthCalendar.set(params.getYear(), params.getMonth() - 1, 1); // 通过日历获取上本月一号的日历
+        lastMonthCalendar.add(Calendar.DAY_OF_MONTH, -1); // 切换到上个月最后一天
+        Integer lastDayOfMonth = lastMonthCalendar.getActualMaximum(Calendar.DAY_OF_MONTH);
+        
         // 1.3.1、填充上个月的定稿记录信息，同时获取上个月的最后一天日期
-        Integer lastDayOfMonth = this.fillLastFinalResultList(params, recordList);
+        String lastProductionVersion = this.fillLastFinalResultList(params, recordList, lastMonthCalendar);
         // 1.3.2、加载本次版本已生成的统计记录
         String productionVersion = params.getProductionVersion();
-        Map<String, MpMonthPlanStatistics> statisticsMap = this.loadMpMonthPlanStatistics(params,
-                productionVersion, isFinal);
-        // 1.4、加载上个月的统计记录
-        String lastProductionVersion = recordList.stream().map(FactoryMonthPlanMouldDayResultExportVo::getLastProductionVersion).filter(Objects::nonNull).findAny().orElse(null);
-        Map<String, MpMonthPlanStatistics> lastStatisticsMap = this.loadMpMonthPlanStatistics(params,
-                lastProductionVersion, isFinal);
+        Map<String, MpMonthPlanStatistics> statisticsMap = this.loadMpMonthPlanStatistics(params, productionVersion, isFinal);
+        // 1.4、加载上个月的统计记录，固定取定稿版本
+        Map<String, MpMonthPlanStatistics> lastStatisticsMap = this.loadMpMonthPlanStatistics(params, lastProductionVersion, true);
         // 1.5、加载结构排产数据
-        LambdaQueryWrapper<MpStructureAllocation> structureQueryWrapper = new LambdaQueryWrapper<>();
-        structureQueryWrapper.eq(MpStructureAllocation::getFactoryCode, params.getFactoryCode());
-        structureQueryWrapper.eq(MpStructureAllocation::getProductionVersion, params.getProductionVersion());
-        structureQueryWrapper.eq(MpStructureAllocation::getFactoryCode, params.getFactoryCode());
-        structureQueryWrapper.eq(StringUtils.isNotEmpty(params.getStructureName()), MpStructureAllocation::getStructureName, params.getStructureName());
-        Map<String, MpStructureAllocation> structureAllocationMap = mpStructureAllocationMapper
-                .selectList(structureQueryWrapper).stream().collect(
-                        Collectors.toMap(MpStructureAllocation::getStructureName, Function.identity(), (s1, s2) -> s1));
+        Map<String, MpStructureAllocation> structureAllocationMap = this.loadStructureAllocationMap(params);
         // 1.6、加载型腔数活块数 - 型腔可用量（按结构+主花纹分组）
         Map<String, Integer> cavityResults = new HashMap<>(0);
         // 活块可用量（按物料描述分组）
@@ -217,16 +214,7 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
             insertResults = moldResult.get(0).getInsertResults();
         }
         // 1.7、加载本月工作日历
-        LambdaQueryWrapper<MdmWorkCalendar> queryWrapper = new LambdaQueryWrapper<>();
-        queryWrapper.eq(MdmWorkCalendar::getFactoryCode, params.getFactoryCode());
-        queryWrapper.eq(MdmWorkCalendar::getYear, params.getYear());
-        queryWrapper.eq(MdmWorkCalendar::getMonth, params.getMonth());
-        queryWrapper.eq(MdmWorkCalendar::getIsDelete, YesOrNoEnum.NO.getValue());
-        queryWrapper.eq(MdmWorkCalendar::getProcCode, "01");
-        Set<Integer> workDaySet = mdmWorkCalendarEntityMapper.selectList(queryWrapper).stream()
-                .filter(wc -> ApsConstant.TRUE.equals(wc.getDayFlag())).map(MdmWorkCalendar::getDay)
-                .distinct().collect(Collectors.toSet());
-
+        Set<Integer> workDaySet = this.loadWrokCalendar(params);
         // 1.8、加载结构模具分配比例
         List<MouldAllocationInfoVo> mouldAllocationInfoList = factoryMonthPlanProductMouldMapper
                 .getMouldAllocationInfo(params.getFactoryCode(), params.getYear(), params.getMonth());
@@ -308,9 +296,9 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
                 if (result.getMouldCavityQty() == null || result.getMouldCavityQty() == 0) {
                     result.setMouldCavityQty(cavityResults.getOrDefault(result.getStructureName() + result.getMainPattern(), 0));
                 }
-//                // 2.1.2.5、记录胎胚的最大型腔数
-//                Integer maxMouldCavityQty = maxMouldCavityQtyMap.getOrDefault(result.getMainMaterialDesc(), 0);
-//                maxMouldCavityQtyMap.put(result.getMainMaterialDesc(), Math.max(maxMouldCavityQty, result.getMouldCavityQty()));
+                // 2.1.2.5、记录胎胚的最大型腔数
+                Integer maxMouldCavityQty = maxMouldCavityQtyMap.getOrDefault(result.getMainMaterialDesc(), 0);
+                maxMouldCavityQtyMap.put(result.getMainMaterialDesc(), Math.max(maxMouldCavityQty, result.getMouldCavityQty()));
                 // 2.1.2.5 补充活块数
                 if (result.getTypeBlockQty() == null || result.getTypeBlockQty() == 0) {
                     result.setTypeBlockQty(insertResults.getOrDefault(result.getMaterialDesc(), 0));
@@ -347,9 +335,9 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
                 s.setMaxTypeBlockQty(maxTypeBlockQtyMap.getOrDefault(s.getMainMaterialDesc(), 0));
             });
             //排序:最大型腔数倒序->胎胚描述->型腔数倒序->主花纹->活块数倒序->花纹->物料描述
-            structureList.sort(Comparator.comparing(FactoryMonthPlanMouldDayResultExportVo::getMouldCavityQty, Comparator.nullsLast(Comparator.reverseOrder()))
+            structureList.sort(Comparator.comparing(FactoryMonthPlanMouldDayResultExportVo::getMaxMouldCavityQty, Comparator.nullsLast(Comparator.reverseOrder()))
                             .thenComparing(FactoryMonthPlanMouldDayResultExportVo::getMainMaterialDesc, Comparator.nullsLast(String::compareTo))
-//                    .thenComparing(FactoryMonthPlanMouldDayResultExportVo::getMouldCavityQty, Comparator.reverseOrder())
+                            .thenComparing(FactoryMonthPlanMouldDayResultExportVo::getMouldCavityQty, Comparator.nullsLast(Comparator.reverseOrder()))
                             .thenComparing(FactoryMonthPlanMouldDayResultExportVo::getMainPattern, Comparator.nullsLast(String::compareTo))
                             .thenComparing(FactoryMonthPlanMouldDayResultExportVo::getTypeBlockQty, Comparator.nullsLast(Comparator.reverseOrder()))
                             .thenComparing(FactoryMonthPlanMouldDayResultExportVo::getPattern, Comparator.nullsLast(String::compareTo))
@@ -373,12 +361,14 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
             lhMachinesStatisticsRecord.setProductCategory(I18nUtil.getMessage(MonthPlanExportDataTypeEnum.LH_MACHINES.getName()));
             // 2.1.4、本月统计信息汇总
             MpMonthPlanStatistics statistics = statisticsMap.get(structureName);
-            this.buildStatisticsRecord(embryoCountStatisticsRecord, lhMachinesStatisticsRecord, FactoryConstant.MONTH_START_DAY, statistics,
-                    changeMouldMap, DAY_FIELD_NAME_FORMAT);
+            this.buildStatisticsRecord(embryoCountStatisticsRecord, lhMachinesStatisticsRecord,
+                    FactoryConstant.MONTH_START_DAY, FactoryConstant.MONTH_MAX_DAY, statistics, changeMouldMap,
+                    DAY_FIELD_NAME_FORMAT);
             // 2.1.5、上个月统计信息汇总，只取上个月最后10天的数据
             MpMonthPlanStatistics lastStatistics = lastStatisticsMap.get(structureName);
-            this.buildStatisticsRecord(embryoCountStatisticsRecord, lhMachinesStatisticsRecord, lastDayOfMonth - LAST_MONTH_DAY + 1, lastStatistics,
-                    lastChangeMouldMap, LAST_FIELD_NAME_FORMAT);
+            this.buildStatisticsRecord(embryoCountStatisticsRecord, lhMachinesStatisticsRecord,
+                    lastDayOfMonth - LAST_MONTH_DAY + 1, lastDayOfMonth, lastStatistics, lastChangeMouldMap,
+                    LAST_FIELD_NAME_FORMAT);
 
             totalRecordList.add(embryoCountStatisticsRecord);
             totalRecordList.add(lhMachinesStatisticsRecord);
@@ -422,141 +412,168 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
     }
 
     /**
-     * 填充上个月的定稿记录信息，并返回上个月最后一天的日期
-     *
+     * 加载本月工作日历
      * @param params
-     * @param recordList
+     * @return
      */
-    private Integer fillLastFinalResultList(FactoryMonthPlanMouldDayResult params,
-                                            List<FactoryMonthPlanMouldDayResultExportVo> recordList) {
-        // 加载上个月的定稿记录
-        Calendar calendar = Calendar.getInstance();
-        calendar.set(params.getYear(), params.getMonth() - 1, 1); // 通过日历获取上本月一号的日历
-        calendar.add(Calendar.DAY_OF_MONTH, -1); // 切换到上个月最后一天
-        Integer lastYear = calendar.get(Calendar.YEAR);
-        Integer lastMonth = calendar.get(Calendar.MONTH) + 1;
+    private Set<Integer> loadWrokCalendar(FactoryMonthPlanMouldDayResult params) {
+        LambdaQueryWrapper<MdmWorkCalendar> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(MdmWorkCalendar::getFactoryCode, params.getFactoryCode());
+        queryWrapper.eq(MdmWorkCalendar::getYear, params.getYear());
+        queryWrapper.eq(MdmWorkCalendar::getMonth, params.getMonth());
+        queryWrapper.eq(MdmWorkCalendar::getIsDelete, YesOrNoEnum.NO.getValue());
+        queryWrapper.eq(MdmWorkCalendar::getProcCode, "01");
+        Set<Integer> workDaySet = mdmWorkCalendarEntityMapper.selectList(queryWrapper).stream()
+                .filter(wc -> ApsConstant.TRUE.equals(wc.getDayFlag())).map(MdmWorkCalendar::getDay)
+                .distinct().collect(Collectors.toSet());
+        return workDaySet;
+    }
+
+    /**
+     * 加载结构排产数据
+     * @param params
+     * @return
+     */
+    private Map<String, MpStructureAllocation> loadStructureAllocationMap(FactoryMonthPlanMouldDayResult params) {
+        LambdaQueryWrapper<MpStructureAllocation> structureQueryWrapper = new LambdaQueryWrapper<>();
+        structureQueryWrapper.eq(MpStructureAllocation::getFactoryCode, params.getFactoryCode());
+        structureQueryWrapper.eq(MpStructureAllocation::getProductionVersion, params.getProductionVersion());
+        structureQueryWrapper.eq(MpStructureAllocation::getFactoryCode, params.getFactoryCode());
+        structureQueryWrapper.eq(StringUtils.isNotEmpty(params.getStructureName()), MpStructureAllocation::getStructureName, params.getStructureName());
+        Map<String, MpStructureAllocation> structureAllocationMap = mpStructureAllocationMapper
+                .selectList(structureQueryWrapper).stream().collect(
+                        Collectors.toMap(MpStructureAllocation::getStructureName, Function.identity(), (s1, s2) -> s1));
+        return structureAllocationMap;
+    }
+
+    /**
+     * 填充上个月的定稿记录信息，并返回上个月的定稿版本号
+     *
+     * @param params            查询参数
+     * @param recordList        本月的排产记录   
+     * @param lastMonthCalendar 上个月的日历
+     */
+    private String fillLastFinalResultList(FactoryMonthPlanMouldDayResult params,
+                                            List<FactoryMonthPlanMouldDayResultExportVo> recordList,
+                                            Calendar lastMonthCalendar) {
+        Integer lastYear = lastMonthCalendar.get(Calendar.YEAR);
+        Integer lastMonth = lastMonthCalendar.get(Calendar.MONTH) + 1;
+        Integer lastDayOfMonth = lastMonthCalendar.getActualMaximum(Calendar.DAY_OF_MONTH);
         LambdaQueryWrapper<FactoryMonthPlanProductionFinalResult> resultQueryWrapper = new LambdaQueryWrapper<>();
         resultQueryWrapper.eq(FactoryMonthPlanProductionFinalResult::getFactoryCode, params.getFactoryCode());
         resultQueryWrapper.eq(FactoryMonthPlanProductionFinalResult::getYear, lastYear);
         resultQueryWrapper.eq(FactoryMonthPlanProductionFinalResult::getMonth, lastMonth);
         resultQueryWrapper.eq(StringUtils.isNotEmpty(params.getStructureName()), FactoryMonthPlanProductionFinalResult::getStructureName, params.getStructureName());
         List<FactoryMonthPlanProductionFinalResult> lastFinalResultList = factoryMonthPlanProductionFinalResultEntityMapper.selectList(resultQueryWrapper);
-        Integer lastDayOfMonth = FactoryConstant.MONTH_MAX_DAY;
+        if (CollectionUtils.isEmpty(lastFinalResultList) || CollectionUtils.isEmpty(recordList)) {
+            return null;
+        }
         // 将上月计划填装到排产明细表中
-        if (CollectionUtils.isNotEmpty(lastFinalResultList) && CollectionUtils.isNotEmpty(recordList)) {
-            // 计算上个月的天数
-            Calendar cal = Calendar.getInstance();
-            cal.set(lastYear, lastMonth - 1, 1);
-            lastDayOfMonth = cal.getActualMaximum(Calendar.DAY_OF_MONTH);
-
-            // 按物料号+施工阶段构建映射
-            Map<String, FactoryMonthPlanProductionFinalResult> lastFinalResultMap = new HashMap<>();
-            for (FactoryMonthPlanProductionFinalResult finalResult : lastFinalResultList) {
-                String key = GenerageMapKeyUtils.createMapKey(finalResult.getMaterialCode(), finalResult.getConstructionStage());
-                lastFinalResultMap.put(key, finalResult);
-            }
-            // 已匹配的 key 集合
-            Set<String> matchedKeys = new HashSet<>();
-
-            // 遍历 recordList，匹配上则赋值 lastDay1~lastDay10
-            for (FactoryMonthPlanMouldDayResultExportVo record : recordList) {
-                String key = GenerageMapKeyUtils.createMapKey(record.getMaterialCode(), record.getConstructionStage());
-                FactoryMonthPlanProductionFinalResult matchedFinal = lastFinalResultMap.get(key);
-                if (matchedFinal != null) {
-                    matchedKeys.add(key);
-                    for (int i = 1; i <= LAST_MONTH_DAY; i++) {
-                        int dayIndex = lastDayOfMonth - i + 1; // dayIndex = (lastDay - 10 + i)，如31天月时：22,23,...,31
-                        Integer dayValue = (Integer) matchedFinal.getFieldValueByFieldName(String.format(DAY_FIELD_NAME_FORMAT, dayIndex));
-                        record.setFieldValueByFieldName(String.format(LAST_FIELD_NAME_FORMAT, i), dayValue);
-                    }
-                }
-            }
-            // 加载上月有排产本月没有排产的物料
-            Set<String> noMatchMaterialCodeSet = lastFinalResultList.stream()
-                    .filter(r -> !matchedKeys
-                            .contains(GenerageMapKeyUtils.createMapKey(r.getMaterialCode(), r.getConstructionStage())))
-                    .map(FactoryMonthPlanProductionFinalResult::getMaterialCode).filter(Objects::nonNull).distinct()
-                    .collect(Collectors.toSet());
-            if (CollectionUtils.isEmpty(noMatchMaterialCodeSet)) { // 如果没有匹配不上的情况，直接返回
-                return lastDayOfMonth;
-            }
-
-            LambdaQueryWrapper<MdmMaterialInfo> mdmMaterialInfoQueryWrapper = new LambdaQueryWrapper<>();
-            mdmMaterialInfoQueryWrapper.eq(MdmMaterialInfo::getFactoryCode, params.getFactoryCode());
-            mdmMaterialInfoQueryWrapper.in(MdmMaterialInfo::getMaterialCode, noMatchMaterialCodeSet);
-            Map<String, MdmMaterialInfo> materialInfoMap = mdmMaterialInfoEntityMapper
-                    .selectList(mdmMaterialInfoQueryWrapper).stream()
-                    .collect(Collectors.toMap(MdmMaterialInfo::getMaterialCode, Function.identity(), (m1, m2) -> m1));
-
-            // 未匹配的 lastFinalResult 新增到 recordList
-            for (FactoryMonthPlanProductionFinalResult finalResult : lastFinalResultList) {
-                String key = GenerageMapKeyUtils.createMapKey(finalResult.getMaterialCode(), finalResult.getConstructionStage());
-                if (matchedKeys.contains(key)) {
-                    continue;
-                }
-
-                // 创建新记录，复制基础字段
-                FactoryMonthPlanMouldDayResultExportVo newRecord = new FactoryMonthPlanMouldDayResultExportVo();
-                newRecord.setLocationType("2"); // TODO 暂时固定外销
-                newRecord.setMaterialCode(finalResult.getMaterialCode());
-                newRecord.setMaterialDesc(finalResult.getMaterialDesc());
-                newRecord.setMesMaterialCode(finalResult.getMesMaterialCode());
-                newRecord.setStructureName(finalResult.getStructureName());
-                newRecord.setConstructionStage(finalResult.getConstructionStage());
-                newRecord.setMainMaterialDesc(finalResult.getMainMaterialDesc());
-                newRecord.setMainPattern(finalResult.getMainPattern());
-                newRecord.setPattern(finalResult.getPattern());
-                newRecord.setSpecifications(finalResult.getSpecifications());
-                newRecord.setProSize(finalResult.getProSize());
-                newRecord.setBrand(finalResult.getBrand());
-                newRecord.setEmbryoCode(finalResult.getEmbryoCode());
-                newRecord.setProductCategory(finalResult.getProductCategory());
-                newRecord.setProductStatus(finalResult.getProductStatus());
-                newRecord.setProductTypeCode(finalResult.getProductTypeCode());
-                newRecord.setStructureType(finalResult.getStructureType());
-                newRecord.setProductionType(finalResult.getProductionType());
-                newRecord.setHeightQty(0);
-                newRecord.setMidQty(0);
-                newRecord.setCycleReserveQty(0);
-                newRecord.setPostponeQty(0);
-                newRecord.setConventionReserveQty(0);
-                newRecord.setTotalQty(0);
-                newRecord.setLastProductionVersion(finalResult.getProductionVersion());
-                newRecord.setDataType(MonthPlanExportDataTypeEnum.RECORD.getCode());
-                newRecord.setDayVulcanizationQty(finalResult.getDayVulcanizationQty());
-                newRecord.setAverageSaleQty(finalResult.getAverageSaleQty());
-                newRecord.setInventorySalesRatio(finalResult.getInventorySalesRatio());
-                newRecord.setMouldCavityQty(0);
-                newRecord.setTypeBlockQty(0);
-                MdmMaterialInfo material = materialInfoMap.get(key);
-                if (material != null) {
-                    newRecord.setSingleTireWeight(material.getSingleTireWeight());
-                }
-                // 赋值 lastDay1~lastDay10
+        // 按物料号+施工阶段构建映射
+        Map<String, FactoryMonthPlanProductionFinalResult> lastFinalResultMap = new HashMap<>();
+        for (FactoryMonthPlanProductionFinalResult finalResult : lastFinalResultList) {
+            String key = GenerageMapKeyUtils.createMapKey(finalResult.getMaterialCode(), finalResult.getConstructionStage());
+            lastFinalResultMap.put(key, finalResult);
+        }
+        // 已匹配的 key 集合
+        Set<String> matchedKeys = new HashSet<>();
+        // 遍历 recordList，匹配上则赋值 lastDay1~lastDay10
+        for (FactoryMonthPlanMouldDayResultExportVo record : recordList) {
+            String key = GenerageMapKeyUtils.createMapKey(record.getMaterialCode(), record.getConstructionStage());
+            FactoryMonthPlanProductionFinalResult matchedFinal = lastFinalResultMap.get(key);
+            if (matchedFinal != null) {
+                matchedKeys.add(key);
                 for (int i = 1; i <= LAST_MONTH_DAY; i++) {
-                    int dayIndex = lastDayOfMonth - i + 1;
-                    Integer dayValue = (Integer) finalResult.getFieldValueByFieldName(String.format(DAY_FIELD_NAME_FORMAT, dayIndex));
-                    newRecord.setFieldValueByFieldName(String.format(LAST_FIELD_NAME_FORMAT, i), dayValue);
-                }
-
-                // 查找插入位置：相同 StructureName 的最后一个元素之后
-                int insertIndex = -1;
-                for (int i = recordList.size() - 1; i >= 0; i--) {
-                    if (finalResult.getStructureName() != null
-                            && finalResult.getStructureName().equals(recordList.get(i).getStructureName())) {
-                        insertIndex = i + 1;
-                        break;
-                    }
-                }
-                if (insertIndex == -1) {
-                    // 没有相同 StructureName 的记录，插到末尾
-                    recordList.add(newRecord);
-                } else {
-                    recordList.add(insertIndex, newRecord);
+                    int dayIndex = lastDayOfMonth - i + 1; // dayIndex = (lastDay - 10 + i)，如31天月时：22,23,...,31
+                    Integer dayValue = (Integer) matchedFinal.getFieldValueByFieldName(String.format(DAY_FIELD_NAME_FORMAT, dayIndex));
+                    record.setFieldValueByFieldName(String.format(LAST_FIELD_NAME_FORMAT, i), dayValue);
                 }
             }
         }
-        return lastDayOfMonth;
+        // 加载上月有排产本月没有排产的物料
+        Set<String> noMatchMaterialCodeSet = lastFinalResultList.stream()
+                .filter(r -> !matchedKeys
+                        .contains(GenerageMapKeyUtils.createMapKey(r.getMaterialCode(), r.getConstructionStage())))
+                .map(FactoryMonthPlanProductionFinalResult::getMaterialCode).filter(Objects::nonNull).distinct()
+                .collect(Collectors.toSet());
+        if (CollectionUtils.isEmpty(noMatchMaterialCodeSet)) { // 如果没有匹配不上的情况，直接返回
+            
+        }
+        LambdaQueryWrapper<MdmMaterialInfo> mdmMaterialInfoQueryWrapper = new LambdaQueryWrapper<>();
+        mdmMaterialInfoQueryWrapper.eq(MdmMaterialInfo::getFactoryCode, params.getFactoryCode());
+        mdmMaterialInfoQueryWrapper.in(MdmMaterialInfo::getMaterialCode, noMatchMaterialCodeSet);
+        Map<String, MdmMaterialInfo> materialInfoMap = mdmMaterialInfoEntityMapper
+                .selectList(mdmMaterialInfoQueryWrapper).stream()
+                .collect(Collectors.toMap(MdmMaterialInfo::getMaterialCode, Function.identity(), (m1, m2) -> m1));
+
+        // 未匹配的 lastFinalResult 新增到 recordList
+        for (FactoryMonthPlanProductionFinalResult finalResult : lastFinalResultList) {
+            String key = GenerageMapKeyUtils.createMapKey(finalResult.getMaterialCode(), finalResult.getConstructionStage());
+            if (matchedKeys.contains(key)) {
+                continue;
+            }
+
+            // 创建新记录，复制基础字段
+            FactoryMonthPlanMouldDayResultExportVo newRecord = new FactoryMonthPlanMouldDayResultExportVo();
+            newRecord.setLocationType("2"); // TODO 暂时固定外销
+            newRecord.setMaterialCode(finalResult.getMaterialCode());
+            newRecord.setMaterialDesc(finalResult.getMaterialDesc());
+            newRecord.setMesMaterialCode(finalResult.getMesMaterialCode());
+            newRecord.setStructureName(finalResult.getStructureName());
+            newRecord.setConstructionStage(finalResult.getConstructionStage());
+            newRecord.setMainMaterialDesc(finalResult.getMainMaterialDesc());
+            newRecord.setMainPattern(finalResult.getMainPattern());
+            newRecord.setPattern(finalResult.getPattern());
+            newRecord.setSpecifications(finalResult.getSpecifications());
+            newRecord.setProSize(finalResult.getProSize());
+            newRecord.setBrand(finalResult.getBrand());
+            newRecord.setEmbryoCode(finalResult.getEmbryoCode());
+            newRecord.setProductCategory(finalResult.getProductCategory());
+            newRecord.setProductStatus(finalResult.getProductStatus());
+            newRecord.setProductTypeCode(finalResult.getProductTypeCode());
+            newRecord.setStructureType(finalResult.getStructureType());
+            newRecord.setProductionType(finalResult.getProductionType());
+            newRecord.setHeightQty(0);
+            newRecord.setMidQty(0);
+            newRecord.setCycleReserveQty(0);
+            newRecord.setPostponeQty(0);
+            newRecord.setConventionReserveQty(0);
+            newRecord.setTotalQty(0);
+            newRecord.setLastProductionVersion(finalResult.getProductionVersion());
+            newRecord.setDataType(MonthPlanExportDataTypeEnum.RECORD.getCode());
+            newRecord.setDayVulcanizationQty(finalResult.getDayVulcanizationQty());
+            newRecord.setAverageSaleQty(finalResult.getAverageSaleQty());
+            newRecord.setInventorySalesRatio(finalResult.getInventorySalesRatio());
+            newRecord.setMouldCavityQty(0);
+            newRecord.setTypeBlockQty(0);
+            MdmMaterialInfo material = materialInfoMap.get(key);
+            if (material != null) {
+                newRecord.setSingleTireWeight(material.getSingleTireWeight());
+            }
+            // 赋值 lastDay1~lastDay10
+            for (int i = 1; i <= LAST_MONTH_DAY; i++) {
+                int dayIndex = lastDayOfMonth - i + 1;
+                Integer dayValue = (Integer) finalResult.getFieldValueByFieldName(String.format(DAY_FIELD_NAME_FORMAT, dayIndex));
+                newRecord.setFieldValueByFieldName(String.format(LAST_FIELD_NAME_FORMAT, i), dayValue);
+            }
+
+            // 查找插入位置：相同 StructureName 的最后一个元素之后
+            int insertIndex = -1;
+            for (int i = recordList.size() - 1; i >= 0; i--) {
+                if (finalResult.getStructureName() != null
+                        && finalResult.getStructureName().equals(recordList.get(i).getStructureName())) {
+                    insertIndex = i + 1;
+                    break;
+                }
+            }
+            if (insertIndex == -1) {
+                // 没有相同 StructureName 的记录，插到末尾
+                recordList.add(newRecord);
+            } else {
+                recordList.add(insertIndex, newRecord);
+            }
+        }
+        return lastFinalResultList.get(0).getProductionVersion();
     }
 
     /**
@@ -678,23 +695,24 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
      * @param embryoCountStatisticsRecord 胎胚统计
      * @param lhMachinesStatisticsRecord  硫化机统计
      * @param startDay                    统计开始日，上月统计和本月统计的开始日不一样
+     * @param endDay                      统计结束日，通常是月底
      * @param statistics                  统计数据
      * @param changeMouldMap              换模统计列表
      */
     private void buildStatisticsRecord(FactoryMonthPlanMouldDayResultExportVo embryoCountStatisticsRecord,
                                        FactoryMonthPlanMouldDayResultExportVo lhMachinesStatisticsRecord,
-                                       Integer startDay, MpMonthPlanStatistics statistics,
+                                       Integer startDay, Integer endDay, MpMonthPlanStatistics statistics,
                                        Map<Integer, Integer> changeMouldMap, String preFix) {
         if (statistics == null) {
             return;
         }
-        for (int day = startDay; day <= FactoryConstant.MONTH_MAX_DAY; day++) {
+        for (int day = startDay; day <= endDay; day++) {
             String dayFieldGetterName = String.format(DAY_FIELD_NAME_FORMAT, day);
             String dayFieldSetterName;
             Integer mapKey;
             if (LAST_FIELD_NAME_FORMAT.equals(preFix)) {
                 // 上个月统计数据：将日序号映射为月末倒数第n天
-                Integer realDay = day - startDay + 1;
+                Integer realDay = endDay - day + 1;
                 if (realDay <= 0 || realDay > LAST_MONTH_DAY) {
                     continue;
                 }
