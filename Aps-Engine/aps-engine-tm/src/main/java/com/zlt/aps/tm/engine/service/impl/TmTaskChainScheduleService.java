@@ -9,10 +9,12 @@ import com.zlt.aps.common.engine.schedule.ScheduleTaskLinkedList;
 import com.zlt.aps.common.engine.schedule.ScheduleTaskNode;
 import com.zlt.aps.tm.api.enums.TmScheduleErrorCodeEnum;
 import com.zlt.aps.tm.engine.domain.*;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.stream.Collectors;
 
 /**
  * 胎面任务链排程服务。
@@ -20,6 +22,7 @@ import java.time.LocalDate;
  * <p>统一处理自动排程和人工操作对运行态任务链的修改。当前为骨架实现，只实现自动追加和
  * 人工插单的基础链表操作；删除、转机台和调量待业务口径确认后补充完整查找与重算逻辑。</p>
  */
+@Slf4j
 @Service
 public class TmTaskChainScheduleService {
 
@@ -44,6 +47,7 @@ public class TmTaskChainScheduleService {
         ScheduleTaskNode<TmTaskDraft> node = toNode(task, machine.getMachineCode(), shiftOrder, context);
         ScheduleChainChangeResult<TmTaskDraft> result = chain.append(node, operationContext(context, "AUTO_APPEND"));
         context.registerTaskNode(node.getTaskId(), node);
+        this.logChainState(context, chain, "AUTO_APPEND", machine.getMachineCode(), shiftOrder, node.getTaskId());
         return result;
     }
 
@@ -70,6 +74,7 @@ public class TmTaskChainScheduleService {
         ScheduleTaskNode<TmTaskDraft> node = toNode(task, machine.getMachineCode(), shiftOrder, context);
         ScheduleChainChangeResult<TmTaskDraft> result = chain.prepend(node, operationContext(context, "AUTO_PREPEND"));
         context.registerTaskNode(node.getTaskId(), node);
+        this.logChainState(context, chain, "AUTO_PREPEND", machine.getMachineCode(), shiftOrder, node.getTaskId());
         return result;
     }
 
@@ -97,6 +102,7 @@ public class TmTaskChainScheduleService {
         ScheduleTaskNode<TmTaskDraft> node = toNode(task, position.getMachineCode(), position.getShiftOrder(), context);
         ScheduleChainChangeResult<TmTaskDraft> result = chain.insertAfter(anchor, node, operationContext(context, "MANUAL_INSERT"));
         context.registerTaskNode(node.getTaskId(), node);
+        this.logChainState(context, chain, "MANUAL_INSERT", position.getMachineCode(), position.getShiftOrder(), node.getTaskId());
         return result;
     }
 
@@ -225,7 +231,31 @@ public class TmTaskChainScheduleService {
         }
 
         // 触发重新编号
-        return targetChain.resequence(operationContext(context, "CHANGE_QTY"));
+        ScheduleChainChangeResult<TmTaskDraft> result = targetChain.resequence(operationContext(context, "CHANGE_QTY"));
+        this.logChainState(context, targetChain, "CHANGE_QTY", targetNode.getMachineCode(), shiftOrder, taskId);
+        return result;
+    }
+
+    /**
+     * 打印任务链变更后的顺序摘要，说明最终班次顺位如何形成。
+     *
+     * @param context 排程上下文
+     * @param chain 当前机台班次任务链
+     * @param operation 操作类型
+     * @param machineCode 机台编码
+     * @param shiftOrder 班次顺序
+     * @param changedTaskId 本次变化的任务业务键
+     */
+    private void logChainState(TmScheduleContext context, ScheduleTaskLinkedList<TmTaskDraft> chain, String operation,
+                               String machineCode, Integer shiftOrder, String changedTaskId) {
+        String chainOrder = chain == null ? "" : chain.toList().stream()
+                .map(ScheduleTaskNode::getTaskId)
+                .collect(Collectors.joining(","));
+        log.info("[TM_TASK_CHAIN] batchNo={}, traceId={}, factoryCode={}, scheduleDate={}, operation={}, machineCode={}, shiftOrder={}, changedTaskId={}, chainSize={}, chainOrder={}",
+                context == null ? null : context.getBatchNo(), context == null ? null : context.getTraceId(),
+                context == null ? null : context.getFactoryCode(),
+                context == null || context.getScheduleDate() == null ? null : DateUtil.formatDate(context.getScheduleDate()),
+                operation, machineCode, shiftOrder, changedTaskId, chain == null ? 0 : chain.getSize(), chainOrder);
     }
 
     private ScheduleTaskNode<TmTaskDraft> toNode(TmTaskDraft task, String machineCode, Integer shiftOrder,

@@ -82,7 +82,7 @@ public class MpTrialPlanServiceImpl extends AbstractDocService<MpTrialPlan> impl
     @Override
     protected List<String> getCheckUniqueFields() {
         // 唯一校验字段：同一工厂年月下，同一物料同一产品状态只允许存在一条试制量试计划。
-        return new ArrayList<>(Arrays.asList("factoryCode", "year", "month", "materialCode", "trialStatus"));
+        return new ArrayList<>(Arrays.asList("factoryCode", "year", "month", "materialCode", "trialStatus","embryoNo"));
     }
 
     @Override

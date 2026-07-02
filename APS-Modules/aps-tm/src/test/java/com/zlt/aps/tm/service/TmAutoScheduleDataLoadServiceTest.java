@@ -3,11 +3,10 @@ package com.zlt.aps.tm.service;
 import cn.hutool.core.date.DateUtil;
 import com.ruoyi.common.redis.service.RedisService;
 import com.zlt.aps.tm.api.domain.entity.*;
+import com.zlt.aps.tm.domain.vo.TmExperimentSpecMonthPlanRowVo;
 import com.zlt.aps.tm.domain.vo.TmFormingDemandRowVo;
 import com.zlt.aps.tm.domain.vo.TmWorkCalendarRowVo;
-import com.zlt.aps.tm.engine.domain.TmMachineCandidate;
-import com.zlt.aps.tm.engine.domain.TmScheduleContext;
-import com.zlt.aps.tm.engine.domain.TmTaskDraft;
+import com.zlt.aps.tm.engine.domain.*;
 import com.zlt.aps.tm.mapper.*;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -15,6 +14,7 @@ import org.mockito.Mock;
 import org.mockito.junit.MockitoJUnitRunner;
 
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.math.BigDecimal;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
@@ -539,6 +539,74 @@ public class TmAutoScheduleDataLoadServiceTest {
     }
 
     /**
+     * 测试内容：验证历史排程前置任务解析读取独立基部胶字段。
+     * 测试场景：历史结果同时存在 baseGlueCode 和 wholeGlueCode，且两者值不同。
+     * 预期结果：前置任务基部胶取 baseGlueCode，不使用整条胶料组合编码。
+     *
+     * @throws Exception 反射调用私有方法失败时由测试框架抛出
+     */
+    @Test
+    public void resolveLatestPredecessorShouldUseBaseGlueCodeInsteadOfWholeGlueCode() throws Exception {
+        TmScheduleResult result = new TmScheduleResult();
+        result.setId(1001L);
+        result.setMachineCode("TM001");
+        result.setTreadCode("210400584");
+        result.setGlueCode("GLUE07");
+        result.setBaseGlueCode("BASE07");
+        result.setWholeGlueCode("WHOLE-GLUE07-COMBO");
+        result.setMouthPlateCode("MP07");
+        result.setClass3Sequence(9);
+        result.setClass3PlanQty(new BigDecimal("100"));
+
+        TmTaskPredecessor predecessor = invokeResolveLatestPredecessor(result);
+
+        assertNotNull(predecessor);
+        assertEquals("BASE07", predecessor.getBaseGlueCode());
+        assertNotEquals("WHOLE-GLUE07-COMBO", predecessor.getBaseGlueCode());
+    }
+
+    /**
+     * 测试内容：验证历史排程缺少基部胶时兼容旧数据。
+     * 测试场景：历史结果只有主胶、整条胶料组合和口型，没有 baseGlueCode。
+     * 预期结果：前置任务仍可解析，基部胶为空，不从 wholeGlueCode 推导。
+     *
+     * @throws Exception 反射调用私有方法失败时由测试框架抛出
+     */
+    @Test
+    public void resolveLatestPredecessorShouldKeepBaseGlueCodeNullForLegacyResult() throws Exception {
+        TmScheduleResult result = new TmScheduleResult();
+        result.setId(1002L);
+        result.setMachineCode("TM001");
+        result.setTreadCode("210400584");
+        result.setGlueCode("GLUE07");
+        result.setWholeGlueCode("WHOLE-GLUE07-COMBO");
+        result.setMouthPlateCode("MP07");
+        result.setClass3Sequence(9);
+        result.setClass3PlanQty(new BigDecimal("100"));
+
+        TmTaskPredecessor predecessor = invokeResolveLatestPredecessor(result);
+
+        assertNotNull(predecessor);
+        assertNull(predecessor.getBaseGlueCode());
+        assertEquals("GLUE07", predecessor.getGlueCode());
+        assertEquals("MP07", predecessor.getMouthPlateCode());
+    }
+
+    /**
+     * 反射调用历史结果前置任务解析方法。
+     *
+     * @param result 历史排程结果
+     * @return 解析出的前置任务
+     * @throws Exception 反射调用失败时抛出
+     */
+    private TmTaskPredecessor invokeResolveLatestPredecessor(TmScheduleResult result) throws Exception {
+        Method method = TmAutoScheduleDataLoadService.class
+                .getDeclaredMethod("resolveLatestPredecessor", TmScheduleResult.class);
+        method.setAccessible(true);
+        return (TmTaskPredecessor) method.invoke(new TmAutoScheduleDataLoadService(), result);
+    }
+
+    /**
      * 通过反射注入测试依赖，避免启动 Spring 容器。
      *
      * @param target    被测服务
@@ -752,5 +820,120 @@ public class TmAutoScheduleDataLoadServiceTest {
         context.setScheduleDate(DateUtil.parseDate("2026-06-18"));
         context.setOperator("tester");
         return context;
+    }
+
+    /**
+     * 测试内容：验证 loadFormingDemandTasks 方法正确拆分胶料编码。
+     * 测试场景：treadRubberCategory 包含多个胶料编码，用英文逗号分隔。
+     * 预期结果：第一个编码赋给 glueCode，其余编码赋给 baseGlueCode。
+     */
+    @Test
+    public void loadFormingDemandTasksShouldSplitRubberCategory() throws Exception {
+        // 准备被测服务并通过反射注入 mapper mock
+        TmAutoScheduleDataLoadService service = new TmAutoScheduleDataLoadService();
+        setField(service, "tmParamsMapper", tmParamsMapper);
+        setField(service, "tmMachineInfoMapper", tmMachineInfoMapper);
+        setField(service, "tmAutoScheduleDataLoadMapper", tmAutoScheduleDataLoadMapper);
+        setField(service, "tmStockMapper", tmStockMapper);
+        setField(service, "tmScheduleResultMapper", tmScheduleResultMapper);
+        setField(service, "tmLossSettingMapper", null);
+        setField(service, "tmAutoScheduleRedisCacheService", buildRedisCacheService());
+
+        // 模拟参数表返回空
+        when(tmParamsMapper.selectList(any())).thenReturn(Collections.emptyList());
+        // 模拟机台表返回一台正常机台
+        TmMachineInfo machineInfo = new TmMachineInfo();
+        machineInfo.setFactoryCode("F1");
+        machineInfo.setMachineCode("TM01");
+        machineInfo.setMachineStatus("1");
+        machineInfo.setMaxCapacity(new BigDecimal("1000"));
+        when(tmMachineInfoMapper.selectList(any())).thenReturn(Collections.singletonList(machineInfo));
+        // 模拟库存查询返回空
+        when(tmStockMapper.selectList(any())).thenReturn(Collections.emptyList());
+        // 模拟历史排程结果返回空
+        when(tmScheduleResultMapper.selectList(any())).thenReturn(Collections.emptyList());
+        // 模拟工作日历返回空
+        when(tmAutoScheduleDataLoadMapper.selectWorkCalendarRows(any(), any(), any()))
+            .thenReturn(Collections.emptyList());
+
+        // 准备测试数据
+        TmFormingDemandRowVo row = new TmFormingDemandRowVo();
+        row.setOrderNo("TEST001");
+        row.setEmbryoCode("EMB001");
+        row.setTreadCode("TREAD001");
+        row.setTreadShoulderLength(new BigDecimal("10.5"));
+        row.setTreadMouthPlate("MP001");
+        row.setTreadRubberCategory("GL001,GL002,GL003");
+        row.setClass1PlanQty(new BigDecimal("100"));
+        row.setClass2PlanQty(new BigDecimal("100"));
+        row.setClass3PlanQty(new BigDecimal("100"));
+        row.setClass4PlanQty(new BigDecimal("100"));
+        row.setClass5PlanQty(new BigDecimal("100"));
+        row.setClass6PlanQty(new BigDecimal("100"));
+
+        when(tmAutoScheduleDataLoadMapper.selectFormingDemandRows(any(), any()))
+            .thenReturn(Collections.singletonList(row));
+
+        // 构造排程上下文
+        TmScheduleContext context = buildContext();
+
+        // 通过 loadAllData 执行，触发完整的数据加载流程
+        service.loadAllData(context);
+
+        // 验证结果
+        List<TmTaskDraft> result = context.getTaskDraftList();
+        assertNotNull(result);
+        assertTrue(result.size() > 0);
+        TmTaskDraft taskDraft = result.get(0);
+        assertEquals("GL001", taskDraft.getGlueCode());
+        assertEquals("GL002,GL003", taskDraft.getBaseGlueCode());
+    }
+
+    /**
+     * 测试内容：验证 buildExperimentSpecTask 方法正确拆分胶料编码。
+     * 测试场景：treadRubberCategory 包含多个胶料编码，用英文逗号分隔。
+     * 预期结果：第一个编码赋给 glueCode，其余编码赋给 baseGlueCode。
+     */
+    @Test
+    public void buildExperimentSpecTaskShouldSplitRubberCategory() throws Exception {
+        // 准备被测服务
+        TmAutoScheduleDataLoadService service = new TmAutoScheduleDataLoadService();
+
+        // 准备测试数据
+        TmExperimentSpecMonthPlanRowVo row = new TmExperimentSpecMonthPlanRowVo();
+        row.setMonthPlanId(1L);
+        row.setProductionNo("EXP001");
+        row.setFactoryCode("F1");
+        row.setTreadCode("TREAD001");
+        row.setTreadShoulderLength(new BigDecimal("10.5"));
+        row.setTreadMouthPlate("MP001");
+        row.setTreadRubberCategory("GL001,GL002");
+
+        // 准备其他参数
+        BigDecimal experimentPlanQty = new BigDecimal("30");
+        TmExperimentSpecInfo experimentSpecInfo = new TmExperimentSpecInfo();
+        List<TmLossSetting> lossSettingList = Collections.emptyList();
+        BigDecimal minStartQty = BigDecimal.ZERO;
+        BigDecimal defaultCurlLength = BigDecimal.ZERO;
+        BigDecimal toolTotalQty = BigDecimal.ZERO;
+
+        // 执行测试
+        Method method = TmAutoScheduleDataLoadService.class.getDeclaredMethod(
+            "buildExperimentSpecTask",
+            TmExperimentSpecMonthPlanRowVo.class,
+            BigDecimal.class,
+            TmExperimentSpecInfo.class,
+            List.class,
+            BigDecimal.class,
+            BigDecimal.class,
+            BigDecimal.class);
+        method.setAccessible(true);
+        TmTaskDraft result = (TmTaskDraft) method.invoke(service, row, experimentPlanQty,
+            experimentSpecInfo, lossSettingList, minStartQty, defaultCurlLength, toolTotalQty);
+
+        // 验证结果
+        assertNotNull(result);
+        assertEquals("GL001", result.getGlueCode());
+        assertEquals("GL002", result.getBaseGlueCode());
     }
 }

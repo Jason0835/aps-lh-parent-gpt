@@ -103,12 +103,12 @@ export default {
           required: true,
           disabled: this.isEdit,
         },
-        {
-          prop: "baseGlueCode",
-          label: this.$t("ui.data.column.tmGlueMachineReal.baseGlueCode"),
-          span: 12,
-          maxlength: 60,
-        },
+        // {
+        //   prop: "baseGlueCode",
+        //   label: this.$t("ui.data.column.tmGlueMachineReal.baseGlueCode"),
+        //   span: 12,
+        //   maxlength: 60,
+        // },
         {
           prop: "machineCode",
           label: this.$t("ui.data.column.tmGlueMachineReal.machineCode"),
@@ -123,8 +123,9 @@ export default {
         {
           prop: "shiftCode",
           label: this.$t("ui.data.column.tmGlueMachineReal.shiftCode"),
+          type: "select",
           span: 12,
-          maxlength: 10,
+          dictData: this.parentDict.type.class_num_three_plan,
         },
         {
           prop: "priority",

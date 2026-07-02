@@ -1,14 +1,24 @@
 package com.zlt.aps.tm.engine.service;
 
+import cn.hutool.core.collection.CollUtil;
+import cn.hutool.core.date.DateUtil;
+import cn.hutool.core.util.StrUtil;
 import com.zlt.aps.common.engine.schedule.IScheduleProcessLogger;
 import com.zlt.aps.common.engine.schedule.ScheduleChainChangeResult;
 import com.zlt.aps.common.engine.schedule.ScheduleRuleResult;
+import com.zlt.aps.tm.engine.domain.TmMachineCandidate;
 import com.zlt.aps.tm.engine.domain.TmRuleTrace;
 import com.zlt.aps.tm.engine.domain.TmScheduleContext;
 import com.zlt.aps.tm.engine.domain.TmTaskDraft;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
+
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * 胎面排程过程日志实现。
@@ -23,14 +33,14 @@ public class TmScheduleProcessLogger implements IScheduleProcessLogger<TmSchedul
 
     @Override
     public void logStepStart(TmScheduleContext context, String stepCode, String inputSummary) {
-        log.info("[TM_SCHEDULE_STEP_START] batchNo={}, traceId={}, stepCode={}, input={}",
-                batchNo(context), traceId(context), stepCode, inputSummary);
+        log.info("[TM_SCHEDULE_STEP_START] batchNo={}, traceId={}, factoryCode={}, scheduleDate={}, stepCode={}, input={}",
+                batchNo(context), traceId(context), factoryCode(context), scheduleDate(context), stepCode, inputSummary);
     }
 
     @Override
     public void logStepEnd(TmScheduleContext context, String stepCode, String outputSummary) {
-        log.info("[TM_SCHEDULE_STEP_END] batchNo={}, traceId={}, stepCode={}, output={}",
-                batchNo(context), traceId(context), stepCode, outputSummary);
+        log.info("[TM_SCHEDULE_STEP_END] batchNo={}, traceId={}, factoryCode={}, scheduleDate={}, stepCode={}, output={}",
+                batchNo(context), traceId(context), factoryCode(context), scheduleDate(context), stepCode, outputSummary);
     }
 
     @Override
@@ -59,12 +69,15 @@ public class TmScheduleProcessLogger implements IScheduleProcessLogger<TmSchedul
      * @param context 胎面排程上下文
      */
     public void logUnplanned(TmTaskDraft task, TmRuleTrace trace, TmScheduleContext context) {
-        log.warn("[TM_SCHEDULE_UNPLANNED] batchNo={}, traceId={}, treadCode={}, glueCode={}, baseGlueCode={}, mouthPlateCode={}, reasonCode={}, evidence={}",
-                batchNo(context), traceId(context), task == null ? null : task.getTreadCode(),
+        log.warn("[TM_SCHEDULE_UNPLANNED] batchNo={}, traceId={}, factoryCode={}, scheduleDate={}, businessKey={}, treadCode={}, glueCode={}, baseGlueCode={}, mouthPlateCode={}, shiftOrder={}, planQty={}, reasonCode={}, candidateRejectSummary={}, evidence={}",
+                batchNo(context), traceId(context), factoryCode(context), scheduleDate(context),
+                task == null ? null : task.getBusinessKey(), task == null ? null : task.getTreadCode(),
                 task == null ? null : task.getGlueCode(),
                 task == null ? null : task.getBaseGlueCode(),
                 task == null ? null : task.getMouthPlateCode(),
-                task == null ? null : task.getUnplannedReasonCode(), trace == null ? null : trace.toExplainJson());
+                task == null ? null : task.getShiftOrder(), task == null ? null : task.getPlanQty(),
+                task == null ? null : task.getUnplannedReasonCode(), summarizeCandidateRejects(context, task),
+                trace == null ? null : trace.toExplainJson());
     }
 
     /**
@@ -74,17 +87,45 @@ public class TmScheduleProcessLogger implements IScheduleProcessLogger<TmSchedul
      * @param result  落库结果摘要
      */
     public void logPersistSummary(TmScheduleContext context, com.zlt.aps.tm.engine.domain.TmPersistResult result) {
-        log.info("[TM_SCHEDULE_PERSIST] batchNo={}, traceId={}, resultCount={}, explainCount={}, unplannedCount={}, errorCount={}",
-                batchNo(context), traceId(context), result == null ? 0 : result.getResultCount(),
+        log.info("[TM_SCHEDULE_PERSIST] batchNo={}, traceId={}, factoryCode={}, scheduleDate={}, resultCount={}, explainCount={}, unplannedCount={}, errorCount={}",
+                batchNo(context), traceId(context), factoryCode(context), scheduleDate(context), result == null ? 0 : result.getResultCount(),
                 result == null ? 0 : result.getExplainCount(), result == null ? 0 : result.getUnplannedCount(),
                 result == null ? 0 : result.getErrorCount());
     }
 
+    /**
+     * 汇总未排任务候选机台拒绝原因。
+     *
+     * @param context 排程上下文
+     * @param task 未排任务
+     * @return 拒绝原因统计
+     */
+    private Map<String, Long> summarizeCandidateRejects(TmScheduleContext context, TmTaskDraft task) {
+        if (context == null || task == null || context.getCandidateTraceMap() == null) {
+            return Collections.emptyMap();
+        }
+        List<TmMachineCandidate> candidates = context.getCandidateTraceMap().get(task.getBusinessKey());
+        if (CollUtil.isEmpty(candidates)) {
+            return Collections.emptyMap();
+        }
+        return candidates.stream()
+                .filter(TmMachineCandidate::isFiltered)
+                .collect(Collectors.groupingBy(candidate -> StrUtil.blankToDefault(candidate.getFilterReasonCode(), "UNKNOWN"),
+                        LinkedHashMap::new, Collectors.counting()));
+    }
     private String batchNo(TmScheduleContext context) {
         return context == null ? null : context.getBatchNo();
     }
 
     private String traceId(TmScheduleContext context) {
         return context == null ? null : context.getTraceId();
+    }
+
+    private String factoryCode(TmScheduleContext context) {
+        return context == null ? null : context.getFactoryCode();
+    }
+
+    private String scheduleDate(TmScheduleContext context) {
+        return context == null || context.getScheduleDate() == null ? null : DateUtil.formatDate(context.getScheduleDate());
     }
 }

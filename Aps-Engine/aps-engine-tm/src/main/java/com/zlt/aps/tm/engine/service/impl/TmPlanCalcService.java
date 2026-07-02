@@ -1,6 +1,7 @@
 package com.zlt.aps.tm.engine.service.impl;
 
 import cn.hutool.core.collection.CollUtil;
+import cn.hutool.core.date.DateUtil;
 import cn.hutool.core.util.StrUtil;
 import com.ruoyi.common.exception.ServiceException;
 import com.zlt.aps.tm.api.enums.TmScheduleErrorCodeEnum;
@@ -110,6 +111,8 @@ public class TmPlanCalcService implements ITmPlanCalcService {
 
             // 计划量策略只读取当前任务班初全局可用工装，工装池滚动状态由本服务统一维护。
             task.setAvailableToolQty(remainingToolQty);
+            BigDecimal beforeRollingStockQty = task.getRollingStockQty();
+            BigDecimal beforeAvailableToolQty = remainingToolQty;
 
             // 通过需求量策略计算库存保证缺口、基础需求量和供应时长，供排序和计划量策略复用。
             TmDemandQtyResult demandQtyResult = demandQtyStrategy.calculate(buildDemandQtyInput(task), context);
@@ -117,18 +120,22 @@ public class TmPlanCalcService implements ITmPlanCalcService {
             addNewSpecTrace(context, task);
             addExperimentSpecTrace(context, task);
             addDemandTrace(context, task, demandQtyAlgorithmCode);
-            // 打印需求量计算公式
-            log.info("[TM_DEMAND_QTY_CALC] treadCode={}, shiftOrder={}, 算法编码={}, 当前班成型胎面需求量【currentShiftDemandQty】-当前班开始滚动库存【rollingStockQty】=当前班库存缺口【currentShiftStockGapQty】，保证范围内成型胎面需求量【guardDemandQty】-当前班开始滚动库存【rollingStockQty】=库存保证缺口【stockGapQty】，max(当前班库存缺口【currentShiftStockGapQty】，库存保证缺口【stockGapQty】)=需求量【demandQty】",
-                    task.getTreadCode(), task.getShiftOrder(), demandQtyAlgorithmCode);
-            log.info("[TM_DEMAND_QTY_CALC_DETAIL] treadCode={}, shiftOrder={}, guardDemandQty={}, rollingStockQty={}, currentShiftStockGapQty={}, stockGapQty={}, currentShiftDemandQty={}, demandQty={}",
-                    task.getTreadCode(), task.getShiftOrder(),
+            // 打印需求量计算公式和关键中间量，便于按批次和业务键还原计划量入口。
+            log.info("[TM_DEMAND_QTY_CALC] batchNo={}, traceId={}, factoryCode={}, scheduleDate={}, businessKey={}, treadCode={}, shiftOrder={}, algorithmCode={}, formula=currentShiftDemandQty-rollingStockQty=>currentShiftStockGapQty,guardDemandQty-rollingStockQty=>stockGapQty,max(currentShiftStockGapQty,stockGapQty)=>demandQty",
+                    context.getBatchNo(), context.getTraceId(), context.getFactoryCode(), formatScheduleDate(context),
+                    task.getBusinessKey(), task.getTreadCode(), task.getShiftOrder(), demandQtyAlgorithmCode);
+            log.info("[TM_DEMAND_QTY_CALC_DETAIL] batchNo={}, traceId={}, factoryCode={}, scheduleDate={}, businessKey={}, treadCode={}, shiftOrder={}, guardDemandQty={}, rollingStockQty={}, currentShiftStockGapQty={}, stockGapQty={}, currentShiftDemandQty={}, demandQty={}",
+                    context.getBatchNo(), context.getTraceId(), context.getFactoryCode(), formatScheduleDate(context),
+                    task.getBusinessKey(), task.getTreadCode(), task.getShiftOrder(),
                     task.getGuardDemandQty(), task.getRollingStockQty(), task.getCurrentShiftStockGapQty(), task.getStockGapQty(),
                     task.getCurrentShiftDemandQty(), task.getDemandQty());
-            // 打印供应时长计算公式
-            log.info("[TM_DEMAND_QTY_SUPPLY] treadCode={}, shiftOrder={}, 供应时长【supplyHours】小时=当前班开始滚动库存【rollingStockQty】/(保证范围内成型胎面需求量【guardDemandQty】/保证范围总小时数【guardRangeHours】)",
-                    task.getTreadCode(), task.getShiftOrder());
-            log.info("[TM_DEMAND_QTY_SUPPLY_DETAIL] treadCode={}, shiftOrder={}, supplyHours={}, rollingStockQty={}, guardDemandQty={}, guardRangeHours={}",
-                    task.getTreadCode(), task.getShiftOrder(),
+            // 打印供应时长计算公式和关键中间量，便于解释排序中的库存紧急度。
+            log.info("[TM_DEMAND_QTY_SUPPLY] batchNo={}, traceId={}, factoryCode={}, scheduleDate={}, businessKey={}, treadCode={}, shiftOrder={}, formula=supplyHours=rollingStockQty/(guardDemandQty/guardRangeHours)",
+                    context.getBatchNo(), context.getTraceId(), context.getFactoryCode(), formatScheduleDate(context),
+                    task.getBusinessKey(), task.getTreadCode(), task.getShiftOrder());
+            log.info("[TM_DEMAND_QTY_SUPPLY_DETAIL] batchNo={}, traceId={}, factoryCode={}, scheduleDate={}, businessKey={}, treadCode={}, shiftOrder={}, supplyHours={}, rollingStockQty={}, guardDemandQty={}, guardRangeHours={}",
+                    context.getBatchNo(), context.getTraceId(), context.getFactoryCode(), formatScheduleDate(context),
+                    task.getBusinessKey(), task.getTreadCode(), task.getShiftOrder(),
                     task.getSupplyHours(), task.getRollingStockQty(),
                     task.getGuardDemandQty(), task.getGuardRangeHours());
 
@@ -140,19 +147,38 @@ public class TmPlanCalcService implements ITmPlanCalcService {
             remainingToolQty = this.updateGlobalToolState(task, remainingToolQty);
             updateRollingStockState(context, task);
             addPlanQtyTrace(context, task, planQtyStrategyCode);
-            // 打印计划量计算公式
+            // 打印计划量计算公式、分量和滚动状态，减少人工二次推导。
             if (task.getPlanQty() != null) {
-                log.info("[TM_PLAN_QTY_CALC] treadCode={}, shiftOrder={}, 策略编码={}, 计划量计算路径={}",
-                        task.getTreadCode(), task.getShiftOrder(), planQtyStrategyCode, task.getCalcFormulaDesc());
-                log.info("[TM_PLAN_QTY_CALC_DETAIL] treadCode={}, shiftOrder={}, demandQty={}, stockDeductQty={}, baseDemandQty={}, lossAddQty={}, toolLimitAdjustQty={}, minStartAdjustQty={}, tailRoundAdjustQty={}, capacityAdjustQty={}, availableToolQty={}, toolUsedQty={}, remainingToolQty={}, planQty={}",
-                        task.getTreadCode(), task.getShiftOrder(),
+                log.info("[TM_PLAN_QTY_CALC] batchNo={}, traceId={}, factoryCode={}, scheduleDate={}, businessKey={}, treadCode={}, shiftOrder={}, strategyCode={}, calcFormulaDesc={}",
+                        context.getBatchNo(), context.getTraceId(), context.getFactoryCode(), formatScheduleDate(context),
+                        task.getBusinessKey(), task.getTreadCode(), task.getShiftOrder(), planQtyStrategyCode,
+                        task.getCalcFormulaDesc());
+                log.info("[TM_PLAN_QTY_CALC_DETAIL] batchNo={}, traceId={}, factoryCode={}, scheduleDate={}, businessKey={}, treadCode={}, shiftOrder={}, demandQty={}, stockDeductQty={}, baseDemandQty={}, lossAddQty={}, toolLimitAdjustQty={}, toolOverflowQty={}, minStartAdjustQty={}, tailRoundAdjustQty={}, capacityAdjustQty={}, availableToolQty={}, toolUsedQty={}, remainingToolQty={}, planStockQty={}, planQty={}, calcFormulaDesc={}",
+                        context.getBatchNo(), context.getTraceId(), context.getFactoryCode(), formatScheduleDate(context),
+                        task.getBusinessKey(), task.getTreadCode(), task.getShiftOrder(),
                         task.getDemandQty(), task.getStockDeductQty(), task.getBaseDemandQty(),
-                        task.getLossAddQty(), task.getToolLimitAdjustQty(),
+                        task.getLossAddQty(), task.getToolLimitAdjustQty(), task.getToolOverflowQty(),
                         task.getMinStartAdjustQty(), task.getTailRoundAdjustQty(),
                         task.getCapacityAdjustQty(), task.getAvailableToolQty(),
-                        task.getToolUsedQty(), task.getRemainingToolQty(), task.getPlanQty());
+                        task.getToolUsedQty(), task.getRemainingToolQty(), task.getPlanStockQty(), task.getPlanQty(),
+                        task.getCalcFormulaDesc());
+                log.info("[TM_PLAN_QTY_STATE] batchNo={}, traceId={}, factoryCode={}, scheduleDate={}, businessKey={}, treadCode={}, shiftOrder={}, beforeRollingStockQty={}, afterRollingStockQty={}, beforeAvailableToolQty={}, afterRemainingToolQty={}, planStockQty={}, planQty={}",
+                        context.getBatchNo(), context.getTraceId(), context.getFactoryCode(), formatScheduleDate(context),
+                        task.getBusinessKey(), task.getTreadCode(), task.getShiftOrder(), beforeRollingStockQty,
+                        context.getRemainingStockMap().get(task.getTreadCode()), beforeAvailableToolQty,
+                        task.getRemainingToolQty(), task.getPlanStockQty(), task.getPlanQty());
             }
         }
+    }
+
+    /**
+     * 格式化排程日期，避免日志中直接打印Date对象造成排查口径不统一。
+     *
+     * @param context 排程上下文
+     * @return yyyy-MM-dd格式日期；日期为空时返回null
+     */
+    private String formatScheduleDate(TmScheduleContext context) {
+        return context == null || context.getScheduleDate() == null ? null : DateUtil.formatDate(context.getScheduleDate());
     }
 
     /**
@@ -397,7 +423,7 @@ public class TmPlanCalcService implements ITmPlanCalcService {
     }
 
     /**
-     * 按当前任务计划量和当前班成型需求量扣减全局工装池。
+     * 按当前任务计划量和当前班成型需求量滚动全局工装池，生产增加占用，成型消耗库存释放占用。
      *
      * @param task                    任务草稿
      * @param currentAvailableToolQty 当前任务计算前全局可用工装数量
@@ -413,11 +439,14 @@ public class TmPlanCalcService implements ITmPlanCalcService {
             task.setRemainingToolQty(currentAvailableToolQty);
             return currentAvailableToolQty;
         }
-        BigDecimal usedToolQty = nvl(task.getPlanQty()).add(nvl(task.getCurrentShiftDemandQty()))
+        BigDecimal netUsedToolQty = nvl(task.getPlanQty()).subtract(nvl(task.getCurrentShiftDemandQty()))
                 .divide(curlLength, 6, RoundingMode.HALF_UP);
-        BigDecimal remainingToolQty = currentAvailableToolQty.subtract(usedToolQty).max(BigDecimal.ZERO)
-                .setScale(6, RoundingMode.HALF_UP);
-        task.setToolUsedQty(usedToolQty);
+        BigDecimal remainingToolQty = currentAvailableToolQty.subtract(netUsedToolQty).max(BigDecimal.ZERO);
+        if (task.getTotalToolQty() != null) {
+            remainingToolQty = remainingToolQty.min(task.getTotalToolQty());
+        }
+        remainingToolQty = remainingToolQty.setScale(6, RoundingMode.HALF_UP);
+        task.setToolUsedQty(netUsedToolQty);
         task.setRemainingToolQty(remainingToolQty);
         return remainingToolQty;
     }

@@ -10,6 +10,7 @@ import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.tm.api.domain.entity.TmGlueMachineReal;
 import com.zlt.aps.tm.mapper.TmGlueMachineRealMapper;
 import com.zlt.aps.tm.service.ITmGlueMachineRealService;
+import com.zlt.aps.utils.AppUtils;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
 import com.zlt.common.utils.PubUtil;
@@ -94,10 +95,19 @@ public class TmGlueMachineRealController extends AbstractDocBizController<TmGlue
     }
 
     @Override
+    protected String[] getQueryFormulas() {
+        return new String[]{
+                "machineName->getcolvalue(T_TM_MACHINE_INFO, MACHINE_NAME, MACHINE_CODE, machineCode)"
+        };
+    }
+
+    @Override
     protected List<TmGlueMachineReal> listExportData(TmGlueMachineReal obj) {
         QueryWrapper<TmGlueMachineReal> wrapper = new QueryWrapper<>();
         this.builderCondition(wrapper, obj);
-        return tmGlueMachineRealMapper.selectList(wrapper);
+        List<TmGlueMachineReal> list = tmGlueMachineRealMapper.selectList(wrapper);
+        AppUtils.formatData(list, getQueryFormulas());
+        return list;
     }
 
     @Override
