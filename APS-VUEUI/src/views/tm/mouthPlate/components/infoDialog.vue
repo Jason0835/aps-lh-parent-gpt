@@ -121,8 +121,10 @@ export default {
         {
           prop: "plateStatus",
           label: this.$t("ui.data.column.tm.mouthPlate.plateStatus"),
+          type: "switch",
           span: 12,
-          maxlength: 50,
+          activeValue: "1",
+          inactiveValue: "0",
         },
         {
           prop: "remark",
@@ -157,10 +159,12 @@ export default {
         this.isEdit = true;
         this.form = {
           ...data,
+          plateStatus: data.plateStatus || "0",
         };
       } else {
         this.form = {
           factoryCode: "116",
+          plateStatus: "1",
         };
       }
     },
