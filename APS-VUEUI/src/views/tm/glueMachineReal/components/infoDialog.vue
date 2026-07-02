@@ -103,12 +103,12 @@ export default {
           required: true,
           disabled: this.isEdit,
         },
-        {
-          prop: "baseGlueCode",
-          label: this.$t("ui.data.column.tmGlueMachineReal.baseGlueCode"),
-          span: 12,
-          maxlength: 60,
-        },
+        // {
+        //   prop: "baseGlueCode",
+        //   label: this.$t("ui.data.column.tmGlueMachineReal.baseGlueCode"),
+        //   span: 12,
+        //   maxlength: 60,
+        // },
         {
           prop: "machineCode",
           label: this.$t("ui.data.column.tmGlueMachineReal.machineCode"),

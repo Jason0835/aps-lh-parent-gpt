@@ -137,9 +137,12 @@ export default {
           label: this.$t("ui.data.column.tmGlueMachineReal.machineCode"),
         },
         {
-          prop: "machineClass",
+          prop: "shiftCode",
           halign: "center",
           label: this.$t("ui.data.column.tmGlueMachineReal.machineClass"),
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(this.dict.type.class_num_three_plan, value);
+          },
         },
         {
           prop: "priority",
