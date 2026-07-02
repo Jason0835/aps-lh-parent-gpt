@@ -32,13 +32,6 @@
           >{{ $t("ui.frame.btn.modify") }}</el-button
         >
         <el-button
-          type="danger"
-          v-hasPermi="['dj:params:remove']"
-          @click="handleDelete(selection)"
-          :disabled="selection.length === 0"
-          >{{ $t("ui.frame.btn.delete") }}</el-button
-        >
-        <el-button
           @click="handleExport"
           v-hasPermi="['dj:params:export']"
           >{{ $t("ui.frame.btn.export") }}</el-button
@@ -50,7 +43,7 @@
 </template>
 <script>
 import { downloadLink } from "@/utils/request";
-import { listParams, removeParams } from "@/api/dj/params";
+import { listParams } from "@/api/dj/params";
 import { getConfigKey } from "@/api/system/config";
 import infoDialog from "./components/infoDialog.vue";
 
@@ -59,7 +52,7 @@ export default {
   components: {
     infoDialog,
   },
-  dicts: ["biz_factory_name"],
+  dicts: ["biz_factory_name", "biz_product_type"],
   provide() {
     return {
       parentDict: this.dict,
@@ -111,50 +104,71 @@ export default {
           prop: "factoryCode",
           halign: "center",
           label: this.$t("ui.dj.params.column.factoryCode"),
+          dictData: this.dict.type.biz_factory_name,
+          formatter: (row, column, value, index) => {
+            return this.selectDictLabel(this.dict.type.biz_factory_name, value);
+          },
+          width: 80,
         },
         {
           prop: "productTypeCode",
           halign: "center",
           label: this.$t("ui.dj.params.column.productTypeCode"),
+          dictData: this.dict.type.biz_product_type,
+          formatter: (row, column, value, index) => {
+            return this.selectDictLabel(this.dict.type.biz_product_type, value);
+          },
+          width: 80,
         },
         {
           prop: "paramCode",
           halign: "center",
           label: this.$t("ui.dj.params.column.paramCode"),
+          width: 100,
         },
         {
           prop: "paramName",
           halign: "center",
           label: this.$t("ui.dj.params.column.paramName"),
           titleTooltip: true,
-        },
-        {
-          prop: "dataType",
-          halign: "center",
-          label: this.$t("ui.dj.params.column.dataType"),
-        },
-        {
-          prop: "defauleValue",
-          halign: "center",
-          label: this.$t("ui.dj.params.column.defauleValue"),
+          width: 180,
         },
         {
           prop: "paramValue",
           halign: "center",
           label: this.$t("ui.dj.params.column.paramValue"),
+          width: 100,
+        },
+        {
+          prop: "defauleValue",
+          halign: "center",
+          label: this.$t("ui.dj.params.column.defauleValue"),
+          width: 100,
         },
         {
           prop: "remark",
           halign: "center",
           label: this.$t("ui.common.column.remark"),
-          minWidth: 100,
+          minWidth: 380,
+        },
+        {
+          prop: "updateBy",
+          halign: "center",
+          label: this.$t("ui.common.column.updateBy"),
+          width: 100,
+        },
+        {
+          prop: "updateTime",
+          halign: "center",
+          label: this.$t("ui.common.column.updateTime"),
+          width: 160,
         },
         {
           align: "center",
           halign: "center",
           label: this.$t("ui.data.btn.option"),
-          minWidth: 180,
-          width: 180,
+          minWidth: 100,
+          width: 100,
           fixed: "right",
           render: ({ row }) => {
             return (
@@ -165,13 +179,6 @@ export default {
                   onClick={() => this.handleEdit(row)}
                 >
                   {this.$t("ui.frame.btn.update")}
-                </el-button>
-                <el-button
-                  class="minus"
-                  type="danger"
-                  onClick={() => this.handleDelete(row)}
-                >
-                  {this.$t("ui.frame.btn.delete")}
                 </el-button>
               </div>
             );
@@ -192,24 +199,6 @@ export default {
       if (this.$refs.infoRef) {
         this.$refs.infoRef.show(row);
       }
-    },
-    handleDelete(row) {
-      const ids = Array.isArray(row) ? row.map((item) => item.id) : [row.id];
-      this.$confirm(this.$t("common.confirm.delete"), {
-        type: "warning",
-      }).then(() => {
-        this.loading = true;
-        removeParams(ids)
-          .then((data) => {
-            this.$modal.msgSuccess(data.msg);
-            this.$set(this.page, "current", 1);
-            this.getList();
-          })
-          .catch((error) => {
-            console.log(error);
-            this.loading = false;
-          });
-      });
     },
 
     handleSearch(data) {
@@ -267,6 +256,8 @@ export default {
     },
   },
   created() {
+    // 清除之前持久化的错误列顺序，保留拖拽功能但不再恢复错误状态
+    localStorage.removeItem("djParamsMainTable");
     getConfigKey("sys.factory.code").then(response => {
       this.search.factoryCode = response.msg;
       this.query.factoryCode = response.msg;

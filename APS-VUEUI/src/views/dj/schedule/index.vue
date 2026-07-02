@@ -298,52 +298,66 @@ export default {
       let columns = [
         { type: "selection", fixed: "left" },
         {
-          label: this.$t("ui.data.column.scheduleResult.baseInfo"),
-          children: [
-            {
-              prop: "releaseStatus",
-              valign: "middle",
-              align: 'center',
-              halign: 'center',
-              label: this.$t("ui.data.column.dj.scheduleResult.releaseStatus"),
-              formatter: (row, column, value, index) => {
-                return this.selectDictLabel(this.dict.type.IS_RELEASE, value);
-              },
-            },
-            {
-              prop: "paddingName",
-              valign: "middle",
-              halign: 'center',
-              align: 'center',
-              minWidth: 120,
-              label: this.$t("ui.data.column.dj.scheduleResult.paddingCode"),
-            },
-            {
-              prop: "glueCode",
-              valign: "middle",
-              halign: 'center',
-              align: "left",
-              minWidth: 120,
-              label: this.$t("ui.data.column.dj.scheduleResult.glueCode"),
-            },
-            {
-              prop: "machineCode",
-              valign: "middle",
-              halign: 'center',
-              align: "left",
-              label: this.$t("ui.data.column.dj.scheduleResult.machineCode"),
-              formatter: (row, column, value, index) => {
-                return row.machineName;
-              },
-            },
-            {
-              prop: "stockQty",
-              valign: "middle",
-              halign: 'center',
-              align: "right",
-              label: this.$t("ui.data.column.scheduleResult.stockQty"),
-            },
-          ],
+          prop: "scheduleDate",
+          valign: "middle",
+          align: 'center',
+          halign: 'center',
+          minWidth: 110,
+          label: this.$t("ui.data.column.scheduleResult.scheduleDate"),
+        },
+        {
+          prop: "factoryCode",
+          valign: "middle",
+          align: 'center',
+          halign: 'center',
+          label: this.$t("ui.data.column.factoryCode"),
+          dictData: this.dict.type.biz_factory_name,
+          formatter: (row, column, value, index) => {
+            return this.selectDictLabel(this.dict.type.biz_factory_name, value);
+          },
+        },
+        {
+          prop: "releaseStatus",
+          valign: "middle",
+          align: 'center',
+          halign: 'center',
+          label: this.$t("ui.data.column.dj.scheduleResult.releaseStatus"),
+          formatter: (row, column, value, index) => {
+            return this.selectDictLabel(this.dict.type.IS_RELEASE, value);
+          },
+        },
+        {
+          prop: "paddingName",
+          valign: "middle",
+          halign: 'center',
+          align: 'center',
+          minWidth: 120,
+          label: this.$t("ui.data.column.dj.scheduleResult.paddingCode"),
+        },
+        {
+          prop: "glueCode",
+          valign: "middle",
+          halign: 'center',
+          align: "left",
+          minWidth: 120,
+          label: this.$t("ui.data.column.dj.scheduleResult.glueCode"),
+        },
+        {
+          prop: "machineCode",
+          valign: "middle",
+          halign: 'center',
+          align: "left",
+          label: this.$t("ui.data.column.dj.scheduleResult.machineCode"),
+          formatter: (row, column, value, index) => {
+            return row.machineName;
+          },
+        },
+        {
+          prop: "stockQty",
+          valign: "middle",
+          halign: 'center',
+          align: "right",
+          label: this.$t("ui.data.column.scheduleResult.stockQty"),
         },
         {
           label: this.classHeaders[0],
@@ -692,6 +706,9 @@ export default {
           prop: "scheduleDate",
           type: "date",
           valueFormat: "yyyy-MM-dd",
+          listeners: {
+            change: this.handleScheduleDateChange,
+          },
         },
         {
           label: this.$t("ui.data.column.dj.scheduleResult.paddingCode"),
@@ -790,11 +807,29 @@ export default {
       });
     },
 
+    // 排程日期变更后自动查询
+    handleScheduleDateChange(val) {
+      this.search = {
+        ...this.search,
+        scheduleDate: val,
+      };
+      this.query = {
+        ...this.query,
+        scheduleDate: val,
+      };
+      if (this.page) {
+        this.$set(this.page, "current", 1);
+      }
+      this.getList();
+      getWorkClass({ scheduleDate: this.getEffectiveScheduleDate() }).then((res) => {
+        this.classHeaders = res;
+      });
+    },
     handleSearch(data) {
       this.query = data;
       // this.$set(this.page, "current", 1);
       this.getList();
-      getWorkClass({ scheduleDate: this.query.scheduleDate }).then((res) => {
+      getWorkClass({ scheduleDate: this.getEffectiveScheduleDate() }).then((res) => {
         this.classHeaders = res;
       });
     },
@@ -850,6 +885,10 @@ export default {
     },
 
     // utils
+    /** 获取有效排程日期：查询条件为空时默认 T-1 */
+    getEffectiveScheduleDate() {
+      return this.query.scheduleDate || moment().add(1, "days").format("YYYY-MM-DD");
+    },
     updateTableHeaderTitle() {
       //  TODO 更新表头标题
     },
@@ -895,6 +934,11 @@ export default {
         ...this.query,
         ...this.sort,
       };
+
+      // 排程日期为空时默认 T-1
+      if (!params.scheduleDate) {
+        params.scheduleDate = this.getEffectiveScheduleDate();
+      }
 
       if (params.createTime && params.createTime[0]) {
         params.createTimeStart = params.createTime[0];
@@ -964,13 +1008,13 @@ export default {
     });
 
     //获取班次表头
-    getWorkClass({ scheduleDate: this.query.scheduleDate }).then((res) => {
+    getWorkClass({ scheduleDate: this.getEffectiveScheduleDate() }).then((res) => {
       this.classHeaders = res;
     });
   },
   activated() {
     this.getList();
-    getWorkClass({ scheduleDate: this.query.scheduleDate }).then((res) => {
+    getWorkClass({ scheduleDate: this.getEffectiveScheduleDate() }).then((res) => {
       this.classHeaders = res;
     });
   },

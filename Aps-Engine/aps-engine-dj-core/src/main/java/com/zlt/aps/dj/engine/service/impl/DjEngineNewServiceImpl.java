@@ -13,6 +13,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.text.MessageFormat;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -148,7 +149,8 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
         List<MdmConstructionInfo> constructionList = this.loadConstructionInfo(factoryCode,
                 new ArrayList<>(constructionCodes));
         if (CollectionUtils.isEmpty(constructionList)) {
-            throw new BusinessException(I18nUtil.getMessage("ui.dj.engine.noConstruction"));
+            throw new BusinessException(MessageFormat.format(
+                    I18nUtil.getMessage("ui.dj.engine.noConstruction"), constructionCodes));
         }
         log.info("步骤2.1：加载施工数据 {} 条", constructionList.size());
 
@@ -162,7 +164,8 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
                 .collect(Collectors.toList());
         if (!unmatchedCodes.isEmpty()) {
             log.warn("步骤2：以下胎胚代码无对应施工数据：{}", unmatchedCodes);
-            throw new BusinessException(I18nUtil.getMessage("ui.dj.engine.noConstruction"));
+            throw new BusinessException(MessageFormat.format(
+                    I18nUtil.getMessage("ui.dj.engine.noConstruction"), unmatchedCodes));
         }
 
         // 校验：施工数据中垫胶代码和垫胶长度必须有效
@@ -177,7 +180,8 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
         }
         if (!invalidConstructionCodes.isEmpty()) {
             log.warn("步骤2：以下胎胚代码施工数据中垫胶代码或垫胶长度无效：{}", invalidConstructionCodes);
-            throw new BusinessException(I18nUtil.getMessage("ui.dj.engine.invalidConstruction"));
+            throw new BusinessException(MessageFormat.format(
+                    I18nUtil.getMessage("ui.dj.engine.invalidConstruction"), invalidConstructionCodes));
         }
 
         // 2.2 关联成型计划与施工数据，解析垫胶消耗量
@@ -187,15 +191,21 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
         log.info("步骤2.2：垫胶规格数：{}，各规格成型机台数：{}", paddingCxMachineCount.size(), paddingCxMachineCount);
 
         // 加载排产参数
-        Map<String, String> paramsMap = this.loadParamsMap(factoryCode);
+        Map<String, DjParams> paramsMap = this.loadParamsMap(factoryCode);
         context.setParamsMap(paramsMap);
 
         // 根据排程首班班次参数构建班次索引映射
-        String startShiftClass = paramsMap.getOrDefault(DjEngineConstants.PARAM_SCHEDULE_START_SHIFT,
-                DjEngineConstants.DEFAULT_SCHEDULE_START_SHIFT);
-        String[] shiftClassMap = DjEngineUtil.buildShiftClassMap(startShiftClass);
+        DjParams startShiftParam = paramsMap.get(DjEngineConstants.PARAM_SCHEDULE_START_SHIFT);
+        String startShiftValue = this.resolveParamValue(startShiftParam);
+        if (startShiftValue == null) {
+            String name = (startShiftParam != null && startShiftParam.getParamName() != null)
+                    ? startShiftParam.getParamName() : DjEngineConstants.PARAM_SCHEDULE_START_SHIFT;
+            throw new BusinessException(MessageFormat.format(
+                    I18nUtil.getMessage("ui.dj.engine.paramNotConfigured"), name, DjEngineConstants.PARAM_SCHEDULE_START_SHIFT));
+        }
+        String[] shiftClassMap = DjEngineUtil.buildShiftClassMap(startShiftValue);
         context.setShiftClassMap(shiftClassMap);
-        log.info("步骤2.2：排程首班班次={}，班次映射={}", startShiftClass, String.join(",", shiftClassMap));
+        log.info("步骤2.2：排程首班班次={}，班次映射={}", startShiftValue, String.join(",", shiftClassMap));
 
         // 按垫胶规格分别解析供应窗口（不同规格排产深度可能不同）
         Map<String, Integer> paddingSupplyDepth = new HashMap<>();
@@ -268,8 +278,9 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
         }
 
         // 3.3 构建垫胶需求清单
+        BigDecimal standardCurlLength = this.getParamAsDecimal(context, DjEngineConstants.PARAM_STANDARD_CRIMP_LENGTH);
         List<DjPaddingDemand> demandList = this.buildDemandList(paddingCodes, consumeQty, effectiveStockMap,
-                constructionMap, newSpecPaddingCodes);
+                constructionMap, newSpecPaddingCodes, standardCurlLength);
         log.info("步骤3.3：生成垫胶需求清单 {} 个规格", demandList.size());
 
         // 第1班接班库存不等同于有效库存（早上6点快照），需预估6:00~14:00（早班）的库存变化
@@ -676,7 +687,8 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
      */
     private List<DjPaddingDemand> buildDemandList(Set<String> paddingCodes,
             Map<String, Map<Integer, BigDecimal>> consumeQty, Map<String, BigDecimal> effectiveStockMap,
-            Map<String, MdmConstructionInfo> constructionMap, Set<String> newSpecPaddingCodes) {
+            Map<String, MdmConstructionInfo> constructionMap, Set<String> newSpecPaddingCodes,
+            BigDecimal standardCurlLength) {
         List<DjPaddingDemand> demandList = new ArrayList<>();
 
         // 收集各规格的总消耗量和最早需求时间
@@ -717,7 +729,7 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
             demand.setNetDemand(netDemand);
             demand.setRemainingDemand(netDemand);
             demand.setIncomingInventory(effectiveStock);
-            demand.setTrolleyCapacity(this.getTrolleyCapacity(paddingCode));
+            demand.setTrolleyCapacity(standardCurlLength);
             demand.setNeedProduce(netDemand.compareTo(BigDecimal.ZERO) > 0);
 
             demandList.add(demand);
@@ -918,7 +930,8 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
                     }
 
                     // 计算机台切换损失
-                    BigDecimal switchLoss = this.calcSwitchLoss(machine, lastSpecCode, spec);
+                    BigDecimal mouthPlateSwitchTime = this.getParamAsDecimal(context, DjEngineConstants.PARAM_MOUTH_PLATE_SWITCH_TIME);
+                    BigDecimal switchLoss = this.calcSwitchLoss(machine, lastSpecCode, spec, mouthPlateSwitchTime);
 
                     // 生产量计算
                     BigDecimal produceQty = calcProduceQty(spec, remainingCapacity.subtract(switchLoss));
@@ -1013,9 +1026,8 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
         Map<String, Integer> paddingSupplyDepth = context.getPaddingSupplyDepth();
         Map<String, BigDecimal> paddingRemainingMap = context.getPaddingRemainingMap();
 
-        // 排产触发阈值：当前库存可覆盖班次数 ≤ 此值时触发排产（默认1）
-        int scheduleThreshold = this.getParamAsDecimal(context, DjEngineConstants.PARAM_SCHEDULE_THRESHOLD,
-                BigDecimal.valueOf(DjEngineConstants.DEFAULT_SCHEDULE_THRESHOLD)).intValue();
+        // 排产触发阈值：当前库存可覆盖班次数 ≤ 此值时触发排产
+        int scheduleThreshold = this.getParamAsDecimal(context, DjEngineConstants.PARAM_SCHEDULE_THRESHOLD).intValue();
 
         for (DjPaddingDemand spec : demandList) {
             BigDecimal incomingInventory = handoverInventory.getOrDefault(spec.getPaddingCode(), BigDecimal.ZERO);
@@ -1188,28 +1200,23 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
      * @return 班次总产量上限（米），若未配置工装总数则返回 null（不限制）
      */
     private BigDecimal calcShiftTrolleyLimit(DjScheduleContext context) {
-        Map<String, String> paramsMap = context.getParamsMap();
-        if (paramsMap == null) {
-            return null;
-        }
+        Map<String, DjParams> paramsMap = context.getParamsMap();
 
         // 工装（台车）总数
-        BigDecimal toolTotalNum = this.getParamAsDecimal(paramsMap, DjEngineConstants.PARAM_TOOL_TOTAL_NUM,
-                BigDecimal.ZERO);
+        BigDecimal toolTotalNum = this.getParamAsDecimal(paramsMap, DjEngineConstants.PARAM_TOOL_TOTAL_NUM);
         if (toolTotalNum.compareTo(BigDecimal.ZERO) <= 0) {
             return null; // 未配置台车总数，不限制
         }
 
         // 整车率
-        BigDecimal trolleyFullRate = this.getParamAsDecimal(paramsMap, DjEngineConstants.PARAM_TROLLEY_FULL_RATE,
-                BigDecimal.ZERO);
+        BigDecimal trolleyFullRate = this.getParamAsDecimal(paramsMap, DjEngineConstants.PARAM_TROLLEY_FULL_RATE);
         if (trolleyFullRate.compareTo(BigDecimal.ZERO) <= 0) {
             trolleyFullRate = BigDecimal.ONE; // 默认整车率为100%
         }
 
         // 标准卷曲米数（台车容量）
         BigDecimal standardCurlLength = this.getParamAsDecimal(paramsMap,
-                DjEngineConstants.PARAM_STANDARD_CRIMP_LENGTH, DjEngineConstants.DEFAULT_CURL_LENGTH);
+                DjEngineConstants.PARAM_STANDARD_CRIMP_LENGTH);
         if (standardCurlLength.compareTo(BigDecimal.ZERO) <= 0) {
             return null;
         }
@@ -1449,15 +1456,15 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
             }
         }
         // 从参数获取全局默认损耗率
-        BigDecimal defaultLoss = this.getParamAsDecimal(context, DjEngineConstants.PARAM_LOSS_RATE,
-                DjEngineConstants.DEFAULT_LOSS_RATE);
+        BigDecimal defaultLoss = this.getParamAsDecimal(context, DjEngineConstants.PARAM_LOSS_RATE);
         return defaultLoss != null ? defaultLoss : BigDecimal.ZERO;
     }
 
     /**
      * 计算机台切换损失
      */
-    private BigDecimal calcSwitchLoss(DjMachineInfo machine, String lastSpecCode, DjPaddingDemand currentSpec) {
+    private BigDecimal calcSwitchLoss(DjMachineInfo machine, String lastSpecCode, DjPaddingDemand currentSpec,
+            BigDecimal mouthPlateSwitchTime) {
         // 本班第一个规格或续做同一规格，无切换损失
         if (lastSpecCode == null || lastSpecCode.equals(currentSpec.getPaddingCode())) {
             return BigDecimal.ZERO;
@@ -1465,10 +1472,8 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
         // 需要切换，需知道上一规格的胶料和口型
         // 这里简化处理：按切换胶料处理（全量切换），调用方需传入上下文中的上一规格信息
         // 切换损失 = (切换时长 / 8小时) × 定额
-        BigDecimal switchTime = DjEngineConstants.DEFAULT_MOUTH_PLATE_SWITCH_TIME;
-        // 如果有上下文中的参数，则使用参数值
         BigDecimal quata = machine.getQuata() != null ? machine.getQuata() : BigDecimal.ZERO;
-        return switchTime.divide(DjEngineConstants.SHIFT_HOURS, 4, RoundingMode.HALF_UP).multiply(quata).setScale(2,
+        return mouthPlateSwitchTime.divide(DjEngineConstants.SHIFT_HOURS, 4, RoundingMode.HALF_UP).multiply(quata).setScale(2,
                 RoundingMode.HALF_UP);
     }
 
@@ -1491,9 +1496,10 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
         }
 
         // 未收尾规格：需台车容量整倍数
-        BigDecimal trolleyCapacity = spec.getTrolleyCapacity() != null
-                && spec.getTrolleyCapacity().compareTo(BigDecimal.ZERO) > 0 ? spec.getTrolleyCapacity()
-                        : DjEngineConstants.DEFAULT_CURL_LENGTH;
+        BigDecimal trolleyCapacity = spec.getTrolleyCapacity();
+        if (trolleyCapacity == null || trolleyCapacity.compareTo(BigDecimal.ZERO) <= 0) {
+            return BigDecimal.ZERO;
+        }
 
         // 计算最大可生产的整台车数
         int maxTrolleys = remainingCapacity.divide(trolleyCapacity, 0, RoundingMode.FLOOR).intValue();
@@ -1603,13 +1609,6 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
         result.setFieldValueByFieldName(String.format(DjEngineConstants.CLASS_PLAN_QTY_FIELD, classIndex), planQty);
     }
 
-    /**
-     * 获取台车容量
-     */
-    private BigDecimal getTrolleyCapacity(String paddingCode) {
-        // 从上下文获取，调用方需要传递
-        return DjEngineConstants.DEFAULT_CURL_LENGTH;
-    }
 
     /**
      * 归档旧数据并写入新数据
@@ -1640,56 +1639,74 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
     /**
      * 加载排产参数
      */
-    private Map<String, String> loadParamsMap(String factoryCode) {
+    private Map<String, DjParams> loadParamsMap(String factoryCode) {
         List<DjParams> paramsList = djEngineParamsMapper
                 .selectList(new LambdaQueryWrapper<DjParams>().eq(DjParams::getFactoryCode, factoryCode));
         if (paramsList == null) {
             return new HashMap<>();
         }
-        return paramsList.stream().filter(p -> p.getParamCode() != null && p.getParamValue() != null)
-                .collect(Collectors.toMap(DjParams::getParamCode, DjParams::getParamValue));
+        return paramsList.stream().filter(p -> p.getParamCode() != null)
+                .collect(Collectors.toMap(DjParams::getParamCode, p -> p));
     }
 
     /**
-     * 获取参数整型值
+     * 解析参数值：优先取 paramValue，没有则取 defauleValue，仍没有则返回 null
      */
-    private int getParamAsInt(Map<String, String> paramsMap, String key, int defaultValue) {
-        if (paramsMap == null) {
-            return defaultValue;
+    private String resolveParamValue(DjParams param) {
+        if (param == null) {
+            return null;
         }
-        String val = paramsMap.get(key);
+        if (param.getParamValue() != null && !param.getParamValue().isEmpty()) {
+            return param.getParamValue();
+        }
+        return (param.getDefauleValue() != null && !param.getDefauleValue().isEmpty())
+                ? param.getDefauleValue() : null;
+    }
+
+    /**
+     * 获取参数整型值，参数未正确配置时抛异常
+     */
+    private int getParamAsInt(Map<String, DjParams> paramsMap, String key) {
+        DjParams param = (paramsMap != null) ? paramsMap.get(key) : null;
+        String val = this.resolveParamValue(param);
         if (val == null) {
-            return defaultValue;
+            String name = (param != null && param.getParamName() != null) ? param.getParamName() : key;
+            throw new BusinessException(MessageFormat.format(
+                    I18nUtil.getMessage("ui.dj.engine.paramNotConfigured"), name, key));
         }
         try {
             return Integer.parseInt(val);
         } catch (NumberFormatException e) {
-            return defaultValue;
+            String name = param.getParamName() != null ? param.getParamName() : key;
+            throw new BusinessException(MessageFormat.format(
+                    I18nUtil.getMessage("ui.dj.engine.paramNotConfigured"), name, key));
         }
     }
 
     /**
-     * 获取参数小数类型值
+     * 获取参数小数类型值，参数未正确配置时抛异常
      */
-    private BigDecimal getParamAsDecimal(Map<String, String> paramsMap, String key, BigDecimal defaultValue) {
-        if (paramsMap == null) {
-            return defaultValue;
-        }
-        String val = paramsMap.get(key);
+    private BigDecimal getParamAsDecimal(Map<String, DjParams> paramsMap, String key) {
+        DjParams param = (paramsMap != null) ? paramsMap.get(key) : null;
+        String val = this.resolveParamValue(param);
         if (val == null) {
-            return defaultValue;
+            String name = (param != null && param.getParamName() != null) ? param.getParamName() : key;
+            throw new BusinessException(MessageFormat.format(
+                    I18nUtil.getMessage("ui.dj.engine.paramNotConfigured"), name, key));
         }
         try {
             return new BigDecimal(val);
         } catch (NumberFormatException e) {
-            return defaultValue;
+            String name = param.getParamName() != null ? param.getParamName() : key;
+            throw new BusinessException(MessageFormat.format(
+                    I18nUtil.getMessage("ui.dj.engine.paramNotConfigured"), name, key));
         }
     }
 
     /**
      * 获取参数小数类型值（通过 context）
      */
-    private BigDecimal getParamAsDecimal(DjScheduleContext context, String key, BigDecimal defaultValue) {
-        return this.getParamAsDecimal(context.getParamsMap(), key, defaultValue);
+    private BigDecimal getParamAsDecimal(DjScheduleContext context, String key) {
+        return this.getParamAsDecimal(context.getParamsMap(), key);
     }
 }
