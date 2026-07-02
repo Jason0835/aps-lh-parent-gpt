@@ -2,6 +2,7 @@ package com.zlt.aps.tm.api.domain.entity;
 
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.ruoyi.common.core.annotation.Excel;
 import com.ruoyi.common.core.web.domain.BaseEntity;
 import com.zlt.aps.common.core.annotation.ImportValidated;
@@ -18,7 +19,7 @@ public class TmMachineMaintenance extends BaseEntity {
 
     private static final long serialVersionUID = 1L;
 
-    @Excel(name = "ui.data.column.tm.machineMaintenance.factoryCode")
+    @Excel(name = "ui.data.column.tm.machineMaintenance.factoryCode", dictType = "biz_factory_name")
     @ImportValidated(required = true, isCode = true, maxLength = 50)
     @ApiModelProperty(value = "工厂编号", name = "factoryCode")
     @TableField(value = "FACTORY_CODE")
@@ -30,12 +31,14 @@ public class TmMachineMaintenance extends BaseEntity {
     @TableField(value = "MACHINE_CODE")
     private String machineCode;
 
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @Excel(name = "ui.data.column.tm.machineMaintenance.stopStartTime", width = 30, dateFormat = "yyyy-MM-dd HH:mm:ss")
     @ImportValidated(required = true, date = true)
     @ApiModelProperty(value = "停机开始时间", name = "stopStartTime")
     @TableField(value = "STOP_START_TIME")
     private Date stopStartTime;
 
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @Excel(name = "ui.data.column.tm.machineMaintenance.stopEndTime", width = 30, dateFormat = "yyyy-MM-dd HH:mm:ss")
     @ImportValidated(required = true, date = true)
     @ApiModelProperty(value = "停机结束时间", name = "stopEndTime")

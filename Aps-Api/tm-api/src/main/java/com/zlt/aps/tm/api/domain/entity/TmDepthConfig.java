@@ -29,7 +29,7 @@ public class TmDepthConfig extends BaseEntity implements Serializable {
     /**
      * 工厂编码
      */
-    @Excel(name = "ui.tm.depthConfig.column.factoryCode")
+    @Excel(name = "ui.tm.depthConfig.column.factoryCode", dictType = "biz_factory_name")
     @ApiModelProperty(value = "工厂编码")
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;
