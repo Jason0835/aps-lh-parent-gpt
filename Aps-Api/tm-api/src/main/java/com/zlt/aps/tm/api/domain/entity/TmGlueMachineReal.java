@@ -40,7 +40,7 @@ public class TmGlueMachineReal extends BaseEntity {
     @TableField(value = "MACHINE_CODE")
     private String machineCode;
 
-    @Excel(name = "ui.data.column.tm.glueMachineReal.shiftCode")
+    @Excel(name = "ui.data.column.tm.glueMachineReal.shiftCode", dictType = "class_num_three_plan")
     @ImportValidated(maxLength = 10)
     @ApiModelProperty(value = "机台班次编码", name = "shiftCode")
     @TableField(value = "SHIFT_CODE")
