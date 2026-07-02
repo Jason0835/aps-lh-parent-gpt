@@ -139,6 +139,16 @@ public class MdmBomInfo extends BaseEntity {
     @TableField(value = "BOM_TYPE")
     private String bomType;
 
+    /** 子物料类型 */
+    @ApiModelProperty(value = "子物料类型", name = "childMaterialType")
+    @TableField(value = "CHILD_MATERIAL_TYPE")
+    private String childMaterialType;
+
+    /** 父物料类型 */
+    @ApiModelProperty(value = "父物料类型", name = "parentMaterialType")
+    @TableField(value = "PARENT_MATERIAL_TYPE")
+    private String parentMaterialType;
+
     /** 状态(1正常3废止) */
     @Excel(name = "ui.data.column.mdmBomInfo.status", dictType = "BOM_STATUS")
     @ApiModelProperty(value = "状态(1正常3废止)", name = "status")
