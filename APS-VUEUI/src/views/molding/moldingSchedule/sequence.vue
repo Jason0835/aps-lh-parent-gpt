@@ -12,7 +12,7 @@
       @refresh="getList"
       @search="handleSearch"
       @reset="handleReset"
-      @page-change="handlePageChange"
+      @pageChange="handlePageChange"
       @sort-change="handleSortChange"
       :showSummary="false"
       :selectArea="false"
@@ -28,6 +28,11 @@
         > -->
         <el-button v-if="hasDirtyData" type="primary" @click="handleSubmit"
           >{{ $t("ui.frame.btn.submit") }}</el-button
+        >
+        <el-button
+          v-hasPermi="['cx:productConstruction:export']"
+          @click="handleExport"
+          >{{ $t("ui.frame.btn.export") }}</el-button
         >
       </template>
     </page-table>
@@ -47,6 +52,7 @@ import {
 } from "@/api/cx/cxScheduleDetail";
 import { listStructureName } from "@/api/mdm/mdmStructureName";
 import { getScheduleDate } from "@/api/lh/scheduleResult";
+import { downloadLink } from "@/utils/request";
 import editDialog from "./components/editDialog.vue";
 
 const SHIFT_COUNT = 8;
@@ -91,6 +97,24 @@ export default {
       const end = start + this.page.pageSize;
       return this.data.slice(start, end);
     },
+    // 当前页内每个分组（成型机台+胎胚描述）对应的交替背景色索引
+    // 颜色足够区分相邻分组即可，使用浅色系不影响阅读
+    groupColorMap() {
+      // 相邻分组交替两种浅色
+      const colors = ["#F5F7FA", "#FFF7E6"];
+      const map = new Map();
+      let colorIndex = 0;
+      let lastKey = null;
+      for (let i = 0; i < this.pagedData.length; i++) {
+        const key = this.getGroupKey(this.pagedData[i]);
+        if (key !== lastKey) {
+          colorIndex = colorIndex === 0 ? 1 : 0;
+          lastKey = key;
+        }
+        map.set(i, colors[colorIndex]);
+      }
+      return map;
+    },
     columns() {
       const fixedColumns = [
         {
@@ -101,8 +125,6 @@ export default {
         },
         { label: this.$t("ui.data.column.cxScheduleResult.cxMachineCode"), prop: "cxMachineCode", align: "center" },
         { label: this.$t("ui.data.column.cxScheduleResult.lhMachineCode"), prop: "lhMachineCode", align: "center", minWidth: 180, },
-        { label: this.$t("ui.data.column.scheduleResult.materialCode"), prop: "materialCode", minWidth: 130, align: "center" },
-        { label: this.$t("ui.data.column.scheduleResult.materialDesc"), prop: "materialDesc", minWidth: 300 },
         { label: this.$t("ui.data.column.scheduleResult.embryoDesc"), prop: "mainMaterialDesc", minWidth: 320 },
         {
           label: this.$t("ui.data.column.cxScheduleResult.tripNo"),
@@ -365,16 +387,30 @@ export default {
       this.$modal.msgSuccess(res.msg || this.$t("common.msg.success.operate"));
       this.getList();
     },
+    handleExport() {
+      downloadLink("/cx/cxScheduleDetail/export", this.formatParams(false));
+    },
     rowStyle({ row }) {
       if (row.markCloseOutTip == "0") return { "background-color": "#FFFFBF" };
       if (row.dataSource == "1") return { "background-color": "#BFE0F7" };
       return {};
     },
-    cellStyle({ row, column }) {
+    cellStyle({ row, column, rowIndex }) {
       if (column.property === "cxMachineCode" && row.changeCxMachine == 1) {
         return { background: "#ef6776" };
       }
+      // 成型机台与胎胚描述列按分组（成型机台+胎胚描述）显示交替背景色，用于直观区分组
+      if (column.property === "cxMachineCode" || column.property === "mainMaterialDesc") {
+        const bg = this.groupColorMap.get(rowIndex);
+        if (bg) {
+          return { background: bg };
+        }
+      }
       return {};
+    },
+    // 分组键：成型机台+胎胚描述
+    getGroupKey(row) {
+      return `${row.cxMachineCode || ""}_${row.mainMaterialDesc || ""}`;
     },
     formatParams(hasPage = false) {
       const params = {
@@ -407,6 +443,39 @@ export default {
           ? res
           : res?.rows || res?.data?.rows || res?.data || [];
         this.data = Array.isArray(rows) ? rows : [];
+        // 数据回填：后端返回数据中只有"主行"有 cxMachineCode/mainMaterialDesc，同组明细行这两个字段为空
+        // 按原始顺序遍历，把上一组有值的成型机台和胎胚描述回填到本组所有空行
+        let lastMachineCode = null;
+        let lastMaterialDesc = null;
+        for (let i = 0; i < this.data.length; i++) {
+          const row = this.data[i];
+          const currentMachine = row.cxMachineCode && row.cxMachineCode.trim() ? row.cxMachineCode.trim() : null;
+          const currentMaterial = row.mainMaterialDesc && row.mainMaterialDesc.trim() ? row.mainMaterialDesc.trim() : null;
+          if (currentMachine) {
+            lastMachineCode = currentMachine;
+          } else if (lastMachineCode) {
+            row.cxMachineCode = lastMachineCode;
+          }
+          if (currentMaterial) {
+            lastMaterialDesc = currentMaterial;
+          } else if (lastMaterialDesc) {
+            row.mainMaterialDesc = lastMaterialDesc;
+          }
+        }
+        // 默认按成型机台+胎胚描述分组排序，同组内按车次号排序，确保分组相邻展示；
+        // 若用户点击列排序，则使用后端返回的顺序
+        if (!this.sort || !this.sort.orderByColumn) {
+          this.data.sort((a, b) => {
+            const keyA = this.getGroupKey(a);
+            const keyB = this.getGroupKey(b);
+            if (keyA !== keyB) {
+              return keyA < keyB ? -1 : 1;
+            }
+            const tripA = Number(a.tripNo) || 0;
+            const tripB = Number(b.tripNo) || 0;
+            return tripA - tripB;
+          });
+        }
         this.page.total = this.data.length;
         this.originEditMap = {};
         this.data.forEach((row) => {

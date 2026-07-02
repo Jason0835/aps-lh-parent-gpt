@@ -21,6 +21,8 @@ public class Cd90MachineTrial {
     private String lossRateLevel;
     /** 实际排产量。 */
     private BigDecimal actualQuantity;
+    /** 单车按胎体长度方向卷取后，对应的直裁排程米数。 */
+    private BigDecimal vehiclePlanQuantity;
     /** 工装可排量。 */
     private BigDecimal toolingQuantity;
     /** 机台产能可排量。 */
@@ -35,6 +37,8 @@ public class Cd90MachineTrial {
     private int priorityOrder;
     /** 机台链尾是否与当前帘线规格相同。 */
     private boolean sameTailSpec;
+    /** 是否为当前规格的历史/续作原机台；只要该机台仍可排，就优先保持原机台生产。 */
+    private boolean historyMachine;
     /** 本次规格切换耗时秒数。 */
     private int changeSeconds;
     /** 本次任务按试算量生产耗时秒数。 */

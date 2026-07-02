@@ -92,4 +92,13 @@ public class ScheduleDetailController {
     public AjaxResult updatePlanQty(@RequestBody List<ScheduleUpdateDetailPlanQtyVo> voList) {
         return cxScheduleDetailService.batchUpdatePlanQty(voList);
     }
+
+    /**
+     * 导出成型顺位数据
+     */
+    @ApiOperation("导出成型顺位数据")
+    @PostMapping("/export")
+    public byte[] exportDetail(@RequestBody ScheduleDetailQueryVo query) {
+        return cxScheduleDetailService.exportDetail(query);
+    }
 }

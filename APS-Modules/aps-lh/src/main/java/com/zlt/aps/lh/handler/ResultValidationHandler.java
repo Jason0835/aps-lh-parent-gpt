@@ -18,6 +18,7 @@ import com.zlt.aps.lh.api.enums.ScheduleStepEnum;
 import com.zlt.aps.lh.api.enums.ShiftEnum;
 import com.zlt.aps.lh.component.IncrSerialGenerator;
 import com.zlt.aps.lh.component.MonthPlanDateResolver;
+import com.zlt.aps.lh.component.TargetScheduleQtyResolver;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.observer.ScheduleEvent;
 import com.zlt.aps.lh.engine.observer.ScheduleEventPublisher;
@@ -27,7 +28,6 @@ import com.zlt.aps.lh.exception.ScheduleException;
 import com.zlt.aps.lh.service.impl.SchedulePersistenceService;
 import com.zlt.aps.lh.util.LeftRightMouldUtil;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
-import com.zlt.aps.lh.util.MonthPlanDayQtyUtil;
 import com.zlt.aps.lh.util.ShiftCapacityResolverUtil;
 import com.zlt.aps.lh.util.ShiftFieldUtil;
 import com.ruoyi.common.i18n.utils.I18nUtil;
@@ -83,6 +83,9 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
 
     @Resource
     private SchedulePersistenceService schedulePersistenceService;
+
+    @Resource
+    private TargetScheduleQtyResolver targetScheduleQtyResolver;
 
     private static final AtomicInteger ORDER_SEQ = new AtomicInteger(0);
     private static final AtomicInteger CHG_SEQ = new AtomicInteger(0);
@@ -223,6 +226,13 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
         if (mouldQty <= 1) {
             return;
         }
+        if (getTargetScheduleQtyResolver().isEmbryoStockEnding(context, result)) {
+            log.info("成型胎胚库存收尾结果跳过模台数保存前收敛, batchNo: {}, materialCode: {}, embryoCode: {}, "
+                            + "machineCode: {}, mouldQty: {}",
+                    context.getBatchNo(), result.getMaterialCode(), result.getEmbryoCode(),
+                    result.getLhMachineCode(), mouldQty);
+            return;
+        }
         boolean adjusted = false;
         for (int shiftIndex = 1; shiftIndex <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT; shiftIndex++) {
             Integer planQty = ShiftFieldUtil.getShiftPlanQty(result, shiftIndex);
@@ -245,6 +255,15 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
         if (adjusted) {
             ShiftFieldUtil.syncDailyPlanQty(result);
         }
+    }
+
+    /**
+     * 获取目标量解析器。
+     *
+     * @return 目标量解析器
+     */
+    private TargetScheduleQtyResolver getTargetScheduleQtyResolver() {
+        return Objects.nonNull(targetScheduleQtyResolver) ? targetScheduleQtyResolver : new TargetScheduleQtyResolver();
     }
 
     /**
@@ -1073,13 +1092,19 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
             return;
         }
 
-        // 按 materialCode + productionDate 汇总实际排产量
+        // 按 materialCode + productStatus + productionDate 汇总实际排产量
         Map<String, Map<LocalDate, Integer>> materialDayScheduledMap = new LinkedHashMap<>();
+        Map<String, String> materialCodeByKeyMap = new LinkedHashMap<>();
+        Map<String, String> productStatusByKeyMap = new LinkedHashMap<>();
         for (LhScheduleResult result : context.getScheduleResultList()) {
             if (result == null || StringUtils.isEmpty(result.getMaterialCode())) {
                 continue;
             }
             String materialCode = result.getMaterialCode();
+            String productStatus = result.getProductStatus();
+            String materialStatusKey = MonthPlanDateResolver.buildMaterialStatusKey(materialCode, productStatus);
+            materialCodeByKeyMap.putIfAbsent(materialStatusKey, materialCode);
+            productStatusByKeyMap.putIfAbsent(materialStatusKey, productStatus);
             for (LhShiftConfigVO shift : shifts) {
                 Integer planQty = ShiftFieldUtil.getShiftPlanQty(result, shift.getShiftIndex());
                 if (planQty == null || planQty <= 0) {
@@ -1092,7 +1117,7 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
                 LocalDate productionDate = workDate.toInstant()
                         .atZone(ZoneId.systemDefault()).toLocalDate();
                 materialDayScheduledMap
-                        .computeIfAbsent(materialCode, k -> new LinkedHashMap<>())
+                        .computeIfAbsent(materialStatusKey, k -> new LinkedHashMap<>())
                         .merge(productionDate, planQty, Integer::sum);
             }
         }
@@ -1105,20 +1130,23 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
         int totalShortageCount = 0;
         int totalShiftFillOverQty = 0;
         for (Map.Entry<String, Map<LocalDate, Integer>> materialEntry : materialDayScheduledMap.entrySet()) {
-            String materialCode = materialEntry.getKey();
+            String materialStatusKey = materialEntry.getKey();
+            String materialCode = materialCodeByKeyMap.get(materialStatusKey);
+            String productStatus = productStatusByKeyMap.get(materialStatusKey);
             for (Map.Entry<LocalDate, Integer> dayEntry : materialEntry.getValue().entrySet()) {
                 LocalDate productionDate = dayEntry.getKey();
                 int actualQty = dayEntry.getValue();
-                int dayPlanQty = MonthPlanDateResolver.resolveDayQty(context, materialCode, productionDate);
+                int dayPlanQty = MonthPlanDateResolver.resolveDayQty(
+                        context, materialCode, productStatus, productionDate);
                 int diffQty = actualQty - dayPlanQty;
                 if (diffQty > 0) {
                     totalOverPlanCount++;
-                    log.warn("日计划超排, 物料: {}, 日期: {}, 日计划量: {}, 实际排产: {}, 超出: {}",
-                            materialCode, productionDate, dayPlanQty, actualQty, diffQty);
+                    log.warn("日计划超排, 物料: {}, 产品状态: {}, 日期: {}, 日计划量: {}, 实际排产: {}, 超出: {}",
+                            materialCode, productStatus, productionDate, dayPlanQty, actualQty, diffQty);
                 } else if (diffQty < 0) {
                     totalShortageCount++;
-                    log.info("日计划欠产, 物料: {}, 日期: {}, 日计划量: {}, 实际排产: {}, 欠产: {}",
-                            materialCode, productionDate, dayPlanQty, actualQty, -diffQty);
+                    log.info("日计划欠产, 物料: {}, 产品状态: {}, 日期: {}, 日计划量: {}, 实际排产: {}, 欠产: {}",
+                            materialCode, productStatus, productionDate, dayPlanQty, actualQty, -diffQty);
                 }
             }
         }

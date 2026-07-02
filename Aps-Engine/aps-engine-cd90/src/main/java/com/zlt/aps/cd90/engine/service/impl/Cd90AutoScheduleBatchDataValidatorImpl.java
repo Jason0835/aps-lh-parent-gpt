@@ -137,7 +137,7 @@ public class Cd90AutoScheduleBatchDataValidatorImpl implements Cd90AutoScheduleB
      * 批次级检查：施工信息完整性。
      * 1. 收集成型计划中 (EMBRYO_CODE, CLASSn_RECIPE_NO) 配对；班次计划量为空或≤0时跳过该班次；
      * 2. 按 CONSTRUCTION_CODE + CONSTRUCTION_VERSION 查施工表，缺失则报错；
-     * 3. 对每条施工记录校验 CORD_SPEC、CORD_WIDTH 及三层帘布层位字段。
+     * 3. 对每条施工记录校验 CORD_SPEC 及三层帘布层位字段。
      * 返回施工中出现过的帘布代号集合，供卷曲长度检查使用。
      */
     private Set<String> checkConstructionInfo(Cd90BatchDataCheckResult.Builder builder,
@@ -225,12 +225,6 @@ public class Cd90AutoScheduleBatchDataValidatorImpl implements Cd90AutoScheduleB
             builder.addError("施工信息", "DATA_MISSING",
                     prefix + "大卷代码(CORD_SPEC)缺失",
                     "请在施工信息页面维护大卷代码");
-        }
-        // CORD_WIDTH 大卷幅宽（直裁长度）
-        if (!isPositive(construction.getCordWidth())) {
-            builder.addError("施工信息", "DATA_MISSING",
-                    prefix + "大卷幅宽(CORD_WIDTH)缺失或非正",
-                    "请在施工信息页面维护大卷幅宽且大于0");
         }
         // 三层帘布层位
         for (int layer = 1; layer <= CONSTRUCTION_LAYERS; layer++) {

@@ -944,6 +944,17 @@ public class ScheduleServiceImpl implements ScheduleService {
             }
         }
 
+        // 加载子表车次合并数（默认1车一条）
+        CxParamConfig tripGroupSizeConfig = paramConfigMap.get("SYS04080006");
+        if (tripGroupSizeConfig != null && tripGroupSizeConfig.getParamValue() != null) {
+            try {
+                context.setDetailTripGroupSize(Integer.parseInt(tripGroupSizeConfig.getParamValue()));
+                log.info("子表车次合并数：{}车/条", tripGroupSizeConfig.getParamValue());
+            } catch (NumberFormatException e) {
+                log.warn("解析子表车次合并数配置失败: {}", tripGroupSizeConfig.getParamValue());
+            }
+        }
+
         // 加载单日试制/量试SKU上限（优先从T_MP_FACTORY_PARAM取）
         String trialSkuLimit = loadFactoryParamValue(factoryParamMapper, context.getFactoryCode(), "TBR", "SYS0206003");
         if (trialSkuLimit != null) {

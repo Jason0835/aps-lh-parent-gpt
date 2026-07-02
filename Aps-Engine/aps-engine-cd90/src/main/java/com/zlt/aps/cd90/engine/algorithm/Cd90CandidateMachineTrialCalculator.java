@@ -46,10 +46,11 @@ public class Cd90CandidateMachineTrialCalculator {
         // 计算含损耗的实际排产量：在净需求基础上上浮损耗量，同时受起排量门槛和均分阈值约束
         BigDecimal actualQuantity = quantityCalculator.calculateActualQuantity(
                 input.getNetDemandQuantity(), input.isCloseOut(), lossRate.getLossRatePercent(),
-                input.getMinimumStartQuantity(), input.getCoilMeter(), input.getEqualShareThreshold());
+                input.getMinimumStartQuantity(), input.getVehiclePlanQuantity(), input.getEqualShareThreshold());
         // 工装试算：根据实际排产量和工装总数（卷轴）计算每台机可同时上机数量
         Cd90ToolingTrial tooling = toolingCalculator.calculate(
-                actualQuantity, input.getTotalToolingCount(), input.getOccupiedVehicleCount(), input.getCoilMeter());
+                actualQuantity, input.getTotalToolingCount(), input.getOccupiedVehicleCount(),
+                input.getVehiclePlanQuantity());
         // 大卷静置时效分配：按大卷释放时间排序，判断是否满足本班次用量，返回延迟秒数或失败
         Cd90BigRollAgingAllocation agingAllocation = agingAllocation(input, actualQuantity);
         // 大卷时效分配失败（如时效期不足），产能直接置零，标记为大卷时效限制
@@ -59,11 +60,13 @@ public class Cd90CandidateMachineTrialCalculator {
                     .lossRatePercent(lossRate.getLossRatePercent())
                     .lossRateLevel(lossRate.getMatchedLevel())
                     .actualQuantity(actualQuantity)
+                    .vehiclePlanQuantity(input.getVehiclePlanQuantity())
                     .toolingQuantity(tooling.getSchedulableQuantity())
                     .capacityQuantity(BigDecimal.ZERO)
                     .finalSchedulableQuantity(BigDecimal.ZERO)
                     .fullyAccommodated(false)
                     .preferredMachine(input.isPreferredMachine())
+                    .historyMachine(input.isHistoryMachine())
                     .priorityOrder(input.getPriorityOrder())
                     .remainingSeconds(input.getRemainingSeconds())
                     .taskStartTime(input.getOriginalStartTime())
@@ -103,6 +106,7 @@ public class Cd90CandidateMachineTrialCalculator {
                 .lossRatePercent(lossRate.getLossRatePercent())
                 .lossRateLevel(lossRate.getMatchedLevel())
                 .actualQuantity(actualQuantity)
+                .vehiclePlanQuantity(input.getVehiclePlanQuantity())
                 .toolingQuantity(tooling.getSchedulableQuantity())
                 .capacityQuantity(capacity.getCapacityQuantity())
                 .finalSchedulableQuantity(finalQuantity)
@@ -117,7 +121,8 @@ public class Cd90CandidateMachineTrialCalculator {
                                     && input.getPreviousTail().getClothCode() != null
                                     && input.getPreviousTail().getClothCode()
                                             .equals(input.getCurrentTail().getClothCode()))
-                    .remainingSeconds(capacity.getRemainingSeconds())
+                .historyMachine(input.isHistoryMachine())
+                .remainingSeconds(capacity.getRemainingSeconds())
                     .taskStartTime(agingAllocation == null ? input.getOriginalStartTime()
                             : agingAllocation.getTaskStartTime())
                 .agingDelaySeconds(agingDelaySeconds)

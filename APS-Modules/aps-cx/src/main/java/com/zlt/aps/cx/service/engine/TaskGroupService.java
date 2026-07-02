@@ -1228,6 +1228,57 @@ public class TaskGroupService {
                             continue;
                         }
 
+                        // 检查：成型余量是否已耗尽（多任务共享同一物料余量）
+                        Integer dtFormingRemainder = getFormingRemainder(dtMaterialCode, context);
+                        int dtUsedRemainder = materialUsedFormingRemainder.getOrDefault(dtMaterialCode, 0);
+                        int dtRemainingForming = dtFormingRemainder != null
+                                ? (dtFormingRemainder - dtUsedRemainder) : Integer.MAX_VALUE;
+                        if (dtRemainingForming <= 0) {
+                            log.info("  [R2-成型余量耗尽] 胎胚={}, 物料={}, 已用{}/总量{}, 收尾移出",
+                                    dtEmbryoCode, dtMaterialCode, dtUsedRemainder, dtFormingRemainder);
+                            if (minTask.getPlannedProduction() != null && minTask.getPlannedProduction() > 0
+                                    && !isTaskAlreadyInResult(minTask, result)
+                                    && !r2AddedToResultGlobal.contains(minTask)) {
+                                minTask.setEndingExtraInventory(minTask.getPlannedProduction());
+                                // 刷新endingSurplusQty为当前剩余成型余量，使handleEndingRemainder能正确判断isLastDay
+                                minTask.setEndingSurplusQty(Math.max(0, dtRemainingForming));
+                                handleEndingRemainder(minTask, context);
+                                if (dtEmbryoCode != null && minTask.getEndingExtraInventory() != null
+                                        && minTask.getEndingExtraInventory() > 0) {
+                                    int endingDiff = minTask.getEndingExtraInventory() - minTask.getPlannedProduction();
+                                    if (endingDiff != 0) {
+                                        shiftFormingOutputMap.merge(dtEmbryoCode, endingDiff, Integer::sum);
+                                        runningTotalProjectedStock += endingDiff;
+                                    }
+                                }
+                                // 成型余量已耗尽，强制标记最后一批并回溯同物料其他任务
+                                minTask.setIsLastEndingBatch(true);
+                                log.info("  [R2-成型余量耗尽] 胎胚={} 强制标记 isLastEndingBatch=true", dtEmbryoCode);
+                                List<CoreScheduleAlgorithmService.DailyEmbryoTask> allTasksForMaterial = materialTasksMap.get(dtMaterialCode);
+                                if (allTasksForMaterial != null) {
+                                    for (CoreScheduleAlgorithmService.DailyEmbryoTask prevTask : allTasksForMaterial) {
+                                        if (prevTask != minTask && !Boolean.TRUE.equals(prevTask.getIsLastEndingBatch())) {
+                                            prevTask.setIsLastEndingBatch(true);
+                                            log.info("  [R2-回溯] 物料={}, 胎胚={} isLastEndingBatch→true",
+                                                    dtMaterialCode, prevTask.getEmbryoCode());
+                                        }
+                                    }
+                                }
+                                boolean dtIsC = Boolean.TRUE.equals(minTask.getIsContinueTask());
+                                boolean dtIsT = Boolean.TRUE.equals(minTask.getIsTrialTask());
+                                if (dtIsC) result.getContinueTasks().add(minTask);
+                                else if (dtIsT) result.getTrialTasks().add(minTask);
+                                else result.getNewTasks().add(minTask);
+                                r2AddedToResultGlobal.add(minTask);
+                            }
+                            structTasks.remove(minTask);
+                            continue;
+                        }
+                        // 限制分配量不超过剩余成型余量
+                        if (dtRemainingForming < fallbackProduction) {
+                            fallbackProduction = dtRemainingForming;
+                        }
+
                         // 检查：立库库容（维度一 — 空间）
                         boolean spaceSkip = false;
                         String spaceSkipReason = "";
@@ -1246,6 +1297,8 @@ public class TaskGroupService {
                                     && !isTaskAlreadyInResult(minTask, result)
                                     && !r2AddedToResultGlobal.contains(minTask)) {
                                 minTask.setEndingExtraInventory(minTask.getPlannedProduction());
+                                // 刷新endingSurplusQty为当前剩余成型余量，使handleEndingRemainder能正确判断isLastDay
+                                minTask.setEndingSurplusQty(Math.max(0, dtRemainingForming));
                                 handleEndingRemainder(minTask, context);
                                 if (dtEmbryoCode != null && minTask.getEndingExtraInventory() != null
                                         && minTask.getEndingExtraInventory() > 0) {
@@ -1393,6 +1446,12 @@ public class TaskGroupService {
                         // 剩余需求耗尽：收尾处理 + 加入结果列表
                         if (newRemaining <= 0) {
                             minTask.setEndingExtraInventory(minTask.getPlannedProduction());
+                            // 刷新endingSurplusQty为当前剩余成型余量，使handleEndingRemainder能正确判断isLastDay
+                            Integer r2EndFormingRemainder = getFormingRemainder(dtMaterialCode, context);
+                            int r2EndUsedRemainder = materialUsedFormingRemainder.getOrDefault(dtMaterialCode, 0);
+                            int r2EndRemainingForming = r2EndFormingRemainder != null
+                                    ? Math.max(0, r2EndFormingRemainder - r2EndUsedRemainder) : 0;
+                            minTask.setEndingSurplusQty(r2EndRemainingForming);
                             handleEndingRemainder(minTask, context);
 
                             if (dtEmbryoCode != null && minTask.getEndingExtraInventory() != null
@@ -1653,6 +1712,57 @@ public class TaskGroupService {
                             continue;
                         }
 
+                        // 检查：成型余量是否已耗尽（多任务共享同一物料余量）
+                        Integer dtFormingRemainder = getFormingRemainder(dtMaterialCode, context);
+                        int dtUsedRemainder = materialUsedFormingRemainder.getOrDefault(dtMaterialCode, 0);
+                        int dtRemainingForming = dtFormingRemainder != null
+                                ? (dtFormingRemainder - dtUsedRemainder) : Integer.MAX_VALUE;
+                        if (dtRemainingForming <= 0) {
+                            log.info("  [R3-成型余量耗尽] 胎胚={}, 物料={}, 已用{}/总量{}, 收尾移出",
+                                    dtEmbryoCode, dtMaterialCode, dtUsedRemainder, dtFormingRemainder);
+                            if (minTask.getPlannedProduction() != null && minTask.getPlannedProduction() > 0
+                                    && !isTaskAlreadyInResult(minTask, result)
+                                    && !r3AddedToResultGlobal.contains(minTask) && !r2AddedToResultGlobal.contains(minTask)) {
+                                minTask.setEndingExtraInventory(minTask.getPlannedProduction());
+                                // 刷新endingSurplusQty为当前剩余成型余量，使handleEndingRemainder能正确判断isLastDay
+                                minTask.setEndingSurplusQty(Math.max(0, dtRemainingForming));
+                                handleEndingRemainder(minTask, context);
+                                if (dtEmbryoCode != null && minTask.getEndingExtraInventory() != null
+                                        && minTask.getEndingExtraInventory() > 0) {
+                                    int endingDiff = minTask.getEndingExtraInventory() - minTask.getPlannedProduction();
+                                    if (endingDiff != 0) {
+                                        shiftFormingOutputMap.merge(dtEmbryoCode, endingDiff, Integer::sum);
+                                        runningTotalProjectedStock += endingDiff;
+                                    }
+                                }
+                                // 成型余量已耗尽，强制标记最后一批并回溯同物料其他任务
+                                minTask.setIsLastEndingBatch(true);
+                                log.info("  [R3-成型余量耗尽] 胎胚={} 强制标记 isLastEndingBatch=true", dtEmbryoCode);
+                                List<CoreScheduleAlgorithmService.DailyEmbryoTask> allTasksForMaterial = materialTasksMap.get(dtMaterialCode);
+                                if (allTasksForMaterial != null) {
+                                    for (CoreScheduleAlgorithmService.DailyEmbryoTask prevTask : allTasksForMaterial) {
+                                        if (prevTask != minTask && !Boolean.TRUE.equals(prevTask.getIsLastEndingBatch())) {
+                                            prevTask.setIsLastEndingBatch(true);
+                                            log.info("  [R3-回溯] 物料={}, 胎胚={} isLastEndingBatch→true",
+                                                    dtMaterialCode, prevTask.getEmbryoCode());
+                                        }
+                                    }
+                                }
+                                boolean dtIsC = Boolean.TRUE.equals(minTask.getIsContinueTask());
+                                boolean dtIsT = Boolean.TRUE.equals(minTask.getIsTrialTask());
+                                if (dtIsC) result.getContinueTasks().add(minTask);
+                                else if (dtIsT) result.getTrialTasks().add(minTask);
+                                else result.getNewTasks().add(minTask);
+                                r3AddedToResultGlobal.add(minTask);
+                            }
+                            structTasks.remove(minTask);
+                            continue;
+                        }
+                        // 限制分配量不超过剩余成型余量
+                        if (dtRemainingForming < fallbackProduction) {
+                            fallbackProduction = dtRemainingForming;
+                        }
+
                         // 检查：立库库容（维度一 — 空间）— R3保留空间检查
                         boolean spaceSkip = false;
                         if (dtEmbryoCode != null && warehouseCapacity > 0
@@ -1737,6 +1847,12 @@ public class TaskGroupService {
                         // 剩余需求耗尽：收尾处理 + 加入结果列表
                         if (newRemaining <= 0) {
                             minTask.setEndingExtraInventory(minTask.getPlannedProduction());
+                            // 刷新endingSurplusQty为当前剩余成型余量，使handleEndingRemainder能正确判断isLastDay
+                            Integer r3EndFormingRemainder = getFormingRemainder(dtMaterialCode, context);
+                            int r3EndUsedRemainder = materialUsedFormingRemainder.getOrDefault(dtMaterialCode, 0);
+                            int r3EndRemainingForming = r3EndFormingRemainder != null
+                                    ? Math.max(0, r3EndFormingRemainder - r3EndUsedRemainder) : 0;
+                            minTask.setEndingSurplusQty(r3EndRemainingForming);
                             handleEndingRemainder(minTask, context);
 
                             if (dtEmbryoCode != null && minTask.getEndingExtraInventory() != null
@@ -3665,7 +3781,8 @@ public class TaskGroupService {
         }
         MonthPlanProductLhCapacityVo capacityVo = context.getMaterialLhCapacityMap().get(materialCode);
         if (capacityVo != null) {
-            return capacityVo.getDefaultDayVulcanizationQty();
+            // 按日硫化量计算模式（DAY_VULCANIZATION_MODE）取值，与计划量计算口径保持一致
+            return capacityVo.getDayVulcanizationQty();
         }
         return null;
     }

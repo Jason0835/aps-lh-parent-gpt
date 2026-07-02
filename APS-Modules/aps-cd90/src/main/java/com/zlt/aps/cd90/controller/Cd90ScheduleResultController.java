@@ -12,6 +12,7 @@ import com.zlt.aps.cd90.api.domain.entity.Cd90ScheduleResult;
 import com.zlt.aps.cd90.engine.domain.Cd90ScheduleTask;
 import com.zlt.aps.cd90.engine.service.Cd90ScheduleTaskService;
 import com.zlt.aps.cd90.mapper.Cd90ScheduleResultMapper;
+import com.zlt.aps.cd90.service.Cd90ScheduleResultPublishService;
 import com.zlt.aps.cd90.service.ICd90ScheduleResultService;
 import com.zlt.aps.cd90.service.Cd90ScheduleTaskRecoveryService;
 import com.zlt.aps.utils.AppUtils;
@@ -42,12 +43,22 @@ public class Cd90ScheduleResultController extends AbstractDocBizController<Cd90S
     private Cd90ScheduleTaskService cd90ScheduleTaskService;
     @Resource
     private Cd90ScheduleTaskRecoveryService cd90ScheduleTaskRecoveryService;
+    @Resource
+    private Cd90ScheduleResultPublishService cd90ScheduleResultPublishService;
 
     @ApiOperation("查询列表")
     @PostMapping("/list")
     @Override
     public TableDataInfo list(@RequestBody Cd90ScheduleResult queryVO) {
         return super.list(queryVO);
+    }
+
+    @Log(title = "ui.data.column.scheduleResult.modelName", businessType = BusinessType.PUBLISH)
+    @ApiOperation("发布排程")
+    @PostMapping("/publish")
+    public AjaxResult publish(@RequestBody Cd90ScheduleResult dto,
+                              @RequestParam(value = "ids", required = false) String ids) {
+        return cd90ScheduleResultPublishService.publish(dto, ids);
     }
 
     @Log(title = "ui.data.column.scheduleResult.modelName", businessType = BusinessType.DELETE)
@@ -174,6 +185,6 @@ public class Cd90ScheduleResultController extends AbstractDocBizController<Cd90S
 
     @Override
     protected String getOrderBy() {
-        return " MACHINE_CODE ASC,BIG_ROLL_CODE ASC,CLOTH_CODE ASC";
+        return " MACHINE_CODE ASC,BIG_ROLL_CODE ASC,CLASS1_PRODUCE_ORDER IS NULL ASC,CLASS1_PRODUCE_ORDER ASC";
     }
 }

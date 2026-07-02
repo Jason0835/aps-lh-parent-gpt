@@ -5,6 +5,7 @@ import com.zlt.aps.cx.entity.CxStock;
 import com.zlt.aps.lh.api.constant.LhScheduleConstant;
 import com.zlt.aps.lh.api.constant.LhScheduleParamConstant;
 import com.zlt.aps.lh.api.domain.entity.LhDayFinishQty;
+import com.zlt.aps.maindata.mapper.MpMouldDeliveryPlanEntityMapper;
 import com.zlt.aps.mdm.api.domain.entity.LhMachineInfo;
 import com.zlt.aps.lh.api.domain.entity.LhMachineOnlineInfo;
 import com.zlt.aps.lh.api.domain.entity.LhMouldChangePlan;
@@ -64,6 +65,7 @@ import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import com.zlt.aps.mp.api.domain.entity.MdmCapsuleChuck;
 import com.zlt.aps.mp.api.domain.entity.MpFactoryProductionVersion;
 import com.zlt.aps.mp.api.domain.entity.MpMonthPlanStatistics;
+import com.zlt.aps.mp.api.domain.entity.MpMouldDeliveryPlan;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
@@ -76,6 +78,7 @@ import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.stream.Collectors;
 import java.util.Collections;
 import java.util.Date;
@@ -91,6 +94,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.Executor;
 import java.util.function.IntSupplier;
+import java.util.stream.Collectors;
 
 /**
  * 硫化排程基础数据服务实现
@@ -143,6 +147,9 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
 
     @Resource
     private MdmSkuMouldRelMapper skuMouldRelMapper;
+
+    @Resource
+    private MpMouldDeliveryPlanEntityMapper mouldDeliveryPlanEntityMapper;
 
     @Resource
     private MdmModelInfoMapper mdmModelInfoMapper;
@@ -217,8 +224,10 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
         Date startDate = LhScheduleTimeUtil.clearTime(scheduleDate);
         int scheduleDays = LhScheduleTimeUtil.getScheduleDays(context);
         Date endDate = LhScheduleTimeUtil.addDays(startDate, scheduleDays);
-        Map<String, LocalDate> requiredMonthMap = resolveRequiredMonthMap(
-                startDate, LhScheduleTimeUtil.addDays(endDate, 1));
+        int earlyProductionDaysThreshold = resolveEarlyProductionDaysThreshold(context);
+        // SKU提前生产需要从窗口结束日继续向后观察N个自然日，月计划和结构机台数按真实年月批量加载。
+        Date earlyProductionLookupEndDate = LhScheduleTimeUtil.addDays(endDate, earlyProductionDaysThreshold);
+        Map<String, LocalDate> requiredMonthMap = resolveRequiredMonthMap(startDate, earlyProductionLookupEndDate);
         // 喷砂时间允许前移一天，工作日历与设备停机需覆盖 T-1；清洗计划仍按当前排程窗口加载。
         Date calendarControlStartDate = LhScheduleTimeUtil.addDays(startDate, -1);
 
@@ -253,7 +262,7 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
                 () -> sizeOf(context.getMonthPlanList()));
         CompletableFuture<Void> monthPlanStatisticsFuture = runDataInitTaskAsync("月计划结构机台统计",
                 () -> loadMonthPlanStatistics(context, factoryCode, requiredMonthMap, startDate,
-                        LhScheduleTimeUtil.addDays(endDate, 1)),
+                        earlyProductionLookupEndDate),
                 () -> sizeOf(context.getStructurePlanMachineCountMap()));
         CompletableFuture<Void> specialMaterialBomFuture = runAfterDataInitTask(monthPlanFuture, "特殊物料清单",
                 () -> loadSpecialMaterialBom(context, factoryCode),
@@ -500,15 +509,37 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
     }
 
     /**
+     * 解析SKU提前生产天数阈值。
+     *
+     * @param context 排程上下文
+     * @return 提前生产天数阈值，范围1～31
+     */
+    private int resolveEarlyProductionDaysThreshold(LhScheduleContext context) {
+        int threshold;
+        if (Objects.nonNull(context) && Objects.nonNull(context.getScheduleConfig())) {
+            threshold = context.getScheduleConfig().getEarlyProductionDaysThreshold();
+        } else if (Objects.nonNull(context)) {
+            threshold = context.getParamIntValue(LhScheduleParamConstant.EARLY_PRODUCTION_DAYS_THRESHOLD,
+                    LhScheduleConstant.DEFAULT_EARLY_PRODUCTION_DAYS_THRESHOLD);
+        } else {
+            threshold = LhScheduleConstant.DEFAULT_EARLY_PRODUCTION_DAYS_THRESHOLD;
+        }
+        if (threshold <= 0) {
+            return LhScheduleConstant.DEFAULT_EARLY_PRODUCTION_DAYS_THRESHOLD;
+        }
+        return Math.min(threshold, LhScheduleConstant.MAX_EARLY_PRODUCTION_DAYS_THRESHOLD);
+    }
+
+    /**
      * 解析本次排程需要访问的月计划月份集合。
-     * <p>范围覆盖 T～T+2 以及 T+3 后看日期，按自然月去重后用于批量加载月计划，避免策略层循环查库。</p>
+     * <p>范围覆盖排程窗口和SKU提前生产向后观察日期，按自然月去重后用于批量加载月计划，避免策略层循环查库。</p>
      *
      * @param startDate 开始日期，包含当天
      * @param endDateExclusive 结束日期，不含当天
      * @return key=year_month，value=该月月初
      */
     private Map<String, LocalDate> resolveRequiredMonthMap(Date startDate, Date endDateExclusive) {
-        Map<String, LocalDate> requiredMonthMap = new LinkedHashMap<String, LocalDate>(2);
+        Map<String, LocalDate> requiredMonthMap = new LinkedHashMap<String, LocalDate>(4);
         LocalDate startLocalDate = toLocalDate(startDate);
         LocalDate endExclusiveLocalDate = toLocalDate(endDateExclusive);
         if (Objects.isNull(startLocalDate) || Objects.isNull(endExclusiveLocalDate)
@@ -1018,9 +1049,11 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
             if (Objects.isNull(plan) || StringUtils.isEmpty(plan.getMaterialCode())) {
                 continue;
             }
-            FactoryMonthPlanProductionFinalResult selectedPlan = selectedPlanMap.get(plan.getMaterialCode());
+            String materialStatusKey = MonthPlanDateResolver.buildMaterialStatusKey(
+                    plan.getMaterialCode(), plan.getProductStatus());
+            FactoryMonthPlanProductionFinalResult selectedPlan = selectedPlanMap.get(materialStatusKey);
             if (Objects.isNull(selectedPlan) || shouldReplaceSchedulingPlan(context, selectedPlan, plan)) {
-                selectedPlanMap.put(plan.getMaterialCode(), plan);
+                selectedPlanMap.put(materialStatusKey, plan);
             }
         }
         return new ArrayList<FactoryMonthPlanProductionFinalResult>(selectedPlanMap.values());
@@ -1122,7 +1155,7 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
                 .map(FactoryMonthPlanProductionFinalResult::getEmbryoCode)
                 .filter(StringUtils::isNotEmpty)
                 .distinct()
-                .collect(java.util.stream.Collectors.toList());
+                .collect(Collectors.toList());
         Map<String, Integer> stockMap = new HashMap<>(Math.max(16, embryoCodeList.size()));
         if (CollectionUtils.isEmpty(embryoCodeList)) {
             context.setEmbryoRealtimeStockMap(stockMap);
@@ -1216,6 +1249,7 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
                 embryoSurplusMap.size(), mainProductCodes.size(), endingCount);
     }
 
+
     /**
      * 加载特殊物料清单，并按当前月计划范围构建分类Map。
      *
@@ -1274,7 +1308,7 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
                 .map(FactoryMonthPlanProductionFinalResult::getMaterialCode)
                 .map(this::normalizeText)
                 .filter(StringUtils::isNotEmpty)
-                .collect(java.util.stream.Collectors.toSet());
+                .collect(Collectors.toSet());
     }
 
     /**
@@ -1288,7 +1322,7 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
                 .map(FactoryMonthPlanProductionFinalResult::getStructureName)
                 .map(this::normalizeText)
                 .filter(StringUtils::isNotEmpty)
-                .collect(java.util.stream.Collectors.toSet());
+                .collect(Collectors.toSet());
     }
 
     /**
@@ -1419,11 +1453,38 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
                         .in(MdmSkuMouldRel::getMaterialCode, materialCodeSet)
                         .eq(MdmSkuMouldRel::getIsDelete, DeleteFlagEnum.NORMAL.getCode()));
         Map<String, List<MdmSkuMouldRel>> skuMouldRelMap = new HashMap<>(64);
+        Set<String> mouldCodeSet = new HashSet<>(64);
         if (skuMouldRelList != null) {
             for (MdmSkuMouldRel rel : skuMouldRelList) {
                 if (rel.getMaterialCode() != null && materialCodeSet.contains(rel.getMaterialCode())) {
                     skuMouldRelMap.computeIfAbsent(rel.getMaterialCode(), k -> new ArrayList<MdmSkuMouldRel>())
                             .add(rel);
+                    mouldCodeSet.add(rel.getMouldCode());
+                }
+            }
+        }
+
+        //加载模具到货计划 到 SKU与模具关系表 sandy+20260701
+        List<MpMouldDeliveryPlan> mouldDeliveryPlanList = mouldDeliveryPlanEntityMapper.selectList(
+                new LambdaQueryWrapper<MpMouldDeliveryPlan>()
+                        .eq(MpMouldDeliveryPlan::getFactoryCode, factoryCode)
+                        .le(MpMouldDeliveryPlan::getBoardingDate, context.getWindowEndDate())
+                        .in(MpMouldDeliveryPlan::getMaterialCode, materialCodeSet)
+                        .eq(MpMouldDeliveryPlan::getIsDelete, DeleteFlagEnum.NORMAL.getCode()));
+        if (mouldDeliveryPlanList != null) {
+            MdmSkuMouldRel skuMouldRel1;
+            for (MpMouldDeliveryPlan mouldDelivery : mouldDeliveryPlanList) {
+                if (mouldDelivery.getMaterialCode() != null && materialCodeSet.contains(mouldDelivery.getMaterialCode()) &&
+                        !mouldCodeSet.contains(mouldDelivery.getMouldCode())) {
+                    skuMouldRel1 = new MdmSkuMouldRel();
+                    skuMouldRel1.setFactoryCode(mouldDelivery.getMouldCode());
+                    skuMouldRel1.setMouldCode(mouldDelivery.getMouldCode());
+                    skuMouldRel1.setMaterialCode(mouldDelivery.getMaterialCode());
+                    skuMouldRel1.setMaterialDesc(mouldDelivery.getMaterialDesc());
+                    skuMouldRel1.setMainPattern(mouldDelivery.getMainPattern());
+                    skuMouldRel1.setBoardingDate(mouldDelivery.getBoardingDate());
+                    skuMouldRelMap.computeIfAbsent(mouldDelivery.getMaterialCode(), k -> new ArrayList<MdmSkuMouldRel>())
+                            .add(skuMouldRel1);
                 }
             }
         }

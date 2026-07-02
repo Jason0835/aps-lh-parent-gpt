@@ -69,6 +69,9 @@ public class MesItfController {
     @Autowired
     private com.zlt.aps.itf.mes.service.ITqScheduleResultIssueService tqScheduleResultIssueService;
 
+    @Autowired
+    private com.zlt.aps.itf.mes.service.ICd90ScheduleResultIssueService cd90ScheduleResultIssueService;
+
     /**
      * 同步SKU与模具关系
      *
@@ -714,6 +717,25 @@ public class MesItfController {
         String factoryCode = FactoryConstant.DEFAULT_FACTORY_CODE;
         String companyCode = factoryCode;
         return tqScheduleResultIssueService.issueTqScheduleResult(tqScheduleResultIssueList, factoryCode, companyCode);
+    }
+
+    /**
+     * 直裁排程结果下发到MES
+     * 业务规则：
+     * 1. 班次配置由 t_cd90_shift_config 启用项决定，默认 CLASS1~CLASS6
+     * 2. 每条 issue 携带 classField / scheduleDay / dayShiftOrder / shiftName，由 MES 侧按班次槽位映射
+     * 3. APS 侧按 SCHEDULE_DAY 推导排班日期，day1=T-1，day2=T，day3=T+1
+     *
+     * @param cd90ScheduleResultIssueList 直裁排程结果列表（已按班次展开）
+     * @return 结果
+     */
+    @ApiOperation("直裁排程结果下发到MES")
+    @PostMapping("/issueCd90ScheduleResult")
+    @AutoLoginLog
+    public AjaxResult issueCd90ScheduleResult(@RequestBody List<com.zlt.aps.mp.api.domain.entity.Cd90ScheduleResultIssue> cd90ScheduleResultIssueList) {
+        String factoryCode = FactoryConstant.DEFAULT_FACTORY_CODE;
+        String companyCode = factoryCode;
+        return cd90ScheduleResultIssueService.issueCd90ScheduleResult(cd90ScheduleResultIssueList, factoryCode, companyCode);
     }
 
     /**

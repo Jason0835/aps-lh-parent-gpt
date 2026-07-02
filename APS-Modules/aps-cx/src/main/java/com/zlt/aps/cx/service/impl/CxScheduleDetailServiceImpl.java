@@ -4,10 +4,15 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.ruoyi.api.gateway.system.service.ISysDictDataCacheService;
+import com.ruoyi.common.core.domain.SysDictData;
 import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.zlt.aps.common.core.utils.ExcelUtils;
+import com.zlt.aps.cx.entity.config.CxKeyProduct;
 import com.zlt.aps.cx.entity.config.CxShiftConfig;
 import com.zlt.aps.cx.entity.schedule.CxScheduleDetail;
 import com.zlt.aps.cx.entity.schedule.CxScheduleResult;
+import com.zlt.aps.cx.mapper.CxKeyProductMapper;
 import com.zlt.aps.cx.mapper.CxScheduleDetailMapper;
 import com.zlt.aps.cx.mapper.CxScheduleResultMapper;
 import com.zlt.aps.cx.mapper.CxShiftConfigMapper;
@@ -16,10 +21,14 @@ import com.zlt.aps.cx.vo.CxScheduleDetailVo;
 import com.zlt.aps.cx.vo.ScheduleDetailQueryVo;
 import com.zlt.aps.cx.vo.ScheduleUpdateDetailPlanQtyVo;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.io.File;
+import java.io.InputStream;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -42,6 +51,12 @@ public class CxScheduleDetailServiceImpl extends ServiceImpl<CxScheduleDetailMap
 
     @javax.annotation.Resource
     private CxShiftConfigMapper cxShiftConfigMapper;
+
+    @javax.annotation.Resource
+    private CxKeyProductMapper cxKeyProductMapper;
+
+    @javax.annotation.Resource
+    private ISysDictDataCacheService sysDictDataCacheService;
 
     @Override
     public List<CxScheduleDetailVo> listVoByMainId(Long mainId) {
@@ -579,6 +594,151 @@ public class CxScheduleDetailServiceImpl extends ServiceImpl<CxScheduleDetailMap
         }
         // 当前实体使用 CLASS1_TRIP_NO 等字段，返回1表示第一个车次
         return 1;
+    }
+
+    @Override
+    public byte[] exportDetail(ScheduleDetailQueryVo query) {
+        try {
+            // 1. 查询数据
+            List<CxScheduleDetailVo> voList = this.listVoByQuery(query);
+
+            // 2. 加载模板（注意：每次都要重新打开 InputStream）
+            InputStream inputStream = this.getClass().getClassLoader()
+                    .getResourceAsStream("excelModel/CxDetail.xlsx");
+            if (inputStream == null) {
+                log.error("成型顺位导出模板不存在: excelModel/CxDetail.xlsx");
+                throw new RuntimeException("成型顺位导出模板不存在");
+            }
+
+            // 3. 加载关键产品胚编码集合（用于计算 classXRemark = "SPQT"）
+            Set<String> keyProductEmbryoCodes = this.loadKeyProductEmbryoCodes();
+
+            // 4. 加载示方类型字典（码值 → 标签）
+            Map<String, String> recipeTypeMap = this.loadRecipeTypeDictMap();
+
+            // 5. 构建数据行
+            List<Map<String, Object>> dataRows = new ArrayList<>(voList.size());
+            for (CxScheduleDetailVo vo : voList) {
+                dataRows.add(this.buildDetailExportRow(vo, keyProductEmbryoCodes, recipeTypeMap));
+            }
+
+            // 6. 使用 ExcelUtils 填充模板（Sheet 0）- 与主表导出保持一致的调用方式
+            List<List<Map<String, Object>>> dataLists = new ArrayList<>();
+            dataLists.add(dataRows);
+
+            log.info("成型顺位导出，数据行数: {}", dataRows.size());
+            return ExcelUtils.writeMultiList(inputStream, 0, new HashMap<>(), dataLists);
+        } catch (Exception e) {
+            log.error("导出成型顺位Excel失败", e);
+            throw new RuntimeException("导出成型顺位Excel失败: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * 构建单行导出数据
+     * 模板占位符：{.cxMachineCode} {.embryoCode} {.mainMaterialDesc}
+     *   {.class6Sequence} {.class6PlanQty} {.class6Analysis} {.class6Remark} {.class6RecipeType}
+     *   {.class7Sequence} {.class7PlanQty} {.class7Analysis} {.class7Remark} {.class7RecipeType}
+     *   {.class8Sequence} {.class8PlanQty} {.class8Analysis} {.class8Remark} {.class8RecipeType}
+     */
+    private Map<String, Object> buildDetailExportRow(CxScheduleDetailVo vo, Set<String> keyProductEmbryoCodes,
+                                                      Map<String, String> recipeTypeMap) {
+        Map<String, Object> row = new LinkedHashMap<>();
+
+        // 主表冗余字段
+        row.put("cxMachineCode", StringUtils.defaultString(vo.getCxMachineCode()));
+        row.put("embryoCode", StringUtils.defaultString(vo.getEmbryoCode()));
+        row.put("mainMaterialDesc", StringUtils.defaultString(vo.getMainMaterialDesc()));
+
+        // 是否是关键产品（用于 classXRemark = "SPQT" 的判断）
+        boolean keyProduct = keyProductEmbryoCodes != null
+                && keyProductEmbryoCodes.contains(StringUtils.defaultString(vo.getEmbryoCode()).trim());
+
+        // 夜班（class6）
+        this.putShiftExportFields(row, 6, vo.getClass6Sequence(), vo.getClass6PlanQty(),
+                vo.getClass6AnalysisInput(), vo.getClass6RecipeType(), keyProduct, recipeTypeMap);
+
+        // 早班（class7）
+        this.putShiftExportFields(row, 7, vo.getClass7Sequence(), vo.getClass7PlanQty(),
+                vo.getClass7AnalysisInput(), vo.getClass7RecipeType(), keyProduct, recipeTypeMap);
+
+        // 中班（class8）
+        this.putShiftExportFields(row, 8, vo.getClass8Sequence(), vo.getClass8PlanQty(),
+                vo.getClass8AnalysisInput(), vo.getClass8RecipeType(), keyProduct, recipeTypeMap);
+
+        return row;
+    }
+
+    /**
+     * 填充单个班次的导出字段（顺序、计划量、原因分析、备注、示方类型）
+     */
+    private void putShiftExportFields(Map<String, Object> row, int classIndex, Integer sequence,
+                                       BigDecimal planQty, String analysis,
+                                       String recipeType, boolean keyProduct,
+                                       Map<String, String> recipeTypeMap) {
+        row.put("class" + classIndex + "Sequence", sequence != null ? sequence : "");
+        row.put("class" + classIndex + "PlanQty", this.zeroToEmpty(planQty));
+        row.put("class" + classIndex + "Analysis", StringUtils.defaultString(analysis));
+        row.put("class" + classIndex + "Remark", keyProduct && this.isPositivePlan(planQty) ? "SPQT" : "");
+        row.put("class" + classIndex + "RecipeType", this.dictLabel(recipeTypeMap, recipeType));
+    }
+
+    /**
+     * 计划量大于0时返回 true
+     */
+    private boolean isPositivePlan(BigDecimal val) {
+        return val != null && val.compareTo(BigDecimal.ZERO) > 0;
+    }
+
+    /**
+     * BigDecimal 为 null 或 0 时返回空字符串，否则返回原值
+     */
+    private Object zeroToEmpty(BigDecimal val) {
+        if (val == null || val.compareTo(BigDecimal.ZERO) == 0) {
+            return "";
+        }
+        return val;
+    }
+
+    /**
+     * 字典码值 → 字典标签
+     */
+    private String dictLabel(Map<String, String> dictMap, String code) {
+        if (dictMap == null || StringUtils.isBlank(code)) {
+            return "";
+        }
+        return dictMap.getOrDefault(code, "");
+    }
+
+    /**
+     * 加载示方类型字典，构建 code → label 映射
+     */
+    private Map<String, String> loadRecipeTypeDictMap() {
+        List<SysDictData> dictList = sysDictDataCacheService.getType("trial_status");
+        if (CollectionUtils.isEmpty(dictList)) {
+            return Collections.emptyMap();
+        }
+        return dictList.stream()
+                .filter(d -> StringUtils.isNotEmpty(d.getDictValue()))
+                .collect(Collectors.toMap(SysDictData::getDictValue, SysDictData::getDictLabel,
+                        (a, b) -> a, LinkedHashMap::new));
+    }
+
+    /**
+     * 加载关键产品胎胚编码集合（与主表导出逻辑一致）
+     */
+    private Set<String> loadKeyProductEmbryoCodes() {
+        List<CxKeyProduct> keyProducts = cxKeyProductMapper.selectList(
+                new LambdaQueryWrapper<CxKeyProduct>()
+                        .eq(CxKeyProduct::getIsActive, 1)
+                        .eq(CxKeyProduct::getIsDelete, "0"));
+        if (CollectionUtils.isEmpty(keyProducts)) {
+            return Collections.emptySet();
+        }
+        return keyProducts.stream()
+                .map(CxKeyProduct::getEmbryoCode)
+                .filter(StringUtils::isNotBlank)
+                .collect(Collectors.toSet());
     }
 
     // ==================== 私有辅助方法 ====================

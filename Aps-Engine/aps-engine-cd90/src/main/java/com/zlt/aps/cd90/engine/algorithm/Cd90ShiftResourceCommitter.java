@@ -69,15 +69,18 @@ public class Cd90ShiftResourceCommitter {
             }
             // 在原状态副本上试提交，任何失败都直接丢弃副本，保证资源修改原子性。
             Cd90ShiftResourceState working = copy(originalState);
+            BigDecimal vehiclePlanQuantity = trial.getVehiclePlanQuantity();
             Cd90StorageLaneAllocationResult allocation = laneAllocator.allocate(
                     request.getClothCode(), trial.getFinalSchedulableQuantity(),
-                    request.getCoilMeter(), working.getLanes());
+                    vehiclePlanQuantity, working.getLanes());
             if (!allocation.isSuccess() || !acceptPartialAllocation(allocation, request)) {
                 // 库排容量不足或部分排比例太小，均不提前修改工装和机台剩余时间。
                 lastFailureReason = "STORAGE_LANE_LIMIT";
                 continue;
             }
             int allocatedVehicles = allocation.getAllocatedVehicleCount();
+            String partialReason = allocatedVehicles < allocation.getRequiredVehicleCount()
+                    ? "STORAGE_LANE_LIMIT" : trial.getLimitReason();
             int availableTooling = working.getTotalToolingCount() - working.getOccupiedToolingCount();
             if (allocatedVehicles > availableTooling) {
                 // 工装数按实际入库车数占用；不足时继续尝试其他方案但仍保留稳定失败原因。
@@ -87,7 +90,7 @@ public class Cd90ShiftResourceCommitter {
 
             int beforeSeconds = working.getRemainingSecondsByMachine().getOrDefault(
                     trial.getMachineCode(), fullShiftSeconds(request));
-            BigDecimal committedQuantity = committedQuantity(trial, request.getCoilMeter(), allocatedVehicles);
+            BigDecimal committedQuantity = committedQuantity(trial, vehiclePlanQuantity, allocatedVehicles);
             int afterSeconds = adjustedRemainingSeconds(request, trial, beforeSeconds, committedQuantity);
             int elapsedBefore = Math.max(0, fullShiftSeconds(request) - beforeSeconds);
             int productionDurationSeconds = Math.max(0, beforeSeconds - afterSeconds - trial.getAgingDelaySeconds());
@@ -123,7 +126,8 @@ public class Cd90ShiftResourceCommitter {
                             + "planQuantity={}, vehicleCount={}, requiredVehicleCount={}, produceOrder={}",
                     request.getClassField(), request.getClothCode(), trial.getMachineCode(),
                     committedQuantity, allocatedVehicles, allocation.getRequiredVehicleCount(), produceOrder);
-            return Cd90ShiftCommitResult.builder().success(true).state(working).task(task).build();
+            return Cd90ShiftCommitResult.builder().success(true).partialReason(partialReason)
+                    .state(working).task(task).build();
         }
         log.warn("[直裁自动排程] 当前班次资源提交失败, classField={}, clothCode={}, reason={}",
                 request.getClassField(), request.getClothCode(), lastFailureReason);
@@ -145,13 +149,13 @@ public class Cd90ShiftResourceCommitter {
         return assigned >= Math.max(1, request.getPartialMinVehicleCount());
     }
 
-    private BigDecimal committedQuantity(Cd90MachineTrial trial, BigDecimal coilMeter,
+    private BigDecimal committedQuantity(Cd90MachineTrial trial, BigDecimal vehiclePlanQuantity,
                                          int allocatedVehicles) {
-        BigDecimal laneQuantity = coilMeter.multiply(BigDecimal.valueOf(allocatedVehicles));
+        BigDecimal laneQuantity = vehiclePlanQuantity.multiply(BigDecimal.valueOf(allocatedVehicles));
         BigDecimal trialQuantity = trial.getFinalSchedulableQuantity() == null
                 ? BigDecimal.ZERO : trial.getFinalSchedulableQuantity();
         BigDecimal result = trialQuantity.signum() > 0 ? laneQuantity.min(trialQuantity) : laneQuantity;
-        return normalize(result);
+        return normalizeCommittedQuantity(result);
     }
 
     private int adjustedRemainingSeconds(Cd90ShiftCommitRequest request, Cd90MachineTrial trial,
@@ -165,6 +169,16 @@ public class Cd90ShiftResourceCommitter {
                 .divide(trialQuantity, 0, RoundingMode.CEILING).intValueExact();
         return Math.max(0, beforeSeconds - trial.getAgingDelaySeconds()
                 - trial.getChangeSeconds() - productionSeconds);
+    }
+
+    /**
+     * 归一化最终提交计划量。当前过渡规则按整数米向上取整，后续改为整卷/整车/整条时只替换本方法。
+     */
+    private BigDecimal normalizeCommittedQuantity(BigDecimal quantity) {
+        if (quantity == null || quantity.signum() <= 0) {
+            return BigDecimal.ZERO;
+        }
+        return quantity.setScale(0, RoundingMode.CEILING);
     }
 
     private BigDecimal normalize(BigDecimal value) {

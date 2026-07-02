@@ -62,7 +62,11 @@ public class Cd90MachineTrialSelector {
         return 2;
     }
     private int compare(Cd90MachineTrial first, Cd90MachineTrial second) {
-        int result = Boolean.compare(second.isFullyAccommodated(), first.isFullyAccommodated());
+        int result = Boolean.compare(second.isHistoryMachine(), first.isHistoryMachine());
+        if (result != 0) {
+            return result;
+        }
+        result = Boolean.compare(second.isFullyAccommodated(), first.isFullyAccommodated());
         if (result != 0) {
             return result;
         }

@@ -148,4 +148,12 @@ public interface CxScheduleDetailService extends IService<CxScheduleDetail> {
      * @return 是否成功
      */
     AjaxResult batchUpdatePlanQty(List<ScheduleUpdateDetailPlanQtyVo> voList);
+
+    /**
+     * 导出成型顺位数据
+     *
+     * @param query 查询条件
+     * @return Excel文件字节数组
+     */
+    byte[] exportDetail(ScheduleDetailQueryVo query);
 }

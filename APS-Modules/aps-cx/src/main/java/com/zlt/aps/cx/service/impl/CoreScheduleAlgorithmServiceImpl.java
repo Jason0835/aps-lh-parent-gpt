@@ -201,6 +201,10 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             // 执行该班次的排程
             ShiftScheduleResult shiftResult = executeShiftSchedule(
                     context, day, shiftConfig, currentScheduleDate, machineOnlineEmbryoMap);
+            // 保存当前班次排程前的 materialStockMap 快照（在 updateContextForNextShift 之前）
+            // 用于子表 stockHours 计算：每个班次独立使用当时的分配库存
+            Map<String, Integer> stockMap = context.getMaterialStockMap();
+            shiftResult.setMaterialStockSnapshot(stockMap != null ? new HashMap<>(stockMap) : new HashMap<>());
             shiftResults.add(shiftResult);
 
             // 更新机台在产状态：仅用本班次分配结果替换（滚动替换，不累积）
@@ -1228,6 +1232,8 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         private List<MachineAllocationResult> allAllocations;
         /** 该班次的精排结果（包含班次级别的车数/数量） */
         private List<ShiftScheduleService.ShiftProductionResult> shiftProductionResults;
+        /** 该班次排程前的 materialStockMap 快照（lhId → 分配库存），用于子表 stockHours 计算 */
+        private Map<String, Integer> materialStockSnapshot;
 
         public int getDay() { return day; }
         public void setDay(int day) { this.day = day; }
@@ -1239,6 +1245,8 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         public void setAllAllocations(List<MachineAllocationResult> allAllocations) { this.allAllocations = allAllocations; }
         public List<ShiftScheduleService.ShiftProductionResult> getShiftProductionResults() { return shiftProductionResults; }
         public void setShiftProductionResults(List<ShiftScheduleService.ShiftProductionResult> shiftProductionResults) { this.shiftProductionResults = shiftProductionResults; }
+        public Map<String, Integer> getMaterialStockSnapshot() { return materialStockSnapshot; }
+        public void setMaterialStockSnapshot(Map<String, Integer> materialStockSnapshot) { this.materialStockSnapshot = materialStockSnapshot; }
     }
 
     /**
@@ -1889,8 +1897,9 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
 
         // ==================== 第一阶段：按班次合并排产结果后生成子表车次 ====================
         // 与主表逻辑一致：同一机台+胎胚+物料在一个班次内有多条排产结果时，先合并数量再拆车次
-        // 库存跟踪器：按 胎胚+物料 维度跟踪累计成型量和硫化消耗（用于stockHours计算）
-        Map<String, EmbryoTripTracker> embryoTrackers = new LinkedHashMap<>();
+        // 子表车次合并数：默认1车一条，配置N则N车合并一条
+        int tripGroupSize = context.getDetailTripGroupSize() != null && context.getDetailTripGroupSize() > 0
+                ? context.getDetailTripGroupSize() : 1;
         // 每个班次的车次记录列表（用于后续排序分配顺位和合并）
         List<List<TripRecord>> perShiftTrips = new ArrayList<>();
 
@@ -1899,10 +1908,14 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             String shiftClassField = shiftResult.getShiftConfig() != null
                     ? shiftResult.getShiftConfig().getClassField() : null;
             List<TripRecord> currentShiftTrips = new ArrayList<>();
+            // 本班次的 materialStockMap 快照（排程前的分配库存）
+            Map<String, Integer> stockSnapshot = shiftResult.getMaterialStockSnapshot();
 
-            // ---- 合并步骤：按 机台+胎胚+物料 汇总当班排产量（同主表merge逻辑）----
+            // ---- 合并步骤：按 机台+胎胚+施工阶段 汇总当班排产量（同主表merge逻辑）----
             // mergeKey = machineCode|embryoCode|constructionStage（剔除物料编码维度）
+            // 同时收集每个合并组的 lhId 列表（用于查询模数、日硫化量、分配库存、硫化消耗）
             Map<String, ShiftScheduleService.ShiftProductionResult> mergedSprMap = new LinkedHashMap<>();
+            Map<String, List<Long>> mergeKeyLhIdMap = new HashMap<>();
 
             for (ShiftScheduleService.ShiftProductionResult spr : shiftResult.getShiftProductionResults()) {
                 if (spr.getQuantity() == null || spr.getQuantity() <= 0) continue;
@@ -1911,6 +1924,12 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                 String eCode = spr.getEmbryoCode();
                 String constructionStage = spr.getConstructionStage() != null ? spr.getConstructionStage() : "";
                 String mergeKey = mCode + "|" + eCode + "|" + constructionStage;
+
+                // 收集 lhId
+                if (spr.getSourceTask() != null && spr.getSourceTask().getLhId() != null) {
+                    mergeKeyLhIdMap.computeIfAbsent(mergeKey, k -> new ArrayList<>())
+                            .add(spr.getSourceTask().getLhId());
+                }
 
                 ShiftScheduleService.ShiftProductionResult existing = mergedSprMap.get(mergeKey);
                 if (existing == null) {
@@ -1934,21 +1953,6 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                     if (existing.getShiftCode() == null && spr.getShiftCode() != null) {
                         existing.setShiftCode(spr.getShiftCode());
                     }
-                    // 累加 sourceTask 的 vulcanizeMachineCount 和 vulcanizeMoldCount
-                    CoreScheduleAlgorithmService.DailyEmbryoTask existingTask = existing.getSourceTask();
-                    CoreScheduleAlgorithmService.DailyEmbryoTask sprTask = spr.getSourceTask();
-                    if (existingTask != null && sprTask != null) {
-                        Integer existingVmc = existingTask.getVulcanizeMachineCount();
-                        Integer sprVmc = sprTask.getVulcanizeMachineCount();
-                        if (existingVmc != null && sprVmc != null) {
-                            existingTask.setVulcanizeMachineCount(existingVmc + sprVmc);
-                        }
-                        Integer existingVmd = existingTask.getVulcanizeMoldCount();
-                        Integer sprVmd = sprTask.getVulcanizeMoldCount();
-                        if (existingVmd != null && sprVmd != null) {
-                            existingTask.setVulcanizeMoldCount(existingVmd + sprVmd);
-                        }
-                    }
                 }
             }
 
@@ -1956,97 +1960,109 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             for (ShiftScheduleService.ShiftProductionResult spr : mergedSprMap.values()) {
                 String embryoCode = spr.getEmbryoCode();
                 String materialCode = spr.getMaterialCode() != null ? spr.getMaterialCode() : "";
-                // embryoKey 用于 tracker 查找，剔除 materialCode 维度（与合并维度一致）
                 String constructionStage = spr.getConstructionStage() != null ? spr.getConstructionStage() : "";
-                String embryoKey = embryoCode + "|" + constructionStage;
+                String mergeKey = spr.getMachineCode() + "|" + embryoCode + "|" + constructionStage;
 
-                EmbryoTripTracker tracker = embryoTrackers.computeIfAbsent(embryoKey,
-                        k -> new EmbryoTripTracker(embryoCode, materialCode));
+                // 基于合并组的 lhId 列表，计算 stockHours 所需的四个参数
+                List<Long> lhIdList = mergeKeyLhIdMap.getOrDefault(mergeKey, Collections.emptyList());
 
-                CoreScheduleAlgorithmService.DailyEmbryoTask task = spr.getSourceTask();
-                if (task != null) {
-                    // 每个班次都从当班合并后的task中获取，覆盖之前的值
-                    if (task.getVulcanizeMachineCount() != null) {
-                        tracker.setVulcanizeMachineCount(task.getVulcanizeMachineCount());
-                    }
-                    if (task.getVulcanizeMoldCount() != null) {
-                        tracker.setVulcanizeMoldCount(task.getVulcanizeMoldCount());
-                    }
-                    // 每个班次开始时，更新beginStock为上一班次结束时的库存（currentStock），
-                    // 并重置累计值，使stockHours反映当前班次的实时库存水位
-                    if (tracker.getBeginStock() != null) {
-                        int previousStock = tracker.getCurrentStock();
-                        tracker.setBeginStock(previousStock);
-                        tracker.setCumulativeForming(0);
-                        tracker.setCumulativeVulcanize(0);
-                    }
-                    if (task.getCurrentStock() != null && tracker.getBeginStock() == null) {
-                        tracker.setBeginStock(task.getCurrentStock());
-                    }
-                    if (task.getHourCapacity() != null && task.getHourCapacity() > 0) {
-                        tracker.setHourlyCapacity(task.getHourCapacity());
-                    } else {
-                        int hourlyCapacity = calculateHourlyCapacity(
-                                spr.getMachineCode(), materialCode, task.getStructureName(), context);
-                        tracker.setHourlyCapacity(hourlyCapacity);
-                    }
-                    // 从 materialLhCapacityMap 获取日硫化量（与 TaskGroupService 逻辑一致）
-                    if (tracker.getDailyLhCapacity() == null && context.getMaterialLhCapacityMap() != null) {
-                        MonthPlanProductLhCapacityVo capacityVo = context.getMaterialLhCapacityMap().get(materialCode);
-                        if (capacityVo != null) {
-                            if (capacityVo.getDayVulcanizationQty() != null && capacityVo.getDayVulcanizationQty() > 0) {
-                                // 日硫化量是双模的，需要除以2得到单模产量
-                                tracker.setDailyLhCapacity(capacityVo.getDayVulcanizationQty() / 2);
-                            } else if (capacityVo.getStandardCapacity() != null && capacityVo.getStandardCapacity() > 0) {
-                                tracker.setDailyLhCapacity(capacityVo.getStandardCapacity());
-                            }
-                        }
-                    }
-                }
-
-                int tripCapacity = spr.getTripCapacity() != null ? spr.getTripCapacity() : 12;
-                int planQty = spr.getQuantity() != null ? spr.getQuantity() : 0;
-
-                int tripCount = (planQty + tripCapacity - 1) / tripCapacity;
-
-                Long lhId = null;
-                LhScheduleResult lhResult = null;
-                if (spr.getSourceTask() != null) {
-                    lhId = spr.getSourceTask().getLhId();
-                    if (lhId != null) {
-                        lhResult = lhResultMap.get(lhId);
-                    }
-                }
-
+                // 1. 模数累加：Σ(lhResult.mouldQty)
+                // 2. 日硫化量平均值(单模)：Σ(dayVulcanizationQty/2) / lhId数量，按参数模式选择的日硫化量
+                // 3. 分配库存合计：Σ(materialStockSnapshot[lhId])
+                // 4. 硫化消耗合计：Σ(lhResult.classXPlanQty)，当前班次
                 String classField = shiftClassField;
                 if (classField == null) {
                     classField = shiftToClassField.getOrDefault(spr.getShiftCode(), spr.getShiftCode());
                 }
                 int vulcanizeClassIndex = getClassIndex(classField);
-                Integer vulcanizeClassConsumptionObj = (lhResult != null)
-                        ? getClassPlanQtyByIndex(lhResult, vulcanizeClassIndex) : null;
-                int vulcanizeClassConsumption = (vulcanizeClassConsumptionObj != null)
-                        ? vulcanizeClassConsumptionObj : 0;
 
-                // 为每个车次创建 TripRecord（车次号从1开始，按机台+胎胚+物料维度独立编号）
+                int totalMoldQty = 0;
+                int totalAllocatedStock = 0;
+                int totalVulcanizeConsumption = 0;
+                int sumSingleMoldDailyCap = 0;
+                int validCapCount = 0;
+
+                for (Long lhId : lhIdList) {
+                    LhScheduleResult lhResult = lhResultMap.get(lhId);
+                    if (lhResult != null) {
+                        // 模数
+                        int moldQty = lhResult.getMouldQty() != null ? lhResult.getMouldQty() : 1;
+                        totalMoldQty += moldQty;
+                        // 硫化消耗（当前班次）
+                        Integer consumption = getClassPlanQtyByIndex(lhResult, vulcanizeClassIndex);
+                        if (consumption != null) {
+                            totalVulcanizeConsumption += consumption;
+                        }
+                        // 日硫化量（按参数模式的 dayVulcanizationQty，双模÷2得单模）
+                        String lhMaterialCode = lhResult.getMaterialCode();
+                        if (lhMaterialCode != null && context.getMaterialLhCapacityMap() != null) {
+                            MonthPlanProductLhCapacityVo capVo = context.getMaterialLhCapacityMap().get(lhMaterialCode);
+                            if (capVo != null && capVo.getDayVulcanizationQty() != null
+                                    && capVo.getDayVulcanizationQty() > 0) {
+                                sumSingleMoldDailyCap += capVo.getDayVulcanizationQty() / 2;
+                                validCapCount++;
+                            }
+                        }
+                    }
+                    // 分配库存（从快照获取）
+                    if (stockSnapshot != null) {
+                        totalAllocatedStock += stockSnapshot.getOrDefault(String.valueOf(lhId), 0);
+                    }
+                }
+
+                // 日硫化量平均值（单模）
+                int avgSingleMoldDailyCap = validCapCount > 0 ? sumSingleMoldDailyCap / validCapCount : 0;
+
+                // 单胎单模时长(秒) = 86400 / 平均日硫化量(单模)
+                double singleTireMoldSeconds = avgSingleMoldDailyCap > 0
+                        ? (double) SECONDS_PER_DAY / avgSingleMoldDailyCap : 0;
+
+                // 获取小时产能（用于车次时间计算）
+                int hourlyCapacity = 12;
+                CoreScheduleAlgorithmService.DailyEmbryoTask task = spr.getSourceTask();
+                if (task != null) {
+                    if (task.getHourCapacity() != null && task.getHourCapacity() > 0) {
+                        hourlyCapacity = task.getHourCapacity();
+                    } else {
+                        hourlyCapacity = calculateHourlyCapacity(
+                                spr.getMachineCode(), materialCode, task.getStructureName(), context);
+                    }
+                }
+
+                // 硫化机台数（用于记录字段）
+                int vulcanizeMachineCount = task != null && task.getVulcanizeMachineCount() != null
+                        ? task.getVulcanizeMachineCount() : 1;
+
+                int tripCapacity = spr.getTripCapacity() != null ? spr.getTripCapacity() : 12;
+                int planQty = spr.getQuantity() != null ? spr.getQuantity() : 0;
+
+                // 车次拆分：按 tripGroupSize 车合并为一条记录
+                int groupTripCapacity = tripCapacity * tripGroupSize;
+                int tripCount = groupTripCapacity > 0
+                        ? (planQty + groupTripCapacity - 1) / groupTripCapacity : 0;
+
+                // 为每个车次组创建 TripRecord（车次号从1开始）
                 for (int i = 1; i <= tripCount; i++) {
-                    int tripPlanQty = Math.min(tripCapacity, planQty - (i - 1) * tripCapacity);
+                    // 本车次组的计划量
+                    int tripPlanQty = Math.min(groupTripCapacity, planQty - (i - 1) * groupTripCapacity);
+                    // 累计成型产出（到本车次为止）
+                    int cumulativeForming = Math.min(groupTripCapacity * i, planQty);
 
-                    // 【先更新成型累计】：stockHours 反映排完本车次之后的库存水位
-                    tracker.addFormingProduction(tripPlanQty);
+                    // 任务预计班后库存 = 分配库存 + 累计成型产出 - 硫化消耗（整个班次）
+                    int projectedStock = totalAllocatedStock + cumulativeForming - totalVulcanizeConsumption;
 
-                    // 计算当前车次后的库存可供硫化时长（= 期初 + 包含本车次在内的累计成型 - 硫化累计）
-                    int currentStock = tracker.getCurrentStock();
-                    double stockHours = calculateStockHours(
-                            currentStock, tracker.getVulcanizeMoldCount(),
-                            tracker.getDailyLhCapacity());
+                    // 可供硫化时长 = 预计库存 × 单胎单模时长 / 总模数 / 3600
+                    double stockHours = 0;
+                    if (totalMoldQty > 0 && singleTireMoldSeconds > 0) {
+                        stockHours = (double) projectedStock * singleTireMoldSeconds
+                                / SECONDS_PER_HOUR / totalMoldQty;
+                    }
 
                     // 计算车次时间
                     LocalDateTime tripStartTime = null;
                     LocalDateTime tripEndTime = null;
-                    if (spr.getPlanStartTime() != null && tracker.getHourlyCapacity() > 0) {
+                    if (spr.getPlanStartTime() != null && hourlyCapacity > 0) {
                         LocalDateTime shiftStart = spr.getPlanStartTime();
-                        int hourlyCapacity = tracker.getHourlyCapacity();
 
                         int cumulativeBeforeTrip = 0;
                         for (TripRecord existingTrip : currentShiftTrips) {
@@ -2080,14 +2096,9 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                     record.setPlanEndTime(tripEndTime);
                     record.setIsTrialTask(Boolean.TRUE.equals(spr.getIsTrialTask()));
                     record.setIsEndingTask(Boolean.TRUE.equals(spr.getIsEndingTask()));
-                    record.setVulcanizeMachineCount(tracker.getVulcanizeMachineCount());
+                    record.setVulcanizeMachineCount(vulcanizeMachineCount);
 
                     currentShiftTrips.add(record);
-
-                    // 最后一个车次才加硫化消耗（影响下一个班次）
-                    if (i == tripCount && vulcanizeClassConsumption > 0) {
-                        tracker.addVulcanizeConsumption(vulcanizeClassConsumption);
-                    }
                 }
             }
 
@@ -2175,83 +2186,6 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         }
 
         return resultGroupMap;
-    }
-
-    /**
-     * 计算库存可供硫化时长（小时）
-     *
-     * <p>正确公式：
-     * <pre>
-     *   单胎单模硫化时长(秒) = 86400 / 日硫化量
-     *   库存可供硫化时长(小时) = (当前库存 + 成型累计) × 单胎单模硫化时长 / 3600 / 硫化机数 / 单台模数
-     * </pre>
-     *
-     * <p>其中当前库存 = 期初库存 + 成型累计 - 硫化累计
-     *
-     * @param currentStock      当前库存（期初库存 + 成型累计 - 硫化累计）
-     * @param vulcanizeMoldCount   单台模数
-     * @param dailyLhCapacity   日硫化量（单模）
-     * @return 库存可供硫化时长（小时）
-     */
-    private double calculateStockHours(int currentStock, int vulcanizeMoldCount,
-                                       Integer dailyLhCapacity) {
-        if (vulcanizeMoldCount <= 0 || dailyLhCapacity == null || dailyLhCapacity <= 0) {
-            return 0;
-        }
-        double singleTireMoldSeconds = (double) SECONDS_PER_DAY / dailyLhCapacity;
-
-        return (double) currentStock * singleTireMoldSeconds
-                / SECONDS_PER_HOUR / vulcanizeMoldCount;
-    }
-
-    /**
-     * 内部类：胎胚车次追踪器
-     * <p>用于递推计算每个班次开始前的库存
-     */
-    private static class EmbryoTripTracker {
-        private final String embryoCode;
-        private final String materialCode;
-        private Integer beginStock;  // 期初库存（首次设置后不再变）
-        private int currentStock;     // 当前库存（= 期初 + 成型累计 - 硫化累计）
-        private int cumulativeForming;     // 成型累计生产
-        private int cumulativeVulcanize;   // 硫化累计消耗
-        private int vulcanizeMachineCount = 1;
-        private int vulcanizeMoldCount = 1;
-        private Integer dailyLhCapacity;   // 日硫化量（单模）
-        private int hourlyCapacity = 12;   // 小时产能（条/小时）
-
-        EmbryoTripTracker(String embryoCode, String materialCode) {
-            this.embryoCode = embryoCode;
-            this.materialCode = materialCode;
-        }
-
-        void setBeginStock(Integer beginStock) {
-            this.beginStock = beginStock;
-            this.currentStock = beginStock;
-        }
-
-        Integer getBeginStock() { return beginStock; }
-        String getEmbryoCode() { return embryoCode; }
-        String getMaterialCode() { return materialCode; }
-        int getVulcanizeMachineCount() { return vulcanizeMachineCount; }
-        void setVulcanizeMachineCount(int count) { this.vulcanizeMachineCount = count; }
-        int getVulcanizeMoldCount() { return vulcanizeMoldCount; }
-        void setVulcanizeMoldCount(int count) { this.vulcanizeMoldCount = count; }
-        Integer getDailyLhCapacity() { return dailyLhCapacity; }
-        void setDailyLhCapacity(Integer capacity) { this.dailyLhCapacity = capacity; }
-
-        int getCurrentStock() {
-            return (beginStock != null ? beginStock : 0) + cumulativeForming - cumulativeVulcanize;
-        }
-
-        int getCumulativeForming() { return cumulativeForming; }
-        int getCumulativeVulcanize() { return cumulativeVulcanize; }
-        void setCumulativeForming(int val) { this.cumulativeForming = val; }
-        void setCumulativeVulcanize(int val) { this.cumulativeVulcanize = val; }
-        void addFormingProduction(int qty) { this.cumulativeForming += qty; }
-        void addVulcanizeConsumption(int qty) { this.cumulativeVulcanize += qty; }
-        int getHourlyCapacity() { return hourlyCapacity; }
-        void setHourlyCapacity(int capacity) { this.hourlyCapacity = capacity > 0 ? capacity : 12; }
     }
 
     /**

@@ -3,8 +3,11 @@
     ref="dialogRef"
     :title="getTitle()"
     :value="showValue"
+    :allow-input="allowInput"
+    :maxlength="maxlength"
     @confirm="handleConfirm"
     @clear="handleClear"
+    @input-change="handleInputChange"
     :disabled="disabled"
     @show="handleShow"
     @cancel="handleCancel"
@@ -57,6 +60,15 @@ export default {
     multiple: {
       type: Boolean,
       default: false,
+    },
+    /** 是否允许手动输入制造示方书号 */
+    allowInput: {
+      type: Boolean,
+      default: false,
+    },
+    maxlength: {
+      type: Number,
+      default: 30,
     },
   },
   data() {
@@ -155,6 +167,8 @@ export default {
     value: function (val) {
       if (!val) {
         this.showValue = "";
+      } else {
+        this.showValue = val;
       }
     },
 
@@ -220,6 +234,10 @@ export default {
 
     handleChange(val, row) {
       this.$emit("change", val, row);
+    },
+    handleInputChange(val) {
+      this.showValue = val;
+      this.$emit("change", val, null);
     },
 
     handleShow() {

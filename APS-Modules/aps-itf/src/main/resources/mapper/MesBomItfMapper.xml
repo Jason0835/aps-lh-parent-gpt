@@ -83,6 +83,7 @@
             CHILD_MATERIAL_NAME_CODE,
             CHILD_CODE,
             CHILD_MATERIAL_VERSION,
+            CHILD_MATERIAL_TYPE,
             UNIT,
             DOSAGE,
             DOSAGE_FORM,
@@ -90,6 +91,7 @@
             PARENT_MATERIAL_NAME,
             PARENT_CODE,
             PARENT_VERSION,
+            PARENT_MATERIAL_TYPE,
             PRODUCTION_STAGE,
             BOM_VERSION,
             REMARK,
@@ -102,6 +104,7 @@
         FROM MES_BOM_INFO
         WHERE FACTORY_CODE = #{factoryCode}
           AND DATA_VERSION = #{dataVersion}
+          AND CHILD_CODE IS NOT NULL
     </select>
 
     <!-- 示方书工艺信息同步 -->

@@ -18,6 +18,8 @@
   "ui.dj.depthConfig.column.machineRange": "Molding supply",
   "ui.dj.depthConfig.column.depthClassQty": "Depth class qty",
   "ui.dj.depthConfig.column.modalName": "Depth config",
+  "ui.dj.schedule.validate.atLeastOneShiftQty": "At least one shift must have a plan quantity",
+  "ui.dj.schedule.validate.seqRequired": "Shift with plan quantity must have a sequence",
   "ui.tm.depthConfig.column.modalName": "Stock Reserve Shift Config",
   "ui.tm.depthConfig.column.factoryCode": "Factory Code",
   "ui.tm.depthConfig.column.machineQty": "Sulfurization Machine Qty",
@@ -846,5 +848,7 @@
   "ui.data.column.xwyyStock.rollBadNum": "Bad Qty(roll)",
   "ui.data.column.xwyyStock.stockMeters": "Meters per Roll",
   "ui.data.column.xwyyStock.estimateStockFlag": "Estimate Stock Flag",
-  "ui.data.column.xwyyStock.checkUnique": "Duplicate stock record for same factory, date and big roll code"
+  "ui.data.column.xwyyStock.checkUnique": "Duplicate stock record for same factory, date and big roll code",
+  "ui.data.column.scheduleResult.midPlanQty": "Mid Shift Plan Qty",
+  "ui.data.column.scheduleResult.midHandAnalysis": "Mid Shift Manual Analysis"
 }

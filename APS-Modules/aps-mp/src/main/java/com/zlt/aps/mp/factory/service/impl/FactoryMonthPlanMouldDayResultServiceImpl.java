@@ -55,7 +55,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.*;
@@ -242,6 +245,9 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
         for (int day = FactoryConstant.MONTH_START_DAY; day <= FactoryConstant.MONTH_MAX_DAY; day++) {
             changeMouldMap.put(day, 0);
         }
+        for (int day = FactoryConstant.MONTH_START_DAY; day <= LAST_MONTH_DAY; day++) {
+            lastChangeMouldMap.put(day, 0);
+        }
         for (Integer i = 0, size = recordList.size(); i < size; i++) {
             // 2.1.1、把同结构的排产记录添加到列表中，全部添加完后开始处理这一批数据
             FactoryMonthPlanMouldDayResultExportVo record = recordList.get(i);
@@ -409,11 +415,7 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
         for (Entry<Integer, Integer> entry : lastChangeMouldMap.entrySet()) {
             Integer day = entry.getKey();
             Integer mould = entry.getValue();
-            Integer realDay = lastDayOfMonth - day + 1; // 日期映射为倒数第n天
-            if (realDay <= 0 || realDay > LAST_MONTH_DAY) {
-                continue;
-            }
-            changeMouldStatisticsRecord.setFieldValueByFieldName(String.format(LAST_FIELD_NAME_FORMAT, realDay), mould);
+            changeMouldStatisticsRecord.setFieldValueByFieldName(String.format(LAST_FIELD_NAME_FORMAT, day), mould);
         }
         totalRecordList.add(changeMouldStatisticsRecord);
         return totalRecordList;
@@ -689,6 +691,7 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
         for (int day = startDay; day <= FactoryConstant.MONTH_MAX_DAY; day++) {
             String dayFieldGetterName = String.format(DAY_FIELD_NAME_FORMAT, day);
             String dayFieldSetterName;
+            Integer mapKey;
             if (LAST_FIELD_NAME_FORMAT.equals(preFix)) {
                 // 上个月统计数据：将日序号映射为月末倒数第n天
                 Integer realDay = day - startDay + 1;
@@ -696,8 +699,10 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
                     continue;
                 }
                 dayFieldSetterName = String.format(LAST_FIELD_NAME_FORMAT, realDay);
+                mapKey = realDay;
             } else {
                 dayFieldSetterName = String.format(preFix, day);
+                mapKey = day;
             }
             String dayStatisticsStr = (String) statistics.getFieldValueByFieldName(dayFieldGetterName);
             if (StringUtils.isNotEmpty(dayStatisticsStr) && JSONValidator.from(dayStatisticsStr).validate()) {
@@ -707,7 +712,7 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
                 lhMachinesStatisticsRecord.setFieldValueByFieldName(dayFieldSetterName, dayStatistics.getLhMachines());
                 Integer changeMould = Optional.ofNullable(dayStatistics.getChangeMould()).orElse(0);
                 if (changeMould > 0) {
-                    changeMouldMap.put(day, changeMouldMap.getOrDefault(day, 0) + Optional.ofNullable(dayStatistics.getChangeMould()).orElse(0));
+                    changeMouldMap.put(mapKey, changeMouldMap.getOrDefault(mapKey, 0) + Optional.ofNullable(dayStatistics.getChangeMould()).orElse(0));
                 }
             }
         }
@@ -747,18 +752,26 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
     public byte[] getFactoryMonthPlanMouldDayResultExportByte(FactoryMonthPlanMouldDayResult queryResult,
                                                               List<FactoryMonthPlanMouldDayResultExportVo> list,
                                                               boolean isFinal) {
-        // 1、获取模板
+        // 1、获取模板（立即读取为字节数组，避免 Spring Boot 嵌套 JAR 的 ZipInflaterInputStream 延迟读取报错）
         ClassLoader classLoader = this.getClass().getClassLoader();
         //20260604+ 日排产量预警处理
         int warningHeaderRowIndex = DAY_TOTAL_WARNING_ROW_INDEX;
         InputStream inputStream;
 //        int warningColumnOffset; // 警告列偏移值
-        if (isFinal) {
-            inputStream = classLoader.getResourceAsStream("excelModel/factoryMonthPlanMouldFinalResultExportTemp.xlsx");
-//            warningColumnOffset = WARNING_COLUMN_OFFSET_FINAL;
-        } else {
-            inputStream = classLoader.getResourceAsStream("excelModel/factoryMonthPlanMouldDayResultExportTemp.xlsx");
-//            warningColumnOffset = WARNING_COLUMN_OFFSET;
+        try {
+            String templatePath = isFinal ? "excelModel/factoryMonthPlanMouldFinalResultExportTemp.xlsx"
+                    : "excelModel/factoryMonthPlanMouldDayResultExportTemp.xlsx";
+            try (InputStream templateIs = classLoader.getResourceAsStream(templatePath);
+                 ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
+                byte[] buffer = new byte[8192];
+                int len;
+                while ((len = templateIs.read(buffer)) != -1) {
+                    baos.write(buffer, 0, len);
+                }
+                inputStream = new ByteArrayInputStream(baos.toByteArray());
+            }
+        } catch (IOException e) {
+            throw new RuntimeException("读取Excel模板失败", e);
         }
 
         // 2、加载字典数据

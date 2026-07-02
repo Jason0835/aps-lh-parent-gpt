@@ -107,17 +107,20 @@ public class MpTrialPlanController extends AbstractDocBizController<MpTrialPlan>
                         .filter(x -> billVO.getTrialStatus().equals(x.getTrialStatus()))
                         .collect(Collectors.toList());
             }
-            if (PubUtil.isEmpty(skuStatusRefList)) {
+            /*if (PubUtil.isEmpty(skuStatusRefList)) {
                 String message = I18nUtil.getMessage("ui.data.alert.mpTrialPlan.embryoNo.error");
                 throw new RuntimeException(message);
+            }*/
+            if (PubUtil.isNotEmpty(skuStatusRefList)) {
+                MdmSkuConstructionRef mdmSkuConstructionRef = skuStatusRefList.get(0);
+                billVO.setEmbryoNo(mdmSkuConstructionRef.getEmbryoNo());
+                billVO.setEmbryoReleaseDate(mdmSkuConstructionRef.getEmbryoReleaseDate());
+                billVO.setTextNo(mdmSkuConstructionRef.getTextNo());
+                billVO.setTextReleaseDate(mdmSkuConstructionRef.getTextReleaseDate());
+                billVO.setLhNo(mdmSkuConstructionRef.getLhNo());
+                billVO.setLhReleaseDate(mdmSkuConstructionRef.getLhReleaseDate());
             }
-            MdmSkuConstructionRef mdmSkuConstructionRef = skuStatusRefList.get(0);
-            billVO.setEmbryoNo(mdmSkuConstructionRef.getEmbryoNo());
-            billVO.setEmbryoReleaseDate(mdmSkuConstructionRef.getEmbryoReleaseDate());
-            billVO.setTextNo(mdmSkuConstructionRef.getTextNo());
-            billVO.setTextReleaseDate(mdmSkuConstructionRef.getTextReleaseDate());
-            billVO.setLhNo(mdmSkuConstructionRef.getLhNo());
-            billVO.setLhReleaseDate(mdmSkuConstructionRef.getLhReleaseDate());
+
         }
         return super.save(billVO);
     }

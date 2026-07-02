@@ -256,6 +256,7 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
             entity.setMonth(value.get(0).getMonth());
             entity.setRequireVersion(requireVersion);
             entity.setProductTypeCode(value.get(0).getProductTypeCode());
+            entity.setStockCapTureDate(maxDate);
             if (materialInfoMap.containsKey(value.get(0).getMaterialCode())) {
                 entity.setBrand(materialInfoMap.get(value.get(0).getMaterialCode()).getBrand());
             }
@@ -1544,7 +1545,7 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
     }
 
     /**
-     * 定时计算上月超欠产
+     * 定时计算上月超欠产（每月1号凌晨3点触发，cron: 0 0 3 1 * ?）
      * 逻辑：
      * 1. 获取上月年月和当月年月
      * 2. 计算上月日期范围（1日~月末）
@@ -1559,25 +1560,52 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
         // 获取上月和当月年月
         YearMonth lastMonth = YearMonth.now().minusMonths(1);
         YearMonth currentMonth = YearMonth.now();
+
+        return this.doCalcOverProd(lastMonth, currentMonth);
+    }
+
+    /**
+     * 计算当月超欠产写入下月（月末倒数2天触发）
+     * cron: 0 0 3 L-1 * ?（倒数第2天）、0 0 3 L * ?（最后一天）
+     * 逻辑：用当月数据写入下月月计划的"上月超欠产"栏位
+     */
+    @Override
+    public AjaxResult calcCurrentMonthOverProdForNextMonth() {
+        // 当月作为数据来源，下月作为写入目标
+        YearMonth lastMonth = YearMonth.now();
+        YearMonth currentMonth = YearMonth.now().plusMonths(1);
+
+        return this.doCalcOverProd(lastMonth, currentMonth);
+    }
+
+    /**
+     * 计算超欠产的公共方法
+     * 根据数据来源月份的计划量和完成量计算超欠产，回填到写入目标月份的定稿记录
+     *
+     * @param lastMonth    数据来源月份（上月或当月）
+     * @param currentMonth 写入目标月份（当月或下月）
+     * @return 计算结果
+     */
+    private AjaxResult doCalcOverProd(YearMonth lastMonth, YearMonth currentMonth) {
         Integer lastYear = lastMonth.getYear();
         Integer lastMonthValue = lastMonth.getMonthValue();
         Integer currentYear = currentMonth.getYear();
         Integer currentMonthValue = currentMonth.getMonthValue();
 
-        // 上月日期范围
-        Date startDate = cn.hutool.core.date.DateUtil.beginOfMonth(cn.hutool.core.date.DateUtil.offsetMonth(new Date(), -1));
+        // 数据来源月份的日期范围
+        Date startDate = cn.hutool.core.date.DateUtil.beginOfMonth(cn.hutool.core.date.DateUtil.parse(lastMonth.toString() + "-01"));
         Date endDate = cn.hutool.core.date.DateUtil.endOfMonth(startDate);
 
         // 超欠产有效标志判定阈值参数编码（SYS0206009）
         String overdueThresholdParamCode = MonthPlanEnums.LAST_MONTH_OVERDUE_THRESHOLD.getCode();
 
-        log.info("开始计算上月超欠产, 上月: {}-{}, 当月: {}-{}, 日期范围: {} ~ {}, 有效标志阈值参数: {}",
+        log.info("开始计算超欠产, 数据来源: {}-{}, 写入目标: {}-{}, 日期范围: {} ~ {}, 有效标志阈值参数: {}",
                 lastYear, lastMonthValue, currentYear, currentMonthValue, startDate, endDate, overdueThresholdParamCode);
 
         int count = finalMapper.updateLastMonthOverProd(lastYear, lastMonthValue, currentYear, currentMonthValue,
                 startDate, endDate, overdueThresholdParamCode);
 
-        log.info("上月超欠产计算完成, 更新记录数: {}", count);
-        return AjaxResult.success("上月超欠产计算完成，更新记录数：" + count);
+        log.info("超欠产计算完成, 更新记录数: {}", count);
+        return AjaxResult.success("超欠产计算完成，更新记录数：" + count);
     }
 }

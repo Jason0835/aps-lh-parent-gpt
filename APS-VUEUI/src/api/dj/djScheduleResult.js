@@ -237,3 +237,17 @@ export function getWorkClass(query) {
     params: query
   })
 }
+
+export function getPaddingDistList() {
+  return request({
+   url: `dj/djScheduleResult/getPaddingDistList`,
+    method: 'get'
+  })
+}
+
+export function getCurrentShift() {
+  return request({
+    url: `dj/djScheduleResult/getCurrentShift`,
+    method: 'get'
+  })
+}

@@ -28,8 +28,8 @@ public class Cd90CandidateMachineTrialInput {
     private BigDecimal minimumStartQuantity;
     /** 各班计划量均分阈值，按加损耗前的净需求量判断是否触发均分。 */
     private BigDecimal equalShareThreshold;
-    /** 标准卷曲长度。 */
-    private BigDecimal coilMeter;
+    /** 单车按胎体长度方向卷取后，对应的直裁排程米数。 */
+    private BigDecimal vehiclePlanQuantity;
     /** 工装总数。 */
     private int totalToolingCount;
     /** 当前库排占用车数。 */
@@ -66,6 +66,8 @@ public class Cd90CandidateMachineTrialInput {
     private BigDecimal fallbackLossRatePercent;
     /** 是否为定点优先机台。 */
     private boolean preferredMachine;
+    /** 是否为该规格上一次生产/本次续作的原机台。 */
+    private boolean historyMachine;
     /** 配置的机台优先顺序。 */
     private int priorityOrder;
 }

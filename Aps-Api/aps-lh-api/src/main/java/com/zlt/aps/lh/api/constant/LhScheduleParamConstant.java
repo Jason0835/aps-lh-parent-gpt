@@ -60,6 +60,8 @@ public final class LhScheduleParamConstant {
     public static final String MAX_FIRST_INSPECTION_PER_SHIFT = "SYS0303099";
     /** 同班次非前2台首检计划量 */
     public static final String FIRST_INSPECTION_QTY = "SYS0303003";
+    /** 同班次总计划量上限阈值，单位：条 */
+    public static final String CLASS_TOTAL_QTY_UP_LIMIT = "SYS0303004";
     /** 收尾判定天数 */
     public static final String ENDING_DETECT_DAYS = "SYS0304001";
     /** 结构收尾判定天数 */
@@ -220,4 +222,6 @@ public final class LhScheduleParamConstant {
     public static final String ENABLE_CURE_FORMULA_HISTORY_PROTECT = "SYS0304018";
     /** 全量SKU排序日志月计划起产日(beginDay)筛选阈值；仅输出月计划beginDay<=该值的SKU */
     public static final String FULL_SKU_SORT_LOG_BEGIN_DAY_THRESHOLD = "SYS0304027";
+    /** SKU提前生产天数阈值 */
+    public static final String EARLY_PRODUCTION_DAYS_THRESHOLD = "SYS0304028";
 }

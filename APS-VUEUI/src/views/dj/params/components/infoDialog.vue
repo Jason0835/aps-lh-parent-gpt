@@ -34,6 +34,11 @@ import { addParams, editParams } from "@/api/dj/params";
 
 export default {
   components: { infoForm },
+  inject: {
+    parentDict: {
+      default: () => ({}),
+    },
+  },
   data() {
     return {
       loading: false,
@@ -61,16 +66,19 @@ export default {
           label: this.$t("ui.dj.params.column.factoryCode"),
           prop: "factoryCode",
           span: 12,
-          maxlength: "50",
           required: true,
-          disabled: false,
+          type: "select",
+          dictData: this.parentDict.type?.biz_factory_name,
+          disabled: true,
         },
         {
           label: this.$t("ui.dj.params.column.productTypeCode"),
           prop: "productTypeCode",
           span: 12,
-          maxlength: "50",
           required: false,
+          type: "select",
+          dictData: this.parentDict.type?.biz_product_type,
+          disabled: true,
         },
         {
           label: this.$t("ui.dj.params.column.paramCode"),

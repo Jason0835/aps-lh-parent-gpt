@@ -991,12 +991,16 @@ public class ExcelUtils {
         // 2. 在目标工作簿中创建新Sheet
         Sheet targetSheet = targetWorkbook.createSheet(sourceSheet.getSheetName());
 
-        // 3. 复制列宽（这一步能保证排版不错位）
+        // 3. 复制列宽（遍历实际列数，避免用行索引误设列宽）
+        int maxColumns = 0;
         for (int i = 0; i <= sourceSheet.getLastRowNum(); i++) {
             Row sourceRow = sourceSheet.getRow(i);
-            if (sourceRow != null) {
-                targetSheet.setColumnWidth(i, sourceSheet.getColumnWidth(i));
+            if (sourceRow != null && sourceRow.getLastCellNum() > maxColumns) {
+                maxColumns = sourceRow.getLastCellNum();
             }
+        }
+        for (int i = 0; i < maxColumns; i++) {
+            targetSheet.setColumnWidth(i, sourceSheet.getColumnWidth(i));
         }
 
         // 4. 复制行（包含行高、样式和值）

@@ -13,6 +13,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.math.BigDecimal;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -29,6 +30,7 @@ public class Cd90MachineTrialPreparationService {
     private final Cd90MachineCandidateResolver candidateResolver;
     private final Cd90CandidateMachineTrialCalculator trialCalculator;
     private final Cd90MachineTrialSelector trialSelector;
+    private final Cd90VehiclePlanQuantityCalculator vehiclePlanQuantityCalculator;
 
     public Cd90MachineTrialPlan prepare(Cd90MachineTrialRequest request,
                                         Cd90MachineResourceSnapshot snapshot) {
@@ -39,6 +41,9 @@ public class Cd90MachineTrialPreparationService {
             throw new IllegalArgumentException("机台资源快照不能为空");
         }
         Cd90AutoScheduleParameters parameters = request.getParameters();
+        BigDecimal vehiclePlanQuantity = vehiclePlanQuantityCalculator.calculate(
+                request.getUnitConsumeMillimeter(), request.getCraftWidth(),
+                request.getCurlLength());
         // 先执行启用状态、大卷绑定、指定/禁止机台、检修和班次开放等硬约束过滤。
         Cd90MachineCandidateResolution resolution = candidateResolver.resolveDetailed(
                 request.getClothCode(), request.getBigRollCode(), request.getCraftWidth(),
@@ -68,8 +73,8 @@ public class Cd90MachineTrialPreparationService {
                         // 最小起排量、均分阈值
                         .minimumStartQuantity(parameters.getMinStartQty())
                         .equalShareThreshold(parameters.getEqualShareThreshold())
-                        // 卷长（单卷米数），用于计算卷数
-                        .coilMeter(request.getCurlLength())
+                        // 单车等价排程量，用于整车取整及工装数量试算
+                        .vehiclePlanQuantity(vehiclePlanQuantity)
                         // 工装总数（卷轴），决定单机同时可上多少卷
                         .totalToolingCount(parameters.getRollTotalCount())
                         // 已占用车数（前序班次已安排入库的部分）
@@ -103,15 +108,17 @@ public class Cd90MachineTrialPreparationService {
                         .fallbackLossRatePercent(parameters.getFallbackLossRatePercent())
                         // 首选机台标志与优先级顺序
                         .preferredMachine(candidate.isPreferredMachine())
+                        .historyMachine(candidate.getMachineCode() != null
+                                && candidate.getMachineCode().equals(request.getPreferredHistoryMachineCode()))
                         .priorityOrder(candidate.getPriorityOrder())
                         .build()))
                 .collect(Collectors.toList());
         // 选择器只给出当前最优方案；提交阶段仍会在库排失败时继续尝试其余方案。
         Cd90MachineTrial selected = trialSelector.select(trials);
         log.info("[直裁自动排程] 规格机台试算准备完成, clothCode={}, bigRollCode={}, "
-                        + "candidateCount={}, selectedMachine={}",
+                        + "candidateCount={}, selectedMachine={}, preferredHistoryMachine={}",
                 request.getClothCode(), request.getBigRollCode(), trials.size(),
-                selected == null ? null : selected.getMachineCode());
+                selected == null ? null : selected.getMachineCode(), request.getPreferredHistoryMachineCode());
         if ("MACHINE_PROHIBITED".equals(resolution.getFailureReason())) {
             log.warn("[直裁自动排程] 大卷绑定机台均不可作业, clothCode={}, bigRollCode={}, machines={}",
                     request.getClothCode(), request.getBigRollCode(), resolution.getBoundMachineCodes());
