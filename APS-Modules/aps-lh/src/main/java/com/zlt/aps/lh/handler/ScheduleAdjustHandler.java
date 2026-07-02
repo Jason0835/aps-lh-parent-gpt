@@ -572,7 +572,6 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
             lastMonthOverdueQty = BigDecimal.ZERO.intValue();
         } else {
             lastMonthOverdueQty = resolveEffectiveLastMonthOverdueQty(firstMonthPlan);
-
         }
 //        CuringMonthPlanTotalResult monthPlanTotalResult = CuringMonthPlanTotalCalculator.calculate(
 //                context, plan, toLocalDate(context.getScheduleDate()), toLocalDate(context.getWindowEndDate()),
