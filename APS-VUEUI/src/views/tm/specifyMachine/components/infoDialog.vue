@@ -88,6 +88,7 @@ export default {
           dictData: this.parentDict.type.biz_factory_name,
           span: 12,
           required: true,
+          disabled: true,
         },
         {
           prop: "treadCode",
@@ -106,6 +107,16 @@ export default {
           dictData: this.machines,
           props: { label: "machineCode", value: "machineCode" },
           filterable: true,
+          listeners: {
+            change: (value) => {
+              if (value) {
+                const machine = this.machines.find(m => m.machineCode === value);
+                if (machine) {
+                  this.form.factoryCode = machine.factoryCode;
+                }
+              }
+            },
+          },
         },
         {
           prop: "jobType",

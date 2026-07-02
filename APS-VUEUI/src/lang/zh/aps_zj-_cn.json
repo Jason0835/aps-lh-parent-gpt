@@ -182,6 +182,7 @@
   "common.rule.inoutMax": "输入数值过大",
   "common.rule.noData": "输入不能为空",
   "common.rule.peleaseInteger": "请输入整数",
+  "common.rule.gtZero": "必须大于0",
   "ui.data.workCalendar.today": "今天",
   "ui.data.workCalendar.genAnnualPlan": "生成整年日历",
   "ui.data.workCalendar.night": "夜",

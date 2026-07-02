@@ -62,6 +62,16 @@ export default {
             message: this.$t("common.rule.input"),
             trigger: "blur",
           },
+          {
+            validator: (rule, value, callback) => {
+              if (value !== null && value !== undefined && value !== "" && Number(value) <= 0) {
+                callback(new Error(this.$t("common.rule.gtZero")));
+              } else {
+                callback();
+              }
+            },
+            trigger: "blur",
+          },
         ],
       },
     };

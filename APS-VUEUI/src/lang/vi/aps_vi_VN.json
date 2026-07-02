@@ -182,6 +182,7 @@
   "common.rule.inoutMax": "Giá trị nhập vào quá lớn",
   "common.rule.noData": "Dữ liệu nhập không được để trống",
   "common.rule.peleaseInteger": "Vui lòng nhập số nguyên",
+  "common.rule.gtZero": "Phải lớn hơn 0",
   "ui.data.workCalendar.today": "Hôm nay",
   "ui.data.workCalendar.genAnnualPlan": "Tạo lịch cả năm",
   "ui.data.workCalendar.night": "Đêm",

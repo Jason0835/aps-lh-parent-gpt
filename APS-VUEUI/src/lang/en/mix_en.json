@@ -8,6 +8,7 @@
   "common.button.confirm": "Confirm",
   "common.rule.input": "Please input",
   "common.rule.select": "Please select",
+  "common.rule.gtZero": "Must be greater than 0",
   "schedule.common.expectedStartTime": "Expected Start Time",
   "schedule.common.expectedEndTime": "Expected End Time",
   "schedule.common.midClassWithTime": "Mid Shift (14:00-22:00)",
