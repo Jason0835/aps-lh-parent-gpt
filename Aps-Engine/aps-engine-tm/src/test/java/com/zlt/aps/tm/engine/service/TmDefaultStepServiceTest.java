@@ -789,6 +789,83 @@ public class TmDefaultStepServiceTest {
     }
 
     /**
+     * 测试内容：验证小胶种后续同胶任务优先沿用已绑定机台。
+     * 测试场景：首个小胶种任务已预置到 TM002，后续同小胶种同主胶任务在 TM001 评分更高。
+     * 预期结果：后续任务仍排到 TM002，避免小胶种频繁切换机台。
+     */
+    @Test
+    public void machineAssignShouldKeepSmallGlueTaskOnBoundMachineWhenAvailable() {
+        TmScheduleContext context = buildContext();
+        TmMachineAssignService service = new TmMachineAssignService(new TmTaskChainScheduleService(), buildRegistry());
+        TmTaskDraft firstTask = buildSmallGlueTask("ORD-SMALL-FIRST", "TM002");
+        TmTaskDraft secondTask = buildSmallGlueTask("ORD-SMALL-SECOND", null);
+        TmMachineCandidate higherScoreMachine = enabledCandidate("TM001", "1000");
+        higherScoreMachine.setTailMainGlueCode("GL-SMALL");
+        TmMachineCandidate boundMachine = enabledCandidate("TM002", "1000");
+        boundMachine.setTailMainGlueCode("GL-OTHER");
+        context.setMachineCandidateList(Arrays.asList(higherScoreMachine, boundMachine));
+        context.setTaskDraftList(Arrays.asList(firstTask, secondTask));
+
+        service.assign(context);
+
+        assertEquals("TM002", firstTask.getMachineCode());
+        assertEquals("TM002", secondTask.getMachineCode());
+        assertEquals("TM002", context.getSmallGlueMachineMap().get("GL-SMALL"));
+    }
+
+    /**
+     * 测试内容：验证小胶种绑定机台硬约束不可用时允许切换机台。
+     * 测试场景：首个小胶种任务绑定 TM002，后续同小胶种任务处理时 TM002 被禁用，TM001 可用。
+     * 预期结果：后续任务切换到 TM001，并刷新小胶种绑定机台。
+     */
+    @Test
+    public void machineAssignShouldSwitchSmallGlueMachineWhenBoundMachineUnavailable() {
+        TmScheduleContext context = buildContext();
+        TmMachineAssignService service = new TmMachineAssignService(new TmTaskChainScheduleService(), buildRegistry());
+        TmTaskDraft firstTask = buildSmallGlueTask("ORD-SMALL-FIRST", "TM002");
+        TmTaskDraft secondTask = buildSmallGlueTask("ORD-SMALL-SECOND", null);
+        TmMachineCandidate availableMachine = enabledCandidate("TM001", "1000");
+        TmMachineCandidate disabledBoundMachine = enabledCandidate("TM002", "1000");
+        disabledBoundMachine.setEnabled(Boolean.FALSE);
+        context.setMachineCandidateList(Arrays.asList(availableMachine, disabledBoundMachine));
+        context.setTaskDraftList(Arrays.asList(firstTask, secondTask));
+
+        service.assign(context);
+
+        assertEquals("TM002", firstTask.getMachineCode());
+        assertEquals("TM001", secondTask.getMachineCode());
+        assertEquals("TM001", context.getSmallGlueMachineMap().get("GL-SMALL"));
+    }
+
+    /**
+     * 测试内容：验证普通胶种任务不复用小胶种绑定机台。
+     * 测试场景：首个任务为小胶种并绑定 TM002，后续同主胶任务不是小胶种且 TM001 评分更高。
+     * 预期结果：普通任务按原评分逻辑选择 TM001，不受小胶种绑定记录影响。
+     */
+    @Test
+    public void machineAssignShouldNotApplySmallGlueBindingToNormalTaskWithSameGlueCode() {
+        TmScheduleContext context = buildContext();
+        TmMachineAssignService service = new TmMachineAssignService(new TmTaskChainScheduleService(), buildRegistry());
+        TmTaskDraft firstTask = buildSmallGlueTask("ORD-SMALL-FIRST", "TM002");
+        TmTaskDraft normalTask = buildTask("ORD-NORMAL-SAME-GLUE", null);
+        normalTask.setGlueCode("GL-SMALL");
+        normalTask.setPlanQty(new BigDecimal("100"));
+        normalTask.setSmallGlueFlag(Boolean.FALSE);
+        TmMachineCandidate higherScoreMachine = enabledCandidate("TM001", "1000");
+        higherScoreMachine.setTailMainGlueCode("GL-SMALL");
+        TmMachineCandidate boundMachine = enabledCandidate("TM002", "1000");
+        boundMachine.setTailMainGlueCode("GL-OTHER");
+        context.setMachineCandidateList(Arrays.asList(higherScoreMachine, boundMachine));
+        context.setTaskDraftList(Arrays.asList(firstTask, normalTask));
+
+        service.assign(context);
+
+        assertEquals("TM002", firstTask.getMachineCode());
+        assertEquals("TM001", normalTask.getMachineCode());
+        assertEquals("TM002", context.getSmallGlueMachineMap().get("GL-SMALL"));
+    }
+
+    /**
      * 构建同规格顺延测试任务。
      *
      * @param orderNo 来源工单号
@@ -801,6 +878,23 @@ public class TmDefaultStepServiceTest {
         task.setMouthPlateCode("MP-SAME");
         task.setShiftOrder(6);
         task.setPlanQty(new BigDecimal("250"));
+        return task;
+    }
+
+    /**
+     * 构建小胶种测试任务。
+     *
+     * @param orderNo 来源工单号
+     * @param machineCode 预置机台编码
+     * @return 小胶种任务
+     */
+    private TmTaskDraft buildSmallGlueTask(String orderNo, String machineCode) {
+        TmTaskDraft task = buildTask(orderNo, machineCode);
+        task.setTreadCode("TR-" + orderNo);
+        task.setGlueCode("GL-SMALL");
+        task.setMouthPlateCode("MP-SMALL");
+        task.setPlanQty(new BigDecimal("100"));
+        task.setSmallGlueFlag(Boolean.TRUE);
         return task;
     }
 

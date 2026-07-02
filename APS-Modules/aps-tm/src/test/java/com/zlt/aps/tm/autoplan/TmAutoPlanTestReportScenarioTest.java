@@ -344,6 +344,13 @@ public class TmAutoPlanTestReportScenarioTest {
     }
 
     /**
+     * TM_SCENE_039：小胶种参数命中后连续生产规则写入解释证据。
+     */
+    @Test
+    public void shouldReportScene039SmallGlueContinuous() {
+        executeScene("tm_scene_039_small_glue_continuous.json");
+    }
+    /**
      * 读取并执行单个报告场景。
      *
      * @param fileName 场景 JSON 文件名

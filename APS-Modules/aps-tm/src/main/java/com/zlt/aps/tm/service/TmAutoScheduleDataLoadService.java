@@ -7,6 +7,7 @@ import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.utils.BigDecimalUtils;
+import com.zlt.aps.common.engine.utils.DepthConfigResolver;
 import com.zlt.aps.tm.api.domain.entity.*;
 import com.zlt.aps.tm.domain.vo.TmExperimentSpecMonthPlanRowVo;
 import com.zlt.aps.tm.domain.vo.TmFormingDemandRowVo;
@@ -57,6 +58,8 @@ public class TmAutoScheduleDataLoadService {
     private static final String PARAM_EXPERIMENT_SPEC_PLAN_QTY = "TM_EXPERIMENT_SPEC_PLAN_QTY";
 
     private static final String PARAM_FORMING_SHIFT_OFFSET = "TM_FORMING_SHIFT_OFFSET";
+
+    private static final String PARAM_SMALL_GLUE_CODES = "TM_SMALL_GLUE_CODES";
 
     private static final String PROC_CODE_CX = "03";
 
@@ -112,6 +115,9 @@ public class TmAutoScheduleDataLoadService {
 
     @Resource
     private TmScheduleResultMapper tmScheduleResultMapper;
+
+    @Resource
+    private TmDepthConfigMapper tmDepthConfigMapper;
 
     @Resource
     private TmAutoScheduleRedisCacheService tmAutoScheduleRedisCacheService = new TmAutoScheduleRedisCacheService();
@@ -170,7 +176,9 @@ public class TmAutoScheduleDataLoadService {
         putDefaultParam(paramMap, PARAM_EXPERIMENT_SPEC_LOOKBACK_DAYS, "5");
         putDefaultParam(paramMap, PARAM_EXPERIMENT_SPEC_PLAN_QTY, "30");
         putDefaultParam(paramMap, PARAM_FORMING_SHIFT_OFFSET, "2");
+        putDefaultParam(paramMap, PARAM_SMALL_GLUE_CODES, "");
         context.setParamMap(paramMap);
+        context.setSmallGlueCodeSet(this.parseSmallGlueCodes(paramMap.get(PARAM_SMALL_GLUE_CODES)));
     }
 
     /**
@@ -593,13 +601,14 @@ public class TmAutoScheduleDataLoadService {
         BigDecimal minStartQty = getDecimalParam(context, PARAM_MIN_START_QTY);
         BigDecimal defaultCurlLength = getDecimalParam(context, PARAM_DEFAULT_CURL_LENGTH);
         BigDecimal toolTotalQty = getDecimalParam(context, PARAM_TOOL_TOTAL_QTY);
-        Integer guardShiftCount = getIntegerParam(context, PARAM_MIN_STOCK_CLASS, 1);
+        Integer fallbackGuardShiftCount = getIntegerParam(context, PARAM_MIN_STOCK_CLASS, 1);
         Integer newSpecLookbackDays = getPositiveIntegerParam(context, PARAM_NEW_SPEC_LOOKBACK_DAYS, 7);
         Integer newSpecAdvanceShiftCount = getPositiveIntegerParam(context, PARAM_NEW_SPEC_ADVANCE_SHIFT_COUNT, 2);
         Integer formingShiftOffset = getNonNegativeIntegerParam(context, PARAM_FORMING_SHIFT_OFFSET, 2);
         Map<String, TmNewSpecInfo> newSpecInfoMap = buildNewSpecInfoMap(context, demandRowList,
                 newSpecLookbackDays, newSpecAdvanceShiftCount);
         List<TmLossSetting> lossSettingList = loadLossSettings(context);
+        List<TmDepthConfig> depthConfigList = this.loadDepthConfigs(context);
         TmWorkCalendarRowVo tmCalendar = loadWorkCalendar(context, PROC_CODE_TM);
         TmWorkCalendarRowVo cxCalendar = loadWorkCalendar(context, PROC_CODE_CX);
         List<TmTaskDraft> taskDraftList = new ArrayList<>();
@@ -612,6 +621,7 @@ public class TmAutoScheduleDataLoadService {
                 continue;
             }
             BigDecimal[] classQtyArray = buildClassQtyArray(row);
+            Integer guardShiftCount = this.resolveGuardShiftCount(context, row, depthConfigList, fallbackGuardShiftCount);
             boolean noShutdownAvailableShift = redistributeShutdownDemand(context, classQtyArray, tmCalendar, cxCalendar);
             for (int shiftOrder = 1; shiftOrder <= 6; shiftOrder++) {
                 BigDecimal formingQty = resolveFormingQty(classQtyArray, shiftOrder, algorithmCode, formingShiftOffset);
@@ -630,7 +640,7 @@ public class TmAutoScheduleDataLoadService {
                 String rubberCategory = row.getTreadRubberCategory();
                 if (StrUtil.isNotBlank(rubberCategory)) {
                     String[] glueParts = rubberCategory.split(",");
-                    taskDraft.setGlueCode(glueParts[0]);
+                    taskDraft.setGlueCode(glueParts[0].trim());
                     if (glueParts.length > 1) {
                         // 使用英文逗号拼接剩余部分作为基部胶编码
                         String baseGlueCode = String.join(",", Arrays.copyOfRange(glueParts, 1, glueParts.length));
@@ -640,6 +650,7 @@ public class TmAutoScheduleDataLoadService {
                     taskDraft.setGlueCode(null);
                     taskDraft.setBaseGlueCode(null);
                 }
+                taskDraft.setSmallGlueFlag(this.isSmallGlueCode(context, taskDraft.getGlueCode()));
                 taskDraft.setMouthPlateCode(row.getTreadMouthPlate());
                 taskDraft.setShiftOrder(targetShiftOrder);
                 taskDraft.setNewSpecInfo(taskNewSpecInfo);
@@ -714,7 +725,7 @@ public class TmAutoScheduleDataLoadService {
                 mergeExperimentSpecTask(existingTask, experimentPlanQty, experimentSpecInfo);
                 continue;
             }
-            taskDraftList.add(buildExperimentSpecTask(treadRows.get(0), experimentPlanQty, experimentSpecInfo,
+            taskDraftList.add(buildExperimentSpecTask(context, treadRows.get(0), experimentPlanQty, experimentSpecInfo,
                     lossSettingList, minStartQty, defaultCurlLength, toolTotalQty));
         }
     }
@@ -868,6 +879,28 @@ public class TmAutoScheduleDataLoadService {
                                                 TmExperimentSpecInfo experimentSpecInfo,
                                                 List<TmLossSetting> lossSettingList, BigDecimal minStartQty,
                                                 BigDecimal defaultCurlLength, BigDecimal toolTotalQty) {
+        return this.buildExperimentSpecTask(null, row, experimentPlanQty, experimentSpecInfo,
+                lossSettingList, minStartQty, defaultCurlLength, toolTotalQty);
+    }
+
+    /**
+     * 构建实验规格任务草稿，并按本次参数快照标记小胶种。
+     *
+     * @param context 自动排程上下文
+     * @param row 实验规格月计划行
+     * @param experimentPlanQty 实验规格固定计划量
+     * @param experimentSpecInfo 实验规格识别证据
+     * @param lossSettingList 损耗配置列表
+     * @param minStartQty 最小开车量
+     * @param defaultCurlLength 默认卷曲长度
+     * @param toolTotalQty 工装总量
+     * @return 实验规格独立任务
+     */
+    private TmTaskDraft buildExperimentSpecTask(TmScheduleContext context, TmExperimentSpecMonthPlanRowVo row,
+                                                BigDecimal experimentPlanQty,
+                                                TmExperimentSpecInfo experimentSpecInfo,
+                                                List<TmLossSetting> lossSettingList, BigDecimal minStartQty,
+                                                BigDecimal defaultCurlLength, BigDecimal toolTotalQty) {
         TmTaskDraft taskDraft = new TmTaskDraft();
         taskDraft.setOrderNo("EXP-" + StrUtil.blankToDefault(row.getProductionNo(), String.valueOf(row.getMonthPlanId()))
                 + "-CLASS" + EXPERIMENT_SPEC_SHIFT_ORDER);
@@ -879,7 +912,7 @@ public class TmAutoScheduleDataLoadService {
         String rubberCategory = row.getTreadRubberCategory();
         if (StrUtil.isNotBlank(rubberCategory)) {
             String[] glueParts = rubberCategory.split(",");
-            taskDraft.setGlueCode(glueParts[0]);
+            taskDraft.setGlueCode(glueParts[0].trim());
             if (glueParts.length > 1) {
                 // 使用英文逗号拼接剩余部分作为基部胶编码
                 String baseGlueCode = String.join(",", Arrays.copyOfRange(glueParts, 1, glueParts.length));
@@ -889,6 +922,7 @@ public class TmAutoScheduleDataLoadService {
             taskDraft.setGlueCode(null);
             taskDraft.setBaseGlueCode(null);
         }
+        taskDraft.setSmallGlueFlag(this.isSmallGlueCode(context, taskDraft.getGlueCode()));
         taskDraft.setMouthPlateCode(row.getTreadMouthPlate());
         taskDraft.setShiftOrder(EXPERIMENT_SPEC_SHIFT_ORDER);
         taskDraft.setTreadShoulderLength(nvl(row.getTreadShoulderLength()));
@@ -1144,6 +1178,140 @@ public class TmAutoScheduleDataLoadService {
                 || nvl(result.getClass5PlanQty()).compareTo(BigDecimal.ZERO) > 0
                 || nvl(result.getClass6PlanQty()).compareTo(BigDecimal.ZERO) > 0;
     }
+
+    /**
+     * 直接加载当前工厂的库存保证班数配置。
+     *
+     * <p>该配置参与自动排程核心计算，每次自动排程都直接查询数据库，不使用 Redis 或本地缓存，
+     * 避免配置调整后仍使用旧库存保证班数。</p>
+     *
+     * @param context 自动排程上下文
+     * @return 按机台数量降序排列的库存保证班数配置；未配置或查询失败时返回空集合
+     */
+    private List<TmDepthConfig> loadDepthConfigs(TmScheduleContext context) {
+        if (tmDepthConfigMapper == null) {
+            return Collections.emptyList();
+        }
+        try {
+            LambdaQueryWrapper<TmDepthConfig> wrapper = new LambdaQueryWrapper<>();
+            wrapper.eq(TmDepthConfig::getFactoryCode, context.getFactoryCode());
+            wrapper.orderByDesc(TmDepthConfig::getMachineQty);
+            return Optional.ofNullable(tmDepthConfigMapper.selectList(wrapper)).orElse(Collections.emptyList()).stream()
+                    .sorted(Comparator.comparing((TmDepthConfig config) -> config.getMachineQty() == null
+                            ? Integer.MIN_VALUE : config.getMachineQty()).reversed())
+                    .collect(Collectors.toList());
+        } catch (RuntimeException ex) {
+            log.warn("[TM_DEPTH_CONFIG_LOAD] factoryCode={} 加载库存保证班数配置失败，原因={}，将回退参数 {}",
+                    context.getFactoryCode(), ex.getMessage(), PARAM_MIN_STOCK_CLASS);
+            return Collections.emptyList();
+        }
+    }
+
+    /**
+     * 解析单条成型需求应使用的库存保证班数。
+     *
+     * <p>优先根据成型结果的硫化机数量匹配 {@code T_TM_DEPTH_CONFIG}；硫化机数量为空、
+     * 未命中配置或命中配置的保证班数不是正整数时，回退原参数 {@code TM_MIN_STOCK_CLASS}。</p>
+     *
+     * @param context                 自动排程上下文
+     * @param row                     成型需求行
+     * @param depthConfigList         库存保证班数配置
+     * @param fallbackGuardShiftCount 参数兜底库存保证班数
+     * @return 当前成型来源使用的库存保证班数
+     */
+    private Integer resolveGuardShiftCount(TmScheduleContext context, TmFormingDemandRowVo row,
+                                           List<TmDepthConfig> depthConfigList, Integer fallbackGuardShiftCount) {
+        Integer lhMachineQty = this.resolveLhMachineQty(row.getLhMachineCode());
+        if (lhMachineQty == null) {
+            log.warn("[TM_DEPTH_CONFIG_MATCH] factoryCode={}, orderNo={} 硫化机编码为空或无法解析，回退参数 {}={}",
+                    context.getFactoryCode(), row.getOrderNo(), PARAM_MIN_STOCK_CLASS, fallbackGuardShiftCount);
+            return fallbackGuardShiftCount;
+        }
+        if (CollUtil.isEmpty(depthConfigList)) {
+            log.warn("[TM_DEPTH_CONFIG_MATCH] factoryCode={}, orderNo={}, lhMachineQty={} 未维护库存保证班数配置，回退参数 {}={}",
+                    context.getFactoryCode(), row.getOrderNo(), lhMachineQty, PARAM_MIN_STOCK_CLASS, fallbackGuardShiftCount);
+            return fallbackGuardShiftCount;
+        }
+        Optional<TmDepthConfig> exactConfigOptional = depthConfigList.stream()
+                .filter(depthConfig -> "EQ".equals(depthConfig.getMachineRange())
+                        && Objects.equals(depthConfig.getMachineQty(), lhMachineQty))
+                .findFirst();
+        if (exactConfigOptional.isPresent()) {
+            return this.resolveMatchedGuardShiftCount(context, row, lhMachineQty, exactConfigOptional.get(),
+                    fallbackGuardShiftCount);
+        }
+        for (TmDepthConfig depthConfig : depthConfigList) {
+            DepthConfigResolver.DepthConfigVo configVo = new DepthConfigResolver.DepthConfigVo(
+                    depthConfig.getMachineQty(), depthConfig.getMachineRange(), depthConfig.getDepthClassQty());
+            BigDecimal matchedDepthClassQty = DepthConfigResolver.resolveDepthClassQty(lhMachineQty,
+                    Collections.singletonList(configVo));
+            if (matchedDepthClassQty == null) {
+                continue;
+            }
+            return this.resolveMatchedGuardShiftCount(context, row, lhMachineQty, depthConfig, fallbackGuardShiftCount);
+        }
+        log.warn("[TM_DEPTH_CONFIG_MATCH] factoryCode={}, orderNo={}, lhMachineQty={} 未命中库存保证班数配置，回退参数 {}={}",
+                context.getFactoryCode(), row.getOrderNo(), lhMachineQty, PARAM_MIN_STOCK_CLASS, fallbackGuardShiftCount);
+        return fallbackGuardShiftCount;
+    }
+
+    /**
+     * 将已命中的深度配置转换为库存保证班数。
+     *
+     * @param context                 自动排程上下文
+     * @param row                     成型需求行
+     * @param lhMachineQty            硫化机数量
+     * @param depthConfig             已命中的深度配置
+     * @param fallbackGuardShiftCount 参数兜底库存保证班数
+     * @return 当前成型来源使用的库存保证班数
+     */
+    private Integer resolveMatchedGuardShiftCount(TmScheduleContext context, TmFormingDemandRowVo row,
+                                                  Integer lhMachineQty, TmDepthConfig depthConfig,
+                                                  Integer fallbackGuardShiftCount) {
+        Integer guardShiftCount = this.toPositiveIntegerDepthClassQty(depthConfig.getDepthClassQty());
+        if (guardShiftCount != null) {
+            return guardShiftCount;
+        }
+        log.warn("[TM_DEPTH_CONFIG_MATCH] factoryCode={}, orderNo={}, lhMachineQty={}, machineRange={}, machineQty={}, depthClassQty={} 不是正整数，回退参数 {}={}",
+                context.getFactoryCode(), row.getOrderNo(), lhMachineQty, depthConfig.getMachineRange(),
+                depthConfig.getMachineQty(), depthConfig.getDepthClassQty(), PARAM_MIN_STOCK_CLASS, fallbackGuardShiftCount);
+        return fallbackGuardShiftCount;
+    }
+
+    /**
+     * 根据成型结果硫化机编码解析硫化机数量。
+     *
+     * @param lhMachineCode 硫化机编码，多个编码使用英文逗号分隔
+     * @return 去重后的硫化机数量；为空或无法解析时返回 null
+     */
+    private Integer resolveLhMachineQty(String lhMachineCode) {
+        if (StrUtil.isBlank(lhMachineCode)) {
+            return null;
+        }
+        Set<String> machineCodeSet = Arrays.stream(lhMachineCode.split(","))
+                .map(String::trim)
+                .filter(StrUtil::isNotBlank)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+        return machineCodeSet.isEmpty() ? null : machineCodeSet.size();
+    }
+
+    /**
+     * 将库存保证班数配置值转换为正整数。
+     *
+     * @param depthClassQty 配置的库存保证班数
+     * @return 正整数班数；为空、非正数或非整数时返回 null
+     */
+    private Integer toPositiveIntegerDepthClassQty(BigDecimal depthClassQty) {
+        if (depthClassQty == null || depthClassQty.compareTo(BigDecimal.ZERO) <= 0) {
+            return null;
+        }
+        try {
+            return depthClassQty.stripTrailingZeros().intValueExact();
+        } catch (ArithmeticException ex) {
+            return null;
+        }
+    }
+
     /**
      * 加载启用的胎面损耗率配置。
      *
@@ -1462,6 +1630,37 @@ public class TmAutoScheduleDataLoadService {
         }
     }
 
+    /**
+     * 解析小胶种参数编码集合。
+     *
+     * @param paramValue 参数快照值
+     * @return 小胶种编码集合；参数为空时返回空集合
+     */
+    private Set<String> parseSmallGlueCodes(TmParamValue paramValue) {
+        if (paramValue == null) {
+            return new LinkedHashSet<>();
+        }
+        String effectiveValue = StrUtil.blankToDefault(paramValue.getParamValue(), paramValue.getDefaultValue());
+        if (StrUtil.isBlank(effectiveValue)) {
+            return new LinkedHashSet<>();
+        }
+        return Arrays.stream(effectiveValue.split(","))
+                .map(String::trim)
+                .filter(StrUtil::isNotBlank)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+    }
+
+    /**
+     * 判断主胶料编码是否命中小胶种参数。
+     *
+     * @param context 自动排程上下文
+     * @param glueCode 主胶料编码
+     * @return true 表示该任务需要启用小胶种连续生产规则
+     */
+    private boolean isSmallGlueCode(TmScheduleContext context, String glueCode) {
+        return context != null && CollUtil.isNotEmpty(context.getSmallGlueCodeSet())
+                && StrUtil.isNotBlank(glueCode) && context.getSmallGlueCodeSet().contains(glueCode.trim());
+    }
     /**
      * 读取非负整数参数，非法或小于 0 时返回默认值。
      *

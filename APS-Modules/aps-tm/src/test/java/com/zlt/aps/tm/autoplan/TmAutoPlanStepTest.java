@@ -43,6 +43,7 @@ public class TmAutoPlanStepTest {
         initTableInfo(TmMachineMaintenance.class);
         initTableInfo(TmCurlRoll.class);
         initTableInfo(TmLossSetting.class);
+        initTableInfo(TmDepthConfig.class);
     }
 
     /**
@@ -160,6 +161,22 @@ public class TmAutoPlanStepTest {
         assertBigDecimalEquals("30", firstShiftTask.getCurrentShiftDemandQty());
     }
 
+    /**
+     * 测试内容：验证库存保证班数按成型结果硫化机数量匹配深度配置。
+     */
+    @Test
+    public void shouldResolveGuardShiftCountByDepthConfigFromJson() {
+        // Given
+        TmAutoPlanMockFactory.MockContext mockContext = buildContext("case_21_depth_config_guard_shift_by_lh_machine_qty.json");
+
+        // When
+        TmScheduleContext context = mockFactory.loadContextOnly(mockContext);
+
+        // Then
+        TmTaskDraft firstShiftTask = assertHelper.findTask(context, "TR-DEPTH", 1);
+        assertEquals(Integer.valueOf(4), firstShiftTask.getGuardShiftCount());
+        assertBigDecimalEquals("100", firstShiftTask.getGuardDemandQty());
+    }
     /**
      * 测试内容：验证库存不足场景在完整入口中产出库存缺口和补库计划。
      */

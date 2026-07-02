@@ -66,6 +66,11 @@ public class TmScheduleContext {
     /** 工厂可用机台候选列表，由数据加载层填充，供机台分配步骤过滤评分使用 */
     private List<TmMachineCandidate> machineCandidateList = new ArrayList<>();
 
+    /** 小胶种编码集合，来源于本次参数快照 */
+    private Set<String> smallGlueCodeSet = new HashSet<>();
+
+    /** 小胶种本次排程内绑定机台，key=主胶料编码，value=机台编码 */
+    private Map<String, String> smallGlueMachineMap = new HashMap<>();
     /** 当前排程日一班开始前的同机台前置任务快照，key=机台编码 */
     private Map<String, TmTaskPredecessor> machinePredecessorMap = new HashMap<>();
 
@@ -171,6 +176,13 @@ public class TmScheduleContext {
         this.remainingStockMap = remainingStockMap == null ? new HashMap<>() : remainingStockMap;
     }
 
+    public void setSmallGlueCodeSet(Set<String> smallGlueCodeSet) {
+        this.smallGlueCodeSet = smallGlueCodeSet == null ? new HashSet<>() : smallGlueCodeSet;
+    }
+
+    public void setSmallGlueMachineMap(Map<String, String> smallGlueMachineMap) {
+        this.smallGlueMachineMap = smallGlueMachineMap == null ? new HashMap<>() : smallGlueMachineMap;
+    }
     public void setMachinePredecessorMap(Map<String, TmTaskPredecessor> machinePredecessorMap) {
         this.machinePredecessorMap = machinePredecessorMap == null ? new HashMap<>() : machinePredecessorMap;
     }

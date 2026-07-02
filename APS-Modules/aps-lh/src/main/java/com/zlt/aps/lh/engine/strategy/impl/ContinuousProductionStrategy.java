@@ -109,7 +109,9 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
     private static final String SINGLE_MACHINE_REDUCED_CONTINUATION_KEY_SUFFIX = "#SINGLE_MACHINE_REDUCED";
     private static final int TYPE_BLOCK_SWITCH_MAX_ATTEMPTS = 16;
     private static final String MAIN_SALE_PRODUCTION_TYPE = "01";
-    private static final LocalTime MAIN_SALE_ENDING_FILL_THRESHOLD_TIME = LocalTime.of(20, 0);
+    private static final String REGULAR_PRODUCTION_TYPE = "02";
+    private static final int EMBRYO_ON_MACHINE_ENDING_FLAG = 0;
+    private static final LocalTime ENDING_FILL_THRESHOLD_TIME = LocalTime.of(20, 0);
 
     @Resource
     private OrderNoGenerator orderNoGenerator;
@@ -4456,12 +4458,12 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
                     singleControlMachine, ScheduleTypeEnum.CONTINUOUS.getCode());
             SkuScheduleDTO sourceSku = resolveResultSourceSku(context, result);
             if (Objects.equals(rawPlanQtyMap, adjustedPlanQtyMap)) {
-                applyMainSaleEndingFillIfNecessary(context, result, sourceSku, shifts);
+                applyEndingFillIfNecessary(context, result, sourceSku, shifts);
                 continue;
             }
             applyDailyStandardShiftPlanQty(context, result, shifts, rawPlanQtyMap, adjustedPlanQtyMap);
             refreshResultSummary(context, result, shifts);
-            applyMainSaleEndingFillIfNecessary(context, result, sourceSku, shifts);
+            applyEndingFillIfNecessary(context, result, sourceSku, shifts);
             log.info("日标准产量结果计划量收敛, 当前流程: 续作排产, materialCode: {}, machineCode: {}, "
                             + "SKU日标准产量: {}, 班产: {}, 日标准产量剩余班次参数值: {}, "
                             + "修正前班次计划量: {}, 修正后班次计划量: {}",
@@ -4471,8 +4473,9 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
     }
 
     /**
-     * 主销产品收尾特殊补满。
-     * <p>仅当主销收尾机台真实收尾时间晚于业务日20:00，且结构已排机台数未达到月计划结构机台数时，
+     * SKU收尾特殊补满。
+     * <p>仅当SKU为收尾、月计划排产类型为主销或常规、运行态共用胎胚、胎胚收尾标识为0、
+     * 机台真实收尾时间晚于业务日20:00，且结构已排机台数未达到月计划结构机台数时，
      * 才允许补满当天中班和下一个晚班。</p>
      *
      * @param context 排程上下文
@@ -4480,11 +4483,28 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
      * @param sku 来源SKU
      * @param shifts 排程窗口班次
      */
-    private void applyMainSaleEndingFillIfNecessary(LhScheduleContext context,
-                                                    LhScheduleResult result,
-                                                    SkuScheduleDTO sku,
-                                                    List<LhShiftConfigVO> shifts) {
-        if (!isMainSaleEndingFillCandidate(context, result, sku, shifts)) {
+    private void applyEndingFillIfNecessary(LhScheduleContext context,
+                                            LhScheduleResult result,
+                                            SkuScheduleDTO sku,
+                                            List<LhShiftConfigVO> shifts) {
+        if (!isEndingFillCandidate(context, result, sku, shifts)) {
+            return;
+        }
+        // 收尾补满只允许运行态共用胎胚触发，单胎胚或动态剔除后转单胎胚的SKU继续严格按收尾目标量控制。
+        if (!isRuntimeSharedEmbryoForEndingFill(context, sku)) {
+            log.info("SKU收尾补满跳过, materialCode: {}, machineCode: {}, productionType: {}, embryoCode: {}, "
+                            + "activeSkuList: {}, 原因: 非运行态共用胎胚",
+                    sku.getMaterialCode(), result.getLhMachineCode(), sku.getProductionType(), sku.getEmbryoCode(),
+                    resolveActiveEmbryoSkuList(context, sku));
+            return;
+        }
+        // 胎胚收尾标识来自基础数据上下文，缺失或非0均视为胎胚不在机，避免收尾补满误超排。
+        if (!isEmbryoOnMachineForEndingFill(context, sku)) {
+            Integer embryoEndingFlag = resolveEmbryoEndingFlag(context, sku);
+            log.info("SKU收尾补满跳过, materialCode: {}, machineCode: {}, productionType: {}, embryoCode: {}, "
+                            + "embryoEndingFlag: {}, 原因: 胎胚未判定为在机",
+                    sku.getMaterialCode(), result.getLhMachineCode(), sku.getProductionType(), sku.getEmbryoCode(),
+                    embryoEndingFlag);
             return;
         }
         int lastShiftIndex = resolveLastPlannedShiftIndex(result);
@@ -4497,42 +4517,43 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
         if (Objects.isNull(endingTime)) {
             endingTime = ShiftFieldUtil.getShiftEndTime(result, currentShift.getShiftIndex());
         }
-        if (!isAfterMainSaleEndingFillThreshold(endingTime)) {
+        if (!isAfterEndingFillThreshold(endingTime)) {
             return;
         }
         LocalDate businessDate = resolveShiftWorkDate(currentShift);
         int planMachineCount = context.getStructurePlanMachineCount(businessDate, sku.getStructureName());
         int scheduledMachineCount = context.getStructureScheduledMachineCount(businessDate, sku.getStructureName());
         if (planMachineCount <= 0 || scheduledMachineCount >= planMachineCount) {
-            log.info("主销收尾补满跳过, materialCode: {}, machineCode: {}, businessDate: {}, structureName: {}, "
+            log.info("SKU收尾补满跳过, materialCode: {}, machineCode: {}, businessDate: {}, structureName: {}, "
                             + "planMachineCount: {}, scheduledMachineCount: {}, endingTime: {}",
                     result.getMaterialCode(), result.getLhMachineCode(), businessDate, sku.getStructureName(),
                     planMachineCount, scheduledMachineCount, LhScheduleTimeUtil.formatDateTime(endingTime));
             return;
         }
         if (isMachineShiftOccupiedByOtherSku(context, sku, result, nextShift)) {
-            log.info("主销收尾补满跳过, materialCode: {}, machineCode: {}, businessDate: {}, nextShift: {}, "
+            log.info("SKU收尾补满跳过, materialCode: {}, machineCode: {}, businessDate: {}, nextShift: {}, "
                             + "原因: 下一晚班已被其他SKU占用",
                     result.getMaterialCode(), result.getLhMachineCode(), businessDate, nextShift.getShiftIndex());
             return;
         }
-        if (!fillMainSaleEndingShifts(context, result, currentShift, nextShift)) {
+        if (!fillEndingShifts(context, result, currentShift, nextShift)) {
             return;
         }
         context.recordScheduledMachine(businessDate, sku.getStructureName(), sku.getMaterialCode(),
                 result.getLhMachineCode());
         refreshResultSummary(context, result, shifts);
-        log.info("主销收尾补满完成, materialCode: {}, machineCode: {}, businessDate: {}, structureName: {}, "
+        log.info("SKU收尾补满完成, materialCode: {}, machineCode: {}, productionType: {}, embryoCode: {}, "
+                        + "businessDate: {}, structureName: {}, "
                         + "planMachineCount: {}, scheduledMachineCountBefore: {}, scheduledMachineCountAfter: {}, "
                         + "endingTime: {}",
-                result.getMaterialCode(), result.getLhMachineCode(), businessDate, sku.getStructureName(),
-                planMachineCount, scheduledMachineCount,
+                result.getMaterialCode(), result.getLhMachineCode(), sku.getProductionType(), sku.getEmbryoCode(),
+                businessDate, sku.getStructureName(), planMachineCount, scheduledMachineCount,
                 context.getStructureScheduledMachineCount(businessDate, sku.getStructureName()),
                 LhScheduleTimeUtil.formatDateTime(endingTime));
     }
 
     /**
-     * 判断续作结果是否进入主销收尾补满候选。
+     * 判断续作结果是否进入SKU收尾补满候选。
      *
      * @param context 排程上下文
      * @param result 续作结果
@@ -4540,15 +4561,15 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
      * @param shifts 排程窗口班次
      * @return true-候选；false-不处理
      */
-    private boolean isMainSaleEndingFillCandidate(LhScheduleContext context,
-                                                  LhScheduleResult result,
-                                                  SkuScheduleDTO sku,
-                                                  List<LhShiftConfigVO> shifts) {
+    private boolean isEndingFillCandidate(LhScheduleContext context,
+                                          LhScheduleResult result,
+                                          SkuScheduleDTO sku,
+                                          List<LhShiftConfigVO> shifts) {
         return Objects.nonNull(context)
                 && Objects.nonNull(result)
                 && Objects.nonNull(sku)
                 && !CollectionUtils.isEmpty(shifts)
-                && StringUtils.equals(MAIN_SALE_PRODUCTION_TYPE, sku.getProductionType())
+                && isEndingFillProductionType(sku.getProductionType())
                 && StringUtils.equals(SkuTagEnum.ENDING.getCode(), sku.getSkuTag())
                 && StringUtils.equals(ScheduleTypeEnum.CONTINUOUS.getCode(), result.getScheduleType())
                 && StringUtils.isNotEmpty(sku.getStructureName())
@@ -4556,18 +4577,88 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
     }
 
     /**
-     * 判断主销收尾时间是否严格晚于20:00。
+     * 判断月计划排产类型是否允许进入SKU收尾补满。
+     *
+     * @param productionType 月计划排产类型
+     * @return true-主销或常规产品；false-其他产品类型
+     */
+    private boolean isEndingFillProductionType(String productionType) {
+        return StringUtils.equals(MAIN_SALE_PRODUCTION_TYPE, productionType)
+                || StringUtils.equals(REGULAR_PRODUCTION_TYPE, productionType);
+    }
+
+    /**
+     * 判断SKU是否满足收尾补满的运行态共用胎胚条件。
+     *
+     * <p>共用胎胚必须以本轮排程仍有效参与排产的SKU集合为准，不能只看月计划静态关系；
+     * 当共用胎胚组内其他SKU已收尾、未排或被动态剔除后，当前SKU应回到普通收尾严格目标量控制。</p>
+     *
+     * @param context 排程上下文
+     * @param sku 来源SKU
+     * @return true-当前胎胚仍存在多个有效SKU；false-单胎胚或无法识别为运行态共用胎胚
+     */
+    private boolean isRuntimeSharedEmbryoForEndingFill(LhScheduleContext context, SkuScheduleDTO sku) {
+        return getTargetScheduleQtyResolver().isSharedEmbryoInWindow(context, sku);
+    }
+
+    /**
+     * 判断胎胚是否满足收尾补满的在机条件。
+     *
+     * @param context 排程上下文
+     * @param sku 来源SKU
+     * @return true-胎胚收尾标识为0；false-标识缺失或非0
+     */
+    private boolean isEmbryoOnMachineForEndingFill(LhScheduleContext context, SkuScheduleDTO sku) {
+        Integer embryoEndingFlag = resolveEmbryoEndingFlag(context, sku);
+        return Integer.valueOf(EMBRYO_ON_MACHINE_ENDING_FLAG).equals(embryoEndingFlag);
+    }
+
+    /**
+     * 从排程上下文解析胎胚收尾标识。
+     *
+     * @param context 排程上下文
+     * @param sku 来源SKU
+     * @return 胎胚收尾标识；缺失时返回null
+     */
+    private Integer resolveEmbryoEndingFlag(LhScheduleContext context, SkuScheduleDTO sku) {
+        if (Objects.isNull(context) || Objects.isNull(sku)
+                || StringUtils.isEmpty(sku.getEmbryoCode())
+                || CollectionUtils.isEmpty(context.getEmbryoEndingFlagMap())) {
+            return null;
+        }
+        return context.getEmbryoEndingFlagMap().get(sku.getEmbryoCode());
+    }
+
+    /**
+     * 获取当前胎胚的运行态有效SKU集合。
+     *
+     * @param context 排程上下文
+     * @param sku 来源SKU
+     * @return 当前胎胚有效SKU集合；缺失时返回空集合
+     */
+    private List<String> resolveActiveEmbryoSkuList(LhScheduleContext context, SkuScheduleDTO sku) {
+        if (Objects.isNull(context) || Objects.isNull(sku)
+                || StringUtils.isEmpty(sku.getEmbryoCode())
+                || CollectionUtils.isEmpty(context.getActiveEmbryoSkuMap())) {
+            return Collections.emptyList();
+        }
+        List<String> activeSkuList = context.getActiveEmbryoSkuMap().get(sku.getEmbryoCode());
+        return CollectionUtils.isEmpty(activeSkuList) ? Collections.emptyList() : activeSkuList;
+    }
+
+    /**
+     * 判断SKU收尾时间是否严格晚于20:00。
      *
      * @param endingTime 收尾时间
      * @return true-晚于20:00；false-不满足
      */
-    private boolean isAfterMainSaleEndingFillThreshold(Date endingTime) {
+    private boolean isAfterEndingFillThreshold(Date endingTime) {
         if (Objects.isNull(endingTime)) {
             return false;
         }
         LocalTime endingLocalTime = endingTime.toInstant()
                 .atZone(ZoneId.systemDefault()).toLocalTime();
-        return endingLocalTime.isAfter(MAIN_SALE_ENDING_FILL_THRESHOLD_TIME);
+        return endingLocalTime.isAfter(ENDING_FILL_THRESHOLD_TIME);
     }
 
     /**
@@ -4585,7 +4676,7 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
     }
 
     /**
-     * 补满主销收尾当前中班和下一晚班。
+     * 补满SKU收尾当前中班和下一晚班。
      *
      * @param context 排程上下文
      * @param result 续作结果
@@ -4593,10 +4684,10 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
      * @param nextShift 下一晚班
      * @return true-发生补满；false-无可补产能
      */
-    private boolean fillMainSaleEndingShifts(LhScheduleContext context,
-                                             LhScheduleResult result,
-                                             LhShiftConfigVO currentShift,
-                                             LhShiftConfigVO nextShift) {
+    private boolean fillEndingShifts(LhScheduleContext context,
+                                     LhScheduleResult result,
+                                     LhShiftConfigVO currentShift,
+                                     LhShiftConfigVO nextShift) {
         int currentBeforeQty = resolveShiftPlanQty(result, currentShift.getShiftIndex());
         int currentShiftCapacity = calculateResultShiftCapacity(context, result, currentShift);
         int nextBeforeQty = resolveShiftPlanQty(result, nextShift.getShiftIndex());
@@ -4614,7 +4705,7 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
                     nextShift.getShiftStartDateTime(), nextShift.getShiftEndDateTime());
             filled = true;
         }
-        log.info("主销收尾补满判断, materialCode: {}, machineCode: {}, currentShift: {}, nextShift: {}, "
+        log.info("SKU收尾补满判断, materialCode: {}, machineCode: {}, currentShift: {}, nextShift: {}, "
                         + "currentBeforeQty: {}, currentCapacity: {}, nextBeforeQty: {}, nextCapacity: {}, filled: {}",
                 result.getMaterialCode(), result.getLhMachineCode(), currentShift.getShiftIndex(),
                 nextShift.getShiftIndex(), currentBeforeQty, currentShiftCapacity, nextBeforeQty,
