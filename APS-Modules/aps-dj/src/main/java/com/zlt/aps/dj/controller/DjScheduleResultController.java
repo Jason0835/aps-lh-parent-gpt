@@ -6,6 +6,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
 
 import javax.annotation.Resource;
 
@@ -36,11 +40,13 @@ import com.zlt.aps.common.engine.service.FactoryService;
 import com.zlt.aps.dj.api.domain.entity.DjDayFinishQty;
 import com.zlt.aps.dj.api.domain.entity.DjDispatcherLog;
 import com.zlt.aps.dj.api.domain.entity.DjScheduleResult;
+import com.zlt.aps.dj.api.domain.entity.DjShiftConfig;
 import com.zlt.aps.dj.engine.mapper.DjEngineConstructionInfoMapper;
 import com.zlt.aps.dj.engine.service.DjEngineNewService;
 import com.zlt.aps.dj.service.DjMachineInfoService;
 import com.zlt.aps.dj.service.DjScheduleResultService;
 import com.zlt.aps.dj.service.IDjScheduleAdjustService;
+import com.zlt.aps.dj.service.IDjShiftConfigService;
 import com.zlt.aps.itf.vo.SyncDataLogs;
 import com.zlt.aps.mdm.api.domain.entity.MdmConstructionInfo;
 import com.zlt.bill.common.controller.AbstractBillBizController;
@@ -76,6 +82,8 @@ public class DjScheduleResultController extends AbstractBillBizController<DjSche
     private IDjScheduleAdjustService iDjScheduleAdjustService;
     @Resource
     private DjEngineConstructionInfoMapper djEngineConstructionInfoMapper;
+    @Resource
+    private IDjShiftConfigService djShiftConfigService;
 	
 
     @ApiOperation("按条件分页查询")
@@ -643,6 +651,115 @@ public class DjScheduleResultController extends AbstractBillBizController<DjSche
             result.add(map);
         }
         return AjaxResult.success(result);
+    }
+
+    /**
+     * 获取当前服务器时间对应的班次信息（用于插单弹窗）
+     * 从 T_DJ_SHIFT_CONFIG 基础资料表读取各班次时间配置，动态判定当前班次
+     * 返回连续3个班次的日期、标签等信息
+     */
+    @GetMapping("/getCurrentShift")
+    @ApiOperation("获取当前班次信息")
+    public AjaxResult getCurrentShift() {
+        // 查询开班的所有班次配置
+        List<DjShiftConfig> activeShifts = djShiftConfigService.listActiveShifts();
+        if (CollectionUtils.isEmpty(activeShifts)) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.dj.shift.configNotFound"));
+        }
+
+        // 获取当前服务器时间
+        LocalTime now = LocalTime.now();
+        LocalDate serverDate = LocalDate.now();
+
+        // 遍历判定当前时间所属班次
+        DjShiftConfig currentConfig = null;
+        LocalDate scheduleDate = serverDate;
+
+        for (DjShiftConfig config : activeShifts) {
+            LocalTime startTime = LocalTime.parse(config.getPlanStartTime());
+            LocalTime endTime = LocalTime.parse(config.getPlanEndTime());
+
+            boolean inRange;
+            if ("1".equals(config.getCrossDayFlag())) {
+                // 跨天班次：当前时间 ≥ 开始时间 或 当前时间 < 结束时间
+                inRange = !now.isBefore(startTime) || now.isBefore(endTime);
+                if (inRange && !now.isBefore(startTime)) {
+                    // 跨天班次且在开始时间之后（如 22:00~00:00），排产日+1
+                    scheduleDate = serverDate.plusDays(1);
+                }
+            } else {
+                // 非跨天班次：开始时间 ≤ 当前时间 < 结束时间
+                inRange = !now.isBefore(startTime) && now.isBefore(endTime);
+            }
+
+            if (inRange) {
+                currentConfig = config;
+                break;
+            }
+        }
+
+        if (currentConfig == null) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.dj.shift.notInAnyShiftRange"));
+        }
+
+        String currentShiftClass = currentConfig.getShiftCode();
+
+        // 计算连续3个班次
+        List<Map<String, Object>> shifts = buildConsecutiveShifts(activeShifts, currentConfig, scheduleDate);
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("scheduleDate", scheduleDate.format(DateTimeFormatter.ISO_LOCAL_DATE));
+        result.put("currentShiftClass", currentShiftClass);
+        result.put("shifts", shifts);
+        return AjaxResult.success(result);
+    }
+
+    /**
+     * 根据排产日和当前班次，构建连续3个班次的信息列表
+     *
+     * @param activeShifts 开班的所有班次配置（按 SHIFT_ORDER 排序）
+     * @param currentConfig 当前命中班次
+     * @param scheduleDate 排产日
+     */
+    private List<Map<String, Object>> buildConsecutiveShifts(List<DjShiftConfig> activeShifts, DjShiftConfig currentConfig, LocalDate scheduleDate) {
+        List<Map<String, Object>> shifts = new ArrayList<>();
+        int currentIndex = -1;
+        for (int i = 0; i < activeShifts.size(); i++) {
+            if (activeShifts.get(i).getShiftCode().equals(currentConfig.getShiftCode())) {
+                currentIndex = i;
+                break;
+            }
+        }
+        if (currentIndex < 0) {
+            return shifts;
+        }
+
+        int totalShifts = activeShifts.size();
+        for (int i = 0; i < 3; i++) {
+            DjShiftConfig config = activeShifts.get((currentIndex + i) % totalShifts);
+            Map<String, Object> shift = new HashMap<>();
+
+            // 通过 ClassNumThreePlanEnums 获取 i18n 班次名称
+            ClassNumThreePlanEnums enumVal = ClassNumThreePlanEnums.getClassEnums(config.getShiftCode());
+            String shiftName = (enumVal != null) ? I18nUtil.getMessage(enumVal.getClassName()) : config.getShiftName();
+
+            // 计算班次日期
+            LocalDate shiftDate = scheduleDate;
+            // 当前班次为中班(03)时，第3个班次（早班）在 D+1 日
+            // 因为中班(14:00~22:00) → 夜班(22:00~06:00, 仍属D日) → 早班(06:00~14:00, 已跨到D+1日)
+            if (i == 2 && "03".equals(currentConfig.getShiftCode())) {
+                shiftDate = scheduleDate.plusDays(1);
+            }
+
+            shift.put("classIndex", i + 1);
+            shift.put("shiftClass", config.getShiftCode());
+            shift.put("date", shiftDate.format(DateTimeFormatter.ISO_LOCAL_DATE));
+            shift.put("label", shiftName + shiftDate.format(DateTimeFormatter.ofPattern("MM/dd")));
+
+            shifts.add(shift);
+        }
+
+        return shifts;
     }
 
     @Override

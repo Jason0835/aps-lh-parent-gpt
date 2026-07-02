@@ -201,4 +201,11 @@ public interface IDjScheduleResultRemoteService {
     @GetMapping("/djScheduleResult/getPaddingDistList")
     @ApiOperation("获取垫胶下拉列表")
     AjaxResult getPaddingDistList();
+
+    /**
+     * 获取当前服务器时间对应的班次信息
+     */
+    @GetMapping("/djScheduleResult/getCurrentShift")
+    @ApiOperation("获取当前班次信息")
+    AjaxResult getCurrentShift();
 }
