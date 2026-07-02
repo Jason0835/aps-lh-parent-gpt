@@ -1,10 +1,14 @@
 package com.zlt.aps.tm.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.ruoyi.common.constant.UserConstants;
+import com.ruoyi.common.core.web.domain.BaseEntity;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.engine.enums.ClassNumThreePlanEnums;
+import com.zlt.aps.common.engine.utils.GenerageMapKeyUtils;
 import com.zlt.aps.tm.api.domain.entity.TmMachineInfo;
 import com.zlt.aps.tm.api.domain.entity.TmMachineMaintenance;
 import com.zlt.aps.tm.api.domain.entity.TmShiftConfig;
@@ -71,8 +75,10 @@ public class TmMachineMaintenanceServiceImpl extends AbstractDocService<TmMachin
     @Override
     protected Map<Object, Object> getServiceCheckParams(List<TmMachineMaintenance> list, List<TmMachineMaintenance> importList) {
         Map<Object, Object> serviceCheckParams = super.getServiceCheckParams(list, importList);
-        List<TmMachineInfo> machineInfoList = machineInfoMapper.selectList(null);
-        Map<String, TmMachineInfo> machineInfoMap = machineInfoList.stream().collect(Collectors.toMap(TmMachineInfo::getMachineCode, Function.identity(), (s1, s2) -> s1));
+        LambdaQueryWrapper<TmMachineInfo> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(BaseEntity::getIsDelete, ApsConstant.DEL_FLAG_NORMAL);
+        List<TmMachineInfo> machineInfoList = machineInfoMapper.selectList(wrapper);
+        Map<String, TmMachineInfo> machineInfoMap = machineInfoList.stream().collect(Collectors.toMap(item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), item.getMachineCode()), Function.identity(), (s1, s2) -> s1));
         serviceCheckParams.put("machineMap", machineInfoMap);
         return serviceCheckParams;
     }
@@ -84,7 +90,7 @@ public class TmMachineMaintenanceServiceImpl extends AbstractDocService<TmMachin
 
         @SuppressWarnings("unchecked")
         Map<String, TmMachineInfo> machineInfoMap = (Map<String, TmMachineInfo>) serviceCheckParams.get("machineMap");
-        String mapKey = importDocEntity.getMachineCode();
+        String mapKey = GenerageMapKeyUtils.createMapKey(importDocEntity.getFactoryCode(), importDocEntity.getMachineCode());
         if (!machineInfoMap.containsKey(mapKey)) {
             String message = I18nUtil.getMessage("ui.data.alert.tmGlueMachineReal.machineNotExist");
             ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(),
@@ -153,13 +159,13 @@ public class TmMachineMaintenanceServiceImpl extends AbstractDocService<TmMachin
         if (shiftName == null) {
             return null;
         }
-        if (shiftName.equals(ClassNumThreePlanEnums.CLASS_NIGHT.getClassName())) {
+        if (shiftName.equals(I18nUtil.getMessage(ClassNumThreePlanEnums.CLASS_NIGHT.getClassName(), Locale.CHINA))) {
             return ClassNumThreePlanEnums.CLASS_NIGHT.getClassIndex();
         }
-        if (shiftName.equals(ClassNumThreePlanEnums.CLASS_MORNING.getClassName())) {
-            return ClassNumThreePlanEnums.CLASS_MORNING.getClassName();
+        if (shiftName.equals(I18nUtil.getMessage(ClassNumThreePlanEnums.CLASS_MORNING.getClassName(), Locale.CHINA))) {
+            return ClassNumThreePlanEnums.CLASS_MORNING.getClassIndex();
         }
-        if (shiftName.equals(ClassNumThreePlanEnums.CLASS_DAY.getClassName())) {
+        if (shiftName.equals(I18nUtil.getMessage(ClassNumThreePlanEnums.CLASS_DAY.getClassName(), Locale.CHINA))) {
             return ClassNumThreePlanEnums.CLASS_DAY.getClassIndex();
         }
         return null;

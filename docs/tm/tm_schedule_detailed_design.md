@@ -201,7 +201,7 @@
 - `TM_TAIL_ROUND_RULE`：收尾取整规则
 - `TM_NORMAL_ROUND_RULE`：常规取整规则
 - `TM_LARGE_SMALL_THRESHOLD`：大小批量阈值
-- `TM_MIN_STOCK_CLASS`：库存最低保证班数。用于控制自动排程至少保障当前班及后续若干班的胎面供应；缺省值按 1 班处理，并在解释信息中记录使用默认值。代码参数常量对齐为 `TM_MIN_STOCK_CLASS`（与 `t_tm_params` 表实际参数名一致）。
+- `TM_MIN_STOCK_CLASS`：库存最低保证班数兜底参数。自动排程优先按成型结果 `LH_MACHINE_CODE` 解析去重后的硫化机数量，并匹配 `T_TM_DEPTH_CONFIG.machine_qty + machine_range` 得到 `depth_class_qty`；当硫化机编码为空、无法解析、深度配置未命中或 `depth_class_qty` 不是正整数时，回退使用本参数。缺省值按 1 班处理，并在解释信息中记录使用默认值。代码参数常量对齐为 `TM_MIN_STOCK_CLASS`（与 `t_tm_params` 表实际参数名一致）。
 - `TM_DEDUCT_PRIORITY`：需求抵扣优先级。用于后续配置库存余额、前序已排计划量等抵扣项的执行顺序；当前默认抵扣链使用首班 14 点预计库存并按交接班库存逐班滚动，未定义来源的数据不进入默认公式。
 - `TM_ROLLING_SHIFT_COUNT`：局部滚动重算班次数，默认 3
 - `TM_MAX_LOOKAHEAD_SHIFT_COUNT`：需求前瞻班次数
@@ -211,6 +211,7 @@
 - `TM_FORMING_SHIFT_OFFSET`：胎面需求计算时，胎面班次到成型班次的偏移量，默认 2。胎面 `CLASS{N}` 对应成型 `CLASS{N + TM_FORMING_SHIFT_OFFSET}`；配置 0 表示同序号班次，未配置、空值、非数字或负数按默认 2 处理，超过成型 `CLASS8` 的班次按 0 处理。
 - `TM_EXPERIMENT_SPEC_LOOKBACK_DAYS`：实验规格月计划回看天数，默认 5。执行排程日期 `D` 时，查询 `D-N` 的月计划定稿实验记录。
 - `TM_EXPERIMENT_SPEC_PLAN_QTY`：实验规格胎面计划量，默认 30，单位米。月计划 `DAY_x > 0` 只作为实验规格命中条件，不按月计划数量放大胎面计划量。
+- `TM_SMALL_GLUE_CODES`：小胶种主胶料编码列表，默认空。多个 `glueCode` 使用英文逗号分隔；成型需求和实验规格任务取胶料组合中的第一个编码作为主胶料，命中后标记为小胶种任务。
 
 ### 4.11 `T_TM_STOCK`
 
@@ -260,6 +261,7 @@
 - `TmPlanCalcService`：计算计划量、预计划、收尾、小批量补卷等。计划量计算前从库存预测初始化 per-tread 班初滚动库存 `remainingStockMap`（初值14点预计库存），同时初始化全局可用工装池 `availableToolQty = 总工装数量 - sum(各胎面14点预计库存 / 对应卷曲长度)`；任务按班次、胎面编码稳定排序，完成后分别回写交接班预计库存和全局剩余工装。
 - `TmMachineAssignService`：基于机台、口型板、定点/禁排、胶料机台关系筛选候选机台；选中机台后按 `machineCode + shiftOrder` 计算真实剩余产能。当前班只写入该机台可承接的计划量，产能受限溢出量与计划量策略产生的工装溢出量统一从下一班开始顺延；下一班同机台同胎面已有任务时先合并计划量，没有同胎面任务时创建顺延任务。顺延仍必须满足开班、停机、口型、胶料、定点/禁排和产能过滤，6 班后仍未排完的数量写未排。全部候选机台被过滤时，按候选 `filterReasonCode` 归类未排原因：全部 `NO_REMAIN_CAPACITY`→`CAPACITY_NOT_ENOUGH`，全部 `MOUTH_PLATE_NOT_MATCH`→`MOUTH_PLATE_NOT_MATCH`，全部 `GLUE_MACHINE_NOT_MATCH`→`GLUE_MACHINE_NOT_ALLOWED`，`MACHINE_DISABLED`/定点规则/混合原因→`NO_AVAILABLE_MACHINE` 兜底。
 - 机台分配按班次处理待排任务，并把同机台已有链尾作为前置任务参与排序：一班优先继承上一排程日同机台最后有效排程任务，二到六班优先继承同机台上一已排班次的最后任务；同班次内每追加一个任务后，剩余任务会基于新的链尾重新计算连续性优先级。链式任务排序按分层优先级比较：先比较主胶料连续，再比较基部胶连续，再比较口型连续，最后在连续性层级相同的任务之间比较产能适配、切换成本、定点生产等业务分；口型连续和产能适配不得反超主胶料连续。上一排程日前置任务从 `T_TM_SCHEDULE_RESULT.base_glue_code` 读取独立基部胶字段，旧历史结果为空时仅跳过基部胶连续评分，不能回退使用 `whole_glue_code`。
+- 小胶种连续生产：数据加载阶段按 `TM_SMALL_GLUE_CODES` 标记小胶种任务；机台分配阶段按主胶料维护本次排程内的小胶种绑定机台。后续任务只有同样命中小胶种标识时才优先尝试绑定机台；普通任务即使 `glueCode` 相同也不复用该绑定。若绑定机台因口型、胶料禁投、停用、不开班、检修或剩余产能等硬约束不可用，才允许按过滤和评分结果切换机台，并在 `rule_hit_json` 写入 `SMALL_GLUE_CONTINUOUS` 证据。
 - `TmCapacityBalanceService`：做产能均衡、中夜班移量、次日回拉和任务顺序计算。当前本轮不实现生产级产能均衡算法，仅保留流程占位和风险记录。
 - `TmSnapshotBuildService`：生成 `T_TM_SCHEDULE_RESULT_EXPLAIN`。
 - `TmPersistService`：统一转换结果和解释信息；`TmBizSnapshotAndPersistService` 负责将已排结果写入 `T_TM_SCHEDULE_RESULT`、未排摘要写入 `T_TM_SCHEDULE_UNPLANNED`、任务级解释写入 `T_TM_SCHEDULE_RESULT_EXPLAIN`。
@@ -839,7 +841,9 @@ Output:
 
 Step7 计算库存保证班数和库存供应成型时长
 Process:
-  参数 TM_MIN_STOCK_CLASS 表示库存最低保证班数，缺省值为 1 班，保证范围包含当前班，即当前班 + 后续 N-1 班；
+  优先从成型结果 `LH_MACHINE_CODE` 按英文逗号拆分、去空并去重后得到硫化机数量，再按 `T_TM_DEPTH_CONFIG` 的 `machine_qty` 与 `machine_range` 匹配库存保证班数，同台数 `EQ` 精确配置优先，其余配置按 `machine_qty` 降序匹配并支持 `LT/LE/EQ/GE/GT`；
+  命中的 `depth_class_qty` 必须是正整数，例如 `4.000000` 生效；为空、非正数或 `3.5` 这类非整数时回退参数 `TM_MIN_STOCK_CLASS`；
+  参数 `TM_MIN_STOCK_CLASS` 仅作为兜底库存最低保证班数，缺省值为 1 班，保证范围包含当前班，即当前班 + 后续 N-1 班；
   guardDemandQty = 保证范围内成型胎面需求量合计；
   currentShiftDemandQty = 当前班成型胎面需求量；
   从当前班开始顺次检查库存，每满足一个班的成型消耗，库存满足成型消耗的班数加 1；
@@ -1339,7 +1343,7 @@ Output:
 
 - 旧批次覆盖：同一 `factory_code + schedule_date` 无旧结果允许生成；旧结果全部未发布时前端确认后允许重新生成；存在任一非未发布结果时拒绝生成。
 - 库存计算起点：使用 6 点库存作为滚动库存起点；如 `T_TM_STOCK` 当前只有日期维度，则该日期库存代表 6 点库存快照。
-- 库存最低保证班数：参数 `TM_MIN_STOCK_CLASS` 缺省按 1 班，保证范围包含当前班，即当前班 + 后续 N-1 班。
+- 库存最低保证班数：优先按成型结果 `LH_MACHINE_CODE` 解析去重后的硫化机数量，并匹配 `T_TM_DEPTH_CONFIG.depth_class_qty`，同台数 `EQ` 精确配置优先；配置未命中或配置值不是正整数时，回退参数 `TM_MIN_STOCK_CLASS`，缺省按 1 班，保证范围包含当前班，即当前班 + 后续 N-1 班。
 - 需求量公式：`currentShiftStockGapQty = max(currentShiftDemandQty - rollingStockQty, 0)`，`stockGapQty = max(guardDemandQty - rollingStockQty, 0)`，`demandQty = max(currentShiftStockGapQty, stockGapQty)`；计划量基础需求为 `baseDemandQty = max(currentShiftDemandQty - rollingStockQty, guardDemandQty - rollingStockQty, 0)`。
 - 插单第二个在产规格：判定范围为同排程日期、同机台、同班次、第二顺序之后。
 - 事务边界：自动排程结果、未排结果、解释表、调度日志在同一事务内处理，任一失败整批回滚。
@@ -1868,7 +1872,7 @@ graph LR
 - `ITmDemandQtyStrategy`：胎面需求量算法策略。
   - `String getAlgorithmCode()`：返回算法编码，例如 `1`、`2`。
   - `TmDemandQtyResult calculate(TmDemandQtyInput input, TmScheduleContext context)`：计算需求量。`input` 传成型计划、胎面长度、班次；`context` 传参数和日志上下文；返回每班需求量。
-  - 默认实现应支持库存最低保证班数：读取 `TM_MIN_STOCK_CLASS`，缺省 1 班；计算 `guardDemandQty`、`currentShiftDemandQty`、`currentShiftStockGapQty`、`stockGapQty` 和 `demandQty`；未来需求为 0 时不得除零，供应时长标记为空或 `NO_FUTURE_DEMAND`。
+  - 默认实现应支持库存最低保证班数：优先按成型结果 `LH_MACHINE_CODE` 解析硫化机数量并匹配 `T_TM_DEPTH_CONFIG.depth_class_qty`，同台数 `EQ` 精确配置优先，配置未命中、为空或不是正整数时读取 `TM_MIN_STOCK_CLASS` 兜底，缺省 1 班；计算 `guardDemandQty`、`currentShiftDemandQty`、`currentShiftStockGapQty`、`stockGapQty` 和 `demandQty`；未来需求为 0 时不得除零，供应时长标记为空或 `NO_FUTURE_DEMAND`。
   - 抵扣优先级通过 `TM_DEDUCT_PRIORITY` 扩展，当前默认抵扣链使用首班 14 点预计库存并按交接班库存逐班滚动，不使用来源未定义字段。
 
 - `ITmPlanQtyStrategy`：胎面计划量算法策略。
@@ -2008,7 +2012,7 @@ TmDataLoadService.loadAllData(context)
 5. 人工操作链表测试：插单、删除、调量、转机台后顺序重算正确。
 6. 解释与日志测试：同一 `batchNo + traceId` 能串起参数、库存、排序、过滤、评分、落库全过程。
 7. 旧批次与插单测试：全未发布旧批次确认后可重排；存在非未发布旧批次拒绝；插单位置不在第二顺序之后拒绝。
-8. 场景测试数据：具体模拟数据放在 `docs/tm` 目录，至少覆盖 6 点库存 1000 米、未来 2 班需求 600/500 米、未来需求为 0、工装限制、最小起排、卷数取整、工装/产能顺延合并、主胶料/基部胶评分和同分机台编码排序。
+8. 场景测试数据：具体模拟数据放在 `docs/tm` 目录，至少覆盖 6 点库存 1000 米、未来 2 班需求 600/500 米、未来需求为 0、工装限制、最小起排、卷数取整、工装/产能顺延合并、主胶料/基部胶评分、同分机台编码排序和小胶种连续生产。
 9. 编译验证：实现代码后优先执行 `mvn -pl APS-Modules/aps-tm -am -DskipTests compile`；若改动 API 层，补跑 `mvn -pl Aps-Api/tm-api -am -DskipTests compile`。
 
 验收标准：

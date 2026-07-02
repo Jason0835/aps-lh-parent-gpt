@@ -162,6 +162,8 @@ public class TmTaskDraft {
     /** 新规格判断与提前排产证据 */
     private TmNewSpecInfo newSpecInfo;
 
+    /** 是否命中小胶种连续生产规则 */
+    private Boolean smallGlueFlag;
     /** 实验规格判断与固定计划量证据 */
     private TmExperimentSpecInfo experimentSpecInfo;
 

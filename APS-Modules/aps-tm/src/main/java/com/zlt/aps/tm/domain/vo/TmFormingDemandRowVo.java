@@ -21,6 +21,9 @@ public class TmFormingDemandRowVo {
     /** BOM 数据版本 */
     private String bomDataVersion;
 
+    /** 硫化机编码，多个编码使用英文逗号分隔 */
+    private String lhMachineCode;
+
     /** 1班成型计划量 */
     private BigDecimal class1PlanQty;
 

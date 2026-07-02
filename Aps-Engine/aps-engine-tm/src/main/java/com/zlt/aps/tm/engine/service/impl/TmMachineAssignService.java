@@ -93,6 +93,7 @@ public class TmMachineAssignService implements ITmMachineAssignService {
         candidate.setMachineCode(task.getMachineCode());
         context.getCandidateTraceMap().put(task.getBusinessKey(), Collections.singletonList(candidate));
         this.addAssignTrace(context, task, "PASS", task.getMachineCode(), null, null);
+        this.bindSmallGlueMachine(context, task, task.getMachineCode(), null, "PRESET_MACHINE");
         this.taskChainScheduleService.appendAutoTask(task, candidate, context);
     }
 
@@ -397,6 +398,8 @@ public class TmMachineAssignService implements ITmMachineAssignService {
                     task.getBusinessKey(), unplannedReason.getCode());
             this.logMachineAssignSummary(context, task, candidates, passedCandidates, null, "REJECT", unplannedReason);
             context.getCandidateTraceMap().put(task.getBusinessKey(), candidates);
+            this.addSmallGlueContinuousTrace(context, task, this.resolveSmallGlueBoundMachine(task, context), null,
+                    false, this.resolveSmallGlueSwitchReason(this.resolveSmallGlueBoundMachine(task, context), candidates));
             this.addAssignTrace(context, task, "REJECT", null, unplannedReason.getCode(), unplannedReason.getDesc());
             this.markUnplanned(task, unplannedReason);
             return;
@@ -411,11 +414,12 @@ public class TmMachineAssignService implements ITmMachineAssignService {
         }
         context.getCandidateTraceMap().put(task.getBusinessKey(), candidates);
 
-        // 按评分降序选择最高分机台，同分按机台编码升序排序保证稳定
-        passedCandidates.sort(Comparator
-                .comparing(TmMachineCandidate::getScore, Comparator.nullsLast(Comparator.reverseOrder()))
-                .thenComparing(TmMachineCandidate::getMachineCode, Comparator.nullsLast(Comparator.naturalOrder())));
+        // 小胶种优先使用已绑定机台；没有绑定或绑定机台不可用时按评分稳定选择。
+        String originalSmallGlueMachine = this.resolveSmallGlueBoundMachine(task, context);
+        passedCandidates = this.sortCandidatesForSmallGlue(task, context, passedCandidates, null);
         TmMachineCandidate bestCandidate = passedCandidates.get(0);
+        this.bindSmallGlueMachine(context, task, bestCandidate.getMachineCode(), originalSmallGlueMachine,
+                this.resolveSmallGlueSwitchReason(originalSmallGlueMachine, candidates));
         if (task.getShiftOrder() == null) {
             task.setShiftOrder(1);
         }
@@ -471,6 +475,8 @@ public class TmMachineAssignService implements ITmMachineAssignService {
                 context.getCandidateTraceMap().put(task.getBusinessKey(), Collections.singletonList(runtimeCandidate));
                 this.addCapacitySplitTrace(context, task, currentShiftPlanQty, assignedQty, capacityOverflowQty,
                         remainCapacity, runtimeCandidate.getMachineCode(), true);
+                this.bindSmallGlueMachine(context, task, runtimeCandidate.getMachineCode(),
+                        this.resolveSmallGlueBoundMachine(task, context), null);
                 this.addAssignTrace(context, task, "PASS", runtimeCandidate.getMachineCode(), null, null);
                 this.taskChainScheduleService.appendAutoTask(task, runtimeCandidate, context);
             }
@@ -536,6 +542,8 @@ public class TmMachineAssignService implements ITmMachineAssignService {
                     context.getCandidateTraceMap().put(mergeTarget.getBusinessKey(), Collections.singletonList(runtimeCandidate));
                     this.addCarryoverTrace(context, mergeTarget, sourceTask, sourceType, assignedQty, sourceShiftOrder,
                             shiftOrder, candidate.getMachineCode(), beforeMergeQty, afterMergeQty, true);
+                    this.bindSmallGlueMachine(context, mergeTarget, candidate.getMachineCode(),
+                            this.resolveSmallGlueBoundMachine(mergeTarget, context), null);
                     this.logCarryoverSummary(context, mergeTarget, sourceTask, sourceType, assignedQty,
                             capacityOverflowQty, toolOverflowQty, sourceShiftOrder, shiftOrder,
                             candidate.getMachineCode(), beforeMergeQty, afterMergeQty, beforeAssignQty, true);
@@ -554,6 +562,8 @@ public class TmMachineAssignService implements ITmMachineAssignService {
                     this.logCarryoverSummary(context, overflowTask, sourceTask, sourceType, assignedQty,
                             capacityOverflowQty, toolOverflowQty, sourceShiftOrder, shiftOrder,
                             candidate.getMachineCode(), BigDecimal.ZERO, assignedQty, beforeAssignQty, false);
+                    this.bindSmallGlueMachine(context, overflowTask, runtimeCandidate.getMachineCode(),
+                            this.resolveSmallGlueBoundMachine(overflowTask, context), null);
                     this.addAssignTrace(context, overflowTask, "PASS", runtimeCandidate.getMachineCode(), null, null);
                     this.taskChainScheduleService.prependAutoTask(overflowTask, runtimeCandidate, context);
                 }
@@ -708,7 +718,7 @@ public class TmMachineAssignService implements ITmMachineAssignService {
         if (CollUtil.isEmpty(candidates) && CollUtil.isNotEmpty(firstShiftCandidates)) {
             candidates = this.buildPassedAndScoredCandidates(probeTask, context, filterRule, scoreStrategy);
         }
-        return this.sortCandidatesWithSelectedFirst(candidates, selectedCandidate);
+        return this.sortCandidatesForSmallGlue(probeTask, context, candidates, selectedCandidate);
     }
     /**
      * 重新执行候选机台过滤和评分，用于溢出量进入后续班次后的跨机台承接判断。
@@ -770,7 +780,7 @@ public class TmMachineAssignService implements ITmMachineAssignService {
      */
     private List<TmMachineCandidate> sortCandidatesWithSelectedFirst(List<TmMachineCandidate> candidates,
                                                                      TmMachineCandidate selectedCandidate) {
-        List<TmMachineCandidate> sortedCandidates = this.sortCandidates(new ArrayList<>(candidates));
+        List<TmMachineCandidate> sortedCandidates = this.sortCandidates(new ArrayList<>(Optional.ofNullable(candidates).orElse(Collections.emptyList())));
         if (selectedCandidate == null || StrUtil.isBlank(selectedCandidate.getMachineCode())) {
             return sortedCandidates;
         }
@@ -804,6 +814,8 @@ public class TmMachineAssignService implements ITmMachineAssignService {
         context.getCandidateTraceMap().put(task.getBusinessKey(), Collections.singletonList(runtimeCandidate));
         this.addCapacitySplitTrace(context, task, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
                 nvl(runtimeCandidate.getRemainCapacity()), runtimeCandidate.getMachineCode(), true);
+        this.bindSmallGlueMachine(context, task, runtimeCandidate.getMachineCode(),
+                this.resolveSmallGlueBoundMachine(task, context), null);
         this.addAssignTrace(context, task, "PASS", runtimeCandidate.getMachineCode(), null, null);
         this.taskChainScheduleService.appendAutoTask(task, runtimeCandidate, context);
     }
@@ -860,6 +872,7 @@ public class TmMachineAssignService implements ITmMachineAssignService {
         target.setDemandQty(source.getDemandQty());
         target.setNewSpecInfo(source.getNewSpecInfo());
         target.setExperimentSpecInfo(source.getExperimentSpecInfo());
+        target.setSmallGlueFlag(source.getSmallGlueFlag());
         target.setBusinessKeySuffix(this.buildOverflowBusinessKeySuffix(source, sourceShift, shiftOrder, machineCode, overflowIndex));
         return target;
     }
@@ -1103,6 +1116,149 @@ public class TmMachineAssignService implements ITmMachineAssignService {
         }
         return current + "->" + addition;
     }
+
+    /**
+     * 判断任务是否启用小胶种连续生产规则。
+     *
+     * @param task 任务草稿
+     * @return true 表示当前任务是小胶种任务
+     */
+    private boolean isSmallGlueTask(TmTaskDraft task) {
+        return task != null && Boolean.TRUE.equals(task.getSmallGlueFlag()) && StrUtil.isNotBlank(task.getGlueCode());
+    }
+
+    /**
+     * 读取小胶种当前绑定机台。
+     *
+     * @param task 任务草稿
+     * @param context 排程上下文
+     * @return 已绑定机台；未命中小胶种或尚未绑定时返回 null
+     */
+    private String resolveSmallGlueBoundMachine(TmTaskDraft task, TmScheduleContext context) {
+        if (!this.isSmallGlueTask(task) || context == null || context.getSmallGlueMachineMap() == null) {
+            return null;
+        }
+        return context.getSmallGlueMachineMap().get(task.getGlueCode());
+    }
+
+    /**
+     * 按小胶种绑定规则排序候选机台。
+     *
+     * @param task 当前任务
+     * @param context 排程上下文
+     * @param candidates 已通过过滤和评分的候选机台
+     * @param selectedCandidate 原首选机台，非小胶种顺延时保持当前班选中机台优先
+     * @return 排序后的候选机台
+     */
+    private List<TmMachineCandidate> sortCandidatesForSmallGlue(TmTaskDraft task, TmScheduleContext context,
+                                                                List<TmMachineCandidate> candidates,
+                                                                TmMachineCandidate selectedCandidate) {
+        List<TmMachineCandidate> sortedCandidates = this.sortCandidates(new ArrayList<>(Optional.ofNullable(candidates).orElse(Collections.emptyList())));
+        String boundMachineCode = this.resolveSmallGlueBoundMachine(task, context);
+        if (StrUtil.isNotBlank(boundMachineCode)) {
+            TmMachineCandidate boundCandidate = this.findCandidateByMachineCode(sortedCandidates, boundMachineCode);
+            if (boundCandidate != null) {
+                sortedCandidates.remove(boundCandidate);
+                sortedCandidates.add(0, boundCandidate);
+                return sortedCandidates;
+            }
+        }
+        if (!this.isSmallGlueTask(task) && selectedCandidate != null) {
+            return this.sortCandidatesWithSelectedFirst(sortedCandidates, selectedCandidate);
+        }
+        return sortedCandidates;
+    }
+
+    /**
+     * 绑定或刷新小胶种生产机台。
+     *
+     * @param context 排程上下文
+     * @param task 当前任务
+     * @param selectedMachineCode 实际选中机台
+     * @param originalMachineCode 原绑定机台
+     * @param switchReason 切换原因
+     */
+    private void bindSmallGlueMachine(TmScheduleContext context, TmTaskDraft task, String selectedMachineCode,
+                                      String originalMachineCode, String switchReason) {
+        if (!this.isSmallGlueTask(task) || context == null || StrUtil.isBlank(selectedMachineCode)) {
+            return;
+        }
+        String previousMachineCode = StrUtil.blankToDefault(originalMachineCode,
+                context.getSmallGlueMachineMap().get(task.getGlueCode()));
+        context.getSmallGlueMachineMap().put(task.getGlueCode(), selectedMachineCode);
+        this.addSmallGlueContinuousTrace(context, task, previousMachineCode, selectedMachineCode,
+                StrUtil.isNotBlank(previousMachineCode) && !previousMachineCode.equals(selectedMachineCode), switchReason);
+    }
+
+    /**
+     * 查找候选机台。
+     *
+     * @param candidates 候选机台列表
+     * @param machineCode 机台编码
+     * @return 候选机台；不存在时返回 null
+     */
+    private TmMachineCandidate findCandidateByMachineCode(List<TmMachineCandidate> candidates, String machineCode) {
+        if (CollUtil.isEmpty(candidates) || StrUtil.isBlank(machineCode)) {
+            return null;
+        }
+        for (TmMachineCandidate candidate : candidates) {
+            if (machineCode.equals(candidate.getMachineCode())) {
+                return candidate;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * 解析小胶种绑定机台切换原因。
+     *
+     * @param boundMachineCode 原绑定机台
+     * @param candidates 当前任务全部候选机台
+     * @return 切换原因；没有绑定或绑定机台仍可用时返回 null
+     */
+    private String resolveSmallGlueSwitchReason(String boundMachineCode, List<TmMachineCandidate> candidates) {
+        if (StrUtil.isBlank(boundMachineCode)) {
+            return null;
+        }
+        TmMachineCandidate boundCandidate = this.findCandidateByMachineCode(candidates, boundMachineCode);
+        if (boundCandidate == null) {
+            return "BOUND_MACHINE_NOT_FOUND";
+        }
+        if (boundCandidate.isFiltered()) {
+            return boundCandidate.getFilterReasonCode();
+        }
+        if (nvl(boundCandidate.getRemainCapacity()).compareTo(BigDecimal.ZERO) <= 0) {
+            return "NO_REMAIN_CAPACITY";
+        }
+        return null;
+    }
+
+    /**
+     * 写入小胶种连续生产证据。
+     *
+     * @param context 排程上下文
+     * @param task 当前任务
+     * @param originalMachineCode 原绑定机台
+     * @param selectedMachineCode 当前选中机台
+     * @param switched 是否发生切换
+     * @param switchReason 切换原因
+     */
+    private void addSmallGlueContinuousTrace(TmScheduleContext context, TmTaskDraft task, String originalMachineCode,
+                                             String selectedMachineCode, boolean switched, String switchReason) {
+        if (!this.isSmallGlueTask(task)) {
+            return;
+        }
+        Map<String, Object> evidence = new LinkedHashMap<>();
+        evidence.put("paramCode", "TM_SMALL_GLUE_CODES");
+        evidence.put("glueCode", task.getGlueCode());
+        evidence.put("originalMachineCode", originalMachineCode);
+        evidence.put("selectedMachineCode", selectedMachineCode);
+        evidence.put("firstBind", StrUtil.isBlank(originalMachineCode) && StrUtil.isNotBlank(selectedMachineCode));
+        evidence.put("switched", switched);
+        evidence.put("switchReason", switchReason);
+        traceOf(context, task).addRuleHit("SMALL_GLUE_CONTINUOUS", selectedMachineCode == null ? "REJECT" : "PASS", evidence);
+    }
+
     /**
      * 写入机台过滤证据。
      *

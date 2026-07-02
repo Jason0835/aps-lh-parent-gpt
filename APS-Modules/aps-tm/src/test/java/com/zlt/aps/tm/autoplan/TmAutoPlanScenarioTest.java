@@ -36,6 +36,7 @@ public class TmAutoPlanScenarioTest {
         initTableInfo(TmMachineMaintenance.class);
         initTableInfo(TmCurlRoll.class);
         initTableInfo(TmLossSetting.class);
+        initTableInfo(TmDepthConfig.class);
     }
 
     /**
