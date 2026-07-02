@@ -4,7 +4,6 @@ import cn.hutool.core.date.DateUtil;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
-import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.util.CollectionUtils;
@@ -385,6 +384,9 @@ public class SkuMonthPlanCalculator {
         }
         if (earliestContinuousDay < BigDecimal.ONE.intValue()) {
             return null;
+        }
+        if (earliestContinuousDay > maxDay) {
+            earliestContinuousDay = maxDay;
         }
         return earliestContinuousDay;
     }
