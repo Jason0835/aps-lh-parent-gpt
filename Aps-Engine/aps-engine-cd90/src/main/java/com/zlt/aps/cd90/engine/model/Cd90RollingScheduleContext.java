@@ -6,6 +6,7 @@ import lombok.Data;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * 多班滚动排程共享的内存上下文。
@@ -28,6 +29,12 @@ public class Cd90RollingScheduleContext {
     private List<Cd90ShiftScheduleTask> committedTasks;
     /** 前序班次真实部分排后尚未覆盖的续作需求量，按帘布代号分组。 */
     private Map<String, BigDecimal> continueDemandByCloth;
+    /** 首班锁定的新增规格提前生产证据。 */
+    private Map<String, Cd90NewSpecAdvanceInfo> newSpecAdvanceInfoByCloth;
+    /** 尚未转入真实续作的新增规格提前需求剩余量。 */
+    private Map<String, BigDecimal> newSpecAdvanceRemainingByCloth;
+    /** 已按施工宽度换算过的新增规格剩余量，后续班次不得重复换算。 */
+    private Set<String> normalizedNewSpecAdvanceClothCodes;
     /** 跨班保留的大卷成熟库存及已分配米数。 */
     private List<Cd90BigRollAgingStock> bigRollAgingStocks;
     /** 各机台最近一次已提交任务的机尾规格。 */

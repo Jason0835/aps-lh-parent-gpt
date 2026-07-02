@@ -49,9 +49,20 @@ public class Cd90DefaultShiftDemandProvider implements Cd90ShiftDemandProvider {
                                            Cd90ScheduleCandidate candidate,
                                            Cd90RollingScheduleContext rolling) {
         validate(context, input, shift, candidate);
+        if (candidate.isNewSpecAdvance()) {
+            BigDecimal advanceRemaining = rolling == null
+                    || rolling.getNewSpecAdvanceRemainingByCloth() == null
+                    ? BigDecimal.ZERO : rolling.getNewSpecAdvanceRemainingByCloth()
+                            .getOrDefault(candidate.getClothCode(), BigDecimal.ZERO);
+            log.info("[直裁自动排程] 新增规格使用提前需求, classField={}, clothCode={}, advanceRemaining={}",
+                    shift.getClassField(), candidate.getClothCode(), advanceRemaining);
+            return Cd90ShiftDemandDecision.builder()
+                    .netDemandQuantity(advanceRemaining)
+                    .planSurplusQuantity(null).build();
+        }
         // 直裁CLASS字段映射到其负责供应的首个成型自然班次。
         LocalDateTime demandStart = demandStart(context, shift.getClassField());
-        List<Cd90DemandShift> clothShifts = safe(input.getDemandShifts()).stream()
+        List<Cd90DemandShift> clothShifts = this.planningDemands(input).stream()
                 .filter(item -> item != null && candidate.getClothCode().equals(item.getClothCode()))
                 .filter(item -> item.getStartTime() != null)
                 .sorted(Comparator.comparing(Cd90DemandShift::getStartTime))
@@ -236,6 +247,13 @@ public class Cd90DefaultShiftDemandProvider implements Cd90ShiftDemandProvider {
         return value == null ? BigDecimal.ZERO : value;
     }
 
+
+    /** 优先使用去重计划需求；未建立新增规格快照时兼容原始输入。 */
+    private List<Cd90DemandShift> planningDemands(Cd90AutoScheduleInput input) {
+        return input.getPlanningDemandShifts() == null
+                ? this.safe(input.getDemandShifts())
+                : this.safe(input.getPlanningDemandShifts());
+    }
     private <T> List<T> safe(List<T> values) {
         return values == null ? Collections.emptyList() : values;
     }

@@ -21,6 +21,12 @@ public class Cd90ScheduleCandidate {
     private boolean shortageInCurrentShift;
     /** 是否续作规格：6点至本班开始前累计成型消耗 > 0，表示前序班次已为该规格排过产。 */
     private boolean continueFromPreviousShift;
+    /** 是否命中新增规格提前生产。 */
+    private boolean newSpecAdvance;
+    /** 新增规格提前需求是否已换算为直裁走料米数。 */
+    private boolean newSpecAdvanceQuantityNormalized;
+    /** 新增规格判定和提前生产原因。 */
+    private String newSpecAdvanceAnalysis;
     /** 本次续作或历史生产的原机台；原机台仍可排时优先保持不换机。 */
     private String sourceMachineCode;
     /** 最早缺料时点。 */

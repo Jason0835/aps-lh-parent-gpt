@@ -4,6 +4,7 @@ import com.zlt.aps.cd90.engine.model.Cd90AutoScheduleContext;
 import com.zlt.aps.cd90.engine.model.Cd90AutoScheduleOutputDraft;
 import com.zlt.aps.cd90.engine.model.Cd90LaneAllocationDraft;
 import com.zlt.aps.cd90.engine.model.Cd90MultiShiftExecutionResult;
+import com.zlt.aps.cd90.engine.model.Cd90NewSpecAdvanceInfo;
 import com.zlt.aps.cd90.engine.model.Cd90ScheduleAttemptTrace;
 import com.zlt.aps.cd90.engine.model.Cd90ScheduleExplainLogDraft;
 import com.zlt.aps.cd90.engine.model.Cd90ScheduleResultDraft;
@@ -72,6 +73,8 @@ public class Cd90AutoScheduleOutputDraftBuilder {
                 .sorted(Comparator.comparingInt(slot -> classIndex(slot.getClassField())))
                 .collect(Collectors.toList())));
         attachPriorFailureAnalysis(results, execution.getAttemptTraces());
+        this.attachNewSpecAdvanceAnalysis(results,
+                execution.getRollingContext().getNewSpecAdvanceInfoByCloth());
         List<Cd90ScheduleExplainLogDraft> logs = results.stream()
                 .map(item -> Cd90ScheduleExplainLogDraft.builder()
                         .resultKey(item.getResultKey()).logType(AUTO_SCHEDULE)
@@ -218,6 +221,29 @@ public class Cd90AutoScheduleOutputDraftBuilder {
         }));
     }
 
+    /** 将新增规格识别窗口、原需求日期和目标生产日追加到实际成功班次分析。 */
+    private void attachNewSpecAdvanceAnalysis(
+            List<Cd90ScheduleResultDraft> results,
+            Map<String, Cd90NewSpecAdvanceInfo> infoByCloth) {
+        if (infoByCloth == null || infoByCloth.isEmpty()) {
+            return;
+        }
+        results.forEach(result -> {
+            Cd90NewSpecAdvanceInfo info = infoByCloth.get(result.getClothCode());
+            if (info == null || !StringUtils.hasText(info.getAnalysis())) {
+                return;
+            }
+            safe(result.getShiftSlots()).forEach(slot -> {
+                if (StringUtils.hasText(slot.getAnalysis())) {
+                    if (!slot.getAnalysis().contains(info.getAnalysis())) {
+                        slot.setAnalysis(slot.getAnalysis() + "</br>" + info.getAnalysis());
+                    }
+                } else {
+                    slot.setAnalysis(info.getAnalysis());
+                }
+            });
+        });
+    }
     private String failureAnalysis(Cd90ScheduleAttemptTrace trace) {
         return trace.getClassField() + "：" + failureDescription(trace.getFailureReason());
     }

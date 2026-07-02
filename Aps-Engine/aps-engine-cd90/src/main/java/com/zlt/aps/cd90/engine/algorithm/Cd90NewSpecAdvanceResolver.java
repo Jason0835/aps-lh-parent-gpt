@@ -28,33 +28,33 @@ import java.util.stream.Collectors;
 public class Cd90NewSpecAdvanceResolver {
 
     /**
-     * 根据历史实际生产集合识别新增规格并生成去重计划需求。
+     * 根据历史已排帘布集合识别新增规格并生成去重计划需求。
      *
      * @param scheduleDate 自动排程日期
-     * @param lookbackDays 历史实际完成量回看天数
+     * @param lookbackDays 历史排程计划量回看天数
      * @param advanceDays 未来需求前瞻天数
      * @param demandShifts 原始成型需求
-     * @param producedClothCodes 历史窗口内已有实际完成量的帘布代号
+     * @param scheduledClothCodes 历史窗口内已有排程计划量的帘布代号
      * @return 提前生产证据和去重计划需求
      */
     public Cd90NewSpecAdvanceResult resolve(LocalDate scheduleDate,
                                             int lookbackDays,
                                             int advanceDays,
                                             List<Cd90DemandShift> demandShifts,
-                                            Set<String> producedClothCodes) {
+                                            Set<String> scheduledClothCodes) {
         this.validate(scheduleDate, lookbackDays, advanceDays);
         LocalDate historyStartDate = scheduleDate.minusDays(lookbackDays);
         LocalDate historyEndDate = scheduleDate.minusDays(1);
         LocalDate demandEndDate = scheduleDate.plusDays(advanceDays - 1L);
         LocalDate targetProductionDate = scheduleDate.minusDays(1);
-        Set<String> producedCodes = producedClothCodes == null
-                ? Collections.emptySet() : producedClothCodes;
+        Set<String> scheduledCodes = scheduledClothCodes == null
+                ? Collections.emptySet() : scheduledClothCodes;
 
         Map<String, List<Cd90DemandShift>> advanceSources = this.safe(demandShifts).stream()
                 .filter(this::isPositiveIncludedDemand)
                 .filter(item -> this.inWindow(item.getStartTime().toLocalDate(),
                         scheduleDate, demandEndDate))
-                .filter(item -> !producedCodes.contains(item.getClothCode()))
+                .filter(item -> !scheduledCodes.contains(item.getClothCode()))
                 .collect(Collectors.groupingBy(Cd90DemandShift::getClothCode,
                         LinkedHashMap::new, Collectors.toList()));
         Map<String, Cd90NewSpecAdvanceInfo> infoByCloth = advanceSources.entrySet().stream()
@@ -66,9 +66,9 @@ public class Cd90NewSpecAdvanceResolver {
         List<Cd90DemandShift> adjustedDemands = this.applySnapshot(demandShifts, infoByCloth);
 
         log.info("[直裁自动排程] 新增规格提前需求解析完成, scheduleDate={}, historyRange={}~{}, "
-                        + "demandRange={}~{}, producedClothCount={}, newSpecClothCount={}",
+                        + "demandRange={}~{}, scheduledClothCount={}, newSpecClothCount={}",
                 scheduleDate, historyStartDate, historyEndDate, scheduleDate, demandEndDate,
-                producedCodes.size(), infoByCloth.size());
+                scheduledCodes.size(), infoByCloth.size());
         infoByCloth.values().forEach(info ->
                 log.info("[直裁自动排程] 新增规格需求提前归并, clothCode={}, sourceDates={}, "
                                 + "advanceQuantity={}, targetProductionDate={}",
@@ -123,7 +123,7 @@ public class Cd90NewSpecAdvanceResolver {
                 .map(LocalDate::toString).collect(Collectors.joining("、"));
         String analysis = "新增规格提前生产：帘布" + clothCode + "在"
                 + historyStartDate + "至" + historyEndDate
-                + "无实际完成量，原需求日期" + sourceDates
+                + "无历史排程计划，原需求日期" + sourceDates
                 + "，按提前生产参数前瞻" + advanceDays + "天，归并至"
                 + targetProductionDate + "生产。";
         return Cd90NewSpecAdvanceInfo.builder()
@@ -185,9 +185,9 @@ public class Cd90NewSpecAdvanceResolver {
         if (scheduleDate == null) {
             throw new IllegalArgumentException("新增规格提前生产的排程日期不能为空");
         }
-        if (lookbackDays <= 0 || advanceDays <= 0) {
-            throw new IllegalArgumentException("新增规格回看天数和前瞻天数必须为正整数");
-        }
+        // if (lookbackDays <= 0 || advanceDays <= 0) {
+        //     throw new IllegalArgumentException("新增规格回看天数和前瞻天数必须为正整数");
+        // }
     }
 
     /** 空列表保护。 */

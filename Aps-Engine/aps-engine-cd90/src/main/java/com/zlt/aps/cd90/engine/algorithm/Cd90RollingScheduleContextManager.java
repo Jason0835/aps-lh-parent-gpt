@@ -1,6 +1,7 @@
 package com.zlt.aps.cd90.engine.algorithm;
 
 import com.zlt.aps.cd90.engine.model.Cd90InboundRecord;
+import com.zlt.aps.cd90.engine.model.Cd90NewSpecAdvanceInfo;
 import com.zlt.aps.cd90.engine.model.Cd90BigRollAgingStock;
 import com.zlt.aps.cd90.engine.model.Cd90ResourceSnapshot;
 import com.zlt.aps.cd90.engine.model.Cd90RollingScheduleContext;
@@ -18,6 +19,7 @@ import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -39,14 +41,39 @@ public class Cd90RollingScheduleContextManager {
      * @return 新滚动上下文
      */
     public Cd90RollingScheduleContext initialize(List<Cd90StorageLaneState> storageLanesAtSix) {
+        return this.initialize(storageLanesAtSix, new HashMap<>());
+    }
+
+    /**
+     * 使用6点库排和首班新增规格证据初始化滚动上下文。
+     *
+     * @param storageLanesAtSix 6点库排快照
+     * @param newSpecAdvanceInfoByCloth 新增规格提前生产证据
+     * @return 新滚动上下文
+     */
+    public Cd90RollingScheduleContext initialize(
+            List<Cd90StorageLaneState> storageLanesAtSix,
+            Map<String, Cd90NewSpecAdvanceInfo> newSpecAdvanceInfoByCloth) {
+        Map<String, Cd90NewSpecAdvanceInfo> copiedInfo =
+                this.copyNewSpecAdvanceInfo(newSpecAdvanceInfoByCloth);
+        Map<String, BigDecimal> remainingByCloth = copiedInfo.values().stream()
+                .filter(item -> item.getClothCode() != null)
+                .filter(item -> item.getAdvanceDemandQuantity() != null
+                        && item.getAdvanceDemandQuantity().signum() > 0)
+                .collect(Collectors.toMap(Cd90NewSpecAdvanceInfo::getClothCode,
+                        Cd90NewSpecAdvanceInfo::getAdvanceDemandQuantity,
+                        (first, second) -> first, HashMap::new));
         return Cd90RollingScheduleContext.builder()
-                .storageLanesAtSix(copyLanes(storageLanesAtSix))
+                .storageLanesAtSix(this.copyLanes(storageLanesAtSix))
                 .cumulativeConsumptionByCloth(new HashMap<>())
                 .actualInboundRecords(new ArrayList<>())
                 .plannedInboundRecords(new ArrayList<>())
                 .bigRollAgingStocks(new ArrayList<>())
                 .committedTasks(new ArrayList<>())
                 .continueDemandByCloth(new HashMap<>())
+                .newSpecAdvanceInfoByCloth(copiedInfo)
+                .newSpecAdvanceRemainingByCloth(remainingByCloth)
+                .normalizedNewSpecAdvanceClothCodes(new HashSet<>())
                 .tailSpecByMachine(new HashMap<>())
                 .lastMachineByCloth(new HashMap<>())
                 .tailByMachine(new HashMap<>())
@@ -249,6 +276,31 @@ public class Cd90RollingScheduleContextManager {
                 .build()).collect(Collectors.toList());
     }
 
+    /** 深拷新增规格提前生产证据，避免跨班共享可变集合。 */
+    private Map<String, Cd90NewSpecAdvanceInfo> copyNewSpecAdvanceInfo(
+            Map<String, Cd90NewSpecAdvanceInfo> source) {
+        Map<String, Cd90NewSpecAdvanceInfo> result = new HashMap<>();
+        if (source == null) {
+            return result;
+        }
+        source.forEach((clothCode, info) -> {
+            if (info != null) {
+                result.put(clothCode, Cd90NewSpecAdvanceInfo.builder()
+                        .clothCode(info.getClothCode())
+                        .historyStartDate(info.getHistoryStartDate())
+                        .historyEndDate(info.getHistoryEndDate())
+                        .sourceDemandDates(info.getSourceDemandDates() == null
+                                ? new ArrayList<>() : new ArrayList<>(info.getSourceDemandDates()))
+                        .sourceDemandKeys(info.getSourceDemandKeys() == null
+                                ? new ArrayList<>() : new ArrayList<>(info.getSourceDemandKeys()))
+                        .advanceDemandQuantity(info.getAdvanceDemandQuantity())
+                        .targetProductionDate(info.getTargetProductionDate())
+                        .analysis(info.getAnalysis())
+                        .build());
+            }
+        });
+        return result;
+    }
     /** 复制机台链尾状态，避免跨班共享可变对象。 */
     private Map<String, com.zlt.aps.cd90.engine.model.Cd90MachineTailState> copyTails(
             Map<String, com.zlt.aps.cd90.engine.model.Cd90MachineTailState> source) {

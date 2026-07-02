@@ -55,6 +55,10 @@ public final class Cd90AutoScheduleParamCode {
     public static final String PARTIAL_MIN_VEHICLE_COUNT = "SYS0701031";
     /** 大卷静置成熟时长，单位小时，默认 24。 */
     public static final String AGING_PERIOD_LIMIT = "SYS0701032";
+    /** 新增规格历史排程回看天数：按排程日期向前检查是否存在正计划量。 */
+    public static final String NEW_SPEC_LOOKBACK_DAYS = "SYS0701034";
+    /** 新增规格未来需求前瞻天数：窗口内需求归并到当前生产日。 */
+    public static final String NEW_SPEC_ADVANCE_DAYS = "SYS0701035";
     /** 通用损耗率兜底（百分比）：t_cd90_loss_setting 四层优先级均未命中时使用，对应参数 LOSS_RATE。 */
     public static final String LOSS_RATE = "SYS0701003";
 
@@ -80,6 +84,8 @@ public final class Cd90AutoScheduleParamCode {
             SPECIAL_ROLL_EXTRA_STOCK_LIMIT,
             PARTIAL_MIN_VEHICLE_COUNT,
             AGING_PERIOD_LIMIT,
+            NEW_SPEC_LOOKBACK_DAYS,
+            NEW_SPEC_ADVANCE_DAYS,
             LOSS_RATE
     ));
 
