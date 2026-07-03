@@ -3462,7 +3462,6 @@
   "ui.data.column.tm.glueOrder.factoryCode": "工厂",
   "ui.data.column.tm.glueOrder.glueGroupCode": "胶料组编码",
   "ui.data.column.tm.glueOrder.glueCode": "胶料号",
-  "ui.data.column.tm.glueOrder.machineCode": "机台编码",
   "ui.data.column.tm.glueOrder.orderNum": "排序号",
   "ui.data.column.tm.lossSetting.modelName": "胎面损耗率设定信息",
   "ui.data.column.tm.lossSetting.factoryCode": "工厂",
