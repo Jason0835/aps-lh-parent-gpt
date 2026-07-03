@@ -19,6 +19,7 @@ import com.zlt.aps.lh.service.ILhScheduleResultService;
 import com.zlt.aps.lh.util.LeftRightMouldUtil;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.lh.util.ShiftFieldUtil;
+import com.zlt.aps.lh.util.SkuConstructionRefResolverUtil;
 import com.zlt.aps.mdm.api.domain.entity.*;
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import com.zlt.aps.mp.api.domain.entity.MpFactoryProductionVersion;
@@ -760,19 +761,19 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
         log.info("fillScheduleResultFields: SKU硫化产能加载完成, 物料数={}, 匹配数={}", materialCodes.size(), skuLhCapacityMap.size());
 
         // ======== 6. 加载SKU示方书关系 ========
-        // key: materialCode + "|" + trialStatus, value: MdmSkuConstructionRef
+        // key: materialCode + "::" + trialStatus, value: MdmSkuConstructionRef
+        // 与 SkuConstructionRefResolverUtil 约定一致，供 fillConstructionRefFields 统一降级匹配使用。
         Map<String, MdmSkuConstructionRef> constructionRefMap = new HashMap<>(materialCodes.size());
         if (!materialCodes.isEmpty()) {
             LambdaQueryWrapper<MdmSkuConstructionRef> wrapper = new LambdaQueryWrapper<>();
             wrapper.in(MdmSkuConstructionRef::getMaterialCode, materialCodes);
             List<MdmSkuConstructionRef> refList = mdmSkuConstructionRefMapper.selectList(wrapper);
-            for (MdmSkuConstructionRef ref : refList) {
-                if (StringUtils.isNotEmpty(ref.getMaterialCode())) {
-                    String key = ref.getMaterialCode() + "|" + StringUtils.defaultString(ref.getTrialStatus());
-                    // 同物料同产品状态只保留一条
-                    constructionRefMap.putIfAbsent(key, ref);
-                }
-            }
+            constructionRefMap = refList.stream()
+                    .filter(ref -> StringUtils.isNotEmpty(ref.getMaterialCode()))
+                    .collect(Collectors.toMap(
+                            ref -> ref.getMaterialCode() + "::" + StringUtils.defaultString(ref.getTrialStatus()),
+                            ref -> ref,
+                            (a, b) -> a));
         }
         log.info("fillScheduleResultFields: 示方书关系加载完成, 物料数={}, 匹配数={}", materialCodes.size(), constructionRefMap.size());
 
@@ -956,7 +957,7 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
      *
      * @param result             排程结果
      * @param monthPlan          月计划对象（可能为null）
-     * @param constructionRefMap 示方书关系Map，key为 materialCode + "|" + trialStatus
+     * @param constructionRefMap 示方书关系Map，key为 materialCode + "::" + trialStatus
      */
     private void fillConstructionRefFields(LhScheduleResult result,
                                            FactoryMonthPlanProductionFinalResult monthPlan,
@@ -967,10 +968,10 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
         }
 
         MdmSkuConstructionRef ref = null;
-        // 按物料编码+产品状态匹配示方书关系
+        // 按物料编码+产品状态统一降级匹配示方书关系（S→T→X；T→X；X 不降级）
         if (Objects.nonNull(monthPlan) && StringUtils.isNotEmpty(monthPlan.getProductStatus())) {
-            String key = matCode + "|" + monthPlan.getProductStatus();
-            ref = constructionRefMap.get(key);
+            ref = SkuConstructionRefResolverUtil.resolveCuringRecipeRef(
+                    matCode, monthPlan.getProductStatus(), constructionRefMap);
         }
 
         // 硫化示方类型：优先取示方书关系的lhType

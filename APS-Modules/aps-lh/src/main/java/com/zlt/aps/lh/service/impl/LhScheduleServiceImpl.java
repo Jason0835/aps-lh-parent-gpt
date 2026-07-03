@@ -43,6 +43,7 @@ import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.lh.util.MachineStatusUtil;
 import com.zlt.aps.lh.util.MouldStatusUtil;
 import com.zlt.aps.lh.util.ShiftFieldUtil;
+import com.zlt.aps.lh.util.SkuConstructionRefResolverUtil;
 import com.zlt.aps.mdm.api.domain.entity.*;
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import com.zlt.aps.mp.api.domain.entity.MpFactoryProductionVersion;
@@ -1493,7 +1494,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         context.machineInfoMap = loadImportMachineInfoMap(factoryCode, machineCodes);
         context.availableMouldCodeSet = loadImportAvailableMouldCodeSet(factoryCode, materialCodes);
         context.materialMouldRelMap = loadImportMaterialMouldRelMap(factoryCode, materialCodes);
-        context.constructionRefKeySet = loadImportConstructionRefKeySet(factoryCode, materialCodes);
+        context.constructionRefMap = loadImportConstructionRefMap(factoryCode, materialCodes);
         context.classCapacityMaterialSet = loadImportClassCapacityMaterialSet(factoryCode, materialCodes);
         return context;
     }
@@ -1548,8 +1549,8 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
 
         // 校验硫化示方号是否存在：
         // 需求要求“通过月计划中物料编码+产品状态到 SKU 与示方关系校验硫化示方号”。
-        // 因此这里先从月计划明细拿 productStatus，再用 factoryCode + materialCode + productStatus
-        // 匹配 MdmSkuConstructionRef，并且要求 lhNo 不为空。
+        // 因此这里先从月计划明细拿 productStatus，再通过 SkuConstructionRefResolverUtil 统一降级匹配
+        // （正规S→量试T→试制X；量试T→试制X；试制X 不降级），与自动排程和 SkuConstructionValidator 使用同一套规则。
         List<FactoryMonthPlanProductionFinalResult> monthPlanList = context.monthPlanMap.get(materialKey);
         // 跨月时，如果主月定稿表中找不到，尝试从窗口结束日期所在月份的定稿表中查找
         if (CollUtil.isEmpty(monthPlanList) && context.crossMonth) {
@@ -1559,8 +1560,9 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
             errors.add(String.format("月计划中不存在SKU%s", materialCode));
         } else {
             boolean hasValidRef = monthPlanList.stream()
-                    .anyMatch(mp -> context.constructionRefKeySet.contains(
-                            buildConstructionRefKey(factoryCode, materialCode, mp.getProductStatus())));
+                    .anyMatch(mp -> SkuConstructionRefResolverUtil
+                            .resolveCuringRecipeRef(materialCode, mp.getProductStatus(),
+                                    context.constructionRefMap) != null);
             if (!hasValidRef) {
                 errors.add(String.format("SKU%s不存在硫化示方号", materialCode));
             }
@@ -1753,19 +1755,20 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
     }
 
     /**
-     * 加载存在有效硫化示方号的 SKU+产品状态集合。
+     * 加载存在有效硫化示方号的 SKU 与示方书关系 Map。
      * <p>
      * 只有 MdmSkuConstructionRef.lhNo 不为空的记录才视为“硫化示方号存在”。
-     * key 中加入 trialStatus，是为了和月计划 productStatus 一一匹配。
+     * key 为 materialCode + "::" + trialStatus，与 SkuConstructionRefResolverUtil 约定一致，
+     * 供校验阶段统一降级匹配使用。
      * </p>
      *
      * @param factoryCode   工厂编码
      * @param materialCodes 本次导入涉及的物料编码集合
-     * @return key=factoryCode|materialCode|trialStatus 的示方关系集合
+     * @return key=materialCode::trialStatus 的示方关系 Map
      */
-    private Set<String> loadImportConstructionRefKeySet(String factoryCode, Set<String> materialCodes) {
+    private Map<String, MdmSkuConstructionRef> loadImportConstructionRefMap(String factoryCode, Set<String> materialCodes) {
         if (CollUtil.isEmpty(materialCodes)) {
-            return Collections.emptySet();
+            return Collections.emptyMap();
         }
         List<MdmSkuConstructionRef> refList = mdmSkuConstructionRefMapper.selectList(new LambdaQueryWrapper<MdmSkuConstructionRef>()
                 .eq(MdmSkuConstructionRef::getFactoryCode, factoryCode)
@@ -1774,8 +1777,10 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         return refList.stream()
                 .filter(item -> StringUtils.isNotBlank(item.getMaterialCode()))
                 .filter(item -> StringUtils.isNotBlank(item.getLhNo()))
-                .map(item -> buildConstructionRefKey(item.getFactoryCode(), item.getMaterialCode(), item.getTrialStatus()))
-                .collect(Collectors.toSet());
+                .collect(Collectors.toMap(
+                        item -> item.getMaterialCode() + "::" + StringUtils.trimToEmpty(item.getTrialStatus()),
+                        item -> item,
+                        (a, b) -> a));
     }
 
     /**
@@ -1829,14 +1834,6 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
     }
 
     /**
-     * 构建 SKU 与示方关系缓存 key。
-     * <p>匹配口径为 factoryCode + materialCode + trialStatus，其中 trialStatus 来源于月计划 productStatus。</p>
-     */
-    private String buildConstructionRefKey(String factoryCode, String materialCode, String trialStatus) {
-        return buildMaterialFactoryKey(factoryCode, materialCode) + "|" + StringUtils.trimToEmpty(trialStatus);
-    }
-
-    /**
      * 导入模板业务校验上下文。
      * <p>
      * 该对象只在一次 importScheduleTemplate 调用内使用，用于保存整批导入共用的校验结果和主数据缓存。
@@ -1870,8 +1867,8 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         private Map<String, List<String>> materialMouldRelMap = new HashMap<>();
         /** 可用模具号集合，key=factoryCode|mouldCode。 */
         private Set<String> availableMouldCodeSet = new HashSet<>();
-        /** 有效硫化示方关系集合，key=factoryCode|materialCode|trialStatus。 */
-        private Set<String> constructionRefKeySet = new HashSet<>();
+        /** 有效硫化示方关系 Map，key=materialCode::trialStatus，value=MdmSkuConstructionRef。 */
+        private Map<String, MdmSkuConstructionRef> constructionRefMap = new HashMap<>();
         /** 已维护有效班产的 SKU 集合，key=factoryCode|materialCode。 */
         private Set<String> classCapacityMaterialSet = new HashSet<>();
     }
