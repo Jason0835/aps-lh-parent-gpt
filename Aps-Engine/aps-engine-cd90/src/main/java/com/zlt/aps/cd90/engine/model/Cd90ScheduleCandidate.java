@@ -1,7 +1,9 @@
 package com.zlt.aps.cd90.engine.model;
 
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -11,6 +13,8 @@ import java.time.LocalDateTime;
  */
 @Data
 @Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class Cd90ScheduleCandidate {
 
     /** 帘布代码。 */
@@ -33,4 +37,8 @@ public class Cd90ScheduleCandidate {
     private LocalDateTime earliestShortageTime;
     /** 库存供应成型时长。 */
     private BigDecimal stockSupplyHours;
+    /** 定时滚动任务稳定身份键。 */
+    private String rollingTaskKey;
+    /** 本条原任务实际分配到的待排数量。 */
+    private BigDecimal rollingRequestedQuantity;
 }

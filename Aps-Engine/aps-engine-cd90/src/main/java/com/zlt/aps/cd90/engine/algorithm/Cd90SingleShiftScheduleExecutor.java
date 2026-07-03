@@ -69,14 +69,31 @@ public class Cd90SingleShiftScheduleExecutor implements Cd90SingleShiftScheduleS
                                             Cd90ShiftDescriptor shift,
                                             Cd90ShiftResourceState initialState,
                                             Cd90RollingScheduleContext rolling) {
+        return executePrepared(context, input, shift, initialState, rolling,
+                null, Collections.emptyMap(), false);
+    }
+
+    /** 使用滚动规划器已排好序的候选执行单班资源试算。 */
+    Cd90ShiftExecutionResult executePrepared(Cd90AutoScheduleContext context,
+                                              Cd90AutoScheduleInput input,
+                                              Cd90ShiftDescriptor shift,
+                                              Cd90ShiftResourceState initialState,
+                                              Cd90RollingScheduleContext rolling,
+                                              List<Cd90ScheduleCandidate> preparedCandidates,
+                                              Map<String, Cd90RollingPendingTask> sourceTasks,
+                                              boolean preservePreparedOrder) {
         validate(context, input, shift, initialState);
         // 候选已按当前班缺料时间、续作优先和库存保障时长排序，后续必须保持该稳定顺序执行。
-        List<Cd90ScheduleCandidate> candidates = new ArrayList<>(candidatePreparationService.prepare(
-                context, input, shift.getClassField(), rolling));
-        attachBigRollCodes(candidates, input.getConstructionMaterials());
         Map<String, BigDecimal> continueDemandByCloth = copyContinueDemand(rolling);
         Map<String, String> lastMachineByCloth = copyLastMachineByCloth(rolling);
-        appendContinueCandidates(candidates, continueDemandByCloth, lastMachineByCloth);
+        List<Cd90ScheduleCandidate> candidates;
+        if (preparedCandidates == null) {
+            candidates = new ArrayList<>(candidatePreparationService.prepare(
+                    context, input, shift.getClassField(), rolling));
+            appendContinueCandidates(candidates, continueDemandByCloth, lastMachineByCloth);
+        } else {
+            candidates = new ArrayList<>(preparedCandidates);
+        }
         attachBigRollCodes(candidates, input.getConstructionMaterials());
         Deque<Cd90ScheduleCandidate> immediateContinueCandidates = new ArrayDeque<>();
         // 机台快照在班次开始时一次加载，规格之间通过state扣减剩余秒数，避免重复查询造成漂移。
@@ -90,7 +107,7 @@ public class Cd90SingleShiftScheduleExecutor implements Cd90SingleShiftScheduleS
                 shift.getClassField(), shift.getShiftCode(), candidates.size());
         while (!candidates.isEmpty() || !immediateContinueCandidates.isEmpty()) {
             // 本班真实部分排产生的续作要尽量贴在上一段任务尾部继续排，避免被普通候选插队。
-            Cd90ScheduleCandidate candidate = selectCandidate(candidates, immediateContinueCandidates, state);
+            Cd90ScheduleCandidate candidate = selectCandidate(candidates, immediateContinueCandidates, state, preservePreparedOrder);
             String clothCode = candidate == null ? null : candidate.getClothCode();
             if (!StringUtils.hasText(clothCode)) {
                 continue;
@@ -170,6 +187,12 @@ public class Cd90SingleShiftScheduleExecutor implements Cd90SingleShiftScheduleS
             state = commit.getState();
             BigDecimal scheduledQuantity = commit.getTask().getPlanQuantity();
             String partialReason = commit.getPartialReason();
+            Cd90RollingPendingTask sourceTask = sourceTasks == null
+                    ? null : sourceTasks.get(candidate.getRollingTaskKey());
+            if (sourceTask != null) {
+                commit.getTask().setSourceTaskKey(sourceTask.getTaskKey());
+                commit.getTask().setSourceResultId(sourceTask.getSourceResultId());
+            }
             if (scheduledQuantity.compareTo(netDemand) < 0 && !StringUtils.hasText(partialReason)) {
                 partialReason = "EQUAL_SHARE";
             }
@@ -190,9 +213,13 @@ public class Cd90SingleShiftScheduleExecutor implements Cd90SingleShiftScheduleS
 
     private Cd90ScheduleCandidate selectCandidate(List<Cd90ScheduleCandidate> candidates,
                                                   Deque<Cd90ScheduleCandidate> immediateContinueCandidates,
-                                                  Cd90ShiftResourceState state) {
+                                                  Cd90ShiftResourceState state,
+                                                  boolean preservePreparedOrder) {
         if (immediateContinueCandidates != null && !immediateContinueCandidates.isEmpty()) {
             return immediateContinueCandidates.removeFirst();
+        }
+        if (preservePreparedOrder) {
+            return candidates.remove(0);
         }
         List<Cd90ScheduleCandidate> sorted = candidateSorter.sort(candidates, this.continuityTails(state));
         candidates.clear();
@@ -206,6 +233,9 @@ public class Cd90SingleShiftScheduleExecutor implements Cd90SingleShiftScheduleS
                                              Cd90ScheduleCandidate candidate,
                                              Cd90RollingScheduleContext rolling,
                                              Map<String, BigDecimal> continueDemandByCloth) {
+        if (candidate.getRollingRequestedQuantity() != null) {
+            return candidate.getRollingRequestedQuantity();
+        }
         BigDecimal continueDemand = continueDemandByCloth.get(candidate.getClothCode());
         if (continueDemand != null && continueDemand.signum() > 0) {
             log.info("[直裁自动排程] 使用续作需求进入本班试算, classField={}, shiftCode={}, clothCode={}, continueDemand={}",

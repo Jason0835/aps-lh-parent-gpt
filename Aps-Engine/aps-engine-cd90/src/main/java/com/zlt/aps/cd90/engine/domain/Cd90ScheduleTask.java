@@ -29,6 +29,9 @@ public class Cd90ScheduleTask extends BaseEntity implements Serializable {
     /** 任务类型：自动排程或插单滚动重排。 */
     @TableField("TASK_TYPE")
     private String taskType;
+    /** 定时滚动业务幂等键。 */
+    @TableField("IDEMPOTENCY_KEY")
+    private String idempotencyKey;
     /** 触发类型：TIMER或MANUAL。 */
     @TableField("TRIGGER_TYPE")
     private String triggerType;

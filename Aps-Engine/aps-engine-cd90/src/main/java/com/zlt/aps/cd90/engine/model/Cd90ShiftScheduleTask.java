@@ -13,6 +13,10 @@ import java.util.List;
 public class Cd90ShiftScheduleTask {
     /** 直裁班次字段。 */
     private String classField;
+    /** 滚动来源任务稳定键。 */
+    private String sourceTaskKey;
+    /** 滚动来源排程结果ID。 */
+    private Long sourceResultId;
     /** 帘布代码。 */
     private String clothCode;
     /** 钢压大卷代码。 */

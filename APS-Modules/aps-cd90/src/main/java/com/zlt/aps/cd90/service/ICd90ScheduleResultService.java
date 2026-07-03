@@ -3,6 +3,7 @@ package com.zlt.aps.cd90.service;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.cd90.api.domain.entity.Cd90ScheduleResult;
 import com.zlt.aps.cd90.api.domain.vo.Cd90InsertOrderRequest;
+import com.zlt.aps.cd90.api.domain.vo.Cd90RollingCheckRequest;
 import com.zlt.bill.common.service.IDocService;
 
 import java.util.Date;
@@ -28,6 +29,12 @@ public interface ICd90ScheduleResultService extends IDocService<Cd90ScheduleResu
     AjaxResult insertOrder(Cd90InsertOrderRequest request);
 
     /** 查询插单异步任务。 */
+
+    /** 检查交班窗口并按稳定输入创建定时滚动任务。 */
+    AjaxResult checkTimedRolling(Cd90RollingCheckRequest request);
+
+    /** 查询定时滚动排程任务。 */
+    AjaxResult getTimedRollingTask(String taskId);
     AjaxResult getInsertTask(String taskId);
 
     /**
