@@ -97,13 +97,16 @@ public class GroupPriorityProductionScheduler {
             return;
         }
         //3、如果Top中有没有挑到适机台的分组，则将没有机台的剔除，进入下一轮Top选择
+        TbrProductionContext productionContext = (TbrProductionContext) context;
         Map<ProductionPlanGroupInfo, GroupPrioritySchedulerResultHelper> selectedCxMachineMap = topSelectedCxMachineList.stream().collect(Collectors.toMap(GroupPrioritySchedulerResultHelper::getSelectedGroup, Function.identity()));
         topList.forEach(preSelectedGroup -> {
             if (!selectedCxMachineMap.containsKey(preSelectedGroup)) {
                 excludeGroupPlan.add(preSelectedGroup.getGroupName());
             }
         });
-        if (topGroupSet.size() != topSelectedCxMachineList.size()) {
+        //是否需要空机台结构自动顺延 开关开启，且找到机台数目不一致
+        boolean isHasFindNext = productionContext.getBaseDataContainer().getParamConfiguration().isAutoNextPriorityGroup() && topGroupSet.size() != topSelectedCxMachineList.size();
+        if (isHasFindNext) {
             allocationCxMachine(context, excludeGroupPlan, preSelectedGroupSet, preSelectedGroupAllocationMap, discontinueGroupSet);
             return;
         }
@@ -113,7 +116,6 @@ public class GroupPriorityProductionScheduler {
             return;
         }
         //5、对挑选出来的分组，进行机台产能分配
-        TbrProductionContext productionContext = (TbrProductionContext) context;
         CxMachineBaseInfoVo selectedCxMachine = finalSelected.getSelectedCxMachine();
         ProductionPlanGroupInfo addNewGroupPlan = finalSelected.getSelectedGroup();
         String groupName = addNewGroupPlan.getGroupName();

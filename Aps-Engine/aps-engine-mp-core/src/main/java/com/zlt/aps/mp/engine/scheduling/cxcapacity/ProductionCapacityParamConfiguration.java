@@ -224,6 +224,10 @@ public class ProductionCapacityParamConfiguration {
      */
     private Integer shareMoldOrEmbryoPriorityRange;
     /**
+     * SYS0207003 前结构出现匹配不到机台时，竞争列表是否自动顺延下一优先级结构
+     */
+    private boolean autoNextPriorityGroup;
+    /**
      * SYS0209006 正式排产优先级排产分段日
      */
     private Integer formalFirstHalfDay;
