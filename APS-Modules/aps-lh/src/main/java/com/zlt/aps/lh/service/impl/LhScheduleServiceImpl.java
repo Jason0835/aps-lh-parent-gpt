@@ -1544,16 +1544,18 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         // 需求要求“通过月计划中物料编码+产品状态到 SKU 与示方关系校验硫化示方号”。
         // 因此这里先从月计划明细拿 productStatus，再用 factoryCode + materialCode + productStatus
         // 匹配 MdmSkuConstructionRef，并且要求 lhNo 不为空。
-        FactoryMonthPlanProductionFinalResult monthPlan = context.monthPlanMap.get(materialKey);
+        List<FactoryMonthPlanProductionFinalResult> monthPlanList = context.monthPlanMap.get(materialKey);
         // 跨月时，如果主月定稿表中找不到，尝试从窗口结束日期所在月份的定稿表中查找
-        if (Objects.isNull(monthPlan) && context.crossMonth) {
-            monthPlan = context.monthPlanMapNextMonth.get(materialKey);
+        if (CollUtil.isEmpty(monthPlanList) && context.crossMonth) {
+            monthPlanList = context.monthPlanMapNextMonth.get(materialKey);
         }
-        if (Objects.isNull(monthPlan)) {
+        if (CollUtil.isEmpty(monthPlanList)) {
             errors.add(String.format("月计划中不存在SKU%s", materialCode));
         } else {
-            String constructionKey = buildConstructionRefKey(factoryCode, materialCode, monthPlan.getProductStatus());
-            if (!context.constructionRefKeySet.contains(constructionKey)) {
+            boolean hasValidRef = monthPlanList.stream()
+                    .anyMatch(mp -> context.constructionRefKeySet.contains(
+                            buildConstructionRefKey(factoryCode, materialCode, mp.getProductStatus())));
+            if (!hasValidRef) {
                 errors.add(String.format("SKU%s不存在硫化示方号", materialCode));
             }
         }
@@ -1641,7 +1643,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
      * @param materialCodes     本次导入涉及的物料编码集合
      * @return key=factoryCode|materialCode，value=月计划定稿明细
      */
-    private Map<String, FactoryMonthPlanProductionFinalResult> loadImportMonthPlanMap(String factoryCode,
+    private Map<String, List<FactoryMonthPlanProductionFinalResult>> loadImportMonthPlanMap(String factoryCode,
                                                                                       int year,
                                                                                       int month,
                                                                                       String productionVersion,
@@ -1658,8 +1660,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
                 .eq(FactoryMonthPlanProductionFinalResult::getIsDelete, DeleteFlagEnum.NORMAL.getCode()));
         return monthPlanList.stream()
                 .filter(item -> StringUtils.isNotBlank(item.getMaterialCode()))
-                .collect(Collectors.toMap(item -> buildMaterialFactoryKey(item.getFactoryCode(), item.getMaterialCode()),
-                        item -> item, (a, b) -> a));
+                .collect(Collectors.groupingBy(item -> buildMaterialFactoryKey(item.getFactoryCode(), item.getMaterialCode())));
     }
 
     /**
@@ -1853,10 +1854,10 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         private MpFactoryProductionVersion finalVersionNextMonth;
         /** 整批导入级错误，例如月计划未定稿、硫化工作日历未生成。 */
         private List<String> globalErrors = new ArrayList<>();
-        /** 定稿月计划明细缓存，key=factoryCode|materialCode。 */
-        private Map<String, FactoryMonthPlanProductionFinalResult> monthPlanMap = new HashMap<>();
+        /** 定稿月计划明细缓存，key=factoryCode|materialCode，同物料（不同产品状态）全部保留。 */
+        private Map<String, List<FactoryMonthPlanProductionFinalResult>> monthPlanMap = new HashMap<>();
         /** 跨月时窗口结束日期所在月份的定稿月计划明细缓存，key=factoryCode|materialCode。 */
-        private Map<String, FactoryMonthPlanProductionFinalResult> monthPlanMapNextMonth = new HashMap<>();
+        private Map<String, List<FactoryMonthPlanProductionFinalResult>> monthPlanMapNextMonth = new HashMap<>();
         /** 硫化机台台账缓存，key=factoryCode|machineCode。 */
         private Map<String, LhMachineInfo> machineInfoMap = new HashMap<>();
         /** SKU 与模具关系缓存，key=factoryCode|materialCode，value=模具号列表。 */
@@ -2005,8 +2006,18 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         if (StringUtils.isNotBlank(source.getIsEnd())) {
             target.setIsEnd(source.getIsEnd());
         }
-        if (StringUtils.isNotBlank(source.getTrialStatus())) {
-            target.setConstructionStage(source.getTrialStatus());
+        String constructionStage = Stream.of(
+                source.getClass1LhType(),
+                source.getClass2LhType(),
+                source.getClass3LhType(),
+                source.getClass4LhType(),
+                source.getClass5LhType(),
+                source.getClass6LhType(),
+                source.getClass7LhType(),
+                source.getClass8LhType()
+        ).filter(StringUtils::isNotBlank).findFirst().orElse(null);
+        if (constructionStage != null) {
+            target.setConstructionStage(constructionStage);
         }
         if (StringUtils.isNotBlank(source.getScheduleOrder())) {
             target.setScheduleOrder(source.getScheduleOrder());
