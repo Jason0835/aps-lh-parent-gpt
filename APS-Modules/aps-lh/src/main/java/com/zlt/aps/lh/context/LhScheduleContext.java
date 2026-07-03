@@ -342,9 +342,9 @@ public class LhScheduleContext {
      * 胎胚库存SKU级内部分摊额度，key=materialCode；只控制排产额度，不影响结果胎胚库存字段
      */
     private Map<String, Integer> embryoStockSkuQuotaMap = new LinkedHashMap<>();
-    /**
-     * 命中胎胚库存T日硬目标的物料集合，用于结果班次量按库存账本奇偶原样裁剪
-     * /
+     /**
+      * 命中胎胚库存T日硬目标的物料集合，用于结果班次量按库存账本奇偶原样裁剪
+      */
     private Set<String> embryoStockHardTargetMaterialSet = new LinkedHashSet<>();
     /**
      * S4.5当前待排正规新增SKU数量，供选机阶段判断普通机台让位规则
