@@ -45,7 +45,7 @@ public class SkuMonthPlanCalculator {
         Date last = allProductionDateList.get(lastIndex);
         YearMonth firstInfo = getProductionYearAndMonth(first);
         YearMonth lastInfo = getProductionYearAndMonth(last);
-        return firstInfo.equals(lastInfo);
+        return !firstInfo.equals(lastInfo);
     }
 
     /**
@@ -94,6 +94,7 @@ public class SkuMonthPlanCalculator {
                 return;
             }
             if (!skuMonthProductionInfo.getMaterialStatusKey().equals(singlePlan.getMaterialStatusKey())) {
+                //不同Sku + 计划类型
                 return;
             }
             resultList.add(singlePlan);
@@ -124,7 +125,7 @@ public class SkuMonthPlanCalculator {
      * @return
      */
     public static Integer getPlanQty(List<Date> allProductionDate, List<FactoryMonthPlanProductionFinalResult> allMonthPlanList, FactoryMonthPlanProductionFinalResult skuMonthProductionInfo) {
-        if (CollectionUtils.isEmpty(allMonthPlanList) || CollectionUtils.isEmpty(allMonthPlanList) || null == skuMonthProductionInfo) {
+        if (CollectionUtils.isEmpty(allProductionDate) || CollectionUtils.isEmpty(allMonthPlanList) || null == skuMonthProductionInfo) {
             return BigDecimal.ZERO.intValue();
         }
         return getPlanQtyByMonthPlan(skuMonthProductionInfo, allProductionDate, allMonthPlanList);
@@ -164,7 +165,7 @@ public class SkuMonthPlanCalculator {
      * @return
      */
     private static Integer getPlanQtyByMonthPlan(FactoryMonthPlanProductionFinalResult skuMonthProductionInfo, List<Date> allProductionList, List<FactoryMonthPlanProductionFinalResult> allMonthPlanList) {
-        if (null == skuMonthProductionInfo || CollectionUtils.isEmpty(allMonthPlanList) || CollectionUtils.isEmpty(allMonthPlanList)) {
+        if (null == skuMonthProductionInfo || CollectionUtils.isEmpty(allProductionList) || CollectionUtils.isEmpty(allMonthPlanList)) {
             return BigDecimal.ZERO.intValue();
         }
         if (!isCrossMonthByProductionDateInfo(allProductionList)) {
@@ -213,7 +214,7 @@ public class SkuMonthPlanCalculator {
         }
         //跨月没有计划量，只有当月有计划量
         FactoryMonthPlanProductionFinalResult firstMonthInfo = yearMonthSkuProductionMap.get(firstYearMonth);
-        return getEarliestContinuousPlanQty(firstMonthInfo, yearMonthMap.get(lastYearMonth));
+        return getEarliestContinuousPlanQty(firstMonthInfo, yearMonthMap.get(firstYearMonth));
     }
 
     /**
@@ -359,7 +360,8 @@ public class SkuMonthPlanCalculator {
     }
 
     /**
-     * 获取从startDay开始，获取最早没有计划排产量的排产日
+     * 获取从startDay开始，连续有计划量的最后一个排产日：
+     * 即获取最早没有计划排产量的排产日的前一日
      *
      * @param startDay               开始日
      * @param yearMonth              年份-月份
