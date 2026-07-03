@@ -12,14 +12,15 @@ import lombok.Data;
  * Copyright (c) 2022, All rights reserved。
  * 文件名称：MdmStructureName.java
  * 描    述：结构信息(SKU与结构关系选择结构使用)对象 t_mdm_structure_name
- *@author zlt
- *@date 2026-02-26
- *@version 1.0
  *
- *  修改记录：
- *     修改时间：...
- *     修 改 人：zlt
- *     修改内容：...
+ * @author zlt
+ * @version 1.0
+ * <p>
+ * 修改记录：
+ * 修改时间：...
+ * 修 改 人：zlt
+ * 修改内容：...
+ * @date 2026-02-26
  */
 @ApiModel(value = "结构信息(SKU与结构关系选择结构使用)对象", description = "结构信息(SKU与结构关系选择结构使用)对象")
 @Data
@@ -28,10 +29,15 @@ public class MdmStructureName extends BaseEntity {
 
     private static final long serialVersionUID = 1L;
 
-     /** 结构 */
+    /**
+     * 结构
+     */
     @Excel(name = "ui.data.column.mdmStructureName.structureName")
     @ApiModelProperty(value = "结构", name = "structureName")
     @TableField(value = "STRUCTURE_NAME")
     private String structureName;
 
+    @ApiModelProperty(value = "是否允许排产多台", name = "isMoreMachine")
+    @TableField(value = "IS_MORE_MACHINE")
+    private String isMoreMachine;
 }

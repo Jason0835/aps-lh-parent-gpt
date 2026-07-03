@@ -17,6 +17,7 @@ import com.zlt.aps.mdm.api.domain.entity.LhMachineInfo;
 import com.zlt.aps.mp.api.domain.entity.*;
 import com.zlt.aps.mp.api.domain.vo.MpCheckItemVo;
 import com.zlt.aps.mp.engine.basedata.assemble.cyclegroup.CycleGroupDataHandler;
+import com.zlt.aps.mp.engine.basedata.assemble.datalist.GroupListHandler;
 import com.zlt.aps.mp.engine.basedata.assemble.history.CxMachineProductionHistoryInfo;
 import com.zlt.aps.mp.engine.basedata.assemble.history.GroupPlanProductionHistoryInfo;
 import com.zlt.aps.mp.engine.basedata.assemble.history.ProductionHistoryHandler;
@@ -58,14 +59,19 @@ import java.util.stream.Stream;
 @Slf4j
 public abstract class AbstractDataLoaderService extends AbstractInitDataLoadService {
 
+    private final GroupListHandler groupListHandler;
+
     private final ProductionHistoryHandler productionHistoryHandler;
 
-    public AbstractDataLoaderService(ProductionMdmDataService dataService,
+
+    public AbstractDataLoaderService(GroupListHandler groupListHandler,
+                                     ProductionMdmDataService dataService,
                                      DpRequireDataService dpRequireDataService,
                                      CycleGroupDataHandler cycleGroupDataHandler,
                                      ProductionHistoryHandler productionHistoryHandler,
                                      MonthProductionDataService monthProductionDataService) {
         super(dataService, dpRequireDataService, cycleGroupDataHandler, monthProductionDataService);
+        this.groupListHandler = groupListHandler;
         this.productionHistoryHandler = productionHistoryHandler;
     }
 
@@ -127,6 +133,8 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
         //20260626+ 加载月周期结构清单
         Set<String> monthProductionCycleList = getMonthProductionCycleList(productionContext);
         productionContext.getBaseDataContainer().setMonthProductionCycleList(monthProductionCycleList);
+        //20260703+ 加载当月最大分配机台数限制信息
+        productionContext.getBaseDataContainer().setGroupMachineLimitMap(groupListHandler.getGroupMaxAllocationCxMachineInfo());
         //2、特殊材料的胎胚配置信息
         specialMaterialInfoHandler(productionContext);
         //3、超6个成品库存信息
