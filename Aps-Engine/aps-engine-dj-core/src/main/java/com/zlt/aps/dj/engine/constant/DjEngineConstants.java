@@ -31,6 +31,9 @@ public class DjEngineConstants {
     /** SYS1401011 排程首班班次（ClassNumThreePlanEnums.classIndex），如 "03"=中班、"01"=夜班、"02"=早班 */
     public static final String PARAM_SCHEDULE_START_SHIFT = "SYS1401011";
 
+    /** SYS1401012 新规格判定天数阈值（天），连续N天未排产则视为新规格 */
+    public static final String PARAM_NEW_SPEC_DAYS_THRESHOLD = "SYS1401012";
+
     // ==================== 班次常量 ====================
 
     /** 垫胶排产班次数 */
