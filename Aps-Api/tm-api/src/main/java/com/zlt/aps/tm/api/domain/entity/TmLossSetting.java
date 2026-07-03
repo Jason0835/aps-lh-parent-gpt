@@ -25,7 +25,7 @@ public class TmLossSetting extends BaseEntity {
     private String factoryCode;
 
     @Excel(name = "ui.data.column.tm.lossSetting.treadCode")
-    @ImportValidated(required = true, isCode = true, maxLength = 20)
+    @ImportValidated(required = false, isCode = true, maxLength = 20)
     @ApiModelProperty(value = "胎面编码", name = "treadCode")
     @TableField(value = "TREAD_CODE")
     private String treadCode;
@@ -42,13 +42,13 @@ public class TmLossSetting extends BaseEntity {
     @TableField(value = "LOSS_RATE")
     private BigDecimal lossRate;
 
-    @Excel(name = "ui.data.column.tm.lossSetting.settingLevel")
+//    @Excel(name = "ui.data.column.tm.lossSetting.settingLevel")
     @ImportValidated(maxLength = 20)
     @ApiModelProperty(value = "配置层级", name = "settingLevel")
     @TableField(value = "SETTING_LEVEL")
     private String settingLevel;
 
-    @Excel(name = "ui.data.column.tm.lossSetting.priority")
+//    @Excel(name = "ui.data.column.tm.lossSetting.priority")
     @ImportValidated(digits = true, min = 0, max = 999)
     @ApiModelProperty(value = "优先级", name = "priority")
     @TableField(value = "PRIORITY")

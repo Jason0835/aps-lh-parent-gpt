@@ -73,7 +73,7 @@ export default {
     infoDialog,
     TltUploadForm,
   },
-  dicts: ["biz_factory_name", "biz_available_status"],
+  dicts: ["biz_factory_name", "biz_available_status", "class_num_three_plan"],
   provide() {
     return {
       parentDict: this.dict,
@@ -142,8 +142,17 @@ export default {
         },
         {
           prop: "openShiftCode",
+          align: "center",
           halign: "center",
           label: this.$t("ui.data.column.tm.machineInfo.openShiftCode"),
+          minWidth: 130,
+          render: ({ row }) => {
+            let value = row.openShiftCode;
+            if (this.isEmpty(value)) {
+              return "";
+            }
+            return this.selectDictLabels(this.dict.type.class_num_three_plan, value);
+          },
         },
         {
           prop: "machineStatus",
@@ -182,11 +191,6 @@ export default {
               ></el-switch>
             );
           },
-        },
-        {
-          prop: "shiftCode",
-          halign: "center",
-          label: this.$t("ui.data.column.tm.machineInfo.shiftCode"),
         },
         {
           prop: "remark",

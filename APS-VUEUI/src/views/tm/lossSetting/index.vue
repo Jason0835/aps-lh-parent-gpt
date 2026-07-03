@@ -137,16 +137,6 @@ export default {
           label: this.$t("ui.data.column.tm.lossSetting.lossRate"),
         },
         {
-          prop: "settingLevel",
-          halign: "center",
-          label: this.$t("ui.data.column.tm.lossSetting.settingLevel"),
-        },
-        {
-          prop: "priority",
-          halign: "center",
-          label: this.$t("ui.data.column.tm.lossSetting.priority"),
-        },
-        {
           prop: "enableStatus",
           halign: "center",
           label: this.$t("ui.data.column.tm.lossSetting.enableStatus"),
@@ -246,10 +236,6 @@ export default {
           labelKey: "machineCode",
           valueKey: "machineCode",
           filterable: true,
-        },
-        {
-          prop: "settingLevel",
-          label: this.$t("ui.data.column.tm.lossSetting.settingLevel"),
         },
         {
           prop: "enableStatus",

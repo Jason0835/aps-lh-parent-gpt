@@ -268,6 +268,9 @@ SET @parentId = LAST_INSERT_ID();
 -- 查询
 INSERT INTO `sys_menu` (`MENU_NAME`, `PARENT_ID`, `ORDER_NUM`, `TARGET`, `PATH`, `BT_URL`, `COMPONENT`, `IS_FRAME`, `IS_CACHE`, `MENU_TYPE`, `VISIBLE`, `STATUS`, `PERMS`, `BT_PERMS`, `ICON`, `BT_ICON`, `CREATE_BY`, `CREATE_TIME`, `UPDATE_BY`, `UPDATE_TIME`, `REMARK`, `LANG_JSON`, `IS_REFRESH`, `QUERY`) VALUES
     ('查询列表', @parentId, 10, 'menuItem', '#', '#', NULL, 1, 0, 'F', '0', '0', 'tm:tmScheduleResult:query', 'tm:tmScheduleResult:list', '#', '#', 'admin', NOW(), 'admin', NOW(), NULL, '[{"zh_CN":"查询","en_US":"Query","vi_VN":"Truy vấn"}]', NULL, NULL);
+-- 自动排程
+INSERT INTO `sys_menu` (`MENU_NAME`, `PARENT_ID`, `ORDER_NUM`, `TARGET`, `PATH`, `BT_URL`, `COMPONENT`, `IS_FRAME`, `IS_CACHE`, `MENU_TYPE`, `VISIBLE`, `STATUS`, `PERMS`, `BT_PERMS`, `ICON`, `BT_ICON`, `CREATE_BY`, `CREATE_TIME`, `UPDATE_BY`, `UPDATE_TIME`, `REMARK`, `LANG_JSON`, `IS_REFRESH`, `QUERY`) VALUES
+    ('自动排程', @parentId, 15, 'menuItem', '#', '#', NULL, 1, 0, 'F', '0', '0', 'tm:tmScheduleResult:autoPlan', 'tm:tmScheduleResult:autoPlan', '#', '#', 'admin', NOW(), 'admin', NOW(), NULL, '[{"zh_CN":"自动排程","en_US":"Auto Plan","vi_VN":"Tự động lập kế hoạch"}]', NULL, NULL);
 -- 插单
 INSERT INTO `sys_menu` (`MENU_NAME`, `PARENT_ID`, `ORDER_NUM`, `TARGET`, `PATH`, `BT_URL`, `COMPONENT`, `IS_FRAME`, `IS_CACHE`, `MENU_TYPE`, `VISIBLE`, `STATUS`, `PERMS`, `BT_PERMS`, `ICON`, `BT_ICON`, `CREATE_BY`, `CREATE_TIME`, `UPDATE_BY`, `UPDATE_TIME`, `REMARK`, `LANG_JSON`, `IS_REFRESH`, `QUERY`) VALUES
     ('插单', @parentId, 20, 'menuItem', '#', '#', NULL, 1, 0, 'F', '0', '0', 'tm:tmScheduleResult:add', 'tm:tmScheduleResult:add', '#', '#', 'admin', NOW(), 'admin', NOW(), NULL, '[{"zh_CN":"插单","en_US":"Insert Order","vi_VN":"Thêm đơn hàng"}]', NULL, NULL);

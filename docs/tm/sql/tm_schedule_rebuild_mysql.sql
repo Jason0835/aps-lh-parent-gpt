@@ -175,7 +175,7 @@ CREATE TABLE `T_TM_SCHEDULE_UNPLANNED` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='胎面排程未排列表';
 
 -- =========================================================
--- 3. 机台基础
+-- 3. 机台管理
 -- =========================================================
 DROP TABLE IF EXISTS `T_TM_MACHINE_INFO`;
 CREATE TABLE `T_TM_MACHINE_INFO` (
