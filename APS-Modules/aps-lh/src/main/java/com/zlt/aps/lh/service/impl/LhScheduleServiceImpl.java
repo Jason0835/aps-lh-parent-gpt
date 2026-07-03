@@ -121,6 +121,12 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
     @Resource
     private ICxScheduleResultService cxScheduleResultService;
 
+    /**
+     * 成型排程结果Mapper（aps-lh模块内直接查询，避免Feign反序列化List失败）
+     */
+    @Resource
+    private CxScheduleResultMapper cxScheduleResultMapper;
+
     @Resource
     private ScheduleEventPublisher scheduleEventPublisher;
 
@@ -2553,9 +2559,10 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         log.debug("buildCxMachineCodeExportMap: 准备查询成型机台号，硫化排程ID数量={}", lhScheduleIds.size());
         List<CxScheduleResult> cxScheduleResults;
         try {
-            cxScheduleResults = cxScheduleResultService.listByLhScheduleIds(lhScheduleIds);
+            // 直接通过Mapper查询，避免Feign反序列化List<CxScheduleResult>失败
+            cxScheduleResults = queryCxScheduleResultByLhScheduleIds(lhScheduleIds);
         } catch (Exception e) {
-            log.error("buildCxMachineCodeExportMap: Feign调用成型排程服务失败，硫化排程ID数量={}，成型机台号列将为空", lhScheduleIds.size(), e);
+            log.error("buildCxMachineCodeExportMap: 查询成型排程结果失败，硫化排程ID数量={}，成型机台号列将为空", lhScheduleIds.size(), e);
             return Collections.emptyMap();
         }
         if (PubUtil.isEmpty(cxScheduleResults)) {
@@ -2630,6 +2637,46 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
             }
         }
         return result;
+    }
+
+    /**
+     * 根据硫化排程结果ID列表查询关联的成型排程结果。
+     * <p>LH_SCHEDULE_IDS 字段保存为逗号分隔字符串，使用 FIND_IN_SET 进行匹配，
+     * 兼容历史数据中的中文逗号、斜杠、分号等分隔符。</p>
+     * <p>直接通过本地Mapper查询，避免Feign反序列化 List&lt;CxScheduleResult&gt; 时
+     * 出现"Cannot deserialize from Object value"错误。</p>
+     *
+     * @param lhScheduleIds 硫化排程结果ID列表
+     * @return 成型排程结果列表
+     */
+    private List<CxScheduleResult> queryCxScheduleResultByLhScheduleIds(List<Long> lhScheduleIds) {
+        if (lhScheduleIds == null || lhScheduleIds.isEmpty()) {
+            return Collections.emptyList();
+        }
+        List<Long> queryIds = lhScheduleIds.stream()
+                .filter(Objects::nonNull)
+                .distinct()
+                .collect(Collectors.toList());
+        if (queryIds.isEmpty()) {
+            return Collections.emptyList();
+        }
+        QueryWrapper<CxScheduleResult> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("IS_DELETE", "0");
+        queryWrapper.and(wrapper -> {
+            boolean first = true;
+            for (Long lhScheduleId : queryIds) {
+                // LH_SCHEDULE_IDS 主要保存为逗号分隔字符串，同时兼容历史数据中的中文逗号、斜杠和分号。
+                // 统一转成英文逗号后再使用 FIND_IN_SET，避免 ID=1 误匹配 10、11。
+                String findInSetSql = "FIND_IN_SET({0}, REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(LH_SCHEDULE_IDS, '，', ','), '/', ','), '；', ','), ';', ','), ' ', ''))";
+                if (first) {
+                    wrapper.apply(findInSetSql, String.valueOf(lhScheduleId));
+                    first = false;
+                } else {
+                    wrapper.or().apply(findInSetSql, String.valueOf(lhScheduleId));
+                }
+            }
+        });
+        return cxScheduleResultMapper.selectList(queryWrapper);
     }
 
     /**

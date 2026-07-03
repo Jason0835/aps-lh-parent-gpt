@@ -1563,7 +1563,7 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
      * 4. 已完成量取自硫化日完成量表，日期范围 = IFNULL(STOCK_CAPTURE_DATE, 月初) ~ 月底
      * 5. 按分厂+物料编码匹配，回填到当月定稿记录
      * 6. 有效标志判定：|超欠产值|(绝对值) > 阈值参数(SYS0206009) → 否('0')，否则 → 是('1')；
-     *    无月底余量记录时值置NULL、标志置否('0')
+     *    月底余量为空时按0处理，超欠产 = 0 - 已完成量，统一走阈值判定
      */
     @Override
     public AjaxResult calcLastMonthOverProd() {
@@ -1585,6 +1585,24 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
         // 当月作为数据来源，下月作为写入目标
         YearMonth lastMonth = YearMonth.now();
         YearMonth currentMonth = YearMonth.now().plusMonths(1);
+
+        return this.doCalcOverProd(lastMonth, currentMonth);
+    }
+
+    /**
+     * 计算指定月份超欠产写入其下月（临时测试用，支持指定数据来源月份）
+     * 逻辑同 {@link #calcCurrentMonthOverProdForNextMonth()}，但允许手动指定数据来源的年月，
+     * 便于测试在非月底时间模拟月底倒数2天的超欠产生成
+     *
+     * @param year  数据来源年份（如2026）
+     * @param month 数据来源月份（如6，代表6月数据写入7月）
+     * @return 计算结果
+     */
+    @Override
+    public AjaxResult calcCurrentMonthOverProdForNextMonth(Integer year, Integer month) {
+        // 指定月份作为数据来源，其下月作为写入目标
+        YearMonth lastMonth = YearMonth.of(year, month);
+        YearMonth currentMonth = lastMonth.plusMonths(1);
 
         return this.doCalcOverProd(lastMonth, currentMonth);
     }
@@ -1635,7 +1653,7 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
      * 数据来源月=6月（取6月月底余量+6月硫化日完成量），写入目标月=6月（更新6月定稿记录标识）。
      * 公式同定时任务：超欠产 = 月底余量 - (库存抓取日~月底)的硫化日完成量，
      * 标识判定逻辑与 MonthOverProdTask 定时任务完全一致：
-     * |超欠产值| > 阈值参数(SYS0206009) → '0'（否），否则 → '1'（是）；无月底余量记录 → '0'。
+     * |超欠产值| > 阈值参数(SYS0206009) → '0'（否），否则 → '1'（是）；月底余量为空时按0处理，统一走阈值判定。
      * </p>
      *
      * @param finalizedYear  定稿年份（如 2026）

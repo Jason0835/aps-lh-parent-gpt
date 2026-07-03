@@ -23,13 +23,28 @@
                IFNULL(sum(cxr.CLASS6_PLAN_QTY),0) CX_CLASS6_PLAN,  /*对应成型6班(D+2日夜班)的消耗量，胎圈4班供应*/
                IFNULL(sum(cxr.CLASS7_PLAN_QTY),0) CX_CLASS7_PLAN,  /*对应成型7班(D+2日早班)的消耗量，胎圈5班供应*/
                IFNULL(sum(cxr.CLASS8_PLAN_QTY),0) CX_CLASS8_PLAN,  /*对应成型8班(D+2日中班)的消耗量，胎圈6班供应*/
-               GROUP_CONCAT(DISTINCT concat(cxr.CX_MACHINE_CODE,'$',cxr.EMBRYO_CODE,'$',cxr.BOM_DATA_VERSION) order by cxr.CX_MACHINE_CODE,cxr.EMBRYO_CODE,cxr.BOM_DATA_VERSION SEPARATOR ',') as quotaKeys /*机台code$胎胚代码*/
+               /* quotaKeys 第三段使用施工表版本ci.CONSTRUCTION_VERSION而非cxr.BOM_DATA_VERSION：
+                  下游 CxEngineQuotaCommonService.getCxMachineQuota 严格按3段解析(机台$胎胚$版本)，
+                  并用 embryoCode+version 去 embryoCodeConstructionMap 匹配施工信息(该Map key=胎胚代码+施工表版本)。
+                  成型侧不再存BOM_DATA_VERSION，必须传施工表版本否则定额查不到导致供应时长为0。 */
+               GROUP_CONCAT(DISTINCT concat(cxr.CX_MACHINE_CODE,'$',cxr.EMBRYO_CODE,'$',ci.CONSTRUCTION_VERSION) order by cxr.CX_MACHINE_CODE,cxr.EMBRYO_CODE,ci.CONSTRUCTION_VERSION SEPARATOR ',') as quotaKeys /*机台code$胎胚代码$施工表版本*/
         from T_CX_SCHEDULE_RESULT cxr /*成型排程结果表*/
-        inner join T_MDM_CONSTRUCTION_INFO ci on cxr.EMBRYO_CODE = ci.CONSTRUCTION_CODE and cxr.BOM_DATA_VERSION = ci.CONSTRUCTION_VERSION  /*施工信息表，关联条件：胎胚代码=施工号、施工版本=BOM版本*/
+        /* 成型排程结果不再存储BOM_DATA_VERSION，无法按版本精确关联施工信息表。
+           改为仅按胎胚代码关联，并取施工信息表中CREATE_TIME最新的一条记录（兼容多版本场景，MySQL 5.x子查询limit写法）。
+           UPDATE_TIME插入时为NULL故改用CREATE_TIME排序；追加ID排序保证稳定性。
+           使用inner join：找不到施工记录的胎胚自然过滤掉，避免计划量重复求和。 */
+        inner join T_MDM_CONSTRUCTION_INFO ci on ci.ID = (
+            select ci2.ID
+            from T_MDM_CONSTRUCTION_INFO ci2
+            where ci2.CONSTRUCTION_CODE = cxr.EMBRYO_CODE
+              and ci2.IS_DELETE = 0
+              <if test="productionStage == '1'.toString()">
+                  and ci2.PRODUCTION_STAGE = '0'
+              </if>
+            order by ci2.CREATE_TIME desc, ci2.ID desc
+            limit 1
+        )
         where cxr.SCHEDULE_DATE = STR_TO_DATE(#{scheduleDate}, '%Y-%m-%d')
-        <if test="productionStage == '1'.toString()">
-            and ci.PRODUCTION_STAGE = '0'
-        </if>
         group by ci.TIRE_RING_CODE
     </select>
 
@@ -294,23 +309,33 @@
 
     <select id="listTqNeedConstruction" resultType="com.zlt.aps.common.engine.domain.EngineConstructionInfo">
         select concat(cxr.EMBRYO_CODE , ',' , IFNULL(ci.CONSTRUCTION_CODE, '')) EMBRYO_CODE,  /*成型排程胎胚代码，施工表的胎胚代码。使用IFNULL防止施工表无匹配时CONCAT结果为NULL*/
-               concat(cxr.BOM_DATA_VERSION , ',' , IFNULL(ci.CONSTRUCTION_VERSION, '')) as BOM_DATA_VERSION, /*成型排程胎胚版本，施工表的胎胚版本。使用IFNULL防止施工表无匹配时CONCAT结果为NULL*/
+               concat(IFNULL(cxr.BOM_DATA_VERSION, '') , ',' , IFNULL(ci.CONSTRUCTION_VERSION, '')) as BOM_DATA_VERSION, /*成型排程胎胚版本(可能为空)，施工表的胎胚版本。使用IFNULL防止成型侧版本为空时CONCAT整体为NULL*/
                ci.TIRE_RING_CODE,   /*胎圈代码*/
                ci.BEAD_CODE,  /*钢丝圈代码*/
                ci.APEX_CODE,   /*三角胶代码*/
                ci.HEXAGON_RUBBER_CODE,   /*胎圈胶料代码*/
                ci.HEXAGON_MOUTH_PLATE,   /*胎圈口型板*/
                ci.HEXAGON_RUBBER_DIMENSION  /*胎圈尺寸*/
-        from (select EMBRYO_CODE,BOM_DATA_VERSION
+        from (select EMBRYO_CODE, BOM_DATA_VERSION
               from T_CX_SCHEDULE_RESULT
-              where schedule_date = STR_TO_DATE(#{scheduleDate}, '%Y-%m-%d')
+              where IS_DELETE = 0
+              and schedule_date = STR_TO_DATE(#{scheduleDate}, '%Y-%m-%d')
               group by EMBRYO_CODE, BOM_DATA_VERSION
               ) cxr /*成型排程结果表*/
-        left join T_MDM_CONSTRUCTION_INFO ci on cxr.EMBRYO_CODE = ci.CONSTRUCTION_CODE and cxr.BOM_DATA_VERSION = ci.CONSTRUCTION_VERSION and ci.IS_DELETE = 0
-        where 1=1
-        <if test="productionStage == '1'.toString()">
-            and (ci.PRODUCTION_STAGE = '0' or ci.PRODUCTION_STAGE is null)
-        </if>
+        /* 成型排程结果不再存储BOM_DATA_VERSION，无法按版本精确关联施工信息表。
+           改为仅按胎胚代码关联，并取施工信息表中CREATE_TIME最新的一条记录（兼容多版本场景，MySQL 5.x子查询limit写法）。
+           UPDATE_TIME插入时为NULL故改用CREATE_TIME排序；追加ID排序保证稳定性。 */
+        left join T_MDM_CONSTRUCTION_INFO ci on ci.ID = (
+            select ci2.ID
+            from T_MDM_CONSTRUCTION_INFO ci2
+            where ci2.CONSTRUCTION_CODE = cxr.EMBRYO_CODE
+              and ci2.IS_DELETE = 0
+              <if test="productionStage == '1'.toString()">
+                  and ci2.PRODUCTION_STAGE = '0'
+              </if>
+            order by ci2.CREATE_TIME desc, ci2.ID desc
+            limit 1
+        )
     </select>
 
     <!-- 获得外协规格列表（外协逻辑已废弃，6班次排程不再使用，SQL整体注释保留） -->
@@ -391,11 +416,17 @@
             ci.TIRE_RING_CODE as beadCode,
             count(DISTINCT cxr.CX_MACHINE_CODE) as machineCount
         from T_CX_SCHEDULE_RESULT cxr
-        inner join T_MDM_CONSTRUCTION_INFO ci
-            on cxr.EMBRYO_CODE = ci.CONSTRUCTION_CODE
-            and cxr.BOM_DATA_VERSION = ci.CONSTRUCTION_VERSION
+        /* 成型排程结果不再存储BOM_DATA_VERSION，改为仅按胎胚代码关联施工信息表并取CREATE_TIME最新一条。
+           UPDATE_TIME插入时为NULL故改用CREATE_TIME排序；追加ID排序保证稳定性。 */
+        inner join T_MDM_CONSTRUCTION_INFO ci on ci.ID = (
+            select ci2.ID
+            from T_MDM_CONSTRUCTION_INFO ci2
+            where ci2.CONSTRUCTION_CODE = cxr.EMBRYO_CODE
+              and ci2.IS_DELETE = 0
+            order by ci2.CREATE_TIME desc, ci2.ID desc
+            limit 1
+        )
         where cxr.SCHEDULE_DATE = STR_TO_DATE(#{scheduleDate}, '%Y-%m-%d')
-            and ci.IS_DELETE = 0
             and cxr.CX_MACHINE_CODE is not null
             and cxr.CX_MACHINE_CODE != ''
         group by ci.TIRE_RING_CODE

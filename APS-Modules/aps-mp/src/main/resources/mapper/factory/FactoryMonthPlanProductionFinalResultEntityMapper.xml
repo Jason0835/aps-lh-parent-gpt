@@ -185,7 +185,7 @@
            - 第二段：派生表 calc 内部 LEFT JOIN fin 后，按行用 STOCK_CAPTURE_DATE 过滤日期再 SUM
          回填规则：
            - 按分厂+物料编码匹配，回填到写入目标月定稿记录
-           - 无月底余量记录(PLAN_SURPLUS_QTY IS NULL) → LAST_MONTH_OVERDUE_QTY=NULL，LAST_MONTH_VALID_FLAG='0'
+           - 月底余量为空(PLAN_SURPLUS_QTY IS NULL)时按0处理，超欠产 = 0 - 已完成量，统一走阈值判定
            - 有效标志判定：|超欠产值|(绝对值) > 阈值参数(overdueThresholdParamCode) → '0'(否)，否则 → '1'(是)
     -->
     <update id="updateLastMonthOverProd">
@@ -227,12 +227,8 @@
             AND fp.PRODUCT_TYPE_CODE = f.PRODUCT_TYPE_CODE
             AND fp.PARAM_CODE = #{overdueThresholdParamCode}
             AND fp.IS_DELETE = 0
-        SET f.LAST_MONTH_OVERDUE_QTY = CASE
-                WHEN calc.PLAN_SURPLUS_QTY IS NULL THEN NULL
-                ELSE IFNULL(calc.PLAN_SURPLUS_QTY, 0) - IFNULL(calc.FINISH_QTY, 0)
-            END,
+        SET f.LAST_MONTH_OVERDUE_QTY = IFNULL(calc.PLAN_SURPLUS_QTY, 0) - IFNULL(calc.FINISH_QTY, 0),
             f.LAST_MONTH_VALID_FLAG = CASE
-                WHEN calc.PLAN_SURPLUS_QTY IS NULL THEN '0'
                 WHEN ABS(IFNULL(calc.PLAN_SURPLUS_QTY, 0) - IFNULL(calc.FINISH_QTY, 0))
                      &gt; IFNULL(CAST(IFNULL(fp.PARAM_VALUE, fp.DEFAULE_VALUE) AS SIGNED), 0) THEN '0'
                 ELSE '1'
@@ -251,7 +247,7 @@
          3. 超欠产 = 月底余量 - 完成量（仅用于标识判定，不写回值字段）
          4. 按分厂+物料编码匹配，回填到写入目标月定稿记录的 LAST_MONTH_VALID_FLAG
          5. 有效标志判定：|超欠产值|(绝对值) > 阈值参数(overdueThresholdParamCode) → '0'(否)，
-            否则 → '1'(是)；无月底余量记录(PLAN_SURPLUS_QTY IS NULL) → '0'(否)
+            否则 → '1'(是)；月底余量为空(PLAN_SURPLUS_QTY IS NULL)时按0处理，统一走阈值判定
          场景：次月定稿时（如6.25定稿7月），数据来源月=写入目标月=上月（6月），
          用6月数据补更新6月定稿记录的标识，覆盖月初定时任务（6.1用5月数据）写入的旧标识。
          性能优化（两段式）：派生表 fin 按 (分厂+物料+完成日期) 预聚合，外层按 STOCK_CAPTURE_DATE 过滤后 SUM
@@ -296,7 +292,6 @@
             AND fp.PARAM_CODE = #{overdueThresholdParamCode}
             AND fp.IS_DELETE = 0
         SET f.LAST_MONTH_VALID_FLAG = CASE
-                WHEN calc.PLAN_SURPLUS_QTY IS NULL THEN '0'
                 WHEN ABS(IFNULL(calc.PLAN_SURPLUS_QTY, 0) - IFNULL(calc.FINISH_QTY, 0))
                      &gt; IFNULL(CAST(IFNULL(fp.PARAM_VALUE, fp.DEFAULE_VALUE) AS SIGNED), 0) THEN '0'
                 ELSE '1'
