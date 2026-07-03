@@ -25,15 +25,32 @@
         >{{ $t("ui.data.column.scheduleResult.autoPlan") }}</el-button>
         <el-button
           type="warning"
-          v-hasPermi="['tm:tmScheduleResult:edit']"
+          v-hasPermi="['tm:tmScheduleResult:add']"
           @click="handleAdd"
         >{{ $t("ui.data.column.scheduleResult.insertOrder") }}</el-button>
+        <el-button
+          v-hasPermi="['tm:tmScheduleResult:edit']"
+          :disabled="selection.length !== 1"
+          type="warning"
+          @click="handleChangeQty"
+        >{{ $t("ui.data.column.scheduleResult.changePlan") }}</el-button>
+        <el-button
+          v-hasPermi="['tm:tmScheduleResult:changeMachine']"
+          :disabled="selection.length === 0"
+          type="primary"
+          @click="handleChangeMachine"
+        >{{ $t("ui.data.column.scheduleResult.changeMachine") }}</el-button>
         <el-button
           type="danger"
           v-hasPermi="['tm:tmScheduleResult:remove']"
           :disabled="selection.length == 0"
           @click="handleDeleteAll"
         >{{ $t("ui.frame.btn.delete") }}</el-button>
+        <el-button
+          v-hasPermi="['tm:tmScheduleResult:export']"
+          type="primary"
+          @click="handleExport"
+        >{{ $t("ui.frame.btn.export") }}</el-button>
         <el-button
           type="primary"
           v-hasPermi="['tm:tmScheduleResult:import']"
@@ -42,26 +59,9 @@
         <el-button
           type="primary"
           :disabled="selection.length === 0"
-          v-hasPermi="['tm:tmScheduleResult:changeMachine']"
-          @click="handleChangeMachine"
-        >{{ $t("ui.data.column.scheduleResult.changeMachine") }}</el-button>
-        <el-button
-          type="warning"
-          :disabled="selection.length !== 1"
-          v-hasPermi="['tm:tmScheduleResult:changeQty']"
-          @click="handleChangeQty"
-        >{{ $t("ui.data.column.scheduleResult.changePlan") }}</el-button>
-        <el-button
-          type="primary"
-          :disabled="selection.length === 0"
           v-hasPermi="['tm:tmScheduleResult:publish']"
           @click="handlePublish"
         >{{ $t("ui.data.column.scheduleResult.publish") }}</el-button>
-        <el-button
-          type="primary"
-          @click="handleExport"
-          v-hasPermi="['tm:tmScheduleResult:export']"
-        >{{ $t("ui.frame.btn.export") }}</el-button>
       </template>
     </page-table>
     <tlt-upload-form

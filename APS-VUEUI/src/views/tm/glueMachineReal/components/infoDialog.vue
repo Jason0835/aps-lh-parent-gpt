@@ -63,15 +63,8 @@ export default {
             trigger: "blur",
           },
         ],
-        enableStatus: [
-          {
-            required: true,
-            message: this.$t("common.rule.select"),
-            trigger: "change",
-          },
-        ],
       },
-    };
+    }
   },
   computed: {
     machines() {
@@ -147,17 +140,18 @@ export default {
         {
           prop: "allowFlag",
           label: this.$t("ui.data.column.tmGlueMachineReal.allowFlag"),
-          type: "select",
+          type: "switch",
           span: 12,
-          dictData: this.parentDict.type.biz_yes_no,
+          activeValue: "1",
+          inactiveValue: "0",
         },
         {
           prop: "enableStatus",
           label: this.$t("ui.data.column.tmGlueMachineReal.enableStatus"),
-          type: "select",
+          type: "switch",
           span: 12,
-          required: true,
-          dictData: this.parentDict.type.biz_yes_no,
+          activeValue: "1",
+          inactiveValue: "0",
         },
         {
           prop: "remark",
@@ -190,6 +184,8 @@ export default {
         this.isEdit = true;
         this.form = {
           ...data,
+          enableStatus: data.enableStatus || "0",
+          allowFlag: data.allowFlag || "0",
         };
       } else {
         this.form = {

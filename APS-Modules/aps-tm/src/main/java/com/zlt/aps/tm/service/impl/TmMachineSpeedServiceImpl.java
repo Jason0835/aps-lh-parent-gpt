@@ -55,9 +55,7 @@ public class TmMachineSpeedServiceImpl extends AbstractDocService<TmMachineSpeed
     public String checkUnique(TmMachineSpeed query) {
         String unique = super.checkUnique(query);
         if (UserConstants.NOT_UNIQUE.equals(unique)) {
-            String msg = I18nUtil.getMessage("ui.data.alert.tm.machineSpeed.notUnique");
-            throw new ServiceException(com.ruoyi.common.utils.StringUtils.format(msg,
-                    query.getFactoryCode(), query.getMachineCode(), query.getTreadCode()));
+            throw new ServiceException(I18nUtil.getMessage("ui.data.alert.tm.machineSpeed.notUnique"));
         }
         return unique;
     }
@@ -99,7 +97,7 @@ public class TmMachineSpeedServiceImpl extends AbstractDocService<TmMachineSpeed
             List<String> machineCodeList = (List<String>) serviceCheckParams.get("tmMachineCodeList");
             String machineCode = importDocEntity.getMachineCode();
             if (!machineCodeList.contains(machineCode)) {
-                String message = String.format(I18nUtil.getMessage("ui.data.alert.tm.machineCodeNotExist"), machineCode);
+                String message = I18nUtil.getMessage("ui.data.alert.tm.machineCodeNotExist");
                 ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(), errorRowNum, message, importErrorLogs);
                 return Boolean.FALSE;
             }

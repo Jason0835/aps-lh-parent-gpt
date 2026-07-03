@@ -35,27 +35,54 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 /**
- * 核心排程算法服务实现类
+ * 核心排程算法编排实现 — S5.2～S5.5，在 {@link ScheduleServiceImpl} 构建上下文之后执行。
  *
- * <p>负责排程主流程编排，具体业务逻辑委托给各专门服务：
+ * <h3>职责</h3>
  * <ul>
- *   <li>{@link TaskGroupService} - 任务分组与属性计算</li>
- *   <li>{@link ContinueTaskProcessor} - 续作任务处理</li>
- *   <li>{@link TrialTaskProcessor} - 试制任务处理</li>
- *   <li>{@link NewTaskProcessor} - 新增任务处理（含量试约束）</li>
- *   <li>{@link ShiftScheduleService} - 班次精排</li>
- *   <li>{@link BalancingService} - 班次间生产量均衡</li>
+ *   <li>按<b>班次</b>循环驱动 engine 层（TaskGroupService → 三类 Processor → ShiftScheduleService）。</li>
+ *   <li>班次间滚动更新 {@link ScheduleContextVo}（库存、硫化/成型余量、在机胎胚、materialStockMap）。</li>
+ *   <li>全部班次结束后汇总 {@link CxScheduleResult} 主表 + {@link CxScheduleDetail} 子表。</li>
  * </ul>
  *
- * <p>排程主流程：
- * <ol>
- *   <li>按天循环排程（共排8个班次，约3天）</li>
- *   <li>每天：任务分组 → 续作处理 → 试制处理 → 新增处理 → 班次精排</li>
- *   <li>每天排完后更新上下文（库存/余量/在机信息）</li>
- *   <li>汇总多天结果，按 机台+胎胚+物料编号 维度生成单表排程数据</li>
- * </ol>
+ * <h3>主流程（{@link #executeSchedule}）</h3>
+ * <pre>
+ * 2.0  试制约束参数（context 已加载）
+ * 2.1  ScheduleDayTypeHelper.preloadCache
+ * 2.2  排序班次配置（scheduleDay → dayShiftOrder，约 8 班/3 天）
+ * 2.3  初始化 machineOnlineEmbryoMap（每班结束后滚动）
+ * 2.4  【核心循环】逐班次：
+ *        2.4.1 停产整天/停产班 → skip
+ *        2.4.2 写入 currentScheduleDay/Date/ShiftConfigs
+ *        2.4.3 跨天重置：试制 SKU 日计数、精度计划 applied 标记
+ *        2.4.4 executeShiftSchedule（5.2～5.3.7）
+ *        2.4.5 updateMachineOnlineStatus
+ *        2.4.6 updateContextForNextShift（库存/余量滚动）
+ *        2.4.7 detectEarlyAbandonment
+ * 2.5  buildFinalScheduleResultsFromShifts  → CLASS1~8 主表
+ * 2.6  balanceShiftQuantities              → 日级班次量均衡
+ * 2.7  buildScheduleDetailsFromShifts      → 子表
+ * 2.8  associateDetailsToResults
+ * </pre>
+ *
+ * <h3>单班次流水线（{@link #executeShiftSchedule}）</h3>
+ * <pre>
+ * 5.2   TaskGroupService.groupTasks
+ * 5.2.1 applyDailyTrialSkuLimit（SKU 上限 / 周日）
+ * 5.3.1 ContinueTaskProcessor
+ * 5.3.2 TrialTaskProcessor
+ * 5.3.3 NewTaskProcessor + BalancingService
+ * 5.3.4 合并 continue + new + trial
+ * 5.3.5 applyPrecisionPlanSelection
+ * 5.3.7 ShiftScheduleService.scheduleTaskToShifts（TaskAllocation → DailyEmbryoTask 反构）
+ * </pre>
+ *
+ * <h3>日期换算</h3>
+ * <p>前端 {@code scheduleDate} 为「中间天」；班次实际日期 =
+ * {@code scheduleDate - SCHEDULE_START_OFFSET_DAYS + scheduleDay - 1}。
  *
  * @author APS Team
+ * @see ScheduleServiceImpl#executeSchedule
+ * @see CoreScheduleAlgorithmService
  */
 @Slf4j
 @Service
@@ -71,7 +98,6 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
     private final ShiftScheduleService shiftScheduleService;
     private final ProductionCalculator productionCalculator;
     private final ScheduleDayTypeHelper scheduleDayTypeHelper;
-    private final BalancingService balancingService;
     private final CxPrecisionPlanMapper precisionPlanMapper;
     private final LhScheduleResultMapper lhScheduleResultMapper;
     private final MdmSkuConstructionRefMapper skuConstructionRefMapper;
@@ -85,7 +111,6 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             @Lazy ShiftScheduleService shiftScheduleService,
             @Lazy ProductionCalculator productionCalculator,
             ScheduleDayTypeHelper scheduleDayTypeHelper,
-            @Lazy BalancingService balancingService,
             CxPrecisionPlanMapper precisionPlanMapper,
             LhScheduleResultMapper lhScheduleResultMapper,
             MdmSkuConstructionRefMapper skuConstructionRefMapper) {
@@ -95,7 +120,6 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         this.shiftScheduleService = shiftScheduleService;
         this.productionCalculator = productionCalculator;
         this.scheduleDayTypeHelper = scheduleDayTypeHelper;
-        this.balancingService = balancingService;
         this.precisionPlanMapper = precisionPlanMapper;
         this.lhScheduleResultMapper = lhScheduleResultMapper;
         this.skuConstructionRefMapper = skuConstructionRefMapper;
@@ -110,19 +134,26 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
     /** 秒转小时的除数 */
     private static final int SECONDS_PER_HOUR = 3600;
 
-    /** 排程起始偏移天数：前端传入中间天，需要往前推1天开始排产 */
+    /** 前端 scheduleDate 为中间天时，排产起始日向前偏移天数 */
     private static final int SCHEDULE_START_OFFSET_DAYS = 1;
 
     private static final int DEFAULT_MAX_TRIAL_SKU_PER_DAY = 2;
 
+    /**
+     * 执行完整成型排程（实现 {@link CoreScheduleAlgorithmService#executeSchedule}）。
+     *
+     * <p>前置条件：{@code context} 已由 {@link ScheduleServiceImpl#executeSchedule} 内构建并传入。
+     * 返回主表列表（含关联子表），由 ScheduleServiceImpl 持久化。
+     */
     @Override
     public List<CxScheduleResult> executeSchedule(ScheduleContextVo context) {
         log.info("开始执行排程算法，日期: {}", context.getScheduleDate());
 
+        // 2.0 试制约束参数（来自 context，buildScheduleContext 第1.9步加载）
         int maxTrialSkuPerDay = context.getMaxTrialSkuPerDay() != null ? context.getMaxTrialSkuPerDay() : DEFAULT_MAX_TRIAL_SKU_PER_DAY;
         boolean trialAllowedOnSunday = context.getTrialAllowedOnSunday() != null ? context.getTrialAllowedOnSunday() : false;
 
-        // 预加载工作日历缓存，避免后续频繁数据库查询
+        // 2.1 预加载工作日历缓存（ScheduleDayTypeHelper，供开停产/停产跳过判定）
         LocalDate scheduleDate = context.getScheduleDate();
         String factoryCode = context.getFactoryCode();
         int scheduleDays = context.getScheduleDays() != null ? context.getScheduleDays() : DEFAULT_SCHEDULE_DAYS;
@@ -130,35 +161,31 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             scheduleDayTypeHelper.preloadCache(scheduleDate, scheduleDate.plusDays(scheduleDays - 1), factoryCode);
         }
 
-        // 使用 ScheduleServiceImpl.buildScheduleContext 中已加载的班次配置
+        // 2.2 获取并排序班次配置（scheduleDay → dayShiftOrder，共约8班次/3天）
         List<CxShiftConfig> allShiftConfigs = context.getShiftConfigList();
         if (allShiftConfigs == null || allShiftConfigs.isEmpty()) {
             log.error("班次配置为空，请先调用 buildScheduleContext 加载班次配置");
             return new ArrayList<>();
         }
-
-        // 按排程天数和班次序号排序，确保按 班次1→班次2→...→班次8 顺序处理
         List<CxShiftConfig> sortedShiftConfigs = allShiftConfigs.stream()
                 .filter(c -> c.getScheduleDay() != null)
                 .sorted(Comparator.comparingInt(CxShiftConfig::getScheduleDay)
                         .thenComparingInt(c -> c.getDayShiftOrder() != null ? c.getDayShiftOrder() : 0))
                 .collect(Collectors.toList());
 
-        // 收集每个班次的排产结果
-        List<ShiftScheduleResult> shiftResults = new ArrayList<>();
-
-        // 记录机台在产状态（跨班次持续更新）
+        // 2.3 跨班次状态：机台在产胎胚映射（每班次结束后滚动替换，见 2.4.4）
         Map<String, Set<String>> machineOnlineEmbryoMap = context.getMachineOnlineEmbryoMap();
         if (machineOnlineEmbryoMap == null) {
             machineOnlineEmbryoMap = new HashMap<>();
         }
 
-        // 已处理的天的集合（用于判断是否需要做停产日检查）
+        // 2.3.1 收集每个班次的排产结果（全部班次完成后汇总主表/子表）
+        List<ShiftScheduleResult> shiftResults = new ArrayList<>();
+
         Set<Integer> processedDays = new HashSet<>();
-        // 记录上一个班次的天数，用于判断是否跨天
         int lastDay = 0;
 
-        // 按班次逐个执行排程
+        // 2.4 按班次逐个执行排程（核心循环，顺序=班次1→8，不可并行）
         int shiftIndex = 0;
         int totalShifts = sortedShiftConfigs.size();
         for (CxShiftConfig shiftConfig : sortedShiftConfigs) {
@@ -167,7 +194,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             LocalDate currentScheduleDate = context.getScheduleDate()
                     .minusDays(SCHEDULE_START_OFFSET_DAYS).plusDays(day - 1);
 
-            // 检查当前天是否是整天停产
+            // 2.4.1 停产跳过：整天停产或当前班次停产
             if (scheduleDayTypeHelper.isFullDayStopped(currentScheduleDate, factoryCode)) {
                 log.info("第 {} 天日期 {} 整天停产，跳过第 {} 个班次 {} 的排程", day, currentScheduleDate, shiftIndex, shiftConfig.getShiftCode());
                 continue;
@@ -186,19 +213,19 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             log.info("【班次开始】#{}/{} | 日期:{} | 班次:{} | 历史胎胚数量:{}",
                     shiftIndex, totalShifts, currentScheduleDate, shiftConfig.getShiftCode(), historyCount);
 
-            // 设置当前班次的上下文
+            // 2.4.2 设置当前班次上下文（TaskGroupService 等 engine 服务通过 context 读取）
             List<CxShiftConfig> singleShiftList = Collections.singletonList(shiftConfig);
             context.setCurrentScheduleDay(day);
             context.setCurrentScheduleDate(currentScheduleDate);
             context.setCurrentShiftConfigs(singleShiftList);
 
-            // 跨天时重置试制/量试单日SKU上限计数（单日最多2个试制+量试SKU）
+            // 2.4.3 跨天重置：试制SKU日计数 + 精度计划应用标记
             if (day != lastDay) {
                 context.setDailyTrialAssignedMaterialCodes(new HashSet<>());
                 context.setPrecisionPlanApplied(false);
             }
 
-            // 执行该班次的排程
+            // 2.4.4 执行单班次排程（S5.2~S5.3.7，见 executeShiftSchedule）
             ShiftScheduleResult shiftResult = executeShiftSchedule(
                     context, day, shiftConfig, currentScheduleDate, machineOnlineEmbryoMap);
             // 保存当前班次排程前的 materialStockMap 快照（在 updateContextForNextShift 之前）
@@ -207,36 +234,35 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             shiftResult.setMaterialStockSnapshot(stockMap != null ? new HashMap<>(stockMap) : new HashMap<>());
             shiftResults.add(shiftResult);
 
-            // 更新机台在产状态：仅用本班次分配结果替换（滚动替换，不累积）
-            // 语义：班次N均衡分配的胎胚仅作为班次N+1的"续作历史"，MES在机数据仅用于第1班次
+            // 2.4.5 更新机台在产状态（本班次分配结果滚动替换，供下一班次续作判定）
             machineOnlineEmbryoMap = updateMachineOnlineStatus(
                     shiftResult.getAllAllocations(), machineOnlineEmbryoMap);
 
             // 将更新后的机台在产状态存回 context，供下一个班次使用
             context.setMachineOnlineEmbryoMap(new HashMap<>(machineOnlineEmbryoMap));
 
-            // 更新库存和硫化余量，供下一个班次排程使用
+            // 2.4.6 更新库存/硫化余量/成型余量，供下一班次 TaskGroupService 使用
             updateContextForNextShift(context, shiftResult.getAllAllocations(), singleShiftList, shiftConfig, shiftResult.getShiftProductionResults());
 
-            // 提前检测：剩余成型余量在下一班次会被舍弃（≤2条且非主销），提前在本班次标识
+            // 2.4.7 提前检测收尾舍弃（非主销余量≤2 将在下班次被舍弃，本班次提前标识）
             detectEarlyAbandonment(context, shiftResult);
 
             lastDay = day;
             processedDays.add(day);
         }
 
-        // ==================== 合并多班次结果：每个机台一条记录，8个班次映射到CLASS1~8 ====================
+        // 2.5 汇总多班次结果：机台+胎胚+物料 → CLASS1~8 主表记录
         List<CxScheduleResult> allResults = buildFinalScheduleResultsFromShifts(context, shiftResults, allShiftConfigs);
 
-        // ==================== 班次量均衡：按结构班产标准，最大硫化机数胎胚调整班次均衡 ====================
+        // 2.6 班次量均衡（按结构班产标准调整最大硫化机数胎胚的班次分布）
         balanceShiftQuantities(context, shiftResults, allShiftConfigs);
 
-        // ==================== 构建子表：按"机台+胎胚+车次"维度，8个班次合并一条，计算库存可供硫化时长和顺位 ====================
+        // 2.7 构建子表（机台+胎胚+车次维度，含库存可供硫化时长和顺位）
         Map<String, List<CxScheduleDetail>> detailGroupMap = buildScheduleDetailsFromShifts(context, shiftResults, allShiftConfigs);
         int totalDetails = detailGroupMap.values().stream().mapToInt(List::size).sum();
         log.info("子表记录构建完成，共 {} 条（按机台+胎胚分组 {} 组）", totalDetails, detailGroupMap.size());
 
-        // ==================== 将子表明细关联到主表（通过机台+胎胚匹配） ====================
+        // 2.8 子表关联到主表（匹配规则：机台编码 + 胎胚代码）
         associateDetailsToResults(allResults, detailGroupMap);
 
         log.info("排程算法执行完成，共 {} 个班次，总机台数: {}", shiftIndex, allResults.size());
@@ -272,18 +298,16 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
     }
 
     /**
-     * 执行单天排程
+     * 单班次排程编排 — 委托 engine 层完成分组、分配、精排。
      *
-     * <p>排程流程：
-     * <ol>
-     *   <li>S5.2 任务分组：续作/试制/新增三类</li>
-     *   <li>S5.3 处理续作任务</li>
-     *   <li>S5.3 处理试制任务（独立处理，特殊约束）</li>
-     *   <li>S5.3 处理新增任务（合并续作+新增，重新均衡）</li>
-     *   <li>S5.3.7 班次排产</li>
-     * </ol>
+     * <p>本方法不修改跨班次持久状态（除返回的 {@link ShiftScheduleResult}）；
+     * 库存/余量滚动在 {@link #executeSchedule} 的 2.4.5～2.4.6 执行。
      *
-     * @return 班次排产结果列表 + 机台分配结果列表
+     * <p><b>TaskAllocation → DailyEmbryoTask</b>：精排前反构任务对象；
+     * {@code endingExtraInventory} 优先于 {@code quantity}；开停产标志 TaskGroup 已写入时保留，
+     * 否则用 {@link ScheduleDayTypeHelper#determineShiftType} 兜底。
+     *
+     * @return 含 allAllocations + shiftProductionResults + 排程前 materialStock 快照
      */
     private ShiftScheduleResult executeShiftSchedule(
             ScheduleContextVo context,
@@ -298,7 +322,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         log.info("========== 开始执行班次排程，天={}, 日期={}, 班次={} ==========",
                 day, scheduleDate, shiftConfig.getShiftCode());
 
-        // ==================== 第一步：S5.2 任务分组（单班次） ====================
+        // 5.2 任务分组（TaskGroupService：R1/R2/R3 + 立库封顶 + 提前生产）
         TaskGroupService.TaskGroupResult taskGroup = taskGroupService.groupTasks(
                 context, machineOnlineEmbryoMap, scheduleDate, singleShiftList);
         log.info("任务分组完成：续作 {} 个，试制 {} 个，新增 {} 个",
@@ -306,20 +330,20 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                 taskGroup.getTrialTasks().size(),
                 taskGroup.getNewTasks().size());
 
-        // ==================== 第一步附加：单日试制/量试SKU上限过滤（单日最多2个） ====================
+        // 5.2.1 单日试制/量试 SKU 上限过滤（胎胚编码去重，默认最多2个）
         applyDailyTrialSkuLimit(context, taskGroup);
 
-        // ==================== 第二步：S5.3 处理续作任务 ====================
+        // 5.3.1 续作处理（SYS04070003=Y 时保底预留1台硫化机，否则仅标记交给 NewTaskProcessor）
         List<MachineAllocationResult> continueAllocations = continueTaskProcessor.processContinueTasks(
                 taskGroup.getContinueTasks(), context, scheduleDate, singleShiftList, day);
         log.info("续作任务处理完成，机台分配数: {}", continueAllocations.size());
 
-        // ==================== 第三步：S5.3 处理试制任务（独立处理） ====================
+        // 5.3.2 试制处理（空机台优先，不走 DFS 均衡）
         List<MachineAllocationResult> trialAllocations = trialTaskProcessor.processTrialTasks(
                 taskGroup.getTrialTasks(), context, scheduleDate, singleShiftList, context.getAvailableMachines());
         log.info("试制任务处理完成，机台分配数: {}", trialAllocations.size());
 
-        // ==================== 第四步：S5.3 处理新增任务（续作剩余需求+新增统一均衡） ====================
+        // 5.3.3 新增处理（续作剩余+新增合并，调用 BalancingService DFS 均衡）
         List<MachineAllocationResult> newAllocations = newTaskProcessor.processNewTasks(
                 taskGroup.getNewTasks(),
                 context,
@@ -330,7 +354,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                 trialAllocations);
         log.info("新增任务处理完成，机台分配数: {}", newAllocations.size());
 
-        // ==================== 第五步：合并分配结果 ====================
+        // 5.3.4 合并三类机台分配结果
         List<MachineAllocationResult> allAllocations = new ArrayList<>();
         allAllocations.addAll(continueAllocations);
         allAllocations.addAll(newAllocations);
@@ -349,10 +373,10 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             }
         }
 
-        // ==================== 精度计划挑选与提前扣量（每日首次执行） ====================
+        // 5.3.5 精度计划挑选与提前扣量（每日首次执行，修改 TaskAllocation 数量）
         applyPrecisionPlanSelection(context, scheduleDate, shiftConfig, allAllocations);
 
-        // ==================== 第六步：S5.3.7 班次排产（单个班次，无需跨班次均衡） ====================
+        // 5.3.7 班次精排（逐机台逐任务调用 ShiftScheduleService.scheduleTaskToShifts）
         List<ShiftScheduleService.ShiftProductionResult> shiftProductionResults = new ArrayList<>();
 
         for (MachineAllocationResult allocation : allAllocations) {
@@ -366,22 +390,20 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                 task.setMainMaterialDesc(taskAlloc.getMainMaterialDesc());
                 task.setStructureName(taskAlloc.getStructureName());
                 task.setPlannedProduction(taskAlloc.getQuantity());
-                // 优先使用 endingExtraInventory（实际需生产量），如果没有则用 quantity
                 task.setEndingExtraInventory(taskAlloc.getEndingExtraInventory() != null
                         ? taskAlloc.getEndingExtraInventory() : taskAlloc.getQuantity());
                 task.setIsTrialTask(taskAlloc.getIsTrialTask());
                 task.setIsProductionTrial(taskAlloc.getIsProductionTrial());
                 task.setIsEndingTask(taskAlloc.getIsEndingTask());
                 task.setIsContinueTask(taskAlloc.getIsContinueTask());
-                task.setIsLastEndingBatch(taskAlloc.getIsLastEndingBatch());  // 设置是否收尾最后一批
-                task.setIsEndProduction(taskAlloc.getIsEndProduction());  // 设置是否结束生产
-                task.setConstructionStage(taskAlloc.getConstructionStage());  // 设置施工阶段
-                task.setEndingAbandoned(taskAlloc.getEndingAbandoned());  // 设置收尾是否被舍弃
-                task.setPrecisionDeducted(taskAlloc.getPrecisionDeducted());  // 设置精度扣量标记
-                task.setIsFirstTask(taskAlloc.getIsFirstTask());  // 设置是否首任务（新开规格）
-                task.setIsUrgentEnding(taskAlloc.getIsUrgentEnding());  // 设置是否紧急收尾
-                task.setIsNearEnding(taskAlloc.getIsNearEnding());  // 设置是否临近收尾
-                // 优先保留 TaskGroupService 设置的标记，仅 null 时用班次类型兜底
+                task.setIsLastEndingBatch(taskAlloc.getIsLastEndingBatch());
+                task.setIsEndProduction(taskAlloc.getIsEndProduction());
+                task.setConstructionStage(taskAlloc.getConstructionStage());
+                task.setEndingAbandoned(taskAlloc.getEndingAbandoned());
+                task.setPrecisionDeducted(taskAlloc.getPrecisionDeducted());
+                task.setIsFirstTask(taskAlloc.getIsFirstTask());
+                task.setIsUrgentEnding(taskAlloc.getIsUrgentEnding());
+                task.setIsNearEnding(taskAlloc.getIsNearEnding());
                 task.setIsOpeningDayTask(taskAlloc.getIsOpeningDayTask());
                 task.setIsClosingDayTask(taskAlloc.getIsClosingDayTask());
                 if (task.getIsOpeningDayTask() == null || task.getIsClosingDayTask() == null) {
@@ -447,13 +469,10 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
     }
 
     /**
-     * 单日试制/量试SKU上限过滤
+     * 单日试制/量试 SKU 上限与周日约束（直接修改 taskGroup 三个列表）。
      *
-     * <p>单日最多 maxTrialSkuPerDay 个试制+量试SKU（按胎胚编码计），
-     * 跨机台、跨班次统一上限。超过上限的试制/量试任务直接跳过不排产。
-     *
-     * @param context   排程上下文（含当日已分配SKU集合）
-     * @param taskGroup 任务分组结果（直接修改列表）
+     * <p>规则：胎胚编码去重计数 ≤ {@code maxTrialSkuPerDay}；周日且不允许时清空全部试制/量试任务。
+     * 跨机台、跨班次在同一 {@code dailyTrialAssignedMaterialCodes} 上累计。
      */
     private void applyDailyTrialSkuLimit(ScheduleContextVo context, TaskGroupService.TaskGroupResult taskGroup) {
         // ==================== 周日不安排试制/量试 ====================
@@ -638,13 +657,13 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                         if (ta.getStockHours() != null) {
                             total = total.add(ta.getStockHours());
                         }
-                        int hourlyCapacity = shiftScheduleService.getMachineHourlyCapacity(
+                        double hourlyCapacity = shiftScheduleService.getMachineHourlyCapacity(
                                 allocation.getMachineCode(), ta.getMaterialCode(), ta.getStructureName(), context);
                         if (hourlyCapacity > 0) {
                             int qty = ta.getEndingExtraInventory() != null
                                     ? ta.getEndingExtraInventory()
                                     : (ta.getQuantity() != null ? ta.getQuantity() : 0);
-                            taskHours += (double) qty / hourlyCapacity;
+                            taskHours += qty / hourlyCapacity;
                         }
                     }
                 }
@@ -755,13 +774,13 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
 
         double totalTaskHours = 0;
         for (TaskAllocation ta : machineAllocation.getTaskAllocations()) {
-            int hourlyCapacity = shiftScheduleService.getMachineHourlyCapacity(
+            double hourlyCapacity = shiftScheduleService.getMachineHourlyCapacity(
                     machineCode, ta.getMaterialCode(), ta.getStructureName(), context);
             if (hourlyCapacity > 0) {
                 int qty = ta.getEndingExtraInventory() != null
                         ? ta.getEndingExtraInventory()
                         : (ta.getQuantity() != null ? ta.getQuantity() : 0);
-                totalTaskHours += (double) qty / hourlyCapacity;
+                totalTaskHours += qty / hourlyCapacity;
             }
         }
 
@@ -802,7 +821,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         for (TaskAllocation taskAlloc : sortedTasks) {
             if (remainingSeconds <= 0) break;
 
-            int hourlyCapacity = shiftScheduleService.getMachineHourlyCapacity(
+            double hourlyCapacity = shiftScheduleService.getMachineHourlyCapacity(
                     machineCode, taskAlloc.getMaterialCode(), taskAlloc.getStructureName(), context);
             if (hourlyCapacity <= 0) continue;
 
@@ -955,113 +974,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         }
     }
 
-    /**
-     * 精度计划扣量处理（已废弃，改为 applyPrecisionPlanSelection 每日首次执行）
-     *
-     * <p>业务规则：
-     * <ul>
-     *   <li>1. 从CxPrecisionPlan获取未完成的精度计划（planDate <= 排程日期+提前天数，actualDate为空）</li>
-     *   <li>2. 将机台按其下所有任务的可供硫化时间降序排序</li>
-     *   <li>3. 检查排序靠前的机台是否在精度计划列表中</li>
-     *   <li>4. 若可供硫化时长 >= 4小时：硫化不停机，只扣成型4小时产能</li>
-     *   <li>5. 若可供硫化时长 < 4小时：硫化产能减半（扣4/8=1/2），对应任务计划量减半</li>
-     *   <li>6. 每天最多安排2台机器做精度</li>
-     * </ul>
-     *
-     * @param context      排程上下文（含精度计划列表）
-     * @param shiftResults 所有班次的排产结果
-     */
-    private void applyPrecisionPlanDeduction(ScheduleContextVo context,
-                                             List<ShiftScheduleResult> shiftResults) {
-        List<CxPrecisionPlan> precisionPlans = context.getPrecisionPlans();
-        if (precisionPlans == null || precisionPlans.isEmpty()) {
-            log.info("无精度计划需要处理，跳过精度扣量");
-            return;
-        }
-
-        // 精度计划按机台编码索引
-        Set<String> precisionMachineCodes = precisionPlans.stream()
-                .map(CxPrecisionPlan::getMachineCode)
-                .collect(Collectors.toSet());
-
-        log.info("精度计划涉及机台：{}", precisionMachineCodes);
-
-        // 按天分组处理（每天最多2台做精度）
-        Map<Integer, List<ShiftScheduleResult>> dayShiftMap = shiftResults.stream()
-                .collect(Collectors.groupingBy(ShiftScheduleResult::getDay));
-
-        for (Map.Entry<Integer, List<ShiftScheduleResult>> dayEntry : dayShiftMap.entrySet()) {
-            int day = dayEntry.getKey();
-            List<ShiftScheduleResult> dayShifts = dayEntry.getValue();
-
-            // 收集该天所有机台，按可供硫化时间降序排序
-            // 可供硫化时间 = 机台下所有任务stockHours的总和
-            Map<String, BigDecimal> machineStockHoursMap = new LinkedHashMap<>();
-            Map<String, List<ShiftScheduleService.ShiftProductionResult>> machineResultsMap = new LinkedHashMap<>();
-
-            for (ShiftScheduleResult shiftResult : dayShifts) {
-                if (shiftResult.getShiftProductionResults() == null) continue;
-                for (ShiftScheduleService.ShiftProductionResult result : shiftResult.getShiftProductionResults()) {
-                    String machineCode = result.getMachineCode();
-                    machineStockHoursMap.merge(machineCode,
-                            result.getStockHours() != null ? result.getStockHours() : BigDecimal.ZERO,
-                            BigDecimal::add);
-                    machineResultsMap.computeIfAbsent(machineCode, k -> new ArrayList<>()).add(result);
-                }
-            }
-
-            // 按可供硫化时间降序排序机台
-            List<String> sortedMachines = machineStockHoursMap.entrySet().stream()
-                    .sorted(Map.Entry.<String, BigDecimal>comparingByValue().reversed())
-                    .map(Map.Entry::getKey)
-                    .collect(Collectors.toList());
-
-            // 精度扣量：最多2台机器
-            int precisionMachineCount = 0;
-            for (String machineCode : sortedMachines) {
-                if (!precisionMachineCodes.contains(machineCode)) continue;
-                if (precisionMachineCount >= 2) break;
-
-                BigDecimal totalStockHours = machineStockHoursMap.get(machineCode);
-                List<ShiftScheduleService.ShiftProductionResult> machineResults = machineResultsMap.get(machineCode);
-
-                log.info("精度扣量：天={}, 机台={}, 可供硫化时长={}h", day, machineCode, totalStockHours);
-
-                if (totalStockHours.compareTo(BigDecimal.valueOf(4)) >= 0) {
-                    // 可供硫化时长 >= 4小时：硫化不停机，只扣成型4小时产能
-                    // 成型精度4小时意味着该机台对应的任务需要扣4小时产能
-                    for (ShiftScheduleService.ShiftProductionResult result : machineResults) {
-                        if (result.getHourCapacity() != null && result.getHourCapacity() > 0) {
-                            // 扣4小时产能 = hourCapacity * 4 条
-                            int deduction = result.getHourCapacity() * 4;
-                            int newQty = Math.max(0, result.getQuantity() - deduction);
-                            log.info("  精度扣量（硫化不停机）：embryoCode={}, 原量={}, 扣量={}, 新量={}",
-                                    result.getEmbryoCode(), result.getQuantity(), deduction, newQty);
-                            result.setQuantity(newQty);
-                        }
-                    }
-                } else {
-                    // 可供硫化时长 < 4小时：硫化产能减半（扣4/8=1/2）
-                    // 对应机台里面那些任务，每个判断可供硫化时长小于4的要扣一半产能
-                    for (ShiftScheduleService.ShiftProductionResult result : machineResults) {
-                        BigDecimal taskStockHours = result.getStockHours() != null ? result.getStockHours() : BigDecimal.ZERO;
-                        if (taskStockHours.compareTo(BigDecimal.valueOf(4)) < 0) {
-                            // 可供硫化时长 < 4小时，扣一半产能
-                            int halfQty = result.getQuantity() / 2;
-                            int newQty = result.getQuantity() - halfQty;
-                            log.info("  精度扣量（硫化减半）：embryoCode={}, 原量={}, 扣量={}, 新量={}, 可供硫化时长={}h",
-                                    result.getEmbryoCode(), result.getQuantity(), halfQty, newQty, taskStockHours);
-                            result.setQuantity(newQty);
-                        }
-                    }
-                }
-
-                precisionMachineCount++;
-            }
-
-            log.info("精度扣量处理完成：天={}, 共处理 {} 台机器", day, precisionMachineCount);
-        }
-    }
+    // ==================== 2.6 班次量均衡（全班次完成后，调整绑定胎胚的班次分布） ====================
 
     /**
      * 班次量均衡
@@ -1088,7 +1001,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
     private void balanceShiftQuantities(ScheduleContextVo context,
                                         List<ShiftScheduleResult> shiftResults,
                                         List<CxShiftConfig> allShiftConfigs) {
-        // 按天分组排产结果
+        // 2.6.1 按 scheduleDay 分组（每天独立均衡，至少 2 个班次才处理）
         Map<Integer, List<ShiftScheduleResult>> dayShiftMap = shiftResults.stream()
                 .collect(Collectors.groupingBy(ShiftScheduleResult::getDay));
 
@@ -1098,8 +1011,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
 
             if (dayShifts.size() < 2) continue; // 至少2个班次才需要均衡
 
-            // 收集该天所有排产结果，按胎胚编码分组
-            // embryoCode -> List<ShiftProductionResult>（按班次顺序）
+            // 2.6.2 按胎胚编码收集各班次 ShiftProductionResult
             Map<String, List<ShiftScheduleService.ShiftProductionResult>> embryoByShiftMap = new LinkedHashMap<>();
             for (ShiftScheduleResult shiftResult : dayShifts) {
                 if (shiftResult.getShiftProductionResults() == null) continue;
@@ -1108,7 +1020,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                 }
             }
 
-            // 找到绑定最大硫化机数的胎胚
+            // 2.6.3 选定「绑定胎胚」：硫化机台数最多的胎胚决定该天均衡节奏
             String maxMachineEmbryo = null;
             int maxMachineCount = 0;
             for (Map.Entry<String, List<ShiftScheduleService.ShiftProductionResult>> entry : embryoByShiftMap.entrySet()) {
@@ -1135,9 +1047,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             List<ShiftScheduleService.ShiftProductionResult> targetResults = embryoByShiftMap.get(maxMachineEmbryo);
             log.info("班次均衡：天={}, 最大硫化机数胎胚={}, 硫化机数={}", day, maxMachineEmbryo, maxMachineCount);
 
-            // 对该胎胚的各班次计划量进行均衡
-            // 均衡策略：通过整车调整使各班次量趋于平衡
-            // 最后一个班次 = 总量 - SUM(第1条到倒数第2条的计划量)
+            // 2.6.4 整车调整：前 N-1 班按平均车数取整，最后班 = 总量 − 已分配
             int totalActualQty = targetResults.stream()
                     .mapToInt(r -> r.getQuantity() != null ? r.getQuantity() : 0)
                     .sum();
@@ -1219,7 +1129,10 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
     }
 
     /**
-     * 单班次排产结果
+     * 单班次排产结果容器 — {@link #executeShiftSchedule} 返回值，供 2.5～2.7 汇总。
+     *
+     * <p>{@code materialStockSnapshot}：本班精排<b>前</b>的 lhId→库存分配快照，
+     * 子表 stockHours 按班独立计算，避免跨班滚动污染。
      */
     public static class ShiftScheduleResult {
         /** 排产日（1-3），与 CxShiftConfig.scheduleDay 对应 */
@@ -1249,22 +1162,27 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         public void setMaterialStockSnapshot(Map<String, Integer> materialStockSnapshot) { this.materialStockSnapshot = materialStockSnapshot; }
     }
 
+    // ==================== 2.5 主表汇总（机台+胎胚+物料 → CLASS1~8） ====================
+
     /**
-     * 按班次排程后合并结果（与 buildFinalScheduleResults 逻辑一致，但输入是 ShiftScheduleResult）
+     * 2.5 多班次精排结果汇总为 {@link CxScheduleResult} 主表（机台+胎胚+施工阶段 → CLASS1~8）。
+     *
+     * <p>步骤：shiftCode→classField 映射 → 按 taskKey 合并各班产量 → 新开规格判定 →
+     * 写主表字段 → {@link #fixEndingFlagsPerClass} 修正收尾标记。
      */
     private List<CxScheduleResult> buildFinalScheduleResultsFromShifts(
             ScheduleContextVo context,
             List<ShiftScheduleResult> shiftResults,
             List<CxShiftConfig> allShiftConfigs) {
 
-        // 构建 shiftCode+scheduleDay → classField 的映射
+        // 2.5.1 构建 shiftCode+scheduleDay → CLASS 字段映射
         Map<String, String> shiftClassFieldMap = new HashMap<>();
         for (CxShiftConfig shiftConfig : allShiftConfigs) {
             String key = shiftConfig.getShiftCode() + "_" + shiftConfig.getScheduleDay();
             shiftClassFieldMap.put(key, shiftConfig.getClassField());
         }
 
-        // ==================== 按 机台+胎胚+SAP物料 三维维度汇总班次排量 ====================
+        // 2.5.1 按 机台|胎胚|施工阶段 三维汇总班次排量（同 CLASS 合并 quantity）
         Map<String, Map<String, ShiftScheduleService.ShiftProductionResult>> taskClassSprMap = new LinkedHashMap<>();
         Map<String, Integer> taskTotalQtyMap = new LinkedHashMap<>();
         Map<String, String> taskStructureMap = new LinkedHashMap<>();
@@ -1849,20 +1767,13 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         return results;
     }
 
+    // ==================== 2.7 子表构建（机台+胎胚+车次 → CLASS1~8） ====================
+
     /**
-     * 按班次排程后构建子表记录
+     * 2.7 构建子表 — 维度：机台+胎胚+车次；8 班合并为 CLASS1~8 一条 {@link CxScheduleDetail}。
      *
-     * <p>核心逻辑：
-     * <ul>
-     *   <li>维度：机台 + 胎胚 + 车次</li>
-     *   <li>8个班次合并到一条记录（CLASS1~CLASS8）</li>
-     *   <li>顺位规则：同一胎胚内按库存可供硫化时长从小到大排序</li>
-     *   <li>预警规则：库存可供硫化时长 > 18小时（可配置）时预警</li>
-     * </ul>
-     *
-     * <p>公式：胎胚预计库存可供硫化时长 = （胎胚实时库存 + 计划量）/ 硫化机数 / 单台模数
-     *
-     * @return 分组子表（key=机台编码|胎胚代码, value=该分组下的子表明细列表）
+     * <p>三阶段：按班合并车次 → 班内按库存可供硫化时长排序赋顺位 → 按机台|胎胚|车次号合并。
+     * stockHours 使用各班 {@link ShiftScheduleResult#getMaterialStockSnapshot}。
      */
     private Map<String, List<CxScheduleDetail>> buildScheduleDetailsFromShifts(
             ScheduleContextVo context,
@@ -2667,15 +2578,10 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         return String.join(",", reasons);
     }
 
+    // ==================== 2.4.6 班次间上下文滚动（库存 / 余量 / 在机状态） ====================
+
     /**
-     * 更新一个班次排程后的库存和硫化余量，供下一个班次排程使用
-     * <p>逻辑与 updateContextForNextDay 一致，只是按单个班次执行
-     *
-     * @param context                排程上下文
-     * @param shiftAllocations       该班次的机台分配结果
-     * @param shiftConfigs           该班次的配置
-     * @param currentShiftConfig     当前班次配置（用于确定取哪个 CLASS 字段）
-     * @param shiftProductionResults 当前班次的成型排产结果（用于计算成型产出）
+     * 班次间上下文滚动入口 — 委托 {@link #updateContextForNextDay}。
      */
     private void updateContextForNextShift(
             ScheduleContextVo context,
@@ -2688,22 +2594,17 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
     }
 
     /**
-     * 每天/每班次排程后更新上下文中的库存和硫化余量，供下一天/下一班次排程使用
+     * 每班次排程后滚动更新 context，供下一班 TaskGroupService 使用。
      *
-     * <p>更新逻辑：
+     * <p><b>链式更新</b>：
      * <ol>
-     *   <li>计算当天成型产出（按胎胚编码汇总 ShiftProductionResult.quantity）</li>
-     *   <li>计算当天硫化消耗（按胎胚编码汇总，根据当天班次CLASS字段获取硫化计划量）</li>
-     *   <li>更新materialStockMap：每条硫化任务的库存 = 原库存 - 硫化消耗 + 比例分配的成型产出</li>
-     *   <li>更新monthSurplusMap：硫化余量 -= 当天硫化消耗</li>
-     *   <li>重算formingRemainderMap：成型余量 = 硫化余量 - 库存</li>
+     *   <li>成型产出 — ShiftProductionResult.quantity 按胎胚汇总</li>
+     *   <li>硫化消耗 — 按本班 CLASS 字段读 LhScheduleResult 计划量（胎胚+物料维度）</li>
+     *   <li>CxStock / materialStockMap — 库存 ± 产出/消耗，共用胎胚按比例重分配</li>
+     *   <li>monthSurplusMap — 硫化余量 -= 物料硫化消耗</li>
+     *   <li>formingRemainderMap — 成型余量 = 硫化余量 − 胎胚库存汇总</li>
+     *   <li>machineOnlineEmbryoMap — 由 executeSchedule 2.4.5 单独更新</li>
      * </ol>
-     *
-     * @param context                排程上下文
-     * @param dayAllocations         当天排程结果
-     * @param dayShifts              当天班次配置
-     * @param currentShiftConfig     当前班次配置（用于确定取哪个 CLASS 字段）
-     * @param shiftProductionResults 当前班次的成型排产结果（用于计算成型产出）
      */
     private void updateContextForNextDay(
             ScheduleContextVo context,

@@ -55,7 +55,7 @@
 <script>
 import {mapState} from "vuex";
 import {downloadLink} from "@/utils/request";
-import {listTmLossSetting, removeTmLossSetting} from "@/api/tm/lossSetting";
+import {listTmLossSetting, removeTmLossSetting, saveTmLossSetting} from "@/api/tm/lossSetting";
 import tltUpload from "@/components/tltUpload/tltUpload.vue";
 import TltUploadForm from "@/views/components/tltUploadForm.vue";
 import infoDialog from "./components/infoDialog.vue";
@@ -137,21 +137,40 @@ export default {
           label: this.$t("ui.data.column.tm.lossSetting.lossRate"),
         },
         {
-          prop: "settingLevel",
-          halign: "center",
-          label: this.$t("ui.data.column.tm.lossSetting.settingLevel"),
-        },
-        {
-          prop: "priority",
-          halign: "center",
-          label: this.$t("ui.data.column.tm.lossSetting.priority"),
-        },
-        {
           prop: "enableStatus",
           halign: "center",
           label: this.$t("ui.data.column.tm.lossSetting.enableStatus"),
-          formatter: (row, column, value) => {
-            return this.selectDictLabel(this.dict.type.biz_yes_no, value);
+          render: ({ row }) => {
+            return (
+              <el-switch
+                active-value="1"
+                inactive-value="0"
+                disabled={this.loading}
+                value={row.enableStatus}
+                onChange={(val) => {
+                  let confirmMsg = val == "0"
+                    ? this.$t("ui.lhMachineInfo.confirm.disable")
+                    : this.$t("ui.lhMachineInfo.confirm.enable");
+                  this.$confirm(confirmMsg, { type: "warning" }).then(
+                    async () => {
+                      try {
+                        this.loading = true;
+                        const data = await saveTmLossSetting({
+                          ...row,
+                          enableStatus: val,
+                        });
+                        this.$modal.msgSuccess(data.msg);
+                        this.getList();
+                      } catch (error) {
+                        console.error(error);
+                      } finally {
+                        this.loading = false;
+                      }
+                    }
+                  );
+                }}
+              ></el-switch>
+            );
           },
         },
         {
@@ -217,10 +236,6 @@ export default {
           labelKey: "machineCode",
           valueKey: "machineCode",
           filterable: true,
-        },
-        {
-          prop: "settingLevel",
-          label: this.$t("ui.data.column.tm.lossSetting.settingLevel"),
         },
         {
           prop: "enableStatus",

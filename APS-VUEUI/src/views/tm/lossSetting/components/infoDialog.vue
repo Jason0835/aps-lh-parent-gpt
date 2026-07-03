@@ -63,14 +63,12 @@ export default {
           label: this.$t("ui.data.column.tm.lossSetting.treadCode"),
           span: 12,
           maxlength: 60,
-          required: true,
           disabled: this.isEdit,
         },
         {
           prop: "machineCode",
           label: this.$t("ui.data.column.tm.lossSetting.machineCode"),
           span: 12,
-          required: true,
           disabled: this.isEdit,
           type: "select",
           dictData: this.machines,
@@ -95,25 +93,12 @@ export default {
           required: true,
         },
         {
-          prop: "settingLevel",
-          label: this.$t("ui.data.column.tm.lossSetting.settingLevel"),
-          span: 12,
-          maxlength: 30,
-          disabled: this.isEdit,
-        },
-        {
-          prop: "priority",
-          label: this.$t("ui.data.column.tm.lossSetting.priority"),
-          span: 12,
-          type: "number",
-        },
-        {
           prop: "enableStatus",
           label: this.$t("ui.data.column.tm.lossSetting.enableStatus"),
-          type: "select",
+          type: "switch",
           span: 12,
-          required: true,
-          dictData: this.parentDict.type.biz_yes_no,
+          activeValue: "1",
+          inactiveValue: "0",
         },
         {
           prop: "remark",
@@ -139,32 +124,13 @@ export default {
             trigger: "change",
           },
         ],
-        treadCode: [
-          {
-            required: true,
-            message: this.$t("common.rule.input"),
-            trigger: "blur",
-          },
-        ],
-        machineCode: [
-          {
-            required: true,
-            message: this.$t("common.rule.input"),
-            trigger: "blur",
-          },
-        ],
+        treadCode: [],
+        machineCode: [],
         lossRate: [
           {
             required: true,
             message: this.$t("common.rule.input"),
             trigger: "blur",
-          },
-        ],
-        enableStatus: [
-          {
-            required: true,
-            message: this.$t("common.rule.select"),
-            trigger: "change",
           },
         ],
       },
@@ -191,6 +157,7 @@ export default {
         this.isEdit = true;
         this.form = {
           ...data,
+          enableStatus: data.enableStatus || "0",
         };
       } else {
         this.form = {
@@ -206,6 +173,10 @@ export default {
       this.visible = false;
     },
     handleConfirm() {
+      if (!this.form.treadCode && !this.form.machineCode) {
+        this.$modal.msgError(this.$t("ui.data.alert.tm.lossSetting.bothEmpty"));
+        return;
+      }
       this.$refs.form.triggerConfirm(this.save);
     },
   },

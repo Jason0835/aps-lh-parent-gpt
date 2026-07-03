@@ -14,17 +14,51 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 开停产日判断工具类
- * 
- * <p>统一管理所有开停产日判断逻辑，所有涉及开产日/停产日判断的代码应优先使用此类。
- * <p>优化：数据一次性加载到缓存，后续查询从缓存获取，避免频繁数据库访问。
- * 
- * <p>按班次级别判断开产/停产逻辑：
- * - 停产班：本班次 = 0(停产)，不做处理
- * - 开产班（首个）：本班次 = 1(开产) 且 上个班次 = 0(停产)，走开产逻辑
- * - 停产前一个班（末个）：本班次 = 1(开产) 且 下个班次 = 0(停产)，走停产前一个班逻辑
+ * 开/停产班次判定工具 — 读取 {@code T_MDM_WORK_CALENDAR}，按<b>班次粒度</b>（非天粒度）判定当前班次类型。
+ *
+ * <h3>在排程中的位置</h3>
+ * <pre>
+ * CoreScheduleAlgorithmServiceImpl.executeSchedule
+ *   → preloadCache（排程开始前一次性加载日历）
+ *   → 每班次 isShiftStopped → 停产班跳过整班排程
+ * TaskGroupService
+ *   → determineShiftType → OPEN_START 关键产品过滤 / 开停产任务标记 / 停产反推
+ * ShiftScheduleService
+ *   → determineShiftType → 开产首班6h封顶 / 停产前班反推 / 停产班策略
+ * </pre>
+ *
+ * <h3>数据源与字段</h3>
+ * <ul>
+ *   <li>表：{@code T_MDM_WORK_CALENDAR}（实体 {@link MdmWorkCalendar}）</li>
+ *   <li>工序：优先 {@code PROC_CODE='CX'}（成型），无数据时回退 {@code '03'}</li>
+ *   <li>班次标志：{@code ONE_SHIFT_FLAG} / {@code TWO_SHIFT_FLAG} / {@code THREE_SHIFT_FLAG}，
+ *       {@code 0=停产}、{@code 1=开产}</li>
+ *   <li>天标志：{@code DAY_FLAG}（仅用于 {@link #findNearestDayFlag} 等<b>按天</b>兼容方法，开产判定已废弃天级 API）</li>
+ * </ul>
+ *
+ * <h3>核心判定：{@link #determineShiftType}（班次级，不可与天级 DAY_FLAG 混用）</h3>
+ * <table>
+ *   <tr><th>ShiftType</th><th>条件</th><th>典型下游行为</th></tr>
+ *   <tr><td>CLOSED</td><td>本班 SHIFT_FLAG=0</td><td>主循环跳过该班；任务标记 isClosingDayTask</td></tr>
+ *   <tr><td>OPEN_START</td><td>本班=1 且 上班=0</td><td>首班6小时产能封顶；开产首班不排关键产品（除非全结构关键）</td></tr>
+ *   <tr><td>BEFORE_CLOSE</td><td>本班=1 且 下班=0</td><td>停产前班反推胎胚需求；跨天封顶</td></tr>
+ *   <tr><td>NORMAL</td><td>本班=1 且 上下班班均=1</td><td>普通波浪分配</td></tr>
+ * </table>
+ *
+ * <h3>班次时间轴（默认每天 3 班，dayShiftOrder 1→2→3）</h3>
+ * <pre>
+ * … → D-1三班 → D一班 → D二班 → D三班 → D+1一班 → …
+ * getPreviousShiftFlag：一班看前一天末班；getNextShiftFlag：三班看次日一班
+ * </pre>
+ *
+ * <h3>缓存策略</h3>
+ * <p>Key = {@code factoryCode|yyyy-MM-dd}。排程入口 {@link #preloadCache} 加载排程区间 ±{@link #CACHE_EXTRA_DAYS} 天；
+ * 懒加载/越界时 {@link #extendCache} 扩展。无日历记录时班次标志<b>默认视为开产（"1"）</b>。
  *
  * @author APS Team
+ * @see com.zlt.aps.cx.service.impl.CoreScheduleAlgorithmServiceImpl
+ * @see TaskGroupService
+ * @see ShiftScheduleService
  */
 @Slf4j
 @Component
@@ -33,75 +67,65 @@ public class ScheduleDayTypeHelper {
     @Autowired
     private MdmWorkCalendarMapper workCalendarMapper;
 
-    /** 班次停产标志：0-停 */
+    /** 工作日历班次标志：停产 */
     private static final String SHIFT_FLAG_STOP = "0";
-    
-    /** 班次开产标志：1-开 */
+
+    /** 工作日历班次标志：开产 */
     private static final String SHIFT_FLAG_START = "1";
 
-    /**
-     * 缓存：factoryCode|yyyy-MM-dd -> 工作日历数据
-     * key 格式：工厂编号|日期（字符串），如 "116|2026-05-19"
-     */
+    /** 日历缓存：{@code factoryCode|yyyy-MM-dd} → 当日 {@link MdmWorkCalendar} 行 */
     private Map<String, MdmWorkCalendar> calendarCache = new HashMap<>();
 
-    /**
-     * 缓存加载标记，避免重复加载
-     */
+    /** 是否已完成至少一次 preload/extend */
     private volatile boolean cacheLoaded = false;
 
-    /**
-     * 当前缓存对应的工厂编号
-     */
+    /** 当前缓存主工厂（懒加载时从数据行回填） */
     private String cachedFactoryCode;
 
-    /**
-     * 缓存加载的数据范围
-     */
+    /** 缓存覆盖的日期闭区间 */
     private LocalDate cacheStartDate;
     private LocalDate cacheEndDate;
 
-    /**
-     * 缓存数据的天数范围（前后各扩展几天，防止边界问题）
-     */
+    /** preload 时在请求区间两侧额外加载的天数，避免前后班次跨日查不到 */
     private static final int CACHE_EXTRA_DAYS = 5;
 
-    /**
-     * 日期格式化工具
-     */
     private static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd");
 
+    // ==================== ShiftType：班次业务语义 ====================
+
     /**
-     * 班次类型枚举（按班次级别）
+     * 班次类型枚举 — {@link #determineShiftType} 的返回值，驱动开停产分支。
+     *
+     * <p>判定仅依赖相邻班次的 SHIFT_FLAG，<b>不</b>使用 DAY_FLAG。
      */
     public enum ShiftType {
-        /** 停产班：本班次=0(停产) */
+        /** 本班 SHIFT_FLAG=0：该班次不排产或走停产精排策略 */
         CLOSED("停产班"),
-        /** 开产班（首个）：本班次=1(开产) 且 上个班次=0(停产) */
+        /** 本班=1 且上一班=0：开产后的第一个生产班次（首班产能、关键产品规则） */
         OPEN_START("开产首个班次"),
-        /** 停产前一个班（末个）：本班次=1(开产) 且 下个班次=0(停产) */
+        /** 本班=1 且下一班=0：停产前的最后一个生产班次（停锅反推、跨天封顶） */
         BEFORE_CLOSE("停产前一个班次"),
-        /** 正常班：本班次=1(开产) 且 上下班次都是开产 */
+        /** 本班=1 且上下班班均为 1：常规定额/波浪分配 */
         NORMAL("正常班");
-        
+
         private final String desc;
-        
+
         ShiftType(String desc) {
             this.desc = desc;
         }
-        
+
         public String getDesc() {
             return desc;
         }
     }
 
     /**
-     * 最近工作日历标识信息
+     * 按天停产标识查询结果 — 供 {@link #findNearestDayFlag} / {@link #isStopDay} 等<b>天级兼容 API</b>使用。
      */
     public static class DayFlagInfo {
-        /** 标识日期 */
+        /** 向前扫描命中的、带 DAY_FLAG 的日期 */
         public final LocalDate nearestDate;
-        /** 标识值：0=停，1=开 */
+        /** DAY_FLAG：0=停，1=开 */
         public final String dayFlag;
 
         public DayFlagInfo(LocalDate nearestDate, String dayFlag) {
@@ -110,82 +134,98 @@ public class ScheduleDayTypeHelper {
         }
     }
 
-    // ==================== 缓存管理 ====================
-
     /**
-     * 生成缓存 key：工厂编号|日期
+     * 单班次标志快照（调试/扩展用数据结构）。
      */
+    public static class ShiftFlagInfo {
+        public final LocalDate date;
+        public final int shiftOrder;
+        public final String shiftName;
+        /** 0=停，1=开 */
+        public final String flag;
+
+        public ShiftFlagInfo(LocalDate date, int shiftOrder, String shiftName, String flag) {
+            this.date = date;
+            this.shiftOrder = shiftOrder;
+            this.shiftName = shiftName;
+            this.flag = flag;
+        }
+    }
+
+    // ==================== 缓存：加载、查询、扩展 ====================
+
+    /** 构造缓存键：{@code factoryCode|LocalDate} */
     private String buildCacheKey(String factoryCode, LocalDate date) {
         return (factoryCode != null ? factoryCode : "UNKNOWN") + "|" + date.toString();
     }
 
-    /**
-     * 生成缓存 key：工厂编号|日期字符串
-     */
+    /** 构造缓存键：{@code factoryCode|yyyy-MM-dd} */
     private String buildCacheKey(String factoryCode, String dateStr) {
         return (factoryCode != null ? factoryCode : "UNKNOWN") + "|" + dateStr;
     }
 
     /**
-     * 预加载缓存数据（带工厂编号，推荐使用）
+     * 预加载工作日历（推荐在 {@code executeSchedule} 开头调用一次）。
      *
-     * <p>在排程开始前调用，一次性加载指定日期范围内的所有工作日历数据。
-     * 支持按工厂编号和工序编码过滤。
+     * <p><b>查询回退链</b>（依次尝试直到有数据）：
+     * <ol>
+     *   <li>PROC_CODE=CX + factoryCode + 日期区间</li>
+     *   <li>PROC_CODE=03 + factoryCode</li>
+     *   <li>PROC_CODE=CX 不限工厂</li>
+     *   <li>PROC_CODE=03 不限工厂</li>
+     * </ol>
      *
-     * @param startDate   开始日期（包含）
-     * @param endDate     结束日期（包含）
-     * @param factoryCode 工厂编号
+     * <p>实际查询区间为 {@code [startDate - CACHE_EXTRA_DAYS, endDate + CACHE_EXTRA_DAYS]}。
+     *
+     * @param startDate   排程起始日（含）
+     * @param endDate     排程结束日（含）
+     * @param factoryCode 工厂编码；可为 null（从结果行回填）
      */
     public void preloadCache(LocalDate startDate, LocalDate endDate, String factoryCode) {
-        // 扩展日期范围
         LocalDate actualStart = startDate.minusDays(CACHE_EXTRA_DAYS);
         LocalDate actualEnd = endDate.plusDays(CACHE_EXTRA_DAYS);
 
         log.info("预加载工作日历缓存: 工厂={}, 日期范围={} ~ {}", factoryCode, actualStart, actualEnd);
 
         try {
-            // 先尝试用 factoryCode + procCode="CX" 查询
             LambdaQueryWrapper<MdmWorkCalendar> wrapper = new LambdaQueryWrapper<>();
             wrapper.eq(MdmWorkCalendar::getProcCode, "CX");
             if (factoryCode != null && !factoryCode.isEmpty()) {
                 wrapper.eq(MdmWorkCalendar::getFactoryCode, factoryCode);
             }
             wrapper.ge(MdmWorkCalendar::getProductionDate, java.sql.Date.valueOf(actualStart))
-                   .le(MdmWorkCalendar::getProductionDate, java.sql.Date.valueOf(actualEnd));
+                    .le(MdmWorkCalendar::getProductionDate, java.sql.Date.valueOf(actualEnd));
 
             List<MdmWorkCalendar> list = workCalendarMapper.selectList(wrapper);
 
-            // 如果 CX 查不到数据，尝试用 "03" 作为工序编码（兼容不同数据配置）
             if (list.isEmpty() && factoryCode != null) {
                 log.info("PROC_CODE='CX' 未查到工作日历数据(工厂={}), 尝试 PROC_CODE='03'", factoryCode);
                 LambdaQueryWrapper<MdmWorkCalendar> wrapper03 = new LambdaQueryWrapper<>();
                 wrapper03.eq(MdmWorkCalendar::getProcCode, "03")
-                         .eq(MdmWorkCalendar::getFactoryCode, factoryCode)
-                         .ge(MdmWorkCalendar::getProductionDate, java.sql.Date.valueOf(actualStart))
-                         .le(MdmWorkCalendar::getProductionDate, java.sql.Date.valueOf(actualEnd));
+                        .eq(MdmWorkCalendar::getFactoryCode, factoryCode)
+                        .ge(MdmWorkCalendar::getProductionDate, java.sql.Date.valueOf(actualStart))
+                        .le(MdmWorkCalendar::getProductionDate, java.sql.Date.valueOf(actualEnd));
                 list = workCalendarMapper.selectList(wrapper03);
             }
 
-            // 如果还是查不到，不按工厂过滤重试（兼容老数据）
             if (list.isEmpty() && factoryCode != null) {
                 log.info("按工厂+工序仍查不到数据, 尝试仅按 PROC_CODE='CX' 不限工厂");
                 LambdaQueryWrapper<MdmWorkCalendar> wrapperNoFactory = new LambdaQueryWrapper<>();
                 wrapperNoFactory.eq(MdmWorkCalendar::getProcCode, "CX")
-                         .ge(MdmWorkCalendar::getProductionDate, java.sql.Date.valueOf(actualStart))
-                         .le(MdmWorkCalendar::getProductionDate, java.sql.Date.valueOf(actualEnd));
+                        .ge(MdmWorkCalendar::getProductionDate, java.sql.Date.valueOf(actualStart))
+                        .le(MdmWorkCalendar::getProductionDate, java.sql.Date.valueOf(actualEnd));
                 list = workCalendarMapper.selectList(wrapperNoFactory);
-                
+
                 if (list.isEmpty()) {
                     log.info("仅按 PROC_CODE='CX' 也查不到, 尝试仅按 PROC_CODE='03' 不限工厂");
                     LambdaQueryWrapper<MdmWorkCalendar> wrapper03NoFactory = new LambdaQueryWrapper<>();
                     wrapper03NoFactory.eq(MdmWorkCalendar::getProcCode, "03")
-                             .ge(MdmWorkCalendar::getProductionDate, java.sql.Date.valueOf(actualStart))
-                             .le(MdmWorkCalendar::getProductionDate, java.sql.Date.valueOf(actualEnd));
+                            .ge(MdmWorkCalendar::getProductionDate, java.sql.Date.valueOf(actualStart))
+                            .le(MdmWorkCalendar::getProductionDate, java.sql.Date.valueOf(actualEnd));
                     list = workCalendarMapper.selectList(wrapper03NoFactory);
                 }
             }
 
-            // 写入缓存
             calendarCache.clear();
             String effectiveFactoryCode = factoryCode;
             for (MdmWorkCalendar calendar : list) {
@@ -206,13 +246,12 @@ public class ScheduleDayTypeHelper {
             cacheLoaded = true;
 
             log.info("工作日历缓存加载完成: 工厂={}, {} 条记录", effectiveFactoryCode, list.size());
-            
-            // 输出关键日期的缓存数据用于诊断
+
             for (MdmWorkCalendar cal : list) {
                 if (cal.getProductionDate() != null) {
                     String dateStr = formatDateKey(cal.getProductionDate());
                     log.info("工作日历缓存: 日期={}, 一班={}, 二班={}, 三班={}, DAY_FLAG={}, 工厂={}",
-                            dateStr, cal.getOneShiftFlag(), cal.getTwoShiftFlag(), 
+                            dateStr, cal.getOneShiftFlag(), cal.getTwoShiftFlag(),
                             cal.getThreeShiftFlag(), cal.getDayFlag(), cal.getFactoryCode());
                 }
             }
@@ -222,34 +261,22 @@ public class ScheduleDayTypeHelper {
         }
     }
 
-    /**
-     * 预加载缓存数据（兼容旧调用）
-     *
-     * @param startDate 开始日期（包含）
-     * @param endDate   结束日期（包含）
-     */
+    /** {@link #preloadCache(LocalDate, LocalDate, String)} 的 factoryCode=null 重载 */
     public void preloadCache(LocalDate startDate, LocalDate endDate) {
         preloadCache(startDate, endDate, null);
     }
 
     /**
-     * 确保缓存已加载（懒加载模式）
-     *
-     * @param date        当前查询日期
-     * @param factoryCode 工厂编号
+     * 懒加载：未 preload 或工厂切换时，以 queryDate ±30 天触发 preload。
      */
     private void ensureCacheLoaded(LocalDate date, String factoryCode) {
         if (!cacheLoaded || (factoryCode != null && !factoryCode.equals(cachedFactoryCode))) {
-            // 默认加载前后30天的数据
             LocalDate start = date.minusDays(30);
             LocalDate end = date.plusDays(30);
             preloadCache(start, end, factoryCode);
         }
     }
 
-    /**
-     * 将 Date 转换为 yyyy-MM-dd 格式的字符串作为缓存 key
-     */
     private String formatDateKey(java.util.Date date) {
         if (date == null) {
             return null;
@@ -258,11 +285,7 @@ public class ScheduleDayTypeHelper {
     }
 
     /**
-     * 从缓存或数据库获取工作日历
-     *
-     * @param queryDate   查询日期
-     * @param factoryCode 工厂编号
-     * @return 工作日历对象，无则返回 null
+     * 按工厂+日期取日历行：先查缓存，越界则 extend，仍无则返回 null（调用方多默认开产）。
      */
     private MdmWorkCalendar getCalendar(LocalDate queryDate, String factoryCode) {
         ensureCacheLoaded(queryDate, factoryCode);
@@ -270,21 +293,18 @@ public class ScheduleDayTypeHelper {
         String key = buildCacheKey(factoryCode, queryDate);
         MdmWorkCalendar calendar = calendarCache.get(key);
 
-        // 如果缓存中没有，尝试用缓存的工厂编号再查一次
         if (calendar == null && cachedFactoryCode != null && !cachedFactoryCode.equals(factoryCode)) {
             key = buildCacheKey(cachedFactoryCode, queryDate);
             calendar = calendarCache.get(key);
         }
 
-        // 如果缓存中没有且在缓存范围内，说明确实没有数据
         if (calendar == null && cacheStartDate != null && cacheEndDate != null) {
             if (queryDate.isBefore(cacheStartDate) || queryDate.isAfter(cacheEndDate)) {
-                // 查询日期超出缓存范围，需要扩展缓存
                 extendCache(queryDate, factoryCode);
-                
+
                 key = buildCacheKey(factoryCode, queryDate);
                 calendar = calendarCache.get(key);
-                
+
                 if (calendar == null && cachedFactoryCode != null) {
                     key = buildCacheKey(cachedFactoryCode, queryDate);
                     calendar = calendarCache.get(key);
@@ -295,11 +315,8 @@ public class ScheduleDayTypeHelper {
         return calendar;
     }
 
-    /**
-     * 扩展缓存范围（懒加载模式下调用）
-     */
+    /** 查询日落入缓存区间外时，向前后各扩展约 30 天并 merge 查询结果 */
     private synchronized void extendCache(LocalDate date, String factoryCode) {
-        // 再次检查，可能其他线程已经扩展了
         if (cacheStartDate != null && cacheEndDate != null) {
             if (date.isBefore(cacheStartDate) || date.isAfter(cacheEndDate)) {
                 log.info("扩展工作日历缓存: 工厂={}, 当前范围 {} ~ {}, 新增日期 {}",
@@ -308,24 +325,22 @@ public class ScheduleDayTypeHelper {
                 LocalDate newStart = cacheStartDate.isBefore(date) ? cacheStartDate : date.minusDays(30);
                 LocalDate newEnd = cacheEndDate.isAfter(date) ? cacheEndDate : date.plusDays(30);
 
-                // 查询新增范围的数据
                 LambdaQueryWrapper<MdmWorkCalendar> wrapper = new LambdaQueryWrapper<>();
                 wrapper.eq(MdmWorkCalendar::getProcCode, "CX");
                 if (factoryCode != null && !factoryCode.isEmpty()) {
                     wrapper.eq(MdmWorkCalendar::getFactoryCode, factoryCode);
                 }
                 wrapper.ge(MdmWorkCalendar::getProductionDate, java.sql.Date.valueOf(newStart))
-                       .le(MdmWorkCalendar::getProductionDate, java.sql.Date.valueOf(newEnd));
+                        .le(MdmWorkCalendar::getProductionDate, java.sql.Date.valueOf(newEnd));
 
                 List<MdmWorkCalendar> list = workCalendarMapper.selectList(wrapper);
 
-                // 如果 CX 查不到，尝试 03
                 if (list.isEmpty() && factoryCode != null) {
                     LambdaQueryWrapper<MdmWorkCalendar> wrapper03 = new LambdaQueryWrapper<>();
                     wrapper03.eq(MdmWorkCalendar::getProcCode, "03")
-                             .eq(MdmWorkCalendar::getFactoryCode, factoryCode)
-                             .ge(MdmWorkCalendar::getProductionDate, java.sql.Date.valueOf(newStart))
-                             .le(MdmWorkCalendar::getProductionDate, java.sql.Date.valueOf(newEnd));
+                            .eq(MdmWorkCalendar::getFactoryCode, factoryCode)
+                            .ge(MdmWorkCalendar::getProductionDate, java.sql.Date.valueOf(newStart))
+                            .le(MdmWorkCalendar::getProductionDate, java.sql.Date.valueOf(newEnd));
                     list = workCalendarMapper.selectList(wrapper03);
                 }
 
@@ -344,9 +359,6 @@ public class ScheduleDayTypeHelper {
         }
     }
 
-    /**
-     * 获取班次名称
-     */
     private String getShiftName(int shiftOrder) {
         switch (shiftOrder) {
             case 1: return "一班";
@@ -357,24 +369,13 @@ public class ScheduleDayTypeHelper {
     }
 
     /**
-     * 获取每天班次数（默认3班）
+     * 每日班次数。当前固定 3；若未来班次配置可变，应与此处及 prev/next 逻辑联动修改。
      */
     private int getShiftsPerDay(LocalDate date) {
         return 3;
     }
 
-    // ==================== 按班次级别判断方法 ====================
-
-    /**
-     * 获取指定班次的开停产标志
-     *
-     * @param date       日期
-     * @param shiftOrder 班次序号（1,2,3）
-     * @return 开产标志（0-停, 1-开），默认返回"1"（开产）
-     */
-    public String getShiftFlag(LocalDate date, int shiftOrder) {
-        return getShiftFlag(date, shiftOrder, null);
-    }
+    // ==================== 班次 SHIFT_FLAG 读取与相邻班次 ====================
 
     /**
      * 获取指定班次的开停产标志（带工厂编号）
@@ -406,29 +407,15 @@ public class ScheduleDayTypeHelper {
     }
 
     /**
-     * 获取上一个班次的开停产标志
-     * 
-     * 班次顺序：一班 → 二班 → 三班 → 下一天一班
-     * 一班的"上一个班次" = 前一天的三班
-     *
-     * @param date       日期
-     * @param shiftOrder 班次序号（1,2,3）
-     * @return 上一个班次的开产标志（0-停, 1-开），默认返回"1"（开产）
-     */
-    public String getPreviousShiftFlag(LocalDate date, int shiftOrder) {
-        return getPreviousShiftFlag(date, shiftOrder, null);
-    }
-
-    /**
      * 获取上一个班次的开停产标志（带工厂编号）
      */
     public String getPreviousShiftFlag(LocalDate date, int shiftOrder, String factoryCode) {
         LocalDate prevDate = date;
         int prevShiftOrder;
-        
+
         // 获取当前排产每天班次数（从班次配置中获取，默认3班）
         int shiftsPerDay = getShiftsPerDay(date);
-        
+
         switch (shiftOrder) {
             case 1:
                 // 一班的"上一个班次" = 前一天的最后一个班次
@@ -447,22 +434,8 @@ public class ScheduleDayTypeHelper {
                 log.warn("未知的班次序号: {}", shiftOrder);
                 return SHIFT_FLAG_START;
         }
-        
-        return getShiftFlag(prevDate, prevShiftOrder, factoryCode);
-    }
 
-    /**
-     * 获取下一个班次的开停产标志
-     * 
-     * 班次顺序：一班 → 二班 → 三班 → 下一天一班
-     * 三班的"下一个班次" = 下一天的一班
-     *
-     * @param date       日期
-     * @param shiftOrder 班次序号（1,2,3）
-     * @return 下一个班次的开产标志（0-停, 1-开），默认返回"1"（开产）
-     */
-    public String getNextShiftFlag(LocalDate date, int shiftOrder) {
-        return getNextShiftFlag(date, shiftOrder, null);
+        return getShiftFlag(prevDate, prevShiftOrder, factoryCode);
     }
 
     /**
@@ -471,7 +444,7 @@ public class ScheduleDayTypeHelper {
     public String getNextShiftFlag(LocalDate date, int shiftOrder, String factoryCode) {
         LocalDate nextDate = date;
         int nextShiftOrder;
-        
+
         switch (shiftOrder) {
             case 1:
                 // 一班的"下一个班次" = 当天的二班
@@ -490,99 +463,80 @@ public class ScheduleDayTypeHelper {
                 log.warn("未知的班次序号: {}", shiftOrder);
                 return SHIFT_FLAG_START;
         }
-        
+
         return getShiftFlag(nextDate, nextShiftOrder, factoryCode);
     }
 
-    // ==================== 班次类型判定 ====================
+    // ==================== determineShiftType：班次类型核心判定 ====================
 
-    /**
-     * 按班次级别判断班次类型
-     * 
-     * 判断逻辑：
-     * - 停产班：本班次 = 0(停产)，不做处理
-     * - 开产班（首个）：本班次 = 1(开产) 且 上个班次 = 0(停产)，走开产逻辑
-     * - 停产前一个班（末个）：本班次 = 1(开产) 且 下个班次 = 0(停产)，走停产前一个班逻辑
-     *
-     * @param date       日期
-     * @param shiftOrder 班次序号（1,2,3）
-     * @return 班次类型
-     */
     public ShiftType determineShiftType(LocalDate date, int shiftOrder) {
         return determineShiftType(date, shiftOrder, null);
     }
 
     /**
-     * 按班次级别判断班次类型（带工厂编号）
+     * 按班次判定开/停产类型 — TaskGroupService、ShiftScheduleService、CoreScheduleAlgorithmServiceImpl 的统一入口。
+     *
+     * <p><b>判定顺序（短路，不可调换）</b>：
+     * <ol>
+     *   <li>本班 flag=0 → {@link ShiftType#CLOSED}</li>
+     *   <li>本班=1 且 {@link #getPreviousShiftFlag}=0 → {@link ShiftType#OPEN_START}</li>
+     *   <li>本班=1 且 {@link #getNextShiftFlag}=0 → {@link ShiftType#BEFORE_CLOSE}</li>
+     *   <li>否则 → {@link ShiftType#NORMAL}</li>
+     * </ol>
+     *
+     * <p>注意：OPEN_START 与 BEFORE_CLOSE 可能同日共存于不同班次；同一班次不会同时为两者。
      */
     public ShiftType determineShiftType(LocalDate date, int shiftOrder, String factoryCode) {
         String currentFlag = getShiftFlag(date, shiftOrder, factoryCode);
-        
+
         // 1. 判断是否为停产班
         if (SHIFT_FLAG_STOP.equals(currentFlag)) {
-            log.debug("班次类型判定：工厂={}, 日期={}, 当天第{}班, 结果=停产班", 
+            log.debug("班次类型判定：工厂={}, 日期={}, 当天第{}班, 结果=停产班",
                     factoryCode, date, shiftOrder);
             return ShiftType.CLOSED;
         }
-        
+
         // 2. 本班次是开产，判断是开产首个班还是停产前一个班
         String prevFlag = getPreviousShiftFlag(date, shiftOrder, factoryCode);
         String nextFlag = getNextShiftFlag(date, shiftOrder, factoryCode);
-        
+
         // 上个班次是停产 -> 开产首个班次
         if (SHIFT_FLAG_STOP.equals(prevFlag)) {
-            log.debug("班次类型判定：工厂={}, 日期={}, 当天第{}班, 上个班次停产, 结果=开产首个班次", 
+            log.debug("班次类型判定：工厂={}, 日期={}, 当天第{}班, 上个班次停产, 结果=开产首个班次",
                     factoryCode, date, shiftOrder);
             return ShiftType.OPEN_START;
         }
-        
+
         // 下个班次是停产 -> 停产前一个班次
         if (SHIFT_FLAG_STOP.equals(nextFlag)) {
-            log.debug("班次类型判定：工厂={}, 日期={}, 当天第{}班, 下个班次停产, 结果=停产前一个班次", 
+            log.debug("班次类型判定：工厂={}, 日期={}, 当天第{}班, 下个班次停产, 结果=停产前一个班次",
                     factoryCode, date, shiftOrder);
             return ShiftType.BEFORE_CLOSE;
         }
-        
+
         // 正常班
-        log.debug("班次类型判定：工厂={}, 日期={}, 当天第{}班, 结果=正常班(上下班次均正常)", 
+        log.debug("班次类型判定：工厂={}, 日期={}, 当天第{}班, 结果=正常班(上下班次均正常)",
                 factoryCode, date, shiftOrder);
         return ShiftType.NORMAL;
     }
 
-    // ==================== 判断方法（带工厂编号） ====================
+    // ==================== 便捷布尔判定 ====================
 
-    /**
-     * 判断是否为停产班（本班次=0），带工厂编号
-     */
+    /** 是否停产班（等价于 {@code determineShiftType == CLOSED}） */
     public boolean isClosingShift(LocalDate date, int shiftOrder, String factoryCode) {
         return determineShiftType(date, shiftOrder, factoryCode) == ShiftType.CLOSED;
     }
 
-    // ==================== 班次停产判断（用于排程主循环跳过停产班次） ====================
-
     /**
-     * 判断某天某班次是否停产（带工厂编号）
+     * 本班 SHIFT_FLAG 是否为 0 — 用于主循环「停产班次跳过排程」。
      *
-     * @param date          查询日期
-     * @param dayShiftOrder 班次顺序（1=一班, 2=二班, 3=三班）
-     * @param factoryCode   工厂编号
-     * @return true 表示该班次停产
+     * <p>与 {@link #isClosingShift} 等价语义，但直接读 flag，不经过 OPEN_START/BEFORE_CLOSE 分支。
      */
     public boolean isShiftStopped(LocalDate date, int dayShiftOrder, String factoryCode) {
         String flag = getShiftFlag(date, dayShiftOrder, factoryCode);
-        log.debug("班次停产判断：工厂={}, 日期={}, 当天第{}班, 标志={}, 结果={}", 
+        log.debug("班次停产判断：工厂={}, 日期={}, 当天第{}班, 标志={}, 结果={}",
                 factoryCode, date, dayShiftOrder, flag, SHIFT_FLAG_STOP.equals(flag));
         return SHIFT_FLAG_STOP.equals(flag);
-    }
-
-    /**
-     * 判断某天是否整天停产（dayFlag=0 或 三个班次全部停产）
-     *
-     * @param date 查询日期
-     * @return true 表示整天停产
-     */
-    public boolean isFullDayStopped(LocalDate date) {
-        return isFullDayStopped(date, null);
     }
 
     /**
@@ -603,8 +557,7 @@ public class ScheduleDayTypeHelper {
     }
 
     /**
-     * 判断某天是否包含任一班次停产（用于跨天封顶检查）
-     * 只要有一个班次的shift_flag="0"就返回true
+     * 当日是否存在任一班次停产 — TaskGroupService 跨天封顶等场景使用。
      */
     public boolean hasAnyClosingShift(LocalDate date, String factoryCode) {
         MdmWorkCalendar calendar = getCalendar(date, factoryCode);
@@ -616,17 +569,7 @@ public class ScheduleDayTypeHelper {
                 || SHIFT_FLAG_STOP.equals(calendar.getThreeShiftFlag());
     }
 
-    // ==================== 原有按天级别判断方法（兼容保留） ====================
-
-    /**
-     * 从当前排产日期往前找最近一个有 dayFlag 标识的日期
-     *
-     * @param date 当前排产日期
-     * @return 最近标识信息，包含标识日期和标识值（"0"=停，"1"=开）
-     */
-    public DayFlagInfo findNearestDayFlag(LocalDate date) {
-        return findNearestDayFlag(date, null);
-    }
+    // ==================== 按天 DAY_FLAG 兼容 API（开产判定请用 determineShiftType） ====================
 
     /**
      * 从当前排产日期往前找最近一个有 dayFlag 标识的日期（带工厂编号）
@@ -644,13 +587,6 @@ public class ScheduleDayTypeHelper {
     }
 
     /**
-     * 判断是否为停产日（已停产，往后停产）
-     */
-    public boolean isStopDay(LocalDate date) {
-        return isStopDay(date, null);
-    }
-
-    /**
      * 判断是否为停产日（已停产，带工厂编号）
      */
     public boolean isStopDay(LocalDate date, String factoryCode) {
@@ -661,16 +597,6 @@ public class ScheduleDayTypeHelper {
         return "0".equals(flagInfo.dayFlag) && date.isAfter(flagInfo.nearestDate);
     }
 
-    /**
-     * 判断是否为停产标识日（停产标记当天，最后一天有量）
-     */
-    public boolean isStopFlagDay(LocalDate date) {
-        return isStopFlagDay(date, null);
-    }
-
-    /**
-     * 判断是否为停产标识日（带工厂编号）
-     */
     public boolean isStopFlagDay(LocalDate date, String factoryCode) {
         DayFlagInfo flagInfo = findNearestDayFlag(date, factoryCode);
         if (flagInfo == null || flagInfo.dayFlag == null) {
@@ -679,15 +605,23 @@ public class ScheduleDayTypeHelper {
         return "0".equals(flagInfo.dayFlag) && !date.isAfter(flagInfo.nearestDate);
     }
 
+    // ==================== 时间与班次序号映射 ====================
+
     /**
-     * 根据时间字符串（HH:mm格式）确定对应的班次序号
+     * 将 HH:mm 时刻映射到 {@code CxShiftConfig.dayShiftOrder}。
      *
-     * <p>逻辑：遍历班次配置（按dayShiftOrder排序），找到 startTime <= timeStr < endTime 的班次。
-     * 如果时间恰好是某个班次的开始时间，则属于该班次。
+     * <p><b>匹配规则</b>：
+     * <ul>
+     *   <li>遍历已排序班次配置，找 {@code startTime <= time < endTime}（非跨天班次）</li>
+     *   <li>跨天班次（start &gt; end）：{@code time >= start || time < end}</li>
+     *   <li>未命中时：若 time 晚于某班 start，取最后一班；若早于首班 start（如停锅 05:30、首班 06:00），归首班</li>
+     * </ul>
      *
-     * @param timeStr       时间字符串（HH:mm格式，如 "08:00"）
-     * @param shiftConfigs  班次配置列表（已按dayShiftOrder排序）
-     * @return 对应的dayShiftOrder（1=一班, 2=二班, 3=三班），找不到返回null
+     * <p>用于硫化停锅/开模时间与班次窗口对齐（TaskGroupService 停产反推）。
+     *
+     * @param timeStr      HH:mm
+     * @param shiftConfigs 当日班次配置（应按 dayShiftOrder 排序）
+     * @return dayShiftOrder，无法匹配时 null
      */
     public Integer getShiftOrderByTime(String timeStr, List<com.zlt.aps.cx.entity.config.CxShiftConfig> shiftConfigs) {
         if (timeStr == null || shiftConfigs == null || shiftConfigs.isEmpty()) {
@@ -710,7 +644,6 @@ public class ScheduleDayTypeHelper {
                 }
             }
         }
-        // 可能是最后一个班次的结束时间（跨天），取最后一个班次
         for (int i = shiftConfigs.size() - 1; i >= 0; i--) {
             com.zlt.aps.cx.entity.config.CxShiftConfig shiftConfig = shiftConfigs.get(i);
             String startTime = shiftConfig.getStartTime();
@@ -721,7 +654,6 @@ public class ScheduleDayTypeHelper {
                 }
             }
         }
-        // 时间早于第一个班次的开始时间（如停锅05:30，第一班06:00），归为第一班
         com.zlt.aps.cx.entity.config.CxShiftConfig firstShift = shiftConfigs.get(0);
         if (firstShift != null && firstShift.getDayShiftOrder() != null) {
             return firstShift.getDayShiftOrder();

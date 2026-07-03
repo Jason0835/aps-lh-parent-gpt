@@ -41,7 +41,9 @@ export default {
       visible: false,
       isEdit: false,
       editType: null,
-      form: {},
+      form: {
+        openShiftCode: [],
+      },
       rules: {
         factoryCode: [
           {
@@ -62,6 +64,19 @@ export default {
             required: true,
             message: this.$t("common.rule.input"),
             trigger: "blur",
+          },
+        ],
+        openShiftCode: [
+          {
+            required: true,
+            validator: (rule, value, callback) => {
+              if (!value || value.length === 0) {
+                callback(new Error(this.$t("common.rule.select")));
+              } else {
+                callback();
+              }
+            },
+            trigger: "change",
           },
         ],
       },
@@ -109,8 +124,20 @@ export default {
         {
           prop: "openShiftCode",
           label: this.$t("ui.data.column.tm.machineInfo.openShiftCode"),
-          span: 12,
-          maxlength: 50,
+          span: 24,
+          render: (form) => {
+            return (
+              <el-checkbox-group v-model={form.openShiftCode}>
+                {this.parentDict.type.class_num_three_plan.map((row) => {
+                  return (
+                    <el-checkbox key={`SHIFT_${row.value}`} label={row.value}>
+                      {row.label}
+                    </el-checkbox>
+                  );
+                })}
+              </el-checkbox-group>
+            );
+          },
         },
         {
           prop: "machineStatus",
@@ -119,12 +146,6 @@ export default {
           type: "switch",
           activeValue: "1",
           inactiveValue: "0",
-        },
-        {
-          prop: "shiftCode",
-          label: this.$t("ui.data.column.tm.machineInfo.shiftCode"),
-          span: 12,
-          maxlength: 50,
         },
         {
           prop: "remark",
@@ -141,6 +162,9 @@ export default {
     async save(params) {
       try {
         this.loading = true;
+        if (params.openShiftCode && Array.isArray(params.openShiftCode)) {
+          params.openShiftCode = params.openShiftCode.join(",");
+        }
         const res = await saveTmMachineInfo(params);
         this.$modal.msgSuccess(res.msg);
         this.$emit("success");
@@ -160,16 +184,20 @@ export default {
         this.form = {
           ...data,
           machineStatus: data.machineStatus || "0",
+          openShiftCode: data.openShiftCode
+            ? data.openShiftCode.split(",")
+            : [],
         };
       } else {
         this.form = {
           factoryCode: "116",
           machineStatus: "1",
+          openShiftCode: [],
         };
       }
     },
     hide() {
-      this.form = {};
+      this.form = { openShiftCode: [] };
       this.$refs.form.triggerResetForm();
       this.isEdit = false;
       this.visible = false;

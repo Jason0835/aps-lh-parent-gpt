@@ -563,6 +563,7 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
         //Sku排产顺序相关
         paramCodeList.add(MonthPlanEnums.HEIGHT_PRIORITY_SKU_LIST_COUNT.getCode());
         paramCodeList.add(MonthPlanEnums.SHARE_MOLD_EMBRYO_PRIORITY.getCode());
+        paramCodeList.add(MonthPlanEnums.EMPTY_AUTO_NEXT_PRIORITY.getCode());
         //其他
         paramCodeList.add(MonthPlanEnums.SECTION_WIDTH_DIFF_VALUE.getCode());
         paramCodeList.add(MonthPlanEnums.CHANGE_STRUCT_DEC_LH_MACHINES.getCode());
@@ -668,6 +669,13 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
         //Sku排产顺序相关
         configuration.setHeightPrioritySkuPreCount((Integer) paramConfigurationMap.get(MonthPlanEnums.HEIGHT_PRIORITY_SKU_LIST_COUNT.getCode()));
         configuration.setShareMoldOrEmbryoPriorityRange((Integer) paramConfigurationMap.get(MonthPlanEnums.SHARE_MOLD_EMBRYO_PRIORITY.getCode()));
+        //20260703+ 是否自动顺延下一优先级结构
+        String autoNextPriorityGroupValue = (String) paramConfigurationMap.get(MonthPlanEnums.EMPTY_AUTO_NEXT_PRIORITY.getCode());
+        if (ProductionProcessUtils.isYesValue(autoNextPriorityGroupValue)) {
+            configuration.setAutoNextPriorityGroup(true);
+        } else {
+            configuration.setAutoNextPriorityGroup(false);
+        }
         //其它
         configuration.setSectionWidthDiffValue((Integer) paramConfigurationMap.get(MonthPlanEnums.SECTION_WIDTH_DIFF_VALUE.getCode()));
         Object deductionLhMachineValue = paramConfigurationMap.get(MonthPlanEnums.CHANGE_STRUCT_DEC_LH_MACHINES.getCode());

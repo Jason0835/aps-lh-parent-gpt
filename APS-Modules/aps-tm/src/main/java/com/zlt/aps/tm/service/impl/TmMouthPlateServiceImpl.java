@@ -48,6 +48,6 @@ public class TmMouthPlateServiceImpl extends AbstractDocService<TmMouthPlate> im
 
     @Override
     protected List<String> getCheckUniqueFields() {
-        return new ArrayList<>(Arrays.asList("factoryCode", "mouthPlateCode"));
+        return new ArrayList<>(Arrays.asList("factoryCode", "mouthPlateCode", "machineCode"));
     }
 }

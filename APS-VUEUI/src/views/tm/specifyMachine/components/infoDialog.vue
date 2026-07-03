@@ -96,7 +96,6 @@ export default {
           span: 12,
           maxlength: 50,
           required: true,
-          disabled: this.isEdit,
         },
         {
           prop: "machineCode",
@@ -123,10 +122,7 @@ export default {
           label: this.$t("ui.data.column.tm.specifyMachine.jobType"),
           type: "select",
           span: 12,
-          options: [
-            { label: "定点", value: "SPECIFY" },
-            { label: "禁排", value: "FORBIDDEN" },
-          ],
+          dictData: this.parentDict.type.JOB_TYPE,
         },
         {
           prop: "priority",
@@ -137,9 +133,10 @@ export default {
         {
           prop: "enableStatus",
           label: this.$t("ui.data.column.tm.specifyMachine.enableStatus"),
-          type: "select",
+          type: "switch",
           span: 12,
-          dictData: this.parentDict.type.biz_yes_no,
+          activeValue: "1",
+          inactiveValue: "0",
         },
         {
           prop: "remark",
@@ -174,6 +171,7 @@ export default {
         this.isEdit = true;
         this.form = {
           ...data,
+          enableStatus: data.enableStatus || "0",
         };
       } else {
         this.form = {

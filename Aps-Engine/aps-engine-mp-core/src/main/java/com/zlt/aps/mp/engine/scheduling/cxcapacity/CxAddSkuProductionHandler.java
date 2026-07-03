@@ -424,6 +424,7 @@ public class CxAddSkuProductionHandler {
      * @param currentSelected 当前选择的Sku信息
      * @param excludeDays     排除的收尾时间点
      * @param isLastSkuPlan   是否最后一个Sku
+     * @param startDay        开始排产日
      */
     private void retrieveNextSku(Context context, ProductionStageEnum productionStage, FormalRoundEnum formalRound, ProductionPlanGroupInfo groupPlanInfo, SkuNeedProductionInfo currentSelected, Set<Integer> excludeDays, boolean isLastSkuPlan, Integer startDay) {
         //没有模具则标记本轮不再参与

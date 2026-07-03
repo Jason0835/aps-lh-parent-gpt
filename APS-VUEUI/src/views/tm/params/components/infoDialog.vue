@@ -85,13 +85,6 @@ export default {
             trigger: "change",
           },
         ],
-        enableStatus: [
-          {
-            required: true,
-            message: this.$t("common.rule.select"),
-            trigger: "change",
-          },
-        ],
       },
     };
   },
@@ -171,10 +164,10 @@ export default {
         {
           prop: "enableStatus",
           label: this.$t("ui.data.column.tm.params.enableStatus"),
-          type: "select",
+          type: "switch",
           span: 12,
-          required: true,
-          dictData: this.parentDict.type.biz_yes_no,
+          activeValue: "1",
+          inactiveValue: "0",
         },
         {
           prop: "regularExpression",
@@ -221,6 +214,7 @@ export default {
         this.isEdit = true;
         this.form = {
           ...data,
+          enableStatus: data.enableStatus || "0",
         };
       } else {
         this.form = {

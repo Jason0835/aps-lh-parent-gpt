@@ -3,6 +3,7 @@ package com.zlt.aps.tm.service.impl;
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.StrUtil;
 import com.ruoyi.common.exception.ServiceException;
+import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.common.engine.schedule.ScheduleTaskLinkedList;
 import com.zlt.aps.common.engine.schedule.ScheduleTaskNode;
 import com.zlt.aps.tm.api.domain.entity.TmScheduleResult;
@@ -482,7 +483,7 @@ public class TmBizSnapshotAndPersistService implements ITmSnapshotAndPersistServ
             return;
         }
         if (nodeList == null || nodeList.size() != chainResultList.size()) {
-            throw new ServiceException("任务链结果数量与任务节点数量不一致，无法关联解释表结果ID");
+            throw new ServiceException(I18nUtil.getMessage("ui.data.alert.tm.schedule.resultRelationFailed"));
         }
         for (int index = 0; index < chainResultList.size(); index++) {
             ScheduleTaskNode<TmTaskDraft> node = nodeList.get(index);
@@ -715,9 +716,7 @@ public class TmBizSnapshotAndPersistService implements ITmSnapshotAndPersistServ
         String businessKey = taskDraft == null ? null : taskDraft.getBusinessKey();
         Long resultId = StrUtil.isBlank(businessKey) ? null : resultIdMap.get(businessKey);
         if (resultId == null) {
-            throw new ServiceException("解释表写入失败，未找到结果表ID，orderNo="
-                    + (taskDraft == null ? null : taskDraft.getOrderNo())
-                    + "，treadCode=" + (taskDraft == null ? null : taskDraft.getTreadCode()));
+            throw new ServiceException(I18nUtil.getMessage("ui.data.alert.tm.schedule.explainResultMissing"));
         }
         return resultId;
     }

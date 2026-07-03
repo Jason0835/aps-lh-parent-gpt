@@ -110,7 +110,6 @@ public class TmLossSettingController extends AbstractDocBizController<TmLossSett
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("factoryCode")), "FACTORY_CODE", queryVO.getFieldValueByFieldName("factoryCode"));
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("treadCode")), "TREAD_CODE", queryVO.getFieldValueByFieldName("treadCode"));
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("machineCode")), "MACHINE_CODE", queryVO.getFieldValueByFieldName("machineCode"));
-        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("settingLevel")), "SETTING_LEVEL", queryVO.getFieldValueByFieldName("settingLevel"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("enableStatus")), "ENABLE_STATUS", queryVO.getFieldValueByFieldName("enableStatus"));
     }
 
@@ -121,6 +120,6 @@ public class TmLossSettingController extends AbstractDocBizController<TmLossSett
 
     @Override
     protected String getOrderBy() {
-        return "priority asc";
+        return "update_time desc";
     }
 }

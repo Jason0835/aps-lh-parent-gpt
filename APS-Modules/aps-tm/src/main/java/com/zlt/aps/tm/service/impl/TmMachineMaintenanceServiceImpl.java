@@ -60,9 +60,7 @@ public class TmMachineMaintenanceServiceImpl extends AbstractDocService<TmMachin
     public String checkUnique(TmMachineMaintenance query) {
         String unique = super.checkUnique(query);
         if (UserConstants.NOT_UNIQUE.equals(unique)) {
-            String msg = I18nUtil.getMessage("ui.data.alert.tm.machineMaintenance.notUnique");
-            throw new ServiceException(com.ruoyi.common.utils.StringUtils.format(msg,
-                    query.getFactoryCode()));
+            throw new ServiceException(I18nUtil.getMessage("ui.data.alert.tm.machineMaintenance.notUnique"));
         }
         return unique;
     }
@@ -92,9 +90,9 @@ public class TmMachineMaintenanceServiceImpl extends AbstractDocService<TmMachin
         Map<String, TmMachineInfo> machineInfoMap = (Map<String, TmMachineInfo>) serviceCheckParams.get("machineMap");
         String mapKey = GenerageMapKeyUtils.createMapKey(importDocEntity.getFactoryCode(), importDocEntity.getMachineCode());
         if (!machineInfoMap.containsKey(mapKey)) {
-            String message = I18nUtil.getMessage("ui.data.alert.tmGlueMachineReal.machineNotExist");
+            String message = I18nUtil.getMessage("ui.data.alert.tm.machineCodeNotExist");
             ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(),
-                    errorRowNum, String.format(message, errorRowNum), importErrorLogs);
+                    errorRowNum, message, importErrorLogs);
             return Boolean.FALSE;
         }
         return super.serviceCheckAndDataHandle(importDocEntity, importErrorLogs, importLogId, errorRowNum, serviceCheckParams);

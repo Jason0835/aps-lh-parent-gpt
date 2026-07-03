@@ -155,6 +155,7 @@ CREATE TABLE `T_TM_SCHEDULE_UNPLANNED` (
   `factory_code` varchar(50) NOT NULL DEFAULT '' COMMENT '工厂编号',
   `batch_no` varchar(64) NOT NULL COMMENT '批次号',
   `schedule_date` date NOT NULL COMMENT '排程日期',
+  `machine_code` varchar(50) DEFAULT NULL COMMENT '机台编码，关联T_TM_MACHINE_INFO.machine_code',
   `tread_code` varchar(50) NOT NULL COMMENT '胎面编码',
   `glue_code` varchar(50) DEFAULT NULL COMMENT '主胶料编码',
   `mouth_plate_code` varchar(50) DEFAULT NULL COMMENT '口型板编码',
@@ -174,7 +175,7 @@ CREATE TABLE `T_TM_SCHEDULE_UNPLANNED` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='胎面排程未排列表';
 
 -- =========================================================
--- 3. 机台基础
+-- 3. 机台管理
 -- =========================================================
 DROP TABLE IF EXISTS `T_TM_MACHINE_INFO`;
 CREATE TABLE `T_TM_MACHINE_INFO` (
@@ -336,7 +337,6 @@ CREATE TABLE `T_TM_GLUE_ORDER` (
   `factory_code` varchar(50) NOT NULL DEFAULT '' COMMENT '工厂编号',
   `glue_group_code` varchar(30) DEFAULT NULL COMMENT '胶料组编码，关联T_TM_GLUE_GROUP_ORDER.glue_group_code',
   `glue_code` varchar(30) DEFAULT NULL COMMENT '胶料号',
-  `machine_code` varchar(50) DEFAULT NULL COMMENT '机台编码，关联T_TM_MACHINE_INFO.machine_code',
   `order_num` int DEFAULT NULL COMMENT '排序号',
   `remark` varchar(900) DEFAULT NULL COMMENT '备注',
   `is_delete` tinyint NOT NULL DEFAULT '0' COMMENT '是否删除，0否，1是',
