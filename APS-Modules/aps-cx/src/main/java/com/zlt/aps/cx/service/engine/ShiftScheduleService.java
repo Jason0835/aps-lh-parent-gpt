@@ -26,20 +26,47 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * 班次排产服务 — 成型排程 S5.3.7 阶段
+ * S5.3.7 班次精排服务 — 将机台级任务分配落到具体班次时间片，产出 {@link ShiftProductionResult}。
  *
- * <p>负责将待排产量分配到具体的班次和时间段，支持5种任务类型的班次分配：
- * <ol>
- *   <li><b>普通任务</b>：波浪放置，每个班次车数相差不超过1</li>
- *   <li><b>收尾任务</b>：只能在硫化的收尾班次或之前安排，最后一个班次可以不是整车</li>
- *   <li><b>开产任务</b>：成型提前一班开始，首班6小时产能，关键产品从第二班开始；
- *       首班产量 = 6×3600 / 成型一条胎时间(s)，不补整车</li>
- *   <li><b>停产任务</b>：根据硫化任务的 class*EndTime 反推成型需要在停产前生产多少条，
- *       使得库存刚好够硫化消化到停产时刻</li>
- *   <li><b>试制任务</b>：只在早班/中班，双数，不补整车</li>
- * </ol>
+ * <h3>流水线位置</h3>
+ * <pre>
+ * CoreScheduleAlgorithmServiceImpl.executeShiftSchedule
+ *   → 5.3.4 合并 continue + new + trial 的 MachineAllocationResult
+ *   → 5.3.5 applyPrecisionPlanSelection（可能扣减 TaskAllocation 条数）
+ *   → 5.3.7 本类：逐机台 × 逐 TaskAllocation 调用 {@link #scheduleTaskToShifts}
+ *   → 汇总为 CxScheduleResult（CLASS1~8）
+ * </pre>
+ *
+ * <h3>上游约定</h3>
+ * <ul>
+ *   <li>计划条数：以 {@code DailyEmbryoTask.endingExtraInventory} 为准（TaskGroupService 收尾/立库封顶后），
+ *       <b>非</b> {@code plannedProduction}。</li>
+ *   <li>机台与硫化机台数：由 ContinueTaskProcessor / NewTaskProcessor / TrialTaskProcessor 已确定。</li>
+ *   <li>开停产标志：{@code isOpeningDayTask} / {@code isClosingDayTask} 等由 TaskGroupService 写入；
+ *       班次类型语义与 {@link ScheduleDayTypeHelper.ShiftType} 对齐。</li>
+ * </ul>
+ *
+ * <h3>任务类型路由（{@link #scheduleTaskToShifts}，优先级不可调换）</h3>
+ * <table>
+ *   <tr><th>优先级</th><th>条件</th><th>策略方法</th><th>要点</th></tr>
+ *   <tr><td>1</td><td>试制</td><td>{@code scheduleTrialTask}</td><td>早/中班、双数、不补整车</td></tr>
+ *   <tr><td>2</td><td>量试且开产日</td><td>{@code scheduleTrialTask}</td><td>同试制班次限制</td></tr>
+ *   <tr><td>3</td><td>停产班</td><td>{@code scheduleClosingTask}</td><td>停锅班不补整车；之前班整车</td></tr>
+ *   <tr><td>4</td><td>开产日</td><td>{@code scheduleOpeningTask} / normal</td><td>成型开产首班 6h 封顶；关键产品首班不排</td></tr>
+ *   <tr><td>5</td><td>收尾</td><td>{@code scheduleEndingTask}</td><td>不晚于硫化收尾班；末班可非整车</td></tr>
+ *   <tr><td>6</td><td>默认</td><td>{@code scheduleNormalTask}</td><td>波浪分车，相邻班差≤1 车</td></tr>
+ * </table>
+ *
+ * <h3>产能与时间</h3>
+ * <ul>
+ *   <li>小时产能：{@link #getMachineHourlyCapacity} — 日硫化量 × 结构配比 → 单胎秒数 → 条/小时</li>
+ *   <li>单车容量：{@link #getTripCapacity} — 结构胎面配置 / 默认 12 条</li>
+ *   <li>班次窗口：{@link #calculateStartTime} / {@link #calculateShiftEndTime}（跨天班 IS_CROSS_DAY=1）</li>
+ * </ul>
  *
  * @author APS Team
+ * @see ScheduleDayTypeHelper
+ * @see com.zlt.aps.cx.service.impl.CoreScheduleAlgorithmServiceImpl
  */
 @Slf4j
 @Service
@@ -48,31 +75,28 @@ public class ShiftScheduleService {
 
     // ==================== 业务阈值常量 ====================
 
-    /** 默认整车容量（条/车） */
+    /** 结构未配置胎面时的默认单车容量（条/车） */
     private static final int DEFAULT_TRIP_CAPACITY = 12;
 
-    /** 默认机台小时产能（条/小时） */
+    /** 无法从日硫化量+配比推算时的小时产能兜底（条/小时） */
     private static final int DEFAULT_HOURLY_CAPACITY = 50;
 
-    /** 开产首班时长上限（小时） */
+    /** 开产首班（OPEN_START / formingOpeningShiftOrder）产能时长上限（小时） */
     private static final int OPENING_FIRST_SHIFT_HOURS = 6;
 
-    /** 默认班次时长（小时） */
+    /** 班次配置未填 shiftHours 时的默认班时长（小时） */
     private static final int DEFAULT_SHIFT_HOURS = 8;
 
-    /** 默认机台准备时间（分钟） */
+    /** 机台班初准备时间扣减（分钟），计入 calculateStartTime */
     private static final int DEFAULT_MACHINE_PREPARE_MINUTES = 30;
 
-    /** 默认精度计划时长（小时） */
+    /** 精度计划扣减最小时长（小时），见 calculateShiftPrecisionDeduction */
     private static final int DEFAULT_PRECISION_HOURS = 4;
 
-    /** 一天的秒数 */
     private static final int SECONDS_PER_DAY = 24 * 60 * 60;
-
-    /** 一小时的秒数 */
     private static final int SECONDS_PER_HOUR = 3600;
 
-    // ==================== 班次编码常量 ====================
+    // ==================== 班次编码（与 CxShiftConfig.shiftCode 对齐） ====================
 
     /** 班次编码：夜班 */
     public static final String SHIFT_NIGHT = "SHIFT_NIGHT";
@@ -81,31 +105,27 @@ public class ShiftScheduleService {
     /** 班次编码：中班 */
     public static final String SHIFT_AFTERNOON = "SHIFT_AFTERNOON";
 
-    // ==================== 依赖注入 ====================
-
     private final ScheduleDayTypeHelper scheduleDayTypeHelper;
 
-    // ==================== 公开方法 ====================
+    // ==================== 5.3.7 精排入口 ====================
 
     /**
-     * S5.3.7 按班次排产（任务级精排）
+     * 单任务班次精排 — 本类唯一 public 业务入口。
      *
-     * <p>将单个任务的待排产量分配到具体的班次，分配的数量是 task.endingExtraInventory。
-     * 根据5种任务类型采用不同的分配策略：
-     * <ol>
-     *   <li>普通任务：波浪放置，每个班次车数相差不超过1</li>
-     *   <li>收尾任务：只能在硫化的收尾班次或之前班次安排，最后班次可以不是整车</li>
-     *   <li>开产任务：首班6小时产能，关键产品从第二班开始</li>
-     *   <li>停产任务：根据硫化EndTime反推，库存全部消耗，最后一个班次用反推计划量</li>
-     *   <li>试制任务：只在早班/中班，双数，不补整车</li>
-     * </ol>
+     * <p>将 {@code task.endingExtraInventory}（条）分配到 {@code dayShifts} 各时间片，并计算计划起止时间。
+     * 单班次排程模式下 {@code dayShifts} 通常仅含当前班一条配置。
      *
-     * @param task          日胎胚任务
-     * @param machineCode   机台编码
-     * @param context       排程上下文
-     * @param dayShifts     当天班次配置
-     * @param scheduleDate  排程日期
-     * @return 班次排产结果列表
+     * <p><b>路由</b>：见类 Javadoc 任务类型表；量试非开产日不走试制分支，落入收尾/普通路径。
+     *
+     * <p><b>开产首班特殊分支</b>（{@code dayShifts.size()==1}）：用 {@code formingOpeningShiftOrder}
+     * 与 {@code lhOpeningShiftOrder} 判断是否为成型开产首班；关键产品首班直接返回空结果。
+     *
+     * @param task         精排用任务（多数字段由 TaskAllocation 反构）
+     * @param machineCode  目标成型机台
+     * @param context      排程上下文（产能映射、关键产品、精度计划等）
+     * @param dayShifts    本班待精排的班次配置列表
+     * @param scheduleDate 排程日
+     * @return 本任务在本机台上的班次排产明细（可多条，通常单班一条）
      */
     public List<ShiftProductionResult> scheduleTaskToShifts(
             CoreScheduleAlgorithmService.DailyEmbryoTask task,
@@ -132,32 +152,32 @@ public class ShiftScheduleService {
                 task.getIsOpeningDayTask(), task.getIsEndingTask(), task.getIsContinueTask(),
                 task.getStockHours(), dayShifts != null ? dayShifts.size() : "null");
 
-        // 判断任务类型，按优先级从高到低
+        // --- 5.3.7.0 任务类型路由（优先级：试制 > 量试开产 > 停产 > 开产 > 收尾 > 普通）---
         boolean isTrial = Boolean.TRUE.equals(task.getIsTrialTask());
         boolean isProductionTrial = Boolean.TRUE.equals(task.getIsProductionTrial());
         boolean isClosingDay = Boolean.TRUE.equals(task.getIsClosingDayTask());
         boolean isOpeningDay = Boolean.TRUE.equals(task.getIsOpeningDayTask());
         boolean isEnding = Boolean.TRUE.equals(task.getIsEndingTask()) || Boolean.TRUE.equals(task.getIsUrgentEnding());
-        boolean isLastEndingBatch = Boolean.TRUE.equals(task.getIsLastEndingBatch());  // 收尾最后一批
+        boolean isLastEndingBatch = Boolean.TRUE.equals(task.getIsLastEndingBatch());
 
-        // ---- 1. 试制任务：只在早班/中班，双数，不补整车 ----
+        // 5.3.7.1 试制：早/中班、双数、不补整车
         if (isTrial) {
             return scheduleTrialTask(task, machineCode, context, dayShifts, scheduleDate, tripCapacity);
         }
 
-        // ---- 1.5. 量试任务开产日：只在早班/中班（非开产日不限班次） ----
+        // 5.3.7.1.1 量试且开产日：班次限制同试制
         if (isProductionTrial && isOpeningDay) {
             return scheduleTrialTask(task, machineCode, context, dayShifts, scheduleDate, tripCapacity);
         }
 
-        // ---- 2. 停产任务：根据硫化EndTime反推计划量 ----
+        // 5.3.7.2 停产班：endingExtraInventory 已在 TaskGroupService 反推封顶
         if (isClosingDay) {
             return scheduleClosingTask(task, machineCode, context, dayShifts, scheduleDate, tripCapacity);
         }
 
-        // ---- 3. 开产任务：首班6小时产能，关键产品从第二班开始 ----
+        // 5.3.7.3 开产日：首班 6h / 关键产品过滤
         if (isOpeningDay) {
-            // 按班次排程时，根据 formingOpeningShiftOrder 判断是否为开产首班
+            // 单班模式：formingOpeningShiftOrder 判定成型开产首班
             if (dayShifts.size() == 1) {
                 CxShiftConfig singleShift = dayShifts.get(0);
                 int shiftOrder = singleShift.getDayShiftOrder() != null ? singleShift.getDayShiftOrder() : 1;
@@ -184,22 +204,29 @@ public class ShiftScheduleService {
             return scheduleOpeningTask(task, machineCode, context, dayShifts, scheduleDate, tripCapacity);
         }
 
-        // ---- 4. 收尾任务：只能在硫化收尾班次或之前安排，最后班次可以不是整车 ----
+        // 5.3.7.4 收尾任务：收尾班次或之前安排，末班可非整车
         if (isEnding || isLastEndingBatch) {
             return scheduleEndingTask(task, machineCode, context, dayShifts, scheduleDate, tripCapacity);
         }
 
-        // ---- 5. 普通任务：波浪放置 ----
+        // 5.3.7.5 普通任务：波浪放置（相邻班次车数差≤1）
         return scheduleNormalTask(task, machineCode, context, dayShifts, scheduleDate, tripCapacity);
     }
 
-    // ==================== 1. 试制/量试任务排产 ====================
+    // ==================== 5.3.7.1 试制/量试精排 ====================
 
     /**
-     * 试制/量试任务排产：只在早班/中班，双数，不补整车
+     * 试制/量试班次分配。
      *
-     * <p>试制任务：始终限制早班/中班
-     * <p>量试任务：仅开产日限制早班/中班，非开产日走普通排产路径
+     * <p><b>约束</b>：
+     * <ul>
+     *   <li>跳过 {@link #SHIFT_NIGHT} 夜班</li>
+     *   <li>总量与各班分配量均为偶数（不足则减 1）</li>
+     *   <li>不补整车：车数 = shiftQty / tripCapacity 向下取整</li>
+     *   <li>班末时间超限则按可用分钟折减产量</li>
+     * </ul>
+     *
+     * <p>试制始终走本方法；量试仅开产日由 {@link #scheduleTaskToShifts} 路由至此。
      */
     private List<ShiftProductionResult> scheduleTrialTask(
             CoreScheduleAlgorithmService.DailyEmbryoTask task,
@@ -263,8 +290,8 @@ public class ShiftScheduleService {
             }
 
             // 计算时间
-            int hourlyCapacity = getMachineHourlyCapacity(machineCode, task.getMaterialCode(), task.getStructureName(), context);
-            double productionHours = (double) shiftQty / hourlyCapacity;
+            double hourlyCapacity = getMachineHourlyCapacity(machineCode, task.getMaterialCode(), task.getStructureName(), context);
+            double productionHours = shiftQty / hourlyCapacity;
             LocalDateTime startTime = calculateStartTime(machineCode, shiftConfig, scheduleDate, context);
             LocalDateTime endTime = startTime.plusMinutes((long) (productionHours * 60));
 
@@ -272,7 +299,6 @@ public class ShiftScheduleService {
             LocalDateTime shiftEndTime = calculateShiftEndTime(shiftConfig, scheduleDate);
             if (endTime.isAfter(shiftEndTime)) {
                 long availableMinutes = Duration.between(startTime, shiftEndTime).toMinutes();
-                availableMinutes -= getMachinePrepareMinutes(machineCode, context);
                 int availableQty = (int) (availableMinutes * hourlyCapacity / 60);
                 // 双数
                 if (availableQty % 2 != 0) {
@@ -303,18 +329,18 @@ public class ShiftScheduleService {
         return results;
     }
 
-    // ==================== 2. 停产任务排产 ====================
+    // ==================== 5.3.7.2 停产班精排 ====================
 
     /**
-     * 停产任务排产：endingExtraInventory已在TaskGroupService中通过反推封顶正确计算
+     * 停产班任务精排。
      *
-     * <p>改造后逻辑（简化）：
-     * <ol>
-     *   <li>endingExtraInventory 已经是经过反推封顶后的正确值，不再需要重新反推</li>
-     *   <li>判断当前班次是否为停锅班次（task.closingShiftOrder）</li>
-     *   <li>停锅班次：不补整车，按实量下</li>
-     *   <li>停锅班次之前的班次：按普通任务排产（整车取整）</li>
-     * </ol>
+     * <p>{@code endingExtraInventory} 已在 TaskGroupService 按停锅反推封顶，此处不再重算反推量。
+     *
+     * <p><b>分支</b>：
+     * <ul>
+     *   <li>{@code closingShiftOrder == 当前 dayShiftOrder}：停锅班，按实量下、不补整车</li>
+     *   <li>停锅前班：按班产能扣停机/精度后整车取整</li>
+     * </ul>
      */
     private List<ShiftProductionResult> scheduleClosingTask(
             CoreScheduleAlgorithmService.DailyEmbryoTask task,
@@ -337,7 +363,7 @@ public class ShiftScheduleService {
         // 判断当前班次是否为停锅班次
         boolean isClosingShift = closingShiftOrder != null && currentDayShiftOrder == closingShiftOrder;
 
-        int hourlyCapacity = getMachineHourlyCapacity(machineCode, task.getMaterialCode(), task.getStructureName(), context);
+        double hourlyCapacity = getMachineHourlyCapacity(machineCode, task.getMaterialCode(), task.getStructureName(), context);
 
         for (CxShiftConfig shiftConfig : dayShifts) {
             if (totalQty <= 0) {
@@ -351,7 +377,7 @@ public class ShiftScheduleService {
             } else {
                 // 停锅班次之前的班次：整车取整
                 int shiftHours = calculateShiftHours(shiftConfig);
-                int shiftCapacity = shiftHours * hourlyCapacity;
+                int shiftCapacity = (int)(shiftHours * hourlyCapacity);
                 shiftCapacity -= calculateShiftShutdownDeduction(machineCode, shiftConfig, hourlyCapacity, context);
                 shiftCapacity -= calculateShiftPrecisionDeduction(machineCode, shiftConfig, hourlyCapacity, context);
                 shiftCapacity = Math.max(0, shiftCapacity);
@@ -365,13 +391,12 @@ public class ShiftScheduleService {
 
             // 计算时间
             LocalDateTime startTime = calculateStartTime(machineCode, shiftConfig, scheduleDate, context);
-            double productionHours = (double) shiftQty / hourlyCapacity;
+            double productionHours = shiftQty / hourlyCapacity;
             LocalDateTime endTime = startTime.plusMinutes((long) (productionHours * 60));
 
             LocalDateTime shiftEndTime = calculateShiftEndTime(shiftConfig, scheduleDate);
             if (endTime.isAfter(shiftEndTime)) {
                 long availableMinutes = Duration.between(startTime, shiftEndTime).toMinutes();
-                availableMinutes -= getMachinePrepareMinutes(machineCode, context);
                 shiftQty = Math.max(0, (int) (availableMinutes * hourlyCapacity / 60));
                 // 停锅班次不补整车；非停锅班次整车取整
                 if (!isClosingShift && tripCapacity > 0) {
@@ -401,18 +426,16 @@ public class ShiftScheduleService {
         return results;
     }
 
-    // ==================== 3. 开产任务排产 ====================
+    // ==================== 5.3.7.3 开产班精排 ====================
 
     /**
-     * 开产任务排产：endingExtraInventory已在TaskGroupService中正确计算
+     * 开产日任务精排。
      *
-     * <p>改造后逻辑（简化）：
-     * <ol>
-     *   <li>endingExtraInventory 已经是经过开产首班6h封顶后的正确值</li>
-     *   <li>判断当前班次是否为成型开产首班（task.formingOpeningShiftOrder）</li>
-     *   <li>成型开产首班：6小时产能封顶，不补整车</li>
-     *   <li>非首班：按普通任务全产能排产，整车取整</li>
-     * </ol>
+     * <p>{@code endingExtraInventory} 已在 TaskGroupService 做开产首班 6h 封顶；本方法负责按班切分与时间计算。
+     *
+     * <p><b>成型开产首班</b>（{@code formingOpeningShiftOrder} 匹配且早于硫化开产班）：
+     * 关键产品不排；非关键产品用封顶后全量、不补整车。
+     * 非首班按班产能整车取整。
      */
     private List<ShiftProductionResult> scheduleOpeningTask(
             CoreScheduleAlgorithmService.DailyEmbryoTask task,
@@ -445,7 +468,7 @@ public class ShiftScheduleService {
             return results;
         }
 
-        int hourlyCapacity = getMachineHourlyCapacity(machineCode, task.getMaterialCode(), task.getStructureName(), context);
+        double hourlyCapacity = getMachineHourlyCapacity(machineCode, task.getMaterialCode(), task.getStructureName(), context);
 
         for (CxShiftConfig shiftConfig : dayShifts) {
             if (totalQty <= 0) {
@@ -459,7 +482,7 @@ public class ShiftScheduleService {
             } else {
                 // 非首班：按整车分配
                 int shiftHours = calculateShiftHours(shiftConfig);
-                int shiftCapacity = shiftHours * hourlyCapacity;
+                int shiftCapacity = (int)(shiftHours * hourlyCapacity);
                 shiftCapacity -= calculateShiftShutdownDeduction(machineCode, shiftConfig, hourlyCapacity, context);
                 shiftCapacity -= calculateShiftPrecisionDeduction(machineCode, shiftConfig, hourlyCapacity, context);
                 shiftCapacity = Math.max(0, shiftCapacity);
@@ -473,13 +496,12 @@ public class ShiftScheduleService {
 
             // 计算时间
             LocalDateTime startTime = calculateStartTime(machineCode, shiftConfig, scheduleDate, context);
-            double productionHours = (double) shiftQty / hourlyCapacity;
+            double productionHours = shiftQty / hourlyCapacity;
             LocalDateTime endTime = startTime.plusMinutes((long) (productionHours * 60));
 
             LocalDateTime shiftEndTime = calculateShiftEndTime(shiftConfig, scheduleDate);
             if (endTime.isAfter(shiftEndTime)) {
                 long availableMinutes = Duration.between(startTime, shiftEndTime).toMinutes();
-                availableMinutes -= getMachinePrepareMinutes(machineCode, context);
                 shiftQty = Math.max(0, (int) (availableMinutes * hourlyCapacity / 60));
                 if (!isOpeningFirstShift && tripCapacity > 0) {
                     // 非首班整车取整
@@ -510,15 +532,12 @@ public class ShiftScheduleService {
     }
 
     /**
-     * 计算开产首班6小时产能
+     * 开产首班 6 小时产量估算（条）。
      *
-     * <p>计算公式：
-     * <pre>
-     *   日硫化量 → materialLhCapacityMap
-     *   配比 → structureLhRatioMap (机型+结构)
-     *   成型一条胎时间(s) = 24×3600 / (配比 × 日硫化量)
-     *   首班6小时产量 = 6×3600 / 成型一条胎时间(s)
-     * </pre>
+     * <p>公式：单胎成型秒数 = 86400 / (配比 × 日硫化量)；产量 = 6×3600 / 单胎秒数（向下取整）。
+     * 配比/日硫化量缺失时回退 {@code OPENING_FIRST_SHIFT_HOURS × getMachineHourlyCapacity}。
+     *
+     * <p>注：当前精排主路径以 TaskGroupService 写入的 endingExtraInventory 为准；本方法供辅助计算/遗留调用。
      */
     private int calculateOpeningFirstShiftCapacity(
             CoreScheduleAlgorithmService.DailyEmbryoTask task,
@@ -538,7 +557,7 @@ public class ShiftScheduleService {
 
         if (dailyLhCapacity == null || dailyLhCapacity <= 0) {
             log.warn("开产首班产能计算：无法获取物料 {} 的日硫化量，使用默认值", task.getEmbryoCode());
-            return OPENING_FIRST_SHIFT_HOURS * getMachineHourlyCapacity(machineCode, task.getMaterialCode(), task.getStructureName(), context);
+            return (int)(OPENING_FIRST_SHIFT_HOURS * getMachineHourlyCapacity(machineCode, task.getMaterialCode(), task.getStructureName(), context));
         }
 
         // 2. 获取配比（机型+结构 → 配比）
@@ -565,14 +584,17 @@ public class ShiftScheduleService {
         return Math.max(firstShiftCapacity, 0);
     }
 
-    // ==================== 4. 收尾任务排产 ====================
+    // ==================== 5.3.7.4 收尾精排 ====================
 
     /**
-     * 收尾任务排产：只能在硫化收尾班次或之前安排，最后班次可以不是整车
+     * 收尾任务精排：波浪分车 + 硫化收尾班截止约束。
      *
-     * <p>如果硫化的收尾班次是夜班，则收尾任务只能在夜班安排；
-     * 如果是早班，则可以在夜班和早班安排；依此类推。
-     * 最后一个班次可以不是整车（按实际量下）。
+     * <p>通过 {@link #getVulcanizeEndingShift} 得到硫化最后有计划量的班次编码，
+     * 将 {@link #calculateWaveCars} 中晚于该班的车数前移到截止班。
+     *
+     * <p>最后一个有产量的班次使用 {@code remainingQty} 实量（可非整车）。
+     * {@code isEndingTask} 标记用 {@code task.isEndingTask}（物料收尾耗尽），
+     * 非「最后一个有量班次」；{@code isLastEndingBatch} 在末班且任务标记时写入结果。
      */
     private List<ShiftProductionResult> scheduleEndingTask(
             CoreScheduleAlgorithmService.DailyEmbryoTask task,
@@ -609,7 +631,7 @@ public class ShiftScheduleService {
             }
         }
 
-        int hourlyCapacity = getMachineHourlyCapacity(machineCode, task.getMaterialCode(), task.getStructureName(), context);
+        double hourlyCapacity = getMachineHourlyCapacity(machineCode, task.getMaterialCode(), task.getStructureName(), context);
         int remainingQty = totalQty;
 
         for (int i = 0; i < dayShifts.size() && remainingQty > 0; i++) {
@@ -635,13 +657,12 @@ public class ShiftScheduleService {
 
             // 计算时间
             LocalDateTime startTime = calculateStartTime(machineCode, shiftConfig, scheduleDate, context);
-            double productionHours = (double) shiftQty / hourlyCapacity;
+            double productionHours = shiftQty / hourlyCapacity;
             LocalDateTime endTime = startTime.plusMinutes((long) (productionHours * 60));
 
             LocalDateTime shiftEndTime = calculateShiftEndTime(shiftConfig, scheduleDate);
             if (endTime.isAfter(shiftEndTime)) {
                 long availableMinutes = Duration.between(startTime, shiftEndTime).toMinutes();
-                availableMinutes -= getMachinePrepareMinutes(machineCode, context);
                 shiftQty = Math.max(0, (int) (availableMinutes * hourlyCapacity / 60));
                 endTime = shiftEndTime;
             }
@@ -652,9 +673,7 @@ public class ShiftScheduleService {
 
             int cars = tripCapacity > 0 ? (shiftQty + tripCapacity - 1) / tripCapacity : 1;
 
-            // 🔧 isEndingTask 应反映成型余量是否真正耗尽（task.getIsEndingTask()），
-            // 而非是否为最后一个有产量的班次（isLastProductive 在单班次模式下恒为true）
-            // isUrgentEnding（紧急收尾）仅影响排程策略，不应在 ANALYSIS 中标记"收尾"
+            // isEndingTask：物料级收尾（成型余量耗尽）；isLastEndingBatch：末班+任务标记
             boolean isMaterialEnding = Boolean.TRUE.equals(task.getIsEndingTask());
             ShiftProductionResult result = buildResult(machineCode, shiftConfig, task, shiftQty,
                     tripCapacity, cars, startTime, endTime, false, isMaterialEnding, task.getIsContinueTask());
@@ -668,10 +687,12 @@ public class ShiftScheduleService {
         return results;
     }
 
-    // ==================== 5. 普通任务排产 ====================
+    // ==================== 5.3.7.5 普通任务精排 ====================
 
     /**
-     * 普通任务排产：波浪放置，每个班次车数相差不超过1
+     * 普通任务精排：{@link #calculateWaveCars} 波浪分车，相邻班次车数差不超过 1。
+     *
+     * <p>班末时间不足时按可用产能折减条数，不强制补整车；未排完量打 warn。
      */
     private List<ShiftProductionResult> scheduleNormalTask(
             CoreScheduleAlgorithmService.DailyEmbryoTask task,
@@ -692,7 +713,7 @@ public class ShiftScheduleService {
         log.info("【波浪分配】胎胚={}, 待排={}条, 每车={}条, 需={}车, 各班分配={}",
                 task.getEmbryoCode(), totalQty, tripCapacity, requiredCars, Arrays.toString(shiftCars));
 
-        int hourlyCapacity = getMachineHourlyCapacity(machineCode, task.getMaterialCode(), task.getStructureName(), context);
+        double hourlyCapacity = getMachineHourlyCapacity(machineCode, task.getMaterialCode(), task.getStructureName(), context);
         int remainingCars = requiredCars;
         int remainingQty = totalQty;
 
@@ -709,14 +730,13 @@ public class ShiftScheduleService {
 
             // 计算时间
             LocalDateTime startTime = calculateStartTime(machineCode, shiftConfig, scheduleDate, context);
-            double productionHours = (double) batchQty / hourlyCapacity;
+            double productionHours = batchQty / hourlyCapacity;
             LocalDateTime endTime = startTime.plusMinutes((long) (productionHours * 60));
 
             // 班次结束时间检查
             LocalDateTime shiftEndTime = calculateShiftEndTime(shiftConfig, scheduleDate);
             if (shiftEndTime != null && endTime.isAfter(shiftEndTime)) {
                 long availableMinutes = Duration.between(startTime, shiftEndTime).toMinutes();
-                availableMinutes -= getMachinePrepareMinutes(machineCode, context);
                 int availableQty = (int) (availableMinutes * hourlyCapacity / 60);
                 // 产能不足时按实际可生产量下，不强制整车取整
                 batchQty = Math.min(Math.max(0, availableQty), remainingQty);
@@ -749,17 +769,14 @@ public class ShiftScheduleService {
         return results;
     }
 
-    // ==================== 波浪分配 ====================
+    // ==================== 波浪/均分算法 ====================
 
     /**
-     * 计算波浪分配车数
+     * 将总车数波浪分配到各班次：基础均分 + 余数从两端向中间对称 +1，保证相邻班差≤1 车。
      *
-     * <p>按比例分配车数到各班次，确保每个班次车数相差不超过1
-     *
-     * @param requiredCars 需要的车数
-     * @param dayShifts    班次配置
-     * @param dayShifts    班次配置
-     * @return 各班次车数数组
+     * @param requiredCars 总车数
+     * @param dayShifts    班次列表（顺序即分配下标）
+     * @return 与 dayShifts 等长的每班车数数组
      */
     private int[] calculateWaveCars(int requiredCars, List<CxShiftConfig> dayShifts) {
 
@@ -807,13 +824,7 @@ public class ShiftScheduleService {
     }
 
     /**
-     * 将总量按条数均分到各班次（与 calculateWaveCars 对称，但分配的是条数而非车数）
-     *
-     * <p>分配结果对称：两侧多、中间少（余数为1时中间多1）
-     *
-     * @param totalQuantity 总条数
-     * @param shiftCount    班次数
-     * @return 各班次分配条数
+     * 将总条数对称均分到各班次（试制路径用，逻辑同 calculateWaveCars 但单位为条）。
      */
     private int[] distributeQuantityEvenly(int totalQuantity, int shiftCount) {
         int[] quantities = new int[shiftCount];
@@ -850,11 +861,9 @@ public class ShiftScheduleService {
         return quantities;
     }
 
-    // ==================== 停产反推计算 ====================
+    // ==================== 硫化排程关联（收尾班判定） ====================
 
-    /**
-     * 查找任务对应的硫化排程结果
-     */
+    /** 按 lhId 在 context.lhScheduleResults 中查找硫化任务行 */
     private LhScheduleResult findLhScheduleResult(Long lhId, ScheduleContextVo context) {
         if (lhId == null || context.getLhScheduleResults() == null) {
             return null;
@@ -867,9 +876,7 @@ public class ShiftScheduleService {
         return null;
     }
 
-    /**
-     * 判断是否为最后一个有产量的班次
-     */
+    /** 在 shiftCars 数组中，currentIndex 之后是否再无正车数 */
     private boolean isLastShiftWithQty(int currentIndex, int[] shiftCars) {
         for (int i = currentIndex + 1; i < shiftCars.length; i++) {
             if (shiftCars[i] > 0) {
@@ -879,12 +886,10 @@ public class ShiftScheduleService {
         return true;
     }
 
-    // ==================== 收尾班次判断 ====================
-
     /**
-     * 获取硫化的收尾班次
+     * 推断硫化侧「最后有计划量的班次」编码。
      *
-     * <p>从硫化排程结果中找到最后一个有计划量的班次
+     * <p>从 LhScheduleResult CLASS8→CLASS1 倒序找首个 planQty&gt;0，映射为 SHIFT_NIGHT/DAY/AFTERNOON。
      */
     private String getVulcanizeEndingShift(CoreScheduleAlgorithmService.DailyEmbryoTask task,
                                            ScheduleContextVo context) {
@@ -909,9 +914,7 @@ public class ShiftScheduleService {
         return SHIFT_DAY;
     }
 
-    /**
-     * 根据班次索引获取硫化记录的计划量
-     */
+    /** CLASS1~8 计划量字段访问 */
     private Integer getClassPlanQtyByIndex(LhScheduleResult lhResult, int classIndex) {
         switch (classIndex) {
             case 1: return lhResult.getClass1PlanQty();
@@ -926,9 +929,7 @@ public class ShiftScheduleService {
         }
     }
 
-    /**
-     * 获取班次索引
-     */
+    /** shiftCode 在 dayShifts 中的下标，未找到返回 -1 */
     private int getShiftIndex(String shiftCode, List<CxShiftConfig> dayShifts) {
         for (int i = 0; i < dayShifts.size(); i++) {
             if (dayShifts.get(i).getShiftCode().equals(shiftCode)) {
@@ -938,11 +939,9 @@ public class ShiftScheduleService {
         return -1;
     }
 
-    // ==================== 产能与时间计算 ====================
+    // ==================== 班产能扣减与时间窗口 ====================
 
-    /**
-     * 计算班次时长（小时）
-     */
+    /** 班次有效生产小时数（配置 shiftHours 或默认 8） */
     private int calculateShiftHours(CxShiftConfig shiftConfig) {
         Integer shiftHours = shiftConfig.getShiftHours();
         if (shiftHours != null && shiftHours > 0) {
@@ -952,12 +951,12 @@ public class ShiftScheduleService {
     }
 
     /**
-     * 计算班次停机扣减产能
+     * 设备计划停机扣减条数（占位：遍历 devicePlanShuts，详细时段扣减待实现）。
      */
     private int calculateShiftShutdownDeduction(
             String machineCode,
             CxShiftConfig shiftConfig,
-            int hourlyCapacity,
+            double hourlyCapacity,
             ScheduleContextVo context) {
 
         if (context.getDevicePlanShuts() == null || context.getDevicePlanShuts().isEmpty()) {
@@ -977,17 +976,15 @@ public class ShiftScheduleService {
     }
 
     /**
-     * 计算班次精度计划扣减产能
+     * 精度计划未完成时扣减本班产能（条）。
      *
-     * 根据精度计划的 precisionCycle（15/60分钟）和 completionStatus 判断：
-     * - 未完成（completionStatus=0）的精度计划才扣减产能
-     * - 精度计划不区分班次，当天有未完成计划即影响全天产能
-     * - 按 precisionCycle 计算扣减时长
+     * <p>机台匹配 precisionPlans 且 completionStatus≠1；按 precisionCycle 估时长，至少扣 4 小时产能。
+     * 全局 precisionPlanApplied 后不再扣减。
      */
     private int calculateShiftPrecisionDeduction(
             String machineCode,
             CxShiftConfig shiftConfig,
-            int hourlyCapacity,
+            double hourlyCapacity,
             ScheduleContextVo context) {
 
         if (context.isPrecisionPlanApplied()) {
@@ -1020,7 +1017,7 @@ public class ShiftScheduleService {
                 if (precisionHours < 4) {
                     precisionHours = 4;
                 }
-                return precisionHours * hourlyCapacity;
+                return (int)(precisionHours * hourlyCapacity);
             }
         }
 
@@ -1028,7 +1025,7 @@ public class ShiftScheduleService {
     }
 
     /**
-     * 计算生产开始时间
+     * 计划生产开始时间 = 班初时刻（跨天班日期 -1）+ 机台准备分钟。
      */
     private LocalDateTime calculateStartTime(
             String machineCode,
@@ -1048,7 +1045,7 @@ public class ShiftScheduleService {
     }
 
     /**
-     * 计算班次结束时间
+     * 班次结束时刻；IS_CROSS_DAY=1 时结束日期 +1 天。
      */
     private LocalDateTime calculateShiftEndTime(CxShiftConfig shiftConfig, LocalDate scheduleDate) {
         LocalTime shiftEnd = shiftConfig.getShiftEndTime();
@@ -1067,24 +1064,14 @@ public class ShiftScheduleService {
     }
 
     /**
-     * 计算机台小时产能
+     * 计算机台小时产能（条/小时）— 可被外部调用。
      *
-     * <p>每个机台生产不同物料成型一条胎的时间不一样，需要动态计算：
-     * <ol>
-     *   <li>从 materialLhCapacityMap 获取该物料的日硫化量</li>
-     *   <li>从 structureLhRatioMap 通过 结构+机型 获取配比 (lhMachineMaxQty)</li>
-     *   <li>成型一条胎的时间(s) = 86400 / (配比 × 日硫化量)</li>
-     *   <li>小时产能 = 3600 / 成型一条胎的时间(s)</li>
-     * </ol>
-     *
-     * @param machineCode   机台编码
-     * @param materialCode  成品物料编码（materialLhCapacityMap 的 key 是 materialCode）
-     * @param structureName 结构名称
-     * @param context       排程上下文
-     * @return 小时产能（条/小时）
+     * <p>链：materialLhCapacityMap[materialCode].dayVulcanizationQty →
+     * structureLhRatioMap[machineType|structure].lhMachineMaxQty →
+     * 单胎秒数 = 86400/(配比×日硫化量) → 3600/单胎秒数。
      */
-    public int getMachineHourlyCapacity(String machineCode, String materialCode,
-                                        String structureName, ScheduleContextVo context) {
+    public double getMachineHourlyCapacity(String machineCode, String materialCode,
+                                           String structureName, ScheduleContextVo context) {
         // 1. 获取日硫化量（materialLhCapacityMap 的 key 是 materialCode，不是 embryoCode）
         Integer dailyLhCapacity = null;
         Map<String, MonthPlanProductLhCapacityVo> lhCapacityMap = context.getMaterialLhCapacityMap();
@@ -1115,11 +1102,11 @@ public class ShiftScheduleService {
             BigDecimal timePerTire = BigDecimal.valueOf(SECONDS_PER_DAY)
                     .divide(BigDecimal.valueOf((long) ratio * dailyLhCapacity), 2, RoundingMode.HALF_UP);
 
-            // 4. 小时产能 = 3600 / 成型一条胎的时间(s)
+            // 4. 小时产能 = 3600 / 成型一条胎的时间(s)，保留2位小数避免整数截断导致产能低估
             if (timePerTire.compareTo(BigDecimal.ZERO) > 0) {
-                int hourlyCapacity = BigDecimal.valueOf(SECONDS_PER_HOUR)
-                        .divide(timePerTire, 0, RoundingMode.FLOOR)
-                        .intValue();
+                double hourlyCapacity = BigDecimal.valueOf(SECONDS_PER_HOUR)
+                        .divide(timePerTire, 2, RoundingMode.HALF_UP)
+                        .doubleValue();
                 log.info("机台 {} 物料 {} 小时产能计算: 日硫化量={}, 配比={}, 单条耗时={}s, 产能={}条/h",
                         machineCode, materialCode, dailyLhCapacity, ratio, timePerTire, hourlyCapacity);
                 return hourlyCapacity;
@@ -1128,12 +1115,10 @@ public class ShiftScheduleService {
 
         log.warn("无法计算机台 {} 物料 {} 的小时产能(日硫化量={}, 配比={})，使用默认值 {}",
                 machineCode, materialCode, dailyLhCapacity, ratio, DEFAULT_HOURLY_CAPACITY);
-        return DEFAULT_HOURLY_CAPACITY;
+        return (double) DEFAULT_HOURLY_CAPACITY;
     }
 
-    /**
-     * 获取结构的整车容量（按结构+胎胚匹配）
-     */
+    /** 结构+胎胚匹配 CxStructureTreadConfig.treadCount，否则 context 默认或 {@link #DEFAULT_TRIP_CAPACITY} */
     private int getTripCapacity(String structureCode, String embryoCode, ScheduleContextVo context) {
         if (context.getStructureShiftCapacities() != null) {
             for (CxStructureTreadConfig capacity : context.getStructureShiftCapacities()) {
@@ -1149,16 +1134,12 @@ public class ShiftScheduleService {
         return context.getDefaultTripCapacity() != null ? context.getDefaultTripCapacity() : DEFAULT_TRIP_CAPACITY;
     }
 
-    /**
-     * 获取机台准备时间（分钟）
-     */
+    /** 机台班初准备时间（分钟），当前为全局常量 */
     private int getMachinePrepareMinutes(String machineCode, ScheduleContextVo context) {
         return DEFAULT_MACHINE_PREPARE_MINUTES;
     }
 
-    /**
-     * 判断是否关键产品
-     */
+    /** 胎胚或物料编码命中 context.keyProductCodes 视为关键产品（开产首班不排） */
     private boolean isKeyProduct(CoreScheduleAlgorithmService.DailyEmbryoTask task, ScheduleContextVo context) {
         if (task == null || context == null) {
             return false;
@@ -1171,10 +1152,10 @@ public class ShiftScheduleService {
                 || keyProductCodes.contains(task.getMaterialCode());
     }
 
-    // ==================== 工具方法 ====================
+    // ==================== 结果构建 ====================
 
     /**
-     * 构建班次排产结果
+     * 组装单条 {@link ShiftProductionResult}，并挂载 sourceTask 供下游取 vulcanizeMachineCount。
      */
     private ShiftProductionResult buildResult(
             String machineCode,
@@ -1212,22 +1193,21 @@ public class ShiftScheduleService {
         result.setIsTrialTask(isTrialTask);
         result.setIsEndingTask(isEndingTask);
         result.setIsContinueTask(isContinueTask);
-        // 设置是否收尾最后一批（从任务中获取）
         result.setIsLastEndingBatch(task.getIsLastEndingBatch());
-        // 保存来源任务（用于均衡计算时获取 vulcanizeMachineCount）
         result.setSourceTask(task);
-        // 传递结束生产标记
         result.setIsEndProduction(task.getIsEndProduction());
-        // 传递施工阶段
         result.setConstructionStage(task.getConstructionStage());
 
         return result;
     }
 
-    // ==================== 数据结构 ====================
+    // ==================== ShiftProductionResult：精排输出 DTO ====================
 
     /**
-     * 班次排产结果
+     * 班次级排产结果 — 汇总为 CxScheduleResult 前的最小持久化单元。
+     *
+     * <p>一条记录 = 某机台、某班次、某任务的一次计划量（条）及计划起止时间。
+     * {@link #sourceTask} 保留原始 DailyEmbryoTask，供合并阶段读取硫化机台数等字段。
      */
     @lombok.Data
     public static class ShiftProductionResult {

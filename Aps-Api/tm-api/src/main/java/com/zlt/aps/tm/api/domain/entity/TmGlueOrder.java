@@ -34,12 +34,6 @@ public class TmGlueOrder extends BaseEntity {
     @TableField(value = "GLUE_CODE")
     private String glueCode;
 
-    @Excel(name = "ui.data.column.tm.glueOrder.machineCode")
-    @ImportValidated(required = true, isCode = true, maxLength = 50)
-    @ApiModelProperty(value = "机台编码", name = "machineCode")
-    @TableField(value = "MACHINE_CODE")
-    private String machineCode;
-
     @Excel(name = "ui.data.column.tm.glueOrder.orderNum")
     @ImportValidated(required = true, digits = true, min = 0, max = 999)
     @ApiModelProperty(value = "排序号", name = "orderNum")

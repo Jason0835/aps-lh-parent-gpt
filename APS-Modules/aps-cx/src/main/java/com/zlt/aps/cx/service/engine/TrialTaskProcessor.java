@@ -15,40 +15,71 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 /**
- * 试制任务处理器
+ * S5.3.2 试制任务处理器 — 为试制/量试任务直接选定成型机台，<b>不</b>经过 {@link BalancingService} DFS 均衡。
  *
- * <p>负责试制任务的机台分配，仅处理试制任务（量试由其他模块处理）。
+ * <h3>流水线位置</h3>
+ * <pre>
+ * CoreScheduleAlgorithmServiceImpl.executeShiftSchedule
+ *   → 5.2  TaskGroupService.groupTasks          trialTasks（constructionStage=01，约束已在分组阶段校验）
+ *   → 5.3.1 ContinueTaskProcessor
+ *   → 5.3.2 TrialTaskProcessor（本类）         产出 trialAllocations
+ *   → 5.3.3 NewTaskProcessor                    从 trialAllocations 构建量试机台约束
+ *   → 5.3.4 合并分配 → ShiftScheduleService     试制：早/中班、双数、不补整车
+ * </pre>
  *
- * <p>处理流程：
+ * <h3>与 TaskGroupService / NewTaskProcessor 的分工</h3>
+ * <table>
+ *   <tr><th>环节</th><th>负责模块</th><th>内容</th></tr>
+ *   <tr><td>试制约束</td><td>TaskGroupService + 上下文参数</td><td>日 SKU 上限、周日是否允许、双数产量、早/中班等<b>在入队前</b>已处理</td></tr>
+ *   <tr><td>机台选择</td><td>本类</td><td>空机台优先 → 负载最不均衡机台；校验机台固定禁用结构</td></tr>
+ *   <tr><td>量试锁定</td><td>NewTaskProcessor</td><td>同胎胚已有试制分配 → 量试 {@code constrainedMachineCode} 锁定试制机台</td></tr>
+ * </table>
+ *
+ * <h3>单位约定（与 DFS 路径不同）</h3>
+ * <ul>
+ *   <li>试制分配中 {@code usedCapacity} / {@code remainingCapacity} 累加的是<b>条数</b>
+ *       （{@code plannedProduction}），用于本处理器内负载不均衡度计算，<b>不是</b>硫化机台数。</li>
+ *   <li>{@code TaskAllocation.quantity} / {@code endingExtraInventory} 为条数；
+ *       {@code vulcanizeMachineCount} 取自任务，缺省为 1。</li>
+ *   <li>精排阶段 {@link ShiftScheduleService} 仍以 {@code endingExtraInventory} 为下量依据。</li>
+ * </ul>
+ *
+ * <h3>主流程（{@link #processTrialTasks}）</h3>
  * <ol>
- *   <li>按结构分组任务</li>
- *   <li>每个结构内按任务优先级（priority）排序</li>
- *   <li>为空机台优先，其次选择最不均衡的机台</li>
- *   <li>直接分配到机台，无整车换算、无胎胚库存分配、无收尾处理</li>
+ *   <li>5.3.2.1 — 按结构分组，过滤 {@code endingExtraInventory≤0}</li>
+ *   <li>5.3.2.2 — 跨结构共享 {@code machineAllocationMap}（负载统计全局一致）</li>
+ *   <li>5.3.2.3 — 逐结构：候选机台 → 优先级排序 → {@link #allocateTrialTask}</li>
  * </ol>
  *
  * @author APS Team
+ * @see NewTaskProcessor#processNewTasks
+ * @see ShiftScheduleService#scheduleTaskToShifts
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class TrialTaskProcessor {
 
-    /** 默认最大胎胚种类数上限（与 BalancingService 保持一致） */
-    private static final int DEFAULT_MAX_TYPES_PER_MACHINE = BalancingService.DEFAULT_MAX_TYPES_PER_MACHINE;
-
-    /** 默认日产能（条/天），机台未配置时使用 */
+    /** 机台主数据缺省日产能（条/天） */
     private static final int DEFAULT_DAILY_CAPACITY = 1200;
 
+    // ==================== 5.3.2 试制处理入口 ====================
+
     /**
-     * 处理试制任务
+     * 处理本班次全部试制任务，输出试制机台分配列表。
      *
-     * @param trialTasks       试制任务列表
-     * @param context         排程上下文
-     * @param scheduleDate    排程日期
-     * @param dayShifts       当天班次配置
-     * @param availableMachines 可用机台列表
-     * @return 机台分配结果列表
+     * <p><b>输入</b>：{@code trialTasks} 来自 TaskGroupService（{@code isTrialTask=true} 或试制施工阶段）；
+     * 无任务或过滤后为空则返回空列表。
+     *
+     * <p><b>输出</b>：{@code trialAllocations}，与 continue/new 分配在 5.3.4 合并；
+     * NewTaskProcessor 据此构建「胎胚→试制机台」映射，约束后续量试 DFS。
+     *
+     * @param trialTasks        试制任务列表
+     * @param context           排程上下文
+     * @param scheduleDate      当前排程日
+     * @param dayShifts         当天班次配置（签名保留，机台选择逻辑未使用）
+     * @param availableMachines 可用机台列表（签名保留，实际从 structureAllocationMap 解析）
+     * @return 试制任务机台分配结果
      */
     public List<CoreScheduleAlgorithmService.MachineAllocationResult> processTrialTasks(
             List<CoreScheduleAlgorithmService.DailyEmbryoTask> trialTasks,
@@ -65,7 +96,7 @@ public class TrialTaskProcessor {
 
         log.info("========== 开始处理试制任务，共 {} 个任务 ==========", trialTasks.size());
 
-        // Step 1: 按结构分组（跳过计划量为0的任务）
+        // 5.3.2.1 按结构分组；无结构名或无待排条数的任务跳过
         Map<String, List<CoreScheduleAlgorithmService.DailyEmbryoTask>> structureTaskMap =
                 trialTasks.stream()
                         .filter(t -> t.getStructureName() != null)
@@ -75,19 +106,18 @@ public class TrialTaskProcessor {
                                 LinkedHashMap::new,
                                 Collectors.toList()));
 
-        // Step 2: 记录已分配的机台任务映射（用于计算负载差异）
+        // 5.3.2.2 机台 → 分配结果（跨结构累积，供 selectMachineForTrial 计算全局负载）
         Map<String, CoreScheduleAlgorithmService.MachineAllocationResult> machineAllocationMap =
                 new HashMap<>();
 
-        // Step 3: 按结构处理
+        // 5.3.2.3 逐结构处理
         for (Map.Entry<String, List<CoreScheduleAlgorithmService.DailyEmbryoTask>> entry : structureTaskMap.entrySet()) {
             String structureName = entry.getKey();
             List<CoreScheduleAlgorithmService.DailyEmbryoTask> tasks = entry.getValue();
 
             log.info("--- 处理结构 {}，共 {} 个试制胎胚 ---", structureName, tasks.size());
 
-            // Step 3.1: 获取该结构可安排的机台（按 PRODUCTION_VERSION 过滤）
-            // 同一结构下所有任务的 productionVersion 应一致，取第一个
+            // 5.3.2.3.1 结构候选机台（当日排产配置或提前生产回退）
             String productionVersion = tasks.get(0).getProductionVersion();
             List<MpCxCapacityConfiguration> structMachines = getAvailableMachinesForStructure(
                     structureName, scheduleDate, context, productionVersion);
@@ -96,7 +126,7 @@ public class TrialTaskProcessor {
                 continue;
             }
 
-            // Step 3.2: 按任务优先级排序
+            // 5.3.2.3.2 同结构内按 priority 升序（分值小的先占机台；null 视为最低优先级）
             tasks.sort((a, b) -> {
                 Integer priA = a.getPriority();
                 Integer priB = b.getPriority();
@@ -105,7 +135,7 @@ public class TrialTaskProcessor {
                         priB != null ? priB : Integer.MAX_VALUE);
             });
 
-            // Step 3.3: 逐个分配到机台
+            // 5.3.2.3.3 逐任务选机并写入 machineAllocationMap
             for (CoreScheduleAlgorithmService.DailyEmbryoTask task : tasks) {
                 allocateTrialTask(task, structMachines, machineAllocationMap, context);
             }
@@ -116,14 +146,12 @@ public class TrialTaskProcessor {
         return results;
     }
 
+    // ==================== 单任务分配 ====================
+
     /**
-     * 分配单个试制任务到机台
+     * 将单个试制任务写入选定机台的 {@link CoreScheduleAlgorithmService.MachineAllocationResult}。
      *
-     * <p>机台选择策略：
-     * <ol>
-     *   <li>空机台优先（没有任何任务分配）</li>
-     *   <li>其次选择最不均衡的机台（负载差异最大）</li>
-     * </ol>
+     * <p>选机委托 {@link #selectMachineForTrial}；失败时打 warn 并跳过（任务本班不落机台）。
      */
     private void allocateTrialTask(
             CoreScheduleAlgorithmService.DailyEmbryoTask task,
@@ -143,26 +171,28 @@ public class TrialTaskProcessor {
 
         String machineCode = selectedMachine.getCxMachineCode();
 
-        // 获取或创建机台分配结果
         CoreScheduleAlgorithmService.MachineAllocationResult allocation =
                 machineAllocationMap.computeIfAbsent(machineCode, k -> createMachineAllocation(k, context));
 
-        // 分配到机台
         allocateTaskToMachine(allocation, task);
         log.debug("试制任务 {} 分配到机台 {}，计划量={}", embryoCode, machineCode, task.getPlannedProduction());
     }
 
     /**
-     * 为试制任务选择机台
+     * 试制选机策略（结构候选集内）。
      *
-     * <p>选择顺序：
+     * <p><b>过滤</b>：机台须在 {@code structMachines} 中且通过 {@link #checkStructureConstraint}（固定禁用结构）。
+     *
+     * <p><b>优先级</b>：
      * <ol>
-     *   <li>空机台优先（无任何任务）</li>
-     *   <li>最不均衡的机台（负载差异最大）</li>
+     *   <li>空机台 — {@code machineAllocationMap} 中无记录或 taskAllocations 为空，取第一个空机台</li>
+     *   <li>无空机台 — 选 {@link #calculateImbalance} 最大者（与当前非空机台平均负载偏差最大）</li>
      * </ol>
+     *
+     * @param embryoCode 胎胚编码
      */
     private MdmMoldingMachine selectMachineForTrial(
-            String materialCode,
+            String embryoCode,
             String structureName,
             List<MpCxCapacityConfiguration> structMachines,
             Map<String, CoreScheduleAlgorithmService.MachineAllocationResult> machineAllocationMap,
@@ -179,7 +209,6 @@ public class TrialTaskProcessor {
                 continue;
             }
 
-            // 检查结构约束
             if (!checkStructureConstraint(machine, structureName, context)) {
                 continue;
             }
@@ -187,12 +216,10 @@ public class TrialTaskProcessor {
             CoreScheduleAlgorithmService.MachineAllocationResult allocation = machineAllocationMap.get(machineCode);
 
             if (allocation == null || allocation.getTaskAllocations().isEmpty()) {
-                // 空机台优先
                 if (emptyMachine == null) {
                     emptyMachine = machine;
                 }
             } else {
-                // 计算负载差异（越不均衡越好）
                 int imbalance = calculateImbalance(machineCode, machineAllocationMap);
                 if (imbalance > maxImbalance) {
                     maxImbalance = imbalance;
@@ -201,7 +228,6 @@ public class TrialTaskProcessor {
             }
         }
 
-        // 空机台优先，其次最不均衡
         if (emptyMachine != null) {
             return emptyMachine;
         }
@@ -209,15 +235,14 @@ public class TrialTaskProcessor {
     }
 
     /**
-     * 计算指定机台的负载不均衡度
+     * 机台负载不均衡度 — 用于无空机台时的择优。
      *
-     * <p>不均衡度 = |usedCapacity - avgUsedCapacity|
-     * 即当前机台与所有非空机台平均负载的偏差，偏差越大越不均衡。
+     * <p>公式：{@code |本机 usedCapacity − 所有非空机台 usedCapacity 均值|}。
+     * 此处 {@code usedCapacity} 为已分配试制<b>条数</b>累计（见 {@link #allocateTaskToMachine}）。
      */
     private int calculateImbalance(
             String machineCode,
             Map<String, CoreScheduleAlgorithmService.MachineAllocationResult> machineAllocationMap) {
-        // 计算所有非空机台的平均负载
         int totalUsed = 0;
         int count = 0;
         for (CoreScheduleAlgorithmService.MachineAllocationResult alloc : machineAllocationMap.values()) {
@@ -235,9 +260,7 @@ public class TrialTaskProcessor {
         return Math.abs(currentUsed - avgUsed);
     }
 
-    /**
-     * 从机台列表中查找指定编码的机台
-     */
+    /** 在机台主数据列表中按编码查找 */
     private MdmMoldingMachine findMachine(String machineCode, List<MdmMoldingMachine> machines) {
         if (machines == null) {
             return null;
@@ -250,13 +273,17 @@ public class TrialTaskProcessor {
         return null;
     }
 
+    // ==================== 结构可用机台（与 NewTaskProcessor / ContinueTaskProcessor 同构） ====================
+
     /**
-     * 获取指定结构在当前日期可安排的机台配置
+     * 获取结构在排程日可安排的机台配置。
+     *
+     * <p>优先 {@code structureAllocationMap}（年月 + beginDay~endDay + 机台去重）；
+     * 无配置时回退 {@link #getAdvanceProductionMachines}。
      */
     private List<MpCxCapacityConfiguration> getAvailableMachinesForStructure(
             String structureName, LocalDate scheduleDate, ScheduleContextVo context,
             String productionVersion) {
-        // 从 structureAllocationMap 取当日可用机台（跨月时两个月配置均在此Map，靠年月过滤选择）
         if (context.getStructureAllocationMap() != null) {
             List<MpCxCapacityConfiguration> configs =
                     context.getStructureAllocationMap().get(structureName);
@@ -264,13 +291,11 @@ public class TrialTaskProcessor {
                 int day = scheduleDate.getDayOfMonth();
                 int dateYear = scheduleDate.getYear();
                 int dateMonth = scheduleDate.getMonthValue();
-                // 过滤日期范围 + 年月匹配（各月配置已按各自排产版本过滤，不再重复过滤版本）
                 List<MpCxCapacityConfiguration> result = configs.stream()
                         .filter(c -> c.getBeginDay() != null && c.getEndDay() != null)
                         .filter(c -> c.getBeginDay() <= day && c.getEndDay() >= day)
                         .filter(c -> c.getYear() != null && c.getYear() == dateYear
                                 && c.getMonth() != null && c.getMonth() == dateMonth)
-                        // 按机台编码去重（同一机台可能有多条配置记录）
                         .collect(Collectors.collectingAndThen(
                                 Collectors.toMap(MpCxCapacityConfiguration::getCxMachineCode, c -> c, (a, b) -> a, LinkedHashMap::new),
                                 m -> new ArrayList<>(m.values())));
@@ -279,24 +304,12 @@ public class TrialTaskProcessor {
                 }
             }
         }
-        // 提前生产回退：当日无机台时，使用 TaskGroupService 分配的未来机台（已剔除冲突）
         return getAdvanceProductionMachines(structureName, context, productionVersion);
     }
 
     /**
-     * 获取提前生产机台（从 context.advanceProductionMachineMap 回退）
-     *
-     * <p>当结构在当日无可配置机台时，TaskGroupService 已从提前生产备用配置中查找并剔除冲突机台，
-     * 将结果存入 advanceProductionMachineMap。此处回退获取，确保提前生产机台在处理器中可用。
-     *
-     * <p>注意：advanceProductionMachineMap 中的机台已在加载阶段完成版本过滤
-     * （本月未来机台用当月版本过滤，跨月机台用次月版本过滤），此处不再重复过滤，
-     * 避免跨月机台因版本不同被错误剔除。
-     *
-     * @param structureName     结构名称
-     * @param context           排程上下文
-     * @param productionVersion 排产版本（未使用，保留参数兼容签名）
-     * @return 提前生产机台列表，无则返回空列表
+     * 提前生产机台回退；{@code advanceProductionMachineMap} 已在 TaskGroupService 完成版本与冲突处理，
+     * 此处不再按 productionVersion 过滤。
      */
     private List<MpCxCapacityConfiguration> getAdvanceProductionMachines(
             String structureName, ScheduleContextVo context, String productionVersion) {
@@ -316,7 +329,9 @@ public class TrialTaskProcessor {
     }
 
     /**
-     * 检查机台是否禁止生产指定结构
+     * 机台固定配置约束 — {@code MdmCxMachineFixed.disableStructure} 包含当前结构则不可选。
+     *
+     * @return true 表示允许在该机台生产此结构
      */
     private boolean checkStructureConstraint(
             MdmMoldingMachine machine, String structureName, ScheduleContextVo context) {
@@ -334,9 +349,9 @@ public class TrialTaskProcessor {
         return true;
     }
 
-    /**
-     * 创建机台分配结果
-     */
+    // ==================== 机台分配壳与任务写入 ====================
+
+    /** 创建空机台分配，remainingCapacity 取机台日产能（条/天） */
     private CoreScheduleAlgorithmService.MachineAllocationResult createMachineAllocation(
             String machineCode, ScheduleContextVo context) {
         CoreScheduleAlgorithmService.MachineAllocationResult allocation =
@@ -348,9 +363,6 @@ public class TrialTaskProcessor {
         return allocation;
     }
 
-    /**
-     * 获取机台日产能
-     */
     private int getMachineDailyCapacity(String machineCode, ScheduleContextVo context) {
         if (context.getAvailableMachines() != null) {
             for (MdmMoldingMachine machine : context.getAvailableMachines()) {
@@ -363,7 +375,13 @@ public class TrialTaskProcessor {
     }
 
     /**
-     * 分配任务到机台
+     * 将试制任务写入 TaskAllocation 并更新机台容量计数。
+     *
+     * <p>条数：{@code quantity} ← {@code plannedProduction}；
+     * {@code endingExtraInventory} 优先任务字段，否则回退 plannedProduction。
+     * 容量：{@code usedCapacity} / {@code remainingCapacity} 按<b>条数</b>增减（试制路径特有，区别于 DFS 硫化机台数）。
+     *
+     * <p>试制不在此做收尾补整车、库存扣减；标志位原样透传供 ShiftScheduleService 试制精排。
      */
     private void allocateTaskToMachine(
             CoreScheduleAlgorithmService.MachineAllocationResult allocation,
@@ -393,9 +411,9 @@ public class TrialTaskProcessor {
         taskAllocation.setIsMainProduct(task.getIsMainProduct());
         taskAllocation.setLhId(task.getLhId());
         taskAllocation.setConstructionStage(task.getConstructionStage());
-        taskAllocation.setIsFirstTask(task.getIsFirstTask());  // 传递是否首任务（新开规格）
-        taskAllocation.setIsUrgentEnding(task.getIsUrgentEnding());  // 传递是否紧急收尾
-        taskAllocation.setIsNearEnding(task.getIsNearEnding());  // 传递是否临近收尾
+        taskAllocation.setIsFirstTask(task.getIsFirstTask());
+        taskAllocation.setIsUrgentEnding(task.getIsUrgentEnding());
+        taskAllocation.setIsNearEnding(task.getIsNearEnding());
 
         allocation.getTaskAllocations().add(taskAllocation);
         allocation.setUsedCapacity(allocation.getUsedCapacity() + task.getPlannedProduction());

@@ -1656,7 +1656,6 @@
   "ui.data.column.tm.glueOrder.factoryCode": "Nhà máy",
   "ui.data.column.tm.glueOrder.glueGroupCode": "Mã nhóm keo",
   "ui.data.column.tm.glueOrder.glueCode": "Mã su",
-  "ui.data.column.tm.glueOrder.machineCode": "Mã máy",
   "ui.data.column.tm.glueOrder.orderNum": "Số thứ tự",
   "ui.data.column.tm.lossSetting.modelName": "Thông tin cài đặt tỷ lệ hao hụt mặt lốp",
   "ui.data.column.tm.lossSetting.factoryCode": "Nhà máy",

@@ -2,17 +2,13 @@ package com.zlt.aps.cx.service.engine;
 
 import com.zlt.aps.cx.entity.config.CxParamConfig;
 import com.zlt.aps.cx.vo.ScheduleContextVo;
-import com.zlt.aps.mp.api.domain.entity.MdmMoldingMachine;
-import com.zlt.aps.mp.api.domain.entity.MdmStructureLhRatio;
 import com.zlt.aps.mp.api.domain.entity.MpCxCapacityConfiguration;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -20,33 +16,54 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
-import java.util.stream.Collectors;
 
 /**
- * 均衡分配服务
+ * S5.3.3.2.5 DFS 均衡分配引擎 — 将结构内胎胚任务按「硫化机台数」均衡分配到多台成型机。
  *
- * <p>负责胎胚到机台的均衡分配，使用 DFS + 剪枝算法。
- * <p><b>优先级原则</b>：满排优先 > 均衡尽量满足
+ * <h3>流水线位置</h3>
+ * <pre>
+ * CoreScheduleAlgorithmServiceImpl.executeShiftSchedule
+ *   → NewTaskProcessor.processNewTasks（按结构分组）
+ *       → BalancingService.balanceEmbryosToMachinesWithMachineCapacity（本类）
+ *           → 输出 MachineAllocationResult → ShiftScheduleService 班次精排
+ * </pre>
+ *
+ * <h3>单位与输入约定</h3>
  * <ul>
- *   <li>硬约束：maxCapacity（机台最大硫化机数）、maxTypes（机台最大种类数）一定不能超过</li>
- *   <li>第一优先：所有任务全部排上（满排）</li>
- *   <li>第二优先：在满排前提下尽量满足均衡指标</li>
- *   <li>均衡指标：负荷差距 ≤ loadDiffThreshold 且 种类差距 ≤ typeDiffThreshold 为均衡解</li>
- *   <li>选择优先级：满排均衡解 > 满排不均衡解 > 非满排解</li>
+ *   <li><b>分配单位</b>：硫化机台数（{@code vulcanizeMachineCount}），不是条数；条数由 TaskGroupService 写入
+ *       {@code endingExtraInventory}，精排阶段才换算。</li>
+ *   <li><b>下量过滤</b>：仅 {@code endingExtraInventory &gt; 0} 的任务进入均衡（与 Processor 预过滤一致）。</li>
+ *   <li><b>续作预扣</b>：{@code continueLoadMap} / {@code continueTypeMap} 由 NewTaskProcessor 传入，
+ *       初始化机台时扣减剩余容量与种类槽，DFS 新分配数 = 总负荷 − 预扣负荷。</li>
+ *   <li><b>机台上限</b>：每台机 {@code maxCapacity}=最大硫化机数、{@code maxTypes}=最大胎胚种类数，
+ *       均由 NewTaskProcessor 按机型+结构+参数前缀解析后传入。</li>
  * </ul>
  *
- * <p>剪枝策略：
- * <ul>
- *   <li>剩余产能为零剪枝：剩余机台总产能为0时剪枝（产能不足时继续探索部分解）</li>
- *   <li>贪心上界剪枝：找到均衡完整解后，当前分支不可能满足均衡阈值时剪枝</li>
- *   <li>搜索限制：100万次，防止极端情况卡死</li>
- * </ul>
+ * <h3>主流程（{@link #balanceEmbryosToMachinesWithMachineCapacity} 8 参数重载）</h3>
+ * <ol>
+ *   <li>5.3.3.2.5.1 — 输入过滤：收尾舍弃 / endingExtraInventory≤0</li>
+ *   <li>5.3.3.2.5.2 — 供需预估：Σ需求、Σ产能、distinct 胎胚种类数</li>
+ *   <li>5.3.3.2.5.3 — 任务排序：量试约束机台 → 续作 → 非零净需求 → 大任务 → 候选机台少者优先</li>
+ *   <li>5.3.3.2.5.4 — 机台状态初始化 + 续作预扣写入 MachineState</li>
+ *   <li>5.3.3.2.5.5 — 保底预留（SYS04070003=Y 时在 DFS 前于历史机台各留 1 台硫化机）</li>
+ *   <li>5.3.3.2.5.6 — DFS+剪枝（{@link #dfsAssign}）：单胎胚可拆分到多机台，搜索上限 100 万次</li>
+ *   <li>5.3.3.2.5.7 — 结果转换：最优解 → {@link BalancingResult}；无解时保底预留兜底或空结果</li>
+ * </ol>
  *
- * <p>被以下处理器复用：
- * <ul>
- *   <li>{@link ContinueTaskProcessor} - 续作任务均衡分配</li>
- *   <li>{@link NewTaskProcessor} - 新增任务均衡分配（合并续作后重新均衡）</li>
- * </ul>
+ * <h3>DFS 解的质量优先级</h3>
+ * <ol>
+ *   <li>完整解（已分配数 = 总需求）优于部分解</li>
+ *   <li>完整解中：满足均衡阈值（{@link #isBalanced}）优于不满足</li>
+ *   <li>同等级下：{@link #calculateBalancingScore} 分数更低者更优（负荷差×10 + 种类差×100）</li>
+ * </ol>
+ *
+ * <h3>约束参数（T_CX_PARAM_CONFIG / context）</h3>
+ * <table>
+ *   <tr><th>编码</th><th>含义</th><th>默认</th></tr>
+ *   <tr><td>SYS04070001</td><td>机台间胎胚种类数最大允许差额</td><td>1</td></tr>
+ *   <tr><td>SYS04070002</td><td>机台间硫化机台数最大允许差额</td><td>3</td></tr>
+ *   <tr><td>SYS04070003</td><td>强制保留历史任务（Y=DFS 前保底预留）</td><td>N</td></tr>
+ * </table>
  *
  * @author APS Team
  */
@@ -79,318 +96,12 @@ public class BalancingService {
     /** 默认：硫化机台数允许差额（最多差3台） */
     private static final int DEFAULT_LOAD_DIFF_THRESHOLD = 3;
 
-    // ==================== 核心均衡分配方法 ====================
+    // ==================== 5.3.3.2.5 均衡分配入口 ====================
 
     /**
-     * 均衡分配胎胚到机台（DFS + 剪枝算法）
+     * 均衡分配（7 参数重载）— 无续作预扣场景。
      *
-     * <p>算法核心：
-     * <ul>
-     *   <li>目标：胎胚种类数均衡，硫化机台数配比均衡</li>
-     *   <li>约束：机台最大硫化机数上限、胎胚种类数上限</li>
-     *   <li>策略：深度优先搜索 + 剪枝，超过均衡阈值的分支直接舍弃</li>
-     * </ul>
-     *
-     * <p>单位说明：
-     * <ul>
-     *   <li>总需求 = 结构下所有胎胚的硫化机台数之和</li>
-     *   <li>总产能 = 所有可分配机台的最大硫化机数之和（每台机台可能不同）</li>
-     * </ul>
-     *
-     * <p>注意：此方法使用统一的 maxLhMachines，如果不同机型有不同的最大硫化机数，
-     * 请使用 {@link #balanceEmbryosToMachinesWithMachineCapacity} 方法
-     *
-     * @param tasks                 胎胚任务列表
-     * @param availableMachines     可分配机台列表（结构排产配置）
-     * @param machineHistoryMap     历史任务映射（机台 -> 昨天做的胎胚集合）
-     * @param maxLhMachines         最大硫化机台数（每台成型机的产能上限，统一值）
-     * @param maxEmbryoTypes        最大胎胚种类数
-     * @param forceKeepHistory      是否强制保留历史任务
-     * @param context               排程上下文
-     * @return 均衡分配结果
-     */
-    public BalancingResult balanceEmbryosToMachines(
-            List<CoreScheduleAlgorithmService.DailyEmbryoTask> tasks,
-            List<MpCxCapacityConfiguration> availableMachines,
-            Map<String, Set<String>> machineHistoryMap,
-            int maxLhMachines,
-            int maxEmbryoTypes,
-            boolean forceKeepHistory,
-            ScheduleContextVo context) {
-
-        // 构建统一的机台最大硫化机数映射（向后兼容）
-        Map<String, Integer> machineMaxLhMap = new HashMap<>();
-        for (MpCxCapacityConfiguration config : availableMachines) {
-            machineMaxLhMap.put(config.getCxMachineCode(), maxLhMachines);
-        }
-
-        return balanceEmbryosToMachinesWithMachineCapacity(
-                tasks, availableMachines, machineHistoryMap,
-                machineMaxLhMap, maxEmbryoTypes, forceKeepHistory, context);
-    }
-
-    /**
-     * 均衡分配（简化版，根据机型+结构获取每台机台的最大硫化机数）
-     *
-     * <p>重要：每台成型机的机型可能不同，需要根据机型+结构从 MdmStructureLhRatio 获取各自的最大硫化机数
-     *
-     * @param tasks             胎胚任务列表
-     * @param availableMachines 可分配机台列表（包含机型信息）
-     * @param structureName     当前处理的结构名称
-     * @param context           排程上下文
-     * @return 均衡分配结果
-     */
-    public BalancingResult balanceEmbryosToMachines(
-            List<CoreScheduleAlgorithmService.DailyEmbryoTask> tasks,
-            List<MdmMoldingMachine> availableMachines,
-            String structureName,
-            ScheduleContextVo context) {
-
-        log.info("====== 均衡分配(简化版)开始 ======");
-        log.info("结构={}, 任务数={}, 可用机台数={}, 机台列表={}",
-                structureName, tasks.size(), availableMachines.size(),
-                availableMachines.stream().map(MdmMoldingMachine::getCxMachineCode).collect(Collectors.toList()));
-
-        // 打印每个胎胚任务详情
-        for (CoreScheduleAlgorithmService.DailyEmbryoTask task : tasks) {
-            String taskType = Boolean.TRUE.equals(task.getIsTrialTask()) ? "试制"
-                    : Boolean.TRUE.equals(task.getIsContinueTask()) ? "续作" : "新增";
-            String zeroDemandFlag = task.getDeferredRemainingDemand() != null ? "(零净需求)" : "";
-            log.info("  胎胚任务: embryoCode={}, materialCode={}, vulcanizeMachineCount={}, structureName={}, 类型={}{}",
-                    task.getEmbryoCode(), task.getMaterialCode(),
-                    task.getVulcanizeMachineCount(), task.getStructureName(),
-                    taskType, zeroDemandFlag);
-        }
-
-        // 统计同胎胚不同物料的分布情况（关键诊断日志）
-        Map<String, Map<String, Integer>> embryoMaterialStats = new java.util.LinkedHashMap<>();
-        for (CoreScheduleAlgorithmService.DailyEmbryoTask task : tasks) {
-            String embryoCode = task.getEmbryoCode();
-            String materialCode = task.getMaterialCode() != null ? task.getMaterialCode() : "未知";
-            int count = task.getVulcanizeMachineCount() != null ? task.getVulcanizeMachineCount() : 0;
-            embryoMaterialStats.computeIfAbsent(embryoCode, k -> new java.util.HashMap<>())
-                    .merge(materialCode, count, Integer::sum);
-        }
-
-        log.info("====== 胎胚物料分布统计 ======");
-        for (Map.Entry<String, Map<String, Integer>> entry : embryoMaterialStats.entrySet()) {
-            String embryoCode = entry.getKey();
-            Map<String, Integer> materialCounts = entry.getValue();
-            List<String> details = materialCounts.entrySet().stream()
-                    .map(e -> e.getKey() + "(" + e.getValue() + "台)")
-                    .collect(java.util.stream.Collectors.toList());
-            int totalCount = materialCounts.values().stream().mapToInt(Integer::intValue).sum();
-            log.info("  【胎胚 {}】共{}台，物料分布：{}", embryoCode, totalCount, details);
-        }
-        log.info("================================");
-
-        // 转换为配置格式
-        List<MpCxCapacityConfiguration> configs = availableMachines.stream()
-                .map(m -> {
-                    MpCxCapacityConfiguration config = new MpCxCapacityConfiguration();
-                    config.setCxMachineCode(m.getCxMachineCode());
-                    return config;
-                })
-                .collect(Collectors.toList());
-
-        // 根据机型+结构获取每台机台的最大硫化机数
-        Map<String, Integer> machineMaxLhMap = buildMachineMaxLhMap(availableMachines, structureName, context);
-
-        // 根据机型+结构获取每台机台的最大胎胚种类数
-        Map<String, Integer> machineMaxEmbryoTypesMap = buildMachineMaxEmbryoTypesMap(availableMachines, structureName, context);
-
-        // 获取其他参数
-        boolean forceKeepHistory = getForceKeepHistoryConfig(context);
-        Map<String, Set<String>> machineHistoryMap = buildMachineHistoryMap(context);
-
-        return balanceEmbryosToMachinesWithMachineCapacity(
-                tasks, configs, machineHistoryMap,
-                machineMaxLhMap, machineMaxEmbryoTypesMap, forceKeepHistory, context);
-    }
-
-    /**
-     * 构建历史机台映射（cxCode → Set&lt;embryoCode&gt;）
-     *
-     * <p>将 machineOnlineEmbryoMap（embryoCode → Set&lt;cxCode&gt;）反转为
-     * cxCode → Set&lt;embryoCode&gt; 格式，供均衡算法使用。
-     */
-    private Map<String, Set<String>> buildMachineHistoryMap(ScheduleContextVo context) {
-        Map<String, Set<String>> historyMap = new HashMap<>();
-        Map<String, Set<String>> onlineEmbryoMap = context.getMachineOnlineEmbryoMap();
-        if (onlineEmbryoMap != null) {
-            for (Map.Entry<String, Set<String>> entry : onlineEmbryoMap.entrySet()) {
-                String embryoCode = entry.getKey();
-                for (String cxCode : entry.getValue()) {
-                    historyMap.computeIfAbsent(cxCode, k -> new HashSet<>()).add(embryoCode);
-                }
-            }
-        }
-        return historyMap;
-    }
-
-    /**
-     * 构建机台最大硫化机数映射
-     *
-     * <p>根据每台机台的机型 + 结构，从 MdmStructureLhRatio 获取对应的最大硫化机数
-     *
-     * @param machines      机台列表
-     * @param structureName 结构名称
-     * @param context       排程上下文
-     * @return 机台编码 -> 最大硫化机数
-     */
-    private Map<String, Integer> buildMachineMaxLhMap(
-            List<MdmMoldingMachine> machines,
-            String structureName,
-            ScheduleContextVo context) {
-
-        Map<String, Integer> result = new HashMap<>();
-        List<MdmStructureLhRatio> ratios = context.getStructureLhRatios();
-
-        // 构建 机型_结构 -> 最大硫化机数 的映射
-        Map<String, Integer> machineTypeStructureMap = new HashMap<>();
-        if (ratios != null) {
-            log.info("结构 {} 配比数据共 {} 条", structureName, ratios.size());
-            int matchCount = 0;
-            for (MdmStructureLhRatio ratio : ratios) {
-                String key = ratio.getCxMachineTypeCode() + "_" + ratio.getStructureName();
-                if (ratio.getLhMachineMaxQty() != null) {
-                    machineTypeStructureMap.put(key, ratio.getLhMachineMaxQty());
-                    // 只记录匹配当前结构的
-                    if (structureName.equals(ratio.getStructureName())) {
-                        log.info("  配比匹配: 机型={}, 结构={}, 硫化机上限={}",
-                                ratio.getCxMachineTypeCode(), ratio.getStructureName(), ratio.getLhMachineMaxQty());
-                        matchCount++;
-                    }
-                }
-            }
-            log.info("结构 {} 找到 {} 条配比配置", structureName, matchCount);
-        } else {
-            log.warn("结构 {} 配比数据为空", structureName);
-        }
-
-        // 为每台机台获取对应的最大硫化机数
-        int fallbackCount = 0;
-        for (MdmMoldingMachine machine : machines) {
-            String machineCode = machine.getCxMachineCode();
-            String machineType = machine.getCxMachineTypeCode();
-
-            // 优先根据机型+结构查找
-            String key = machineType + "_" + structureName;
-            Integer maxLh = machineTypeStructureMap.get(key);
-
-            // 如果找不到，使用机台本身的硫化机上限
-            if (maxLh == null) {
-                int defaultMaxLh = context.getMaxLhMachineQty() != null ? context.getMaxLhMachineQty() : DEFAULT_MAX_LH_MACHINE_QTY;
-                maxLh = machine.getLhMachineMaxQty() != null ? machine.getLhMachineMaxQty() : defaultMaxLh;
-                log.info("  机台 {} 机型 {} 未找到配比，使用默认值 {}", machineCode, machineType, maxLh);
-                fallbackCount++;
-            }
-
-            result.put(machineCode, maxLh);
-        }
-
-        if (fallbackCount > 0) {
-            log.warn("结构 {} 有 {}/{} 台机台未找到配比配置，使用默认值", structureName, fallbackCount, machines.size());
-        }
-        return result;
-    }
-
-    /**
-     * 构建机台最大胎胚种类数映射
-     *
-     * <p>根据每台机台的机型 + 结构，从 MdmStructureLhRatio 获取对应的最大胎胚种类数
-     *
-     * @param machines      机台列表
-     * @param structureName 结构名称
-     * @param context       排程上下文
-     * @return 机台编码 -> 最大胎胚种类数
-     */
-    private Map<String, Integer> buildMachineMaxEmbryoTypesMap(
-            List<MdmMoldingMachine> machines,
-            String structureName,
-            ScheduleContextVo context) {
-
-        log.info("构建机台最大胎胚种类数映射: 结构={}, 机台数={}", structureName, machines.size());
-
-        Map<String, Integer> result = new HashMap<>();
-
-        // 构建机台编码 -> 机型 映射
-        Map<String, String> machineTypeMap = new HashMap<>();
-        for (MdmMoldingMachine machine : machines) {
-            machineTypeMap.put(machine.getCxMachineCode(), machine.getCxMachineTypeCode());
-        }
-
-        // 构建 机型_结构 -> 最大胎胚种类数 映射
-        Map<String, Integer> typeStructureMap = new HashMap<>();
-        List<MdmStructureLhRatio> ratios = context.getStructureLhRatios();
-        if (ratios != null) {
-            log.info("  配比数据共 {} 条，筛选结构={}", ratios.size(), structureName);
-            int matchCount = 0;
-            for (MdmStructureLhRatio ratio : ratios) {
-                String key = ratio.getCxMachineTypeCode() + "_" + ratio.getStructureName();
-                if (ratio.getMaxEmbryoQty() != null) {
-                    typeStructureMap.put(key, ratio.getMaxEmbryoQty());
-                    if (structureName.equals(ratio.getStructureName())) {
-                        log.info("  配比匹配: 机型={}, 结构={}, 最大胎胚种类数={}",
-                                ratio.getCxMachineTypeCode(), ratio.getStructureName(), ratio.getMaxEmbryoQty());
-                        matchCount++;
-                    }
-                }
-            }
-            log.info("  结构 {} 匹配到 {} 条配比记录", structureName, matchCount);
-        } else {
-            log.warn("  配比数据为空，所有机台将使用默认值");
-        }
-
-        Map<String, Integer> machineMaxEmbryoTypes = context.getMachineMaxEmbryoTypes();
-
-        for (MdmMoldingMachine machine : machines) {
-            String machineCode = machine.getCxMachineCode();
-            String machineType = machineTypeMap.get(machineCode);
-
-            // 自定义机台前缀匹配：使用专用最大胎胚种类数
-            Integer maxTypes = null;
-            if (machineMaxEmbryoTypes != null && machineCode != null) {
-                for (Map.Entry<String, Integer> entry : machineMaxEmbryoTypes.entrySet()) {
-                    if (machineCode.startsWith(entry.getKey())) {
-                        maxTypes = entry.getValue();
-                        log.info("  机台 {} (机型={}): 使用{}专用最大胎胚种类数={}", machineCode, machineType, entry.getKey(), maxTypes);
-                        break;
-                    }
-                }
-            }
-            if (maxTypes != null) {
-                result.put(machineCode, maxTypes);
-                continue;
-            }
-
-            String key = machineType + "_" + structureName;
-            maxTypes = typeStructureMap.get(key);
-
-            // 如果找不到，使用默认值
-            if (maxTypes == null) {
-                maxTypes = context.getMaxTypesPerMachine() != null ? context.getMaxTypesPerMachine() : DEFAULT_MAX_TYPES_PER_MACHINE;
-                log.debug("  机台 {} 机型 {} 未找到配比，使用默认最大胎胚种类数 {}", machineCode, machineType, maxTypes);
-            }
-
-            log.info("  机台 {} (机型={}): 最大胎胚种类数={}", machineCode, machineType, maxTypes);
-            result.put(machineCode, maxTypes);
-        }
-
-        return result;
-    }
-
-    /**
-     * 均衡分配胎胚到机台（支持每台机台有不同的最大硫化机数和最大胎胚种类数）
-     *
-     * @param tasks                   胎胚任务列表
-     * @param availableMachines       可分配机台列表
-     * @param machineHistoryMap       历史任务映射
-     * @param machineMaxLhMap         机台最大硫化机数映射（机台编码 -> 最大硫化机数）
-     * @param machineMaxEmbryoTypesMap 机台最大胎胚种类数映射（机台编码 -> 最大胎胚种类数）
-     * @param forceKeepHistory        是否强制保留历史任务
-     * @param context                 排程上下文
-     * @return 均衡分配结果
+     * <p>委托给 9 参数重载，{@code continueLoadMap=null}、{@code continueTypeMap=null}。
      */
     public BalancingResult balanceEmbryosToMachinesWithMachineCapacity(
             List<CoreScheduleAlgorithmService.DailyEmbryoTask> tasks,
@@ -409,10 +120,20 @@ public class BalancingService {
     }
 
     /**
-     * 均衡分配胎胚到机台（含续作预扣）
+     * 均衡分配主入口（9 参数）— 含续作预扣与 DFS 全流程。
      *
-     * @param continueLoadMap 续作已占容量（机台编码 → 已占硫化机数），可为null
-     * @param continueTypeMap 续作已占种类（机台编码 → 已占胎胚编码集合），可为null
+     * <p>调用方：{@link NewTaskProcessor#processNewTasks} 对每个结构调用一次。
+     *
+     * @param tasks                    待均衡任务（同结构；vulcanizeMachineCount 为剩余待分配硫化机数）
+     * @param availableMachines        该结构当日可用机台（已按 PRODUCTION_VERSION 过滤）
+     * @param machineHistoryMap        机台 → 在产/历史胎胚集合（embryoCode 集合，来自在机信息反转）
+     * @param machineMaxLhMap          机台 → 最大硫化机数（机型+结构配比）
+     * @param machineMaxEmbryoTypesMap 机台 → 最大胎胚种类数（参数前缀 / 配比 / 默认 4）
+     * @param forceKeepHistory         SYS04070003：true 时 DFS 前执行 {@link #reservedHistoryTasks}
+     * @param context                  排程上下文（读均衡阈值参数）
+     * @param continueLoadMap          续作已占硫化机数（机台 → 台数），null 表示无预扣
+     * @param continueTypeMap          续作已占胎胚种类（机台 → embryoCode 集合），null 表示无预扣
+     * @return 机台 → 胎胚 → 分配硫化机数 的 {@link BalancingResult}
      */
     public BalancingResult balanceEmbryosToMachinesWithMachineCapacity(
             List<CoreScheduleAlgorithmService.DailyEmbryoTask> tasks,
@@ -428,8 +149,9 @@ public class BalancingService {
         log.info("====== 均衡分配(含续作预扣)开始 ======");
         log.info("任务数={}, 可用机台数={}", tasks.size(), availableMachines.size());
 
-        // 过滤被收尾舍弃的任务（isLastEndingBatch=true 且 endingExtraInventory=0）
-        // 同时过滤计划量为0的任务（防御性过滤，正常情况下已在Processor层过滤）
+        // ---- 5.3.3.2.5.1 输入过滤 ----
+        // 条件1：收尾最后一批且 endingExtraInventory≤0 → 已舍弃，不参与均衡
+        // 条件2：endingExtraInventory 必须 >0（实际排产量，Processor 层亦会预过滤）
         List<CoreScheduleAlgorithmService.DailyEmbryoTask> filteredTasks = tasks.stream()
                 .filter(t -> !(Boolean.TRUE.equals(t.getIsLastEndingBatch())
                         && (t.getEndingExtraInventory() == null || t.getEndingExtraInventory() <= 0)))
@@ -447,7 +169,7 @@ public class BalancingService {
             return emptyResult;
         }
 
-        // 打印每个胎胚任务详情（关键诊断）
+        // ---- 诊断日志：任务明细与共用胎胚物料分布（不影响分配逻辑） ----
         for (CoreScheduleAlgorithmService.DailyEmbryoTask task : tasks) {
             String taskType = Boolean.TRUE.equals(task.getIsTrialTask()) ? "试制"
                     : Boolean.TRUE.equals(task.getIsContinueTask()) ? "续作" : "新增";
@@ -457,8 +179,6 @@ public class BalancingService {
                     task.getVulcanizeMachineCount(),
                     taskType, zeroDemandFlag);
         }
-
-        // 统计同胎胚不同物料的分布情况（关键诊断日志）
         Map<String, Map<String, Integer>> embryoMaterialStats = new java.util.LinkedHashMap<>();
         for (CoreScheduleAlgorithmService.DailyEmbryoTask task : tasks) {
             String embryoCode = task.getEmbryoCode();
@@ -467,7 +187,6 @@ public class BalancingService {
             embryoMaterialStats.computeIfAbsent(embryoCode, k -> new java.util.HashMap<>())
                     .merge(materialCode, count, Integer::sum);
         }
-
         log.info("====== 胎胚物料分布统计 ======");
         for (Map.Entry<String, Map<String, Integer>> entry : embryoMaterialStats.entrySet()) {
             String embryoCode = entry.getKey();
@@ -480,19 +199,19 @@ public class BalancingService {
         }
         log.info("================================");
 
-        // Step 1: 获取均衡阈值配置
+        // ---- 5.3.3.2.5.2 供需预估 + 均衡阈值 ----
         int typeDiffThreshold = getTypeDiffThreshold(context);
         int loadDiffThreshold = getLoadDiffThreshold(context);
 
         log.info("均衡分配参数：种类差额阈值={}, 负荷差额阈值={}",
                 typeDiffThreshold, loadDiffThreshold);
 
-        // Step 2: 计算总需求（所有胎胚的硫化机台数之和）
+        // 总需求 = 结构内所有任务 vulcanizeMachineCount 之和（单位：硫化机台数）
         int totalDemand = tasks.stream()
                 .mapToInt(t -> t.getVulcanizeMachineCount() != null ? t.getVulcanizeMachineCount() : 0)
                 .sum();
 
-        // Step 3: 计算总产能（每台机台的最大硫化机数之和，不再简单相乘）
+        // 总产能 = 各机台 maxLh 之和（每台机型+结构可能不同）
         int totalCapacity = 0;
         for (MpCxCapacityConfiguration config : availableMachines) {
             Integer maxLh = machineMaxLhMap.get(config.getCxMachineCode());
@@ -520,8 +239,13 @@ public class BalancingService {
                 .collect(Collectors.toList());
         log.info("任务需求明细：{}", taskDetails);
 
-        // Step 4: 排序胎胚任务
-        // 先计算每个胎胚编码的总需求量（同编码的任务已拆成(1)单元，需汇总）
+        // ---- 5.3.3.2.5.3 任务排序（决定 DFS 探索顺序，影响部分解质量） ----
+        // 排序键优先级（高→低）：
+        //   ① constrainedMachineCode 非空（量试锁定机台，候选唯一，必须先排）
+        //   ② isContinueTask 且有机台列表（续作候选受限）
+        //   ③ 非 deferredRemainingDemand（零净需求让位于有实际缺口的任务）
+        //   ④ 同 embryoCode 总硫化机数降序（大任务优先占种类槽）
+        //   ⑤ 静态候选机台数升序（受限任务优先）
         Map<String, Integer> embryoTotalDemand = new HashMap<>();
         for (CoreScheduleAlgorithmService.DailyEmbryoTask task : tasks) {
             embryoTotalDemand.merge(task.getEmbryoCode(),
@@ -529,43 +253,31 @@ public class BalancingService {
                     Integer::sum);
         }
 
-        // 第零排序：约束量试任务优先（候选机台最少，必须先安排）
-        // 续作排序：续作任务优先（候选机台受限，必须先保住）
-        // 净需求排序：非零净需求优先于零净需求（库存已覆盖的任务在种类槽不足时让位给有实际缺口的任务）
-        // 第一排序：胎胚总需求量降序（大需求优先占种类槽，产能不足时丢弃小需求更划算）
-        // 第二排序：候选机台数升序（受限任务优先）
         final Set<String> availableMachineCodes = availableMachines.stream()
                 .map(MpCxCapacityConfiguration::getCxMachineCode)
                 .collect(Collectors.toSet());
 
         List<CoreScheduleAlgorithmService.DailyEmbryoTask> sortedTasks = tasks.stream()
                 .sorted((a, b) -> {
-                    // 第零排序：约束量试任务优先
                     boolean aConstrained = a.getConstrainedMachineCode() != null && !a.getConstrainedMachineCode().isEmpty();
                     boolean bConstrained = b.getConstrainedMachineCode() != null && !b.getConstrainedMachineCode().isEmpty();
                     if (aConstrained != bConstrained) return aConstrained ? -1 : 1;
 
-                    // 续作排序：续作任务优先（候选机台受限，必须先保住）
                     boolean aContinue = a.getIsContinueTask() != null && a.getIsContinueTask()
                             && a.getContinueMachineCodes() != null && !a.getContinueMachineCodes().isEmpty();
                     boolean bContinue = b.getIsContinueTask() != null && b.getIsContinueTask()
                             && b.getContinueMachineCodes() != null && !b.getContinueMachineCodes().isEmpty();
                     if (aContinue != bContinue) return aContinue ? -1 : 1;
 
-                    // 净需求排序：非零净需求优先于零净需求
-                    // 零净需求任务标记为 deferredRemainingDemand != null，库存已覆盖硫化需求，
-                    // 种类槽不足时应优先让位给有实际缺口的非零净需求任务
                     boolean aZeroDemand = a.getDeferredRemainingDemand() != null;
                     boolean bZeroDemand = b.getDeferredRemainingDemand() != null;
                     if (aZeroDemand != bZeroDemand) return aZeroDemand ? 1 : -1;
 
-                    // 第一排序：胎胚总需求量降序（大需求优先占种类槽）
                     int totalA = embryoTotalDemand.getOrDefault(a.getEmbryoCode(), 0);
                     int totalB = embryoTotalDemand.getOrDefault(b.getEmbryoCode(), 0);
                     int demandCompare = Integer.compare(totalB, totalA);
                     if (demandCompare != 0) return demandCompare;
 
-                    // 第二排序：候选机台数升序（受限任务优先）
                     MachineState tmpA = createTempMachineState(availableMachineCodes);
                     MachineState tmpB = createTempMachineState(availableMachineCodes);
                     int candA = countCandidatesForStaticSort(a.getEmbryoCode(), tmpA);
@@ -574,7 +286,9 @@ public class BalancingService {
                 })
                 .collect(Collectors.toList());
 
-        // Step 5: 初始化机台状态（每台机台使用自己的最大硫化机数和最大胎胚种类数）
+        // ---- 5.3.3.2.5.4 机台状态初始化（含续作预扣） ----
+        // MachineState 字段：maxCapacity/maxTypes=上限，currentLoad/currentTypes=已占用，
+        // assignedEmbryos=分配明细，historyEmbryos=在产胎胚（影响 DFS 候选排序）
         List<MachineState> machineStates = new ArrayList<>();
         for (MpCxCapacityConfiguration config : availableMachines) {
             MachineState state = new MachineState();
@@ -607,33 +321,39 @@ public class BalancingService {
                 for (String embryoCode : preTypes) {
                     state.getAssignedEmbryos().add(new EmbryoAssignment(embryoCode, null, 1));
                 }
-                log.info("  【初始化机台】{}: 剩余容量={}台, 剩余种类={}种, 历史胎胚={}",
-                        config.getCxMachineCode(), state.getMaxCapacity(), state.getMaxTypes(),
-                        preLoad, preTypes, state.getHistoryEmbryos());
+                log.info("  【初始化机台】{}: 续作预扣={}台/{}, 剩余容量={}台, 剩余种类={}种, 历史胎胚={}",
+                        config.getCxMachineCode(), preLoad, preTypes,
+                        state.getMaxCapacity() - state.getCurrentLoad(),
+                        state.getMaxTypes() - state.getCurrentTypes(),
+                        state.getHistoryEmbryos());
             } else {
                 log.info("  【初始化机台】{}: 剩余容量={}台, 剩余种类={}种, 历史胎胚={}",
-                        config.getCxMachineCode(), state.getMaxCapacity(), state.getMaxTypes(), state.getHistoryEmbryos());
+                        config.getCxMachineCode(),
+                        state.getMaxCapacity() - state.getCurrentLoad(),
+                        state.getMaxTypes() - state.getCurrentTypes(),
+                        state.getHistoryEmbryos());
             }
 
             machineStates.add(state);
         }
 
-        // Step 6: 如果强制保留历史任务，先进行保底预留
+        // ---- 5.3.3.2.5.5 保底预留（仅 forceKeepHistory=true） ----
+        // 与 ContinueTaskProcessor 的保底逻辑类似，但在 DFS 前写入 MachineState，
+        // 并从 task.vulcanizeMachineCount 扣减已预留台数
         if (forceKeepHistory) {
             reservedHistoryTasks(sortedTasks, machineStates, context);
         }
 
-        // 产能充足标记（影响DFS候选排序策略）
+        // capacitySufficient 影响 DFS 内 sortCandidatesForDfs 的策略分支
         boolean capacitySufficient = (totalCapacity >= totalDemand);
 
-        // 产能不足提示（DFS仍可处理部分解，无需贪心兜底）
         int effectiveCapacity = totalCapacity;
         if (!capacitySufficient) {
             log.warn("产能不足（产能={}, 需求={}），DFS将尝试最优部分解", effectiveCapacity, totalDemand);
         }
 
-        // Step 7: DFS + 剪枝搜索最优方案
-        // 计算续作预扣总负荷（用于DFS中正确计算新分配数 = allCurrentLoad - preOccupiedLoad）
+        // ---- 5.3.3.2.5.6 DFS 搜索 ----
+        // preOccupiedLoad = 续作预扣 + 保底预留已占负荷；DFS 评估时用 总currentLoad − preOccupiedLoad
         int preOccupiedLoad = 0;
         for (MachineState s : machineStates) {
             preOccupiedLoad += s.getCurrentLoad();
@@ -651,7 +371,6 @@ public class BalancingService {
 
         List<CoreScheduleAlgorithmService.DailyEmbryoTask> remainingTasks = getRemainingTasks(sortedTasks);
 
-        // 打印 DFS 任务列表（排序后）
         if (!remainingTasks.isEmpty()) {
             List<String> taskList = remainingTasks.stream()
                     .map(t -> t.getEmbryoCode() + "(" + (t.getVulcanizeMachineCount() != null ? t.getVulcanizeMachineCount() : 0) + ")")
@@ -659,7 +378,6 @@ public class BalancingService {
             log.info("DFS任务列表（排序后，共{}个）：{}", remainingTasks.size(), taskList);
         }
 
-        // 初始化：从第一个任务开始，remainingCount 为第一个任务的硫化机台数
         int initialRemainingCount = remainingTasks.isEmpty() ? 0
                 : (remainingTasks.get(0).getVulcanizeMachineCount() != null
                 ? remainingTasks.get(0).getVulcanizeMachineCount() : 0);
@@ -672,10 +390,10 @@ public class BalancingService {
                 searchResult.bestIsBalanced ? "满足" : "不满足",
                 searchResult.bestAssignedCount, totalDemand);
 
-        // 输出未被分配的任务（区分正式/量试）
+        // 分配不足时输出缺口明细（诊断用）
         if (searchResult.bestAssignedCount < totalDemand && searchResult.bestAssignments != null) {
-            log.info("检测到分配不足：已分配={}/总需求={}, bestAssignments={}",
-                    searchResult.bestAssignedCount, totalDemand, searchResult.bestAssignments != null ? "存在" : "null");
+            log.info("检测到分配不足：已分配={}/总需求={}",
+                    searchResult.bestAssignedCount, totalDemand);
             // 统计每个embryoCode的已分配总量
             Map<String, Integer> assignedQtyMap = new java.util.HashMap<>();
             for (List<EmbryoAssignment> assignments : searchResult.bestAssignments) {
@@ -708,7 +426,8 @@ public class BalancingService {
             }
         }
 
-        // Step 8: 构建结果
+        // ---- 5.3.3.2.5.7 结果转换 ----
+        // 完整解 / 部分解均直接使用 DFS 最优解；仅当 bestAssignments=null 且无预扣时才返回空
         BalancingResult result;
         if (searchResult.bestAssignments != null) {
             // 直接使用 bestAssignedCount 判断完整性（避免从 Map 统计因重复 key 导致数据丢失）
@@ -738,38 +457,17 @@ public class BalancingService {
         return result;
     }
 
-    // ==================== 向后兼容方法 ====================
+
+    // ==================== DFS 核心（dfsAssign 及辅助） ====================
 
     /**
-     * 均衡分配胎胚到机台（向后兼容，统一 maxEmbryoTypes）
+     * 5.3.3.2.5.5 子步骤 — 保底预留历史胎胚（SYS04070003=Y）。
      *
-     * @deprecated 请使用 {@link #balanceEmbryosToMachinesWithMachineCapacity} 方法
-     */
-    @Deprecated
-    public BalancingResult balanceEmbryosToMachinesWithMachineCapacity(
-            List<CoreScheduleAlgorithmService.DailyEmbryoTask> tasks,
-            List<MpCxCapacityConfiguration> availableMachines,
-            Map<String, Set<String>> machineHistoryMap,
-            Map<String, Integer> machineMaxLhMap,
-            int maxEmbryoTypes,
-            boolean forceKeepHistory,
-            ScheduleContextVo context) {
-
-        // 构建统一的机台最大胎胚种类数映射（向后兼容）
-        Map<String, Integer> machineMaxEmbryoTypesMap = new HashMap<>();
-        for (MpCxCapacityConfiguration config : availableMachines) {
-            machineMaxEmbryoTypesMap.put(config.getCxMachineCode(), maxEmbryoTypes);
-        }
-
-        return balanceEmbryosToMachinesWithMachineCapacity(
-                tasks, availableMachines, machineHistoryMap,
-                machineMaxLhMap, machineMaxEmbryoTypesMap, forceKeepHistory, context);
-    }
-
-    // ==================== DFS + 剪枝算法核心 ====================
-
-    /**
-     * 保底预留历史任务
+     * <p>对每个机台 historyEmbryos 中的胎胚：若任务仍有 vulcanizeMachineCount&gt;0，
+     * 在该机台预留 1 台硫化机，并从任务需求量扣减 1。
+     *
+     * <p>与 {@link ContinueTaskProcessor} 的区别：此处写入 {@link MachineState} 供 DFS 继承，
+     * ContinueTaskProcessor 则产出 continueAllocations 供 NewTaskProcessor 构建预扣 Map。
      */
     private void reservedHistoryTasks(
             List<CoreScheduleAlgorithmService.DailyEmbryoTask> tasks,
@@ -804,8 +502,8 @@ public class BalancingService {
                     continue;
                 }
 
-                int remainingDemand = matchedTask.getVulcanizeMachineCount() != null
-                        ? matchedTask.getVulcanizeMachineCount() : 0;
+                // matchedTask 仅在 vulcanizeMachineCount>0 时被选中，此处无需再判 null
+                int remainingDemand = matchedTask.getVulcanizeMachineCount();
 
                 if (state.getCurrentLoad() >= state.getMaxCapacity()) {
                     log.warn("机台 {} 容量已满，无法保底预留胎胚 {}",
@@ -814,8 +512,8 @@ public class BalancingService {
                 }
 
                 // 检查胎胚种类数是否已达上限
-                boolean isNewTypeForHistory = !state.getAssignedEmbryos().stream()
-                        .anyMatch(e -> e.getEmbryoCode().equals(embryoCode));
+                boolean isNewTypeForHistory = state.getAssignedEmbryos().stream()
+                        .noneMatch(e -> e.getEmbryoCode().equals(embryoCode));
                 if (isNewTypeForHistory && state.getCurrentTypes() >= state.getMaxTypes()) {
                     log.warn("机台 {} 胎胚种类已达上限 ({}/{})，无法保底预留胎胚 {}",
                             state.getMachineCode(), state.getCurrentTypes(), state.getMaxTypes(), embryoCode);
@@ -841,7 +539,9 @@ public class BalancingService {
     }
 
     /**
-     * 获取剩余待分配的任务（需求量 > 0）
+     * 提取 vulcanizeMachineCount&gt;0 的任务列表，作为 DFS 输入。
+     *
+     * <p>保底预留 / 续作预扣已在之前步骤从 vulcanizeMachineCount 扣减，此处只保留仍有需求的任务。
      */
     private List<CoreScheduleAlgorithmService.DailyEmbryoTask> getRemainingTasks(
             List<CoreScheduleAlgorithmService.DailyEmbryoTask> tasks) {
@@ -851,14 +551,28 @@ public class BalancingService {
     }
 
     /**
-     * DFS深度优先搜索 + 剪枝（支持胎胚拆分）
+     * DFS 深度优先搜索 + 剪枝 — 核心分配算法。
      *
-     * <p>算法改进：
+     * <p><b>递归模型</b>：按 sortedTasks 顺序处理；每个任务可拆分到多机台。
+     * {@code remainingCount} 表示当前任务（taskIndex）尚未分配的硫化机台数。
+     *
+     * <p><b>递归参数</b>
      * <ul>
-     *   <li>支持将一个胎胚的硫化机台数拆分到多台机台</li>
-     *   <li>递归单位从"整个胎胚"改为"单个硫化机台数"</li>
-     *   <li>增加 remainingCount 参数跟踪当前胎胚剩余待分配的硫化机数</li>
+     *   <li>{@code taskIndex} — 当前任务在 sortedTasks 中的下标</li>
+     *   <li>{@code remainingCount} — 当前任务剩余待分配硫化机数；0 表示该任务已完成，推进到下一任务</li>
+     *   <li>{@code preOccupiedLoad} — 续作预扣+保底预留已占负荷，评估新分配数时需扣除</li>
      * </ul>
+     *
+     * <p><b>执行阶段</b>
+     * <ol>
+     *   <li>A. 防护 — searchCount&gt;100万 强制返回</li>
+     *   <li>B. 剪枝 — 剩余产能=0 时记录部分/完整解后返回；已找到均衡完整解后启用贪心上界剪枝</li>
+     *   <li>C. 终止 — taskIndex≥tasks.size() 时评估完整解或部分解，更新 searchResult</li>
+     *   <li>D. 分配 — remainingCount&gt;0：找候选机台 → 尝试 assignQty(大到小) → 递归 → 回溯</li>
+     *   <li>E. 推进 — remainingCount=0：启动下一 taskIndex 或跳过零需求任务</li>
+     * </ol>
+     *
+     * <p><b>解的择优</b>（见 {@link DfsSearchResult}）：完整度 &gt; 是否均衡 &gt; calculateBalancingScore。
      */
     private void dfsAssign(
             List<CoreScheduleAlgorithmService.DailyEmbryoTask> tasks,
@@ -876,13 +590,45 @@ public class BalancingService {
         searchResult.searchCount++;
         searchResult.callCount++;
 
-        // 安全限制：搜索次数超过 100 万次后停止（防止极端情况卡死）
+        // --- A. 搜索次数上限（硬终止，防极端结构卡死） ---
         if (searchResult.searchCount > 1000000) {
             return;
         }
 
-        // 【剩余产能为零剪枝】：剩余产能为0时，无法再分配任何任务，剪枝
-        // 注意：产能不足（产能<需求）时不剪枝，DFS需要继续探索最优部分解
+        // --- B1. 剩余产能为零剪枝 ---
+        //
+        // 触发条件：ΣcurrentLoad == ΣmaxCapacity，后续分支无法再增加任何分配，直接剪枝返回。
+        // 注意：产能不足（总产能<总需求）时通常不会在此处触发，而是在 C 终止层记录部分解。
+        //
+        // 变量：
+        //   totalAssignedNow  = ΣcurrentLoad − preOccupiedLoad   （本次 DFS 新分配的硫化机数）
+        //   totalRequiredAll  = Σtask.vulcanizeMachineCount      （剩余任务总需求）
+        //
+        // 伪代码（与 C 终止层择优规则一致）：
+        // <pre>
+        // if (remainingCapacity &lt;= 0) {
+        //     assigned = totalAssignedNow
+        //     required = totalRequiredAll
+        //
+        //     if (assigned &lt; required) {
+        //         // 【部分解】任务未分完但机台已满，记录当前最优部分解
+        //         if (best 仍是部分解) {
+        //             if (assigned &gt; bestAssignedCount)           → 替换（多分配优先）
+        //             else if (assigned == bestAssignedCount
+        //                      &amp;&amp; score &lt; bestScore)            → 替换（同完整度比均衡分）
+        //         } else {
+        //             // best 已是完整解，部分解不覆盖完整解
+        //             不替换
+        //         }
+        //     } else {
+        //         // 【完整解】assigned &gt;= required，所有任务需求已满足（可能仍有未遍历的 taskIndex）
+        //         if (best 仍是部分解)                              → 替换
+        //         else if (当前均衡 &amp;&amp; best 不均衡)               → 替换
+        //         else if (均衡等级相同 &amp;&amp; score &lt; bestScore)    → 替换
+        //     }
+        //     pruneCount++; return;
+        // }
+        // </pre>
         int allCurrentLoad = 0;
         int allCapacity = 0;
         for (MachineState s : machineStates) {
@@ -891,14 +637,12 @@ public class BalancingService {
         }
         int remainingCapacity = allCapacity - allCurrentLoad;
         if (remainingCapacity <= 0) {
-            // 产能已耗尽，先记录当前部分解，再剪枝
-            // 实际新分配数 = 总负荷 - 续作预扣负荷
             int totalAssignedNow = allCurrentLoad - preOccupiedLoad;
             int totalRequiredAll = tasks.stream()
                     .mapToInt(t -> t.getVulcanizeMachineCount() != null ? t.getVulcanizeMachineCount() : 0)
                     .sum();
             if (totalAssignedNow < totalRequiredAll) {
-                // 部分解评估
+                // 部分解分支（见上方伪代码 if assigned < required）
                 int partialScore = calculateBalancingScore(machineStates);
                 boolean currentBestIsComplete = (searchResult.bestAssignedCount == totalRequiredAll);
                 if (!currentBestIsComplete &&
@@ -911,7 +655,7 @@ public class BalancingService {
                     searchResult.bestMachineCodes = copyMachineCodes(machineStates);
                 }
             } else {
-                // 完整解评估（所有任务已分配，产能刚好耗尽）
+                // 完整解分支（见上方伪代码 else assigned >= required）
                 int score = calculateBalancingScore(machineStates);
                 boolean currentIsBalanced = isBalanced(machineStates, typeDiffThreshold, loadDiffThreshold);
                 boolean currentBestIsComplete = (searchResult.bestAssignedCount == totalRequiredAll);
@@ -935,9 +679,7 @@ public class BalancingService {
             return;
         }
 
-        // 【贪心上界剪枝】：只在已找到完整解后才启用均衡剪枝
-        // 满排优先：没找到完整解时不剪枝，确保优先探索满排方案
-        // 找到均衡完整解后：当前负荷差不可能满足阈值时剪枝（加速收敛）
+        // --- B2. 贪心上界剪枝（仅已存在「均衡完整解」时启用，加速收敛） ---
         if (searchResult.bestAssignedCount >= totalDemand && searchResult.bestIsBalanced) {
             int curMaxLoad = 0;
             for (MachineState s : machineStates) {
@@ -947,17 +689,14 @@ public class BalancingService {
             }
             // 贪心解的负荷下界：总已分配 / 机台数
             int greedyLoadLowerBound = allCurrentLoad / machineStates.size();
-            // 如果当前最大负荷 - 贪心下界 > 负荷阈值，说明此分支不可能满足均衡条件
             if (curMaxLoad - greedyLoadLowerBound > loadDiffThreshold) {
                 searchResult.pruneCount++;
                 return;
             }
         }
 
-        // 终止条件：所有任务已分配
+        // --- C. 终止：所有任务索引已遍历 ---
         if (taskIndex >= tasks.size()) {
-            // 检查是否所有任务都已分配完毕
-            // 实际新分配数 = 总负荷 - 续作预扣负荷
             int totalAssigned = machineStates.stream()
                     .mapToInt(MachineState::getCurrentLoad).sum() - preOccupiedLoad;
             int totalRequired = tasks.stream()
@@ -965,7 +704,7 @@ public class BalancingService {
                     .sum();
 
             if (totalAssigned == totalRequired) {
-                // 完整解：优先级 = 满排均衡 > 满排不均衡
+                // C1. 完整解择优
                 int score = calculateBalancingScore(machineStates);
                 boolean currentIsBalanced = isBalanced(machineStates, typeDiffThreshold, loadDiffThreshold);
                 boolean currentBestIsComplete = (searchResult.bestAssignedCount == totalRequired);
@@ -990,7 +729,7 @@ public class BalancingService {
                     searchResult.bestMachineCodes = copyMachineCodes(machineStates);
                 }
             } else {
-                // 部分解：完整度优先（分配更多优于更均衡），同等完整度比较均衡分数
+                // C2. 部分解择优（完整度优先于均衡分数）
                 int partialScore = calculateBalancingScore(machineStates);
                 boolean currentBestIsComplete = (searchResult.bestAssignedCount == totalRequired);
                 if (!currentBestIsComplete &&
@@ -1009,16 +748,14 @@ public class BalancingService {
         CoreScheduleAlgorithmService.DailyEmbryoTask task = tasks.get(taskIndex);
         String embryoCode = task.getEmbryoCode();
 
-        // 如果当前胎胚还有剩余未分配的硫化机数
+        // --- D. 当前任务仍有 remainingCount 台待分配 ---
         if (remainingCount > 0) {
-            // 找出可以分配的候选机台（只要有剩余容量即可）
-            // isFirstCall=true 时打印日志，避免重复噪音
             List<MachineState> candidates = findCandidateMachinesForSplit(
                     embryoCode, machineStates, forceKeepHistory, searchResult.searchCount == 1,
                     task.getConstrainedMachineCode());
 
             if (candidates.isEmpty()) {
-                // 没有可用机台，跳过当前任务，继续处理后续任务（记录部分解）
+                // D1. 无候选：记录部分解，跳过本任务继续后续任务
                 int totalAssignedNow = machineStates.stream().mapToInt(MachineState::getCurrentLoad).sum() - preOccupiedLoad;
                 int totalRequiredAll = tasks.stream()
                         .mapToInt(t -> t.getVulcanizeMachineCount() != null ? t.getVulcanizeMachineCount() : 0)
@@ -1040,10 +777,9 @@ public class BalancingService {
                 return;
             }
 
-            // 按优先级排序候选机台
             sortCandidatesForDfs(candidates, embryoCode, forceKeepHistory, capacitySufficient, loadDiffThreshold);
 
-            // 尝试给每个候选机台分配 k 个硫化机台数（k从1到min(remainingCount, 机台剩余容量)）
+            // D2. 对每个候选机台尝试 assignQty（从大到小，优先填满单机）
             boolean anyRecursed = false;
             for (MachineState candidate : candidates) {
                 int maxCanAssign = Math.min(remainingCount,
@@ -1055,8 +791,6 @@ public class BalancingService {
 
                 // 尝试分配不同的数量（从大到小，优先填满一台机台）
                 for (int assignQty = maxCanAssign; assignQty >= 1; assignQty--) {
-                    // === 剪枝检查 ===
-
                     int newTypes = candidate.getCurrentTypes();
                     boolean isNewType = !candidate.getAssignedEmbryos().stream()
                             .anyMatch(e -> e.getEmbryoCode().equals(embryoCode));
@@ -1064,24 +798,13 @@ public class BalancingService {
                         newTypes++;
                     }
 
-                    // 剪枝条件1：新增种类超过机台最大胎胚种类数限制（硬约束，必须剪枝）
-                    // 注意：仅当胎胚是新种类时才检查，已有种类的追加分配不增加种类数
-                    // 与 findCandidateMachinesForSplit 的 isNewType && currentTypes >= maxTypes 逻辑一致
+                    // 硬约束剪枝：新机台种类数超过 maxTypes
                     if (isNewType && newTypes > candidate.getMaxTypes()) {
                         searchResult.pruneCount++;
                         continue;
                     }
 
-                    // 剪枝条件2：当前分配后产能耗尽，无需尝试更小分配量
-                    // （DFS递归入口处会检查 remainingCapacity <= 0 剪枝）
-
-                    // 剪枝条件3：剩余种类可行性剪枝（已在下方实现）
-                    // 注意：种类均衡和负荷均衡不做中间剪枝！
-                    // 原因：DFS中间状态不可能均衡，只有最终分配结果才能判断均衡性
-                    // 均衡性通过 calculateBalancingScore 在终点评估
-
-                    // 可行性剪枝：计算剩余机台种类容量，判断是否还能容纳剩余未分配的胎胚种类
-                    // 注意：种类不足时仍需探索部分解（丢弃放不下的胎胚种类），所以只在满排可能时剪枝
+                    // 软剪枝：剩余种类槽不足以容纳后续未分配胎胚种类（仅已有完整解时启用）
                     int remainingTypeCapacity = 0;
                     for (MachineState state : machineStates) {
                         remainingTypeCapacity += state.getMaxTypes() - state.getCurrentTypes();
@@ -1107,15 +830,14 @@ public class BalancingService {
                             assignedEmbryoSet.add(nextEmbryo);
                         }
                     }
-                    // 只在已找到完整解后启用此剪枝（加速搜索收敛）
-                    // 未找到完整解时不剪枝，让DFS探索丢弃小需求种类、保大需求种类的部分解
+                    // 仅在已找到完整解后启用种类可行性剪枝
                     if (remainingDistinctTypes > remainingTypeCapacity
                             && searchResult.bestAssignedCount >= totalDemand) {
                         searchResult.pruneCount++;
                         continue;
                     }
 
-                    // === 分配并递归 ===
+                    // D3. 试探分配 → 递归 → 回溯
                     int newLoad = candidate.getCurrentLoad() + assignQty;
                     candidate.getAssignedEmbryos().add(new EmbryoAssignment(embryoCode, task, assignQty));
                     candidate.setCurrentLoad(newLoad);
@@ -1135,7 +857,6 @@ public class BalancingService {
                                 typeDiffThreshold, loadDiffThreshold, totalDemand, searchResult, capacitySufficient, preOccupiedLoad);
                     }
 
-                    // === 回溯 ===
                     candidate.getAssignedEmbryos().remove(candidate.getAssignedEmbryos().size() - 1);
                     candidate.setCurrentLoad(candidate.getCurrentLoad() - assignQty);
                     if (isNewType) {
@@ -1144,8 +865,7 @@ public class BalancingService {
                 }
             }
 
-            // 所有候选机台都被剪枝（种类满或容量满）时，跳过当前任务继续处理后续任务
-            // 与 candidates.isEmpty() 的处理逻辑一致：记录部分解后递归下一个任务
+            // D4. 所有候选均被剪枝：跳过本任务，继续后续
             if (!anyRecursed) {
                 int totalAssignedNow = machineStates.stream().mapToInt(MachineState::getCurrentLoad).sum() - preOccupiedLoad;
                 int totalRequiredAll = tasks.stream()
@@ -1167,12 +887,9 @@ public class BalancingService {
                         typeDiffThreshold, loadDiffThreshold, totalDemand, searchResult, capacitySufficient, preOccupiedLoad);
             }
         } else {
-            // remainingCount=0：当前任务刚完成或刚被跳过，需要处理 taskIndex 处的任务
-            // 注意：调用方传入 taskIndex 时已指向下一个待处理任务，remainingCount=0 表示该任务还未开始分配
-            int currentLhCount = taskIndex < tasks.size()
-                    ? (tasks.get(taskIndex).getVulcanizeMachineCount() != null
-                    ? tasks.get(taskIndex).getVulcanizeMachineCount() : 0)
-                    : 0;
+            // --- E. remainingCount=0：推进 taskIndex ---
+            // C 层已保证 taskIndex < tasks.size()；task 已在方法前部绑定为 tasks.get(taskIndex)
+            int currentLhCount = task.getVulcanizeMachineCount() != null ? task.getVulcanizeMachineCount() : 0;
 
             if (currentLhCount <= 0) {
                 // 当前任务不需要分配，跳到下一个
@@ -1187,7 +904,7 @@ public class BalancingService {
     }
 
     /**
-     * 创建临时MachineState用于静态排序（所有机台初始状态）
+     * 静态排序辅助 — 创建容量充足的临时 MachineState（仅用于 countCandidatesForStaticSort）。
      */
     private MachineState createTempMachineState(Set<String> availableMachineCodes) {
         MachineState state = new MachineState();
@@ -1200,14 +917,9 @@ public class BalancingService {
     }
 
     /**
-     * 静态估算候选机台数（用于排序）
+     * 静态排序辅助 — 按 embryoCode 数字段粗估候选机台稀缺程度（排序键⑤）。
      *
-     * 策略：
-     * 1. 如果机器数>=3且候选数量充足，返回3
-     * 2. 如果是该批次中的后几个胚子（推理受限），返回较少候选
-     *
-     * 由于没有运行时信息，使用胚胎编码数字部分来估算：
-     * 数字大的胚胎（后面的）通常候选更少
+     * <p>无运行时 MachineState 信息时的启发式：编码数值越大，假定候选越少，返回更小值使其排序靠前。
      */
     private int countCandidatesForStaticSort(String embryoCode, MachineState tmpState) {
         // 提取胚胎编码中的数字部分
@@ -1232,16 +944,16 @@ public class BalancingService {
     }
 
     /**
-     * 查找可以将胎胚分配到该机台的候选机台列表
+     * 查找可接收当前胎胚的候选机台（DFS 分配层 D2 的前置步骤）。
      *
-     * <p>候选条件：机台当前负荷 < 最大容量（即还有剩余硫化机台数）
-     * <p>胎胚种类数未达上限（已有该胎胚或还有空余种类位）
-     * <p>胎胚可以拆分：一个胎胚的硫化机台数可以分配到多台候选机台
+     * <p>候选条件（全部满足）：
+     * <ol>
+     *   <li>量试约束：{@code constrainedMachineCode} 非空时仅该机台可接收</li>
+     *   <li>容量：{@code currentLoad &lt; maxCapacity}</li>
+     *   <li>种类：新胎胚时 {@code currentTypes &lt; maxTypes}；已有胎胚不占新种类槽</li>
+     * </ol>
      *
-     * @param embryoCode       胎胚编码
-     * @param machineStates    所有机台状态列表
-     * @param forceKeepHistory 是否强制保留历史胎胚（未使用，为扩展预留）
-     * @return 有剩余容量的机台列表
+     * <p>单胎胚的硫化机数可在多个候选机台间拆分（由 dfsAssign 的 assignQty 循环实现）。
      */
     private List<MachineState> findCandidateMachinesForSplit(
             String embryoCode,
@@ -1264,8 +976,8 @@ public class BalancingService {
                 continue;
             }
             // 胎胚种类数已达上限，且当前胎胚是新种类，跳过
-            boolean isNewType = !state.getAssignedEmbryos().stream()
-                    .anyMatch(e -> e.getEmbryoCode().equals(embryoCode));
+            boolean isNewType = state.getAssignedEmbryos().stream()
+                    .noneMatch(e -> e.getEmbryoCode().equals(embryoCode));
             if (isNewType && state.getCurrentTypes() >= state.getMaxTypes()) {
                 log.trace("  [-种类满] 机台 {}", state.getMachineCode());
                 continue;
@@ -1275,16 +987,24 @@ public class BalancingService {
 
         // 仅在候选为空或首次搜索时打印，避免重复噪音
         if (candidates.isEmpty() || isFirstCall) {
-            String skipInfo = "";
+            StringBuilder skipInfo = new StringBuilder();
             for (MachineState s : machineStates) {
                 if (!candidates.contains(s)) {
                     if (s.getCurrentLoad() >= s.getMaxCapacity()) {
-                        skipInfo += String.format("满载(%d/%d)/", s.getCurrentLoad(), s.getMaxCapacity());
+                        skipInfo.append("满载(")
+                                .append(s.getCurrentLoad())
+                                .append("/")
+                                .append(s.getMaxCapacity())
+                                .append(")/");
                     } else {
-                        boolean isNew = !s.getAssignedEmbryos().stream()
-                                .anyMatch(e -> e.getEmbryoCode().equals(embryoCode));
+                        boolean isNew = s.getAssignedEmbryos().stream()
+                                .noneMatch(e -> e.getEmbryoCode().equals(embryoCode));
                         if (isNew) {
-                            skipInfo += String.format("种类满(%d/%d)/", s.getCurrentTypes(), s.getMaxTypes());
+                            skipInfo.append("种类满(")
+                                    .append(s.getCurrentTypes())
+                                    .append("/")
+                                    .append(s.getMaxTypes())
+                                    .append(")/");
                         }
                     }
                 }
@@ -1301,13 +1021,10 @@ public class BalancingService {
     }
 
     /**
-     * 排序候选机台（DFS用）
+     * DFS 候选机台排序 — 策略随产能是否充足分支。
      *
-     * <p>根据产能是否充足，使用不同排序策略：
-     * <ul>
-     *   <li><b>产能充足</b>：目标是均衡分配，侧重负荷均衡</li>
-     *   <li><b>产能不足</b>：目标是尽量多排，侧重节省种类槽</li>
-     * </ul>
+     * <p><b>产能充足</b>（totalCapacity≥totalDemand）：优先均衡负荷，其次节省种类槽、偏好历史胎胚。
+     * <p><b>产能不足</b>：优先节省种类槽（已在机台的胎胚绝对优先），尽量多排，负荷均衡降为次要。
      */
     private void sortCandidatesForDfs(
             List<MachineState> candidates,
@@ -1317,8 +1034,7 @@ public class BalancingService {
             int loadDiffThreshold) {
 
         if (capacitySufficient) {
-            // ===== 产能充足策略：负荷均衡优先，已有胎胚为次要考量 =====
-            // 产能充足时目标是均衡分配，避免任务集中在少数机台
+            // 产能充足：负荷均衡 → 已有胎胚 → 历史胎胚 → 剩余种类槽 → 种类少
             candidates.sort((a, b) -> {
                 // 优先级1：负荷少的优先（均衡分配，避免集中）
                 int loadCompare = Integer.compare(a.getCurrentLoad(), b.getCurrentLoad());
@@ -1362,7 +1078,7 @@ public class BalancingService {
                 return Integer.compare(a.getCurrentTypes(), b.getCurrentTypes());
             });
         } else {
-            // ===== 产能不足策略：侧重节省种类槽、尽量多排 =====
+            // 产能不足：已在机台 → 历史胎胚 → 剩余种类槽 → 负荷少 → 种类少
             candidates.sort((a, b) -> {
                 // 优先级1：胎胚已在机台上绝对优先（节省种类槽，多排任务）
                 boolean aAlreadyHas = a.getAssignedEmbryos().stream()
@@ -1407,16 +1123,7 @@ public class BalancingService {
     }
 
     /**
-     * 深拷贝所有机台的分配状态
-     *
-     * <p>用于在 DFS 搜索过程中保存当前最优解。
-     * 每个 MachineState 中的 assignedEmbryos 列表会被完整复制。
-     *
-     * @param machineStates 所有机台状态
-     * @return machineCode → EmbryoAssignment列表 的深拷贝
-     */
-    /**
-     * 深拷贝机台分配状态（按机台索引存储，避免重复编码覆盖）
+     * 深拷贝各机台 assignedEmbryos 列表（保存 DFS 最优解快照，按机台索引存储避免同 embryoCode 覆盖）。
      */
     private List<List<EmbryoAssignment>> copyAssignments(List<MachineState> machineStates) {
         List<List<EmbryoAssignment>> copy = new ArrayList<>();
@@ -1438,27 +1145,9 @@ public class BalancingService {
     }
 
     /**
-     * 计算当前分配方案的均衡分数
+     * 判断当前机台负荷/种类分布是否满足均衡阈值（SYS04070001/002）。
      *
-     * <p>分数越小越均衡。公式：score = 负荷差额 × 10 + 种类差额 × 100
-     * <ul>
-     *   <li>负荷差额 = max(各机台硫化机台数) − min(各机台硫化机台数)</li>
-     *   <li>种类差额 = max(各机台胎胚种类数) − min(各机台胎胚种类数)</li>
-     * </ul>
-     * 只统计负荷>0 或种类>0 的机台。
-     *
-     * @param machineStates 所有机台状态
-     * @return 均衡分数
-     */
-    /**
-     * 判断当前分配结果是否满足均衡阈值
-     *
-     * <p>均衡条件：负荷差距 ≤ loadDiffThreshold 且 种类差距 ≤ typeDiffThreshold
-     *
-     * @param machineStates     所有机台状态
-     * @param typeDiffThreshold 种类数允许差额
-     * @param loadDiffThreshold 负荷允许差额
-     * @return true=均衡，false=不均衡
+     * @return true 当 maxLoad−minLoad ≤ loadDiffThreshold 且 maxTypes−minTypes ≤ typeDiffThreshold
      */
     private boolean isBalanced(List<MachineState> machineStates, int typeDiffThreshold, int loadDiffThreshold) {
         if (machineStates.isEmpty()) {
@@ -1478,12 +1167,9 @@ public class BalancingService {
     }
 
     /**
-     * 计算均衡分数（仅在同等均衡等级内用于比较优劣）
+     * 均衡分数 — 仅在同等完整度/均衡等级内比较优劣。
      *
-     * <p>分数 = 负荷差距 * 10 + 种类差距 * 100，越小越优。
-     *
-     * @param machineStates 所有机台状态
-     * @return 均衡分数
+     * <p>公式：{@code loadGap × 10 + typeGap × 100}，越小越优。
      */
     private int calculateBalancingScore(List<MachineState> machineStates) {
         if (machineStates.isEmpty()) {
@@ -1507,15 +1193,7 @@ public class BalancingService {
     }
 
     /**
-     * 将 DFS 最优解的分配映射转换为 BalancingResult 结构
-     *
-     * <p>遍历 assignments 中每台机台及其分配的胎胚列表，
-     * 重建 MachineAssignment 对象，计算该机台的总硫化机台数和总胎胚种类数。
-     *
-     * @param assignments  machineCode → EmbryoAssignment列表
-     * @param machineStates 所有机台状态（用于获取未分配机台的信息）
-     * @param tasks        所有任务（用于获取未分配任务的信息）
-     * @return 转换后的 BalancingResult
+     * 将 DFS 最优解（按机台索引的 EmbryoAssignment 列表）转换为 {@link BalancingResult}。
      */
     private BalancingResult convertDfsResultToBalancingResult(
             List<List<EmbryoAssignment>> assignments,
@@ -1542,7 +1220,7 @@ public class BalancingService {
     }
 
     /**
-     * 从 machineStates 构建分配结果（保底预留后 DFS 无剩余任务的场景）
+     * 从 MachineState 直接构建结果 — DFS 无剩余任务但存在保底/续作预扣时使用。
      */
     private BalancingResult buildResultFromMachineStates(List<MachineState> machineStates) {
         BalancingResult result = new BalancingResult();
@@ -1561,7 +1239,7 @@ public class BalancingService {
     }
 
     /**
-     * 记录分配结果日志
+     * 5.3.3.2.5.7 子步骤 — 输出分配明细、均衡指标（负荷差/种类差）、未排上胎胚告警。
      */
     private void logAllocationResult(BalancingResult result, List<MachineState> machineStates,
                                      List<CoreScheduleAlgorithmService.DailyEmbryoTask> originalTasks) {
@@ -1670,11 +1348,9 @@ public class BalancingService {
         }
     }
 
-    // ==================== 配置获取方法 ====================
+    // ==================== 参数读取（SYS04070001~003） ====================
 
-    /**
-     * 获取种类数允许差额配置
-     */
+    /** 读取 SYS04070001 机台间胎胚种类数允许差额，默认 {@link #DEFAULT_TYPE_DIFF_THRESHOLD}。 */
     public int getTypeDiffThreshold(ScheduleContextVo context) {
         if (context.getParamConfigMap() != null) {
             CxParamConfig config = context.getParamConfigMap().get(PARAM_TYPE_DIFF_THRESHOLD);
@@ -1689,9 +1365,7 @@ public class BalancingService {
         return DEFAULT_TYPE_DIFF_THRESHOLD;
     }
 
-    /**
-     * 获取负荷允许差额配置
-     */
+    /** 读取 SYS04070002 机台间硫化机台数允许差额，默认 {@link #DEFAULT_LOAD_DIFF_THRESHOLD}。 */
     public int getLoadDiffThreshold(ScheduleContextVo context) {
         if (context.getParamConfigMap() != null) {
             CxParamConfig config = context.getParamConfigMap().get(PARAM_LOAD_DIFF_THRESHOLD);
@@ -1706,9 +1380,7 @@ public class BalancingService {
         return DEFAULT_LOAD_DIFF_THRESHOLD;
     }
 
-    /**
-     * 获取是否强制保留历史任务配置
-     */
+    /** 读取 SYS04070003 是否强制保留历史任务（Y/true=DFS 前保底预留）。 */
     public boolean getForceKeepHistoryConfig(ScheduleContextVo context) {
         if (context.getParamConfigMap() != null) {
             CxParamConfig config = context.getParamConfigMap().get(PARAM_FORCE_KEEP_HISTORY);
@@ -1719,344 +1391,19 @@ public class BalancingService {
         return false;
     }
 
-    // ==================== 班次间均衡方法 ====================
+
+    // ==================== 数据结构 ====================
 
     /**
-     * 班次间生产量均衡
+     * DFS 搜索过程中的单机台快照。
      *
-     * <p>目标：使同一结构（structureName）下，各机台同班次的总车数趋于均衡。
-     * 硫化机台数最多的胎胚（绑定胎胚）决定该结构的排产节奏，其他胎胚向其靠拢。
-     *
-     * <p>不参与均衡的任务类型：
      * <ul>
-     *   <li>试制任务：独立排产，不与其他任务混合</li>
-     *   <li>收尾任务：仅在首/末班生产，不参与班次比例调整</li>
+     *   <li>{@code maxCapacity} — 最大可分配硫化机台数</li>
+     *   <li>{@code maxTypes} — 最大胎胚种类数</li>
+     *   <li>{@code currentLoad} / {@code currentTypes} — 已占用（含续作预扣+保底预留+DFS 分配）</li>
+     *   <li>{@code assignedEmbryos} — 分配明细（embryoCode + assignedQty + 源 task）</li>
+     *   <li>{@code historyEmbryos} — 在产/历史胎胚，影响 sortCandidatesForDfs 优先级</li>
      * </ul>
-     *
-     * <p>均衡执行步骤：
-     * <ul>
-     *   <li>Step1: 按 structureName 分组</li>
-     *   <li>Step2: 在每个结构组内，按 (machineCode, embryoCode) 分组</li>
-     *   <li>Step3: 在每个 (machine, embryo) 组合内，找硫化机台数最多的胎胚作为绑定胎胚</li>
-     *   <li>Step4: 对每个绑定胎胚执行"排序+循环右移"均衡（例：76,86,76 → 86,76,76）</li>
-     *   <li>Step5: 汇总每个班次的总车数，检查是否均衡（max-min ≤ 1）</li>
-     *   <li>Step6: 若不均衡，执行跨机台调整，按比例分摊差额</li>
-     *   <li>Step7: 更新所有 ShiftProductionResult 的 carsForShift 和 quantity</li>
-     * </ul>
-     *
-     * @param results 排产结果列表（包含所有任务的班次精排结果，会被直接修改）
-     * @param context 排程上下文
-     * @return 均衡后的结果列表（与输入 results 相同引用）
-     */
-    public List<ShiftScheduleService.ShiftProductionResult> balanceShiftQuantities(
-            List<ShiftScheduleService.ShiftProductionResult> results,
-            ScheduleContextVo context) {
-
-        log.info("====== 班次间均衡开始 ======");
-
-        if (results == null || results.isEmpty()) {
-            log.warn("班次均衡输入为空，跳过");
-            return results;
-        }
-
-        log.info("班次均衡输入: 总结果数={}", results.size());
-        // 打印均衡前每个结果的详情
-        for (ShiftScheduleService.ShiftProductionResult r : results) {
-            log.info("  均衡前: 机台={}, 胎胚={}, 班次={}, 车数={}, 产量={}, 试制={}, 收尾={}",
-                    r.getMachineCode(), r.getEmbryoCode(), r.getShiftCode(),
-                    r.getCarsForShift(), r.getQuantity(),
-                    r.getIsTrialTask(), r.getIsEndingTask());
-        }
-
-        // Step1: 按 structureName 分组
-        Map<String, List<ShiftScheduleService.ShiftProductionResult>> byStructure = results.stream()
-                .collect(Collectors.groupingBy(r -> {
-                    CoreScheduleAlgorithmService.DailyEmbryoTask task = r.getSourceTask();
-                    return task != null ? task.getStructureName() : r.getStructureName();
-                }));
-
-        log.info("按结构分组: 共 {} 个结构组", byStructure.size());
-        for (Map.Entry<String, List<ShiftScheduleService.ShiftProductionResult>> e : byStructure.entrySet()) {
-            log.info("  结构 {}: {} 条结果", e.getKey(), e.getValue().size());
-        }
-
-        for (Map.Entry<String, List<ShiftScheduleService.ShiftProductionResult>> entry : byStructure.entrySet()) {
-            String currentStructure = entry.getKey();
-            List<ShiftScheduleService.ShiftProductionResult> group = entry.getValue();
-
-            log.info("--- 处理结构 {} (共{}条) ---", currentStructure, group.size());
-
-            // 过滤出普通任务（排除试制、收尾）
-            List<ShiftScheduleService.ShiftProductionResult> regularTasks = group.stream()
-                    .filter(r -> !Boolean.TRUE.equals(r.getIsTrialTask())
-                            && !Boolean.TRUE.equals(r.getIsEndingTask()))
-                    .collect(Collectors.toList());
-
-            log.info("结构 {} 普通任务数={}, 试制/收尾任务数={}",
-                    currentStructure, regularTasks.size(), group.size() - regularTasks.size());
-
-            if (regularTasks.size() < 2) {
-                log.info("结构 {} 普通任务不足2条，跳过班次均衡", currentStructure);
-                continue;
-            }
-
-            // Step2: 按 machineCode + embryoCode 分组，每组内找绑定胎胚（硫化机台数最多）
-            Map<String, List<ShiftScheduleService.ShiftProductionResult>> byMachineEmbryo = regularTasks.stream()
-                    .collect(Collectors.groupingBy(r -> r.getMachineCode() + "|" + r.getEmbryoCode()));
-
-            log.info("结构 {} 按(机台+胎胚)分组: {} 组", currentStructure, byMachineEmbryo.size());
-            for (Map.Entry<String, List<ShiftScheduleService.ShiftProductionResult>> me : byMachineEmbryo.entrySet()) {
-                log.info("  组 {}: {} 条班次结果", me.getKey(), me.getValue().size());
-            }
-
-            // 收集所有绑定胎胚的班次结果
-            List<BindingEmbryoShifts> bindingList = new ArrayList<>();
-
-            for (Map.Entry<String, List<ShiftScheduleService.ShiftProductionResult>> meEntry : byMachineEmbryo.entrySet()) {
-                List<ShiftScheduleService.ShiftProductionResult> meResults = meEntry.getValue();
-
-                // 该 (machine, embryo) 组合内的绑定胎胚：取硫化机台数最多的
-                ShiftScheduleService.ShiftProductionResult binding = meResults.stream()
-                        .max(Comparator.comparingInt(r -> {
-                            CoreScheduleAlgorithmService.DailyEmbryoTask task = r.getSourceTask();
-                            return task != null && task.getVulcanizeMachineCount() != null
-                                    ? task.getVulcanizeMachineCount() : 0;
-                        }))
-                        .orElse(null);
-
-                if (binding == null) {
-                    continue;
-                }
-
-                log.info("  组 {} 绑定胎胚: embryoCode={}, vulcanizeMachineCount={}",
-                        meEntry.getKey(), binding.getEmbryoCode(),
-                        binding.getSourceTask() != null ? binding.getSourceTask().getVulcanizeMachineCount() : "null");
-
-                // 提取该绑定胎胚的三个班次（按班次编码排序，确保顺序固定为夜-早-中）
-                List<ShiftScheduleService.ShiftProductionResult> bindingShifts = meResults.stream()
-                        .filter(r -> r.getEmbryoCode().equals(binding.getEmbryoCode()))
-                        .sorted(Comparator.comparing(ShiftScheduleService.ShiftProductionResult::getShiftCode))
-                        .collect(Collectors.toList());
-
-                if (bindingShifts.size() == 3) {
-                    bindingList.add(new BindingEmbryoShifts(bindingShifts));
-                    log.info("  绑定胎胚 {} 三个班次车次: 班次1={}({}), 班次2={}({}), 班次3={}({})",
-                            binding.getEmbryoCode(),
-                            bindingShifts.get(0).getCarsForShift(), bindingShifts.get(0).getShiftCode(),
-                            bindingShifts.get(1).getCarsForShift(), bindingShifts.get(1).getShiftCode(),
-                            bindingShifts.get(2).getCarsForShift(), bindingShifts.get(2).getShiftCode());
-                } else {
-                    log.warn("  绑定胎胚 {} 班次数={}, 不足3个，跳过",
-                            binding.getEmbryoCode(), bindingShifts.size());
-                }
-            }
-
-            if (bindingList.isEmpty()) {
-                log.info("结构 {} 无有效绑定胎胚（三班齐全），跳过班次均衡", currentStructure);
-                continue;
-            }
-
-            log.info("结构 {} 共找到 {} 个绑定胎胚，开始排序+循环右移均衡", currentStructure, bindingList.size());
-
-            // Step3: 对每台绑定胎胚执行排序+循环右移，并汇总各班次总量
-            int[] totalByShift = new int[3]; // 汇总：夜、早、中
-
-            int bindingIdx = 0;
-            for (BindingEmbryoShifts binding : bindingList) {
-                int[] cars = binding.getCars();
-                int total = cars[0] + cars[1] + cars[2];
-
-                log.info("  绑定胎胚 #{}: 原始车次=[夜={}, 早={}, 中={}], 总计={}",
-                        bindingIdx, cars[0], cars[1], cars[2], total);
-
-                // 均衡：排序后循环右移1位
-                int[] sorted = cars.clone();
-                Arrays.sort(sorted);
-                // sorted = [min, mid, max]
-                // 循环右移：[max, min, mid]
-                int[] balanced = new int[]{sorted[2], sorted[0], sorted[1]};
-
-                log.info("  绑定胎胚 #{}: 排序后=[{}, {}, {}], 均衡后=[夜={}, 早={}, 中={}]",
-                        bindingIdx, sorted[0], sorted[1], sorted[2],
-                        balanced[0], balanced[1], balanced[2]);
-
-                binding.applyBalanced(balanced);
-
-                // 汇总
-                for (int i = 0; i < 3; i++) {
-                    totalByShift[i] += balanced[i];
-                }
-                bindingIdx++;
-            }
-
-            log.info("结构 {} 汇总班次车次: 夜={}, 早={}, 中={}, 总计={}",
-                    currentStructure, totalByShift[0], totalByShift[1], totalByShift[2],
-                    totalByShift[0] + totalByShift[1] + totalByShift[2]);
-
-            // Step4: 检查汇总后是否均衡（max-min > 1 则需要跨机台调整）
-            int maxShift = Math.max(Math.max(totalByShift[0], totalByShift[1]), totalByShift[2]);
-            int minShift = Math.min(Math.min(totalByShift[0], totalByShift[1]), totalByShift[2]);
-            log.info("结构 {} 均衡检查: max={}, min={}, 差额={}, 阈值=1",
-                    currentStructure, maxShift, minShift, maxShift - minShift);
-            if (maxShift - minShift > 1) {
-                log.info("结构 {} 需要跨机台调整均衡", currentStructure);
-                // 跨机台调整：计算每台绑定胎胚各班次占总班次数的比例，按比例分摊调整量
-                int totalCars = totalByShift[0] + totalByShift[1] + totalByShift[2];
-                if (totalCars > 0) {
-                    // 目标：max-min <= 1 的均衡分布
-                    int base = totalCars / 3;
-                    int remainder = totalCars % 3;
-                    // remainder=0 → [base, base, base]
-                    // remainder=1 → [base+1, base, base] 或 [base, base+1, base]
-                    // remainder=2 → [base+1, base+1, base]
-                    int[] targetTotal = new int[]{base, base, base};
-                    if (remainder == 1) {
-                        targetTotal[1] = base + 1; // 中班多1
-                    } else if (remainder == 2) {
-                        targetTotal[0] = base + 1;
-                        targetTotal[1] = base + 1; // 夜和中多1
-                    }
-
-                    log.info("  跨机台调整: totalCars={}, base={}, remainder={}, 目标=[夜={}, 早={}, 中={}]",
-                            totalCars, base, remainder, targetTotal[0], targetTotal[1], targetTotal[2]);
-
-                    // 计算差额
-                    int[] diff = new int[3];
-                    for (int i = 0; i < 3; i++) {
-                        diff[i] = targetTotal[i] - totalByShift[i];
-                    }
-                    log.info("  跨机台调整: 当前=[夜={}, 早={}, 中={}], 差额=[夜={}, 早={}, 中={}]",
-                            totalByShift[0], totalByShift[1], totalByShift[2],
-                            diff[0], diff[1], diff[2]);
-
-                    // 按各班次差额占总差额的比例，从各绑定胎胚的对应班次中调整
-                    // 正差额表示该班次多了需要减，负差额表示少了需要加
-                    int totalDiff = Math.abs(diff[0]) + Math.abs(diff[1]) + Math.abs(diff[2]);
-                    if (totalDiff > 0) {
-                        int adjustIdx = 0;
-                        for (BindingEmbryoShifts binding : bindingList) {
-                            int[] currentCars = binding.getCars();
-                            int bindingTotal = currentCars[0] + currentCars[1] + currentCars[2];
-
-                            log.info("    调整绑定胎胚 #{}: 当前车次=[夜={}, 早={}, 中={}], 总计={}",
-                                    adjustIdx, currentCars[0], currentCars[1], currentCars[2], bindingTotal);
-
-                            for (int i = 0; i < 3; i++) {
-                                if (diff[i] == 0) {
-                                    continue;
-                                }
-                                // 按该班次差额占总差额的比例分摊调整量
-                                int absDiff = Math.abs(diff[i]);
-                                int adjust = (int) Math.round((double) absDiff / totalDiff * bindingTotal / 3.0);
-                                adjust = Math.max(1, adjust); // 至少调整1车
-
-                                log.info("      班次{}: 差额={}, 分摊调整量={}, 当前车次={}",
-                                        i, diff[i], adjust, currentCars[i]);
-
-                                int oldCars = currentCars[i];
-                                if (diff[i] > 0) {
-                                    // 该班次少了，需要加车（从其他班次匀）
-                                    // 找到有多余的班次匀过来
-                                    for (int j = 0; j < 3; j++) {
-                                        if (j == i || currentCars[j] <= binding.getMinCars() + 1) {
-                                            continue;
-                                        }
-                                        int canGive = currentCars[j] - binding.getMinCars() - 1;
-                                        if (canGive > 0) {
-                                            int give = Math.min(canGive, adjust);
-                                            currentCars[j] -= give;
-                                            currentCars[i] += give;
-                                            adjust -= give;
-                                        }
-                                        if (adjust <= 0) {
-                                            break;
-                                        }
-                                    }
-                                } else {
-                                    // 该班次多了，需要减车（匀到其他班次）
-                                    int canReduce = currentCars[i] - binding.getMinCars() - 1;
-                                    int reduce = Math.min(canReduce, absDiff);
-                                    currentCars[i] -= reduce;
-                                    // 加到其他班次
-                                    for (int j = 0; j < 3; j++) {
-                                        if (j == i) {
-                                            continue;
-                                        }
-                                        currentCars[j] += reduce / 2;
-                                        break;
-                                    }
-                                }
-                            }
-
-                            // 更新结果
-                            binding.updateResults();
-                            log.info("    调整后绑定胎胚 #{}: 车次=[夜={}, 早={}, 中={}]",
-                                    adjustIdx, currentCars[0], currentCars[1], currentCars[2]);
-                            adjustIdx++;
-                        }
-                    }
-                }
-            }
-        }
-
-        // 打印均衡后每个结果的详情
-        log.info("====== 班次间均衡后结果 ======");
-        for (ShiftScheduleService.ShiftProductionResult r : results) {
-            log.info("  均衡后: 机台={}, 胎胚={}, 班次={}, 车数={}, 产量={}",
-                    r.getMachineCode(), r.getEmbryoCode(), r.getShiftCode(),
-                    r.getCarsForShift(), r.getQuantity());
-        }
-
-        return results;
-    }
-
-    /**
-     * 绑定胎胚三个班次结果的封装，内部记录原始引用，均衡后可直接写回
-     */
-    private static class BindingEmbryoShifts {
-        private final List<ShiftScheduleService.ShiftProductionResult> shifts;
-        private int[] cars = new int[3];
-        private int minCars;
-
-        BindingEmbryoShifts(List<ShiftScheduleService.ShiftProductionResult> shifts) {
-            this.shifts = shifts;
-            this.cars[0] = shifts.get(0).getCarsForShift() != null ? shifts.get(0).getCarsForShift() : 0;
-            this.cars[1] = shifts.get(1).getCarsForShift() != null ? shifts.get(1).getCarsForShift() : 0;
-            this.cars[2] = shifts.get(2).getCarsForShift() != null ? shifts.get(2).getCarsForShift() : 0;
-            this.minCars = Math.min(Math.min(cars[0], cars[1]), cars[2]);
-            log.debug("BindingEmbryoShifts初始化: 胎胚={}, 班次=[{},{},{}], minCars={}",
-                    shifts.get(0).getEmbryoCode(), cars[0], cars[1], cars[2], minCars);
-        }
-
-        int[] getCars() {
-            return cars;
-        }
-
-        int getMinCars() {
-            return minCars;
-        }
-
-        void applyBalanced(int[] balanced) {
-            for (int i = 0; i < 3; i++) {
-                this.cars[i] = balanced[i];
-            }
-            this.minCars = Math.min(Math.min(cars[0], cars[1]), cars[2]);
-        }
-
-        void updateResults() {
-            for (int i = 0; i < 3; i++) {
-                ShiftScheduleService.ShiftProductionResult r = shifts.get(i);
-                int tripCapacity = r.getTripCapacity() != null ? r.getTripCapacity() : 1;
-                r.setCarsForShift(cars[i]);
-                r.setQuantity(cars[i] * tripCapacity);
-            }
-        }
-    }
-
-    // ==================== 内部类 ====================
-
-    /**
-     * 机台状态（分配过程中使用）
      */
     @lombok.Data
     public static class MachineState {
@@ -2070,31 +1417,32 @@ public class BalancingService {
     }
 
     /**
-     * DFS搜索结果记录
+     * DFS 搜索过程的全局最优解记录（单次 balance 调用内共享，由 dfsAssign 读写）。
      */
     @lombok.Data
     private static class DfsSearchResult {
+        /** 最优解均衡分数（越小越优，仅同完整度/均衡等级内比较） */
         int bestScore;
-        int bestAssignedCount;  // 最优解的已分配数量（完整度优先于均衡分数）
-        boolean bestIsBalanced; // 最优解是否满足均衡阈值
-        List<List<EmbryoAssignment>> bestAssignments; // 按机台索引存储，避免重复编码覆盖
-        List<String> bestMachineCodes; // 对应的机台编码列表
-        int searchCount;  // DFS搜索次数
-        int pruneCount;   // 剪枝次数
-        int callCount;    // findCandidate调用次数（用于日志控制）
+        /** 最优解已分配硫化机台数（完整度第一优先） */
+        int bestAssignedCount;
+        /** 最优解是否满足 isBalanced 阈值 */
+        boolean bestIsBalanced;
+        /** 最优解各机台分配明细（按机台索引，与 bestMachineCodes 对齐） */
+        List<List<EmbryoAssignment>> bestAssignments;
+        /** 与 bestAssignments 对应的机台编码列表 */
+        List<String> bestMachineCodes;
+        int searchCount;
+        int pruneCount;
+        int callCount;
     }
 
-    /**
-     * 均衡分配结果
-     */
+    /** 均衡分配对外返回结构：机台 → 多条 EmbryoAssignment。 */
     @lombok.Data
     public static class BalancingResult {
         private List<MachineAssignment> assignments;
     }
 
-    /**
-     * 机台分配
-     */
+    /** 单机台的分配汇总。 */
     @lombok.Data
     public static class MachineAssignment {
         private String machineCode;
@@ -2102,14 +1450,14 @@ public class BalancingService {
     }
 
     /**
-     * 胎胚分配
+     * 单条分配记录：胎胚编码 + 源任务 + 分配到该机台的硫化机台数。
      */
     @lombok.Data
     @lombok.AllArgsConstructor
     public static class EmbryoAssignment {
         private String embryoCode;
         private CoreScheduleAlgorithmService.DailyEmbryoTask task;
-        /** 分配数量，单位：硫化机台数 */
+        /** 分配到该机台的硫化机台数（非条数） */
         private int assignedQty;
     }
 }

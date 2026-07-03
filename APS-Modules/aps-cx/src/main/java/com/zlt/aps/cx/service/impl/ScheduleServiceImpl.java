@@ -47,25 +47,50 @@ import org.springframework.beans.factory.annotation.Autowired;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.YearMonth;
 import java.time.ZoneId;
 import java.util.*;
-import java.time.YearMonth;
 import java.util.stream.Collectors;
 
 /**
- * 排程服务实现类
+ * 排程服务实现 — HTTP/API 层入口（S5.1），负责上下文构建、校验、持久化。
  *
- * <p>整合所有核心服务，实现完整的排程流程
+ * <h3>端到端流水线</h3>
+ * <pre>
+ * executeSchedule / reSchedule（本类）
+ *   ├─ S5.1.6 buildScheduleContext     加载主数据 → ScheduleContextVo（步骤 1.1～1.20）
+ *   ├─ validateScheduleData            策略模式校验（ERROR 阻断）
+ *   ├─ CoreScheduleAlgorithmServiceImpl.executeSchedule   S5.2～S5.5
+ *   ├─ deleteExistingScheduleResults     按中间天删旧主表+子表
+ *   └─ saveScheduleResults               写入 T_CX_SCHEDULE_RESULT / DETAIL
+ * </pre>
  *
- * <p>主要功能：
+ * <h3>buildScheduleContext 三层加载</h3>
+ * <table>
+ *   <tr><th>层</th><th>步骤</th><th>产出</th></tr>
+ *   <tr><td>基础</td><td>1.1～1.7</td><td>班次、机台、硫化任务、在机、物料、库存</td></tr>
+ *   <tr><td>计算</td><td>1.8～1.13</td><td>参数、产能映射、硫化/成型余量、库存分配</td></tr>
+ *   <tr><td>配置</td><td>1.14～1.20</td><td>主销、精度、收尾日、结构机台、单车容量</td></tr>
+ * </table>
+ *
+ * <h3>ScheduleContextVo 运行时字段</h3>
  * <ul>
- *   <li>排程上下文初始化</li>
- *   <li>核心排程算法调用</li>
- *   <li>排程结果保存与验证</li>
- *   <li>物料收尾计算</li>
+ *   <li><b>快照</b>：{@code initialMonthSurplusMap} / {@code initialFormingRemainderMap} /
+ *       {@code initialMaterialStockMap}（排程开始前，不被班次滚动覆盖）</li>
+ *   <li><b>滚动</b>：{@code monthSurplusMap}、{@code formingRemainderMap}、{@code materialStockMap}、
+ *       {@code machineOnlineEmbryoMap}（每班后由 CoreScheduleAlgorithmServiceImpl 更新）</li>
  * </ul>
  *
+ * <h3>日期约定</h3>
+ * <p>请求 {@code scheduleDate} = 前端「中间天」；{@code scheduleStartDate = scheduleDate - 1} 为排产起始日，
+ * 余量/库存/在机等多以此日为基准。
+ *
+ * <h3>参数治理</h3>
+ * <p>{@link #loadParamConfigs} 遵循：硫化/工厂源头表 &gt; T_CX_PARAM_CONFIG &gt; 代码默认值（见 AGENTS.md SYS04 体系）。
+ *
  * @author APS Team
+ * @see CoreScheduleAlgorithmServiceImpl
+ * @see ScheduleDataValidator
  */
 @Slf4j
 @Service
@@ -162,8 +187,14 @@ public class ScheduleServiceImpl implements ScheduleService {
     private final CxPrecisionPlanMapper precisionPlanMapper;
     private final LhFinishQtyMapper lhFinishQtyMapper;
 
-    // ==================== 公共方法 ====================
+    // ==================== S5.1 对外接口 ====================
 
+    /**
+     * 执行排程（首次排产）。
+     *
+     * <p>流程：构建上下文 → 数据校验 → 核心算法 → 删旧结果 → 保存 → 后置约束检查。
+     * 校验失败时返回 {@code success=false} 及 validationErrors，不执行算法。
+     */
     @Override
     public ScheduleResult executeSchedule(ScheduleRequestVo request) {
         ScheduleResult result = new ScheduleResult();
@@ -186,17 +217,16 @@ public class ScheduleServiceImpl implements ScheduleService {
         try {
             log.info("开始执行排程，日期：{}，排程模式：{}", request.getScheduleDate(), request.getScheduleMode());
 
-            // 0. 精度计划不再全局回滚，由loadPrecisionPlans的重新纳入逻辑处理
-            // scheduleDate为空的直接加载，已回填但planDate>排程日期的重新纳入
+            // 0. 精度计划：不再全局回滚，由 loadPrecisionPlans（buildScheduleContext 第15.5步）按 planDate 重新纳入
 
-            // 1. 构建排程上下文(流程图S5.1.6初始化)
+            // 1. 构建排程上下文 S5.1.6（20步加载：班次→机台→硫化→库存→余量→结构配置等）
             ScheduleContextVo context = buildScheduleContext(request);
             if (context == null) {
                 result.setMessage("构建排程上下文失败");
                 return result;
             }
 
-            // 2. 数据完整性校验
+            // 2. 数据完整性校验（ERROR 阻断排程，WARN 仅告警；见 validation 包策略）
             ScheduleDataValidationResult validationResult = validateScheduleData(context, request.getScheduleDate(), request.getFactoryCode());
 
             if (!validationResult.isPassed()) {
@@ -208,17 +238,16 @@ public class ScheduleServiceImpl implements ScheduleService {
                 return result;
             }
 
-            // 3. 执行核心排程算法(流程图S5.2-S5.5)
+            // 3. 执行核心排程算法 S5.2~S5.5（委托 CoreScheduleAlgorithmServiceImpl，按班次循环）
             List<CxScheduleResult> scheduleResults = coreScheduleAlgorithmService.executeSchedule(context);
 
-            // 3.1 删除该排程日期已有的排程结果（主表+子表），避免重复数据
-            // 注意：排程算法返回的结果中，scheduleDate 只有 request.getScheduleDate() 这一天
+            // 3.1 删除该排程日期已有结果（主表+子表），避免重复
             deleteExistingScheduleResults(request.getScheduleDate());
 
-            // 3.2 保存排程结果（主表+子表）
+            // 3.2 保存排程结果（主表 T_CX_SCHEDULE_RESULT + 子表 T_CX_SCHEDULE_DETAIL）
             saveScheduleResults(scheduleResults);
 
-            // 4. 验证排程结果
+            // 4. 后置约束验证（与校验层不同，检查排程产出是否满足业务约束）
             boolean validated = validateScheduleResults(scheduleResults);
 
             result.setSuccess(validated);
@@ -238,6 +267,9 @@ public class ScheduleServiceImpl implements ScheduleService {
         return result;
     }
 
+    /**
+     * 重排程 — 与 {@link #executeSchedule} 相同算法链，跳过校验层与后置约束检查，固定返回 boolean。
+     */
     @Override
     public boolean reSchedule(ScheduleRequestVo request) {
         try {
@@ -403,26 +435,14 @@ public class ScheduleServiceImpl implements ScheduleService {
     }
 
     /**
-     * 回滚精度计划的排程日期（清理上次排程回填的scheduleDate）
+     * S5.1.6 构建排程上下文 — 将 DB 主数据一次性装入 {@link ScheduleContextVo}。
      *
-     * <p>将实际未执行（actualDate为空）且未被删除（isDelete=0）的精度计划的scheduleDate置空，
-     * 使这些精度计划在重新排程时能被 loadPrecisionPlans 重新加载和分配。
-     * <p>已实际执行的精度计划（actualDate不为空）不回滚，因为已由MES确认执行。
-     */
-    private void rollbackPrecisionPlans() {
-        LambdaUpdateWrapper<CxPrecisionPlan> updateWrapper = new LambdaUpdateWrapper<>();
-        updateWrapper.isNotNull(CxPrecisionPlan::getScheduleDate)
-                .isNull(CxPrecisionPlan::getActualDate)
-                .eq(CxPrecisionPlan::getIsDelete, "0")
-                .set(CxPrecisionPlan::getScheduleDate, null);
-        int count = precisionPlanMapper.update(null, updateWrapper);
-        if (count > 0) {
-            log.info("回滚精度计划 scheduleDate：清理 {} 条上次排程的精度计划回填记录", count);
-        }
-    }
-
-    /**
-     * 构建排程上下文
+     * <p><b>步骤 1.1～1.20 有依赖顺序，不可调换</b>。例如：在机信息(1.5)先于物料(1.6)；
+     * 参数(1.9)先于余量计算(1.13)；余量先于收尾日(1.16)与已收尾过滤(1.17)。
+     *
+     * <p>单步失败多数 catch 后 warn 并继续（非致命）；整体异常返回 null。
+     *
+     * <p>{@code scheduleStartDate = request.scheduleDate - 1}（中间天约定）。
      */
     private ScheduleContextVo buildScheduleContext(ScheduleRequestVo request) {
         try {
@@ -433,13 +453,13 @@ public class ScheduleServiceImpl implements ScheduleService {
             log.info("开始构建排程上下文，排产起始日期：{}，中间天：{}，工厂：{}",
                     scheduleStartDate, scheduleDate, request.getFactoryCode());
 
-            // 1. 加载班次配置
+            // 1.1 加载班次配置（T_CX_SHIFT_CONFIG，计算 scheduleDays）
             String factoryCode = request.getFactoryCode() != null ? request.getFactoryCode() : DEFAULT_FACTORY_CODE;
             context.setFactoryCode(factoryCode);
             loadShiftConfigs(context, factoryCode);
             log.info("班次配置加载完成，班次数：{}", context.getShiftConfigList() != null ? context.getShiftConfigList().size() : 0);
 
-            // 2. 获取设备计划停机信息（使用排产起始日期，覆盖整个排程区间）
+            // 1.2 设备计划停机（T_MDM_DEVICE_PLAN_SHUT，覆盖排程区间）
             try {
                 loadDevicePlanShuts(context, scheduleStartDate);
                 log.info("设备计划停机信息加载完成");
@@ -447,11 +467,11 @@ public class ScheduleServiceImpl implements ScheduleService {
                 log.warn("加载设备计划停机信息失败，继续执行：{}", e.getMessage());
             }
 
-            // 3. 获取所有机台
+            // 1.3 成型机台主数据（T_MDM_MOLDING_MACHINE）
             loadMoldingMachines(context);
             log.info("机台信息加载完成，机台数：{}", context.getAvailableMachines() != null ? context.getAvailableMachines().size() : 0);
 
-            // 4. 获取硫化排程结果（后续会根据成型余量过滤）
+            // 1.4 硫化排程结果（T_LH_SCHEDULE_RESULT）+ 提取 PRODUCTION_VERSION
             try {
                 loadLhScheduleResults(context, scheduleDate);
                 log.info("硫化排程结果加载完成");
@@ -461,7 +481,7 @@ public class ScheduleServiceImpl implements ScheduleService {
                 log.warn("加载硫化排程结果失败，继续执行：{}", e.getMessage());
             }
 
-            // 5. 获取成型在机信息（需要在获取物料信息之前，以便补充物料来源）
+            // 1.5 成型在机信息（续作判定数据源，需在物料加载前）
             try {
                 loadOnlineInfos(context, scheduleStartDate);
                 log.info("成型在机信息加载完成");
@@ -469,7 +489,7 @@ public class ScheduleServiceImpl implements ScheduleService {
                 log.warn("加载成型在机信息失败，继续执行：{}", e.getMessage());
             }
 
-            // 6. 根据硫化排程结果和成型在机信息获取物料信息
+            // 1.6 物料主数据（硫化任务+在机信息关联的 MdmMaterialInfo）
             try {
                 loadMaterials(context);
                 log.info("物料信息加载完成");
@@ -477,7 +497,7 @@ public class ScheduleServiceImpl implements ScheduleService {
                 log.warn("加载物料信息失败，继续执行：{}", e.getMessage());
             }
 
-            // 7. 获取胎胚库存信息（根据排产起始日期获取早上6点的库存）
+            // 1.7 胎胚库存（排产起始日早6点快照，T_CX_STOCK）
             try {
                 loadStocks(context, scheduleStartDate);
                 log.info("胎胚库存信息加载完成");
@@ -485,99 +505,91 @@ public class ScheduleServiceImpl implements ScheduleService {
                 log.warn("加载胎胚库存信息失败，继续执行：{}", e.getMessage());
             }
 
-            // 8. 构建机台在机胎胚映射（后续会根据成型余量过滤）
+            // 1.8 机台在产胎胚映射（embryoCode→机台集合，供续作/均衡使用）
             try {
                 buildMachineOnlineEmbryoMap(context);
             } catch (Exception e) {
                 log.warn("构建机台在机胎胚映射失败，继续执行：{}", e.getMessage());
             }
 
-            // 9. 获取参数配置
+            // 1.9 成型参数配置（SYS04 编码体系，含源头表优先级加载）
             try {
                 loadParamConfigs(context);
             } catch (Exception e) {
                 log.warn("加载参数配置失败，继续执行：{}", e.getMessage());
             }
 
-            // 10. 获取结构整车配置
+            // 1.10 结构班次产能配置
             try {
                 loadStructureShiftCapacities(context);
             } catch (Exception e) {
                 log.warn("加载结构整车配置失败，继续执行：{}", e.getMessage());
             }
 
-            // 11. 获取关键产品配置
+            // 1.11 关键产品配置（开产首班过滤用，T_CX_KEY_PRODUCT）
             try {
                 loadKeyProducts(context);
             } catch (Exception e) {
                 log.warn("加载关键产品配置失败，继续执行：{}", e.getMessage());
             }
 
-            // 12. 构建物料日产能映射/成型硫化配比
+            // 1.12 物料日硫化产能 + 结构硫化配比映射
             try {
                 buildCapacityMaps(context);
             } catch (Exception e) {
                 log.warn("构建产能映射失败，继续执行：{}", e.getMessage());
             }
 
-            // 13. 获取月度计划余量并计算成型余量（考虑共用胎胚）
-            // T日使用排产起始日期（scheduleStartDate），而非前端传入的中间天
+            // 1.13 硫化余量 + 成型余量动态计算（月计划-完成量-库存分配，核心过滤依据）
             try {
                 loadMonthSurplusAndCalculateFormingRemainder(context, scheduleStartDate);
             } catch (Exception e) {
                 log.warn("加载月度计划余量失败，继续执行：{}", e.getMessage());
             }
 
-            // 14. 获取SKU排产分类
+            // 1.14 SKU 排产分类（主销/非主销判定）
             try {
                 loadSkuCategories(context);
             } catch (Exception e) {
                 log.warn("加载SKU排产分类失败，继续执行：{}", e.getMessage());
             }
 
-            // 15. 设置节假日相关标记
-            try {
-                setHolidayFlags(context, scheduleDate);
-            } catch (Exception e) {
-                log.warn("设置节假日标记失败，继续执行：{}", e.getMessage());
-            }
-
-            // 15.5 加载精度计划（planDate < 当前班次日期 - 3天 且 actualDate 为空）
+            // 1.15 精度计划（planDate 筛选，供 CoreScheduleAlgorithmServiceImpl 扣量）
             try {
                 loadPrecisionPlans(context, scheduleStartDate);
             } catch (Exception e) {
                 log.warn("加载精度计划失败，继续执行：{}", e.getMessage());
             }
 
-            // 16. 加载物料收尾信息并计算收尾日（使用排产起始日期，非前端传入的最后一天）
+            // 1.16 物料收尾日计算（TaskGroupService.calculateEndingInfo 使用）
             try {
                 loadMaterialEndings(context, scheduleStartDate);
             } catch (Exception e) {
                 log.warn("加载物料收尾信息失败，继续执行：{}", e.getMessage());
             }
 
-            // 17. 过滤已收尾物料（成型余量<=0的物料不参与排程）
+            // 1.17 过滤已收尾物料（成型余量≤0 的硫化任务剔除）
             try {
                 filterCompletedMaterials(context);
             } catch (Exception e) {
                 log.warn("过滤已收尾物料失败，继续执行：{}", e.getMessage());
             }
 
-            // 18. 加载结构排产配置（用于均衡分配）
+            // 1.18 结构排产配置（当日机台，NewTaskProcessor/BalancingService 候选机台来源）
             try {
                 loadStructureAllocations(context, scheduleDate);
             } catch (Exception e) {
                 log.warn("加载结构排产配置失败，继续执行：{}", e.getMessage());
             }
 
-            // 19. 加载结构整车配置（用于按车分配计算）
+            // 1.19 结构整车配置（每车条数，ProductionCalculator.getTripCapacity 使用）
             try {
                 loadStructureTreadConfigs(context);
             } catch (Exception e) {
                 log.warn("加载结构整车配置失败，继续执行：{}", e.getMessage());
             }
 
-            // 20. 设置排程参数
+            // 1.20 写入排程日期与模式，上下文构建完成
             context.setScheduleDate(scheduleDate);
             context.setScheduleMode(request.getScheduleMode());
 
@@ -590,10 +602,14 @@ public class ScheduleServiceImpl implements ScheduleService {
         }
     }
 
-    // ==================== 私有方法：初始化相关 ====================
+    // ==================== S5.1.6 上下文加载（1.1～1.20，与 buildScheduleContext 逐步对应） ====================
+    //
+    // 基础层：班次/停机/机台/硫化/在机/物料/库存/机台胎胚映射
+    // 计算层：SYS04 参数、整车配置、关键产品、日硫化产能+配比、硫化余量+成型余量+库存分配
+    // 配置层：SKU 分类、精度计划、收尾日、已收尾过滤、结构机台、结构单车、排程日期写入
 
     /**
-     * 加载班次配置
+     * 1.1 加载班次配置（T_CX_SHIFT_CONFIG，并推算 scheduleDays）
      */
     private void loadShiftConfigs(ScheduleContextVo context, String factoryCode) {
         List<CxShiftConfig> allShiftConfigs = shiftConfigMapper.selectList(
@@ -812,7 +828,10 @@ public class ScheduleServiceImpl implements ScheduleService {
     }
 
     /**
-     * 加载参数配置
+     * 1.9 加载成型参数（T_CX_PARAM_CONFIG + 源头表覆盖）。
+     *
+     * <p>优先级：T_LH_PARAMS / T_MP_FACTORY_PARAM 覆盖同编码 SYS04 参数；
+     * 并解析机台前缀最大胎胚种类数、试制 SKU 上限、日硫化模式等到 context 字段。
      */
     private void loadParamConfigs(ScheduleContextVo context) {
         List<CxParamConfig> paramConfigs = paramConfigMapper.selectList(
@@ -1210,16 +1229,16 @@ public class ScheduleServiceImpl implements ScheduleService {
     }
 
     /**
-     * 加载月度计划余量并计算成型余量
-     * <p>
-     * 硫化余量计算逻辑（支持跨月与月计划断点场景）：
-     * 硫化余量 = Max(Σ(day1~断点日)计划量 + 上月超欠产 - 已完成量, 0)
-     * <ul>
-     *   <li>断点定义：月计划前日有值、当日无值 → 前日为断点日</li>
-     *   <li>跨月时分别计算当月和次月硫化余量后相加</li>
-     *   <li>不再使用 totalQty 字段，改为按 day1~断点日 逐日累加</li>
-     * </ul>
-     * </p>
+     * 1.13 动态计算硫化余量与成型余量（排程前快照 + 运行时基准）。
+     *
+     * <p><b>硫化余量</b>（按物料）：
+     * {@code Max(月计划有效量(断点日前累加) − 月累计完成 − T日班次完成, 0)}。
+     * 支持跨月：当月+次月分别计算后合并；断点日 = 月计划逐日有值→无值的前一日。
+     *
+     * <p><b>成型余量</b>：{@code Max(0, 硫化余量 − 按 lhId 比例分配的胎胚库存)}。
+     * 写入 {@code monthSurplusMap}、{@code formingRemainderMap}、{@code materialStockMap} 及 initial* 快照。
+     *
+     * <p>数据源：t_mp_month_plan_prod_final、T_LH_DAY_FINISH_QTY、T_LH_SCHE_FINISH_QTY、T_CX_STOCK。
      */
     private void loadMonthSurplusAndCalculateFormingRemainder(ScheduleContextVo context, LocalDate scheduleDate) {
         String factoryCode = context.getFactoryCode();
@@ -1701,16 +1720,10 @@ public class ScheduleServiceImpl implements ScheduleService {
         log.info("加载SKU排产分类 {} 条，其中主销产品 {} 个", skuCategories.size(), mainProductCodes.size());
     }
 
-    /**
-     * 设置节假日相关标记（已废弃，改用ScheduleDayTypeHelper按班次级别判断）
-     */
-    private void setHolidayFlags(ScheduleContextVo context, LocalDate scheduleDate) {
-        // 已废弃：改用 CoreScheduleAlgorithmServiceImpl 中的 scheduleDayTypeHelper.isOpenStartShift/isClosedShift/isBeforeCloseShift
-        // 这些方法按班次级别判断开产/停产，更精确
-    }
+    // ==================== 校验与持久化 ====================
 
     /**
-     * 数据完整性校验
+     * 委托 {@link ScheduleDataValidator} 执行策略模式校验（ERROR 阻断 / WARN 日志）。
      */
     private ScheduleDataValidationResult validateScheduleData(ScheduleContextVo context, LocalDate scheduleDate, String factoryCode) {
         ScheduleDataValidationResult validationResult = scheduleDataValidator.validate(context, scheduleDate, factoryCode);
@@ -1750,9 +1763,7 @@ public class ScheduleServiceImpl implements ScheduleService {
     }
 
     /**
-     * 保存排程结果
-     *
-     * @param results 排程结果列表
+     * 持久化排程结果：主表 {@code T_CX_SCHEDULE_RESULT} + 子表 {@code T_CX_SCHEDULE_DETAIL}（随主表 details 级联写入）。
      */
     @Transactional(rollbackFor = Exception.class)
     public void saveScheduleResults(List<CxScheduleResult> results) {
@@ -2737,10 +2748,7 @@ public class ScheduleServiceImpl implements ScheduleService {
 
 
     /**
-     * 灵活解析日期时间字符串，支持 HH:mm 和 H:mm 两种格式
-     *
-     * @param dateTimeStr 日期时间字符串，如 "2026-05-19 5:30" 或 "2026-05-19 05:30"
-     * @return 解析后的 LocalDateTime，无法解析时返回 null
+     * 从 T_LH_PARAMS 按工厂+参数编码读取硫化源头参数值。
      */
     private String loadLhParamValue(LhParamsMapper mapper, String factoryCode, String paramCode) {
         try {
@@ -2850,6 +2858,12 @@ public class ScheduleServiceImpl implements ScheduleService {
         }
     }
 
+    /**
+     * 灵活解析日期时间字符串，时间部分支持 H:mm 与 HH:mm。
+     *
+     * @param dateTimeStr 如 {@code "2026-05-19 5:30"} 或 {@code "2026-05-19 05:30"}
+     * @return 解析后的 LocalDateTime；无法解析时返回 null
+     */
     private LocalDateTime parseFlexibleDateTime(String dateTimeStr) {
         if (dateTimeStr == null || dateTimeStr.isEmpty()) {
             return null;
