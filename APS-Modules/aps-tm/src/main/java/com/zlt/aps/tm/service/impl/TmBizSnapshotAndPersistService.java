@@ -3,6 +3,7 @@ package com.zlt.aps.tm.service.impl;
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.StrUtil;
 import com.ruoyi.common.exception.ServiceException;
+import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.common.engine.schedule.ScheduleTaskLinkedList;
 import com.zlt.aps.common.engine.schedule.ScheduleTaskNode;
 import com.zlt.aps.tm.api.domain.entity.TmScheduleResult;
@@ -126,6 +127,9 @@ public class TmBizSnapshotAndPersistService implements ITmSnapshotAndPersistServ
         assignTmOrderNo(mergedResultList, context.getBatchNo());
         for (TmScheduleResult result : mergedResultList) {
             normalizeResultShiftFields(result);
+        }
+        resequenceVisibleShiftSequences(mergedResultList);
+        for (TmScheduleResult result : mergedResultList) {
             try {
                 scheduleResultMapper.insert(result);
                 registerInsertedResultId(result, mergedResultBusinessKeyMap, resultIdMap);
@@ -284,6 +288,99 @@ public class TmBizSnapshotAndPersistService implements ITmSnapshotAndPersistServ
     }
 
     /**
+     * 按机台和班次重排结果表可见行顺序。
+     *
+     * <p>结果表展示顺序只面向已经落到机台且班次计划量大于 0 的可见结果行；原始任务链顺序仍保留在解释表和日志中。</p>
+     *
+     * @param resultList 已归并并归一化的排程结果列表
+     */
+    private void resequenceVisibleShiftSequences(List<TmScheduleResult> resultList) {
+        if (CollUtil.isEmpty(resultList)) {
+            return;
+        }
+        for (int shiftOrder = 1; shiftOrder <= 6; shiftOrder++) {
+            Map<String, List<TmScheduleResult>> machineShiftResultMap = new LinkedHashMap<>();
+            for (TmScheduleResult result : resultList) {
+                if (!isVisibleShiftResult(result, shiftOrder)) {
+                    continue;
+                }
+                String groupKey = StrUtil.blankToDefault(result.getMachineCode(), "") + "|" + shiftOrder;
+                machineShiftResultMap.computeIfAbsent(groupKey, key -> new ArrayList<>()).add(result);
+            }
+            for (List<TmScheduleResult> visibleResultList : machineShiftResultMap.values()) {
+                resequenceSingleVisibleShift(visibleResultList, shiftOrder);
+            }
+        }
+    }
+
+    /**
+     * 判断结果行在指定班次是否属于可见行。
+     *
+     * @param result     排程结果
+     * @param shiftOrder 班次顺序
+     * @return true 表示该班次应参与展示顺序重排
+     */
+    private boolean isVisibleShiftResult(TmScheduleResult result, int shiftOrder) {
+        if (result == null || StrUtil.isBlank(result.getMachineCode())) {
+            return false;
+        }
+        return isPositiveQty(getShiftPlanQty(result, shiftOrder));
+    }
+
+    /**
+     * 重排单个机台班次的可见结果行。
+     *
+     * @param visibleResultList 可见结果行
+     * @param shiftOrder        班次顺序
+     */
+    private void resequenceSingleVisibleShift(List<TmScheduleResult> visibleResultList, int shiftOrder) {
+        visibleResultList.sort(Comparator
+                .comparing((TmScheduleResult result) -> resolveSortSequence(result, shiftOrder))
+                .thenComparing(result -> StrUtil.blankToDefault(result.getOrderNo(), ""))
+                .thenComparing(result -> StrUtil.blankToDefault(result.getTreadCode(), "")));
+        for (int index = 0; index < visibleResultList.size(); index++) {
+            setShiftSequence(visibleResultList.get(index), shiftOrder, index + 1);
+        }
+    }
+
+    /**
+     * 读取班次计划量。
+     *
+     * @param result     排程结果
+     * @param shiftOrder 班次顺序
+     * @return 班次计划量
+     */
+    private BigDecimal getShiftPlanQty(TmScheduleResult result, int shiftOrder) {
+        Object planQty = result.getFieldValueByFieldName(String.format("class%dPlanQty", shiftOrder));
+        return planQty instanceof BigDecimal ? (BigDecimal) planQty : null;
+    }
+
+    /**
+     * 设置班次展示顺序。
+     *
+     * @param result     排程结果
+     * @param shiftOrder 班次顺序
+     * @param sequence   展示顺序
+     */
+    private void setShiftSequence(TmScheduleResult result, int shiftOrder, Integer sequence) {
+        result.setFieldValueByFieldName(String.format("class%dSequence", shiftOrder), sequence);
+    }
+
+    /**
+     * 读取重排前的班次顺序，空顺序排在最后。
+     *
+     * @param result     排程结果
+     * @param shiftOrder 班次顺序
+     * @return 排序用顺序值
+     */
+    private Integer resolveSortSequence(TmScheduleResult result, int shiftOrder) {
+        Object sequence = result.getFieldValueByFieldName(String.format("class%dSequence", shiftOrder));
+        if (sequence instanceof Integer) {
+            return (Integer) sequence;
+        }
+        return Integer.MAX_VALUE;
+    }
+    /**
      * 判断计划量是否大于 0。
      *
      * @param planQty 班次计划量
@@ -386,7 +483,7 @@ public class TmBizSnapshotAndPersistService implements ITmSnapshotAndPersistServ
             return;
         }
         if (nodeList == null || nodeList.size() != chainResultList.size()) {
-            throw new ServiceException("任务链结果数量与任务节点数量不一致，无法关联解释表结果ID");
+            throw new ServiceException(I18nUtil.getMessage("ui.data.alert.tm.schedule.resultRelationFailed"));
         }
         for (int index = 0; index < chainResultList.size(); index++) {
             ScheduleTaskNode<TmTaskDraft> node = nodeList.get(index);
@@ -619,9 +716,7 @@ public class TmBizSnapshotAndPersistService implements ITmSnapshotAndPersistServ
         String businessKey = taskDraft == null ? null : taskDraft.getBusinessKey();
         Long resultId = StrUtil.isBlank(businessKey) ? null : resultIdMap.get(businessKey);
         if (resultId == null) {
-            throw new ServiceException("解释表写入失败，未找到结果表ID，orderNo="
-                    + (taskDraft == null ? null : taskDraft.getOrderNo())
-                    + "，treadCode=" + (taskDraft == null ? null : taskDraft.getTreadCode()));
+            throw new ServiceException(I18nUtil.getMessage("ui.data.alert.tm.schedule.explainResultMissing"));
         }
         return resultId;
     }

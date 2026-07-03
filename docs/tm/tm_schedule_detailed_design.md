@@ -31,7 +31,8 @@
 - `machine_code`：机台编码，关联 `T_TM_MACHINE_INFO.machine_code`；自动排程有效结果必须有机台，未排任务写入 `T_TM_SCHEDULE_UNPLANNED`
 - `tread_code`：胎面编码
 - `glue_code`：主胶料编码
-- `whole_glue_code`：整条胶料组合编码
+- `base_glue_code`：基部胶编码，作为同机台前置任务链基部胶连续评分输入；不得由 `whole_glue_code` 推导或替代
+- `whole_glue_code`：整条胶料组合编码，不承担基部胶语义
 - `glue_seq`：胶料顺序
 - `mouth_plate_code`：口型板编码
 - `class1_sequence`~`class6_sequence`：六班顺序
@@ -200,7 +201,7 @@
 - `TM_TAIL_ROUND_RULE`：收尾取整规则
 - `TM_NORMAL_ROUND_RULE`：常规取整规则
 - `TM_LARGE_SMALL_THRESHOLD`：大小批量阈值
-- `TM_MIN_STOCK_CLASS`：库存最低保证班数。用于控制自动排程至少保障当前班及后续若干班的胎面供应；缺省值按 1 班处理，并在解释信息中记录使用默认值。代码参数常量对齐为 `TM_MIN_STOCK_CLASS`（与 `t_tm_params` 表实际参数名一致）。
+- `TM_MIN_STOCK_CLASS`：库存最低保证班数兜底参数。自动排程优先按成型结果 `LH_MACHINE_CODE` 解析去重后的硫化机数量，并匹配 `T_TM_DEPTH_CONFIG.machine_qty + machine_range` 得到 `depth_class_qty`；当硫化机编码为空、无法解析、深度配置未命中或 `depth_class_qty` 不是正整数时，回退使用本参数。缺省值按 1 班处理，并在解释信息中记录使用默认值。代码参数常量对齐为 `TM_MIN_STOCK_CLASS`（与 `t_tm_params` 表实际参数名一致）。
 - `TM_DEDUCT_PRIORITY`：需求抵扣优先级。用于后续配置库存余额、前序已排计划量等抵扣项的执行顺序；当前默认抵扣链使用首班 14 点预计库存并按交接班库存逐班滚动，未定义来源的数据不进入默认公式。
 - `TM_ROLLING_SHIFT_COUNT`：局部滚动重算班次数，默认 3
 - `TM_MAX_LOOKAHEAD_SHIFT_COUNT`：需求前瞻班次数
@@ -210,6 +211,7 @@
 - `TM_FORMING_SHIFT_OFFSET`：胎面需求计算时，胎面班次到成型班次的偏移量，默认 2。胎面 `CLASS{N}` 对应成型 `CLASS{N + TM_FORMING_SHIFT_OFFSET}`；配置 0 表示同序号班次，未配置、空值、非数字或负数按默认 2 处理，超过成型 `CLASS8` 的班次按 0 处理。
 - `TM_EXPERIMENT_SPEC_LOOKBACK_DAYS`：实验规格月计划回看天数，默认 5。执行排程日期 `D` 时，查询 `D-N` 的月计划定稿实验记录。
 - `TM_EXPERIMENT_SPEC_PLAN_QTY`：实验规格胎面计划量，默认 30，单位米。月计划 `DAY_x > 0` 只作为实验规格命中条件，不按月计划数量放大胎面计划量。
+- `TM_SMALL_GLUE_CODES`：小胶种主胶料编码列表，默认空。多个 `glueCode` 使用英文逗号分隔；成型需求和实验规格任务取胶料组合中的第一个编码作为主胶料，命中后标记为小胶种任务。
 
 ### 4.11 `T_TM_STOCK`
 
@@ -258,6 +260,8 @@
 - `TmInventoryPredictService`：读取 `T_TM_STOCK` 和损耗设置，计算预计库存和供应时长。
 - `TmPlanCalcService`：计算计划量、预计划、收尾、小批量补卷等。计划量计算前从库存预测初始化 per-tread 班初滚动库存 `remainingStockMap`（初值14点预计库存），同时初始化全局可用工装池 `availableToolQty = 总工装数量 - sum(各胎面14点预计库存 / 对应卷曲长度)`；任务按班次、胎面编码稳定排序，完成后分别回写交接班预计库存和全局剩余工装。
 - `TmMachineAssignService`：基于机台、口型板、定点/禁排、胶料机台关系筛选候选机台；选中机台后按 `machineCode + shiftOrder` 计算真实剩余产能。当前班只写入该机台可承接的计划量，产能受限溢出量与计划量策略产生的工装溢出量统一从下一班开始顺延；下一班同机台同胎面已有任务时先合并计划量，没有同胎面任务时创建顺延任务。顺延仍必须满足开班、停机、口型、胶料、定点/禁排和产能过滤，6 班后仍未排完的数量写未排。全部候选机台被过滤时，按候选 `filterReasonCode` 归类未排原因：全部 `NO_REMAIN_CAPACITY`→`CAPACITY_NOT_ENOUGH`，全部 `MOUTH_PLATE_NOT_MATCH`→`MOUTH_PLATE_NOT_MATCH`，全部 `GLUE_MACHINE_NOT_MATCH`→`GLUE_MACHINE_NOT_ALLOWED`，`MACHINE_DISABLED`/定点规则/混合原因→`NO_AVAILABLE_MACHINE` 兜底。
+- 机台分配按班次处理待排任务，并把同机台已有链尾作为前置任务参与排序：一班优先继承上一排程日同机台最后有效排程任务，二到六班优先继承同机台上一已排班次的最后任务；同班次内每追加一个任务后，剩余任务会基于新的链尾重新计算连续性优先级。链式任务排序按分层优先级比较：先比较主胶料连续，再比较基部胶连续，再比较口型连续，最后在连续性层级相同的任务之间比较产能适配、切换成本、定点生产等业务分；口型连续和产能适配不得反超主胶料连续。上一排程日前置任务从 `T_TM_SCHEDULE_RESULT.base_glue_code` 读取独立基部胶字段，旧历史结果为空时仅跳过基部胶连续评分，不能回退使用 `whole_glue_code`。
+- 小胶种连续生产：数据加载阶段按 `TM_SMALL_GLUE_CODES` 标记小胶种任务；机台分配阶段按主胶料维护本次排程内的小胶种绑定机台。后续任务只有同样命中小胶种标识时才优先尝试绑定机台；普通任务即使 `glueCode` 相同也不复用该绑定。若绑定机台因口型、胶料禁投、停用、不开班、检修或剩余产能等硬约束不可用，才允许按过滤和评分结果切换机台，并在 `rule_hit_json` 写入 `SMALL_GLUE_CONTINUOUS` 证据。
 - `TmCapacityBalanceService`：做产能均衡、中夜班移量、次日回拉和任务顺序计算。当前本轮不实现生产级产能均衡算法，仅保留流程占位和风险记录。
 - `TmSnapshotBuildService`：生成 `T_TM_SCHEDULE_RESULT_EXPLAIN`。
 - `TmPersistService`：统一转换结果和解释信息；`TmBizSnapshotAndPersistService` 负责将已排结果写入 `T_TM_SCHEDULE_RESULT`、未排摘要写入 `T_TM_SCHEDULE_UNPLANNED`、任务级解释写入 `T_TM_SCHEDULE_RESULT_EXPLAIN`。
@@ -336,6 +340,7 @@
 
 - 待排规格排序使用 `PriorityQueue<TmTaskDraft>` 或等价优先队列，比较器顺序为强紧急、库存紧急度、同在产胶料、胶料优先级、基部胶相似度、口型聚集、稳定兜底。稳定兜底按 `treadCode`、`machineCode` 等固定字段升序，保证相同输入重复运行结果一致。
 - 候选机台先通过责任链过滤硬约束，再通过评分策略排序。硬约束包括不开班、停用、整班检修、口型不匹配、胶料不允许、禁排机台、产能不足。评分项包括剩余产能、同胶料、同口型、切换成本、稳定兜底。
+- 链式连续排序不再只看数据加载时的静态链尾主胶料；评分前会按 `machineCode + shiftOrder` 从当前任务链解析有效前置任务，依次使用当前班链尾、上一已排班次链尾、上一排程日同机台链尾。主胶连续、基部胶相似、口型连续、切换成本、产能适配和稳定兜底共同决定优先级。
 - 运行态上下文使用 `Map<String, TmParamValue>` 保存参数快照，使用 `Map<String, MachineRuntimeState>` 保存机台剩余产能、链尾胶料、链尾口型、下一可开工时间，使用 `Map<MachineShiftKey, ScheduleTaskLinkedList<TmTaskDraft>>` 保存任务链，使用 `Map<String, BigDecimal> remainingStockMap` 保存胎面班初滚动库存状态（初值14点预计库存，逐班回写交接班库存）。
 
 #### 7.4.1 库存直接抵扣当前班生产量
@@ -836,7 +841,9 @@ Output:
 
 Step7 计算库存保证班数和库存供应成型时长
 Process:
-  参数 TM_MIN_STOCK_CLASS 表示库存最低保证班数，缺省值为 1 班，保证范围包含当前班，即当前班 + 后续 N-1 班；
+  优先从成型结果 `LH_MACHINE_CODE` 按英文逗号拆分、去空并去重后得到硫化机数量，再按 `T_TM_DEPTH_CONFIG` 的 `machine_qty` 与 `machine_range` 匹配库存保证班数，同台数 `EQ` 精确配置优先，其余配置按 `machine_qty` 降序匹配并支持 `LT/LE/EQ/GE/GT`；
+  命中的 `depth_class_qty` 必须是正整数，例如 `4.000000` 生效；为空、非正数或 `3.5` 这类非整数时回退参数 `TM_MIN_STOCK_CLASS`；
+  参数 `TM_MIN_STOCK_CLASS` 仅作为兜底库存最低保证班数，缺省值为 1 班，保证范围包含当前班，即当前班 + 后续 N-1 班；
   guardDemandQty = 保证范围内成型胎面需求量合计；
   currentShiftDemandQty = 当前班成型胎面需求量；
   从当前班开始顺次检查库存，每满足一个班的成型消耗，库存满足成型消耗的班数加 1；
@@ -907,8 +914,8 @@ Process:
   任务按 shiftOrder 升序、treadCode 升序稳定计算，同班多个任务也逐任务扣减工装池；
   当前任务工装限制上限 = 当前任务班初 availableToolQty * 当前胎面卷曲长度；
   工装不足时截断计划量；截断差额记为 `toolOverflowQty`，不丢弃，进入下一班顺延合并；
-  当前任务占用工装 toolUsedQty = (当前任务最终计划量 finalPlanQty + 当前班成型胎面需求 currentShiftDemandQty) / 当前胎面卷曲长度；
-  当前任务后剩余工装 remainingToolQty = max(availableToolQty - toolUsedQty, 0)，作为下一任务的班初 `availableToolQty`。
+  当前任务净占用工装 toolUsedQty = (当前任务最终计划量 finalPlanQty - 当前班成型胎面需求 currentShiftDemandQty) / 当前胎面卷曲长度；生产计划量增加工装占用，当前班成型消耗释放库存占用，因此净占用允许为负数；
+  当前任务后剩余工装 remainingToolQty = min(max(availableToolQty - toolUsedQty, 0), 总工装数量)，作为下一任务的班初 `availableToolQty`。
 Output:
   ToolLimitedQty(tread_code, shift_code, plan_qty, available_tool_qty, tool_used_qty, remaining_tool_qty)
 
@@ -957,8 +964,9 @@ Persist:
   T_TM_SCHEDULE_RESULT_EXPLAIN
 Process:
   将排产规格追加到本机台本班任务链末尾；
-  生成本条排程记录的胎面、胶料、胶料序号、口型板、机台、月计划剩余量、库存等展示字段；
+  生成本条排程记录的胎面、主胶料、基部胶、整条胶料组合、胶料序号、口型板、机台、月计划剩余量、库存等展示字段；
   按 `factoryCode + batchNo + scheduleDate + machineCode + treadCode` 归并结果行，同一归并行横向累加各班次计划量、顺序、完成量、完成率和原因分析字段；
+  归并结果落库前先清空计划量小于等于 0 的班次展示字段，再按 `machineCode + shiftOrder` 对可见结果行重排 `class{N}_sequence`，可见行口径为机台非空且对应班次计划量大于 0；解释表继续保留原始任务级 `task_business_key`、`shift_order` 和 `final_plan_qty` 用于追溯；
   自动排程结果 `order_no` 按胎面批次号生成，格式为 `batchNo-0001`，不使用成型来源工单号；
   已分配任务写入 `T_TM_SCHEDULE_RESULT`，未排任务写入 `T_TM_SCHEDULE_UNPLANNED`；解释信息按来源任务写入 `T_TM_SCHEDULE_RESULT_EXPLAIN`，已排解释关联归并后的 `result_id`，未排解释 `result_id` 为空；
   解释信息需包含计划量计算过程、库存依据、规则命中、候选机台和最终选机原因。
@@ -996,7 +1004,26 @@ Output:
   RunSummary(batch_no, assigned_count, unassigned_count, error_count)
 ```
 
-### 15.3.1 关键术语定义
+### 15.3.1 自动排程日志排查口径
+
+自动排程日志采用“摘要 Info + 明细 Debug”的分层口径：Info 日志必须能按 `batchNo + traceId + businessKey` 还原主计算链路、计划量来源、排序依据、选机结论、产能承接和未排原因；Debug 日志用于查看单台候选机台逐台过滤和评分明细，生产排查默认不要求打开 Debug。
+
+一次自动排程建议按以下顺序串联日志：
+
+1. 入口与模板步骤：通过 `[TM_AUTO_PLAN]`、`[TM_SCHEDULE_STEP_START]`、`[TM_SCHEDULE_STEP_END]` 定位 `batchNo`、`traceId`、`factoryCode`、`scheduleDate`，并确认 `REQUEST_VALIDATED`、`MACHINE_ASSIGN`、`SNAPSHOT_BUILD`、`TEMPLATE_FINISHED`、`FINISHED` 等阶段输入输出数量。
+2. 计划量计算：通过 `[TM_DEMAND_QTY_CALC]`、`[TM_DEMAND_QTY_CALC_DETAIL]`、`[TM_DEMAND_QTY_SUPPLY]`、`[TM_DEMAND_QTY_SUPPLY_DETAIL]`、`[TM_PLAN_QTY_CALC]`、`[TM_PLAN_QTY_CALC_DETAIL]`、`[TM_PLAN_QTY_STATE]` 按 `businessKey` 还原需求量、库存抵扣、工装限制和滚动库存状态。
+3. 排序：通过 `[TM_TASK_SORT]` 查看排序策略、任务总数、排序前后业务键摘要；通过 `[TM_TASK_SORT_DETAIL]` 查看每个任务的 `sortIndex`、`supplyHours`、胶料、口型板、计划量和需求量，确认最终待排顺序如何形成。
+4. 选机和产能承接：通过 `[TM_MACHINE_ASSIGN_SUMMARY]` 查看候选数、通过数、拒绝数、拒绝原因统计、选中机台、评分分项、计划量、剩余产能、实际承接量和溢出量；如需逐台排查，再打开 Debug 查看 `[TM_MACHINE_FILTER]`、`[TM_MACHINE_SCORE]` 明细。
+5. 顺延和任务链：通过 `[TM_MACHINE_CARRYOVER]` 查看产能或工装溢出如何顺延、是否合并到目标任务、合并前后计划量和剩余未排量；通过 `[TM_TASK_CHAIN]` 查看追加、前插、调量后 `chainOrder`，该顺序用于最终形成 `class{N}_sequence`。
+6. 未排与落库：通过 `[TM_SCHEDULE_UNPLANNED]` 查看未排任务的 `businessKey`、班次、计划量、未排原因和 `candidateRejectSummary`；通过 `[TM_SCHEDULE_PERSIST]` 与 `SNAPSHOT_BUILD` 结束摘要核对已排、未排、解释和异常数量。
+
+计划量日志字段含义：`currentShiftDemandQty` 为当前班成型胎面需求量，`guardDemandQty` 为库存保证范围需求量，`rollingStockQty` 为任务计算前班初滚动库存，`currentShiftStockGapQty` 为当前班库存缺口，`stockGapQty` 为保证范围库存缺口，`demandQty` 为排序和解释使用的需求缺口，`stockDeductQty` 为本次库存抵扣量，`baseDemandQty` 为库存抵扣后的基础应排量，`lossAddQty` 为损耗补偿量，`minStartAdjustQty` 为最小起排调整量，`tailRoundAdjustQty` 为收尾取整调整量，`toolLimitAdjustQty` 为工装限制调整量，`toolOverflowQty` 为工装压缩后需要顺延的数量，`availableToolQty` 为计算前可用工装，`toolUsedQty` 为本任务净占用工装，`remainingToolQty` 为计算后剩余工装，`planStockQty` 为本任务完成后的滚动库存，`planQty` 为最终进入机台分配的计划量，`calcFormulaDesc` 为本任务计划量计算路径摘要。
+
+排序日志字段含义：`strategyCode` 为排序策略编码，`beforeOrder` 和 `afterOrder` 为排序前后业务键摘要，`sortIndex` 为排序后的序号，`supplyHours` 为库存可供应时长，`glueCode`、`baseGlueCode`、`mouthPlateCode` 为胶料和口型板排序/选机依据，`planQty` 和 `demandQty` 用于判断同等条件下的任务紧急度。
+
+选机和顺延日志字段含义：`candidateCount`、`passedCount`、`rejectedCount`、`rejectReasonSummary` 用于判断候选机台过滤结果；`selectedMachineCode`、`selectedScore`、`scoreItems` 用于还原为什么选择该机台；`remainCapacity`、`assignedQty`、`overflowQty` 用于还原当前班承接和溢出；`carryoverQty`、`capacityOverflowQty`、`toolOverflowQty`、`beforeMergePlanQty`、`afterMergePlanQty`、`remainingQty` 用于还原跨班顺延、合并和六班后未排的数量变化。
+
+### 15.3.2 关键术语定义
 
 | 术语 | 说明 | 来源 |
 |------|------|------|
@@ -1316,7 +1343,7 @@ Output:
 
 - 旧批次覆盖：同一 `factory_code + schedule_date` 无旧结果允许生成；旧结果全部未发布时前端确认后允许重新生成；存在任一非未发布结果时拒绝生成。
 - 库存计算起点：使用 6 点库存作为滚动库存起点；如 `T_TM_STOCK` 当前只有日期维度，则该日期库存代表 6 点库存快照。
-- 库存最低保证班数：参数 `TM_MIN_STOCK_CLASS` 缺省按 1 班，保证范围包含当前班，即当前班 + 后续 N-1 班。
+- 库存最低保证班数：优先按成型结果 `LH_MACHINE_CODE` 解析去重后的硫化机数量，并匹配 `T_TM_DEPTH_CONFIG.depth_class_qty`，同台数 `EQ` 精确配置优先；配置未命中或配置值不是正整数时，回退参数 `TM_MIN_STOCK_CLASS`，缺省按 1 班，保证范围包含当前班，即当前班 + 后续 N-1 班。
 - 需求量公式：`currentShiftStockGapQty = max(currentShiftDemandQty - rollingStockQty, 0)`，`stockGapQty = max(guardDemandQty - rollingStockQty, 0)`，`demandQty = max(currentShiftStockGapQty, stockGapQty)`；计划量基础需求为 `baseDemandQty = max(currentShiftDemandQty - rollingStockQty, guardDemandQty - rollingStockQty, 0)`。
 - 插单第二个在产规格：判定范围为同排程日期、同机台、同班次、第二顺序之后。
 - 事务边界：自动排程结果、未排结果、解释表、调度日志在同一事务内处理，任一失败整批回滚。
@@ -1845,7 +1872,7 @@ graph LR
 - `ITmDemandQtyStrategy`：胎面需求量算法策略。
   - `String getAlgorithmCode()`：返回算法编码，例如 `1`、`2`。
   - `TmDemandQtyResult calculate(TmDemandQtyInput input, TmScheduleContext context)`：计算需求量。`input` 传成型计划、胎面长度、班次；`context` 传参数和日志上下文；返回每班需求量。
-  - 默认实现应支持库存最低保证班数：读取 `TM_MIN_STOCK_CLASS`，缺省 1 班；计算 `guardDemandQty`、`currentShiftDemandQty`、`currentShiftStockGapQty`、`stockGapQty` 和 `demandQty`；未来需求为 0 时不得除零，供应时长标记为空或 `NO_FUTURE_DEMAND`。
+  - 默认实现应支持库存最低保证班数：优先按成型结果 `LH_MACHINE_CODE` 解析硫化机数量并匹配 `T_TM_DEPTH_CONFIG.depth_class_qty`，同台数 `EQ` 精确配置优先，配置未命中、为空或不是正整数时读取 `TM_MIN_STOCK_CLASS` 兜底，缺省 1 班；计算 `guardDemandQty`、`currentShiftDemandQty`、`currentShiftStockGapQty`、`stockGapQty` 和 `demandQty`；未来需求为 0 时不得除零，供应时长标记为空或 `NO_FUTURE_DEMAND`。
   - 抵扣优先级通过 `TM_DEDUCT_PRIORITY` 扩展，当前默认抵扣链使用首班 14 点预计库存并按交接班库存逐班滚动，不使用来源未定义字段。
 
 - `ITmPlanQtyStrategy`：胎面计划量算法策略。
@@ -1864,7 +1891,7 @@ graph LR
 - `ITmMachineScoreStrategy`：胎面机台评分策略。
   - `TmMachineScoreResult score(TmMachineCandidate candidate, TmMachineRuleContext context)`：对候选机台评分。返回评分项和总分。
   - 默认评分权重：剩余产能适配 10、主胶料连续 10、基部胶相似 8、同口型连续 10、切换成本 10、定点生产 10。
-  - 同胶料连续优先判断链尾主胶料与当前任务主胶料是否相同；主胶料不同但基部胶相同个数越多分越高；如果只能拿到一个基部胶编码，则相同个数退化为 0 或 1。
+  - 候选机台评分仍按总分选择机台；同班次待排任务的链式排序另按主胶料连续、基部胶连续、口型连续、业务分的分层优先级选择下一个任务。
   - 完全同分时按机台编码升序排序，保证同输入结果稳定。
 
 - `ITmTaskSortStrategy`：待排任务排序策略。
@@ -1940,6 +1967,7 @@ graph LR
   - `void loadMachineInfo(TmScheduleContext context)`：加载机台基础数据。从 T_TM_MACHINE_INFO 按 factoryCode 查询。
   - `void loadMachineMaintenance(TmScheduleContext context)`：加载机台维修计划。从 T_TM_MACHINE_MAINTENANCE 按日期范围查询。
   - `void loadMachineSpeed(TmScheduleContext context)`：加载机台生产速度。从 T_TM_MACHINE_SPEED 按 factoryCode 查询。
+  - `void loadMachinePredecessor(TmScheduleContext context)`：加载当前排程日前一天同工厂、同机台最后有效排程任务。有效任务要求对应班次 `class{N}_sequence` 有值且 `class{N}_plan_qty > 0`，结果写入 `context.machinePredecessorMap` 并同步为候选机台初始链尾。
   - `void loadMouthPlate(TmScheduleContext context)`：加载口型板关系。从 T_TM_MOUTH_PLATE 按 factoryCode 查询。
   - `void loadGlueMachineReal(TmScheduleContext context)`：加载胶料机台关系。从 T_TM_GLUE_MACHINE_REAL 按 factoryCode 查询。
   - `void loadGlueOrder(TmScheduleContext context)`：加载胶料顺序。从 T_TM_GLUE_GROUP_ORDER + T_TM_GLUE_ORDER 按 factoryCode 查询。
@@ -1984,7 +2012,7 @@ TmDataLoadService.loadAllData(context)
 5. 人工操作链表测试：插单、删除、调量、转机台后顺序重算正确。
 6. 解释与日志测试：同一 `batchNo + traceId` 能串起参数、库存、排序、过滤、评分、落库全过程。
 7. 旧批次与插单测试：全未发布旧批次确认后可重排；存在非未发布旧批次拒绝；插单位置不在第二顺序之后拒绝。
-8. 场景测试数据：具体模拟数据放在 `docs/tm` 目录，至少覆盖 6 点库存 1000 米、未来 2 班需求 600/500 米、未来需求为 0、工装限制、最小起排、卷数取整、工装/产能顺延合并、主胶料/基部胶评分和同分机台编码排序。
+8. 场景测试数据：具体模拟数据放在 `docs/tm` 目录，至少覆盖 6 点库存 1000 米、未来 2 班需求 600/500 米、未来需求为 0、工装限制、最小起排、卷数取整、工装/产能顺延合并、主胶料/基部胶评分、同分机台编码排序和小胶种连续生产。
 9. 编译验证：实现代码后优先执行 `mvn -pl APS-Modules/aps-tm -am -DskipTests compile`；若改动 API 层，补跑 `mvn -pl Aps-Api/tm-api -am -DskipTests compile`。
 
 验收标准：

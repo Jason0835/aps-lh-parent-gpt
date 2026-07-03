@@ -104,10 +104,10 @@ export default {
           label: this.$t("ui.tq.specifyMachine.column.beadCode"),
         },
         {
-          prop: "machineName",
+          prop: "machineCode",
           align: "center",
           halign: "center",
-          label: this.$t("ui.specifyMachine.column.machineName"),
+          label: this.$t("ui.specifyMachine.column.machineCode"),
           width: 120,
         },
         {
@@ -177,7 +177,7 @@ export default {
           prop: "beadCode",
         },
         {
-          label: this.$t("ui.specifyMachine.column.machineName"),
+          label: this.$t("ui.specifyMachine.column.machineCode"),
           prop: "machineCode",
           type: "select",
           dictData: this.machineList,

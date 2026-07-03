@@ -5,6 +5,7 @@ import com.ruoyi.common.constant.ServiceNameConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.zlt.aps.cd90.api.domain.entity.Cd90ScheduleResult;
+import com.zlt.aps.cd90.api.domain.vo.Cd90InsertOrderRequest;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.*;
@@ -28,6 +29,27 @@ public interface ICd90ScheduleResultRemoteService {
     @ApiOperation("自动排程")
     @PostMapping("/cd90ScheduleResult/autoSchedule")
     AjaxResult autoSchedule(@RequestBody Cd90ScheduleResult scheduleResult);
+
+    @ApiOperation("查询插单班次日期")
+    @PostMapping("/cd90ScheduleResult/shiftDates")
+    AjaxResult shiftDates(@RequestBody Cd90InsertOrderRequest request);
+
+    @ApiOperation("插单预校验")
+    @PostMapping("/cd90ScheduleResult/validateInsert")
+    AjaxResult validateInsert(@RequestBody Cd90InsertOrderRequest request);
+
+    @ApiOperation("提交插单滚动重排")
+    @PostMapping("/cd90ScheduleResult/insert")
+    AjaxResult insertOrder(@RequestBody Cd90InsertOrderRequest request);
+
+    @ApiOperation("查询插单滚动重排任务")
+    @GetMapping("/cd90ScheduleResult/insert/task/{taskId}")
+    AjaxResult getInsertTask(@PathVariable("taskId") String taskId);
+
+    @ApiOperation("发布排程")
+    @PostMapping("/cd90ScheduleResult/publish")
+    AjaxResult publish(@RequestBody Cd90ScheduleResult dto,
+                       @RequestParam(value = "ids", required = false) String ids);
 
     @ApiOperation("查询自动排程任务状态")
     @GetMapping("/cd90ScheduleResult/autoSchedule/task/{taskId}")

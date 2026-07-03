@@ -496,6 +496,103 @@ public class TmBizSnapshotAndPersistServiceTest {
         assertEquals(null, insertedResult.getClass1StartTime());
         assertEquals(null, insertedResult.getClass1EndTime());
     }
+
+    /**
+     * 测试内容：验证结果表可见行按机台和班次重新生成连续顺序。
+     * 测试场景：同一机台 1 班可见结果的原始顺序为 2、3、6、10。
+     * 预期结果：结果表插入前重排为 1、2、3、4，解释表仍按原任务业务键追溯。
+     */
+    @Test
+    public void snapshotAndPersistShouldResequenceVisibleRowsByMachineAndShift() {
+        TmTaskDraft firstTask = buildAssignedTask("TR-001", 1);
+        TmTaskDraft secondTask = buildAssignedTask("TR-002", 1);
+        TmTaskDraft thirdTask = buildAssignedTask("TR-003", 1);
+        TmTaskDraft fourthTask = buildAssignedTask("TR-004", 1);
+        TmScheduleContext context = buildVisibleSequenceContext(Arrays.asList(firstTask, secondTask, thirdTask, fourthTask));
+        List<TmScheduleResult> resultList = Arrays.asList(
+                buildClass1Result(context, firstTask, 2, "100"),
+                buildClass1Result(context, secondTask, 3, "100"),
+                buildClass1Result(context, thirdTask, 6, "100"),
+                buildClass1Result(context, fourthTask, 10, "100"));
+
+        mockVisibleSequencePersist(context, Arrays.asList(firstTask, secondTask, thirdTask, fourthTask), resultList);
+
+        new TmBizSnapshotAndPersistService(snapshotBuildService, persistService, scheduleResultMapper,
+                scheduleResultExplainMapper, scheduleUnplannedMapper).snapshotAndPersist(context);
+
+        ArgumentCaptor<TmScheduleResult> resultCaptor = ArgumentCaptor.forClass(TmScheduleResult.class);
+        verify(scheduleResultMapper, times(4)).insert(resultCaptor.capture());
+        List<TmScheduleResult> insertedList = resultCaptor.getAllValues();
+        assertEquals(Integer.valueOf(1), insertedList.get(0).getClass1Sequence());
+        assertEquals(Integer.valueOf(2), insertedList.get(1).getClass1Sequence());
+        assertEquals(Integer.valueOf(3), insertedList.get(2).getClass1Sequence());
+        assertEquals(Integer.valueOf(4), insertedList.get(3).getClass1Sequence());
+    }
+
+    /**
+     * 测试内容：验证无计划量的结果行不参与可见顺位重排。
+     * 测试场景：同一机台 1 班存在 sequence=1 但计划量为 0 的行，以及 sequence=2、3 的可见行。
+     * 预期结果：0 计划量行顺序清空，可见行重排为 1、2。
+     */
+    @Test
+    public void snapshotAndPersistShouldSkipZeroPlanQtyRowsWhenResequencingVisibleRows() {
+        TmTaskDraft zeroTask = buildAssignedTask("TR-ZERO", 1);
+        TmTaskDraft firstVisibleTask = buildAssignedTask("TR-001", 1);
+        TmTaskDraft secondVisibleTask = buildAssignedTask("TR-002", 1);
+        TmScheduleContext context = buildVisibleSequenceContext(Arrays.asList(zeroTask, firstVisibleTask, secondVisibleTask));
+        List<TmScheduleResult> resultList = Arrays.asList(
+                buildClass1Result(context, zeroTask, 1, "0"),
+                buildClass1Result(context, firstVisibleTask, 2, "100"),
+                buildClass1Result(context, secondVisibleTask, 3, "100"));
+
+        mockVisibleSequencePersist(context, Arrays.asList(zeroTask, firstVisibleTask, secondVisibleTask), resultList);
+
+        new TmBizSnapshotAndPersistService(snapshotBuildService, persistService, scheduleResultMapper,
+                scheduleResultExplainMapper, scheduleUnplannedMapper).snapshotAndPersist(context);
+
+        ArgumentCaptor<TmScheduleResult> resultCaptor = ArgumentCaptor.forClass(TmScheduleResult.class);
+        verify(scheduleResultMapper, times(3)).insert(resultCaptor.capture());
+        List<TmScheduleResult> insertedList = resultCaptor.getAllValues();
+        assertEquals(null, insertedList.get(0).getClass1Sequence());
+        assertEquals(Integer.valueOf(1), insertedList.get(1).getClass1Sequence());
+        assertEquals(Integer.valueOf(2), insertedList.get(2).getClass1Sequence());
+    }
+
+    /**
+     * 测试内容：验证可见顺位按班次和机台分别重排。
+     * 测试场景：TM001 的 1 班、2 班以及 TM002 的 1 班都存在非连续原始顺序。
+     * 预期结果：每个机台和班次组合都从 1 独立编号，互不影响。
+     */
+    @Test
+    public void snapshotAndPersistShouldResequenceVisibleRowsIndependentlyByMachineAndShift() {
+        TmTaskDraft tm001Class1Task = buildAssignedTask("TR-001", 1);
+        TmTaskDraft tm001Class2Task = buildAssignedTask("TR-002", 2);
+        TmTaskDraft tm002Class1Task = buildAssignedTask("TR-003", 1);
+        TmScheduleContext context = buildVisibleSequenceContext(Arrays.asList(tm001Class1Task, tm001Class2Task, tm002Class1Task));
+        List<TmScheduleResult> resultList = Arrays.asList(
+                buildClass1Result(context, tm001Class1Task, 5, "100"),
+                buildClass2Result(context, tm001Class2Task, 8, "100"),
+                buildClass1Result(context, tm002Class1Task, 7, "100"));
+        resultList.get(2).setMachineCode("TM002");
+
+        mockVisibleSequencePersist(context, Arrays.asList(tm001Class1Task, tm001Class2Task, tm002Class1Task), resultList);
+        when(persistService.convertChainToResult(any(), eq(context)))
+                .thenReturn(Arrays.asList(resultList.get(0), resultList.get(2)))
+                .thenReturn(Collections.singletonList(resultList.get(1)));
+
+        new TmBizSnapshotAndPersistService(snapshotBuildService, persistService, scheduleResultMapper,
+                scheduleResultExplainMapper, scheduleUnplannedMapper).snapshotAndPersist(context);
+
+        ArgumentCaptor<TmScheduleResult> resultCaptor = ArgumentCaptor.forClass(TmScheduleResult.class);
+        verify(scheduleResultMapper, times(3)).insert(resultCaptor.capture());
+        List<TmScheduleResult> insertedList = resultCaptor.getAllValues();
+        TmScheduleResult tm001Class1Result = findResult(insertedList, "TM001", "TR-001");
+        TmScheduleResult tm001Class2Result = findResult(insertedList, "TM001", "TR-002");
+        TmScheduleResult tm002Class1Result = findResult(insertedList, "TM002", "TR-003");
+        assertEquals(Integer.valueOf(1), tm001Class1Result.getClass1Sequence());
+        assertEquals(Integer.valueOf(1), tm001Class2Result.getClass2Sequence());
+        assertEquals(Integer.valueOf(1), tm002Class1Result.getClass1Sequence());
+    }
     /**
      * 构造未排任务草稿。
      *
@@ -524,6 +621,130 @@ public class TmBizSnapshotAndPersistServiceTest {
         return task;
     }
 
+
+    /**
+     * 构造指定胎面和班次的已分配任务草稿。
+     *
+     * @param treadCode 胎面编码
+     * @param shiftOrder 班次顺序
+     * @return 已分配任务草稿
+     */
+    private TmTaskDraft buildAssignedTask(String treadCode, Integer shiftOrder) {
+        TmTaskDraft task = buildAssignedTask();
+        task.setOrderNo("ORD-" + treadCode + "-" + shiftOrder);
+        task.setTreadCode(treadCode);
+        task.setShiftOrder(shiftOrder);
+        task.setPlanQty(new BigDecimal("100"));
+        task.setSourceOrderNos(task.getOrderNo());
+        return task;
+    }
+
+    /**
+     * 构造可见顺位测试上下文，并创建一条任务链用于关联结果和解释。
+     *
+     * @param taskList 已分配任务列表
+     * @return 排程上下文
+     */
+    private TmScheduleContext buildVisibleSequenceContext(List<TmTaskDraft> taskList) {
+        TmScheduleContext context = new TmScheduleContext();
+        context.setFactoryCode("116");
+        context.setBatchNo("TM20260625143025123");
+        context.setScheduleDate(java.sql.Date.valueOf(LocalDate.of(2026, 6, 25)));
+        context.setTaskDraftList(taskList);
+        for (TmTaskDraft task : taskList) {
+            appendAssignedTask(context, task, "TM001", task.getShiftOrder(), task.getPlanQty());
+        }
+        return context;
+    }
+
+    /**
+     * 模拟可见顺位测试所需的快照、结果转换和解释转换。
+     *
+     * @param context    排程上下文
+     * @param taskList   任务列表
+     * @param resultList 转换后的结果列表
+     */
+    private void mockVisibleSequencePersist(TmScheduleContext context, List<TmTaskDraft> taskList,
+                                            List<TmScheduleResult> resultList) {
+        for (TmTaskDraft task : taskList) {
+            when(snapshotBuildService.buildTaskExplain(task, context)).thenReturn(new TmSnapshotBuildResult());
+            when(persistService.convertExplain(eq(task), any(), eq(context))).thenReturn(buildExplain(task));
+        }
+        when(persistService.convertChainToResult(any(), eq(context))).thenReturn(resultList);
+        when(scheduleResultMapper.insert(any(TmScheduleResult.class))).thenAnswer(invocation -> {
+            TmScheduleResult result = invocation.getArgument(0);
+            result.setId(1000L + result.getOrderNo().hashCode());
+            return 1;
+        });
+        when(scheduleResultExplainMapper.insert(any(TmScheduleResultExplain.class))).thenReturn(1);
+    }
+
+    /**
+     * 构造 1 班排程结果。
+     *
+     * @param context  排程上下文
+     * @param task     任务草稿
+     * @param sequence 原始班内顺序
+     * @param planQty  计划量
+     * @return 排程结果
+     */
+    private TmScheduleResult buildClass1Result(TmScheduleContext context, TmTaskDraft task,
+                                               Integer sequence, String planQty) {
+        TmScheduleResult result = buildVisibleSequenceResult(context, task);
+        result.setClass1Sequence(sequence);
+        result.setClass1PlanQty(new BigDecimal(planQty));
+        return result;
+    }
+
+    /**
+     * 构造 2 班排程结果。
+     *
+     * @param context  排程上下文
+     * @param task     任务草稿
+     * @param sequence 原始班内顺序
+     * @param planQty  计划量
+     * @return 排程结果
+     */
+    private TmScheduleResult buildClass2Result(TmScheduleContext context, TmTaskDraft task,
+                                               Integer sequence, String planQty) {
+        TmScheduleResult result = buildVisibleSequenceResult(context, task);
+        result.setClass2Sequence(sequence);
+        result.setClass2PlanQty(new BigDecimal(planQty));
+        return result;
+    }
+
+    /**
+     * 构造可见顺位测试的排程结果基础字段。
+     *
+     * @param context 排程上下文
+     * @param task    任务草稿
+     * @return 排程结果
+     */
+    private TmScheduleResult buildVisibleSequenceResult(TmScheduleContext context, TmTaskDraft task) {
+        TmScheduleResult result = buildResult(task);
+        result.setFactoryCode(context.getFactoryCode());
+        result.setBatchNo(context.getBatchNo());
+        result.setScheduleDate(context.getScheduleDate());
+        result.setMachineCode("TM001");
+        return result;
+    }
+
+    /**
+     * 按机台和胎面查找排程结果。
+     *
+     * @param resultList  结果列表
+     * @param machineCode 机台编码
+     * @param treadCode   胎面编码
+     * @return 匹配的排程结果
+     */
+    private TmScheduleResult findResult(List<TmScheduleResult> resultList, String machineCode, String treadCode) {
+        for (TmScheduleResult result : resultList) {
+            if (machineCode.equals(result.getMachineCode()) && treadCode.equals(result.getTreadCode())) {
+                return result;
+            }
+        }
+        throw new AssertionError("未找到排程结果，machineCode=" + machineCode + ", treadCode=" + treadCode);
+    }
     /**
      * 构造排程结果实体。
      *

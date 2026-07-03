@@ -2,28 +2,42 @@ package com.zlt.aps.cd90.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.cd90.api.domain.entity.Cd90ScheduleResult;
+import com.zlt.aps.cd90.api.domain.entity.Cd90ShiftConfig;
+import com.zlt.aps.cd90.api.domain.vo.Cd90InsertOrderRequest;
 import com.zlt.aps.cd90.engine.domain.Cd90ScheduleTask;
+import com.zlt.aps.cd90.engine.constant.Cd90ScheduleTaskType;
 import com.zlt.aps.cd90.engine.model.Cd90BatchDataCheckResult;
 import com.zlt.aps.cd90.engine.service.Cd90AutoScheduleBatchDataValidator;
 import com.zlt.aps.cd90.engine.service.Cd90ScheduleTaskService;
+import com.zlt.aps.cd90.engine.mapper.Cd90AutoScheduleShiftMapper;
 import com.zlt.aps.cd90.mapper.Cd90ScheduleResultMapper;
 import com.zlt.aps.cd90.model.Cd90ScheduleOverwriteDecision;
 import com.zlt.aps.cd90.service.Cd90AutoScheduleAsyncExecutor;
+import com.zlt.aps.cd90.service.Cd90InsertOrderAsyncExecutor;
 import com.zlt.aps.cd90.service.Cd90ScheduleOverwriteValidator;
 import com.zlt.aps.cd90.service.ICd90ScheduleResultService;
+import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.sysdef.domain.SysDocType;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.Objects;
+import java.util.Comparator;
+import java.util.stream.Collectors;
 
 @Service
 @Transactional(rollbackFor = Exception.class)
@@ -39,6 +53,10 @@ public class Cd90ScheduleResultServiceImpl extends AbstractDocService<Cd90Schedu
     private Cd90AutoScheduleAsyncExecutor asyncExecutor;
     @Resource
     private Cd90AutoScheduleBatchDataValidator batchDataValidator;
+    @Resource
+    private Cd90AutoScheduleShiftMapper shiftMapper;
+    @Resource
+    private Cd90InsertOrderAsyncExecutor insertOrderAsyncExecutor;
 
     /**
      * 接收自动排程请求。
@@ -97,11 +115,142 @@ public class Cd90ScheduleResultServiceImpl extends AbstractDocService<Cd90Schedu
                 + ",scheduleDate=" + scheduleResult.getScheduleDate()
                 + ",forceRegenerate=" + Boolean.TRUE.equals(scheduleResult.getForceRegenerate());
         Cd90ScheduleTask task = taskService.createPending(scheduleResult.getFactoryCode(),
-                scheduleResult.getScheduleDate(), "MANUAL", snapshot, null);
+                scheduleResult.getScheduleDate(), Cd90ScheduleTaskType.AUTO_SCHEDULE,
+                "MANUAL", snapshot, null);
         asyncExecutor.execute(task.getTaskId(), task.getFactoryCode(), task.getScheduleDate());
         data.put("needConfirm", false);
         data.put("taskId", task.getTaskId());
         return AjaxResult.success("自动排程任务已提交", data);
+    }
+
+    @Override
+    public AjaxResult shiftDates(Cd90InsertOrderRequest request) {
+        if (request == null || request.getScheduleDate() == null
+                || request.getFactoryCode() == null || request.getFactoryCode().trim().isEmpty()) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.cd90.insert.required"));
+        }
+        LocalDate scheduleDate = request.getScheduleDate().toInstant()
+                .atZone(ZoneId.systemDefault()).toLocalDate();
+        List<Map<String, Object>> values = shiftMapper.selectList(
+                        new LambdaQueryWrapper<Cd90ShiftConfig>()
+                                .eq(Cd90ShiftConfig::getFactoryCode, request.getFactoryCode())
+                                .eq(Cd90ShiftConfig::getIsActive, 1))
+                .stream()
+                .sorted(Comparator.comparing(Cd90ShiftConfig::getScheduleDay)
+                        .thenComparing(Cd90ShiftConfig::getDayShiftOrder)
+                        .thenComparing(Cd90ShiftConfig::getShiftOrder))
+                .map(config -> {
+                    Map<String, Object> item = new HashMap<>();
+                    item.put("classField", config.getClassField());
+                    item.put("shiftCode", config.getShiftCode());
+                    item.put("shiftName", config.getShiftName());
+                    item.put("shiftDate", scheduleDate.plusDays(config.getScheduleDay() - 2L)
+                            .format(DateTimeFormatter.ISO_LOCAL_DATE));
+                    return item;
+                }).collect(Collectors.toList());
+        return AjaxResult.success(values);
+    }
+
+    @Override
+    public AjaxResult validateInsert(Cd90InsertOrderRequest request) {
+        if (request == null || request.getScheduleDate() == null
+                || isBlank(request.getFactoryCode()) || isBlank(request.getMachineCode())
+                || isBlank(request.getClothCode())) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.cd90.insert.required"));
+        }
+        boolean hasPlan = false;
+        List<Cd90ScheduleResult> existing = this.selectByDateAndFactory(
+                request.getScheduleDate(), request.getFactoryCode());
+        for (int classIndex = 1; classIndex <= 6; classIndex++) {
+            Double planQuantity = (Double) request.getFieldValueByFieldName(
+                    String.format("class%dPlanQty", classIndex));
+            Integer produceOrder = (Integer) request.getFieldValueByFieldName(
+                    String.format("class%dProduceOrder", classIndex));
+            boolean positivePlan = planQuantity != null && planQuantity > 0D;
+            if (positivePlan != (produceOrder != null && produceOrder > 0)) {
+                return AjaxResult.error(I18nUtil.getMessage("ui.cd90.insert.pairRequired"));
+            }
+            if (!positivePlan) {
+                continue;
+            }
+            hasPlan = true;
+            int finalClassIndex = classIndex;
+            int finalClassIndex1 = classIndex;
+            int highestLockedOrder = existing.stream()
+                    .filter(item -> request.getMachineCode().equals(item.getMachineCode()))
+                    .filter(item -> isLocked(item, finalClassIndex))
+                    .map(item -> readProduceOrder(item, finalClassIndex1))
+                    .filter(Objects::nonNull).max(Integer::compareTo).orElse(0);
+            if (produceOrder <= highestLockedOrder) {
+                return AjaxResult.error(I18nUtil.getMessage("ui.cd90.insert.lockedPrefix"));
+            }
+            int finalClassIndex2 = classIndex;
+            boolean duplicateSegment = existing.stream()
+                    .filter(item -> request.getMachineCode().equals(item.getMachineCode()))
+                    .filter(item -> request.getClothCode().equals(item.getClothCode()))
+                    .anyMatch(item -> readPlanQuantity(item, finalClassIndex2) > 0D);
+            if (duplicateSegment) {
+                return AjaxResult.error(I18nUtil.getMessage("ui.cd90.insert.duplicateSegment"));
+            }
+        }
+        return hasPlan ? AjaxResult.success()
+                : AjaxResult.error(I18nUtil.getMessage("ui.cd90.insert.planRequired"));
+    }
+
+    @Override
+    public AjaxResult insertOrder(Cd90InsertOrderRequest request) {
+        AjaxResult validation = this.validateInsert(request);
+        if (!Integer.valueOf(200).equals(validation.get("code"))) {
+            return validation;
+        }
+        Cd90ScheduleTask activeTask = taskService.findActive(
+                request.getFactoryCode(), request.getScheduleDate());
+        if (activeTask != null) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.cd90.insert.activeTask"));
+        }
+        Cd90ScheduleTask task = taskService.createPending(request.getFactoryCode(),
+                request.getScheduleDate(), Cd90ScheduleTaskType.INSERT_ORDER,
+                "MANUAL", request.toString(), null);
+        insertOrderAsyncExecutor.execute(task.getTaskId(), request);
+        Map<String, Object> data = new HashMap<>();
+        data.put("taskId", task.getTaskId());
+        return AjaxResult.success(I18nUtil.getMessage("ui.cd90.insert.submitted"), data);
+    }
+
+    @Override
+    public AjaxResult getInsertTask(String taskId) {
+        Cd90ScheduleTask task = taskService.findByTaskId(taskId);
+        if (task == null || !Cd90ScheduleTaskType.INSERT_ORDER.equals(task.getTaskType())) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.cd90.insert.taskNotFound"));
+        }
+        return AjaxResult.success(task);
+    }
+
+    private boolean isBlank(String value) {
+        return value == null || value.trim().isEmpty();
+    }
+
+    private boolean isLocked(Cd90ScheduleResult result, int classIndex) {
+        Double finishQuantity = readDouble(result, String.format("class%dFinishQty", classIndex));
+        Double planQuantity = readDouble(result, String.format("class%dPlanQty", classIndex));
+        return Integer.valueOf(1).equals(result.getIsLocked())
+                || (finishQuantity != null && finishQuantity > 0D)
+                || ("1".equals(result.getProductionStatus())
+                && planQuantity != null && (finishQuantity == null || finishQuantity < planQuantity));
+    }
+
+    private Integer readProduceOrder(Cd90ScheduleResult result, int classIndex) {
+        return (Integer) result.getFieldValueByFieldName(String.format(
+                "class%dProduceOrder", classIndex));
+    }
+
+    private double readPlanQuantity(Cd90ScheduleResult result, int classIndex) {
+        Double value = readDouble(result, String.format("class%dPlanQty", classIndex));
+        return value == null ? 0D : value;
+    }
+
+    private Double readDouble(Cd90ScheduleResult result, String fieldName) {
+        return (Double) result.getFieldValueByFieldName(fieldName);
     }
 
     @Override
@@ -129,5 +278,49 @@ public class Cd90ScheduleResultServiceImpl extends AbstractDocService<Cd90Schedu
             result.add(item);
         }
         return result;
+    }
+
+    @Override
+    public List<Cd90ScheduleResult> selectByDateAndFactory(Date scheduleDate, String factoryCode) {
+        if (scheduleDate == null || factoryCode == null || factoryCode.isEmpty()) {
+            return new ArrayList<>();
+        }
+        LambdaQueryWrapper<Cd90ScheduleResult> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(Cd90ScheduleResult::getScheduleDate, scheduleDate)
+                .eq(Cd90ScheduleResult::getFactoryCode, factoryCode);
+        return cd90ScheduleResultMapper.selectList(wrapper);
+    }
+
+    @Override
+    public List<Cd90ScheduleResult> getCd90ScheduleResultListByIds(List<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return new ArrayList<>();
+        }
+        LambdaQueryWrapper<Cd90ScheduleResult> wrapper = new LambdaQueryWrapper<>();
+        wrapper.in(Cd90ScheduleResult::getId, ids);
+        return cd90ScheduleResultMapper.selectList(wrapper);
+    }
+
+    /**
+     * 批量更新发布状态。REQUIRES_NEW 独立短事务：
+     * 即便外层 MES 调用 try 块抛异常，失败状态回写也能独立提交，避免状态丢失。
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class, propagation = Propagation.REQUIRES_NEW)
+    public int batchUpdateReleaseStatus(List<Cd90ScheduleResult> list, String targetStatus) {
+        if (list == null || list.isEmpty()) {
+            return 0;
+        }
+        Date now = new Date();
+        for (Cd90ScheduleResult entity : list) {
+            entity.setIsRelease(targetStatus);
+            if (ApsConstant.IS_RELEASE.equals(targetStatus)) {
+                entity.setPublishSuccessCount(
+                        Optional.ofNullable(entity.getPublishSuccessCount()).orElse(0) + 1);
+                entity.setNewestPublishTime(now);
+            }
+        }
+        this.baseDao.updateBatch(list);
+        return list.size();
     }
 }

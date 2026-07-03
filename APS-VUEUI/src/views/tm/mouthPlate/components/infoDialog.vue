@@ -88,6 +88,7 @@ export default {
           dictData: this.parentDict.type.biz_factory_name,
           span: 12,
           required: true,
+          disabled: true,
         },
         {
           prop: "mouthPlateCode",
@@ -106,12 +107,24 @@ export default {
           dictData: this.machines,
           props: { label: "machineCode", value: "machineCode" },
           filterable: true,
+          listeners: {
+            change: (value) => {
+              if (value) {
+                const machine = this.machines.find(m => m.machineCode === value);
+                if (machine) {
+                  this.form.factoryCode = machine.factoryCode;
+                }
+              }
+            },
+          },
         },
         {
           prop: "plateStatus",
           label: this.$t("ui.data.column.tm.mouthPlate.plateStatus"),
+          type: "switch",
           span: 12,
-          maxlength: 50,
+          activeValue: "1",
+          inactiveValue: "0",
         },
         {
           prop: "remark",
@@ -146,10 +159,12 @@ export default {
         this.isEdit = true;
         this.form = {
           ...data,
+          plateStatus: data.plateStatus || "0",
         };
       } else {
         this.form = {
           factoryCode: "116",
+          plateStatus: "1",
         };
       }
     },

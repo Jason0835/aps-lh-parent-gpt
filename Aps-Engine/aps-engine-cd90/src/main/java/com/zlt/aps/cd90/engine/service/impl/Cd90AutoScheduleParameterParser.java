@@ -92,6 +92,10 @@ public class Cd90AutoScheduleParameterParser {
                         Cd90AutoScheduleParamCode.PARTIAL_MIN_VEHICLE_COUNT))
                 .agingPeriodHours(positiveInt(values,
                         Cd90AutoScheduleParamCode.AGING_PERIOD_LIMIT))
+                .newSpecLookbackDays(this.positiveInt(values,
+                        Cd90AutoScheduleParamCode.NEW_SPEC_LOOKBACK_DAYS))
+                .newSpecAdvanceDays(this.nonNegativeInt(values,
+                        Cd90AutoScheduleParamCode.NEW_SPEC_ADVANCE_DAYS))
                 .fallbackLossRatePercent(nonNegativeDecimal(values, Cd90AutoScheduleParamCode.LOSS_RATE))
                 .taskTimeoutMinutes(positiveInt(values, Cd90AutoScheduleParamCode.TASK_TIMEOUT_MINUTES))
                 .autoScheduleCron(values.getOrDefault(Cd90AutoScheduleParamCode.AUTO_SCHEDULE_CRON, ""))

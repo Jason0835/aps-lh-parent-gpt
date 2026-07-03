@@ -43,7 +43,8 @@ public class Cd90ScheduleTaskServiceImpl implements Cd90ScheduleTaskService {
      *
      * @param factoryCode     工厂编码，标识排程所属工厂
      * @param scheduleDate    排程日期，即本次自动排程的目标日期
-     * @param triggerType     触发类型（MANUAL=手动触发 / AUTO=系统自动触发），用于区分排程来源
+     * @param taskType        任务类型（自动排程或插单滚动重排）
+     * @param triggerType     触发类型（MANUAL=手动触发 / TIMER=定时触发），用于区分触发来源
      * @param requestSnapshot 请求快照，记录触发时的关键参数（如"factoryCode=XX,scheduleDate=XX,forceRegenerate=true"），
      *                        便于事后审计排程触发条件
      * @param createBy        创建人标识，手动触发时记录操作人，自动触发时为 null
@@ -51,8 +52,8 @@ public class Cd90ScheduleTaskServiceImpl implements Cd90ScheduleTaskService {
      */
     @Override
     @Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
-    public Cd90ScheduleTask createPending(String factoryCode, Date scheduleDate, String triggerType,
-                                          String requestSnapshot, String createBy) {
+    public Cd90ScheduleTask createPending(String factoryCode, Date scheduleDate, String taskType,
+                                          String triggerType, String requestSnapshot, String createBy) {
         // --- 1. 幂等性检查：查询同工厂、同日期是否已有进行中的任务 ---
         // findActive 查询条件：factoryCode + scheduleDate + taskStatus IN (PENDING, RUNNING)
         // 如果查询到活跃任务，说明已有任务在处理该日期的排程，直接返回已有任务，防止重复创建
@@ -73,22 +74,24 @@ public class Cd90ScheduleTaskServiceImpl implements Cd90ScheduleTaskService {
         task.setFactoryCode(factoryCode);
         // 2.3 排程日期
         task.setScheduleDate(scheduleDate);
-        // 2.4 触发类型（MANUAL / AUTO）
+        // 2.4 任务类型（AUTO_SCHEDULE / INSERT_ORDER）
+        task.setTaskType(taskType);
+        // 2.5 触发类型（MANUAL / TIMER）
         task.setTriggerType(triggerType);
 
-        // 2.5 初始状态：PENDING（等待异步执行器领取）
+        // 2.6 初始状态：PENDING（等待异步执行器领取）
         // 状态机：PENDING → RUNNING → SUCCESS / FAILED
         task.setTaskStatus(Cd90ScheduleTaskStatus.PENDING);
 
-        // 2.6 初始进度 0%
+        // 2.7 初始进度 0%
         task.setProgress(0);
-        // 2.7 当前阶段：等待基础数据校验
+        // 2.8 当前阶段：等待基础数据校验
         task.setCurrentStage(Cd90ScheduleTaskStage.VALIDATE_DATA);
-        // 2.8 阶段名称（中文展示）
+        // 2.9 阶段名称（中文展示）
         task.setCurrentStageName("等待基础数据校验");
-        // 2.9 请求快照，用于事后审计
+        // 2.10 请求快照，用于事后审计
         task.setRequestSnapshot(requestSnapshot);
-        // 2.10 创建人
+        // 2.11 创建人
         task.setCreateBy(createBy);
 
         // --- 3. 持久化：插入 cd90_schedule_task 表 ---
@@ -96,8 +99,9 @@ public class Cd90ScheduleTaskServiceImpl implements Cd90ScheduleTaskService {
         taskMapper.insert(task);
 
         // --- 4. 记录创建日志 ---
-        log.info("[直裁自动排程] 创建等待执行任务, taskId={}, factoryCode={}, scheduleDate={}, triggerType={}",
-                task.getTaskId(), factoryCode, scheduleDate, triggerType);
+        log.info("[直裁排程任务] 创建等待执行任务, taskId={}, factoryCode={}, scheduleDate={}, "
+                        + "taskType={}, triggerType={}",
+                task.getTaskId(), factoryCode, scheduleDate, taskType, triggerType);
 
         return task;
     }

@@ -165,7 +165,7 @@ public class TqLossSettingController extends AbstractDocBizController<TqLossSett
             TqLossSettingExportVO vo = new TqLossSettingExportVO();
             vo.setBeadCode(setting.getBeadCode());
             vo.setMachineName(machineMap.getOrDefault(setting.getMachineCode(), ""));
-            vo.setLossRate(setting.getLossRate());
+            vo.setLossRate(setting.getLossRate() != null ? setting.getLossRate() * 100 : null);
             vo.setRemark(setting.getRemark());
             vo.setUpdateTime(setting.getUpdateTime());
             voList.add(vo);

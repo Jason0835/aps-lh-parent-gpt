@@ -1,17 +1,19 @@
 package com.zlt.aps.tm.engine.service;
 
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import cn.hutool.core.date.DateUtil;
 import cn.hutool.core.util.StrUtil;
 import com.ruoyi.common.exception.ServiceException;
 import com.zlt.aps.common.engine.schedule.ScheduleTaskLinkedList;
+import com.zlt.aps.tm.api.domain.entity.TmScheduleResult;
 import com.zlt.aps.tm.api.enums.TmUnplannedReasonEnum;
-import com.zlt.aps.tm.engine.domain.TmMachineCandidate;
-import com.zlt.aps.tm.engine.domain.TmScheduleContext;
-import com.zlt.aps.tm.engine.domain.TmStockForecast;
-import com.zlt.aps.tm.engine.domain.TmTaskDraft;
+import com.zlt.aps.tm.engine.domain.*;
 import com.zlt.aps.tm.engine.service.impl.*;
 import com.zlt.aps.tm.engine.strategy.*;
 import org.junit.Test;
+import org.slf4j.LoggerFactory;
 
 import java.math.BigDecimal;
 import java.util.Arrays;
@@ -77,6 +79,51 @@ public class TmDefaultStepServiceTest {
     }
 
     /**
+     * 测试内容：验证排序日志包含排序策略、排序摘要和排序依据字段。
+     * 测试场景：两个任务按默认策略排序，日志捕获排序前后信息。
+     * 预期结果：info日志可直接看到sortIndex、businessKey、supplyHours、planQty和demandQty。
+     */
+    @Test
+    public void taskSortShouldWriteTraceableSortLogs() {
+        Logger logger = (Logger) LoggerFactory.getLogger(TmTaskSortService.class);
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+        try {
+            TmScheduleContext context = buildContext();
+            context.setBatchNo("BATCH-SORT");
+            context.setTraceId("TRACE-SORT");
+            TmTaskDraft taskB = buildTask("ORD-SORT-2", null);
+            taskB.setSupplyHours(new BigDecimal("8"));
+            taskB.setDemandQty(new BigDecimal("200"));
+            taskB.setPlanQty(new BigDecimal("200"));
+            TmTaskDraft taskA = buildTask("ORD-SORT-1", null);
+            taskA.setSupplyHours(new BigDecimal("4"));
+            taskA.setDemandQty(new BigDecimal("100"));
+            taskA.setPlanQty(new BigDecimal("100"));
+            context.setTaskDraftList(Arrays.asList(taskB, taskA));
+
+            new TmTaskSortService(buildRegistry()).sort(context);
+
+            assertTrue(appender.list.stream().map(ILoggingEvent::getFormattedMessage)
+                    .anyMatch(message -> message.contains("[TM_TASK_SORT]")
+                            && message.contains("batchNo=BATCH-SORT")
+                            && message.contains("traceId=TRACE-SORT")
+                            && message.contains("beforeOrder=")
+                            && message.contains("afterOrder=")));
+            assertTrue(appender.list.stream().map(ILoggingEvent::getFormattedMessage)
+                    .anyMatch(message -> message.contains("[TM_TASK_SORT_DETAIL]")
+                            && message.contains("sortIndex=1")
+                            && message.contains("businessKey=" + taskA.getBusinessKey())
+                            && message.contains("supplyHours=4")
+                            && message.contains("planQty=100")
+                            && message.contains("demandQty=100")));
+        } finally {
+            logger.detachAppender(appender);
+        }
+    }
+
+    /**
      * 测试内容：验证机台分配步骤处理预设机台和空机台任务。
      * 测试场景：一条任务已有机台 TM01，另一条任务机台为空且无候选机台。
      * 预期结果：预设机台任务追加到 TM01 链，空机台任务标记无可用机台未排。
@@ -116,6 +163,26 @@ public class TmDefaultStepServiceTest {
         assertEquals(2, context.getPersistResult().getResultCount());
         assertEquals(2, context.getPersistResult().getExplainCount());
         assertEquals(1, context.getPersistResult().getUnplannedCount());
+    }
+
+    /**
+     * 测试内容：验证已排任务转换结果表时保留独立基部胶编码。
+     * 测试场景：任务草稿包含主胶、基部胶和口型，并已进入机台任务链。
+     * 预期结果：转换后的 T_TM_SCHEDULE_RESULT 实体写入 baseGlueCode，不依赖整条胶料组合编码。
+     */
+    @Test
+    public void persistServiceShouldWriteBaseGlueCodeToScheduleResult() {
+        TmScheduleContext context = buildContext();
+        TmTaskDraft task = buildTask("ORD-BASE", "TM01");
+        task.setBaseGlueCode("BASE-ORD-BASE");
+        TmMachineCandidate candidate = enabledCandidate("TM01", "1000");
+        new TmTaskChainScheduleService().appendAutoTask(task, candidate, context);
+
+        List<TmScheduleResult> resultList = new TmPersistService()
+                .convertChainToResult(context.getTaskChain("TM01", 1), context);
+
+        assertEquals(1, resultList.size());
+        assertEquals("BASE-ORD-BASE", resultList.get(0).getBaseGlueCode());
     }
 
     /**
@@ -172,6 +239,238 @@ public class TmDefaultStepServiceTest {
         ScheduleTaskLinkedList<TmTaskDraft> chain = context.getTaskChain("TM01", 1);
         assertNotNull(chain);
         assertEquals(1, chain.getSize());
+    }
+
+    /**
+     * 测试内容：验证一班动态排序会继承同机台前一天最后任务作为前置任务。
+     * 测试场景：TM001 前一天链尾为 GL-A，当前一班输入顺序先 GL-B 后 GL-A。
+     * 预期结果：机台分配时优先排与前置任务连续性更高的 GL-A。
+     */
+    @Test
+    public void machineAssignShouldUsePreviousDayPredecessorForFirstShiftOrder() {
+        TmScheduleContext context = buildContext();
+        context.getMachinePredecessorMap().put("TM001", buildPredecessor("TM001", "TR-A", "GL-A", "MP-A"));
+        TmTaskDraft laterTask = buildTask("ORD-LATER", null);
+        laterTask.setTreadCode("TR-B");
+        laterTask.setGlueCode("GL-B");
+        laterTask.setMouthPlateCode("MP-B");
+        laterTask.setPlanQty(new BigDecimal("100"));
+        TmTaskDraft continuousTask = buildTask("ORD-CONTINUOUS", null);
+        continuousTask.setTreadCode("TR-A");
+        continuousTask.setGlueCode("GL-A");
+        continuousTask.setMouthPlateCode("MP-A");
+        continuousTask.setPlanQty(new BigDecimal("100"));
+        context.setTaskDraftList(Arrays.asList(laterTask, continuousTask));
+        TmMachineCandidate tm001 = enabledCandidate("TM001", "1000");
+        tm001.setMaxCapacity(new BigDecimal("1000"));
+        context.setMachineCandidateList(Collections.singletonList(tm001));
+
+        new TmMachineAssignService(new TmTaskChainScheduleService(), buildRegistry()).assign(context);
+
+        ScheduleTaskLinkedList<TmTaskDraft> chain = context.getTaskChain("TM001", 1);
+        assertNotNull(chain);
+        assertEquals("TR-A", chain.toList().get(0).getTask().getTreadCode());
+        assertEquals("TR-B", chain.toList().get(1).getTask().getTreadCode());
+    }
+
+    /**
+     * 测试内容：验证一班链式排序中主胶料连续优先于口型连续和产能适配。
+     * 测试场景：TM001 前一天链尾为 GLUE07/SW007，当前一班同时存在口型匹配且计划量更大的 GLUE10
+     * 和主胶料匹配但口型不匹配的 GLUE07。
+     * 预期结果：机台分配时优先排 GLUE07，避免口型和产能分反超前置任务主胶料连续性。
+     */
+    @Test
+    public void machineAssignShouldPreferPredecessorMainGlueBeforeMouthPlateAndCapacityForFirstShiftOrder() {
+        TmScheduleContext context = buildContext();
+        context.setScheduleDate(DateUtil.parseDate("2026-06-25"));
+        context.getMachinePredecessorMap().put("TM001",
+                buildPredecessor("TM001", "210400584", "GLUE07", "SW007"));
+        TmTaskDraft mouthPlateAndCapacityTask = buildTask("ORD-GLUE10", null);
+        mouthPlateAndCapacityTask.setTreadCode("210400584");
+        mouthPlateAndCapacityTask.setGlueCode("GLUE10");
+        mouthPlateAndCapacityTask.setMouthPlateCode("SW007");
+        mouthPlateAndCapacityTask.setPlanQty(new BigDecimal("1200"));
+        TmTaskDraft mainGlueTask = buildTask("ORD-GLUE07", null);
+        mainGlueTask.setTreadCode("210400277");
+        mainGlueTask.setGlueCode("GLUE07");
+        mainGlueTask.setMouthPlateCode("SW001");
+        mainGlueTask.setPlanQty(new BigDecimal("1000"));
+        context.setTaskDraftList(Arrays.asList(mouthPlateAndCapacityTask, mainGlueTask));
+        TmMachineCandidate tm001 = enabledCandidate("TM001", "5300");
+        tm001.setMaxCapacity(new BigDecimal("5300"));
+        context.setMachineCandidateList(Collections.singletonList(tm001));
+
+        new TmMachineAssignService(new TmTaskChainScheduleService(), buildRegistry()).assign(context);
+
+        ScheduleTaskLinkedList<TmTaskDraft> chain = context.getTaskChain("TM001", 1);
+        assertNotNull(chain);
+        assertEquals("210400277", chain.toList().get(0).getTask().getTreadCode());
+        assertEquals("GLUE07", chain.toList().get(0).getTask().getGlueCode());
+        assertEquals("210400584", chain.toList().get(1).getTask().getTreadCode());
+        assertEquals("GLUE10", chain.toList().get(1).getTask().getGlueCode());
+    }
+
+    /**
+     * 测试内容：验证没有任务匹配前置主胶料时仍保留口型和产能等原有排序能力。
+     * 测试场景：TM001 前一天链尾为 GLUE07/SW007，当前一班两个任务都不匹配 GLUE07，
+     * 其中一个任务匹配口型 SW007。
+     * 预期结果：机台分配时仍优先排口型连续的任务，避免排序退化为只看主胶料。
+     */
+    @Test
+    public void machineAssignShouldStillUseMouthPlateAndCapacityWhenNoTaskMatchesPredecessorMainGlue() {
+        TmScheduleContext context = buildContext();
+        context.getMachinePredecessorMap().put("TM001",
+                buildPredecessor("TM001", "210400584", "GLUE07", "SW007"));
+        TmTaskDraft mouthPlateTask = buildTask("ORD-MP", null);
+        mouthPlateTask.setTreadCode("210400584");
+        mouthPlateTask.setGlueCode("GLUE10");
+        mouthPlateTask.setMouthPlateCode("SW007");
+        mouthPlateTask.setPlanQty(new BigDecimal("1000"));
+        TmTaskDraft otherTask = buildTask("ORD-OTHER", null);
+        otherTask.setTreadCode("210400999");
+        otherTask.setGlueCode("GLUE11");
+        otherTask.setMouthPlateCode("SW001");
+        otherTask.setPlanQty(new BigDecimal("1000"));
+        context.setTaskDraftList(Arrays.asList(otherTask, mouthPlateTask));
+        TmMachineCandidate tm001 = enabledCandidate("TM001", "5300");
+        tm001.setMaxCapacity(new BigDecimal("5300"));
+        context.setMachineCandidateList(Collections.singletonList(tm001));
+
+        new TmMachineAssignService(new TmTaskChainScheduleService(), buildRegistry()).assign(context);
+
+        ScheduleTaskLinkedList<TmTaskDraft> chain = context.getTaskChain("TM001", 1);
+        assertNotNull(chain);
+        assertEquals("210400584", chain.toList().get(0).getTask().getTreadCode());
+        assertEquals("GLUE10", chain.toList().get(0).getTask().getGlueCode());
+    }
+    /**
+     * 测试内容：验证二班排序继承同机台上一班链尾，而不是继续使用前一天尾部任务。
+     * 测试场景：TM001 前一天链尾为 GL-OLD，一班排入 GL-A，二班同时存在 GL-OLD 和 GL-A。
+     * 预期结果：二班优先排 GL-A，说明前置任务已切换为一班链尾。
+     */
+    @Test
+    public void machineAssignShouldUsePreviousShiftTailBeforePreviousDayTail() {
+        TmScheduleContext context = buildContext();
+        context.getMachinePredecessorMap().put("TM001", buildPredecessor("TM001", "TR-OLD", "GL-OLD", "MP-OLD"));
+        TmTaskDraft shiftOneTask = buildTask("ORD-SHIFT1", null);
+        shiftOneTask.setTreadCode("TR-A");
+        shiftOneTask.setGlueCode("GL-A");
+        shiftOneTask.setMouthPlateCode("MP-A");
+        shiftOneTask.setPlanQty(new BigDecimal("100"));
+        TmTaskDraft oldGlueTask = buildTask("ORD-OLD", null);
+        oldGlueTask.setShiftOrder(2);
+        oldGlueTask.setTreadCode("TR-OLD");
+        oldGlueTask.setGlueCode("GL-OLD");
+        oldGlueTask.setMouthPlateCode("MP-OLD");
+        oldGlueTask.setPlanQty(new BigDecimal("100"));
+        TmTaskDraft continuousTask = buildTask("ORD-SHIFT2", null);
+        continuousTask.setShiftOrder(2);
+        continuousTask.setTreadCode("TR-A");
+        continuousTask.setGlueCode("GL-A");
+        continuousTask.setMouthPlateCode("MP-A");
+        continuousTask.setPlanQty(new BigDecimal("100"));
+        context.setTaskDraftList(Arrays.asList(shiftOneTask, oldGlueTask, continuousTask));
+        TmMachineCandidate tm001 = enabledCandidate("TM001", "1000");
+        tm001.setMaxCapacity(new BigDecimal("1000"));
+        context.setMachineCandidateList(Collections.singletonList(tm001));
+
+        new TmMachineAssignService(new TmTaskChainScheduleService(), buildRegistry()).assign(context);
+
+        ScheduleTaskLinkedList<TmTaskDraft> shiftTwoChain = context.getTaskChain("TM001", 2);
+        assertNotNull(shiftTwoChain);
+        assertEquals("TR-A", shiftTwoChain.toList().get(0).getTask().getTreadCode());
+        assertEquals("TR-OLD", shiftTwoChain.toList().get(1).getTask().getTreadCode());
+    }
+
+    /**
+     * 测试内容：验证多机台前置任务按同机台独立生效。
+     * 测试场景：TM001 前置 GL-A，TM002 前置 GL-B，当前一班存在两个对应任务。
+     * 预期结果：两个任务分别排到匹配自己前置任务的机台，不发生跨机台串扰。
+     */
+    @Test
+    public void machineAssignShouldKeepMachinePredecessorsIndependent() {
+        TmScheduleContext context = buildContext();
+        context.getMachinePredecessorMap().put("TM001", buildPredecessor("TM001", "TR-A", "GL-A", "MP-A"));
+        context.getMachinePredecessorMap().put("TM002", buildPredecessor("TM002", "TR-B", "GL-B", "MP-B"));
+        TmTaskDraft taskA = buildTask("ORD-A", null);
+        taskA.setTreadCode("TR-A");
+        taskA.setGlueCode("GL-A");
+        taskA.setMouthPlateCode("MP-A");
+        taskA.setPlanQty(new BigDecimal("100"));
+        TmTaskDraft taskB = buildTask("ORD-B", null);
+        taskB.setTreadCode("TR-B");
+        taskB.setGlueCode("GL-B");
+        taskB.setMouthPlateCode("MP-B");
+        taskB.setPlanQty(new BigDecimal("100"));
+        context.setTaskDraftList(Arrays.asList(taskB, taskA));
+        TmMachineCandidate tm001 = enabledCandidate("TM001", "1000");
+        tm001.setMaxCapacity(new BigDecimal("1000"));
+        TmMachineCandidate tm002 = enabledCandidate("TM002", "1000");
+        tm002.setMaxCapacity(new BigDecimal("1000"));
+        context.setMachineCandidateList(Arrays.asList(tm001, tm002));
+
+        new TmMachineAssignService(new TmTaskChainScheduleService(), buildRegistry()).assign(context);
+
+        assertEquals("TR-A", context.getTaskChain("TM001", 1).toList().get(0).getTask().getTreadCode());
+        assertEquals("TR-B", context.getTaskChain("TM002", 1).toList().get(0).getTask().getTreadCode());
+    }
+    /**
+     * 测试内容：验证选机摘要和任务链日志包含人工排查所需字段。
+     * 测试场景：任务无机台，两个候选机台评分后选择主胶连续的TM01。
+     * 预期结果：info日志包含候选统计、选中机台、评分分项、计划量、产能承接和链顺序摘要。
+     */
+    @Test
+    public void machineAssignShouldWriteSummaryAndChainLogs() {
+        Logger assignLogger = (Logger) LoggerFactory.getLogger(TmMachineAssignService.class);
+        Logger chainLogger = (Logger) LoggerFactory.getLogger(TmTaskChainScheduleService.class);
+        ListAppender<ILoggingEvent> assignAppender = new ListAppender<>();
+        ListAppender<ILoggingEvent> chainAppender = new ListAppender<>();
+        assignAppender.start();
+        chainAppender.start();
+        assignLogger.addAppender(assignAppender);
+        chainLogger.addAppender(chainAppender);
+        try {
+            TmScheduleContext context = buildContext();
+            context.setBatchNo("BATCH-ASSIGN");
+            context.setTraceId("TRACE-ASSIGN");
+            TmTaskDraft task = buildTask("ORD-ASSIGN", null);
+            task.setPlanQty(new BigDecimal("500"));
+            task.setGlueCode("GL-A");
+            context.setTaskDraftList(Collections.singletonList(task));
+            TmMachineCandidate lower = enabledCandidate("TM02", "700");
+            lower.setTailMainGlueCode("GL-B");
+            TmMachineCandidate higher = enabledCandidate("TM01", "700");
+            higher.setTailMainGlueCode("GL-A");
+            context.setMachineCandidateList(Arrays.asList(lower, higher));
+
+            new TmMachineAssignService(new TmTaskChainScheduleService(), buildRegistry()).assign(context);
+
+            assertTrue(assignAppender.list.stream().map(ILoggingEvent::getFormattedMessage)
+                    .anyMatch(message -> message.contains("[TM_MACHINE_ASSIGN_SUMMARY]")
+                            && message.contains("batchNo=BATCH-ASSIGN")
+                            && message.contains("traceId=TRACE-ASSIGN")
+                            && message.contains("businessKey=" + task.getBusinessKey())
+                            && message.contains("candidateCount=2")
+                            && message.contains("passedCount=2")
+                            && message.contains("rejectedCount=0")
+                            && message.contains("selectedMachineCode=TM01")
+                            && message.contains("selectedScore=")
+                            && message.contains("scoreItems=")
+                            && message.contains("planQty=500")
+                            && message.contains("assignedQty=500")
+                            && message.contains("overflowQty=0")));
+            assertTrue(chainAppender.list.stream().map(ILoggingEvent::getFormattedMessage)
+                    .anyMatch(message -> message.contains("[TM_TASK_CHAIN]")
+                            && message.contains("batchNo=BATCH-ASSIGN")
+                            && message.contains("traceId=TRACE-ASSIGN")
+                            && message.contains("operation=AUTO_APPEND")
+                            && message.contains("machineCode=TM01")
+                            && message.contains("shiftOrder=1")
+                            && message.contains("chainOrder=" + task.getBusinessKey())));
+        } finally {
+            assignLogger.detachAppender(assignAppender);
+            chainLogger.detachAppender(chainAppender);
+        }
     }
 
     /**
@@ -421,6 +720,26 @@ public class TmDefaultStepServiceTest {
         return candidate;
     }
 
+
+    /**
+     * 构建机台前置任务快照。
+     *
+     * @param machineCode 机台编码
+     * @param treadCode 胎面编码
+     * @param glueCode 主胶料编码
+     * @param mouthPlateCode 口型板编码
+     * @return 机台前置任务快照
+     */
+    private TmTaskPredecessor buildPredecessor(String machineCode, String treadCode, String glueCode,
+                                               String mouthPlateCode) {
+        TmTaskPredecessor predecessor = new TmTaskPredecessor();
+        predecessor.setMachineCode(machineCode);
+        predecessor.setTreadCode(treadCode);
+        predecessor.setGlueCode(glueCode);
+        predecessor.setMouthPlateCode(mouthPlateCode);
+        return predecessor;
+    }
+
     /**
      * 测试内容：验证候选机台全部因剩余产能不足被过滤时，未排原因归类为产能不足。
      * 测试场景：任务无机台，两台候选机台剩余产能均为 0。
@@ -470,6 +789,83 @@ public class TmDefaultStepServiceTest {
     }
 
     /**
+     * 测试内容：验证小胶种后续同胶任务优先沿用已绑定机台。
+     * 测试场景：首个小胶种任务已预置到 TM002，后续同小胶种同主胶任务在 TM001 评分更高。
+     * 预期结果：后续任务仍排到 TM002，避免小胶种频繁切换机台。
+     */
+    @Test
+    public void machineAssignShouldKeepSmallGlueTaskOnBoundMachineWhenAvailable() {
+        TmScheduleContext context = buildContext();
+        TmMachineAssignService service = new TmMachineAssignService(new TmTaskChainScheduleService(), buildRegistry());
+        TmTaskDraft firstTask = buildSmallGlueTask("ORD-SMALL-FIRST", "TM002");
+        TmTaskDraft secondTask = buildSmallGlueTask("ORD-SMALL-SECOND", null);
+        TmMachineCandidate higherScoreMachine = enabledCandidate("TM001", "1000");
+        higherScoreMachine.setTailMainGlueCode("GL-SMALL");
+        TmMachineCandidate boundMachine = enabledCandidate("TM002", "1000");
+        boundMachine.setTailMainGlueCode("GL-OTHER");
+        context.setMachineCandidateList(Arrays.asList(higherScoreMachine, boundMachine));
+        context.setTaskDraftList(Arrays.asList(firstTask, secondTask));
+
+        service.assign(context);
+
+        assertEquals("TM002", firstTask.getMachineCode());
+        assertEquals("TM002", secondTask.getMachineCode());
+        assertEquals("TM002", context.getSmallGlueMachineMap().get("GL-SMALL"));
+    }
+
+    /**
+     * 测试内容：验证小胶种绑定机台硬约束不可用时允许切换机台。
+     * 测试场景：首个小胶种任务绑定 TM002，后续同小胶种任务处理时 TM002 被禁用，TM001 可用。
+     * 预期结果：后续任务切换到 TM001，并刷新小胶种绑定机台。
+     */
+    @Test
+    public void machineAssignShouldSwitchSmallGlueMachineWhenBoundMachineUnavailable() {
+        TmScheduleContext context = buildContext();
+        TmMachineAssignService service = new TmMachineAssignService(new TmTaskChainScheduleService(), buildRegistry());
+        TmTaskDraft firstTask = buildSmallGlueTask("ORD-SMALL-FIRST", "TM002");
+        TmTaskDraft secondTask = buildSmallGlueTask("ORD-SMALL-SECOND", null);
+        TmMachineCandidate availableMachine = enabledCandidate("TM001", "1000");
+        TmMachineCandidate disabledBoundMachine = enabledCandidate("TM002", "1000");
+        disabledBoundMachine.setEnabled(Boolean.FALSE);
+        context.setMachineCandidateList(Arrays.asList(availableMachine, disabledBoundMachine));
+        context.setTaskDraftList(Arrays.asList(firstTask, secondTask));
+
+        service.assign(context);
+
+        assertEquals("TM002", firstTask.getMachineCode());
+        assertEquals("TM001", secondTask.getMachineCode());
+        assertEquals("TM001", context.getSmallGlueMachineMap().get("GL-SMALL"));
+    }
+
+    /**
+     * 测试内容：验证普通胶种任务不复用小胶种绑定机台。
+     * 测试场景：首个任务为小胶种并绑定 TM002，后续同主胶任务不是小胶种且 TM001 评分更高。
+     * 预期结果：普通任务按原评分逻辑选择 TM001，不受小胶种绑定记录影响。
+     */
+    @Test
+    public void machineAssignShouldNotApplySmallGlueBindingToNormalTaskWithSameGlueCode() {
+        TmScheduleContext context = buildContext();
+        TmMachineAssignService service = new TmMachineAssignService(new TmTaskChainScheduleService(), buildRegistry());
+        TmTaskDraft firstTask = buildSmallGlueTask("ORD-SMALL-FIRST", "TM002");
+        TmTaskDraft normalTask = buildTask("ORD-NORMAL-SAME-GLUE", null);
+        normalTask.setGlueCode("GL-SMALL");
+        normalTask.setPlanQty(new BigDecimal("100"));
+        normalTask.setSmallGlueFlag(Boolean.FALSE);
+        TmMachineCandidate higherScoreMachine = enabledCandidate("TM001", "1000");
+        higherScoreMachine.setTailMainGlueCode("GL-SMALL");
+        TmMachineCandidate boundMachine = enabledCandidate("TM002", "1000");
+        boundMachine.setTailMainGlueCode("GL-OTHER");
+        context.setMachineCandidateList(Arrays.asList(higherScoreMachine, boundMachine));
+        context.setTaskDraftList(Arrays.asList(firstTask, normalTask));
+
+        service.assign(context);
+
+        assertEquals("TM002", firstTask.getMachineCode());
+        assertEquals("TM001", normalTask.getMachineCode());
+        assertEquals("TM002", context.getSmallGlueMachineMap().get("GL-SMALL"));
+    }
+
+    /**
      * 构建同规格顺延测试任务。
      *
      * @param orderNo 来源工单号
@@ -482,6 +878,23 @@ public class TmDefaultStepServiceTest {
         task.setMouthPlateCode("MP-SAME");
         task.setShiftOrder(6);
         task.setPlanQty(new BigDecimal("250"));
+        return task;
+    }
+
+    /**
+     * 构建小胶种测试任务。
+     *
+     * @param orderNo 来源工单号
+     * @param machineCode 预置机台编码
+     * @return 小胶种任务
+     */
+    private TmTaskDraft buildSmallGlueTask(String orderNo, String machineCode) {
+        TmTaskDraft task = buildTask(orderNo, machineCode);
+        task.setTreadCode("TR-" + orderNo);
+        task.setGlueCode("GL-SMALL");
+        task.setMouthPlateCode("MP-SMALL");
+        task.setPlanQty(new BigDecimal("100"));
+        task.setSmallGlueFlag(Boolean.TRUE);
         return task;
     }
 

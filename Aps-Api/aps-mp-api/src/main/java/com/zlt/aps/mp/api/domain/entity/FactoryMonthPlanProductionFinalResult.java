@@ -8,8 +8,10 @@ import com.zlt.aps.mp.api.IFinalAndAdjustResultInterface;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
+import org.apache.commons.lang3.StringUtils;
 
 import java.math.BigDecimal;
+import java.time.YearMonth;
 import java.util.Optional;
 
 /**
@@ -310,7 +312,6 @@ public class FactoryMonthPlanProductionFinalResult extends BaseEntity implements
     private BigDecimal inventorySalesRatio;
 
 
-
     /**
      * 日硫化量
      */
@@ -349,7 +350,9 @@ public class FactoryMonthPlanProductionFinalResult extends BaseEntity implements
     @TableField(value = "UNIFORMITY_QTY")
     private Integer uniformityQty;
 
-    /** 是否锁定上机日期：0-否，1-是 */
+    /**
+     * 是否锁定上机日期：0-否，1-是
+     */
     @ApiModelProperty(value = "是否锁定上机日期：0-否，1-是", name = "isLockSchedule")
     @TableField(value = "IS_LOCK_SCHEDULE")
     private String isLockSchedule;
@@ -475,22 +478,30 @@ public class FactoryMonthPlanProductionFinalResult extends BaseEntity implements
     @TableField(value = "DIFFERENCE_QTY")
     private Integer differenceQty;
 
-    /** 第1周调整量 */
+    /**
+     * 第1周调整量
+     */
     @ApiModelProperty(value = "第1周调整量", name = "adjustQty1")
     @TableField(value = "ADJUST_QTY1")
     private Integer adjustQty1;
 
-    /** 第2周调整量 */
+    /**
+     * 第2周调整量
+     */
     @ApiModelProperty(value = "第2周调整量", name = "adjustQty2")
     @TableField(value = "ADJUST_QTY2")
     private Integer adjustQty2;
 
-    /** 第3周调整量 */
+    /**
+     * 第3周调整量
+     */
     @ApiModelProperty(value = "第3周调整量", name = "adjustQty3")
     @TableField(value = "ADJUST_QTY3")
     private Integer adjustQty3;
 
-    /** 第4周调整量 */
+    /**
+     * 第4周调整量
+     */
     @ApiModelProperty(value = "第4周调整量", name = "adjustQty4")
     @TableField(value = "ADJUST_QTY4")
     private Integer adjustQty4;
@@ -809,14 +820,14 @@ public class FactoryMonthPlanProductionFinalResult extends BaseEntity implements
 
     @ApiModelProperty(value = "双模日硫化量", name = "dayLhQty")
     public Integer getDayLhQty() {
-        if(null == this.dayVulcanizationQty) {
+        if (null == this.dayVulcanizationQty) {
             return 0;
         }
         return dayVulcanizationQty * 2;
     }
 
     /**
-     *  月底计划剩余量key
+     * 月底计划剩余量key
      */
     public String getGroupKey() {
         String keyFormat = "%s|*|%s";
@@ -824,44 +835,111 @@ public class FactoryMonthPlanProductionFinalResult extends BaseEntity implements
     }
 
     /**
+     * 获取物料+计划类型Key
+     *
+     * @return
+     */
+    public String getMaterialStatusKey() {
+        String keyFormat = "%s|*|%s";
+        String trimmedProductStatus = StringUtils.trimToEmpty(productStatus);
+        return String.format(keyFormat, materialCode, trimmedProductStatus);
+    }
+
+    /**
+     * 是否与YearMonth相同年份、月份
+     *
+     * @param yearMonth
+     * @return
+     */
+    public boolean isSameYearMonth(YearMonth yearMonth) {
+        if (null == yearMonth) {
+            return false;
+        }
+        return yearMonth.getYear() == year && yearMonth.getMonthValue() == month;
+    }
+
+    /**
+     * 按年、月分组
+     *
+     * @return
+     */
+    public String getGroupYearMonth() {
+        String keyFormat = "%s|*|%s";
+        return String.format(keyFormat, year, month);
+    }
+
+    /**
      * 获取指定日期的排产量
+     *
      * @param day 日期(1-31)
      * @return 排产量
      */
     public Integer getDayQty(int day) {
         switch (day) {
-            case 1: return day1;
-            case 2: return day2;
-            case 3: return day3;
-            case 4: return day4;
-            case 5: return day5;
-            case 6: return day6;
-            case 7: return day7;
-            case 8: return day8;
-            case 9: return day9;
-            case 10: return day10;
-            case 11: return day11;
-            case 12: return day12;
-            case 13: return day13;
-            case 14: return day14;
-            case 15: return day15;
-            case 16: return day16;
-            case 17: return day17;
-            case 18: return day18;
-            case 19: return day19;
-            case 20: return day20;
-            case 21: return day21;
-            case 22: return day22;
-            case 23: return day23;
-            case 24: return day24;
-            case 25: return day25;
-            case 26: return day26;
-            case 27: return day27;
-            case 28: return day28;
-            case 29: return day29;
-            case 30: return day30;
-            case 31: return day31;
-            default: return null;
+            case 1:
+                return day1;
+            case 2:
+                return day2;
+            case 3:
+                return day3;
+            case 4:
+                return day4;
+            case 5:
+                return day5;
+            case 6:
+                return day6;
+            case 7:
+                return day7;
+            case 8:
+                return day8;
+            case 9:
+                return day9;
+            case 10:
+                return day10;
+            case 11:
+                return day11;
+            case 12:
+                return day12;
+            case 13:
+                return day13;
+            case 14:
+                return day14;
+            case 15:
+                return day15;
+            case 16:
+                return day16;
+            case 17:
+                return day17;
+            case 18:
+                return day18;
+            case 19:
+                return day19;
+            case 20:
+                return day20;
+            case 21:
+                return day21;
+            case 22:
+                return day22;
+            case 23:
+                return day23;
+            case 24:
+                return day24;
+            case 25:
+                return day25;
+            case 26:
+                return day26;
+            case 27:
+                return day27;
+            case 28:
+                return day28;
+            case 29:
+                return day29;
+            case 30:
+                return day30;
+            case 31:
+                return day31;
+            default:
+                return null;
         }
     }
 
@@ -869,37 +947,7 @@ public class FactoryMonthPlanProductionFinalResult extends BaseEntity implements
      * 重新统计总排产量
      */
     public void statisticsTotalQty() {
-        this.totalQty = Optional.ofNullable(this.day1).orElse(0) +
-                Optional.ofNullable(this.day2).orElse(0) +
-                Optional.ofNullable(this.day3).orElse(0) +
-                Optional.ofNullable(this.day4).orElse(0) +
-                Optional.ofNullable(this.day5).orElse(0) +
-                Optional.ofNullable(this.day6).orElse(0) +
-                Optional.ofNullable(this.day7).orElse(0) +
-                Optional.ofNullable(this.day8).orElse(0) +
-                Optional.ofNullable(this.day9).orElse(0) +
-                Optional.ofNullable(this.day10).orElse(0) +
-                Optional.ofNullable(this.day11).orElse(0) +
-                Optional.ofNullable(this.day12).orElse(0) +
-                Optional.ofNullable(this.day13).orElse(0) +
-                Optional.ofNullable(this.day14).orElse(0) +
-                Optional.ofNullable(this.day15).orElse(0) +
-                Optional.ofNullable(this.day16).orElse(0) +
-                Optional.ofNullable(this.day17).orElse(0) +
-                Optional.ofNullable(this.day18).orElse(0) +
-                Optional.ofNullable(this.day19).orElse(0) +
-                Optional.ofNullable(this.day20).orElse(0) +
-                Optional.ofNullable(this.day21).orElse(0) +
-                Optional.ofNullable(this.day22).orElse(0) +
-                Optional.ofNullable(this.day23).orElse(0) +
-                Optional.ofNullable(this.day24).orElse(0) +
-                Optional.ofNullable(this.day25).orElse(0) +
-                Optional.ofNullable(this.day26).orElse(0) +
-                Optional.ofNullable(this.day27).orElse(0) +
-                Optional.ofNullable(this.day28).orElse(0) +
-                Optional.ofNullable(this.day29).orElse(0) +
-                Optional.ofNullable(this.day30).orElse(0) +
-                Optional.ofNullable(this.day31).orElse(0);
+        this.totalQty = Optional.ofNullable(this.day1).orElse(0) + Optional.ofNullable(this.day2).orElse(0) + Optional.ofNullable(this.day3).orElse(0) + Optional.ofNullable(this.day4).orElse(0) + Optional.ofNullable(this.day5).orElse(0) + Optional.ofNullable(this.day6).orElse(0) + Optional.ofNullable(this.day7).orElse(0) + Optional.ofNullable(this.day8).orElse(0) + Optional.ofNullable(this.day9).orElse(0) + Optional.ofNullable(this.day10).orElse(0) + Optional.ofNullable(this.day11).orElse(0) + Optional.ofNullable(this.day12).orElse(0) + Optional.ofNullable(this.day13).orElse(0) + Optional.ofNullable(this.day14).orElse(0) + Optional.ofNullable(this.day15).orElse(0) + Optional.ofNullable(this.day16).orElse(0) + Optional.ofNullable(this.day17).orElse(0) + Optional.ofNullable(this.day18).orElse(0) + Optional.ofNullable(this.day19).orElse(0) + Optional.ofNullable(this.day20).orElse(0) + Optional.ofNullable(this.day21).orElse(0) + Optional.ofNullable(this.day22).orElse(0) + Optional.ofNullable(this.day23).orElse(0) + Optional.ofNullable(this.day24).orElse(0) + Optional.ofNullable(this.day25).orElse(0) + Optional.ofNullable(this.day26).orElse(0) + Optional.ofNullable(this.day27).orElse(0) + Optional.ofNullable(this.day28).orElse(0) + Optional.ofNullable(this.day29).orElse(0) + Optional.ofNullable(this.day30).orElse(0) + Optional.ofNullable(this.day31).orElse(0);
     }
 
 }

@@ -257,6 +257,7 @@ public class LhMouldChangePlanServiceImpl extends AbstractDocService<LhMouldChan
                 queryWrapper.ge(LhMouldChangePlan::getPlanDate, planDate);
                 queryWrapper.lt(LhMouldChangePlan::getPlanDate, DateUtil.offsetDay(planDate, 1));
                 queryWrapper.eq(LhMouldChangePlan::getScheduleDate, docEntity.getScheduleDate());
+                queryWrapper.eq(LhMouldChangePlan::getAfterMaterialCode, docEntity.getAfterMaterialCode());
                 LhMouldChangePlan exist = lhMouldChangePlanMapper.selectOne(queryWrapper);
                 if (exist == null) {
                     failureNum++;

@@ -143,6 +143,7 @@ public class TmAutoPlanMockFactory {
         TmMachineMaintenanceMapper maintenanceMapper = mock(TmMachineMaintenanceMapper.class);
         TmCurlRollMapper curlRollMapper = mock(TmCurlRollMapper.class);
         TmLossSettingMapper lossSettingMapper = mock(TmLossSettingMapper.class);
+        TmDepthConfigMapper depthConfigMapper = mock(TmDepthConfigMapper.class);
 
         when(paramsMapper.selectList(any())).thenReturn(nullToEmpty(scenario.getParams()));
         when(machineInfoMapper.selectList(any())).thenReturn(nullToEmpty(scenario.getMachineInfos()));
@@ -160,6 +161,7 @@ public class TmAutoPlanMockFactory {
         when(maintenanceMapper.selectList(any())).thenReturn(nullToEmpty(scenario.getMachineMaintenances()));
         when(curlRollMapper.selectList(any())).thenReturn(nullToEmpty(scenario.getCurlRolls()));
         when(lossSettingMapper.selectList(any())).thenReturn(nullToEmpty(scenario.getLossSettings()));
+        when(depthConfigMapper.selectList(any())).thenReturn(nullToEmpty(scenario.getDepthConfigs()));
 
         setField(service, "tmParamsMapper", paramsMapper);
         setField(service, "tmMachineInfoMapper", machineInfoMapper);
@@ -173,6 +175,7 @@ public class TmAutoPlanMockFactory {
         setField(service, "tmMachineMaintenanceMapper", maintenanceMapper);
         setField(service, "tmCurlRollMapper", curlRollMapper);
         setField(service, "tmLossSettingMapper", lossSettingMapper);
+        setField(service, "tmDepthConfigMapper", depthConfigMapper);
         return service;
     }
 

@@ -244,3 +244,10 @@ export function getPaddingDistList() {
     method: 'get'
   })
 }
+
+export function getCurrentShift() {
+  return request({
+    url: `dj/djScheduleResult/getCurrentShift`,
+    method: 'get'
+  })
+}

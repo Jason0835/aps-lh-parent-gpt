@@ -55,6 +55,7 @@ export default {
           type: "select",
           span: 12,
           required: true,
+          disabled: true,
           dictData: this.parentDict.type.biz_factory_name,
         },
         {
@@ -75,6 +76,16 @@ export default {
           dictData: this.machines,
           props: { label: "machineCode", value: "machineCode" },
           filterable: true,
+          listeners: {
+            change: (value) => {
+              if (value) {
+                const machine = this.machines.find(m => m.machineCode === value);
+                if (machine) {
+                  this.form.factoryCode = machine.factoryCode;
+                }
+              }
+            },
+          },
         },
         {
           prop: "lossRate",
@@ -99,10 +110,10 @@ export default {
         {
           prop: "enableStatus",
           label: this.$t("ui.data.column.tm.lossSetting.enableStatus"),
-          type: "select",
+          type: "switch",
           span: 12,
-          required: true,
-          dictData: this.parentDict.type.biz_yes_no,
+          activeValue: "1",
+          inactiveValue: "0",
         },
         {
           prop: "remark",
@@ -149,13 +160,6 @@ export default {
             trigger: "blur",
           },
         ],
-        enableStatus: [
-          {
-            required: true,
-            message: this.$t("common.rule.select"),
-            trigger: "change",
-          },
-        ],
       },
     };
   },
@@ -180,6 +184,7 @@ export default {
         this.isEdit = true;
         this.form = {
           ...data,
+          enableStatus: data.enableStatus || "0",
         };
       } else {
         this.form = {

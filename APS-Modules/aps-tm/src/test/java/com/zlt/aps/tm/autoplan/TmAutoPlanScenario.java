@@ -80,6 +80,9 @@ public class TmAutoPlanScenario {
     /** 胎面损耗率设置 */
     private List<TmLossSetting> lossSettings = new ArrayList<>();
 
+    /** 库存保证班数配置 */
+    private List<TmDepthConfig> depthConfigs = new ArrayList<>();
+
     /** 工作日历资料 */
     private List<WorkCalendarData> workCalendars = new ArrayList<>();
 

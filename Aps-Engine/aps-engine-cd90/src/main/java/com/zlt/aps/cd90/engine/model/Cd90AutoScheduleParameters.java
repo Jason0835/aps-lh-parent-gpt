@@ -58,6 +58,10 @@ public class Cd90AutoScheduleParameters {
     private int partialMinVehicleCount;
     /** 大卷静置成熟时长，单位小时。 */
     private int agingPeriodHours;
+    /** 新增规格历史排程计划量回看天数。 */
+    private int newSpecLookbackDays;
+    /** 新增规格未来需求前瞻天数。 */
+    private int newSpecAdvanceDays;
     /** 通用损耗率兜底（百分比），对应参数 SYS0701003；t_cd90_loss_setting 四层优先级均未命中时使用。 */
     private BigDecimal fallbackLossRatePercent;
     /** 自动排程任务超时分钟数。 */

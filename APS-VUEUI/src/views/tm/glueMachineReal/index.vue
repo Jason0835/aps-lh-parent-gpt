@@ -55,7 +55,7 @@
 <script>
 import {mapState} from "vuex";
 import {downloadLink} from "@/utils/request";
-import {listGlueMachineReal, removeGlueMachineReal} from "@/api/tm/glueMachineReal";
+import {listGlueMachineReal, removeGlueMachineReal, saveGlueMachineReal} from "@/api/tm/glueMachineReal";
 import tltUpload from "@/components/tltUpload/tltUpload.vue";
 import TltUploadForm from "@/views/components/tltUploadForm.vue";
 import infoDialog from "./components/infoDialog.vue";
@@ -67,7 +67,7 @@ export default {
     infoDialog,
     TltUploadForm,
   },
-  dicts: ["biz_factory_name", "biz_yes_no"],
+  dicts: ["biz_factory_name", "biz_yes_no", "class_num_three_plan"],
   provide() {
     return {
       parentDict: this.dict,
@@ -137,9 +137,12 @@ export default {
           label: this.$t("ui.data.column.tmGlueMachineReal.machineCode"),
         },
         {
-          prop: "machineClass",
+          prop: "shiftCode",
           halign: "center",
           label: this.$t("ui.data.column.tmGlueMachineReal.machineClass"),
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(this.dict.type.class_num_three_plan, value);
+          },
         },
         {
           prop: "priority",
@@ -150,16 +153,74 @@ export default {
           prop: "allowFlag",
           halign: "center",
           label: this.$t("ui.data.column.tmGlueMachineReal.allowFlag"),
-          formatter: (row, column, value) => {
-            return this.selectDictLabel(this.dict.type.biz_yes_no, value);
+          render: ({ row }) => {
+            return (
+              <el-switch
+                active-value="1"
+                inactive-value="0"
+                disabled={this.loading}
+                value={row.allowFlag}
+                onChange={(val) => {
+                  let confirmMsg = val == "0"
+                    ? this.$t("ui.lhMachineInfo.confirm.disable")
+                    : this.$t("ui.lhMachineInfo.confirm.enable");
+                  this.$confirm(confirmMsg, { type: "warning" }).then(
+                    async () => {
+                      try {
+                        this.loading = true;
+                        const data = await saveGlueMachineReal({
+                          ...row,
+                          allowFlag: val,
+                        });
+                        this.$modal.msgSuccess(data.msg);
+                        this.getList();
+                      } catch (error) {
+                        console.error(error);
+                      } finally {
+                        this.loading = false;
+                      }
+                    }
+                  );
+                }}
+              ></el-switch>
+            );
           },
         },
         {
           prop: "enableStatus",
           halign: "center",
           label: this.$t("ui.data.column.tmGlueMachineReal.enableStatus"),
-          formatter: (row, column, value) => {
-            return this.selectDictLabel(this.dict.type.biz_yes_no, value);
+          render: ({ row }) => {
+            return (
+              <el-switch
+                active-value="1"
+                inactive-value="0"
+                disabled={this.loading}
+                value={row.enableStatus}
+                onChange={(val) => {
+                  let confirmMsg = val == "0"
+                    ? this.$t("ui.lhMachineInfo.confirm.disable")
+                    : this.$t("ui.lhMachineInfo.confirm.enable");
+                  this.$confirm(confirmMsg, { type: "warning" }).then(
+                    async () => {
+                      try {
+                        this.loading = true;
+                        const data = await saveGlueMachineReal({
+                          ...row,
+                          enableStatus: val,
+                        });
+                        this.$modal.msgSuccess(data.msg);
+                        this.getList();
+                      } catch (error) {
+                        console.error(error);
+                      } finally {
+                        this.loading = false;
+                      }
+                    }
+                  );
+                }}
+              ></el-switch>
+            );
           },
         },
         {
@@ -225,6 +286,12 @@ export default {
           labelKey: "machineCode",
           valueKey: "machineCode",
           filterable: true,
+        },
+        {
+          prop: "shiftCode",
+          label: this.$t("ui.data.column.tmGlueMachineReal.shiftCode"),
+          type: "select",
+          dictData: this.dict.type.class_num_three_plan,
         },
         {
           prop: "enableStatus",

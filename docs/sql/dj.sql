@@ -350,4 +350,27 @@ CREATE TABLE `t_dj_day_finish_qty` (
   PRIMARY KEY (`ID`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3 COMMENT='垫胶排程计划每日各班完成量';
 
+
+-- ----------------------------
+-- Table structure for T_DJ_SHIFT_CONFIG
+-- ----------------------------
+CREATE TABLE `T_DJ_SHIFT_CONFIG` (
+    `ID` bigint NOT NULL COMMENT '主键ID',
+    `FACTORY_CODE` varchar(50) DEFAULT NULL COMMENT '工厂编号',
+    `SHIFT_CODE` varchar(30) NOT NULL COMMENT '班次编码（如 01=夜班, 02=早班, 03=中班）',
+    `SHIFT_NAME` varchar(50) NOT NULL COMMENT '班次名称（如 夜班、早班、中班）',
+    `SHIFT_ORDER` int NOT NULL COMMENT '班次顺序（1,2,3...），用于确定班次循环顺序',
+    `PLAN_START_TIME` varchar(8) NOT NULL COMMENT '计划开始时间（HH:mm:ss）',
+    `PLAN_END_TIME` varchar(8) NOT NULL COMMENT '计划结束时间（HH:mm:ss）',
+    `CROSS_DAY_FLAG` char(1) DEFAULT '0' COMMENT '是否跨天（0-否，1-是），跨天班次结束时间在次日',
+    `OPEN_FLAG` char(1) DEFAULT '0' COMMENT '是否开班（0-否，1-是），只查询 OPEN_FLAG=1 的班次',
+    `REMARK` varchar(500) DEFAULT NULL COMMENT '备注',
+    `CREATE_BY` varchar(64) DEFAULT NULL COMMENT '创建人',
+    `CREATE_TIME` datetime DEFAULT NULL COMMENT '创建时间',
+    `UPDATE_BY` varchar(64) DEFAULT NULL COMMENT '更新人',
+    `UPDATE_TIME` datetime DEFAULT NULL COMMENT '更新时间',
+    `IS_DELETE` char(1) DEFAULT '0' COMMENT '逻辑删除标识',
+    PRIMARY KEY (`ID`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='垫胶班制配置表';
+
 SET FOREIGN_KEY_CHECKS = 1;

@@ -172,14 +172,14 @@ public class TqDataLoadServiceImpl implements ITqDataLoadService {
                         com.zlt.aps.tq.engine.vo.TqParamsVo::getParamValue));
 
         TqScheduleParams params = new TqScheduleParams();
-        // 胎圈排程专用参数（SYS0301XXX 系列）
+        // 胎圈排程专用参数（SYS1101XXX 系列）
         params.setBackupShiftCount(getDouble(paramsMap.getOrDefault(EngineConstants.TQ_BACKUP_SHIFT_COUNT, "1")));
         params.setDemandCoefficient(getDouble(paramsMap.getOrDefault(EngineConstants.TQ_DEMAND_COEFFICIENT, "2")));
         params.setClassHours(getDouble(paramsMap.getOrDefault(EngineConstants.TQ_CLASS_HOURS, "8")));
         params.setToolCapacity(getDouble(paramsMap.getOrDefault(EngineConstants.TQ_TOOL_CAPACITY, DEFAULT_TOOL_CAPACITY)));
         params.setLossRate(getDouble(paramsMap.getOrDefault(EngineConstants.TQ_LOSS_RATE, "0.02")));
         params.setMergeThreshold(getDouble(paramsMap.getOrDefault(EngineConstants.TQ_MERGE_THRESHOLD, "100")));
-        // 预生产库存天数（SYS0301007直接配置天数，无需再除以24）
+        // 预生产库存天数（SYS1101007直接配置天数，无需再除以24）
         params.setProductStockDay(getDouble(paramsMap.getOrDefault(EngineConstants.TQ_PRODUCT_STOCK_DAY, "1")));
         params.setLargeDemand(getDouble(paramsMap.getOrDefault(EngineConstants.TQ_LARGE_DEMAND, DEFAULT_LARGE_DEMAND)));
         params.setCloseOutNum(getDouble(paramsMap.getOrDefault(EngineConstants.TQ_CLOSE_OUT_NUM, "50")));
@@ -242,7 +242,7 @@ public class TqDataLoadServiceImpl implements ITqDataLoadService {
 
     /**
      * 加载工装车容量数据（整车容量，按胎圈编码区分）
-     * <p>工装车总数已改为全局参数配置（SYS0301023），在 loadParams() 中加载到 params.toolingTotal</p>
+     * <p>工装车总数已改为全局参数配置（SYS1101023），在 loadParams() 中加载到 params.toolingTotal</p>
      * <p>T_TQ_TOOLING 表已废弃，不再读取</p>
      */
     private void loadToolingData(TqScheduleContext context) {

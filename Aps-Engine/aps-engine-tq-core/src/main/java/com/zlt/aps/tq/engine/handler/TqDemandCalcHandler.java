@@ -38,7 +38,7 @@ import static com.alibaba.fastjson.JSON.toJSONString;
  *
  * <p>注意：均衡逻辑已移至S5(TqBalanceHandler)，停产协调已移至S4(TqStopCoordinationHandler)</p>
  *
- * <p>班次与实际时间对应关系（D=排程日期-2，即今天）：</p>
+ * <p>班次与实际时间对应关系（D=排程日期-1，即今天；排程日期=T+1）：</p>
  * <ul>
  *   <li>胎圈1班：D日中班(14:00-22:00)    → 供应成型3班(D+1日夜班)</li>
  *   <li>胎圈2班：D+1日夜班(22:00-6:00)   → 供应成型4班(D+1日早班)</li>
@@ -376,7 +376,7 @@ public class TqDemandCalcHandler extends AbsTqScheduleStepHandler {
         availableStock = BigDecimalUtil.sub(availableStock, tqConsume3);  // 扣除成型3班胎圈消耗
 
         // 【备库触发判断】胎圈1班排完后判断库存是否不足以支撑1个班的量
-        // 触发条件：当前可用库存 < SYS0301001阈值（1个班的成型消耗量）
+        // 触发条件：当前可用库存 < SYS1101001阈值（1个班的成型消耗量）
         if (hasBackupConfig && backupTriggerClass == 0 && shouldTriggerBackup(availableStock, params)) {
             backupTriggerClass = 1;
             // 计算备库N个班的总量（从成型5班开始连续N个班，超出成型8班用平均值估算）
@@ -602,7 +602,7 @@ public class TqDemandCalcHandler extends AbsTqScheduleStepHandler {
     /**
      * 判断是否触发胎圈备库班数配置逻辑。
      *
-     * <p>触发条件：当前可用库存不足以支撑成型1个班的消耗量（参数SYS0301001配置的阈值）</p>
+     * <p>触发条件：当前可用库存不足以支撑成型1个班的消耗量（参数SYS1101001配置的阈值）</p>
      *
      * @param availableStock 当前可用库存
      * @param params 工序参数

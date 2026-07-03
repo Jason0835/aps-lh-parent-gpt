@@ -21,6 +21,8 @@ public class Cd90MachineTrial {
     private String lossRateLevel;
     /** 实际排产量。 */
     private BigDecimal actualQuantity;
+    /** 单车按胎体长度方向卷取后，对应的直裁排程米数。 */
+    private BigDecimal vehiclePlanQuantity;
     /** 工装可排量。 */
     private BigDecimal toolingQuantity;
     /** 机台产能可排量。 */

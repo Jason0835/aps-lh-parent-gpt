@@ -10,8 +10,8 @@ import java.util.List;
  */
 public interface Cd90ScheduleTaskService {
 
-    Cd90ScheduleTask createPending(String factoryCode, Date scheduleDate, String triggerType,
-                                   String requestSnapshot, String createBy);
+    Cd90ScheduleTask createPending(String factoryCode, Date scheduleDate, String taskType,
+                                   String triggerType, String requestSnapshot, String createBy);
 
     Cd90ScheduleTask findByTaskId(String taskId);
 

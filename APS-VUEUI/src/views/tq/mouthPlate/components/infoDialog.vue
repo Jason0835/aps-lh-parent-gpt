@@ -82,7 +82,7 @@ export default {
           maxlength: "30",
         },
         {
-          label: this.$t("ui.specifyMachine.column.machineName"),
+          label: this.$t("ui.specifyMachine.column.machineCode"),
           prop: "machineCode",
           span: 24,
           required: true,

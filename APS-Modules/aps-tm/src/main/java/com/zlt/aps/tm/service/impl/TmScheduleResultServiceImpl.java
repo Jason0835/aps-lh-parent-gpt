@@ -144,7 +144,7 @@ public class TmScheduleResultServiceImpl extends AbstractDocService<TmScheduleRe
             List<String> machineCodeList = (List<String>) serviceCheckParams.get("tmMachineCodeList");
             String machineCode = importDocEntity.getMachineCode();
             if (!machineCodeList.contains(machineCode)) {
-                String message = String.format(I18nUtil.getMessage("ui.data.alert.tm.machineCodeNotExist"), machineCode);
+                String message = I18nUtil.getMessage("ui.data.alert.tm.machineCodeNotExist");
                 ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(), errorRowNum, message, importErrorLogs);
                 return Boolean.FALSE;
             }
@@ -275,7 +275,8 @@ public class TmScheduleResultServiceImpl extends AbstractDocService<TmScheduleRe
         fillOverwriteCheckResult(request, response, currentResultList, false);
         response.setSuccess(Boolean.TRUE);
         response.setMessage(Boolean.TRUE.equals(response.getConfirmRequired())
-                ? "当前排程日期已有未发布计划，确认后将重新生成" : "自动排程校验通过");
+                ? resolveTmMessage("ui.data.alert.tm.schedule.confirmOverwriteTip", "当前排程日期已有未发布计划，确认后将重新生成")
+                : resolveTmMessage("ui.data.alert.tm.schedule.validatePassed", "自动排程校验通过"));
         return response;
     }
 
@@ -360,12 +361,12 @@ public class TmScheduleResultServiceImpl extends AbstractDocService<TmScheduleRe
             response.setResultCount(persistResult.getResultCount());
             response.setUnplannedCount(persistResult.getUnplannedCount());
             if (persistResult.getErrorCount() > 0) {
-                response.setMessage("胎面自动排程执行完成，部分记录落库失败：" + persistResult.getLastErrorMsg());
+                response.setMessage(resolveTmMessage("ui.data.alert.tm.schedule.executePartialFailed", "胎面自动排程执行完成，部分记录落库失败，请联系管理员处理"));
                 log.warn("{} step=PERSIST_PARTIAL_FAILED factoryCode={}, scheduleDate={}, batchNo={}, traceId={}, errorCount={}, lastErrorMsg={}",
                         TM_AUTO_PLAN_LOG_PREFIX, context.getFactoryCode(), formatAutoPlanDate(context.getScheduleDate()),
                         context.getBatchNo(), context.getTraceId(), persistResult.getErrorCount(), persistResult.getLastErrorMsg());
             } else {
-                response.setMessage("胎面自动排程执行完成");
+                response.setMessage(resolveTmMessage("ui.data.alert.tm.schedule.executeFinished", "胎面自动排程执行完成"));
             }
             log.info("{} step=FINISHED factoryCode={}, scheduleDate={}, batchNo={}, traceId={}, success={}, resultCount={}, unplannedCount={}, message={}, elapsedMs={}",
                     TM_AUTO_PLAN_LOG_PREFIX, request.getFactoryCode(), formatAutoPlanDate(request.getScheduleDate()),
@@ -492,16 +493,16 @@ public class TmScheduleResultServiceImpl extends AbstractDocService<TmScheduleRe
     @Override
     public int insertTask(TmScheduleResult scheduleResult) {
         if (scheduleResult == null) {
-            throw new ServiceException("插单排程结果不能为空");
+            throw new ServiceException(resolveTmMessage("ui.data.alert.tm.schedule.insertTaskEmpty", "插单排程结果不能为空"));
         }
         if (StrUtil.isBlank(scheduleResult.getFactoryCode())) {
             scheduleResult.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
         }
         if (scheduleResult.getScheduleDate() == null) {
-            throw new ServiceException("插单排程日期不能为空");
+            throw new ServiceException(resolveTmMessage("ui.data.alert.tm.schedule.insertScheduleDateEmpty", "插单排程日期不能为空"));
         }
         if (StrUtil.isBlank(scheduleResult.getTreadCode())) {
-            throw new ServiceException("插单胎面编码不能为空");
+            throw new ServiceException(resolveTmMessage("ui.data.alert.tm.schedule.insertTreadCodeEmpty", "插单胎面不能为空"));
         }
         validateInsertAfterSecondSequence(scheduleResult);
         invokeInsertFacade(scheduleResult);
@@ -522,7 +523,7 @@ public class TmScheduleResultServiceImpl extends AbstractDocService<TmScheduleRe
     @Override
     public int changeQty(TmScheduleResult scheduleResult) {
         if (scheduleResult == null || scheduleResult.getId() == null) {
-            throw new ServiceException("调量排程结果ID不能为空");
+            throw new ServiceException(resolveTmMessage("ui.data.alert.tm.schedule.changeQtyIdEmpty", "调量排程结果不能为空"));
         }
         if (isReleasingOrTimeoutByIds(new Long[]{scheduleResult.getId()}) > 0) {
             throw new ServiceException(I18nUtil.getMessage("ui.data.column.scheduleResult.release.isReleasingOrTimeoutById"));
@@ -543,7 +544,7 @@ public class TmScheduleResultServiceImpl extends AbstractDocService<TmScheduleRe
     @Override
     public int changeMachine(TmScheduleResult scheduleResult) {
         if (scheduleResult == null || scheduleResult.getId() == null) {
-            throw new ServiceException("转机台排程结果ID不能为空");
+            throw new ServiceException(resolveTmMessage("ui.data.alert.tm.schedule.changeMachineIdEmpty", "转机台排程结果不能为空"));
         }
         if (isReleasingOrTimeoutByIds(new Long[]{scheduleResult.getId()}) > 0) {
             throw new ServiceException(I18nUtil.getMessage("ui.data.column.scheduleResult.release.isReleasingOrTimeoutById"));
@@ -564,7 +565,7 @@ public class TmScheduleResultServiceImpl extends AbstractDocService<TmScheduleRe
     @Override
     public boolean publishValidate(List<Long> ids) {
         if (CollUtil.isEmpty(ids)) {
-            throw new ServiceException("发布排程结果ID不能为空");
+            throw new ServiceException(resolveTmMessage("ui.data.alert.tm.schedule.publishIdsEmpty", "发布排程结果不能为空"));
         }
         if (isReleasingOrTimeoutByIds(ids.toArray(new Long[0])) > 0) {
             throw new ServiceException(I18nUtil.getMessage("ui.data.column.scheduleResult.release.isReleasingOrTimeoutById"));
@@ -596,13 +597,13 @@ public class TmScheduleResultServiceImpl extends AbstractDocService<TmScheduleRe
      */
     private void validateAutoScheduleRequest(TmAutoScheduleRequestVo request) {
         if (request == null) {
-            throw new ServiceException("自动排程请求不能为空");
+            throw new ServiceException(resolveTmMessage("ui.data.alert.tm.schedule.autoPlanRequestEmpty", "自动排程请求不能为空"));
         }
         if (StrUtil.isBlank(request.getFactoryCode())) {
-            throw new ServiceException("自动排程工厂编号不能为空");
+            throw new ServiceException(resolveTmMessage("ui.data.alert.tm.schedule.factoryCodeEmpty", "自动排程工厂不能为空"));
         }
         if (request.getScheduleDate() == null) {
-            throw new ServiceException("自动排程日期不能为空");
+            throw new ServiceException(I18nUtil.getMessage("ui.data.alert.tm.schedule.dateEmpty"));
         }
     }
 
@@ -671,12 +672,11 @@ public class TmScheduleResultServiceImpl extends AbstractDocService<TmScheduleRe
         boolean allNoRelease = currentResultList.stream()
                 .allMatch(item -> ApsConstant.NO_RELEASE.equals(item.getReleaseStatus()));
         if (!allNoRelease) {
-            throw new ServiceException(String.format("排程日期：%s已有发布过的生成计划，不可重复生成",
-                    DateUtil.formatDate(request.getScheduleDate())));
+            throw new ServiceException(resolveTmMessage("ui.data.alert.tm.schedule.generatedPlanExists", "当前排程日期已存在已发布计划，不允许重复生成"));
         }
         response.setConfirmRequired(Boolean.TRUE);
         if (executeMode && !Boolean.TRUE.equals(request.getConfirmOverwrite())) {
-            throw new ServiceException("当前排程日期已有未发布计划，请确认后重新生成");
+            throw new ServiceException(resolveTmMessage("ui.data.alert.tm.schedule.confirmOverwriteRequired", "当前排程日期已有未发布计划，请确认后重新生成"));
         }
     }
 
@@ -734,7 +734,7 @@ public class TmScheduleResultServiceImpl extends AbstractDocService<TmScheduleRe
     private void invokeChangeQtyFacade(TmScheduleResult scheduleResult) {
         TmScheduleResult oldSchedule = tmScheduleResultMapper.selectById(scheduleResult.getId());
         if (oldSchedule == null) {
-            throw new ServiceException("调量排程结果不存在");
+            throw new ServiceException(resolveTmMessage("ui.data.alert.tm.schedule.changeQtyResultNotFound", "调量排程结果不存在或已失效"));
         }
         Integer shiftOrder = Optional.ofNullable(TmInsertPositionValidator.resolveShiftOrder(scheduleResult))
                 .orElseGet(() -> Optional.ofNullable(TmInsertPositionValidator.resolveShiftOrder(oldSchedule)).orElse(1));
@@ -752,7 +752,7 @@ public class TmScheduleResultServiceImpl extends AbstractDocService<TmScheduleRe
     private void invokeTransferMachineFacade(TmScheduleResult scheduleResult) {
         TmScheduleResult oldSchedule = tmScheduleResultMapper.selectById(scheduleResult.getId());
         if (oldSchedule == null) {
-            throw new ServiceException("转机台排程结果不存在");
+            throw new ServiceException(resolveTmMessage("ui.data.alert.tm.schedule.changeMachineResultNotFound", "转机台排程结果不存在或已失效"));
         }
         Integer shiftOrder = Optional.ofNullable(TmInsertPositionValidator.resolveShiftOrder(scheduleResult))
                 .orElseGet(() -> Optional.ofNullable(TmInsertPositionValidator.resolveShiftOrder(oldSchedule)).orElse(1));
@@ -856,6 +856,18 @@ public class TmScheduleResultServiceImpl extends AbstractDocService<TmScheduleRe
         String message = I18nUtil.getMessage(errorCode.getMessageKey());
         return StringUtils.isBlank(message) || errorCode.getMessageKey().equals(message)
                 ? errorCode.getDefaultMessage() : message;
+    }
+
+    /**
+     * 读取胎面排程国际化提示，未命中时回退默认文案。
+     *
+     * @param messageKey     国际化 key
+     * @param defaultMessage 默认提示
+     * @return 当前语言环境下的提示文案
+     */
+    private String resolveTmMessage(String messageKey, String defaultMessage) {
+        String message = I18nUtil.getMessage(messageKey);
+        return StringUtils.isBlank(message) || messageKey.equals(message) ? defaultMessage : message;
     }
 
     /**

@@ -292,6 +292,10 @@ public enum MonthPlanEnums {
      */
     SHARE_MOLD_EMBRYO_PRIORITY("SYS0207002", "参与Sku排产竞争共用模具或是共用胎胚优先"),
     /**
+     * SYS0207003 前结构出现匹配不到机台时，竞争列表是否自动顺延下一优先级结构
+     */
+    EMPTY_AUTO_NEXT_PRIORITY("SYS0207003", "前高优先级结构出现匹配不到机台时，竞争列表是否自动顺延下一优先级结构"),
+    /**
      * SYS0209003 APS通用班制
      */
     APS_GENERAL_SHIFT("SYS0209003", "SKU双模日硫化量，倒算班产使用"),

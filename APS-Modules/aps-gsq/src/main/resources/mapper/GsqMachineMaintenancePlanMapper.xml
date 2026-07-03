@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.gsq.mapper.GsqMachineMaintenancePlanMapper">
+
+    <!-- 查询钢丝圈机台维修计划列表（左联机台信息表反显机台名称） -->
+    <select id="listMachineMaintenancePlan" parameterType="com.zlt.aps.gsq.api.domain.entity.GsqMachineMaintenancePlan"
+            resultType="com.zlt.aps.gsq.api.domain.entity.GsqMachineMaintenancePlan">
+        select * from (
+            select mp.ID, mp.MACHINE_CODE, mp.DOWNTIME_DATE, mp.DOWNTIME_SHIFT,
+                   mp.DOWNTIME_HOURS, mp.REMARK, mp.IS_DELETE, mp.CREATE_BY, mp.CREATE_TIME,
+                   mp.UPDATE_BY, mp.UPDATE_TIME,
+                   mi.MACHINE_NAME
+            from T_GSQ_MACHINE_MAINTENANCE_PLAN mp
+            left join T_GSQ_MACHINE_INFO mi on mp.MACHINE_CODE = mi.MACHINE_CODE
+            where mp.IS_DELETE = '0'
+            <if test="downtimeDateBegin != null">
+                and mp.DOWNTIME_DATE &gt;= #{downtimeDateBegin}
+            </if>
+            <if test="downtimeDateEnd != null">
+                and mp.DOWNTIME_DATE &lt;= #{downtimeDateEnd}
+            </if>
+            <if test="machineCode != null and machineCode != ''">
+                and mp.MACHINE_CODE = #{machineCode}
+            </if>
+            order by mp.DOWNTIME_DATE desc, mi.MACHINE_NAME
+        ) t
+    </select>
+
+    <!-- 校验"停机日期+机台编码+停机班次"组合唯一性 -->
+    <select id="checkUnique" parameterType="com.zlt.aps.gsq.api.domain.entity.GsqMachineMaintenancePlan" resultType="int">
+        SELECT count(1)
+        FROM T_GSQ_MACHINE_MAINTENANCE_PLAN
+        where IS_DELETE = '0'
+        and DOWNTIME_DATE = #{downtimeDate}
+        and MACHINE_CODE = #{machineCode}
+        and DOWNTIME_SHIFT = #{downtimeShift}
+        <if test="id != null">and ID != #{id}</if>
+    </select>
+
+    <!-- 批量合并保存（存在则更新，否则新增），用于导入场景 -->
+    <insert id="mergeSql" parameterType="list">
+        INSERT INTO T_GSQ_MACHINE_MAINTENANCE_PLAN (
+            MACHINE_CODE, DOWNTIME_DATE, DOWNTIME_SHIFT, DOWNTIME_HOURS, REMARK,
+            CREATE_BY, CREATE_TIME, UPDATE_BY, UPDATE_TIME, IS_DELETE
+        )
+        VALUES
+        <foreach collection="list" item="plan" separator=",">
+            (
+            #{plan.machineCode,jdbcType=VARCHAR},
+            #{plan.downtimeDate,jdbcType=DATE},
+            #{plan.downtimeShift,jdbcType=VARCHAR},
+            #{plan.downtimeHours,jdbcType=DECIMAL},
+            #{plan.remark,jdbcType=VARCHAR},
+            #{plan.createBy,jdbcType=VARCHAR},
+            NOW(),
+            #{plan.updateBy,jdbcType=VARCHAR},
+            NOW(),
+            '0'
+            )
+        </foreach>
+        ON DUPLICATE KEY UPDATE
+        DOWNTIME_HOURS = VALUES(DOWNTIME_HOURS),
+        UPDATE_BY = VALUES(CREATE_BY),
+        UPDATE_TIME = NOW(),
+        REMARK = VALUES(REMARK)
+    </insert>
+
+</mapper>

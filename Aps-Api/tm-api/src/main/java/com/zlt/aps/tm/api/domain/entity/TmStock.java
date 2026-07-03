@@ -2,6 +2,7 @@ package com.zlt.aps.tm.api.domain.entity;
 
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.ruoyi.common.core.annotation.Excel;
 import com.ruoyi.common.core.web.domain.BaseEntity;
 import com.zlt.aps.common.core.annotation.ImportValidated;
@@ -19,13 +20,14 @@ public class TmStock extends BaseEntity {
 
     private static final long serialVersionUID = 1L;
 
-    @Excel(name = "ui.data.column.tm.stock.factoryCode")
+    @Excel(name = "ui.data.column.tm.stock.factoryCode", dictType = "biz_factory_name")
     @ImportValidated(required = true, isCode = true, maxLength = 50)
     @ApiModelProperty(value = "工厂编号", name = "factoryCode")
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;
 
-    @Excel(name = "ui.data.column.tm.stock.stockDate")
+    @JsonFormat(pattern = "yyyy-MM-dd")
+    @Excel(name = "ui.data.column.tm.stock.stockDate", width = 30, dateFormat = "yyyy-MM-dd")
     @ImportValidated(required = true, date = true)
     @ApiModelProperty(value = "库存日期", name = "stockDate")
     @TableField(value = "STOCK_DATE")
@@ -54,4 +56,10 @@ public class TmStock extends BaseEntity {
     @ApiModelProperty(value = "调整数量", name = "adjustQty")
     @TableField(value = "ADJUST_QTY")
     private BigDecimal adjustQty;
+
+    @Excel(name = "ui.common.column.remark")
+    @ImportValidated(maxLength = 500)
+    @ApiModelProperty("备注")
+    @TableField("REMARK")
+    private String remark;
 }

@@ -100,7 +100,7 @@ public class TmTaskDraft {
     /** 当前任务计算前全局可用工装数量 */
     private BigDecimal availableToolQty;
 
-    /** 当前任务占用的工装数量 */
+    /** 当前任务净占用的工装数量，生产为正、成型消耗库存释放占用为负 */
     private BigDecimal toolUsedQty;
 
     /** 当前任务计算后全局剩余工装数量 */
@@ -162,6 +162,8 @@ public class TmTaskDraft {
     /** 新规格判断与提前排产证据 */
     private TmNewSpecInfo newSpecInfo;
 
+    /** 是否命中小胶种连续生产规则 */
+    private Boolean smallGlueFlag;
     /** 实验规格判断与固定计划量证据 */
     private TmExperimentSpecInfo experimentSpecInfo;
 

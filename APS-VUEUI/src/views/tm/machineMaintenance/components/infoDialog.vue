@@ -68,7 +68,6 @@ export default {
                 if (new Date(value).getTime() > new Date(this.form.stopEndTime).getTime()) {
                   callback(new Error("开始时间不能大于结束时间"));
                 } else {
-                  this.$refs.form.$refs.infoForm.validateField("stopEndTime");
                   callback();
                 }
               } else {
@@ -90,7 +89,6 @@ export default {
                 if (new Date(value).getTime() < new Date(this.form.stopStartTime).getTime()) {
                   callback(new Error("结束时间不能小于开始时间"));
                 } else {
-                  this.$refs.form.$refs.infoForm.validateField("stopStartTime");
                   callback();
                 }
               } else {
@@ -123,6 +121,7 @@ export default {
           type: "select",
           span: 12,
           required: true,
+          disabled: true,
           dictData: this.parentDict.type.biz_factory_name,
         },
         {
@@ -134,6 +133,16 @@ export default {
           dictData: this.machines,
           props: { label: "machineCode", value: "machineCode" },
           filterable: true,
+          listeners: {
+            change: (value) => {
+              if (value) {
+                const machine = this.machines.find(m => m.machineCode === value);
+                if (machine) {
+                  this.form.factoryCode = machine.factoryCode;
+                }
+              }
+            },
+          },
         },
         {
           prop: "stopStartTime",
@@ -172,6 +181,14 @@ export default {
           },
         },
         {
+          prop: "stopShift",
+          label: this.$t("ui.data.column.tm.machineMaintenance.stopShift"),
+          span: 12,
+          type: "select",
+          disabled: true,
+          dictData: this.parentDict.type.class_num_three_plan,
+        },
+        {
           prop: "remark",
           label: this.$t("ui.common.column.remark"),
           span: 24,
@@ -188,8 +205,8 @@ export default {
         const res = await saveTmMachineMaintenance(params);
         this.$modal.msgSuccess(res.msg);
         this.$emit("success");
-        this.hide();
         this.loading = false;
+        this.hide();
       } catch (error) {
         console.log(error);
         this.loading = false;

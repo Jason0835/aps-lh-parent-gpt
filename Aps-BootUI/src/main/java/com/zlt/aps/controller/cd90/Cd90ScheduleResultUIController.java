@@ -8,6 +8,7 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.text.Convert;
 import com.ruoyi.common4ui.core.controller.BaseUIController;
 import com.zlt.aps.cd90.api.domain.entity.Cd90ScheduleResult;
+import com.zlt.aps.cd90.api.domain.vo.Cd90InsertOrderRequest;
 import com.zlt.aps.cd90.api.service.ICd90ScheduleResultRemoteService;
 import com.zlt.file.encryptbyll.FileEncryptUtils;
 import io.swagger.annotations.Api;
@@ -52,6 +53,53 @@ public class Cd90ScheduleResultUIController extends BaseUIController<Cd90Schedul
     @ResponseBody
     public AjaxResult autoSchedule(Cd90ScheduleResult scheduleResult) {
         return remoteService.autoSchedule(scheduleResult);
+    }
+
+    @ApiOperation("查询插单班次日期")
+    @RequiresPermissions("cd90:scheduleResult:insert")
+    @PostMapping("/shiftDates")
+    @ResponseBody
+    public AjaxResult shiftDates(@RequestBody Cd90InsertOrderRequest request) {
+        return remoteService.shiftDates(request);
+    }
+
+    @ApiOperation("插单预校验")
+    @RequiresPermissions("cd90:scheduleResult:insert")
+    @PostMapping("/validateInsert")
+    @ResponseBody
+    public AjaxResult validateInsert(@RequestBody Cd90InsertOrderRequest request) {
+        return remoteService.validateInsert(request);
+    }
+
+    @ApiOperation("提交插单滚动重排")
+    @RequiresPermissions("cd90:scheduleResult:insert")
+    @PostMapping("/insert")
+    @ResponseBody
+    public AjaxResult insertOrder(@RequestBody Cd90InsertOrderRequest request) {
+        return remoteService.insertOrder(request);
+    }
+
+    @ApiOperation("查询插单滚动重排任务")
+    @RequiresPermissions("cd90:scheduleResult:insert")
+    @GetMapping("/insert/task/{taskId}")
+    @ResponseBody
+    public AjaxResult getInsertTask(@PathVariable("taskId") String taskId) {
+        return remoteService.getInsertTask(taskId);
+    }
+
+    /**
+     * 发布直裁排程结果到 MES。
+     *
+     * @param dto 包含 scheduleDate、factoryCode 的请求体
+     * @param ids 选中记录 ID 列表（逗号分隔），为空时按日期全量发布
+     * @return 发布结果
+     */
+    @ApiOperation("发布排程")
+    @RequiresPermissions("cd90:scheduleResult:publish")
+    @PostMapping("/publish")
+    @ResponseBody
+    public AjaxResult publish(Cd90ScheduleResult dto, String ids) {
+        return remoteService.publish(dto, ids);
     }
 
     /**

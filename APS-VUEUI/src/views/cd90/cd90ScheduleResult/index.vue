@@ -81,6 +81,10 @@
       ref="autoScheduleRef"
       @success="handleAutoScheduleSuccess"
     />
+    <insert-order-dialog
+      ref="insertOrderRef"
+      @success="handleInsertSuccess"
+    />
     <el-dialog
       :title="$t('ui.data.column.cd90ScheduleResult.autoScheduleProgress')"
       :visible.sync="autoScheduleProgressVisible"
@@ -103,11 +107,6 @@
         {{ autoScheduleProgressHint }}
       </div>
     </el-dialog>
-    <release-status-dialog
-      ref="releaseStatusRef"
-      :schedule-date="query.scheduleDate"
-      @success="getList"
-    />
     <el-dialog
       :title="$t('ui.data.column.scheduleResult.unscheduleResult')"
       :visible.sync="unscheduleResultDialogVisible"
@@ -134,13 +133,13 @@
 
 <script>
 import moment from 'moment'
-import { getAutoScheduleTask, listScheduleResult, delScheduleResult, exportScheduleResult } from '@/api/cd90/scheduleResult'
+import { getAutoScheduleTask, getInsertTask, listScheduleResult, delScheduleResult, exportScheduleResult, publishScheduleResult } from '@/api/cd90/scheduleResult'
 import { listTireFabricCodes } from '@/api/cd90/specifyMachine'
 import { getCd90MachineEnableOptions } from '@/api/cd90/cd90MachineInfo'
 import { listUnscheduleResult, exportUnscheduleResult } from '@/api/cd90/unscheduleResult'
 import TltUploadForm from '@/views/components/tltUploadForm.vue'
 import AutoScheduleDialog from './components/autoScheduleDialog.vue'
-import ReleaseStatusDialog from './components/releaseStatusDialog.vue'
+import InsertOrderDialog from './components/insertOrderDialog.vue'
 
 const SHIFT_CONFIG = [
   { classField: 'class1', shiftKey: 'middleShift', dayOffset: -1 },
@@ -153,7 +152,7 @@ const SHIFT_CONFIG = [
 
 export default {
   name: 'Cd90ScheduleResult',
-  components: { TltUploadForm, AutoScheduleDialog, ReleaseStatusDialog },
+  components: { TltUploadForm, AutoScheduleDialog, InsertOrderDialog },
   dicts: ['biz_factory_name', 'IS_RELEASE'],
   provide() {
     return {
@@ -469,6 +468,9 @@ export default {
       }
     },
     pollAutoScheduleTask(taskId) {
+      this.pollScheduleTask(taskId, getAutoScheduleTask)
+    },
+    pollScheduleTask(taskId, taskGetter) {
       this.clearAutoScheduleTimer()
       this.autoSchedulePollTimes = 0
       this.autoScheduleProgressVisible = true
@@ -477,7 +479,7 @@ export default {
       this.autoScheduleProgressStatus = null
       this.autoScheduleProgressHint = this.$t('ui.data.column.cd90ScheduleResult.autoScheduleProgressHint')
       const poll = () => {
-        getAutoScheduleTask(taskId).then(res => {
+        taskGetter(taskId).then(res => {
           this.autoSchedulePollTimes += 1
           // 兼容响应拦截器两种返回形态：
           //   - 剥离后：res = { taskId, progress, taskStatus, currentStageName, ... }
@@ -543,7 +545,23 @@ export default {
       }
     },
     handleInsert() {
-      this.showPendingActionMessage()
+      this.$refs.insertOrderRef.show({
+        factoryCode: this.search.factoryCode,
+        scheduleDate: this.search.scheduleDate
+      })
+    },
+    handleInsertSuccess(scheduleDate, payload) {
+      if (scheduleDate) {
+        this.query = { ...this.query, scheduleDate }
+        this.search = { ...this.search, scheduleDate }
+        this.updateDateList(scheduleDate)
+      }
+      const data = payload || {}
+      if (data.taskId) {
+        this.pollScheduleTask(data.taskId, getInsertTask)
+      } else {
+        this.getList()
+      }
     },
     handleChangeMachine() {
       this.showPendingActionMessage()
@@ -552,8 +570,26 @@ export default {
       this.showPendingActionMessage()
     },
     handlePublish() {
-      const ids = this.selection.map(item => item.id).join(',')
-      this.$refs.releaseStatusRef.show(ids, this.query.scheduleDate, this.query.factoryCode)
+      this.$confirm(this.$t('ui.biz.alter.makeSurePublish'), {
+        type: 'warning'
+      }).then(async () => {
+        try {
+          this.loading = true
+          const ids = this.selection.map(item => item.id).join(',')
+          const params = {
+            scheduleDate: this.query.scheduleDate,
+            factoryCode: this.query.factoryCode,
+            ids
+          }
+          const data = await publishScheduleResult(params)
+          this.$modal.msgSuccess(data.msg)
+          this.getList()
+        } catch (error) {
+          console.error(error)
+        } finally {
+          this.loading = false
+        }
+      })
     },
     showPendingActionMessage() {
       this.$message.warning('\u8be5\u6d41\u7a0b\u5165\u53e3\u5df2\u9884\u7559\uff0c\u5f85 cd90 \u5bf9\u5e94\u63a5\u53e3\u548c\u5f39\u7a97\u5b8c\u6210\u540e\u63a5\u5165')

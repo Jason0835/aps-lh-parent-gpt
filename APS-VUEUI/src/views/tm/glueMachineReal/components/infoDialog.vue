@@ -63,15 +63,7 @@ export default {
             trigger: "blur",
           },
         ],
-        enableStatus: [
-          {
-            required: true,
-            message: this.$t("common.rule.select"),
-            trigger: "change",
-          },
-        ],
       },
-    };
   },
   computed: {
     machines() {
@@ -93,6 +85,7 @@ export default {
           type: "select",
           span: 12,
           required: true,
+          disabled: true,
           dictData: this.parentDict.type.biz_factory_name,
         },
         {
@@ -103,12 +96,12 @@ export default {
           required: true,
           disabled: this.isEdit,
         },
-        {
-          prop: "baseGlueCode",
-          label: this.$t("ui.data.column.tmGlueMachineReal.baseGlueCode"),
-          span: 12,
-          maxlength: 60,
-        },
+        // {
+        //   prop: "baseGlueCode",
+        //   label: this.$t("ui.data.column.tmGlueMachineReal.baseGlueCode"),
+        //   span: 12,
+        //   maxlength: 60,
+        // },
         {
           prop: "machineCode",
           label: this.$t("ui.data.column.tmGlueMachineReal.machineCode"),
@@ -119,12 +112,23 @@ export default {
           dictData: this.machines,
           props: { label: "machineCode", value: "machineCode" },
           filterable: true,
+          listeners: {
+            change: (value) => {
+              if (value) {
+                const machine = this.machines.find(m => m.machineCode === value);
+                if (machine) {
+                  this.form.factoryCode = machine.factoryCode;
+                }
+              }
+            },
+          },
         },
         {
           prop: "shiftCode",
           label: this.$t("ui.data.column.tmGlueMachineReal.shiftCode"),
+          type: "select",
           span: 12,
-          maxlength: 10,
+          dictData: this.parentDict.type.class_num_three_plan,
         },
         {
           prop: "priority",
@@ -135,17 +139,18 @@ export default {
         {
           prop: "allowFlag",
           label: this.$t("ui.data.column.tmGlueMachineReal.allowFlag"),
-          type: "select",
+          type: "switch",
           span: 12,
-          dictData: this.parentDict.type.biz_yes_no,
+          activeValue: "1",
+          inactiveValue: "0",
         },
         {
           prop: "enableStatus",
           label: this.$t("ui.data.column.tmGlueMachineReal.enableStatus"),
-          type: "select",
+          type: "switch",
           span: 12,
-          required: true,
-          dictData: this.parentDict.type.biz_yes_no,
+          activeValue: "1",
+          inactiveValue: "0",
         },
         {
           prop: "remark",
@@ -178,6 +183,8 @@ export default {
         this.isEdit = true;
         this.form = {
           ...data,
+          enableStatus: data.enableStatus || "0",
+          allowFlag: data.allowFlag || "0",
         };
       } else {
         this.form = {

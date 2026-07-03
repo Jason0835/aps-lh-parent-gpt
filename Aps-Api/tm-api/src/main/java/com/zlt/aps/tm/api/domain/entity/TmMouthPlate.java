@@ -15,7 +15,7 @@ import lombok.Data;
 public class TmMouthPlate extends BaseEntity {
     private static final long serialVersionUID = 1L;
 
-    @Excel(name = "ui.data.column.tm.mouthPlate.factoryCode")
+    @Excel(name = "ui.data.column.tm.mouthPlate.factoryCode", dictType = "biz_factory_name")
     @ImportValidated(required = true, isCode = true, maxLength = 50)
     @ApiModelProperty(value = "工厂编号", name = "factoryCode")
     @TableField(value = "FACTORY_CODE")
@@ -33,9 +33,15 @@ public class TmMouthPlate extends BaseEntity {
     @TableField(value = "MACHINE_CODE")
     private String machineCode;
 
-    @Excel(name = "ui.data.column.tm.mouthPlate.plateStatus")
+    @Excel(name = "ui.data.column.tm.mouthPlate.plateStatus", dictType = "biz_yes_no")
     @ImportValidated(maxLength = 1)
     @ApiModelProperty(value = "口型板状态", name = "plateStatus")
     @TableField(value = "PLATE_STATUS")
     private String plateStatus;
+
+    @Excel(name = "ui.common.column.remark")
+    @ImportValidated(maxLength = 500)
+    @ApiModelProperty("备注")
+    @TableField("REMARK")
+    private String remark;
 }

@@ -32,7 +32,7 @@
         >{{ $t("ui.frame.btn.delete") }}</el-button>
         <el-button
           v-hasPermi="['tm:tmMachineMaintenance:import']"
-          @click="$refs.tltUpload.handleImport()"
+          @click="$refs.tltUpload.handleImport({ updateSupport: false })"
         >{{ $t("ui.frame.btn.import") }}</el-button>
         <el-button
           @click="handleExport"
@@ -67,7 +67,7 @@ export default {
     infoDialog,
     TltUploadForm,
   },
-  dicts: ["biz_factory_name"],
+  dicts: ["biz_factory_name", "class_num_three_plan"],
   provide() {
     return {
       parentDict: this.dict,
@@ -139,6 +139,15 @@ export default {
           width: 180,
         },
         {
+          prop: "stopShift",
+          halign: "center",
+          label: this.$t("ui.data.column.tm.machineMaintenance.stopShift"),
+          type: "select",
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(this.dict.type.class_num_three_plan, value);
+          },
+        },
+        {
           prop: "remark",
           halign: "center",
           label: this.$t("ui.common.column.remark"),
@@ -197,6 +206,12 @@ export default {
           labelKey: "machineCode",
           valueKey: "machineCode",
           filterable: true,
+        },
+        {
+          prop: "stopShift",
+          label: this.$t("ui.data.column.tm.machineMaintenance.stopShift"),
+          type: "select",
+          dictData: this.dict.type.class_num_three_plan,
         },
       ];
     },

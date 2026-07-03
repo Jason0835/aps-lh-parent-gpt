@@ -334,6 +334,22 @@ public class TmAutoPlanTestReportScenarioTest {
     public void shouldReportScene037ExperimentSpecCustomParamsAndSkipNonExperiment() {
         executeScene("tm_scene_037_experiment_spec_custom_params_skip.json");
     }
+
+    /**
+     * 测试内容：TM_SCENE_038 同机台前置任务链连续排序。
+     */
+    @Test
+    public void shouldReportScene038MachinePredecessorChainSort() {
+        executeScene("tm_scene_038_machine_predecessor_chain_sort.json");
+    }
+
+    /**
+     * TM_SCENE_039：小胶种参数命中后连续生产规则写入解释证据。
+     */
+    @Test
+    public void shouldReportScene039SmallGlueContinuous() {
+        executeScene("tm_scene_039_small_glue_continuous.json");
+    }
     /**
      * 读取并执行单个报告场景。
      *

@@ -55,9 +55,7 @@ public class TmGlueMachineRealServiceImpl extends AbstractDocService<TmGlueMachi
     public String checkUnique(TmGlueMachineReal query) {
         String unique = super.checkUnique(query);
         if (UserConstants.NOT_UNIQUE.equals(unique)) {
-            String msg = I18nUtil.getMessage("ui.data.alert.tm.glueMachineReal.notUnique");
-            throw new ServiceException(com.ruoyi.common.utils.StringUtils.format(msg,
-                    query.getFactoryCode(), query.getGlueCode(), query.getMachineCode()));
+            throw new ServiceException(I18nUtil.getMessage("ui.data.alert.tm.glueMachineReal.notUnique"));
         }
         return unique;
     }
@@ -99,7 +97,7 @@ public class TmGlueMachineRealServiceImpl extends AbstractDocService<TmGlueMachi
             List<String> machineCodeList = (List<String>) serviceCheckParams.get("tmMachineCodeList");
             String machineCode = importDocEntity.getMachineCode();
             if (!machineCodeList.contains(machineCode)) {
-                String message = String.format(I18nUtil.getMessage("ui.data.alert.tm.machineCodeNotExist"), machineCode);
+                String message = I18nUtil.getMessage("ui.data.alert.tm.machineCodeNotExist");
                 ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(), errorRowNum, message, importErrorLogs);
                 return Boolean.FALSE;
             }

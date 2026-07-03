@@ -12,6 +12,7 @@ import com.zlt.aps.cd90.engine.model.Cd90FormingScheduleSource;
 import com.zlt.aps.cd90.engine.model.Cd90MachineTrialPlan;
 import com.zlt.aps.cd90.engine.model.Cd90MachineTrialRequest;
 import com.zlt.aps.cd90.engine.model.Cd90RollingScheduleContext;
+import com.zlt.aps.cd90.engine.model.Cd90RollingPendingTask;
 import com.zlt.aps.cd90.engine.model.Cd90ScheduleAttemptTrace;
 import com.zlt.aps.cd90.engine.model.Cd90ScheduleCandidate;
 import com.zlt.aps.cd90.engine.model.Cd90ShiftCommitRequest;
@@ -114,9 +115,27 @@ public class Cd90SingleShiftScheduleExecutor implements Cd90SingleShiftScheduleS
                         BigDecimal.ZERO, reason, attemptTraces.size() + 1));
                 continue;
             }
-            BigDecimal netDemand = continueDemand ? this.normalize(rawDemand)
-                    : roundUpByUnitLength(shift, clothCode, rawDemand,
-                    construction.getUnitConsumeMillimeter(), construction.getCraftWidth());
+            BigDecimal netDemand;
+            BigDecimal vehicleDemand;
+            if (continueDemand || candidate.isNewSpecAdvanceQuantityNormalized()) {
+                netDemand = this.normalize(rawDemand);
+                vehicleDemand = netDemand;
+            } else {
+                BigDecimal unitLengthMm = construction.getUnitConsumeMillimeter();
+                BigDecimal craftWidthMm = construction.getCraftWidth();
+                BigDecimal unitLengthM = unitLengthMm.divide(BigDecimal.valueOf(1000), 10, RoundingMode.HALF_UP);
+                BigDecimal craftWidthM = craftWidthMm.divide(BigDecimal.valueOf(1000), 10, RoundingMode.HALF_UP);
+                BigDecimal pieceCount = rawDemand.divide(unitLengthM, 0, RoundingMode.CEILING);
+                // netDemand: 帘布纵向消耗米数 = pieceCount x craftWidth (直裁宽度方向)
+                // 用于 closeOut 判断、续作剩余量计算和 trace 日志，方向为帘布走料方向。
+                netDemand = this.normalize(pieceCount.multiply(craftWidthM));
+                // vehicleDemand: 小车实际卷取米数 = pieceCount x unitLength (胎体长度方向)
+                // 小车收取是头尾相连沿 TIRE_FABRIC_LENGTH 方向，不是 craftWidth 方向。
+                // 此值仅用于日志复盘原需求方向；试算服务按施工数据独立计算单车等价量。
+                vehicleDemand = this.normalize(pieceCount.multiply(unitLengthM));
+                log.info("[直裁自动排程] 净需求按单片长度取整并按直裁宽度换算, classField={}, clothCode={}, rawDemand={}, unitLength={}mm, craftWidth={}mm, pieceCount={}, roundedDemand={}, vehicleDemand={}",
+                        shift.getClassField(), clothCode, rawDemand, unitLengthMm, craftWidthMm, pieceCount, netDemand, vehicleDemand);
+            }
             if (input.getBigRollAgingDataMissingCodes() != null
                     && input.getBigRollAgingDataMissingCodes().contains(construction.getBigRollCode())) {
                 String reason = "DATA_MISSING";
@@ -157,7 +176,8 @@ public class Cd90SingleShiftScheduleExecutor implements Cd90SingleShiftScheduleS
             attemptTraces.add(trace(shift, clothCode, construction.getBigRollCode(),
                     netDemand, scheduledQuantity, null, partialReason,
                     attemptTraces.size() + 1));
-            handleContinueDemand(shift, candidate, netDemand, scheduledQuantity, commit.getTask().getMachineCode(), partialReason,
+            this.handleRemainingDemand(shift, candidate, netDemand, scheduledQuantity,
+                    commit.getTask().getMachineCode(), partialReason, rolling,
                     continueDemandByCloth, immediateContinueCandidates);
         }
         saveContinueDemand(rolling, continueDemandByCloth);
@@ -225,20 +245,79 @@ public class Cd90SingleShiftScheduleExecutor implements Cd90SingleShiftScheduleS
         return roundedDemand;
     }
 
+    /**
+     * 保存部分排后的剩余需求。均分只是计划策略切分，仍保持新增规格提前属性；
+     * 机台、库排等真实资源限制产生的剩余量，才转为后续班次续作。
+     */
+    private void handleRemainingDemand(Cd90ShiftDescriptor shift,
+                                       Cd90ScheduleCandidate candidate,
+                                       BigDecimal netDemand,
+                                       BigDecimal scheduledQuantity,
+                                       String sourceMachineCode,
+                                       String partialReason,
+                                       Cd90RollingScheduleContext rolling,
+                                       Map<String, BigDecimal> continueDemandByCloth,
+                                       Deque<Cd90ScheduleCandidate> immediateContinueCandidates) {
+        if (!candidate.isNewSpecAdvance()) {
+            this.handleContinueDemand(shift, candidate, netDemand, scheduledQuantity,
+                    sourceMachineCode, partialReason, rolling, continueDemandByCloth,
+                    immediateContinueCandidates);
+            return;
+        }
+        BigDecimal remainingDemand = this.remainingDemand(netDemand, scheduledQuantity);
+        Map<String, BigDecimal> advanceRemainingByCloth = rolling == null
+                ? null : rolling.getNewSpecAdvanceRemainingByCloth();
+        Set<String> normalizedAdvanceClothCodes = rolling == null
+                ? null : rolling.getNormalizedNewSpecAdvanceClothCodes();
+        if (advanceRemainingByCloth == null || normalizedAdvanceClothCodes == null) {
+            log.warn("[直裁自动排程] 新增规格提前需求滚动快照缺失, classField={}, clothCode={}",
+                    shift.getClassField(), candidate.getClothCode());
+            return;
+        }
+        if (remainingDemand.signum() <= 0) {
+            advanceRemainingByCloth.remove(candidate.getClothCode());
+            normalizedAdvanceClothCodes.remove(candidate.getClothCode());
+            continueDemandByCloth.remove(candidate.getClothCode());
+            return;
+        }
+        if ("EQUAL_SHARE".equals(partialReason)) {
+            advanceRemainingByCloth.put(candidate.getClothCode(), remainingDemand);
+            normalizedAdvanceClothCodes.add(candidate.getClothCode());
+            continueDemandByCloth.remove(candidate.getClothCode());
+            log.info("[直裁自动排程] 新增规格均分后保留提前需求属性, classField={}, clothCode={}, "
+                            + "scheduledQuantity={}, remainingDemand={}",
+                    shift.getClassField(), candidate.getClothCode(), scheduledQuantity, remainingDemand);
+            return;
+        }
+        advanceRemainingByCloth.remove(candidate.getClothCode());
+        normalizedAdvanceClothCodes.remove(candidate.getClothCode());
+        this.handleContinueDemand(shift, candidate, netDemand, scheduledQuantity,
+                sourceMachineCode, partialReason, rolling, continueDemandByCloth,
+                immediateContinueCandidates);
+        log.info("[直裁自动排程] 新增规格因资源限制转为续作, classField={}, clothCode={}, "
+                        + "scheduledQuantity={}, remainingDemand={}, partialReason={}",
+                shift.getClassField(), candidate.getClothCode(), scheduledQuantity,
+                remainingDemand, partialReason);
+    }
+
     private void handleContinueDemand(Cd90ShiftDescriptor shift,
                                       Cd90ScheduleCandidate candidate,
                                       BigDecimal netDemand,
                                       BigDecimal scheduledQuantity,
                                       String sourceMachineCode,
                                       String partialReason,
+                                      Cd90RollingScheduleContext rolling,
                                       Map<String, BigDecimal> continueDemandByCloth,
                                       Deque<Cd90ScheduleCandidate> immediateContinueCandidates) {
         BigDecimal remainingDemand = this.remainingDemand(netDemand, scheduledQuantity);
         if (remainingDemand.signum() <= 0 || "EQUAL_SHARE".equals(partialReason)) {
             continueDemandByCloth.remove(candidate.getClothCode());
+            this.removePendingTask(rolling, candidate.getClothCode());
             return;
         }
         continueDemandByCloth.put(candidate.getClothCode(), remainingDemand);
+        this.savePendingTask(rolling, shift, candidate, netDemand, scheduledQuantity,
+                remainingDemand, sourceMachineCode, partialReason);
         candidate.setContinueFromPreviousShift(true);
         if (!StringUtils.hasText(candidate.getSourceMachineCode())) {
             candidate.setSourceMachineCode(sourceMachineCode);
@@ -249,6 +328,49 @@ public class Cd90SingleShiftScheduleExecutor implements Cd90SingleShiftScheduleS
         }
         log.info("[直裁自动排程] 当前规格部分排后进入续作队列, classField={}, clothCode={}, sourceMachineCode={}, scheduledQuantity={}, remainingDemand={}, partialReason={}",
                 shift.getClassField(), candidate.getClothCode(), candidate.getSourceMachineCode(), scheduledQuantity, remainingDemand, partialReason);
+    }
+
+    /** 自动排程同时保存任务级续作节点，供插单和后续滚动共享任务身份模型。 */
+    private void savePendingTask(Cd90RollingScheduleContext rolling,
+                                 Cd90ShiftDescriptor shift,
+                                 Cd90ScheduleCandidate candidate,
+                                 BigDecimal originalQuantity,
+                                 BigDecimal scheduledQuantity,
+                                 BigDecimal remainingQuantity,
+                                 String sourceMachineCode,
+                                 String partialReason) {
+        if (rolling == null || rolling.getPendingTasks() == null) {
+            return;
+        }
+        this.removePendingTask(rolling, candidate.getClothCode());
+        rolling.getPendingTasks().add(Cd90RollingPendingTask.builder()
+                .taskKey("AUTO|" + shift.getClassField() + "|" + candidate.getClothCode())
+                .originalClassField(shift.getClassField())
+                .targetClassField(nextClassField(shift.getClassField()))
+                .clothCode(candidate.getClothCode())
+                .bigRollCode(candidate.getBigRollCode())
+                .sourceMachineCode(sourceMachineCode)
+                .requiredMachineCode(sourceMachineCode)
+                .originalQuantity(originalQuantity)
+                .scheduledQuantity(scheduledQuantity)
+                .remainingQuantity(remainingQuantity)
+                .hardInsert(false).locked(false).continueFromPreviousShift(true)
+                .lastLimitReason(partialReason).build());
+    }
+
+    private String nextClassField(String classField) {
+        if (!StringUtils.hasText(classField) || !classField.startsWith("CLASS")) {
+            return null;
+        }
+        int classIndex = Integer.parseInt(classField.substring("CLASS".length()));
+        return classIndex >= 6 ? null : "CLASS" + (classIndex + 1);
+    }
+
+    private void removePendingTask(Cd90RollingScheduleContext rolling, String clothCode) {
+        if (rolling == null || rolling.getPendingTasks() == null) {
+            return;
+        }
+        rolling.getPendingTasks().removeIf(item -> clothCode.equals(item.getClothCode()));
     }
 
     private BigDecimal remainingDemand(BigDecimal netDemand, BigDecimal scheduledQuantity) {
@@ -387,6 +509,7 @@ public class Cd90SingleShiftScheduleExecutor implements Cd90SingleShiftScheduleS
                 .bigRollCode(construction.getBigRollCode())
                 .cordSpec(construction.getCordSpec())
                 .craftWidth(construction.getCraftWidth())
+                .unitConsumeMillimeter(construction.getUnitConsumeMillimeter())
                 .curlLength(effectiveCurlLength(context, construction))
                 .shiftCode(shift.getShiftCode())
                 .shiftStart(shift.getStartTime()).shiftEnd(shift.getEndTime())
@@ -412,7 +535,6 @@ public class Cd90SingleShiftScheduleExecutor implements Cd90SingleShiftScheduleS
                 .cordSpec(construction.getCordSpec())
                 .classField(shift.getClassField())
                 .shiftStart(shift.getStartTime()).shiftEnd(shift.getEndTime())
-                .coilMeter(effectiveCurlLength(context, construction))
                 .closeOut(closeOut)
                 .partialMinVehicleCount(context.getParameters().getPartialMinVehicleCount())
                 .trialPlan(trialPlan).build();

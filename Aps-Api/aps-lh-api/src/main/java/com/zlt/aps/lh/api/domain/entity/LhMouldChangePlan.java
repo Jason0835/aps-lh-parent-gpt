@@ -174,5 +174,5 @@ public class LhMouldChangePlan extends BaseEntity implements Serializable {
      * 是否导出模板
      */
     @TableField(exist = false)
-    private Boolean exportTemplate;
+    private Boolean exportTemplate = Boolean.FALSE;
 }

@@ -55,6 +55,8 @@ import com.zlt.sysdef.domain.SysDocType;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.xssf.usermodel.XSSFColor;
+import org.apache.poi.xssf.usermodel.XSSFCellStyle;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -1009,9 +1011,21 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
                 // 日计划量列（原 J 列，现 F 列）：后续需要参与导入，不能保留公式；
                 // 按模板公式逻辑 todayNightFinishQty - totalDailyPlanQty 写入静态数值。
                 if (dailyPlanQtyCol >= 0 && todayNightFinishQtyCol >= 0 && totalDailyPlanQtyCol >= 0) {
-                    setNumericCell(row, dailyPlanQtyCol,
-                            readNumericCell(row.getCell(todayNightFinishQtyCol))
-                                    .subtract(readNumericCell(row.getCell(totalDailyPlanQtyCol))));
+                    BigDecimal dailyPlanValue = readNumericCell(row.getCell(todayNightFinishQtyCol))
+                            .subtract(readNumericCell(row.getCell(totalDailyPlanQtyCol)));
+                    setNumericCell(row, dailyPlanQtyCol, dailyPlanValue);
+                    // 日计划量 ≤ 400：该单元格标淡橙提示产量偏低
+                    if (dailyPlanValue.compareTo(BigDecimal.valueOf(400)) <= 0) {
+                        XSSFColor orange = new XSSFColor(new byte[]{(byte) 0xFC, (byte) 0xD5, (byte) 0xB4}, null);
+                        Cell cell = row.getCell(dailyPlanQtyCol);
+                        if (cell != null) {
+                            XSSFCellStyle style = workbook.createCellStyle();
+                            style.cloneStyleFrom(cell.getCellStyle());
+                            style.setFillForegroundColor(orange);
+                            style.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+                            cell.setCellStyle(style);
+                        }
+                    }
                 }
 
                 // 夜班合计计划量 / 夜班合计完成量：后续同样需要导入，直接写入静态合计值。
@@ -1396,11 +1410,19 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
                                                                                  String factoryCode,
                                                                                  Date scheduleDate) {
         ImportScheduleValidationContext context = new ImportScheduleValidationContext();
-        // 月计划业务月不是自然月：每月 26 号开始计入下一个月计划周期。
-        // 例如 2026-05-25 匹配 2026 年 5 月，2026-05-26 匹配 2026 年 6 月。
+        // 按自然月解析排程日期所属月份，26 号不算跨月。
         int[] yearMonth = resolveImportPlanYearMonth(scheduleDate);
         context.year = yearMonth[0];
         context.month = yearMonth[1];
+
+        // 排程窗口覆盖 scheduleDate-1 到 scheduleDate+1。
+        // 当窗口结束日期与排程日期不在同一自然月时，需同时加载下个月的定稿月计划明细，
+        // 否则跨月物料会在"月计划中不存在SKU"校验中误报。
+        Date windowEndDate = DateUtil.offsetDay(scheduleDate, LhScheduleConstant.SCHEDULE_DAYS - 2);
+        int[] endYearMonth = resolveImportPlanYearMonth(windowEndDate);
+        context.nextMonthYear = endYearMonth[0];
+        context.nextMonthMonth = endYearMonth[1];
+        context.crossMonth = (context.year != context.nextMonthYear) || (context.month != context.nextMonthMonth);
 
         // 仅基于第一轮基础校验通过的行提取批量查询条件；
         // 必填缺失、Excel 内重复等基础错误行已经标记为 -999，不参与业务主数据校验。
@@ -1427,10 +1449,24 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
             return context;
         }
 
+        // 全局校验 1.1：跨月时窗口结束日期所在月也必须存在定稿生产版本。
+        if (context.crossMonth) {
+            context.finalVersionNextMonth = getImportFinalProductionVersion(factoryCode, context.nextMonthYear, context.nextMonthMonth);
+            if (Objects.isNull(context.finalVersionNextMonth) || StringUtils.isBlank(context.finalVersionNextMonth.getProductionVersion())) {
+                context.globalErrors.add(String.format("工厂%s，%s年%s月月计划未定稿（跨月）", factoryCode, context.nextMonthYear, context.nextMonthMonth));
+                return context;
+            }
+        }
+
         // 全局校验 2：工作日历中必须已经生成硫化工序日历。
         // 硫化工序编码固定为 02，与 MdmWorkCalendar.procCode 字典保持一致。
         if (!hasLhWorkCalendar(factoryCode, context.year, context.month)) {
             context.globalErrors.add(String.format("工厂%s，%s年%s月工作日历中硫化工序未生成", factoryCode, context.year, context.month));
+            return context;
+        }
+        // 全局校验 2.1：跨月时窗口结束日期所在月也必须已生成硫化工序日历。
+        if (context.crossMonth && !hasLhWorkCalendar(factoryCode, context.nextMonthYear, context.nextMonthMonth)) {
+            context.globalErrors.add(String.format("工厂%s，%s年%s月工作日历中硫化工序未生成（跨月）", factoryCode, context.nextMonthYear, context.nextMonthMonth));
             return context;
         }
 
@@ -1443,6 +1479,11 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         // 6. SKU 双模日硫化能力：用于确认班产 classCapacity 有值。
         context.monthPlanMap = loadImportMonthPlanMap(factoryCode, context.year, context.month,
                 context.finalVersion.getProductionVersion(), materialCodes);
+        // 跨月时同时加载窗口结束日期所在月份的定稿月计划明细。
+        if (context.crossMonth) {
+            context.monthPlanMapNextMonth = loadImportMonthPlanMap(factoryCode, context.nextMonthYear, context.nextMonthMonth,
+                    context.finalVersionNextMonth.getProductionVersion(), materialCodes);
+        }
         context.machineInfoMap = loadImportMachineInfoMap(factoryCode, machineCodes);
         context.availableMouldCodeSet = loadImportAvailableMouldCodeSet(factoryCode, materialCodes);
         context.materialMouldRelMap = loadImportMaterialMouldRelMap(factoryCode, materialCodes);
@@ -1504,6 +1545,10 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         // 因此这里先从月计划明细拿 productStatus，再用 factoryCode + materialCode + productStatus
         // 匹配 MdmSkuConstructionRef，并且要求 lhNo 不为空。
         FactoryMonthPlanProductionFinalResult monthPlan = context.monthPlanMap.get(materialKey);
+        // 跨月时，如果主月定稿表中找不到，尝试从窗口结束日期所在月份的定稿表中查找
+        if (Objects.isNull(monthPlan) && context.crossMonth) {
+            monthPlan = context.monthPlanMapNextMonth.get(materialKey);
+        }
         if (Objects.isNull(monthPlan)) {
             errors.add(String.format("月计划中不存在SKU%s", materialCode));
         } else {
@@ -1522,20 +1567,18 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
     }
 
     /**
-     * 根据排程日期解析月计划业务年月。
+     * 根据排程日期解析对应的自然年月。
      * <p>
-     * 月计划周期按每月 26 号切换：1-25 号属于当前自然月，26 号及之后属于下一个月计划月。
+     * 按自然月计算，26 号不算跨月。
+     * 排程窗口 t-1~t+1 的跨月判断由调用方通过比较 scheduleDate 和 windowEndDate 的自然月实现。
      * </p>
      *
      * @param scheduleDate 排程日期
-     * @return int[0]=业务年份，int[1]=业务月份
+     * @return int[0]=自然年份，int[1]=自然月份
      */
     private int[] resolveImportPlanYearMonth(Date scheduleDate) {
         Calendar calendar = Calendar.getInstance();
         calendar.setTime(scheduleDate);
-        if (calendar.get(Calendar.DAY_OF_MONTH) >= 26) {
-            calendar.add(Calendar.MONTH, 1);
-        }
         return new int[]{calendar.get(Calendar.YEAR), calendar.get(Calendar.MONTH) + 1};
     }
 
@@ -1800,10 +1843,20 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         private int month;
         /** 当前工厂、业务年月对应的定稿生产版本。 */
         private MpFactoryProductionVersion finalVersion;
+        /** 排程窗口结束日期对应的业务年份（跨月时与 year 不同）。 */
+        private int nextMonthYear;
+        /** 排程窗口结束日期对应的业务月份（跨月时与 month 不同）。 */
+        private int nextMonthMonth;
+        /** 是否跨月（窗口结束日期所在月份与 scheduleDate 所在月份不同）。 */
+        private boolean crossMonth;
+        /** 跨月时窗口结束日期所在月份的定稿生产版本。 */
+        private MpFactoryProductionVersion finalVersionNextMonth;
         /** 整批导入级错误，例如月计划未定稿、硫化工作日历未生成。 */
         private List<String> globalErrors = new ArrayList<>();
         /** 定稿月计划明细缓存，key=factoryCode|materialCode。 */
         private Map<String, FactoryMonthPlanProductionFinalResult> monthPlanMap = new HashMap<>();
+        /** 跨月时窗口结束日期所在月份的定稿月计划明细缓存，key=factoryCode|materialCode。 */
+        private Map<String, FactoryMonthPlanProductionFinalResult> monthPlanMapNextMonth = new HashMap<>();
         /** 硫化机台台账缓存，key=factoryCode|machineCode。 */
         private Map<String, LhMachineInfo> machineInfoMap = new HashMap<>();
         /** SKU 与模具关系缓存，key=factoryCode|materialCode，value=模具号列表。 */
@@ -2949,7 +3002,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
      *
      * <p>规则 1：交替前 SKU — class3~8 中有收尾班次（classXIsEnd="1"），机台列涂灰。</p>
      * <p>规则 2：交替后 SKU — class3~8 中第一个有计划量的班次之前全空，机台/物料号/物料描述列涂灰。</p>
-     * <p>规则 3：硫化余量低于等于 400 条，合计余量列涂淡橙。</p>
+     * <p>规则 3（已移至 exportData 方法）：日计划量 ≤ 400，dailyPlanQty 列涂淡橙。</p>
      *
      * @param row    导出行数据
      * @param result 排程结果
@@ -2962,9 +3015,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
             row.put("style_materialCode", GRAY_STYLE);
             row.put("style_materialDesc", GRAY_STYLE);
         }
-        if (result.getMouldSurplusQty() != null && result.getMouldSurplusQty() <= 400) {
-            row.put("style_dailyPlanQty", ORANGE_STYLE);
-        }
+
     }
 
     /**
@@ -3430,7 +3481,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
     @Override
     public String[] getQueryFormulas() {
         return new String[]{
-                "embryoCode,structureName->getcolsvaluewithcondition(T_MDM_MATERIAL_INFO, [EMBRYO_CODE,STRUCTURE_NAME], MATERIAL_CODE, materialCode, IS_DELETE=0)"
+                "embryoCode,structureName,mainMaterialDesc->getcolsvaluewithcondition(T_MDM_MATERIAL_INFO, [EMBRYO_CODE,STRUCTURE_NAME,EMBRYO_DESC], MATERIAL_CODE, materialCode, IS_DELETE=0)"
         };
     }
 
