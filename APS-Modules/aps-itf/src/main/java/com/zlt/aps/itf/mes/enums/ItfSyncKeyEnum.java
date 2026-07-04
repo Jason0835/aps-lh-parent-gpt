@@ -41,6 +41,11 @@ public enum ItfSyncKeyEnum {
     EMBRYO_STOCK_SYNC("EMBRYO_STOCK_SYNC", "MES", "APS", "生胎库存同步"),
 
     /**
+     * 生胎库存同步-6点
+     */
+    EMBRYO_STOCK_SIX_SYNC("EMBRYO_STOCK_SIX_SYNC", "MES", "APS", "生胎库存同步-6点"),
+
+    /**
      * 胎面库存同步
      */
     TREAD_STOCK_SYNC("TREAD_STOCK_SYNC", "MES", "APS", "胎面库存同步"),

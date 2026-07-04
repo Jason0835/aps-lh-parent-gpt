@@ -255,6 +255,15 @@
         WHERE 1 = 1
     </select>
 
+    <select id="selectMesEmbryoStockSixList" resultType="com.zlt.aps.cx.api.domain.entity.CxMesStock">
+        SELECT
+            STOCK_DATE,
+            EMBRYO_CODE,
+            STOCK_NUM
+        FROM EMBRYO_STOCK_SIX_SYNC
+        WHERE 1 = 1
+    </select>
+
     <!-- 查询直裁库存同步数据（MES 中间表 T_MES_CD90_STOCK） -->
     <select id="selectMesCd90StockList" resultType="com.zlt.aps.mp.api.domain.entity.Cd90MesStock">
         SELECT
