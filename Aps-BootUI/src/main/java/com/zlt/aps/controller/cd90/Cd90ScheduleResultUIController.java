@@ -8,6 +8,7 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.text.Convert;
 import com.ruoyi.common4ui.core.controller.BaseUIController;
 import com.zlt.aps.cd90.api.domain.entity.Cd90ScheduleResult;
+import com.zlt.aps.cd90.api.domain.entity.Cd90ScheduleRollingAdjustLog;
 import com.zlt.aps.cd90.api.domain.vo.Cd90InsertOrderRequest;
 import com.zlt.aps.cd90.api.service.ICd90ScheduleResultRemoteService;
 import com.zlt.file.encryptbyll.FileEncryptUtils;
@@ -86,6 +87,32 @@ public class Cd90ScheduleResultUIController extends BaseUIController<Cd90Schedul
     public AjaxResult getInsertTask(@PathVariable("taskId") String taskId) {
         return remoteService.getInsertTask(taskId);
     }
+    @ApiOperation("查询定时滚动排程任务")
+    @RequiresPermissions("cd90:scheduleResult:rollingQuery")
+    @GetMapping("/rollingSchedule/task/{taskId}")
+    @ResponseBody
+    public AjaxResult getTimedRollingTask(@PathVariable("taskId") String taskId) {
+        return remoteService.getTimedRollingTask(taskId);
+    }
+
+    @ApiOperation("查询定时滚动调整日志列表")
+    @RequiresPermissions("cd90:scheduleResult:rollingQuery")
+    @PostMapping("/rollingSchedule/adjustLog/list")
+    @ResponseBody
+    public TableDataInfo listRollingAdjustLogs(
+            @RequestBody Cd90ScheduleRollingAdjustLog queryVO) {
+        return remoteService.listRollingAdjustLogs(queryVO);
+    }
+
+    @ApiOperation("查询定时滚动调整日志详情")
+    @RequiresPermissions("cd90:scheduleResult:rollingQuery")
+    @GetMapping("/rollingSchedule/adjustLog/{id}")
+    @ResponseBody
+    public Cd90ScheduleRollingAdjustLog getRollingAdjustLog(
+            @PathVariable("id") Long id) {
+        return remoteService.getRollingAdjustLog(id);
+    }
+
 
     /**
      * 发布直裁排程结果到 MES。

@@ -9,10 +9,13 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.zlt.aps.cd90.api.domain.entity.Cd90ScheduleResult;
+import com.zlt.aps.cd90.api.domain.entity.Cd90ScheduleRollingAdjustLog;
 import com.zlt.aps.cd90.api.domain.vo.Cd90InsertOrderRequest;
+import com.zlt.aps.cd90.api.domain.vo.Cd90RollingCheckRequest;
 import com.zlt.aps.cd90.engine.domain.Cd90ScheduleTask;
 import com.zlt.aps.cd90.engine.service.Cd90ScheduleTaskService;
 import com.zlt.aps.cd90.mapper.Cd90ScheduleResultMapper;
+import com.zlt.aps.cd90.mapper.Cd90ScheduleRollingAdjustLogMapper;
 import com.zlt.aps.cd90.service.Cd90ScheduleResultPublishService;
 import com.zlt.aps.cd90.service.ICd90ScheduleResultService;
 import com.zlt.aps.cd90.service.Cd90ScheduleTaskRecoveryService;
@@ -46,6 +49,8 @@ public class Cd90ScheduleResultController extends AbstractDocBizController<Cd90S
     private Cd90ScheduleTaskRecoveryService cd90ScheduleTaskRecoveryService;
     @Resource
     private Cd90ScheduleResultPublishService cd90ScheduleResultPublishService;
+    @Resource
+    private Cd90ScheduleRollingAdjustLogMapper cd90ScheduleRollingAdjustLogMapper;
 
     @ApiOperation("查询列表")
     @PostMapping("/list")
@@ -116,6 +121,95 @@ public class Cd90ScheduleResultController extends AbstractDocBizController<Cd90S
     @GetMapping("/insert/task/{taskId}")
     public AjaxResult getInsertTask(@PathVariable("taskId") String taskId) {
         return cd90ScheduleResultService.getInsertTask(taskId);
+    }
+
+    /** 供aps-job每5分钟检查交班滚动窗口。 */
+    @ApiOperation("检查定时滚动排程窗口")
+    @PostMapping("/rollingSchedule/check")
+    public AjaxResult checkTimedRolling(@RequestBody Cd90RollingCheckRequest request) {
+        return cd90ScheduleResultService.checkTimedRolling(request);
+    }
+
+    /** 查询定时滚动排程任务。 */
+    @ApiOperation("查询定时滚动排程任务")
+    @GetMapping("/rollingSchedule/task/{taskId}")
+    public AjaxResult getTimedRollingTask(@PathVariable("taskId") String taskId) {
+        return cd90ScheduleResultService.getTimedRollingTask(taskId);
+    }
+
+    /** 查询定时滚动调整日志列表，列表不加载大JSON快照。 */
+    @ApiOperation("查询定时滚动调整日志列表")
+    @PostMapping("/rollingSchedule/adjustLog/list")
+    public TableDataInfo listRollingAdjustLogs(
+            @RequestBody Cd90ScheduleRollingAdjustLog queryVO) {
+        this.startPage();
+        LambdaQueryWrapper<Cd90ScheduleRollingAdjustLog> wrapper =
+                new LambdaQueryWrapper<>();
+        this.selectRollingAdjustLogListFields(wrapper);
+        wrapper.eq(PubUtil.isNotEmpty(queryVO.getFactoryCode()),
+                        Cd90ScheduleRollingAdjustLog::getFactoryCode,
+                        queryVO.getFactoryCode())
+                .eq(queryVO.getScheduleDate() != null,
+                        Cd90ScheduleRollingAdjustLog::getScheduleDate,
+                        queryVO.getScheduleDate())
+                .eq(PubUtil.isNotEmpty(queryVO.getBatchNo()),
+                        Cd90ScheduleRollingAdjustLog::getBatchNo,
+                        queryVO.getBatchNo())
+                .eq(PubUtil.isNotEmpty(queryVO.getTaskId()),
+                        Cd90ScheduleRollingAdjustLog::getTaskId,
+                        queryVO.getTaskId())
+                .like(PubUtil.isNotEmpty(queryVO.getClothCode()),
+                        Cd90ScheduleRollingAdjustLog::getClothCode,
+                        queryVO.getClothCode())
+                .eq(PubUtil.isNotEmpty(queryVO.getAdjustType()),
+                        Cd90ScheduleRollingAdjustLog::getAdjustType,
+                        queryVO.getAdjustType())
+                .orderByDesc(Cd90ScheduleRollingAdjustLog::getCreateTime)
+                .orderByDesc(Cd90ScheduleRollingAdjustLog::getId);
+        return this.getDataTable(
+                cd90ScheduleRollingAdjustLogMapper.selectList(wrapper));
+    }
+
+    /** 查询定时滚动调整日志详情，详情包含调整前后快照。 */
+    @ApiOperation("查询定时滚动调整日志详情")
+    @GetMapping("/rollingSchedule/adjustLog/{id}")
+    public Cd90ScheduleRollingAdjustLog getRollingAdjustLog(
+            @PathVariable("id") Long id) {
+        return cd90ScheduleRollingAdjustLogMapper.selectById(id);
+    }
+
+    /** 指定列表字段，避免默认传输前后快照大字段。 */
+    private void selectRollingAdjustLogListFields(
+            LambdaQueryWrapper<Cd90ScheduleRollingAdjustLog> wrapper) {
+        wrapper.select(
+                Cd90ScheduleRollingAdjustLog::getId,
+                Cd90ScheduleRollingAdjustLog::getFactoryCode,
+                Cd90ScheduleRollingAdjustLog::getTaskId,
+                Cd90ScheduleRollingAdjustLog::getBatchNo,
+                Cd90ScheduleRollingAdjustLog::getScheduleDate,
+                Cd90ScheduleRollingAdjustLog::getTargetShiftCode,
+                Cd90ScheduleRollingAdjustLog::getRollingItemKey,
+                Cd90ScheduleRollingAdjustLog::getScheduleResultId,
+                Cd90ScheduleRollingAdjustLog::getClothCode,
+                Cd90ScheduleRollingAdjustLog::getBigRollCode,
+                Cd90ScheduleRollingAdjustLog::getAdjustType,
+                Cd90ScheduleRollingAdjustLog::getOldClassIndex,
+                Cd90ScheduleRollingAdjustLog::getNewClassIndex,
+                Cd90ScheduleRollingAdjustLog::getOldProduceOrder,
+                Cd90ScheduleRollingAdjustLog::getNewProduceOrder,
+                Cd90ScheduleRollingAdjustLog::getOldPlanQty,
+                Cd90ScheduleRollingAdjustLog::getNewPlanQty,
+                Cd90ScheduleRollingAdjustLog::getOldMachineCode,
+                Cd90ScheduleRollingAdjustLog::getNewMachineCode,
+                Cd90ScheduleRollingAdjustLog::getReasonCode,
+                Cd90ScheduleRollingAdjustLog::getReasonDetail,
+                Cd90ScheduleRollingAdjustLog::getInputVersion,
+                Cd90ScheduleRollingAdjustLog::getSnapshotSchemaVersion,
+                Cd90ScheduleRollingAdjustLog::getCreateBy,
+                Cd90ScheduleRollingAdjustLog::getCreateTime,
+                Cd90ScheduleRollingAdjustLog::getUpdateBy,
+                Cd90ScheduleRollingAdjustLog::getUpdateTime,
+                Cd90ScheduleRollingAdjustLog::getRemark);
     }
 
     /**

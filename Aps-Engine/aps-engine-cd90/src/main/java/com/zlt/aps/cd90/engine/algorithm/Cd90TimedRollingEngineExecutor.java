@@ -182,6 +182,14 @@ public class Cd90TimedRollingEngineExecutor {
                         .bigRollCode(item.getBigRollCode()).stableOrder(Integer.MAX_VALUE)
                         .urgentCurrentShiftShortage(item.isShortageInCurrentShift()).build())
                 .collect(Collectors.toList());
+        Map<String, String> newKeyByCloth = newTasks.stream()
+                .collect(Collectors.toMap(Cd90RollingPendingTask::getClothCode,
+                        Cd90RollingPendingTask::getTaskKey, (left, right) -> left));
+        autoCandidates.stream()
+                .filter(item -> newKeyByCloth.containsKey(item.getClothCode()))
+                .forEach(item -> item.setRollingTaskKey(
+                        newKeyByCloth.get(item.getClothCode())));
+
         List<Cd90RollingPendingTask> ordered = stableTaskPlanner.plan(
                 Collections.emptyList(), carryOver, originals, newTasks, autoCandidates);
         Map<String, Cd90ScheduleCandidate> candidatesByKey = new LinkedHashMap<>();
@@ -274,12 +282,16 @@ public class Cd90TimedRollingEngineExecutor {
         List<Cd90ScheduleResult> deleted = updated.stream()
                 .filter(item -> allPlansZero(item, context.getShifts()))
                 .collect(Collectors.toList());
+        List<Cd90ScheduleResult> inserted = new ArrayList<>(insertedByKey.values());
         List<Cd90RollingAdjustmentDraft> adjustments = updated.stream()
                 .map(after -> adjustment(beforeById.get(after.getId()), after,
-                        affectedShifts, sourceLanes.getOrDefault(after.getId(), Collections.emptyList())))
-                .collect(Collectors.toList());
-        return new ResultDiff(new ArrayList<>(insertedByKey.values()), updated, deleted,
-                lanes, adjustments);
+                        affectedShifts, sourceLanes.getOrDefault(after.getId(), Collections.emptyList()),
+                        lanesForOrder(lanes, after.getOrderNo())))
+                .collect(Collectors.toCollection(ArrayList::new));
+        inserted.stream().map(after -> insertedAdjustment(after, affectedShifts,
+                        lanesForOrder(lanes, after.getOrderNo())))
+                .forEach(adjustments::add);
+        return new ResultDiff(inserted, updated, deleted, lanes, adjustments);
     }
 
     private void applyTask(Cd90RollingTarget target,
@@ -394,26 +406,77 @@ public class Cd90TimedRollingEngineExecutor {
     private Cd90RollingAdjustmentDraft adjustment(
             Cd90ScheduleResult before, Cd90ScheduleResult after,
             List<Cd90ShiftDescriptor> shifts,
-            List<Cd90ScheduleLaneAllocation> beforeLanes) {
+            List<Cd90ScheduleLaneAllocation> beforeLanes,
+            List<Cd90ScheduleLaneAllocation> afterLanes) {
         String reason = shifts.stream().allMatch(
                 shift -> readPlan(after, shift.getClassField()).signum() <= 0)
                 ? "ZERO_DEMAND_REMOVE" : "ROLLING_REPLAN";
-        Map<String, Object> beforeSnapshot = snapshot(before, beforeLanes, shifts);
-        Map<String, Object> afterSnapshot = snapshot(after, Collections.emptyList(), shifts);
+        String beforeClass = firstPlannedClass(before, shifts);
+        String afterClass = firstPlannedClass(after, shifts);
         return Cd90RollingAdjustmentDraft.builder()
                 .rollingItemKey(after.getId() + ":" + after.getClothCode())
                 .scheduleResultId(after.getId()).clothCode(after.getClothCode())
                 .bigRollCode(after.getBigRollCode()).adjustType(reason)
-                .beforeMachineCode(before.getMachineCode()).afterMachineCode(after.getMachineCode())
+                .beforeClassField(beforeClass)
+                .beforeProduceOrder(readOrderOrNull(before, beforeClass))
+                .beforeQuantity(readPlanOrZero(before, beforeClass))
+                .beforeMachineCode(before.getMachineCode())
+                .afterClassField(afterClass)
+                .afterProduceOrder(readOrderOrNull(after, afterClass))
+                .afterQuantity(readPlanOrZero(after, afterClass))
+                .afterMachineCode(after.getMachineCode())
                 .reasonCode(reason).reasonDetail("定时滚动按最新需求和资源状态重排")
-                .beforeSnapshot(beforeSnapshot).afterSnapshot(afterSnapshot).build();
+                .beforeSnapshot(snapshot(before, beforeLanes, shifts))
+                .afterSnapshot(snapshot(after, afterLanes, shifts)).build();
+    }
+
+    private Cd90RollingAdjustmentDraft insertedAdjustment(
+            Cd90ScheduleResult after, List<Cd90ShiftDescriptor> shifts,
+            List<Cd90ScheduleLaneAllocation> afterLanes) {
+        String afterClass = firstPlannedClass(after, shifts);
+        return Cd90RollingAdjustmentDraft.builder()
+                .rollingItemKey(after.getOrderNo()).scheduleResultId(null)
+                .clothCode(after.getClothCode()).bigRollCode(after.getBigRollCode())
+                .adjustType("ROLLING_INSERT").afterClassField(afterClass)
+                .afterProduceOrder(readOrderOrNull(after, afterClass))
+                .afterQuantity(readPlanOrZero(after, afterClass))
+                .afterMachineCode(after.getMachineCode())
+                .reasonCode("ROLLING_INSERT")
+                .reasonDetail("最新需求产生新规格或新机台排程")
+                .beforeSnapshot(snapshot(null, Collections.emptyList(), shifts))
+                .afterSnapshot(snapshot(after, afterLanes, shifts)).build();
+    }
+
+    private List<Cd90ScheduleLaneAllocation> lanesForOrder(
+            List<Cd90ScheduleLaneAllocation> lanes, String orderNo) {
+        return lanes.stream().filter(item -> Objects.equals(orderNo, item.getOrderNo()))
+                .collect(Collectors.toList());
+    }
+
+    private String firstPlannedClass(Cd90ScheduleResult result,
+                                     List<Cd90ShiftDescriptor> shifts) {
+        if (result == null) {
+            return null;
+        }
+        return shifts.stream().map(Cd90ShiftDescriptor::getClassField)
+                .filter(classField -> readPlan(result, classField).signum() > 0)
+                .findFirst().orElse(null);
+    }
+
+    private Integer readOrderOrNull(Cd90ScheduleResult result, String classField) {
+        return result == null || classField == null ? null : readOrder(result, classField);
+    }
+
+    private BigDecimal readPlanOrZero(Cd90ScheduleResult result, String classField) {
+        return result == null || classField == null
+                ? BigDecimal.ZERO : readPlan(result, classField);
     }
 
     private Map<String, Object> snapshot(Cd90ScheduleResult result,
                                          List<Cd90ScheduleLaneAllocation> lanes,
                                          List<Cd90ShiftDescriptor> shifts) {
         Map<String, Object> snapshot = new LinkedHashMap<>();
-        snapshot.put("scheduleResult", copyResult(result));
+        snapshot.put("scheduleResult", result == null ? null : copyResult(result));
         snapshot.put("laneAllocations", new ArrayList<>(lanes));
         snapshot.put("affectedClasses", shifts.stream()
                 .map(Cd90ShiftDescriptor::getClassField).collect(Collectors.toList()));

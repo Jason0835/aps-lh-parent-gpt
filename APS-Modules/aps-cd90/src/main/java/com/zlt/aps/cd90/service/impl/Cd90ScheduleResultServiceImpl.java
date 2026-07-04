@@ -1,8 +1,12 @@
 package com.zlt.aps.cd90.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.zlt.aps.cd90.api.domain.entity.Cd90UnscheduleResult;
+import com.zlt.aps.cd90.api.domain.entity.Cd90ScheduleRollingAdjustLog;
 import com.zlt.aps.cd90.api.domain.entity.Cd90ScheduleResult;
 import com.zlt.aps.cd90.api.domain.entity.Cd90ShiftConfig;
 import com.zlt.aps.cd90.api.domain.vo.Cd90InsertOrderRequest;
@@ -13,6 +17,8 @@ import com.zlt.aps.cd90.engine.model.Cd90BatchDataCheckResult;
 import com.zlt.aps.cd90.engine.service.Cd90AutoScheduleBatchDataValidator;
 import com.zlt.aps.cd90.engine.service.Cd90ScheduleTaskService;
 import com.zlt.aps.cd90.engine.mapper.Cd90AutoScheduleShiftMapper;
+import com.zlt.aps.cd90.mapper.Cd90ScheduleRollingAdjustLogMapper;
+import com.zlt.aps.cd90.mapper.Cd90UnscheduleResultMapper;
 import com.zlt.aps.cd90.mapper.Cd90ScheduleResultMapper;
 import com.zlt.aps.cd90.model.Cd90ScheduleOverwriteDecision;
 import com.zlt.aps.cd90.service.Cd90AutoScheduleAsyncExecutor;
@@ -59,6 +65,12 @@ public class Cd90ScheduleResultServiceImpl extends AbstractDocService<Cd90Schedu
     private Cd90AutoScheduleShiftMapper shiftMapper;
     @Resource
     private Cd90InsertOrderAsyncExecutor insertOrderAsyncExecutor;
+    @Resource
+    private Cd90ScheduleRollingAdjustLogMapper rollingAdjustLogMapper;
+    @Resource
+    private Cd90UnscheduleResultMapper unscheduleResultMapper;
+    @Resource
+    private ObjectMapper objectMapper;
     @Resource
     private Cd90TimedRollingCheckService timedRollingCheckService;
 
@@ -240,9 +252,39 @@ public class Cd90ScheduleResultServiceImpl extends AbstractDocService<Cd90Schedu
     public AjaxResult getTimedRollingTask(String taskId) {
         Cd90ScheduleTask task = taskService.findByTaskId(taskId);
         if (task == null || !Cd90ScheduleTaskType.ROLLING_SCHEDULE.equals(task.getTaskType())) {
-            return AjaxResult.error("定时滚动排程任务不存在");
+            return AjaxResult.error(I18nUtil.getMessage("ui.cd90.rolling.taskNotFound"));
         }
-        return AjaxResult.success(task);
+        Map<String, Object> response = objectMapper.convertValue(task, Map.class);
+        String targetShiftCode = null;
+        String inputVersion = null;
+        if (!isBlank(task.getRequestSnapshot())) {
+            try {
+                JsonNode snapshot = objectMapper.readTree(task.getRequestSnapshot());
+                inputVersion = snapshot.path("inputVersion").asText(null);
+                targetShiftCode = snapshot.path("target")
+                        .path("targetShiftCode").asText(null);
+            } catch (Exception exception) {
+                response.put("snapshotParseError", true);
+            }
+        }
+        Number adjustedCount = rollingAdjustLogMapper.selectCount(
+                new LambdaQueryWrapper<Cd90ScheduleRollingAdjustLog>()
+                        .eq(Cd90ScheduleRollingAdjustLog::getTaskId,
+                                task.getTaskId()));
+        Number unscheduledCount = 0;
+        if (!isBlank(task.getBatchNo())) {
+            unscheduledCount = unscheduleResultMapper.selectCount(
+                    new LambdaQueryWrapper<Cd90UnscheduleResult>()
+                            .eq(Cd90UnscheduleResult::getFactoryCode, task.getFactoryCode())
+                            .eq(Cd90UnscheduleResult::getScheduleDate, task.getScheduleDate())
+                            .eq(Cd90UnscheduleResult::getBatchNo, task.getBatchNo()));
+        }
+        response.put("targetShiftCode", targetShiftCode);
+        response.put("inputVersion", inputVersion);
+        response.put("sourceBatchNo", task.getBatchNo());
+        response.put("adjustedCount", adjustedCount);
+        response.put("unscheduledCount", unscheduledCount);
+        return AjaxResult.success(response);
     }
     private boolean isBlank(String value) {
         return value == null || value.trim().isEmpty();
