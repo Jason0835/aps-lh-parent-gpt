@@ -1237,6 +1237,10 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         Calendar calendar = Calendar.getInstance();
         calendar.set(param.getYear(), param.getMonth() - 1, FactoryConstant.MONTH_START_DAY);
         Integer monthMaxDay = calendar.getActualMaximum(Calendar.DAY_OF_MONTH);
+        calendar.add(Calendar.DAY_OF_MONTH, -1); // 切换到上个月最后一天
+        Integer lastMonthMaxDay = calendar.getActualMaximum(Calendar.DAY_OF_MONTH);
+        Integer lastYear = calendar.get(Calendar.YEAR);
+        Integer lastMonth = calendar.get(Calendar.MONTH) + 1;
         // 1.3.2、按结构 + 日期 统计硫化机台数
         Map<String, Map<Integer, Integer>> lhMachineStatisticsMap = this.buildLhMachineStatiseicsMap(statisticsMap,
                 monthMaxDay);
@@ -1249,9 +1253,9 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         // 1.4.1、加载月计划排产明细，根据参数决定加载月计划还是定稿版本，一个结构一份
         Map<String, FactoryMonthPlanMouldDayResult> structureDayResultMap = this.loadStructureDayResultMap(param, isFinal, monthMaxDay);
         // 1.4.2、加载上个月定稿信息，一个结构一份
-        Map<String, FactoryMonthPlanProductionFinalResult> lastStructureDayResultMap = this.loadLastStructureDayResultMap(param);
+        Map<String, FactoryMonthPlanProductionFinalResult> lastStructureDayResultMap = this.loadLastStructureDayResultMap(param, lastYear, lastMonth);
         // 1.4.3、将上月定稿信息填充到列表中，包括将上月定稿有本但月没有的结构也添加到结构列表中
-        Map<Integer, Integer> lastTotalMap = this.fillLastFinalResultList(param, recordList, lastStructureDayResultMap);
+        Map<Integer, Integer> lastTotalMap = this.fillLastFinalResultList(param, recordList, lastStructureDayResultMap, lastMonthMaxDay);
         
         // 1.5、加载需求计划
         Map<String, DpDemandPlan> dpDemandPlanMap = this.loadDemandPlanMap(param);
@@ -1287,20 +1291,21 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         for (int day = 1; day <= monthMaxDay; day++) {  // 初始化汇总map
             totalMap.put(day, 0);
         }
-        for (Integer i = 0, size = recordList.size(); i < size; i++) {
+        // 倒序遍历
+        for (int i = recordList.size() - 1; i >= 0; i--) {
             // 3.2.1、把同机台的排产记录添加到列表中，全部添加完后开始处理这一批数据
             MpStructureAllocationExportVo record = recordList.get(i);
             machineStructureList.add(record); // 先添加到列表
             cxMachineCode = record.getCxMachineCode(); // 更新机台
             // 3.2.2、下一笔机台没有变化，且还不是最后一笔记录，继续遍历下一笔数据
-            if (i < size - 1) { // 还不是最后一行，则校验下一行是否同一个机台
-                MpStructureAllocationExportVo nextRecord = recordList.get(i + 1);
+            if (i > 0) { // 还不是最后一行，则校验下一行是否同一个机台
+                MpStructureAllocationExportVo nextRecord = recordList.get(i - 1);
                 if (cxMachineCode.equals(nextRecord.getCxMachineCode())) { // 机台没有变化，则添继续往下
                     continue;
                 }
             }
             // 3.2.3、处理列表明细的数据
-            Integer changeRank = 1; // 切换序号，用于导出的切换颜色渲染
+            Integer changeRank = (int)(machineStructureList.stream().filter(s -> !s.getIsOnlyLast()).count()); // 切换序号，用于导出的切换颜色渲染
             for (MpStructureAllocationExportVo machineRecord : machineStructureList) {
                 if (machineRecord.getIsOnlyLast()) { // 仅上月定稿数据的记录跳过不处理
                     continue;
@@ -1348,7 +1353,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                     structureType = ProductionGroupTypeEnum.CONVENTION.getGroupType();
                 }
                 machineRecord.setStructureType(structureType); // 结构类型
-                machineRecord.setChangeRank(changeRank++); // 设置序号
+                machineRecord.setChangeRank(changeRank--); // 设置序号
                 machineRecord.setBeginDay(beginDay);
                 machineRecord.setEndDay(endDay);
                 DpDemandPlan dpDemandPlan = Optional.ofNullable(dpDemandPlanMap.get(structureName)).orElse(null);
@@ -1368,7 +1373,9 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
             totalRecordList.addAll(machineStructureList);
             machineStructureList.clear(); // 处理完一个机台后清空列表
         }
-        // 3.3、更新统计行数值
+        // 3.3、部分特殊规格总硫化机数会超过成型机 * 最大硫化机数，因此会有剩余，剩余的部分需要重新分配到最后一行当天有排产的记录中
+        this.handleOverLimitMachine(lhMachineStatisticsMap, totalRecordList, totalMap, DAY_FIELD_NAME_FORMAT, FactoryConstant.MONTH_START_DAY, true);
+        // 3.4.1、更新统计行数值
         for (Entry<Integer, Integer> entry : totalMap.entrySet()) {
             Integer day = entry.getKey();
             Integer realLhMachines = entry.getValue();
@@ -1377,7 +1384,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
             this.updateExportDayField(maxProductQtyRecord, dayFieldName, lhmachineCount); // 填充最大产能数值 = 硫化机总数
             this.updateExportDayField(enableCountRecord, dayFieldName, lhmachineCount - realLhMachines); // 可用机台数 = 排产合计 - 最大产能
         }
-        // 更新上月定稿统计数值
+        // 3.4.2、更新上月定稿统计数值
         for (Entry<Integer, Integer> entry : lastTotalMap.entrySet()) {
             Integer day = entry.getKey();
             Integer realLhMachines = entry.getValue();
@@ -1387,37 +1394,12 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
             this.updateExportDayField(enableCountRecord, dayFieldName, lhmachineCount - realLhMachines); // 可用机台数 = 排产合计 - 最大产能
         }
         
+        // 3.5、先顺序反转，再添加合计行
+        Collections.reverse(totalRecordList);
         totalRecordList.add(totalRecord);
         totalRecordList.add(maxProductQtyRecord);
         totalRecordList.add(enableCountRecord);
         exportVo.setRecordList(totalRecordList);
-        
-        // 3.4、部分特殊规格总硫化机数会超过成型机 * 最大硫化机数，因此会有剩余，剩余的部分需要重新分配到最后一行当天有排产的记录中
-        for (Entry<String, Map<Integer, Integer>> statisticsEntry : lhMachineStatisticsMap.entrySet()) {
-            String structureName = statisticsEntry.getKey();
-            Map<Integer, Integer> lhMachineDayMap = statisticsEntry.getValue();
-            for (Entry<Integer, Integer> lhMachineDayEntry : lhMachineDayMap.entrySet()) {
-                Integer day = lhMachineDayEntry.getKey();
-                Integer remainLhMachine = Convert.toInt(lhMachineDayEntry.getValue(), 0);
-                if (remainLhMachine <= 0) {
-                    continue;
-                }
-                String dayFieldName = String.format(DAY_FIELD_NAME_FORMAT, day);
-                for (int i = totalRecordList.size() - 1; i >= 0; i--) {
-                    MpStructureAllocationExportVo record = totalRecordList.get(i);
-                    if (!Objects.equals(structureName, record.getStructureName())) {
-                        continue;
-                    }
-                    // 检查当天是否有排产，有则加上，没有则看下一笔记录
-                    int lhMachineCount = Convert.toInt(record.getFieldValueByFieldName(dayFieldName), 0);
-                    if (lhMachineCount > 0) {
-                        record.setFieldValueByFieldName(dayFieldName, lhMachineCount + remainLhMachine);
-                        break;
-                    }
-                }
-            }
-        }
-
         // 4、构建切换数统计信息
         this.buildChangeStructureStatistics(recordList, exportVo);
 
@@ -1425,6 +1407,56 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         this.buildHeadStatistics(monthMaxDay, structureDayResultMap, lastStructureDayResultMap, exportVo);
         
         return exportVo;
+    }
+
+    /**
+     * 部分特殊规格总硫化机数会超过成型机 * 最大硫化机数，因此会有剩余，剩余的部分需要重新分配到最后一行当天有排产的记录中
+     * @param lhMachineStatisticsMap   硫化机统计总列表 
+     * @param recordList   明细列表
+     * @param totalMap  汇总列表
+     * @param fieldName 更新字段名
+     * @param startDay  开始处理日期
+     * @param isReverse 是否导出
+     */
+    private void handleOverLimitMachine(Map<String, Map<Integer, Integer>> lhMachineStatisticsMap,
+            List<MpStructureAllocationExportVo> recordList, Map<Integer, Integer> totalMap, String fieldName,
+            Integer startDay, boolean isReverse) {
+        for (Entry<String, Map<Integer, Integer>> statisticsEntry : lhMachineStatisticsMap.entrySet()) {
+            String structureName = statisticsEntry.getKey();
+            Map<Integer, Integer> lhMachineDayMap = statisticsEntry.getValue();
+            for (Entry<Integer, Integer> lhMachineDayEntry : lhMachineDayMap.entrySet()) {
+                Integer day = lhMachineDayEntry.getKey();
+                Integer remainLhMachine = Convert.toInt(lhMachineDayEntry.getValue(), 0);
+                if (day < startDay) {
+                    continue;
+                }
+                if (remainLhMachine <= 0) {
+                    continue;
+                }
+                String dayFieldName = String.format(fieldName, day);
+
+                List<MpStructureAllocationExportVo> newRecordList;
+                if (isReverse) {
+                    newRecordList = new ArrayList<>(recordList);
+                    Collections.reverse(newRecordList);
+                } else {
+                    newRecordList = recordList;
+                }
+
+                for (MpStructureAllocationExportVo record: newRecordList) {
+                    if (!Objects.equals(structureName, record.getStructureName())) {
+                        continue;
+                    }
+                    // 检查当天是否有排产，有则加上，没有则看下一笔记录
+                    int lhMachineCount = Convert.toInt(record.getFieldValueByFieldName(dayFieldName), 0);
+                    if (lhMachineCount > 0) {
+                        record.setFieldValueByFieldName(dayFieldName, lhMachineCount + remainLhMachine);
+                        totalMap.put(day, totalMap.getOrDefault(day, 0) + remainLhMachine);
+                        break;
+                    }
+                }
+            }
+        }
     }
 
     /**
@@ -1633,15 +1665,11 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
      * 加载上个月的定稿记录信息
      * 
      * @param param
+     * @param lastYear
+     * @param lastMonth
      */
     private Map<String, FactoryMonthPlanProductionFinalResult> loadLastStructureDayResultMap(
-            MpStructureAllocation param) {
-        // 加载上个月的定稿记录
-        Calendar calendar = Calendar.getInstance();
-        calendar.set(param.getYear(), param.getMonth() - 1, 1); // 通过日历获取上本月一号的日历
-        calendar.add(Calendar.DAY_OF_MONTH, -1); // 切换到上个月最后一天
-        Integer lastYear = calendar.get(Calendar.YEAR);
-        Integer lastMonth = calendar.get(Calendar.MONTH) + 1;
+            MpStructureAllocation param, Integer lastYear, Integer lastMonth) {
         LambdaQueryWrapper<FactoryMonthPlanProductionFinalResult> resultQueryWrapper = new LambdaQueryWrapper<>();
         resultQueryWrapper.eq(FactoryMonthPlanProductionFinalResult::getFactoryCode, param.getFactoryCode());
         resultQueryWrapper.eq(FactoryMonthPlanProductionFinalResult::getYear, lastYear);
@@ -1680,15 +1708,17 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
     
     /**
      * 填充上个月的定稿记录信息，并返回上个月最后一天的日期
-     * 
      * @param param
      * @param recordList
-     * @param mouldingDayResultMap
+     * @param lastStructureDayResultMap
+     * @param lastMonthMaxDay
+     * @return
      */
     private Map<Integer, Integer> fillLastFinalResultList(MpStructureAllocation param, List<MpStructureAllocationExportVo> recordList,
-            Map<String, FactoryMonthPlanProductionFinalResult> lastStructureDayResultMap) {
+            Map<String, FactoryMonthPlanProductionFinalResult> lastStructureDayResultMap, Integer lastMonthMaxDay) {
         Map<Integer, Integer> totalMap = new HashMap<>(); // 汇总map，用于记录每天的机台合计值
-        for (int day = FactoryConstant.MONTH_MAX_DAY - LAST_MONTH_DAY; day <= FactoryConstant.MONTH_MAX_DAY; day++) {  // 初始化汇总map
+        Integer realStartDay = FactoryConstant.MONTH_MAX_DAY - LAST_MONTH_DAY; // 实际开始日期
+        for (int day = realStartDay; day <= lastMonthMaxDay; day++) {  // 初始化汇总map
             totalMap.put(day, 0);
         }
         if (CollectionUtils.isEmpty(lastStructureDayResultMap)) {
@@ -1794,6 +1824,8 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                 }
             }
         }
+        // 部分特殊规格总硫化机数会超过成型机 * 最大硫化机数，因此会有剩余，剩余的部分需要重新分配到第一行当天有排产的记录中
+        this.handleOverLimitMachine(lhMachineStatisticsMap, recordList, totalMap, LAST_DAY_FIELD_NAME_FORMAT, realStartDay, false);
         return totalMap;
     }
 

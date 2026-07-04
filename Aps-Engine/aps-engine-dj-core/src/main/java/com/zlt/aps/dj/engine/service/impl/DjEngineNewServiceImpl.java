@@ -13,13 +13,14 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.text.MessageFormat;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
-import org.springframework.util.StringUtils;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.zlt.aps.common.engine.enums.MachineRangeEnum;
@@ -61,6 +62,8 @@ import com.zlt.core.dao.basedao.BaseDao;
 
 import cn.hutool.core.date.DateUtil;
 import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.ruoyi.common.utils.StringUtils;
+
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -245,7 +248,13 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
         if (lastScheduleList != null) {
             for (Map<String, Object> row : lastScheduleList) {
                 String code = (String) row.get("PADDING_CODE");
-                Date lastDate = (Date) row.get("LAST_DATE");
+                Object lastDateObj = row.get("LAST_DATE");
+                Date lastDate = null;
+                if (lastDateObj instanceof LocalDateTime) {
+                    lastDate = Date.from(((LocalDateTime) lastDateObj).atZone(ZoneId.systemDefault()).toInstant());
+                } else if (lastDateObj instanceof Date) {
+                    lastDate = (Date) lastDateObj;
+                }
                 lastScheduleMap.put(code, lastDate);
             }
         }
