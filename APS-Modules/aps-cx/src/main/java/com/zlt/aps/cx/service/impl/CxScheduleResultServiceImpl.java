@@ -674,6 +674,14 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
     private Map<String, Object> buildCxTemplateSubtotalRow(List<CxScheduleResult> groupList) {
         Map<String, Object> row = new LinkedHashMap<>();
         row.put("cxMachineCode", "小计");
+        // 小计行显示该机台分组内去重后的结构
+        String structureNames = groupList.stream()
+                .map(CxScheduleResult::getStructureName)
+                .filter(StringUtils::isNotBlank)
+                .map(String::trim)
+                .distinct()
+                .collect(Collectors.joining("；"));
+        row.put("structureName", structureNames);
 
         BigDecimal[] planSums = new BigDecimal[9];
         BigDecimal[] finishSums = new BigDecimal[9];
