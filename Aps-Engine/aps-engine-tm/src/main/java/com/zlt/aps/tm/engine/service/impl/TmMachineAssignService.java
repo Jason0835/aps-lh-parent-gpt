@@ -401,6 +401,7 @@ public class TmMachineAssignService implements ITmMachineAssignService {
         }
         return count;
     }
+
     /**
      * 规范化班次序号。
      *
@@ -800,6 +801,7 @@ public class TmMachineAssignService implements ITmMachineAssignService {
         }
         return this.sortCandidatesForSmallGlue(probeTask, context, candidates, selectedCandidate);
     }
+
     /**
      * 重新执行候选机台过滤和评分，用于溢出量进入后续班次后的跨机台承接判断。
      *
@@ -1141,7 +1143,10 @@ public class TmMachineAssignService implements ITmMachineAssignService {
     }
 
     /**
-     * 追加零计划量任务到选中机台，避免库存充足场景被误判为未排。
+     * 记录零计划量任务的评估结果。
+     *
+     * <p>零计划量表示当前任务无需占用机台产能，只保留候选机台、评分和容量证据，
+     * 不追加到任务链，避免生成全 0 的排程结果行。</p>
      *
      * @param task              当前零计划量任务
      * @param selectedCandidate 已选中候选机台
@@ -1151,21 +1156,19 @@ public class TmMachineAssignService implements ITmMachineAssignService {
     private void appendZeroPlanTask(TmTaskDraft task, TmMachineCandidate selectedCandidate,
                                     TmScheduleContext context, Integer shiftOrder) {
         task.setShiftOrder(shiftOrder);
-        this.settleAssignedTaskToolState(task, context);
         BigDecimal machineSpeed = this.resolveMachineSpeed(task, selectedCandidate);
         TmMachineCandidate runtimeCandidate = this.copyCandidate(selectedCandidate);
         runtimeCandidate.setMachineSpeed(machineSpeed);
         runtimeCandidate.setRemainCapacity(this.resolveRemainCapacity(task, context, runtimeCandidate, machineSpeed));
+        task.setMachineCode(runtimeCandidate.getMachineCode());
         task.setMachineRemainCapacity(runtimeCandidate.getRemainCapacity());
         task.setMachineSpeed(machineSpeed);
         context.getCandidateTraceMap().put(task.getBusinessKey(), Collections.singletonList(runtimeCandidate));
         this.addCapacitySplitTrace(context, task, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
                 nvl(runtimeCandidate.getRemainCapacity()), runtimeCandidate.getMachineCode(), true);
-        this.bindSmallGlueMachine(context, task, runtimeCandidate.getMachineCode(),
-                this.resolveSmallGlueBoundMachine(task, context), null);
         this.addAssignTrace(context, task, "PASS", runtimeCandidate.getMachineCode(), null, null);
-        this.taskChainScheduleService.appendAutoTask(task, runtimeCandidate, context);
     }
+
     /**
      * 复制产能溢出顺延任务，保留原任务业务属性并追加业务键后缀。
      *
@@ -1228,6 +1231,7 @@ public class TmMachineAssignService implements ITmMachineAssignService {
         target.setBusinessKeySuffix(this.buildOverflowBusinessKeySuffix(source, sourceShift, shiftOrder, machineCode, overflowIndex));
         return target;
     }
+
     /**
      * 构建顺延任务业务键后缀，来源工单参与唯一性，避免同规格同班次多个未排副本冲突。
      *
@@ -1382,6 +1386,7 @@ public class TmMachineAssignService implements ITmMachineAssignService {
         evidence.put("afterMergePlanQty", afterMergeQty);
         traceOf(context, targetTask).addRuleHit("PLAN_QTY_CARRYOVER", "PASS", evidence);
     }
+
     /**
      * 写入产能拆分证据。
      *

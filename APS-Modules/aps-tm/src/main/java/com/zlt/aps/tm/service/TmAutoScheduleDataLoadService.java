@@ -9,6 +9,7 @@ import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.utils.BigDecimalUtils;
 import com.zlt.aps.common.engine.utils.DepthConfigResolver;
 import com.zlt.aps.tm.api.domain.entity.*;
+import com.zlt.aps.tm.api.enums.TmUnplannedReasonEnum;
 import com.zlt.aps.tm.domain.vo.TmExperimentSpecMonthPlanRowVo;
 import com.zlt.aps.tm.domain.vo.TmFormingDemandRowVo;
 import com.zlt.aps.tm.domain.vo.TmWorkCalendarRowVo;
@@ -669,8 +670,8 @@ public class TmAutoScheduleDataLoadService {
                     taskDraft.setTotalToolQty(toolTotalQty);
                 }
                 if (noShutdownAvailableShift && !isShiftOpen(tmCalendar, targetShiftOrder) && isShiftOpen(cxCalendar, shiftOrder)) {
-                    taskDraft.setUnplannedReasonCode("TM_SHUTDOWN_NO_AVAILABLE_SHIFT");
-                    taskDraft.setUnplannedReasonDesc("胎面停产且无可分配班次，成型需求无法重分配");
+                    taskDraft.setUnplannedReasonCode(TmUnplannedReasonEnum.TM_SHUTDOWN_NO_AVAILABLE_SHIFT.getCode());
+                    taskDraft.setUnplannedReasonDesc(TmUnplannedReasonEnum.TM_SHUTDOWN_NO_AVAILABLE_SHIFT.getDesc());
                 }
                 taskDraftList.add(taskDraft);
             }
