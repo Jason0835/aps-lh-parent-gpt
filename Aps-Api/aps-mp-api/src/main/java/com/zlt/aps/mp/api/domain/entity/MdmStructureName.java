@@ -37,6 +37,10 @@ public class MdmStructureName extends BaseEntity {
     @TableField(value = "STRUCTURE_NAME")
     private String structureName;
 
+    /**
+     * 当月-是否允许排产多台
+     */
+    @Excel(name = "ui.data.column.mdmStructureName.isMoreMachine", dictType = "biz_yes_no")
     @ApiModelProperty(value = "是否允许排产多台", name = "isMoreMachine")
     @TableField(value = "IS_MORE_MACHINE")
     private String isMoreMachine;
