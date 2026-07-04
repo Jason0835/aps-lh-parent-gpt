@@ -1611,6 +1611,15 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
      * 计算超欠产的公共方法
      * 根据数据来源月份的月计划月底余量和硫化日完成量计算超欠产，回填到写入目标月份的定稿记录
      * 公式：超欠产 = 月底余量 - (库存抓取日~月底)的硫化日完成量
+     * 匹配维度：(分厂+物料编码+产品状态) 三字段
+     * 处理流程：
+     *   1. UPDATE：当月定稿表按三字段能匹配上的记录，更新其上月超欠产值和有效标识
+     *   2. INSERT：上月定稿有、当月定稿按三字段匹配不上的记录，新增一条到当月定稿表
+     *      - 超欠产值 = 0 的记录不插入
+     *      - 当月定稿表无任何记录的工厂不插入（无版本号可取）
+     *      - 版本号字段(MONTH_PLAN_VERSION/LAST_MONTH_PLAN_VERSION/PRODUCTION_VERSION)取当月同分厂任意一条记录的值
+     *      - DAY_1~DAY_31 全部置 NULL
+     *      - 其他业务字段从上月定稿复制
      *
      * @param lastMonth    数据来源月份（上月或当月）
      * @param currentMonth 写入目标月份（当月或下月）
@@ -1632,11 +1641,19 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
         log.info("开始计算超欠产, 数据来源: {}-{}, 写入目标: {}-{}, 日期范围: {} ~ {}, 有效标志阈值参数: {}",
                 lastYear, lastMonthValue, currentYear, currentMonthValue, startDate, endDate, overdueThresholdParamCode);
 
-        int count = finalMapper.updateLastMonthOverProd(lastYear, lastMonthValue, currentYear, currentMonthValue,
+        // 1. UPDATE：更新当月定稿表中按 (分厂+物料+产品状态) 维度能匹配上的记录
+        int updateCount = finalMapper.updateLastMonthOverProd(lastYear, lastMonthValue, currentYear, currentMonthValue,
                 startDate, endDate, overdueThresholdParamCode);
 
-        log.info("超欠产计算完成, 更新记录数: {}", count);
-        return AjaxResult.success("超欠产计算完成，更新记录数：" + count);
+        // 2. INSERT：补齐上月定稿有、当月定稿按相同维度匹配不上的记录
+        //    - 超欠产值 = 0 的记录不插入
+        //    - 当月定稿表无任何记录的工厂不插入（无版本号可取）
+        //    - 版本号取当月同分厂任意一条记录的值，DAY_1~DAY_31 置空
+        int insertCount = finalMapper.insertMissingLastMonthOverProd(lastYear, lastMonthValue, currentYear, currentMonthValue,
+                startDate, endDate, overdueThresholdParamCode);
+
+        log.info("超欠产计算完成, 更新记录数: {}, 新增记录数: {}", updateCount, insertCount);
+        return AjaxResult.success("超欠产计算完成，更新记录数：" + updateCount + "，新增记录数：" + insertCount);
     }
 
     /**
