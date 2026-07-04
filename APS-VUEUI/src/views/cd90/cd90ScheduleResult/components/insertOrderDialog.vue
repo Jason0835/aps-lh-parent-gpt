@@ -1,14 +1,14 @@
 <template>
   <el-dialog
-    :title="$t('ui.data.column.scheduleResult.insertOrder')"
+    :title="$t('ui.data.column.cd90ScheduleResult.insertOrder')"
     :visible.sync="visible"
-    width="860px"
+    width="1000px"
     append-to-body
     :close-on-click-modal="false"
     @close="hide"
   >
     <el-form ref="form" :model="form" :rules="rules" label-width="100px" v-loading="loading">
-      <el-row :gutter="16">
+      <el-row :gutter="16" style="margin-bottom:20px;">
         <el-col :span="8">
           <el-form-item :label="$t('ui.data.column.cd90ScheduleResult.factoryCode')" prop="factoryCode">
             <el-select v-model="form.factoryCode" filterable disabled style="width:100%">
@@ -50,15 +50,14 @@
         border
         size="small"
         style="width:100%"
-        :empty-text="loading ? $t('common.message.loading') : $t('common.message.noData')"
+        :empty-text="loading ? $t('common.api.role.tips.loding') : $t('common.api.role.tips.loding')"
       >
-        <el-table-column :label="$t('ui.data.column.scheduleResult.shiftName')" min-width="160">
+        <el-table-column :label="$t('ui.data.column.cd90ScheduleResult.shiftName')" width="120">
           <template slot-scope="scope">
-            <span>{{ scope.row.shiftName }}</span>
-            <span v-if="scope.row.shiftDate" style="margin-left:4px;color:#909399;">{{ scope.row.shiftDate }}</span>
+            <span>{{ scope.row.shiftName }}<span v-if="scope.row.shiftDate" style="color:#909399;">{{ formatDateMMDD(scope.row.shiftDate) }}</span></span>
           </template>
         </el-table-column>
-        <el-table-column :label="$t('ui.data.column.scheduleResult.produceOrder')" width="150" align="center">
+        <el-table-column :label="$t('ui.data.column.cd90ScheduleResult.produceOrder')" width="150" align="center">
           <template slot-scope="scope">
             <el-input-number
               v-model="scope.row.produceOrder"
@@ -66,23 +65,21 @@
               :precision="0"
               controls-position="right"
               style="width:120px"
-              :placeholder="$t('common.placeholder.input')"
             />
           </template>
         </el-table-column>
-        <el-table-column :label="$t('ui.data.column.scheduleResult.planQty')" width="170" align="center">
+        <el-table-column :label="$t('ui.data.column.cd90ScheduleResult.planQty')" width="170" align="center">
           <template slot-scope="scope">
             <el-input-number
               v-model="scope.row.planQty"
               :min="0"
-              :precision="3"
+              :precision="0"
               controls-position="right"
               style="width:140px"
-              :placeholder="$t('common.placeholder.input')"
             />
           </template>
         </el-table-column>
-        <el-table-column :label="$t('ui.data.column.scheduleResult.analysis')" min-width="220">
+        <el-table-column :label="$t('ui.data.column.cd90ScheduleResult.analysis')" min-width="220">
           <template slot-scope="scope">
             <el-input v-model="scope.row.analysisInput" maxlength="500" show-word-limit />
           </template>
@@ -91,7 +88,7 @@
 
       <!-- 填写提示 -->
       <div v-if="shiftRows.length > 0" style="margin-top:6px;font-size:12px;color:#909399;">
-        {{ $t('common.tip.atLeastOneShift') || '至少填写一班次的生产顺序和计划数量' }}
+        {{ $t('ui.dj.schedule.validate.atLeastOneShiftQty') }}
       </div>
     </el-form>
 
@@ -156,6 +153,11 @@ export default {
       }
       await Promise.all([this.loadMachines(), this.loadCloths(), this.loadShiftDates()])
     },
+    formatDateMMDD(dateStr) {
+      if (!dateStr) return ''
+      const parts = dateStr.split(/[-/]/)
+      return parts.length === 3 ? `${parts[1]}/${parts[2]}` : dateStr
+    },
     hide() {
       this.visible = false
       this.loading = false
@@ -197,14 +199,22 @@ export default {
     handleConfirm() {
       this.$refs.form.validate(async valid => {
         if (!valid) return
-        // 至少有一行同时填写了 produceOrder 和 planQty > 0
+        // 每行填写了 produceOrder 和 planQty > 0 的必须同时填写原因分析
         const hasPlan = this.shiftRows.some(
           item => item.planQty > 0 && item.produceOrder > 0
         )
         if (!hasPlan) {
           this.$modal.msgWarning(
-            this.$t('common.tip.atLeastOneShift') || '请至少填写一个班次的生产顺序和计划数量'
+            this.$t('ui.dj.schedule.validate.atLeastOneShiftQty')
           )
+          return
+        }
+        // 校验原因分析必填
+        const missingAnalysis = this.shiftRows.some(
+          item => item.planQty > 0 && item.produceOrder > 0 && !item.analysisInput
+        )
+        if (missingAnalysis) {
+          this.$modal.msgWarning('原因分析为必填项')
           return
         }
         await this.submit()

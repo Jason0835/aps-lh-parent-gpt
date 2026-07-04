@@ -743,6 +743,11 @@
   "ui.data.column.cd90ScheduleResult.autoScheduleConfirm": "An unfinished and unpublished auto schedule already exists for this date. Regenerate?",
   "ui.data.column.cd90ScheduleResult.factoryCode": "Factory",
   "ui.data.column.cd90ScheduleResult.scheduleDate": "Schedule Date",
+  "ui.data.column.cd90ScheduleResult.insertOrder": "Insert Order",
+  "ui.data.column.cd90ScheduleResult.shiftName": "Shift Name",
+  "ui.data.column.cd90ScheduleResult.produceOrder": "Produce Order",
+  "ui.data.column.cd90ScheduleResult.planQty": "Plan Qty",
+  "ui.data.column.cd90ScheduleResult.analysis": "Reason Analysis",
   "ui.data.column.cd90UnscheduleResult.factoryCode": "Factory",
   "ui.data.column.cd90UnscheduleResult.scheduleDate": "Schedule Date",
   "ui.data.column.cd90UnscheduleResult.clothCode": "Cloth Code",
@@ -848,4 +853,8 @@
   "ui.data.column.xwyyStock.checkUnique": "Duplicate stock record for same factory, date and big roll code",
   "ui.data.column.scheduleResult.midPlanQty": "Mid Shift Plan Qty",
   "ui.data.column.scheduleResult.midHandAnalysis": "Mid Shift Manual Analysis"
+  ,"ui.cd90.rolling.taskName": "Timed rolling schedule"
+  ,"ui.cd90.rolling.success": "Timed rolling schedule completed"
+  ,"ui.cd90.rolling.failed": "Timed rolling schedule failed"
+  ,"ui.cd90.rolling.versionChanged": "Data changed during rolling; recalculation will run in the next cycle"
 }

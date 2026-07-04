@@ -86,7 +86,7 @@
       @success="handleInsertSuccess"
     />
     <el-dialog
-      :title="$t('ui.data.column.cd90ScheduleResult.autoScheduleProgress')"
+      :title="scheduleTaskTitle"
       :visible.sync="autoScheduleProgressVisible"
       width="420px"
       :close-on-click-modal="false"
@@ -133,7 +133,7 @@
 
 <script>
 import moment from 'moment'
-import { getAutoScheduleTask, getInsertTask, listScheduleResult, delScheduleResult, exportScheduleResult, publishScheduleResult } from '@/api/cd90/scheduleResult'
+import { getAutoScheduleTask, getInsertTask, getTimedRollingTask, listScheduleResult, delScheduleResult, exportScheduleResult, publishScheduleResult } from '@/api/cd90/scheduleResult'
 import { listTireFabricCodes } from '@/api/cd90/specifyMachine'
 import { getCd90MachineEnableOptions } from '@/api/cd90/cd90MachineInfo'
 import { listUnscheduleResult, exportUnscheduleResult } from '@/api/cd90/unscheduleResult'
@@ -204,6 +204,7 @@ export default {
       autoScheduleProgressStage: '',
       autoScheduleProgressStatus: null,
       autoScheduleProgressHint: '',
+      scheduleTaskTitle: this.$t('ui.data.column.cd90ScheduleResult.autoScheduleProgress'),
       unscheduleResultDialogVisible: false,
       unscheduleLoading: false,
       unscheduleData: [],
@@ -470,6 +471,9 @@ export default {
     pollAutoScheduleTask(taskId) {
       this.pollScheduleTask(taskId, getAutoScheduleTask)
     },
+    pollTimedRollingTask(taskId) {
+      this.pollScheduleTask(taskId, getTimedRollingTask)
+    },
     pollScheduleTask(taskId, taskGetter) {
       this.clearAutoScheduleTimer()
       this.autoSchedulePollTimes = 0
@@ -478,6 +482,7 @@ export default {
       this.autoScheduleProgressStage = ''
       this.autoScheduleProgressStatus = null
       this.autoScheduleProgressHint = this.$t('ui.data.column.cd90ScheduleResult.autoScheduleProgressHint')
+      this.scheduleTaskTitle = this.$t('ui.data.column.cd90ScheduleResult.autoScheduleProgress')
       const poll = () => {
         taskGetter(taskId).then(res => {
           this.autoSchedulePollTimes += 1
@@ -485,6 +490,16 @@ export default {
           //   - 剥离后：res = { taskId, progress, taskStatus, currentStageName, ... }
           //   - 完整体：res = { code, msg, data: { ... } }
           const task = (res && res.data) ? res.data : (res || {})
+          const rollingTask = task.taskType === 'ROLLING_SCHEDULE'
+          const successKey = rollingTask
+            ? 'ui.cd90.rolling.success'
+            : 'ui.data.column.cd90ScheduleResult.autoScheduleSuccess'
+          const failedKey = rollingTask
+            ? 'ui.cd90.rolling.failed'
+            : 'ui.data.column.cd90ScheduleResult.autoScheduleFailed'
+          if (rollingTask) {
+            this.scheduleTaskTitle = this.$t('ui.cd90.rolling.taskName')
+          }
           // 更新进度展示
           if (task.progress != null) {
             this.autoScheduleProgressValue = Math.min(100, Math.max(0, task.progress))
@@ -496,18 +511,21 @@ export default {
             this.clearAutoScheduleTimer()
             this.autoScheduleProgressValue = 100
             this.autoScheduleProgressStatus = 'success'
-            this.autoScheduleProgressStage = this.$t('ui.data.column.cd90ScheduleResult.autoScheduleSuccess')
+            this.autoScheduleProgressStage = this.$t(successKey)
             // 短暂展示成功状态后关闭弹窗
             window.setTimeout(() => { this.closeAutoScheduleProgress() }, 600)
-            this.$modal.msgSuccess(this.$t('ui.data.column.cd90ScheduleResult.autoScheduleSuccess'))
+            this.$modal.msgSuccess(this.$t(successKey))
             this.getList()
+            if (this.unscheduleResultDialogVisible) {
+              this.getUnscheduleList()
+            }
             return
           }
           if (task.taskStatus === 'FAILED') {
             this.clearAutoScheduleTimer()
             this.autoScheduleProgressStatus = 'exception'
-            this.autoScheduleProgressStage = this.$t('ui.data.column.cd90ScheduleResult.autoScheduleFailed')
-            this.$modal.msgError(task.errorMessage || this.$t('ui.data.column.cd90ScheduleResult.autoScheduleFailed'))
+            this.autoScheduleProgressStage = this.$t(failedKey)
+            this.$modal.msgError(task.errorMessage || this.$t(failedKey))
             // 失败时保留弹窗让用户看到失败状态，3秒后自动关闭
             window.setTimeout(() => { this.closeAutoScheduleProgress() }, 3000)
             return

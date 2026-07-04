@@ -28,6 +28,28 @@ utf-8 no bom
       return yyy;
   }
   ```
+- 编写或重构 Java 代码时，对于集合的过滤、映射、收集等操作，优先使用 Stream API 替代传统 for 循环，使代码更简洁易读。例如：
+
+```java
+// 反例：for 循环
+List<String> result = new ArrayList<>();
+for (MdmConstructionInfo info : list) {
+    String code = info.getCordSpec();
+    if (code != null && !code.trim().isEmpty()) {
+        result.add(code.trim());
+    }
+}
+
+// 正例：Stream API
+List<String> result = list.stream()
+        .map(MdmConstructionInfo::getCordSpec)
+        .filter(Objects::nonNull)
+        .map(String::trim)
+        .filter(s -> !s.isEmpty())
+        .distinct()
+        .collect(Collectors.toList());
+```
+
 - **动态字段访问**：实体类中批量读写类似命名规则的字段（如 class1PlanQty ~ class6PlanQty、class1Sequence ~ class6Sequence、class1Analysis ~ class6Analysis 等）时，禁止使用逐个字段的 switch/case 或 if-else 硬编码获取/设置值，统一通过实体的 `getFieldValueByFieldName(String)` / `setFieldValueByFieldName(String, Object)` 方法配合字段名模板常量（如 `String.format("class%dPlanQty", index)`）动态访问。
 - **国际化规则**：所有返回给前端的信息（包括错误提示、校验失败提示等）必须使用 `I18nUtil.getMessage()` 抽取国际化 key，禁止硬编码中文/英文/越南语字符串直接返回前端。i18n key 统一以模块前缀命名（如 `ui.dj.*`），并同步更新 `apsui.properties`、`apsui_zh_CN.properties`、`apsui_en_US.properties`、`apsui_vi_VN.properties` 四个语言文件。
   - **占位符规范**：properties 文件中使用 `{0}`、`{1}`、`{2}` 等格式作为占位符（`java.text.MessageFormat` 风格），代码中必须使用 `MessageFormat.format()` 进行参数替换，禁止使用 `String.format()`。例如：

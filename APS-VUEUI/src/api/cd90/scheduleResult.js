@@ -42,6 +42,20 @@ export function insertOrder(data) {
 export function getInsertTask(taskId) {
   return request({ url: `/cd90/cd90ScheduleResult/insert/task/${taskId}`, method: 'get' })
 }
+export function getTimedRollingTask(taskId) {
+  return request({ url: `/cd90/cd90ScheduleResult/rollingSchedule/task/${taskId}`, method: 'get' })
+}
+export function listTimedRollingAdjustLogs(data) {
+  return request({
+    url: '/cd90/cd90ScheduleResult/rollingSchedule/adjustLog/list',
+    method: 'post',
+    headers: { 'Content-Type': 'application/json;charset=UTF-8' },
+    data
+  })
+}
+export function getTimedRollingAdjustLog(id) {
+  return request({ url: `/cd90/cd90ScheduleResult/rollingSchedule/adjustLog/${id}`, method: 'get' })
+}
 export function publishScheduleResult(data) {
   return request({ url: '/cd90/cd90ScheduleResult/publish', method: 'post', data })
 }

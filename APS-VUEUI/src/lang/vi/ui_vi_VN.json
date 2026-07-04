@@ -1759,6 +1759,11 @@
   "ui.data.column.cd90ScheduleResult.autoScheduleConfirm": "Đã tồn tại lịch tự động chưa hoàn thành và chưa phát hành cho ngày này. Có tạo lại không?",
   "ui.data.column.cd90ScheduleResult.factoryCode": "Nhà máy",
   "ui.data.column.cd90ScheduleResult.scheduleDate": "Ngày lập lịch",
+  "ui.data.column.cd90ScheduleResult.insertOrder": "Chèn đơn hàng",
+  "ui.data.column.cd90ScheduleResult.shiftName": "Tên ca",
+  "ui.data.column.cd90ScheduleResult.produceOrder": "Thứ tự",
+  "ui.data.column.cd90ScheduleResult.planQty": "SL kế hoạch",
+  "ui.data.column.cd90ScheduleResult.analysis": "Phân tích nguyên nhân",
   "ui.data.column.cd90UnscheduleResult.factoryCode": "Nhà máy",
   "ui.data.column.cd90UnscheduleResult.scheduleDate": "Ngày lập lịch",
   "ui.data.column.cd90UnscheduleResult.clothCode": "Mã vải",
@@ -1839,4 +1844,8 @@
   "ui.data.column.xwyyStock.stockMeters": "Số mét mỗi cuộn",
   "ui.data.column.xwyyStock.estimateStockFlag": "Cờ ước tính tồn kho",
   "ui.data.column.xwyyStock.checkUnique": "Bản ghi tồn kho đã tồn tại cho cùng nhà máy, ngày và mã cuộn lớn"
+  ,"ui.cd90.rolling.taskName": "Lập lịch cuốn chiếu định kỳ"
+  ,"ui.cd90.rolling.success": "Lập lịch cuốn chiếu định kỳ đã hoàn tất"
+  ,"ui.cd90.rolling.failed": "Lập lịch cuốn chiếu định kỳ thất bại"
+  ,"ui.cd90.rolling.versionChanged": "Dữ liệu đã thay đổi trong khi cuốn chiếu; hệ thống sẽ tính lại ở chu kỳ tiếp theo"
 }
