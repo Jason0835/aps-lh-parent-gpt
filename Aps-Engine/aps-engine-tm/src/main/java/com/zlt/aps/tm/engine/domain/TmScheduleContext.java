@@ -66,6 +66,15 @@ public class TmScheduleContext {
     /** 工厂可用机台候选列表，由数据加载层填充，供机台分配步骤过滤评分使用 */
     private List<TmMachineCandidate> machineCandidateList = new ArrayList<>();
 
+    /** 损耗率规则列表，由数据加载层填充，供机台分配步骤解析最终损耗率 */
+    private List<TmLossRule> lossRuleList = new ArrayList<>();
+
+    /** 计划量阶段计算出的首个任务工装池初始可用数量 */
+    private BigDecimal initialAvailableToolQty;
+
+    /** 机台分配阶段正在滚动使用的全局可用工装数量 */
+    private BigDecimal currentAvailableToolQty;
+
     /** 小胶种编码集合，来源于本次参数快照 */
     private Set<String> smallGlueCodeSet = new HashSet<>();
 
@@ -189,5 +198,9 @@ public class TmScheduleContext {
 
     public void setCandidateTraceMap(Map<String, List<TmMachineCandidate>> candidateTraceMap) {
         this.candidateTraceMap = candidateTraceMap == null ? new HashMap<>() : candidateTraceMap;
+    }
+
+    public void setLossRuleList(List<TmLossRule> lossRuleList) {
+        this.lossRuleList = lossRuleList == null ? new ArrayList<>() : lossRuleList;
     }
 }

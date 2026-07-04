@@ -82,8 +82,23 @@ public class TmTaskDraft {
     /** 收尾成型余量，单位条 */
     private BigDecimal tailBalanceQty;
 
-    /** 损耗率，百分比 */
+    /** 损耗率，百分比；兼容旧测试或临时覆盖值 */
     private BigDecimal lossRate;
+
+    /** 机台确认后最终命中的损耗率，百分比 */
+    private BigDecimal resolvedLossRate;
+
+    /** 损耗率命中层级 */
+    private String lossMatchLevel;
+
+    /** 损耗率命中来源说明 */
+    private String lossMatchSource;
+
+    /** 损耗前计划量，单位米 */
+    private BigDecimal preLossPlanQty;
+
+    /** 工装限制前计划量，单位米 */
+    private BigDecimal planQtyBeforeToolLimit;
 
     /** 基础应排需求量，单位米 */
     private BigDecimal baseDemandQty;
