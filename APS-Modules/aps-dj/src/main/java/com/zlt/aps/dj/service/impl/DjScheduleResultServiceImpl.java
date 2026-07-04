@@ -805,7 +805,8 @@ public class DjScheduleResultServiceImpl extends AbstractBillService<DjScheduleR
 
     /**
      * 获取排程日期的排程结果合计。
-     * <p>根据排产起始班次动态映射 class 字段，取起始班次开始的连续3个班的计划汇总值。</p>
+     * <p>直接汇总 class1PlanQty / class2PlanQty / class3PlanQty，
+     * 实体中 class1 即为排产起始班次，对应连续3个班。</p>
      *
      * @param scheduleResult 排程日期
      * @return 结果
@@ -817,38 +818,24 @@ public class DjScheduleResultServiceImpl extends AbstractBillService<DjScheduleR
             return AjaxResult.success(new ScheduleSummaryVo());
         }
 
-        // 获取排产起始班次（所有结果的首班班次应一致，取第一条即可）
-        String scheduleShiftClass = djScheduleResultList.get(0).getScheduleShiftClass();
-        if (StringUtils.isBlank(scheduleShiftClass)) {
-            scheduleShiftClass = ClassNumThreePlanEnums.CLASS_NIGHT.getClassIndex();
-        }
-
-        // 根据排产起始班次确定各真实班次对应的 class 索引
-        int nightClassIdx = realShiftToClassIndex(scheduleShiftClass, ClassNumThreePlanEnums.CLASS_NIGHT.getClassIndex());   // 夜班
-        int morningClassIdx = realShiftToClassIndex(scheduleShiftClass, ClassNumThreePlanEnums.CLASS_MORNING.getClassIndex()); // 早班
-        int dayClassIdx = realShiftToClassIndex(scheduleShiftClass, ClassNumThreePlanEnums.CLASS_DAY.getClassIndex());        // 中班
-
-        BigDecimal totalNightPlanQty = BigDecimal.ZERO;   // 夜班合计 → dayPlanQty
-        BigDecimal totalMorningPlanQty = BigDecimal.ZERO; // 早班合计 → nightPlanQty
-        BigDecimal totalDayPlanQty = BigDecimal.ZERO;     // 中班合计 → nextDayPlanQty
+        BigDecimal totalClass1PlanQty = BigDecimal.ZERO;
+        BigDecimal totalClass2PlanQty = BigDecimal.ZERO;
+        BigDecimal totalClass3PlanQty = BigDecimal.ZERO;
         BigDecimal totalStockQty = BigDecimal.ZERO;
         BigDecimal totalPrevDayClass3PlanQty = BigDecimal.ZERO;
 
         for (DjScheduleResult result : djScheduleResultList) {
-            totalNightPlanQty = totalNightPlanQty.add(BigDecimalUtils.valueOf(
-                    result.getFieldValueByFieldName("class" + nightClassIdx + "PlanQty")));
-            totalMorningPlanQty = totalMorningPlanQty.add(BigDecimalUtils.valueOf(
-                    result.getFieldValueByFieldName("class" + morningClassIdx + "PlanQty")));
-            totalDayPlanQty = totalDayPlanQty.add(BigDecimalUtils.valueOf(
-                    result.getFieldValueByFieldName("class" + dayClassIdx + "PlanQty")));
+            totalClass1PlanQty = totalClass1PlanQty.add(BigDecimalUtils.valueOf(result.getClass1PlanQty()));
+            totalClass2PlanQty = totalClass2PlanQty.add(BigDecimalUtils.valueOf(result.getClass2PlanQty()));
+            totalClass3PlanQty = totalClass3PlanQty.add(BigDecimalUtils.valueOf(result.getClass3PlanQty()));
             totalStockQty = totalStockQty.add(BigDecimalUtils.valueOf(result.getStockQty()));
             totalPrevDayClass3PlanQty = totalPrevDayClass3PlanQty.add(BigDecimalUtils.valueOf(result.getPrevDayClass3PlanQty()));
         }
 
         ScheduleSummaryVo scheduleSummaryVo = new ScheduleSummaryVo();
-        scheduleSummaryVo.setDayPlanQty(totalNightPlanQty.doubleValue());
-        scheduleSummaryVo.setNightPlanQty(totalMorningPlanQty.doubleValue());
-        scheduleSummaryVo.setNextDayPlanQty(totalDayPlanQty.doubleValue());
+        scheduleSummaryVo.setClass1PlanQty(totalClass1PlanQty.doubleValue());
+        scheduleSummaryVo.setClass2PlanQty(totalClass2PlanQty.doubleValue());
+        scheduleSummaryVo.setClass3PlanQty(totalClass3PlanQty.doubleValue());
         scheduleSummaryVo.setStockQty(totalStockQty.doubleValue());
         scheduleSummaryVo.setLastDayPlanQty(totalPrevDayClass3PlanQty.doubleValue());
         return AjaxResult.success(scheduleSummaryVo);
