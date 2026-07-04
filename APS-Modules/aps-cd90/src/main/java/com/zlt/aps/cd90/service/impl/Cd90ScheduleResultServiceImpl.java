@@ -1,6 +1,7 @@
 package com.zlt.aps.cd90.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ruoyi.common.core.web.domain.AjaxResult;
@@ -17,6 +18,7 @@ import com.zlt.aps.cd90.engine.model.Cd90BatchDataCheckResult;
 import com.zlt.aps.cd90.engine.service.Cd90AutoScheduleBatchDataValidator;
 import com.zlt.aps.cd90.engine.service.Cd90ScheduleTaskService;
 import com.zlt.aps.cd90.engine.mapper.Cd90AutoScheduleShiftMapper;
+import com.zlt.aps.cd90.engine.mapper.Cd90EngineConstructionMapper;
 import com.zlt.aps.cd90.mapper.Cd90ScheduleRollingAdjustLogMapper;
 import com.zlt.aps.cd90.mapper.Cd90UnscheduleResultMapper;
 import com.zlt.aps.cd90.mapper.Cd90ScheduleResultMapper;
@@ -27,6 +29,7 @@ import com.zlt.aps.cd90.service.Cd90ScheduleOverwriteValidator;
 import com.zlt.aps.cd90.service.Cd90TimedRollingCheckService;
 import com.zlt.aps.cd90.service.ICd90ScheduleResultService;
 import com.zlt.aps.common.core.constant.ApsConstant;
+import com.zlt.aps.mdm.api.domain.entity.MdmConstructionInfo;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.sysdef.domain.SysDocType;
 import org.springframework.stereotype.Service;
@@ -34,6 +37,7 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -73,6 +77,8 @@ public class Cd90ScheduleResultServiceImpl extends AbstractDocService<Cd90Schedu
     private ObjectMapper objectMapper;
     @Resource
     private Cd90TimedRollingCheckService timedRollingCheckService;
+    @Resource
+    private Cd90EngineConstructionMapper constructionMapper;
 
     /**
      * 接收自动排程请求。
@@ -219,6 +225,27 @@ public class Cd90ScheduleResultServiceImpl extends AbstractDocService<Cd90Schedu
         if (!Integer.valueOf(200).equals(validation.get("code"))) {
             return validation;
         }
+        // 创建INSERT_ORDER异步任务前，复用自动排程1.2节批次级数据先行检查；
+        // 失败时不创建PENDING任务、不占用执行锁、不进入异步执行器，
+        // 与autoSchedule一致返回success+batchCheckFailed结构化错误，由前端渲染。
+        LocalDate localScheduleDate = request.getScheduleDate().toInstant()
+                .atZone(ZoneId.systemDefault()).toLocalDate();
+        Cd90BatchDataCheckResult batchCheck = batchDataValidator.check(
+                request.getFactoryCode(), localScheduleDate);
+        if (batchCheck.isFailed()) {
+            Map<String, Object> data = new HashMap<>();
+            data.put("batchCheckFailed", true);
+            data.put("errors", toErrorList(batchCheck.getErrors()));
+            data.put("warnings", toErrorList(batchCheck.getWarnings()));
+            return AjaxResult.success(batchCheck.getPrimaryMessage(), data);
+        }
+        // 追加针对插窗帘布的 TIRE_FABRIC_LENGTH/TIRE_FABRIC_CRAFT 检查。
+        // batchDataValidator.check 基于成型计划胚号+版本维度校验施工，
+        // 插单以单独帘布代号指定，需按该帘布代号兜底校验施工层位中的直裁宽度和单耗。
+        Map<String, Object> clothCheckResult = checkInsertClothTireFabric(request.getFactoryCode(), request.getClothCode());
+        if (clothCheckResult != null) {
+            return AjaxResult.success("帘布 " + request.getClothCode() + " 施工数据检查失败", clothCheckResult);
+        }
         Cd90ScheduleTask activeTask = taskService.findActive(
                 request.getFactoryCode(), request.getScheduleDate());
         if (activeTask != null) {
@@ -338,6 +365,119 @@ public class Cd90ScheduleResultServiceImpl extends AbstractDocService<Cd90Schedu
             result.add(item);
         }
         return result;
+    }
+
+    /**
+     * 检查插窗帘布的 TIRE_FABRIC_CRAFT 和 TIRE_FABRIC_LENGTH 施工数据。
+     * 以帘布代号查询施工信息中匹配的层位，校验直裁宽度和单耗均存在且为正。
+     *
+     * @param factoryCode 工厂编码
+     * @param clothCode   帘布代号
+     * @return 失败时返回包含 batchCheckFailed 等的 Map（与前端的 batchCheckFailed=true 协定对齐），通过时返回 null
+     */
+    private Map<String, Object> checkInsertClothTireFabric(String factoryCode, String clothCode) {
+        if (isBlank(clothCode)) {
+            return null;
+        }
+        List<MdmConstructionInfo> constructions = constructionMapper.selectList(
+                Wrappers.<MdmConstructionInfo>lambdaQuery()
+                        .eq(MdmConstructionInfo::getFactoryCode, factoryCode)
+                        .and(w -> w.eq(MdmConstructionInfo::getTireFabricCode1, clothCode)
+                                .or().eq(MdmConstructionInfo::getTireFabricCode2, clothCode)
+                                .or().eq(MdmConstructionInfo::getTireFabricCode3, clothCode)));
+        List<Map<String, Object>> errors = new ArrayList<>();
+        boolean clothFound = false;
+        if (constructions != null) {
+            for (MdmConstructionInfo construction : constructions) {
+                String prefix = "胎胚 " + construction.getConstructionCode()
+                        + " 施工版本 " + construction.getConstructionVersion() + " ";
+                for (int layer = 1; layer <= 3; layer++) {
+                    String layerClothCode = getMdmLayerClothCode(construction, layer);
+                    if (!clothCode.equals(layerClothCode)) {
+                        continue;
+                    }
+                    clothFound = true;
+                    // 检查 TIRE_FABRIC_CRAFT{n}
+                    String craftRaw = getMdmLayerCraftRaw(construction, layer);
+                    if (!isPositiveDecimal(craftRaw)) {
+                        Map<String, Object> error = new HashMap<>();
+                        error.put("field", "施工信息");
+                        error.put("reasonCode", "DATA_MISSING");
+                        error.put("message", prefix + "第 " + layer + " 层帘布 " + clothCode + " 直裁宽度缺失或非正");
+                        error.put("suggestion", "请在施工信息页面维护 TIRE_FABRIC_CRAFT" + layer + " 且大于0");
+                        errors.add(error);
+                    }
+                    // 检查 TIRE_FABRIC_LENGTH{n}
+                    BigDecimal length = getMdmLayerLength(construction, layer);
+                    if (length == null || length.signum() <= 0) {
+                        Map<String, Object> error = new HashMap<>();
+                        error.put("field", "施工信息");
+                        error.put("reasonCode", "DATA_MISSING");
+                        error.put("message", prefix + "第 " + layer + " 层帘布 " + clothCode + " 单耗缺失或非正");
+                        error.put("suggestion", "请在施工信息页面维护 TIRE_FABRIC_LENGTH" + layer + " 且大于0");
+                        errors.add(error);
+                    }
+                }
+            }
+        }
+        if (!clothFound) {
+            Map<String, Object> error = new HashMap<>();
+            error.put("field", "施工信息");
+            error.put("reasonCode", "DATA_MISSING");
+            error.put("message", "帘布 " + clothCode + " 未在任何施工信息中找到");
+            error.put("suggestion", "请检查帘布代号维护是否正确");
+            errors.add(error);
+        }
+        if (!errors.isEmpty()) {
+            Map<String, Object> result = new HashMap<>();
+            result.put("batchCheckFailed", true);
+            result.put("errors", errors);
+            result.put("warnings", new ArrayList<>());
+            return result;
+        }
+        return null;
+    }
+
+    /** 取施工记录指定层位的帘布代号（1=TIRE_FABRIC_CODE1, 2=TIRE_FABRIC_CODE2, 3=TIRE_FABRIC_CODE3）。 */
+    private String getMdmLayerClothCode(MdmConstructionInfo construction, int layer) {
+        switch (layer) {
+            case 1: return construction.getTireFabricCode1();
+            case 2: return construction.getTireFabricCode2();
+            case 3: return construction.getTireFabricCode3();
+            default: return null;
+        }
+    }
+
+    /** 取施工记录指定层位的直裁宽度原始值（TIRE_FABRIC_CRAFT1/2/3）。 */
+    private String getMdmLayerCraftRaw(MdmConstructionInfo construction, int layer) {
+        switch (layer) {
+            case 1: return construction.getTireFabricCraft1();
+            case 2: return construction.getTireFabricCraft2();
+            case 3: return construction.getTireFabricCraft3();
+            default: return null;
+        }
+    }
+
+    /** 取施工记录指定层位的单耗（TIRE_FABRIC_LENGTH1/2/3）。 */
+    private BigDecimal getMdmLayerLength(MdmConstructionInfo construction, int layer) {
+        switch (layer) {
+            case 1: return construction.getTireFabricLength1();
+            case 2: return construction.getTireFabricLength2();
+            case 3: return construction.getTireFabricLength3();
+            default: return null;
+        }
+    }
+
+    /** 判断字符串是否为正数（可解析为 >0 的数值）。 */
+    private boolean isPositiveDecimal(String raw) {
+        if (raw == null || raw.trim().isEmpty()) {
+            return false;
+        }
+        try {
+            return new BigDecimal(raw.trim()).signum() > 0;
+        } catch (NumberFormatException e) {
+            return false;
+        }
     }
 
     @Override
