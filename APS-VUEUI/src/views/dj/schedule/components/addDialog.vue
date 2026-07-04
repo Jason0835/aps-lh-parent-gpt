@@ -49,6 +49,8 @@ export default {
       // 连续3个班次信息（来自 getCurrentShift API）
       currentShiftData: null,
       shiftList: [],
+      // 排产起始班次（首班班次），用于提交后端计算实际排程日期和班次
+      startShiftClass: null,
       form: {
         scheduleDate: moment().add(1, "days").format("yyyy-MM-DD"),
       },
@@ -215,6 +217,7 @@ export default {
         if (res) {
           this.currentShiftData = res;
           this.shiftList = res.shifts || [];
+          this.startShiftClass = res.currentShiftClass || null;
           if (res.scheduleDate) {
             this.form.scheduleDate = res.scheduleDate;
           }
@@ -246,6 +249,7 @@ export default {
       this.form = {};
       this.shiftList = [];
       this.currentShiftData = null;
+      this.startShiftClass = null;
       this.$refs.form.triggerResetForm();
       // this.resetForm("infoForm");
       this.isEdit = false;
@@ -260,6 +264,9 @@ export default {
 
     handleConfirm() {
       this.$refs.form.triggerConfirm((params) => {
+        // 传入排产起始班次，供后端计算实际排程日期和班次
+        params.scheduleShiftClass = this.startShiftClass;
+
         const groupLabels = this.shiftList.map((s) => s.label || "class" + s.classIndex);
         // 自定义校验：至少一个班有录入计划量
         const shifts = [
