@@ -6,7 +6,7 @@ import java.math.BigDecimal;
  * 胎面同机台任务链排序分。
  *
  * <p>用于在同一班次内选择下一个待排任务。排序采用分层比较：先比较主胶料连续，
- * 再比较基部胶连续、口型连续，最后比较产能适配、切换成本、定点生产等业务分。
+ * 再比较基部胶相同元素数量、口型连续，最后比较产能适配、切换成本、定点生产等业务分。
  * 该对象只承载排序结果，不修改任务、候选机台或任务链。</p>
  */
 public class TmChainSortScore implements Comparable<TmChainSortScore> {
@@ -18,7 +18,7 @@ public class TmChainSortScore implements Comparable<TmChainSortScore> {
     /** 是否匹配前置任务主胶料，1 表示匹配 */
     private final int mainGlueMatched;
 
-    /** 是否匹配前置任务基部胶，1 表示匹配 */
+    /** 匹配前置任务基部胶的元素数量，数量越大优先级越高 */
     private final int baseGlueMatched;
 
     /** 是否匹配前置任务口型板，1 表示匹配 */
@@ -49,7 +49,7 @@ public class TmChainSortScore implements Comparable<TmChainSortScore> {
      * 创建胎面任务链排序分。
      *
      * @param mainGlueMatched 是否匹配前置任务主胶料
-     * @param baseGlueMatched 是否匹配前置任务基部胶
+     * @param baseGlueMatched 匹配前置任务基部胶的元素数量
      * @param mouthPlateMatched 是否匹配前置任务口型板
      * @param capacityScore 产能适配分
      * @param mainGlueScore 主胶料连续分
@@ -128,9 +128,9 @@ public class TmChainSortScore implements Comparable<TmChainSortScore> {
     }
 
     /**
-     * 获取基部胶连续命中标识。
+     * 获取基部胶连续命中元素数量。
      *
-     * @return 1 表示匹配，0 表示不匹配
+     * @return 基部胶交集元素数量
      */
     public int getBaseGlueMatched() {
         return baseGlueMatched;

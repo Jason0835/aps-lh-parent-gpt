@@ -118,7 +118,7 @@ public class TmPersistService {
             explain.setCoverageShiftCount(task.getGuardShiftCount());
             explain.setUnplannedReasonCode(task.getUnplannedReasonCode());
             explain.setUnplannedReasonDesc(task.getUnplannedReasonDesc());
-            explain.setTaskStatus(task.isUnassigned() ? null : TmScheduleTaskStatusEnum.PLANNED.getCode());
+            explain.setTaskStatus(resolveTaskStatus(task));
             explain.setResultStatus(TmScheduleReleaseStatusEnum.NOT_RELEASED.getCode());
             explain.setTreadCode(task.getTreadCode());
             explain.setGlueCode(task.getGlueCode());
@@ -140,6 +140,43 @@ public class TmPersistService {
     }
 
     /**
+     * 解析解释表任务状态。
+     *
+     * @param task 待排任务草稿
+     * @return 任务状态；未排任务返回 null，由未排原因字段表达
+     */
+    private String resolveTaskStatus(TmTaskDraft task) {
+        if (task == null || isUnplannedTask(task)) {
+            return null;
+        }
+        if (isNoProductionNeeded(task)) {
+            return TmScheduleTaskStatusEnum.NO_PRODUCTION_NEEDED.getCode();
+        }
+        return TmScheduleTaskStatusEnum.PLANNED.getCode();
+    }
+
+    /**
+     * 判断任务是否属于未排任务。
+     *
+     * @param task 待排任务草稿
+     * @return true 表示任务需要进入未排语义
+     */
+    private boolean isUnplannedTask(TmTaskDraft task) {
+        return task != null && (task.isUnassigned() || StrUtil.isNotBlank(task.getUnplannedReasonCode()));
+    }
+
+    /**
+     * 判断任务是否无需生产。
+     *
+     * @param task 待排任务草稿
+     * @return true 表示最终计划量为空或小于等于 0，且不是未排任务
+     */
+    private boolean isNoProductionNeeded(TmTaskDraft task) {
+        return task != null && !isUnplannedTask(task)
+                && (task.getPlanQty() == null || task.getPlanQty().compareTo(BigDecimal.ZERO) <= 0);
+    }
+
+    /**
      * 解析解释表应排需求量。
      *
      * @param task 待排任务草稿
@@ -151,6 +188,7 @@ public class TmPersistService {
         }
         return task.getCurrentShiftDemandQty() == null ? task.getDemandQty() : task.getCurrentShiftDemandQty();
     }
+
     /**
      * 写入未排任务入口。
      *

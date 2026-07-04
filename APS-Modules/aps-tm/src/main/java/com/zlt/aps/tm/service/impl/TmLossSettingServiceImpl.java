@@ -53,6 +53,15 @@ public class TmLossSettingServiceImpl extends AbstractDocService<TmLossSetting> 
 
     @Override
     public String checkUnique(TmLossSetting query) {
+        if (StringUtils.isBlank(query.getTreadCode()) && StringUtils.isBlank(query.getMachineCode())) {
+            throw new ServiceException(I18nUtil.getMessage("ui.data.alert.tm.lossSetting.bothEmpty"));
+        }
+        if (StringUtils.isBlank(query.getTreadCode())) {
+            query.setTreadCode("");
+        }
+        if (StringUtils.isBlank(query.getMachineCode())) {
+            query.setMachineCode("");
+        }
         String unique = super.checkUnique(query);
         if (UserConstants.NOT_UNIQUE.equals(unique)) {
             throw new ServiceException(I18nUtil.getMessage("ui.data.alert.tm.lossSetting.notUnique"));
@@ -62,7 +71,7 @@ public class TmLossSettingServiceImpl extends AbstractDocService<TmLossSetting> 
 
     @Override
     protected List<String> getCheckUniqueFields() {
-        return new ArrayList<>(Arrays.asList("factoryCode", "treadCode", "machineCode", "settingLevel"));
+        return new ArrayList<>(Arrays.asList("factoryCode", "treadCode", "machineCode"));
     }
 
     @Override
@@ -92,10 +101,10 @@ public class TmLossSettingServiceImpl extends AbstractDocService<TmLossSetting> 
     @Override
     protected Boolean serviceCheckAndDataHandle(TmLossSetting importDocEntity, List<ImportErrorLog> importErrorLogs,
                                                 Long importLogId, int errorRowNum, Map<Object, Object> serviceCheckParams) {
-        // 校验机台编码是否存在
-        if (serviceCheckParams.containsKey("tmMachineCodeList")) {
+        // 校验机台编码是否存在（为空时跳过）
+        String machineCode = importDocEntity.getMachineCode();
+        if (StringUtils.isNotBlank(machineCode) && serviceCheckParams.containsKey("tmMachineCodeList")) {
             List<String> machineCodeList = (List<String>) serviceCheckParams.get("tmMachineCodeList");
-            String machineCode = importDocEntity.getMachineCode();
             if (!machineCodeList.contains(machineCode)) {
                 String message = I18nUtil.getMessage("ui.data.alert.tm.machineCodeNotExist");
                 ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(), errorRowNum, message, importErrorLogs);

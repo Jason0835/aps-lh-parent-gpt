@@ -131,6 +131,11 @@ public class BaseDataContainer implements Serializable {
      * key=分组名 ： value=机台排产历史
      */
     private Map<String, GroupPlanProductionHistoryInfo> groupPlanHistoryInfoMap;
+    /**
+     * 20260703+ 当月结构分配机台特殊限制
+     * key=分组名 : value=机台数
+     */
+    private Map<String, Integer> groupMachineLimitMap;
 
     /**
      * 判断同结构下前后两个Sku是否共用模具

@@ -138,6 +138,11 @@ public class Cd90InsertRollingServiceImpl implements Cd90InsertRollingService {
                     context.getParameters().getRollCoilMeter(),
                     context.getParameters().getRollTotalCount(),
                     Collections.singletonList(request.getMachineCode()));
+            Cd90MachineTailState inheritedTail = resourceState.getTailByMachine()
+                    .get(request.getMachineCode());
+            if (inheritedTail != null) {
+                tailByMachine.put(request.getMachineCode(), inheritedTail);
+            }
             Double insertQuantity = (Double) request.getFieldValueByFieldName(
                     String.format("class%dPlanQty", classIndex));
             Integer insertOrder = (Integer) request.getFieldValueByFieldName(
@@ -233,13 +238,20 @@ public class Cd90InsertRollingServiceImpl implements Cd90InsertRollingService {
             String limitReason = null;
             if (segment.locked) {
                 scheduled = segment.quantity;
-                int occupiedSeconds = scheduled.multiply(BigDecimal.valueOf(fullSeconds))
-                        .divide(BigDecimal.valueOf(machine.getQuota()), 0, RoundingMode.CEILING)
-                        .intValue();
-                remainingSeconds = Math.max(0, remainingSeconds - occupiedSeconds);
-                previousTail = Cd90MachineTailState.builder()
+                Cd90MachineTailState currentTail = Cd90MachineTailState.builder()
                         .clothCode(segment.result.getClothCode())
                         .bigRollCode(segment.result.getBigRollCode()).build();
+                Cd90MachineCapacityTrial lockedTrial = capacityCalculator.calculateWithRemainingSeconds(
+                        BigDecimal.valueOf(machine.getQuota()),
+                        Math.max(1, shift.getDurationSeconds() / 3600), remainingSeconds,
+                        previousTail, currentTail,
+                        context.getParameters().getSameRollDiffSpecChangeMinutes(),
+                        context.getParameters().getDiffRollSameSpecChangeMinutes(),
+                        context.getParameters().getDiffRollDiffSpecChangeMinutes(),
+                        segment.quantity);
+                remainingSeconds = lockedTrial.isFullyAccommodated()
+                        ? lockedTrial.getRemainingSeconds() : 0;
+                previousTail = currentTail;
             } else if (remainingSeconds <= 0) {
                 scheduled = BigDecimal.ZERO;
                 limitReason = "CAPACITY_LIMIT";
@@ -274,12 +286,12 @@ public class Cd90InsertRollingServiceImpl implements Cd90InsertRollingService {
                 limitReason = laneCommit.limitReason;
             }
             if (scheduled.signum() > 0) {
-                writeClass(segment.result, classIndex, shift, scheduled, assignedOrder,
-                        limitReason, request);
-                if (segment.result.getId() != null) {
-                    changedById.put(segment.result.getId(), segment.result);
-                }
                 if (!segment.locked) {
+                    writeClass(segment.result, classIndex, shift, scheduled, assignedOrder,
+                            limitReason, request);
+                    if (segment.result.getId() != null) {
+                        changedById.put(segment.result.getId(), segment.result);
+                    }
                     List<Cd90InsertLaneAllocationDraft> targetLanes = segment.result.getId() == null
                             ? insertLanes : replacementLanes.computeIfAbsent(
                                     segment.result.getId(), key -> new ArrayList<>());
@@ -307,6 +319,7 @@ public class Cd90InsertRollingServiceImpl implements Cd90InsertRollingService {
         }
         if (previousTail != null) {
             tailByMachine.put(request.getMachineCode(), previousTail);
+            resourceState.getTailByMachine().put(request.getMachineCode(), previousTail);
         }
         return new ShiftRollingResult(carryovers, segments.size());
     }
@@ -341,6 +354,9 @@ public class Cd90InsertRollingServiceImpl implements Cd90InsertRollingService {
                             .expectedStartTime(shift.getStartTime())
                             .expectedEndTime(shift.getEndTime())
                             .laneAllocations(laneCommit.allocations).build());
+                    state.getTailByMachine().put(item.getMachineCode(),
+                            Cd90MachineTailState.builder().clothCode(item.getClothCode())
+                                    .bigRollCode(item.getBigRollCode()).build());
                 });
     }
 

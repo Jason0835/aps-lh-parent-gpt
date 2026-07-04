@@ -140,4 +140,14 @@ public interface IFactoryMonthPlanProductionFinalResultRemoteService {
     @PostMapping("/factoryMonthPlanFinalResult/calcCurrentMonthOverProdForNextMonth")
     AjaxResult calcCurrentMonthOverProdForNextMonth();
 
+    /**
+     * 计算指定月份超欠产写入其下月（临时测试用，支持指定数据来源月份）
+     *
+     * @param year  数据来源年份（如2026）
+     * @param month 数据来源月份（如6，代表6月数据写入7月）
+     */
+    @ApiOperation("计算指定月份超欠产写入其下月（临时测试用）")
+    @PostMapping("/factoryMonthPlanFinalResult/calcCurrentMonthOverProdForNextMonth/{year}/{month}")
+    AjaxResult calcCurrentMonthOverProdForNextMonth(@PathVariable("year") Integer year, @PathVariable("month") Integer month);
+
 }

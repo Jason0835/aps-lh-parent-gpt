@@ -752,4 +752,20 @@ public class FactoryMonthPlanProductionFinalResultController extends AbstractDoc
     public AjaxResult calcCurrentMonthOverProdForNextMonth() {
         return factoryMonthPlanProductionFinalResultService.calcCurrentMonthOverProdForNextMonth();
     }
+
+    /**
+     * 计算指定月份超欠产写入其下月（临时测试用，支持指定数据来源月份）
+     * 逻辑同calcCurrentMonthOverProdForNextMonth，但允许手动指定数据来源的年月，
+     * 便于测试在非月底时间模拟月底倒数2天的超欠产生成
+     *
+     * @param year  数据来源年份（如2026）
+     * @param month 数据来源月份（如6，代表6月数据写入7月）
+     * @return 计算结果
+     */
+    @ApiOperation("计算指定月份超欠产写入其下月（临时测试用）")
+    @PostMapping("/calcCurrentMonthOverProdForNextMonth/{year}/{month}")
+    public AjaxResult calcCurrentMonthOverProdForNextMonth(@PathVariable("year") Integer year,
+                                                           @PathVariable("month") Integer month) {
+        return factoryMonthPlanProductionFinalResultService.calcCurrentMonthOverProdForNextMonth(year, month);
+    }
 }

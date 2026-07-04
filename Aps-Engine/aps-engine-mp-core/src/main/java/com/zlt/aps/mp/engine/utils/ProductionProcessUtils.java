@@ -1,6 +1,7 @@
 package com.zlt.aps.mp.engine.utils;
 
 import com.zlt.aps.constant.FactoryConstant;
+import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.mp.engine.constant.ProductionConstant;
 import com.zlt.aps.mp.engine.scheduling.ProductionContext;
 import lombok.extern.slf4j.Slf4j;
@@ -29,6 +30,20 @@ public class ProductionProcessUtils {
             return false;
         }
         return ProductionConstant.YES_VALUE.equalsIgnoreCase(paramValue);
+    }
+
+    /**
+     * 判断参数值是否为"1"
+     * 为空或是非"1"则为false
+     *
+     * @param paramValue
+     * @return
+     */
+    public static boolean isYes(String paramValue) {
+        if (StringUtils.isBlank(paramValue)) {
+            return false;
+        }
+        return YesOrNoEnum.YES.getCode().equals(paramValue);
     }
 
     /**

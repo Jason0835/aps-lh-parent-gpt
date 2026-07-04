@@ -63,6 +63,9 @@ public class TmMachineAssignService implements ITmMachineAssignService {
         if (CollUtil.isEmpty(context.getTaskDraftList())) {
             return;
         }
+        if (context.getCurrentAvailableToolQty() == null) {
+            context.setCurrentAvailableToolQty(context.getInitialAvailableToolQty());
+        }
         Map<Integer, List<TmTaskDraft>> shiftTaskMap = new ArrayList<>(context.getTaskDraftList()).stream()
                 .collect(Collectors.groupingBy(task -> this.normalizeShiftOrder(task.getShiftOrder()),
                         TreeMap::new, Collectors.toList()));
@@ -175,14 +178,14 @@ public class TmMachineAssignService implements ITmMachineAssignService {
         BigDecimal remainCapacity = this.resolveRemainCapacity(task, context, candidate, machineSpeed);
         BigDecimal capacityScore = this.capacityFitScore(task, remainCapacity);
         boolean mainGlueMatched = this.same(task.getGlueCode(), tailMainGlueCode);
-        boolean baseGlueMatched = !mainGlueMatched && this.same(task.getBaseGlueCode(), tailBaseGlueCode);
+        int baseGlueMatchedCount = mainGlueMatched ? 0 : this.calculateBaseGlueIntersectionCount(task.getBaseGlueCode(), tailBaseGlueCode);
         boolean mouthPlateMatched = this.same(task.getMouthPlateCode(), tailMouthPlateCode);
         BigDecimal mainGlueScore = mainGlueMatched ? BigDecimal.TEN : BigDecimal.ZERO;
-        BigDecimal baseGlueScore = baseGlueMatched ? BigDecimal.valueOf(8) : BigDecimal.ZERO;
+        BigDecimal baseGlueScore = mainGlueMatched ? BigDecimal.ZERO : this.calculateBaseGlueSimilarityScore(task.getBaseGlueCode(), tailBaseGlueCode);
         BigDecimal mouthPlateScore = mouthPlateMatched ? BigDecimal.TEN : BigDecimal.ZERO;
         BigDecimal switchCostScore = BigDecimal.TEN.subtract(nvl(candidate.getSwitchCostHours())).max(BigDecimal.ZERO);
         BigDecimal fixedScore = Boolean.TRUE.equals(candidate.getFixedMachineMatched()) ? BigDecimal.TEN : BigDecimal.ZERO;
-        return new TmChainSortScore(mainGlueMatched ? 1 : 0, baseGlueMatched ? 1 : 0,
+        return new TmChainSortScore(mainGlueMatched ? 1 : 0, baseGlueMatchedCount,
                 mouthPlateMatched ? 1 : 0, capacityScore, mainGlueScore, baseGlueScore, mouthPlateScore,
                 switchCostScore, fixedScore);
     }
@@ -332,6 +335,74 @@ public class TmMachineAssignService implements ITmMachineAssignService {
     }
 
     /**
+     * 按基部胶交集元素数量计算相似分。
+     *
+     * @param left  当前任务基部胶编码
+     * @param right 链尾基部胶编码
+     * @return 基部胶相似分，最高 8 分
+     */
+    private BigDecimal calculateBaseGlueSimilarityScore(String left, String right) {
+        Set<String> leftSet = this.parseBaseGlueSet(left);
+        int intersectionCount = this.calculateBaseGlueIntersectionCount(leftSet, this.parseBaseGlueSet(right));
+        if (leftSet.isEmpty() || intersectionCount <= 0) {
+            return BigDecimal.ZERO;
+        }
+        return BigDecimal.valueOf(8).multiply(BigDecimal.valueOf(intersectionCount))
+                .divide(BigDecimal.valueOf(leftSet.size()), 2, java.math.RoundingMode.HALF_UP);
+    }
+
+    /**
+     * 计算两个基部胶编码的交集元素数量。
+     *
+     * @param left  左侧基部胶编码
+     * @param right 右侧基部胶编码
+     * @return 交集元素数量
+     */
+    private int calculateBaseGlueIntersectionCount(String left, String right) {
+        return this.calculateBaseGlueIntersectionCount(this.parseBaseGlueSet(left), this.parseBaseGlueSet(right));
+    }
+
+    /**
+     * 将逗号分隔的基部胶编码拆分为元素集合，去除空白并忽略重复元素。
+     *
+     * @param baseGlueCode 基部胶编码串
+     * @return 基部胶元素集合
+     */
+    private Set<String> parseBaseGlueSet(String baseGlueCode) {
+        Set<String> baseGlueSet = new HashSet<>();
+        if (StrUtil.isBlank(baseGlueCode)) {
+            return baseGlueSet;
+        }
+        for (String item : baseGlueCode.split(",")) {
+            String value = StrUtil.trim(item);
+            if (StrUtil.isNotBlank(value)) {
+                baseGlueSet.add(value);
+            }
+        }
+        return baseGlueSet;
+    }
+
+    /**
+     * 计算两个基部胶集合的交集元素数量。
+     *
+     * @param leftSet  左侧基部胶集合
+     * @param rightSet 右侧基部胶集合
+     * @return 交集元素数量
+     */
+    private int calculateBaseGlueIntersectionCount(Set<String> leftSet, Set<String> rightSet) {
+        if (CollUtil.isEmpty(leftSet) || CollUtil.isEmpty(rightSet)) {
+            return 0;
+        }
+        int count = 0;
+        for (String item : leftSet) {
+            if (rightSet.contains(item)) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    /**
      * 规范化班次序号。
      *
      * @param shiftOrder 原始班次序号
@@ -450,6 +521,8 @@ public class TmMachineAssignService implements ITmMachineAssignService {
                                                 ITmMachineFilterRule filterRule,
                                                 ITmMachineScoreStrategy scoreStrategy,
                                                 TmScheduleContext context) {
+        BigDecimal originalToolOverflowQty = nvl(task.getToolOverflowQty());
+        this.finalizeSelectedTaskPlan(task, selectedCandidate, context);
         BigDecimal currentShiftPlanQty = nvl(task.getPlanQty());
         BigDecimal toolOverflowQty = nvl(task.getToolOverflowQty());
         Integer startShiftOrder = task.getShiftOrder() == null ? 1 : task.getShiftOrder();
@@ -471,6 +544,10 @@ public class TmMachineAssignService implements ITmMachineAssignService {
             if (assignedQty.compareTo(BigDecimal.ZERO) > 0) {
                 this.applyCapacitySplitResult(task, currentShiftPlanQty, assignedQty, remainCapacity, machineSpeed,
                         capacityOverflowQty.compareTo(BigDecimal.ZERO) > 0 ? "当前班产能受限" : "当前班选中机台承接");
+                if (originalToolOverflowQty.compareTo(BigDecimal.ZERO) > 0) {
+                    task.setPlanQty(assignedQty.setScale(0, java.math.RoundingMode.CEILING));
+                }
+                this.settleAssignedTaskToolState(task, context);
                 this.addContextTask(context, task);
                 context.getCandidateTraceMap().put(task.getBusinessKey(), Collections.singletonList(runtimeCandidate));
                 this.addCapacitySplitTrace(context, task, currentShiftPlanQty, assignedQty, capacityOverflowQty,
@@ -537,8 +614,11 @@ public class TmMachineAssignService implements ITmMachineAssignService {
                 TmTaskDraft mergeTarget = this.findMergeTarget(context, candidate.getMachineCode(), shiftOrder, sourceTask);
                 if (mergeTarget != null) {
                     BigDecimal beforeMergeQty = nvl(mergeTarget.getPlanQty());
-                    BigDecimal afterMergeQty = beforeMergeQty.add(assignedQty);
+                    BigDecimal afterMergeQty = beforeMergeQty.add(assignedQty)
+                            .setScale(0, java.math.RoundingMode.CEILING);
                     this.taskChainScheduleService.changeQty(mergeTarget.getBusinessKey(), afterMergeQty, shiftOrder, context);
+                    mergeTarget.setPlanQty(afterMergeQty);
+                    this.applyCarryoverMergeToolState(mergeTarget, assignedQty, context);
                     context.getCandidateTraceMap().put(mergeTarget.getBusinessKey(), Collections.singletonList(runtimeCandidate));
                     this.addCarryoverTrace(context, mergeTarget, sourceTask, sourceType, assignedQty, sourceShiftOrder,
                             shiftOrder, candidate.getMachineCode(), beforeMergeQty, afterMergeQty, true);
@@ -553,6 +633,7 @@ public class TmMachineAssignService implements ITmMachineAssignService {
                             sourceShiftOrder, overflowIndex, candidate.getMachineCode());
                     this.applyCapacitySplitResult(overflowTask, beforeAssignQty, assignedQty, remainCapacity,
                             machineSpeed, "顺延量承接");
+                    this.settleAssignedTaskToolState(overflowTask, context);
                     this.addContextTask(context, overflowTask);
                     context.getCandidateTraceMap().put(overflowTask.getBusinessKey(), Collections.singletonList(runtimeCandidate));
                     this.addCapacitySplitTrace(context, overflowTask, beforeAssignQty, assignedQty, overflowQty,
@@ -574,7 +655,7 @@ public class TmMachineAssignService implements ITmMachineAssignService {
         if (remainingQty.compareTo(BigDecimal.ZERO) > 0) {
             TmTaskDraft unplannedTask = this.copyOverflowTask(sourceTask, 6, remainingQty, sourceShiftOrder,
                     overflowIndex, "UNPLANNED");
-            unplannedTask.setPlanQty(remainingQty);
+            unplannedTask.setPlanQty(remainingQty.setScale(0, java.math.RoundingMode.CEILING));
             unplannedTask.setShiftOrder(6);
             unplannedTask.setMachineCode(null);
             unplannedTask.setUnplannedReasonCode(TmUnplannedReasonEnum.CAPACITY_NOT_ENOUGH.getCode());
@@ -720,6 +801,7 @@ public class TmMachineAssignService implements ITmMachineAssignService {
         }
         return this.sortCandidatesForSmallGlue(probeTask, context, candidates, selectedCandidate);
     }
+
     /**
      * 重新执行候选机台过滤和评分，用于溢出量进入后续班次后的跨机台承接判断。
      *
@@ -794,8 +876,277 @@ public class TmMachineAssignService implements ITmMachineAssignService {
         });
         return sortedCandidates;
     }
+
     /**
-     * 追加零计划量任务到选中机台，避免库存充足场景被误判为未排。
+     * 在机台确认后结算最终损耗率、工装限制和最终计划量。
+     *
+     * @param task 当前任务
+     * @param selectedCandidate 已选中机台
+     * @param context 排程上下文
+     */
+    private void finalizeSelectedTaskPlan(TmTaskDraft task, TmMachineCandidate selectedCandidate,
+                                          TmScheduleContext context) {
+        BigDecimal preLossPlanQty = task.getPreLossPlanQty() == null ? nvl(task.getPlanQty()) : nvl(task.getPreLossPlanQty());
+        preLossPlanQty = preLossPlanQty.setScale(6, java.math.RoundingMode.HALF_UP);
+        TmLossRuleMatchResult matchResult = this.resolveLossRule(task, selectedCandidate, context);
+        BigDecimal resolvedLossRate = matchResult == null || matchResult.getLossRate() == null
+                ? nvl(task.getLossRate()) : nvl(matchResult.getLossRate());
+        BigDecimal lossAddQty = this.calculateLossAddQty(preLossPlanQty, resolvedLossRate);
+        BigDecimal planQtyBeforeToolLimit = preLossPlanQty.add(lossAddQty);
+        BigDecimal currentAvailableToolQty = this.resolveCurrentAvailableToolQty(context, task);
+        BigDecimal originalToolLimitAdjustQty = nvl(task.getToolLimitAdjustQty());
+        BigDecimal originalToolOverflowQty = nvl(task.getToolOverflowQty());
+        BigDecimal finalPlanQty = planQtyBeforeToolLimit;
+        BigDecimal toolLimitAdjustQty = BigDecimal.ZERO;
+        BigDecimal toolOverflowQty = BigDecimal.ZERO;
+        BigDecimal curlLength = this.resolveCurlLength(task);
+        if (currentAvailableToolQty != null && curlLength.compareTo(BigDecimal.ZERO) > 0) {
+            BigDecimal maxPlanQty = currentAvailableToolQty.multiply(curlLength);
+            if (finalPlanQty.compareTo(maxPlanQty) > 0) {
+                finalPlanQty = maxPlanQty.max(BigDecimal.ZERO);
+                toolLimitAdjustQty = finalPlanQty.subtract(planQtyBeforeToolLimit).setScale(6, java.math.RoundingMode.HALF_UP);
+                toolOverflowQty = planQtyBeforeToolLimit.subtract(finalPlanQty).max(BigDecimal.ZERO)
+                        .setScale(6, java.math.RoundingMode.HALF_UP);
+            }
+        } else if (originalToolOverflowQty.compareTo(BigDecimal.ZERO) > 0) {
+            toolLimitAdjustQty = originalToolLimitAdjustQty;
+            toolOverflowQty = originalToolOverflowQty;
+        }
+        task.setAvailableToolQty(currentAvailableToolQty);
+        task.setResolvedLossRate(resolvedLossRate);
+        task.setLossMatchLevel(matchResult == null ? (task.getLossRate() == null ? "NONE" : "LEGACY_TASK") : matchResult.getMatchLevel());
+        task.setLossMatchSource(this.buildLossMatchSource(task, selectedCandidate, matchResult));
+        task.setPreLossPlanQty(preLossPlanQty);
+        task.setLossAddQty(lossAddQty);
+        task.setPlanQtyBeforeToolLimit(planQtyBeforeToolLimit);
+        task.setToolLimitAdjustQty(toolLimitAdjustQty);
+        task.setToolOverflowQty(toolOverflowQty);
+        task.setPlanQty(finalPlanQty);
+        task.setPlanStockQty(nvl(task.getRollingStockQty()).add(finalPlanQty).subtract(nvl(task.getCurrentShiftDemandQty())).max(BigDecimal.ZERO));
+        task.setCalcFormulaDesc(this.appendFormulaDesc(task.getCalcFormulaDesc(), "机台确认损耗"));
+        if (toolOverflowQty.compareTo(BigDecimal.ZERO) > 0) {
+            task.setCalcFormulaDesc(this.appendFormulaDesc(task.getCalcFormulaDesc(), "工装限制"));
+        }
+    }
+
+    /**
+     * 读取当前任务结算前的全局可用工装数量。
+     *
+     * @param context 排程上下文
+     * @param task 当前任务
+     * @return 全局可用工装数量；未启用工装限制时返回 null
+     */
+    private BigDecimal resolveCurrentAvailableToolQty(TmScheduleContext context, TmTaskDraft task) {
+        if (context != null && context.getCurrentAvailableToolQty() != null) {
+            return context.getCurrentAvailableToolQty().setScale(6, java.math.RoundingMode.HALF_UP);
+        }
+        if (task != null && task.getAvailableToolQty() != null) {
+            return task.getAvailableToolQty().setScale(6, java.math.RoundingMode.HALF_UP);
+        }
+        return null;
+    }
+
+    /**
+     * 按四层优先级解析最终损耗率。
+     *
+     * @param task 当前任务
+     * @param selectedCandidate 已选中机台
+     * @param context 排程上下文
+     * @return 损耗率匹配结果；未命中时返回 null
+     */
+    private TmLossRuleMatchResult resolveLossRule(TmTaskDraft task, TmMachineCandidate selectedCandidate,
+                                                  TmScheduleContext context) {
+        if (context == null || CollUtil.isEmpty(context.getLossRuleList())) {
+            return null;
+        }
+        String machineCode = selectedCandidate == null ? task.getMachineCode() : selectedCandidate.getMachineCode();
+        TmLossRuleMatchResult matchResult = this.findLossRule(context.getLossRuleList(), task.getTreadCode(), machineCode, "MACHINE_TREAD");
+        if (matchResult != null) {
+            return matchResult;
+        }
+        matchResult = this.findLossRule(context.getLossRuleList(), task.getTreadCode(), machineCode, "TREAD");
+        if (matchResult != null) {
+            return matchResult;
+        }
+        matchResult = this.findLossRule(context.getLossRuleList(), task.getTreadCode(), machineCode, "MACHINE");
+        if (matchResult != null) {
+            return matchResult;
+        }
+        return this.findLossRule(context.getLossRuleList(), task.getTreadCode(), machineCode, "DEFAULT");
+    }
+
+    /**
+     * 从指定层级规则中选择优先级最小的一条。
+     *
+     * @param ruleList 损耗率规则列表
+     * @param treadCode 胎面编码
+     * @param machineCode 机台编码
+     * @param matchLevel 匹配层级
+     * @return 命中结果；未命中返回 null
+     */
+    private TmLossRuleMatchResult findLossRule(List<TmLossRule> ruleList, String treadCode, String machineCode,
+                                               String matchLevel) {
+        TmLossRule matchedRule = ruleList.stream()
+                .filter(rule -> {
+                    String normalizedRuleTreadCode = StrUtil.emptyToNull(StrUtil.trim(rule.getTreadCode()));
+                    String normalizedRuleMachineCode = StrUtil.emptyToNull(StrUtil.trim(rule.getMachineCode()));
+                    String normalizedTreadCode = StrUtil.emptyToNull(StrUtil.trim(treadCode));
+                    String normalizedMachineCode = StrUtil.emptyToNull(StrUtil.trim(machineCode));
+                    if ("MACHINE_TREAD".equals(matchLevel)) {
+                        return this.sameNullable(normalizedRuleTreadCode, normalizedTreadCode)
+                                && this.sameNullable(normalizedRuleMachineCode, normalizedMachineCode);
+                    }
+                    if ("TREAD".equals(matchLevel)) {
+                        return this.sameNullable(normalizedRuleTreadCode, normalizedTreadCode)
+                                && normalizedRuleMachineCode == null;
+                    }
+                    if ("MACHINE".equals(matchLevel)) {
+                        return normalizedRuleTreadCode == null
+                                && this.sameNullable(normalizedRuleMachineCode, normalizedMachineCode);
+                    }
+                    return normalizedRuleTreadCode == null && normalizedRuleMachineCode == null;
+                })
+                .min(Comparator.comparing(rule -> rule.getPriority() == null ? Integer.MAX_VALUE : rule.getPriority()))
+                .orElse(null);
+        if (matchedRule == null) {
+            return null;
+        }
+        TmLossRuleMatchResult matchResult = new TmLossRuleMatchResult();
+        matchResult.setMatchLevel(matchLevel);
+        matchResult.setLossRate(nvl(matchedRule.getLossRate()));
+        matchResult.setMatchedRule(matchedRule);
+        return matchResult;
+    }
+
+    /**
+     * 判断两个可空编码是否一致。
+     *
+     * @param left 左值
+     * @param right 右值
+     * @return true 表示一致
+     */
+    private boolean sameNullable(String left, String right) {
+        return Objects.equals(StrUtil.emptyToNull(StrUtil.trim(left)), StrUtil.emptyToNull(StrUtil.trim(right)));
+    }
+
+    /**
+     * 计算损耗补偿量。
+     *
+     * @param preLossPlanQty 损耗前计划量
+     * @param resolvedLossRate 最终损耗率
+     * @return 损耗补偿量
+     */
+    private BigDecimal calculateLossAddQty(BigDecimal preLossPlanQty, BigDecimal resolvedLossRate) {
+        if (nvl(preLossPlanQty).compareTo(BigDecimal.ZERO) <= 0 || nvl(resolvedLossRate).compareTo(BigDecimal.ZERO) <= 0) {
+            return BigDecimal.ZERO;
+        }
+        return nvl(preLossPlanQty).multiply(nvl(resolvedLossRate))
+                .divide(BigDecimal.valueOf(100), 6, java.math.RoundingMode.HALF_UP);
+    }
+
+    /**
+     * 在任务实际落到班次机台后结算工装占用和剩余工装。
+     *
+     * @param task 当前任务
+     * @param context 排程上下文
+     */
+    private void settleAssignedTaskToolState(TmTaskDraft task, TmScheduleContext context) {
+        BigDecimal currentAvailableToolQty = this.resolveCurrentAvailableToolQty(context, task);
+        if (currentAvailableToolQty == null) {
+            return;
+        }
+        task.setAvailableToolQty(currentAvailableToolQty);
+        BigDecimal curlLength = this.resolveCurlLength(task);
+        if (curlLength.compareTo(BigDecimal.ZERO) <= 0) {
+            task.setToolUsedQty(BigDecimal.ZERO.setScale(6, java.math.RoundingMode.HALF_UP));
+            task.setRemainingToolQty(currentAvailableToolQty);
+            context.setCurrentAvailableToolQty(currentAvailableToolQty);
+            return;
+        }
+        BigDecimal toolUsedQty = nvl(task.getPlanQty()).subtract(nvl(task.getCurrentShiftDemandQty()))
+                .divide(curlLength, 6, java.math.RoundingMode.HALF_UP);
+        BigDecimal remainingToolQty = currentAvailableToolQty.subtract(toolUsedQty).max(BigDecimal.ZERO);
+        if (task.getTotalToolQty() != null) {
+            remainingToolQty = remainingToolQty.min(task.getTotalToolQty());
+        }
+        remainingToolQty = remainingToolQty.setScale(6, java.math.RoundingMode.HALF_UP);
+        task.setToolUsedQty(toolUsedQty);
+        task.setRemainingToolQty(remainingToolQty);
+        task.setPlanStockQty(nvl(task.getRollingStockQty()).add(nvl(task.getPlanQty()))
+                .subtract(nvl(task.getCurrentShiftDemandQty())).max(BigDecimal.ZERO));
+        context.setCurrentAvailableToolQty(remainingToolQty);
+    }
+
+    /**
+     * 顺延量合并到已存在任务后，按增量回写工装状态。
+     *
+     * @param mergeTarget 被合并任务
+     * @param carryoverQty 本次合并顺延量
+     * @param context 排程上下文
+     */
+    private void applyCarryoverMergeToolState(TmTaskDraft mergeTarget, BigDecimal carryoverQty, TmScheduleContext context) {
+        BigDecimal currentAvailableToolQty = this.resolveCurrentAvailableToolQty(context, mergeTarget);
+        if (currentAvailableToolQty == null) {
+            return;
+        }
+        BigDecimal curlLength = this.resolveCurlLength(mergeTarget);
+        if (curlLength.compareTo(BigDecimal.ZERO) <= 0) {
+            mergeTarget.setRemainingToolQty(currentAvailableToolQty);
+            context.setCurrentAvailableToolQty(currentAvailableToolQty);
+            return;
+        }
+        BigDecimal incrementalToolQty = nvl(carryoverQty).divide(curlLength, 6, java.math.RoundingMode.HALF_UP);
+        BigDecimal remainingToolQty = currentAvailableToolQty.subtract(incrementalToolQty).max(BigDecimal.ZERO);
+        if (mergeTarget.getTotalToolQty() != null) {
+            remainingToolQty = remainingToolQty.min(mergeTarget.getTotalToolQty());
+        }
+        remainingToolQty = remainingToolQty.setScale(6, java.math.RoundingMode.HALF_UP);
+        mergeTarget.setAvailableToolQty(currentAvailableToolQty);
+        mergeTarget.setToolUsedQty(nvl(mergeTarget.getToolUsedQty()).add(incrementalToolQty));
+        mergeTarget.setRemainingToolQty(remainingToolQty);
+        mergeTarget.setPlanStockQty(nvl(mergeTarget.getPlanStockQty()).add(nvl(carryoverQty)));
+        context.setCurrentAvailableToolQty(remainingToolQty);
+    }
+
+    /**
+     * 解析卷曲长度。
+     *
+     * @param task 当前任务
+     * @return 卷曲长度，无法取得时返回 0
+     */
+    private BigDecimal resolveCurlLength(TmTaskDraft task) {
+        if (task.getCurlRollLength() != null && task.getCurlRollLength().compareTo(BigDecimal.ZERO) > 0) {
+            return task.getCurlRollLength();
+        }
+        return nvl(task.getDefaultCurlRollLength());
+    }
+
+    /**
+     * 构建损耗率命中来源说明。
+     *
+     * @param task 当前任务
+     * @param selectedCandidate 已选中机台
+     * @param matchResult 匹配结果
+     * @return 命中来源说明
+     */
+    private String buildLossMatchSource(TmTaskDraft task, TmMachineCandidate selectedCandidate,
+                                        TmLossRuleMatchResult matchResult) {
+        String machineCode = selectedCandidate == null ? task.getMachineCode() : selectedCandidate.getMachineCode();
+        if (matchResult == null || matchResult.getMatchedRule() == null) {
+            return "machineCode=" + machineCode + ",treadCode=" + task.getTreadCode();
+        }
+        TmLossRule matchedRule = matchResult.getMatchedRule();
+        return "machineCode=" + machineCode + ",treadCode=" + task.getTreadCode()
+                + ",ruleMachineCode=" + matchedRule.getMachineCode()
+                + ",ruleTreadCode=" + matchedRule.getTreadCode()
+                + ",priority=" + matchedRule.getPriority();
+    }
+
+    /**
+     * 记录零计划量任务的评估结果。
+     *
+     * <p>零计划量表示当前任务无需占用机台产能，只保留候选机台、评分和容量证据，
+     * 不追加到任务链，避免生成全 0 的排程结果行。</p>
      *
      * @param task              当前零计划量任务
      * @param selectedCandidate 已选中候选机台
@@ -809,16 +1160,15 @@ public class TmMachineAssignService implements ITmMachineAssignService {
         TmMachineCandidate runtimeCandidate = this.copyCandidate(selectedCandidate);
         runtimeCandidate.setMachineSpeed(machineSpeed);
         runtimeCandidate.setRemainCapacity(this.resolveRemainCapacity(task, context, runtimeCandidate, machineSpeed));
+        task.setMachineCode(runtimeCandidate.getMachineCode());
         task.setMachineRemainCapacity(runtimeCandidate.getRemainCapacity());
         task.setMachineSpeed(machineSpeed);
         context.getCandidateTraceMap().put(task.getBusinessKey(), Collections.singletonList(runtimeCandidate));
         this.addCapacitySplitTrace(context, task, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
                 nvl(runtimeCandidate.getRemainCapacity()), runtimeCandidate.getMachineCode(), true);
-        this.bindSmallGlueMachine(context, task, runtimeCandidate.getMachineCode(),
-                this.resolveSmallGlueBoundMachine(task, context), null);
         this.addAssignTrace(context, task, "PASS", runtimeCandidate.getMachineCode(), null, null);
-        this.taskChainScheduleService.appendAutoTask(task, runtimeCandidate, context);
     }
+
     /**
      * 复制产能溢出顺延任务，保留原任务业务属性并追加业务键后缀。
      *
@@ -839,25 +1189,30 @@ public class TmMachineAssignService implements ITmMachineAssignService {
         target.setBaseGlueCode(source.getBaseGlueCode());
         target.setMouthPlateCode(source.getMouthPlateCode());
         target.setShiftOrder(shiftOrder);
-        target.setCurrentShiftDemandQty(source.getCurrentShiftDemandQty());
-        target.setGuardDemandQty(source.getGuardDemandQty());
-        target.setRollingStockQty(source.getRollingStockQty());
+        target.setCurrentShiftDemandQty(BigDecimal.ZERO);
+        target.setGuardDemandQty(BigDecimal.ZERO);
+        target.setRollingStockQty(nvl(source.getPlanStockQty()));
         target.setSixClockStockQty(source.getSixClockStockQty());
         target.setGuardShiftCount(source.getGuardShiftCount());
         target.setGuardRangeHours(source.getGuardRangeHours());
         target.setSupplyHours(source.getSupplyHours());
-        target.setCurrentShiftStockGapQty(source.getCurrentShiftStockGapQty());
-        target.setStockGapQty(source.getStockGapQty());
-        target.setStockDeductQty(source.getStockDeductQty());
-        target.setPlanStockQty(source.getPlanStockQty());
+        target.setCurrentShiftStockGapQty(BigDecimal.ZERO);
+        target.setStockGapQty(BigDecimal.ZERO);
+        target.setStockDeductQty(BigDecimal.ZERO);
+        target.setPlanStockQty(nvl(source.getPlanStockQty()).add(nvl(planQty)));
         target.setPlanQty(planQty);
         target.setTreadShoulderLength(source.getTreadShoulderLength());
         target.setTailFlag(source.getTailFlag());
         target.setTailBalanceQty(source.getTailBalanceQty());
         target.setLossRate(source.getLossRate());
-        target.setBaseDemandQty(source.getBaseDemandQty());
-        target.setLossAddQty(source.getLossAddQty());
-        target.setToolLimitAdjustQty(source.getToolLimitAdjustQty());
+        target.setResolvedLossRate(source.getResolvedLossRate());
+        target.setLossMatchLevel(source.getLossMatchLevel());
+        target.setLossMatchSource(source.getLossMatchSource());
+        target.setPreLossPlanQty(nvl(planQty));
+        target.setPlanQtyBeforeToolLimit(nvl(planQty));
+        target.setBaseDemandQty(nvl(planQty));
+        target.setLossAddQty(BigDecimal.ZERO);
+        target.setToolLimitAdjustQty(BigDecimal.ZERO);
         target.setToolOverflowQty(BigDecimal.ZERO);
         target.setMinStartAdjustQty(source.getMinStartAdjustQty());
         target.setTailRoundAdjustQty(source.getTailRoundAdjustQty());
@@ -876,6 +1231,7 @@ public class TmMachineAssignService implements ITmMachineAssignService {
         target.setBusinessKeySuffix(this.buildOverflowBusinessKeySuffix(source, sourceShift, shiftOrder, machineCode, overflowIndex));
         return target;
     }
+
     /**
      * 构建顺延任务业务键后缀，来源工单参与唯一性，避免同规格同班次多个未排副本冲突。
      *
@@ -926,10 +1282,11 @@ public class TmMachineAssignService implements ITmMachineAssignService {
      */
     private void applyCapacitySplitResult(TmTaskDraft task, BigDecimal beforeAssignQty, BigDecimal assignedQty,
                                           BigDecimal remainCapacity, BigDecimal machineSpeed, String splitDesc) {
-        task.setPlanQty(assignedQty);
+        BigDecimal normalizedAssignedQty = StrUtil.contains(splitDesc, "顺延") ? assignedQty.setScale(0, java.math.RoundingMode.CEILING) : assignedQty;
+        task.setPlanQty(normalizedAssignedQty);
         task.setMachineRemainCapacity(remainCapacity);
         task.setMachineSpeed(machineSpeed);
-        task.setCapacityAdjustQty(nvl(task.getCapacityAdjustQty()).add(assignedQty.subtract(nvl(beforeAssignQty))));
+        task.setCapacityAdjustQty(nvl(task.getCapacityAdjustQty()).add(normalizedAssignedQty.subtract(nvl(beforeAssignQty))));
         task.setCalcFormulaDesc(this.appendFormulaDesc(task.getCalcFormulaDesc(), splitDesc));
     }
 
@@ -1029,6 +1386,7 @@ public class TmMachineAssignService implements ITmMachineAssignService {
         evidence.put("afterMergePlanQty", afterMergeQty);
         traceOf(context, targetTask).addRuleHit("PLAN_QTY_CARRYOVER", "PASS", evidence);
     }
+
     /**
      * 写入产能拆分证据。
      *

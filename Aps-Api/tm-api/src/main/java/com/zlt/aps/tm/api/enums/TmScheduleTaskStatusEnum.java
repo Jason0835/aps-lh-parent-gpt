@@ -10,6 +10,9 @@ public enum TmScheduleTaskStatusEnum {
     /** 已计划 */
     PLANNED("PLANNED", "已计划"),
 
+    /** 无需排产 */
+    NO_PRODUCTION_NEEDED("NO_PRODUCTION_NEEDED", "无需排产"),
+
     /** 已锁定 */
     LOCKED("LOCKED", "已锁定"),
 

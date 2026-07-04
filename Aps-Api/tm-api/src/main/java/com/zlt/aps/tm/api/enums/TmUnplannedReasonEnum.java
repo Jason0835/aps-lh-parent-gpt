@@ -28,6 +28,9 @@ public enum TmUnplannedReasonEnum {
     /** 规则冲突 */
     RULE_CONFLICT("RULE_CONFLICT", "规则冲突"),
 
+    /** 胎面停产且无可分配班次 */
+    TM_SHUTDOWN_NO_AVAILABLE_SHIFT("TM_SHUTDOWN_NO_AVAILABLE_SHIFT", "胎面停产且无可分配班次，成型需求无法重分配"),
+
     /** 待业务确认 */
     WAIT_CONFIRM("WAIT_CONFIRM", "待业务确认");
 

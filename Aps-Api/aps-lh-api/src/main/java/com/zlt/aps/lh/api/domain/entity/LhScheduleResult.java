@@ -1108,6 +1108,16 @@ public class LhScheduleResult extends BaseEntity implements Serializable {
     @TableField(value = "SKU_SCHEDULED_MACHINE_COUNT_RANGE")
     private String skuScheduledMachineCountRange;
 
+    /**
+     * 胎胚收尾标识 0-否 1-是（默认 0）。
+     * <p>取值来源 {@code LhScheduleContext.embryoEndingFlagMap}（key=胎胚代码, value=1-收尾/0-非收尾），
+     * 由 S4.6 保存前 {@code SchedulePersistenceService.fillEmbryoEndingAnalysis} 统一回写。</p>
+     */
+    @Excel(name = "ui.data.column.lhScheduleResult.isEmbryoEnding", dictType = "biz_yes_no")
+    @ApiModelProperty(value = "胎胚收尾标识 0-否 1-是", name = "isEmbryoEnding")
+    @TableField(value = "IS_EMBRYO_ENDING")
+    private String isEmbryoEnding;
+
 
     /**
      * 是否为滚动排程继承结果，仅用于本次排程运行期识别，不落库。

@@ -56,9 +56,9 @@ public class TmMachineInfo extends BaseEntity {
     @TableField(value = "MAX_CAPACITY")
     private BigDecimal maxCapacity;
 
-    @Excel(name = "ui.data.column.tm.machineInfo.openShiftCode")
-    @ImportValidated(maxLength = 10)
-    @ApiModelProperty(value = "开放班次编码", name = "openShiftCode")
+    @Excel(name = "ui.data.column.tm.machineInfo.openShiftCode", dictType = "class_num_three_plan")
+    @ImportValidated(maxLength = 20)
+    @ApiModelProperty(value = "开机班次", name = "openShiftCode")
     @TableField(value = "OPEN_SHIFT_CODE")
     private String openShiftCode;
 
@@ -67,12 +67,6 @@ public class TmMachineInfo extends BaseEntity {
     @ApiModelProperty(value = "机台状态", name = "machineStatus")
     @TableField(value = "MACHINE_STATUS")
     private String machineStatus;
-
-    @Excel(name = "ui.data.column.tm.machineInfo.shiftCode")
-    @ImportValidated(maxLength = 10)
-    @ApiModelProperty(value = "班次编码", name = "shiftCode")
-    @TableField(value = "SHIFT_CODE")
-    private String shiftCode;
 
     @Excel(name = "ui.common.column.remark")
     @ImportValidated(maxLength = 500)

@@ -1,36 +1,41 @@
 package com.zlt.aps.itf.mes.service.impl;
 
+import cn.hutool.core.date.DateUtil;
 import com.alibaba.fastjson.JSONObject;
 import com.baomidou.dynamic.datasource.toolkit.DynamicDataSourceContextHolder;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.zlt.aps.autoLogin.feign.FeignTokenHelper;
 import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.zlt.aps.autoLogin.feign.FeignTokenHelper;
+import com.zlt.aps.cd90.api.domain.entity.Cd90ShiftConfig;
+import com.zlt.aps.cd90.api.domain.entity.Cd90Stock;
+import com.zlt.aps.cd90.api.service.ICd90StockRemoteService;
 import com.zlt.aps.common.core.constant.ApsConstant;
+import com.zlt.aps.common.core.enums.MouldFinishStatusEnum;
 import com.zlt.aps.common.core.utils.AjaxResultUtils;
 import com.zlt.aps.constant.FactoryConstant;
+import com.zlt.aps.cx.api.domain.entity.*;
+import com.zlt.aps.cx.api.service.ICxMesSyncRemoteService;
+import com.zlt.aps.cx.api.service.ICxPrecisionPlanRemoteService;
 import com.zlt.aps.enums.LocationTypeEnum;
 import com.zlt.aps.enums.ProductTypeEnum;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.itf.constant.DataSource;
-import com.zlt.aps.itf.mes.enums.MouldCategoryConvertEnum;
 import com.zlt.aps.itf.constant.SysCode;
 import com.zlt.aps.itf.mes.enums.ItfSyncKeyEnum;
-import com.zlt.aps.itf.mes.mapper.MesItfMapper;
-import com.zlt.aps.itf.mes.mapper.MoldAlterPlanIssueMapper;
-import com.zlt.aps.itf.mes.mapper.MesViewMapper;
-import com.zlt.aps.itf.mes.mapper.LhScheduleResultQueryMapper;
+import com.zlt.aps.itf.mes.enums.MouldCategoryConvertEnum;
+import com.zlt.aps.itf.mes.mapper.*;
 import com.zlt.aps.itf.mes.service.IPrecisionPlanIssueService;
 import com.zlt.aps.itf.mes.service.MesItfService;
 import com.zlt.aps.itf.mes.vo.MoldAlterPlanIssue;
 import com.zlt.aps.itf.scm.service.ScmItfService;
 import com.zlt.aps.itf.vo.*;
-import com.zlt.sync.handle.SyncDataHandle;
-import com.zlt.sync.povo.SyncParamsVO;
-import com.zlt.sync.service.SyncDataLogsService;
+import com.zlt.aps.lh.api.constant.LhScheduleParamConstant;
 import com.zlt.aps.lh.api.domain.entity.*;
 import com.zlt.aps.lh.api.enums.TrialStatusEnum;
-import com.zlt.aps.lh.api.constant.LhScheduleParamConstant;
+import com.zlt.aps.lh.api.service.ILhChipStockRemoteService;
+import com.zlt.aps.lh.api.service.ILhMesSyncRemoteService;
+import com.zlt.aps.lh.api.service.ILhPrecisionPlanRemoteService;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.maindata.mapper.*;
 import com.zlt.aps.maindata.service.IFactoryParamService;
@@ -39,27 +44,16 @@ import com.zlt.aps.maindata.service.IMdmSkuStructureRefService;
 import com.zlt.aps.maindata.utils.ScmListUtils;
 import com.zlt.aps.mdm.api.domain.entity.MdmMoldAlterPlan;
 import com.zlt.aps.mp.api.domain.entity.*;
-import com.zlt.aps.cx.api.domain.entity.CxMachineOnlineInfo;
-import com.zlt.aps.cx.api.domain.entity.CxStructureTreadConfig;
-import com.zlt.aps.cx.api.domain.entity.CxMesStock;
-import com.zlt.aps.cx.api.domain.entity.CxStock;
-import com.zlt.aps.cx.api.domain.entity.CxScheFinishQty;
-import com.zlt.aps.cx.api.domain.entity.CxDayFinishQty;
-import com.zlt.aps.cx.api.service.ICxMesSyncRemoteService;
 import com.zlt.aps.tq.api.domain.entity.TqDayFinishQty;
 import com.zlt.aps.tq.api.domain.entity.TqMesStock;
 import com.zlt.aps.tq.api.domain.entity.TqScheFinishQty;
 import com.zlt.aps.tq.api.domain.entity.TqStock;
 import com.zlt.aps.tq.api.service.ITqMesSyncRemoteService;
-import com.zlt.aps.lh.api.service.ILhMesSyncRemoteService;
-import com.zlt.aps.lh.api.service.ILhChipStockRemoteService;
-import com.zlt.aps.lh.api.domain.entity.LhChipStock;
-import com.zlt.aps.lh.api.service.ILhPrecisionPlanRemoteService;
-import com.zlt.aps.cx.api.service.ICxPrecisionPlanRemoteService;
-
-import com.zlt.aps.common.core.enums.MouldFinishStatusEnum;
 import com.zlt.aps.utils.GenerageMapKeyUtils;
 import com.zlt.core.dao.basedao.BaseDao;
+import com.zlt.sync.handle.SyncDataHandle;
+import com.zlt.sync.povo.SyncParamsVO;
+import com.zlt.sync.service.SyncDataLogsService;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang.StringUtils;
@@ -69,7 +63,6 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.text.ParseException;
-import cn.hutool.core.date.DateUtil;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
@@ -119,6 +112,12 @@ public class MesItfServiceImpl implements MesItfService {
 
     @Autowired
     private ICxMesSyncRemoteService cxMesSyncRemoteService;
+
+    @Autowired
+    private ICd90StockRemoteService cd90StockRemoteService;
+
+    @Autowired
+    private Cd90ShiftQueryMapper cd90ShiftQueryMapper;
 
     @Autowired
     private ITqMesSyncRemoteService tqMesSyncRemoteService;
@@ -1535,7 +1534,7 @@ public class MesItfServiceImpl implements MesItfService {
     @Override
     public AjaxResult syncMesCxStock(AuxReqSyncDataLogs syncDataLogs) {
         DynamicDataSourceContextHolder.push(DataSource.MES);
-        List<CxMesStock> syncList = mesItfMapper.selectMesCxStockList(syncDataLogs);
+        List<CxMesStock> syncList = mesItfMapper.selectMesEmbryoStockSixList(syncDataLogs);
         DynamicDataSourceContextHolder.poll();
 
         Map<String, CxMesStock> groupMap = syncList.stream()
@@ -1582,6 +1581,137 @@ public class MesItfServiceImpl implements MesItfService {
             return AjaxResult.error("生胎库存同步失败：" + e.getMessage());
         }
         return AjaxResult.success();
+    }
+
+    /**
+     * 同步直裁库存（从 MES 中间表 T_MES_CD90_STOCK 同步到 t_cd90_stock）。
+     * <p>采用逻辑删除+插入方案，按 DATA_SOURCE=MES 隔离，不动人工维护数据。</p>
+     * <p>班次来源：按同步执行时间从 t_cd90_shift_config 启用项自动推断；queryParams.shiftCode 可覆盖。</p>
+     *
+     * @param syncDataLogs 同步参数
+     * @return 结果
+     */
+    @Override
+    public AjaxResult syncMesCd90Stock(AuxReqSyncDataLogs syncDataLogs) {
+        String factoryCode = StringUtils.isBlank(syncDataLogs.getFactoryCode())
+                ? FactoryConstant.DEFAULT_FACTORY_CODE : syncDataLogs.getFactoryCode();
+
+        // 1. 切 MES 数据源查询中间表
+        DynamicDataSourceContextHolder.push(DataSource.MES);
+        List<Cd90MesStock> syncList = mesItfMapper.selectMesCd90StockList(syncDataLogs);
+        DynamicDataSourceContextHolder.poll();
+
+        if (CollectionUtils.isEmpty(syncList)) {
+            log.warn("直裁库存同步：MES中间表查询结果为空，factoryCode={}", factoryCode);
+            return AjaxResult.success("MES中间表无数据可同步");
+        }
+
+        // 2. 按 STOCK_DATE + MATERIAL_CODE 去重，累加可用库存（参考 buildBaseCdStockList 口径）
+        Map<String, Cd90MesStock> groupMap = syncList.stream()
+                .collect(Collectors.toMap(
+                        item -> DateUtil.formatDate(item.getStockDate()) + "|" + item.getMaterialCode(),
+                        Function.identity(),
+                        (v1, v2) -> {
+                            BigDecimal merged = (v1.getAvailableStock() == null ? BigDecimal.ZERO : v1.getAvailableStock())
+                                    .add(v2.getAvailableStock() == null ? BigDecimal.ZERO : v2.getAvailableStock());
+                            v1.setAvailableStock(merged);
+                            return v1;
+                        }
+                ));
+        syncList = new ArrayList<>(groupMap.values());
+
+        // 3. 推断当前班次（queryParams.shiftCode 可覆盖）
+        String shiftCode = resolveShiftCode(syncDataLogs, factoryCode);
+        if (StringUtils.isBlank(shiftCode)) {
+            log.error("直裁库存同步：无法推断当前班次，factoryCode={}, 请检查 t_cd90_shift_config 启用配置", factoryCode);
+            return AjaxResult.error("直裁库存同步失败：无法推断当前班次，请在 t_cd90_shift_config 配置启用班次或通过 queryParams.shiftCode 指定");
+        }
+
+        // 4. 转换为 Cd90Stock
+        Date now = DateUtils.getNowDate();
+        List<Cd90Stock> insertList = syncList.stream().map(item -> {
+            Cd90Stock stock = new Cd90Stock();
+            stock.setFactoryCode(factoryCode);
+            stock.setStockDate(item.getStockDate());
+            stock.setShiftCode(shiftCode);
+            stock.setSnapshotTime(now);
+            stock.setMaterialCode(item.getMaterialCode());
+            stock.setStockNum(item.getAvailableStock() != null ? item.getAvailableStock().doubleValue() : 0d);
+            stock.setDataSource(ApsConstant.DATA_SOURCE_MES);
+            stock.setCreateBy("MES");
+            stock.setUpdateBy("MES");
+            stock.setCreateTime(now);
+            stock.setUpdateTime(now);
+            return stock;
+        }).collect(Collectors.toList());
+
+        // 5. Feign 调用 aps-cd90 逻辑删除+批量插入
+        try {
+            Date stockDate = insertList.stream().map(Cd90Stock::getStockDate).filter(Objects::nonNull)
+                    .findFirst().orElse(now);
+            String stockDateStr = DateUtil.formatDate(stockDate);
+            log.info("直裁库存同步：开始同步，factoryCode={}, shiftCode={}, stockDate={}, 待插入数量={}",
+                    factoryCode, shiftCode, stockDateStr, insertList.size());
+
+            FeignTokenHelper.runWithToken(() -> {
+                cd90StockRemoteService.logicDeleteAndSaveCd90StockByDataSource(
+                        factoryCode, ApsConstant.DATA_SOURCE_MES, stockDateStr, shiftCode, "MES", insertList);
+            });
+
+            log.info("直裁库存同步：同步完成，factoryCode={}, shiftCode={}, 插入数量={}", factoryCode, shiftCode, insertList.size());
+        } catch (Exception e) {
+            log.error("直裁库存同步：Feign调用异常，factoryCode={}, shiftCode={}, 待插入数量={}",
+                    factoryCode, shiftCode, insertList.size(), e);
+            return AjaxResult.error("直裁库存同步失败：" + e.getMessage());
+        }
+        return AjaxResult.success();
+    }
+
+    /**
+     * 推断直裁当前班次：优先取 queryParams.shiftCode，否则按当前系统时间从 t_cd90_shift_config 启用项匹配。
+     *
+     * @param syncDataLogs 同步参数
+     * @param factoryCode  工厂编码
+     * @return 班次编码，推断不出返回 null
+     */
+    private String resolveShiftCode(AuxReqSyncDataLogs syncDataLogs, String factoryCode) {
+        // 优先取 queryParams.shiftCode 显式覆盖
+        Map<String, Object> queryParams = syncDataLogs.getQueryParams();
+        if (queryParams != null && queryParams.get("shiftCode") != null
+                && StringUtils.isNotBlank(String.valueOf(queryParams.get("shiftCode")))) {
+            return String.valueOf(queryParams.get("shiftCode"));
+        }
+        // 按当前时间从 t_cd90_shift_config 启用项推断
+        DynamicDataSourceContextHolder.push(DataSource.APS);
+        List<Cd90ShiftConfig> activeShifts = cd90ShiftQueryMapper.listActiveShiftConfigs(factoryCode);
+        DynamicDataSourceContextHolder.poll();
+        if (CollectionUtils.isEmpty(activeShifts)) {
+            return null;
+        }
+        String nowTime = DateUtil.format(new Date(), "HH:mm:ss");
+        for (Cd90ShiftConfig config : activeShifts) {
+            if (matchShiftByTime(config, nowTime)) {
+                return config.getShiftCode();
+            }
+        }
+        return null;
+    }
+
+    /**
+     * 按当前时间 HH:mm:ss 匹配班次配置。
+     * 非跨天：START_TIME <= now < END_TIME；跨天：now >= START_TIME 或 now < END_TIME。
+     */
+    private boolean matchShiftByTime(Cd90ShiftConfig config, String nowTime) {
+        String start = config.getStartTime();
+        String end = config.getEndTime();
+        if (StringUtils.isBlank(start) || StringUtils.isBlank(end)) {
+            return false;
+        }
+        boolean crossDay = config.getIsCrossDay() != null && config.getIsCrossDay() == 1;
+        if (crossDay) {
+            return nowTime.compareTo(start) >= 0 || nowTime.compareTo(end) < 0;
+        }
+        return nowTime.compareTo(start) >= 0 && nowTime.compareTo(end) < 0;
     }
 
     /**

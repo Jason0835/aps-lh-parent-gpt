@@ -1563,7 +1563,7 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
      * 4. 已完成量取自硫化日完成量表，日期范围 = IFNULL(STOCK_CAPTURE_DATE, 月初) ~ 月底
      * 5. 按分厂+物料编码匹配，回填到当月定稿记录
      * 6. 有效标志判定：|超欠产值|(绝对值) > 阈值参数(SYS0206009) → 否('0')，否则 → 是('1')；
-     *    无月底余量记录时值置NULL、标志置否('0')
+     *    月底余量为空时按0处理，超欠产 = 0 - 已完成量，统一走阈值判定
      */
     @Override
     public AjaxResult calcLastMonthOverProd() {
@@ -1590,9 +1590,36 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
     }
 
     /**
+     * 计算指定月份超欠产写入其下月（临时测试用，支持指定数据来源月份）
+     * 逻辑同 {@link #calcCurrentMonthOverProdForNextMonth()}，但允许手动指定数据来源的年月，
+     * 便于测试在非月底时间模拟月底倒数2天的超欠产生成
+     *
+     * @param year  数据来源年份（如2026）
+     * @param month 数据来源月份（如6，代表6月数据写入7月）
+     * @return 计算结果
+     */
+    @Override
+    public AjaxResult calcCurrentMonthOverProdForNextMonth(Integer year, Integer month) {
+        // 指定月份作为数据来源，其下月作为写入目标
+        YearMonth lastMonth = YearMonth.of(year, month);
+        YearMonth currentMonth = lastMonth.plusMonths(1);
+
+        return this.doCalcOverProd(lastMonth, currentMonth);
+    }
+
+    /**
      * 计算超欠产的公共方法
      * 根据数据来源月份的月计划月底余量和硫化日完成量计算超欠产，回填到写入目标月份的定稿记录
      * 公式：超欠产 = 月底余量 - (库存抓取日~月底)的硫化日完成量
+     * 匹配维度：(分厂+物料编码+产品状态) 三字段
+     * 处理流程：
+     *   1. UPDATE：当月定稿表按三字段能匹配上的记录，更新其上月超欠产值和有效标识
+     *   2. INSERT：上月定稿有、当月定稿按三字段匹配不上的记录，新增一条到当月定稿表
+     *      - 超欠产值 = 0 的记录不插入
+     *      - 当月定稿表无任何记录的工厂不插入（无版本号可取）
+     *      - 版本号字段(MONTH_PLAN_VERSION/LAST_MONTH_PLAN_VERSION/PRODUCTION_VERSION)取当月同分厂任意一条记录的值
+     *      - DAY_1~DAY_31 全部置 NULL
+     *      - 其他业务字段从上月定稿复制
      *
      * @param lastMonth    数据来源月份（上月或当月）
      * @param currentMonth 写入目标月份（当月或下月）
@@ -1614,11 +1641,19 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
         log.info("开始计算超欠产, 数据来源: {}-{}, 写入目标: {}-{}, 日期范围: {} ~ {}, 有效标志阈值参数: {}",
                 lastYear, lastMonthValue, currentYear, currentMonthValue, startDate, endDate, overdueThresholdParamCode);
 
-        int count = finalMapper.updateLastMonthOverProd(lastYear, lastMonthValue, currentYear, currentMonthValue,
+        // 1. UPDATE：更新当月定稿表中按 (分厂+物料+产品状态) 维度能匹配上的记录
+        int updateCount = finalMapper.updateLastMonthOverProd(lastYear, lastMonthValue, currentYear, currentMonthValue,
                 startDate, endDate, overdueThresholdParamCode);
 
-        log.info("超欠产计算完成, 更新记录数: {}", count);
-        return AjaxResult.success("超欠产计算完成，更新记录数：" + count);
+        // 2. INSERT：补齐上月定稿有、当月定稿按相同维度匹配不上的记录
+        //    - 超欠产值 = 0 的记录不插入
+        //    - 当月定稿表无任何记录的工厂不插入（无版本号可取）
+        //    - 版本号取当月同分厂任意一条记录的值，DAY_1~DAY_31 置空
+        int insertCount = finalMapper.insertMissingLastMonthOverProd(lastYear, lastMonthValue, currentYear, currentMonthValue,
+                startDate, endDate, overdueThresholdParamCode);
+
+        log.info("超欠产计算完成, 更新记录数: {}, 新增记录数: {}", updateCount, insertCount);
+        return AjaxResult.success("超欠产计算完成，更新记录数：" + updateCount + "，新增记录数：" + insertCount);
     }
 
     /**
@@ -1635,7 +1670,7 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
      * 数据来源月=6月（取6月月底余量+6月硫化日完成量），写入目标月=6月（更新6月定稿记录标识）。
      * 公式同定时任务：超欠产 = 月底余量 - (库存抓取日~月底)的硫化日完成量，
      * 标识判定逻辑与 MonthOverProdTask 定时任务完全一致：
-     * |超欠产值| > 阈值参数(SYS0206009) → '0'（否），否则 → '1'（是）；无月底余量记录 → '0'。
+     * |超欠产值| > 阈值参数(SYS0206009) → '0'（否），否则 → '1'（是）；月底余量为空时按0处理，统一走阈值判定。
      * </p>
      *
      * @param finalizedYear  定稿年份（如 2026）

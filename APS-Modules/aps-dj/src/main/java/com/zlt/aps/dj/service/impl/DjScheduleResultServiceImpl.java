@@ -804,7 +804,9 @@ public class DjScheduleResultServiceImpl extends AbstractBillService<DjScheduleR
     }
 
     /**
-     * 获取排程日期的昨日早班合计，夜班合计，早班合计，库存合计，理论交班库存合计
+     * 获取排程日期的排程结果合计。
+     * <p>直接汇总 class1PlanQty / class2PlanQty / class3PlanQty，
+     * 实体中 class1 即为排产起始班次，对应连续3个班。</p>
      *
      * @param scheduleResult 排程日期
      * @return 结果
@@ -812,25 +814,28 @@ public class DjScheduleResultServiceImpl extends AbstractBillService<DjScheduleR
     @Override
     public AjaxResult getSummaryVo(DjScheduleResult scheduleResult) {
         List<DjScheduleResult> djScheduleResultList = selectDjScheduleResultList(scheduleResult);
+        if (CollectionUtils.isEmpty(djScheduleResultList)) {
+            return AjaxResult.success(new ScheduleSummaryVo());
+        }
 
-        BigDecimal totalClass2PlanQty = BigDecimal.ZERO; // 夜班
-        BigDecimal totalClass3PlanQty = BigDecimal.ZERO; // 早班
-        BigDecimal totalClass4PlanQty = BigDecimal.ZERO; // 中班
+        BigDecimal totalClass1PlanQty = BigDecimal.ZERO;
+        BigDecimal totalClass2PlanQty = BigDecimal.ZERO;
+        BigDecimal totalClass3PlanQty = BigDecimal.ZERO;
         BigDecimal totalStockQty = BigDecimal.ZERO;
-        BigDecimal totalPrevDayClass3PlanQty = BigDecimal.ZERO; // 昨日中班
+        BigDecimal totalPrevDayClass3PlanQty = BigDecimal.ZERO;
 
         for (DjScheduleResult result : djScheduleResultList) {
+            totalClass1PlanQty = totalClass1PlanQty.add(BigDecimalUtils.valueOf(result.getClass1PlanQty()));
             totalClass2PlanQty = totalClass2PlanQty.add(BigDecimalUtils.valueOf(result.getClass2PlanQty()));
             totalClass3PlanQty = totalClass3PlanQty.add(BigDecimalUtils.valueOf(result.getClass3PlanQty()));
-            totalClass4PlanQty = totalClass4PlanQty.add(BigDecimalUtils.valueOf(result.getClass4PlanQty()));
             totalStockQty = totalStockQty.add(BigDecimalUtils.valueOf(result.getStockQty()));
             totalPrevDayClass3PlanQty = totalPrevDayClass3PlanQty.add(BigDecimalUtils.valueOf(result.getPrevDayClass3PlanQty()));
         }
 
         ScheduleSummaryVo scheduleSummaryVo = new ScheduleSummaryVo();
-        scheduleSummaryVo.setDayPlanQty(totalClass2PlanQty.doubleValue());
-        scheduleSummaryVo.setNightPlanQty(totalClass3PlanQty.doubleValue());
-        scheduleSummaryVo.setNextDayPlanQty(totalClass4PlanQty.doubleValue());
+        scheduleSummaryVo.setClass1PlanQty(totalClass1PlanQty.doubleValue());
+        scheduleSummaryVo.setClass2PlanQty(totalClass2PlanQty.doubleValue());
+        scheduleSummaryVo.setClass3PlanQty(totalClass3PlanQty.doubleValue());
         scheduleSummaryVo.setStockQty(totalStockQty.doubleValue());
         scheduleSummaryVo.setLastDayPlanQty(totalPrevDayClass3PlanQty.doubleValue());
         return AjaxResult.success(scheduleSummaryVo);

@@ -9,6 +9,7 @@ import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.utils.BigDecimalUtils;
 import com.zlt.aps.common.engine.utils.DepthConfigResolver;
 import com.zlt.aps.tm.api.domain.entity.*;
+import com.zlt.aps.tm.api.enums.TmUnplannedReasonEnum;
 import com.zlt.aps.tm.domain.vo.TmExperimentSpecMonthPlanRowVo;
 import com.zlt.aps.tm.domain.vo.TmFormingDemandRowVo;
 import com.zlt.aps.tm.domain.vo.TmWorkCalendarRowVo;
@@ -133,6 +134,7 @@ public class TmAutoScheduleDataLoadService {
         loadParams(context);
         List<TmMachineInfo> machineList = loadMachineInfo(context);
         context.setMachineCandidateList(loadMachineCandidates(context, machineList));
+        context.setLossRuleList(loadLossRules(context));
         List<TmTaskDraft> taskDraftList = loadFormingDemandTasks(context, machineList);
         fillTaskAuxiliaryData(context, taskDraftList);
         context.setTaskDraftList(taskDraftList);
@@ -607,7 +609,7 @@ public class TmAutoScheduleDataLoadService {
         Integer formingShiftOffset = getNonNegativeIntegerParam(context, PARAM_FORMING_SHIFT_OFFSET, 2);
         Map<String, TmNewSpecInfo> newSpecInfoMap = buildNewSpecInfoMap(context, demandRowList,
                 newSpecLookbackDays, newSpecAdvanceShiftCount);
-        List<TmLossSetting> lossSettingList = loadLossSettings(context);
+        List<TmLossRule> lossRuleList = context.getLossRuleList();
         List<TmDepthConfig> depthConfigList = this.loadDepthConfigs(context);
         TmWorkCalendarRowVo tmCalendar = loadWorkCalendar(context, PROC_CODE_TM);
         TmWorkCalendarRowVo cxCalendar = loadWorkCalendar(context, PROC_CODE_CX);
@@ -657,7 +659,6 @@ public class TmAutoScheduleDataLoadService {
                 taskDraft.setTreadShoulderLength(treadLength);
                 taskDraft.setTailFlag(CLOSE_OUT_TIP.equals(row.getMarkCloseOutTip()) ? YES : NO);
                 taskDraft.setTailBalanceQty(nvl(row.getCxRemainQty()));
-                taskDraft.setLossRate(resolveLossRate(row.getTreadCode(), lossSettingList));
                 taskDraft.setCurrentShiftDemandQty(demandQty);
                 taskDraft.setGuardDemandQty(calculateGuardDemand(classQtyArray, shiftOrder, guardShiftCount,
                         formingShiftOffset).multiply(treadLength));
@@ -669,13 +670,13 @@ public class TmAutoScheduleDataLoadService {
                     taskDraft.setTotalToolQty(toolTotalQty);
                 }
                 if (noShutdownAvailableShift && !isShiftOpen(tmCalendar, targetShiftOrder) && isShiftOpen(cxCalendar, shiftOrder)) {
-                    taskDraft.setUnplannedReasonCode("TM_SHUTDOWN_NO_AVAILABLE_SHIFT");
-                    taskDraft.setUnplannedReasonDesc("胎面停产且无可分配班次，成型需求无法重分配");
+                    taskDraft.setUnplannedReasonCode(TmUnplannedReasonEnum.TM_SHUTDOWN_NO_AVAILABLE_SHIFT.getCode());
+                    taskDraft.setUnplannedReasonDesc(TmUnplannedReasonEnum.TM_SHUTDOWN_NO_AVAILABLE_SHIFT.getDesc());
                 }
                 taskDraftList.add(taskDraft);
             }
         }
-        appendExperimentSpecTasks(context, taskDraftList, lossSettingList, minStartQty, defaultCurlLength, toolTotalQty);
+        appendExperimentSpecTasks(context, taskDraftList, lossRuleList, minStartQty, defaultCurlLength, toolTotalQty);
         return taskDraftList;
     }
 
@@ -684,13 +685,13 @@ public class TmAutoScheduleDataLoadService {
      *
      * @param context 自动排程上下文
      * @param taskDraftList 待排任务列表
-     * @param lossSettingList 损耗配置列表
+     * @param lossRuleList 损耗配置列表
      * @param minStartQty 最小起排量
      * @param defaultCurlLength 默认卷曲长度
      * @param toolTotalQty 总工装数量
      */
     private void appendExperimentSpecTasks(TmScheduleContext context, List<TmTaskDraft> taskDraftList,
-                                           List<TmLossSetting> lossSettingList, BigDecimal minStartQty,
+                                           List<TmLossRule> lossRuleList, BigDecimal minStartQty,
                                            BigDecimal defaultCurlLength, BigDecimal toolTotalQty) {
         Integer lookbackDays = getPositiveIntegerParam(context, PARAM_EXPERIMENT_SPEC_LOOKBACK_DAYS, 5);
         BigDecimal experimentPlanQty = getPositiveDecimalParam(context, PARAM_EXPERIMENT_SPEC_PLAN_QTY, BigDecimal.valueOf(30));
@@ -726,7 +727,7 @@ public class TmAutoScheduleDataLoadService {
                 continue;
             }
             taskDraftList.add(buildExperimentSpecTask(context, treadRows.get(0), experimentPlanQty, experimentSpecInfo,
-                    lossSettingList, minStartQty, defaultCurlLength, toolTotalQty));
+                    lossRuleList, minStartQty, defaultCurlLength, toolTotalQty));
         }
     }
 
@@ -870,17 +871,17 @@ public class TmAutoScheduleDataLoadService {
      * @param row 月计划实验规格行
      * @param experimentPlanQty 实验固定计划量
      * @param experimentSpecInfo 实验规格证据
-     * @param lossSettingList 损耗配置列表
+     * @param lossRuleList 损耗配置列表
      * @param minStartQty 最小起排量
      * @param defaultCurlLength 默认卷曲长度
      * @return 实验规格独立任务
      */
     private TmTaskDraft buildExperimentSpecTask(TmExperimentSpecMonthPlanRowVo row, BigDecimal experimentPlanQty,
                                                 TmExperimentSpecInfo experimentSpecInfo,
-                                                List<TmLossSetting> lossSettingList, BigDecimal minStartQty,
+                                                List<TmLossRule> lossRuleList, BigDecimal minStartQty,
                                                 BigDecimal defaultCurlLength, BigDecimal toolTotalQty) {
         return this.buildExperimentSpecTask(null, row, experimentPlanQty, experimentSpecInfo,
-                lossSettingList, minStartQty, defaultCurlLength, toolTotalQty);
+                lossRuleList, minStartQty, defaultCurlLength, toolTotalQty);
     }
 
     /**
@@ -890,7 +891,7 @@ public class TmAutoScheduleDataLoadService {
      * @param row 实验规格月计划行
      * @param experimentPlanQty 实验规格固定计划量
      * @param experimentSpecInfo 实验规格识别证据
-     * @param lossSettingList 损耗配置列表
+     * @param lossRuleList 损耗配置列表
      * @param minStartQty 最小开车量
      * @param defaultCurlLength 默认卷曲长度
      * @param toolTotalQty 工装总量
@@ -899,7 +900,7 @@ public class TmAutoScheduleDataLoadService {
     private TmTaskDraft buildExperimentSpecTask(TmScheduleContext context, TmExperimentSpecMonthPlanRowVo row,
                                                 BigDecimal experimentPlanQty,
                                                 TmExperimentSpecInfo experimentSpecInfo,
-                                                List<TmLossSetting> lossSettingList, BigDecimal minStartQty,
+                                                List<TmLossRule> lossRuleList, BigDecimal minStartQty,
                                                 BigDecimal defaultCurlLength, BigDecimal toolTotalQty) {
         TmTaskDraft taskDraft = new TmTaskDraft();
         taskDraft.setOrderNo("EXP-" + StrUtil.blankToDefault(row.getProductionNo(), String.valueOf(row.getMonthPlanId()))
@@ -928,7 +929,6 @@ public class TmAutoScheduleDataLoadService {
         taskDraft.setTreadShoulderLength(nvl(row.getTreadShoulderLength()));
         taskDraft.setTailFlag(NO);
         taskDraft.setTailBalanceQty(BigDecimal.ZERO);
-        taskDraft.setLossRate(resolveLossRate(row.getTreadCode(), lossSettingList));
         taskDraft.setCurrentShiftDemandQty(experimentPlanQty);
         taskDraft.setGuardDemandQty(experimentPlanQty);
         taskDraft.setDemandQty(experimentPlanQty);
@@ -1318,45 +1318,33 @@ public class TmAutoScheduleDataLoadService {
      * @param context 自动排程上下文
      * @return 损耗率配置列表；未配置时返回空集合
      */
-    private List<TmLossSetting> loadLossSettings(TmScheduleContext context) {
+    private List<TmLossRule> loadLossRules(TmScheduleContext context) {
         if (tmLossSettingMapper == null) {
             return Collections.emptyList();
         }
         LambdaQueryWrapper<TmLossSetting> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(TmLossSetting::getFactoryCode, context.getFactoryCode());
         wrapper.eq(TmLossSetting::getEnableStatus, YES);
-        return Optional.ofNullable(tmLossSettingMapper.selectList(wrapper)).orElse(Collections.emptyList());
+        return Optional.ofNullable(tmLossSettingMapper.selectList(wrapper)).orElse(Collections.emptyList())
+                .stream()
+                .map(this::buildLossRule)
+                .collect(Collectors.toList());
     }
 
     /**
-     * 按胎面编码解析计划量阶段可使用的损耗率。
+     * 将业务损耗率配置映射为引擎规则对象。
      *
-     * <p>计划量计算发生在机台分配之前，因此当前只能应用胎面级和默认级配置；
-     * 同层级多条配置按 priority 小值优先。</p>
-     *
-     * @param treadCode       胎面编码
-     * @param lossSettingList 损耗率配置列表
-     * @return 损耗率，未配置时返回 0
+     * @param setting 损耗率业务实体
+     * @return 引擎损耗率规则
      */
-    private BigDecimal resolveLossRate(String treadCode, List<TmLossSetting> lossSettingList) {
-        if (CollUtil.isEmpty(lossSettingList)) {
-            return BigDecimal.ZERO;
-        }
-        Optional<TmLossSetting> treadSetting = lossSettingList.stream()
-                .filter(item -> item.getLossRate() != null)
-                .filter(item -> StrUtil.isBlank(item.getMachineCode()))
-                .filter(item -> StrUtil.isNotBlank(item.getTreadCode()) && item.getTreadCode().equals(treadCode))
-                .min(Comparator.comparing(item -> item.getPriority() == null ? Integer.MAX_VALUE : item.getPriority()));
-        if (treadSetting.isPresent()) {
-            return treadSetting.get().getLossRate();
-        }
-        return lossSettingList.stream()
-                .filter(item -> item.getLossRate() != null)
-                .filter(item -> StrUtil.isBlank(item.getMachineCode()))
-                .filter(item -> StrUtil.isBlank(item.getTreadCode()))
-                .min(Comparator.comparing(item -> item.getPriority() == null ? Integer.MAX_VALUE : item.getPriority()))
-                .map(TmLossSetting::getLossRate)
-                .orElse(BigDecimal.ZERO);
+    private TmLossRule buildLossRule(TmLossSetting setting) {
+        TmLossRule rule = new TmLossRule();
+        rule.setFactoryCode(setting.getFactoryCode());
+        rule.setTreadCode(setting.getTreadCode());
+        rule.setMachineCode(setting.getMachineCode());
+        rule.setLossRate(setting.getLossRate());
+        rule.setPriority(setting.getPriority());
+        return rule;
     }
 
     /**

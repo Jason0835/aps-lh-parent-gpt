@@ -10,6 +10,7 @@ import com.zlt.aps.exception.BusinessException;
 import com.zlt.aps.mp.api.domain.entity.*;
 import com.zlt.aps.mp.engine.basedata.assemble.continueinfo.ContinueGroupInfoHandler;
 import com.zlt.aps.mp.engine.basedata.assemble.cyclegroup.CycleGroupDataHandler;
+import com.zlt.aps.mp.engine.basedata.assemble.datalist.GroupListHandler;
 import com.zlt.aps.mp.engine.basedata.assemble.fixed.GroupFixedInfoHandler;
 import com.zlt.aps.mp.engine.basedata.assemble.history.ProductionHistoryHandler;
 import com.zlt.aps.mp.engine.domain.Context;
@@ -92,7 +93,8 @@ public class TbrCxCapacityAllocationService extends AbstractDataLoaderService {
 
     private final MatchingProductionHandler matchingProductionHandler;
 
-    public TbrCxCapacityAllocationService(ProductionMdmDataService dataService,
+    public TbrCxCapacityAllocationService(GroupListHandler groupListHandler,
+                                          ProductionMdmDataService dataService,
                                           DpRequireDataService dpRequireDataService,
                                           CycleGroupDataHandler cycleGroupDataHandler,
                                           GroupFixedInfoHandler groupFixedInfoHandler,
@@ -111,7 +113,7 @@ public class TbrCxCapacityAllocationService extends AbstractDataLoaderService {
                                           ProductionCxMachineCalculationHandler productionCxMachineCalculationHandler,
                                           AdjustContinueSkuProductionQtyHandler adjustContinueSkuProductionQtyHandler,
                                           MatchingProductionHandler matchingProductionHandler) {
-        super(dataService, dpRequireDataService, cycleGroupDataHandler, productionHistoryHandler, monthProductionDataService);
+        super(groupListHandler, dataService, dpRequireDataService, cycleGroupDataHandler, productionHistoryHandler, monthProductionDataService);
         this.groupFixedInfoHandler = groupFixedInfoHandler;
         this.formalProductionHandler = formalProductionHandler;
         this.iSysDictDataCacheService = iSysDictDataCacheService;

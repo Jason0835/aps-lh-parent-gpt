@@ -9,6 +9,8 @@ public final class Cd90ScheduleTaskType {
     public static final String AUTO_SCHEDULE = "AUTO_SCHEDULE";
     /** 插单滚动重排。 */
     public static final String INSERT_ORDER = "INSERT_ORDER";
+    /** 定时滚动排程。 */
+    public static final String ROLLING_SCHEDULE = "ROLLING_SCHEDULE";
 
     private Cd90ScheduleTaskType() {
     }

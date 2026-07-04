@@ -6,6 +6,7 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.cd90.api.domain.entity.Cd90ScheduleResult;
 import com.zlt.aps.cd90.api.domain.entity.Cd90ShiftConfig;
 import com.zlt.aps.cd90.api.domain.vo.Cd90InsertOrderRequest;
+import com.zlt.aps.cd90.api.domain.vo.Cd90RollingCheckRequest;
 import com.zlt.aps.cd90.engine.domain.Cd90ScheduleTask;
 import com.zlt.aps.cd90.engine.constant.Cd90ScheduleTaskType;
 import com.zlt.aps.cd90.engine.model.Cd90BatchDataCheckResult;
@@ -17,6 +18,7 @@ import com.zlt.aps.cd90.model.Cd90ScheduleOverwriteDecision;
 import com.zlt.aps.cd90.service.Cd90AutoScheduleAsyncExecutor;
 import com.zlt.aps.cd90.service.Cd90InsertOrderAsyncExecutor;
 import com.zlt.aps.cd90.service.Cd90ScheduleOverwriteValidator;
+import com.zlt.aps.cd90.service.Cd90TimedRollingCheckService;
 import com.zlt.aps.cd90.service.ICd90ScheduleResultService;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.bill.common.service.AbstractDocService;
@@ -57,6 +59,8 @@ public class Cd90ScheduleResultServiceImpl extends AbstractDocService<Cd90Schedu
     private Cd90AutoScheduleShiftMapper shiftMapper;
     @Resource
     private Cd90InsertOrderAsyncExecutor insertOrderAsyncExecutor;
+    @Resource
+    private Cd90TimedRollingCheckService timedRollingCheckService;
 
     /**
      * 接收自动排程请求。
@@ -226,6 +230,20 @@ public class Cd90ScheduleResultServiceImpl extends AbstractDocService<Cd90Schedu
         return AjaxResult.success(task);
     }
 
+
+    @Override
+    public AjaxResult checkTimedRolling(Cd90RollingCheckRequest request) {
+        return timedRollingCheckService.check(request);
+    }
+
+    @Override
+    public AjaxResult getTimedRollingTask(String taskId) {
+        Cd90ScheduleTask task = taskService.findByTaskId(taskId);
+        if (task == null || !Cd90ScheduleTaskType.ROLLING_SCHEDULE.equals(task.getTaskType())) {
+            return AjaxResult.error("定时滚动排程任务不存在");
+        }
+        return AjaxResult.success(task);
+    }
     private boolean isBlank(String value) {
         return value == null || value.trim().isEmpty();
     }

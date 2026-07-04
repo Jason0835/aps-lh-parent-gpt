@@ -46,6 +46,8 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class ProductionMdmDataServiceImpl extends AbstractDataService implements ProductionMdmDataService {
 
+    private final MdmStructureNameEntityMapper structureNameMapper;
+
     private final MdmInterestRateEntityMapper interestRateMapper;
 
     private final MdmWorkWearInfoEntityMapper workWearInfoEntityMapper;
@@ -77,6 +79,17 @@ public class ProductionMdmDataServiceImpl extends AbstractDataService implements
     private final IProductALevelService productALevelService;
     @Autowired
     private ISysConfigService sysConfigService;
+
+    @Override
+    public List<MdmStructureName> getAllStructureInfo() {
+        QueryWrapper<MdmStructureName> allQuery = new QueryWrapper<>();
+        allQuery.eq("IS_DELETE", YesOrNoEnum.NO.getValue());
+        List<MdmStructureName> allList = structureNameMapper.selectList(allQuery);
+        if (CollectionUtils.isEmpty(allList)) {
+            return Collections.emptyList();
+        }
+        return allList;
+    }
 
     @Override
     public Integer getProductionCycleConfiguration(Context context) {

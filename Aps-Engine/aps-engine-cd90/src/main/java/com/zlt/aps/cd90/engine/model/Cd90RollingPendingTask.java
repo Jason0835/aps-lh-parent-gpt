@@ -48,4 +48,10 @@ public class Cd90RollingPendingTask {
     private boolean continueFromPreviousShift;
     /** 最近一次真实限制原因。 */
     private String lastLimitReason;
+    /** 是否为当前班紧急缺口。 */
+    private boolean urgentCurrentShiftShortage;
+    /** 原任务稳定顺序，新任务使用最大值。 */
+    private int stableOrder;
+    /** 滚动调整或未排原因。 */
+    private String reasonCode;
 }
