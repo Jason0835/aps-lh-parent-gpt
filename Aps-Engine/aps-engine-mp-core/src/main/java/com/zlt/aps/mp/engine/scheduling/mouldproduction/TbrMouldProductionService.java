@@ -11,6 +11,7 @@ import com.zlt.aps.mp.api.domain.entity.*;
 import com.zlt.aps.mp.api.enums.ProductionProcessStage;
 import com.zlt.aps.mp.engine.basedata.assemble.continueinfo.ContinueGroupInfoHandler;
 import com.zlt.aps.mp.engine.basedata.assemble.cyclegroup.CycleGroupDataHandler;
+import com.zlt.aps.mp.engine.basedata.assemble.datalist.GroupListHandler;
 import com.zlt.aps.mp.engine.basedata.assemble.history.ProductionHistoryHandler;
 import com.zlt.aps.mp.engine.domain.Context;
 import com.zlt.aps.mp.engine.domain.dto.*;
@@ -81,7 +82,8 @@ public class TbrMouldProductionService extends AbstractDataLoaderService {
 
     private final AdjustContinueSkuProductionQtyHandler adjustContinueSkuProductionQtyHandler;
 
-    public TbrMouldProductionService(ProductionMdmDataService dataService,
+    public TbrMouldProductionService(GroupListHandler groupListHandler,
+                                     ProductionMdmDataService dataService,
                                      DpRequireDataService dpRequireDataService,
                                      CycleGroupDataHandler cycleGroupDataHandler,
                                      ProductionHistoryHandler productionHistoryHandler,
@@ -97,7 +99,7 @@ public class TbrMouldProductionService extends AbstractDataLoaderService {
                                      CalculateStructureCxMachineNumber calculateStructureCxMachineNumber,
                                      ProductionCxMachineCalculationHandler productionCxMachineCalculationHandler,
                                      AdjustContinueSkuProductionQtyHandler adjustContinueSkuProductionQtyHandler) {
-        super(dataService, dpRequireDataService, cycleGroupDataHandler, productionHistoryHandler, monthProductionDataService);
+        super(groupListHandler, dataService, dpRequireDataService, cycleGroupDataHandler, productionHistoryHandler, monthProductionDataService);
         this.formalProductionHandler = formalProductionHandler;
         this.iSysDictDataCacheService = iSysDictDataCacheService;
         this.continueGroupInfoHandler = continueGroupInfoHandler;

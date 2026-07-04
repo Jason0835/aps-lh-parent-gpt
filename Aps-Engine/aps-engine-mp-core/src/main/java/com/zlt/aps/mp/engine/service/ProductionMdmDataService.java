@@ -20,6 +20,11 @@ import java.util.Map;
  */
 public interface ProductionMdmDataService {
     /**
+     * 获取所有结构信息
+     * @return
+     */
+    List<MdmStructureName> getAllStructureInfo();
+    /**
      * 获取排产周期配置信息
      * 自然月与非自然月周期
      *

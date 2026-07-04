@@ -88,33 +88,28 @@ public class TqPreValidationHandler extends AbsTqScheduleStepHandler {
         for (EngineConstructionInfo construction : list) {
             List<String> errorColumns = new ArrayList<>();
 
-            // 源数据（成型排程结果 T_CX_SCHEDULE_RESULT）胎胚代码/版本为空防护：
-            // 此时 construction.getEmbryoCode()/getBomDataVersion() 可能为 null，
-            // 直接 split(",") 会触发 NPE；且这属于成型排程源数据脏数据，需单独报错让用户感知，
-            // 而非走下游"施工表无匹配"的 length<2 校验，避免错误归因。
+            // embryoCodeRaw 格式：成型胎胚代码,施工表胎胚代码
+            // bomDataVersionRaw 格式：成型版本(可能为空),施工表版本
+            // 注：成型排程结果不再存储BOM_DATA_VERSION，成型侧版本恒为空属正常状态，
+            // 不再作为脏数据强制中断；版本号以施工表 CONSTRUCTION_VERSION 为准。
             String embryoCodeRaw = construction.getEmbryoCode();
             String bomDataVersionRaw = construction.getBomDataVersion();
-            if (StringUtils.isBlank(embryoCodeRaw) || StringUtils.isBlank(bomDataVersionRaw)) {
-                List<String> sourceErrorColumns = new ArrayList<>();
-                if (StringUtils.isBlank(embryoCodeRaw)) {
-                    sourceErrorColumns.add("\"" + I18nUtil.getMessage("ui.construction.embryoCode") + "\"");
-                }
-                if (StringUtils.isBlank(bomDataVersionRaw)) {
-                    sourceErrorColumns.add("\"" + I18nUtil.getMessage("ui.construction.embryoVersion") + "\"");
-                }
+
+            // 成型排程胎胚代码为空仍属于源数据脏数据，需单独报错让用户感知
+            if (StringUtils.isBlank(embryoCodeRaw)) {
                 String tip = StringUtils.format(
                         I18nUtil.getMessage("engine.auto.scheule.construction.validate"),
-                        StringUtils.defaultString(embryoCodeRaw, ""),
-                        StringUtils.defaultString(bomDataVersionRaw, ""),
-                        String.join(",", sourceErrorColumns));
+                        "", "",
+                        "\"" + I18nUtil.getMessage("ui.construction.embryoCode") + "\"");
                 autoScheduleLogService.insertTqScheduleLog(batchNo, "", "自动排程失败", tip);
                 context.interruptSchedule(tip);
                 return;
             }
 
             String embryoCode = embryoCodeRaw.split(",")[0];
-            String[] versionArray = bomDataVersionRaw.split(",");
-            String embryoVersion = versionArray.length > 0 ? versionArray[0] : "";
+            // 取施工表版本用于错误提示；versionArray[1] 为施工表版本，若不存在则为空
+            String[] versionArray = StringUtils.isBlank(bomDataVersionRaw) ? new String[0] : bomDataVersionRaw.split(",");
+            String embryoVersion = versionArray.length > 1 ? versionArray[1] : "";
 
             // 胎圈代码为空说明成型排程的胎胚在施工表中找不到匹配记录，直接中断排程
             if (StringUtils.isBlank(construction.getTireRingCode())) {
@@ -127,14 +122,9 @@ public class TqPreValidationHandler extends AbsTqScheduleStepHandler {
                 return;
             }
 
-            if (construction.getEmbryoCode().split(",").length < 2) {
-                errorColumns.add("\"" + I18nUtil.getMessage("ui.construction.embryoCode") + "\"");
-            }
-            if (versionArray.length < 2) {
+            // 以下校验施工表字段完整性
+            if (StringUtils.isBlank(embryoVersion)) {
                 errorColumns.add("\"" + I18nUtil.getMessage("ui.construction.embryoVersion") + "\"");
-            }
-            if (StringUtils.isBlank(construction.getTireRingCode())) {
-                errorColumns.add("\"" + I18nUtil.getMessage("ui.construction.tireRingCode") + "\"");
             }
             if (StringUtils.isBlank(construction.getBeadCode())) {
                 errorColumns.add("\"" + I18nUtil.getMessage("ui.construction.beadCode") + "\"");

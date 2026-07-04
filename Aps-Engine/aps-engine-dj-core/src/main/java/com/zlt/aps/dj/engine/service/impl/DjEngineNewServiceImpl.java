@@ -236,9 +236,33 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
         context.setEffectiveStockMap(effectiveStockMap);
         log.info("步骤3.1：加载有效库存 {} 个规格", effectiveStockMap.size());
 
-        // 判断新规格：库存表中不存在的垫胶代码即为新规格
-        Set<String> newSpecPaddingCodes = new HashSet<>(paddingCodes);
-        newSpecPaddingCodes.removeAll(effectiveStockMap.keySet());
+        // 判断新规格：连续N天未排产的规格（含从未排产过的）视为新规格
+        // 从排产结果表（含日志表）查询各垫胶代码最近一次有排产量的排产日期
+        int newSpecDaysThreshold = this.getParamAsDecimal(context, DjEngineConstants.PARAM_NEW_SPEC_DAYS_THRESHOLD).intValue();
+        List<Map<String, Object>> lastScheduleList = djEngineScheduleResultMapper.selectLastScheduleDate(
+                factoryCode, new ArrayList<>(paddingCodes));
+        Map<String, Date> lastScheduleMap = new HashMap<>();
+        if (lastScheduleList != null) {
+            for (Map<String, Object> row : lastScheduleList) {
+                String code = (String) row.get("PADDING_CODE");
+                Date lastDate = (Date) row.get("LAST_DATE");
+                lastScheduleMap.put(code, lastDate);
+            }
+        }
+        Set<String> newSpecPaddingCodes = new HashSet<>();
+        for (String code : paddingCodes) {
+            Date lastDate = lastScheduleMap.get(code);
+            if (lastDate == null) {
+                // 从未排产过 → 新规格
+                newSpecPaddingCodes.add(code);
+            } else {
+                // 计算间隔天数
+                long daysBetween = DateUtil.betweenDay(lastDate, scheduleDate, true);
+                if (daysBetween >= newSpecDaysThreshold) {
+                    newSpecPaddingCodes.add(code);
+                }
+            }
+        }
 
         // 3.2 供应窗口超出成型范围时，加载月计划余量预估
         // 筛选出排产深度超出成型班数的垫胶规格

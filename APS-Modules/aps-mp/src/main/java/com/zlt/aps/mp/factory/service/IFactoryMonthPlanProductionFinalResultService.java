@@ -152,7 +152,7 @@ public interface IFactoryMonthPlanProductionFinalResultService extends IDocServi
      * 月底余量(PLAN_SURPLUS_QTY)、库存抓取日(STOCK_CAPTURE_DATE) 取自 T_MDM_MONTH_SURPLUS，
      * 按需求版本号(MONTH_PLAN_VERSION=REQUIRE_VERSION) 匹配；
      * 并按阈值参数(SYS0206009)判定上月超欠产有效标志：
-     * |超欠产值|(绝对值) > 阈值 → 否('0')，否则 → 是('1')；无月底余量记录 → 否('0')
+     * |超欠产值|(绝对值) > 阈值 → 否('0')，否则 → 是('1')；月底余量为空时按0处理，统一走阈值判定
      *
      * @return 计算结果
      */
@@ -165,5 +165,16 @@ public interface IFactoryMonthPlanProductionFinalResultService extends IDocServi
      * @return 计算结果
      */
     AjaxResult calcCurrentMonthOverProdForNextMonth();
+
+    /**
+     * 计算指定月份超欠产写入其下月（临时测试用，支持指定数据来源月份）
+     * 逻辑同 {@link #calcCurrentMonthOverProdForNextMonth()}，但允许手动指定数据来源的年月，
+     * 便于测试在非月底时间模拟月底倒数2天的超欠产生成
+     *
+     * @param year  数据来源年份（如2026）
+     * @param month 数据来源月份（如6，代表6月数据写入7月）
+     * @return 计算结果
+     */
+    AjaxResult calcCurrentMonthOverProdForNextMonth(Integer year, Integer month);
 
 }

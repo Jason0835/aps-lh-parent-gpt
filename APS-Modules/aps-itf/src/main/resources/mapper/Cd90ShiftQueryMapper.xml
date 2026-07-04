@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.itf.mes.mapper.Cd90ShiftQueryMapper">
+
+    <!-- 查询指定工厂启用的班次配置列表（APS 数据源，t_cd90_shift_config） -->
+    <select id="listActiveShiftConfigs" resultType="com.zlt.aps.cd90.api.domain.entity.Cd90ShiftConfig">
+        SELECT
+            ID,
+            FACTORY_CODE,
+            SHIFT_CODE,
+            SHIFT_NAME,
+            SHIFT_ORDER,
+            START_TIME,
+            END_TIME,
+            SHIFT_HOURS,
+            IS_CROSS_DAY,
+            SCHEDULE_DAY,
+            DAY_SHIFT_ORDER,
+            CLASS_FIELD,
+            IS_ACTIVE
+        FROM t_cd90_shift_config
+        WHERE IS_DELETE = 0
+          AND IS_ACTIVE = 1
+          AND FACTORY_CODE = #{factoryCode}
+        ORDER BY SHIFT_ORDER ASC
+    </select>
+
+</mapper>

@@ -2,6 +2,7 @@ package com.zlt.aps.mp.engine.handler;
 
 import com.zlt.aps.constant.StringConstant;
 import com.zlt.aps.enums.YesOrNoEnum;
+import com.zlt.aps.mp.engine.basedata.assemble.datalist.GroupListHandler;
 import com.zlt.aps.mp.engine.domain.Context;
 import com.zlt.aps.mp.engine.domain.dto.CxMachineAllocationPlanHelper;
 import com.zlt.aps.mp.engine.domain.dto.ProductionPlanGroupInfo;
@@ -41,6 +42,7 @@ public class GroupPlanCxMachineSelector {
     public static List<CxMachineBaseInfoVo> getEnableBaseCxMachineList(Context context, ProductionPlanGroupInfo addNewGroupPlan) {
         TbrProductionContext productionContext = (TbrProductionContext) context;
         String structureName = addNewGroupPlan.getGroupName();
+
         //获取所有机台信息
         Map<String, CxMachineBaseInfoVo> allCxMachineMap = productionContext.getBaseDataContainer().getCxMachineBaseInfo();
         if (CollectionUtils.isEmpty(allCxMachineMap)) {
@@ -67,6 +69,10 @@ public class GroupPlanCxMachineSelector {
      */
     public static List<CxMachineBaseInfoVo> getEnableCxMachineListByAppoint(Context context, ProductionPlanGroupInfo matchGroup, List<CxMachineBaseInfoVo> appointCxMachineList) {
         if (null == matchGroup || CollectionUtils.isEmpty(appointCxMachineList)) {
+            return Collections.emptyList();
+        }
+        //20260703+ 判断是否达到结构分配上限
+        if (GroupListHandler.isReachAddMachineLimit(context, matchGroup)) {
             return Collections.emptyList();
         }
         String structureName = matchGroup.getGroupName();

@@ -81,4 +81,10 @@ public class Cd90Stock extends BaseEntity implements Serializable {
     @TableField("LAYERS")
     @Excel(name = "ui.data.column.cd90Stock.layers")
     private Integer layers;
+
+    /** 数据来源：0-MES同步，1-人工维护 */
+    @ApiModelProperty("数据来源：0-MES同步，1-人工维护")
+    @TableField("DATA_SOURCE")
+    @Excel(name = "ui.data.column.cd90Stock.dataSource", dictType = "lh_precision_data_source")
+    private String dataSource;
 }

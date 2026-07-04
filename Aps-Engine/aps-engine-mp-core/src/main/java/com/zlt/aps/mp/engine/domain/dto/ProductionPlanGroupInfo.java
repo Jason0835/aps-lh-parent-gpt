@@ -1,6 +1,7 @@
 package com.zlt.aps.mp.engine.domain.dto;
 
 import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
 import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.enums.MonthPlanNoProductionReasonEnum;
 import com.zlt.aps.enums.ProductTypeEnum;
@@ -276,6 +277,31 @@ public class ProductionPlanGroupInfo {
         // 模具数换算成硫化机台数
         groupInfo.minLhMachineCountByMould = mouldCodeSet.size() / ProductionConstant.DOUBLE_MOULD_PRODUCTION;
         return groupInfo;
+    }
+
+    /**
+     * 获取分组当前已分配机台信息
+     *
+     * @param context 排产上下文
+     * @return
+     */
+    public Set<String> getAssignedMachineInfo(Context context) {
+        TbrProductionContext productionContext = (TbrProductionContext) context;
+        Map<String, CxMachineBaseInfoVo> allCxMachineMap = productionContext.getBaseDataContainer().getCxMachineBaseInfo();
+        if (CollectionUtils.isEmpty(allCxMachineMap)) {
+            return Collections.emptySet();
+        }
+        Set<String> assignedSet = Sets.newHashSet();
+        allCxMachineMap.forEach((cxMachineCode, cxMachineBaseInfo) -> {
+            if (!cxMachineBaseInfo.isAssignedGroup(groupName)) {
+                return;
+            }
+            assignedSet.add(cxMachineCode);
+        });
+        if (CollectionUtils.isEmpty(assignedSet)) {
+            return Collections.emptySet();
+        }
+        return assignedSet;
     }
 
     /**

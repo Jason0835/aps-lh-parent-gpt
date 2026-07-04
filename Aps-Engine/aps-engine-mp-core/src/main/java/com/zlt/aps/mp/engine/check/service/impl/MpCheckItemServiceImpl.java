@@ -11,6 +11,7 @@ import com.zlt.aps.mp.api.domain.entity.MpCheckItemRecord;
 import com.zlt.aps.mp.api.domain.vo.MpCheckItemVo;
 import com.zlt.aps.mp.engine.basedata.assemble.calendar.WorkerCalendarHandler;
 import com.zlt.aps.mp.engine.basedata.assemble.cyclegroup.CycleGroupDataHandler;
+import com.zlt.aps.mp.engine.basedata.assemble.datalist.GroupListHandler;
 import com.zlt.aps.mp.engine.basedata.assemble.history.ProductionHistoryHandler;
 import com.zlt.aps.mp.engine.check.service.IMpCheckItemRecordService;
 import com.zlt.aps.mp.engine.check.service.IMpCheckItemService;
@@ -55,14 +56,15 @@ public class MpCheckItemServiceImpl extends AbstractDataLoaderService implements
 
     private final WorkerCalendarHandler workerCalendarHandler;
 
-    public MpCheckItemServiceImpl(ProductionMdmDataService dataService,
+    public MpCheckItemServiceImpl(GroupListHandler groupListHandler,
+                                  ProductionMdmDataService dataService,
                                   DpRequireDataService dpRequireDataService,
                                   CycleGroupDataHandler cycleGroupDataHandler,
                                   WorkerCalendarHandler workerCalendarHandler,
                                   ProductionHistoryHandler productionHistoryHandler,
                                   IMpCheckItemRecordService iMpCheckItemRecordService,
                                   MonthProductionDataService monthProductionDataService) {
-        super(dataService, dpRequireDataService, cycleGroupDataHandler, productionHistoryHandler, monthProductionDataService);
+        super(groupListHandler, dataService, dpRequireDataService, cycleGroupDataHandler, productionHistoryHandler, monthProductionDataService);
         this.cycleGroupDataHandler = cycleGroupDataHandler;
         this.workerCalendarHandler = workerCalendarHandler;
         this.iMpCheckItemRecordService = iMpCheckItemRecordService;

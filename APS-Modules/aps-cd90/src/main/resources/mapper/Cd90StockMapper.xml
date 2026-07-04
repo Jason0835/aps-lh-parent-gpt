@@ -1,4 +1,20 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.zlt.aps.cd90.mapper.Cd90StockMapper">
+
+    <!-- 逻辑删除指定工厂、数据来源、库存日期、班次的未删除记录（MES 同步前置清理） -->
+    <update id="logicDeleteByFactoryCodeAndDataSourceAndShiftCode">
+        UPDATE t_cd90_stock
+        SET IS_DELETE = 1,
+            UPDATE_BY = #{updateBy},
+            UPDATE_TIME = #{updateTime}
+        WHERE FACTORY_CODE = #{factoryCode}
+          AND DATA_SOURCE = #{dataSource}
+          AND DATE(STOCK_DATE) = DATE(#{stockDate})
+          AND SHIFT_CODE = #{shiftCode}
+          AND IS_DELETE = 0
+    </update>
+
 </mapper>

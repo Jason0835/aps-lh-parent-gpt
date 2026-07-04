@@ -113,8 +113,7 @@ public class MesMergeController {
             // cd15库存
             halfPartService.mergeCd15(dataVersion);
         } else if (syncKey.equals(SyncKeyEnum.ADJUDI90_STOCK.getDescription())) {
-            // cd90库存
-            halfPartService.mergeCd90(dataVersion);
+            // cd90库存：已切换至新链路 syncMesCd90Stock，旧 mergeCd90 链路与新表结构不匹配，不再走 MPS 合并
         } else if (syncKey.equals(SyncKeyEnum.GDYY_STOCK.getDescription())) {
             // 钢带压延库存
             halfPartService.mergeGdyy(dataVersion);

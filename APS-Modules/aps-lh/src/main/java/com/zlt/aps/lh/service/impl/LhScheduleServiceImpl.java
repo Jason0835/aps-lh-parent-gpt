@@ -43,6 +43,7 @@ import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.lh.util.MachineStatusUtil;
 import com.zlt.aps.lh.util.MouldStatusUtil;
 import com.zlt.aps.lh.util.ShiftFieldUtil;
+import com.zlt.aps.lh.util.SkuConstructionRefResolverUtil;
 import com.zlt.aps.mdm.api.domain.entity.*;
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import com.zlt.aps.mp.api.domain.entity.MpFactoryProductionVersion;
@@ -120,6 +121,12 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
 
     @Resource
     private ICxScheduleResultService cxScheduleResultService;
+
+    /**
+     * 成型排程结果Mapper（aps-lh模块内直接查询，避免Feign反序列化List失败）
+     */
+    @Resource
+    private CxScheduleResultMapper cxScheduleResultMapper;
 
     @Resource
     private ScheduleEventPublisher scheduleEventPublisher;
@@ -1487,7 +1494,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         context.machineInfoMap = loadImportMachineInfoMap(factoryCode, machineCodes);
         context.availableMouldCodeSet = loadImportAvailableMouldCodeSet(factoryCode, materialCodes);
         context.materialMouldRelMap = loadImportMaterialMouldRelMap(factoryCode, materialCodes);
-        context.constructionRefKeySet = loadImportConstructionRefKeySet(factoryCode, materialCodes);
+        context.constructionRefMap = loadImportConstructionRefMap(factoryCode, materialCodes);
         context.classCapacityMaterialSet = loadImportClassCapacityMaterialSet(factoryCode, materialCodes);
         return context;
     }
@@ -1542,18 +1549,21 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
 
         // 校验硫化示方号是否存在：
         // 需求要求“通过月计划中物料编码+产品状态到 SKU 与示方关系校验硫化示方号”。
-        // 因此这里先从月计划明细拿 productStatus，再用 factoryCode + materialCode + productStatus
-        // 匹配 MdmSkuConstructionRef，并且要求 lhNo 不为空。
-        FactoryMonthPlanProductionFinalResult monthPlan = context.monthPlanMap.get(materialKey);
+        // 因此这里先从月计划明细拿 productStatus，再通过 SkuConstructionRefResolverUtil 统一降级匹配
+        // （正规S→量试T→试制X；量试T→试制X；试制X 不降级），与自动排程和 SkuConstructionValidator 使用同一套规则。
+        List<FactoryMonthPlanProductionFinalResult> monthPlanList = context.monthPlanMap.get(materialKey);
         // 跨月时，如果主月定稿表中找不到，尝试从窗口结束日期所在月份的定稿表中查找
-        if (Objects.isNull(monthPlan) && context.crossMonth) {
-            monthPlan = context.monthPlanMapNextMonth.get(materialKey);
+        if (CollUtil.isEmpty(monthPlanList) && context.crossMonth) {
+            monthPlanList = context.monthPlanMapNextMonth.get(materialKey);
         }
-        if (Objects.isNull(monthPlan)) {
+        if (CollUtil.isEmpty(monthPlanList)) {
             errors.add(String.format("月计划中不存在SKU%s", materialCode));
         } else {
-            String constructionKey = buildConstructionRefKey(factoryCode, materialCode, monthPlan.getProductStatus());
-            if (!context.constructionRefKeySet.contains(constructionKey)) {
+            boolean hasValidRef = monthPlanList.stream()
+                    .anyMatch(mp -> SkuConstructionRefResolverUtil
+                            .resolveCuringRecipeRef(materialCode, mp.getProductStatus(),
+                                    context.constructionRefMap) != null);
+            if (!hasValidRef) {
                 errors.add(String.format("SKU%s不存在硫化示方号", materialCode));
             }
         }
@@ -1641,7 +1651,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
      * @param materialCodes     本次导入涉及的物料编码集合
      * @return key=factoryCode|materialCode，value=月计划定稿明细
      */
-    private Map<String, FactoryMonthPlanProductionFinalResult> loadImportMonthPlanMap(String factoryCode,
+    private Map<String, List<FactoryMonthPlanProductionFinalResult>> loadImportMonthPlanMap(String factoryCode,
                                                                                       int year,
                                                                                       int month,
                                                                                       String productionVersion,
@@ -1658,8 +1668,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
                 .eq(FactoryMonthPlanProductionFinalResult::getIsDelete, DeleteFlagEnum.NORMAL.getCode()));
         return monthPlanList.stream()
                 .filter(item -> StringUtils.isNotBlank(item.getMaterialCode()))
-                .collect(Collectors.toMap(item -> buildMaterialFactoryKey(item.getFactoryCode(), item.getMaterialCode()),
-                        item -> item, (a, b) -> a));
+                .collect(Collectors.groupingBy(item -> buildMaterialFactoryKey(item.getFactoryCode(), item.getMaterialCode())));
     }
 
     /**
@@ -1746,19 +1755,20 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
     }
 
     /**
-     * 加载存在有效硫化示方号的 SKU+产品状态集合。
+     * 加载存在有效硫化示方号的 SKU 与示方书关系 Map。
      * <p>
      * 只有 MdmSkuConstructionRef.lhNo 不为空的记录才视为“硫化示方号存在”。
-     * key 中加入 trialStatus，是为了和月计划 productStatus 一一匹配。
+     * key 为 materialCode + "::" + trialStatus，与 SkuConstructionRefResolverUtil 约定一致，
+     * 供校验阶段统一降级匹配使用。
      * </p>
      *
      * @param factoryCode   工厂编码
      * @param materialCodes 本次导入涉及的物料编码集合
-     * @return key=factoryCode|materialCode|trialStatus 的示方关系集合
+     * @return key=materialCode::trialStatus 的示方关系 Map
      */
-    private Set<String> loadImportConstructionRefKeySet(String factoryCode, Set<String> materialCodes) {
+    private Map<String, MdmSkuConstructionRef> loadImportConstructionRefMap(String factoryCode, Set<String> materialCodes) {
         if (CollUtil.isEmpty(materialCodes)) {
-            return Collections.emptySet();
+            return Collections.emptyMap();
         }
         List<MdmSkuConstructionRef> refList = mdmSkuConstructionRefMapper.selectList(new LambdaQueryWrapper<MdmSkuConstructionRef>()
                 .eq(MdmSkuConstructionRef::getFactoryCode, factoryCode)
@@ -1767,8 +1777,10 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         return refList.stream()
                 .filter(item -> StringUtils.isNotBlank(item.getMaterialCode()))
                 .filter(item -> StringUtils.isNotBlank(item.getLhNo()))
-                .map(item -> buildConstructionRefKey(item.getFactoryCode(), item.getMaterialCode(), item.getTrialStatus()))
-                .collect(Collectors.toSet());
+                .collect(Collectors.toMap(
+                        item -> item.getMaterialCode() + "::" + StringUtils.trimToEmpty(item.getTrialStatus()),
+                        item -> item,
+                        (a, b) -> a));
     }
 
     /**
@@ -1822,14 +1834,6 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
     }
 
     /**
-     * 构建 SKU 与示方关系缓存 key。
-     * <p>匹配口径为 factoryCode + materialCode + trialStatus，其中 trialStatus 来源于月计划 productStatus。</p>
-     */
-    private String buildConstructionRefKey(String factoryCode, String materialCode, String trialStatus) {
-        return buildMaterialFactoryKey(factoryCode, materialCode) + "|" + StringUtils.trimToEmpty(trialStatus);
-    }
-
-    /**
      * 导入模板业务校验上下文。
      * <p>
      * 该对象只在一次 importScheduleTemplate 调用内使用，用于保存整批导入共用的校验结果和主数据缓存。
@@ -1853,18 +1857,18 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         private MpFactoryProductionVersion finalVersionNextMonth;
         /** 整批导入级错误，例如月计划未定稿、硫化工作日历未生成。 */
         private List<String> globalErrors = new ArrayList<>();
-        /** 定稿月计划明细缓存，key=factoryCode|materialCode。 */
-        private Map<String, FactoryMonthPlanProductionFinalResult> monthPlanMap = new HashMap<>();
+        /** 定稿月计划明细缓存，key=factoryCode|materialCode，同物料（不同产品状态）全部保留。 */
+        private Map<String, List<FactoryMonthPlanProductionFinalResult>> monthPlanMap = new HashMap<>();
         /** 跨月时窗口结束日期所在月份的定稿月计划明细缓存，key=factoryCode|materialCode。 */
-        private Map<String, FactoryMonthPlanProductionFinalResult> monthPlanMapNextMonth = new HashMap<>();
+        private Map<String, List<FactoryMonthPlanProductionFinalResult>> monthPlanMapNextMonth = new HashMap<>();
         /** 硫化机台台账缓存，key=factoryCode|machineCode。 */
         private Map<String, LhMachineInfo> machineInfoMap = new HashMap<>();
         /** SKU 与模具关系缓存，key=factoryCode|materialCode，value=模具号列表。 */
         private Map<String, List<String>> materialMouldRelMap = new HashMap<>();
         /** 可用模具号集合，key=factoryCode|mouldCode。 */
         private Set<String> availableMouldCodeSet = new HashSet<>();
-        /** 有效硫化示方关系集合，key=factoryCode|materialCode|trialStatus。 */
-        private Set<String> constructionRefKeySet = new HashSet<>();
+        /** 有效硫化示方关系 Map，key=materialCode::trialStatus，value=MdmSkuConstructionRef。 */
+        private Map<String, MdmSkuConstructionRef> constructionRefMap = new HashMap<>();
         /** 已维护有效班产的 SKU 集合，key=factoryCode|materialCode。 */
         private Set<String> classCapacityMaterialSet = new HashSet<>();
     }
@@ -2005,8 +2009,18 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         if (StringUtils.isNotBlank(source.getIsEnd())) {
             target.setIsEnd(source.getIsEnd());
         }
-        if (StringUtils.isNotBlank(source.getTrialStatus())) {
-            target.setConstructionStage(source.getTrialStatus());
+        String constructionStage = Stream.of(
+                source.getClass1LhType(),
+                source.getClass2LhType(),
+                source.getClass3LhType(),
+                source.getClass4LhType(),
+                source.getClass5LhType(),
+                source.getClass6LhType(),
+                source.getClass7LhType(),
+                source.getClass8LhType()
+        ).filter(StringUtils::isNotBlank).findFirst().orElse(null);
+        if (constructionStage != null) {
+            target.setConstructionStage(constructionStage);
         }
         if (StringUtils.isNotBlank(source.getScheduleOrder())) {
             target.setScheduleOrder(source.getScheduleOrder());
@@ -2542,9 +2556,10 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         log.debug("buildCxMachineCodeExportMap: 准备查询成型机台号，硫化排程ID数量={}", lhScheduleIds.size());
         List<CxScheduleResult> cxScheduleResults;
         try {
-            cxScheduleResults = cxScheduleResultService.listByLhScheduleIds(lhScheduleIds);
+            // 直接通过Mapper查询，避免Feign反序列化List<CxScheduleResult>失败
+            cxScheduleResults = queryCxScheduleResultByLhScheduleIds(lhScheduleIds);
         } catch (Exception e) {
-            log.error("buildCxMachineCodeExportMap: Feign调用成型排程服务失败，硫化排程ID数量={}，成型机台号列将为空", lhScheduleIds.size(), e);
+            log.error("buildCxMachineCodeExportMap: 查询成型排程结果失败，硫化排程ID数量={}，成型机台号列将为空", lhScheduleIds.size(), e);
             return Collections.emptyMap();
         }
         if (PubUtil.isEmpty(cxScheduleResults)) {
@@ -2619,6 +2634,46 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
             }
         }
         return result;
+    }
+
+    /**
+     * 根据硫化排程结果ID列表查询关联的成型排程结果。
+     * <p>LH_SCHEDULE_IDS 字段保存为逗号分隔字符串，使用 FIND_IN_SET 进行匹配，
+     * 兼容历史数据中的中文逗号、斜杠、分号等分隔符。</p>
+     * <p>直接通过本地Mapper查询，避免Feign反序列化 List&lt;CxScheduleResult&gt; 时
+     * 出现"Cannot deserialize from Object value"错误。</p>
+     *
+     * @param lhScheduleIds 硫化排程结果ID列表
+     * @return 成型排程结果列表
+     */
+    private List<CxScheduleResult> queryCxScheduleResultByLhScheduleIds(List<Long> lhScheduleIds) {
+        if (lhScheduleIds == null || lhScheduleIds.isEmpty()) {
+            return Collections.emptyList();
+        }
+        List<Long> queryIds = lhScheduleIds.stream()
+                .filter(Objects::nonNull)
+                .distinct()
+                .collect(Collectors.toList());
+        if (queryIds.isEmpty()) {
+            return Collections.emptyList();
+        }
+        QueryWrapper<CxScheduleResult> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("IS_DELETE", "0");
+        queryWrapper.and(wrapper -> {
+            boolean first = true;
+            for (Long lhScheduleId : queryIds) {
+                // LH_SCHEDULE_IDS 主要保存为逗号分隔字符串，同时兼容历史数据中的中文逗号、斜杠和分号。
+                // 统一转成英文逗号后再使用 FIND_IN_SET，避免 ID=1 误匹配 10、11。
+                String findInSetSql = "FIND_IN_SET({0}, REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(LH_SCHEDULE_IDS, '，', ','), '/', ','), '；', ','), ';', ','), ' ', ''))";
+                if (first) {
+                    wrapper.apply(findInSetSql, String.valueOf(lhScheduleId));
+                    first = false;
+                } else {
+                    wrapper.or().apply(findInSetSql, String.valueOf(lhScheduleId));
+                }
+            }
+        });
+        return cxScheduleResultMapper.selectList(queryWrapper);
     }
 
     /**

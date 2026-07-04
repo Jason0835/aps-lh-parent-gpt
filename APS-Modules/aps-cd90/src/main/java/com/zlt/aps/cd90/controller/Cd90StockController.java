@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.*;
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.Date;
 import java.util.List;
 
 @Api(tags = "直裁库存管理")
@@ -87,6 +88,19 @@ public class Cd90StockController extends AbstractDocBizController<Cd90Stock> {
     @Override
     public byte[] exportData(@RequestBody Cd90Stock query, @PathVariable("fileName") String fileName, HttpServletResponse r) throws IOException {
         return super.exportData(query, fileName, r);
+    }
+
+    @ApiOperation("逻辑删除并批量保存直裁库存（MES同步专用，事务性操作）")
+    @PostMapping("/logicDeleteAndSaveCd90StockByDataSource")
+    public AjaxResult logicDeleteAndSaveCd90StockByDataSource(@RequestParam("factoryCode") String factoryCode,
+                                                              @RequestParam("dataSource") String dataSource,
+                                                              @RequestParam("stockDate") String stockDateStr,
+                                                              @RequestParam("shiftCode") String shiftCode,
+                                                              @RequestParam("updateBy") String updateBy,
+                                                              @RequestBody List<Cd90Stock> list) {
+        Date stockDate = cn.hutool.core.date.DateUtil.parse(stockDateStr);
+        service.logicDeleteAndSaveBatch(factoryCode, dataSource, stockDate, shiftCode, updateBy, list);
+        return AjaxResult.success();
     }
 
     @Override

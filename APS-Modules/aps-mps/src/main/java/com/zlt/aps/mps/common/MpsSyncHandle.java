@@ -135,9 +135,8 @@ public class MpsSyncHandle {
                     AjaxResult result = halfPartService.mergeCd90LineSide(dataVersion);
                     buildSuccessOrFailList(failList, successList, syncDataLog, result);
                 } else if (syncKey.equals(SyncKeyEnum.ADJUDI90_STOCK.getDescription())) {
-                    // cd90库存
-                    AjaxResult result = halfPartService.mergeCd90(dataVersion);
-                    buildSuccessOrFailList(failList, successList, syncDataLog, result);
+                    // cd90库存：已切换至新链路 syncMesCd90Stock，旧 mergeCd90 链路与新表结构不匹配，不再走 MPS 合并
+                    logger.warn("cd90库存同步已切换至新链路 syncMesCd90Stock，请通过 MES 接口同步，不再走 MPS mergeCd90");
                 } else if (syncKey.equals(SyncKeyEnum.GDYY_STOCK.getDescription())) {
                     // 钢带压延库存
                     AjaxResult result = halfPartService.mergeGdyy(dataVersion);

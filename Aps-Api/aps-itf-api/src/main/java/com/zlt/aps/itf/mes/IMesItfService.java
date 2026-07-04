@@ -230,6 +230,15 @@ public interface IMesItfService {
     public AjaxResult syncMesCxStock(@RequestBody AuxReqSyncDataLogs syncDataLogs);
 
     /**
+     * 同步直裁库存（从 MES 中间表 T_MES_CD90_STOCK 同步到 t_cd90_stock）
+     * @param syncDataLogs 参数（可传 factoryCode；queryParams.shiftCode 可覆盖自动推断班次）
+     * @return 结果
+     */
+    @ApiOperation("同步直裁库存")
+    @PostMapping("/mesItf/syncMesCd90Stock")
+    public AjaxResult syncMesCd90Stock(@RequestBody AuxReqSyncDataLogs syncDataLogs);
+
+    /**
      * 实时查询MES生胎库存（不写入APS本地表，仅供成型排程实时调用）
      * @param syncDataLogs 参数（可传factoryCode过滤分厂）
      * @return 生胎库存列表

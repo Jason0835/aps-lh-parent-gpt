@@ -8,15 +8,23 @@
                IFNULL(sum(cxr.CLASS2_PLAN_QTY),0) CX_CLASS2_PLAN_CONSUME  /*半制品对应成型(7点-19点)计划量的消耗量 一个胎对应1副胎圈*/
         from (
                select r.EMBRYO_CODE,
-                      r.BOM_DATA_VERSION,
                       max(ci.TIRE_RING_CODE) TIRE_RING_CODE, /*胎圈代码*/
                       sum(IFNULL(CLASS3_PLANNED_QTY, 0)) CLASS1_PLAN_QTY, /*7点-隔天7点成型计划量*/
                       sum(IFNULL(CLASS2_PLAN_QTY, 0)) CLASS2_PLAN_QTY /*7点-19点成型计划量*/
                from T_CX_SCHEDULE_RESULT r
-               inner join T_MDM_CONSTRUCTION_INFO ci on r.EMBRYO_CODE = ci.CONSTRUCTION_CODE and r.BOM_DATA_VERSION = ci.CONSTRUCTION_VERSION and ci.IS_DELETE = 0 /*施工信息表*/
+               /* 成型排程结果不再存储BOM_DATA_VERSION，改为仅按胎胚代码关联施工信息表并取CREATE_TIME最新一条。
+                  UPDATE_TIME插入时为NULL故改用CREATE_TIME排序；追加ID排序保证稳定性。 */
+               inner join T_MDM_CONSTRUCTION_INFO ci on ci.ID = (
+                   select ci2.ID
+                   from T_MDM_CONSTRUCTION_INFO ci2
+                   where ci2.CONSTRUCTION_CODE = r.EMBRYO_CODE
+                     and ci2.IS_DELETE = 0
+                   order by ci2.CREATE_TIME desc, ci2.ID desc
+                   limit 1
+               )
                where schedule_date = STR_TO_DATE(#{scheduleDate}, '%Y-%m-%d')
                and r.IS_DELETE = 0
-               group by r.EMBRYO_CODE,r.BOM_DATA_VERSION
+               group by r.EMBRYO_CODE
               ) cxr /*成型排程结果表*/
         group by cxr.TIRE_RING_CODE
     </select>

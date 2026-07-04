@@ -226,13 +226,40 @@ public class CxMachineBaseInfoVo implements Serializable {
     }
 
     /**
+     * 机台是否分配了groupName
+     *
+     * @param groupName 分组名(TBR 结构)
+     * @return
+     */
+    public boolean isAssignedGroup(String groupName) {
+        if (StringUtils.isBlank(groupName)) {
+            return false;
+        }
+        if (CollectionUtils.isEmpty(allocationList)) {
+            return false;
+        }
+        List<CxMachineAllocationPlanHelper> allocationGroupList = allocationList.stream().filter(singleAllocation -> groupName.equals(singleAllocation.getAllocationGroup())).collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(allocationGroupList)) {
+            return false;
+        }
+        List<CxMachineAllocationPlanHelper> effectiveList = allocationGroupList.stream().filter(singleAllocation -> {
+            Integer allocationDay = singleAllocation.getAllocationDay();
+            return null != allocationDay && allocationDay > BigDecimal.ZERO.intValue();
+        }).collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(effectiveList)) {
+            return false;
+        }
+        return true;
+    }
+
+    /**
      * 获取固定机台种类数
      *
      * @return
      */
     public Integer getAllFixedProSizeTypes() {
         //设置固定结构个数,sandy+ 202.3.26
-        Set<String> fixedStructureSet = new HashSet<>();
+        Set<String> fixedStructureSet = Sets.newHashSet();
         if (StringUtils.isNotBlank(fixedStructure1)) {
             CollectValueUtils.addSingleValueToCollect(fixedStructureSet, fixedStructure1, StringConstant.COMMA);
         }
@@ -255,22 +282,6 @@ public class CxMachineBaseInfoVo implements Serializable {
             }
         }
         return fixedProSizeSet.size();
-    }
-
-    /**
-     * 从结构信息中解析出英寸
-     *
-     * @return 英寸
-     */
-    private static String analyseTbrProSize(String structureName) {
-        if (StringUtil.isEmptyWithTrim(structureName)) {
-            return "";
-        }
-        // 正则：R后面跟数字（可能带小数点）
-        Pattern pattern = Pattern.compile("R\\d+(?:\\.\\d+)?");
-        Matcher matcher = pattern.matcher(structureName);
-        String proSize = matcher.find() ? matcher.group() : "";
-        return proSize;
     }
 
     /**
@@ -1683,5 +1694,21 @@ public class CxMachineBaseInfoVo implements Serializable {
         }
         this.priorityValue = new CxMachineGroupPriorityValueHelper(GroupCxMachinePriorityEnum.OTHER_NO_COVERED, needDays, capacityDays);
         return;
+    }
+
+    /**
+     * 从结构信息中解析出英寸
+     *
+     * @return 英寸
+     */
+    private static String analyseTbrProSize(String structureName) {
+        if (StringUtil.isEmptyWithTrim(structureName)) {
+            return "";
+        }
+        // 正则：R后面跟数字（可能带小数点）
+        Pattern pattern = Pattern.compile("R\\d+(?:\\.\\d+)?");
+        Matcher matcher = pattern.matcher(structureName);
+        String proSize = matcher.find() ? matcher.group() : "";
+        return proSize;
     }
 }

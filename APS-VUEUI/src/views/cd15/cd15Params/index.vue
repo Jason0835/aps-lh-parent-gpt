@@ -263,8 +263,9 @@ export default {
       this.query = { ...params };
       this.getList();
     },
-    handlePageChange(page) {
-      this.page = page;
+    handlePageChange(current, pageSize) {
+      this.page.current = current;
+      this.page.pageSize = pageSize;
       this.getList();
     },
     handleSortChange(sort) {

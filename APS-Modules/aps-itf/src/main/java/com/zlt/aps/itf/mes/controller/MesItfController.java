@@ -475,6 +475,22 @@ public class MesItfController {
     }
 
     /**
+     * 同步直裁库存（从 MES 中间表 T_MES_CD90_STOCK 同步到 t_cd90_stock）
+     * @param syncDataLogs 参数（可传 factoryCode；queryParams.shiftCode 可覆盖自动推断班次）
+     * @return 结果
+     */
+    @ApiOperation("同步直裁库存")
+    @PostMapping("/syncMesCd90Stock")
+    @AutoLoginLog
+    public AjaxResult syncMesCd90Stock(@RequestBody AuxReqSyncDataLogs syncDataLogs) {
+        String factoryCode = syncDataLogs.getFactoryCode();
+        if (StringUtils.isBlank(factoryCode)) {
+            syncDataLogs.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
+        }
+        return mesItfService.syncMesCd90Stock(syncDataLogs);
+    }
+
+    /**
      * 实时查询MES生胎库存（不写入APS本地表，仅供成型排程实时调用）
      * @param syncDataLogs 参数（可传factoryCode过滤分厂）
      * @return 生胎库存列表

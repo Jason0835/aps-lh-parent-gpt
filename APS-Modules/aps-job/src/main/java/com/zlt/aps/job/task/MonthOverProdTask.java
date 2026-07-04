@@ -23,7 +23,7 @@ import org.springframework.stereotype.Component;
  *     按需求版本号(MONTH_PLAN_VERSION=REQUIRE_VERSION) 匹配
  *   - 已完成量取自硫化日完成量表，日期范围 = IFNULL(STOCK_CAPTURE_DATE, 月初) ~ 月底
  * 并按阈值参数(SYS0206009)判定上月超欠产有效标志：
- * |超欠产值|(绝对值) > 阈值 → 否('0')，否则 → 是('1')；无月底余量记录 → 否('0')
+ * |超欠产值|(绝对值) > 阈值 → 否('0')，否则 → 是('1')；月底余量为空时按0处理，统一走阈值判定
  * 三次触发天然幂等，UPDATE直接覆盖写入
  *
  * @author APS Team
@@ -87,5 +87,51 @@ public class MonthOverProdTask {
             log.error("定时任务-计算超欠产(最后一天触发)异常", e);
         }
         log.info("定时任务-计算超欠产(最后一天触发)完成");
+    }
+
+    // ==================== 临时测试方法（指定月份模拟月底超欠产生成） ====================
+    // 以下两个方法用于测试在非月底时间手动触发超欠产计算，逻辑同calcOverProdOnSecondLastDay/calcOverProdOnLastDay
+    // 当前指定2026年6月数据触发7月超欠产生成，测试完成后请删除
+
+    /**
+     * 临时测试方法-模拟倒数第2天触发超欠产计算（指定6月数据写入7月）
+     * 逻辑同calcOverProdOnSecondLastDay，但使用指定的年月(2026-06)替代当前月份
+     */
+    @ApiOperation("临时测试-模拟倒数第2天触发超欠产（指定6月数据写入7月）")
+    public void testCalcOverProdOnSecondLastDay() {
+        // 临时指定2026年6月作为数据来源，写入7月月计划
+        Integer year = 2026;
+        Integer month = 6;
+        log.info("临时测试-开始计算超欠产(模拟倒数第2天触发, 数据来源: {}-{})", year, month);
+        try {
+            FeignTokenHelper.runWithToken(() -> {
+                AjaxResult result = factoryMonthPlanProdFinalRemoteService.calcCurrentMonthOverProdForNextMonth(year, month);
+                log.info("临时测试-计算超欠产(模拟倒数第2天触发, 数据来源: {}-{})结果：{}", year, month, result);
+            });
+        } catch (Exception e) {
+            log.error("临时测试-计算超欠产(模拟倒数第2天触发, 数据来源: {}-{})异常", year, month, e);
+        }
+        log.info("临时测试-计算超欠产(模拟倒数第2天触发, 数据来源: {}-{})完成", year, month);
+    }
+
+    /**
+     * 临时测试方法-模拟最后一天触发超欠产计算（指定6月数据写入7月）
+     * 逻辑同calcOverProdOnLastDay，但使用指定的年月(2026-06)替代当前月份
+     */
+    @ApiOperation("临时测试-模拟最后一天触发超欠产（指定6月数据写入7月）")
+    public void testCalcOverProdOnLastDay() {
+        // 临时指定2026年6月作为数据来源，写入7月月计划
+        Integer year = 2026;
+        Integer month = 6;
+        log.info("临时测试-开始计算超欠产(模拟最后一天触发, 数据来源: {}-{})", year, month);
+        try {
+            FeignTokenHelper.runWithToken(() -> {
+                AjaxResult result = factoryMonthPlanProdFinalRemoteService.calcCurrentMonthOverProdForNextMonth(year, month);
+                log.info("临时测试-计算超欠产(模拟最后一天触发, 数据来源: {}-{})结果：{}", year, month, result);
+            });
+        } catch (Exception e) {
+            log.error("临时测试-计算超欠产(模拟最后一天触发, 数据来源: {}-{})异常", year, month, e);
+        }
+        log.info("临时测试-计算超欠产(模拟最后一天触发, 数据来源: {}-{})完成", year, month);
     }
 }
