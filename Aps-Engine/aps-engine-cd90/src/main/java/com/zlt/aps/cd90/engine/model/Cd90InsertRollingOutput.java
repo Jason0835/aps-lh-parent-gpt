@@ -27,4 +27,6 @@ public class Cd90InsertRollingOutput {
     private List<Cd90InsertLaneAllocationDraft> laneAllocations;
     /** 窗口结束后仍未容纳的任务。 */
     private List<Cd90UnscheduleResult> unscheduledResults;
+    /** 预演过程中逐班产生的跨班顺延影响。 */
+    private List<Cd90InsertCarryoverImpact> carryoverImpacts;
 }

@@ -7,7 +7,7 @@
     :close-on-click-modal="false"
     @close="hide"
   >
-    <el-form ref="form" :model="form" :rules="rules" label-width="100px" v-loading="loading">
+    <el-form ref="form" v-loading="loading" :model="form" :rules="rules" label-width="100px">
       <el-row :gutter="16" style="margin-bottom:20px;">
         <el-col :span="8">
           <el-form-item :label="$t('ui.data.column.cd90ScheduleResult.factoryCode')" prop="factoryCode">
@@ -236,25 +236,97 @@ export default {
       try {
         const params = this.buildRequest()
         await validateInsertOrder(params)
-        const result = await insertOrder(params)
-        // 兼容响应拦截器两种返回形态：
-        //   - 剥离后：result = { taskId, batchCheckFailed, errors, warnings, ... }
-        //   - 完整体：result = { code, msg, data: { ... } }
-        const data = (result && result.data) ? result.data : (result || {})
-        const msg = (result && result.msg) || ''
-        const batchCheckFailed = !!(data.batchCheckFailed || result.batchCheckFailed)
-        // 批次级基础数据检查失败：不创建任务、不进入滚动，直接展示结构化错误（与自动排程一致）
-        if (batchCheckFailed) {
+        let response = this.normalizeInsertResponse(
+          await insertOrder({ ...params, confirmed: false })
+        )
+        if (this.handleBatchCheckResponse(response)) return
+        if (response.needConfirm) {
           this.loading = false
-          this.showBatchCheckAlert(data, msg)
-          return
+          try {
+            await this.$confirm(
+              this.buildCarryoverConfirmHtml(response.carryoverDetails, response.msg),
+              this.$t('ui.data.column.cd90ScheduleResult.carryoverConfirmTitle'),
+              {
+                dangerouslyUseHTMLString: true,
+                type: 'warning',
+                confirmButtonText: this.$t('common.button.confirm'),
+                cancelButtonText: this.$t('common.button.cancel')
+              }
+            )
+          } catch (error) {
+            return
+          }
+          this.loading = true
+          response = this.normalizeInsertResponse(
+            await insertOrder({ ...params, confirmed: true })
+          )
+          if (this.handleBatchCheckResponse(response)) return
         }
-        this.$modal.msgSuccess(msg || this.$t('common.message.operationSuccess'))
-        this.$emit('success', params.scheduleDate, data)
+        this.$modal.msgSuccess(response.msg || this.$t('common.message.operationSuccess'))
+        this.$emit('success', params.scheduleDate, response.data)
         this.hide()
       } finally {
         this.loading = false
       }
+    },
+    normalizeInsertResponse(result) {
+      const data = (result && result.data) ? result.data : (result || {})
+      return {
+        data,
+        msg: (result && result.msg) || '',
+        batchCheckFailed: !!(data.batchCheckFailed || (result && result.batchCheckFailed)),
+        needConfirm: !!(data.needConfirm || (result && result.needConfirm)),
+        carryoverDetails: data.carryoverDetails || (result && result.carryoverDetails) || []
+      }
+    },
+    handleBatchCheckResponse(response) {
+      if (!response.batchCheckFailed) return false
+      this.loading = false
+      this.showBatchCheckAlert(response.data, response.msg)
+      return true
+    },
+    buildCarryoverConfirmHtml(details, fallbackMsg) {
+      const groups = (details || []).reduce((result, item) => {
+        const clothCode = item.clothCode || '-'
+        if (!result[clothCode]) result[clothCode] = []
+        result[clothCode].push(item)
+        return result
+      }, {})
+      let html = '<div style="max-height:55vh;overflow:auto;text-align:left;">'
+      if (fallbackMsg) {
+        html += '<div style="margin-bottom:12px;color:#606266;">' +
+          this.escapeHtml(fallbackMsg) + '</div>'
+      }
+      Object.keys(groups).forEach(clothCode => {
+        html += '<div style="padding:10px 0;border-top:1px solid #EBEEF5;">'
+        html += '<div style="font-weight:bold;color:#303133;margin-bottom:6px;">' +
+          this.escapeHtml(clothCode) + '</div>'
+        groups[clothCode].forEach(item => {
+          const affectedType = item.affectedType === 'INSERT'
+            ? this.$t('ui.data.column.cd90ScheduleResult.carryoverInsertType')
+            : this.$t('ui.data.column.cd90ScheduleResult.carryoverExistingType')
+          const targetClass = item.targetClassField ||
+            this.$t('ui.data.column.cd90ScheduleResult.carryoverWindowEnd')
+          html += '<div style="font-size:13px;line-height:1.8;color:#606266;">'
+          html += this.escapeHtml(affectedType) + ' · '
+          html += this.escapeHtml(this.$t('ui.data.column.cd90ScheduleResult.carryoverFrom')) +
+            ' ' + this.escapeHtml(item.sourceClassField || '-') + ' · '
+          html += this.escapeHtml(this.$t('ui.data.column.cd90ScheduleResult.carryoverTo')) +
+            ' ' + this.escapeHtml(targetClass) + ' · '
+          html += this.escapeHtml(this.$t('ui.data.column.cd90ScheduleResult.carryoverQty')) +
+            ' ' + this.escapeHtml(item.carryoverQty)
+          html += '<br/><span style="color:#E6A23C;">' +
+            this.escapeHtml(item.reasonMessage || item.reasonCode || '') + '</span>'
+          html += '</div>'
+        })
+        html += '</div>'
+      })
+      html += '</div>'
+      return html
+    },
+    escapeHtml(value) {
+      const characters = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }
+      return String(value == null ? '' : value).replace(/[&<>"']/g, character => characters[character])
     },
     /**
      * 渲染批次级数据检查失败的结构化错误/警告面板。
@@ -263,14 +335,14 @@ export default {
     showBatchCheckAlert(data, fallbackMsg) {
       const errors = (data && data.errors) || []
       const warnings = (data && data.warnings) || []
-      const summary = fallbackMsg
-        || (errors.length > 0 ? errors[0].message : '')
-        || this.$t('ui.data.column.cxScheduleResult.scheduleFailed')
+      const summary = fallbackMsg ||
+        (errors.length > 0 ? errors[0].message : '') ||
+        this.$t('ui.data.column.cxScheduleResult.scheduleFailed')
 
       let html = ''
       html += '<div style="margin-bottom:16px;padding:10px;background:#fef0f0;border:1px solid #fde2e2;border-radius:4px;">'
-      html += '<div style="color:#F56C6C;font-size:14px;font-weight:bold;">⚠️ '
-        + this.$t('ui.data.column.cxScheduleResult.scheduleFailed') + '</div>'
+      html += '<div style="color:#F56C6C;font-size:14px;font-weight:bold;">⚠️ ' +
+        this.$t('ui.data.column.cxScheduleResult.scheduleFailed') + '</div>'
       html += '<div style="color:#909399;font-size:13px;margin-top:4px;">' + summary + '</div>'
       html += '</div>'
 
@@ -278,8 +350,8 @@ export default {
         html += '<div style="margin-bottom:12px;">'
         html += '<div style="color:#F56C6C;font-size:13px;font-weight:bold;margin-bottom:8px;display:flex;align-items:center;">'
         html += '<span style="display:inline-block;width:4px;height:14px;background:#F56C6C;margin-right:6px;border-radius:2px;"></span>'
-        html += this.$t('ui.data.column.cxScheduleResult.errorLabel') + ' ('
-          + errors.length + ' ' + this.$t('ui.data.column.cxScheduleResult.itemsLabel') + ')</div>'
+        html += this.$t('ui.data.column.cxScheduleResult.errorLabel') + ' (' +
+          errors.length + ' ' + this.$t('ui.data.column.cxScheduleResult.itemsLabel') + ')</div>'
         errors.forEach((item) => {
           html += '<div style="margin-bottom:12px;padding:10px;background:#fef0f0;border-left:3px solid #F56C6C;border-radius:3px;">'
           html += '<div style="font-weight:bold;color:#303133;font-size:13px;margin-bottom:6px;">' + (item.field || item.reasonCode || '') + '</div>'
@@ -297,8 +369,8 @@ export default {
         html += '<div>'
         html += '<div style="color:#E6A23C;font-size:13px;font-weight:bold;margin-bottom:8px;display:flex;align-items:center;">'
         html += '<span style="display:inline-block;width:4px;height:14px;background:#E6A23C;margin-right:6px;border-radius:2px;"></span>'
-        html += this.$t('ui.data.column.cxScheduleResult.warningLabel') + ' ('
-          + warnings.length + ' ' + this.$t('ui.data.column.cxScheduleResult.itemsLabel') + ')</div>'
+        html += this.$t('ui.data.column.cxScheduleResult.warningLabel') + ' (' +
+          warnings.length + ' ' + this.$t('ui.data.column.cxScheduleResult.itemsLabel') + ')</div>'
         warnings.forEach((item) => {
           html += '<div style="margin-bottom:12px;padding:10px;background:#fdf6ec;border-left:3px solid #E6A23C;border-radius:3px;">'
           html += '<div style="font-weight:bold;color:#303133;font-size:13px;margin-bottom:6px;">' + (item.field || item.reasonCode || '') + '</div>'

@@ -15,7 +15,11 @@ import com.zlt.aps.cd90.api.domain.vo.Cd90RollingCheckRequest;
 import com.zlt.aps.cd90.engine.domain.Cd90ScheduleTask;
 import com.zlt.aps.cd90.engine.constant.Cd90ScheduleTaskType;
 import com.zlt.aps.cd90.engine.model.Cd90BatchDataCheckResult;
+import com.zlt.aps.cd90.engine.model.Cd90InsertCarryoverImpact;
+import com.zlt.aps.cd90.engine.model.Cd90InsertRollingOutput;
 import com.zlt.aps.cd90.engine.service.Cd90AutoScheduleBatchDataValidator;
+import com.zlt.aps.cd90.engine.service.Cd90AutoScheduleLockService;
+import com.zlt.aps.cd90.engine.service.Cd90InsertRollingService;
 import com.zlt.aps.cd90.engine.service.Cd90ScheduleTaskService;
 import com.zlt.aps.cd90.engine.mapper.Cd90AutoScheduleShiftMapper;
 import com.zlt.aps.cd90.engine.mapper.Cd90EngineConstructionMapper;
@@ -32,6 +36,7 @@ import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.mdm.api.domain.entity.MdmConstructionInfo;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.sysdef.domain.SysDocType;
+import org.redisson.api.RLock;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -42,6 +47,7 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
@@ -79,6 +85,10 @@ public class Cd90ScheduleResultServiceImpl extends AbstractDocService<Cd90Schedu
     private Cd90TimedRollingCheckService timedRollingCheckService;
     @Resource
     private Cd90EngineConstructionMapper constructionMapper;
+    @Resource
+    private Cd90InsertRollingService insertRollingService;
+    @Resource
+    private Cd90AutoScheduleLockService lockService;
 
     /**
      * 接收自动排程请求。
@@ -251,6 +261,12 @@ public class Cd90ScheduleResultServiceImpl extends AbstractDocService<Cd90Schedu
         if (activeTask != null) {
             return AjaxResult.error(I18nUtil.getMessage("ui.cd90.insert.activeTask"));
         }
+        if (!Boolean.TRUE.equals(request.getConfirmed())) {
+            AjaxResult previewResult = this.previewInsertOrder(request, localScheduleDate);
+            if (previewResult != null) {
+                return previewResult;
+            }
+        }
         Cd90ScheduleTask task = taskService.createPending(request.getFactoryCode(),
                 request.getScheduleDate(), Cd90ScheduleTaskType.INSERT_ORDER,
                 "MANUAL", request.toString(), null);
@@ -258,6 +274,78 @@ public class Cd90ScheduleResultServiceImpl extends AbstractDocService<Cd90Schedu
         Map<String, Object> data = new HashMap<>();
         data.put("taskId", task.getTaskId());
         return AjaxResult.success(I18nUtil.getMessage("ui.cd90.insert.submitted"), data);
+    }
+
+    /**
+     * 使用正式滚动内核执行只读预演，跨班顺延时返回确认明细。
+     */
+    private AjaxResult previewInsertOrder(Cd90InsertOrderRequest request,
+                                          LocalDate scheduleDate) {
+        RLock lock = lockService.getLock(request.getFactoryCode(), scheduleDate);
+        try {
+            if (!lock.tryLock()) {
+                return AjaxResult.error(I18nUtil.getMessage("ui.cd90.insert.activeTask"));
+            }
+            if (taskService.findActive(request.getFactoryCode(), request.getScheduleDate()) != null) {
+                return AjaxResult.error(I18nUtil.getMessage("ui.cd90.insert.activeTask"));
+            }
+            Cd90InsertRollingOutput output = insertRollingService.execute(request);
+            List<Cd90InsertCarryoverImpact> impacts = output.getCarryoverImpacts() == null
+                    ? Collections.emptyList() : output.getCarryoverImpacts();
+            if (impacts.isEmpty()) {
+                return null;
+            }
+            Map<String, Object> data = new HashMap<>();
+            data.put("needConfirm", true);
+            data.put("carryoverDetails", impacts.stream()
+                    .map(this::toCarryoverDetail)
+                    .collect(Collectors.toList()));
+            return AjaxResult.success(
+                    I18nUtil.getMessage("ui.cd90.insert.carryoverConfirm"), data);
+        } finally {
+            if (lock.isHeldByCurrentThread()) {
+                lock.unlock();
+            }
+        }
+    }
+
+    /** 将引擎影响模型转换为前端确认结构。 */
+    private Map<String, Object> toCarryoverDetail(Cd90InsertCarryoverImpact impact) {
+        Map<String, Object> detail = new HashMap<>();
+        detail.put("clothCode", impact.getClothCode());
+        detail.put("affectedType", impact.getAffectedType());
+        detail.put("sourceClassField", impact.getSourceClassField());
+        detail.put("targetClassField", impact.getTargetClassField());
+        detail.put("carryoverQty", impact.getCarryoverQty());
+        detail.put("reasonCode", impact.getReasonCode());
+        detail.put("reasonMessage", this.resolveCarryoverReason(impact.getReasonCode()));
+        return detail;
+    }
+
+    /** 将滚动限制原因转换为用户可理解的国际化说明。 */
+    private String resolveCarryoverReason(String reasonCode) {
+        if ("CAPACITY_LIMIT".equals(reasonCode)) {
+            return I18nUtil.getMessage("ui.cd90.insert.reason.capacityLimit");
+        }
+        if ("STORAGE_LANE_LIMIT".equals(reasonCode)) {
+            return I18nUtil.getMessage("ui.cd90.insert.reason.storageLaneLimit");
+        }
+        if ("ROLL_TOOL_LIMIT".equals(reasonCode) || "TOOLING_LIMIT".equals(reasonCode)) {
+            return I18nUtil.getMessage("ui.cd90.insert.reason.toolingLimit");
+        }
+        if ("BIG_ROLL_STOCK_DATA_MISSING".equals(reasonCode)) {
+            return I18nUtil.getMessage("ui.cd90.insert.reason.bigRollStockDataMissing");
+        }
+        if ("CONSTRUCTION_MISSING".equals(reasonCode) || "DATA_MISSING".equals(reasonCode)) {
+            return I18nUtil.getMessage("ui.cd90.insert.reason.constructionMissing");
+        }
+        if ("AGING_PERIOD_LIMIT".equals(reasonCode)) {
+            return I18nUtil.getMessage("ui.cd90.insert.reason.agingPeriodLimit");
+        }
+        if ("SCHEDULE_WINDOW_LIMIT".equals(reasonCode)) {
+            return I18nUtil.getMessage("ui.cd90.insert.reason.scheduleWindowLimit");
+        }
+        return I18nUtil.getMessage("ui.cd90.insert.reason.other");
     }
 
     @Override
