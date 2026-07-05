@@ -1109,6 +1109,7 @@
   "ui.data.column.mdmMoldingMachine.isZeroRack": "Bộ cấp liệu góc 0 độ",
   "ui.data.column.mdmMoldingMachine.lhMachineMaxQty": "Giới hạn trên máy lưu hóa",
   "ui.data.column.mdmMoldingMachine.maxDayCapacity": "Sản lượng tối đa hàng ngày",
+  "ui.data.column.mdmStructureName.isMoreMachine": "Có cho phép nhiều máy",
   "ui.data.lh.column.machine.info": "Thông tin máy hấp",
   "ui.data.column.moldChange.modalName": "Phiếu thay đổi khuôn",
   "ui.data.column.moldChange.moldBatchNo": "Số lô",

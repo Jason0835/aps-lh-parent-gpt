@@ -73,6 +73,12 @@ export default {
           maxlength:64
         },
         {
+          prop: "isMoreMachine",
+          label: this.$t("ui.data.column.mdmStructureName.isMoreMachine"),
+          type: "select",
+          dictData: this.parentDict.type.biz_yes_no,
+        },
+        {
           prop: "remark",
           label: this.$t("ui.common.column.remark"),
           maxlength:300
@@ -107,9 +113,9 @@ export default {
           ...data,
         };
       } else {
-        // this.form = {
-        //   factoryCode: "AH01",
-        // };
+        this.form = {
+          isMoreMachine: "1",
+        };
       }
     },
     hide() {
