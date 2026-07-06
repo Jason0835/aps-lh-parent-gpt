@@ -49,7 +49,6 @@ import com.zlt.aps.lh.mapper.MdmSkuScheduleCategoryMapper;
 import com.zlt.aps.lh.mapper.MdmWorkCalendarMapper;
 import com.zlt.aps.lh.mapper.MpFactoryProductionVersionMapper;
 import com.zlt.aps.lh.mapper.MpMonthPlanStatisticsMapper;
-import com.zlt.aps.lh.mapper.MpMouldDeliveryPlanEntityMapper;
 import com.zlt.aps.lh.service.ILhBaseDataService;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.lh.util.MachineStatusUtil;
