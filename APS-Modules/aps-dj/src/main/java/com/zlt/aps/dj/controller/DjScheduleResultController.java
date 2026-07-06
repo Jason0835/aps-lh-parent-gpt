@@ -771,7 +771,15 @@ public class DjScheduleResultController extends AbstractBillBizController<DjSche
     
     @Override
     protected String getOrderBy() {
-        return "MACHINE_CODE, ISNULL(CLASS1_SEQUENCE), CLASS1_SEQUENCE, ISNULL(CLASS2_SEQUENCE), CLASS2_SEQUENCE, ISNULL(CLASS3_SEQUENCE), CLASS3_SEQUENCE";
+        StringBuilder orderStr = new StringBuilder();
+        orderStr.append("MACHINE_CODE");
+        orderStr.append("ISNULL(CLASS1_SEQUENCE), CLASS1_SEQUENCE");
+        orderStr.append("ISNULL(CLASS2_SEQUENCE), CLASS2_SEQUENCE");
+        orderStr.append("ISNULL(CLASS3_SEQUENCE), CLASS3_SEQUENCE");
+        orderStr.append("ISNULL(CLASS4_SEQUENCE), CLASS4_SEQUENCE");
+        orderStr.append("ISNULL(CLASS5_SEQUENCE), CLASS5_SEQUENCE");
+        orderStr.append("ISNULL(CLASS6_SEQUENCE), CLASS6_SEQUENCE");
+        return orderStr.toString();
     }
 
     @Override

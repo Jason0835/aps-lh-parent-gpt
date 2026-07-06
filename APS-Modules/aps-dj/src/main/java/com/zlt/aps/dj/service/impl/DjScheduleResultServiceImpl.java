@@ -155,7 +155,7 @@ public class DjScheduleResultServiceImpl extends AbstractBillService<DjScheduleR
      *   <li>首班=夜班("01")：加载 T-1 日早班 + 中班数据 → prevDayClass3* + prevDayClass1*</li>
      *   <li>首班=早班("02")：无需加载 T-1 日数据</li>
      * </ul>
-     * 首班班次优先取 T 日已有排产结果的 scheduleShiftClass，无数据时从参数 SYS1401011 获取。
+     * 首班班次优先取 T 日已有排产结果的 scheduleShiftClass，无数据时从 DjShiftConfig 中获取 crossDayFlag="1" 的班次。
      * T-1 日具体加载的 classX 字段由其自身的 scheduleShiftClass 动态映射。
      */
     @Override
@@ -299,7 +299,7 @@ public class DjScheduleResultServiceImpl extends AbstractBillService<DjScheduleR
 
     /**
      * 获取排程首班班次
-     * <p>优先取当前排产结果的 scheduleShiftClass，无数据时从参数配置获取。</p>
+     * <p>优先取当前排产结果的 scheduleShiftClass，无数据时从 DjShiftConfig 中获取 crossDayFlag="1" 的班次。</p>
      */
     private String getStartShiftClass(List<DjScheduleResult> list) {
         // 先看 T 日是否已有排产结果
@@ -308,19 +308,16 @@ public class DjScheduleResultServiceImpl extends AbstractBillService<DjScheduleR
                 return r.getScheduleShiftClass();
             }
         }
-        // 从参数表获取
+        // 从班次配置中获取跨天班次（crossDayFlag="1"）作为首班班次
         try {
-            DjParams param = djParamsMapper.selectOne(
-                    new LambdaQueryWrapper<DjParams>()
-                            .eq(DjParams::getParamCode, "SYS1401011"));
-            if (param != null && param.getParamValue() != null) {
-                String val = param.getParamValue().trim();
-                if ("01".equals(val) || "02".equals(val) || "03".equals(val)) {
-                    return val;
+            List<DjShiftConfig> activeShifts = djShiftConfigService.listActiveShifts();
+            for (DjShiftConfig shift : activeShifts) {
+                if ("1".equals(shift.getCrossDayFlag())) {
+                    return shift.getShiftCode();
                 }
             }
         } catch (Exception e) {
-            // 参数查询失败时使用默认值
+            // 查询失败时使用默认值
         }
         return "03";
     }

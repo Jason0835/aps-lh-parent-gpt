@@ -861,10 +861,10 @@ public class DjScheduleAdjustServiceImpl implements IDjScheduleAdjustService {
         // 确定目标班次是连续3个班中的第几个班（1/2/3）
         int targetClass = resolveTargetClass(insertVO);
 
-        // 查询活跃班次配置
+        // 查询活动班次配置
         List<DjShiftConfig> activeShifts = djShiftConfigService.listActiveShifts();
         if (CollectionUtils.isEmpty(activeShifts)) {
-            log.warn("未找到活跃班次配置，无法计算插单排产日期，使用前端传入日期");
+            log.warn("未找到活动班次配置，无法计算插单排产日期，使用前端传入日期");
             return insertVO.getScheduleDate();
         }
 

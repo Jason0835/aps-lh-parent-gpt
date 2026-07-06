@@ -28,11 +28,11 @@ public class DjEngineConstants {
     /** SYS1401010 排产触发阈值（个班次），当前库存可覆盖的成型班次数 ≤ 此值时触发排产 */
     public static final String PARAM_SCHEDULE_THRESHOLD = "SYS1401010";
     
-    /** SYS1401011 排程首班班次（ClassNumThreePlanEnums.classIndex），如 "03"=中班、"01"=夜班、"02"=早班 */
-    public static final String PARAM_SCHEDULE_START_SHIFT = "SYS1401011";
-
     /** SYS1401012 新规格判定天数阈值（天），连续N天未排产则视为新规格 */
     public static final String PARAM_NEW_SPEC_DAYS_THRESHOLD = "SYS1401012";
+
+    /** SYS1401013 单规格每班最大排产量（米），默认3000 */
+    public static final String PARAM_MAX_SHIFT_PRODUCE_QTY = "SYS1401013";
 
     // ==================== 班次常量 ====================
 
