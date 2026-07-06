@@ -34,7 +34,7 @@ import moment from "moment";
 import infoForm from "@/views/components/infoForm.vue";
 
 import { listMachine } from "@/api/dj/machine";
-import { validateAdd, editScheduleResult, getPaddingDistList } from "@/api/dj/djScheduleResult";
+import { validateAdd, editScheduleResult, getPaddingDistList, getCurrentShift } from "@/api/dj/djScheduleResult";
 
 export default {
   components: { infoForm },
@@ -46,6 +46,11 @@ export default {
       editType: null,
       machines: [],
       paddingList: [],
+      // 连续3个班次信息（来自 getCurrentShift API）
+      currentShiftData: null,
+      shiftList: [],
+      // 排产起始班次（首班班次），用于提交后端计算实际排程日期和班次
+      startShiftClass: null,
       form: {
         scheduleDate: moment().add(1, "days").format("yyyy-MM-DD"),
       },
@@ -79,13 +84,18 @@ export default {
       return this.$t("ui.data.column.djScheduleResult.modalName");
     },
     columns() {
-      return [
+      const seqLabel = this.$t("ui.data.column.dj.scheduleResult.sequence");
+      const analysisLabel = this.$t("ui.data.column.dj.scheduleResult.analysis");
+      const planQtyLabel = this.$t("ui.data.column.dj.scheduleResult.planQty");
+      const shiftLabels = this.shiftList.map((s) => s.label || "");
+      const colDefs = [
         {
           label: this.$t("ui.data.column.scheduleResult.scheduleDate"),
           prop: "scheduleDate",
           span: 24,
           type: "date",
           valueFormat: "yyyy-MM-dd",
+          disabled: true,
         },
         {
           label: this.$t("ui.data.column.dj.scheduleResult.paddingCode"),
@@ -106,64 +116,44 @@ export default {
             value: "id",
           },
         },
-        // ============ 夜班计划量 ============
-        {
-          label: this.$t("ui.data.column.scheduleResult.nightPlanQty"),
-          prop: "class2PlanQty",
-          span: 12,
-        },
-        {
-          label: this.$t("ui.data.column.dj.scheduleResult.sequence"),
-          prop: "class2Sequence",
-          span: 12,
-        },
-        {
-          label: this.$t("ui.data.column.scheduleResult.nightHandAnalysis"),
-          prop: "class2Analysis",
-          span: 24,
-          maxlength: "100",
-        },
-        // ============ 早班计划量 ============
-        {
-          label: this.$t("ui.data.column.scheduleResult.dayPlanQty"),
-          prop: "class3PlanQty",
-          span: 12,
-        },
-        {
-          label: this.$t("ui.data.column.dj.scheduleResult.sequence"),
-          prop: "class3Sequence",
-          span: 12,
-        },
-        {
-          label: this.$t("ui.data.column.scheduleResult.dayHandAnalysis"),
-          prop: "class3Analysis",
-          span: 24,
-          maxlength: "100",
-        },
-        // ============ 中班计划量 ============
-        {
-          label: this.$t("ui.data.column.scheduleResult.midPlanQty"),
-          prop: "class1PlanQty",
-          span: 12,
-        },
-        {
-          label: this.$t("ui.data.column.dj.scheduleResult.sequence"),
-          prop: "class1Sequence",
-          span: 12,
-        },
-        {
-          label: this.$t("ui.data.column.scheduleResult.midHandAnalysis"),
-          prop: "class1Analysis",
-          span: 24,
-          maxlength: "100",
-        },
-        {
-          label: this.$t("ui.common.column.remark"),
-          prop: "remark",
-          span: 24,
-          type: "textarea",
-        },
       ];
+
+      // 动态生成连续3个班次的字段，每个班次前加标题区隔
+      for (let i = 0; i < 3; i++) {
+        const label = shiftLabels[i] || "class" + (i + 1);
+        const classIdx = i + 1;
+
+        // 标题区隔：x班 mm/dd
+        colDefs.push({
+          type: "title",
+          label: label,
+        });
+
+        colDefs.push({
+          label: planQtyLabel,
+          prop: "class" + classIdx + "PlanQty",
+          span: 12,
+        });
+        colDefs.push({
+          label: seqLabel,
+          prop: "class" + classIdx + "Sequence",
+          span: 12,
+        });
+        colDefs.push({
+          label: analysisLabel,
+          prop: "class" + classIdx + "Analysis",
+          span: 24,
+          maxlength: "100",
+        });
+      }
+
+      colDefs.push({
+        label: this.$t("ui.common.column.remark"),
+        prop: "remark",
+        span: 24,
+        type: "textarea",
+      });
+      return colDefs;
     },
   },
   methods: {
@@ -216,11 +206,32 @@ export default {
     },
     loadPaddingList() {
       getPaddingDistList().then((res) => {
-        this.paddingList = res.data || [];
+        this.paddingList = res || [];
       });
     },
-    show(data, editType) {
+    loadCurrentShift() {
+      this.loading = true;
+      getCurrentShift().then((res) => {
+        this.loading = false;
+        // res 是 AjaxResult 解包后的 data
+        if (res) {
+          this.currentShiftData = res;
+          this.shiftList = res.shifts || [];
+          this.startShiftClass = res.currentShiftClass || null;
+          if (res.scheduleDate) {
+            this.form.scheduleDate = res.scheduleDate;
+          }
+        }
+      }).catch(() => {
+        this.loading = false;
+      });
+    },
+    show(data) {
       this.visible = true;
+      // 新建时调用 getCurrentShift 获取当前班次
+      if (!data) {
+        this.loadCurrentShift();
+      }
       this.loadMachines();
       this.loadPaddingList();
       if (data) {
@@ -236,6 +247,9 @@ export default {
     },
     hide() {
       this.form = {};
+      this.shiftList = [];
+      this.currentShiftData = null;
+      this.startShiftClass = null;
       this.$refs.form.triggerResetForm();
       // this.resetForm("infoForm");
       this.isEdit = false;
@@ -250,11 +264,15 @@ export default {
 
     handleConfirm() {
       this.$refs.form.triggerConfirm((params) => {
+        // 传入排产起始班次，供后端计算实际排程日期和班次
+        params.scheduleShiftClass = this.startShiftClass;
+
+        const groupLabels = this.shiftList.map((s) => s.label || "class" + s.classIndex);
         // 自定义校验：至少一个班有录入计划量
         const shifts = [
-          { qtyProp: "class2PlanQty", seqProp: "class2Sequence", label: this.$t("ui.data.column.scheduleResult.nightPlanQty") },
-          { qtyProp: "class3PlanQty", seqProp: "class3Sequence", label: this.$t("ui.data.column.scheduleResult.dayPlanQty") },
-          { qtyProp: "class1PlanQty", seqProp: "class1Sequence", label: this.$t("ui.data.column.scheduleResult.midPlanQty") },
+          { qtyProp: "class1PlanQty", seqProp: "class1Sequence", label: groupLabels[0] },
+          { qtyProp: "class2PlanQty", seqProp: "class2Sequence", label: groupLabels[1] },
+          { qtyProp: "class3PlanQty", seqProp: "class3Sequence", label: groupLabels[2] },
         ];
 
         const hasQty = shifts.filter((s) => params[s.qtyProp] != null && params[s.qtyProp] !== "");

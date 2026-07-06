@@ -680,7 +680,7 @@ public class DjScheduleResultController extends AbstractBillBizController<DjSche
             LocalTime endTime = LocalTime.parse(config.getPlanEndTime());
 
             boolean inRange;
-            if ("1".equals(config.getCrossDayFlag())) {
+            if (ApsConstant.TRUE.equals(config.getCrossDayFlag())) {
                 // 跨天班次：当前时间 ≥ 开始时间 或 当前时间 < 结束时间
                 inRange = !now.isBefore(startTime) || now.isBefore(endTime);
                 if (inRange && !now.isBefore(startTime)) {
@@ -704,8 +704,8 @@ public class DjScheduleResultController extends AbstractBillBizController<DjSche
 
         String currentShiftClass = currentConfig.getShiftCode();
 
-        // 计算连续3个班次
-        List<Map<String, Object>> shifts = buildConsecutiveShifts(activeShifts, currentConfig, scheduleDate);
+        // 计算连续3个班次（用 serverDate 作为基准日期，不跟随排产日调整）
+        List<Map<String, Object>> shifts = this.buildConsecutiveShifts(activeShifts, currentConfig, serverDate);
 
         Map<String, Object> result = new HashMap<>();
         result.put("scheduleDate", scheduleDate.format(DateTimeFormatter.ISO_LOCAL_DATE));
@@ -743,13 +743,15 @@ public class DjScheduleResultController extends AbstractBillBizController<DjSche
             ClassNumThreePlanEnums enumVal = ClassNumThreePlanEnums.getClassEnums(config.getShiftCode());
             String shiftName = (enumVal != null) ? I18nUtil.getMessage(enumVal.getClassName()) : config.getShiftName();
 
-            // 计算班次日期
-            LocalDate shiftDate = scheduleDate;
-            // 当前班次为中班(03)时，第3个班次（早班）在 D+1 日
-            // 因为中班(14:00~22:00) → 夜班(22:00~06:00, 仍属D日) → 早班(06:00~14:00, 已跨到D+1日)
-            if (i == 2 && "03".equals(currentConfig.getShiftCode())) {
-                shiftDate = scheduleDate.plusDays(1);
+            // 计算班次日期：若当前或之前已遇到跨天班次（crossDayFlag=1），则该班次及后续日期+1
+            boolean crossedCrossDay = false;
+            for (int j = 0; j <= i; j++) {
+                if (ApsConstant.TRUE.equals(activeShifts.get((currentIndex + j) % totalShifts).getCrossDayFlag())) {
+                    crossedCrossDay = true;
+                    break;
+                }
             }
+            LocalDate shiftDate = crossedCrossDay ? scheduleDate.plusDays(1) : scheduleDate;
 
             shift.put("classIndex", i + 1);
             shift.put("shiftClass", config.getShiftCode());

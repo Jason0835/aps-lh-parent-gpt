@@ -2,6 +2,9 @@ package com.zlt.aps.dj.service.impl;
 
 import java.math.BigDecimal;
 import java.text.MessageFormat;
+import java.time.LocalDate;
+import java.time.LocalTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -27,6 +30,7 @@ import com.zlt.aps.dj.api.domain.entity.DjDayFinishQty;
 import com.zlt.aps.dj.api.domain.entity.DjDispatcherLog;
 import com.zlt.aps.dj.api.domain.entity.DjMachineInfo;
 import com.zlt.aps.dj.api.domain.entity.DjScheduleResult;
+import com.zlt.aps.dj.api.domain.entity.DjShiftConfig;
 import com.zlt.aps.dj.api.domain.entity.DjSpecifyMachine;
 import com.zlt.aps.dj.api.domain.entity.DjStock;
 import com.zlt.aps.dj.engine.constant.DjEngineConstants;
@@ -45,6 +49,7 @@ import com.zlt.aps.dj.service.DjDispatcherLogService;
 import com.zlt.aps.dj.service.DjMachineInfoService;
 import com.zlt.aps.dj.service.DjScheduleResultService;
 import com.zlt.aps.dj.service.IDjScheduleAdjustService;
+import com.zlt.aps.dj.service.IDjShiftConfigService;
 import com.zlt.aps.mdm.api.domain.entity.MdmConstructionInfo;
 import com.zlt.aps.redissonLock.annotation.DistributedLock;
 import com.zlt.core.dao.basedao.BaseDao;
@@ -98,6 +103,9 @@ public class DjScheduleAdjustServiceImpl implements IDjScheduleAdjustService {
 
     @Resource
     private IDjOrderGeneratorService iDjOrderGeneratorService;
+
+    @Resource
+    private IDjShiftConfigService djShiftConfigService;
 
     // ==================== 1. 公共数据预加载 ====================
 
@@ -160,9 +168,12 @@ public class DjScheduleAdjustServiceImpl implements IDjScheduleAdjustService {
     @Transactional(rollbackFor = Exception.class)
     @DistributedLock(key = "APS:DJ:SCHEDULE:OPER_LOCK:#factoryCode:#scheduleDate:#machineCode")
     public AjaxResult insertOrder(DjScheduleResult insertVO) {
-        Date scheduleDate = insertVO.getScheduleDate();
         String factoryCode = insertVO.getFactoryCode();
         String machineCode = insertVO.getMachineCode();
+
+        // 根据首班班次计算实际排产日期（取代前端直接传入的 scheduleDate）
+        Date scheduleDate = this.calculateInsertScheduleDate(insertVO);
+        insertVO.setScheduleDate(scheduleDate);
 
         // 1. 公共数据预加载
         DjAdjustScheduleContext ctx = this.loadBaseData(factoryCode, scheduleDate);
@@ -222,9 +233,12 @@ public class DjScheduleAdjustServiceImpl implements IDjScheduleAdjustService {
     @Transactional(rollbackFor = Exception.class)
     @DistributedLock(key = "APS:DJ:SCHEDULE:OPER_LOCK:#factoryCode:#scheduleDate:#machineCode")
     public AjaxResult confirmInsertOrder(DjScheduleResult insertVO) {
-        Date scheduleDate = insertVO.getScheduleDate();
         String factoryCode = insertVO.getFactoryCode();
         String machineCode = insertVO.getMachineCode();
+
+        // 根据首班班次计算实际排产日期
+        Date scheduleDate = this.calculateInsertScheduleDate(insertVO);
+        insertVO.setScheduleDate(scheduleDate);
 
         DjAdjustScheduleContext ctx = this.loadBaseData(factoryCode, scheduleDate);
 
@@ -820,6 +834,89 @@ public class DjScheduleAdjustServiceImpl implements IDjScheduleAdjustService {
     private int resolveTargetSequence(DjScheduleResult vo, int targetClass) {
         Integer seq = getSeqByClass(vo, targetClass);
         return seq != null ? seq : 1;
+    }
+
+    /**
+     * 根据首班班次计算插单的实际排产日期
+     * <p>
+     * 逻辑说明：
+     * <ol>
+     *   <li>从传入的 insertVO 中获取 {@code scheduleShiftClass}（首班班次，打开插单页面时记录）</li>
+     *   <li>通过 {@link #resolveTargetClass(DjScheduleResult)} 确定插单目标班次（连续3个班中的第几个班）</li>
+     *   <li>查询活跃班次配置，以首班班次为起点、目标班次为终点（含两端），遍历检查是否有跨天班次（crossDayFlag="1"）：</li>
+     *   <li>无跨天班次 → 排产日期 = 当前服务器时间所在排产日；有跨天班次 → 排产日期 = 当前服务器时间所在排产日 + 1</li>
+     * </ol>
+     * </p>
+     *
+     * @param insertVO 插单参数（需包含 scheduleShiftClass 及各班次计划量）
+     * @return 计算后的排产日期；若缺少必要参数则返回前端传入的原始 scheduleDate
+     */
+    private Date calculateInsertScheduleDate(DjScheduleResult insertVO) {
+        String startShiftClass = insertVO.getScheduleShiftClass();
+        if (StringUtils.isBlank(startShiftClass)) {
+            // 无首班班次时直接使用前端传入的排产日期（兼容旧逻辑）
+            return insertVO.getScheduleDate();
+        }
+
+        // 确定目标班次是连续3个班中的第几个班（1/2/3）
+        int targetClass = resolveTargetClass(insertVO);
+
+        // 查询活跃班次配置
+        List<DjShiftConfig> activeShifts = djShiftConfigService.listActiveShifts();
+        if (CollectionUtils.isEmpty(activeShifts)) {
+            log.warn("未找到活跃班次配置，无法计算插单排产日期，使用前端传入日期");
+            return insertVO.getScheduleDate();
+        }
+
+        // 计算当前服务器时间所在的排产日
+        LocalTime now = LocalTime.now();
+        LocalDate serverDate = LocalDate.now();
+        LocalDate serverProductionDate = serverDate;
+        for (DjShiftConfig config : activeShifts) {
+            LocalTime startTime = LocalTime.parse(config.getPlanStartTime());
+            LocalTime endTime = LocalTime.parse(config.getPlanEndTime());
+            boolean inRange;
+            if (ApsConstant.TRUE.equals(config.getCrossDayFlag())) {
+                inRange = !now.isBefore(startTime) || now.isBefore(endTime);
+                if (inRange && !now.isBefore(startTime)) {
+                    serverProductionDate = serverDate.plusDays(1);
+                }
+            } else {
+                inRange = !now.isBefore(startTime) && now.isBefore(endTime);
+            }
+            if (inRange) {
+                break;
+            }
+        }
+
+        // 查找首班班次在活跃班次列表中的索引
+        int startIndex = -1;
+        int totalShifts = activeShifts.size();
+        for (int i = 0; i < totalShifts; i++) {
+            if (activeShifts.get(i).getShiftCode().equals(startShiftClass)) {
+                startIndex = i;
+                break;
+            }
+        }
+        if (startIndex < 0) {
+            log.warn("首班班次 {} 不在活跃班次配置中，使用前端传入日期", startShiftClass);
+            return insertVO.getScheduleDate();
+        }
+
+        // 判断从首班班次到目标班次之间（含首班）是否有跨天班次
+        boolean hasCrossDay = false;
+        for (int j = 0; j < targetClass; j++) {
+            if (ApsConstant.TRUE.equals(activeShifts.get((startIndex + j) % totalShifts).getCrossDayFlag())) {
+                hasCrossDay = true;
+                break;
+            }
+        }
+
+        // 计算排产日期
+        LocalDate calculatedDate = hasCrossDay ? serverProductionDate.plusDays(1) : serverProductionDate;
+        log.info("插单排产日期计算：startShiftClass={}, targetClass={}, hasCrossDay={}, serverProductionDate={}, calculatedDate={}",
+                startShiftClass, targetClass, hasCrossDay, serverProductionDate, calculatedDate);
+        return Date.from(calculatedDate.atStartOfDay(ZoneId.systemDefault()).toInstant());
     }
 
     /**

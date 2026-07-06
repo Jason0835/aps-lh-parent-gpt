@@ -110,18 +110,18 @@
       </template>
       <template slot="headerRight">
         <span class="stat-info">
-          <span>{{ $t("ui.data.column.dj.scheduleResult.statNightPlanQty") }}：<span class="stat-value">{{
-              stat.dayPlanQty === null ? "--" : stat.dayPlanQty
+          <span>{{ $t("ui.data.column.scheduleResult.class." + shiftSuffixes[0]) }}合计：<span class="stat-value">{{
+              stat.class1PlanQty === null ? "--" : stat.class1PlanQty
             }}</span
             >，</span
           >
-          <span>{{ $t("ui.data.column.dj.scheduleResult.statMorningPlanQty") }}：<span class="stat-value">{{
-              stat.nightPlanQty === null ? "--" : stat.nightPlanQty
+          <span>{{ $t("ui.data.column.scheduleResult.class." + shiftSuffixes[1]) }}合计：<span class="stat-value">{{
+              stat.class2PlanQty === null ? "--" : stat.class2PlanQty
             }}</span
             >，</span
           >
-          <span>{{ $t("ui.data.column.dj.scheduleResult.statMiddlePlanQty") }}：<span class="stat-value">{{
-              stat.nextDayPlanQty === null ? "--" : stat.nextDayPlanQty
+          <span>{{ $t("ui.data.column.scheduleResult.class." + shiftSuffixes[2]) }}合计：<span class="stat-value">{{
+              stat.class3PlanQty === null ? "--" : stat.class3PlanQty
             }}</span
             >，</span
           >
@@ -281,12 +281,22 @@ export default {
       },
       stat: {},
       showPrevDayClass1: false,
+      scheduleShiftClass: '01',
     };
   },
   computed: {
     ...mapState({
       machines: (state) => state.dj.machines,
     }),
+    // 排产起始班次对应的3个连续班次国际化后缀
+    shiftSuffixes() {
+      const map = {
+        '01': ['night', 'morning', 'day'],
+        '02': ['morning', 'day', 'night'],
+        '03': ['day', 'night', 'morning'],
+      };
+      return map[this.scheduleShiftClass] || map['01'];
+    },
     columns() {
       let finishRateFormatter = function (row, column, value, index) {
         if (value == 0 || value == null) {
@@ -956,6 +966,9 @@ export default {
         const data = await listScheduleResult(this.formatParams());
         console.log(data);
         this.data = data.rows;
+        // 记录排产起始班次用于动态显示汇总标签
+        this.scheduleShiftClass = data.rows && data.rows.length > 0 && data.rows[0].scheduleShiftClass
+          ? data.rows[0].scheduleShiftClass : '01';
         // 根据首班班次决定是否展示 T-1 日中班栏位
         this.showPrevDayClass1 = data.rows && data.rows.length > 0 && data.rows[0].scheduleShiftClass === '01';
         // this.page.total = data.total;
@@ -1011,8 +1024,6 @@ export default {
     getWorkClass({ scheduleDate: this.getEffectiveScheduleDate() }).then((res) => {
       this.classHeaders = res;
     });
-  },
-  activated() {
     this.getList();
     getWorkClass({ scheduleDate: this.getEffectiveScheduleDate() }).then((res) => {
       this.classHeaders = res;

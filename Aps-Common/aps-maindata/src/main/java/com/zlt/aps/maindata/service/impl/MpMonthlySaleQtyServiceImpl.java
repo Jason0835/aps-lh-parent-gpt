@@ -206,9 +206,9 @@ public class MpMonthlySaleQtyServiceImpl extends AbstractDocService<MpMonthlySal
     /**
      * 生成月均销量
      *
-     * @param nowDate       当前时间
-     * @param lastYear      上个月对应年份
-     * @param lastMonth     上月
+     * @param nowDate   当前时间
+     * @param lastYear  上个月对应年份
+     * @param lastMonth 上月
      */
     @Override
     public AjaxResult genMpHistorySaleRecord(String factoryCode, Date nowDate, int lastYear, String lastMonth) {
@@ -255,7 +255,7 @@ public class MpMonthlySaleQtyServiceImpl extends AbstractDocService<MpMonthlySal
     }
 
     @Override
-    public List<MpMonthlySaleQty> findCurrentMonthlySaleQty(String factoryCode,Set<String> skus) {
+    public List<MpMonthlySaleQty> findCurrentMonthlySaleQty(String factoryCode, Set<String> skus) {
         List<MpMonthlySaleQty> result = Lists.newArrayList();
         final int batchSize = 1000;
         List<String> skuList = new ArrayList<>(skus);
@@ -263,10 +263,10 @@ public class MpMonthlySaleQtyServiceImpl extends AbstractDocService<MpMonthlySal
             int end = Math.min(i + batchSize, skus.size());
             List<String> batchSkus = skuList.subList(i, end);
             LambdaQueryWrapper<MpMonthlySaleQty> wrapper =
-                Wrappers.lambdaQuery(MpMonthlySaleQty.class)
-                    .eq(MpMonthlySaleQty::getFactoryCode, factoryCode)
-                    .in(MpMonthlySaleQty::getMaterialCode, batchSkus)
-                    .eq(MpMonthlySaleQty::getIsDelete, ApsConstant.APS_YES_NO_0);
+                    Wrappers.lambdaQuery(MpMonthlySaleQty.class)
+                            .eq(MpMonthlySaleQty::getFactoryCode, factoryCode)
+                            .in(MpMonthlySaleQty::getMaterialCode, batchSkus)
+                            .eq(MpMonthlySaleQty::getIsDelete, ApsConstant.APS_YES_NO_0);
             result.addAll(entityMapper.selectList(wrapper));
         }
         return result;
@@ -285,18 +285,18 @@ public class MpMonthlySaleQtyServiceImpl extends AbstractDocService<MpMonthlySal
     @Override
     public Map<String, Integer> findCurrentMonthlySaleQty(String factoryCode) {
         List<MpMonthlySaleQty> list = this.findCurrentMonthlySaleQtyByFactoryCode(factoryCode);
-        if(CollectionUtils.isEmpty(list)){
+        if (CollectionUtils.isEmpty(list)) {
             return Collections.emptyMap();
         }
         return list.stream()
-            .filter(Objects::nonNull)
-            .filter(monthlySaleQty -> StringUtils.isNotBlank(monthlySaleQty.getMaterialCode()) && monthlySaleQty.getAverageSaleQty() != null)
-            .collect(Collectors.groupingBy(MpMonthlySaleQty::getMaterialCode, Collectors.summingInt(MpMonthlySaleQty::getAverageSaleQty)));
+                .filter(Objects::nonNull)
+                .filter(monthlySaleQty -> StringUtils.isNotBlank(monthlySaleQty.getMaterialCode()) && monthlySaleQty.getAverageSaleQty() != null)
+                .collect(Collectors.groupingBy(MpMonthlySaleQty::getMaterialCode, Collectors.summingInt(MpMonthlySaleQty::getAverageSaleQty)));
     }
 
     @Override
     public Map<String, Integer> findAdjustMonthlySaleQty(DpDemandPlan createCondition, Set<String> skus) {
-        if(CollectionUtils.isEmpty(skus)) {
+        if (CollectionUtils.isEmpty(skus)) {
             return Collections.emptyMap();
         }
         List<MpMonthlySaleQty> list = Lists.newArrayList();
@@ -306,19 +306,19 @@ public class MpMonthlySaleQtyServiceImpl extends AbstractDocService<MpMonthlySal
             int end = Math.min(i + batchSize, skus.size());
             List<String> batchSkus = skuList.subList(i, end);
             LambdaQueryWrapper<MpMonthlySaleQty> wrapper =
-                Wrappers.lambdaQuery(MpMonthlySaleQty.class)
-                    .eq(MpMonthlySaleQty::getFactoryCode, createCondition.getFactoryCode())
-                    .in(MpMonthlySaleQty::getMaterialCode, batchSkus)
-                    .eq(MpMonthlySaleQty::getIsDelete, ApsConstant.APS_YES_NO_0);
+                    Wrappers.lambdaQuery(MpMonthlySaleQty.class)
+                            .eq(MpMonthlySaleQty::getFactoryCode, createCondition.getFactoryCode())
+                            .in(MpMonthlySaleQty::getMaterialCode, batchSkus)
+                            .eq(MpMonthlySaleQty::getIsDelete, ApsConstant.APS_YES_NO_0);
             list.addAll(this.entityMapper.selectList(wrapper));
         }
-        if(CollectionUtils.isEmpty(list)){
+        if (CollectionUtils.isEmpty(list)) {
             return Collections.emptyMap();
         }
         return list.stream()
-            .filter(Objects::nonNull)
-            .filter(monthlySaleQty -> StringUtils.isNotBlank(monthlySaleQty.getMaterialCode()) && monthlySaleQty.getAverageSaleQty() != null)
-            .collect(Collectors.groupingBy(MpMonthlySaleQty::getMaterialCode, Collectors.summingInt(MpMonthlySaleQty::getAverageSaleQty)));
+                .filter(Objects::nonNull)
+                .filter(monthlySaleQty -> StringUtils.isNotBlank(monthlySaleQty.getMaterialCode()) && monthlySaleQty.getAverageSaleQty() != null)
+                .collect(Collectors.groupingBy(MpMonthlySaleQty::getMaterialCode, Collectors.summingInt(MpMonthlySaleQty::getAverageSaleQty)));
     }
 
     private List<MpMonthlySaleQty> findCurrentMonthlySaleQtyByFactoryCode(String factoryCode) {
@@ -459,13 +459,14 @@ public class MpMonthlySaleQtyServiceImpl extends AbstractDocService<MpMonthlySal
 
                     yearMonthCount.add(yearMonth);
                     if (yearMonth >= Integer.parseInt(last3YearMonth)) {
-                        // 近3个月
-                        BigDecimal result = BigDecimal.valueOf(totalSaleQty).divide(BigDecimal.valueOf(yearMonthCount.size()), 0, RoundingMode.UP);
+
+                        // 近3个月 20260704+ 除以3yearMonthCount.size()
+                        BigDecimal result = BigDecimal.valueOf(totalSaleQty).divide(BigDecimal.valueOf(passThreeMonth), 0, RoundingMode.UP);
                         monthlySaleQty.setPassThreeMonthSaleQty(result.intValue());
                     }
                     if (yearMonth >= Integer.parseInt(last6YearMonth)) {
-                        // 近6个月
-                        BigDecimal result = BigDecimal.valueOf(totalSaleQty).divide(BigDecimal.valueOf(yearMonthCount.size()), 0, RoundingMode.UP);
+                        // 近6个月 20260704+ 除以6 yearMonthCount.size()
+                        BigDecimal result = BigDecimal.valueOf(totalSaleQty).divide(BigDecimal.valueOf(passSixMonth), 0, RoundingMode.UP);
                         monthlySaleQty.setPassSixMonthSaleQty(result.intValue());
                     }
                     // 销售区域汇总
@@ -486,7 +487,8 @@ public class MpMonthlySaleQtyServiceImpl extends AbstractDocService<MpMonthlySal
 
                 // 月均销量
                 if (CollectionUtils.isNotEmpty(yearMonthCount)) {
-                    BigDecimal result = BigDecimal.valueOf(totalSaleQty).divide(BigDecimal.valueOf(yearMonthCount.size()), 0, RoundingMode.UP);
+                    //20260704+ yearMonthCount.size()
+                    BigDecimal result = BigDecimal.valueOf(totalSaleQty).divide(BigDecimal.valueOf(passSixMonth), 0, RoundingMode.UP);
                     monthlySaleQty.setAverageSaleQty(result.intValue());
                 } else {
                     monthlySaleQty.setAverageSaleQty(0);
@@ -610,4 +612,5 @@ public class MpMonthlySaleQtyServiceImpl extends AbstractDocService<MpMonthlySal
             }
         }
     }
+
 }
