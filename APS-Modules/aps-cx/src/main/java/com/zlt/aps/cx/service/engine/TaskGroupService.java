@@ -257,6 +257,7 @@ public class TaskGroupService {
         Map<String, Integer> structureTotalMaxLhCache = new HashMap<>();
         Map<String, BigDecimal> structureAvgRatioCache = new HashMap<>();
         Map<String, Integer> structureTaskCountMap = new HashMap<>();
+        Map<String, Set<String>> structureCountedMachineCodesMap = new HashMap<>();
         Map<String, BigDecimal> structureCumulativeTimeMap = new HashMap<>();
         int skippedCapacityExceeded = 0;
 
@@ -714,7 +715,14 @@ public class TaskGroupService {
                         BigDecimal avgRatio = structureAvgRatioCache
                                 .computeIfAbsent(structureName, k -> calculateStructureAvgRatio(recommendedMachines, k, context));
 
-                        int currentCount = structureTaskCountMap.getOrDefault(structureName, 0);
+                        // 按lhMachineCode去重计数硫化机台数（同一台硫化机L+R模只算1台）
+                        // 使用 task.getLhMachineCode()（已通过 extractLhMachineKey 去掉 L/R 后缀）
+                        String lhMachineCode = task.getLhMachineCode();
+                        String machineKey = (lhMachineCode != null && !lhMachineCode.isEmpty()) ? lhMachineCode : "lhId_" + lhResult.getId();
+                        Set<String> countedCodes = structureCountedMachineCodesMap
+                                .computeIfAbsent(structureName, k -> new HashSet<>());
+                        int currentCount = countedCodes.size();
+                        boolean isNewLhMachine = !countedCodes.contains(machineKey);
                         int plannedProduction = task.getPlannedProduction() != null ? task.getPlannedProduction() : 0;
 
                         if (plannedProduction == 0) {
@@ -722,7 +730,8 @@ public class TaskGroupService {
                                     structureName, lhResult.getEmbryoCode());
                         } else {
                             if (currentCount >= totalMaxLh) {
-                                log.info("[检查4-硫化机数] 跳过：结构={}, 当前{}/上限{}", structureName, currentCount, totalMaxLh);
+                                log.info("[检查4-硫化机数] 跳过：结构={}, 当前{}/上限{}, lhMachineCode={}, machineKey={}, 已计数={}",
+                                        structureName, currentCount, totalMaxLh, lhMachineCode, machineKey, countedCodes);
                                 skippedCapacityExceeded++;
                                 continue;
                             }
@@ -751,12 +760,14 @@ public class TaskGroupService {
                                 }
                                 structureCumulativeTimeMap.put(structureName, cumulativeTime.add(itemTimeSeconds));
                             }
-                            structureTaskCountMap.merge(structureName, 1, Integer::sum);
+                            if (isNewLhMachine) {
+                                countedCodes.add(machineKey);
+                            }
 
-                            int newCount = structureTaskCountMap.getOrDefault(structureName, 0);
+                            int newCount = countedCodes.size();
                             BigDecimal newCumulative = structureCumulativeTimeMap.getOrDefault(structureName, BigDecimal.ZERO);
                             BigDecimal remaining = totalCapacitySeconds.subtract(newCumulative);
-                            log.info("【机台产能管控】结构={}, 胎胚={}, 已排任务={}/{}, 配比={}, 单胎耗时={}s, 计划量={}条, 本项={}s({}h), 累计消耗={}s({}h), 总产能={}s({}h), 剩余={}s({}h)",
+                            log.info("【机台产能管控】结构={}, 胎胚={}, 已排硫化机={}/{}, 配比={}, 单胎耗时={}s, 计划量={}条, 本项={}s({}h), 累计消耗={}s({}h), 总产能={}s({}h), 剩余={}s({}h), lhMachineCode={}, 左右模={}, 新硫化机={}",
                                     structureName, lhResult.getEmbryoCode(), newCount, totalMaxLh,
                                     avgRatio.stripTrailingZeros().toPlainString(), timePerTireStr,
                                     plannedProduction,
@@ -767,7 +778,8 @@ public class TaskGroupService {
                                     totalCapacitySeconds.stripTrailingZeros().toPlainString(),
                                     totalCapacitySeconds.divide(BigDecimal.valueOf(SECONDS_PER_HOUR), 1, BigDecimal.ROUND_HALF_UP),
                                     remaining.stripTrailingZeros().toPlainString(),
-                                    remaining.divide(BigDecimal.valueOf(SECONDS_PER_HOUR), 1, BigDecimal.ROUND_HALF_UP));
+                                    remaining.divide(BigDecimal.valueOf(SECONDS_PER_HOUR), 1, BigDecimal.ROUND_HALF_UP),
+                                    lhMachineCode, lhResult.getLeftRightMould(), isNewLhMachine);
                         }
                     }
                 }
@@ -851,51 +863,10 @@ public class TaskGroupService {
                                 .append(")=").append(spaceLimit);
                     }
 
-                    // 维度二（时间）：本任务自身分配库存预计班后库存可供硫化时长超过6小时
-                    //   库存基准：materialStockMap[lhId]（按比例分配给本任务的库存，共用胎胚时小于胎胚总库存）
-                    //   累计口径：本任务成型产出(可能被封顶) + 本任务硫化消耗（任务级，不与其他任务合并）
-                    //   语义：管控的是"本任务自身分配库存的可供硫化时长"，避免共用胎胚被误封顶
-                    int taskMoldQty = task.getVulcanizeMoldCount();
-                    int singleMoldLhCap = productionCalculator.getSingleMoldDailyLhCapacity(materialCode, context);
-                    BigDecimal projectedStockHours = null;
-                    int capMaxStock = 0;
-                    int taskAllocatedStock = 0;
-                    int taskProjectedStock = 0;
-                    if (stockHoursCapEnabled && taskMoldQty > 0 && singleMoldLhCap > 0) {
-                        // 取本任务分配库存（共用胎胚按比例分配，可能小于胎胚总库存）
-                        taskAllocatedStock = getCurrentStock(context, lhResult.getId());
-                        // 任务级预计班后库存 = 任务分配库存 + 本任务成型产出(封顶后) - 本任务硫化消耗
-                        int taskActualProduction = task.getPlannedProduction() != null ? task.getPlannedProduction() : 0;
-                        taskProjectedStock = taskAllocatedStock + taskActualProduction - vulcanizingConsumption;
-                        BigDecimal singleTireMoldSeconds = productionCalculator.calculateSingleTireMoldSeconds(singleMoldLhCap);
-                        projectedStockHours = productionCalculator.calculateStockHours(taskProjectedStock, singleMoldLhCap, taskMoldQty);
-                        if (projectedStockHours.compareTo(BigDecimal.valueOf(stockHoursCap)) > 0) {
-                            capMaxStock = BigDecimal.valueOf(stockHoursCap)
-                                    .multiply(BigDecimal.valueOf(SECONDS_PER_HOUR))
-                                    .multiply(BigDecimal.valueOf(taskMoldQty))
-                                    .divide(singleTireMoldSeconds, 0, BigDecimal.ROUND_UP)
-                                    .intValue();
-                            int stockHoursOver = taskProjectedStock - capMaxStock;
-                            if (stockHoursOver > 0) {
-                                int timeLimit = Math.max(0, originalProduction - stockHoursOver);
-                                maxAllowedProduction = Math.min(maxAllowedProduction, timeLimit);
-                                capped = true;
-                                if (capDetail.length() > 0) capDetail.append("; ");
-                                capDetail.append("[时间] 本任务预计库存=").append(taskProjectedStock)
-                                        .append(", 可供硫化=").append(projectedStockHours.setScale(2, BigDecimal.ROUND_HALF_UP)).append("h")
-                                        .append(" > ").append(stockHoursCap).append("h")
-                                        .append(", ").append(stockHoursCap).append("h对应最大库存=").append(capMaxStock)
-                                        .append(", 超出=").append(stockHoursOver)
-                                        .append(", 时间允许产量=max(0,").append(originalProduction).append("-").append(stockHoursOver)
-                                        .append(")=").append(timeLimit);
-                            }
-                        }
-                        log.info("【可供硫化管控】胎胚={}, 任务分配库存={}条(本任务), 本任务成型产出={}条, 本任务硫化消耗={}条, 任务预计班后库存={}条(分配库存+本任务成型-本任务硫化), 可供硫化= {} × {} / {} / 3600 = {}h, 6h上限, {}",
-                                embryoCode, taskAllocatedStock, taskActualProduction, vulcanizingConsumption, taskProjectedStock,
-                                taskProjectedStock, singleTireMoldSeconds.setScale(2, BigDecimal.ROUND_HALF_UP), taskMoldQty,
-                                projectedStockHours.setScale(2, BigDecimal.ROUND_HALF_UP),
-                                projectedStockHours.compareTo(BigDecimal.valueOf(stockHoursCap)) > 0 ? "超限→封顶" : "未超限→通过");
-                    }
+                    // 维度二（时间6h封顶）已在R1移除：R1的职责是满足硫化需求，
+                    // 6h封顶会导致硫化任务无法满足（封顶后不够一车→归零→硫化需求落空）。
+                    // 立库空间维度（维度一）仍保留，防止立库溢出。
+                    // 6h管控仅在R2中以"事前预估→退出到R3"方式生效，R3无6h限制。
 
                     if (capped && maxAllowedProduction < originalProduction) {
                         int cappedProduction;
@@ -934,14 +905,8 @@ public class TaskGroupService {
                             }
                         }
 
-                        String capReason;
-                        if (capDetail.toString().contains("[空间]") && capDetail.toString().contains("[时间]")) {
-                            capReason = "空间+时间双重限制";
-                        } else if (capDetail.toString().contains("[空间]")) {
-                            capReason = "立库空间不足";
-                        } else {
-                            capReason = "可供硫化超6h";
-                        }
+                        // R1仅保留维度一（空间）封顶，维度二（时间6h）已移除
+                        String capReason = "立库空间不足";
                         log.info("【立库封顶详情】胎胚={}, 原产量={}条, 因{}只能生产{}条, 整车容量={}条, {}→最终计划量={}条, 详情: {}",
                                 embryoCode,
                                 originalProduction, capReason, maxAllowedProduction, tripCapacity,
@@ -2394,11 +2359,41 @@ public class TaskGroupService {
         // 硫化机台数和模数：一条LhScheduleResult = 一台硫化机
         task.setVulcanizeMachineCount(1);
         task.setVulcanizeMoldCount(lhResult.getMouldQty() != null ? lhResult.getMouldQty() : 1);
+        // 硫化机台编号：L+R模的 lhMachineCode 含模号后缀（如 K1502L/K1502R），
+        // 去掉末尾 L/R 后缀得到硫化机台号（如 K1502），用于硫化机台数去重
+        task.setLhMachineCode(extractLhMachineKey(lhResult.getLhMachineCode(), lhResult.getLeftRightMould()));
 
         // S5.2.3 计算库存可供硫化时长
         calculateStockHours(task, lhResult, currentStock, context);
 
         return task;
+    }
+
+    /**
+     * 从 lhMachineCode + leftRightMould 提取硫化机台号（去掉末尾 L/R 模号后缀）。
+     *
+     * <p>同一台硫化机的左右模在数据库中各有独立记录：
+     * <ul>
+     *   <li>L模：lhMachineCode=K1502L, leftRightMould=L → 台号 K1502</li>
+     *   <li>R模：lhMachineCode=K1502R, leftRightMould=R → 台号 K1502</li>
+     *   <li>双模：lhMachineCode=K1602,  leftRightMould=LR → 台号 K1602</li>
+     * </ul>
+     * 仅当 leftRightMould 为 L 或 R（单模）时才去后缀，避免误截双模台号。
+     *
+     * @param lhMachineCode  原始硫化机台编号（可能含 L/R 后缀）
+     * @param leftRightMould 左右模标识（L/R/LR）
+     * @return 硫化机台号（去后缀），null/空字符串时返回 null
+     */
+    private String extractLhMachineKey(String lhMachineCode, String leftRightMould) {
+        if (lhMachineCode == null || lhMachineCode.isEmpty()) {
+            return null;
+        }
+        if ("L".equals(leftRightMould) || "R".equals(leftRightMould)) {
+            if (lhMachineCode.endsWith("L") || lhMachineCode.endsWith("R")) {
+                return lhMachineCode.substring(0, lhMachineCode.length() - 1);
+            }
+        }
+        return lhMachineCode;
     }
 
     /**

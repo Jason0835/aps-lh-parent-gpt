@@ -12,10 +12,10 @@ import lombok.Getter;
  */
 @Getter
 public enum BomTypeEnum {
-    /**
-     * 胎胚
-     */
-    EMBRYO("01", "胎胚")
+    EMBRYO("01", "胎胚"),
+    FINAL_RUBBER("终炼胶 ", "终炼胶 "),
+    MASTICATED_RUBBER("塑炼胶", "塑炼胶"),
+    AQ("AQ", "AQ")
     ;
     private String code;
     private String mesCode;
