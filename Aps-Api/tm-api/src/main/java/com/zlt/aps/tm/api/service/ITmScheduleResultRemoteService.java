@@ -5,6 +5,7 @@ import com.ruoyi.common.constant.ServiceNameConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.zlt.aps.tm.api.domain.entity.TmScheduleResult;
+import com.zlt.aps.tm.api.domain.vo.TmAutoScheduleRequestVo;
 import com.zlt.aps.tm.api.domain.vo.TmScheduleShiftDateVO;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.cloud.openfeign.FeignClient;
@@ -37,6 +38,26 @@ public interface ITmScheduleResultRemoteService {
     @ApiOperation("校验唯一性")
     @PostMapping("/tmScheduleResult/checkUnique")
     String checkUnique(@RequestBody TmScheduleResult tmScheduleResultVO);
+
+    /**
+     * 校验胎面自动排程请求。
+     *
+     * @param request 自动排程请求
+     * @return 校验结果
+     */
+    @ApiOperation("校验胎面自动排程")
+    @PostMapping("/tmScheduleResult/validateAutoPlan")
+    AjaxResult validateAutoPlan(@RequestBody TmAutoScheduleRequestVo request);
+
+    /**
+     * 执行胎面自动排程。
+     *
+     * @param request 自动排程请求
+     * @return 自动排程结果
+     */
+    @ApiOperation("执行胎面自动排程")
+    @PostMapping("/tmScheduleResult/autoPlan")
+    AjaxResult autoPlan(@RequestBody TmAutoScheduleRequestVo request);
 
     @ApiOperation("导出列表")
     @PostMapping("/tmScheduleResult/exportData/{fileName}")
