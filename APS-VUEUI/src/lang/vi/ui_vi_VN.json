@@ -1683,6 +1683,7 @@
   "ui.data.column.tm.shiftConfig.planEndTime": "Thời gian kết thúc kế hoạch",
   "ui.data.column.tm.shiftConfig.crossDayFlag": "Có qua ngày không",
   "ui.data.column.tm.shiftConfig.openFlag": "Có mở ca không",
+  "ui.data.column.tm.shiftConfig.shiftHours": "Giờ ca",
   "ui.data.column.tm.scheduleResult.modelName": "Kết quả lịch trình mặt lốp",
   "ui.data.column.tm.scheduleResult.factoryCode": "Nhà máy",
   "ui.data.column.tm.scheduleResult.batchNo": "Số lô",

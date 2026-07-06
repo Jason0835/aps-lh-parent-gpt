@@ -644,6 +644,7 @@
   "ui.data.column.tm.shiftConfig.planEndTime": "Plan End Time",
   "ui.data.column.tm.shiftConfig.crossDayFlag": "Cross Day Flag",
   "ui.data.column.tm.shiftConfig.openFlag": "Open Flag",
+  "ui.data.column.tm.shiftConfig.shiftHours": "Shift Hours",
   "ui.data.column.tm.scheduleResult.modelName": "Tread Schedule Result",
   "ui.data.column.tm.scheduleResult.factoryCode": "Factory",
   "ui.data.column.tm.scheduleResult.batchNo": "Batch No",

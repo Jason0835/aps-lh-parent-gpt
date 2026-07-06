@@ -9,6 +9,7 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.text.Convert;
 import com.ruoyi.common4ui.core.controller.BaseUIController;
 import com.zlt.aps.tm.api.domain.entity.TmScheduleResult;
+import com.zlt.aps.tm.api.domain.vo.TmAutoScheduleRequestVo;
 import com.zlt.aps.tm.api.domain.vo.TmScheduleShiftDateVO;
 import com.zlt.aps.tm.api.service.ITmScheduleResultRemoteService;
 import com.zlt.file.encryptbyll.FileEncryptUtils;
@@ -104,6 +105,34 @@ public class TmScheduleResultUIController extends BaseUIController<TmScheduleRes
     @ResponseBody
     public String checkUnique(@RequestBody TmScheduleResult query) {
         return iTmScheduleResultService.checkUnique(query);
+    }
+
+    /**
+     * 校验胎面自动排程请求。
+     *
+     * @param request 自动排程请求
+     * @return 校验结果
+     */
+    @ApiOperation("校验胎面自动排程")
+    @PostMapping("/validateAutoPlan")
+    @RequiresPermissions("tm:tmScheduleResult:autoPlan")
+    @ResponseBody
+    public AjaxResult validateAutoPlan(@RequestBody TmAutoScheduleRequestVo request) {
+        return iTmScheduleResultService.validateAutoPlan(request);
+    }
+
+    /**
+     * 执行胎面自动排程。
+     *
+     * @param request 自动排程请求
+     * @return 自动排程结果
+     */
+    @ApiOperation("执行胎面自动排程")
+    @PostMapping("/autoPlan")
+    @RequiresPermissions("tm:tmScheduleResult:autoPlan")
+    @ResponseBody
+    public AjaxResult autoPlan(@RequestBody TmAutoScheduleRequestVo request) {
+        return iTmScheduleResultService.autoPlan(request);
     }
 
     /**

@@ -121,6 +121,9 @@ public class TmAutoScheduleDataLoadService {
     private TmDepthConfigMapper tmDepthConfigMapper;
 
     @Resource
+    private TmShiftConfigMapper tmShiftConfigMapper;
+
+    @Resource
     private TmAutoScheduleRedisCacheService tmAutoScheduleRedisCacheService = new TmAutoScheduleRedisCacheService();
 
     /**
@@ -233,8 +236,10 @@ public class TmAutoScheduleDataLoadService {
         fillCandidateGlueRule(context, candidateMap);
         fillCandidateSpecifyRule(context, candidateMap);
         fillCandidateSpeed(context, candidateMap);
-        fillCandidateMaintenance(context, candidateMap);
+        List<TmShiftConfig> shiftConfigList = this.loadOpenShiftConfigs(context);
+        fillCandidateMaintenance(context, candidateMap, shiftConfigList);
         fillCandidatePredecessor(context, candidateMap);
+        fillShiftHoursMap(context, shiftConfigList);
         return new ArrayList<>(candidateMap.values());
     }
 
@@ -366,12 +371,22 @@ public class TmAutoScheduleDataLoadService {
     /**
      * 填充候选机台排程日检修时长。
      *
-     * @param context      自动排程上下文
-     * @param candidateMap 候选机台映射
+     * <p>当存在启用班次配置时，按维修窗口与每个班次窗口的实际重叠分钟分摊到班次；
+     * 当班次配置缺失时，保留旧逻辑按排程自然日汇总到机台维度，避免基础数据缺失导致扣减完全失效。</p>
+     *
+     * @param context         自动排程上下文
+     * @param candidateMap    候选机台映射
+     * @param shiftConfigList 启用班次配置列表
      */
-    private void fillCandidateMaintenance(TmScheduleContext context, Map<String, TmMachineCandidate> candidateMap) {
+    private void fillCandidateMaintenance(TmScheduleContext context, Map<String, TmMachineCandidate> candidateMap,
+                                          List<TmShiftConfig> shiftConfigList) {
         if (tmMachineMaintenanceMapper == null || candidateMap.isEmpty()) {
             return;
+        }
+        Map<Integer, Date[]> shiftWindowMap = this.buildShiftWindowMap(context, shiftConfigList);
+        if (CollUtil.isNotEmpty(shiftWindowMap)) {
+            candidateMap.values().forEach(candidate -> shiftWindowMap.keySet()
+                    .forEach(shiftOrder -> candidate.getMaintenanceHoursByShift().put(shiftOrder, BigDecimal.ZERO)));
         }
         LambdaQueryWrapper<TmMachineMaintenance> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(TmMachineMaintenance::getFactoryCode, context.getFactoryCode());
@@ -379,19 +394,26 @@ public class TmAutoScheduleDataLoadService {
         List<TmMachineMaintenance> maintenanceList = tmMachineMaintenanceMapper.selectList(wrapper);
         Date dayStart = DateUtil.beginOfDay(context.getScheduleDate());
         Date dayEnd = DateUtil.endOfDay(context.getScheduleDate());
-        for (TmMachineMaintenance maintenance : maintenanceList) {
+        for (TmMachineMaintenance maintenance : nullToEmpty(maintenanceList)) {
             TmMachineCandidate candidate = candidateMap.get(maintenance.getMachineCode());
             if (candidate == null || maintenance.getStopStartTime() == null || maintenance.getStopEndTime() == null) {
                 continue;
             }
-            Date overlapStart = maintenance.getStopStartTime().after(dayStart) ? maintenance.getStopStartTime() : dayStart;
-            Date overlapEnd = maintenance.getStopEndTime().before(dayEnd) ? maintenance.getStopEndTime() : dayEnd;
-            if (!overlapStart.before(overlapEnd)) {
+            BigDecimal dayHours = this.calculateOverlapHours(maintenance.getStopStartTime(), maintenance.getStopEndTime(),
+                    dayStart, dayEnd);
+            candidate.setMaintenanceHours(nvl(candidate.getMaintenanceHours()).add(dayHours));
+            if (CollUtil.isEmpty(shiftWindowMap)) {
                 continue;
             }
-            BigDecimal hours = BigDecimal.valueOf(DateUtil.between(overlapStart, overlapEnd, DateUnit.MINUTE))
-                    .divide(BigDecimal.valueOf(60), 6, RoundingMode.HALF_UP);
-            candidate.setMaintenanceHours(nvl(candidate.getMaintenanceHours()).add(hours));
+            for (Map.Entry<Integer, Date[]> entry : shiftWindowMap.entrySet()) {
+                Date[] shiftWindow = entry.getValue();
+                BigDecimal shiftHours = this.calculateOverlapHours(maintenance.getStopStartTime(),
+                        maintenance.getStopEndTime(), shiftWindow[0], shiftWindow[1]);
+                if (shiftHours.compareTo(BigDecimal.ZERO) <= 0) {
+                    continue;
+                }
+                candidate.getMaintenanceHoursByShift().merge(entry.getKey(), shiftHours, BigDecimal::add);
+            }
         }
     }
 
@@ -445,6 +467,143 @@ public class TmAutoScheduleDataLoadService {
                 context.getFactoryCode(), DateUtil.formatDate(context.getScheduleDate()), DateUtil.formatDate(previousDate),
                 predecessorMap.size(), predecessorMap);
     }
+
+    /**
+     * 构建排程日各班次的时间窗口。
+     *
+     * <p>班次配置只保存时分秒，运行时结合当前排程日期生成完整时间；跨天班次的结束时间顺延一天，
+     * 用于把机台检修时长精确分摊到每个班次。</p>
+     *
+     * @param context         自动排程上下文
+     * @param shiftConfigList 启用班次配置列表
+     * @return 班次顺序到开始、结束时间的映射；配置不完整时跳过对应班次
+     */
+    private Map<Integer, Date[]> buildShiftWindowMap(TmScheduleContext context, List<TmShiftConfig> shiftConfigList) {
+        Map<Integer, Date[]> shiftWindowMap = new LinkedHashMap<>();
+        if (context == null || context.getScheduleDate() == null || CollUtil.isEmpty(shiftConfigList)) {
+            return shiftWindowMap;
+        }
+        String scheduleDateText = DateUtil.formatDate(context.getScheduleDate());
+        Date previousEndTime = null;
+        for (TmShiftConfig config : shiftConfigList) {
+            if (config == null || config.getShiftOrder() == null
+                    || StrUtil.isBlank(config.getPlanStartTime()) || StrUtil.isBlank(config.getPlanEndTime())) {
+                continue;
+            }
+            try {
+                Date startTime = DateUtil.parse(scheduleDateText + " " + config.getPlanStartTime());
+                Date endTime = DateUtil.parse(scheduleDateText + " " + config.getPlanEndTime());
+                if (YES.equals(config.getCrossDayFlag()) || !endTime.after(startTime)) {
+                    endTime = DateUtil.offsetDay(endTime, 1);
+                }
+                while (previousEndTime != null && startTime.before(previousEndTime)) {
+                    startTime = DateUtil.offsetDay(startTime, 1);
+                    endTime = DateUtil.offsetDay(endTime, 1);
+                }
+                shiftWindowMap.put(config.getShiftOrder(), new Date[]{startTime, endTime});
+                previousEndTime = endTime;
+            } catch (Exception exception) {
+                log.warn("[TM_SHIFT_WINDOW_PARSE_FAIL] factoryCode={}, scheduleDate={}, shiftOrder={}, startTime={}, endTime={}",
+                        context.getFactoryCode(), scheduleDateText, config.getShiftOrder(),
+                        config.getPlanStartTime(), config.getPlanEndTime(), exception);
+            }
+        }
+        return shiftWindowMap;
+    }
+
+    /**
+     * 计算两个时间段的重叠小时数。
+     *
+     * @param sourceStart 源时间段开始时间
+     * @param sourceEnd   源时间段结束时间
+     * @param targetStart 目标时间段开始时间
+     * @param targetEnd   目标时间段结束时间
+     * @return 重叠小时数；无重叠时返回 0
+     */
+    private BigDecimal calculateOverlapHours(Date sourceStart, Date sourceEnd, Date targetStart, Date targetEnd) {
+        if (sourceStart == null || sourceEnd == null || targetStart == null || targetEnd == null) {
+            return BigDecimal.ZERO;
+        }
+        Date overlapStart = sourceStart.after(targetStart) ? sourceStart : targetStart;
+        Date overlapEnd = sourceEnd.before(targetEnd) ? sourceEnd : targetEnd;
+        if (!overlapStart.before(overlapEnd)) {
+            return BigDecimal.ZERO;
+        }
+        return BigDecimal.valueOf(DateUtil.between(overlapStart, overlapEnd, DateUnit.MINUTE))
+                .divide(BigDecimal.valueOf(60), 6, RoundingMode.HALF_UP);
+    }
+
+    /**
+     * 将可能为空的列表转换为空列表兜底。
+     *
+     * @param sourceList 原始列表
+     * @param <T>        列表元素类型
+     * @return 非空列表
+     */
+    private <T> List<T> nullToEmpty(List<T> sourceList) {
+        return sourceList == null ? Collections.emptyList() : sourceList;
+    }
+
+    /**
+     * 加载工厂启用班次配置。
+     *
+     * <p>数据加载阶段只查询一次启用班次配置，后续检修产能扣减、班次小时数和任务时间窗口均复用该列表，
+     * 避免引擎层直接访问数据库。</p>
+     *
+     * @param context 自动排程上下文
+     * @return 启用班次配置列表；未配置时返回空列表
+     */
+    private List<TmShiftConfig> loadOpenShiftConfigs(TmScheduleContext context) {
+        if (tmShiftConfigMapper == null) {
+            return Collections.emptyList();
+        }
+        List<TmShiftConfig> configs = tmShiftConfigMapper.selectList(
+                new LambdaQueryWrapper<TmShiftConfig>()
+                        .eq(TmShiftConfig::getFactoryCode, context.getFactoryCode())
+                        .eq(TmShiftConfig::getOpenFlag, YES));
+        return nullToEmpty(configs).stream()
+                .filter(config -> config.getShiftOrder() != null)
+                .sorted(Comparator.comparing(TmShiftConfig::getShiftOrder))
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * 加载班次小时数和时间窗口映射。
+     *
+     * <p>查询工厂启用的班次配置，将班次顺序映射到班次时长和计划起止时间，
+     * 供机台分配阶段计算生产速度，并供任务链阶段推算预计开始和结束时间。</p>
+     *
+     * @param context 自动排程上下文
+     * @param shiftConfigList 启用班次配置列表
+     */
+    private void fillShiftHoursMap(TmScheduleContext context, List<TmShiftConfig> shiftConfigList) {
+        Map<Integer, BigDecimal> shiftHoursMap = new HashMap<>();
+        Map<Integer, TmShiftTimeWindow> shiftTimeWindowMap = new HashMap<>();
+        if (CollUtil.isEmpty(shiftConfigList)) {
+            context.setShiftHoursMap(shiftHoursMap);
+            context.setShiftTimeWindowMap(shiftTimeWindowMap);
+            return;
+        }
+        for (TmShiftConfig config : shiftConfigList) {
+            if (config.getShiftOrder() == null) {
+                continue;
+            }
+            if (config.getShiftHours() != null && config.getShiftHours() > 0) {
+                shiftHoursMap.put(config.getShiftOrder(), BigDecimal.valueOf(config.getShiftHours()));
+            }
+            TmShiftTimeWindow window = new TmShiftTimeWindow();
+            window.setShiftOrder(config.getShiftOrder());
+            window.setShiftCode(config.getShiftCode());
+            window.setPlanStartTime(config.getPlanStartTime());
+            window.setPlanEndTime(config.getPlanEndTime());
+            window.setCrossDayFlag(config.getCrossDayFlag());
+            window.setShiftHours(config.getShiftHours() == null ? null : BigDecimal.valueOf(config.getShiftHours()));
+            shiftTimeWindowMap.put(config.getShiftOrder(), window);
+        }
+        context.setShiftHoursMap(shiftHoursMap);
+        context.setShiftTimeWindowMap(shiftTimeWindowMap);
+    }
+
 
     /**
      * 从单条排程结果中解析最后一个有效班次任务。

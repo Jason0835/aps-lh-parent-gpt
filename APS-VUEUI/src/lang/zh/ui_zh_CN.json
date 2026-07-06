@@ -3489,6 +3489,7 @@
   "ui.data.column.tm.shiftConfig.planEndTime": "计划结束时间",
   "ui.data.column.tm.shiftConfig.crossDayFlag": "是否跨天",
   "ui.data.column.tm.shiftConfig.openFlag": "是否开班",
+  "ui.data.column.tm.shiftConfig.shiftHours": "班次时长（小时）",
   "ui.data.column.tm.scheduleResult.modelName": "胎面排程结果",
   "ui.data.column.tm.scheduleResult.factoryCode": "工厂",
   "ui.data.column.tm.scheduleResult.batchNo": "批次号",

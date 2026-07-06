@@ -86,6 +86,12 @@ public class TmScheduleContext {
     /** 单任务候选机台过滤和评分快照，key=任务业务键 */
     private Map<String, List<TmMachineCandidate>> candidateTraceMap = new HashMap<>();
 
+    /** 班次小时数映射，key=班次顺序(1~6)，来自 T_TM_SHIFT_CONFIG */
+    private Map<Integer, BigDecimal> shiftHoursMap = new HashMap<>();
+
+    /** 班次时间窗口映射，key=班次顺序(1~6)，来自 T_TM_SHIFT_CONFIG */
+    private Map<Integer, TmShiftTimeWindow> shiftTimeWindowMap = new HashMap<>();
+
     /**
      * 按参数编码读取本次排程参数快照。
      *
@@ -198,6 +204,14 @@ public class TmScheduleContext {
 
     public void setCandidateTraceMap(Map<String, List<TmMachineCandidate>> candidateTraceMap) {
         this.candidateTraceMap = candidateTraceMap == null ? new HashMap<>() : candidateTraceMap;
+    }
+
+    public void setShiftHoursMap(Map<Integer, BigDecimal> shiftHoursMap) {
+        this.shiftHoursMap = shiftHoursMap == null ? new HashMap<>() : shiftHoursMap;
+    }
+
+    public void setShiftTimeWindowMap(Map<Integer, TmShiftTimeWindow> shiftTimeWindowMap) {
+        this.shiftTimeWindowMap = shiftTimeWindowMap == null ? new HashMap<>() : shiftTimeWindowMap;
     }
 
     public void setLossRuleList(List<TmLossRule> lossRuleList) {

@@ -191,6 +191,14 @@ export default {
           inactiveValue: "0",
         },
         {
+          prop: "shiftHours",
+          label: this.$t("ui.data.column.tm.shiftConfig.shiftHours"),
+          span: 12,
+          type: "number",
+          min: 0,
+          max: 24,
+        },
+        {
           prop: "remark",
           label: this.$t("ui.common.column.remark"),
           span: 24,
