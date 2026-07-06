@@ -2,6 +2,7 @@ package com.zlt.aps.controller.tm;
 
 import com.alibaba.fastjson.JSON;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
+import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
@@ -155,7 +156,7 @@ public class TmScheduleResultUIController extends BaseUIController<TmScheduleRes
             query.setTreadCode(scheduleResult.getTreadCode());
             // 唯一性校验：tm的checkUnique返回String，"0"表示唯一，"1"表示不唯一
             String uniqueResult = iTmScheduleResultService.checkUnique(query);
-            if ("1".equals(uniqueResult)) {
+            if (UserConstants.NOT_UNIQUE.equals(uniqueResult)) {
                 if (sb1.length() > 0) {
                     sb1.append(",").append(query.getTreadCode());
                 } else {
