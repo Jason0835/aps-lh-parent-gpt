@@ -16,6 +16,7 @@ import com.zlt.aps.lh.api.domain.entity.LhScheFinishQty;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.api.domain.entity.LhSpecialMaterialBom;
 import com.zlt.aps.lh.api.domain.entity.LhSpecifyMachine;
+import com.zlt.aps.lh.api.enums.ConstructionStageEnum;
 import com.zlt.aps.lh.api.enums.DeleteFlagEnum;
 import com.zlt.aps.lh.api.enums.LhSpecialMaterialCategoryEnum;
 import com.zlt.aps.lh.api.enums.ScheduleStepEnum;
@@ -83,6 +84,7 @@ import java.util.stream.Collectors;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -1005,13 +1007,6 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
                                                                        int year,
                                                                        int month) {
         String locationText = formatFactoryYearMonth(context.getFactoryDisplayName(), year, month);
-        String monthPlanVersion = resolveMonthPlanVersion(context, year, month);
-        if (StringUtils.isEmpty(monthPlanVersion)) {
-            log.error("月生产计划加载失败，需求版本为空, factoryCode: {}, year: {}, month: {}",
-                    factoryCode, year, month);
-            interruptByDataIncomplete(context, String.format("%s 的定稿需求版本为空", locationText));
-            return new ArrayList<FactoryMonthPlanProductionFinalResult>(0);
-        }
         String productionVersion = resolveProductionVersion(context, year, month);
         if (StringUtils.isEmpty(productionVersion)) {
             log.error("月生产计划加载失败，排产版本为空, factoryCode: {}, year: {}, month: {}",
@@ -1019,16 +1014,19 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
             interruptByDataIncomplete(context, String.format("%s 的定稿排产版本为空", locationText));
             return new ArrayList<FactoryMonthPlanProductionFinalResult>(0);
         }
+        // 同一排产版本下可能同时存在原始需求版本和调整需求版本，不能用 MONTH_PLAN_VERSION 过滤。
         LambdaQueryWrapper<FactoryMonthPlanProductionFinalResult> wrapper = new LambdaQueryWrapper<FactoryMonthPlanProductionFinalResult>()
                 .eq(FactoryMonthPlanProductionFinalResult::getFactoryCode, factoryCode)
                 .eq(FactoryMonthPlanProductionFinalResult::getYear, year)
                 .eq(FactoryMonthPlanProductionFinalResult::getMonth, month)
-                .eq(FactoryMonthPlanProductionFinalResult::getMonthPlanVersion, monthPlanVersion)
                 .eq(FactoryMonthPlanProductionFinalResult::getProductionVersion, productionVersion)
                 .eq(FactoryMonthPlanProductionFinalResult::getIsDelete, DeleteFlagEnum.NORMAL.getCode());
         List<FactoryMonthPlanProductionFinalResult> monthPlanList = monthPlanMapper.selectList(wrapper);
-        return monthPlanList != null ? monthPlanList : new ArrayList<FactoryMonthPlanProductionFinalResult>(0);
+        List<FactoryMonthPlanProductionFinalResult> resultList = monthPlanList != null
+                ? monthPlanList : new ArrayList<FactoryMonthPlanProductionFinalResult>(0);
+        return resultList;
     }
+
 
     /**
      * 为 S4.3 SKU 归集选择每个物料唯一的基础月计划。
