@@ -91,3 +91,11 @@ export function listScheduleShiftDates(query) {
     data: query
   })
 }
+
+export function changeReleaseStatus(data) {
+  return request({
+    url: '/tm/tmScheduleResult/changeReleaseStatus',
+    method: 'post',
+    data: data
+  })
+}

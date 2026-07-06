@@ -12,6 +12,7 @@ import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * 胎面排程结果表 Feign接口
@@ -80,4 +81,8 @@ public interface ITmScheduleResultRemoteService {
     @ApiOperation("获取胎面排程班次日期列表")
     @PostMapping("/tmScheduleResult/listScheduleShiftDates")
     List<TmScheduleShiftDateVO> listScheduleShiftDates(@RequestBody TmScheduleResult scheduleResult);
+
+    @ApiOperation("更改发布状态")
+    @PostMapping("/tmScheduleResult/changeReleaseStatus")
+    AjaxResult changeReleaseStatus(@RequestBody Map<String, Object> params);
 }

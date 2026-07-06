@@ -27,6 +27,8 @@ import javax.annotation.Resource;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * 胎面排程结果表 控制层
@@ -206,6 +208,17 @@ public class TmScheduleResultController extends AbstractDocBizController<TmSched
     @PostMapping("/listScheduleShiftDates")
     public List<TmScheduleShiftDateVO> listScheduleShiftDates(@RequestBody TmScheduleResult scheduleResult) {
         return tmScheduleResultService.listScheduleShiftDates(scheduleResult.getScheduleDate());
+    }
+
+    @Log(title = "ui.data.column.tm.scheduleResult.modelName", businessType = BusinessType.UPDATE)
+    @ApiOperation("更改发布状态")
+    @PostMapping("/changeReleaseStatus")
+    public AjaxResult changeReleaseStatus(@RequestBody Map<String, Object> params) {
+        @SuppressWarnings("unchecked")
+        List<Integer> idsRaw = (List<Integer>) params.get("ids");
+        String isRelease = (String) params.get("isRelease");
+        List<Long> ids = idsRaw.stream().map(Integer::longValue).collect(Collectors.toList());
+        return toAjax(tmScheduleResultService.changeReleaseStatus(ids, isRelease));
     }
 
     @Log(title = "ui.data.column.tm.scheduleResult.modelName", businessType = BusinessType.IMPORT)
