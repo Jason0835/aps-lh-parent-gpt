@@ -270,14 +270,24 @@ public class Cd90InsertRollingServiceImpl implements Cd90InsertRollingService {
                     String.format("class%dPlanQty", currentClassIndex), transferQuantity.doubleValue());
             insertRequest.setFieldValueByFieldName(
                     String.format("class%dProduceOrder", currentClassIndex),
-                    this.nextTargetProduceOrder(workingResults, transferRequest.getTargetMachineCode(),
-                            currentClassIndex));
+                    this.resolveTransferProduceOrder(transferRequest, workingResults, currentClassIndex));
             insertRequest.setFieldValueByFieldName(
                     String.format("class%dAnalysisInput", currentClassIndex), "转机台");
         }
         this.compactSourceMachineOrders(workingResults, transferSources, transferRequest.getSourceMachineCode(),
                 startClassIndex, changedById);
         this.clearTransferSourceClasses(transferSources, startClassIndex, changedById, replacementLanes);
+    }
+
+    private int resolveTransferProduceOrder(Cd90TransferMachineRequest transferRequest,
+                                            List<Cd90ScheduleResult> workingResults,
+                                            int classIndex) {
+        Integer produceOrder = (Integer) transferRequest.getFieldValueByFieldName(String.format(
+                "class%dProduceOrder", classIndex));
+        if (produceOrder != null && produceOrder > 0) {
+            return produceOrder;
+        }
+        return this.nextTargetProduceOrder(workingResults, transferRequest.getTargetMachineCode(), classIndex);
     }
 
     private int nextTargetProduceOrder(List<Cd90ScheduleResult> workingResults,

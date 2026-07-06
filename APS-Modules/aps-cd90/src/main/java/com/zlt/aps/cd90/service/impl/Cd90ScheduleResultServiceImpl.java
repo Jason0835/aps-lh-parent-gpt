@@ -383,13 +383,21 @@ public class Cd90ScheduleResultServiceImpl extends AbstractDocService<Cd90Schedu
         }
         List<Cd90ScheduleResult> existing = this.selectByDateAndFactory(
                 request.getScheduleDate(), request.getFactoryCode());
-        boolean hasTransferPlan = existing.stream()
+        List<Cd90ScheduleResult> transferPlans = existing.stream()
                 .filter(item -> request.getSourceMachineCode().equals(item.getMachineCode()))
                 .filter(item -> request.getClothCode().equals(item.getClothCode()))
+                .collect(Collectors.toList());
+        boolean hasTransferPlan = transferPlans.stream()
                 .anyMatch(item -> IntStream.rangeClosed(startClassIndex, 6)
                         .anyMatch(classIndex -> readPlanQuantity(item, classIndex) > 0D));
-        return hasTransferPlan ? AjaxResult.success()
-                : AjaxResult.error("原机台从起始班次开始没有可转走的帘布计划");
+        if (!hasTransferPlan) {
+            return AjaxResult.error("原机台从起始班次开始没有可转走的帘布计划");
+        }
+        boolean missingProduceOrder = transferPlans.stream()
+                .anyMatch(item -> IntStream.rangeClosed(startClassIndex, 6)
+                        .anyMatch(classIndex -> readPlanQuantity(item, classIndex) > 0D
+                                && readTransferProduceOrder(request, classIndex) == null));
+        return missingProduceOrder ? AjaxResult.error("转机台目标顺序不能为空") : AjaxResult.success();
     }
 
     @Override
@@ -531,6 +539,12 @@ public class Cd90ScheduleResultServiceImpl extends AbstractDocService<Cd90Schedu
     private double readPlanQuantity(Cd90ScheduleResult result, int classIndex) {
         Double value = readDouble(result, String.format("class%dPlanQty", classIndex));
         return value == null ? 0D : value;
+    }
+
+    private Integer readTransferProduceOrder(Cd90TransferMachineRequest request, int classIndex) {
+        Integer produceOrder = (Integer) request.getFieldValueByFieldName(String.format(
+                "class%dProduceOrder", classIndex));
+        return produceOrder != null && produceOrder > 0 ? produceOrder : null;
     }
 
     private Double readDouble(Cd90ScheduleResult result, String fieldName) {
