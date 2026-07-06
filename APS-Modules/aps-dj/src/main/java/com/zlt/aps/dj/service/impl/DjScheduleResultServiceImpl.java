@@ -49,6 +49,7 @@ import com.zlt.aps.dj.api.domain.entity.DjParams;
 import com.zlt.aps.dj.api.domain.entity.DjScheduleResult;
 import com.zlt.aps.dj.api.domain.entity.DjShiftConfig;
 import com.zlt.aps.dj.engine.constant.DjEngineConstants;
+import com.zlt.aps.dj.engine.service.impl.DjEngineNewServiceImpl;
 import com.zlt.aps.dj.engine.vo.DjScheduleResultVo;
 import com.zlt.aps.dj.mapper.DjScheduleResultMapper;
 import com.zlt.aps.dj.mapper.DjParamsMapper;
@@ -60,12 +61,15 @@ import com.zlt.aps.dj.service.IDjShiftConfigService;
 import com.zlt.aps.utils.BillUtils;
 import com.zlt.bill.common.service.AbstractBillService;
 
+import lombok.extern.slf4j.Slf4j;
+
 /**
  * 垫胶胶排程结果Service业务层处理
  *
  * @author zlt
  * @date 2026-06-24
  */
+@Slf4j
 @Service
 public class DjScheduleResultServiceImpl extends AbstractBillService<DjScheduleResult>
         implements DjScheduleResultService {
@@ -167,16 +171,16 @@ public class DjScheduleResultServiceImpl extends AbstractBillService<DjScheduleR
         // 1. 确定排程首班班次
         String startShiftClass = this.getStartShiftClass(list);
         if (startShiftClass == null) {
-            startShiftClass = "03"; // 默认中班
+            startShiftClass = ClassNumThreePlanEnums.CLASS_DAY.getClassIndex(); // 默认中班
         }
 
         // 首班=早班时，不需要加载 T-1 日数据
-        if ("02".equals(startShiftClass)) {
+        if (ClassNumThreePlanEnums.CLASS_MORNING.getClassIndex().equals(startShiftClass)) {
             return;
         }
 
         // 首班=夜班时，需要加载早班+中班；首班=中班时，只需要加载早班
-        boolean needClass1 = "01".equals(startShiftClass); // 是否需要中班数据
+        boolean needClass1 = ClassNumThreePlanEnums.CLASS_NIGHT.getClassIndex().equals(startShiftClass); // 是否需要中班数据
 
         // 2. 加载 T-1 日排产结果
         Date prevDate = DateUtils.addDays(scheduleDate, -1);
@@ -200,10 +204,12 @@ public class DjScheduleResultServiceImpl extends AbstractBillService<DjScheduleR
             prevScheduleShiftClass = startShiftClass; // 与 T 日一致
         }
 
-        // 早班("02")在 T-1 日对应的 classX
-        int earlyClassIndex = this.realShiftToClassIndex(prevScheduleShiftClass, "02");
-        // 中班("03")在 T-1 日对应的 classX
-        int middleClassIndex = this.realShiftToClassIndex(prevScheduleShiftClass, "03");
+        // 早班在 T-1 日对应的 classX
+        int earlyClassIndex = this.realShiftToClassIndex(prevScheduleShiftClass,
+                ClassNumThreePlanEnums.CLASS_MORNING.getClassIndex());
+        // 中班在 T-1 日对应的 classX
+        int middleClassIndex = this.realShiftToClassIndex(prevScheduleShiftClass,
+                ClassNumThreePlanEnums.CLASS_DAY.getClassIndex());
 
         // 4. 按 machineCode + paddingCode 汇总 T-1 日数据
         Map<String, DjScheduleResult> prevDayEarlyFirstMap = new HashMap<>();
@@ -312,14 +318,15 @@ public class DjScheduleResultServiceImpl extends AbstractBillService<DjScheduleR
         try {
             List<DjShiftConfig> activeShifts = djShiftConfigService.listActiveShifts();
             for (DjShiftConfig shift : activeShifts) {
-                if ("1".equals(shift.getCrossDayFlag())) {
+                if (ApsConstant.TRUE.equals(shift.getCrossDayFlag())) {
                     return shift.getShiftCode();
                 }
             }
         } catch (Exception e) {
             // 查询失败时使用默认值
+            log.error(e.getMessage(), e);
         }
-        return "03";
+        return ClassNumThreePlanEnums.CLASS_NIGHT.getClassIndex();
     }
 
     /**
