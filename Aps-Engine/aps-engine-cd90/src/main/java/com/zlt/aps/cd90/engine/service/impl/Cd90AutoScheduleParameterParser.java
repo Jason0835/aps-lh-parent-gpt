@@ -92,7 +92,7 @@ public class Cd90AutoScheduleParameterParser {
                         Cd90AutoScheduleParamCode.PARTIAL_MIN_VEHICLE_COUNT))
                 .agingPeriodHours(positiveInt(values,
                         Cd90AutoScheduleParamCode.AGING_PERIOD_LIMIT))
-                .newSpecLookbackDays(this.positiveInt(values,
+                .newSpecLookbackDays(this.nonNegativeInt(values,
                         Cd90AutoScheduleParamCode.NEW_SPEC_LOOKBACK_DAYS))
                 .newSpecAdvanceDays(this.nonNegativeInt(values,
                         Cd90AutoScheduleParamCode.NEW_SPEC_ADVANCE_DAYS))

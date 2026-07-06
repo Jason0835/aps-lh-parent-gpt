@@ -490,7 +490,8 @@ public class Cd90InsertRollingServiceImpl implements Cd90InsertRollingService {
         BigDecimal toolingQuantity = vehicleQuantity.multiply(BigDecimal.valueOf(availableTooling));
         BigDecimal trialQuantity = requestedQuantity.min(toolingQuantity);
         Cd90StorageLaneAllocationResult allocation = laneAllocator.allocate(
-                segment.result.getClothCode(), trialQuantity, vehicleQuantity, state.getLanes());
+                segment.result.getClothCode(), trialQuantity, vehicleQuantity,
+                state.getLanes(), segment.hardInsert);
         if (!allocation.isSuccess() || allocation.getAllocatedVehicleCount() <= 0) {
             return new LaneCommit(BigDecimal.ZERO, Collections.emptyList(), 0,
                     allocation.getFailureReason());

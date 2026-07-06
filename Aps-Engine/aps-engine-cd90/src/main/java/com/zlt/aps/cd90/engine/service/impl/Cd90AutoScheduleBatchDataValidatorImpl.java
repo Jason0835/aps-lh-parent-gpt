@@ -3,7 +3,10 @@ package com.zlt.aps.cd90.engine.service.impl;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.zlt.aps.cd90.api.domain.entity.Cd90CurlLength;
 import com.zlt.aps.cd90.api.domain.entity.Cd90MachineInfo;
+import com.zlt.aps.cd90.api.domain.entity.Cd90Params;
 import com.zlt.aps.cd90.api.domain.entity.Cd90StorageLaneLimit;
+import com.zlt.aps.cd90.engine.constant.Cd90AutoScheduleParamCode;
+import com.zlt.aps.cd90.engine.mapper.Cd90AutoScheduleParamsMapper;
 import com.zlt.aps.cd90.engine.mapper.Cd90EngineConstructionMapper;
 import com.zlt.aps.cd90.engine.mapper.Cd90EngineCurlLengthMapper;
 import com.zlt.aps.cd90.engine.mapper.Cd90EngineCxScheduleMapper;
@@ -56,6 +59,7 @@ public class Cd90AutoScheduleBatchDataValidatorImpl implements Cd90AutoScheduleB
     private final Cd90EngineCurlLengthMapper curlLengthMapper;
     private final Cd90EngineMachineInfoMapper machineInfoMapper;
     private final Cd90EngineStorageLaneMapper storageLaneMapper;
+    private final Cd90AutoScheduleParamsMapper paramsMapper;
 
     @Override
     public Cd90BatchDataCheckResult check(String factoryCode, LocalDate scheduleDate) {
@@ -251,7 +255,9 @@ public class Cd90AutoScheduleBatchDataValidatorImpl implements Cd90AutoScheduleB
     /**
      * 批次级检查：卷曲长度配置。
      * 对施工中出现的每个帘布代号，要求 t_cd90_curl_length 有记录且 CURL_LENGTH > 0。
-     * 不查 CRIMP_LENGTH 兜底参数，严格要基础数据完整。
+     * 若某帘布未维护标准卷曲长度，但参数 CRIMP_LENGTH (SYS0701011) 已配置有效正值，
+     * 则降级为 warning（排程运行时会使用该参数兜底）；
+     * 若兜底参数也未配置，则报 error 阻止排程。
      */
     private void checkCurlLength(Cd90BatchDataCheckResult.Builder builder,
                                   String factoryCode,
@@ -266,18 +272,46 @@ public class Cd90AutoScheduleBatchDataValidatorImpl implements Cd90AutoScheduleB
         Map<String, Cd90CurlLength> curlByCloth = curls.stream()
                 .collect(Collectors.toMap(Cd90CurlLength::getClothCode,
                         item -> item, (left, right) -> left, LinkedHashMap::new));
+
+        // 查询 CRIMP_LENGTH 兜底参数是否已配置有效正值
+        boolean hasFallback = false;
+        try {
+            Cd90Params fallbackParam = paramsMapper.selectOne(
+                    Wrappers.<Cd90Params>lambdaQuery()
+                            .eq(Cd90Params::getFactoryCode, factoryCode)
+                            .eq(Cd90Params::getParamCode, Cd90AutoScheduleParamCode.CRIMP_LENGTH));
+            if (fallbackParam != null) {
+                BigDecimal fb = new BigDecimal(fallbackParam.getParamValue());
+                hasFallback = fb != null && fb.signum() > 0;
+            }
+        } catch (RuntimeException ignored) {
+            // 解析失败当作无可兜底
+        }
+
         for (String clothCode : clothCodes) {
             Cd90CurlLength curl = curlByCloth.get(clothCode);
             if (curl == null) {
-                builder.addError("卷曲长度", "DATA_MISSING",
-                        "帘布 " + clothCode + " 卷曲长度未维护",
-                        "请在卷曲长度配置页面维护帘布 " + clothCode + " 的卷曲长度");
+                if (hasFallback) {
+                    builder.addWarning("卷曲长度", "FALLBACK_CRIMP_LENGTH",
+                            "帘布 " + clothCode + " 卷曲长度未维护，将使用参数CRIMP_LENGTH兜底",
+                            "建议在卷曲长度配置页面维护帘布 " + clothCode + " 的标准卷曲长度");
+                } else {
+                    builder.addError("卷曲长度", "DATA_MISSING",
+                            "帘布 " + clothCode + " 卷曲长度未维护且兜底参数CRIMP_LENGTH也未配置",
+                            "请在卷曲长度配置页面维护帘布 " + clothCode + " 的卷曲长度");
+                }
                 continue;
             }
             if (curl.getCurlLength() == null || curl.getCurlLength() <= 0) {
-                builder.addError("卷曲长度", "DATA_MISSING",
-                        "帘布 " + clothCode + " 卷曲长度非正",
-                        "请在卷曲长度配置页面维护帘布 " + clothCode + " 的卷曲长度且大于0");
+                if (hasFallback) {
+                    builder.addWarning("卷曲长度", "FALLBACK_CRIMP_LENGTH",
+                            "帘布 " + clothCode + " 卷曲长度非正，将使用参数CRIMP_LENGTH兜底",
+                            "建议在卷曲长度配置页面维护帘布 " + clothCode + " 的标准卷曲长度且大于0");
+                } else {
+                    builder.addError("卷曲长度", "DATA_MISSING",
+                            "帘布 " + clothCode + " 卷曲长度非正且兜底参数CRIMP_LENGTH也未配置",
+                            "请在卷曲长度配置页面维护帘布 " + clothCode + " 的卷曲长度且大于0");
+                }
             }
         }
     }

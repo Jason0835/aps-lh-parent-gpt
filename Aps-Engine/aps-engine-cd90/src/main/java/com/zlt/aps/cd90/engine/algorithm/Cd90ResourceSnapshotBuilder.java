@@ -78,7 +78,9 @@ public class Cd90ResourceSnapshotBuilder {
             }
             if (lane.getVehicleCount() > 0 && lane.getClothCode() != null
                     && !lane.getClothCode().equals(inbound.getClothCode())) {
-                throw new IllegalArgumentException("同一库排不能恢复不同帘布入库");
+                log.warn("[直裁库排] 入库库位 {} 已被帘布 {} 占用(原计划入库帘布 {}),跳过此条入库记录",
+                        inbound.getLaneCode(), lane.getClothCode(), inbound.getClothCode());
+                return;
             }
             lane.setClothCode(inbound.getClothCode());
             lane.setVehicleCount(lane.getVehicleCount() + inbound.getVehicleCount());
