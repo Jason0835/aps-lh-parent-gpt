@@ -95,7 +95,7 @@
         </el-button>
         <el-button
           type="primary"
-          v-hasPermi="['nc:finishQty:import']"
+          v-hasPermi="['dj:finishQty:import']"
           @click="$refs.tltUploadForm3.handleImport(importDefaultValue)"
         >
           {{ $t("完成量导入") }}
@@ -249,24 +249,15 @@ export default {
       //   pageSize: 20,
       //   total: 0,
       // },
-      page: undefined,
+      page: {
+        current: 1,
+        pageSize: 20,
+        total: 0,
+        pageSizes: [10, 20, 50, 100, 200, 500],
+      },
       sort: {},
-      search: {
-        factoryCode: '',
-        scheduleDate: '',
-        paddingCode: '',
-        glueCode: '',
-        releaseStatus: '',
-        machineCode: '',
-      },
-      query: {
-        factoryCode: '',
-        scheduleDate: '',
-        paddingCode: '',
-        glueCode: '',
-        releaseStatus: '',
-        machineCode: '',
-      },
+      search: {},
+      query: {},
       importDefaultValue: {
         scheduleDate: moment().add(1, "days").format("YYYY-MM-DD"),
       },
@@ -817,7 +808,6 @@ export default {
       });
     },
 
-    // 排程日期变更后自动查询
     handleScheduleDateChange(val) {
       this.search = {
         ...this.search,
@@ -837,8 +827,10 @@ export default {
     },
     handleSearch(data) {
       this.query = data;
-      // this.$set(this.page, "current", 1);
+      this.$set(this.page, "current", 1);
       this.getList();
+
+      // 更新班次表头（排程日期变更后需要重新获取班次）
       getWorkClass({ scheduleDate: this.getEffectiveScheduleDate() }).then((res) => {
         this.classHeaders = res;
       });
@@ -962,15 +954,15 @@ export default {
     async getList() {
       try {
         this.loading = true;
-        this.getStat();
+        await this.getStat();
         const data = await listScheduleResult(this.formatParams());
         console.log(data);
         this.data = data.rows;
-        // 记录排产起始班次用于动态显示汇总标签
-        this.scheduleShiftClass = data.rows && data.rows.length > 0 && data.rows[0].scheduleShiftClass
-          ? data.rows[0].scheduleShiftClass : '01';
+        // 记录排产起始班次用于动态显示汇总标签（从getSummaryVo接口获取）
+        this.scheduleShiftClass = this.stat && this.stat.scheduleShiftClass
+          ? this.stat.scheduleShiftClass : '01';
         // 根据首班班次决定是否展示 T-1 日中班栏位
-        this.showPrevDayClass1 = data.rows && data.rows.length > 0 && data.rows[0].scheduleShiftClass === '01';
+        this.showPrevDayClass1 = this.stat && this.stat.scheduleShiftClass === '01';
         // this.page.total = data.total;
       } catch (error) {
         console.error(error);
@@ -1005,7 +997,7 @@ export default {
   },
   created() {
     // 清除之前持久化的错误列顺序，保留拖拽功能但不再恢复错误状态
-    localStorage.removeItem("djScheduleMainTable");
+    // localStorage.removeItem("djScheduleMainTable");
     //设置默认排程时间
     let date = moment().add(1, "days").format("YYYY-MM-DD");
     // date = "2023-06-01"; //test
@@ -1025,9 +1017,9 @@ export default {
       this.classHeaders = res;
     });
     this.getList();
-    getWorkClass({ scheduleDate: this.getEffectiveScheduleDate() }).then((res) => {
-      this.classHeaders = res;
-    });
+  },
+  activated() {
+    this.getList();
   },
 };
 </script>
