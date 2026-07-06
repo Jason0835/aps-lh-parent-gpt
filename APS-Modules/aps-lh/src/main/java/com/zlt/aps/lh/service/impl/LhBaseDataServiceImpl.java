@@ -231,6 +231,7 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
         Date earlyProductionLookupEndDate = LhScheduleTimeUtil.addDays(endDate, earlyProductionDaysThreshold);
         Map<String, LocalDate> requiredMonthMap = resolveRequiredMonthMap(startDate, earlyProductionLookupEndDate);
         // 喷砂时间允许前移一天，工作日历与设备停机需覆盖 T-1；清洗计划仍按当前排程窗口加载。
+        // 设备停机、工作日历沿用 T-1 覆盖范围，保证滚动继承和跨日停机判断可复用同一窗口。
         Date calendarControlStartDate = LhScheduleTimeUtil.addDays(startDate, -1);
 
         // 获取年月信息（按排程目标日取月计划所属年月）
@@ -257,7 +258,7 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
 
         // 2. 创建异步任务并建立任务间的依赖关系：
         //    - 月生产计划（monthPlanFuture）是特殊物料清单和胎胚库存的前置依赖，后者通过 thenCompose 串联。
-        //    - 硫化机台信息（machineInfoFuture）是模具清洗计划的前置依赖，清洗计划需要根据已加载的机台列表过滤查询条件。
+        //    - 干冰/喷砂清洗已统一并入设备停机计划，不再加载旧模具清洗表。
         //    - 机台信息与月计划无依赖关系，两者可并发加载。
         CompletableFuture<Void> monthPlanFuture = runDataInitTaskAsync("月生产计划",
                 () -> loadMonthPlan(context, factoryCode, requiredMonthMap),
@@ -285,9 +286,6 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
         CompletableFuture<Void> machineInfoFuture = runDataInitTaskAsync("硫化机台信息",
                 () -> loadMachineInfo(context, factoryCode),
                 () -> sizeOf(context.getMachineInfoMap()));
-        CompletableFuture<Void> cleaningPlanFuture = runAfterDataInitTask(machineInfoFuture, "模具清洗计划",
-                () -> loadCleaningPlan(context, factoryCode, startDate, endDate),
-                () -> sizeOf(context.getCleaningPlanList()));
 
         // 3. 等待所有无依赖的并行任务完成（含已通过 thenCompose 串联的依赖链）。
         //    使用 CompletableFuture.allOf().join() 实现屏障同步：
@@ -311,7 +309,6 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
                 skuMouldRelFuture,
                 modelInfoFuture,
                 machineInfoFuture,
-                cleaningPlanFuture,
                 runDataInitTaskAsync("前日物料日完成量",
                         () -> loadDayFinishQty(context, factoryCode, previousDataDate),
                         () -> sizeOf(context.getMaterialDayFinishedQtyMap())),

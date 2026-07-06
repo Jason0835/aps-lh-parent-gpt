@@ -5,6 +5,7 @@ import com.zlt.aps.lh.api.constant.LhScheduleConstant;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -32,6 +33,8 @@ public final class ShiftFieldUtil {
 
     private static final String SHIFT_END_MARK = "1";
 
+    private static final String ANALYSIS_SEPARATOR = ",";
+
     private ShiftFieldUtil() {
     }
 
@@ -55,21 +58,6 @@ public final class ShiftFieldUtil {
         BeanUtil.setProperty(result, prefix + "PlanQty", qty);
         BeanUtil.setProperty(result, prefix + "StartTime", startTime);
         BeanUtil.setProperty(result, prefix + "EndTime", endTime);
-    }
-
-    /**
-     * 设置班次完成量
-     *
-     * @param result     排程结果
-     * @param shiftIndex 班次索引 1～8
-     * @param finishQty  完成量
-     */
-    public static void setShiftFinishQty(LhScheduleResult result, int shiftIndex, Integer finishQty) {
-        if (!isValidIndex(shiftIndex)) {
-            log.warn("未知班次索引: {}", shiftIndex);
-            return;
-        }
-        BeanUtil.setProperty(result, propertyPrefix(shiftIndex) + "FinishQty", finishQty);
     }
 
     /**
@@ -333,6 +321,31 @@ public final class ShiftFieldUtil {
             return;
         }
         BeanUtil.setProperty(result, propertyPrefix(shiftIndex) + "Analysis", analysis);
+    }
+
+    /**
+     * 向指定班次追加原因分析，已有相同原因时不重复写入。
+     *
+     * @param result 排程结果
+     * @param shiftIndex 班次索引
+     * @param analysis 原因分析
+     */
+    public static void appendShiftAnalysis(LhScheduleResult result, int shiftIndex, String analysis) {
+        if (StringUtils.isEmpty(analysis)) {
+            return;
+        }
+        String currentAnalysis = getShiftAnalysis(result, shiftIndex);
+        if (StringUtils.isEmpty(currentAnalysis)) {
+            setShiftAnalysis(result, shiftIndex, analysis);
+            return;
+        }
+        String[] existsAnalysisArray = currentAnalysis.split(ANALYSIS_SEPARATOR);
+        for (String existsAnalysis : existsAnalysisArray) {
+            if (StringUtils.equals(StringUtils.trim(existsAnalysis), analysis)) {
+                return;
+            }
+        }
+        setShiftAnalysis(result, shiftIndex, currentAnalysis + ANALYSIS_SEPARATOR + analysis);
     }
 
     /**

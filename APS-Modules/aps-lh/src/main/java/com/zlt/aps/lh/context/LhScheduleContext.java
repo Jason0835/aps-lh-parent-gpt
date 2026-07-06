@@ -181,7 +181,7 @@ public class LhScheduleContext {
      */
     private Map<String, LhMachineInfo> machineInfoMap = new LinkedHashMap<>();
     /**
-     * 模具清洗计划列表
+     * 旧模具清洗计划兼容列表；干冰/喷砂清洗排程不再使用该列表作为来源
      */
     private List<LhMouldCleanPlan> cleaningPlanList = new ArrayList<>();
     /**
