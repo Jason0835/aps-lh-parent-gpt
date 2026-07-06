@@ -1078,9 +1078,15 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                 // businessTargetQty 保留进入本 SKU 时的业务目标，避免 dayN 节奏量被当前机台吃完后提前退出。
                 int businessTargetQty = Objects.nonNull(baseTargetScheduleQty)
                         ? Math.max(0, baseTargetScheduleQty) : dynamicTargetQty;
+                /*
+                 * dayN 模拟已确认当前机台数满足节奏时，剩余业务目标不能再驱动普通空闲机台开机；
+                 * 后续是否继续只交给尾部产能判断，保留续作收尾释放机台的承接能力。
+                 */
+                boolean needMoreMachineForTailDecision = needMoreMachine(context, sku)
+                        && !segment.isStopAfterCurrentForSmallShortage();
                 boolean continueForTailCapacityBeforeRemaining = shouldContinueForTailCapacity(
                         context, sku, candidates, excludedMachineCodes, machineCode,
-                        dynamicTargetQty, totalScheduledQty, businessTargetQty, needMoreMachine(context, sku));
+                        dynamicTargetQty, totalScheduledQty, businessTargetQty, needMoreMachineForTailDecision);
                 if (segment.isStopAfterCurrentForSmallShortage() && !continueForTailCapacityBeforeRemaining) {
                     // 小额欠产允许滚动时，当前机台已覆盖后续日计划，不再为了首日欠产余额继续扩机。
                     dynamicTargetQty = totalScheduledQty;
@@ -1107,7 +1113,9 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                         LhScheduleTimeUtil.formatDateTime(productionStartTime));
                 logNewSpecMachinePlanDecision(sku, quantityPolicy, isEnding, singleMachineWindowFill,
                         dynamicTargetQty, maxQtyToWindowEnd, machinePlanQty, machineScheduledQty);
-                boolean needMoreMachineAfterCurrent = needMoreMachine(context, sku);
+                // 同一口径用于本机台落地后的退出判断，避免前后两次判断结果不一致。
+                boolean needMoreMachineAfterCurrent = needMoreMachine(context, sku)
+                        && !segment.isStopAfterCurrentForSmallShortage();
                 boolean continueForTailCapacity = shouldContinueForTailCapacity(
                         context, sku, candidates, excludedMachineCodes, machineCode,
                         dynamicTargetQty, totalScheduledQty, businessTargetQty, needMoreMachineAfterCurrent);
@@ -1672,7 +1680,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
     }
 
     /**
-     * 初始化新增待排SKU类型计数，供选机阶段日志与特殊机台保护规则复用。
+     * 初始化新增待排SKU类型计数，供选机阶段日志和规则排查复用。
      *
      * @param context 排程上下文
      */
@@ -1690,8 +1698,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
 
     /**
      * 刷新新增待排SKU类型计数。
-     * <p>小批量单控保留只统计“当前窗口内仍有dayN剩余额度”的小批量SKU，
-     * 避免窗口额度已为0的小批量继续冻结单控机台。</p>
+     * <p>小批量已并入正规组排序；这里仍保留独立计数，只用于日志和规则排查。</p>
      *
      * @param context 排程上下文
      */
@@ -1728,7 +1735,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
 
     /**
      * 判断小批量SKU在当前窗口内是否仍有待排日计划额度。
-     * <p>只要窗口内 dayN 全为0，即使SKU类型上属于小批量，也不再继续占用单控保留名额。</p>
+     * <p>只要窗口内 dayN 全为0，即使SKU类型上属于小批量，也不再计入待排小批量统计。</p>
      *
      * @param sku SKU
      * @return true-窗口内仍有待排额度
@@ -1917,13 +1924,6 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         }
         if (isTypeRuleBlocked(context, sku) && isTrialConstructionStage(sku)) {
             return "试制SKU只能使用单控机台，但当前无可用单控机台或单控机台产能不足，无法排产";
-        }
-        if (isTypeRuleBlocked(context, sku)
-                && !isTrialConstructionStage(sku)
-                && !isMassTrialSku(sku)
-                && context != null
-                && context.getPendingSmallBatchNewSpecSkuCount() > 0) {
-            return "待排小批量SKU未完成，单控机台优先保留给小批量SKU，当前正规SKU无法使用单控机台";
         }
         if (isSpecialMaterialSupportBlocked(context, sku)) {
             return "特殊材料SKU无匹配特殊支持机台，无法排产";
@@ -2431,7 +2431,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
             return preferredContinuousMachine;
         }
         if (preferredTrialMachine != null && containsMachine(scopedCandidates, preferredTrialMachine.getMachineCode())) {
-            log.info("新增排产优先尝试试制/小批量预选机台, materialCode: {}, machineCode: {}",
+            log.info("新增排产优先尝试试制/量试/小批量预选机台, materialCode: {}, machineCode: {}",
                     sku.getMaterialCode(), preferredTrialMachine.getMachineCode());
             return preferredTrialMachine;
         }
@@ -5791,7 +5791,61 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         if (StringUtils.isNotEmpty(currentMachineCode)) {
             triedMachineCodeSet.add(currentMachineCode);
         }
-        return countAvailableCandidateMachines(candidates, triedMachineCodeSet) > 0;
+        return hasAvailableReleasedTailCapacityCandidate(context, candidates, triedMachineCodeSet);
+    }
+
+    /**
+     * 判断剩余候选中是否存在续作收尾释放的尾部产能机台。
+     * <p>dayN 加机台目标已经满足时，不允许再打开从窗口起点就空闲的普通机台；
+     * 仅保留已在窗口内被续作/在机占用、且收尾后释放出尾部时间的候选机台。</p>
+     *
+     * @param context 排程上下文
+     * @param candidates 原始候选机台列表
+     * @param triedMachineCodeSet 已尝试机台编码
+     * @return true-存在可继续承接的尾部产能机台；false-不存在
+     */
+    private boolean hasAvailableReleasedTailCapacityCandidate(LhScheduleContext context,
+                                                              List<MachineScheduleDTO> candidates,
+                                                              Set<String> triedMachineCodeSet) {
+        if (Objects.isNull(context) || CollectionUtils.isEmpty(candidates)
+                || CollectionUtils.isEmpty(context.getScheduleWindowShifts())) {
+            return false;
+        }
+        for (MachineScheduleDTO candidate : candidates) {
+            if (Objects.isNull(candidate) || StringUtils.isEmpty(candidate.getMachineCode())) {
+                continue;
+            }
+            if (!CollectionUtils.isEmpty(triedMachineCodeSet)
+                    && triedMachineCodeSet.contains(candidate.getMachineCode())) {
+                continue;
+            }
+            if (isReleasedTailCapacityCandidate(context, candidate)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * 判断候选机台是否属于窗口内释放的尾部产能。
+     *
+     * @param context 排程上下文
+     * @param candidate 候选机台
+     * @return true-窗口内已有占用结束时间，可复用结束后的尾部产能；false-普通空闲或无可用尾部
+     */
+    private boolean isReleasedTailCapacityCandidate(LhScheduleContext context, MachineScheduleDTO candidate) {
+        if (Objects.isNull(context) || Objects.isNull(candidate)
+                || CollectionUtils.isEmpty(context.getScheduleWindowShifts())) {
+            return false;
+        }
+        List<LhShiftConfigVO> shifts = context.getScheduleWindowShifts();
+        Date windowStartTime = shifts.get(0).getShiftStartDateTime();
+        Date windowEndTime = shifts.get(shifts.size() - 1).getShiftEndDateTime();
+        Date occupationEndTime = resolveMachineOccupationEndTime(context, candidate, shifts);
+        return Objects.nonNull(windowStartTime) && Objects.nonNull(windowEndTime)
+                && Objects.nonNull(occupationEndTime)
+                && occupationEndTime.after(windowStartTime)
+                && occupationEndTime.before(windowEndTime);
     }
 
     /**
