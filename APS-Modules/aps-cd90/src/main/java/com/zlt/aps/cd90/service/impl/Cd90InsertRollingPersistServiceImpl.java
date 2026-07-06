@@ -1,6 +1,7 @@
 package com.zlt.aps.cd90.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.zlt.aps.cd90.api.domain.entity.Cd90ScheduleLaneAllocation;
@@ -68,12 +69,12 @@ public class Cd90InsertRollingPersistServiceImpl implements Cd90InsertRollingPer
             this.saveLog(insertResult, "CREATE", "INSERT_ORDER", request);
         }
         for (Cd90ScheduleResult result : output.getUpdatedResults()) {
-            if (result.getId() == null || resultMapper.updateById(result) != 1) {
+            if (result.getId() == null || this.updateScheduleResultForcibly(result) != 1) {
                 throw new IllegalStateException("更新插单受影响排程结果失败");
             }
             if (result.getPublishSuccessCount() != null && result.getPublishSuccessCount() > 0) {
                 result.setIsRelease("5");
-                if (resultMapper.updateById(result) != 1) {
+                if (this.updateScheduleResultForcibly(result) != 1) {
                     throw new IllegalStateException("更新插单受影响发布状态失败");
                 }
                 this.saveLog(result, "UPDATE", "INSERT_ORDER_DEGRADE", request);
@@ -164,6 +165,39 @@ public class Cd90InsertRollingPersistServiceImpl implements Cd90InsertRollingPer
         if (lock == null || !lock.isHeldByCurrentThread()) {
             throw new IllegalStateException("插单执行锁已失效");
         }
+    }
+
+    /**
+     * 强制更新插单受影响排程结果的所有班次字段（包括 null）。
+     * <p>MyBatis-Plus updateById 默认 NOT_NULL 策略会跳过 null 字段，
+     * 但 clearAdjustableClassFields 清空后未走 writeClass 的字段需要保持为 null，
+     * 否则会保留自动排程旧值导致 PRODUCE_ORDER 等字段重复（例如 G1301 出现两个 4）。
+     * 因此用 UpdateWrapper 显式 set，确保 null 字段也被更新。</p>
+     *
+     * @param result 待更新的排程结果
+     * @return 受影响行数
+     */
+    private int updateScheduleResultForcibly(Cd90ScheduleResult result) {
+        UpdateWrapper<Cd90ScheduleResult> wrapper = new UpdateWrapper<>();
+        wrapper.eq("ID", result.getId());
+        // 动态设置 6 个 class 班次的 ScheduleDate/PlanQty/ProduceOrder/Analysis/AnalysisInput 字段
+        for (int classIndex = 1; classIndex <= 6; classIndex++) {
+            String dbPrefix = String.format("CLASS%d_", classIndex);
+            String fieldPrefix = String.format("class%d", classIndex);
+            wrapper.set(dbPrefix + "SCHEDULE_DATE",
+                    result.getFieldValueByFieldName(fieldPrefix + "ScheduleDate"));
+            wrapper.set(dbPrefix + "PLAN_QTY",
+                    result.getFieldValueByFieldName(fieldPrefix + "PlanQty"));
+            wrapper.set(dbPrefix + "PRODUCE_ORDER",
+                    result.getFieldValueByFieldName(fieldPrefix + "ProduceOrder"));
+            wrapper.set(dbPrefix + "ANALYSIS",
+                    result.getFieldValueByFieldName(fieldPrefix + "Analysis"));
+            wrapper.set(dbPrefix + "ANALYSIS_INPUT",
+                    result.getFieldValueByFieldName(fieldPrefix + "AnalysisInput"));
+        }
+        wrapper.set("STORAGE_LANE_CODE", result.getStorageLaneCode());
+        wrapper.set("IS_RELEASE", result.getIsRelease());
+        return resultMapper.update(null, wrapper);
     }
 
     private boolean hasScheduledQuantity(Cd90ScheduleResult result) {

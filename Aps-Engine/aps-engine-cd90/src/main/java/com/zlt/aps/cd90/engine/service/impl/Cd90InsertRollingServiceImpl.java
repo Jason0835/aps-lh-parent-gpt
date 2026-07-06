@@ -88,6 +88,14 @@ public class Cd90InsertRollingServiceImpl implements Cd90InsertRollingService {
         if (sourceResults.isEmpty()) {
             throw new IllegalStateException("当前排程日期没有可供插单的原排程结果");
         }
+        // 只使用最新批次的排程结果，避免多批次共存时重复处理同一帘布。
+        String latestBatchNo = sourceResults.stream()
+                .map(Cd90ScheduleResult::getBatchNo).filter(Objects::nonNull)
+                .max(String::compareTo)
+                .orElseThrow(() -> new IllegalStateException("原排程结果缺少批次号"));
+        sourceResults = sourceResults.stream()
+                .filter(item -> latestBatchNo.equals(item.getBatchNo()))
+                .collect(Collectors.toList());
         String batchNo = sourceResults.stream().map(Cd90ScheduleResult::getBatchNo)
                 .filter(Objects::nonNull).findFirst()
                 .orElseThrow(() -> new IllegalStateException("原排程结果缺少批次号"));
@@ -121,7 +129,6 @@ public class Cd90InsertRollingServiceImpl implements Cd90InsertRollingService {
         Map<String, Cd90MachineTailState> tailByMachine = new HashMap<>();
         Map<Long, Cd90ScheduleResult> changedById = new LinkedHashMap<>();
         List<Cd90InsertCarryoverImpact> carryoverImpacts = new ArrayList<>();
-        boolean rollingStarted = false;
         Cd90RollingScheduleContext rollingResources = null;
         List<Cd90ShiftDescriptor> shifts = context.getShifts();
         for (int shiftIndex = 0; shiftIndex < shifts.size(); shiftIndex++) {
@@ -151,13 +158,13 @@ public class Cd90InsertRollingServiceImpl implements Cd90InsertRollingService {
             Integer insertOrder = (Integer) request.getFieldValueByFieldName(
                     String.format("class%dProduceOrder", classIndex));
             boolean hasInsert = insertQuantity != null && insertQuantity > 0D;
-            if (!rollingStarted && !hasInsert && carryovers.isEmpty()) {
+            boolean shouldRollCurrentShift = hasInsert || !carryovers.isEmpty();
+            if (!shouldRollCurrentShift) {
                 reserveUnaffectedTasks(resourceState, shift, classIndex, workingResults,
                         sourceLanesByResult, input, context, null);
                 rollingContextManager.completeShift(rollingResources, resourceState);
                 continue;
             }
-            rollingStarted = true;
             reserveUnaffectedTasks(resourceState, shift, classIndex, workingResults,
                     sourceLanesByResult, input, context, request.getMachineCode());
             ShiftRollingResult rollingResult = rollShift(context, shift, classIndex,
@@ -240,11 +247,11 @@ public class Cd90InsertRollingServiceImpl implements Cd90InsertRollingService {
                 directInsert.hardInsert = true;
             }
         }
-        orderSegments(segments, insertOrder);
+        Cd90MachineTailState previousTail = tailByMachine.get(request.getMachineCode());
+        orderSegments(segments, insertOrder, previousTail);
 
         int fullSeconds = Math.max(1, shift.getDurationSeconds());
         int remainingSeconds = fullSeconds;
-        Cd90MachineTailState previousTail = tailByMachine.get(request.getMachineCode());
         List<Cd90RollingPendingTask> carryovers = new ArrayList<>();
         int nextOrder = 1;
         boolean deferSuffix = false;
@@ -309,7 +316,7 @@ public class Cd90InsertRollingServiceImpl implements Cd90InsertRollingService {
                     ? reserveLockedLanes(segment, shift, scheduled, resourceState,
                             sourceLanesByResult, input, context)
                     : allocateLanes(segment, shift, scheduled, resourceState, input, context);
-            scheduled = laneCommit.quantity;
+            scheduled = normalizeScheduledQuantity(laneCommit.quantity);
             if (!segment.locked && scheduled.signum() <= 0) {
                 remainingSeconds = remainingSecondsBeforeTrial;
                 previousTail = previousTailBeforeTrial;
@@ -431,6 +438,28 @@ public class Cd90InsertRollingServiceImpl implements Cd90InsertRollingService {
             return allocateLanes(Segment.existing(result, classIndex(shift.getClassField()),
                     quantity, null, true), shift, quantity, state, input, context);
         }
+        // 预检查：原库排若已被其他帘布占用（mergeInbound 跳过入库留下的脏数据），整体降级为重新分配
+        // 与 Cd90ResourceSnapshotBuilder.mergeInbound 的软冲突策略对齐，避免整个插单中断
+        List<String> conflictedLaneCodes = rows.stream()
+                .map(row -> {
+                    Cd90StorageLaneState lane = state.getLanes().stream()
+                            .filter(item -> row.getStorageLaneCode().equals(item.getLaneCode()))
+                            .findFirst().orElse(null);
+                    if (lane == null || lane.getClothCode() == null
+                            || lane.getClothCode().trim().isEmpty()) {
+                        return null;
+                    }
+                    return result.getClothCode().equals(lane.getClothCode())
+                            ? null : row.getStorageLaneCode();
+                })
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
+        if (!conflictedLaneCodes.isEmpty()) {
+            log.warn("[直裁插单] 原排程库排已被其他帘布占用,降级为重新分配, clothCode={}, conflictedLanes={}",
+                    result.getClothCode(), conflictedLaneCodes);
+            return allocateLanes(Segment.existing(result, classIndex(shift.getClassField()),
+                    quantity, null, true), shift, quantity, state, input, context);
+        }
         List<Cd90StorageLaneAllocation> allocations = rows.stream().map(row -> {
             Cd90StorageLaneState lane = state.getLanes().stream()
                     .filter(item -> row.getStorageLaneCode().equals(item.getLaneCode()))
@@ -507,6 +536,14 @@ public class Cd90InsertRollingServiceImpl implements Cd90InsertRollingService {
                         ? "ROLL_TOOL_LIMIT" : "STORAGE_LANE_LIMIT") : null;
         return new LaneCommit(committed, allocation.getAllocations(),
                 allocation.getAllocatedVehicleCount(), reason);
+    }
+
+    /** 插单滚动与自动排程提交层保持一致，最终计划量按整数米向上取整。 */
+    private BigDecimal normalizeScheduledQuantity(BigDecimal quantity) {
+        if (quantity == null || quantity.signum() <= 0) {
+            return BigDecimal.ZERO;
+        }
+        return quantity.setScale(0, RoundingMode.CEILING);
     }
 
     private List<Cd90InsertLaneAllocationDraft> toLaneDrafts(
@@ -595,10 +632,12 @@ public class Cd90InsertRollingServiceImpl implements Cd90InsertRollingService {
                 .findFirst().orElse(null);
     }
 
-    private void orderSegments(List<Segment> segments, Integer insertOrder) {
+    private void orderSegments(List<Segment> segments, Integer insertOrder,
+                               Cd90MachineTailState previousTail) {
         List<Segment> sorted = segments.stream()
                 .sorted(Comparator.comparing((Segment item) -> !item.locked)
-                        .thenComparing(item -> !item.carryover)
+                        .thenComparingInt(item -> continuityRank(item, previousTail))
+                        .thenComparing(item -> insertOrder == null ? item.carryover : !item.carryover)
                         .thenComparing(item -> item.order,
                                 Comparator.nullsLast(Integer::compareTo))
                         .thenComparing(item -> item.result.getId(),
@@ -613,6 +652,21 @@ public class Cd90InsertRollingServiceImpl implements Cd90InsertRollingService {
         }
         segments.clear();
         segments.addAll(sorted);
+    }
+
+    private int continuityRank(Segment segment, Cd90MachineTailState previousTail) {
+        if (segment == null || segment.result == null || previousTail == null) {
+            return 3;
+        }
+        boolean sameSpec = Objects.equals(previousTail.getClothCode(), segment.result.getClothCode());
+        boolean sameRoll = Objects.equals(previousTail.getBigRollCode(), segment.result.getBigRollCode());
+        if (sameSpec && sameRoll) {
+            return 0;
+        }
+        if (sameSpec) {
+            return 1;
+        }
+        return sameRoll ? 2 : 3;
     }
 
     private void mergeCarryovers(List<Segment> segments,
@@ -632,6 +686,7 @@ public class Cd90InsertRollingServiceImpl implements Cd90InsertRollingService {
                 segment = Segment.carryover(result, classIndex, pending);
                 segments.add(segment);
             } else {
+                // 已在当前班存在的原任务合并上一班顺延量时，只合并数量，排序交给实际机尾续作规则。
                 segment.quantity = segment.quantity.add(pending.getRemainingQuantity());
             }
         }
