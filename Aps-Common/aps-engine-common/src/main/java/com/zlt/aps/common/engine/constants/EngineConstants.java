@@ -78,6 +78,11 @@ public class EngineConstants {
     public static String STANDARD_CRIMP_LENGTH = "STANDARD_CRIMP_LENGTH";
 
     /**
+     * 参数code：仅投产阶段规格排产标识（值为1时，表示仅投产阶段的规格才进行自动排程；其他值的时候表示自动排程的排产全部规格）
+     */
+    public static String PRODUCTION_STAGE_PRODUCE = "PRODUCTION_STAGE_PRODUCE";
+
+    /**
      *  参数code：卷曲数小数取整值（小数部分大于等于该值的进位，否则舍弃）
      */
     public static String CURL_DECIMAL_ROUNDING = "CURL_DECIMAL_ROUNDING";
