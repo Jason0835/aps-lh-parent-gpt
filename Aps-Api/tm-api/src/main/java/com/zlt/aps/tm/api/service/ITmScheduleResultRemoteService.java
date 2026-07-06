@@ -12,7 +12,6 @@ import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Map;
 
 /**
  * 胎面排程结果表 Feign接口
@@ -84,5 +83,5 @@ public interface ITmScheduleResultRemoteService {
 
     @ApiOperation("更改发布状态")
     @PostMapping("/tmScheduleResult/changeReleaseStatus")
-    AjaxResult changeReleaseStatus(@RequestBody Map<String, Object> params);
+    AjaxResult changeReleaseStatus(@RequestParam("ids") String ids, @RequestParam("isRelease") String isRelease);
 }

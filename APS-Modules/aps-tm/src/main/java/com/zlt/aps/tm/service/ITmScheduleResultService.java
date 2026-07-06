@@ -153,11 +153,11 @@ public interface ITmScheduleResultService extends IDocService<TmScheduleResult> 
     /**
      * 更改排程结果发布状态
      *
-     * @param ids 排程结果ID列表
+     * @param ids 排程结果ID列表，逗号分隔
      * @param releaseStatus 发布状态
      * @return 更新行数
      */
-    int changeReleaseStatus(List<Long> ids, String releaseStatus);
+    int changeReleaseStatus(String ids, String releaseStatus);
 
     /**
      * 胎面排程班次日期列表

@@ -31,7 +31,6 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
-import java.util.Map;
 
 /**
  * 胎面排程结果表 页面控制层
@@ -105,7 +104,7 @@ public class TmScheduleResultUIController extends BaseUIController<TmScheduleRes
     @ApiOperation("校验唯一性")
     @PostMapping("/checkUnique")
     @ResponseBody
-    public String checkUnique(@RequestBody TmScheduleResult query) {
+    public String checkUnique(TmScheduleResult query) {
         return iTmScheduleResultService.checkUnique(query);
     }
 
@@ -119,7 +118,7 @@ public class TmScheduleResultUIController extends BaseUIController<TmScheduleRes
     @PostMapping("/validateAutoPlan")
     @RequiresPermissions("tm:tmScheduleResult:autoPlan")
     @ResponseBody
-    public AjaxResult validateAutoPlan(@RequestBody TmAutoScheduleRequestVo request) {
+    public AjaxResult validateAutoPlan(TmAutoScheduleRequestVo request) {
         return iTmScheduleResultService.validateAutoPlan(request);
     }
 
@@ -133,7 +132,7 @@ public class TmScheduleResultUIController extends BaseUIController<TmScheduleRes
     @PostMapping("/autoPlan")
     @RequiresPermissions("tm:tmScheduleResult:autoPlan")
     @ResponseBody
-    public AjaxResult autoPlan(@RequestBody TmAutoScheduleRequestVo request) {
+    public AjaxResult autoPlan(TmAutoScheduleRequestVo request) {
         return iTmScheduleResultService.autoPlan(request);
     }
 
@@ -244,7 +243,7 @@ public class TmScheduleResultUIController extends BaseUIController<TmScheduleRes
     @ApiOperation("更改发布状态")
     @PostMapping("/changeReleaseStatus")
     @ResponseBody
-    public AjaxResult changeReleaseStatus(@RequestBody Map<String, Object> params) {
-        return iTmScheduleResultService.changeReleaseStatus(params);
+    public AjaxResult changeReleaseStatus(@RequestParam("ids") String ids, @RequestParam("isRelease") String isRelease) {
+        return iTmScheduleResultService.changeReleaseStatus(ids, isRelease);
     }
 }

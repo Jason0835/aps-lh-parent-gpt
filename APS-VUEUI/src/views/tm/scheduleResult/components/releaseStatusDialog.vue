@@ -80,7 +80,7 @@ export default {
     handleConfirm() {
       this.$refs.infoForm.validate((valid) => {
         if (valid) {
-          const ids = this.tableRows.map((item) => item.id);
+          const ids = this.tableRows.map((item) => item.id).join(",");
           this.save({
             ids: ids,
             isRelease: this.form.isRelease,
