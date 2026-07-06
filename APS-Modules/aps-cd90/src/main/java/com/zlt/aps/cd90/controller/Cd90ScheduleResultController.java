@@ -12,6 +12,7 @@ import com.zlt.aps.cd90.api.domain.entity.Cd90ScheduleResult;
 import com.zlt.aps.cd90.api.domain.entity.Cd90ScheduleRollingAdjustLog;
 import com.zlt.aps.cd90.api.domain.vo.Cd90InsertOrderRequest;
 import com.zlt.aps.cd90.api.domain.vo.Cd90RollingCheckRequest;
+import com.zlt.aps.cd90.api.domain.vo.Cd90TransferMachineRequest;
 import com.zlt.aps.cd90.engine.domain.Cd90ScheduleTask;
 import com.zlt.aps.cd90.engine.service.Cd90ScheduleTaskService;
 import com.zlt.aps.cd90.mapper.Cd90ScheduleResultMapper;
@@ -123,6 +124,27 @@ public class Cd90ScheduleResultController extends AbstractDocBizController<Cd90S
         return cd90ScheduleResultService.getInsertTask(taskId);
     }
 
+
+    /** 转机台预校验。 */
+    @ApiOperation("转机台预校验")
+    @PostMapping("/validateTransferMachine")
+    public AjaxResult validateTransferMachine(@RequestBody Cd90TransferMachineRequest request) {
+        return cd90ScheduleResultService.validateTransferMachine(request);
+    }
+
+    /** 提交转机台滚动重排任务。 */
+    @ApiOperation("提交转机台滚动重排")
+    @PostMapping("/transferMachine")
+    public AjaxResult transferMachine(@RequestBody Cd90TransferMachineRequest request) {
+        return cd90ScheduleResultService.transferMachine(request);
+    }
+
+    /** 查询转机台滚动重排任务。 */
+    @ApiOperation("查询转机台滚动重排任务")
+    @GetMapping("/transferMachine/task/{taskId}")
+    public AjaxResult getTransferMachineTask(@PathVariable("taskId") String taskId) {
+        return cd90ScheduleResultService.getTransferMachineTask(taskId);
+    }
     /** 供aps-job每5分钟检查交班滚动窗口。 */
     @ApiOperation("检查定时滚动排程窗口")
     @PostMapping("/rollingSchedule/check")

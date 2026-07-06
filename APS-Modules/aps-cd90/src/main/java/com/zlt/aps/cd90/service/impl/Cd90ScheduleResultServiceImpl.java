@@ -12,6 +12,7 @@ import com.zlt.aps.cd90.api.domain.entity.Cd90ScheduleResult;
 import com.zlt.aps.cd90.api.domain.entity.Cd90ShiftConfig;
 import com.zlt.aps.cd90.api.domain.vo.Cd90InsertOrderRequest;
 import com.zlt.aps.cd90.api.domain.vo.Cd90RollingCheckRequest;
+import com.zlt.aps.cd90.api.domain.vo.Cd90TransferMachineRequest;
 import com.zlt.aps.cd90.engine.domain.Cd90ScheduleTask;
 import com.zlt.aps.cd90.engine.constant.Cd90ScheduleTaskType;
 import com.zlt.aps.cd90.engine.model.Cd90BatchDataCheckResult;
@@ -56,6 +57,7 @@ import java.util.Optional;
 import java.util.Objects;
 import java.util.Comparator;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 @Service
 @Transactional(rollbackFor = Exception.class)
@@ -357,6 +359,113 @@ public class Cd90ScheduleResultServiceImpl extends AbstractDocService<Cd90Schedu
         return AjaxResult.success(task);
     }
 
+
+
+    @Override
+    public AjaxResult validateTransferMachine(Cd90TransferMachineRequest request) {
+        if (request == null || request.getScheduleDate() == null
+                || isBlank(request.getFactoryCode()) || isBlank(request.getSourceMachineCode())
+                || isBlank(request.getTargetMachineCode()) || isBlank(request.getClothCode())
+                || isBlank(request.getStartClassField())) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.cd90.insert.required"));
+        }
+        if (request.getSourceMachineCode().equals(request.getTargetMachineCode())) {
+            return AjaxResult.error("原机台和目标机台不能相同");
+        }
+        int startClassIndex;
+        try {
+            startClassIndex = Integer.parseInt(request.getStartClassField().replace("CLASS", ""));
+        } catch (NumberFormatException exception) {
+            return AjaxResult.error("开始班次必须为CLASS1至CLASS6");
+        }
+        if (startClassIndex < 1 || startClassIndex > 6) {
+            return AjaxResult.error("开始班次必须为CLASS1至CLASS6");
+        }
+        List<Cd90ScheduleResult> existing = this.selectByDateAndFactory(
+                request.getScheduleDate(), request.getFactoryCode());
+        boolean hasTransferPlan = existing.stream()
+                .filter(item -> request.getSourceMachineCode().equals(item.getMachineCode()))
+                .filter(item -> request.getClothCode().equals(item.getClothCode()))
+                .anyMatch(item -> IntStream.rangeClosed(startClassIndex, 6)
+                        .anyMatch(classIndex -> readPlanQuantity(item, classIndex) > 0D));
+        return hasTransferPlan ? AjaxResult.success()
+                : AjaxResult.error("原机台从起始班次开始没有可转走的帘布计划");
+    }
+
+    @Override
+    public AjaxResult transferMachine(Cd90TransferMachineRequest request) {
+        AjaxResult validation = this.validateTransferMachine(request);
+        if (!Integer.valueOf(200).equals(validation.get("code"))) {
+            return validation;
+        }
+        LocalDate localScheduleDate = request.getScheduleDate().toInstant()
+                .atZone(ZoneId.systemDefault()).toLocalDate();
+        Cd90BatchDataCheckResult batchCheck = batchDataValidator.check(
+                request.getFactoryCode(), localScheduleDate);
+        if (batchCheck.isFailed()) {
+            Map<String, Object> data = new HashMap<>();
+            data.put("batchCheckFailed", true);
+            data.put("errors", toErrorList(batchCheck.getErrors()));
+            data.put("warnings", toErrorList(batchCheck.getWarnings()));
+            return AjaxResult.success(batchCheck.getPrimaryMessage(), data);
+        }
+        Cd90ScheduleTask activeTask = taskService.findActive(
+                request.getFactoryCode(), request.getScheduleDate());
+        if (activeTask != null) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.cd90.insert.activeTask"));
+        }
+        if (!Boolean.TRUE.equals(request.getConfirmed())) {
+            AjaxResult previewResult = this.previewTransferMachine(request, localScheduleDate);
+            if (previewResult != null) {
+                return previewResult;
+            }
+        }
+        Cd90ScheduleTask task = taskService.createPending(request.getFactoryCode(),
+                request.getScheduleDate(), Cd90ScheduleTaskType.TRANSFER_MACHINE,
+                "MANUAL", request.toString(), null);
+        insertOrderAsyncExecutor.executeTransfer(task.getTaskId(), request);
+        Map<String, Object> data = new HashMap<>();
+        data.put("taskId", task.getTaskId());
+        return AjaxResult.success("转机台任务已提交", data);
+    }
+
+    private AjaxResult previewTransferMachine(Cd90TransferMachineRequest request,
+                                              LocalDate scheduleDate) {
+        RLock lock = lockService.getLock(request.getFactoryCode(), scheduleDate);
+        try {
+            if (!lock.tryLock()) {
+                return AjaxResult.error(I18nUtil.getMessage("ui.cd90.insert.activeTask"));
+            }
+            if (taskService.findActive(request.getFactoryCode(), request.getScheduleDate()) != null) {
+                return AjaxResult.error(I18nUtil.getMessage("ui.cd90.insert.activeTask"));
+            }
+            Cd90InsertRollingOutput output = insertRollingService.executeTransfer(request);
+            List<Cd90InsertCarryoverImpact> impacts = output.getCarryoverImpacts() == null
+                    ? Collections.emptyList() : output.getCarryoverImpacts();
+            if (impacts.isEmpty()) {
+                return null;
+            }
+            Map<String, Object> data = new HashMap<>();
+            data.put("needConfirm", true);
+            data.put("carryoverDetails", impacts.stream()
+                    .map(this::toCarryoverDetail)
+                    .collect(Collectors.toList()));
+            return AjaxResult.success("转机台会引起跨班顺延，请确认后继续", data);
+        } finally {
+            if (lock.isHeldByCurrentThread()) {
+                lock.unlock();
+            }
+        }
+    }
+
+    @Override
+    public AjaxResult getTransferMachineTask(String taskId) {
+        Cd90ScheduleTask task = taskService.findByTaskId(taskId);
+        if (task == null || !Cd90ScheduleTaskType.TRANSFER_MACHINE.equals(task.getTaskType())) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.cd90.insert.taskNotFound"));
+        }
+        return AjaxResult.success(task);
+    }
 
     @Override
     public AjaxResult checkTimedRolling(Cd90RollingCheckRequest request) {

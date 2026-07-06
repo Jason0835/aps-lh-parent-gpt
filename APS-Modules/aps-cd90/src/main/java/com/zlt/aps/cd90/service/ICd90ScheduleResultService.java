@@ -4,6 +4,7 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.cd90.api.domain.entity.Cd90ScheduleResult;
 import com.zlt.aps.cd90.api.domain.vo.Cd90InsertOrderRequest;
 import com.zlt.aps.cd90.api.domain.vo.Cd90RollingCheckRequest;
+import com.zlt.aps.cd90.api.domain.vo.Cd90TransferMachineRequest;
 import com.zlt.bill.common.service.IDocService;
 
 import java.util.Date;
@@ -29,13 +30,22 @@ public interface ICd90ScheduleResultService extends IDocService<Cd90ScheduleResu
     AjaxResult insertOrder(Cd90InsertOrderRequest request);
 
     /** 查询插单异步任务。 */
+    AjaxResult getInsertTask(String taskId);
+
+    /** 校验转机台请求。 */
+    AjaxResult validateTransferMachine(Cd90TransferMachineRequest request);
+
+    /** 创建转机台异步任务。 */
+    AjaxResult transferMachine(Cd90TransferMachineRequest request);
+
+    /** 查询转机台异步任务。 */
+    AjaxResult getTransferMachineTask(String taskId);
 
     /** 检查交班窗口并按稳定输入创建定时滚动任务。 */
     AjaxResult checkTimedRolling(Cd90RollingCheckRequest request);
 
     /** 查询定时滚动排程任务。 */
     AjaxResult getTimedRollingTask(String taskId);
-    AjaxResult getInsertTask(String taskId);
 
     /**
      * 按排程日期 + 工厂编码查询未删除的排程结果。

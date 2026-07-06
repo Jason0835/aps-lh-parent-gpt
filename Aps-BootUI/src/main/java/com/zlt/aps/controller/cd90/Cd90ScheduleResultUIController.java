@@ -10,6 +10,7 @@ import com.ruoyi.common4ui.core.controller.BaseUIController;
 import com.zlt.aps.cd90.api.domain.entity.Cd90ScheduleResult;
 import com.zlt.aps.cd90.api.domain.entity.Cd90ScheduleRollingAdjustLog;
 import com.zlt.aps.cd90.api.domain.vo.Cd90InsertOrderRequest;
+import com.zlt.aps.cd90.api.domain.vo.Cd90TransferMachineRequest;
 import com.zlt.aps.cd90.api.service.ICd90ScheduleResultRemoteService;
 import com.zlt.file.encryptbyll.FileEncryptUtils;
 import io.swagger.annotations.Api;
@@ -86,6 +87,30 @@ public class Cd90ScheduleResultUIController extends BaseUIController<Cd90Schedul
     @ResponseBody
     public AjaxResult getInsertTask(@PathVariable("taskId") String taskId) {
         return remoteService.getInsertTask(taskId);
+    }
+
+    @ApiOperation("转机台预校验")
+    @RequiresPermissions("cd90:scheduleResult:changeMachine")
+    @PostMapping("/validateTransferMachine")
+    @ResponseBody
+    public AjaxResult validateTransferMachine(@RequestBody Cd90TransferMachineRequest request) {
+        return remoteService.validateTransferMachine(request);
+    }
+
+    @ApiOperation("提交转机台滚动重排")
+    @RequiresPermissions("cd90:scheduleResult:changeMachine")
+    @PostMapping("/transferMachine")
+    @ResponseBody
+    public AjaxResult transferMachine(@RequestBody Cd90TransferMachineRequest request) {
+        return remoteService.transferMachine(request);
+    }
+
+    @ApiOperation("查询转机台滚动重排任务")
+    @RequiresPermissions("cd90:scheduleResult:changeMachine")
+    @GetMapping("/transferMachine/task/{taskId}")
+    @ResponseBody
+    public AjaxResult getTransferMachineTask(@PathVariable("taskId") String taskId) {
+        return remoteService.getTransferMachineTask(taskId);
     }
     @ApiOperation("查询定时滚动排程任务")
     @RequiresPermissions("cd90:scheduleResult:rollingQuery")

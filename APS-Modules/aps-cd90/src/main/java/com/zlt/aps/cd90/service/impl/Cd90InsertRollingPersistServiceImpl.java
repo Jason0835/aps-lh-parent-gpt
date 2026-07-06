@@ -9,6 +9,7 @@ import com.zlt.aps.cd90.api.domain.entity.Cd90ScheduleResult;
 import com.zlt.aps.cd90.api.domain.entity.Cd90ScheduleResultLog;
 import com.zlt.aps.cd90.api.domain.entity.Cd90UnscheduleResult;
 import com.zlt.aps.cd90.api.domain.vo.Cd90InsertOrderRequest;
+import com.zlt.aps.cd90.api.domain.vo.Cd90TransferMachineRequest;
 import com.zlt.aps.cd90.engine.constant.Cd90ScheduleTaskStatus;
 import com.zlt.aps.cd90.engine.domain.Cd90ScheduleTask;
 import com.zlt.aps.cd90.engine.model.Cd90InsertRollingOutput;
@@ -56,6 +57,22 @@ public class Cd90InsertRollingPersistServiceImpl implements Cd90InsertRollingPer
     @Transactional(rollbackFor = Exception.class)
     public void persist(String taskId, Cd90InsertOrderRequest request,
                         Cd90InsertRollingOutput output, RLock lock) {
+        this.persistInternal(taskId, request, output, lock, "INSERT_ORDER",
+                "INSERT_ORDER_ROLLING", "INSERT_ORDER_DEGRADE", "插单");
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void persistTransfer(String taskId, Cd90TransferMachineRequest request,
+                                Cd90InsertRollingOutput output, RLock lock) {
+        this.persistInternal(taskId, request, output, lock, "TRANSFER_MACHINE",
+                "TRANSFER_MACHINE_ROLLING", "TRANSFER_MACHINE_DEGRADE", "转机台");
+    }
+
+    private void persistInternal(String taskId, Object request,
+                                 Cd90InsertRollingOutput output, RLock lock,
+                                 String createReason, String updateReason,
+                                 String degradeReason, String actionName) {
         this.validateCommitState(taskId, lock);
         versionVerifier.verify(output.getContext());
         Cd90ScheduleResult insertResult = output.getInsertResult();
@@ -64,39 +81,37 @@ public class Cd90InsertRollingPersistServiceImpl implements Cd90InsertRollingPer
         if (insertSaved) {
             insertResult.setOrderNo(numberService.nextOrderNo(output.getBatchNo()));
             if (resultMapper.insert(insertResult) != 1) {
-                throw new IllegalStateException("保存直裁插单结果失败");
+                throw new IllegalStateException("保存直裁" + actionName + "结果失败");
             }
-            this.saveLog(insertResult, "CREATE", "INSERT_ORDER", request);
+            this.saveLog(insertResult, "CREATE", createReason, request);
         }
         for (Cd90ScheduleResult result : output.getUpdatedResults()) {
             if (result.getId() == null || this.updateScheduleResultForcibly(result) != 1) {
-                throw new IllegalStateException("更新插单受影响排程结果失败");
+                throw new IllegalStateException("更新" + actionName + "受影响排程结果失败");
             }
             if (result.getPublishSuccessCount() != null && result.getPublishSuccessCount() > 0) {
                 result.setIsRelease("5");
                 if (this.updateScheduleResultForcibly(result) != 1) {
-                    throw new IllegalStateException("更新插单受影响发布状态失败");
+                    throw new IllegalStateException("更新" + actionName + "受影响发布状态失败");
                 }
-                this.saveLog(result, "UPDATE", "INSERT_ORDER_DEGRADE", request);
+                this.saveLog(result, "UPDATE", degradeReason, request);
             } else {
-                this.saveLog(result, "UPDATE", "INSERT_ORDER_ROLLING", request);
+                this.saveLog(result, "UPDATE", updateReason, request);
             }
         }
         for (Cd90UnscheduleResult unscheduled : output.getUnscheduledResults()) {
             if (unscheduleMapper.insert(unscheduled) != 1) {
-                throw new IllegalStateException("保存插单未排结果失败");
+                throw new IllegalStateException("保存" + actionName + "未排结果失败");
             }
         }
         this.replaceLaneAllocations(output, insertSaved);
         if (!taskService.markSuccessInCurrentTransaction(taskId, output.getBatchNo())) {
-            throw new IllegalStateException("插单任务状态已变化，不能提交结果");
+            throw new IllegalStateException(actionName + "任务状态已变化，不能提交结果");
         }
-        log.info("[直裁插单] 最终事务提交完成, taskId={}, batchNo={}, insertSaved={}, "
-                        + "updatedCount={}, unscheduledCount={}",
-                taskId, output.getBatchNo(), insertSaved, output.getUpdatedResults().size(),
+        log.info("[直裁{}] 最终事务提交完成, taskId={}, batchNo={}, insertSaved={}, updatedCount={}, unscheduledCount={}",
+                actionName, taskId, output.getBatchNo(), insertSaved, output.getUpdatedResults().size(),
                 output.getUnscheduledResults().size());
     }
-
     private void applyStorageLaneCodes(Cd90InsertRollingOutput output) {
         List<Cd90InsertLaneAllocationDraft> lanes = output.getLaneAllocations() == null
                 ? Collections.emptyList() : output.getLaneAllocations();
@@ -212,7 +227,7 @@ public class Cd90InsertRollingPersistServiceImpl implements Cd90InsertRollingPer
     }
 
     private void saveLog(Cd90ScheduleResult result, String logType,
-                         String reasonCode, Cd90InsertOrderRequest request) {
+                         String reasonCode, Object request) {
         Cd90ScheduleResultLog entity = new Cd90ScheduleResultLog();
         entity.setScheduleResultId(result.getId());
         entity.setFactoryCode(result.getFactoryCode());
@@ -232,7 +247,7 @@ public class Cd90InsertRollingPersistServiceImpl implements Cd90InsertRollingPer
         }
     }
 
-    private String reasonDetail(Cd90ScheduleResult result, Cd90InsertOrderRequest request) {
+    private String reasonDetail(Cd90ScheduleResult result, Object request) {
         Map<String, Object> detail = new LinkedHashMap<>();
         detail.put("request", request);
         detail.put("result", result);
