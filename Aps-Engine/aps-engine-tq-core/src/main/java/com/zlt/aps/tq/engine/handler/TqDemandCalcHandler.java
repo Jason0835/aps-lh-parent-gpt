@@ -366,29 +366,50 @@ public class TqDemandCalcHandler extends AbsTqScheduleStepHandler {
         // 公式：胎圈N班 = max(0, 成型(N+2)班消耗×系数 - 可用库存) × (100% + 损耗率)
         double class1Plan = 0;
         double class1PureDemand = 0; // 纯需求量（不含损耗），用于滚动库存计算
-        if (availableStock < tqConsume3) {
-            class1PureDemand = BigDecimalUtil.sub(tqConsume3, availableStock);
-            class1Plan = BigDecimalUtil.mul(class1PureDemand, lossRateMultiplier);
-        }
-        class1Plan = planQtyRounding(scheduleVo, class1Plan, toolCapacity, totalConsumeQty, context);
-        scheduleVo.setClass1PlanQty(class1Plan);
-        availableStock = BigDecimalUtil.add(availableStock, class1Plan);  // 加上胎圈1班产出
-        availableStock = BigDecimalUtil.sub(availableStock, tqConsume3);  // 扣除成型3班胎圈消耗
 
-        // 【备库触发判断】胎圈1班排完后判断库存是否不足以支撑1个班的量
-        // 触发条件：当前可用库存 < SYS1101001阈值（1个班的成型消耗量）
-        if (hasBackupConfig && backupTriggerClass == 0 && shouldTriggerBackup(availableStock, params)) {
+        // 【试制/量试规格主动备库】第一班直接触发，不依赖被动库存判断
+        // 触发条件：embryoTypeFlag=1（含试制X/量试T物料）且存在备库班数配置
+        boolean isTrialSpec = scheduleVo.getEmbryoTypeFlag() != null
+                && scheduleVo.getEmbryoTypeFlag() == 1;
+        if (isTrialSpec && hasBackupConfig && backupTriggerClass == 0) {
             backupTriggerClass = 1;
-            // 计算备库N个班的总量（从成型5班开始连续N个班，超出成型8班用平均值估算）
+            // 计算备库N个班的总量（复用现有逻辑，从成型5班开始连续N个班）
             backupTotalQty = calculateBackupTotalQty(backupTriggerClass, backupShiftCount, scheduleVo, coefficient);
             // 触发班次计划量 = max(0, 备库总量 - 当前可用库存) × 损耗率乘数
             double pureDemand = Math.max(0, BigDecimalUtil.sub(backupTotalQty, availableStock));
             class1Plan = BigDecimalUtil.mul(pureDemand, lossRateMultiplier);
             class1Plan = planQtyRounding(scheduleVo, class1Plan, toolCapacity, totalConsumeQty, context);
             scheduleVo.setClass1PlanQty(class1Plan);
-            // 更新可用库存：加上胎圈1班备库产出
+            // 更新可用库存：加上胎圈1班备库产出，扣除成型3班消耗
             availableStock = BigDecimalUtil.add(availableStock, class1Plan);
+            availableStock = BigDecimalUtil.sub(availableStock, tqConsume3);
             logBackupTrigger(scheduleVo, 1, machineCount, backupShiftCount, backupTotalQty, availableStock);
+        } else {
+            // 【常规规格】胎圈1班按正常逻辑计算计划量
+            if (availableStock < tqConsume3) {
+                class1PureDemand = BigDecimalUtil.sub(tqConsume3, availableStock);
+                class1Plan = BigDecimalUtil.mul(class1PureDemand, lossRateMultiplier);
+            }
+            class1Plan = planQtyRounding(scheduleVo, class1Plan, toolCapacity, totalConsumeQty, context);
+            scheduleVo.setClass1PlanQty(class1Plan);
+            availableStock = BigDecimalUtil.add(availableStock, class1Plan);  // 加上胎圈1班产出
+            availableStock = BigDecimalUtil.sub(availableStock, tqConsume3);  // 扣除成型3班胎圈消耗
+
+            // 【被动备库触发判断】胎圈1班排完后判断库存是否不足以支撑1个班的量
+            // 触发条件：当前可用库存 < SYS1101001阈值（1个班的成型消耗量）
+            if (hasBackupConfig && shouldTriggerBackup(availableStock, params)) {
+                backupTriggerClass = 1;
+                // 计算备库N个班的总量（从成型5班开始连续N个班，超出成型8班用平均值估算）
+                backupTotalQty = calculateBackupTotalQty(backupTriggerClass, backupShiftCount, scheduleVo, coefficient);
+                // 触发班次计划量 = max(0, 备库总量 - 当前可用库存) × 损耗率乘数
+                double pureDemand = Math.max(0, BigDecimalUtil.sub(backupTotalQty, availableStock));
+                class1Plan = BigDecimalUtil.mul(pureDemand, lossRateMultiplier);
+                class1Plan = planQtyRounding(scheduleVo, class1Plan, toolCapacity, totalConsumeQty, context);
+                scheduleVo.setClass1PlanQty(class1Plan);
+                // 更新可用库存：加上胎圈1班备库产出
+                availableStock = BigDecimalUtil.add(availableStock, class1Plan);
+                logBackupTrigger(scheduleVo, 1, machineCount, backupShiftCount, backupTotalQty, availableStock);
+            }
         }
 
         // 胎圈2班(D+1日夜班) → 供应成型4班(D+1日早班)

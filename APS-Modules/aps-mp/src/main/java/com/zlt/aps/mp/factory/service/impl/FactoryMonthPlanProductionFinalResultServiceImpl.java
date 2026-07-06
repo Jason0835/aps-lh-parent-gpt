@@ -1609,16 +1609,19 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
 
     /**
      * 计算超欠产的公共方法
-     * 根据数据来源月份的月计划月底余量和硫化日完成量计算超欠产，回填到写入目标月份的定稿记录
-     * 公式：超欠产 = 月底余量 - (库存抓取日~月底)的硫化日完成量
+     * 根据数据来源月份的月计划计划量(库存抓取日~月底累加DAY_x)和硫化日完成量计算超欠产，回填到写入目标月份的定稿记录
+     * 公式：超欠产 = (库存抓取日~月底的)计划量 - (库存抓取日~月底的)已完成量
      * 匹配维度：(分厂+物料编码+产品状态) 三字段
      * 处理流程：
      *   1. UPDATE：当月定稿表按三字段能匹配上的记录，更新其上月超欠产值和有效标识
      *   2. INSERT：上月定稿有、当月定稿按三字段匹配不上的记录，新增一条到当月定稿表
      *      - 超欠产值 = 0 的记录不插入
-     *      - 当月定稿表无任何记录的工厂不插入（无版本号可取）
-     *      - 版本号字段(MONTH_PLAN_VERSION/LAST_MONTH_PLAN_VERSION/PRODUCTION_VERSION)取当月同分厂任意一条记录的值
+     *      - 当月定稿表无定稿版本的工厂不插入（无版本号可取）
+     *      - 版本号字段(MONTH_PLAN_VERSION/PRODUCTION_VERSION)取自 T_MP_PROC_VERSION 当月定稿版本(IS_FINAL='1')，
+     *        LAST_MONTH_PLAN_VERSION 置 NULL
+     *      - PRODUCTION_NO 工单号在 Java 层按当月同分厂最大值+1 递增生成
      *      - DAY_1~DAY_31 全部置 NULL
+     *      - 产量/调整相关字段置 0
      *      - 其他业务字段从上月定稿复制
      *
      * @param lastMonth    数据来源月份（上月或当月）
@@ -1646,11 +1649,51 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
                 startDate, endDate, overdueThresholdParamCode);
 
         // 2. INSERT：补齐上月定稿有、当月定稿按相同维度匹配不上的记录
-        //    - 超欠产值 = 0 的记录不插入
-        //    - 当月定稿表无任何记录的工厂不插入（无版本号可取）
-        //    - 版本号取当月同分厂任意一条记录的值，DAY_1~DAY_31 置空
-        int insertCount = finalMapper.insertMissingLastMonthOverProd(lastYear, lastMonthValue, currentYear, currentMonthValue,
+        //    步骤：查询待插入记录 → 按分厂分组 → 查询当月各分厂最大工单号 → Java层递增生成工单号 → 批量插入
+        List<FactoryMonthPlanProductionFinalResult> missingList = finalMapper.selectMissingLastMonthOverProd(
+                lastYear, lastMonthValue, currentYear, currentMonthValue,
                 startDate, endDate, overdueThresholdParamCode);
+
+        int insertCount = 0;
+        if (CollectionUtils.isNotEmpty(missingList)) {
+            // 按分厂分组，每个分厂独立生成工单号序列
+            Map<String, List<FactoryMonthPlanProductionFinalResult>> factoryGroupMap = missingList.stream()
+                    .collect(Collectors.groupingBy(FactoryMonthPlanProductionFinalResult::getFactoryCode));
+
+            for (Map.Entry<String, List<FactoryMonthPlanProductionFinalResult>> entry : factoryGroupMap.entrySet()) {
+                String factoryCode = entry.getKey();
+                List<FactoryMonthPlanProductionFinalResult> factoryList = entry.getValue();
+
+                // 查询当月该分厂定稿表 PRODUCTION_NO 最大值
+                String maxProductionNo = finalMapper.selectMaxProductionNo(factoryCode, currentYear, currentMonthValue);
+                if (StringUtils.isEmpty(maxProductionNo) || maxProductionNo.length() < 3) {
+                    // 当月无工单号或格式异常，跳过该分厂（正常不会出现，因为 PRODUCTION_NO 是必填字段）
+                    log.warn("分厂 {} 当月定稿表无有效工单号，跳过 {} 条新增记录", factoryCode, factoryList.size());
+                    continue;
+                }
+
+                // 解析数字部分 +1（工单号格式：MP + 13位数字，如 MP2607020100257 → 2607020100257 → +1 → 2607020100258）
+                long nextSeq = Long.parseLong(maxProductionNo.substring(2)) + 1;
+
+                // 为每条记录生成递增工单号
+                for (FactoryMonthPlanProductionFinalResult item : factoryList) {
+                    item.setProductionNo("MP" + String.format("%013d", nextSeq++));
+                }
+
+                insertCount += factoryList.size();
+            }
+
+            // 批量插入已生成工单号的记录
+            if (insertCount > 0) {
+                // 过滤掉未生成工单号的记录（被跳过分厂的记录）
+                List<FactoryMonthPlanProductionFinalResult> toInsertList = missingList.stream()
+                        .filter(item -> StringUtils.isNotEmpty(item.getProductionNo()))
+                        .collect(Collectors.toList());
+                if (CollectionUtils.isNotEmpty(toInsertList)) {
+                    baseDao.insertBatch(toInsertList);
+                }
+            }
+        }
 
         log.info("超欠产计算完成, 更新记录数: {}, 新增记录数: {}", updateCount, insertCount);
         return AjaxResult.success("超欠产计算完成，更新记录数：" + updateCount + "，新增记录数：" + insertCount);

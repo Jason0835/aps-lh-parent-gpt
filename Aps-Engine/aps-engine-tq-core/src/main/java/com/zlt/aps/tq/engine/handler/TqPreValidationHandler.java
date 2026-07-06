@@ -77,9 +77,8 @@ public class TqPreValidationHandler extends AbsTqScheduleStepHandler {
     private void validateConstruction(TqScheduleContext context) {
         String scheduleDate = context.getScheduleDate();
         String batchNo = context.getBatchNo();
-        String productionStage = context.getParams().getProductionStage();
 
-        List<EngineConstructionInfo> list = tqEngineMapper.listTqNeedConstruction(scheduleDate, productionStage);
+        List<EngineConstructionInfo> list = tqEngineMapper.listTqNeedConstruction(scheduleDate);
         // 校验忽略掉外协规格，只校验不是外协的规格
 //        list = list.stream()
 //                .filter(r -> !context.getAssistSpecMap().containsKey(r.getTireRingCode()))

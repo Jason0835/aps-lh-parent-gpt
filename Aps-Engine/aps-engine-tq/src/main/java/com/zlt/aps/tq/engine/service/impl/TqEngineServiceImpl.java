@@ -262,8 +262,7 @@ public class TqEngineServiceImpl implements TqEngineService {
 
         List<String> beadCodes = scheduleList.stream().map(TqScheduleResultVo::getBeadCode).collect(Collectors.toList());
         TqScheduleParams params = this.loadParams();  // 获取工序参数map
-        String productionStage = params.getProductionStage();  //仅投产阶段规格排产标识
-        Map<String, TqScheduleBaseInfoVo> scheduleBaseInfoMap = getScheduleBaseInfoMap(scheduleDate, beadCodes, productionStage);  //根据胎圈代码查询对应的胎圈基础信息
+        Map<String, TqScheduleBaseInfoVo> scheduleBaseInfoMap = getScheduleBaseInfoMap(scheduleDate, beadCodes);  //根据胎圈代码查询对应的胎圈基础信息
         Map<String, Double> planStockMap = tqEngineStockService.getPlanStockMap(batchNo, scheduleDate, params.getStockLossRate(), null);  //计算胎圈16点预计库存（插单场景不按工厂过滤）
         Map<String, TqMonthSurplusVo> monthSurplus = tqEngineMonthSurplusService.getMonthSurplus(scheduleDate);  //获得月度计划剩余量、完成量
         autoScheduleLogService.insertTqScheduleLog(batchNo, "", "插单或批量导入基础数据", logSplit("半部件基础数据信息:" + toJSONString(scheduleBaseInfoMap),
@@ -306,15 +305,15 @@ public class TqEngineServiceImpl implements TqEngineService {
      * @param scheduleDate
      * @return
      */
-    private Map<String, TqScheduleBaseInfoVo> getScheduleBaseInfoMap(String scheduleDate, List<String> beadCodes, String productionStage) {
+    private Map<String, TqScheduleBaseInfoVo> getScheduleBaseInfoMap(String scheduleDate, List<String> beadCodes) {
         Map<String, TqScheduleBaseInfoVo> map = new HashMap<>();
-        List<TqScheduleBaseInfoVo> list = tqEngineMapper.listTqScheduleBaseInfo(beadCodes, ""); //查询出胎面在施工表的基础信息
+        List<TqScheduleBaseInfoVo> list = tqEngineMapper.listTqScheduleBaseInfo(beadCodes); //查询出胎面在施工表的基础信息
         if(!StringUtils.isEmpty(list)) {
             map = list.stream().collect(Collectors.toMap(TqScheduleBaseInfoVo::getBeadCode, baseInfoVo->baseInfoVo));
         }
 
         Map<String, TqScheduleBaseInfoVo> hasCxMap = new HashMap<>();
-        List<TqScheduleResultVo> hasCxlist = tqEngineMapper.statTqScheduleBase(scheduleDate, productionStage); //查询出在有对应成型排程的胎面基础信息
+        List<TqScheduleResultVo> hasCxlist = tqEngineMapper.statTqScheduleBase(scheduleDate); //查询出在有对应成型排程的胎面基础信息
         for(TqScheduleResultVo info : hasCxlist) {
             TqScheduleBaseInfoVo baseInfoVo = new TqScheduleBaseInfoVo();
             BeanUtils.copyProperties(info, baseInfoVo);
@@ -1673,7 +1672,6 @@ public class TqEngineServiceImpl implements TqEngineService {
         params.setReopenStockThreshold(getDouble(paramsMap.getOrDefault(EngineConstants.TQ_REOPEN_STOCK_THRESHOLD, "0")));
         params.setMoldingStopPreShiftCount(getDouble(paramsMap.getOrDefault(EngineConstants.TQ_MOLDING_STOP_PRE_SHIFT_COUNT, "2")));
         params.setToolingTotal(getInt(paramsMap.getOrDefault(EngineConstants.TQ_TOOLING_TOTAL, "50")));
-        params.setProductionStage(paramsMap.getOrDefault(EngineConstants.TQ_PRODUCTION_STAGE_PRODUCE, "1"));
         params.setBigSizeSpec(BigDecimalUtils.valueOf(paramsMap.getOrDefault(EngineConstants.TQ_BIG_SIZE_SPEC, DEFAULT_BIG_SIZE_SPEC)));
         params.setStockLossRate(getDouble(paramsMap.getOrDefault(EngineConstants.TQ_STOCK_LOSS_RATE, "0")));
         params.setEqualShareThreshold(new BigDecimal(paramsMap.getOrDefault(EngineConstants.TQ_EQUAL_SHARE_THRESHOLD, DEFAULT_EQUAL_SHARE_THRESHOLD)));
@@ -1758,12 +1756,11 @@ public class TqEngineServiceImpl implements TqEngineService {
     /**
      * 查询胎圈施工基础信息（委托给Mapper）
      *
-     * @param beadCodes       胎圈代码集合
-     * @param productionStage 生产阶段过滤（空串表示不过滤）
+     * @param beadCodes 胎圈代码集合
      * @return 施工基础信息列表
      */
     @Override
-    public List<TqScheduleBaseInfoVo> listTqScheduleBaseInfo(List<String> beadCodes, String productionStage) {
-        return tqEngineMapper.listTqScheduleBaseInfo(beadCodes, productionStage);
+    public List<TqScheduleBaseInfoVo> listTqScheduleBaseInfo(List<String> beadCodes) {
+        return tqEngineMapper.listTqScheduleBaseInfo(beadCodes);
     }
 }

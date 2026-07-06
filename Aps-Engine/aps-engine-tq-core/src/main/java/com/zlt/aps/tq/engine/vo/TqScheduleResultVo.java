@@ -254,6 +254,13 @@ public class TqScheduleResultVo extends ApsBaseDto {
      */
     private Integer backupTriggerClass;
 
+    /**
+     * 是否含试制/量试物料标记（1=是，0=否）
+     * 关联SKU与示方书关系表，按物料编码取制造示方类型最新一条
+     * 存在T(量试)或X(试制)物料时标记为1，在胎圈1班直接触发主动备库
+     */
+    private Integer embryoTypeFlag;
+
     @ApiModelProperty(value = "数据来源：0>自动排程；1>APS插单；2>导入；")
     private String dataSource;
 
