@@ -151,6 +151,15 @@ public interface ITmScheduleResultService extends IDocService<TmScheduleResult> 
     int publish(List<Long> ids);
 
     /**
+     * 更改排程结果发布状态
+     *
+     * @param ids 排程结果ID列表
+     * @param releaseStatus 发布状态
+     * @return 更新行数
+     */
+    int changeReleaseStatus(List<Long> ids, String releaseStatus);
+
+    /**
      * 胎面排程班次日期列表
      * 根据排程日期构建6个班次的日期展示列表
      *

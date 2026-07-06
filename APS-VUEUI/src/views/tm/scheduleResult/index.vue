@@ -62,6 +62,12 @@
           v-hasPermi="['tm:tmScheduleResult:publish']"
           @click="handlePublish"
         >{{ $t("ui.data.column.scheduleResult.publish") }}</el-button>
+        <el-button
+          v-hasRole="['admin']"
+          :disabled="selection.length === 0"
+          type="primary"
+          @click="handleChangeReleaseStatus"
+        >{{ $t("ui.data.column.scheduleResult.changeReleaseStatus") }}</el-button>
       </template>
     </page-table>
     <tlt-upload-form
@@ -76,6 +82,7 @@
     <autoPlanDialog ref="autoPlanRef" @success="handleAutoPlanSuccess" />
     <infoDialog ref="infoRef" @success="getList" />
     <changeMachineDialog ref="changeMachineRef" @success="getList" />
+    <releaseStatusDialog ref="releaseStatusRef" @success="getList" />
   </basic-container>
 </template>
 <script>
@@ -87,6 +94,7 @@ import TltUploadForm from "@/views/components/tltUploadForm.vue";
 import autoPlanDialog from "./components/autoPlanDialog.vue";
 import infoDialog from "./components/infoDialog.vue";
 import changeMachineDialog from "./components/changeMachineDialog.vue";
+import releaseStatusDialog from "./components/releaseStatusDialog.vue";
 
 const formatDate = (date) => {
   const year = date.getFullYear();
@@ -109,6 +117,7 @@ export default {
     infoDialog,
     TltUploadForm,
     changeMachineDialog,
+    releaseStatusDialog,
   },
   dicts: ["biz_factory_name", "biz_yes_no", "IS_RELEASE", "tm_data_source"],
   provide() {
@@ -508,6 +517,12 @@ export default {
       if (this.$refs.changeMachineRef) {
         let row = this.selection;
         this.$refs.changeMachineRef.show(row);
+      }
+    },
+    // 更改发布状态弹窗
+    handleChangeReleaseStatus() {
+      if (this.$refs.releaseStatusRef) {
+        this.$refs.releaseStatusRef.show(this.selection);
       }
     },
     // 调量入口：复用编辑弹窗，由弹窗根据编辑状态调用调量接口。

@@ -86,6 +86,9 @@ public class TmScheduleResultServiceImpl extends AbstractDocService<TmScheduleRe
     @Resource
     private TmAutoScheduleRedisCacheService tmAutoScheduleRedisCacheService;
 
+    @Resource
+    private TmManualInsertRollingService tmManualInsertRollingService;
+
     @Override
     protected String getDocTypeCode() {
         return "TM0815";
@@ -505,9 +508,7 @@ public class TmScheduleResultServiceImpl extends AbstractDocService<TmScheduleRe
             throw new ServiceException(resolveTmMessage("ui.data.alert.tm.schedule.insertTreadCodeEmpty", "插单胎面不能为空"));
         }
         validateInsertAfterSecondSequence(scheduleResult);
-        invokeInsertFacade(scheduleResult);
-        scheduleResult.setReleaseStatus(ApsConstant.NO_RELEASE);
-        int insertCount = tmScheduleResultMapper.insert(scheduleResult);
+        int insertCount = tmManualInsertRollingService.insertAndRoll(scheduleResult);
         scheduleResult.setBaseVale(scheduleResult.getId());
         insetDispatcherLog(ApsConstant.DISPATCHER_OPER_INSERT_ORDER, scheduleResult);
         return insertCount;
@@ -586,6 +587,24 @@ public class TmScheduleResultServiceImpl extends AbstractDocService<TmScheduleRe
         LambdaUpdateWrapper<TmScheduleResult> wrapper = new LambdaUpdateWrapper<>();
         wrapper.in(TmScheduleResult::getId, ids);
         wrapper.set(TmScheduleResult::getReleaseStatus, ApsConstant.WAIT_RELEASING);
+        return tmScheduleResultMapper.update(null, wrapper);
+    }
+
+    /**
+     * 更改排程结果发布状态。
+     *
+     * @param ids 排程结果 ID 列表
+     * @param releaseStatus 发布状态
+     * @return 更新行数
+     */
+    @Override
+    public int changeReleaseStatus(List<Long> ids, String releaseStatus) {
+        if (CollUtil.isEmpty(ids)) {
+            throw new ServiceException(resolveTmMessage("ui.data.alert.tm.schedule.publishIdsEmpty", "请选择要更改发布状态的排程记录"));
+        }
+        LambdaUpdateWrapper<TmScheduleResult> wrapper = new LambdaUpdateWrapper<>();
+        wrapper.in(TmScheduleResult::getId, ids);
+        wrapper.set(TmScheduleResult::getReleaseStatus, releaseStatus);
         return tmScheduleResultMapper.update(null, wrapper);
     }
 

@@ -18,6 +18,7 @@ import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.io.IOUtils;
 import org.apache.shiro.authz.annotation.RequiresPermissions;
+import org.apache.shiro.authz.annotation.RequiresRoles;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.ModelMap;
@@ -30,6 +31,7 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 胎面排程结果表 页面控制层
@@ -236,5 +238,13 @@ public class TmScheduleResultUIController extends BaseUIController<TmScheduleRes
         scheduleResult.setScheduleDate(scheduleDateQuery);
         List<TmScheduleShiftDateVO> list = iTmScheduleResultService.listScheduleShiftDates(scheduleResult);
         return AjaxResult.success(list);
+    }
+
+    @RequiresRoles("admin")
+    @ApiOperation("更改发布状态")
+    @PostMapping("/changeReleaseStatus")
+    @ResponseBody
+    public AjaxResult changeReleaseStatus(@RequestBody Map<String, Object> params) {
+        return iTmScheduleResultService.changeReleaseStatus(params);
     }
 }
