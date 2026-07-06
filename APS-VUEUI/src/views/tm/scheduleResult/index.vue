@@ -429,7 +429,7 @@ export default {
         },
         {
           label: this.$t("ui.data.column.tm.scheduleResult.scheduleDate"),
-          prop: "scheduleDateQuery",
+          prop: "scheduleDate",
           type: "date",
           valueFormat: "yyyy-MM-dd",
           listeners: {
@@ -472,13 +472,13 @@ export default {
       return shiftName + " " + (item.shiftDate || "");
     },
     handleScheduleDateChange(val) {
-      this.query.scheduleDateQuery = val;
+      this.query.scheduleDate = val;
       this.getDate();
     },
     async getDate() {
       try {
         let res = await listScheduleShiftDates({
-          scheduleDateQuery: this.query.scheduleDateQuery || this.search.scheduleDateQuery,
+          scheduleDate: this.query.scheduleDate || this.search.scheduleDate,
         });
         if (res && res.length > 0) {
           this.dateList = res;
@@ -497,17 +497,17 @@ export default {
       if (this.$refs.autoPlanRef) {
         this.$refs.autoPlanRef.show(
           this.query.factoryCode || this.search.factoryCode,
-          this.query.scheduleDateQuery || this.search.scheduleDateQuery
+          this.query.scheduleDate || this.search.scheduleDate
         );
       }
     },
     // 自动排程成功后同步查询日期并刷新列表。
     handleAutoPlanSuccess(scheduleDate) {
       if (scheduleDate) {
-        this.$set(this.query, "scheduleDateQuery", scheduleDate);
+        this.$set(this.query, "scheduleDate", scheduleDate);
         this.search = {
           ...this.search,
-          scheduleDateQuery: scheduleDate
+          scheduleDate: scheduleDate
         };
       }
       this.getList();
@@ -655,11 +655,11 @@ export default {
     };
     this.search = {
       ...defaultParams,
-      scheduleDateQuery: getOffsetDate(2),
+      scheduleDate: getOffsetDate(2),
     };
     this.query = {
       ...defaultParams,
-      scheduleDateQuery: getOffsetDate(2),
+      scheduleDate: getOffsetDate(2),
     };
     this.getList();
   },
