@@ -47,6 +47,7 @@ import com.zlt.aps.dj.api.domain.entity.DjDispatcherLog;
 import com.zlt.aps.dj.api.domain.entity.DjMachineInfo;
 import com.zlt.aps.dj.api.domain.entity.DjParams;
 import com.zlt.aps.dj.api.domain.entity.DjScheduleResult;
+import com.zlt.aps.dj.api.domain.entity.DjShiftConfig;
 import com.zlt.aps.dj.engine.constant.DjEngineConstants;
 import com.zlt.aps.dj.engine.vo.DjScheduleResultVo;
 import com.zlt.aps.dj.mapper.DjScheduleResultMapper;
@@ -55,6 +56,7 @@ import com.zlt.aps.dj.service.DjDispatcherLogService;
 import com.zlt.aps.dj.service.DjMachineInfoService;
 import com.zlt.aps.dj.service.DjScheduleResultService;
 import com.zlt.aps.dj.service.IDjScheduleAdjustService;
+import com.zlt.aps.dj.service.IDjShiftConfigService;
 import com.zlt.aps.utils.BillUtils;
 import com.zlt.bill.common.service.AbstractBillService;
 
@@ -84,6 +86,9 @@ public class DjScheduleResultServiceImpl extends AbstractBillService<DjScheduleR
 
     @Autowired
     private IDjScheduleAdjustService iDjScheduleAdjustService;
+
+    @Autowired
+    private IDjShiftConfigService djShiftConfigService;
 
     /**
      * 查询垫胶排程结果
@@ -813,11 +818,7 @@ public class DjScheduleResultServiceImpl extends AbstractBillService<DjScheduleR
      */
     @Override
     public AjaxResult getSummaryVo(DjScheduleResult scheduleResult) {
-        List<DjScheduleResult> djScheduleResultList = selectDjScheduleResultList(scheduleResult);
-        if (CollectionUtils.isEmpty(djScheduleResultList)) {
-            return AjaxResult.success(new ScheduleSummaryVo());
-        }
-
+        List<DjScheduleResult> djScheduleResultList = this.selectDjScheduleResultList(scheduleResult);
         BigDecimal totalClass1PlanQty = BigDecimal.ZERO;
         BigDecimal totalClass2PlanQty = BigDecimal.ZERO;
         BigDecimal totalClass3PlanQty = BigDecimal.ZERO;
@@ -832,12 +833,20 @@ public class DjScheduleResultServiceImpl extends AbstractBillService<DjScheduleR
             totalPrevDayClass3PlanQty = totalPrevDayClass3PlanQty.add(BigDecimalUtils.valueOf(result.getPrevDayClass3PlanQty()));
         }
 
+        // 获取排产起始班次（shiftOrder最小的班次编码）
+        String startShiftClass = ClassNumThreePlanEnums.CLASS_NIGHT.getClassIndex(); // 默认夜班
+        List<DjShiftConfig> activeShifts = djShiftConfigService.listActiveShifts();
+        if (CollectionUtils.isNotEmpty(activeShifts)) {
+            startShiftClass = activeShifts.get(0).getShiftCode();
+        }
+
         ScheduleSummaryVo scheduleSummaryVo = new ScheduleSummaryVo();
         scheduleSummaryVo.setClass1PlanQty(totalClass1PlanQty.doubleValue());
         scheduleSummaryVo.setClass2PlanQty(totalClass2PlanQty.doubleValue());
         scheduleSummaryVo.setClass3PlanQty(totalClass3PlanQty.doubleValue());
         scheduleSummaryVo.setStockQty(totalStockQty.doubleValue());
         scheduleSummaryVo.setLastDayPlanQty(totalPrevDayClass3PlanQty.doubleValue());
+        scheduleSummaryVo.setScheduleShiftClass(startShiftClass);
         return AjaxResult.success(scheduleSummaryVo);
     }
 
