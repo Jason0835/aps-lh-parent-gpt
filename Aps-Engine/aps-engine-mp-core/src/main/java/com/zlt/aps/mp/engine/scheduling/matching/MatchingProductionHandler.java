@@ -270,6 +270,10 @@ public class MatchingProductionHandler extends AbstractDataLoaderService {
             }
             // 统计那些SKU已排产
             productionPlanList.forEach(plan -> {
+                //20260705+ 剔除本身不排产计划
+                if (YesOrNoEnum.NO.getCode().equals(plan.getIsProduction())) {
+                    return;
+                }
                 // 计算剩余可搭配量，实单取实际需求量 - 已生产量；非实单取储备量
                 Integer remainMatchingQty = isActualOrder ? plan.getFactProdReqQty() - plan.getProducedQty()
                         : plan.getConventionReserveQty();

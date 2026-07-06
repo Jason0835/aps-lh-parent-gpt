@@ -17,10 +17,9 @@ public interface TqEngineMapper {
     /**
      * 根据成型排程记录 统计出 胎圈胶排程记录基础数据
      * @param scheduleDate 排程日期
-     * @param productionStage 仅投产阶段规格排产标识
      * @return
      */
-    List<TqScheduleResultVo> statTqScheduleBase(@Param("scheduleDate") String scheduleDate, @Param("productionStage") String productionStage);
+    List<TqScheduleResultVo> statTqScheduleBase(@Param("scheduleDate") String scheduleDate);
 
     /**
      * 创建自动排程记录
@@ -83,7 +82,7 @@ public interface TqEngineMapper {
      * @param beadCodes 胎圈code列表
      * @return
      */
-    List<TqScheduleBaseInfoVo> listTqScheduleBaseInfo(@Param("beadCodes") List<String> beadCodes, @Param("productionStage") String productionStage);
+    List<TqScheduleBaseInfoVo> listTqScheduleBaseInfo(@Param("beadCodes") List<String> beadCodes);
 
 //    /**
 //     * 新增单挑胎圈排程记录
@@ -102,10 +101,9 @@ public interface TqEngineMapper {
     /**
      * 查询出胎圈需要的施工信息字段
      * @param scheduleDate 排程日期
-     * @param productionStage 仅投产阶段规格排产标识
      * @return
      */
-    List<EngineConstructionInfo> listTqNeedConstruction(@Param("scheduleDate") String scheduleDate, @Param("productionStage") String productionStage);
+    List<EngineConstructionInfo> listTqNeedConstruction(@Param("scheduleDate") String scheduleDate);
 
     /**
      * 获得外协规格列表（外协逻辑已废弃，6班次排程不再使用）

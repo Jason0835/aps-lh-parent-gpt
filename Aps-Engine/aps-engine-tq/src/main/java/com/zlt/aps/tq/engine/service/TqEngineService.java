@@ -56,9 +56,8 @@ public interface TqEngineService {
     /**
      * 查询胎圈施工基础信息（用于校验胎圈规格施工是否存在，并回显钢丝圈、三角胶、尺寸等）
      *
-     * @param beadCodes       胎圈代码集合
-     * @param productionStage 生产阶段过滤（空串表示不过滤）
+     * @param beadCodes 胎圈代码集合
      * @return 施工基础信息列表
      */
-    List<TqScheduleBaseInfoVo> listTqScheduleBaseInfo(List<String> beadCodes, String productionStage);
+    List<TqScheduleBaseInfoVo> listTqScheduleBaseInfo(List<String> beadCodes);
 }

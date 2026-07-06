@@ -91,13 +91,37 @@ public class TmMachineAssignService implements ITmMachineAssignService {
             this.assignByFilterAndScore(task, context);
             return;
         }
-        // 已预置机台的任务直接追加到对应机台任务链
-        TmMachineCandidate candidate = new TmMachineCandidate();
-        candidate.setMachineCode(task.getMachineCode());
+        // 已预置机台的任务补齐速度、剩余产能等运行态信息后直接追加到对应机台任务链。
+        TmMachineCandidate candidate = this.resolvePresetMachineCandidate(task, context);
         context.getCandidateTraceMap().put(task.getBusinessKey(), Collections.singletonList(candidate));
         this.addAssignTrace(context, task, "PASS", task.getMachineCode(), null, null);
         this.bindSmallGlueMachine(context, task, task.getMachineCode(), null, "PRESET_MACHINE");
         this.taskChainScheduleService.appendAutoTask(task, candidate, context);
+    }
+
+    /**
+     * 解析预置机台任务的运行态候选机台信息。
+     *
+     * <p>预置机台任务不经过完整过滤评分流程，但仍需要沿用候选机台中的生产速度、最大产能和检修时长，
+     * 以便后续产能判断、任务链时间计算和解释快照使用同一份机台能力数据。</p>
+     *
+     * @param task 当前任务
+     * @param context 胎面排程上下文
+     * @return 补齐速度和剩余产能后的候选机台
+     */
+    private TmMachineCandidate resolvePresetMachineCandidate(TmTaskDraft task, TmScheduleContext context) {
+        TmMachineCandidate sourceCandidate = this.findCandidateByMachineCode(context.getMachineCandidateList(),
+                task.getMachineCode());
+        TmMachineCandidate candidate = sourceCandidate == null ? new TmMachineCandidate() : this.copyCandidate(sourceCandidate);
+        candidate.setMachineCode(task.getMachineCode());
+        BigDecimal machineSpeed = this.resolveMachineSpeed(task, candidate, context);
+        BigDecimal remainCapacity = this.resolveRemainCapacity(task, context, candidate, machineSpeed);
+        candidate.setMachineSpeed(machineSpeed);
+        candidate.setRemainCapacity(remainCapacity);
+        task.setMachineSpeed(machineSpeed);
+        task.setMachineRemainCapacity(remainCapacity);
+        task.setMaintenanceHours(candidate.getMaintenanceHours());
+        return candidate;
     }
 
     /**
@@ -174,7 +198,7 @@ public class TmMachineAssignService implements ITmMachineAssignService {
         String tailMainGlueCode = predecessor == null ? candidate.getTailMainGlueCode() : predecessor.getGlueCode();
         String tailBaseGlueCode = predecessor == null ? candidate.getTailBaseGlueCode() : predecessor.getBaseGlueCode();
         String tailMouthPlateCode = predecessor == null ? candidate.getTailMouthPlateCode() : predecessor.getMouthPlateCode();
-        BigDecimal machineSpeed = this.resolveMachineSpeed(task, candidate);
+        BigDecimal machineSpeed = this.resolveMachineSpeed(task, candidate, context);
         BigDecimal remainCapacity = this.resolveRemainCapacity(task, context, candidate, machineSpeed);
         BigDecimal capacityScore = this.capacityFitScore(task, remainCapacity);
         boolean mainGlueMatched = this.same(task.getGlueCode(), tailMainGlueCode);
@@ -534,7 +558,7 @@ public class TmMachineAssignService implements ITmMachineAssignService {
         BigDecimal capacityOverflowQty = BigDecimal.ZERO;
         task.setShiftOrder(startShiftOrder);
         if (currentShiftPlanQty.compareTo(BigDecimal.ZERO) > 0) {
-            BigDecimal machineSpeed = this.resolveMachineSpeed(task, selectedCandidate);
+            BigDecimal machineSpeed = this.resolveMachineSpeed(task, selectedCandidate, context);
             TmMachineCandidate runtimeCandidate = this.copyCandidate(selectedCandidate);
             runtimeCandidate.setMachineSpeed(machineSpeed);
             runtimeCandidate.setRemainCapacity(this.resolveRemainCapacity(task, context, runtimeCandidate, machineSpeed));
@@ -597,7 +621,7 @@ public class TmMachineAssignService implements ITmMachineAssignService {
                 if (remainingQty.compareTo(BigDecimal.ZERO) <= 0) {
                     break;
                 }
-                BigDecimal machineSpeed = this.resolveMachineSpeed(sourceTask, candidate);
+                BigDecimal machineSpeed = this.resolveMachineSpeed(sourceTask, candidate, context);
                 TmMachineCandidate runtimeCandidate = this.copyCandidate(candidate);
                 runtimeCandidate.setMachineSpeed(machineSpeed);
                 TmTaskDraft capacityProbeTask = this.copyOverflowTask(sourceTask, shiftOrder, remainingQty,
@@ -1156,7 +1180,7 @@ public class TmMachineAssignService implements ITmMachineAssignService {
     private void appendZeroPlanTask(TmTaskDraft task, TmMachineCandidate selectedCandidate,
                                     TmScheduleContext context, Integer shiftOrder) {
         task.setShiftOrder(shiftOrder);
-        BigDecimal machineSpeed = this.resolveMachineSpeed(task, selectedCandidate);
+        BigDecimal machineSpeed = this.resolveMachineSpeed(task, selectedCandidate, context);
         TmMachineCandidate runtimeCandidate = this.copyCandidate(selectedCandidate);
         runtimeCandidate.setMachineSpeed(machineSpeed);
         runtimeCandidate.setRemainCapacity(this.resolveRemainCapacity(task, context, runtimeCandidate, machineSpeed));
@@ -1766,6 +1790,7 @@ public class TmMachineAssignService implements ITmMachineAssignService {
         copy.setMaxCapacity(source.getMaxCapacity());
         copy.setRemainCapacity(source.getRemainCapacity());
         copy.setMaintenanceHours(source.getMaintenanceHours());
+        copy.getMaintenanceHoursByShift().putAll(source.getMaintenanceHoursByShift());
         copy.setMachineSpeed(source.getMachineSpeed());
         copy.getTreadSpeedMap().putAll(source.getTreadSpeedMap());
         copy.setMouthPlateCodes(source.getMouthPlateCodes());
@@ -1798,7 +1823,7 @@ public class TmMachineAssignService implements ITmMachineAssignService {
                 .anyMatch(candidate -> contains(candidate.getFixedAllowTreadCodes(), task.getTreadCode()));
         for (TmMachineCandidate candidate : candidates) {
             this.applyEffectivePredecessor(task, context, candidate);
-            BigDecimal machineSpeed = resolveMachineSpeed(task, candidate);
+            BigDecimal machineSpeed = resolveMachineSpeed(task, candidate, context);
             BigDecimal remainCapacity = resolveRemainCapacity(task, context, candidate, machineSpeed);
             candidate.setMachineSpeed(machineSpeed);
             candidate.setRemainCapacity(remainCapacity);
@@ -1811,13 +1836,14 @@ public class TmMachineAssignService implements ITmMachineAssignService {
             // 打印机台速度选择来源
             log.info("[TM_MACHINE_SPEED] treadCode={}, machineCode={}, 机台速度【{}】，来源={}",
                     task.getTreadCode(), candidate.getMachineCode(), machineSpeed,
-                    candidate.getTreadSpeedMap().containsKey(task.getTreadCode()) ? "胎面规格速度" : "机台默认速度");
+                    candidate.getTreadSpeedMap().containsKey(task.getTreadCode()) ? "胎面规格速度" : "最大产能/班次小时数");
             // 打印机台产能计算公式
             log.info("[TM_MACHINE_CAPACITY] treadCode={}, machineCode={}, shiftOrder={}, 最大产能【maxCapacity】-检修时长*机台速度【maintenanceDeduct】-已排计划量【assignedPlanQty】=剩余产能【remainCapacity】",
                     task.getTreadCode(), candidate.getMachineCode(), task.getShiftOrder());
-            log.info("[TM_MACHINE_CAPACITY_DETAIL] treadCode={}, machineCode={}, shiftOrder={}, maxCapacity={}, maintenanceHours={}, machineSpeed={}, assignedPlanQty={}, remainCapacity={}",
+            BigDecimal shiftMaintenanceHours = this.resolveMaintenanceHours(task, candidate);
+            log.info("[TM_MACHINE_CAPACITY_DETAIL] treadCode={}, machineCode={}, shiftOrder={}, maxCapacity={}, maintenanceHours={}, totalMaintenanceHours={}, machineSpeed={}, assignedPlanQty={}, remainCapacity={}",
                     task.getTreadCode(), candidate.getMachineCode(), task.getShiftOrder(),
-                    candidate.getMaxCapacity(), candidate.getMaintenanceHours(), machineSpeed,
+                    candidate.getMaxCapacity(), shiftMaintenanceHours, candidate.getMaintenanceHours(), machineSpeed,
                     resolveAssignedPlanQty(context, candidate.getMachineCode(), task.getShiftOrder()),
                     remainCapacity);
         }
@@ -1841,16 +1867,23 @@ public class TmMachineAssignService implements ITmMachineAssignService {
     }
 
     /**
-     * 解析机台生产速度，优先机台+胎面规格，其次机台默认速度。
+     * 解析机台生产速度，优先机台+胎面规格，其次最大产能/班次小时数，最后机台默认速度。
      *
      * @param task      待排任务草稿
      * @param candidate 候选机台
+     * @param context   胎面排程上下文
      * @return 生产速度，缺失时返回0
      */
-    private BigDecimal resolveMachineSpeed(TmTaskDraft task, TmMachineCandidate candidate) {
+    private BigDecimal resolveMachineSpeed(TmTaskDraft task, TmMachineCandidate candidate, TmScheduleContext context) {
         BigDecimal speed = candidate.getTreadSpeedMap().get(task.getTreadCode());
         if (speed != null) {
             return speed;
+        }
+        // 无胎面规格速度时，使用最大产能 / 班次小时数作为机台生产速度
+        BigDecimal maxCapacity = nvl(candidate.getMaxCapacity());
+        BigDecimal shiftHours = nvl(context.getShiftHoursMap().get(task.getShiftOrder()));
+        if (maxCapacity.compareTo(BigDecimal.ZERO) > 0 && shiftHours.compareTo(BigDecimal.ZERO) > 0) {
+            return maxCapacity.divide(shiftHours, 6, java.math.RoundingMode.HALF_UP);
         }
         return nvl(candidate.getMachineSpeed());
     }
@@ -1867,11 +1900,26 @@ public class TmMachineAssignService implements ITmMachineAssignService {
     private BigDecimal resolveRemainCapacity(TmTaskDraft task, TmScheduleContext context,
                                              TmMachineCandidate candidate, BigDecimal machineSpeed) {
         BigDecimal maxCapacity = candidate.getMaxCapacity() == null ? candidate.getRemainCapacity() : candidate.getMaxCapacity();
-        BigDecimal maintenanceDeduct = nvl(candidate.getMaintenanceHours()).multiply(nvl(machineSpeed));
+        BigDecimal maintenanceDeduct = this.resolveMaintenanceHours(task, candidate).multiply(nvl(machineSpeed));
         BigDecimal assignedPlanQty = resolveAssignedPlanQty(context, candidate.getMachineCode(), task.getShiftOrder());
         return nvl(maxCapacity).subtract(maintenanceDeduct).subtract(assignedPlanQty).max(BigDecimal.ZERO);
     }
 
+
+    /**
+     * 解析当前任务班次实际需要扣减的检修小时数。
+     *
+     * @param task      待排任务草稿
+     * @param candidate 候选机台
+     * @return 当前班次检修小时数，未加载分班数据时回退到当日总检修小时数
+     */
+    private BigDecimal resolveMaintenanceHours(TmTaskDraft task, TmMachineCandidate candidate) {
+        Map<Integer, BigDecimal> maintenanceHoursByShift = candidate.getMaintenanceHoursByShift();
+        if (CollUtil.isNotEmpty(maintenanceHoursByShift)) {
+            return nvl(maintenanceHoursByShift.get(this.normalizeShiftOrder(task.getShiftOrder())));
+        }
+        return nvl(candidate.getMaintenanceHours());
+    }
     /**
      * 汇总目标机台班次已排计划量。
      *

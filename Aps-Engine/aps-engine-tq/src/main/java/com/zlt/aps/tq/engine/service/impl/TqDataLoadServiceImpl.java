@@ -92,9 +92,8 @@ public class TqDataLoadServiceImpl implements ITqDataLoadService {
         TqScheduleParams params = loadParams();
         context.setParams(params);
 
-        // 3. 加载排程基础数据（从成型排程统计）
-        String productionStage = params.getProductionStage();
-        List<TqScheduleResultVo> scheduleList = tqEngineMapper.statTqScheduleBase(scheduleDate, productionStage);
+        // 3. 加载排程基础数据（从成型排程统计，不再按投产阶段过滤，所有胎胚均参与排程）
+        List<TqScheduleResultVo> scheduleList = tqEngineMapper.statTqScheduleBase(scheduleDate);
         if (scheduleList == null || scheduleList.isEmpty()) {
             autoScheduleLogService.insertTqScheduleLog(batchNo, "", "自动排程失败",
                     "自动排程失败，原因：成型排程数据为空，或没有在施工信息中找到对应的物料");
@@ -197,7 +196,6 @@ public class TqDataLoadServiceImpl implements ITqDataLoadService {
         params.setMoldingStopPreShiftCount(getDouble(paramsMap.getOrDefault(EngineConstants.TQ_MOLDING_STOP_PRE_SHIFT_COUNT, "2")));
         // 工装车总数（全局统一值，从参数表加载，默认50）
         params.setToolingTotal(getInt(paramsMap.getOrDefault(EngineConstants.TQ_TOOLING_TOTAL, "50")));
-        params.setProductionStage(paramsMap.getOrDefault(EngineConstants.TQ_PRODUCTION_STAGE_PRODUCE, "1"));
         params.setBigSizeSpec(com.zlt.aps.common.core.utils.BigDecimalUtils.valueOf(paramsMap.getOrDefault(EngineConstants.TQ_BIG_SIZE_SPEC, DEFAULT_BIG_SIZE_SPEC)));
         params.setStockLossRate(getDouble(paramsMap.getOrDefault(EngineConstants.TQ_STOCK_LOSS_RATE, "0")));
         params.setEqualShareThreshold(new BigDecimal(paramsMap.getOrDefault(EngineConstants.TQ_EQUAL_SHARE_THRESHOLD, DEFAULT_EQUAL_SHARE_THRESHOLD)));

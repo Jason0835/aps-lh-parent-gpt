@@ -34,6 +34,7 @@ import com.zlt.aps.dj.api.domain.entity.DjMachineInfo;
 import com.zlt.aps.dj.api.domain.entity.DjMachineMaintenance;
 import com.zlt.aps.dj.api.domain.entity.DjParams;
 import com.zlt.aps.dj.api.domain.entity.DjScheduleResult;
+import com.zlt.aps.dj.api.domain.entity.DjShiftConfig;
 import com.zlt.aps.dj.api.domain.entity.DjSpecifyMachine;
 import com.zlt.aps.dj.api.domain.entity.DjStock;
 import com.zlt.aps.dj.engine.util.DjEngineUtil;
@@ -48,6 +49,7 @@ import com.zlt.aps.dj.engine.mapper.DjEngineMonthPlanMonitorMapper;
 import com.zlt.aps.dj.engine.mapper.DjEngineParamsMapper;
 import com.zlt.aps.dj.engine.mapper.DjEngineScheduleResultLogMapper;
 import com.zlt.aps.dj.engine.mapper.DjEngineScheduleResultMapper;
+import com.zlt.aps.dj.engine.mapper.DjEngineShiftConfigMapper;
 import com.zlt.aps.dj.engine.mapper.DjEngineSpecifyMachineMapper;
 import com.zlt.aps.dj.engine.mapper.DjEngineStockMapper;
 import com.zlt.aps.dj.engine.constant.DjEngineConstants;
@@ -104,6 +106,9 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
 
     @Autowired
     private DjEngineParamsMapper djEngineParamsMapper;
+
+    @Autowired
+    private DjEngineShiftConfigMapper djEngineShiftConfigMapper;
 
     @Autowired
     private DjEngineMonthPlanMonitorMapper djEngineMonthPlanMonitorMapper;
@@ -197,15 +202,18 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
         Map<String, DjParams> paramsMap = this.loadParamsMap(factoryCode);
         context.setParamsMap(paramsMap);
 
-        // 根据排程首班班次参数构建班次索引映射
-        DjParams startShiftParam = paramsMap.get(DjEngineConstants.PARAM_SCHEDULE_START_SHIFT);
-        String startShiftValue = this.resolveParamValue(startShiftParam);
-        if (startShiftValue == null) {
-            String name = (startShiftParam != null && startShiftParam.getParamName() != null)
-                    ? startShiftParam.getParamName() : DjEngineConstants.PARAM_SCHEDULE_START_SHIFT;
+        // 从班次配置中获取首班班次（crossDayFlag="1"的班次为跨天班次，即排程首班）
+        DjShiftConfig startShiftConfig = djEngineShiftConfigMapper.selectOne(
+                new LambdaQueryWrapper<DjShiftConfig>()
+                        .eq(DjShiftConfig::getCrossDayFlag, "1")
+                        .orderByAsc(DjShiftConfig::getShiftOrder)
+                        .last("LIMIT 1"));
+        if (startShiftConfig == null || startShiftConfig.getShiftCode() == null) {
             throw new BusinessException(MessageFormat.format(
-                    I18nUtil.getMessage("ui.dj.engine.paramNotConfigured"), name, DjEngineConstants.PARAM_SCHEDULE_START_SHIFT));
+                    I18nUtil.getMessage("ui.dj.engine.shiftConfigNotConfigured"),
+                    factoryCode));
         }
+        String startShiftValue = startShiftConfig.getShiftCode();
         String[] shiftClassMap = DjEngineUtil.buildShiftClassMap(startShiftValue);
         context.setShiftClassMap(shiftClassMap);
         log.info("步骤2.2：排程首班班次={}，班次映射={}", startShiftValue, String.join(",", shiftClassMap));
@@ -223,14 +231,12 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
         context.setPaddingSupplyDepth(paddingSupplyDepth);
         log.info("步骤2.2：排产深度（供应窗口），最大 {} 个班", maxSupplyDepth);
 
-        // 整理消耗量 Map<paddingCode, Map<班次索引, 消耗量>>
-        Map<String, Map<Integer, BigDecimal>> consumeQty = this.parseConsumeQty(cxScheduleList, constructionMap,
-                paddingSupplyDepth);
-        context.setConsumeQty(consumeQty);
-        log.info("步骤2.2：解析出 {} 个垫胶规格的消耗量", consumeQty.size());
+        // 存储成型计划和施工数据到上下文（供班次循环中动态计算消耗量使用）
+        context.setCxScheduleList(cxScheduleList);
+        context.setConstructionMap(constructionMap);
 
-        // 获取所有垫胶代码
-        Set<String> paddingCodes = consumeQty.keySet();
+        // 获取所有垫胶代码（从排产深度Map中获取）
+        Set<String> paddingCodes = paddingSupplyDepth.keySet();
 
         // ==================== 步骤3：计算垫胶需求清单 ====================
         // 3.1 加载库存
@@ -297,11 +303,7 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
             // 按垫胶代码整理月计划余量
             Map<String, BigDecimal> paddingMonthSurplus = this.calcPaddingMonthSurplus(monthPlanMonitors,
                     constructionMap, maxShiftConsume, maxExceedShifts);
-            // 补充超出范围的消耗量
-            if (!paddingMonthSurplus.isEmpty()) {
-                this.supplementOutOfRangeConsume(consumeQty, context, exceedPaddingMap, maxShiftConsume,
-                        paddingMonthSurplus);
-            }
+            // 超出范围的消耗量估算将在班次循环中的 checkDemandForShift 内按需计算
             // 存储月度剩余量到上下文（用于净需求计算中 n>8 时的月计划约束）
             Map<String, BigDecimal> rawPaddingRemaining = this.calcRawPaddingRemaining(monthPlanMonitors,
                     constructionMap);
@@ -312,8 +314,8 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
 
         // 3.3 构建垫胶需求清单
         BigDecimal standardCurlLength = this.getParamAsDecimal(context, DjEngineConstants.PARAM_STANDARD_CRIMP_LENGTH);
-        List<DjPaddingDemand> demandList = this.buildDemandList(paddingCodes, consumeQty, effectiveStockMap,
-                constructionMap, newSpecPaddingCodes, standardCurlLength);
+        List<DjPaddingDemand> demandList = this.buildDemandList(paddingCodes, cxScheduleList,
+                effectiveStockMap, constructionMap, newSpecPaddingCodes, standardCurlLength);
         log.info("步骤3.3：生成垫胶需求清单 {} 个规格", demandList.size());
 
         // 第1班接班库存不等同于有效库存（早上6点快照），需预估6:00~14:00（早班）的库存变化
@@ -338,12 +340,8 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
             String paddingCode = demand.getPaddingCode();
             BigDecimal stock = effectiveStockMap.getOrDefault(paddingCode, BigDecimal.ZERO);
             BigDecimal addPlan = prevDayClass3Plan.getOrDefault(paddingCode, BigDecimal.ZERO);
-            // CX class1（早班）消耗量
-            BigDecimal cxConsume = BigDecimal.ZERO;
-            Map<Integer, BigDecimal> shiftConsume = consumeQty.get(paddingCode);
-            if (shiftConsume != null) {
-                cxConsume = shiftConsume.getOrDefault(1, BigDecimal.ZERO);
-            }
+            // CX class1（早班）消耗量（从成型计划动态计算）
+            BigDecimal cxConsume = this.calcShiftConsume(cxScheduleList, constructionMap, paddingCode, 1);
             BigDecimal inventory = stock.add(addPlan).subtract(cxConsume);
             if (inventory.compareTo(BigDecimal.ZERO) < 0) {
                 inventory = BigDecimal.ZERO;
@@ -425,38 +423,37 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
     }
 
     /**
-     * 解析消耗量
+     * 动态计算指定垫胶规格在指定班次的成型消耗量
+     * <p>
+     * 遍历成型计划，找到匹配该垫胶规格的胎胚，按单耗换算为该班的消耗量。
+     * 每班循环中调用此方法，从当前排产班次开始往后计算，不再提前预计算所有班次。
+     * </p>
+     *
+     * @param cxScheduleList 成型计划列表
+     * @param constructionMap 施工数据 Map
+     * @param paddingCode 垫胶代码
+     * @param shiftIndex 班次索引（1~8）
+     * @return 该班次的消耗量（米）
      */
-    private Map<String, Map<Integer, BigDecimal>> parseConsumeQty(List<CxScheduleResult> cxScheduleList,
-            Map<String, MdmConstructionInfo> constructionMap, Map<String, Integer> paddingSupplyDepth) {
-        Map<String, Map<Integer, BigDecimal>> result = new HashMap<>();
-
+    private BigDecimal calcShiftConsume(List<CxScheduleResult> cxScheduleList,
+            Map<String, MdmConstructionInfo> constructionMap, String paddingCode, int shiftIndex) {
+        BigDecimal totalConsume = BigDecimal.ZERO;
         for (CxScheduleResult cx : cxScheduleList) {
             MdmConstructionInfo construction = constructionMap.get(cx.getEmbryoCode());
-            if (construction == null || construction.getPaddingCode() == null) {
+            if (construction == null || !paddingCode.equals(construction.getPaddingCode())) {
                 continue;
             }
-            String paddingCode = construction.getPaddingCode();
             // 垫胶长度单位是毫米(mm)，需要换算成米(m)
             BigDecimal unitConsume = construction.getPaddingLength() != null
                     ? construction.getPaddingLength().divide(DjEngineConstants.MM_TO_M_DIVISOR, 6, RoundingMode.HALF_UP)
                     : BigDecimal.ONE;
-
-            result.putIfAbsent(paddingCode, new HashMap<>());
-            Map<Integer, BigDecimal> shiftConsume = result.get(paddingCode);
-
-            // 使用该垫胶规格对应的排产深度
-            int specSupplyDepth = paddingSupplyDepth.getOrDefault(paddingCode, DjEngineConstants.CX_SHIFT_COUNT);
-            // 遍历8个班的计划量，只取排产深度范围内的
-            for (int i = 1; i <= specSupplyDepth && i <= DjEngineConstants.CX_SHIFT_COUNT; i++) {
-                BigDecimal classPlanQty = this.getClassPlanQty(cx, i);
-                if (classPlanQty != null && classPlanQty.compareTo(BigDecimal.ZERO) > 0) {
-                    BigDecimal consume = classPlanQty.multiply(unitConsume).setScale(2, RoundingMode.HALF_UP);
-                    shiftConsume.merge(i, consume, BigDecimal::add);
-                }
+            BigDecimal classPlanQty = this.getClassPlanQty(cx, shiftIndex);
+            if (classPlanQty != null && classPlanQty.compareTo(BigDecimal.ZERO) > 0) {
+                totalConsume = totalConsume.add(classPlanQty.multiply(unitConsume)
+                        .setScale(2, RoundingMode.HALF_UP));
             }
         }
-        return result;
+        return totalConsume;
     }
 
     /**
@@ -679,47 +676,10 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
     }
 
     /**
-     * 补充超出供应窗口的消耗量
-     */
-    private void supplementOutOfRangeConsume(Map<String, Map<Integer, BigDecimal>> consumeQty,
-            DjScheduleContext context, Map<String, Integer> paddingExceedShifts,
-            Map<String, BigDecimal> maxShiftConsume, Map<String, BigDecimal> paddingMonthSurplus) {
-        for (Map.Entry<String, BigDecimal> entry : paddingMonthSurplus.entrySet()) {
-            String paddingCode = entry.getKey();
-            BigDecimal monthRemaining = entry.getValue();
-            BigDecimal maxShift = maxShiftConsume.getOrDefault(paddingCode, BigDecimal.ZERO);
-
-            int exceedShifts = paddingExceedShifts.getOrDefault(paddingCode, 0);
-            if (exceedShifts <= 0) {
-                continue;
-            }
-
-            consumeQty.putIfAbsent(paddingCode, new HashMap<>());
-            Map<Integer, BigDecimal> shiftConsume = consumeQty.get(paddingCode);
-
-            BigDecimal accumulated = BigDecimal.ZERO;
-            int startShift = DjEngineConstants.CX_SHIFT_COUNT + 1;
-            for (int i = 0; i < exceedShifts; i++) {
-                int shiftIndex = startShift + i;
-                BigDecimal consume = maxShift;
-                // 累计不能超过月剩余量
-                if (accumulated.add(consume).compareTo(monthRemaining) > 0) {
-                    consume = monthRemaining.subtract(accumulated);
-                    if (consume.compareTo(BigDecimal.ZERO) <= 0) {
-                        break;
-                    }
-                }
-                shiftConsume.put(shiftIndex, consume);
-                accumulated = accumulated.add(consume);
-            }
-        }
-    }
-
-    /**
      * 构建垫胶需求清单
      */
     private List<DjPaddingDemand> buildDemandList(Set<String> paddingCodes,
-            Map<String, Map<Integer, BigDecimal>> consumeQty, Map<String, BigDecimal> effectiveStockMap,
+            List<CxScheduleResult> cxScheduleList, Map<String, BigDecimal> effectiveStockMap,
             Map<String, MdmConstructionInfo> constructionMap, Set<String> newSpecPaddingCodes,
             BigDecimal standardCurlLength) {
         List<DjPaddingDemand> demandList = new ArrayList<>();
@@ -751,9 +711,12 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
             // 判断是否新规格
             demand.setNewSpec(newSpecPaddingCodes.contains(paddingCode));
 
-            // 计算总消耗量（净需求 = 总消耗 - 有效库存）
-            Map<Integer, BigDecimal> shiftConsume = consumeQty.getOrDefault(paddingCode, new HashMap<>());
-            BigDecimal totalConsume = shiftConsume.values().stream().reduce(BigDecimal.ZERO, BigDecimal::add);
+            // 计算所有班次的总消耗量（从成型计划动态计算）
+            BigDecimal totalConsume = BigDecimal.ZERO;
+            for (int i = 1; i <= DjEngineConstants.CX_SHIFT_COUNT; i++) {
+                totalConsume = totalConsume.add(
+                        this.calcShiftConsume(cxScheduleList, constructionMap, paddingCode, i));
+            }
             BigDecimal effectiveStock = effectiveStockMap.getOrDefault(paddingCode, BigDecimal.ZERO);
             BigDecimal netDemand = totalConsume.subtract(effectiveStock);
             if (netDemand.compareTo(BigDecimal.ZERO) < 0) {
@@ -884,7 +847,6 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
      */
     private List<DjScheduleResult> executeSchedule(List<DjPaddingDemand> demandList, DjScheduleContext context) {
         List<DjScheduleResult> results = new ArrayList<>();
-        Map<String, Map<Integer, BigDecimal>> consumeQty = context.getConsumeQty();
         Map<String, BigDecimal> handoverInventory = context.getHandoverInventory();
         Map<String, DjMachineInfo> machineMap = context.getMachineMap();
 
@@ -967,7 +929,7 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
                     BigDecimal switchLoss = this.calcSwitchLoss(machine, lastSpecCode, spec, mouthPlateSwitchTime);
 
                     // 生产量计算
-                    BigDecimal produceQty = calcProduceQty(spec, remainingCapacity.subtract(switchLoss));
+                    BigDecimal produceQty = calcProduceQty(spec, remainingCapacity.subtract(switchLoss), context);
                     if (produceQty == null || produceQty.compareTo(BigDecimal.ZERO) <= 0) {
                         continue; // 放不下此规格
                     }
@@ -997,9 +959,10 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
             // 本班排产完毕后，计算各规格交班库存
             for (DjPaddingDemand spec : demandList) {
                 BigDecimal produceQtyThisShift = this.getScheduledQty(resultMap, spec.getPaddingCode(), shiftIndex);
-                // 本班成型消耗量
-                BigDecimal consumeQtyThisShift = consumeQty.getOrDefault(spec.getPaddingCode(), new HashMap<>())
-                        .getOrDefault(shiftIndex, BigDecimal.ZERO);
+                // 本班成型消耗量（从成型计划动态计算）
+                BigDecimal consumeQtyThisShift = this.calcShiftConsume(
+                        context.getCxScheduleList(), context.getConstructionMap(),
+                        spec.getPaddingCode(), shiftIndex);
                 BigDecimal incomingInv = handoverInventory.getOrDefault(spec.getPaddingCode(), BigDecimal.ZERO);
                 BigDecimal newInventory = incomingInv.add(produceQtyThisShift).subtract(consumeQtyThisShift);
                 if (newInventory.compareTo(BigDecimal.ZERO) < 0) {
@@ -1055,7 +1018,8 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
      */
     private void checkDemandForShift(List<DjPaddingDemand> demandList, int shiftIndex, DjScheduleContext context) {
         Map<String, BigDecimal> handoverInventory = context.getHandoverInventory();
-        Map<String, Map<Integer, BigDecimal>> consumeQty = context.getConsumeQty();
+        List<CxScheduleResult> cxScheduleList = context.getCxScheduleList();
+        Map<String, MdmConstructionInfo> constructionMap = context.getConstructionMap();
         Map<String, Integer> paddingSupplyDepth = context.getPaddingSupplyDepth();
         Map<String, BigDecimal> paddingRemainingMap = context.getPaddingRemainingMap();
 
@@ -1070,12 +1034,17 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
             int specSupplyDepth = paddingSupplyDepth.getOrDefault(spec.getPaddingCode(),
                     DjEngineConstants.CX_SHIFT_COUNT);
 
-            // ===== 步骤1：计算可覆盖班次数 coverableShiftCount =====
-            Map<Integer, BigDecimal> shiftConsume = consumeQty.getOrDefault(spec.getPaddingCode(), new HashMap<>());
+            // ===== 步骤1：从当前班次开始，动态计算各班成型消耗量 =====
+            // 计算范围：当前班次 ~ 当前班次 + 排产深度 - 1（最多到 CX_SHIFT_COUNT = 8）
+            int checkEndShift = Math.min(shiftIndex + specSupplyDepth - 1, DjEngineConstants.CX_SHIFT_COUNT);
+            Map<Integer, BigDecimal> shiftConsume = new HashMap<>();
+            for (int k = shiftIndex; k <= checkEndShift; k++) {
+                shiftConsume.put(k, this.calcShiftConsume(cxScheduleList, constructionMap, spec.getPaddingCode(), k));
+            }
+
             BigDecimal accumulateConsume = BigDecimal.ZERO;
             int coverableShiftCount = 0;
-            int maxCheckShift = Math.min(shiftIndex + specSupplyDepth - 1, DjEngineConstants.CX_SHIFT_COUNT);
-            for (int k = shiftIndex; k <= maxCheckShift; k++) {
+            for (int k = shiftIndex; k <= checkEndShift; k++) {
                 BigDecimal consume = shiftConsume.getOrDefault(k, BigDecimal.ZERO);
                 if (consume.compareTo(BigDecimal.ZERO) <= 0) {
                     coverableShiftCount++; // 无消耗的班次视为可覆盖
@@ -1104,7 +1073,8 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
                 // 全部在成型计划范围内（n ≤ 8）
                 BigDecimal demandInWindow = BigDecimal.ZERO;
                 for (int i = shiftIndex; i < shiftIndex + specSupplyDepth; i++) {
-                    demandInWindow = demandInWindow.add(shiftConsume.getOrDefault(i, BigDecimal.ZERO));
+                    demandInWindow = demandInWindow.add(this.calcShiftConsume(
+                            cxScheduleList, constructionMap, spec.getPaddingCode(), i));
                 }
                 netDemand = demandInWindow.subtract(incomingInventory);
                 if (netDemand.compareTo(BigDecimal.ZERO) < 0) {
@@ -1115,7 +1085,8 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
                 // part1: 第 shiftIndex~8 班部分
                 BigDecimal part1 = BigDecimal.ZERO;
                 for (int i = shiftIndex; i <= DjEngineConstants.CX_SHIFT_COUNT; i++) {
-                    part1 = part1.add(shiftConsume.getOrDefault(i, BigDecimal.ZERO));
+                    part1 = part1.add(this.calcShiftConsume(
+                            cxScheduleList, constructionMap, spec.getPaddingCode(), i));
                 }
                 part1 = part1.subtract(incomingInventory);
                 if (part1.compareTo(BigDecimal.ZERO) < 0) {
@@ -1125,12 +1096,14 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
                 // 最后3个班次消耗量之和（第6/7/8班）
                 BigDecimal last3Sum = BigDecimal.ZERO;
                 for (int i = 6; i <= DjEngineConstants.CX_SHIFT_COUNT; i++) {
-                    last3Sum = last3Sum.add(shiftConsume.getOrDefault(i, BigDecimal.ZERO));
+                    last3Sum = last3Sum.add(this.calcShiftConsume(
+                            cxScheduleList, constructionMap, spec.getPaddingCode(), i));
                 }
                 // 如果最后3班无数据，用当前班次到第8班的消耗量总计兜底
                 if (last3Sum.compareTo(BigDecimal.ZERO) <= 0) {
                     for (int i = shiftIndex; i <= DjEngineConstants.CX_SHIFT_COUNT; i++) {
-                        last3Sum = last3Sum.add(shiftConsume.getOrDefault(i, BigDecimal.ZERO));
+                        last3Sum = last3Sum.add(this.calcShiftConsume(
+                                cxScheduleList, constructionMap, spec.getPaddingCode(), i));
                     }
                 }
                 BigDecimal avgLast3Shifts = last3Sum.divide(BigDecimal.valueOf(3), 2, RoundingMode.HALF_UP);
@@ -1452,17 +1425,16 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
      * 计算库消比
      */
     private BigDecimal calcStockConsumeRatio(DjPaddingDemand spec, DjScheduleContext context) {
-        Map<String, Map<Integer, BigDecimal>> consumeQty = context.getConsumeQty();
-        Map<Integer, BigDecimal> shiftConsume = consumeQty.get(spec.getPaddingCode());
-        if (shiftConsume == null || shiftConsume.isEmpty()) {
-            return null;
-        }
-        // 计算日均消耗量（取前3个班）
+        // 从成型计划动态计算前3个班的日均消耗量
+        List<CxScheduleResult> cxScheduleList = context.getCxScheduleList();
+        Map<String, MdmConstructionInfo> constructionMap = context.getConstructionMap();
+        String paddingCode = spec.getPaddingCode();
+
         BigDecimal avgDailyConsume = BigDecimal.ZERO;
         int count = 0;
         for (int i = 1; i <= 3; i++) {
-            BigDecimal consume = shiftConsume.get(i);
-            if (consume != null && consume.compareTo(BigDecimal.ZERO) > 0) {
+            BigDecimal consume = this.calcShiftConsume(cxScheduleList, constructionMap, paddingCode, i);
+            if (consume.compareTo(BigDecimal.ZERO) > 0) {
                 avgDailyConsume = avgDailyConsume.add(consume);
                 count++;
             }
@@ -1512,8 +1484,20 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
 
     /**
      * 计算生产量
+     * <p>
+     * 已收尾规格精确排产，不要求台车整倍数；
+     * 未收尾规格需按台车容量向上取整台车。
+     * 受 SYS1401013（单规格每班最大排产量）约束：
+     * - 已收尾规格超过限制时直接截断；
+     * - 未收尾规格截断后再向上取整台车，因取整车多出的部分允许超过限制。
+     * </p>
+     *
+     * @param spec              垫胶需求规格
+     * @param remainingCapacity 机台本班剩余产能
+     * @param context           排产上下文（用于读取参数）
+     * @return 本班生产量（米）
      */
-    private BigDecimal calcProduceQty(DjPaddingDemand spec, BigDecimal remainingCapacity) {
+    private BigDecimal calcProduceQty(DjPaddingDemand spec, BigDecimal remainingCapacity, DjScheduleContext context) {
         if (remainingCapacity == null || remainingCapacity.compareTo(BigDecimal.ZERO) <= 0) {
             return BigDecimal.ZERO;
         }
@@ -1523,34 +1507,59 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
             return BigDecimal.ZERO;
         }
 
+        // 计算基础排产量（暂不限制最大排产量）
+        BigDecimal baseProduceQty;
+
         // 已收尾规格：精确排产，不要求台车整倍数
         if (spec.isTailFinished()) {
-            return remainingDemand.min(remainingCapacity);
-        }
-
-        // 未收尾规格：需台车容量整倍数
-        BigDecimal trolleyCapacity = spec.getTrolleyCapacity();
-        if (trolleyCapacity == null || trolleyCapacity.compareTo(BigDecimal.ZERO) <= 0) {
-            return BigDecimal.ZERO;
-        }
-
-        // 计算最大可生产的整台车数
-        int maxTrolleys = remainingCapacity.divide(trolleyCapacity, 0, RoundingMode.FLOOR).intValue();
-        // 计算剩余需求所需台车数
-        int needTrolleys = remainingDemand.divide(trolleyCapacity, 0, RoundingMode.CEILING).intValue();
-
-        int actualTrolleys = Math.min(maxTrolleys, needTrolleys);
-        if (actualTrolleys <= 0) {
-            // 连一台车都放不下，本班不生产此规格
-            if (remainingDemand.compareTo(BigDecimal.ZERO) > 0 && remainingCapacity.compareTo(trolleyCapacity) >= 0) {
-                // 剩余需求不足一台车但至少生产一台车
-                actualTrolleys = 1;
-            } else {
+            baseProduceQty = remainingDemand.min(remainingCapacity);
+        } else {
+            // 未收尾规格：需台车容量整倍数
+            BigDecimal trolleyCapacity = spec.getTrolleyCapacity();
+            if (trolleyCapacity == null || trolleyCapacity.compareTo(BigDecimal.ZERO) <= 0) {
                 return BigDecimal.ZERO;
+            }
+
+            // 计算最大可生产的整台车数
+            int maxTrolleys = remainingCapacity.divide(trolleyCapacity, 0, RoundingMode.FLOOR).intValue();
+            // 计算剩余需求所需台车数
+            int needTrolleys = remainingDemand.divide(trolleyCapacity, 0, RoundingMode.CEILING).intValue();
+
+            int actualTrolleys = Math.min(maxTrolleys, needTrolleys);
+            if (actualTrolleys <= 0) {
+                // 连一台车都放不下，本班不生产此规格
+                if (remainingDemand.compareTo(BigDecimal.ZERO) > 0 && remainingCapacity.compareTo(trolleyCapacity) >= 0) {
+                    // 剩余需求不足一台车但至少生产一台车
+                    actualTrolleys = 1;
+                } else {
+                    return BigDecimal.ZERO;
+                }
+            }
+            baseProduceQty = BigDecimal.valueOf(actualTrolleys).multiply(trolleyCapacity);
+        }
+
+        // ===== 单规格每班最大排产量限制 =====
+        BigDecimal maxShiftProduceQty = this.getParamAsDecimal(context, DjEngineConstants.PARAM_MAX_SHIFT_PRODUCE_QTY);
+        if (maxShiftProduceQty != null && maxShiftProduceQty.compareTo(BigDecimal.ZERO) > 0
+                && baseProduceQty.compareTo(maxShiftProduceQty) > 0) {
+            if (spec.isTailFinished()) {
+                // 已收尾规格：直接截断至最大排产量
+                baseProduceQty = maxShiftProduceQty;
+            } else {
+                // 未收尾规格：先按最大排产量截断，再向上取整台车
+                // 因取整车多出来的部分允许超过最大排产限制
+                BigDecimal trolleyCapacity = spec.getTrolleyCapacity();
+                if (trolleyCapacity != null && trolleyCapacity.compareTo(BigDecimal.ZERO) > 0) {
+                    int trolleysWithinLimit = maxShiftProduceQty.divide(trolleyCapacity, 0, RoundingMode.FLOOR).intValue();
+                    if (trolleysWithinLimit >= 1) {
+                        baseProduceQty = BigDecimal.valueOf(trolleysWithinLimit).multiply(trolleyCapacity);
+                    }
+                    // 若整车容量本身超过限制（trolleysWithinLimit < 1），保留原基础排产量
+                }
             }
         }
 
-        return BigDecimal.valueOf(actualTrolleys).multiply(trolleyCapacity);
+        return baseProduceQty;
     }
 
     /**

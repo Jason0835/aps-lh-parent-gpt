@@ -127,7 +127,6 @@ public class TmMachineInfoController extends AbstractDocBizController<TmMachineI
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("maxCapacity")), "MAX_CAPACITY", queryVO.getFieldValueByFieldName("maxCapacity"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("openShiftCode")), "OPEN_SHIFT_CODE", queryVO.getFieldValueByFieldName("openShiftCode"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("machineStatus")), "MACHINE_STATUS", queryVO.getFieldValueByFieldName("machineStatus"));
-        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("shiftCode")), "SHIFT_CODE", queryVO.getFieldValueByFieldName("shiftCode"));
     }
 
     @Override

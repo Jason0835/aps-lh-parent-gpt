@@ -8,6 +8,7 @@ import com.zlt.aps.itf.vo.MesBrandDict;
 import com.zlt.aps.lh.api.domain.entity.LhMachineOnlineInfo;
 import com.zlt.aps.mdm.api.domain.entity.MdmMoldAlterPlan;
 import com.zlt.aps.mp.api.domain.entity.*;
+import com.zlt.aps.tm.api.domain.entity.TmScheduleResultIssue;
 
 import java.text.ParseException;
 import java.util.List;
@@ -264,6 +265,42 @@ public interface MesItfService {
      * @return 结果
      */
     AjaxResult syncTqScheDayFinishQty(AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 同步胎面排程完成量
+     * T_TM_SCHE_FINISH_QTY：采用逻辑删除+插入方案
+     *   步骤1：逻辑删除当天排程日期的所有数据（IS_DELETE置为1）
+     *   步骤2：将MES最新排程完成量数据批量插入（新记录，IS_DELETE=0）
+     *   步骤3：回写胎面排程结果表各班次完成量
+     *
+     * @param syncDataLogs 同步参数
+     * @return 结果
+     */
+    AjaxResult syncTmClassShiftFinishQty(AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 同步胎面排程日完成量
+     * T_TM_DAY_FINISH_QTY（复用表名，1-total 结构）：采用逻辑删除+插入方案
+     *   步骤1：逻辑删除当天排程日期的所有数据（IS_DELETE置为1）
+     *   步骤2：将MES最新排程日完成量数据批量插入（新记录，IS_DELETE=0）
+     *   注意：该表 mps 以 2 班结构复用，逻辑删除会覆盖 mps 数据（已知冲突风险）
+     *
+     * @param syncDataLogs 同步参数
+     * @return 结果
+     */
+    AjaxResult syncTmScheDayFinishQty(AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 胎面排程结果下发到MES
+     * 业务规则（与胎圈一致）：
+     * 1. D日（今天）：更新中班数据，夜班早班已过不下发
+     * 2. D+1日（明天）：更新夜早中3班数据
+     * 3. D+2日（后天）：先删后插夜早2班数据，中班尚未排产不下发
+     *
+     * @param tmScheduleResultIssueList 胎面排程结果下发列表（已按3天拆分）
+     * @return 结果
+     */
+    AjaxResult issueTmScheduleResult(List<TmScheduleResultIssue> tmScheduleResultIssueList);
 
     /**
      * 同步成型排程完成量

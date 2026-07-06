@@ -2,6 +2,7 @@ package com.zlt.aps.controller.tm;
 
 import com.alibaba.fastjson.JSON;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
+import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
@@ -9,6 +10,7 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.text.Convert;
 import com.ruoyi.common4ui.core.controller.BaseUIController;
 import com.zlt.aps.tm.api.domain.entity.TmScheduleResult;
+import com.zlt.aps.tm.api.domain.vo.TmAutoScheduleRequestVo;
 import com.zlt.aps.tm.api.domain.vo.TmScheduleShiftDateVO;
 import com.zlt.aps.tm.api.service.ITmScheduleResultRemoteService;
 import com.zlt.file.encryptbyll.FileEncryptUtils;
@@ -17,6 +19,7 @@ import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.io.IOUtils;
 import org.apache.shiro.authz.annotation.RequiresPermissions;
+import org.apache.shiro.authz.annotation.RequiresRoles;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.ModelMap;
@@ -102,8 +105,36 @@ public class TmScheduleResultUIController extends BaseUIController<TmScheduleRes
     @ApiOperation("校验唯一性")
     @PostMapping("/checkUnique")
     @ResponseBody
-    public String checkUnique(@RequestBody TmScheduleResult query) {
+    public String checkUnique(TmScheduleResult query) {
         return iTmScheduleResultService.checkUnique(query);
+    }
+
+    /**
+     * 校验胎面自动排程请求。
+     *
+     * @param request 自动排程请求
+     * @return 校验结果
+     */
+    @ApiOperation("校验胎面自动排程")
+    @PostMapping("/validateAutoPlan")
+    @RequiresPermissions("tm:tmScheduleResult:autoPlan")
+    @ResponseBody
+    public AjaxResult validateAutoPlan(TmAutoScheduleRequestVo request) {
+        return iTmScheduleResultService.validateAutoPlan(request);
+    }
+
+    /**
+     * 执行胎面自动排程。
+     *
+     * @param request 自动排程请求
+     * @return 自动排程结果
+     */
+    @ApiOperation("执行胎面自动排程")
+    @PostMapping("/autoPlan")
+    @RequiresPermissions("tm:tmScheduleResult:autoPlan")
+    @ResponseBody
+    public AjaxResult autoPlan(TmAutoScheduleRequestVo request) {
+        return iTmScheduleResultService.autoPlan(request);
     }
 
     /**
@@ -125,7 +156,7 @@ public class TmScheduleResultUIController extends BaseUIController<TmScheduleRes
             query.setTreadCode(scheduleResult.getTreadCode());
             // 唯一性校验：tm的checkUnique返回String，"0"表示唯一，"1"表示不唯一
             String uniqueResult = iTmScheduleResultService.checkUnique(query);
-            if ("1".equals(uniqueResult)) {
+            if (UserConstants.NOT_UNIQUE.equals(uniqueResult)) {
                 if (sb1.length() > 0) {
                     sb1.append(",").append(query.getTreadCode());
                 } else {
@@ -196,16 +227,24 @@ public class TmScheduleResultUIController extends BaseUIController<TmScheduleRes
     /**
      * 获取胎面排程班次日期列表
      *
-     * @param scheduleDateQuery 排程日期
+     * @param scheduleDate 排程日期
      * @return 班次日期列表
      */
     @ApiOperation("获取胎面排程班次日期列表")
     @PostMapping("/listScheduleShiftDates")
     @ResponseBody
-    public AjaxResult listScheduleShiftDates(Date scheduleDateQuery) {
+    public AjaxResult listScheduleShiftDates(Date scheduleDate) {
         TmScheduleResult scheduleResult = new TmScheduleResult();
-        scheduleResult.setScheduleDate(scheduleDateQuery);
+        scheduleResult.setScheduleDate(scheduleDate);
         List<TmScheduleShiftDateVO> list = iTmScheduleResultService.listScheduleShiftDates(scheduleResult);
         return AjaxResult.success(list);
+    }
+
+    @RequiresRoles("admin")
+    @ApiOperation("更改发布状态")
+    @PostMapping("/changeReleaseStatus")
+    @ResponseBody
+    public AjaxResult changeReleaseStatus(@RequestParam("ids") String ids, @RequestParam("isRelease") String isRelease) {
+        return iTmScheduleResultService.changeReleaseStatus(ids, isRelease);
     }
 }

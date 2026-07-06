@@ -73,14 +73,14 @@ public class EngineConstants {
     public static String LOSS_RATE = "LOSS_RATE";
 
     /**
-     * 参数code：仅投产阶段规格排产标识（值为1时，表示仅投产阶段的规格才进行自动排程；其他值的时候表示自动排程的排产全部规格）
-     */
-    public static String PRODUCTION_STAGE_PRODUCE = "PRODUCTION_STAGE_PRODUCE";
-
-    /**
      *  参数code：标准卷曲长度（部件卷曲到一个工件上的标准长度）
      */
     public static String STANDARD_CRIMP_LENGTH = "STANDARD_CRIMP_LENGTH";
+
+    /**
+     * 参数code：仅投产阶段规格排产标识（值为1时，表示仅投产阶段的规格才进行自动排程；其他值的时候表示自动排程的排产全部规格）
+     */
+    public static String PRODUCTION_STAGE_PRODUCE = "PRODUCTION_STAGE_PRODUCE";
 
     /**
      *  参数code：卷曲数小数取整值（小数部分大于等于该值的进位，否则舍弃）
@@ -536,9 +536,6 @@ public class EngineConstants {
 
     /** SYS1101022：工装车总数（全局统一值），默认50 */
     public static String TQ_TOOLING_TOTAL = "SYS1101022";
-
-    /** SYS1101023：仅投产阶段规格排产标识，值为1时仅投产阶段规格排产，默认1 */
-    public static String TQ_PRODUCTION_STAGE_PRODUCE = "SYS1101023";
 
     /** SYS1101024：大尺寸规格阈值，寸口大于此值为大尺寸规格，默认35 */
     public static String TQ_BIG_SIZE_SPEC = "SYS1101024";

@@ -32,6 +32,9 @@ public class TmMachineCandidate {
     /** 检修时长，单位小时 */
     private BigDecimal maintenanceHours;
 
+    /** 按班次分摊的检修时长，key 为班次顺序，value 为检修小时数 */
+    private Map<Integer, BigDecimal> maintenanceHoursByShift = new LinkedHashMap<>();
+
     /** 机台默认生产速度，单位米/小时 */
     private BigDecimal machineSpeed;
 

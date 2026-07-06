@@ -47,7 +47,9 @@ import com.zlt.aps.dj.api.domain.entity.DjDispatcherLog;
 import com.zlt.aps.dj.api.domain.entity.DjMachineInfo;
 import com.zlt.aps.dj.api.domain.entity.DjParams;
 import com.zlt.aps.dj.api.domain.entity.DjScheduleResult;
+import com.zlt.aps.dj.api.domain.entity.DjShiftConfig;
 import com.zlt.aps.dj.engine.constant.DjEngineConstants;
+import com.zlt.aps.dj.engine.service.impl.DjEngineNewServiceImpl;
 import com.zlt.aps.dj.engine.vo.DjScheduleResultVo;
 import com.zlt.aps.dj.mapper.DjScheduleResultMapper;
 import com.zlt.aps.dj.mapper.DjParamsMapper;
@@ -55,8 +57,11 @@ import com.zlt.aps.dj.service.DjDispatcherLogService;
 import com.zlt.aps.dj.service.DjMachineInfoService;
 import com.zlt.aps.dj.service.DjScheduleResultService;
 import com.zlt.aps.dj.service.IDjScheduleAdjustService;
+import com.zlt.aps.dj.service.IDjShiftConfigService;
 import com.zlt.aps.utils.BillUtils;
 import com.zlt.bill.common.service.AbstractBillService;
+
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * 垫胶胶排程结果Service业务层处理
@@ -64,6 +69,7 @@ import com.zlt.bill.common.service.AbstractBillService;
  * @author zlt
  * @date 2026-06-24
  */
+@Slf4j
 @Service
 public class DjScheduleResultServiceImpl extends AbstractBillService<DjScheduleResult>
         implements DjScheduleResultService {
@@ -84,6 +90,9 @@ public class DjScheduleResultServiceImpl extends AbstractBillService<DjScheduleR
 
     @Autowired
     private IDjScheduleAdjustService iDjScheduleAdjustService;
+
+    @Autowired
+    private IDjShiftConfigService djShiftConfigService;
 
     /**
      * 查询垫胶排程结果
@@ -150,7 +159,7 @@ public class DjScheduleResultServiceImpl extends AbstractBillService<DjScheduleR
      *   <li>首班=夜班("01")：加载 T-1 日早班 + 中班数据 → prevDayClass3* + prevDayClass1*</li>
      *   <li>首班=早班("02")：无需加载 T-1 日数据</li>
      * </ul>
-     * 首班班次优先取 T 日已有排产结果的 scheduleShiftClass，无数据时从参数 SYS1401011 获取。
+     * 首班班次优先取 T 日已有排产结果的 scheduleShiftClass，无数据时从 DjShiftConfig 中获取 crossDayFlag="1" 的班次。
      * T-1 日具体加载的 classX 字段由其自身的 scheduleShiftClass 动态映射。
      */
     @Override
@@ -162,16 +171,16 @@ public class DjScheduleResultServiceImpl extends AbstractBillService<DjScheduleR
         // 1. 确定排程首班班次
         String startShiftClass = this.getStartShiftClass(list);
         if (startShiftClass == null) {
-            startShiftClass = "03"; // 默认中班
+            startShiftClass = ClassNumThreePlanEnums.CLASS_DAY.getClassIndex(); // 默认中班
         }
 
         // 首班=早班时，不需要加载 T-1 日数据
-        if ("02".equals(startShiftClass)) {
+        if (ClassNumThreePlanEnums.CLASS_MORNING.getClassIndex().equals(startShiftClass)) {
             return;
         }
 
         // 首班=夜班时，需要加载早班+中班；首班=中班时，只需要加载早班
-        boolean needClass1 = "01".equals(startShiftClass); // 是否需要中班数据
+        boolean needClass1 = ClassNumThreePlanEnums.CLASS_NIGHT.getClassIndex().equals(startShiftClass); // 是否需要中班数据
 
         // 2. 加载 T-1 日排产结果
         Date prevDate = DateUtils.addDays(scheduleDate, -1);
@@ -195,10 +204,12 @@ public class DjScheduleResultServiceImpl extends AbstractBillService<DjScheduleR
             prevScheduleShiftClass = startShiftClass; // 与 T 日一致
         }
 
-        // 早班("02")在 T-1 日对应的 classX
-        int earlyClassIndex = this.realShiftToClassIndex(prevScheduleShiftClass, "02");
-        // 中班("03")在 T-1 日对应的 classX
-        int middleClassIndex = this.realShiftToClassIndex(prevScheduleShiftClass, "03");
+        // 早班在 T-1 日对应的 classX
+        int earlyClassIndex = this.realShiftToClassIndex(prevScheduleShiftClass,
+                ClassNumThreePlanEnums.CLASS_MORNING.getClassIndex());
+        // 中班在 T-1 日对应的 classX
+        int middleClassIndex = this.realShiftToClassIndex(prevScheduleShiftClass,
+                ClassNumThreePlanEnums.CLASS_DAY.getClassIndex());
 
         // 4. 按 machineCode + paddingCode 汇总 T-1 日数据
         Map<String, DjScheduleResult> prevDayEarlyFirstMap = new HashMap<>();
@@ -294,7 +305,7 @@ public class DjScheduleResultServiceImpl extends AbstractBillService<DjScheduleR
 
     /**
      * 获取排程首班班次
-     * <p>优先取当前排产结果的 scheduleShiftClass，无数据时从参数配置获取。</p>
+     * <p>优先取当前排产结果的 scheduleShiftClass，无数据时从 DjShiftConfig 中获取 crossDayFlag="1" 的班次。</p>
      */
     private String getStartShiftClass(List<DjScheduleResult> list) {
         // 先看 T 日是否已有排产结果
@@ -303,21 +314,19 @@ public class DjScheduleResultServiceImpl extends AbstractBillService<DjScheduleR
                 return r.getScheduleShiftClass();
             }
         }
-        // 从参数表获取
+        // 从班次配置中获取跨天班次（crossDayFlag="1"）作为首班班次
         try {
-            DjParams param = djParamsMapper.selectOne(
-                    new LambdaQueryWrapper<DjParams>()
-                            .eq(DjParams::getParamCode, "SYS1401011"));
-            if (param != null && param.getParamValue() != null) {
-                String val = param.getParamValue().trim();
-                if ("01".equals(val) || "02".equals(val) || "03".equals(val)) {
-                    return val;
+            List<DjShiftConfig> activeShifts = djShiftConfigService.listActiveShifts();
+            for (DjShiftConfig shift : activeShifts) {
+                if (ApsConstant.TRUE.equals(shift.getCrossDayFlag())) {
+                    return shift.getShiftCode();
                 }
             }
         } catch (Exception e) {
-            // 参数查询失败时使用默认值
+            // 查询失败时使用默认值
+            log.error(e.getMessage(), e);
         }
-        return "03";
+        return ClassNumThreePlanEnums.CLASS_NIGHT.getClassIndex();
     }
 
     /**
@@ -813,11 +822,7 @@ public class DjScheduleResultServiceImpl extends AbstractBillService<DjScheduleR
      */
     @Override
     public AjaxResult getSummaryVo(DjScheduleResult scheduleResult) {
-        List<DjScheduleResult> djScheduleResultList = selectDjScheduleResultList(scheduleResult);
-        if (CollectionUtils.isEmpty(djScheduleResultList)) {
-            return AjaxResult.success(new ScheduleSummaryVo());
-        }
-
+        List<DjScheduleResult> djScheduleResultList = this.selectDjScheduleResultList(scheduleResult);
         BigDecimal totalClass1PlanQty = BigDecimal.ZERO;
         BigDecimal totalClass2PlanQty = BigDecimal.ZERO;
         BigDecimal totalClass3PlanQty = BigDecimal.ZERO;
@@ -832,12 +837,21 @@ public class DjScheduleResultServiceImpl extends AbstractBillService<DjScheduleR
             totalPrevDayClass3PlanQty = totalPrevDayClass3PlanQty.add(BigDecimalUtils.valueOf(result.getPrevDayClass3PlanQty()));
         }
 
+        // 获取排产起始班次（shiftOrder最小的班次编码）
+        String startShiftClass = ClassNumThreePlanEnums.CLASS_NIGHT.getClassIndex(); // 默认夜班
+        List<DjShiftConfig> activeShifts = djShiftConfigService.listActiveShifts();
+        if (CollectionUtils.isNotEmpty(activeShifts)) {
+            startShiftClass = activeShifts.stream().filter(r -> ApsConstant.TRUE.equals(r.getOpenFlag())).findFirst()
+                    .map(DjShiftConfig::getShiftCode).orElse(startShiftClass);
+        }
+
         ScheduleSummaryVo scheduleSummaryVo = new ScheduleSummaryVo();
         scheduleSummaryVo.setClass1PlanQty(totalClass1PlanQty.doubleValue());
         scheduleSummaryVo.setClass2PlanQty(totalClass2PlanQty.doubleValue());
         scheduleSummaryVo.setClass3PlanQty(totalClass3PlanQty.doubleValue());
         scheduleSummaryVo.setStockQty(totalStockQty.doubleValue());
         scheduleSummaryVo.setLastDayPlanQty(totalPrevDayClass3PlanQty.doubleValue());
+        scheduleSummaryVo.setScheduleShiftClass(startShiftClass);
         return AjaxResult.success(scheduleSummaryVo);
     }
 
