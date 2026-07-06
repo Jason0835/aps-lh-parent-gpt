@@ -41,6 +41,11 @@ public enum ItfSyncKeyEnum {
     EMBRYO_STOCK_SYNC("EMBRYO_STOCK_SYNC", "MES", "APS", "生胎库存同步"),
 
     /**
+     * 生胎库存同步-6点
+     */
+    EMBRYO_STOCK_SIX_SYNC("EMBRYO_STOCK_SIX_SYNC", "MES", "APS", "生胎库存同步-6点"),
+
+    /**
      * 胎面库存同步
      */
     TREAD_STOCK_SYNC("TREAD_STOCK_SYNC", "MES", "APS", "胎面库存同步"),
@@ -113,6 +118,21 @@ public enum ItfSyncKeyEnum {
      * 胎圈排程日完成量同步
      */
     TQ_SCHE_DAY_FINISH_QTY("TQ_DAY_COMPLETE", "MES", "APS", "胎圈排程日完成量同步"),
+
+    /**
+     * 胎面排程结果下发
+     */
+    SYNC_TM_SCHEDULE_RESULT("TREAD_SCHE_RST_FBK", "APS", "MES", "胎面排程结果下发接口"),
+
+    /**
+     * 胎面排程完成量同步
+     */
+    TM_CLASS_SHIFT_FINISH_QTY("TREAD_COMPLETE_QUANTITY", "MES", "APS", "胎面排程完成量同步"),
+
+    /**
+     * 胎面排程日完成量同步
+     */
+    TM_SCHE_DAY_FINISH_QTY("TM_DAY_COMPLETE", "MES", "APS", "胎面排程日完成量同步"),
 
     /**
      * 直裁排程结果下发

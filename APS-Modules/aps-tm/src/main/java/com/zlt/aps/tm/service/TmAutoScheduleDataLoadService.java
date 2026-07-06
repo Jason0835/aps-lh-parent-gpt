@@ -9,6 +9,7 @@ import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.utils.BigDecimalUtils;
 import com.zlt.aps.common.engine.utils.DepthConfigResolver;
 import com.zlt.aps.tm.api.domain.entity.*;
+import com.zlt.aps.tm.api.enums.TmUnplannedReasonEnum;
 import com.zlt.aps.tm.domain.vo.TmExperimentSpecMonthPlanRowVo;
 import com.zlt.aps.tm.domain.vo.TmFormingDemandRowVo;
 import com.zlt.aps.tm.domain.vo.TmWorkCalendarRowVo;
@@ -120,6 +121,9 @@ public class TmAutoScheduleDataLoadService {
     private TmDepthConfigMapper tmDepthConfigMapper;
 
     @Resource
+    private TmShiftConfigMapper tmShiftConfigMapper;
+
+    @Resource
     private TmAutoScheduleRedisCacheService tmAutoScheduleRedisCacheService = new TmAutoScheduleRedisCacheService();
 
     /**
@@ -133,6 +137,7 @@ public class TmAutoScheduleDataLoadService {
         loadParams(context);
         List<TmMachineInfo> machineList = loadMachineInfo(context);
         context.setMachineCandidateList(loadMachineCandidates(context, machineList));
+        context.setLossRuleList(loadLossRules(context));
         List<TmTaskDraft> taskDraftList = loadFormingDemandTasks(context, machineList);
         fillTaskAuxiliaryData(context, taskDraftList);
         context.setTaskDraftList(taskDraftList);
@@ -231,8 +236,10 @@ public class TmAutoScheduleDataLoadService {
         fillCandidateGlueRule(context, candidateMap);
         fillCandidateSpecifyRule(context, candidateMap);
         fillCandidateSpeed(context, candidateMap);
-        fillCandidateMaintenance(context, candidateMap);
+        List<TmShiftConfig> shiftConfigList = this.loadOpenShiftConfigs(context);
+        fillCandidateMaintenance(context, candidateMap, shiftConfigList);
         fillCandidatePredecessor(context, candidateMap);
+        fillShiftHoursMap(context, shiftConfigList);
         return new ArrayList<>(candidateMap.values());
     }
 
@@ -364,12 +371,22 @@ public class TmAutoScheduleDataLoadService {
     /**
      * 填充候选机台排程日检修时长。
      *
-     * @param context      自动排程上下文
-     * @param candidateMap 候选机台映射
+     * <p>当存在启用班次配置时，按维修窗口与每个班次窗口的实际重叠分钟分摊到班次；
+     * 当班次配置缺失时，保留旧逻辑按排程自然日汇总到机台维度，避免基础数据缺失导致扣减完全失效。</p>
+     *
+     * @param context         自动排程上下文
+     * @param candidateMap    候选机台映射
+     * @param shiftConfigList 启用班次配置列表
      */
-    private void fillCandidateMaintenance(TmScheduleContext context, Map<String, TmMachineCandidate> candidateMap) {
+    private void fillCandidateMaintenance(TmScheduleContext context, Map<String, TmMachineCandidate> candidateMap,
+                                          List<TmShiftConfig> shiftConfigList) {
         if (tmMachineMaintenanceMapper == null || candidateMap.isEmpty()) {
             return;
+        }
+        Map<Integer, Date[]> shiftWindowMap = this.buildShiftWindowMap(context, shiftConfigList);
+        if (CollUtil.isNotEmpty(shiftWindowMap)) {
+            candidateMap.values().forEach(candidate -> shiftWindowMap.keySet()
+                    .forEach(shiftOrder -> candidate.getMaintenanceHoursByShift().put(shiftOrder, BigDecimal.ZERO)));
         }
         LambdaQueryWrapper<TmMachineMaintenance> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(TmMachineMaintenance::getFactoryCode, context.getFactoryCode());
@@ -377,19 +394,26 @@ public class TmAutoScheduleDataLoadService {
         List<TmMachineMaintenance> maintenanceList = tmMachineMaintenanceMapper.selectList(wrapper);
         Date dayStart = DateUtil.beginOfDay(context.getScheduleDate());
         Date dayEnd = DateUtil.endOfDay(context.getScheduleDate());
-        for (TmMachineMaintenance maintenance : maintenanceList) {
+        for (TmMachineMaintenance maintenance : nullToEmpty(maintenanceList)) {
             TmMachineCandidate candidate = candidateMap.get(maintenance.getMachineCode());
             if (candidate == null || maintenance.getStopStartTime() == null || maintenance.getStopEndTime() == null) {
                 continue;
             }
-            Date overlapStart = maintenance.getStopStartTime().after(dayStart) ? maintenance.getStopStartTime() : dayStart;
-            Date overlapEnd = maintenance.getStopEndTime().before(dayEnd) ? maintenance.getStopEndTime() : dayEnd;
-            if (!overlapStart.before(overlapEnd)) {
+            BigDecimal dayHours = this.calculateOverlapHours(maintenance.getStopStartTime(), maintenance.getStopEndTime(),
+                    dayStart, dayEnd);
+            candidate.setMaintenanceHours(nvl(candidate.getMaintenanceHours()).add(dayHours));
+            if (CollUtil.isEmpty(shiftWindowMap)) {
                 continue;
             }
-            BigDecimal hours = BigDecimal.valueOf(DateUtil.between(overlapStart, overlapEnd, DateUnit.MINUTE))
-                    .divide(BigDecimal.valueOf(60), 6, RoundingMode.HALF_UP);
-            candidate.setMaintenanceHours(nvl(candidate.getMaintenanceHours()).add(hours));
+            for (Map.Entry<Integer, Date[]> entry : shiftWindowMap.entrySet()) {
+                Date[] shiftWindow = entry.getValue();
+                BigDecimal shiftHours = this.calculateOverlapHours(maintenance.getStopStartTime(),
+                        maintenance.getStopEndTime(), shiftWindow[0], shiftWindow[1]);
+                if (shiftHours.compareTo(BigDecimal.ZERO) <= 0) {
+                    continue;
+                }
+                candidate.getMaintenanceHoursByShift().merge(entry.getKey(), shiftHours, BigDecimal::add);
+            }
         }
     }
 
@@ -443,6 +467,143 @@ public class TmAutoScheduleDataLoadService {
                 context.getFactoryCode(), DateUtil.formatDate(context.getScheduleDate()), DateUtil.formatDate(previousDate),
                 predecessorMap.size(), predecessorMap);
     }
+
+    /**
+     * 构建排程日各班次的时间窗口。
+     *
+     * <p>班次配置只保存时分秒，运行时结合当前排程日期生成完整时间；跨天班次的结束时间顺延一天，
+     * 用于把机台检修时长精确分摊到每个班次。</p>
+     *
+     * @param context         自动排程上下文
+     * @param shiftConfigList 启用班次配置列表
+     * @return 班次顺序到开始、结束时间的映射；配置不完整时跳过对应班次
+     */
+    private Map<Integer, Date[]> buildShiftWindowMap(TmScheduleContext context, List<TmShiftConfig> shiftConfigList) {
+        Map<Integer, Date[]> shiftWindowMap = new LinkedHashMap<>();
+        if (context == null || context.getScheduleDate() == null || CollUtil.isEmpty(shiftConfigList)) {
+            return shiftWindowMap;
+        }
+        String scheduleDateText = DateUtil.formatDate(context.getScheduleDate());
+        Date previousEndTime = null;
+        for (TmShiftConfig config : shiftConfigList) {
+            if (config == null || config.getShiftOrder() == null
+                    || StrUtil.isBlank(config.getPlanStartTime()) || StrUtil.isBlank(config.getPlanEndTime())) {
+                continue;
+            }
+            try {
+                Date startTime = DateUtil.parse(scheduleDateText + " " + config.getPlanStartTime());
+                Date endTime = DateUtil.parse(scheduleDateText + " " + config.getPlanEndTime());
+                if (YES.equals(config.getCrossDayFlag()) || !endTime.after(startTime)) {
+                    endTime = DateUtil.offsetDay(endTime, 1);
+                }
+                while (previousEndTime != null && startTime.before(previousEndTime)) {
+                    startTime = DateUtil.offsetDay(startTime, 1);
+                    endTime = DateUtil.offsetDay(endTime, 1);
+                }
+                shiftWindowMap.put(config.getShiftOrder(), new Date[]{startTime, endTime});
+                previousEndTime = endTime;
+            } catch (Exception exception) {
+                log.warn("[TM_SHIFT_WINDOW_PARSE_FAIL] factoryCode={}, scheduleDate={}, shiftOrder={}, startTime={}, endTime={}",
+                        context.getFactoryCode(), scheduleDateText, config.getShiftOrder(),
+                        config.getPlanStartTime(), config.getPlanEndTime(), exception);
+            }
+        }
+        return shiftWindowMap;
+    }
+
+    /**
+     * 计算两个时间段的重叠小时数。
+     *
+     * @param sourceStart 源时间段开始时间
+     * @param sourceEnd   源时间段结束时间
+     * @param targetStart 目标时间段开始时间
+     * @param targetEnd   目标时间段结束时间
+     * @return 重叠小时数；无重叠时返回 0
+     */
+    private BigDecimal calculateOverlapHours(Date sourceStart, Date sourceEnd, Date targetStart, Date targetEnd) {
+        if (sourceStart == null || sourceEnd == null || targetStart == null || targetEnd == null) {
+            return BigDecimal.ZERO;
+        }
+        Date overlapStart = sourceStart.after(targetStart) ? sourceStart : targetStart;
+        Date overlapEnd = sourceEnd.before(targetEnd) ? sourceEnd : targetEnd;
+        if (!overlapStart.before(overlapEnd)) {
+            return BigDecimal.ZERO;
+        }
+        return BigDecimal.valueOf(DateUtil.between(overlapStart, overlapEnd, DateUnit.MINUTE))
+                .divide(BigDecimal.valueOf(60), 6, RoundingMode.HALF_UP);
+    }
+
+    /**
+     * 将可能为空的列表转换为空列表兜底。
+     *
+     * @param sourceList 原始列表
+     * @param <T>        列表元素类型
+     * @return 非空列表
+     */
+    private <T> List<T> nullToEmpty(List<T> sourceList) {
+        return sourceList == null ? Collections.emptyList() : sourceList;
+    }
+
+    /**
+     * 加载工厂启用班次配置。
+     *
+     * <p>数据加载阶段只查询一次启用班次配置，后续检修产能扣减、班次小时数和任务时间窗口均复用该列表，
+     * 避免引擎层直接访问数据库。</p>
+     *
+     * @param context 自动排程上下文
+     * @return 启用班次配置列表；未配置时返回空列表
+     */
+    private List<TmShiftConfig> loadOpenShiftConfigs(TmScheduleContext context) {
+        if (tmShiftConfigMapper == null) {
+            return Collections.emptyList();
+        }
+        List<TmShiftConfig> configs = tmShiftConfigMapper.selectList(
+                new LambdaQueryWrapper<TmShiftConfig>()
+                        .eq(TmShiftConfig::getFactoryCode, context.getFactoryCode())
+                        .eq(TmShiftConfig::getOpenFlag, YES));
+        return nullToEmpty(configs).stream()
+                .filter(config -> config.getShiftOrder() != null)
+                .sorted(Comparator.comparing(TmShiftConfig::getShiftOrder))
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * 加载班次小时数和时间窗口映射。
+     *
+     * <p>查询工厂启用的班次配置，将班次顺序映射到班次时长和计划起止时间，
+     * 供机台分配阶段计算生产速度，并供任务链阶段推算预计开始和结束时间。</p>
+     *
+     * @param context 自动排程上下文
+     * @param shiftConfigList 启用班次配置列表
+     */
+    private void fillShiftHoursMap(TmScheduleContext context, List<TmShiftConfig> shiftConfigList) {
+        Map<Integer, BigDecimal> shiftHoursMap = new HashMap<>();
+        Map<Integer, TmShiftTimeWindow> shiftTimeWindowMap = new HashMap<>();
+        if (CollUtil.isEmpty(shiftConfigList)) {
+            context.setShiftHoursMap(shiftHoursMap);
+            context.setShiftTimeWindowMap(shiftTimeWindowMap);
+            return;
+        }
+        for (TmShiftConfig config : shiftConfigList) {
+            if (config.getShiftOrder() == null) {
+                continue;
+            }
+            if (config.getShiftHours() != null && config.getShiftHours() > 0) {
+                shiftHoursMap.put(config.getShiftOrder(), BigDecimal.valueOf(config.getShiftHours()));
+            }
+            TmShiftTimeWindow window = new TmShiftTimeWindow();
+            window.setShiftOrder(config.getShiftOrder());
+            window.setShiftCode(config.getShiftCode());
+            window.setPlanStartTime(config.getPlanStartTime());
+            window.setPlanEndTime(config.getPlanEndTime());
+            window.setCrossDayFlag(config.getCrossDayFlag());
+            window.setShiftHours(config.getShiftHours() == null ? null : BigDecimal.valueOf(config.getShiftHours()));
+            shiftTimeWindowMap.put(config.getShiftOrder(), window);
+        }
+        context.setShiftHoursMap(shiftHoursMap);
+        context.setShiftTimeWindowMap(shiftTimeWindowMap);
+    }
+
 
     /**
      * 从单条排程结果中解析最后一个有效班次任务。
@@ -607,7 +768,7 @@ public class TmAutoScheduleDataLoadService {
         Integer formingShiftOffset = getNonNegativeIntegerParam(context, PARAM_FORMING_SHIFT_OFFSET, 2);
         Map<String, TmNewSpecInfo> newSpecInfoMap = buildNewSpecInfoMap(context, demandRowList,
                 newSpecLookbackDays, newSpecAdvanceShiftCount);
-        List<TmLossSetting> lossSettingList = loadLossSettings(context);
+        List<TmLossRule> lossRuleList = context.getLossRuleList();
         List<TmDepthConfig> depthConfigList = this.loadDepthConfigs(context);
         TmWorkCalendarRowVo tmCalendar = loadWorkCalendar(context, PROC_CODE_TM);
         TmWorkCalendarRowVo cxCalendar = loadWorkCalendar(context, PROC_CODE_CX);
@@ -657,7 +818,6 @@ public class TmAutoScheduleDataLoadService {
                 taskDraft.setTreadShoulderLength(treadLength);
                 taskDraft.setTailFlag(CLOSE_OUT_TIP.equals(row.getMarkCloseOutTip()) ? YES : NO);
                 taskDraft.setTailBalanceQty(nvl(row.getCxRemainQty()));
-                taskDraft.setLossRate(resolveLossRate(row.getTreadCode(), lossSettingList));
                 taskDraft.setCurrentShiftDemandQty(demandQty);
                 taskDraft.setGuardDemandQty(calculateGuardDemand(classQtyArray, shiftOrder, guardShiftCount,
                         formingShiftOffset).multiply(treadLength));
@@ -669,13 +829,13 @@ public class TmAutoScheduleDataLoadService {
                     taskDraft.setTotalToolQty(toolTotalQty);
                 }
                 if (noShutdownAvailableShift && !isShiftOpen(tmCalendar, targetShiftOrder) && isShiftOpen(cxCalendar, shiftOrder)) {
-                    taskDraft.setUnplannedReasonCode("TM_SHUTDOWN_NO_AVAILABLE_SHIFT");
-                    taskDraft.setUnplannedReasonDesc("胎面停产且无可分配班次，成型需求无法重分配");
+                    taskDraft.setUnplannedReasonCode(TmUnplannedReasonEnum.TM_SHUTDOWN_NO_AVAILABLE_SHIFT.getCode());
+                    taskDraft.setUnplannedReasonDesc(TmUnplannedReasonEnum.TM_SHUTDOWN_NO_AVAILABLE_SHIFT.getDesc());
                 }
                 taskDraftList.add(taskDraft);
             }
         }
-        appendExperimentSpecTasks(context, taskDraftList, lossSettingList, minStartQty, defaultCurlLength, toolTotalQty);
+        appendExperimentSpecTasks(context, taskDraftList, lossRuleList, minStartQty, defaultCurlLength, toolTotalQty);
         return taskDraftList;
     }
 
@@ -684,13 +844,13 @@ public class TmAutoScheduleDataLoadService {
      *
      * @param context 自动排程上下文
      * @param taskDraftList 待排任务列表
-     * @param lossSettingList 损耗配置列表
+     * @param lossRuleList 损耗配置列表
      * @param minStartQty 最小起排量
      * @param defaultCurlLength 默认卷曲长度
      * @param toolTotalQty 总工装数量
      */
     private void appendExperimentSpecTasks(TmScheduleContext context, List<TmTaskDraft> taskDraftList,
-                                           List<TmLossSetting> lossSettingList, BigDecimal minStartQty,
+                                           List<TmLossRule> lossRuleList, BigDecimal minStartQty,
                                            BigDecimal defaultCurlLength, BigDecimal toolTotalQty) {
         Integer lookbackDays = getPositiveIntegerParam(context, PARAM_EXPERIMENT_SPEC_LOOKBACK_DAYS, 5);
         BigDecimal experimentPlanQty = getPositiveDecimalParam(context, PARAM_EXPERIMENT_SPEC_PLAN_QTY, BigDecimal.valueOf(30));
@@ -726,7 +886,7 @@ public class TmAutoScheduleDataLoadService {
                 continue;
             }
             taskDraftList.add(buildExperimentSpecTask(context, treadRows.get(0), experimentPlanQty, experimentSpecInfo,
-                    lossSettingList, minStartQty, defaultCurlLength, toolTotalQty));
+                    lossRuleList, minStartQty, defaultCurlLength, toolTotalQty));
         }
     }
 
@@ -870,17 +1030,17 @@ public class TmAutoScheduleDataLoadService {
      * @param row 月计划实验规格行
      * @param experimentPlanQty 实验固定计划量
      * @param experimentSpecInfo 实验规格证据
-     * @param lossSettingList 损耗配置列表
+     * @param lossRuleList 损耗配置列表
      * @param minStartQty 最小起排量
      * @param defaultCurlLength 默认卷曲长度
      * @return 实验规格独立任务
      */
     private TmTaskDraft buildExperimentSpecTask(TmExperimentSpecMonthPlanRowVo row, BigDecimal experimentPlanQty,
                                                 TmExperimentSpecInfo experimentSpecInfo,
-                                                List<TmLossSetting> lossSettingList, BigDecimal minStartQty,
+                                                List<TmLossRule> lossRuleList, BigDecimal minStartQty,
                                                 BigDecimal defaultCurlLength, BigDecimal toolTotalQty) {
         return this.buildExperimentSpecTask(null, row, experimentPlanQty, experimentSpecInfo,
-                lossSettingList, minStartQty, defaultCurlLength, toolTotalQty);
+                lossRuleList, minStartQty, defaultCurlLength, toolTotalQty);
     }
 
     /**
@@ -890,7 +1050,7 @@ public class TmAutoScheduleDataLoadService {
      * @param row 实验规格月计划行
      * @param experimentPlanQty 实验规格固定计划量
      * @param experimentSpecInfo 实验规格识别证据
-     * @param lossSettingList 损耗配置列表
+     * @param lossRuleList 损耗配置列表
      * @param minStartQty 最小开车量
      * @param defaultCurlLength 默认卷曲长度
      * @param toolTotalQty 工装总量
@@ -899,7 +1059,7 @@ public class TmAutoScheduleDataLoadService {
     private TmTaskDraft buildExperimentSpecTask(TmScheduleContext context, TmExperimentSpecMonthPlanRowVo row,
                                                 BigDecimal experimentPlanQty,
                                                 TmExperimentSpecInfo experimentSpecInfo,
-                                                List<TmLossSetting> lossSettingList, BigDecimal minStartQty,
+                                                List<TmLossRule> lossRuleList, BigDecimal minStartQty,
                                                 BigDecimal defaultCurlLength, BigDecimal toolTotalQty) {
         TmTaskDraft taskDraft = new TmTaskDraft();
         taskDraft.setOrderNo("EXP-" + StrUtil.blankToDefault(row.getProductionNo(), String.valueOf(row.getMonthPlanId()))
@@ -928,7 +1088,6 @@ public class TmAutoScheduleDataLoadService {
         taskDraft.setTreadShoulderLength(nvl(row.getTreadShoulderLength()));
         taskDraft.setTailFlag(NO);
         taskDraft.setTailBalanceQty(BigDecimal.ZERO);
-        taskDraft.setLossRate(resolveLossRate(row.getTreadCode(), lossSettingList));
         taskDraft.setCurrentShiftDemandQty(experimentPlanQty);
         taskDraft.setGuardDemandQty(experimentPlanQty);
         taskDraft.setDemandQty(experimentPlanQty);
@@ -1318,45 +1477,33 @@ public class TmAutoScheduleDataLoadService {
      * @param context 自动排程上下文
      * @return 损耗率配置列表；未配置时返回空集合
      */
-    private List<TmLossSetting> loadLossSettings(TmScheduleContext context) {
+    private List<TmLossRule> loadLossRules(TmScheduleContext context) {
         if (tmLossSettingMapper == null) {
             return Collections.emptyList();
         }
         LambdaQueryWrapper<TmLossSetting> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(TmLossSetting::getFactoryCode, context.getFactoryCode());
         wrapper.eq(TmLossSetting::getEnableStatus, YES);
-        return Optional.ofNullable(tmLossSettingMapper.selectList(wrapper)).orElse(Collections.emptyList());
+        return Optional.ofNullable(tmLossSettingMapper.selectList(wrapper)).orElse(Collections.emptyList())
+                .stream()
+                .map(this::buildLossRule)
+                .collect(Collectors.toList());
     }
 
     /**
-     * 按胎面编码解析计划量阶段可使用的损耗率。
+     * 将业务损耗率配置映射为引擎规则对象。
      *
-     * <p>计划量计算发生在机台分配之前，因此当前只能应用胎面级和默认级配置；
-     * 同层级多条配置按 priority 小值优先。</p>
-     *
-     * @param treadCode       胎面编码
-     * @param lossSettingList 损耗率配置列表
-     * @return 损耗率，未配置时返回 0
+     * @param setting 损耗率业务实体
+     * @return 引擎损耗率规则
      */
-    private BigDecimal resolveLossRate(String treadCode, List<TmLossSetting> lossSettingList) {
-        if (CollUtil.isEmpty(lossSettingList)) {
-            return BigDecimal.ZERO;
-        }
-        Optional<TmLossSetting> treadSetting = lossSettingList.stream()
-                .filter(item -> item.getLossRate() != null)
-                .filter(item -> StrUtil.isBlank(item.getMachineCode()))
-                .filter(item -> StrUtil.isNotBlank(item.getTreadCode()) && item.getTreadCode().equals(treadCode))
-                .min(Comparator.comparing(item -> item.getPriority() == null ? Integer.MAX_VALUE : item.getPriority()));
-        if (treadSetting.isPresent()) {
-            return treadSetting.get().getLossRate();
-        }
-        return lossSettingList.stream()
-                .filter(item -> item.getLossRate() != null)
-                .filter(item -> StrUtil.isBlank(item.getMachineCode()))
-                .filter(item -> StrUtil.isBlank(item.getTreadCode()))
-                .min(Comparator.comparing(item -> item.getPriority() == null ? Integer.MAX_VALUE : item.getPriority()))
-                .map(TmLossSetting::getLossRate)
-                .orElse(BigDecimal.ZERO);
+    private TmLossRule buildLossRule(TmLossSetting setting) {
+        TmLossRule rule = new TmLossRule();
+        rule.setFactoryCode(setting.getFactoryCode());
+        rule.setTreadCode(setting.getTreadCode());
+        rule.setMachineCode(setting.getMachineCode());
+        rule.setLossRate(setting.getLossRate());
+        rule.setPriority(setting.getPriority());
+        return rule;
     }
 
     /**

@@ -70,6 +70,28 @@ public class ScheduleSummaryVo implements Serializable {
     private Double nextDayPlanQtyRollNum;
 
     /**
+     * 连续3个班的第1个班计划合计（排产起始班次）
+     */
+    @ApiModelProperty(value = "连续3个班的第1个班计划合计（排产起始班次）")
+    private Double class1PlanQty;
+
+    /**
+     * 连续3个班的第2个班计划合计
+     */
+    @ApiModelProperty(value = "连续3个班的第2个班计划合计")
+    private Double class2PlanQty;
+
+    /**
+     * 连续3个班的第3个班计划合计
+     */
+    @ApiModelProperty(value = "连续3个班的第3个班计划合计")
+    private Double class3PlanQty;
+
+    /** 排程首班班次（ClassNumThreePlanEnums.classIndex），如 "03"=中班、"01"=夜班、"02"=早班 */
+    @ApiModelProperty(value = "排程首班班次")
+    private String scheduleShiftClass;
+
+    /**
      * 库存合计
      */
     @ApiModelProperty(value = "库存合计")

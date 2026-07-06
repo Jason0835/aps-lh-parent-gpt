@@ -7,27 +7,18 @@ import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.cx.api.domain.entity.CxMachineOnlineInfo;
 import com.zlt.aps.cx.api.domain.entity.CxStock;
 import com.zlt.aps.enums.ProductTypeEnum;
-import com.zlt.aps.itf.mes.service.ICxScheduleResultIssueService;
-import com.zlt.aps.itf.mes.service.ILhScheduleResultIssueService;
-import com.zlt.aps.itf.mes.service.IMonthPlanIssueService;
-import com.zlt.aps.itf.mes.service.MesBomItfService;
-import com.zlt.aps.itf.mes.service.MesItfService;
+import com.zlt.aps.itf.mes.service.*;
 import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
 import com.zlt.aps.itf.vo.MesBrandDict;
 import com.zlt.aps.lh.api.domain.entity.LhMachineOnlineInfo;
 import com.zlt.aps.mdm.api.domain.entity.MdmMoldAlterPlan;
 import com.zlt.aps.mp.api.domain.entity.*;
-import com.zlt.aps.mp.api.domain.entity.LhScheduleResultIssue;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.text.ParseException;
 import java.util.Date;
@@ -733,6 +724,57 @@ public class MesItfController {
         String factoryCode = FactoryConstant.DEFAULT_FACTORY_CODE;
         String companyCode = factoryCode;
         return tqScheduleResultIssueService.issueTqScheduleResult(tqScheduleResultIssueList, factoryCode, companyCode);
+    }
+
+    /**
+     * 同步胎面排程完成量
+     * @param syncDataLogs 参数
+     * @return 结果
+     */
+    @ApiOperation("同步胎面排程完成量")
+    @PostMapping("/syncTmClassShiftFinishQty")
+    @AutoLoginLog
+    public AjaxResult syncTmClassShiftFinishQty(@RequestBody AuxReqSyncDataLogs syncDataLogs) {
+        String factoryCode = syncDataLogs.getFactoryCode();
+        if (StringUtils.isBlank(factoryCode)) {
+            syncDataLogs.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
+        }
+        return mesItfService.syncTmClassShiftFinishQty(syncDataLogs);
+    }
+
+    /**
+     * 同步胎面排程日完成量
+     * @param syncDataLogs 参数
+     * @return 结果
+     */
+    @ApiOperation("同步胎面排程日完成量")
+    @PostMapping("/syncTmScheDayFinishQty")
+    @AutoLoginLog
+    public AjaxResult syncTmScheDayFinishQty(@RequestBody AuxReqSyncDataLogs syncDataLogs) {
+        String factoryCode = syncDataLogs.getFactoryCode();
+        if (StringUtils.isBlank(factoryCode)) {
+            syncDataLogs.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
+        }
+        return mesItfService.syncTmScheDayFinishQty(syncDataLogs);
+    }
+
+    /**
+     * 胎面排程结果下发到MES
+     * 业务规则（与胎圈一致）：
+     * 1. D日（今天）：更新中班数据，夜班早班已过不下发
+     * 2. D+1日（明天）：更新夜早中3班数据
+     * 3. D+2日（后天）：先删后插夜早2班数据，中班尚未排产不下发
+     *
+     * @param tmScheduleResultIssueList 胎面排程结果列表（已按3天拆分）
+     * @return 结果
+     */
+    @ApiOperation("胎面排程结果下发到MES")
+    @PostMapping("/issueTmScheduleResult")
+    @AutoLoginLog
+    public AjaxResult issueTmScheduleResult(@RequestBody List<com.zlt.aps.tm.api.domain.entity.TmScheduleResultIssue> tmScheduleResultIssueList) {
+        String factoryCode = FactoryConstant.DEFAULT_FACTORY_CODE;
+        String companyCode = factoryCode;
+        return mesItfService.issueTmScheduleResult(tmScheduleResultIssueList);
     }
 
     /**

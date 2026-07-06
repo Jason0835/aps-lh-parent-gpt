@@ -11,10 +11,6 @@ import lombok.Data;
 @Data
 public class TqScheduleParams {
     /**
-     * 仅投产阶段规格排产标识
-     */
-    private String productionStage;
-    /**
      * 工装容量
      */
     private Double toolCapacity;

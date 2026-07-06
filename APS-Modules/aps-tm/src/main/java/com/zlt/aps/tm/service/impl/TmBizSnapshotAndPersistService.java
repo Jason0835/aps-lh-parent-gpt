@@ -124,12 +124,13 @@ public class TmBizSnapshotAndPersistService implements ITmSnapshotAndPersistServ
         }
         Map<TmScheduleResult, List<String>> mergedResultBusinessKeyMap = new IdentityHashMap<>();
         List<TmScheduleResult> mergedResultList = mergeScheduleResults(resultList, resultBusinessKeyMap, mergedResultBusinessKeyMap);
-        assignTmOrderNo(mergedResultList, context.getBatchNo());
         for (TmScheduleResult result : mergedResultList) {
             normalizeResultShiftFields(result);
         }
-        resequenceVisibleShiftSequences(mergedResultList);
-        for (TmScheduleResult result : mergedResultList) {
+        List<TmScheduleResult> visibleResultList = filterVisibleScheduleResults(mergedResultList, mergedResultBusinessKeyMap);
+        assignTmOrderNo(visibleResultList, context.getBatchNo());
+        resequenceVisibleShiftSequences(visibleResultList);
+        for (TmScheduleResult result : visibleResultList) {
             try {
                 scheduleResultMapper.insert(result);
                 registerInsertedResultId(result, mergedResultBusinessKeyMap, resultIdMap);
@@ -155,8 +156,9 @@ public class TmBizSnapshotAndPersistService implements ITmSnapshotAndPersistServ
             TmSnapshotBuildResult snapshot = context.getSnapshotMap().get(taskDraft.getBusinessKey());
             TmScheduleResultExplain explain = persistService.convertExplain(taskDraft, snapshot, context);
             try {
-                if (!isUnplannedTask(taskDraft)) {
-                    explain.setResultId(resolveResultId(taskDraft, resultIdMap));
+                Long resultId = resolveOptionalResultId(taskDraft, resultIdMap);
+                if (resultId != null) {
+                    explain.setResultId(resultId);
                 }
                 scheduleResultExplainMapper.insert(explain);
                 persistResult.setExplainCount(persistResult.getExplainCount() + 1);
@@ -168,6 +170,7 @@ public class TmBizSnapshotAndPersistService implements ITmSnapshotAndPersistServ
         }
         return persistResult;
     }
+
     /**
      * 判断任务是否属于未排任务。
      *
@@ -176,6 +179,49 @@ public class TmBizSnapshotAndPersistService implements ITmSnapshotAndPersistServ
      */
     private boolean isUnplannedTask(TmTaskDraft taskDraft) {
         return taskDraft != null && (taskDraft.isUnassigned() || StrUtil.isNotBlank(taskDraft.getUnplannedReasonCode()));
+    }
+
+    /**
+     * 过滤需要写入结果表的可见排程结果。
+     *
+     * @param mergedResultList           已归并的结果行
+     * @param mergedResultBusinessKeyMap 结果行与任务业务键映射
+     * @return 至少存在一个正计划量班次的结果行
+     */
+    private List<TmScheduleResult> filterVisibleScheduleResults(List<TmScheduleResult> mergedResultList,
+                                                                Map<TmScheduleResult, List<String>> mergedResultBusinessKeyMap) {
+        List<TmScheduleResult> visibleResultList = new ArrayList<>();
+        if (CollUtil.isEmpty(mergedResultList)) {
+            return visibleResultList;
+        }
+        for (TmScheduleResult result : mergedResultList) {
+            if (hasAnyPositivePlanQty(result)) {
+                visibleResultList.add(result);
+                continue;
+            }
+            if (mergedResultBusinessKeyMap != null) {
+                mergedResultBusinessKeyMap.remove(result);
+            }
+        }
+        return visibleResultList;
+    }
+
+    /**
+     * 判断结果行是否存在任一正计划量班次。
+     *
+     * @param result 排程结果
+     * @return true 表示结果行需要写入结果表
+     */
+    private boolean hasAnyPositivePlanQty(TmScheduleResult result) {
+        if (result == null) {
+            return false;
+        }
+        for (int shiftOrder = 1; shiftOrder <= 6; shiftOrder++) {
+            if (isPositiveQty(getShiftPlanQty(result, shiftOrder))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -218,6 +264,7 @@ public class TmBizSnapshotAndPersistService implements ITmSnapshotAndPersistServ
                 + "|" + StrUtil.blankToDefault(unplanned == null ? null : unplanned.getMouthPlateCode(), "")
                 + "|" + StrUtil.blankToDefault(unplanned == null ? null : unplanned.getUnplannedReasonCode(), "");
     }
+
     /**
      * 构建胎面未排任务实体。
      *
@@ -380,6 +427,7 @@ public class TmBizSnapshotAndPersistService implements ITmSnapshotAndPersistServ
         }
         return Integer.MAX_VALUE;
     }
+
     /**
      * 判断计划量是否大于 0。
      *
@@ -469,6 +517,7 @@ public class TmBizSnapshotAndPersistService implements ITmSnapshotAndPersistServ
         result.setClass6StartTime(null);
         result.setClass6EndTime(null);
     }
+
     /**
      * 将任务链转换后的结果实体与原任务业务键建立关联。
      *
@@ -706,14 +755,19 @@ public class TmBizSnapshotAndPersistService implements ITmSnapshotAndPersistServ
     }
 
     /**
-     * 根据任务业务键读取解释表需要关联的结果表主键。
+     * 根据任务业务键读取解释表可关联的结果表主键。
+     *
+     * <p>零计划量任务不写入结果表，解释行允许不关联 resultId；正计划任务仍要求存在结果行。</p>
      *
      * @param taskDraft   待排任务
      * @param resultIdMap 任务业务键与结果表主键映射
-     * @return 结果表主键
+     * @return 结果表主键；零计划或未排任务返回 null
      */
-    private Long resolveResultId(TmTaskDraft taskDraft, Map<String, Long> resultIdMap) {
-        String businessKey = taskDraft == null ? null : taskDraft.getBusinessKey();
+    private Long resolveOptionalResultId(TmTaskDraft taskDraft, Map<String, Long> resultIdMap) {
+        if (isUnplannedTask(taskDraft) || taskDraft == null || !isPositiveQty(taskDraft.getPlanQty())) {
+            return null;
+        }
+        String businessKey = taskDraft.getBusinessKey();
         Long resultId = StrUtil.isBlank(businessKey) ? null : resultIdMap.get(businessKey);
         if (resultId == null) {
             throw new ServiceException(I18nUtil.getMessage("ui.data.alert.tm.schedule.explainResultMissing"));
@@ -747,6 +801,7 @@ public class TmBizSnapshotAndPersistService implements ITmSnapshotAndPersistServ
                 + "，treadCode=" + (unplanned == null ? null : unplanned.getTreadCode())
                 + "，原因=" + ex.getMessage();
     }
+
     /**
      * 构建解释表落库失败信息。
      *

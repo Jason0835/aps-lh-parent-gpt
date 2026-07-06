@@ -34,6 +34,12 @@ public class TmPlanQtyResult {
     /** 产能压缩调整量 */
     private BigDecimal capacityAdjustQty;
 
+    /** 损耗前计划量 */
+    private BigDecimal preLossPlanQty;
+
+    /** 工装限制前计划量 */
+    private BigDecimal planQtyBeforeToolLimit;
+
     /** 最终计划量 */
     private BigDecimal finalPlanQty;
 

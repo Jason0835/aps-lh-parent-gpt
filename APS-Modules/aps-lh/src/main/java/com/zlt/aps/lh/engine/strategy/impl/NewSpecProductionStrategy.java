@@ -68,6 +68,7 @@ import com.zlt.aps.lh.util.SingleMouldShiftQtyUtil;
 import com.zlt.aps.lh.util.SkuDailyPlanQuotaUtil;
 import com.zlt.aps.mdm.api.domain.entity.MdmDevicePlanShut;
 import com.zlt.aps.mdm.api.domain.entity.MdmSkuConstructionRef;
+import com.zlt.aps.mdm.api.domain.entity.MdmSkuMouldRel;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
@@ -118,7 +119,8 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
             "共用胎胚且硫化余量为0";
     private static final String SMALL_ENDING_SURPLUS_UNSCHEDULED_REASON =
             SmallEndingSurplusSkipRule.UNSCHEDULED_REASON;
-    private static final String NEW_SPEC_CLEANING_ANALYSIS = "模具清洗+换模";
+    private static final String TARGET_SKU_MOULD_ALL_OCCUPIED_UNSCHEDULED_REASON =
+            "目标 SKU 模具全部被占用";
     private static final int NEW_SPEC_CHANGEOVER_PROBE_LIMIT = 16;
     private static final Set<String> EMPTY_STRING_SET = Collections.emptySet();
     private static final Map<String, String> EMPTY_STRING_MAP = Collections.emptyMap();
@@ -709,7 +711,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                 }
                 String machineCode = candidateMachine.getMachineCode();
                 LocalDate currentAddMachineProductionDate = resolveCurrentAddMachineProductionDate(
-                        addMachineProductionDateList, actualAllowedAddMachineCount);
+                        sku, addMachineProductionDateList, actualAllowedAddMachineCount);
                 if (StringUtils.isEmpty(machineCode)) {
                     log.warn("候选机台编码为空，跳过新增SKU排产, materialCode: {}, 目标量: {}",
                             sku.getMaterialCode(), sku.resolveTargetScheduleQty());
@@ -717,7 +719,6 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                             failReason, NewSpecFailReasonEnum.MACHINE_SELECTION_FAILED);
                     break;
                 }
-                // 刷新当前排程日期
                 refreshCurrentScheduleDate(context, sku, currentAddMachineProductionDate);
                 // SKU新增机台必须先按候选机台模数预占可用模具；模具不足只跳过当前机台，不能中断排程主链。
                 MouldResourceAllocationResult mouldResourceAllocationResult = tryAllocateMouldResourceForAddMachine(
@@ -818,6 +819,9 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                             productionStartTime = FirstInspectionQtyUtil.resolveTrialProductionStartTime(
                                     context, sku, shifts, mouldChangeCompleteTime, defaultProductionStartTime,
                                     ScheduleTypeEnum.NEW_SPEC.getCode());
+                            // 清洗与换模实际重叠时，开产时间取换模完成与清洗结束的最晚时间；未重叠不改变原开产时间。
+                            productionStartTime = resolveCleaningOverlapProductionStartTime(
+                                    candidateMachine, mouldChangeStartTime, productionStartTime);
                         }
                     }
                 }
@@ -1076,9 +1080,15 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                 // businessTargetQty 保留进入本 SKU 时的业务目标，避免 dayN 节奏量被当前机台吃完后提前退出。
                 int businessTargetQty = Objects.nonNull(baseTargetScheduleQty)
                         ? Math.max(0, baseTargetScheduleQty) : dynamicTargetQty;
+                /*
+                 * dayN 模拟已确认当前机台数满足节奏时，剩余业务目标不能再驱动普通空闲机台开机；
+                 * 后续是否继续只交给尾部产能判断，保留续作收尾释放机台的承接能力。
+                 */
+                boolean needMoreMachineForTailDecision = needMoreMachine(context, sku)
+                        && !segment.isStopAfterCurrentForSmallShortage();
                 boolean continueForTailCapacityBeforeRemaining = shouldContinueForTailCapacity(
                         context, sku, candidates, excludedMachineCodes, machineCode,
-                        dynamicTargetQty, totalScheduledQty, businessTargetQty, needMoreMachine(context, sku));
+                        dynamicTargetQty, totalScheduledQty, businessTargetQty, needMoreMachineForTailDecision);
                 if (segment.isStopAfterCurrentForSmallShortage() && !continueForTailCapacityBeforeRemaining) {
                     // 小额欠产允许滚动时，当前机台已覆盖后续日计划，不再为了首日欠产余额继续扩机。
                     dynamicTargetQty = totalScheduledQty;
@@ -1105,7 +1115,9 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                         LhScheduleTimeUtil.formatDateTime(productionStartTime));
                 logNewSpecMachinePlanDecision(sku, quantityPolicy, isEnding, singleMachineWindowFill,
                         dynamicTargetQty, maxQtyToWindowEnd, machinePlanQty, machineScheduledQty);
-                boolean needMoreMachineAfterCurrent = needMoreMachine(context, sku);
+                // 同一口径用于本机台落地后的退出判断，避免前后两次判断结果不一致。
+                boolean needMoreMachineAfterCurrent = needMoreMachine(context, sku)
+                        && !segment.isStopAfterCurrentForSmallShortage();
                 boolean continueForTailCapacity = shouldContinueForTailCapacity(
                         context, sku, candidates, excludedMachineCodes, machineCode,
                         dynamicTargetQty, totalScheduledQty, businessTargetQty, needMoreMachineAfterCurrent);
@@ -1670,7 +1682,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
     }
 
     /**
-     * 初始化新增待排SKU类型计数，供选机阶段日志与特殊机台保护规则复用。
+     * 初始化新增待排SKU类型计数，供选机阶段日志和规则排查复用。
      *
      * @param context 排程上下文
      */
@@ -1688,8 +1700,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
 
     /**
      * 刷新新增待排SKU类型计数。
-     * <p>小批量单控保留只统计“当前窗口内仍有dayN剩余额度”的小批量SKU，
-     * 避免窗口额度已为0的小批量继续冻结单控机台。</p>
+     * <p>小批量已并入正规组排序；这里仍保留独立计数，只用于日志和规则排查。</p>
      *
      * @param context 排程上下文
      */
@@ -1726,7 +1737,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
 
     /**
      * 判断小批量SKU在当前窗口内是否仍有待排日计划额度。
-     * <p>只要窗口内 dayN 全为0，即使SKU类型上属于小批量，也不再继续占用单控保留名额。</p>
+     * <p>只要窗口内 dayN 全为0，即使SKU类型上属于小批量，也不再计入待排小批量统计。</p>
      *
      * @param sku SKU
      * @return true-窗口内仍有待排额度
@@ -1916,17 +1927,82 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         if (isTypeRuleBlocked(context, sku) && isTrialConstructionStage(sku)) {
             return "试制SKU只能使用单控机台，但当前无可用单控机台或单控机台产能不足，无法排产";
         }
-        if (isTypeRuleBlocked(context, sku)
-                && !isTrialConstructionStage(sku)
-                && !isMassTrialSku(sku)
-                && context != null
-                && context.getPendingSmallBatchNewSpecSkuCount() > 0) {
-            return "待排小批量SKU未完成，单控机台优先保留给小批量SKU，当前正规SKU无法使用单控机台";
-        }
         if (isSpecialMaterialSupportBlocked(context, sku)) {
             return "特殊材料SKU无匹配特殊支持机台，无法排产";
         }
+        if (isTargetSkuMouldAllOccupied(context, sku)) {
+            return TARGET_SKU_MOULD_ALL_OCCUPIED_UNSCHEDULED_REASON;
+        }
         return "无可用硫化机台";
+    }
+
+    /**
+     * 判断目标SKU的模具是否已全部被当前排程结果占用。
+     * <p>候选机台硬过滤会在所有目标SKU模具均被占用时返回空候选，这里只复用相同运行态数据
+     * 细化未排原因，不改变新增排产候选筛选和排序规则。</p>
+     *
+     * @param context 排程上下文
+     * @param sku SKU
+     * @return true-目标SKU模具全部被占用；false-仍保留原无可用硫化机台原因
+     */
+    private boolean isTargetSkuMouldAllOccupied(LhScheduleContext context, SkuScheduleDTO sku) {
+        if (Objects.isNull(context) || Objects.isNull(sku) || StringUtils.isEmpty(sku.getMaterialCode())) {
+            return false;
+        }
+        List<MdmSkuMouldRel> mouldRelList = context.getSkuMouldRelMap().get(sku.getMaterialCode());
+        if (CollectionUtils.isEmpty(mouldRelList)) {
+            return false;
+        }
+        Set<String> skuMouldCodeSet = new LinkedHashSet<String>(mouldRelList.size());
+        for (MdmSkuMouldRel mouldRel : mouldRelList) {
+            if (Objects.isNull(mouldRel) || StringUtils.isEmpty(mouldRel.getMouldCode())) {
+                continue;
+            }
+            skuMouldCodeSet.add(StringUtils.trim(mouldRel.getMouldCode()));
+        }
+        if (CollectionUtils.isEmpty(skuMouldCodeSet)) {
+            return false;
+        }
+        Set<String> occupiedMouldCodeSet = collectOccupiedMouldCodes(context);
+        return !CollectionUtils.isEmpty(occupiedMouldCodeSet)
+                && occupiedMouldCodeSet.containsAll(skuMouldCodeSet);
+    }
+
+    /**
+     * 汇总当前已排结果占用的模具号。
+     *
+     * @param context 排程上下文
+     * @return 已占用模具号集合
+     */
+    private Set<String> collectOccupiedMouldCodes(LhScheduleContext context) {
+        Set<String> occupiedMouldCodeSet = new HashSet<String>(16);
+        if (Objects.isNull(context) || CollectionUtils.isEmpty(context.getMachineAssignmentMap())) {
+            return occupiedMouldCodeSet;
+        }
+        for (List<LhScheduleResult> resultList : context.getMachineAssignmentMap().values()) {
+            if (CollectionUtils.isEmpty(resultList)) {
+                continue;
+            }
+            for (LhScheduleResult result : resultList) {
+                if (isReleasedFirstDayNoPlanPlaceholderResult(context, result)) {
+                    continue;
+                }
+                if (Objects.isNull(result) || StringUtils.isEmpty(result.getMouldCode())) {
+                    continue;
+                }
+                String[] mouldCodeArray = StringUtils.split(result.getMouldCode(), ",");
+                if (Objects.isNull(mouldCodeArray)) {
+                    continue;
+                }
+                for (String mouldCode : mouldCodeArray) {
+                    String normalizedMouldCode = StringUtils.trim(mouldCode);
+                    if (StringUtils.isNotEmpty(normalizedMouldCode)) {
+                        occupiedMouldCodeSet.add(normalizedMouldCode);
+                    }
+                }
+            }
+        }
+        return occupiedMouldCodeSet;
     }
 
     /**
@@ -2357,7 +2433,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
             return preferredContinuousMachine;
         }
         if (preferredTrialMachine != null && containsMachine(scopedCandidates, preferredTrialMachine.getMachineCode())) {
-            log.info("新增排产优先尝试试制/小批量预选机台, materialCode: {}, machineCode: {}",
+            log.info("新增排产优先尝试试制/量试/小批量预选机台, materialCode: {}, machineCode: {}",
                     sku.getMaterialCode(), preferredTrialMachine.getMachineCode());
             return preferredTrialMachine;
         }
@@ -2420,6 +2496,10 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         if (sku == null || !sku.isContinuousCompensationSku()
                 || StringUtils.isEmpty(sku.getPreferredContinuousMachineCode())
                 || CollectionUtils.isEmpty(scopedCandidates)) {
+            return null;
+        }
+        if (isContinuationAddMachineCandidate(sku)) {
+            // 续作增机台补偿已经进入新增统一排序，选机必须走普通新增候选排序，不锁回原续作机台。
             return null;
         }
         for (MachineScheduleDTO candidate : scopedCandidates) {
@@ -3586,8 +3666,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                                                        List<LhShiftConfigVO> shifts,
                                                        int totalScheduledQty,
                                                        LocalDate addMachineProductionDate) {
-        if (Objects.isNull(firstProductionStartTime) || totalScheduledQty <= 0
-                || Objects.isNull(addMachineProductionDate)) {
+        if (Objects.isNull(firstProductionStartTime) || Objects.isNull(addMachineProductionDate)) {
             return firstProductionStartTime;
         }
         Date addMachineStartTime = resolveFirstShiftStartTime(shifts, addMachineProductionDate);
@@ -3617,8 +3696,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                                                   List<LhShiftConfigVO> shifts,
                                                   int totalScheduledQty,
                                                   LocalDate addMachineProductionDate) {
-        if (Objects.isNull(switchReadyTime) || totalScheduledQty <= 0
-                || Objects.isNull(addMachineProductionDate)) {
+        if (Objects.isNull(switchReadyTime) || Objects.isNull(addMachineProductionDate)) {
             return switchReadyTime;
         }
         Date addMachineSwitchReadyTime = resolveFirstAllowMouldChangeShiftStartTime(shifts, addMachineProductionDate);
@@ -4768,9 +4846,16 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
      * @return 当前候选作为新增机台时的生效日期；首台或未配置时返回null
      */
     private LocalDate resolveCurrentAddMachineProductionDate(
+            SkuScheduleDTO sku,
             List<LocalDate> addMachineProductionDateList,
             int scheduledMachineCount) {
-        if (scheduledMachineCount <= 0 || CollectionUtils.isEmpty(addMachineProductionDateList)) {
+        if (scheduledMachineCount <= 0) {
+            if (isContinuationAddMachineCandidate(sku)) {
+                return sku.getFirstAddMachineProductionDate();
+            }
+            return null;
+        }
+        if (CollectionUtils.isEmpty(addMachineProductionDateList)) {
             return null;
         }
         int addedMachineIndex = scheduledMachineCount - 1;
@@ -5406,6 +5491,8 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         productionStartTime = FirstInspectionQtyUtil.resolveTrialProductionStartTime(
                 context, sku, shifts, mouldChangeCompleteTime, productionStartTime,
                 ScheduleTypeEnum.NEW_SPEC.getCode());
+        // dayN 模拟必须同步清洗重叠后的最晚开产时间，避免模拟产能高于真实排产。
+        productionStartTime = resolveCleaningOverlapProductionStartTime(candidate, mouldChangeStartTime, productionStartTime);
         if (productionStartTime == null) {
             return capacityMap;
         }
@@ -5442,6 +5529,42 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                     context, simulationSegment, productionDate));
         }
         return capacityMap;
+    }
+
+    /**
+     * 清洗与新增换模实际重叠时，开产时间取两者最晚结束时间。
+     *
+     * @param machine 机台
+     * @param mouldChangeStartTime 换模开始时间
+     * @param productionStartTime 换模/首检规则解析出的原开产时间
+     * @return 合并清洗重叠后的开产时间
+     */
+    private Date resolveCleaningOverlapProductionStartTime(MachineScheduleDTO machine,
+                                                           Date mouldChangeStartTime,
+                                                           Date productionStartTime) {
+        if (Objects.isNull(machine)
+                || CollectionUtils.isEmpty(machine.getCleaningWindowList())
+                || Objects.isNull(mouldChangeStartTime)
+                || Objects.isNull(productionStartTime)
+                || !mouldChangeStartTime.before(productionStartTime)) {
+            return productionStartTime;
+        }
+        Date resolvedStartTime = productionStartTime;
+        for (MachineCleaningWindowDTO cleaningWindow : machine.getCleaningWindowList()) {
+            if (Objects.isNull(cleaningWindow)
+                    || Objects.isNull(cleaningWindow.getCleanStartTime())
+                    || Objects.isNull(cleaningWindow.getCleanEndTime())
+                    || !cleaningWindow.getCleanStartTime().before(cleaningWindow.getCleanEndTime())) {
+                continue;
+            }
+            // 仅当清洗与换模窗口实际相交时进入特殊分支，避免影响正常新增换模开产时间。
+            if (cleaningWindow.getCleanStartTime().before(productionStartTime)
+                    && cleaningWindow.getCleanEndTime().after(mouldChangeStartTime)
+                    && cleaningWindow.getCleanEndTime().after(resolvedStartTime)) {
+                resolvedStartTime = cleaningWindow.getCleanEndTime();
+            }
+        }
+        return resolvedStartTime;
     }
 
     /**
@@ -5708,7 +5831,61 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         if (StringUtils.isNotEmpty(currentMachineCode)) {
             triedMachineCodeSet.add(currentMachineCode);
         }
-        return countAvailableCandidateMachines(candidates, triedMachineCodeSet) > 0;
+        return hasAvailableReleasedTailCapacityCandidate(context, candidates, triedMachineCodeSet);
+    }
+
+    /**
+     * 判断剩余候选中是否存在续作收尾释放的尾部产能机台。
+     * <p>dayN 加机台目标已经满足时，不允许再打开从窗口起点就空闲的普通机台；
+     * 仅保留已在窗口内被续作/在机占用、且收尾后释放出尾部时间的候选机台。</p>
+     *
+     * @param context 排程上下文
+     * @param candidates 原始候选机台列表
+     * @param triedMachineCodeSet 已尝试机台编码
+     * @return true-存在可继续承接的尾部产能机台；false-不存在
+     */
+    private boolean hasAvailableReleasedTailCapacityCandidate(LhScheduleContext context,
+                                                              List<MachineScheduleDTO> candidates,
+                                                              Set<String> triedMachineCodeSet) {
+        if (Objects.isNull(context) || CollectionUtils.isEmpty(candidates)
+                || CollectionUtils.isEmpty(context.getScheduleWindowShifts())) {
+            return false;
+        }
+        for (MachineScheduleDTO candidate : candidates) {
+            if (Objects.isNull(candidate) || StringUtils.isEmpty(candidate.getMachineCode())) {
+                continue;
+            }
+            if (!CollectionUtils.isEmpty(triedMachineCodeSet)
+                    && triedMachineCodeSet.contains(candidate.getMachineCode())) {
+                continue;
+            }
+            if (isReleasedTailCapacityCandidate(context, candidate)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * 判断候选机台是否属于窗口内释放的尾部产能。
+     *
+     * @param context 排程上下文
+     * @param candidate 候选机台
+     * @return true-窗口内已有占用结束时间，可复用结束后的尾部产能；false-普通空闲或无可用尾部
+     */
+    private boolean isReleasedTailCapacityCandidate(LhScheduleContext context, MachineScheduleDTO candidate) {
+        if (Objects.isNull(context) || Objects.isNull(candidate)
+                || CollectionUtils.isEmpty(context.getScheduleWindowShifts())) {
+            return false;
+        }
+        List<LhShiftConfigVO> shifts = context.getScheduleWindowShifts();
+        Date windowStartTime = shifts.get(0).getShiftStartDateTime();
+        Date windowEndTime = shifts.get(shifts.size() - 1).getShiftEndDateTime();
+        Date occupationEndTime = resolveMachineOccupationEndTime(context, candidate, shifts);
+        return Objects.nonNull(windowStartTime) && Objects.nonNull(windowEndTime)
+                && Objects.nonNull(occupationEndTime)
+                && occupationEndTime.after(windowStartTime)
+                && occupationEndTime.before(windowEndTime);
     }
 
     /**
@@ -6832,36 +7009,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                 maintenanceWindowList, sku, isEnding, mouldChangeEndTime, shiftPlanCapacityMap,
                 firstInspectionAttributionShift);
         refreshResultSummary(context, result);
-        applyCleaningMouldChangeAnalysis(context, result);
         return result;
-    }
-
-    /**
-     * 命中"模具清洗+换模"组合场景时，写入首个排产班次原因分析。
-     *
-     * @param context 排程上下文
-     * @param result 新增换模结果
-     */
-    private void applyCleaningMouldChangeAnalysis(LhScheduleContext context,
-                                                  LhScheduleResult result) {
-        Date firstPlannedShiftStartTime = resolveFirstPlannedShiftStartTime(result);
-        if (context == null
-                || result == null
-                || result.getMouldChangeStartTime() == null
-                || firstPlannedShiftStartTime == null) {
-            return;
-        }
-        int firstPlannedShiftIndex = resolveFirstPlannedShiftIndex(result);
-        if (firstPlannedShiftIndex <= 0) {
-            return;
-        }
-        MachineScheduleDTO machine = context.getMachineScheduleMap().get(result.getLhMachineCode());
-        if (machine == null
-                || !MachineCleaningOverlapUtil.hasBlockingOverlap(
-                machine.getCleaningWindowList(), result.getMouldChangeStartTime(), firstPlannedShiftStartTime)) {
-            return;
-        }
-        ShiftFieldUtil.setShiftAnalysis(result, firstPlannedShiftIndex, NEW_SPEC_CLEANING_ANALYSIS);
     }
 
     /**

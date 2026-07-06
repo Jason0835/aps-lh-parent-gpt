@@ -24,131 +24,131 @@
         <if test="year != null and year != ''">AND YEAR = #{year}</if>
         <if test="month != null and month != ''">AND MONTH = #{month}</if>
         GROUP BY FACTORY_CODE, YEAR, MONTH, MONTH_PLAN_VERSION, LAST_MONTH_PLAN_VERSION, PRODUCTION_VERSION
-</select>
+    </select>
 
     <select id="list4Adjust" resultType="com.zlt.aps.mp.api.domain.vo.FactoryMonthPlanFinalAdjustVo">
         SELECT
-            fin.ID,
-            fin.PRODUCTION_NO,
-            fin.FACTORY_CODE,
-            fin.YEAR,
-            fin.MONTH,
-            fin.YEAR_MONTH,
-            fin.MONTH_PLAN_VERSION,
-            IFNULL(fin.LAST_MONTH_PLAN_VERSION, fin.MONTH_PLAN_VERSION) AS LAST_MONTH_PLAN_VERSION,
-            fin.PRODUCTION_VERSION,
-            fin.PRODUCT_TYPE_CODE,
-            fin.MATERIAL_CODE,
-            fin.MATERIAL_DESC,
-            fin.MES_MATERIAL_CODE,
-            fin.STRUCTURE_NAME,
-            fin.PRO_SIZE,
-            fin.PRODUCT_CATEGORY,
-            fin.PRODUCT_STATUS,
-            fin.STRUCTURE_TYPE,
-            fin.PRODUCTION_TYPE,
-            fin.EMBRYO_CODE,
-            fin.MAIN_MATERIAL_DESC,
-            fin.CONSTRUCTION_STAGE,
-            fin.IS_ZERO_RACK,
-            fin.EMBRYO_NO,
-            fin.LH_NO,
-            fin.TEXT_NO,
-            fin.BRAND,
-            fin.SPECIFICATIONS,
-            fin.MAIN_PATTERN,
-            fin.PATTERN,
-            fin.MOULD_CAVITY_QTY,
-            fin.TYPE_BLOCK_QTY,
-            fin.DYNAMIC_BALANCE_QTY,
-            fin.UNIFORMITY_QTY,
-            fin.AVERAGE_SALE_QTY,
-            fin.INVENTORY_SALES_RATIO,
-            fin.DAY_VULCANIZATION_QTY,
-            fin.CX_MACHINE_CODE,
-            fin.MOULD_CHANGE_INFO,
-            fin.IS_IMPORT,
-            fin.PRODUCTION_SEQUENCE,
-            fin.CURING_TIME,
-            fin.PROD_REQ_PLAN,
-            fin.TRIAL_QTY,
-            fin.FACT_PROD_REQ_QTY,
-            fin.TOTAL_QTY,
-            fin.HEIGHT_PRODUCTION_QTY,
-            fin.MID_PRODUCTION_QTY,
-            fin.CYCLE_PRODUCTION_QTY,
-            fin.CONVENTION_PRODUCTION_QTY,
-            fin.POSTPONE_PRODUCTION_QTY,
-            fin.TRIAL_PRODUCTION_QTY,
-            fin.DIFFERENCE_QTY,
-            fin.ORIGINAL_TOTAL_QTY,
-            fin.REASON,
-            fin.BEGIN_DAY,
-            fin.END_DAY,
-            fin.DAY_1,
-            fin.DAY_2,
-            fin.DAY_3,
-            fin.DAY_4,
-            fin.DAY_5,
-            fin.DAY_6,
-            fin.DAY_7,
-            fin.DAY_8,
-            fin.DAY_9,
-            fin.DAY_10,
-            fin.DAY_11,
-            fin.DAY_12,
-            fin.DAY_13,
-            fin.DAY_14,
-            fin.DAY_15,
-            fin.DAY_16,
-            fin.DAY_17,
-            fin.DAY_18,
-            fin.DAY_19,
-            fin.DAY_20,
-            fin.DAY_21,
-            fin.DAY_22,
-            fin.DAY_23,
-            fin.DAY_24,
-            fin.DAY_25,
-            fin.DAY_26,
-            fin.DAY_27,
-            fin.DAY_28,
-            fin.DAY_29,
-            fin.DAY_30,
-            fin.DAY_31,
-            fin.TOTAL_VULCANIZATION_MINUTES,
-            fin.DISPLAY_SEQ,
-            fin.LAST_MONTH_OVERDUE_QTY,
-            fin.LAST_MONTH_VALID_FLAG,
-            fin.IS_RELEASE,
-            fin.REMARK,
-            fin.IS_DELETE,
-            fin.CREATE_TIME,
-            fin.UPDATE_TIME,
-            fin.CREATE_BY,
-            fin.UPDATE_BY,
-            fin.LAST_MONTH_OVERDUE_QTY,
-            fin.LAST_MONTH_VALID_FLAG,
+        fin.ID,
+        fin.PRODUCTION_NO,
+        fin.FACTORY_CODE,
+        fin.YEAR,
+        fin.MONTH,
+        fin.YEAR_MONTH,
+        fin.MONTH_PLAN_VERSION,
+        IFNULL(fin.LAST_MONTH_PLAN_VERSION, fin.MONTH_PLAN_VERSION) AS LAST_MONTH_PLAN_VERSION,
+        fin.PRODUCTION_VERSION,
+        fin.PRODUCT_TYPE_CODE,
+        fin.MATERIAL_CODE,
+        fin.MATERIAL_DESC,
+        fin.MES_MATERIAL_CODE,
+        fin.STRUCTURE_NAME,
+        fin.PRO_SIZE,
+        fin.PRODUCT_CATEGORY,
+        fin.PRODUCT_STATUS,
+        fin.STRUCTURE_TYPE,
+        fin.PRODUCTION_TYPE,
+        fin.EMBRYO_CODE,
+        fin.MAIN_MATERIAL_DESC,
+        fin.CONSTRUCTION_STAGE,
+        fin.IS_ZERO_RACK,
+        fin.EMBRYO_NO,
+        fin.LH_NO,
+        fin.TEXT_NO,
+        fin.BRAND,
+        fin.SPECIFICATIONS,
+        fin.MAIN_PATTERN,
+        fin.PATTERN,
+        fin.MOULD_CAVITY_QTY,
+        fin.TYPE_BLOCK_QTY,
+        fin.DYNAMIC_BALANCE_QTY,
+        fin.UNIFORMITY_QTY,
+        fin.AVERAGE_SALE_QTY,
+        fin.INVENTORY_SALES_RATIO,
+        fin.DAY_VULCANIZATION_QTY,
+        fin.CX_MACHINE_CODE,
+        fin.MOULD_CHANGE_INFO,
+        fin.IS_IMPORT,
+        fin.PRODUCTION_SEQUENCE,
+        fin.CURING_TIME,
+        fin.PROD_REQ_PLAN,
+        fin.TRIAL_QTY,
+        fin.FACT_PROD_REQ_QTY,
+        fin.TOTAL_QTY,
+        fin.HEIGHT_PRODUCTION_QTY,
+        fin.MID_PRODUCTION_QTY,
+        fin.CYCLE_PRODUCTION_QTY,
+        fin.CONVENTION_PRODUCTION_QTY,
+        fin.POSTPONE_PRODUCTION_QTY,
+        fin.TRIAL_PRODUCTION_QTY,
+        fin.DIFFERENCE_QTY,
+        fin.ORIGINAL_TOTAL_QTY,
+        fin.REASON,
+        fin.BEGIN_DAY,
+        fin.END_DAY,
+        fin.DAY_1,
+        fin.DAY_2,
+        fin.DAY_3,
+        fin.DAY_4,
+        fin.DAY_5,
+        fin.DAY_6,
+        fin.DAY_7,
+        fin.DAY_8,
+        fin.DAY_9,
+        fin.DAY_10,
+        fin.DAY_11,
+        fin.DAY_12,
+        fin.DAY_13,
+        fin.DAY_14,
+        fin.DAY_15,
+        fin.DAY_16,
+        fin.DAY_17,
+        fin.DAY_18,
+        fin.DAY_19,
+        fin.DAY_20,
+        fin.DAY_21,
+        fin.DAY_22,
+        fin.DAY_23,
+        fin.DAY_24,
+        fin.DAY_25,
+        fin.DAY_26,
+        fin.DAY_27,
+        fin.DAY_28,
+        fin.DAY_29,
+        fin.DAY_30,
+        fin.DAY_31,
+        fin.TOTAL_VULCANIZATION_MINUTES,
+        fin.DISPLAY_SEQ,
+        fin.LAST_MONTH_OVERDUE_QTY,
+        fin.LAST_MONTH_VALID_FLAG,
+        fin.IS_RELEASE,
+        fin.REMARK,
+        fin.IS_DELETE,
+        fin.CREATE_TIME,
+        fin.UPDATE_TIME,
+        fin.CREATE_BY,
+        fin.UPDATE_BY,
+        fin.LAST_MONTH_OVERDUE_QTY,
+        fin.LAST_MONTH_VALID_FLAG,
         NULLIF(fin.ADJUST_QTY1, 0) AS ADJUST_QTY1,
         NULLIF(fin.ADJUST_QTY2, 0) AS ADJUST_QTY2,
         NULLIF(fin.ADJUST_QTY3, 0) AS ADJUST_QTY3,
         NULLIF(fin.ADJUST_QTY4, 0) AS ADJUST_QTY4,
-            ddps.NET_QTY,
-            ddps.HEIGHT_QTY,
-            ddps.MID_QTY,
-            ddps.CYCLE_RESERVE_QTY,
-            ddps.CONVENTION_RESERVE_QTY,
-            ddps.POSTPONE_QTY
+        ddps.NET_QTY,
+        ddps.HEIGHT_QTY,
+        ddps.MID_QTY,
+        ddps.CYCLE_RESERVE_QTY,
+        ddps.CONVENTION_RESERVE_QTY,
+        ddps.POSTPONE_QTY
 
         FROM T_MP_MONTH_PLAN_PROD_FINAL fin
 
         LEFT JOIN T_DP_DEMAND_PLAN_SUM ddps
-            ON fin.FACTORY_CODE = ddps.FACTORY_CODE
-                AND fin.`YEAR` = ddps.`YEAR`
-                AND fin.`MONTH` = ddps.`MONTH`
-                AND fin.MATERIAL_CODE = ddps.MATERIAL_CODE
-                AND IFNULL(fin.LAST_MONTH_PLAN_VERSION, fin.MONTH_PLAN_VERSION) = ddps.MONTH_PLAN_VERSION
-                AND ddps.IS_DELETE = 0
+        ON fin.FACTORY_CODE = ddps.FACTORY_CODE
+        AND fin.`YEAR` = ddps.`YEAR`
+        AND fin.`MONTH` = ddps.`MONTH`
+        AND fin.MATERIAL_CODE = ddps.MATERIAL_CODE
+        AND IFNULL(fin.LAST_MONTH_PLAN_VERSION, fin.MONTH_PLAN_VERSION) = ddps.MONTH_PLAN_VERSION
+        AND ddps.IS_DELETE = 0
 
         WHERE fin.IS_DELETE = 0
         <if test="factoryCode != null and factoryCode != ''">AND fin.FACTORY_CODE = #{factoryCode}</if>
@@ -173,132 +173,420 @@
 
     <!-- 计算上月超欠产并回填到当月定稿表
          新公式：
-           上月超欠产 = 定稿需求版本对应的月计划月底余量 - (库存抓取日 ~ 月底)的硫化日完成量
-         数据来源：
-           1. 月计划月底余量(PLAN_SURPLUS_QTY)、库存抓取日(STOCK_CAPTURE_DATE)：
-              取自 T_MDM_MONTH_SURPLUS（当月生产余量同步页面），按
-              (分厂+物料+年+月+需求版本号 MONTH_PLAN_VERSION=REQUIRE_VERSION) 匹配；
-              业务保证 (FACTORY_CODE, MATERIAL_CODE, YEAR, MONTH, REQUIRE_VERSION) 唯一
-           2. 已完成量：取自 T_LH_DAY_FINISH_QTY，日期范围 = IFNULL(STOCK_CAPTURE_DATE, 月初) ~ 月底
-         性能优化（两段式）：
-           - 第一段：派生表 fin 按 (分厂+物料+完成日期) 预聚合硫化日完成量，全月范围只扫描一次
-           - 第二段：派生表 calc 内部 LEFT JOIN fin 后，按行用 STOCK_CAPTURE_DATE 过滤日期再 SUM
+           上月超欠产 = (库存抓取日至月底的)计划量 - (库存抓取日至月底的)已完成量
+         计划量计算：
+           - 库存抓取日(STOCK_CAPTURE_DATE) 取自 T_MDM_MONTH_SURPLUS，按
+             (分厂+物料+年+月+需求版本号 MONTH_PLAN_VERSION=REQUIRE_VERSION) 匹配
+           - stockDay = DAYOFMONTH(IFNULL(STOCK_CAPTURE_DATE, 月初))
+           - 计划量 = SUM(DAY_x) 其中 x >= stockDay（STOCK_CAPTURE_DATE 为空时累加 DAY_1~DAY_31 全部）
+         已完成量：
+           - 取自 T_LH_DAY_FINISH_QTY，日期范围 = IFNULL(STOCK_CAPTURE_DATE, 月初) ~ 月底
          回填规则：
-           - 按分厂+物料编码匹配，回填到写入目标月定稿记录
-           - 月底余量为空(PLAN_SURPLUS_QTY IS NULL)时按0处理，超欠产 = 0 - 已完成量，统一走阈值判定
+           - 按 (分厂+物料编码+产品状态) 三字段维度匹配，回填到写入目标月定稿记录
            - 有效标志判定：|超欠产值|(绝对值) > 阈值参数(overdueThresholdParamCode) → '0'(否)，否则 → '1'(是)
+         注意：同一(分厂+物料+产品状态)维度下 DAY_x 字段值相同（上月定稿按此维度唯一），
+               故 SUM(DAY_x) 等价于取该行的 DAY_x 值，公式中用 CASE WHEN 实现动态累加。
     -->
     <update id="updateLastMonthOverProd">
         UPDATE T_MP_MONTH_PLAN_PROD_FINAL f
-        LEFT JOIN (
+            LEFT JOIN (
             SELECT
-                f5.FACTORY_CODE,
-                f5.MATERIAL_CODE,
-                surplus.PLAN_SURPLUS_QTY AS PLAN_SURPLUS_QTY,
-                IFNULL(SUM(fin.DAY_QTY), 0) AS FINISH_QTY
+            f5.FACTORY_CODE,
+            f5.MATERIAL_CODE,
+            f5.PRODUCT_STATUS,
+            (
+            -- 计划量：从 STOCK_CAPTURE_DATE 日号到月底累加 DAY_x
+            -- STOCK_CAPTURE_DATE 为空时 stockDay=1，累加 DAY_1~DAY_31
+            IFNULL(CASE WHEN DAYOFMONTH(IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})) &lt;= 1 THEN f5.DAY_1 ELSE 0 END, 0) +
+            IFNULL(CASE WHEN DAYOFMONTH(IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})) &lt;= 2 THEN f5.DAY_2 ELSE 0 END, 0) +
+            IFNULL(CASE WHEN DAYOFMONTH(IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})) &lt;= 3 THEN f5.DAY_3 ELSE 0 END, 0) +
+            IFNULL(CASE WHEN DAYOFMONTH(IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})) &lt;= 4 THEN f5.DAY_4 ELSE 0 END, 0) +
+            IFNULL(CASE WHEN DAYOFMONTH(IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})) &lt;= 5 THEN f5.DAY_5 ELSE 0 END, 0) +
+            IFNULL(CASE WHEN DAYOFMONTH(IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})) &lt;= 6 THEN f5.DAY_6 ELSE 0 END, 0) +
+            IFNULL(CASE WHEN DAYOFMONTH(IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})) &lt;= 7 THEN f5.DAY_7 ELSE 0 END, 0) +
+            IFNULL(CASE WHEN DAYOFMONTH(IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})) &lt;= 8 THEN f5.DAY_8 ELSE 0 END, 0) +
+            IFNULL(CASE WHEN DAYOFMONTH(IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})) &lt;= 9 THEN f5.DAY_9 ELSE 0 END, 0) +
+            IFNULL(CASE WHEN DAYOFMONTH(IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})) &lt;= 10 THEN f5.DAY_10 ELSE 0 END, 0) +
+            IFNULL(CASE WHEN DAYOFMONTH(IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})) &lt;= 11 THEN f5.DAY_11 ELSE 0 END, 0) +
+            IFNULL(CASE WHEN DAYOFMONTH(IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})) &lt;= 12 THEN f5.DAY_12 ELSE 0 END, 0) +
+            IFNULL(CASE WHEN DAYOFMONTH(IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})) &lt;= 13 THEN f5.DAY_13 ELSE 0 END, 0) +
+            IFNULL(CASE WHEN DAYOFMONTH(IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})) &lt;= 14 THEN f5.DAY_14 ELSE 0 END, 0) +
+            IFNULL(CASE WHEN DAYOFMONTH(IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})) &lt;= 15 THEN f5.DAY_15 ELSE 0 END, 0) +
+            IFNULL(CASE WHEN DAYOFMONTH(IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})) &lt;= 16 THEN f5.DAY_16 ELSE 0 END, 0) +
+            IFNULL(CASE WHEN DAYOFMONTH(IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})) &lt;= 17 THEN f5.DAY_17 ELSE 0 END, 0) +
+            IFNULL(CASE WHEN DAYOFMONTH(IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})) &lt;= 18 THEN f5.DAY_18 ELSE 0 END, 0) +
+            IFNULL(CASE WHEN DAYOFMONTH(IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})) &lt;= 19 THEN f5.DAY_19 ELSE 0 END, 0) +
+            IFNULL(CASE WHEN DAYOFMONTH(IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})) &lt;= 20 THEN f5.DAY_20 ELSE 0 END, 0) +
+            IFNULL(CASE WHEN DAYOFMONTH(IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})) &lt;= 21 THEN f5.DAY_21 ELSE 0 END, 0) +
+            IFNULL(CASE WHEN DAYOFMONTH(IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})) &lt;= 22 THEN f5.DAY_22 ELSE 0 END, 0) +
+            IFNULL(CASE WHEN DAYOFMONTH(IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})) &lt;= 23 THEN f5.DAY_23 ELSE 0 END, 0) +
+            IFNULL(CASE WHEN DAYOFMONTH(IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})) &lt;= 24 THEN f5.DAY_24 ELSE 0 END, 0) +
+            IFNULL(CASE WHEN DAYOFMONTH(IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})) &lt;= 25 THEN f5.DAY_25 ELSE 0 END, 0) +
+            IFNULL(CASE WHEN DAYOFMONTH(IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})) &lt;= 26 THEN f5.DAY_26 ELSE 0 END, 0) +
+            IFNULL(CASE WHEN DAYOFMONTH(IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})) &lt;= 27 THEN f5.DAY_27 ELSE 0 END, 0) +
+            IFNULL(CASE WHEN DAYOFMONTH(IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})) &lt;= 28 THEN f5.DAY_28 ELSE 0 END, 0) +
+            IFNULL(CASE WHEN DAYOFMONTH(IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})) &lt;= 29 THEN f5.DAY_29 ELSE 0 END, 0) +
+            IFNULL(CASE WHEN DAYOFMONTH(IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})) &lt;= 30 THEN f5.DAY_30 ELSE 0 END, 0) +
+            IFNULL(CASE WHEN DAYOFMONTH(IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})) &lt;= 31 THEN f5.DAY_31 ELSE 0 END, 0)
+            ) AS PLAN_QTY,
+            IFNULL(SUM(fin.DAY_QTY), 0) AS FINISH_QTY
             FROM T_MP_MONTH_PLAN_PROD_FINAL f5
             LEFT JOIN T_MDM_MONTH_SURPLUS surplus
-                ON surplus.FACTORY_CODE = f5.FACTORY_CODE
-               AND surplus.MATERIAL_CODE = f5.MATERIAL_CODE
-               AND surplus.YEAR = f5.YEAR
-               AND surplus.MONTH = f5.MONTH
-               AND surplus.REQUIRE_VERSION = f5.MONTH_PLAN_VERSION
-               AND surplus.IS_DELETE = 0
+            ON surplus.FACTORY_CODE = f5.FACTORY_CODE
+            AND surplus.MATERIAL_CODE = f5.MATERIAL_CODE
+            AND surplus.YEAR = f5.YEAR
+            AND surplus.MONTH = f5.MONTH
+            AND surplus.REQUIRE_VERSION = f5.MONTH_PLAN_VERSION
+            AND surplus.IS_DELETE = 0
             LEFT JOIN (
-                SELECT
-                    FACTORY_CODE,
-                    MATERIAL_CODE,
-                    FINISH_DATE,
-                    IFNULL(SUM(DAY_FINISH_QTY), 0) AS DAY_QTY
-                FROM T_LH_DAY_FINISH_QTY
-                WHERE IS_DELETE = 0
-                  AND FINISH_DATE BETWEEN #{startDate} AND #{endDate}
-                GROUP BY FACTORY_CODE, MATERIAL_CODE, FINISH_DATE
+            SELECT
+            FACTORY_CODE,
+            MATERIAL_CODE,
+            FINISH_DATE,
+            IFNULL(SUM(DAY_FINISH_QTY), 0) AS DAY_QTY
+            FROM T_LH_DAY_FINISH_QTY
+            WHERE IS_DELETE = 0
+            AND FINISH_DATE BETWEEN #{startDate} AND #{endDate}
+            GROUP BY FACTORY_CODE, MATERIAL_CODE, FINISH_DATE
             ) fin ON fin.FACTORY_CODE = f5.FACTORY_CODE
-                  AND fin.MATERIAL_CODE = f5.MATERIAL_CODE
-                  AND fin.FINISH_DATE &gt;= IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})
-                  AND fin.FINISH_DATE &lt;= #{endDate}
+            AND fin.MATERIAL_CODE = f5.MATERIAL_CODE
+            AND fin.FINISH_DATE &gt;= IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})
+            AND fin.FINISH_DATE &lt;= #{endDate}
             WHERE f5.IS_DELETE = 0
-              AND f5.YEAR = #{lastYear}
-              AND f5.MONTH = #{lastMonth}
-            GROUP BY f5.FACTORY_CODE, f5.MATERIAL_CODE, surplus.PLAN_SURPLUS_QTY
-        ) calc ON f.FACTORY_CODE = calc.FACTORY_CODE AND f.MATERIAL_CODE = calc.MATERIAL_CODE
-        LEFT JOIN T_MP_FACTORY_PARAM fp ON fp.FACTORY_CODE = f.FACTORY_CODE
+            AND f5.YEAR = #{lastYear}
+            AND f5.MONTH = #{lastMonth}
+            GROUP BY f5.FACTORY_CODE, f5.MATERIAL_CODE, f5.PRODUCT_STATUS, surplus.STOCK_CAPTURE_DATE,
+            f5.DAY_1, f5.DAY_2, f5.DAY_3, f5.DAY_4, f5.DAY_5, f5.DAY_6, f5.DAY_7, f5.DAY_8,
+            f5.DAY_9, f5.DAY_10, f5.DAY_11, f5.DAY_12, f5.DAY_13, f5.DAY_14, f5.DAY_15, f5.DAY_16,
+            f5.DAY_17, f5.DAY_18, f5.DAY_19, f5.DAY_20, f5.DAY_21, f5.DAY_22, f5.DAY_23, f5.DAY_24,
+            f5.DAY_25, f5.DAY_26, f5.DAY_27, f5.DAY_28, f5.DAY_29, f5.DAY_30, f5.DAY_31
+            ) calc ON f.FACTORY_CODE = calc.FACTORY_CODE
+            AND f.MATERIAL_CODE = calc.MATERIAL_CODE
+            AND f.PRODUCT_STATUS = calc.PRODUCT_STATUS
+            LEFT JOIN T_MP_FACTORY_PARAM fp ON fp.FACTORY_CODE = f.FACTORY_CODE
             AND fp.PRODUCT_TYPE_CODE = f.PRODUCT_TYPE_CODE
             AND fp.PARAM_CODE = #{overdueThresholdParamCode}
             AND fp.IS_DELETE = 0
-        SET f.LAST_MONTH_OVERDUE_QTY = IFNULL(calc.PLAN_SURPLUS_QTY, 0) - IFNULL(calc.FINISH_QTY, 0),
-            f.LAST_MONTH_VALID_FLAG = CASE
-                WHEN ABS(IFNULL(calc.PLAN_SURPLUS_QTY, 0) - IFNULL(calc.FINISH_QTY, 0))
-                     &gt; IFNULL(CAST(IFNULL(fp.PARAM_VALUE, fp.DEFAULE_VALUE) AS SIGNED), 0) THEN '0'
+            SET f.LAST_MONTH_OVERDUE_QTY = IFNULL(calc.PLAN_QTY, 0) - IFNULL(calc.FINISH_QTY, 0),
+                f.LAST_MONTH_VALID_FLAG = CASE
+                WHEN ABS(IFNULL(calc.PLAN_QTY, 0) - IFNULL(calc.FINISH_QTY, 0))
+                    &gt; IFNULL(CAST(IFNULL(fp.PARAM_VALUE, fp.DEFAULE_VALUE) AS SIGNED), 0) THEN '0'
                 ELSE '1'
-            END,
+        END,
             f.UPDATE_TIME = NOW()
         WHERE f.IS_DELETE = 0
           AND f.YEAR = #{currentYear}
-          AND f.MONTH = #{currentMonth}
+        AND f.MONTH = #{currentMonth}
     </update>
 
     <!-- 定稿时补更新上月定稿记录的上月超欠产有效标识（只更新标识，不更新值）
          计算逻辑同 updateLastMonthOverProd，仅 SET 子句移除 LAST_MONTH_OVERDUE_QTY：
-         1. 月计划月底余量(PLAN_SURPLUS_QTY)、库存抓取日(STOCK_CAPTURE_DATE)：
-            取自 T_MDM_MONTH_SURPLUS，按 (分厂+物料+年+月+需求版本号 MONTH_PLAN_VERSION=REQUIRE_VERSION) 匹配
+         1. 计划量：按 (分厂+物料+年+月+需求版本号 MONTH_PLAN_VERSION=REQUIRE_VERSION) 取 STOCK_CAPTURE_DATE，
+            stockDay = DAYOFMONTH(IFNULL(STOCK_CAPTURE_DATE, 月初))，
+            累加 DAY_x (x >= stockDay)；STOCK_CAPTURE_DATE 为空时累加 DAY_1~DAY_31 全部
          2. 已完成量：取自 T_LH_DAY_FINISH_QTY，日期范围 = IFNULL(STOCK_CAPTURE_DATE, 月初) ~ 月底
-         3. 超欠产 = 月底余量 - 完成量（仅用于标识判定，不写回值字段）
-         4. 按分厂+物料编码匹配，回填到写入目标月定稿记录的 LAST_MONTH_VALID_FLAG
-         5. 有效标志判定：|超欠产值|(绝对值) > 阈值参数(overdueThresholdParamCode) → '0'(否)，
-            否则 → '1'(是)；月底余量为空(PLAN_SURPLUS_QTY IS NULL)时按0处理，统一走阈值判定
+         3. 超欠产 = 计划量 - 完成量（仅用于标识判定，不写回值字段）
+         4. 按 (分厂+物料编码+产品状态) 三字段维度匹配，回填到写入目标月定稿记录的 LAST_MONTH_VALID_FLAG
+         5. 有效标志判定：|超欠产值|(绝对值) > 阈值参数(overdueThresholdParamCode) → '0'(否)，否则 → '1'(是)
          场景：次月定稿时（如6.25定稿7月），数据来源月=写入目标月=上月（6月），
          用6月数据补更新6月定稿记录的标识，覆盖月初定时任务（6.1用5月数据）写入的旧标识。
-         性能优化（两段式）：派生表 fin 按 (分厂+物料+完成日期) 预聚合，外层按 STOCK_CAPTURE_DATE 过滤后 SUM
     -->
     <update id="updateLastMonthOverProdFlag">
         UPDATE T_MP_MONTH_PLAN_PROD_FINAL f
-        LEFT JOIN (
+            LEFT JOIN (
             SELECT
-                f5.FACTORY_CODE,
-                f5.MATERIAL_CODE,
-                surplus.PLAN_SURPLUS_QTY AS PLAN_SURPLUS_QTY,
-                IFNULL(SUM(fin.DAY_QTY), 0) AS FINISH_QTY
+            f5.FACTORY_CODE,
+            f5.MATERIAL_CODE,
+            f5.PRODUCT_STATUS,
+            (
+            -- 计划量：从 STOCK_CAPTURE_DATE 日号到月底累加 DAY_x
+            IFNULL(CASE WHEN DAYOFMONTH(IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})) &lt;= 1 THEN f5.DAY_1 ELSE 0 END, 0) +
+            IFNULL(CASE WHEN DAYOFMONTH(IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})) &lt;= 2 THEN f5.DAY_2 ELSE 0 END, 0) +
+            IFNULL(CASE WHEN DAYOFMONTH(IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})) &lt;= 3 THEN f5.DAY_3 ELSE 0 END, 0) +
+            IFNULL(CASE WHEN DAYOFMONTH(IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})) &lt;= 4 THEN f5.DAY_4 ELSE 0 END, 0) +
+            IFNULL(CASE WHEN DAYOFMONTH(IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})) &lt;= 5 THEN f5.DAY_5 ELSE 0 END, 0) +
+            IFNULL(CASE WHEN DAYOFMONTH(IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})) &lt;= 6 THEN f5.DAY_6 ELSE 0 END, 0) +
+            IFNULL(CASE WHEN DAYOFMONTH(IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})) &lt;= 7 THEN f5.DAY_7 ELSE 0 END, 0) +
+            IFNULL(CASE WHEN DAYOFMONTH(IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})) &lt;= 8 THEN f5.DAY_8 ELSE 0 END, 0) +
+            IFNULL(CASE WHEN DAYOFMONTH(IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})) &lt;= 9 THEN f5.DAY_9 ELSE 0 END, 0) +
+            IFNULL(CASE WHEN DAYOFMONTH(IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})) &lt;= 10 THEN f5.DAY_10 ELSE 0 END, 0) +
+            IFNULL(CASE WHEN DAYOFMONTH(IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})) &lt;= 11 THEN f5.DAY_11 ELSE 0 END, 0) +
+            IFNULL(CASE WHEN DAYOFMONTH(IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})) &lt;= 12 THEN f5.DAY_12 ELSE 0 END, 0) +
+            IFNULL(CASE WHEN DAYOFMONTH(IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})) &lt;= 13 THEN f5.DAY_13 ELSE 0 END, 0) +
+            IFNULL(CASE WHEN DAYOFMONTH(IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})) &lt;= 14 THEN f5.DAY_14 ELSE 0 END, 0) +
+            IFNULL(CASE WHEN DAYOFMONTH(IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})) &lt;= 15 THEN f5.DAY_15 ELSE 0 END, 0) +
+            IFNULL(CASE WHEN DAYOFMONTH(IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})) &lt;= 16 THEN f5.DAY_16 ELSE 0 END, 0) +
+            IFNULL(CASE WHEN DAYOFMONTH(IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})) &lt;= 17 THEN f5.DAY_17 ELSE 0 END, 0) +
+            IFNULL(CASE WHEN DAYOFMONTH(IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})) &lt;= 18 THEN f5.DAY_18 ELSE 0 END, 0) +
+            IFNULL(CASE WHEN DAYOFMONTH(IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})) &lt;= 19 THEN f5.DAY_19 ELSE 0 END, 0) +
+            IFNULL(CASE WHEN DAYOFMONTH(IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})) &lt;= 20 THEN f5.DAY_20 ELSE 0 END, 0) +
+            IFNULL(CASE WHEN DAYOFMONTH(IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})) &lt;= 21 THEN f5.DAY_21 ELSE 0 END, 0) +
+            IFNULL(CASE WHEN DAYOFMONTH(IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})) &lt;= 22 THEN f5.DAY_22 ELSE 0 END, 0) +
+            IFNULL(CASE WHEN DAYOFMONTH(IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})) &lt;= 23 THEN f5.DAY_23 ELSE 0 END, 0) +
+            IFNULL(CASE WHEN DAYOFMONTH(IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})) &lt;= 24 THEN f5.DAY_24 ELSE 0 END, 0) +
+            IFNULL(CASE WHEN DAYOFMONTH(IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})) &lt;= 25 THEN f5.DAY_25 ELSE 0 END, 0) +
+            IFNULL(CASE WHEN DAYOFMONTH(IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})) &lt;= 26 THEN f5.DAY_26 ELSE 0 END, 0) +
+            IFNULL(CASE WHEN DAYOFMONTH(IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})) &lt;= 27 THEN f5.DAY_27 ELSE 0 END, 0) +
+            IFNULL(CASE WHEN DAYOFMONTH(IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})) &lt;= 28 THEN f5.DAY_28 ELSE 0 END, 0) +
+            IFNULL(CASE WHEN DAYOFMONTH(IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})) &lt;= 29 THEN f5.DAY_29 ELSE 0 END, 0) +
+            IFNULL(CASE WHEN DAYOFMONTH(IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})) &lt;= 30 THEN f5.DAY_30 ELSE 0 END, 0) +
+            IFNULL(CASE WHEN DAYOFMONTH(IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})) &lt;= 31 THEN f5.DAY_31 ELSE 0 END, 0)
+            ) AS PLAN_QTY,
+            IFNULL(SUM(fin.DAY_QTY), 0) AS FINISH_QTY
             FROM T_MP_MONTH_PLAN_PROD_FINAL f5
             LEFT JOIN T_MDM_MONTH_SURPLUS surplus
-                ON surplus.FACTORY_CODE = f5.FACTORY_CODE
-               AND surplus.MATERIAL_CODE = f5.MATERIAL_CODE
-               AND surplus.YEAR = f5.YEAR
-               AND surplus.MONTH = f5.MONTH
-               AND surplus.REQUIRE_VERSION = f5.MONTH_PLAN_VERSION
-               AND surplus.IS_DELETE = 0
+            ON surplus.FACTORY_CODE = f5.FACTORY_CODE
+            AND surplus.MATERIAL_CODE = f5.MATERIAL_CODE
+            AND surplus.YEAR = f5.YEAR
+            AND surplus.MONTH = f5.MONTH
+            AND surplus.REQUIRE_VERSION = f5.MONTH_PLAN_VERSION
+            AND surplus.IS_DELETE = 0
             LEFT JOIN (
-                SELECT
-                    FACTORY_CODE,
-                    MATERIAL_CODE,
-                    FINISH_DATE,
-                    IFNULL(SUM(DAY_FINISH_QTY), 0) AS DAY_QTY
-                FROM T_LH_DAY_FINISH_QTY
-                WHERE IS_DELETE = 0
-                  AND FINISH_DATE BETWEEN #{startDate} AND #{endDate}
-                GROUP BY FACTORY_CODE, MATERIAL_CODE, FINISH_DATE
+            SELECT
+            FACTORY_CODE,
+            MATERIAL_CODE,
+            FINISH_DATE,
+            IFNULL(SUM(DAY_FINISH_QTY), 0) AS DAY_QTY
+            FROM T_LH_DAY_FINISH_QTY
+            WHERE IS_DELETE = 0
+            AND FINISH_DATE BETWEEN #{startDate} AND #{endDate}
+            GROUP BY FACTORY_CODE, MATERIAL_CODE, FINISH_DATE
             ) fin ON fin.FACTORY_CODE = f5.FACTORY_CODE
-                  AND fin.MATERIAL_CODE = f5.MATERIAL_CODE
-                  AND fin.FINISH_DATE &gt;= IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})
-                  AND fin.FINISH_DATE &lt;= #{endDate}
+            AND fin.MATERIAL_CODE = f5.MATERIAL_CODE
+            AND fin.FINISH_DATE &gt;= IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})
+            AND fin.FINISH_DATE &lt;= #{endDate}
             WHERE f5.IS_DELETE = 0
-              AND f5.YEAR = #{lastYear}
-              AND f5.MONTH = #{lastMonth}
-            GROUP BY f5.FACTORY_CODE, f5.MATERIAL_CODE, surplus.PLAN_SURPLUS_QTY
-        ) calc ON f.FACTORY_CODE = calc.FACTORY_CODE AND f.MATERIAL_CODE = calc.MATERIAL_CODE
-        LEFT JOIN T_MP_FACTORY_PARAM fp ON fp.FACTORY_CODE = f.FACTORY_CODE
+            AND f5.YEAR = #{lastYear}
+            AND f5.MONTH = #{lastMonth}
+            GROUP BY f5.FACTORY_CODE, f5.MATERIAL_CODE, f5.PRODUCT_STATUS, surplus.STOCK_CAPTURE_DATE,
+            f5.DAY_1, f5.DAY_2, f5.DAY_3, f5.DAY_4, f5.DAY_5, f5.DAY_6, f5.DAY_7, f5.DAY_8,
+            f5.DAY_9, f5.DAY_10, f5.DAY_11, f5.DAY_12, f5.DAY_13, f5.DAY_14, f5.DAY_15, f5.DAY_16,
+            f5.DAY_17, f5.DAY_18, f5.DAY_19, f5.DAY_20, f5.DAY_21, f5.DAY_22, f5.DAY_23, f5.DAY_24,
+            f5.DAY_25, f5.DAY_26, f5.DAY_27, f5.DAY_28, f5.DAY_29, f5.DAY_30, f5.DAY_31
+            ) calc ON f.FACTORY_CODE = calc.FACTORY_CODE
+            AND f.MATERIAL_CODE = calc.MATERIAL_CODE
+            AND f.PRODUCT_STATUS = calc.PRODUCT_STATUS
+            LEFT JOIN T_MP_FACTORY_PARAM fp ON fp.FACTORY_CODE = f.FACTORY_CODE
             AND fp.PRODUCT_TYPE_CODE = f.PRODUCT_TYPE_CODE
             AND fp.PARAM_CODE = #{overdueThresholdParamCode}
             AND fp.IS_DELETE = 0
-        SET f.LAST_MONTH_VALID_FLAG = CASE
-                WHEN ABS(IFNULL(calc.PLAN_SURPLUS_QTY, 0) - IFNULL(calc.FINISH_QTY, 0))
-                     &gt; IFNULL(CAST(IFNULL(fp.PARAM_VALUE, fp.DEFAULE_VALUE) AS SIGNED), 0) THEN '0'
+            SET f.LAST_MONTH_VALID_FLAG = CASE
+                WHEN ABS(IFNULL(calc.PLAN_QTY, 0) - IFNULL(calc.FINISH_QTY, 0))
+                    &gt; IFNULL(CAST(IFNULL(fp.PARAM_VALUE, fp.DEFAULE_VALUE) AS SIGNED), 0) THEN '0'
                 ELSE '1'
-            END,
+        END,
             f.UPDATE_TIME = NOW()
         WHERE f.IS_DELETE = 0
           AND f.YEAR = #{currentYear}
-          AND f.MONTH = #{currentMonth}
+        AND f.MONTH = #{currentMonth}
     </update>
+
+    <!-- 查询上月定稿存在但当月定稿缺失的超欠产记录（用于 Java 层补充工单号后批量插入）
+         场景：上月定稿表中按 (分厂+物料编码+产品状态) 维度存在，但当月定稿表中按相同维度匹配不到的记录，
+         需要新增一条到当月定稿表，把上月超欠产值及有效标志写入。
+         规则：
+           1. 数据来源：上月定稿表 f5 LEFT JOIN T_MDM_MONTH_SURPLUS / T_LH_DAY_FINISH_QTY，
+              按 (分厂+物料+产品状态) 维度聚合计算超欠产 = 计划量 - 完成量
+              计划量 = 从 STOCK_CAPTURE_DATE 日号到月底累加 DAY_x（为空时累加 DAY_1~DAY_31 全部）
+           2. 过滤1：当月定稿表按相同维度已存在的记录不插入（exist.ID IS NULL）
+           3. 过滤2：超欠产值 = 0 的记录不插入（OVERDUE_QTY &lt;&gt; 0）
+           4. 过滤3：当月无定稿版本的工厂不插入（procVer 子查询无数据，INNER JOIN 自动排除）
+           5. 字段映射：
+              - 年月取当月（currentYear、currentMonth、YEAR_MONTH=year*100+month）
+              - 需求版本号(MONTH_PLAN_VERSION)、排产版本号(PRODUCTION_VERSION) 取自 T_MP_PROC_VERSION
+                当月定稿版本（IS_FINAL='1'）；最新需求版本号(LAST_MONTH_PLAN_VERSION) 置 NULL
+              - PRODUCTION_NO 工单号不在此查询赋值，由 Java 层按当月最大值+1 递增生成后填充
+              - DAY_1~DAY_31 全部置 NULL（不复制上月数据、不赋值）
+              - 产量/调整相关字段置 0：HEIGHT_PRODUCTION_QTY、TOTAL_QTY、ORIGINAL_TOTAL_QTY、
+                MID_PRODUCTION_QTY、CYCLE_PRODUCTION_QTY、CONVENTION_PRODUCTION_QTY、
+                POSTPONE_PRODUCTION_QTY、TRIAL_PRODUCTION_QTY、DIFFERENCE_QTY、
+                ADJUST_QTY1~4、BEGIN_DAY、END_DAY
+              - 其他业务字段（产品品类、物料、产品状态、胎胚号、品牌、规格、施工阶段等）从上月定稿复制
+              - LAST_MONTH_OVERDUE_QTY / LAST_MONTH_VALID_FLAG 按超欠产值和阈值参数判定写入
+         性能优化：两段式写法
+           - 第一段：calc 子查询按 (分厂+物料+产品状态+STOCK_CAPTURE_DATE+DAY_1~DAY_31) 聚合计算超欠产
+           - 第二段：外层 INNER JOIN 上月定稿表 f5 取完整业务字段（按唯一键关联，无笛卡尔积）
+    -->
+    <select id="selectMissingLastMonthOverProd" resultType="com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult">
+        SELECT
+            calc.FACTORY_CODE AS factoryCode,
+            #{currentYear} AS year,
+            #{currentMonth} AS month,
+            (#{currentYear} * 100 + #{currentMonth}) AS yearMonth,
+            procVer.MONTH_PLAN_VERSION AS monthPlanVersion,
+            procVer.MONTH_PLAN_VERSION AS lastMonthPlanVersion,
+            procVer.PRODUCTION_VERSION AS productionVersion,
+            f5.PRODUCT_TYPE_CODE AS productTypeCode,
+            calc.MATERIAL_CODE AS materialCode,
+            calc.PRODUCT_STATUS AS productStatus,
+            f5.EMBRYO_CODE AS embryoCode,
+            f5.BRAND AS brand,
+            f5.SPECIFICATIONS AS specifications,
+            f5.MAIN_PATTERN AS mainPattern,
+            f5.PATTERN AS pattern,
+            f5.CONSTRUCTION_STAGE AS constructionStage,
+            f5.STRUCTURE_TYPE AS structureType,
+            f5.PRODUCTION_TYPE AS productionType,
+            f5.MAIN_MATERIAL_DESC AS mainMaterialDesc,
+            f5.MOULD_CAVITY_QTY AS mouldCavityQty,
+            f5.TYPE_BLOCK_QTY AS typeBlockQty,
+            f5.HEIGHT_QTY AS heightQty,
+            f5.AVERAGE_SALE_QTY AS averageSaleQty,
+            f5.INVENTORY_SALES_RATIO AS inventorySalesRatio,
+            f5.DAY_VULCANIZATION_QTY AS dayVulcanizationQty,
+            f5.CX_MACHINE_CODE AS cxMachineCode,
+            f5.MOULD_CHANGE_INFO AS mouldChangeInfo,
+            f5.DYNAMIC_BALANCE_QTY AS dynamicBalanceQty,
+            f5.UNIFORMITY_QTY AS uniformityQty,
+            f5.IS_LOCK_SCHEDULE AS isLockSchedule,
+            f5.IS_IMPORT AS isImport,
+            f5.PRODUCTION_SEQUENCE AS productionSequence,
+            f5.CURING_TIME AS curingTime,
+            f5.PROD_REQ_PLAN AS prodReqPlan,
+            f5.TRIAL_QTY AS trialQty,
+            0 AS heightProductionQty,
+            f5.FACT_PROD_REQ_QTY AS factProdReqQty,
+            0 AS totalQty,
+            0 AS originalTotalQty,
+            0 AS midProductionQty,
+            0 AS cycleProductionQty,
+            0 AS conventionProductionQty,
+            0 AS postponeProductionQty,
+            0 AS trialProductionQty,
+            0 AS differenceQty,
+            0 AS adjustQty1,
+            0 AS adjustQty2,
+            0 AS adjustQty3,
+            0 AS adjustQty4,
+            f5.REASON AS reason,
+            0 AS beginDay,
+            0 AS endDay,
+            calc.OVERDUE_QTY AS lastMonthOverdueQty,
+            CASE WHEN ABS(calc.OVERDUE_QTY)
+                &gt; IFNULL(CAST(IFNULL(fp.PARAM_VALUE, fp.DEFAULE_VALUE) AS SIGNED), 0)
+            THEN '0' ELSE '1' END AS lastMonthValidFlag
+        FROM (
+            -- 第一段：按 (分厂+物料+产品状态+STOCK_CAPTURE_DATE+DAY_1~DAY_31) 聚合计算超欠产
+            -- 超欠产 = 计划量(STOCK_CAPTURE_DATE 到月底累加 DAY_x) - 完成量
+            SELECT
+                f5.FACTORY_CODE,
+                f5.MATERIAL_CODE,
+                f5.PRODUCT_STATUS,
+                (
+                    IFNULL(CASE WHEN DAYOFMONTH(IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})) &lt;= 1 THEN f5.DAY_1 ELSE 0 END, 0) +
+        IFNULL(CASE WHEN DAYOFMONTH(IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})) &lt;= 2 THEN f5.DAY_2 ELSE 0 END, 0) +
+        IFNULL(CASE WHEN DAYOFMONTH(IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})) &lt;= 3 THEN f5.DAY_3 ELSE 0 END, 0) +
+        IFNULL(CASE WHEN DAYOFMONTH(IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})) &lt;= 4 THEN f5.DAY_4 ELSE 0 END, 0) +
+        IFNULL(CASE WHEN DAYOFMONTH(IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})) &lt;= 5 THEN f5.DAY_5 ELSE 0 END, 0) +
+        IFNULL(CASE WHEN DAYOFMONTH(IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})) &lt;= 6 THEN f5.DAY_6 ELSE 0 END, 0) +
+        IFNULL(CASE WHEN DAYOFMONTH(IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})) &lt;= 7 THEN f5.DAY_7 ELSE 0 END, 0) +
+        IFNULL(CASE WHEN DAYOFMONTH(IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})) &lt;= 8 THEN f5.DAY_8 ELSE 0 END, 0) +
+        IFNULL(CASE WHEN DAYOFMONTH(IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})) &lt;= 9 THEN f5.DAY_9 ELSE 0 END, 0) +
+        IFNULL(CASE WHEN DAYOFMONTH(IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})) &lt;= 10 THEN f5.DAY_10 ELSE 0 END, 0) +
+        IFNULL(CASE WHEN DAYOFMONTH(IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})) &lt;= 11 THEN f5.DAY_11 ELSE 0 END, 0) +
+        IFNULL(CASE WHEN DAYOFMONTH(IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})) &lt;= 12 THEN f5.DAY_12 ELSE 0 END, 0) +
+        IFNULL(CASE WHEN DAYOFMONTH(IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})) &lt;= 13 THEN f5.DAY_13 ELSE 0 END, 0) +
+        IFNULL(CASE WHEN DAYOFMONTH(IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})) &lt;= 14 THEN f5.DAY_14 ELSE 0 END, 0) +
+        IFNULL(CASE WHEN DAYOFMONTH(IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})) &lt;= 15 THEN f5.DAY_15 ELSE 0 END, 0) +
+        IFNULL(CASE WHEN DAYOFMONTH(IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})) &lt;= 16 THEN f5.DAY_16 ELSE 0 END, 0) +
+        IFNULL(CASE WHEN DAYOFMONTH(IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})) &lt;= 17 THEN f5.DAY_17 ELSE 0 END, 0) +
+        IFNULL(CASE WHEN DAYOFMONTH(IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})) &lt;= 18 THEN f5.DAY_18 ELSE 0 END, 0) +
+        IFNULL(CASE WHEN DAYOFMONTH(IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})) &lt;= 19 THEN f5.DAY_19 ELSE 0 END, 0) +
+        IFNULL(CASE WHEN DAYOFMONTH(IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})) &lt;= 20 THEN f5.DAY_20 ELSE 0 END, 0) +
+        IFNULL(CASE WHEN DAYOFMONTH(IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})) &lt;= 21 THEN f5.DAY_21 ELSE 0 END, 0) +
+        IFNULL(CASE WHEN DAYOFMONTH(IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})) &lt;= 22 THEN f5.DAY_22 ELSE 0 END, 0) +
+        IFNULL(CASE WHEN DAYOFMONTH(IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})) &lt;= 23 THEN f5.DAY_23 ELSE 0 END, 0) +
+        IFNULL(CASE WHEN DAYOFMONTH(IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})) &lt;= 24 THEN f5.DAY_24 ELSE 0 END, 0) +
+        IFNULL(CASE WHEN DAYOFMONTH(IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})) &lt;= 25 THEN f5.DAY_25 ELSE 0 END, 0) +
+        IFNULL(CASE WHEN DAYOFMONTH(IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})) &lt;= 26 THEN f5.DAY_26 ELSE 0 END, 0) +
+        IFNULL(CASE WHEN DAYOFMONTH(IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})) &lt;= 27 THEN f5.DAY_27 ELSE 0 END, 0) +
+        IFNULL(CASE WHEN DAYOFMONTH(IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})) &lt;= 28 THEN f5.DAY_28 ELSE 0 END, 0) +
+        IFNULL(CASE WHEN DAYOFMONTH(IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})) &lt;= 29 THEN f5.DAY_29 ELSE 0 END, 0) +
+        IFNULL(CASE WHEN DAYOFMONTH(IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})) &lt;= 30 THEN f5.DAY_30 ELSE 0 END, 0) +
+        IFNULL(CASE WHEN DAYOFMONTH(IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})) &lt;= 31 THEN f5.DAY_31 ELSE 0 END, 0)
+        ) - IFNULL(SUM(fin.DAY_QTY), 0) AS OVERDUE_QTY
+        FROM T_MP_MONTH_PLAN_PROD_FINAL f5
+        LEFT JOIN T_MDM_MONTH_SURPLUS surplus
+        ON surplus.FACTORY_CODE = f5.FACTORY_CODE
+        AND surplus.MATERIAL_CODE = f5.MATERIAL_CODE
+        AND surplus.YEAR = f5.YEAR
+        AND surplus.MONTH = f5.MONTH
+        AND surplus.REQUIRE_VERSION = f5.MONTH_PLAN_VERSION
+        AND surplus.IS_DELETE = 0
+        LEFT JOIN (
+        SELECT
+        FACTORY_CODE,
+        MATERIAL_CODE,
+        FINISH_DATE,
+        IFNULL(SUM(DAY_FINISH_QTY), 0) AS DAY_QTY
+        FROM T_LH_DAY_FINISH_QTY
+        WHERE IS_DELETE = 0
+        AND FINISH_DATE BETWEEN #{startDate} AND #{endDate}
+        GROUP BY FACTORY_CODE, MATERIAL_CODE, FINISH_DATE
+        ) fin ON fin.FACTORY_CODE = f5.FACTORY_CODE
+        AND fin.MATERIAL_CODE = f5.MATERIAL_CODE
+        AND fin.FINISH_DATE &gt;= IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})
+        AND fin.FINISH_DATE &lt;= #{endDate}
+        WHERE f5.IS_DELETE = 0
+        AND f5.YEAR = #{lastYear}
+        AND f5.MONTH = #{lastMonth}
+        GROUP BY f5.FACTORY_CODE, f5.MATERIAL_CODE, f5.PRODUCT_STATUS, surplus.STOCK_CAPTURE_DATE,
+        f5.DAY_1, f5.DAY_2, f5.DAY_3, f5.DAY_4, f5.DAY_5, f5.DAY_6, f5.DAY_7, f5.DAY_8,
+        f5.DAY_9, f5.DAY_10, f5.DAY_11, f5.DAY_12, f5.DAY_13, f5.DAY_14, f5.DAY_15, f5.DAY_16,
+        f5.DAY_17, f5.DAY_18, f5.DAY_19, f5.DAY_20, f5.DAY_21, f5.DAY_22, f5.DAY_23, f5.DAY_24,
+        f5.DAY_25, f5.DAY_26, f5.DAY_27, f5.DAY_28, f5.DAY_29, f5.DAY_30, f5.DAY_31
+        ) calc
+        -- 第二段：关联上月定稿表取完整业务字段（按唯一键关联，无笛卡尔积）
+        INNER JOIN T_MP_MONTH_PLAN_PROD_FINAL f5
+        ON f5.FACTORY_CODE = calc.FACTORY_CODE
+        AND f5.MATERIAL_CODE = calc.MATERIAL_CODE
+        AND IFNULL(f5.PRODUCT_STATUS, '') = IFNULL(calc.PRODUCT_STATUS, '')
+        AND f5.YEAR = #{lastYear}
+        AND f5.MONTH = #{lastMonth}
+        AND f5.IS_DELETE = 0
+        -- 第三段：从排产版本表取当月定稿版本号（IS_FINAL='1'），可能有多个定稿版本，取任意一条
+        INNER JOIN (
+        SELECT
+        FACTORY_CODE,
+        ANY_VALUE(MONTH_PLAN_VERSION) AS MONTH_PLAN_VERSION,
+        ANY_VALUE(PRODUCTION_VERSION) AS PRODUCTION_VERSION
+        FROM T_MP_PROC_VERSION
+        WHERE IS_DELETE = 0
+        AND IS_FINAL = '1'
+        AND YEAR = #{currentYear}
+        AND MONTH = #{currentMonth}
+        GROUP BY FACTORY_CODE
+        ) procVer ON procVer.FACTORY_CODE = calc.FACTORY_CODE
+        -- 阈值参数
+        LEFT JOIN T_MP_FACTORY_PARAM fp ON fp.FACTORY_CODE = calc.FACTORY_CODE
+        AND fp.PRODUCT_TYPE_CODE = f5.PRODUCT_TYPE_CODE
+        AND fp.PARAM_CODE = #{overdueThresholdParamCode}
+        AND fp.IS_DELETE = 0
+        -- 防重：当月定稿表按相同维度已存在的不插入
+        LEFT JOIN T_MP_MONTH_PLAN_PROD_FINAL exist
+        ON exist.FACTORY_CODE = calc.FACTORY_CODE
+        AND exist.MATERIAL_CODE = calc.MATERIAL_CODE
+        AND IFNULL(exist.PRODUCT_STATUS, '') = IFNULL(calc.PRODUCT_STATUS, '')
+        AND exist.YEAR = #{currentYear}
+        AND exist.MONTH = #{currentMonth}
+        AND exist.IS_DELETE = 0
+        WHERE exist.ID IS NULL
+        AND calc.OVERDUE_QTY IS NOT NULL
+        AND calc.OVERDUE_QTY &lt;&gt; 0
+    </select>
+
+    <!-- 查询当月定稿表 PRODUCTION_NO 工单号最大值（用于 Java 层递增生成新工单号）
+         工单号格式：MP + yyMMdd + 2位批次号 + 5位序列号 = 15位，如 MP2607020100257
+         按 (分厂+年+月) 维度取最大值；返回最大工单号字符串，Java 层解析数字部分 +1 递增
+    -->
+    <select id="selectMaxProductionNo" parameterType="map" resultType="java.lang.String">
+        SELECT MAX(PRODUCTION_NO)
+        FROM T_MP_MONTH_PLAN_PROD_FINAL
+        WHERE IS_DELETE = 0
+                  AND YEAR = #{currentYear}
+                  AND MONTH = #{currentMonth}
+          AND FACTORY_CODE = #{factoryCode}
+          AND PRODUCTION_NO IS NOT NULL
+          AND PRODUCTION_NO != ''
+    </select>
 </mapper>

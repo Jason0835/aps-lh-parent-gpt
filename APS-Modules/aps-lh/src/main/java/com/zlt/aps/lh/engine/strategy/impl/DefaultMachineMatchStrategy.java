@@ -56,7 +56,7 @@ import java.util.stream.Collectors;
  *   <li>为新增排产、局部搜索和目标量评估提供候选硫化机台；</li>
  *   <li>先执行硬性过滤：定点不可作业、机台状态、寸口、特殊材料能力、模具占用和停机窗口；</li>
  *   <li>再执行单控/普通机台类型约束，区分试制、量试、小批量和正规 SKU；</li>
- *   <li>最后先锁定最早收尾后20分钟窗口，再按单控拆分/胎胚/规格/模壳/胶囊/英寸/机台编码排序。</li>
+ *   <li>最后先锁定最早收尾后20分钟窗口，再按单控拆分/胎胚/模壳/规格/胶囊/英寸/机台编码排序。</li>
  * </ul>
  *
  * <p>注意：该策略不直接分配班次排量，只返回候选和排序；真正的换模、首检和产能落地在新增策略中执行。</p>
@@ -159,7 +159,7 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
         // 该规则只处理候选集合，不在此消费机台；最终是否占用仍由 S4.5 换模、首检和产能结果决定。
         candidates = applySingleControlReservationRule(context, sku, candidates, trace);
 
-        // 5. 先筛最早收尾20分钟窗口，再按单控、胎胚、规格、模壳、胶囊、英寸和机台编码排序。
+        // 5. 先筛最早收尾20分钟窗口，再按单控、胎胚、模壳、规格、胶囊、英寸和机台编码排序。
         EndingWindowContext endingWindowContext = sortCandidates(context, candidates, sku);
         traceMachineCandidates(context, sku, specialMaterialMatchResult, candidates, trace, endingWindowContext);
 
@@ -278,12 +278,8 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
             retainedCandidates.addAll(normalCandidates);
             return retainedCandidates;
         }
-        if (context != null && context.getPendingSmallBatchNewSpecSkuCount() > 0) {
-            // 待排小批量SKU未完成前，正规SKU仍保留单控候选，但单控只能作为普通机台后的回落。
-            return retainNormalThenSingleCandidates(singleControlCandidates, normalCandidates);
-        }
         if (!CollectionUtils.isEmpty(normalCandidates)) {
-            // 小批量已全部排完后，正规SKU优先普通机台，但仍可保留单控候选作为回落机台。
+            // 正规SKU优先普通机台，但仍可保留单控候选作为普通机台不足时的回落机台。
             // 单控放在普通机台之后，避免正规 SKU 抢占后续特殊 SKU 可能需要的单控资源。
             return retainNormalThenSingleCandidates(singleControlCandidates, normalCandidates);
         }
@@ -358,16 +354,13 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
             return "小批量SKU优先使用单控机台，单控候选不足时允许普通机台";
         }
         if (isFormalSku(sku) && singleControlMachine) {
-            if (context != null && context.getPendingSmallBatchNewSpecSkuCount() > 0) {
-                return "待排小批量SKU未完成，正规SKU单控候选降为普通机台后的回落候选";
-            }
             return "正规SKU优先使用普通机台";
         }
         return "SKU类型机台约束";
     }
 
     /**
-     * 输出单控机台候选诊断日志，便于排查小批量/正规SKU单控回落链路。
+     * 输出单控机台候选诊断日志，便于排查不同类型SKU的单控/普通机台回落链路。
      *
      * @param context 排程上下文
      * @param sku SKU
@@ -977,12 +970,13 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
                 return compareResult;
             }
 
-            compareResult = compareSpecExactMatch(sku, left, right);
+            // 同模壳优先级高于同规格，避免同一窗口内规格命中机台抢占更匹配模壳能力的机台。
+            compareResult = compareMouldShellMatch(context, sku, left, right);
             if (compareResult != 0) {
                 return compareResult;
             }
 
-            compareResult = compareMouldShellMatch(context, sku, left, right);
+            compareResult = compareSpecExactMatch(sku, left, right);
             if (compareResult != 0) {
                 return compareResult;
             }
@@ -2032,7 +2026,7 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
         int topCount = Math.min(topN, PriorityTraceLogHelper.sizeOf(candidates));
         PriorityTraceLogHelper.appendLine(detailBuilder, "TOP" + topCount + "候选排序:");
         List<String> levelNames = java.util.Arrays.asList(
-                "L1_单控拆分", "L2_同胎胚", "L3_同规格", "L4_同模壳",
+                "L1_单控拆分", "L2_同胎胚", "L3_同模壳", "L4_同规格",
                 "L5_胶囊共用", "L6_同英寸", "L7_相近英寸", "L8_机台编码");
         for (int i = 0; i < topCount; i++) {
             MachineScheduleDTO machine = candidates.get(i);
@@ -2062,8 +2056,8 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
             List<String> sortKeyLevels = java.util.Arrays.asList(
                     "L1_单控拆分=" + singleCtrlScore,
                     "L2_同胎胚=" + embryoMatchScore,
-                    "L3_同规格=" + specMatchScore,
-                    "L4_同模壳=" + mouldShellMatchScore,
+                    "L3_同模壳=" + mouldShellMatchScore,
+                    "L4_同规格=" + specMatchScore,
                     "L5_胶囊共用=" + capsuleScore,
                     "L6_同英寸=" + proSizeMatchScore,
                     "L7_相近英寸=" + formatInchDistance(inchDistance),
@@ -2071,8 +2065,8 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
             List<Integer> scores = java.util.Arrays.asList(
                     singleCtrlScore,
                     embryoMatchScore,
-                    specMatchScore,
                     mouldShellMatchScore,
+                    specMatchScore,
                     capsuleScore,
                     proSizeMatchScore,
                     safeInchDistanceScore(inchDistance),
@@ -2367,11 +2361,11 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
         if (resolveEmbryoMatchScore(context, sku, machine) == 0) {
             reasons.add("同胎胚");
         }
-        if (resolveSpecMatchScore(sku, machine) == 0) {
-            reasons.add("同规格");
-        }
         if (resolveMouldShellMatchScore(context, sku, machine) == 0) {
             reasons.add("同模壳");
+        }
+        if (resolveSpecMatchScore(sku, machine) == 0) {
+            reasons.add("同规格");
         }
         if (resolveCapsuleAffinityScore(context, sku, machine) == 0) {
             reasons.add("胶囊共用");

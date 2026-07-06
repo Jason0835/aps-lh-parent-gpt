@@ -149,6 +149,12 @@ export default {
           },
         },
         {
+          prop: "shiftHours",
+          halign: "center",
+          label: this.$t("ui.data.column.tm.shiftConfig.shiftHours"),
+          width: 120,
+        },
+        {
           prop: "crossDayFlag",
           halign: "center",
           label: this.$t("ui.data.column.tm.shiftConfig.crossDayFlag"),

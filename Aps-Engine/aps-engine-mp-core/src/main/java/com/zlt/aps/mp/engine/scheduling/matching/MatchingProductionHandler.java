@@ -14,6 +14,7 @@ import com.zlt.aps.mp.api.domain.capacity.MpDailyCapacityLimitVo;
 import com.zlt.aps.mp.api.domain.entity.*;
 import com.zlt.aps.mp.api.domain.vo.MpDayProductionStatisticsDetailVo;
 import com.zlt.aps.mp.engine.basedata.assemble.cyclegroup.CycleGroupDataHandler;
+import com.zlt.aps.mp.engine.basedata.assemble.datalist.GroupListHandler;
 import com.zlt.aps.mp.engine.basedata.assemble.history.ProductionHistoryHandler;
 import com.zlt.aps.mp.engine.capacity.MpMonthPlanDailyCapacityLimit;
 import com.zlt.aps.mp.engine.check.SkuSecondChecker;
@@ -72,12 +73,13 @@ import static com.zlt.aps.common.core.utils.ApsNumberUtils.*;
 @Component
 public class MatchingProductionHandler extends AbstractDataLoaderService {
 
-    public MatchingProductionHandler(ProductionMdmDataService dataService,
+    public MatchingProductionHandler(GroupListHandler groupListHandler,
+                                     ProductionMdmDataService dataService,
                                      DpRequireDataService dpRequireDataService,
                                      CycleGroupDataHandler cycleGroupDataHandler,
                                      ProductionHistoryHandler productionHistoryHandler,
                                      MonthProductionDataService monthProductionDataService) {
-        super(dataService, dpRequireDataService, cycleGroupDataHandler, productionHistoryHandler, monthProductionDataService);
+        super(groupListHandler, dataService, dpRequireDataService, cycleGroupDataHandler, productionHistoryHandler, monthProductionDataService);
     }
 
     @Autowired
@@ -146,7 +148,9 @@ public class MatchingProductionHandler extends AbstractDataLoaderService {
         }
         // 构建上下文等各项参数
         TbrProductionContext productionContext = this.initProductionContext(planList); // 初始化上下文
-        List<MonthPlanProductionRequirePlanVo> requirePlanList = this.selectRequirePlan(productionContext, detailLogList); // 查询需求计划
+        // 查询需求计划
+        List<MonthPlanProductionRequirePlanVo> requirePlanList = getRequirePlanByInit(productionContext, detailLogList);
+//                this.selectRequirePlan(productionContext, detailLogList);
         this.buildProductionContext(productionContext, planList, detailLogList, requirePlanList); // 填充上下文各项必要数据
 
         Map<String, ProductionPlanGroupInfo> estimateGroupCxAllocationMap = calculateStructureCxMachineNumber.calculateStructureCxMachineNumber(productionContext, requirePlanList, false); // 分配成型产能
@@ -266,6 +270,10 @@ public class MatchingProductionHandler extends AbstractDataLoaderService {
             }
             // 统计那些SKU已排产
             productionPlanList.forEach(plan -> {
+                //20260705+ 剔除本身不排产计划
+                if (YesOrNoEnum.NO.getCode().equals(plan.getIsProduction())) {
+                    return;
+                }
                 // 计算剩余可搭配量，实单取实际需求量 - 已生产量；非实单取储备量
                 Integer remainMatchingQty = isActualOrder ? plan.getFactProdReqQty() - plan.getProducedQty()
                         : plan.getConventionReserveQty();
@@ -2421,6 +2429,40 @@ public class MatchingProductionHandler extends AbstractDataLoaderService {
             requirePlan.resetProductionDataInfo(false);
             requirePlanList.add(requirePlan);
         }
+        return requirePlanList;
+    }
+
+    /**
+     * 从排产初始化中获取排产计划信息
+     *
+     * @param productionContext
+     * @param detailLogList
+     * @return
+     */
+    private List<MonthPlanProductionRequirePlanVo> getRequirePlanByInit(TbrProductionContext productionContext,
+                                                                        List<FactoryMonthPlanMouldDayDetail> detailLogList) {
+        //20260630+ 获取排产计划信息-从初始化结果中获取
+        List<MonthPlanProductionRequirePlanVo> requirePlanList = getMonthProductionDataService().getFactoryMonthPlanManufacturing(productionContext);
+        if (CollectionUtils.isEmpty(requirePlanList)) {
+            return Collections.emptyList();
+        }
+        Map<Long, List<FactoryMonthPlanMouldDayDetail>> detailLogMap = detailLogList.stream()
+                .filter(d -> d.getMonthPlanId() != null)
+                .collect(Collectors.groupingBy(FactoryMonthPlanMouldDayDetail::getMonthPlanId));
+        requirePlanList.forEach(singlePlan -> {
+            List<FactoryMonthPlanMouldDayDetail> detailLogs = detailLogMap.get(singlePlan.getMonthPlanId());
+            int productionQty = BigDecimal.ZERO.intValue();
+            if (!CollectionUtils.isEmpty(detailLogs)) {
+                productionQty = detailLogs.stream().filter(d -> d.getTotalQty() != null)
+                        .mapToInt(FactoryMonthPlanMouldDayDetail::getTotalQty).sum();
+            }
+            singlePlan.setOriginProductionQty(singlePlan.getFactProdReqQty());
+            singlePlan.setOriginHeightProductionQty(singlePlan.getHeightLossQty());
+            //还需排产量置为零
+            singlePlan.setProductionQty(BigDecimal.ZERO.intValue());
+            singlePlan.setProducedQty(productionQty);
+            singlePlan.resetProductionDataInfo(false);
+        });
         return requirePlanList;
     }
 

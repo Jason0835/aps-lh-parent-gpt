@@ -186,26 +186,23 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
             return recordList;
         }
         
-        // 计算上个月的天数
-        // 加载上个月的定稿记录
+        // 1.3.1、计算上个月的天数
         Calendar lastMonthCalendar = Calendar.getInstance();
         lastMonthCalendar.set(params.getYear(), params.getMonth() - 1, 1); // 通过日历获取上本月一号的日历
         lastMonthCalendar.add(Calendar.DAY_OF_MONTH, -1); // 切换到上个月最后一天
-        Integer lastDayOfMonth = lastMonthCalendar.getActualMaximum(Calendar.DAY_OF_MONTH);
-        
-        // 1.3.1、填充上个月的定稿记录信息，同时获取上个月的最后一天日期
+        Integer lastDayOfMonth = lastMonthCalendar.getActualMaximum(Calendar.DAY_OF_MONTH); // 上个月最后一天的日期
+        // 1.3.2、填充上个月的定稿记录信息，同时获取上个月的定稿版本
         String lastProductionVersion = this.fillLastFinalResultList(params, recordList, lastMonthCalendar);
-        // 1.3.2、加载本次版本已生成的统计记录
+        // 1.3.3、加载本次版本已生成的统计记录
         String productionVersion = params.getProductionVersion();
         Map<String, MpMonthPlanStatistics> statisticsMap = this.loadMpMonthPlanStatistics(params, productionVersion, isFinal);
         // 1.4、加载上个月的统计记录，固定取定稿版本
         Map<String, MpMonthPlanStatistics> lastStatisticsMap = this.loadMpMonthPlanStatistics(params, lastProductionVersion, true);
         // 1.5、加载结构排产数据
         Map<String, MpStructureAllocation> structureAllocationMap = this.loadStructureAllocationMap(params);
-        // 1.6、加载型腔数活块数 - 型腔可用量（按结构+主花纹分组）
-        Map<String, Integer> cavityResults = new HashMap<>(0);
-        // 活块可用量（按物料描述分组）
-        Map<String, Integer> insertResults = new HashMap<>(0);
+        // 1.6、加载型腔数活块数
+        Map<String, Integer> cavityResults = new HashMap<>(0); // 型腔可用量（按结构+主花纹分组）
+        Map<String, Integer> insertResults = new HashMap<>(0); // 活块可用量（按物料描述分组）
         List<DailyMouldAvailabilityResult> moldResult = moldCavityInsertMaxValueCalculator
                 .moldCavityInsertMaxValueCalculator(params.getYear(), params.getMonth(), params.getFactoryCode(),
                         null, null, true);
@@ -213,9 +210,9 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
             cavityResults = moldResult.get(0).getCavityResults();
             insertResults = moldResult.get(0).getInsertResults();
         }
-        // 1.7、加载本月工作日历
+        // 1.8、加载本月工作日历（本月可排产日列表）
         Set<Integer> workDaySet = this.loadWrokCalendar(params);
-        // 1.8、加载结构模具分配比例
+        // 1.9、加载结构模具分配比例
         List<MouldAllocationInfoVo> mouldAllocationInfoList = factoryMonthPlanProductMouldMapper
                 .getMouldAllocationInfo(params.getFactoryCode(), params.getYear(), params.getMonth());
 
@@ -270,10 +267,9 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
                 Integer prodReqPlan;
                 if (isFinal) {
                     // 定稿只看高中
-                    prodReqPlan = intValue(result.getHeightQty()) + intValue(result.getMidQty());
+                    prodReqPlan = safeAdd(result.getHeightQty(), result.getMidQty());
                 } else {
-                    prodReqPlan = intValue(result.getHeightQty()) + intValue(result.getMidQty())
-                            + intValue(result.getCycleReserveQty()) + intValue(result.getConventionReserveQty());
+                    prodReqPlan = safeAdd(result.getHeightQty(), result.getMidQty(), result.getCycleReserveQty(), result.getConventionReserveQty());
                 }
                 Integer differenceQty = prodReqPlan - intValue(result.getTotalQty());
                 result.setDifferenceQty(differenceQty >= 0 ? differenceQty : 0);
@@ -711,7 +707,7 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
             String dayFieldSetterName;
             Integer mapKey;
             if (LAST_FIELD_NAME_FORMAT.equals(preFix)) {
-                // 上个月统计数据：将日序号映射为月末倒数第n天
+                // 上个月统计数据：将日期换算为月末倒数第n天
                 Integer realDay = endDay - day + 1;
                 if (realDay <= 0 || realDay > LAST_MONTH_DAY) {
                     continue;

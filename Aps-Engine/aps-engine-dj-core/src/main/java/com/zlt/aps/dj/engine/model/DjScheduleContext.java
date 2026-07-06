@@ -1,8 +1,10 @@
 package com.zlt.aps.dj.engine.model;
 
+import com.zlt.aps.cx.entity.schedule.CxScheduleResult;
 import com.zlt.aps.dj.api.domain.entity.DjMachineInfo;
 import com.zlt.aps.dj.api.domain.entity.DjMachineMaintenance;
 import com.zlt.aps.dj.api.domain.entity.DjParams;
+import com.zlt.aps.mdm.api.domain.entity.MdmConstructionInfo;
 import com.zlt.aps.mdm.api.domain.entity.MdmWorkCalendar;
 import lombok.Data;
 
@@ -31,9 +33,6 @@ public class DjScheduleContext {
 
     /** 交班库存 Map<paddingCode, inventory> */
     private Map<String, BigDecimal> handoverInventory;
-
-    /** 消耗量 Map<paddingCode, Map<shiftIndex, consumeQty>> */
-    private Map<String, Map<Integer, BigDecimal>> consumeQty;
 
     /** 有效库存 Map<paddingCode, stock> */
     private Map<String, BigDecimal> effectiveStockMap;
@@ -79,4 +78,10 @@ public class DjScheduleContext {
 
     /** 班次索引→classIndex 映射数组（长度6），根据排程首班班次参数动态构建 */
     private String[] shiftClassMap;
+
+    /** 成型计划列表 */
+    private List<CxScheduleResult> cxScheduleList;
+
+    /** 施工数据 Map<constructionCode, MdmConstructionInfo> */
+    private Map<String, MdmConstructionInfo> constructionMap;
 }

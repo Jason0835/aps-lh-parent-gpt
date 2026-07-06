@@ -1,18 +1,17 @@
 package com.zlt.aps.itf.mes.mapper;
 
 import com.baomidou.dynamic.datasource.annotation.DS;
+import com.zlt.aps.cx.api.domain.entity.*;
 import com.zlt.aps.itf.constant.DataSource;
 import com.zlt.aps.itf.vo.*;
-import com.zlt.aps.mp.api.domain.entity.*;
-    import com.zlt.aps.cx.api.domain.entity.CxMachineOnlineInfo;
-import com.zlt.aps.cx.api.domain.entity.CxMesStock;
-import com.zlt.aps.cx.api.domain.entity.CxScheFinishQty;
-import com.zlt.aps.cx.api.domain.entity.CxDayFinishQty;
-import com.zlt.aps.cx.api.domain.entity.CxStock;
-import com.zlt.aps.lh.api.domain.entity.LhMachineOnlineInfo;
-import com.zlt.aps.lh.api.domain.entity.LhScheFinishQty;
 import com.zlt.aps.lh.api.domain.entity.LhDayFinishQty;
+import com.zlt.aps.lh.api.domain.entity.LhMachineOnlineInfo;
 import com.zlt.aps.lh.api.domain.entity.LhMoldAlterPlanFinish;
+import com.zlt.aps.lh.api.domain.entity.LhScheFinishQty;
+import com.zlt.aps.mp.api.domain.entity.*;
+import com.zlt.aps.tm.api.domain.entity.TmDayFinishQty;
+import com.zlt.aps.tm.api.domain.entity.TmMesStock;
+import com.zlt.aps.tm.api.domain.entity.TmScheFinishQty;
 import com.zlt.aps.tq.api.domain.entity.TqDayFinishQty;
 import com.zlt.aps.tq.api.domain.entity.TqMesStock;
 import com.zlt.aps.tq.api.domain.entity.TqScheFinishQty;
@@ -128,6 +127,14 @@ public interface MesItfMapper {
     List<CxMesStock> selectMesCxStockList(AuxReqSyncDataLogs syncDataLogs);
 
     /**
+     * 查询生胎库存同步-6点数据
+     *
+     * @param syncDataLogs 参数
+     * @return 列表
+     */
+    List<CxMesStock> selectMesEmbryoStockSixList(AuxReqSyncDataLogs syncDataLogs);
+
+    /**
      * 查询直裁库存同步数据（MES 中间表 T_MES_CD90_STOCK）
      *
      * @param syncDataLogs 参数（可传 dataVersion 过滤）
@@ -149,7 +156,7 @@ public interface MesItfMapper {
      * @param syncDataLogs 参数
      * @return 列表
      */
-    List<MdmTreadStock> selectTreadStockList(AuxReqSyncDataLogs syncDataLogs);
+    List<TmMesStock> selectTreadStockList(AuxReqSyncDataLogs syncDataLogs);
 
     /**
      * 查询胎圈库存同步数据
@@ -223,6 +230,22 @@ public interface MesItfMapper {
      * @return 列表
      */
     List<TqDayFinishQty> selectTqScheDayFinishQtyList(AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 查询胎面排程完成量同步数据
+     *
+     * @param syncDataLogs 参数
+     * @return 列表
+     */
+    List<TmScheFinishQty> selectTmClassShiftFinishQtyList(AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 查询胎面排程日完成量同步数据
+     *
+     * @param syncDataLogs 参数
+     * @return 列表
+     */
+    List<TmDayFinishQty> selectTmScheDayFinishQtyList(AuxReqSyncDataLogs syncDataLogs);
 
 
 

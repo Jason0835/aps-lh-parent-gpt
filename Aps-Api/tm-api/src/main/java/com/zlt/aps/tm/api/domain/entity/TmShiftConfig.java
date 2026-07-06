@@ -53,6 +53,12 @@ public class TmShiftConfig extends BaseEntity {
     @TableField(value = "PLAN_END_TIME")
     private String planEndTime;
 
+    @Excel(name = "ui.data.column.tm.shiftConfig.shiftHours")
+    @ImportValidated(digits = true, min = 0, max = 24)
+    @ApiModelProperty(value = "班次时长（小时）", name = "shiftHours")
+    @TableField(value = "SHIFT_HOURS")
+    private Integer shiftHours;
+
     @Excel(name = "ui.data.column.tm.shiftConfig.crossDayFlag", dictType = "biz_yes_no")
     @ImportValidated(required = true, dictType = "biz_yes_no", maxLength = 1)
     @ApiModelProperty(value = "是否跨天", name = "crossDayFlag")

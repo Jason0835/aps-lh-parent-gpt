@@ -108,6 +108,7 @@ public class TmScheduleResultController extends AbstractDocBizController<TmSched
     public AjaxResult autoPlan(@RequestBody TmAutoScheduleRequestVo request) {
         return AjaxResult.success(tmScheduleResultService.tmAutoPlan(request));
     }
+
     /**
      * 清除胎面自动排程 Redis 缓存。
      *
@@ -198,13 +199,20 @@ public class TmScheduleResultController extends AbstractDocBizController<TmSched
      * 获取胎面排程班次日期列表
      * 根据排程日期构建6个班次的日期展示列表
      *
-     * @param scheduleDate 排程日期
+     * @param scheduleResult 排程日期
      * @return 班次日期列表
      */
     @ApiOperation("获取胎面排程班次日期列表")
     @PostMapping("/listScheduleShiftDates")
     public List<TmScheduleShiftDateVO> listScheduleShiftDates(@RequestBody TmScheduleResult scheduleResult) {
         return tmScheduleResultService.listScheduleShiftDates(scheduleResult.getScheduleDate());
+    }
+
+    @Log(title = "ui.data.column.tm.scheduleResult.modelName", businessType = BusinessType.UPDATE)
+    @ApiOperation("更改发布状态")
+    @PostMapping("/changeReleaseStatus")
+    public AjaxResult changeReleaseStatus(@RequestParam("ids") String ids, @RequestParam("isRelease") String isRelease) {
+        return toAjax(tmScheduleResultService.changeReleaseStatus(ids, isRelease));
     }
 
     @Log(title = "ui.data.column.tm.scheduleResult.modelName", businessType = BusinessType.IMPORT)

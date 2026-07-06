@@ -62,6 +62,12 @@
           v-hasPermi="['tm:tmScheduleResult:publish']"
           @click="handlePublish"
         >{{ $t("ui.data.column.scheduleResult.publish") }}</el-button>
+        <el-button
+          v-hasRole="['admin']"
+          :disabled="selection.length === 0"
+          type="primary"
+          @click="handleChangeReleaseStatus"
+        >{{ $t("ui.data.column.scheduleResult.changeReleaseStatus") }}</el-button>
       </template>
     </page-table>
     <tlt-upload-form
@@ -76,6 +82,7 @@
     <autoPlanDialog ref="autoPlanRef" @success="handleAutoPlanSuccess" />
     <infoDialog ref="infoRef" @success="getList" />
     <changeMachineDialog ref="changeMachineRef" @success="getList" />
+    <releaseStatusDialog ref="releaseStatusRef" @success="getList" />
   </basic-container>
 </template>
 <script>
@@ -87,6 +94,7 @@ import TltUploadForm from "@/views/components/tltUploadForm.vue";
 import autoPlanDialog from "./components/autoPlanDialog.vue";
 import infoDialog from "./components/infoDialog.vue";
 import changeMachineDialog from "./components/changeMachineDialog.vue";
+import releaseStatusDialog from "./components/releaseStatusDialog.vue";
 
 const formatDate = (date) => {
   const year = date.getFullYear();
@@ -109,6 +117,7 @@ export default {
     infoDialog,
     TltUploadForm,
     changeMachineDialog,
+    releaseStatusDialog,
   },
   dicts: ["biz_factory_name", "biz_yes_no", "IS_RELEASE", "tm_data_source"],
   provide() {
@@ -420,7 +429,7 @@ export default {
         },
         {
           label: this.$t("ui.data.column.tm.scheduleResult.scheduleDate"),
-          prop: "scheduleDateQuery",
+          prop: "scheduleDate",
           type: "date",
           valueFormat: "yyyy-MM-dd",
           listeners: {
@@ -463,13 +472,13 @@ export default {
       return shiftName + " " + (item.shiftDate || "");
     },
     handleScheduleDateChange(val) {
-      this.query.scheduleDateQuery = val;
+      this.query.scheduleDate = val;
       this.getDate();
     },
     async getDate() {
       try {
         let res = await listScheduleShiftDates({
-          scheduleDateQuery: this.query.scheduleDateQuery || this.search.scheduleDateQuery,
+          scheduleDate: this.query.scheduleDate || this.search.scheduleDate,
         });
         if (res && res.length > 0) {
           this.dateList = res;
@@ -488,17 +497,17 @@ export default {
       if (this.$refs.autoPlanRef) {
         this.$refs.autoPlanRef.show(
           this.query.factoryCode || this.search.factoryCode,
-          this.query.scheduleDateQuery || this.search.scheduleDateQuery
+          this.query.scheduleDate || this.search.scheduleDate
         );
       }
     },
     // 自动排程成功后同步查询日期并刷新列表。
     handleAutoPlanSuccess(scheduleDate) {
       if (scheduleDate) {
-        this.$set(this.query, "scheduleDateQuery", scheduleDate);
+        this.$set(this.query, "scheduleDate", scheduleDate);
         this.search = {
           ...this.search,
-          scheduleDateQuery: scheduleDate
+          scheduleDate: scheduleDate
         };
       }
       this.getList();
@@ -508,6 +517,12 @@ export default {
       if (this.$refs.changeMachineRef) {
         let row = this.selection;
         this.$refs.changeMachineRef.show(row);
+      }
+    },
+    // 更改发布状态弹窗
+    handleChangeReleaseStatus() {
+      if (this.$refs.releaseStatusRef) {
+        this.$refs.releaseStatusRef.show(this.selection);
       }
     },
     // 调量入口：复用编辑弹窗，由弹窗根据编辑状态调用调量接口。
@@ -640,11 +655,11 @@ export default {
     };
     this.search = {
       ...defaultParams,
-      scheduleDateQuery: getOffsetDate(2),
+      scheduleDate: getOffsetDate(2),
     };
     this.query = {
       ...defaultParams,
-      scheduleDateQuery: getOffsetDate(2),
+      scheduleDate: getOffsetDate(2),
     };
     this.getList();
   },

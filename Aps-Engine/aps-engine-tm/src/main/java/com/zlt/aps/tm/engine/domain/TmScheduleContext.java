@@ -66,6 +66,15 @@ public class TmScheduleContext {
     /** 工厂可用机台候选列表，由数据加载层填充，供机台分配步骤过滤评分使用 */
     private List<TmMachineCandidate> machineCandidateList = new ArrayList<>();
 
+    /** 损耗率规则列表，由数据加载层填充，供机台分配步骤解析最终损耗率 */
+    private List<TmLossRule> lossRuleList = new ArrayList<>();
+
+    /** 计划量阶段计算出的首个任务工装池初始可用数量 */
+    private BigDecimal initialAvailableToolQty;
+
+    /** 机台分配阶段正在滚动使用的全局可用工装数量 */
+    private BigDecimal currentAvailableToolQty;
+
     /** 小胶种编码集合，来源于本次参数快照 */
     private Set<String> smallGlueCodeSet = new HashSet<>();
 
@@ -76,6 +85,12 @@ public class TmScheduleContext {
 
     /** 单任务候选机台过滤和评分快照，key=任务业务键 */
     private Map<String, List<TmMachineCandidate>> candidateTraceMap = new HashMap<>();
+
+    /** 班次小时数映射，key=班次顺序(1~6)，来自 T_TM_SHIFT_CONFIG */
+    private Map<Integer, BigDecimal> shiftHoursMap = new HashMap<>();
+
+    /** 班次时间窗口映射，key=班次顺序(1~6)，来自 T_TM_SHIFT_CONFIG */
+    private Map<Integer, TmShiftTimeWindow> shiftTimeWindowMap = new HashMap<>();
 
     /**
      * 按参数编码读取本次排程参数快照。
@@ -189,5 +204,17 @@ public class TmScheduleContext {
 
     public void setCandidateTraceMap(Map<String, List<TmMachineCandidate>> candidateTraceMap) {
         this.candidateTraceMap = candidateTraceMap == null ? new HashMap<>() : candidateTraceMap;
+    }
+
+    public void setShiftHoursMap(Map<Integer, BigDecimal> shiftHoursMap) {
+        this.shiftHoursMap = shiftHoursMap == null ? new HashMap<>() : shiftHoursMap;
+    }
+
+    public void setShiftTimeWindowMap(Map<Integer, TmShiftTimeWindow> shiftTimeWindowMap) {
+        this.shiftTimeWindowMap = shiftTimeWindowMap == null ? new HashMap<>() : shiftTimeWindowMap;
+    }
+
+    public void setLossRuleList(List<TmLossRule> lossRuleList) {
+        this.lossRuleList = lossRuleList == null ? new ArrayList<>() : lossRuleList;
     }
 }

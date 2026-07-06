@@ -1,9 +1,11 @@
 package com.zlt.aps.tm.engine.service.impl;
 
 import cn.hutool.core.collection.CollUtil;
+import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONArray;
 import cn.hutool.json.JSONObject;
 import cn.hutool.json.JSONUtil;
+import com.zlt.aps.tm.api.enums.TmScheduleTaskStatusEnum;
 import com.zlt.aps.tm.engine.domain.*;
 import org.springframework.stereotype.Service;
 
@@ -32,12 +34,50 @@ public class TmSnapshotBuildService {
             result.setRuleHitJson(buildRuleHitJson(context.getRuleTraceMap().get(task.getBusinessKey())));
             List<TmMachineCandidate> candidates = context.getCandidateTraceMap().get(task.getBusinessKey());
             result.setCandidateMachineJson(buildCandidateMachineJson(candidates));
+            String assignStatus = resolveAssignStatus(task);
             result.setSelectedMachineScore(resolveSelectedMachineScore(task, candidates));
-            result.setMachineSelectReason(buildMachineSelectReason(task, result.getSelectedMachineScore()));
-            result.setAssignStatus(task.isUnassigned() ? "UNPLANNED" : "PLANNED");
+            result.setMachineSelectReason(buildMachineSelectReason(task, result.getSelectedMachineScore(), assignStatus));
+            result.setAssignStatus(assignStatus);
         }
         result.setSysAnalysis(task == null ? "任务为空" : "已生成任务规则、候选机台和选机解释");
         return result;
+    }
+
+    /**
+     * 解析解释表分配状态。
+     *
+     * @param task 任务草稿
+     * @return 分配状态编码
+     */
+    private String resolveAssignStatus(TmTaskDraft task) {
+        if (task == null || isUnplannedTask(task)) {
+            return "UNPLANNED";
+        }
+        if (isNoProductionNeeded(task)) {
+            return TmScheduleTaskStatusEnum.NO_PRODUCTION_NEEDED.getCode();
+        }
+        return TmScheduleTaskStatusEnum.PLANNED.getCode();
+    }
+
+    /**
+     * 判断任务是否属于未排任务。
+     *
+     * @param task 任务草稿
+     * @return true 表示任务需要进入未排语义
+     */
+    private boolean isUnplannedTask(TmTaskDraft task) {
+        return task != null && (task.isUnassigned() || StrUtil.isNotBlank(task.getUnplannedReasonCode()));
+    }
+
+    /**
+     * 判断任务是否无需生产。
+     *
+     * @param task 任务草稿
+     * @return true 表示最终计划量为空或小于等于 0，且不是未排任务
+     */
+    private boolean isNoProductionNeeded(TmTaskDraft task) {
+        return task != null && !isUnplannedTask(task)
+                && (task.getPlanQty() == null || task.getPlanQty().compareTo(BigDecimal.ZERO) <= 0);
     }
 
     /**
@@ -45,10 +85,10 @@ public class TmSnapshotBuildService {
      *
      * @param task       任务草稿
      * @param candidates 候选机台列表
-     * @return 选中机台评分；未排时返回 null
+     * @return 选中机台评分；未排或无需生产时返回 null
      */
     private BigDecimal resolveSelectedMachineScore(TmTaskDraft task, List<TmMachineCandidate> candidates) {
-        if (task == null || task.isUnassigned() || CollUtil.isEmpty(candidates)) {
+        if (task == null || isUnplannedTask(task) || isNoProductionNeeded(task) || CollUtil.isEmpty(candidates)) {
             return null;
         }
         for (TmMachineCandidate candidate : candidates) {
@@ -64,15 +104,19 @@ public class TmSnapshotBuildService {
      *
      * @param task                 任务草稿
      * @param selectedMachineScore 选中机台评分
+     * @param assignStatus         分配状态编码
      * @return 选机说明
      */
-    private String buildMachineSelectReason(TmTaskDraft task, BigDecimal selectedMachineScore) {
+    private String buildMachineSelectReason(TmTaskDraft task, BigDecimal selectedMachineScore, String assignStatus) {
         if (task == null) {
             return "任务为空，无法选机";
         }
-        if (task.isUnassigned()) {
+        if (isUnplannedTask(task)) {
             String reason = task.getUnplannedReasonDesc() == null ? task.getUnplannedReasonCode() : task.getUnplannedReasonDesc();
             return "未选中机台：" + reason;
+        }
+        if (TmScheduleTaskStatusEnum.NO_PRODUCTION_NEEDED.getCode().equals(assignStatus)) {
+            return "无需排产：最终计划量为0，保留任务解释但不占用机台产能";
         }
         return "选中机台 " + task.getMachineCode() + "，评分=" + selectedMachineScore + "，按默认过滤和评分规则选择";
     }

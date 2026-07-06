@@ -47,7 +47,7 @@
             <groupId>com.zlt</groupId>
             <artifactId>zlt-rabbitMQ</artifactId>
         </dependency>
-        
+
         <dependency>
             <groupId>com.zlt.aps</groupId>
             <artifactId>aps-maindata</artifactId>
@@ -72,6 +72,12 @@
         </dependency>
 
         <dependency>
+            <groupId>com.zlt.aps.tm</groupId>
+            <artifactId>aps-tm-api</artifactId>
+            <version>1.0.3-SNAPSHOT</version>
+        </dependency>
+
+        <dependency>
             <groupId>com.zlt.aps.cd90</groupId>
             <artifactId>aps-cd90-api</artifactId>
             <version>1.0.3-SNAPSHOT</version>
@@ -81,7 +87,7 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
         </dependency>
-        
+
         <!-- log4j-slf4j-impl cannot be present with log4j-to-slf4j 报错 -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

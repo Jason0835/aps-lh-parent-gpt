@@ -5,10 +5,7 @@ import com.zlt.aps.tm.engine.domain.TmTaskDraft;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * 胎面默认待排任务排序策略。
@@ -48,7 +45,7 @@ public class TmDefaultTaskSortStrategy implements ITmTaskSortStrategy {
     @Override
     public Comparator<TmTaskDraft> buildComparator(TmScheduleContext context) {
         Map<String, BigDecimal> glueGroupEarliestSupplyMap = buildGlueGroupEarliestSupplyMap(context);
-        Map<String, Integer> baseGlueCountMap = buildBaseGlueCountMap(context);
+        Map<TmTaskDraft, Integer> baseGlueSimilarityMap = buildBaseGlueSimilarityMap(context);
         return Comparator
                 // 1. 可供成型班次分组：按班次从早到晚排序
                 .comparing(TmTaskDraft::getShiftOrder, Comparator.nullsLast(Comparator.naturalOrder()))
@@ -58,7 +55,7 @@ public class TmDefaultTaskSortStrategy implements ITmTaskSortStrategy {
                 .thenComparing(TmTaskDraft::getGlueCode,
                         Comparator.nullsLast(Comparator.naturalOrder()))
                 // 4. 基部胶相似度：同班次基部胶相同个数越多优先级越高
-                .thenComparing(task -> resolveBaseGlueSimilarity(task, baseGlueCountMap),
+                .thenComparing(task -> resolveBaseGlueSimilarity(task, baseGlueSimilarityMap),
                         Comparator.nullsLast(Comparator.reverseOrder()))
                 .thenComparing(TmTaskDraft::getBaseGlueCode,
                         Comparator.nullsLast(Comparator.naturalOrder()))
@@ -98,25 +95,32 @@ public class TmDefaultTaskSortStrategy implements ITmTaskSortStrategy {
     }
 
     /**
-     * 构建同一班次内基部胶出现次数，用于近似表达基部胶相似度。
+     * 构建同一班次内基部胶元素交集累计分，用于表达基部胶相似度。
      *
      * @param context 胎面排程上下文
-     * @return 班次和基部胶组合 -> 出现次数
+     * @return 任务草稿 -> 同班次基部胶交集累计数量
      */
-    private Map<String, Integer> buildBaseGlueCountMap(TmScheduleContext context) {
-        Map<String, Integer> countMap = new HashMap<>();
+    private Map<TmTaskDraft, Integer> buildBaseGlueSimilarityMap(TmScheduleContext context) {
+        Map<TmTaskDraft, Integer> similarityMap = new IdentityHashMap<>();
         if (context == null || context.getTaskDraftList() == null) {
-            return countMap;
+            return similarityMap;
         }
         List<TmTaskDraft> taskDraftList = context.getTaskDraftList();
         for (TmTaskDraft task : taskDraftList) {
-            if (task == null || task.getBaseGlueCode() == null || task.getBaseGlueCode().trim().isEmpty()) {
+            Set<String> baseGlueSet = parseBaseGlueSet(task == null ? null : task.getBaseGlueCode());
+            if (baseGlueSet.isEmpty()) {
                 continue;
             }
-            String key = buildShiftGroupKey(task.getShiftOrder(), task.getBaseGlueCode());
-            countMap.put(key, countMap.getOrDefault(key, 0) + 1);
+            int similarityScore = 0;
+            for (TmTaskDraft otherTask : taskDraftList) {
+                if (task == otherTask || otherTask == null || !Objects.equals(task.getShiftOrder(), otherTask.getShiftOrder())) {
+                    continue;
+                }
+                similarityScore += calculateIntersectionCount(baseGlueSet, parseBaseGlueSet(otherTask.getBaseGlueCode()));
+            }
+            similarityMap.put(task, similarityScore);
         }
-        return countMap;
+        return similarityMap;
     }
 
     /**
@@ -136,15 +140,55 @@ public class TmDefaultTaskSortStrategy implements ITmTaskSortStrategy {
     /**
      * 读取任务基部胶相似度分值。
      *
-     * @param task     任务草稿
-     * @param countMap 基部胶出现次数映射
+     * @param task          任务草稿
+     * @param similarityMap 基部胶相似度映射
      * @return 相似度分值
      */
-    private Integer resolveBaseGlueSimilarity(TmTaskDraft task, Map<String, Integer> countMap) {
-        if (task == null || task.getBaseGlueCode() == null || task.getBaseGlueCode().trim().isEmpty()) {
+    private Integer resolveBaseGlueSimilarity(TmTaskDraft task, Map<TmTaskDraft, Integer> similarityMap) {
+        if (task == null || parseBaseGlueSet(task.getBaseGlueCode()).isEmpty()) {
             return null;
         }
-        return countMap.get(buildShiftGroupKey(task.getShiftOrder(), task.getBaseGlueCode()));
+        return similarityMap.get(task);
+    }
+
+    /**
+     * 将逗号分隔的基部胶编码拆分为元素集合，去除空白并忽略重复元素。
+     *
+     * @param baseGlueCode 基部胶编码串
+     * @return 基部胶元素集合
+     */
+    private Set<String> parseBaseGlueSet(String baseGlueCode) {
+        Set<String> baseGlueSet = new HashSet<>();
+        if (baseGlueCode == null || baseGlueCode.trim().isEmpty()) {
+            return baseGlueSet;
+        }
+        for (String item : baseGlueCode.split(",")) {
+            String value = item == null ? "" : item.trim();
+            if (!value.isEmpty()) {
+                baseGlueSet.add(value);
+            }
+        }
+        return baseGlueSet;
+    }
+
+    /**
+     * 计算两个基部胶集合的交集元素数量。
+     *
+     * @param leftSet  左侧基部胶集合
+     * @param rightSet 右侧基部胶集合
+     * @return 交集元素数量
+     */
+    private int calculateIntersectionCount(Set<String> leftSet, Set<String> rightSet) {
+        if (leftSet.isEmpty() || rightSet.isEmpty()) {
+            return 0;
+        }
+        int count = 0;
+        for (String item : leftSet) {
+            if (rightSet.contains(item)) {
+                count++;
+            }
+        }
+        return count;
     }
 
     /**

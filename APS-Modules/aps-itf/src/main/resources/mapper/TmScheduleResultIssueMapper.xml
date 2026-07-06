@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.itf.mes.mapper.TmScheduleResultIssueMapper">
+
+    <!-- 批量新增胎面排程结果到MES中间表 -->
+    <insert id="batchInsertTmScheduleResult" parameterType="list">
+        INSERT INTO MES_TM_SCHEDULE_RESULT (
+            SCHEDULE_DATE, BATCH_NO, ORDER_NO, TREAD_CODE,
+            SAP_MATERIAL_CODE, GLUE_CODE, BASE_GLUE_CODE, WHOLE_GLUE_CODE, GLUE_SEQ,
+            MOUTH_PLATE_CODE, SPEC_SIZE, MACHINE_CODE,
+            UNIT_CONSUME, STOCK_QTY, SUPPLY_TIME,
+            MID_PLAN_QTY, MID_PRODUCE_ORDER, MID_SYS_ANALYSIS, MID_HAND_ANALYSIS,
+            NIGHT_PLAN_QTY, NIGHT_PRODUCE_ORDER, NIGHT_SYS_ANALYSIS, NIGHT_HAND_ANALYSIS,
+            DAY_PLAN_QTY, DAY_PRODUCE_ORDER, DAY_SYS_ANALYSIS, DAY_HAND_ANALYSIS,
+            NEXT_MID_PLAN_QTY, NEXT_MID_PRODUCE_ORDER, NEXT_MID_SYS_ANALYSIS, NEXT_MID_HAND_ANALYSIS,
+            IS_RELEASE, MARK_CLOSE_OUT_TIP, TAIL_FLAG, PRODUCTION_STATUS, REMARK,
+            DATA_VERSION, COMPANY_CODE, FACTORY_CODE
+        )
+        SELECT * FROM (
+        <foreach collection="list" item="item" separator=" UNION ALL ">
+            SELECT
+            #{item.scheduleDate} AS SCHEDULE_DATE,
+            #{item.batchNo} AS BATCH_NO,
+            #{item.orderNo} AS ORDER_NO,
+            #{item.treadCode} AS TREAD_CODE,
+            #{item.sapMaterialCode} AS SAP_MATERIAL_CODE,
+            #{item.glueCode} AS GLUE_CODE,
+            #{item.baseGlueCode} AS BASE_GLUE_CODE,
+            #{item.wholeGlueCode} AS WHOLE_GLUE_CODE,
+            #{item.glueSeq} AS GLUE_SEQ,
+            #{item.mouthPlateCode} AS MOUTH_PLATE_CODE,
+            #{item.specSize} AS SPEC_SIZE,
+            #{item.machineCode} AS MACHINE_CODE,
+            #{item.unitConsume} AS UNIT_CONSUME,
+            #{item.stockQty} AS STOCK_QTY,
+            #{item.supplyTime} AS SUPPLY_TIME,
+            #{item.midPlanQty} AS MID_PLAN_QTY,
+            #{item.midProduceOrder} AS MID_PRODUCE_ORDER,
+            #{item.midSysAnalysis} AS MID_SYS_ANALYSIS,
+            #{item.midHandAnalysis} AS MID_HAND_ANALYSIS,
+            #{item.nightPlanQty} AS NIGHT_PLAN_QTY,
+            #{item.nightProduceOrder} AS NIGHT_PRODUCE_ORDER,
+            #{item.nightSysAnalysis} AS NIGHT_SYS_ANALYSIS,
+            #{item.nightHandAnalysis} AS NIGHT_HAND_ANALYSIS,
+            #{item.dayPlanQty} AS DAY_PLAN_QTY,
+            #{item.dayProduceOrder} AS DAY_PRODUCE_ORDER,
+            #{item.daySysAnalysis} AS DAY_SYS_ANALYSIS,
+            #{item.dayHandAnalysis} AS DAY_HAND_ANALYSIS,
+            #{item.nextMidPlanQty} AS NEXT_MID_PLAN_QTY,
+            #{item.nextMidProduceOrder} AS NEXT_MID_PRODUCE_ORDER,
+            #{item.nextMidSysAnalysis} AS NEXT_MID_SYS_ANALYSIS,
+            #{item.nextMidHandAnalysis} AS NEXT_MID_HAND_ANALYSIS,
+            '1' AS IS_RELEASE,
+            #{item.markCloseOutTip} AS MARK_CLOSE_OUT_TIP,
+            #{item.tailFlag} AS TAIL_FLAG,
+            #{item.productionStatus} AS PRODUCTION_STATUS,
+            #{item.remark} AS REMARK,
+            #{item.dataVersion} AS DATA_VERSION,
+            #{item.companyCode} AS COMPANY_CODE,
+            #{item.factoryCode} AS FACTORY_CODE
+        </foreach>
+        ) AS t
+        WHERE NOT EXISTS (
+            SELECT 1 FROM MES_TM_SCHEDULE_RESULT
+            WHERE SCHEDULE_DATE = t.SCHEDULE_DATE
+            AND MACHINE_CODE = t.MACHINE_CODE
+            AND TREAD_CODE = t.TREAD_CODE
+            AND DATA_VERSION = t.DATA_VERSION
+        )
+    </insert>
+
+    <!-- 根据排程日期删除数据 -->
+    <delete id="deleteByScheduleDate">
+        DELETE FROM MES_TM_SCHEDULE_RESULT
+        WHERE SCHEDULE_DATE = #{scheduleDate}
+        AND DATA_VERSION = #{dataVersion}
+    </delete>
+
+    <!-- 批量根据排程日期+机台+胎面编码更新数据 -->
+    <update id="batchUpdateByScheduleDateAndMachine">
+        <foreach collection="list" item="item" separator=";">
+            UPDATE MES_TM_SCHEDULE_RESULT SET
+                BATCH_NO = #{item.batchNo},
+                ORDER_NO = #{item.orderNo},
+                SAP_MATERIAL_CODE = #{item.sapMaterialCode},
+                GLUE_CODE = #{item.glueCode},
+                BASE_GLUE_CODE = #{item.baseGlueCode},
+                WHOLE_GLUE_CODE = #{item.wholeGlueCode},
+                GLUE_SEQ = #{item.glueSeq},
+                MOUTH_PLATE_CODE = #{item.mouthPlateCode},
+                SPEC_SIZE = #{item.specSize},
+                UNIT_CONSUME = #{item.unitConsume},
+                STOCK_QTY = #{item.stockQty},
+                SUPPLY_TIME = #{item.supplyTime},
+                MID_PLAN_QTY = #{item.midPlanQty},
+                MID_PRODUCE_ORDER = #{item.midProduceOrder},
+                MID_SYS_ANALYSIS = #{item.midSysAnalysis},
+                MID_HAND_ANALYSIS = #{item.midHandAnalysis},
+                NIGHT_PLAN_QTY = #{item.nightPlanQty},
+                NIGHT_PRODUCE_ORDER = #{item.nightProduceOrder},
+                NIGHT_SYS_ANALYSIS = #{item.nightSysAnalysis},
+                NIGHT_HAND_ANALYSIS = #{item.nightHandAnalysis},
+                DAY_PLAN_QTY = #{item.dayPlanQty},
+                DAY_PRODUCE_ORDER = #{item.dayProduceOrder},
+                DAY_SYS_ANALYSIS = #{item.daySysAnalysis},
+                DAY_HAND_ANALYSIS = #{item.dayHandAnalysis},
+                NEXT_MID_PLAN_QTY = #{item.nextMidPlanQty},
+                NEXT_MID_PRODUCE_ORDER = #{item.nextMidProduceOrder},
+                NEXT_MID_SYS_ANALYSIS = #{item.nextMidSysAnalysis},
+                NEXT_MID_HAND_ANALYSIS = #{item.nextMidHandAnalysis},
+                MARK_CLOSE_OUT_TIP = #{item.markCloseOutTip},
+                TAIL_FLAG = #{item.tailFlag},
+                PRODUCTION_STATUS = #{item.productionStatus},
+                REMARK = #{item.remark},
+                COMPANY_CODE = #{item.companyCode},
+                FACTORY_CODE = #{item.factoryCode}
+            WHERE SCHEDULE_DATE = #{item.scheduleDate}
+            AND MACHINE_CODE = #{item.machineCode}
+            AND TREAD_CODE = #{item.treadCode}
+            AND DATA_VERSION = #{item.dataVersion}
+        </foreach>
+    </update>
+
+    <!-- 批量查询中间表中已存在的记录（按排程日期+机台编码+胎面编码+版本号匹配） -->
+    <select id="selectExistingByScheduleDateAndMachine" resultType="com.zlt.aps.itf.vo.MesTmScheduleResult">
+        SELECT SCHEDULE_DATE, MACHINE_CODE, TREAD_CODE, DATA_VERSION
+        FROM MES_TM_SCHEDULE_RESULT
+        WHERE
+        <foreach collection="list" item="item" separator=" OR ">
+            (SCHEDULE_DATE = #{item.scheduleDate}
+             AND MACHINE_CODE = #{item.machineCode}
+             AND TREAD_CODE = #{item.treadCode}
+             AND DATA_VERSION = #{item.dataVersion})
+        </foreach>
+    </select>
+
+</mapper>

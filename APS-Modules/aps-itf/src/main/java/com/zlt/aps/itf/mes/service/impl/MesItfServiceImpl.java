@@ -1,36 +1,42 @@
 package com.zlt.aps.itf.mes.service.impl;
 
+import cn.hutool.core.date.DateUtil;
 import com.alibaba.fastjson.JSONObject;
 import com.baomidou.dynamic.datasource.toolkit.DynamicDataSourceContextHolder;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.zlt.aps.autoLogin.feign.FeignTokenHelper;
 import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.zlt.aps.autoLogin.feign.FeignTokenHelper;
+import com.zlt.aps.cd90.api.domain.entity.Cd90ShiftConfig;
+import com.zlt.aps.cd90.api.domain.entity.Cd90Stock;
+import com.zlt.aps.cd90.api.service.ICd90StockRemoteService;
 import com.zlt.aps.common.core.constant.ApsConstant;
+import com.zlt.aps.common.core.enums.MouldFinishStatusEnum;
 import com.zlt.aps.common.core.utils.AjaxResultUtils;
 import com.zlt.aps.constant.FactoryConstant;
+import com.zlt.aps.cx.api.domain.entity.*;
+import com.zlt.aps.cx.api.service.ICxMesSyncRemoteService;
+import com.zlt.aps.cx.api.service.ICxPrecisionPlanRemoteService;
 import com.zlt.aps.enums.LocationTypeEnum;
 import com.zlt.aps.enums.ProductTypeEnum;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.itf.constant.DataSource;
-import com.zlt.aps.itf.mes.enums.MouldCategoryConvertEnum;
 import com.zlt.aps.itf.constant.SysCode;
 import com.zlt.aps.itf.mes.enums.ItfSyncKeyEnum;
-import com.zlt.aps.itf.mes.mapper.MesItfMapper;
-import com.zlt.aps.itf.mes.mapper.MoldAlterPlanIssueMapper;
-import com.zlt.aps.itf.mes.mapper.MesViewMapper;
-import com.zlt.aps.itf.mes.mapper.LhScheduleResultQueryMapper;
+import com.zlt.aps.itf.mes.enums.MouldCategoryConvertEnum;
+import com.zlt.aps.itf.mes.mapper.*;
 import com.zlt.aps.itf.mes.service.IPrecisionPlanIssueService;
+import com.zlt.aps.itf.mes.service.ITmScheduleResultIssueService;
 import com.zlt.aps.itf.mes.service.MesItfService;
 import com.zlt.aps.itf.mes.vo.MoldAlterPlanIssue;
 import com.zlt.aps.itf.scm.service.ScmItfService;
 import com.zlt.aps.itf.vo.*;
-import com.zlt.sync.handle.SyncDataHandle;
-import com.zlt.sync.povo.SyncParamsVO;
-import com.zlt.sync.service.SyncDataLogsService;
+import com.zlt.aps.lh.api.constant.LhScheduleParamConstant;
 import com.zlt.aps.lh.api.domain.entity.*;
 import com.zlt.aps.lh.api.enums.TrialStatusEnum;
-import com.zlt.aps.lh.api.constant.LhScheduleParamConstant;
+import com.zlt.aps.lh.api.service.ILhChipStockRemoteService;
+import com.zlt.aps.lh.api.service.ILhMesSyncRemoteService;
+import com.zlt.aps.lh.api.service.ILhPrecisionPlanRemoteService;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.maindata.mapper.*;
 import com.zlt.aps.maindata.service.IFactoryParamService;
@@ -39,32 +45,18 @@ import com.zlt.aps.maindata.service.IMdmSkuStructureRefService;
 import com.zlt.aps.maindata.utils.ScmListUtils;
 import com.zlt.aps.mdm.api.domain.entity.MdmMoldAlterPlan;
 import com.zlt.aps.mp.api.domain.entity.*;
-import com.zlt.aps.cx.api.domain.entity.CxMachineOnlineInfo;
-import com.zlt.aps.cx.api.domain.entity.CxStructureTreadConfig;
-import com.zlt.aps.cx.api.domain.entity.CxMesStock;
-import com.zlt.aps.cx.api.domain.entity.CxStock;
-import com.zlt.aps.cx.api.domain.entity.CxScheFinishQty;
-import com.zlt.aps.cx.api.domain.entity.CxDayFinishQty;
-import com.zlt.aps.cx.api.service.ICxMesSyncRemoteService;
-import com.zlt.aps.cd90.api.domain.entity.Cd90Stock;
-import com.zlt.aps.cd90.api.domain.entity.Cd90ShiftConfig;
-import com.zlt.aps.cd90.api.service.ICd90StockRemoteService;
-import com.zlt.aps.mp.api.domain.entity.Cd90MesStock;
-import com.zlt.aps.itf.mes.mapper.Cd90ShiftQueryMapper;
+import com.zlt.aps.tm.api.domain.entity.*;
+import com.zlt.aps.tm.api.service.ITmMesSyncRemoteService;
 import com.zlt.aps.tq.api.domain.entity.TqDayFinishQty;
 import com.zlt.aps.tq.api.domain.entity.TqMesStock;
 import com.zlt.aps.tq.api.domain.entity.TqScheFinishQty;
 import com.zlt.aps.tq.api.domain.entity.TqStock;
 import com.zlt.aps.tq.api.service.ITqMesSyncRemoteService;
-import com.zlt.aps.lh.api.service.ILhMesSyncRemoteService;
-import com.zlt.aps.lh.api.service.ILhChipStockRemoteService;
-import com.zlt.aps.lh.api.domain.entity.LhChipStock;
-import com.zlt.aps.lh.api.service.ILhPrecisionPlanRemoteService;
-import com.zlt.aps.cx.api.service.ICxPrecisionPlanRemoteService;
-
-import com.zlt.aps.common.core.enums.MouldFinishStatusEnum;
 import com.zlt.aps.utils.GenerageMapKeyUtils;
 import com.zlt.core.dao.basedao.BaseDao;
+import com.zlt.sync.handle.SyncDataHandle;
+import com.zlt.sync.povo.SyncParamsVO;
+import com.zlt.sync.service.SyncDataLogsService;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang.StringUtils;
@@ -74,7 +66,6 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.text.ParseException;
-import cn.hutool.core.date.DateUtil;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
@@ -135,6 +126,12 @@ public class MesItfServiceImpl implements MesItfService {
     private ITqMesSyncRemoteService tqMesSyncRemoteService;
 
     @Autowired
+    private ITmMesSyncRemoteService tmMesSyncRemoteService;
+
+    @Autowired
+    private ITmScheduleResultIssueService tmScheduleResultIssueService;
+
+    @Autowired
     private ILhMesSyncRemoteService lhMesSyncRemoteService;
 
     @Autowired
@@ -148,10 +145,6 @@ public class MesItfServiceImpl implements MesItfService {
 
     @Autowired
     private ICxPrecisionPlanRemoteService cxPrecisionPlanRemoteService;
-
-
-    @Autowired
-    private MdmTreadStockEntityMapper treadStockEntityMapper;
 
     @Autowired
     private IMdmProductModelRelationService iMdmProductModelRelationService;
@@ -1546,7 +1539,7 @@ public class MesItfServiceImpl implements MesItfService {
     @Override
     public AjaxResult syncMesCxStock(AuxReqSyncDataLogs syncDataLogs) {
         DynamicDataSourceContextHolder.push(DataSource.MES);
-        List<CxMesStock> syncList = mesItfMapper.selectMesCxStockList(syncDataLogs);
+        List<CxMesStock> syncList = mesItfMapper.selectMesEmbryoStockSixList(syncDataLogs);
         DynamicDataSourceContextHolder.poll();
 
         Map<String, CxMesStock> groupMap = syncList.stream()
@@ -3020,74 +3013,205 @@ public class MesItfServiceImpl implements MesItfService {
 
     /**
      * 同步胎面库存
-     * 采用更新删除标识模式，而不是先删后插
+     * T_TM_STOCK：采用逻辑删除+插入方案（经Feign调用tm模块）
+     *   步骤1：逻辑删除当天库存日期的旧数据（IS_DELETE置为1）
+     *   步骤2：将MES最新库存数据批量插入（新记录，IS_DELETE=0）
+     *   历史数据保留，只删当天库存日期的数据
      * @param syncDataLogs 同步参数
      * @return 结果
      */
     @Override
     public AjaxResult syncTreadStock(AuxReqSyncDataLogs syncDataLogs) {
+        // 切换到MES数据源查询中间表
         DynamicDataSourceContextHolder.push(DataSource.MES);
-        List<MdmTreadStock> syncList = mesItfMapper.selectTreadStockList(syncDataLogs);
+        List<TmMesStock> syncList = mesItfMapper.selectTreadStockList(syncDataLogs);
         DynamicDataSourceContextHolder.poll();
 
-        Map<String, MdmTreadStock> groupMap = syncList.stream()
+        // 按分厂+库存日期+物料编码去重，保留第一条
+        Map<String, TmMesStock> groupMap = syncList.stream()
                 .collect(Collectors.toMap(
-                        item -> item.getFactoryCode() + "|" + item.getStockDate() + "|" + item.getMaterialCode(),
+                        item -> item.getFactoryCode() + "|" + DateUtil.formatDate(item.getStockDate()) + "|" + item.getMaterialCode(),
                         Function.identity(),
                         (v1, v2) -> v1
                 ));
         syncList = new ArrayList<>(groupMap.values());
 
+        if (CollectionUtils.isEmpty(syncList)) {
+            log.warn("胎面库存同步：MES中间表查询结果为空");
+            return AjaxResult.success("MES中间表无数据可同步");
+        }
+
+        // 转换 TmMesStock → TmStock（materialCode→treadCode, availableStock→stockQty）
+        List<TmStock> tmStockInsertList = syncList.stream().map(item -> {
+            TmStock tmStock = new TmStock();
+            tmStock.setFactoryCode(item.getFactoryCode());
+            tmStock.setStockDate(item.getStockDate());
+            tmStock.setTreadCode(item.getMaterialCode());
+            tmStock.setStockQty(item.getAvailableStock() != null ? item.getAvailableStock() : BigDecimal.ZERO);
+            tmStock.setCreateBy("MES");
+            tmStock.setUpdateBy("MES");
+            tmStock.setCreateTime(DateUtils.getNowDate());
+            tmStock.setUpdateTime(DateUtils.getNowDate());
+            return tmStock;
+        }).collect(Collectors.toList());
+
         try {
-            DynamicDataSourceContextHolder.push(DataSource.APS);
+            // 取第一条数据的库存日期作为逻辑删除条件
+            Date stockDate = tmStockInsertList.stream()
+                    .map(TmStock::getStockDate)
+                    .filter(Objects::nonNull)
+                    .findFirst()
+                    .orElse(DateUtils.getNowDate());
+            String stockDateStr = DateUtil.formatDate(stockDate);
 
-            List<List<MdmTreadStock>> splitList = ScmListUtils.getSplitList(syncList, 1000);
-            for (List<MdmTreadStock> saveList : splitList) {
-                List<MdmTreadStock> existsList = treadStockEntityMapper.selectByUniqueKeyList(
-                        saveList.stream().map(item -> {
-                            MdmTreadStock stock = new MdmTreadStock();
-                            stock.setStockDate(item.getStockDate());
-                            stock.setMaterialCode(item.getMaterialCode());
-                            stock.setFactoryCode(item.getFactoryCode());
-                            return stock;
-                        }).collect(Collectors.toList())
-                );
+            log.info("胎面库存同步：开始同步，待插入数量={}, 库存日期={}", tmStockInsertList.size(), stockDateStr);
 
-                Map<String, MdmTreadStock> existsMap = new HashMap<>(16);
-                if (CollectionUtils.isNotEmpty(existsList)) {
-                    existsMap = existsList.stream()
-                            .collect(Collectors.toMap(
-                                    item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), String.valueOf(item.getStockDate()), item.getMaterialCode()),
-                                    Function.identity(),
-                                    (v1, v2) -> v1
-                            ));
-                }
+            FeignTokenHelper.runWithToken(() -> {
+                tmMesSyncRemoteService.logicDeleteAndSaveTmStockByStockDate(stockDateStr, "MES", tmStockInsertList);
+            });
 
-                List<MdmTreadStock> insertOrUpdateList = new ArrayList<>();
-                for (MdmTreadStock item : saveList) {
-                    MdmTreadStock entity = new MdmTreadStock();
-                    BeanUtils.copyProperties(item, entity);
-                    entity.setCreateBy("MES");
-                    entity.setUpdateBy("MES");
-
-                    if (entity.getIsDelete() == null) {
-                        entity.setIsDelete(0);
-                    }
-
-                    String mapKey = GenerageMapKeyUtils.createMapKey(entity.getFactoryCode(), String.valueOf(entity.getStockDate()), entity.getMaterialCode());
-                    if (existsMap.containsKey(mapKey)) {
-                        MdmTreadStock existsData = existsMap.get(mapKey);
-                        entity.setId(existsData.getId());
-                    }
-                    insertOrUpdateList.add(entity);
-                }
-
-                baseDao.saveBatch(insertOrUpdateList);
-            }
-        } finally {
-            DynamicDataSourceContextHolder.poll();
+            log.info("胎面库存同步：同步完成，插入数量={}", tmStockInsertList.size());
+        } catch (Exception e) {
+            log.error("胎面库存同步：Feign调用异常，待插入数量={}", tmStockInsertList.size(), e);
+            return AjaxResult.error("胎面库存同步失败：" + e.getMessage());
         }
         return AjaxResult.success();
+    }
+
+    /**
+     * 同步胎面排程完成量
+     * 从MES中间表MES_TM_CLASS_FINISH_QTY查询当天最新版本数据，
+     * 逻辑删除APS旧数据并插入新数据，最后回写胎面排程结果表各班次完成量
+     *
+     * @param syncDataLogs 同步参数
+     * @return 结果
+     */
+    @Override
+    public AjaxResult syncTmClassShiftFinishQty(AuxReqSyncDataLogs syncDataLogs) {
+        DynamicDataSourceContextHolder.push(DataSource.MES);
+        List<TmScheFinishQty> syncList = mesItfMapper.selectTmClassShiftFinishQtyList(syncDataLogs);
+        DynamicDataSourceContextHolder.poll();
+
+        if (CollectionUtils.isEmpty(syncList)) {
+            log.warn("胎面排程完成量同步：MES中间表查询结果为空，factoryCode={}", syncDataLogs.getFactoryCode());
+            return AjaxResult.success("MES中间表无数据可同步");
+        }
+
+        List<TmScheFinishQty> insertList = new ArrayList<>();
+        for (TmScheFinishQty item : syncList) {
+            TmScheFinishQty entity = new TmScheFinishQty();
+            BeanUtils.copyProperties(item, entity);
+            entity.setCreateBy("MES");
+            entity.setUpdateBy("MES");
+            entity.setCreateTime(DateUtils.getNowDate());
+            entity.setUpdateTime(DateUtils.getNowDate());
+            entity.setIsDelete(0);
+            insertList.add(entity);
+        }
+
+        try {
+            String factoryCode = syncDataLogs.getFactoryCode();
+            Date scheduleDate = insertList.stream().map(TmScheFinishQty::getScheduleDate).filter(Objects::nonNull).findFirst().orElse(DateUtils.getNowDate());
+            String scheduleDateStr = DateUtil.formatDate(scheduleDate);
+            log.info("胎面排程完成量同步：开始同步，factoryCode={}, scheduleDate={}, 待插入数量={}", factoryCode, scheduleDateStr, insertList.size());
+
+            FeignTokenHelper.runWithToken(() -> {
+                tmMesSyncRemoteService.logicDeleteAndSaveScheFinishQty(factoryCode, scheduleDateStr, "MES", insertList);
+            });
+
+            log.info("胎面排程完成量同步：同步完成，factoryCode={}, 插入数量={}", factoryCode, insertList.size());
+        } catch (Exception e) {
+            log.error("胎面排程完成量同步：Feign调用异常，factoryCode={}, 待插入数量={}", syncDataLogs.getFactoryCode(), insertList.size(), e);
+            return AjaxResult.error("胎面排程完成量同步失败：" + e.getMessage());
+        }
+
+        try {
+            FeignTokenHelper.runWithToken(() -> {
+                tmMesSyncRemoteService.writeBackScheduleResultFinishQty(insertList);
+            });
+        } catch (Exception e) {
+            log.error("【胎面排程完成量回写】回写胎面排程结果表完成量异常", e);
+        }
+        return AjaxResult.success();
+    }
+
+    /**
+     * 同步胎面排程日完成量
+     * 从MES中间表MES_TM_DAY_FINISH_TOTL查询前一天的数据，
+     * 逻辑删除APS旧数据并插入新数据
+     *
+     * @param syncDataLogs 同步参数
+     * @return 结果
+     */
+    @Override
+    public AjaxResult syncTmScheDayFinishQty(AuxReqSyncDataLogs syncDataLogs) {
+        DynamicDataSourceContextHolder.push(DataSource.MES);
+        Date nowDate = DateUtils.truncate(DateUtils.getNowDate(), Calendar.DATE);
+        Date lastDate = DateUtils.addDays(nowDate, -1);
+        syncDataLogs.setQueryParams(new HashMap<>());
+        syncDataLogs.getQueryParams().put("scheduleDate", lastDate);
+        List<TmDayFinishQty> syncList = mesItfMapper.selectTmScheDayFinishQtyList(syncDataLogs);
+        DynamicDataSourceContextHolder.poll();
+
+        if (CollectionUtils.isEmpty(syncList)) {
+            log.warn("胎面排程日完成量同步：MES中间表查询结果为空，factoryCode={}", syncDataLogs.getFactoryCode());
+            return AjaxResult.success("MES中间表无数据可同步");
+        }
+
+        Map<String, TmDayFinishQty> groupMap = syncList.stream()
+                .collect(Collectors.toMap(
+                        item -> item.getFactoryCode() + "|" + DateUtil.formatDate(item.getScheduleDate()) + "|" + item.getTreadCode(),
+                        Function.identity(),
+                        (v1, v2) -> v1
+                ));
+        syncList = new ArrayList<>(groupMap.values());
+
+        List<TmDayFinishQty> insertList = new ArrayList<>();
+        for (TmDayFinishQty item : syncList) {
+            TmDayFinishQty entity = new TmDayFinishQty();
+            BeanUtils.copyProperties(item, entity);
+            entity.setCreateBy("MES");
+            entity.setUpdateBy("MES");
+            entity.setCreateTime(DateUtils.getNowDate());
+            entity.setUpdateTime(DateUtils.getNowDate());
+            entity.setIsDelete(0);
+            insertList.add(entity);
+        }
+
+        try {
+            String factoryCode = syncDataLogs.getFactoryCode();
+            Date scheduleDate = insertList.stream().map(TmDayFinishQty::getScheduleDate).filter(Objects::nonNull).findFirst().orElse(DateUtils.getNowDate());
+            String scheduleDateStr = DateUtil.formatDate(scheduleDate);
+            log.info("胎面排程日完成量同步：开始同步，factoryCode={}, scheduleDate={}, 待插入数量={}", factoryCode, scheduleDateStr, insertList.size());
+
+            FeignTokenHelper.runWithToken(() -> {
+                tmMesSyncRemoteService.logicDeleteAndSaveDayFinishQty(factoryCode, scheduleDateStr, "MES", insertList);
+            });
+
+            log.info("胎面排程日完成量同步：同步完成，factoryCode={}, 插入数量={}", factoryCode, insertList.size());
+        } catch (Exception e) {
+            log.error("胎面排程日完成量同步：Feign调用异常，factoryCode={}, 待插入数量={}", syncDataLogs.getFactoryCode(), insertList.size(), e);
+            return AjaxResult.error("胎面排程日完成量同步失败：" + e.getMessage());
+        }
+        return AjaxResult.success();
+    }
+
+    /**
+     * 胎面排程结果下发到MES
+     * 业务规则（与胎圈一致）：
+     * 1. D日（今天）：更新中班数据，夜班早班已过不下发
+     * 2. D+1日（明天）：更新夜早中3班数据
+     * 3. D+2日（后天）：先删后插夜早2班数据，中班尚未排产不下发
+     *
+     * @param tmScheduleResultIssueList 胎面排程结果下发列表（已按3天拆分）
+     * @return 结果
+     */
+    @Override
+    public AjaxResult issueTmScheduleResult(List<TmScheduleResultIssue> tmScheduleResultIssueList) {
+        // 分公司编码与分厂编码保持一致
+        String factoryCode = FactoryConstant.DEFAULT_FACTORY_CODE;
+        String companyCode = factoryCode;
+        return tmScheduleResultIssueService.issueTmScheduleResult(tmScheduleResultIssueList, factoryCode, companyCode);
     }
 
     @Override

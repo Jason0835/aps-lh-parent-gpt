@@ -70,7 +70,8 @@
                                AND (cx.BOM_DATA_VERSION = ci.CONSTRUCTION_VERSION
                                     OR (cx.BOM_DATA_VERSION IS NULL AND ci.CONSTRUCTION_VERSION IS NULL))
                                AND ci.IS_DELETE = 0
-        WHERE cx.FACTORY_CODE = #{factoryCode}
+        WHERE cx.IS_DELETE = 0
+          AND cx.FACTORY_CODE = #{factoryCode}
           AND cx.SCHEDULE_DATE = #{scheduleDate}
     </select>
 

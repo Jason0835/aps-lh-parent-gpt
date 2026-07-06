@@ -91,7 +91,7 @@ export default {
     infoDialog,
     TltUploadForm
   },
-  dicts: ["LINE_TYPE", "JOB_TYPE", "biz_factory_name",'biz_rawMaterial_type'],
+  dicts: ["LINE_TYPE", "JOB_TYPE", "biz_factory_name", "biz_rawMaterial_type", "biz_yes_no"],
   provide() {
     return {
       parentDict: this.dict,
@@ -142,6 +142,14 @@ export default {
           prop: "structureName",
           label: this.$t("ui.data.column.mdmStructureName.structureName"),
           minWidth: 200,
+        },
+        {
+          prop: "isMoreMachine",
+          label: this.$t("ui.data.column.mdmStructureName.isMoreMachine"),
+          align: "center",
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(this.dict.type.biz_yes_no, value);
+          },
         },
         {
           prop: "remark",

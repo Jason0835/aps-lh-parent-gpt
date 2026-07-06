@@ -87,6 +87,8 @@ public class TmPlanCalcService implements ITmPlanCalcService {
                 .comparing(TmTaskDraft::getShiftOrder, Comparator.nullsLast(Comparator.naturalOrder()))
                 .thenComparing(TmTaskDraft::getTreadCode, Comparator.nullsLast(Comparator.naturalOrder())));
         BigDecimal remainingToolQty = this.initializeGlobalAvailableToolQty(context, stockForecastMap);
+        context.setInitialAvailableToolQty(remainingToolQty);
+        context.setCurrentAvailableToolQty(remainingToolQty);
 
         for (TmTaskDraft task : context.getTaskDraftList()) {
             // 6点库存保留预测快照；班初滚动库存必须从上一任务回写的交接班库存读取。
@@ -144,7 +146,9 @@ public class TmPlanCalcService implements ITmPlanCalcService {
                 TmPlanQtyResult planQtyResult = planQtyStrategy.calculate(task, context);
                 applyPlanQtyResult(task, planQtyResult);
             }
-            remainingToolQty = this.updateGlobalToolState(task, remainingToolQty);
+            task.setToolUsedQty(BigDecimal.ZERO.setScale(6, RoundingMode.HALF_UP));
+            task.setRemainingToolQty(remainingToolQty);
+            context.setCurrentAvailableToolQty(remainingToolQty);
             updateRollingStockState(context, task);
             addPlanQtyTrace(context, task, planQtyStrategyCode);
             // 打印计划量计算公式、分量和滚动状态，减少人工二次推导。
@@ -295,7 +299,11 @@ public class TmPlanCalcService implements ITmPlanCalcService {
         evidence.put("toolUsedQty", task.getToolUsedQty());
         evidence.put("remainingToolQty", task.getRemainingToolQty());
         evidence.put("curlRollLength", task.getCurlRollLength());
-        evidence.put("lossRate", task.getLossRate());
+        evidence.put("lossRate", task.getResolvedLossRate() == null ? task.getLossRate() : task.getResolvedLossRate());
+        evidence.put("lossMatchLevel", task.getLossMatchLevel());
+        evidence.put("lossMatchSource", task.getLossMatchSource());
+        evidence.put("preLossPlanQty", task.getPreLossPlanQty());
+        evidence.put("planQtyBeforeToolLimit", task.getPlanQtyBeforeToolLimit());
         evidence.put("calcFormulaDesc", task.getCalcFormulaDesc());
         traceOf(context, task).addRuleHit("PLAN_QTY_CALC", "PASS", evidence);
     }
@@ -480,6 +488,8 @@ public class TmPlanCalcService implements ITmPlanCalcService {
         task.setMinStartAdjustQty(result.getMinStartAdjustQty());
         task.setTailRoundAdjustQty(result.getTailRoundAdjustQty());
         task.setCapacityAdjustQty(result.getCapacityAdjustQty());
+        task.setPreLossPlanQty(result.getPreLossPlanQty());
+        task.setPlanQtyBeforeToolLimit(result.getPlanQtyBeforeToolLimit());
         task.setPlanQty(result.getFinalPlanQty());
         task.setCalcFormulaDesc(result.getCalcFormulaDesc());
     }

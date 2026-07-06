@@ -97,25 +97,30 @@ public enum MesInterfaceCodeEnum {
     EMBRYO_STOCK_SYNC("MES_CX_STOCK", "mesItfService", "syncMesCxStock", "生胎库存同步"),
 
     /**
+     * 生胎库存同步-6点
+     */
+    EMBRYO_STOCK_SIX_SYNC("EMBRYO_STOCK_SIX_SYNC", "mesItfService", "syncMesCxStock", "生胎库存同步-6点"),
+
+    /**
      * 成型排程完成量同步
      */
     CX_CLASS_SHIFT_FINISH_QTY("FINISH_SCHE_COMPLETE", "mesItfService", "syncCxClassShiftFinishQty", "成型排程完成量同步"),
-    
+
     /**
      * 硫化排程完成量同步
      */
     LH_CLASS_SHIFT_FINISH_QTY("LH_CLASS_SHIFT_FINISH_QTY", "mesItfService", "syncLhClassShiftFinishQty", "硫化排程完成量同步"),
-    
+
     /**
      * 成型排程日完成量同步
      */
     CX_SCHE_DAY_FINISH_QTY("CX_SCHE_DAY_FINISH_QTY", "mesItfService", "syncCxScheDayFinishQty", "成型排程日完成量同步"),
-    
+
     /**
      * 硫化排程日完成量同步
      */
     LH_SCHE_DAY_FINISH_QTY("LH_SCHE_DAY_FINISH_QTY", "mesItfService", "syncLhScheDayFinishQty", "硫化排程日完成量同步"),
-    
+
     /**
      * 模具交替计划下发
      */

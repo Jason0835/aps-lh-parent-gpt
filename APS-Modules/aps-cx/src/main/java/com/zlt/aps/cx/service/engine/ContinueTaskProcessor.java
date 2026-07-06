@@ -265,6 +265,7 @@ public class ContinueTaskProcessor {
         taskAllocation.setIsMainProduct(task.getIsMainProduct());
         taskAllocation.setIsContinueTask(true);
         taskAllocation.setLhId(task.getLhId());
+        taskAllocation.setLhMachineCode(task.getLhMachineCode());
         taskAllocation.setConstructionStage(task.getConstructionStage());
         taskAllocation.setIsFirstTask(task.getIsFirstTask());
         taskAllocation.setIsUrgentEnding(task.getIsUrgentEnding());

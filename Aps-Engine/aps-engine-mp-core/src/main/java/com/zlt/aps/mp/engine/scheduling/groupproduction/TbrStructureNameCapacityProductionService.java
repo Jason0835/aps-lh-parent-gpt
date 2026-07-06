@@ -10,6 +10,7 @@ import com.zlt.aps.mp.api.domain.entity.MpStructureAllocation;
 import com.zlt.aps.mp.api.enums.ProductionProcessStage;
 import com.zlt.aps.mp.engine.basedata.assemble.continueinfo.ContinueGroupInfoHandler;
 import com.zlt.aps.mp.engine.basedata.assemble.cyclegroup.CycleGroupDataHandler;
+import com.zlt.aps.mp.engine.basedata.assemble.datalist.GroupListHandler;
 import com.zlt.aps.mp.engine.basedata.assemble.fixed.GroupFixedInfoHandler;
 import com.zlt.aps.mp.engine.basedata.assemble.history.ProductionHistoryHandler;
 import com.zlt.aps.mp.engine.domain.Context;
@@ -68,7 +69,8 @@ public class TbrStructureNameCapacityProductionService extends AbstractDataLoade
 
     private final AdjustContinueSkuProductionQtyHandler adjustContinueSkuProductionQtyHandler;
 
-    public TbrStructureNameCapacityProductionService(ProductionMdmDataService dataService,
+    public TbrStructureNameCapacityProductionService(GroupListHandler groupListHandler,
+                                                     ProductionMdmDataService dataService,
                                                      DpRequireDataService dpRequireDataService,
                                                      CycleGroupDataHandler cycleGroupDataHandler,
                                                      GroupFixedInfoHandler groupFixedInfoHandler,
@@ -79,7 +81,7 @@ public class TbrStructureNameCapacityProductionService extends AbstractDataLoade
                                                      CalculateStructureCxMachineNumber calculateStructureCxMachineNumber,
                                                      ProductionCxMachineCalculationHandler productionCxMachineCalculationHandler,
                                                      AdjustContinueSkuProductionQtyHandler adjustContinueSkuProductionQtyHandler) {
-        super(dataService, dpRequireDataService, cycleGroupDataHandler, productionHistoryHandler, monthProductionDataService);
+        super(groupListHandler, dataService, dpRequireDataService, cycleGroupDataHandler, productionHistoryHandler, monthProductionDataService);
         this.groupFixedInfoHandler = groupFixedInfoHandler;
         this.continueGroupInfoHandler = continueGroupInfoHandler;
         this.simulateProductionHandler = simulateProductionHandler;

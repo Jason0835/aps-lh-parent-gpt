@@ -24,7 +24,8 @@ public class DjShiftConfigServiceImpl extends AbstractDocService<DjShiftConfig> 
     @Override
     public List<DjShiftConfig> listActiveShifts() {
         LambdaQueryWrapper<DjShiftConfig> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(DjShiftConfig::getOpenFlag, "1")
+        wrapper
+//        .eq(DjShiftConfig::getOpenFlag, "1")
                .orderByAsc(DjShiftConfig::getShiftOrder);
         return djShiftConfigMapper.selectList(wrapper);
     }
