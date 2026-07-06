@@ -837,7 +837,8 @@ public class DjScheduleResultServiceImpl extends AbstractBillService<DjScheduleR
         String startShiftClass = ClassNumThreePlanEnums.CLASS_NIGHT.getClassIndex(); // 默认夜班
         List<DjShiftConfig> activeShifts = djShiftConfigService.listActiveShifts();
         if (CollectionUtils.isNotEmpty(activeShifts)) {
-            startShiftClass = activeShifts.get(0).getShiftCode();
+            startShiftClass = activeShifts.stream().filter(r -> ApsConstant.TRUE.equals(r.getOpenFlag())).findFirst()
+                    .map(DjShiftConfig::getShiftCode).orElse(startShiftClass);
         }
 
         ScheduleSummaryVo scheduleSummaryVo = new ScheduleSummaryVo();
