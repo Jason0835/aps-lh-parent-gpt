@@ -32,6 +32,9 @@ public class ProductionCalculator {
     /** 默认整车容量 */
     public static final int DEFAULT_TRIP_CAPACITY = 12;
 
+    /** 默认机台种类上限（被 BalancingService / TrialTaskProcessor 等引用） */
+    public static final int DEFAULT_MAX_TYPES_PER_MACHINE = 4;
+
     /** 一天总秒数 */
     public static final int SECONDS_PER_DAY = 24 * 60 * 60;
 

@@ -105,6 +105,8 @@ public interface CoreScheduleAlgorithmService {
         private String structureName;
         /** 硫化排程任务主键；关联 context.materialStockMap 中按任务分配的库存 */
         private Long lhId;
+        /** 硫化机台编号（同一台硫化机L+R模共享，用于硫化机台数去重） */
+        private String lhMachineCode;
         /** 月计划排产版本（PRODUCTION_VERSION），过滤结构可用机台 */
         private String productionVersion;
         /** 施工阶段：00 无工艺 / 01 试制 / 02 量试 / 03 正式（来自硫化任务） */
@@ -310,6 +312,8 @@ public interface CoreScheduleAlgorithmService {
         private BigDecimal stockHours;
         /** 硫化任务 ID */
         private Long lhId;
+        /** 硫化机台编号（续作预扣去重用） */
+        private String lhMachineCode;
         /** 施工阶段 00/01/02/03 */
         private String constructionStage;
 

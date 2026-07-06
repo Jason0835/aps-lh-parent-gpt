@@ -1406,6 +1406,16 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             }
         }
 
+        // ---- 胎胚库存映射（embryoCode → 总库存，来源于CxStock，不受任务是否排程影响） ----
+        Map<String, Integer> embryoStockMap = new HashMap<>();
+        if (context.getStocks() != null) {
+            for (CxStock stock : context.getStocks()) {
+                if (stock.getEmbryoCode() != null) {
+                    embryoStockMap.merge(stock.getEmbryoCode(), stock.getEffectiveStock(), Integer::sum);
+                }
+            }
+        }
+
         // ---- SKU与示方书关系映射（materialCode+constructionStage -> embryoType） ----
         Map<String, String> skuRecipeTypeMap = new HashMap<>();
         try {
@@ -1544,20 +1554,10 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                 }
             }
 
-            // ---- 库存信息（求和合并多个lhId的库存，embryo级别不按机台拆分） ----
+            // ---- 库存信息（直接取胎胚级库存，不依赖任务是否排程） ----
             String embryoLhKey = embryoCode + "|" + (constructionStage != null ? constructionStage : "");
             List<Long> lhIdList = taskLhIdListMap.get(embryoLhKey);
-            int totalStock = 0;
-            if (lhIdList != null && !lhIdList.isEmpty()) {
-                List<Long> distinctLhIdList = lhIdList.stream().distinct().collect(Collectors.toList());
-                Map<String, Integer> stockMap = context.getInitialMaterialStockMap();
-                for (Long lhId : distinctLhIdList) {
-                    if (stockMap != null) {
-                        Integer stock = stockMap.get(String.valueOf(lhId));
-                        totalStock += (stock != null ? stock : 0);
-                    }
-                }
-            }
+            int totalStock = embryoStockMap.getOrDefault(embryoCode, 0);
             result.setTotalStock(new BigDecimal(totalStock));
 
             // ---- 硫化信息（合并多个硫化任务） ----

@@ -164,24 +164,37 @@ public class NewTaskProcessor {
             Map<String, Set<String>> machineHistoryMap = new HashMap<>();
             Map<String, Integer> continueLoadMap = new HashMap<>();
             Map<String, Set<String>> continueTypeMap = new HashMap<>();
+            Map<String, Set<String>> continueLhMachineCodeMap = new HashMap<>();
 
             if (existAllocations != null) {
                 for (CoreScheduleAlgorithmService.MachineAllocationResult allocation : existAllocations) {
                     String machineCode = allocation.getMachineCode();
                     Set<String> embryos = new HashSet<>();
-                    int load = 0;
                     Set<String> types = new HashSet<>();
+                    Set<String> lhMachineCodes = new HashSet<>();
+                    Set<String> countedLoadKeys = new HashSet<>();
+                    int load = 0;
                     for (CoreScheduleAlgorithmService.TaskAllocation taskAlloc : allocation.getTaskAllocations()) {
                         if (structureName.equals(taskAlloc.getStructureName())) {
                             embryos.add(taskAlloc.getEmbryoCode());
                             types.add(taskAlloc.getEmbryoCode());
-                            load += taskAlloc.getVulcanizeMachineCount() != null ? taskAlloc.getVulcanizeMachineCount() : 0;
+                            // 按 lhMachineCode 去重计算负荷（同一台硫化机L+R只算1台）
+                            String lhMc = taskAlloc.getLhMachineCode();
+                            String loadKey = (lhMc != null && !lhMc.isEmpty()) ? lhMc : "lhId_" + taskAlloc.getLhId();
+                            if (!countedLoadKeys.contains(loadKey)) {
+                                countedLoadKeys.add(loadKey);
+                                load += taskAlloc.getVulcanizeMachineCount() != null ? taskAlloc.getVulcanizeMachineCount() : 0;
+                            }
+                            if (lhMc != null && !lhMc.isEmpty()) {
+                                lhMachineCodes.add(lhMc);
+                            }
                         }
                     }
                     if (!embryos.isEmpty()) {
                         machineHistoryMap.put(machineCode, embryos);
                         continueLoadMap.put(machineCode, load);
                         continueTypeMap.put(machineCode, types);
+                        continueLhMachineCodeMap.put(machineCode, lhMachineCodes);
                     }
                 }
             }
@@ -235,7 +248,7 @@ public class NewTaskProcessor {
             Map<String, Integer> machineMaxEmbryoTypesMap = buildMachineMaxEmbryoTypesMap(
                     availableMachines, structureName, context);
 
-            // 5.3.3.2.6 DFS 均衡（9 参数重载：含 continueLoadMap / continueTypeMap 预扣）
+            // 5.3.3.2.6 DFS 均衡（10 参数重载：含 continueLoadMap / continueTypeMap / continueLhMachineCodeMap 预扣）
             BalancingService.BalancingResult balancingResult =
                     balancingService.balanceEmbryosToMachinesWithMachineCapacity(
                             allTasksForStructure,
@@ -246,7 +259,8 @@ public class NewTaskProcessor {
                             forceKeepHistoryForBalancing,
                             context,
                             continueLoadMap,
-                            continueTypeMap);
+                            continueTypeMap,
+                            continueLhMachineCodeMap);
 
             if (balancingResult == null
                     || CollectionUtils.isEmpty(balancingResult.getAssignments())) {
