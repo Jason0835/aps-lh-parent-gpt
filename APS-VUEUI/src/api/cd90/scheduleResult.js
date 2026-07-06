@@ -42,6 +42,25 @@ export function insertOrder(data) {
 export function getInsertTask(taskId) {
   return request({ url: `/cd90/cd90ScheduleResult/insert/task/${taskId}`, method: 'get' })
 }
+export function validateTransferMachine(data) {
+  return request({
+    url: '/cd90/cd90ScheduleResult/validateTransferMachine',
+    method: 'post',
+    headers: { 'Content-Type': 'application/json;charset=UTF-8' },
+    data
+  })
+}
+export function transferMachine(data) {
+  return request({
+    url: '/cd90/cd90ScheduleResult/transferMachine',
+    method: 'post',
+    headers: { 'Content-Type': 'application/json;charset=UTF-8' },
+    data
+  })
+}
+export function getTransferMachineTask(taskId) {
+  return request({ url: `/cd90/cd90ScheduleResult/transferMachine/task/${taskId}`, method: 'get' })
+}
 export function getTimedRollingTask(taskId) {
   return request({ url: `/cd90/cd90ScheduleResult/rollingSchedule/task/${taskId}`, method: 'get' })
 }

@@ -85,6 +85,10 @@
       ref="insertOrderRef"
       @success="handleInsertSuccess"
     />
+    <change-machine-dialog
+      ref="changeMachineRef"
+      @success="handleChangeMachineSuccess"
+    />
     <el-dialog
       :title="scheduleTaskTitle"
       :visible.sync="autoScheduleProgressVisible"
@@ -133,13 +137,14 @@
 
 <script>
 import moment from 'moment'
-import { getAutoScheduleTask, getInsertTask, getTimedRollingTask, listScheduleResult, delScheduleResult, exportScheduleResult, publishScheduleResult } from '@/api/cd90/scheduleResult'
+import { getAutoScheduleTask, getInsertTask, getTransferMachineTask, getTimedRollingTask, listScheduleResult, delScheduleResult, exportScheduleResult, publishScheduleResult } from '@/api/cd90/scheduleResult'
 import { listTireFabricCodes } from '@/api/cd90/specifyMachine'
 import { getCd90MachineEnableOptions } from '@/api/cd90/cd90MachineInfo'
-import { listUnscheduleResult, exportUnscheduleResult } from '@/api/cd90/unscheduleResult'
+import { listUnscheduleResult } from '@/api/cd90/unscheduleResult'
 import TltUploadForm from '@/views/components/tltUploadForm.vue'
 import AutoScheduleDialog from './components/autoScheduleDialog.vue'
 import InsertOrderDialog from './components/insertOrderDialog.vue'
+import ChangeMachineDialog from './components/changeMachineDialog.vue'
 
 const SHIFT_CONFIG = [
   { classField: 'class1', shiftKey: 'middleShift', dayOffset: -1 },
@@ -152,7 +157,7 @@ const SHIFT_CONFIG = [
 
 export default {
   name: 'Cd90ScheduleResult',
-  components: { TltUploadForm, AutoScheduleDialog, InsertOrderDialog },
+  components: { TltUploadForm, AutoScheduleDialog, InsertOrderDialog, ChangeMachineDialog },
   dicts: ['biz_factory_name', 'IS_RELEASE'],
   provide() {
     return {
@@ -491,14 +496,21 @@ export default {
           //   - 完整体：res = { code, msg, data: { ... } }
           const task = (res && res.data) ? res.data : (res || {})
           const rollingTask = task.taskType === 'ROLLING_SCHEDULE'
+          const transferTask = task.taskType === 'TRANSFER_MACHINE'
           const successKey = rollingTask
             ? 'ui.cd90.rolling.success'
-            : 'ui.data.column.cd90ScheduleResult.autoScheduleSuccess'
+            : transferTask
+              ? 'ui.data.column.scheduleResult.changeMachineSuccess'
+              : 'ui.data.column.cd90ScheduleResult.autoScheduleSuccess'
           const failedKey = rollingTask
             ? 'ui.cd90.rolling.failed'
-            : 'ui.data.column.cd90ScheduleResult.autoScheduleFailed'
+            : transferTask
+              ? 'ui.data.column.scheduleResult.changeMachineFail'
+              : 'ui.data.column.cd90ScheduleResult.autoScheduleFailed'
           if (rollingTask) {
             this.scheduleTaskTitle = this.$t('ui.cd90.rolling.taskName')
+          } else if (transferTask) {
+            this.scheduleTaskTitle = this.$t('ui.data.column.scheduleResult.changeMachine')
           }
           // 更新进度展示
           if (task.progress != null) {
@@ -582,7 +594,25 @@ export default {
       }
     },
     handleChangeMachine() {
-      this.showPendingActionMessage()
+      const row = this.selection[0]
+      if (!row) {
+        this.$message.warning(this.$t('ui.message.pleaseSelectData'))
+        return
+      }
+      this.$refs.changeMachineRef.show(row)
+    },
+    handleChangeMachineSuccess(scheduleDate, payload) {
+      if (scheduleDate) {
+        this.query = { ...this.query, scheduleDate }
+        this.search = { ...this.search, scheduleDate }
+        this.updateDateList(scheduleDate)
+      }
+      const data = payload || {}
+      if (data.taskId) {
+        this.pollScheduleTask(data.taskId, getTransferMachineTask)
+      } else {
+        this.getList()
+      }
     },
     handleChangePlan() {
       this.showPendingActionMessage()
@@ -590,7 +620,7 @@ export default {
     handlePublish() {
       this.$confirm(this.$t('ui.biz.alter.makeSurePublish'), {
         type: 'warning'
-      }).then(async () => {
+      }).then(async() => {
         try {
           this.loading = true
           const ids = this.selection.map(item => item.id).join(',')
