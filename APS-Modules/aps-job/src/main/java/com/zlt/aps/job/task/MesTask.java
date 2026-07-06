@@ -1,5 +1,6 @@
 package com.zlt.aps.job.task;
 
+import cn.hutool.core.date.DateUtil;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.autoLogin.feign.FeignTokenHelper;
 import com.zlt.aps.cx.api.domain.entity.CxMachineOnlineInfo;
@@ -7,13 +8,18 @@ import com.zlt.aps.itf.mes.IMesItfService;
 import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
 import com.zlt.aps.lh.api.domain.entity.LhMachineOnlineInfo;
 import com.zlt.aps.lh.api.service.ILhPrecisionPlanRemoteService;
-import com.zlt.aps.mp.api.domain.entity.*;
+import com.zlt.aps.mp.api.domain.entity.MdmOutbountOrdersNotScan;
+import com.zlt.aps.mp.api.domain.entity.MdmProductStock;
+import com.zlt.aps.mp.api.domain.entity.MdmUnqualifiedStock;
+import com.zlt.aps.mp.api.domain.entity.RawSpecialMaterialStock;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
+import java.util.Date;
+import java.util.HashMap;
 
 /**
  * MES接口定时任务
@@ -108,7 +114,13 @@ public class MesTask {
      */
     @ApiOperation("同步生胎库存")
     public void syncMesCxStock() {
-        FeignTokenHelper.runWithToken(() -> iMesItfService.syncMesCxStock(new AuxReqSyncDataLogs()));
+        FeignTokenHelper.runWithToken(() -> {
+            AuxReqSyncDataLogs syncDataLogs = new AuxReqSyncDataLogs();
+            HashMap<String, Object> queryParams = new HashMap<>();
+            queryParams.put("stockDate", DateUtil.format(new Date(), "yyyy-MM-dd"));
+            syncDataLogs.setQueryParams(queryParams);
+            iMesItfService.syncMesCxStock(syncDataLogs);
+        });
     }
 
     /**
