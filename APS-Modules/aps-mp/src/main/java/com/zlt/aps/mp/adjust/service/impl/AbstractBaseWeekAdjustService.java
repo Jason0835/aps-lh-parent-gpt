@@ -1005,6 +1005,9 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         // 设置周程滚动参数
         contextDTO.setParamMap(mpAdjustStructureInService.getMpWeekAdjustParam(contextDTO.getFactoryCode(), ProductTypeEnum.WHOLE_STEEL.getValue()));
 
+        // 初始化SKU排产分类
+        initSkuProductionType(contextDTO);
+
         // 设置调整日（依赖 paramMap）
         setAdjustDate(contextDTO);
 
@@ -1721,7 +1724,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         // 初始化SKU与施工（示方书）关系
         initSkuConstructionRef(contextDTO);
         // 初始化SKU排产分类
-        initSkuProductionType(contextDTO);
+        //initSkuProductionType(contextDTO);
         // 汇总调整明细
         List<MpAdjustDetailVo> summaryAdjustDetailList = sumByStructureAndMaterial(adjustDetailList, Boolean.TRUE);
         Map<String, MpAdjustDetailVo> adjustDetailVoMap = summaryAdjustDetailList.stream()
@@ -2640,6 +2643,10 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             String materialCode = monthPlan.getMaterialCode();
             if (StringUtils.isEmpty(materialCode)) {
                 continue;
+            }
+            if (StringUtil.isEmptyWithTrim(monthPlan.getProductionType())) {
+                //补充排产分类
+                monthPlan.setProductionType(contextDTO.getMdmSkuProductionTypeMap().get(monthPlan.getMaterialCode()));
             }
             String materialCodeKey = String.join(BusiConstant.WeekRollAdjust.SPLIT_GROUP_KEY, materialCode, monthPlan.getConstructionStage());
             String oriMonthPlanVersion = monthPlan.getMonthPlanVersion();
