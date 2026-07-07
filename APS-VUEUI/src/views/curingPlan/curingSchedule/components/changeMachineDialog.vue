@@ -586,15 +586,9 @@ export default {
         const selectedMachine = this.machineOptions.find(
           (item) => item.machineCode === this.form.lhMachineCode
         );
-        if (!selectedMachine || !selectedMachine.machineName) {
-          this.$modal.msgWarning(
-            this.$t("ui.data.column.scheduleResult.newMachineNameNotFound")
-          );
-          return;
-        }
         this.handleChangeMachine({
           lhMachineCode: this.form.lhMachineCode,
-          lhMachineName: selectedMachine.machineName,
+          lhMachineName: selectedMachine?.machineName || '',
           id: this.form.id,
           factoryCode: this.form.factoryCode,
         });
