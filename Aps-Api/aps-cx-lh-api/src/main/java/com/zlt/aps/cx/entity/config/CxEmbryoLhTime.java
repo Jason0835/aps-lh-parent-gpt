@@ -5,6 +5,7 @@ import com.fasterxml.jackson.annotation.JsonFormat;
 import com.ruoyi.common.core.annotation.Excel;
 import com.ruoyi.common.core.web.domain.BaseEntity;
 import com.zlt.aps.common.core.annotation.ImportValidated;
+import com.zlt.common.annotation.ImportExcelValidated;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
@@ -26,6 +27,10 @@ import java.util.Date;
 public class CxEmbryoLhTime extends BaseEntity {
 
     private static final long serialVersionUID = 1L;
+
+    @ApiModelProperty(value = "分厂编号")
+    @TableField(value = "FACTORY_CODE")
+    private String factoryCode;
 
     @Excel(name = "ui.data.column.cxEmbryoLhTime.structureName")
     @ApiModelProperty(value = "结构")
