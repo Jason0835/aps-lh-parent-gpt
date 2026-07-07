@@ -3716,8 +3716,7 @@
   "ui.data.column.cd15ScheduleResult.monthSurplusQty": "月计划剩余量",
   "ui.data.column.cd15ScheduleResult.cutMode": "裁断模式",
   "ui.data.column.cd15ScheduleResult.sourceType": "数据来源",
-  "ui.data.column.cd15ScheduleResult.isLocked": "是否锁定"
-  "ui.data.column.xwyyStock.checkUnique": "同一工厂下已存在相同日期和大卷编号的库存记录",
+  "ui.data.column.cd15ScheduleResult.isLocked": "是否锁定",
   "ui.data.column.tm.scheduleResult.autoPlanProgress": "胎面自动排程进度",
   "ui.data.column.tm.scheduleResult.autoPlanProgressHint": "排程执行中，请勿关闭页面",
   "ui.data.column.tm.scheduleResult.autoPlanSuccess": "胎面自动排程完成",

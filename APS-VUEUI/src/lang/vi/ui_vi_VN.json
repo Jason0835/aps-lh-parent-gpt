@@ -1925,8 +1925,7 @@
   "ui.data.column.cd15ScheduleResult.monthSurplusQty": "So luong du thang",
   "ui.data.column.cd15ScheduleResult.cutMode": "Che do cat",
   "ui.data.column.cd15ScheduleResult.sourceType": "Nguon du lieu",
-  "ui.data.column.cd15ScheduleResult.isLocked": "Da khoa"
-  "ui.data.column.xwyyStock.checkUnique": "Bản ghi tồn kho đã tồn tại cho cùng nhà máy, ngày và mã cuộn lớn",
+  "ui.data.column.cd15ScheduleResult.isLocked": "Da khoa",
   "ui.data.column.tm.scheduleResult.autoPlanProgress": "Tiến độ lập lịch tự động TM",
   "ui.data.column.tm.scheduleResult.autoPlanProgressHint": "Đang lập lịch, vui lòng không đóng trang",
   "ui.data.column.tm.scheduleResult.autoPlanSuccess": "Lập lịch tự động TM hoàn tất",

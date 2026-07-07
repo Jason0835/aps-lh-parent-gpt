@@ -939,8 +939,7 @@
   "ui.data.column.cd15ScheduleResult.monthSurplusQty": "Month Surplus Qty",
   "ui.data.column.cd15ScheduleResult.cutMode": "Cut Mode",
   "ui.data.column.cd15ScheduleResult.sourceType": "Source Type",
-  "ui.data.column.cd15ScheduleResult.isLocked": "Locked"
-  "ui.data.column.scheduleResult.midHandAnalysis": "Mid Shift Manual Analysis",
+  "ui.data.column.cd15ScheduleResult.isLocked": "Locked",
   "ui.data.column.tm.scheduleResult.autoPlanProgress": "TM Auto Schedule Progress",
   "ui.data.column.tm.scheduleResult.autoPlanProgressHint": "Scheduling is running. Do not close this page.",
   "ui.data.column.tm.scheduleResult.autoPlanSuccess": "TM auto schedule completed",
