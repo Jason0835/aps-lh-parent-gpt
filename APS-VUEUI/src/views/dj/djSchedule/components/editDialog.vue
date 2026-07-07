@@ -81,7 +81,7 @@ export default {
         },
         {
           label: this.$t("ui.data.column.dj.scheduleResult.paddingCode"),
-          prop: "liningCode",
+          prop: "paddingCode",
           span: 12,
           disabled: true,
         },
@@ -107,7 +107,7 @@ export default {
         },
         {
           label: this.$t("ui.data.column.dj.scheduleResult.machineCode"),
-          prop: "machineId",
+          prop: "machineCode",
           span: 12,
           type: "select",
           disabled: true,

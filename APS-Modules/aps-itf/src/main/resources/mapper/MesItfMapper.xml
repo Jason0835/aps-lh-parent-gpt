@@ -262,6 +262,7 @@
             STOCK_NUM
         FROM EMBRYO_STOCK_SIX_SYNC
         WHERE 1 = 1
+        <if test="queryParams.stockDate != null and queryParams.stockDate != ''">AND CONVERT(DATE, STOCK_DATE) = CONVERT(DATE, #{queryParams.stockDate})</if>
     </select>
 
     <!-- 查询直裁库存同步数据（MES 中间表 T_MES_CD90_STOCK） -->

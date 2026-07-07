@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.utils.StringUtils;
 import com.zlt.aps.common.core.constant.ApsConstant;
+import com.zlt.aps.common.core.utils.BigDecimalUtils;
 import com.zlt.aps.itf.constant.DataSource;
 import com.zlt.aps.itf.mes.mapper.MesBomItfMapper;
 import com.zlt.aps.itf.mes.service.MesBomItfService;
@@ -13,6 +14,7 @@ import com.zlt.aps.maindata.mapper.*;
 import com.zlt.aps.maindata.utils.ScmListUtils;
 import com.zlt.aps.mdm.api.domain.entity.MdmConstructionProcess;
 import com.zlt.aps.mdm.api.enums.BomTypeEnum;
+import com.zlt.aps.mdm.api.enums.ProcessCodeEnum;
 import com.zlt.aps.mp.api.domain.entity.MdmBomInfo;
 import com.zlt.aps.mp.api.domain.entity.MdmConstructionInfo;
 import com.zlt.aps.mp.api.domain.entity.MdmMaterialConsumeDetail;
@@ -245,15 +247,28 @@ public class MesBomItfServiceImpl implements MesBomItfService {
         List<MdmMaterialConsumeDetail> oldDetailList = mdmMaterialConsumeDetailMapper.selectList(queryWrapper);
         Map<String, MdmMaterialConsumeDetail> oldDetailMap = oldDetailList.stream().collect(Collectors.toMap(detail -> this.getMapKey(detail), Function.identity(), (d1, d2) -> d1));
 
-        // 3、根据父节汇总
-        Map<String, List<MdmBomInfo>> parentMap = bomList.stream()
-                .collect(Collectors.groupingBy(bom -> this.getBomParentMapKey(bom)));
+        // 3、根据父节汇总（构建成TreeMap，用于后续的模糊匹配）
+        TreeMap<String, List<MdmBomInfo>> parentMap = bomList.stream()
+                .collect(Collectors.groupingBy(bom -> this.getBomParentMapKey(bom), TreeMap::new, Collectors.toList()));
         // 4、构建bom树
         for (MdmBomInfo bom: bomList) {
             String childKey = this.getBomChildMapKey(bom);
             List<MdmBomInfo> children = parentMap.get(childKey);
             boolean isLeaf = CollectionUtils.isEmpty(children); // 如果没有子节点，判定为叶子节点
             bom.setIsLeaf(isLeaf);
+            // 如果是叶子节点，需要复查子节点类型，如果是满足下述情况，需要通过特殊方式获取子节点
+            if (isLeaf) {
+                // 检查是否胶料
+                if (this.checkChildBomType(bom, BomTypeEnum.FINAL_RUBBER)) {
+                    // 胶料需要通过前匹配的方式获取
+                    String fromKey = bom.getChildMaterialName();
+                    String toKey = fromKey + Character.MAX_VALUE;
+                    children = parentMap.subMap(fromKey, toKey) // 基于红黑树的前缀匹配，获取以胶料名称开头的key
+                            .values().stream().flatMap(List::stream) // 扁平化
+                            .collect(Collectors.toList());
+                    isLeaf = CollectionUtils.isEmpty(children); // 如果没有子节点，判定为叶子节点
+                }
+            }
             if (!isLeaf) { // 非叶子节点，关联父子节点的关系
                 bom.setChildren(children);
                 children.forEach(child -> child.setParent(bom));
@@ -291,12 +306,12 @@ public class MesBomItfServiceImpl implements MesBomItfService {
                 String embryoCode = null;
                 String embryoVersion = null;
                 // 先检查本节点是否胎胚
-                if (!BomTypeEnum.EMBRYO.getMesCode().equals(embryoBom.getChildMaterialType())) { // 本节点型不是胎胚说明有问题，跳过
+                if (!this.checkChildBomType(embryoBom, BomTypeEnum.EMBRYO)) { // 本节点型不是胎胚说明有问题，跳过
                     if (StringUtils.isEmpty(embryoBom.getParentCode())) { // 胎胚号为空说明有问题，跳过
                         continue;
                     }
                     // 类型不是胎胚，跳过
-                    if (!BomTypeEnum.EMBRYO.getMesCode().equals(embryoBom.getParentMaterialType())) { // 父类型不是胎胚说明有问题，跳过
+                    if (!this.checkParentBomType(embryoBom, BomTypeEnum.EMBRYO)) { // 父类型不是胎胚说明有问题，跳过
                         continue;
                     }
                     embryoCode = embryoBom.getParentCode();
@@ -372,7 +387,8 @@ public class MesBomItfServiceImpl implements MesBomItfService {
                 for (List<MdmConstructionProcess> saveList : splitList) { // 分批保存，防止长度超出限制
                     baseDao.saveBatch(saveList);
                 }
-
+                // 将示方书工艺更新到施工表
+                this.updateConstruction(syncDataLogs.getFactoryCode(), syncList);
             } finally {
                 DynamicDataSourceContextHolder.clear();
                 /** 切换APS数据源 end **/
@@ -381,7 +397,88 @@ public class MesBomItfServiceImpl implements MesBomItfService {
         return AjaxResult.success();
     
     }
+    
+    /**
+     * 将示方书工艺更新到施工表
+     * @param factoryCode
+     * @param syncList
+     */
+    private void updateConstruction(String factoryCode, List<MdmConstructionProcess> syncList) {
+        // 加载部件长度
+        Map<String, MdmConstructionProcess> lengthMap = syncList.stream().filter(p -> ProcessCodeEnum.LENGTH.getCode().equals(p.getProcessCode())).collect(Collectors.toMap(this::getmatchMapKey, Function.identity(), (p1, p2) -> {
+            if (Objects.compare(p1.getMaterialVersion(), p2.getMaterialVersion(), String::compareTo) > 0) {
+                return p1;
+            } else {
+                return p2;
+            }
+        }));
+        // 加载部件宽度
+        Map<String, MdmConstructionProcess> widthMap = syncList.stream().filter(p -> ProcessCodeEnum.WIDTH.getCode().equals(p.getProcessCode())).collect(Collectors.toMap(this::getmatchMapKey, Function.identity(), (p1, p2) -> {
+            if (Objects.compare(p1.getMaterialVersion(), p2.getMaterialVersion(), String::compareTo) > 0) {
+                return p1;
+            } else {
+                return p2;
+            }
+        }));
+        LambdaQueryWrapper<MdmConstructionInfo> constructQueryWrapper = new LambdaQueryWrapper<>();
+        constructQueryWrapper.eq(MdmConstructionInfo::getFactoryCode, factoryCode);
+        List<MdmConstructionInfo> constructList = mdmConstructionInfoEntityMapper.selectList(constructQueryWrapper); // 取出APS数据
+        List<MdmConstructionInfo> updateList = new ArrayList<>();
+        for (MdmConstructionInfo construct: constructList) {
+            boolean isUpdate = false;
+            // 更新长度、工艺
+            // 胎面
+            isUpdate |= updateConstructionField(lengthMap.get(construct.getTreadCode()), construct, "treadShoulderLength");
+            // 垫胶
+            isUpdate |= updateConstructionField(lengthMap.get(construct.getPaddingCode()), construct, "paddingLength");
+            // 斜裁
+            isUpdate |= updateConstructionField(lengthMap.get(construct.getTireFabricCode1()), construct, "tireFabricLength1");
+            isUpdate |= updateConstructionField(widthMap.get(construct.getTireFabricCode1()), construct, "tireFabricCraft1");
+            if (isUpdate) {
+                updateList.add(construct);
+            }
+        }
+        List<List<MdmConstructionProcess>> splitList = ScmListUtils.getSplitList(syncList, 1000);
+        for (List<MdmConstructionProcess> saveList : splitList) { // 分批保存，防止长度超出限制
+            baseDao.updateBatch(saveList);
+        }
+    }
 
+    /**
+     * 将工艺信息更新到指定字段
+     * 
+     * @param process
+     * @param construct
+     * @param fieldName
+     * @return
+     */
+    private boolean updateConstructionField(MdmConstructionProcess process, MdmConstructionInfo construct,
+            String fieldName) {
+        if (process == null) {
+            return false;
+        }
+        BigDecimal oriPaddingLength = BigDecimalUtils.valueOf(construct.getFieldValueByFieldName(fieldName));
+        BigDecimal processValue = BigDecimalUtils.valueOf(process.getProcessValue());
+        if (Objects.compare(oriPaddingLength, processValue, BigDecimal::compareTo) != 0) {
+            construct.setFieldValueByFieldName(fieldName, processValue);
+            return true;
+        }
+        return false;
+    }
+    
+    /**
+     * 获取分组key（SKU与施工关系表）
+     *
+     * @param info
+     * @return
+     */
+    private String getmatchMapKey(MdmConstructionProcess info) {
+        return GenerageMapKeyUtils.createMapKey(info.getFactoryCode(),
+                info.getMaterialCode(),
+                info.getProcessCode()
+        );
+    }
+    
     /**
      * 获取分组key（SKU与施工关系表）
      *
@@ -406,6 +503,26 @@ public class MesBomItfServiceImpl implements MesBomItfService {
 		return GenerageMapKeyUtils.createMapKey(info.getFactoryCode(), info.getParentCode(),
 				info.getParentVersion(), info.getChildCode(), info.getChildMaterialVersion());
 	}
+	
+    /**
+     * 判断BOM子节点的类型
+     * @param bom
+     * @param bomType
+     * @return
+     */
+    private boolean checkChildBomType(MdmBomInfo bom, BomTypeEnum bomType) {
+        return bomType.getMesCode().equals(bom.getChildMaterialType());
+    }
+    
+    /**
+     * 判断BOM父节点的类型
+     * @param bom
+     * @param bomType
+     * @return
+     */
+    private boolean checkParentBomType(MdmBomInfo bom, BomTypeEnum bomType) {
+        return bomType.getMesCode().equals(bom.getParentMaterialType());
+    }
 
     /**
      * 获取父节点分组key（BOM表）
@@ -414,6 +531,10 @@ public class MesBomItfServiceImpl implements MesBomItfService {
      * @return
      */
     private String getBomParentMapKey(MdmBomInfo info) {
+        // 如果父节点是AQ，说明是密炼的原材料，需要特殊处理父节点
+        if (this.checkParentBomType(info, BomTypeEnum.AQ)) {
+            return info.getParentMaterialName();
+        }
         return GenerageMapKeyUtils.createMapKey(info.getFactoryCode(), info.getParentCode(), info.getParentVersion());
     }
 
