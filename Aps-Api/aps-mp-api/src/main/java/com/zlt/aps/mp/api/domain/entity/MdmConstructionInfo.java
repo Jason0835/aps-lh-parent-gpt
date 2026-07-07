@@ -529,6 +529,12 @@ public class MdmConstructionInfo extends BaseEntity {
     @TableField(value = "BELT_CRAFT1")
     private BigDecimal beltCraft1;
 
+    /** 1#钢带长度 */
+//    @Excel(name = "ui.data.column.mdmConstructionInfo.belt1Length")
+    @ApiModelProperty(value = "1#钢带长度", name = "belt1Length")
+    @TableField(value = "BELT1_LENGTH")
+    private BigDecimal belt1Length;
+
     /** 1#钢带边胶 */
 //    @Excel(name = "ui.data.column.mdmConstructionInfo.beltSideRubber1")
     @ApiModelProperty(value = "1#钢带边胶", name = "beltSideRubber1")
@@ -563,6 +569,24 @@ public class MdmConstructionInfo extends BaseEntity {
     @TableField(value = "BELT_NAME3")
     private String beltName3;
 
+    /** 3#钢带BOM版本 */
+//    @Excel(name = "ui.data.column.mdmConstructionInfo.belt3Version")
+    @ApiModelProperty(value = "3#钢带BOM版本", name = "belt3Version")
+    @TableField(value = "BELT3_VERSION")
+    private String belt3Version;
+
+    /** 3#钢带工艺 */
+//    @Excel(name = "ui.data.column.mdmConstructionInfo.beltCraft3")
+    @ApiModelProperty(value = "3#钢带工艺", name = "beltCraft3")
+    @TableField(value = "BELT_CRAFT3")
+    private BigDecimal beltCraft3;
+
+    /** 3#钢带长度 */
+//    @Excel(name = "ui.data.column.mdmConstructionInfo.belt3Length")
+    @ApiModelProperty(value = "3#钢带长度", name = "belt3Length")
+    @TableField(value = "BELT3_LENGTH")
+    private BigDecimal belt3Length;
+
     /** 4#钢带代号 */
     @Excel(name = "ui.data.column.mdmConstructionInfo.beltCode4", sort = 22)
     @ApiModelProperty(value = "4#钢带代号", name = "beltCode4")
@@ -573,6 +597,24 @@ public class MdmConstructionInfo extends BaseEntity {
     @ApiModelProperty(value = "4#钢带物料名", name = "beltName4")
     @TableField(value = "BELT_NAME4")
     private String beltName4;
+
+    /** 4#钢带BOM版本 */
+//    @Excel(name = "ui.data.column.mdmConstructionInfo.belt4Version")
+    @ApiModelProperty(value = "4#钢带BOM版本", name = "belt4Version")
+    @TableField(value = "BELT4_VERSION")
+    private String belt4Version;
+
+    /** 4#钢带工艺 */
+//    @Excel(name = "ui.data.column.mdmConstructionInfo.beltCraft4")
+    @ApiModelProperty(value = "4#钢带工艺", name = "beltCraft4")
+    @TableField(value = "BELT_CRAFT4")
+    private BigDecimal beltCraft4;
+
+    /** 4#钢带长度 */
+//    @Excel(name = "ui.data.column.mdmConstructionInfo.belt4Length")
+    @ApiModelProperty(value = "4#钢带长度", name = "belt4Length")
+    @TableField(value = "BELT4_LENGTH")
+    private BigDecimal belt4Length;
 
     /** 左加强层 */
     @Excel(name = "ui.data.column.mdmConstructionInfo.beltCodeLeftCode", sort = 23)
@@ -585,6 +627,24 @@ public class MdmConstructionInfo extends BaseEntity {
     @TableField(value = "BELT_CODE_LEFT_NAME")
     private String beltCodeLeftName;
 
+    /** 左加强层BOM版本 */
+//    @Excel(name = "ui.data.column.mdmConstructionInfo.beltCodeLeftVersion")
+    @ApiModelProperty(value = "左加强层BOM版本", name = "beltCodeLeftVersion")
+    @TableField(value = "BELT_CODE_LEFT_VERSION")
+    private String beltCodeLeftVersion;
+
+    /** 左加强层工艺 */
+//    @Excel(name = "ui.data.column.mdmConstructionInfo.beltCodeLeftCraft")
+    @ApiModelProperty(value = "左加强层工艺", name = "beltCodeLeftCraft")
+    @TableField(value = "BELT_CODE_LEFT_CRAFT")
+    private BigDecimal beltCodeLeftCraft;
+
+    /** 左加强层长度 */
+//    @Excel(name = "ui.data.column.mdmConstructionInfo.beltCodeLeftLength")
+    @ApiModelProperty(value = "左加强层长度", name = "beltCodeLeftLength")
+    @TableField(value = "BELT_CODE_LEFT_LENGTH")
+    private BigDecimal beltCodeLeftLength;
+
     /** 右加强层 */
     @Excel(name = "ui.data.column.mdmConstructionInfo.beltCodeRightCode", sort = 24)
     @ApiModelProperty(value = "右加强层", name = "beltCodeRightCode")
@@ -595,6 +655,24 @@ public class MdmConstructionInfo extends BaseEntity {
     @ApiModelProperty(value = "右加强层物料名", name = "beltCodeRightName")
     @TableField(value = "BELT_CODE_RIGHT_NAME")
     private String beltCodeRightName;
+
+    /** 右加强层BOM版本 */
+//    @Excel(name = "ui.data.column.mdmConstructionInfo.beltCodeRightVersion")
+    @ApiModelProperty(value = "右加强层BOM版本", name = "beltCodeRightVersion")
+    @TableField(value = "BELT_CODE_RIGHT_VERSION")
+    private String beltCodeRightVersion;
+
+    /** 右加强层工艺 */
+//    @Excel(name = "ui.data.column.mdmConstructionInfo.beltCodeRightCraft")
+    @ApiModelProperty(value = "右加强层工艺", name = "beltCodeRightCraft")
+    @TableField(value = "BELT_CODE_RIGHT_CRAFT")
+    private BigDecimal beltCodeRightCraft;
+
+    /** 右加强层长度 */
+//    @Excel(name = "ui.data.column.mdmConstructionInfo.beltCodeRightLength")
+    @ApiModelProperty(value = "右加强层长度", name = "beltCodeRightLength")
+    @TableField(value = "BELT_CODE_RIGHT_LENGTH")
+    private BigDecimal beltCodeRightLength;
 
     /** 2#钢带BOM版本 */
 //    @Excel(name = "ui.data.column.mdmConstructionInfo.belt2Version")
@@ -607,6 +685,12 @@ public class MdmConstructionInfo extends BaseEntity {
     @ApiModelProperty(value = "2#钢带工艺", name = "beltCraft2")
     @TableField(value = "BELT_CRAFT2")
     private BigDecimal beltCraft2;
+
+    /** 2#钢带长度 */
+//    @Excel(name = "ui.data.column.mdmConstructionInfo.belt2Length")
+    @ApiModelProperty(value = "2#钢带长度", name = "belt2Length")
+    @TableField(value = "BELT2_LENGTH")
+    private BigDecimal belt2Length;
 
     /** 2#钢带边胶 */
 //    @Excel(name = "ui.data.column.mdmConstructionInfo.beltSideRubber2")
