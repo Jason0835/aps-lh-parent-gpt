@@ -550,8 +550,24 @@ public class TmMachineAssignService implements ITmMachineAssignService {
         BigDecimal currentShiftPlanQty = nvl(task.getPlanQty());
         BigDecimal toolOverflowQty = nvl(task.getToolOverflowQty());
         Integer startShiftOrder = task.getShiftOrder() == null ? 1 : task.getShiftOrder();
+        // 工装结算后补打最终态，避免 [TM_MACHINE_ASSIGN_SUMMARY] 在结算前打印 result=PASS 误导排查
+        log.info("[TM_MACHINE_ASSIGN_FINAL] batchNo={}, traceId={}, factoryCode={}, scheduleDate={}, businessKey={}, treadCode={}, shiftOrder={}, selectedMachineCode={}, planQtyBeforeToolLimit={}, finalPlanQty={}, toolLimitAdjustQty={}, toolOverflowQty={}, availableToolQty={}, assignStatus={}",
+                context.getBatchNo(), context.getTraceId(), context.getFactoryCode(), this.formatScheduleDate(context),
+                task.getBusinessKey(), task.getTreadCode(), task.getShiftOrder(),
+                selectedCandidate.getMachineCode(), task.getPlanQtyBeforeToolLimit(), task.getPlanQty(),
+                task.getToolLimitAdjustQty(), task.getToolOverflowQty(), task.getAvailableToolQty(),
+                StrUtil.isNotBlank(task.getUnplannedReasonCode()) ? "UNPLANNED" : "ASSIGNED");
         if (currentShiftPlanQty.compareTo(BigDecimal.ZERO) <= 0 && toolOverflowQty.compareTo(BigDecimal.ZERO) <= 0) {
             this.appendZeroPlanTask(task, selectedCandidate, context, startShiftOrder);
+            return;
+        }
+        if (currentShiftPlanQty.compareTo(BigDecimal.ZERO) <= 0
+                && toolOverflowQty.compareTo(BigDecimal.ZERO) > 0) {
+            // 工装限制将计划量压为零且存在工装溢出：原任务标记产能不足未排并记证据，溢出量继续顺延承接，避免 machineCode 留空形成 null 原因孤儿任务
+            this.markUnplanned(task, TmUnplannedReasonEnum.CAPACITY_NOT_ENOUGH);
+            this.addToolLimitUnplannedTrace(context, task, toolOverflowQty, startShiftOrder);
+            this.appendCarryoverQty(task, selectedCandidate, firstShiftCandidates, filterRule, scoreStrategy,
+                    context, toolOverflowQty, BigDecimal.ZERO, toolOverflowQty, startShiftOrder);
             return;
         }
 
@@ -1483,6 +1499,31 @@ public class TmMachineAssignService implements ITmMachineAssignService {
     }
 
     /**
+     * 写入工装限制压零未排证据。
+     *
+     * <p>当全局工装池耗尽导致 {@code finalizeSelectedTaskPlan} 将计划量压为零、且存在工装溢出顺延时，
+     * 原任务无法在当前班次占用机台产能，标记产能不足未排并记录工装证据，便于后续追溯工装耗尽与顺延目标。</p>
+     *
+     * @param context           排程上下文
+     * @param task              当前未排任务
+     * @param toolOverflowQty   工装溢出顺延量
+     * @param sourceShiftOrder  来源班次
+     */
+    private void addToolLimitUnplannedTrace(TmScheduleContext context, TmTaskDraft task,
+                                            BigDecimal toolOverflowQty, Integer sourceShiftOrder) {
+        Map<String, Object> evidence = new LinkedHashMap<>();
+        evidence.put("reasonCode", TmUnplannedReasonEnum.CAPACITY_NOT_ENOUGH.getCode());
+        evidence.put("reasonDesc", TmUnplannedReasonEnum.CAPACITY_NOT_ENOUGH.getDesc());
+        evidence.put("sourceType", "TOOL_LIMIT");
+        evidence.put("sourceShiftOrder", sourceShiftOrder);
+        evidence.put("toolOverflowQty", toolOverflowQty);
+        evidence.put("availableToolQty", task.getAvailableToolQty());
+        evidence.put("planQtyBeforeToolLimit", task.getPlanQtyBeforeToolLimit());
+        evidence.put("carryoverTargetShiftFrom", sourceShiftOrder == null ? null : sourceShiftOrder + 1);
+        traceOf(context, task).addRuleHit("TOOL_LIMIT_UNPLANNED", "REJECT", evidence);
+    }
+
+    /**
      * 追加计划量公式说明。
      *
      * @param current  当前说明
@@ -1793,8 +1834,12 @@ public class TmMachineAssignService implements ITmMachineAssignService {
         copy.getMaintenanceHoursByShift().putAll(source.getMaintenanceHoursByShift());
         copy.setMachineSpeed(source.getMachineSpeed());
         copy.getTreadSpeedMap().putAll(source.getTreadSpeedMap());
+        copy.setConfiguredMouthPlateCodes(source.getConfiguredMouthPlateCodes());
         copy.setMouthPlateCodes(source.getMouthPlateCodes());
+        copy.setConfiguredGlueCodes(source.getConfiguredGlueCodes());
+        copy.setAllowedGlueCodes(source.getAllowedGlueCodes());
         copy.setForbiddenGlueCodes(source.getForbiddenGlueCodes());
+        copy.setConfiguredFixedAllowTreadCodes(source.getConfiguredFixedAllowTreadCodes());
         copy.setFixedAllowTreadCodes(source.getFixedAllowTreadCodes());
         copy.setFixedForbidTreadCodes(source.getFixedForbidTreadCodes());
         copy.setMouthPlateMatched(source.getMouthPlateMatched());
@@ -1819,8 +1864,10 @@ public class TmMachineAssignService implements ITmMachineAssignService {
      */
     private void prepareCandidatesForTask(TmTaskDraft task, TmScheduleContext context,
                                           List<TmMachineCandidate> candidates) {
+        boolean hasGlueAllowRule = candidates.stream()
+                .anyMatch(candidate -> contains(candidate.getAllowedGlueCodes(), task.getGlueCode()));
         boolean hasFixedAllowRule = candidates.stream()
-                .anyMatch(candidate -> contains(candidate.getFixedAllowTreadCodes(), task.getTreadCode()));
+                .anyMatch(candidate -> contains(candidate.getConfiguredFixedAllowTreadCodes(), task.getTreadCode()));
         for (TmMachineCandidate candidate : candidates) {
             this.applyEffectivePredecessor(task, context, candidate);
             BigDecimal machineSpeed = resolveMachineSpeed(task, candidate, context);
@@ -1828,7 +1875,7 @@ public class TmMachineAssignService implements ITmMachineAssignService {
             candidate.setMachineSpeed(machineSpeed);
             candidate.setRemainCapacity(remainCapacity);
             candidate.setMouthPlateMatched(isMouthPlateMatched(task, candidate));
-            candidate.setGlueMachineMatched(!contains(candidate.getForbiddenGlueCodes(), task.getGlueCode()));
+            candidate.setGlueMachineMatched(isGlueMachineMatched(task, candidate, hasGlueAllowRule));
             boolean fixedAllowMatched = contains(candidate.getFixedAllowTreadCodes(), task.getTreadCode());
             candidate.setFixedMachineSelected(!hasFixedAllowRule || fixedAllowMatched);
             candidate.setFixedMachineMatched(fixedAllowMatched);
@@ -1860,10 +1907,30 @@ public class TmMachineAssignService implements ITmMachineAssignService {
         if (StrUtil.isBlank(task.getMouthPlateCode())) {
             return true;
         }
-        if (candidate.getMouthPlateCodes() == null) {
-            return !Boolean.FALSE.equals(candidate.getMouthPlateMatched());
+        if (!contains(candidate.getConfiguredMouthPlateCodes(), task.getMouthPlateCode())) {
+            return true;
         }
         return contains(candidate.getMouthPlateCodes(), task.getMouthPlateCode());
+    }
+
+    /**
+     * 判断当前任务胶料是否符合候选机台胶料关系。
+     *
+     * <p>禁用关系始终优先排除；存在允许配置时按允许机台白名单筛选；没有允许配置时不限制。</p>
+     *
+     * @param task             待排任务草稿
+     * @param candidate        候选机台
+     * @param hasGlueAllowRule 当前任务主胶料是否存在允许配置
+     * @return true 表示匹配
+     */
+    private boolean isGlueMachineMatched(TmTaskDraft task, TmMachineCandidate candidate, boolean hasGlueAllowRule) {
+        if (StrUtil.isBlank(task.getGlueCode())) {
+            return true;
+        }
+        if (contains(candidate.getForbiddenGlueCodes(), task.getGlueCode())) {
+            return false;
+        }
+        return !hasGlueAllowRule || contains(candidate.getAllowedGlueCodes(), task.getGlueCode());
     }
 
     /**

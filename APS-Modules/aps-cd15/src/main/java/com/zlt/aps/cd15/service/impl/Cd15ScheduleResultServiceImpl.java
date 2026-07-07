@@ -6,14 +6,25 @@ import com.zlt.aps.cd15.api.domain.entity.Cd15ScheduleResult;
 import com.zlt.aps.cd15.api.domain.vo.Cd15ChangeQtyRequest;
 import com.zlt.aps.cd15.api.domain.vo.Cd15InsertOrderRequest;
 import com.zlt.aps.cd15.api.domain.vo.Cd15TransferMachineRequest;
+import com.zlt.aps.cd15.engine.constant.Cd15ScheduleTaskType;
+import com.zlt.aps.cd15.engine.domain.Cd15ScheduleTask;
+import com.zlt.aps.cd15.engine.model.Cd15BatchDataCheckResult;
+import com.zlt.aps.cd15.engine.service.Cd15AutoScheduleBatchDataValidator;
+import com.zlt.aps.cd15.engine.service.Cd15AutoScheduleInputVersionService;
+import com.zlt.aps.cd15.engine.service.Cd15ScheduleTaskService;
 import com.zlt.aps.cd15.service.ICd15ScheduleResultService;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.sysdef.domain.SysDocType;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import javax.annotation.Resource;
 import java.text.MessageFormat;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.util.Date;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.IntStream;
@@ -25,12 +36,18 @@ import java.util.stream.IntStream;
 @Transactional(rollbackFor = Exception.class)
 public class Cd15ScheduleResultServiceImpl extends AbstractDocService<Cd15ScheduleResult> implements ICd15ScheduleResultService {
 
-    private static final String TASK_STATUS_SUCCESS = "SUCCESS";
-    private static final String TASK_STAGE_ENGINE_PENDING = "ENGINE_NOT_IMPLEMENTED";
+    @Resource
+    private Cd15ScheduleTaskService taskService;
+
+    @Resource
+    private Cd15AutoScheduleBatchDataValidator batchDataValidator;
+
+    @Resource
+    private Cd15AutoScheduleInputVersionService inputVersionService;
 
     /**
      * 斜裁自动排程 Service 入口。
-     * 首期只打通页面到 Service 的链路，Engine 暂不实现。
+     * 当前阶段先创建真实异步任务记录，算法执行链路后续补齐。
      *
      * @param scheduleResult 自动排程条件
      * @return 任务入口结构
@@ -46,12 +63,28 @@ public class Cd15ScheduleResultServiceImpl extends AbstractDocService<Cd15Schedu
         if (scheduleResult.getScheduleDate() == null) {
             return this.required("scheduleDate");
         }
-        return this.successTask("AUTO_SCHEDULE");
+        LocalDate localScheduleDate = this.toLocalDate(scheduleResult.getScheduleDate());
+        Cd15BatchDataCheckResult batchCheck = batchDataValidator.check(
+                scheduleResult.getFactoryCode(), localScheduleDate);
+        if (batchCheck.isFailed()) {
+            Map<String, Object> data = new LinkedHashMap<>();
+            data.put("needConfirm", false);
+            data.put("batchCheckFailed", true);
+            data.put("errors", this.toErrorList(batchCheck.getErrors()));
+            data.put("warnings", this.toErrorList(batchCheck.getWarnings()));
+            return AjaxResult.success(batchCheck.getPrimaryMessage(), data);
+        }
+        String inputVersion = inputVersionService.fingerprint(scheduleResult.getFactoryCode(), localScheduleDate);
+        String snapshot = "factoryCode=" + scheduleResult.getFactoryCode()
+                + ",scheduleDate=" + scheduleResult.getScheduleDate()
+                + ",forceRegenerate=" + Boolean.TRUE.equals(scheduleResult.getForceRegenerate());
+        return this.createTask(scheduleResult.getFactoryCode(), scheduleResult.getScheduleDate(),
+                Cd15ScheduleTaskType.AUTO_SCHEDULE, snapshot, inputVersion);
     }
 
     @Override
     public AjaxResult getAutoScheduleTask(String taskId) {
-        return this.successTaskView(taskId, "AUTO_SCHEDULE");
+        return this.taskView(taskId, Cd15ScheduleTaskType.AUTO_SCHEDULE);
     }
 
     @Override
@@ -65,7 +98,7 @@ public class Cd15ScheduleResultServiceImpl extends AbstractDocService<Cd15Schedu
 
     /**
      * 斜裁插单 Service 入口。
-     * 首期只做参数契约和任务入口返回，Engine 暂不实现。
+     * 当前阶段先创建真实异步任务记录，滚动重排链路后续补齐。
      *
      * @param request 插单请求
      * @return 任务入口结构
@@ -76,12 +109,13 @@ public class Cd15ScheduleResultServiceImpl extends AbstractDocService<Cd15Schedu
         if (!Objects.equals(200, validation.get("code"))) {
             return validation;
         }
-        return this.successTask("INSERT_ORDER");
+        return this.createTask(request.getFactoryCode(), request.getScheduleDate(),
+                Cd15ScheduleTaskType.INSERT_ORDER, request.toString());
     }
 
     @Override
     public AjaxResult getInsertTask(String taskId) {
-        return this.successTaskView(taskId, "INSERT_ORDER");
+        return this.taskView(taskId, Cd15ScheduleTaskType.INSERT_ORDER);
     }
 
     @Override
@@ -109,7 +143,7 @@ public class Cd15ScheduleResultServiceImpl extends AbstractDocService<Cd15Schedu
 
     /**
      * 斜裁转机台 Service 入口。
-     * 首期只做参数契约和任务入口返回，Engine 暂不实现。
+     * 当前阶段先创建真实异步任务记录，滚动重排链路后续补齐。
      *
      * @param request 转机台请求
      * @return 任务入口结构
@@ -120,12 +154,13 @@ public class Cd15ScheduleResultServiceImpl extends AbstractDocService<Cd15Schedu
         if (!Objects.equals(200, validation.get("code"))) {
             return validation;
         }
-        return this.successTask("TRANSFER_MACHINE");
+        return this.createTask(request.getFactoryCode(), request.getScheduleDate(),
+                Cd15ScheduleTaskType.TRANSFER_MACHINE, request.toString());
     }
 
     @Override
     public AjaxResult getTransferMachineTask(String taskId) {
-        return this.successTaskView(taskId, "TRANSFER_MACHINE");
+        return this.taskView(taskId, Cd15ScheduleTaskType.TRANSFER_MACHINE);
     }
 
     @Override
@@ -157,7 +192,7 @@ public class Cd15ScheduleResultServiceImpl extends AbstractDocService<Cd15Schedu
 
     /**
      * 斜裁调量 Service 入口。
-     * 首期只做参数契约和任务入口返回，Engine 暂不实现。
+     * 当前阶段先创建真实异步任务记录，滚动重排链路后续补齐。
      *
      * @param request 调量请求
      * @return 任务入口结构
@@ -168,17 +203,18 @@ public class Cd15ScheduleResultServiceImpl extends AbstractDocService<Cd15Schedu
         if (!Objects.equals(200, validation.get("code"))) {
             return validation;
         }
-        return this.successTask("CHANGE_QTY");
+        return this.createTask(request.getFactoryCode(), request.getScheduleDate(),
+                Cd15ScheduleTaskType.CHANGE_QTY, request.toString());
     }
 
     @Override
     public AjaxResult getChangeQtyTask(String taskId) {
-        return this.successTaskView(taskId, "CHANGE_QTY");
+        return this.taskView(taskId, Cd15ScheduleTaskType.CHANGE_QTY);
     }
 
     @Override
     public AjaxResult publish(Cd15ScheduleResult dto, String ids) {
-        return this.successTask("PUBLISH");
+        return AjaxResult.success(I18nUtil.getMessage("ui.message.operation.success"));
     }
 
     private AjaxResult validateInsertRequired(Cd15InsertOrderRequest request) {
@@ -228,26 +264,59 @@ public class Cd15ScheduleResultServiceImpl extends AbstractDocService<Cd15Schedu
         return (Double) request.getFieldValueByFieldName(String.format("class%dPlanQty", classIndex));
     }
 
-    private AjaxResult successTask(String taskType) {
-        Map<String, Object> data = new LinkedHashMap<>();
-        data.put("taskId", "CD15-" + taskType + "-" + System.currentTimeMillis());
-        data.put("taskType", taskType);
-        data.put("taskStatus", TASK_STATUS_SUCCESS);
-        data.put("progress", 100);
-        data.put("currentStageName", TASK_STAGE_ENGINE_PENDING);
-        data.put("engineImplemented", false);
-        return AjaxResult.success(I18nUtil.getMessage("ui.message.operation.success"), data);
+    private AjaxResult createTask(String factoryCode, Date scheduleDate, String taskType, String requestSnapshot) {
+        return this.createTask(factoryCode, scheduleDate, taskType, requestSnapshot, null);
     }
 
-    private AjaxResult successTaskView(String taskId, String taskType) {
+    private AjaxResult createTask(String factoryCode, Date scheduleDate, String taskType,
+                                  String requestSnapshot, String inputVersion) {
+        Cd15ScheduleTask task = taskService.createPending(factoryCode, scheduleDate, taskType,
+                "MANUAL", requestSnapshot, inputVersion, null);
+        return AjaxResult.success(I18nUtil.getMessage("ui.message.operation.success"), this.toTaskData(task));
+    }
+
+    private AjaxResult taskView(String taskId, String expectedTaskType) {
+        if (this.isBlank(taskId)) {
+            return this.required("taskId");
+        }
+        Cd15ScheduleTask task = taskService.findByTaskId(taskId);
+        if (task == null || !expectedTaskType.equals(task.getTaskType())) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.message.parameter.error"));
+        }
+        return AjaxResult.success(this.toTaskData(task));
+    }
+
+    private List<Map<String, Object>> toErrorList(List<Cd15BatchDataCheckResult.CheckError> errors) {
+        return errors.stream()
+                .map(error -> {
+                    Map<String, Object> item = new LinkedHashMap<>();
+                    item.put("field", error.getField());
+                    item.put("reasonCode", error.getReasonCode());
+                    item.put("message", error.getMessage());
+                    item.put("suggestion", error.getSuggestion());
+                    return item;
+                })
+                .collect(java.util.stream.Collectors.toList());
+    }
+
+    private LocalDate toLocalDate(Date scheduleDate) {
+        return scheduleDate.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+    }
+
+    private Map<String, Object> toTaskData(Cd15ScheduleTask task) {
         Map<String, Object> data = new LinkedHashMap<>();
-        data.put("taskId", taskId);
-        data.put("taskType", taskType);
-        data.put("taskStatus", TASK_STATUS_SUCCESS);
-        data.put("progress", 100);
-        data.put("currentStageName", TASK_STAGE_ENGINE_PENDING);
+        data.put("needConfirm", false);
+        data.put("taskId", task.getTaskId());
+        data.put("taskType", task.getTaskType());
+        data.put("taskStatus", task.getTaskStatus());
+        data.put("progress", task.getProgress());
+        data.put("currentStage", task.getCurrentStage());
+        data.put("currentStageName", task.getCurrentStageName());
+        data.put("batchNo", task.getBatchNo());
+        data.put("inputVersion", task.getInputVersion());
+        data.put("errorMessage", task.getErrorMessage());
         data.put("engineImplemented", false);
-        return AjaxResult.success(data);
+        return data;
     }
 
     private AjaxResult required(String fieldName) {

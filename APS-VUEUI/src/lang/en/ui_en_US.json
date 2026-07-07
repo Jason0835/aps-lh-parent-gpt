@@ -940,4 +940,21 @@
   "ui.data.column.cd15ScheduleResult.cutMode": "Cut Mode",
   "ui.data.column.cd15ScheduleResult.sourceType": "Source Type",
   "ui.data.column.cd15ScheduleResult.isLocked": "Locked"
+  "ui.data.column.scheduleResult.midHandAnalysis": "Mid Shift Manual Analysis",
+  "ui.data.column.tm.scheduleResult.autoPlanProgress": "TM Auto Schedule Progress",
+  "ui.data.column.tm.scheduleResult.autoPlanProgressHint": "Scheduling is running. Do not close this page.",
+  "ui.data.column.tm.scheduleResult.autoPlanSuccess": "TM auto schedule completed",
+  "ui.data.column.tm.scheduleResult.autoPlanFailed": "TM auto schedule failed",
+  "ui.data.column.tm.scheduleResult.autoPlanTimeout": "TM auto schedule query timed out",
+  "ui.data.column.tm.scheduleResult.autoPlanIssues": "Current Schedule Issues",
+  "ui.data.column.tm.scheduleResult.issueLevel": "Level",
+  "ui.data.column.tm.scheduleResult.issueStage": "Stage",
+  "ui.data.column.tm.scheduleResult.issueCategory": "Category",
+  "ui.data.column.tm.scheduleResult.issueSourceOrderNo": "Source Order",
+  "ui.data.column.tm.scheduleResult.issueEmbryoCode": "Embryo Code",
+  "ui.data.column.tm.scheduleResult.issueRecipeNo": "Recipe No.",
+  "ui.data.column.tm.scheduleResult.issueShiftOrder": "Shift",
+  "ui.data.column.tm.scheduleResult.issueFieldName": "Field",
+  "ui.data.column.tm.scheduleResult.issueMessage": "Message"
+
 }

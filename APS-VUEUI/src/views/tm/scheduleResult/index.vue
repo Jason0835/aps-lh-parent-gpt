@@ -83,12 +83,62 @@
     <infoDialog ref="infoRef" @success="getList" />
     <changeMachineDialog ref="changeMachineRef" @success="getList" />
     <releaseStatusDialog ref="releaseStatusRef" @success="getList" />
+    <el-dialog
+      :close-on-click-modal="false"
+      :close-on-press-escape="false"
+      :show-close="false"
+      :title="$t('ui.data.column.tm.scheduleResult.autoPlanProgress')"
+      :visible.sync="autoPlanProgressVisible"
+      append-to-body
+      width="420px"
+    >
+      <div style="text-align:center;margin-bottom:12px;color:#606266;font-size:14px;">
+        {{ autoPlanProgressStage }}
+      </div>
+      <el-progress
+        class="auto-plan-progress"
+        :percentage="autoPlanProgressValue"
+        :status="autoPlanProgressStatus"
+        :stroke-width="18"
+        :text-inside="true"
+        text-color="#fff"
+      />
+      <div style="margin-top:10px;color:#909399;font-size:12px;text-align:center;">
+        {{ autoPlanProgressHint }}
+      </div>
+    </el-dialog>
+    <el-dialog
+      :title="$t('ui.data.column.tm.scheduleResult.autoPlanIssues')"
+      :visible.sync="autoPlanIssueVisible"
+      append-to-body
+      width="80%"
+    >
+      <el-table :data="autoPlanIssues" border style="width:100%">
+        <el-table-column :label="$t('ui.data.column.tm.scheduleResult.issueLevel')" prop="level" width="90" />
+        <el-table-column :label="$t('ui.data.column.tm.scheduleResult.issueStage')" prop="stageName" width="120" />
+        <el-table-column :label="$t('ui.data.column.tm.scheduleResult.issueCategory')" prop="category" width="170" />
+        <el-table-column :label="$t('ui.data.column.tm.scheduleResult.issueSourceOrderNo')" prop="sourceOrderNo" width="160" />
+        <el-table-column :label="$t('ui.data.column.tm.scheduleResult.issueEmbryoCode')" prop="embryoCode" width="150" />
+        <el-table-column :label="$t('ui.data.column.tm.scheduleResult.issueRecipeNo')" prop="recipeNo" width="150" />
+        <el-table-column :label="$t('ui.data.column.tm.scheduleResult.issueShiftOrder')" prop="shiftOrder" width="90" />
+        <el-table-column :label="$t('ui.data.column.tm.scheduleResult.issueFieldName')" prop="fieldName" width="150" />
+        <el-table-column :label="$t('ui.data.column.tm.scheduleResult.issueMessage')" min-width="220" prop="message" show-overflow-tooltip />
+      </el-table>
+    </el-dialog>
   </basic-container>
 </template>
 <script>
 import {mapState} from "vuex";
 import {downloadLink} from "@/utils/request";
-import {listScheduleShiftDates, listTmScheduleResult, publishScheduleResult, publishValidate, removeTmScheduleResult,} from "@/api/tm/scheduleResult";
+import {
+  getAutoPlanTask,
+  getLatestAutoPlanTask,
+  listScheduleShiftDates,
+  listTmScheduleResult,
+  publishScheduleResult,
+  publishValidate,
+  removeTmScheduleResult,
+} from "@/api/tm/scheduleResult";
 import tltUpload from "@/components/tltUpload/tltUpload.vue";
 import TltUploadForm from "@/views/components/tltUploadForm.vue";
 import autoPlanDialog from "./components/autoPlanDialog.vue";
@@ -156,6 +206,16 @@ export default {
       query: {},
       importDefaultValue: {},
       importRules: {},
+      autoPlanTimer: null,
+      autoPlanPollTimes: 0,
+      maxAutoPlanPollTimes: 120,
+      autoPlanProgressVisible: false,
+      autoPlanProgressValue: 0,
+      autoPlanProgressStage: "",
+      autoPlanProgressStatus: null,
+      autoPlanProgressHint: "",
+      autoPlanIssueVisible: false,
+      autoPlanIssues: [],
       dateList: [
         { shift: 1, shiftType: "night", shiftDate: "" },
         { shift: 2, shiftType: "morning", shiftDate: "" },
@@ -501,8 +561,8 @@ export default {
         );
       }
     },
-    // 自动排程成功后同步查询日期并刷新列表。
-    handleAutoPlanSuccess(scheduleDate) {
+    // 自动排程提交成功后启动后台任务轮询。
+    handleAutoPlanSuccess(scheduleDate, payload) {
       if (scheduleDate) {
         this.$set(this.query, "scheduleDate", scheduleDate);
         this.search = {
@@ -510,7 +570,98 @@ export default {
           scheduleDate: scheduleDate
         };
       }
+      const result = payload || {};
+      if (result.taskId) {
+        this.pollAutoPlanTask(result.taskId);
+        return;
+      }
       this.getList();
+    },
+    pollAutoPlanTask(taskId) {
+      this.clearAutoPlanTimer();
+      this.autoPlanPollTimes = 0;
+      this.autoPlanProgressVisible = true;
+      this.autoPlanProgressValue = 0;
+      this.autoPlanProgressStage = "";
+      this.autoPlanProgressStatus = null;
+      this.autoPlanProgressHint = this.$t("ui.data.column.tm.scheduleResult.autoPlanProgressHint");
+      const poll = () => {
+        getAutoPlanTask(taskId).then(res => {
+          this.autoPlanPollTimes += 1;
+          const task = res && res.data ? res.data : (res || {});
+          if (task.progress != null) {
+            this.autoPlanProgressValue = Math.min(100, Math.max(0, task.progress));
+          }
+          if (task.currentStageName) {
+            this.autoPlanProgressStage = task.currentStageName;
+          }
+          if (task.taskStatus === "SUCCESS") {
+            this.clearAutoPlanTimer();
+            this.autoPlanProgressValue = 100;
+            this.autoPlanProgressStatus = "success";
+            this.autoPlanProgressStage = this.$t("ui.data.column.tm.scheduleResult.autoPlanSuccess");
+            window.setTimeout(() => { this.closeAutoPlanProgress(); }, 600);
+            this.showAutoPlanIssues(task.issues);
+            this.getList();
+            return;
+          }
+          if (task.taskStatus === "FAILED") {
+            this.clearAutoPlanTimer();
+            this.autoPlanProgressStatus = "exception";
+            this.autoPlanProgressStage = this.$t("ui.data.column.tm.scheduleResult.autoPlanFailed");
+            this.showAutoPlanIssues(task.issues);
+            this.$modal.msgError(task.message || this.$t("ui.data.column.tm.scheduleResult.autoPlanFailed"));
+            window.setTimeout(() => { this.closeAutoPlanProgress(); }, 3000);
+            return;
+          }
+          if (this.autoPlanPollTimes >= this.maxAutoPlanPollTimes) {
+            this.clearAutoPlanTimer();
+            this.autoPlanProgressStatus = "exception";
+            this.autoPlanProgressStage = this.$t("ui.data.column.tm.scheduleResult.autoPlanTimeout");
+            this.$modal.msgWarning(this.$t("ui.data.column.tm.scheduleResult.autoPlanTimeout"));
+            window.setTimeout(() => { this.closeAutoPlanProgress(); }, 3000);
+            return;
+          }
+          this.autoPlanTimer = window.setTimeout(poll, 3000);
+        }).catch(() => {
+          this.clearAutoPlanTimer();
+          this.autoPlanProgressStatus = "exception";
+          this.autoPlanProgressStage = this.$t("ui.data.column.tm.scheduleResult.autoPlanTimeout");
+          this.$modal.msgWarning(this.$t("ui.data.column.tm.scheduleResult.autoPlanTimeout"));
+          window.setTimeout(() => { this.closeAutoPlanProgress(); }, 3000);
+        });
+      };
+      poll();
+    },
+    clearAutoPlanTimer() {
+      if (this.autoPlanTimer) {
+        window.clearTimeout(this.autoPlanTimer);
+        this.autoPlanTimer = null;
+      }
+    },
+    closeAutoPlanProgress() {
+      this.autoPlanProgressVisible = false;
+      this.autoPlanProgressValue = 0;
+      this.autoPlanProgressStage = "";
+      this.autoPlanProgressStatus = null;
+      this.autoPlanProgressHint = "";
+    },
+    showAutoPlanIssues(issues) {
+      this.autoPlanIssues = Array.isArray(issues) ? issues : [];
+      this.autoPlanIssueVisible = this.autoPlanIssues.length > 0;
+    },
+    restoreLatestAutoPlanTask() {
+      const factoryCode = this.query.factoryCode || this.search.factoryCode;
+      const scheduleDate = this.query.scheduleDate || this.search.scheduleDate;
+      if (!factoryCode || !scheduleDate) {
+        return;
+      }
+      getLatestAutoPlanTask({ factoryCode, scheduleDate }).then(res => {
+        const task = res && res.data ? res.data : null;
+        if (task && task.taskId && (task.taskStatus === "PENDING" || task.taskStatus === "RUNNING")) {
+          this.pollAutoPlanTask(task.taskId);
+        }
+      }).catch(() => {});
     },
     // 转机台弹窗
     handleChangeMachine() {
@@ -662,9 +813,13 @@ export default {
       scheduleDate: getOffsetDate(2),
     };
     this.getList();
+    this.restoreLatestAutoPlanTask();
   },
   activated() {
     // this.getList();
+  },
+  beforeDestroy() {
+    this.clearAutoPlanTimer();
   },
 };
 </script>

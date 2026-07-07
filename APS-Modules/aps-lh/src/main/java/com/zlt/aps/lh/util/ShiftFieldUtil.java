@@ -7,11 +7,7 @@ import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.Date;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 
 /**
  * 通过 Hutool BeanUtil 统一读写 {@link LhScheduleResult} 的 class1～class8 班次字段（与 shiftIndex 对应）。
@@ -107,6 +103,25 @@ public final class ShiftFieldUtil {
                 BeanUtil.setProperty(result, propertyPrefix(shiftIndex) + "LhType", null);
             }
         }
+    }
+
+    /**
+     * 清空指定班次的辅助计划字段（开始时间、结束时间、硫化示方书号、硫化示方书类型）。
+     * <p>当计划量被调为 0 时，班次不再排产，需要同步清空这些字段避免脏数据残留。</p>
+     *
+     * @param result     排程结果
+     * @param shiftIndex 班次索引（1~8）
+     */
+    public static void clearShiftPlanAuxFields(LhScheduleResult result, int shiftIndex) {
+        if (!isValidIndex(shiftIndex)) {
+            log.warn("未知班次索引: {}", shiftIndex);
+            return;
+        }
+        String prefix = propertyPrefix(shiftIndex);
+        BeanUtil.setProperty(result, prefix + "StartTime", null);
+        BeanUtil.setProperty(result, prefix + "EndTime", null);
+        BeanUtil.setProperty(result, prefix + "LhNo", null);
+        BeanUtil.setProperty(result, prefix + "LhType", null);
     }
 
     /**

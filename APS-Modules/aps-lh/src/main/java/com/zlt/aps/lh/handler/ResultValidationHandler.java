@@ -28,6 +28,7 @@ import com.zlt.aps.lh.exception.ScheduleException;
 import com.zlt.aps.lh.service.impl.SchedulePersistenceService;
 import com.zlt.aps.lh.util.LeftRightMouldUtil;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
+import com.zlt.aps.lh.util.LhSingleControlMachineUtil;
 import com.zlt.aps.lh.util.ShiftCapacityResolverUtil;
 import com.zlt.aps.lh.util.ShiftFieldUtil;
 import com.ruoyi.common.i18n.utils.I18nUtil;
@@ -122,9 +123,6 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
             // S4.6.5.3 无计划量班次不展示硫化示方号和类型，避免空班次携带示方信息。
             clearUnplannedShiftCureFormulaFields(context);
 
-            // S4.6.5.4 清洗分析标识：被清洗窗口覆盖的班次在analysis中标识原因
-            applyCleaningAnalysis(context);
-
             // S4.6.6 保存排程结果到数据库：由持久化服务统一做目标日原子替换。
             schedulePersistenceService.replaceScheduleAtomically(context);
 
@@ -202,12 +200,107 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
                 throwValidationFailure(context, result, I18nUtil.getMessage("ui.data.column.lhScheduleResult.mouldCodeMissingInChangeMould"));
             }
         }
+//        validateWholeSingleControlMachineResults(context);
 
 //        TODO 这两个校验当前保持历史关闭状态。后续如需打开，应先用真实批次验证同胎胚换模和多机台补满结果。
 //        validateGreenTireChangeoverShift(context);
 //        validateProductionQuantityPolicy(context);
 
         log.info("排程后置校验完成");
+    }
+
+    /**
+     * 校验正规 SKU 单控整机结果完整性。
+     * <p>试制、量试、小批量 SKU 允许单边使用单控机台；正规 SKU 只要落到配置生效的 L/R 单控机台，
+     * 就必须同时存在配对侧结果，且物料、生产开始时间、生产结束时间、各班次计划量完全一致。</p>
+     *
+     * @param context 排程上下文
+     */
+    private void validateWholeSingleControlMachineResults(LhScheduleContext context) {
+        if (Objects.isNull(context) || CollectionUtils.isEmpty(context.getScheduleResultList())) {
+            return;
+        }
+        for (LhScheduleResult result : context.getScheduleResultList()) {
+            if (!shouldValidateWholeSingleControlResult(context, result)) {
+                continue;
+            }
+            LhScheduleResult pairResult = findPairSingleControlResult(context, result);
+            if (Objects.isNull(pairResult)) {
+                throwValidationFailure(context, result, "正规SKU使用单控机台必须同时生成L/R两侧排产结果");
+            }
+            if (!isWholeSingleControlPairResultConsistent(result, pairResult)) {
+                throwValidationFailure(context, result, "正规SKU单控机台L/R两侧物料、时间或班次计划量不一致");
+            }
+        }
+    }
+
+    /**
+     * 判断当前结果是否需要执行正规 SKU 单控整机校验。
+     *
+     * @param context 排程上下文
+     * @param result 排程结果
+     * @return true-需要校验
+     */
+    private boolean shouldValidateWholeSingleControlResult(LhScheduleContext context, LhScheduleResult result) {
+        if (Objects.isNull(result)
+                || resolveResultPlanQty(result) <= 0
+                || !LhSingleControlMachineUtil.isConfiguredSingleControlMachine(context, result.getLhMachineCode())) {
+            return false;
+        }
+        SkuScheduleDTO sourceSku = context.getScheduleResultSourceSkuMap().get(result);
+        return Objects.nonNull(sourceSku)
+                && LhSingleControlMachineUtil.isWholeMachineGranularitySku(sourceSku);
+    }
+
+    /**
+     * 查找正规 SKU 单控结果的配对侧结果。
+     *
+     * @param context 排程上下文
+     * @param result 当前结果
+     * @return 配对侧结果；不存在时返回 null
+     */
+    private LhScheduleResult findPairSingleControlResult(LhScheduleContext context, LhScheduleResult result) {
+        String pairMachineCode = LhSingleControlMachineUtil.resolvePairMachineCode(result.getLhMachineCode());
+        if (StringUtils.isEmpty(pairMachineCode)) {
+            return null;
+        }
+        for (LhScheduleResult candidate : context.getScheduleResultList()) {
+            if (candidate == result || Objects.isNull(candidate)) {
+                continue;
+            }
+            if (StringUtils.equals(pairMachineCode, candidate.getLhMachineCode())
+                    && StringUtils.equals(result.getMaterialCode(), candidate.getMaterialCode())
+                    && resolveResultPlanQty(candidate) > 0) {
+                return candidate;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * 判断单控 L/R 两侧结果是否满足整机一致性。
+     *
+     * @param leftResult 当前侧结果
+     * @param rightResult 配对侧结果
+     * @return true-一致
+     */
+    private boolean isWholeSingleControlPairResultConsistent(LhScheduleResult leftResult,
+                                                             LhScheduleResult rightResult) {
+        if (!StringUtils.equals(leftResult.getMaterialCode(), rightResult.getMaterialCode())) {
+            return false;
+        }
+        if (!Objects.equals(resolveProductionStartTime(leftResult), resolveProductionStartTime(rightResult))
+                || !Objects.equals(leftResult.getSpecEndTime(), rightResult.getSpecEndTime())) {
+            return false;
+        }
+        for (int shiftIndex = 1; shiftIndex <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT; shiftIndex++) {
+            Integer leftQty = ShiftFieldUtil.getShiftPlanQty(leftResult, shiftIndex);
+            Integer rightQty = ShiftFieldUtil.getShiftPlanQty(rightResult, shiftIndex);
+            if (!Objects.equals(leftQty, rightQty)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /**
@@ -359,7 +452,7 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
         if (scheduledQty <= targetQty) {
             return;
         }
-        String message = String.format(I18nUtil.getMessage("ui.data.column.lhScheduleResult.strictUpperLimitExceeded"),
+        String message = String.format("严格目标量SKU超排：物料[%s] 目标量[%d] 实际排产[%d]",
                 sku.getMaterialCode(), targetQty, scheduledQty);
         log.error("排程结果校验失败, {}", message);
         throw new ScheduleException(ScheduleStepEnum.S4_6_RESULT_VALIDATION,
@@ -386,7 +479,7 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
         int allowedOverQty = Math.max(validationShiftCapacity,
                 sku != null ? Math.max(0, sku.getShiftFillOverQty()) : 0);
         if (allowedOverQty > 0 && overQty > allowedOverQty) {
-            String message = String.format(I18nUtil.getMessage("ui.data.column.lhScheduleResult.formalOverShiftCapacity"),
+            String message = String.format("正式/量试SKU超排超过最后已开班补满范围：物料[%s] 目标量[%d] 实际排产[%d] 超排[%d] 班产[%d]",
                     sku.getMaterialCode(), targetQty, scheduledQty, overQty, validationShiftCapacity);
             log.error("排程结果校验失败, {}", message);
             throw new ScheduleException(ScheduleStepEnum.S4_6_RESULT_VALIDATION,
@@ -394,7 +487,7 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
                     context.getFactoryCode(), context.getBatchNo(), message);
         }
         if (scheduledQty < targetQty && !hasUnscheduledResult(context, sku)) {
-            String message = String.format(I18nUtil.getMessage("ui.data.column.lhScheduleResult.formalTargetNotMet"),
+            String message = String.format("正式/量试SKU未满足窗口目标量且无未排记录：物料[%s] 目标量[%d] 实际排产[%d]",
                     sku.getMaterialCode(), targetQty, scheduledQty);
             log.error("排程结果校验失败, {}", message);
             throw new ScheduleException(ScheduleStepEnum.S4_6_RESULT_VALIDATION,
@@ -696,7 +789,7 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
                         && !r.isRollingInherited()
                         && r.getDailyPlanQty() != null
                         && r.getDailyPlanQty() > 0)
-                .sorted(Comparator.comparing(LhScheduleResult::getLhMachineCode, Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER))
+                .sorted(Comparator.comparing(LhScheduleResult::getLhMachineCode, Comparator.nullsLast(String::compareTo))
                         .thenComparing(this::resolvePlannedMouldChangeStartTime, Comparator.nullsLast(Date::compareTo))
                         .thenComparing(LhScheduleResult::getSpecEndTime, Comparator.nullsLast(Date::compareTo)))
                 .collect(Collectors.toList());
@@ -1720,221 +1813,5 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
             }
         }
         return null;
-    }
-
-    /**
-     * 为被清洗窗口覆盖的班次设置分析标识。
-     * <p>遍历每个排程结果，检查其每个班次是否被清洗窗口覆盖，
-     * 如果被覆盖则在 classNAnalysis 中标识清洗原因（干冰清洗/喷砂清洗）。</p>
-     *
-     * @param context 排程上下文
-     */
-    private void applyCleaningAnalysis(LhScheduleContext context) {
-        if (CollectionUtils.isEmpty(context.getScheduleResultList())) {
-            return;
-        }
-        for (LhScheduleResult result : context.getScheduleResultList()) {
-            String machineCode = result.getLhMachineCode();
-            MachineScheduleDTO machine = context.getMachineScheduleMap().get(machineCode);
-            if (machine == null || CollectionUtils.isEmpty(machine.getCleaningWindowList())) {
-                continue;
-            }
-            List<MachineCleaningWindowDTO> cleaningWindowList = machine.getCleaningWindowList();
-            List<LhShiftConfigVO> shifts = context.getScheduleWindowShifts();
-            if (CollectionUtils.isEmpty(shifts)) {
-                continue;
-            }
-            // 遍历每个清洗窗口，只标识清洗结束时间所在的班次
-            for (MachineCleaningWindowDTO cleaningWindow : cleaningWindowList) {
-                if (cleaningWindow == null || cleaningWindow.getCleanStartTime() == null
-                        || cleaningWindow.getCleanEndTime() == null) {
-                    continue;
-                }
-                tagCleaningEndShift(result, cleaningWindow, shifts, machineCode);
-            }
-            // 检查因有可换模具而跳过的喷砂清洗
-            Map<String, Date> skippedMap = context.getSkippedSandblastCleaningMap();
-            if (skippedMap != null && !skippedMap.isEmpty()) {
-                Date skippedCleanTime = skippedMap.get(machineCode);
-                if (skippedCleanTime != null) {
-                    tagSkippedSandblastCleaningShift(result, skippedCleanTime, shifts, machineCode);
-                }
-            }
-        }
-    }
-
-    /**
-     * 标识清洗结束时间所在的班次。
-     * <p>实际清洗开始时间取 max(计划清洗开始时间, 清洗前最后一个有计划量班次的实际完工时间)，
-     * 再加上清洗时长得到实际清洗结束时间，用于定位标识班次。</p>
-     * <p>注意：排产结果中班次endTime可能被清洗窗口截断（如class4EndTime=清洗开始时间），
-     * 不能直接使用。需要按 planQty×lhTime 从班次startTime推算实际完工时间。</p>
-     */
-    private void tagCleaningEndShift(LhScheduleResult result, MachineCleaningWindowDTO cleaningWindow,
-                                     List<LhShiftConfigVO> shifts, String machineCode) {
-        Date cleanStartTime = cleaningWindow.getCleanStartTime();
-        Date cleanEndTimeOrig = cleaningWindow.getCleanEndTime();
-        // 查找清洗窗口开始时仍在生产的班次的实际完工时间
-        // 向上取整导致实际生产时间可能超过班次可用时间，需用比例方式推算
-        Date lastShiftActualEndTime = null;
-        Integer lhTime = result.getLhTime();
-        Integer mouldQty = result.getMouldQty();
-        Integer singleMouldShiftQty = result.getSingleMouldShiftQty();
-        log.debug("[清洗分析标识-调试] 机台: {}, lhTime: {}, mouldQty: {}, singleMouldShiftQty: {}, 清洗窗口: {}~{}",
-                machineCode, lhTime, mouldQty, singleMouldShiftQty,
-                LhScheduleTimeUtil.formatDateTime(cleanStartTime),
-                LhScheduleTimeUtil.formatDateTime(cleanEndTimeOrig));
-        if (lhTime != null && lhTime > 0 && singleMouldShiftQty != null && singleMouldShiftQty > 0) {
-            int resolvedMouldQty = (mouldQty != null && mouldQty > 0) ? mouldQty : 1;
-            for (int si = 1; si <= 8; si++) {
-                Integer planQty = ShiftFieldUtil.getShiftPlanQty(result, si);
-                if (planQty != null && planQty > 0) {
-                    Date shiftStart = ShiftFieldUtil.getShiftStartTime(result, si);
-                    // 只考虑清洗开始时间之前或同时开始的班次（清洗期间新开始的班次不算）
-                    if (shiftStart == null || shiftStart.after(cleanStartTime)) {
-                        log.debug("[清洗分析标识-调试] 机台: {}, 班次: {} 跳过, shiftStart: {}",
-                                machineCode, si,
-                                shiftStart != null ? LhScheduleTimeUtil.formatDateTime(shiftStart) : "null");
-                        continue;
-                    }
-                    // 用满班次时长推算实际完工时间
-                    // 单模排产周期数 = ceil(planQty / mouldQty)
-                    // 单模满班周期数 = singleMouldShiftQty / mouldQty（班产/模台数）
-                    // 满班次时长从班次配置获取
-                    LhShiftConfigVO shiftConfig = findShiftByIndex(shifts, si);
-                    long fullShiftSeconds = 0;
-                    if (shiftConfig != null && shiftConfig.getShiftStartDateTime() != null
-                            && shiftConfig.getShiftEndDateTime() != null) {
-                        fullShiftSeconds = (shiftConfig.getShiftEndDateTime().getTime()
-                                - shiftConfig.getShiftStartDateTime().getTime()) / 1000L;
-                    }
-                    if (fullShiftSeconds <= 0) {
-                        fullShiftSeconds = 8 * 3600L; // 默认8小时
-                    }
-                    int singleMouldQty = (planQty + resolvedMouldQty - 1) / resolvedMouldQty;
-                    int singleMouldFullShift = singleMouldShiftQty / resolvedMouldQty;
-                    // 实际生产秒数 = 单模排产数 / 单模满班产 × 满班次时长
-                    long productionMs = BigDecimal.valueOf(singleMouldQty)
-                            .multiply(BigDecimal.valueOf(fullShiftSeconds * 1000L))
-                            .divide(BigDecimal.valueOf(singleMouldFullShift), 0, RoundingMode.UP)
-                            .longValue();
-                    Date actualEnd = new Date(shiftStart.getTime() + productionMs);
-                    log.debug("[清洗分析标识-调试] 机台: {}, 班次: {}, planQty: {}, singleMouldQty: {}, fullShiftSeconds: {}, productionMs: {}ms, shiftStart: {}, actualEnd: {}",
-                            machineCode, si, planQty, singleMouldQty, fullShiftSeconds, productionMs,
-                            LhScheduleTimeUtil.formatDateTime(shiftStart),
-                            LhScheduleTimeUtil.formatDateTime(actualEnd));
-                    lastShiftActualEndTime = (lastShiftActualEndTime == null || actualEnd.after(lastShiftActualEndTime))
-                            ? actualEnd : lastShiftActualEndTime;
-                }
-            }
-        }
-        // 实际清洗开始时间 = max(计划清洗开始时间, 前一班次实际完工时间)
-        Date actualCleanStartTime = cleanStartTime;
-        if (lastShiftActualEndTime != null && lastShiftActualEndTime.after(cleanStartTime)) {
-            actualCleanStartTime = lastShiftActualEndTime;
-        }
-        // 实际清洗结束时间 = 实际清洗开始时间 + 清洗时长
-        long cleaningDurationMs = cleanEndTimeOrig.getTime() - cleanStartTime.getTime();
-        Date actualCleanEndTime = new Date(actualCleanStartTime.getTime() + cleaningDurationMs);
-
-        if (!actualCleanEndTime.equals(cleanEndTimeOrig)) {
-            log.info("[清洗分析标识] 清洗窗口顺延, 机台: {}, 计划清洗窗口: {}~{}, 前班次完工时间: {}, 顺延后: {}~{}",
-                    machineCode,
-                    LhScheduleTimeUtil.formatDateTime(cleanStartTime),
-                    LhScheduleTimeUtil.formatDateTime(cleanEndTimeOrig),
-                    lastShiftActualEndTime != null ? LhScheduleTimeUtil.formatDateTime(lastShiftActualEndTime) : "无",
-                    LhScheduleTimeUtil.formatDateTime(actualCleanStartTime),
-                    LhScheduleTimeUtil.formatDateTime(actualCleanEndTime));
-        }
-
-        Date cleanEndTime = actualCleanEndTime;
-        for (int shiftIndex = 1; shiftIndex <= 8; shiftIndex++) {
-            LhShiftConfigVO shift = findShiftByIndex(shifts, shiftIndex);
-            if (shift == null || shift.getShiftStartDateTime() == null
-                    || shift.getShiftEndDateTime() == null) {
-                continue;
-            }
-            // [start, end] 两端闭区间，顺序遍历时边界值优先命中前一个班次
-            if (!cleanEndTime.before(shift.getShiftStartDateTime())
-                    && !cleanEndTime.after(shift.getShiftEndDateTime())) {
-                String analysis = resolveEndShiftCleaningAnalysis(
-                        cleaningWindow.getCleanType(), cleaningWindow);
-                if (analysis == null) {
-                    continue;
-                }
-                ShiftFieldUtil.setShiftAnalysis(result, shiftIndex, analysis);
-                log.info("[清洗分析标识] 机台: {}, 班次: {}, 原因: {}, 清洗窗口: {}~{}, readyTime: {}",
-                        machineCode, shiftIndex, analysis,
-                        LhScheduleTimeUtil.formatDateTime(cleaningWindow.getCleanStartTime()),
-                        LhScheduleTimeUtil.formatDateTime(cleanEndTime),
-                        cleaningWindow.getReadyTime() != null
-                                ? LhScheduleTimeUtil.formatDateTime(cleaningWindow.getReadyTime()) : "无");
-                break;
-            }
-        }
-    }
-
-    /**
-     * 标识因有可换模具而跳过的喷砂清洗（按计划清洗时间定位班次）。
-     */
-    private void tagSkippedSandblastCleaningShift(LhScheduleResult result, Date plannedCleanTime,
-                                                   List<LhShiftConfigVO> shifts, String machineCode) {
-        for (int shiftIndex = 1; shiftIndex <= 8; shiftIndex++) {
-            LhShiftConfigVO shift = findShiftByIndex(shifts, shiftIndex);
-            if (shift == null || shift.getShiftStartDateTime() == null
-                    || shift.getShiftEndDateTime() == null) {
-                continue;
-            }
-            if (!plannedCleanTime.before(shift.getShiftStartDateTime())
-                    && plannedCleanTime.before(shift.getShiftEndDateTime())) {
-                ShiftFieldUtil.setShiftAnalysis(result, shiftIndex, "换模跳过喷砂清洗");
-                log.info("[清洗分析标识] 机台: {}, 班次: {}, 原因: 换模跳过喷砂清洗, 计划清洗时间: {}",
-                        machineCode, shiftIndex,
-                        LhScheduleTimeUtil.formatDateTime(plannedCleanTime));
-                break;
-            }
-        }
-    }
-
-    /**
-     * 根据清洗窗口解析结束班次的分析标识。
-     * <p>喷砂清洗区分"喷砂清洗"（readyTime之前结束）和"喷砂含首检"（readyTime之后结束），
-     * 干冰清洗标识"干冰清洗"。</p>
-     *
-     * @param cleanType      清洗类型
-     * @param cleaningWindow 清洗窗口
-     * @return 分析标识，无法确定时返回null
-     */
-    private String resolveEndShiftCleaningAnalysis(String cleanType,
-                                                   MachineCleaningWindowDTO cleaningWindow) {
-        if (CleaningTypeEnum.SAND_BLAST.getCode().equals(cleanType)) {
-            // 喷砂清洗：cleanEndTime在readyTime之后为含首检，否则为单独喷砂清洗
-            Date readyTime = cleaningWindow.getReadyTime();
-            Date cleanEndTime = cleaningWindow.getCleanEndTime();
-            if (readyTime != null && cleanEndTime != null && cleanEndTime.after(readyTime)) {
-                return "喷砂含首检";
-            }
-            return "喷砂清洗";
-        }
-        if (CleaningTypeEnum.DRY_ICE.getCode().equals(cleanType)) {
-            return "干冰清洗";
-        }
-        return null;
-    }
-
-    /**
-     * 判断两个时间段是否有重叠。
-     *
-     * @param start1 时间段1开始
-     * @param end1   时间段1结束
-     * @param start2 时间段2开始
-     * @param end2   时间段2结束
-     * @return true-有重叠，false-无重叠
-     */
-    private boolean hasTimeOverlap(Date start1, Date end1, Date start2, Date end2) {
-        if (start1 == null || end1 == null || start2 == null || end2 == null) {
-            return false;
-        }
-        return start1.before(end2) && end1.after(start2);
     }
 }

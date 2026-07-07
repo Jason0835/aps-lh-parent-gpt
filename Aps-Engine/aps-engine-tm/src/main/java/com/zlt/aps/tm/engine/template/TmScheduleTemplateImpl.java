@@ -118,11 +118,48 @@ public class TmScheduleTemplateImpl extends AbsTmScheduleTemplate {
             processLogger.logStepStart(context, stepEnum.getCode(), buildStepSummary(context, stepEnum, true));
         }
         runnable.run();
+        this.updateProgress(context, stepEnum);
         if (processLogger != null) {
             processLogger.logStepEnd(context, stepEnum.getCode(), buildStepSummary(context, stepEnum, false));
         }
     }
 
+    /**
+     * 根据步骤更新自动排程进度。
+     *
+     * @param context  排程上下文
+     * @param stepEnum 步骤枚举
+     */
+    private void updateProgress(TmScheduleContext context, TmScheduleStepEnum stepEnum) {
+        if (context == null || context.getProgressListener() == null) {
+            return;
+        }
+        int progress;
+        switch (stepEnum) {
+            case BOOTSTRAP:
+                progress = 10;
+                break;
+            case INVENTORY_PREDICT:
+                progress = 25;
+                break;
+            case PLAN_CALC:
+                progress = 45;
+                break;
+            case TASK_SORT:
+                progress = 60;
+                break;
+            case MACHINE_ASSIGN:
+                progress = 75;
+                break;
+            case SNAPSHOT_BUILD:
+                progress = 90;
+                break;
+            default:
+                progress = 5;
+                break;
+        }
+        context.getProgressListener().update(progress, stepEnum.getCode(), stepEnum.getDesc());
+    }
     /**
      * 构建步骤输入或输出摘要。
      *

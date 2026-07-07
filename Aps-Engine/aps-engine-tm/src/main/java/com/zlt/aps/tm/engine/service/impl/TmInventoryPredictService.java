@@ -6,10 +6,7 @@ import com.ruoyi.common.exception.ServiceException;
 import com.zlt.aps.common.core.utils.BigDecimalUtils;
 import com.zlt.aps.tm.api.domain.entity.TmStock;
 import com.zlt.aps.tm.api.enums.TmScheduleErrorCodeEnum;
-import com.zlt.aps.tm.engine.domain.TmInventoryPredictQtyVo;
-import com.zlt.aps.tm.engine.domain.TmScheduleContext;
-import com.zlt.aps.tm.engine.domain.TmStockForecast;
-import com.zlt.aps.tm.engine.domain.TmTaskDraft;
+import com.zlt.aps.tm.engine.domain.*;
 import com.zlt.aps.tm.engine.mapper.TmEngineInventoryPredictMapper;
 import com.zlt.aps.tm.engine.mapper.TmEngineStockMapper;
 import com.zlt.aps.tm.engine.service.ITmInventoryPredictService;
@@ -76,7 +73,8 @@ public class TmInventoryPredictService implements ITmInventoryPredictService {
         Map<String, BigDecimal> sixClockStockMap = querySixClockStock(scheduleDate, treadCodes);
 
         // 查询早班需求量（当天早班成型消耗，按胎面标准长度折算）
-        Map<String, BigDecimal> firstShiftDemandMap = queryFirstShiftDemand(factoryCode, scheduleDate, treadCodes);
+        boolean useRecipe = isRecipeMode(context);
+        Map<String, BigDecimal> firstShiftDemandMap = queryFirstShiftDemand(factoryCode, scheduleDate, treadCodes, useRecipe);
 
         // 查询早班计划量（前一天夜班胎面排程计划量）
         Map<String, BigDecimal> firstShiftPlanMap = queryFirstShiftPlan(factoryCode, scheduleDate, treadCodes);
@@ -102,6 +100,27 @@ public class TmInventoryPredictService implements ITmInventoryPredictService {
 
         context.setStockForecastMap(stockForecastMap);
         log.info("库存预测完成，共预测{}个胎面规格", stockForecastMap.size());
+    }
+
+    /**
+     * 判断当前是否 RECIPE 模式（按示方书版本关联施工）。
+     *
+     * <p>读取数据加载阶段写入上下文的 {@code TM_VERSION_MATCH_MODE} 参数，默认 RECIPE；
+     * 仅当显式配置为 BOM 时返回 false，保证与数据加载口径一致。</p>
+     *
+     * @param context 自动排程上下文
+     * @return true 表示 RECIPE 模式
+     */
+    private boolean isRecipeMode(TmScheduleContext context) {
+        if (context == null || context.getParamMap() == null) {
+            return true;
+        }
+        TmParamValue value = context.getParamMap().get("TM_VERSION_MATCH_MODE");
+        if (value == null) {
+            return true;
+        }
+        String mode = value.getEffectiveValue();
+        return mode == null || !"BOM".equalsIgnoreCase(mode.trim());
     }
 
     /**
@@ -152,22 +171,26 @@ public class TmInventoryPredictService implements ITmInventoryPredictService {
      * @param factoryCode  工厂编号
      * @param scheduleDate 排程日期
      * @param treadCodes   胎面编码列表
+     * @param useRecipe    是否按 RECIPE 模式（示方书版本）关联施工
      * @return 胎面编码 -> 早班需求量 的映射
      */
-    private Map<String, BigDecimal> queryFirstShiftDemand(String factoryCode, Date scheduleDate, List<String> treadCodes) {
+    private Map<String, BigDecimal> queryFirstShiftDemand(String factoryCode, Date scheduleDate, List<String> treadCodes,
+                                                          boolean useRecipe) {
         if (treadCodes == null || treadCodes.isEmpty()) {
             return new HashMap<>();
         }
         List<TmInventoryPredictQtyVo> rowList;
         try {
-            rowList = tmEngineInventoryPredictMapper.selectFirstShiftDemandRows(factoryCode, scheduleDate, treadCodes);
+            rowList = useRecipe
+                    ? tmEngineInventoryPredictMapper.selectFirstShiftDemandRowsByRecipe(factoryCode, scheduleDate, treadCodes)
+                    : tmEngineInventoryPredictMapper.selectFirstShiftDemandRows(factoryCode, scheduleDate, treadCodes);
         } catch (RuntimeException ex) {
-            log.error("查询早班需求量失败，factoryCode={}, scheduleDate={}",
-                    factoryCode, DateUtil.formatDate(scheduleDate), ex);
+            log.error("查询早班需求量失败，factoryCode={}, scheduleDate={}, useRecipe={}",
+                    factoryCode, DateUtil.formatDate(scheduleDate), useRecipe, ex);
             return new HashMap<>();
         }
         if (rowList == null || rowList.isEmpty()) {
-            log.info("排程日期[{}]当天无早班成型计划数据，早班需求量按0处理", DateUtil.formatDate(scheduleDate));
+            log.info("排程日期[{}]当天无早班成型计划数据，早班需求量按0处理（useRecipe={}）", DateUtil.formatDate(scheduleDate), useRecipe);
             return new HashMap<>();
         }
         Map<String, BigDecimal> demandMap = new HashMap<>();

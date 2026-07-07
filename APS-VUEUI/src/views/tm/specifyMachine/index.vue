@@ -253,6 +253,7 @@ export default {
         {
           prop: "jobType",
           label: this.$t("ui.data.column.tm.specifyMachine.jobType"),
+          type: "select",
           dictData: this.dict.type.JOB_TYPE,
         },
         {

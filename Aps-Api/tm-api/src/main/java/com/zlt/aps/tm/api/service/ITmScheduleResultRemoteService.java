@@ -59,6 +59,28 @@ public interface ITmScheduleResultRemoteService {
     @PostMapping("/tmScheduleResult/autoPlan")
     AjaxResult autoPlan(@RequestBody TmAutoScheduleRequestVo request);
 
+
+    /**
+     * 查询胎面自动排程任务状态。
+     *
+     * @param taskId 自动排程任务 ID
+     * @return 任务状态和异常明细
+     */
+    @ApiOperation("查询胎面自动排程任务状态")
+    @GetMapping("/tmScheduleResult/autoPlan/task/{taskId}")
+    AjaxResult getAutoPlanTask(@PathVariable("taskId") String taskId);
+
+    /**
+     * 查询最近胎面自动排程任务。
+     *
+     * @param factoryCode 工厂编码
+     * @param scheduleDate 排程日期
+     * @return 最近任务状态
+     */
+    @ApiOperation("查询最近胎面自动排程任务")
+    @GetMapping("/tmScheduleResult/autoPlan/task/latest")
+    AjaxResult getLatestAutoPlanTask(@RequestParam("factoryCode") String factoryCode,
+                                     @RequestParam("scheduleDate") String scheduleDate);
     @ApiOperation("导出列表")
     @PostMapping("/tmScheduleResult/exportData/{fileName}")
     byte[] exportData(@RequestBody TmScheduleResult queryVO, @PathVariable("fileName") String fileName);
