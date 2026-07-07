@@ -1,60 +1,28 @@
 package com.zlt.aps.lh.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 import com.zlt.aps.cx.entity.CxStock;
 import com.zlt.aps.cx.entity.config.CxEmbryoLhTime;
+import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.lh.api.constant.LhScheduleConstant;
 import com.zlt.aps.lh.api.constant.LhScheduleParamConstant;
-import com.zlt.aps.lh.api.domain.entity.LhDayFinishQty;
-import com.zlt.aps.lh.mapper.CxEmbryoLhTimeMapper;
-import com.zlt.aps.maindata.mapper.MpMouldDeliveryPlanEntityMapper;
-import com.zlt.aps.mdm.api.domain.entity.LhMachineInfo;
-import com.zlt.aps.lh.api.domain.entity.LhMachineOnlineInfo;
-import com.zlt.aps.lh.api.domain.entity.LhMouldChangePlan;
-import com.zlt.aps.lh.api.domain.entity.LhPrecisionPlan;
-import com.zlt.aps.lh.api.domain.entity.LhRepairCapsule;
-import com.zlt.aps.lh.api.domain.entity.LhScheFinishQty;
-import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
-import com.zlt.aps.lh.api.domain.entity.LhSpecialMaterialBom;
-import com.zlt.aps.lh.api.domain.entity.LhSpecifyMachine;
-import com.zlt.aps.lh.api.enums.ConstructionStageEnum;
-import com.zlt.aps.lh.api.enums.DeleteFlagEnum;
-import com.zlt.aps.lh.api.enums.LhSpecialMaterialCategoryEnum;
-import com.zlt.aps.lh.api.enums.MachineStopTypeEnum;
-import com.zlt.aps.lh.api.enums.ScheduleStepEnum;
+import com.zlt.aps.lh.api.domain.entity.*;
+import com.zlt.aps.lh.api.enums.*;
 import com.zlt.aps.lh.component.MonthPlanDateResolver;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.exception.ScheduleDomainExceptionHelper;
 import com.zlt.aps.lh.exception.ScheduleErrorCode;
 import com.zlt.aps.lh.handler.ScheduleAdjustHandler;
-import com.zlt.aps.lh.mapper.CxStockMapper;
-import com.zlt.aps.lh.mapper.FactoryMonthPlanProductionFinalResultMapper;
-import com.zlt.aps.lh.mapper.LhDayFinishQtyMapper;
-import com.zlt.aps.lh.mapper.LhMachineInfoMapper;
-import com.zlt.aps.lh.mapper.LhMachineOnlineInfoMapper;
-import com.zlt.aps.lh.mapper.LhMouldChangePlanEntityMapper;
-import com.zlt.aps.lh.mapper.LhPrecisionPlanMapper;
-import com.zlt.aps.lh.mapper.LhRepairCapsuleMapper;
-import com.zlt.aps.lh.mapper.LhScheFinishQtyMapper;
-import com.zlt.aps.lh.mapper.LhScheduleResultMapper;
-import com.zlt.aps.lh.mapper.LhSpecialMaterialBomEntityMapper;
-import com.zlt.aps.lh.mapper.LhSpecifyMachineMapper;
-import com.zlt.aps.lh.mapper.MdmCapsuleChuckMapper;
-import com.zlt.aps.lh.mapper.MdmDevicePlanShutMapper;
-import com.zlt.aps.lh.mapper.MdmMaterialInfoMapper;
-import com.zlt.aps.lh.mapper.MdmModelInfoMapper;
-import com.zlt.aps.lh.mapper.MdmSkuConstructionRefMapper;
-import com.zlt.aps.lh.mapper.MdmSkuLhCapacityMapper;
-import com.zlt.aps.lh.mapper.MdmSkuMouldRelMapper;
-import com.zlt.aps.lh.mapper.MdmSkuScheduleCategoryMapper;
-import com.zlt.aps.lh.mapper.MdmWorkCalendarMapper;
-import com.zlt.aps.lh.mapper.MpFactoryProductionVersionMapper;
-import com.zlt.aps.lh.mapper.MpMonthPlanStatisticsMapper;
+import com.zlt.aps.lh.handler.SkuMonthPlanCalculator;
+import com.zlt.aps.lh.mapper.*;
 import com.zlt.aps.lh.service.ILhBaseDataService;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.lh.util.MachineStatusUtil;
 import com.zlt.aps.lh.util.MonthPlanDayQtyUtil;
 import com.zlt.aps.lh.util.MonthPlanStatisticsDayUtil;
+import com.zlt.aps.maindata.mapper.MpMouldDeliveryPlanEntityMapper;
 import com.zlt.aps.mdm.api.domain.entity.MdmDevicePlanShut;
 import com.zlt.aps.mdm.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.mdm.api.domain.entity.MdmModelInfo;
@@ -63,11 +31,10 @@ import com.zlt.aps.mdm.api.domain.entity.MdmSkuLhCapacity;
 import com.zlt.aps.mdm.api.domain.entity.MdmSkuMouldRel;
 import com.zlt.aps.mdm.api.domain.entity.MdmSkuScheduleCategory;
 import com.zlt.aps.mdm.api.domain.entity.MdmWorkCalendar;
-import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
+import com.zlt.aps.mdm.api.domain.entity.*;
 import com.zlt.aps.mp.api.domain.entity.MdmCapsuleChuck;
-import com.zlt.aps.mp.api.domain.entity.MpFactoryProductionVersion;
-import com.zlt.aps.mp.api.domain.entity.MpMonthPlanStatistics;
-import com.zlt.aps.mp.api.domain.entity.MpMouldDeliveryPlan;
+import com.zlt.aps.mp.api.domain.entity.MdmMonthSurplus;
+import com.zlt.aps.mp.api.domain.entity.*;
 import com.zlt.common.utils.PubUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -77,22 +44,9 @@ import org.springframework.util.CollectionUtils;
 import javax.annotation.Resource;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.time.ZoneId;
-import java.util.ArrayList;
-import java.util.Calendar;
-import java.util.Collection;
-import java.util.stream.Collectors;
-import java.util.Collections;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
-import java.util.TreeSet;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.Executor;
@@ -109,25 +63,39 @@ import java.util.stream.Collectors;
 @Service
 public class LhBaseDataServiceImpl implements ILhBaseDataService {
 
-    /** 排产版本已定稿（与 MpFactoryProductionVersion.isFinal 一致） */
+    /**
+     * 排产版本已定稿（与 MpFactoryProductionVersion.isFinal 一致）
+     */
     private static final String PRODUCTION_VERSION_IS_FINAL = "1";
 
-    /** 查询最新排产版本时返回前两条，用于判断是否存在多条数据 */
+    /**
+     * 查询最新排产版本时返回前两条，用于判断是否存在多条数据
+     */
     private static final String FINAL_PRODUCTION_VERSION_LIMIT_TWO = "LIMIT 2";
 
-    /** 主销产品排产类型（与 t_mdm_sku_schedule_category.SCHEDULE_TYPE='01' 一致） */
+    /**
+     * 主销产品排产类型（与 t_mdm_sku_schedule_category.SCHEDULE_TYPE='01' 一致）
+     */
     private static final String MAIN_PRODUCT_SCHEDULE_TYPE = "01";
 
-    /** 非主销合并胎胚的收尾余量阈值：胎胚余量 <= 该值视为收尾 */
+    /**
+     * 非主销合并胎胚的收尾余量阈值：胎胚余量 <= 该值视为收尾
+     */
     private static final int NON_MAIN_PRODUCT_ENDING_THRESHOLD = 2;
 
-    /** 主销合并胎胚的收尾余量阈值：胎胚余量 <= 该值视为收尾 */
+    /**
+     * 主销合并胎胚的收尾余量阈值：胎胚余量 <= 该值视为收尾
+     */
     private static final int MAIN_PRODUCT_ENDING_THRESHOLD = 0;
 
-    /** 胎胚收尾标识：收尾 */
+    /**
+     * 胎胚收尾标识：收尾
+     */
     private static final int EMBRYO_ENDING_FLAG_YES = 1;
 
-    /** 胎胚收尾标识：非收尾 */
+    /**
+     * 胎胚收尾标识：非收尾
+     */
     private static final int EMBRYO_ENDING_FLAG_NO = 0;
 
     @Resource
@@ -204,6 +172,9 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
 
     @Resource
     private MdmSkuScheduleCategoryMapper skuScheduleCategoryMapper;
+
+    @Resource
+    private MdmMonthSurplusMapper monthSurplusMapper;
 
     @Resource
     private ScheduleAdjustHandler scheduleAdjustHandler;
@@ -393,7 +364,7 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
      * @return 异步任务
      */
     private CompletableFuture<Void> runAfterDataInitTask(CompletableFuture<Void> dependency, String taskName,
-                                                          Runnable task, IntSupplier countSupplier) {
+                                                         Runnable task, IntSupplier countSupplier) {
         return dependency.thenCompose(result -> runDataInitTaskAsync(taskName, task, countSupplier));
     }
 
@@ -532,7 +503,7 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
      * 解析本次排程需要访问的月计划月份集合。
      * <p>范围覆盖排程窗口和SKU提前生产向后观察日期，按自然月去重后用于批量加载月计划，避免策略层循环查库。</p>
      *
-     * @param startDate 开始日期，包含当天
+     * @param startDate        开始日期，包含当天
      * @param endDateExclusive 结束日期，不含当天
      * @return key=year_month，value=该月月初
      */
@@ -558,11 +529,10 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
      * 加载月计划结构维度计划硫化机台数。
      * <p>提前生产规则只需要 T～T+2 窗口内 dayN.lhMachines，按 structureName 聚合 SUM 后缓存到上下文。</p>
      *
-     * @param context 排程上下文
-     * @param factoryCode 工厂编号
-     * @param year 年份
-     * @param month 月份
-     * @param startDate 窗口开始日期
+     * @param context          排程上下文
+     * @param factoryCode      工厂编号
+     * @param requiredMonthMap 年份计划
+     * @param startDate        窗口开始日期
      * @param endDateExclusive 窗口结束日期，不含当天
      */
     private void loadMonthPlanStatistics(LhScheduleContext context,
@@ -713,9 +683,9 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
      * <p>强制重排下 {@code previousScheduleResultList} 服务于窗口T日前一日滚动衔接；
      * 新增历史欠产兜底判断需要按接口目标日前一日判断是否已排过，两者日期口径不能混用。</p>
      *
-     * @param context 排程上下文
+     * @param context     排程上下文
      * @param factoryCode 分厂编号
-     * @param targetDate 排程目标日
+     * @param targetDate  排程目标日
      */
     private void loadTargetPreviousScheduleResults(LhScheduleContext context, String factoryCode, Date targetDate) {
         Date targetPreviousDate = LhScheduleTimeUtil.clearTime(LhScheduleTimeUtil.addDays(targetDate, -1));
@@ -732,9 +702,9 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
     /**
      * 加载前日模具交替计划。
      *
-     * @param context 排程上下文
+     * @param context     排程上下文
      * @param factoryCode 分厂编号
-     * @param targetDate 排程目标日
+     * @param targetDate  排程目标日
      */
     private void loadPreviousMouldChangePlans(LhScheduleContext context, String factoryCode, Date targetDate) {
         Date previousDate = resolvePreviousDataDate(context, targetDate);
@@ -750,7 +720,7 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
     /**
      * 解析前日基础数据日期。
      *
-     * @param context 排程上下文
+     * @param context    排程上下文
      * @param targetDate 排程目标日
      * @return 前日基础数据日期
      */
@@ -766,10 +736,10 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
     /**
      * 加载定稿排产版本：工厂 + 年 + 月 + 已定稿且未删除；无数据则中断；多条时取更新时间最新一条（再按主键降序）
      *
-     * @param context     排程上下文
-     * @param factoryCode 分厂编号
-     * @param year        年份
-     * @param month       月份（1-12）
+     * @param context      排程上下文
+     * @param factoryCode  分厂编号
+     * @param primaryYear  年份
+     * @param primaryMonth 月份（1-12）
      */
     private void loadFinalProductionVersions(LhScheduleContext context,
                                              String factoryCode,
@@ -827,10 +797,10 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
     /**
      * 解析指定年月定稿版本记录。
      *
-     * @param context 排程上下文
+     * @param context     排程上下文
      * @param factoryCode 工厂编码
-     * @param year 年份
-     * @param month 月份
+     * @param year        年份
+     * @param month       月份
      * @return 定稿版本记录
      */
     private MpFactoryProductionVersion resolveFinalProductionVersionRow(LhScheduleContext context,
@@ -876,8 +846,8 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
      * 获取指定年月的定稿排产版本。
      *
      * @param context 排程上下文
-     * @param year 年份
-     * @param month 月份
+     * @param year    年份
+     * @param month   月份
      * @return 排产版本
      */
     private String resolveProductionVersion(LhScheduleContext context, int year, int month) {
@@ -895,8 +865,8 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
      * 获取指定年月的定稿需求版本。
      *
      * @param context 排程上下文
-     * @param year 年份
-     * @param month 月份
+     * @param year    年份
+     * @param month   月份
      * @return 需求版本
      */
     private String resolveMonthPlanVersion(LhScheduleContext context, int year, int month) {
@@ -939,7 +909,9 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
         return String.format("工厂【%s】 计划月份【%s】", factoryName, yearMonthText);
     }
 
-    /** 定稿排产版本：工厂 + 年月 + 已定稿 + 未删除 */
+    /**
+     * 定稿排产版本：工厂 + 年月 + 已定稿 + 未删除
+     */
     private LambdaQueryWrapper<MpFactoryProductionVersion> wrapFinalProductionVersion(
             String factoryCode, int year, int month) {
         return new LambdaQueryWrapper<MpFactoryProductionVersion>()
@@ -953,14 +925,18 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
     /**
      * 加载月生产计划
      *
-     * @param context     排程上下文
-     * @param factoryCode 分厂编号
-     * @param year        年份（yyyy）
-     * @param month       月份（m）
+     * @param context          排程上下文
+     * @param factoryCode      分厂编号
+     * @param requiredMonthMap
      */
     private void loadMonthPlan(LhScheduleContext context,
                                String factoryCode,
                                Map<String, LocalDate> requiredMonthMap) {
+        //20260707+ 补充计划量起始计算日
+        List<Date> allProductionDate = Lists.newArrayList(context.getAllProductionDateInfo());
+        YearMonth nextMonth = SkuMonthPlanCalculator.getNextMonth(allProductionDate);
+        Map<YearMonth, Date> monthStartDayMap = getStartDay(nextMonth);
+        context.setPlanStartDate(monthStartDayMap.get(SkuMonthPlanCalculator.getFirstYearMonth(allProductionDate)));
         List<FactoryMonthPlanProductionFinalResult> loadedPlanList = new ArrayList<FactoryMonthPlanProductionFinalResult>(256);
         if (CollectionUtils.isEmpty(requiredMonthMap)) {
             Calendar cal = Calendar.getInstance();
@@ -992,10 +968,10 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
     /**
      * 查询指定月份月生产计划。
      *
-     * @param context 排程上下文
+     * @param context     排程上下文
      * @param factoryCode 工厂编码
-     * @param year 年份
-     * @param month 月份
+     * @param year        年份
+     * @param month       月份
      * @return 月计划列表
      */
     private List<FactoryMonthPlanProductionFinalResult> queryMonthPlan(LhScheduleContext context,
@@ -1027,11 +1003,11 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
     /**
      * 输出月计划查询版本口径和施工阶段统计。
      *
-     * @param factoryCode 工厂编码
-     * @param year 年份
-     * @param month 月份
+     * @param factoryCode       工厂编码
+     * @param year              年份
+     * @param month             月份
      * @param productionVersion 排产版本
-     * @param monthPlanList 月计划列表
+     * @param monthPlanList     月计划列表
      */
     private void traceMonthPlanQuerySummary(String factoryCode,
                                             int year,
@@ -1077,7 +1053,7 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
      * 为 S4.3 SKU 归集选择每个物料唯一的基础月计划。
      * <p>跨月时同一物料可能同时存在两个月计划，归集只能生成一个 DTO；dayN 读取仍由 Resolver 按业务日期取对应月份。</p>
      *
-     * @param context 排程上下文
+     * @param context        排程上下文
      * @param loadedPlanList 多月月计划
      * @return 去重后的归集月计划
      */
@@ -1105,8 +1081,8 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
     /**
      * 判断候选月计划是否更适合作为本轮 SKU 归集基础计划。
      *
-     * @param context 排程上下文
-     * @param selectedPlan 已选计划
+     * @param context       排程上下文
+     * @param selectedPlan  已选计划
      * @param candidatePlan 候选计划
      * @return true-替换
      */
@@ -1125,9 +1101,9 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
     /**
      * 判断月计划在排程窗口内是否有日计划量。
      *
-     * @param plan 月计划
+     * @param plan      月计划
      * @param startDate 窗口开始日期
-     * @param endDate 窗口结束日期
+     * @param endDate   窗口结束日期
      * @return true-窗口内有计划
      */
     private boolean hasWindowPlanQty(FactoryMonthPlanProductionFinalResult plan, Date startDate, Date endDate) {
@@ -1152,7 +1128,7 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
     /**
      * 判断月计划是否属于排程窗口 T 日所在月份。
      *
-     * @param plan 月计划
+     * @param plan         月计划
      * @param scheduleDate T 日
      * @return true-属于 T 日月份
      */
@@ -1189,9 +1165,9 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
     /**
      * 加载胎胚实时库存，按胎胚编码汇总库存数量。
      *
-     * @param context 排程上下文
+     * @param context     排程上下文
      * @param factoryCode 分厂编号
-     * @param stockDate 库存日期
+     * @param stockDate   库存日期
      */
     private void loadEmbryoRealtimeStock(LhScheduleContext context, String factoryCode, Date stockDate) {
         List<String> embryoCodeList = context.getMonthPlanList().stream()
@@ -1260,8 +1236,8 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
 
         // 1. 查询主销产品物料集合（SCHEDULE_TYPE='01'），逻辑删除由框架自动过滤
         Set<String> mainProductCodes = skuScheduleCategoryMapper.selectList(
-                new LambdaQueryWrapper<MdmSkuScheduleCategory>()
-                        .eq(MdmSkuScheduleCategory::getScheduleType, MAIN_PRODUCT_SCHEDULE_TYPE))
+                        new LambdaQueryWrapper<MdmSkuScheduleCategory>()
+                                .eq(MdmSkuScheduleCategory::getScheduleType, MAIN_PRODUCT_SCHEDULE_TYPE))
                 .stream()
                 .map(MdmSkuScheduleCategory::getMaterialCode)
                 .filter(StringUtils::isNotEmpty)
@@ -1312,7 +1288,7 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
     /**
      * 加载特殊物料清单，并按当前月计划范围构建分类Map。
      *
-     * @param context 排程上下文
+     * @param context     排程上下文
      * @param factoryCode 分厂编号
      */
     private void loadSpecialMaterialBom(LhScheduleContext context, String factoryCode) {
@@ -1387,10 +1363,10 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
     /**
      * 构建特殊物料分类Map。
      *
-     * @param bom 特殊物料清单配置
-     * @param materialCodeSet 当前月计划物料编码集合
-     * @param structureNameSet 当前月计划结构名称集合
-     * @param categoryByMaterialCode 物料编码分类Map
+     * @param bom                     特殊物料清单配置
+     * @param materialCodeSet         当前月计划物料编码集合
+     * @param structureNameSet        当前月计划结构名称集合
+     * @param categoryByMaterialCode  物料编码分类Map
      * @param categoryByStructureName 结构名称分类Map
      */
     private void buildSpecialMaterialCategoryMap(LhSpecialMaterialBom bom,
@@ -1421,9 +1397,9 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
     /**
      * 写入特殊物料配置到排程上下文。
      *
-     * @param context 排程上下文
-     * @param specialMaterialBomList 特殊物料配置列表
-     * @param categoryByMaterialCode 物料编码分类Map
+     * @param context                 排程上下文
+     * @param specialMaterialBomList  特殊物料配置列表
+     * @param categoryByMaterialCode  物料编码分类Map
      * @param categoryByStructureName 结构名称分类Map
      */
     private void attachSpecialMaterialConfig(LhScheduleContext context,
@@ -1523,7 +1499,7 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
      * 合并普通停机和未来清洗候选，避免窗口内清洗记录被重复加入上下文。
      *
      * @param normalDevicePlanShutList 普通窗口停机计划
-     * @param futureCleaningPlanList T 日及之后的清洗候选
+     * @param futureCleaningPlanList   T 日及之后的清洗候选
      * @return 去重后的设备停机计划
      */
     private List<MdmDevicePlanShut> mergeDevicePlanShutList(List<MdmDevicePlanShut> normalDevicePlanShutList,
@@ -1539,7 +1515,7 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
     /**
      * 将设备停机计划按业务关键字段追加到去重 Map。
      *
-     * @param mergedPlanMap 已合并的停机计划 Map
+     * @param mergedPlanMap      已合并的停机计划 Map
      * @param devicePlanShutList 待追加停机计划
      */
     private void appendDevicePlanShut(Map<String, MdmDevicePlanShut> mergedPlanMap,
@@ -1765,11 +1741,11 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
     /**
      * 加载月累计完成量（截至排产T-1日（包含）），按物料编号+示方类型建立Map。
      *
-     * @param context     排程上下文
-     * @param factoryCode 分厂编号
-     * @param year        月计划所属年份
-     * @param month       月计划所属月份
-     * @param cutoffDate  截止日期（T-1日，含当天）
+     * @param context      排程上下文
+     * @param factoryCode  分厂编号
+     * @param primaryYear  月计划所属年份
+     * @param primaryMonth 月计划所属月份
+     * @param cutoffDate   截止日期（T-1日，含当天）
      */
     private void loadMaterialMonthFinishedQty(LhScheduleContext context,
                                               String factoryCode,
@@ -1818,14 +1794,14 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
     /**
      * 合并指定月份的月累计完成量。
      *
-     * @param context 排程上下文
-     * @param factoryCode 工厂编码
-     * @param year 年份
-     * @param month 月份
-     * @param cutoffDate 截止日期
-     * @param monthFinishedQtyMap 当前月份物料完成量
+     * @param context                            排程上下文
+     * @param factoryCode                        工厂编码
+     * @param year                               年份
+     * @param month                              月份
+     * @param cutoffDate                         截止日期
+     * @param monthFinishedQtyMap                当前月份物料完成量
      * @param materialMonthFinishedQtyByMonthMap 跨月物料完成量
-     * @param materialMonthDailyFinishedQtyMap 逐日完成量
+     * @param materialMonthDailyFinishedQtyMap   逐日完成量
      */
     private void mergeMaterialMonthFinishedQty(LhScheduleContext context,
                                                String factoryCode,
@@ -1919,8 +1895,8 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
      * 按指定年月的已加载月计划物料+产品状态初始化月累计完成量。
      *
      * @param context 排程上下文
-     * @param year 年份
-     * @param month 月份
+     * @param year    年份
+     * @param month   月份
      * @return 物料完成量Map
      */
     private Map<String, Integer> buildMonthPlanMaterialFinishedQtyMap(LhScheduleContext context, int year, int month) {
@@ -1943,8 +1919,8 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
      * 判断月计划是否归属指定年月。
      * <p>历史测试和部分内存构造对象可能不带年月字段，按当前查询月初始化，避免目标月无完成记录时误触发历史回退。</p>
      *
-     * @param plan 月计划
-     * @param year 年份
+     * @param plan  月计划
+     * @param year  年份
      * @param month 月份
      * @return true-属于指定年月；false-不属于
      */
@@ -1961,10 +1937,10 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
     /**
      * 将单月物料+产品状态完成量写入物料+产品状态+年月维度Map。
      *
-     * @param monthFinishedQtyMap 单月物料+产品状态完成量
+     * @param monthFinishedQtyMap                单月物料+产品状态完成量
      * @param materialMonthFinishedQtyByMonthMap 物料+产品状态+年月维度完成量
-     * @param year 年份
-     * @param month 月份
+     * @param year                               年份
+     * @param month                              月份
      */
     private void appendMonthFinishedQtyByMonth(Map<String, Integer> monthFinishedQtyMap,
                                                Map<String, Integer> materialMonthFinishedQtyByMonthMap,
@@ -1987,9 +1963,9 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
      * 加载T日排程班次完成量（来自LhScheFinishQty表），按物料编号汇总class1FinishQty。
      * <p>同一物料在同一T日可能有多条记录（不同机台），需按materialCode汇总。</p>
      *
-     * @param context       排程上下文
-     * @param factoryCode   分厂编号
-     * @param scheduleDate  排程窗口起点T日
+     * @param context      排程上下文
+     * @param factoryCode  分厂编号
+     * @param scheduleDate 排程窗口起点T日
      */
     private void loadScheDayFinishQty(LhScheduleContext context, String factoryCode, Date scheduleDate) {
         Date tDay = LhScheduleTimeUtil.clearTime(scheduleDate);
@@ -2026,7 +2002,7 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
     /**
      * 构建"物料+产品状态"聚合Key。
      *
-     * @param materialCode 物料编码
+     * @param materialCode  物料编码
      * @param productStatus 产品状态或示方类型
      * @return 聚合Key
      */
@@ -2041,9 +2017,9 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
     /**
      * 生成"物料+产品状态+完成日期"聚合Key。
      *
-     * @param materialCode 物料编码
+     * @param materialCode  物料编码
      * @param productStatus 产品状态或示方类型
-     * @param finishDate 完成日期
+     * @param finishDate    完成日期
      * @return 聚合Key
      */
     private String buildMaterialDayKey(String materialCode, String productStatus, Date finishDate) {
@@ -2116,7 +2092,7 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
     /**
      * 加载胶囊卡盘分组，按规格和英寸分别建立快速判定Map。
      *
-     * @param context 排程上下文
+     * @param context     排程上下文
      * @param factoryCode 分厂编号
      */
     private void loadCapsuleChuck(LhScheduleContext context, String factoryCode) {
@@ -2143,7 +2119,7 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
      * 注册一条胶囊卡盘分组。
      *
      * @param capsuleGroupMap 分组Map
-     * @param rawGroupValue 原始逗号分隔值
+     * @param rawGroupValue   原始逗号分隔值
      */
     private void registerCapsuleGroup(Map<String, String> capsuleGroupMap, String rawGroupValue) {
         Set<String> normalizedTokens = splitGroupTokens(rawGroupValue);
@@ -2194,10 +2170,10 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
     /**
      * 加载MES硫化在机信息，按机台编号建立"追溯窗口内最近记录"Map
      *
-     * @param context       排程上下文
-     * @param factoryCode   分厂编号
-     * @param scheduleTDay  排程窗口起点 T 日
-     * @param lookbackDays  往前追溯天数（最小 1）
+     * @param context      排程上下文
+     * @param factoryCode  分厂编号
+     * @param scheduleTDay 排程窗口起点 T 日
+     * @param lookbackDays 往前追溯天数（最小 1）
      */
     private void loadMachineOnlineInfo(LhScheduleContext context, String factoryCode, Date scheduleTDay, int lookbackDays) {
         int safeLookbackDays = Math.max(1, lookbackDays);
@@ -2370,4 +2346,50 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
         return calendar.get(Calendar.YEAR);
     }
 
+    /**
+     * 获取对应年月的排产统计日
+     *
+     * @param nextMonth
+     * @return
+     */
+    private Map<YearMonth, Date> getStartDay(YearMonth nextMonth) {
+        LambdaQueryWrapper<MpFactoryProductionVersion> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(MpFactoryProductionVersion::getYear, nextMonth.getYear())
+                .eq(MpFactoryProductionVersion::getMonth, nextMonth.getMonthValue())
+                .eq(MpFactoryProductionVersion::getIsFinal, "1")
+                .eq(MpFactoryProductionVersion::getIsDelete, DeleteFlagEnum.NORMAL.getCode())
+                .orderByDesc(MpFactoryProductionVersion::getUpdateTime)
+                .orderByDesc(MpFactoryProductionVersion::getId)
+                .last("LIMIT 1");
+        MpFactoryProductionVersion finalVersion = mpFactoryProductionVersionMapper.selectOne(wrapper);
+        if (null == finalVersion) {
+            Collections.emptyMap();
+        }
+        Date surplusDate = getMonthSurplusDate(finalVersion);
+        Map<YearMonth, Date> result = Maps.newHashMap();
+        YearMonth previousMonth = nextMonth.plusMonths(-BigDecimal.ONE.longValue());
+        result.put(previousMonth, surplusDate);
+        return result;
+    }
+
+    /**
+     * 获取定稿版本对应的库存抓取日
+     *
+     * @param finalVersion
+     * @return
+     */
+    private Date getMonthSurplusDate(MpFactoryProductionVersion finalVersion) {
+        if (null == finalVersion) {
+            return null;
+        }
+        LambdaQueryWrapper<MdmMonthSurplus> query = new LambdaQueryWrapper<>();
+        query.eq(MdmMonthSurplus::getFactoryCode, finalVersion.getFactoryCode());
+        query.eq(MdmMonthSurplus::getRequireVersion, finalVersion.getMonthPlanVersion());
+        query.eq(MdmMonthSurplus::getIsDelete, YesOrNoEnum.NO.getValue());
+        List<MdmMonthSurplus> find = monthSurplusMapper.selectList(query);
+        if (CollectionUtils.isEmpty(find)) {
+            return null;
+        }
+        return find.get(BigDecimal.ZERO.intValue()).getStockCapTureDate();
+    }
 }
