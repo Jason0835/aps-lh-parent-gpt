@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
+import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.zlt.aps.constant.FactoryConstant;
@@ -11,8 +12,10 @@ import com.zlt.aps.redissonLock.annotation.DistributedLock;
 import com.zlt.aps.tm.api.domain.entity.TmScheduleResult;
 import com.zlt.aps.tm.api.domain.vo.TmAutoScheduleRequestVo;
 import com.zlt.aps.tm.api.domain.vo.TmScheduleShiftDateVO;
+import com.zlt.aps.tm.domain.TmAutoScheduleTask;
 import com.zlt.aps.tm.mapper.TmScheduleResultMapper;
 import com.zlt.aps.tm.service.ITmScheduleResultService;
+import com.zlt.aps.tm.service.TmAutoScheduleTaskService;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
 import com.zlt.common.utils.PubUtil;
@@ -21,11 +24,13 @@ import io.swagger.annotations.ApiOperation;
 import jodd.util.StringUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.Date;
 import java.util.List;
 
 /**
@@ -42,6 +47,9 @@ public class TmScheduleResultController extends AbstractDocBizController<TmSched
 
     @Resource
     private TmScheduleResultMapper tmScheduleResultMapper;
+
+    @Resource
+    private TmAutoScheduleTaskService tmAutoScheduleTaskService;
 
     @ApiOperation("查询列表")
     @PostMapping("/list")
@@ -107,6 +115,36 @@ public class TmScheduleResultController extends AbstractDocBizController<TmSched
             waitTime = 0, leaseTime = -1, failMsg = "ui.data.alert.tm.schedule.running")
     public AjaxResult autoPlan(@RequestBody TmAutoScheduleRequestVo request) {
         return AjaxResult.success(tmScheduleResultService.tmAutoPlan(request));
+    }
+
+    /**
+     * 查询胎面自动排程任务状态。
+     *
+     * @param taskId 自动排程任务 ID
+     * @return 自动排程任务状态和异常明细
+     */
+    @ApiOperation("查询胎面自动排程任务状态")
+    @GetMapping("/autoPlan/task/{taskId}")
+    public AjaxResult getAutoPlanTask(@PathVariable("taskId") String taskId) {
+        TmAutoScheduleTask task = tmAutoScheduleTaskService.findByTaskId(taskId);
+        return task == null ? AjaxResult.error(I18nUtil.getMessage("ui.data.alert.tm.schedule.taskNotFound"))
+                : AjaxResult.success(tmAutoScheduleTaskService.toResponse(task));
+    }
+
+    /**
+     * 查询指定工厂和排程日期最近的胎面自动排程任务。
+     *
+     * @param factoryCode 工厂编码
+     * @param scheduleDate 排程日期
+     * @return 最近自动排程任务状态
+     */
+    @ApiOperation("查询最近胎面自动排程任务")
+    @GetMapping("/autoPlan/task/latest")
+    public AjaxResult getLatestAutoPlanTask(@RequestParam("factoryCode") String factoryCode,
+                                           @RequestParam("scheduleDate")
+                                           @DateTimeFormat(pattern = "yyyy-MM-dd") Date scheduleDate) {
+        TmAutoScheduleTask task = tmAutoScheduleTaskService.findLatest(factoryCode, scheduleDate);
+        return AjaxResult.success(task == null ? null : tmAutoScheduleTaskService.toResponse(task));
     }
 
     /**

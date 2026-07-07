@@ -9,6 +9,7 @@ import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.utils.BigDecimalUtils;
 import com.zlt.aps.common.engine.utils.DepthConfigResolver;
 import com.zlt.aps.tm.api.domain.entity.*;
+import com.zlt.aps.tm.api.enums.TmScheduleStepEnum;
 import com.zlt.aps.tm.api.enums.TmUnplannedReasonEnum;
 import com.zlt.aps.tm.domain.vo.*;
 import com.zlt.aps.tm.engine.domain.*;
@@ -232,8 +233,12 @@ public class TmAutoScheduleDataLoadService {
             candidate.setRemainCapacity(nvl(machineInfo.getMaxCapacity()));
             candidate.setMaintenanceHours(BigDecimal.ZERO);
             candidate.setSwitchCostHours(BigDecimal.ZERO);
+            candidate.setConfiguredMouthPlateCodes(new HashSet<>());
             candidate.setMouthPlateCodes(new HashSet<>());
+            candidate.setConfiguredGlueCodes(new HashSet<>());
+            candidate.setAllowedGlueCodes(new HashSet<>());
             candidate.setForbiddenGlueCodes(new HashSet<>());
+            candidate.setConfiguredFixedAllowTreadCodes(new HashSet<>());
             candidate.setFixedAllowTreadCodes(new HashSet<>());
             candidate.setFixedForbidTreadCodes(new HashSet<>());
             candidateMap.put(machineInfo.getMachineCode(), candidate);
@@ -263,6 +268,16 @@ public class TmAutoScheduleDataLoadService {
         wrapper.eq(TmMouthPlate::getFactoryCode, context.getFactoryCode());
         wrapper.in(TmMouthPlate::getMachineCode, candidateMap.keySet());
         List<TmMouthPlate> mouthPlateList = tmMouthPlateMapper.selectList(wrapper);
+        Set<String> configuredMouthPlateCodes = mouthPlateList.stream()
+                .map(TmMouthPlate::getMouthPlateCode)
+                .filter(StrUtil::isNotBlank)
+                .collect(Collectors.toSet());
+        for (TmMachineCandidate candidate : candidateMap.values()) {
+            if (candidate.getConfiguredMouthPlateCodes() == null) {
+                candidate.setConfiguredMouthPlateCodes(new HashSet<>());
+            }
+            candidate.getConfiguredMouthPlateCodes().addAll(configuredMouthPlateCodes);
+        }
         for (TmMouthPlate mouthPlate : mouthPlateList) {
             TmMachineCandidate candidate = candidateMap.get(mouthPlate.getMachineCode());
             if (candidate == null || StrUtil.isBlank(mouthPlate.getMouthPlateCode())) {
@@ -290,18 +305,37 @@ public class TmAutoScheduleDataLoadService {
         wrapper.eq(TmGlueMachineReal::getEnableStatus, YES);
         wrapper.in(TmGlueMachineReal::getMachineCode, candidateMap.keySet());
         List<TmGlueMachineReal> glueRuleList = tmGlueMachineRealMapper.selectList(wrapper);
+        Set<String> configuredGlueCodes = glueRuleList.stream()
+                .filter(glueRule -> YES.equals(glueRule.getAllowFlag()) || NO.equals(glueRule.getAllowFlag()))
+                .map(TmGlueMachineReal::getGlueCode)
+                .filter(StrUtil::isNotBlank)
+                .collect(Collectors.toSet());
+        for (TmMachineCandidate candidate : candidateMap.values()) {
+            if (candidate.getConfiguredGlueCodes() == null) {
+                candidate.setConfiguredGlueCodes(new HashSet<>());
+            }
+            candidate.getConfiguredGlueCodes().addAll(configuredGlueCodes);
+        }
         for (TmGlueMachineReal glueRule : glueRuleList) {
-            if (StrUtil.isBlank(glueRule.getGlueCode()) || !NO.equals(glueRule.getAllowFlag())) {
+            if (StrUtil.isBlank(glueRule.getGlueCode())
+                    || (!YES.equals(glueRule.getAllowFlag()) && !NO.equals(glueRule.getAllowFlag()))) {
                 continue;
             }
             TmMachineCandidate candidate = candidateMap.get(glueRule.getMachineCode());
             if (candidate == null) {
                 continue;
             }
-            if (candidate.getForbiddenGlueCodes() == null) {
-                candidate.setForbiddenGlueCodes(new HashSet<>());
+            if (YES.equals(glueRule.getAllowFlag())) {
+                if (candidate.getAllowedGlueCodes() == null) {
+                    candidate.setAllowedGlueCodes(new HashSet<>());
+                }
+                candidate.getAllowedGlueCodes().add(glueRule.getGlueCode());
+            } else {
+                if (candidate.getForbiddenGlueCodes() == null) {
+                    candidate.setForbiddenGlueCodes(new HashSet<>());
+                }
+                candidate.getForbiddenGlueCodes().add(glueRule.getGlueCode());
             }
-            candidate.getForbiddenGlueCodes().add(glueRule.getGlueCode());
         }
     }
 
@@ -320,6 +354,17 @@ public class TmAutoScheduleDataLoadService {
         wrapper.eq(TmSpecifyMachine::getEnableStatus, YES);
         wrapper.in(TmSpecifyMachine::getMachineCode, candidateMap.keySet());
         List<TmSpecifyMachine> specifyList = tmSpecifyMachineMapper.selectList(wrapper);
+        Set<String> configuredFixedAllowTreadCodes = specifyList.stream()
+                .filter(specify -> JOB_TYPE_ALLOW.equals(specify.getJobType()))
+                .map(TmSpecifyMachine::getTreadCode)
+                .filter(StrUtil::isNotBlank)
+                .collect(Collectors.toSet());
+        for (TmMachineCandidate candidate : candidateMap.values()) {
+            if (candidate.getConfiguredFixedAllowTreadCodes() == null) {
+                candidate.setConfiguredFixedAllowTreadCodes(new HashSet<>());
+            }
+            candidate.getConfiguredFixedAllowTreadCodes().addAll(configuredFixedAllowTreadCodes);
+        }
         for (TmSpecifyMachine specify : specifyList) {
             TmMachineCandidate candidate = candidateMap.get(specify.getMachineCode());
             if (candidate == null || StrUtil.isBlank(specify.getTreadCode())) {
@@ -782,6 +827,8 @@ public class TmAutoScheduleDataLoadService {
         if (errorMsg.length() > 0) {
             // 移除末尾的分号
             errorMsg.setLength(errorMsg.length() - 1);
+            context.getIssueCollector().addIssue(TmAutoScheduleIssueCollector.LEVEL_ERROR,
+                    TmScheduleStepEnum.BOOTSTRAP, "CONSTRUCTION_FIELD_MISSING", errorMsg.toString());
             throw new RuntimeException(errorMsg.toString());
         }
         // 成型来源需求不在数据加载阶段聚合，解释表需要逐条追溯原成型排程结果。
@@ -1005,6 +1052,8 @@ public class TmAutoScheduleDataLoadService {
         }
         if (errorMsg.length() > 0) {
             errorMsg.setLength(errorMsg.length() - 1);
+            context.getIssueCollector().addIssue(TmAutoScheduleIssueCollector.LEVEL_ERROR,
+                    TmScheduleStepEnum.BOOTSTRAP, "CONSTRUCTION_FIELD_MISSING", errorMsg.toString());
             throw new RuntimeException(errorMsg.toString());
         }
         Map<String, TmNewSpecInfo> newSpecInfoMap = buildNewSpecInfoMap(context, allTreadCodes,
@@ -1031,12 +1080,18 @@ public class TmAutoScheduleDataLoadService {
                     continue;
                 }
                 int startIndex = resolveFormingStartIndex(shiftOrder, formingShiftOffset);
+                String[] taskRecipeNoByClass = buildRecipeNoArray(row);
                 TmConstructionTreadRowVo primarySpec = (startIndex >= 0 && startIndex < 8) ? specByClass[startIndex] : null;
                 if (primarySpec == null || StrUtil.isBlank(primarySpec.getTreadCode())
                         || nvl(primarySpec.getTreadShoulderLength()).compareTo(BigDecimal.ZERO) <= 0) {
+                    String missingRecipeNo = (startIndex >= 0 && startIndex < taskRecipeNoByClass.length) ? taskRecipeNoByClass[startIndex] : null;
+                    String missingReason = primarySpec == null ? "示方书为空或未命中施工" : "施工胎面编码或肩长无效";
                     log.warn("[TM_RECIPE_MATCH] 跳过班次：factoryCode={}, orderNo={}, embryoCode={}, shiftOrder={}, startIndex={}, formingQty={}, 原因={}",
                             context.getFactoryCode(), row.getOrderNo(), row.getEmbryoCode(), shiftOrder, startIndex, formingQty,
-                            primarySpec == null ? "示方书为空或未命中施工" : "施工胎面编码或肩长无效");
+                            missingReason);
+                    context.getIssueCollector().addConstructionIssue(TmAutoScheduleIssueCollector.LEVEL_WARN,
+                            "CONSTRUCTION_MISSING", row.getOrderNo(), row.getEmbryoCode(), missingRecipeNo,
+                            shiftOrder, primarySpec == null ? "recipeNo" : "treadCode/treadShoulderLength", missingReason);
                     skippedShiftNoSpec++;
                     continue;
                 }

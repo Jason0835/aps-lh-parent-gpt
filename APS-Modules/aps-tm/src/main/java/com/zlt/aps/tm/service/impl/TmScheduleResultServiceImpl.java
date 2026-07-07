@@ -5,6 +5,7 @@ import cn.hutool.core.collection.ListUtil;
 import cn.hutool.core.date.DateUtil;
 import cn.hutool.core.util.IdUtil;
 import cn.hutool.core.util.StrUtil;
+import com.alibaba.fastjson.JSON;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
@@ -24,13 +25,17 @@ import com.zlt.aps.tm.api.domain.vo.TmAutoScheduleRequestVo;
 import com.zlt.aps.tm.api.domain.vo.TmAutoScheduleResponseVo;
 import com.zlt.aps.tm.api.domain.vo.TmScheduleShiftDateVO;
 import com.zlt.aps.tm.api.enums.TmScheduleErrorCodeEnum;
+import com.zlt.aps.tm.api.enums.TmScheduleStepEnum;
+import com.zlt.aps.tm.domain.TmAutoScheduleTask;
 import com.zlt.aps.tm.engine.domain.*;
 import com.zlt.aps.tm.engine.service.TmScheduleOperationFacade;
 import com.zlt.aps.tm.engine.template.TmScheduleTemplateImpl;
 import com.zlt.aps.tm.engine.validator.TmInsertPositionValidator;
 import com.zlt.aps.tm.mapper.*;
 import com.zlt.aps.tm.service.ITmScheduleResultService;
+import com.zlt.aps.tm.service.TmAutoScheduleAsyncExecutor;
 import com.zlt.aps.tm.service.TmAutoScheduleRedisCacheService;
+import com.zlt.aps.tm.service.TmAutoScheduleTaskService;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.common.enums.ImportErrorTypeEnums;
 import com.zlt.common.utils.ImportExcelValidatedUtils;
@@ -85,6 +90,12 @@ public class TmScheduleResultServiceImpl extends AbstractDocService<TmScheduleRe
 
     @Resource
     private TmAutoScheduleRedisCacheService tmAutoScheduleRedisCacheService;
+
+    @Resource
+    private TmAutoScheduleTaskService tmAutoScheduleTaskService;
+
+    @Resource
+    private TmAutoScheduleAsyncExecutor tmAutoScheduleAsyncExecutor;
 
     @Resource
     private TmManualInsertRollingService tmManualInsertRollingService;
@@ -292,6 +303,30 @@ public class TmScheduleResultServiceImpl extends AbstractDocService<TmScheduleRe
      */
     @Override
     public TmAutoScheduleResponseVo tmAutoPlan(TmAutoScheduleRequestVo request) {
+        validateAutoScheduleRequest(request);
+        TmAutoScheduleResponseVo response = buildAutoScheduleResponse(request);
+        List<TmScheduleResult> currentResultList = listForOverwriteCheck(request);
+        fillOverwriteCheckResult(request, response, currentResultList, true);
+        TmAutoScheduleTask activeTask = tmAutoScheduleTaskService.findActive(request.getFactoryCode(), request.getScheduleDate());
+        if (activeTask != null) {
+            return tmAutoScheduleTaskService.toResponse(activeTask);
+        }
+        TmAutoScheduleTask task = tmAutoScheduleTaskService.createPending(request, response);
+        TmAutoScheduleResponseVo submitResponse = tmAutoScheduleTaskService.toResponse(task);
+        submitResponse.setSuccess(Boolean.TRUE);
+        submitResponse.setConfirmRequired(Boolean.FALSE);
+        submitResponse.setMessage(resolveTmMessage("ui.data.alert.tm.schedule.taskSubmitted", "胎面自动排程任务已提交"));
+        tmAutoScheduleAsyncExecutor.execute(task.getTaskId());
+        return submitResponse;
+    }
+
+    @Override
+    public TmAutoScheduleResponseVo executeTmAutoPlanTask(String taskId) {
+        TmAutoScheduleTask autoScheduleTask = tmAutoScheduleTaskService.findByTaskId(taskId);
+        if (autoScheduleTask == null) {
+            throw new ServiceException(resolveTmMessage("ui.data.alert.tm.schedule.taskNotFound", "未找到胎面自动排程任务"));
+        }
+        TmAutoScheduleRequestVo request = JSON.parseObject(autoScheduleTask.getRequestSnapshot(), TmAutoScheduleRequestVo.class);
         long startMillis = System.currentTimeMillis();
         TmAutoScheduleResponseVo response = null;
         TmScheduleContext context = null;
@@ -337,6 +372,8 @@ public class TmScheduleResultServiceImpl extends AbstractDocService<TmScheduleRe
             }
 
             context = buildScheduleContext(request, response);
+            context.setProgressListener((progress, stage, stageName) ->
+                    tmAutoScheduleTaskService.updateProgress(taskId, progress, stage, stageName));
             log.info("{} step=CONTEXT_BUILT factoryCode={}, scheduleDate={}, batchNo={}, traceId={}, operator={}, taskCount={}, machineCount={}, paramCount={}",
                     TM_AUTO_PLAN_LOG_PREFIX, context.getFactoryCode(), formatAutoPlanDate(context.getScheduleDate()),
                     context.getBatchNo(), context.getTraceId(), context.getOperator(), context.getTaskDraftList().size(),
@@ -364,6 +401,8 @@ public class TmScheduleResultServiceImpl extends AbstractDocService<TmScheduleRe
             response.setResultCount(persistResult.getResultCount());
             response.setUnplannedCount(persistResult.getUnplannedCount());
             if (persistResult.getErrorCount() > 0) {
+                context.getIssueCollector().addIssue(TmAutoScheduleIssueCollector.LEVEL_ERROR,
+                        TmScheduleStepEnum.PERSIST, "PERSIST_PARTIAL_FAILED", persistResult.getLastErrorMsg());
                 response.setMessage(resolveTmMessage("ui.data.alert.tm.schedule.executePartialFailed", "胎面自动排程执行完成，部分记录落库失败，请联系管理员处理"));
                 log.warn("{} step=PERSIST_PARTIAL_FAILED factoryCode={}, scheduleDate={}, batchNo={}, traceId={}, errorCount={}, lastErrorMsg={}",
                         TM_AUTO_PLAN_LOG_PREFIX, context.getFactoryCode(), formatAutoPlanDate(context.getScheduleDate()),
@@ -371,6 +410,7 @@ public class TmScheduleResultServiceImpl extends AbstractDocService<TmScheduleRe
             } else {
                 response.setMessage(resolveTmMessage("ui.data.alert.tm.schedule.executeFinished", "胎面自动排程执行完成"));
             }
+            tmAutoScheduleTaskService.markSuccess(taskId, response, context.getIssueCollector().getIssues());
             log.info("{} step=FINISHED factoryCode={}, scheduleDate={}, batchNo={}, traceId={}, success={}, resultCount={}, unplannedCount={}, message={}, elapsedMs={}",
                     TM_AUTO_PLAN_LOG_PREFIX, request.getFactoryCode(), formatAutoPlanDate(request.getScheduleDate()),
                     response.getBatchNo(), response.getTraceId(), response.getSuccess(), response.getResultCount(),
@@ -383,6 +423,8 @@ public class TmScheduleResultServiceImpl extends AbstractDocService<TmScheduleRe
                     context == null ? response == null ? null : response.getBatchNo() : context.getBatchNo(),
                     context == null ? response == null ? request == null ? null : request.getTraceId() : response.getTraceId() : context.getTraceId(),
                     System.currentTimeMillis() - startMillis, ex.getClass().getSimpleName(), ex.getMessage());
+            tmAutoScheduleTaskService.markFailed(taskId, ex.getMessage(),
+                    context == null ? Collections.emptyList() : context.getIssueCollector().getIssues());
             throw ex;
         } catch (RuntimeException ex) {
             log.error("{} step=FAILED factoryCode={}, scheduleDate={}, batchNo={}, traceId={}, elapsedMs={}, exceptionType={}, message={}",
@@ -391,6 +433,8 @@ public class TmScheduleResultServiceImpl extends AbstractDocService<TmScheduleRe
                     context == null ? response == null ? null : response.getBatchNo() : context.getBatchNo(),
                     context == null ? response == null ? request == null ? null : request.getTraceId() : response.getTraceId() : context.getTraceId(),
                     System.currentTimeMillis() - startMillis, ex.getClass().getSimpleName(), ex.getMessage(), ex);
+            tmAutoScheduleTaskService.markFailed(taskId, ex.getMessage(),
+                    context == null ? Collections.emptyList() : context.getIssueCollector().getIssues());
             throw ex;
         }
     }
