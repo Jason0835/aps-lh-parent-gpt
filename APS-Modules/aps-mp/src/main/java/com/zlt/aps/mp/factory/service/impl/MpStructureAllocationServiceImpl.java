@@ -39,6 +39,7 @@ import com.zlt.aps.exception.BusinessException;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.maindata.mapper.*;
 import com.zlt.aps.maindata.service.IFactoryParamService;
+import com.zlt.aps.maindata.service.IMdmSkuScheduleCategoryService;
 import com.zlt.aps.maindata.service.IRawSpecialMaterialRecordService;
 import com.zlt.aps.maindata.utils.FactoryParamUtils;
 import com.zlt.aps.mdm.api.domain.entity.LhMachineInfo;
@@ -167,6 +168,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
     private final DataManager dataManager;
     private final IRawSpecialMaterialRecordService rawSpecialMaterialRecordService;
     private final IFactoryMonthPlanMouldDayResultService iFactoryMonthPlanMouldDayResultService;
+    private final IMdmSkuScheduleCategoryService mdmSkuScheduleCategoryService;
     private final Map<Long, Map<String, String>> importMachineMapCache = new ConcurrentHashMap<>();
     @Autowired
     @Lazy
@@ -3485,6 +3487,12 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                         productionEndDate);
         Set<String> materialHasMoldSet = moldList.stream().map(MoldCavityInsertMaxValueCalculatorVo::getMaterialDesc).distinct().collect(Collectors.toSet()); // 有模具的sku列表
         materialHasMoldSet.addAll(mouldDeliveryList.stream().map(MoldCavityInsertMaxValueCalculatorVo::getMaterialDesc).distinct().collect(Collectors.toSet())); // 模具到货计划合并到sku列表中
+        
+        // 1.11、初始化SKU排产分类，Map<物料编码, 分类>
+        Map<String, String> productionTypeMap = mdmSkuScheduleCategoryService.skuToProductionType(factoryCode);
+        if (PubUtil.isEmpty(productionTypeMap)) {
+            productionTypeMap = new HashMap<>();
+        }
 
         // 2、遍历导入数据，填充各必要栏位数值
         List<FactoryMonthPlanMouldDayResult> finalImportList = new ArrayList<>();
@@ -3647,6 +3655,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                     dailyCapacityMap);
             insertItem.setMouldChangeInfo(mpFinalVo.getMouldChangeInfo());
             insertItem.setYearMonth(yearMonth);
+            insertItem.setProductionType(productionTypeMap.get(materialCode));
             finalImportList.add(insertItem);
         }
         // 3、生成统计信息（handleMonthPlanStatistics）
