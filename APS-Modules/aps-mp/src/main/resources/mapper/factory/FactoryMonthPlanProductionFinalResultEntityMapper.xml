@@ -187,6 +187,12 @@
          注意：同一(分厂+物料+产品状态)维度下 DAY_x 字段值相同（上月定稿按此维度唯一），
                故 SUM(DAY_x) 等价于取该行的 DAY_x 值，公式中用 CASE WHEN 实现动态累加。
     -->
+    <!-- 月初定时任务：用上月数据计算超欠产，写入当月定稿表
+         数据来源月=lastMonth（如6月），写入目标月=currentMonth（如7月）
+         关键：surplus.REQUIRE_VERSION 必须匹配当月(7月)定稿版本号，而非上月(6月)版本号
+         数据流：7月定稿表 f → pv7 取7月定稿版本号 → surplus(6月) 按7月版本号匹配STOCK_CAPTURE_DATE
+                → f5(6月定稿表) 提供 DAY_x 计划量 → fin(6月完成量) → 超欠产 = 计划量 - 完成量
+    -->
     <update id="updateLastMonthOverProd">
         UPDATE T_MP_MONTH_PLAN_PROD_FINAL f
             LEFT JOIN (
@@ -194,6 +200,7 @@
             f5.FACTORY_CODE,
             f5.MATERIAL_CODE,
             f5.PRODUCT_STATUS,
+            pv7.MONTH_PLAN_VERSION AS CURRENT_VERSION,
             (
             -- 计划量：从 STOCK_CAPTURE_DATE 日号到月底累加 DAY_x
             -- STOCK_CAPTURE_DATE 为空时 stockDay=1，累加 DAY_1~DAY_31
@@ -238,12 +245,19 @@
                 AND pv.MONTH = f5.MONTH
                 AND pv.IS_FINAL = '1'
                 AND pv.IS_DELETE = 0
+            -- 关联当月(如7月)定稿版本，用于匹配 surplus 的需求版本号
+            INNER JOIN T_MP_PROC_VERSION pv7
+                ON pv7.FACTORY_CODE = f5.FACTORY_CODE
+                AND pv7.YEAR = #{currentYear}
+                AND pv7.MONTH = #{currentMonth}
+                AND pv7.IS_FINAL = '1'
+                AND pv7.IS_DELETE = 0
             LEFT JOIN T_MDM_MONTH_SURPLUS surplus
             ON surplus.FACTORY_CODE = f5.FACTORY_CODE
             AND surplus.MATERIAL_CODE = f5.MATERIAL_CODE
             AND surplus.YEAR = f5.YEAR
             AND surplus.MONTH = f5.MONTH
-            AND surplus.REQUIRE_VERSION = f5.MONTH_PLAN_VERSION
+            AND surplus.REQUIRE_VERSION = pv7.MONTH_PLAN_VERSION
             AND surplus.IS_DELETE = 0
             LEFT JOIN (
                 SELECT
@@ -262,7 +276,8 @@
             WHERE f5.IS_DELETE = 0
             AND f5.YEAR = #{lastYear}
             AND f5.MONTH = #{lastMonth}
-            GROUP BY f5.FACTORY_CODE, f5.MATERIAL_CODE, f5.PRODUCT_STATUS, surplus.STOCK_CAPTURE_DATE,
+            GROUP BY f5.FACTORY_CODE, f5.MATERIAL_CODE, f5.PRODUCT_STATUS, pv7.MONTH_PLAN_VERSION,
+            surplus.STOCK_CAPTURE_DATE,
             f5.DAY_1, f5.DAY_2, f5.DAY_3, f5.DAY_4, f5.DAY_5, f5.DAY_6, f5.DAY_7, f5.DAY_8,
             f5.DAY_9, f5.DAY_10, f5.DAY_11, f5.DAY_12, f5.DAY_13, f5.DAY_14, f5.DAY_15, f5.DAY_16,
             f5.DAY_17, f5.DAY_18, f5.DAY_19, f5.DAY_20, f5.DAY_21, f5.DAY_22, f5.DAY_23, f5.DAY_24,
@@ -270,6 +285,7 @@
             ) calc ON f.FACTORY_CODE = calc.FACTORY_CODE
             AND f.MATERIAL_CODE = calc.MATERIAL_CODE
             AND f.PRODUCT_STATUS = calc.PRODUCT_STATUS
+            AND f.MONTH_PLAN_VERSION = calc.CURRENT_VERSION
             LEFT JOIN T_MP_FACTORY_PARAM fp ON fp.FACTORY_CODE = f.FACTORY_CODE
             AND fp.PRODUCT_TYPE_CODE = f.PRODUCT_TYPE_CODE
             AND fp.PARAM_CODE = #{overdueThresholdParamCode}
@@ -486,6 +502,7 @@
                 f5.FACTORY_CODE,
                 f5.MATERIAL_CODE,
                 f5.PRODUCT_STATUS,
+                pv7.MONTH_PLAN_VERSION AS CURRENT_VERSION,
                 (
                     IFNULL(CASE WHEN DAYOFMONTH(IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})) &lt;= 1 THEN f5.DAY_1 ELSE 0 END, 0) +
         IFNULL(CASE WHEN DAYOFMONTH(IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})) &lt;= 2 THEN f5.DAY_2 ELSE 0 END, 0) +
@@ -527,12 +544,19 @@
             AND pv.MONTH = f5.MONTH
             AND pv.IS_FINAL = '1'
             AND pv.IS_DELETE = 0
+        -- 关联当月(如7月)定稿版本，用于匹配 surplus 的需求版本号
+        INNER JOIN T_MP_PROC_VERSION pv7
+            ON pv7.FACTORY_CODE = f5.FACTORY_CODE
+            AND pv7.YEAR = #{currentYear}
+            AND pv7.MONTH = #{currentMonth}
+            AND pv7.IS_FINAL = '1'
+            AND pv7.IS_DELETE = 0
         LEFT JOIN T_MDM_MONTH_SURPLUS surplus
         ON surplus.FACTORY_CODE = f5.FACTORY_CODE
         AND surplus.MATERIAL_CODE = f5.MATERIAL_CODE
         AND surplus.YEAR = f5.YEAR
         AND surplus.MONTH = f5.MONTH
-        AND surplus.REQUIRE_VERSION = f5.MONTH_PLAN_VERSION
+        AND surplus.REQUIRE_VERSION = pv7.MONTH_PLAN_VERSION
         AND surplus.IS_DELETE = 0
         LEFT JOIN (
         SELECT
@@ -551,7 +575,7 @@
         WHERE f5.IS_DELETE = 0
         AND f5.YEAR = #{lastYear}
         AND f5.MONTH = #{lastMonth}
-        GROUP BY f5.FACTORY_CODE, f5.MATERIAL_CODE, f5.PRODUCT_STATUS, surplus.STOCK_CAPTURE_DATE,
+        GROUP BY f5.FACTORY_CODE, f5.MATERIAL_CODE, f5.PRODUCT_STATUS, pv7.MONTH_PLAN_VERSION, surplus.STOCK_CAPTURE_DATE,
         f5.DAY_1, f5.DAY_2, f5.DAY_3, f5.DAY_4, f5.DAY_5, f5.DAY_6, f5.DAY_7, f5.DAY_8,
         f5.DAY_9, f5.DAY_10, f5.DAY_11, f5.DAY_12, f5.DAY_13, f5.DAY_14, f5.DAY_15, f5.DAY_16,
         f5.DAY_17, f5.DAY_18, f5.DAY_19, f5.DAY_20, f5.DAY_21, f5.DAY_22, f5.DAY_23, f5.DAY_24,
