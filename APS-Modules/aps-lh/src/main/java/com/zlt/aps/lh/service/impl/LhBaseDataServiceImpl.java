@@ -2,9 +2,11 @@ package com.zlt.aps.lh.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.zlt.aps.cx.entity.CxStock;
+import com.zlt.aps.cx.entity.config.CxEmbryoLhTime;
 import com.zlt.aps.lh.api.constant.LhScheduleConstant;
 import com.zlt.aps.lh.api.constant.LhScheduleParamConstant;
 import com.zlt.aps.lh.api.domain.entity.LhDayFinishQty;
+import com.zlt.aps.lh.mapper.CxEmbryoLhTimeMapper;
 import com.zlt.aps.maindata.mapper.MpMouldDeliveryPlanEntityMapper;
 import com.zlt.aps.mdm.api.domain.entity.LhMachineInfo;
 import com.zlt.aps.lh.api.domain.entity.LhMachineOnlineInfo;
@@ -66,6 +68,7 @@ import com.zlt.aps.mp.api.domain.entity.MdmCapsuleChuck;
 import com.zlt.aps.mp.api.domain.entity.MpFactoryProductionVersion;
 import com.zlt.aps.mp.api.domain.entity.MpMonthPlanStatistics;
 import com.zlt.aps.mp.api.domain.entity.MpMouldDeliveryPlan;
+import com.zlt.common.utils.PubUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
@@ -189,6 +192,9 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
 
     @Resource
     private CxStockMapper cxStockMapper;
+
+    @Resource
+    private CxEmbryoLhTimeMapper cxEmbryoLhTimeMapper;
 
     @Resource
     private LhSpecialMaterialBomEntityMapper lhSpecialMaterialBomEntityMapper;
@@ -1193,6 +1199,7 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
                 .filter(StringUtils::isNotEmpty)
                 .distinct()
                 .collect(Collectors.toList());
+        context.setStructureEarliestLhTimeMap(new HashMap<>());
         Map<String, Integer> stockMap = new HashMap<>(Math.max(16, embryoCodeList.size()));
         if (CollectionUtils.isEmpty(embryoCodeList)) {
             context.setEmbryoRealtimeStockMap(stockMap);
@@ -1212,6 +1219,21 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
         }
         context.setEmbryoRealtimeStockMap(stockMap);
         log.debug("胎胚实时库存加载完成, 数量: {}", stockMap.size());
+
+        //加载胎胚最早可供硫化时间，结构维度 sandy+ 2026.7.7
+        List<CxEmbryoLhTime> embryoLhTimesList = cxEmbryoLhTimeMapper.selectList(new LambdaQueryWrapper<CxEmbryoLhTime>()
+                .eq(CxEmbryoLhTime::getFactoryCode, factoryCode)
+                .gt(CxEmbryoLhTime::getEarliestLhTime, stockDate));
+        if (embryoLhTimesList != null) {
+            Map<String, Date> timeMap = embryoLhTimesList.stream()
+                    .filter(e -> e.getEarliestLhTime() != null)
+                    .collect(Collectors.toMap(
+                            CxEmbryoLhTime::getStructureName,
+                            CxEmbryoLhTime::getEarliestLhTime,
+                            (v1, v2) -> v1 // 如果有重复，保留第一个
+                    ));
+            context.setStructureEarliestLhTimeMap(PubUtil.isNotEmpty(timeMap) ? timeMap : new HashMap<>());
+        }
     }
 
     /**
