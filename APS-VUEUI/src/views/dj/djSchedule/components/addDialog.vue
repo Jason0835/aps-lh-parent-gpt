@@ -201,12 +201,28 @@ export default {
     //utils
     loadMachines() {
       listMachine().then((res) => {
-        this.machines = res.rows || [];
+        // 按 id 去重，防止重复 key 报错
+        const seen = new Set();
+        this.machines = (res.rows || []).filter((m) => {
+          if (seen.has(m.id)) {
+            return false;
+          }
+          seen.add(m.id);
+          return true;
+        });
       });
     },
     loadPaddingList() {
       getPaddingDistList().then((res) => {
-        this.paddingList = res || [];
+        // 按 value 去重，防止重复 key 报错
+        const seen = new Set();
+        this.paddingList = (res || []).filter((p) => {
+          if (seen.has(p.value)) {
+            return false;
+          }
+          seen.add(p.value);
+          return true;
+        });
       });
     },
     loadCurrentShift() {
