@@ -100,6 +100,8 @@ public class Cd15MachineInfoServiceImpl extends AbstractDocService<Cd15MachineIn
                 importList.add(docEntity);
             } else if (updateSupport) {
                 exist.setMachineName(docEntity.getMachineName());
+                exist.setClothWidthMax(docEntity.getClothWidthMax());
+                exist.setClothWidthMin(docEntity.getClothWidthMin());
                 exist.setQuota(docEntity.getQuota());
                 exist.setClassShift(docEntity.getClassShift());
                 exist.setOpenMachineClass(docEntity.getOpenMachineClass());

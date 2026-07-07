@@ -47,7 +47,9 @@ export default {
       loading: false,
       visible: false,
       isEdit: false,
-      form: {},
+      form: {
+        openMachineClass: [],
+      },
       rules: {
         factoryCode: [requiredSelect],
         machineCode: [requiredInput],
@@ -64,7 +66,19 @@ export default {
             trigger: "blur",
           },
         ],
-        openMachineClass: [requiredSelect],
+        openMachineClass: [
+          {
+            required: true,
+            validator: (rule, value, callback) => {
+              if (!value || value.length === 0) {
+                callback(new Error(this.$t("common.rule.select")));
+              } else {
+                callback();
+              }
+            },
+            trigger: "change",
+          },
+        ],
       },
     };
   },
@@ -92,6 +106,16 @@ export default {
           maxlength: 60,
         },
         {
+          prop: "clothWidthMax",
+          label: this.$t("ui.data.column.cd15MachineInfo.clothWidthMax"),
+          type: "number",
+        },
+        {
+          prop: "clothWidthMin",
+          label: this.$t("ui.data.column.cd15MachineInfo.clothWidthMin"),
+          type: "number",
+        },
+        {
           prop: "quota",
           label: this.$t("ui.data.column.cd15MachineInfo.quota"),
           type: "number",
@@ -99,9 +123,19 @@ export default {
         {
           prop: "openMachineClass",
           label: this.$t("ui.data.column.cd15MachineInfo.openMachineClass"),
-          type: "select",
-          dictData: this.parentDict.type.class_num,
-          filterable: true,
+          render: (form) => {
+            return (
+              <el-checkbox-group v-model={form.openMachineClass}>
+                {this.parentDict.type.class_num_three_plan.map((row) => {
+                  return (
+                    <el-checkbox key={`SHIFT_${row.value}`} label={row.value}>
+                      {row.label}
+                    </el-checkbox>
+                  );
+                })}
+              </el-checkbox-group>
+            );
+          },
         },
         {
           prop: "isOutTwo",
@@ -136,6 +170,9 @@ export default {
     async save(params) {
       this.loading = true;
       try {
+        if (params.openMachineClass && Array.isArray(params.openMachineClass)) {
+          params.openMachineClass = params.openMachineClass.join(",");
+        }
         const res = this.isEdit
           ? await updateCd15MachineInfo(params)
           : await addCd15MachineInfo(params);
@@ -150,17 +187,23 @@ export default {
       this.visible = true;
       if (data) {
         this.isEdit = true;
-        this.form = { ...data };
+        this.form = {
+          ...data,
+          openMachineClass: data.openMachineClass
+            ? data.openMachineClass.split(",")
+            : [],
+        };
       } else {
         this.form = {
           factoryCode: "116",
           isOutTwo: "0",
           status: "1",
+          openMachineClass: [],
         };
       }
     },
     hide() {
-      this.form = {};
+      this.form = { openMachineClass: [] };
       this.$refs.form && this.$refs.form.triggerResetForm();
       this.isEdit = false;
       this.visible = false;

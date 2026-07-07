@@ -41,6 +41,17 @@ public class Cd15MachineInfo extends BaseEntity implements Serializable {
     @Excel(name = "ui.data.column.cd15MachineInfo.machineName")
     private String machineName;
 
+    /** 帘布宽度上限 */
+    @ApiModelProperty(value = "帘布宽度上限", name = "clothWidthMax")
+    @TableField("CLOTH_WIDTH_MAX")
+    @Excel(name = "ui.data.column.cd15MachineInfo.clothWidthMax")
+    private Double clothWidthMax;
+
+    /** 帘布宽度下限 */
+    @ApiModelProperty(value = "帘布宽度下限", name = "clothWidthMin")
+    @TableField("CLOTH_WIDTH_MIN")
+    @Excel(name = "ui.data.column.cd15MachineInfo.clothWidthMin")
+    private Double clothWidthMin;
     /** 生产定额，单位米/班 */
     @ApiModelProperty(value = "生产定额", name = "quota")
     @ImportExcelValidated(required = true, maxLength = 10)
@@ -57,7 +68,7 @@ public class Cd15MachineInfo extends BaseEntity implements Serializable {
     @ApiModelProperty(value = "开机班次", name = "openMachineClass")
     @ImportExcelValidated(required = true, maxLength = 20)
     @TableField("OPEN_MACHINE_CLASS")
-    @Excel(name = "ui.data.column.cd15MachineInfo.openMachineClass", dictType = "class_num")
+    @Excel(name = "ui.data.column.cd15MachineInfo.openMachineClass", dictType = "class_num_three_plan")
     private String openMachineClass;
 
     /** 是否支持一出二：0--支持，1--不支持 */

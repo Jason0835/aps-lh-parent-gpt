@@ -1,228 +1,95 @@
-import request from '@/utils/request'
+import request, { downloadLink } from '@/utils/request'
 
 export function listScheduleResult(query) {
-  return request({
-    url: 'cd15/cd15ScheduleResult/list',
-    method: 'post',
-    data: query
-  })
+  return request({ url: '/cd15/cd15ScheduleResult/list', method: 'post', data: query })
 }
-export function removeScheduleResult(query) {
+
+export function getScheduleResult(id) {
+  return request({ url: `/cd15/cd15ScheduleResult/getInfo/${id}`, method: 'get' })
+}
+
+export function delScheduleResult(data) {
+  return request({ url: '/cd15/cd15ScheduleResult/remove', method: 'post', data })
+}
+
+export function autoSchedule(data) {
+  return request({ url: '/cd15/cd15ScheduleResult/autoSchedule', method: 'post', data })
+}
+
+export function getAutoScheduleTask(taskId) {
+  return request({ url: `/cd15/cd15ScheduleResult/autoSchedule/task/${taskId}`, method: 'get' })
+}
+
+export function validateInsert(data) {
   return request({
-    url: 'cd15/cd15ScheduleResult/remove',
+    url: '/cd15/cd15ScheduleResult/validateInsert',
     method: 'post',
-    data: query
+    headers: { 'Content-Type': 'application/json;charset=UTF-8' },
+    data
   })
 }
 
-//
-export function validateAutoPlan(query) {
+export function insert(data) {
   return request({
-    url: 'cd15/cd15ScheduleResult/validateAutoPlan',
+    url: '/cd15/cd15ScheduleResult/insert',
     method: 'post',
-    data: query
-  })
-}
-export function autoPlan(query) {
-  return request({
-    url: 'cd15/cd15ScheduleResult/autoPlan',
-    method: 'post',
-    data: query
-  })
-}
-export function balance(query) {
-  return request({
-    url: 'cd15/cd15ScheduleResult/balance',
-    method: 'post',
-    data: query
-  })
-}
-// export function modelChange(query) {
-//   return request({
-//     url: 'cd15/cd15ScheduleResult/modelChange',
-//     method: 'post',
-//     data: query
-//   })
-// }
-// export function modelAdjustPlan(query) {
-//   return request({
-//     url: 'cd15/cd15ScheduleResult/modelAdjustPlan',
-//     method: 'post',
-//     data: query
-//   })
-// }
-
-// // 获取胎胚版本
-// export function getProductEmbryoVersions(query) {
-//   return request({
-//     url: 'cd15/cd15ScheduleResult/getProductEmbryoVersions',
-//     method: 'post',
-//     data: query
-//   })
-// }
-// export function getCxMachines(query) {
-//   return request({
-//     url: 'cd15/cd15ScheduleResult/getCxMachines',
-//     method: 'post',
-//     data: query
-//   })
-// }
-// export function validateBeforeAdd(query) {
-//   return request({
-//     url: 'cd15/cd15ScheduleResult/validateBeforeAdd',
-//     method: 'post',
-//     data: query
-//   })
-// }
-export function validateAdd(query) {
-  return request({
-    url: 'cd15/cd15ScheduleResult/validateAdd',
-    method: 'post',
-    data: query
+    headers: { 'Content-Type': 'application/json;charset=UTF-8' },
+    data
   })
 }
 
-export function editScheduleResult(query) {
-  return request({
-    url: 'cd15/cd15ScheduleResult/edit',
-    method: 'post',
-    data: query
-  })
+export function getInsertTask(taskId) {
+  return request({ url: `/cd15/cd15ScheduleResult/insert/task/${taskId}`, method: 'get' })
 }
-export function batchChangeMachine(machineId, query) {
+
+export function validateTransferMachine(data) {
   return request({
-    url: 'cd15/cd15ScheduleResult/batchChangeMachine/' + machineId,
+    url: '/cd15/cd15ScheduleResult/validateTransferMachine',
     method: 'post',
-    data: query
-  })
-}
-export function chooseMachine(query) {
-  return request({
-    url: 'cd15/cd15ScheduleResult/chooseMachine',
-    method: 'post',
-    data: query
-  })
-}
-export function mergeProduct(query) {
-  return request({
-    url: 'cd15/cd15ScheduleResult/mergeProduct',
-    method: 'post',
-    data: query
+    headers: { 'Content-Type': 'application/json;charset=UTF-8' },
+    data
   })
 }
 
-
-
-// //
-// export function modifyMoldsValidate(query) {
-//   return request({
-//     url: 'cd15/cd15ScheduleResult/modifyMoldsValidate',
-//     method: 'post',
-//     data: query
-//   })
-// }
-// export function modifyMolds(query) {
-//   return request({
-//     url: 'cd15/cd15ScheduleResult/modifyMolds',
-//     method: 'post',
-//     data: query
-//   })
-// }
-
-
-// export function validateChangeMachine(query) {
-//   return request({
-//     url: 'cd15/cd15ScheduleResult/validateChangeMachine',
-//     method: 'post',
-//     data: query
-//   })
-// }
-export function publishValidate(query) {
+export function transferMachine(data) {
   return request({
-    url: 'cd15/cd15ScheduleResult/publishValidate',
+    url: '/cd15/cd15ScheduleResult/transferMachine',
     method: 'post',
-    data: query
-  })
-}
-export function publishScheduleResult(query) {
-  return request({
-    url: 'cd15/cd15ScheduleResult/publish',
-    method: 'post',
-    data: query
+    headers: { 'Content-Type': 'application/json;charset=UTF-8' },
+    data
   })
 }
 
-// export function hasRecordValidate(query) {
-//   return request({
-//     url: 'cd15/cd15ScheduleResult/hasRecordValidate',
-//     method: 'post',
-//     data: query
-//   })
-// }
-
-// export function modifyQty(query) {
-//   return request({
-//     url: `cd15/cd15ScheduleResult/modifyQty/${query}`,
-//     method: 'post',
-//     // data: query
-//   })
-// }
-
-// export function manualClose(query) {
-//   return request({
-//     url: `cd15/cd15ScheduleResult/manualClose`,
-//     method: 'post',
-//     data: query
-//   })
-// }
-
-// export function listFinished(query) {
-//   return request({
-//     url: `cd15/cd15ScheduleResult/finished/list`,
-//     method: 'post',
-//     data: query
-//   })
-// }
-// export function producingIssue(query) {
-//   return request({
-//    url: `cd15/cd15ScheduleResult/producingIssue`,
-//     method: 'post',
-//     data: query
-//   })
-// }
-// export function validateConstruction(query) {
-//   return request({
-//    url: `cd15/cd15ScheduleResult/validateConstruction`,
-//     method: 'post',
-//     data: query
-//   })
-// }
-export function changeReleaseStatus(query) {
-  return request({
-   url: `cd15/cd15ScheduleResult/changeReleaseStatus`,
-    method: 'post',
-    data: query
-  })
+export function getTransferMachineTask(taskId) {
+  return request({ url: `/cd15/cd15ScheduleResult/transferMachine/task/${taskId}`, method: 'get' })
 }
-export function changeQty(query) {
+
+export function validateChangeQty(data) {
   return request({
-   url: `cd15/cd15ScheduleResult/changeQty`,
+    url: '/cd15/cd15ScheduleResult/validateChangeQty',
     method: 'post',
-    data: query
-  })
-}
-export function combinationMiddleAndNight(query) {
-  return request({
-   url: `cd15/cd15ScheduleResult/combinationMiddleAndNight`,
-    method: 'post',
-    data: query
+    headers: { 'Content-Type': 'application/json;charset=UTF-8' },
+    data
   })
 }
 
-export function getSummaryVo(query) {
+export function changeQty(data) {
   return request({
-   url: `cd15/cd15ScheduleResult/getSummaryVo`,
+    url: '/cd15/cd15ScheduleResult/changeQty',
     method: 'post',
-    data: query
+    headers: { 'Content-Type': 'application/json;charset=UTF-8' },
+    data
   })
+}
+
+export function getChangeQtyTask(taskId) {
+  return request({ url: `/cd15/cd15ScheduleResult/changeQty/task/${taskId}`, method: 'get' })
+}
+
+export function publishScheduleResult(data) {
+  return request({ url: '/cd15/cd15ScheduleResult/publish', method: 'post', data })
+}
+
+export function exportScheduleResult(query) {
+  return downloadLink('/cd15/cd15ScheduleResult/export', query)
 }
