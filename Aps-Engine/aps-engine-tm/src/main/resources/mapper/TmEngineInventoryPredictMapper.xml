@@ -20,6 +20,24 @@
         GROUP BY ci.TREAD_CODE
     </select>
 
+    <!-- RECIPE 模式：按 (EMBRYO_CODE, CLASS1_RECIPE_NO) 关联施工，recipe 为空时不匹配、该行不计入汇总 -->
+    <select id="selectFirstShiftDemandRowsByRecipe" resultType="com.zlt.aps.tm.engine.domain.TmInventoryPredictQtyVo">
+        SELECT ci.TREAD_CODE AS treadCode,
+               SUM(IFNULL(cx.CLASS1_PLAN_QTY, 0) * IFNULL(ci.TREAD_SHOULDER_LENGTH, 0)) AS qty
+        FROM T_CX_SCHEDULE_RESULT cx
+        INNER JOIN T_MDM_CONSTRUCTION_INFO ci
+               ON cx.EMBRYO_CODE = ci.CONSTRUCTION_CODE
+              AND cx.CLASS1_RECIPE_NO = ci.CONSTRUCTION_VERSION
+              AND ci.IS_DELETE = 0
+        WHERE cx.FACTORY_CODE = #{factoryCode}
+          AND cx.SCHEDULE_DATE = #{scheduleDate}
+          AND ci.TREAD_CODE IN
+          <foreach collection="treadCodes" item="treadCode" open="(" separator="," close=")">
+              #{treadCode}
+          </foreach>
+        GROUP BY ci.TREAD_CODE
+    </select>
+
     <select id="selectFirstShiftPlanRows" resultType="com.zlt.aps.tm.engine.domain.TmInventoryPredictQtyVo">
         SELECT TREAD_CODE AS treadCode,
                SUM(IFNULL(CLASS3_PLAN_QTY, 0)) AS qty
