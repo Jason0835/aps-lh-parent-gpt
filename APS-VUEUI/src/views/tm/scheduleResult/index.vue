@@ -96,10 +96,12 @@
         {{ autoPlanProgressStage }}
       </div>
       <el-progress
+        class="auto-plan-progress"
         :percentage="autoPlanProgressValue"
         :status="autoPlanProgressStatus"
         :stroke-width="18"
         :text-inside="true"
+        text-color="#fff"
       />
       <div style="margin-top:10px;color:#909399;font-size:12px;text-align:center;">
         {{ autoPlanProgressHint }}
