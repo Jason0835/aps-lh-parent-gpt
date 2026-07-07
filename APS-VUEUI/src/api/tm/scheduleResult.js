@@ -44,6 +44,20 @@ export function autoPlan(query) {
   })
 }
 
+export function getAutoPlanTask(taskId) {
+  return request({
+    url: '/tm/tmScheduleResult/autoPlan/task/' + taskId,
+    method: 'get'
+  })
+}
+
+export function getLatestAutoPlanTask(query) {
+  return request({
+    url: '/tm/tmScheduleResult/autoPlan/task/latest',
+    method: 'get',
+    params: query
+  })
+}
 export function listTmScheduleBoard(query) {
   return request({
     url: '/tm/tmScheduleResult/board',

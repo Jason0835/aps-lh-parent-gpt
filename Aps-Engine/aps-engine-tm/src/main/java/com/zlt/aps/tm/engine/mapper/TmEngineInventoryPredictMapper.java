@@ -27,6 +27,21 @@ public interface TmEngineInventoryPredictMapper {
                                                              @Param("treadCodes") List<String> treadCodes);
 
     /**
+     * 查询排程当天成型早班胎面需求量（RECIPE 模式）。
+     *
+     * <p>按 (EMBRYO_CODE, CLASS1_RECIPE_NO) 关联施工信息取胎面标准长度，
+     * 示方书为空时不匹配，该行不计入汇总。</p>
+     *
+     * @param factoryCode  工厂编号
+     * @param scheduleDate 排程日期
+     * @param treadCodes   胎面编码列表
+     * @return 胎面需求量行，treadCode 为胎面编码，qty 为早班需求量
+     */
+    List<TmInventoryPredictQtyVo> selectFirstShiftDemandRowsByRecipe(@Param("factoryCode") String factoryCode,
+                                                                     @Param("scheduleDate") Date scheduleDate,
+                                                                     @Param("treadCodes") List<String> treadCodes);
+
+    /**
      * 查询排程前一天夜班胎面计划量。
      *
      * @param factoryCode  工厂编号

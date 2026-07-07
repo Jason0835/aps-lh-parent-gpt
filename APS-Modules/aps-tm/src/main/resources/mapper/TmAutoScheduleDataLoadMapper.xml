@@ -67,8 +67,8 @@
         FROM T_CX_SCHEDULE_RESULT cx
                  LEFT JOIN T_MDM_CONSTRUCTION_INFO ci
                            ON cx.EMBRYO_CODE = ci.CONSTRUCTION_CODE
-                               AND (cx.BOM_DATA_VERSION = ci.CONSTRUCTION_VERSION
-                                    OR (cx.BOM_DATA_VERSION IS NULL AND ci.CONSTRUCTION_VERSION IS NULL))
+        <!-- AND (cx.BOM_DATA_VERSION = ci.CONSTRUCTION_VERSION
+             OR (cx.BOM_DATA_VERSION IS NULL AND ci.CONSTRUCTION_VERSION IS NULL)) -->
                                AND ci.IS_DELETE = 0
         WHERE cx.IS_DELETE = 0
           AND cx.FACTORY_CODE = #{factoryCode}
@@ -115,6 +115,89 @@
         WHERE FACTORY_CODE = #{factoryCode}
           AND PROC_CODE = #{procCode}
           AND PRODUCTION_DATE = #{productionDate}
+    </select>
+
+    <resultMap id="TmFormingDemandRecipeRowResult" type="com.zlt.aps.tm.domain.vo.TmFormingDemandRecipeRowVo">
+        <result column="ORDER_NO" property="orderNo"/>
+        <result column="EMBRYO_CODE" property="embryoCode"/>
+        <result column="LH_MACHINE_CODE" property="lhMachineCode"/>
+        <result column="CLASS1_PLAN_QTY" property="class1PlanQty"/>
+        <result column="CLASS2_PLAN_QTY" property="class2PlanQty"/>
+        <result column="CLASS3_PLAN_QTY" property="class3PlanQty"/>
+        <result column="CLASS4_PLAN_QTY" property="class4PlanQty"/>
+        <result column="CLASS5_PLAN_QTY" property="class5PlanQty"/>
+        <result column="CLASS6_PLAN_QTY" property="class6PlanQty"/>
+        <result column="CLASS7_PLAN_QTY" property="class7PlanQty"/>
+        <result column="CLASS8_PLAN_QTY" property="class8PlanQty"/>
+        <result column="CLASS1_RECIPE_NO" property="class1RecipeNo"/>
+        <result column="CLASS2_RECIPE_NO" property="class2RecipeNo"/>
+        <result column="CLASS3_RECIPE_NO" property="class3RecipeNo"/>
+        <result column="CLASS4_RECIPE_NO" property="class4RecipeNo"/>
+        <result column="CLASS5_RECIPE_NO" property="class5RecipeNo"/>
+        <result column="CLASS6_RECIPE_NO" property="class6RecipeNo"/>
+        <result column="CLASS7_RECIPE_NO" property="class7RecipeNo"/>
+        <result column="CLASS8_RECIPE_NO" property="class8RecipeNo"/>
+        <result column="MARK_CLOSE_OUT_TIP" property="markCloseOutTip"/>
+        <result column="CX_REMAIN_QTY" property="cxRemainQty"/>
+    </resultMap>
+
+    <resultMap id="TmConstructionTreadRowResult" type="com.zlt.aps.tm.domain.vo.TmConstructionTreadRowVo">
+        <result column="CONSTRUCTION_CODE" property="constructionCode"/>
+        <result column="CONSTRUCTION_VERSION" property="constructionVersion"/>
+        <result column="TREAD_CODE" property="treadCode"/>
+        <result column="TREAD_SHOULDER_LENGTH" property="treadShoulderLength"/>
+        <result column="TREAD_MOUTH_PLATE" property="treadMouthPlate"/>
+        <result column="TREAD_RUBBER_CATEGORY" property="treadRubberCategory"/>
+    </resultMap>
+
+    <!-- RECIPE 模式：仅查成型排程结果，不 JOIN 施工表，施工信息由 Java 按 (EMBRYO_CODE, CLASSn_RECIPE_NO) 关联解析 -->
+    <select id="selectFormingDemandRowsByRecipe" resultMap="TmFormingDemandRecipeRowResult">
+        SELECT cx.ORDER_NO,
+               cx.EMBRYO_CODE,
+               cx.LH_MACHINE_CODE,
+               cx.CLASS1_PLAN_QTY,
+               cx.CLASS2_PLAN_QTY,
+               cx.CLASS3_PLAN_QTY,
+               cx.CLASS4_PLAN_QTY,
+               cx.CLASS5_PLAN_QTY,
+               cx.CLASS6_PLAN_QTY,
+               cx.CLASS7_PLAN_QTY,
+               cx.CLASS8_PLAN_QTY,
+               cx.CLASS1_RECIPE_NO,
+               cx.CLASS2_RECIPE_NO,
+               cx.CLASS3_RECIPE_NO,
+               cx.CLASS4_RECIPE_NO,
+               cx.CLASS5_RECIPE_NO,
+               cx.CLASS6_RECIPE_NO,
+               cx.CLASS7_RECIPE_NO,
+               cx.CLASS8_RECIPE_NO,
+               cx.MARK_CLOSE_OUT_TIP,
+               cx.CX_REMAIN_QTY
+        FROM T_CX_SCHEDULE_RESULT cx
+        WHERE cx.IS_DELETE = 0
+          AND cx.FACTORY_CODE = #{factoryCode}
+          AND cx.SCHEDULE_DATE = #{scheduleDate}
+    </select>
+
+    <!-- RECIPE 模式：按 (CONSTRUCTION_CODE, CONSTRUCTION_VERSION) 批量加载施工胎面属性 -->
+    <select id="selectConstructionInfoRows" resultMap="TmConstructionTreadRowResult">
+        SELECT ci.CONSTRUCTION_CODE,
+               ci.CONSTRUCTION_VERSION,
+               ci.TREAD_CODE,
+               ci.TREAD_SHOULDER_LENGTH,
+               ci.TREAD_MOUTH_PLATE,
+               ci.TREAD_RUBBER_CATEGORY
+        FROM T_MDM_CONSTRUCTION_INFO ci
+        WHERE ci.IS_DELETE = 0
+          AND ci.FACTORY_CODE = #{factoryCode}
+          AND ci.CONSTRUCTION_CODE IN
+        <foreach collection="embryoCodes" item="embryoCode" open="(" separator="," close=")">
+            #{embryoCode}
+        </foreach>
+          AND ci.CONSTRUCTION_VERSION IN
+        <foreach collection="constructionVersions" item="constructionVersion" open="(" separator="," close=")">
+            #{constructionVersion}
+        </foreach>
     </select>
 
 </mapper>

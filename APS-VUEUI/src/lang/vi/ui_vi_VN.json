@@ -1843,5 +1843,21 @@
   "ui.data.column.xwyyStock.rollBadNum": "SL lỗi(cuộn)",
   "ui.data.column.xwyyStock.stockMeters": "Số mét mỗi cuộn",
   "ui.data.column.xwyyStock.estimateStockFlag": "Cờ ước tính tồn kho",
-  "ui.data.column.xwyyStock.checkUnique": "Bản ghi tồn kho đã tồn tại cho cùng nhà máy, ngày và mã cuộn lớn"
+  "ui.data.column.xwyyStock.checkUnique": "Bản ghi tồn kho đã tồn tại cho cùng nhà máy, ngày và mã cuộn lớn",
+  "ui.data.column.tm.scheduleResult.autoPlanProgress": "Tiến độ lập lịch tự động TM",
+  "ui.data.column.tm.scheduleResult.autoPlanProgressHint": "Đang lập lịch, vui lòng không đóng trang",
+  "ui.data.column.tm.scheduleResult.autoPlanSuccess": "Lập lịch tự động TM hoàn tất",
+  "ui.data.column.tm.scheduleResult.autoPlanFailed": "Lập lịch tự động TM thất bại",
+  "ui.data.column.tm.scheduleResult.autoPlanTimeout": "Truy vấn lập lịch tự động TM quá thời gian",
+  "ui.data.column.tm.scheduleResult.autoPlanIssues": "Bất thường của lần lập lịch này",
+  "ui.data.column.tm.scheduleResult.issueLevel": "Cấp độ",
+  "ui.data.column.tm.scheduleResult.issueStage": "Giai đoạn",
+  "ui.data.column.tm.scheduleResult.issueCategory": "Loại",
+  "ui.data.column.tm.scheduleResult.issueSourceOrderNo": "Lệnh nguồn",
+  "ui.data.column.tm.scheduleResult.issueEmbryoCode": "Mã phôi",
+  "ui.data.column.tm.scheduleResult.issueRecipeNo": "Số công thức",
+  "ui.data.column.tm.scheduleResult.issueShiftOrder": "Ca",
+  "ui.data.column.tm.scheduleResult.issueFieldName": "Trường",
+  "ui.data.column.tm.scheduleResult.issueMessage": "Mô tả"
+
 }

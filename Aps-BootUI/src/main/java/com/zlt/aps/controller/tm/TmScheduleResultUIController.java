@@ -137,6 +137,36 @@ public class TmScheduleResultUIController extends BaseUIController<TmScheduleRes
         return iTmScheduleResultService.autoPlan(request);
     }
 
+
+    /**
+     * 查询胎面自动排程任务状态。
+     *
+     * @param taskId 自动排程任务 ID
+     * @return 任务状态和异常明细
+     */
+    @ApiOperation("查询胎面自动排程任务状态")
+    @GetMapping("/autoPlan/task/{taskId}")
+    @RequiresPermissions("tm:tmScheduleResult:autoPlan")
+    @ResponseBody
+    public AjaxResult getAutoPlanTask(@PathVariable("taskId") String taskId) {
+        return iTmScheduleResultService.getAutoPlanTask(taskId);
+    }
+
+    /**
+     * 查询最近胎面自动排程任务。
+     *
+     * @param factoryCode 工厂编码
+     * @param scheduleDate 排程日期
+     * @return 最近任务状态
+     */
+    @ApiOperation("查询最近胎面自动排程任务")
+    @GetMapping("/autoPlan/task/latest")
+    @RequiresPermissions("tm:tmScheduleResult:autoPlan")
+    @ResponseBody
+    public AjaxResult getLatestAutoPlanTask(@RequestParam("factoryCode") String factoryCode,
+                                            @RequestParam("scheduleDate") String scheduleDate) {
+        return iTmScheduleResultService.getLatestAutoPlanTask(factoryCode, scheduleDate);
+    }
     /**
      * 批量转机台
      */

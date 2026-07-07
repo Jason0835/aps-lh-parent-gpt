@@ -3632,5 +3632,21 @@
   "ui.data.column.xwyyStock.rollBadNum": "不良数量(卷)",
   "ui.data.column.xwyyStock.stockMeters": "单卷米数（米/卷）",
   "ui.data.column.xwyyStock.estimateStockFlag": "预计库存标记",
-  "ui.data.column.xwyyStock.checkUnique": "同一工厂下已存在相同日期和大卷编号的库存记录"
+  "ui.data.column.xwyyStock.checkUnique": "同一工厂下已存在相同日期和大卷编号的库存记录",
+  "ui.data.column.tm.scheduleResult.autoPlanProgress": "胎面自动排程进度",
+  "ui.data.column.tm.scheduleResult.autoPlanProgressHint": "排程执行中，请勿关闭页面",
+  "ui.data.column.tm.scheduleResult.autoPlanSuccess": "胎面自动排程完成",
+  "ui.data.column.tm.scheduleResult.autoPlanFailed": "胎面自动排程失败",
+  "ui.data.column.tm.scheduleResult.autoPlanTimeout": "胎面自动排程查询超时",
+  "ui.data.column.tm.scheduleResult.autoPlanIssues": "本次排程异常",
+  "ui.data.column.tm.scheduleResult.issueLevel": "级别",
+  "ui.data.column.tm.scheduleResult.issueStage": "阶段",
+  "ui.data.column.tm.scheduleResult.issueCategory": "类别",
+  "ui.data.column.tm.scheduleResult.issueSourceOrderNo": "来源工单",
+  "ui.data.column.tm.scheduleResult.issueEmbryoCode": "胎胚代码",
+  "ui.data.column.tm.scheduleResult.issueRecipeNo": "示方书",
+  "ui.data.column.tm.scheduleResult.issueShiftOrder": "班次",
+  "ui.data.column.tm.scheduleResult.issueFieldName": "字段",
+  "ui.data.column.tm.scheduleResult.issueMessage": "说明"
+
 }
