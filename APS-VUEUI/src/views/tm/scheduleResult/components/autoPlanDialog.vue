@@ -166,9 +166,10 @@ export default {
     async doAutoPlan(params) {
       try {
         const data = await autoPlan(params)
-        const message = data.data && data.data.message ? data.data.message : data.msg
+        const result = data.data || {}
+        const message = result.message || data.msg
         this.$modal.msgSuccess(message)
-        this.$emit('success', params.scheduleDate)
+        this.$emit('success', params.scheduleDate, result)
         this.hide()
       } catch (error) {
         console.error(error)
