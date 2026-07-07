@@ -3,15 +3,18 @@ package com.zlt.aps.lh.api.domain.entity;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.google.common.collect.Lists;
 import com.ruoyi.common.core.annotation.Excel;
 import com.ruoyi.common.core.web.domain.BaseEntity;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
+import org.apache.commons.lang3.StringUtils;
 
 import java.io.Serializable;
 import java.math.BigDecimal;
 import java.util.Date;
+import java.util.List;
 
 /**
  * 硫化排程结果实体类
@@ -1130,4 +1133,38 @@ public class LhScheduleResult extends BaseEntity implements Serializable {
      */
     @TableField(exist = false)
     private BigDecimal todayNightFinishQty;
+
+    /**
+     * 计划类型
+     *
+     * @return
+     */
+    public String getLhType() {
+        List<String> allLhType = Lists.newArrayList();
+        allLhType.add(class1LhType);
+        allLhType.add(class2LhType);
+        allLhType.add(class3LhType);
+        allLhType.add(class4LhType);
+        allLhType.add(class5LhType);
+        allLhType.add(class6LhType);
+        allLhType.add(class7LhType);
+        allLhType.add(class8LhType);
+        for (String singleClassLhType : allLhType) {
+            if (StringUtils.isNotBlank(singleClassLhType)) {
+                return singleClassLhType;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * 获取物料+计划类型Key
+     *
+     * @return
+     */
+    public String getFactoryMaterialStatusKey() {
+        String keyFormat = "%s|*|%s|*|%s";
+        String trimmedProductStatus = StringUtils.trimToEmpty(getLhType());
+        return String.format(keyFormat, factoryCode, materialCode, trimmedProductStatus);
+    }
 }

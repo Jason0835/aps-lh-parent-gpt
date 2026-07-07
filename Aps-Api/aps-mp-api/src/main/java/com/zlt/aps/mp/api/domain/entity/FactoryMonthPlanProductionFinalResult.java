@@ -846,6 +846,17 @@ public class FactoryMonthPlanProductionFinalResult extends BaseEntity implements
     }
 
     /**
+     * 获取工厂+物料+计划类型Key
+     *
+     * @return
+     */
+    public String getFactoryMaterialStatusKey() {
+        String keyFormat = "%s|*|%s|*|%s";
+        String trimmedProductStatus = StringUtils.trimToEmpty(productStatus);
+        return String.format(keyFormat, factoryCode, materialCode, trimmedProductStatus);
+    }
+
+    /**
      * 是否与YearMonth相同年份、月份
      *
      * @param yearMonth

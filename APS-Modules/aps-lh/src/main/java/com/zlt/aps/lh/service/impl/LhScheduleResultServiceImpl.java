@@ -3,6 +3,9 @@ package com.zlt.aps.lh.service.impl;
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.date.DateUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
+import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.lh.api.constant.LhScheduleConstant;
 import com.zlt.aps.lh.api.domain.dto.LhInsertOrderValidateResultDTO;
 import com.zlt.aps.lh.api.domain.dto.LhOrderInsertDTO;
@@ -14,6 +17,7 @@ import com.zlt.aps.lh.api.enums.DeleteFlagEnum;
 import com.zlt.aps.lh.api.enums.ReleaseStatusEnum;
 import com.zlt.aps.lh.component.LhBatchNoRedisGenerator;
 import com.zlt.aps.lh.handler.LhInsertOrderValidateHandler;
+import com.zlt.aps.lh.handler.SkuMonthPlanCalculator;
 import com.zlt.aps.lh.mapper.*;
 import com.zlt.aps.lh.service.ILhScheduleResultService;
 import com.zlt.aps.lh.util.LeftRightMouldUtil;
@@ -32,6 +36,8 @@ import org.springframework.transaction.annotation.Transactional;
 import javax.annotation.Resource;
 import java.math.BigDecimal;
 import java.text.SimpleDateFormat;
+import java.time.LocalDate;
+import java.time.YearMonth;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
@@ -86,6 +92,9 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
 
     @Resource
     private LhScheFinishQtyMapper lhScheFinishQtyMapper;
+
+    @Resource
+    private MdmMonthSurplusMapper monthSurplusMapper;
 
     private static final AtomicInteger INSERT_ORDER_SEQ = new AtomicInteger(0);
 
@@ -257,7 +266,7 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
     /**
      * 查询同机台+同排程日期下最新的排程结果
      *
-     * @param dto          插单请求数据
+     * @param dto           插单请求数据
      * @param includeInsert 是否包含插单来源的记录
      * @return 最新的排程结果，不存在返回null
      */
@@ -516,10 +525,10 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
      * 生成插单对应的模具交替计划
      * <p>若同机台+同排程日期+同后规格物料已存在交替计划，则覆盖更新；否则新增。</p>
      *
-     * @param dto                 插单请求数据
-     * @param batchNo             批次号
-     * @param beforeMaterialCode  前规格物料编码（在插入排程结果之前查询获得）
-     * @param beforeMaterialDesc  前规格物料描述（在插入排程结果之前查询获得）
+     * @param dto                插单请求数据
+     * @param batchNo            批次号
+     * @param beforeMaterialCode 前规格物料编码（在插入排程结果之前查询获得）
+     * @param beforeMaterialDesc 前规格物料描述（在插入排程结果之前查询获得）
      */
     private void generateInsertMouldChangePlan(LhOrderInsertDTO dto, String batchNo,
                                                String beforeMaterialCode, String beforeMaterialDesc) {
@@ -648,11 +657,17 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
                     lhScheduleResultList == null ? 0 : lhScheduleResultList.size(), scheduleDate);
             return;
         }
-
+        List<Date> allProductionDate = getAllProductionDateInfo(scheduleDate);
+        YearMonth firstMonth = SkuMonthPlanCalculator.getFirstYearMonth(allProductionDate);
+        boolean isCrossMonth = SkuMonthPlanCalculator.isCrossMonthByProductionDateInfo(allProductionDate);
+        YearMonth nextMonth = SkuMonthPlanCalculator.getNextMonth(allProductionDate);
+        Map<YearMonth, Date> monthStartDateMap = getStartDay(nextMonth);
+        boolean isNextMonthFinal = null == monthStartDateMap.get(SkuMonthPlanCalculator.getFirstYearMonth(allProductionDate)) ? false : true;
         // 提取排程日期年月
         cn.hutool.core.date.DateTime dateTime = DateUtil.date(scheduleDate);
         int year = DateUtil.year(dateTime);
         int month = DateUtil.month(dateTime) + 1;
+        YearMonth productionYearMonth = YearMonth.of(year, month);
 
         log.info("fillScheduleResultFields: 开始填充排程结果字段, 排程日期={}, 结果数量={}, year={}, month={}",
                 DateUtil.formatDate(scheduleDate), lhScheduleResultList.size(), year, month);
@@ -681,37 +696,27 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
         // ======== 1. 加载定稿排产版本 ========
         // key: factoryCode, value: MpFactoryProductionVersion
         Map<String, MpFactoryProductionVersion> productionVersionMap = new HashMap<>(factoryCodes.size());
+        Map<String, MpFactoryProductionVersion> nextMonthMap = new HashMap<>(factoryCodes.size());
+        Map<String, Date> nextMonthDateMap = new HashMap<>(factoryCodes.size());
         for (String fc : factoryCodes) {
             MpFactoryProductionVersion version = getFinalProductionVersion(fc, year, month);
             if (Objects.nonNull(version)) {
                 productionVersionMap.put(fc, version);
+            }
+            MpFactoryProductionVersion nextMonthVersion = getFinalProductionVersion(fc, year, month);
+            if (Objects.nonNull(nextMonthVersion)) {
+                nextMonthMap.put(fc, nextMonthVersion);
+                nextMonthDateMap.put(fc, getMonthSurplusDate(nextMonthVersion));
             }
         }
         log.info("fillScheduleResultFields: 排产版本加载完成, 工厂数={}, 匹配数={}", factoryCodes.size(), productionVersionMap.size());
 
         // ======== 2. 加载月计划定稿数据 ========
         // key: factoryCode + "|" + materialCode, value: FactoryMonthPlanProductionFinalResult
-        Map<String, FactoryMonthPlanProductionFinalResult> monthPlanMap = new HashMap<>(lhScheduleResultList.size());
-        for (String fc : factoryCodes) {
-            MpFactoryProductionVersion version = productionVersionMap.get(fc);
-            String productionVersion = Objects.nonNull(version) ? version.getProductionVersion() : null;
-            if (StringUtils.isBlank(productionVersion)) {
-                continue;
-            }
-            // 按物料编码分批查询
-            LambdaQueryWrapper<FactoryMonthPlanProductionFinalResult> wrapper = new LambdaQueryWrapper<>();
-            wrapper.eq(FactoryMonthPlanProductionFinalResult::getFactoryCode, fc)
-                    .eq(FactoryMonthPlanProductionFinalResult::getYear, year)
-                    .eq(FactoryMonthPlanProductionFinalResult::getMonth, month)
-                    .eq(FactoryMonthPlanProductionFinalResult::getProductionVersion, productionVersion)
-                    .in(FactoryMonthPlanProductionFinalResult::getMaterialCode, materialCodes)
-                    .eq(FactoryMonthPlanProductionFinalResult::getIsDelete, DeleteFlagEnum.NORMAL.getCode());
-            List<FactoryMonthPlanProductionFinalResult> monthPlanList = monthPlanMapper.selectList(wrapper);
-            for (FactoryMonthPlanProductionFinalResult mp : monthPlanList) {
-                if (StringUtils.isNotEmpty(mp.getMaterialCode())) {
-                    monthPlanMap.put(fc + "|" + mp.getMaterialCode(), mp);
-                }
-            }
+        List<FactoryMonthPlanProductionFinalResult> allMonthPlanList = getMonthPlanList(allProductionDate, Lists.newArrayList(factoryCodes), Lists.newArrayList(materialCodes));
+        Map<String, List<FactoryMonthPlanProductionFinalResult>> monthPlanMap = Maps.newHashMap();
+        if (CollectionUtils.isNotEmpty(allMonthPlanList)) {
+            monthPlanMap = allMonthPlanList.stream().collect(Collectors.groupingBy(FactoryMonthPlanProductionFinalResult::getFactoryMaterialStatusKey));
         }
         log.info("fillScheduleResultFields: 月计划定稿加载完成, 月计划匹配数={}", monthPlanMap.size());
 
@@ -780,23 +785,22 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
         // ======== 7. 加载日完成量（本月1日至T-1日累计） ========
         // T-1 日 = tDay - 1天
         // key: factoryCode + "|" + materialCode, value: 累计完成量
-        Map<String, BigDecimal> dayFinishSumMap = new HashMap<>(materialCodes.size());
-        Date monthStart = DateUtil.beginOfMonth(scheduleDate);
+        Map<String, Integer> dayFinishSumMap = new HashMap<>(materialCodes.size());
         Date dayBeforeTDay = DateUtil.offsetDay(tDay, -1);
+        //获取起始天
+        YearMonth yearMonthKey = SkuMonthPlanCalculator.getFirstYearMonth(allProductionDate);
+        Date startDate = monthStartDateMap.get(yearMonthKey);
+        if (null == startDate) {
+            startDate = SkuMonthPlanCalculator.getDate(yearMonthKey.atDay(BigDecimal.ONE.intValue()));
+        }
         if (!factoryCodes.isEmpty() && !materialCodes.isEmpty()) {
             LambdaQueryWrapper<LhDayFinishQty> wrapper = new LambdaQueryWrapper<>();
             wrapper.in(LhDayFinishQty::getFactoryCode, factoryCodes)
                     .in(LhDayFinishQty::getMaterialCode, materialCodes)
-                    .ge(LhDayFinishQty::getFinishDate, monthStart)
+                    .ge(LhDayFinishQty::getFinishDate, startDate)
                     .le(LhDayFinishQty::getFinishDate, dayBeforeTDay);
             List<LhDayFinishQty> dayFinishList = lhDayFinishQtyMapper.selectList(wrapper);
-            for (LhDayFinishQty qty : dayFinishList) {
-                if (StringUtils.isNotEmpty(qty.getFactoryCode()) && StringUtils.isNotEmpty(qty.getMaterialCode())
-                        && Objects.nonNull(qty.getDayFinishQty())) {
-                    String key = qty.getFactoryCode() + "|" + qty.getMaterialCode();
-                    dayFinishSumMap.merge(key, qty.getDayFinishQty(), BigDecimal::add);
-                }
-            }
+            dayFinishSumMap = SkuMonthPlanCalculator.getDayFinishQty(startDate, dayFinishList);
         }
         log.info("fillScheduleResultFields: 日完成量加载完成, 匹配数={}", dayFinishSumMap.size());
 
@@ -812,7 +816,7 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
             for (LhScheFinishQty qty : scheFinishList) {
                 if (StringUtils.isNotEmpty(qty.getFactoryCode()) && StringUtils.isNotEmpty(qty.getMaterialCode())
                         && Objects.nonNull(qty.getClass1FinishQty())) {
-                    String key = qty.getFactoryCode() + "|" + qty.getMaterialCode();
+                    String key = qty.getFactoryMaterialStatusKey();
                     scheNightFinishMap.merge(key, qty.getClass1FinishQty(), BigDecimal::add);
                 }
             }
@@ -824,14 +828,25 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
             String fc = result.getFactoryCode();
             String matCode = result.getMaterialCode();
             String machineCode = result.getLhMachineCode();
-            String fcMatKey = fc + "|" + matCode;
-
+            String fcMatKey = result.getFactoryMaterialStatusKey();
+            FactoryMonthPlanProductionFinalResult skuInfo = new FactoryMonthPlanProductionFinalResult();
+            skuInfo.setFactoryCode(fc);
+            skuInfo.setMaterialCode(machineCode);
+            skuInfo.setProductStatus(result.getLhType());
             // 月计划对象（用于获取 productStatus、totalQty、constructionStage、monthPlanVersion）
-            FactoryMonthPlanProductionFinalResult monthPlan = monthPlanMap.get(fcMatKey);
+            FactoryMonthPlanProductionFinalResult monthPlan = SkuMonthPlanCalculator.getSkuYearMonthFinal(allMonthPlanList, skuInfo, productionYearMonth);
+            Integer startDay = DateUtil.dayOfMonth(startDate);
+            Map<YearMonth, Integer> yearMonthPlanQtyMap = SkuMonthPlanCalculator.getPlanQty(allProductionDate, allMonthPlanList, monthPlan, startDay);
 
+            Integer planQty;
+            if (null == yearMonthPlanQtyMap || yearMonthPlanQtyMap.isEmpty()) {
+                planQty = BigDecimal.ZERO.intValue();
+            } else {
+                planQty = yearMonthPlanQtyMap.values().stream().mapToInt(Integer::intValue).sum();
+            }
             // ---------- TOTAL_DAILY_PLAN_QTY：月计划总量 ----------
-            if (Objects.nonNull(monthPlan) && Objects.nonNull(monthPlan.getTotalQty())) {
-                result.setTotalDailyPlanQty(monthPlan.getTotalQty());
+            if (Objects.nonNull(monthPlan)) {
+                result.setTotalDailyPlanQty(planQty);
             }
 
             // ---------- PRODUCTION_VERSION：排产版本 ----------
@@ -903,9 +918,9 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
             // ---------- TOTAL_FINISH_QTY：月累计已完成量 ----------
             // total_finish_qty = 本月1日至T-1日日完成量汇总 + T日夜班完成量
             int finishedQty = 0;
-            BigDecimal dayFinishSum = dayFinishSumMap.get(fcMatKey);
+            Integer dayFinishSum = dayFinishSumMap.get(fcMatKey);
             if (dayFinishSum != null) {
-                finishedQty += dayFinishSum.intValue();
+                finishedQty += dayFinishSum;
             }
             BigDecimal nightFinish = scheNightFinishMap.get(fcMatKey);
             if (nightFinish != null) {
@@ -920,16 +935,20 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
             // LAST_MONTH_OVERDUE_QTY：负数表示超产需扣减，正数表示欠产需加上
             // 已完成量 = total_finish_qty（1号到T-1日日完成量汇总 + T日夜班完成量）
             // 上月超欠产量：仅当 lastMonthValidFlag = "1" 时取 lastMonthOverdueQty，否则按 0 处理
-            if (Objects.nonNull(monthPlan) && Objects.nonNull(monthPlan.getTotalQty())) {
-                int lastMonthOverdue = 0;
-                if ("1".equals(monthPlan.getLastMonthValidFlag())
-                        && Objects.nonNull(monthPlan.getLastMonthOverdueQty())) {
-                    lastMonthOverdue = monthPlan.getLastMonthOverdueQty();
-                }
-                int surplus = monthPlan.getTotalQty() - finishedQty + lastMonthOverdue;
-                result.setMouldSurplusQty(Math.max(surplus, 0));
-            }
-
+//            if (Objects.nonNull(monthPlan) && Objects.nonNull(monthPlan.getTotalQty())) {
+//                int lastMonthOverdue = 0;
+//                if ("1".equals(monthPlan.getLastMonthValidFlag())
+//                        && Objects.nonNull(monthPlan.getLastMonthOverdueQty())) {
+//                    lastMonthOverdue = monthPlan.getLastMonthOverdueQty();
+//                }
+//                int surplus = monthPlan.getTotalQty() - finishedQty + lastMonthOverdue;
+//                result.setMouldSurplusQty(Math.max(surplus, 0));
+//            }
+            Map<YearMonth, Integer> monthOverdueQtyMap = SkuMonthPlanCalculator.getOverdueProduction(isNextMonthFinal, allProductionDate, allMonthPlanList, skuInfo);
+            //硫化余量计算：不在排产后期内：
+            Map<YearMonth, FactoryMonthPlanProductionFinalResult> hasProductionPlanMap = SkuMonthPlanCalculator.getHasProductionPlan(allMonthPlanList, allProductionDate, fc, machineCode, result.getLhType());
+            int surplus = SkuMonthPlanCalculator.getSurplusQty(productionYearMonth, allProductionDate, hasProductionPlanMap, monthOverdueQtyMap, yearMonthPlanQtyMap, finishedQty);
+            result.setMouldSurplusQty(Math.max(surplus, BigDecimal.ZERO.intValue()));
             // ---------- SPEC_CODE：规格编码 ----------
             MdmMaterialInfo materialInfo = materialInfoMap.get(matCode);
             if (Objects.nonNull(materialInfo) && StringUtils.isNotEmpty(materialInfo.getSpecifications())) {
@@ -1079,4 +1098,128 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
         log.info("导入后回写模具交替计划批次号: {}, 工厂: {}, 排程日期: {}, 更新条数: {}", batchNo, factoryCode, scheduleDate, mouldChangePlans.size());
     }
 
+    /**
+     * 获取所有的排产日期
+     *
+     * @param scheduleDate
+     * @return
+     */
+    private List<Date> getAllProductionDateInfo(Date scheduleDate) {
+        LocalDate currentDate = SkuMonthPlanCalculator.getDate(scheduleDate);
+        List<Date> allProductionDate = Lists.newArrayList();
+        LocalDate before = currentDate.plusDays(-BigDecimal.ONE.intValue());
+        allProductionDate.add(SkuMonthPlanCalculator.getDate(before));
+        allProductionDate.add(scheduleDate);
+        LocalDate after = currentDate.plusDays(BigDecimal.ONE.intValue());
+        allProductionDate.add(SkuMonthPlanCalculator.getDate(after));
+        return allProductionDate;
+    }
+
+    /**
+     * 获取对应年月的排产统计日
+     *
+     * @param nextMonth
+     * @return
+     */
+    private Map<YearMonth, Date> getStartDay(YearMonth nextMonth) {
+        LambdaQueryWrapper<MpFactoryProductionVersion> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(MpFactoryProductionVersion::getYear, nextMonth.getYear())
+                .eq(MpFactoryProductionVersion::getMonth, nextMonth.getMonthValue())
+                .eq(MpFactoryProductionVersion::getIsFinal, "1")
+                .eq(MpFactoryProductionVersion::getIsDelete, DeleteFlagEnum.NORMAL.getCode())
+                .orderByDesc(MpFactoryProductionVersion::getUpdateTime)
+                .orderByDesc(MpFactoryProductionVersion::getId)
+                .last("LIMIT 1");
+        MpFactoryProductionVersion finalVersion = mpFactoryProductionVersionMapper.selectOne(wrapper);
+        if (null == finalVersion) {
+            Collections.emptyMap();
+        }
+        Date surplusDate = getMonthSurplusDate(finalVersion);
+        Map<YearMonth, Date> result = Maps.newHashMap();
+        YearMonth previousMonth = nextMonth.plusMonths(-BigDecimal.ONE.longValue());
+        result.put(previousMonth, surplusDate);
+        return result;
+    }
+
+    /**
+     * 获取定稿版本对应的库存抓取日
+     *
+     * @param finalVersion
+     * @return
+     */
+    private Date getMonthSurplusDate(MpFactoryProductionVersion finalVersion) {
+        if (null == finalVersion) {
+            return null;
+        }
+        LambdaQueryWrapper<com.zlt.aps.mp.api.domain.entity.MdmMonthSurplus> query = new LambdaQueryWrapper<>();
+        query.eq(com.zlt.aps.mp.api.domain.entity.MdmMonthSurplus::getFactoryCode, finalVersion.getFactoryCode());
+        query.eq(com.zlt.aps.mp.api.domain.entity.MdmMonthSurplus::getRequireVersion, finalVersion.getMonthPlanVersion());
+        query.eq(com.zlt.aps.mp.api.domain.entity.MdmMonthSurplus::getIsDelete, YesOrNoEnum.NO.getValue());
+        List<com.zlt.aps.mp.api.domain.entity.MdmMonthSurplus> find = monthSurplusMapper.selectList(query);
+        if (CollectionUtils.isEmpty(find)) {
+            return null;
+        }
+        return find.get(BigDecimal.ZERO.intValue()).getStockCapTureDate();
+    }
+
+    /**
+     * 获取对应月计划排产数据
+     *
+     * @param allProductionDate 日排产周期
+     * @param factoryList       工厂
+     * @param materialCodeList  物料信息
+     * @return
+     */
+    private List<FactoryMonthPlanProductionFinalResult> getMonthPlanList(List<Date> allProductionDate, List<String> factoryList, List<String> materialCodeList) {
+        if (CollectionUtils.isEmpty(allProductionDate)) {
+            return Collections.emptyList();
+        }
+        YearMonth first = SkuMonthPlanCalculator.getFirstYearMonth(allProductionDate);
+        YearMonth last = SkuMonthPlanCalculator.getLastYearMonth(allProductionDate);
+        //同年月
+        if (first.equals(last)) {
+            return getMonthPlanList(first, factoryList, materialCodeList);
+        }
+        //跨月
+        List<FactoryMonthPlanProductionFinalResult> monthPlanList = Lists.newArrayList();
+        monthPlanList.addAll(getMonthPlanList(first, factoryList, materialCodeList));
+        monthPlanList.addAll(getMonthPlanList(last, factoryList, materialCodeList));
+        return monthPlanList;
+    }
+
+
+    /**
+     * 获取某个年月的排产月计划信息
+     *
+     * @param yearMonth        年-月信息
+     * @param factoryList      工厂
+     * @param materialCodeList 物料编码
+     * @return
+     */
+    private List<FactoryMonthPlanProductionFinalResult> getMonthPlanList(YearMonth yearMonth, List<String> factoryList, List<String> materialCodeList) {
+        if (null == yearMonth || CollectionUtils.isEmpty(factoryList) || CollectionUtils.isEmpty(materialCodeList)) {
+            return Collections.emptyList();
+        }
+        List<FactoryMonthPlanProductionFinalResult> monthPlanList = Lists.newArrayList();
+        int year = yearMonth.getYear();
+        int month = yearMonth.getMonthValue();
+        for (String fc : factoryList) {
+            MpFactoryProductionVersion version = getFinalProductionVersion(fc, year, month);
+            if (null == version) {
+                continue;
+            }
+            LambdaQueryWrapper<FactoryMonthPlanProductionFinalResult> wrapper = new LambdaQueryWrapper<>();
+            wrapper.eq(FactoryMonthPlanProductionFinalResult::getFactoryCode, version.getFactoryCode())
+                    .eq(FactoryMonthPlanProductionFinalResult::getYear, version.getYear())
+                    .eq(FactoryMonthPlanProductionFinalResult::getMonth, version.getMonth())
+                    .eq(FactoryMonthPlanProductionFinalResult::getProductionVersion, version.getProductionVersion())
+                    .in(FactoryMonthPlanProductionFinalResult::getMaterialCode, materialCodeList)
+                    .eq(FactoryMonthPlanProductionFinalResult::getIsDelete, DeleteFlagEnum.NORMAL.getCode());
+            List<FactoryMonthPlanProductionFinalResult> singleList = monthPlanMapper.selectList(wrapper);
+            if (CollectionUtils.isNotEmpty(singleList)) {
+                monthPlanList.addAll(singleList);
+            }
+        }
+        return monthPlanList;
+    }
 }
