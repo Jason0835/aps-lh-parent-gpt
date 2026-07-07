@@ -39,11 +39,7 @@ import com.zlt.aps.lh.mapper.*;
 import com.zlt.aps.lh.service.ILhScheduleResultService;
 import com.zlt.aps.lh.service.ILhScheduleService;
 import com.zlt.aps.lh.service.IScheduleSummaryReportService;
-import com.zlt.aps.lh.util.LhScheduleTimeUtil;
-import com.zlt.aps.lh.util.MachineStatusUtil;
-import com.zlt.aps.lh.util.MouldStatusUtil;
-import com.zlt.aps.lh.util.ShiftFieldUtil;
-import com.zlt.aps.lh.util.SkuConstructionRefResolverUtil;
+import com.zlt.aps.lh.util.*;
 import com.zlt.aps.mdm.api.domain.entity.*;
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import com.zlt.aps.mp.api.domain.entity.MpFactoryProductionVersion;
@@ -56,8 +52,8 @@ import com.zlt.sysdef.domain.SysDocType;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.poi.ss.usermodel.*;
-import org.apache.poi.xssf.usermodel.XSSFColor;
 import org.apache.poi.xssf.usermodel.XSSFCellStyle;
+import org.apache.poi.xssf.usermodel.XSSFColor;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -537,6 +533,9 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
             if (Objects.nonNull(adjustPlanQty)) {
                 setAdjustPlanQty(record, shiftIndex, adjustPlanQty);
                 setAdjustAnalysis(record, shiftIndex, getAdjustAnalysis(dto, shiftIndex));
+                if (adjustPlanQty == 0) {
+                    ShiftFieldUtil.clearShiftPlanAuxFields(record, shiftIndex);
+                }
             }
         }
 
