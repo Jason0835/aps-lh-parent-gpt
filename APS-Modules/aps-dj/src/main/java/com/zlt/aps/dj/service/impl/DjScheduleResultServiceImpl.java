@@ -587,13 +587,18 @@ public class DjScheduleResultServiceImpl extends AbstractBillService<DjScheduleR
     }
 
     /**
-     * 唯一性校验
+     * 唯一性校验（校验该排产日期+机台+垫胶代码+工厂下是否存在排程记录）
+     * <p>注意：只使用 factoryCode、scheduleDate、machineCode、paddingCode 作为查询条件，
+     * 排除班次计划量、顺位等班次字段，避免因待插入记录不存在完全匹配而导致误判"该日未排程"。</p>
      */
     @Override
     public List<DjScheduleResult> checkUnique(DjScheduleResult entity) {
         Long id = entity.getId();
-        entity.setId(null);
-        QueryWrapper<DjScheduleResult> queryWrapper = BillUtils.builderCondition(entity);
+        QueryWrapper<DjScheduleResult> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("FACTORY_CODE", entity.getFactoryCode())
+                .eq("SCHEDULE_DATE", entity.getScheduleDate())
+                .eq("MACHINE_CODE", entity.getMachineCode())
+                .eq("PADDING_CODE", entity.getPaddingCode());
         if (id != null) {
             queryWrapper.ne("id", id);
         }
