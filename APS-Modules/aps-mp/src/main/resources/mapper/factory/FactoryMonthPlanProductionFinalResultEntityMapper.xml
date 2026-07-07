@@ -231,6 +231,13 @@
             ) AS PLAN_QTY,
             IFNULL(SUM(fin.DAY_QTY), 0) AS FINISH_QTY
             FROM T_MP_MONTH_PLAN_PROD_FINAL f5
+            INNER JOIN T_MP_PROC_VERSION pv
+                ON pv.FACTORY_CODE = f5.FACTORY_CODE
+                AND pv.MONTH_PLAN_VERSION = f5.MONTH_PLAN_VERSION
+                AND pv.YEAR = f5.YEAR
+                AND pv.MONTH = f5.MONTH
+                AND pv.IS_FINAL = '1'
+                AND pv.IS_DELETE = 0
             LEFT JOIN T_MDM_MONTH_SURPLUS surplus
             ON surplus.FACTORY_CODE = f5.FACTORY_CODE
             AND surplus.MATERIAL_CODE = f5.MATERIAL_CODE
@@ -334,6 +341,13 @@
             ) AS PLAN_QTY,
             IFNULL(SUM(fin.DAY_QTY), 0) AS FINISH_QTY
             FROM T_MP_MONTH_PLAN_PROD_FINAL f5
+            INNER JOIN T_MP_PROC_VERSION pv
+                ON pv.FACTORY_CODE = f5.FACTORY_CODE
+                AND pv.MONTH_PLAN_VERSION = f5.MONTH_PLAN_VERSION
+                AND pv.YEAR = f5.YEAR
+                AND pv.MONTH = f5.MONTH
+                AND pv.IS_FINAL = '1'
+                AND pv.IS_DELETE = 0
             LEFT JOIN T_MDM_MONTH_SURPLUS surplus
             ON surplus.FACTORY_CODE = f5.FACTORY_CODE
             AND surplus.MATERIAL_CODE = f5.MATERIAL_CODE
@@ -506,6 +520,13 @@
         IFNULL(CASE WHEN DAYOFMONTH(IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})) &lt;= 31 THEN f5.DAY_31 ELSE 0 END, 0)
         ) - IFNULL(SUM(fin.DAY_QTY), 0) AS OVERDUE_QTY
         FROM T_MP_MONTH_PLAN_PROD_FINAL f5
+        INNER JOIN T_MP_PROC_VERSION pv
+            ON pv.FACTORY_CODE = f5.FACTORY_CODE
+            AND pv.MONTH_PLAN_VERSION = f5.MONTH_PLAN_VERSION
+            AND pv.YEAR = f5.YEAR
+            AND pv.MONTH = f5.MONTH
+            AND pv.IS_FINAL = '1'
+            AND pv.IS_DELETE = 0
         LEFT JOIN T_MDM_MONTH_SURPLUS surplus
         ON surplus.FACTORY_CODE = f5.FACTORY_CODE
         AND surplus.MATERIAL_CODE = f5.MATERIAL_CODE
@@ -544,6 +565,13 @@
         AND f5.YEAR = #{lastYear}
         AND f5.MONTH = #{lastMonth}
         AND f5.IS_DELETE = 0
+        INNER JOIN T_MP_PROC_VERSION pv2
+            ON pv2.FACTORY_CODE = f5.FACTORY_CODE
+            AND pv2.MONTH_PLAN_VERSION = f5.MONTH_PLAN_VERSION
+            AND pv2.YEAR = f5.YEAR
+            AND pv2.MONTH = f5.MONTH
+            AND pv2.IS_FINAL = '1'
+            AND pv2.IS_DELETE = 0
         -- 第三段：从排产版本表取当月定稿版本号（IS_FINAL='1'），可能有多个定稿版本，取任意一条
         INNER JOIN (
         SELECT
