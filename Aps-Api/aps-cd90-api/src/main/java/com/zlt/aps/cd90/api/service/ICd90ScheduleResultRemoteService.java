@@ -6,6 +6,7 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.zlt.aps.cd90.api.domain.entity.Cd90ScheduleResult;
 import com.zlt.aps.cd90.api.domain.entity.Cd90ScheduleRollingAdjustLog;
+import com.zlt.aps.cd90.api.domain.vo.Cd90ChangeQtyRequest;
 import com.zlt.aps.cd90.api.domain.vo.Cd90InsertOrderRequest;
 import com.zlt.aps.cd90.api.domain.vo.Cd90RollingCheckRequest;
 import com.zlt.aps.cd90.api.domain.vo.Cd90TransferMachineRequest;
@@ -60,6 +61,17 @@ public interface ICd90ScheduleResultRemoteService {
     @ApiOperation("查询转机台滚动重排任务")
     @GetMapping("/cd90ScheduleResult/transferMachine/task/{taskId}")
     AjaxResult getTransferMachineTask(@PathVariable("taskId") String taskId);
+    @ApiOperation("调量预校验")
+    @PostMapping("/cd90ScheduleResult/validateChangeQty")
+    AjaxResult validateChangeQty(@RequestBody Cd90ChangeQtyRequest request);
+
+    @ApiOperation("提交调量滚动重排")
+    @PostMapping("/cd90ScheduleResult/changeQty")
+    AjaxResult changeQty(@RequestBody Cd90ChangeQtyRequest request);
+
+    @ApiOperation("查询调量滚动重排任务")
+    @GetMapping("/cd90ScheduleResult/changeQty/task/{taskId}")
+    AjaxResult getChangeQtyTask(@PathVariable("taskId") String taskId);
     @ApiOperation("检查定时滚动排程窗口")
     @PostMapping("/cd90ScheduleResult/rollingSchedule/check")
     AjaxResult checkTimedRolling(@RequestBody Cd90RollingCheckRequest request);

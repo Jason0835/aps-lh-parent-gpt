@@ -10,6 +10,7 @@ import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.zlt.aps.cd90.api.domain.entity.Cd90ScheduleResult;
 import com.zlt.aps.cd90.api.domain.entity.Cd90ScheduleRollingAdjustLog;
+import com.zlt.aps.cd90.api.domain.vo.Cd90ChangeQtyRequest;
 import com.zlt.aps.cd90.api.domain.vo.Cd90InsertOrderRequest;
 import com.zlt.aps.cd90.api.domain.vo.Cd90RollingCheckRequest;
 import com.zlt.aps.cd90.api.domain.vo.Cd90TransferMachineRequest;
@@ -144,6 +145,24 @@ public class Cd90ScheduleResultController extends AbstractDocBizController<Cd90S
     @GetMapping("/transferMachine/task/{taskId}")
     public AjaxResult getTransferMachineTask(@PathVariable("taskId") String taskId) {
         return cd90ScheduleResultService.getTransferMachineTask(taskId);
+    }
+
+    @ApiOperation("调量预校验")
+    @PostMapping("/validateChangeQty")
+    public AjaxResult validateChangeQty(@RequestBody Cd90ChangeQtyRequest request) {
+        return cd90ScheduleResultService.validateChangeQty(request);
+    }
+
+    @ApiOperation("提交调量滚动重排")
+    @PostMapping("/changeQty")
+    public AjaxResult changeQty(@RequestBody Cd90ChangeQtyRequest request) {
+        return cd90ScheduleResultService.changeQty(request);
+    }
+
+    @ApiOperation("查询调量滚动重排任务")
+    @GetMapping("/changeQty/task/{taskId}")
+    public AjaxResult getChangeQtyTask(@PathVariable("taskId") String taskId) {
+        return cd90ScheduleResultService.getChangeQtyTask(taskId);
     }
     /** 供aps-job每5分钟检查交班滚动窗口。 */
     @ApiOperation("检查定时滚动排程窗口")

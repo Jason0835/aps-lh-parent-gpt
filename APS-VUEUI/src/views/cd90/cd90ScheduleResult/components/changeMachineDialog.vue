@@ -53,16 +53,12 @@
           </el-form-item>
         </el-col>
       </el-row>
-      <el-form-item label="转出班次" prop="startClassField">
+      <el-form-item label="转出班次">
         <el-table :data="shiftRows" border size="small" style="width:100%">
-          <el-table-column label="起点" width="80" align="center">
+          <el-table-column label="状态" width="90" align="center">
             <template slot-scope="scope">
-              <el-radio
-                v-model="form.startClassField"
-                :label="scope.row.classField"
-                :disabled="!hasTransferPlanFrom(scope.row)"
-                @change="handleStartClassChange"
-              >&nbsp;</el-radio>
+              <el-tag v-if="isTransferClass(scope.row)" size="mini" type="success">可转</el-tag>
+              <el-tag v-else size="mini" type="info">不可转</el-tag>
             </template>
           </el-table-column>
           <el-table-column :label="$t('ui.data.column.cd90ScheduleResult.shiftName')" min-width="130">
@@ -100,7 +96,7 @@
 
 <script>
 import { getCd90MachineEnableOptions } from '@/api/cd90/cd90MachineInfo'
-import { validateTransferMachine, transferMachine } from '@/api/cd90/scheduleResult'
+import { shiftDates, validateTransferMachine, transferMachine } from '@/api/cd90/scheduleResult'
 
 const DEFAULT_FORM = () => ({
   factoryCode: '116',
@@ -128,13 +124,13 @@ export default {
       currentRow: null,
       shiftRows: [],
       machineOptions: [],
+      editableFromClassIndex: 7,
       rules: {
         factoryCode: [{ required: true, message: this.$t('common.rule.select'), trigger: 'change' }],
         scheduleDate: [{ required: true, message: this.$t('common.rule.select'), trigger: 'change' }],
         sourceMachineCode: [{ required: true, message: this.$t('common.rule.select'), trigger: 'change' }],
         targetMachineCode: [{ required: true, message: this.$t('common.rule.select'), trigger: 'change' }],
-        clothCode: [{ required: true, message: this.$t('common.rule.select'), trigger: 'change' }],
-        startClassField: [{ required: true, message: this.$t('common.rule.select'), trigger: 'change' }]
+        clothCode: [{ required: true, message: this.$t('common.rule.select'), trigger: 'change' }]
       }
     }
   },
@@ -158,11 +154,10 @@ export default {
         scheduleDate: this.currentRow.scheduleDate || '',
         sourceMachineCode: this.currentRow.machineCode || '',
         clothCode: this.currentRow.clothCode || '',
-        startClassField: this.getDefaultStartClass(this.currentRow)
+        startClassField: ''
       }
-      this.shiftRows = this.buildShiftRows(this.currentRow)
-      this.handleStartClassChange()
       this.visible = true
+      await this.loadShiftDates()
       await this.loadMachines()
     },
     hide() {
@@ -172,42 +167,43 @@ export default {
       this.currentRow = null
       this.shiftRows = []
       this.machineOptions = []
+      this.editableFromClassIndex = 7
       if (this.$refs.form) {
         this.$refs.form.resetFields()
       }
     },
-    buildShiftRows(row) {
-      return CLASS_FIELDS.map((classField, index) => ({
-        classField,
-        shiftName: this.$t(`ui.data.column.scheduleResult.${SHIFT_KEYS[index]}`),
-        planQty: Number(row && row[CLASS_PLAN_FIELDS[index]]) || 0,
-        produceOrder: row && row[CLASS_ORDER_FIELDS[index]] ? Number(row[CLASS_ORDER_FIELDS[index]]) : undefined
-      }))
+    buildShiftRows(row, shiftItems = []) {
+      const shiftMap = shiftItems.reduce((map, item) => {
+        map[item.classField] = item
+        return map
+      }, {})
+      return CLASS_FIELDS.map((classField, index) => {
+        const planQty = Number(row && row[CLASS_PLAN_FIELDS[index]]) || 0
+        const shiftItem = shiftMap[classField] || {}
+        const transferable = index + 1 >= this.editableFromClassIndex && planQty > 0
+        return {
+          classField,
+          shiftName: shiftItem.shiftName || this.$t(`ui.data.column.scheduleResult.${SHIFT_KEYS[index]}`),
+          planQty,
+          currentShift: !!shiftItem.currentShift,
+          transferable,
+          produceOrder: transferable ? (row && row[CLASS_ORDER_FIELDS[index]] ? Number(row[CLASS_ORDER_FIELDS[index]]) : 1) : undefined
+        }
+      })
     },
-    getDefaultStartClass(row) {
-      const index = CLASS_PLAN_FIELDS.findIndex(field => Number(row && row[field]) > 0)
-      return index >= 0 ? CLASS_FIELDS[index] : 'CLASS1'
+    async loadShiftDates() {
+      const response = await shiftDates({ factoryCode: this.form.factoryCode, scheduleDate: this.form.scheduleDate })
+      const rows = Array.isArray(response) ? response : (response.data || [])
+      const firstEditable = rows.find(item => item.changeQtyEditable)
+      this.editableFromClassIndex = firstEditable ? this.getClassIndex(firstEditable.classField) + 1 : 7
+      this.form.startClassField = this.editableFromClassIndex <= 6 ? CLASS_FIELDS[this.editableFromClassIndex - 1] : ''
+      this.shiftRows = this.buildShiftRows(this.currentRow, rows)
     },
     getClassIndex(classField) {
       return CLASS_FIELDS.indexOf(classField)
     },
-    hasTransferPlanFrom(row) {
-      const rowIndex = this.getClassIndex(row.classField)
-      return rowIndex >= 0 && this.shiftRows.some((item, index) => index >= rowIndex && item.planQty > 0)
-    },
     isTransferClass(row) {
-      const startIndex = this.getClassIndex(this.form.startClassField)
-      const rowIndex = this.getClassIndex(row.classField)
-      return startIndex >= 0 && rowIndex >= startIndex && row.planQty > 0
-    },
-    handleStartClassChange() {
-      this.shiftRows.forEach(row => {
-        if (!this.isTransferClass(row)) {
-          row.produceOrder = undefined
-        } else if (!row.produceOrder) {
-          row.produceOrder = 1
-        }
-      })
+      return !!(row && row.transferable)
     },
     async loadMachines() {
       const res = await getCd90MachineEnableOptions({ factoryCode: this.form.factoryCode })
@@ -221,6 +217,10 @@ export default {
         }
         if (this.form.sourceMachineCode === this.form.targetMachineCode) {
           this.$modal.msgWarning('原机台和目标机台不能相同')
+          return
+        }
+        if (!this.shiftRows.some(row => this.isTransferClass(row))) {
+          this.$modal.msgWarning('当前班次及后续没有可转走的帘布计划')
           return
         }
         if (this.shiftRows.some(row => this.isTransferClass(row) && !row.produceOrder)) {

@@ -2,6 +2,7 @@ package com.zlt.aps.cd90.service;
 
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.cd90.api.domain.entity.Cd90ScheduleResult;
+import com.zlt.aps.cd90.api.domain.vo.Cd90ChangeQtyRequest;
 import com.zlt.aps.cd90.api.domain.vo.Cd90InsertOrderRequest;
 import com.zlt.aps.cd90.api.domain.vo.Cd90RollingCheckRequest;
 import com.zlt.aps.cd90.api.domain.vo.Cd90TransferMachineRequest;
@@ -40,6 +41,15 @@ public interface ICd90ScheduleResultService extends IDocService<Cd90ScheduleResu
 
     /** 查询转机台异步任务。 */
     AjaxResult getTransferMachineTask(String taskId);
+
+    /** 调量预校验。 */
+    AjaxResult validateChangeQty(Cd90ChangeQtyRequest request);
+
+    /** 创建调量异步任务。 */
+    AjaxResult changeQty(Cd90ChangeQtyRequest request);
+
+    /** 查询调量异步任务。 */
+    AjaxResult getChangeQtyTask(String taskId);
 
     /** 检查交班窗口并按稳定输入创建定时滚动任务。 */
     AjaxResult checkTimedRolling(Cd90RollingCheckRequest request);

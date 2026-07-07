@@ -8,6 +8,7 @@ import com.zlt.aps.cd90.api.domain.entity.Cd90ScheduleLaneAllocation;
 import com.zlt.aps.cd90.api.domain.entity.Cd90ScheduleResult;
 import com.zlt.aps.cd90.api.domain.entity.Cd90ScheduleResultLog;
 import com.zlt.aps.cd90.api.domain.entity.Cd90UnscheduleResult;
+import com.zlt.aps.cd90.api.domain.vo.Cd90ChangeQtyRequest;
 import com.zlt.aps.cd90.api.domain.vo.Cd90InsertOrderRequest;
 import com.zlt.aps.cd90.api.domain.vo.Cd90TransferMachineRequest;
 import com.zlt.aps.cd90.engine.constant.Cd90ScheduleTaskStatus;
@@ -69,6 +70,14 @@ public class Cd90InsertRollingPersistServiceImpl implements Cd90InsertRollingPer
                 "TRANSFER_MACHINE_ROLLING", "TRANSFER_MACHINE_DEGRADE", "转机台");
     }
 
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void persistChangeQty(String taskId, Cd90ChangeQtyRequest request,
+                                 Cd90InsertRollingOutput output, RLock lock) {
+        this.persistInternal(taskId, request, output, lock, "CHANGE_QTY",
+                "CHANGE_QTY_ROLLING", "CHANGE_QTY_DEGRADE", "调量");
+    }
+
     private void persistInternal(String taskId, Object request,
                                  Cd90InsertRollingOutput output, RLock lock,
                                  String createReason, String updateReason,
@@ -85,6 +94,8 @@ public class Cd90InsertRollingPersistServiceImpl implements Cd90InsertRollingPer
             }
             this.saveLog(insertResult, "CREATE", createReason, request);
         }
+        List<Cd90ScheduleResult> deletedResults = output.getDeletedResults() == null
+                ? Collections.emptyList() : output.getDeletedResults();
         for (Cd90ScheduleResult result : output.getUpdatedResults()) {
             if (result.getId() == null || this.updateScheduleResultForcibly(result) != 1) {
                 throw new IllegalStateException("更新" + actionName + "受影响排程结果失败");
@@ -99,6 +110,17 @@ public class Cd90InsertRollingPersistServiceImpl implements Cd90InsertRollingPer
                 this.saveLog(result, "UPDATE", updateReason, request);
             }
         }
+        for (Cd90ScheduleResult result : deletedResults) {
+            if (result.getId() == null) {
+                throw new IllegalStateException("删除" + actionName + "转出排程结果失败");
+            }
+            this.saveLog(result, "DELETE", updateReason, request);
+            laneMapper.delete(new LambdaQueryWrapper<Cd90ScheduleLaneAllocation>()
+                    .eq(Cd90ScheduleLaneAllocation::getScheduleResultId, result.getId()));
+            if (resultMapper.deleteById(result.getId()) != 1) {
+                throw new IllegalStateException("删除" + actionName + "转出排程结果失败");
+            }
+        }
         for (Cd90UnscheduleResult unscheduled : output.getUnscheduledResults()) {
             if (unscheduleMapper.insert(unscheduled) != 1) {
                 throw new IllegalStateException("保存" + actionName + "未排结果失败");
@@ -108,16 +130,18 @@ public class Cd90InsertRollingPersistServiceImpl implements Cd90InsertRollingPer
         if (!taskService.markSuccessInCurrentTransaction(taskId, output.getBatchNo())) {
             throw new IllegalStateException(actionName + "任务状态已变化，不能提交结果");
         }
-        log.info("[直裁{}] 最终事务提交完成, taskId={}, batchNo={}, insertSaved={}, updatedCount={}, unscheduledCount={}",
+        log.info("[直裁{}] 最终事务提交完成, taskId={}, batchNo={}, insertSaved={}, updatedCount={}, deletedCount={}, unscheduledCount={}",
                 actionName, taskId, output.getBatchNo(), insertSaved, output.getUpdatedResults().size(),
-                output.getUnscheduledResults().size());
+                deletedResults.size(), output.getUnscheduledResults().size());
     }
     private void applyStorageLaneCodes(Cd90InsertRollingOutput output) {
         List<Cd90InsertLaneAllocationDraft> lanes = output.getLaneAllocations() == null
                 ? Collections.emptyList() : output.getLaneAllocations();
-        output.getInsertResult().setStorageLaneCode(joinLaneCodes(lanes.stream()
-                .filter(Cd90InsertLaneAllocationDraft::isInsertResult)
-                .collect(Collectors.toList())));
+        if (output.getInsertResult() != null) {
+            output.getInsertResult().setStorageLaneCode(joinLaneCodes(lanes.stream()
+                    .filter(Cd90InsertLaneAllocationDraft::isInsertResult)
+                    .collect(Collectors.toList())));
+        }
         output.getUpdatedResults().forEach(result -> result.setStorageLaneCode(
                 joinLaneCodes(lanes.stream()
                         .filter(item -> !item.isInsertResult())
@@ -153,6 +177,9 @@ public class Cd90InsertRollingPersistServiceImpl implements Cd90InsertRollingPer
                             .filter(item -> resultId.equals(item.getId())).findFirst()
                             .orElseThrow(() -> new IllegalStateException(
                                     "插单库排明细找不到主结果: " + resultId));
+            if (parent == null) {
+                continue;
+            }
             Cd90ScheduleLaneAllocation entity = new Cd90ScheduleLaneAllocation();
             entity.setFactoryCode(parent.getFactoryCode());
             entity.setScheduleDate(parent.getScheduleDate());
@@ -216,6 +243,9 @@ public class Cd90InsertRollingPersistServiceImpl implements Cd90InsertRollingPer
     }
 
     private boolean hasScheduledQuantity(Cd90ScheduleResult result) {
+        if (result == null) {
+            return false;
+        }
         for (int classIndex = 1; classIndex <= 6; classIndex++) {
             Double quantity = (Double) result.getFieldValueByFieldName(
                     String.format("class%dPlanQty", classIndex));

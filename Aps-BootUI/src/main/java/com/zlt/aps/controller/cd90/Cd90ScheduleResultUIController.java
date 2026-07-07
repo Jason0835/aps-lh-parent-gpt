@@ -9,6 +9,7 @@ import com.ruoyi.common.text.Convert;
 import com.ruoyi.common4ui.core.controller.BaseUIController;
 import com.zlt.aps.cd90.api.domain.entity.Cd90ScheduleResult;
 import com.zlt.aps.cd90.api.domain.entity.Cd90ScheduleRollingAdjustLog;
+import com.zlt.aps.cd90.api.domain.vo.Cd90ChangeQtyRequest;
 import com.zlt.aps.cd90.api.domain.vo.Cd90InsertOrderRequest;
 import com.zlt.aps.cd90.api.domain.vo.Cd90TransferMachineRequest;
 import com.zlt.aps.cd90.api.service.ICd90ScheduleResultRemoteService;
@@ -111,6 +112,30 @@ public class Cd90ScheduleResultUIController extends BaseUIController<Cd90Schedul
     @ResponseBody
     public AjaxResult getTransferMachineTask(@PathVariable("taskId") String taskId) {
         return remoteService.getTransferMachineTask(taskId);
+    }
+
+    @ApiOperation("调量预校验")
+    @RequiresPermissions("cd90:scheduleResult:adjustQty")
+    @PostMapping("/validateChangeQty")
+    @ResponseBody
+    public AjaxResult validateChangeQty(@RequestBody Cd90ChangeQtyRequest request) {
+        return remoteService.validateChangeQty(request);
+    }
+
+    @ApiOperation("提交调量滚动重排")
+    @RequiresPermissions("cd90:scheduleResult:adjustQty")
+    @PostMapping("/changeQty")
+    @ResponseBody
+    public AjaxResult changeQty(@RequestBody Cd90ChangeQtyRequest request) {
+        return remoteService.changeQty(request);
+    }
+
+    @ApiOperation("查询调量滚动重排任务")
+    @RequiresPermissions("cd90:scheduleResult:adjustQty")
+    @GetMapping("/changeQty/task/{taskId}")
+    @ResponseBody
+    public AjaxResult getChangeQtyTask(@PathVariable("taskId") String taskId) {
+        return remoteService.getChangeQtyTask(taskId);
     }
     @ApiOperation("查询定时滚动排程任务")
     @RequiresPermissions("cd90:scheduleResult:rollingQuery")

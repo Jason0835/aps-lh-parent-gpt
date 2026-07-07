@@ -1,5 +1,6 @@
 package com.zlt.aps.cd90.service.impl;
 
+import com.zlt.aps.cd90.api.domain.vo.Cd90ChangeQtyRequest;
 import com.zlt.aps.cd90.api.domain.vo.Cd90InsertOrderRequest;
 import com.zlt.aps.cd90.api.domain.vo.Cd90TransferMachineRequest;
 import com.zlt.aps.cd90.engine.constant.Cd90ScheduleTaskStatus;
@@ -91,6 +92,38 @@ public class Cd90InsertOrderAsyncExecutorImpl implements Cd90InsertOrderAsyncExe
             persistService.persistTransfer(taskId, request, output, lock);
         } catch (Exception exception) {
             log.error("[直裁转机台] 异步任务执行失败, taskId={}, factoryCode={}, scheduleDate={}",
+                    taskId, request.getFactoryCode(), scheduleDate, exception);
+            taskService.markFailed(taskId, I18nUtil.getMessage("ui.cd90.insert.executeFailed"));
+        } finally {
+            if (lock.isHeldByCurrentThread()) {
+                lock.unlock();
+            }
+        }
+    }
+    @Async
+    @Override
+    public void executeChangeQty(String taskId, Cd90ChangeQtyRequest request) {
+        LocalDate scheduleDate = request.getScheduleDate().toInstant()
+                .atZone(ZoneId.systemDefault()).toLocalDate();
+        RLock lock = lockService.getLock(request.getFactoryCode(), scheduleDate);
+        try {
+            if (!lock.tryLock()) {
+                log.info("[直裁调量] 执行锁已由其他任务持有, taskId={}, factoryCode={}, scheduleDate={}",
+                        taskId, request.getFactoryCode(), scheduleDate);
+                taskService.markFailed(taskId,
+                        I18nUtil.getMessage("ui.cd90.insert.activeTask"));
+                return;
+            }
+            if (!taskService.start(taskId)) {
+                log.warn("[直裁调量] 任务已被其他执行者处理, taskId={}", taskId);
+                return;
+            }
+            this.updateProgress(taskId, 20, "LOAD_EXISTING", "加载原排程任务链");
+            Cd90InsertRollingOutput output = insertRollingService.executeChangeQty(request);
+            this.updateProgress(taskId, 90, "ROLLING_COMPLETE", "调量滚动重排完成");
+            persistService.persistChangeQty(taskId, request, output, lock);
+        } catch (Exception exception) {
+            log.error("[直裁调量] 异步任务执行失败, taskId={}, factoryCode={}, scheduleDate={}",
                     taskId, request.getFactoryCode(), scheduleDate, exception);
             taskService.markFailed(taskId, I18nUtil.getMessage("ui.cd90.insert.executeFailed"));
         } finally {

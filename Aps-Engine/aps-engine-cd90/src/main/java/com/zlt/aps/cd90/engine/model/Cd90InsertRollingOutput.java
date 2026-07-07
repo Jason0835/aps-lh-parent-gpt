@@ -23,6 +23,8 @@ public class Cd90InsertRollingOutput {
     private Cd90ScheduleResult insertResult;
     /** 原批次内需要更新的排程结果。 */
     private List<Cd90ScheduleResult> updatedResults;
+    /** 原批次内需要删除的排程结果。*/
+    private List<Cd90ScheduleResult> deletedResults;
     /** 受影响主结果的完整库排明细替换草稿。 */
     private List<Cd90InsertLaneAllocationDraft> laneAllocations;
     /** 窗口结束后仍未容纳的任务。 */

@@ -29,7 +29,7 @@ public class Cd90TransferMachineRequest implements Serializable {
     private String targetMachineCode;
     @ApiModelProperty("帘布代号")
     private String clothCode;
-    @ApiModelProperty("开始转走班次，取值CLASS1至CLASS6")
+    @ApiModelProperty("内部兼容字段：系统按当前班次自动写入，前端不再要求用户选择")
     private String startClassField;
     @ApiModelProperty("一班目标机台插入顺序")
     private Integer class1ProduceOrder;

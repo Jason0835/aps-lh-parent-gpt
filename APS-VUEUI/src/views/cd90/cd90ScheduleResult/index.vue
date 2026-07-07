@@ -89,6 +89,10 @@
       ref="changeMachineRef"
       @success="handleChangeMachineSuccess"
     />
+    <change-qty-dialog
+      ref="changeQtyRef"
+      @success="handleChangeQtySuccess"
+    />
     <el-dialog
       :title="scheduleTaskTitle"
       :visible.sync="autoScheduleProgressVisible"
@@ -137,7 +141,7 @@
 
 <script>
 import moment from 'moment'
-import { getAutoScheduleTask, getInsertTask, getTransferMachineTask, getTimedRollingTask, listScheduleResult, delScheduleResult, exportScheduleResult, publishScheduleResult } from '@/api/cd90/scheduleResult'
+import { getAutoScheduleTask, getInsertTask, getTransferMachineTask, getChangeQtyTask, getTimedRollingTask, listScheduleResult, delScheduleResult, exportScheduleResult, publishScheduleResult } from '@/api/cd90/scheduleResult'
 import { listTireFabricCodes } from '@/api/cd90/specifyMachine'
 import { getCd90MachineEnableOptions } from '@/api/cd90/cd90MachineInfo'
 import { listUnscheduleResult } from '@/api/cd90/unscheduleResult'
@@ -145,6 +149,7 @@ import TltUploadForm from '@/views/components/tltUploadForm.vue'
 import AutoScheduleDialog from './components/autoScheduleDialog.vue'
 import InsertOrderDialog from './components/insertOrderDialog.vue'
 import ChangeMachineDialog from './components/changeMachineDialog.vue'
+import ChangeQtyDialog from './components/changeQtyDialog.vue'
 
 const SHIFT_CONFIG = [
   { classField: 'class1', shiftKey: 'middleShift', dayOffset: -1 },
@@ -157,7 +162,7 @@ const SHIFT_CONFIG = [
 
 export default {
   name: 'Cd90ScheduleResult',
-  components: { TltUploadForm, AutoScheduleDialog, InsertOrderDialog, ChangeMachineDialog },
+  components: { TltUploadForm, AutoScheduleDialog, InsertOrderDialog, ChangeMachineDialog, ChangeQtyDialog },
   dicts: ['biz_factory_name', 'IS_RELEASE'],
   provide() {
     return {
@@ -615,7 +620,25 @@ export default {
       }
     },
     handleChangePlan() {
-      this.showPendingActionMessage()
+      const row = this.selection[0]
+      if (!row) {
+        this.$message.warning(this.$t('ui.message.pleaseSelectData'))
+        return
+      }
+      this.$refs.changeQtyRef.show(row)
+    },
+    handleChangeQtySuccess(scheduleDate, payload) {
+      if (scheduleDate) {
+        this.query = { ...this.query, scheduleDate }
+        this.search = { ...this.search, scheduleDate }
+        this.updateDateList(scheduleDate)
+      }
+      const data = payload || {}
+      if (data.taskId) {
+        this.pollScheduleTask(data.taskId, getChangeQtyTask)
+      } else {
+        this.getList()
+      }
     },
     handlePublish() {
       this.$confirm(this.$t('ui.biz.alter.makeSurePublish'), {

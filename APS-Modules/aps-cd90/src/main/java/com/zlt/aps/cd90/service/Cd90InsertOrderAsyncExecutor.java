@@ -1,5 +1,6 @@
 package com.zlt.aps.cd90.service;
 
+import com.zlt.aps.cd90.api.domain.vo.Cd90ChangeQtyRequest;
 import com.zlt.aps.cd90.api.domain.vo.Cd90InsertOrderRequest;
 import com.zlt.aps.cd90.api.domain.vo.Cd90TransferMachineRequest;
 
@@ -23,4 +24,12 @@ public interface Cd90InsertOrderAsyncExecutor {
      * @param request 转机台请求快照
      */
     void executeTransfer(String taskId, Cd90TransferMachineRequest request);
+
+    /**
+     * 异步执行调量滚动重排。
+     *
+     * @param taskId 异步任务ID
+     * @param request 调量请求快照
+     */
+    void executeChangeQty(String taskId, Cd90ChangeQtyRequest request);
 }

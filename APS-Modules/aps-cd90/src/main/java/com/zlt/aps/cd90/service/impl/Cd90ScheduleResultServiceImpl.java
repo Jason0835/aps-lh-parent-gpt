@@ -10,6 +10,7 @@ import com.zlt.aps.cd90.api.domain.entity.Cd90UnscheduleResult;
 import com.zlt.aps.cd90.api.domain.entity.Cd90ScheduleRollingAdjustLog;
 import com.zlt.aps.cd90.api.domain.entity.Cd90ScheduleResult;
 import com.zlt.aps.cd90.api.domain.entity.Cd90ShiftConfig;
+import com.zlt.aps.cd90.api.domain.vo.Cd90ChangeQtyRequest;
 import com.zlt.aps.cd90.api.domain.vo.Cd90InsertOrderRequest;
 import com.zlt.aps.cd90.api.domain.vo.Cd90RollingCheckRequest;
 import com.zlt.aps.cd90.api.domain.vo.Cd90TransferMachineRequest;
@@ -45,12 +46,15 @@ import org.springframework.transaction.annotation.Transactional;
 import javax.annotation.Resource;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -165,26 +169,59 @@ public class Cd90ScheduleResultServiceImpl extends AbstractDocService<Cd90Schedu
         }
         LocalDate scheduleDate = request.getScheduleDate().toInstant()
                 .atZone(ZoneId.systemDefault()).toLocalDate();
-        List<Map<String, Object>> values = shiftMapper.selectList(
-                        new LambdaQueryWrapper<Cd90ShiftConfig>()
-                                .eq(Cd90ShiftConfig::getFactoryCode, request.getFactoryCode())
-                                .eq(Cd90ShiftConfig::getIsActive, 1))
+        LocalDateTime now = LocalDateTime.now();
+        List<Map<String, Object>> values = this.activeShiftConfigs(request.getFactoryCode())
                 .stream()
-                .sorted(Comparator.comparing(Cd90ShiftConfig::getScheduleDay)
-                        .thenComparing(Cd90ShiftConfig::getDayShiftOrder)
-                        .thenComparing(Cd90ShiftConfig::getShiftOrder))
                 .map(config -> {
+                    LocalDate shiftDate = scheduleDate.plusDays(this.scheduleDay(config) - 2L);
+                    LocalDateTime startTime = LocalDateTime.of(shiftDate, LocalTime.parse(config.getStartTime()));
+                    LocalDateTime endTime = this.resolveShiftEnd(shiftDate, config);
                     Map<String, Object> item = new HashMap<>();
                     item.put("classField", config.getClassField());
                     item.put("shiftCode", config.getShiftCode());
                     item.put("shiftName", config.getShiftName());
-                    item.put("shiftDate", scheduleDate.plusDays(config.getScheduleDay() - 2L)
-                            .format(DateTimeFormatter.ISO_LOCAL_DATE));
+                    item.put("shiftDate", shiftDate.format(DateTimeFormatter.ISO_LOCAL_DATE));
+                    item.put("startTime", startTime.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
+                    item.put("endTime", endTime.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
+                    item.put("currentShift", !now.isBefore(startTime) && now.isBefore(endTime));
+                    item.put("changeQtyEditable", now.isBefore(endTime));
                     return item;
                 }).collect(Collectors.toList());
         return AjaxResult.success(values);
     }
 
+    private List<Cd90ShiftConfig> activeShiftConfigs(String factoryCode) {
+        return shiftMapper.selectList(
+                        new LambdaQueryWrapper<Cd90ShiftConfig>()
+                                .eq(Cd90ShiftConfig::getFactoryCode, factoryCode)
+                                .eq(Cd90ShiftConfig::getIsActive, 1))
+                .stream()
+                .sorted(Comparator.comparing(Cd90ShiftConfig::getScheduleDay)
+                        .thenComparing(Cd90ShiftConfig::getDayShiftOrder)
+                        .thenComparing(Cd90ShiftConfig::getShiftOrder))
+                .collect(Collectors.toList());
+    }
+
+    private int scheduleDay(Cd90ShiftConfig config) {
+        return config.getScheduleDay() == null ? 2 : config.getScheduleDay();
+    }
+
+    private LocalDateTime resolveShiftEnd(LocalDate shiftDate, Cd90ShiftConfig config) {
+        LocalDate endDate = Integer.valueOf(1).equals(config.getIsCrossDay())
+                ? shiftDate.plusDays(1) : shiftDate;
+        return LocalDateTime.of(endDate, LocalTime.parse(config.getEndTime()));
+    }
+
+    private int resolveChangeQtyEditableFromClassIndex(Date scheduleDateValue, String factoryCode) {
+        LocalDate scheduleDate = scheduleDateValue.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+        LocalDateTime now = LocalDateTime.now();
+        return this.activeShiftConfigs(factoryCode).stream()
+                .filter(config -> now.isBefore(this.resolveShiftEnd(
+                        scheduleDate.plusDays(this.scheduleDay(config) - 2L), config)))
+                .map(Cd90ShiftConfig::getClassField)
+                .map(this::parseClassIndex)
+                .findFirst().orElse(7);
+    }
     @Override
     public AjaxResult validateInsert(Cd90InsertOrderRequest request) {
         if (request == null || request.getScheduleDate() == null
@@ -365,39 +402,55 @@ public class Cd90ScheduleResultServiceImpl extends AbstractDocService<Cd90Schedu
     public AjaxResult validateTransferMachine(Cd90TransferMachineRequest request) {
         if (request == null || request.getScheduleDate() == null
                 || isBlank(request.getFactoryCode()) || isBlank(request.getSourceMachineCode())
-                || isBlank(request.getTargetMachineCode()) || isBlank(request.getClothCode())
-                || isBlank(request.getStartClassField())) {
+                || isBlank(request.getTargetMachineCode()) || isBlank(request.getClothCode())) {
             return AjaxResult.error(I18nUtil.getMessage("ui.cd90.insert.required"));
         }
         if (request.getSourceMachineCode().equals(request.getTargetMachineCode())) {
             return AjaxResult.error("原机台和目标机台不能相同");
         }
-        int startClassIndex;
-        try {
-            startClassIndex = Integer.parseInt(request.getStartClassField().replace("CLASS", ""));
-        } catch (NumberFormatException exception) {
-            return AjaxResult.error("开始班次必须为CLASS1至CLASS6");
+        int editableFromClassIndex = this.resolveChangeQtyEditableFromClassIndex(
+                request.getScheduleDate(), request.getFactoryCode());
+        if (editableFromClassIndex > 6) {
+            return AjaxResult.error("当前排程窗口已结束，不能转机台");
         }
-        if (startClassIndex < 1 || startClassIndex > 6) {
-            return AjaxResult.error("开始班次必须为CLASS1至CLASS6");
-        }
+        request.setStartClassField("CLASS" + editableFromClassIndex);
         List<Cd90ScheduleResult> existing = this.selectByDateAndFactory(
                 request.getScheduleDate(), request.getFactoryCode());
         List<Cd90ScheduleResult> transferPlans = existing.stream()
                 .filter(item -> request.getSourceMachineCode().equals(item.getMachineCode()))
                 .filter(item -> request.getClothCode().equals(item.getClothCode()))
                 .collect(Collectors.toList());
-        boolean hasTransferPlan = transferPlans.stream()
-                .anyMatch(item -> IntStream.rangeClosed(startClassIndex, 6)
-                        .anyMatch(classIndex -> readPlanQuantity(item, classIndex) > 0D));
-        if (!hasTransferPlan) {
-            return AjaxResult.error("原机台从起始班次开始没有可转走的帘布计划");
+        if (transferPlans.isEmpty()) {
+            return AjaxResult.error("原机台没有可转走的帘布计划");
         }
-        boolean missingProduceOrder = transferPlans.stream()
-                .anyMatch(item -> IntStream.rangeClosed(startClassIndex, 6)
-                        .anyMatch(classIndex -> readPlanQuantity(item, classIndex) > 0D
-                                && readTransferProduceOrder(request, classIndex) == null));
-        return missingProduceOrder ? AjaxResult.error("转机台目标顺序不能为空") : AjaxResult.success();
+        boolean invalidClassOrder = IntStream.rangeClosed(1, editableFromClassIndex - 1)
+                .anyMatch(classIndex -> readTransferProduceOrder(request, classIndex) != null);
+        if (invalidClassOrder) {
+            return AjaxResult.error("当前班次之前的数据不能转机台");
+        }
+        boolean zeroQuantitySelected = IntStream.rangeClosed(editableFromClassIndex, 6)
+                .anyMatch(classIndex -> readTransferProduceOrder(request, classIndex) != null
+                        && transferPlans.stream().mapToDouble(item -> readPlanQuantity(item, classIndex)).sum() <= 0D);
+        if (zeroQuantitySelected) {
+            return AjaxResult.error("计划量为0的班次不能转机台");
+        }
+        boolean missingProduceOrder = IntStream.rangeClosed(editableFromClassIndex, 6)
+                .anyMatch(classIndex -> transferPlans.stream()
+                        .mapToDouble(item -> readPlanQuantity(item, classIndex)).sum() > 0D
+                        && readTransferProduceOrder(request, classIndex) == null);
+        if (missingProduceOrder) {
+            return AjaxResult.error("转机台目标顺序不能为空");
+        }
+        boolean hasTransferPlan = IntStream.rangeClosed(editableFromClassIndex, 6)
+                .anyMatch(classIndex -> transferPlans.stream()
+                        .mapToDouble(item -> readPlanQuantity(item, classIndex)).sum() > 0D);
+        if (!hasTransferPlan) {
+            return AjaxResult.error("当前班次及后续没有可转走的帘布计划");
+        }
+        boolean lockedTransfer = IntStream.rangeClosed(editableFromClassIndex, 6)
+                .anyMatch(classIndex -> transferPlans.stream()
+                        .anyMatch(item -> readPlanQuantity(item, classIndex) > 0D && isLocked(item, classIndex)));
+        return lockedTransfer ? AjaxResult.error("已锁定或已生产的班次计划不能转机台") : AjaxResult.success();
     }
 
     @Override
@@ -476,6 +529,133 @@ public class Cd90ScheduleResultServiceImpl extends AbstractDocService<Cd90Schedu
     }
 
     @Override
+    public AjaxResult validateChangeQty(Cd90ChangeQtyRequest request) {
+        if (request == null || request.getScheduleDate() == null
+                || isBlank(request.getFactoryCode()) || isBlank(request.getMachineCode())
+                || isBlank(request.getClothCode())) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.cd90.insert.required"));
+        }
+        Map<Integer, Double> targetQtyByClass;
+        try {
+            targetQtyByClass = this.resolveChangeQtyTargets(request);
+        } catch (IllegalArgumentException exception) {
+            return AjaxResult.error(exception.getMessage());
+        }
+        List<Cd90ScheduleResult> existing = this.latestBatchResults(this.selectByDateAndFactory(
+                request.getScheduleDate(), request.getFactoryCode()));
+        Optional<Cd90ScheduleResult> targetOptional = this.findChangeQtyTarget(request, existing);
+        if (!targetOptional.isPresent()) {
+            return AjaxResult.error("未找到可调量的直裁排程结果");
+        }
+        Cd90ScheduleResult target = targetOptional.get();
+        boolean allSame = targetQtyByClass.entrySet().stream().allMatch(entry ->
+                BigDecimal.valueOf(this.readPlanQuantity(target, entry.getKey()))
+                        .compareTo(BigDecimal.valueOf(entry.getValue())) == 0);
+        if (allSame) {
+            return AjaxResult.error("调量目标计划量与原计划一致");
+        }
+        int editableFromClassIndex = this.resolveChangeQtyEditableFromClassIndex(
+                request.getScheduleDate(), request.getFactoryCode());
+        if (editableFromClassIndex > 6) {
+            return AjaxResult.error("当前排程窗口已结束，不能调量");
+        }
+        Optional<Integer> beforeCurrentClass = targetQtyByClass.keySet().stream()
+                .filter(classIndex -> classIndex < editableFromClassIndex)
+                .findFirst();
+        if (beforeCurrentClass.isPresent()) {
+            return AjaxResult.error("当前班次之前不可调量");
+        }
+
+        Optional<Map.Entry<Integer, Double>> lockedClass = targetQtyByClass.entrySet().stream()
+                .filter(entry -> this.isLocked(target, entry.getKey()))
+                .findFirst();
+        if (lockedClass.isPresent()) {
+            return AjaxResult.error("已锁定或已生产的班次计划不能调量");
+        }
+        Optional<Map.Entry<Integer, Double>> lessThanFinish = targetQtyByClass.entrySet().stream()
+                .filter(entry -> {
+                    Double finishQty = this.readDouble(target, String.format("class%dFinishQty", entry.getKey()));
+                    return finishQty != null && entry.getValue() < finishQty;
+                }).findFirst();
+        return lessThanFinish.isPresent()
+                ? AjaxResult.error("调量目标不能小于已完成数量") : AjaxResult.success();
+    }
+
+    @Override
+    public AjaxResult changeQty(Cd90ChangeQtyRequest request) {
+        AjaxResult validation = this.validateChangeQty(request);
+        if (!Integer.valueOf(200).equals(validation.get("code"))) {
+            return validation;
+        }
+        LocalDate localScheduleDate = request.getScheduleDate().toInstant()
+                .atZone(ZoneId.systemDefault()).toLocalDate();
+        Cd90BatchDataCheckResult batchCheck = batchDataValidator.check(
+                request.getFactoryCode(), localScheduleDate);
+        if (batchCheck.isFailed()) {
+            Map<String, Object> data = new HashMap<>();
+            data.put("batchCheckFailed", true);
+            data.put("errors", toErrorList(batchCheck.getErrors()));
+            data.put("warnings", toErrorList(batchCheck.getWarnings()));
+            return AjaxResult.success(batchCheck.getPrimaryMessage(), data);
+        }
+        Cd90ScheduleTask activeTask = taskService.findActive(
+                request.getFactoryCode(), request.getScheduleDate());
+        if (activeTask != null) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.cd90.insert.activeTask"));
+        }
+        if (!Boolean.TRUE.equals(request.getConfirmed())) {
+            AjaxResult previewResult = this.previewChangeQty(request, localScheduleDate);
+            if (previewResult != null) {
+                return previewResult;
+            }
+        }
+        Cd90ScheduleTask task = taskService.createPending(request.getFactoryCode(),
+                request.getScheduleDate(), Cd90ScheduleTaskType.CHANGE_QTY,
+                "MANUAL", request.toString(), null);
+        insertOrderAsyncExecutor.executeChangeQty(task.getTaskId(), request);
+        Map<String, Object> data = new HashMap<>();
+        data.put("taskId", task.getTaskId());
+        return AjaxResult.success("调量滚动重排任务已提交", data);
+    }
+
+    private AjaxResult previewChangeQty(Cd90ChangeQtyRequest request,
+                                        LocalDate scheduleDate) {
+        RLock lock = lockService.getLock(request.getFactoryCode(), scheduleDate);
+        try {
+            if (!lock.tryLock()) {
+                return AjaxResult.error(I18nUtil.getMessage("ui.cd90.insert.activeTask"));
+            }
+            if (taskService.findActive(request.getFactoryCode(), request.getScheduleDate()) != null) {
+                return AjaxResult.error(I18nUtil.getMessage("ui.cd90.insert.activeTask"));
+            }
+            Cd90InsertRollingOutput output = insertRollingService.executeChangeQty(request);
+            List<Cd90InsertCarryoverImpact> impacts = output.getCarryoverImpacts() == null
+                    ? Collections.emptyList() : output.getCarryoverImpacts();
+            if (impacts.isEmpty()) {
+                return null;
+            }
+            Map<String, Object> data = new HashMap<>();
+            data.put("needConfirm", true);
+            data.put("carryoverDetails", impacts.stream()
+                    .map(this::toCarryoverDetail)
+                    .collect(Collectors.toList()));
+            return AjaxResult.success("调量会引起跨班顺延，请确认后继续", data);
+        } finally {
+            if (lock.isHeldByCurrentThread()) {
+                lock.unlock();
+            }
+        }
+    }
+
+    @Override
+    public AjaxResult getChangeQtyTask(String taskId) {
+        Cd90ScheduleTask task = taskService.findByTaskId(taskId);
+        if (task == null || !Cd90ScheduleTaskType.CHANGE_QTY.equals(task.getTaskType())) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.cd90.insert.taskNotFound"));
+        }
+        return AjaxResult.success(task);
+    }
+    @Override
     public AjaxResult checkTimedRolling(Cd90RollingCheckRequest request) {
         return timedRollingCheckService.check(request);
     }
@@ -523,8 +703,8 @@ public class Cd90ScheduleResultServiceImpl extends AbstractDocService<Cd90Schedu
     }
 
     private boolean isLocked(Cd90ScheduleResult result, int classIndex) {
-        Double finishQuantity = readDouble(result, String.format("class%dFinishQty", classIndex));
-        Double planQuantity = readDouble(result, String.format("class%dPlanQty", classIndex));
+        Double finishQuantity = this.readDouble(result, String.format("class%dFinishQty", classIndex));
+        Double planQuantity = this.readDouble(result, String.format("class%dPlanQty", classIndex));
         return Integer.valueOf(1).equals(result.getIsLocked())
                 || (finishQuantity != null && finishQuantity > 0D)
                 || ("1".equals(result.getProductionStatus())
@@ -537,10 +717,69 @@ public class Cd90ScheduleResultServiceImpl extends AbstractDocService<Cd90Schedu
     }
 
     private double readPlanQuantity(Cd90ScheduleResult result, int classIndex) {
-        Double value = readDouble(result, String.format("class%dPlanQty", classIndex));
+        Double value = this.readDouble(result, String.format("class%dPlanQty", classIndex));
         return value == null ? 0D : value;
     }
 
+    private Map<Integer, Double> resolveChangeQtyTargets(Cd90ChangeQtyRequest request) {
+        Map<Integer, Double> targetQtyByClass = new LinkedHashMap<>();
+        if (!isBlank(request.getStartClassField()) || request.getTargetPlanQty() != null) {
+            if (isBlank(request.getStartClassField()) || request.getTargetPlanQty() == null) {
+                throw new IllegalArgumentException("调量班次和目标计划量必须同时填写");
+            }
+            int classIndex = this.parseClassIndex(request.getStartClassField());
+            targetQtyByClass.put(classIndex, request.getTargetPlanQty());
+        }
+        IntStream.rangeClosed(1, 6).forEach(classIndex -> {
+            Double planQty = (Double) request.getFieldValueByFieldName(
+                    String.format("class%dPlanQty", classIndex));
+            if (planQty != null) {
+                targetQtyByClass.put(classIndex, planQty);
+            }
+        });
+        if (targetQtyByClass.isEmpty()) {
+            throw new IllegalArgumentException("至少填写一个调量目标计划量");
+        }
+        targetQtyByClass.forEach((classIndex, planQty) -> {
+            if (classIndex < 1 || classIndex > 6 || planQty == null || planQty < 0D) {
+                throw new IllegalArgumentException("调量班次必须为CLASS1至CLASS6，目标计划量不能小于0");
+            }
+        });
+        return targetQtyByClass;
+    }
+
+    private int parseClassIndex(String classField) {
+        try {
+            int classIndex = Integer.parseInt(classField.replace("CLASS", ""));
+            if (classIndex < 1 || classIndex > 6) {
+                throw new NumberFormatException("class index out of range");
+            }
+            return classIndex;
+        } catch (RuntimeException exception) {
+            throw new IllegalArgumentException("班次必须为CLASS1至CLASS6", exception);
+        }
+    }
+
+    private List<Cd90ScheduleResult> latestBatchResults(List<Cd90ScheduleResult> results) {
+        if (results == null || results.isEmpty()) {
+            return Collections.emptyList();
+        }
+        String latestBatchNo = results.stream().map(Cd90ScheduleResult::getBatchNo)
+                .filter(Objects::nonNull).max(String::compareTo).orElse(null);
+        return latestBatchNo == null ? Collections.emptyList() : results.stream()
+                .filter(item -> latestBatchNo.equals(item.getBatchNo()))
+                .collect(Collectors.toList());
+    }
+
+    private Optional<Cd90ScheduleResult> findChangeQtyTarget(Cd90ChangeQtyRequest request,
+                                                             List<Cd90ScheduleResult> existing) {
+        return existing.stream()
+                .filter(item -> request.getScheduleResultId() == null
+                        || Objects.equals(item.getId(), request.getScheduleResultId()))
+                .filter(item -> request.getMachineCode().equals(item.getMachineCode()))
+                .filter(item -> request.getClothCode().equals(item.getClothCode()))
+                .findFirst();
+    }
     private Integer readTransferProduceOrder(Cd90TransferMachineRequest request, int classIndex) {
         Integer produceOrder = (Integer) request.getFieldValueByFieldName(String.format(
                 "class%dProduceOrder", classIndex));
