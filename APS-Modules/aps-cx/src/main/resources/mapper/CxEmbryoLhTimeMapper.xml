@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.cx.mapper.CxEmbryoLhTimeMapper">
+
+    <!-- 批量插入 -->
+    <insert id="insertBatch">
+        INSERT INTO T_CX_EMBRYO_LH_TIME (
+            STRUCTURE_NAME,
+            EARLIEST_LH_TIME,
+            CREATE_BY,
+            CREATE_TIME,
+            UPDATE_BY,
+            UPDATE_TIME,
+            REMARK
+        ) VALUES
+        <foreach collection="list" item="item" separator=",">
+            (
+                #{item.structureName},
+                #{item.earliestLhTime},
+                #{item.createBy},
+                #{item.createTime},
+                #{item.updateBy},
+                #{item.updateTime},
+                #{item.remark}
+            )
+        </foreach>
+    </insert>
+
+    <!-- 批量更新 -->
+    <update id="updateBatch">
+        <foreach collection="list" item="item" separator=";">
+            UPDATE T_CX_EMBRYO_LH_TIME
+            <set>
+                STRUCTURE_NAME = #{item.structureName},
+                EARLIEST_LH_TIME = #{item.earliestLhTime},
+                UPDATE_BY = #{item.updateBy},
+                UPDATE_TIME = #{item.updateTime},
+                REMARK = #{item.remark}
+            </set>
+            WHERE ID = #{item.id}
+        </foreach>
+    </update>
+
+</mapper>
