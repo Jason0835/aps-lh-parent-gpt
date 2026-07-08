@@ -597,7 +597,7 @@ public class DjScheduleResultServiceImpl extends AbstractBillService<DjScheduleR
         LambdaQueryWrapper<DjScheduleResult> queryWrapper = new LambdaQueryWrapper<>();
         queryWrapper.eq(DjScheduleResult::getFactoryCode, entity.getFactoryCode())
                 .eq(DjScheduleResult::getScheduleDate, entity.getScheduleDate())
-                .eq(DjScheduleResult::getMachineCode, entity.getMachineCode())
+                .eq(StringUtils.isNotEmpty(entity.getMachineCode()), DjScheduleResult::getMachineCode, entity.getMachineCode())
                 .eq(StringUtils.isNotEmpty(entity.getPaddingCode()), DjScheduleResult::getPaddingCode, entity.getPaddingCode());
         if (id != null) {
             queryWrapper.ne(DjScheduleResult::getId, id);
