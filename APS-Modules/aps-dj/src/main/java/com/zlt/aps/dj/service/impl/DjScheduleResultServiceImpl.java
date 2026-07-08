@@ -594,13 +594,13 @@ public class DjScheduleResultServiceImpl extends AbstractBillService<DjScheduleR
     @Override
     public List<DjScheduleResult> checkUnique(DjScheduleResult entity) {
         Long id = entity.getId();
-        QueryWrapper<DjScheduleResult> queryWrapper = new QueryWrapper<>();
-        queryWrapper.eq("FACTORY_CODE", entity.getFactoryCode())
-                .eq("SCHEDULE_DATE", entity.getScheduleDate())
-                .eq("MACHINE_CODE", entity.getMachineCode())
-                .eq("PADDING_CODE", entity.getPaddingCode());
+        LambdaQueryWrapper<DjScheduleResult> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(DjScheduleResult::getFactoryCode, entity.getFactoryCode())
+                .eq(DjScheduleResult::getScheduleDate, entity.getScheduleDate())
+                .eq(DjScheduleResult::getMachineCode, entity.getMachineCode())
+                .eq(StringUtils.isNotEmpty(entity.getPaddingCode()), DjScheduleResult::getPaddingCode, entity.getPaddingCode());
         if (id != null) {
-            queryWrapper.ne("id", id);
+            queryWrapper.ne(DjScheduleResult::getId, id);
         }
         return djScheduleResultMapper.selectList(queryWrapper);
     }
