@@ -1757,13 +1757,13 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
         Map<String, Integer> materialMonthFinishedQtyByMonthMap = new HashMap<>(128);
         Map<String, Integer> materialMonthDailyFinishedQtyMap = new HashMap<>(128);
         if (CollectionUtils.isEmpty(requiredMonthMap)) {
-            mergeMaterialMonthFinishedQty(context, factoryCode, primaryYear, primaryMonth, cutoffDate,
+            mergeMaterialMonthFinishedQty(context, factoryCode, primaryYear, primaryMonth, context.getPlanStartDate(), cutoffDate,
                     primaryMonthFinishedQtyMap, materialMonthFinishedQtyByMonthMap, materialMonthDailyFinishedQtyMap);
         } else {
             for (LocalDate monthStartDate : requiredMonthMap.values()) {
                 Map<String, Integer> monthFinishedQtyMap = new HashMap<>(64);
                 mergeMaterialMonthFinishedQty(context, factoryCode, monthStartDate.getYear(),
-                        monthStartDate.getMonthValue(), cutoffDate, monthFinishedQtyMap,
+                        monthStartDate.getMonthValue(), context.getPlanStartDate(), cutoffDate, monthFinishedQtyMap,
                         materialMonthFinishedQtyByMonthMap, materialMonthDailyFinishedQtyMap);
                 if (monthStartDate.getYear() == primaryYear && monthStartDate.getMonthValue() == primaryMonth) {
                     primaryMonthFinishedQtyMap.putAll(monthFinishedQtyMap);
@@ -1779,25 +1779,15 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
                 CollectionUtils.isEmpty(requiredMonthMap) ? new ArrayList<String>(0) : requiredMonthMap.keySet());
     }
 
-    private void loadMaterialMonthFinishedQty(LhScheduleContext context, String factoryCode,
-                                              int year, int month, Date cutoffDate) {
-        Map<String, Integer> monthFinishedQtyMap = new HashMap<>(64);
-        Map<String, Integer> materialMonthFinishedQtyByMonthMap = new HashMap<>(128);
-        Map<String, Integer> materialMonthDailyFinishedQtyMap = new HashMap<>(128);
-        mergeMaterialMonthFinishedQty(context, factoryCode, year, month, cutoffDate, monthFinishedQtyMap,
-                materialMonthFinishedQtyByMonthMap, materialMonthDailyFinishedQtyMap);
-        context.setMaterialMonthFinishedQtyMap(monthFinishedQtyMap);
-        context.setMaterialMonthFinishedQtyByMonthMap(materialMonthFinishedQtyByMonthMap);
-        context.setMaterialMonthDailyFinishedQtyMap(materialMonthDailyFinishedQtyMap);
-    }
-
     /**
      * 合并指定月份的月累计完成量。
+     * 按起始日~截止日算：下个月定稿后，起始日会有变化
      *
      * @param context                            排程上下文
      * @param factoryCode                        工厂编码
      * @param year                               年份
      * @param month                              月份
+     * @param monthStartDate                     完成量起始日
      * @param cutoffDate                         截止日期
      * @param monthFinishedQtyMap                当前月份物料完成量
      * @param materialMonthFinishedQtyByMonthMap 跨月物料完成量
@@ -1807,6 +1797,7 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
                                                String factoryCode,
                                                int year,
                                                int month,
+                                               Date monthStartDate,
                                                Date cutoffDate,
                                                Map<String, Integer> monthFinishedQtyMap,
                                                Map<String, Integer> materialMonthFinishedQtyByMonthMap,
@@ -1817,8 +1808,13 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
         calendar.set(Calendar.YEAR, year);
         calendar.set(Calendar.MONTH, month - 1);
         calendar.set(Calendar.DAY_OF_MONTH, 1);
-        Date monthStart = LhScheduleTimeUtil.clearTime(calendar.getTime());
-
+        //20260707+ 下个月定稿后，完成量起始日从下个月定稿库存日开始计算
+        Date monthStart;
+        if (null == monthStartDate) {
+            monthStart = LhScheduleTimeUtil.clearTime(calendar.getTime());
+        } else {
+            monthStart = monthStartDate;
+        }
         calendar.add(Calendar.MONTH, 1);
         Date nextMonthStart = LhScheduleTimeUtil.clearTime(calendar.getTime());
 
