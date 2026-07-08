@@ -313,27 +313,7 @@ public class DjScheduleAdjustServiceImpl implements IDjScheduleAdjustService {
         CapacityValidateResult capacityResult = iDjScheduleShiftEngineService.validateCapacity(machineCode, targetClass,
                 targetSeq, insertPlanQty, ctx.getScheduleResults(), factoryCode, scheduleDate);
 
-        // 第一档：插单量 ≤ 剩余产能（定额 - 当班原有计划量），无产能问题直接通过
-        if (capacityResult.isWithinQuota()) {
-            return AjaxResult.success();
-        }
-
-        // 第三档：插单量 > 实际剩余产能（定额 - 已生产量），超当班剩余产能，拒绝插单
-        if (!capacityResult.isPassed()) {
-            log.warn("插单量 {} 超出实际剩余产能 {}", insertPlanQty, capacityResult.getRemainingCapacity());
-            return AjaxResult.error(capacityResult.getErrorMsg());
-        }
-
-        // 第二档：插单量 > 剩余产能 但 ≤ 实际剩余产能，需提示用户确认
-        String overflowSpecsStr = "";
-        if (CollectionUtils.isNotEmpty(capacityResult.getOverflowSpecs())) {
-            overflowSpecsStr = String.join(",", capacityResult.getOverflowSpecs());
-        }
-        String overflowMsg = MessageFormat.format(
-                I18nUtil.getMessage("ui.data.column.scheduleResult.validate.capacity.overflow"),
-                insertPlanQty, capacityResult.getRemainingCapacity(), overflowSpecsStr);
-        log.info("插单产能溢出（前置校验），受影响规格：{}", overflowSpecsStr);
-        return AjaxResult.success().put("msg", overflowMsg).put("dialogType", "CAPACITY_OVERFLOW");
+        return this.handleCapacityResult(capacityResult, insertPlanQty);
     }
 
     /**
@@ -593,14 +573,30 @@ public class DjScheduleAdjustServiceImpl implements IDjScheduleAdjustService {
         CapacityValidateResult capacityResult = iDjScheduleShiftEngineService.validateCapacity(machineCode,
                 targetClass, originSeq, delta, ctx.getScheduleResults(), factoryCode, scheduleDate);
 
-        // 第一档：定额内，直接通过
+        return this.handleCapacityResult(capacityResult, delta);
+    }
+
+    /**
+     * 处理产能校验结果（三档判断），生成对应的 AjaxResult
+     * <p>
+     * 第一档：定额内 → {@code AjaxResult.success()}<br>
+     * 第二档：超定额但未超实际剩余产能 → {@code AjaxResult.success().put("dialogType", "CAPACITY_OVERFLOW")}<br>
+     * 第三档：超实际剩余产能 → {@code AjaxResult.error()}
+     * </p>
+     *
+     * @param capacityResult 产能校验结果
+     * @param checkQty       用于日志和消息中的数量（插单/调量的量值）
+     * @return 对应的 AjaxResult
+     */
+    private AjaxResult handleCapacityResult(CapacityValidateResult capacityResult, BigDecimal checkQty) {
+        // 第一档：在定额内，直接通过
         if (capacityResult.isWithinQuota()) {
             return AjaxResult.success();
         }
 
         // 第三档：超出实际剩余产能，拒绝
         if (!capacityResult.isPassed()) {
-            log.warn("调量增量 {} 超出实际剩余产能 {}", delta, capacityResult.getRemainingCapacity());
+            log.warn("产能校验拒绝：数量 {} 超出实际剩余产能 {}", checkQty, capacityResult.getRemainingCapacity());
             return AjaxResult.error(capacityResult.getErrorMsg());
         }
 
@@ -611,8 +607,8 @@ public class DjScheduleAdjustServiceImpl implements IDjScheduleAdjustService {
         }
         String overflowMsg = MessageFormat.format(
                 I18nUtil.getMessage("ui.data.column.scheduleResult.validate.capacity.overflow"),
-                delta, capacityResult.getRemainingCapacity(), overflowSpecsStr);
-        log.info("调量产能溢出（前置校验），受影响规格：{}", overflowSpecsStr);
+                checkQty, capacityResult.getRemainingCapacity(), overflowSpecsStr);
+        log.info("产能溢出，受影响规格：{}", overflowSpecsStr);
         return AjaxResult.success().put("msg", overflowMsg).put("dialogType", "CAPACITY_OVERFLOW");
     }
 
