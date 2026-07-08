@@ -206,6 +206,14 @@ export function changeReleaseStatus(query) {
   })
 }
 
+export function changeQtyValidate(query) {
+  return request({
+    url: '/dj/djScheduleResult/changeQtyValidate',
+    method: 'post',
+    data: query
+  })
+}
+
 export function changeQty(query) {
   return request({
     url: 'dj/djScheduleResult/changeQty',

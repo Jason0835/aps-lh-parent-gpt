@@ -205,6 +205,16 @@ public class DjScheduleResultUIController extends BaseController<DjScheduleResul
     }
 
     /**
+     * 调量前置校验（产能校验）
+     */
+    @ApiOperation("调量前置校验")
+    @PostMapping("/changeQtyValidate")
+    @ResponseBody
+    public AjaxResult changeQtyValidate(DjScheduleResult scheduleResult) {
+        return iDjScheduleResultService.changeQtyValidate(scheduleResult);
+    }
+
+    /**
      * 调量
      */
     @ApiOperation("调量")
@@ -223,18 +233,7 @@ public class DjScheduleResultUIController extends BaseController<DjScheduleResul
     @PostMapping("/remove")
     @ResponseBody
     public AjaxResult remove(String ids) {
-        String newIds="";
-        String scheduleDate="";
-        if (StringUtils.isNotBlank(ids)){
-            newIds=ids.substring(0,ids.indexOf("|"));
-            scheduleDate=ids.substring(ids.indexOf("|")+1);
-        }
-//        DjScheduleResult queryEntity=new DjScheduleResult();
-//        queryEntity.setScheduleDate(DateUtils.parseDate(scheduleDate));
-//        if(iDjScheduleResultService.isPublish(queryEntity)){
-//            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.hasPublishedCanNotDelete"));
-//        }
-        Long[] arr = Convert.toLongArray(newIds);
+        Long[] arr = Convert.toLongArray(ids);
         return iDjScheduleResultService.remove(arr);
     }
 

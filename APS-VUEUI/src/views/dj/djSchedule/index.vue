@@ -756,7 +756,6 @@ export default {
         type: "warning",
       }).then(() => {
         let ids = this.selection.map((row) => row.id).join(",");
-        ids = ids + "|" + this.query.scheduleDate;
         removeScheduleResult({ ids }).then((data) => {
           this.$modal.msgSuccess(data.msg);
           // this.$set(this.page, "current", 1);

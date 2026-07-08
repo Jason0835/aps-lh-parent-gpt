@@ -10,6 +10,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Date;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 import javax.annotation.Resource;
@@ -312,27 +313,7 @@ public class DjScheduleAdjustServiceImpl implements IDjScheduleAdjustService {
         CapacityValidateResult capacityResult = iDjScheduleShiftEngineService.validateCapacity(machineCode, targetClass,
                 targetSeq, insertPlanQty, ctx.getScheduleResults(), factoryCode, scheduleDate);
 
-        // 第一档：插单量 ≤ 剩余产能（定额 - 当班原有计划量），无产能问题直接通过
-        if (capacityResult.isWithinQuota()) {
-            return AjaxResult.success();
-        }
-
-        // 第三档：插单量 > 实际剩余产能（定额 - 已生产量），超当班剩余产能，拒绝插单
-        if (!capacityResult.isPassed()) {
-            log.warn("插单量 {} 超出实际剩余产能 {}", insertPlanQty, capacityResult.getRemainingCapacity());
-            return AjaxResult.error(capacityResult.getErrorMsg());
-        }
-
-        // 第二档：插单量 > 剩余产能 但 ≤ 实际剩余产能，需提示用户确认
-        String overflowSpecsStr = "";
-        if (CollectionUtils.isNotEmpty(capacityResult.getOverflowSpecs())) {
-            overflowSpecsStr = String.join(",", capacityResult.getOverflowSpecs());
-        }
-        String overflowMsg = MessageFormat.format(
-                I18nUtil.getMessage("ui.data.column.scheduleResult.validate.capacity.overflow"),
-                insertPlanQty, capacityResult.getRemainingCapacity(), overflowSpecsStr);
-        log.info("插单产能溢出（前置校验），受影响规格：{}", overflowSpecsStr);
-        return AjaxResult.success().put("msg", overflowMsg).put("dialogType", "CAPACITY_OVERFLOW");
+        return this.handleCapacityResult(capacityResult, insertPlanQty);
     }
 
     /**
@@ -541,6 +522,97 @@ public class DjScheduleAdjustServiceImpl implements IDjScheduleAdjustService {
     }
 
     /**
+     * 3.4 调量前置校验（产能校验）
+     * <p>
+     * 仅对增量场景进行产能校验。减量或清空班次直接返回成功。
+     * </p>
+     */
+    @Override
+    public AjaxResult changeQtyValidate(DjScheduleResult adjustVO) {
+        Date scheduleDate = adjustVO.getScheduleDate();
+        String factoryCode = adjustVO.getFactoryCode();
+        String machineCode = adjustVO.getMachineCode();
+
+        DjAdjustScheduleContext ctx = this.loadBaseData(factoryCode, scheduleDate);
+
+        // 校验发布状态
+        AjaxResult lockedCheck = this.checkScheduleLocked(scheduleDate, new Long[]{adjustVO.getId()});
+        if (lockedCheck != null) {
+            return lockedCheck;
+        }
+
+        // 获取原始记录
+        DjScheduleResult original = ctx.getScheduleResults().stream()
+                .filter(r -> r.getId().equals(adjustVO.getId()))
+                .findFirst().orElse(null);
+        if (original == null) {
+            log.info("调量记录未找到（不在当前排程结果中），id={}", adjustVO.getId());
+            return AjaxResult.error(I18nUtil.getMessage("ui.message.data.not.found"));
+        }
+
+        // 确定目标班次，获取新旧计划量
+        int targetClass = resolveTargetClass(adjustVO);
+        BigDecimal oldPlanQty = iDjScheduleShiftEngineService.getPlanQtyByIndex(original, targetClass);
+        BigDecimal newPlanQty = getPlanQtyByClass(adjustVO, targetClass);
+
+        // 新计划量为空或≤0（清空班次）或非增量场景，直接通过
+        if (newPlanQty == null || newPlanQty.compareTo(BigDecimal.ZERO) <= 0) {
+            return AjaxResult.success();
+        }
+
+        // 原班次无计划量（等同插单场景）或减量/无变化，直接通过
+        if (oldPlanQty == null || oldPlanQty.compareTo(BigDecimal.ZERO) <= 0
+                || newPlanQty.compareTo(oldPlanQty) <= 0) {
+            return AjaxResult.success();
+        }
+
+        // 增量场景：执行产能校验
+        BigDecimal delta = newPlanQty.subtract(oldPlanQty);
+        int originSeq = iDjScheduleShiftEngineService.getSequenceByIndex(original, targetClass);
+
+        CapacityValidateResult capacityResult = iDjScheduleShiftEngineService.validateCapacity(machineCode,
+                targetClass, originSeq, delta, ctx.getScheduleResults(), factoryCode, scheduleDate);
+
+        return this.handleCapacityResult(capacityResult, delta);
+    }
+
+    /**
+     * 处理产能校验结果（三档判断），生成对应的 AjaxResult
+     * <p>
+     * 第一档：定额内 → {@code AjaxResult.success()}<br>
+     * 第二档：超定额但未超实际剩余产能 → {@code AjaxResult.success().put("dialogType", "CAPACITY_OVERFLOW")}<br>
+     * 第三档：超实际剩余产能 → {@code AjaxResult.error()}
+     * </p>
+     *
+     * @param capacityResult 产能校验结果
+     * @param checkQty       用于日志和消息中的数量（插单/调量的量值）
+     * @return 对应的 AjaxResult
+     */
+    private AjaxResult handleCapacityResult(CapacityValidateResult capacityResult, BigDecimal checkQty) {
+        // 第一档：在定额内，直接通过
+        if (capacityResult.isWithinQuota()) {
+            return AjaxResult.success();
+        }
+
+        // 第三档：超出实际剩余产能，拒绝
+        if (!capacityResult.isPassed()) {
+            log.warn("产能校验拒绝：数量 {} 超出实际剩余产能 {}", checkQty, capacityResult.getRemainingCapacity());
+            return AjaxResult.error(capacityResult.getErrorMsg());
+        }
+
+        // 第二档：超出定额但未超实际剩余产能，需用户确认
+        String overflowSpecsStr = "";
+        if (CollectionUtils.isNotEmpty(capacityResult.getOverflowSpecs())) {
+            overflowSpecsStr = String.join(",", capacityResult.getOverflowSpecs());
+        }
+        String overflowMsg = MessageFormat.format(
+                I18nUtil.getMessage("ui.data.column.scheduleResult.validate.capacity.overflow"),
+                checkQty, capacityResult.getRemainingCapacity(), overflowSpecsStr);
+        log.info("产能溢出，受影响规格：{}", overflowSpecsStr);
+        return AjaxResult.success().put("msg", overflowMsg).put("dialogType", "CAPACITY_OVERFLOW");
+    }
+
+    /**
      * 内部：调量增量处理
      * 已有计划量的班次在原量基础上追加，记录原因分析并进行产能校验/顺延处理。
      */
@@ -553,12 +625,10 @@ public class DjScheduleAdjustServiceImpl implements IDjScheduleAdjustService {
         BigDecimal newTotal = existingPlanQty.add(BigDecimalUtils.valueOf(deltaQty));
         iDjScheduleShiftEngineService.setPlanQtyByIndex(original, targetClass, newTotal);
 
-        // 记录原因分析
-        String analysis = iDjScheduleShiftEngineService.getAnalysisByIndex(original, targetClass);
+        // 记录原因分析（直接覆盖，不保留之前的过程）
         String record = MessageFormat.format(I18nUtil.getMessage("ui.data.column.scheduleResult.analysis.adjust.increase"),
                 original.getPaddingName(), deltaQty);
-        iDjScheduleShiftEngineService.setAnalysisByIndex(original, targetClass,
-                StringUtils.isNotBlank(analysis) ? analysis + ";" + record : record);
+        iDjScheduleShiftEngineService.setAnalysisByIndex(original, targetClass, record);
 
         // 产能校验（三档判断）
         int originSeq = iDjScheduleShiftEngineService.getSequenceByIndex(original, targetClass);
@@ -714,12 +784,19 @@ public class DjScheduleAdjustServiceImpl implements IDjScheduleAdjustService {
             // 逻辑删除
             djScheduleResultMapper.deleteBatchIds(canDeleteIds);
 
-            // 生产顺位补位：按（工厂 + 排产日 + 机台 + 班次）分组，前移后续顺位
-            deletedRecords.stream()
-                    .filter(r -> r.getScheduleShiftClass() != null)
-                    .collect(Collectors.groupingBy(r ->
-                            r.getFactoryCode() + "|" + r.getScheduleDate() + "|" + r.getMachineCode() + "|" + r.getScheduleShiftClass()))
-                    .forEach((key, group) -> this.fixSequenceAfterDelete(group));
+            // 生产顺位补位：遍历所有班次索引（1~6），对有顺位的班次执行顺位前移
+            for (int classIdx = 1; classIdx <= DjEngineConstants.SHIFT_COUNT; classIdx++) {
+                final int idx = classIdx;
+                List<DjScheduleResult> recordsWithSeq = deletedRecords.stream()
+                        .filter(r -> {
+                            Integer seq = this.getSeqByClass(r, idx);
+                            return seq != null && seq > 0;
+                        })
+                        .collect(Collectors.toList());
+                if (CollectionUtils.isNotEmpty(recordsWithSeq)) {
+                    this.fixSequenceAfterDelete(recordsWithSeq, idx);
+                }
+            }
 
             // 记录操作日志
             DjScheduleResult firstRecord = deletedRecords.get(0);
@@ -745,52 +822,45 @@ public class DjScheduleAdjustServiceImpl implements IDjScheduleAdjustService {
     }
 
     /**
-     * 删除后生产顺位补位：将同一机台班次中顺位大于被删除记录的所有记录前移
+     * 删除后生产顺位补位：将同一机台排产日中指定班次索引的顺位前移
+     * <p>
+     * 对于被删除记录中指定 {@code classIndex} 有顺位的记录，收集所有被删除的顺位，
+     * 将同一机台相同排产日的剩余记录中该班次索引的顺位减去前面被删除的个数。
+     * </p>
      *
-     * @param deletedGroup 同一（工厂 + 排产日 + 机台 + 班次）分组内的被删除记录列表
+     * @param deletedGroup 被删除的记录列表（需包含在该班次索引有顺位的记录）
+     * @param classIndex   班次索引（1~6）
      */
-    private void fixSequenceAfterDelete(List<DjScheduleResult> deletedGroup) {
+    private void fixSequenceAfterDelete(List<DjScheduleResult> deletedGroup, int classIndex) {
         DjScheduleResult first = deletedGroup.get(0);
-        String shiftClass = first.getScheduleShiftClass();
-        String seqField = String.format("class%dSequence", shiftClass);
 
-        // 收集该分组内所有被删除的顺位
-        List<Integer> deletedSequences = new ArrayList<>();
-        for (DjScheduleResult r : deletedGroup) {
-            Object v = r.getFieldValueByFieldName(seqField);
-            if (v != null) {
-                deletedSequences.add(((Number) v).intValue());
-            }
-        }
+        // 收集该班次索引下所有被删除的顺位
+        List<Integer> deletedSequences = deletedGroup.stream()
+                .map(r -> this.getSeqByClass(r, classIndex))
+                .filter(Objects::nonNull)
+                .sorted()
+                .collect(Collectors.toList());
+
         if (deletedSequences.isEmpty()) {
             return;
         }
-        Collections.sort(deletedSequences);
 
-        // 查询同一班次剩余的非删除记录（框架自动过滤已删除数据）
-        LambdaQueryWrapper<DjScheduleResult> qw = new LambdaQueryWrapper<DjScheduleResult>()
-                .eq(DjScheduleResult::getFactoryCode, first.getFactoryCode())
-                .eq(DjScheduleResult::getScheduleDate, first.getScheduleDate())
-                .eq(DjScheduleResult::getMachineCode, first.getMachineCode())
-                .eq(DjScheduleResult::getScheduleShiftClass, shiftClass);
+        // 查询同一机台排产日下的所有剩余记录（框架自动过滤已删除数据）
+        List<DjScheduleResult> sameMachineRecords = djScheduleResultMapper.selectList(
+                new LambdaQueryWrapper<DjScheduleResult>()
+                        .eq(DjScheduleResult::getFactoryCode, first.getFactoryCode())
+                        .eq(DjScheduleResult::getScheduleDate, first.getScheduleDate())
+                        .eq(DjScheduleResult::getMachineCode, first.getMachineCode()));
 
-        List<DjScheduleResult> sameShiftRecords = djScheduleResultMapper.selectList(qw);
-
-        // 前移顺位：每个剩余记录的顺位减去其之前被删除的记录数
-        for (DjScheduleResult rec : sameShiftRecords) {
-            Object v = rec.getFieldValueByFieldName(seqField);
-            if (v == null) {
+        // 前移顺位：每个剩余记录在该班次索引的顺位减去其之前被删除的记录数
+        for (DjScheduleResult rec : sameMachineRecords) {
+            Integer seq = this.getSeqByClass(rec, classIndex);
+            if (seq == null) {
                 continue;
             }
-            int seq = ((Number) v).intValue();
-            long offset = 0;
-            for (int ds : deletedSequences) {
-                if (ds < seq) {
-                    offset++;
-                }
-            }
+            long offset = deletedSequences.stream().filter(ds -> ds < seq).count();
             if (offset > 0) {
-                rec.setFieldValueByFieldName(seqField, seq - (int) offset);
+                this.setSeqByClass(rec, classIndex, seq - (int) offset);
                 djScheduleResultMapper.updateById(rec);
             }
         }

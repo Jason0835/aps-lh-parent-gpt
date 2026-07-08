@@ -12,15 +12,6 @@ utf-8 no bom
 - 前端开发规范见@APS-VUEUI/docs/前端规则.md
 
 ## 后端规范
-- **AjaxResult 使用规范**：
-  - `msg` 字段存放返回给前端展示的消息内容（如国际化消息），`data` 字段存放结果标识、返回对象等结构化数据
-  - 优先使用静态工厂方法构建响应：
-    - `AjaxResult.success()` — 仅表示成功
-    - `AjaxResult.success(data)` — 返回成功，data 为返回对象
-    - `AjaxResult.success(msg, data)` — 返回成功，msg 为展示消息、data 为结果数据
-    - `AjaxResult.error(msg)` — 返回错误，msg 为错误提示
-  - 需要前端确认的业务场景（如产能溢出、排程未生成等），使用 `AjaxResult.success(displayMsg, typeFlag)` 形式，其中 `displayMsg` 是前端弹窗展示的国际化消息（通过 `I18nUtil.getMessage()` 获取），`typeFlag` 是前端用于判断的字符串常量。前端通过 `valid.data == typeFlag` 判断类型，通过 `valid.msg` 展示消息。
-  - 禁止在 `msg` 字符串中混入特殊前缀标识（如 `"CAPACITY_OVERFLOW:" + msg`），应使用独立字段传递。
 - Date类的运算可以使用cn.hutool.core内的Date相关方法
 - 有条件的话尽可能使用stream流来处理数据
 - 导入业务数据importData见@docs/importdoc.md
