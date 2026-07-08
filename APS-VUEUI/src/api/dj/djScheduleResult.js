@@ -89,9 +89,9 @@ export function editScheduleResult(query) {
     data: query
   })
 }
-export function batchChangeMachine(machineId, query) {
+export function batchChangeMachine(machineCode, query) {
   return request({
-    url: 'dj/djScheduleResult/batchChangeMachine/' + machineId,
+    url: 'dj/djScheduleResult/batchChangeMachine/' + machineCode,
     method: 'post',
     data: query
   })

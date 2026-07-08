@@ -160,9 +160,9 @@ public class DjScheduleResultUIController extends BaseController<DjScheduleResul
      * 转机台
      */
     @ApiOperation("转机台")
-    @PostMapping("/batchChangeMachine/{machineId}")
+    @PostMapping("/batchChangeMachine/{machineCode}")
     @ResponseBody
-    public AjaxResult batchChangeMachine(@PathVariable("machineId") String machineId, String selects) {
+    public AjaxResult batchChangeMachine(@PathVariable("machineCode") String machineCode, String selects) {
         List<DjScheduleResult> scheduleResultList = JSON.parseArray(selects, DjScheduleResult.class);
         DjScheduleResult query = new DjScheduleResult();
         StringBuilder sb1 = new StringBuilder();
@@ -170,7 +170,7 @@ public class DjScheduleResultUIController extends BaseController<DjScheduleResul
         for (DjScheduleResult scheduleResult : scheduleResultList) {
             query.setId(scheduleResult.getId());
             query.setScheduleDate(scheduleResult.getScheduleDate());
-            query.setMachineCode(machineId);
+            query.setMachineCode(machineCode);
             query.setPaddingCode(scheduleResult.getPaddingCode());
             Boolean isUnique = iDjScheduleResultService.checkUnique(query);
             if (!isUnique) {
@@ -181,7 +181,7 @@ public class DjScheduleResultUIController extends BaseController<DjScheduleResul
                 }
                 continue;
             }
-            scheduleResult.setMachineCode(machineId);
+            scheduleResult.setMachineCode(machineCode);
             AjaxResult result = iDjScheduleResultService.changeMachine(scheduleResult);
             if (result.get(GatewayConstants.MSG_TAG).equals(I18nUtil.getMessage("ui.data.column.scheduleResult.release.isReleasingOrTimeoutById"))) {
                 if (sb2.length() > 0) {

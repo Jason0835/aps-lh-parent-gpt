@@ -114,6 +114,8 @@
   "ui.data.column.dj.scheduleResult.paddingName": "Padding",
   "ui.data.column.dj.scheduleResult.glueCode": "Glue",
   "ui.data.column.dj.scheduleResult.machineCode": "Machine",
+  "ui.data.column.dj.scheduleResult.sourceMachine": "Source Machine",
+  "ui.data.column.dj.scheduleResult.targetMachine": "Target Machine",
   "ui.data.column.dj.scheduleResult.sequence": "Sequence",
   "ui.data.column.dj.scheduleResult.planQty": "Plan Qty",
   "ui.data.column.dj.scheduleResult.finishQty": "Finish Qty",
