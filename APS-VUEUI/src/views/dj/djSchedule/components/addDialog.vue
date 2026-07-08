@@ -113,7 +113,7 @@ export default {
           dictData: this.machines,
           props: {
             label: "machineName",
-            value: "id",
+            value: "machineCode",
           },
         },
       ];

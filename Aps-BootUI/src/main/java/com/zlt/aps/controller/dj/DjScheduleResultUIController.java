@@ -331,6 +331,8 @@ public class DjScheduleResultUIController extends BaseController<DjScheduleResul
         if (releasingOrTimeoutByDate > 0) {
             return AjaxResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.release.isReleasingOrTimeoutByDate"));
         }
+        entity.setPaddingCode(null);
+        entity.setMachineCode(null);
         Boolean isUnique = iDjScheduleResultService.checkUnique(entity);
         if (isUnique) {
             return AjaxResult.success("0");
