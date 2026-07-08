@@ -245,19 +245,25 @@ public class DjScheduleAdjustServiceImpl implements IDjScheduleAdjustService {
             return AjaxResult.error(capacityResult.getErrorMsg());
         }
 
-        // 第二档：插单量 > 剩余产能 但 ≤ 实际剩余产能，需提示用户确认
-        String overflowSpecsStr = "";
-        if (CollectionUtils.isNotEmpty(capacityResult.getOverflowSpecs())) {
-            overflowSpecsStr = String.join(",", capacityResult.getOverflowSpecs());
-        }
-        log.info("插单产能溢出，受影响规格：{}", overflowSpecsStr);
-        return AjaxResult.error("CAPACITY_OVERFLOW:" + overflowSpecsStr);
+        // 第二档在 insertOrderValidate 中已处理，用户确认后直接执行
+        // 若走到这里说明未经过前置校验或前置已确认，直接执行插单
+        return executeInsertInternal(insertVO, targetClass, targetSeq, ctx);
     }
 
     /**
-     * 插单前置校验（含跨天日期计算）
+     * 插单前置校验（含跨天日期计算及产能校验）
      * <p>
-     * 根据 {@code scheduleShiftClass} 计算实际排产日期，然后执行排产日锁定校验和排程计划存在性校验。
+     * 根据 {@code scheduleShiftClass} 计算实际排产日期，然后依次执行：
+     * 排产日锁定校验 → 排程计划存在性校验 → 约束一（生产顺位）校验 → 约束二（产能）校验。
+     * </p>
+     * <p>
+     * 约束二产能校验分三档：
+     * <ul>
+     *   <li>第一档（withinQuota=true）：无产能问题，返回成功</li>
+     *   <li>第二档（withinQuota=false, passed=true）：超出定额但 ≤ 实际剩余产能，
+     *       返回 {@code AjaxResult.success("CAPACITY_OVERFLOW:" + 提示信息)}，前端弹窗让用户确认</li>
+     *   <li>第三档（passed=false）：超出实际剩余产能，拒绝插单</li>
+     * </ul>
      * </p>
      */
     @Override
@@ -281,7 +287,52 @@ public class DjScheduleAdjustServiceImpl implements IDjScheduleAdjustService {
             return scheduleExistCheck;
         }
 
-        return AjaxResult.success();
+        // 1. 加载完整上下文（用于后续约束校验）
+        DjAdjustScheduleContext ctx = this.loadBaseData(factoryCode, scheduleDate);
+
+        // 2.1 入参校验
+        AjaxResult paramCheck = validateInsertParams(insertVO, ctx);
+        if (paramCheck != null) {
+            return paramCheck;
+        }
+
+        // 确定目标班次和顺位
+        int targetClass = resolveTargetClass(insertVO);
+        int targetSeq = resolveTargetSequence(insertVO, targetClass);
+
+        // 2.2 约束一校验 — 生产顺位合法性
+        ShiftValidateResult shiftResult = iDjScheduleShiftEngineService.validateInsertConstraint(factoryCode,
+                scheduleDate, machineCode, targetClass, targetSeq);
+        if (!shiftResult.isPassed()) {
+            return AjaxResult.error(shiftResult.getErrorMsg());
+        }
+
+        // 2.3 约束二校验 — 产能校验（三档判断）
+        BigDecimal insertPlanQty = getPlanQtyByClass(insertVO, targetClass);
+        CapacityValidateResult capacityResult = iDjScheduleShiftEngineService.validateCapacity(machineCode, targetClass,
+                targetSeq, insertPlanQty, ctx.getScheduleResults(), factoryCode, scheduleDate);
+
+        // 第一档：插单量 ≤ 剩余产能（定额 - 当班原有计划量），无产能问题直接通过
+        if (capacityResult.isWithinQuota()) {
+            return AjaxResult.success();
+        }
+
+        // 第三档：插单量 > 实际剩余产能（定额 - 已生产量），超当班剩余产能，拒绝插单
+        if (!capacityResult.isPassed()) {
+            log.warn("插单量 {} 超出实际剩余产能 {}", insertPlanQty, capacityResult.getRemainingCapacity());
+            return AjaxResult.error(capacityResult.getErrorMsg());
+        }
+
+        // 第二档：插单量 > 剩余产能 但 ≤ 实际剩余产能，需提示用户确认
+        String overflowSpecsStr = "";
+        if (CollectionUtils.isNotEmpty(capacityResult.getOverflowSpecs())) {
+            overflowSpecsStr = String.join(",", capacityResult.getOverflowSpecs());
+        }
+        String overflowMsg = MessageFormat.format(
+                I18nUtil.getMessage("ui.data.column.scheduleResult.validate.capacity.overflow"),
+                insertPlanQty, capacityResult.getRemainingCapacity(), overflowSpecsStr);
+        log.info("插单产能溢出（前置校验），受影响规格：{}", overflowSpecsStr);
+        return AjaxResult.success(overflowMsg, "CAPACITY_OVERFLOW");
     }
 
     /**

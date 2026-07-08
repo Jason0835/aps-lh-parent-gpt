@@ -12,6 +12,15 @@ utf-8 no bom
 - 前端开发规范见@APS-VUEUI/docs/前端规则.md
 
 ## 后端规范
+- **AjaxResult 使用规范**：
+  - `msg` 字段存放返回给前端展示的消息内容（如国际化消息），`data` 字段存放结果标识、返回对象等结构化数据
+  - 优先使用静态工厂方法构建响应：
+    - `AjaxResult.success()` — 仅表示成功
+    - `AjaxResult.success(data)` — 返回成功，data 为返回对象
+    - `AjaxResult.success(msg, data)` — 返回成功，msg 为展示消息、data 为结果数据
+    - `AjaxResult.error(msg)` — 返回错误，msg 为错误提示
+  - 需要前端确认的业务场景（如产能溢出、排程未生成等），使用 `AjaxResult.success(displayMsg, typeFlag)` 形式，其中 `displayMsg` 是前端弹窗展示的国际化消息（通过 `I18nUtil.getMessage()` 获取），`typeFlag` 是前端用于判断的字符串常量。前端通过 `valid.data == typeFlag` 判断类型，通过 `valid.msg` 展示消息。
+  - 禁止在 `msg` 字符串中混入特殊前缀标识（如 `"CAPACITY_OVERFLOW:" + msg`），应使用独立字段传递。
 - Date类的运算可以使用cn.hutool.core内的Date相关方法
 - 有条件的话尽可能使用stream流来处理数据
 - 导入业务数据importData见@docs/importdoc.md
@@ -22,12 +31,7 @@ utf-8 no bom
 - 批量新增数据统一使用 `baseDao.saveBatch()` 方法保存，不要编写自定义的批量 insert SQL 到 mapper.xml
 - 数值类型转 BigDecimal 统一使用 `BigDecimalUtils.valueOf()` 方法（空值自动返回 0），避免手写 `value != null ? BigDecimal.valueOf(value) : null` 或 `value != null ? new BigDecimal(value.toString()) : BigDecimal.ZERO`
 - 调用类内部的私有方法时统一在调用前加 `this.` 前缀，例如 `this.loadCxSchedule(factoryCode, scheduleDate)`
-- 所有 `if`、`else`、`for`、`while` 等控制语句必须使用大括号 `{}`，且左大括号不换行、右大括号独立一行。禁止单行写法，例如 `if (xxx) return yyy;` 必须写成：
-  ```
-  if (xxx) {
-      return yyy;
-  }
-  ```
+- 所有 `if`、`else`、`for`、`while` 等控制语句必须使用大括号 `{}`，且左大括号不换行、右大括号独立一行。禁止单行写法
 - 编写或重构 Java 代码时，对于集合的过滤、映射、收集等操作，优先使用 Stream API 替代传统 for 循环，使代码更简洁易读。例如：
 
 ```java
@@ -52,9 +56,7 @@ List<String> result = list.stream()
 
 - **动态字段访问**：实体类中批量读写类似命名规则的字段（如 class1PlanQty ~ class6PlanQty、class1Sequence ~ class6Sequence、class1Analysis ~ class6Analysis 等）时，禁止使用逐个字段的 switch/case 或 if-else 硬编码获取/设置值，统一通过实体的 `getFieldValueByFieldName(String)` / `setFieldValueByFieldName(String, Object)` 方法配合字段名模板常量（如 `String.format("class%dPlanQty", index)`）动态访问。
 - **国际化规则**：所有返回给前端的信息（包括错误提示、校验失败提示等）必须使用 `I18nUtil.getMessage()` 抽取国际化 key，禁止硬编码中文/英文/越南语字符串直接返回前端。i18n key 统一以模块前缀命名（如 `ui.dj.*`），并同步更新 `apsui.properties`、`apsui_zh_CN.properties`、`apsui_en_US.properties`、`apsui_vi_VN.properties` 四个语言文件。
-  - **占位符规范**：properties 文件中使用 `{0}`、`{1}`、`{2}` 等格式作为占位符（`java.text.MessageFormat` 风格），代码中必须使用 `MessageFormat.format()` 进行参数替换，禁止使用 `String.format()`。例如：
-    - ✅ 正确：`MessageFormat.format(I18nUtil.getMessage("key"), param1, param2)`
-    - ❌ 错误：`String.format(I18nUtil.getMessage("key"), param1, param2)`
+  - **占位符规范**：properties 文件中使用 `{0}`、`{1}`、`{2}` 等格式作为占位符（`java.text.MessageFormat` 风格），代码中必须使用 `MessageFormat.format()` 进行参数替换，禁止使用 `String.format()`。
 ### 注释规范
 - 优先重要,主要逻辑方法需加注释
 - 注释用中文，尽可能的详细

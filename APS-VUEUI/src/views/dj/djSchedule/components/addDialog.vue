@@ -35,6 +35,7 @@ import infoForm from "@/views/components/infoForm.vue";
 
 import { listMachine } from "@/api/dj/machine";
 import { validateAdd, editScheduleResult, getPaddingDistList, getCurrentShift } from "@/api/dj/djScheduleResult";
+import { getConfigKey } from "@/api/system/config";
 
 export default {
   components: { infoForm },
@@ -162,10 +163,23 @@ export default {
       return new Promise(async (resolve, reject) => {
         try {
           let valid = await validateAdd(params);
-          if (valid.msg == "0") {
+          if (valid.msg == "SCHEDULE_NOT_EXIST") {
             this.$confirm(
               this.$t("ui.data.column.scheduleResult.isContinueAdd")
             )
+              .then(async () => {
+                resolve();
+              })
+              .catch((error) => {
+                reject(error);
+              });
+          } else if (valid.data == "CAPACITY_OVERFLOW") {
+            // 第二档：产能溢出，用户确认后继续执行
+            this.$confirm(valid.msg, this.$t("ui.data.column.scheduleResult.insertOrder"), {
+              confirmButtonText: this.$t("common.button.confirm"),
+              cancelButtonText: this.$t("common.button.cancel"),
+              type: "warning"
+            })
               .then(async () => {
                 resolve();
               })
@@ -247,6 +261,10 @@ export default {
       // 新建时调用 getCurrentShift 获取当前班次
       if (!data) {
         this.loadCurrentShift();
+        // 获取工厂编码，与列表页面保持一致
+        getConfigKey("sys.factory.code").then(response => {
+          this.form.factoryCode = response.msg;
+        });
       }
       this.loadMachines();
       this.loadPaddingList();
