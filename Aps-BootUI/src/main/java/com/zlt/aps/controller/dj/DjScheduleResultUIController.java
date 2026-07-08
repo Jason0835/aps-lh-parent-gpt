@@ -322,22 +322,13 @@ public class DjScheduleResultUIController extends BaseController<DjScheduleResul
     }
 
     /**
-     * 插单校验
+     * 插单校验（含跨天日期计算）
+     * <p>委派后端 {@code insertOrderValidate} 方法根据 scheduleShiftClass 计算实际排产日期后执行校验。</p>
      */
     @PostMapping("/validateAdd")
     @ResponseBody
     public AjaxResult validateAdd(DjScheduleResult entity) {
-        int releasingOrTimeoutByDate = iDjScheduleResultService.isReleasingOrTimeoutByDate(entity);
-        if (releasingOrTimeoutByDate > 0) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.release.isReleasingOrTimeoutByDate"));
-        }
-        entity.setPaddingCode(null);
-        entity.setMachineCode(null);
-        Boolean isUnique = iDjScheduleResultService.checkUnique(entity);
-        if (isUnique) {
-            return AjaxResult.success("0");
-        }
-        return AjaxResult.success();
+        return iDjScheduleResultService.validateAdd(entity);
     }
 
     /**

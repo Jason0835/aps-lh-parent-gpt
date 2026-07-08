@@ -160,6 +160,33 @@ public class DjScheduleAdjustServiceImpl implements IDjScheduleAdjustService {
         return null;
     }
 
+    /**
+     * 2.1.2 排程计划存在性校验
+     * <p>
+     * 使用计算后的实际排产日期，校验目标机台在该排产日是否已有排程记录。
+     * 若没有任何排程记录（排程计划尚未生成），返回 {@code AjaxResult.success("SCHEDULE_NOT_EXIST")}，
+     * 前端弹窗提示用户确认后调用 {@link #confirmInsertOrder} 继续执行。
+     * </p>
+     *
+     * @param factoryCode  工厂编码
+     * @param scheduleDate 计算后的实际排产日期
+     * @param machineCode  目标机台编码
+     * @return 若排程计划不存在返回 {@code AjaxResult.success("SCHEDULE_NOT_EXIST")}，否则返回 null
+     */
+    private AjaxResult checkScheduleExists(String factoryCode, Date scheduleDate, String machineCode) {
+        List<DjScheduleResult> exists = djScheduleResultMapper.selectList(
+                new LambdaQueryWrapper<DjScheduleResult>()
+                        .eq(DjScheduleResult::getFactoryCode, factoryCode)
+                        .eq(DjScheduleResult::getScheduleDate, scheduleDate)
+                        .eq(DjScheduleResult::getMachineCode, machineCode));
+        if (CollectionUtils.isEmpty(exists)) {
+            log.info("排程计划存在性校验不通过：factoryCode={}, scheduleDate={}, machineCode={}",
+                    factoryCode, scheduleDate, machineCode);
+            return AjaxResult.success("SCHEDULE_NOT_EXIST");
+        }
+        return null;
+    }
+
     // ==================== 2. 插单 ====================
 
     /**
@@ -225,6 +252,36 @@ public class DjScheduleAdjustServiceImpl implements IDjScheduleAdjustService {
         }
         log.info("插单产能溢出，受影响规格：{}", overflowSpecsStr);
         return AjaxResult.error("CAPACITY_OVERFLOW:" + overflowSpecsStr);
+    }
+
+    /**
+     * 插单前置校验（含跨天日期计算）
+     * <p>
+     * 根据 {@code scheduleShiftClass} 计算实际排产日期，然后执行排产日锁定校验和排程计划存在性校验。
+     * </p>
+     */
+    @Override
+    public AjaxResult insertOrderValidate(DjScheduleResult insertVO) {
+        // 2.1.1 根据首班班次计算实际排产日期（取代前端直接传入的 scheduleDate）
+        Date scheduleDate = this.calculateInsertScheduleDate(insertVO);
+        insertVO.setScheduleDate(scheduleDate);
+
+        String factoryCode = insertVO.getFactoryCode();
+        String machineCode = insertVO.getMachineCode();
+
+        // 排产日锁定校验
+        AjaxResult lockedCheck = this.checkScheduleLocked(scheduleDate, null);
+        if (lockedCheck != null) {
+            return lockedCheck;
+        }
+
+        // 2.1.2 排程计划存在性校验：使用计算后的实际排产日期
+        AjaxResult scheduleExistCheck = this.checkScheduleExists(factoryCode, scheduleDate, machineCode);
+        if (scheduleExistCheck != null) {
+            return scheduleExistCheck;
+        }
+
+        return AjaxResult.success();
     }
 
     /**
@@ -450,7 +507,7 @@ public class DjScheduleAdjustServiceImpl implements IDjScheduleAdjustService {
         String record = MessageFormat.format(I18nUtil.getMessage("ui.data.column.scheduleResult.analysis.adjust.increase"),
                 original.getPaddingName(), deltaQty);
         iDjScheduleShiftEngineService.setAnalysisByIndex(original, targetClass,
-                StringUtils.isNotBlank(analysis) ? analysis + record : record);
+                StringUtils.isNotBlank(analysis) ? analysis + ";" + record : record);
 
         // 产能校验（三档判断）
         int originSeq = iDjScheduleShiftEngineService.getSequenceByIndex(original, targetClass);

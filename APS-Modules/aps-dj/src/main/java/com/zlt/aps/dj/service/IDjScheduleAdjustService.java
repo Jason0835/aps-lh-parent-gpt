@@ -29,6 +29,18 @@ public interface IDjScheduleAdjustService {
     AjaxResult insertOrder(DjScheduleResult insertVO);
 
     /**
+     * 插单前置校验（含跨天日期计算）
+     * <p>
+     * 根据 {@code scheduleShiftClass} 和 {@code targetClass} 计算实际排产日期，
+     * 然后执行：排程计划存在性校验、排产日锁定校验。
+     * </p>
+     *
+     * @param insertVO 插单数据
+     * @return 校验结果，通过返回 {@code AjaxResult.success()}，否则返回错误信息
+     */
+    AjaxResult insertOrderValidate(DjScheduleResult insertVO);
+
+    /**
      * 确认插单（用户在前端弹窗点击"坚持执行"后调用）
      *
      * @param insertVO 插单数据
