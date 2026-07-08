@@ -322,7 +322,7 @@ public class DjScheduleShiftEngineServiceImpl implements IDjScheduleShiftEngineS
                 String analysis = getAnalysisByIndex(sr, targetClass);
                 String record = MessageFormat.format(I18nUtil.getMessage("ui.data.column.scheduleResult.analysis.insert.seq.shift"), specName, seq, seq + 1);
                 setAnalysisByIndex(sr, targetClass,
-                        StringUtils.isNotBlank(analysis) ? analysis + record : record);
+                        StringUtils.isNotBlank(analysis) ? analysis + ";" + record : record);
                 // 顺位 +1
                 setSequenceByIndex(sr, targetClass, seq + 1);
             }
@@ -389,7 +389,7 @@ public class DjScheduleShiftEngineServiceImpl implements IDjScheduleShiftEngineS
                     // 原班次清理：计划量、顺位置NULL，原因分析保留并追加记录
                     String shiftRecord = MessageFormat.format(I18nUtil.getMessage("ui.data.column.scheduleResult.analysis.insert.class.shift"), specName, i, nextClass);
                     setAnalysisByIndex(sr, i,
-                            StringUtils.isNotBlank(analysis) ? analysis + shiftRecord : shiftRecord);
+                            StringUtils.isNotBlank(analysis) ? analysis + ";" + shiftRecord : shiftRecord);
                     setPlanQtyByIndex(sr, i, null);
                     setSequenceByIndex(sr, i, null);
 
@@ -429,7 +429,7 @@ public class DjScheduleShiftEngineServiceImpl implements IDjScheduleShiftEngineS
                         String analysis = getAnalysisByIndex(sr, i);
                         String reduceRecord = MessageFormat.format(I18nUtil.getMessage("ui.data.column.scheduleResult.analysis.insert.reduce"), specName, planQty);
                         setAnalysisByIndex(sr, i,
-                                StringUtils.isNotBlank(analysis) ? analysis + reduceRecord : reduceRecord);
+                                StringUtils.isNotBlank(analysis) ? analysis + ";" + reduceRecord : reduceRecord);
                         setPlanQtyByIndex(sr, i, null);
                         setSequenceByIndex(sr, i, null);
                     } else if (planQty.compareTo(available) > 0) {
@@ -438,7 +438,7 @@ public class DjScheduleShiftEngineServiceImpl implements IDjScheduleShiftEngineS
                         String analysis = getAnalysisByIndex(sr, i);
                         String reduceRecord = MessageFormat.format(I18nUtil.getMessage("ui.data.column.scheduleResult.analysis.insert.reduce"), specName, reduceQty);
                         setAnalysisByIndex(sr, i,
-                                StringUtils.isNotBlank(analysis) ? analysis + reduceRecord : reduceRecord);
+                                StringUtils.isNotBlank(analysis) ? analysis + ";" + reduceRecord : reduceRecord);
                         setPlanQtyByIndex(sr, i, available);
                     } else {
                         // 可以容纳，无需减量

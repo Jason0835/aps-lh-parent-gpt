@@ -35,6 +35,12 @@ public interface IDjScheduleResultRemoteService {
     @PostMapping("/djScheduleResult/add")
     AjaxResult add(@RequestBody DjScheduleResult djScheduleResult);
 
+    /**
+     * 插单前置校验（含跨天日期计算）
+     */
+    @PostMapping("/djScheduleResult/validateAdd")
+    AjaxResult validateAdd(@RequestBody DjScheduleResult djScheduleResult);
+
 
     /**
      * 修改垫胶排程结果
