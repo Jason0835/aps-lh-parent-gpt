@@ -60,32 +60,32 @@ export default {
     columns() {
       return [
         {
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.lhDayFinishQty.factoryCode"),
           prop: "factoryCode",
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
           },
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.materialCode"),
+          label: this.$t("ui.data.column.lhDayFinishQty.materialCode"),
           prop: "materialCode",
           minWidth: 150,
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.materialDesc"),
+          label: this.$t("ui.data.column.lhDayFinishQty.materialDesc"),
           align: "left",
           prop: "materialDesc",
           minWidth: 350,
           showOverflowTooltip: true,
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.finishQty"),
+          label: this.$t("ui.data.column.lhDayFinishQty.dayFinishQty"),
           prop: "dayFinishQty",
           align: "right",
           minWidth: 100,
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.completeDate"),
+          label: this.$t("ui.data.column.lhDayFinishQty.finishDate"),
           prop: "finishDate",
           minWidth: 120,
         },
@@ -105,24 +105,24 @@ export default {
     searchColumns() {
       return [
         {
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.lhDayFinishQty.factoryCode"),
           prop: "factoryCode",
           type: "select",
           dictData: this.dict.type.biz_factory_name,
           filterable: true,
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.completeDate"),
+          label: this.$t("ui.data.column.lhDayFinishQty.finishDate"),
           prop: "finishDate",
           type: "date",
           valueFormat: "yyyy-MM-dd",
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.materialCode"),
+          label: this.$t("ui.data.column.lhDayFinishQty.materialCode"),
           prop: "materialCode",
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.materialDesc"),
+          label: this.$t("ui.data.column.lhDayFinishQty.materialDesc"),
           minWidth: 350,
           align: "left",
           prop: "materialDesc",

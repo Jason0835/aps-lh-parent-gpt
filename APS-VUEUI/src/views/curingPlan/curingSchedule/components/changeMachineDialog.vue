@@ -17,7 +17,7 @@
       >
         <el-row :gutter="16">
           <el-col :span="8">
-            <el-form-item :label="$t('ui.data.column.scheduleResult.scheduleDate')">
+            <el-form-item :label="$t('ui.data.column.lhScheduleResult.scheduleDate')">
               <el-input v-model="form.scheduleDate" disabled />
             </el-form-item>
           </el-col>
@@ -97,16 +97,16 @@ export default {
     tableColumns() {
       return [
         {
-          label: this.$t("ui.data.column.scheduleResult.lhMachineCode"),
+          label: this.$t("ui.data.column.lhScheduleResult.lhMachineCode"),
           prop: "lhMachineCode",
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.materialCode"),
+          label: this.$t("ui.data.column.lhScheduleResult.materialCode"),
           prop: "materialCode",
           width: 320
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.materialDesc"),
+          label: this.$t("ui.data.column.lhScheduleResult.materialDesc"),
           prop: "materialDesc",
           width: 320
         },
@@ -115,7 +115,7 @@ export default {
           prop: "mainMaterialDesc",
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.constructionStage"),
+          label: this.$t("ui.data.column.lhScheduleResult.constructionStage"),
           prop: "scheduleType",
           minWidth: 100,
           formatter: (row, column, value) => {
@@ -134,7 +134,7 @@ export default {
           prop: "todayNightFinishQty",
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.embryoStock"),
+          label: this.$t("ui.data.column.lhScheduleResult.embryoStock"),
           prop: "embryoStock",
         },
         {
@@ -142,11 +142,11 @@ export default {
           prop: "singleMouldShiftQty",
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.leftRightMould"),
+          label: this.$t("ui.data.column.lhScheduleResult.leftRightMould"),
           prop: "leftRightMould",
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.constructionStage"),
+          label: this.$t("ui.data.column.lhScheduleResult.constructionStage"),
           prop: "trialStatus",
           formatter: (row, column, value) => {
             return this.selectDictLabel(
@@ -167,12 +167,12 @@ export default {
           children: [
             {
               prop: "leftRightMould",
-              label: this.$t("ui.data.column.scheduleResult.leftRightMould"),
+              label: this.$t("ui.data.column.lhScheduleResult.leftRightMould"),
               formatter: (row, column, value) => this.shiftLeftRightMouldFormatter(row, column, value, 1),
             },
             {
               prop: "trialStatus",
-              label: this.$t("ui.data.column.scheduleResult.constructionStage"),
+              label: this.$t("ui.data.column.lhScheduleResult.constructionStage"),
               formatter: (row, column, value) => this.shiftConstructionStageFormatter(row, column, value, 1),
             },
             {
@@ -202,12 +202,12 @@ export default {
           children: [
             {
               prop: "leftRightMould",
-              label: this.$t("ui.data.column.scheduleResult.leftRightMould"),
+              label: this.$t("ui.data.column.lhScheduleResult.leftRightMould"),
               formatter: (row, column, value) => this.shiftLeftRightMouldFormatter(row, column, value, 2),
             },
             {
               prop: "trialStatus",
-              label: this.$t("ui.data.column.scheduleResult.constructionStage"),
+              label: this.$t("ui.data.column.lhScheduleResult.constructionStage"),
               formatter: (row, column, value) => this.shiftConstructionStageFormatter(row, column, value, 2),
             },
             {
@@ -237,12 +237,12 @@ export default {
           children: [
             {
               prop: "leftRightMould",
-              label: this.$t("ui.data.column.scheduleResult.leftRightMould"),
+              label: this.$t("ui.data.column.lhScheduleResult.leftRightMould"),
               formatter: (row, column, value) => this.shiftLeftRightMouldFormatter(row, column, value, 3),
             },
             {
               prop: "trialStatus",
-              label: this.$t("ui.data.column.scheduleResult.constructionStage"),
+              label: this.$t("ui.data.column.lhScheduleResult.constructionStage"),
               formatter: (row, column, value) => this.shiftConstructionStageFormatter(row, column, value, 3),
             },
             {
@@ -272,12 +272,12 @@ export default {
           children: [
             {
               prop: "leftRightMould",
-              label: this.$t("ui.data.column.scheduleResult.leftRightMould"),
+              label: this.$t("ui.data.column.lhScheduleResult.leftRightMould"),
               formatter: (row, column, value) => this.shiftLeftRightMouldFormatter(row, column, value, 4),
             },
             {
               prop: "trialStatus",
-              label: this.$t("ui.data.column.scheduleResult.constructionStage"),
+              label: this.$t("ui.data.column.lhScheduleResult.constructionStage"),
               formatter: (row, column, value) => this.shiftConstructionStageFormatter(row, column, value, 4),
             },
             {
@@ -307,12 +307,12 @@ export default {
           children: [
             {
               prop: "leftRightMould",
-              label: this.$t("ui.data.column.scheduleResult.leftRightMould"),
+              label: this.$t("ui.data.column.lhScheduleResult.leftRightMould"),
               formatter: (row, column, value) => this.shiftLeftRightMouldFormatter(row, column, value, 5),
             },
             {
               prop: "changedTrialStatus",
-              label: this.$t("ui.data.column.scheduleResult.constructionStage"),
+              label: this.$t("ui.data.column.lhScheduleResult.constructionStage"),
               formatter: (row, column, value) => this.shiftConstructionStageFormatter(row, column, value, 5),
             },
             {
@@ -342,12 +342,12 @@ export default {
           children: [
             {
               prop: "leftRightMould",
-              label: this.$t("ui.data.column.scheduleResult.leftRightMould"),
+              label: this.$t("ui.data.column.lhScheduleResult.leftRightMould"),
               formatter: (row, column, value) => this.shiftLeftRightMouldFormatter(row, column, value, 6),
             },
             {
               prop: "changedTrialStatus",
-              label: this.$t("ui.data.column.scheduleResult.constructionStage"),
+              label: this.$t("ui.data.column.lhScheduleResult.constructionStage"),
               formatter: (row, column, value) => this.shiftConstructionStageFormatter(row, column, value, 6),
             },
             {
@@ -377,12 +377,12 @@ export default {
           children: [
             {
               prop: "leftRightMould",
-              label: this.$t("ui.data.column.scheduleResult.leftRightMould"),
+              label: this.$t("ui.data.column.lhScheduleResult.leftRightMould"),
               formatter: (row, column, value) => this.shiftLeftRightMouldFormatter(row, column, value, 7),
             },
             {
               prop: "changedTrialStatus",
-              label: this.$t("ui.data.column.scheduleResult.constructionStage"),
+              label: this.$t("ui.data.column.lhScheduleResult.constructionStage"),
               formatter: (row, column, value) => this.shiftConstructionStageFormatter(row, column, value, 7),
             },
             {
@@ -412,12 +412,12 @@ export default {
           children: [
             {
               prop: "leftRightMould",
-              label: this.$t("ui.data.column.scheduleResult.leftRightMould"),
+              label: this.$t("ui.data.column.lhScheduleResult.leftRightMould"),
               formatter: (row, column, value) => this.shiftLeftRightMouldFormatter(row, column, value, 8),
             },
             {
               prop: "changedTrialStatus",
-              label: this.$t("ui.data.column.scheduleResult.constructionStage"),
+              label: this.$t("ui.data.column.lhScheduleResult.constructionStage"),
               formatter: (row, column, value) => this.shiftConstructionStageFormatter(row, column, value, 8),
             },
             {

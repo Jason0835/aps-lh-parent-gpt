@@ -64,7 +64,7 @@ export default {
         { type: "selection", fixed: "left" },
         {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.mouldCleanWarn.factoryCode"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
           },
@@ -102,7 +102,7 @@ export default {
     searchColumns() {
       return [
        {
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.mouldCleanWarn.factoryCode"),
           prop: "factoryCode",
           type: "select",
           dictData: this.dict.type.biz_factory_name,

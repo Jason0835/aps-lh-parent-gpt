@@ -132,37 +132,37 @@ export default {
         { type: "selection", fixed: "left" },
         {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.lhPrecisionPlan.factoryCode"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
           },
         },
         {
           prop: "year",
-          label: this.$t("ui.lh.precision.plan.year"),
+          label: this.$t("ui.data.column.lhPrecisionPlan.year"),
         },
         {
           prop: "machineCode",
-          label: this.$t("ui.lh.precision.plan.machine.code"),
+          label: this.$t("ui.data.column.lhPrecisionPlan.machineCode"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.lh_machine, value);
           },
         },
         {
           prop: "precisionType",
-          label: this.$t("ui.lh.precision.plan.precision.type"),
+          label: this.$t("ui.data.column.lhPrecisionPlan.precisionType"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.lh_precision_type, value);
           },
         },
         {
           prop: "planDate",
-          label: this.$t("ui.lh.precision.plan.plan.date"),
+          label: this.$t("ui.data.column.lhPrecisionPlan.planDate"),
           width: 150
         },
         {
           prop: "actualDate",
-          label: this.$t("ui.lh.precision.plan.actual.date"),
+          label: this.$t("ui.data.column.lhPrecisionPlan.actualDate"),
           width: 150
         },
         {
@@ -173,7 +173,7 @@ export default {
         },
         {
           prop: "daysToDue",
-          label: this.$t("ui.lh.precision.plan.days.to.due"),
+          label: this.$t("ui.data.column.lhPrecisionPlan.daysToDue"),
           formatter: (row, column, value) => {
             return value < 0 ? 0 : value;
           },
@@ -239,27 +239,27 @@ export default {
     searchColumns() {
       return [
         {
-          label: this.$t("ui.lh.precision.plan.year"),
+          label: this.$t("ui.data.column.lhPrecisionPlan.year"),
           prop: "year",
           type: "select",
           dictData: this.yearList,
           value: new Date().getFullYear().toString(),
         },
         {
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.lhPrecisionPlan.factoryCode"),
           prop: "factoryCode",
           type: "select",
           dictData: this.dict.type.biz_factory_name,
         },
         {
-          label: this.$t("ui.lh.precision.plan.machine.code"),
+          label: this.$t("ui.data.column.lhPrecisionPlan.machineCode"),
           prop: "machineCode",
           type: "select",
           dictData: this.machineList,
           filterable: true,
         },
         {
-          label: this.$t("ui.lh.precision.plan.plan.date"),
+          label: this.$t("ui.data.column.lhPrecisionPlan.planDate"),
           prop: "planDate",
           type: "date",
           dateType: "daterange",
@@ -268,7 +268,7 @@ export default {
           endPlaceholder: this.$t("common.endTime"),
         },
         {
-          label: this.$t("ui.lh.precision.plan.actual.date"),
+          label: this.$t("ui.data.column.lhPrecisionPlan.actualDate"),
           prop: "actualDate",
           type: "date",
           dateType: "daterange",

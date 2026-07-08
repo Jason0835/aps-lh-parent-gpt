@@ -264,7 +264,7 @@ export default {
       },
       importColumns: [
         {
-          label: this.$t("ui.data.column.scheduleResult.scheduleDate"),
+          label: this.$t("ui.data.column.lhScheduleResult.scheduleDate"),
           prop: "scheduleDate",
           type: "date",
           dateType: "date",
@@ -363,16 +363,16 @@ export default {
           },
         }, // 工厂代码
         {
-          label: this.$t("ui.data.column.scheduleResult.lhMachineCode"),
+          label: this.$t("ui.data.column.lhScheduleResult.lhMachineCode"),
           prop: "lhMachineCode",
         }, // 硫化机台代码
         {
-          label: this.$t("ui.data.column.scheduleResult.materialCode"),
+          label: this.$t("ui.data.column.lhScheduleResult.materialCode"),
           width:120,
           prop: "materialCode",
         }, // 物料编码
         {
-          label: this.$t("ui.data.column.scheduleResult.materialDesc"),
+          label: this.$t("ui.data.column.lhScheduleResult.materialDesc"),
           align: "left",
           prop: "materialDesc",
           minWidth: 350,
@@ -387,7 +387,7 @@ export default {
         }, // 胚料描述
         {
           prop: "scheduleType",
-          label: this.$t("ui.data.column.scheduleResult.scheduleType"),
+          label: this.$t("ui.data.column.lhScheduleResult.scheduleType"),
           minWidth: 100,
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.lh_schedule_type, value);
@@ -407,7 +407,7 @@ export default {
           align: "right",
         }, // 模具剩余数量
         {
-          label: this.$t("ui.data.column.scheduleResult.embryoStock"),
+          label: this.$t("ui.data.column.lhScheduleResult.embryoStock"),
           prop: "embryoStock",
         }, // 胚料库存
         {
@@ -415,7 +415,7 @@ export default {
           prop: "singleMouldShiftQty",
         }, // 单模班产数量
         {
-          label: this.$t("ui.data.column.scheduleResult.isRelease"),
+          label: this.$t("ui.data.column.lhScheduleResult.isRelease"),
           prop: "isRelease",
           minWidth: 100,
           formatter: (row, column, value, index) => {
@@ -428,12 +428,12 @@ export default {
           children: [
             {
               prop: "leftRightMould",
-              label: this.$t("ui.data.column.scheduleResult.leftRightMould"),
+              label: this.$t("ui.data.column.lhScheduleResult.leftRightMould"),
               formatter: (row, column, value) => this.shiftLeftRightMouldFormatter(row, column, value, 1),
             }, // 第1班-左右模
             {
           prop: "class1LhType",
-          label: this.$t("ui.data.column.scheduleResult.constructionStage"),
+          label: this.$t("ui.data.column.lhScheduleResult.constructionStage"),
           formatter: (row, column, value) => this.shiftLhTypeFormatter(row, column, value, 1),
         }, // 第1班-示方类型
         {
@@ -463,12 +463,12 @@ export default {
           children: [
             {
               prop: "leftRightMould",
-              label: this.$t("ui.data.column.scheduleResult.leftRightMould"),
+              label: this.$t("ui.data.column.lhScheduleResult.leftRightMould"),
               formatter: (row, column, value) => this.shiftLeftRightMouldFormatter(row, column, value, 2),
             }, // 第2班-左右模
             {
               prop: "class2LhType",
-              label: this.$t("ui.data.column.scheduleResult.constructionStage"),
+              label: this.$t("ui.data.column.lhScheduleResult.constructionStage"),
               formatter: (row, column, value) => this.shiftLhTypeFormatter(row, column, value, 2),
             }, // 第2班-示方类型
            {
@@ -499,12 +499,12 @@ export default {
           children: [
             {
               prop: "leftRightMould",
-              label: this.$t("ui.data.column.scheduleResult.leftRightMould"),
+              label: this.$t("ui.data.column.lhScheduleResult.leftRightMould"),
               formatter: (row, column, value) => this.shiftLeftRightMouldFormatter(row, column, value, 3),
             }, // 第3班-左右模
             {
               prop: "class3LhType",
-              label: this.$t("ui.data.column.scheduleResult.constructionStage"),
+              label: this.$t("ui.data.column.lhScheduleResult.constructionStage"),
               formatter: (row, column, value) => this.shiftLhTypeFormatter(row, column, value, 3),
             }, // 第3班-示方类型
            {
@@ -535,12 +535,12 @@ export default {
           children: [
             {
               prop: "leftRightMould",
-              label: this.$t("ui.data.column.scheduleResult.leftRightMould"),
+              label: this.$t("ui.data.column.lhScheduleResult.leftRightMould"),
               formatter: (row, column, value) => this.shiftLeftRightMouldFormatter(row, column, value, 4),
             }, // 第4班-左右模
             {
               prop: "class4LhType",
-              label: this.$t("ui.data.column.scheduleResult.constructionStage"),
+              label: this.$t("ui.data.column.lhScheduleResult.constructionStage"),
               formatter: (row, column, value) => this.shiftLhTypeFormatter(row, column, value, 4),
             }, // 第4班-示方类型
            {
@@ -571,12 +571,12 @@ export default {
           children: [
             {
               prop: "leftRightMould",
-              label: this.$t("ui.data.column.scheduleResult.leftRightMould"),
+              label: this.$t("ui.data.column.lhScheduleResult.leftRightMould"),
               formatter: (row, column, value) => this.shiftLeftRightMouldFormatter(row, column, value, 5),
             }, // 第5班-左右模
             {
               prop: "class5LhType",
-              label: this.$t("ui.data.column.scheduleResult.constructionStage"),
+              label: this.$t("ui.data.column.lhScheduleResult.constructionStage"),
               formatter: (row, column, value) => this.shiftLhTypeFormatter(row, column, value, 5),
             }, // 第5班-示方类型
             {
@@ -607,12 +607,12 @@ export default {
           children: [
             {
               prop: "leftRightMould",
-              label: this.$t("ui.data.column.scheduleResult.leftRightMould"),
+              label: this.$t("ui.data.column.lhScheduleResult.leftRightMould"),
               formatter: (row, column, value) => this.shiftLeftRightMouldFormatter(row, column, value, 6),
             }, // 第6班-左右模
             {
               prop: "class6LhType",
-              label: this.$t("ui.data.column.scheduleResult.constructionStage"),
+              label: this.$t("ui.data.column.lhScheduleResult.constructionStage"),
               formatter: (row, column, value) => this.shiftLhTypeFormatter(row, column, value, 6),
             }, // 第6班-示方类型
             {
@@ -643,12 +643,12 @@ export default {
           children: [
             {
               prop: "leftRightMould",
-              label: this.$t("ui.data.column.scheduleResult.leftRightMould"),
+              label: this.$t("ui.data.column.lhScheduleResult.leftRightMould"),
               formatter: (row, column, value) => this.shiftLeftRightMouldFormatter(row, column, value, 7),
             }, // 第7班-左右模
             {
               prop: "class7LhType",
-              label: this.$t("ui.data.column.scheduleResult.constructionStage"),
+              label: this.$t("ui.data.column.lhScheduleResult.constructionStage"),
               formatter: (row, column, value) => this.shiftLhTypeFormatter(row, column, value, 7),
             }, // 第7班-示方类型
             {
@@ -679,12 +679,12 @@ export default {
           children: [
             {
               prop: "leftRightMould",
-              label: this.$t("ui.data.column.scheduleResult.leftRightMould"),
+              label: this.$t("ui.data.column.lhScheduleResult.leftRightMould"),
               formatter: (row, column, value) => this.shiftLeftRightMouldFormatter(row, column, value, 8),
             }, // 第8班-左右模
             {
               prop: "class8LhType",
-              label: this.$t("ui.data.column.scheduleResult.constructionStage"),
+              label: this.$t("ui.data.column.lhScheduleResult.constructionStage"),
               formatter: (row, column, value) => this.shiftLhTypeFormatter(row, column, value, 8),
             }, // 第8班-示方类型
             {
@@ -715,13 +715,13 @@ export default {
           label: this.$t("ui.data.column.remark"),
         }, // 备注
         {
-          label: this.$t("ui.data.column.scheduleResult.batchNo"),
+          label: this.$t("ui.data.column.lhScheduleResult.batchNo"),
           prop: "batchNo",
           align: "left",
           minWidth: 160,
         }, // 批号
         {
-          label: this.$t("ui.data.column.scheduleResult.orderNo"),
+          label: this.$t("ui.data.column.lhScheduleResult.orderNo"),
           prop: "orderNo",
           align: "left",
           minWidth: 160,
@@ -788,7 +788,7 @@ export default {
           filterable: true,
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.scheduleDate"),
+          label: this.$t("ui.data.column.lhScheduleResult.scheduleDate"),
           prop: "scheduleDate",
           type: "date",
           valueFormat: "yyyy-MM-dd",
@@ -797,19 +797,19 @@ export default {
           },
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.orderNo"),
+          label: this.$t("ui.data.column.lhScheduleResult.orderNo"),
           prop: "orderNo",
           align: "left",
           minWidth: 160,
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.batchNo"),
+          label: this.$t("ui.data.column.lhScheduleResult.batchNo"),
           prop: "batchNo",
           align: "left",
           minWidth: 160,
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.isRelease"),
+          label: this.$t("ui.data.column.lhScheduleResult.isRelease"),
           prop: "isRelease",
           render: (form) => {
             return (
@@ -821,11 +821,11 @@ export default {
           },
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.materialCode"),
+          label: this.$t("ui.data.column.lhScheduleResult.materialCode"),
           prop: "materialCode",
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.materialDesc"),
+          label: this.$t("ui.data.column.lhScheduleResult.materialDesc"),
           minWidth: 350,
           align: "left",
           prop: "materialDesc",
@@ -837,7 +837,7 @@ export default {
           prop: "mainMaterialDesc",
         },
         {
-          label: this.$t("ui.data.column.cxScheduleResult.lhMachineCode"),
+          label: this.$t("ui.data.column.lhScheduleResult.lhMachineCode"),
           prop: "lhMachineCode",
           type: "select",
           dictData: this.curingMachines,

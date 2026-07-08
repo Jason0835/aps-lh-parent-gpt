@@ -67,7 +67,7 @@ export default {
           filterable: true,
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.scheduleDate"),
+          label: this.$t("ui.data.column.lhScheduleResult.scheduleDate"),
           prop: "scheduleDate",
           type: "date",
           dateType: "date",
