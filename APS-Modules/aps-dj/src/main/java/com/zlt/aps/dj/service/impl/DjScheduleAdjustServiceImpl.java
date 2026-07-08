@@ -332,7 +332,7 @@ public class DjScheduleAdjustServiceImpl implements IDjScheduleAdjustService {
                 I18nUtil.getMessage("ui.data.column.scheduleResult.validate.capacity.overflow"),
                 insertPlanQty, capacityResult.getRemainingCapacity(), overflowSpecsStr);
         log.info("插单产能溢出（前置校验），受影响规格：{}", overflowSpecsStr);
-        return AjaxResult.success(overflowMsg, "CAPACITY_OVERFLOW");
+        return AjaxResult.success().put("msg", overflowMsg).put("dialogType", "CAPACITY_OVERFLOW");
     }
 
     /**
@@ -669,6 +669,7 @@ public class DjScheduleAdjustServiceImpl implements IDjScheduleAdjustService {
 
     /**
      * 4. 删除
+     * <p>执行逻辑删除后，对同一机台班次中顺位大于被删除记录的所有记录进行顺位前移（减 1），填补生产顺位空缺。</p>
      */
     @Transactional(rollbackFor = Exception.class)
     @DistributedLock(key = "APS:DJ:SCHEDULE:DELETE_LOCK")
@@ -705,17 +706,26 @@ public class DjScheduleAdjustServiceImpl implements IDjScheduleAdjustService {
         }
 
         if (CollectionUtils.isNotEmpty(canDeleteIds)) {
-            // 从已加载的记录中获取工厂编码和排产日期
-            DjScheduleResult firstRecord = records.stream()
+            // 获取被删除的记录详情（用于顺位补位）
+            List<DjScheduleResult> deletedRecords = records.stream()
                     .filter(r -> canDeleteIds.contains(r.getId()))
-                    .findFirst().orElse(null);
-            String recordFactoryCode = firstRecord != null ? firstRecord.getFactoryCode() : null;
-            Date recordScheduleDate = firstRecord != null ? firstRecord.getScheduleDate() : null;
+                    .collect(Collectors.toList());
 
             // 逻辑删除
             djScheduleResultMapper.deleteBatchIds(canDeleteIds);
 
+            // 生产顺位补位：按（工厂 + 排产日 + 机台 + 班次）分组，前移后续顺位
+            deletedRecords.stream()
+                    .filter(r -> r.getScheduleShiftClass() != null)
+                    .collect(Collectors.groupingBy(r ->
+                            r.getFactoryCode() + "|" + r.getScheduleDate() + "|" + r.getMachineCode() + "|" + r.getScheduleShiftClass()))
+                    .forEach((key, group) -> this.fixSequenceAfterDelete(group));
+
             // 记录操作日志
+            DjScheduleResult firstRecord = deletedRecords.get(0);
+            String recordFactoryCode = firstRecord.getFactoryCode();
+            Date recordScheduleDate = firstRecord.getScheduleDate();
+
             for (Long deleteId : canDeleteIds) {
                 DjDispatcherLog logEntry = new DjDispatcherLog();
                 logEntry.setFactoryCode(recordFactoryCode);
@@ -732,6 +742,58 @@ public class DjScheduleAdjustServiceImpl implements IDjScheduleAdjustService {
         }
 
         return AjaxResult.success(I18nUtil.getMessage("ui.message.operation.success"));
+    }
+
+    /**
+     * 删除后生产顺位补位：将同一机台班次中顺位大于被删除记录的所有记录前移
+     *
+     * @param deletedGroup 同一（工厂 + 排产日 + 机台 + 班次）分组内的被删除记录列表
+     */
+    private void fixSequenceAfterDelete(List<DjScheduleResult> deletedGroup) {
+        DjScheduleResult first = deletedGroup.get(0);
+        String shiftClass = first.getScheduleShiftClass();
+        String seqField = String.format("class%dSequence", shiftClass);
+
+        // 收集该分组内所有被删除的顺位
+        List<Integer> deletedSequences = new ArrayList<>();
+        for (DjScheduleResult r : deletedGroup) {
+            Object v = r.getFieldValueByFieldName(seqField);
+            if (v != null) {
+                deletedSequences.add(((Number) v).intValue());
+            }
+        }
+        if (deletedSequences.isEmpty()) {
+            return;
+        }
+        Collections.sort(deletedSequences);
+
+        // 查询同一班次剩余的非删除记录（框架自动过滤已删除数据）
+        LambdaQueryWrapper<DjScheduleResult> qw = new LambdaQueryWrapper<DjScheduleResult>()
+                .eq(DjScheduleResult::getFactoryCode, first.getFactoryCode())
+                .eq(DjScheduleResult::getScheduleDate, first.getScheduleDate())
+                .eq(DjScheduleResult::getMachineCode, first.getMachineCode())
+                .eq(DjScheduleResult::getScheduleShiftClass, shiftClass);
+
+        List<DjScheduleResult> sameShiftRecords = djScheduleResultMapper.selectList(qw);
+
+        // 前移顺位：每个剩余记录的顺位减去其之前被删除的记录数
+        for (DjScheduleResult rec : sameShiftRecords) {
+            Object v = rec.getFieldValueByFieldName(seqField);
+            if (v == null) {
+                continue;
+            }
+            int seq = ((Number) v).intValue();
+            long offset = 0;
+            for (int ds : deletedSequences) {
+                if (ds < seq) {
+                    offset++;
+                }
+            }
+            if (offset > 0) {
+                rec.setFieldValueByFieldName(seqField, seq - (int) offset);
+                djScheduleResultMapper.updateById(rec);
+            }
+        }
     }
 
     // ==================== 5. 发布 ====================
