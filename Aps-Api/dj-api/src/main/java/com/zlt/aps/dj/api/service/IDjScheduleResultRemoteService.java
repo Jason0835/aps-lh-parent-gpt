@@ -49,10 +49,16 @@ public interface IDjScheduleResultRemoteService {
     AjaxResult edit(@RequestBody DjScheduleResult djScheduleResult);
 
     /**
+     * 调量前置校验（产能校验）
+     */
+    @PostMapping("/djScheduleResult/changeQtyValidate")
+    AjaxResult changeQtyValidate(@RequestBody DjScheduleResult scheduleResult);
+
+    /**
      * 调量
      */
     @PostMapping("/djScheduleResult/changeQty")
-    public AjaxResult changeQty(@RequestBody DjScheduleResult scheduleResult);
+    AjaxResult changeQty(@RequestBody DjScheduleResult scheduleResult);
 
     /**
      * 转机台

@@ -60,6 +60,22 @@ public interface IDjScheduleAdjustService {
     AjaxResult changeQty(DjScheduleResult adjustVO);
 
     /**
+     * 3.4 调量前置校验（产能校验）
+     * <p>
+     * 仅对增量场景进行产能校验，分三档判断：
+     * <ul>
+     *   <li>第一档：定额内，返回 {@code AjaxResult.success()}</li>
+     *   <li>第二档：超出定额但未超实际剩余产能，返回 {@code AjaxResult.success().put("dialogType", "CAPACITY_OVERFLOW")}</li>
+     *   <li>第三档：超出实际剩余产能，返回 {@code AjaxResult.error()}</li>
+     * </ul>
+     * </p>
+     *
+     * @param adjustVO 调整数据
+     * @return 校验结果
+     */
+    AjaxResult changeQtyValidate(DjScheduleResult adjustVO);
+
+    /**
      * 3.5 转机台
      *
      * @param adjustVO 调整数据

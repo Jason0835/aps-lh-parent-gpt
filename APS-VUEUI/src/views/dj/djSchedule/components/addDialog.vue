@@ -173,7 +173,7 @@ export default {
               .catch((error) => {
                 reject(error);
               });
-          } else if (valid.data == "CAPACITY_OVERFLOW") {
+          } else if (valid.dialogType == "CAPACITY_OVERFLOW") {
             // 第二档：产能溢出，用户确认后继续执行
             this.$confirm(valid.msg, this.$t("ui.data.column.scheduleResult.insertOrder"), {
               confirmButtonText: this.$t("common.button.confirm"),
