@@ -251,6 +251,7 @@
   "ui.data.column.lhChipStock.remainStockNum": "Số lượng tồn còn lại",
   "ui.data.column.lhChipStock.updateTime": "Thời gian cập nhật",
   "ui.data.column.lhChipStock.remark": "Ghi chú",
+  "lhChipStock.chipCodeExistsConfirmMerge": "Mã chip đã tồn tại, có hợp nhất vào bản ghi hiện có không?",
   "ui.data.column.lhMachineOnlineInfo.modelName": "Thông tin máy lưu hóa đang chạy",
   "ui.data.column.lhMachineOnlineInfo.factoryCode": "Nhà máy",
   "ui.data.column.lhMachineOnlineInfo.onlineDate": "Ngày trực tuyến",

@@ -281,6 +281,7 @@
   "ui.data.column.lhSpecialMaterialBom.modelName": "Special Material BOM Config",
   "ui.data.column.lhMachineOnlineInfo.modelName": "Curing Machine Online Info",
   "ui.data.column.lhChipStock.modelName": "Chip Stock",
+  "lhChipStock.chipCodeExistsConfirmMerge": "Chip code already exists, merge into existing record?",
   "ui.data.column.lhRepairCapsule.modelName": "Capsule Usage Count",
   "ui.data.column.machine.machineCode": "Machine Code",
   "ui.data.column.machine.machineName": "Machine Name",
