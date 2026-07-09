@@ -93,17 +93,17 @@ public class MouldRelationValidator implements IDataValidator {
             List<MouldValidationErrorDetail> details = buildMissingDetails(missingModelInfoMouldCodeSet);
             context.addValidationErrorDetails(details);
         }
-        if (!disabledMouldCodeSet.isEmpty()) {
-            String summaryMsg = buildSummaryMessage(
-                    I18nUtil.getMessage("ui.data.column.lhScheduleResult.validator.mouldDisabledSimple"),
-                    I18nUtil.getMessage("ui.data.column.lhScheduleResult.validator.mouldDisabledMany"),
-                    getValidatorName(), disabledMouldCodeSet);
-            log.warn("检测到禁用模具, 工厂: {}, 模具号: {}", context.getFactoryCode(),
-                    String.join(MOULD_CODE_DELIMITER, disabledMouldCodeSet));
-            context.addValidationError(summaryMsg);
-            List<MouldValidationErrorDetail> details = buildDisabledDetails(disabledMouldCodeSet, modelInfoMap);
-            context.addValidationErrorDetails(details);
-        }
+//        if (!disabledMouldCodeSet.isEmpty()) {
+//            String summaryMsg = buildSummaryMessage(
+//                    I18nUtil.getMessage("ui.data.column.lhScheduleResult.validator.mouldDisabledSimple"),
+//                    I18nUtil.getMessage("ui.data.column.lhScheduleResult.validator.mouldDisabledMany"),
+//                    getValidatorName(), disabledMouldCodeSet);
+//            log.warn("检测到禁用模具, 工厂: {}, 模具号: {}", context.getFactoryCode(),
+//                    String.join(MOULD_CODE_DELIMITER, disabledMouldCodeSet));
+//            context.addValidationError(summaryMsg);
+//            List<MouldValidationErrorDetail> details = buildDisabledDetails(disabledMouldCodeSet, modelInfoMap);
+//            context.addValidationErrorDetails(details);
+//        }
         if (!missingModelInfoMouldCodeSet.isEmpty() || !disabledMouldCodeSet.isEmpty()) {
             return false;
         }
