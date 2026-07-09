@@ -599,14 +599,12 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
 //                    monthPlanTotalResult.getCalculateScene());
 //        }
         Integer lastMonthOverdueQty = monthOverdueQtyMap.values().stream().mapToInt(Integer::intValue).sum();
-        if (lastMonthOverdueQty != 0 || scheDayFinishQty > 0 || isCrossMonth) {
-            log.info("硫化余量计算完成, materialCode: {}, monthPlanQty: {}, monthFinishedAndScheDayQty: {}, "
-                            + "scheDayFinishQty: {}, lastMonthValidFlag: {}, lastMonthOverdueQty: {}, surplusQty: {}, "
-                            + "crossMonth: {}",
-                    plan.getMaterialCode(), totalPlanQty, actualFinishedQty, scheDayFinishQty,
-                    plan.getLastMonthValidFlag(), lastMonthOverdueQty, remainingDemandQty,
-                    isCrossMonth);
-        }
+        log.info("硫化余量计算完成, materialCode: {}, monthPlanQty: {}, monthFinishedAndScheDayQty: {}, "
+                        + "scheDayFinishQty: {}, lastMonthValidFlag: {}, lastMonthOverdueQty: {}, surplusQty: {}, "
+                        + "crossMonth: {}",
+                plan.getMaterialCode(), totalPlanQty, actualFinishedQty, scheDayFinishQty,
+                plan.getLastMonthValidFlag(), lastMonthOverdueQty, remainingDemandQty,
+                isCrossMonth);
         return new SurplusCalculation(remainingDemandQty, actualFinishedQty, ignoredOverProductionQty,
                 lastMonthOverdueQty, totalPlanQty);
     }
