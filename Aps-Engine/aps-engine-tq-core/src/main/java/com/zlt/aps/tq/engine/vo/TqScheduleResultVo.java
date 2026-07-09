@@ -255,6 +255,13 @@ public class TqScheduleResultVo extends ApsBaseDto {
     private Integer backupTriggerClass;
 
     /**
+     * 触发备库后尚未排完的剩余备库量
+     * <p>由 S2 阶段按阈值分摊后初始化，S3/S3.5 阶段每班排产后扣减，直至为0</p>
+     * <p>用于 S3.5 阶段判断是否还有备库量需要回填到剩余产能</p>
+     */
+    private Double backupRemainingQty;
+
+    /**
      * 是否含试制/量试物料标记（1=是，0=否）
      * 关联SKU与示方书关系表，按物料编码取制造示方类型最新一条
      * 存在T(量试)或X(试制)物料时标记为1，在胎圈1班直接触发主动备库

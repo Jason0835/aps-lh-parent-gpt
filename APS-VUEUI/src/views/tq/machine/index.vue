@@ -197,6 +197,11 @@ export default {
           },
         },
         {
+          label: this.$t("ui.data.column.machine.quata"),
+          prop: "quota",
+          minWidth: 100,
+        },
+        {
           label: this.$t("ui.common.column.remark"),
           prop: "remark",
           minWidth: 100,

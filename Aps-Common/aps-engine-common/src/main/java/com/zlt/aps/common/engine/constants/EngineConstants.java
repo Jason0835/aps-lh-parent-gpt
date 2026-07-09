@@ -551,4 +551,7 @@ public class EngineConstants {
 
     /** SYS1101028：一次生产卷数，默认220 */
     public static String TQ_ONE_ROLL_NUM = "SYS1101028";
+
+    /** SYS1101029：胎圈规格班次最大班产阈值（多规格模式下，触发备库的胎圈当班初始排产上限），默认1000 */
+    public static String TQ_BACKUP_SHIFT_THRESHOLD = "SYS1101029";
 }

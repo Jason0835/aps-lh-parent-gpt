@@ -1,64 +1,60 @@
 package com.zlt.aps.template.gsq;
 
-import com.fasterxml.jackson.annotation.JsonFormat;
 import com.ruoyi.common.core.annotation.Excel;
 import com.ruoyi.common.core.web.domain.BaseEntity;
 import com.zlt.aps.common.core.annotation.ImportValidated;
-import com.zlt.aps.common.core.domain.ApsBaseDto;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 
 import java.io.Serializable;
-import java.util.Date;
+import java.math.BigDecimal;
 
+/**
+ * 钢丝圈缠绕盘信息导入模板
+ * <p>对应新表结构 T_GSQ_TWINING_DISC，用于导入时 Excel 字段映射</p>
+ *
+ * @author zlt
+ * @date 2026-07-08
+ */
 @Data
-@ApiModel(value="钢丝圈缠绕盘信息导入模板", description="钢丝圈缠绕盘信息导入模板")
-public class GsqTwiningDiscTemp extends BaseEntity {
+@ApiModel(value = "钢丝圈缠绕盘信息导入模板", description = "钢丝圈缠绕盘信息导入模板")
+public class GsqTwiningDiscTemp extends BaseEntity implements Serializable {
 
-    @ApiModelProperty(value = "编号")
-    @Excel(name = "ui.twiningDisc.column.serialNumber")
-    private String serialNumber;
+    private static final long serialVersionUID = 1L;
 
+    /** 缠绕盘编码（必填，唯一） */
+    @ApiModelProperty(value = "缠绕盘编码")
+    @Excel(name = "ui.data.column.gsq.twiningDisc.twiningDiscCode")
+    @ImportValidated(required = true, isCode = true, maxLength = 50)
+    private String twiningDiscCode;
+
+    /** 缠绕盘名称（必填） */
     @ApiModelProperty(value = "缠绕盘名称")
-    @Excel(name = "ui.twiningDisc.column.name")
-    private String name;
+    @Excel(name = "ui.data.column.gsq.twiningDisc.twiningDiscName")
+    @ImportValidated(required = true, maxLength = 100)
+    private String twiningDiscName;
 
-    @ApiModelProperty(value = "规格尺寸")
-    @Excel(name = "ui.twiningDisc.column.spec")
-    private String spec;
+    /** 状态（0正常 1停用） */
+    @ApiModelProperty(value = "状态")
+    @Excel(name = "ui.data.column.gsq.twiningDisc.status", dictType = "sys_normal_disable")
+    private String status;
 
-    @ApiModelProperty(value = "排列方式")
-    @Excel(name = "ui.twiningDisc.column.orderWay")
-    private String orderWay;
+    /** 英寸（必填） */
+    @ApiModelProperty(value = "英寸")
+    @Excel(name = "ui.data.column.gsq.twiningDisc.proSize")
+    @ImportValidated(required = true, number = true, min = 0, max = 9999.99)
+    private BigDecimal proSize;
 
-    @ApiModelProperty(value = "用途")
-    @Excel(name = "ui.twiningDisc.column.purpose")
-    private String purpose;
+    /** 数量 */
+    @ApiModelProperty(value = "数量")
+    @Excel(name = "ui.data.column.gsq.twiningDisc.qty")
+    @ImportValidated(number = true, min = 0, max = 999999)
+    private Integer qty;
 
-    @ApiModelProperty(value = "数量，描述对应的缠绕盘数量信息。")
-    @Excel(name = "ui.twiningDisc.column.twiningNum")
-    private Integer twiningNum;
-
-    @ApiModelProperty(value = "入厂时间")
-    @JsonFormat(pattern = "yyyy-MM-dd",timezone = "GMT+8")
-    @Excel(name = "ui.twiningDisc.column.inTime", width = 30, dateFormat = "yyyy-MM-dd")
-    private Date inTime;
-
-    @ApiModelProperty(value = "报废时间")
-    @JsonFormat(pattern = "yyyy-MM-dd",timezone = "GMT+8")
-    @Excel(name = "ui.twiningDisc.column.scrapTime", width = 30, dateFormat = "yyyy-MM-dd")
-    private Date scrapTime;
-
-    @ApiModelProperty(value = "报废原因")
-    @Excel(name = "ui.twiningDisc.column.scrapReason")
-    private String scrapReason;
-
-    @ApiModelProperty(value = "机台编号")
-    @Excel(name = "ui.data.column.loss.line")
-    private String machineCode;
-
+    /** 备注 */
     @ApiModelProperty(value = "备注", position = 500)
-    @Excel(name = "ui.data.column.stock.remark")
+    @Excel(name = "ui.common.column.remark")
+    @ImportValidated(maxLength = 900)
     private String remark;
 }

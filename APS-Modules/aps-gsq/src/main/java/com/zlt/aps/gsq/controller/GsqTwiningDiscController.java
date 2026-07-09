@@ -1,107 +1,182 @@
 package com.zlt.aps.gsq.controller;
 
-
-import com.ruoyi.common.core.web.controller.BaseController;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
+import com.ruoyi.common.core.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
-import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
-import com.zlt.aps.common.engine.utils.CollectionUtil;
-import com.zlt.aps.gsq.api.domain.dto.GsqTwiningDiscDto;
-import com.zlt.aps.gsq.entity.GsqTwiningDisc;
-import com.zlt.aps.gsq.service.GsqTwiningDiscService;
+import com.zlt.aps.gsq.api.domain.entity.GsqTwiningDisc;
+import com.zlt.aps.gsq.mapper.GsqTwiningDiscMapper;
+import com.zlt.aps.gsq.service.IGsqTwiningDiscService;
+import com.zlt.aps.utils.AppUtils;
+import com.zlt.bill.common.controller.AbstractDocBizController;
+import com.zlt.bill.common.service.IDocService;
+import com.zlt.common.utils.PubUtil;
 import io.swagger.annotations.Api;
-import io.swagger.annotations.ApiImplicitParam;
-import io.swagger.annotations.ApiImplicitParams;
 import io.swagger.annotations.ApiOperation;
-import org.springframework.beans.BeanUtils;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
+import javax.servlet.http.HttpServletResponse;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.util.List;
 
-@Api(tags = {"钢丝圈缠绕盘接口"})
+/**
+ * 钢丝圈缠绕盘Controller
+ * 路径：/gsq/twiningDisc
+ * <p>主子表管理：列表显示主表，新增/编辑弹窗内含主表表单与子表明细（钢丝圈）</p>
+ *
+ * @author zlt
+ * @date 2026-07-08
+ */
+@Slf4j
+@Api(tags = "钢丝圈缠绕盘")
 @RestController
 @RequestMapping("/gsq/twiningDisc")
-public class GsqTwiningDiscController extends BaseController {
+public class GsqTwiningDiscController extends AbstractDocBizController<GsqTwiningDisc> {
+
+    @Autowired
+    private IGsqTwiningDiscService gsqTwiningDiscService;
 
     @Resource
-    private GsqTwiningDiscService gsqTwiningDiscService;
+    private GsqTwiningDiscMapper gsqTwiningDiscMapper;
 
-    @ApiOperation("根据条件查询缠绕盘列表")
-    @PostMapping("/listTwiningDisc")
-    public TableDataInfo listTwiningDisc(@RequestBody GsqTwiningDiscDto dto) {
+    /**
+     * 查询钢丝圈缠绕盘列表
+     */
+    @ApiOperation("查询钢丝圈缠绕盘列表")
+    @PostMapping("/list")
+    @Override
+    public TableDataInfo list(@RequestBody GsqTwiningDisc queryVO) {
         startPage();
-        dto.setOrderStr(orderStr());
-        List<GsqTwiningDiscDto> list = gsqTwiningDiscService.listTwiningDisc(dto);
+        List<GsqTwiningDisc> list = gsqTwiningDiscMapper.listTwiningDisc(queryVO);
         return getDataTable(list);
     }
 
-    @ApiOperation("根据id查询缠绕盘信息")
-    @GetMapping("/getTwiningDisc/{id}")
-    @ApiImplicitParams({
-            @ApiImplicitParam(name = "id", dataType = "int", value = "主键id", paramType = "query")
-    })
-    public GsqTwiningDiscDto getTwiningDisc(@PathVariable("id") Long id) {
-        GsqTwiningDiscDto dto = new GsqTwiningDiscDto();
-        BeanUtils.copyProperties(gsqTwiningDiscService.getById(id), dto);
-        return dto;
+    /**
+     * 保存钢丝圈缠绕盘（id为空新增，id不为空修改），级联保存子表明细
+     */
+    @Log(title = "钢丝圈缠绕盘", businessType = BusinessType.INSERT_OR_UPDATE)
+    @ApiOperation("保存")
+    @PostMapping("/save")
+    @Override
+    public AjaxResult save(@RequestBody GsqTwiningDisc billVO) {
+        return gsqTwiningDiscService.saveMainAndSub(billVO);
     }
 
-    @Log(title = "ui.gsq.twiningDisc.column.modalName", businessType = BusinessType.INSERT_OR_UPDATE)
-    @ApiOperation("保存缠绕盘信息（id为空则新增，id不为空则修改）")
-    @PostMapping("/saveTwiningDisc")
-    public AjaxResult saveTwiningDisc(@RequestBody GsqTwiningDiscDto dto) {
-        GsqTwiningDisc entity = new GsqTwiningDisc();
-        BeanUtils.copyProperties(dto, entity);
-        gsqTwiningDiscService.saveTwiningDisc(entity);
-        return AjaxResult.success();
+    /**
+     * 删除钢丝圈缠绕盘（逻辑删除主表，级联逻辑删除子表）
+     */
+    @Log(title = "钢丝圈缠绕盘", businessType = BusinessType.DELETE)
+    @ApiOperation("删除")
+    @PostMapping("/delete/{ids}")
+    public AjaxResult deleteByIds(@PathVariable("ids") List<Long> ids) {
+        return gsqTwiningDiscService.removeMainAndSub(ids);
     }
 
-    @ApiOperation("根据code判断缠绕盘代号是否已经存在")
-    @PostMapping("/checkSerialNumberUnique")
-    public String checkSerialNumberUnique(@RequestBody GsqTwiningDiscDto dto) {
-        return gsqTwiningDiscService.checkSerialNumberUnique(dto);
-    }
-
-    @Log(title = "ui.gsq.twiningDisc.column.modalName", businessType = BusinessType.DELETE)
-    @ApiOperation("批量删除缠绕盘信 息(逻辑删)")
-    @PostMapping("/deleteTwiningDisc/{ids}")
-    @ApiImplicitParams({
-            @ApiImplicitParam(name = "ids", dataType = "Array", value = "id數組", paramType = "query")
-    })
-    public AjaxResult deleteTwiningDisc(@PathVariable("ids") Long[] ids) {
-        gsqTwiningDiscService.deleteTwiningDisc(ids);
-        return AjaxResult.success();
-    }
-
-
-    @Log(title = "ui.gsq.twiningDisc.column.modalName", businessType = BusinessType.DELETE)
-    @ApiOperation("删除全部(逻辑删)")
-    @PostMapping("/deleteAll")
-    public AjaxResult deleteAll() {
-        gsqTwiningDiscService.deleteAll();
-        return AjaxResult.success();
-    }
-
-
-    @Log(title = "ui.gsq.twiningDisc.column.modalName", businessType = BusinessType.EXPORT)
-    @ApiOperation("导出数据")
-    @PostMapping("/exportData")
-    public List<GsqTwiningDiscDto> exportData(@RequestBody GsqTwiningDiscDto dto) {
-        dto.setOrderStr(orderStr());
-        List<GsqTwiningDiscDto> list = gsqTwiningDiscService.listTwiningDisc(dto);
-        return list;
-    }
-
-    @Log(title = "ui.gsq.twiningDisc.column.modalName", businessType = BusinessType.IMPORT)
-    @PostMapping("/importData")
-    @ApiOperation("导入钢丝圈缠绕盘信息")
-    public AjaxResult importData(@RequestBody List<GsqTwiningDiscDto> list, @RequestParam("updateSupport") boolean updateSupport, @RequestParam("importLogId") Long importLogId) {
-        if (CollectionUtil.isEmpty(list)) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.import.nodata"));
+    /**
+     * 获取钢丝圈缠绕盘详细信息（含子表明细及钢丝圈名称反显）
+     */
+    @ApiOperation("获取详细信息")
+    @GetMapping("/{id}")
+    @Override
+    public GsqTwiningDisc getInfo(@PathVariable("id") Long id) {
+        GsqTwiningDisc entity = super.getInfo(id);
+        if (entity != null) {
+            entity.setSubList(gsqTwiningDiscService.querySubListByDiscId(id));
         }
-        return gsqTwiningDiscService.importData(list, updateSupport, importLogId);
+        return entity;
+    }
+
+    /**
+     * 导入钢丝圈缠绕盘
+     */
+    @Log(title = "钢丝圈缠绕盘", businessType = BusinessType.IMPORT)
+    @ApiOperation("导入数据")
+    @PostMapping("/importData")
+    @Override
+    public AjaxResult importData(@RequestBody ImportContext importContext,
+                                 @RequestParam("updateSupport") boolean updateSupport) throws Exception {
+        return super.importData(importContext, updateSupport);
+    }
+
+    /**
+     * 导出钢丝圈缠绕盘
+     */
+    @Log(title = "钢丝圈缠绕盘", businessType = BusinessType.EXPORT)
+    @ApiOperation("导出数据")
+    @PostMapping("/exportData/{fileName}")
+    @Override
+    public byte[] exportData(@RequestBody GsqTwiningDisc queryVO,
+                             @PathVariable("fileName") String fileName,
+                             HttpServletResponse response) throws IOException {
+        List<GsqTwiningDisc> list = listExportData(queryVO);
+        ExcelUtil<GsqTwiningDisc> util = new ExcelUtil<>(GsqTwiningDisc.class);
+        Workbook workbook = util.exportExcelFromList(list, fileName);
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        workbook.write(out);
+        return out.toByteArray();
+    }
+
+    /**
+     * 校验缠绕盘编码唯一性
+     */
+    @ApiOperation("校验缠绕盘编码唯一性")
+    @PostMapping("/checkUnique")
+    public String checkUnique(@RequestBody GsqTwiningDisc entity) {
+        return gsqTwiningDiscService.checkUnique(entity);
+    }
+
+    @Override
+    protected IDocService getDocService() {
+        return gsqTwiningDiscService;
+    }
+
+    @Override
+    protected String getTypeCode() {
+        return "0";
+    }
+
+    @Override
+    protected String getOrderBy() {
+        return "CREATE_TIME desc";
+    }
+
+    /**
+     * 主表反显公式
+     */
+    @Override
+    protected String[] getQueryFormulas() {
+        return gsqTwiningDiscService.getQueryFormulas();
+    }
+
+    /**
+     * 构建查询条件（手动追加 IS_DELETE=0 过滤逻辑删除数据）
+     */
+    @Override
+    protected void builderCondition(QueryWrapper<GsqTwiningDisc> queryWrapper, GsqTwiningDisc queryVO) {
+        queryWrapper.eq("IS_DELETE", "0");
+        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getTwiningDiscCode()), "TWINING_DISC_CODE", queryVO.getTwiningDiscCode());
+        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getTwiningDiscName()), "TWINING_DISC_NAME", queryVO.getTwiningDiscName());
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getStatus()), "STATUS", queryVO.getStatus());
+    }
+
+    /**
+     * 获取导出数据列表，并补反显字段
+     */
+    @Override
+    protected List<GsqTwiningDisc> listExportData(GsqTwiningDisc obj) {
+        QueryWrapper<GsqTwiningDisc> wrapper = new QueryWrapper<>();
+        this.builderCondition(wrapper, obj);
+        wrapper.last("ORDER BY " + getOrderBy());
+        List<GsqTwiningDisc> list = gsqTwiningDiscMapper.selectList(wrapper);
+        AppUtils.formatData(list, getQueryFormulas());
+        return list;
     }
 }

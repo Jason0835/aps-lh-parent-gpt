@@ -1,38 +1,38 @@
 package com.zlt.aps.gsq.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-import com.zlt.aps.gsq.api.domain.dto.GsqTwiningDiscDto;
-import com.zlt.aps.gsq.entity.GsqTwiningDisc;
+import com.zlt.aps.gsq.api.domain.entity.GsqTwiningDisc;
 
 import java.util.List;
 
 /**
- * <p>
- * 钢丝圈缠绕盘表 Mapper 接口
- * </p>
+ * 钢丝圈缠绕盘 Mapper 接口
  *
- * @author zhangbinglin
- * @since 2021-06-04
+ * @author zlt
+ * @date 2026-07-08
  */
 public interface GsqTwiningDiscMapper extends BaseMapper<GsqTwiningDisc> {
 
     /**
-     * 根据条件查询缠绕盘顺序列表
+     * 查询钢丝圈缠绕盘列表
      *
-     * @param dto
-     * @return
+     * @param entity 查询条件
+     * @return 列表
      */
-    List<GsqTwiningDiscDto> listTwiningDisc(GsqTwiningDiscDto dto);
+    List<GsqTwiningDisc> listTwiningDisc(GsqTwiningDisc entity);
 
     /**
-     * 合并操作，如果记录存在则更新，否则新增
+     * 校验缠绕盘编码是否已存在
      *
-     * @param list 要合并的集合
+     * @param entity 实体
+     * @return 已存在数量（0表示唯一，>0表示不唯一）
      */
-    public void mergeSql(List<GsqTwiningDiscDto> list);
+    int checkUnique(GsqTwiningDisc entity);
 
-
-    public int updateTGsqTwiningDisc(GsqTwiningDisc dto);
-
-    void deleteAll();
+    /**
+     * 批量合并保存（存在则更新，否则新增），用于导入场景
+     *
+     * @param list 待保存数据集合
+     */
+    void mergeSql(List<GsqTwiningDisc> list);
 }

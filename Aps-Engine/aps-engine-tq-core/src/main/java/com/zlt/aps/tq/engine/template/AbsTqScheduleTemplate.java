@@ -7,15 +7,15 @@ import lombok.extern.slf4j.Slf4j;
 /**
  * 胎圈排程模板方法抽象类。
  *
- * <p>定义胎圈排程不可变的算法骨架：S1 → S2 → S3 → S4 → S5 → S6，
+ * <p>定义胎圈排程不可变的算法骨架：S1 → S2 → S3 → S3.5 → S4 → S5 → S6，
  * 每步之间检查中断状态，任何一步中断则后续步骤全部跳过。</p>
  *
- * <p>子类 {@link TqScheduleTemplateImpl} 通过注入6个Handler来填充具体实现。</p>
+ * <p>子类 {@link TqScheduleTemplateImpl} 通过注入7个Handler来填充具体实现。</p>
  *
  * <pre>
  * 执行流程：
- * S1(前置校验与数据加载) → S2(需求计算) → S3(班次排产分配) → S4(成型/胎圈停产协调) → S5(班次均衡调整) → S6(结果校验与持久化)
- *       ↓ 中断检查              ↓ 中断检查         ↓ 中断检查              ↓ 中断检查              ↓ 中断检查
+ * S1(前置校验与数据加载) → S2(需求计算) → S3(班次排产分配) → S3.5(剩余产能分配) → S4(成型/胎圈停产协调) → S5(班次均衡调整) → S6(结果校验与持久化)
+ *       ↓ 中断检查              ↓ 中断检查         ↓ 中断检查              ↓ 中断检查              ↓ 中断检查              ↓ 中断检查
  * </pre>
  *
  * @author APS
@@ -31,6 +31,7 @@ public abstract class AbsTqScheduleTemplate {
      *   <li>S1: 前置校验与数据加载</li>
      *   <li>S2: 需求计算</li>
      *   <li>S3: 班次排产分配</li>
+     *   <li>S3.5: 剩余产能分配</li>
      *   <li>S4: 成型/胎圈停产协调</li>
      *   <li>S5: 班次均衡调整</li>
      *   <li>S6: 结果校验与持久化</li>
@@ -64,6 +65,14 @@ public abstract class AbsTqScheduleTemplate {
             // S3: 班次排产分配
             context.setCurrentStep(TqScheduleStepEnum.S3_MACHINE_ASSIGN.getCode());
             doMachineAssign(context);
+            if (context.isInterrupted()) {
+                logInterrupt(context);
+                return;
+            }
+
+            // S3.5: 剩余产能分配
+            context.setCurrentStep(TqScheduleStepEnum.S3_5_RESIDUAL_CAPACITY.getCode());
+            doResidualCapacity(context);
             if (context.isInterrupted()) {
                 logInterrupt(context);
                 return;
@@ -125,6 +134,22 @@ public abstract class AbsTqScheduleTemplate {
      * @param context 排程上下文
      */
     protected abstract void doMachineAssign(TqScheduleContext context);
+
+    /**
+     * S3.5: 剩余产能分配。
+     *
+     * <p>职责：S3机台分配完成后，回收每个机台每班的剩余产能（quota - 已排产量），
+     * 按三级优先级回填到该机台上的规格：</p>
+     * <ul>
+     *   <li>Priority-1: 触发备库胎圈（backupTriggerClass > 0 且 backupRemainingQty > 0），按触发班次升序+供应时长升序</li>
+     *   <li>Priority-2: 未触发备库但供应时长 &lt; 阈值的规格，按供应时长升序</li>
+     *   <li>Priority-3: 未触发备库且供应时长 ≥ 阈值的规格，按供应时长升序</li>
+     * </ul>
+     * <p>第6班特殊处理：把所有剩余量（含跨班次备库剩余量）塞入第6班，避免超出6班范围丢失量。</p>
+     *
+     * @param context 排程上下文
+     */
+    protected abstract void doResidualCapacity(TqScheduleContext context);
 
     /**
      * S4: 成型/胎圈停产协调。

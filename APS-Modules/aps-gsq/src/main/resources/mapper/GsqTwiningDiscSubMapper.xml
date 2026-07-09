@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.gsq.mapper.GsqTwiningDiscSubMapper">
+
+    <!-- 按主表ID查询子表明细（仅查未逻辑删除数据） -->
+    <select id="listSubByDiscId" parameterType="java.lang.Long" resultType="com.zlt.aps.gsq.api.domain.entity.GsqTwiningDiscSub">
+        select ID,
+               DISC_ID,
+               STEEL_RING_CODE,
+               IS_DELETE,
+               CREATE_BY,
+               CREATE_TIME,
+               UPDATE_BY,
+               UPDATE_TIME,
+               REMARK
+        from T_GSQ_TWINING_DISC_SUB
+        where DISC_ID = #{discId}
+          and IS_DELETE = '0'
+        order by CREATE_TIME asc
+    </select>
+
+</mapper>
