@@ -89,9 +89,9 @@ export function editScheduleResult(query) {
     data: query
   })
 }
-export function batchChangeMachine(machineId, query) {
+export function batchChangeMachine(machineCode, query) {
   return request({
-    url: 'dj/djScheduleResult/batchChangeMachine/' + machineId,
+    url: 'dj/djScheduleResult/batchChangeMachine/' + machineCode,
     method: 'post',
     data: query
   })
@@ -201,6 +201,14 @@ export function publishScheduleResult(query) {
 export function changeReleaseStatus(query) {
   return request({
    url: `dj/djScheduleResult/changeReleaseStatus`,
+    method: 'post',
+    data: query
+  })
+}
+
+export function changeQtyValidate(query) {
+  return request({
+    url: '/dj/djScheduleResult/changeQtyValidate',
     method: 'post',
     data: query
   })

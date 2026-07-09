@@ -2,6 +2,7 @@ package com.zlt.aps.mp.engine.scheduling.cxcapacity;
 
 import com.google.common.collect.Maps;
 import com.zlt.aps.constant.StringConstant;
+import com.zlt.aps.mp.engine.enums.CycleProductionModeEnum;
 import lombok.Data;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;
@@ -197,6 +198,11 @@ public class ProductionCapacityParamConfiguration {
      * SYS0203013 周期储备量占实单的比例(%),防止储备量过大
      */
     private Integer reservePercent;
+
+    /**
+     * SYS0203018 周期结构排产模式
+     */
+    private CycleProductionModeEnum cycleProductionMode;
 
     /**
      * SYS0203014 按高优先级SKU个数降序的结构清单-前 X 个结构，单位个

@@ -56,7 +56,7 @@ public class TqMachineInfo extends BaseEntity {
     private String remark;
 
     @ApiModelProperty(value = "定额：该机台单班标准产量", position = 80)
-    @Excel(name = "ui.data.column.machine.quota")
+    @Excel(name = "ui.data.column.machine.quata")
     @TableField("QUOTA")
     private Double quota;
 

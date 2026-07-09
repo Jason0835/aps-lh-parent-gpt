@@ -61,7 +61,7 @@ export default {
           prop: "factoryCode",
           align: "center",
           halign: "center",
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.lhRepairCapsule.factoryCode"),
           minWidth: 120,
           formatter: (row, column, value, index) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
@@ -132,7 +132,7 @@ export default {
     searchColumns() {
       return [
         {
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.lhRepairCapsule.factoryCode"),
           prop: "factoryCode",
           type: "select",
           dictData: this.dict.type.biz_factory_name,

@@ -29,6 +29,18 @@ public interface IDjScheduleAdjustService {
     AjaxResult insertOrder(DjScheduleResult insertVO);
 
     /**
+     * 插单前置校验（含跨天日期计算）
+     * <p>
+     * 根据 {@code scheduleShiftClass} 和 {@code targetClass} 计算实际排产日期，
+     * 然后执行：排程计划存在性校验、排产日锁定校验。
+     * </p>
+     *
+     * @param insertVO 插单数据
+     * @return 校验结果，通过返回 {@code AjaxResult.success()}，否则返回错误信息
+     */
+    AjaxResult insertOrderValidate(DjScheduleResult insertVO);
+
+    /**
      * 确认插单（用户在前端弹窗点击"坚持执行"后调用）
      *
      * @param insertVO 插单数据
@@ -46,6 +58,22 @@ public interface IDjScheduleAdjustService {
      * @return 操作结果
      */
     AjaxResult changeQty(DjScheduleResult adjustVO);
+
+    /**
+     * 3.4 调量前置校验（产能校验）
+     * <p>
+     * 仅对增量场景进行产能校验，分三档判断：
+     * <ul>
+     *   <li>第一档：定额内，返回 {@code AjaxResult.success()}</li>
+     *   <li>第二档：超出定额但未超实际剩余产能，返回 {@code AjaxResult.success().put("dialogType", "CAPACITY_OVERFLOW")}</li>
+     *   <li>第三档：超出实际剩余产能，返回 {@code AjaxResult.error()}</li>
+     * </ul>
+     * </p>
+     *
+     * @param adjustVO 调整数据
+     * @return 校验结果
+     */
+    AjaxResult changeQtyValidate(DjScheduleResult adjustVO);
 
     /**
      * 3.5 转机台

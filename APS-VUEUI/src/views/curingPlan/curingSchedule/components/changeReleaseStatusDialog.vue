@@ -54,7 +54,7 @@ export default {
       },
       columns: [
         {
-          label: this.$t("ui.data.column.scheduleResult.isRelease"),
+          label: this.$t("ui.data.column.lhScheduleResult.isRelease"),
           prop: "isRelease",
           render: (form) => {
             return (

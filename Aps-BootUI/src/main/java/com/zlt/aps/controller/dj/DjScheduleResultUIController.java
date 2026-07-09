@@ -160,9 +160,9 @@ public class DjScheduleResultUIController extends BaseController<DjScheduleResul
      * 转机台
      */
     @ApiOperation("转机台")
-    @PostMapping("/batchChangeMachine/{machineId}")
+    @PostMapping("/batchChangeMachine/{machineCode}")
     @ResponseBody
-    public AjaxResult batchChangeMachine(@PathVariable("machineId") String machineId, String selects) {
+    public AjaxResult batchChangeMachine(@PathVariable("machineCode") String machineCode, String selects) {
         List<DjScheduleResult> scheduleResultList = JSON.parseArray(selects, DjScheduleResult.class);
         DjScheduleResult query = new DjScheduleResult();
         StringBuilder sb1 = new StringBuilder();
@@ -170,7 +170,7 @@ public class DjScheduleResultUIController extends BaseController<DjScheduleResul
         for (DjScheduleResult scheduleResult : scheduleResultList) {
             query.setId(scheduleResult.getId());
             query.setScheduleDate(scheduleResult.getScheduleDate());
-            query.setMachineCode(machineId);
+            query.setMachineCode(machineCode);
             query.setPaddingCode(scheduleResult.getPaddingCode());
             Boolean isUnique = iDjScheduleResultService.checkUnique(query);
             if (!isUnique) {
@@ -181,7 +181,7 @@ public class DjScheduleResultUIController extends BaseController<DjScheduleResul
                 }
                 continue;
             }
-            scheduleResult.setMachineCode(machineId);
+            scheduleResult.setMachineCode(machineCode);
             AjaxResult result = iDjScheduleResultService.changeMachine(scheduleResult);
             if (result.get(GatewayConstants.MSG_TAG).equals(I18nUtil.getMessage("ui.data.column.scheduleResult.release.isReleasingOrTimeoutById"))) {
                 if (sb2.length() > 0) {
@@ -205,6 +205,16 @@ public class DjScheduleResultUIController extends BaseController<DjScheduleResul
     }
 
     /**
+     * 调量前置校验（产能校验）
+     */
+    @ApiOperation("调量前置校验")
+    @PostMapping("/changeQtyValidate")
+    @ResponseBody
+    public AjaxResult changeQtyValidate(DjScheduleResult scheduleResult) {
+        return iDjScheduleResultService.changeQtyValidate(scheduleResult);
+    }
+
+    /**
      * 调量
      */
     @ApiOperation("调量")
@@ -223,18 +233,7 @@ public class DjScheduleResultUIController extends BaseController<DjScheduleResul
     @PostMapping("/remove")
     @ResponseBody
     public AjaxResult remove(String ids) {
-        String newIds="";
-        String scheduleDate="";
-        if (StringUtils.isNotBlank(ids)){
-            newIds=ids.substring(0,ids.indexOf("|"));
-            scheduleDate=ids.substring(ids.indexOf("|")+1);
-        }
-//        DjScheduleResult queryEntity=new DjScheduleResult();
-//        queryEntity.setScheduleDate(DateUtils.parseDate(scheduleDate));
-//        if(iDjScheduleResultService.isPublish(queryEntity)){
-//            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.hasPublishedCanNotDelete"));
-//        }
-        Long[] arr = Convert.toLongArray(newIds);
+        Long[] arr = Convert.toLongArray(ids);
         return iDjScheduleResultService.remove(arr);
     }
 
@@ -322,20 +321,13 @@ public class DjScheduleResultUIController extends BaseController<DjScheduleResul
     }
 
     /**
-     * 插单校验
+     * 插单校验（含跨天日期计算）
+     * <p>委派后端 {@code insertOrderValidate} 方法根据 scheduleShiftClass 计算实际排产日期后执行校验。</p>
      */
     @PostMapping("/validateAdd")
     @ResponseBody
     public AjaxResult validateAdd(DjScheduleResult entity) {
-        int releasingOrTimeoutByDate = iDjScheduleResultService.isReleasingOrTimeoutByDate(entity);
-        if (releasingOrTimeoutByDate > 0) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.release.isReleasingOrTimeoutByDate"));
-        }
-        Boolean isUnique = iDjScheduleResultService.checkUnique(entity);
-        if (isUnique) {
-            return AjaxResult.success("0");
-        }
-        return AjaxResult.success();
+        return iDjScheduleResultService.validateAdd(entity);
     }
 
     /**

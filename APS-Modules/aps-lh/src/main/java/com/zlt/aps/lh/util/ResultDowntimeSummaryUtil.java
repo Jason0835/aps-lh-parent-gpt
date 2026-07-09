@@ -4,6 +4,7 @@ import com.zlt.aps.lh.api.constant.LhScheduleConstant;
 import com.zlt.aps.lh.api.domain.dto.MachineCleaningWindowDTO;
 import com.zlt.aps.lh.api.domain.dto.MachineMaintenanceWindowDTO;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
+import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
 import com.zlt.aps.lh.api.enums.CleaningTypeEnum;
 import com.zlt.aps.mdm.api.domain.entity.MdmDevicePlanShut;
 import org.springframework.util.CollectionUtils;
@@ -33,6 +34,8 @@ public final class ResultDowntimeSummaryUtil {
     private static final String DRY_ICE_ANALYSIS = "干冰清洗";
     /** 单独喷砂清洗时写入班次分析的固定原因 */
     private static final String SAND_BLAST_ANALYSIS = "喷砂清洗";
+    /** 标识为是的固定值 */
+    private static final String YES_FLAG = "1";
 
     private ResultDowntimeSummaryUtil() {
     }
@@ -48,7 +51,8 @@ public final class ResultDowntimeSummaryUtil {
     public static void fillDowntimeSummary(LhScheduleResult result,
                                            List<MachineMaintenanceWindowDTO> maintenanceWindowList,
                                            List<MachineCleaningWindowDTO> cleaningWindowList,
-                                           List<MdmDevicePlanShut> devicePlanShutList) {
+                                           List<MdmDevicePlanShut> devicePlanShutList,
+                                           List<LhShiftConfigVO> scheduleWindowShifts) {
         clearDowntimeSummary(result);
         if (Objects.isNull(result)) {
             return;
@@ -60,16 +64,31 @@ public final class ResultDowntimeSummaryUtil {
             return;
         }
         fillMaintenanceSummary(result, maintenanceWindowList, productionStartTime, productionEndTime);
-        fillCleaningSummary(result, cleaningWindowList, productionStartTime, productionEndTime);
+        // 清洗摘要是机台级口径：只要该机台存在有效清洗窗口就回填，不按结果生产时段截断，
+        // 避免清洗恰好从完工时刻开始时被边界判定漏掉。
+        fillCleaningSummary(result, cleaningWindowList);
         fillShutdownSummary(result, devicePlanShutList, productionStartTime, productionEndTime);
         // 喷砂清洗与精度/维修实际重叠时，才在对应的最后一个重叠班次追加固定原因。
-        appendSandBlastDowntimeAnalysis(result, cleaningWindowList, maintenanceWindowList, devicePlanShutList);
-        // 清洗与普通换模实际重叠时，清洗不额外顺延开产，只在实际执行清洗的班次写入固定原因。
-        appendCleaningMouldChangeAnalysis(result, cleaningWindowList,
-                result.getMouldChangeStartTime(), productionStartTime);
+        appendSandBlastDowntimeAnalysis(result, cleaningWindowList, maintenanceWindowList,
+                devicePlanShutList, scheduleWindowShifts);
         // 未与换模/维修/精度重叠的单独清洗，也要在实际开始清洗的班次写入简洁原因。
-        appendStandaloneCleaningAnalysis(result, cleaningWindowList, maintenanceWindowList,
-                devicePlanShutList, result.getMouldChangeStartTime(), productionStartTime);
+        // 换模区间上界取换模完成时间（换模开始+换模总时长）与首个生产班次开始时间的较大者，
+        // 避免换模开始时间与生产开始时间相同时（零时长区间）重叠检测失效导致重复写单独清洗原因。
+        Date mouldChangeStartTime = result.getMouldChangeStartTime();
+        Date switchOverlapEndTime = productionStartTime;
+        if (Objects.nonNull(mouldChangeStartTime)) {
+            Date mouldChangeCompleteTime = LhScheduleTimeUtil.addHours(mouldChangeStartTime,
+                    LhScheduleConstant.MOULD_CHANGE_TOTAL_HOURS);
+            switchOverlapEndTime = mouldChangeCompleteTime.after(productionStartTime)
+                    ? mouldChangeCompleteTime : productionStartTime;
+        }
+        // 换活字块结果的清洗备注由 TypeBlockProductionStrategy.applyTypeBlockCleaningAnalysis 统一处理，
+        // 此处跳过单独清洗备注，避免与"清洗+换活字块"重复。
+        if (!YES_FLAG.equals(result.getIsTypeBlock())) {
+            appendStandaloneCleaningAnalysis(result, cleaningWindowList, maintenanceWindowList,
+                    devicePlanShutList, mouldChangeStartTime, switchOverlapEndTime,
+                    scheduleWindowShifts);
+        }
     }
 
     /**
@@ -114,9 +133,7 @@ public final class ResultDowntimeSummaryUtil {
     }
 
     private static void fillCleaningSummary(LhScheduleResult result,
-                                            List<MachineCleaningWindowDTO> cleaningWindowList,
-                                            Date productionStartTime,
-                                            Date productionEndTime) {
+                                            List<MachineCleaningWindowDTO> cleaningWindowList) {
         if (CollectionUtils.isEmpty(cleaningWindowList)) {
             return;
         }
@@ -125,9 +142,7 @@ public final class ResultDowntimeSummaryUtil {
         for (MachineCleaningWindowDTO cleaningWindow : cleaningWindowList) {
             if (Objects.isNull(cleaningWindow)
                     || Objects.isNull(cleaningWindow.getCleanStartTime())
-                    || Objects.isNull(cleaningWindow.getCleanEndTime())
-                    || !isWindowOverlap(cleaningWindow.getCleanStartTime(),
-                    cleaningWindow.getCleanEndTime(), productionStartTime, productionEndTime)) {
+                    || Objects.isNull(cleaningWindow.getCleanEndTime())) {
                 continue;
             }
             earliestStartTime = earlier(earliestStartTime, cleaningWindow.getCleanStartTime());
@@ -172,7 +187,8 @@ public final class ResultDowntimeSummaryUtil {
     private static void appendSandBlastDowntimeAnalysis(LhScheduleResult result,
                                                         List<MachineCleaningWindowDTO> cleaningWindowList,
                                                         List<MachineMaintenanceWindowDTO> maintenanceWindowList,
-                                                        List<MdmDevicePlanShut> devicePlanShutList) {
+                                                        List<MdmDevicePlanShut> devicePlanShutList,
+                                                        List<LhShiftConfigVO> scheduleWindowShifts) {
         if (Objects.isNull(result) || CollectionUtils.isEmpty(cleaningWindowList)) {
             return;
         }
@@ -181,9 +197,9 @@ public final class ResultDowntimeSummaryUtil {
                 continue;
             }
             // 喷砂与精度保养窗口实际相交时，产能扣减走并行取最大，原因写入最后一个重叠班次。
-            appendSandBlastMaintenanceAnalysis(result, cleaningWindow, maintenanceWindowList);
+            appendSandBlastMaintenanceAnalysis(result, cleaningWindow, maintenanceWindowList, scheduleWindowShifts);
             // 喷砂与普通设备停机计划实际相交时，写入设备停机计划组合原因。
-            appendSandBlastShutdownAnalysis(result, cleaningWindow, devicePlanShutList);
+            appendSandBlastShutdownAnalysis(result, cleaningWindow, devicePlanShutList, scheduleWindowShifts);
         }
     }
 
@@ -196,7 +212,8 @@ public final class ResultDowntimeSummaryUtil {
      */
     private static void appendSandBlastMaintenanceAnalysis(LhScheduleResult result,
                                                            MachineCleaningWindowDTO cleaningWindow,
-                                                           List<MachineMaintenanceWindowDTO> maintenanceWindowList) {
+                                                           List<MachineMaintenanceWindowDTO> maintenanceWindowList,
+                                                           List<LhShiftConfigVO> scheduleWindowShifts) {
         if (CollectionUtils.isEmpty(maintenanceWindowList)) {
             return;
         }
@@ -206,7 +223,7 @@ public final class ResultDowntimeSummaryUtil {
             }
             appendOverlapAnalysis(result, cleaningWindow.getCleanStartTime(), cleaningWindow.getCleanEndTime(),
                     maintenanceWindow.getMaintenanceStartTime(), maintenanceWindow.getMaintenanceEndTime(),
-                    SAND_BLAST_PRECISION_ANALYSIS);
+                    SAND_BLAST_PRECISION_ANALYSIS, scheduleWindowShifts);
         }
     }
 
@@ -219,7 +236,8 @@ public final class ResultDowntimeSummaryUtil {
      */
     private static void appendSandBlastShutdownAnalysis(LhScheduleResult result,
                                                         MachineCleaningWindowDTO cleaningWindow,
-                                                        List<MdmDevicePlanShut> devicePlanShutList) {
+                                                        List<MdmDevicePlanShut> devicePlanShutList,
+                                                        List<LhShiftConfigVO> scheduleWindowShifts) {
         if (CollectionUtils.isEmpty(devicePlanShutList)) {
             return;
         }
@@ -228,7 +246,8 @@ public final class ResultDowntimeSummaryUtil {
                 continue;
             }
             appendOverlapAnalysis(result, cleaningWindow.getCleanStartTime(), cleaningWindow.getCleanEndTime(),
-                    planShut.getBeginDate(), planShut.getEndDate(), SAND_BLAST_SHUTDOWN_ANALYSIS);
+                    planShut.getBeginDate(), planShut.getEndDate(), SAND_BLAST_SHUTDOWN_ANALYSIS,
+                    scheduleWindowShifts);
         }
     }
 
@@ -245,7 +264,8 @@ public final class ResultDowntimeSummaryUtil {
     public static void appendCleaningMouldChangeAnalysis(LhScheduleResult result,
                                                          List<MachineCleaningWindowDTO> cleaningWindowList,
                                                          Date mouldChangeStartTime,
-                                                         Date productionStartTime) {
+                                                         Date mouldChangeCompleteTime,
+                                                         List<LhShiftConfigVO> scheduleWindowShifts) {
         if (Objects.isNull(result) || CollectionUtils.isEmpty(cleaningWindowList)) {
             return;
         }
@@ -255,11 +275,13 @@ public final class ResultDowntimeSummaryUtil {
             if (Objects.isNull(analysis)) {
                 continue;
             }
-            // 换模重叠备注按清洗来源计划窗口或实际窗口判断；命中后只写原因，不把清洗作为额外产能扣减。
+            // 只有实际清洗窗口与换模窗口重叠时才写“清洗+换模”备注；
+            // 实际清洗时间已由硫化排程重新安排，来源计划窗口不再作为重叠判定依据。
+            // 换模窗口必须按真实换模总时长(8h)判断，不能用首个生产班次开始时间截断，否则首检落在换模班次时会漏判。
             appendOverlapAnalysis(result,
-                    MachineCleaningOverlapUtil.resolveMouldChangeAnalysisStartTime(cleaningWindow),
-                    MachineCleaningOverlapUtil.resolveMouldChangeAnalysisEndTime(cleaningWindow),
-                    mouldChangeStartTime, productionStartTime, analysis, fallbackShiftIndex);
+                    cleaningWindow.getCleanStartTime(), cleaningWindow.getCleanEndTime(),
+                    mouldChangeStartTime, mouldChangeCompleteTime, analysis, fallbackShiftIndex,
+                    scheduleWindowShifts);
         }
     }
 
@@ -281,7 +303,8 @@ public final class ResultDowntimeSummaryUtil {
                                                          List<MachineMaintenanceWindowDTO> maintenanceWindowList,
                                                          List<MdmDevicePlanShut> devicePlanShutList,
                                                          Date mouldChangeStartTime,
-                                                         Date productionStartTime) {
+                                                         Date productionStartTime,
+                                                         List<LhShiftConfigVO> scheduleWindowShifts) {
         if (Objects.isNull(result) || CollectionUtils.isEmpty(cleaningWindowList)) {
             return;
         }
@@ -291,7 +314,7 @@ public final class ResultDowntimeSummaryUtil {
                     maintenanceWindowList, devicePlanShutList, mouldChangeStartTime, productionStartTime)) {
                 continue;
             }
-            appendCleaningStartShiftAnalysis(result, cleaningWindow, analysis);
+            appendCleaningStartShiftAnalysis(result, cleaningWindow, analysis, scheduleWindowShifts);
         }
     }
 
@@ -342,15 +365,17 @@ public final class ResultDowntimeSummaryUtil {
      */
     private static void appendCleaningStartShiftAnalysis(LhScheduleResult result,
                                                          MachineCleaningWindowDTO cleaningWindow,
-                                                         String analysis) {
-        for (int shiftIndex = 1; shiftIndex <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT; shiftIndex++) {
-            Date shiftStartTime = ShiftFieldUtil.getShiftStartTime(result, shiftIndex);
-            Date shiftEndTime = ShiftFieldUtil.getShiftEndTime(result, shiftIndex);
-            if (isWindowOverlap(cleaningWindow.getCleanStartTime(), cleaningWindow.getCleanEndTime(),
-                    shiftStartTime, shiftEndTime)) {
-                ShiftFieldUtil.appendShiftAnalysis(result, shiftIndex, analysis);
-                return;
-            }
+                                                         String analysis,
+                                                         List<LhShiftConfigVO> scheduleWindowShifts) {
+        // 单独清洗横跨多个班次时，备注应写入最后一个重叠班次（Spec：清洗重叠原因备注规则第2条）；
+        // 未命中重叠班次时回退到按开始时间定位，避免边界场景漏写备注。
+        int shiftIndex = resolveLastOverlapShiftIndex(scheduleWindowShifts,
+                cleaningWindow.getCleanStartTime(), cleaningWindow.getCleanEndTime());
+        if (shiftIndex <= 0) {
+            shiftIndex = resolveShiftIndexByStartTime(scheduleWindowShifts, cleaningWindow.getCleanStartTime());
+        }
+        if (shiftIndex > 0) {
+            ShiftFieldUtil.appendShiftAnalysis(result, shiftIndex, analysis);
         }
     }
 
@@ -401,8 +426,10 @@ public final class ResultDowntimeSummaryUtil {
                                               Date leftEndTime,
                                               Date rightStartTime,
                                               Date rightEndTime,
-                                              String analysis) {
-        appendOverlapAnalysis(result, leftStartTime, leftEndTime, rightStartTime, rightEndTime, analysis, -1);
+                                              String analysis,
+                                              List<LhShiftConfigVO> scheduleWindowShifts) {
+        appendOverlapAnalysis(result, leftStartTime, leftEndTime, rightStartTime, rightEndTime,
+                analysis, -1, scheduleWindowShifts);
     }
 
     /**
@@ -422,13 +449,14 @@ public final class ResultDowntimeSummaryUtil {
                                               Date rightStartTime,
                                               Date rightEndTime,
                                               String analysis,
-                                              int fallbackShiftIndex) {
+                                              int fallbackShiftIndex,
+                                              List<LhShiftConfigVO> scheduleWindowShifts) {
         if (!isWindowOverlap(leftStartTime, leftEndTime, rightStartTime, rightEndTime)) {
             return;
         }
         Date overlapStartTime = later(leftStartTime, rightStartTime);
         Date overlapEndTime = earlier(leftEndTime, rightEndTime);
-        int shiftIndex = resolveLastOverlapShiftIndex(result, overlapStartTime, overlapEndTime);
+        int shiftIndex = resolveLastOverlapShiftIndex(scheduleWindowShifts, overlapStartTime, overlapEndTime);
         if (shiftIndex <= 0) {
             shiftIndex = fallbackShiftIndex;
         }
@@ -473,18 +501,47 @@ public final class ResultDowntimeSummaryUtil {
      * @param overlapEndTime 重叠结束时间
      * @return 最后一个重叠班次索引；未命中返回 -1
      */
-    private static int resolveLastOverlapShiftIndex(LhScheduleResult result,
+    private static int resolveLastOverlapShiftIndex(List<LhShiftConfigVO> scheduleWindowShifts,
                                                     Date overlapStartTime,
                                                     Date overlapEndTime) {
+        if (CollectionUtils.isEmpty(scheduleWindowShifts)) {
+            return -1;
+        }
         int lastShiftIndex = -1;
-        for (int shiftIndex = 1; shiftIndex <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT; shiftIndex++) {
-            Date shiftStartTime = ShiftFieldUtil.getShiftStartTime(result, shiftIndex);
-            Date shiftEndTime = ShiftFieldUtil.getShiftEndTime(result, shiftIndex);
-            if (isWindowOverlap(shiftStartTime, shiftEndTime, overlapStartTime, overlapEndTime)) {
-                lastShiftIndex = shiftIndex;
+        for (LhShiftConfigVO shift : scheduleWindowShifts) {
+            if (Objects.isNull(shift) || Objects.isNull(shift.getShiftIndex())) {
+                continue;
+            }
+            if (isWindowOverlap(shift.getShiftStartDateTime(), shift.getShiftEndDateTime(),
+                    overlapStartTime, overlapEndTime)) {
+                lastShiftIndex = shift.getShiftIndex();
             }
         }
         return lastShiftIndex;
+    }
+
+    /**
+     * 按时间点定位其落入的排程窗口标准班次索引。
+     *
+     * @param scheduleWindowShifts 排程窗口标准班次
+     * @param time 待定位时间
+     * @return 班次索引；未命中返回 -1
+     */
+    private static int resolveShiftIndexByStartTime(List<LhShiftConfigVO> scheduleWindowShifts, Date time) {
+        if (CollectionUtils.isEmpty(scheduleWindowShifts) || Objects.isNull(time)) {
+            return -1;
+        }
+        for (LhShiftConfigVO shift : scheduleWindowShifts) {
+            if (Objects.isNull(shift) || Objects.isNull(shift.getShiftIndex())) {
+                continue;
+            }
+            Date start = shift.getShiftStartDateTime();
+            Date end = shift.getShiftEndDateTime();
+            if (Objects.nonNull(start) && Objects.nonNull(end) && !time.before(start) && time.before(end)) {
+                return shift.getShiftIndex();
+            }
+        }
+        return -1;
     }
 
     private static Date resolveFirstPlannedShiftStartTime(LhScheduleResult result) {

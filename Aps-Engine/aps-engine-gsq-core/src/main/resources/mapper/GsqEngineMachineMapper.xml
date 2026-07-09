@@ -31,15 +31,14 @@
         group by STEEL_RING_CODE
     </select>
 
-    <select id="listGsqTwiningDiscMachine" resultType="com.zlt.aps.gsq.engine.vo.GsqTwiningDiscMachineVo" >
-        select SPEC, ORDER_WAY,
-                GROUP_CONCAT(DISTINCT a.MACHINE_ID ORDER BY a.MACHINE_ID SEPARATOR ',') as machine_ids
-        from T_GSQ_TWINING_DISC a
-        inner join T_GSQ_MACHINE_INFO m on a.machine_id = m.id
-        where a.DEL_FLAG = '0'
-        and m.STATUS = '0'
-        and m.DEL_FLAG = '0'
-        group by SPEC, ORDER_WAY
+    <!--
+        缠绕盘机台映射查询
+        原逻辑：从 T_GSQ_TWINING_DISC 按 SPEC+ORDER_WAY 分组关联 MACHINE_ID 构建规格~排列→机台映射
+        新表结构变更：T_GSQ_TWINING_DISC 已移除 SPEC/ORDER_WAY/MACHINE_ID 字段，改为缠绕盘资产管理
+        新表无机台关联字段，该映射暂返回空，排程回退到定点机台（specifyCanMachineMap）逻辑
+    -->
+    <select id="listGsqTwiningDiscMachine" resultType="com.zlt.aps.gsq.engine.vo.GsqTwiningDiscMachineVo">
+        select null as SPEC, null as ORDER_WAY, null as machine_ids from dual where 1 = 0
     </select>
 
     <select id="listGsqTwiningDisc" resultType="com.zlt.aps.gsq.engine.vo.GsqTwiningDiscVo">

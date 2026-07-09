@@ -696,13 +696,6 @@ export default {
     searchColumns() {
       return [
         {
-          label: this.$t("ui.data.column.factoryCode"),
-          prop: "factoryCode",
-          type: "select",
-          dictData: this.dict.type.biz_factory_name,
-          filterable: true,
-        },
-        {
           label: this.$t("ui.data.column.scheduleResult.scheduleDate"),
           prop: "scheduleDate",
           type: "date",
@@ -763,7 +756,6 @@ export default {
         type: "warning",
       }).then(() => {
         let ids = this.selection.map((row) => row.id).join(",");
-        ids = ids + "|" + this.query.scheduleDate;
         removeScheduleResult({ ids }).then((data) => {
           this.$modal.msgSuccess(data.msg);
           // this.$set(this.page, "current", 1);
@@ -826,7 +818,7 @@ export default {
       });
     },
     handleSearch(data) {
-      this.query = data;
+      this.query = { ...data, factoryCode: this.query.factoryCode };
       this.$set(this.page, "current", 1);
       this.getList();
 

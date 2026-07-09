@@ -27,7 +27,7 @@
 
           <el-col :span="12">
             <el-form-item
-              :label="$t('ui.data.column.scheduleResult.lhMachineCode')"
+              :label="$t('ui.data.column.lhScheduleResult.lhMachineCode')"
               prop="lhMachineCode"
             >
               <el-input v-model="form.lhMachineCode" disabled></el-input>
@@ -36,7 +36,7 @@
 
           <el-col :span="12">
             <el-form-item
-              :label="$t('ui.data.column.scheduleResult.materialCode')"
+              :label="$t('ui.data.column.lhScheduleResult.materialCode')"
               prop="materialCode"
             >
               <el-input v-model="form.materialCode" disabled></el-input>
@@ -65,7 +65,7 @@
               </el-col> -->
           <el-col :span="12">
             <el-form-item
-              :label="$t('ui.data.column.scheduleResult.materialDesc')"
+              :label="$t('ui.data.column.lhScheduleResult.materialDesc')"
               prop="materialDesc"
             >
             <el-input v-model="form.materialDesc" disabled></el-input>
@@ -90,7 +90,7 @@
           </el-col>
           <el-col :span="12">
             <el-form-item
-              :label="$t('ui.data.column.scheduleResult.embryoStock')"
+              :label="$t('ui.data.column.lhScheduleResult.embryoStock')"
               prop="embryoStock"
             >
               <el-input v-model="form.embryoStock" disabled></el-input>
@@ -149,7 +149,7 @@
 
           <el-col :span="12">
             <el-form-item
-              :label="$t('ui.data.column.scheduleResult.isRelease')"
+              :label="$t('ui.data.column.lhScheduleResult.isRelease')"
               prop="isRelease"
             >
               <dict-select
@@ -672,7 +672,7 @@ export default {
           type: "title",
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.scheduleDate"),
+          label: this.$t("ui.data.column.lhScheduleResult.scheduleDate"),
           prop: "scheduleDate",
           span: 12,
           type: "date",
@@ -692,7 +692,7 @@ export default {
           disabled: true,
         },
         {
-          label: this.$t("ui.data.column.cxScheduleResult.lhMachineCode"),
+          label: this.$t("ui.data.column.lhScheduleResult.lhMachineCode"),
           prop: "lhMachineCode",
           span: 12,
           disabled: true,
@@ -749,13 +749,13 @@ export default {
           disabled: true,
         },
         {
-          label: this.$t("ui.data.column.cxScheduleResult.embryoCode"),
+          label: this.$t("ui.data.column.lhScheduleResult.embryoCode"),
           prop: "embryoCode",
           span: 12,
           disabled: true,
         },
         {
-          label: this.$t("ui.data.column.cxScheduleResult.specDesc"),
+          label: this.$t("ui.data.column.lhScheduleResult.specDesc"),
           prop: "specDesc",
           span: 12,
           disabled: true,
@@ -862,7 +862,7 @@ export default {
           disabled: true,
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.isRelease"),
+          label: this.$t("ui.data.column.lhScheduleResult.isRelease"),
           prop: "monthPlanOs",
           span: 12,
           disabled: true,

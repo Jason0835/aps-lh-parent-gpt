@@ -5,6 +5,7 @@ import com.zlt.aps.tq.engine.handler.TqBalanceHandler;
 import com.zlt.aps.tq.engine.handler.TqDemandCalcHandler;
 import com.zlt.aps.tq.engine.handler.TqMachineAssignHandler;
 import com.zlt.aps.tq.engine.handler.TqPreValidationHandler;
+import com.zlt.aps.tq.engine.handler.TqResidualCapacityHandler;
 import com.zlt.aps.tq.engine.handler.TqResultPersistHandler;
 import com.zlt.aps.tq.engine.handler.TqStopCoordinationHandler;
 import lombok.extern.slf4j.Slf4j;
@@ -15,11 +16,12 @@ import javax.annotation.Resource;
 /**
  * 胎圈排程模板方法实现类。
  *
- * <p>绑定6个Handler到模板方法的6个阶段：</p>
+ * <p>绑定7个Handler到模板方法的7个阶段：</p>
  * <ul>
  *   <li>S1: TqPreValidationHandler - 前置校验与数据加载</li>
  *   <li>S2: TqDemandCalcHandler - 需求计算</li>
  *   <li>S3: TqMachineAssignHandler - 班次排产分配</li>
+ *   <li>S3.5: TqResidualCapacityHandler - 剩余产能分配</li>
  *   <li>S4: TqStopCoordinationHandler - 成型/胎圈停产协调</li>
  *   <li>S5: TqBalanceHandler - 班次均衡调整</li>
  *   <li>S6: TqResultPersistHandler - 结果校验与持久化</li>
@@ -39,6 +41,9 @@ public class TqScheduleTemplateImpl extends AbsTqScheduleTemplate {
 
     @Resource
     private TqMachineAssignHandler machineAssignHandler;
+
+    @Resource
+    private TqResidualCapacityHandler residualCapacityHandler;
 
     @Resource
     private TqStopCoordinationHandler stopCoordinationHandler;
@@ -62,6 +67,11 @@ public class TqScheduleTemplateImpl extends AbsTqScheduleTemplate {
     @Override
     protected void doMachineAssign(TqScheduleContext context) {
         machineAssignHandler.handle(context);
+    }
+
+    @Override
+    protected void doResidualCapacity(TqScheduleContext context) {
+        residualCapacityHandler.handle(context);
     }
 
     @Override

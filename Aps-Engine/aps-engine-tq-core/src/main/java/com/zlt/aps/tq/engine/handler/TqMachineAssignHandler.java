@@ -27,18 +27,11 @@ import static com.alibaba.fastjson.JSON.toJSONString;
  * <ol>
  *   <li>按优先级排序排程记录（定点机台优先 → 已排产规格优先 → 计划量从大到小）</li>
  *   <li>通过策略链过滤候选机台（定点/口型板/寸口/维修）</li>
- *   <li>3步排产策略：①当前班当前机台 → ②当前班切换机台 → ③延至下一班次</li>
+ *   <li>机台分配与切换：当前机台定额满则切换其他可用机台，仍无可用则延后到下一班</li>
  *   <li>机台定额约束：单机台单班产量不超过该机台定额</li>
  *   <li>设置6个班次的生产顺序</li>
  *   <li>构建任务链</li>
  * </ol>
- *
- * <p>3步排产策略说明：</p>
- * <ul>
- *   <li>步骤1：当前班次，当前已分配机台，若定额有余量则排产，超出部分进入步骤2</li>
- *   <li>步骤2：当前班次，搜索其他可用机台切换排产，超出部分进入步骤3</li>
- *   <li>步骤3：超出定额的需求量延后至下一班次累加，不再前移</li>
- * </ul>
  */
 @Slf4j
 @Component
@@ -113,6 +106,13 @@ public class TqMachineAssignHandler extends AbsTqScheduleStepHandler {
             return;
         }
 
+        // ========== 预扫描：建立机台→规格数映射 ==========
+        // 业务规则：一个规格只在指定机台生产，但一个机台可生产多个规格
+        // 通过预扫描每个规格的候选机台，统计每台机台对应多少个规格
+        // 用于 S3 分配时判断"单一规格机台"（只受quota限制）vs"多规格机台"（备库胎圈受阈值限制）
+        Map<String, Integer> machineSpecCountMap = preScanMachineSpecCount(scheduleList, allMachineList,
+                context, sortedStrategies);
+
         // 机台产能占用追踪（6个班次）
         Map<String, BigDecimal> class1CapacityMap = new HashMap<>();
         Map<String, BigDecimal> class2CapacityMap = new HashMap<>();
@@ -124,17 +124,13 @@ public class TqMachineAssignHandler extends AbsTqScheduleStepHandler {
         Map<String, List<String>> mouthPlatMap = new HashMap<>();
         Map<String, String> plannedMachineMap = new HashMap<>();
 
-        // 按优先级排序：定点机台优先 → 已排产规格优先 → 计划量从大到小
+        // 按优先级排序：定点机台优先 → 计划量从大到小
+        // 注：plannedMachineMap 在此处为空（尚未分配），原"已排产规格优先"条件失效，
+        //     已移至班次内三级优先级排序中动态判断（见 classSortedScheduleList）
         List<TqScheduleResultVo> sortedScheduleList = scheduleList.stream().sorted((o1, o2) -> {
             Integer flag1 = context.getSpecifyCanMachineMap().containsKey(o1.getBeadCode()) ? 1 : 2;
             Integer flag2 = context.getSpecifyCanMachineMap().containsKey(o2.getBeadCode()) ? 1 : 2;
             int result = flag1.compareTo(flag2);
-            if (result != 0) {
-                return result;
-            }
-            Integer isPlanned1 = plannedMachineMap.containsKey(o1.getBeadCode()) ? 1 : 2;
-            Integer isPlanned2 = plannedMachineMap.containsKey(o2.getBeadCode()) ? 1 : 2;
-            result = isPlanned1.compareTo(isPlanned2);
             if (result != 0) {
                 return result;
             }
@@ -161,18 +157,49 @@ public class TqMachineAssignHandler extends AbsTqScheduleStepHandler {
             double supplyTimeThreshold = context.getParams().getSupplyTimeThreshold() == null ? 24D
                     : context.getParams().getSupplyTimeThreshold();
 
-            // 按供应时长阈值排序：未达阈值优先，已达阈值排后
+            // ========== 三级优先级排序（新规则） ==========
+            // Priority-1: 当前班次新触发备库的规格（最高优先级）
+            // Priority-2: 前序班次已触发备库的规格，同组内按剩余需求缺口从大到小排序（缺口越大越优先）
+            // Priority-3: 非备库规格，按供应时长升序
+            final Integer currentClassNum = classIdx + 1;
             List<TqScheduleResultVo> classSortedScheduleList = sortedScheduleList.stream()
                     .sorted((o1, o2) -> {
+                        // 已分配机台的规格优先处理（避免机台分配不稳定）
+                        boolean planned1 = plannedMachineMap.containsKey(o1.getBeadCode());
+                        boolean planned2 = plannedMachineMap.containsKey(o2.getBeadCode());
+                        if (planned1 != planned2) {
+                            return planned1 ? -1 : 1;
+                        }
+
+                        boolean backup1 = o1.getBackupTriggerClass() != null && o1.getBackupTriggerClass() > 0;
+                        boolean backup2 = o2.getBackupTriggerClass() != null && o2.getBackupTriggerClass() > 0;
+
+                        // P-1: 当前班次新触发备库（最高优先级）
+                        boolean currentTrigger1 = backup1 && o1.getBackupTriggerClass().equals(currentClassNum);
+                        boolean currentTrigger2 = backup2 && o2.getBackupTriggerClass().equals(currentClassNum);
+                        if (currentTrigger1 != currentTrigger2) {
+                            return currentTrigger1 ? -1 : 1;
+                        }
+
+                        // P-2: 前序班次已触发备库
+                        boolean prevTrigger1 = backup1 && !currentTrigger1;
+                        boolean prevTrigger2 = backup2 && !currentTrigger2;
+                        if (prevTrigger1 != prevTrigger2) {
+                            return prevTrigger1 ? -1 : 1;
+                        }
+
+                        // 同为备库触发：按剩余需求缺口从大到小排序（缺口越大越优先）
+                        if (backup1 && backup2) {
+                            double rem1 = o1.getBackupRemainingQty() == null ? 0D : o1.getBackupRemainingQty();
+                            double rem2 = o2.getBackupRemainingQty() == null ? 0D : o2.getBackupRemainingQty();
+                            if (rem1 != rem2) {
+                                return Double.compare(rem2, rem1);  // 降序
+                            }
+                        }
+
+                        // P-3: 非备库规格按供应时长升序
                         double st1 = o1.getSupplyTime() == null ? 0D : o1.getSupplyTime();
                         double st2 = o2.getSupplyTime() == null ? 0D : o2.getSupplyTime();
-                        boolean above1 = st1 >= supplyTimeThreshold;
-                        boolean above2 = st2 >= supplyTimeThreshold;
-                        // 未达阈值排前面
-                        if (above1 != above2) {
-                            return above1 ? 1 : -1;
-                        }
-                        // 同组内按供应时长升序
                         return Double.compare(st1, st2);
                     })
                     .collect(Collectors.toList());
@@ -187,7 +214,9 @@ public class TqMachineAssignHandler extends AbsTqScheduleStepHandler {
                 double defaultQuota = context.getParams().getMaxClassOutput() == null ? 3000D
                         : context.getParams().getMaxClassOutput();
 
-                // ========== 3步排产策略 ==========
+                // ========== 单机台满排+延后策略（业务需求） ==========
+                // 业务规则：一个规格正常占用一个机台；当计划量超过机台定额（阈值）时，
+                // 当班满排机台定额的量，剩余量延后到下一班；下一班继续满排，仍排不完则继续延后。
 
                 // 步骤1：当前班次，当前已分配机台
                 if (StringUtils.isNotEmpty(scheduleVo.getMachineCode())) {
@@ -203,57 +232,81 @@ public class TqMachineAssignHandler extends AbsTqScheduleStepHandler {
                         continue;
                     }
 
-                    // 获取机台定额
+                    // 获取机台定额（作为当班满排阈值）
                     double machineQuota = getMachineQuota(existingMachine, defaultQuota);
 
                     // 定额检查：已排产能 + 当前计划量不能超过定额
                     BigDecimal currentCapacity = capacityMaps[classIdx].getOrDefault(machineCode, BigDecimal.ZERO);
                     double remainingCapacity = BigDecimalUtil.sub(machineQuota, currentCapacity.doubleValue());
 
-                    if (remainingCapacity <= 0) {
-                        // 步骤1失败：已无剩余定额，进入步骤2
-                        double overflowQty = planQty;
+                    // 备库胎圈多规格阈值限制：
+                    // 单一规格机台 → 只受 quota 限制（可满排）
+                    // 多规格机台   → 备库胎圈初始排产不超过 SYS1101029 阈值，剩余产能由 S3.5 回填
+                    double backupThreshold = context.getParams().getBackupShiftThreshold() == null ? 1000D
+                            : context.getParams().getBackupShiftThreshold();
+                    double initAssignLimit = getBackupInitAssignLimit(scheduleVo, machineCode,
+                            machineSpecCountMap, machineQuota, backupThreshold);
+                    // 当班实际可排上限 = min(机台剩余产能, 备库初始排产上限)
+                    double effectiveCapacity = Math.min(remainingCapacity, initAssignLimit);
+
+                    // 判断是否为备库胎圈多规格机台场景
+                    boolean isBackupSpec = scheduleVo.getBackupTriggerClass() != null
+                            && scheduleVo.getBackupTriggerClass() > 0;
+                    boolean isMultiSpecMachine = !isSingleSpecMachine(machineCode, machineSpecCountMap);
+
+                    if (isBackupSpec && isMultiSpecMachine) {
+                        // 备库胎圈多规格机台：只排 min(计划量, 阈值, 剩余产能)，不延后
+                        // 未排量累加到 backupRemainingQty，由 S3.5 按优先级回填
+                        double assignQty = Math.min(planQty, effectiveCapacity);
+                        if (assignQty < 0) assignQty = 0;
+                        setClassPlanQty(scheduleVo, classIdx + 1, assignQty);
+                        if (assignQty > 0) {
+                            capacityMaps[classIdx].put(machineCode, capacityMaps[classIdx].getOrDefault(machineCode, BigDecimal.ZERO)
+                                    .add(BigDecimalUtils.valueOf(assignQty)));
+                        }
+                        // 未排量累加到 backupRemainingQty（供 S3.5 回填使用）
+                        double unplanQty = BigDecimalUtil.sub(planQty, assignQty);
+                        if (unplanQty > 0) {
+                            double current = scheduleVo.getBackupRemainingQty() == null ? 0D : scheduleVo.getBackupRemainingQty();
+                            scheduleVo.setBackupRemainingQty(BigDecimalUtil.add(current, unplanQty));
+                            autoScheduleLogService.insertTqScheduleLog(scheduleVo.getBatchNo(), scheduleVo.getOrderNo(),
+                                    "备库胎圈阈值限制-未排量累计", "胎圈代码：" + scheduleVo.getBeadCode()
+                                            + "，" + (classIdx + 1) + "班排" + assignQty
+                                            + "，未排量" + unplanQty + "累计到backupRemainingQty");
+                        }
+                    } else if (effectiveCapacity <= 0) {
+                        // 非备库或单规格机台：当前机台本班已排满，全部计划量延后到下一班
                         setClassPlanQty(scheduleVo, classIdx + 1, 0D);
-
-                        // 步骤2：当前班次，搜索其他可用机台切换
-                        boolean step2Success = trySwitchMachine(scheduleVo, classIdx, classCode, overflowQty,
-                                capacityMaps, allMachineList, context, sortedStrategies, plannedMachineMap,
-                                glueMap, mouthPlatMap, defaultQuota);
-
-                        if (!step2Success) {
-                            // 步骤3：延后至下一班次
-                            deferToNextClass(scheduleVo, classIdx + 1, overflowQty);
-                        }
-                    } else if (planQty > remainingCapacity) {
-                        // 部分可排：截断到剩余定额，超出部分进入步骤2/3
-                        setClassPlanQty(scheduleVo, classIdx + 1, remainingCapacity);
+                        deferToNextClass(scheduleVo, classIdx + 1, planQty);
+                    } else if (planQty > effectiveCapacity) {
+                        // 部分可排：当班先排满有效产能，超出部分延后到下一班
+                        setClassPlanQty(scheduleVo, classIdx + 1, effectiveCapacity);
                         capacityMaps[classIdx].put(machineCode, capacityMaps[classIdx].getOrDefault(machineCode, BigDecimal.ZERO)
-                                .add(BigDecimalUtils.valueOf(remainingCapacity)));
+                                .add(BigDecimalUtils.valueOf(effectiveCapacity)));
 
-                        double overflowQty = BigDecimalUtil.sub(planQty, remainingCapacity);
+                        double overflowQty = BigDecimalUtil.sub(planQty, effectiveCapacity);
+                        deferToNextClass(scheduleVo, classIdx + 1, overflowQty);
 
-                        // 步骤2：搜索其他可用机台
-                        boolean step2Success = trySwitchMachine(scheduleVo, classIdx, classCode, overflowQty,
-                                capacityMaps, allMachineList, context, sortedStrategies, plannedMachineMap,
-                                glueMap, mouthPlatMap, defaultQuota);
-
-                        if (!step2Success) {
-                            // 步骤3：延后至下一班次
-                            deferToNextClass(scheduleVo, classIdx + 1, overflowQty);
-                        }
+                        autoScheduleLogService.insertTqScheduleLog(scheduleVo.getBatchNo(), scheduleVo.getOrderNo(),
+                                "当班满排-剩余延后", "胎圈代码：" + scheduleVo.getBeadCode()
+                                        + "，" + (classIdx + 1) + "班排满" + effectiveCapacity
+                                        + "，剩余" + overflowQty + "延后至下一班");
                     } else {
                         // 全部可排
+                        setClassPlanQty(scheduleVo, classIdx + 1, planQty);
                         capacityMaps[classIdx].put(machineCode, capacityMaps[classIdx].getOrDefault(machineCode, BigDecimal.ZERO)
                                 .add(BigDecimalUtils.valueOf(planQty)));
                     }
+                    chooseMachineLog(scheduleVo, context);
                     continue;
                 }
 
-                // 未分配机台，搜索可用机台
+                // 未分配机台：搜索一个可用机台分配
                 List<TqMachineInfo> optionalMachineList = searchOptionalMachineList(
                         scheduleVo, classCode, capacityMaps[classIdx], allMachineList, context, sortedStrategies, plannedMachineMap);
+
                 if (CollectionUtil.isEmpty(optionalMachineList)) {
-                    // 无可用机台，延后至下一班次（步骤3）
+                    // 无可用机台，延后至下一班次
                     setClassPlanQty(scheduleVo, classIdx + 1, 0D);
                     deferToNextClass(scheduleVo, classIdx + 1, planQty);
                     autoScheduleLogService.insertTqScheduleLog(scheduleVo.getBatchNo(), scheduleVo.getOrderNo(),
@@ -261,50 +314,85 @@ public class TqMachineAssignHandler extends AbsTqScheduleStepHandler {
                                     + "，" + (classIdx + 1) + "班计划量" + planQty + "延后");
                     continue;
                 }
-                scheduleVo.setUnscheduledFlag("0");
 
-                TqMachineInfo machine = CollectionUtil.firstElement(optionalMachineList);
+                // 选择第一台可用机台（一个规格一个机台）
+                TqMachineInfo machine = optionalMachineList.get(0);
                 String machineCode = machine.getMachineCode();
-                scheduleVo.setMachineCode(machineCode);
-
-                // 获取机台定额
                 double machineQuota = getMachineQuota(machine, defaultQuota);
-
-                // 定额约束检查
                 BigDecimal currentCapacity = capacityMaps[classIdx].getOrDefault(machineCode, BigDecimal.ZERO);
                 double remainingCapacity = BigDecimalUtil.sub(machineQuota, currentCapacity.doubleValue());
 
-                if (planQty > remainingCapacity && remainingCapacity > 0) {
-                    // 部分可排
-                    setClassPlanQty(scheduleVo, classIdx + 1, remainingCapacity);
-                    capacityMaps[classIdx].put(machineCode, capacityMaps[classIdx].getOrDefault(machineCode, BigDecimal.ZERO)
-                            .add(BigDecimalUtils.valueOf(remainingCapacity)));
+                // 首次分配机台，设置排程记录的机台编号
+                scheduleVo.setMachineCode(machineCode);
+                scheduleVo.setUnscheduledFlag("0");
+                plannedMachineMap.put(scheduleVo.getBeadCode(), machineCode);
+                putMachineCode(scheduleVo.getGlueCode(), machineCode, glueMap);
+                putMachineCode(scheduleVo.getMouthPlateCode(), machineCode, mouthPlatMap);
 
-                    double overflowQty = BigDecimalUtil.sub(planQty, remainingCapacity);
-                    // 超出部分延后至下一班次
-                    deferToNextClass(scheduleVo, classIdx + 1, overflowQty);
-                } else if (remainingCapacity <= 0) {
-                    // 无剩余定额，全部延后
-                    setClassPlanQty(scheduleVo, classIdx + 1, 0D);
-                    deferToNextClass(scheduleVo, classIdx + 1, planQty);
-                } else {
-                    // 全部可排
-                    capacityMaps[classIdx].put(machineCode, capacityMaps[classIdx].getOrDefault(machineCode, BigDecimal.ZERO)
-                            .add(BigDecimalUtils.valueOf(planQty)));
-                }
-
-                // 占用机台其他班产能
+                // 占用机台其他班产能（避免其他规格在同一机台其他班次超定额）
                 for (int i = 0; i < 6; i++) {
-                    if (i == classIdx) continue; // 当前班已处理
+                    if (i == classIdx) continue;
                     double classPlan = getClassPlanQty(scheduleVo, i + 1);
                     if (classPlan > 0) {
                         capacityMaps[i].put(machineCode, capacityMaps[i].getOrDefault(machineCode, BigDecimal.ZERO)
                                 .add(BigDecimalUtils.valueOf(classPlan)));
                     }
                 }
-                plannedMachineMap.put(scheduleVo.getBeadCode(), machineCode);
-                putMachineCode(scheduleVo.getGlueCode(), machineCode, glueMap);
-                putMachineCode(scheduleVo.getMouthPlateCode(), machineCode, mouthPlatMap);
+
+                // 备库胎圈多规格阈值限制（同已分配机台分支逻辑）
+                double backupThreshold = context.getParams().getBackupShiftThreshold() == null ? 1000D
+                        : context.getParams().getBackupShiftThreshold();
+                double initAssignLimit = getBackupInitAssignLimit(scheduleVo, machineCode,
+                        machineSpecCountMap, machineQuota, backupThreshold);
+                double effectiveCapacity = Math.min(remainingCapacity, initAssignLimit);
+
+                // 判断是否为备库胎圈多规格机台场景（同已分配机台分支）
+                boolean isBackupSpec = scheduleVo.getBackupTriggerClass() != null
+                        && scheduleVo.getBackupTriggerClass() > 0;
+                boolean isMultiSpecMachine = !isSingleSpecMachine(machineCode, machineSpecCountMap);
+
+                if (isBackupSpec && isMultiSpecMachine) {
+                    // 备库胎圈多规格机台：只排 min(计划量, 阈值, 剩余产能)，不延后
+                    double assignQty = Math.min(planQty, effectiveCapacity);
+                    if (assignQty < 0) assignQty = 0;
+                    setClassPlanQty(scheduleVo, classIdx + 1, assignQty);
+                    if (assignQty > 0) {
+                        capacityMaps[classIdx].put(machineCode, capacityMaps[classIdx].getOrDefault(machineCode, BigDecimal.ZERO)
+                                .add(BigDecimalUtils.valueOf(assignQty)));
+                    }
+                    // 未排量累加到 backupRemainingQty（供 S3.5 回填使用）
+                    double unplanQty = BigDecimalUtil.sub(planQty, assignQty);
+                    if (unplanQty > 0) {
+                        double current = scheduleVo.getBackupRemainingQty() == null ? 0D : scheduleVo.getBackupRemainingQty();
+                        scheduleVo.setBackupRemainingQty(BigDecimalUtil.add(current, unplanQty));
+                        autoScheduleLogService.insertTqScheduleLog(scheduleVo.getBatchNo(), scheduleVo.getOrderNo(),
+                                "备库胎圈阈值限制-未排量累计", "胎圈代码：" + scheduleVo.getBeadCode()
+                                        + "，" + (classIdx + 1) + "班排" + assignQty
+                                        + "，未排量" + unplanQty + "累计到backupRemainingQty");
+                    }
+                } else if (effectiveCapacity <= 0) {
+                    // 非备库或单规格机台：机台本班已排满，全部计划量延后到下一班
+                    setClassPlanQty(scheduleVo, classIdx + 1, 0D);
+                    deferToNextClass(scheduleVo, classIdx + 1, planQty);
+                } else if (planQty > effectiveCapacity) {
+                    // 部分可排：当班先排满有效产能，超出部分延后到下一班
+                    setClassPlanQty(scheduleVo, classIdx + 1, effectiveCapacity);
+                    capacityMaps[classIdx].put(machineCode, capacityMaps[classIdx].getOrDefault(machineCode, BigDecimal.ZERO)
+                            .add(BigDecimalUtils.valueOf(effectiveCapacity)));
+
+                    double overflowQty = BigDecimalUtil.sub(planQty, effectiveCapacity);
+                    deferToNextClass(scheduleVo, classIdx + 1, overflowQty);
+
+                    autoScheduleLogService.insertTqScheduleLog(scheduleVo.getBatchNo(), scheduleVo.getOrderNo(),
+                            "当班满排-剩余延后", "胎圈代码：" + scheduleVo.getBeadCode()
+                                    + "，" + (classIdx + 1) + "班排满" + effectiveCapacity
+                                    + "，剩余" + overflowQty + "延后至下一班");
+                } else {
+                    // 全部可排
+                    setClassPlanQty(scheduleVo, classIdx + 1, planQty);
+                    capacityMaps[classIdx].put(machineCode, capacityMaps[classIdx].getOrDefault(machineCode, BigDecimal.ZERO)
+                            .add(BigDecimalUtils.valueOf(planQty)));
+                }
 
                 chooseMachineLog(scheduleVo, context);
             }
@@ -322,88 +410,99 @@ public class TqMachineAssignHandler extends AbsTqScheduleStepHandler {
     }
 
     /**
-     * 步骤2：尝试切换到其他可用机台排产
+     * 预扫描所有规格的候选机台，统计每台机台对应多少个规格。
      *
-     * @return true=切换成功，false=无可用机台
+     * <p>业务规则：一个规格只在指定机台生产，但一个机台可生产多个规格。
+     * 通过预扫描建立 machineCode → specCount 映射，用于判断"单一规格机台"vs"多规格机台"。</p>
+     *
+     * @param scheduleList 排程结果列表
+     * @param allMachineList 所有机台列表
+     * @param context 排程上下文
+     * @param sortedStrategies 排序后的机台过滤策略链
+     * @return machineCode → specCount 映射
      */
-    private boolean trySwitchMachine(TqScheduleResultVo scheduleVo, int classIdx, String classCode,
-                                     double overflowQty, Map<String, BigDecimal>[] capacityMaps,
-                                     List<TqMachineInfo> allMachineList, TqScheduleContext context,
-                                     List<IMachineFilterStrategy> sortedStrategies,
-                                     Map<String, String> plannedMachineMap,
-                                     Map<String, List<String>> glueMap, Map<String, List<String>> mouthPlatMap,
-                                     double defaultQuota) {
-        // 搜索其他可用机台（排除当前已分配的机台）
-        String currentMachineCode = scheduleVo.getMachineCode();
-        List<TqMachineInfo> optionalMachineList = searchOptionalMachineList(
-                scheduleVo, classCode, capacityMaps[classIdx], allMachineList, context, sortedStrategies, plannedMachineMap);
+    private Map<String, Integer> preScanMachineSpecCount(List<TqScheduleResultVo> scheduleList,
+                                                         List<TqMachineInfo> allMachineList,
+                                                         TqScheduleContext context,
+                                                         List<IMachineFilterStrategy> sortedStrategies) {
+        Map<String, Integer> machineSpecCountMap = new HashMap<>();
+        // 使用第一班次作为预扫描班次，空产能Map
+        String firstClassCode = SHIFT_CLASS_MAP[0];
+        Map<String, BigDecimal> emptyCapacityMap = new HashMap<>();
+        Map<String, String> emptyPlannedMap = new HashMap<>();
 
-        // 排除当前机台
-        if (StringUtils.isNotEmpty(currentMachineCode)) {
-            optionalMachineList = optionalMachineList.stream()
-                    .filter(m -> !m.getMachineCode().equals(currentMachineCode))
-                    .collect(Collectors.toList());
+        for (TqScheduleResultVo scheduleVo : scheduleList) {
+            List<TqMachineInfo> candidates = searchOptionalMachineList(
+                    scheduleVo, firstClassCode, emptyCapacityMap, allMachineList, context, sortedStrategies, emptyPlannedMap);
+            if (!CollectionUtil.isEmpty(candidates)) {
+                String machineCode = candidates.get(0).getMachineCode();
+                machineSpecCountMap.merge(machineCode, 1, Integer::sum);
+            }
         }
-
-        if (CollectionUtil.isEmpty(optionalMachineList)) {
-            autoScheduleLogService.insertTqScheduleLog(scheduleVo.getBatchNo(), scheduleVo.getOrderNo(),
-                    "步骤2-切换机台失败", "胎圈代码：" + scheduleVo.getBeadCode()
-                            + "，无其他可用机台，" + overflowQty + "将延后至下一班");
-            return false;
-        }
-
-        // 选择定额余量最大的机台
-        TqMachineInfo switchMachine = optionalMachineList.stream()
-                .max(Comparator.comparingDouble(m -> {
-                    double quota = getMachineQuota(m, defaultQuota);
-                    double used = capacityMaps[classIdx].getOrDefault(m.getMachineCode(), BigDecimal.ZERO).doubleValue();
-                    return BigDecimalUtil.sub(quota, used);
-                })).orElse(null);
-
-        if (switchMachine == null) {
-            return false;
-        }
-
-        double switchMachineQuota = getMachineQuota(switchMachine, defaultQuota);
-        BigDecimal switchCapacity = capacityMaps[classIdx].getOrDefault(switchMachine.getMachineCode(), BigDecimal.ZERO);
-        double switchRemaining = BigDecimalUtil.sub(switchMachineQuota, switchCapacity.doubleValue());
-
-        if (switchRemaining <= 0) {
-            return false;
-        }
-
-        // 在切换机台上排产
-        double assignQty = Math.min(overflowQty, switchRemaining);
-        capacityMaps[classIdx].put(switchMachine.getMachineCode(), capacityMaps[classIdx].getOrDefault(switchMachine.getMachineCode(), BigDecimal.ZERO)
-                .add(BigDecimalUtils.valueOf(assignQty)));
-
-        // 将切换机台排产量加回当前班次计划量（调用方已将当前班次设为原始机台的排产量，此处累加切换机台的排产量）
-        double currentQty = getClassPlanQty(scheduleVo, classIdx + 1);
-        setClassPlanQty(scheduleVo, classIdx + 1, BigDecimalUtil.add(currentQty, assignQty));
-
-        double stillOverflow = BigDecimalUtil.sub(overflowQty, assignQty);
-        if (stillOverflow > 0) {
-            // 仍有超出部分，延后至下一班次
-            deferToNextClass(scheduleVo, classIdx + 1, stillOverflow);
-        }
-
-        autoScheduleLogService.insertTqScheduleLog(scheduleVo.getBatchNo(), scheduleVo.getOrderNo(),
-                "步骤2-切换机台成功", "胎圈代码：" + scheduleVo.getBeadCode()
-                        + "，切换到机台" + switchMachine.getMachineCode() + "，排产量" + assignQty
-                        + (stillOverflow > 0 ? "，仍有" + stillOverflow + "延后" : ""));
-        return true;
+        return machineSpecCountMap;
     }
 
     /**
-     * 步骤3：将超出定额的计划量延后至下一班次累加
+     * 判断机台是否为单一规格机台（只生产1个规格）。
      *
-     * <p>不再前移，而是延后到下一个班次。6班已是最后一班时，记录溢出日志。</p>
+     * @param machineCode 机台编码
+     * @param machineSpecCountMap 机台→规格数映射
+     * @return true=单一规格机台，false=多规格机台
+     */
+    private boolean isSingleSpecMachine(String machineCode, Map<String, Integer> machineSpecCountMap) {
+        Integer count = machineSpecCountMap.get(machineCode);
+        return count != null && count == 1;
+    }
+
+    /**
+     * 计算备库胎圈当班初始排产上限。
+     *
+     * <p>规则：</p>
+     * <ul>
+     *   <li>非备库胎圈：返回 quota（不受阈值限制，走现有逻辑）</li>
+     *   <li>备库胎圈 + 单一规格机台：返回 quota（单一规格只受机台定额限制）</li>
+     *   <li>备库胎圈 + 多规格机台：返回 min(quota, threshold)（受SYS1101029阈值限制）</li>
+     * </ul>
+     *
+     * @param scheduleVo 排程结果VO
+     * @param machineCode 机台编码
+     * @param machineSpecCountMap 机台→规格数映射
+     * @param machineQuota 机台定额
+     * @param backupShiftThreshold 备库班次阈值（SYS1101029）
+     * @return 当班初始排产上限
+     */
+    private double getBackupInitAssignLimit(TqScheduleResultVo scheduleVo, String machineCode,
+                                            Map<String, Integer> machineSpecCountMap,
+                                            double machineQuota, double backupShiftThreshold) {
+        boolean isBackupSpec = scheduleVo.getBackupTriggerClass() != null
+                && scheduleVo.getBackupTriggerClass() > 0;
+        if (!isBackupSpec) {
+            // 非备库胎圈：不受阈值限制
+            return machineQuota;
+        }
+        if (isSingleSpecMachine(machineCode, machineSpecCountMap)) {
+            // 单一规格机台：备库胎圈只受机台定额限制，可满排
+            return machineQuota;
+        }
+        // 多规格机台：备库胎圈受阈值限制，初始排产不超过 threshold
+        return Math.min(machineQuota, backupShiftThreshold);
+    }
+
+    /**
+     * 将超出机台定额的计划量延后至下一班次累加。
+     *
+     * <p>业务规则：当班满排机台定额（阈值）后，剩余量延后到下一班；
+     * 下一班继续满排，仍排不完则继续延后，直到6班排完或排完所有计划量。</p>
+     *
+     * @param scheduleVo 排程记录
+     * @param currentClass 当前班次号（1~6）
+     * @param overflowQty 溢出量
      */
     private void deferToNextClass(TqScheduleResultVo scheduleVo, int currentClass, double overflowQty) {
         if (currentClass >= 6) {
             // 已是最后一班，无法延后，记录溢出
             autoScheduleLogService.insertTqScheduleLog(scheduleVo.getBatchNo(), scheduleVo.getOrderNo(),
-                    "步骤3-延后失败(已是最后一班)", "胎圈代码：" + scheduleVo.getBeadCode()
+                    "延后失败(已是最后一班)", "胎圈代码：" + scheduleVo.getBeadCode()
                             + "，" + currentClass + "班溢出量" + overflowQty + "无法延后");
             log.warn("[S3] 胎圈{}的6班溢出量{}无法延后", scheduleVo.getBeadCode(), overflowQty);
             return;
@@ -413,7 +512,7 @@ public class TqMachineAssignHandler extends AbsTqScheduleStepHandler {
         setClassPlanQty(scheduleVo, currentClass + 1, BigDecimalUtil.add(nextClassQty, overflowQty));
 
         autoScheduleLogService.insertTqScheduleLog(scheduleVo.getBatchNo(), scheduleVo.getOrderNo(),
-                "步骤3-延后至下一班", "胎圈代码：" + scheduleVo.getBeadCode()
+                "延后至下一班", "胎圈代码：" + scheduleVo.getBeadCode()
                         + "，" + currentClass + "班溢出量" + overflowQty + "延后至" + (currentClass + 1) + "班");
     }
 
@@ -510,27 +609,36 @@ public class TqMachineAssignHandler extends AbsTqScheduleStepHandler {
      * <p>排序规则：1.相同英寸连续生产 2.同英寸内按库存供应时长升序排序</p>
      */
     private void setProduceOrder(List<TqScheduleResultVo> scheduleList) {
-        int[] produceOrders = new int[6]; // 6个班次各自的生产顺序计数器
-        Arrays.fill(produceOrders, 1);
+        // 按机台分组：顺序值应按机台独立编号（同一机台同一班次内的规格顺序1,2,3...）
+        // 而非全局编号，避免"机台只有2个规格但顺序值=4"的问题
+        Map<String, List<TqScheduleResultVo>> machineGroupMap = scheduleList.stream()
+                .filter(s -> StringUtils.isNotEmpty(s.getMachineCode()))
+                .collect(Collectors.groupingBy(TqScheduleResultVo::getMachineCode));
 
         for (int classIdx = 0; classIdx < 6; classIdx++) {
             final int ci = classIdx;
-            // 排序：1.相同英寸连续 2.同英寸内按供应时长升序
-            List<TqScheduleResultVo> sortedList = scheduleList.stream()
-                    .filter(s -> getClassPlanQty(s, ci + 1) > 0)
-                    .sorted(Comparator
-                            .comparing((TqScheduleResultVo s) -> s.getDimension() == null ? BigDecimal.ZERO : s.getDimension())
-                            .thenComparing(TqScheduleResultVo::getSupplyTime))
-                    .collect(Collectors.toList());
+            // 每个机台内独立设置顺序值
+            for (Map.Entry<String, List<TqScheduleResultVo>> entry : machineGroupMap.entrySet()) {
+                String machineCode = entry.getKey();
+                List<TqScheduleResultVo> machineSpecs = entry.getValue();
+                // 排序：1.相同英寸连续 2.同英寸内按供应时长升序
+                List<TqScheduleResultVo> sortedList = machineSpecs.stream()
+                        .filter(s -> getClassPlanQty(s, ci + 1) > 0)
+                        .sorted(Comparator
+                                .comparing((TqScheduleResultVo s) -> s.getDimension() == null ? BigDecimal.ZERO : s.getDimension())
+                                .thenComparing(s -> s.getSupplyTime() == null ? 0D : s.getSupplyTime()))
+                        .collect(Collectors.toList());
 
-            for (TqScheduleResultVo scheduleVo : sortedList) {
-                setClassProduceOrder(scheduleVo, ci + 1, produceOrders[ci]++);
+                int order = 1;
+                for (TqScheduleResultVo scheduleVo : sortedList) {
+                    setClassProduceOrder(scheduleVo, ci + 1, order++);
 
-                autoScheduleLogService.insertTqScheduleLog(scheduleVo.getBatchNo(), scheduleVo.getOrderNo(),
-                        "设置" + (ci + 1) + "班生产顺序",
-                        "相同英寸连续生产规则，寸口=" + scheduleVo.getDimension()
-                                + "，供应时长=" + scheduleVo.getSupplyTime()
-                                + "，生产顺序=" + (produceOrders[ci] - 1));
+                    autoScheduleLogService.insertTqScheduleLog(scheduleVo.getBatchNo(), scheduleVo.getOrderNo(),
+                            "设置" + (ci + 1) + "班生产顺序",
+                            "机台" + machineCode + "内相同英寸连续生产规则，寸口=" + scheduleVo.getDimension()
+                                    + "，供应时长=" + scheduleVo.getSupplyTime()
+                                    + "，生产顺序=" + (order - 1));
+                }
             }
         }
     }

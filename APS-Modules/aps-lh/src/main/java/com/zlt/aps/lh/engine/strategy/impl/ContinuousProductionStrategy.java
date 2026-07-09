@@ -1329,7 +1329,8 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
         if (sourceSku == null || CollectionUtils.isEmpty(activeResults)) {
             return keptResults;
         }
-        int minimumMachineCount = resolveContinuationDayMinimumMachineCount(context, sourceSku, dayPlanQty);
+        // 传入activeResults以便识别单控机台折半产能
+        int minimumMachineCount = resolveContinuationDayMinimumMachineCount(context, sourceSku, dayPlanQty, activeResults);
         if (minimumMachineCount <= 0 || (!CollectionUtils.isEmpty(keptResults)
                 && keptResults.size() >= minimumMachineCount)) {
             return keptResults;
@@ -1367,6 +1368,25 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
     private int resolveContinuationDayMinimumMachineCount(LhScheduleContext context,
                                                           SkuScheduleDTO sourceSku,
                                                           int dayPlanQty) {
+        return resolveContinuationDayMinimumMachineCount(context, sourceSku, dayPlanQty, null);
+    }
+
+    /**
+     * 解析 dayN 计划量对应的续作最小机台数（支持单控机台折半产能）。
+     * <p>单控机台每侧（L或R）只有普通机台一半的硫化产能，计算最小机台数时
+     * 必须将硫化日标准量折半，否则会错误判定单台单控机台即可覆盖日计划量，
+     * 导致不必要的降模减机台。</p>
+     *
+     * @param context 排程上下文
+     * @param sourceSku 来源SKU
+     * @param dayPlanQty 当前 dayN 日计划量
+     * @param machineResults 当前续作机台结果列表；用于判断是否全部为单控机台
+     * @return 最小续作机台数
+     */
+    private int resolveContinuationDayMinimumMachineCount(LhScheduleContext context,
+                                                          SkuScheduleDTO sourceSku,
+                                                          int dayPlanQty,
+                                                          List<LhScheduleResult> machineResults) {
         int positiveDayPlanQty = Math.max(0, dayPlanQty);
         if (positiveDayPlanQty <= 0) {
             return 0;
@@ -1375,7 +1395,67 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
         if (dailyStandardQty <= 0) {
             return 0;
         }
+        // 单控机台每侧只有普通机台一半的产能，硫化日标准量折半后再参与最小机台数计算
+        if (isAllSingleControlMachines(context, machineResults)) {
+            dailyStandardQty = Math.max(1, dailyStandardQty / 2);
+        }
         return (positiveDayPlanQty + dailyStandardQty - 1) / dailyStandardQty;
+    }
+
+    /**
+     * 判断续作机台结果列表是否全部为单控机台。
+     * <p>全部为单控机台时，硫化日标准量需要折半计算最小机台数，
+     * 避免误判单台单控机台即可覆盖日计划量。</p>
+     *
+     * @param context 排程上下文
+     * @param machineResults 续作机台结果列表
+     * @return true-全部为单控机台；false-包含非单控机台或列表为空
+     */
+    private boolean isAllSingleControlMachines(LhScheduleContext context,
+                                               List<LhScheduleResult> machineResults) {
+        if (context == null || CollectionUtils.isEmpty(machineResults)) {
+            return false;
+        }
+        for (LhScheduleResult result : machineResults) {
+            if (result == null || StringUtils.isEmpty(result.getLhMachineCode())) {
+                continue;
+            }
+            if (!LhSingleControlMachineUtil.isConfiguredSingleControlMachine(
+                    context, result.getLhMachineCode())) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * 解析来源SKU对应的续作机台结果列表。
+     * <p>用于在不直接持有skuResults的场景（如增机台判断）中，
+     * 从排程上下文获取当前续作机台，以判断是否为单控机台。</p>
+     *
+     * @param context 排程上下文
+     * @param sourceSku 来源SKU
+     * @return 续作机台结果列表
+     */
+    private List<LhScheduleResult> resolveContinuousMachineResults(LhScheduleContext context,
+                                                                   SkuScheduleDTO sourceSku) {
+        if (context == null || sourceSku == null
+                || CollectionUtils.isEmpty(context.getScheduleResultList())) {
+            return new ArrayList<LhScheduleResult>(0);
+        }
+        List<LhScheduleResult> results = new ArrayList<LhScheduleResult>(4);
+        for (LhScheduleResult result : context.getScheduleResultList()) {
+            if (!isPureContinuousResult(result)) {
+                continue;
+            }
+            SkuScheduleDTO resultSourceSku = resolveResultSourceSku(context, result);
+            if (resultSourceSku == null
+                    || resultSourceSku.getDailyPlanQuotaMap() != sourceSku.getDailyPlanQuotaMap()) {
+                continue;
+            }
+            results.add(result);
+        }
+        return results;
     }
 
     /**
@@ -2179,8 +2259,9 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
         if (firstDayPlanQty <= 0) {
             return false;
         }
+        // 传入skuResults以便识别单控机台折半产能
         int firstDayMinimumMachineCount = resolveContinuationDayMinimumMachineCount(
-                context, sourceSku, firstDayPlanQty);
+                context, sourceSku, firstDayPlanQty, skuResults);
         if (firstDayMinimumMachineCount > 1) {
             log.info("续作收尾单机降模跳过, materialCode: {}, historyShortageQty: {}, threshold: {}, "
                             + "firstDayPlanQty: {}, SKU日标准产量: {}, dayN最小机台数: {}, 原始机台: {}, "
@@ -2573,6 +2654,8 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
                 LhScheduleParamConstant.DRY_ICE_LOSS_QTY, LhScheduleConstant.DRY_ICE_LOSS_QTY);
         int dryIceDurationHours = context.getParamIntValue(
                 LhScheduleParamConstant.DRY_ICE_DURATION_HOURS, LhScheduleConstant.DRY_ICE_DURATION_HOURS);
+        int plannedRepairFixedQty = context.getParamIntValue(
+                LhScheduleParamConstant.PLANNED_REPAIR_FIXED_QTY, LhScheduleConstant.PLANNED_REPAIR_FIXED_QTY);
         String configPlusShiftType = ShiftCapacityResolverUtil.resolveOddShiftCapacityPlusShiftType(context);
         int actualShiftPlanQty = ShiftCapacityResolverUtil.resolveActualShiftPlanQty(
                 shiftCapacity, shift, configPlusShiftType, ScheduleTypeEnum.CONTINUOUS.getCode());
@@ -2604,7 +2687,8 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
                 dryIceDurationHours,
                 shift,
                 configPlusShiftType,
-                ScheduleTypeEnum.CONTINUOUS.getCode());
+                ScheduleTypeEnum.CONTINUOUS.getCode(),
+                plannedRepairFixedQty);
         if (oddShiftAdjustEnabled) {
             log.info("奇数班产修正命中, 当前流程: 续作排产, materialCode: {}, machineCode: {}, 参数值: {}, "
                             + "原始班产: {}, 班次序号: {}, 当前班别: {}, 修正后班次计划量: {}, 班产落库字段值: {}",
@@ -5170,6 +5254,8 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
                 LhScheduleParamConstant.DRY_ICE_LOSS_QTY, LhScheduleConstant.DRY_ICE_LOSS_QTY);
         int dryIceDurationHours = context.getParamIntValue(
                 LhScheduleParamConstant.DRY_ICE_DURATION_HOURS, LhScheduleConstant.DRY_ICE_DURATION_HOURS);
+        int plannedRepairFixedQty = context.getParamIntValue(
+                LhScheduleParamConstant.PLANNED_REPAIR_FIXED_QTY, LhScheduleConstant.PLANNED_REPAIR_FIXED_QTY);
         String configPlusShiftType = ShiftCapacityResolverUtil.resolveOddShiftCapacityPlusShiftType(context);
         Map<Integer, Integer> dailyStandardShiftCapacityMap = calculateDailyStandardShiftCapacityMap(
                 context, result, shifts, startTime, shiftCapacity, lhTimeSeconds, mouldQty,
@@ -5189,6 +5275,8 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
 
             ShiftProductionControlDTO control = ShiftProductionControlUtil.resolveEffectiveControl(context, shift, startTime);
             if (control == null || !control.isCanSchedule()) {
+                logContinuousShiftSkip(result, shift, remaining, shiftCapacity, 0,
+                        0, "班次管控不可排");
                 continue;
             }
             Date effectiveStart = control.getEffectiveStartTime();
@@ -5209,15 +5297,24 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
                     dryIceDurationHours,
                     shift,
                     configPlusShiftType,
-                    ScheduleTypeEnum.CONTINUOUS.getCode());
+                    ScheduleTypeEnum.CONTINUOUS.getCode(),
+                    plannedRepairFixedQty);
             shiftMaxQty = ShiftProductionControlUtil.deductCapacityByControl(control, shiftMaxQty, mouldQty);
+            int physicalShiftMaxQty = shiftMaxQty;
             shiftMaxQty = dailyStandardShiftCapacityMap.getOrDefault(shift.getShiftIndex(), shiftMaxQty);
             if (shiftMaxQty <= 0) {
+                String skipReason = physicalShiftMaxQty <= 0
+                        ? "停机/清洗/保养/班次管控扣减后无可用产能"
+                        : "日标准产量修正后无可用产能";
+                logContinuousShiftSkip(result, shift, remaining, shiftCapacity,
+                        physicalShiftMaxQty, shiftMaxQty, skipReason);
                 continue;
             }
             int shiftQty = getTargetScheduleQtyResolver().resolveAllocatedShiftQty(
                     context, result, Math.min(remaining, shiftMaxQty), shiftMaxQty, mouldQty);
             if (shiftQty <= 0) {
+                logContinuousShiftSkip(result, shift, remaining, shiftCapacity,
+                        physicalShiftMaxQty, shiftMaxQty, "目标量或硫化余量账本回裁为0");
                 continue;
             }
 
@@ -5242,6 +5339,34 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
             }
         }
         return remaining;
+    }
+
+    /**
+     * 记录续作班次跳过原因，便于核对已在机 SKU 中间空班是否存在硬约束。
+     *
+     * @param result 续作排程结果
+     * @param shift 当前班次
+     * @param remaining 当前剩余目标量
+     * @param shiftCapacity 原始班产
+     * @param physicalShiftMaxQty 停机/清洗/保养/班次管控扣减后的物理可用产能
+     * @param finalShiftMaxQty 日标准修正后的最终可排产能
+     * @param skipReason 跳过原因
+     */
+    private void logContinuousShiftSkip(LhScheduleResult result,
+                                        LhShiftConfigVO shift,
+                                        int remaining,
+                                        int shiftCapacity,
+                                        int physicalShiftMaxQty,
+                                        int finalShiftMaxQty,
+                                        String skipReason) {
+        if (Objects.isNull(result) || Objects.isNull(shift)) {
+            return;
+        }
+        log.info("连续排产班次跳过诊断, 当前流程: 续作排产, materialCode: {}, machineCode: {}, 班次: {}, "
+                        + "剩余余量: {}, 原始班产: {}, 班次物理可用产能: {}, 最终班次可用产能: {}, "
+                        + "是否跳过: {}, 跳过原因: {}",
+                result.getMaterialCode(), result.getLhMachineCode(), shift.getShiftIndex(), remaining,
+                shiftCapacity, physicalShiftMaxQty, finalShiftMaxQty, true, skipReason);
     }
 
     /**
@@ -5279,6 +5404,8 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
                 LhScheduleParamConstant.DRY_ICE_LOSS_QTY, LhScheduleConstant.DRY_ICE_LOSS_QTY);
         int dryIceDurationHours = context.getParamIntValue(
                 LhScheduleParamConstant.DRY_ICE_DURATION_HOURS, LhScheduleConstant.DRY_ICE_DURATION_HOURS);
+        int plannedRepairFixedQty = context.getParamIntValue(
+                LhScheduleParamConstant.PLANNED_REPAIR_FIXED_QTY, LhScheduleConstant.PLANNED_REPAIR_FIXED_QTY);
         String configPlusShiftType = ShiftCapacityResolverUtil.resolveOddShiftCapacityPlusShiftType(context);
         boolean started = false;
         for (LhShiftConfigVO shift : shifts) {
@@ -5308,7 +5435,8 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
                     dryIceDurationHours,
                     shift,
                     configPlusShiftType,
-                    ScheduleTypeEnum.CONTINUOUS.getCode());
+                    ScheduleTypeEnum.CONTINUOUS.getCode(),
+                    plannedRepairFixedQty);
             shiftMaxQty = ShiftProductionControlUtil.deductCapacityByControl(control, shiftMaxQty, mouldQty);
             rawShiftCapacityMap.put(shift.getShiftIndex(), Math.max(0, shiftMaxQty));
         }
@@ -5805,6 +5933,8 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
                 LhScheduleParamConstant.DRY_ICE_LOSS_QTY, LhScheduleConstant.DRY_ICE_LOSS_QTY);
         int dryIceDurationHours = context.getParamIntValue(
                 LhScheduleParamConstant.DRY_ICE_DURATION_HOURS, LhScheduleConstant.DRY_ICE_DURATION_HOURS);
+        int plannedRepairFixedQty = context.getParamIntValue(
+                LhScheduleParamConstant.PLANNED_REPAIR_FIXED_QTY, LhScheduleConstant.PLANNED_REPAIR_FIXED_QTY);
         String configPlusShiftType = ShiftCapacityResolverUtil.resolveOddShiftCapacityPlusShiftType(context);
         Map<Integer, Integer> dailyStandardShiftCapacityMap = calculateDailyStandardShiftCapacityMap(
                 context, result, shifts, cursorStartTime, shiftCapacity, result.getLhTime(), mouldQty,
@@ -5843,7 +5973,8 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
                     dryIceDurationHours,
                     shift,
                     configPlusShiftType,
-                    ScheduleTypeEnum.CONTINUOUS.getCode());
+                    ScheduleTypeEnum.CONTINUOUS.getCode(),
+                    plannedRepairFixedQty);
             shiftMaxQty = ShiftProductionControlUtil.deductCapacityByControl(control, shiftMaxQty, mouldQty);
             shiftMaxQty = dailyStandardShiftCapacityMap.getOrDefault(shift.getShiftIndex(), shiftMaxQty);
             if (shiftMaxQty <= 0) {
@@ -6211,8 +6342,10 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
             int activeMachineCount = resolveContinuousMachineCount(context, sourceSku);
             int addMachineDayPlanQty = resolveContinuationDayPlanQtyByDate(
                     context, sourceSku, firstAddMachineProductionDate);
+            // 传入续作机台结果以便识别单控机台折半产能
+            List<LhScheduleResult> continuousMachineResults = resolveContinuousMachineResults(context, sourceSku);
             int requiredMachineCount = resolveContinuationDayMinimumMachineCount(
-                    context, sourceSku, addMachineDayPlanQty);
+                    context, sourceSku, addMachineDayPlanQty, continuousMachineResults);
             int shortageMachineCount = Math.max(0, requiredMachineCount - activeMachineCount);
             int dayNShortageCompensationQty = resolveContinuationAddMachineCompensationQty(
                     context, sourceSku, firstAddMachineProductionDate, activeMachineCount);
@@ -6449,7 +6582,8 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
                 continue;
             }
             int dayPlanQty = resolveContinuationDayPlanQtyByDate(context, sourceSku, entry.getKey());
-            int requiredMachineCount = resolveContinuationDayMinimumMachineCount(context, sourceSku, dayPlanQty);
+            // 传入续作机台结果以便识别单控机台折半产能
+            int requiredMachineCount = resolveContinuationDayMinimumMachineCount(context, sourceSku, dayPlanQty, resolveContinuousMachineResults(context, sourceSku));
             maxRequiredMachineCount = Math.max(maxRequiredMachineCount, requiredMachineCount);
             if (requiredMachineCount > activeMachineCount) {
                 log.info("续作补偿新增判断，已有续作机台不满足原始dayN最小机台数, materialCode: {}, 日期: {}, "
@@ -7864,11 +7998,24 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
             ResultDowntimeSummaryUtil.clearDowntimeSummary(result);
             return;
         }
+        List<LhShiftConfigVO> scheduleWindowShifts = context.getScheduleWindowShifts();
         ResultDowntimeSummaryUtil.fillDowntimeSummary(
                 result,
                 resolveMachineMaintenanceWindowList(context, result.getLhMachineCode()),
                 resolveEffectiveCleaningWindowList(context, result, firstPlannedShiftStartTime),
-                resolveMachineShutdownWindowList(context, result.getLhMachineCode()));
+                resolveMachineShutdownWindowList(context, result.getLhMachineCode()),
+                scheduleWindowShifts);
+        // 清洗与普通换模重叠时只执行换模，有效清洗窗口已剔除该清洗；这里用原始全量清洗窗口
+        // 按真实换模8h窗口补写“清洗+换模”备注，与新增排产口径保持一致。
+        Date mouldChangeCompleteTime = Objects.nonNull(result.getMouldChangeStartTime())
+                ? LhScheduleTimeUtil.addHours(result.getMouldChangeStartTime(),
+                LhScheduleTimeUtil.getMouldChangeTotalHours(context)) : firstPlannedShiftStartTime;
+        ResultDowntimeSummaryUtil.appendCleaningMouldChangeAnalysis(
+                result,
+                resolveMachineCleaningWindowList(context, result.getLhMachineCode()),
+                result.getMouldChangeStartTime(),
+                mouldChangeCompleteTime,
+                scheduleWindowShifts);
     }
 
     /**

@@ -490,9 +490,11 @@ public class SkuMonthPlanCalculator {
     }
 
     /**
-     * 根据排产日信息，获取在dateList中最晚出现计划量
-     * 以此日为起始，往后查找，直到第一个没有排产量的排产日
+     * 根据排产日信息，获取在dateList中最晚出现计划量的日期
+     * 1、以此日为起始，往后查找，直到第一个没有排产量的排产日
      * 以找到的排产日，统计从计划量起始日~找到的排产日前一个日的计划量
+     * 2、如果在dateList中都没有计划量，则从dateList之后一个日开始，
+     * 找到最早一段连续排产量的最后一个有计划量的排产日，统计从计划量起始日startDay~找到的排产日的计划量
      *
      * @param skuMonthProductionInfo Sku信息
      * @param startDay               计算计划量起始日
@@ -526,8 +528,13 @@ public class SkuMonthPlanCalculator {
         //取得有计划量的最后一天
         Integer lastDay = getLastHasPlanQtyDay(dayList, skuMonthProductionInfo);
         if (null == lastDay) {
-            //都没有计划量,取到三天中任意一天
-            return statisticsPlanQtyEndDay(startDay, dayList.get(BigDecimal.ZERO.intValue()), skuMonthProductionInfo);
+            //都没有计划量,取三天中最后一天
+            Integer nextStartDay = dayList.get(dayList.size() - BigDecimal.ONE.intValue());
+            Integer nextContinueEndDay = getEarliestContinuousEndDay(nextStartDay, realYearMonth, skuMonthProductionInfo);
+            if (null == nextContinueEndDay) {
+                return statisticsPlanQtyEndDay(startDay, nextStartDay, skuMonthProductionInfo);
+            }
+            return statisticsPlanQtyEndDay(startDay, nextContinueEndDay, skuMonthProductionInfo);
         }
         Integer earliestContinuousDay = getEarliestContinuousDay(lastDay, realYearMonth, skuMonthProductionInfo);
         //不能小于1
@@ -666,6 +673,37 @@ public class SkuMonthPlanCalculator {
             earliestContinuousDay = maxDay;
         }
         return earliestContinuousDay;
+    }
+
+    /**
+     * 在FactoryMonthPlanProductionFinalResult中取得从startDay开始往后，第一段连续排产计划
+     * 从第一段连续中获取最后一个排产量的排产日
+     *
+     * @param startDay               开始排产日
+     * @param skuMonthProductionInfo 月排产计划
+     * @return
+     */
+    private static Integer getEarliestContinuousEndDay(Integer startDay, YearMonth yearMonth, FactoryMonthPlanProductionFinalResult skuMonthProductionInfo) {
+        if (null == startDay || null == yearMonth || null == skuMonthProductionInfo) {
+            return null;
+        }
+        Integer monthEndDay = yearMonth.lengthOfMonth();
+        if (startDay >= monthEndDay) {
+            return null;
+        }
+        Integer planStartDay = startDay;
+        for (; planStartDay <= monthEndDay; ) {
+            String fieldName = String.format(FIELD_NAME_FORMAT, planStartDay);
+            Object value = skuMonthProductionInfo.getFieldValueByFieldName(fieldName);
+            if (null != value && (Integer) value >= BigDecimal.ZERO.intValue()) {
+                break;
+            }
+            planStartDay = planStartDay + BigDecimal.ONE.intValue();
+        }
+        if (planStartDay.equals(startDay) || planStartDay > monthEndDay) {
+            return null;
+        }
+        return getEarliestContinuousDay(planStartDay, yearMonth, skuMonthProductionInfo);
     }
 
     /**
