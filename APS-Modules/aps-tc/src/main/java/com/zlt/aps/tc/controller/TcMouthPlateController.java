@@ -1,131 +1,125 @@
 package com.zlt.aps.tc.controller;
 
-
-import com.ruoyi.common.core.web.controller.BaseController;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
-import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
-import com.ruoyi.common.utils.StringUtils;
-import com.zlt.aps.tc.api.domain.dto.TcMouthPlateDto;
-import com.zlt.aps.tc.entity.TcMouthPlate;
-import com.zlt.aps.tc.service.TcMouthPlateService;
-import io.swagger.annotations.ApiImplicitParam;
-import io.swagger.annotations.ApiImplicitParams;
+import com.zlt.aps.constant.FactoryConstant;
+import com.zlt.aps.tc.api.domain.entity.TcMouthPlate;
+import com.zlt.aps.tc.mapper.TcMouthPlateMapper;
+import com.zlt.aps.tc.service.ITcMouthPlateService;
+import com.zlt.bill.common.controller.AbstractDocBizController;
+import com.zlt.bill.common.service.IDocService;
+import com.zlt.common.utils.PubUtil;
+import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
-import org.springframework.beans.BeanUtils;
+import jodd.util.StringUtil;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.cloud.openfeign.SpringQueryMap;
-import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
+import javax.annotation.Resource;
+import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
 import java.util.List;
 
-/**
- * <p>
- * 胎侧口型板信息维护 前端控制器
- * </p>
- *
- * @author chenxueyuan
- * @since 2021-06-02
- */
+@Slf4j
+@Api(tags = "胎侧口型板信息")
 @RestController
-@RequestMapping("/tc/mouthPlate")
-public class TcMouthPlateController extends BaseController {
+@RequestMapping("/tcMouthPlate")
+public class TcMouthPlateController extends AbstractDocBizController<TcMouthPlate> {
 
     @Autowired
-    private TcMouthPlateService tcMouthPlateService;
+    private ITcMouthPlateService tcMouthPlateService;
 
-    /**
-     * 查询胎侧口型板信息维护列表
-     */
+    @Resource
+    private TcMouthPlateMapper tcMouthPlateMapper;
+
+    @ApiOperation("查询列表")
     @PostMapping("/list")
-    @ApiOperation("查询胎侧口型板信息维护列表")
-    public TableDataInfo list(@RequestBody TcMouthPlateDto dto) {
-        TcMouthPlate mouthPlate = new TcMouthPlate();
-        BeanUtils.copyProperties(dto, mouthPlate);
-        startPage();
-        mouthPlate.setOrderStr(orderStr());
-        List<TcMouthPlateDto> list = tcMouthPlateService.selectMouthPlateList(mouthPlate);
-        return getDataTable(list);
+    @Override
+    public TableDataInfo list(@RequestBody TcMouthPlate queryVO) {
+        return super.list(queryVO);
     }
 
-    /**
-     * 根据id获取胎侧口型板信息维护详细信息
-     *
-     * @return 查询到的口型板信息
-     */
+    @Log(title = "ui.data.column.tc.MouthPlate.modelName", businessType = BusinessType.INSERT_OR_UPDATE)
+    @ApiOperation("保存")
+    @PostMapping("/save")
+    @Override
+    public AjaxResult save(@RequestBody TcMouthPlate billVO) {
+        if (StringUtil.isBlank(billVO.getFactoryCode())) {
+            billVO.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
+        }
+        return super.save(billVO);
+    }
+
+    @Log(title = "ui.data.column.tc.MouthPlate.modelName", businessType = BusinessType.DELETE)
+    @ApiOperation("删除")
+    @DeleteMapping("/remove")
+    @Override
+    public AjaxResult removeByIds(@RequestBody List<Long> ids) {
+        return super.removeByIds(ids);
+    }
+
+    @ApiOperation("获取详细信息")
     @GetMapping(value = "/{id}")
-    @ApiOperation("获取胎侧口型板信息详细信息")
-    @ApiImplicitParams({
-            @ApiImplicitParam(name = "id", dataType = "int", value = "主键id", paramType = "query")
-    })
-    public TcMouthPlateDto getInfo(@PathVariable("id") Long id) {
-        TcMouthPlate mouthPlate = tcMouthPlateService.selectTmMouthPlateById(id);
-        TcMouthPlateDto dto = new TcMouthPlateDto();
-        BeanUtils.copyProperties(mouthPlate, dto);
-        return dto;
+    @Override
+    public TcMouthPlate getInfo(@PathVariable("id") Long id) {
+        return super.getInfo(id);
     }
 
-    /**
-     * 保存胎侧口型板信息维护
-     */
-    @Log(title = "ui.data.column.tc.mouthPlate.modelName", businessType = BusinessType.INSERT_OR_UPDATE)
-    @PostMapping("/edit")
-    @ApiOperation("保存胎侧口型板信息（id为空则新增，id不为空则修改）")
-    public AjaxResult edit(@Validated @RequestBody TcMouthPlateDto dto) {
-        TcMouthPlate mouthPlate = new TcMouthPlate();
-        BeanUtils.copyProperties(dto, mouthPlate);
-        tcMouthPlateService.saveTmMouthPlate(mouthPlate);
-        return AjaxResult.success();
+    @ApiOperation("校验唯一性")
+    @PostMapping("/checkUnique")
+    public String checkUnique(@RequestBody TcMouthPlate query) {
+        return tcMouthPlateService.checkUnique(query);
     }
 
-    /**
-     * 删除胎侧口型板信息维护
-     */
-    @Log(title = "ui.data.column.tc.mouthPlate.modelName", businessType = BusinessType.DELETE)
-    @PostMapping("/{ids}")
-    @ApiOperation("删除胎侧口型板信息")
-    @ApiImplicitParams({
-            @ApiImplicitParam(name = "ids", dataType = "Array", value = "id数组", paramType = "query")
-    })
-    public AjaxResult remove(@PathVariable("ids") Long[] ids) {
-        tcMouthPlateService.deleteTmMouthPlateByIds(ids);
-        return AjaxResult.success();
-    }
-
-
-    @Log(title = "ui.data.column.tc.mouthPlate.modelName", businessType = BusinessType.DELETE)
-    @ApiOperation("删除全部(逻辑删)")
-    @PostMapping("/deleteAll")
-    public AjaxResult deleteAll() {
-        tcMouthPlateService.deleteAll();
-        return AjaxResult.success();
-    }
-
-
-    /**
-     * 导出胎面口型板信息
-     */
-    @Log(title = "ui.data.column.tc.mouthPlate.modelName", businessType = BusinessType.EXPORT)
-    @PostMapping("/exportData")
-    @ApiOperation("导出胎面口型板信息")
-    public List<TcMouthPlateDto> exportData(@RequestBody TcMouthPlateDto dto) {
-        TcMouthPlate mouthPlate = new TcMouthPlate();
-        BeanUtils.copyProperties(dto, mouthPlate);
-        startPage();
-        mouthPlate.setOrderStr(orderStr());
-        return tcMouthPlateService.selectMouthPlateList(mouthPlate);
-    }
-
-    @Log(title = "ui.data.column.tc.mouthPlate.modelName", businessType = BusinessType.IMPORT)
+    @Log(title = "ui.data.column.tc.MouthPlate.modelName", businessType = BusinessType.IMPORT)
     @ApiOperation("导入数据")
     @PostMapping("/importData")
-    public AjaxResult importData(@RequestBody List<TcMouthPlateDto> list, @RequestParam("updateSupport") boolean updateSupport, @RequestParam("importLogId") Long importLogId) {
-        if (StringUtils.isNull(list) || list.size() == 0) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.import.nodata"));
-        }
-        return tcMouthPlateService.importData(list, updateSupport, importLogId);
+    @Override
+    public AjaxResult importData(@RequestBody ImportContext importContext, @RequestParam("updateSupport") boolean updateSupport) throws Exception {
+        return super.importData(importContext, updateSupport);
+    }
+
+    @Log(title = "ui.data.column.tc.MouthPlate.modelName", businessType = BusinessType.EXPORT)
+    @ApiOperation("导出数据")
+    @PostMapping("/exportData/{fileName}")
+    @Override
+    public byte[] exportData(@RequestBody TcMouthPlate queryVO, @PathVariable("fileName") String fileName,
+                             HttpServletResponse response) throws IOException {
+        return super.exportData(queryVO, fileName, response);
+    }
+
+    @Override
+    protected List<TcMouthPlate> listExportData(TcMouthPlate obj) {
+        QueryWrapper<TcMouthPlate> wrapper = new QueryWrapper<>();
+        this.builderCondition(wrapper, obj);
+        return tcMouthPlateMapper.selectList(wrapper);
+    }
+
+    @Override
+    protected IDocService getDocService() {
+        return tcMouthPlateService;
+    }
+
+    @Override
+    protected void builderCondition(QueryWrapper<TcMouthPlate> queryWrapper, TcMouthPlate queryVO) {
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("factoryCode")), "FACTORY_CODE", queryVO.getFieldValueByFieldName("factoryCode"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("mouthPlateCode")), "MOUTH_PLATE_CODE", queryVO.getFieldValueByFieldName("mouthPlateCode"));
+        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("machineCode")), "MACHINE_CODE", queryVO.getFieldValueByFieldName("machineCode"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("plateStatus")), "PLATE_STATUS", queryVO.getFieldValueByFieldName("plateStatus"));
+    }
+
+    @Override
+    protected String getTypeCode() {
+        return "TC0906";
+    }
+
+    @Override
+    protected String getOrderBy() {
+        return "create_time desc";
     }
 }

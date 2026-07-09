@@ -1,33 +1,29 @@
 import request from '@/utils/request'
 
-//
-export function listStock(query) {
+export function listTcStock(query) {
   return request({
-    url: '/tc/stock/list',
+    url: '/tc/tcStock/list',
     method: 'post',
     data: query
   })
 }
-export function editStock(query) {
+export function saveTcStock(data) {
   return request({
-    url: '/tc/stock/edit',
+    url: '/tc/tcStock/save',
+    method: 'post',
+    data: data
+  })
+}
+export function removeTcStock(query) {
+  return request({
+    url: '/tc/tcStock/remove',
     method: 'post',
     data: query
   })
 }
-export function removeStock(query) {
+export function getTcStock(id) {
   return request({
-    url: '/tc/stock/remove',
-    method: 'post',
-    data: query
+    url: '/tc/tcStock/' + id,
+    method: 'get'
   })
 }
-export function releaseStock(query) {
-  return request({
-    url: '/tc/stock/releaseStock',
-    method: 'post',
-    data: query
-  })
-}
-
-

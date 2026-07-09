@@ -1,103 +1,98 @@
 package com.zlt.aps.tc.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.toolkit.StringUtils;
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.ruoyi.common.constant.UserConstants;
-import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
-import com.ruoyi.common.utils.StringUtils;
-import com.zlt.aps.common.core.constant.ApsConstant;
-import com.zlt.aps.tc.api.domain.dto.TcParamsDto;
-import com.zlt.aps.tc.entity.TcParams;
+import com.zlt.aps.tc.api.domain.entity.TcParams;
 import com.zlt.aps.tc.mapper.TcParamsMapper;
-import com.zlt.aps.tc.service.TcParamsService;
-import org.apache.commons.lang3.ObjectUtils;
-import org.springframework.beans.factory.annotation.Autowired;
+import com.zlt.aps.tc.service.ITcParamsService;
+import com.zlt.bill.common.service.AbstractDocService;
+import com.zlt.common.utils.PubUtil;
+import com.zlt.sysdef.domain.SysDocType;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
-import java.util.regex.Pattern;
+import javax.annotation.Resource;
+import java.util.*;
 
 /**
- * 胎侧参数信息Service业务层处理
+ * Copyright (c) 2022, All rights reserved。
+ * 文件名称：TcParamsServiceImpl.java
+ * 描    述：TcParamsServiceImpl胎侧排程参数配置业务层处理
  *
  * @author zlt
- * @date 2021-05-25
+ * @version 1.0
+ * <p>
+ * 修改记录：
+ * 修改时间：...
+ * 修 改 人：zlt
+ * 修改内容：...
+ * @date 2026-07-07
  */
+@Slf4j
 @Service
-public class TcParamsServiceImpl extends ServiceImpl<TcParamsMapper, TcParams> implements TcParamsService {
-    @Autowired
+@Transactional(rollbackFor = Exception.class)
+public class TcParamsServiceImpl extends AbstractDocService<TcParams> implements ITcParamsService {
+
+    @Resource
     private TcParamsMapper tcParamsMapper;
 
-    /**
-     * 查询胎侧参数信息
-     *
-     * @param id 胎侧参数信息ID
-     * @return 胎侧参数信息
-     */
     @Override
-    public TcParams selectParamsById(Long id) {
-        LambdaQueryWrapper<TcParams> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(TcParams::getDelFlag, ApsConstant.DEL_FLAG_NORMAL);
-        wrapper.eq(TcParams::getId, id);
+    protected String getDocTypeCode() {
+        return "TC0901";
+    }
+
+    @Override
+    protected SysDocType getSysDocType() {
+        SysDocType sysDocType = new SysDocType();
+        sysDocType.setDocTypeCode("TC0901");
+        return sysDocType;
+    }
+
+    @Override
+    public String checkUnique(TcParams query) {
+        String unique = super.checkUnique(query);
+        if (UserConstants.NOT_UNIQUE.equals(unique)) {
+            throw new ServiceException(I18nUtil.getMessage("ui.data.alert.tc.params.notUnique"));
+        }
+        return unique;
+    }
+
+    @Override
+    protected List<String> getCheckUniqueFields() {
+        // 唯一校验字段
+        return new ArrayList<>(Arrays.asList("factoryCode", "paramCode"));
+    }
+
+    @Override
+    public TcParams selectOneByParamCode(String paramCode, String factoryCode) {
+        if (StringUtils.isBlank(paramCode)) {
+            return null;
+        }
+        LambdaQueryWrapper<TcParams> wrapper = Wrappers.lambdaQuery();
+        wrapper.eq(TcParams::getParamCode, paramCode);
+        if (StringUtils.isNotBlank(factoryCode)) {
+            wrapper.eq(TcParams::getFactoryCode, factoryCode);
+        }
         return tcParamsMapper.selectOne(wrapper);
     }
 
-    /**
-     * 查询胎侧参数信息列表
-     *
-     * @param params 胎侧参数信息
-     * @return 胎侧参数信息
-     */
     @Override
-    public List<TcParamsDto> selectParamsList(TcParams params) {
-        return tcParamsMapper.listParams(params);
-    }
-
-    /**
-     * 修改胎侧参数信息
-     *
-     * @param params 胎侧参数信息
-     * @return 结果
-     */
-    @Override
-    public AjaxResult updateParams(TcParams params) {
-        //基本参数校验
-        if (!ObjectUtils.allNotNull(params.getId(), params.getParamCode(), params.getParamName(), params.getParamValue())) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.params.message.invalidParameter"));
+    public Map<String, String> listTcParams(String factoryCode) {
+        Map<String, String> params = new HashMap<>();
+        QueryWrapper<TcParams> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("FACTORY_CODE", factoryCode);
+        List<TcParams> paramsList = tcParamsMapper.selectList(queryWrapper);
+        if (PubUtil.isNotEmpty(paramsList)) {
+            for (TcParams tcParam : paramsList) {
+                params.put(tcParam.getParamCode(), tcParam.getParamValue());
+            }
         }
-        String unique = checkParamsCodeUnique(params);
-        if (UserConstants.NOT_UNIQUE.equals(unique)) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.params.message.unique"));
-        }
-        //校验正则表达式
-        boolean regularResult = true;
-        String regularExpression = params.getRegularExpression();
-        if (StringUtils.isNotEmpty(regularExpression)) {
-            Pattern pattern = Pattern.compile(regularExpression);
-            regularResult = pattern.matcher(params.getParamValue()).matches();
-        }
-        if (regularResult) {
-            params.setBaseVale(params.getId());
-            tcParamsMapper.updateById(params);
-        }
-        return regularResult ? AjaxResult.success() : AjaxResult.error(params.getErrorTips());
-    }
-
-    /**
-     * 校验参数代码唯一性
-     *
-     * @param params 胎侧参数信息
-     * @return 是否唯一
-     */
-    @Override
-    public String checkParamsCodeUnique(TcParams params) {
-        //校验参数代码字段唯一性
-        Long paramsId = StringUtils.isNull(params.getId()) ? -1L : params.getId();
-        TcParams info = tcParamsMapper.checkParamsCodeUnique(params.getParamCode(), paramsId);
-        if (StringUtils.isNotNull(info) && info.getId().longValue() != paramsId.longValue()) {
-            return UserConstants.NOT_UNIQUE;
-        }
-        return UserConstants.UNIQUE;
+        return params;
     }
 }

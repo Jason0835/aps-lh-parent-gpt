@@ -1,126 +1,141 @@
 package com.zlt.aps.tc.controller;
 
-import com.ruoyi.common.core.web.controller.BaseController;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
-import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
-import com.ruoyi.common.utils.StringUtils;
+import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.tc.api.domain.entity.TcMachineInfo;
-import com.zlt.aps.tc.service.TcMachineInfoService;
+import com.zlt.aps.tc.mapper.TcMachineInfoMapper;
+import com.zlt.aps.tc.service.ITcMachineInfoService;
+import com.zlt.bill.common.controller.AbstractDocBizController;
+import com.zlt.bill.common.service.IDocService;
+import com.zlt.common.utils.PubUtil;
 import io.swagger.annotations.Api;
-import io.swagger.annotations.ApiImplicitParam;
-import io.swagger.annotations.ApiImplicitParams;
 import io.swagger.annotations.ApiOperation;
+import jodd.util.StringUtil;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
+import javax.annotation.Resource;
+import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
 import java.util.List;
 
 /**
- * 胎侧机台信息Controller
+ * Copyright (c) 2022, All rights reserved。
+ * 文件名称：TcMachineInfoController.java
+ * 描    述：胎侧机台基础表 控制层类
  *
  * @author zlt
- * @date 2021-05-28
+ * @version 1.0
+ * <p>
+ * 修改记录：
+ * 修改时间：...
+ * 修 改 人：zlt
+ * 修改内容：...
+ * @date 2026-07-07
  */
-@Api(tags = "胎侧机台信息维护接口")
+@Slf4j
+@Api(tags = "胎侧机台基础表")
 @RestController
-@RequestMapping("/tc/machine")
-public class TcMachineInfoController extends BaseController {
+@RequestMapping("/tcMachineInfo")
+public class TcMachineInfoController extends AbstractDocBizController<TcMachineInfo> {
+
     @Autowired
-    private TcMachineInfoService machineInfoService;
+    private ITcMachineInfoService tcMachineInfoService;
 
-    /**
-     * 查询胎侧机台信息列表
-     */
-    @ApiOperation("根据条件查询胎侧机台信息")
+    @Resource
+    private TcMachineInfoMapper tcMachineInfoMapper;
+
+    @ApiOperation("查询列表")
     @PostMapping("/list")
-    public TableDataInfo list(@RequestBody TcMachineInfo machineInfo) {
-        startPage();
-        machineInfo.setOrderStr(orderStr());
-        List<TcMachineInfo> list = machineInfoService.selectMachineInfoList(machineInfo);
-        return getDataTable(list);
+    @Override
+    public TableDataInfo list(@RequestBody TcMachineInfo queryVO) {
+        return super.list(queryVO);
     }
 
-    /**
-     * 获取胎侧机台信息详细信息
-     */
-    @GetMapping(value = "/{id}")
-    @ApiOperation("根据id查询胎侧机台信息")
-    @ApiImplicitParams({
-            @ApiImplicitParam(name = "id", dataType = "int", value = "主键id", paramType = "query")
-    })
-    public TcMachineInfo getInfo(@PathVariable("id") Long id) {
-        return machineInfoService.selectMachineInfoById(id);
-    }
-
-    /**
-     * 新增胎侧机台信息
-     */
-    @Log(title = "ui.data.column.machine.info", businessType = BusinessType.INSERT)
-    @ApiOperation("新增胎侧机台信息（id不为空）")
-    @PostMapping
-    public AjaxResult add(@RequestBody TcMachineInfo machineInfo) {
-        return toAjax(machineInfoService.insertMachineInfo(machineInfo));
-    }
-
-    /**
-     * 修改胎侧机台信息
-     */
-    @Log(title = "ui.data.column.machine.info", businessType = BusinessType.UPDATE)
-    @ApiOperation("修改胎侧机台信息（id不为空）")
-    @PutMapping
-    public AjaxResult edit(@RequestBody TcMachineInfo machineInfo) {
-        return toAjax(machineInfoService.updateMachineInfo(machineInfo));
-    }
-
-    /**
-     * 删除胎侧机台信息
-     */
-    @Log(title = "ui.data.column.machine.info", businessType = BusinessType.DELETE)
-    @ApiOperation("删除胎侧机台信息（id不为空）")
-    @DeleteMapping("/{ids}")
-    public AjaxResult remove(@PathVariable Long[] ids) {
-        return toAjax(machineInfoService.deleteMachineInfoByIds(ids));
-    }
-
-    /**
-     * 校验机台编号唯一性
-     */
-    @PostMapping("/checkMachineCodeUnique")
-    public String checkMachineCodeUnique(@RequestBody TcMachineInfo machineInfo) {
-        return machineInfoService.checkMachineCodeUnique(machineInfo);
-    }
-
-    /**
-     * 查询列表
-     */
-    @Log(title = "ui.data.column.machine.info", businessType = BusinessType.EXPORT)
-    @PostMapping("/exportList")
-    public List<TcMachineInfo> exportList(@RequestBody TcMachineInfo machineInfo) {
-        startPage();
-        machineInfo.setOrderStr(orderStr());
-        List<TcMachineInfo> list = machineInfoService.selectMachineInfoList(machineInfo);
-        return list;
-    }
-
-    /**
-     * 根据胎面和口型板获取对应机台信息
-     */
-    @ApiOperation("根据胎面和口型板获取对应机台信息")
-    @PostMapping("/list2")
-    public List<TcMachineInfo> list2(@RequestBody TcMachineInfo machineInfo) {
-        List<TcMachineInfo> list = machineInfoService.selectMachineInfoList2(machineInfo);
-        return list;
-    }
-
-    @Log(title = "ui.data.column.machine.info", businessType = BusinessType.IMPORT)
-    @PostMapping("/importData")
-    public AjaxResult importData(@RequestBody List<TcMachineInfo> list, @RequestParam("updateSupport") boolean updateSupport, @RequestParam("importLogId") Long importLogId) {
-        if (StringUtils.isNull(list) || list.size() == 0) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.import.nodata"));
+    @Log(title = "ui.data.column.tc.MachineInfo.modelName", businessType = BusinessType.INSERT_OR_UPDATE)
+    @ApiOperation("保存")
+    @PostMapping("/save")
+    @Override
+    public AjaxResult save(@RequestBody TcMachineInfo billVO) {
+        if (StringUtil.isBlank(billVO.getFactoryCode())) {
+            billVO.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
         }
-        return machineInfoService.importData(list, updateSupport, importLogId);
+        return super.save(billVO);
+    }
+
+    @Log(title = "ui.data.column.tc.MachineInfo.modelName", businessType = BusinessType.DELETE)
+    @ApiOperation("删除")
+    @DeleteMapping("/remove")
+    @Override
+    public AjaxResult removeByIds(@RequestBody List<Long> ids) {
+        return super.removeByIds(ids);
+    }
+
+    @ApiOperation("获取详细信息")
+    @GetMapping(value = "/{id}")
+    @Override
+    public TcMachineInfo getInfo(@PathVariable("id") Long id) {
+        return super.getInfo(id);
+    }
+
+    @ApiOperation("校验唯一性")
+    @PostMapping("/checkUnique")
+    public String checkUnique(@RequestBody TcMachineInfo query) {
+        return tcMachineInfoService.checkUnique(query);
+    }
+
+    @Log(title = "ui.data.column.tc.MachineInfo.modelName", businessType = BusinessType.IMPORT)
+    @ApiOperation("导入数据")
+    @PostMapping("/importData")
+    @Override
+    public AjaxResult importData(@RequestBody ImportContext importContext, @RequestParam("updateSupport") boolean updateSupport) throws Exception {
+        return super.importData(importContext, updateSupport);
+    }
+
+    @Log(title = "ui.data.column.tc.MachineInfo.modelName", businessType = BusinessType.EXPORT)
+    @ApiOperation("导出数据")
+    @PostMapping("/exportData/{fileName}")
+    @Override
+    public byte[] exportData(@RequestBody TcMachineInfo queryVO, @PathVariable("fileName") String fileName,
+                             HttpServletResponse response) throws IOException {
+        return super.exportData(queryVO, fileName, response);
+    }
+
+    @Override
+    protected List<TcMachineInfo> listExportData(TcMachineInfo obj) {
+        QueryWrapper<TcMachineInfo> wrapper = new QueryWrapper<>();
+        this.builderCondition(wrapper, obj);
+        return tcMachineInfoMapper.selectList(wrapper);
+    }
+
+    @Override
+    protected IDocService getDocService() {
+        return tcMachineInfoService;
+    }
+
+    @Override
+    protected void builderCondition(QueryWrapper<TcMachineInfo> queryWrapper, TcMachineInfo queryVO) {
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("factoryCode")), "FACTORY_CODE", queryVO.getFieldValueByFieldName("factoryCode"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("machineCode")), "MACHINE_CODE", queryVO.getFieldValueByFieldName("machineCode"));
+        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("machineName")), "MACHINE_NAME", queryVO.getFieldValueByFieldName("machineName"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("maxCapacity")), "MAX_CAPACITY", queryVO.getFieldValueByFieldName("maxCapacity"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("openShiftCode")), "OPEN_SHIFT_CODE", queryVO.getFieldValueByFieldName("openShiftCode"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("machineStatus")), "MACHINE_STATUS", queryVO.getFieldValueByFieldName("machineStatus"));
+    }
+
+    @Override
+    protected String getTypeCode() {
+        return "TC0903";
+    }
+
+    @Override
+    protected String getOrderBy() {
+        return "create_time desc";
     }
 }

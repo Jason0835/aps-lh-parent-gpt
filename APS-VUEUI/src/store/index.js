@@ -21,6 +21,7 @@ import cut90 from './modules/semifinished/cut90'
 import dj from './modules/semifinished/dj'
 import insideLiner from './modules/semifinished/insideLiner'
 import sidewall from './modules/semifinished/sidewall'
+import tc from './modules/semifinished/tc'
 import fiberPress from './modules/semifinished/fiberPress'
 import steelPress from './modules/semifinished/steelPress'
 import globalList from './modules/globalList'
@@ -51,6 +52,7 @@ const store = new Vuex.Store({
     bead,
     beadRing,
     sidewall,
+    tc,
     insideLiner,
     cut15,
     cut90,

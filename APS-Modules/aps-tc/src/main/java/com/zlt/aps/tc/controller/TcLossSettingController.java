@@ -1,133 +1,125 @@
 package com.zlt.aps.tc.controller;
 
-import com.ruoyi.common.core.web.controller.BaseController;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
-import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
-import com.ruoyi.common.utils.StringUtils;
-import com.zlt.aps.tc.api.domain.dto.TcLossSettingDto;
-import com.zlt.aps.tc.entity.TcLossSetting;
-import com.zlt.aps.tc.service.TcLossSettingService;
+import com.zlt.aps.constant.FactoryConstant;
+import com.zlt.aps.tc.api.domain.entity.TcLossSetting;
+import com.zlt.aps.tc.mapper.TcLossSettingMapper;
+import com.zlt.aps.tc.service.ITcLossSettingService;
+import com.zlt.bill.common.controller.AbstractDocBizController;
+import com.zlt.bill.common.service.IDocService;
+import com.zlt.common.utils.PubUtil;
+import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
-import org.springframework.beans.BeanUtils;
+import jodd.util.StringUtil;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
+import javax.annotation.Resource;
+import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
 import java.util.List;
 
-/**
- * 胎侧损耗率设定Controller
- *
- * @author chen
- * @date 2021-07-13
- */
+@Slf4j
+@Api(tags = "胎侧损耗率设定")
 @RestController
-@RequestMapping("/tc/loss")
-public class TcLossSettingController extends BaseController {
+@RequestMapping("/tcLossSetting")
+public class TcLossSettingController extends AbstractDocBizController<TcLossSetting> {
+
     @Autowired
-    private TcLossSettingService tcLossSettingService;
+    private ITcLossSettingService tcLossSettingService;
 
-    /**
-     * 查询胎侧损耗率设定列表
-     */
-    //@PreAuthorize(hasPermi = "tc:loss:list")
+    @Resource
+    private TcLossSettingMapper tcLossSettingMapper;
+
+    @ApiOperation("查询列表")
     @PostMapping("/list")
-    public TableDataInfo list(@RequestBody TcLossSettingDto dto) {
-        TcLossSetting tcLossSetting = new TcLossSetting();
-        BeanUtils.copyProperties(dto, tcLossSetting);
-        startPage();
-        tcLossSetting.setOrderStr(orderStr());
-        List<TcLossSettingDto> list = tcLossSettingService.selectTcLossSettingList(tcLossSetting);
-        return getDataTable(list);
+    @Override
+    public TableDataInfo list(@RequestBody TcLossSetting queryVO) {
+        return super.list(queryVO);
     }
 
-    /**
-     * 获取胎侧损耗率设定详细信息
-     */
-    //@PreAuthorize(hasPermi = "tc:loss:query")
+    @Log(title = "ui.data.column.tc.LossSetting.modelName", businessType = BusinessType.INSERT_OR_UPDATE)
+    @ApiOperation("保存")
+    @PostMapping("/save")
+    @Override
+    public AjaxResult save(@RequestBody TcLossSetting billVO) {
+        if (StringUtil.isBlank(billVO.getFactoryCode())) {
+            billVO.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
+        }
+        return super.save(billVO);
+    }
+
+    @Log(title = "ui.data.column.tc.LossSetting.modelName", businessType = BusinessType.DELETE)
+    @ApiOperation("删除")
+    @DeleteMapping("/remove")
+    @Override
+    public AjaxResult removeByIds(@RequestBody List<Long> ids) {
+        return super.removeByIds(ids);
+    }
+
+    @ApiOperation("获取详细信息")
     @GetMapping(value = "/{id}")
-    public TcLossSettingDto getInfo(@PathVariable("id") Long id) {
-        return tcLossSettingService.selectTcLossSettingById(id);
+    @Override
+    public TcLossSetting getInfo(@PathVariable("id") Long id) {
+        return super.getInfo(id);
     }
 
-    /**
-     * 新增胎侧损耗率设定
-     */
-    @Log(title = "ui.data.column.tc.loss.modelName}", businessType = BusinessType.INSERT)
-    //@PreAuthorize(hasPermi = "tc:loss:add")
-    @PostMapping("/add")
-    public AjaxResult add(@RequestBody TcLossSettingDto dto) {
-        TcLossSetting tcLossSetting = new TcLossSetting();
-        BeanUtils.copyProperties(dto, tcLossSetting);
-        return toAjax(tcLossSettingService.insertTcLossSetting(tcLossSetting));
+    @ApiOperation("校验唯一性")
+    @PostMapping("/checkUnique")
+    public String checkUnique(@RequestBody TcLossSetting query) {
+        return tcLossSettingService.checkUnique(query);
     }
 
-    /**
-     * 修改胎侧损耗率设定
-     */
-    @Log(title = "ui.data.column.tc.loss.modelName}", businessType = BusinessType.UPDATE)
-    //@PreAuthorize(hasPermi = "tc:loss:edit")
-    @PostMapping("/edit")
-    public AjaxResult edit(@RequestBody TcLossSettingDto dto) {
-        TcLossSetting tcLossSetting = new TcLossSetting();
-        BeanUtils.copyProperties(dto, tcLossSetting);
-        return toAjax(tcLossSettingService.updateTcLossSetting(tcLossSetting));
-    }
-
-    /**
-     * 删除胎侧损耗率设定
-     */
-    @Log(title = "ui.data.column.tc.loss.modelName}", businessType = BusinessType.DELETE)
-    //@PreAuthorize(hasPermi = "tc:loss:remove")
-    @DeleteMapping("/{ids}")
-    public AjaxResult remove(@PathVariable Long[] ids) {
-        return toAjax(tcLossSettingService.deleteTcLossSettingByIds(ids));
-    }
-
-    @Log(title = "ui.data.column.tc.loss.modelName", businessType = BusinessType.DELETE)
-    @ApiOperation("删除全部(逻辑删)")
-    @PostMapping("/deleteAll")
-    public AjaxResult deleteAll() {
-        tcLossSettingService.deleteAll();
-        return AjaxResult.success();
-    }
-
-
-    /**
-     * 导出胎侧损耗率设定列表
-     */
-    @Log(title = "ui.data.column.tc.loss.modelName}", businessType = BusinessType.EXPORT)
-    //@PreAuthorize(hasPermi = "tc:loss:export")
-    @PostMapping("/getList")
-    public List<TcLossSettingDto> getList(@RequestBody TcLossSettingDto dto) {
-        TcLossSetting tcLossSetting = new TcLossSetting();
-        BeanUtils.copyProperties(dto, tcLossSetting);
-        startPage();
-        tcLossSetting.setOrderStr(orderStr());
-        return tcLossSettingService.selectTcLossSettingList(tcLossSetting);
-    }
-
-    /**
-     * 校验胎侧损耗率设定唯一性
-     */
-    @ApiOperation("校验胎侧损耗率设定唯一性")
-    @PostMapping("/checkTcLossSettingUnique")
-    public String checkTcLossSettingUnique(@RequestBody TcLossSettingDto dto) {
-        TcLossSetting tcLossSetting = new TcLossSetting();
-        BeanUtils.copyProperties(dto, tcLossSetting);
-        return tcLossSettingService.checkTcLossSettingUnique(tcLossSetting);
-    }
-
-    @Log(title = "ui.data.column.tc.loss.modelName}", businessType = BusinessType.IMPORT)
+    @Log(title = "ui.data.column.tc.LossSetting.modelName", businessType = BusinessType.IMPORT)
     @ApiOperation("导入数据")
     @PostMapping("/importData")
-    public AjaxResult importData(@RequestBody List<TcLossSettingDto> list, @RequestParam("updateSupport") boolean updateSupport, @RequestParam("importLogId") Long importLogId) {
-        if (StringUtils.isNull(list) || list.size() == 0) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.import.nodata"));
-        }
-        return tcLossSettingService.importData(list, updateSupport, importLogId);
+    @Override
+    public AjaxResult importData(@RequestBody ImportContext importContext, @RequestParam("updateSupport") boolean updateSupport) throws Exception {
+        return super.importData(importContext, updateSupport);
     }
 
+    @Log(title = "ui.data.column.tc.LossSetting.modelName", businessType = BusinessType.EXPORT)
+    @ApiOperation("导出数据")
+    @PostMapping("/exportData/{fileName}")
+    @Override
+    public byte[] exportData(@RequestBody TcLossSetting queryVO, @PathVariable("fileName") String fileName,
+                             HttpServletResponse response) throws IOException {
+        return super.exportData(queryVO, fileName, response);
+    }
+
+    @Override
+    protected List<TcLossSetting> listExportData(TcLossSetting obj) {
+        QueryWrapper<TcLossSetting> wrapper = new QueryWrapper<>();
+        this.builderCondition(wrapper, obj);
+        return tcLossSettingMapper.selectList(wrapper);
+    }
+
+    @Override
+    protected IDocService getDocService() {
+        return tcLossSettingService;
+    }
+
+    @Override
+    protected void builderCondition(QueryWrapper<TcLossSetting> queryWrapper, TcLossSetting queryVO) {
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("factoryCode")), "FACTORY_CODE", queryVO.getFieldValueByFieldName("factoryCode"));
+        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("sidewallCode")), "SIDEWALL_CODE", queryVO.getFieldValueByFieldName("sidewallCode"));
+        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("machineCode")), "MACHINE_CODE", queryVO.getFieldValueByFieldName("machineCode"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("enableStatus")), "ENABLE_STATUS", queryVO.getFieldValueByFieldName("enableStatus"));
+    }
+
+    @Override
+    protected String getTypeCode() {
+        return "TC0910";
+    }
+
+    @Override
+    protected String getOrderBy() {
+        return "update_time desc";
+    }
 }

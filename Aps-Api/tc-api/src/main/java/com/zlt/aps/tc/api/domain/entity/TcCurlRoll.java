@@ -1,53 +1,44 @@
 package com.zlt.aps.tc.api.domain.entity;
 
-import com.baomidou.mybatisplus.annotation.*;
+import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableName;
 import com.ruoyi.common.core.annotation.Excel;
+import com.ruoyi.common.core.web.domain.BaseEntity;
 import com.zlt.aps.common.core.annotation.ImportValidated;
-import com.zlt.aps.common.core.domain.ApsBaseEntity;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
-import lombok.EqualsAndHashCode;
-import org.apache.ibatis.type.JdbcType;
 
-import java.io.Serializable;
 import java.math.BigDecimal;
 
-/**
- * <p>
- * 胎侧卷曲信息维护表
- * </p>
- *
- * @author zlt
- * @since 2023-09-04
- */
+@ApiModel(value = "胎侧卷曲长度对象", description = "胎侧卷曲长度对象")
 @Data
-@EqualsAndHashCode(callSuper = false)
-@TableName("T_TC_CURL_ROLL")
-@ApiModel(value = "TcCurlRoll对象", description = "胎侧卷曲信息维护表")
-//@KeySequence(value = "SEQ_PUBLIC",dbType = DbType.ORACLE)
-public class TcCurlRoll extends ApsBaseEntity implements Serializable {
+@TableName(value = "T_TC_CURL_ROLL")
+public class TcCurlRoll extends BaseEntity {
 
     private static final long serialVersionUID = 1L;
 
-    @ApiModelProperty(value = "主键ID，对应自增序列为：SEQ_PUBLIC")
-    @TableId(value = "ID", type = IdType.AUTO)
-    private Long id;
+    @Excel(name = "ui.data.column.tc.curlRoll.factoryCode", dictType = "biz_factory_name")
+    @ImportValidated(required = true, isCode = true, maxLength = 50)
+    @ApiModelProperty(value = "工厂编号", name = "factoryCode")
+    @TableField(value = "FACTORY_CODE")
+    private String factoryCode;
 
-    @ApiModelProperty(value = "胎侧编号")
-    @TableField("SIDEWALL_CODE")
+    @Excel(name = "ui.data.column.tc.curlRoll.sidewallCode")
+    @ImportValidated(required = true, isCode = true, maxLength = 20)
+    @ApiModelProperty(value = "胎侧编码", name = "sidewallCode")
+    @TableField(value = "SIDEWALL_CODE")
     private String sidewallCode;
 
-    @ApiModelProperty(value = "卷曲长度。此胎侧一卷的最大长度，单位：米。")
-    @TableField(value = "CURL_LENGTH", updateStrategy = FieldStrategy.IGNORED, jdbcType = JdbcType.DOUBLE)
-    @Excel(name = "ui.curlRoll.column.length")
-    @ImportValidated(name = "ui.curlRoll.column.length", required = true, max = 999999, min = 0)
+    @Excel(name = "ui.data.column.tc.curlRoll.curlLength")
+    @ImportValidated(required = true, number = true, min = 0, max = 999999)
+    @ApiModelProperty(value = "卷曲长度", name = "curlLength")
+    @TableField(value = "CURL_LENGTH")
     private BigDecimal curlLength;
 
-    /**
-     * 查询编号，用于精确查询
-     */
-    @ApiModelProperty(value = "查询编号，用于精确查询")
-    @TableField(exist = false)
-    private String queryCode;
+    @Excel(name = "ui.common.column.remark")
+    @ImportValidated(maxLength = 500)
+    @ApiModelProperty("备注")
+    @TableField("REMARK")
+    private String remark;
 }
