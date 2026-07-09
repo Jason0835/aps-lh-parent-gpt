@@ -6,7 +6,6 @@ import com.ruoyi.common.utils.StringUtils;
 import com.zlt.aps.gsq.api.domain.dto.GsqScheduleResultDto;
 import com.zlt.aps.gsq.api.domain.entity.GsqMachineInfo;
 import com.zlt.aps.gsq.api.service.IGsqMachineInfoService;
-import com.zlt.aps.gsq.api.service.IGsqSpecifyMachineService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -20,8 +19,6 @@ public class GsqService {
 
     @Autowired
     private IGsqMachineInfoService iGsqMachineInfoService;
-    @Autowired
-    private IGsqSpecifyMachineService iGsqSpecifyMachineService;
 
     /**
      * 机台下拉列表

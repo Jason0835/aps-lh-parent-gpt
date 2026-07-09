@@ -2,60 +2,36 @@ package com.zlt.aps.gsq.api.service;
 
 import com.ruoyi.common.constant.ServiceNameConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
-import com.ruoyi.common.core.web.page.TableDataInfo;
-import com.zlt.aps.gsq.api.domain.dto.GsqSpecifyMachineDto;
-import io.swagger.annotations.ApiOperation;
+import com.zlt.aps.gsq.api.domain.entity.GsqSpecifyMachine;
+import com.zlt.bill.common.service.IDocService;
 import org.springframework.cloud.openfeign.FeignClient;
-import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
 /**
- * 钢丝圈定点机台对外暴露接口
+ * 钢丝圈定点机台Service接口
+ *
+ * @author zlt
+ * @date 2026-07-08
  */
-@FeignClient(contextId = "iGsqSpecifyMachineService", value = ServiceNameConstants.GATEWAY_SERVICE, path="${api.path.gsq:gsq}")
-public interface IGsqSpecifyMachineService {
+@FeignClient(contextId = "iGsqSpecifyMachineService", value = ServiceNameConstants.GATEWAY_SERVICE, path = "${api.path.gsq:gsq}")
+public interface IGsqSpecifyMachineService extends IDocService<GsqSpecifyMachine> {
 
     /**
-     * 根据条件查询定点机台列表
+     * 校验"钢丝圈代码+生产线"组合唯一性
+     *
+     * @param entity 实体
+     * @return 唯一性结果（UserConstants.UNIQUE=唯一，UserConstants.NOT_UNIQUE=不唯一）
      */
-    @PostMapping("/gsq/specifyMachine/listSpecifyMachine")
-    TableDataInfo listSpecifyMachine(@RequestBody GsqSpecifyMachineDto dto);
+    String checkUnique(GsqSpecifyMachine entity);
 
     /**
-     * 根据id查询定点机台信息
+     * 导入数据，并保存记录
+     *
+     * @param list          要导入的数据
+     * @param updateSupport 已存在是否更新
+     * @param importLogId   导入日志id
+     * @return 导入后提示信息
      */
-    @GetMapping("/gsq/specifyMachine/getSpecifyMachine/{id}")
-    GsqSpecifyMachineDto getSpecifyMachine(@PathVariable("id") Long id);
-
-    /**
-     * 保存定点机台信息（id为空则新增，id不为空则修改）
-     */
-    @PostMapping("/gsq/specifyMachine/saveSpecifyMachine")
-    AjaxResult saveSpecifyMachine(@RequestBody GsqSpecifyMachineDto dto);
-
-    /**
-     * 批量删除定点机台信息(逻辑删)
-     * @param ids 多个id逗号分割
-     */
-    @PostMapping("/gsq/specifyMachine/deleteSpecifyMachine/{ids}")
-    AjaxResult deleteSpecifyMachine(@PathVariable("ids") Long[] ids);
-
-    /**
-     * 删除全部定点机台信息(逻辑删)
-     */
-    @PostMapping("/gsq/specifyMachine/deleteAllSpecifyMachine")
-    AjaxResult deleteAllSpecifyMachine();
-
-    /**
-     * 导出接口
-     * @param dto
-     */
-    @PostMapping("/gsq/specifyMachine/exportData")
-    List<GsqSpecifyMachineDto> exportData(@RequestBody GsqSpecifyMachineDto dto);
-
-    @PostMapping("/gsq/specifyMachine/importData")
-    @ApiOperation("导入钢丝圈定点机台信息")
-    public AjaxResult importData(@RequestBody List<GsqSpecifyMachineDto> list, @RequestParam("updateSupport") boolean updateSupport, @RequestParam("importLogId") Long importLogId);
-
+    AjaxResult importData(List<GsqSpecifyMachine> list, boolean updateSupport, Long importLogId);
 }

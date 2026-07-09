@@ -101,7 +101,7 @@ export default {
         },
         {
           label: this.$t("ui.data.column.machine.quata"),
-          prop: "quata",
+          prop: "quota",
           type: "number",
           min: 0,
           max: 999999,
@@ -202,7 +202,7 @@ export default {
         this.form = {
           ...data,
           efficiency: this.numberEmpty(data.efficiency),
-          quata: this.numberEmpty(data.quata),
+          quota: this.numberEmpty(data.quota),
           openMachineClass: data.openMachineClass
             ? data.openMachineClass.split(",")
             : [],

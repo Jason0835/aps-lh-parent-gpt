@@ -1,33 +1,21 @@
 package com.zlt.aps.controller.gsq;
 
-
-import com.ruoyi.api.gateway.system.domain.ExportLog;
-import com.ruoyi.api.gateway.system.domain.ImportLog;
-import com.ruoyi.api.gateway.system.service.IExportLogService;
-import com.ruoyi.api.gateway.system.service.IImportErrorLogService;
-import com.ruoyi.api.gateway.system.service.IImportLogService;
+import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.core.utils.poi.ExcelUtil;
-import com.ruoyi.common.core.web.controller.BaseController;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.text.Convert;
-import com.zlt.aps.common.core.constant.ApsConstant;
-import com.zlt.aps.common.utils.ExportUtil;
-import com.zlt.aps.common.utils.ImportUtil;
-import com.zlt.aps.gsq.api.domain.dto.GsqTwiningDiscDto;
+import com.ruoyi.common4ui.constant.UserConstants;
+import com.ruoyi.common4ui.core.controller.BaseUIController;
+import com.zlt.aps.gsq.api.domain.entity.GsqTwiningDisc;
 import com.zlt.aps.gsq.api.service.IGsqTwiningDiscService;
-import com.zlt.aps.template.gsq.GsqTwiningDiscTemp;
 import com.zlt.file.encryptbyll.FileEncryptUtils;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
-import io.swagger.annotations.ApiParam;
-import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.commons.io.IOUtils;
 import org.apache.shiro.authz.annotation.RequiresPermissions;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Controller;
-import org.springframework.ui.ModelMap;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -35,146 +23,141 @@ import javax.annotation.Resource;
 import javax.servlet.http.HttpServletResponse;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.util.List;
+import java.util.Arrays;
 
-@Api(tags = {"钢丝圈缠绕盘维护接口"})
+/**
+ * 钢丝圈缠绕盘管理 UI 控制层
+ * <p>主子表管理：列表显示主表，新增/编辑弹窗含主表表单与子表明细</p>
+ *
+ * @author zlt
+ * @date 2026-07-08
+ */
+@Api(tags = "钢丝圈缠绕盘管理")
 @Controller
 @RequestMapping("/gsq/twiningDisc")
-public class GsqTwiningDiscController extends BaseController {
-
-    private String prefix = "gsq/twiningDisc";
+public class GsqTwiningDiscController extends BaseUIController<GsqTwiningDisc> {
 
     @Resource
-    private IGsqTwiningDiscService iGsqTwiningDiscService;
+    private IGsqTwiningDiscService gsqTwiningDiscRemoteService;
 
-    @Autowired
-    private IExportLogService iExportLogService;
-    @Autowired
-    private IImportLogService iImportLogService;
-    @Autowired
-    private IImportErrorLogService iImportErrorLogService;
-
-    @Value("${excelTemplateModel}")
-    private String excelTemplateModel;
-
-    @RequiresPermissions("gsq:twiningDisc:view")
-    @GetMapping()
-    public String TwiningDisc() {
-        return prefix + "/twiningDisc";
-    }
-
-    @ApiOperation("根据条件查询缠绕盘列表")
+    /**
+     * 查询钢丝圈缠绕盘列表
+     */
+    @ApiOperation("查询钢丝圈缠绕盘列表")
     @RequiresPermissions("gsq:twiningDisc:list")
     @PostMapping("/list")
     @ResponseBody
-    public TableDataInfo list(GsqTwiningDiscDto dto) {
-        return iGsqTwiningDiscService.listTwiningDisc(dto);
+    public TableDataInfo list(GsqTwiningDisc queryVO) {
+        return gsqTwiningDiscRemoteService.list(queryVO);
     }
 
-    @ApiOperation("跳转到缠绕盘新增页面")
-    @GetMapping("/add")
-    public String add(ModelMap mmap) {
-        mmap.put("twiningDisc", new GsqTwiningDiscDto());
-        return prefix + "/edit";
+    /**
+     * 获取钢丝圈缠绕盘详情（含子表明细及钢丝圈名称反显）
+     */
+    @ApiOperation("获取钢丝圈缠绕盘详情")
+    @GetMapping("/getInfo/{id}")
+    @ResponseBody
+    public GsqTwiningDisc getInfo(@PathVariable("id") Long id) {
+        return gsqTwiningDiscRemoteService.getInfo(id);
     }
 
-    @ApiOperation("获取缠绕盘信息，跳转到编辑页面")
-    @GetMapping("/edit/{id}")
-    public String edit(@ApiParam("id") @PathVariable("id") Long id, ModelMap mmap) {
-        mmap.put("twiningDisc", iGsqTwiningDiscService.getTwiningDisc(id));
-        return prefix + "/edit";
-    }
-
-    @ApiOperation("修改缠绕盘(id为空则进行新增，id不为空则进行修改)")
+    /**
+     * 保存钢丝圈缠绕盘（id为空新增，id不为空修改），级联保存子表明细
+     * 保存前先校验缠绕盘编码唯一性
+     */
+    @ApiOperation("保存钢丝圈缠绕盘")
     @RequiresPermissions("gsq:twiningDisc:edit")
     @PostMapping("/save")
     @ResponseBody
-    public AjaxResult saveTwiningDisc(GsqTwiningDiscDto dto) {
-        return iGsqTwiningDiscService.saveTwiningDisc(dto);
+    public AjaxResult save(@RequestBody GsqTwiningDisc entity) {
+        if (UserConstants.NOT_UNIQUE.equals(gsqTwiningDiscRemoteService.checkUnique(entity))) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.gsq.twiningDisc.conflict"));
+        }
+        return gsqTwiningDiscRemoteService.save(entity);
     }
 
-    @ApiOperation("判断缠绕code是否唯一")
-    @PostMapping("/checkSerialNumberUnique")
-    @ResponseBody
-    public String checkSerialNumberUnique(GsqTwiningDiscDto dto) {
-        return iGsqTwiningDiscService.checkSerialNumberUnique(dto);
-    }
-
-    @ApiOperation("刪除缠绕盘")
+    /**
+     * 删除钢丝圈缠绕盘（逻辑删除主表，级联逻辑删除子表）
+     */
+    @ApiOperation("删除钢丝圈缠绕盘")
     @RequiresPermissions("gsq:twiningDisc:remove")
     @PostMapping("/remove")
     @ResponseBody
     public AjaxResult remove(String ids) {
-        Long[] arr = Convert.toLongArray(ids);
-        return iGsqTwiningDiscService.deleteTwiningDisc(arr);
+        Long[] idArray = Convert.toLongArray(ids);
+        return gsqTwiningDiscRemoteService.removeByIds(Arrays.asList(idArray));
     }
 
-
-    @ApiOperation("刪除全部")
-    @RequiresPermissions("gsq:twiningDisc:removeAll")
-    @PostMapping("/removeAll")
+    /**
+     * 校验缠绕盘编码唯一性
+     */
+    @ApiOperation("校验缠绕盘编码唯一性")
+    @PostMapping("/checkUnique")
     @ResponseBody
-    public AjaxResult removeAll() {
-        return iGsqTwiningDiscService.deleteAll();
+    public String checkUnique(@RequestBody GsqTwiningDisc entity) {
+        return gsqTwiningDiscRemoteService.checkUnique(entity);
     }
 
+    @Override
+    public String getExportTemplateFileName() {
+        return getFunctionName();
+    }
 
+    @Override
+    public String getProcedureCode() {
+        return "GSQ";
+    }
+
+    @Override
+    public String getFunctionName() {
+        return I18nUtil.getMessage("ui.data.column.gsq.twiningDisc.modelName");
+    }
+
+    /**
+     * 下载导入模板
+     */
+    @ApiOperation("下载导入模板")
+    @Override
+    public AjaxResult importTemplate(HttpServletResponse response) throws IOException {
+        String fileName = getExportTemplateFileName();
+        ExcelUtil<GsqTwiningDisc> util = new ExcelUtil<>(GsqTwiningDisc.class);
+        util.exportExcel(response, null, fileName, fileName);
+        return AjaxResult.success();
+    }
+
+    /**
+     * 导出钢丝圈缠绕盘
+     */
+    @ApiOperation("导出钢丝圈缠绕盘")
     @RequiresPermissions("gsq:twiningDisc:export")
-    @ApiOperation("导出缠绕盘")
     @GetMapping("/export")
     @ResponseBody
-    public void export(HttpServletResponse response, GsqTwiningDiscDto dto) throws IOException {
-        List<GsqTwiningDiscDto> list = iGsqTwiningDiscService.exportData(dto);
-        ExcelUtil<GsqTwiningDiscDto> util = new ExcelUtil(GsqTwiningDiscDto.class);
-        String fileName = I18nUtil.getMessage("ui.gsq.twiningDisc.column.modalName");
-        Workbook workbook = util.exportExcel2(response, list, fileName);
-        ExportLog exportLog = ExportUtil.uploadAndExportExcel(response, workbook, fileName, dto.toString(), ApsConstant.PROCEDURE_CODE_GSQ);
-        iExportLogService.add(exportLog);
+    @Override
+    public void export(HttpServletResponse response, GsqTwiningDisc entity) throws IOException {
+        String fileName = getExportTemplateFileName();
+        byte[] excelBytes = gsqTwiningDiscRemoteService.exportData(entity, fileName);
+        ByteArrayInputStream inputStream = new ByteArrayInputStream(excelBytes);
+        ExcelUtil.setResponseHeader(response, fileName, ".xlsx");
+        IOUtils.copy(inputStream, response.getOutputStream());
+        response.flushBuffer();
     }
 
     /**
-     * 下载模板
-     *
-     * @param response
-     * @throws IOException
+     * 导入钢丝圈缠绕盘
      */
-    @ApiOperation("下载模板")
-    @GetMapping("/importTemplate")
-    @ResponseBody
-    public void importTemplate(HttpServletResponse response) throws IOException {
-        String fileName = I18nUtil.getMessage("ui.gsq.twiningDisc.column.modalName");
-        ExcelUtil<GsqTwiningDiscTemp> util = new ExcelUtil<>(GsqTwiningDiscTemp.class);
-        util.exportExcel(response, null, fileName, fileName);
-    }
-
-    /**
-     * 数据导入
-     *
-     * @param file
-     * @param updateSupport
-     * @return
-     * @throws Exception
-     */
+    @ApiOperation("导入钢丝圈缠绕盘")
     @RequiresPermissions("gsq:twiningDisc:import")
-    @ApiOperation("数据导入")
     @PostMapping("/importData")
     @ResponseBody
-    public AjaxResult importData(MultipartFile file, boolean updateSupport) throws Exception {
-        //文件解密
+    @Override
+    public AjaxResult importData(@RequestPart("file") MultipartFile file, boolean updateSupport) throws Exception {
         byte[] data = this.useFileEncrypt ? FileEncryptUtils.DecodeFile(file) : file.getBytes();
-        InputStream in = new ByteArrayInputStream(data);
-        // 上传文件到服务器，并获取导入记录对象进行保存
-        ImportLog importLog = ImportUtil.getImportLogAndUploadFile(data, ApsConstant.PROCEDURE_CODE_GSQ,
-                I18nUtil.getMessage("ui.gsq.twiningDisc.column.modalName"), file.getOriginalFilename());
-        importLog = iImportLogService.add(importLog);
-
-        ExcelUtil<GsqTwiningDiscDto> util = new ExcelUtil<>(GsqTwiningDiscDto.class);
-        List<GsqTwiningDiscDto> list = util.importExcel(in);
-        AjaxResult ajaxResult = iGsqTwiningDiscService.importData(list, updateSupport, importLog.getId());
-        // 更新日志记录成功数，失败数
-        ImportUtil.updateImportLogAndFormatMsg(importLog, ajaxResult, iImportLogService);
-        ImportUtil.saveImportErrorLogs(ajaxResult, iImportErrorLogService);
-        return ajaxResult;
+        ImportContext context = new ImportContext();
+        context.setImportFilePath(this.importFilePath);
+        context.setFunctionName(getFunctionName());
+        context.setProcedureCode(getProcedureCode());
+        context.setOriFileName(file.getOriginalFilename());
+        context.setFileBytes(data);
+        return gsqTwiningDiscRemoteService.importData(context, updateSupport);
     }
 }

@@ -1,38 +1,38 @@
 package com.zlt.aps.gsq.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-import com.zlt.aps.gsq.api.domain.dto.GsqSpecifyMachineDto;
-import com.zlt.aps.gsq.entity.GsqSpecifyMachine;
+import com.zlt.aps.gsq.api.domain.entity.GsqSpecifyMachine;
 
 import java.util.List;
 
 /**
- * <p>
- * 钢丝圈定点机台表 Mapper 接口
- * </p>
+ * 钢丝圈定点机台Mapper接口
  *
- * @author zhangbinglin
- * @since 2021-06-04
+ * @author zlt
+ * @date 2026-07-08
  */
 public interface GsqSpecifyMachineMapper extends BaseMapper<GsqSpecifyMachine> {
 
     /**
-     * 根据条件查询定点机台顺序列表
+     * 查询钢丝圈定点机台列表（左联机台信息表反显生产线名称）
      *
-     * @param dto
-     * @return
+     * @param entity 查询条件
+     * @return 列表
      */
-    List<GsqSpecifyMachineDto> listSpecifyMachine(GsqSpecifyMachineDto dto);
+    List<GsqSpecifyMachine> listSpecifyMachine(GsqSpecifyMachine entity);
 
     /**
-     * 合并操作，如果记录存在则更新，否则新增
+     * 校验"钢丝圈代码+生产线"组合是否已存在
      *
-     * @param list 要合并的集合
+     * @param entity 实体
+     * @return 已存在数量（0表示唯一，>0表示不唯一）
      */
-    public void mergeSql(List<GsqSpecifyMachineDto> list);
+    int checkUnique(GsqSpecifyMachine entity);
 
     /**
-     * 删除全部定点机台数据
+     * 批量合并保存（存在则更新，否则新增），用于导入场景
+     *
+     * @param list 待保存数据集合
      */
-    void deleteAllSpecifyMachine();
+    void mergeSql(List<GsqSpecifyMachine> list);
 }

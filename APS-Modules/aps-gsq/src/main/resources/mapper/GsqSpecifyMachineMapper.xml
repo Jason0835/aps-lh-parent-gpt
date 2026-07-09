@@ -2,64 +2,70 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.zlt.aps.gsq.mapper.GsqSpecifyMachineMapper">
 
-    <select id="listSpecifyMachine" parameterType="com.zlt.aps.gsq.api.domain.dto.GsqSpecifyMachineDto"
-            resultType="com.zlt.aps.gsq.api.domain.dto.GsqSpecifyMachineDto">
+    <!-- 查询钢丝圈定点机台列表（左联机台信息表反显生产线名称） -->
+    <select id="listSpecifyMachine" parameterType="com.zlt.aps.gsq.api.domain.entity.GsqSpecifyMachine"
+            resultType="com.zlt.aps.gsq.api.domain.entity.GsqSpecifyMachine">
         select * from (
-        select sm.*, m.machine_code, m.machine_name
-        from T_GSQ_SPECIFY_MACHINE sm
-        left join T_GSQ_MACHINE_INFO m on sm.machine_id = m.id
-        where sm.DEL_FLAG = 0
-        and m.DEL_FLAG = 0
-        <if test="steelRingCode != null and steelRingCode != ''">
-            and INSTR(STEEL_RING_CODE, #{steelRingCode}) > 0
-        </if>
-        <if test="machineId != null">
-            and MACHINE_ID = #{machineId}
-        </if>
-        <if test="lineType != null and lineType != ''">
-            and LINE_TYPE = #{lineType}
-        </if>
-        <if test="jobType != null and jobType != ''">
-            and JOB_TYPE = #{jobType}
-        </if>
-        <if test="orderStr == null">
-            order by sm.CREATE_TIME DESC
-        </if>
+            select sm.ID, sm.STEEL_RING_CODE, sm.MACHINE_CODE, sm.LINE_TYPE, sm.JOB_TYPE,
+                   sm.REMARK, sm.IS_DELETE, sm.CREATE_BY, sm.CREATE_TIME,
+                   sm.UPDATE_BY, sm.UPDATE_TIME,
+                   mi.MACHINE_NAME
+            from T_GSQ_SPECIFY_MACHINE sm
+            left join T_GSQ_MACHINE_INFO mi on sm.MACHINE_CODE = mi.MACHINE_CODE
+            where sm.IS_DELETE = '0'
+            <if test="steelRingCode != null and steelRingCode != ''">
+                and sm.STEEL_RING_CODE = #{steelRingCode}
+            </if>
+            <if test="machineCode != null and machineCode != ''">
+                and sm.MACHINE_CODE = #{machineCode}
+            </if>
+            <if test="lineType != null and lineType != ''">
+                and sm.LINE_TYPE = #{lineType}
+            </if>
+            <if test="jobType != null and jobType != ''">
+                and sm.JOB_TYPE = #{jobType}
+            </if>
+            order by sm.STEEL_RING_CODE, mi.MACHINE_NAME
         ) t
-        <if test="orderStr != null">
-            order by ${orderStr}
-        </if>
-
     </select>
 
+    <!-- 校验"钢丝圈代码+生产线"组合唯一性 -->
+    <select id="checkUnique" parameterType="com.zlt.aps.gsq.api.domain.entity.GsqSpecifyMachine" resultType="int">
+        SELECT count(1)
+        FROM T_GSQ_SPECIFY_MACHINE
+        where IS_DELETE = '0'
+        and STEEL_RING_CODE = #{steelRingCode}
+        and MACHINE_CODE = #{machineCode}
+        <if test="id != null">and ID != #{id}</if>
+    </select>
+
+    <!-- 批量合并保存（存在则更新，否则新增），用于导入场景 -->
     <insert id="mergeSql" parameterType="list">
         INSERT INTO T_GSQ_SPECIFY_MACHINE (
-        steel_ring_code, machine_id, line_type, job_type,
-        create_by, create_time, update_by, update_time, remark, del_flag
-        ) VALUES
-        <foreach collection="list" item="SpecifyMachine" separator=",">
+            STEEL_RING_CODE, MACHINE_CODE, LINE_TYPE, JOB_TYPE, REMARK,
+            CREATE_BY, CREATE_TIME, UPDATE_BY, UPDATE_TIME, IS_DELETE
+        )
+        VALUES
+        <foreach collection="list" item="sm" separator=",">
             (
-            #{SpecifyMachine.steelRingCode,jdbcType=VARCHAR},
-            #{SpecifyMachine.machineId,jdbcType=DOUBLE},
-            #{SpecifyMachine.lineType,jdbcType=VARCHAR},
-            #{SpecifyMachine.jobType,jdbcType=VARCHAR},
-            #{SpecifyMachine.createBy,jdbcType=VARCHAR},
+            #{sm.steelRingCode,jdbcType=VARCHAR},
+            #{sm.machineCode,jdbcType=VARCHAR},
+            #{sm.lineType,jdbcType=VARCHAR},
+            #{sm.jobType,jdbcType=VARCHAR},
+            #{sm.remark,jdbcType=VARCHAR},
+            #{sm.createBy,jdbcType=VARCHAR},
             NOW(),
-            #{SpecifyMachine.updateBy,jdbcType=VARCHAR},
+            #{sm.updateBy,jdbcType=VARCHAR},
             NOW(),
-            #{SpecifyMachine.remark,jdbcType=VARCHAR},
             '0'
             )
         </foreach>
         ON DUPLICATE KEY UPDATE
-        line_type = VALUES(line_type),
-        job_type = VALUES(job_type),
-        update_by = VALUES(create_by),
-        update_time = NOW(),
-        remark = VALUES(remark)
+        LINE_TYPE = VALUES(LINE_TYPE),
+        JOB_TYPE = VALUES(JOB_TYPE),
+        UPDATE_BY = VALUES(CREATE_BY),
+        UPDATE_TIME = NOW(),
+        REMARK = VALUES(REMARK)
     </insert>
 
-    <update id="deleteAllSpecifyMachine">
-        update T_GSQ_SPECIFY_MACHINE set del_flag = NULL where del_flag = '0'
-    </update>
 </mapper>

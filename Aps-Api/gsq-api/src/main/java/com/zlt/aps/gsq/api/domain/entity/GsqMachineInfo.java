@@ -1,10 +1,15 @@
 package com.zlt.aps.gsq.api.domain.entity;
 
+import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableName;
 import com.ruoyi.common.core.annotation.Excel;
 import com.zlt.aps.common.core.annotation.ImportValidated;
 import com.zlt.aps.common.core.domain.ApsBaseEntity;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
 
 import java.math.BigDecimal;
 
@@ -14,6 +19,9 @@ import java.math.BigDecimal;
  * @author zlt
  * @date 2021-05-28
  */
+@Data
+@EqualsAndHashCode(callSuper = false)
+@TableName("t_gsq_machine_info")
 @ApiModel(value = "钢丝圈机台信息对象", description = "钢丝圈机台信息对象 ")
 public class GsqMachineInfo extends ApsBaseEntity {
     private static final long serialVersionUID = 1L;
@@ -22,6 +30,7 @@ public class GsqMachineInfo extends ApsBaseEntity {
      * 主键ID，对应自增序列为：SEQ_PUBLIC
      */
     @ApiModelProperty(value = "主键ID", position = 10)
+    @TableId("ID")
     private Long id;
 
     /**
@@ -29,6 +38,7 @@ public class GsqMachineInfo extends ApsBaseEntity {
      */
     @ApiModelProperty(value = "机台编号", position = 20)
     @Excel(name = "ui.data.column.machine.machineCode")
+    @TableField("MACHINE_CODE")
     @ImportValidated(required = true, isCode = true, maxLength = 30)
     private String machineCode;
 
@@ -37,11 +47,16 @@ public class GsqMachineInfo extends ApsBaseEntity {
      */
     @ApiModelProperty(value = "机台名称", position = 30)
     @Excel(name = "ui.data.column.machine.machineName")
+    @TableField("MACHINE_NAME")
     @ImportValidated(required = true, maxLength = 20)
     private String machineName;
 
+    /**
+     * 工装信息
+     */
     @ApiModelProperty(value = "工装信息", position = 40)
     @Excel(name = "ui.data.column.machine.toolingInfo")
+    @TableField("TOOLING_INFO")
     @ImportValidated(maxLength = 50)
     private String toolingInfo;
 
@@ -50,6 +65,7 @@ public class GsqMachineInfo extends ApsBaseEntity {
      */
     @ApiModelProperty(value = "生产定额", position = 75)
     @Excel(name = "ui.data.column.machine.quata")
+    @TableField("QUATA")
     @ImportValidated(number = true, min = 0, max = 999999)
     private BigDecimal quata;
 
@@ -58,14 +74,16 @@ public class GsqMachineInfo extends ApsBaseEntity {
      */
     @ApiModelProperty(value = "班制", position = 80)
     @Excel(name = "ui.data.column.machine.classShift", dictType = "CLASS_SHIFT")
-    @ImportValidated(maxLength = 20 ,required = true)
+    @TableField("CLASS_SHIFT")
+    @ImportValidated(maxLength = 20, required = true)
     private String classShift;
 
     /**
      * 开机班次，如：中班、夜班；对应数据字典CLASS_NUM
      */
     @ApiModelProperty(value = "开机班次", position = 85)
-    @Excel(name = "ui.data.column.machine.openMachineClass", dictType = "CLASS_NUM_THREE",dictTypeToExcelEnable = false)
+    @Excel(name = "ui.data.column.machine.openMachineClass", dictType = "CLASS_NUM_THREE", dictTypeToExcelEnable = false)
+    @TableField("OPEN_MACHINE_CLASS")
     @ImportValidated(maxLength = 20)
     private String openMachineClass;
 
@@ -74,16 +92,19 @@ public class GsqMachineInfo extends ApsBaseEntity {
      */
     @ApiModelProperty(value = "机台状态", position = 90)
     @Excel(name = "ui.data.column.machine.status", dictType = "STATUS")
-    @ImportValidated(maxLength = 2 ,required = true)
+    @TableField("STATUS")
+    @ImportValidated(maxLength = 2, required = true)
     private String status;
 
     @Excel(name = "ui.common.column.remark")
+    @TableField("REMARK")
     @ImportValidated(maxLength = 300)
     private String remark;
 
     /**
      * 删除标识：0--正常，1-删除.对应数据字典DEL_FLAG
      */
+    @TableField("DEL_FLAG")
     private String delFlag;
 
     @Override

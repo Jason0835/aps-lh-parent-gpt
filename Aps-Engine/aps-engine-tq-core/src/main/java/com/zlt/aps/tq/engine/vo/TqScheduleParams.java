@@ -92,6 +92,13 @@ public class TqScheduleParams {
     private Double maxClassOutput;
 
     /**
+     * 胎圈规格班次最大班产阈值（SYS1101029）
+     * <p>多规格模式下，触发备库的胎圈当班初始排产上限，默认1000</p>
+     * <p>单一规格机台不受此阈值限制，仅受机台定额（quota）限制</p>
+     */
+    private Double backupShiftThreshold;
+
+    /**
      * 规格切换时长（小时），默认0.5
      */
     private Double specSwitchTime;
