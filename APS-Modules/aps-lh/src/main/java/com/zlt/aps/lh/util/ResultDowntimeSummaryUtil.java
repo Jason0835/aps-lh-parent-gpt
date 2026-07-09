@@ -34,6 +34,8 @@ public final class ResultDowntimeSummaryUtil {
     private static final String DRY_ICE_ANALYSIS = "干冰清洗";
     /** 单独喷砂清洗时写入班次分析的固定原因 */
     private static final String SAND_BLAST_ANALYSIS = "喷砂清洗";
+    /** 标识为是的固定值 */
+    private static final String YES_FLAG = "1";
 
     private ResultDowntimeSummaryUtil() {
     }
@@ -70,9 +72,23 @@ public final class ResultDowntimeSummaryUtil {
         appendSandBlastDowntimeAnalysis(result, cleaningWindowList, maintenanceWindowList,
                 devicePlanShutList, scheduleWindowShifts);
         // 未与换模/维修/精度重叠的单独清洗，也要在实际开始清洗的班次写入简洁原因。
-        appendStandaloneCleaningAnalysis(result, cleaningWindowList, maintenanceWindowList,
-                devicePlanShutList, result.getMouldChangeStartTime(), productionStartTime,
-                scheduleWindowShifts);
+        // 换模区间上界取换模完成时间（换模开始+换模总时长）与首个生产班次开始时间的较大者，
+        // 避免换模开始时间与生产开始时间相同时（零时长区间）重叠检测失效导致重复写单独清洗原因。
+        Date mouldChangeStartTime = result.getMouldChangeStartTime();
+        Date switchOverlapEndTime = productionStartTime;
+        if (Objects.nonNull(mouldChangeStartTime)) {
+            Date mouldChangeCompleteTime = LhScheduleTimeUtil.addHours(mouldChangeStartTime,
+                    LhScheduleConstant.MOULD_CHANGE_TOTAL_HOURS);
+            switchOverlapEndTime = mouldChangeCompleteTime.after(productionStartTime)
+                    ? mouldChangeCompleteTime : productionStartTime;
+        }
+        // 换活字块结果的清洗备注由 TypeBlockProductionStrategy.applyTypeBlockCleaningAnalysis 统一处理，
+        // 此处跳过单独清洗备注，避免与"清洗+换活字块"重复。
+        if (!YES_FLAG.equals(result.getIsTypeBlock())) {
+            appendStandaloneCleaningAnalysis(result, cleaningWindowList, maintenanceWindowList,
+                    devicePlanShutList, mouldChangeStartTime, switchOverlapEndTime,
+                    scheduleWindowShifts);
+        }
     }
 
     /**
@@ -259,15 +275,9 @@ public final class ResultDowntimeSummaryUtil {
             if (Objects.isNull(analysis)) {
                 continue;
             }
-            // 换模重叠备注按清洗来源计划窗口或实际窗口判断；命中后只写原因，不把清洗作为额外产能扣减。
+            // 只有实际清洗窗口与换模窗口重叠时才写“清洗+换模”备注；
+            // 实际清洗时间已由硫化排程重新安排，来源计划窗口不再作为重叠判定依据。
             // 换模窗口必须按真实换模总时长(8h)判断，不能用首个生产班次开始时间截断，否则首检落在换模班次时会漏判。
-            appendOverlapAnalysis(result,
-                    MachineCleaningOverlapUtil.resolveMouldChangeAnalysisStartTime(cleaningWindow),
-                    MachineCleaningOverlapUtil.resolveMouldChangeAnalysisEndTime(cleaningWindow),
-                    mouldChangeStartTime, mouldChangeCompleteTime, analysis, fallbackShiftIndex,
-                    scheduleWindowShifts);
-            // 排程可能把清洗提前/延后到换模时段，实际清洗窗口与来源计划窗口不一致；
-            // 两者任一与换模重叠都需写“清洗+换模”，同一班次重复写入会被自动去重。
             appendOverlapAnalysis(result,
                     cleaningWindow.getCleanStartTime(), cleaningWindow.getCleanEndTime(),
                     mouldChangeStartTime, mouldChangeCompleteTime, analysis, fallbackShiftIndex,
@@ -357,9 +367,13 @@ public final class ResultDowntimeSummaryUtil {
                                                          MachineCleaningWindowDTO cleaningWindow,
                                                          String analysis,
                                                          List<LhShiftConfigVO> scheduleWindowShifts) {
-        // 单独清洗按"实际开始清洗时间"定位班次：使用排程窗口标准班次而非结果班次时间，
-        // 避免结果在该班次无生产(班次时间为空)时备注错位到相邻班次。
-        int shiftIndex = resolveShiftIndexByStartTime(scheduleWindowShifts, cleaningWindow.getCleanStartTime());
+        // 单独清洗横跨多个班次时，备注应写入最后一个重叠班次（Spec：清洗重叠原因备注规则第2条）；
+        // 未命中重叠班次时回退到按开始时间定位，避免边界场景漏写备注。
+        int shiftIndex = resolveLastOverlapShiftIndex(scheduleWindowShifts,
+                cleaningWindow.getCleanStartTime(), cleaningWindow.getCleanEndTime());
+        if (shiftIndex <= 0) {
+            shiftIndex = resolveShiftIndexByStartTime(scheduleWindowShifts, cleaningWindow.getCleanStartTime());
+        }
         if (shiftIndex > 0) {
             ShiftFieldUtil.appendShiftAnalysis(result, shiftIndex, analysis);
         }
