@@ -16,7 +16,7 @@ spring:
     name: aps-nc
   profiles:
     # 环境配置
-    active: prod
+    active: test
   main:
     allow-bean-definition-overriding: true
   cloud:

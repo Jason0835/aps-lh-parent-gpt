@@ -1,32 +1,29 @@
 package com.zlt.aps.nc.service.impl;
 
-
-import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
-import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
-import com.ruoyi.common.constant.UserConstants;
-import com.ruoyi.common.core.utils.SecurityUtils;
-import com.ruoyi.common.core.web.domain.AjaxResult;
-import com.ruoyi.common.i18n.utils.I18nUtil;
-import com.zlt.aps.common.core.constant.ApsConstant;
-import com.zlt.aps.common.core.domain.ApsBaseEntity;
-import com.zlt.aps.common.core.utils.ImportUtil;
-import com.zlt.aps.nc.api.domain.dto.NcGlueGroupOrderDto;
-import com.zlt.aps.nc.entity.NcGlueGroupOrder;
-import com.zlt.aps.nc.mapper.NcGlueGroupOrderMapper;
-import com.zlt.aps.nc.service.NcGlueGroupOrderService;
-import org.apache.commons.collections4.CollectionUtils;
-import org.apache.commons.lang.StringUtils;
-import org.springframework.beans.BeanUtils;
-import org.springframework.stereotype.Service;
-
-import javax.annotation.Resource;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import java.util.stream.Collectors;
 
-import static com.zlt.aps.common.core.utils.ImportUtil.addImportErrorLog;
+import javax.annotation.Resource;
 
+import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.lang.StringUtils;
+import org.springframework.stereotype.Service;
+
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
+import com.ruoyi.common.constant.UserConstants;
+import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.zlt.aps.nc.api.domain.entity.NcGlueGroupOrder;
+import com.zlt.aps.nc.mapper.NcGlueGroupOrderMapper;
+import com.zlt.aps.nc.service.NcGlueGroupOrderService;
+import com.zlt.aps.utils.ApsBeanUtils;
+import com.zlt.bill.common.service.AbstractDocService;
+import com.zlt.common.enums.ImportErrorTypeEnums;
+import com.zlt.common.utils.ImportExcelValidatedUtils;
 
 /**
  * <p>
@@ -37,7 +34,8 @@ import static com.zlt.aps.common.core.utils.ImportUtil.addImportErrorLog;
  * @since 2021-05-25
  */
 @Service
-public class NcGlueGroupOrderServiceImpl extends ServiceImpl<NcGlueGroupOrderMapper, NcGlueGroupOrder> implements NcGlueGroupOrderService {
+public class NcGlueGroupOrderServiceImpl extends AbstractDocService<NcGlueGroupOrder>
+        implements NcGlueGroupOrderService {
 
     @Resource
     private NcGlueGroupOrderMapper ncGlueGroupOrderMapper;
@@ -47,32 +45,23 @@ public class NcGlueGroupOrderServiceImpl extends ServiceImpl<NcGlueGroupOrderMap
      *
      * @return
      */
-    public List<NcGlueGroupOrderDto> listGlueGroupOrder(NcGlueGroupOrderDto dto) {
-        return ncGlueGroupOrderMapper.listGlueGroupOrder(dto);
-    }
-
-    /**
-     * 保存胶料组别顺序信息（id为空则新增，id不为空则修改）
-     *
-     * @param entity
-     */
-    public void saveGlueGroupOrder(NcGlueGroupOrder entity) {
-        entity.setBaseVale(entity.getId());  //根据id是否为空给创建时间，创建人，更新时间，更新人赋值
-        this.saveOrUpdate(entity);
+    @Override
+    public List<NcGlueGroupOrder> listGlueGroupOrder(NcGlueGroupOrder dto) {
+        return ncGlueGroupOrderMapper.selectList(ApsBeanUtils.builderCondition(dto));
     }
 
     /**
      * 根据code判断胶料组号是否已经存在
      */
-    public String checkGlueGroupCodeUnique(NcGlueGroupOrderDto dto) {
+    @Override
+    public String checkGlueGroupCodeUnique(NcGlueGroupOrder dto) {
         if (dto == null || StringUtils.isBlank(dto.getGlueGroupCode())) {
             return UserConstants.NOT_UNIQUE;
         }
         QueryWrapper<NcGlueGroupOrder> queryWrapper = new QueryWrapper<>();
         queryWrapper.eq("GLUE_GROUP_CODE", dto.getGlueGroupCode());
-        queryWrapper.eq("DEL_FLAG", ApsConstant.DEL_FLAG_NORMAL);
         if (dto.getId() != null) {
-            queryWrapper.ne("ID", dto.getId());  //编辑的时候校验，要过滤掉自身的id
+            queryWrapper.ne("ID", dto.getId());
         }
         List<NcGlueGroupOrder> list = ncGlueGroupOrderMapper.selectList(queryWrapper);
         if (list.size() > 0) {
@@ -82,24 +71,22 @@ public class NcGlueGroupOrderServiceImpl extends ServiceImpl<NcGlueGroupOrderMap
     }
 
     /**
-     * 批量删除(逻辑删)
+     * 查询出被使用了的胶料组别
      *
-     * @param ids 多个id逗号分割
+     * @param glueGroupIds
+     * @return
      */
-    public void deleteGlueGroupOrder(Long[] ids) {
-        List<Long> glueGroupIds = Arrays.asList(ids);
-        List<String> usedGlueGroupList = ncGlueGroupOrderMapper.listUserdGlueGroup(glueGroupIds);  //查询出已经被使用的胶料组别
-        if (usedGlueGroupList != null && !usedGlueGroupList.isEmpty()) {
-            String groupNames = "'" + String.join("'，'", usedGlueGroupList) + "'";
-            throw new RuntimeException(groupNames + I18nUtil.getMessage("胶料组别已被使用，禁止删除！"));
-        }
+    @Override
+    public List<String> listUserdGlueGroup(List<Long> glueGroupIds) {
+        LambdaQueryWrapper<NcGlueGroupOrder> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.in(NcGlueGroupOrder::getId, glueGroupIds);
+        return ncGlueGroupOrderMapper.selectList(queryWrapper).stream().map(NcGlueGroupOrder::getGlueGroupCode)
+                .distinct().collect(Collectors.toList());
+    }
 
-        LambdaUpdateWrapper<NcGlueGroupOrder> wrapper = new LambdaUpdateWrapper<>();
-        wrapper.in(ApsBaseEntity::getId, Arrays.asList(ids));
-        wrapper.set(ApsBaseEntity::getDelFlag, null);
-        wrapper.set(ApsBaseEntity::getUpdateBy, SecurityUtils.getUsername());
-        wrapper.set(ApsBaseEntity::getUpdateTime, new Date());
-        super.getBaseMapper().update(null, wrapper);
+    @Override
+    protected List<String> getCheckUniqueFields() {
+        return new ArrayList<>(Arrays.asList("glueGroupCode"));
     }
 
     /**
@@ -111,81 +98,77 @@ public class NcGlueGroupOrderServiceImpl extends ServiceImpl<NcGlueGroupOrderMap
      * @return 导入后提示信息
      */
     @Override
-    public AjaxResult importData(List<NcGlueGroupOrderDto> list, boolean updateSupport, Long importLogId) {
+    public AjaxResult importData(List<NcGlueGroupOrder> list, boolean updateSupport, Long importLogId) {
         int successNum = 0;
         int failureNum = 0;
-        // 校验
+        List<NcGlueGroupOrder> importList = new ArrayList<>();
         List<ImportErrorLog> importErrorLogs = new ArrayList<>();
-        List<NcGlueGroupOrderDto> importList = new ArrayList<>();
-
-        //按业务主键分组
-        Map<String, Long> groupMap = list.stream().collect(Collectors.groupingBy(a -> a.getGlueGroupCode(), Collectors.counting()));
+        String uniqueMsg = I18nUtil.getMessage("ui.data.alert.cxStock.embryoCodeNotUnique");
 
         for (int i = 0; i < list.size(); i++) {
-            NcGlueGroupOrderDto glueGroupOrder = list.get(i);
-
-            //重复记录校验
-            Long hasValue = groupMap.get(glueGroupOrder.getGlueGroupCode());
-            if (hasValue > 1) {
+            int errorNum = i + 2;
+            NcGlueGroupOrder docEntity = list.get(i);
+            List<ImportErrorLog> validated = ImportExcelValidatedUtils.validated(importLogId, errorNum, docEntity);
+            ImportExcelValidatedUtils.validatedRepeat(list, docEntity, i, 2, importLogId, validated,
+                    this.getCheckUniqueFields().toArray(new String[0]));
+            if (CollectionUtils.isNotEmpty(validated)) {
                 failureNum++;
-                glueGroupOrder.setId(-999L);
-                String message = I18nUtil.getMessage("ui.data.column.all.conflictRecord");
-                String columnName = I18nUtil.getMessage("ui.glueGroup.column.glueGroupCode");
-                message=String.format(message,columnName);
-                addImportErrorLog(importLogId, i + 2,message, importErrorLogs);
-                continue;
-            }
-
-            List<ImportErrorLog> validated = ImportUtil.validated(importLogId, i + 2, glueGroupOrder);
-            if (CollectionUtils.isEmpty(validated)) {
-                glueGroupOrder.setBaseVale(null);
-                importList.add(glueGroupOrder);
-            } else {
-                failureNum++;
-                glueGroupOrder.setId(-999L);
+                docEntity.setId(-999L);
                 importErrorLogs.addAll(validated);
             }
         }
-        try {
-            //勾选更新记录，调用merge即可
-            if (updateSupport && CollectionUtils.isNotEmpty(importList)) {
-                successNum = importList.size();
-                ncGlueGroupOrderMapper.mergeSql(importList);
+
+        for (int i = 0; i < list.size(); i++) {
+            int errorNum = i + 2;
+            NcGlueGroupOrder docEntity = list.get(i);
+            if (docEntity.getId() != null && docEntity.getId() == -999L) {
+                continue;
+            }
+
+            if (checkUnique(docEntity).equals(UserConstants.UNIQUE)) {
+                importList.add(docEntity);
+                successNum++;
             } else {
-                //查询数据库已存在对象
-                for (int i = 0; i < list.size(); i++) {
-                    NcGlueGroupOrderDto excelItem = list.get(i);
-                    if (excelItem.getId() != null && excelItem.getId().equals(-999L)) {
-                        continue;
-                    }
-                    // 唯一性校验
-                    String unique = checkGlueGroupCodeUnique(excelItem);
-                    if (UserConstants.UNIQUE.equals(unique)) {
-                        //不存在插入
-                        successNum++;
-                        NcGlueGroupOrder glueGroupOrder = new NcGlueGroupOrder();
-                        BeanUtils.copyProperties(excelItem, glueGroupOrder);
-                        ncGlueGroupOrderMapper.insert(glueGroupOrder);
-                    } else {
-                        // 存在，插入错误详细日志
+                if (updateSupport) {
+                    LambdaQueryWrapper<NcGlueGroupOrder> queryWrapper = new LambdaQueryWrapper<>();
+                    queryWrapper.eq(NcGlueGroupOrder::getFactoryCode, docEntity.getFactoryCode());
+                    queryWrapper.eq(NcGlueGroupOrder::getGlueGroupCode, docEntity.getGlueGroupCode());
+                    logger.info("updateSupport:{}", docEntity);
+                    List<NcGlueGroupOrder> existList = ncGlueGroupOrderMapper.selectList(queryWrapper);
+                    if (existList.size() > 1) {
                         failureNum++;
-                        addImportErrorLog(importLogId, i + 2,
-                                I18nUtil.getMessage("ui.error.message.glueGroupOrder.unique"), importErrorLogs);
+                        String multipleMsg = I18nUtil.getMessage("ui.data.alert.cxStock.multipleRecords");
+                        ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(),
+                                errorNum, String.format(multipleMsg, errorNum), importErrorLogs);
+                        continue;
+                    } else if (existList.size() == 1) {
+                        docEntity.setId(existList.get(0).getId());
+                        importList.add(docEntity);
+                        successNum++;
                     }
+                } else {
+                    failureNum++;
+                    ImportExcelValidatedUtils.addImportErrorLog(importLogId, errorNum,
+                            String.format(uniqueMsg, errorNum), importErrorLogs);
                 }
             }
-        } catch (Exception e) {
-            e.printStackTrace();
-            // 执行sql失败，插入导入失败记录
-            successNum = 0;
-            failureNum = list.size();
-            importErrorLogs.clear();
-            addImportErrorLog(importLogId, null, e.getMessage(), importErrorLogs);
         }
+
+        if (CollectionUtils.isEmpty(importList)) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.message.import.fail") + "," + successNum + "," + failureNum,
+                    importErrorLogs);
+        }
+        baseDao.saveBatch(importList);
         if (failureNum > 0) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.message.import.fail") + "," + successNum + "," + failureNum, importErrorLogs);
+            return AjaxResult.error(I18nUtil.getMessage("ui.message.import.fail") + "," + successNum + "," + failureNum,
+                    importErrorLogs);
         } else {
             return AjaxResult.success(I18nUtil.getMessage("ui.message.import.success") + "," + successNum);
         }
+    }
+
+    @Override
+    protected String getDocTypeCode() {
+        return "";
     }
 }

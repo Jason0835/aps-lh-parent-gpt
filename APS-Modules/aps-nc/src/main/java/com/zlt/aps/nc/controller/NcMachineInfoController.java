@@ -1,6 +1,22 @@
 package com.zlt.aps.nc.controller;
 
-import com.ruoyi.common.core.web.controller.BaseController;
+import java.io.IOException;
+import java.util.List;
+
+import javax.annotation.Resource;
+import javax.servlet.http.HttpServletResponse;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.i18n.utils.I18nUtil;
@@ -8,123 +24,111 @@ import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.ruoyi.common.utils.StringUtils;
 import com.zlt.aps.nc.api.domain.entity.NcMachineInfo;
+import com.zlt.aps.nc.mapper.NcMachineInfoMapper;
 import com.zlt.aps.nc.service.NcMachineInfoService;
+import com.zlt.aps.utils.AppUtils;
+import com.zlt.bill.common.controller.AbstractDocBizController;
+import com.zlt.bill.common.service.IDocService;
+
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiImplicitParam;
 import io.swagger.annotations.ApiImplicitParams;
 import io.swagger.annotations.ApiOperation;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 /**
  * 内衬机台信息Controller
  *
  * @author zlt
- * @date 2021-05-28
+ * @date 2026-05-28
  */
 @Api(tags = "内衬机台信息维护接口")
 @RestController
 @RequestMapping("/nc/machine")
-public class NcMachineInfoController extends BaseController {
+public class NcMachineInfoController extends AbstractDocBizController<NcMachineInfo> {
     @Autowired
-    private NcMachineInfoService machineInfoService;
+    private NcMachineInfoService machineService;
+
+    @Resource
+    private NcMachineInfoMapper machineMapper;
 
     /**
-     * 查询内衬机台信息列表
+     * 查询信息列表
      */
-    @ApiOperation("根据条件查询内衬机台信息")
     @PostMapping("/list")
-    public TableDataInfo list(@RequestBody NcMachineInfo machineInfo) {
-        startPage();
-        machineInfo.setOrderStr(orderStr());
-        List<NcMachineInfo> list = machineInfoService.selectMachineInfoList(machineInfo);
-        return getDataTable(list);
+    @ApiOperation("根据条件查询列表信息")
+    public TableDataInfo list(@RequestBody NcMachineInfo queryVO) {
+        return super.list(queryVO);
     }
 
     /**
-     * 获取内衬机台信息详细信息
+     * 新增信息
      */
-    @GetMapping(value = "/{id}")
-    @ApiOperation("根据id查询内衬机台信息")
-    @ApiImplicitParams({
-            @ApiImplicitParam(name = "id", dataType = "int", value = "主键id", paramType = "query")
-    })
-    public NcMachineInfo getInfo(@PathVariable("id") Long id) {
-        return machineInfoService.selectMachineInfoById(id);
-    }
-
-    /**
-     * 新增内衬机台信息
-     */
-    //@PreAuthorize(hasPermi = "tc:machine:add")
-    @Log(title = "ui.data.column.machine.info", businessType = BusinessType.INSERT)
-    @ApiOperation("新增内衬机台信息（id不为空）")
+    @Log(title = "ui.nc.machine.column.modalName", businessType = BusinessType.INSERT)
+    @ApiOperation("新增信息（id不为空）")
     @PostMapping
-    public AjaxResult add(@RequestBody NcMachineInfo machineInfo) {
-        return toAjax(machineInfoService.insertMachineInfo(machineInfo));
+    public AjaxResult save(@RequestBody NcMachineInfo machine) {
+        if (UserConstants.NOT_UNIQUE.equals(machineService.checkUnique(machine))) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.error.message.quota.unique"));
+        }
+        return super.save(machine);
     }
 
     /**
-     * 修改内衬机台信息
+     * 删除信息
      */
-    //@PreAuthorize(hasPermi = "tc:machine:edit")
-    @Log(title = "ui.data.column.machine.info", businessType = BusinessType.UPDATE)
-    @ApiOperation("修改内衬机台信息（id不为空）")
-    @PutMapping
-    public AjaxResult edit(@RequestBody NcMachineInfo machineInfo) {
-        return toAjax(machineInfoService.updateMachineInfo(machineInfo));
+    @Log(title = "ui.nc.machine.column.modalName", businessType = BusinessType.DELETE)
+    @ApiOperation("根据id批量删除信息")
+    @ApiImplicitParams({ @ApiImplicitParam(name = "ids", dataType = "Long[]", value = "主键ids") })
+    @PostMapping("/remove")
+    public AjaxResult removeByIds(@RequestBody List<Long> ids) {
+        return super.removeByIds(ids);
     }
 
     /**
-     * 删除内衬机台信息
+     * 导出列表
      */
-    //@PreAuthorize(hasPermi = "tc:machine:remove")
-    @Log(title = "ui.data.column.machine.info", businessType = BusinessType.DELETE)
-    @ApiOperation("删除内衬机台信息（id不为空）")
-    @DeleteMapping("/{ids}")
-    public AjaxResult remove(@PathVariable Long[] ids) {
-        return toAjax(machineInfoService.deleteMachineInfoByIds(ids));
+    @ApiOperation("导出数据")
+    @PostMapping("/exportData/{fileName}")
+    @Override
+    public byte[] exportData(@RequestBody NcMachineInfo queryVO, @PathVariable("fileName") String fileName,
+            HttpServletResponse response) throws IOException {
+        return super.exportData(queryVO, fileName, response);
     }
 
-    /**
-     * 校验机台编号唯一性
-     */
-    @ApiOperation("校验机台编号唯一性")
-    @PostMapping("/checkMachineCodeUnique")
-    public String checkMachineCodeUnique(@RequestBody NcMachineInfo machineInfo) {
-        return machineInfoService.checkMachineCodeUnique(machineInfo);
-    }
-
-    /**
-     * 查询列表
-     */
-    @Log(title = "ui.data.column.machine.info", businessType = BusinessType.EXPORT)
-    @PostMapping("/exportList")
-    public List<NcMachineInfo> exportList(@RequestBody NcMachineInfo machineInfo) {
-        startPage();
-        machineInfo.setOrderStr(orderStr());
-        List<NcMachineInfo> list = machineInfoService.selectMachineInfoList(machineInfo);
+    @Override
+    protected List<NcMachineInfo> listExportData(NcMachineInfo obj) {
+        QueryWrapper<NcMachineInfo> wrapper = new QueryWrapper<>();
+        startPage("update_time desc");
+        this.builderCondition(wrapper, obj);
+        List<NcMachineInfo> list = machineMapper.selectList(wrapper);
+        AppUtils.formatData(list, getQueryFormulas());
         return list;
     }
 
-    /**
-     * 根据内衬和口型板获取对应机台信息
-     */
-    @PostMapping("/list2")
-    public List<NcMachineInfo> list2(@RequestBody NcMachineInfo machineInfo) {
-        List<NcMachineInfo> list = machineInfoService.selectMachineInfoList2(machineInfo);
-        return list;
-    }
-
-    @Log(title = "ui.data.column.machine.info", businessType = BusinessType.IMPORT)
+    @Log(title = "ui.nc.machine.column.modalName", businessType = BusinessType.IMPORT)
     @PostMapping("/importData")
-    @ApiOperation("导入内衬机台信息")
-    public AjaxResult importData(@RequestBody List<NcMachineInfo> list, @RequestParam("updateSupport") boolean updateSupport, @RequestParam("importLogId") Long importLogId) {
+    @ApiOperation("导入信息")
+    public AjaxResult importData(@RequestBody List<NcMachineInfo> list, @RequestParam("updateSupport") boolean updateSupport,
+            @RequestParam("importLogId") Long importLogId) {
         if (StringUtils.isNull(list) || list.size() == 0) {
             return AjaxResult.error(I18nUtil.getMessage("ui.data.column.import.nodata"));
         }
-        return machineInfoService.importData(list, updateSupport, importLogId);
+        return machineService.importData(list, updateSupport, importLogId);
+    }
+
+    @Override
+    @SuppressWarnings("rawtypes")
+    protected IDocService getDocService() {
+        return machineService;
+    }
+
+    @Override
+    protected String getTypeCode() {
+        return "0";
+    }
+
+    @Override
+    protected String getOrderBy() {
+        return "MACHINE_CODE";
     }
 }

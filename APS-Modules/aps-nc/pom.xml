@@ -41,6 +41,10 @@
             <groupId>com.zlt.aps</groupId>
             <artifactId>aps-common-core</artifactId>
         </dependency>
+        <dependency>
+            <groupId>com.zlt.aps</groupId>
+            <artifactId>aps-base</artifactId>
+        </dependency>
         <!-- 算法引擎模块 -->
         <dependency>
             <groupId>com.zlt.aps.nc</groupId>

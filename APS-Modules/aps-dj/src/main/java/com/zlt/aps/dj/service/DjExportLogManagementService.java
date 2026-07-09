@@ -10,7 +10,7 @@ import com.zlt.aps.dj.api.domain.entity.DjExportLogManagement;
  * 工序导出日志管理Service接口
  *
  * @author duanjuntao
- * @date 2021-06-07
+ * @date 2026-06-07
  */
 public interface DjExportLogManagementService extends IService<DjExportLogManagement> {
     /**
