@@ -341,7 +341,12 @@ public class TmScheduleResultServiceImpl extends AbstractDocService<TmScheduleRe
                     TM_AUTO_PLAN_LOG_PREFIX, request.getFactoryCode(), formatAutoPlanDate(request.getScheduleDate()), request.getTraceId(),
                     request.getOperator(), request.getDataSource(), request.getConfirmOverwrite());
 
-            response = buildAutoScheduleResponse(request);
+            response = new TmAutoScheduleResponseVo();
+            response.setBatchNo(autoScheduleTask.getBatchNo());
+            response.setTraceId(autoScheduleTask.getTraceId());
+            response.setResultCount(0);
+            response.setUnplannedCount(0);
+            response.setConfirmRequired(Boolean.FALSE);
             log.info("{} step=RESPONSE_INITIALIZED factoryCode={}, scheduleDate={}, batchNo={}, traceId={}, operator={}",
                     TM_AUTO_PLAN_LOG_PREFIX, request.getFactoryCode(), formatAutoPlanDate(request.getScheduleDate()),
                     response.getBatchNo(), response.getTraceId(), StrUtil.blankToDefault(request.getOperator(), "system"));
