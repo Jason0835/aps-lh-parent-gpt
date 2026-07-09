@@ -3,6 +3,7 @@ package com.zlt.aps.lh.handler;
 import com.google.common.collect.Lists;
 import com.zlt.aps.lh.api.constant.LhScheduleConstant;
 import com.zlt.aps.lh.api.constant.LhScheduleParamConstant;
+import com.zlt.aps.lh.api.domain.dto.CuringMonthPlanTotalResult;
 import com.zlt.aps.lh.api.domain.dto.MachineScheduleDTO;
 import com.zlt.aps.lh.api.domain.dto.SkuDailyPlanQuotaDTO;
 import com.zlt.aps.lh.api.domain.dto.SkuScheduleDTO;
@@ -14,6 +15,7 @@ import com.zlt.aps.lh.api.enums.ConstructionStageEnum;
 import com.zlt.aps.lh.api.enums.ScheduleStepEnum;
 import com.zlt.aps.lh.api.enums.ScheduleTypeEnum;
 import com.zlt.aps.lh.api.enums.SkuTagEnum;
+import com.zlt.aps.lh.component.CuringMonthPlanTotalCalculator;
 import com.zlt.aps.lh.component.MonthPlanDateResolver;
 import com.zlt.aps.lh.component.TargetScheduleQtyResolver;
 import com.zlt.aps.lh.context.LhScheduleContext;
@@ -553,7 +555,6 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
         return surplusCalculation.getSurplusQty();
     }
 
-
     /**
      * 计算SKU的硫化余量
      * <p>
@@ -578,8 +579,9 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
         Map<YearMonth, FactoryMonthPlanProductionFinalResult> dayProductionPlanMap = SkuMonthPlanCalculator.getHasProductionPlan(allMonthPlanList, allProductionDate, plan.getFactoryCode(), plan.getMaterialCode(), plan.getProductStatus());
         Map<YearMonth, Integer> monthPlanQtyMap = context.getMonthPlanQty(plan);
         boolean isCrossMonth = context.isCrossMonthByProductionDateInfo();
+        //当前排产计划总量：与月计划总量差别，在于欠产及中间的断点以及跨月
         int totalPlanQty;
-        if (CollectionUtils.isEmpty(monthPlanQtyMap)) {
+        if (null == monthPlanQtyMap) {
             totalPlanQty = BigDecimal.ZERO.intValue();
         } else {
             totalPlanQty = monthPlanQtyMap.values().stream().mapToInt(Integer::intValue).sum();
@@ -598,15 +600,22 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
 //                    monthPlanTotalResult.getCurrentMonthPlanTotal(), monthPlanTotalResult.getCrossMonthPlanTotal(),
 //                    monthPlanTotalResult.getCalculateScene());
 //        }
-        Integer lastMonthOverdueQty = monthOverdueQtyMap.values().stream().mapToInt(Integer::intValue).sum();
-        log.info("硫化余量计算完成, materialCode: {}, monthPlanQty: {}, monthFinishedAndScheDayQty: {}, "
-                        + "scheDayFinishQty: {}, lastMonthValidFlag: {}, lastMonthOverdueQty: {}, surplusQty: {}, "
-                        + "crossMonth: {}",
-                plan.getMaterialCode(), totalPlanQty, actualFinishedQty, scheDayFinishQty,
-                plan.getLastMonthValidFlag(), lastMonthOverdueQty, remainingDemandQty,
-                isCrossMonth);
+        int lastMonthOverdueQty = resolveEffectiveLastMonthOverdueQty(plan);
+        CuringMonthPlanTotalResult monthPlanTotalResult = CuringMonthPlanTotalCalculator.calculate(
+                context, plan, toLocalDate(context.getScheduleDate()), toLocalDate(context.getWindowEndDate()),
+                actualFinishedQty, lastMonthOverdueQty);
+        //月计划总量
+        int monthPlanTotalQty = monthPlanTotalResult.getMonthPlanTotal();
+        if (lastMonthOverdueQty != 0 || scheDayFinishQty > 0 || isCrossMonth) {
+            log.info("硫化余量计算完成, materialCode: {}, monthPlanQty: {}, monthFinishedAndScheDayQty: {}, "
+                            + "scheDayFinishQty: {}, lastMonthValidFlag: {}, lastMonthOverdueQty: {}, surplusQty: {}, "
+                            + "crossMonth: {}, monthPlanTotalQty: {}",
+                    plan.getMaterialCode(), totalPlanQty, actualFinishedQty, scheDayFinishQty,
+                    plan.getLastMonthValidFlag(), lastMonthOverdueQty, remainingDemandQty,
+                    isCrossMonth, monthPlanTotalQty);
+        }
         return new SurplusCalculation(remainingDemandQty, actualFinishedQty, ignoredOverProductionQty,
-                lastMonthOverdueQty, totalPlanQty);
+                lastMonthOverdueQty, monthPlanTotalQty);
     }
 
     /**
@@ -1894,7 +1903,7 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
      * 仅当远期计划超出提前生产天数阈值时，才禁止提前消耗未来计划。</p>
      *
      * @param context 排程上下文
-     * @param sku SKU排程DTO
+     * @param sku     SKU排程DTO
      * @return true-本轮不排产，false-继续按新增SKU处理
      */
     private boolean shouldSkipWindowNoPlanNewSku(LhScheduleContext context, SkuScheduleDTO sku) {
@@ -1918,7 +1927,7 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
      * 追加窗口无计划且无本月历史欠产的新增SKU未排结果和排程过程日志。
      *
      * @param context 排程上下文
-     * @param sku SKU排程DTO
+     * @param sku     SKU排程DTO
      */
     private void appendWindowNoPlanNewSkuUnscheduledResult(LhScheduleContext context, SkuScheduleDTO sku) {
         LhUnscheduledResult unscheduled = buildBaseUnscheduledResult(context, sku);

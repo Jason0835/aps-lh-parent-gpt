@@ -13,7 +13,6 @@ import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.constant.ServiceNameConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
-import com.zlt.aps.nc.api.domain.dto.NcGlueGroupOrderDto;
 import com.zlt.aps.nc.api.domain.entity.NcGlueGroupOrder;
 
 /**
@@ -44,7 +43,7 @@ public interface INcGlueGroupOrderRemoteService {
      * 根据code判断胶料组号是否已经存在
      */
     @PostMapping("/nc/glueGroupOrder/checkGlueGroupCodeUnique")
-    String checkGlueGroupCodeUnique(@RequestBody NcGlueGroupOrderDto dto);
+    String checkGlueGroupCodeUnique(@RequestBody NcGlueGroupOrder dto);
 
     /**
      * 校验唯一性
