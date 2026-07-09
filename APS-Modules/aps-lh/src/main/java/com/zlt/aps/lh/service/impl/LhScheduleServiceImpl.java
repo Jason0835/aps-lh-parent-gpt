@@ -66,6 +66,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
+import java.text.MessageFormat;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -332,10 +333,10 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
     @Override
     public AjaxResult changeMachinePreCheck(LhTransferDeskDTO dto) {
         if (dto.getId() == null) {
-            return AjaxResult.error("请选择需要转机台的记录");
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.lhScheduleResult.changeMachine.selectRequired"));
         }
         if (dto.getLhMachineCode() == null) {
-            return AjaxResult.error("新机台编码不能为空");
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.lhScheduleResult.changeMachine.newMachineCodeRequired"));
         }
 
         Long ids = dto.getId();
@@ -347,7 +348,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
             String existScheduleDate = DateUtil.format(existResult.getScheduleDate(), "yyyy-MM-dd");
             String existMachineCode = existResult.getLhMachineCode();
             String existMaterialCode = existResult.getMaterialCode();
-            errorMessages.add(String.format("排程日期:%s，物料编码：%s，机台编号：%s，已经存在！", existScheduleDate, existMaterialCode, existMachineCode));
+            errorMessages.add(MessageFormat.format(I18nUtil.getMessage("ui.data.alert.lhScheduleResult.changeMachine.conflictExists"), existScheduleDate, existMaterialCode, existMachineCode));
         }
         if (CollUtil.isNotEmpty(errorMessages)) {
             return AjaxResult.error(String.join(";", errorMessages));
@@ -364,10 +365,10 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
     @Override
     public AjaxResult changeMachine(LhTransferDeskDTO dto) {
         if (dto.getId() == null) {
-            return AjaxResult.error("请选择需要转机台的记录");
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.lhScheduleResult.changeMachine.selectRequired"));
         }
         if (dto.getLhMachineCode() == null) {
-            return AjaxResult.error("新机台编码不能为空");
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.lhScheduleResult.changeMachine.newMachineCodeRequired"));
         }
 
         // 检查所有记录是否已发布
@@ -380,7 +381,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
 
         // 更新备注
         String remark = record.getRemark() != null ? record.getRemark() : "";
-        record.setRemark(remark + "转机台时间：" + DateUtil.now() + "【原机台：" + oldMachine + ",转入机台：" + dto.getLhMachineCode() + "】");
+        record.setRemark(remark + MessageFormat.format(I18nUtil.getMessage("ui.data.alert.lhScheduleResult.changeMachine.remarkTemplate"), DateUtil.now(), oldMachine, dto.getLhMachineCode()));
 
         // 发布状态是已发布的话，需要更新为待发布
         if (ReleaseStatusEnum.RELEASED.getCode().equals(record.getIsRelease())) {
@@ -388,7 +389,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         }
 
         scheduleResultMapper.updateById(record);
-        return AjaxResult.success("转机台成功");
+        return AjaxResult.success(I18nUtil.getMessage("ui.data.alert.lhScheduleResult.changeMachine.success"));
     }
 
     /**
@@ -400,12 +401,12 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
     @Override
     public AjaxResult adjustQuantityPreCheck(LhScheduleResultUpdateDTO dto) {
         if (Objects.isNull(dto) || Objects.isNull(dto.getId())) {
-            return AjaxResult.error("请选择需要调量的排程记录");
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.lhScheduleResult.adjustQuantity.selectRequired"));
         }
 
         LhScheduleResult record = scheduleResultMapper.selectById(dto.getId());
         if (Objects.isNull(record)) {
-            return AjaxResult.error("排程记录不存在或已删除");
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.lhScheduleResult.adjustQuantity.recordNotFound"));
         }
 
         Date now = new Date();
@@ -419,19 +420,19 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
             }
             hasAdjustField = true;
             if (adjustPlanQty < 0) {
-                errorMessages.add(String.format("第%s班计划量不能小于0", shiftIndex));
+                errorMessages.add(MessageFormat.format(I18nUtil.getMessage("ui.data.alert.lhScheduleResult.adjustQuantity.planQtyNegative"), shiftIndex));
             }
             // 历史班次允许调量低于完成量，非历史班次仍需保护完成量下限。
             boolean historyShift = isHistoryShift(record, shiftIndex, now, shiftContext);
             Integer finishQty = Optional.ofNullable(ShiftFieldUtil.getShiftFinishQty(record, shiftIndex))
                     .orElse(0);
             if (!historyShift && adjustPlanQty < finishQty) {
-                errorMessages.add(String.format("第%s班计划量不能小于完成量%s", shiftIndex, finishQty));
+                errorMessages.add(MessageFormat.format(I18nUtil.getMessage("ui.data.alert.lhScheduleResult.adjustQuantity.planQtyLessThanFinish"), shiftIndex, finishQty));
             }
         }
 
         if (!hasAdjustField) {
-            errorMessages.add("未检测到可调量的班次计划量字段");
+            errorMessages.add(I18nUtil.getMessage("ui.data.alert.lhScheduleResult.adjustQuantity.noAdjustableField"));
         }
         if (CollUtil.isNotEmpty(errorMessages)) {
             return AjaxResult.error(String.join("；", errorMessages));
@@ -525,7 +526,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
 
         LhScheduleResult record = scheduleResultMapper.selectById(dto.getId());
         if (Objects.isNull(record)) {
-            return AjaxResult.error("排程记录不存在或已删除");
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.lhScheduleResult.adjustQuantity.recordNotFound"));
         }
 
         for (int shiftIndex = 1; shiftIndex <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT; shiftIndex++) {
@@ -548,9 +549,9 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
 
         int updateCount = scheduleResultMapper.updateById(record);
         if (updateCount <= 0) {
-            return AjaxResult.error("调量失败，请稍后重试");
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.lhScheduleResult.adjustQuantity.failRetry"));
         }
-        return AjaxResult.success("调量成功，记录已回置待发布");
+        return AjaxResult.success(I18nUtil.getMessage("ui.data.alert.lhScheduleResult.adjustQuantity.success"));
     }
 
     /**
