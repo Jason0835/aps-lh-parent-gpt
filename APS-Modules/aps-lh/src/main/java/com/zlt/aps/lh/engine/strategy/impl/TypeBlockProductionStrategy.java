@@ -2613,6 +2613,8 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
                 LhScheduleParamConstant.DRY_ICE_LOSS_QTY, LhScheduleConstant.DRY_ICE_LOSS_QTY);
         int dryIceDurationHours = context.getParamIntValue(
                 LhScheduleParamConstant.DRY_ICE_DURATION_HOURS, LhScheduleConstant.DRY_ICE_DURATION_HOURS);
+        int plannedRepairFixedQty = context.getParamIntValue(
+                LhScheduleParamConstant.PLANNED_REPAIR_FIXED_QTY, LhScheduleConstant.PLANNED_REPAIR_FIXED_QTY);
         String configPlusShiftType = ShiftCapacityResolverUtil.resolveOddShiftCapacityPlusShiftType(context);
         Map<Integer, Integer> dailyStandardShiftCapacityMap = calculateDailyStandardShiftCapacityMap(
                 context, result, shifts, startTime, shiftCapacity, lhTimeSeconds, mouldQty,
@@ -2689,7 +2691,8 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
                     dryIceDurationHours,
                     shift,
                     configPlusShiftType,
-                    ScheduleTypeEnum.TYPE_BLOCK.getCode());
+                    ScheduleTypeEnum.TYPE_BLOCK.getCode(),
+                    plannedRepairFixedQty);
             shiftMaxQty = ShiftProductionControlUtil.deductCapacityByControl(control, shiftMaxQty, mouldQty);
             int physicalShiftMaxQty = shiftMaxQty;
             shiftMaxQty = dailyStandardShiftCapacityMap.getOrDefault(shift.getShiftIndex(), shiftMaxQty);
@@ -2903,6 +2906,8 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
                 LhScheduleParamConstant.DRY_ICE_LOSS_QTY, LhScheduleConstant.DRY_ICE_LOSS_QTY);
         int dryIceDurationHours = context.getParamIntValue(
                 LhScheduleParamConstant.DRY_ICE_DURATION_HOURS, LhScheduleConstant.DRY_ICE_DURATION_HOURS);
+        int plannedRepairFixedQty = context.getParamIntValue(
+                LhScheduleParamConstant.PLANNED_REPAIR_FIXED_QTY, LhScheduleConstant.PLANNED_REPAIR_FIXED_QTY);
         String configPlusShiftType = ShiftCapacityResolverUtil.resolveOddShiftCapacityPlusShiftType(context);
         boolean started = false;
         for (LhShiftConfigVO shift : shifts) {
@@ -2932,7 +2937,8 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
                     dryIceDurationHours,
                     shift,
                     configPlusShiftType,
-                    ScheduleTypeEnum.TYPE_BLOCK.getCode());
+                    ScheduleTypeEnum.TYPE_BLOCK.getCode(),
+                    plannedRepairFixedQty);
             shiftMaxQty = ShiftProductionControlUtil.deductCapacityByControl(control, shiftMaxQty, mouldQty);
             rawShiftCapacityMap.put(shift.getShiftIndex(), Math.max(0, shiftMaxQty));
         }
@@ -3147,20 +3153,26 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
         if (firstPlannedShiftIndex <= 0) {
             return;
         }
+        // 换活字块完成时间 = 切换开始 + 换活字块总时长；取完成时间与首个生产班次开始时间的较大者
+        // 作为重叠判定上界，避免切换开始时间与生产开始时间相同时（零时长区间）重叠检测失效。
+        Date switchCompleteTime = LhScheduleTimeUtil.addHours(switchStartTime,
+                LhScheduleTimeUtil.getTypeBlockChangeTotalHours(context));
+        Date overlapEndTime = switchCompleteTime.after(productionStartTime)
+                ? switchCompleteTime : productionStartTime;
         List<MachineCleaningWindowDTO> cleaningWindowList =
                 resolveMachineCleaningWindowList(context, result.getLhMachineCode());
         int analysisShiftIndex = MachineCleaningOverlapUtil.resolveLastOverlapShiftIndex(
-                shifts, switchStartTime, productionStartTime);
+                shifts, switchStartTime, overlapEndTime);
         if (analysisShiftIndex <= 0) {
             analysisShiftIndex = firstPlannedShiftIndex;
         }
         // 换活字块调用处只写清洗固定枚举原因，不再沿用旧“模具清洗+换活字块”泛化文案。
         if (MachineCleaningOverlapUtil.hasCleaningTypeBlockingOverlap(
-                cleaningWindowList, CleaningTypeEnum.DRY_ICE.getCode(), switchStartTime, productionStartTime)) {
+                cleaningWindowList, CleaningTypeEnum.DRY_ICE.getCode(), switchStartTime, overlapEndTime)) {
             ShiftFieldUtil.appendShiftAnalysis(result, analysisShiftIndex, TYPE_BLOCK_DRY_ICE_CLEANING_ANALYSIS);
         }
         if (MachineCleaningOverlapUtil.hasCleaningTypeBlockingOverlap(
-                cleaningWindowList, CleaningTypeEnum.SAND_BLAST.getCode(), switchStartTime, productionStartTime)) {
+                cleaningWindowList, CleaningTypeEnum.SAND_BLAST.getCode(), switchStartTime, overlapEndTime)) {
             ShiftFieldUtil.appendShiftAnalysis(result, analysisShiftIndex, TYPE_BLOCK_SAND_BLAST_CLEANING_ANALYSIS);
         }
     }
@@ -3273,17 +3285,19 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
                 resolveEffectiveCleaningWindowList(context, result, firstPlannedShiftStartTime),
                 resolveMachineShutdownWindowList(context, result.getLhMachineCode()),
                 scheduleWindowShifts);
-        // 清洗与普通换模重叠时只执行换模，有效清洗窗口已剔除该清洗；这里用原始全量清洗窗口
-        // 按真实换模8h窗口补写“清洗+换模”备注，与新增排产口径保持一致。
-        Date mouldChangeCompleteTime = Objects.nonNull(result.getMouldChangeStartTime())
-                ? LhScheduleTimeUtil.addHours(result.getMouldChangeStartTime(),
-                LhScheduleTimeUtil.getMouldChangeTotalHours(context)) : firstPlannedShiftStartTime;
-        ResultDowntimeSummaryUtil.appendCleaningMouldChangeAnalysis(
-                result,
-                resolveMachineCleaningWindowList(context, result.getLhMachineCode()),
-                result.getMouldChangeStartTime(),
-                mouldChangeCompleteTime,
-                scheduleWindowShifts);
+        // 换活字块结果的“清洗+换活字块”备注由 applyTypeBlockCleaningAnalysis 统一处理，
+        // 这里不再调用 appendCleaningMouldChangeAnalysis 写“清洗+换模”，避免换活字块场景备注错写为换模。
+        if (!YES_FLAG.equals(result.getIsTypeBlock())) {
+            Date mouldChangeCompleteTime = Objects.nonNull(result.getMouldChangeStartTime())
+                    ? LhScheduleTimeUtil.addHours(result.getMouldChangeStartTime(),
+                    LhScheduleTimeUtil.getMouldChangeTotalHours(context)) : firstPlannedShiftStartTime;
+            ResultDowntimeSummaryUtil.appendCleaningMouldChangeAnalysis(
+                    result,
+                    resolveMachineCleaningWindowList(context, result.getLhMachineCode()),
+                    result.getMouldChangeStartTime(),
+                    mouldChangeCompleteTime,
+                    scheduleWindowShifts);
+        }
     }
 
     /**

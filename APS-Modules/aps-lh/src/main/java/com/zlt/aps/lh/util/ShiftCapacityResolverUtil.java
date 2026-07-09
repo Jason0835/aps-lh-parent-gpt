@@ -6,6 +6,7 @@ import com.zlt.aps.lh.api.domain.dto.MachineMaintenanceWindowDTO;
 import com.zlt.aps.lh.api.domain.dto.MachineScheduleDTO;
 import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
 import com.zlt.aps.lh.api.enums.CleaningTypeEnum;
+import com.zlt.aps.lh.api.enums.MachineStopTypeEnum;
 import com.zlt.aps.lh.api.enums.ScheduleTypeEnum;
 import com.zlt.aps.lh.api.enums.ShiftEnum;
 import com.zlt.aps.lh.context.LhScheduleContext;
@@ -786,8 +787,11 @@ public final class ShiftCapacityResolverUtil {
     /**
      * 计算机台在指定时间窗内被计划停机占用的总秒数。
      * <p>同一机台可能存在多条停机记录，本方法会先裁剪到目标时间窗，再做区间合并，避免重复扣秒。</p>
+     * <p>所有非清洗类设备停机类型（含精度校验、润滑、巡检点检、预见性维护、预防性维护、
+     * 计划性维修、临时性故障、盘点等）均通过本方法统一按时间重叠折算扣减，
+     * 其中盘点只扣时间产能，不触发换模、换活字块、预热等逻辑。</p>
      *
-     * @param devicePlanShutList 设备计划停机列表
+     * @param devicePlanShutList 设备计划停机列表（已剥离清洗类停机）
      * @param machineCode 机台编号
      * @param windowStartTime 时间窗开始时间
      * @param windowEndTime 时间窗结束时间
@@ -953,10 +957,11 @@ public final class ShiftCapacityResolverUtil {
                                                        int mouldQty,
                                                        long shiftDurationSeconds,
                                                        int dryIceLossQty,
-                                                       int dryIceDurationHours) {
+                                                       int dryIceDurationHours,
+                                                       int plannedRepairFixedQty) {
         return resolveShiftCapacityWithDowntime(devicePlanShutList, cleaningWindowList, null, machineCode,
                 windowStartTime, windowEndTime, shiftCapacity, lhTimeSeconds, mouldQty, shiftDurationSeconds,
-                dryIceLossQty, dryIceDurationHours);
+                dryIceLossQty, dryIceDurationHours, plannedRepairFixedQty);
     }
 
     /**
@@ -991,10 +996,11 @@ public final class ShiftCapacityResolverUtil {
                                                        int dryIceDurationHours,
                                                        LhShiftConfigVO shift,
                                                        String configPlusShiftType,
-                                                       String scheduleType) {
+                                                       String scheduleType,
+                                                       int plannedRepairFixedQty) {
         return resolveShiftCapacityWithDowntime(devicePlanShutList, cleaningWindowList, null, machineCode,
                 windowStartTime, windowEndTime, shiftCapacity, lhTimeSeconds, mouldQty, shiftDurationSeconds,
-                dryIceLossQty, dryIceDurationHours, shift, configPlusShiftType, scheduleType);
+                dryIceLossQty, dryIceDurationHours, shift, configPlusShiftType, scheduleType, plannedRepairFixedQty);
     }
 
     /**
@@ -1025,9 +1031,14 @@ public final class ShiftCapacityResolverUtil {
                                                        int mouldQty,
                                                        long shiftDurationSeconds,
                                                        int dryIceLossQty,
-                                                       int dryIceDurationHours) {
+                                                       int dryIceDurationHours,
+                                                       int plannedRepairFixedQty) {
         if (Objects.isNull(windowStartTime) || Objects.isNull(windowEndTime) || !windowStartTime.before(windowEndTime)) {
             return 0;
+        }
+        // 计划性维修(05)固定排产量：维修计划开始时间落在当前班次窗口时，该班次固定只排 plannedRepairFixedQty 条，不按时间折算
+        if (isPlannedRepairStartShift(devicePlanShutList, machineCode, windowStartTime, windowEndTime)) {
+            return Math.max(0, plannedRepairFixedQty);
         }
         long availableSeconds = Math.max(0L, (windowEndTime.getTime() - windowStartTime.getTime()) / 1000L);
         List<Date[]> stopIntervals = collectMergedPlannedStopIntervals(
@@ -1094,12 +1105,53 @@ public final class ShiftCapacityResolverUtil {
                                                        int dryIceDurationHours,
                                                        LhShiftConfigVO shift,
                                                        String configPlusShiftType,
-                                                       String scheduleType) {
+                                                       String scheduleType,
+                                                       int plannedRepairFixedQty) {
         int actualShiftCapacity = resolveActualShiftPlanQty(
                 shiftCapacity, shift, configPlusShiftType, scheduleType);
         return resolveShiftCapacityWithDowntime(devicePlanShutList, cleaningWindowList, maintenanceWindowList,
                 machineCode, windowStartTime, windowEndTime, actualShiftCapacity, lhTimeSeconds, mouldQty,
-                shiftDurationSeconds, dryIceLossQty, dryIceDurationHours);
+                shiftDurationSeconds, dryIceLossQty, dryIceDurationHours, plannedRepairFixedQty);
+    }
+
+
+    /**
+     * 判断当前班次是否为计划性维修(05)开始班次。
+     * <p>当设备停机计划中存在 05-计划性维修 且其计划开始时间落在当前班次窗口内时，返回 true。
+     * 命中的班次固定只排 plannedRepairFixedQty 条（由硫化参数 PLANNED_REPAIR_FIXED_QTY 配置，默认 2 条），
+     * 不按时间折算，排完后机台进入维修。</p>
+     *
+     * @param devicePlanShutList 设备停机计划列表
+     * @param machineCode 机台编号
+     * @param windowStartTime 班次窗口开始时间
+     * @param windowEndTime 班次窗口结束时间
+     * @return true-当前班次为计划性维修开始班次；false-否
+     */
+    private static boolean isPlannedRepairStartShift(List<MdmDevicePlanShut> devicePlanShutList,
+                                                      String machineCode,
+                                                      Date windowStartTime,
+                                                      Date windowEndTime) {
+        if (CollectionUtils.isEmpty(devicePlanShutList)) {
+            return false;
+        }
+        for (MdmDevicePlanShut planShut : devicePlanShutList) {
+            if (Objects.isNull(planShut) || !StringUtils.equals(machineCode, planShut.getMachineCode())) {
+                continue;
+            }
+            // 只匹配计划性维修(05)停机计划
+            if (!StringUtils.equals(MachineStopTypeEnum.PLANNED_REPAIR.getCode(), planShut.getMachineStopType())) {
+                continue;
+            }
+            Date beginDate = planShut.getBeginDate();
+            if (Objects.isNull(beginDate)) {
+                continue;
+            }
+            // 计划开始时间落在当前班次窗口 [windowStartTime, windowEndTime) 内时，该班次为维修开始班次
+            if (!beginDate.before(windowStartTime) && beginDate.before(windowEndTime)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -1581,6 +1633,11 @@ public final class ShiftCapacityResolverUtil {
     /**
      * 收集并合并指定时间窗内的停机区间。
      * <p>windowEndTime 允许为 null，表示一直统计到停机记录自身结束时刻。</p>
+     * <p>本方法对所有非清洗类设备停机计划统一处理，包括精度校验、润滑、巡检点检、预见性维护、
+     * 预防性维护、计划性维修、临时性故障、盘点等。所有停机类型均按 beginDate～endDate 与目标时间窗
+     * 取交集后合并区间，统一折算扣减班次可生产秒数。</p>
+     * <p>盘点（{@link MachineStopTypeEnum#TAKE_STOCK}）与其他停机类型一样
+     * 只扣时间产能，不触发换模、换活字块、首检、预热等逻辑；盘点结束后机台可直接进入生产排产。</p>
      */
     private static List<Date[]> collectMergedPlannedStopIntervals(List<MdmDevicePlanShut> devicePlanShutList,
                                                                   String machineCode,

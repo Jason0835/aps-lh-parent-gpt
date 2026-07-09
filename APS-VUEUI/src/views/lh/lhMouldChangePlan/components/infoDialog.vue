@@ -124,7 +124,7 @@ export default {
       const columns = [
         {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.lhMouldChangePlan.factoryCode"),
           type: "select",
           dictData: this.parentDict.type.biz_factory_name,
           filterable: true,

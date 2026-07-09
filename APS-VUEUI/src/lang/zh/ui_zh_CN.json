@@ -519,6 +519,8 @@
   "ui.data.column.dj.scheduleResult.paddingName": "垫胶",
   "ui.data.column.dj.scheduleResult.glueCode": "胶料",
   "ui.data.column.dj.scheduleResult.machineCode": "机台",
+  "ui.data.column.dj.scheduleResult.sourceMachine": "原机台",
+  "ui.data.column.dj.scheduleResult.targetMachine": "目标机台",
   "ui.data.column.dj.scheduleResult.sequence": "顺序",
   "ui.data.column.dj.scheduleResult.planQty": "计划量",
   "ui.data.column.dj.scheduleResult.finishQty": "完成量",

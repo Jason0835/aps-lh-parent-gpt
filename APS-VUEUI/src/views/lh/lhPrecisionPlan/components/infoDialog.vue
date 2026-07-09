@@ -64,7 +64,7 @@ export default {
       return [
         {
           prop: 'factoryCode',
-          label: this.$t('ui.data.column.factoryCode'),
+          label: this.$t('ui.data.column.lhPrecisionPlan.factoryCode'),
           type: 'select',
           dictData: this.dict.type.biz_factory_name,
           filterable: true,
@@ -72,7 +72,7 @@ export default {
         },
         {
           prop: 'year',
-          label: this.$t('ui.lh.precision.plan.year'),
+          label: this.$t('ui.data.column.lhPrecisionPlan.year'),
           type: 'select',
           dictData: this.yearList,
           props: {
@@ -83,7 +83,7 @@ export default {
         },
         {
           prop: 'machineCode',
-          label: this.$t('ui.lh.precision.plan.machine.code'),
+          label: this.$t('ui.data.column.lhPrecisionPlan.machineCode'),
           type: 'select',
           dictData: this.machineList,
           filterable: true,
@@ -91,7 +91,7 @@ export default {
         },
         {
           prop: 'precisionType',
-          label: this.$t('ui.lh.precision.plan.precision.type'),
+          label: this.$t('ui.data.column.lhPrecisionPlan.precisionType'),
           type: 'select',
           dictData: this.dict.type.lh_precision_type,
           filterable: true,
@@ -100,14 +100,14 @@ export default {
         },
         {
           prop: 'planDate',
-          label: this.$t('ui.lh.precision.plan.plan.date'),
+          label: this.$t('ui.data.column.lhPrecisionPlan.planDate'),
           type: 'date',
           valueFormat: 'yyyy-MM-dd',
           required: true
         },
         {
           prop: 'actualDate',
-          label: this.$t('ui.lh.precision.plan.actual.date'),
+          label: this.$t('ui.data.column.lhPrecisionPlan.actualDate'),
           type: 'date',
           valueFormat: 'yyyy-MM-dd'
         },

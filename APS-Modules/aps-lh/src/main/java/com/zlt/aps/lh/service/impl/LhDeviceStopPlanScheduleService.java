@@ -6,6 +6,7 @@ import com.zlt.aps.lh.api.enums.CleaningTypeEnum;
 import com.zlt.aps.lh.api.enums.MachineStopTypeEnum;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
+import com.zlt.aps.lh.util.ShiftCapacityResolverUtil;
 import com.zlt.aps.mdm.api.domain.entity.MdmDevicePlanShut;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -40,11 +41,12 @@ public class LhDeviceStopPlanScheduleService {
 
     /**
      * 从设备停机计划中过滤干冰/喷砂清洗候选，并按计划开始时间、机台编码升序返回。
-     * <p>清洗计划加载口径与普通设备停机不同：计划开始时间只用于判断候选顺序和是否晚于 T 日，
-     * 不要求落在 T～T+2 排程窗口内，实际清洗开始/结束时间由清洗排程服务重新安排。</p>
+     * <p>清洗计划加载口径与普通设备停机不同：计划开始时间只用于候选排序，
+     * 不要求落在 T～T+2 排程窗口内，也不限制计划开始时间必须晚于 T 日；
+     * 实际清洗开始/结束时间由清洗排程服务按 T～T+2 窗口班次重新安排。</p>
      *
      * @param context 排程上下文
-     * @return T 日及之后的清洗类设备停机候选
+     * @return 全部清洗类设备停机候选（按计划开始时间、机台编码升序）
      */
     public List<MdmDevicePlanShut> queryCleaningStopPlans(LhScheduleContext context) {
         if (Objects.isNull(context) || CollectionUtils.isEmpty(context.getDevicePlanShutList())) {
@@ -52,10 +54,12 @@ public class LhDeviceStopPlanScheduleService {
         }
         List<MdmDevicePlanShut> cleaningStopPlans = new ArrayList<>(context.getDevicePlanShutList().size());
         for (MdmDevicePlanShut planShut : context.getDevicePlanShutList()) {
-            if (!isValidStopPlan(planShut) || !isCleaningStopType(planShut.getMachineStopType())) {
+            // 清洗类停机计划的实际时长由配置参数决定（干冰3h/喷砂含首检12h），不依赖计划 begin/end 时长，
+            // 因此允许 begin=end 的清洗计划纳入候选；计划开始时间只用于排序，不作为 T 日下限过滤条件。
+            if (Objects.isNull(planShut) || !isCleaningStopType(planShut.getMachineStopType())) {
                 continue;
             }
-            if (!isPlanBeginOnOrAfterScheduleDate(context, planShut.getBeginDate())) {
+            if (!isValidCleaningStopPlan(planShut)) {
                 continue;
             }
             cleaningStopPlans.add(planShut);
@@ -71,6 +75,11 @@ public class LhDeviceStopPlanScheduleService {
      *
      * <p>清洗类停机计划会先被转换成运行态清洗窗口；转换完成后必须从普通停机列表中剥离，
      * 否则超过每日上限或 3 天内收尾被跳过的清洗仍会按普通停机扣减产能。</p>
+     *
+     * <p>非清洗类停机（含精度校验、润滑、巡检点检、预见性维护、预防性维护、计划性维修、
+     * 临时性故障、盘点等）保留在普通停机列表中，后续统一由 {@link ShiftCapacityResolverUtil}
+     * 按时间重叠折算扣减班次可生产秒数。其中盘点（{@link MachineStopTypeEnum#TAKE_STOCK}）
+     * 只扣时间产能，不触发换模、换活字块、预热等逻辑。</p>
      *
      * @param devicePlanShutList 原始设备停机计划
      * @return 非清洗类设备停机计划
@@ -117,6 +126,18 @@ public class LhDeviceStopPlanScheduleService {
      */
     public boolean isSandBlastCleaning(String machineStopType) {
         return StringUtils.equals(MachineStopTypeEnum.SANDBLASTING_CLEANING.getCode(), machineStopType);
+    }
+
+    /**
+     * 判断停机类型是否为盘点。
+     * <p>盘点停机只扣除对应时间段的可生产计划量，不触发换模、换活字块、首检、预热等逻辑；
+     * 盘点期间机台视为已完成预热，盘点结束后可直接进入生产排产。</p>
+     *
+     * @param machineStopType 停机类型编码
+     * @return true-盘点停机；false-非盘点停机
+     */
+    public boolean isInventoryStopType(String machineStopType) {
+        return StringUtils.equals(MachineStopTypeEnum.TAKE_STOCK.getCode(), machineStopType);
     }
 
     /**
@@ -255,6 +276,21 @@ public class LhDeviceStopPlanScheduleService {
         }
         Date scheduleStartTime = LhScheduleTimeUtil.clearTime(context.getScheduleDate());
         return !planBeginTime.before(scheduleStartTime);
+    }
+
+    /**
+     * 校验清洗类设备停机计划是否有效。
+     * <p>清洗类停机计划的实际清洗时长由配置参数决定（干冰3h/喷砂含首检12h），
+     * 不依赖计划 begin/end 时长，因此允许 begin=end（零时长计划）纳入候选。</p>
+     *
+     * @param planShut 设备停机计划
+     * @return true-有效清洗候选；false-无效
+     */
+    private boolean isValidCleaningStopPlan(MdmDevicePlanShut planShut) {
+        return Objects.nonNull(planShut)
+                && StringUtils.isNotEmpty(planShut.getMachineCode())
+                && Objects.nonNull(planShut.getBeginDate())
+                && Objects.nonNull(planShut.getEndDate());
     }
 
     private boolean isValidStopPlan(MdmDevicePlanShut planShut) {

@@ -112,6 +112,22 @@ public class DjScheduleResultController extends AbstractBillBizController<DjSche
     }
 
     /**
+     * 插单前置校验（含跨天日期计算）
+     */
+    @PostMapping("/validateAdd")
+    public AjaxResult validateAdd(@RequestBody DjScheduleResult djScheduleResult) {
+        return iDjScheduleAdjustService.insertOrderValidate(djScheduleResult);
+    }
+
+    /**
+     * 调量前置校验（产能校验）
+     */
+    @PostMapping("/changeQtyValidate")
+    public AjaxResult changeQtyValidate(@RequestBody DjScheduleResult djScheduleResult) {
+        return iDjScheduleAdjustService.changeQtyValidate(djScheduleResult);
+    }
+
+    /**
      * 修改垫胶排程结果
      */
     @Log(title = "ui.data.column.djScheduleResult.modalName", businessType = BusinessType.UPDATE)

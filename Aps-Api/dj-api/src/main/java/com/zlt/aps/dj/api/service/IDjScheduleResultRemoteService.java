@@ -35,6 +35,12 @@ public interface IDjScheduleResultRemoteService {
     @PostMapping("/djScheduleResult/add")
     AjaxResult add(@RequestBody DjScheduleResult djScheduleResult);
 
+    /**
+     * 插单前置校验（含跨天日期计算）
+     */
+    @PostMapping("/djScheduleResult/validateAdd")
+    AjaxResult validateAdd(@RequestBody DjScheduleResult djScheduleResult);
+
 
     /**
      * 修改垫胶排程结果
@@ -43,10 +49,16 @@ public interface IDjScheduleResultRemoteService {
     AjaxResult edit(@RequestBody DjScheduleResult djScheduleResult);
 
     /**
+     * 调量前置校验（产能校验）
+     */
+    @PostMapping("/djScheduleResult/changeQtyValidate")
+    AjaxResult changeQtyValidate(@RequestBody DjScheduleResult scheduleResult);
+
+    /**
      * 调量
      */
     @PostMapping("/djScheduleResult/changeQty")
-    public AjaxResult changeQty(@RequestBody DjScheduleResult scheduleResult);
+    AjaxResult changeQty(@RequestBody DjScheduleResult scheduleResult);
 
     /**
      * 转机台

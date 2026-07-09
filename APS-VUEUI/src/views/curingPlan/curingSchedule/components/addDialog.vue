@@ -120,7 +120,7 @@ export default {
           disabled: true,
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.scheduleDate"),
+          label: this.$t("ui.data.column.lhScheduleResult.scheduleDate"),
           prop: "scheduleDate",
           type: "date",
           dateType: "date",
@@ -132,7 +132,7 @@ export default {
           disabled: true,
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.lhMachineCode"),
+          label: this.$t("ui.data.column.lhScheduleResult.lhMachineCode"),
           prop: "lhMachineCode",
           type: "select",
           dictData: this.curingMachines,
@@ -141,7 +141,7 @@ export default {
         },
         {
           prop: "materialCode",
-          label: this.$t("ui.data.column.scheduleResult.materialCode"),
+          label: this.$t("ui.data.column.lhScheduleResult.materialCode"),
           render: (form) => {
             return (
               <materialCodeSelect
@@ -154,7 +154,7 @@ export default {
           },
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.materialDesc"),
+          label: this.$t("ui.data.column.lhScheduleResult.materialDesc"),
           prop: "materialDesc",
           disabled: true,
         },
@@ -165,7 +165,7 @@ export default {
           span: 12,
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.embryoStock"),
+          label: this.$t("ui.data.column.lhScheduleResult.embryoStock"),
           prop: "embryoStock",
           disabled: true,
           span: 12,
@@ -177,7 +177,7 @@ export default {
           span: 12,
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.constructionStage"),
+          label: this.$t("ui.data.column.lhScheduleResult.constructionStage"),
           prop: "trialStatus",
           type: "select",
           dictData: this.parentDict.type.lh_trial_status,
@@ -185,7 +185,7 @@ export default {
           span: 12,
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.leftRightMould"),
+          label: this.$t("ui.data.column.lhScheduleResult.leftRightMould"),
           prop: "leftRightMould",
           disabled: true,
           span: 12,

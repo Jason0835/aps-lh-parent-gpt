@@ -1867,6 +1867,23 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
 
         context.setContinuousSkuList(continuousSkuList);
         context.setNewSpecSkuList(newSpecSkuList);
+        // 填充全量SKU排程信息索引，供S4.5.1置换等后置阶段按物料编码查找SKU
+        for (SkuScheduleDTO sku : continuousSkuList) {
+            if (Objects.nonNull(sku) && StringUtils.isNotEmpty(sku.getMaterialCode())) {
+                context.getAllSkuScheduleDtoMap().put(sku.getMaterialCode(), sku);
+            }
+        }
+        for (SkuScheduleDTO sku : newSpecSkuList) {
+            if (Objects.nonNull(sku) && StringUtils.isNotEmpty(sku.getMaterialCode())) {
+                context.getAllSkuScheduleDtoMap().put(sku.getMaterialCode(), sku);
+            }
+        }
+        // 被阻塞的SKU也需记录到索引，避免置换时无法找回
+        for (SkuScheduleDTO blockedSku : blockedNewSkuList) {
+            if (Objects.nonNull(blockedSku) && StringUtils.isNotEmpty(blockedSku.getMaterialCode())) {
+                context.getAllSkuScheduleDtoMap().put(blockedSku.getMaterialCode(), blockedSku);
+            }
+        }
         log.info("续作/新增SKU区分完成, 续作: {}个, 新增: {}个", continuousSkuList.size(), newSpecSkuList.size());
     }
 
@@ -2097,6 +2114,11 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
                                                  String machineCode,
                                                  MachineScheduleDTO machine,
                                                  LhMachineOnlineInfo onlineInfo) {
+        // 计划性维修(05)属于下机维修，维修结束后机台不能直接续产，必须换模或换活字块
+        if (machine != null && machine.isForceChangeoverAfterRepair()) {
+            log.info("机台存在计划性维修，阻止续产并释放给换模/换活字块链路, 机台: {}", machineCode);
+            return null;
+        }
         String rollingMaterialCode = resolveRollingContinuousMaterialCode(context, machineCode, machine);
         if (StringUtils.isNotEmpty(rollingMaterialCode)) {
             return rollingMaterialCode;
@@ -2115,6 +2137,10 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
     private String resolveRollingContinuousMaterialCode(LhScheduleContext context,
                                                         String machineCode,
                                                         MachineScheduleDTO machine) {
+        // 计划性维修(05)属于下机维修，维修结束后机台不能直接续产，必须换模或换活字块
+        if (machine != null && machine.isForceChangeoverAfterRepair()) {
+            return null;
+        }
         if (context == null
                 || !context.isRollingScheduleHandoff()
                 || machine == null

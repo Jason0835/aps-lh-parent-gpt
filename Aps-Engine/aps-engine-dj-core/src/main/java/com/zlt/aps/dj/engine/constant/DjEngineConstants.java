@@ -45,11 +45,6 @@ public class DjEngineConstants {
     /** 每班小时数 */
     public static final BigDecimal SHIFT_HOURS = new BigDecimal("8");
 
-    /** 班次索引与 ClassNumThreePlanEnums.classIndex 映射
-     *  shiftIndex=1(中班)→"03", 2(夜班)→"01", 3(早班)→"02",
-     *  shiftIndex=4(中班)→"03", 5(夜班)→"01", 6(早班)→"02" */
-    public static final String[] SHIFT_CLASS_MAP = {"03", "01", "02", "03", "01", "02"};
-
     // ==================== 批次号常量 ====================
 
     /** 批次号前缀 */
