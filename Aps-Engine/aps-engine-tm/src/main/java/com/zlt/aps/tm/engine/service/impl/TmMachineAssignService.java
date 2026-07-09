@@ -76,6 +76,7 @@ public class TmMachineAssignService implements ITmMachineAssignService {
                 remainingTaskList.remove(task);
                 this.assignSingleTask(task, context);
             }
+            this.fillCurrentShiftIdleCapacity(entry.getKey(), shiftTaskMap, context);
         }
     }
 
@@ -604,6 +605,278 @@ public class TmMachineAssignService implements ITmMachineAssignService {
             this.appendCarryoverQty(task, selectedCandidate, firstShiftCandidates, filterRule, scoreStrategy, context,
                     carryoverQty, capacityOverflowQty, toolOverflowQty, startShiftOrder);
         }
+    }
+
+    /**
+     * 当前班原需求排完后，使用后续班次待排需求补足当前班未满产机台。
+     *
+     * @param currentShiftOrder 当前班次
+     * @param shiftTaskMap      按班次分组的待排任务
+     * @param context           胎面排程上下文
+     */
+    private void fillCurrentShiftIdleCapacity(Integer currentShiftOrder, Map<Integer, List<TmTaskDraft>> shiftTaskMap,
+                                             TmScheduleContext context) {
+        Integer targetShiftOrder = this.normalizeShiftOrder(currentShiftOrder);
+        if (targetShiftOrder >= 6 || CollUtil.isEmpty(context.getMachineCandidateList())) {
+            return;
+        }
+        ITmMachineFilterRule filterRule = strategyRegistry.getMachineFilterRule(DEFAULT_FILTER_RULE_CODE);
+        ITmMachineScoreStrategy scoreStrategy = strategyRegistry.getMachineScoreStrategy(DEFAULT_SCORE_STRATEGY_CODE);
+        int earlyFillIndex = 1;
+        boolean hasAssigned = true;
+        while (hasAssigned) {
+            hasAssigned = false;
+            for (TmMachineCandidate machineCandidate : context.getMachineCandidateList()) {
+                if (machineCandidate == null || StrUtil.isBlank(machineCandidate.getMachineCode())) {
+                    continue;
+                }
+                TmTaskDraft sourceTask = this.selectFutureEarlyFillTask(targetShiftOrder, shiftTaskMap, context,
+                        filterRule, scoreStrategy, machineCandidate.getMachineCode(), earlyFillIndex);
+                if (sourceTask == null) {
+                    continue;
+                }
+                Integer sourceShiftOrder = this.normalizeShiftOrder(sourceTask.getShiftOrder());
+                TmMachineCandidate runtimeCandidate = this.resolveEarlyFillRuntimeCandidate(sourceTask,
+                        targetShiftOrder, sourceShiftOrder, context, filterRule, scoreStrategy,
+                        machineCandidate.getMachineCode(), earlyFillIndex);
+                if (runtimeCandidate == null || nvl(runtimeCandidate.getRemainCapacity()).compareTo(BigDecimal.ZERO) <= 0) {
+                    continue;
+                }
+                BigDecimal sourcePlanQty = nvl(sourceTask.getPlanQty());
+                BigDecimal assignedQty = sourcePlanQty.min(nvl(runtimeCandidate.getRemainCapacity()));
+                if (assignedQty.compareTo(BigDecimal.ZERO) <= 0) {
+                    continue;
+                }
+                TmTaskDraft earlyFillTask = this.copyFutureEarlyFillTask(sourceTask, targetShiftOrder, assignedQty,
+                        sourceShiftOrder, earlyFillIndex, runtimeCandidate.getMachineCode());
+                this.applyCapacitySplitResult(earlyFillTask, sourcePlanQty, assignedQty,
+                        nvl(runtimeCandidate.getRemainCapacity()), nvl(runtimeCandidate.getMachineSpeed()), "后续班次提前补产");
+                this.settleAssignedTaskToolState(earlyFillTask, context);
+                this.addContextTask(context, earlyFillTask);
+                context.getCandidateTraceMap().put(earlyFillTask.getBusinessKey(), Collections.singletonList(runtimeCandidate));
+                this.addFutureEarlyFillTrace(context, earlyFillTask, sourceTask, sourceShiftOrder, targetShiftOrder,
+                        runtimeCandidate.getMachineCode(), assignedQty, sourcePlanQty.subtract(assignedQty),
+                        nvl(runtimeCandidate.getRemainCapacity()), runtimeCandidate.getScore());
+                this.addAssignTrace(context, earlyFillTask, "PASS", runtimeCandidate.getMachineCode(), null, null);
+                this.taskChainScheduleService.appendAutoTask(earlyFillTask, runtimeCandidate, context);
+                this.deductFutureTaskPlan(sourceTask, assignedQty, shiftTaskMap, context);
+                log.info("[TM_FUTURE_SHIFT_EARLY_FILL] batchNo={}, traceId={}, factoryCode={}, scheduleDate={}, sourceBusinessKey={}, targetBusinessKey={}, sourceShiftOrder={}, targetShiftOrder={}, machineCode={}, assignedQty={}, sourceRemainQty={}",
+                        context.getBatchNo(), context.getTraceId(), context.getFactoryCode(), this.formatScheduleDate(context),
+                        sourceTask.getBusinessKey(), earlyFillTask.getBusinessKey(), sourceShiftOrder, targetShiftOrder,
+                        runtimeCandidate.getMachineCode(), assignedQty, nvl(sourceTask.getPlanQty()));
+                hasAssigned = true;
+                earlyFillIndex++;
+            }
+        }
+    }
+
+    /**
+     * 从后续班次中选择最适合提前到当前机台生产的任务。
+     *
+     * @param targetShiftOrder 目标提前班次
+     * @param shiftTaskMap     按班次分组的待排任务
+     * @param context          胎面排程上下文
+     * @param filterRule       机台过滤规则
+     * @param scoreStrategy    机台评分策略
+     * @param machineCode      当前未满产机台
+     * @param earlyFillIndex   提前补产序号
+     * @return 可提前任务；没有可提前任务时返回 null
+     */
+    private TmTaskDraft selectFutureEarlyFillTask(Integer targetShiftOrder, Map<Integer, List<TmTaskDraft>> shiftTaskMap,
+                                                  TmScheduleContext context, ITmMachineFilterRule filterRule,
+                                                  ITmMachineScoreStrategy scoreStrategy, String machineCode,
+                                                  int earlyFillIndex) {
+        TmTaskDraft bestTask = null;
+        BigDecimal bestScore = BigDecimal.ZERO;
+        Integer bestSourceShiftOrder = null;
+        int bestTaskIndex = Integer.MAX_VALUE;
+        for (Map.Entry<Integer, List<TmTaskDraft>> entry : shiftTaskMap.entrySet()) {
+            Integer sourceShiftOrder = this.normalizeShiftOrder(entry.getKey());
+            if (sourceShiftOrder <= targetShiftOrder || CollUtil.isEmpty(entry.getValue())) {
+                continue;
+            }
+            for (int taskIndex = 0; taskIndex < entry.getValue().size(); taskIndex++) {
+                TmTaskDraft sourceTask = entry.getValue().get(taskIndex);
+                if (sourceTask == null || nvl(sourceTask.getPlanQty()).compareTo(BigDecimal.ZERO) <= 0) {
+                    continue;
+                }
+                TmMachineCandidate runtimeCandidate = this.resolveEarlyFillRuntimeCandidate(sourceTask,
+                        targetShiftOrder, sourceShiftOrder, context, filterRule, scoreStrategy, machineCode,
+                        earlyFillIndex);
+                if (runtimeCandidate == null || nvl(runtimeCandidate.getRemainCapacity()).compareTo(BigDecimal.ZERO) <= 0) {
+                    continue;
+                }
+                BigDecimal score = nvl(runtimeCandidate.getScore());
+                if (bestTask == null || score.compareTo(bestScore) > 0
+                        || (score.compareTo(bestScore) == 0 && sourceShiftOrder.compareTo(bestSourceShiftOrder) < 0)
+                        || (score.compareTo(bestScore) == 0 && sourceShiftOrder.equals(bestSourceShiftOrder)
+                        && taskIndex < bestTaskIndex)) {
+                    bestTask = sourceTask;
+                    bestScore = score;
+                    bestSourceShiftOrder = sourceShiftOrder;
+                    bestTaskIndex = taskIndex;
+                }
+            }
+        }
+        return bestTask;
+    }
+
+    /**
+     * 按目标班次和机台重新过滤评分后，解析提前补产可用的运行态候选机台。
+     *
+     * @param sourceTask       后续班次来源任务
+     * @param targetShiftOrder 目标提前班次
+     * @param sourceShiftOrder 来源班次
+     * @param context          胎面排程上下文
+     * @param filterRule       机台过滤规则
+     * @param scoreStrategy    机台评分策略
+     * @param machineCode      目标机台
+     * @param earlyFillIndex   提前补产序号
+     * @return 运行态候选机台；不满足过滤或产能时返回 null
+     */
+    private TmMachineCandidate resolveEarlyFillRuntimeCandidate(TmTaskDraft sourceTask, Integer targetShiftOrder,
+                                                               Integer sourceShiftOrder, TmScheduleContext context,
+                                                               ITmMachineFilterRule filterRule,
+                                                               ITmMachineScoreStrategy scoreStrategy,
+                                                               String machineCode, int earlyFillIndex) {
+        TmTaskDraft probeTask = this.copyFutureEarlyFillTask(sourceTask, targetShiftOrder, nvl(sourceTask.getPlanQty()),
+                sourceShiftOrder, earlyFillIndex, machineCode + "_PROBE");
+        List<TmMachineCandidate> candidates = this.buildPassedAndScoredCandidates(probeTask, context,
+                filterRule, scoreStrategy);
+        TmMachineCandidate candidate = this.findCandidateByMachineCode(candidates, machineCode);
+        if (candidate == null) {
+            return null;
+        }
+        BigDecimal machineSpeed = this.resolveMachineSpeed(probeTask, candidate, context);
+        TmMachineCandidate runtimeCandidate = this.copyCandidate(candidate);
+        runtimeCandidate.setMachineSpeed(machineSpeed);
+        runtimeCandidate.setRemainCapacity(this.resolveRemainCapacity(probeTask, context, runtimeCandidate, machineSpeed));
+        return runtimeCandidate;
+    }
+
+    /**
+     * 扣减被提前生产的后续班次原任务，防止重复排产。
+     *
+     * @param sourceTask  来源任务
+     * @param deductedQty 本次提前生产量
+     * @param shiftTaskMap 按班次分组的待排任务
+     * @param context     胎面排程上下文
+     */
+    private void deductFutureTaskPlan(TmTaskDraft sourceTask, BigDecimal deductedQty,
+                                      Map<Integer, List<TmTaskDraft>> shiftTaskMap, TmScheduleContext context) {
+        BigDecimal remainQty = nvl(sourceTask.getPlanQty()).subtract(nvl(deductedQty)).max(BigDecimal.ZERO);
+        sourceTask.setPlanQty(remainQty);
+        sourceTask.setPreLossPlanQty(this.deductQty(sourceTask.getPreLossPlanQty(), deductedQty));
+        sourceTask.setPlanQtyBeforeToolLimit(this.deductQty(sourceTask.getPlanQtyBeforeToolLimit(), deductedQty));
+        sourceTask.setBaseDemandQty(this.deductQty(sourceTask.getBaseDemandQty(), deductedQty));
+        sourceTask.setDemandQty(this.deductQty(sourceTask.getDemandQty(), deductedQty));
+        sourceTask.setCurrentShiftDemandQty(this.deductQty(sourceTask.getCurrentShiftDemandQty(), deductedQty));
+        sourceTask.setGuardDemandQty(this.deductQty(sourceTask.getGuardDemandQty(), deductedQty));
+        sourceTask.setCurrentShiftStockGapQty(this.deductQty(sourceTask.getCurrentShiftStockGapQty(), deductedQty));
+        sourceTask.setStockGapQty(this.deductQty(sourceTask.getStockGapQty(), deductedQty));
+        sourceTask.setPlanStockQty(nvl(sourceTask.getRollingStockQty()).add(nvl(sourceTask.getPlanQty()))
+                .subtract(nvl(sourceTask.getCurrentShiftDemandQty())).max(BigDecimal.ZERO));
+        if (remainQty.compareTo(BigDecimal.ZERO) > 0) {
+            return;
+        }
+        for (List<TmTaskDraft> taskList : shiftTaskMap.values()) {
+            if (taskList != null) {
+                taskList.remove(sourceTask);
+            }
+        }
+        if (context.getTaskDraftList() != null) {
+            context.getTaskDraftList().remove(sourceTask);
+        }
+    }
+
+    /**
+     * 扣减数量字段，字段为空时保持为空，避免改变原始缺省语义。
+     *
+     * @param value       原数量
+     * @param deductedQty 扣减量
+     * @return 扣减后的非负数量
+     */
+    private BigDecimal deductQty(BigDecimal value, BigDecimal deductedQty) {
+        if (value == null) {
+            return null;
+        }
+        return value.subtract(nvl(deductedQty)).max(BigDecimal.ZERO);
+    }
+
+    /**
+     * 复制后续班次提前补产任务，保留来源业务属性并切换到目标班次。
+     *
+     * @param sourceTask       来源任务
+     * @param targetShiftOrder 目标提前班次
+     * @param planQty          本次提前生产量
+     * @param sourceShiftOrder 来源班次
+     * @param earlyFillIndex   提前补产序号
+     * @param machineCode      目标机台
+     * @return 提前补产任务副本
+     */
+    private TmTaskDraft copyFutureEarlyFillTask(TmTaskDraft sourceTask, Integer targetShiftOrder, BigDecimal planQty,
+                                                Integer sourceShiftOrder, int earlyFillIndex, String machineCode) {
+        TmTaskDraft target = this.copyOverflowTask(sourceTask, targetShiftOrder, planQty, sourceShiftOrder,
+                earlyFillIndex, machineCode);
+        target.setBusinessKeySuffix(this.buildFutureEarlyFillBusinessKeySuffix(sourceTask, sourceShiftOrder,
+                targetShiftOrder, machineCode, earlyFillIndex));
+        target.setCalcFormulaDesc(this.appendFormulaDesc(target.getCalcFormulaDesc(), "后续班次提前补产"));
+        return target;
+    }
+
+    /**
+     * 构建提前补产任务业务键后缀。
+     *
+     * @param sourceTask       来源任务
+     * @param sourceShiftOrder 来源班次
+     * @param targetShiftOrder 目标提前班次
+     * @param machineCode      目标机台
+     * @param earlyFillIndex   提前补产序号
+     * @return 业务键后缀
+     */
+    private String buildFutureEarlyFillBusinessKeySuffix(TmTaskDraft sourceTask, Integer sourceShiftOrder,
+                                                         Integer targetShiftOrder, String machineCode,
+                                                         int earlyFillIndex) {
+        String sourceOrderToken = this.normalizeBusinessKeyToken(sourceTask == null ? null : sourceTask.getOrderNo());
+        if (StrUtil.isBlank(sourceOrderToken) && sourceTask != null) {
+            sourceOrderToken = this.normalizeBusinessKeyToken(sourceTask.getSourceOrderNos());
+        }
+        if (StrUtil.isBlank(sourceOrderToken)) {
+            sourceOrderToken = "UNKNOWN";
+        }
+        return "EARLY_FILL_SRC_" + sourceOrderToken + "_FROM_CLASS" + sourceShiftOrder
+                + "_TO_CLASS" + targetShiftOrder + "_" + machineCode + "_" + earlyFillIndex;
+    }
+
+    /**
+     * 写入后续班次提前补产证据。
+     *
+     * @param context          排程上下文
+     * @param targetTask       提前补产任务
+     * @param sourceTask       来源任务
+     * @param sourceShiftOrder 来源班次
+     * @param targetShiftOrder 目标提前班次
+     * @param machineCode      目标机台
+     * @param assignedQty      本次提前生产量
+     * @param sourceRemainQty  来源任务扣减后剩余量
+     * @param remainCapacity   当前机台剩余产能
+     * @param selectedScore    选中评分
+     */
+    private void addFutureEarlyFillTrace(TmScheduleContext context, TmTaskDraft targetTask, TmTaskDraft sourceTask,
+                                         Integer sourceShiftOrder, Integer targetShiftOrder, String machineCode,
+                                         BigDecimal assignedQty, BigDecimal sourceRemainQty,
+                                         BigDecimal remainCapacity, BigDecimal selectedScore) {
+        Map<String, Object> evidence = new LinkedHashMap<>();
+        evidence.put("sourceShiftOrder", sourceShiftOrder);
+        evidence.put("targetShiftOrder", targetShiftOrder);
+        evidence.put("sourceTask", sourceTask == null ? null : sourceTask.getBusinessKey());
+        evidence.put("targetMachineCode", machineCode);
+        evidence.put("assignedQty", assignedQty);
+        evidence.put("sourceRemainQty", sourceRemainQty.max(BigDecimal.ZERO));
+        evidence.put("remainCapacity", remainCapacity);
+        evidence.put("selectedScore", selectedScore);
+        evidence.put("priority", "硬约束过滤后按固定/定点、主胶连续、基部胶相似、口型连续、切换成本、产能适配评分排序");
+        traceOf(context, targetTask).addRuleHit("FUTURE_SHIFT_EARLY_FILL", "PASS", evidence);
     }
 
     /**
