@@ -29,11 +29,11 @@
 </template>
 
 <script>
-import {mapState} from "vuex";
+import { mapState } from "vuex";
 
 import infoForm from "@/views/components/infoForm.vue";
 
-import {checkCurlRollCodeUnique, saveCurlRoll} from "@/api/nc/curlRoll";
+import { saveCurlRoll } from "@/api/nc/curlRoll";
 
 export default {
   components: { infoForm },
@@ -64,7 +64,7 @@ export default {
   },
   computed: {
     ...mapState({
-      machines: (state) => state.tm.machines,
+      machines: (state) => state.insideLiner.machines,
     }),
     title: function () {
       return this.isEdit
@@ -74,12 +74,12 @@ export default {
     columns() {
       return [
         {
-          label: this.$t("ui.data.column.quota.liningCode"),
+          label: this.$t("ui.nc.curlRoll.column.liningCode"),
           prop: "liningCode",
           span: 24,
         },
         {
-          label: this.$t("ui.curlRoll.column.length"),
+          label: this.$t("ui.nc.curlRoll.column.curlLength"),
           prop: "curlLength",
           span: 24,
           required: true,
@@ -133,37 +133,8 @@ export default {
       this.isEdit = false;
       this.visible = false;
     },
-    checkCurlRollCodeUnique(rule, value, callback) {
-      return new Promise((resolve, reject) => {
-        checkCurlRollCodeUnique({
-          id: this.form.id,
-          liningCode: this.form.liningCode,
-        })
-          .then((res) => {
-            if (res === 0) {
-              resolve();
-            } else {
-              reject(new Error(this.$t("ui.curlRoll.alter.isSpecExist")));
-            }
-          })
-          .catch((error) => {
-            console.error(error);
-            reject(new Error("验证失败，请稍后再试"));
-          });
-      });
-    },
-
-   handleConfirm() {
-      this.$refs.form.triggerConfirm(async (params) => {
-        try {
-          this.loading = true;
-          await this.checkCurlRollCodeUnique();
-          this.save(params);
-        } catch (error) {
-          this.$modal.msgError(error.message);
-          this.loading = false;
-        }
-      });
+    handleConfirm() {
+      this.$refs.form.triggerConfirm(this.save);
     },
   },
 };

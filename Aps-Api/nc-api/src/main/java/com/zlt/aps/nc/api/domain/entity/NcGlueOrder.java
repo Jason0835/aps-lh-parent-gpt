@@ -45,4 +45,19 @@ public class NcGlueOrder extends BaseEntity implements Serializable {
     @ApiModelProperty(value = "备注")
     @TableField("REMARK")
     private String remark;
+
+    /** 反显字段：胶料组代码 */
+    @TableField(exist = false)
+    @ApiModelProperty(value = "胶料组代码")
+    private String glueGroupCode;
+
+    /** 反显字段：胶料组名称 */
+    @TableField(exist = false)
+    @ApiModelProperty(value = "胶料组名称")
+    private String glueGroupName;
+
+    /** 反显字段：胶料组序号 */
+    @TableField(exist = false)
+    @ApiModelProperty(value = "胶料组序号")
+    private Integer glueGroupOrderNum;
 }

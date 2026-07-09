@@ -58,18 +58,19 @@ import { mapState } from "vuex";
 import { downloadLink } from "@/utils/request";
 //interface
 import { listLoss, removeLoss } from "@/api/nc/loss";
+import { getConfigKey } from "@/api/system/config";
 //components
 import tltUpload from "@/components/tltUpload/tltUpload.vue";
 
 import infoDialog from "./components/infoDialog.vue";
 
 export default {
- name: "InsideLinerLoss",
+ name: "ncLoss",
   components: {
     tltUpload,
     infoDialog,
   },
-  dicts: [],
+  dicts: ["biz_factory_name"],
   provide() {
     return {
       parentDict: this.dict,
@@ -87,9 +88,11 @@ export default {
       },
       sort: {},
       search: {
+        factoryCode: '',
         mainPlanMonth: "",
       },
       query: {
+        factoryCode: '',
         mainPlanMonth: "",
       },
       importDefaultValue: {},
@@ -107,11 +110,11 @@ export default {
           prop: "liningCode",
           align: "center",
           halign: "center",
-          label: this.$t("ui.data.column.quota.liningCode"),
+          label: this.$t("ui.nc.lossSetting.column.liningCode"),
           sortable: true,
         },
         {
-          prop: "machineName",
+          prop: "machineCode",
           align: "center",
           halign: "center",
           label: this.$t("ui.data.column.loss.line"),
@@ -174,16 +177,23 @@ export default {
     searchColumns() {
       return [
         {
-          label: this.$t("ui.data.column.quota.liningCode"),
+          label: this.$t("ui.data.column.factoryCode"),
+          prop: "factoryCode",
+          type: "select",
+          dictData: this.dict.type.biz_factory_name,
+          filterable: true,
+        },
+        {
+          label: this.$t("ui.data.column.quota.paddingCode"),
           prop: "liningCode",
         },
         {
           label: this.$t("ui.data.column.loss.line"),
-          prop: "machineId",
+          prop: "machineCode",
           type: "select",
           dictData: this.machines,
           labelKey: "machineName",
-          valueKey: "id",
+          valueKey: "machineCode",
         },
       ];
     },
@@ -285,10 +295,13 @@ export default {
     },
   },
   created() {
-    this.$store.dispatch("insideLiner/getMachineList");
-  },
-  activated() {
-    this.getList();
+    getConfigKey("sys.factory.code").then(response => {
+      this.search.factoryCode = response.msg;
+      this.query.factoryCode = response.msg;
+      this.getList();
+    }).catch(() => {
+      this.getList();
+    });
   },
 };
 </script>

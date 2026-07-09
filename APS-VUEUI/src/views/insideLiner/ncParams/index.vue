@@ -1,8 +1,7 @@
-
 <template>
   <basic-container>
     <page-table
-      tableRef="insideLinerParamsMainTable"
+      tableRef="ncParamsMainTable"
       :calcHeight="true"
       v-loading="loading"
       :columns="columns"
@@ -19,29 +18,19 @@
       :selectArea="false"
     >
       <template slot="header">
-        <!-- <el-button
+        <el-button
           type="primary"
           v-hasPermi="['nc:params:add']"
           @click="handleAdd"
           >{{ $t("ui.frame.btn.add") }}</el-button
-        > -->
-        <!-- <el-button
+        >
+        <el-button
           type="warning"
           v-hasPermi="['nc:params:edit']"
           @click="handleEdit(selection[0])"
+          :disabled="selection.length !== 1"
           >{{ $t("ui.frame.btn.modify") }}</el-button
-        > -->
-        <!-- <el-button
-          type="danger"
-          v-hasPermi="['nc:params:remove']"
-          @click="handleDelete(selection)"
-          >{{ $t("ui.frame.btn.delete") }}</el-button
-        > -->
-        <!-- <el-button
-          v-hasPermi="['nc:params:import']"
-          @click="$refs.tltUpload.handleImport()"
-          >{{ $t("ui.frame.btn.import") }}</el-button
-        > -->
+        >
         <el-button
           @click="handleExport"
           v-hasPermi="['nc:params:export']"
@@ -49,35 +38,21 @@
         >
       </template>
     </page-table>
-    <!-- <el-button style="display: none" ref="hidePopoverBtnRef"></el-button> -->
-    <!-- <tlt-upload
-      ref="tltUpload"
-      downloadUrl="/nc/params/importTemplate"
-      uploadUrl="/nc/params/importData"
-      @uploadSuccess="getList"
-    /> -->
     <infoDialog ref="infoRef" @success="getList" />
   </basic-container>
 </template>
 <script>
-//lib
-// import moment from "moment";
-//utils
 import { downloadLink } from "@/utils/request";
-//interface
-import { listParams, removeParams } from "@/api/nc/params";
-//components
-// import tltUpload from "@/components/tltUpload/tltUpload.vue";
-
+import { listParams } from "@/api/nc/params";
+import { getConfigKey } from "@/api/system/config";
 import infoDialog from "./components/infoDialog.vue";
 
 export default {
- name: "InsideLinerParams",
+  name: "NcParams",
   components: {
-    // tltUpload,
     infoDialog,
   },
-  dicts: [],
+  dicts: ["biz_factory_name", "biz_product_type"],
   provide() {
     return {
       parentDict: this.dict,
@@ -85,16 +60,6 @@ export default {
   },
   data() {
     return {
-      searchColumns: [
-        {
-          label: this.$t("ui.data.column.paramsCode"),
-          prop: "paramCode",
-        },
-        {
-          label: this.$t("ui.data.column.paramsName"),
-          prop: "paramName",
-        },
-      ],
       loading: false,
       data: [],
       selection: [],
@@ -104,48 +69,106 @@ export default {
         total: 0,
       },
       sort: {},
-      search: {},
-      query: {},
-      importDefaultValue: {},
-      importRules: {},
+      search: {
+        factoryCode: '',
+      },
+      query: {
+        factoryCode: '',
+      },
     };
   },
   computed: {
+    searchColumns() {
+      return [
+        {
+          label: this.$t("ui.data.column.factoryCode"),
+          prop: "factoryCode",
+          type: "select",
+          dictData: this.dict.type.biz_factory_name,
+          filterable: true,
+        },
+        {
+          label: this.$t("ui.nc.params.column.paramCode"),
+          prop: "paramCode",
+        },
+        {
+          label: this.$t("ui.nc.params.column.paramName"),
+          prop: "paramName",
+        },
+      ];
+    },
     columns() {
       let columns = [
         { type: "selection", fixed: "left" },
         {
+          prop: "factoryCode",
+          halign: "center",
+          label: this.$t("ui.nc.params.column.factoryCode"),
+          dictData: this.dict.type.biz_factory_name,
+          formatter: (row, column, value, index) => {
+            return this.selectDictLabel(this.dict.type.biz_factory_name, value);
+          },
+          width: 80,
+        },
+        {
+          prop: "productTypeCode",
+          halign: "center",
+          label: this.$t("ui.nc.params.column.productTypeCode"),
+          dictData: this.dict.type.biz_product_type,
+          formatter: (row, column, value, index) => {
+            return this.selectDictLabel(this.dict.type.biz_product_type, value);
+          },
+          width: 80,
+        },
+        {
           prop: "paramCode",
           halign: "center",
-          label: this.$t("ui.data.column.paramsCode"),
-          // sortable: "custom",
+          label: this.$t("ui.nc.params.column.paramCode"),
+          width: 100,
         },
         {
           prop: "paramName",
           halign: "center",
-          label: this.$t("ui.data.column.paramsName"),
+          label: this.$t("ui.nc.params.column.paramName"),
           titleTooltip: true,
-          // sortable: "custom",
+          width: 180,
         },
         {
           prop: "paramValue",
           halign: "center",
-          label: this.$t("ui.data.column.paramsValue"),
-          // sortable: "custom",
+          label: this.$t("ui.nc.params.column.paramValue"),
+          width: 100,
+        },
+        {
+          prop: "defauleValue",
+          halign: "center",
+          label: this.$t("ui.nc.params.column.defauleValue"),
+          width: 100,
         },
         {
           prop: "remark",
           halign: "center",
           label: this.$t("ui.common.column.remark"),
-          minWidth: 100,
-          // sortable: "custom",
+          minWidth: 380,
+        },
+        {
+          prop: "updateBy",
+          halign: "center",
+          label: this.$t("ui.common.column.updateBy"),
+          width: 100,
+        },
+        {
+          prop: "updateTime",
+          halign: "center",
+          label: this.$t("ui.common.column.updateTime"),
+          width: 160,
         },
         {
           align: "center",
           halign: "center",
           label: this.$t("ui.data.btn.option"),
-          minWidth: 180,
-          width: 180,
+          minWidth: 100,
+          width: 100,
           fixed: "right",
           render: ({ row }) => {
             return (
@@ -157,13 +180,6 @@ export default {
                 >
                   {this.$t("ui.frame.btn.update")}
                 </el-button>
-               { /* <el-button
-                  class="minus"
-                  type="danger"
-                  onClick={() => this.handleDelete(row)}
-                >
-                  {this.$t("ui.frame.btn.delete")}
-                </el-button> */}
               </div>
             );
           },
@@ -184,24 +200,6 @@ export default {
         this.$refs.infoRef.show(row);
       }
     },
-    handleDelete(row) {
-      this.$confirm(this.$t("common.confirm.delete"), {
-        type: "warning",
-      }).then(() => {
-        const ids = row.id;
-        this.loading = true;
-        removeParams({ ids })
-          .then((data) => {
-            this.$modal.msgSuccess(data.msg);
-            this.$set(this.page, "current", 1);
-            this.getList();
-          })
-          .catch((error) => {
-            console.log(error);
-            this.loading = false;
-          });
-      });
-    },
 
     handleSearch(data) {
       this.query = data;
@@ -213,9 +211,6 @@ export default {
       this.$set(this.page, "pageSize", pageSize);
       this.getList();
     },
-    handelSuccess() {
-      this.getList();
-    },
     handleSortChange({ column, prop, order }) {
       if (order) {
         this.sort = {
@@ -223,7 +218,6 @@ export default {
           isAsc: order == "ascending" ? "asc" : "desc",
         };
       } else {
-        //默认排序
         this.sort = {};
       }
       this.getList();
@@ -235,7 +229,6 @@ export default {
       downloadLink("/nc/params/export", this.formatParams(false));
     },
 
-    // utils
     formatParams(hasPage = true) {
       const params = {
         ...this.query,
@@ -247,15 +240,8 @@ export default {
         params.pageNum = this.page.current;
       }
 
-      if (params.createTime && params.createTime[0]) {
-        params.createTimeStart = params.createTime[0];
-        params.createTimeEnd = params.createTime[1];
-        params.createTime = undefined;
-      }
-
       return params;
     },
-    // api
     async getList() {
       try {
         this.loading = true;
@@ -269,9 +255,16 @@ export default {
       }
     },
   },
-  created() {},
-  activated() {
-    this.getList();
+  created() {
+    // 清除之前持久化的错误列顺序，保留拖拽功能但不再恢复错误状态
+    localStorage.removeItem("ncParamsMainTable");
+    getConfigKey("sys.factory.code").then(response => {
+      this.search.factoryCode = response.msg;
+      this.query.factoryCode = response.msg;
+      this.getList();
+    }).catch(() => {
+      this.getList();
+    });
   },
 };
 </script>
