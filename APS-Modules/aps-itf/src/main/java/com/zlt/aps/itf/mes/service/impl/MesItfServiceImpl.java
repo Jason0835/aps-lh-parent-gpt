@@ -2489,8 +2489,20 @@ public class MesItfServiceImpl implements MesItfService {
                 .filter(item -> isTrialOrMassTrial(item.getLhType()))
                 .collect(Collectors.toList());
         if (CollectionUtils.isEmpty(trialList)) {
+            //#region debug-point dp-trial-empty
+            log.info("[DEBUG-zero-fill] trialList为空，未进入试制/量试规则处理，insertList.size={}, factoryCode={}",
+                    insertList.size(), factoryCode);
+            //#endregion
             return;
         }
+        //#region debug-point dp-trial-summary
+        long zeroQtyCount = trialList.stream()
+                .filter(item -> item.getDayFinishQty() == null
+                        || item.getDayFinishQty().compareTo(BigDecimal.ZERO) == 0)
+                .count();
+        log.info("[DEBUG-zero-fill] 进入试制/量试规则：trialList.size={}, 其中完成量为0的记录数={}, factoryCode={}",
+                trialList.size(), zeroQtyCount, factoryCode);
+        //#endregion
 
         // 按完成日期分组（用LocalDate避免Date精度问题），逐日查询当日计划量
         Map<java.time.LocalDate, List<LhDayFinishQty>> dateGroupedMap = trialList.stream()
@@ -2538,6 +2550,10 @@ public class MesItfServiceImpl implements MesItfService {
                     planQtyMap.merge(key, vo.getDayPlanQty() == null ? 0 : vo.getDayPlanQty(), Integer::sum);
                 }
             }
+            //#region debug-point dp-planqty-map
+            log.info("[DEBUG-zero-fill] 当日计划量查询：factoryCode={}, finishDate={}, planQtyList行数={}, planQtyMap.size={}, mapKeys={}",
+                    factoryCode, scheduleLocalDate, planQtyList.size(), planQtyMap.size(), planQtyMap.keySet());
+            //#endregion
 
             // 逐条应用试制/量试完成量回报规则
             for (LhDayFinishQty item : dayItems) {
@@ -2551,6 +2567,13 @@ public class MesItfServiceImpl implements MesItfService {
                 String key = item.getMaterialCode() + "|" + item.getLhType();
                 Integer dayPlanQtyInt = planQtyMap.getOrDefault(key, 0);
                 BigDecimal dayPlanQty = BigDecimal.valueOf(dayPlanQtyInt);
+                //#region debug-point dp-zero-item
+                if (isZeroFinishQty) {
+                    log.warn("[DEBUG-zero-fill] 完成量为0的记录：materialCode={}, lhType={}, key={}, key存在={}, dayPlanQty={}, factoryCode={}, finishDate={}",
+                            item.getMaterialCode(), item.getLhType(), key, planQtyMap.containsKey(key),
+                            dayPlanQty, factoryCode, scheduleLocalDate);
+                }
+                //#endregion
                 // 3.1) 完成量 ≤ 日计划量：按当日计划量回报
                 // 注：完成量为0时落入此分支按日计划量回报（日计划量=0时回报0，>0时回报日计划量即0值放大）
                 if (finishQty.compareTo(dayPlanQty) <= 0) {
