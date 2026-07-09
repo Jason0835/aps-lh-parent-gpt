@@ -829,6 +829,10 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         summaryDataList.add(new ArrayList<>());
         exportBytes = ExcelUtils.writeMultiList(new ByteArrayInputStream(exportBytes), 2, summaryTableMap, summaryDataList);
 
+        // 重命名 Sheet 0（硫化计划）和 Sheet 1（硫化换模计划）为国际化名称
+        // 使导入时能按 i18n sheetName 匹配模板中的工作表
+        exportBytes = renameImportSheets(exportBytes);
+
         // 移除物料描述列
         return removeMaterialDescColumn(exportBytes);
     }
@@ -962,9 +966,27 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
                 break;
             case BLANK:
                 target.setBlank();
-                break;
+                    break;
             default:
                 break;
+        }
+    }
+
+    /**
+     * 将 Sheet 0（硫化计划）和 Sheet 1（硫化换模计划）重命名为国际化名称，
+     * 使导入时能按 i18n sheetName 匹配模板中的工作表。
+     */
+    private byte[] renameImportSheets(byte[] excelBytes) {
+        try (ByteArrayInputStream bais = new ByteArrayInputStream(excelBytes);
+             XSSFWorkbook workbook = new XSSFWorkbook(bais);
+             ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
+            workbook.setSheetName(0, I18nUtil.getMessage("ui.data.column.scheduleResult.exportSheetName"));
+            workbook.setSheetName(1, I18nUtil.getMessage("ui.data.column.lhMouldChangePlan.import.modelName"));
+            workbook.write(baos);
+            return baos.toByteArray();
+        } catch (IOException e) {
+            log.error("重命名导入模板Sheet失败", e);
+            throw new ServiceException("生成导入模板失败");
         }
     }
 

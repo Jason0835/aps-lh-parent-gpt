@@ -61,12 +61,14 @@ import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.ss.usermodel.WorkbookFactory;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletResponse;
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.Field;
@@ -358,6 +360,17 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
         setExportTitleFieldName(tableMap);
 
         byte[] resultBytes =  ExcelUtils.writeMultiList(inputStream, 0, tableMap, excelDataList);
+
+        try (ByteArrayInputStream bais = new ByteArrayInputStream(resultBytes);
+             XSSFWorkbook workbook = new XSSFWorkbook(bais);
+             ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
+            workbook.setSheetName(0, I18nUtil.getMessage("ui.data.column.lhMouldChangePlan.import.modelName"));
+            workbook.write(baos);
+            resultBytes = baos.toByteArray();
+        } catch (IOException e) {
+            log.error("重命名导入模板Sheet失败", e);
+            throw new ServiceException("生成导入模板失败");
+        }
         Date endTime = DateUtils.getNowDate();
 
         //3.组装导出日志
