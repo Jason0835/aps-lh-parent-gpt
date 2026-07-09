@@ -104,7 +104,7 @@ public class MouldRelationValidator implements IDataValidator {
 //            List<MouldValidationErrorDetail> details = buildDisabledDetails(disabledMouldCodeSet, modelInfoMap);
 //            context.addValidationErrorDetails(details);
 //        }
-        if (!missingModelInfoMouldCodeSet.isEmpty() || !disabledMouldCodeSet.isEmpty()) {
+        if (!missingModelInfoMouldCodeSet.isEmpty()) {
             return false;
         }
         log.info("模具关系校验通过, SKU模具关系数: {}", context.getSkuMouldRelMap().size());
