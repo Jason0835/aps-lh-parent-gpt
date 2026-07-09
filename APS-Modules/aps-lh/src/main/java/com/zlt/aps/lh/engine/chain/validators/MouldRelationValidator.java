@@ -82,17 +82,17 @@ public class MouldRelationValidator implements IDataValidator {
                 }
             }
         }
-        if (!missingModelInfoMouldCodeSet.isEmpty()) {
-            String summaryMsg = buildSummaryMessage(
-                    I18nUtil.getMessage("ui.data.column.lhScheduleResult.validator.mouldMissingSimple"),
-                    I18nUtil.getMessage("ui.data.column.lhScheduleResult.validator.mouldMissingMany"),
-                    getValidatorName(), missingModelInfoMouldCodeSet);
-            log.warn("检测到模具台账缺失, 工厂: {}, 模具号: {}", context.getFactoryCode(),
-                    String.join(MOULD_CODE_DELIMITER, missingModelInfoMouldCodeSet));
-            context.addValidationError(summaryMsg);
-            List<MouldValidationErrorDetail> details = buildMissingDetails(missingModelInfoMouldCodeSet);
-            context.addValidationErrorDetails(details);
-        }
+//        if (!missingModelInfoMouldCodeSet.isEmpty()) {
+//            String summaryMsg = buildSummaryMessage(
+//                    I18nUtil.getMessage("ui.data.column.lhScheduleResult.validator.mouldMissingSimple"),
+//                    I18nUtil.getMessage("ui.data.column.lhScheduleResult.validator.mouldMissingMany"),
+//                    getValidatorName(), missingModelInfoMouldCodeSet);
+//            log.warn("检测到模具台账缺失, 工厂: {}, 模具号: {}", context.getFactoryCode(),
+//                    String.join(MOULD_CODE_DELIMITER, missingModelInfoMouldCodeSet));
+//            context.addValidationError(summaryMsg);
+//            List<MouldValidationErrorDetail> details = buildMissingDetails(missingModelInfoMouldCodeSet);
+//            context.addValidationErrorDetails(details);
+//        }
         if (!disabledMouldCodeSet.isEmpty()) {
             String summaryMsg = buildSummaryMessage(
                     I18nUtil.getMessage("ui.data.column.lhScheduleResult.validator.mouldDisabledSimple"),
@@ -104,7 +104,7 @@ public class MouldRelationValidator implements IDataValidator {
             List<MouldValidationErrorDetail> details = buildDisabledDetails(disabledMouldCodeSet, modelInfoMap);
             context.addValidationErrorDetails(details);
         }
-        if (!missingModelInfoMouldCodeSet.isEmpty() || !disabledMouldCodeSet.isEmpty()) {
+        if (!disabledMouldCodeSet.isEmpty()) {
             return false;
         }
         log.info("模具关系校验通过, SKU模具关系数: {}", context.getSkuMouldRelMap().size());

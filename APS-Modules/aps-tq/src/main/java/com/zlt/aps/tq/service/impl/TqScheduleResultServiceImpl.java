@@ -121,7 +121,7 @@ public class TqScheduleResultServiceImpl extends AbstractDocService<TqScheduleRe
         // 校验施工是否存在（查询施工表 T_MDM_CONSTRUCTION_INFO）
         List<TqScheduleBaseInfoVo> baseInfoList = tqEngineService.listTqScheduleBaseInfo(
                 Collections.singletonList(dto.getBeadCode()));
-        if (CollectionUtils.isEmpty(baseInfoList)) {
+        if (CollectionUtils.isEmpty(baseInfoList)) { 
             return AjaxResult.error("胎圈规格有误，施工不存在");
         }
 

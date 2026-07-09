@@ -2,104 +2,81 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.zlt.aps.gsq.mapper.GsqTwiningDiscMapper">
 
-    <select id="listTwiningDisc" parameterType="com.zlt.aps.gsq.api.domain.dto.GsqTwiningDiscDto" resultType="com.zlt.aps.gsq.api.domain.dto.GsqTwiningDiscDto">
+    <!-- 查询钢丝圈缠绕盘列表（按新表结构 T_GSQ_TWINING_DISC） -->
+    <select id="listTwiningDisc" parameterType="com.zlt.aps.gsq.api.domain.entity.GsqTwiningDisc" resultType="com.zlt.aps.gsq.api.domain.entity.GsqTwiningDisc">
         select * from (
-        select sm.*, m.machine_code, m.machine_name
-        from T_GSQ_TWINING_DISC sm
-        left join T_GSQ_MACHINE_INFO m on sm.machine_id = m.id
-        where sm.DEL_FLAG = 0
-        and m.DEL_FLAG = 0
-        <if test="serialNumber != null and serialNumber != ''">
-            and INSTR(SERIAL_NUMBER, #{serialNumber}) > 0
+        select ID,
+               TWINING_DISC_CODE,
+               TWINING_DISC_NAME,
+               STATUS,
+               PRO_SIZE,
+               QTY,
+               IS_DELETE,
+               CREATE_BY,
+               CREATE_TIME,
+               UPDATE_BY,
+               UPDATE_TIME,
+               REMARK
+        from T_GSQ_TWINING_DISC
+        where IS_DELETE = '0'
+        <if test="twiningDiscCode != null and twiningDiscCode != ''">
+            and INSTR(TWINING_DISC_CODE, #{twiningDiscCode}) > 0
         </if>
-        <if test="orderWay != null and orderWay != ''">
-            and INSTR(order_way, #{orderWay}) > 0
+        <if test="twiningDiscName != null and twiningDiscName != ''">
+            and INSTR(TWINING_DISC_NAME, #{twiningDiscName}) > 0
         </if>
-        <if test="name != null and name != ''">
-            AND instr(name, #{name} )>0
-        </if>
-        <if test="machineId != null">
-            AND MACHINE_ID = #{machineId}
+        <if test="status != null and status != ''">
+            and STATUS = #{status}
         </if>
         <if test="orderStr == null">
-            order by sm.create_time desc
+            order by CREATE_TIME desc
         </if>
         ) t
         <if test="orderStr != null">
             order by ${orderStr}
         </if>
-
     </select>
 
-    <update id="updateTGsqTwiningDisc" parameterType="com.zlt.aps.gsq.entity.GsqTwiningDisc">
-        update t_gsq_twining_disc
-        <trim prefix="SET" suffixOverrides=",">
-            <if test="serialNumber != null">serial_number = #{serialNumber},</if>
-            <if test="name != null">name = #{name},</if>
-            <if test="seq != null">seq = #{seq},</if>
-            <if test="purpose != null">purpose = #{purpose},</if>
-            <if test="spec != null">spec = #{spec},</if>
-            <if test="orderWay != null">order_way = #{orderWay},</if>
-            twining_num = #{twiningNum,jdbcType=DECIMAL},
-            in_time = #{inTime,jdbcType=DATE},
-            scrap_time = #{scrapTime,jdbcType=DATE},
-            <if test="scrapReason != null">scrap_reason = #{scrapReason},</if>
-            <if test="machineId != null">machine_id = #{machineId},</if>
-            <if test="delFlag != null">del_flag = #{delFlag},</if>
-            <if test="remark != null">remark = #{remark},</if>
-            <if test="createBy != null">create_by = #{createBy},</if>
-            <if test="createTime != null">create_time = #{createTime},</if>
-            <if test="updateBy != null">update_by = #{updateBy},</if>
-            <if test="updateTime != null">update_time = #{updateTime},</if>
-        </trim>
-        where id = #{id}
-    </update>
+    <!-- 校验缠绕盘编码是否已存在（0=唯一，>0=不唯一） -->
+    <select id="checkUnique" parameterType="com.zlt.aps.gsq.api.domain.entity.GsqTwiningDisc" resultType="int">
+        select count(1)
+        from T_GSQ_TWINING_DISC
+        where IS_DELETE = '0'
+          and TWINING_DISC_CODE = #{twiningDiscCode}
+        <if test="id != null">
+            and ID != #{id}
+        </if>
+    </select>
 
+    <!-- 批量合并保存（存在则更新，否则新增），用于导入场景 -->
     <insert id="mergeSql" parameterType="list">
         INSERT INTO T_GSQ_TWINING_DISC (
-        serial_number, name, seq, purpose, spec,
-        order_way, twining_num, in_time, scrap_time, scrap_reason, machine_id,
-        create_by, create_time, update_by, update_time, remark, del_flag
+            TWINING_DISC_CODE, TWINING_DISC_NAME, STATUS, PRO_SIZE, QTY,
+            CREATE_BY, CREATE_TIME, UPDATE_BY, UPDATE_TIME, REMARK, IS_DELETE
         ) VALUES
-        <foreach collection="list" item="twiningDisc" separator=",">
+        <foreach collection="list" item="item" separator=",">
             (
-            #{twiningDisc.serialNumber,jdbcType=VARCHAR},
-            #{twiningDisc.name,jdbcType=VARCHAR},
-            #{twiningDisc.seq,jdbcType=DOUBLE},
-            #{twiningDisc.purpose,jdbcType=VARCHAR},
-            #{twiningDisc.spec,jdbcType=VARCHAR},
-            #{twiningDisc.orderWay,jdbcType=VARCHAR},
-            #{twiningDisc.twiningNum,jdbcType=DOUBLE},
-            #{twiningDisc.inTime,jdbcType=DATE},
-            #{twiningDisc.scrapTime,jdbcType=DATE},
-            #{twiningDisc.scrapReason,jdbcType=VARCHAR},
-            #{twiningDisc.machineId,jdbcType=DOUBLE},
-            #{twiningDisc.createBy,jdbcType=VARCHAR},
+            #{item.twiningDiscCode,jdbcType=VARCHAR},
+            #{item.twiningDiscName,jdbcType=VARCHAR},
+            #{item.status,jdbcType=VARCHAR},
+            #{item.proSize,jdbcType=DECIMAL},
+            #{item.qty,jdbcType=INTEGER},
+            #{item.createBy,jdbcType=VARCHAR},
             NOW(),
-            #{twiningDisc.updateBy,jdbcType=VARCHAR},
+            #{item.updateBy,jdbcType=VARCHAR},
             NOW(),
-            #{twiningDisc.remark,jdbcType=VARCHAR},
+            #{item.remark,jdbcType=VARCHAR},
             '0'
             )
         </foreach>
         ON DUPLICATE KEY UPDATE
-        name = VALUES(name),
-        seq = VALUES(seq),
-        purpose = VALUES(purpose),
-        spec = VALUES(spec),
-        order_way = VALUES(order_way),
-        twining_num = VALUES(twining_num),
-        in_time = VALUES(in_time),
-        scrap_time = VALUES(scrap_time),
-        scrap_reason = VALUES(scrap_reason),
-        machine_id = VALUES(machine_id),
-        update_by = VALUES(create_by),
-        update_time = NOW(),
-        remark = VALUES(remark)
+        TWINING_DISC_NAME = VALUES(TWINING_DISC_NAME),
+        STATUS = VALUES(STATUS),
+        PRO_SIZE = VALUES(PRO_SIZE),
+        QTY = VALUES(QTY),
+        UPDATE_BY = VALUES(CREATE_BY),
+        UPDATE_TIME = NOW(),
+        REMARK = VALUES(REMARK)
     </insert>
 
-
-    <update id="deleteAll">
-        update t_gsq_twining_disc set del_flag = NULL where del_flag = '0'
-    </update>
 </mapper>

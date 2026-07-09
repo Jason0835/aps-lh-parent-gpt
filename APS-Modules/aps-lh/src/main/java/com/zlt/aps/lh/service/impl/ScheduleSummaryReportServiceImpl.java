@@ -23,8 +23,12 @@ import com.zlt.aps.lh.api.enums.MouldChangeTypeEnum;
 import com.zlt.aps.lh.mapper.*;
 import com.zlt.aps.lh.service.IScheduleSummaryReportService;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
+import com.zlt.aps.lh.util.LhSingleControlMachineUtil;
+import com.zlt.aps.lh.util.MachineStatusUtil;
 import com.zlt.aps.maindata.mapper.FactoryParamMapper;
+import com.zlt.aps.maindata.mapper.LhMachineInfoEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmMaterialConsumeDetailMapper;
+import com.zlt.aps.mdm.api.domain.entity.LhMachineInfo;
 import com.zlt.aps.mdm.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.mp.api.domain.entity.FactoryParam;
 import com.zlt.aps.mp.api.domain.entity.MdmMaterialConsumeDetail;
@@ -122,6 +126,9 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
     private MdmMaterialInfoMapper mdmMaterialInfoMapper;
 
     @Resource
+    private LhMachineInfoEntityMapper lhMachineInfoEntityMapper;
+
+    @Resource
     private IMpStructureAllocationRemoteService mpStructureAllocationRemoteService;
 
     @Resource
@@ -191,14 +198,16 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
 
         // 原模板（左侧，无后缀）：T+1数据，取class3/4/5班次
         Date scheduleDateT2 = DateUtil.offsetDay(scheduleDate, 1);
+        // 硫化机台单双模(模台数)映射：用于硫化开动机台数统计时合并K1501L/K1501R等单控机台
+        Map<String, Integer> machineMaxMouldMap = this.loadMachineMaxMouldMap(factoryCode);
         Map<String, Object> tableMap = this.buildTableMapFromResults(
                 scheduleDate, scheduleDate, scheduleDateT2, factoryCode,
-                classShiftTypeMap, cxResults, lhResults, "");
+                classShiftTypeMap, cxResults, lhResults, "", machineMaxMouldMap);
 
         // 新模板（右侧，后缀2）：T+2数据，从同一份排程结果中取class6/7/8班次
         Map<String, Object> tableMapT2 = this.buildTableMapFromResults(
                 scheduleDateT2, scheduleDate, scheduleDateT2, factoryCode,
-                classShiftTypeMap, cxResults, lhResults, "2");
+                classShiftTypeMap, cxResults, lhResults, "2", machineMaxMouldMap);
         tableMap.putAll(tableMapT2);
 
         // 模具交替/清洗信息：一次性查询该排程批次所有数据，按 planDate 分组到 T+1/T+2 栏位
@@ -316,12 +325,14 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
      * @param cxResults          预查询的成型排程结果
      * @param lhResults          预查询的硫化排程结果
      * @param keySuffix          key 后缀（"" 或 "2"）
+     * @param machineMaxMouldMap 硫化机台单双模(模台数)映射，key=机台编号(大写), value=单双模值；
+     *                           用于硫化开动机台数统计时合并K1501L/K1501R等单控机台
      * @return 模板参数映射
      */
     private Map<String, Object> buildTableMapFromResults(Date reportDate, Date actualScheduleDate, Date scheduleDateT2,
                                                          String factoryCode, Map<Integer, String> classShiftTypeMap,
                                                          List<CxScheduleResult> cxResults, List<LhScheduleResult> lhResults,
-                                                         String keySuffix) {
+                                                         String keySuffix, Map<String, Integer> machineMaxMouldMap) {
         Map<String, Object> map = new HashMap<>(32);
 
         map.put("titleDate" + keySuffix, DateUtil.format(reportDate, "MM月dd日") + "计划排产\n"
@@ -410,9 +421,9 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
             lhMiddleTotal = lhMiddleTotal.add(sumLhQtyByShiftTypeInRange(result, classShiftTypeMap, "03", shiftIndexMin, shiftIndexMax));
         }
 
-        long nightMachines = countLhMachinesByShiftTypeInRange(lhResults, classShiftTypeMap, "01", shiftIndexMin, shiftIndexMax);
-        long morningMachines = countLhMachinesByShiftTypeInRange(lhResults, classShiftTypeMap, "02", shiftIndexMin, shiftIndexMax);
-        long middleMachines = countLhMachinesByShiftTypeInRange(lhResults, classShiftTypeMap, "03", shiftIndexMin, shiftIndexMax);
+        long nightMachines = countLhMachinesByShiftTypeInRange(lhResults, classShiftTypeMap, "01", shiftIndexMin, shiftIndexMax, machineMaxMouldMap);
+        long morningMachines = countLhMachinesByShiftTypeInRange(lhResults, classShiftTypeMap, "02", shiftIndexMin, shiftIndexMax, machineMaxMouldMap);
+        long middleMachines = countLhMachinesByShiftTypeInRange(lhResults, classShiftTypeMap, "03", shiftIndexMin, shiftIndexMax, machineMaxMouldMap);
 
         map.put("lhNightQty" + keySuffix, lhNightTotal.toString());
         map.put("lhMorningQty" + keySuffix, lhMorningTotal.toString());
@@ -421,13 +432,15 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
         map.put("lhNightMachines" + keySuffix, String.valueOf(nightMachines));
         map.put("lhMorningMachines" + keySuffix, String.valueOf(morningMachines));
         map.put("lhMiddleMachines" + keySuffix, String.valueOf(middleMachines));
-        map.put("lhTotalMachines" + keySuffix, String.valueOf(nightMachines + morningMachines + middleMachines));
+        // 硫化开动合计列取夜、早、中三个班次开动机台数的最大值(非求和)，与业务口径一致
+        long maxMachines = Math.max(Math.max(nightMachines, morningMachines), middleMachines);
+        map.put("lhTotalMachines" + keySuffix, String.valueOf(maxMachines));
 
-        log.info("硫化排程汇总[keySuffix={}] - 夜班: {}, 早班: {}, 中班: {}, 合计: {}, 开动机台 - 夜: {}, 早: {}, 中: {}, 合计: {}",
+        log.info("硫化排程汇总[keySuffix={}] - 夜班: {}, 早班: {}, 中班: {}, 合计: {}, 开动机台 - 夜: {}, 早: {}, 中: {}, 合计(取最大值): {}",
                 keySuffix, lhNightTotal, lhMorningTotal, lhMiddleTotal,
                 lhNightTotal.add(lhMorningTotal).add(lhMiddleTotal),
                 nightMachines, morningMachines, middleMachines,
-                nightMachines + morningMachines + middleMachines);
+                maxMachines);
 
         // 模具交替/清洗信息已由外层 buildMouldChangeAndCleanInfo 统一查询并按 planDate 分组注入，
         // 不再在此处逐个日期查询，避免 T+2 栏位因 scheduleDate 过滤条件错误导致查不到数据
@@ -1145,19 +1158,64 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
      * 按班次类型和班次序号范围统计硫化开动机台数。
      * 用于区分T+1（班次1~5）和T+2（班次6~8）的硫化数据。
      *
-     * @param results          硫化排程结果列表
-     * @param classShiftTypeMap 班次类型映射
-     * @param shiftType        班次类型（01-夜，02-早，03-中）
-     * @param shiftIndexMin    班次序号下限（含）
-     * @param shiftIndexMax    班次序号上限（含）
-     * @return 在指定范围内该班次类型有计划产量的机台数
+     * <p>统计规则：</p>
+     * <ol>
+     *   <li>收集该班次类型下"计划量>0"的机台号(去重，同一机台多条记录只算1条开动)；</li>
+     *   <li>为每个机台号生成"计数标识"：
+     *     <ul>
+     *       <li>单控机台(编码以L/R结尾)且单双模(模台数)=1 → 用物理机台号(去L/R后缀)，
+     *           使K1501L/K1501R归并为K1501，只算1条开动；</li>
+     *       <li>其余 → 用原机台号。</li>
+     *     </ul>
+     *   </li>
+     *   <li>去重后的计数标识数即为开动机台数。</li>
+     * </ol>
+     *
+     * @param results            硫化排程结果列表
+     * @param classShiftTypeMap  班次类型映射
+     * @param shiftType          班次类型（01-夜，02-早，03-中）
+     * @param shiftIndexMin      班次序号下限（含）
+     * @param shiftIndexMax      班次序号上限（含）
+     * @param machineMaxMouldMap 硫化机台单双模(模台数)映射，key=机台编号(大写), value=单双模值；
+     *                           机台主数据缺失时按"不合并"保守计数
+     * @return 在指定范围内该班次类型有计划产量的开动机台数(已按物理机台归并)
      */
     private long countLhMachinesByShiftTypeInRange(List<LhScheduleResult> results,
                                                     Map<Integer, String> classShiftTypeMap,
-                                                    String shiftType, int shiftIndexMin, int shiftIndexMax) {
-        return results.stream()
+                                                    String shiftType, int shiftIndexMin, int shiftIndexMax,
+                                                    Map<String, Integer> machineMaxMouldMap) {
+        // 步骤1: 收集该班次类型下"计划量>0"的机台号(去重，同一机台多条记录只算1条开动)
+        Set<String> activeMachineCodes = results.stream()
                 .filter(r -> hasNonZeroQtyForShiftTypeInRange(r, classShiftTypeMap, shiftType, shiftIndexMin, shiftIndexMax))
-                .count();
+                .map(LhScheduleResult::getLhMachineCode)
+                .filter(StringUtils::isNotBlank)
+                .map(String::trim)
+                .map(c -> c.toUpperCase(Locale.ROOT))
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+
+        if (activeMachineCodes.isEmpty()) {
+            return 0;
+        }
+
+        // 步骤2: 为每个机台号生成"计数标识"
+        //   - 单控(L/R结尾)且单双模=1 → 用物理机台号(去L/R后缀), 使K1501L/K1501R归并为K1501
+        //   - 其余 → 用原机台号
+        Set<String> countKeys = new HashSet<>(activeMachineCodes.size());
+        for (String code : activeMachineCodes) {
+            Integer maxMoldNum = machineMaxMouldMap.get(code);
+            if (LhSingleControlMachineUtil.isSingleMouldMachine(code)
+                    && maxMoldNum != null && maxMoldNum == 1) {
+                String physicalCode = LhSingleControlMachineUtil.resolvePhysicalMachineCode(code);
+                if (StringUtils.isNotBlank(physicalCode)) {
+                    countKeys.add(physicalCode);
+                }
+            } else {
+                countKeys.add(code);
+            }
+        }
+
+        // 步骤3: 去重后的计数标识数即为开动机台数
+        return countKeys.size();
     }
 
     /**
@@ -1742,5 +1800,34 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
                     factoryCode, paramCode, e.getMessage());
         }
         return null;
+    }
+
+    /**
+     * 加载指定分厂启用状态硫化机台的单双模(模台数)映射。
+     *
+     * <p>用于硫化开动机台数统计时识别单控机台(K1501L/K1501R)是否需合并：</p>
+     * <ul>
+     *   <li>key 统一为大写并去除首尾空格的机台编号，value 为单双模值；</li>
+     *   <li>机台主数据缺失时，调用方按"不合并"保守计数。</li>
+     * </ul>
+     *
+     * @param factoryCode 分厂编码
+     * @return key=机台编号(大写去空格), value=单双模(模台数)；无数据返回空Map
+     */
+    private Map<String, Integer> loadMachineMaxMouldMap(String factoryCode) {
+        List<LhMachineInfo> machineList = lhMachineInfoEntityMapper.selectList(
+                new LambdaQueryWrapper<LhMachineInfo>()
+                        .eq(LhMachineInfo::getFactoryCode, factoryCode)
+                        .eq(LhMachineInfo::getStatus, MachineStatusUtil.STATUS_ENABLED));
+        Map<String, Integer> map = new HashMap<>(machineList.size());
+        for (LhMachineInfo machine : machineList) {
+            String code = machine.getMachineCode();
+            if (StringUtils.isBlank(code)) {
+                continue;
+            }
+            map.put(code.trim().toUpperCase(Locale.ROOT), machine.getMaxMoldNum());
+        }
+        log.info("硫化机台单双模映射加载完成, 分厂: {}, 机台数: {}", factoryCode, map.size());
+        return map;
     }
 }

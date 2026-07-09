@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.gsq.mapper.GsqLossRateMapper">
+
+    <!-- 查询钢丝圈损耗率列表（左联机台信息表反显机台名称） -->
+    <select id="listLossRate" parameterType="com.zlt.aps.gsq.api.domain.entity.GsqLossRate"
+            resultType="com.zlt.aps.gsq.api.domain.entity.GsqLossRate">
+        select * from (
+            select lr.ID, lr.STEEL_RING_CODE, lr.MACHINE_CODE, lr.LOSS_RATE,
+                   lr.IS_DELETE, lr.CREATE_BY, lr.CREATE_TIME, lr.UPDATE_BY, lr.UPDATE_TIME, lr.REMARK,
+                   mi.MACHINE_NAME
+            from T_GSQ_LOSS_SETTING lr
+            left join T_GSQ_MACHINE_INFO mi on lr.MACHINE_CODE = mi.MACHINE_CODE
+            where lr.IS_DELETE = '0'
+            <if test="steelRingCode != null and steelRingCode != ''">
+                and lr.STEEL_RING_CODE like concat('%', #{steelRingCode}, '%')
+            </if>
+            <if test="machineCode != null and machineCode != ''">
+                and lr.MACHINE_CODE = #{machineCode}
+            </if>
+            order by lr.CREATE_TIME desc
+        ) t
+    </select>
+
+    <!-- 校验"钢丝圈编码+机台编码"组合唯一性 -->
+    <select id="checkUnique" parameterType="com.zlt.aps.gsq.api.domain.entity.GsqLossRate" resultType="int">
+        SELECT count(1)
+        FROM T_GSQ_LOSS_SETTING
+        where IS_DELETE = '0'
+        <choose>
+            <when test="steelRingCode != null and steelRingCode != ''">
+                and STEEL_RING_CODE = #{steelRingCode}
+            </when>
+            <otherwise>
+                and STEEL_RING_CODE is null
+            </otherwise>
+        </choose>
+        <choose>
+            <when test="machineCode != null and machineCode != ''">
+                and MACHINE_CODE = #{machineCode}
+            </when>
+            <otherwise>
+                and MACHINE_CODE is null
+            </otherwise>
+        </choose>
+        <if test="id != null">and ID != #{id}</if>
+    </select>
+
+    <!-- 批量合并保存（存在则更新，否则新增），用于导入场景 -->
+    <insert id="mergeSql" parameterType="list">
+        INSERT INTO T_GSQ_LOSS_SETTING (
+            STEEL_RING_CODE, MACHINE_CODE, LOSS_RATE, REMARK,
+            CREATE_BY, CREATE_TIME, UPDATE_BY, UPDATE_TIME, IS_DELETE
+        )
+        VALUES
+        <foreach collection="list" item="item" separator=",">
+            (
+            #{item.steelRingCode,jdbcType=VARCHAR},
+            #{item.machineCode,jdbcType=VARCHAR},
+            #{item.lossRate,jdbcType=DECIMAL},
+            #{item.remark,jdbcType=VARCHAR},
+            #{item.createBy,jdbcType=VARCHAR},
+            NOW(),
+            #{item.updateBy,jdbcType=VARCHAR},
+            NOW(),
+            '0'
+            )
+        </foreach>
+        ON DUPLICATE KEY UPDATE
+        LOSS_RATE = VALUES(LOSS_RATE),
+        REMARK = VALUES(REMARK),
+        UPDATE_BY = VALUES(CREATE_BY),
+        UPDATE_TIME = NOW()
+    </insert>
+
+</mapper>

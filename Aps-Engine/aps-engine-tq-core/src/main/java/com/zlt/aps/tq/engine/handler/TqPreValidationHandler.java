@@ -72,7 +72,8 @@ public class TqPreValidationHandler extends AbsTqScheduleStepHandler {
      * 校验成型排程记录的胎胚code在施工表中是否都能找到对应记录，如果不能则中断排程。
      *
      * <p>校验规则：忽略外协规格，只校验非外协规格的施工信息完整性。</p>
-     * <p>校验字段：胎胚代码、版本、胎圈代码、钢丝圈代码、三角胶代码、胶料代码、口型板、尺寸</p>
+     * <p>校验字段：胎胚代码、版本、胎圈代码、钢丝圈代码</p>
+     * <p>注：三角胶代码、六边形圈胶料、六边形圈口型、三角胶高和宽 这4个字段从未维护，已移除校验</p>
      */
     private void validateConstruction(TqScheduleContext context) {
         String scheduleDate = context.getScheduleDate();
@@ -128,18 +129,10 @@ public class TqPreValidationHandler extends AbsTqScheduleStepHandler {
             if (StringUtils.isBlank(construction.getBeadCode())) {
                 errorColumns.add("\"" + I18nUtil.getMessage("ui.construction.beadCode") + "\"");
             }
-            if (StringUtils.isBlank(construction.getApexCode())) {
-                errorColumns.add("\"" + I18nUtil.getMessage("ui.construction.apexCode") + "\"");
-            }
-            if (StringUtils.isBlank(construction.getHexagonRubberCode())) {
-                errorColumns.add("\"" + I18nUtil.getMessage("ui.construction.hexagonRubberCode") + "\"");
-            }
-            if (StringUtils.isBlank(construction.getHexagonMouthPlate())) {
-                errorColumns.add("\"" + I18nUtil.getMessage("ui.construction.hexagonMouthPlate") + "\"");
-            }
-            if (StringUtils.isBlank(construction.getHexagonRubberDimension())) {
-                errorColumns.add("\"" + I18nUtil.getMessage("ui.construction.hexagonRubberDimension") + "\"");
-            }
+            // 注：APEX_CODE(三角胶代码)、HEXAGON_RUBBER_CODE(六边形圈胶料)、
+            // HEXAGON_MOUTH_PLATE(六边形圈口型)、HEXAGON_RUBBER_DIMENSION(三角胶高和宽)
+            // 这4个字段在 T_MDM_CONSTRUCTION_INFO 表中从未维护（全表为NULL），
+            // 且不参与胎圈排程计划量计算，故移除必填校验，避免阻塞排程。
 
             if (!errorColumns.isEmpty()) {
                 String tip = StringUtils.format(

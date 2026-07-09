@@ -1,5 +1,6 @@
 package com.zlt.aps.gsq.api.service;
 
+import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.constant.ServiceNameConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
@@ -74,7 +75,7 @@ public interface IGsqMachineInfoService {
     /**
      * 导出钢丝圈机台列表
      *
-     * @param stock
+     * @param machineInfo
      * @return
      */
     @PostMapping("/gsq/machine/exportList")
@@ -97,8 +98,27 @@ public interface IGsqMachineInfoService {
     @GetMapping("/gsq/machine/listEnabledMachines")
     List<GsqMachineInfo> listEnabledMachines();
 
+    /**
+     * 导入钢丝圈机台信息（基于ImportContext的标准导入接口，供UIController调用）
+     *
+     * @param importContext 导入上下文（含文件字节、原始文件名等）
+     * @param updateSupport 是否支持更新已有数据
+     * @return 导入结果
+     */
     @PostMapping("/gsq/machine/importData")
     @ApiOperation("导入钢丝圈机台信息")
-    public AjaxResult importData(@RequestBody List<GsqMachineInfo> list, @RequestParam("updateSupport") boolean updateSupport, @RequestParam("importLogId") Long importLogId);
+    AjaxResult importData(@RequestBody ImportContext importContext, @RequestParam("updateSupport") boolean updateSupport);
+
+    /**
+     * 导入钢丝圈机台信息（Feign兼容旧接口，基于已解析的实体列表）
+     *
+     * @param list          待导入的机台信息列表
+     * @param updateSupport 是否支持更新已有数据
+     * @param importLogId   导入日志ID
+     * @return 导入结果
+     */
+    @PostMapping("/gsq/machine/importDataFeign")
+    @ApiOperation("导入钢丝圈机台信息（Feign兼容）")
+    AjaxResult importDataFeign(@RequestBody List<GsqMachineInfo> list, @RequestParam("updateSupport") boolean updateSupport, @RequestParam("importLogId") Long importLogId);
 
 }

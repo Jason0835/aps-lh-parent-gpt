@@ -18,6 +18,7 @@ import com.zlt.aps.lh.component.MonthPlanDateResolver;
 import com.zlt.aps.lh.component.TargetScheduleQtyResolver;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.strategy.IEndingJudgmentStrategy;
+import com.zlt.aps.lh.engine.strategy.support.EarlyProductionChecker;
 import com.zlt.aps.lh.util.*;
 import com.zlt.aps.mdm.api.domain.entity.MdmSkuLhCapacity;
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
@@ -598,14 +599,12 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
 //                    monthPlanTotalResult.getCalculateScene());
 //        }
         Integer lastMonthOverdueQty = monthOverdueQtyMap.values().stream().mapToInt(Integer::intValue).sum();
-        if (lastMonthOverdueQty != 0 || scheDayFinishQty > 0 || isCrossMonth) {
-            log.info("硫化余量计算完成, materialCode: {}, monthPlanQty: {}, monthFinishedAndScheDayQty: {}, "
-                            + "scheDayFinishQty: {}, lastMonthValidFlag: {}, lastMonthOverdueQty: {}, surplusQty: {}, "
-                            + "crossMonth: {}",
-                    plan.getMaterialCode(), totalPlanQty, actualFinishedQty, scheDayFinishQty,
-                    plan.getLastMonthValidFlag(), lastMonthOverdueQty, remainingDemandQty,
-                    isCrossMonth);
-        }
+        log.info("硫化余量计算完成, materialCode: {}, monthPlanQty: {}, monthFinishedAndScheDayQty: {}, "
+                        + "scheDayFinishQty: {}, lastMonthValidFlag: {}, lastMonthOverdueQty: {}, surplusQty: {}, "
+                        + "crossMonth: {}",
+                plan.getMaterialCode(), totalPlanQty, actualFinishedQty, scheDayFinishQty,
+                plan.getLastMonthValidFlag(), lastMonthOverdueQty, remainingDemandQty,
+                isCrossMonth);
         return new SurplusCalculation(remainingDemandQty, actualFinishedQty, ignoredOverProductionQty,
                 lastMonthOverdueQty, totalPlanQty);
     }
@@ -1844,7 +1843,7 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
                     continue;
                 }
                 // 续作匹配完成后，拦截窗口无计划、无本月历史欠产且仅存在窗口后计划的新增SKU。
-                if (shouldSkipWindowNoPlanNewSku(sku)) {
+                if (shouldSkipWindowNoPlanNewSku(context, sku)) {
                     appendWindowNoPlanNewSkuUnscheduledResult(context, sku);
                     blockedNewSkuList.add(sku);
                     continue;
@@ -1888,24 +1887,38 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
     }
 
     /**
-     * 判断新增SKU是否仅存在排程窗口后的月计划，且当前没有本月历史欠产。
+     * 判断新增SKU是否仅存在排程窗口后的远期月计划，且当前没有本月历史欠产。
      * <p>有效上月超欠产已计入硫化余量，但不能作为提前消耗本月远期计划的依据。</p>
+     * <p>结合SKU提前生产天数阈值（SYS0304028）判断：以窗口结束日为基准，向后查找阈值范围内是否有远期计划。
+     * 若有，允许进入排程由提前生产准入判断器（EarlyProductionChecker）逐日决策；
+     * 仅当远期计划超出提前生产天数阈值时，才禁止提前消耗未来计划。</p>
      *
+     * @param context 排程上下文
      * @param sku SKU排程DTO
      * @return true-本轮不排产，false-继续按新增SKU处理
      */
-    private boolean shouldSkipWindowNoPlanNewSku(SkuScheduleDTO sku) {
-        return Objects.nonNull(sku)
-                && sku.getWindowPlanQty() <= 0
-                && sku.getFutureMonthPlanQtyAfterWindow() > 0
-                && sku.getMonthlyHistoryShortageQty() <= 0;
+    private boolean shouldSkipWindowNoPlanNewSku(LhScheduleContext context, SkuScheduleDTO sku) {
+        if (Objects.isNull(sku)
+                || sku.getWindowPlanQty() > 0
+                || sku.getFutureMonthPlanQtyAfterWindow() <= 0
+                || sku.getMonthlyHistoryShortageQty() > 0) {
+            return false;
+        }
+        // 窗口无日计划、无本月历史欠产，但存在窗口后远期计划时，
+        // 需结合SKU提前生产天数阈值判断：以窗口结束日为基准，向后查找阈值范围内是否有远期计划。
+        // 若有，允许进入排程由提前生产准入判断器（EarlyProductionChecker）逐日决策；
+        // 若无（远期计划超出阈值），才禁止提前消耗未来计划。
+        LocalDate windowEndLocalDate = toLocalDate(context.getWindowEndDate());
+        LocalDate firstFuturePlanDate = EarlyProductionChecker.resolveFirstFuturePlanDate(
+                context, sku, windowEndLocalDate);
+        return Objects.isNull(firstFuturePlanDate);
     }
 
     /**
      * 追加窗口无计划且无本月历史欠产的新增SKU未排结果和排程过程日志。
      *
      * @param context 排程上下文
-     * @param sku     SKU排程DTO
+     * @param sku SKU排程DTO
      */
     private void appendWindowNoPlanNewSkuUnscheduledResult(LhScheduleContext context, SkuScheduleDTO sku) {
         LhUnscheduledResult unscheduled = buildBaseUnscheduledResult(context, sku);
@@ -1916,13 +1929,17 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
         String window = String.format("%s～%s",
                 LhScheduleTimeUtil.formatDate(context.getScheduleDate()),
                 LhScheduleTimeUtil.formatDate(context.getWindowEndDate()));
+        int earlyProductionDaysThreshold = context.getParamIntValue(
+                LhScheduleParamConstant.EARLY_PRODUCTION_DAYS_THRESHOLD,
+                LhScheduleConstant.DEFAULT_EARLY_PRODUCTION_DAYS_THRESHOLD);
         String detail = String.format(
                 "工厂: %s, 排程窗口: %s, 物料: %s, 窗口计划量: %d, 窗口后计划量: %d, "
-                        + "本月历史欠产量: %d, 有效上月超欠产量: %d, 硫化余量: %d, 原因: %s",
+                        + "本月历史欠产量: %d, 有效上月超欠产量: %d, 硫化余量: %d, "
+                        + "提前生产天数阈值: %d, 原因: %s",
                 context.getFactoryCode(), window, sku.getMaterialCode(), sku.getWindowPlanQty(),
                 sku.getFutureMonthPlanQtyAfterWindow(), sku.getMonthlyHistoryShortageQty(),
                 sku.getEffectiveLastMonthOverdueQty(), sku.getSurplusQty(),
-                WINDOW_NO_PLAN_NO_SHORTAGE_UNSCHEDULED_REASON);
+                earlyProductionDaysThreshold, WINDOW_NO_PLAN_NO_SHORTAGE_UNSCHEDULED_REASON);
         log.info("新增SKU排产准入拦截, {}", detail);
         PriorityTraceLogHelper.appendProcessLog(context, "窗口无计划新增SKU不排产", detail);
     }

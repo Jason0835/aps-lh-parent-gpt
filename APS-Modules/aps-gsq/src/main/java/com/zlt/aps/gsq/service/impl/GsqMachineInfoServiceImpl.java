@@ -1,5 +1,6 @@
 package com.zlt.aps.gsq.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
@@ -8,12 +9,17 @@ import com.zlt.aps.common.core.utils.ImportUtil;
 import com.zlt.aps.gsq.api.domain.entity.GsqMachineInfo;
 import com.zlt.aps.gsq.mapper.GsqMachineInfoMapper;
 import com.zlt.aps.gsq.service.GsqMachineInfoService;
+import com.zlt.aps.gsq.service.IGsqMachineInfoDocService;
+import com.zlt.bill.common.service.AbstractDocService;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import javax.annotation.Resource;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -22,14 +28,25 @@ import static com.zlt.aps.common.core.utils.ImportUtil.addImportErrorLog;
 
 /**
  * 钢丝圈机台信息Service业务层处理
+ * 继承AbstractDocService并实现新旧接口，保证对依赖模块的兼容性
  *
  * @author zlt
  * @date 2021-05-28
  */
+@Slf4j
 @Service
-public class GsqMachineInfoServiceImpl implements GsqMachineInfoService {
-    @Autowired
+public class GsqMachineInfoServiceImpl extends AbstractDocService<GsqMachineInfo> implements IGsqMachineInfoDocService, GsqMachineInfoService {
+
+    @Resource
     private GsqMachineInfoMapper machineInfoMapper;
+
+    /**
+     * 获取单据类型编码
+     */
+    @Override
+    protected String getDocTypeCode() {
+        return "GSQ_MACHINE_INFO";
+    }
 
     /**
      * 查询钢丝圈机台信息
@@ -89,20 +106,58 @@ public class GsqMachineInfoServiceImpl implements GsqMachineInfoService {
     }
 
     /**
-     * 校验机台编号唯一性
+     * 校验机台编号唯一性（使用LambdaQueryWrapper，禁止手写IS_DELETE条件）
+     *
+     * @param machineInfo 钢丝圈机台信息
+     * @return 校验结果
      */
     @Override
-    public String checkMachineCodeUnique(GsqMachineInfo MachineInfo) {
-        List<GsqMachineInfo> list = machineInfoMapper.checkMachineCodeUnique(MachineInfo);
-        if (CollectionUtils.isNotEmpty(list)) {
+    public String checkUnique(GsqMachineInfo machineInfo) {
+        LambdaQueryWrapper<GsqMachineInfo> wrapper = new LambdaQueryWrapper<>();
+        wrapper.ne(machineInfo.getId() != null, GsqMachineInfo::getId, machineInfo.getId());
+        wrapper.eq(GsqMachineInfo::getMachineCode, machineInfo.getMachineCode());
+        wrapper.eq(GsqMachineInfo::getDelFlag, "0");
+        if (machineInfoMapper.selectCount(wrapper) > 0) {
             return UserConstants.NOT_UNIQUE;
         }
         return UserConstants.UNIQUE;
     }
 
+    /**
+     * 校验机台编号唯一性
+     *
+     * @param machineInfo 钢丝圈机台信息
+     * @return 校验结果
+     */
+    @Override
+    public String checkMachineCodeUnique(GsqMachineInfo machineInfo) {
+        LambdaQueryWrapper<GsqMachineInfo> wrapper = new LambdaQueryWrapper<>();
+        wrapper.ne(machineInfo.getId() != null, GsqMachineInfo::getId, machineInfo.getId());
+        wrapper.eq(GsqMachineInfo::getMachineCode, machineInfo.getMachineCode());
+        wrapper.eq(GsqMachineInfo::getDelFlag, "0");
+        if (machineInfoMapper.selectCount(wrapper) > 0) {
+            return UserConstants.NOT_UNIQUE;
+        }
+        return UserConstants.UNIQUE;
+    }
+
+    /**
+     * 根据条件查询机台信息
+     *
+     * @param machineInfo 查询条件
+     * @return 机台列表
+     */
     @Override
     public List<GsqMachineInfo> listMachineInfo(GsqMachineInfo machineInfo) {
         return machineInfoMapper.listMachineInfo(machineInfo);
+    }
+
+    /**
+     * 获取需要校验唯一性的字段列表
+     */
+    @Override
+    protected List<String> getCheckUniqueFields() {
+        return Arrays.asList("machineCode");
     }
 
     /**
@@ -126,13 +181,12 @@ public class GsqMachineInfoServiceImpl implements GsqMachineInfoService {
         //机台名称分组
         Map<String, Long> nameMap = list.stream().collect(Collectors.groupingBy(a -> a.getMachineName(), Collectors.counting()));
 
-
         for (int i = 0; i < list.size(); i++) {
             GsqMachineInfo machineInfo = list.get(i);
 
             //重复记录校验
             Long hasValue = groupMap.get(machineInfo.getMachineCode());
-            if (hasValue > 1) {
+            if (hasValue != null && hasValue > 1) {
                 failureNum++;
                 machineInfo.setId(-999L);
                 String message = I18nUtil.getMessage("ui.data.column.all.conflictRecord");
@@ -157,7 +211,7 @@ public class GsqMachineInfoServiceImpl implements GsqMachineInfoService {
             }
             //校验Excel机台名称唯一性
             Long hasNameValue = nameMap.get(machineInfo.getMachineName());
-            if (hasNameValue > 1) {
+            if (hasNameValue != null && hasNameValue > 1) {
                 String message = I18nUtil.getMessage("ui.data.column.all.conflictRecord4Name");
                 addImportErrorLog(importLogId, i + 2, message, validated);
             }
@@ -167,7 +221,6 @@ public class GsqMachineInfoServiceImpl implements GsqMachineInfoService {
                 machineInfo.setId(-999L);
                 importErrorLogs.addAll(validated);
             } else {
-
                 // 唯一性校验
                 Boolean hasFalse = false;
                 GsqMachineInfo query = new GsqMachineInfo();

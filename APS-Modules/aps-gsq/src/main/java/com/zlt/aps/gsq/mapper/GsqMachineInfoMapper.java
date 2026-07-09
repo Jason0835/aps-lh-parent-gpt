@@ -1,5 +1,6 @@
 package com.zlt.aps.gsq.mapper;
 
+import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.zlt.aps.gsq.api.domain.entity.GsqMachineInfo;
 
 import java.util.List;
@@ -10,7 +11,7 @@ import java.util.List;
  * @author zlt
  * @date 2021-05-28
  */
-public interface GsqMachineInfoMapper {
+public interface GsqMachineInfoMapper extends BaseMapper<GsqMachineInfo> {
     /**
      * 查询钢丝圈机台信息
      *

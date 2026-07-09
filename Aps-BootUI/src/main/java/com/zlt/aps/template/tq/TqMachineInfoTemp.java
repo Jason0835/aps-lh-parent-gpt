@@ -45,4 +45,10 @@ public class TqMachineInfoTemp extends ApsBaseEntity {
     @Excel(name = "ui.common.column.remark")
     @ImportValidated(maxLength = 900)
     private String remark;
+
+    /** 定额：该机台单班标准产量 */
+    @ApiModelProperty(value = "定额：该机台单班标准产量", position = 80)
+    @Excel(name = "ui.data.column.machine.quata")
+    @ImportValidated(number = true, min = 0, max = 999999)
+    private Double quota;
 }
