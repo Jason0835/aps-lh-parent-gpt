@@ -232,7 +232,7 @@ export default {
           label: this.$t("ui.data.column.lhMouldChangePlan.changeMouldType"),
           minWidth: 120,
           formatter: (row, column, value, index) => {
-            return this.selectDictLabel(this.dict.type.CHANGE_MOULD_TYPE, value);
+            return this.selectDictLabels(this.dict.type.CHANGE_MOULD_TYPE, value);
           },
         },
         {

@@ -1,6 +1,7 @@
 package com.zlt.aps.lh.handler;
 
 import cn.hutool.core.date.DateUtil;
+import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.lh.api.constant.LhScheduleConstant;
 import com.zlt.aps.lh.api.constant.LhScheduleParamConstant;
 import com.zlt.aps.lh.api.domain.dto.MachineCleaningWindowDTO;
@@ -26,35 +27,17 @@ import com.zlt.aps.lh.engine.strategy.support.ProductionQuantityPolicy;
 import com.zlt.aps.lh.exception.ScheduleErrorCode;
 import com.zlt.aps.lh.exception.ScheduleException;
 import com.zlt.aps.lh.service.impl.SchedulePersistenceService;
-import com.zlt.aps.lh.util.LeftRightMouldUtil;
-import com.zlt.aps.lh.util.LhScheduleTimeUtil;
-import com.zlt.aps.lh.util.LhSingleControlMachineUtil;
-import com.zlt.aps.lh.util.ShiftCapacityResolverUtil;
-import com.zlt.aps.lh.util.ShiftFieldUtil;
-import com.ruoyi.common.i18n.utils.I18nUtil;
-import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
+import com.zlt.aps.lh.util.*;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 
 import javax.annotation.Resource;
-import java.math.BigDecimal;
-import java.math.RoundingMode;
-import java.text.SimpleDateFormat;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
-import java.util.ArrayList;
-import java.util.Calendar;
-import java.util.Comparator;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.IdentityHashMap;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
@@ -937,8 +920,8 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
         if (plan == null || !Objects.equals(plan.getIsDelete(), 0)) {
             return false;
         }
-        return StringUtils.equals(MouldChangeTypeEnum.REGULAR.getCode(), plan.getChangeMouldType())
-                || StringUtils.equals(MouldChangeTypeEnum.TYPE_BLOCK.getCode(), plan.getChangeMouldType());
+        return MouldChangeTypeEnum.containsAnyCode(plan.getChangeMouldType(),
+                MouldChangeTypeEnum.REGULAR.getCode(), MouldChangeTypeEnum.TYPE_BLOCK.getCode());
     }
 
     /**
@@ -1064,8 +1047,8 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
      */
     private boolean isCleaningMouldChangePlan(LhMouldChangePlan plan) {
         return Objects.nonNull(plan)
-                && (StringUtils.equals(MouldChangeTypeEnum.SAND_BLAST.getCode(), plan.getChangeMouldType())
-                || StringUtils.equals(MouldChangeTypeEnum.DRY_ICE.getCode(), plan.getChangeMouldType()));
+                && MouldChangeTypeEnum.containsAnyCode(plan.getChangeMouldType(),
+                MouldChangeTypeEnum.SAND_BLAST.getCode(), MouldChangeTypeEnum.DRY_ICE.getCode());
     }
 
     /**

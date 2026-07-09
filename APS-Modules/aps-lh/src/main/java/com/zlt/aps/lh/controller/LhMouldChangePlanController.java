@@ -603,15 +603,15 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
 
             // 如果换模类型是喷砂清洗或干冰清洗，前规格不导出
             String changeMouldType = lhMouldChangePlan.getChangeMouldType();
-            if (MouldChangeTypeEnum.TYPE_BLOCK.getCode().equals(changeMouldType)) {
+            if (MouldChangeTypeEnum.containsCode(changeMouldType, MouldChangeTypeEnum.TYPE_BLOCK.getCode())) {
                 lhMouldChangePlanVo.setIsReplaceBlock(YesOrNoEnum.YES.getCode());
             }
-            if (MouldChangeTypeEnum.SAND_BLAST.getCode().equals(changeMouldType)) {
+            if (MouldChangeTypeEnum.containsCode(changeMouldType, MouldChangeTypeEnum.SAND_BLAST.getCode())) {
                 lhMouldChangePlanVo.setIsSandblastingClean(YesOrNoEnum.YES.getCode());
                 lhMouldChangePlanVo.setBeforeMaterialCode("");
                 lhMouldChangePlanVo.setBeforeMaterialDesc("");
             }
-            if (MouldChangeTypeEnum.DRY_ICE.getCode().equals(changeMouldType)) {
+            if (MouldChangeTypeEnum.containsCode(changeMouldType, MouldChangeTypeEnum.DRY_ICE.getCode())) {
                 lhMouldChangePlanVo.setIsDryIceClean(YesOrNoEnum.YES.getCode());
                 lhMouldChangePlanVo.setBeforeMaterialCode("");
                 lhMouldChangePlanVo.setBeforeMaterialDesc("");
@@ -657,7 +657,22 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getLhMachineName()), "LH_MACHINE_NAME", queryVO.getLhMachineName());
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getBeforeMaterialCode()), "BEFORE_MATERIAL_CODE", queryVO.getBeforeMaterialCode());
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getBeforeMaterialDesc()), "BEFORE_MATERIAL_DESC", queryVO.getBeforeMaterialDesc());
-        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getChangeMouldType()), "CHANGE_MOULD_TYPE", queryVO.getChangeMouldType());
+        if (PubUtil.isNotEmpty(queryVO.getChangeMouldType())) {
+            List<String> changeMouldTypes = Arrays.stream(queryVO.getChangeMouldType().split(","))
+                    .map(String::trim)
+                    .filter(StringUtils::isNotEmpty)
+                    .collect(Collectors.toList());
+            queryWrapper.and(CollectionUtils.isNotEmpty(changeMouldTypes), wrapper -> {
+                for (int index = 0; index < changeMouldTypes.size(); index++) {
+                    String changeMouldType = changeMouldTypes.get(index);
+                    if (index == 0) {
+                        wrapper.apply("FIND_IN_SET({0}, CHANGE_MOULD_TYPE)", changeMouldType);
+                    } else {
+                        wrapper.or().apply("FIND_IN_SET({0}, CHANGE_MOULD_TYPE)", changeMouldType);
+                    }
+                }
+            });
+        }
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getAfterMaterialCode()), "AFTER_MATERIAL_CODE", queryVO.getAfterMaterialCode());
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getAfterMaterialDesc()), "AFTER_MATERIAL_DESC", queryVO.getAfterMaterialDesc());
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getMouldCode()), "MOULD_CODE", queryVO.getMouldCode());

@@ -22,13 +22,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
 
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -316,8 +310,8 @@ public class RollingScheduleHandoffService {
         if (plan == null || !Objects.equals(plan.getIsDelete(), NORMAL_DELETE_FLAG)) {
             return false;
         }
-        return MouldChangeTypeEnum.REGULAR.getCode().equals(plan.getChangeMouldType())
-                || MouldChangeTypeEnum.TYPE_BLOCK.getCode().equals(plan.getChangeMouldType());
+        return MouldChangeTypeEnum.containsAnyCode(plan.getChangeMouldType(),
+                MouldChangeTypeEnum.REGULAR.getCode(), MouldChangeTypeEnum.TYPE_BLOCK.getCode());
     }
 
     /**

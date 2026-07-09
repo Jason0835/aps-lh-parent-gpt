@@ -2,40 +2,34 @@ package com.zlt.aps.lh.service.impl;
 
 import cn.hutool.core.date.DateUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.exception.ServiceException;
 import com.zlt.aps.common.core.domain.ExcelCellRangeAddress;
 import com.zlt.aps.common.core.utils.ExcelUtils;
-import com.zlt.aps.cx.entity.schedule.CxPrecisionPlan;
+import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.cx.entity.config.CxParamConfig;
+import com.zlt.aps.cx.entity.schedule.CxPrecisionPlan;
 import com.zlt.aps.cx.entity.schedule.CxScheduleResult;
+import com.zlt.aps.enums.ConstructionStageEnum;
 import com.zlt.aps.lh.api.domain.entity.LhMouldChangePlan;
 import com.zlt.aps.lh.api.domain.entity.LhPrecisionPlan;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.api.domain.entity.LhShiftConfig;
 import com.zlt.aps.lh.api.domain.vo.ScheduleSummaryReportVO;
 import com.zlt.aps.lh.api.enums.DeleteFlagEnum;
-import com.zlt.aps.enums.ConstructionStageEnum;
-import com.zlt.aps.lh.mapper.CxLhScheduleResultMapper;
-import com.zlt.aps.lh.mapper.CxParamConfigMapper;
-import com.zlt.aps.lh.mapper.CxPrecisionPlanMapper;
-import com.zlt.aps.lh.mapper.CxScheduleResultMapper;
-import com.zlt.aps.lh.mapper.LhMouldChangePlanEntityMapper;
-import com.zlt.aps.lh.mapper.LhPrecisionPlanMapper;
-import com.zlt.aps.lh.mapper.LhShiftConfigMapper;
-import com.zlt.aps.lh.mapper.MdmMaterialInfoMapper;
+import com.zlt.aps.lh.api.enums.MouldChangeTypeEnum;
+import com.zlt.aps.lh.mapper.*;
 import com.zlt.aps.lh.service.IScheduleSummaryReportService;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.maindata.mapper.FactoryParamMapper;
 import com.zlt.aps.maindata.mapper.MdmMaterialConsumeDetailMapper;
-import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.mdm.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.mp.api.domain.entity.FactoryParam;
 import com.zlt.aps.mp.api.domain.entity.MdmMaterialConsumeDetail;
 import com.zlt.aps.mp.api.domain.entity.MpStructureAllocation;
 import com.zlt.aps.mp.api.service.IMpStructureAllocationRemoteService;
-import com.ruoyi.common.core.web.page.TableDataInfo;
-import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
@@ -45,7 +39,6 @@ import java.io.InputStream;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.*;
-import java.util.Objects;
 import java.util.stream.Collectors;
 
 /**
@@ -584,7 +577,8 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
         // T+1 模具交替机台（planDate 在 T+1 当天，更换类型 01/02）
         String mouldChangeInfoT1 = allPlans.stream()
                 .filter(p -> this.isPlanDateInRange(p, t1Start, t1End))
-                .filter(p -> "01".equals(p.getChangeMouldType()) || "02".equals(p.getChangeMouldType()))
+                .filter(p -> MouldChangeTypeEnum.containsAnyCode(p.getChangeMouldType(),
+                        MouldChangeTypeEnum.REGULAR.getCode(), MouldChangeTypeEnum.TYPE_BLOCK.getCode()))
                 .map(LhMouldChangePlan::getLhMachineCode)
                 .filter(StringUtils::isNotBlank)
                 .distinct()
@@ -594,7 +588,8 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
         // T+2 模具交替机台（planDate 在 T+2 当天，更换类型 01/02）
         String mouldChangeInfoT2 = allPlans.stream()
                 .filter(p -> this.isPlanDateInRange(p, t2Start, t2End))
-                .filter(p -> "01".equals(p.getChangeMouldType()) || "02".equals(p.getChangeMouldType()))
+                .filter(p -> MouldChangeTypeEnum.containsAnyCode(p.getChangeMouldType(),
+                        MouldChangeTypeEnum.REGULAR.getCode(), MouldChangeTypeEnum.TYPE_BLOCK.getCode()))
                 .map(LhMouldChangePlan::getLhMachineCode)
                 .filter(StringUtils::isNotBlank)
                 .distinct()
@@ -604,7 +599,8 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
         // T+1 模具清洗机台（planDate 在 T+1 当天，更换类型 03/04）
         String mouldCleanInfoT1 = allPlans.stream()
                 .filter(p -> this.isPlanDateInRange(p, t1Start, t1End))
-                .filter(p -> "03".equals(p.getChangeMouldType()) || "04".equals(p.getChangeMouldType()))
+                .filter(p -> MouldChangeTypeEnum.containsAnyCode(p.getChangeMouldType(),
+                        MouldChangeTypeEnum.SAND_BLAST.getCode(), MouldChangeTypeEnum.DRY_ICE.getCode()))
                 .map(LhMouldChangePlan::getLhMachineCode)
                 .filter(StringUtils::isNotBlank)
                 .distinct()
@@ -613,7 +609,8 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
         // T+2 模具清洗机台（planDate 在 T+2 当天，更换类型 03/04）
         String mouldCleanInfoT2 = allPlans.stream()
                 .filter(p -> this.isPlanDateInRange(p, t2Start, t2End))
-                .filter(p -> "03".equals(p.getChangeMouldType()) || "04".equals(p.getChangeMouldType()))
+                .filter(p -> MouldChangeTypeEnum.containsAnyCode(p.getChangeMouldType(),
+                        MouldChangeTypeEnum.SAND_BLAST.getCode(), MouldChangeTypeEnum.DRY_ICE.getCode()))
                 .map(LhMouldChangePlan::getLhMachineCode)
                 .filter(StringUtils::isNotBlank)
                 .distinct()
