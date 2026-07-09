@@ -99,7 +99,7 @@ public class GsqTwiningDiscServiceImpl extends AbstractDocService<GsqTwiningDisc
             return AjaxResult.error(I18nUtil.getMessage("ui.data.column.gsq.twiningDisc.conflict"));
         }
         // 保存主表（id为空新增，id不为空更新）
-        this.saveOrUpdate(entity);
+        this.save(entity);
         Long mainId = entity.getId();
         // 删除旧子表（逻辑删除，按主表ID）
         LambdaUpdateWrapper<GsqTwiningDiscSub> deleteWrapper = new LambdaUpdateWrapper<>();

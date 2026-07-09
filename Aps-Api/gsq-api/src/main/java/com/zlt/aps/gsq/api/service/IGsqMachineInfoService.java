@@ -75,7 +75,7 @@ public interface IGsqMachineInfoService {
     /**
      * 导出钢丝圈机台列表
      *
-     * @param stock
+     * @param machineInfo
      * @return
      */
     @PostMapping("/gsq/machine/exportList")
