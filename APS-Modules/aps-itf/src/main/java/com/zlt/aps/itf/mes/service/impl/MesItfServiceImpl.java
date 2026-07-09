@@ -2292,7 +2292,7 @@ public class MesItfServiceImpl implements MesItfService {
             insertList.addAll(extraFormalRecords);
         }
 
-        // 处理试制/量试完成量回报规则（完成量为0忽略、≤日计划量按计划量回报、>日计划量按实际回报）
+        // 处理试制/量试完成量回报规则（≤日计划量按计划量回报、>日计划量按实际回报；完成量为0按日计划量回报）
         handleTrialFinishQtyRule(insertList, syncDataLogs.getFactoryCode());
         if (CollectionUtils.isEmpty(insertList)) {
             log.info("硫化排程日完成量同步：试制/量试规则处理后待同步列表为空，factoryCode={}", syncDataLogs.getFactoryCode());
@@ -2394,7 +2394,7 @@ public class MesItfServiceImpl implements MesItfService {
             insertList.addAll(extraFormalRecords);
         }
 
-        // 处理试制/量试完成量回报规则（完成量为0忽略、≤日计划量按计划量回报、>日计划量按实际回报）
+        // 处理试制/量试完成量回报规则（≤日计划量按计划量回报、>日计划量按实际回报；完成量为0按日计划量回报）
         // 注意：此处统一处理所有日期的试制/量试数据，规则处理后再按完成日期分组同步
         String trialFactoryCode = insertList.get(0).getFactoryCode();
         handleTrialFinishQtyRule(insertList, trialFactoryCode);
@@ -2464,18 +2464,20 @@ public class MesItfServiceImpl implements MesItfService {
 
     /**
      * 处理试制(X)/量试(T)数据的日完成量回报规则。
-     * <p>规则：
+     * <p>规则（已移除原3.1"完成量为0忽略"，0值统一按下方规则处理）：
      * <ul>
-     *   <li>3.1) 完成量为0：从待同步列表中移除（忽略不同步）</li>
-     *   <li>3.2) 完成量 ≤ 当日计划量：将完成量调整为当日计划量进行回报</li>
-     *   <li>3.3) 完成量 > 当日计划量：保持原实际完成量不变</li>
+     *   <li>3.1) 完成量 ≤ 当日计划量：将完成量调整为当日计划量进行回报</li>
+     *   <li>3.2) 完成量 > 当日计划量：保持原实际完成量不变</li>
      * </ul>
      * 当日计划量取自T_LH_SCHEDULE_RESULT中 SCHEDULE_DATE = FINISH_DATE 的记录，
      * 合计班次3(夜)+班次4(早)+班次5(中)的计划量。</p>
-     * <p>匹配维度：物料编码 + 示方类型。查不到日计划量时按0处理（完成量&gt;0则按实际回报）。</p>
+     * <p>匹配维度：物料编码 + 示方类型。查不到日计划量时按0处理。</p>
      * <p>正规(S)数据不做处理，原样同步。</p>
+     * <p>完成量为0或null时的处理：落入3.1分支按日计划量回报
+     * （日计划量=0时回报0，日计划量&gt;0时回报日计划量即"0值放大"，
+     * 此类记录会输出WARN日志便于追踪）。</p>
      *
-     * @param insertList 待同步的日完成量列表（会被原地修改：调整dayFinishQty或移除元素）
+     * @param insertList 待同步的日完成量列表（会被原地修改：调整dayFinishQty）
      * @param factoryCode 工厂编码
      */
     private void handleTrialFinishQtyRule(List<LhDayFinishQty> insertList, String factoryCode) {
@@ -2503,8 +2505,8 @@ public class MesItfServiceImpl implements MesItfService {
                 .distinct()
                 .collect(Collectors.toList());
 
-        // 需要忽略的记录（完成量为0）
-        List<LhDayFinishQty> toRemove = new ArrayList<>();
+        // 完成量为0按日计划量放大的记录计数（原3.1会忽略，现按新规则放大），用于WARN日志追踪
+        int zeroFilledCount = 0;
 
         for (Map.Entry<java.time.LocalDate, List<LhDayFinishQty>> dateEntry : dateGroupedMap.entrySet()) {
             java.time.LocalDate scheduleLocalDate = dateEntry.getKey();
@@ -2540,31 +2542,34 @@ public class MesItfServiceImpl implements MesItfService {
             // 逐条应用试制/量试完成量回报规则
             for (LhDayFinishQty item : dayItems) {
                 BigDecimal finishQty = item.getDayFinishQty();
-                // 3.1) 完成量为0或空，忽略（不同步）
-                if (finishQty == null || finishQty.compareTo(BigDecimal.ZERO) == 0) {
-                    toRemove.add(item);
-                    continue;
+                // 完成量为null时按0处理，统一落入下方 ≤ 日计划量 分支
+                boolean isZeroFinishQty = finishQty == null || finishQty.compareTo(BigDecimal.ZERO) == 0;
+                if (isZeroFinishQty) {
+                    finishQty = BigDecimal.ZERO;
                 }
                 // 获取当日计划量，查不到按0处理
                 String key = item.getMaterialCode() + "|" + item.getLhType();
                 Integer dayPlanQtyInt = planQtyMap.getOrDefault(key, 0);
                 BigDecimal dayPlanQty = BigDecimal.valueOf(dayPlanQtyInt);
-                // 3.2) 完成量 ≤ 日计划量：按当日计划量回报
+                // 3.1) 完成量 ≤ 日计划量：按当日计划量回报
+                // 注：完成量为0时落入此分支按日计划量回报（日计划量=0时回报0，>0时回报日计划量即0值放大）
                 if (finishQty.compareTo(dayPlanQty) <= 0) {
+                    if (isZeroFinishQty && dayPlanQty.compareTo(BigDecimal.ZERO) > 0) {
+                        zeroFilledCount++;
+                    }
                     item.setDayFinishQty(dayPlanQty);
                 }
-                // 3.3) 完成量 > 日计划量：按实际完成量回报（保持原值，无需处理）
+                // 3.2) 完成量 > 日计划量：按实际完成量回报（保持原值，无需处理）
             }
 
             log.info("试制/量试完成量回报规则处理：factoryCode={}, finishDate={}, 当日计划量匹配数={}, 当日试制/量试数据数={}",
                     factoryCode, scheduleLocalDate, planQtyMap.size(), dayItems.size());
         }
 
-        // 从待同步列表中移除被忽略的记录（完成量为0）
-        if (!toRemove.isEmpty()) {
-            insertList.removeAll(toRemove);
-            log.info("试制/量试完成量回报规则处理：忽略完成量为0的记录数={}, 剩余待同步数量={}",
-                    toRemove.size(), insertList.size());
+        // 完成量为0但按日计划量放大的记录（原逻辑会忽略，现按新规则放大），输出WARN便于上线追踪影响范围
+        if (zeroFilledCount > 0) {
+            log.warn("试制/量试完成量回报规则处理：完成量为0按日计划量放大的记录数={}, factoryCode={}",
+                    zeroFilledCount, factoryCode);
         }
     }
 
