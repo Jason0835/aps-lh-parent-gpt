@@ -1,7 +1,7 @@
 package com.zlt.aps.nc.service.impl;
 
 
-import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
@@ -9,7 +9,6 @@ import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.utils.SecurityUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.i18n.utils.I18nUtil;
-import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.domain.ApsBaseEntity;
 import com.zlt.aps.common.core.utils.ImportUtil;
 import com.zlt.aps.nc.api.domain.entity.NcAssistSpec;
@@ -46,7 +45,12 @@ public class NcAssistSpecServiceImpl extends ServiceImpl<NcAssistSpecMapper, NcA
      * @return
      */
     public List<NcAssistSpec> listAssistSpec(NcAssistSpec dto) {
-        return ncAssistSpecMapper.listAssistSpec(dto);
+        LambdaQueryWrapper<NcAssistSpec> wrapper = new LambdaQueryWrapper<>();
+        if (StringUtils.isNotBlank(dto.getMaterialCode())) {
+            wrapper.like(NcAssistSpec::getMaterialCode, dto.getMaterialCode());
+        }
+        wrapper.orderByDesc(NcAssistSpec::getCreateTime);
+        return ncAssistSpecMapper.selectList(wrapper);
     }
 
     /**
@@ -80,13 +84,12 @@ public class NcAssistSpecServiceImpl extends ServiceImpl<NcAssistSpecMapper, NcA
         if (dto == null || StringUtils.isBlank(dto.getMaterialCode())) {
             return UserConstants.NOT_UNIQUE;
         }
-        QueryWrapper<NcAssistSpec> queryWrapper = new QueryWrapper<>();
-        queryWrapper.eq("MATERIAL_CODE", dto.getMaterialCode());
-        queryWrapper.eq("DEL_FLAG", ApsConstant.DEL_FLAG_NORMAL);
+        LambdaQueryWrapper<NcAssistSpec> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(NcAssistSpec::getMaterialCode, dto.getMaterialCode());
         if (dto.getId() != null) {
-            queryWrapper.ne("ID", dto.getId());  //编辑的时候校验，要过滤掉自身的id
+            wrapper.ne(NcAssistSpec::getId, dto.getId());  //编辑的时候校验，要过滤掉自身的id
         }
-        List<NcAssistSpec> list = ncAssistSpecMapper.selectList(queryWrapper);
+        List<NcAssistSpec> list = ncAssistSpecMapper.selectList(wrapper);
         if (list.size() > 0) {
             return UserConstants.NOT_UNIQUE;
         }
@@ -140,10 +143,10 @@ public class NcAssistSpecServiceImpl extends ServiceImpl<NcAssistSpecMapper, NcA
         }
         if (CollectionUtils.isNotEmpty(list)) {
             try {
-                //勾选更新记录，调用merge即可
+                //勾选更新记录，调用saveBatch即可
                 if (updateSupport && CollectionUtils.isNotEmpty(importList)) {
                     successNum = importList.size();
-                    ncAssistSpecMapper.mergeSql(importList);
+                    this.saveBatch(importList);
                 } else {
                     //查询数据库已存在对象
                     for (int i = 0; i < list.size(); i++) {

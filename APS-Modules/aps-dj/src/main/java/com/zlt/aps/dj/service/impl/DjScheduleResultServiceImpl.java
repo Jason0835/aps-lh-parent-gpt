@@ -58,7 +58,7 @@ import com.zlt.aps.dj.service.DjMachineInfoService;
 import com.zlt.aps.dj.service.DjScheduleResultService;
 import com.zlt.aps.dj.service.IDjScheduleAdjustService;
 import com.zlt.aps.dj.service.IDjShiftConfigService;
-import com.zlt.aps.utils.BillUtils;
+import com.zlt.aps.utils.ApsBeanUtils;
 import com.zlt.bill.common.service.AbstractBillService;
 
 import lombok.extern.slf4j.Slf4j;
@@ -113,7 +113,7 @@ public class DjScheduleResultServiceImpl extends AbstractBillService<DjScheduleR
      */
     @Override
     public List<DjScheduleResult> selectDjScheduleResultList(DjScheduleResult djScheduleResult) {
-        QueryWrapper<DjScheduleResult> queryWrapper = BillUtils.builderCondition(djScheduleResult);
+        QueryWrapper<DjScheduleResult> queryWrapper = ApsBeanUtils.builderCondition(djScheduleResult);
         List<DjScheduleResult> list = djScheduleResultMapper.selectList(queryWrapper);
         if (CollectionUtils.isEmpty(list)) {
             return new ArrayList<>();
@@ -482,7 +482,7 @@ public class DjScheduleResultServiceImpl extends AbstractBillService<DjScheduleR
      */
     @Override
     public List<DjScheduleResult> selectByScheduleDateAndCode(DjScheduleResult scheduleResult) {
-        return djScheduleResultMapper.selectList(BillUtils.builderCondition(scheduleResult));
+        return djScheduleResultMapper.selectList(ApsBeanUtils.builderCondition(scheduleResult));
     }
 
     public boolean compare(String str1, String str2) {

@@ -1,6 +1,7 @@
 package com.zlt.aps.nc.api.domain.entity;
 
 import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableName;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.ruoyi.common.core.annotation.Excel;
 import com.ruoyi.common.core.web.domain.BaseEntity;
@@ -8,6 +9,7 @@ import com.zlt.aps.common.core.domain.IFinishQtyImport;
 import com.zlt.common.annotation.ImportExcelValidated;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 
 import java.math.BigDecimal;
 import java.util.Date;
@@ -17,12 +19,13 @@ import java.util.Date;
  * @TableName T_NC_DAY_FINISH_QTY
  */
 @Data
+@EqualsAndHashCode(callSuper = false)
+@TableName("T_NC_DAY_FINISH_QTY")
 public class NcDayFinishQty extends BaseEntity implements IFinishQtyImport {
 
-    /**
-     * 主键ID
-     */
-    private Long id;
+    @ApiModelProperty(value = "工厂编码")
+    @TableField(value = "FACTORY_CODE")
+    private String factoryCode;
 
     /**
      * 排程时间

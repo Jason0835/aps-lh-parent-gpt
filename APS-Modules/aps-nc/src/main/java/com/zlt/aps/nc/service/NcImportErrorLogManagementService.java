@@ -1,7 +1,7 @@
 package com.zlt.aps.nc.service;
 
-import com.baomidou.mybatisplus.extension.service.IService;
 import com.zlt.aps.nc.api.domain.dto.NcImportErrorLogManagementDto;
+import com.zlt.bill.common.service.IDocService;
 
 import java.util.List;
 
@@ -11,7 +11,7 @@ import java.util.List;
  * @author duanjuntao
  * @date 2021-06-07
  */
-public interface NcImportErrorLogManagementService extends IService<NcImportErrorLogManagementDto>
+public interface NcImportErrorLogManagementService extends IDocService<NcImportErrorLogManagementDto>
 {
     /**
      * 查询工序导入日志管理错误日志列表

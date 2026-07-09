@@ -1,33 +1,14 @@
-import request,{ downloadLink } from '@/utils/request'
+import request from '@/utils/request'
 
-/**
- * 口型板列表
- * @param {Object} query
- * @returns
- */
-export function listMouthPlate(query) {
-  return request({
-    url: 'tc/mouthPlate/list',
-    method: 'post',
-    data: query
-  })
+export function listTcMouthPlate(query) {
+  return request({ url: '/tc/tcMouthPlate/list', method: 'post', data: query })
 }
-/**
- * 编辑成型机台
- * @param {Object} query
- * @returns
- */
-export function editMouthPlate(query) {
-  return request({
-    url: 'tc/mouthPlate/edit',
-    method: 'post',
-    data: query
-  })
+export function saveTcMouthPlate(data) {
+  return request({ url: '/tc/tcMouthPlate/save', method: 'post', data: data })
 }
-export function removeMouthPlate(query) {
-  return request({
-    url: 'tc/mouthPlate/remove',
-    method: 'post',
-    data: query
-  })
+export function removeTcMouthPlate(query) {
+  return request({ url: '/tc/tcMouthPlate/remove', method: 'post', data: query })
+}
+export function getTcMouthPlate(id) {
+  return request({ url: '/tc/tcMouthPlate/' + id, method: 'get' })
 }

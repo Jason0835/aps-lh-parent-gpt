@@ -28,7 +28,6 @@ import com.zlt.aps.gsq.api.domain.entity.GsqDayFinishQty;
 import com.zlt.aps.gsq.api.domain.entity.GsqMachineInfo;
 import com.zlt.aps.gsq.api.service.IGsqMachineInfoService;
 import com.zlt.aps.gsq.api.service.IGsqScheduleResultService;
-import com.zlt.aps.tc.api.domain.entity.TcScheduleResult;
 import com.zlt.file.encryptbyll.FileEncryptUtils;
 import com.zlt.framework.utils.AuthorizationUtils;
 import io.swagger.annotations.Api;

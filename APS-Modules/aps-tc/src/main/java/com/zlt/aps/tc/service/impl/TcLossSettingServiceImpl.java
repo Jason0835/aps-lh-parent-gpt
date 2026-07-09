@@ -1,264 +1,124 @@
 package com.zlt.aps.tc.service.impl;
 
-import static com.zlt.aps.common.core.utils.ImportUtil.addImportErrorLog;
+import cn.hutool.core.collection.CollUtil;
+import cn.hutool.core.collection.ListUtil;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
+import com.ruoyi.common.constant.UserConstants;
+import com.ruoyi.common.exception.ServiceException;
+import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.ruoyi.common.utils.StringUtils;
+import com.zlt.aps.tc.api.domain.entity.TcLossSetting;
+import com.zlt.aps.tc.api.domain.entity.TcMachineInfo;
+import com.zlt.aps.tc.mapper.TcLossSettingMapper;
+import com.zlt.aps.tc.mapper.TcMachineInfoMapper;
+import com.zlt.aps.tc.service.ITcLossSettingService;
+import com.zlt.bill.common.service.AbstractDocService;
+import com.zlt.common.enums.ImportErrorTypeEnums;
+import com.zlt.common.utils.ImportExcelValidatedUtils;
+import com.zlt.sysdef.domain.SysDocType;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import javax.annotation.Resource;
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-import org.apache.commons.collections.CollectionUtils;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
-import com.ruoyi.common.constant.UserConstants;
-import com.ruoyi.common.core.utils.bean.BeanUtils;
-import com.ruoyi.common.core.web.domain.AjaxResult;
-import com.ruoyi.common.i18n.utils.I18nUtil;
-import com.ruoyi.common.utils.StringUtils;
-import com.zlt.aps.common.core.utils.ImportUtil;
-import com.zlt.aps.tc.api.domain.dto.TcLossSettingDto;
-import com.zlt.aps.tc.api.domain.entity.TcMachineInfo;
-import com.zlt.aps.tc.entity.TcLossSetting;
-import com.zlt.aps.tc.mapper.TcLossSettingMapper;
-import com.zlt.aps.tc.service.TcLossSettingService;
-import com.zlt.aps.tc.service.TcMachineInfoService;
-
-
-/**
- * 胎侧损耗率设定Service业务层处理
- *
- * @author chen
- * @date 2021-07-13
- */
+@Slf4j
 @Service
-public class TcLossSettingServiceImpl extends ServiceImpl<TcLossSettingMapper, TcLossSetting> implements TcLossSettingService {
-    @Autowired
+@Transactional(rollbackFor = Exception.class)
+public class TcLossSettingServiceImpl extends AbstractDocService<TcLossSetting> implements ITcLossSettingService {
+
+    @Resource
     private TcLossSettingMapper tcLossSettingMapper;
 
-    @Autowired
-    private TcMachineInfoService tcMachineInfoService;
+    @Resource
+    private TcMachineInfoMapper tcMachineInfoMapper;
 
-    /**
-     * 查询胎侧损耗率设定
-     *
-     * @param id 胎侧损耗率设定ID
-     * @return 胎侧损耗率设定
-     */
     @Override
-    public TcLossSettingDto selectTcLossSettingById(Long id) {
-        return tcLossSettingMapper.selectTcLossSettingById(id);
+    protected String getDocTypeCode() {
+        return "TC0910";
     }
 
-    /**
-     * 查询胎侧损耗率设定列表
-     *
-     * @param tcLossSetting 胎侧损耗率设定
-     * @return 胎侧损耗率设定
-     */
     @Override
-    public List<TcLossSettingDto> selectTcLossSettingList(TcLossSetting tcLossSetting) {
-        return tcLossSettingMapper.selectTcLossSettingList(tcLossSetting);
+    protected SysDocType getSysDocType() {
+        SysDocType sysDocType = new SysDocType();
+        sysDocType.setDocTypeCode("TC0910");
+        return sysDocType;
     }
 
-    /**
-     * 新增胎侧损耗率设定
-     *
-     * @param tcLossSetting 胎侧损耗率设定
-     * @return 结果
-     */
     @Override
-    public int insertTcLossSetting(TcLossSetting tcLossSetting) {
-        checkParamAndUnique(tcLossSetting);
-        tcLossSetting.setBaseVale(null);
-        return tcLossSettingMapper.insertTcLossSetting(tcLossSetting);
-    }
-
-    /**
-     * 修改胎侧损耗率设定
-     *
-     * @param tcLossSetting 胎侧损耗率设定
-     * @return 结果
-     */
-    @Override
-    public int updateTcLossSetting(TcLossSetting tcLossSetting) {
-        checkParamAndUnique(tcLossSetting);
-        tcLossSetting.setBaseVale(tcLossSetting.getId());
-        return tcLossSettingMapper.updateTcLossSetting(tcLossSetting);
-    }
-
-    /**
-     * 批量删除胎侧损耗率设定
-     *
-     * @param ids 需要删除的胎侧损耗率设定ID
-     * @return 结果
-     */
-    @Override
-    public int deleteTcLossSettingByIds(Long[] ids) {
-        return tcLossSettingMapper.deleteTcLossSettingByIds(ids);
-    }
-
-    /**
-     * 删除胎侧损耗率设定信息
-     *
-     * @param id 胎侧损耗率设定ID
-     * @return 结果
-     */
-    @Override
-    public int deleteTcLossSettingById(Long id) {
-        return tcLossSettingMapper.deleteTcLossSettingById(id);
-    }
-
-    /**
-     * 校验记录唯一性
-     */
-    @Override
-    public String checkTcLossSettingUnique(TcLossSetting tcLossSetting) {
-        if (tcLossSetting == null) {
-            return UserConstants.NOT_UNIQUE;
+    public String checkUnique(TcLossSetting query) {
+        // 校验胎侧编码与机台编码不能同时为空
+        if (StringUtils.isBlank(query.getSidewallCode()) && StringUtils.isBlank(query.getMachineCode())) {
+            throw new ServiceException(I18nUtil.getMessage("ui.data.alert.tc.lossSetting.bothEmpty"));
         }
-        int num = tcLossSettingMapper.checkTcLossSettingUnique(tcLossSetting);
-        if (num > 0) {
-            return UserConstants.NOT_UNIQUE;
+        if (StringUtils.isBlank(query.getSidewallCode())) {
+            query.setSidewallCode("");
         }
-        return UserConstants.UNIQUE;
-    }
-
-    /**
-     * 检查参数是否合法，记录是否唯一
-     *
-     * @param tcLossSetting 要检查记录
-     */
-    private void checkParamAndUnique(TcLossSetting tcLossSetting) {
-        if (tcLossSetting.getMachineId() == null && StringUtils.isEmpty(tcLossSetting.getSidewallCode())) {
-            throw new RuntimeException(I18nUtil.getMessage("ui.error.message.loss.isAllNull"));
+        if (StringUtils.isBlank(query.getMachineCode())) {
+            query.setMachineCode("");
         }
-        String unique = checkTcLossSettingUnique(tcLossSetting);
+        String unique = super.checkUnique(query);
         if (UserConstants.NOT_UNIQUE.equals(unique)) {
-            throw new RuntimeException(I18nUtil.getMessage("ui.error.message.loss.unique"));
+            throw new ServiceException(I18nUtil.getMessage("ui.data.alert.tc.lossSetting.notUnique"));
         }
-    }
-
-    /**
-     * 导入数据
-     */
-    @Override
-    public AjaxResult importData(List<TcLossSettingDto> list, boolean updateSupport, Long importLogId) {
-
-        //初始化值准备
-        int successNum = 0;
-        int failureNum = 0;
-        List<TcLossSettingDto> newList = new ArrayList<>();
-        List<ImportErrorLog> importErrorLogs = new ArrayList<>();
-
-        List<TcMachineInfo> machineInfoList = tcMachineInfoService.selectMachineInfoList(new TcMachineInfo());
-        if (CollectionUtils.isEmpty(machineInfoList)) {
-            String errorMsg = I18nUtil.getMessage("ui.error.message.column.machineIsNull");
-            ImportUtil.addImportErrorLog(importLogId, null, errorMsg, importErrorLogs);
-            return AjaxResult.error(errorMsg, importErrorLogs);
-        }
-        Map<String, Long> machineCodeMap = new HashMap<>();
-//        machineInfoList.forEach(a -> machineCodeMap.put(a.getMachineCode(), a.getId()));
-        machineInfoList.forEach(a -> machineCodeMap.put(a.getMachineName(), a.getId()));
-
-        //按业务主键分组
-        Map<String, Long> groupMap = list.stream().collect(Collectors.groupingBy(a -> (a.getSidewallCode()+a.getMachineName()), Collectors.counting()));
-
-        //校验（非空校验、长度校验等）
-        for (int i = 0; i < list.size(); i++) {
-            TcLossSettingDto dto = list.get(i);
-
-            //重复记录校验
-            Long hasValue = groupMap.get(dto.getSidewallCode()+dto.getMachineName());
-            if (hasValue > 1) {
-                failureNum++;
-                dto.setId(-999L);
-                String message = I18nUtil.getMessage("ui.data.column.all.conflictRecord");
-                String columnName = I18nUtil.getMessage("ui.data.column.loss.sidewallCode");
-                String columnName2 = I18nUtil.getMessage("ui.data.column.loss.line");
-                message=String.format(message,columnName+"+"+columnName2);
-                addImportErrorLog(importLogId, i + 2,message, importErrorLogs);
-                continue;
-            }
-
-
-            String machineName = dto.getMachineName();
-            List<ImportErrorLog> validated = ImportUtil.validated(importLogId, i + 2, dto);
-
-            if (StringUtils.isEmpty(machineName) && StringUtils.isEmpty(dto.getSidewallCode())) {
-                // 代码和机台名称不能同时为空校验
-                addImportErrorLog(importLogId, i + 2,
-                        I18nUtil.getMessage("ui.error.message.loss.isAllNull"), validated);
-            }
-            if (machineCodeMap.get(machineName) == null && StringUtils.isNotEmpty(machineName)) {
-                String errorMsg = I18nUtil.getMessage("ui.error.message.column.machineNotExist");
-                ImportUtil.addImportErrorLog(importLogId, i + 2, errorMsg, validated);
-            }
-
-            if (CollectionUtils.isNotEmpty(validated)) {
-                failureNum++;
-                dto.setId(-999L);
-                importErrorLogs.addAll(validated);
-            } else {
-                dto.setMachineId(machineCodeMap.get(machineName));
-                dto.setBaseVale(null);
-                if (StringUtils.isBlank(dto.getSidewallCode())) {
-                    dto.setSidewallCode(null);
-                }
-                newList.add(dto);
-            }
-        }
-
-        //新集合操作（更新或插入操作）
-        try {
-            //勾选更新记录，调用merge即可
-            if (updateSupport && CollectionUtils.isNotEmpty(newList)) {
-                successNum = newList.size();
-                tcLossSettingMapper.mergeSql(newList);
-            } else {
-                for (int i = 0; i < list.size(); i++) {
-                    TcLossSettingDto entity = list.get(i);
-                    // 错误跳过
-                    if (entity.getId() != null && entity.getId().equals(-999L)) {
-                        continue;
-                    }
-                    // 唯一性校验
-                    TcLossSetting lossSetting = new TcLossSetting();
-                    BeanUtils.copyProperties(entity, lossSetting);
-                    String unique = checkTcLossSettingUnique(lossSetting);
-                    if (UserConstants.UNIQUE.equals(unique)) {
-                        successNum++;
-                        this.saveOrUpdate(lossSetting);
-                    } else {
-                        failureNum++;
-                        String message = I18nUtil.getMessage("ui.error.message.quota.unique");
-                        ImportUtil.addImportErrorLog(importLogId, i + 2, message, importErrorLogs);
-                    }
-                }
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-            // 执行sql失败，插入导入失败记录
-            successNum = 0;
-            failureNum = list.size();
-            importErrorLogs.clear();
-            ImportUtil.addImportErrorLog(importLogId, null, e.getMessage(), importErrorLogs);
-        }
-
-        //返回提示信息及错误集合
-        if (failureNum > 0) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.message.import.fail") + "," + successNum + "," + failureNum, importErrorLogs);
-        } else {
-            return AjaxResult.success(I18nUtil.getMessage("ui.message.import.success") + "," + successNum);
-        }
+        return unique;
     }
 
     @Override
-    public void deleteAll() {
-        this.tcLossSettingMapper.deleteAll();
+    protected List<String> getCheckUniqueFields() {
+        return new ArrayList<>(Arrays.asList("factoryCode", "sidewallCode", "machineCode"));
     }
 
+    @Override
+    protected Map<Object, Object> getServiceCheckParams(List<TcLossSetting> list, List<TcLossSetting> importList) {
+        Map<Object, Object> serviceCheckParams = super.getServiceCheckParams(list, importList);
+        // 提取所有非空、去重的机台编码
+        List<String> machineCodeList = list.stream()
+                .map(TcLossSetting::getMachineCode)
+                .filter(StringUtils::isNotBlank)
+                .distinct()
+                .collect(Collectors.toList());
+        // 分批查询机台基础数据
+        List<List<String>> splitList = ListUtil.split(machineCodeList, 500);
+        List<TcMachineInfo> machineInfoList = new ArrayList<>();
+        for (List<String> codes : splitList) {
+            LambdaQueryWrapper<TcMachineInfo> wrapper = new LambdaQueryWrapper<>();
+            wrapper.in(TcMachineInfo::getMachineCode, codes);
+            machineInfoList.addAll(tcMachineInfoMapper.selectList(wrapper));
+        }
+        if (CollUtil.isNotEmpty(machineInfoList)) {
+            serviceCheckParams.put("tcMachineCodeList",
+                    machineInfoList.stream().map(TcMachineInfo::getMachineCode).collect(Collectors.toList()));
+        }
+        return serviceCheckParams;
+    }
+
+    @Override
+    protected Boolean serviceCheckAndDataHandle(TcLossSetting importDocEntity, List<ImportErrorLog> importErrorLogs,
+                                                Long importLogId, int errorRowNum, Map<Object, Object> serviceCheckParams) {
+        // 校验胎侧编码与机台编码不能同时为空
+        String sidewallCode = importDocEntity.getSidewallCode();
+        String machineCode = importDocEntity.getMachineCode();
+        if (StringUtils.isBlank(sidewallCode) && StringUtils.isBlank(machineCode)) {
+            String message = I18nUtil.getMessage("ui.data.alert.tc.lossSetting.bothEmpty");
+            ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(), errorRowNum, message, importErrorLogs);
+            return Boolean.FALSE;
+        }
+        // 校验机台编码是否存在（非空时校验）
+        if (StringUtils.isNotBlank(machineCode) && serviceCheckParams.containsKey("tcMachineCodeList")) {
+            List<String> machineCodeList = (List<String>) serviceCheckParams.get("tcMachineCodeList");
+            if (!machineCodeList.contains(machineCode)) {
+                String message = I18nUtil.getMessage("ui.data.alert.tc.machineCodeNotExist");
+                ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(), errorRowNum, message, importErrorLogs);
+                return Boolean.FALSE;
+            }
+        }
+        return super.serviceCheckAndDataHandle(importDocEntity, importErrorLogs, importLogId, errorRowNum, serviceCheckParams);
+    }
 }

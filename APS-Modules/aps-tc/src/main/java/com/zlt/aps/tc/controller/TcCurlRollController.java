@@ -1,109 +1,124 @@
 package com.zlt.aps.tc.controller;
 
-
-import com.ruoyi.common.core.web.controller.BaseController;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
-import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
-import com.zlt.aps.tc.api.domain.dto.TcCurlRollDto;
+import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.tc.api.domain.entity.TcCurlRoll;
-import com.zlt.aps.tc.service.TcCurlRollService;
+import com.zlt.aps.tc.mapper.TcCurlRollMapper;
+import com.zlt.aps.tc.service.ITcCurlRollService;
+import com.zlt.bill.common.controller.AbstractDocBizController;
+import com.zlt.bill.common.service.IDocService;
+import com.zlt.common.utils.PubUtil;
 import io.swagger.annotations.Api;
-import io.swagger.annotations.ApiImplicitParam;
-import io.swagger.annotations.ApiImplicitParams;
 import io.swagger.annotations.ApiOperation;
-import org.apache.commons.collections4.CollectionUtils;
-import org.springframework.beans.BeanUtils;
+import jodd.util.StringUtil;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
+import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
 import java.util.List;
 
-@Api(tags = {"胎侧卷曲信息接口"})
+@Slf4j
+@Api(tags = "胎侧卷曲长度")
 @RestController
-@RequestMapping("/tc/curlRoll")
-public class TcCurlRollController extends BaseController {
+@RequestMapping("/tcCurlRoll")
+public class TcCurlRollController extends AbstractDocBizController<TcCurlRoll> {
+
+    @Autowired
+    private ITcCurlRollService tcCurlRollService;
 
     @Resource
-    private TcCurlRollService tcCurlRollService;
+    private TcCurlRollMapper tcCurlRollMapper;
 
-    @ApiOperation("根据条件查询胎侧卷曲信息列表")
-    @PostMapping("/listCurlRoll")
-    public TableDataInfo listCurlRoll(@RequestBody TcCurlRoll dto) {
-        startPage();
-        dto.setOrderStr(orderStr());
-        List<TcCurlRoll> list = tcCurlRollService.listCurlRoll(dto);
-        return getDataTable(list);
+    @ApiOperation("查询列表")
+    @PostMapping("/list")
+    @Override
+    public TableDataInfo list(@RequestBody TcCurlRoll queryVO) {
+        return super.list(queryVO);
     }
 
-    @ApiOperation("根据id查询胎侧卷曲信息信息")
-    @GetMapping("/getCurlRoll/{id}")
-    @ApiImplicitParams({
-            @ApiImplicitParam(name = "id", dataType = "int", value = "主键id", paramType = "query")
-    })
-    public TcCurlRoll getCurlRoll(@PathVariable("id") Long id) {
-        TcCurlRoll dto = new TcCurlRoll();
-        BeanUtils.copyProperties(tcCurlRollService.getById(id), dto);
-        return dto;
+    @Log(title = "ui.data.column.tc.CurlRoll.modelName", businessType = BusinessType.INSERT_OR_UPDATE)
+    @ApiOperation("保存")
+    @PostMapping("/save")
+    @Override
+    public AjaxResult save(@RequestBody TcCurlRoll billVO) {
+        if (StringUtil.isBlank(billVO.getFactoryCode())) {
+            billVO.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
+        }
+        return super.save(billVO);
     }
 
-    @Log(title = "ui.tc.curlRoll.column.modalName", businessType = BusinessType.INSERT_OR_UPDATE)
-    @ApiOperation("保存胎侧卷曲信息信息（id为空则新增，id不为空则修改）")
-    @PostMapping("/saveCurlRoll")
-    public AjaxResult saveCurlRoll(@RequestBody TcCurlRoll dto) {
-        TcCurlRoll entity = new TcCurlRoll();
-        BeanUtils.copyProperties(dto, entity);
-        tcCurlRollService.saveCurlRoll(entity);
-        return AjaxResult.success();
+    @Log(title = "ui.data.column.tc.CurlRoll.modelName", businessType = BusinessType.DELETE)
+    @ApiOperation("删除")
+    @DeleteMapping("/remove")
+    @Override
+    public AjaxResult removeByIds(@RequestBody List<Long> ids) {
+        return super.removeByIds(ids);
     }
 
-    @ApiOperation("根据code判断胎侧卷曲代号是否已经存在")
-    @PostMapping("/checkCurlRollCodeUnique")
-    public String checkCurlRollCodeUnique(@RequestBody TcCurlRoll dto) {
-        return tcCurlRollService.checkCurlRollCodeUnique(dto);
+    @ApiOperation("获取详细信息")
+    @GetMapping(value = "/{id}")
+    @Override
+    public TcCurlRoll getInfo(@PathVariable("id") Long id) {
+        return super.getInfo(id);
     }
 
-    @Log(title = "ui.tc.curlRoll.column.modalName", businessType = BusinessType.DELETE)
-    @ApiOperation("批量删除胎侧卷曲信息信息(逻辑删)")
-    @PostMapping("/deleteCurlRoll/{ids}")
-    @ApiImplicitParams({
-            @ApiImplicitParam(name = "ids", dataType = "Array", value = "id數組", paramType = "query")
-    })
-    public AjaxResult deleteCurlRoll(@PathVariable("ids") Long[] ids) {
-        tcCurlRollService.deleteCurlRoll(ids);
-        return AjaxResult.success();
+    @ApiOperation("校验唯一性")
+    @PostMapping("/checkUnique")
+    public String checkUnique(@RequestBody TcCurlRoll query) {
+        return tcCurlRollService.checkUnique(query);
     }
 
-    @Log(title = "ui.tc.curlRoll.column.modalName", businessType = BusinessType.EXPORT)
-    @ApiOperation("导出数据")
-    @PostMapping("/exportData")
-    public List<TcCurlRoll> exportData(@RequestBody TcCurlRoll dto) {
-        dto.setOrderStr(orderStr());
-        List<TcCurlRoll> list = tcCurlRollService.listCurlRoll(dto);
-        return list;
-    }
-
-    @Log(title = "ui.tc.curlRoll.column.modalName", businessType = BusinessType.IMPORT)
+    @Log(title = "ui.data.column.tc.CurlRoll.modelName", businessType = BusinessType.IMPORT)
     @ApiOperation("导入数据")
     @PostMapping("/importData")
-    public AjaxResult importData(@RequestBody List<TcCurlRollDto> list, @RequestParam("updateSupport") boolean updateSupport, @RequestParam("importLogId") Long importLogId) {
-        if (CollectionUtils.isEmpty(list)) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.import.nodata"));
-        }
-        return tcCurlRollService.importData(list, updateSupport, importLogId);
+    @Override
+    public AjaxResult importData(@RequestBody ImportContext importContext, @RequestParam("updateSupport") boolean updateSupport) throws Exception {
+        return super.importData(importContext, updateSupport);
     }
 
-    /**
-     * 根据编号查询卷曲长度
-     *
-     * @param curlRoll 查询条件
-     * @return 结果
-     */
-    @ApiOperation("根据编号查询卷曲长度")
-    @PostMapping("/selectCurlLengthByCode")
-    public AjaxResult selectCurlLengthByCode(@RequestBody TcCurlRoll curlRoll) {
-        return tcCurlRollService.selectCurlLengthByCode(curlRoll);
+    @Log(title = "ui.data.column.tc.CurlRoll.modelName", businessType = BusinessType.EXPORT)
+    @ApiOperation("导出数据")
+    @PostMapping("/exportData/{fileName}")
+    @Override
+    public byte[] exportData(@RequestBody TcCurlRoll queryVO, @PathVariable("fileName") String fileName,
+                             HttpServletResponse response) throws IOException {
+        return super.exportData(queryVO, fileName, response);
+    }
+
+    @Override
+    protected List<TcCurlRoll> listExportData(TcCurlRoll obj) {
+        QueryWrapper<TcCurlRoll> wrapper = new QueryWrapper<>();
+        this.builderCondition(wrapper, obj);
+        return tcCurlRollMapper.selectList(wrapper);
+    }
+
+    @Override
+    protected IDocService getDocService() {
+        return tcCurlRollService;
+    }
+
+    @Override
+    protected void builderCondition(QueryWrapper<TcCurlRoll> queryWrapper, TcCurlRoll queryVO) {
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("factoryCode")), "FACTORY_CODE", queryVO.getFieldValueByFieldName("factoryCode"));
+        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("sidewallCode")), "SIDEWALL_CODE", queryVO.getFieldValueByFieldName("sidewallCode"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("curlLength")), "CURL_LENGTH", queryVO.getFieldValueByFieldName("curlLength"));
+    }
+
+    @Override
+    protected String getTypeCode() {
+        return "TC0911";
+    }
+
+    @Override
+    protected String getOrderBy() {
+        return "create_time desc";
     }
 }

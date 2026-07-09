@@ -1,40 +1,14 @@
 import request from '@/utils/request'
 
-/**
- * 成型定点机台管理列表
- * @param {Object} query
- * @returns
- */
-export function listSpecifyMachine(query) {
-  return request({
-    url: 'tc/specifyMachine/list',
-    method: 'post',
-    data: query
-  })
+export function listTcSpecifyMachine(query) {
+  return request({ url: '/tc/tcSpecifyMachine/list', method: 'post', data: query })
 }
-/**
- * 编辑
- * @param {Object} query
- * @returns
- */
-export function editSpecifyMachine(query) {
-  return request({
-    url: 'tc/specifyMachine/save',
-    method: 'post',
-    data: query
-  })
+export function saveTcSpecifyMachine(data) {
+  return request({ url: '/tc/tcSpecifyMachine/save', method: 'post', data: data })
 }
-export function removeSpecifyMachine(query) {
-  return request({
-    url: 'tc/specifyMachine/remove',
-    method: 'post',
-    data: query
-  })
+export function removeTcSpecifyMachine(query) {
+  return request({ url: '/tc/tcSpecifyMachine/remove', method: 'post', data: query })
 }
-export function removeAllSpecifyMachine(query) {
-  return request({
-    url: 'tc/specifyMachine/removeAll',
-    method: 'post',
-    data: query
-  })
+export function getTcSpecifyMachine(id) {
+  return request({ url: '/tc/tcSpecifyMachine/' + id, method: 'get' })
 }

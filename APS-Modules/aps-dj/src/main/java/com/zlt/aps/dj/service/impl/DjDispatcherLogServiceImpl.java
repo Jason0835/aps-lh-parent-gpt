@@ -12,7 +12,7 @@ import com.zlt.bill.common.service.AbstractBillService;
  * 垫胶调度员排程操作日志Service业务层处理
  * 
  * @author zlt
- * @date 2022-02-25
+ * @date 2026-06-25
  */
 @Service
 public class DjDispatcherLogServiceImpl extends AbstractBillService<DjDispatcherLog>

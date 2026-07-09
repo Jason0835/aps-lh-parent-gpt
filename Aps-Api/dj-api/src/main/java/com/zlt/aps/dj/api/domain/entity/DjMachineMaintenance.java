@@ -34,14 +34,14 @@ public class DjMachineMaintenance extends BaseEntity {
     @TableField(value = "MACHINE_CODE")
     private String machineCode;
 
-    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @Excel(name = "ui.data.column.dj.machineMaintenance.stopStartTime", width = 30, dateFormat = "yyyy-MM-dd HH:mm:ss")
     @ImportValidated(required = true, date = true)
     @ApiModelProperty(value = "停机开始时间", name = "stopStartTime")
     @TableField(value = "STOP_START_TIME")
     private Date stopStartTime;
 
-    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @Excel(name = "ui.data.column.dj.machineMaintenance.stopEndTime", width = 30, dateFormat = "yyyy-MM-dd HH:mm:ss")
     @ImportValidated(required = true, date = true)
     @ApiModelProperty(value = "停机结束时间", name = "stopEndTime")

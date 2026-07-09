@@ -1,43 +1,28 @@
 package com.zlt.aps.nc.service.impl;
 
 
-import static com.zlt.aps.common.core.utils.ImportUtil.addImportErrorLog;
-
-import java.math.BigDecimal;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Date;
 import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
 
 import javax.annotation.Resource;
 
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang.StringUtils;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
-import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
 import com.ruoyi.common.constant.UserConstants;
-import com.ruoyi.common.core.utils.SecurityUtils;
-import com.ruoyi.common.core.utils.bean.BeanUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.i18n.utils.I18nUtil;
-import com.zlt.aps.common.core.constant.ApsConstant;
-import com.zlt.aps.common.core.domain.ApsBaseEntity;
-import com.zlt.aps.common.core.utils.BigDecimalUtil;
-import com.zlt.aps.common.core.utils.ImportUtil;
-import com.zlt.aps.nc.api.domain.dto.NcCurlRollDto;
 import com.zlt.aps.nc.api.domain.entity.NcCurlRoll;
-import com.zlt.aps.nc.entity.NcParams;
 import com.zlt.aps.nc.mapper.NcCurlRollMapper;
-import com.zlt.aps.nc.mapper.NcParamsMapper;
 import com.zlt.aps.nc.service.NcCurlRollService;
+import com.zlt.bill.common.service.AbstractDocService;
+import com.zlt.common.enums.ImportErrorTypeEnums;
+import com.zlt.common.utils.ImportExcelValidatedUtils;
+import com.zlt.common.utils.PubUtil;
 
 /**
  * <p>
@@ -48,205 +33,107 @@ import com.zlt.aps.nc.service.NcCurlRollService;
  * @since 2023-09-07
  */
 @Service
-public class NcCurlRollServiceImpl extends ServiceImpl<NcCurlRollMapper, NcCurlRoll> implements NcCurlRollService {
+public class NcCurlRollServiceImpl extends AbstractDocService<NcCurlRoll> implements NcCurlRollService {
 
     @Resource
-    private NcCurlRollMapper ncCurlRollMapper;
+    private NcCurlRollMapper curlRollMapper;
 
-    /**
-     * 根据条件查询胎侧卷曲信息列表
-     *
-     * @return
-     */
-    public List<NcCurlRoll> listCurlRoll(NcCurlRoll dto) {
-        return ncCurlRollMapper.listCurlRoll(dto);
-    }
-
-    /**
-     * 保存胎侧卷曲信息信息（id为空则新增，id不为空则修改）
-     *
-     * @param entity
-     */
-    public void saveCurlRoll(NcCurlRoll entity) {
-        entity.setBaseVale(entity.getId());  //根据id是否为空给创建时间，创建人，更新时间，更新人赋值
-        this.saveOrUpdate(entity);
-    }
-
-    /**
-     * 批量删除(逻辑删)
-     *
-     * @param ids 多个id逗号分割
-     */
-    public void deleteCurlRoll(Long[] ids) {
-        LambdaUpdateWrapper<NcCurlRoll> wrapper = new LambdaUpdateWrapper<>();
-        wrapper.in(ApsBaseEntity::getId, Arrays.asList(ids));
-        wrapper.set(ApsBaseEntity::getDelFlag, null);
-        wrapper.set(ApsBaseEntity::getUpdateBy, SecurityUtils.getUsername());
-        wrapper.set(ApsBaseEntity::getUpdateTime, new Date());
-        super.getBaseMapper().update(null, wrapper);
-    }
-
-    /**
-     * 根据code判断胎侧卷曲是否已经存在
-     */
-    public String checkCurlRollCodeUnique(NcCurlRoll dto) {
-        if (dto == null || StringUtils.isBlank(dto.getLiningCode())) {
-            return UserConstants.NOT_UNIQUE;
+    @Override
+    public String checkUnique(NcCurlRoll entity) {
+        if (StringUtils.isEmpty(entity.getLiningCode())) {
+            throw new RuntimeException(I18nUtil.getMessage("ui.error.message.curlRoll.paddingCodeNull"));
         }
         QueryWrapper<NcCurlRoll> queryWrapper = new QueryWrapper<>();
-        queryWrapper.eq("LINING_CODE", dto.getLiningCode());
-        queryWrapper.eq("DEL_FLAG", ApsConstant.DEL_FLAG_NORMAL);
-        if (dto.getId() != null) {
-            queryWrapper.ne("ID", dto.getId());  //编辑的时候校验，要过滤掉自身的id
-        }
-        List<NcCurlRoll> list = ncCurlRollMapper.selectList(queryWrapper);
-        if (list.size() > 0) {
+        queryWrapper.ne(PubUtil.isNotEmpty(entity.getFieldValueByFieldName("id")), "ID",
+                entity.getFieldValueByFieldName("id"));
+        queryWrapper.eq("FACTORY_CODE", entity.getFactoryCode());
+        queryWrapper.eq("PADDING_CODE", entity.getLiningCode());
+        if (curlRollMapper.exists(queryWrapper)) {
             return UserConstants.NOT_UNIQUE;
         }
         return UserConstants.UNIQUE;
     }
 
-    private static final Integer DEFAULT_CURL_LENGTH = 82;
-    @Autowired
-    private NcParamsMapper paramsMapper;
-
     /**
-     * 导入数据
+     * 导入数据，并保存记录
+     *
+     * @param list          要导入数据
+     * @param updateSupport 已存在是否更新
+     * @param importLogId   导入日志id
+     * @return 导入后提示信息
      */
     @Override
-    public AjaxResult importData(List<NcCurlRollDto> list, boolean updateSupport, Long importLogId) {
-
-        //初始化
+    public AjaxResult importData(List<NcCurlRoll> list, boolean updateSupport, Long importLogId) {
         int successNum = 0;
         int failureNum = 0;
-        List<NcCurlRoll> newList = new ArrayList<>();
+        List<NcCurlRoll> importList = new ArrayList<>();
         List<ImportErrorLog> importErrorLogs = new ArrayList<>();
+        String uniqueMsg = I18nUtil.getMessage("ui.data.alert.cxStock.embryoCodeNotUnique");
 
-		// 按业务主键分组
-		Map<String, Long> groupMap = list.stream()
-				.collect(Collectors.groupingBy(NcCurlRollDto::getLiningCode, Collectors.counting()));
-        //公共校验（非空校验、长度校验等）
         for (int i = 0; i < list.size(); i++) {
-            int rowNo = i + 2; // excel里的行号
-            NcCurlRollDto sourceEntity = list.get(i);
-			// excel内业务主键唯一校验
-			if (groupMap.get(sourceEntity.getLiningCode()) > 1) {
-				String columnName = I18nUtil.getMessage("ui.data.column.quota.liningCode");
-                sourceEntity.setId(-999L);
-				addImportErrorLog(importLogId, rowNo,
-						String.format(I18nUtil.getMessage("ui.data.column.all.conflictRecord"), columnName),
-						importErrorLogs);
-                failureNum++;
-				continue;
-			}
-
-            List<ImportErrorLog> validated = ImportUtil.validated(importLogId, rowNo, sourceEntity);
+            int errorNum = i + 2;
+            NcCurlRoll docEntity = list.get(i);
+            List<ImportErrorLog> validated = ImportExcelValidatedUtils.validated(importLogId, errorNum, docEntity);
+            ImportExcelValidatedUtils.validatedRepeat(list, docEntity, i, 2, importLogId, validated,
+                    this.getCheckUniqueFields().toArray(new String[0]));
             if (CollectionUtils.isNotEmpty(validated)) {
-                sourceEntity.setId(-999L);
                 failureNum++;
+                docEntity.setId(-999L);
                 importErrorLogs.addAll(validated);
+            }
+        }
+
+        for (int i = 0; i < list.size(); i++) {
+            int errorNum = i + 2;
+            NcCurlRoll docEntity = list.get(i);
+            if (docEntity.getId() != null && docEntity.getId() == -999L) {
+                continue;
+            }
+
+            if (checkUnique(docEntity).equals(UserConstants.UNIQUE)) {
+                importList.add(docEntity);
+                successNum++;
             } else {
-            	// 校验通过后单独对数字字段校验
-            	String curlLength = sourceEntity.getCurlLength();
-            	if (BigDecimalUtil.isDigits(curlLength)) {
-            		NcCurlRoll importEntity = new NcCurlRoll();
-            		importEntity.setLiningCode(sourceEntity.getLiningCode());
-            		importEntity.setCurlLength(new BigDecimal(sourceEntity.getCurlLength()));
-            		importEntity.setRemark(sourceEntity.getRemark());
-                    List<ImportErrorLog> importValidated = ImportUtil.validated(importLogId, rowNo, importEntity);
-                    if (CollectionUtils.isNotEmpty(importValidated)) { // 数字字段校验失败
-                        sourceEntity.setId(-999L);
+                if (updateSupport) {
+                    LambdaQueryWrapper<NcCurlRoll> queryWrapper = new LambdaQueryWrapper<>();
+                    queryWrapper.eq(NcCurlRoll::getFactoryCode, docEntity.getFactoryCode());
+                    queryWrapper.eq(NcCurlRoll::getLiningCode, docEntity.getLiningCode());
+                    logger.info("updateSupport:{}", docEntity);
+                    List<NcCurlRoll> existList = curlRollMapper.selectList(queryWrapper);
+                    if (existList.size() > 1) {
                         failureNum++;
-                        importErrorLogs.addAll(importValidated);
-                    } else { // 全部校验通过
-                        NcCurlRoll targetEntity = new NcCurlRoll();
-                        BeanUtils.copyProperties(importEntity, targetEntity);
-                        targetEntity.setBaseVale(null);
-                        newList.add(targetEntity);
+                        String multipleMsg = I18nUtil.getMessage("ui.data.alert.cxStock.multipleRecords");
+                        ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(),
+                                errorNum, String.format(multipleMsg, errorNum), importErrorLogs);
+                        continue;
+                    } else if (existList.size() == 1) {
+                        docEntity.setId(existList.get(0).getId());
+                        importList.add(docEntity);
+                        successNum++;
                     }
-            	} else { // 卷曲长度不是数字类型
-    				String columnName = I18nUtil.getMessage("ui.curlRoll.column.length");
-                    sourceEntity.setId(-999L);
-    				addImportErrorLog(importLogId, rowNo,
-    						String.format(I18nUtil.getMessage("import.errorValueEnum.message.doubleValue"), rowNo, columnName),
-    						importErrorLogs);
-                    failureNum++;
-            	}
-            }
-        }
-
-        //新集合操作（更新或插入操作）
-        if (CollectionUtils.isNotEmpty(list)) {
-            try {
-                //勾选更新记录，调用mergeOrInsert
-                if (updateSupport && CollectionUtils.isNotEmpty(newList)) {
-                    successNum = newList.size();
-                    ncCurlRollMapper.mergeSql(newList);
                 } else {
-                    //唯一则新增
-                    for (int i = 0; i < list.size(); i++) {
-                        NcCurlRollDto dto = list.get(i);
-                        //过滤错误的记录
-                        if (dto.getId() != null && dto.getId() == -999L) {
-                            continue;
-                        }
-                        NcCurlRoll newItem = new NcCurlRoll();
-                        newItem.setLiningCode(dto.getLiningCode());
-                        newItem.setCurlLength(new BigDecimal(dto.getCurlLength()));
-                        newItem.setRemark(dto.getRemark());
-                        newItem.setBaseVale(null);
-
-                        QueryWrapper<NcCurlRoll> queryWrapper = new QueryWrapper<>();
-                        queryWrapper.eq("LINING_CODE", newItem.getLiningCode());
-                        queryWrapper.eq("DEL_FLAG", ApsConstant.DEL_FLAG_NORMAL);
-                        List<NcCurlRoll> alreadyExistList = ncCurlRollMapper.selectList(queryWrapper);
-                        if (CollectionUtils.isNotEmpty(alreadyExistList)) {
-                            failureNum++;
-                            String message = I18nUtil.getMessage("ui.error.message.quota.unique");
-                            addImportErrorLog(importLogId, i + 2, message, importErrorLogs);
-                        } else {
-                            successNum++;
-                            this.saveOrUpdate(newItem);
-                        }
-                    }
+                    failureNum++;
+                    ImportExcelValidatedUtils.addImportErrorLog(importLogId, errorNum,
+                            String.format(uniqueMsg, errorNum), importErrorLogs);
                 }
-            } catch (Exception e) {
-                e.printStackTrace();
-                successNum = 0;
-                failureNum = list.size();
-                importErrorLogs.clear();
-                addImportErrorLog(importLogId, null, e.getMessage(), importErrorLogs);
             }
         }
-        //返回提示信息及错误集合
+
+        if (CollectionUtils.isEmpty(importList)) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.message.import.fail") + "," + successNum + "," + failureNum,
+                    importErrorLogs);
+        }
+        baseDao.saveBatch(importList);
         if (failureNum > 0) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.message.import.fail") + "," + successNum + "," + failureNum, importErrorLogs);
+            return AjaxResult.error(I18nUtil.getMessage("ui.message.import.fail") + "," + successNum + "," + failureNum,
+                    importErrorLogs);
         } else {
             return AjaxResult.success(I18nUtil.getMessage("ui.message.import.success") + "," + successNum);
         }
     }
 
-    /**
-     * 根据code查询卷曲长度
-     *
-     * @param curlRoll 查询条件
-     * @return 结果
-     */
     @Override
-    public AjaxResult selectCurlLengthByCode(NcCurlRoll curlRoll) {
-        LambdaQueryWrapper<NcCurlRoll> queryWrapper = new LambdaQueryWrapper<>();
-        queryWrapper.eq(NcCurlRoll::getDelFlag, ApsConstant.DEL_FLAG_NORMAL);
-        queryWrapper.eq(NcCurlRoll::getLiningCode, curlRoll.getQueryCode());
-        NcCurlRoll data = ncCurlRollMapper.selectOne(queryWrapper);
-        LambdaQueryWrapper<NcParams> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(ApsBaseEntity::getDelFlag, ApsConstant.DEL_FLAG_NORMAL);
-        wrapper.eq(NcParams::getParamCode, "STANDARD_CRIMP_LENGTH");
-        NcParams params = paramsMapper.selectOne(wrapper);
-        if (data == null) {
-            data = new NcCurlRoll();
-            data.setLiningCode(curlRoll.getQueryCode());
-            data.setCurlLength(params == null ? new BigDecimal(DEFAULT_CURL_LENGTH) : new BigDecimal(params.getParamValue()));
-        }
-        return AjaxResult.success(data);
+    protected String getDocTypeCode() {
+        return "";
     }
 }
