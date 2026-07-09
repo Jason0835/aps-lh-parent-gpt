@@ -56,15 +56,6 @@ public interface IDjMachineInfoRemoteService {
      * @param id
      * @return
      */
-    @GetMapping(value = "/dj/machine/selectStockById/{id}")
-    DjMachineInfo selectStockById(@PathVariable("id") Long id);
-
-    /**
-     * 根据ID获取详细信息
-     *
-     * @param id
-     * @return
-     */
     @GetMapping(value = "/dj/machine/{id}")
     AjaxResult getInfo(@PathVariable("id") Long id);
 

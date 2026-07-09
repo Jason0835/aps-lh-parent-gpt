@@ -16,10 +16,11 @@ import com.zlt.aps.dj.service.DjExportLogManagementService;
  * 工序导出日志管理Service业务层处理
  *
  * @author zlt
- * @date 2021-06-07
+ * @date 2026-06-07
  */
 @Service
-public class DjExportLogManagementServiceImpl extends ServiceImpl<DjExportLogManagementMapper, DjExportLogManagement> implements DjExportLogManagementService {
+public class DjExportLogManagementServiceImpl extends ServiceImpl<DjExportLogManagementMapper, DjExportLogManagement>
+        implements DjExportLogManagementService {
 
     @Resource
     private DjExportLogManagementMapper exportLogManagementMapper;

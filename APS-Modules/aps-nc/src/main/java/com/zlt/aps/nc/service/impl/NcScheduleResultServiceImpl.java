@@ -45,10 +45,10 @@ import com.zlt.aps.nc.api.domain.entity.NcCurlRoll;
 import com.zlt.aps.nc.api.domain.entity.NcDayFinishQty;
 import com.zlt.aps.nc.api.domain.entity.NcDispatcherLog;
 import com.zlt.aps.nc.api.domain.entity.NcMachineInfo;
+import com.zlt.aps.nc.api.domain.entity.NcParams;
 import com.zlt.aps.nc.api.domain.entity.NcScheduleResult;
 import com.zlt.aps.nc.engine.service.NcEngineService;
 import com.zlt.aps.nc.engine.vo.NcScheduleResultVo;
-import com.zlt.aps.nc.entity.NcParams;
 import com.zlt.aps.nc.mapper.NcCurlRollMapper;
 import com.zlt.aps.nc.mapper.NcParamsMapper;
 import com.zlt.aps.nc.mapper.NcScheduleResultMapper;
@@ -144,9 +144,9 @@ public class NcScheduleResultServiceImpl extends AbstractBillService<NcScheduleR
             if (CollectionUtils.isNotEmpty(cxConsumeList)) {
                 cxConsumeMap = cxConsumeList.stream().collect(Collectors.toMap(NcScheduleResult::getLiningCode, NcScheduleResult::getCxConsumeQty));
             }
-            NcCurlRoll curlRoll = new NcCurlRoll();
-            curlRoll.getParams().put("codeList", codeList);
-            List<NcCurlRoll> curlRollList = curlRollMapper.listCurlRoll(curlRoll);
+            LambdaQueryWrapper<NcCurlRoll> curlRollWrapper = new LambdaQueryWrapper<>();
+            curlRollWrapper.in(NcCurlRoll::getLiningCode, codeList);
+            List<NcCurlRoll> curlRollList = curlRollMapper.selectList(curlRollWrapper);
             Map<String, BigDecimal> curlRollMap = new HashMap<>(16);
             if (CollectionUtils.isNotEmpty(curlRollList)) {
                 curlRollMap = curlRollList.stream().collect(Collectors.toMap(NcCurlRoll::getLiningCode, NcCurlRoll::getCurlLength));
@@ -251,7 +251,7 @@ public class NcScheduleResultServiceImpl extends AbstractBillService<NcScheduleR
         log.setAfterDayPlan(newSchedule.getDayPlanQty());
         log.setAfterNightPlan(newSchedule.getNightPlanQty());
         /** 调用插入日志方法 **/
-        ncDispatcherLogService.insertNcDispatcherLog(log);
+//        ncDispatcherLogService.insertNcDispatcherLog(log);
     }
 
     /**
@@ -287,7 +287,7 @@ public class NcScheduleResultServiceImpl extends AbstractBillService<NcScheduleR
         log.setAfterDayPlan(newSchedule.getDayPlanQty());
         log.setAfterNightPlan(newSchedule.getNightPlanQty());
         /* 调用插入日志方法 **/
-        ncDispatcherLogService.insertNcDispatcherLog(log);
+//        ncDispatcherLogService.insertNcDispatcherLog(log);
     }
 
     /**
@@ -636,9 +636,9 @@ public class NcScheduleResultServiceImpl extends AbstractBillService<NcScheduleR
         List<String> resultCodeList = tmScheduleResultList.stream().map(NcScheduleResult::getLiningCode).collect(Collectors.toList());
         List<String> notExistCodeList = lastDayPlanQty4List.stream().map(NcScheduleResult::getLiningCode)
                 .filter(item -> !resultCodeList.contains(item)).collect(Collectors.toList());
-        NcCurlRoll curlRoll = new NcCurlRoll();
-        curlRoll.getParams().put("codeList", notExistCodeList);
-        List<NcCurlRoll> curlRollList = curlRollMapper.listCurlRoll(curlRoll);
+        LambdaQueryWrapper<NcCurlRoll> curlRollWrapper = new LambdaQueryWrapper<>();
+        curlRollWrapper.in(NcCurlRoll::getLiningCode, notExistCodeList);
+        List<NcCurlRoll> curlRollList = curlRollMapper.selectList(curlRollWrapper);
         Map<String, BigDecimal> curlRollMap = new HashMap<>(16);
         if (CollectionUtils.isNotEmpty(curlRollList)) {
             curlRollMap = curlRollList.stream().collect(Collectors.toMap(NcCurlRoll::getLiningCode, NcCurlRoll::getCurlLength));

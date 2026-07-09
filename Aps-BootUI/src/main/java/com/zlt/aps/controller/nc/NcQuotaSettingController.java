@@ -16,7 +16,7 @@ import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.utils.ExportUtil;
 import com.zlt.aps.common.utils.ImportUtil;
 import com.zlt.aps.nc.api.domain.entity.NcQuotaSetting;
-import com.zlt.aps.nc.api.service.INcQuotaSettingService;
+import com.zlt.aps.nc.api.service.INcQuotaSettingRemoteService;
 import com.zlt.aps.template.nc.NcQuotaSettingTemp;
 import com.zlt.file.encryptbyll.FileEncryptUtils;
 import io.swagger.annotations.Api;
@@ -49,7 +49,7 @@ public class NcQuotaSettingController extends BaseController {
     private String prefix = "nc/quota";
 
     @Autowired
-    private INcQuotaSettingService iNcQuotaSettingService;
+    private INcQuotaSettingRemoteService iNcQuotaSettingService;
 
     @Autowired
     private IImportLogService iImportLogService;

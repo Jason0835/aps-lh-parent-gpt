@@ -11,6 +11,7 @@ import org.apache.commons.collections.CollectionUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
@@ -22,6 +23,7 @@ import com.zlt.aps.nc.api.domain.entity.NcQuotaSetting;
 import com.zlt.aps.nc.mapper.NcQuotaSettingMapper;
 import com.zlt.aps.nc.service.NcMachineInfoService;
 import com.zlt.aps.nc.service.NcQuotaSettingService;
+import com.zlt.bill.common.service.AbstractDocService;
 
 
 /**
@@ -31,82 +33,12 @@ import com.zlt.aps.nc.service.NcQuotaSettingService;
  * @date 2021-06-29
  */
 @Service
-public class NcQuotaSettingServiceImpl implements NcQuotaSettingService {
+public class NcQuotaSettingServiceImpl extends AbstractDocService<NcQuotaSetting> implements NcQuotaSettingService {
     @Autowired
     private NcQuotaSettingMapper ncQuotaSettingMapper;
 
     @Autowired
     private NcMachineInfoService ncMachineInfoService;
-
-    /**
-     * 查询内衬定额设定
-     *
-     * @param id 内衬定额设定ID
-     * @return 内衬定额设定
-     */
-    @Override
-    public NcQuotaSetting selectNcQuotaSettingById(Long id) {
-        return ncQuotaSettingMapper.selectNcQuotaSettingById(id);
-    }
-
-    /**
-     * 查询内衬定额设定列表
-     *
-     * @param ncQuotaSetting 内衬定额设定
-     * @return 内衬定额设定
-     */
-    @Override
-    public List<NcQuotaSetting> selectNcQuotaSettingList(NcQuotaSetting ncQuotaSetting) {
-        return ncQuotaSettingMapper.selectNcQuotaSettingList(ncQuotaSetting);
-    }
-
-    /**
-     * 新增内衬定额设定
-     *
-     * @param ncQuotaSetting 内衬定额设定
-     * @return 结果
-     */
-    @Override
-    public int insertNcQuotaSetting(NcQuotaSetting ncQuotaSetting) {
-        checkParamAndUnique(ncQuotaSetting);
-        ncQuotaSetting.setBaseVale(null);
-        return ncQuotaSettingMapper.insertNcQuotaSetting(ncQuotaSetting);
-    }
-
-    /**
-     * 修改内衬定额设定
-     *
-     * @param ncQuotaSetting 内衬定额设定
-     * @return 结果
-     */
-    @Override
-    public int updateNcQuotaSetting(NcQuotaSetting ncQuotaSetting) {
-        checkParamAndUnique(ncQuotaSetting);
-        ncQuotaSetting.setBaseVale(ncQuotaSetting.getId());
-        return ncQuotaSettingMapper.updateNcQuotaSetting(ncQuotaSetting);
-    }
-
-    /**
-     * 批量删除内衬定额设定
-     *
-     * @param ids 需要删除的内衬定额设定ID
-     * @return 结果
-     */
-    @Override
-    public int deleteNcQuotaSettingByIds(Long[] ids) {
-        return ncQuotaSettingMapper.deleteNcQuotaSettingByIds(ids);
-    }
-
-    /**
-     * 删除内衬定额设定信息
-     *
-     * @param id 内衬定额设定ID
-     * @return 结果
-     */
-    @Override
-    public int deleteNcQuotaSettingById(Long id) {
-        return ncQuotaSettingMapper.deleteNcQuotaSettingById(id);
-    }
 
     /**
      * 校验记录唯一性
@@ -116,7 +48,21 @@ public class NcQuotaSettingServiceImpl implements NcQuotaSettingService {
         if (ncQuotaSetting == null) {
             return UserConstants.NOT_UNIQUE;
         }
-        List<NcQuotaSetting> list = ncQuotaSettingMapper.checkNcQuotaSettingUnique(ncQuotaSetting);
+        LambdaQueryWrapper<NcQuotaSetting> wrapper = new LambdaQueryWrapper<>();
+        if (ncQuotaSetting.getId() != null) {
+            wrapper.ne(NcQuotaSetting::getId, ncQuotaSetting.getId());
+        }
+        if (ncQuotaSetting.getMachineId() == null) {
+            wrapper.isNull(NcQuotaSetting::getMachineId);
+        } else {
+            wrapper.eq(NcQuotaSetting::getMachineId, ncQuotaSetting.getMachineId());
+        }
+        if (StringUtils.isEmpty(ncQuotaSetting.getLiningCode())) {
+            wrapper.isNull(NcQuotaSetting::getLiningCode);
+        } else {
+            wrapper.eq(NcQuotaSetting::getLiningCode, ncQuotaSetting.getLiningCode());
+        }
+        List<NcQuotaSetting> list = ncQuotaSettingMapper.selectList(wrapper);
         if (CollectionUtils.isNotEmpty(list)) {
             return UserConstants.NOT_UNIQUE;
         }
@@ -211,7 +157,7 @@ public class NcQuotaSettingServiceImpl implements NcQuotaSettingService {
             //勾选更新记录，调用merge即可
             if (updateSupport && CollectionUtils.isNotEmpty(importList)) {
                 successNum = importList.size();
-                ncQuotaSettingMapper.mergeSql(importList);
+                baseDao.saveBatch(importList);
             } else {
                 //查询数据库已存在对象
                 for (int i = 0; i < list.size(); i++) {
@@ -221,11 +167,25 @@ public class NcQuotaSettingServiceImpl implements NcQuotaSettingService {
                         continue;
                     }
                     // 唯一性校验
-                    List<NcQuotaSetting> quotaSettings = ncQuotaSettingMapper.checkNcQuotaSettingUnique(excelItem);
+                    LambdaQueryWrapper<NcQuotaSetting> unicWrapper = new LambdaQueryWrapper<>();
+                    if (excelItem.getId() != null) {
+                        unicWrapper.ne(NcQuotaSetting::getId, excelItem.getId());
+                    }
+                    if (excelItem.getMachineId() == null) {
+                        unicWrapper.isNull(NcQuotaSetting::getMachineId);
+                    } else {
+                        unicWrapper.eq(NcQuotaSetting::getMachineId, excelItem.getMachineId());
+                    }
+                    if (StringUtils.isEmpty(excelItem.getLiningCode())) {
+                        unicWrapper.isNull(NcQuotaSetting::getLiningCode);
+                    } else {
+                        unicWrapper.eq(NcQuotaSetting::getLiningCode, excelItem.getLiningCode());
+                    }
+                    List<NcQuotaSetting> quotaSettings = ncQuotaSettingMapper.selectList(unicWrapper);
                     if (CollectionUtils.isEmpty(quotaSettings)) {
                         //不存在插入
                         successNum++;
-                        ncQuotaSettingMapper.insertNcQuotaSetting(excelItem);
+                        ncQuotaSettingMapper.insert(excelItem);
                     } else {
                         // 存在，插入错误详细日志
                         failureNum++;
@@ -247,5 +207,10 @@ public class NcQuotaSettingServiceImpl implements NcQuotaSettingService {
         } else {
             return AjaxResult.success(I18nUtil.getMessage("ui.message.import.success") + "," + successNum);
         }
+    }
+
+    @Override
+    protected String getDocTypeCode() {
+        return null;
     }
 }
