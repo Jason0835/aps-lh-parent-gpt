@@ -408,6 +408,41 @@ public class SkuMonthPlanCalculator {
     }
 
     /**
+     * 统计从startPlanDate开始，在allMonthPlanList中的所有计划量
+     *
+     * @param skuInfo          需统计Sku信息
+     * @param startPlanDate    开始统计日
+     * @param allMonthPlanList 所有计划
+     * @return
+     */
+    public static Map<YearMonth, Integer> statisticsSumPlanQtyBySku(FactoryMonthPlanProductionFinalResult skuInfo, Date startPlanDate, List<FactoryMonthPlanProductionFinalResult> allMonthPlanList) {
+        if (null == skuInfo || null == startPlanDate || CollectionUtils.isEmpty(allMonthPlanList)) {
+            return Collections.emptyMap();
+        }
+        List<FactoryMonthPlanProductionFinalResult> findPlanList = allMonthPlanList.stream().filter(single -> single.getMaterialStatusKey().equals(skuInfo.getMaterialStatusKey())).collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(findPlanList)) {
+            return Collections.emptyMap();
+        }
+        Map<YearMonth, Integer> sumMap = Maps.newHashMap();
+        YearMonth firstMonth = getProductionYearAndMonth(startPlanDate);
+        Integer startDay = getDate(startPlanDate).getDayOfMonth();
+        findPlanList.forEach(singleMonthPlan -> {
+            YearMonth productionYearMonth = YearMonth.of(singleMonthPlan.getYear(), singleMonthPlan.getMonth());
+            Integer monthEndDay = productionYearMonth.lengthOfMonth();
+            //同年-月
+            Integer sumQty;
+            if (productionYearMonth.equals(firstMonth)) {
+                sumQty = statisticsPlanQtyEndDay(startDay, monthEndDay, singleMonthPlan);
+            } else {
+                //下一个年月
+                sumQty = statisticsPlanQtyEndDay(BigDecimal.ONE.intValue(), monthEndDay, singleMonthPlan);
+            }
+            sumMap.put(productionYearMonth, sumQty);
+        });
+        return sumMap;
+    }
+
+    /**
      * 根据Sku日排产周期内的月计划安排情况，获取Sku对应的计划量
      * 需要看日排产周期是否存在跨月
      * 1、不存在跨月
