@@ -155,8 +155,6 @@ public class ScheduleServiceImpl implements ScheduleService {
     /** 启用状态 */
     private static final Integer ACTIVE_STATUS = 1;
 
-    /** 排程锁冲突错误码 */
-    String ERROR_CODE_LOCK_CONFLICT = "LOCK_CONFLICT";
     // ==================== 依赖注入 ====================
 
     private final CoreScheduleAlgorithmService coreScheduleAlgorithmService;
@@ -215,7 +213,7 @@ public class ScheduleServiceImpl implements ScheduleService {
         String lockToken = scheduleExecutionGuard.acquire(factoryCode, scheduleDate);
         if (lockToken == null) {
             result.setSuccess(false);
-            result.setErrorCode(ERROR_CODE_LOCK_CONFLICT);
+            result.setErrorCode(result.ERROR_CODE_LOCK_CONFLICT);
             result.setMessage(I18nUtil.getMessage("ui.data.column.cxScheduleResult.scheduleRunning"));
             log.warn("排程锁已被占用，拒绝重复执行。工厂: {}, 日期: {}", factoryCode, scheduleDate);
             return result;

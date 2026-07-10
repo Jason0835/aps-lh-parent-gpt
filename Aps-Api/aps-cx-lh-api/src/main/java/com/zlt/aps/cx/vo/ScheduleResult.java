@@ -11,6 +11,9 @@ import java.util.List;
  * @author APS Team
  */
 public class ScheduleResult {
+    /** 排程锁冲突错误码 */
+    public final String ERROR_CODE_LOCK_CONFLICT = "LOCK_CONFLICT";
+
     private boolean success;
     private String message;
     private String errorCode;
@@ -35,6 +38,14 @@ public class ScheduleResult {
 
     public void setMessage(String message) {
         this.message = message;
+    }
+
+    public String getErrorCode() {
+        return errorCode;
+    }
+
+    public void setErrorCode(String errorCode) {
+        this.errorCode = errorCode;
     }
 
     public LocalDate getScheduleDate() {
@@ -67,13 +78,5 @@ public class ScheduleResult {
 
     public void setValidationWarnings(List<ValidationDetail> validationWarnings) {
         this.validationWarnings = validationWarnings;
-    }
-
-    public String getErrorCode() {
-        return errorCode;
-    }
-
-    public void setErrorCode(String errorCode) {
-        this.errorCode = errorCode;
     }
 }
