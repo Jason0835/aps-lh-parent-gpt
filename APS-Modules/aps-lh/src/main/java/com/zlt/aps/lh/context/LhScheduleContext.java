@@ -220,7 +220,7 @@ public class LhScheduleContext {
      */
     private Map<String, Integer> materialMonthFinishedQtyMap = new HashMap<>();
     /**
-     * T日排程班次完成量Map, key=materialCode, value=T日class1FinishQty按物料汇总值
+     * T日排程班次完成量Map, key=materialCode+产品状态, value=T日class1FinishQty按物料汇总值
      */
     private Map<String, Integer> materialScheDayFinishQtyMap = new HashMap<>();
     /**
