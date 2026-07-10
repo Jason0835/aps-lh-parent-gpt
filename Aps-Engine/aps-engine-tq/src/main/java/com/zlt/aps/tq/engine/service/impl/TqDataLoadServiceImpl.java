@@ -184,6 +184,8 @@ public class TqDataLoadServiceImpl implements ITqDataLoadService {
         params.setCloseOutNum(getDouble(paramsMap.getOrDefault(EngineConstants.TQ_CLOSE_OUT_NUM, "50")));
         params.setMinPlanQty(getDouble(paramsMap.getOrDefault(EngineConstants.TQ_MIN_PLAN_QTY, "10")));
         params.setMaxClassOutput(getDouble(paramsMap.getOrDefault(EngineConstants.TQ_MAX_CLASS_OUTPUT, "3000")));
+        // 加载SYS1101029胎圈规格班次最大班产阈值（多规格模式下备库胎圈当班初始排产上限，默认1000）
+        params.setBackupShiftThreshold(getDouble(paramsMap.getOrDefault(EngineConstants.TQ_BACKUP_SHIFT_THRESHOLD, "1000")));
         params.setDemandCalcMode(getInt(paramsMap.getOrDefault(EngineConstants.TQ_DEMAND_CALC_MODE, "2")));
         params.setSupplyTimeThreshold(getDouble(paramsMap.getOrDefault(EngineConstants.TQ_SUPPLY_TIME_THRESHOLD, "24")));
         params.setSpecSwitchTime(getDouble(paramsMap.getOrDefault(EngineConstants.TQ_SPEC_SWITCH_TIME, "0.5")));

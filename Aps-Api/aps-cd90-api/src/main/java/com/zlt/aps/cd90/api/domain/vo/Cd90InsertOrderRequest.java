@@ -29,6 +29,8 @@ public class Cd90InsertOrderRequest implements Serializable {
     private String clothCode;
     @ApiModelProperty("备注")
     private String remark;
+    @ApiModelProperty("是否已确认跨班顺延影响")
+    private Boolean confirmed;
 
     private Double class1PlanQty;
     private Integer class1ProduceOrder;

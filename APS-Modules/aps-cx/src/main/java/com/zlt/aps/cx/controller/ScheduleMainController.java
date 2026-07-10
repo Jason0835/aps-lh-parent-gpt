@@ -407,13 +407,13 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
      *   5. 根据MES反馈结果更新发布状态：成功→"已发布(1)"，失败→"发布失败(2)"；
      *
      * 日期推导与班次映射（doIssueCxScheduleResultToMes内部）：
-     *   每条成型排程结果自带8班数据（排程日期=T，排产窗口=T-2 ~ T）：
-     *   8班结构：CLASS1=早(T-2), CLASS2=中(T-2), CLASS3=夜(T-1), CLASS4=早(T-1),
-     *            CLASS5=中(T-1), CLASS6=夜(T), CLASS7=早(T), CLASS8=中(T)
+     *   每条成型排程结果自带8班数据（排程日期=T，排产窗口=T-1 ~ T+1）：
+     *   8班结构：CLASS1=早(T-1), CLASS2=中(T-1), CLASS3=夜(T), CLASS4=早(T),
+     *            CLASS5=中(T), CLASS6=夜(T+1), CLASS7=早(T+1), CLASS8=中(T+1)
      *   下发到MES中间表时拆分为3天的3班数据（中间表1班=夜班, 2班=早班, 3班=中班）：
-     *   - T-2日（窗口首日）：下发早中2班（CLASS1→2班, CLASS2→3班；1班=夜班置空，因T-2夜班已生产）
-     *   - T-1日（窗口次日）：下发夜早中3班（CLASS3→1班, CLASS4→2班, CLASS5→3班）
-     *   - T 日（排程日期）：下发夜早中3班（CLASS6→1班, CLASS7→2班, CLASS8→3班）
+     *   - T-1日（窗口首日）：下发早中2班（CLASS1→2班, CLASS2→3班；1班=夜班置空，因T-1夜班已生产）
+     *   - T 日（排程日期）：下发夜早中3班（CLASS3→1班, CLASS4→2班, CLASS5→3班）
+     *   - T+1日（窗口次日）：下发夜早中3班（CLASS6→1班, CLASS7→2班, CLASS8→3班）
      *
      * 下发前数据补全（enrichMaterialAndExampleInfo）：
      *   - 成型示方号：通过胎胚编码+产品状态(trial_status字典)关联MdmSkuConstructionRef获取embryoNo作为示方号，
@@ -498,17 +498,18 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
      * 支持两种模式：
      * 1. 按选中ID下发：selectedIds不为空时，按ID查询选中记录下发
      * 2. 按排程日期全量下发：selectedIds为空时，查询排程日期下所有未下发记录
-     * 日期推导：从排程日期(scheduleDate=T)推导T-2、T-1、T三天
+     * 日期推导：从排程日期(scheduleDate=T)推导T-1、T、T+1三天
      *
      * @param scheduleDate 排程日期
      * @param selectedIds  选中的记录ID列表，为空时按日期全量查询
      * @return 下发结果
      */
     private AjaxResult doIssueCxScheduleResultToMes(Date scheduleDate, List<Long> selectedIds) {
+        // 排程日期T：成型排的是T-1的早中班、T的夜早中班、T+1的夜早中班
         LocalDate scheduleLocalDate = DateUtil.toLocalDateTime(scheduleDate).toLocalDate();
-        LocalDate day1 = scheduleLocalDate.minusDays(2);
-        LocalDate day2 = scheduleLocalDate.minusDays(1);
-        LocalDate day3 = scheduleLocalDate;
+        LocalDate day1 = scheduleLocalDate.minusDays(1);
+        LocalDate day2 = scheduleLocalDate;
+        LocalDate day3 = scheduleLocalDate.plusDays(1);
 
         List<CxScheduleResult> scheduleResultList;
         if (CollectionUtils.isNotEmpty(selectedIds)) {
@@ -640,13 +641,13 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
      * 成型排程结果下发到MES中间表
      * 业务规则：
      * 1. 查询当天的排程日期，获取8班数据
-     * 2. 8班对应关系：
-     *    - 1-2班：当天的早、中班（夜班已生产）
-     *    - 3-5班：第二天的夜、早、中班
-     *    - 6-8班：第三天的夜、早、中班
+     * 2. 8班对应关系（排程日期T）：
+     *    - 1-2班：T-1日的早、中班
+     *    - 3-5班：T日的夜、早、中班
+     *    - 6-8班：T+1日的夜、早、中班
      * 3. 中间表映射：1班=夜班，2班=早班，3班=中班
-     * 4. 当天、隔天数据更新（存在则更新，不存在则插入）
-     * 5. 第三天数据下发（插入）
+     * 4. T-1、T日数据更新（存在则更新，不存在则插入）
+     * 5. T+1日数据下发（插入）
      *
      * @return 下发结果
      */
@@ -655,38 +656,39 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
     @PostMapping("/issueToMes")
     public AjaxResult issueCxScheduleResultToMes() {
 
-        // 获取今天、明天、后天的日期
-        LocalDate today = LocalDate.now();
-        LocalDate tomorrow = today.plusDays(1);
-        LocalDate dayAfterTomorrow = today.plusDays(2);
+        // 排程日期T=今天，成型排的是T-1的早中班、T的夜早中班、T+1的夜早中班
+        LocalDate scheduleDate = LocalDate.now();
+        LocalDate day1 = scheduleDate.minusDays(1);
+        LocalDate day2 = scheduleDate;
+        LocalDate day3 = scheduleDate.plusDays(1);
 
         // 只查询当天的排程结果数据（包含8班数据）
-        List<CxScheduleResult> scheduleResultList = cxScheduleResultService.listByScheduleDate(today);
+        List<CxScheduleResult> scheduleResultList = cxScheduleResultService.listByScheduleDate(scheduleDate);
 
         if (scheduleResultList.isEmpty()) {
             return AjaxResult.error(I18nUtil.getMessage("ui.data.column.cxScheduleResult.noDataToIssue"));
         }
 
         // 转换为3天的下发数据
-        List<CxScheduleResultIssue> day1IssueList = new ArrayList<>();    // 当天（更新）
-        List<CxScheduleResultIssue> day2IssueList = new ArrayList<>();    // 隔天（更新）
-        List<CxScheduleResultIssue> day3IssueList = new ArrayList<>();    // 后天（插入）
+        List<CxScheduleResultIssue> day1IssueList = new ArrayList<>();    // T-1日（更新）
+        List<CxScheduleResultIssue> day2IssueList = new ArrayList<>();    // T日（更新）
+        List<CxScheduleResultIssue> day3IssueList = new ArrayList<>();    // T+1日（插入）
 
         for (CxScheduleResult source : scheduleResultList) {
-            // 第1天（当天）- 更新2班数据（早中班）
-            CxScheduleResultIssue day1Issue = convertToDay1IssueEntity(source, today);
+            // 第1天（T-1）- 更新2班数据（早中班）
+            CxScheduleResultIssue day1Issue = convertToDay1IssueEntity(source, day1);
             if (day1Issue != null) {
                 day1IssueList.add(day1Issue);
             }
 
-            // 第2天（隔天）- 更新3班数据（夜早中班）
-            CxScheduleResultIssue day2Issue = convertToDay2IssueEntity(source, tomorrow);
+            // 第2天（T）- 更新3班数据（夜早中班）
+            CxScheduleResultIssue day2Issue = convertToDay2IssueEntity(source, day2);
             if (day2Issue != null) {
                 day2IssueList.add(day2Issue);
             }
 
-            // 第3天（后天）- 下发3班数据（夜早中班）
-            CxScheduleResultIssue day3Issue = convertToDay3IssueEntity(source, dayAfterTomorrow);
+            // 第3天（T+1）- 下发3班数据（夜早中班）
+            CxScheduleResultIssue day3Issue = convertToDay3IssueEntity(source, day3);
             if (day3Issue != null) {
                 day3IssueList.add(day3Issue);
             }
@@ -710,7 +712,7 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
     }
 
     /**
-     * 转换为第1天（当天）的下发实体
+     * 转换为第1天（T-1日）的下发实体
      * 8班数据：1班(早)、2班(中) -> 中间表：1班(夜)=空, 2班(早)=1班, 3班(中)=2班
      * 业务规则：只更新2班数据（早中班），即中间表的2班(早)和3班(中)
      */
@@ -739,7 +741,7 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
         target.setMesMaterialCode(null);
         target.setSpecDesc(source.getMaterialDesc());
         target.setEmbryoCode(source.getEmbryoCode());
-        target.setEmbryoSpecDesc(null); // 胎胚物料描述需要另外查询
+        target.setEmbryoSpecDesc(source.getMainMaterialDesc()); // 胎胚物料描述取自源数据
 
         // 中间表1班 = 夜班（当天夜班已生产，清空）
         target.setClass1PlanQtySeq(BigDecimal.valueOf(1));
@@ -769,7 +771,7 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
     }
 
     /**
-     * 转换为第2天（隔天）的下发实体
+     * 转换为第2天（T日）的下发实体
      * 8班数据：3班(夜)、4班(早)、5班(中) -> 中间表：1班(夜)=3班, 2班(早)=4班, 3班(中)=5班
      * 业务规则：更新3班数据（夜早中班）
      */
@@ -798,7 +800,7 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
         target.setMesMaterialCode(null);
         target.setSpecDesc(source.getMaterialDesc());
         target.setEmbryoCode(source.getEmbryoCode());
-        target.setEmbryoSpecDesc(null);
+        target.setEmbryoSpecDesc(source.getMainMaterialDesc());
 
         // 中间表1班 = 夜班（3班数据）
         target.setClass1PlanQtySeq(BigDecimal.valueOf(1));
@@ -828,7 +830,7 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
     }
 
     /**
-     * 转换为第3天（后天）的下发实体
+     * 转换为第3天（T+1日）的下发实体
      * 8班数据：6班(夜)、7班(早)、8班(中) -> 中间表：1班(夜)=6班, 2班(早)=7班, 3班(中)=8班
      * 业务规则：下发3班数据（夜早中班）
      */
@@ -857,7 +859,7 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
         target.setMesMaterialCode(null);
         target.setSpecDesc(source.getMaterialDesc());
         target.setEmbryoCode(source.getEmbryoCode());
-        target.setEmbryoSpecDesc(null);
+        target.setEmbryoSpecDesc(source.getMainMaterialDesc());
 
         // 中间表1班 = 夜班（6班数据）
         target.setClass1PlanQtySeq(BigDecimal.valueOf(1));

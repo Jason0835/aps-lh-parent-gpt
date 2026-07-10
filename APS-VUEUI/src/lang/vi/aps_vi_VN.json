@@ -173,7 +173,7 @@
   "ui.data.column.rawMaterial.deviationRate": "Tỷ lệ sai lệch",
   "ui.data.column.rawMaterial.hasWarning": "Có cảnh báo hay không",
   "ui.data.column.mpMonthlySaleQty.rollTwelveMonthSaleQty": "Doanh số 12 tháng trượt",
-  "ui.data.column.mpMonthlySaleQty.averageSaleQty": "Doanh số trung bình tháng",
+  "ui.data.column.mpMonthlySaleQty.averageSaleQty": "Doanh số trung bình tháng gần 6 tháng",
   "ui.data.column.mpMonthlySaleQty.saleArea": "Khu vực bán phù hợp (top 3)",
   "ui.data.column.mpMonthlySaleQty.areaAll": "Khu vực (tất cả các khu vực trong 12 tháng trước)",
   "ui.data.column.mpMonthlySaleQty.monthAll": "12 tháng trước (tất cả)",

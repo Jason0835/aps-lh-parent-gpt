@@ -23,10 +23,12 @@ import com.zlt.aps.common.engine.enums.ClassNumThreePlanEnums;
 import com.zlt.aps.dj.api.domain.entity.DjDayFinishQty;
 import com.zlt.aps.dj.api.domain.entity.DjMachineInfo;
 import com.zlt.aps.dj.api.domain.entity.DjScheduleResult;
+import com.zlt.aps.dj.api.domain.entity.DjShiftConfig;
 import com.zlt.aps.dj.engine.constant.DjEngineConstants;
 import com.zlt.aps.dj.engine.mapper.DjEngineDayFinishQtyMapper;
 import com.zlt.aps.dj.engine.mapper.DjEngineMachineMapper;
 import com.zlt.aps.dj.engine.mapper.DjEngineScheduleResultMapper;
+import com.zlt.aps.dj.engine.mapper.DjEngineShiftConfigMapper;
 import com.zlt.aps.dj.engine.mapper.DjEngineSpecifyMachineMapper;
 import com.zlt.aps.dj.engine.model.CapacityValidateResult;
 import com.zlt.aps.dj.engine.model.ShiftContext;
@@ -57,6 +59,9 @@ public class DjScheduleShiftEngineServiceImpl implements IDjScheduleShiftEngineS
 
     @Resource
     private DjEngineSpecifyMachineMapper djEngineSpecifyMachineMapper;
+
+    @Resource
+    private DjEngineShiftConfigMapper djEngineShiftConfigMapper;
 
     /**
      * 2.2 约束一校验 — 生产顺位合法性
@@ -319,10 +324,8 @@ public class DjScheduleShiftEngineServiceImpl implements IDjScheduleShiftEngineS
             Integer seq = getSequenceByIndex(sr, targetClass);
             if (seq != null && seq >= targetSeq) {
                 // 记录原因：因XX插单推迟生产次序i->j
-                String analysis = getAnalysisByIndex(sr, targetClass);
                 String record = MessageFormat.format(I18nUtil.getMessage("ui.data.column.scheduleResult.analysis.insert.seq.shift"), specName, seq, seq + 1);
-                setAnalysisByIndex(sr, targetClass,
-                        StringUtils.isNotBlank(analysis) ? analysis + record : record);
+                setAnalysisByIndex(sr, targetClass, record);
                 // 顺位 +1
                 setSequenceByIndex(sr, targetClass, seq + 1);
             }
@@ -384,12 +387,10 @@ public class DjScheduleShiftEngineServiceImpl implements IDjScheduleShiftEngineS
                 for (DjScheduleResult sr : toShift) {
                     BigDecimal planQty = getPlanQtyByIndex(sr, i);
                     Integer seq = getSequenceByIndex(sr, i);
-                    String analysis = getAnalysisByIndex(sr, i);
 
                     // 原班次清理：计划量、顺位置NULL，原因分析保留并追加记录
                     String shiftRecord = MessageFormat.format(I18nUtil.getMessage("ui.data.column.scheduleResult.analysis.insert.class.shift"), specName, i, nextClass);
-                    setAnalysisByIndex(sr, i,
-                            StringUtils.isNotBlank(analysis) ? analysis + shiftRecord : shiftRecord);
+                    setAnalysisByIndex(sr, i, shiftRecord);
                     setPlanQtyByIndex(sr, i, null);
                     setSequenceByIndex(sr, i, null);
 
@@ -400,10 +401,8 @@ public class DjScheduleShiftEngineServiceImpl implements IDjScheduleShiftEngineS
                             .max().orElse(0);
                     setPlanQtyByIndex(sr, nextClass, planQty);
                     setSequenceByIndex(sr, nextClass, maxSeqInNext + 1);
-                    String nextAnalysis = getAnalysisByIndex(sr, nextClass);
                     String nextShiftRecord = MessageFormat.format(I18nUtil.getMessage("ui.data.column.scheduleResult.analysis.insert.to.current"), specName, i);
-                    setAnalysisByIndex(sr, nextClass,
-                            StringUtils.isNotBlank(nextAnalysis) ? nextAnalysis + ";" + nextShiftRecord : nextShiftRecord);
+                    setAnalysisByIndex(sr, nextClass, nextShiftRecord);
                 }
                 // 继续下一班次的产能检测
             } else {
@@ -426,19 +425,15 @@ public class DjScheduleShiftEngineServiceImpl implements IDjScheduleShiftEngineS
                     BigDecimal available = quota.subtract(currentTotal);
                     if (available.compareTo(BigDecimal.ZERO) <= 0) {
                         // 整条规格移除
-                        String analysis = getAnalysisByIndex(sr, i);
                         String reduceRecord = MessageFormat.format(I18nUtil.getMessage("ui.data.column.scheduleResult.analysis.insert.reduce"), specName, planQty);
-                        setAnalysisByIndex(sr, i,
-                                StringUtils.isNotBlank(analysis) ? analysis + reduceRecord : reduceRecord);
+                        setAnalysisByIndex(sr, i, reduceRecord);
                         setPlanQtyByIndex(sr, i, null);
                         setSequenceByIndex(sr, i, null);
                     } else if (planQty.compareTo(available) > 0) {
                         // 部分减量
                         BigDecimal reduceQty = planQty.subtract(available);
-                        String analysis = getAnalysisByIndex(sr, i);
                         String reduceRecord = MessageFormat.format(I18nUtil.getMessage("ui.data.column.scheduleResult.analysis.insert.reduce"), specName, reduceQty);
-                        setAnalysisByIndex(sr, i,
-                                StringUtils.isNotBlank(analysis) ? analysis + reduceRecord : reduceRecord);
+                        setAnalysisByIndex(sr, i, reduceRecord);
                         setPlanQtyByIndex(sr, i, available);
                     } else {
                         // 可以容纳，无需减量
@@ -587,7 +582,7 @@ public class DjScheduleShiftEngineServiceImpl implements IDjScheduleShiftEngineS
      * 计算机台当前班次的已生产量（完成量）
      * <p>
      * 根据该机台所有排程结果的工单号，查询完成量表中对应班次的完成量之和。
-     * classIndex 通过 {@link DjEngineConstants#SHIFT_CLASS_MAP} 映射到真实班次。
+     * classIndex 通过 {@link #buildShiftClassMap(String)} 映射到真实班次。
      * </p>
      *
      * @param machineCode    机台编码
@@ -621,8 +616,9 @@ public class DjScheduleShiftEngineServiceImpl implements IDjScheduleShiftEngineS
             return BigDecimal.ZERO;
         }
 
-        // 根据 classIndex 获取对应的真实班次
-        String realShiftClass = DjEngineConstants.SHIFT_CLASS_MAP[classIndex - 1];
+        // 根据 classIndex 获取对应的真实班次（从班制配置动态获取）
+        String[] shiftClassMap = this.buildShiftClassMap(factoryCode);
+        String realShiftClass = shiftClassMap[classIndex - 1];
 
         // 累加该班次的完成量
         BigDecimal totalFinishQty = BigDecimal.ZERO;
@@ -630,6 +626,40 @@ public class DjScheduleShiftEngineServiceImpl implements IDjScheduleShiftEngineS
             totalFinishQty = totalFinishQty.add(this.getFinishQtyByRealShift(fq, realShiftClass));
         }
         return totalFinishQty;
+    }
+
+    /**
+     * 根据工厂编码动态构建班次索引→班次编码映射数组
+     * <p>
+     * 从 {@link DjShiftConfig} 表中查询当前工厂开班班次配置，按 shiftOrder 排序，
+     * 将 shiftCode 循环填充至 6 个班次索引。
+     * 例如：shiftOrder=1→"03", 2→"01", 3→"02"，则映射为 ["03","01","02","03","01","02"]。
+     * </p>
+     *
+     * @param factoryCode 工厂编码
+     * @return 6 元素班次映射数组，index=0 对应 classIndex=1
+     */
+    private String[] buildShiftClassMap(String factoryCode) {
+        List<DjShiftConfig> shifts = djEngineShiftConfigMapper.selectList(
+                new LambdaQueryWrapper<DjShiftConfig>()
+                        .eq(DjShiftConfig::getFactoryCode, factoryCode)
+                        .eq(DjShiftConfig::getOpenFlag, "1")
+                        .orderByAsc(DjShiftConfig::getShiftOrder));
+
+        if (CollectionUtils.isEmpty(shifts)) {
+            // 无配置时使用默认映射（中班→夜班→早班循环），保持向后兼容
+            return new String[]{"03", "01", "02", "03", "01", "02"};
+        }
+
+        List<String> shiftCodes = shifts.stream()
+                .map(DjShiftConfig::getShiftCode)
+                .collect(Collectors.toList());
+
+        String[] map = new String[DjEngineConstants.SHIFT_COUNT];
+        for (int i = 0; i < DjEngineConstants.SHIFT_COUNT; i++) {
+            map[i] = shiftCodes.get(i % shiftCodes.size());
+        }
+        return map;
     }
 
     /**

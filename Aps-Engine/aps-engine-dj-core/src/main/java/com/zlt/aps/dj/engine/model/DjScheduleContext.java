@@ -82,6 +82,6 @@ public class DjScheduleContext {
     /** 成型计划列表 */
     private List<CxScheduleResult> cxScheduleList;
 
-    /** 施工数据 Map<constructionCode, MdmConstructionInfo> */
-    private Map<String, MdmConstructionInfo> constructionMap;
+    /** 施工数据 Map<constructionCode, List<MdmConstructionInfo>>，同一施工号可能存在多个BOM版本 */
+    private Map<String, List<MdmConstructionInfo>> constructionMap;
 }

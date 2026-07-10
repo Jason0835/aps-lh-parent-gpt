@@ -1,109 +1,133 @@
 package com.zlt.aps.nc.controller;
 
+import java.io.IOException;
+import java.util.List;
 
-import com.ruoyi.common.core.web.controller.BaseController;
+import javax.annotation.Resource;
+import javax.servlet.http.HttpServletResponse;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
-import com.zlt.aps.nc.api.domain.dto.NcCurlRollDto;
+import com.ruoyi.common.utils.StringUtils;
 import com.zlt.aps.nc.api.domain.entity.NcCurlRoll;
+import com.zlt.aps.nc.mapper.NcCurlRollMapper;
 import com.zlt.aps.nc.service.NcCurlRollService;
-import io.swagger.annotations.Api;
+import com.zlt.aps.utils.AppUtils;
+import com.zlt.bill.common.controller.AbstractDocBizController;
+import com.zlt.bill.common.service.IDocService;
+
 import io.swagger.annotations.ApiImplicitParam;
 import io.swagger.annotations.ApiImplicitParams;
 import io.swagger.annotations.ApiOperation;
-import org.apache.commons.collections4.CollectionUtils;
-import org.springframework.beans.BeanUtils;
-import org.springframework.web.bind.annotation.*;
 
-import javax.annotation.Resource;
-import java.util.List;
-
-@Api(tags = {"内衬卷曲信息接口"})
+/**
+ * 内衬卷曲信息维护Controller
+ *
+ * @author zlt
+ * @date 2026-06-10
+ */
 @RestController
 @RequestMapping("/nc/curlRoll")
-public class NcCurlRollController extends BaseController {
+public class NcCurlRollController extends AbstractDocBizController<NcCurlRoll> {
+    @Autowired
+    private NcCurlRollService curlRollService;
 
     @Resource
-    private NcCurlRollService ncCurlRollService;
+    private NcCurlRollMapper curlRollMapper;
 
-    @ApiOperation("根据条件查询内衬卷曲信息列表")
-    @PostMapping("/listCurlRoll")
-    public TableDataInfo listCurlRoll(@RequestBody NcCurlRoll dto) {
-        startPage();
-        dto.setOrderStr(orderStr());
-        List<NcCurlRoll> list = ncCurlRollService.listCurlRoll(dto);
-        return getDataTable(list);
+    /**
+     * 查询信息列表
+     */
+    @PostMapping("/list")
+    @ApiOperation("根据条件查询列表信息")
+    public TableDataInfo list(@RequestBody NcCurlRoll queryVO) {
+        return super.list(queryVO);
     }
 
-    @ApiOperation("根据id查询内衬卷曲信息信息")
-    @GetMapping("/getCurlRoll/{id}")
-    @ApiImplicitParams({
-            @ApiImplicitParam(name = "id", dataType = "int", value = "主键id", paramType = "query")
-    })
-    public NcCurlRoll getCurlRoll(@PathVariable("id") Long id) {
-        NcCurlRoll dto = new NcCurlRoll();
-        BeanUtils.copyProperties(ncCurlRollService.getById(id), dto);
-        return dto;
+    /**
+     * 新增信息
+     */
+    @Log(title = "ui.nc.curlRoll.column.modalName", businessType = BusinessType.INSERT)
+    @ApiOperation("新增信息（id不为空）")
+    @PostMapping
+    public AjaxResult save(@RequestBody NcCurlRoll stock) {
+        if (UserConstants.NOT_UNIQUE.equals(curlRollService.checkUnique(stock))) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.error.message.quota.unique"));
+        }
+        return super.save(stock);
     }
 
-    @Log(title = "ui.nc.curlRoll.column.modalName", businessType = BusinessType.INSERT_OR_UPDATE)
-    @ApiOperation("保存内衬卷曲信息信息（id为空则新增，id不为空则修改）")
-    @PostMapping("/saveCurlRoll")
-    public AjaxResult saveCurlRoll(@RequestBody NcCurlRoll dto) {
-        NcCurlRoll entity = new NcCurlRoll();
-        BeanUtils.copyProperties(dto, entity);
-        ncCurlRollService.saveCurlRoll(entity);
-        return AjaxResult.success();
-    }
-
-    @ApiOperation("根据code判断内衬卷曲代号是否已经存在")
-    @PostMapping("/checkCurlRollCodeUnique")
-    public String checkCurlRollCodeUnique(@RequestBody NcCurlRoll dto) {
-        return ncCurlRollService.checkCurlRollCodeUnique(dto);
-    }
-
+    /**
+     * 删除信息
+     */
     @Log(title = "ui.nc.curlRoll.column.modalName", businessType = BusinessType.DELETE)
-    @ApiOperation("批量删除内衬卷曲信息信息(逻辑删)")
-    @PostMapping("/deleteCurlRoll/{ids}")
-    @ApiImplicitParams({
-            @ApiImplicitParam(name = "ids", dataType = "Array", value = "id數組", paramType = "query")
-    })
-    public AjaxResult deleteCurlRoll(@PathVariable("ids") Long[] ids) {
-        ncCurlRollService.deleteCurlRoll(ids);
-        return AjaxResult.success();
+    @ApiOperation("根据id批量删除信息")
+    @ApiImplicitParams({ @ApiImplicitParam(name = "ids", dataType = "Long[]", value = "主键ids") })
+    @PostMapping("/remove")
+    public AjaxResult removeByIds(@RequestBody List<Long> ids) {
+        return super.removeByIds(ids);
     }
 
+    /**
+     * 导出列表
+     */
     @Log(title = "ui.nc.curlRoll.column.modalName", businessType = BusinessType.EXPORT)
     @ApiOperation("导出数据")
-    @PostMapping("/exportData")
-    public List<NcCurlRoll> exportData(@RequestBody NcCurlRoll dto) {
-        dto.setOrderStr(orderStr());
-        List<NcCurlRoll> list = ncCurlRollService.listCurlRoll(dto);
+    @PostMapping("/exportData/{fileName}")
+    @Override
+    public byte[] exportData(@RequestBody NcCurlRoll queryVO, @PathVariable("fileName") String fileName,
+            HttpServletResponse response) throws IOException {
+        return super.exportData(queryVO, fileName, response);
+    }
+
+    @Override
+    protected List<NcCurlRoll> listExportData(NcCurlRoll obj) {
+        QueryWrapper<NcCurlRoll> wrapper = new QueryWrapper<>();
+        startPage("update_time desc");
+        this.builderCondition(wrapper, obj);
+        List<NcCurlRoll> list = curlRollMapper.selectList(wrapper);
+        AppUtils.formatData(list, getQueryFormulas());
         return list;
     }
 
     @Log(title = "ui.nc.curlRoll.column.modalName", businessType = BusinessType.IMPORT)
-    @ApiOperation("导入数据")
     @PostMapping("/importData")
-    public AjaxResult importData(@RequestBody List<NcCurlRollDto> list, @RequestParam("updateSupport") boolean updateSupport, @RequestParam("importLogId") Long importLogId) {
-        if (CollectionUtils.isEmpty(list)) {
+    @ApiOperation("导入信息")
+    public AjaxResult importData(@RequestBody List<NcCurlRoll> list, @RequestParam("updateSupport") boolean updateSupport,
+            @RequestParam("importLogId") Long importLogId) {
+        if (StringUtils.isNull(list) || list.size() == 0) {
             return AjaxResult.error(I18nUtil.getMessage("ui.data.column.import.nodata"));
         }
-        return ncCurlRollService.importData(list, updateSupport, importLogId);
+        return curlRollService.importData(list, updateSupport, importLogId);
     }
 
-    /**
-     * 根据编号查询卷曲长度
-     *
-     * @param curlRoll 查询条件
-     * @return 结果
-     */
-    @ApiOperation("根据编号查询卷曲长度")
-    @PostMapping("/selectCurlLengthByCode")
-    public AjaxResult selectCurlLengthByCode(@RequestBody NcCurlRoll curlRoll) {
-        return ncCurlRollService.selectCurlLengthByCode(curlRoll);
+    @Override
+    @SuppressWarnings("rawtypes")
+    protected IDocService getDocService() {
+        return curlRollService;
+    }
+
+    @Override
+    protected String getTypeCode() {
+        return "0";
+    }
+
+    @Override
+    protected String getOrderBy() {
+        return "PADDING_CODE";
     }
 }

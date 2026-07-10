@@ -39,11 +39,7 @@ import com.zlt.aps.lh.mapper.*;
 import com.zlt.aps.lh.service.ILhScheduleResultService;
 import com.zlt.aps.lh.service.ILhScheduleService;
 import com.zlt.aps.lh.service.IScheduleSummaryReportService;
-import com.zlt.aps.lh.util.LhScheduleTimeUtil;
-import com.zlt.aps.lh.util.MachineStatusUtil;
-import com.zlt.aps.lh.util.MouldStatusUtil;
-import com.zlt.aps.lh.util.ShiftFieldUtil;
-import com.zlt.aps.lh.util.SkuConstructionRefResolverUtil;
+import com.zlt.aps.lh.util.*;
 import com.zlt.aps.mdm.api.domain.entity.*;
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import com.zlt.aps.mp.api.domain.entity.MpFactoryProductionVersion;
@@ -56,8 +52,8 @@ import com.zlt.sysdef.domain.SysDocType;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.poi.ss.usermodel.*;
-import org.apache.poi.xssf.usermodel.XSSFColor;
 import org.apache.poi.xssf.usermodel.XSSFCellStyle;
+import org.apache.poi.xssf.usermodel.XSSFColor;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -70,6 +66,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
+import java.text.MessageFormat;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -336,10 +333,10 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
     @Override
     public AjaxResult changeMachinePreCheck(LhTransferDeskDTO dto) {
         if (dto.getId() == null) {
-            return AjaxResult.error("请选择需要转机台的记录");
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.lhScheduleResult.changeMachine.selectRequired"));
         }
         if (dto.getLhMachineCode() == null) {
-            return AjaxResult.error("新机台编码不能为空");
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.lhScheduleResult.changeMachine.newMachineCodeRequired"));
         }
 
         Long ids = dto.getId();
@@ -351,7 +348,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
             String existScheduleDate = DateUtil.format(existResult.getScheduleDate(), "yyyy-MM-dd");
             String existMachineCode = existResult.getLhMachineCode();
             String existMaterialCode = existResult.getMaterialCode();
-            errorMessages.add(String.format("排程日期:%s，物料编码：%s，机台编号：%s，已经存在！", existScheduleDate, existMaterialCode, existMachineCode));
+            errorMessages.add(MessageFormat.format(I18nUtil.getMessage("ui.data.alert.lhScheduleResult.changeMachine.conflictExists"), existScheduleDate, existMaterialCode, existMachineCode));
         }
         if (CollUtil.isNotEmpty(errorMessages)) {
             return AjaxResult.error(String.join(";", errorMessages));
@@ -368,10 +365,10 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
     @Override
     public AjaxResult changeMachine(LhTransferDeskDTO dto) {
         if (dto.getId() == null) {
-            return AjaxResult.error("请选择需要转机台的记录");
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.lhScheduleResult.changeMachine.selectRequired"));
         }
         if (dto.getLhMachineCode() == null) {
-            return AjaxResult.error("新机台编码不能为空");
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.lhScheduleResult.changeMachine.newMachineCodeRequired"));
         }
 
         // 检查所有记录是否已发布
@@ -384,7 +381,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
 
         // 更新备注
         String remark = record.getRemark() != null ? record.getRemark() : "";
-        record.setRemark(remark + "转机台时间：" + DateUtil.now() + "【原机台：" + oldMachine + ",转入机台：" + dto.getLhMachineCode() + "】");
+        record.setRemark(remark + MessageFormat.format(I18nUtil.getMessage("ui.data.alert.lhScheduleResult.changeMachine.remarkTemplate"), DateUtil.now(), oldMachine, dto.getLhMachineCode()));
 
         // 发布状态是已发布的话，需要更新为待发布
         if (ReleaseStatusEnum.RELEASED.getCode().equals(record.getIsRelease())) {
@@ -392,7 +389,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         }
 
         scheduleResultMapper.updateById(record);
-        return AjaxResult.success("转机台成功");
+        return AjaxResult.success(I18nUtil.getMessage("ui.data.alert.lhScheduleResult.changeMachine.success"));
     }
 
     /**
@@ -404,12 +401,12 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
     @Override
     public AjaxResult adjustQuantityPreCheck(LhScheduleResultUpdateDTO dto) {
         if (Objects.isNull(dto) || Objects.isNull(dto.getId())) {
-            return AjaxResult.error("请选择需要调量的排程记录");
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.lhScheduleResult.adjustQuantity.selectRequired"));
         }
 
         LhScheduleResult record = scheduleResultMapper.selectById(dto.getId());
         if (Objects.isNull(record)) {
-            return AjaxResult.error("排程记录不存在或已删除");
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.lhScheduleResult.adjustQuantity.recordNotFound"));
         }
 
         Date now = new Date();
@@ -423,19 +420,19 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
             }
             hasAdjustField = true;
             if (adjustPlanQty < 0) {
-                errorMessages.add(String.format("第%s班计划量不能小于0", shiftIndex));
+                errorMessages.add(MessageFormat.format(I18nUtil.getMessage("ui.data.alert.lhScheduleResult.adjustQuantity.planQtyNegative"), shiftIndex));
             }
             // 历史班次允许调量低于完成量，非历史班次仍需保护完成量下限。
             boolean historyShift = isHistoryShift(record, shiftIndex, now, shiftContext);
             Integer finishQty = Optional.ofNullable(ShiftFieldUtil.getShiftFinishQty(record, shiftIndex))
                     .orElse(0);
             if (!historyShift && adjustPlanQty < finishQty) {
-                errorMessages.add(String.format("第%s班计划量不能小于完成量%s", shiftIndex, finishQty));
+                errorMessages.add(MessageFormat.format(I18nUtil.getMessage("ui.data.alert.lhScheduleResult.adjustQuantity.planQtyLessThanFinish"), shiftIndex, finishQty));
             }
         }
 
         if (!hasAdjustField) {
-            errorMessages.add("未检测到可调量的班次计划量字段");
+            errorMessages.add(I18nUtil.getMessage("ui.data.alert.lhScheduleResult.adjustQuantity.noAdjustableField"));
         }
         if (CollUtil.isNotEmpty(errorMessages)) {
             return AjaxResult.error(String.join("；", errorMessages));
@@ -529,7 +526,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
 
         LhScheduleResult record = scheduleResultMapper.selectById(dto.getId());
         if (Objects.isNull(record)) {
-            return AjaxResult.error("排程记录不存在或已删除");
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.lhScheduleResult.adjustQuantity.recordNotFound"));
         }
 
         for (int shiftIndex = 1; shiftIndex <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT; shiftIndex++) {
@@ -537,6 +534,9 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
             if (Objects.nonNull(adjustPlanQty)) {
                 setAdjustPlanQty(record, shiftIndex, adjustPlanQty);
                 setAdjustAnalysis(record, shiftIndex, getAdjustAnalysis(dto, shiftIndex));
+                if (adjustPlanQty == 0) {
+                    ShiftFieldUtil.clearShiftPlanAuxFields(record, shiftIndex);
+                }
             }
         }
 
@@ -549,9 +549,9 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
 
         int updateCount = scheduleResultMapper.updateById(record);
         if (updateCount <= 0) {
-            return AjaxResult.error("调量失败，请稍后重试");
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.lhScheduleResult.adjustQuantity.failRetry"));
         }
-        return AjaxResult.success("调量成功，记录已回置待发布");
+        return AjaxResult.success(I18nUtil.getMessage("ui.data.alert.lhScheduleResult.adjustQuantity.success"));
     }
 
     /**
@@ -829,6 +829,10 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         summaryDataList.add(new ArrayList<>());
         exportBytes = ExcelUtils.writeMultiList(new ByteArrayInputStream(exportBytes), 2, summaryTableMap, summaryDataList);
 
+        // 重命名 Sheet 0（硫化计划）和 Sheet 1（硫化换模计划）为国际化名称
+        // 使导入时能按 i18n sheetName 匹配模板中的工作表
+        exportBytes = renameImportSheets(exportBytes);
+
         // 移除物料描述列
         return removeMaterialDescColumn(exportBytes);
     }
@@ -962,9 +966,27 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
                 break;
             case BLANK:
                 target.setBlank();
-                break;
+                    break;
             default:
                 break;
+        }
+    }
+
+    /**
+     * 将 Sheet 0（硫化计划）和 Sheet 1（硫化换模计划）重命名为国际化名称，
+     * 使导入时能按 i18n sheetName 匹配模板中的工作表。
+     */
+    private byte[] renameImportSheets(byte[] excelBytes) {
+        try (ByteArrayInputStream bais = new ByteArrayInputStream(excelBytes);
+             XSSFWorkbook workbook = new XSSFWorkbook(bais);
+             ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
+            workbook.setSheetName(0, I18nUtil.getMessage("ui.data.column.scheduleResult.exportSheetName"));
+            workbook.setSheetName(1, I18nUtil.getMessage("ui.data.column.lhMouldChangePlan.import.modelName"));
+            workbook.write(baos);
+            return baos.toByteArray();
+        } catch (IOException e) {
+            log.error("重命名导入模板Sheet失败", e);
+            throw new ServiceException("生成导入模板失败");
         }
     }
 
@@ -1022,7 +1044,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
                             .subtract(readNumericCell(row.getCell(totalDailyPlanQtyCol)));
                     setNumericCell(row, dailyPlanQtyCol, dailyPlanValue);
                     // 日计划量 ≤ 400：该单元格标淡橙提示产量偏低
-                    if (dailyPlanValue.compareTo(BigDecimal.valueOf(400)) <= 0) {
+                    if (dailyPlanValue.abs().compareTo(BigDecimal.valueOf(400)) <= 0) {
                         XSSFColor orange = new XSSFColor(new byte[]{(byte) 0xFC, (byte) 0xD5, (byte) 0xB4}, null);
                         Cell cell = row.getCell(dailyPlanQtyCol);
                         if (cell != null) {
@@ -1430,6 +1452,13 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         context.nextMonthYear = endYearMonth[0];
         context.nextMonthMonth = endYearMonth[1];
         context.crossMonth = (context.year != context.nextMonthYear) || (context.month != context.nextMonthMonth);
+        // 窗口开始日期（scheduleDate-1）也可能与 scheduleDate 不在同一自然月，
+        // 此时需同时加载上个月的定稿月计划明细，否则向左跨月的物料会被误报。
+        Date windowStartDate = DateUtil.offsetDay(scheduleDate, -(LhScheduleConstant.SCHEDULE_DAYS - 2));
+        int[] startYearMonth = resolveImportPlanYearMonth(windowStartDate);
+        context.prevMonthYear = startYearMonth[0];
+        context.prevMonthMonth = startYearMonth[1];
+        context.crossMonthPrev = (context.year != context.prevMonthYear) || (context.month != context.prevMonthMonth);
 
         // 仅基于第一轮基础校验通过的行提取批量查询条件；
         // 必填缺失、Excel 内重复等基础错误行已经标记为 -999，不参与业务主数据校验。
@@ -1464,6 +1493,14 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
                 return context;
             }
         }
+        // 全局校验 1.2：向左跨月时窗口开始日期所在月也必须存在定稿生产版本。
+        if (context.crossMonthPrev) {
+            context.finalVersionPrevMonth = getImportFinalProductionVersion(factoryCode, context.prevMonthYear, context.prevMonthMonth);
+            if (Objects.isNull(context.finalVersionPrevMonth) || StringUtils.isBlank(context.finalVersionPrevMonth.getProductionVersion())) {
+                context.globalErrors.add(String.format("工厂%s，%s年%s月月计划未定稿（左跨月）", factoryCode, context.prevMonthYear, context.prevMonthMonth));
+                return context;
+            }
+        }
 
         // 全局校验 2：工作日历中必须已经生成硫化工序日历。
         // 硫化工序编码固定为 02，与 MdmWorkCalendar.procCode 字典保持一致。
@@ -1476,6 +1513,11 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
             context.globalErrors.add(String.format("工厂%s，%s年%s月工作日历中硫化工序未生成（跨月）", factoryCode, context.nextMonthYear, context.nextMonthMonth));
             return context;
         }
+        // 全局校验 2.2：向左跨月时窗口开始日期所在月也必须已生成硫化工序日历。
+        if (context.crossMonthPrev && !hasLhWorkCalendar(factoryCode, context.prevMonthYear, context.prevMonthMonth)) {
+            context.globalErrors.add(String.format("工厂%s，%s年%s月工作日历中硫化工序未生成（左跨月）", factoryCode, context.prevMonthYear, context.prevMonthMonth));
+            return context;
+        }
 
         // 批量加载逐行校验所需数据：
         // 1. 月计划定稿明细：用于确认 SKU 是否在月计划中，并取得产品状态 productStatus；
@@ -1486,10 +1528,15 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         // 6. SKU 双模日硫化能力：用于确认班产 classCapacity 有值。
         context.monthPlanMap = loadImportMonthPlanMap(factoryCode, context.year, context.month,
                 context.finalVersion.getProductionVersion(), materialCodes);
-        // 跨月时同时加载窗口结束日期所在月份的定稿月计划明细。
+        // 向右跨月时同时加载窗口结束日期所在月份的定稿月计划明细。
         if (context.crossMonth) {
             context.monthPlanMapNextMonth = loadImportMonthPlanMap(factoryCode, context.nextMonthYear, context.nextMonthMonth,
                     context.finalVersionNextMonth.getProductionVersion(), materialCodes);
+        }
+        // 向左跨月时同时加载窗口开始日期所在月份的定稿月计划明细。
+        if (context.crossMonthPrev) {
+            context.monthPlanMapPrevMonth = loadImportMonthPlanMap(factoryCode, context.prevMonthYear, context.prevMonthMonth,
+                    context.finalVersionPrevMonth.getProductionVersion(), materialCodes);
         }
         context.machineInfoMap = loadImportMachineInfoMap(factoryCode, machineCodes);
         context.availableMouldCodeSet = loadImportAvailableMouldCodeSet(factoryCode, materialCodes);
@@ -1552,9 +1599,13 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         // 因此这里先从月计划明细拿 productStatus，再通过 SkuConstructionRefResolverUtil 统一降级匹配
         // （正规S→量试T→试制X；量试T→试制X；试制X 不降级），与自动排程和 SkuConstructionValidator 使用同一套规则。
         List<FactoryMonthPlanProductionFinalResult> monthPlanList = context.monthPlanMap.get(materialKey);
-        // 跨月时，如果主月定稿表中找不到，尝试从窗口结束日期所在月份的定稿表中查找
+        // 向右跨月时，如果主月定稿表中找不到，尝试从窗口结束日期所在月份的定稿表中查找
         if (CollUtil.isEmpty(monthPlanList) && context.crossMonth) {
             monthPlanList = context.monthPlanMapNextMonth.get(materialKey);
+        }
+        // 向左跨月时，如果主月和右跨月定稿表中都找不到，尝试从窗口开始日期所在月份的定稿表中查找
+        if (CollUtil.isEmpty(monthPlanList) && context.crossMonthPrev) {
+            monthPlanList = context.monthPlanMapPrevMonth.get(materialKey);
         }
         if (CollUtil.isEmpty(monthPlanList)) {
             errors.add(String.format("月计划中不存在SKU%s", materialCode));
@@ -1851,16 +1902,26 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         private int nextMonthYear;
         /** 排程窗口结束日期对应的业务月份（跨月时与 month 不同）。 */
         private int nextMonthMonth;
-        /** 是否跨月（窗口结束日期所在月份与 scheduleDate 所在月份不同）。 */
+        /** 排程窗口开始日期对应的业务年份（左跨月时与 year 不同）。 */
+        private int prevMonthYear;
+        /** 排程窗口开始日期对应的业务月份（左跨月时与 month 不同）。 */
+        private int prevMonthMonth;
+        /** 是否向右跨月（窗口结束日期所在月份与 scheduleDate 所在月份不同）。 */
         private boolean crossMonth;
-        /** 跨月时窗口结束日期所在月份的定稿生产版本。 */
+        /** 是否向左跨月（窗口开始日期所在月份与 scheduleDate 所在月份不同）。 */
+        private boolean crossMonthPrev;
+        /** 向右跨月时窗口结束日期所在月份的定稿生产版本。 */
         private MpFactoryProductionVersion finalVersionNextMonth;
+        /** 向左跨月时窗口开始日期所在月份的定稿生产版本。 */
+        private MpFactoryProductionVersion finalVersionPrevMonth;
         /** 整批导入级错误，例如月计划未定稿、硫化工作日历未生成。 */
         private List<String> globalErrors = new ArrayList<>();
         /** 定稿月计划明细缓存，key=factoryCode|materialCode，同物料（不同产品状态）全部保留。 */
         private Map<String, List<FactoryMonthPlanProductionFinalResult>> monthPlanMap = new HashMap<>();
-        /** 跨月时窗口结束日期所在月份的定稿月计划明细缓存，key=factoryCode|materialCode。 */
+        /** 向右跨月时窗口结束日期所在月份的定稿月计划明细缓存，key=factoryCode|materialCode。 */
         private Map<String, List<FactoryMonthPlanProductionFinalResult>> monthPlanMapNextMonth = new HashMap<>();
+        /** 向左跨月时窗口开始日期所在月份的定稿月计划明细缓存，key=factoryCode|materialCode。 */
+        private Map<String, List<FactoryMonthPlanProductionFinalResult>> monthPlanMapPrevMonth = new HashMap<>();
         /** 硫化机台台账缓存，key=factoryCode|machineCode。 */
         private Map<String, LhMachineInfo> machineInfoMap = new HashMap<>();
         /** SKU 与模具关系缓存，key=factoryCode|materialCode，value=模具号列表。 */

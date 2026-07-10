@@ -1,5 +1,6 @@
 package com.zlt.aps.lh.context;
 
+import cn.hutool.core.date.DateUtil;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import com.zlt.aps.lh.api.domain.dto.*;
@@ -39,7 +40,11 @@ import java.util.*;
 public class LhScheduleContext {
 
     // ========== 排程基本参数 ==========
-
+    /**
+     * 计划量计算起始日：默认为月份第一天
+     * 当下个月定稿后，则为定稿需求的库存取值日
+     */
+    private Date planStartDate;
     /**
      * 分厂编号
      */
@@ -192,6 +197,12 @@ public class LhScheduleContext {
      * 胎胚实时库存Map, key=embryoCode；始终保存原始库存，内部排产额度分摊不得回写到该原始库存口径
      */
     private Map<String, Integer> embryoRealtimeStockMap = new HashMap<>();
+
+    /**
+     * 结构胎胚最早可供硫化时间Map, key=structureName
+     */
+    private Map<String, Date> structureEarliestLhTimeMap = new HashMap<>();
+
     /**
      * 胎胚收尾标识Map, key=embryoCode, value=1-收尾/0-非收尾；以胎胚维度合并硫化余量后按主销参与情况判定
      */
@@ -209,7 +220,7 @@ public class LhScheduleContext {
      */
     private Map<String, Integer> materialMonthFinishedQtyMap = new HashMap<>();
     /**
-     * T日排程班次完成量Map, key=materialCode, value=T日class1FinishQty按物料汇总值
+     * T日排程班次完成量Map, key=materialCode+产品状态, value=T日class1FinishQty按物料汇总值
      */
     private Map<String, Integer> materialScheDayFinishQtyMap = new HashMap<>();
     /**
@@ -342,20 +353,28 @@ public class LhScheduleContext {
      * 胎胚库存SKU级内部分摊额度，key=materialCode；只控制排产额度，不影响结果胎胚库存字段
      */
     private Map<String, Integer> embryoStockSkuQuotaMap = new LinkedHashMap<>();
-     /**
-      * 命中胎胚库存T日硬目标的物料集合，用于结果班次量按库存账本奇偶原样裁剪
-      */
+    /**
+     * 命中胎胚库存T日硬目标的物料集合，用于结果班次量按库存账本奇偶原样裁剪
+     */
     private Set<String> embryoStockHardTargetMaterialSet = new LinkedHashSet<>();
-    /** 共用胎胚收尾错峰降模释放候选原收尾班次快照，使用对象身份避免结果行字段被清零后丢失释放来源 */
+    /**
+     * 共用胎胚收尾错峰降模释放候选原收尾班次快照，使用对象身份避免结果行字段被清零后丢失释放来源
+     */
     private Map<LhScheduleResult, Integer> sharedEmbryoEndingStaggerReleaseShiftIndexMap =
             new IdentityHashMap<LhScheduleResult, Integer>();
-    /** 共用胎胚收尾错峰降模释放候选原班次计划量快照，用于选中后延时恢复原班次收尾产量 */
+    /**
+     * 共用胎胚收尾错峰降模释放候选原班次计划量快照，用于选中后延时恢复原班次收尾产量
+     */
     private Map<LhScheduleResult, Integer> sharedEmbryoEndingStaggerReleaseShiftQtyMap =
             new IdentityHashMap<LhScheduleResult, Integer>();
-    /** 共用胎胚收尾错峰后延允许超目标量，供严格收口、账本裁剪和校验识别“错峰补量”例外 */
+    /**
+     * 共用胎胚收尾错峰后延允许超目标量，供严格收口、账本裁剪和校验识别“错峰补量”例外
+     */
     private Map<LhScheduleResult, Integer> sharedEmbryoEndingStaggerAllowedOverQtyMap =
             new IdentityHashMap<LhScheduleResult, Integer>();
-    /** 主销/常规SKU收尾补满允许超目标量，供严格收口、账本裁剪和校验识别“补满夜班”例外 */
+    /**
+     * 主销/常规SKU收尾补满允许超目标量，供严格收口、账本裁剪和校验识别“补满夜班”例外
+     */
     private Map<LhScheduleResult, Integer> endingFillAllowedOverQtyMap =
             new IdentityHashMap<LhScheduleResult, Integer>();
     /**
@@ -493,6 +512,15 @@ public class LhScheduleContext {
      * 每日精度保养计数, key=dateString, value=已安排保养机台数
      */
     private Map<String, Integer> dailyMaintenanceCountMap = new LinkedHashMap<>();
+    /**
+     * 特殊材料硫化机置换备注Map，key=被置换机台编码，value=置换备注（供S4.6生成模具交替计划时追加备注）
+     */
+    private Map<String, String> substitutionRemarkMap;
+    /**
+     * 全量SKU排程信息索引Map，key=物料编码，value=SkuScheduleDTO。在S4.3创建SKU时填充，永不清空，供S4.5.1置换等后置阶段按物料编码查找SKU排程信息
+     */
+    private Map<String, SkuScheduleDTO> allSkuScheduleDtoMap = new LinkedHashMap<>();
+
 
     // ========== 排程输出结果 ==========
 
@@ -555,6 +583,15 @@ public class LhScheduleContext {
     }
 
     /**
+     * 下个月是否定稿
+     *
+     * @return
+     */
+    public boolean isNextMonthFinal() {
+        return null == planStartDate ? false : true;
+    }
+
+    /**
      * 20260701+ 获取前一个月的年份-月份
      *
      * @return
@@ -606,8 +643,28 @@ public class LhScheduleContext {
      * @return
      */
     public Integer getPlanQty(FactoryMonthPlanProductionFinalResult skuProductionInfo) {
+        Map<YearMonth, Integer> yearMonthPlanQty = getMonthPlanQty(skuProductionInfo);
+        if (CollectionUtils.isEmpty(yearMonthPlanQty)) {
+            return BigDecimal.ZERO.intValue();
+        }
+        return yearMonthPlanQty.values().stream().mapToInt(Integer::intValue).sum();
+    }
+
+    /**
+     * 获取月计划排产计划量
+     *
+     * @param skuProductionInfo
+     * @return
+     */
+    public Map<YearMonth, Integer> getMonthPlanQty(FactoryMonthPlanProductionFinalResult skuProductionInfo) {
         List<Date> allProductionDateList = Lists.newArrayList(getAllProductionDateInfo());
-        return SkuMonthPlanCalculator.getPlanQty(allProductionDateList, loadedMonthPlanList, skuProductionInfo);
+        Integer startDay;
+        if (null == planStartDate) {
+            startDay = BigDecimal.ONE.intValue();
+        } else {
+            startDay = DateUtil.dayOfMonth(planStartDate);
+        }
+        return SkuMonthPlanCalculator.getPlanQty(allProductionDateList, loadedMonthPlanList, skuProductionInfo, startDay);
     }
 
     /**

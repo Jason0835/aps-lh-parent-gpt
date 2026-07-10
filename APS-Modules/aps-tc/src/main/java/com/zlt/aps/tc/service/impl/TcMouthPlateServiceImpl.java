@@ -1,219 +1,107 @@
 package com.zlt.aps.tc.service.impl;
 
-import static com.zlt.aps.common.core.utils.ImportUtil.addImportErrorLog;
+import cn.hutool.core.collection.CollUtil;
+import cn.hutool.core.collection.ListUtil;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
+import com.ruoyi.common.constant.UserConstants;
+import com.ruoyi.common.exception.ServiceException;
+import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.ruoyi.common.utils.StringUtils;
+import com.zlt.aps.tc.api.domain.entity.TcMachineInfo;
+import com.zlt.aps.tc.api.domain.entity.TcMouthPlate;
+import com.zlt.aps.tc.mapper.TcMachineInfoMapper;
+import com.zlt.aps.tc.mapper.TcMouthPlateMapper;
+import com.zlt.aps.tc.service.ITcMouthPlateService;
+import com.zlt.bill.common.service.AbstractDocService;
+import com.zlt.common.enums.ImportErrorTypeEnums;
+import com.zlt.common.utils.ImportExcelValidatedUtils;
+import com.zlt.sysdef.domain.SysDocType;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import javax.annotation.Resource;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Date;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-import org.apache.commons.collections.CollectionUtils;
-import org.apache.commons.lang3.ObjectUtils;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
-import com.ruoyi.common.core.utils.SecurityUtils;
-import com.ruoyi.common.core.utils.bean.BeanUtils;
-import com.ruoyi.common.core.web.domain.AjaxResult;
-import com.ruoyi.common.i18n.utils.I18nUtil;
-import com.zlt.aps.common.core.constant.ApsConstant;
-import com.zlt.aps.common.core.domain.ApsBaseEntity;
-import com.zlt.aps.common.core.utils.ImportUtil;
-import com.zlt.aps.tc.api.domain.dto.TcMouthPlateDto;
-import com.zlt.aps.tc.api.domain.entity.TcMachineInfo;
-import com.zlt.aps.tc.entity.TcMouthPlate;
-import com.zlt.aps.tc.mapper.TcMouthPlateMapper;
-import com.zlt.aps.tc.service.TcMachineInfoService;
-import com.zlt.aps.tc.service.TcMouthPlateService;
-import com.zlt.common.utils.StringUtil;
-
-/**
- * <p>
- * 胎侧口型板信息维护 服务实现类
- * </p>
- *
- * @author chenxueyuan
- * @since 2021-06-02
- */
+@Slf4j
 @Service
-public class TcMouthPlateServiceImpl extends ServiceImpl<TcMouthPlateMapper, TcMouthPlate> implements TcMouthPlateService {
+@Transactional(rollbackFor = Exception.class)
+public class TcMouthPlateServiceImpl extends AbstractDocService<TcMouthPlate> implements ITcMouthPlateService {
 
-    @Autowired
+    @Resource
     private TcMouthPlateMapper tcMouthPlateMapper;
 
-    @Autowired
-    private TcMachineInfoService tcMachineInfoService;
+    @Resource
+    private TcMachineInfoMapper tcMachineInfoMapper;
 
-    /**
-     * 查询胎侧口型板信息维护列表
-     *
-     * @param mouthPlate 胎侧口型板信息维护
-     * @return 胎侧口型板信息维护集合
-     */
     @Override
-    public List<TcMouthPlateDto> selectMouthPlateList(TcMouthPlate mouthPlate) {
-        return tcMouthPlateMapper.selectMouthPlateWithMachineInfo(mouthPlate);
+    protected String getDocTypeCode() {
+        return "TC0906";
     }
 
-    /**
-     * 查询胎侧口型板信息维护列表
-     *
-     * @param id 要查询的id
-     * @return 胎侧口型板信息维护集合
-     */
     @Override
-    public TcMouthPlate selectTmMouthPlateById(Long id) {
-        LambdaQueryWrapper<TcMouthPlate> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(TcMouthPlate::getDelFlag, ApsConstant.DEL_FLAG_NORMAL);
-        wrapper.eq(TcMouthPlate::getId, id);
-        return tcMouthPlateMapper.selectOne(wrapper);
+    protected SysDocType getSysDocType() {
+        SysDocType sysDocType = new SysDocType();
+        sysDocType.setDocTypeCode("TC0906");
+        return sysDocType;
     }
 
-    /**
-     * 新增胎侧口型板信息维护
-     *
-     * @param mouthPlate 胎侧口型板信息维护
-     */
     @Override
-    public void saveTmMouthPlate(TcMouthPlate mouthPlate) {
-        if (ObjectUtils.allNotNull(mouthPlate.getMouthPlateCode(), mouthPlate.getMachineId()) && tcMouthPlateMapper.checkUnique(mouthPlate) > 0) {
-            throw new RuntimeException(I18nUtil.getMessage("ui.mouthPlate.message.unique"));
+    public String checkUnique(TcMouthPlate query) {
+        String unique = super.checkUnique(query);
+        if (UserConstants.NOT_UNIQUE.equals(unique)) {
+            throw new ServiceException(I18nUtil.getMessage("ui.data.alert.tc.mouthPlate.notUnique"));
         }
-        mouthPlate.setBaseVale(mouthPlate.getId());
-        saveOrUpdate(mouthPlate);
+        return unique;
     }
 
-    /**
-     * 批量删除胎侧口型板信息维护
-     *
-     * @param ids 需要删除的胎侧口型板信息维护ID
-     */
     @Override
-    public void deleteTmMouthPlateByIds(Long[] ids) {
-        if (ids == null) {
-            return;
-        }
-        LambdaUpdateWrapper<TcMouthPlate> wrapper = new LambdaUpdateWrapper<>();
-        wrapper.in(ApsBaseEntity::getId, Arrays.asList(ids));
-        wrapper.set(ApsBaseEntity::getDelFlag, null);
-        wrapper.set(ApsBaseEntity::getUpdateBy, SecurityUtils.getUsername());
-        wrapper.set(ApsBaseEntity::getUpdateTime, new Date());
-        super.getBaseMapper().update(null, wrapper);
+    protected List<String> getCheckUniqueFields() {
+        return new ArrayList<>(Arrays.asList("factoryCode", "mouthPlateCode", "machineCode"));
     }
 
-    /**
-     * 导入数据
-     */
     @Override
-    public AjaxResult importData(List<TcMouthPlateDto> list, boolean updateSupport, Long importLogId) {
-
-        //初始化值准备
-        int successNum = 0;
-        int failureNum = 0;
-        List<TcMouthPlateDto> newList = new ArrayList<>();
-        List<ImportErrorLog> importErrorLogs = new ArrayList<>();
-
-        List<TcMachineInfo> machineInfoList = tcMachineInfoService.selectMachineInfoList(new TcMachineInfo());
-        if (CollectionUtils.isEmpty(machineInfoList)) {
-            String errorMsg = I18nUtil.getMessage("ui.error.message.column.machineIsNull");
-            ImportUtil.addImportErrorLog(importLogId, null, errorMsg, importErrorLogs);
-            return AjaxResult.error(errorMsg, importErrorLogs);
+    protected Map<Object, Object> getServiceCheckParams(List<TcMouthPlate> list, List<TcMouthPlate> importList) {
+        Map<Object, Object> serviceCheckParams = super.getServiceCheckParams(list, importList);
+        // 提取所有非空、去重的机台编码
+        List<String> machineCodeList = list.stream()
+                .map(TcMouthPlate::getMachineCode)
+                .filter(StringUtils::isNotBlank)
+                .distinct()
+                .collect(Collectors.toList());
+        // 分批查询机台基础数据
+        List<List<String>> splitList = ListUtil.split(machineCodeList, 500);
+        List<TcMachineInfo> machineInfoList = new ArrayList<>();
+        for (List<String> codes : splitList) {
+            LambdaQueryWrapper<TcMachineInfo> wrapper = new LambdaQueryWrapper<>();
+            wrapper.in(TcMachineInfo::getMachineCode, codes);
+            machineInfoList.addAll(tcMachineInfoMapper.selectList(wrapper));
         }
-        Map<String, Long> machineCodeMap = new HashMap<>();
-//        machineInfoList.forEach(a -> machineCodeMap.put(a.getMachineCode(), a.getId()));
-        machineInfoList.forEach(a -> machineCodeMap.put(a.getMachineName(), a.getId()));
+        if (CollUtil.isNotEmpty(machineInfoList)) {
+            serviceCheckParams.put("tcMachineCodeList",
+                    machineInfoList.stream().map(TcMachineInfo::getMachineCode).collect(Collectors.toList()));
+        }
+        return serviceCheckParams;
+    }
 
-        //按业务主键分组
-        Map<String, Long> groupMap = list.stream().collect(Collectors.groupingBy(a -> (a.getMouthPlateCode()+a.getMachineName()), Collectors.counting()));
-
-        //校验（非空校验、长度校验等）
-        for (int i = 0; i < list.size(); i++) {
-            TcMouthPlateDto dto = list.get(i);
-
-            //重复记录校验
-            Long hasValue = groupMap.get(dto.getMouthPlateCode()+dto.getMachineName());
-            if (hasValue > 1) {
-                failureNum++;
-                dto.setId(-999L);
-                String message = I18nUtil.getMessage("ui.data.column.all.conflictRecord");
-                String columnName = I18nUtil.getMessage("ui.data.column.mouthPlateCode");
-                String columnName2 = I18nUtil.getMessage("ui.specifyMachine.column.machineName");
-                message=String.format(message,columnName+"+"+columnName2);
-                addImportErrorLog(importLogId, i + 2,message, importErrorLogs);
-                continue;
-            }
-
-            String machineName = dto.getMachineName();
-            Long machineId = machineCodeMap.get(machineName);
-            List<ImportErrorLog> validated = ImportUtil.validated(importLogId, i + 2, dto);
-            if (machineId == null && !StringUtil.isEmpty(machineName)) {
-                String errorMsg = I18nUtil.getMessage("ui.error.message.column.machineNotExist");
-                ImportUtil.addImportErrorLog(importLogId, i + 2, errorMsg, validated);
-            }
-            if (CollectionUtils.isNotEmpty(validated)) {
-                failureNum++;
-                dto.setId(-999L);
-                importErrorLogs.addAll(validated);
-            } else {
-                dto.setMachineId(machineId);
-                dto.setBaseVale(null);
-                newList.add(dto);
+    @Override
+    protected Boolean serviceCheckAndDataHandle(TcMouthPlate importDocEntity, List<ImportErrorLog> importErrorLogs,
+                                                Long importLogId, int errorRowNum, Map<Object, Object> serviceCheckParams) {
+        // 校验机台编码是否存在
+        if (serviceCheckParams.containsKey("tcMachineCodeList")) {
+            List<String> machineCodeList = (List<String>) serviceCheckParams.get("tcMachineCodeList");
+            String machineCode = importDocEntity.getMachineCode();
+            if (!machineCodeList.contains(machineCode)) {
+                String message = I18nUtil.getMessage("ui.data.alert.tc.machineCodeNotExist");
+                ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(), errorRowNum, message, importErrorLogs);
+                return Boolean.FALSE;
             }
         }
-
-        //新集合操作（更新或插入操作）
-        try {
-            //勾选更新记录，调用merge即可
-            if (updateSupport && CollectionUtils.isNotEmpty(newList)) {
-                successNum = newList.size();
-                tcMouthPlateMapper.mergeSql(newList);
-            } else {
-                for (int i = 0; i < list.size(); i++) {
-                    TcMouthPlateDto entity = list.get(i);
-                    // 错误跳过
-                    if (entity.getId() != null && entity.getId().equals(-999L)) {
-                        continue;
-                    }
-                    // 唯一性校验
-                    TcMouthPlate mouthPlate = new TcMouthPlate();
-                    BeanUtils.copyProperties(entity, mouthPlate);
-                    if (tcMouthPlateMapper.checkUnique(mouthPlate) <= 0) {
-                        successNum++;
-                        saveOrUpdate(mouthPlate);
-                    } else {
-                        failureNum++;
-                        String message = I18nUtil.getMessage("ui.mouthPlate.message.unique");
-                        ImportUtil.addImportErrorLog(importLogId, i + 2, message, importErrorLogs);
-                    }
-                }
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-            // 执行sql失败，插入导入失败记录
-            successNum = 0;
-            failureNum = list.size();
-            importErrorLogs.clear();
-            ImportUtil.addImportErrorLog(importLogId, null, e.getMessage(), importErrorLogs);
-        }
-
-        //返回提示信息及错误集合
-        if (failureNum > 0) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.message.import.fail") + "," + successNum + "," + failureNum, importErrorLogs);
-        } else {
-            return AjaxResult.success(I18nUtil.getMessage("ui.message.import.success") + "," + successNum);
-        }
+        return super.serviceCheckAndDataHandle(importDocEntity, importErrorLogs, importLogId, errorRowNum, serviceCheckParams);
     }
-
-    @Override
-    public void deleteAll() {
-        this.tcMouthPlateMapper.deleteAll();
-    }
-
 }

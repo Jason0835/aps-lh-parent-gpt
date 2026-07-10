@@ -9,6 +9,7 @@ import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
+import org.apache.commons.lang3.StringUtils;
 
 import java.io.Serializable;
 import java.math.BigDecimal;
@@ -78,4 +79,60 @@ public class LhDayFinishQty extends BaseEntity implements Serializable {
     @ApiModelProperty(value = "示方类型")
     @TableField(value = "LH_TYPE")
     private String lhType;
+
+    /**
+     * 日完成量
+     *
+     * @return
+     */
+    public Integer getFinishQty() {
+        if (null == dayFinishQty) {
+            return BigDecimal.ZERO.intValue();
+        }
+        return dayFinishQty.intValue();
+    }
+
+    /**
+     * 获取物料+计划类型Key
+     *
+     * @return
+     */
+    public String getMaterialStatusKey() {
+        String keyFormat = "%s|*|%s";
+        String trimmedProductStatus = StringUtils.trimToEmpty(lhType);
+        return String.format(keyFormat, materialCode, trimmedProductStatus);
+    }
+
+    /**
+     * 获取物料+计划类型Key
+     *
+     * @return
+     */
+    public String getFactoryMaterialStatusKey() {
+        String keyFormat = "%s|*|%s|*|%s";
+        String trimmedProductStatus = StringUtils.trimToEmpty(lhType);
+        return String.format(keyFormat, factoryCode, materialCode, trimmedProductStatus);
+    }
+
+    /**
+     * 完成日在compareDate之后或是=compareDate
+     *
+     * @param compareDate
+     * @return
+     */
+    public boolean isAfterOrCurrent(Date compareDate) {
+        if (null == compareDate) {
+            return false;
+        }
+        if (null == finishDate) {
+            return false;
+        }
+        if (finishDate.after(compareDate)) {
+            return true;
+        }
+        if (finishDate.before(compareDate)) {
+            return false;
+        }
+        return true;
+    }
 }

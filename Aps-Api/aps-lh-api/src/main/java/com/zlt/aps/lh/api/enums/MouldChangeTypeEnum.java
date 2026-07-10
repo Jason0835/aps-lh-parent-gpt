@@ -6,6 +6,9 @@ package com.zlt.aps.lh.api.enums;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 
+import java.util.Arrays;
+import java.util.Objects;
+
 /**
  * 模具交替类型枚举。
  *
@@ -48,5 +51,38 @@ public enum MouldChangeTypeEnum {
             }
         }
         return null;
+    }
+
+    /**
+     * 判断换模类型字段是否包含指定类型编码。
+     *
+     * @param changeMouldType 换模类型字段值，支持单值或英文逗号分隔的多值
+     * @param code            需要匹配的换模类型编码
+     * @return true-包含指定编码；false-不包含指定编码
+     */
+    public static boolean containsCode(String changeMouldType, String code) {
+        if (changeMouldType == null || code == null) {
+            return false;
+        }
+        return Arrays.stream(changeMouldType.split(","))
+                .map(String::trim)
+                .filter(item -> !item.isEmpty())
+                .anyMatch(item -> Objects.equals(item, code));
+    }
+
+    /**
+     * 判断换模类型字段是否包含任一候选类型编码。
+     *
+     * @param changeMouldType 换模类型字段值，支持单值或英文逗号分隔的多值
+     * @param codes           需要匹配的候选换模类型编码
+     * @return true-包含任一候选编码；false-不包含候选编码
+     */
+    public static boolean containsAnyCode(String changeMouldType, String... codes) {
+        if (changeMouldType == null || codes == null || codes.length == 0) {
+            return false;
+        }
+        return Arrays.stream(codes)
+                .filter(Objects::nonNull)
+                .anyMatch(code -> containsCode(changeMouldType, code));
     }
 }

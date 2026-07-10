@@ -1,105 +1,124 @@
 package com.zlt.aps.tc.controller;
 
-
-import com.ruoyi.common.core.web.controller.BaseController;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
-import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
-import com.ruoyi.common.utils.StringUtils;
-import com.zlt.aps.tc.api.domain.dto.TcGlueGroupOrderDto;
-import com.zlt.aps.tc.entity.TcGlueGroupOrder;
-import com.zlt.aps.tc.service.TcGlueGroupOrderService;
+import com.zlt.aps.constant.FactoryConstant;
+import com.zlt.aps.tc.api.domain.entity.TcGlueGroupOrder;
+import com.zlt.aps.tc.mapper.TcGlueGroupOrderMapper;
+import com.zlt.aps.tc.service.ITcGlueGroupOrderService;
+import com.zlt.bill.common.controller.AbstractDocBizController;
+import com.zlt.bill.common.service.IDocService;
+import com.zlt.common.utils.PubUtil;
 import io.swagger.annotations.Api;
-import io.swagger.annotations.ApiImplicitParam;
-import io.swagger.annotations.ApiImplicitParams;
 import io.swagger.annotations.ApiOperation;
-import org.springframework.beans.BeanUtils;
+import jodd.util.StringUtil;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
+import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
 import java.util.List;
 
-/**
- * <p>
- * 胎侧胶料组别顺序维护 前端控制器
- * </p>
- *
- * @author zhangbinglin
- */
-@Api(tags = {"胎侧胶料组别顺序维护接口"})
+@Slf4j
+@Api(tags = "胎侧胶料组顺序")
 @RestController
-@RequestMapping("/tc/glueGroupOrder")
-public class TcGlueGroupOrderController extends BaseController {
+@RequestMapping("/tcGlueGroupOrder")
+public class TcGlueGroupOrderController extends AbstractDocBizController<TcGlueGroupOrder> {
+
+    @Autowired
+    private ITcGlueGroupOrderService tcGlueGroupOrderService;
 
     @Resource
-    public TcGlueGroupOrderService tcGlueGroupOrderService;
+    private TcGlueGroupOrderMapper tcGlueGroupOrderMapper;
 
-    @ApiOperation("根据条件查询胶料组别顺序列表")
-    @PostMapping("/listGlueGroupOrder")
-    public TableDataInfo listGlueGroupOrder(@RequestBody TcGlueGroupOrderDto dto) {
-        startPage();
-        dto.setOrderStr(orderStr());
-        List<TcGlueGroupOrderDto> list = tcGlueGroupOrderService.listGlueGroupOrder(dto);
-        return getDataTable(list);
+    @ApiOperation("查询列表")
+    @PostMapping("/list")
+    @Override
+    public TableDataInfo list(@RequestBody TcGlueGroupOrder queryVO) {
+        return super.list(queryVO);
     }
 
-    @ApiOperation("根据id查询胶料组别顺序信息")
-    @GetMapping("/getGlueGroupOrder/{id}")
-    @ApiImplicitParams({
-            @ApiImplicitParam(name = "id", dataType = "int", value = "主键id", paramType = "query")
-    })
-    public TcGlueGroupOrderDto getGlueGroupOrder(@PathVariable("id") Long id) {
-        TcGlueGroupOrderDto dto = new TcGlueGroupOrderDto();
-        BeanUtils.copyProperties(tcGlueGroupOrderService.getById(id), dto);
-        return dto;
+    @Log(title = "ui.data.column.tc.GlueGroupOrder.modelName", businessType = BusinessType.INSERT_OR_UPDATE)
+    @ApiOperation("保存")
+    @PostMapping("/save")
+    @Override
+    public AjaxResult save(@RequestBody TcGlueGroupOrder billVO) {
+        if (StringUtil.isBlank(billVO.getFactoryCode())) {
+            billVO.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
+        }
+        return super.save(billVO);
     }
 
-    @Log(title = "ui.tc.glueGroup.column.modalName", businessType = BusinessType.INSERT_OR_UPDATE)
-    @ApiOperation("保存胶料组别顺序信息（id为空则新增，id不为空则修改）")
-    @PostMapping("/saveGlueGroupOrder")
-    public AjaxResult saveGlueGroupOrder(@RequestBody TcGlueGroupOrderDto dto) {
-        TcGlueGroupOrder entity = new TcGlueGroupOrder();
-        BeanUtils.copyProperties(dto, entity);
-        tcGlueGroupOrderService.saveGlueGroupOrder(entity);
-        return AjaxResult.success();
+    @Log(title = "ui.data.column.tc.GlueGroupOrder.modelName", businessType = BusinessType.DELETE)
+    @ApiOperation("删除")
+    @DeleteMapping("/remove")
+    @Override
+    public AjaxResult removeByIds(@RequestBody List<Long> ids) {
+        return super.removeByIds(ids);
     }
 
-    @ApiOperation("根据code判断胶料组号是否已经存在")
-    @PostMapping("/checkGlueGroupCodeUnique")
-    public String checkGlueGroupCodeUnique(@RequestBody TcGlueGroupOrderDto dto) {
-        return tcGlueGroupOrderService.checkGlueGroupCodeUnique(dto);
+    @ApiOperation("获取详细信息")
+    @GetMapping(value = "/{id}")
+    @Override
+    public TcGlueGroupOrder getInfo(@PathVariable("id") Long id) {
+        return super.getInfo(id);
     }
 
-    @Log(title = "ui.tc.glueGroup.column.modalName", businessType = BusinessType.DELETE)
-    @ApiOperation("批量删除胶料组别顺序信息(逻辑删)")
-    @PostMapping("/deleteGlueGroupOrder/{ids}")
-    @ApiImplicitParams({
-            @ApiImplicitParam(name = "ids", dataType = "Array", value = "id數組", paramType = "query")
-    })
-    public AjaxResult deleteGlueGroupOrder(@PathVariable("ids") Long[] ids) {
-        tcGlueGroupOrderService.deleteGlueGroupOrder(ids);
-        return AjaxResult.success();
+    @ApiOperation("校验唯一性")
+    @PostMapping("/checkUnique")
+    public String checkUnique(@RequestBody TcGlueGroupOrder query) {
+        return tcGlueGroupOrderService.checkUnique(query);
     }
 
-    @Log(title = "ui.tc.glueGroup.column.modalName", businessType = BusinessType.EXPORT)
-    @ApiOperation("导出数据")
-    @PostMapping("/exportData")
-    public List<TcGlueGroupOrderDto> exportData(@RequestBody TcGlueGroupOrderDto dto) {
-        startPage();
-        dto.setOrderStr(orderStr());
-        List<TcGlueGroupOrderDto> list = tcGlueGroupOrderService.listGlueGroupOrder(dto);
-        return list;
-    }
-
-    @Log(title = "ui.tc.glueGroup.column.modalName", businessType = BusinessType.IMPORT)
+    @Log(title = "ui.data.column.tc.GlueGroupOrder.modelName", businessType = BusinessType.IMPORT)
     @ApiOperation("导入数据")
     @PostMapping("/importData")
-    public AjaxResult importData(@RequestBody List<TcGlueGroupOrderDto> list, @RequestParam("updateSupport") boolean updateSupport, @RequestParam("importLogId") Long importLogId) {
-        if (StringUtils.isNull(list) || list.size() == 0) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.import.nodata"));
-        }
-        return tcGlueGroupOrderService.importData(list, updateSupport, importLogId);
+    @Override
+    public AjaxResult importData(@RequestBody ImportContext importContext, @RequestParam("updateSupport") boolean updateSupport) throws Exception {
+        return super.importData(importContext, updateSupport);
+    }
+
+    @Log(title = "ui.data.column.tc.GlueGroupOrder.modelName", businessType = BusinessType.EXPORT)
+    @ApiOperation("导出数据")
+    @PostMapping("/exportData/{fileName}")
+    @Override
+    public byte[] exportData(@RequestBody TcGlueGroupOrder queryVO, @PathVariable("fileName") String fileName,
+                             HttpServletResponse response) throws IOException {
+        return super.exportData(queryVO, fileName, response);
+    }
+
+    @Override
+    protected List<TcGlueGroupOrder> listExportData(TcGlueGroupOrder obj) {
+        QueryWrapper<TcGlueGroupOrder> wrapper = new QueryWrapper<>();
+        this.builderCondition(wrapper, obj);
+        return tcGlueGroupOrderMapper.selectList(wrapper);
+    }
+
+    @Override
+    protected IDocService getDocService() {
+        return tcGlueGroupOrderService;
+    }
+
+    @Override
+    protected void builderCondition(QueryWrapper<TcGlueGroupOrder> queryWrapper, TcGlueGroupOrder queryVO) {
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("factoryCode")), "FACTORY_CODE", queryVO.getFieldValueByFieldName("factoryCode"));
+        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("glueGroupCode")), "GLUE_GROUP_CODE", queryVO.getFieldValueByFieldName("glueGroupCode"));
+        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("glueGroupName")), "GLUE_GROUP_NAME", queryVO.getFieldValueByFieldName("glueGroupName"));
+    }
+
+    @Override
+    protected String getTypeCode() {
+        return "TC0908";
+    }
+
+    @Override
+    protected String getOrderBy() {
+        return "order_num asc";
     }
 }

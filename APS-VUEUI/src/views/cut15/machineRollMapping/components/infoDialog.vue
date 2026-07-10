@@ -1,141 +1,88 @@
 <template>
-  <el-dialog
-    :title="title"
-    :visible="visible"
-    width="800px"
-    @close="hide"
-    :close-on-click-modal="false"
-    :close-on-press-escape="false"
-    :append-to-body="true"
-  >
-    <info-form
-      class="form-item-height"
-      ref="form"
-      :form="form"
-      :rules="rules"
-      :columns="columns"
-      label-position="right"
-      label-width="160px"
-      v-loading="loading"
-    >
-    </info-form>
+  <el-dialog :title="title" :visible="visible" width="720px" @close="hide" :close-on-click-modal="false" :close-on-press-escape="false" :append-to-body="true">
+    <info-form class="form-item-height" ref="form" :form="form" :rules="rules" :columns="columns" label-position="right" label-width="130px" v-loading="loading" />
     <template slot="footer">
-      <el-button @click="hide">{{ this.$t("common.button.cancel") }}</el-button>
-      <el-button type="primary" :loading="loading" @click="handleConfirm">{{
-        this.$t("common.button.confirm")
-      }}</el-button>
+      <el-button @click="hide">{{ $t("common.button.cancel") }}</el-button>
+      <el-button type="primary" :loading="loading" @click="handleConfirm">{{ $t("common.button.confirm") }}</el-button>
     </template>
   </el-dialog>
 </template>
 
 <script>
-import { mapState } from "vuex";
-
+import { addMachineRollMapping, updateMachineRollMapping } from "@/api/cd15/machineRollMapping";
+import { getCd15MachineEnableOptions } from "@/api/cd15/cd15MachineInfo";
 import infoForm from "@/views/components/infoForm.vue";
-
-import { editMachineRollMapping } from "@/api/cd15/machineRollMapping";
 
 export default {
   components: { infoForm },
+  inject: ["parentDict"],
+  props: {
+    machineOptions: {
+      type: Array,
+      default: () => [],
+    },
+  },
   data() {
+    const requiredSelect = { required: true, message: this.$t("common.rule.select"), trigger: "change" };
+    const requiredInput = { required: true, message: this.$t("common.rule.input"), trigger: "blur" };
     return {
       loading: false,
       visible: false,
       isEdit: false,
-      editType: null,
       form: {},
+      localMachineOptions: [],
       rules: {
-        bigRollCode: [
-          {
-            required: true,
-            message: this.$t("common.rule.input"),
-            trigger: "blur",
-          },
-        ],
-        machineId: [
-          {
-            required: true,
-            message: this.$t("common.rule.input"),
-            trigger: "blur",
-          },
-        ],
+        factoryCode: [requiredSelect],
+        bigRollCode: [requiredInput],
+        machineCode: [requiredSelect],
       },
     };
   },
   computed: {
-    ...mapState({
-      machines: (state) => state.cut15.machines,
-    }),
-    title: function () {
-      return (
-        (this.isEdit
-          ? this.$t("common.button.edit")
-          : this.$t("common.button.add")) +
-        this.$t("ui.cd15.MachineRollMapping.column.modalName")
-      );
+    title() {
+      return this.isEdit ? this.$t("common.button.edit") : this.$t("common.button.add");
     },
     columns() {
       return [
-        {
-          label: this.$t("ui.common.column.gy.bigRollCode"),
-          prop: "bigRollCode",
-          span: 24,
-          maxlength: "30",
-          required: true,
-          // disabled: true,
-        },
-        {
-          label: this.$t("ui.data.column.loss.line"),
-          prop: "machineId",
-          span: 24,
-          required: true,
-          type: "select",
-          dictData: this.machines,
-          valueKey: "id",
-          labelKey: "machineName",
-        },
-        {
-          label: this.$t("ui.common.column.remark"),
-          prop: "remark",
-          span: 24,
-          type: "textarea",
-          maxlength: "300",
-        },
+        { prop: "factoryCode", label: this.$t("ui.data.column.cd15MachineRollMapping.factoryCode"), type: "select", dictData: this.parentDict.type.biz_factory_name, filterable: true, change: () => this.loadMachineOptions() },
+        { prop: "bigRollCode", label: this.$t("ui.data.column.cd15MachineRollMapping.bigRollCode"), span: 24, maxlength: "30", required: true },
+        { prop: "machineCode", label: this.$t("ui.data.column.cd15MachineRollMapping.machineCode"), span: 24, required: true, type: "select", dictData: this.localMachineOptions, filterable: true },
+        { prop: "remark", label: this.$t("ui.common.column.remark"), span: 24, type: "textarea", maxlength: "900" },
       ];
     },
   },
   methods: {
-    // api
     async save(params) {
+      this.loading = true;
       try {
-        this.loading = true;
-
-        const res = await editMachineRollMapping(params);
+        const res = this.isEdit ? await updateMachineRollMapping(params) : await addMachineRollMapping(params);
         this.$modal.msgSuccess(res.msg);
         this.$emit("success");
         this.hide();
-
-        this.loading = false;
-      } catch (error) {
-        console.log(error);
+      } finally {
         this.loading = false;
       }
     },
-
-    //utils
+    async loadMachineOptions() {
+      const factoryCode = this.form.factoryCode || "116";
+      const res = await getCd15MachineEnableOptions({ factoryCode });
+      const rows = Array.isArray(res) ? res : (res.rows || res.data || []);
+      this.localMachineOptions = rows.map((item) => ({ label: item.machineCode, value: item.machineCode }));
+    },
     show(data) {
       this.visible = true;
       if (data) {
         this.isEdit = true;
-        this.form = {
-          ...data,
-        };
+        this.form = { ...data };
+      } else {
+        this.form = { factoryCode: "116" };
       }
+      this.localMachineOptions = this.machineOptions;
+      this.loadMachineOptions();
     },
     hide() {
       this.form = {};
-      this.$refs.form.triggerResetForm();
-      // this.resetForm("infoForm");
+      this.$refs.form && this.$refs.form.triggerResetForm();
       this.isEdit = false;
       this.visible = false;
     },

@@ -36,7 +36,7 @@ import { numberEmpty } from "@/utils/index";
 
 import infoForm from "@/views/components/infoForm.vue";
 
-import { changeQty } from "@/api/dj/djScheduleResult";
+import { changeQtyValidate, changeQty } from "@/api/dj/djScheduleResult";
 
 export default {
   components: { infoForm },
@@ -354,23 +354,17 @@ export default {
     async save(params) {
       try {
         this.loading = true;
-        // const valid = await modelChangeValidate(params);
 
-        // if (valid.msg == "0") {
-        //   this.$confirm(
-        //     this.$t("ui.data.column.scheduleResult.modelChangeValidate")
-        //   ).then(async () => {
-        //     await modelChange(params);
-        //     this.loading = false;
-        //     this.$emit("success");
-        //     this.hide();
-        //   });
-        // } else {
-        //   await modelChange(params);
-        //   this.loading = false;
-        //   this.$emit("success");
-        //   this.hide();
-        // }
+        // 调量前置校验
+        const valid = await changeQtyValidate(params);
+        if (valid.dialogType == "CAPACITY_OVERFLOW") {
+          // 第二档：产能溢出，用户确认后继续执行
+          await this.$confirm(valid.msg, this.$t("ui.data.column.scheduleResult.insertOrder"), {
+            confirmButtonText: this.$t("common.button.confirm"),
+            cancelButtonText: this.$t("common.button.cancel"),
+            type: "warning"
+          });
+        }
 
         const res = await changeQty(params);
         this.$modal.msgSuccess(

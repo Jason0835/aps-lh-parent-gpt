@@ -122,6 +122,18 @@ export default {
       this.$refs.form.triggerConfirm(this.save)
     },
     /**
+     * 兼容请求拦截器已拆包和原始 AjaxResult 两种返回结构。
+     *
+     * @param {Object} response 接口响应
+     * @returns {Object} 业务响应体
+     */
+    resolveResponseData(response) {
+      if (!response) {
+        return {}
+      }
+      return response.data || response
+    },
+    /**
      * 校验旧批次状态，必要时由用户确认后再执行胎面自动排程。
      *
      * @param {Object} form 表单参数
@@ -135,7 +147,7 @@ export default {
       try {
         this.loading = true
         const validateResult = await validateAutoPlan(params)
-        const result = validateResult.data || {}
+        const result = this.resolveResponseData(validateResult)
         if (result.confirmRequired) {
           this.$confirm(result.message, {
             type: 'warning'
@@ -166,9 +178,10 @@ export default {
     async doAutoPlan(params) {
       try {
         const data = await autoPlan(params)
-        const message = data.data && data.data.message ? data.data.message : data.msg
+        const result = this.resolveResponseData(data)
+        const message = result.message || data.msg
         this.$modal.msgSuccess(message)
-        this.$emit('success', params.scheduleDate)
+        this.$emit('success', params.scheduleDate, result)
         this.hide()
       } catch (error) {
         console.error(error)

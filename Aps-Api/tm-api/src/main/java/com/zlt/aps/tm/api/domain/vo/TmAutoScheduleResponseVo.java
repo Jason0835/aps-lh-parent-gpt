@@ -5,6 +5,8 @@ import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 
 import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * 胎面自动排程响应对象。
@@ -17,6 +19,34 @@ import java.io.Serializable;
 public class TmAutoScheduleResponseVo implements Serializable {
 
     private static final long serialVersionUID = 1L;
+
+    /** 对外任务 ID */
+    @ApiModelProperty(value = "对外任务ID", name = "taskId")
+    private String taskId;
+
+    /** 任务状态 */
+    @ApiModelProperty(value = "任务状态", name = "taskStatus")
+    private String taskStatus;
+
+    /** 执行进度 */
+    @ApiModelProperty(value = "执行进度", name = "progress")
+    private Integer progress;
+
+    /** 当前阶段编码 */
+    @ApiModelProperty(value = "当前阶段编码", name = "currentStage")
+    private String currentStage;
+
+    /** 当前阶段名称 */
+    @ApiModelProperty(value = "当前阶段名称", name = "currentStageName")
+    private String currentStageName;
+
+    /** 异常明细数量 */
+    @ApiModelProperty(value = "异常明细数量", name = "issueCount")
+    private Integer issueCount;
+
+    /** 异常明细 */
+    @ApiModelProperty(value = "异常明细", name = "issues")
+    private List<TmAutoScheduleIssueVo> issues = new ArrayList<>();
 
     /** 是否成功 */
     @ApiModelProperty(value = "是否成功", name = "success")

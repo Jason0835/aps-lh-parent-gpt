@@ -51,6 +51,13 @@ public class Cd90NewSpecAdvanceInputPreparer {
                                             Cd90AutoScheduleInput input) {
         this.validate(context, input);
         int lookbackDays = context.getParameters().getNewSpecLookbackDays();
+        if (lookbackDays <= 0) {
+            log.info("[直裁自动排程] 新增规格历史回看天数={}, 不启用新增规格提前生产", lookbackDays);
+            return Cd90NewSpecAdvanceResult.builder()
+                    .adjustedDemandShifts(input.getDemandShifts())
+                    .advanceInfoByCloth(Collections.emptyMap())
+                    .build();
+        }
         int advanceDays = context.getParameters().getNewSpecAdvanceDays();
         LocalDate historyStartDate = context.getScheduleDate().minusDays(lookbackDays);
         LocalDate historyEndDate = context.getScheduleDate().minusDays(1);

@@ -2,15 +2,18 @@ package com.zlt.aps.lh.api.domain.entity;
 
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.google.common.collect.Lists;
 import com.ruoyi.common.core.web.domain.BaseEntity;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
+import org.apache.commons.lang3.StringUtils;
 
 import java.io.Serializable;
 import java.math.BigDecimal;
 import java.util.Date;
+import java.util.List;
 
 /**
  * APS硫化排程完成量回报接口
@@ -117,4 +120,42 @@ public class LhScheFinishQty extends BaseEntity implements Serializable {
     @ApiModelProperty(value = "三班(中班)示方类型")
     @TableField(value = "CLASS3_LH_TYPE")
     private String class3LhType;
+
+    /**
+     * 计划类型
+     *
+     * @return
+     */
+    public String getLhType() {
+        List<String> allLhType = Lists.newArrayList();
+        allLhType.add(class1LhType);
+        allLhType.add(class2LhType);
+        allLhType.add(class3LhType);
+        for (String singleClassLhType : allLhType) {
+            if (StringUtils.isNotBlank(singleClassLhType)) {
+                return singleClassLhType;
+            }
+        }
+        return null;
+    }
+    /**
+     * 获取物料+计划类型Key
+     *
+     * @return
+     */
+    public String getMaterialStatusKey() {
+        String keyFormat = "%s|*|%s";
+        String trimmedProductStatus = StringUtils.trimToEmpty(getLhType());
+        return String.format(keyFormat, materialCode, trimmedProductStatus);
+    }
+    /**
+     * 获取工厂+物料+计划类型Key
+     *
+     * @return
+     */
+    public String getFactoryMaterialStatusKey() {
+        String keyFormat = "%s|*|%s|*|%s";
+        String trimmedProductStatus = StringUtils.trimToEmpty(getLhType());
+        return String.format(keyFormat, factoryCode, materialCode, trimmedProductStatus);
+    }
 }

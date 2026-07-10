@@ -42,6 +42,58 @@ export function insertOrder(data) {
 export function getInsertTask(taskId) {
   return request({ url: `/cd90/cd90ScheduleResult/insert/task/${taskId}`, method: 'get' })
 }
+export function validateTransferMachine(data) {
+  return request({
+    url: '/cd90/cd90ScheduleResult/validateTransferMachine',
+    method: 'post',
+    headers: { 'Content-Type': 'application/json;charset=UTF-8' },
+    data
+  })
+}
+export function transferMachine(data) {
+  return request({
+    url: '/cd90/cd90ScheduleResult/transferMachine',
+    method: 'post',
+    headers: { 'Content-Type': 'application/json;charset=UTF-8' },
+    data
+  })
+}
+export function getTransferMachineTask(taskId) {
+  return request({ url: `/cd90/cd90ScheduleResult/transferMachine/task/${taskId}`, method: 'get' })
+}
+export function validateChangeQty(data) {
+  return request({
+    url: '/cd90/cd90ScheduleResult/validateChangeQty',
+    method: 'post',
+    headers: { 'Content-Type': 'application/json;charset=UTF-8' },
+    data
+  })
+}
+export function changeQty(data) {
+  return request({
+    url: '/cd90/cd90ScheduleResult/changeQty',
+    method: 'post',
+    headers: { 'Content-Type': 'application/json;charset=UTF-8' },
+    data
+  })
+}
+export function getChangeQtyTask(taskId) {
+  return request({ url: `/cd90/cd90ScheduleResult/changeQty/task/${taskId}`, method: 'get' })
+}
+export function getTimedRollingTask(taskId) {
+  return request({ url: `/cd90/cd90ScheduleResult/rollingSchedule/task/${taskId}`, method: 'get' })
+}
+export function listTimedRollingAdjustLogs(data) {
+  return request({
+    url: '/cd90/cd90ScheduleResult/rollingSchedule/adjustLog/list',
+    method: 'post',
+    headers: { 'Content-Type': 'application/json;charset=UTF-8' },
+    data
+  })
+}
+export function getTimedRollingAdjustLog(id) {
+  return request({ url: `/cd90/cd90ScheduleResult/rollingSchedule/adjustLog/${id}`, method: 'get' })
+}
 export function publishScheduleResult(data) {
   return request({ url: '/cd90/cd90ScheduleResult/publish', method: 'post', data })
 }

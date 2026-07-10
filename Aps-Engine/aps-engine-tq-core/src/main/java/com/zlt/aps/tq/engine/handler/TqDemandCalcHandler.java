@@ -330,8 +330,13 @@ public class TqDemandCalcHandler extends AbsTqScheduleStepHandler {
         double tqConsume7 = BigDecimalUtil.mul(cxClass7, coefficient);
         double tqConsume8 = BigDecimalUtil.mul(cxClass8, coefficient);
 
-        // 初始可用库存 = 当前库存 + 当天早班计划量（昨天已排的、属于今天早班的胎圈计划量）
-        double availableStock = BigDecimalUtil.add(stockQty, todayMorningPlanQty);
+        // 初始可用库存 = 当前库存 - 成型2班(D日中班)消耗量
+        // 业务背景：库存是14点统计的快照
+        //   - 成型1班(早班)在14点前已结束，消耗已反映在库存中，不再扣除
+        //   - 当天早班产出已反映在14点库存中，不再加 todayMorningPlanQty
+        //   - 成型2班(中班)在14点后开始，消耗未反映在库存中，需要扣除
+        // 因此 availableStock = stockQty - tqConsume2
+        double availableStock = BigDecimalUtil.sub(stockQty, tqConsume2);
 
         autoScheduleLogService.insertTqScheduleLog(scheduleVo.getBatchNo(), scheduleVo.getOrderNo(),
                 "计算胎圈6班计划量-初始数据",
@@ -355,12 +360,13 @@ public class TqDemandCalcHandler extends AbsTqScheduleStepHandler {
         // 备库N个班的总量（触发时用于一次性备库到触发班次）
         double backupTotalQty = 0;
 
-        // 成型1班(D日早班)消耗由库存直接供应
-        availableStock = BigDecimalUtil.sub(availableStock, tqConsume1);
-
-        // 成型2班(D日中班)消耗由库存+当天早班产出供应
-        // 当天早班产出已经在todayMorningPlanQty中计入初始库存，这里直接扣除消耗
-        availableStock = BigDecimalUtil.sub(availableStock, tqConsume2);
+        // 库存是14点统计的快照：
+        //   - 成型1班(D日早班)在14点前已结束，其消耗已反映在库存中，不再扣除
+        //   - 当天早班产出已反映在14点库存中，不再加 todayMorningPlanQty
+        //   - 成型2班(D日中班)在14点后开始生产，其消耗未反映在库存中，需要扣除
+        // 因此 availableStock 初始值 = stockQty - tqConsume2（在L334处初始化时已扣除）
+        // 此处不再重复扣除成型1班、成型2班消耗
+        // availableStock 保持初始值 = stockQty - tqConsume2，直接用于后续备库判断和计划量计算
 
         // 胎圈1班(D日中班) → 供应成型3班(D+1日夜班)
         // 公式：胎圈N班 = max(0, 成型(N+2)班消耗×系数 - 可用库存) × (100% + 损耗率)
@@ -375,14 +381,13 @@ public class TqDemandCalcHandler extends AbsTqScheduleStepHandler {
             backupTriggerClass = 1;
             // 计算备库N个班的总量（复用现有逻辑，从成型5班开始连续N个班）
             backupTotalQty = calculateBackupTotalQty(backupTriggerClass, backupShiftCount, scheduleVo, coefficient);
-            // 触发班次计划量 = max(0, 备库总量 - 当前可用库存) × 损耗率乘数
-            double pureDemand = Math.max(0, BigDecimalUtil.sub(backupTotalQty, availableStock));
-            class1Plan = BigDecimalUtil.mul(pureDemand, lossRateMultiplier);
-            class1Plan = planQtyRounding(scheduleVo, class1Plan, toolCapacity, totalConsumeQty, context);
-            scheduleVo.setClass1PlanQty(class1Plan);
-            // 更新可用库存：加上胎圈1班备库产出，扣除成型3班消耗
-            availableStock = BigDecimalUtil.add(availableStock, class1Plan);
-            availableStock = BigDecimalUtil.sub(availableStock, tqConsume3);
+            // 按阈值（SYS1101029）分摊备库总量到1~6班，返回实际总排产量
+            double actualTotalPlan = triggerBackupAndAllocate(scheduleVo, backupTriggerClass, backupTotalQty,
+                    availableStock, lossRateMultiplier, toolCapacity, totalConsumeQty, context);
+            // 备库量已预支所有后续班次消耗，availableStock 直接加上总排产量，不再逐班扣除
+            availableStock = BigDecimalUtil.add(availableStock, actualTotalPlan);
+            // 同步本地变量（用于后续 totalPlanQtyVo 累计）
+            class1Plan = getClassPlanQtyByIndex(scheduleVo, 1);
             logBackupTrigger(scheduleVo, 1, machineCount, backupShiftCount, backupTotalQty, availableStock);
         } else {
             // 【常规规格】胎圈1班按正常逻辑计算计划量
@@ -399,15 +404,19 @@ public class TqDemandCalcHandler extends AbsTqScheduleStepHandler {
             // 触发条件：当前可用库存 < SYS1101001阈值（1个班的成型消耗量）
             if (hasBackupConfig && shouldTriggerBackup(availableStock, params)) {
                 backupTriggerClass = 1;
+                // 撤销1班常规计算对 availableStock 的影响（恢复到1班排产前状态）
+                // 备库分摊会覆盖1班计划量，且备库量已预支所有后续班次消耗，不再逐班扣除
+                availableStock = BigDecimalUtil.add(availableStock, tqConsume3);
+                availableStock = BigDecimalUtil.sub(availableStock, class1Plan);
                 // 计算备库N个班的总量（从成型5班开始连续N个班，超出成型8班用平均值估算）
                 backupTotalQty = calculateBackupTotalQty(backupTriggerClass, backupShiftCount, scheduleVo, coefficient);
-                // 触发班次计划量 = max(0, 备库总量 - 当前可用库存) × 损耗率乘数
-                double pureDemand = Math.max(0, BigDecimalUtil.sub(backupTotalQty, availableStock));
-                class1Plan = BigDecimalUtil.mul(pureDemand, lossRateMultiplier);
-                class1Plan = planQtyRounding(scheduleVo, class1Plan, toolCapacity, totalConsumeQty, context);
-                scheduleVo.setClass1PlanQty(class1Plan);
-                // 更新可用库存：加上胎圈1班备库产出
-                availableStock = BigDecimalUtil.add(availableStock, class1Plan);
+                // 按阈值（SYS1101029）分摊备库总量到1~6班，返回实际总排产量
+                double actualTotalPlan = triggerBackupAndAllocate(scheduleVo, backupTriggerClass, backupTotalQty,
+                        availableStock, lossRateMultiplier, toolCapacity, totalConsumeQty, context);
+                // 备库量已预支所有后续班次消耗，availableStock 直接加上总排产量
+                availableStock = BigDecimalUtil.add(availableStock, actualTotalPlan);
+                // 同步本地变量
+                class1Plan = getClassPlanQtyByIndex(scheduleVo, 1);
                 logBackupTrigger(scheduleVo, 1, machineCount, backupShiftCount, backupTotalQty, availableStock);
             }
         }
@@ -428,12 +437,15 @@ public class TqDemandCalcHandler extends AbsTqScheduleStepHandler {
             // 【备库触发判断】胎圈2班排完后判断
             if (hasBackupConfig && shouldTriggerBackup(availableStock, params)) {
                 backupTriggerClass = 2;
+                // 撤销2班常规计算对 availableStock 的影响
+                availableStock = BigDecimalUtil.add(availableStock, tqConsume4);
+                availableStock = BigDecimalUtil.sub(availableStock, class2Plan);
                 backupTotalQty = calculateBackupTotalQty(backupTriggerClass, backupShiftCount, scheduleVo, coefficient);
-                double pureDemand = Math.max(0, BigDecimalUtil.sub(backupTotalQty, availableStock));
-                class2Plan = BigDecimalUtil.mul(pureDemand, lossRateMultiplier);
-                class2Plan = planQtyRounding(scheduleVo, class2Plan, toolCapacity, totalConsumeQty, context);
-                scheduleVo.setClass2PlanQty(class2Plan);
-                availableStock = BigDecimalUtil.add(availableStock, class2Plan);
+                // 按阈值分摊备库总量到2~6班
+                double actualTotalPlan = triggerBackupAndAllocate(scheduleVo, backupTriggerClass, backupTotalQty,
+                        availableStock, lossRateMultiplier, toolCapacity, totalConsumeQty, context);
+                availableStock = BigDecimalUtil.add(availableStock, actualTotalPlan);
+                class2Plan = getClassPlanQtyByIndex(scheduleVo, 2);
                 logBackupTrigger(scheduleVo, 2, machineCount, backupShiftCount, backupTotalQty, availableStock);
             }
         }
@@ -454,12 +466,15 @@ public class TqDemandCalcHandler extends AbsTqScheduleStepHandler {
             // 【备库触发判断】胎圈3班排完后判断
             if (hasBackupConfig && shouldTriggerBackup(availableStock, params)) {
                 backupTriggerClass = 3;
+                // 撤销3班常规计算对 availableStock 的影响
+                availableStock = BigDecimalUtil.add(availableStock, tqConsume5);
+                availableStock = BigDecimalUtil.sub(availableStock, class3Plan);
                 backupTotalQty = calculateBackupTotalQty(backupTriggerClass, backupShiftCount, scheduleVo, coefficient);
-                double pureDemand = Math.max(0, BigDecimalUtil.sub(backupTotalQty, availableStock));
-                class3Plan = BigDecimalUtil.mul(pureDemand, lossRateMultiplier);
-                class3Plan = planQtyRounding(scheduleVo, class3Plan, toolCapacity, totalConsumeQty, context);
-                scheduleVo.setClass3PlanQty(class3Plan);
-                availableStock = BigDecimalUtil.add(availableStock, class3Plan);
+                // 按阈值分摊备库总量到3~6班
+                double actualTotalPlan = triggerBackupAndAllocate(scheduleVo, backupTriggerClass, backupTotalQty,
+                        availableStock, lossRateMultiplier, toolCapacity, totalConsumeQty, context);
+                availableStock = BigDecimalUtil.add(availableStock, actualTotalPlan);
+                class3Plan = getClassPlanQtyByIndex(scheduleVo, 3);
                 logBackupTrigger(scheduleVo, 3, machineCount, backupShiftCount, backupTotalQty, availableStock);
             }
         }
@@ -480,12 +495,15 @@ public class TqDemandCalcHandler extends AbsTqScheduleStepHandler {
             // 【备库触发判断】胎圈4班排完后判断
             if (hasBackupConfig && shouldTriggerBackup(availableStock, params)) {
                 backupTriggerClass = 4;
+                // 撤销4班常规计算对 availableStock 的影响
+                availableStock = BigDecimalUtil.add(availableStock, tqConsume6);
+                availableStock = BigDecimalUtil.sub(availableStock, class4Plan);
                 backupTotalQty = calculateBackupTotalQty(backupTriggerClass, backupShiftCount, scheduleVo, coefficient);
-                double pureDemand = Math.max(0, BigDecimalUtil.sub(backupTotalQty, availableStock));
-                class4Plan = BigDecimalUtil.mul(pureDemand, lossRateMultiplier);
-                class4Plan = planQtyRounding(scheduleVo, class4Plan, toolCapacity, totalConsumeQty, context);
-                scheduleVo.setClass4PlanQty(class4Plan);
-                availableStock = BigDecimalUtil.add(availableStock, class4Plan);
+                // 按阈值分摊备库总量到4~6班
+                double actualTotalPlan = triggerBackupAndAllocate(scheduleVo, backupTriggerClass, backupTotalQty,
+                        availableStock, lossRateMultiplier, toolCapacity, totalConsumeQty, context);
+                availableStock = BigDecimalUtil.add(availableStock, actualTotalPlan);
+                class4Plan = getClassPlanQtyByIndex(scheduleVo, 4);
                 logBackupTrigger(scheduleVo, 4, machineCount, backupShiftCount, backupTotalQty, availableStock);
             }
         }
@@ -506,12 +524,15 @@ public class TqDemandCalcHandler extends AbsTqScheduleStepHandler {
             // 【备库触发判断】胎圈5班排完后判断
             if (hasBackupConfig && shouldTriggerBackup(availableStock, params)) {
                 backupTriggerClass = 5;
+                // 撤销5班常规计算对 availableStock 的影响
+                availableStock = BigDecimalUtil.add(availableStock, tqConsume7);
+                availableStock = BigDecimalUtil.sub(availableStock, class5Plan);
                 backupTotalQty = calculateBackupTotalQty(backupTriggerClass, backupShiftCount, scheduleVo, coefficient);
-                double pureDemand = Math.max(0, BigDecimalUtil.sub(backupTotalQty, availableStock));
-                class5Plan = BigDecimalUtil.mul(pureDemand, lossRateMultiplier);
-                class5Plan = planQtyRounding(scheduleVo, class5Plan, toolCapacity, totalConsumeQty, context);
-                scheduleVo.setClass5PlanQty(class5Plan);
-                availableStock = BigDecimalUtil.add(availableStock, class5Plan);
+                // 按阈值分摊备库总量到5~6班（第6班会塞入所有剩余量）
+                double actualTotalPlan = triggerBackupAndAllocate(scheduleVo, backupTriggerClass, backupTotalQty,
+                        availableStock, lossRateMultiplier, toolCapacity, totalConsumeQty, context);
+                availableStock = BigDecimalUtil.add(availableStock, actualTotalPlan);
+                class5Plan = getClassPlanQtyByIndex(scheduleVo, 5);
                 logBackupTrigger(scheduleVo, 5, machineCount, backupShiftCount, backupTotalQty, availableStock);
             }
         }
@@ -519,11 +540,10 @@ public class TqDemandCalcHandler extends AbsTqScheduleStepHandler {
         // 胎圈6班(D+2日早班) → 供应成型8班(D+2日中班)，滚动排程
         double class6Plan = 0;
         if (backupTriggerClass > 0) {
-            // 触发了备库：胎圈6班不排产，交接班库存=当前可用库存（已包含备库量）
-            scheduleVo.setUseBackupConfigFlag("1");
+            // 触发了备库：第6班计划量已在 triggerBackupAndAllocate 分摊时设置，此处不重置
+            // 备库标记已在 triggerBackupAndAllocate 内设置（useBackupConfigFlag、backupTriggerClass、backupRemainingQty）
             scheduleVo.setBackupShiftCount(backupShiftCount);
-            scheduleVo.setBackupTriggerClass(backupTriggerClass);
-            scheduleVo.setClass6PlanQty(0D);
+            class6Plan = getClassPlanQtyByIndex(scheduleVo, 6);
             scheduleVo.setClassStock(availableStock);
         } else {
             // 未触发备库：原 productStockDay 逻辑
@@ -545,7 +565,13 @@ public class TqDemandCalcHandler extends AbsTqScheduleStepHandler {
         double oneDayTqConsume = BigDecimalUtil.add(tqConsume6, BigDecimalUtil.add(tqConsume7, tqConsume8));
         scheduleVo.setSupplyDemandRatio(oneDayTqConsume > 0 ? BigDecimalUtil.div(scheduleVo.getClassStock(), oneDayTqConsume, 4) : 0);
 
-        // 累加总计划量
+        // 累加总计划量（备库触发后统一从 scheduleVo 重新读取，避免分摊后本地变量未同步）
+        class1Plan = getClassPlanQtyByIndex(scheduleVo, 1);
+        class2Plan = getClassPlanQtyByIndex(scheduleVo, 2);
+        class3Plan = getClassPlanQtyByIndex(scheduleVo, 3);
+        class4Plan = getClassPlanQtyByIndex(scheduleVo, 4);
+        class5Plan = getClassPlanQtyByIndex(scheduleVo, 5);
+        class6Plan = getClassPlanQtyByIndex(scheduleVo, 6);
         totalPlanQtyVo.setTotalClass1PlanQty(BigDecimalUtil.add(totalPlanQtyVo.getTotalClass1PlanQty(), class1Plan));
         totalPlanQtyVo.setTotalClass2PlanQty(BigDecimalUtil.add(totalPlanQtyVo.getTotalClass2PlanQty(), class2Plan));
         totalPlanQtyVo.setTotalClass3PlanQty(BigDecimalUtil.add(totalPlanQtyVo.getTotalClass3PlanQty(), class3Plan));
@@ -563,6 +589,112 @@ public class TqDemandCalcHandler extends AbsTqScheduleStepHandler {
                         "1班计划量：" + class1Plan + "，2班计划量：" + class2Plan + "，3班计划量：" + class3Plan,
                         "4班计划量：" + class4Plan + "，5班计划量：" + class5Plan + "，6班计划量：" + class6Plan,
                         "交接班库存：" + scheduleVo.getClassStock() + "，供需比率：" + scheduleVo.getSupplyDemandRatio()));
+    }
+
+    /**
+     * 按班次索引设置对应的胎圈计划量。
+     *
+     * @param scheduleVo 排程结果VO
+     * @param classNum 班次（1-6）
+     * @param qty 计划量
+     */
+    private void setClassPlanQtyByIndex(TqScheduleResultVo scheduleVo, int classNum, double qty) {
+        switch (classNum) {
+            case 1: scheduleVo.setClass1PlanQty(qty); break;
+            case 2: scheduleVo.setClass2PlanQty(qty); break;
+            case 3: scheduleVo.setClass3PlanQty(qty); break;
+            case 4: scheduleVo.setClass4PlanQty(qty); break;
+            case 5: scheduleVo.setClass5PlanQty(qty); break;
+            case 6: scheduleVo.setClass6PlanQty(qty); break;
+            default: break;
+        }
+    }
+
+    /**
+     * 按班次索引获取对应的胎圈计划量。
+     *
+     * @param scheduleVo 排程结果VO
+     * @param classNum 班次（1-6）
+     * @return 计划量
+     */
+    private double getClassPlanQtyByIndex(TqScheduleResultVo scheduleVo, int classNum) {
+        switch (classNum) {
+            case 1: return scheduleVo.getClass1PlanQty() == null ? 0D : scheduleVo.getClass1PlanQty();
+            case 2: return scheduleVo.getClass2PlanQty() == null ? 0D : scheduleVo.getClass2PlanQty();
+            case 3: return scheduleVo.getClass3PlanQty() == null ? 0D : scheduleVo.getClass3PlanQty();
+            case 4: return scheduleVo.getClass4PlanQty() == null ? 0D : scheduleVo.getClass4PlanQty();
+            case 5: return scheduleVo.getClass5PlanQty() == null ? 0D : scheduleVo.getClass5PlanQty();
+            case 6: return scheduleVo.getClass6PlanQty() == null ? 0D : scheduleVo.getClass6PlanQty();
+            default: return 0D;
+        }
+    }
+
+    /**
+     * 触发备库后，按阈值（SYS1101029）分摊备库总量到触发班及后续班次。
+     *
+     * <p>分摊规则：</p>
+     * <ul>
+     *   <li>从触发班次开始，每班分摊 min(剩余量, 阈值)</li>
+     *   <li>分到第6班时，把剩余量全部塞入第6班（即使超过阈值）</li>
+     *   <li>对每班计划量调用 planQtyRounding 进行取整和工装限制</li>
+     * </ul>
+     *
+     * <p>注意：本方法不修改 availableStock，仅设置各班计划量和备库标记。
+     * 调用方负责在备库触发后统一更新 availableStock（备库量已预支所有后续班次消耗，不再逐班扣除）。</p>
+     *
+     * @param scheduleVo 排程结果VO
+     * @param triggerClass 触发班次（1-5）
+     * @param backupTotalQty 备库N班总量
+     * @param availableStock 当前可用库存（用于计算纯需求量）
+     * @param lossRateMultiplier 损耗率乘数
+     * @param toolCapacity 工装容量
+     * @param totalConsumeQty 月计划余量
+     * @param context 排程上下文（用于取阈值参数）
+     * @return 实际总排产量（分摊后各班计划量之和）
+     */
+    private double triggerBackupAndAllocate(TqScheduleResultVo scheduleVo, int triggerClass,
+                                            double backupTotalQty, double availableStock,
+                                            double lossRateMultiplier, BigDecimal toolCapacity,
+                                            Double totalConsumeQty, TqScheduleContext context) {
+        // 纯需求量 = max(0, 备库总量 - 当前可用库存)
+        double pureDemand = Math.max(0, BigDecimalUtil.sub(backupTotalQty, availableStock));
+        // 总计划量 = 纯需求量 × 损耗率乘数
+        double totalPlanQty = BigDecimalUtil.mul(pureDemand, lossRateMultiplier);
+
+        // 阈值（多规格模式下，触发备库的胎圈当班初始排产上限，默认1000）
+        TqScheduleParams params = context.getParams();
+        double threshold = params.getBackupShiftThreshold() == null ? 1000D : params.getBackupShiftThreshold();
+
+        // 按阈值分摊到 triggerClass ~ 6 班
+        double remainingQty = totalPlanQty;
+        for (int classNum = triggerClass; classNum <= 6 && remainingQty > 0; classNum++) {
+            double classPlan;
+            if (classNum == 6) {
+                // 第6班：把剩余量全部塞入（即使超过阈值，避免超出6班范围丢失量）
+                classPlan = remainingQty;
+            } else {
+                classPlan = Math.min(remainingQty, threshold);
+            }
+            // 对单班计划量做取整和工装限制
+            classPlan = planQtyRounding(scheduleVo, classPlan, toolCapacity, totalConsumeQty, context);
+            setClassPlanQtyByIndex(scheduleVo, classNum, classPlan);
+            remainingQty = BigDecimalUtil.sub(remainingQty, classPlan);
+        }
+
+        // 实际总排产量（分摊后各班计划量之和，可能因取整略有差异）
+        double actualTotalPlan = 0;
+        for (int classNum = triggerClass; classNum <= 6; classNum++) {
+            actualTotalPlan = BigDecimalUtil.add(actualTotalPlan, getClassPlanQtyByIndex(scheduleVo, classNum));
+        }
+
+        // 设置备库标记和剩余备库量（供 S3/S3.5 阶段使用）
+        scheduleVo.setUseBackupConfigFlag("1");
+        scheduleVo.setBackupTriggerClass(triggerClass);
+        // backupRemainingQty 初始化为0：S3阶段排产时未排完的量会动态累加到此字段
+        // S3.5阶段用此值限制回填量，避免过度回填
+        scheduleVo.setBackupRemainingQty(0D);
+
+        return actualTotalPlan;
     }
 
     /**

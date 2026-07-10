@@ -1220,16 +1220,19 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
             Map<String, List<MdmSkuConstructionRef>> constructionStatusGroup = constructionInfoMap.get(materialCode);
             if (constructionStatusGroup != null) {
                 List<MdmSkuConstructionRef> constructionConfigurationList = constructionStatusGroup.get(insertItem.getConstructionStage());
-                if (!CollectionUtils.isEmpty(constructionConfigurationList)) {
-                    MdmSkuConstructionRef constructionInfo = constructionConfigurationList.get(0);
-                    insertItem.setEmbryoCode(constructionInfo.getEmbryoCode());
-                    insertItem.setIsZeroRack(constructionInfo.getIsZeroRack());
-                    insertItem.setEmbryoNo(constructionInfo.getEmbryoNo());
-                    insertItem.setTextNo(constructionInfo.getTextNo());
-                    insertItem.setLhNo(constructionInfo.getLhNo());
-                    insertItem.setProductStatus(constructionInfo.getTrialStatus());
-                    insertItem.setMainMaterialDesc(constructionInfo.getMainMaterialDesc());
+                if (CollectionUtils.isEmpty(constructionConfigurationList)) { // 如果找不到对应阶段的施工，则找阶段编码最大的一笔
+                    Entry<String, List<MdmSkuConstructionRef>> maxEntry = constructionStatusGroup.entrySet().stream()
+                            .max(Comparator.comparing(Entry::getKey)).get();
+                    constructionConfigurationList = maxEntry.getValue();
                 }
+                MdmSkuConstructionRef constructionInfo = constructionConfigurationList.get(0);
+                insertItem.setEmbryoCode(constructionInfo.getEmbryoCode());
+                insertItem.setIsZeroRack(constructionInfo.getIsZeroRack());
+                insertItem.setEmbryoNo(constructionInfo.getEmbryoNo());
+                insertItem.setTextNo(constructionInfo.getTextNo());
+                insertItem.setLhNo(constructionInfo.getLhNo());
+                insertItem.setProductStatus(constructionInfo.getTrialStatus());
+                insertItem.setMainMaterialDesc(constructionInfo.getMainMaterialDesc());
             }
             // 日硫化量（单模），单条硫化时间---数据源：SKU双模日硫化量， 日标准产量/2，硫化总时间(s)
             MdmSkuLhCapacity mdmSkuLhCapacity = productLhCapacityMap.get(materialCode);

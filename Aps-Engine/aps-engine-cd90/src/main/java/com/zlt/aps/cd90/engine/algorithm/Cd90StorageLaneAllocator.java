@@ -35,9 +35,21 @@ public class Cd90StorageLaneAllocator {
      * @return 分配结果
      */
     public Cd90StorageLaneAllocationResult allocate(String clothCode,
-                                                     BigDecimal planQuantity,
-                                                     BigDecimal vehiclePlanQuantity,
-                                                     List<Cd90StorageLaneState> originalLanes) {
+                                                      BigDecimal planQuantity,
+                                                      BigDecimal vehiclePlanQuantity,
+                                                      List<Cd90StorageLaneState> originalLanes) {
+        return allocate(clothCode, planQuantity, vehiclePlanQuantity, originalLanes, false);
+    }
+
+    /**
+     * 硬插单分配时 isHardInsert=true，可将已被消耗(vehicleCount=0)但残留旧帘布标签的库位视为空库位，
+     * 让插单帘布优先获得这些库位资源。
+     */
+    public Cd90StorageLaneAllocationResult allocate(String clothCode,
+                                                      BigDecimal planQuantity,
+                                                      BigDecimal vehiclePlanQuantity,
+                                                      List<Cd90StorageLaneState> originalLanes,
+                                                      boolean isHardInsert) {
         if (planQuantity == null || planQuantity.signum() <= 0) {
             throw new IllegalArgumentException("库排分配计划量必须大于0");
         }
@@ -57,11 +69,12 @@ public class Cd90StorageLaneAllocator {
                         .thenComparing(Cd90StorageLaneState::getLaneCode))
                 .collect(Collectors.toList());
 
-        // 第二段:空库排(clothCode 空 且 vehicleCount=0),按 laneCode 稳定排序
+        // 第二段:空库排,硬插单时 vehicleCount=0 即视为空(不论是否残留旧帘布标签)
         List<Cd90StorageLaneState> emptyLanes = lanes.stream()
                 .filter(item -> item.getMaxVehicleCount() > 0)
-                .filter(item -> !StringUtils.hasText(item.getClothCode()))
-                .filter(item -> item.getVehicleCount() == 0)
+                .filter(item -> isHardInsert
+                        ? item.getVehicleCount() == 0
+                        : !StringUtils.hasText(item.getClothCode()) && item.getVehicleCount() == 0)
                 .sorted(Comparator.comparing(Cd90StorageLaneState::getLaneCode))
                 .collect(Collectors.toList());
 

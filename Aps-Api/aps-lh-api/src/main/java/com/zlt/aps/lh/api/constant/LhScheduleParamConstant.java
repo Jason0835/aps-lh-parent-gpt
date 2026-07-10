@@ -152,6 +152,8 @@ public final class LhScheduleParamConstant {
     public static final String MOULD_CLEANING_ADVANCE_DAYS = "SYS0308002";
     /** 清洗跳过近收尾天数阈值（机台当前物料剩余天数 <= 该值时跳过清洗） */
     public static final String CLEANING_SKIP_ENDING_DAY_THRESHOLD = "SYS0308003";
+    /** 计划性维修固定排产量（条），维修开始班次固定只排该数量，不按时间折算 */
+    public static final String PLANNED_REPAIR_FIXED_QTY = "SYS0308010";
     /** 胶囊预警次数 */
     public static final String CAPSULE_WARNING_COUNT = "SYS0309001";
     /** 胶囊强制下机次数 */
@@ -184,6 +186,8 @@ public final class LhScheduleParamConstant {
     public static final String SMALL_BATCH_SKU_THRESHOLD = "SYS0311003";
     /** 模具交替计划天数 */
     public static final String MOULD_CHANGE_PLAN_DAYS = "SYS0302011";
+    /** 模具交替计划导出模具号往前追溯天数（机台在机信息取排程日期前N天内最近一条） */
+    public static final String MOULD_CHANGE_PLAN_LOOKBACK_DAYS = "SYS0302012";
     /** 局部搜索开关（0-关闭，1-开启） */
     public static final String ENABLE_LOCAL_SEARCH = "SYS0304010";
     /** 局部搜索候选机台阈值（小于该值时启用） */

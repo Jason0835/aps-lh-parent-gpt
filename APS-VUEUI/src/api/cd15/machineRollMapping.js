@@ -1,34 +1,29 @@
-import request,{ downloadLink } from '@/utils/request'
+import request, { downloadLink } from '@/utils/request'
 
-/**
- * 根据条件查询帘布大卷与机台的映射表列表
- * @param {Object} query
- * @returns
- */
 export function listMachineRollMapping(query) {
-  return request({
-    url: 'cd15/machineRollMapping/list',
-    method: 'post',
-    data: query
-  })
+  return request({ url: '/cd15/machineRollMapping/list', method: 'post', data: query })
 }
-/**
- * 修改帘布大卷与机台的映射表
- * @param {Object} query
- * @returns
- */
-export function editMachineRollMapping(query) {
-  return request({
-    url: 'cd15/machineRollMapping/save',
-    method: 'post',
-    data: query
-  })
+
+export function getMachineRollMapping(id) {
+  return request({ url: `/cd15/machineRollMapping/getInfo/${id}`, method: 'get' })
 }
-export function removeMachineRollMapping(query) {
-  return request({
-    url: '/cd15/machineRollMapping/remove',
-    method: 'post',
-    data: query
-  })
+
+export function addMachineRollMapping(data) {
+  return request({ url: '/cd15/machineRollMapping/add', method: 'post', headers: { 'Content-Type': 'application/json;charset=UTF-8' }, data })
 }
-  
+
+export function updateMachineRollMapping(data) {
+  return request({ url: '/cd15/machineRollMapping/edit', method: 'post', headers: { 'Content-Type': 'application/json;charset=UTF-8' }, data })
+}
+
+export function editMachineRollMapping(data) {
+  return data && data.id ? updateMachineRollMapping(data) : addMachineRollMapping(data)
+}
+
+export function removeMachineRollMapping(data) {
+  return request({ url: '/cd15/machineRollMapping/remove', method: 'post', data })
+}
+
+export function exportMachineRollMapping(query) {
+  return downloadLink('/cd15/machineRollMapping/export', query)
+}

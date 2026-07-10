@@ -119,15 +119,10 @@ public class DjStockServiceImpl extends AbstractDocService<DjStock> implements D
             return AjaxResult.error(I18nUtil.getMessage("ui.message.import.fail") + "," + successNum + "," + failureNum,
                     importErrorLogs);
         }
-
         for (DjStock entity : importList) {
             entity.setDataSource(ApsConstant.DATA_SOURCE_SYSTEM);
-            if (entity.getId() != null) {
-                stockMapper.updateById(entity);
-            } else {
-                stockMapper.insert(entity);
-            }
         }
+        baseDao.saveBatch(importList);
 
         if (failureNum > 0) {
             return AjaxResult.error(I18nUtil.getMessage("ui.message.import.fail") + "," + successNum + "," + failureNum,

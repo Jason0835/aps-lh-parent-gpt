@@ -1,7 +1,9 @@
 package com.zlt.aps.lh.handler;
 
+import com.google.common.collect.Lists;
 import com.zlt.aps.lh.api.constant.LhScheduleConstant;
 import com.zlt.aps.lh.api.constant.LhScheduleParamConstant;
+import com.zlt.aps.lh.api.domain.dto.CuringMonthPlanTotalResult;
 import com.zlt.aps.lh.api.domain.dto.MachineScheduleDTO;
 import com.zlt.aps.lh.api.domain.dto.SkuDailyPlanQuotaDTO;
 import com.zlt.aps.lh.api.domain.dto.SkuScheduleDTO;
@@ -13,10 +15,12 @@ import com.zlt.aps.lh.api.enums.ConstructionStageEnum;
 import com.zlt.aps.lh.api.enums.ScheduleStepEnum;
 import com.zlt.aps.lh.api.enums.ScheduleTypeEnum;
 import com.zlt.aps.lh.api.enums.SkuTagEnum;
+import com.zlt.aps.lh.component.CuringMonthPlanTotalCalculator;
 import com.zlt.aps.lh.component.MonthPlanDateResolver;
 import com.zlt.aps.lh.component.TargetScheduleQtyResolver;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.strategy.IEndingJudgmentStrategy;
+import com.zlt.aps.lh.engine.strategy.support.EarlyProductionChecker;
 import com.zlt.aps.lh.util.*;
 import com.zlt.aps.mdm.api.domain.entity.MdmSkuLhCapacity;
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
@@ -29,6 +33,7 @@ import javax.annotation.Resource;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.time.ZoneId;
 import java.util.*;
 
@@ -564,22 +569,20 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
      */
     private SurplusCalculation calculateSurplusQty(LhScheduleContext context, FactoryMonthPlanProductionFinalResult plan) {
         int actualFinishedQty = calculateFinishedQty(context, plan);
-        int scheDayFinishQty = resolveScheDayFinishQty(context, plan.getMaterialCode());
+        int scheDayFinishQty = resolveScheDayFinishQty(context, plan);
+        YearMonth productionYearMonth = SkuMonthPlanCalculator.getProductionYearAndMonth(context.getScheduleDate());
         //20260702+ 欠产都只看当月
-        int lastMonthOverdueQty;
-        FactoryMonthPlanProductionFinalResult firstMonthPlan = context.getSkuYearMonthFinal(plan, context.getFirstYearMonth());
-        if (null == firstMonthPlan) {
-            lastMonthOverdueQty = BigDecimal.ZERO.intValue();
-        } else {
-            lastMonthOverdueQty = resolveEffectiveLastMonthOverdueQty(firstMonthPlan);
-        }
-//        CuringMonthPlanTotalResult monthPlanTotalResult = CuringMonthPlanTotalCalculator.calculate(
-//                context, plan, toLocalDate(context.getScheduleDate()), toLocalDate(context.getWindowEndDate()),
-//                actualFinishedQty, lastMonthOverdueQty);
-//        int totalPlanQty = monthPlanTotalResult.getMonthPlanTotal();
+        List<Date> allProductionDate = Lists.newArrayList(context.getAllProductionDateInfo());
+        List<FactoryMonthPlanProductionFinalResult> allMonthPlanList = context.getLoadedMonthPlanList();
+        Map<YearMonth, Integer> monthOverdueQtyMap = SkuMonthPlanCalculator.getOverdueProduction(context.isNextMonthFinal(), allProductionDate, allMonthPlanList, plan);
         //20260702+ 计划量，支持跨月连续
-        int totalPlanQty = context.getPlanQty(plan);
-        int remainingDemandQty = Math.max(0, totalPlanQty - actualFinishedQty + lastMonthOverdueQty);
+        Map<YearMonth, FactoryMonthPlanProductionFinalResult> dayProductionPlanMap = SkuMonthPlanCalculator.getHasProductionPlan(allMonthPlanList, allProductionDate, plan.getFactoryCode(), plan.getMaterialCode(), plan.getProductStatus());
+        Map<YearMonth, Integer> monthPlanQtyMap = context.getMonthPlanQty(plan);
+        boolean isCrossMonth = context.isCrossMonthByProductionDateInfo();
+        //当前排产计划总量
+        int totalPlanQty = getMonthPlanTotalQty(monthPlanQtyMap);
+        int remainingDemandQty = SkuMonthPlanCalculator.getSurplusQty(productionYearMonth, allProductionDate, dayProductionPlanMap, monthOverdueQtyMap, monthPlanQtyMap, actualFinishedQty);
+        remainingDemandQty = Math.max(BigDecimal.ZERO.intValue(), remainingDemandQty);
         // 保留逐日超产统计用于诊断日志，不参与余量计算
         int ignoredOverProductionQty = calculateIgnoredOverProductionQty(context, plan);
 //        if (lastMonthOverdueQty != 0 || scheDayFinishQty > 0 || monthPlanTotalResult.isCrossMonth()) {
@@ -592,16 +595,50 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
 //                    monthPlanTotalResult.getCurrentMonthPlanTotal(), monthPlanTotalResult.getCrossMonthPlanTotal(),
 //                    monthPlanTotalResult.getCalculateScene());
 //        }
-        if (lastMonthOverdueQty != 0 || scheDayFinishQty > 0 || context.isCrossMonthByProductionDateInfo()) {
+        //超欠产信息 由resolveEffectiveLastMonthOverdueQty(plan)改为monthOverdueQtyMap直接获取
+        int lastMonthOverdueQty = monthOverdueQtyMap.values().stream().mapToInt(Integer::intValue).sum();
+        //月计划总量
+        int monthPlanTotalQty = getMonthPlanTotalQty(monthPlanQtyMap);
+        if (lastMonthOverdueQty != 0 || scheDayFinishQty > 0 || isCrossMonth) {
             log.info("硫化余量计算完成, materialCode: {}, monthPlanQty: {}, monthFinishedAndScheDayQty: {}, "
                             + "scheDayFinishQty: {}, lastMonthValidFlag: {}, lastMonthOverdueQty: {}, surplusQty: {}, "
-                            + "crossMonth: {}",
+                            + "crossMonth: {}, monthPlanTotalQty: {}",
                     plan.getMaterialCode(), totalPlanQty, actualFinishedQty, scheDayFinishQty,
                     plan.getLastMonthValidFlag(), lastMonthOverdueQty, remainingDemandQty,
-                    context.isCrossMonthByProductionDateInfo());
+                    isCrossMonth, monthPlanTotalQty);
         }
         return new SurplusCalculation(remainingDemandQty, actualFinishedQty, ignoredOverProductionQty,
-                lastMonthOverdueQty, totalPlanQty);
+                lastMonthOverdueQty, monthPlanTotalQty);
+    }
+
+    /**
+     * 根据各月的计划量
+     *
+     * @param monthPlanQtyMap
+     * @return
+     */
+    private int getMonthPlanTotalQty(Map<YearMonth, Integer> monthPlanQtyMap) {
+        if (CollectionUtils.isEmpty(monthPlanQtyMap)) {
+            return BigDecimal.ZERO.intValue();
+        }
+        return monthPlanQtyMap.values().stream().mapToInt(Integer::intValue).sum();
+    }
+
+    /**
+     * 旧有的月计划总量计算
+     *
+     * @param context
+     * @param plan
+     * @param actualFinishedQty
+     * @param lastMonthOverdueQty resolveEffectiveLastMonthOverdueQty(plan);
+     * @return
+     */
+    private int getMonthPlanTotalQty(LhScheduleContext context, FactoryMonthPlanProductionFinalResult plan, int actualFinishedQty, int lastMonthOverdueQty) {
+        CuringMonthPlanTotalResult monthPlanTotalResult = CuringMonthPlanTotalCalculator.calculate(
+                context, plan, toLocalDate(context.getScheduleDate()), toLocalDate(context.getWindowEndDate()),
+                actualFinishedQty, lastMonthOverdueQty);
+        //月计划总量
+        return monthPlanTotalResult.getMonthPlanTotal();
     }
 
     /**
@@ -633,7 +670,7 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
         if (StringUtils.isNotEmpty(materialCode)) {
             Integer monthFinishedQty = resolveMaterialMonthFinishedQty(context, plan);
             if (Objects.nonNull(monthFinishedQty)) {
-                return Math.max(monthFinishedQty, 0) + resolveScheDayFinishQty(context, materialCode);
+                return Math.max(monthFinishedQty, 0) + resolveScheDayFinishQty(context, plan);
             }
             if (canFallbackToPreviousFinishedQty(context)) {
                 Integer dayFinishedQty = context.getMaterialDayFinishedQtyMap().get(
@@ -702,7 +739,7 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
         }
         int currentDayPlanQty = MonthPlanDateResolver.resolveDayQty(
                 context, plan.getMaterialCode(), plan.getProductStatus(), scheduleDate);
-        int scheDayFinishQty = resolveScheDayFinishQty(context, plan.getMaterialCode());
+        int scheDayFinishQty = resolveScheDayFinishQty(context, plan);
         int currentDayIgnoredOverQty = Math.max(0, scheDayFinishQty - currentDayPlanQty);
         if (currentDayIgnoredOverQty > 0) {
             ignoredOverProductionQty += currentDayIgnoredOverQty;
@@ -716,15 +753,17 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
     /**
      * 获取指定物料的T日排程班次完成量（class1FinishQty汇总值）。
      *
-     * @param context      排程上下文
-     * @param materialCode 物料编码
+     * @param context 排程上下文
+     * @param plan    计划信息
      * @return T日班次完成量，无记录时返回0
+     * @
      */
-    private int resolveScheDayFinishQty(LhScheduleContext context, String materialCode) {
-        if (StringUtils.isEmpty(materialCode)) {
+    private int resolveScheDayFinishQty(LhScheduleContext context, FactoryMonthPlanProductionFinalResult plan) {
+        String materialStatusKey = plan.getMaterialStatusKey();
+        if (StringUtils.isEmpty(materialStatusKey)) {
             return 0;
         }
-        Integer scheDayFinishQty = context.getMaterialScheDayFinishQtyMap().get(materialCode);
+        Integer scheDayFinishQty = context.getMaterialScheDayFinishQtyMap().get(materialStatusKey);
         return Objects.nonNull(scheDayFinishQty) ? Math.max(scheDayFinishQty, 0) : 0;
     }
 
@@ -775,7 +814,7 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
                 plan.getMaterialCode(), plan.getProductStatus());
         int rawCarryForwardQty = context.getCarryForwardQtyMap().getOrDefault(materialStatusKey, 0);
         int carryForwardQty = resolveEffectiveCarryForwardQty(context, plan.getMaterialCode(), rawCarryForwardQty);
-        int scheDayFinishQty = resolveScheDayFinishQty(context, plan.getMaterialCode());
+        int scheDayFinishQty = resolveScheDayFinishQty(context, plan);
         int windowPlanQty = MonthPlanDateResolver.resolveWindowPlanQty(context, plan.getMaterialCode(),
                 plan.getProductStatus(),
                 toLocalDate(context.getScheduleDate()), toLocalDate(context.getWindowEndDate()));
@@ -794,7 +833,7 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
         Map<LocalDate, SkuDailyPlanQuotaDTO> dailyPlanQuotaMap = buildDailyPlanQuotaMap(
                 context, plan, dto.getMaterialCode());
         deductInheritedFromDailyQuota(dailyPlanQuotaMap, inheritedPlanQty);
-        deductScheDayFinishFromDailyQuota(context, dailyPlanQuotaMap, dto.getMaterialCode());
+        deductScheDayFinishFromDailyQuota(context, dailyPlanQuotaMap, plan);
 
         // 只把“本月历史欠产”叠加到首日日计划账本，不处理上月欠产和超产抵扣。
         applyCarryForwardToDailyQuota(dailyPlanQuotaMap, carryForwardQty, dto.getMaterialCode());
@@ -868,15 +907,16 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
         // 月计划模具变化信息只在 S4.5 窗口无日计划历史欠产补排时用于判断计划使用模数。
         dto.setMouldChangeInfo(targetMonthPlan.getMouldChangeInfo());
         dto.setTrial(isTrialStage(targetMonthPlan.getConstructionStage()));
-        // 正规SKU余量小于阈值时标记为小批量，供选机阶段在单控/普通机台之间应用类型约束
-        int smallBatchThreshold = resolveSmallBatchSkuThreshold(context);
+        // 正规SKU按月计划表原始 totalQty 判定小批量，供单控机台按单边粒度处理；
+        // 这里不能再用运行态余量，否则大计划 SKU 会在后期余量变小后被误判成小批量。
+        int monthPlanTotalQty = safeInt(targetMonthPlan.getTotalQty());
         boolean isSmallBatch = !dto.isTrial()
-                && dto.getSurplusQty() < smallBatchThreshold;
+                && monthPlanTotalQty <= LhScheduleConstant.SMALL_BATCH_SKU_THRESHOLD;
         dto.setSmallBatchValidation(isSmallBatch);
         if (isSmallBatch) {
-            log.info("小批量SKU判定命中, 物料编码: {}, 施工阶段: {}, 余量: {}, 阈值: {}",
+            log.info("小批量SKU判定命中, 物料编码: {}, 施工阶段: {}, 月计划totalQty: {}, 固定阈值: {}",
                     dto.getMaterialCode(), dto.getConstructionStage(),
-                    dto.getSurplusQty(), smallBatchThreshold);
+                    monthPlanTotalQty, LhScheduleConstant.SMALL_BATCH_SKU_THRESHOLD);
         }
 
         // 示方书信息
@@ -1064,12 +1104,13 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
      *
      * @param context           排程上下文
      * @param dailyPlanQuotaMap 日计划额度账本
-     * @param materialCode      物料编码
+     * @param plan              Sku信息
      */
     private void deductScheDayFinishFromDailyQuota(LhScheduleContext context,
                                                    Map<LocalDate, SkuDailyPlanQuotaDTO> dailyPlanQuotaMap,
-                                                   String materialCode) {
-        int scheDayFinishQty = resolveScheDayFinishQty(context, materialCode);
+                                                   FactoryMonthPlanProductionFinalResult plan) {
+        String materialCode = plan.getMaterialCode();
+        int scheDayFinishQty = resolveScheDayFinishQty(context, plan);
         if (scheDayFinishQty <= 0) {
             return;
         }
@@ -1838,7 +1879,7 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
                     continue;
                 }
                 // 续作匹配完成后，拦截窗口无计划、无本月历史欠产且仅存在窗口后计划的新增SKU。
-                if (shouldSkipWindowNoPlanNewSku(sku)) {
+                if (shouldSkipWindowNoPlanNewSku(context, sku)) {
                     appendWindowNoPlanNewSkuUnscheduledResult(context, sku);
                     blockedNewSkuList.add(sku);
                     continue;
@@ -1861,21 +1902,52 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
 
         context.setContinuousSkuList(continuousSkuList);
         context.setNewSpecSkuList(newSpecSkuList);
+        // 填充全量SKU排程信息索引，供S4.5.1置换等后置阶段按物料编码查找SKU
+        for (SkuScheduleDTO sku : continuousSkuList) {
+            if (Objects.nonNull(sku) && StringUtils.isNotEmpty(sku.getMaterialCode())) {
+                context.getAllSkuScheduleDtoMap().put(sku.getMaterialCode(), sku);
+            }
+        }
+        for (SkuScheduleDTO sku : newSpecSkuList) {
+            if (Objects.nonNull(sku) && StringUtils.isNotEmpty(sku.getMaterialCode())) {
+                context.getAllSkuScheduleDtoMap().put(sku.getMaterialCode(), sku);
+            }
+        }
+        // 被阻塞的SKU也需记录到索引，避免置换时无法找回
+        for (SkuScheduleDTO blockedSku : blockedNewSkuList) {
+            if (Objects.nonNull(blockedSku) && StringUtils.isNotEmpty(blockedSku.getMaterialCode())) {
+                context.getAllSkuScheduleDtoMap().put(blockedSku.getMaterialCode(), blockedSku);
+            }
+        }
         log.info("续作/新增SKU区分完成, 续作: {}个, 新增: {}个", continuousSkuList.size(), newSpecSkuList.size());
     }
 
     /**
-     * 判断新增SKU是否仅存在排程窗口后的月计划，且当前没有本月历史欠产。
+     * 判断新增SKU是否仅存在排程窗口后的远期月计划，且当前没有本月历史欠产。
      * <p>有效上月超欠产已计入硫化余量，但不能作为提前消耗本月远期计划的依据。</p>
+     * <p>结合SKU提前生产天数阈值（SYS0304028）判断：以窗口结束日为基准，向后查找阈值范围内是否有远期计划。
+     * 若有，允许进入排程由提前生产准入判断器（EarlyProductionChecker）逐日决策；
+     * 仅当远期计划超出提前生产天数阈值时，才禁止提前消耗未来计划。</p>
      *
-     * @param sku SKU排程DTO
+     * @param context 排程上下文
+     * @param sku     SKU排程DTO
      * @return true-本轮不排产，false-继续按新增SKU处理
      */
-    private boolean shouldSkipWindowNoPlanNewSku(SkuScheduleDTO sku) {
-        return Objects.nonNull(sku)
-                && sku.getWindowPlanQty() <= 0
-                && sku.getFutureMonthPlanQtyAfterWindow() > 0
-                && sku.getMonthlyHistoryShortageQty() <= 0;
+    private boolean shouldSkipWindowNoPlanNewSku(LhScheduleContext context, SkuScheduleDTO sku) {
+        if (Objects.isNull(sku)
+                || sku.getWindowPlanQty() > 0
+                || sku.getFutureMonthPlanQtyAfterWindow() <= 0
+                || sku.getMonthlyHistoryShortageQty() > 0) {
+            return false;
+        }
+        // 窗口无日计划、无本月历史欠产，但存在窗口后远期计划时，
+        // 需结合SKU提前生产天数阈值判断：以窗口结束日为基准，向后查找阈值范围内是否有远期计划。
+        // 若有，允许进入排程由提前生产准入判断器（EarlyProductionChecker）逐日决策；
+        // 若无（远期计划超出阈值），才禁止提前消耗未来计划。
+        LocalDate windowEndLocalDate = toLocalDate(context.getWindowEndDate());
+        LocalDate firstFuturePlanDate = EarlyProductionChecker.resolveFirstFuturePlanDate(
+                context, sku, windowEndLocalDate);
+        return Objects.isNull(firstFuturePlanDate);
     }
 
     /**
@@ -1893,13 +1965,17 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
         String window = String.format("%s～%s",
                 LhScheduleTimeUtil.formatDate(context.getScheduleDate()),
                 LhScheduleTimeUtil.formatDate(context.getWindowEndDate()));
+        int earlyProductionDaysThreshold = context.getParamIntValue(
+                LhScheduleParamConstant.EARLY_PRODUCTION_DAYS_THRESHOLD,
+                LhScheduleConstant.DEFAULT_EARLY_PRODUCTION_DAYS_THRESHOLD);
         String detail = String.format(
                 "工厂: %s, 排程窗口: %s, 物料: %s, 窗口计划量: %d, 窗口后计划量: %d, "
-                        + "本月历史欠产量: %d, 有效上月超欠产量: %d, 硫化余量: %d, 原因: %s",
+                        + "本月历史欠产量: %d, 有效上月超欠产量: %d, 硫化余量: %d, "
+                        + "提前生产天数阈值: %d, 原因: %s",
                 context.getFactoryCode(), window, sku.getMaterialCode(), sku.getWindowPlanQty(),
                 sku.getFutureMonthPlanQtyAfterWindow(), sku.getMonthlyHistoryShortageQty(),
                 sku.getEffectiveLastMonthOverdueQty(), sku.getSurplusQty(),
-                WINDOW_NO_PLAN_NO_SHORTAGE_UNSCHEDULED_REASON);
+                earlyProductionDaysThreshold, WINDOW_NO_PLAN_NO_SHORTAGE_UNSCHEDULED_REASON);
         log.info("新增SKU排产准入拦截, {}", detail);
         PriorityTraceLogHelper.appendProcessLog(context, "窗口无计划新增SKU不排产", detail);
     }
@@ -2091,6 +2167,11 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
                                                  String machineCode,
                                                  MachineScheduleDTO machine,
                                                  LhMachineOnlineInfo onlineInfo) {
+        // 计划性维修(05)属于下机维修，维修结束后机台不能直接续产，必须换模或换活字块
+        if (machine != null && machine.isForceChangeoverAfterRepair()) {
+            log.info("机台存在计划性维修，阻止续产并释放给换模/换活字块链路, 机台: {}", machineCode);
+            return null;
+        }
         String rollingMaterialCode = resolveRollingContinuousMaterialCode(context, machineCode, machine);
         if (StringUtils.isNotEmpty(rollingMaterialCode)) {
             return rollingMaterialCode;
@@ -2109,6 +2190,10 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
     private String resolveRollingContinuousMaterialCode(LhScheduleContext context,
                                                         String machineCode,
                                                         MachineScheduleDTO machine) {
+        // 计划性维修(05)属于下机维修，维修结束后机台不能直接续产，必须换模或换活字块
+        if (machine != null && machine.isForceChangeoverAfterRepair()) {
+            return null;
+        }
         if (context == null
                 || !context.isRollingScheduleHandoff()
                 || machine == null

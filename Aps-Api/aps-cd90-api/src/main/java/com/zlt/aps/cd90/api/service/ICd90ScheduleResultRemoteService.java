@@ -5,7 +5,11 @@ import com.ruoyi.common.constant.ServiceNameConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.zlt.aps.cd90.api.domain.entity.Cd90ScheduleResult;
+import com.zlt.aps.cd90.api.domain.entity.Cd90ScheduleRollingAdjustLog;
+import com.zlt.aps.cd90.api.domain.vo.Cd90ChangeQtyRequest;
 import com.zlt.aps.cd90.api.domain.vo.Cd90InsertOrderRequest;
+import com.zlt.aps.cd90.api.domain.vo.Cd90RollingCheckRequest;
+import com.zlt.aps.cd90.api.domain.vo.Cd90TransferMachineRequest;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.*;
@@ -45,6 +49,47 @@ public interface ICd90ScheduleResultRemoteService {
     @ApiOperation("查询插单滚动重排任务")
     @GetMapping("/cd90ScheduleResult/insert/task/{taskId}")
     AjaxResult getInsertTask(@PathVariable("taskId") String taskId);
+
+    @ApiOperation("转机台预校验")
+    @PostMapping("/cd90ScheduleResult/validateTransferMachine")
+    AjaxResult validateTransferMachine(@RequestBody Cd90TransferMachineRequest request);
+
+    @ApiOperation("提交转机台滚动重排")
+    @PostMapping("/cd90ScheduleResult/transferMachine")
+    AjaxResult transferMachine(@RequestBody Cd90TransferMachineRequest request);
+
+    @ApiOperation("查询转机台滚动重排任务")
+    @GetMapping("/cd90ScheduleResult/transferMachine/task/{taskId}")
+    AjaxResult getTransferMachineTask(@PathVariable("taskId") String taskId);
+    @ApiOperation("调量预校验")
+    @PostMapping("/cd90ScheduleResult/validateChangeQty")
+    AjaxResult validateChangeQty(@RequestBody Cd90ChangeQtyRequest request);
+
+    @ApiOperation("提交调量滚动重排")
+    @PostMapping("/cd90ScheduleResult/changeQty")
+    AjaxResult changeQty(@RequestBody Cd90ChangeQtyRequest request);
+
+    @ApiOperation("查询调量滚动重排任务")
+    @GetMapping("/cd90ScheduleResult/changeQty/task/{taskId}")
+    AjaxResult getChangeQtyTask(@PathVariable("taskId") String taskId);
+    @ApiOperation("检查定时滚动排程窗口")
+    @PostMapping("/cd90ScheduleResult/rollingSchedule/check")
+    AjaxResult checkTimedRolling(@RequestBody Cd90RollingCheckRequest request);
+
+    @ApiOperation("查询定时滚动排程任务")
+    @GetMapping("/cd90ScheduleResult/rollingSchedule/task/{taskId}")
+    AjaxResult getTimedRollingTask(@PathVariable("taskId") String taskId);
+
+    @ApiOperation("查询定时滚动调整日志列表")
+    @PostMapping("/cd90ScheduleResult/rollingSchedule/adjustLog/list")
+    TableDataInfo listRollingAdjustLogs(
+            @RequestBody Cd90ScheduleRollingAdjustLog queryVO);
+
+    @ApiOperation("查询定时滚动调整日志详情")
+    @GetMapping("/cd90ScheduleResult/rollingSchedule/adjustLog/{id}")
+    Cd90ScheduleRollingAdjustLog getRollingAdjustLog(
+            @PathVariable("id") Long id);
+
 
     @ApiOperation("发布排程")
     @PostMapping("/cd90ScheduleResult/publish")

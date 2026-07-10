@@ -71,7 +71,11 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
     private static final long MILLIS_PER_HOUR = 60L * 60L * 1000L;
     /** 每分钟毫秒数 */
     private static final long MILLIS_PER_MINUTE = 60L * 1000L;
-    /** 新增选机优先比较的收尾时间窗口分钟数 */
+    /**
+     * 新增选机收尾窗口分钟数（已废弃）。
+     * <p>原"最早收尾时间后20分钟窗口"已改为"最早参考收尾时间所在班次同班次筛选"，
+     * 该常量仅保留用于历史日志对比，不再参与窗口筛选判定。</p>
+     */
     private static final int ENDING_WINDOW_MINUTES = 20;
     /** 试制SKU单控机台优先得分 */
     private static final int SINGLE_CONTROL_TRIAL_SCORE = 0;
@@ -115,7 +119,7 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
                     conflictedMouldCodes.size(), freeMouldCount, conflictedMouldCodes);
         }
         // 4. 过滤候选机台：状态启用 + 硬性指标匹配 + 模具未被占用。
-        // 模壳匹配不再作为硬过滤，后续在最早收尾20分钟窗口内按同模壳排序降级处理。
+        // 模套型号匹配作为硬过滤（到货模具不降级），同模壳仍参与后续最早收尾窗口内排序降级。
         // 这里只保留业务上可承接的机台，不在这里提前决定最终排产量。
         BigDecimal skuInch = parseInch(sku.getProSize());
         SpecialMaterialMatchResult specialMaterialMatchResult =
@@ -155,11 +159,11 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
             }
         }
 
-        // 单控/普通机台约束是类型规则：试制强约束单控，量试/小批量优先单控，正规优先普通。
+        // 单控/普通机台约束是类型规则：试制强约束单控，量试/小批量优先单边单控，正规单控必须L/R成组。
         // 该规则只处理候选集合，不在此消费机台；最终是否占用仍由 S4.5 换模、首检和产能结果决定。
         candidates = applySingleControlReservationRule(context, sku, candidates, trace);
 
-        // 5. 先筛最早收尾20分钟窗口，再按单控、胎胚、模壳、规格、胶囊、英寸和机台编码排序。
+        // 5. 先按最早参考收尾时间同班次筛选，再按单控、胎胚、模壳、规格、胶囊、英寸和机台编码排序。
         EndingWindowContext endingWindowContext = sortCandidates(context, candidates, sku);
         traceMachineCandidates(context, sku, specialMaterialMatchResult, candidates, trace, endingWindowContext);
 
@@ -180,8 +184,8 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
 
     /**
      * 对单控拆分机台执行SKU类型约束。
-     * <p>试制只保留单控候选；量试/小批量优先单控、无单控时回落普通；
-     * 正规优先普通，单控候选保留为普通机台后的回落机台。</p>
+     * <p>试制只保留单边单控候选；量试/小批量优先单边单控、无单控时回落普通；
+     * 正规优先普通，单控候选必须先收敛成L/R整机候选后才能作为普通机台后的回落。</p>
      *
      * <p>业务边界：这里不做新增排序重排，不让后续试制/量试反向抢占当前 SKU 的全局顺序；
      * 只在当前 SKU 已轮到选机时，按类型决定单控和普通候选是否保留。</p>
@@ -196,13 +200,13 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
                                                                        SkuScheduleDTO sku,
                                                                        List<MachineScheduleDTO> candidates,
                                                                        MachineFilterTrace trace) {
-        if (CollectionUtils.isEmpty(candidates) || sku == null) {
+        if (CollectionUtils.isEmpty(candidates) || Objects.isNull(sku)) {
             return candidates;
         }
         List<MachineScheduleDTO> singleControlCandidates = new ArrayList<>(2);
         List<MachineScheduleDTO> normalCandidates = new ArrayList<>(candidates.size());
         for (MachineScheduleDTO candidate : candidates) {
-            if (candidate == null) {
+            if (Objects.isNull(candidate)) {
                 continue;
             }
             if (isSingleControlMachine(context, candidate.getMachineCode())) {
@@ -212,8 +216,11 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
             }
             normalCandidates.add(candidate);
         }
+        List<MachineScheduleDTO> effectiveSingleControlCandidates = isFormalSku(sku)
+                ? resolveWholeSingleControlCandidates(context, sku, singleControlCandidates)
+                : singleControlCandidates;
         List<MachineScheduleDTO> filteredCandidates = resolveCandidatesBySkuType(
-                context, sku, singleControlCandidates, normalCandidates);
+                context, sku, effectiveSingleControlCandidates, normalCandidates);
         markTypeRuleBlocked(context, sku, candidates, filteredCandidates, trace);
         recordSingleControlRuleTrace(trace, candidates, filteredCandidates, context, sku);
         logSingleControlCandidateDecision(context, sku, candidates, filteredCandidates, trace);
@@ -228,6 +235,93 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
                     context.getPendingFormalNewSpecSkuCount());
         }
         return filteredCandidates;
+    }
+
+    /**
+     * 将正规 SKU 的单控 L/R 候选收敛成物理整机候选。
+     * <p>正规 SKU 不能单边上机，因此只有左右两侧都已经通过前置硬过滤、且当前排程运行态没有被其它 SKU
+     * 占用时，才保留一个左侧代表候选。代表候选只用于排序和后续入口传递，真正结果写入仍需同步生成 L/R 两条。</p>
+     *
+     * @param context 排程上下文
+     * @param sku 待排正规 SKU
+     * @param singleControlCandidates 单边候选集合
+     * @return 整机候选集合，每个物理单控机台最多返回一个左侧代表
+     */
+    private List<MachineScheduleDTO> resolveWholeSingleControlCandidates(LhScheduleContext context,
+                                                                         SkuScheduleDTO sku,
+                                                                         List<MachineScheduleDTO> singleControlCandidates) {
+        if (CollectionUtils.isEmpty(singleControlCandidates)) {
+            return singleControlCandidates;
+        }
+        Map<String, MachineScheduleDTO> candidateMap = new HashMap<>(singleControlCandidates.size());
+        for (MachineScheduleDTO candidate : singleControlCandidates) {
+            if (Objects.nonNull(candidate) && StringUtils.isNotEmpty(candidate.getMachineCode())) {
+                candidateMap.put(candidate.getMachineCode(), candidate);
+            }
+        }
+        List<MachineScheduleDTO> wholeMachineCandidates = new ArrayList<>(singleControlCandidates.size());
+        Set<String> processedPhysicalMachineSet = new HashSet<>(singleControlCandidates.size());
+        for (MachineScheduleDTO candidate : singleControlCandidates) {
+            if (Objects.isNull(candidate) || StringUtils.isEmpty(candidate.getMachineCode())) {
+                continue;
+            }
+            String physicalMachineCode = LhSingleControlMachineUtil.resolvePhysicalMachineCode(candidate.getMachineCode());
+            if (StringUtils.isEmpty(physicalMachineCode) || processedPhysicalMachineSet.contains(physicalMachineCode)) {
+                continue;
+            }
+            processedPhysicalMachineSet.add(physicalMachineCode);
+            String leftMachineCode = LhSingleControlMachineUtil.resolveLeftMachineCode(candidate.getMachineCode());
+            String rightMachineCode = LhSingleControlMachineUtil.resolveRightMachineCode(candidate.getMachineCode());
+            MachineScheduleDTO leftMachine = candidateMap.get(leftMachineCode);
+            MachineScheduleDTO rightMachine = candidateMap.get(rightMachineCode);
+            if (Objects.isNull(leftMachine) || Objects.isNull(rightMachine)) {
+                log.debug("正规SKU单控整机候选过滤, materialCode: {}, physicalMachine: {}, leftExists: {}, rightExists: {}, reason: {}",
+                        sku.getMaterialCode(), physicalMachineCode, Objects.nonNull(leftMachine), Objects.nonNull(rightMachine),
+                        "L/R两侧未同时通过硬性机台约束");
+                continue;
+            }
+            if (hasOtherSkuAssignment(context, sku, leftMachineCode) || hasOtherSkuAssignment(context, sku, rightMachineCode)) {
+                log.info("正规SKU单控整机候选过滤, materialCode: {}, physicalMachine: {}, leftMachine: {}, rightMachine: {}, reason: {}",
+                        sku.getMaterialCode(), physicalMachineCode, leftMachineCode, rightMachineCode,
+                        "L/R任一侧已被其它SKU占用");
+                continue;
+            }
+            wholeMachineCandidates.add(leftMachine);
+        }
+        return wholeMachineCandidates;
+    }
+
+    /**
+     * 判断单控某一侧是否已被其它 SKU 的当前排程结果占用。
+     * <p>正规 SKU 整机候选要求左右两侧同进同出；若任一侧已登记其它物料结果，
+     * 当前物理单控机台不能再作为正规 SKU 候选，避免左右模混排。</p>
+     *
+     * @param context 排程上下文
+     * @param sku 当前待排 SKU
+     * @param machineCode 机台编码
+     * @return true-已被其它 SKU 占用
+     */
+    private boolean hasOtherSkuAssignment(LhScheduleContext context, SkuScheduleDTO sku, String machineCode) {
+        if (Objects.isNull(context) || Objects.isNull(sku) || StringUtils.isEmpty(machineCode)
+                || CollectionUtils.isEmpty(context.getMachineAssignmentMap())) {
+            return false;
+        }
+        List<LhScheduleResult> assignedResults = context.getMachineAssignmentMap().get(machineCode);
+        if (CollectionUtils.isEmpty(assignedResults)) {
+            return false;
+        }
+        for (LhScheduleResult assignedResult : assignedResults) {
+            if (shouldIgnoreReleasedContinuousPlaceholder(context, assignedResult)) {
+                continue;
+            }
+            if (Objects.isNull(assignedResult) || StringUtils.isEmpty(assignedResult.getMaterialCode())) {
+                return true;
+            }
+            if (!StringUtils.equals(sku.getMaterialCode(), assignedResult.getMaterialCode())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -279,11 +373,11 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
             return retainedCandidates;
         }
         if (!CollectionUtils.isEmpty(normalCandidates)) {
-            // 正规SKU优先普通机台，但仍可保留单控候选作为普通机台不足时的回落机台。
-            // 单控放在普通机台之后，避免正规 SKU 抢占后续特殊 SKU 可能需要的单控资源。
+            // 正规SKU优先普通机台；若要使用单控机台，候选必须已经收敛为L/R整机代表。
+            // 单控整机放在普通机台之后，避免正规 SKU 抢占后续特殊 SKU 可能需要的单边单控资源。
             return retainNormalThenSingleCandidates(singleControlCandidates, normalCandidates);
         }
-        // 正规SKU仅剩单控候选时，允许直接使用单控机台。
+        // 正规SKU仅剩单控候选时，也只能使用已经成组的单控整机候选。
         return singleControlCandidates;
     }
 
@@ -354,7 +448,7 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
             return "小批量SKU优先使用单控机台，单控候选不足时允许普通机台";
         }
         if (isFormalSku(sku) && singleControlMachine) {
-            return "正规SKU优先使用普通机台";
+            return "正规SKU使用单控机台必须L/R整机同步，单边候选已过滤";
         }
         return "SKU类型机台约束";
     }
@@ -384,7 +478,7 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
         if (!needLog) {
             return;
         }
-        log.info("SKU单控候选诊断, materialCode: {}, skuType: {}, surplusQty: {}, smallBatchThreshold: {}, isSmallBatch: {}, "
+        log.info("SKU单控候选诊断, materialCode: {}, skuType: {}, surplusQty: {}, smallBatchTotalQtyThreshold: {}, isSmallBatch: {}, "
                         + "待排小批量SKU数: {}, 原候选: {}, 过滤后候选: {}, K1501L入候选: {}, K1501R入候选: {}, K1501L保留: {}, K1501R保留: {}, 过滤明细: {}",
                 sku.getMaterialCode(), resolveSkuTypeDesc(sku), sku.getSurplusQty(),
                 resolveSmallBatchThreshold(context), sku.isSmallBatchValidation(),
@@ -442,14 +536,7 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
     }
 
     private int resolveSmallBatchThreshold(LhScheduleContext context) {
-        if (context != null && Objects.nonNull(context.getScheduleConfig())) {
-            return context.getScheduleConfig().getSmallBatchSkuThreshold();
-        }
-        if (context == null) {
-            return LhScheduleConstant.SMALL_BATCH_SKU_THRESHOLD;
-        }
-        return context.getParamIntValue(LhScheduleParamConstant.SMALL_BATCH_SKU_THRESHOLD,
-                LhScheduleConstant.SMALL_BATCH_SKU_THRESHOLD);
+        return LhScheduleConstant.SMALL_BATCH_SKU_THRESHOLD;
     }
 
     /**
@@ -652,6 +739,10 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
                 skuInch, machine.getDimensionMinimum(), machine.getDimensionMaximum())) {
             return MachineAvailabilityReason.INCH_MISMATCH;
         }
+        // 模套型号硬过滤：普通模具模壳必须命中机台模套型号，仅到货模具时不降级。
+        if (!LhMachineHardMatchUtil.isMouldSetPriorityMatched(context, sku, machine)) {
+            return MachineAvailabilityReason.MOULD_SET_MISMATCH;
+        }
         MachineAvailabilityReason specialSupportReason =
                 resolveSpecialSupportAvailabilityReason(matchResult, machine);
         if (MachineAvailabilityReason.AVAILABLE != specialSupportReason) {
@@ -833,7 +924,33 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
     private Date resolveAlignedCandidateReferenceTime(LhScheduleContext context,
                                                       SkuScheduleDTO sku,
                                                       MachineScheduleDTO machine) {
+        if (LhSingleControlMachineUtil.isWholeMachineGranularitySku(sku)
+                && machine != null
+                && isSingleControlMachine(context, machine.getMachineCode())) {
+            MachineScheduleDTO pairMachine = LhSingleControlMachineUtil.resolvePairMachine(context, machine.getMachineCode());
+            Date currentSideReferenceTime = resolveAlignedCandidateReferenceTime(context, machine);
+            Date pairSideReferenceTime = resolveAlignedCandidateReferenceTime(context, pairMachine);
+            // 正规SKU按整机占用单控机台，最早换模起点必须等L/R两边都释放。
+            return resolveLaterTime(currentSideReferenceTime, pairSideReferenceTime);
+        }
         return resolveAlignedCandidateReferenceTime(context, machine);
+    }
+
+    /**
+     * 获取两个时间中较晚的一个。
+     *
+     * @param first 第一个时间
+     * @param second 第二个时间
+     * @return 较晚时间
+     */
+    private Date resolveLaterTime(Date first, Date second) {
+        if (Objects.isNull(first)) {
+            return second;
+        }
+        if (Objects.isNull(second)) {
+            return first;
+        }
+        return first.after(second) ? first : second;
     }
 
     /**
@@ -951,7 +1068,7 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
 
     /**
      * 构建机台优先级比较器。
-     * <p>硬性过滤和收尾20分钟窗口已在外层完成，本比较器只保留业务指定的排序层级。</p>
+     * <p>硬性过滤和同班次窗口筛选已在外层完成，本比较器只保留业务指定的排序层级。</p>
      *
      * @param context 排程上下文
      * @param sku 待排SKU
@@ -1001,7 +1118,12 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
     }
 
     /**
-     * 按最早收尾时间生成20分钟候选窗口，并移除窗口外机台。
+     * 按最早参考收尾时间所在班次生成同班次候选窗口，并移除班次外机台。
+     * <p>基准班次 = 所有候选机台中最早的参考收尾时间(referenceTime)所命中的班次；
+     * 保留机台收尾时间(referenceTime)落在该班次区间 [班次开始, 班次结束) 内的候选。</p>
+     * <p>注意：基准必须取参考收尾时间而非可开产时间(switchStartTime + 换模总时长)。可开产时间会因
+     * 晚班不能换模推迟到次日、再叠加换模总时长(默认8h)而跨到与收尾时间不同的班次，若用其定基准再按
+     * 收尾时间过滤，会把包括基准机台在内的全部候选过滤为0，导致新增排产SKU数为0。</p>
      *
      * @param context 排程上下文
      * @param candidates 候选机台
@@ -1017,64 +1139,119 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
         if (CollectionUtils.isEmpty(candidates)) {
             return EndingWindowContext.empty(originalCount);
         }
-        Date windowStartTime = resolveEarliestCandidateReferenceTime(context, candidates, sku, profileCache);
-        if (Objects.isNull(windowStartTime)) {
+        // 基准 = 最早参考收尾时间(referenceTime)所在班次；与"收尾时间同班次"语义及选机规则spec保持一致
+        Date earliestReferenceTime = resolveEarliestCandidateReferenceTime(context, candidates, sku, profileCache);
+        LhShiftConfigVO baseShift = resolveBaseShiftByTime(context, earliestReferenceTime);
+        if (Objects.isNull(baseShift) || baseShift.getShiftIndex() == null
+                || baseShift.getShiftStartDateTime() == null || baseShift.getShiftEndDateTime() == null) {
+            // 最早参考收尾时间未命中任何班次，无法确定同班次基准，保持原有兜底：不筛
             return EndingWindowContext.empty(originalCount);
         }
-        Date windowEndTime = new Date(windowStartTime.getTime() + ENDING_WINDOW_MINUTES * MILLIS_PER_MINUTE);
+        // 同班次窗口区间 = 基准班次的 [开始时间, 结束时间)
+        Date windowStartTime = baseShift.getShiftStartDateTime();
+        Date windowEndTime = baseShift.getShiftEndDateTime();
+        int baseShiftIndex = baseShift.getShiftIndex();
         List<MachineScheduleDTO> windowCandidates = new ArrayList<>(candidates.size());
+        // 窗口外过滤的单控候选,用于单边粒度SKU候选不足时回补
+        List<MachineScheduleDTO> filteredSingleControlCandidates = new ArrayList<>(2);
         for (MachineScheduleDTO candidate : candidates) {
             CandidateWindowProfile profile = resolveCandidateWindowProfile(context, sku, candidate, profileCache);
+            // 同班次判定：机台收尾时间落在基准班次区间内
             if (isInEndingWindow(profile.getReferenceTime(), windowStartTime, windowEndTime)) {
                 windowCandidates.add(candidate);
+            } else if (LhSingleControlMachineUtil.isSingleSideGranularitySku(sku)
+                    && isSingleControlMachine(context, candidate.getMachineCode())) {
+                // 单边粒度SKU的单控候选被窗口过滤,暂存用于候选不足时回补
+                filteredSingleControlCandidates.add(candidate);
+            }
+        }
+        // 单边粒度SKU(试制/量试/小批量)只能使用单控机台,窗口过滤后如果单控候选不足,回补被过滤的单控候选
+        if (LhSingleControlMachineUtil.isSingleSideGranularitySku(sku)
+                && !CollectionUtils.isEmpty(filteredSingleControlCandidates)) {
+            long windowSingleControlCount = windowCandidates.stream()
+                    .filter(machine -> isSingleControlMachine(context, machine.getMachineCode()))
+                    .count();
+            if (windowSingleControlCount <= 1) {
+                windowCandidates.addAll(filteredSingleControlCandidates);
             }
         }
         candidates.clear();
         candidates.addAll(windowCandidates);
-        return new EndingWindowContext(windowStartTime, windowEndTime, originalCount,
+        return new EndingWindowContext(windowStartTime, windowEndTime, baseShiftIndex, originalCount,
                 Math.max(0, originalCount - windowCandidates.size()));
     }
 
     /**
-     * 解析候选机台最早参考收尾时间。
+     * 解析候选机台中最早的参考收尾时间，作为同班次筛选的基准。
+     * <p>参考收尾时间 = 机台已占用结束时间(或释放时间)对齐排程窗口首班后的值；
+     * 取所有候选机台中的最小值。基准与过滤口径必须同为收尾时间，避免换模耗时跨班次导致全量过滤。</p>
      *
      * @param context 排程上下文
      * @param candidates 候选机台
      * @param sku 待排SKU
      * @param profileCache 候选机台窗口画像缓存
-     * @return 最早参考收尾时间
+     * @return 最早参考收尾时间；无任何参考收尾时间时返回 null
      */
     private Date resolveEarliestCandidateReferenceTime(LhScheduleContext context,
-                                                       List<MachineScheduleDTO> candidates,
-                                                       SkuScheduleDTO sku,
-                                                       Map<String, CandidateWindowProfile> profileCache) {
-        Date earliestReferenceTime = null;
+                                                      List<MachineScheduleDTO> candidates,
+                                                      SkuScheduleDTO sku,
+                                                      Map<String, CandidateWindowProfile> profileCache) {
+        Date earliest = null;
         for (MachineScheduleDTO candidate : candidates) {
             CandidateWindowProfile profile = resolveCandidateWindowProfile(context, sku, candidate, profileCache);
             Date referenceTime = profile.getReferenceTime();
             if (Objects.isNull(referenceTime)) {
                 continue;
             }
-            if (Objects.isNull(earliestReferenceTime) || referenceTime.before(earliestReferenceTime)) {
-                earliestReferenceTime = referenceTime;
+            if (Objects.isNull(earliest) || referenceTime.before(earliest)) {
+                earliest = referenceTime;
             }
         }
-        return earliestReferenceTime;
+        return earliest;
     }
 
     /**
-     * 判断候选机台参考时间是否落在本轮收尾窗口内。
+     * 根据基准时间定位其所在班次，返回该班次配置。
+     * <p>班次命中区间为半开区间 [班次开始, 班次结束)，与 resolveShiftIndex 判定保持一致。</p>
+     *
+     * @param context 排程上下文
+     * @param baseTime 基准时间(最早参考收尾时间)
+     * @return 基准班次配置；未命中任何班次时返回 null
+     */
+    private LhShiftConfigVO resolveBaseShiftByTime(LhScheduleContext context, Date baseTime) {
+        if (context == null || baseTime == null
+                || CollectionUtils.isEmpty(context.getScheduleWindowShifts())) {
+            return null;
+        }
+        for (LhShiftConfigVO shift : context.getScheduleWindowShifts()) {
+            if (shift == null || shift.getShiftIndex() == null
+                    || shift.getShiftStartDateTime() == null || shift.getShiftEndDateTime() == null) {
+                continue;
+            }
+            // 半开区间 [start, end)，与 resolveShiftIndex 判定保持一致
+            if (!baseTime.before(shift.getShiftStartDateTime())
+                    && baseTime.before(shift.getShiftEndDateTime())) {
+                return shift;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * 判断候选机台参考时间是否落在本轮同班次窗口内。
+     * <p>窗口区间为半开区间 [班次开始, 班次结束)，与班次命中判定保持一致。</p>
      *
      * @param referenceTime 候选机台参考收尾时间
-     * @param windowStartTime 收尾窗口起点
-     * @param windowEndTime 收尾窗口截止
+     * @param windowStartTime 班次开始时间
+     * @param windowEndTime 班次结束时间
      * @return true-在窗口内，false-窗口外
      */
     private boolean isInEndingWindow(Date referenceTime, Date windowStartTime, Date windowEndTime) {
         if (Objects.isNull(referenceTime) || Objects.isNull(windowStartTime) || Objects.isNull(windowEndTime)) {
             return false;
         }
-        return !referenceTime.before(windowStartTime) && !referenceTime.after(windowEndTime);
+        // 半开区间 [班次开始, 班次结束)，班次结束时刻归属下一班次
+        return !referenceTime.before(windowStartTime) && referenceTime.before(windowEndTime);
     }
 
     /**
@@ -2001,11 +2178,11 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
                         + ", 模具占用=" + trace.mouldConflictCount
                         + ", 单控规则=" + trace.singleControlRuleFilteredCount);
         PriorityTraceLogHelper.appendLine(detailBuilder,
-                PriorityTraceLogHelper.kv("收尾窗口起点", PriorityTraceLogHelper.formatDateTime(
+                PriorityTraceLogHelper.kv("同班次基准班次序号", endingWindowContext.getBaseShiftIndex())
+                        + ", " + PriorityTraceLogHelper.kv("同班次窗口起点(班次开始)", PriorityTraceLogHelper.formatDateTime(
                         endingWindowContext.getWindowStartTime()))
-                        + ", " + PriorityTraceLogHelper.kv("收尾窗口截止", PriorityTraceLogHelper.formatDateTime(
+                        + ", " + PriorityTraceLogHelper.kv("同班次窗口截止(班次结束)", PriorityTraceLogHelper.formatDateTime(
                         endingWindowContext.getWindowEndTime()))
-                        + ", " + PriorityTraceLogHelper.kv("收尾窗口分钟", ENDING_WINDOW_MINUTES)
                         + ", " + PriorityTraceLogHelper.kv("窗口筛选前候选数", endingWindowContext.getOriginalCount())
                         + ", " + PriorityTraceLogHelper.kv("窗口外过滤数", endingWindowContext.getFilteredCount()));
         if (!CollectionUtils.isEmpty(trace.filteredMachineMessages)) {
@@ -2486,27 +2663,36 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
     }
 
     /**
-     * 新增选机收尾窗口上下文。
+     * 新增选机同班次窗口上下文。
+     * <p>窗口区间即基准班次的 [班次开始, 班次结束)，windowStartTime/windowEndTime 分别对应班次起止时间。</p>
      */
     private static class EndingWindowContext {
-        /** 收尾窗口起点 */
+        /** 同班次筛选基准班次序号 */
+        private final int baseShiftIndex;
+        /** 班次开始时间(窗口起点) */
         private final Date windowStartTime;
-        /** 收尾窗口截止 */
+        /** 班次结束时间(窗口截止) */
         private final Date windowEndTime;
         /** 窗口筛选前候选数 */
         private final int originalCount;
         /** 窗口外过滤数 */
         private final int filteredCount;
 
-        private EndingWindowContext(Date windowStartTime, Date windowEndTime, int originalCount, int filteredCount) {
+        private EndingWindowContext(Date windowStartTime, Date windowEndTime, int baseShiftIndex,
+                                    int originalCount, int filteredCount) {
             this.windowStartTime = windowStartTime;
             this.windowEndTime = windowEndTime;
+            this.baseShiftIndex = baseShiftIndex;
             this.originalCount = originalCount;
             this.filteredCount = filteredCount;
         }
 
         private static EndingWindowContext empty(int originalCount) {
-            return new EndingWindowContext(null, null, originalCount, 0);
+            return new EndingWindowContext(null, null, LhScheduleConstant.MAX_SHIFT_SLOT_COUNT + 1, originalCount, 0);
+        }
+
+        private int getBaseShiftIndex() {
+            return baseShiftIndex;
         }
 
         private Date getWindowStartTime() {

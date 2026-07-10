@@ -29,8 +29,8 @@
 </template>
 
 <script>
-import { editLhMouldChangePlan } from "@/api/lh/lhMouldChangePlan";
-import { listMachine } from "@/api/lh/machine";
+import {editLhMouldChangePlan} from "@/api/lh/lhMouldChangePlan";
+import {listMachine} from "@/api/lh/machine";
 
 import infoForm from "@/views/components/infoForm.vue";
 import materialCodeSelect from "@/views/components/materialCodeSelect.vue";
@@ -124,7 +124,7 @@ export default {
       const columns = [
         {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.lhMouldChangePlan.factoryCode"),
           type: "select",
           dictData: this.parentDict.type.biz_factory_name,
           filterable: true,
@@ -220,6 +220,9 @@ export default {
           type: "select",
           dictData: this.parentDict.type.CHANGE_MOULD_TYPE,
           filterable: true,
+          attrs: {
+            multiple: true,
+          },
         },
         {
           prop: "afterMaterialCode",
@@ -337,10 +340,26 @@ export default {
       this.$set(this.form, "planOrder", value);
     },
 
+    formatChangeMouldType(value) {
+      if (Array.isArray(value)) {
+        return value.filter((item) => item !== undefined && item !== null && item !== "").join(",");
+      }
+      return value || "";
+    },
+    parseChangeMouldType(value) {
+      if (Array.isArray(value)) {
+        return value;
+      }
+      if (!value) {
+        return [];
+      }
+      return String(value).split(",").map((item) => item.trim()).filter((item) => item);
+    },
     // api
     async save(params) {
       try {
         this.loading = true;
+        params.changeMouldType = this.formatChangeMouldType(params.changeMouldType);
         if (params.planOrder !== undefined && params.planOrder !== null && params.planOrder !== "") {
           params.planOrder = Number(params.planOrder);
         }
@@ -367,6 +386,7 @@ export default {
         this.isEdit = true;
         this.originalIsRelease = data.isRelease || "";
         this.form = { ...data };
+        this.form.changeMouldType = this.parseChangeMouldType(data.changeMouldType);
         if (data.lhMachineCode) {
           this.machineOptions = [
             {
@@ -384,6 +404,7 @@ export default {
           factoryCode: "116",
           isRelease: "0",
           mouldStatus: "0",
+          changeMouldType: [],
         };
         this.machineOptions = [];
       }

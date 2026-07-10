@@ -314,8 +314,9 @@ public class LocalSearchMachineAllocatorStrategy {
         Date mouldChangeStartTime = null;
         Date mouldChangeCompleteTime = null;
         Date inspectionTime = null;
+        // 试制SKU换模需在早班完成，不受开产模式限制；非试制SKU仍受开产模式约束
         Date candidateSwitchStartTime = ShiftProductionControlUtil.resolveEarliestSwitchStartTime(
-                context, machineReadyTime);
+                context, machineReadyTime, sku);
         int maxDelayRetryCount = resolveMaxSwitchDelayRetryCount(machine);
         for (int retry = 0; retry < maxDelayRetryCount; retry++) {
             mouldChangeStartTime = mouldChangeBalance.allocateMouldChange(
@@ -444,6 +445,10 @@ public class LocalSearchMachineAllocatorStrategy {
         int dryIceDurationHours = context.getParamIntValue(
                 LhScheduleParamConstant.DRY_ICE_DURATION_HOURS, LhScheduleConstant.DRY_ICE_DURATION_HOURS);
 
+        int plannedRepairFixedQty = context.getParamIntValue(
+
+                LhScheduleParamConstant.PLANNED_REPAIR_FIXED_QTY, LhScheduleConstant.PLANNED_REPAIR_FIXED_QTY);
+
         Date cursorStartTime = productionStartTime;
         LhShiftConfigVO firstInspectionShift = FirstInspectionQtyUtil.resolveFirstInspectionAttributionShift(
                 context, sku, shifts, mouldChangeCompleteTime, ScheduleTypeEnum.NEW_SPEC.getCode());
@@ -486,7 +491,8 @@ public class LocalSearchMachineAllocatorStrategy {
                     mouldQty,
                     ShiftCapacityResolverUtil.resolveShiftDurationSeconds(shift),
                     dryIceLossQty,
-                    dryIceDurationHours);
+                    dryIceDurationHours,
+                plannedRepairFixedQty);
             shiftMaxQty = ShiftProductionControlUtil.deductCapacityByControl(control, shiftMaxQty, mouldQty);
             shiftMaxQty = FirstInspectionQtyUtil.resolveNormalCapacityAfterFirstInspection(
                     context, shift, shiftMaxQty, firstInspectionShiftIndex, firstInspectionQty,

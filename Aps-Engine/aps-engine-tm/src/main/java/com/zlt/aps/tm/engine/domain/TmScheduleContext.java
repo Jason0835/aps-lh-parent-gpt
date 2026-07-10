@@ -80,6 +80,12 @@ public class TmScheduleContext {
 
     /** 小胶种本次排程内绑定机台，key=主胶料编码，value=机台编码 */
     private Map<String, String> smallGlueMachineMap = new HashMap<>();
+
+    /** 本次自动排程异常收集器 */
+    private TmAutoScheduleIssueCollector issueCollector = new TmAutoScheduleIssueCollector();
+
+    /** 本次自动排程进度监听器 */
+    private TmAutoScheduleProgressListener progressListener;
     /** 当前排程日一班开始前的同机台前置任务快照，key=机台编码 */
     private Map<String, TmTaskPredecessor> machinePredecessorMap = new HashMap<>();
 
@@ -197,6 +203,10 @@ public class TmScheduleContext {
 
     public void setSmallGlueMachineMap(Map<String, String> smallGlueMachineMap) {
         this.smallGlueMachineMap = smallGlueMachineMap == null ? new HashMap<>() : smallGlueMachineMap;
+    }
+
+    public void setIssueCollector(TmAutoScheduleIssueCollector issueCollector) {
+        this.issueCollector = issueCollector == null ? new TmAutoScheduleIssueCollector() : issueCollector;
     }
     public void setMachinePredecessorMap(Map<String, TmTaskPredecessor> machinePredecessorMap) {
         this.machinePredecessorMap = machinePredecessorMap == null ? new HashMap<>() : machinePredecessorMap;

@@ -27,6 +27,7 @@ import com.zlt.aps.mp.engine.domain.Context;
 import com.zlt.aps.mp.engine.domain.ProductionStageLogRecorder;
 import com.zlt.aps.mp.engine.domain.dto.ProductionPlanGroupInfo;
 import com.zlt.aps.mp.engine.domain.vo.*;
+import com.zlt.aps.mp.engine.enums.CycleProductionModeEnum;
 import com.zlt.aps.mp.engine.handler.GroupProductionConversionHandler;
 import com.zlt.aps.mp.engine.handler.LhMachineInfoCalculateHelper;
 import com.zlt.aps.mp.engine.logrecorder.TbrBeforeProductionGroupLogRecorder;
@@ -558,6 +559,7 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
         paramCodeList.add(MonthPlanEnums.OEM_BRAND_CAPACITY.getCode());
         paramCodeList.add(MonthPlanEnums.ADD_CHANGE_MOLD_COUNT_BY_SAME_PATTERN.getCode());
         paramCodeList.add(MonthPlanEnums.RESERVE_PERCENT.getCode());
+        paramCodeList.add(MonthPlanEnums.CYCLE_PRODUCTION_TYPE.getCode());
         paramCodeList.add(MonthPlanEnums.STRUCTURE_BILL_PRE_COUNT.getCode());
         paramCodeList.add(MonthPlanEnums.OEM_JOIN_STRUCTURE_PRIORITY.getCode());
         //降膜排产相关
@@ -617,6 +619,10 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
         configuration.setOemBrandCapacity((Integer) paramConfigurationMap.get(MonthPlanEnums.OEM_BRAND_CAPACITY.getCode()));
         //周期储备量占实单的比例(%)
         configuration.setReservePercent((Integer) paramConfigurationMap.get(MonthPlanEnums.RESERVE_PERCENT.getCode()));
+        //20260709+ 周期结构排产模式
+        Integer cycleProductionMode = (Integer) paramConfigurationMap.get(MonthPlanEnums.CYCLE_PRODUCTION_TYPE.getCode());
+        configuration.setCycleProductionMode(CycleProductionModeEnum.getInstance(cycleProductionMode));
+
         //按高优先级SKU个数降序的结构清单-前 X 个结构，单位个
         configuration.setStructureBillPreCount((Integer) paramConfigurationMap.get(MonthPlanEnums.STRUCTURE_BILL_PRE_COUNT.getCode()));
         //外销贴牌是否参与结构优先级的竞争

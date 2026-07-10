@@ -5,7 +5,7 @@
       <div style="height: 30px">
         <el-form :inline="true" style="display: contents">
           <el-form-item
-            :label="$t('ui.data.column.scheduleResult.scheduleDate')"
+            :label="$t('ui.data.column.lhScheduleResult.scheduleDate')"
           >
             <el-date-picker
               v-model="scheduleDate"

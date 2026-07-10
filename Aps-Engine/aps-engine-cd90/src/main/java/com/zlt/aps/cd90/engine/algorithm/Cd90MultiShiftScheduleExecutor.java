@@ -69,9 +69,9 @@ public class Cd90MultiShiftScheduleExecutor {
         for (int index = 0; index < shiftCount; index++) {
             Cd90ShiftDescriptor shift = context.getShifts().get(index);
             // 每班独立做超时检查和进度上报，便于异步任务准确显示当前卡点。
-            runtimeGuard.checkNotTimedOut(context, shift.getClassField() + "班次开始");
+            runtimeGuard.checkNotTimedOut(context, shiftStageName(shift, "班次开始"));
             progressListener.onProgress(progress(index, shiftCount), "SHIFT_EXECUTION",
-                    shift.getClassField() + "班次开始", shift);
+                    shiftStageName(shift, "班次开始"), shift);
             // 每班重新读取需求、库存和库排，不能复用首班输入，否则滚动数据变化无法生效。
             Cd90AutoScheduleInput input = inputService.load(
                     context.getFactoryCode(), context.getScheduleDate(),
@@ -112,9 +112,9 @@ public class Cd90MultiShiftScheduleExecutor {
                     attemptTraces.add(trace);
                 }
             }
-            runtimeGuard.checkNotTimedOut(context, shift.getClassField() + "班次完成");
+            runtimeGuard.checkNotTimedOut(context, shiftStageName(shift, "班次完成"));
             progressListener.onProgress(progress(index + 1, shiftCount), "SHIFT_EXECUTION",
-                    shift.getClassField() + "班次完成", shift);
+                    shiftStageName(shift, "班次完成"), shift);
         }
         log.info("[直裁自动排程] 多班循环执行完成, factoryCode={}, scheduleDate={}, "
                         + "shiftCount={}, taskCount={}",
@@ -128,6 +128,13 @@ public class Cd90MultiShiftScheduleExecutor {
                 .build();
     }
 
+    private String shiftStageName(Cd90ShiftDescriptor shift, String suffix) {
+        String displayName = shift == null ? null : shift.getShiftDisplayName();
+        String classField = shift == null ? "" : shift.getClassField();
+        String shiftName = displayName == null || displayName.trim().isEmpty()
+                ? classField : displayName;
+        return shiftName + suffix;
+    }
     private Map<String, BigDecimal> buildCurlLengthByCloth(Cd90AutoScheduleInput input,
                                                            BigDecimal fallbackCoilMeter) {
         if (input == null || input.getConstructionMaterials() == null) {

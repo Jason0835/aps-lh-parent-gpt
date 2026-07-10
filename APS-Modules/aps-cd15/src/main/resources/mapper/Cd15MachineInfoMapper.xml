@@ -8,6 +8,8 @@
         <result column="FACTORY_CODE" property="factoryCode"/>
         <result column="MACHINE_CODE" property="machineCode"/>
         <result column="MACHINE_NAME" property="machineName"/>
+        <result column="CLOTH_WIDTH_MAX" property="clothWidthMax"/>
+        <result column="CLOTH_WIDTH_MIN" property="clothWidthMin"/>
         <result column="QUOTA" property="quota"/>
         <result column="CLASS_SHIFT" property="classShift"/>
         <result column="OPEN_MACHINE_CLASS" property="openMachineClass"/>

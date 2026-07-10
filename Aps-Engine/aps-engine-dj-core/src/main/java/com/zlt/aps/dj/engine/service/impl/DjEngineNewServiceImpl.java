@@ -162,9 +162,9 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
         }
         log.info("步骤2.1：加载施工数据 {} 条", constructionList.size());
 
-        // 构建施工号 -> 施工信息 Map
-        Map<String, MdmConstructionInfo> constructionMap = constructionList.stream()
-                .collect(Collectors.toMap(MdmConstructionInfo::getConstructionCode, c -> c, (a, b) -> a));
+        // 构建施工号 -> 施工信息列表 Map（同一施工号可能存在多个BOM版本）
+        Map<String, List<MdmConstructionInfo>> constructionMap = constructionList.stream()
+                .collect(Collectors.groupingBy(MdmConstructionInfo::getConstructionCode));
 
         // 校验：所有胎胚代码必须能匹配到施工数据
         List<String> unmatchedCodes = constructionCodes.stream()
@@ -176,13 +176,15 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
                     I18nUtil.getMessage("ui.dj.engine.noConstruction"), unmatchedCodes));
         }
 
-        // 校验：施工数据中垫胶代码和垫胶长度必须有效
+        // 校验：施工数据中垫胶代码和垫胶长度必须有效（任一版本有效即可）
         List<String> invalidConstructionCodes = new ArrayList<>();
-        for (Map.Entry<String, MdmConstructionInfo> entry : constructionMap.entrySet()) {
-            MdmConstructionInfo construction = entry.getValue();
-            if (StringUtils.isEmpty(construction.getPaddingCode())
-                    || construction.getPaddingLength() == null
-                    || construction.getPaddingLength().compareTo(BigDecimal.ZERO) <= 0) {
+        for (Map.Entry<String, List<MdmConstructionInfo>> entry : constructionMap.entrySet()) {
+            List<MdmConstructionInfo> constructions = entry.getValue();
+            boolean hasValid = constructions.stream().anyMatch(c ->
+                    StringUtils.isNotEmpty(c.getPaddingCode())
+                            && c.getPaddingLength() != null
+                            && c.getPaddingLength().compareTo(BigDecimal.ZERO) > 0);
+            if (!hasValid) {
                 invalidConstructionCodes.add(entry.getKey());
             }
         }
@@ -436,10 +438,11 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
      * @return 该班次的消耗量（米）
      */
     private BigDecimal calcShiftConsume(List<CxScheduleResult> cxScheduleList,
-            Map<String, MdmConstructionInfo> constructionMap, String paddingCode, int shiftIndex) {
+            Map<String, List<MdmConstructionInfo>> constructionMap, String paddingCode, int shiftIndex) {
         BigDecimal totalConsume = BigDecimal.ZERO;
         for (CxScheduleResult cx : cxScheduleList) {
-            MdmConstructionInfo construction = constructionMap.get(cx.getEmbryoCode());
+            // 根据班次示方书编号匹配对应的施工版本
+            MdmConstructionInfo construction = this.resolveConstructionForShift(cx, shiftIndex, constructionMap);
             if (construction == null || !paddingCode.equals(construction.getPaddingCode())) {
                 continue;
             }
@@ -462,6 +465,92 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
     private BigDecimal getClassPlanQty(CxScheduleResult cx, int classIndex) {
         String fieldName = String.format(DjEngineConstants.CLASS_PLAN_QTY_FIELD, classIndex);
         return BigDecimalUtils.valueOf(cx.getFieldValueByFieldName(fieldName));
+    }
+
+    /**
+     * 获取成型计划某班的示方书编号（逗号分隔时取第一个）
+     *
+     * @param cx        成型计划结果
+     * @param shiftIndex 班次索引（1~8）
+     * @return 该班次第一个示方书编号，无值时返回 null
+     */
+    private String getShiftRecipeNo(CxScheduleResult cx, int shiftIndex) {
+        String fieldName = String.format("class%dRecipeNo", shiftIndex);
+        String recipeNo = (String) cx.getFieldValueByFieldName(fieldName);
+        if (StringUtils.isEmpty(recipeNo)) {
+            return null;
+        }
+        // 逗号分隔取第一个
+        String first = recipeNo.split(",")[0].trim();
+        return StringUtils.isNotEmpty(first) ? first : null;
+    }
+
+    /**
+     * 根据班次示方书编号匹配对应的施工版本数据
+     * <p>
+     * 匹配规则：
+     * 1. 从 class{N}RecipeNo 获取示方书编号（逗号分隔时取第一个）
+     * 2. 施工版本号格式 VTMCB20000380XA01，最后2位为小版本号
+     * 3. 先尝试精确匹配（RecipeNo = constructionVersion）
+     * 4. 若精确匹配失败，去掉施工版本号最后2位后进行前缀匹配
+     * 5. 前缀匹配到多个施工版本时，取小版本号最大的那个
+     * 6. 若 RecipeNo 为空或无匹配，返回第一个施工记录（向后兼容）
+     * </p>
+     *
+     * @param cx              成型计划结果
+     * @param shiftIndex       班次索引（1~8）
+     * @param constructionMap  施工数据 Map<constructionCode, List<MdmConstructionInfo>>
+     * @return 匹配到的施工数据，无匹配时返回第一个施工记录
+     */
+    private MdmConstructionInfo resolveConstructionForShift(CxScheduleResult cx, int shiftIndex,
+            Map<String, List<MdmConstructionInfo>> constructionMap) {
+        List<MdmConstructionInfo> constructions = constructionMap.get(cx.getEmbryoCode());
+        if (constructions == null || constructions.isEmpty()) {
+            return null;
+        }
+        if (constructions.size() == 1) {
+            return constructions.get(0);
+        }
+
+        // 获取本班示方书编号
+        String recipeNo = this.getShiftRecipeNo(cx, shiftIndex);
+        if (StringUtils.isEmpty(recipeNo)) {
+            return constructions.get(0);
+        }
+
+        // 1. 精确匹配
+        for (MdmConstructionInfo c : constructions) {
+            if (recipeNo.equals(c.getConstructionVersion())) {
+                return c;
+            }
+        }
+
+        // 2. 前缀匹配：施工版本号去掉最后2位小版本号后与 RecipeNo 比较
+        MdmConstructionInfo bestMatch = null;
+        String maxSuffix = null;
+
+        for (MdmConstructionInfo c : constructions) {
+            String version = c.getConstructionVersion();
+            if (StringUtils.isEmpty(version)) {
+                continue;
+            }
+            // 去掉最后2位小版本号
+            String prefix = version.length() > 2
+                    ? version.substring(0, version.length() - 2)
+                    : version;
+
+            if (prefix.equals(recipeNo)) {
+                String suffix = version.length() > 2
+                        ? version.substring(version.length() - 2)
+                        : "00";
+                if (bestMatch == null || (maxSuffix != null && suffix.compareTo(maxSuffix) > 0)) {
+                    bestMatch = c;
+                    maxSuffix = suffix;
+                }
+            }
+        }
+
+        return bestMatch != null ? bestMatch : constructions.get(0);
     }
 
     // ==================== 步骤3：计算垫胶需求清单 ====================
@@ -491,15 +580,20 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
      * 按垫胶规格统计对应的成型机台数量
      */
     private Map<String, Integer> calcPaddingCxMachineCount(List<CxScheduleResult> cxScheduleList,
-            Map<String, MdmConstructionInfo> constructionMap) {
+            Map<String, List<MdmConstructionInfo>> constructionMap) {
         Map<String, Set<String>> paddingMachines = new HashMap<>();
         for (CxScheduleResult cx : cxScheduleList) {
-            MdmConstructionInfo construction = constructionMap.get(cx.getEmbryoCode());
-            if (construction == null || construction.getPaddingCode() == null || cx.getCxMachineCode() == null) {
+            List<MdmConstructionInfo> constructions = constructionMap.get(cx.getEmbryoCode());
+            if (constructions == null || constructions.isEmpty() || cx.getCxMachineCode() == null) {
                 continue;
             }
-            paddingMachines.computeIfAbsent(construction.getPaddingCode(), k -> new HashSet<>())
-                    .add(cx.getCxMachineCode());
+            // 收集该胎胚所有BOM版本的垫胶代码
+            for (MdmConstructionInfo construction : constructions) {
+                if (construction.getPaddingCode() != null) {
+                    paddingMachines.computeIfAbsent(construction.getPaddingCode(), k -> new HashSet<>())
+                            .add(cx.getCxMachineCode());
+                }
+            }
         }
         Map<String, Integer> result = new HashMap<>();
         for (Map.Entry<String, Set<String>> entry : paddingMachines.entrySet()) {
@@ -544,7 +638,7 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
      * 获取成型计划最后一天的最大班需求量（用于预估超出部分）
      */
     private Map<String, BigDecimal> getMaxShiftConsume(List<CxScheduleResult> cxScheduleList,
-            Map<String, MdmConstructionInfo> constructionMap) {
+            Map<String, List<MdmConstructionInfo>> constructionMap) {
         Map<String, BigDecimal> maxShiftConsume = new HashMap<>();
         // 找到最后一天（取最大的日期）
         Date lastDay = null;
@@ -565,7 +659,11 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
             if (cx.getScheduleDate() == null || !DateUtil.isSameDay(cx.getScheduleDate(), finalLastDay)) {
                 continue;
             }
-            MdmConstructionInfo construction = constructionMap.get(cx.getEmbryoCode());
+            // 取第1班匹配的施工数据（各班次取最大版本）
+            MdmConstructionInfo construction = null;
+            for (int i = 1; i <= 3 && construction == null; i++) {
+                construction = this.resolveConstructionForShift(cx, i, constructionMap);
+            }
             if (construction == null || construction.getPaddingCode() == null) {
                 continue;
             }
@@ -605,8 +703,23 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
     /**
      * 计算垫胶月度剩余量
      */
+    /**
+     * 从施工数据列表中取第一个有效的施工记录（用于计算月计划余量等不需要按班次区分的场景）
+     */
+    private MdmConstructionInfo getFirstValidConstruction(
+            Map<String, List<MdmConstructionInfo>> constructionMap, String paddingCode) {
+        for (List<MdmConstructionInfo> constructions : constructionMap.values()) {
+            for (MdmConstructionInfo c : constructions) {
+                if (paddingCode.equals(c.getPaddingCode())) {
+                    return c;
+                }
+            }
+        }
+        return null;
+    }
+
     private Map<String, BigDecimal> calcPaddingMonthSurplus(List<MpMonthPlanMonitor> monthPlanMonitors,
-            Map<String, MdmConstructionInfo> constructionMap, Map<String, BigDecimal> maxShiftConsume,
+            Map<String, List<MdmConstructionInfo>> constructionMap, Map<String, BigDecimal> maxShiftConsume,
             int exceedShifts) {
         if (CollectionUtils.isEmpty(monthPlanMonitors)) {
             return Collections.emptyMap();
@@ -615,9 +728,11 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
         Map<String, BigDecimal> result = new HashMap<>();
         for (MpMonthPlanMonitor monitor : monthPlanMonitors) {
             // 通过施工表找到垫胶代码
-            for (Map.Entry<String, MdmConstructionInfo> entry : constructionMap.entrySet()) {
-                MdmConstructionInfo construction = entry.getValue();
-                if (construction.getPaddingCode() == null) {
+            for (List<MdmConstructionInfo> constructions : constructionMap.values()) {
+                MdmConstructionInfo construction = constructions.stream()
+                        .filter(c -> c.getPaddingCode() != null)
+                        .findFirst().orElse(null);
+                if (construction == null) {
                     continue;
                 }
                 String paddingCode = construction.getPaddingCode();
@@ -649,15 +764,17 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
      * <p>返回 Map<paddingCode, paddingRemaining>，paddingRemaining = lhMargin × unitConsume</p>
      */
     private Map<String, BigDecimal> calcRawPaddingRemaining(List<MpMonthPlanMonitor> monthPlanMonitors,
-            Map<String, MdmConstructionInfo> constructionMap) {
+            Map<String, List<MdmConstructionInfo>> constructionMap) {
         if (CollectionUtils.isEmpty(monthPlanMonitors)) {
             return Collections.emptyMap();
         }
         Map<String, BigDecimal> result = new HashMap<>();
         for (MpMonthPlanMonitor monitor : monthPlanMonitors) {
-            for (Map.Entry<String, MdmConstructionInfo> entry : constructionMap.entrySet()) {
-                MdmConstructionInfo construction = entry.getValue();
-                if (construction.getPaddingCode() == null) {
+            for (List<MdmConstructionInfo> constructions : constructionMap.values()) {
+                MdmConstructionInfo construction = constructions.stream()
+                        .filter(c -> c.getPaddingCode() != null)
+                        .findFirst().orElse(null);
+                if (construction == null) {
                     continue;
                 }
                 String paddingCode = construction.getPaddingCode();
@@ -680,7 +797,7 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
      */
     private List<DjPaddingDemand> buildDemandList(Set<String> paddingCodes,
             List<CxScheduleResult> cxScheduleList, Map<String, BigDecimal> effectiveStockMap,
-            Map<String, MdmConstructionInfo> constructionMap, Set<String> newSpecPaddingCodes,
+            Map<String, List<MdmConstructionInfo>> constructionMap, Set<String> newSpecPaddingCodes,
             BigDecimal standardCurlLength) {
         List<DjPaddingDemand> demandList = new ArrayList<>();
 
@@ -689,19 +806,15 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
             DjPaddingDemand demand = new DjPaddingDemand();
             demand.setPaddingCode(paddingCode);
 
-            // 从施工信息获取单耗、胶料、垫胶物料名等
-            for (MdmConstructionInfo construction : constructionMap.values()) {
-                if (paddingCode.equals(construction.getPaddingCode())) {
-                    if (demand.getUnitConsume() == null) {
-                        demand.setUnitConsume(construction.getPaddingLength() != null ? construction.getPaddingLength()
-                                : BigDecimal.ONE);
-                        demand.setConstructionCode(construction.getConstructionCode());
-                        demand.setProductionStatus(construction.getProductionStage());
-                        demand.setPaddingName(construction.getPaddingName());
-                        demand.setGlueCode(construction.getPaddingRubber());
-                    }
-                    break;
-                }
+            // 从施工信息获取单耗、胶料、垫胶物料名等（取第一个有效版本）
+            MdmConstructionInfo firstConstruction = this.getFirstValidConstruction(constructionMap, paddingCode);
+            if (firstConstruction != null) {
+                demand.setUnitConsume(firstConstruction.getPaddingLength() != null
+                        ? firstConstruction.getPaddingLength() : BigDecimal.ONE);
+                demand.setConstructionCode(firstConstruction.getConstructionCode());
+                demand.setProductionStatus(firstConstruction.getProductionStage());
+                demand.setPaddingName(firstConstruction.getPaddingName());
+                demand.setGlueCode(firstConstruction.getPaddingRubber());
             }
 
             // 判断是否已收尾
@@ -1019,7 +1132,7 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
     private void checkDemandForShift(List<DjPaddingDemand> demandList, int shiftIndex, DjScheduleContext context) {
         Map<String, BigDecimal> handoverInventory = context.getHandoverInventory();
         List<CxScheduleResult> cxScheduleList = context.getCxScheduleList();
-        Map<String, MdmConstructionInfo> constructionMap = context.getConstructionMap();
+        Map<String, List<MdmConstructionInfo>> constructionMap = context.getConstructionMap();
         Map<String, Integer> paddingSupplyDepth = context.getPaddingSupplyDepth();
         Map<String, BigDecimal> paddingRemainingMap = context.getPaddingRemainingMap();
 
@@ -1427,7 +1540,7 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
     private BigDecimal calcStockConsumeRatio(DjPaddingDemand spec, DjScheduleContext context) {
         // 从成型计划动态计算前3个班的日均消耗量
         List<CxScheduleResult> cxScheduleList = context.getCxScheduleList();
-        Map<String, MdmConstructionInfo> constructionMap = context.getConstructionMap();
+        Map<String, List<MdmConstructionInfo>> constructionMap = context.getConstructionMap();
         String paddingCode = spec.getPaddingCode();
 
         BigDecimal avgDailyConsume = BigDecimal.ZERO;

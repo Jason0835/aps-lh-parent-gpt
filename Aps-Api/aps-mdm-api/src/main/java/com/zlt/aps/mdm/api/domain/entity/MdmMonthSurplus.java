@@ -10,6 +10,7 @@ import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 
 import java.math.BigDecimal;
+import java.util.Date;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -119,6 +120,13 @@ public class MdmMonthSurplus extends BaseEntity {
     @ApiModelProperty(value = "计划余量", name = "planSurplusQty")
     @TableField(value = "PLAN_SURPLUS_QTY")
     private BigDecimal planSurplusQty;
+
+    /**
+     * 库存抓取日
+     */
+    @ApiModelProperty(value = "库存抓取日", name = "stockCaptureDate")
+    @TableField(value = "STOCK_CAPTURE_DATE")
+    private Date stockCaptureDate;
 
     /**
      * 以分厂+物料为维度，转换月底计划余量

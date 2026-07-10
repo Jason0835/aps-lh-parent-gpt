@@ -9,10 +9,9 @@ import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.utils.BigDecimalUtils;
 import com.zlt.aps.common.engine.utils.DepthConfigResolver;
 import com.zlt.aps.tm.api.domain.entity.*;
+import com.zlt.aps.tm.api.enums.TmScheduleStepEnum;
 import com.zlt.aps.tm.api.enums.TmUnplannedReasonEnum;
-import com.zlt.aps.tm.domain.vo.TmExperimentSpecMonthPlanRowVo;
-import com.zlt.aps.tm.domain.vo.TmFormingDemandRowVo;
-import com.zlt.aps.tm.domain.vo.TmWorkCalendarRowVo;
+import com.zlt.aps.tm.domain.vo.*;
 import com.zlt.aps.tm.engine.domain.*;
 import com.zlt.aps.tm.mapper.*;
 import lombok.extern.slf4j.Slf4j;
@@ -61,6 +60,13 @@ public class TmAutoScheduleDataLoadService {
     private static final String PARAM_FORMING_SHIFT_OFFSET = "TM_FORMING_SHIFT_OFFSET";
 
     private static final String PARAM_SMALL_GLUE_CODES = "TM_SMALL_GLUE_CODES";
+
+    /** 版本匹配模式参数：RECIPE 按示方书逐班解析（默认），BOM 回退原 BOM_DATA_VERSION 关联 */
+    private static final String PARAM_VERSION_MATCH_MODE = "TM_VERSION_MATCH_MODE";
+
+    private static final String VERSION_MATCH_MODE_RECIPE = "RECIPE";
+
+    private static final String VERSION_MATCH_MODE_BOM = "BOM";
 
     private static final String PROC_CODE_CX = "03";
 
@@ -182,6 +188,7 @@ public class TmAutoScheduleDataLoadService {
         putDefaultParam(paramMap, PARAM_EXPERIMENT_SPEC_PLAN_QTY, "30");
         putDefaultParam(paramMap, PARAM_FORMING_SHIFT_OFFSET, "2");
         putDefaultParam(paramMap, PARAM_SMALL_GLUE_CODES, "");
+        putDefaultParam(paramMap, PARAM_VERSION_MATCH_MODE, VERSION_MATCH_MODE_RECIPE);
         context.setParamMap(paramMap);
         context.setSmallGlueCodeSet(this.parseSmallGlueCodes(paramMap.get(PARAM_SMALL_GLUE_CODES)));
     }
@@ -226,8 +233,12 @@ public class TmAutoScheduleDataLoadService {
             candidate.setRemainCapacity(nvl(machineInfo.getMaxCapacity()));
             candidate.setMaintenanceHours(BigDecimal.ZERO);
             candidate.setSwitchCostHours(BigDecimal.ZERO);
+            candidate.setConfiguredMouthPlateCodes(new HashSet<>());
             candidate.setMouthPlateCodes(new HashSet<>());
+            candidate.setConfiguredGlueCodes(new HashSet<>());
+            candidate.setAllowedGlueCodes(new HashSet<>());
             candidate.setForbiddenGlueCodes(new HashSet<>());
+            candidate.setConfiguredFixedAllowTreadCodes(new HashSet<>());
             candidate.setFixedAllowTreadCodes(new HashSet<>());
             candidate.setFixedForbidTreadCodes(new HashSet<>());
             candidateMap.put(machineInfo.getMachineCode(), candidate);
@@ -257,6 +268,16 @@ public class TmAutoScheduleDataLoadService {
         wrapper.eq(TmMouthPlate::getFactoryCode, context.getFactoryCode());
         wrapper.in(TmMouthPlate::getMachineCode, candidateMap.keySet());
         List<TmMouthPlate> mouthPlateList = tmMouthPlateMapper.selectList(wrapper);
+        Set<String> configuredMouthPlateCodes = mouthPlateList.stream()
+                .map(TmMouthPlate::getMouthPlateCode)
+                .filter(StrUtil::isNotBlank)
+                .collect(Collectors.toSet());
+        for (TmMachineCandidate candidate : candidateMap.values()) {
+            if (candidate.getConfiguredMouthPlateCodes() == null) {
+                candidate.setConfiguredMouthPlateCodes(new HashSet<>());
+            }
+            candidate.getConfiguredMouthPlateCodes().addAll(configuredMouthPlateCodes);
+        }
         for (TmMouthPlate mouthPlate : mouthPlateList) {
             TmMachineCandidate candidate = candidateMap.get(mouthPlate.getMachineCode());
             if (candidate == null || StrUtil.isBlank(mouthPlate.getMouthPlateCode())) {
@@ -284,18 +305,37 @@ public class TmAutoScheduleDataLoadService {
         wrapper.eq(TmGlueMachineReal::getEnableStatus, YES);
         wrapper.in(TmGlueMachineReal::getMachineCode, candidateMap.keySet());
         List<TmGlueMachineReal> glueRuleList = tmGlueMachineRealMapper.selectList(wrapper);
+        Set<String> configuredGlueCodes = glueRuleList.stream()
+                .filter(glueRule -> YES.equals(glueRule.getAllowFlag()) || NO.equals(glueRule.getAllowFlag()))
+                .map(TmGlueMachineReal::getGlueCode)
+                .filter(StrUtil::isNotBlank)
+                .collect(Collectors.toSet());
+        for (TmMachineCandidate candidate : candidateMap.values()) {
+            if (candidate.getConfiguredGlueCodes() == null) {
+                candidate.setConfiguredGlueCodes(new HashSet<>());
+            }
+            candidate.getConfiguredGlueCodes().addAll(configuredGlueCodes);
+        }
         for (TmGlueMachineReal glueRule : glueRuleList) {
-            if (StrUtil.isBlank(glueRule.getGlueCode()) || !NO.equals(glueRule.getAllowFlag())) {
+            if (StrUtil.isBlank(glueRule.getGlueCode())
+                    || (!YES.equals(glueRule.getAllowFlag()) && !NO.equals(glueRule.getAllowFlag()))) {
                 continue;
             }
             TmMachineCandidate candidate = candidateMap.get(glueRule.getMachineCode());
             if (candidate == null) {
                 continue;
             }
-            if (candidate.getForbiddenGlueCodes() == null) {
-                candidate.setForbiddenGlueCodes(new HashSet<>());
+            if (YES.equals(glueRule.getAllowFlag())) {
+                if (candidate.getAllowedGlueCodes() == null) {
+                    candidate.setAllowedGlueCodes(new HashSet<>());
+                }
+                candidate.getAllowedGlueCodes().add(glueRule.getGlueCode());
+            } else {
+                if (candidate.getForbiddenGlueCodes() == null) {
+                    candidate.setForbiddenGlueCodes(new HashSet<>());
+                }
+                candidate.getForbiddenGlueCodes().add(glueRule.getGlueCode());
             }
-            candidate.getForbiddenGlueCodes().add(glueRule.getGlueCode());
         }
     }
 
@@ -314,6 +354,17 @@ public class TmAutoScheduleDataLoadService {
         wrapper.eq(TmSpecifyMachine::getEnableStatus, YES);
         wrapper.in(TmSpecifyMachine::getMachineCode, candidateMap.keySet());
         List<TmSpecifyMachine> specifyList = tmSpecifyMachineMapper.selectList(wrapper);
+        Set<String> configuredFixedAllowTreadCodes = specifyList.stream()
+                .filter(specify -> JOB_TYPE_ALLOW.equals(specify.getJobType()))
+                .map(TmSpecifyMachine::getTreadCode)
+                .filter(StrUtil::isNotBlank)
+                .collect(Collectors.toSet());
+        for (TmMachineCandidate candidate : candidateMap.values()) {
+            if (candidate.getConfiguredFixedAllowTreadCodes() == null) {
+                candidate.setConfiguredFixedAllowTreadCodes(new HashSet<>());
+            }
+            candidate.getConfiguredFixedAllowTreadCodes().addAll(configuredFixedAllowTreadCodes);
+        }
         for (TmSpecifyMachine specify : specifyList) {
             TmMachineCandidate candidate = candidateMap.get(specify.getMachineCode());
             if (candidate == null || StrUtil.isBlank(specify.getTreadCode())) {
@@ -696,11 +747,31 @@ public class TmAutoScheduleDataLoadService {
     /**
      * 从成型计划和施工信息构造胎面待排任务。
      *
+     * <p>按参数 {@code TM_VERSION_MATCH_MODE} 分流：{@code RECIPE}（默认）走逐班示方书版本解析，
+     * {@code BOM} 走原 {@code BOM_DATA_VERSION} 关联逻辑（可随时切换回退）。</p>
+     *
      * @param context     自动排程上下文
      * @param machineList 胎面机台列表
      * @return 胎面待排任务列表
      */
     private List<TmTaskDraft> loadFormingDemandTasks(TmScheduleContext context, List<TmMachineInfo> machineList) {
+        String versionMatchMode = getParamValue(context, PARAM_VERSION_MATCH_MODE, VERSION_MATCH_MODE_RECIPE);
+        log.info("[TM_BOOTSTRAP_DETAIL] factoryCode={}, scheduleDate={} 版本匹配模式={}",
+                context.getFactoryCode(), DateUtil.formatDate(context.getScheduleDate()), versionMatchMode);
+        if (VERSION_MATCH_MODE_BOM.equalsIgnoreCase(versionMatchMode)) {
+            return loadFormingDemandTasksByBom(context, machineList);
+        }
+        return loadFormingDemandTasksByRecipe(context, machineList);
+    }
+
+    /**
+     * BOM 模式：原 BOM_DATA_VERSION 关联逻辑，一行成型对应一套胎面属性、6 班共用。
+     *
+     * @param context     自动排程上下文
+     * @param machineList 胎面机台列表
+     * @return 胎面待排任务列表
+     */
+    private List<TmTaskDraft> loadFormingDemandTasksByBom(TmScheduleContext context, List<TmMachineInfo> machineList) {
         List<TmFormingDemandRowVo> rowList;
         try {
             rowList = tmAutoScheduleDataLoadMapper.selectFormingDemandRows(context.getFactoryCode(), context.getScheduleDate());
@@ -712,6 +783,8 @@ public class TmAutoScheduleDataLoadService {
         if (rowList == null) {
             rowList = Collections.emptyList();
         }
+        log.info("[TM_BOOTSTRAP_DETAIL] factoryCode={}, scheduleDate={} BOM模式成型计划原始行数={}",
+                context.getFactoryCode(), DateUtil.formatDate(context.getScheduleDate()), rowList.size());
         // 校验成型关联施工的关键字段是否为空，收集所有有问题的规格统一提示
         Set<String> treadCodeEmptyList = new HashSet<>();
         Set<String> treadLengthEmptyList = new HashSet<>();
@@ -754,6 +827,8 @@ public class TmAutoScheduleDataLoadService {
         if (errorMsg.length() > 0) {
             // 移除末尾的分号
             errorMsg.setLength(errorMsg.length() - 1);
+            context.getIssueCollector().addIssue(TmAutoScheduleIssueCollector.LEVEL_ERROR,
+                    TmScheduleStepEnum.BOOTSTRAP, "CONSTRUCTION_FIELD_MISSING", errorMsg.toString());
             throw new RuntimeException(errorMsg.toString());
         }
         // 成型来源需求不在数据加载阶段聚合，解释表需要逐条追溯原成型排程结果。
@@ -766,8 +841,9 @@ public class TmAutoScheduleDataLoadService {
         Integer newSpecLookbackDays = getPositiveIntegerParam(context, PARAM_NEW_SPEC_LOOKBACK_DAYS, 7);
         Integer newSpecAdvanceShiftCount = getPositiveIntegerParam(context, PARAM_NEW_SPEC_ADVANCE_SHIFT_COUNT, 2);
         Integer formingShiftOffset = getNonNegativeIntegerParam(context, PARAM_FORMING_SHIFT_OFFSET, 2);
-        Map<String, TmNewSpecInfo> newSpecInfoMap = buildNewSpecInfoMap(context, demandRowList,
-                newSpecLookbackDays, newSpecAdvanceShiftCount);
+        Map<String, TmNewSpecInfo> newSpecInfoMap = buildNewSpecInfoMap(context, demandRowList.stream()
+                .map(TmFormingDemandRowVo::getTreadCode).filter(StrUtil::isNotBlank)
+                .distinct().collect(Collectors.toList()), newSpecLookbackDays, newSpecAdvanceShiftCount);
         List<TmLossRule> lossRuleList = context.getLossRuleList();
         List<TmDepthConfig> depthConfigList = this.loadDepthConfigs(context);
         TmWorkCalendarRowVo tmCalendar = loadWorkCalendar(context, PROC_CODE_TM);
@@ -782,7 +858,8 @@ public class TmAutoScheduleDataLoadService {
                 continue;
             }
             BigDecimal[] classQtyArray = buildClassQtyArray(row);
-            Integer guardShiftCount = this.resolveGuardShiftCount(context, row, depthConfigList, fallbackGuardShiftCount);
+            Integer guardShiftCount = this.resolveGuardShiftCount(context, row.getLhMachineCode(), row.getOrderNo(),
+                    depthConfigList, fallbackGuardShiftCount);
             boolean noShutdownAvailableShift = redistributeShutdownDemand(context, classQtyArray, tmCalendar, cxCalendar);
             for (int shiftOrder = 1; shiftOrder <= 6; shiftOrder++) {
                 BigDecimal formingQty = resolveFormingQty(classQtyArray, shiftOrder, algorithmCode, formingShiftOffset);
@@ -836,7 +913,311 @@ public class TmAutoScheduleDataLoadService {
             }
         }
         appendExperimentSpecTasks(context, taskDraftList, lossRuleList, minStartQty, defaultCurlLength, toolTotalQty);
+        log.info("[TM_BOOTSTRAP_DETAIL] factoryCode={}, scheduleDate={} BOM模式任务生成汇总：成型行数={}，生成任务={}",
+                context.getFactoryCode(), DateUtil.formatDate(context.getScheduleDate()),
+                rowList.size(), taskDraftList.size());
         return taskDraftList;
+    }
+
+    /**
+     * RECIPE 模式：按 CD90 式逐班示方书版本解析施工，同一成型行不同班次可对应不同胎面规格。
+     *
+     * <p>分两阶段加载：先查成型排程结果（含 CLASS1~8_RECIPE_NO），再按 (EMBRYO_CODE, CONSTRUCTION_VERSION)
+     * 批量查施工胎面属性，Java 中按 (embryoCode, classNRecipeNo) 逐班关联。某班次示方书为空或未命中施工时
+     * 记 warn 跳过该班次，不抛异常（CD90 风格）。</p>
+     *
+     * @param context     自动排程上下文
+     * @param machineList 胎面机台列表
+     * @return 胎面待排任务列表
+     */
+    private List<TmTaskDraft> loadFormingDemandTasksByRecipe(TmScheduleContext context, List<TmMachineInfo> machineList) {
+        List<TmFormingDemandRecipeRowVo> rowList;
+        try {
+            rowList = tmAutoScheduleDataLoadMapper.selectFormingDemandRowsByRecipe(
+                    context.getFactoryCode(), context.getScheduleDate());
+        } catch (RuntimeException ex) {
+            log.warn("[TM_AUTO_SCHEDULE_LOAD] RECIPE 模式加载成型计划失败，scheduleDate={}，原因={}",
+                    DateUtil.formatDate(context.getScheduleDate()), ex.getMessage());
+            return Collections.emptyList();
+        }
+        if (CollUtil.isEmpty(rowList)) {
+            log.warn("[TM_BOOTSTRAP_DETAIL] factoryCode={}, scheduleDate={} RECIPE模式查询成型计划结果为空，无排程任务可生成",
+                    context.getFactoryCode(), DateUtil.formatDate(context.getScheduleDate()));
+            return Collections.emptyList();
+        }
+        log.info("[TM_BOOTSTRAP_DETAIL] factoryCode={}, scheduleDate={} RECIPE模式成型计划原始行数={}",
+                context.getFactoryCode(), DateUtil.formatDate(context.getScheduleDate()), rowList.size());
+        // 收集胎胚代码与所有班次示方书版本，批量加载施工胎面属性
+        Set<String> embryoCodes = rowList.stream().map(TmFormingDemandRecipeRowVo::getEmbryoCode)
+                .filter(StrUtil::isNotBlank).collect(Collectors.toCollection(LinkedHashSet::new));
+        Set<String> recipeVersions = new LinkedHashSet<>();
+        for (TmFormingDemandRecipeRowVo row : rowList) {
+            for (String recipeNo : buildRecipeNoArray(row)) {
+                if (StrUtil.isNotBlank(recipeNo)) {
+                    recipeVersions.add(recipeNo.trim());
+                }
+            }
+        }
+        List<TmConstructionTreadRowVo> constructionList;
+        if (embryoCodes.isEmpty() || recipeVersions.isEmpty()) {
+            log.warn("[TM_RECIPE_MATCH] factoryCode={}, scheduleDate={} 成型计划未提供胎胚代码或示方书版本，跳过施工解析",
+                    context.getFactoryCode(), DateUtil.formatDate(context.getScheduleDate()));
+            constructionList = Collections.emptyList();
+        } else {
+            constructionList = tmAutoScheduleDataLoadMapper.selectConstructionInfoRows(
+                    context.getFactoryCode(), embryoCodes, recipeVersions);
+        }
+        Map<String, TmConstructionTreadRowVo> constructionMap = new HashMap<>();
+        for (TmConstructionTreadRowVo construction : nullToEmpty(constructionList)) {
+            if (construction == null || StrUtil.isBlank(construction.getConstructionCode())
+                    || StrUtil.isBlank(construction.getConstructionVersion())) {
+                continue;
+            }
+            constructionMap.putIfAbsent(construction.getConstructionCode() + "|" + construction.getConstructionVersion(),
+                    construction);
+        }
+        log.info("[TM_BOOTSTRAP_DETAIL] factoryCode={}, scheduleDate={} RECIPE模式施工胎面属性：胚编码数={}，示方书版本数={}，命中施工行数={}，构造映射数={}",
+                context.getFactoryCode(), DateUtil.formatDate(context.getScheduleDate()),
+                embryoCodes.size(), recipeVersions.size(),
+                nullToEmpty(constructionList).size(), constructionMap.size());
+        // 参数与基础数据
+        String algorithmCode = getParamValue(context, PARAM_ALGORITHM_SWITCH, "1");
+        BigDecimal minStartQty = getDecimalParam(context, PARAM_MIN_START_QTY);
+        BigDecimal defaultCurlLength = getDecimalParam(context, PARAM_DEFAULT_CURL_LENGTH);
+        BigDecimal toolTotalQty = getDecimalParam(context, PARAM_TOOL_TOTAL_QTY);
+        Integer fallbackGuardShiftCount = getIntegerParam(context, PARAM_MIN_STOCK_CLASS, 1);
+        Integer newSpecLookbackDays = getPositiveIntegerParam(context, PARAM_NEW_SPEC_LOOKBACK_DAYS, 7);
+        Integer newSpecAdvanceShiftCount = getPositiveIntegerParam(context, PARAM_NEW_SPEC_ADVANCE_SHIFT_COUNT, 2);
+        Integer formingShiftOffset = getNonNegativeIntegerParam(context, PARAM_FORMING_SHIFT_OFFSET, 2);
+        List<TmLossRule> lossRuleList = context.getLossRuleList();
+        List<TmDepthConfig> depthConfigList = this.loadDepthConfigs(context);
+        TmWorkCalendarRowVo tmCalendar = loadWorkCalendar(context, PROC_CODE_TM);
+        TmWorkCalendarRowVo cxCalendar = loadWorkCalendar(context, PROC_CODE_CX);
+
+        // 预解析每行各班次施工规格，并收集有效胎面编码用于新规格判断
+        List<BigDecimal[]> classQtyArrayList = new ArrayList<>();
+        List<TmConstructionTreadRowVo[]> specByClassList = new ArrayList<>();
+        Set<String> allTreadCodes = new LinkedHashSet<>();
+        Set<String> treadCodeEmptyList = new LinkedHashSet<>();
+        Set<String> treadLengthEmptyList = new LinkedHashSet<>();
+        Set<String> mouthPlateEmptyList = new LinkedHashSet<>();
+        Set<String> rubberCategoryEmptyList = new LinkedHashSet<>();
+        for (TmFormingDemandRecipeRowVo row : rowList) {
+            BigDecimal[] classQtyArray = buildClassQtyArrayByRecipe(row);
+            classQtyArrayList.add(classQtyArray);
+            String[] recipeNoByClass = buildRecipeNoArray(row);
+            TmConstructionTreadRowVo[] specByClass = new TmConstructionTreadRowVo[8];
+            for (int i = 0; i < 8; i++) {
+                String recipeNo = recipeNoByClass[i];
+                if (StrUtil.isBlank(recipeNo)) {
+                    continue;
+                }
+                TmConstructionTreadRowVo spec = constructionMap.get(row.getEmbryoCode() + "|" + recipeNo.trim());
+                specByClass[i] = spec;
+                if (spec == null || readClassQty(classQtyArray, i).compareTo(BigDecimal.ZERO) <= 0) {
+                    continue;
+                }
+                String sourceKey = StrUtil.blankToDefault(row.getEmbryoCode(), row.getOrderNo()) + "/" + recipeNo.trim();
+                if (StrUtil.isBlank(spec.getTreadCode())) {
+                    treadCodeEmptyList.add(sourceKey);
+                }
+                if (nvl(spec.getTreadShoulderLength()).compareTo(BigDecimal.ZERO) <= 0) {
+                    treadLengthEmptyList.add(sourceKey);
+                }
+                if (StrUtil.isBlank(spec.getTreadMouthPlate())) {
+                    mouthPlateEmptyList.add(sourceKey);
+                }
+                if (StrUtil.isBlank(spec.getTreadRubberCategory())) {
+                    rubberCategoryEmptyList.add(sourceKey);
+                }
+                if (StrUtil.isNotBlank(spec.getTreadCode())
+                        && nvl(spec.getTreadShoulderLength()).compareTo(BigDecimal.ZERO) > 0) {
+                    allTreadCodes.add(spec.getTreadCode());
+                }
+            }
+            specByClassList.add(specByClass);
+        }
+        StringBuilder errorMsg = new StringBuilder();
+        if (CollUtil.isNotEmpty(treadCodeEmptyList)) {
+            errorMsg.append("成型规格/示方书：").append(String.join("、", treadCodeEmptyList)).append("，胎面代码为空；");
+        }
+        if (CollUtil.isNotEmpty(treadLengthEmptyList)) {
+            errorMsg.append("成型规格/示方书：").append(String.join("、", treadLengthEmptyList)).append("，胎面长为空；");
+        }
+        if (CollUtil.isNotEmpty(mouthPlateEmptyList)) {
+            errorMsg.append("成型规格/示方书：").append(String.join("、", mouthPlateEmptyList)).append("，胎面口型板为空；");
+        }
+        if (CollUtil.isNotEmpty(rubberCategoryEmptyList)) {
+            errorMsg.append("成型规格/示方书：").append(String.join("、", rubberCategoryEmptyList)).append("，胎面胶料为空；");
+        }
+        if (errorMsg.length() > 0) {
+            errorMsg.setLength(errorMsg.length() - 1);
+            context.getIssueCollector().addIssue(TmAutoScheduleIssueCollector.LEVEL_ERROR,
+                    TmScheduleStepEnum.BOOTSTRAP, "CONSTRUCTION_FIELD_MISSING", errorMsg.toString());
+            throw new RuntimeException(errorMsg.toString());
+        }
+        Map<String, TmNewSpecInfo> newSpecInfoMap = buildNewSpecInfoMap(context, allTreadCodes,
+                newSpecLookbackDays, newSpecAdvanceShiftCount);
+
+        // 逐行逐班次生成任务
+        List<TmTaskDraft> taskDraftList = new ArrayList<>();
+        int sourceRowIndex = 0;
+        int skippedShiftNoFormingQty = 0;
+        int skippedShiftNoSpec = 0;
+        int skippedShiftNoDemand = 0;
+        for (int rowIdx = 0; rowIdx < rowList.size(); rowIdx++) {
+            TmFormingDemandRecipeRowVo row = rowList.get(rowIdx);
+            sourceRowIndex++;
+            BigDecimal[] classQtyArray = classQtyArrayList.get(rowIdx);
+            TmConstructionTreadRowVo[] specByClass = specByClassList.get(rowIdx);
+            Integer guardShiftCount = this.resolveGuardShiftCount(context, row.getLhMachineCode(), row.getOrderNo(),
+                    depthConfigList, fallbackGuardShiftCount);
+            boolean noShutdownAvailableShift = redistributeShutdownDemand(context, classQtyArray, tmCalendar, cxCalendar);
+            for (int shiftOrder = 1; shiftOrder <= 6; shiftOrder++) {
+                BigDecimal formingQty = resolveFormingQty(classQtyArray, shiftOrder, algorithmCode, formingShiftOffset);
+                if (formingQty.compareTo(BigDecimal.ZERO) <= 0) {
+                    skippedShiftNoFormingQty++;
+                    continue;
+                }
+                int startIndex = resolveFormingStartIndex(shiftOrder, formingShiftOffset);
+                String[] taskRecipeNoByClass = buildRecipeNoArray(row);
+                TmConstructionTreadRowVo primarySpec = (startIndex >= 0 && startIndex < 8) ? specByClass[startIndex] : null;
+                if (primarySpec == null || StrUtil.isBlank(primarySpec.getTreadCode())
+                        || nvl(primarySpec.getTreadShoulderLength()).compareTo(BigDecimal.ZERO) <= 0) {
+                    String missingRecipeNo = (startIndex >= 0 && startIndex < taskRecipeNoByClass.length) ? taskRecipeNoByClass[startIndex] : null;
+                    String missingReason = primarySpec == null ? "示方书为空或未命中施工" : "施工胎面编码或肩长无效";
+                    log.warn("[TM_RECIPE_MATCH] 跳过班次：factoryCode={}, orderNo={}, embryoCode={}, shiftOrder={}, startIndex={}, formingQty={}, 原因={}",
+                            context.getFactoryCode(), row.getOrderNo(), row.getEmbryoCode(), shiftOrder, startIndex, formingQty,
+                            missingReason);
+                    context.getIssueCollector().addConstructionIssue(TmAutoScheduleIssueCollector.LEVEL_WARN,
+                            "CONSTRUCTION_MISSING", row.getOrderNo(), row.getEmbryoCode(), missingRecipeNo,
+                            shiftOrder, primarySpec == null ? "recipeNo" : "treadCode/treadShoulderLength", missingReason);
+                    skippedShiftNoSpec++;
+                    continue;
+                }
+                String treadCode = primarySpec.getTreadCode();
+                BigDecimal treadLength = nvl(primarySpec.getTreadShoulderLength());
+                BigDecimal demandQty = formingQty.multiply(treadLength);
+                if (demandQty.compareTo(BigDecimal.ZERO) <= 0) {
+                    continue;
+                }
+                TmNewSpecInfo taskNewSpecInfo = buildTaskNewSpecInfo(newSpecInfoMap.get(treadCode), shiftOrder, demandQty);
+                int targetShiftOrder = resolveTargetShiftOrder(taskNewSpecInfo, shiftOrder);
+                TmTaskDraft taskDraft = new TmTaskDraft();
+                taskDraft.setOrderNo(row.getOrderNo() + "-CLASS" + shiftOrder);
+                taskDraft.setSourceOrderNos(row.getOrderNo());
+                taskDraft.setBusinessKeySuffix(buildSourceTaskBusinessKeySuffix(row, sourceRowIndex, shiftOrder));
+                taskDraft.setTreadCode(treadCode);
+                // 拆分胶料类别：第一个值为主胶料编码，其余值为基部胶编码
+                String rubberCategory = primarySpec.getTreadRubberCategory();
+                if (StrUtil.isNotBlank(rubberCategory)) {
+                    String[] glueParts = rubberCategory.split(",");
+                    taskDraft.setGlueCode(glueParts[0].trim());
+                    if (glueParts.length > 1) {
+                        String baseGlueCode = String.join(",", Arrays.copyOfRange(glueParts, 1, glueParts.length));
+                        taskDraft.setBaseGlueCode(baseGlueCode);
+                    }
+                } else {
+                    taskDraft.setGlueCode(null);
+                    taskDraft.setBaseGlueCode(null);
+                }
+                taskDraft.setSmallGlueFlag(this.isSmallGlueCode(context, taskDraft.getGlueCode()));
+                taskDraft.setMouthPlateCode(primarySpec.getTreadMouthPlate());
+                taskDraft.setShiftOrder(targetShiftOrder);
+                taskDraft.setNewSpecInfo(taskNewSpecInfo);
+                taskDraft.setTreadShoulderLength(treadLength);
+                taskDraft.setTailFlag(CLOSE_OUT_TIP.equals(row.getMarkCloseOutTip()) ? YES : NO);
+                taskDraft.setTailBalanceQty(nvl(row.getCxRemainQty()));
+                taskDraft.setCurrentShiftDemandQty(demandQty);
+                taskDraft.setGuardDemandQty(calculateGuardDemandByRecipe(classQtyArray, specByClass, shiftOrder,
+                        guardShiftCount, formingShiftOffset));
+                taskDraft.setDemandQty(demandQty);
+                taskDraft.setGuardShiftCount(guardShiftCount);
+                taskDraft.setMinStartQty(minStartQty);
+                taskDraft.setDefaultCurlRollLength(defaultCurlLength);
+                if (toolTotalQty.compareTo(BigDecimal.ZERO) > 0) {
+                    taskDraft.setTotalToolQty(toolTotalQty);
+                }
+                if (noShutdownAvailableShift && !isShiftOpen(tmCalendar, targetShiftOrder) && isShiftOpen(cxCalendar, shiftOrder)) {
+                    taskDraft.setUnplannedReasonCode(TmUnplannedReasonEnum.TM_SHUTDOWN_NO_AVAILABLE_SHIFT.getCode());
+                    taskDraft.setUnplannedReasonDesc(TmUnplannedReasonEnum.TM_SHUTDOWN_NO_AVAILABLE_SHIFT.getDesc());
+                }
+                taskDraftList.add(taskDraft);
+            }
+        }
+        appendExperimentSpecTasks(context, taskDraftList, lossRuleList, minStartQty, defaultCurlLength, toolTotalQty);
+        log.info("[TM_BOOTSTRAP_DETAIL] factoryCode={}, scheduleDate={} RECIPE模式任务生成汇总：成型行数={}，跳过(成型量=0)={}班次，跳过(示方书/施工不匹配)={}班次，生成任务={}",
+                context.getFactoryCode(), DateUtil.formatDate(context.getScheduleDate()),
+                rowList.size(), skippedShiftNoFormingQty, skippedShiftNoSpec, taskDraftList.size());
+        return taskDraftList;
+    }
+
+    /**
+     * RECIPE 模式库存保证范围内的成型需求米数：按各班次实际单耗加权求和。
+     *
+     * <p>窗口内每个成型班次乘以该班次示方书命中的胎面肩长（未命中按 0），替代原 BOM 模式
+     * {@code Σ qty × 单一 treadLength}，当窗口内各班次施工版本不同时更精确。</p>
+     *
+     * @param classQtyArray   成型班次计划量数组
+     * @param specByClass     各班次命中的施工胎面属性，未命中为 null
+     * @param shiftOrder      胎面排程班次，从 1 开始
+     * @param guardShiftCount 库存最低保证班数
+     * @param formingShiftOffset 胎面班次到成型班次的偏移量
+     * @return 库存保证范围内的成型需求米数合计
+     */
+    private BigDecimal calculateGuardDemandByRecipe(BigDecimal[] classQtyArray, TmConstructionTreadRowVo[] specByClass,
+                                                    int shiftOrder, int guardShiftCount, int formingShiftOffset) {
+        BigDecimal total = BigDecimal.ZERO;
+        int startIndex = resolveFormingStartIndex(shiftOrder, formingShiftOffset);
+        int count = Math.max(guardShiftCount, 1);
+        for (int index = startIndex; index < startIndex + count; index++) {
+            BigDecimal formingQty = readClassQty(classQtyArray, index);
+            if (formingQty.compareTo(BigDecimal.ZERO) <= 0) {
+                continue;
+            }
+            BigDecimal treadLength = (index >= 0 && index < 8 && specByClass != null && specByClass[index] != null)
+                    ? nvl(specByClass[index].getTreadShoulderLength()) : BigDecimal.ZERO;
+            total = total.add(formingQty.multiply(treadLength));
+        }
+        return total;
+    }
+
+    /**
+     * 构建成型班次计划量数组（RECIPE 模式）。
+     *
+     * @param row 成型需求行（示方书版本模式）
+     * @return 1~8 班成型计划量数组
+     */
+    private BigDecimal[] buildClassQtyArrayByRecipe(TmFormingDemandRecipeRowVo row) {
+        return new BigDecimal[]{
+                nvl(row.getClass1PlanQty()),
+                nvl(row.getClass2PlanQty()),
+                nvl(row.getClass3PlanQty()),
+                nvl(row.getClass4PlanQty()),
+                nvl(row.getClass5PlanQty()),
+                nvl(row.getClass6PlanQty()),
+                nvl(row.getClass7PlanQty()),
+                nvl(row.getClass8PlanQty())
+        };
+    }
+
+    /**
+     * 构建成型班次示方书编号数组（RECIPE 模式）。
+     *
+     * @param row 成型需求行（示方书版本模式）
+     * @return 1~8 班示方书编号数组
+     */
+    private String[] buildRecipeNoArray(TmFormingDemandRecipeRowVo row) {
+        return new String[]{
+                row.getClass1RecipeNo(),
+                row.getClass2RecipeNo(),
+                row.getClass3RecipeNo(),
+                row.getClass4RecipeNo(),
+                row.getClass5RecipeNo(),
+                row.getClass6RecipeNo(),
+                row.getClass7RecipeNo(),
+                row.getClass8RecipeNo()
+        };
     }
 
     /**
@@ -1148,37 +1529,50 @@ public class TmAutoScheduleDataLoadService {
     }
 
     /**
+     * 构造来源任务业务键后缀（RECIPE 模式重载）。
+     *
+     * @param row            成型需求行（示方书版本模式）
+     * @param sourceRowIndex 来源行顺序，从 1 开始
+     * @param shiftOrder     胎面排程班次
+     * @return 来源任务业务键后缀
+     */
+    private String buildSourceTaskBusinessKeySuffix(TmFormingDemandRecipeRowVo row, int sourceRowIndex, int shiftOrder) {
+        String sourceOrderNo = row == null ? null : row.getOrderNo();
+        String sourceKey = StrUtil.blankToDefault(sourceOrderNo, "ROW" + sourceRowIndex);
+        return sourceKey + "-CLASS" + shiftOrder + "-ROW" + sourceRowIndex;
+    }
+
+    /**
      * 构建胎面新规格判断结果。
      *
      * @param context 自动排程上下文
-     * @param demandRowList 成型需求行
+     * @param treadCodes 待判断的胎面编码集合（BOM 模式取成型行 treadCode，RECIPE 模式取逐班解析命中的 treadCode 并集）
      * @param lookbackDays 回看天数
      * @param advanceShiftCount 提前班次数
      * @return 胎面编码到新规格证据的映射
      */
     private Map<String, TmNewSpecInfo> buildNewSpecInfoMap(TmScheduleContext context,
-                                                           List<TmFormingDemandRowVo> demandRowList,
+                                                           Collection<String> treadCodes,
                                                            Integer lookbackDays,
                                                            Integer advanceShiftCount) {
         Map<String, TmNewSpecInfo> resultMap = new HashMap<>();
-        if (CollUtil.isEmpty(demandRowList)) {
+        if (CollUtil.isEmpty(treadCodes)) {
             return resultMap;
         }
-        List<String> treadCodes = demandRowList.stream()
-                .map(TmFormingDemandRowVo::getTreadCode)
+        List<String> treadCodeList = treadCodes.stream()
                 .filter(StrUtil::isNotBlank)
                 .distinct()
                 .collect(Collectors.toList());
-        if (CollUtil.isEmpty(treadCodes)) {
+        if (CollUtil.isEmpty(treadCodeList)) {
             return resultMap;
         }
         Date previousDate = DateUtil.offsetDay(context.getScheduleDate(), -1);
         Date historyStartDate = DateUtil.offsetDay(context.getScheduleDate(), -lookbackDays);
-        Map<String, BigDecimal> previousStockMap = queryPreviousDayStockMap(context, treadCodes, previousDate);
-        Map<String, Boolean> historyPlanMap = queryHistoryPlanExistsMap(context, treadCodes, historyStartDate, previousDate);
+        Map<String, BigDecimal> previousStockMap = queryPreviousDayStockMap(context, treadCodeList, previousDate);
+        Map<String, Boolean> historyPlanMap = queryHistoryPlanExistsMap(context, treadCodeList, historyStartDate, previousDate);
         String lookbackSource = getPositiveIntegerParamSource(context, PARAM_NEW_SPEC_LOOKBACK_DAYS, 7);
         String advanceSource = getPositiveIntegerParamSource(context, PARAM_NEW_SPEC_ADVANCE_SHIFT_COUNT, 2);
-        for (String treadCode : treadCodes) {
+        for (String treadCode : treadCodeList) {
             BigDecimal previousStockQty = previousStockMap.getOrDefault(treadCode, BigDecimal.ZERO);
             boolean previousStockExists = previousStockQty.compareTo(BigDecimal.ZERO) > 0;
             boolean historyPlanExists = Boolean.TRUE.equals(historyPlanMap.get(treadCode));
@@ -1373,22 +1767,23 @@ public class TmAutoScheduleDataLoadService {
      * 未命中配置或命中配置的保证班数不是正整数时，回退原参数 {@code TM_MIN_STOCK_CLASS}。</p>
      *
      * @param context                 自动排程上下文
-     * @param row                     成型需求行
+     * @param lhMachineCode           硫化机编码（成型需求行）
+     * @param orderNo                 成型工单号（日志追溯）
      * @param depthConfigList         库存保证班数配置
      * @param fallbackGuardShiftCount 参数兜底库存保证班数
      * @return 当前成型来源使用的库存保证班数
      */
-    private Integer resolveGuardShiftCount(TmScheduleContext context, TmFormingDemandRowVo row,
+    private Integer resolveGuardShiftCount(TmScheduleContext context, String lhMachineCode, String orderNo,
                                            List<TmDepthConfig> depthConfigList, Integer fallbackGuardShiftCount) {
-        Integer lhMachineQty = this.resolveLhMachineQty(row.getLhMachineCode());
+        Integer lhMachineQty = this.resolveLhMachineQty(lhMachineCode);
         if (lhMachineQty == null) {
             log.warn("[TM_DEPTH_CONFIG_MATCH] factoryCode={}, orderNo={} 硫化机编码为空或无法解析，回退参数 {}={}",
-                    context.getFactoryCode(), row.getOrderNo(), PARAM_MIN_STOCK_CLASS, fallbackGuardShiftCount);
+                    context.getFactoryCode(), orderNo, PARAM_MIN_STOCK_CLASS, fallbackGuardShiftCount);
             return fallbackGuardShiftCount;
         }
         if (CollUtil.isEmpty(depthConfigList)) {
             log.warn("[TM_DEPTH_CONFIG_MATCH] factoryCode={}, orderNo={}, lhMachineQty={} 未维护库存保证班数配置，回退参数 {}={}",
-                    context.getFactoryCode(), row.getOrderNo(), lhMachineQty, PARAM_MIN_STOCK_CLASS, fallbackGuardShiftCount);
+                    context.getFactoryCode(), orderNo, lhMachineQty, PARAM_MIN_STOCK_CLASS, fallbackGuardShiftCount);
             return fallbackGuardShiftCount;
         }
         Optional<TmDepthConfig> exactConfigOptional = depthConfigList.stream()
@@ -1396,7 +1791,7 @@ public class TmAutoScheduleDataLoadService {
                         && Objects.equals(depthConfig.getMachineQty(), lhMachineQty))
                 .findFirst();
         if (exactConfigOptional.isPresent()) {
-            return this.resolveMatchedGuardShiftCount(context, row, lhMachineQty, exactConfigOptional.get(),
+            return this.resolveMatchedGuardShiftCount(context, orderNo, lhMachineQty, exactConfigOptional.get(),
                     fallbackGuardShiftCount);
         }
         for (TmDepthConfig depthConfig : depthConfigList) {
@@ -1407,10 +1802,10 @@ public class TmAutoScheduleDataLoadService {
             if (matchedDepthClassQty == null) {
                 continue;
             }
-            return this.resolveMatchedGuardShiftCount(context, row, lhMachineQty, depthConfig, fallbackGuardShiftCount);
+            return this.resolveMatchedGuardShiftCount(context, orderNo, lhMachineQty, depthConfig, fallbackGuardShiftCount);
         }
         log.warn("[TM_DEPTH_CONFIG_MATCH] factoryCode={}, orderNo={}, lhMachineQty={} 未命中库存保证班数配置，回退参数 {}={}",
-                context.getFactoryCode(), row.getOrderNo(), lhMachineQty, PARAM_MIN_STOCK_CLASS, fallbackGuardShiftCount);
+                context.getFactoryCode(), orderNo, lhMachineQty, PARAM_MIN_STOCK_CLASS, fallbackGuardShiftCount);
         return fallbackGuardShiftCount;
     }
 
@@ -1418,13 +1813,13 @@ public class TmAutoScheduleDataLoadService {
      * 将已命中的深度配置转换为库存保证班数。
      *
      * @param context                 自动排程上下文
-     * @param row                     成型需求行
+     * @param orderNo                 成型工单号（日志追溯）
      * @param lhMachineQty            硫化机数量
      * @param depthConfig             已命中的深度配置
      * @param fallbackGuardShiftCount 参数兜底库存保证班数
      * @return 当前成型来源使用的库存保证班数
      */
-    private Integer resolveMatchedGuardShiftCount(TmScheduleContext context, TmFormingDemandRowVo row,
+    private Integer resolveMatchedGuardShiftCount(TmScheduleContext context, String orderNo,
                                                   Integer lhMachineQty, TmDepthConfig depthConfig,
                                                   Integer fallbackGuardShiftCount) {
         Integer guardShiftCount = this.toPositiveIntegerDepthClassQty(depthConfig.getDepthClassQty());
@@ -1432,7 +1827,7 @@ public class TmAutoScheduleDataLoadService {
             return guardShiftCount;
         }
         log.warn("[TM_DEPTH_CONFIG_MATCH] factoryCode={}, orderNo={}, lhMachineQty={}, machineRange={}, machineQty={}, depthClassQty={} 不是正整数，回退参数 {}={}",
-                context.getFactoryCode(), row.getOrderNo(), lhMachineQty, depthConfig.getMachineRange(),
+                context.getFactoryCode(), orderNo, lhMachineQty, depthConfig.getMachineRange(),
                 depthConfig.getMachineQty(), depthConfig.getDepthClassQty(), PARAM_MIN_STOCK_CLASS, fallbackGuardShiftCount);
         return fallbackGuardShiftCount;
     }

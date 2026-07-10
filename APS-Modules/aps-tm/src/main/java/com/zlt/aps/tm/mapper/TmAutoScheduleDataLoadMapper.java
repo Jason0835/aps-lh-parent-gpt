@@ -1,11 +1,10 @@
 package com.zlt.aps.tm.mapper;
 
-import com.zlt.aps.tm.domain.vo.TmExperimentSpecMonthPlanRowVo;
-import com.zlt.aps.tm.domain.vo.TmFormingDemandRowVo;
-import com.zlt.aps.tm.domain.vo.TmWorkCalendarRowVo;
+import com.zlt.aps.tm.domain.vo.*;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
+import java.util.Collection;
 import java.util.Date;
 import java.util.List;
 
@@ -26,6 +25,28 @@ public interface TmAutoScheduleDataLoadMapper {
      */
     List<TmFormingDemandRowVo> selectFormingDemandRows(@Param("factoryCode") String factoryCode,
                                                        @Param("scheduleDate") Date scheduleDate);
+
+    /**
+     * 查询成型排程结果（仅成型表，含各班次示方书编号），用于 RECIPE 模式逐班解析施工。
+     *
+     * @param factoryCode  工厂编号
+     * @param scheduleDate 排程日期
+     * @return 成型排程行数据（含 CLASS1~8_RECIPE_NO）
+     */
+    List<TmFormingDemandRecipeRowVo> selectFormingDemandRowsByRecipe(@Param("factoryCode") String factoryCode,
+                                                                     @Param("scheduleDate") Date scheduleDate);
+
+    /**
+     * 按 (CONSTRUCTION_CODE, CONSTRUCTION_VERSION) 批量查询施工胎面属性，用于 RECIPE 模式逐班关联。
+     *
+     * @param factoryCode          工厂编号
+     * @param embryoCodes          胚胎代码集合（对应 CONSTRUCTION_CODE）
+     * @param constructionVersions 施工版本集合（对应 CLASSn_RECIPE_NO）
+     * @return 施工胎面属性行数据
+     */
+    List<TmConstructionTreadRowVo> selectConstructionInfoRows(@Param("factoryCode") String factoryCode,
+                                                              @Param("embryoCodes") Collection<String> embryoCodes,
+                                                              @Param("constructionVersions") Collection<String> constructionVersions);
 
     /**
      * 查询指定工序的工作日历。

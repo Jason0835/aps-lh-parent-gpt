@@ -19,6 +19,7 @@ import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -27,6 +28,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.stream.Collectors;
 
 /**
@@ -75,9 +77,10 @@ public class CxScheduleResultIssueServiceImpl implements ICxScheduleResultIssueS
     /**
      * 下发成型排程结果到MES
      * 业务规则：
-     * 1. 当天数据：更新（存在则更新，不存在则插入）
-     * 2. 隔天数据：更新（存在则更新，不存在则插入）
-     * 3. 第三天数据：插入
+     * 1. 从下发数据中提取实际排程日期，按日期分组处理（不再依赖LocalDate.now()推导日期）
+     * 2. 今天及过去日期的数据：upsert（存在则更新，不存在则插入）
+     * 3. 未来日期的数据：先删除后插入（确保数据干净）
+     * 4. 添加事务保证，任一批次失败则全部回滚
      *
      * @param cxScheduleResultIssueList 成型排程结果列表
      * @param factoryCode               厂别
@@ -85,52 +88,66 @@ public class CxScheduleResultIssueServiceImpl implements ICxScheduleResultIssueS
      * @return 下发结果
      */
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public AjaxResult issueCxScheduleResult(List<CxScheduleResultIssue> cxScheduleResultIssueList, String factoryCode, String companyCode) {
         if (CollectionUtils.isEmpty(cxScheduleResultIssueList)) {
             return AjaxResult.success();
         }
 
+        log.info("成型排程结果下发MES开始，传入记录数：{}", cxScheduleResultIssueList.size());
+
         // 获取下发接口版本号
         String dataVersion = syncDataHandle.getDataVersion(ItfSyncKeyEnum.SYNC_CX_SCHEDULE_RESULT.getCode());
 
-        // 获取今天、明天、后天的日期
+        // 从下发数据中提取所有不重复的排程日期（不再依赖LocalDate.now()推导，避免发布日期与排程日期不一致导致数据被过滤）
+        Set<LocalDate> scheduleDates = cxScheduleResultIssueList.stream()
+                .filter(item -> item.getScheduleDate() != null)
+                .map(item -> item.getScheduleDate().toLocalDate())
+                .collect(Collectors.toCollection(TreeSet::new));
+
+        if (CollectionUtils.isEmpty(scheduleDates)) {
+            return AjaxResult.success("没有需要下发的数据");
+        }
+
         LocalDate today = LocalDate.now();
-        LocalDate tomorrow = today.plusDays(1);
-        LocalDate dayAfterTomorrow = today.plusDays(2);
-
-        // 按日期分组处理数据
-        List<CxScheduleResultIssue> todayList = filterByDate(cxScheduleResultIssueList, today);
-        List<CxScheduleResultIssue> tomorrowList = filterByDate(cxScheduleResultIssueList, tomorrow);
-        List<CxScheduleResultIssue> dayAfterTomorrowList = filterByDate(cxScheduleResultIssueList, dayAfterTomorrow);
-
-        // 处理当天的数据：转换为MES实体
-        List<MesCxScheduleResult> todayMesList = convertToMesList(todayList, dataVersion, companyCode, factoryCode);
-
-        // 处理明天的数据：转换为MES实体
-        List<MesCxScheduleResult> tomorrowMesList = convertToMesList(tomorrowList, dataVersion, companyCode, factoryCode);
-
-        // 处理后天的数据：转换为MES实体
-        List<MesCxScheduleResult> dayAfterTomorrowMesList = convertToMesList(dayAfterTomorrowList, dataVersion, companyCode, factoryCode);
-
-        // 当天和隔天数据：更新（存在则更新，不存在则插入）
-        upsertCxScheduleResult(todayMesList, dataVersion);
-        upsertCxScheduleResult(tomorrowMesList, dataVersion);
-
-        // 第三天数据：先删除后插入（确保数据干净）
-        insertCxScheduleResult(dayAfterTomorrowMesList, dayAfterTomorrow, dataVersion);
-
-        // 合并所有数据用于发送MQ
         List<MesCxScheduleResult> allMesList = new ArrayList<>();
-        allMesList.addAll(todayMesList);
-        allMesList.addAll(tomorrowMesList);
-        allMesList.addAll(dayAfterTomorrowMesList);
+
+        // 按实际排程日期分组处理
+        for (LocalDate scheduleDate : scheduleDates) {
+            List<CxScheduleResultIssue> dayList = filterByDate(cxScheduleResultIssueList, scheduleDate);
+            if (CollectionUtils.isEmpty(dayList)) {
+                continue;
+            }
+
+            log.info("处理排程日期{}，记录数：{}", scheduleDate, dayList.size());
+
+            // 转换为MES实体
+            List<MesCxScheduleResult> dayMesList = convertToMesList(dayList, dataVersion, companyCode, factoryCode);
+            allMesList.addAll(dayMesList);
+
+            if (scheduleDate.isAfter(today)) {
+                // 未来日期：先删除后插入（确保数据干净）
+                insertCxScheduleResult(dayMesList, scheduleDate, dataVersion);
+            } else {
+                // 今天及过去日期：upsert（存在则更新，不存在则插入）
+                upsertCxScheduleResult(dayMesList, dataVersion);
+            }
+        }
 
         if (CollectionUtils.isEmpty(allMesList)) {
             return AjaxResult.success("没有需要下发的数据");
         }
 
+        // 获取日期范围用于MQ通知（scheduleDates已按TreeSet排序）
+        LocalDate startDate = scheduleDates.iterator().next();
+        LocalDate endDate = scheduleDates.stream()
+                .reduce((first, second) -> second)
+                .orElse(startDate);
+
+        log.info("成型排程结果下发MES完成，总记录数：{}，日期范围：{} ~ {}", allMesList.size(), startDate, endDate);
+
         // 发送MQ通知MES
-        return sendMqNotice(allMesList, today, dayAfterTomorrow, dataVersion, factoryCode, companyCode);
+        return sendMqNotice(allMesList, startDate, endDate, dataVersion, factoryCode, companyCode);
     }
 
     /**
@@ -142,6 +159,7 @@ public class CxScheduleResultIssueServiceImpl implements ICxScheduleResultIssueS
         if (CollectionUtils.isEmpty(mesList)) {
             return;
         }
+        log.info("upsert处理开始，总记录数：{}", mesList.size());
         // 分批查询已有记录，按排程日期+机台编码+胎胚编码+版本号匹配
         Set<String> existingKeys = new HashSet<>();
         for (List<MesCxScheduleResult> batch : partitionList(mesList)) {
@@ -161,14 +179,20 @@ public class CxScheduleResultIssueServiceImpl implements ICxScheduleResultIssueS
                 insertList.add(mesItem);
             }
         }
+        log.info("upsert分组结果：更新{}条，新增{}条", updateList.size(), insertList.size());
         // 分批更新
+        int updateBatchCount = 0;
         for (List<MesCxScheduleResult> batch : partitionList(updateList)) {
             cxScheduleResultIssueMapper.batchUpdateByScheduleDateAndMachine(batch);
+            updateBatchCount += batch.size();
         }
         // 分批插入
+        int insertBatchCount = 0;
         for (List<MesCxScheduleResult> batch : partitionList(insertList)) {
             cxScheduleResultIssueMapper.batchInsertCxScheduleResult(batch);
+            insertBatchCount += batch.size();
         }
+        log.info("upsert处理完成：实际更新{}条，实际新增{}条", updateBatchCount, insertBatchCount);
     }
 
     /**
@@ -180,19 +204,23 @@ public class CxScheduleResultIssueServiceImpl implements ICxScheduleResultIssueS
         if (CollectionUtils.isEmpty(mesList)) {
             return;
         }
+        log.info("insert处理开始，排程日期{}，总记录数：{}", scheduleDate, mesList.size());
         String dateStr = scheduleDate.format(DATE_FORMATTER);
         cxScheduleResultIssueMapper.deleteByScheduleDate(dateStr, dataVersion);
         // 分批插入
+        int insertBatchCount = 0;
         for (List<MesCxScheduleResult> batch : partitionList(mesList)) {
             cxScheduleResultIssueMapper.batchInsertCxScheduleResult(batch);
+            insertBatchCount += batch.size();
         }
+        log.info("insert处理完成，排程日期{}，实际新增{}条", scheduleDate, insertBatchCount);
     }
 
     /**
      * 发送MQ通知
      */
-    private AjaxResult sendMqNotice(List<MesCxScheduleResult> allMesList, LocalDate today, 
-                                     LocalDate dayAfterTomorrow, String dataVersion,
+    private AjaxResult sendMqNotice(List<MesCxScheduleResult> allMesList, LocalDate startDate,
+                                     LocalDate endDate, String dataVersion,
                                      String factoryCode, String companyCode) {
         AjaxResult ajaxResult;
         try {
@@ -203,8 +231,8 @@ public class CxScheduleResultIssueServiceImpl implements ICxScheduleResultIssueS
             // 请求参数
             JSONObject params = new JSONObject();
             params.put("rowCount", allMesList.size());
-            params.put("startDate", today.format(DATE_FORMATTER));
-            params.put("endDate", dayAfterTomorrow.format(DATE_FORMATTER));
+            params.put("startDate", startDate.format(DATE_FORMATTER));
+            params.put("endDate", endDate.format(DATE_FORMATTER));
             syncParamsVO.setParams(params);
             syncParamsVO.setDataSys(SysCode.APS);
             syncParamsVO.setDockSys(ApsConstant.DOCK_SYS_MES);

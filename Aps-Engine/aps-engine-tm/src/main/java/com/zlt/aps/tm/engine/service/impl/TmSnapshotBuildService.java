@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 胎面解释快照构建服务。
@@ -31,13 +32,17 @@ public class TmSnapshotBuildService {
     public TmSnapshotBuildResult buildTaskExplain(TmTaskDraft task, TmScheduleContext context) {
         TmSnapshotBuildResult result = new TmSnapshotBuildResult();
         if (context != null && task != null) {
-            result.setRuleHitJson(buildRuleHitJson(context.getRuleTraceMap().get(task.getBusinessKey())));
+            TmRuleTrace ruleTrace = context.getRuleTraceMap().get(task.getBusinessKey());
+            result.setRuleHitJson(buildRuleHitJson(ruleTrace));
             List<TmMachineCandidate> candidates = context.getCandidateTraceMap().get(task.getBusinessKey());
             result.setCandidateMachineJson(buildCandidateMachineJson(candidates));
             String assignStatus = resolveAssignStatus(task);
             result.setSelectedMachineScore(resolveSelectedMachineScore(task, candidates));
             result.setMachineSelectReason(buildMachineSelectReason(task, result.getSelectedMachineScore(), assignStatus));
             result.setAssignStatus(assignStatus);
+            if (isUnplannedTask(task)) {
+                result.setUnplannedEvidenceJson(buildUnplannedEvidenceJson(ruleTrace, task));
+            }
         }
         result.setSysAnalysis(task == null ? "任务为空" : "已生成任务规则、候选机台和选机解释");
         return result;
@@ -119,6 +124,63 @@ public class TmSnapshotBuildService {
             return "无需排产：最终计划量为0，保留任务解释但不占用机台产能";
         }
         return "选中机台 " + task.getMachineCode() + "，评分=" + selectedMachineScore + "，按默认过滤和评分规则选择";
+    }
+
+    /**
+     * 构建未排证据 JSON。
+     *
+     * <p>从规则证据中提取候选机台过滤、工装/产能溢出和选机拒绝等未排相关证据，组装为精简 JSON，
+     * 写入解释表和未排表的 UNPLANNED_EVIDENCE_JSON 字段，便于未排原因追溯。</p>
+     *
+     * @param ruleTrace  规则证据
+     * @param task       未排任务
+     * @return 未排证据 JSON 文本；无证据时返回仅含原因码的 JSON
+     */
+    private String buildUnplannedEvidenceJson(TmRuleTrace ruleTrace, TmTaskDraft task) {
+        JSONObject obj = new JSONObject();
+        obj.set("reasonCode", task.getUnplannedReasonCode());
+        obj.set("reasonDesc", task.getUnplannedReasonDesc());
+        JSONArray rejectedCandidates = new JSONArray();
+        JSONArray unplannedEvidences = new JSONArray();
+        if (ruleTrace != null && ruleTrace.getRuleHits() != null) {
+            for (TmRuleTraceItem item : ruleTrace.getRuleHits()) {
+                if (item == null) {
+                    continue;
+                }
+                String ruleCode = item.getRuleCode();
+                if ("MACHINE_FILTER".equals(ruleCode) && "REJECT".equals(item.getResult())) {
+                    rejectedCandidates.add(buildFilterEvidenceObject(item.getEvidence()));
+                } else if ("TOOL_LIMIT_UNPLANNED".equals(ruleCode)
+                        || "CAPACITY_OVERFLOW_UNPLANNED".equals(ruleCode)
+                        || ("MACHINE_ASSIGN".equals(ruleCode) && "REJECT".equals(item.getResult()))) {
+                    JSONObject evObj = new JSONObject();
+                    evObj.set("ruleCode", ruleCode);
+                    evObj.set("result", item.getResult());
+                    evObj.set("evidence", item.getEvidence());
+                    unplannedEvidences.add(evObj);
+                }
+            }
+        }
+        obj.set("rejectedCandidates", rejectedCandidates);
+        obj.set("unplannedEvidences", unplannedEvidences);
+        return JSONUtil.toJsonPrettyStr(obj);
+    }
+
+    /**
+     * 将机台过滤证据 Map 转换为精简 JSON 对象。
+     *
+     * @param evidence 过滤证据
+     * @return 精简 JSON 对象
+     */
+    private JSONObject buildFilterEvidenceObject(Object evidence) {
+        JSONObject obj = new JSONObject();
+        if (evidence instanceof Map) {
+            Map<?, ?> map = (Map<?, ?>) evidence;
+            obj.set("machineCode", map.get("machineCode"));
+            obj.set("filterReasonCode", map.get("reasonCode"));
+            obj.set("filterReasonDesc", map.get("reasonDesc"));
+        }
+        return obj;
     }
 
     /**

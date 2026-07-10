@@ -41,11 +41,23 @@ public class TmMachineCandidate {
     /** 胎面规格生产速度映射，key 为胎面编码 */
     private Map<String, BigDecimal> treadSpeedMap = new LinkedHashMap<>();
 
+    /** 当前工厂候选机台已配置的口型板集合，用于判断未配置口型板是否不限制机台 */
+    private Set<String> configuredMouthPlateCodes;
+
     /** 当前机台可用口型板集合 */
     private Set<String> mouthPlateCodes;
 
-    /** 明确禁止生产的主胶料集合 */
+    /** 当前工厂候选机台已配置过胶料关系的主胶料集合，用于解释基础数据覆盖范围 */
+    private Set<String> configuredGlueCodes;
+
+    /** 当前机台明确允许生产的主胶料集合 */
+    private Set<String> allowedGlueCodes;
+
+    /** 当前机台明确禁止生产的主胶料集合 */
     private Set<String> forbiddenGlueCodes;
+
+    /** 当前工厂候选机台存在定点允许配置的胎面集合，用于判断未配置胎面是否不限制机台 */
+    private Set<String> configuredFixedAllowTreadCodes;
 
     /** 指定生产的胎面集合 */
     private Set<String> fixedAllowTreadCodes;

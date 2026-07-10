@@ -5,7 +5,9 @@ import com.zlt.aps.cd90.api.domain.entity.Cd90MachineInfo;
 import com.zlt.aps.cd90.api.domain.entity.Cd90ScheduleLaneAllocation;
 import com.zlt.aps.cd90.api.domain.entity.Cd90ScheduleResult;
 import com.zlt.aps.cd90.api.domain.entity.Cd90UnscheduleResult;
+import com.zlt.aps.cd90.api.domain.vo.Cd90ChangeQtyRequest;
 import com.zlt.aps.cd90.api.domain.vo.Cd90InsertOrderRequest;
+import com.zlt.aps.cd90.api.domain.vo.Cd90TransferMachineRequest;
 import com.zlt.aps.cd90.engine.algorithm.Cd90MachineCapacityCalculator;
 import com.zlt.aps.cd90.engine.algorithm.Cd90RollingScheduleContextManager;
 import com.zlt.aps.cd90.engine.algorithm.Cd90StorageLaneAllocator;
@@ -19,6 +21,7 @@ import com.zlt.aps.cd90.engine.model.Cd90ConstructionMaterial;
 import com.zlt.aps.mdm.api.domain.entity.MdmConstructionInfo;
 import com.zlt.aps.cd90.engine.model.Cd90AutoScheduleContext;
 import com.zlt.aps.cd90.engine.model.Cd90AutoScheduleInput;
+import com.zlt.aps.cd90.engine.model.Cd90InsertCarryoverImpact;
 import com.zlt.aps.cd90.engine.model.Cd90InsertRollingOutput;
 import com.zlt.aps.cd90.engine.model.Cd90InsertLaneAllocationDraft;
 import com.zlt.aps.cd90.engine.model.Cd90MachineCapacityTrial;
@@ -53,6 +56,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 /**
  * 基于现有班次和产能计算器执行插单滚动重排。
@@ -77,6 +81,36 @@ public class Cd90InsertRollingServiceImpl implements Cd90InsertRollingService {
 
     @Override
     public Cd90InsertRollingOutput execute(Cd90InsertOrderRequest request) {
+        return this.executeInternal(request, null, null);
+    }
+
+    @Override
+    public Cd90InsertRollingOutput executeTransfer(Cd90TransferMachineRequest request) {
+        Cd90InsertOrderRequest insertRequest = new Cd90InsertOrderRequest();
+        insertRequest.setFactoryCode(request.getFactoryCode());
+        insertRequest.setScheduleDate(request.getScheduleDate());
+        insertRequest.setMachineCode(request.getTargetMachineCode());
+        insertRequest.setClothCode(request.getClothCode());
+        insertRequest.setRemark(request.getRemark());
+        insertRequest.setConfirmed(request.getConfirmed());
+        return this.executeInternal(insertRequest, request, null);
+    }
+
+    @Override
+    public Cd90InsertRollingOutput executeChangeQty(Cd90ChangeQtyRequest request) {
+        Cd90InsertOrderRequest rollingRequest = new Cd90InsertOrderRequest();
+        rollingRequest.setFactoryCode(request.getFactoryCode());
+        rollingRequest.setScheduleDate(request.getScheduleDate());
+        rollingRequest.setMachineCode(request.getMachineCode());
+        rollingRequest.setClothCode(request.getClothCode());
+        rollingRequest.setRemark(request.getRemark());
+        rollingRequest.setConfirmed(request.getConfirmed());
+        return this.executeInternal(rollingRequest, null, request);
+    }
+
+    private Cd90InsertRollingOutput executeInternal(Cd90InsertOrderRequest request,
+                                                    Cd90TransferMachineRequest transferRequest,
+                                                    Cd90ChangeQtyRequest changeQtyRequest) {
         Cd90AutoScheduleContext context = autoScheduleEngineService.prepare(
                 request.getFactoryCode(), request.getScheduleDate());
         List<Cd90ScheduleResult> sourceResults = scheduleResultMapper.selectList(
@@ -86,6 +120,14 @@ public class Cd90InsertRollingServiceImpl implements Cd90InsertRollingService {
         if (sourceResults.isEmpty()) {
             throw new IllegalStateException("当前排程日期没有可供插单的原排程结果");
         }
+        // 只使用最新批次的排程结果，避免多批次共存时重复处理同一帘布。
+        String latestBatchNo = sourceResults.stream()
+                .map(Cd90ScheduleResult::getBatchNo).filter(Objects::nonNull)
+                .max(String::compareTo)
+                .orElseThrow(() -> new IllegalStateException("原排程结果缺少批次号"));
+        sourceResults = sourceResults.stream()
+                .filter(item -> latestBatchNo.equals(item.getBatchNo()))
+                .collect(Collectors.toList());
         String batchNo = sourceResults.stream().map(Cd90ScheduleResult::getBatchNo)
                 .filter(Objects::nonNull).findFirst()
                 .orElseThrow(() -> new IllegalStateException("原排程结果缺少批次号"));
@@ -102,9 +144,21 @@ public class Cd90InsertRollingServiceImpl implements Cd90InsertRollingService {
         Map<Long, List<Cd90InsertLaneAllocationDraft>> replacementLanes = sourceLaneAllocations.stream()
                 .collect(Collectors.groupingBy(Cd90ScheduleLaneAllocation::getScheduleResultId,
                         LinkedHashMap::new, Collectors.mapping(this::copyLaneDraft, Collectors.toList())));
+        Map<Long, Cd90ScheduleResult> changedById = new LinkedHashMap<>();
+        Map<Long, Cd90ScheduleResult> deletedById = new LinkedHashMap<>();
+        ChangeQtyPlan changeQtyPlan = null;
+        if (changeQtyRequest != null) {
+            changeQtyPlan = this.prepareChangeQtySource(changeQtyRequest, request, workingResults);
+        }
+        if (transferRequest != null) {
+            this.prepareTransferSource(transferRequest, request, workingResults,
+                    changedById, deletedById, replacementLanes);
+        }
         List<Cd90InsertLaneAllocationDraft> insertLanes = new ArrayList<>();
         Cd90ConstructionMaterial insertMaterial = findInsertMaterial(request);
-        Cd90ScheduleResult insertResult = newInsertResult(request, batchNo, insertMaterial);
+        Cd90ScheduleResult insertResult = changeQtyPlan == null
+                ? newInsertResult(request, batchNo, insertMaterial)
+                : changeQtyPlan.targetResult;
         Cd90MachineInfo machine = machineInfoMapper.selectOne(
                 new LambdaQueryWrapper<Cd90MachineInfo>()
                         .eq(Cd90MachineInfo::getFactoryCode, request.getFactoryCode())
@@ -117,9 +171,7 @@ public class Cd90InsertRollingServiceImpl implements Cd90InsertRollingService {
 
         List<Cd90RollingPendingTask> carryovers = new ArrayList<>();
         Map<String, Cd90MachineTailState> tailByMachine = new HashMap<>();
-        Map<Long, Cd90ScheduleResult> changedById = new LinkedHashMap<>();
-        List<Cd90UnscheduleResult> unscheduled = new ArrayList<>();
-        boolean rollingStarted = false;
+        List<Cd90InsertCarryoverImpact> carryoverImpacts = new ArrayList<>();
         Cd90RollingScheduleContext rollingResources = null;
         List<Cd90ShiftDescriptor> shifts = context.getShifts();
         for (int shiftIndex = 0; shiftIndex < shifts.size(); shiftIndex++) {
@@ -128,6 +180,7 @@ public class Cd90InsertRollingServiceImpl implements Cd90InsertRollingService {
             Cd90AutoScheduleInput input = inputService.load(context.getFactoryCode(),
                     context.getScheduleDate(), shift.getClassField(), shift.getShiftCode(),
                     context.getParameters().getAgingPeriodHours());
+            this.ensureInsertMaterial(input, insertMaterial);
             if (rollingResources == null) {
                 rollingResources = rollingContextManager.initialize(input.getStorageLanesAtSix());
             }
@@ -143,32 +196,70 @@ public class Cd90InsertRollingServiceImpl implements Cd90InsertRollingService {
             if (inheritedTail != null) {
                 tailByMachine.put(request.getMachineCode(), inheritedTail);
             }
+            boolean forceRollCurrentShift = changeQtyPlan != null
+                    && changeQtyPlan.targetQtyByClass.containsKey(classIndex);
+            if (forceRollCurrentShift) {
+                this.clearChangeQtyTargetClass(changeQtyPlan, classIndex, changedById, replacementLanes);
+            }
             Double insertQuantity = (Double) request.getFieldValueByFieldName(
                     String.format("class%dPlanQty", classIndex));
             Integer insertOrder = (Integer) request.getFieldValueByFieldName(
                     String.format("class%dProduceOrder", classIndex));
             boolean hasInsert = insertQuantity != null && insertQuantity > 0D;
-            if (!rollingStarted && !hasInsert && carryovers.isEmpty()) {
+            boolean shouldRollCurrentShift = hasInsert || !carryovers.isEmpty() || forceRollCurrentShift;
+            if (!shouldRollCurrentShift) {
                 reserveUnaffectedTasks(resourceState, shift, classIndex, workingResults,
                         sourceLanesByResult, input, context, null);
                 rollingContextManager.completeShift(rollingResources, resourceState);
                 continue;
             }
-            rollingStarted = true;
             reserveUnaffectedTasks(resourceState, shift, classIndex, workingResults,
                     sourceLanesByResult, input, context, request.getMachineCode());
             ShiftRollingResult rollingResult = rollShift(context, shift, classIndex,
                     request, machine, workingResults, insertResult, carryovers,
                     hasInsert ? BigDecimal.valueOf(insertQuantity) : BigDecimal.ZERO,
                     insertOrder, changedById, tailByMachine, resourceState,
-                    input, sourceLanesByResult, replacementLanes, insertLanes);
+                    input, sourceLanesByResult, replacementLanes, insertLanes,
+                    carryoverImpacts);
             carryovers = rollingResult.carryovers;
             rollingContextManager.completeShift(rollingResources, resourceState);
-            if (shiftIndex == shifts.size() - 1 && !carryovers.isEmpty()) {
-                unscheduled.addAll(toUnscheduled(request, batchNo, carryovers));
-            }
             log.info("[直裁插单] 班次滚动完成, classField={}, inserted={}, taskCount={}, carryoverCount={}",
                     shift.getClassField(), hasInsert, rollingResult.taskCount, carryovers.size());
+        }
+        if (changeQtyPlan != null) {
+            carryoverImpacts.stream()
+                    .filter(item -> "INSERT".equals(item.getAffectedType()))
+                    .forEach(item -> item.setAffectedType("CHANGE_QTY"));
+            List<Cd90InsertLaneAllocationDraft> changedLanes = changedById.keySet().stream()
+                    .flatMap(id -> replacementLanes.getOrDefault(id, Collections.emptyList()).stream())
+                    .collect(Collectors.toCollection(ArrayList::new));
+            return Cd90InsertRollingOutput.builder().context(context).batchNo(batchNo)
+                    .insertResult(null)
+                    .updatedResults(new ArrayList<>(changedById.values()))
+                    .deletedResults(new ArrayList<>(deletedById.values()))
+                    .laneAllocations(changedLanes)
+                    .unscheduledResults(this.toUnscheduled(request, batchNo, carryovers))
+                    .carryoverImpacts(carryoverImpacts).build();
+        }
+        if (!this.hasScheduledQuantity(insertResult)) {
+            List<Cd90RollingPendingTask> insertCarryovers = carryovers.stream()
+                    .filter(Cd90RollingPendingTask::isHardInsert)
+                    .collect(Collectors.toList());
+            List<Cd90InsertCarryoverImpact> insertImpacts = carryoverImpacts.stream()
+                    .filter(item -> "INSERT".equals(item.getAffectedType()))
+                    .collect(Collectors.toList());
+            List<Cd90InsertLaneAllocationDraft> changedLanes = changedById.keySet().stream()
+                    .flatMap(id -> replacementLanes.getOrDefault(id, Collections.emptyList()).stream())
+                    .collect(Collectors.toCollection(ArrayList::new));
+            return Cd90InsertRollingOutput.builder().context(context).batchNo(batchNo)
+                    .insertResult(insertResult)
+                    .updatedResults(transferRequest == null ? Collections.emptyList()
+                            : new ArrayList<>(changedById.values()))
+                    .deletedResults(transferRequest == null ? Collections.emptyList()
+                            : new ArrayList<>(deletedById.values()))
+                    .laneAllocations(transferRequest == null ? Collections.emptyList() : changedLanes)
+                    .unscheduledResults(this.toUnscheduled(request, batchNo, insertCarryovers))
+                    .carryoverImpacts(insertImpacts).build();
         }
         List<Cd90InsertLaneAllocationDraft> affectedLanes = changedById.keySet().stream()
                 .flatMap(id -> replacementLanes.getOrDefault(id, Collections.emptyList()).stream())
@@ -177,10 +268,244 @@ public class Cd90InsertRollingServiceImpl implements Cd90InsertRollingService {
         return Cd90InsertRollingOutput.builder().context(context).batchNo(batchNo)
                 .insertResult(insertResult)
                 .updatedResults(new ArrayList<>(changedById.values()))
+                .deletedResults(new ArrayList<>(deletedById.values()))
                 .laneAllocations(affectedLanes)
-                .unscheduledResults(unscheduled).build();
+                .unscheduledResults(this.toUnscheduled(request, batchNo, carryovers))
+                .carryoverImpacts(carryoverImpacts).build();
     }
 
+    /**
+     * 调量先定位原排程结果，把指定班次的原计划量清空，再按原顺位写入目标量参与滚动。
+     */
+    private ChangeQtyPlan prepareChangeQtySource(Cd90ChangeQtyRequest changeQtyRequest,
+                                                 Cd90InsertOrderRequest rollingRequest,
+                                                 List<Cd90ScheduleResult> workingResults) {
+        Cd90ScheduleResult targetResult = workingResults.stream()
+                .filter(item -> changeQtyRequest.getScheduleResultId() == null
+                        || Objects.equals(item.getId(), changeQtyRequest.getScheduleResultId()))
+                .filter(item -> changeQtyRequest.getMachineCode().equals(item.getMachineCode()))
+                .filter(item -> changeQtyRequest.getClothCode().equals(item.getClothCode()))
+                .findFirst().orElseThrow(() -> new IllegalStateException("未找到可调量的直裁排程结果"));
+        Map<Integer, BigDecimal> targetQtyByClass = this.resolveChangeQtyTargets(changeQtyRequest);
+        targetQtyByClass.forEach((classIndex, targetQuantity) -> {
+            if (this.isLocked(targetResult, classIndex)) {
+                throw new IllegalStateException("已锁定或已生产的班次计划不能调量");
+            }
+            Double finishQty = (Double) targetResult.getFieldValueByFieldName(
+                    String.format("class%dFinishQty", classIndex));
+            if (finishQty != null && BigDecimal.valueOf(finishQty).compareTo(targetQuantity) > 0) {
+                throw new IllegalStateException("调量目标不能小于已完成数量");
+            }
+            Integer produceOrder = this.readOrder(targetResult, classIndex);
+            if (produceOrder == null || produceOrder <= 0) {
+                produceOrder = this.nextProduceOrder(workingResults,
+                        changeQtyRequest.getMachineCode(), classIndex);
+            }
+            rollingRequest.setFieldValueByFieldName(
+                    String.format("class%dPlanQty", classIndex), targetQuantity.doubleValue());
+            rollingRequest.setFieldValueByFieldName(
+                    String.format("class%dProduceOrder", classIndex), produceOrder);
+            rollingRequest.setFieldValueByFieldName(
+                    String.format("class%dAnalysisInput", classIndex), "调量");
+        });
+        return new ChangeQtyPlan(targetResult, targetQtyByClass);
+    }
+
+    /** 解析调量目标量，支持单班字段和逐班字段两种入参。 */
+    private Map<Integer, BigDecimal> resolveChangeQtyTargets(Cd90ChangeQtyRequest request) {
+        Map<Integer, BigDecimal> targetQtyByClass = new LinkedHashMap<>();
+        if (request.getStartClassField() != null && request.getTargetPlanQty() != null) {
+            targetQtyByClass.put(this.classIndex(request.getStartClassField()),
+                    BigDecimal.valueOf(request.getTargetPlanQty()));
+        }
+        IntStream.rangeClosed(1, 6).forEach(classIndex -> {
+            Double planQty = (Double) request.getFieldValueByFieldName(
+                    String.format("class%dPlanQty", classIndex));
+            if (planQty != null) {
+                targetQtyByClass.put(classIndex, BigDecimal.valueOf(planQty));
+            }
+        });
+        if (targetQtyByClass.isEmpty()) {
+            throw new IllegalStateException("调量目标计划量不能为空");
+        }
+        targetQtyByClass.forEach((classIndex, targetQuantity) -> {
+            if (classIndex < 1 || classIndex > 6 || targetQuantity.signum() < 0) {
+                throw new IllegalStateException("调量班次或目标计划量不合法");
+            }
+        });
+        return targetQtyByClass;
+    }
+
+    /** 清空调量目标记录在当前班次的旧计划量，后续由滚动内核按目标量重写。 */
+    private void clearChangeQtyTargetClass(ChangeQtyPlan changeQtyPlan,
+                                           int classIndex,
+                                           Map<Long, Cd90ScheduleResult> changedById,
+                                           Map<Long, List<Cd90InsertLaneAllocationDraft>> replacementLanes) {
+        Cd90ScheduleResult targetResult = changeQtyPlan.targetResult;
+        targetResult.setFieldValueByFieldName(String.format("class%dPlanQty", classIndex), null);
+        targetResult.setFieldValueByFieldName(String.format("class%dProduceOrder", classIndex), null);
+        targetResult.setFieldValueByFieldName(String.format("class%dAnalysis", classIndex), null);
+        changedById.put(targetResult.getId(), targetResult);
+        replacementLanes.computeIfAbsent(targetResult.getId(), key -> new ArrayList<>())
+                .removeIf(lane -> ("CLASS" + classIndex).equals(lane.getClassField()));
+    }
+    /**
+     * 转机台先在内存中清掉原机台从起始班次开始的该帘布计划，
+     * 再把清出的数量作为目标机台插入量交给同一套滚动内核。
+     */
+    private void prepareTransferSource(Cd90TransferMachineRequest transferRequest,
+                                       Cd90InsertOrderRequest insertRequest,
+                                       List<Cd90ScheduleResult> workingResults,
+                                       Map<Long, Cd90ScheduleResult> changedById,
+                                       Map<Long, Cd90ScheduleResult> deletedById,
+                                       Map<Long, List<Cd90InsertLaneAllocationDraft>> replacementLanes) {
+        if (transferRequest.getSourceMachineCode().equals(transferRequest.getTargetMachineCode())) {
+            throw new IllegalStateException("原机台和目标机台不能相同");
+        }
+        List<Integer> transferClassIndexes = IntStream.rangeClosed(1, 6)
+                .filter(classIndex -> this.readTransferProduceOrder(transferRequest, classIndex) != null)
+                .boxed().collect(Collectors.toList());
+        if (transferClassIndexes.isEmpty()) {
+            throw new IllegalStateException("没有可转走的班次计划");
+        }
+        List<Cd90ScheduleResult> transferSources = workingResults.stream()
+                .filter(item -> transferRequest.getSourceMachineCode().equals(item.getMachineCode()))
+                .filter(item -> transferRequest.getClothCode().equals(item.getClothCode()))
+                .filter(item -> transferClassIndexes.stream()
+                        .anyMatch(classIndex -> readPlan(item, classIndex).signum() > 0))
+                .collect(Collectors.toList());
+        if (transferSources.isEmpty()) {
+            throw new IllegalStateException("原机台没有可转走的帘布计划");
+        }
+        transferClassIndexes.forEach(classIndex -> {
+            BigDecimal transferQuantity = transferSources.stream()
+                    .map(item -> readPlan(item, classIndex))
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            if (transferQuantity.signum() <= 0) {
+                return;
+            }
+            boolean lockedTransfer = transferSources.stream()
+                    .anyMatch(item -> readPlan(item, classIndex).signum() > 0
+                            && isLocked(item, classIndex));
+            if (lockedTransfer) {
+                throw new IllegalStateException("已锁定或已生产的班次计划不能转机台");
+            }
+            insertRequest.setFieldValueByFieldName(
+                    String.format("class%dPlanQty", classIndex), transferQuantity.doubleValue());
+            insertRequest.setFieldValueByFieldName(
+                    String.format("class%dProduceOrder", classIndex),
+                    this.resolveTransferProduceOrder(transferRequest, workingResults, classIndex));
+            insertRequest.setFieldValueByFieldName(
+                    String.format("class%dAnalysisInput", classIndex), "转机台");
+        });
+        this.compactSourceMachineOrders(workingResults, transferSources, transferRequest.getSourceMachineCode(),
+                transferClassIndexes, changedById);
+        this.clearTransferSourceClasses(workingResults, transferSources, transferClassIndexes,
+                changedById, deletedById, replacementLanes);
+    }
+
+    private Integer readTransferProduceOrder(Cd90TransferMachineRequest transferRequest,
+                                             int classIndex) {
+        Integer produceOrder = (Integer) transferRequest.getFieldValueByFieldName(String.format(
+                "class%dProduceOrder", classIndex));
+        return produceOrder != null && produceOrder > 0 ? produceOrder : null;
+    }
+
+    private int resolveTransferProduceOrder(Cd90TransferMachineRequest transferRequest,
+                                            List<Cd90ScheduleResult> workingResults,
+                                            int classIndex) {
+        Integer produceOrder = (Integer) transferRequest.getFieldValueByFieldName(String.format(
+                "class%dProduceOrder", classIndex));
+        if (produceOrder != null && produceOrder > 0) {
+            return produceOrder;
+        }
+        return this.nextTargetProduceOrder(workingResults, transferRequest.getTargetMachineCode(), classIndex);
+    }
+
+    private int nextTargetProduceOrder(List<Cd90ScheduleResult> workingResults,
+                                       String targetMachineCode,
+                                       int classIndex) {
+        return workingResults.stream()
+                .filter(item -> targetMachineCode.equals(item.getMachineCode()))
+                .map(item -> readOrder(item, classIndex))
+                .filter(Objects::nonNull)
+                .max(Integer::compareTo).orElse(0) + 1;
+    }
+
+    private void clearTransferSourceClasses(List<Cd90ScheduleResult> workingResults,
+                                            List<Cd90ScheduleResult> transferSources,
+                                            List<Integer> transferClassIndexes,
+                                            Map<Long, Cd90ScheduleResult> changedById,
+                                            Map<Long, Cd90ScheduleResult> deletedById,
+                                            Map<Long, List<Cd90InsertLaneAllocationDraft>> replacementLanes) {
+        transferSources.forEach(result -> {
+            transferClassIndexes.stream()
+                    .filter(classIndex -> readPlan(result, classIndex).signum() > 0)
+                    .forEach(classIndex -> {
+                        result.setFieldValueByFieldName(String.format("class%dPlanQty", classIndex), null);
+                        result.setFieldValueByFieldName(String.format("class%dProduceOrder", classIndex), null);
+                        result.setFieldValueByFieldName(String.format("class%dAnalysis", classIndex), null);
+                        result.setFieldValueByFieldName(String.format("class%dAnalysisInput", classIndex), null);
+                        if (result.getId() != null) {
+                            String classField = "CLASS" + classIndex;
+                            replacementLanes.computeIfAbsent(result.getId(), key -> new ArrayList<>())
+                                    .removeIf(lane -> classField.equals(lane.getClassField()));
+                        }
+                    });
+            if (result.getId() == null) {
+                return;
+            }
+            if (this.hasScheduledQuantity(result)) {
+                changedById.put(result.getId(), result);
+                return;
+            }
+            changedById.remove(result.getId());
+            deletedById.put(result.getId(), result);
+            workingResults.remove(result);
+        });
+    }
+
+    private void compactSourceMachineOrders(List<Cd90ScheduleResult> workingResults,
+                                            List<Cd90ScheduleResult> transferSources,
+                                            String sourceMachineCode,
+                                            List<Integer> transferClassIndexes,
+                                            Map<Long, Cd90ScheduleResult> changedById) {
+        for (Integer classIndex : transferClassIndexes) {
+            final int currentClassIndex = classIndex;
+            List<Integer> removedOrders = transferSources.stream()
+                    .filter(item -> readPlan(item, currentClassIndex).signum() > 0)
+                    .map(item -> readOrder(item, currentClassIndex))
+                    .filter(Objects::nonNull)
+                    .sorted()
+                    .collect(Collectors.toList());
+            if (removedOrders.isEmpty()) {
+                continue;
+            }
+            workingResults.stream()
+                    .filter(item -> sourceMachineCode.equals(item.getMachineCode()))
+                    .filter(item -> !transferSources.contains(item))
+                    .filter(item -> readPlan(item, currentClassIndex).signum() > 0)
+                    .forEach(item -> {
+                        Integer currentOrder = readOrder(item, currentClassIndex);
+                        if (currentOrder == null) {
+                            return;
+                        }
+                        long decrement = removedOrders.stream()
+                                .filter(removedOrder -> removedOrder < currentOrder)
+                                .count();
+                        if (decrement <= 0) {
+                            return;
+                        }
+                        item.setFieldValueByFieldName(String.format("class%dProduceOrder", currentClassIndex),
+                                currentOrder - (int) decrement);
+                        item.setFieldValueByFieldName(String.format("class%dAnalysis", currentClassIndex),
+                                "转机台后原机台顺位前移");
+                        if (item.getId() != null) {
+                            changedById.put(item.getId(), item);
+                        }
+                    });
+        }
+    }
     private ShiftRollingResult rollShift(Cd90AutoScheduleContext context,
                                           Cd90ShiftDescriptor shift,
                                           int classIndex,
@@ -197,7 +522,8 @@ public class Cd90InsertRollingServiceImpl implements Cd90InsertRollingService {
                                           Cd90AutoScheduleInput input,
                                           Map<Long, List<Cd90ScheduleLaneAllocation>> sourceLanesByResult,
                                           Map<Long, List<Cd90InsertLaneAllocationDraft>> replacementLanes,
-                                          List<Cd90InsertLaneAllocationDraft> insertLanes) {
+                                          List<Cd90InsertLaneAllocationDraft> insertLanes,
+                                          List<Cd90InsertCarryoverImpact> carryoverImpacts) {
         List<Segment> segments = workingResults.stream()
                 .filter(item -> request.getMachineCode().equals(item.getMachineCode()))
                 .filter(item -> readPlan(item, classIndex).signum() > 0)
@@ -223,17 +549,31 @@ public class Cd90InsertRollingServiceImpl implements Cd90InsertRollingService {
                 directInsert.hardInsert = true;
             }
         }
-        orderSegments(segments, insertOrder);
+        Cd90MachineTailState previousTail = tailByMachine.get(request.getMachineCode());
+        orderSegments(segments, insertOrder, previousTail);
 
         int fullSeconds = Math.max(1, shift.getDurationSeconds());
         int remainingSeconds = fullSeconds;
-        Cd90MachineTailState previousTail = tailByMachine.get(request.getMachineCode());
         List<Cd90RollingPendingTask> carryovers = new ArrayList<>();
         int nextOrder = 1;
+        boolean deferSuffix = false;
+        String deferReason = null;
         for (Segment segment : segments) {
+            if (deferSuffix) {
+                Cd90RollingPendingTask pendingTask = toPending(segment, shift,
+                        nextClassField(context, classIndex), segment.quantity, deferReason);
+                carryovers.add(pendingTask);
+                carryoverImpacts.add(this.toCarryoverImpact(
+                        pendingTask, shift.getClassField()));
+                continue;
+            }
             int assignedOrder = segment.locked && segment.order != null
                     ? segment.order : nextOrder;
-            nextOrder = Math.max(nextOrder, assignedOrder + 1);
+            if (segment.locked) {
+                nextOrder = Math.max(nextOrder, assignedOrder + 1);
+            }
+            int remainingSecondsBeforeTrial = remainingSeconds;
+            Cd90MachineTailState previousTailBeforeTrial = previousTail;
             BigDecimal scheduled;
             String limitReason = null;
             if (segment.locked) {
@@ -278,7 +618,11 @@ public class Cd90InsertRollingServiceImpl implements Cd90InsertRollingService {
                     ? reserveLockedLanes(segment, shift, scheduled, resourceState,
                             sourceLanesByResult, input, context)
                     : allocateLanes(segment, shift, scheduled, resourceState, input, context);
-            scheduled = laneCommit.quantity;
+            scheduled = normalizeScheduledQuantity(laneCommit.quantity);
+            if (!segment.locked && scheduled.signum() <= 0) {
+                remainingSeconds = remainingSecondsBeforeTrial;
+                previousTail = previousTailBeforeTrial;
+            }
             if (scheduled.signum() <= 0 && segment.quantity.signum() > 0) {
                 limitReason = laneCommit.limitReason;
             } else if (scheduled.compareTo(segment.quantity) < 0
@@ -287,6 +631,7 @@ public class Cd90InsertRollingServiceImpl implements Cd90InsertRollingService {
             }
             if (scheduled.signum() > 0) {
                 if (!segment.locked) {
+                    nextOrder = Math.max(nextOrder, assignedOrder + 1);
                     writeClass(segment.result, classIndex, shift, scheduled, assignedOrder,
                             limitReason, request);
                     if (segment.result.getId() != null) {
@@ -313,8 +658,15 @@ public class Cd90InsertRollingServiceImpl implements Cd90InsertRollingService {
             }
             BigDecimal remaining = segment.quantity.subtract(scheduled).max(BigDecimal.ZERO);
             if (remaining.signum() > 0) {
-                carryovers.add(toPending(segment, shift, nextClassField(context, classIndex),
-                        remaining, limitReason));
+                Cd90RollingPendingTask pendingTask = toPending(segment, shift,
+                        nextClassField(context, classIndex), remaining, limitReason);
+                carryovers.add(pendingTask);
+                carryoverImpacts.add(this.toCarryoverImpact(
+                        pendingTask, shift.getClassField()));
+                if (segment.hardInsert) {
+                    deferSuffix = true;
+                    deferReason = limitReason;
+                }
             }
         }
         if (previousTail != null) {
@@ -388,6 +740,28 @@ public class Cd90InsertRollingServiceImpl implements Cd90InsertRollingService {
             return allocateLanes(Segment.existing(result, classIndex(shift.getClassField()),
                     quantity, null, true), shift, quantity, state, input, context);
         }
+        // 预检查：原库排若已被其他帘布占用（mergeInbound 跳过入库留下的脏数据），整体降级为重新分配
+        // 与 Cd90ResourceSnapshotBuilder.mergeInbound 的软冲突策略对齐，避免整个插单中断
+        List<String> conflictedLaneCodes = rows.stream()
+                .map(row -> {
+                    Cd90StorageLaneState lane = state.getLanes().stream()
+                            .filter(item -> row.getStorageLaneCode().equals(item.getLaneCode()))
+                            .findFirst().orElse(null);
+                    if (lane == null || lane.getClothCode() == null
+                            || lane.getClothCode().trim().isEmpty()) {
+                        return null;
+                    }
+                    return result.getClothCode().equals(lane.getClothCode())
+                            ? null : row.getStorageLaneCode();
+                })
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
+        if (!conflictedLaneCodes.isEmpty()) {
+            log.warn("[直裁插单] 原排程库排已被其他帘布占用,降级为重新分配, clothCode={}, conflictedLanes={}",
+                    result.getClothCode(), conflictedLaneCodes);
+            return allocateLanes(Segment.existing(result, classIndex(shift.getClassField()),
+                    quantity, null, true), shift, quantity, state, input, context);
+        }
         List<Cd90StorageLaneAllocation> allocations = rows.stream().map(row -> {
             Cd90StorageLaneState lane = state.getLanes().stream()
                     .filter(item -> row.getStorageLaneCode().equals(item.getLaneCode()))
@@ -425,7 +799,13 @@ public class Cd90InsertRollingServiceImpl implements Cd90InsertRollingService {
         Cd90ConstructionMaterial material = findMaterial(input, segment.result.getClothCode());
         if (material == null || material.getCraftWidth() == null
                 || material.getUnitConsumeMillimeter() == null) {
-            return new LaneCommit(BigDecimal.ZERO, Collections.emptyList(), 0, "DATA_MISSING");
+            return new LaneCommit(BigDecimal.ZERO, Collections.emptyList(), 0,
+                    "CONSTRUCTION_MISSING");
+        }
+        if (input.getBigRollAgingDataMissingCodes() != null
+                && input.getBigRollAgingDataMissingCodes().contains(material.getBigRollCode())) {
+            return new LaneCommit(BigDecimal.ZERO, Collections.emptyList(), 0,
+                    "BIG_ROLL_STOCK_DATA_MISSING");
         }
         BigDecimal fallback = context == null ? BigDecimal.valueOf(1000)
                 : context.getParameters().getRollCoilMeter();
@@ -441,7 +821,8 @@ public class Cd90InsertRollingServiceImpl implements Cd90InsertRollingService {
         BigDecimal toolingQuantity = vehicleQuantity.multiply(BigDecimal.valueOf(availableTooling));
         BigDecimal trialQuantity = requestedQuantity.min(toolingQuantity);
         Cd90StorageLaneAllocationResult allocation = laneAllocator.allocate(
-                segment.result.getClothCode(), trialQuantity, vehicleQuantity, state.getLanes());
+                segment.result.getClothCode(), trialQuantity, vehicleQuantity,
+                state.getLanes(), segment.hardInsert);
         if (!allocation.isSuccess() || allocation.getAllocatedVehicleCount() <= 0) {
             return new LaneCommit(BigDecimal.ZERO, Collections.emptyList(), 0,
                     allocation.getFailureReason());
@@ -457,6 +838,14 @@ public class Cd90InsertRollingServiceImpl implements Cd90InsertRollingService {
                         ? "ROLL_TOOL_LIMIT" : "STORAGE_LANE_LIMIT") : null;
         return new LaneCommit(committed, allocation.getAllocations(),
                 allocation.getAllocatedVehicleCount(), reason);
+    }
+
+    /** 插单滚动与自动排程提交层保持一致，最终计划量按整数米向上取整。 */
+    private BigDecimal normalizeScheduledQuantity(BigDecimal quantity) {
+        if (quantity == null || quantity.signum() <= 0) {
+            return BigDecimal.ZERO;
+        }
+        return quantity.setScale(0, RoundingMode.CEILING);
     }
 
     private List<Cd90InsertLaneAllocationDraft> toLaneDrafts(
@@ -516,6 +905,25 @@ public class Cd90InsertRollingServiceImpl implements Cd90InsertRollingService {
                         (first, second) -> first));
     }
 
+    /** 将插单帘布施工补入按成型计划加载的班次输入，供库排和工装试算使用。 */
+    private void ensureInsertMaterial(Cd90AutoScheduleInput input,
+                                      Cd90ConstructionMaterial insertMaterial) {
+        if (input == null || insertMaterial == null) {
+            return;
+        }
+        List<Cd90ConstructionMaterial> materials = new ArrayList<>(
+                input.getConstructionMaterials() == null
+                        ? Collections.emptyList() : input.getConstructionMaterials());
+        boolean exists = materials.stream()
+                .filter(Objects::nonNull)
+                .anyMatch(item -> Objects.equals(item.getClothCode(), insertMaterial.getClothCode())
+                        && Objects.equals(item.getBigRollCode(), insertMaterial.getBigRollCode()));
+        if (!exists) {
+            materials.add(insertMaterial);
+            input.setConstructionMaterials(materials);
+        }
+    }
+
     private Cd90ConstructionMaterial findMaterial(Cd90AutoScheduleInput input, String clothCode) {
         if (input == null || input.getConstructionMaterials() == null) {
             return null;
@@ -526,10 +934,12 @@ public class Cd90InsertRollingServiceImpl implements Cd90InsertRollingService {
                 .findFirst().orElse(null);
     }
 
-    private void orderSegments(List<Segment> segments, Integer insertOrder) {
+    private void orderSegments(List<Segment> segments, Integer insertOrder,
+                               Cd90MachineTailState previousTail) {
         List<Segment> sorted = segments.stream()
                 .sorted(Comparator.comparing((Segment item) -> !item.locked)
-                        .thenComparing(item -> !item.carryover)
+                        .thenComparingInt(item -> continuityRank(item, previousTail))
+                        .thenComparing(item -> insertOrder == null ? item.carryover : !item.carryover)
                         .thenComparing(item -> item.order,
                                 Comparator.nullsLast(Integer::compareTo))
                         .thenComparing(item -> item.result.getId(),
@@ -544,6 +954,21 @@ public class Cd90InsertRollingServiceImpl implements Cd90InsertRollingService {
         }
         segments.clear();
         segments.addAll(sorted);
+    }
+
+    private int continuityRank(Segment segment, Cd90MachineTailState previousTail) {
+        if (segment == null || segment.result == null || previousTail == null) {
+            return 3;
+        }
+        boolean sameSpec = Objects.equals(previousTail.getClothCode(), segment.result.getClothCode());
+        boolean sameRoll = Objects.equals(previousTail.getBigRollCode(), segment.result.getBigRollCode());
+        if (sameSpec && sameRoll) {
+            return 0;
+        }
+        if (sameSpec) {
+            return 1;
+        }
+        return sameRoll ? 2 : 3;
     }
 
     private void mergeCarryovers(List<Segment> segments,
@@ -563,6 +988,7 @@ public class Cd90InsertRollingServiceImpl implements Cd90InsertRollingService {
                 segment = Segment.carryover(result, classIndex, pending);
                 segments.add(segment);
             } else {
+                // 已在当前班存在的原任务合并上一班顺延量时，只合并数量，排序交给实际机尾续作规则。
                 segment.quantity = segment.quantity.add(pending.getRemainingQuantity());
             }
         }
@@ -623,11 +1049,35 @@ public class Cd90InsertRollingServiceImpl implements Cd90InsertRollingService {
                 .continueFromPreviousShift(true).lastLimitReason(limitReason).build();
     }
 
+    /** 将任务级待排转换为前端确认使用的逐班影响明细。 */
+    private Cd90InsertCarryoverImpact toCarryoverImpact(Cd90RollingPendingTask pendingTask,
+                                                         String sourceClassField) {
+        String reasonCode = pendingTask.getLastLimitReason() == null
+                ? "SCHEDULE_WINDOW_LIMIT" : pendingTask.getLastLimitReason();
+        return Cd90InsertCarryoverImpact.builder()
+                .clothCode(pendingTask.getClothCode())
+                .affectedType(pendingTask.isHardInsert() ? "INSERT" : "EXISTING")
+                .sourceClassField(sourceClassField)
+                .targetClassField(pendingTask.getTargetClassField())
+                .carryoverQty(pendingTask.getRemainingQuantity())
+                .reasonCode(reasonCode)
+                .build();
+    }
+
     private String nextClassField(Cd90AutoScheduleContext context, int classIndex) {
         return context.getShifts().stream()
                 .filter(item -> classIndex(item.getClassField()) > classIndex)
                 .map(Cd90ShiftDescriptor::getClassField)
                 .findFirst().orElse(null);
+    }
+
+    /** 判断插单结果是否至少有一个班次形成正排产量。 */
+    private boolean hasScheduledQuantity(Cd90ScheduleResult result) {
+        return IntStream.rangeClosed(1, 6)
+                .mapToObj(classIndex -> (Double) result.getFieldValueByFieldName(
+                        String.format("class%dPlanQty", classIndex)))
+                .filter(Objects::nonNull)
+                .anyMatch(quantity -> quantity > 0D);
     }
 
     private List<Cd90UnscheduleResult> toUnscheduled(Cd90InsertOrderRequest request,
@@ -643,17 +1093,38 @@ public class Cd90InsertRollingServiceImpl implements Cd90InsertRollingService {
             result.setScheduledQty(task.getScheduledQuantity().doubleValue());
             result.setUnscheduledQty(task.getRemainingQuantity().doubleValue());
             result.setFailStage("SCHEDULE_WINDOW_END");
-            result.setReasonCode(task.getLastLimitReason() == null
-                    ? "SCHEDULE_WINDOW_LIMIT" : task.getLastLimitReason());
+            String limitReason = task.getLastLimitReason() == null
+                    ? "SCHEDULE_WINDOW_LIMIT" : task.getLastLimitReason();
+            result.setReasonCode(this.persistedReasonCode(limitReason));
             result.setReasonOrder(1);
             result.setPrimaryReason("1");
-            result.setUnscheduledReason("插单滚动至最后班次仍未完全容纳");
+            result.setUnscheduledReason(this.unscheduledReason(limitReason));
             result.setCandidateMachineCodes(task.getRequiredMachineCode());
             result.setBatchNo(batchNo);
             result.setDataSource("1");
             result.setProcessedTime(new Date());
             return result;
         }).collect(Collectors.toList());
+    }
+
+    /** 内部细分原因落库时兼容现有未排原因编码。 */
+    private String persistedReasonCode(String reasonCode) {
+        if ("BIG_ROLL_STOCK_DATA_MISSING".equals(reasonCode)
+                || "CONSTRUCTION_MISSING".equals(reasonCode)) {
+            return "DATA_MISSING";
+        }
+        return reasonCode;
+    }
+
+    /** 为数据缺失类未排结果保存可直接理解的具体说明。 */
+    private String unscheduledReason(String reasonCode) {
+        if ("BIG_ROLL_STOCK_DATA_MISSING".equals(reasonCode)) {
+            return "大卷库存没有成熟时间和单卷米数";
+        }
+        if ("CONSTRUCTION_MISSING".equals(reasonCode)) {
+            return "插单帘布施工宽度或单耗数据不完整";
+        }
+        return "插单滚动至最后班次仍未完全容纳";
     }
 
     private Cd90ScheduleResult newInsertResult(Cd90InsertOrderRequest request, String batchNo,
@@ -712,6 +1183,19 @@ public class Cd90InsertRollingServiceImpl implements Cd90InsertRollingService {
                 String.format("class%dProduceOrder", classIndex));
     }
 
+    private Integer nextProduceOrder(List<Cd90ScheduleResult> results,
+                                     String machineCode,
+                                     int classIndex) {
+        return results.stream()
+                .filter(item -> machineCode.equals(item.getMachineCode()))
+                .map(item -> readOrder(item, classIndex))
+                .filter(Objects::nonNull)
+                .filter(order -> order > 0)
+                .max(Integer::compareTo)
+                .map(order -> order + 1)
+                .orElse(1);
+    }
+
     private int classIndex(String classField) {
         return Integer.parseInt(classField.replace("CLASS", ""));
     }
@@ -721,6 +1205,16 @@ public class Cd90InsertRollingServiceImpl implements Cd90InsertRollingService {
                 + "|" + classField + "|" + order;
     }
 
+    private static final class ChangeQtyPlan {
+        private final Cd90ScheduleResult targetResult;
+        private final Map<Integer, BigDecimal> targetQtyByClass;
+
+        private ChangeQtyPlan(Cd90ScheduleResult targetResult,
+                              Map<Integer, BigDecimal> targetQtyByClass) {
+            this.targetResult = targetResult;
+            this.targetQtyByClass = targetQtyByClass;
+        }
+    }
     private static final class ShiftRollingResult {
         private final List<Cd90RollingPendingTask> carryovers;
         private final int taskCount;

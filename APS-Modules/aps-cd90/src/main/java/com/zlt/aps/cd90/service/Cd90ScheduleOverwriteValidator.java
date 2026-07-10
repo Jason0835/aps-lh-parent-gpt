@@ -40,9 +40,9 @@ public class Cd90ScheduleOverwriteValidator {
     }
 
     private String conflict(Cd90ScheduleResult result) {
-        if (!"0".equals(result.getDataSource())) {
-            return "当前日期存在插单或人工调整结果，自动排程不能覆盖";
-        }
+//        if (!"0".equals(result.getDataSource())) {
+//            return "当前日期存在插单或人工调整结果，自动排程不能覆盖";
+//        }
         if (Integer.valueOf(1).equals(result.getIsLocked())) {
             return "当前日期存在人工锁定结果，自动排程不能覆盖";
         }

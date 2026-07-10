@@ -1,0 +1,9 @@
+package com.zlt.aps.cd15.mapper;
+
+import com.zlt.aps.cd15.api.domain.entity.Cd15AngleWidthMapping;
+import com.zlt.core.dao.basemapper.CommBaseMapper;
+import org.apache.ibatis.annotations.Mapper;
+
+@Mapper
+public interface Cd15AngleWidthMappingMapper extends CommBaseMapper<Cd15AngleWidthMapping> {
+}

@@ -58,7 +58,7 @@ import com.zlt.aps.dj.service.DjMachineInfoService;
 import com.zlt.aps.dj.service.DjScheduleResultService;
 import com.zlt.aps.dj.service.IDjScheduleAdjustService;
 import com.zlt.aps.dj.service.IDjShiftConfigService;
-import com.zlt.aps.utils.BillUtils;
+import com.zlt.aps.utils.ApsBeanUtils;
 import com.zlt.bill.common.service.AbstractBillService;
 
 import lombok.extern.slf4j.Slf4j;
@@ -113,7 +113,7 @@ public class DjScheduleResultServiceImpl extends AbstractBillService<DjScheduleR
      */
     @Override
     public List<DjScheduleResult> selectDjScheduleResultList(DjScheduleResult djScheduleResult) {
-        QueryWrapper<DjScheduleResult> queryWrapper = BillUtils.builderCondition(djScheduleResult);
+        QueryWrapper<DjScheduleResult> queryWrapper = ApsBeanUtils.builderCondition(djScheduleResult);
         List<DjScheduleResult> list = djScheduleResultMapper.selectList(queryWrapper);
         if (CollectionUtils.isEmpty(list)) {
             return new ArrayList<>();
@@ -482,7 +482,7 @@ public class DjScheduleResultServiceImpl extends AbstractBillService<DjScheduleR
      */
     @Override
     public List<DjScheduleResult> selectByScheduleDateAndCode(DjScheduleResult scheduleResult) {
-        return djScheduleResultMapper.selectList(BillUtils.builderCondition(scheduleResult));
+        return djScheduleResultMapper.selectList(ApsBeanUtils.builderCondition(scheduleResult));
     }
 
     public boolean compare(String str1, String str2) {
@@ -587,15 +587,20 @@ public class DjScheduleResultServiceImpl extends AbstractBillService<DjScheduleR
     }
 
     /**
-     * 唯一性校验
+     * 唯一性校验（校验该排产日期+机台+垫胶代码+工厂下是否存在排程记录）
+     * <p>注意：只使用 factoryCode、scheduleDate、machineCode、paddingCode 作为查询条件，
+     * 排除班次计划量、顺位等班次字段，避免因待插入记录不存在完全匹配而导致误判"该日未排程"。</p>
      */
     @Override
     public List<DjScheduleResult> checkUnique(DjScheduleResult entity) {
         Long id = entity.getId();
-        entity.setId(null);
-        QueryWrapper<DjScheduleResult> queryWrapper = BillUtils.builderCondition(entity);
+        LambdaQueryWrapper<DjScheduleResult> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(DjScheduleResult::getFactoryCode, entity.getFactoryCode())
+                .eq(DjScheduleResult::getScheduleDate, entity.getScheduleDate())
+                .eq(StringUtils.isNotEmpty(entity.getMachineCode()), DjScheduleResult::getMachineCode, entity.getMachineCode())
+                .eq(StringUtils.isNotEmpty(entity.getPaddingCode()), DjScheduleResult::getPaddingCode, entity.getPaddingCode());
         if (id != null) {
-            queryWrapper.ne("id", id);
+            queryWrapper.ne(DjScheduleResult::getId, id);
         }
         return djScheduleResultMapper.selectList(queryWrapper);
     }

@@ -1,227 +1,188 @@
 package com.zlt.aps.gsq.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
+import com.ruoyi.common.constant.UserConstants;
+import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.zlt.aps.common.core.utils.ImportUtil;
+import com.zlt.aps.gsq.api.domain.entity.GsqMachineInfo;
+import com.zlt.aps.gsq.api.domain.entity.GsqSpecifyMachine;
+import com.zlt.aps.gsq.mapper.GsqSpecifyMachineMapper;
+import com.zlt.aps.gsq.service.GsqMachineInfoService;
+import com.zlt.aps.gsq.service.IGsqSpecifyMachineService;
+import com.zlt.bill.common.service.AbstractDocService;
+import com.zlt.common.utils.StringUtil;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.collections.CollectionUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
 
-import static com.zlt.aps.common.core.utils.ImportUtil.addImportErrorLog;
-
+import javax.annotation.Resource;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-import javax.annotation.Resource;
-
-import org.apache.commons.collections4.CollectionUtils;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-
-import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
-import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
-import com.ruoyi.common.core.utils.SecurityUtils;
-import com.ruoyi.common.core.utils.bean.BeanUtils;
-import com.ruoyi.common.core.web.domain.AjaxResult;
-import com.ruoyi.common.i18n.utils.I18nUtil;
-import com.zlt.aps.common.core.constant.ApsConstant;
-import com.zlt.aps.common.core.domain.ApsBaseEntity;
-import com.zlt.aps.common.core.utils.ImportUtil;
-import com.zlt.aps.gsq.api.domain.dto.GsqSpecifyMachineDto;
-import com.zlt.aps.gsq.api.domain.entity.GsqMachineInfo;
-import com.zlt.aps.gsq.entity.GsqSpecifyMachine;
-import com.zlt.aps.gsq.mapper.GsqSpecifyMachineMapper;
-import com.zlt.aps.gsq.service.GsqMachineInfoService;
-import com.zlt.aps.gsq.service.GsqSpecifyMachineService;
-import com.zlt.common.utils.StringUtil;
+import static com.zlt.aps.common.core.utils.ImportUtil.addImportErrorLog;
 
 /**
- * <p>
- * 钢丝圈定点机台表 服务实现类
- * </p>
+ * 钢丝圈定点机台Service实现
+ * 唯一性校验字段：钢丝圈代码 + 生产线（机台编码）
  *
- * @author zhangbinglin
- * @since 2021-06-04
+ * @author zlt
+ * @date 2026-07-08
  */
+@Slf4j
 @Service
-public class GsqSpecifyMachineServiceImpl extends ServiceImpl<GsqSpecifyMachineMapper, GsqSpecifyMachine> implements GsqSpecifyMachineService {
+public class GsqSpecifyMachineServiceImpl extends AbstractDocService<GsqSpecifyMachine>
+        implements IGsqSpecifyMachineService {
 
     @Resource
     private GsqSpecifyMachineMapper gsqSpecifyMachineMapper;
+
     @Autowired
     private GsqMachineInfoService gsqMachineInfoService;
 
     /**
-     * 根据条件查询定点机台列表
-     *
-     * @return
+     * 单据类型编码
      */
-    public List<GsqSpecifyMachineDto> listSpecifyMachine(GsqSpecifyMachineDto dto) {
-        return gsqSpecifyMachineMapper.listSpecifyMachine(dto);
+    @Override
+    protected String getDocTypeCode() {
+        return "GSQ_SPECIFY_MACHINE";
     }
 
     /**
-     * 保存定点机台信息（id为空则新增，id不为空则修改）
-     *
-     * @param entity
+     * 唯一性校验字段：钢丝圈代码 + 生产线
      */
-    public void saveSpecifyMachine(GsqSpecifyMachine entity) {
-        entity.setBaseVale(entity.getId());  //根据id是否为空给创建时间，创建人，更新时间，更新人赋值
-        if (!isSpecifyMachineUnique(entity)) {
-            //根据物料号+机台信息验证
-            throw new RuntimeException(I18nUtil.getMessage("ui.gsq.specifyMachine.unique"));
-        }
-        this.saveOrUpdate(entity);
+    @Override
+    protected List<String> getCheckUniqueFields() {
+        return java.util.Arrays.asList("steelRingCode", "machineCode");
     }
 
     /**
-     * 根据物料号+机台验证唯一性
+     * 校验"钢丝圈代码+生产线"组合唯一性
+     * 框架已自动过滤逻辑删除数据，无需手动追加 IS_DELETE 条件
      *
-     * @param entity
-     * @return
+     * @param entity 实体
+     * @return UserConstants.UNIQUE=唯一，UserConstants.NOT_UNIQUE=不唯一
      */
-    private boolean isSpecifyMachineUnique(GsqSpecifyMachine entity) {
-        QueryWrapper<GsqSpecifyMachine> queryWrapper = new QueryWrapper<>();
-        queryWrapper.eq("STEEL_RING_CODE", entity.getSteelRingCode());
-        queryWrapper.eq("MACHINE_ID", entity.getMachineId());
-        queryWrapper.eq("DEL_FLAG", ApsConstant.DEL_FLAG_NORMAL);
-        if (entity.getId() != null) {
-            queryWrapper.ne("ID", entity.getId());  //编辑的时候校验，要过滤掉自身的id
+    @Override
+    public String checkUnique(GsqSpecifyMachine entity) {
+        LambdaQueryWrapper<GsqSpecifyMachine> wrapper = new LambdaQueryWrapper<>();
+        wrapper.ne(entity.getId() != null, GsqSpecifyMachine::getId, entity.getId());
+        wrapper.eq(GsqSpecifyMachine::getSteelRingCode, entity.getSteelRingCode());
+        wrapper.eq(GsqSpecifyMachine::getMachineCode, entity.getMachineCode());
+        wrapper.eq(GsqSpecifyMachine::getIsDelete, "0");
+        if (gsqSpecifyMachineMapper.selectCount(wrapper) > 0) {
+            return UserConstants.NOT_UNIQUE;
         }
-        List<GsqSpecifyMachine> list = gsqSpecifyMachineMapper.selectList(queryWrapper);
-        if (list.size() > 0) {
-            return false;
-        }
-        return true;
-    }
-
-    /**
-     * 批量删除(逻辑删)
-     *
-     * @param ids 多个id逗号分割
-     */
-    public void deleteSpecifyMachine(Long[] ids) {
-        LambdaUpdateWrapper<GsqSpecifyMachine> wrapper = new LambdaUpdateWrapper<>();
-        wrapper.in(ApsBaseEntity::getId, Arrays.asList(ids));
-        wrapper.set(ApsBaseEntity::getDelFlag, null);
-        wrapper.set(ApsBaseEntity::getUpdateBy, SecurityUtils.getUsername());
-        wrapper.set(ApsBaseEntity::getUpdateTime, new Date());
-        super.getBaseMapper().update(null, wrapper);
+        return UserConstants.UNIQUE;
     }
 
     /**
      * 导入数据，并保存记录
+     * 校验规则：钢丝圈代码、生产线必填；按"钢丝圈代码+生产线"校验重复
+     * 导入时生产线按"机台名称"录入，需根据机台名称反查机台编码
      *
-     * @param list          要导入数据
+     * @param list          要导入的数据
      * @param updateSupport 已存在是否更新
      * @param importLogId   导入日志id
      * @return 导入后提示信息
      */
     @Override
-    public AjaxResult importData(List<GsqSpecifyMachineDto> list, boolean updateSupport, Long importLogId) {
+    public AjaxResult importData(List<GsqSpecifyMachine> list, boolean updateSupport, Long importLogId) {
         int successNum = 0;
         int failureNum = 0;
         List<ImportErrorLog> importErrorLogs = new ArrayList<>();
-        List<GsqSpecifyMachineDto> importList = new ArrayList<>();
-        //将机台名称转为机台code
+        List<GsqSpecifyMachine> importList = new ArrayList<>();
+
+        // 加载启用的钢丝圈机台信息，构建机台名称到机台编码的映射
         List<GsqMachineInfo> machineInfoList = gsqMachineInfoService.selectMachineInfoList(new GsqMachineInfo());
         if (CollectionUtils.isEmpty(machineInfoList)) {
-            // 未查询到机台信息
             String message = I18nUtil.getMessage("ui.error.message.column.machineIsNull");
             addImportErrorLog(importLogId, null, message, importErrorLogs);
             return AjaxResult.error(message, importErrorLogs);
         }
-//        Map<String, Long> machineCodeMap = machineInfoList.stream().collect(Collectors.toMap(GsqMachineInfo::getMachineCode, GsqMachineInfo::getId));
-        Map<String, Long> machineCodeMap = machineInfoList.stream().collect(Collectors.toMap(GsqMachineInfo::getMachineName, GsqMachineInfo::getId));
+        Map<String, String> machineNameMap = machineInfoList.stream()
+                .collect(Collectors.toMap(GsqMachineInfo::getMachineName, GsqMachineInfo::getMachineCode, (v1, v2) -> v1));
 
-        //按业务主键分组
-        Map<String, Long> groupMap = list.stream().collect(Collectors.groupingBy(a -> (a.getSteelRingCode()+a.getMachineName()), Collectors.counting()));
+        // 按"钢丝圈代码+生产线名称"分组，识别文件内重复数据
+        Map<String, Long> groupMap = list.stream()
+                .collect(Collectors.groupingBy(
+                        a -> (a.getSteelRingCode() + "_" + a.getMachineName()),
+                        Collectors.counting()));
 
-        //将机台code转换为机台id，并做校验
+        // 逐行校验
         for (int i = 0; i < list.size(); i++) {
-            GsqSpecifyMachineDto specifyMachine = list.get(i);
+            GsqSpecifyMachine entity = list.get(i);
 
-            //重复记录校验
-            Long hasValue = groupMap.get(specifyMachine.getSteelRingCode()+specifyMachine.getMachineName());
-            if (hasValue > 1) {
+            // 文件内重复校验
+            String groupKey = entity.getSteelRingCode() + "_" + entity.getMachineName();
+            Long hasValue = groupMap.get(groupKey);
+            if (hasValue != null && hasValue > 1) {
                 failureNum++;
-                specifyMachine.setId(-999L);
+                entity.setId(-999L);
                 String message = I18nUtil.getMessage("ui.data.column.all.conflictRecord");
-                String columnName = I18nUtil.getMessage("ui.gsq.specifyMachine.column.steelRingCode");
-                String columnName2 = I18nUtil.getMessage("ui.specifyMachine.column.machineName");
-                message=String.format(message,columnName+"+"+columnName2);
-                addImportErrorLog(importLogId, i + 2,message, importErrorLogs);
+                String columnName = I18nUtil.getMessage("ui.data.column.gsq.specifyMachine.steelRingCode")
+                        + "+" + I18nUtil.getMessage("ui.data.column.gsq.specifyMachine.machineName");
+                message = String.format(message, columnName);
+                addImportErrorLog(importLogId, i + 2, message, importErrorLogs);
                 continue;
             }
 
-            // 校验
-            List<ImportErrorLog> validated = ImportUtil.validated(importLogId, i + 2, specifyMachine);
-            String machineName = specifyMachine.getMachineName();
-            Long machineId = machineCodeMap.get(machineName);
-            if (machineId == null && !StringUtil.isEmpty(machineName)) {
-                // 未查询到对应机台信息
-                ImportUtil.addImportErrorLog(importLogId, i + 2,
+            // 字段格式校验 + 机台名称是否存在校验
+            List<ImportErrorLog> validated = ImportUtil.validated(importLogId, i + 2, entity);
+            String machineName = entity.getMachineName();
+            String machineCode = machineNameMap.get(machineName);
+            if (machineCode == null && !StringUtil.isEmpty(machineName)) {
+                addImportErrorLog(importLogId, i + 2,
                         I18nUtil.getMessage("ui.error.message.column.machineNotExist"), validated);
             }
-            if (CollectionUtils.isNotEmpty(validated)) {
-                // 校验失败
-                failureNum++;
-                specifyMachine.setId(-999L);
-                importErrorLogs.addAll(validated);
+            if (validated.isEmpty()) {
+                entity.setMachineCode(machineCode);
+                importList.add(entity);
             } else {
-                // 查询到机台信息，且校验通过
-                specifyMachine.setMachineId(machineId);
-                specifyMachine.setBaseVale(null);
-                importList.add(specifyMachine);
+                failureNum++;
+                entity.setId(-999L);
+                importErrorLogs.addAll(validated);
             }
         }
+
+        // 保存：updateSupport=true 走 mergeSql（存在则更新）；否则逐条校验唯一后 save
         try {
-            //勾选更新记录，调用merge即可
-            if (updateSupport && CollectionUtils.isNotEmpty(importList)) {
+            if (updateSupport && !importList.isEmpty()) {
                 successNum = importList.size();
                 gsqSpecifyMachineMapper.mergeSql(importList);
             } else {
-                //查询数据库已存在对象
                 for (int i = 0; i < list.size(); i++) {
-                    GsqSpecifyMachineDto excelItem = list.get(i);
-                    // 错误记录跳过
+                    GsqSpecifyMachine excelItem = list.get(i);
                     if (excelItem.getId() != null && excelItem.getId().equals(-999L)) {
                         continue;
                     }
-                    // 唯一性校验
-                    GsqSpecifyMachine tmSpecifyMachine = new GsqSpecifyMachine();
-                    BeanUtils.copyProperties(excelItem, tmSpecifyMachine);
-                    if (isSpecifyMachineUnique(tmSpecifyMachine)) {
-                        //不存在插入
+                    int unique = gsqSpecifyMachineMapper.checkUnique(excelItem);
+                    if (unique == 0) {
                         successNum++;
-                        saveSpecifyMachine(tmSpecifyMachine);
+                        baseDao.save(excelItem);
                     } else {
-                        // 存在，插入错误详细日志
                         failureNum++;
-                        ImportUtil.addImportErrorLog(importLogId, i + 2,
-                                I18nUtil.getMessage("ui.error.message.quota.unique"), importErrorLogs);
+                        addImportErrorLog(importLogId, i + 2,
+                                I18nUtil.getMessage("ui.data.column.gsq.specifyMachine.conflict"), importErrorLogs);
                     }
                 }
             }
         } catch (Exception e) {
-            e.printStackTrace();
-            // 执行sql失败，插入导入失败记录
+            log.error("导入钢丝圈定点机台异常", e);
             successNum = 0;
             failureNum = list.size();
             importErrorLogs.clear();
-            ImportUtil.addImportErrorLog(importLogId, null, e.getMessage(), importErrorLogs);
+            addImportErrorLog(importLogId, null, e.getMessage(), importErrorLogs);
         }
+
         if (failureNum > 0) {
             return AjaxResult.error(I18nUtil.getMessage("ui.message.import.fail") + "," + successNum + "," + failureNum, importErrorLogs);
         } else {
             return AjaxResult.success(I18nUtil.getMessage("ui.message.import.success") + "," + successNum);
         }
-    }
-
-    /**
-     * 删除全部定点机台数据
-     */
-    public void deleteAllSpecifyMachine() {
-        this.gsqSpecifyMachineMapper.deleteAllSpecifyMachine();
     }
 }

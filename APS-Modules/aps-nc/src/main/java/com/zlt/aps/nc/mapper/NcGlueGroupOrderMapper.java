@@ -1,12 +1,7 @@
 package com.zlt.aps.nc.mapper;
 
-import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-import com.zlt.aps.nc.api.domain.dto.NcGlueGroupOrderDto;
-import com.zlt.aps.nc.entity.NcGlueGroupOrder;
-import org.apache.ibatis.annotations.Param;
-
-import java.util.List;
-
+import com.zlt.aps.nc.api.domain.entity.NcGlueGroupOrder;
+import com.zlt.core.dao.basemapper.CommBaseMapper;
 
 /**
  * <p>
@@ -16,27 +11,5 @@ import java.util.List;
  * @author zhangbinglin
  * @since 2021-05-25
  */
-public interface NcGlueGroupOrderMapper extends BaseMapper<NcGlueGroupOrder> {
-
-    /**
-     * 根据条件查询胶料组别顺序列表
-     *
-     * @param dto
-     * @return
-     */
-    List<NcGlueGroupOrderDto> listGlueGroupOrder(NcGlueGroupOrderDto dto);
-
-    /**
-     * 查询出被使用了的胶料组别
-     *
-     * @param glueGroupIds
-     * @return
-     */
-    List<String> listUserdGlueGroup(@Param("glueGroupIds") List<Long> glueGroupIds);
-
-    /**
-     * 合并操作，如果记录存在则更新，否则新增
-     * @param list 要合并的集合
-     */
-    public void mergeSql(List<NcGlueGroupOrderDto> list);
+public interface NcGlueGroupOrderMapper extends CommBaseMapper<NcGlueGroupOrder> {
 }

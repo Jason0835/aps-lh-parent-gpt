@@ -2,6 +2,7 @@ package com.zlt.aps.nc.service;
 
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.nc.api.domain.entity.NcQuotaSetting;
+import com.zlt.bill.common.service.IDocService;
 
 import java.util.List;
 
@@ -12,55 +13,7 @@ import java.util.List;
  * @author zlt
  * @date 2021-06-29
  */
-public interface NcQuotaSettingService {
-    /**
-     * 查询内衬定额设定
-     *
-     * @param id 内衬定额设定ID
-     * @return 内衬定额设定
-     */
-    public NcQuotaSetting selectNcQuotaSettingById(Long id);
-
-    /**
-     * 查询内衬定额设定列表
-     *
-     * @param ncQuotaSetting 内衬定额设定
-     * @return 内衬定额设定集合
-     */
-    public List<NcQuotaSetting> selectNcQuotaSettingList(NcQuotaSetting ncQuotaSetting);
-
-    /**
-     * 新增内衬定额设定
-     *
-     * @param ncQuotaSetting 内衬定额设定
-     * @return 结果
-     */
-    public int insertNcQuotaSetting(NcQuotaSetting ncQuotaSetting);
-
-    /**
-     * 修改内衬定额设定
-     *
-     * @param ncQuotaSetting 内衬定额设定
-     * @return 结果
-     */
-    public int updateNcQuotaSetting(NcQuotaSetting ncQuotaSetting);
-
-    /**
-     * 批量删除内衬定额设定
-     *
-     * @param ids 需要删除的内衬定额设定ID
-     * @return 结果
-     */
-    public int deleteNcQuotaSettingByIds(Long[] ids);
-
-    /**
-     * 删除内衬定额设定信息
-     *
-     * @param id 内衬定额设定ID
-     * @return 结果
-     */
-    public int deleteNcQuotaSettingById(Long id);
-
+public interface NcQuotaSettingService extends IDocService<NcQuotaSetting> {
     /**
      * 校验内衬定额设定唯一性
      */

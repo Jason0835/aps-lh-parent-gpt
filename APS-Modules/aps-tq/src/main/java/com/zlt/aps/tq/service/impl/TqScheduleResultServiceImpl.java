@@ -120,8 +120,8 @@ public class TqScheduleResultServiceImpl extends AbstractDocService<TqScheduleRe
         }
         // 校验施工是否存在（查询施工表 T_MDM_CONSTRUCTION_INFO）
         List<TqScheduleBaseInfoVo> baseInfoList = tqEngineService.listTqScheduleBaseInfo(
-                Collections.singletonList(dto.getBeadCode()), "");
-        if (CollectionUtils.isEmpty(baseInfoList)) {
+                Collections.singletonList(dto.getBeadCode()));
+        if (CollectionUtils.isEmpty(baseInfoList)) { 
             return AjaxResult.error("胎圈规格有误，施工不存在");
         }
 
@@ -242,7 +242,7 @@ public class TqScheduleResultServiceImpl extends AbstractDocService<TqScheduleRe
 
         // 回显施工字段（钢丝圈、三角胶、尺寸），从施工表获取
         List<TqScheduleBaseInfoVo> baseInfoList = tqEngineService.listTqScheduleBaseInfo(
-                Collections.singletonList(dto.getBeadCode()), "");
+                Collections.singletonList(dto.getBeadCode()));
         if (CollectionUtils.isNotEmpty(baseInfoList)) {
             TqScheduleBaseInfoVo baseInfo = baseInfoList.get(0);
             entity.setSteelRingCode(baseInfo.getSteelRingCode());

@@ -69,7 +69,7 @@ export default {
     TltUploadForm,
     infoDialog,
   },
-  dicts: ["biz_factory_name", "biz_yes_no", "sys_enable_disable", "class_num"],
+  dicts: ["biz_factory_name", "biz_yes_no", "sys_enable_disable", "class_num_three_plan"],
   provide() {
     return {
       parentDict: this.dict,
@@ -137,6 +137,20 @@ export default {
           minWidth: 140,
         },
         {
+          prop: "clothWidthMax",
+          align: "center",
+          halign: "center",
+          label: this.$t("ui.data.column.cd15MachineInfo.clothWidthMax"),
+          minWidth: 150,
+        },
+        {
+          prop: "clothWidthMin",
+          align: "center",
+          halign: "center",
+          label: this.$t("ui.data.column.cd15MachineInfo.clothWidthMin"),
+          minWidth: 150,
+        },
+        {
           prop: "quota",
           align: "center",
           halign: "center",
@@ -149,7 +163,13 @@ export default {
           halign: "center",
           label: this.$t("ui.data.column.cd15MachineInfo.openMachineClass"),
           minWidth: 130,
-          formatter: (row, column, value) => this.selectDictLabel(this.dict.type.class_num, value),
+          render: ({ row }) => {
+            let value = row.openMachineClass;
+            if (this.isEmpty(value)) {
+              return "";
+            }
+            return this.selectDictLabels(this.dict.type.class_num_three_plan, value);
+          },
         },
         {
           prop: "isOutTwo",

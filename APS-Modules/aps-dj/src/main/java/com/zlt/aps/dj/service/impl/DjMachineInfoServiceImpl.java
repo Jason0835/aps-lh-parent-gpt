@@ -42,7 +42,7 @@ public class DjMachineInfoServiceImpl extends AbstractDocService<DjMachineInfo> 
     @Override
     public List<DjMachineInfo> selectMachineInfoList(DjMachineInfo queryParams) {
         QueryWrapper<DjMachineInfo> queryWrapper = new QueryWrapper<>();
-        queryWrapper.eq(StringUtils.isNoneEmpty(queryParams.getFactoryCode()), "FACTORY_CODE", queryParams.getFactoryCode());
+        queryWrapper.eq("FACTORY_CODE", queryParams.getFactoryCode());
         queryWrapper.eq(StringUtils.isNoneEmpty(queryParams.getMachineCode()), "MACHINE_CODE", queryParams.getMachineCode());
         return machineMapper.selectList(queryWrapper);
     }
@@ -131,14 +131,7 @@ public class DjMachineInfoServiceImpl extends AbstractDocService<DjMachineInfo> 
             return AjaxResult.error(I18nUtil.getMessage("ui.message.import.fail") + "," + successNum + "," + failureNum,
                     importErrorLogs);
         }
-
-        for (DjMachineInfo entity : importList) {
-            if (entity.getId() != null) {
-                machineMapper.updateById(entity);
-            } else {
-                machineMapper.insert(entity);
-            }
-        }
+        baseDao.saveBatch(importList);
 
         if (failureNum > 0) {
             return AjaxResult.error(I18nUtil.getMessage("ui.message.import.fail") + "," + successNum + "," + failureNum,
