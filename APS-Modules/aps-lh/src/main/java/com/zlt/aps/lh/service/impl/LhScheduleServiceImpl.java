@@ -2481,9 +2481,10 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
                 row.put("class" + shift + "FinishQty", getClassFinishQty(result, shift));
                 Object shiftType = buildShiftType(result, shift, endTypeMap);
                 Object shiftLhType = buildShiftMouldMethod(result, shift, recipeTypeMap);
+                Object shiftProductStatus = buildShiftProductStatus(result, shift, recipeTypeMap);
                 row.put("class" + shift + "IsEnd", shiftType);
                 row.put("class" + shift + "Type", shiftType);
-                row.put("class" + shift + "LhType", recipeTypeMap.getOrDefault(result.getProductStatus(), result.getProductStatus()));
+                row.put("class" + shift + "LhType", shiftProductStatus);
                 row.put("class" + shift + "MouldMethod", shiftLhType);
                 row.put("class" + shift + "Analysis", getClassAnalysis(result, shift));
                 row.put("class" + shift + "Dot", "");
@@ -3344,6 +3345,32 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
             return "";
         }
         return recipeTypeMap.getOrDefault(lhType, lhType);
+    }
+
+    /**
+     * 构建班次维度的产品状态展示文本。
+     * <p>参照 buildShiftMouldMethod 的判定逻辑：仅当该班次在收尾班次之前且计划量大于 0 时，
+     * 才返回产品状态（productStatus）对应的 lh_trial_status 字典中文描述；其余情况返回空字符串。</p>
+     *
+     * @param result 排程结果
+     * @param shift 班次序号
+     * @param recipeTypeMap lh_trial_status 字典映射
+     * @return 产品状态展示文本
+     */
+    private Object buildShiftProductStatus(LhScheduleResult result, int shift, Map<String, String> recipeTypeMap) {
+        if (Objects.isNull(result) || isShiftAfterEnding(result, shift)) {
+            return "";
+        }
+        Integer planQty = getClassPlanQty(result, shift);
+        if (Objects.isNull(planQty) || planQty <= 0) {
+            return "";
+        }
+        // 产品状态（S/T/X）直接对应 lh_trial_status 字典值，转换为中文描述。
+        String productStatus = result.getProductStatus();
+        if (StringUtils.isBlank(productStatus)) {
+            return "";
+        }
+        return recipeTypeMap.getOrDefault(productStatus, productStatus);
     }
 
     /**
