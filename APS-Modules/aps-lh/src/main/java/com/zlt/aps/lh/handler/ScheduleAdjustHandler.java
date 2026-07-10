@@ -598,7 +598,8 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
         //超欠产信息 由resolveEffectiveLastMonthOverdueQty(plan)改为monthOverdueQtyMap直接获取
         int lastMonthOverdueQty = monthOverdueQtyMap.values().stream().mapToInt(Integer::intValue).sum();
         //月计划总量
-        int monthPlanTotalQty = getMonthPlanTotalQty(monthPlanQtyMap);
+        Map<YearMonth, Integer> monthTotalMap = context.getSumPlanQty(plan);
+        int monthPlanTotalQty = getMonthPlanTotalQty(monthTotalMap);
         if (lastMonthOverdueQty != 0 || scheDayFinishQty > 0 || isCrossMonth) {
             log.info("硫化余量计算完成, materialCode: {}, monthPlanQty: {}, monthFinishedAndScheDayQty: {}, "
                             + "scheDayFinishQty: {}, lastMonthValidFlag: {}, lastMonthOverdueQty: {}, surplusQty: {}, "
@@ -608,7 +609,7 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
                     isCrossMonth, monthPlanTotalQty);
         }
         return new SurplusCalculation(remainingDemandQty, actualFinishedQty, ignoredOverProductionQty,
-                lastMonthOverdueQty, monthPlanTotalQty);
+                lastMonthOverdueQty, totalPlanQty, monthPlanTotalQty);
     }
 
     /**
@@ -2248,14 +2249,16 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
         private final int ignoredOverProductionQty;
         private final int lastMonthOverdueQty;
         private final int monthPlanTotal;
+        private final int monthPlanSumTotal;
 
         private SurplusCalculation(int surplusQty, int actualFinishedQty, int ignoredOverProductionQty,
-                                   int lastMonthOverdueQty, int monthPlanTotal) {
+                                   int lastMonthOverdueQty, int monthPlanTotal, int monthPlanSumTotal) {
             this.surplusQty = surplusQty;
             this.actualFinishedQty = Math.max(0, actualFinishedQty);
             this.ignoredOverProductionQty = Math.max(0, ignoredOverProductionQty);
             this.lastMonthOverdueQty = lastMonthOverdueQty;
             this.monthPlanTotal = Math.max(0, monthPlanTotal);
+            this.monthPlanSumTotal = Math.max(BigDecimal.ZERO.intValue(), monthPlanSumTotal);
         }
 
         public int getSurplusQty() {
@@ -2285,6 +2288,10 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
          */
         public int getMonthPlanTotal() {
             return monthPlanTotal;
+        }
+
+        public int getMonthPlanSumTotal() {
+            return monthPlanSumTotal;
         }
     }
 
