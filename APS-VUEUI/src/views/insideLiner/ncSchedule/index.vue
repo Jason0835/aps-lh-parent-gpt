@@ -274,7 +274,7 @@ import allocateDialog from "./components/allocateDialog.vue";
 import mergeDialog from "./components/mergeDialog.vue";
 
 export default {
-  name: "InsideLinerSchedule",
+  name: "NcSchedule",
   components: {
     allocateDialog,
     autoPlanDialog,

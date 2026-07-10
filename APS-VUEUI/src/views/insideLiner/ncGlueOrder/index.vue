@@ -10,7 +10,6 @@
       :data="data"
       :page="page"
       :search="search"
-      @refresh="getList"
       @search="handleSearch"
       @pageChange="handlePageChange"
       @sort-change="handleSortChange"
@@ -63,18 +62,19 @@ import { downloadLink } from "@/utils/request";
 //interface
 import { listGlueGroupOrder } from "@/api/nc/glueGroupOrder";
 import { listGlueOrder, removeGlueOrder } from "@/api/nc/glueOrder";
+import { getConfigKey } from "@/api/system/config";
 //components
 import tltUpload from "@/components/tltUpload/tltUpload.vue";
 
 import infoDialog from "./components/infoDialog.vue";
 
 export default {
-  name: "InsideLinerGlueOrder",
+  name: "NcGlueOrder",
   components: {
     tltUpload,
     infoDialog,
   },
-  dicts: [],
+  dicts: ["biz_factory_name"],
   provide() {
     return {
       parentDict: this.dict,
@@ -82,7 +82,39 @@ export default {
   },
   data() {
     return {
-      searchColumns: [
+      loading: false,
+      data: [],
+      selection: [],
+      page: {
+        current: 1,
+        pageSize: 20,
+        total: 0,
+      },
+      sort: {},
+      search: {
+        mainPlanMonth: "",
+        factoryCode: "",
+      },
+      query: {
+        mainPlanMonth: "",
+        factoryCode: "",
+      },
+      importDefaultValue: {},
+      importRules: {},
+      glueGroupList: [],
+      initialized: false,
+    };
+  },
+  computed: {
+    searchColumns() {
+      return [
+        {
+          label: this.$t("ui.data.column.factoryCode"),
+          prop: "factoryCode",
+          type: "select",
+          dictData: this.dict.type.biz_factory_name,
+          filterable: true,
+        },
         {
           label: this.$t("ui.glueOrder.column.glueGroup"),
           prop: "glueGroupId",
@@ -100,28 +132,8 @@ export default {
           label: this.$t("ui.glueOrder.column.glueCode"),
           prop: "glueCode",
         },
-      ],
-      loading: false,
-      data: [],
-      selection: [],
-      page: {
-        current: 1,
-        pageSize: 20,
-        total: 0,
-      },
-      sort: {},
-      search: {
-        mainPlanMonth: "",
-      },
-      query: {
-        mainPlanMonth: "",
-      },
-      importDefaultValue: {},
-      importRules: {},
-      glueGroupList: [],
-    };
-  },
-  computed: {
+      ];
+    },
     columns() {
       let columns = [
         { type: "selection", fixed: "left" },
@@ -313,12 +325,23 @@ export default {
     },
   },
   created() {
-    this.getGlueGroup();
-    this.getList();
+    getConfigKey("sys.factory.code").then(response => {
+      this.search.factoryCode = response.msg;
+      this.query.factoryCode = response.msg;
+      this.initialized = true;
+      this.getGlueGroup();
+      this.getList();
+    }).catch(() => {
+      this.initialized = true;
+      this.getGlueGroup();
+      this.getList();
+    });
   },
   activated() {
-    this.getGlueGroup();
-    this.getList();
+    if (this.initialized) {
+      this.getGlueGroup();
+      this.getList();
+    }
   },
 };
 </script>
