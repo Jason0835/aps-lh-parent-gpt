@@ -967,7 +967,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
                 new LambdaQueryWrapper<MdmMaterialConsumeDetail>()
                         .eq(BaseEntity::getIsDelete, YesOrNoEnum.NO.getCode())
                         .eq(factoryCode != null, MdmMaterialConsumeDetail::getFactoryCode, factoryCode)
-                        .likeRight(MdmMaterialConsumeDetail::getChildMaterialName, "AQ"));
+                        .likeRight(MdmMaterialConsumeDetail::getChildMaterialName, "AQT"));
 
         if (CollectionUtils.isEmpty(consumeDetails)) {
             return result;
@@ -1328,7 +1328,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
         List<MdmMaterialConsumeDetail> mdmMaterialConsumeDetailList = mdmMaterialConsumeDetailMapper.selectList(new LambdaQueryWrapper<MdmMaterialConsumeDetail>()
                 .eq(BaseEntity::getIsDelete, YesOrNoEnum.NO.getCode())
                 .eq(MdmMaterialConsumeDetail::getFactoryCode, list.get(0).getFactoryCode())
-                .likeRight(MdmMaterialConsumeDetail::getChildMaterialName, "AQ"));
+                .likeRight(MdmMaterialConsumeDetail::getChildMaterialName, "AQT"));
 
         if (CollectionUtils.isNotEmpty(mdmMaterialConsumeDetailList)) {
             smallGlueMap = mdmMaterialConsumeDetailList.stream()
