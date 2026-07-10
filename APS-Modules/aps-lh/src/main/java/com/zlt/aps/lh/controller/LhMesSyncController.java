@@ -234,6 +234,15 @@ public class LhMesSyncController implements ILhMesSyncRemoteService {
     }
 
     @Override
+    @ApiOperation("根据分厂编号和完成日期范围查询硫化排程日完成量数据（未删除）")
+    @PostMapping("/selectDayFinishQtyByDateRange")
+    public List<LhDayFinishQty> selectDayFinishQtyByDateRange(@RequestParam("factoryCode") String factoryCode, @RequestParam("startDate") String startDateStr, @RequestParam("endDate") String endDateStr) {
+        Date startDate = DateUtil.parse(startDateStr);
+        Date endDate = DateUtil.parse(endDateStr);
+        return lhDayFinishQtyMapper.selectByFactoryCodeAndDateRange(factoryCode, startDate, endDate);
+    }
+
+    @Override
     @ApiOperation("批量保存模具交替计划完成回报")
     @PostMapping("/saveMoldAlterPlanFinishBatch")
     @Deprecated

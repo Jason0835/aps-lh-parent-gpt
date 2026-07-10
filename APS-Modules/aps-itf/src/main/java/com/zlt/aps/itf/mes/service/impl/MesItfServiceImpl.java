@@ -2240,23 +2240,35 @@ public class MesItfServiceImpl implements MesItfService {
 
     /**
      * 同步硫化排程日完成量
-     * 采用逻辑删除后插入模式
-     * 同步完成后根据参数配置CHIP_CODE_STOCK_UPDATE里的芯片编码，过滤物料编码对应的编码数据增量更新芯片库存的完成量
+     * MES数据返回周期已由单日变更为多日（如7/10返回7/3至7/9的连续数据），
+     * 采用按最新版本号查询MES中间表，获取多日完成量数据后：
+     * 1. 逻辑删除前查询窗口范围内的旧数据，按芯片编码汇总（用于芯片库存差值更新）
+     * 2. 按完成日期分组，逐组调用逻辑删除+插入
+     * 3. 月计划监控按各完成日期的年月分别更新
+     * 4. 芯片库存按差值更新（FINISH_QTY += 新值 - 旧值），避免多日滚动数据重复累加
      * @param syncDataLogs 同步参数
      * @return 结果
      */
     @Override
     public AjaxResult syncLhScheDayFinishQty(AuxReqSyncDataLogs syncDataLogs) {
+        // 查询MES中间表最新版本号
         DynamicDataSourceContextHolder.push(DataSource.MES);
-        Date nowDate = DateUtils.truncate(DateUtils.getNowDate(), Calendar.DATE);
-        Date lastDate = DateUtils.addDays(nowDate, -1);
+        String latestVersion = mesItfMapper.selectMaxDataVersionFromLhDayFinishQty(syncDataLogs.getFactoryCode());
+        if (StringUtils.isBlank(latestVersion)) {
+            DynamicDataSourceContextHolder.poll();
+            log.warn("硫化排程日完成量同步：MES中间表无版本号数据，factoryCode={}", syncDataLogs.getFactoryCode());
+            return AjaxResult.success("MES中间表无数据可同步");
+        }
+        log.info("硫化排程日完成量同步：查询到最新版本号={}，factoryCode={}", latestVersion, syncDataLogs.getFactoryCode());
+
+        // 按最新版本号查询MES中间表多日数据（不传finishDate，取该版本下所有日期数据）
+        syncDataLogs.setDataVersion(latestVersion);
         syncDataLogs.setQueryParams(new HashMap<>());
-        syncDataLogs.getQueryParams().put("finishDate", lastDate);
         List<LhDayFinishQty> syncList = mesItfMapper.selectLhScheDayFinishQtyList(syncDataLogs);
         DynamicDataSourceContextHolder.poll();
 
         if (CollectionUtils.isEmpty(syncList)) {
-            log.warn("硫化排程日完成量同步：MES中间表查询结果为空，factoryCode={}", syncDataLogs.getFactoryCode());
+            log.warn("硫化排程日完成量同步：MES中间表查询结果为空，factoryCode={}, dataVersion={}", syncDataLogs.getFactoryCode(), latestVersion);
             return AjaxResult.success("MES中间表无数据可同步");
         }
 
@@ -2292,41 +2304,81 @@ public class MesItfServiceImpl implements MesItfService {
             insertList.addAll(extraFormalRecords);
         }
 
-        // 处理试制/量试完成量回报规则（≤日计划量按计划量回报、>日计划量按实际回报；完成量为0按日计划量回报）
+        // 处理试制/量试完成量回报规则（跨日合并计划量；≤日计划量按计划量回报、>日计划量按实际回报；计划量查不到则过滤）
         handleTrialFinishQtyRule(insertList, syncDataLogs.getFactoryCode());
         if (CollectionUtils.isEmpty(insertList)) {
             log.info("硫化排程日完成量同步：试制/量试规则处理后待同步列表为空，factoryCode={}", syncDataLogs.getFactoryCode());
             return AjaxResult.success("试制/量试规则处理后无数据可同步");
         }
 
-        try {
-            String factoryCode = syncDataLogs.getFactoryCode();
-            Date finishDate = insertList.stream().map(LhDayFinishQty::getFinishDate).filter(Objects::nonNull).findFirst().orElse(DateUtils.getNowDate());
-            String finishDateStr = DateUtil.formatDate(finishDate);
-            log.info("硫化排程日完成量同步：开始同步，factoryCode={}, finishDate={}, 待插入数量={}", factoryCode, finishDateStr, insertList.size());
+        String factoryCode = syncDataLogs.getFactoryCode();
 
-            FeignTokenHelper.runWithToken(() -> {
-                lhMesSyncRemoteService.logicDeleteAndSaveDayFinishQty(factoryCode, finishDateStr, "MES", insertList);
-            });
+        // 提取窗口日期范围：min(finishDate) ~ max(finishDate)
+        Date minFinishDate = insertList.stream().map(LhDayFinishQty::getFinishDate)
+                .filter(Objects::nonNull).min(Date::compareTo).orElse(DateUtils.getNowDate());
+        Date maxFinishDate = insertList.stream().map(LhDayFinishQty::getFinishDate)
+                .filter(Objects::nonNull).max(Date::compareTo).orElse(DateUtils.getNowDate());
+        String minDateStr = DateUtil.formatDate(minFinishDate);
+        String maxDateStr = DateUtil.formatDate(maxFinishDate);
+        log.info("硫化排程日完成量同步：窗口日期范围={} ~ {}，factoryCode={}", minDateStr, maxDateStr, factoryCode);
 
-            log.info("硫化排程日完成量同步：同步完成，factoryCode={}, 插入数量={}", factoryCode, insertList.size());
-        } catch (Exception e) {
-            log.error("硫化排程日完成量同步：Feign调用异常，factoryCode={}, 待插入数量={}", syncDataLogs.getFactoryCode(), insertList.size(), e);
-            return AjaxResult.error("硫化排程日完成量同步失败：" + e.getMessage());
+        // 【芯片库存差值更新-步骤1】逻辑删除前查询窗口范围内的旧数据，按芯片编码汇总
+        // 必须在逻辑删除之前执行，否则旧数据已被删除，无法查询
+        Map<String, Integer> oldChipFinishQtyMap = queryOldChipFinishQty(factoryCode, minDateStr, maxDateStr);
+
+        // 按完成日期分组，逐组同步（原逻辑按单个完成日期做逻辑删除+插入）
+        Map<String, List<LhDayFinishQty>> groupByFinishDate = insertList.stream()
+                .collect(Collectors.groupingBy(item -> {
+                    Date finishDate = item.getFinishDate();
+                    return finishDate != null ? DateUtil.formatDate(finishDate) : "unknown";
+                }));
+
+        for (Map.Entry<String, List<LhDayFinishQty>> entry : groupByFinishDate.entrySet()) {
+            String finishDateStr = entry.getKey();
+            List<LhDayFinishQty> groupList = entry.getValue();
+            String groupFactoryCode = groupList.get(0).getFactoryCode();
+
+            try {
+                log.info("硫化排程日完成量同步：开始同步，factoryCode={}, finishDate={}, 待插入数量={}", groupFactoryCode, finishDateStr, groupList.size());
+
+                String finalFactoryCode = groupFactoryCode;
+                FeignTokenHelper.runWithToken(() -> {
+                    lhMesSyncRemoteService.logicDeleteAndSaveDayFinishQty(finalFactoryCode, finishDateStr, "MES", groupList);
+                });
+
+                log.info("硫化排程日完成量同步：同步完成，factoryCode={}, finishDate={}, 插入数量={}", groupFactoryCode, finishDateStr, groupList.size());
+            } catch (Exception e) {
+                log.error("硫化排程日完成量同步：Feign调用异常，factoryCode={}, finishDate={}", groupFactoryCode, finishDateStr, e);
+                return AjaxResult.error("硫化排程日完成量同步失败：" + e.getMessage());
+            }
         }
 
-        try {
-            MpMonthPlanMonitor paramVo = new MpMonthPlanMonitor();
-            paramVo.setFactoryCode(syncDataLogs.getFactoryCode());
-            paramVo.setYear(DateUtils.getYear(lastDate));
-            paramVo.setMonth(DateUtils.getMonth(lastDate));
-            DynamicDataSourceContextHolder.push(DataSource.APS);
-            mpMonthPlanMonitorEntityMapper.updateByDayFinish(paramVo);
-        } finally {
-            DynamicDataSourceContextHolder.poll();
+        // 月计划监控更新：按各完成日期的年月分别更新
+        Set<String> yearMonthSet = new HashSet<>();
+        for (LhDayFinishQty item : insertList) {
+            if (item.getFinishDate() != null) {
+                String yearMonth = DateUtils.getYear(item.getFinishDate()) + "-" + DateUtils.getMonth(item.getFinishDate());
+                yearMonthSet.add(yearMonth);
+            }
+        }
+        for (String yearMonth : yearMonthSet) {
+            String[] parts = yearMonth.split("-");
+            Integer year = Integer.parseInt(parts[0]);
+            Integer month = Integer.parseInt(parts[1]);
+            try {
+                MpMonthPlanMonitor paramVo = new MpMonthPlanMonitor();
+                paramVo.setFactoryCode(factoryCode);
+                paramVo.setYear(year);
+                paramVo.setMonth(month);
+                DynamicDataSourceContextHolder.push(DataSource.APS);
+                mpMonthPlanMonitorEntityMapper.updateByDayFinish(paramVo);
+            } finally {
+                DynamicDataSourceContextHolder.poll();
+            }
         }
 
-        updateChipStockFinishQty(syncDataLogs.getFactoryCode(), syncList);
+        // 【芯片库存差值更新-步骤2】按差值更新芯片库存（FINISH_QTY += 新值 - 旧值）
+        updateChipStockFinishQty(factoryCode, syncList, oldChipFinishQtyMap, latestVersion);
         return AjaxResult.success();
     }
 
@@ -2394,7 +2446,7 @@ public class MesItfServiceImpl implements MesItfService {
             insertList.addAll(extraFormalRecords);
         }
 
-        // 处理试制/量试完成量回报规则（≤日计划量按计划量回报、>日计划量按实际回报；完成量为0按日计划量回报）
+        // 处理试制/量试完成量回报规则（跨日合并计划量；≤日计划量按计划量回报、>日计划量按实际回报；计划量查不到则过滤）
         // 注意：此处统一处理所有日期的试制/量试数据，规则处理后再按完成日期分组同步
         String trialFactoryCode = insertList.get(0).getFactoryCode();
         handleTrialFinishQtyRule(insertList, trialFactoryCode);
@@ -2402,6 +2454,18 @@ public class MesItfServiceImpl implements MesItfService {
             log.info("硫化排程日完成量按最新版本号同步：试制/量试规则处理后待同步列表为空，dataVersion={}", dataVersion);
             return AjaxResult.success("试制/量试规则处理后无数据可同步");
         }
+
+        // 提取窗口日期范围：min(finishDate) ~ max(finishDate)
+        Date minFinishDate = insertList.stream().map(LhDayFinishQty::getFinishDate)
+                .filter(Objects::nonNull).min(Date::compareTo).orElse(DateUtils.getNowDate());
+        Date maxFinishDate = insertList.stream().map(LhDayFinishQty::getFinishDate)
+                .filter(Objects::nonNull).max(Date::compareTo).orElse(DateUtils.getNowDate());
+        String minDateStr = DateUtil.formatDate(minFinishDate);
+        String maxDateStr = DateUtil.formatDate(maxFinishDate);
+        log.info("硫化排程日完成量按最新版本号同步：窗口日期范围={} ~ {}，factoryCode={}", minDateStr, maxDateStr, trialFactoryCode);
+
+        // 【芯片库存差值更新-步骤1】逻辑删除前查询窗口范围内的旧数据，按芯片编码汇总
+        Map<String, Integer> oldChipFinishQtyMap = queryOldChipFinishQty(trialFactoryCode, minDateStr, maxDateStr);
 
         // 按完成日期分组，逐组同步（原逻辑按单个完成日期做逻辑删除+插入）
         Map<String, List<LhDayFinishQty>> groupByFinishDate = insertList.stream()
@@ -2457,27 +2521,31 @@ public class MesItfServiceImpl implements MesItfService {
             }
         }
 
-        // 增量更新芯片库存完成量
-        updateChipStockFinishQty(insertList.get(0).getFactoryCode(), syncList);
+        // 【芯片库存差值更新-步骤2】按差值更新芯片库存完成量
+        updateChipStockFinishQty(trialFactoryCode, syncList, oldChipFinishQtyMap, dataVersion);
         return AjaxResult.success();
     }
 
     /**
      * 处理试制(X)/量试(T)数据的日完成量回报规则。
-     * <p>规则（已移除原3.1"完成量为0忽略"，0值统一按下方规则处理）：
+     * <p>规则：
      * <ul>
-     *   <li>3.1) 完成量 ≤ 当日计划量：将完成量调整为当日计划量进行回报</li>
-     *   <li>3.2) 完成量 > 当日计划量：保持原实际完成量不变</li>
+     *   <li>1) 计划量查不到（三个班次示方类型均为NULL或排程数据不存在）：过滤不同步</li>
+     *   <li>2) 完成量 ≤ 当日计划量：将完成量调整为当日计划量进行回报</li>
+     *   <li>3) 完成量 > 当日计划量：保持原实际完成量不变</li>
      * </ul>
-     * 当日计划量取自T_LH_SCHEDULE_RESULT中 SCHEDULE_DATE = FINISH_DATE 的记录，
-     * 合计班次3(夜)+班次4(早)+班次5(中)的计划量。</p>
-     * <p>匹配维度：物料编码 + 示方类型。查不到日计划量时按0处理。</p>
+     * 当日计划量取自T_LH_SCHEDULE_RESULT，跨日滚动合并三段（MES完成日期D）：
+     * <ul>
+     *   <li>排程日期D的CLASS3（D日夜班）</li>
+     *   <li>排程日期(D+1)的CLASS1（D日早班，滚动排程后D+1版本最新）</li>
+     *   <li>排程日期(D+1)的CLASS2（D日中班，滚动排程后D+1版本最新）</li>
+     * </ul>
+     * 三个班次各自带示方类型，按物料编码+示方类型分组汇总。</p>
+     * <p>匹配维度：物料编码 + 示方类型。若三个班次示方类型均为NULL，则key不存在，过滤不同步。</p>
      * <p>正规(S)数据不做处理，原样同步。</p>
-     * <p>完成量为0或null时的处理：落入3.1分支按日计划量回报
-     * （日计划量=0时回报0，日计划量&gt;0时回报日计划量即"0值放大"，
-     * 此类记录会输出WARN日志便于追踪）。</p>
+     * <p>完成量为0或null时：若计划量查得到（key存在），落入规则2按日计划量回报（0值放大）。</p>
      *
-     * @param insertList 待同步的日完成量列表（会被原地修改：调整dayFinishQty）
+     * @param insertList 待同步的日完成量列表（会被原地修改：调整dayFinishQty或移除元素）
      * @param factoryCode 工厂编码
      */
     private void handleTrialFinishQtyRule(List<LhDayFinishQty> insertList, String factoryCode) {
@@ -2489,20 +2557,8 @@ public class MesItfServiceImpl implements MesItfService {
                 .filter(item -> isTrialOrMassTrial(item.getLhType()))
                 .collect(Collectors.toList());
         if (CollectionUtils.isEmpty(trialList)) {
-            //#region debug-point dp-trial-empty
-            log.info("[DEBUG-zero-fill] trialList为空，未进入试制/量试规则处理，insertList.size={}, factoryCode={}",
-                    insertList.size(), factoryCode);
-            //#endregion
             return;
         }
-        //#region debug-point dp-trial-summary
-        long zeroQtyCount = trialList.stream()
-                .filter(item -> item.getDayFinishQty() == null
-                        || item.getDayFinishQty().compareTo(BigDecimal.ZERO) == 0)
-                .count();
-        log.info("[DEBUG-zero-fill] 进入试制/量试规则：trialList.size={}, 其中完成量为0的记录数={}, factoryCode={}",
-                trialList.size(), zeroQtyCount, factoryCode);
-        //#endregion
 
         // 按完成日期分组（用LocalDate避免Date精度问题），逐日查询当日计划量
         Map<java.time.LocalDate, List<LhDayFinishQty>> dateGroupedMap = trialList.stream()
@@ -2517,7 +2573,9 @@ public class MesItfServiceImpl implements MesItfService {
                 .distinct()
                 .collect(Collectors.toList());
 
-        // 完成量为0按日计划量放大的记录计数（原3.1会忽略，现按新规则放大），用于WARN日志追踪
+        // 需要过滤的记录（计划量查不到，三个班次示方类型均为NULL或排程数据不存在）
+        List<LhDayFinishQty> toRemove = new ArrayList<>();
+        // 完成量为0按日计划量放大的记录计数，用于WARN日志追踪
         int zeroFilledCount = 0;
 
         for (Map.Entry<java.time.LocalDate, List<LhDayFinishQty>> dateEntry : dateGroupedMap.entrySet()) {
@@ -2526,7 +2584,7 @@ public class MesItfServiceImpl implements MesItfService {
             // 取该日期下任意一条数据的finishDate作为查询参数（同一天任意一条都行）
             Date finishDate = dayItems.get(0).getFinishDate();
 
-            // 查询当日日计划量（APS数据源）；物料编码列表为空时跳过查询，按日计划量=0处理
+            // 查询当日计划量（APS数据源，跨日滚动合并CLASS3+CLASS1+CLASS2）
             List<LhDayPlanQtyVo> planQtyList = Collections.emptyList();
             if (!allMaterialCodes.isEmpty()) {
                 try {
@@ -2550,10 +2608,6 @@ public class MesItfServiceImpl implements MesItfService {
                     planQtyMap.merge(key, vo.getDayPlanQty() == null ? 0 : vo.getDayPlanQty(), Integer::sum);
                 }
             }
-            //#region debug-point dp-planqty-map
-            log.info("[DEBUG-zero-fill] 当日计划量查询：factoryCode={}, finishDate={}, planQtyList行数={}, planQtyMap.size={}, mapKeys={}",
-                    factoryCode, scheduleLocalDate, planQtyList.size(), planQtyMap.size(), planQtyMap.keySet());
-            //#endregion
 
             // 逐条应用试制/量试完成量回报规则
             for (LhDayFinishQty item : dayItems) {
@@ -2563,18 +2617,14 @@ public class MesItfServiceImpl implements MesItfService {
                 if (isZeroFinishQty) {
                     finishQty = BigDecimal.ZERO;
                 }
-                // 获取当日计划量，查不到按0处理
+                // 获取当日计划量；若key不存在说明三个班次示方类型均为NULL或排程数据不存在，过滤不同步
                 String key = item.getMaterialCode() + "|" + item.getLhType();
-                Integer dayPlanQtyInt = planQtyMap.getOrDefault(key, 0);
-                BigDecimal dayPlanQty = BigDecimal.valueOf(dayPlanQtyInt);
-                //#region debug-point dp-zero-item
-                if (isZeroFinishQty) {
-                    log.warn("[DEBUG-zero-fill] 完成量为0的记录：materialCode={}, lhType={}, key={}, key存在={}, dayPlanQty={}, factoryCode={}, finishDate={}",
-                            item.getMaterialCode(), item.getLhType(), key, planQtyMap.containsKey(key),
-                            dayPlanQty, factoryCode, scheduleLocalDate);
+                if (!planQtyMap.containsKey(key)) {
+                    toRemove.add(item);
+                    continue;
                 }
-                //#endregion
-                // 3.1) 完成量 ≤ 日计划量：按当日计划量回报
+                BigDecimal dayPlanQty = BigDecimal.valueOf(planQtyMap.get(key));
+                // 2) 完成量 ≤ 日计划量：按当日计划量回报
                 // 注：完成量为0时落入此分支按日计划量回报（日计划量=0时回报0，>0时回报日计划量即0值放大）
                 if (finishQty.compareTo(dayPlanQty) <= 0) {
                     if (isZeroFinishQty && dayPlanQty.compareTo(BigDecimal.ZERO) > 0) {
@@ -2582,14 +2632,20 @@ public class MesItfServiceImpl implements MesItfService {
                     }
                     item.setDayFinishQty(dayPlanQty);
                 }
-                // 3.2) 完成量 > 日计划量：按实际完成量回报（保持原值，无需处理）
+                // 3) 完成量 > 日计划量：按实际完成量回报（保持原值，无需处理）
             }
 
             log.info("试制/量试完成量回报规则处理：factoryCode={}, finishDate={}, 当日计划量匹配数={}, 当日试制/量试数据数={}",
                     factoryCode, scheduleLocalDate, planQtyMap.size(), dayItems.size());
         }
 
-        // 完成量为0但按日计划量放大的记录（原逻辑会忽略，现按新规则放大），输出WARN便于上线追踪影响范围
+        // 从待同步列表中移除计划量查不到的记录（三个班次示方类型均为NULL或排程数据不存在）
+        if (!toRemove.isEmpty()) {
+            insertList.removeAll(toRemove);
+            log.warn("试制/量试完成量回报规则处理：计划量查不到被过滤的记录数={}, 剩余待同步数量={}, factoryCode={}",
+                    toRemove.size(), insertList.size(), factoryCode);
+        }
+        // 完成量为0但按日计划量放大的记录，输出WARN便于上线追踪影响范围
         if (zeroFilledCount > 0) {
             log.warn("试制/量试完成量回报规则处理：完成量为0按日计划量放大的记录数={}, factoryCode={}",
                     zeroFilledCount, factoryCode);
@@ -2727,103 +2783,143 @@ public class MesItfServiceImpl implements MesItfService {
     }
 
     /**
-     * 根据参数配置CHIP_CODE_STOCK_UPDATE里的芯片编码，过滤物料编码对应的日完成量数据增量更新芯片库存
-     * 采用增量更新模式：
-     *   已存在（分厂+芯片编码匹配）：累加完成量
-     *   不存在：新增记录（仅设置完成量，库存量由用户手动维护）
+     * 查询APS表中窗口日期范围内的旧数据，按芯片编码汇总完成量
+     * 用于芯片库存差值更新：必须在逻辑删除之前执行，否则旧数据已被删除无法查询
+     *
      * @param factoryCode 分厂编码
-     * @param syncList 硫化排程日完成量列表
+     * @param minDateStr  窗口起始日期（yyyy-MM-dd）
+     * @param maxDateStr  窗口结束日期（yyyy-MM-dd）
+     * @return 芯片编码 -> 旧完成量汇总值
      */
-    private void updateChipStockFinishQty(String factoryCode, List<LhDayFinishQty> syncList) {
-        log.info("【芯片库存回填排查】开始处理，factoryCode={}, syncList.size={}", factoryCode, syncList.size());
+    private Map<String, Integer> queryOldChipFinishQty(String factoryCode, String minDateStr, String maxDateStr) {
+        Map<String, Integer> oldChipFinishQtyMap = new HashMap<>();
+        try {
+            List<LhDayFinishQty> oldList = FeignTokenHelper.callWithToken(() ->
+                    lhMesSyncRemoteService.selectDayFinishQtyByDateRange(factoryCode, minDateStr, maxDateStr));
+            if (CollectionUtils.isEmpty(oldList)) {
+                log.info("芯片库存差值更新：窗口范围旧数据为空，factoryCode={}, dateRange={}~{}", factoryCode, minDateStr, maxDateStr);
+                return oldChipFinishQtyMap;
+            }
+            log.info("芯片库存差值更新：窗口范围旧数据条数={}，factoryCode={}, dateRange={}~{}", oldList.size(), factoryCode, minDateStr, maxDateStr);
+
+            // 查询芯片编码配置，用于过滤匹配芯片编码的旧数据
+            LhParams paramResult = FeignTokenHelper.callWithToken(() ->
+                    lhMesSyncRemoteService.selectLhParamsByCode(LhScheduleParamConstant.CHIP_CODE_STOCK_UPDATE, factoryCode));
+            if (paramResult == null || StringUtils.isBlank(paramResult.getParamValue())) {
+                log.warn("芯片库存差值更新：硫化参数CHIP_CODE_STOCK_UPDATE未配置，factoryCode={}", factoryCode);
+                return oldChipFinishQtyMap;
+            }
+            Set<String> chipCodeSet = Arrays.stream(paramResult.getParamValue().split(","))
+                    .map(String::trim)
+                    .filter(StringUtils::isNotBlank)
+                    .collect(Collectors.toSet());
+
+            // 按芯片编码汇总旧数据完成量
+            oldChipFinishQtyMap = oldList.stream()
+                    .filter(item -> chipCodeSet.contains(item.getMaterialCode()))
+                    .filter(item -> item.getDayFinishQty() != null)
+                    .collect(Collectors.groupingBy(
+                            LhDayFinishQty::getMaterialCode,
+                            Collectors.summingInt(item -> item.getDayFinishQty().intValue())
+                    ));
+            log.info("芯片库存差值更新：旧数据汇总结果={}，factoryCode={}", oldChipFinishQtyMap, factoryCode);
+        } catch (Exception e) {
+            log.error("芯片库存差值更新：查询旧数据异常，factoryCode={}, dateRange={}~{}", factoryCode, minDateStr, maxDateStr, e);
+        }
+        return oldChipFinishQtyMap;
+    }
+
+    /**
+     * 根据参数配置CHIP_CODE_STOCK_UPDATE里的芯片编码，过滤物料编码对应的日完成量数据差值更新芯片库存
+     * 采用差值更新模式：FINISH_QTY += 新值 - 旧值
+     *   新值 = 本次MES返回的窗口范围内数据按芯片编码汇总
+     *   旧值 = 逻辑删除前查询的APS表窗口范围内数据按芯片编码汇总
+     *   差值 = 新值 - 旧值，差值为0时跳过更新
+     * 避免多日滚动数据同步时重复累加芯片库存完成量
+     *
+     * @param factoryCode          分厂编码
+     * @param syncList             MES返回的日完成量列表
+     * @param oldChipFinishQtyMap  逻辑删除前查询的旧数据汇总（芯片编码 -> 旧完成量汇总值）
+     * @param dataVersion          本次同步的数据版本号
+     */
+    private void updateChipStockFinishQty(String factoryCode, List<LhDayFinishQty> syncList,
+                                          Map<String, Integer> oldChipFinishQtyMap, String dataVersion) {
+        log.info("【芯片库存差值更新】开始处理，factoryCode={}, syncList.size={}", factoryCode, syncList.size());
 
         LhParams paramResult;
         try {
             paramResult = FeignTokenHelper.callWithToken(() ->
                     lhMesSyncRemoteService.selectLhParamsByCode(LhScheduleParamConstant.CHIP_CODE_STOCK_UPDATE, factoryCode));
         } catch (Exception e) {
-            log.error("【芯片库存回填排查】查询硫化参数配置异常，factoryCode={}", factoryCode, e);
+            log.error("【芯片库存差值更新】查询硫化参数配置异常，factoryCode={}", factoryCode, e);
             return;
         }
         if (paramResult == null || StringUtils.isBlank(paramResult.getParamValue())) {
-            log.warn("【芯片库存回填排查】硫化参数CHIP_CODE_STOCK_UPDATE未配置或值为空，factoryCode={}, paramResult={}", factoryCode, paramResult);
+            log.warn("【芯片库存差值更新】硫化参数CHIP_CODE_STOCK_UPDATE未配置或值为空，factoryCode={}", factoryCode);
             return;
         }
-        log.info("【芯片库存回填排查】硫化参数CHIP_CODE_STOCK_UPDATE配置值：factoryCode={}, paramValue={}", factoryCode, paramResult.getParamValue());
+        log.info("【芯片库存差值更新】硫化参数CHIP_CODE_STOCK_UPDATE配置值：factoryCode={}, paramValue={}", factoryCode, paramResult.getParamValue());
 
         Set<String> chipCodeSet = Arrays.stream(paramResult.getParamValue().split(","))
                 .map(String::trim)
                 .filter(StringUtils::isNotBlank)
                 .collect(Collectors.toSet());
         if (CollectionUtils.isEmpty(chipCodeSet)) {
-            log.warn("【芯片库存回填排查】解析芯片编码集合为空，factoryCode={}", factoryCode);
+            log.warn("【芯片库存差值更新】解析芯片编码集合为空，factoryCode={}", factoryCode);
             return;
         }
-        log.info("【芯片库存回填排查】芯片编码集合：{}", chipCodeSet);
-
-        List<String> syncMaterialCodes = syncList.stream()
-                .map(LhDayFinishQty::getMaterialCode)
-                .filter(StringUtils::isNotBlank)
-                .distinct()
-                .collect(Collectors.toList());
-        log.info("【芯片库存回填排查】syncList中物料编码列表：{}", syncMaterialCodes);
-
-        List<String> syncMesMaterialCodes = syncList.stream()
-                .map(LhDayFinishQty::getMesMaterialCode)
-                .filter(StringUtils::isNotBlank)
-                .distinct()
-                .collect(Collectors.toList());
-        log.info("【芯片库存回填排查】syncList中MES物料编码列表：{}", syncMesMaterialCodes);
-
-        List<String> matchedMaterialCodes = syncMaterialCodes.stream()
-                .filter(chipCodeSet::contains)
-                .collect(Collectors.toList());
-        log.info("【芯片库存回填排查】物料编码与芯片编码集合匹配结果：matched={}, unmatched={}", matchedMaterialCodes, syncMaterialCodes.stream().filter(code -> !chipCodeSet.contains(code)).collect(Collectors.toList()));
+        log.info("【芯片库存差值更新】芯片编码集合：{}", chipCodeSet);
 
         List<LhDayFinishQty> chipDataList = syncList.stream()
                 .filter(item -> chipCodeSet.contains(item.getMaterialCode()))
                 .collect(Collectors.toList());
         if (CollectionUtils.isEmpty(chipDataList)) {
-            log.warn("【芯片库存回填排查】过滤后芯片数据为空，无匹配的物料编码！chipCodeSet={}, syncMaterialCodes={}", chipCodeSet, syncMaterialCodes);
+            log.warn("【芯片库存差值更新】过滤后芯片数据为空，无匹配的物料编码！chipCodeSet={}", chipCodeSet);
             return;
         }
-        log.info("【芯片库存回填排查】过滤后芯片数据条数：{}", chipDataList.size());
+        log.info("【芯片库存差值更新】过滤后芯片数据条数：{}", chipDataList.size());
 
-        Map<String, Integer> chipFinishQtyMap = chipDataList.stream()
+        // 按芯片编码汇总新数据完成量
+        Map<String, Integer> newChipFinishQtyMap = chipDataList.stream()
                 .filter(item -> item.getDayFinishQty() != null)
                 .collect(Collectors.groupingBy(
                         LhDayFinishQty::getMaterialCode,
                         Collectors.summingInt(item -> item.getDayFinishQty().intValue())
                 ));
-        log.info("【芯片库存回填排查】芯片完成量汇总结果：{}", chipFinishQtyMap);
+        log.info("【芯片库存差值更新】新数据汇总结果：{}", newChipFinishQtyMap);
 
-        Map<String, String> chipVersionMap = chipDataList.stream()
-                .filter(item -> item.getDataVersion() != null && !item.getDataVersion().isEmpty())
-                .collect(Collectors.groupingBy(
-                        LhDayFinishQty::getMaterialCode,
-                        Collectors.collectingAndThen(
-                                Collectors.maxBy(Comparator.comparing(LhDayFinishQty::getDataVersion, Comparator.nullsFirst(Comparator.naturalOrder()))),
-                                opt -> opt.map(LhDayFinishQty::getDataVersion).orElse(null)
-                        )
-                ));
+        // 计算差值：delta = 新值 - 旧值，差值不为0才需要更新
+        List<LhChipStock> chipStockList = new ArrayList<>();
+        for (String chipCode : chipCodeSet) {
+            int newSum = newChipFinishQtyMap.getOrDefault(chipCode, 0);
+            int oldSum = oldChipFinishQtyMap.getOrDefault(chipCode, 0);
+            int delta = newSum - oldSum;
+            if (delta != 0) {
+                LhChipStock chipStock = new LhChipStock();
+                chipStock.setFactoryCode(factoryCode);
+                chipStock.setChipCode(chipCode);
+                chipStock.setFinishQty(delta);
+                chipStock.setDataVersion(dataVersion);
+                chipStockList.add(chipStock);
+                log.info("芯片库存差值更新：chipCode={}, newSum={}, oldSum={}, delta={}", chipCode, newSum, oldSum, delta);
+            } else {
+                log.info("芯片库存差值更新：chipCode={}, delta=0, 跳过更新（newSum={}, oldSum={}）", chipCode, newSum, oldSum);
+            }
+        }
 
-        List<LhChipStock> chipStockList = chipFinishQtyMap.entrySet().stream().map(entry -> {
-            LhChipStock chipStock = new LhChipStock();
-            chipStock.setFactoryCode(factoryCode);
-            chipStock.setChipCode(entry.getKey());
-            chipStock.setFinishQty(entry.getValue());
-            chipStock.setDataVersion(chipVersionMap.get(entry.getKey()));
-            return chipStock;
-        }).collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(chipStockList)) {
+            log.info("芯片库存差值更新：所有芯片编码差值为0，无需更新，factoryCode={}", factoryCode);
+            return;
+        }
 
         try {
             FeignTokenHelper.runWithToken(() -> {
-                log.info("芯片库存增量更新：开始同步，factoryCode={}, 待处理数量={}", factoryCode, chipStockList.size());
+                log.info("芯片库存差值更新：开始同步，factoryCode={}, 待处理数量={}", factoryCode, chipStockList.size());
                 lhChipStockRemoteService.upsertFinishQty(factoryCode, chipStockList);
-                log.info("芯片库存增量更新：同步完成，factoryCode={}, 处理数量={}", factoryCode, chipStockList.size());
+                log.info("芯片库存差值更新：同步完成，factoryCode={}, 处理数量={}", factoryCode, chipStockList.size());
             });
         } catch (Exception e) {
-            log.error("芯片库存增量更新异常, factoryCode={}", factoryCode, e);
+            log.error("芯片库存差值更新异常, factoryCode={}", factoryCode, e);
         }
     }
 

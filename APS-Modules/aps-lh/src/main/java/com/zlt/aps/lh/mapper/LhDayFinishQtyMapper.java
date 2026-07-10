@@ -58,4 +58,17 @@ public interface LhDayFinishQtyMapper extends CommBaseMapper<LhDayFinishQty> {
     @Update("UPDATE T_LH_DAY_FINISH_QTY SET IS_DELETE = 1, UPDATE_BY = 'CLEAN_TASK', UPDATE_TIME = NOW() WHERE DATE(FINISH_DATE) <= CURDATE() AND IS_DELETE = 0")
     int logicDeleteAllBeforeToday();
 
+    /**
+     * 根据分厂编号和完成日期范围查询硫化排程日完成量数据（未删除）
+     * 用于芯片库存差值更新：逻辑删除前查询窗口范围内的旧数据
+     *
+     * @param factoryCode 分厂编号
+     * @param startDate   开始日期
+     * @param endDate     结束日期
+     * @return 日完成量列表（IS_DELETE=0）
+     */
+    List<LhDayFinishQty> selectByFactoryCodeAndDateRange(@Param("factoryCode") String factoryCode,
+                                                        @Param("startDate") Date startDate,
+                                                        @Param("endDate") Date endDate);
+
 }

@@ -1,31 +1,83 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <!DOCTYPE mapper
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
-        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+        "http://mybatis.org/dtd/mybatis-3.0/dtd/mybatis-3.0/mapper.dtd">
 <mapper namespace="com.zlt.aps.itf.mes.mapper.LhScheduleResultQueryMapper">
 
     <!--
-        按工厂+完成日期+物料+示方类型，汇总硫化排程结果当日计划量。
-        当日计划量 = 班次3(夜) + 班次4(早) + 班次5(中) 的计划量合计。
-        匹配维度：物料编码 + 示方类型（同一行排程结果三班示方类型一致，取CLASS3_LH_TYPE作为代表）。
-        查询的SCHEDULE_DATE对应MES完成量回报的FINISH_DATE（凌晨同步前一天数据）。
+        按工厂+完成日期+物料+示方类型，汇总硫化排程结果当日计划量（跨日滚动合并）。
+        业务背景：硫化排程8班覆盖3天窗口（排程日期=T+1日）：
+          - 排程日期D的CLASS3 = D日夜班
+          - 排程日期(D+1)的CLASS1 = D日早班（滚动排程后D+1版本最新）
+          - 排程日期(D+1)的CLASS2 = D日中班（滚动排程后D+1版本最新）
+        因此MES完成日期D的当日计划量需跨日合并三段：
+          第1段：排程日期D的CLASS3（夜班），取CLASS3_LH_TYPE
+          第2段：排程日期(D+1)的CLASS1（早班），取CLASS1_LH_TYPE
+          第3段：排程日期(D+1)的CLASS2（中班），取CLASS2_LH_TYPE
+        三个班次各自带示方类型，按物料编码+示方类型分组汇总。
+        若某班次示方类型为NULL，该班次不参与汇总（被IS NOT NULL过滤）。
+        若三个班次示方类型均为NULL，三段均返回0行，planQtyMap为空，由代码层过滤不同步。
     -->
     <select id="sumDayPlanQtyByFinishDate" resultType="com.zlt.aps.itf.vo.LhDayPlanQtyVo">
         SELECT
-            FACTORY_CODE    AS factoryCode,
-            MATERIAL_CODE   AS materialCode,
-            CLASS3_LH_TYPE  AS lhType,
-            SUM(IFNULL(CLASS3_PLAN_QTY, 0) + IFNULL(CLASS4_PLAN_QTY, 0) + IFNULL(CLASS5_PLAN_QTY, 0)) AS dayPlanQty
-        FROM T_LH_SCHEDULE_RESULT
-        WHERE IS_DELETE = 0
-          AND FACTORY_CODE = #{factoryCode}
-          AND DATE_FORMAT(SCHEDULE_DATE, '%Y-%m-%d') = DATE_FORMAT(#{finishDate}, '%Y-%m-%d')
-          AND MATERIAL_CODE IN
-          <foreach collection="materialCodes" item="code" open="(" separator="," close=")">
-              #{code}
-          </foreach>
-          AND CLASS3_LH_TYPE IS NOT NULL
-        GROUP BY FACTORY_CODE, MATERIAL_CODE, CLASS3_LH_TYPE
+            factoryCode,
+            materialCode,
+            lhType,
+            SUM(dayPlanQty) AS dayPlanQty
+        FROM (
+            <!-- 第1段：排程日期=完成日期D，取CLASS3夜班计划量 -->
+            SELECT
+                FACTORY_CODE    AS factoryCode,
+                MATERIAL_CODE   AS materialCode,
+                CLASS3_LH_TYPE  AS lhType,
+                IFNULL(CLASS3_PLAN_QTY, 0) AS dayPlanQty
+            FROM T_LH_SCHEDULE_RESULT
+            WHERE IS_DELETE = 0
+              AND FACTORY_CODE = #{factoryCode}
+              AND DATE_FORMAT(SCHEDULE_DATE, '%Y-%m-%d') = DATE_FORMAT(#{finishDate}, '%Y-%m-%d')
+              AND MATERIAL_CODE IN
+              <foreach collection="materialCodes" item="code" open="(" separator="," close=")">
+                  #{code}
+              </foreach>
+              AND CLASS3_LH_TYPE IS NOT NULL
+
+            UNION ALL
+
+            <!-- 第2段：排程日期=完成日期(D+1)，取CLASS1早班计划量 -->
+            SELECT
+                FACTORY_CODE    AS factoryCode,
+                MATERIAL_CODE   AS materialCode,
+                CLASS1_LH_TYPE  AS lhType,
+                IFNULL(CLASS1_PLAN_QTY, 0) AS dayPlanQty
+            FROM T_LH_SCHEDULE_RESULT
+            WHERE IS_DELETE = 0
+              AND FACTORY_CODE = #{factoryCode}
+              AND DATE_FORMAT(SCHEDULE_DATE, '%Y-%m-%d') = DATE_FORMAT(DATE_ADD(#{finishDate}, INTERVAL 1 DAY), '%Y-%m-%d')
+              AND MATERIAL_CODE IN
+              <foreach collection="materialCodes" item="code" open="(" separator="," close=")">
+                  #{code}
+              </foreach>
+              AND CLASS1_LH_TYPE IS NOT NULL
+
+            UNION ALL
+
+            <!-- 第3段：排程日期=完成日期(D+1)，取CLASS2中班计划量 -->
+            SELECT
+                FACTORY_CODE    AS factoryCode,
+                MATERIAL_CODE   AS materialCode,
+                CLASS2_LH_TYPE  AS lhType,
+                IFNULL(CLASS2_PLAN_QTY, 0) AS dayPlanQty
+            FROM T_LH_SCHEDULE_RESULT
+            WHERE IS_DELETE = 0
+              AND FACTORY_CODE = #{factoryCode}
+              AND DATE_FORMAT(SCHEDULE_DATE, '%Y-%m-%d') = DATE_FORMAT(DATE_ADD(#{finishDate}, INTERVAL 1 DAY), '%Y-%m-%d')
+              AND MATERIAL_CODE IN
+              <foreach collection="materialCodes" item="code" open="(" separator="," close=")">
+                  #{code}
+              </foreach>
+              AND CLASS2_LH_TYPE IS NOT NULL
+        ) t
+        GROUP BY factoryCode, materialCode, lhType
     </select>
 
 </mapper>
