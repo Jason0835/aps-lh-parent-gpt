@@ -18,7 +18,7 @@
       :selectArea="false"
     >
       <template slot="header">
-        <!-- <el-button
+        <el-button
           type="primary"
           plain
           v-hasPermi="['dj:stock:add']"
@@ -45,7 +45,7 @@
           v-hasPermi="['dj:stock:remove']"
           @click="handleBatchDelete"
           >{{ $t("ui.frame.btn.delete") }}</el-button
-        > -->
+        > 
         <el-button
           v-hasPermi="['dj:stock:import']"
           @click="$refs.tltUpload.handleImport()"
@@ -79,7 +79,7 @@ import tltUpload from "@/components/tltUpload/tltUpload.vue";
 import infoDialog from "./components/infoDialog.vue";
 
 export default {
-  name: "djStock",
+  name: "DjStock",
   components: {
     tltUpload,
     infoDialog,

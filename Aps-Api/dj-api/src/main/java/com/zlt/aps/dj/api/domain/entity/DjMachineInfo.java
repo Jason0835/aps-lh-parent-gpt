@@ -80,7 +80,7 @@ public class DjMachineInfo extends BaseEntity {
 
     /** 开机班次，存储 ClassNumThreePlanEnums.classIndex 值（"01"=夜班、"02"=早班、"03"=中班），如"01,02"表示夜班+早班 */
     @ApiModelProperty(value = "开机班次", position =85)
-    @Excel(name = "ui.data.column.machine.openMachineClass",dictType = "CLASS_NUM_THREE",dictTypeToExcelEnable = false)
+    @Excel(name = "ui.data.column.machine.openMachineClass",dictType = "class_num_three_plan",dictTypeToExcelEnable = false)
     @ImportValidated(name = "ui.data.column.machine.openMachineClass", maxLength = 20)
     private String openMachineClass;
 

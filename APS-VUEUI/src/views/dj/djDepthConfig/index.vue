@@ -43,8 +43,19 @@
           v-hasPermi="['dj:depthConfig:export']"
           >{{ $t("ui.frame.btn.export") }}</el-button
         >
+        <el-button
+          v-hasPermi="['dj:depthConfig:import']"
+          @click="$refs.tltUpload.handleImport()"
+          >{{ $t("ui.frame.btn.import") }}</el-button
+        >
       </template>
     </page-table>
+    <tlt-upload-form
+      ref="tltUpload"
+      downloadUrl="/dj/depthConfig/importTemplate"
+      uploadUrl="/dj/depthConfig/importData"
+      @uploadSuccess="getList"
+    />
     <infoDialog ref="infoRef" @success="getList" />
   </basic-container>
 </template>
@@ -52,12 +63,14 @@
 import { downloadLink } from "@/utils/request";
 import { listDepthConfig, removeDepthConfig } from "@/api/dj/depthConfig";
 import { getConfigKey } from "@/api/system/config";
+import TltUploadForm from "@/views/components/tltUploadForm.vue";
 import infoDialog from "./components/infoDialog.vue";
 
 export default {
   name: "DjDepthConfig",
   components: {
     infoDialog,
+    TltUploadForm,
   },
   dicts: ["biz_factory_name", "machine_range"],
   provide() {

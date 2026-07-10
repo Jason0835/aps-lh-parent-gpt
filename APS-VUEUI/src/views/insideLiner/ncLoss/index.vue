@@ -27,7 +27,7 @@
         >
         <!-- <el-button
           type="warning"
-          v-hasPermi="['nc:machine:edit']"
+          v-hasPermi="['nc:loss:edit']"
           @click="handleEdit(selection[0])"
           >{{ $t("ui.frame.btn.modify") }}</el-button
         > -->
