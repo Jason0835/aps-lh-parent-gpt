@@ -3142,7 +3142,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         if (null == monthPlanSumTotal || monthPlanSumTotal == BigDecimal.ZERO.intValue()) {
             monthPlanSumTotal = totalDailyPlanQty;
         }
-        return monthPlanSumTotal.equals(totalDailyPlanQty);
+        return !monthPlanSumTotal.equals(totalDailyPlanQty);
     }
 
     /**
