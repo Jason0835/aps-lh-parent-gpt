@@ -10,7 +10,6 @@
       :data="data"
       :page="page"
       :search="search"
-      @refresh="getList"
       @search="handleSearch"
       @pageChange="handlePageChange"
       @sort-change="handleSortChange"
@@ -58,18 +57,19 @@
 import { downloadLink } from "@/utils/request";
 //interface
 import { listGlueGroupOrder, removeGlueGroupOrder } from "@/api/nc/glueGroupOrder";
+import { getConfigKey } from "@/api/system/config";
 //components
 import tltUpload from "@/components/tltUpload/tltUpload.vue";
 
 import infoDialog from "./components/infoDialog.vue";
 
 export default {
- name: "InsideLinerGlueGroupOrder",
+ name: "NcGlueGroupOrder",
   components: {
     tltUpload,
     infoDialog,
   },
-  dicts: [],
+  dicts: ["biz_factory_name"],
   provide() {
     return {
       parentDict: this.dict,
@@ -77,16 +77,6 @@ export default {
   },
   data() {
     return {
-      searchColumns: [
-        {
-          label: this.$t("ui.glueGroup.column.glueGroupCode"),
-          prop: "glueGroupCode",
-        },
-        {
-          label: this.$t("ui.glueGroup.column.glueGroupName"),
-          prop: "glueGroupName",
-        },
-      ],
       loading: false,
       data: [],
       selection: [],
@@ -98,15 +88,37 @@ export default {
       sort: {},
       search: {
         mainPlanMonth: "",
+        factoryCode: "",
       },
       query: {
         mainPlanMonth: "",
+        factoryCode: "",
       },
       importDefaultValue: {},
       importRules: {},
+      initialized: false,
     };
   },
   computed: {
+    searchColumns() {
+      return [
+        {
+          label: this.$t("ui.data.column.factoryCode"),
+          prop: "factoryCode",
+          type: "select",
+          dictData: this.dict.type.biz_factory_name,
+          filterable: true,
+        },
+        {
+          label: this.$t("ui.glueGroup.column.glueGroupCode"),
+          prop: "glueGroupCode",
+        },
+        {
+          label: this.$t("ui.glueGroup.column.glueGroupName"),
+          prop: "glueGroupName",
+        },
+      ];
+    },
     columns() {
       let columns = [
         { type: "selection", fixed: "left" },
@@ -268,9 +280,21 @@ export default {
       }
     },
   },
-  created() {},
+  created() {
+    getConfigKey("sys.factory.code").then(response => {
+      this.search.factoryCode = response.msg;
+      this.query.factoryCode = response.msg;
+      this.initialized = true;
+      this.getList();
+    }).catch(() => {
+      this.initialized = true;
+      this.getList();
+    });
+  },
   activated() {
-    this.getList();
+    if (this.initialized) {
+      this.getList();
+    }
   },
 };
 </script>
