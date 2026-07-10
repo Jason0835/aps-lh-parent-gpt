@@ -125,7 +125,7 @@ public class NcGlueOrderController extends AbstractDocBizController<NcGlueOrder>
     @Override
     protected String[] getQueryFormulas() {
         return new String[]{
-                "glueGroupCode,glueGroupName,glueGroupOrderNum->getcolsvaluewithcondition(T_NC_GLUE_GROUP_ORDER, [GLUE_GROUP_CODE, GLUE_GROUP_NAME, ORDER_NUM], ID, glueGroupId)"
+                "glueGroupCode,glueGroupName,glueGroupOrderNum->getcolsvalue(T_NC_GLUE_GROUP_ORDER, [GLUE_GROUP_CODE, GLUE_GROUP_NAME, ORDER_NUM], ID, glueGroupId)"
         };
     }
 }

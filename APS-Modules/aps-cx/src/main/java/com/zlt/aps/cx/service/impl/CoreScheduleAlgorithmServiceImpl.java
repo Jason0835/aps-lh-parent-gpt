@@ -182,6 +182,17 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         // 2.3.1 收集每个班次的排产结果（全部班次完成后汇总主表/子表）
         List<ShiftScheduleResult> shiftResults = new ArrayList<>();
 
+        // 2.3.2 保存初始胎胚库存快照（排程循环中 updateCxStockEntities 会修改 context.getStocks()，
+        //        totalStock 字段需要使用排程前的初始库存，而非排程后的剩余库存）
+        Map<String, Integer> initialEmbryoStockMap = new HashMap<>();
+        if (context.getStocks() != null) {
+            for (CxStock stock : context.getStocks()) {
+                if (stock.getEmbryoCode() != null) {
+                    initialEmbryoStockMap.merge(stock.getEmbryoCode(), stock.getEffectiveStock(), Integer::sum);
+                }
+            }
+        }
+
         Set<Integer> processedDays = new HashSet<>();
         int lastDay = 0;
 
@@ -254,8 +265,8 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             processedDays.add(day);
         }
 
-        // 2.5 汇总多班次结果：机台+胎胚+物料 → CLASS1~8 主表记录
-        List<CxScheduleResult> allResults = buildFinalScheduleResultsFromShifts(context, shiftResults, allShiftConfigs);
+        // 2.5 汇总多班次结果：机台+胎胚+物料 -> CLASS1~8 主表记录
+        List<CxScheduleResult> allResults = buildFinalScheduleResultsFromShifts(context, shiftResults, allShiftConfigs, initialEmbryoStockMap);
 
         // 2.6 班次量均衡（按结构班产标准调整最大硫化机数胎胚的班次分布）
         //balanceShiftQuantities(context, shiftResults, allShiftConfigs);
@@ -1763,7 +1774,8 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
     private List<CxScheduleResult> buildFinalScheduleResultsFromShifts(
             ScheduleContextVo context,
             List<ShiftScheduleResult> shiftResults,
-            List<CxShiftConfig> allShiftConfigs) {
+            List<CxShiftConfig> allShiftConfigs,
+            Map<String, Integer> initialEmbryoStockMap) {
 
         // 2.5.1 构建 shiftCode+scheduleDay → CLASS 字段映射
         Map<String, String> shiftClassFieldMap = new HashMap<>();
@@ -1996,15 +2008,8 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             }
         }
 
-        // ---- 胎胚库存映射（embryoCode → 总库存，来源于CxStock，不受任务是否排程影响） ----
-        Map<String, Integer> embryoStockMap = new HashMap<>();
-        if (context.getStocks() != null) {
-            for (CxStock stock : context.getStocks()) {
-                if (stock.getEmbryoCode() != null) {
-                    embryoStockMap.merge(stock.getEmbryoCode(), stock.getEffectiveStock(), Integer::sum);
-                }
-            }
-        }
+        // ---- 胎胚库存映射（使用排程前初始快照，排程循环中 updateCxStockEntities 会修改 context.getStocks()） ----
+        Map<String, Integer> embryoStockMap = initialEmbryoStockMap != null ? initialEmbryoStockMap : new HashMap<>();
 
         // ---- SKU与示方书关系映射（materialCode+constructionStage -> embryoType） ----
         Map<String, String> skuRecipeTypeMap = new HashMap<>();

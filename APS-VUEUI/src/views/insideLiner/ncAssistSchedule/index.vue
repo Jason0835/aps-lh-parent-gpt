@@ -42,7 +42,7 @@ import { listAssistSchedule } from "@/api/nc/assistSchedule.js";
 // import TltUploadForm from "@/views/components/tltUploadForm.vue";
 
 export default {
- name: "InsideLinerAssistSchedule",
+ name: "NcAssistSchedule",
   components: {
     // TltUploadForm,
   },
