@@ -845,6 +845,7 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
         dto.setWindowRemainingPlanQty(windowRemainingPlanQty);
 
         dto.setSurplusQty(surplus.getSurplusQty());
+        dto.setMonthPlanSumTotal(surplus.getMonthPlanSumTotal());
         dto.setEmbryoStock(resolveRawEmbryoStock(context, plan));
         // 待排量保持"需求口径"：使用月计划余量扣减滚动继承量，再与胎胚库存取大。
         // 本月历史欠产已体现在首日日计划账本中，不能再次重复叠加。

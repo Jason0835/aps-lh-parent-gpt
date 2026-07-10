@@ -1123,6 +1123,13 @@ public class LhScheduleResult extends BaseEntity implements Serializable {
 
 
     /**
+     * 非断点计划总量
+     */
+    @ApiModelProperty(value = "非断点计划总量", name = "monthPlanSumTotal")
+    @TableField(value = "MONTH_PLAN_SUM_TOTAL")
+    private Integer monthPlanSumTotal;
+
+    /**
      * 是否为滚动排程继承结果，仅用于本次排程运行期识别，不落库。
      */
     @TableField(exist = false)
