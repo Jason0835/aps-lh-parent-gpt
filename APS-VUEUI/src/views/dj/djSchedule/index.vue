@@ -219,7 +219,7 @@ import allocateDialog from "./components/allocateDialog.vue";
 import mergeDialog from "./components/mergeDialog.vue";
 
 export default {
-  name: "djSchedule",
+  name: "DjSchedule",
   components: {
     allocateDialog,
     autoPlanDialog,
@@ -273,6 +273,7 @@ export default {
       stat: {},
       showPrevDayClass1: false,
       scheduleShiftClass: '01',
+      initialized: false,
     };
   },
   computed: {
@@ -1009,9 +1010,13 @@ export default {
       this.classHeaders = res;
     });
     this.getList();
+    this.initialized = true;
   },
   activated() {
-    this.getList();
+    if (!this.initialized) {
+      this.initialized = true;
+      this.getList();
+    }
   },
 };
 </script>

@@ -19,22 +19,11 @@
     >
       <template slot="header">
         <el-button
-          type="primary"
-          v-hasPermi="['dj:params:add']"
-          @click="handleAdd"
-          >{{ $t("ui.frame.btn.add") }}</el-button
-        >
-        <el-button
           type="warning"
           v-hasPermi="['dj:params:edit']"
           @click="handleEdit(selection[0])"
           :disabled="selection.length !== 1"
           >{{ $t("ui.frame.btn.modify") }}</el-button
-        >
-        <el-button
-          @click="handleExport"
-          v-hasPermi="['dj:params:export']"
-          >{{ $t("ui.frame.btn.export") }}</el-button
         >
       </template>
     </page-table>
@@ -42,7 +31,6 @@
   </basic-container>
 </template>
 <script>
-import { downloadLink } from "@/utils/request";
 import { listParams } from "@/api/dj/params";
 import { getConfigKey } from "@/api/system/config";
 import infoDialog from "./components/infoDialog.vue";
@@ -51,6 +39,7 @@ export default {
   name: "DjParams",
   components: {
     infoDialog,
+    TltUploadForm,
   },
   dicts: ["biz_factory_name", "biz_product_type"],
   provide() {
@@ -190,11 +179,6 @@ export default {
     },
   },
   methods: {
-    handleAdd() {
-      if (this.$refs.infoRef) {
-        this.$refs.infoRef.show();
-      }
-    },
     handleEdit(row) {
       if (this.$refs.infoRef) {
         this.$refs.infoRef.show(row);
@@ -224,9 +208,6 @@ export default {
     },
     handleSelectionChange(rows) {
       this.selection = rows;
-    },
-    handleExport() {
-      downloadLink("/dj/params/export", this.formatParams(false));
     },
 
     formatParams(hasPage = true) {
