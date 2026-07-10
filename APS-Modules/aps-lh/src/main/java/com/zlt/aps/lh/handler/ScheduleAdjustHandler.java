@@ -554,7 +554,6 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
         }
         return surplusCalculation.getSurplusQty();
     }
-
     /**
      * 计算SKU的硫化余量
      * <p>
@@ -580,7 +579,7 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
         Map<YearMonth, Integer> monthPlanQtyMap = context.getMonthPlanQty(plan);
         boolean isCrossMonth = context.isCrossMonthByProductionDateInfo();
         //当前排产计划总量
-        int totalPlanQty = getMonthPlanTotalQty(monthPlanQtyMap);
+        int totalPlanQty = SkuMonthPlanCalculator.sumQty(monthPlanQtyMap);
         int remainingDemandQty = SkuMonthPlanCalculator.getSurplusQty(productionYearMonth, allProductionDate, dayProductionPlanMap, monthOverdueQtyMap, monthPlanQtyMap, actualFinishedQty);
         remainingDemandQty = Math.max(BigDecimal.ZERO.intValue(), remainingDemandQty);
         // 保留逐日超产统计用于诊断日志，不参与余量计算
@@ -599,7 +598,7 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
         int lastMonthOverdueQty = monthOverdueQtyMap.values().stream().mapToInt(Integer::intValue).sum();
         //月计划总量
         Map<YearMonth, Integer> monthTotalMap = context.getSumPlanQty(plan);
-        int monthPlanTotalQty = getMonthPlanTotalQty(monthTotalMap);
+        int monthPlanTotalQty = SkuMonthPlanCalculator.sumQty(monthTotalMap);
         if (lastMonthOverdueQty != 0 || scheDayFinishQty > 0 || isCrossMonth) {
             log.info("硫化余量计算完成, materialCode: {}, monthPlanQty: {}, monthFinishedAndScheDayQty: {}, "
                             + "scheDayFinishQty: {}, lastMonthValidFlag: {}, lastMonthOverdueQty: {}, surplusQty: {}, "
@@ -612,18 +611,6 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
                 lastMonthOverdueQty, totalPlanQty, monthPlanTotalQty);
     }
 
-    /**
-     * 根据各月的计划量
-     *
-     * @param monthPlanQtyMap
-     * @return
-     */
-    private int getMonthPlanTotalQty(Map<YearMonth, Integer> monthPlanQtyMap) {
-        if (CollectionUtils.isEmpty(monthPlanQtyMap)) {
-            return BigDecimal.ZERO.intValue();
-        }
-        return monthPlanQtyMap.values().stream().mapToInt(Integer::intValue).sum();
-    }
 
     /**
      * 旧有的月计划总量计算

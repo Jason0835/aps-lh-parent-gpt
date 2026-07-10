@@ -346,6 +346,20 @@ public class SkuMonthPlanCalculator {
         return result;
     }
 
+
+    /**
+     * 汇总月数据量
+     *
+     * @param needSumQtyMap 需汇总月数量集合
+     * @return
+     */
+    public static int sumQty(Map<YearMonth, Integer> needSumQtyMap) {
+        if (CollectionUtils.isEmpty(needSumQtyMap)) {
+            return BigDecimal.ZERO.intValue();
+        }
+        return needSumQtyMap.values().stream().mapToInt(Integer::intValue).sum();
+    }
+
     /**
      * 获取对应的排产计划
      *
