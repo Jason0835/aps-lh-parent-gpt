@@ -310,6 +310,9 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
 
         Set<String> keyProductEmbryoCodes = loadKeyProductEmbryoCodes();
 
+        // 构建硫化排程6/7/8班消耗量映射（按胎胚代码匹配同日硫化计划量）
+        Map<String, int[]> lhShiftConsumptionMap = this.buildLhShiftConsumptionMap(exportList, scheduleDate);
+
         // Sheet 0: 成型余量-按机台
         Map<String, Object> remainQtyTableMap = new HashMap<>(16);
         List<List<Map<String, Object>>> remainQtyDataList = new ArrayList<>();
@@ -347,7 +350,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
         }
         planTableMap.put("version", productionVersion != null ? productionVersion : "");
         List<List<Map<String, Object>>> planDataList = new ArrayList<>();
-        List<Map<String, Object>> planRows = buildCxTemplateDataList(exportList, recipeTypeMap, totalDailyPlanQtyMap, todayNightFinishQtyMap, smallGlueMap, placeholderMap, shiftCapacitiesMap, keyProductEmbryoCodes);
+        List<Map<String, Object>> planRows = buildCxTemplateDataList(exportList, recipeTypeMap, totalDailyPlanQtyMap, todayNightFinishQtyMap, smallGlueMap, placeholderMap, shiftCapacitiesMap, keyProductEmbryoCodes, lhShiftConsumptionMap);
         planDataList.add(planRows);
 
         // 为小计行添加 DAEEF3 背景色标识 + 胎胚余量<400 红色背景
@@ -360,7 +363,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
             if ("小计".equals(rowMap.get("cxMachineCode"))) {
                 cellStyleList.add(new CellStyle(
                         rowNum, rowNum,
-                        0, 59,
+                        0, 60,
                         "#DAEEF3", true, true, null));
             } else {
                 Object cxRemainVal = rowMap.get("cxRemainQty");
@@ -369,7 +372,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
                     if (remainQty.compareTo(new BigDecimal("400")) < 0) {
                         cellStyleList.add(new CellStyle(
                                 rowNum, rowNum,
-                                8, 8,
+                                9, 9,
                                 null, true, false, null, "#FF0000"));
                     }
                 }
@@ -519,7 +522,8 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
                                                                Map<String, String> smallGlueMap,
                                                                Map<String, String> placeholderMap,
                                                                Map<String, String> shiftCapacitiesMap,
-                                                               Set<String> keyProductEmbryoCodes) {
+                                                               Set<String> keyProductEmbryoCodes,
+                                                               Map<String, int[]> lhShiftConsumptionMap) {
         List<CxScheduleResult> exportList = Objects.isNull(list) ? Collections.emptyList() : list;
 
         Map<String, List<CxScheduleResult>> groupMap = exportList.stream()
@@ -537,9 +541,9 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
                     String::compareTo));
 
             for (CxScheduleResult item : groupList) {
-                dataList.add(buildCxTemplateRow(item, recipeTypeMap, totalDailyPlanQtyMap, todayNightFinishQtyMap, smallGlueMap, placeholderMap, shiftCapacitiesMap, keyProductEmbryoCodes));
+                dataList.add(buildCxTemplateRow(item, recipeTypeMap, totalDailyPlanQtyMap, todayNightFinishQtyMap, smallGlueMap, placeholderMap, shiftCapacitiesMap, keyProductEmbryoCodes, lhShiftConsumptionMap));
             }
-            dataList.add(buildCxTemplateSubtotalRow(groupList));
+            dataList.add(buildCxTemplateSubtotalRow(groupList, lhShiftConsumptionMap));
         }
 
         return dataList;
@@ -554,14 +558,20 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
                                                       Map<String, String> smallGlueMap,
                                                       Map<String, String> placeholderMap,
                                                       Map<String, String> shiftCapacitiesMap,
-                                                      Set<String> keyProductEmbryoCodes) {
+                                                      Set<String> keyProductEmbryoCodes,
+                                                      Map<String, int[]> lhShiftConsumptionMap) {
         Map<String, Object> row = new LinkedHashMap<>();
+        // 硫化排程6/7/8班消耗量（按胎胚代码匹配同日硫化计划量）
+        String embryoKey = StringUtils.defaultString(item.getEmbryoCode()).trim();
+        int[] lhConsumption = lhShiftConsumptionMap != null ? lhShiftConsumptionMap.getOrDefault(embryoKey, new int[3]) : new int[3];
+        row.put("lhClass6Consumption", lhConsumption[0] != 0 ? lhConsumption[0] : "");
+        row.put("lhClass7Consumption", lhConsumption[1] != 0 ? lhConsumption[1] : "");
+        row.put("lhClass8Consumption", lhConsumption[2] != 0 ? lhConsumption[2] : "");
+
         row.put("cxMachineCode", item.getCxMachineCode());
         row.put("structureName", item.getStructureName());
         row.put("embryoCode", item.getEmbryoCode());
-        row.put("materialDesc", item.getMaterialDesc());
         row.put("mainMaterialDesc", item.getMainMaterialDesc());
-        row.put("materialCode", item.getMaterialCode());
         row.put("cxRemainQty", item.getCxRemainQty());
         row.put("lhRemainQty", item.getLhRemainQty());
         row.put("totalStock", item.getTotalStock());
@@ -670,9 +680,18 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
 
     /**
      * 构建小计行。
+     *
+     * @param groupList 机台分组内的明细列表
+     * @param lhShiftConsumptionMap 硫化排程6/7/8班消耗量映射（小计行不汇总此3列）
+     * @return 小计行数据
      */
-    private Map<String, Object> buildCxTemplateSubtotalRow(List<CxScheduleResult> groupList) {
+    private Map<String, Object> buildCxTemplateSubtotalRow(List<CxScheduleResult> groupList, Map<String, int[]> lhShiftConsumptionMap) {
         Map<String, Object> row = new LinkedHashMap<>();
+        // 小计行不汇总硫化6/7/8班消耗量，置空
+        row.put("lhClass6Consumption", "");
+        row.put("lhClass7Consumption", "");
+        row.put("lhClass8Consumption", "");
+
         row.put("cxMachineCode", "小计");
         // 小计行显示该机台分组内去重后的结构
         String structureNames = groupList.stream()
@@ -791,6 +810,56 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
                 .map(String::trim)
                 .filter(StringUtils::isNotEmpty)
                 .count();
+    }
+
+    /**
+     * 构建硫化排程6/7/8班消耗量映射。
+     * <p>按排程日期和胎胚代码匹配硫化排程结果，分别汇总6班、7班、8班的计划量。
+     * 匹配维度：硫化排程结果中同一天（scheduleDate）+ 相同胎胚代码（embryoCode）的所有记录。</p>
+     *
+     * @param exportList  成型排程结果列表
+     * @param scheduleDate 排程日期
+     * @return key=embryoCode, value=[6班合计, 7班合计, 8班合计]
+     */
+    private Map<String, int[]> buildLhShiftConsumptionMap(List<CxScheduleResult> exportList, Date scheduleDate) {
+        if (PubUtil.isEmpty(exportList) || scheduleDate == null) {
+            return Collections.emptyMap();
+        }
+
+        // 收集所有唯一的胎胚代码
+        Set<String> embryoCodes = exportList.stream()
+                .map(CxScheduleResult::getEmbryoCode)
+                .filter(StringUtils::isNotBlank)
+                .map(String::trim)
+                .collect(Collectors.toSet());
+
+        if (embryoCodes.isEmpty()) {
+            return Collections.emptyMap();
+        }
+
+        // 查询同一天、相同胎胚的硫化排程结果
+        List<LhScheduleResult> lhResults = lhScheduleResultMapper.selectList(
+                new LambdaQueryWrapper<LhScheduleResult>()
+                        .eq(LhScheduleResult::getScheduleDate, scheduleDate)
+                        .in(LhScheduleResult::getEmbryoCode, embryoCodes));
+
+        if (PubUtil.isEmpty(lhResults)) {
+            return Collections.emptyMap();
+        }
+
+        // 按胎胚代码分组，分别累加6/7/8班计划量
+        Map<String, int[]> resultMap = new LinkedHashMap<>();
+        for (LhScheduleResult lh : lhResults) {
+            String embryoCode = StringUtils.defaultString(lh.getEmbryoCode()).trim();
+            if (StringUtils.isEmpty(embryoCode)) {
+                continue;
+            }
+            int[] sums = resultMap.computeIfAbsent(embryoCode, k -> new int[3]);
+            sums[0] += lh.getClass6PlanQty() != null ? lh.getClass6PlanQty() : 0;
+            sums[1] += lh.getClass7PlanQty() != null ? lh.getClass7PlanQty() : 0;
+            sums[2] += lh.getClass8PlanQty() != null ? lh.getClass8PlanQty() : 0;
+        }
+        return resultMap;
     }
 
     /**
