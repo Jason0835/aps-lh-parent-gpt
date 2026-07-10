@@ -102,7 +102,7 @@ public class Cd90TimedRollingEngineExecutor {
         for (int index = 0; index < shiftCount; index++) {
             Cd90ShiftDescriptor shift = affectedShifts.get(index);
             progress.onProgress(20 + index * 60 / shiftCount, "ROLLING_SHIFT",
-                    shift.getClassField() + "滚动开始", shift);
+                    shiftStageName(shift, "滚动开始"), shift);
             Cd90AutoScheduleInput input = loadInput(context, shift);
             if (rolling == null) {
                 Cd90NewSpecAdvanceResult advance = newSpecAdvanceInputPreparer.prepare(context, input);
@@ -147,7 +147,7 @@ public class Cd90TimedRollingEngineExecutor {
             appendTraces(traces, shiftResult.getAttemptTraces());
             carryOver = buildCarryOver(planning, shiftResult.getTasks(), shift);
             progress.onProgress(20 + (index + 1) * 60 / shiftCount, "ROLLING_SHIFT",
-                    shift.getClassField() + "滚动完成", shift);
+                    shiftStageName(shift, "滚动完成"), shift);
         }
 
         ResultDiff diff = buildResultDiff(target, context, affectedShifts,
@@ -212,6 +212,13 @@ public class Cd90TimedRollingEngineExecutor {
         return new PlanningSet(ordered, new ArrayList<>(candidatesByKey.values()), taskByKey);
     }
 
+    private String shiftStageName(Cd90ShiftDescriptor shift, String suffix) {
+        String displayName = shift == null ? null : shift.getShiftDisplayName();
+        String classField = shift == null ? "" : shift.getClassField();
+        String shiftName = displayName == null || displayName.trim().isEmpty()
+                ? classField : displayName;
+        return shiftName + suffix;
+    }
     private Map<String, BigDecimal> demandByCloth(Cd90AutoScheduleContext context,
                                                    Cd90AutoScheduleInput input,
                                                    Cd90ShiftDescriptor shift,

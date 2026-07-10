@@ -14,6 +14,8 @@ public class Cd90ScheduleAttemptTrace {
     private String classField;
     /** 业务班次编码。 */
     private String shiftCode;
+    /** 班次展示名称，用于分析文案显示，如夜班07/20。 */
+    private String shiftDisplayName;
     /** 帘布代码。 */
     private String clothCode;
     /** 钢压大卷代码。 */
