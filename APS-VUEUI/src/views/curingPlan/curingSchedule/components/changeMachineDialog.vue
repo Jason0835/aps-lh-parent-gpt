@@ -147,7 +147,7 @@ export default {
         },
         {
           label: this.$t("ui.data.column.lhScheduleResult.constructionStage"),
-          prop: "trialStatus",
+          prop: "productStatus",
           formatter: (row, column, value) => {
             return this.selectDictLabel(
               this.parentDict.type.lh_trial_status,
@@ -171,7 +171,7 @@ export default {
               formatter: (row, column, value) => this.shiftLeftRightMouldFormatter(row, column, value, 1),
             },
             {
-              prop: "trialStatus",
+              prop: "productStatus",
               label: this.$t("ui.data.column.lhScheduleResult.constructionStage"),
               formatter: (row, column, value) => this.shiftConstructionStageFormatter(row, column, value, 1),
             },
@@ -206,7 +206,7 @@ export default {
               formatter: (row, column, value) => this.shiftLeftRightMouldFormatter(row, column, value, 2),
             },
             {
-              prop: "trialStatus",
+              prop: "productStatus",
               label: this.$t("ui.data.column.lhScheduleResult.constructionStage"),
               formatter: (row, column, value) => this.shiftConstructionStageFormatter(row, column, value, 2),
             },
@@ -241,7 +241,7 @@ export default {
               formatter: (row, column, value) => this.shiftLeftRightMouldFormatter(row, column, value, 3),
             },
             {
-              prop: "trialStatus",
+              prop: "productStatus",
               label: this.$t("ui.data.column.lhScheduleResult.constructionStage"),
               formatter: (row, column, value) => this.shiftConstructionStageFormatter(row, column, value, 3),
             },
@@ -276,7 +276,7 @@ export default {
               formatter: (row, column, value) => this.shiftLeftRightMouldFormatter(row, column, value, 4),
             },
             {
-              prop: "trialStatus",
+              prop: "productStatus",
               label: this.$t("ui.data.column.lhScheduleResult.constructionStage"),
               formatter: (row, column, value) => this.shiftConstructionStageFormatter(row, column, value, 4),
             },
@@ -311,7 +311,7 @@ export default {
               formatter: (row, column, value) => this.shiftLeftRightMouldFormatter(row, column, value, 5),
             },
             {
-              prop: "changedTrialStatus",
+              prop: "productStatus",
               label: this.$t("ui.data.column.lhScheduleResult.constructionStage"),
               formatter: (row, column, value) => this.shiftConstructionStageFormatter(row, column, value, 5),
             },
@@ -346,7 +346,7 @@ export default {
               formatter: (row, column, value) => this.shiftLeftRightMouldFormatter(row, column, value, 6),
             },
             {
-              prop: "changedTrialStatus",
+              prop: "productStatus",
               label: this.$t("ui.data.column.lhScheduleResult.constructionStage"),
               formatter: (row, column, value) => this.shiftConstructionStageFormatter(row, column, value, 6),
             },
@@ -381,7 +381,7 @@ export default {
               formatter: (row, column, value) => this.shiftLeftRightMouldFormatter(row, column, value, 7),
             },
             {
-              prop: "changedTrialStatus",
+              prop: "productStatus",
               label: this.$t("ui.data.column.lhScheduleResult.constructionStage"),
               formatter: (row, column, value) => this.shiftConstructionStageFormatter(row, column, value, 7),
             },
@@ -416,7 +416,7 @@ export default {
               formatter: (row, column, value) => this.shiftLeftRightMouldFormatter(row, column, value, 8),
             },
             {
-              prop: "changedTrialStatus",
+              prop: "productStatus",
               label: this.$t("ui.data.column.lhScheduleResult.constructionStage"),
               formatter: (row, column, value) => this.shiftConstructionStageFormatter(row, column, value, 8),
             },

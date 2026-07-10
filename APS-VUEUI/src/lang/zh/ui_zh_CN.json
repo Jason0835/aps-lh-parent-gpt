@@ -3050,6 +3050,7 @@
   "ui.data.alert.lhMouldChangePlan.generateTextPlan.success": "文字示方更新成功",
   "ui.data.alert.lhScheduleResult.increaseMouldStartPlanConfirm": "是否确认执行计划更新？",
   "ui.data.alert.lhScheduleResult.increaseMouldStartPlanSuccess": "计划更新成功",
+  "ui.data.column.lhScheduleResult.isAutoExecCx": "成型排程同步生成",
   "ui.data.column.lhScheduleResult.insertOrder.materialCodeBlank": "物料编码不能为空",
   "ui.data.column.lhScheduleResult.insertOrder.materialCodeNotFound": "物料编码[{}]有误，不存在该物料",
   "ui.data.column.lhScheduleResult.insertOrder.shiftPlanQtyEmpty": "夜班、中班、早班至少有一个班的计划量要有值",

@@ -138,6 +138,7 @@
   "ui.data.btn.lhScheduleResult.increaseMouldStartPlan": "Cập nhật kế hoạch",
   "ui.data.alert.lhScheduleResult.increaseMouldStartPlanConfirm": "Có xác nhận thực hiện cập nhật kế hoạch không?",
   "ui.data.alert.lhScheduleResult.increaseMouldStartPlanSuccess": "Cập nhật kế hoạch thành công",
+  "ui.data.column.lhScheduleResult.isAutoExecCx": "Đồng bộ tạo lịch trình đúc",
   "ui.data.alert.lhScheduleResult.insertOrder.materialCodeBlank": "Mã vật liệu không được để trống",
   "ui.data.alert.lhScheduleResult.insertOrder.materialCodeNotFound": "Mã vật liệu [{}] sai, không tồn tại vật liệu này",
   "ui.data.alert.lhScheduleResult.insertOrder.shiftPlanQtyEmpty": "Ca đêm, ca trung, ca sáng ít nhất một ca phải có kế hoạch",
