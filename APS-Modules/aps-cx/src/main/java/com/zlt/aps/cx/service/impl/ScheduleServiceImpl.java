@@ -12,6 +12,7 @@ import com.zlt.aps.cx.entity.config.CxParamConfig;
 import com.zlt.aps.cx.entity.config.CxShiftConfig;
 import com.zlt.aps.cx.entity.schedule.CxScheduleDetail;
 import com.zlt.aps.cx.entity.schedule.CxScheduleResult;
+import com.zlt.aps.cx.entity.schedule.CxShiftMachineLoad;
 import com.zlt.aps.cx.entity.schedule.LhScheduleResult;
 import com.zlt.aps.cx.api.domain.entity.CxPrecisionPlan;
 import com.zlt.aps.cx.enums.DayVulcanizationModeEnum;
@@ -186,6 +187,7 @@ public class ScheduleServiceImpl implements ScheduleService {
     private final MdmWorkCalendarMapper workCalendarMapper;
     private final CxPrecisionPlanMapper precisionPlanMapper;
     private final LhFinishQtyMapper lhFinishQtyMapper;
+    private final CxShiftMachineLoadMapper cxShiftMachineLoadMapper;
 
     // ==================== S5.1 对外接口 ====================
 
@@ -245,7 +247,7 @@ public class ScheduleServiceImpl implements ScheduleService {
             deleteExistingScheduleResults(request.getScheduleDate());
 
             // 3.2 保存排程结果（主表 T_CX_SCHEDULE_RESULT + 子表 T_CX_SCHEDULE_DETAIL）
-            saveScheduleResults(scheduleResults);
+            saveScheduleResults(scheduleResults, request.getScheduleDate(), context);
 
             // 4. 后置约束验证（与校验层不同，检查排程产出是否满足业务约束）
             boolean validated = validateScheduleResults(scheduleResults);
@@ -289,7 +291,7 @@ public class ScheduleServiceImpl implements ScheduleService {
             deleteExistingScheduleResults(request.getScheduleDate());
 
             // 4. 保存新排程结果（主表+子表）
-            saveScheduleResults(scheduleResults);
+            saveScheduleResults(scheduleResults, request.getScheduleDate(), context);
 
             log.info("重排程完成，日期：{}，结果数量：{}", request.getScheduleDate(), scheduleResults.size());
             return true;
@@ -593,6 +595,13 @@ public class ScheduleServiceImpl implements ScheduleService {
             context.setScheduleDate(scheduleDate);
             context.setScheduleMode(request.getScheduleMode());
 
+            // 1.21 加载前日最后班次的机台胎胚负荷映射（供动态保底预留）
+            try {
+                loadPreviousShiftMachineEmbryoLoadMap(context, scheduleDate);
+            } catch (Exception e) {
+                log.warn("加载前日班次负荷数据失败，继续执行：{}", e.getMessage());
+            }
+
             log.info("排程上下文构建完成");
             return context;
 
@@ -600,6 +609,35 @@ public class ScheduleServiceImpl implements ScheduleService {
             log.error("构建排程上下文失败", e);
             return null;
         }
+    }
+
+    /**
+     * 加载前日最后班次的机台胎胚负荷映射。
+     *
+     * <p>从 T_CX_SHIFT_MACHINE_LOAD 查询排程日期前一天的最后一个班次记录，
+     * 构建 previousShiftMachineEmbryoLoadMap 供 ContinueTaskProcessor/BalancingService 动态保底预留。
+     *
+     * @param context      排程上下文
+     * @param scheduleDate 排程日期
+     */
+    private void loadPreviousShiftMachineEmbryoLoadMap(ScheduleContextVo context, LocalDate scheduleDate) {
+        LocalDate previousDate = scheduleDate.minusDays(1);
+        String factoryCode = context.getFactoryCode();
+        List<CxShiftMachineLoad> loads = cxShiftMachineLoadMapper.selectLastShiftByDate(previousDate, factoryCode);
+        if (loads == null || loads.isEmpty()) {
+            log.info("无前日班次负荷数据(日期={})，动态保底预留将使用兜底值1", previousDate);
+            context.setPreviousShiftMachineEmbryoLoadMap(new HashMap<>());
+            return;
+        }
+        Map<String, Map<String, Integer>> loadMap = new HashMap<>();
+        for (CxShiftMachineLoad load : loads) {
+            loadMap.computeIfAbsent(load.getCxMachineCode(), k -> new HashMap<>())
+                    .put(load.getEmbryoCode(), load.getLhMachineCount() != null ? load.getLhMachineCount() : 1);
+        }
+        context.setPreviousShiftMachineEmbryoLoadMap(loadMap);
+        log.info("加载前日班次负荷数据: 日期={}, 班次={}, {}台机台, {}条记录",
+                previousDate, loads.get(0).getShiftCode(), loadMap.size(),
+                loadMap.values().stream().mapToInt(Map::size).sum());
     }
 
     // ==================== S5.1.6 上下文加载（1.1～1.20，与 buildScheduleContext 逐步对应） ====================
@@ -1764,9 +1802,13 @@ public class ScheduleServiceImpl implements ScheduleService {
 
     /**
      * 持久化排程结果：主表 {@code T_CX_SCHEDULE_RESULT} + 子表 {@code T_CX_SCHEDULE_DETAIL}（随主表 details 级联写入）。
+     *
+     * @param results      排程结果列表
+     * @param scheduleDate 排程日期
+     * @param context      排程上下文（含 previousShiftMachineEmbryoLoadMap 最后班次分配结果）
      */
     @Transactional(rollbackFor = Exception.class)
-    public void saveScheduleResults(List<CxScheduleResult> results) {
+    public void saveScheduleResults(List<CxScheduleResult> results, LocalDate scheduleDate, ScheduleContextVo context) {
         if (CollectionUtils.isEmpty(results)) {
             return;
         }
@@ -1804,6 +1846,62 @@ public class ScheduleServiceImpl implements ScheduleService {
             }
         }
         log.info("保存排程结果 {} 条（含子表）", results.size());
+
+        // 持久化班次级机台胎胚负荷映射（供下次排程动态保底预留）
+        saveShiftMachineLoad(scheduleDate, context);
+    }
+
+    /**
+     * 持久化班次级机台胎胚负荷映射到 T_CX_SHIFT_MACHINE_LOAD。
+     *
+     * <p>先删除当日旧数据，再从 context.previousShiftMachineEmbryoLoadMap（最后一个班次的分配结果）
+     * 构建记录并批量插入。
+     *
+     * @param scheduleDate 排程日期
+     * @param context      排程上下文
+     */
+    private void saveShiftMachineLoad(LocalDate scheduleDate, ScheduleContextVo context) {
+        String factoryCode = context.getFactoryCode();
+        // 先删除当日旧数据
+        cxShiftMachineLoadMapper.deleteByDate(scheduleDate, factoryCode);
+
+        Map<String, Map<String, Integer>> loadMap = context.getPreviousShiftMachineEmbryoLoadMap();
+        if (loadMap == null || loadMap.isEmpty()) {
+            log.info("无班次负荷数据需要持久化");
+            return;
+        }
+
+        // 获取班次信息（取最后一个班次的编码和序号）
+        List<CxShiftConfig> shiftConfigs = context.getShiftConfigList();
+        String lastShiftCode = "";
+        int lastShiftOrder = 0;
+        if (shiftConfigs != null && !shiftConfigs.isEmpty()) {
+            CxShiftConfig lastShift = shiftConfigs.get(shiftConfigs.size() - 1);
+            lastShiftCode = lastShift.getShiftCode();
+            lastShiftOrder = shiftConfigs.size();
+        }
+
+        List<CxShiftMachineLoad> loads = new ArrayList<>();
+        for (Map.Entry<String, Map<String, Integer>> machineEntry : loadMap.entrySet()) {
+            for (Map.Entry<String, Integer> embryoEntry : machineEntry.getValue().entrySet()) {
+                CxShiftMachineLoad load = new CxShiftMachineLoad();
+                load.setScheduleDate(scheduleDate);
+                load.setShiftCode(lastShiftCode);
+                load.setShiftOrder(lastShiftOrder);
+                load.setCxMachineCode(machineEntry.getKey());
+                load.setEmbryoCode(embryoEntry.getKey());
+                load.setLhMachineCount(embryoEntry.getValue());
+                load.setFactoryCode(factoryCode);
+                load.setCreateTime(new Date());
+                loads.add(load);
+            }
+        }
+
+        // 批量插入
+        for (CxShiftMachineLoad load : loads) {
+            cxShiftMachineLoadMapper.insert(load);
+        }
+        log.info("持久化班次负荷数据: 日期={}, 班次={}, {}条记录", scheduleDate, lastShiftCode, loads.size());
     }
 
     /**

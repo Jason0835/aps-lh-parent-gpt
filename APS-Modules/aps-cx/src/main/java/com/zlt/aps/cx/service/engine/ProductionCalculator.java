@@ -3,11 +3,15 @@ package com.zlt.aps.cx.service.engine;
 import com.zlt.aps.cx.api.domain.entity.CxStructureTreadConfig;
 import com.zlt.aps.cx.vo.MonthPlanProductLhCapacityVo;
 import com.zlt.aps.cx.vo.ScheduleContextVo;
+import com.zlt.aps.mp.api.domain.entity.MdmStructureLhRatio;
+import com.zlt.aps.mp.api.domain.entity.MpCxCapacityConfiguration;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.List;
+import java.util.Map;
 
 /**
  * 产量与产能计算工具 — 被 TaskGroupService、CoreScheduleAlgorithmServiceImpl 调用。
@@ -20,7 +24,12 @@ import java.math.RoundingMode;
  *   <li>{@link #calculateStockHours}：库存可供硫化时长（小时）</li>
  *   <li>{@link #calculateTimePerTire}：单胎生产耗时（秒，含结构配比）</li>
  *   <li>{@link #getDoubleMoldDailyLhCapacity} / {@link #getSingleMoldDailyLhCapacity}：日硫化量获取</li>
+ *   <li>{@link #resolveSingleMoldDailyLhCapacity}：单模日硫化量解析（含 standardCapacity 回退）</li>
  *   <li>{@link #calculateRequiredCars}：所需车数计算</li>
+ *   <li>{@link #calculateSpaceAllowedProduction}：立库空间维度允许产量</li>
+ *   <li>{@link #calculateTaskStockHours}：任务级预计班后库存可供硫化时长</li>
+ *   <li>{@link #calculateMaxStockForCapHours}：时间维度封顶对应最大库存量</li>
+ *   <li>{@link #calculateStructureTotalMaxLh} / {@link #calculateStructureAvgRatio}：结构产能计算</li>
  * </ul>
  *
  * @author APS Team
@@ -34,6 +43,9 @@ public class ProductionCalculator {
 
     /** 默认机台种类上限（被 BalancingService / TrialTaskProcessor 等引用） */
     public static final int DEFAULT_MAX_TYPES_PER_MACHINE = 4;
+
+    /** 默认机台最大硫化机数（配比缺失时单台最多生产的硫化机数） */
+    public static final int DEFAULT_MAX_LH_MACHINE_QTY = 10;
 
     /** 一天总秒数 */
     public static final int SECONDS_PER_DAY = 24 * 60 * 60;
@@ -163,8 +175,8 @@ public class ProductionCalculator {
     /**
      * 获取物料的单模日硫化量（双模值÷2）。
      *
-     * <p>不含 standardCapacity 回退逻辑。如需回退请使用 TaskGroupService 中的
-     * {@code resolveSingleMoldDailyLhCapacity} 方法。
+     * <p>不含 standardCapacity 回退逻辑。如需回退请使用
+     * {@link #resolveSingleMoldDailyLhCapacity} 方法。
      *
      * @param materialCode 物料编码
      * @param context      排程上下文
@@ -192,5 +204,173 @@ public class ProductionCalculator {
             return 0;
         }
         return (quantity + tripCapacity - 1) / tripCapacity;
+    }
+
+    // ==================== 立库库容管控计算 ====================
+
+    /**
+     * 计算空间维度允许的最大产量
+     *
+     * <p>公式：允许产量 = max(0, 原始产量 - 超出量)，其中超出量 = 预计总库存 - 预警线
+     *
+     * @param originalProduction  原始计划产量
+     * @param totalProjectedStock 加入本任务后的预计总库存
+     * @param warehouseThreshold  库容预警线
+     * @return 空间维度允许产量
+     */
+    public int calculateSpaceAllowedProduction(int originalProduction, int totalProjectedStock, int warehouseThreshold) {
+        int overAmount = totalProjectedStock - warehouseThreshold;
+        return Math.max(0, originalProduction - overAmount);
+    }
+
+    /**
+     * 计算任务级预计班后库存可供硫化时长（维度二核心计算）
+     *
+     * <p>公式：可供硫化时长 = (分配库存 + 成型产出 - 硫化消耗) × 单胎单模时长 / 模数 / 3600
+     *
+     * @param materialCode    物料编码
+     * @param context         排程上下文
+     * @param allocatedStock  任务分配库存
+     * @param production      成型产出
+     * @param vulcConsumption 硫化消耗
+     * @param moldQty         模数
+     * @return 可供硫化时长（小时），null = 无法计算（参数缺失）
+     */
+    public BigDecimal calculateTaskStockHours(String materialCode, ScheduleContextVo context,
+                                              int allocatedStock, int production, int vulcConsumption, int moldQty) {
+        if (moldQty <= 0) {
+            return null;
+        }
+        int singleMoldLhCap = getSingleMoldDailyLhCapacity(materialCode, context);
+        if (singleMoldLhCap <= 0) {
+            return null;
+        }
+        int projectedStock = allocatedStock + production - vulcConsumption;
+        return calculateStockHours(projectedStock, singleMoldLhCap, moldQty);
+    }
+
+    /**
+     * 计算时间维度封顶对应的最大库存量
+     *
+     * <p>公式：最大库存 = 封顶时长 × 3600 × 模数 / 单胎单模时长
+     *
+     * @param stockHoursCap   封顶阈值（小时）
+     * @param moldQty         模数
+     * @param singleMoldLhCap 单模日硫化量
+     * @return 封顶时长对应的最大库存量
+     */
+    public int calculateMaxStockForCapHours(int stockHoursCap, int moldQty, int singleMoldLhCap) {
+        BigDecimal singleTireMoldSeconds = calculateSingleTireMoldSeconds(singleMoldLhCap);
+        return BigDecimal.valueOf(stockHoursCap)
+                .multiply(BigDecimal.valueOf(SECONDS_PER_HOUR))
+                .multiply(BigDecimal.valueOf(moldQty))
+                .divide(singleTireMoldSeconds, 0, RoundingMode.UP)
+                .intValue();
+    }
+
+    // ==================== 日硫化量解析（含回退） ====================
+
+    /**
+     * 获取物料的日硫化产能 VO
+     *
+     * @param materialCode 物料编码
+     * @param context      排程上下文
+     * @return 产能 VO，不存在时返回 null
+     */
+    public MonthPlanProductLhCapacityVo getMaterialLhCapacityVo(String materialCode,
+                                                                ScheduleContextVo context) {
+        if (context.getMaterialLhCapacityMap() == null || materialCode == null) {
+            return null;
+        }
+        return context.getMaterialLhCapacityMap().get(materialCode);
+    }
+
+    /**
+     * 解析物料的单模日硫化量（含 standardCapacity 回退）
+     *
+     * <p>优先使用 dayVulcanizationQty（÷2 转单模），回退到 standardCapacity。
+     * 与 {@link #getSingleMoldDailyLhCapacity} 的区别：本方法含回退逻辑。
+     *
+     * @param materialCode 物料编码
+     * @param context      排程上下文
+     * @return 单模日硫化量，无效时返回 0
+     */
+    public int resolveSingleMoldDailyLhCapacity(String materialCode, ScheduleContextVo context) {
+        MonthPlanProductLhCapacityVo vo = getMaterialLhCapacityVo(materialCode, context);
+        if (vo == null) {
+            return 0;
+        }
+        if (vo.getDayVulcanizationQty() != null && vo.getDayVulcanizationQty() > 0) {
+            return vo.getDayVulcanizationQty() / 2;
+        }
+        if (vo.getStandardCapacity() != null && vo.getStandardCapacity() > 0) {
+            return vo.getStandardCapacity();
+        }
+        return 0;
+    }
+
+    // ==================== 结构产能计算 ====================
+
+    /**
+     * 获取机台的硫化机数上限
+     *
+     * <p>从结构配比表中按 机台类型编码|结构名称 查找。
+     *
+     * @param machineCode   成型机台编码
+     * @param structureName 结构名称
+     * @param context       排程上下文
+     * @return 硫化机数上限，未配置时返回 null
+     */
+    public Integer getMachineLhMaxQty(String machineCode, String structureName, ScheduleContextVo context) {
+        if (context.getStructureLhRatioMap() != null && structureName != null && machineCode != null) {
+            Map<String, String> machineTypeCodeMap = context.getMachineTypeCodeMap();
+            String machineTypeCode = machineTypeCodeMap != null ? machineTypeCodeMap.get(machineCode) : null;
+            if (machineTypeCode != null) {
+                MdmStructureLhRatio lhRatio = context.getStructureLhRatioMap().get(machineTypeCode + "|" + structureName);
+                if (lhRatio != null && lhRatio.getLhMachineMaxQty() != null && lhRatio.getLhMachineMaxQty() > 0) {
+                    return lhRatio.getLhMachineMaxQty();
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * 计算结构推荐机台的总硫化机数上限
+     *
+     * @param machines      推荐机台配置列表
+     * @param structureName 结构名称
+     * @param context       排程上下文
+     * @return 总硫化机数上限
+     */
+    public int calculateStructureTotalMaxLh(
+            List<MpCxCapacityConfiguration> machines, String structureName, ScheduleContextVo context) {
+        int total = 0;
+        for (MpCxCapacityConfiguration config : machines) {
+            Integer maxLh = getMachineLhMaxQty(config.getCxMachineCode(), structureName, context);
+            total += (maxLh != null ? maxLh : DEFAULT_MAX_LH_MACHINE_QTY);
+        }
+        return total;
+    }
+
+    /**
+     * 计算结构推荐机台的平均硫化配比
+     *
+     * @param machines      推荐机台配置列表
+     * @param structureName 结构名称
+     * @param context       排程上下文
+     * @return 平均配比，无机台时返回 1
+     */
+    public BigDecimal calculateStructureAvgRatio(
+            List<MpCxCapacityConfiguration> machines, String structureName, ScheduleContextVo context) {
+        if (machines.isEmpty()) {
+            return BigDecimal.ONE;
+        }
+        BigDecimal totalRatio = BigDecimal.ZERO;
+        for (MpCxCapacityConfiguration config : machines) {
+            Integer ratio = getMachineLhMaxQty(config.getCxMachineCode(), structureName, context);
+            totalRatio = totalRatio.add(BigDecimal.valueOf(ratio != null && ratio > 0 ? ratio : 1));
+        }
+        return totalRatio.divide(BigDecimal.valueOf(machines.size()), 4, RoundingMode.HALF_UP);
     }
 }

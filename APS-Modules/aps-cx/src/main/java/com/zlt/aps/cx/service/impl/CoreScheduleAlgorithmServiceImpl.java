@@ -227,7 +227,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
 
             // 2.4.4 执行单班次排程（S5.2~S5.3.7，见 executeShiftSchedule）
             ShiftScheduleResult shiftResult = executeShiftSchedule(
-                    context, day, shiftConfig, currentScheduleDate, machineOnlineEmbryoMap);
+                    context, day, shiftConfig, currentScheduleDate, machineOnlineEmbryoMap, shiftResults);
             // 保存当前班次排程前的 materialStockMap 快照（在 updateContextForNextShift 之前）
             // 用于子表 stockHours 计算：每个班次独立使用当时的分配库存
             Map<String, Integer> stockMap = context.getMaterialStockMap();
@@ -240,6 +240,9 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
 
             // 将更新后的机台在产状态存回 context，供下一个班次使用
             context.setMachineOnlineEmbryoMap(new HashMap<>(machineOnlineEmbryoMap));
+
+            // 更新前序班次负荷映射（供下一班次动态保底预留）
+            updatePreviousShiftMachineEmbryoLoadMap(context, shiftResult.getAllAllocations());
 
             // 2.4.6 更新库存/硫化余量/成型余量，供下一班次 TaskGroupService 使用
             updateContextForNextShift(context, shiftResult.getAllAllocations(), singleShiftList, shiftConfig, shiftResult.getShiftProductionResults());
@@ -255,7 +258,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         List<CxScheduleResult> allResults = buildFinalScheduleResultsFromShifts(context, shiftResults, allShiftConfigs);
 
         // 2.6 班次量均衡（按结构班产标准调整最大硫化机数胎胚的班次分布）
-        balanceShiftQuantities(context, shiftResults, allShiftConfigs);
+        //balanceShiftQuantities(context, shiftResults, allShiftConfigs);
 
         // 2.7 构建子表（机台+胎胚+车次维度，含库存可供硫化时长和顺位）
         Map<String, List<CxScheduleDetail>> detailGroupMap = buildScheduleDetailsFromShifts(context, shiftResults, allShiftConfigs);
@@ -314,7 +317,8 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             int day,
             CxShiftConfig shiftConfig,
             LocalDate scheduleDate,
-            Map<String, Set<String>> machineOnlineEmbryoMap) {
+            Map<String, Set<String>> machineOnlineEmbryoMap,
+            List<ShiftScheduleResult> shiftHistory) {
 
         List<CxShiftConfig> singleShiftList = Collections.singletonList(shiftConfig);
         String factoryCode = context.getFactoryCode();
@@ -372,6 +376,43 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                 }
             }
         }
+
+        // 5.3.4 进行结构间多机台同班次量均衡
+        //同班次下同一个结构下各个机台里的任务，量可以调换达到合理
+        //例如这个结构当班次总排量540,4台成型机
+        //各机台负荷=H1105=8台/3种, H1204=7台/4种, H1304=8台/3种, H1504=8台/3种
+        //每一台都有合理的量，如何计算合理量
+        //H1105=540*8/(8+7+8+8)=139.3 四舍五入=140（最大合理量）
+        //H1204=540*7/(8+7+8+8)=121.9 四舍五入=120（最大合理量）
+        //H1304=540*8/(8+7+8+8)=139.3 四舍五入=140（最大合理量）
+        //H1504=540*8/(8+7+8+8)=139.3 四舍五入=140（最大合理量）
+
+        //分组排量实际的排产量如下
+        //第一个班次实际的排产量是H1105=130,H1204=120,H1304=140,H1504=150，总量=540
+        //第二个班次实际的排产量是H1105=150,H1204=140,H1304=110,H1504=140，总量=540
+        //第三个班次实际的排产量是H1105=160,H1204=110,H1304=140,H1504=130，总量=540
+
+        //这样可以看到虽然我的总量都是540，但是每个机台都不是合理量，需要调整尽量达到合理量
+        //调整是同班次，不同机台之间以整车为单位调拨，因为同一个结构下整车都是同一个。
+        //此时调拨的方式以交班库存可供硫化时长来判断，
+        //1.优先采用不同机台同胎胚调拨，取交班库存可供硫化时长大的机台来减去，交班库存可供硫化时长少的补充
+
+        //我期望达到的效果是每个机台的排量都达到最大合理量，即H1105=140,H1204=120,H1304=140,H1504=140
+        //并且H1105机台任意两个同结构，同分配硫化机台数，一样的班次的排量差值不能超过1车。举例：
+        //H1105=140（1班次，分配了结构A，分配了硫化机数8台）
+        //H1105=130（2班次，分配了结构A，分配了硫化机数8台）
+        //H1105=150（3班次，分配了结构A，分配了硫化机数8台）
+        //H1105=120（4班次，分配了结构A，分配了硫化机数7台）
+        //H1105=70（5班次，分配了结构A，分配了硫化机数4台）
+        //H1105=70（6班次，分配了结构B，分配了硫化机数4台）
+        //像这样班次1和班次2比较，排量差值为1车，符合要求，班次2和班次3比较，排量差值为2车，不符合要求
+        //班次3和班次4比较不用比骄傲因为分配机台数不同没有比较空间
+        //班次4和班次5比较不用比骄傲因为分配机台数不同没有比较空间
+        //班次5和班次6比较不用比骄傲因为结构不同没有比较空间
+        //因为我是按班次排产所以班次没有办法比较，2班次就是跟1班次看下有没有空间如果有就可以下140/150/130,3班次如果跟1班次有比较空间就代表和2班次也有比较空间那就是和两个都比只要发现差了2车就不行要调整。
+
+        // 执行结构内多机台同班次量均衡 + 跨班次同机台排量差值约束
+        balanceMachineQuantityWithinStructure(allAllocations, context, shiftHistory);
 
         // 5.3.5 精度计划挑选与提前扣量（每日首次执行，修改 TaskAllocation 数量）
         applyPrecisionPlanSelection(context, scheduleDate, shiftConfig, allAllocations);
@@ -466,6 +507,522 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
 
         log.info("========== 班次排程完成，天={}, 班次={} ==========\n", day, shiftConfig.getShiftCode());
         return shiftResult;
+    }
+
+    // ==================== 5.3.4 结构内多机台同班次量均衡 + 跨班次同机台排量差值约束 ====================
+
+    /**
+     * 5.3.4 结构内多机台同班次量均衡 + 跨班次同机台排量差值约束。
+     *
+     * <p><b>阶段一（同班次同结构）</b>：按结构分组，合理量 = 总排量 × 机台负荷 / 总负荷，
+     * 四舍五入到最近整车（条）。以交班库存可供硫化时长（stockHours，胎胚级）决定调拨优先级--
+     * stockHours 大的机台调出，stockHours 小的机台补入。以整车为单位，优先同胎胚调拨。
+     * 排除试制/量试/收尾任务。总量守恒。
+     *
+     * <p><b>阶段二（跨班次同机台）</b>：对同一机台、同一结构、同一硫化机台数的任意两个班次，
+     * 排量差值不超过 1 车。实现方式：用历史区间钳制各机台合理量，再统一调拨，
+     * 避免两阶段互相打架。
+     *
+     * @param allAllocations 当前班次合并后的机台分配结果（原地修改 quantity/endingExtraInventory）
+     * @param context         排程上下文（获取整车容量等）
+     * @param shiftHistory    已完成班次的结果历史（用于跨班次差值约束，仅含前序班次）
+     */
+    void balanceMachineQuantityWithinStructure(
+            List<MachineAllocationResult> allAllocations,
+            ScheduleContextVo context,
+            List<ShiftScheduleResult> shiftHistory) {
+
+        if (CollectionUtils.isEmpty(allAllocations)) {
+            return;
+        }
+
+        // 1. 按结构 -> 机台 聚合可参与任务（排除试制/量试/收尾）
+        Map<String, Map<String, MachineAgg>> structMachineMap = buildStructMachineAgg(allAllocations);
+        if (structMachineMap.isEmpty()) {
+            return;
+        }
+
+        // 2. 构建跨班次历史索引（机台|结构|硫化机台数 -> 历史排量列表）
+        Map<String, List<Integer>> historyIndex = buildShiftHistoryIndex(shiftHistory);
+
+        // 2.1 构建 lhId -> mouldQty 映射（用于每车重算 stockHours）
+        Map<Long, Integer> lhIdToMoldQty = new HashMap<>();
+        if (context.getLhScheduleResults() != null) {
+            for (LhScheduleResult lh : context.getLhScheduleResults()) {
+                if (lh.getId() != null) {
+                    int mq = lh.getMouldQty() != null && lh.getMouldQty() > 0 ? lh.getMouldQty() : 1;
+                    lhIdToMoldQty.put(lh.getId(), mq);
+                }
+            }
+        }
+
+        // 3. 逐结构处理
+        for (Map.Entry<String, Map<String, MachineAgg>> structEntry : structMachineMap.entrySet()) {
+            String structure = structEntry.getKey();
+            Map<String, MachineAgg> machineAggs = structEntry.getValue();
+            if (machineAggs.size() < 2) {
+                continue;
+            }
+
+            // 3.1 汇总总量与总负荷
+            int totalQty = 0;
+            int totalLoad = 0;
+            for (MachineAgg agg : machineAggs.values()) {
+                totalQty += agg.actualQty;
+                totalLoad += agg.load;
+            }
+            if (totalLoad <= 0 || totalQty <= 0) {
+                continue;
+            }
+
+            // 3.2 整车容量（同结构一致，取任一胎胚查询）
+            int tripCap = getTripCapForStructure(structure, machineAggs, context);
+            if (tripCap <= 0) {
+                continue;
+            }
+
+            // 3.3 计算合理量（四舍五入到最近整车）
+            for (MachineAgg agg : machineAggs.values()) {
+                double raw = (double) totalQty * agg.load / totalLoad;
+                agg.reasonable = roundToNearestCar(raw, tripCap);
+            }
+
+            // 3.4 查跨班次历史区间，标记各机台 hasHistory/validLow/validHigh
+            loadShiftHistoryBound(machineAggs, structure, historyIndex, tripCap);
+
+            // 3.4.1 计算调拨目标：合理量钳制到跨班次合法区间（无历史时=合理量）
+            for (MachineAgg agg : machineAggs.values()) {
+                agg.target = agg.reasonable;
+                if (agg.hasHistory) {
+                    agg.target = Math.min(Math.max(agg.reasonable, agg.validLow), agg.validHigh);
+                }
+            }
+
+            // 3.5 同胎胚调拨（往调拨目标靠拢，尽量达到合理量，受跨班次区间约束）
+            transferWithinStructure(machineAggs, tripCap, structure, context, lhIdToMoldQty);
+        }
+    }
+
+    /**
+     * 按结构 -> 机台 聚合任务。
+     *
+     * <p>所有任务（含试制/量试/收尾）计入 {@code actualQty} / {@code load}，用于合理量计算和跨班次比较；
+     * 仅可参与调拨的任务计入 {@code eligibleQty} / {@code embryoTaskMap} / stockHours。
+     *
+     * @param allAllocations 机台分配结果列表
+     * @return Map&lt;结构名, Map&lt;机台编码, MachineAgg&gt;&gt;
+     */
+    private Map<String, Map<String, MachineAgg>> buildStructMachineAgg(List<MachineAllocationResult> allAllocations) {
+        Map<String, Map<String, MachineAgg>> result = new LinkedHashMap<>();
+        for (MachineAllocationResult mar : allAllocations) {
+            String machineCode = mar.getMachineCode();
+            if (machineCode == null || mar.getTaskAllocations() == null) {
+                continue;
+            }
+            for (TaskAllocation ta : mar.getTaskAllocations()) {
+                String structure = ta.getStructureName();
+                if (structure == null) {
+                    continue;
+                }
+                MachineAgg agg = result
+                        .computeIfAbsent(structure, k -> new LinkedHashMap<>())
+                        .computeIfAbsent(machineCode, k -> new MachineAgg(machineCode));
+                int qty = getTaskQty(ta);
+                int vulc = ta.getVulcanizeMachineCount() != null ? ta.getVulcanizeMachineCount() : 0;
+                // 所有任务计入总量和负荷
+                agg.actualQty += qty;
+                agg.load += vulc;
+                // 仅可参与任务计入调拨通道
+                if (!isTaskExcluded(ta)) {
+                    BigDecimal sh = ta.getStockHours() != null ? ta.getStockHours() : BigDecimal.ZERO;
+                    agg.eligibleQty += qty;
+                    agg.eligibleTasks.add(ta);
+                    agg.embryoTaskMap.putIfAbsent(ta.getEmbryoCode(), ta);
+                    if (agg.minStockHours == null || sh.compareTo(agg.minStockHours) < 0) {
+                        agg.minStockHours = sh;
+                    }
+                    if (agg.maxStockHours == null || sh.compareTo(agg.maxStockHours) > 0) {
+                        agg.maxStockHours = sh;
+                    }
+                }
+            }
+        }
+        return result;
+    }
+
+    /**
+     * 判断任务是否排除出均衡（试制/量试/收尾任务不参与）。
+     *
+     * @param ta 任务分配
+     * @return true 表示排除
+     */
+    private boolean isTaskExcluded(TaskAllocation ta) {
+        return Boolean.TRUE.equals(ta.getIsTrialTask())
+                || Boolean.TRUE.equals(ta.getIsProductionTrial())
+                || Boolean.TRUE.equals(ta.getIsEndingTask());
+    }
+
+    /**
+     * 获取任务实际排产量（优先 endingExtraInventory，其次 quantity）。
+     *
+     * @param ta 任务分配
+     * @return 实际条数
+     */
+    private int getTaskQty(TaskAllocation ta) {
+        Integer eei = ta.getEndingExtraInventory();
+        if (eei != null) {
+            return eei;
+        }
+        Integer q = ta.getQuantity();
+        return q != null ? q : 0;
+    }
+
+    /**
+     * 调整任务排产量（同步更新 quantity 和 endingExtraInventory）。
+     *
+     * @param ta    任务分配
+     * @param delta 增减量（正=增加，负=减少）
+     */
+    private void adjustTaskQty(TaskAllocation ta, int delta) {
+        int newQty = getTaskQty(ta) + delta;
+        ta.setQuantity(newQty);
+        ta.setEndingExtraInventory(newQty);
+    }
+
+    /**
+     * 四舍五入到最近整车（条数）。
+     *
+     * @param rawQty 原始条数
+     * @param tripCap 单车容量（条）
+     * @return 整车对齐后的条数
+     */
+    private int roundToNearestCar(double rawQty, int tripCap) {
+        if (tripCap <= 0) {
+            return (int) Math.round(rawQty);
+        }
+        return (int) Math.round(rawQty / tripCap) * tripCap;
+    }
+
+    /**
+     * 获取结构整车容量（同结构取任一胎胚查询，无匹配时用默认值）。
+     *
+     * @param structure   结构名称
+     * @param machineAggs 机台聚合
+     * @param context     排程上下文
+     * @return 整车容量（条）
+     */
+    private int getTripCapForStructure(String structure, Map<String, MachineAgg> machineAggs, ScheduleContextVo context) {
+        for (MachineAgg agg : machineAggs.values()) {
+            for (TaskAllocation ta : agg.eligibleTasks) {
+                if (ta.getEmbryoCode() != null) {
+                    return productionCalculator.getTripCapacity(structure, ta.getEmbryoCode(), context);
+                }
+            }
+        }
+        return context.getDefaultTripCapacity() != null ? context.getDefaultTripCapacity() : 12;
+    }
+
+    /**
+     * 构建跨班次历史索引。
+     *
+     * <p>key = {@code 机台编码|结构名|硫化机台数}，value = 该组合在历史各班次的排量列表。
+     *
+     * @param shiftHistory 前序班次结果列表
+     * @return 历史索引
+     */
+    private Map<String, List<Integer>> buildShiftHistoryIndex(List<ShiftScheduleResult> shiftHistory) {
+        Map<String, List<Integer>> index = new HashMap<>();
+        if (CollectionUtils.isEmpty(shiftHistory)) {
+            return index;
+        }
+        for (ShiftScheduleResult ssr : shiftHistory) {
+            if (ssr.getAllAllocations() == null) {
+                continue;
+            }
+            Map<String, Map<String, MachineAgg>> structMachine = buildStructMachineAgg(ssr.getAllAllocations());
+            for (Map.Entry<String, Map<String, MachineAgg>> e : structMachine.entrySet()) {
+                String structure = e.getKey();
+                for (MachineAgg agg : e.getValue().values()) {
+                    String key = agg.machineCode + "|" + structure + "|" + agg.load;
+                    index.computeIfAbsent(key, k -> new ArrayList<>()).add(agg.actualQty);
+                }
+            }
+        }
+        return index;
+    }
+
+    /**
+     * 查跨班次历史区间，标记各机台 hasHistory / validLow / validHigh。
+     *
+     * <p>key = 机台编码|结构名|硫化机台数，value = 历史各班次排量列表。
+     * 合法区间 = [max(历史) - 1车, min(历史) + 1车]。
+     * 防御性兜底：若区间倒置则放宽到 [min-1车, max+1车]。
+     *
+     * @param machineAggs  机台聚合
+     * @param structure    结构名
+     * @param historyIndex 历史索引
+     * @param tripCap      整车容量
+     */
+    private void loadShiftHistoryBound(Map<String, MachineAgg> machineAggs, String structure,
+                                       Map<String, List<Integer>> historyIndex, int tripCap) {
+        // 预构建 机台|结构 -> 所有历史排量列表（含不同负荷），用于负荷变化时回退
+        Map<String, List<Integer>> msAllQtys = new HashMap<>();
+        for (Map.Entry<String, List<Integer>> entry : historyIndex.entrySet()) {
+            String hk = entry.getKey();
+            int lastSep = hk.lastIndexOf('|');
+            if (lastSep > 0) {
+                String msKey = hk.substring(0, lastSep);
+                msAllQtys.computeIfAbsent(msKey, k -> new ArrayList<>()).addAll(entry.getValue());
+            }
+        }
+        for (MachineAgg agg : machineAggs.values()) {
+            String msKey = agg.machineCode + "|" + structure;
+            String key = msKey + "|" + agg.load;
+            List<Integer> prevQtys = historyIndex.get(key);
+            if (prevQtys != null && !prevQtys.isEmpty()) {
+                // 精确匹配（同机台+同结构+同负荷）
+                agg.hasHistory = true;
+                agg.historyExisted = true;
+                int maxPrev = Collections.max(prevQtys);
+                int minPrev = Collections.min(prevQtys);
+                agg.validLow = maxPrev - tripCap;
+                agg.validHigh = minPrev + tripCap;
+                // 防御：历史自身违规时区间可能倒置，放宽兜底
+                if (agg.validLow > agg.validHigh) {
+                    agg.validLow = minPrev - tripCap;
+                    agg.validHigh = maxPrev + tripCap;
+                }
+            } else {
+                // 负荷变化：回退到同机台+同结构的所有历史排量（含不同负荷）做区间约束
+                List<Integer> allQtys = msAllQtys.get(msKey);
+                if (allQtys != null && !allQtys.isEmpty()) {
+                    agg.hasHistory = true;
+                    agg.historyExisted = true;
+                    int maxPrev = Collections.max(allQtys);
+                    int minPrev = Collections.min(allQtys);
+                    agg.validLow = maxPrev - tripCap;
+                    agg.validHigh = minPrev + tripCap;
+                    if (agg.validLow > agg.validHigh) {
+                        agg.validLow = minPrev - tripCap;
+                        agg.validHigh = maxPrev + tripCap;
+                    }
+                } else {
+                    agg.hasHistory = false;
+                    agg.historyExisted = false;
+                }
+            }
+        }
+    }
+
+    /**
+     * 同结构内多机台同胎胚调拨。
+     *
+     * <p>调拨目标 = 合理量钳制到跨班次合法区间 [validLow, validHigh]，无历史时 = 合理量。
+     * 调出方 = actual &gt; target（按 maxStockHours 降序）；
+     * 调入方 = actual &lt; target（按 minStockHours 升序）。
+     * 尽量往 target 靠拢，受同胎胚和整车取整限制（尽量做到，非百分百）。
+     *
+     * <p>第一步：同胎胚调拨（总量守恒），公共胚胎中 giver 侧 stockHours 最高者。
+     * 第二步：同胎胚调拨后仍有偏离的机台，配对调整（总量守恒）--
+     * giver 减自己最高 stockHours 任务，receiver 加自己最低 stockHours 任务，金额配对。
+     *
+     * @param machineAggs 机台聚合（已计算 target）
+     * @param tripCap     整车容量
+     * @param structure   结构名（日志用）
+     */
+    private void transferWithinStructure(Map<String, MachineAgg> machineAggs, int tripCap, String structure,
+                                         ScheduleContextVo context, Map<Long, Integer> lhIdToMoldQty) {
+        // 负荷变化的机台（historyExisted && !hasHistory）跳过，避免合理量因负荷变化而误判
+        List<MachineAgg> givers = machineAggs.values().stream()
+                .filter(a -> a.actualQty - a.target >= tripCap && a.eligibleQty >= tripCap)
+                .sorted(Comparator.comparing(
+                        (MachineAgg a) -> a.maxStockHours == null ? BigDecimal.ZERO : a.maxStockHours).reversed())
+                .collect(Collectors.toList());
+        List<MachineAgg> receivers = machineAggs.values().stream()
+                .filter(a -> a.target - a.actualQty >= tripCap && !a.embryoTaskMap.isEmpty())
+                .sorted(Comparator.comparing(
+                        a -> a.minStockHours == null ? BigDecimal.ZERO : a.minStockHours))
+                .collect(Collectors.toList());
+
+        // ---- Phase A: 同胎胚调拨（每车重选最高 stockHours 公共胚胎，更新 stockHours）----
+        for (MachineAgg giver : givers) {
+            int giverExcess = giver.actualQty - giver.target;
+            if (giverExcess < tripCap || giver.eligibleQty < tripCap) {
+                continue;
+            }
+            for (MachineAgg receiver : receivers) {
+                int receiverDeficit = receiver.target - receiver.actualQty;
+                if (receiverDeficit < tripCap) {
+                    continue;
+                }
+                int remaining = Math.min(Math.min(giverExcess, giver.eligibleQty), receiverDeficit);
+                remaining = (remaining / tripCap) * tripCap;
+                while (remaining >= tripCap) {
+                    // 每车重选：giver 侧 stockHours 最高的公共胚胎（且任务条数 >= 1车）
+                    Set<String> commonEmbryos = new HashSet<>(giver.embryoTaskMap.keySet());
+                    commonEmbryos.retainAll(receiver.embryoTaskMap.keySet());
+                    String bestEmbryo = null;
+                    BigDecimal bestSh = null;
+                    for (String emb : commonEmbryos) {
+                        TaskAllocation gt = giver.embryoTaskMap.get(emb);
+                        if (getTaskQty(gt) < tripCap) {
+                            continue;
+                        }
+                        BigDecimal sh = gt.getStockHours() != null ? gt.getStockHours() : BigDecimal.ZERO;
+                        if (bestSh == null || sh.compareTo(bestSh) > 0) {
+                            bestSh = sh;
+                            bestEmbryo = emb;
+                        }
+                    }
+                    if (bestEmbryo == null) {
+                        break;
+                    }
+                    TaskAllocation giverTask = giver.embryoTaskMap.get(bestEmbryo);
+                    TaskAllocation receiverTask = receiver.embryoTaskMap.get(bestEmbryo);
+                    int giverBefore = giver.actualQty;
+                    int receiverBefore = receiver.actualQty;
+                    adjustTaskQty(giverTask, -tripCap);
+                    adjustTaskQty(receiverTask, tripCap);
+                    updateTaskStockHours(giverTask, -tripCap, context, lhIdToMoldQty);
+                    updateTaskStockHours(receiverTask, tripCap, context, lhIdToMoldQty);
+                    giver.actualQty -= tripCap;
+                    giver.eligibleQty -= tripCap;
+                    giverExcess -= tripCap;
+                    receiver.actualQty += tripCap;
+                    receiver.eligibleQty += tripCap;
+                    remaining -= tripCap;
+                    log.info("【机台量均衡】结构={}, 调拨1车({}条): {}(胚胎{},stockHours={}) -> {}(胚胎{}), "
+                                    + "giver {}->{} receiver {}->{}",
+                            structure, tripCap, giver.machineCode, bestEmbryo, bestSh,
+                            receiver.machineCode, bestEmbryo,
+                            giverBefore, giver.actualQty, receiverBefore, receiver.actualQty);
+                }
+                if (giverExcess < tripCap || giver.eligibleQty < tripCap) {
+                    break;
+                }
+            }
+        }
+
+        // ---- Phase B: 配对调整（每车重选最高/最低 stockHours 任务，更新 stockHours，总量守恒）----
+        for (MachineAgg giver : givers) {
+            int giverExcess = giver.actualQty - giver.target;
+            if (giverExcess < tripCap || giver.eligibleQty < tripCap) {
+                continue;
+            }
+            for (MachineAgg receiver : receivers) {
+                int receiverDeficit = receiver.target - receiver.actualQty;
+                if (receiverDeficit < tripCap || receiver.eligibleTasks.isEmpty()) {
+                    continue;
+                }
+                int remaining = Math.min(Math.min(giverExcess, giver.eligibleQty), receiverDeficit);
+                remaining = (remaining / tripCap) * tripCap;
+                while (remaining >= tripCap) {
+                    // 每车重选：giver 最高 stockHours 任务（条数 >= 1车），receiver 最低 stockHours 任务
+                    TaskAllocation giverTask = giver.eligibleTasks.stream()
+                            .filter(t -> getTaskQty(t) >= tripCap)
+                            .max(Comparator.comparing(t -> t.getStockHours() != null
+                                    ? t.getStockHours() : BigDecimal.ZERO))
+                            .orElse(null);
+                    TaskAllocation receiverTask = receiver.eligibleTasks.stream()
+                            .min(Comparator.comparing(t -> t.getStockHours() != null
+                                    ? t.getStockHours() : BigDecimal.ZERO))
+                            .orElse(null);
+                    if (giverTask == null || receiverTask == null) {
+                        break;
+                    }
+                    int giverBefore = giver.actualQty;
+                    int receiverBefore = receiver.actualQty;
+                    adjustTaskQty(giverTask, -tripCap);
+                    adjustTaskQty(receiverTask, tripCap);
+                    updateTaskStockHours(giverTask, -tripCap, context, lhIdToMoldQty);
+                    updateTaskStockHours(receiverTask, tripCap, context, lhIdToMoldQty);
+                    giver.actualQty -= tripCap;
+                    giver.eligibleQty -= tripCap;
+                    giverExcess -= tripCap;
+                    receiver.actualQty += tripCap;
+                    receiver.eligibleQty += tripCap;
+                    remaining -= tripCap;
+                    log.info("【机台量均衡-配对】结构={}, 1车({}条): {}减产(胚胎{},stockHours={})->{}加产(胚胎{}), "
+                                    + "giver {}->{} receiver {}->{}",
+                            structure, tripCap, giver.machineCode, giverTask.getEmbryoCode(),
+                            giverTask.getStockHours(), receiver.machineCode, receiverTask.getEmbryoCode(),
+                            giverBefore, giver.actualQty, receiverBefore, receiver.actualQty);
+                }
+                if (giverExcess < tripCap || giver.eligibleQty < tripCap) {
+                    break;
+                }
+            }
+        }
+    }
+
+    /**
+     * 每车调整后更新任务的 stockHours（基于 projectedStock 变化重新计算）。
+     * <p>公式：stockHours = projectedStock × 24 / (dailyLhCapacity × moldQty)
+     * <br>调整 ±tripCap 条 -> projectedStock ±tripCap -> stockHours ±calculateStockHours(tripCap, singleLhCap, moldQty)
+     *
+     * @param task          被调整的任务
+     * @param deltaQty      调整条数（正=加产，负=减产）
+     * @param context       排程上下文
+     * @param lhIdToMoldQty lhId -> 模数映射
+     */
+    private void updateTaskStockHours(TaskAllocation task, int deltaQty, ScheduleContextVo context,
+                                      Map<Long, Integer> lhIdToMoldQty) {
+        int singleLhCap = productionCalculator.getSingleMoldDailyLhCapacity(task.getMaterialCode(), context);
+        if (singleLhCap <= 0) {
+            return;
+        }
+        int moldQty = lhIdToMoldQty.getOrDefault(task.getLhId(), 1);
+        if (moldQty <= 0) {
+            return;
+        }
+        BigDecimal delta = productionCalculator.calculateStockHours(Math.abs(deltaQty), singleLhCap, moldQty);
+        BigDecimal currentSh = task.getStockHours() != null ? task.getStockHours() : BigDecimal.ZERO;
+        if (deltaQty > 0) {
+            task.setStockHours(currentSh.add(delta));
+        } else {
+            task.setStockHours(currentSh.subtract(delta));
+        }
+    }
+
+    /**
+     * 机台维度聚合（均衡算法内部使用）。
+     *
+     * <p>{@code actualQty} / {@code load} 包含该机台该结构下的<b>所有</b>任务（含试制/收尾），
+     * 用于计算合理量和跨班次比较；{@code eligibleQty} / {@code embryoTaskMap} 仅含可参与调拨的任务。
+     */
+    private static class MachineAgg {
+        /** 机台编码 */
+        final String machineCode;
+        /** 实际排量（条，含所有任务） */
+        int actualQty;
+        /** 硫化机台数（负荷，含所有任务） */
+        int load;
+        /** 合理量（条，整车对齐） */
+        int reasonable;
+        /** 调拨目标（条）= 合理量钳制到跨班次合法区间，无历史时=合理量 */
+        int target;
+        /** 跨班次合法区间下界（条），hasHistory=true 时有效 */
+        int validLow;
+        /** 跨班次合法区间上界（条），hasHistory=true 时有效 */
+        int validHigh;
+        /** 是否有可比较的历史班次（同机台+同结构+同负荷） */
+        boolean hasHistory;
+        /** 历史中是否存在该机台+结构（负荷可能不同），用于判断负荷是否变化 */
+        boolean historyExisted;
+        /** 可参与调拨任务的总排量（条，排除试制/量试/收尾） */
+        int eligibleQty;
+        /** 该机台可参与任务中最小 stockHours（代表值） */
+        BigDecimal minStockHours;
+        /** 该机台可参与任务中最大 stockHours */
+        BigDecimal maxStockHours;
+        /** 可参与任务列表 */
+        final List<TaskAllocation> eligibleTasks = new ArrayList<>();
+        /** 胎胚编码 -> 可参与任务（同胎胚取首条） */
+        final Map<String, TaskAllocation> embryoTaskMap = new LinkedHashMap<>();
+
+        MachineAgg(String machineCode) {
+            this.machineCode = machineCode;
+        }
     }
 
     /**
@@ -1101,6 +1658,39 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
 
         log.debug("更新机台在产状态完成（滚动替换），共 {} 个胎胚: {}", newMap.size(), formatMachineEmbryoMap(newMap));
         return newMap;
+    }
+
+    /**
+     * 更新前序班次机台胎胚负荷映射，供下一班次的保底预留参考。
+     *
+     * <p>从当前班次的 allAllocations 中提取每个机台每个胎胚的硫化机台数（vulcanizeMachineCount），
+     * 按 lhMachineCode 去重后汇总，写入 context.previousShiftMachineEmbryoLoadMap。
+     *
+     * @param context        排程上下文
+     * @param allAllocations 当前班次的全部机台分配结果
+     */
+    private void updatePreviousShiftMachineEmbryoLoadMap(
+            ScheduleContextVo context,
+            List<MachineAllocationResult> allAllocations) {
+        Map<String, Map<String, Integer>> loadMap = new HashMap<>();
+        for (MachineAllocationResult allocation : allAllocations) {
+            String machineCode = allocation.getMachineCode();
+            for (TaskAllocation taskAlloc : allocation.getTaskAllocations()) {
+                String embryoCode = taskAlloc.getEmbryoCode();
+                if (embryoCode == null || embryoCode.isEmpty()) {
+                    continue;
+                }
+                int lhCount = taskAlloc.getVulcanizeMachineCount() != null
+                        ? taskAlloc.getVulcanizeMachineCount() : 0;
+                if (lhCount > 0) {
+                    loadMap.computeIfAbsent(machineCode, k -> new HashMap<>())
+                            .merge(embryoCode, lhCount, Integer::sum);
+                }
+            }
+        }
+        context.setPreviousShiftMachineEmbryoLoadMap(loadMap);
+        log.info("更新前序班次负荷映射: {} 台机台, 共 {} 条胎胚记录",
+                loadMap.size(), loadMap.values().stream().mapToInt(Map::size).sum());
     }
 
     /**

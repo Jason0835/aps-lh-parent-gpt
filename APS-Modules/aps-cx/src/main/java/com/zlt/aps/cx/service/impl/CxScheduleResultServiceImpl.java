@@ -941,9 +941,8 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
 
     /**
      * 构建小胶种和占位符映射。
-     * <p>取值逻辑与 Sheet0 成型余量-按机台 的 smallGlue 完全一致：
-     * 从 CxParamConfig 读取 SYS04010002，加 AQ 前缀后精确匹配 MdmMaterialConsumeDetail，
-     * 取 CHILD_MATERIAL_NAME 去掉 AQ 前缀后直接展示参数值（如 A01）。</p>
+     * <p>直接从物料消耗明细表查询以AQ开头的胶种记录（不依赖参数配置），
+     * 取 CHILD_MATERIAL_NAME 去掉 AQ 前缀后展示。</p>
      *
      * @param exportList 成型排程结果列表
      * @return key=smallGlue/placeholder, value=embryoCode→字符串的映射
@@ -957,36 +956,18 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
             return result;
         }
 
-        CxParamConfig config = cxParamConfigMapper.selectOne(
-                new LambdaQueryWrapper<CxParamConfig>()
-                        .eq(CxParamConfig::getParamCode, "SYS04010002")
-                        .eq(CxParamConfig::getIsActive, 1));
-
-        if (config == null || StringUtils.isBlank(config.getParamValue())) {
-            return result;
-        }
-
-        List<String> codes = Arrays.stream(config.getParamValue().split(","))
-                .map(String::trim)
-                .filter(StringUtils::isNotBlank)
-                .map(item -> "AQ" + item)
-                .collect(Collectors.toList());
-
-        if (codes.isEmpty()) {
-            return result;
-        }
-
         String factoryCode = exportList.stream()
                 .map(CxScheduleResult::getFactoryCode)
                 .filter(StringUtils::isNotBlank)
                 .findFirst()
                 .orElse(null);
 
+        // 直接查询胶种数据（CHILD_MATERIAL_NAME以AQ开头），不依赖参数配置
         List<MdmMaterialConsumeDetail> consumeDetails = mdmMaterialConsumeDetailMapper.selectList(
                 new LambdaQueryWrapper<MdmMaterialConsumeDetail>()
                         .eq(BaseEntity::getIsDelete, YesOrNoEnum.NO.getCode())
                         .eq(factoryCode != null, MdmMaterialConsumeDetail::getFactoryCode, factoryCode)
-                        .in(MdmMaterialConsumeDetail::getChildMaterialName, codes));
+                        .likeRight(MdmMaterialConsumeDetail::getChildMaterialName, "AQ"));
 
         if (CollectionUtils.isEmpty(consumeDetails)) {
             return result;
@@ -1342,29 +1323,17 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
                 .filter(Objects::nonNull)
                 .collect(Collectors.groupingBy(this::buildCxRemainQtyGroupKey, LinkedHashMap::new, Collectors.toList()));
 
-        // 查询胶种，使用胎胚代码关联，取对应的花纹等
-        CxParamConfig config = cxParamConfigMapper.selectOne(
-                new LambdaQueryWrapper<CxParamConfig>()
-                        .eq(CxParamConfig::getParamCode, "SYS04010002")
-                        .eq(CxParamConfig::getIsActive, 1));
-
+        // 直接查询胶种数据（CHILD_MATERIAL_NAME以AQ开头），不依赖参数配置
         Map<String, String> smallGlueMap = new HashMap<>();
-        if (config != null && StringUtils.isNotBlank(config.getParamValue())) {
-            List<String> codes = Arrays.stream(config.getParamValue().split(","))
-                    .map(String::trim)
-                    .filter(StringUtils::isNotBlank)
-                    .map(item -> "AQ" + item)
-                    .collect(Collectors.toList());
-            List<MdmMaterialConsumeDetail> mdmMaterialConsumeDetailList = mdmMaterialConsumeDetailMapper.selectList(new LambdaQueryWrapper<MdmMaterialConsumeDetail>()
-                    .eq(BaseEntity::getIsDelete, YesOrNoEnum.NO.getCode())
-                    .eq(MdmMaterialConsumeDetail::getFactoryCode, list.get(0).getFactoryCode())
-                    .in(MdmMaterialConsumeDetail::getChildMaterialName, codes));
+        List<MdmMaterialConsumeDetail> mdmMaterialConsumeDetailList = mdmMaterialConsumeDetailMapper.selectList(new LambdaQueryWrapper<MdmMaterialConsumeDetail>()
+                .eq(BaseEntity::getIsDelete, YesOrNoEnum.NO.getCode())
+                .eq(MdmMaterialConsumeDetail::getFactoryCode, list.get(0).getFactoryCode())
+                .likeRight(MdmMaterialConsumeDetail::getChildMaterialName, "AQ"));
 
-            if(CollectionUtils.isNotEmpty(mdmMaterialConsumeDetailList)) {
-                smallGlueMap = mdmMaterialConsumeDetailList.stream()
-                        .collect(Collectors.toMap(MdmMaterialConsumeDetail::getEmbryoCode,
-                                MdmMaterialConsumeDetail::getChildMaterialName, (a, b) -> a));
-            }
+        if (CollectionUtils.isNotEmpty(mdmMaterialConsumeDetailList)) {
+            smallGlueMap = mdmMaterialConsumeDetailList.stream()
+                    .collect(Collectors.toMap(MdmMaterialConsumeDetail::getEmbryoCode,
+                            MdmMaterialConsumeDetail::getChildMaterialName, (a, b) -> a));
         }
 
 
