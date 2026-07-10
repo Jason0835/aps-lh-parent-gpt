@@ -20,6 +20,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -178,8 +179,8 @@ public class Cd90AutoScheduleOutputDraftBuilder {
     /**
      * 将同一帘布在成功班次前的失败尝试写入该成功班次的系统分析。
      * <p>
-     * 例如C02在CLASS1~CLASS3均因库排不足失败、CLASS4成功，则CLASS4_ANALYSIS记录前三班原因，
-     * 页面展示时用</br>分隔，便于复盘为什么最终排到了后续班次。
+     * 例如C02在前序班次均因库排不足失败、后续班次成功，则成功班次ANALYSIS记录前序原因，
+     * 页面展示时优先使用夜班07/20这类班次名称并用</br>分隔，便于复盘为什么最终排到了后续班次。
      * </p>
      */
     private void attachPriorFailureAnalysis(List<Cd90ScheduleResultDraft> results,
@@ -244,8 +245,9 @@ public class Cd90AutoScheduleOutputDraftBuilder {
             });
         });
     }
+
     private String failureAnalysis(Cd90ScheduleAttemptTrace trace) {
-        return trace.getClassField() + "：" + failureDescription(trace.getFailureReason());
+        return traceDisplayName(trace) + "：" + failureDescription(trace.getFailureReason());
     }
 
     private String partialScheduleAnalysis(Cd90ScheduleAttemptTrace trace) {
@@ -256,11 +258,19 @@ public class Cd90AutoScheduleOutputDraftBuilder {
             return null;
         }
         BigDecimal remaining = netDemand.subtract(scheduled);
-        return trace.getClassField() + "：" + partialReasonDescription(trace.getPartialReason())
+        return traceDisplayName(trace) + "：" + partialReasonDescription(trace.getPartialReason())
                 + "，仅部分排" + plain(scheduled)
                 + "m，剩余" + plain(remaining) + "m转后续班次重算";
     }
 
+    /** 优先使用业务班次展示名，历史轨迹没有展示名时回退CLASS字段。 */
+    private String traceDisplayName(Cd90ScheduleAttemptTrace trace) {
+        if (trace == null) {
+            return "";
+        }
+        return StringUtils.hasText(trace.getShiftDisplayName())
+                ? trace.getShiftDisplayName() : trace.getClassField();
+    }
     private String partialReasonDescription(String partialReason) {
         if ("STORAGE_LANE_LIMIT".equals(partialReason)) {
             return "库排容量不足";
@@ -351,14 +361,19 @@ public class Cd90AutoScheduleOutputDraftBuilder {
     }
 
     private Map<String, LocalDate> resolveShiftDates(List<Cd90ShiftDescriptor> shifts) {
-        Map<String, LocalDate> result = new HashMap<>();
-        for (Cd90ShiftDescriptor shift : safe(shifts)) {
-            if (shift != null && StringUtils.hasText(shift.getClassField())
-                    && shift.getStartTime() != null) {
-                result.put(shift.getClassField(), shift.getStartTime().toLocalDate());
-            }
+        return safe(shifts).stream()
+                .filter(shift -> shift != null && StringUtils.hasText(shift.getClassField()))
+                .map(shift -> new AbstractMap.SimpleEntry<>(shift.getClassField(), shiftScheduleDate(shift)))
+                .filter(entry -> entry.getValue() != null)
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue,
+                        (left, right) -> right, HashMap::new));
+    }
+
+    private LocalDate shiftScheduleDate(Cd90ShiftDescriptor shift) {
+        if (shift.getScheduleDate() != null) {
+            return shift.getScheduleDate();
         }
-        return result;
+        return shift.getStartTime() == null ? null : shift.getStartTime().toLocalDate();
     }
 
     private String resultKey(Cd90ShiftScheduleTask task) {

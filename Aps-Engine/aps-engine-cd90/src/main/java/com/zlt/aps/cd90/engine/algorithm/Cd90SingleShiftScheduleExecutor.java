@@ -553,7 +553,9 @@ public class Cd90SingleShiftScheduleExecutor implements Cd90SingleShiftScheduleS
                                            String partialReason,
                                            int sequence) {
         return Cd90ScheduleAttemptTrace.builder()
-                .classField(shift.getClassField()).shiftCode(shift.getShiftCode())
+                .classField(shift.getClassField())
+                .shiftCode(shift.getShiftCode())
+                .shiftDisplayName(shift.getShiftDisplayName())
                 .clothCode(clothCode).bigRollCode(bigRollCode)
                 .netDemandQuantity(netDemand).scheduledQuantity(scheduled)
                 .failureReason(failureReason).partialReason(partialReason)

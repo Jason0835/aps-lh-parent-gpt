@@ -21,6 +21,9 @@ import java.util.stream.Collectors;
 public class Cd90ShiftWindowResolver {
 
     private static final int ACTIVE = 1;
+    private static final String SHIFT_NAME_MIDDLE = "中班";
+    private static final String SHIFT_NAME_NIGHT = "夜班";
+    private static final String SHIFT_NAME_DAY = "早班";
 
     /**
      * 解析启用班次并按排程日、当天顺序和结果字段稳定排序。
@@ -52,15 +55,48 @@ public class Cd90ShiftWindowResolver {
         LocalDateTime start = LocalDateTime.of(shiftDate, LocalTime.parse(config.getStartTime()));
         LocalDate endDate = Integer.valueOf(1).equals(config.getIsCrossDay())
                 ? shiftDate.plusDays(1) : shiftDate;
+        LocalDate displayDate = Integer.valueOf(1).equals(config.getIsCrossDay())
+                ? endDate : shiftDate;
         LocalDateTime end = LocalDateTime.of(endDate, LocalTime.parse(config.getEndTime()));
         long durationSeconds = ChronoUnit.SECONDS.between(start, end);
         if (durationSeconds <= 0 || durationSeconds > Integer.MAX_VALUE) {
             throw new IllegalArgumentException("班次开始结束时间无效: " + config.getClassField());
         }
         return Cd90ShiftDescriptor.builder()
-                .shiftCode(config.getShiftCode()).classField(config.getClassField())
+                .shiftCode(config.getShiftCode())
+                .shiftDisplayName(shiftDisplayName(config, displayDate))
+                .scheduleDate(displayDate)
+                .classField(config.getClassField())
                 .shiftOrder(config.getShiftOrder()).startTime(start).endTime(end)
                 .durationSeconds((int) durationSeconds).build();
+    }
+
+    /** 组装面向页面的班次名称，跨夜班按结束日展示。 */
+    private String shiftDisplayName(Cd90ShiftConfig config, LocalDate shiftDate) {
+        String shiftName = shiftNameForDisplay(config);
+        if (!StringUtils.hasText(shiftName) || shiftDate == null) {
+            return config.getClassField();
+        }
+        return shiftName + String.format("%02d/%02d",
+                shiftDate.getMonthValue(), shiftDate.getDayOfMonth());
+    }
+
+    /** 班次中文集中在此方法，后续多语言只需替换这里的映射来源。 */
+    private String shiftNameForDisplay(Cd90ShiftConfig config) {
+        if (config == null || !StringUtils.hasText(config.getShiftName())) {
+            return null;
+        }
+        String shiftName = config.getShiftName().trim();
+        if (SHIFT_NAME_MIDDLE.equals(shiftName)) {
+            return SHIFT_NAME_MIDDLE;
+        }
+        if (SHIFT_NAME_NIGHT.equals(shiftName)) {
+            return SHIFT_NAME_NIGHT;
+        }
+        if (SHIFT_NAME_DAY.equals(shiftName)) {
+            return SHIFT_NAME_DAY;
+        }
+        return shiftName;
     }
 
     private boolean isEnabled(Cd90ShiftConfig config) {
