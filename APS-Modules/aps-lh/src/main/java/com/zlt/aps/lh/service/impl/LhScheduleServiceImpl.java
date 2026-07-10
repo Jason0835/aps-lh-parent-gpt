@@ -15,7 +15,6 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.domain.ExcelStyleVo;
 import com.zlt.aps.common.core.utils.ExcelUtils;
-import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.cx.entity.schedule.CxScheduleResult;
 import com.zlt.aps.cx.service.ICxScheduleResultService;
 import com.zlt.aps.lh.api.constant.LhScheduleConstant;
@@ -694,6 +693,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         }
         ShiftFieldUtil.setShiftAnalysis(record, shiftIndex, analysis);
     }
+
     /**
      * 导出数据
      *
@@ -758,7 +758,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         mouldChangePlanExcelDataList.add(lhMouldChangePlanController.buildExportDataList(mouldChangePlanExportList, mouldChangePlan));
 
         inputStream = new ByteArrayInputStream(exportBytes);
-        exportBytes =  ExcelUtils.writeMultiList(inputStream, 1, mouldChangePlanTableMap, mouldChangePlanExcelDataList);
+        exportBytes = ExcelUtils.writeMultiList(inputStream, 1, mouldChangePlanTableMap, mouldChangePlanExcelDataList);
 
         // 排产小结已迁移至成型日计划导出（aps-cx 通过 Feign 调用 buildScheduleSummaryExportData），
         // 硫化日计划导出不再写入排产小结 sheet。
@@ -906,7 +906,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
                 break;
             case BLANK:
                 target.setBlank();
-                    break;
+                break;
             default:
                 break;
         }
@@ -938,8 +938,8 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
      * <p>所有列位置均通过 placeholderMap 动态获取，不再硬编码列索引，
      * 模板增删列后只需更新模板中的占位符，代码无需修改。</p>
      *
-     * @param exportBytes Excel 导出字节
-     * @param dataRowCount 明细数据行数
+     * @param exportBytes    Excel 导出字节
+     * @param dataRowCount   明细数据行数
      * @param placeholderMap 占位符名称→列索引（0起始）的映射，由 exportData 在模板扫描阶段生成
      * @return 已回填公式的 Excel 导出字节
      */
@@ -1097,7 +1097,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
      * 读取 zip 当前条目的完整字节。
      *
      * @param zipInputStream zip 输入流
-     * @param buffer 复用缓冲区
+     * @param buffer         复用缓冲区
      * @return 当前条目字节
      * @throws IOException zip 读取异常
      */
@@ -1137,9 +1137,9 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
     /**
      * 设置公式单元格。
      *
-     * @param row 当前数据行
+     * @param row         当前数据行
      * @param columnIndex 公式所在列下标，POI 从 0 开始计数
-     * @param formula Excel 公式内容，不包含等号
+     * @param formula     Excel 公式内容，不包含等号
      */
     private void setFormulaCell(Row row, int columnIndex, String formula) {
         Cell cell = row.getCell(columnIndex);
@@ -1158,9 +1158,9 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
      * 设置数值单元格。
      * <p>用于导出后还会被系统再次导入的列，避免 Excel 公式在导入端无法计算或公式缓存为空。</p>
      *
-     * @param row 当前数据行
+     * @param row         当前数据行
      * @param columnIndex 数值所在列下标，POI 从 0 开始计数
-     * @param value 写入的数值
+     * @param value       写入的数值
      */
     private void setNumericCell(Row row, int columnIndex, BigDecimal value) {
         Cell cell = row.getCell(columnIndex);
@@ -1211,7 +1211,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
     /**
      * 汇总同一行多个数字单元格。
      *
-     * @param row 当前数据行
+     * @param row           当前数据行
      * @param columnIndexes 需要汇总的列下标，POI 从 0 开始计数
      * @return 汇总值
      */
@@ -1643,10 +1643,10 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
      * @return key=factoryCode|materialCode，value=月计划定稿明细
      */
     private Map<String, List<FactoryMonthPlanProductionFinalResult>> loadImportMonthPlanMap(String factoryCode,
-                                                                                      int year,
-                                                                                      int month,
-                                                                                      String productionVersion,
-                                                                                      Set<String> materialCodes) {
+                                                                                            int year,
+                                                                                            int month,
+                                                                                            String productionVersion,
+                                                                                            Set<String> materialCodes) {
         if (CollUtil.isEmpty(materialCodes)) {
             return Collections.emptyMap();
         }
@@ -1832,45 +1832,85 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
      * </p>
      */
     private static class ImportScheduleValidationContext {
-        /** 按 26 号切月规则解析得到的月计划业务年份。 */
+        /**
+         * 按 26 号切月规则解析得到的月计划业务年份。
+         */
         private int year;
-        /** 按 26 号切月规则解析得到的月计划业务月份。 */
+        /**
+         * 按 26 号切月规则解析得到的月计划业务月份。
+         */
         private int month;
-        /** 当前工厂、业务年月对应的定稿生产版本。 */
+        /**
+         * 当前工厂、业务年月对应的定稿生产版本。
+         */
         private MpFactoryProductionVersion finalVersion;
-        /** 排程窗口结束日期对应的业务年份（跨月时与 year 不同）。 */
+        /**
+         * 排程窗口结束日期对应的业务年份（跨月时与 year 不同）。
+         */
         private int nextMonthYear;
-        /** 排程窗口结束日期对应的业务月份（跨月时与 month 不同）。 */
+        /**
+         * 排程窗口结束日期对应的业务月份（跨月时与 month 不同）。
+         */
         private int nextMonthMonth;
-        /** 排程窗口开始日期对应的业务年份（左跨月时与 year 不同）。 */
+        /**
+         * 排程窗口开始日期对应的业务年份（左跨月时与 year 不同）。
+         */
         private int prevMonthYear;
-        /** 排程窗口开始日期对应的业务月份（左跨月时与 month 不同）。 */
+        /**
+         * 排程窗口开始日期对应的业务月份（左跨月时与 month 不同）。
+         */
         private int prevMonthMonth;
-        /** 是否向右跨月（窗口结束日期所在月份与 scheduleDate 所在月份不同）。 */
+        /**
+         * 是否向右跨月（窗口结束日期所在月份与 scheduleDate 所在月份不同）。
+         */
         private boolean crossMonth;
-        /** 是否向左跨月（窗口开始日期所在月份与 scheduleDate 所在月份不同）。 */
+        /**
+         * 是否向左跨月（窗口开始日期所在月份与 scheduleDate 所在月份不同）。
+         */
         private boolean crossMonthPrev;
-        /** 向右跨月时窗口结束日期所在月份的定稿生产版本。 */
+        /**
+         * 向右跨月时窗口结束日期所在月份的定稿生产版本。
+         */
         private MpFactoryProductionVersion finalVersionNextMonth;
-        /** 向左跨月时窗口开始日期所在月份的定稿生产版本。 */
+        /**
+         * 向左跨月时窗口开始日期所在月份的定稿生产版本。
+         */
         private MpFactoryProductionVersion finalVersionPrevMonth;
-        /** 整批导入级错误，例如月计划未定稿、硫化工作日历未生成。 */
+        /**
+         * 整批导入级错误，例如月计划未定稿、硫化工作日历未生成。
+         */
         private List<String> globalErrors = new ArrayList<>();
-        /** 定稿月计划明细缓存，key=factoryCode|materialCode，同物料（不同产品状态）全部保留。 */
+        /**
+         * 定稿月计划明细缓存，key=factoryCode|materialCode，同物料（不同产品状态）全部保留。
+         */
         private Map<String, List<FactoryMonthPlanProductionFinalResult>> monthPlanMap = new HashMap<>();
-        /** 向右跨月时窗口结束日期所在月份的定稿月计划明细缓存，key=factoryCode|materialCode。 */
+        /**
+         * 向右跨月时窗口结束日期所在月份的定稿月计划明细缓存，key=factoryCode|materialCode。
+         */
         private Map<String, List<FactoryMonthPlanProductionFinalResult>> monthPlanMapNextMonth = new HashMap<>();
-        /** 向左跨月时窗口开始日期所在月份的定稿月计划明细缓存，key=factoryCode|materialCode。 */
+        /**
+         * 向左跨月时窗口开始日期所在月份的定稿月计划明细缓存，key=factoryCode|materialCode。
+         */
         private Map<String, List<FactoryMonthPlanProductionFinalResult>> monthPlanMapPrevMonth = new HashMap<>();
-        /** 硫化机台台账缓存，key=factoryCode|machineCode。 */
+        /**
+         * 硫化机台台账缓存，key=factoryCode|machineCode。
+         */
         private Map<String, LhMachineInfo> machineInfoMap = new HashMap<>();
-        /** SKU 与模具关系缓存，key=factoryCode|materialCode，value=模具号列表。 */
+        /**
+         * SKU 与模具关系缓存，key=factoryCode|materialCode，value=模具号列表。
+         */
         private Map<String, List<String>> materialMouldRelMap = new HashMap<>();
-        /** 可用模具号集合，key=factoryCode|mouldCode。 */
+        /**
+         * 可用模具号集合，key=factoryCode|mouldCode。
+         */
         private Set<String> availableMouldCodeSet = new HashSet<>();
-        /** 有效硫化示方关系 Map，key=materialCode::trialStatus，value=MdmSkuConstructionRef。 */
+        /**
+         * 有效硫化示方关系 Map，key=materialCode::trialStatus，value=MdmSkuConstructionRef。
+         */
         private Map<String, MdmSkuConstructionRef> constructionRefMap = new HashMap<>();
-        /** 已维护有效班产的 SKU 集合，key=factoryCode|materialCode。 */
+        /**
+         * 已维护有效班产的 SKU 集合，key=factoryCode|materialCode。
+         */
         private Set<String> classCapacityMaterialSet = new HashSet<>();
     }
 
@@ -2159,10 +2199,11 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
                 break;
         }
     }
+
     /**
      * 构建模板表头数据
      *
-     * @param list 排程结果列表
+     * @param list         排程结果列表
      * @param scheduleDate 排程日期
      * @return 模板表头数据
      */
@@ -2203,9 +2244,9 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
      * batchNo + factoryCode 批量查询，再按班次标题日期 + classIndex 统计：</p>
      * <p>只统计早班和中班：第1天早/中、第2天早/中、第3天早/中依次对应 1~6；夜班没有对应 classIndex，不生成占位符。</p>
      *
-     * @param list 排程结果列表
+     * @param list               排程结果列表
      * @param exportScheduleDate 导出排程日期
-     * @param shiftDateList 班次标题日期列表
+     * @param shiftDateList      班次标题日期列表
      * @return 换模次数表头Map
      */
     private Map<String, Object> buildMouldChangeCountTableMap(List<LhScheduleResult> list,
@@ -2323,7 +2364,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
      * 构建换模次数聚合Key。
      *
      * @param scheduleDate 排程日期
-     * @param classIndex 班次编码
+     * @param classIndex   班次编码
      * @return 聚合Key
      */
     private String buildMouldChangeCountKey(Date scheduleDate, String classIndex) {
@@ -2333,7 +2374,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
     /**
      * 构建批次工厂匹配Key。
      *
-     * @param batchNo 批次号
+     * @param batchNo     批次号
      * @param factoryCode 工厂编号
      * @return 批次工厂匹配Key
      */
@@ -2344,7 +2385,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
     /**
      * 构建模板列表数据
      *
-     * @param list 排程结果列表
+     * @param list         排程结果列表
      * @param scheduleDate 导出入口传入的排程日期，用于固定 T 日完成量查询口径
      * @return 模板列表数据
      */
@@ -2403,6 +2444,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
             row.put("dailyPlanQty", result.getDailyPlanQty());
             row.put("totalPlanQty", result.getDailyPlanQty());
             row.put("totalDailyPlanQty", result.getTotalDailyPlanQty());
+            row.put("monthPlanSumTotal", result.getMonthPlanSumTotal());
             row.put("remark", result.getRemark());
 
             // 公式列占位符：模板中 BZ/CA/CB 列使用 {.nightPlanQtyTotal} / {.nightFinishQtyTotal} /
@@ -2494,7 +2536,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
      * 按排程日期匹配胶囊使用次数。
      * <p>先找获取日期与排程日期同一天的记录；若不存在，则取获取日期距离排程日期最近的一条。</p>
      *
-     * @param capsuleList 同一硫化机台下的胶囊使用次数列表
+     * @param capsuleList  同一硫化机台下的胶囊使用次数列表
      * @param scheduleDate 排程日期
      * @return 匹配到的胶囊使用次数
      */
@@ -2784,7 +2826,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         query.in(LhScheFinishQty::getFactoryCode, factoryCodes)
                 .in(LhScheFinishQty::getMaterialCode, materialCodes)
                 .eq(LhScheFinishQty::getScheduleDate, targetScheduleDate);
-        List<LhScheFinishQty> scheFinishQtyList = lhScheFinishQtyMapper.selectList( query);
+        List<LhScheFinishQty> scheFinishQtyList = lhScheFinishQtyMapper.selectList(query);
         log.debug("buildTodayNightFinishQtyExportMap: T_LH_SCHE_FINISH_QTY查询结果数量={}", scheFinishQtyList.size());
         for (LhScheFinishQty finishQty : scheFinishQtyList) {
             if (StringUtils.isBlank(finishQty.getFactoryCode()) || StringUtils.isBlank(finishQty.getMaterialCode())) {
@@ -2816,7 +2858,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
     /**
      * 构建物料工厂匹配key。
      *
-     * @param factoryCode 工厂编号
+     * @param factoryCode  工厂编号
      * @param materialCode 物料编码
      * @return 物料工厂匹配key
      */
@@ -2838,14 +2880,13 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
     /**
      * 构建胶囊机台匹配key。
      *
-     * @param factoryCode 工厂编号
+     * @param factoryCode   工厂编号
      * @param lhMachineCode 硫化机台编号
      * @return 机台匹配key
      */
     private String buildCapsuleMachineKey(String factoryCode, String lhMachineCode) {
         return StringUtils.defaultString(factoryCode).trim() + "|" + StringUtils.defaultString(lhMachineCode).trim();
     }
-
 
 
     /**
@@ -2902,7 +2943,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
     /**
      * 汇总指定班次计划量
      *
-     * @param list 排程结果列表
+     * @param list  排程结果列表
      * @param shift 班次序号
      * @return 计划量合计
      */
@@ -2917,7 +2958,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
     /**
      * 汇总指定班次完成量
      *
-     * @param list 排程结果列表
+     * @param list  排程结果列表
      * @param shift 班次序号
      * @return 完成量合计
      */
@@ -2936,7 +2977,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
      * @param shift  班次序号
      * @return 班次顺序
      * @deprecated 已被 {@link #buildContinuousShiftOrderMap} + {@link #getContinuousShiftOrder} 替代，
-     *             不再使用数据库字段 scheduleOrder，改为同一物料按班次连续编排
+     * 不再使用数据库字段 scheduleOrder，改为同一物料按班次连续编排
      */
     @Deprecated
     private Object buildShiftOrder(LhScheduleResult result, int shift) {
@@ -3072,7 +3113,9 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
             row.put("style_materialCode", GRAY_STYLE);
             row.put("style_materialDesc", GRAY_STYLE);
         }
-
+        if (isHasMorePlanQty(row)) {
+            row.put("style_totalDailyPlanQty", GRAY_STYLE);
+        }
     }
 
     /**
@@ -3088,16 +3131,31 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
     }
 
     /**
+     * 20260710+ 是否还有断点后的计划量
+     *
+     * @param row
+     * @return
+     */
+    private boolean isHasMorePlanQty(Map<String, Object> row) {
+        Integer totalDailyPlanQty = (Integer) row.get("totalDailyPlanQty");
+        Integer monthPlanSumTotal = (Integer) row.get("monthPlanSumTotal");
+        if (null == monthPlanSumTotal || monthPlanSumTotal == BigDecimal.ZERO.intValue()) {
+            monthPlanSumTotal = totalDailyPlanQty;
+        }
+        return monthPlanSumTotal.equals(totalDailyPlanQty);
+    }
+
+    /**
      * 判断是否为交替后 SKU：class3~8 中第一个有计划量（>0）的班次，
      * 其前面所有班次（class3~8 范围内）计划量都为 0 或空。
      */
     private boolean isPostChangeSku(LhScheduleResult result) {
         // class1~2（今天）如果不为空，说明是延续品，不是交替后
         //for (int shift = 1; shift <= 1; shift++) {
-            Integer planQty1 = getClassPlanQty(result, 1);
-            if (Objects.nonNull(planQty1) && planQty1 > 0) {
-                return false;
-            }
+        Integer planQty1 = getClassPlanQty(result, 1);
+        if (Objects.nonNull(planQty1) && planQty1 > 0) {
+            return false;
+        }
         //}
         int firstPlannedShift = 0;
         for (int shift = 1; shift <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT; shift++) {
@@ -3249,7 +3307,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
      * <p>模板首行用于反向导入，收尾类型不再按 8 个班次分别导入，因此导出时也提供统一字段。
      * 优先取主字段 isEnd；旧数据未写主字段时，回退取第一个有计划量班次的 classXIsEnd。</p>
      *
-     * @param result 排程结果
+     * @param result     排程结果
      * @param endTypeMap biz_end_type 字典映射
      * @return 收尾类型显示值
      */
@@ -3292,8 +3350,8 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
      * <p>参照 buildShiftMouldMethod 的判定逻辑：仅当该班次在收尾班次之前且计划量大于 0 时，
      * 才返回产品状态（productStatus）对应的 lh_trial_status 字典中文描述；其余情况返回空字符串。</p>
      *
-     * @param result 排程结果
-     * @param shift 班次序号
+     * @param result        排程结果
+     * @param shift         班次序号
      * @param recipeTypeMap lh_trial_status 字典映射
      * @return 产品状态展示文本
      */
@@ -3331,7 +3389,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
      * <p>模板首行用于反向导入，示方类型不再按 8 个班次分别导入，因此导出时也提供统一字段。
      * 优先取第一个有计划量班次的 classXLhType；没有班次值时回退使用 constructionStage。</p>
      *
-     * @param result 排程结果
+     * @param result        排程结果
      * @param recipeTypeMap lh_trial_status 字典映射
      * @return 示方类型显示值
      */
@@ -3397,7 +3455,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
      * 获取指定班次的硫化示方类型。
      *
      * @param result 排程结果
-     * @param shift 班次序号
+     * @param shift  班次序号
      * @return class1LhType~class8LhType 的字段值
      */
     private String getClassLhType(LhScheduleResult result, int shift) {
