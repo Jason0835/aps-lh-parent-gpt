@@ -84,4 +84,27 @@ public class DjScheduleContext {
 
     /** 施工数据 Map<constructionCode, List<MdmConstructionInfo>>，同一施工号可能存在多个BOM版本 */
     private Map<String, List<MdmConstructionInfo>> constructionMap;
+
+    /** 排程过程日志收集器 */
+    private StringBuilder processLog;
+
+    /**
+     * 追加排程日志
+     *
+     * @param format 日志格式（MessageFormat 风格）
+     * @param args   参数
+     */
+    public void appendLog(String format, Object... args) {
+        if (processLog == null) {
+            processLog = new StringBuilder(4096);
+        }
+        processLog.append(java.text.MessageFormat.format(format, args)).append("\n");
+    }
+
+    /**
+     * 获取已收集的排程日志文本
+     */
+    public String getProcessLogText() {
+        return processLog != null ? processLog.toString() : "";
+    }
 }
