@@ -1,6 +1,7 @@
 package com.zlt.aps.cx.service.engine;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.zlt.aps.cx.entity.config.CxShiftConfig;
 import com.zlt.aps.cx.mapper.MdmWorkCalendarMapper;
 import com.zlt.aps.mp.api.domain.entity.MdmWorkCalendar;
 import lombok.extern.slf4j.Slf4j;
@@ -557,7 +558,55 @@ public class ScheduleDayTypeHelper {
     }
 
     /**
-     * 当日是否存在任一班次停产 — TaskGroupService 跨天封顶等场景使用。
+     * 判断是否整天停产（直接传入日历对象，避免重复查缓存）
+     *
+     * <p>与 {@link #isFullDayStopped(LocalDate, String)} 逻辑一致，适用于调用方已持有
+     * {@link MdmWorkCalendar} 对象的场景（如批量遍历时预加载了日历映射）。
+     *
+     * @param calendar 工作日历对象
+     * @return true=整天停产（dayFlag=0 或三个班次全部停产）
+     */
+    public boolean isFullDayStopped(MdmWorkCalendar calendar) {
+        if (calendar == null) {
+            return false;
+        }
+        if (SHIFT_FLAG_STOP.equals(calendar.getDayFlag())) {
+            return true;
+        }
+        boolean shift1Stopped = SHIFT_FLAG_STOP.equals(calendar.getOneShiftFlag());
+        boolean shift2Stopped = SHIFT_FLAG_STOP.equals(calendar.getTwoShiftFlag());
+        boolean shift3Stopped = SHIFT_FLAG_STOP.equals(calendar.getThreeShiftFlag());
+        return shift1Stopped && shift2Stopped && shift3Stopped;
+    }
+
+    /**
+     * 判断指定班次是否停产（直接传入日历对象，避免重复查缓存）
+     *
+     * <p>与 {@link #isShiftStopped(LocalDate, int, String)} 逻辑一致，适用于调用方已持有
+     * {@link MdmWorkCalendar} 对象的场景。
+     *
+     * @param calendar     工作日历对象
+     * @param shiftConfig  班次配置（读取 dayShiftOrder）
+     * @return true=该班次停产
+     */
+    public boolean isShiftStopped(MdmWorkCalendar calendar, CxShiftConfig shiftConfig) {
+        if (calendar == null || shiftConfig == null) {
+            return false;
+        }
+        Integer shiftOrder = shiftConfig.getDayShiftOrder();
+        if (shiftOrder == null) {
+            return false;
+        }
+        switch (shiftOrder) {
+            case 1: return SHIFT_FLAG_STOP.equals(calendar.getOneShiftFlag());
+            case 2: return SHIFT_FLAG_STOP.equals(calendar.getTwoShiftFlag());
+            case 3: return SHIFT_FLAG_STOP.equals(calendar.getThreeShiftFlag());
+            default: return false;
+        }
+    }
+
+    /**
+     * 当日是否存在任一班次停产 - TaskGroupService 跨天封顶等场景使用。
      */
     public boolean hasAnyClosingShift(LocalDate date, String factoryCode) {
         MdmWorkCalendar calendar = getCalendar(date, factoryCode);

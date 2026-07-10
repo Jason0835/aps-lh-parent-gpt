@@ -1,8 +1,11 @@
 package com.zlt.aps.cx.service.engine;
 
 import com.zlt.aps.cx.api.domain.entity.CxStructureTreadConfig;
+import com.zlt.aps.cx.entity.schedule.LhScheduleResult;
 import com.zlt.aps.cx.vo.MonthPlanProductLhCapacityVo;
 import com.zlt.aps.cx.vo.ScheduleContextVo;
+import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
+import com.zlt.aps.mp.api.domain.entity.MdmMonthSurplus;
 import com.zlt.aps.mp.api.domain.entity.MdmStructureLhRatio;
 import com.zlt.aps.mp.api.domain.entity.MpCxCapacityConfiguration;
 import lombok.extern.slf4j.Slf4j;
@@ -10,6 +13,10 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -372,5 +379,165 @@ public class ProductionCalculator {
             totalRatio = totalRatio.add(BigDecimal.valueOf(ratio != null && ratio > 0 ? ratio : 1));
         }
         return totalRatio.divide(BigDecimal.valueOf(machines.size()), 4, RoundingMode.HALF_UP);
+    }
+
+    // ==================== 班次计划量获取 ====================
+
+    /**
+     * 根据班次索引获取硫化记录的计划量
+     *
+     * @param lhResult   硫化记录
+     * @param classIndex 班次索引（1~8）
+     * @return 对应班次的计划量，无效时返回 null
+     */
+    public Integer getClassPlanQtyByIndex(LhScheduleResult lhResult, int classIndex) {
+        switch (classIndex) {
+            case 1: return lhResult.getClass1PlanQty();
+            case 2: return lhResult.getClass2PlanQty();
+            case 3: return lhResult.getClass3PlanQty();
+            case 4: return lhResult.getClass4PlanQty();
+            case 5: return lhResult.getClass5PlanQty();
+            case 6: return lhResult.getClass6PlanQty();
+            case 7: return lhResult.getClass7PlanQty();
+            case 8: return lhResult.getClass8PlanQty();
+            default: return null;
+        }
+    }
+
+    // ==================== 硫化余量判断 ====================
+
+    /**
+     * 判断物料的硫化余量是否已耗尽（<=0 视为超产）
+     *
+     * @param materialCode    物料编码
+     * @param monthSurplusMap 月度硫化余量映射
+     * @return true=已耗尽（跳过该物料的库存分配）
+     */
+    public boolean isVulcanizeSurplusExhausted(String materialCode,
+                                               Map<String, MdmMonthSurplus> monthSurplusMap) {
+        if (materialCode == null || monthSurplusMap == null) {
+            return false;
+        }
+        MdmMonthSurplus monthSurplus = monthSurplusMap.get(materialCode);
+        return monthSurplus != null
+                && monthSurplus.getPlanSurplusQty() != null
+                && monthSurplus.getPlanSurplusQty().compareTo(BigDecimal.ZERO) <= 0;
+    }
+
+    /**
+     * 从 monthSurplusMap 读取物料的硫化余量数值
+     *
+     * @param materialCode    物料编码
+     * @param monthSurplusMap 月度硫化余量映射
+     * @return 硫化余量，无记录时返回 Integer.MAX_VALUE（无上限约束）
+     */
+    public int getVulcanizingSurplus(String materialCode,
+                                     Map<String, MdmMonthSurplus> monthSurplusMap) {
+        if (materialCode == null || monthSurplusMap == null) {
+            return Integer.MAX_VALUE;
+        }
+        MdmMonthSurplus monthSurplus = monthSurplusMap.get(materialCode);
+        if (monthSurplus != null && monthSurplus.getPlanSurplusQty() != null) {
+            return monthSurplus.getPlanSurplusQty().intValue();
+        }
+        return Integer.MAX_VALUE;
+    }
+
+    // ==================== 参数解析与转换 ====================
+
+    /**
+     * 日硫化量计算模式转换（工厂参数表字母 -> 成型参数表数字）
+     *
+     * <p>M -> 1（MES日硫化量），S -> 2（标准日硫化量），A -> 3（APS日硫化量）
+     *
+     * @param mpValue 工厂参数表的原始值
+     * @return 转换后的数字编码，无法识别时原样返回
+     */
+    public String convertDayVulcanizationMode(String mpValue) {
+        if (mpValue == null) return null;
+        switch (mpValue.toUpperCase().trim()) {
+            case "M": return "1";
+            case "S": return "2";
+            case "A": return "3";
+            default: return mpValue;
+        }
+    }
+
+    /**
+     * 解析机台最大胎胚种类数参数（格式：H15,3;H14,5）
+     *
+     * @param value 参数值（分号分隔，逗号分隔前缀和数值）
+     * @return 机台编码前缀 -> 最大胎胚种类数
+     */
+    public Map<String, Integer> parseMachineMaxTypes(String value) {
+        Map<String, Integer> result = new LinkedHashMap<>();
+        if (value == null || value.trim().isEmpty()) return result;
+        for (String seg : value.trim().split(";")) {
+            String[] parts = seg.trim().split(",");
+            if (parts.length == 2) {
+                try {
+                    String prefix = parts[0].trim();
+                    int maxTypes = Integer.parseInt(parts[1].trim());
+                    if (!prefix.isEmpty() && maxTypes > 0) {
+                        result.put(prefix, maxTypes);
+                    }
+                } catch (NumberFormatException e) {
+                    log.warn("解析机台最大胎胚种类数分段失败: {}", seg);
+                }
+            }
+        }
+        return result;
+    }
+
+    /**
+     * 灵活解析日期时间字符串，时间部分支持 H:mm 与 HH:mm
+     *
+     * @param dateTimeStr 如 "2026-05-19 5:30" 或 "2026-05-19 05:30"
+     * @return 解析后的 LocalDateTime；无法解析时返回 null
+     */
+    public LocalDateTime parseFlexibleDateTime(String dateTimeStr) {
+        if (dateTimeStr == null || dateTimeStr.isEmpty()) {
+            return null;
+        }
+        String trimmed = dateTimeStr.trim();
+        String[] patterns = {"yyyy-MM-dd HH:mm:ss", "yyyy-MM-dd HH:mm", "yyyy-MM-dd H:mm"};
+        for (String pattern : patterns) {
+            try {
+                return LocalDateTime.parse(trimmed, DateTimeFormatter.ofPattern(pattern));
+            } catch (Exception e) {
+                // try next pattern
+            }
+        }
+        log.warn("无法解析日期时间: {}", dateTimeStr);
+        return null;
+    }
+
+    // ==================== 月计划产量计算 ====================
+
+    /**
+     * 计算从当前日到目标日之间的可生产量
+     *
+     * <p>遍历该物料的所有月计划记录，累加 [fromDay, toDay] 区间内每天的排产量
+     *
+     * @param plans   该物料的月计划列表
+     * @param fromDay 起始日（含）
+     * @param toDay   截止日（含）
+     * @return 区间内计划排产总量
+     */
+    public int calculateProducibleQty(List<FactoryMonthPlanProductionFinalResult> plans, int fromDay, int toDay) {
+        int total = 0;
+        for (FactoryMonthPlanProductionFinalResult plan : plans) {
+            int planBegin = plan.getBeginDay() != null ? plan.getBeginDay() : 1;
+            int planEnd = plan.getEndDay() != null ? plan.getEndDay() : 31;
+            int start = Math.max(fromDay, planBegin);
+            int end = Math.min(toDay, planEnd);
+            for (int day = start; day <= end; day++) {
+                Integer dayQty = plan.getDayQty(day);
+                if (dayQty != null && dayQty > 0) {
+                    total += dayQty;
+                }
+            }
+        }
+        return total;
     }
 }

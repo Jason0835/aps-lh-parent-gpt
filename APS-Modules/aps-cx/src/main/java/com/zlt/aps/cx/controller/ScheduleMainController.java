@@ -16,6 +16,11 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.zlt.aps.cx.api.domain.vo.*;
+import com.zlt.aps.cx.api.domain.vo.ScheduleAdjustVo;
+import com.zlt.aps.cx.api.domain.vo.ScheduleGenerateVo;
+import com.zlt.aps.cx.api.domain.vo.ScheduleInsertVo;
+import com.zlt.aps.cx.api.domain.vo.ScheduleTransferMachineVo;
+import com.zlt.aps.cx.api.domain.vo.ScheduleUpdateRemarkVo;
 import com.zlt.aps.cx.entity.config.CxParamConfig;
 import com.zlt.aps.cx.entity.config.CxShiftConfig;
 import com.zlt.aps.cx.entity.schedule.CxScheduleResult;
@@ -23,10 +28,7 @@ import com.zlt.aps.cx.enums.DayVulcanizationModeEnum;
 import com.zlt.aps.cx.mapper.*;
 import com.zlt.aps.cx.service.CxScheduleResultService;
 import com.zlt.aps.cx.service.ScheduleService;
-import com.zlt.aps.cx.vo.CxScheduleImportDTO;
-import com.zlt.aps.cx.vo.CxScheduleResultTemplateImportVO;
-import com.zlt.aps.cx.vo.MonthPlanProductLhCapacityVo;
-import com.zlt.aps.cx.vo.ScheduleRequestVo;
+import com.zlt.aps.cx.vo.*;
 import com.zlt.aps.itf.mes.IMesItfService;
 import com.zlt.aps.maindata.mapper.FactoryParamMapper;
 import com.zlt.aps.mp.api.domain.entity.CxScheduleResultIssue;
@@ -375,16 +377,16 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
         request.setScheduleMode(dto.getScheduleType());
         // 传递排产天数
         request.setDays(dto.getDays());
-        ScheduleService.ScheduleResult result = scheduleService.executeSchedule(request);
+        ScheduleResult result = scheduleService.executeSchedule(request);
         if (result.isSuccess()) {
             return AjaxResult.success();
         } else {
             // 排程锁冲突：已有排程执行中
-            if (ScheduleService.ERROR_CODE_LOCK_CONFLICT.equals(result.getErrorCode())) {
+            if (result.ERROR_CODE_LOCK_CONFLICT.equals(result.getErrorCode())) {
                 return AjaxResult.error(423, result.getMessage());
             }
             // 校验不通过时，构建校验摘要返回前端
-            ScheduleService.ValidationSummary summary = new ScheduleService.ValidationSummary();
+            ValidationSummary summary = new ValidationSummary();
             summary.setErrorCount(result.getValidationErrors() != null ? result.getValidationErrors().size() : 0);
             summary.setWarningCount(result.getValidationWarnings() != null ? result.getValidationWarnings().size() : 0);
             summary.setErrors(result.getValidationErrors());

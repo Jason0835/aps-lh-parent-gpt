@@ -1,7 +1,10 @@
 package com.zlt.aps.cx.service.engine;
 
 import com.zlt.aps.cx.entity.config.CxShiftConfig;
+import com.zlt.aps.cx.vo.DailyEmbryoTask;
+import com.zlt.aps.cx.vo.MachineAllocationResult;
 import com.zlt.aps.cx.vo.ScheduleContextVo;
+import com.zlt.aps.cx.vo.TaskAllocation;
 import com.zlt.aps.mp.api.domain.entity.MdmCxMachineFixed;
 import com.zlt.aps.mp.api.domain.entity.MdmMoldingMachine;
 import com.zlt.aps.mp.api.domain.entity.MpCxCapacityConfiguration;
@@ -81,14 +84,14 @@ public class TrialTaskProcessor {
      * @param availableMachines 可用机台列表（签名保留，实际从 structureAllocationMap 解析）
      * @return 试制任务机台分配结果
      */
-    public List<CoreScheduleAlgorithmService.MachineAllocationResult> processTrialTasks(
-            List<CoreScheduleAlgorithmService.DailyEmbryoTask> trialTasks,
+    public List<MachineAllocationResult> processTrialTasks(
+            List<DailyEmbryoTask> trialTasks,
             ScheduleContextVo context,
             LocalDate scheduleDate,
             List<CxShiftConfig> dayShifts,
             List<MdmMoldingMachine> availableMachines) {
 
-        List<CoreScheduleAlgorithmService.MachineAllocationResult> results = new ArrayList<>();
+        List<MachineAllocationResult> results = new ArrayList<>();
 
         if (CollectionUtils.isEmpty(trialTasks)) {
             return results;
@@ -97,23 +100,23 @@ public class TrialTaskProcessor {
         log.info("========== 开始处理试制任务，共 {} 个任务 ==========", trialTasks.size());
 
         // 5.3.2.1 按结构分组；无结构名或无待排条数的任务跳过
-        Map<String, List<CoreScheduleAlgorithmService.DailyEmbryoTask>> structureTaskMap =
+        Map<String, List<DailyEmbryoTask>> structureTaskMap =
                 trialTasks.stream()
                         .filter(t -> t.getStructureName() != null)
                         .filter(t -> t.getEndingExtraInventory() != null && t.getEndingExtraInventory() > 0)
                         .collect(Collectors.groupingBy(
-                                CoreScheduleAlgorithmService.DailyEmbryoTask::getStructureName,
+                                DailyEmbryoTask::getStructureName,
                                 LinkedHashMap::new,
                                 Collectors.toList()));
 
         // 5.3.2.2 机台 → 分配结果（跨结构累积，供 selectMachineForTrial 计算全局负载）
-        Map<String, CoreScheduleAlgorithmService.MachineAllocationResult> machineAllocationMap =
+        Map<String, MachineAllocationResult> machineAllocationMap =
                 new HashMap<>();
 
         // 5.3.2.3 逐结构处理
-        for (Map.Entry<String, List<CoreScheduleAlgorithmService.DailyEmbryoTask>> entry : structureTaskMap.entrySet()) {
+        for (Map.Entry<String, List<DailyEmbryoTask>> entry : structureTaskMap.entrySet()) {
             String structureName = entry.getKey();
-            List<CoreScheduleAlgorithmService.DailyEmbryoTask> tasks = entry.getValue();
+            List<DailyEmbryoTask> tasks = entry.getValue();
 
             log.info("--- 处理结构 {}，共 {} 个试制胎胚 ---", structureName, tasks.size());
 
@@ -136,7 +139,7 @@ public class TrialTaskProcessor {
             });
 
             // 5.3.2.3.3 逐任务选机并写入 machineAllocationMap
-            for (CoreScheduleAlgorithmService.DailyEmbryoTask task : tasks) {
+            for (DailyEmbryoTask task : tasks) {
                 allocateTrialTask(task, structMachines, machineAllocationMap, context);
             }
         }
@@ -149,14 +152,14 @@ public class TrialTaskProcessor {
     // ==================== 单任务分配 ====================
 
     /**
-     * 将单个试制任务写入选定机台的 {@link CoreScheduleAlgorithmService.MachineAllocationResult}。
+     * 将单个试制任务写入选定机台的 {@link MachineAllocationResult}。
      *
      * <p>选机委托 {@link #selectMachineForTrial}；失败时打 warn 并跳过（任务本班不落机台）。
      */
     private void allocateTrialTask(
-            CoreScheduleAlgorithmService.DailyEmbryoTask task,
+            DailyEmbryoTask task,
             List<MpCxCapacityConfiguration> structMachines,
-            Map<String, CoreScheduleAlgorithmService.MachineAllocationResult> machineAllocationMap,
+            Map<String, MachineAllocationResult> machineAllocationMap,
             ScheduleContextVo context) {
 
         String structureName = task.getStructureName();
@@ -171,7 +174,7 @@ public class TrialTaskProcessor {
 
         String machineCode = selectedMachine.getCxMachineCode();
 
-        CoreScheduleAlgorithmService.MachineAllocationResult allocation =
+        MachineAllocationResult allocation =
                 machineAllocationMap.computeIfAbsent(machineCode, k -> createMachineAllocation(k, context));
 
         allocateTaskToMachine(allocation, task);
@@ -195,7 +198,7 @@ public class TrialTaskProcessor {
             String embryoCode,
             String structureName,
             List<MpCxCapacityConfiguration> structMachines,
-            Map<String, CoreScheduleAlgorithmService.MachineAllocationResult> machineAllocationMap,
+            Map<String, MachineAllocationResult> machineAllocationMap,
             ScheduleContextVo context) {
 
         MdmMoldingMachine emptyMachine = null;
@@ -213,7 +216,7 @@ public class TrialTaskProcessor {
                 continue;
             }
 
-            CoreScheduleAlgorithmService.MachineAllocationResult allocation = machineAllocationMap.get(machineCode);
+            MachineAllocationResult allocation = machineAllocationMap.get(machineCode);
 
             if (allocation == null || allocation.getTaskAllocations().isEmpty()) {
                 if (emptyMachine == null) {
@@ -242,10 +245,10 @@ public class TrialTaskProcessor {
      */
     private int calculateImbalance(
             String machineCode,
-            Map<String, CoreScheduleAlgorithmService.MachineAllocationResult> machineAllocationMap) {
+            Map<String, MachineAllocationResult> machineAllocationMap) {
         int totalUsed = 0;
         int count = 0;
-        for (CoreScheduleAlgorithmService.MachineAllocationResult alloc : machineAllocationMap.values()) {
+        for (MachineAllocationResult alloc : machineAllocationMap.values()) {
             if (!alloc.getTaskAllocations().isEmpty()) {
                 totalUsed += alloc.getUsedCapacity();
                 count++;
@@ -255,7 +258,7 @@ public class TrialTaskProcessor {
             return 0;
         }
         int avgUsed = totalUsed / count;
-        CoreScheduleAlgorithmService.MachineAllocationResult current = machineAllocationMap.get(machineCode);
+        MachineAllocationResult current = machineAllocationMap.get(machineCode);
         int currentUsed = current != null ? current.getUsedCapacity() : 0;
         return Math.abs(currentUsed - avgUsed);
     }
@@ -352,10 +355,10 @@ public class TrialTaskProcessor {
     // ==================== 机台分配壳与任务写入 ====================
 
     /** 创建空机台分配，remainingCapacity 取机台日产能（条/天） */
-    private CoreScheduleAlgorithmService.MachineAllocationResult createMachineAllocation(
+    private MachineAllocationResult createMachineAllocation(
             String machineCode, ScheduleContextVo context) {
-        CoreScheduleAlgorithmService.MachineAllocationResult allocation =
-                new CoreScheduleAlgorithmService.MachineAllocationResult();
+        MachineAllocationResult allocation =
+                new MachineAllocationResult();
         allocation.setMachineCode(machineCode);
         allocation.setTaskAllocations(new ArrayList<>());
         allocation.setUsedCapacity(0);
@@ -384,11 +387,11 @@ public class TrialTaskProcessor {
      * <p>试制不在此做收尾补整车、库存扣减；标志位原样透传供 ShiftScheduleService 试制精排。
      */
     private void allocateTaskToMachine(
-            CoreScheduleAlgorithmService.MachineAllocationResult allocation,
-            CoreScheduleAlgorithmService.DailyEmbryoTask task) {
+            MachineAllocationResult allocation,
+            DailyEmbryoTask task) {
 
-        CoreScheduleAlgorithmService.TaskAllocation taskAllocation =
-                new CoreScheduleAlgorithmService.TaskAllocation();
+        TaskAllocation taskAllocation =
+                new TaskAllocation();
         taskAllocation.setEmbryoCode(task.getEmbryoCode());
         taskAllocation.setMaterialCode(task.getMaterialCode());
         taskAllocation.setMaterialDesc(task.getMaterialDesc());

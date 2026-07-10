@@ -11,8 +11,12 @@ import com.zlt.aps.cx.mapper.CxPrecisionPlanMapper;
 import com.zlt.aps.cx.mapper.LhScheduleResultMapper;
 import com.zlt.aps.cx.mapper.MdmSkuConstructionRefMapper;
 import com.zlt.aps.cx.service.engine.*;
+import com.zlt.aps.cx.vo.DailyEmbryoTask;
+import com.zlt.aps.cx.vo.MachineAllocationResult;
 import com.zlt.aps.cx.vo.MonthPlanProductLhCapacityVo;
 import com.zlt.aps.cx.vo.ScheduleContextVo;
+import com.zlt.aps.cx.vo.ShiftAllocationResult;
+import com.zlt.aps.cx.vo.TaskAllocation;
 import com.zlt.aps.mp.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.mp.api.domain.entity.MdmMoldingMachine;
 import com.zlt.aps.mp.api.domain.entity.MdmMonthSurplus;
@@ -149,10 +153,6 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
     public List<CxScheduleResult> executeSchedule(ScheduleContextVo context) {
         log.info("开始执行排程算法，日期: {}", context.getScheduleDate());
 
-        // 2.0 试制约束参数（来自 context，buildScheduleContext 第1.9步加载）
-        int maxTrialSkuPerDay = context.getMaxTrialSkuPerDay() != null ? context.getMaxTrialSkuPerDay() : DEFAULT_MAX_TRIAL_SKU_PER_DAY;
-        boolean trialAllowedOnSunday = context.getTrialAllowedOnSunday() != null ? context.getTrialAllowedOnSunday() : false;
-
         // 2.1 预加载工作日历缓存（ScheduleDayTypeHelper，供开停产/停产跳过判定）
         LocalDate scheduleDate = context.getScheduleDate();
         String factoryCode = context.getFactoryCode();
@@ -220,7 +220,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             }
 
             // 获取历史胎胚数量用于日志
-            int historyCount = machineOnlineEmbryoMap != null ? machineOnlineEmbryoMap.size() : 0;
+            int historyCount = machineOnlineEmbryoMap.size();
             log.info("【班次开始】#{}/{} | 日期:{} | 班次:{} | 历史胎胚数量:{}",
                     shiftIndex, totalShifts, currentScheduleDate, shiftConfig.getShiftCode(), historyCount);
 
@@ -267,9 +267,6 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
 
         // 2.5 汇总多班次结果：机台+胎胚+物料 -> CLASS1~8 主表记录
         List<CxScheduleResult> allResults = buildFinalScheduleResultsFromShifts(context, shiftResults, allShiftConfigs, initialEmbryoStockMap);
-
-        // 2.6 班次量均衡（按结构班产标准调整最大硫化机数胎胚的班次分布）
-        //balanceShiftQuantities(context, shiftResults, allShiftConfigs);
 
         // 2.7 构建子表（机台+胎胚+车次维度，含库存可供硫化时长和顺位）
         Map<String, List<CxScheduleDetail>> detailGroupMap = buildScheduleDetailsFromShifts(context, shiftResults, allShiftConfigs);
@@ -388,40 +385,6 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             }
         }
 
-        // 5.3.4 进行结构间多机台同班次量均衡
-        //同班次下同一个结构下各个机台里的任务，量可以调换达到合理
-        //例如这个结构当班次总排量540,4台成型机
-        //各机台负荷=H1105=8台/3种, H1204=7台/4种, H1304=8台/3种, H1504=8台/3种
-        //每一台都有合理的量，如何计算合理量
-        //H1105=540*8/(8+7+8+8)=139.3 四舍五入=140（最大合理量）
-        //H1204=540*7/(8+7+8+8)=121.9 四舍五入=120（最大合理量）
-        //H1304=540*8/(8+7+8+8)=139.3 四舍五入=140（最大合理量）
-        //H1504=540*8/(8+7+8+8)=139.3 四舍五入=140（最大合理量）
-
-        //分组排量实际的排产量如下
-        //第一个班次实际的排产量是H1105=130,H1204=120,H1304=140,H1504=150，总量=540
-        //第二个班次实际的排产量是H1105=150,H1204=140,H1304=110,H1504=140，总量=540
-        //第三个班次实际的排产量是H1105=160,H1204=110,H1304=140,H1504=130，总量=540
-
-        //这样可以看到虽然我的总量都是540，但是每个机台都不是合理量，需要调整尽量达到合理量
-        //调整是同班次，不同机台之间以整车为单位调拨，因为同一个结构下整车都是同一个。
-        //此时调拨的方式以交班库存可供硫化时长来判断，
-        //1.优先采用不同机台同胎胚调拨，取交班库存可供硫化时长大的机台来减去，交班库存可供硫化时长少的补充
-
-        //我期望达到的效果是每个机台的排量都达到最大合理量，即H1105=140,H1204=120,H1304=140,H1504=140
-        //并且H1105机台任意两个同结构，同分配硫化机台数，一样的班次的排量差值不能超过1车。举例：
-        //H1105=140（1班次，分配了结构A，分配了硫化机数8台）
-        //H1105=130（2班次，分配了结构A，分配了硫化机数8台）
-        //H1105=150（3班次，分配了结构A，分配了硫化机数8台）
-        //H1105=120（4班次，分配了结构A，分配了硫化机数7台）
-        //H1105=70（5班次，分配了结构A，分配了硫化机数4台）
-        //H1105=70（6班次，分配了结构B，分配了硫化机数4台）
-        //像这样班次1和班次2比较，排量差值为1车，符合要求，班次2和班次3比较，排量差值为2车，不符合要求
-        //班次3和班次4比较不用比骄傲因为分配机台数不同没有比较空间
-        //班次4和班次5比较不用比骄傲因为分配机台数不同没有比较空间
-        //班次5和班次6比较不用比骄傲因为结构不同没有比较空间
-        //因为我是按班次排产所以班次没有办法比较，2班次就是跟1班次看下有没有空间如果有就可以下140/150/130,3班次如果跟1班次有比较空间就代表和2班次也有比较空间那就是和两个都比只要发现差了2车就不行要调整。
-
         // 执行结构内多机台同班次量均衡 + 跨班次同机台排量差值约束
         balanceMachineQuantityWithinStructure(allAllocations, context, shiftHistory);
 
@@ -435,7 +398,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             String machineCode = allocation.getMachineCode();
             log.info("========== 对{}机台进行班次排量 ==========", machineCode);
             for (TaskAllocation taskAlloc : allocation.getTaskAllocations()) {
-                CoreScheduleAlgorithmService.DailyEmbryoTask task = new CoreScheduleAlgorithmService.DailyEmbryoTask();
+                DailyEmbryoTask task = new DailyEmbryoTask();
                 task.setEmbryoCode(taskAlloc.getEmbryoCode());
                 task.setMaterialCode(taskAlloc.getMaterialCode());
                 task.setMaterialDesc(taskAlloc.getMaterialDesc());
@@ -1074,8 +1037,8 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         int initialSize = dailySet.size();
 
         // 过滤试制任务
-        List<CoreScheduleAlgorithmService.DailyEmbryoTask> filteredTrialTasks = new ArrayList<>();
-        for (CoreScheduleAlgorithmService.DailyEmbryoTask task : taskGroup.getTrialTasks()) {
+        List<DailyEmbryoTask> filteredTrialTasks = new ArrayList<>();
+        for (DailyEmbryoTask task : taskGroup.getTrialTasks()) {
             String mc = task.getMaterialCode();
             if (dailySet.contains(mc) || dailySet.size() < maxTrialSku) {
                 dailySet.add(mc);
@@ -1088,8 +1051,8 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         taskGroup.getTrialTasks().addAll(filteredTrialTasks);
 
         // 过滤量试任务（在newTasks中）
-        List<CoreScheduleAlgorithmService.DailyEmbryoTask> filteredNewTasks = new ArrayList<>();
-        for (CoreScheduleAlgorithmService.DailyEmbryoTask task : taskGroup.getNewTasks()) {
+        List<DailyEmbryoTask> filteredNewTasks = new ArrayList<>();
+        for (DailyEmbryoTask task : taskGroup.getNewTasks()) {
             if (Boolean.TRUE.equals(task.getIsProductionTrial())) {
                 String mc = task.getMaterialCode();
                 if (dailySet.contains(mc) || dailySet.size() < maxTrialSku) {
@@ -1106,8 +1069,8 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         taskGroup.getNewTasks().addAll(filteredNewTasks);
 
         // 过滤续作中的试制/量试任务——续作是前面班次已排产过的，直接放行不占新增SKU名额
-        List<CoreScheduleAlgorithmService.DailyEmbryoTask> filteredContinueTasks = new ArrayList<>();
-        for (CoreScheduleAlgorithmService.DailyEmbryoTask task : taskGroup.getContinueTasks()) {
+        List<DailyEmbryoTask> filteredContinueTasks = new ArrayList<>();
+        for (DailyEmbryoTask task : taskGroup.getContinueTasks()) {
             if (Boolean.TRUE.equals(task.getIsTrialTask()) || Boolean.TRUE.equals(task.getIsProductionTrial())) {
                 String mc = task.getMaterialCode();
                 // 已在dailySet中的（前面班次已排产），直接放行；不在的也不占新名额，直接放行
@@ -1424,7 +1387,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                         taskAlloc.getEmbryoCode(), lhId, lhResult != null ? "已找到" : "未找到", classIndex);
                 continue;
             }
-            Integer currentClassPlanObj = getClassPlanQtyByIndex(lhResult, classIndex);
+            Integer currentClassPlanObj = productionCalculator.getClassPlanQtyByIndex(lhResult, classIndex);
             if (currentClassPlanObj == null || currentClassPlanObj <= 0) {
                 log.info("  硫化联动跳过: 胎胚={}, CLASS{}硫化计划量为0或空({}), 无需联动",
                         taskAlloc.getEmbryoCode(), classIndex, currentClassPlanObj);
@@ -1491,20 +1454,6 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         return 0;
     }
 
-    private Integer getClassPlanQtyByIndex(LhScheduleResult lhResult, int classIndex) {
-        switch (classIndex) {
-            case 1: return lhResult.getClass1PlanQty();
-            case 2: return lhResult.getClass2PlanQty();
-            case 3: return lhResult.getClass3PlanQty();
-            case 4: return lhResult.getClass4PlanQty();
-            case 5: return lhResult.getClass5PlanQty();
-            case 6: return lhResult.getClass6PlanQty();
-            case 7: return lhResult.getClass7PlanQty();
-            case 8: return lhResult.getClass8PlanQty();
-            default: return null;
-        }
-    }
-
     private void setClassPlanQtyByIndex(LhScheduleResult lhResult, int classIndex, int value) {
         switch (classIndex) {
             case 1: lhResult.setClass1PlanQty(value); break;
@@ -1542,111 +1491,6 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         }
     }
 
-    // ==================== 2.6 班次量均衡（全班次完成后，调整绑定胎胚的班次分布） ====================
-
-    /**
-     * 班次量均衡
-     *
-     * <p>业务规则：
-     * <ul>
-     *   <li>1. 按结构向下，找到绑定最大硫化机数的胎胚计划</li>
-     *   <li>2. 通过整车调整使每个班次的计划量趋于平衡</li>
-     *   <li>3. 最后一个班次的计划量 = 总量 - SUM(第1条到倒数第2条的计划量)</li>
-     * </ul>
-     *
-     * <p>示例：
-     * <pre>
-     * 序号  物料   硫化机数  班次计划量(夜-早-中)  均衡后的班次计划量
-     * 1    胎胚1   1        11-22-11              11-22-11
-     * 2    胎胚2   2        32-32-32              32-32-32
-     * 3    胎胚3   5        76-86-76              86-76-86（整车调整使班次均衡）
-     * </pre>
-     *
-     * @param context        排程上下文
-     * @param shiftResults   所有班次的排产结果
-     * @param allShiftConfigs 所有班次配置
-     */
-    private void balanceShiftQuantities(ScheduleContextVo context,
-                                        List<ShiftScheduleResult> shiftResults,
-                                        List<CxShiftConfig> allShiftConfigs) {
-        // 2.6.1 按 scheduleDay 分组（每天独立均衡，至少 2 个班次才处理）
-        Map<Integer, List<ShiftScheduleResult>> dayShiftMap = shiftResults.stream()
-                .collect(Collectors.groupingBy(ShiftScheduleResult::getDay));
-
-        for (Map.Entry<Integer, List<ShiftScheduleResult>> dayEntry : dayShiftMap.entrySet()) {
-            int day = dayEntry.getKey();
-            List<ShiftScheduleResult> dayShifts = dayEntry.getValue();
-
-            if (dayShifts.size() < 2) continue; // 至少2个班次才需要均衡
-
-            // 2.6.2 按胎胚编码收集各班次 ShiftProductionResult
-            Map<String, List<ShiftScheduleService.ShiftProductionResult>> embryoByShiftMap = new LinkedHashMap<>();
-            for (ShiftScheduleResult shiftResult : dayShifts) {
-                if (shiftResult.getShiftProductionResults() == null) continue;
-                for (ShiftScheduleService.ShiftProductionResult result : shiftResult.getShiftProductionResults()) {
-                    embryoByShiftMap.computeIfAbsent(result.getEmbryoCode(), k -> new ArrayList<>()).add(result);
-                }
-            }
-
-            // 2.6.3 选定「绑定胎胚」：硫化机台数最多的胎胚决定该天均衡节奏
-            String maxMachineEmbryo = null;
-            int maxMachineCount = 0;
-            for (Map.Entry<String, List<ShiftScheduleService.ShiftProductionResult>> entry : embryoByShiftMap.entrySet()) {
-                String embryoCode = entry.getKey();
-                List<ShiftScheduleService.ShiftProductionResult> results = entry.getValue();
-                if (results.isEmpty()) continue;
-
-                // 从sourceTask获取硫化机数
-                int vulcanizeMachineCount = 0;
-                if (results.get(0).getSourceTask() != null && results.get(0).getSourceTask().getVulcanizeMachineCount() != null) {
-                    vulcanizeMachineCount = results.get(0).getSourceTask().getVulcanizeMachineCount();
-                }
-                if (vulcanizeMachineCount > maxMachineCount) {
-                    maxMachineCount = vulcanizeMachineCount;
-                    maxMachineEmbryo = embryoCode;
-                }
-            }
-
-            if (maxMachineEmbryo == null) {
-                log.info("天={}：未找到绑定最大硫化机数的胎胚，跳过均衡", day);
-                continue;
-            }
-
-            List<ShiftScheduleService.ShiftProductionResult> targetResults = embryoByShiftMap.get(maxMachineEmbryo);
-            log.info("班次均衡：天={}, 最大硫化机数胎胚={}, 硫化机数={}", day, maxMachineEmbryo, maxMachineCount);
-
-            // 2.6.4 整车调整：前 N-1 班按平均车数取整，最后班 = 总量 − 已分配
-            int totalActualQty = targetResults.stream()
-                    .mapToInt(r -> r.getQuantity() != null ? r.getQuantity() : 0)
-                    .sum();
-
-            if (totalActualQty <= 0) continue;
-
-            // 获取整车条数
-            int tripCapacity = targetResults.get(0).getTripCapacity() != null ? targetResults.get(0).getTripCapacity() : 1;
-            if (tripCapacity <= 0) tripCapacity = 1;
-
-            // 计算每个班次应该分配的平均量（按整车取整）
-            int avgPerShift = totalActualQty / targetResults.size();
-            int avgCarsPerShift = avgPerShift / tripCapacity;
-
-            // 重新分配：前N-1个班次按整车取整，最后一个班次用余额
-            int allocatedTotal = 0;
-            for (int i = 0; i < targetResults.size() - 1; i++) {
-                ShiftScheduleService.ShiftProductionResult result = targetResults.get(i);
-                int balancedQty = avgCarsPerShift * tripCapacity;
-                result.setQuantity(balancedQty);
-                allocatedTotal += balancedQty;
-                log.info("  班次均衡：班次索引={}, 胚胎={}, 均衡后量={}", i, maxMachineEmbryo, balancedQty);
-            }
-
-            // 最后一个班次 = 总量 - 已分配
-            ShiftScheduleService.ShiftProductionResult lastResult = targetResults.get(targetResults.size() - 1);
-            int lastQty = totalActualQty - allocatedTotal;
-            lastResult.setQuantity(lastQty);
-            log.info("  班次均衡：最后班次，胚胎={}, 均衡后量={}（余额）", maxMachineEmbryo, lastQty);
-        }
-    }
 
     /**
      * 更新机台在产状态（滚动替换：仅保留本班次分配结果，作为下一班次的续作历史）
@@ -1868,12 +1712,12 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                             merged.setPlanEndTime(existing.getPlanEndTime());
 
                             // ---- 合并 sourceTask：任一记录有 isUrgentEnding=true 则保留 ----
-                            CoreScheduleAlgorithmService.DailyEmbryoTask existingTask = existing.getSourceTask();
-                            CoreScheduleAlgorithmService.DailyEmbryoTask sprTask = spr.getSourceTask();
+                            DailyEmbryoTask existingTask = existing.getSourceTask();
+                            DailyEmbryoTask sprTask = spr.getSourceTask();
                             boolean hasUrgentEnding = (existingTask != null && Boolean.TRUE.equals(existingTask.getIsUrgentEnding()))
                                     || (sprTask != null && Boolean.TRUE.equals(sprTask.getIsUrgentEnding()));
                             if (hasUrgentEnding || existingTask != null) {
-                                CoreScheduleAlgorithmService.DailyEmbryoTask mergedTask = new CoreScheduleAlgorithmService.DailyEmbryoTask();
+                                DailyEmbryoTask mergedTask = new DailyEmbryoTask();
                                 mergedTask.setEmbryoCode(existingTask != null ? existingTask.getEmbryoCode() : (sprTask != null ? sprTask.getEmbryoCode() : null));
                                 mergedTask.setMaterialCode(existingTask != null ? existingTask.getMaterialCode() : (sprTask != null ? sprTask.getMaterialCode() : null));
                                 mergedTask.setIsUrgentEnding(hasUrgentEnding);
@@ -2299,7 +2143,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                     }
                 }
                 // 试制/量试标记从 sourceTask 获取
-                CoreScheduleAlgorithmService.DailyEmbryoTask srcTask = spr.getSourceTask();
+                DailyEmbryoTask srcTask = spr.getSourceTask();
                 if (srcTask != null) {
                     log.info("  spr[{}] sourceTask: isTrialTask={}, isProductionTrial={}",
                             sprIndex, srcTask.getIsTrialTask(), srcTask.getIsProductionTrial());
@@ -2495,7 +2339,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                         int moldQty = lhResult.getMouldQty() != null ? lhResult.getMouldQty() : 1;
                         totalMoldQty += moldQty;
                         // 硫化消耗（当前班次）
-                        Integer consumption = getClassPlanQtyByIndex(lhResult, vulcanizeClassIndex);
+                        Integer consumption = productionCalculator.getClassPlanQtyByIndex(lhResult, vulcanizeClassIndex);
                         if (consumption != null) {
                             totalVulcanizeConsumption += consumption;
                         }
@@ -2525,7 +2369,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
 
                 // 获取小时产能（用于车次时间计算）
                 int hourlyCapacity = 12;
-                CoreScheduleAlgorithmService.DailyEmbryoTask task = spr.getSourceTask();
+                DailyEmbryoTask task = spr.getSourceTask();
                 if (task != null) {
                     if (task.getHourCapacity() != null && task.getHourCapacity() > 0) {
                         hourlyCapacity = task.getHourCapacity();
@@ -3074,7 +2918,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         if (isEndingTask) return true;
         // 回退到 sourceTask 检查：仅保留 endingAbandoned（收尾舍弃），
         // isLastEndingBatch 和 isEndingTask 由班次级 SPR 标记决定（scheduleEndingTask 已按 isLastProductive 精确设置）
-        CoreScheduleAlgorithmService.DailyEmbryoTask task = spr.getSourceTask();
+        DailyEmbryoTask task = spr.getSourceTask();
         if (task != null) {
             boolean endingAbandoned = Boolean.TRUE.equals(task.getEndingAbandoned());
             if (endingAbandoned) {
@@ -3115,7 +2959,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         List<String> reasons = new ArrayList<>();
 
         // 从 sourceTask 获取详细任务类型
-        CoreScheduleAlgorithmService.DailyEmbryoTask task = spr.getSourceTask();
+        DailyEmbryoTask task = spr.getSourceTask();
         if (task != null) {
             if (Boolean.TRUE.equals(task.getIsTrialTask())) {
                 reasons.add("试制");
@@ -3404,7 +3248,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             if (classField != null && classField.startsWith("CLASS")) {
                 try {
                     int classIndex = Integer.parseInt(classField.substring(5));
-                    Integer planQty = getClassPlanQtyByIndex(lhResult, classIndex);
+                    Integer planQty = productionCalculator.getClassPlanQtyByIndex(lhResult, classIndex);
                     if (planQty != null && planQty > 0) {
                         total += planQty;
                     }
@@ -3528,7 +3372,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                 String taskKey = String.valueOf(task.getId());
 
                 // 检查硫化余量：如果已超产（<=0），跳过分配
-                if (isVulcanizeSurplusExhausted(task.getMaterialCode(), monthSurplusMap)) {
+                if (productionCalculator.isVulcanizeSurplusExhausted(task.getMaterialCode(), monthSurplusMap)) {
                     log.debug("胎胚 {} 硫化任务 {} 硫化余量<=0，跳过库存分配", embryoCode, taskKey);
                     continue;
                 }
@@ -3545,7 +3389,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                     int dayVulcanizationQty = 0;
 
                     // 检查硫化余量：如果已超产（<=0），跳过分配
-                    if (isVulcanizeSurplusExhausted(materialCode, monthSurplusMap)) {
+                    if (productionCalculator.isVulcanizeSurplusExhausted(materialCode, monthSurplusMap)) {
                         log.debug("胎胚 {} 硫化任务 {} 物料 {} 硫化余量<=0，跳过库存分配",
                                 embryoCode, lh.getId(), materialCode);
                         continue;
@@ -3577,7 +3421,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                 // 构建分配追踪列表，每个任务记录硫化余量上限
                 List<TaskAllocationR> allocations = new ArrayList<>();
                 for (TaskDemandSimple td : taskDemands) {
-                    int surplus = getVulcanizingSurplusSimple(td.materialCode, monthSurplusMap);
+                    int surplus = productionCalculator.getVulcanizingSurplus(td.materialCode, monthSurplusMap);
                     allocations.add(new TaskAllocationR(td, 0, surplus));
                 }
 
@@ -3609,21 +3453,6 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         }
 
         return materialStockMap;
-    }
-
-    /**
-     * 获取物料的硫化余量（作为库存分配上限）
-     */
-    private int getVulcanizingSurplusSimple(String materialCode,
-                                            Map<String, MdmMonthSurplus> monthSurplusMap) {
-        if (materialCode == null || monthSurplusMap == null) {
-            return Integer.MAX_VALUE;
-        }
-        MdmMonthSurplus monthSurplus = monthSurplusMap.get(materialCode);
-        if (monthSurplus != null && monthSurplus.getPlanSurplusQty() != null) {
-            return monthSurplus.getPlanSurplusQty().intValue();
-        }
-        return Integer.MAX_VALUE;
     }
 
     /**
@@ -3689,24 +3518,6 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
     }
 
     /**
-     * 判断物料的硫化余量是否已耗尽（<=0）
-     *
-     * @param materialCode    物料编码
-     * @param monthSurplusMap 月度硫化余量映射
-     * @return true 表示硫化余量已耗尽，应跳过库存分配
-     */
-    private boolean isVulcanizeSurplusExhausted(String materialCode,
-                                                Map<String, MdmMonthSurplus> monthSurplusMap) {
-        if (materialCode == null || monthSurplusMap == null) {
-            return false;
-        }
-        MdmMonthSurplus monthSurplus = monthSurplusMap.get(materialCode);
-        return monthSurplus != null
-                && monthSurplus.getPlanSurplusQty() != null
-                && monthSurplus.getPlanSurplusQty().compareTo(BigDecimal.ZERO) <= 0;
-    }
-
-    /**
      * 硫化任务需求（内部类）
      */
     private static class TaskDemandSimple {
@@ -3748,7 +3559,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             if (classField != null && classField.startsWith("CLASS")) {
                 try {
                     int classIndex = Integer.parseInt(classField.substring(5));
-                    Integer planQty = getClassPlanQtyByIndex(lhResult, classIndex);
+                    Integer planQty = productionCalculator.getClassPlanQtyByIndex(lhResult, classIndex);
                     if (planQty != null && planQty > 0) {
                         return new ShiftPlanResultSimple(planQty);
                     }
@@ -4274,7 +4085,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             spr.setIsLastEndingBatch(true);
 
             // 设置 sourceTask 用于 buildTaskAnalysis 构建
-            CoreScheduleAlgorithmService.DailyEmbryoTask sourceTask = new CoreScheduleAlgorithmService.DailyEmbryoTask();
+            DailyEmbryoTask sourceTask = new DailyEmbryoTask();
             sourceTask.setEmbryoCode(foundTask.getEmbryoCode());
             sourceTask.setMaterialCode(materialCode);
             sourceTask.setIsEndingTask(true);
