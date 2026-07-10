@@ -119,7 +119,7 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
                     conflictedMouldCodes.size(), freeMouldCount, conflictedMouldCodes);
         }
         // 4. 过滤候选机台：状态启用 + 硬性指标匹配 + 模具未被占用。
-        // 模壳匹配不再作为硬过滤，后续在最早收尾20分钟窗口内按同模壳排序降级处理。
+        // 模套型号匹配作为硬过滤（到货模具不降级），同模壳仍参与后续最早收尾窗口内排序降级。
         // 这里只保留业务上可承接的机台，不在这里提前决定最终排产量。
         BigDecimal skuInch = parseInch(sku.getProSize());
         SpecialMaterialMatchResult specialMaterialMatchResult =
@@ -478,7 +478,7 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
         if (!needLog) {
             return;
         }
-        log.info("SKU单控候选诊断, materialCode: {}, skuType: {}, surplusQty: {}, smallBatchThreshold: {}, isSmallBatch: {}, "
+        log.info("SKU单控候选诊断, materialCode: {}, skuType: {}, surplusQty: {}, smallBatchTotalQtyThreshold: {}, isSmallBatch: {}, "
                         + "待排小批量SKU数: {}, 原候选: {}, 过滤后候选: {}, K1501L入候选: {}, K1501R入候选: {}, K1501L保留: {}, K1501R保留: {}, 过滤明细: {}",
                 sku.getMaterialCode(), resolveSkuTypeDesc(sku), sku.getSurplusQty(),
                 resolveSmallBatchThreshold(context), sku.isSmallBatchValidation(),
@@ -536,14 +536,7 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
     }
 
     private int resolveSmallBatchThreshold(LhScheduleContext context) {
-        if (context != null && Objects.nonNull(context.getScheduleConfig())) {
-            return context.getScheduleConfig().getSmallBatchSkuThreshold();
-        }
-        if (context == null) {
-            return LhScheduleConstant.SMALL_BATCH_SKU_THRESHOLD;
-        }
-        return context.getParamIntValue(LhScheduleParamConstant.SMALL_BATCH_SKU_THRESHOLD,
-                LhScheduleConstant.SMALL_BATCH_SKU_THRESHOLD);
+        return LhScheduleConstant.SMALL_BATCH_SKU_THRESHOLD;
     }
 
     /**
@@ -745,6 +738,10 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
         if (!LhMachineHardMatchUtil.isInchInRange(
                 skuInch, machine.getDimensionMinimum(), machine.getDimensionMaximum())) {
             return MachineAvailabilityReason.INCH_MISMATCH;
+        }
+        // 模套型号硬过滤：普通模具模壳必须命中机台模套型号，仅到货模具时不降级。
+        if (!LhMachineHardMatchUtil.isMouldSetPriorityMatched(context, sku, machine)) {
+            return MachineAvailabilityReason.MOULD_SET_MISMATCH;
         }
         MachineAvailabilityReason specialSupportReason =
                 resolveSpecialSupportAvailabilityReason(matchResult, machine);
@@ -1155,11 +1152,27 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
         Date windowEndTime = baseShift.getShiftEndDateTime();
         int baseShiftIndex = baseShift.getShiftIndex();
         List<MachineScheduleDTO> windowCandidates = new ArrayList<>(candidates.size());
+        // 窗口外过滤的单控候选,用于单边粒度SKU候选不足时回补
+        List<MachineScheduleDTO> filteredSingleControlCandidates = new ArrayList<>(2);
         for (MachineScheduleDTO candidate : candidates) {
             CandidateWindowProfile profile = resolveCandidateWindowProfile(context, sku, candidate, profileCache);
             // 同班次判定：机台收尾时间落在基准班次区间内
             if (isInEndingWindow(profile.getReferenceTime(), windowStartTime, windowEndTime)) {
                 windowCandidates.add(candidate);
+            } else if (LhSingleControlMachineUtil.isSingleSideGranularitySku(sku)
+                    && isSingleControlMachine(context, candidate.getMachineCode())) {
+                // 单边粒度SKU的单控候选被窗口过滤,暂存用于候选不足时回补
+                filteredSingleControlCandidates.add(candidate);
+            }
+        }
+        // 单边粒度SKU(试制/量试/小批量)只能使用单控机台,窗口过滤后如果单控候选不足,回补被过滤的单控候选
+        if (LhSingleControlMachineUtil.isSingleSideGranularitySku(sku)
+                && !CollectionUtils.isEmpty(filteredSingleControlCandidates)) {
+            long windowSingleControlCount = windowCandidates.stream()
+                    .filter(machine -> isSingleControlMachine(context, machine.getMachineCode()))
+                    .count();
+            if (windowSingleControlCount <= 1) {
+                windowCandidates.addAll(filteredSingleControlCandidates);
             }
         }
         candidates.clear();
