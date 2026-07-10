@@ -1,6 +1,7 @@
 package com.zlt.aps.cx.service.engine;
 
 import com.zlt.aps.cx.entity.config.CxParamConfig;
+import com.zlt.aps.cx.vo.DailyEmbryoTask;
 import com.zlt.aps.cx.vo.ScheduleContextVo;
 import com.zlt.aps.mp.api.domain.entity.MpCxCapacityConfiguration;
 import lombok.RequiredArgsConstructor;
@@ -78,9 +79,6 @@ public class BalancingService {
     /** 机台默认最大硫化机数（配比配置缺失时的兜底值） */
     public static final int DEFAULT_MAX_LH_MACHINE_QTY = 10;
 
-    /** 参数编码：机台最大硫化机数 */
-    private static final String PARAM_MAX_LH_MACHINE_QTY = "SYS04020003";
-
     /** 参数编码：强制保留历史任务  */
     private static final String PARAM_FORCE_KEEP_HISTORY = "SYS04070003";
 
@@ -104,7 +102,7 @@ public class BalancingService {
      * <p>委托给 10 参数重载，{@code continueLoadMap=null}、{@code continueTypeMap=null}、{@code continueLhMachineCodeMap=null}。
      */
     public BalancingResult balanceEmbryosToMachinesWithMachineCapacity(
-            List<CoreScheduleAlgorithmService.DailyEmbryoTask> tasks,
+            List<DailyEmbryoTask> tasks,
             List<MpCxCapacityConfiguration> availableMachines,
             Map<String, Set<String>> machineHistoryMap,
             Map<String, Integer> machineMaxLhMap,
@@ -137,7 +135,7 @@ public class BalancingService {
      * @return 机台 → 胎胚 → 分配硫化机数 的 {@link BalancingResult}
      */
     public BalancingResult balanceEmbryosToMachinesWithMachineCapacity(
-            List<CoreScheduleAlgorithmService.DailyEmbryoTask> tasks,
+            List<DailyEmbryoTask> tasks,
             List<MpCxCapacityConfiguration> availableMachines,
             Map<String, Set<String>> machineHistoryMap,
             Map<String, Integer> machineMaxLhMap,
@@ -154,7 +152,7 @@ public class BalancingService {
         // ---- 5.3.3.2.5.1 输入过滤 ----
         // 条件1：收尾最后一批且 endingExtraInventory≤0 → 已舍弃，不参与均衡
         // 条件2：endingExtraInventory 必须 >0（实际排产量，Processor 层亦会预过滤）
-        List<CoreScheduleAlgorithmService.DailyEmbryoTask> filteredTasks = tasks.stream()
+        List<DailyEmbryoTask> filteredTasks = tasks.stream()
                 .filter(t -> !(Boolean.TRUE.equals(t.getIsLastEndingBatch())
                         && (t.getEndingExtraInventory() == null || t.getEndingExtraInventory() <= 0)))
                 .filter(t -> t.getEndingExtraInventory() != null && t.getEndingExtraInventory() > 0)
@@ -172,7 +170,7 @@ public class BalancingService {
         }
 
         // ---- 诊断日志：任务明细与共用胎胚物料分布（不影响分配逻辑） ----
-        for (CoreScheduleAlgorithmService.DailyEmbryoTask task : tasks) {
+        for (DailyEmbryoTask task : tasks) {
             String taskType = Boolean.TRUE.equals(task.getIsTrialTask()) ? "试制"
                     : Boolean.TRUE.equals(task.getIsContinueTask()) ? "续作" : "新增";
             String zeroDemandFlag = task.getDeferredRemainingDemand() != null ? "(零净需求)" : "";
@@ -182,7 +180,7 @@ public class BalancingService {
                     taskType, zeroDemandFlag);
         }
         Map<String, Map<String, Integer>> embryoMaterialStats = new java.util.LinkedHashMap<>();
-        for (CoreScheduleAlgorithmService.DailyEmbryoTask task : tasks) {
+        for (DailyEmbryoTask task : tasks) {
             String embryoCode = task.getEmbryoCode();
             String materialCode = task.getMaterialCode() != null ? task.getMaterialCode() : "未知";
             int count = task.getVulcanizeMachineCount() != null ? task.getVulcanizeMachineCount() : 0;
@@ -222,7 +220,7 @@ public class BalancingService {
 
         // 计算种类数（去重）
         long totalTypes = tasks.stream()
-                .map(CoreScheduleAlgorithmService.DailyEmbryoTask::getEmbryoCode)
+                .map(DailyEmbryoTask::getEmbryoCode)
                 .distinct()
                 .count();
 
@@ -231,7 +229,7 @@ public class BalancingService {
 
         // 打印任务需求明细（合并同胚子代码）
         Map<String, Integer> taskDetailMap = new LinkedHashMap<>();
-        for (CoreScheduleAlgorithmService.DailyEmbryoTask task : tasks) {
+        for (DailyEmbryoTask task : tasks) {
             String code = task.getEmbryoCode();
             int cnt = task.getVulcanizeMachineCount() != null ? task.getVulcanizeMachineCount() : 0;
             taskDetailMap.merge(code, cnt, Integer::sum);
@@ -249,7 +247,7 @@ public class BalancingService {
         //   ④ 同 embryoCode 总硫化机数降序（大任务优先占种类槽）
         //   ⑤ 静态候选机台数升序（受限任务优先）
         Map<String, Integer> embryoTotalDemand = new HashMap<>();
-        for (CoreScheduleAlgorithmService.DailyEmbryoTask task : tasks) {
+        for (DailyEmbryoTask task : tasks) {
             embryoTotalDemand.merge(task.getEmbryoCode(),
                     task.getVulcanizeMachineCount() != null ? task.getVulcanizeMachineCount() : 0,
                     Integer::sum);
@@ -259,7 +257,7 @@ public class BalancingService {
                 .map(MpCxCapacityConfiguration::getCxMachineCode)
                 .collect(Collectors.toSet());
 
-        List<CoreScheduleAlgorithmService.DailyEmbryoTask> sortedTasks = tasks.stream()
+        List<DailyEmbryoTask> sortedTasks = tasks.stream()
                 .sorted((a, b) -> {
                     boolean aConstrained = a.getConstrainedMachineCode() != null && !a.getConstrainedMachineCode().isEmpty();
                     boolean bConstrained = b.getConstrainedMachineCode() != null && !b.getConstrainedMachineCode().isEmpty();
@@ -424,7 +422,7 @@ public class BalancingService {
      */
     private RoundExecutionResult executeBalancingRound(
             BalancingRoundConfig config,
-            List<CoreScheduleAlgorithmService.DailyEmbryoTask> sortedTasks,
+            List<DailyEmbryoTask> sortedTasks,
             List<MpCxCapacityConfiguration> availableMachines,
             Map<String, Set<String>> machineHistoryMap,
             Map<String, Integer> machineMaxLhMap,
@@ -444,7 +442,7 @@ public class BalancingService {
         // ---- 目标胎胚种类数计算（须在机台初始化前完成，供 maxTypes cap 使用）----
         int machineCount = availableMachines.size();
         long distinctTypeCount = sortedTasks.stream()
-                .map(CoreScheduleAlgorithmService.DailyEmbryoTask::getEmbryoCode)
+                .map(DailyEmbryoTask::getEmbryoCode)
                 .distinct().count();
         config.setTargetTypesPerMachine(
                 machineCount > 0 && distinctTypeCount > 0
@@ -585,7 +583,7 @@ public class BalancingService {
         searchResult.dfsAssignedQty = 0;
         searchResult.config = config;  // 传递轮次配置，DFS 内部通过 searchResult.config 读取策略
 
-        List<CoreScheduleAlgorithmService.DailyEmbryoTask> remainingTasks = getRemainingTasks(sortedTasks);
+        List<DailyEmbryoTask> remainingTasks = getRemainingTasks(sortedTasks);
 
         // 【修复】DFS totalDemand：第一轮用原始值（保持不变），第二轮用剩余需求（启用B2剪枝+正确日志）
         // 原始 totalDemand 含续作预扣/保底预留，bestAssignedCount 不含，等式永不成立；
@@ -630,14 +628,14 @@ public class BalancingService {
                 }
             }
             Map<String, Integer> demandQtyMap = new java.util.LinkedHashMap<>();
-            for (CoreScheduleAlgorithmService.DailyEmbryoTask t : remainingTasks) {
+            for (DailyEmbryoTask t : remainingTasks) {
                 String key = t.getEmbryoCode()
                         + (t.getIsProductionTrial() != null && t.getIsProductionTrial() ? "(量试)" : "(正式)")
                         + (t.getConstrainedMachineCode() != null ? "[约束:" + t.getConstrainedMachineCode() + "]" : "");
                 demandQtyMap.merge(key, t.getVulcanizeMachineCount() != null ? t.getVulcanizeMachineCount() : 1, Integer::sum);
             }
             Map<String, Integer> demandByEmbryo = new java.util.HashMap<>();
-            for (CoreScheduleAlgorithmService.DailyEmbryoTask t : remainingTasks) {
+            for (DailyEmbryoTask t : remainingTasks) {
                 demandByEmbryo.merge(t.getEmbryoCode(), t.getVulcanizeMachineCount() != null ? t.getVulcanizeMachineCount() : 1, Integer::sum);
             }
             List<String> shortageItems = new java.util.ArrayList<>();
@@ -780,9 +778,9 @@ public class BalancingService {
      * @return lhId → 原始 vulcanizeMachineCount 映射
      */
     private Map<Long, Integer> snapshotDemands(
-            List<CoreScheduleAlgorithmService.DailyEmbryoTask> tasks) {
+            List<DailyEmbryoTask> tasks) {
         Map<Long, Integer> snapshot = new HashMap<>();
-        for (CoreScheduleAlgorithmService.DailyEmbryoTask task : tasks) {
+        for (DailyEmbryoTask task : tasks) {
             Integer count = task.getVulcanizeMachineCount();
             snapshot.put(task.getLhId(), count != null ? count : 0);
         }
@@ -796,9 +794,9 @@ public class BalancingService {
      * @param snapshot    snapshotDemands 产生的快照映射
      */
     private void restoreDemands(
-            List<CoreScheduleAlgorithmService.DailyEmbryoTask> sortedTasks,
+            List<DailyEmbryoTask> sortedTasks,
             Map<Long, Integer> snapshot) {
-        for (CoreScheduleAlgorithmService.DailyEmbryoTask task : sortedTasks) {
+        for (DailyEmbryoTask task : sortedTasks) {
             Integer original = snapshot.get(task.getLhId());
             if (original != null) {
                 task.setVulcanizeMachineCount(original);
@@ -821,7 +819,7 @@ public class BalancingService {
      * ContinueTaskProcessor 则产出 continueAllocations 供 NewTaskProcessor 构建预扣 Map。
      */
     private void reservedHistoryTasks(
-            List<CoreScheduleAlgorithmService.DailyEmbryoTask> tasks,
+            List<DailyEmbryoTask> tasks,
             List<MachineState> machineStates,
             ScheduleContextVo context) {
 
@@ -837,8 +835,8 @@ public class BalancingService {
 
             for (String embryoCode : historyEmbryos) {
                 // 收集该胚胎的所有匹配任务（vulcanizeMachineCount > 0）
-                List<CoreScheduleAlgorithmService.DailyEmbryoTask> matchedTasks = new ArrayList<>();
-                for (CoreScheduleAlgorithmService.DailyEmbryoTask task : tasks) {
+                List<DailyEmbryoTask> matchedTasks = new ArrayList<>();
+                for (DailyEmbryoTask task : tasks) {
                     if (embryoCode.equals(task.getEmbryoCode())) {
                         int remainingDemand = task.getVulcanizeMachineCount() != null
                                 ? task.getVulcanizeMachineCount() : 0;
@@ -858,9 +856,9 @@ public class BalancingService {
                 int totalReservedThisEmbryo = 0;
 
                 // 容量/种类检查取第一个任务（同胚胎的任务属性一致）
-                CoreScheduleAlgorithmService.DailyEmbryoTask firstTask = matchedTasks.get(0);
+                DailyEmbryoTask firstTask = matchedTasks.get(0);
 
-                for (CoreScheduleAlgorithmService.DailyEmbryoTask matchedTask : matchedTasks) {
+                for (DailyEmbryoTask matchedTask : matchedTasks) {
                     if (remainingToReserve <= 0) break;
 
                     int remainingDemand = matchedTask.getVulcanizeMachineCount();
@@ -920,8 +918,8 @@ public class BalancingService {
      *
      * <p>保底预留 / 续作预扣已在之前步骤从 vulcanizeMachineCount 扣减，此处只保留仍有需求的任务。
      */
-    private List<CoreScheduleAlgorithmService.DailyEmbryoTask> getRemainingTasks(
-            List<CoreScheduleAlgorithmService.DailyEmbryoTask> tasks) {
+    private List<DailyEmbryoTask> getRemainingTasks(
+            List<DailyEmbryoTask> tasks) {
         return tasks.stream()
                 .filter(t -> t.getVulcanizeMachineCount() != null && t.getVulcanizeMachineCount() > 0)
                 .collect(Collectors.toList());
@@ -952,7 +950,7 @@ public class BalancingService {
      * <p><b>解的择优</b>（见 {@link DfsSearchResult}）：完整度 &gt; 是否均衡 &gt; calculateBalancingScore。
      */
     private void dfsAssign(
-            List<CoreScheduleAlgorithmService.DailyEmbryoTask> tasks,
+            List<DailyEmbryoTask> tasks,
             int taskIndex,
             int remainingCount,
             List<MachineState> machineStates,
@@ -1127,7 +1125,7 @@ public class BalancingService {
             return;
         }
 
-        CoreScheduleAlgorithmService.DailyEmbryoTask task = tasks.get(taskIndex);
+        DailyEmbryoTask task = tasks.get(taskIndex);
         String embryoCode = task.getEmbryoCode();
 
         // --- D. 当前任务仍有 remainingCount 台待分配 ---
@@ -1752,7 +1750,7 @@ public class BalancingService {
             List<List<EmbryoAssignment>> assignments,
             List<String> machineCodes,
             List<MachineState> machineStates,
-            List<CoreScheduleAlgorithmService.DailyEmbryoTask> tasks) {
+            List<DailyEmbryoTask> tasks) {
 
         BalancingResult result = new BalancingResult();
         result.setAssignments(new ArrayList<>());
@@ -1795,7 +1793,7 @@ public class BalancingService {
      * 5.3.3.2.5.7 子步骤 — 输出分配明细、均衡指标（负荷差/种类差）、未排上胎胚告警。
      */
     private void logAllocationResult(BalancingResult result, List<MachineState> machineStates,
-                                     List<CoreScheduleAlgorithmService.DailyEmbryoTask> originalTasks) {
+                                     List<DailyEmbryoTask> originalTasks) {
         log.info("【均衡分配结果】");
 
         int maxLoad = 0, minLoad = Integer.MAX_VALUE;
@@ -1884,7 +1882,7 @@ public class BalancingService {
         // 打印未排上的胎胚
         if (originalTasks != null && !originalTasks.isEmpty()) {
             Map<String, Integer> demandByEmbryo = new LinkedHashMap<>();
-            for (CoreScheduleAlgorithmService.DailyEmbryoTask t : originalTasks) {
+            for (DailyEmbryoTask t : originalTasks) {
                 demandByEmbryo.merge(t.getEmbryoCode(),
                         t.getVulcanizeMachineCount() != null ? t.getVulcanizeMachineCount() : 1, Integer::sum);
             }
@@ -2031,7 +2029,7 @@ public class BalancingService {
      * @return P1 满足则返回分配结果，否则返回 null
      */
     private BalancingResult greedyAssign(
-            List<CoreScheduleAlgorithmService.DailyEmbryoTask> sortedTasks,
+            List<DailyEmbryoTask> sortedTasks,
             List<MpCxCapacityConfiguration> availableMachines,
             Map<String, Set<String>> machineHistoryMap,
             Map<String, Integer> machineMaxLhMap,
@@ -2060,8 +2058,8 @@ public class BalancingService {
         // ---- 2. 按胎胚分组并按总需求升序排序（小需求优先） ----
         // 小需求胎胚（如1台）通常只有少数候选机台（历史机台），需优先分配避免被大需求占满。
         // 大需求胎胚（如11台）有更多机台选择，后分配时填充剩余容量，自然实现聚集。
-        Map<String, List<CoreScheduleAlgorithmService.DailyEmbryoTask>> embryoGroups = new LinkedHashMap<>();
-        for (CoreScheduleAlgorithmService.DailyEmbryoTask task : sortedTasks) {
+        Map<String, List<DailyEmbryoTask>> embryoGroups = new LinkedHashMap<>();
+        for (DailyEmbryoTask task : sortedTasks) {
             embryoGroups.computeIfAbsent(task.getEmbryoCode(), k -> new ArrayList<>()).add(task);
         }
         List<String> sortedEmbryos = embryoGroups.keySet().stream()
@@ -2198,7 +2196,7 @@ public class BalancingService {
      */
     private int greedyAssignPhase(
             List<MachineState> machineStates,
-            Map<String, List<CoreScheduleAlgorithmService.DailyEmbryoTask>> embryoGroups,
+            Map<String, List<DailyEmbryoTask>> embryoGroups,
             List<String> sortedEmbryos,
             Map<String, Set<String>> machineHistoryMap,
             int maxTypesLimit,
@@ -2208,7 +2206,7 @@ public class BalancingService {
         int totalUnassigned = 0;
 
         for (String embryoCode : sortedEmbryos) {
-            List<CoreScheduleAlgorithmService.DailyEmbryoTask> taskList = embryoGroups.get(embryoCode);
+            List<DailyEmbryoTask> taskList = embryoGroups.get(embryoCode);
             int remaining = taskList.stream()
                     .mapToInt(t -> t.getVulcanizeMachineCount() != null ? t.getVulcanizeMachineCount() : 0)
                     .sum();
@@ -2252,7 +2250,7 @@ public class BalancingService {
 
                 // 从 taskList 中取任务分配
                 while (assignQty > 0 && taskIndex < taskList.size()) {
-                    CoreScheduleAlgorithmService.DailyEmbryoTask task = taskList.get(taskIndex);
+                    DailyEmbryoTask task = taskList.get(taskIndex);
                     int taskDemand = task.getVulcanizeMachineCount() != null ? task.getVulcanizeMachineCount() : 0;
                     if (taskDemand <= 0) {
                         taskIndex++;
@@ -2414,7 +2412,7 @@ public class BalancingService {
             }
 
             // 执行 Move: 从 highMachine 移 1 台到 lowMachine
-            CoreScheduleAlgorithmService.DailyEmbryoTask task = ea.getTask();
+            DailyEmbryoTask task = ea.getTask();
             String machineKey = buildLhMachineKey(task.getLhMachineCode(), task.getLhId());
             boolean highHasLhKey = highMachine.getAssignedLhMachineCodes().contains(machineKey);
             boolean lowHasLhKey = lowMachine.getAssignedLhMachineCodes().contains(machineKey);
@@ -2696,7 +2694,7 @@ public class BalancingService {
     @lombok.AllArgsConstructor
     public static class EmbryoAssignment {
         private String embryoCode;
-        private CoreScheduleAlgorithmService.DailyEmbryoTask task;
+        private DailyEmbryoTask task;
         /** 分配到该机台的硫化机台数（非条数） */
         private int assignedQty;
     }

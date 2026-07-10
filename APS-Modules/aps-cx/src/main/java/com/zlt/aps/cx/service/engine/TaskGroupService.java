@@ -7,8 +7,8 @@ import com.zlt.aps.cx.entity.config.CxShiftConfig;
 import com.zlt.aps.cx.entity.schedule.LhScheduleResult;
 import com.zlt.aps.cx.vo.MonthPlanProductLhCapacityVo;
 import com.zlt.aps.cx.vo.ScheduleContextVo;
+import com.zlt.aps.cx.vo.DailyEmbryoTask;
 import com.zlt.aps.cx.vo.WarehouseControlStateVo;
-import com.zlt.aps.cx.service.engine.CoreScheduleAlgorithmService;
 import com.zlt.aps.mp.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.mp.api.domain.entity.MdmMonthSurplus;
 import com.zlt.aps.mp.api.domain.entity.MdmStructureLhRatio;
@@ -162,11 +162,11 @@ public class TaskGroupService {
     @lombok.Data
     public static class TaskGroupResult {
         /** 续作任务：当前机台在产的胎胚 */
-        private List<CoreScheduleAlgorithmService.DailyEmbryoTask> continueTasks = new ArrayList<>();
+        private List<DailyEmbryoTask> continueTasks = new ArrayList<>();
         /** 试制任务：试制/量试任务 */
-        private List<CoreScheduleAlgorithmService.DailyEmbryoTask> trialTasks = new ArrayList<>();
+        private List<DailyEmbryoTask> trialTasks = new ArrayList<>();
         /** 新增任务：非续作、非试制的常规任务 */
-        private List<CoreScheduleAlgorithmService.DailyEmbryoTask> newTasks = new ArrayList<>();
+        private List<DailyEmbryoTask> newTasks = new ArrayList<>();
     }
 
     // ==================== 立库库容管控 ====================
@@ -274,7 +274,7 @@ public class TaskGroupService {
      * @param context                    排程上下文
      * @return 封顶后的实际计划产量
      */
-    private int applyWarehouseCap(CoreScheduleAlgorithmService.DailyEmbryoTask task,
+    private int applyWarehouseCap(DailyEmbryoTask task,
                                   int originalProduction, int maxAllowedProduction, int tripCapacity,
                                   String embryoCode, String materialCode, String structureName,
                                   WarehouseControlStateVo whState,
@@ -415,12 +415,12 @@ public class TaskGroupService {
         // 跟踪每个物料已使用的成型余量（用于多任务共享同一物料的场景）
         Map<String, Integer> materialUsedFormingRemainder = new HashMap<>();
         // 跟踪每个物料已处理的任务列表（用于回溯更新 isLastEndingBatch）
-        Map<String, List<CoreScheduleAlgorithmService.DailyEmbryoTask>> materialTasksMap = new HashMap<>();
+        Map<String, List<DailyEmbryoTask>> materialTasksMap = new HashMap<>();
 
         // 零净需求暂存列表（第一轮完成后按结构分组分配剩余产能）
-        List<CoreScheduleAlgorithmService.DailyEmbryoTask> deferredTasks = new ArrayList<>();
+        List<DailyEmbryoTask> deferredTasks = new ArrayList<>();
         // 第一轮已执行任务列表（非deferred且有plannedProduction>0），用于结束后检查剩余产能并入队R2
-        List<CoreScheduleAlgorithmService.DailyEmbryoTask> firstRoundCompletedTasks = new ArrayList<>();
+        List<DailyEmbryoTask> firstRoundCompletedTasks = new ArrayList<>();
 
         // 跟踪每个结构的推荐机台产能管控（遍历中累计）
         Map<String, List<MpCxCapacityConfiguration>> structureRecommendedMachinesCache = new HashMap<>();
@@ -649,7 +649,7 @@ public class TaskGroupService {
             }
             // 本班次无计划量，检查下班次
             int currentClassIdx = getCurrentClassIndex(dayShifts);
-            Integer nextShiftPlanQty = getClassPlanQtyByIndex(lh, currentClassIdx + 1);
+            Integer nextShiftPlanQty = productionCalculator.getClassPlanQtyByIndex(lh, currentClassIdx + 1);
             if (nextShiftPlanQty != null && nextShiftPlanQty > 0) {
                 log.info("[班次筛选-下班次有计划] 胎胚={}, 物料={}, 参与本班次排程",
                         lh.getEmbryoCode(), lh.getMaterialCode());
@@ -672,8 +672,8 @@ public class TaskGroupService {
         log.info("【按结构分组】共 {} 个结构", structureGroupedActive.size());
 
         // 全局防重复集合（跨结构共享）
-        Set<CoreScheduleAlgorithmService.DailyEmbryoTask> r2AddedToResultGlobal = new HashSet<>();
-        Set<CoreScheduleAlgorithmService.DailyEmbryoTask> r3AddedToResultGlobal = new HashSet<>();
+        Set<DailyEmbryoTask> r2AddedToResultGlobal = new HashSet<>();
+        Set<DailyEmbryoTask> r3AddedToResultGlobal = new HashSet<>();
 
         // 按结构逐个执行 R1→入队→R2→R3
         for (Map.Entry<String, List<LhScheduleResult>> structEntry : structureGroupedActive.entrySet()) {
@@ -704,7 +704,7 @@ public class TaskGroupService {
             // 清空每结构的R2/R3状态
             deferredTasks.clear();
             firstRoundCompletedTasks.clear();
-            List<CoreScheduleAlgorithmService.DailyEmbryoTask> r2ExitedTasks = new ArrayList<>();
+            List<DailyEmbryoTask> r2ExitedTasks = new ArrayList<>();
 
             for (LhScheduleResult lhResult : structActiveResults) {
                 if (lhResult.getEmbryoCode() == null) {
@@ -749,7 +749,7 @@ public class TaskGroupService {
                 }
 
 
-                CoreScheduleAlgorithmService.DailyEmbryoTask task = buildSingleTask(
+                DailyEmbryoTask task = buildSingleTask(
                         lhResult, materialMap, stockMap, context, dayShifts);
                 if (task == null) {
                     log.info("[buildSingleTask返回null] 跳过：胎胚={}", lhResult.getEmbryoCode());
@@ -941,9 +941,9 @@ public class TaskGroupService {
 
                 // S5.2.6.1 收尾余量处理后再次检查：如果 handleEndingRemainder 标记了 isLastEndingBatch，需要回溯更新
                 if (Boolean.TRUE.equals(task.getIsLastEndingBatch())) {
-                    List<CoreScheduleAlgorithmService.DailyEmbryoTask> allTasksForMaterial = materialTasksMap.get(materialCode);
+                    List<DailyEmbryoTask> allTasksForMaterial = materialTasksMap.get(materialCode);
                     if (allTasksForMaterial != null) {
-                        for (CoreScheduleAlgorithmService.DailyEmbryoTask prevTask : allTasksForMaterial) {
+                        for (DailyEmbryoTask prevTask : allTasksForMaterial) {
                             if (prevTask != task && !Boolean.TRUE.equals(prevTask.getIsLastEndingBatch())) {
                                 prevTask.setIsLastEndingBatch(true);
                                 log.info("回溯更新 isLastEndingBatch（收尾余量处理）: 物料={}, 胎胚={} → true", materialCode, prevTask.getEmbryoCode());
@@ -1125,7 +1125,7 @@ public class TaskGroupService {
             if (!firstRoundCompletedTasks.isEmpty()) {
                 log.info("【第一轮已执行任务入队】检查 {} 个第一轮任务是否有剩余成型余量", firstRoundCompletedTasks.size());
                 int enrolledCount = 0;
-                for (CoreScheduleAlgorithmService.DailyEmbryoTask completedTask : firstRoundCompletedTasks) {
+                for (DailyEmbryoTask completedTask : firstRoundCompletedTasks) {
                     String ctMaterialCode = completedTask.getMaterialCode();
                     Integer totalFormingRemainder = getFormingRemainder(ctMaterialCode, context);
                     int usedRemainder = materialUsedFormingRemainder.getOrDefault(ctMaterialCode, 0);
@@ -1165,8 +1165,8 @@ public class TaskGroupService {
                 Map<String, int[]> taskRoundTracker = new HashMap<>();
 
                 // 按结构分组
-                Map<String, List<CoreScheduleAlgorithmService.DailyEmbryoTask>> structureDeferredMap = new LinkedHashMap<>();
-                for (CoreScheduleAlgorithmService.DailyEmbryoTask dt : deferredTasks) {
+                Map<String, List<DailyEmbryoTask>> structureDeferredMap = new LinkedHashMap<>();
+                for (DailyEmbryoTask dt : deferredTasks) {
                     String structName = dt.getStructureName() != null ? dt.getStructureName() : "";
                     structureDeferredMap.computeIfAbsent(structName, k -> new ArrayList<>()).add(dt);
                 }
@@ -1203,9 +1203,9 @@ public class TaskGroupService {
                 }
 
                 // 按结构独立处理：变更2c - 最小优先策略 + R2预处理 + 6h退出条件
-                for (Map.Entry<String, List<CoreScheduleAlgorithmService.DailyEmbryoTask>> entry : structureDeferredMap.entrySet()) {
+                for (Map.Entry<String, List<DailyEmbryoTask>> entry : structureDeferredMap.entrySet()) {
                     String structName = entry.getKey();
-                    List<CoreScheduleAlgorithmService.DailyEmbryoTask> structTasks = new ArrayList<>(entry.getValue());
+                    List<DailyEmbryoTask> structTasks = new ArrayList<>(entry.getValue());
                     BigDecimal remainingCapacity = structureRemainingCapacityMap.getOrDefault(structName, BigDecimal.ZERO);
 
                     log.info("==================== 结构={}, 剩余产能={}s({}h), 任务数={} ====================",
@@ -1231,9 +1231,9 @@ public class TaskGroupService {
                             totalRecommendedMachines);
 
                     // ==================== 变更2c: R2预处理 - 移出当前stockHours已超阈值的任务 ====================
-                    Iterator<CoreScheduleAlgorithmService.DailyEmbryoTask> preIter = structTasks.iterator();
+                    Iterator<DailyEmbryoTask> preIter = structTasks.iterator();
                     while (preIter.hasNext()) {
-                        CoreScheduleAlgorithmService.DailyEmbryoTask dt = preIter.next();
+                        DailyEmbryoTask dt = preIter.next();
                         String preMaterialCode = dt.getMaterialCode();
 
                         // 检查成型余量是否已耗尽
@@ -1292,9 +1292,9 @@ public class TaskGroupService {
                         int currentRound = structGlobalRound;
 
                         // 找动态可供硫化时长最小的任务（与预处理/6h退出公式一致：分配库存 + 已排产量 - 硫化消耗）
-                        CoreScheduleAlgorithmService.DailyEmbryoTask minTask = null;
+                        DailyEmbryoTask minTask = null;
                         BigDecimal minStockHours = null;
-                        for (CoreScheduleAlgorithmService.DailyEmbryoTask dt : structTasks) {
+                        for (DailyEmbryoTask dt : structTasks) {
                             BigDecimal sh = BigDecimal.ZERO;
                             int dtSingleLhCap = productionCalculator.getSingleMoldDailyLhCapacity(dt.getMaterialCode(), context);
                             Integer dtMoldQty = dt.getVulcanizeMoldCount();
@@ -1385,9 +1385,9 @@ public class TaskGroupService {
                                 // 成型余量已耗尽，强制标记最后一批并回溯同物料其他任务
                                 minTask.setIsLastEndingBatch(true);
                                 log.info("  [R2-成型余量耗尽] 胎胚={} 强制标记 isLastEndingBatch=true", dtEmbryoCode);
-                                List<CoreScheduleAlgorithmService.DailyEmbryoTask> allTasksForMaterial = materialTasksMap.get(dtMaterialCode);
+                                List<DailyEmbryoTask> allTasksForMaterial = materialTasksMap.get(dtMaterialCode);
                                 if (allTasksForMaterial != null) {
-                                    for (CoreScheduleAlgorithmService.DailyEmbryoTask prevTask : allTasksForMaterial) {
+                                    for (DailyEmbryoTask prevTask : allTasksForMaterial) {
                                         if (prevTask != minTask && !Boolean.TRUE.equals(prevTask.getIsLastEndingBatch())) {
                                             prevTask.setIsLastEndingBatch(true);
                                             log.info("  [R2-回溯] 物料={}, 胎胚={} isLastEndingBatch→true",
@@ -1594,9 +1594,9 @@ public class TaskGroupService {
                             }
 
                             if (Boolean.TRUE.equals(minTask.getIsLastEndingBatch())) {
-                                List<CoreScheduleAlgorithmService.DailyEmbryoTask> allTasksForMaterial = materialTasksMap.get(dtMaterialCode);
+                                List<DailyEmbryoTask> allTasksForMaterial = materialTasksMap.get(dtMaterialCode);
                                 if (allTasksForMaterial != null) {
-                                    for (CoreScheduleAlgorithmService.DailyEmbryoTask prevTask : allTasksForMaterial) {
+                                    for (DailyEmbryoTask prevTask : allTasksForMaterial) {
                                         if (prevTask != minTask && !Boolean.TRUE.equals(prevTask.getIsLastEndingBatch())) {
                                             prevTask.setIsLastEndingBatch(true);
                                             log.info("  第二轮回溯更新 isLastEndingBatch: 物料={}, 胎胚={} → true",
@@ -1643,8 +1643,8 @@ public class TaskGroupService {
                 }
 
                 int remainingDeferred = 0;
-                for (List<CoreScheduleAlgorithmService.DailyEmbryoTask> remaining : structureDeferredMap.values()) {
-                    for (CoreScheduleAlgorithmService.DailyEmbryoTask rt : remaining) {
+                for (List<DailyEmbryoTask> remaining : structureDeferredMap.values()) {
+                    for (DailyEmbryoTask rt : remaining) {
                         remainingDeferred++;
                         String rtKey = rt.getEmbryoCode() != null ? rt.getEmbryoCode() : rt.getMaterialCode();
                         int[] tracker = taskRoundTracker.getOrDefault(rtKey, new int[]{0, 0});
@@ -1708,8 +1708,8 @@ public class TaskGroupService {
                 List<String> r3SkippedFormingList = new ArrayList<>();
 
                 // 按结构分组 r2ExitedTasks
-                Map<String, List<CoreScheduleAlgorithmService.DailyEmbryoTask>> r3StructureMap = new LinkedHashMap<>();
-                for (CoreScheduleAlgorithmService.DailyEmbryoTask dt : r2ExitedTasks) {
+                Map<String, List<DailyEmbryoTask>> r3StructureMap = new LinkedHashMap<>();
+                for (DailyEmbryoTask dt : r2ExitedTasks) {
                     String structName = dt.getStructureName() != null ? dt.getStructureName() : "";
                     r3StructureMap.computeIfAbsent(structName, k -> new ArrayList<>()).add(dt);
                 }
@@ -1744,9 +1744,9 @@ public class TaskGroupService {
                 }
 
                 // R3 核心逻辑：最小优先、逐车轮询、结构全局轮次，不检查6h限制
-                for (Map.Entry<String, List<CoreScheduleAlgorithmService.DailyEmbryoTask>> entry : r3StructureMap.entrySet()) {
+                for (Map.Entry<String, List<DailyEmbryoTask>> entry : r3StructureMap.entrySet()) {
                     String structName = entry.getKey();
-                    List<CoreScheduleAlgorithmService.DailyEmbryoTask> structTasks = new ArrayList<>(entry.getValue());
+                    List<DailyEmbryoTask> structTasks = new ArrayList<>(entry.getValue());
                     BigDecimal remainingCapacity = r3RemainingCapacityMap.getOrDefault(structName, BigDecimal.ZERO);
 
                     log.info("==================== R3 结构={}, 剩余产能={}s({}h), 初始任务数={} ====================",
@@ -1767,9 +1767,9 @@ public class TaskGroupService {
                             .multiply(BigDecimal.valueOf(SECONDS_PER_SHIFT));
 
                     // R3预处理：移出成型余量已耗尽的任务
-                    Iterator<CoreScheduleAlgorithmService.DailyEmbryoTask> r3PreIter = structTasks.iterator();
+                    Iterator<DailyEmbryoTask> r3PreIter = structTasks.iterator();
                     while (r3PreIter.hasNext()) {
-                        CoreScheduleAlgorithmService.DailyEmbryoTask dt = r3PreIter.next();
+                        DailyEmbryoTask dt = r3PreIter.next();
                         String preMaterialCode = dt.getMaterialCode();
                         Integer preFormingRemainder = getFormingRemainder(preMaterialCode, context);
                         int preUsedRemainder = materialUsedFormingRemainder.getOrDefault(preMaterialCode, 0);
@@ -1794,9 +1794,9 @@ public class TaskGroupService {
                         structGlobalRound++;
 
                         // 最小优先：找当前可供硫化时长最小的任务（动态计算，反映R2/R3已排产量，实现自然轮转）
-                        CoreScheduleAlgorithmService.DailyEmbryoTask minTask = null;
+                        DailyEmbryoTask minTask = null;
                         BigDecimal minStockHours = null;
-                        for (CoreScheduleAlgorithmService.DailyEmbryoTask dt : structTasks) {
+                        for (DailyEmbryoTask dt : structTasks) {
                             // 动态计算可供硫化时长 = (分配库存 + 已排产量 - 硫化消耗) × 单胎单模时长 / 模数 / 3600
                             BigDecimal sh = BigDecimal.ZERO;
                             int dtSingleLhCap = productionCalculator.getSingleMoldDailyLhCapacity(dt.getMaterialCode(), context);
@@ -1886,9 +1886,9 @@ public class TaskGroupService {
                                 // 成型余量已耗尽，强制标记最后一批并回溯同物料其他任务
                                 minTask.setIsLastEndingBatch(true);
                                 log.info("  [R3-成型余量耗尽] 胎胚={} 强制标记 isLastEndingBatch=true", dtEmbryoCode);
-                                List<CoreScheduleAlgorithmService.DailyEmbryoTask> allTasksForMaterial = materialTasksMap.get(dtMaterialCode);
+                                List<DailyEmbryoTask> allTasksForMaterial = materialTasksMap.get(dtMaterialCode);
                                 if (allTasksForMaterial != null) {
-                                    for (CoreScheduleAlgorithmService.DailyEmbryoTask prevTask : allTasksForMaterial) {
+                                    for (DailyEmbryoTask prevTask : allTasksForMaterial) {
                                         if (prevTask != minTask && !Boolean.TRUE.equals(prevTask.getIsLastEndingBatch())) {
                                             prevTask.setIsLastEndingBatch(true);
                                             log.info("  [R3-回溯] 物料={}, 胎胚={} isLastEndingBatch→true",
@@ -2006,9 +2006,9 @@ public class TaskGroupService {
                             if (r3EndRemainingForming <= 0 && !Boolean.TRUE.equals(minTask.getIsLastEndingBatch())) {
                                 minTask.setIsLastEndingBatch(true);
                                 log.info("  [R3-分配完成] 胎胚={} 强制标记 isLastEndingBatch=true（成型余量耗尽）", dtEmbryoCode);
-                                List<CoreScheduleAlgorithmService.DailyEmbryoTask> allTasksForMaterial = materialTasksMap.get(dtMaterialCode);
+                                List<DailyEmbryoTask> allTasksForMaterial = materialTasksMap.get(dtMaterialCode);
                                 if (allTasksForMaterial != null) {
-                                    for (CoreScheduleAlgorithmService.DailyEmbryoTask prevTask : allTasksForMaterial) {
+                                    for (DailyEmbryoTask prevTask : allTasksForMaterial) {
                                         if (prevTask != minTask && !Boolean.TRUE.equals(prevTask.getIsLastEndingBatch())) {
                                             prevTask.setIsLastEndingBatch(true);
                                             log.info("  [R3-回溯] 物料={}, 胎胚={} isLastEndingBatch→true",
@@ -2060,8 +2060,8 @@ public class TaskGroupService {
                 }
 
                 // R3未完成但已分配的任务：收尾处理 + 加入结果列表
-                for (List<CoreScheduleAlgorithmService.DailyEmbryoTask> remaining : r3StructureMap.values()) {
-                    for (CoreScheduleAlgorithmService.DailyEmbryoTask rt : remaining) {
+                for (List<DailyEmbryoTask> remaining : r3StructureMap.values()) {
+                    for (DailyEmbryoTask rt : remaining) {
                         if (rt.getPlannedProduction() != null && rt.getPlannedProduction() > 0
                                 && !isTaskAlreadyInResult(rt, result)
                                 && !r3AddedToResultGlobal.contains(rt) && !r2AddedToResultGlobal.contains(rt)) {
@@ -2079,9 +2079,9 @@ public class TaskGroupService {
                             // 回溯更新 isLastEndingBatch（与R1/R2保持一致）
                             if (Boolean.TRUE.equals(rt.getIsLastEndingBatch())) {
                                 String rtMaterialCode = rt.getMaterialCode();
-                                List<CoreScheduleAlgorithmService.DailyEmbryoTask> allTasksForMaterial = materialTasksMap.get(rtMaterialCode);
+                                List<DailyEmbryoTask> allTasksForMaterial = materialTasksMap.get(rtMaterialCode);
                                 if (allTasksForMaterial != null) {
-                                    for (CoreScheduleAlgorithmService.DailyEmbryoTask prevTask : allTasksForMaterial) {
+                                    for (DailyEmbryoTask prevTask : allTasksForMaterial) {
                                         if (prevTask != rt && !Boolean.TRUE.equals(prevTask.getIsLastEndingBatch())) {
                                             prevTask.setIsLastEndingBatch(true);
                                             log.info("  第三轮回溯更新 isLastEndingBatch(未完成): 物料={}, 胎胚={} → true",
@@ -2141,7 +2141,7 @@ public class TaskGroupService {
     /**
      * 判断任务是否已在分组结果列表中（防止R2/R3重复添加第一轮已执行任务）
      */
-    private boolean isTaskAlreadyInResult(CoreScheduleAlgorithmService.DailyEmbryoTask task, TaskGroupResult result) {
+    private boolean isTaskAlreadyInResult(DailyEmbryoTask task, TaskGroupResult result) {
         return result.getContinueTasks().contains(task)
                 || result.getTrialTasks().contains(task)
                 || result.getNewTasks().contains(task);
@@ -2158,7 +2158,7 @@ public class TaskGroupService {
      * @param usedRemainder  该物料已使用的成型余量（前面任务已排产的数量）
      */
     public void calculateEndingInfo(
-            CoreScheduleAlgorithmService.DailyEmbryoTask task,
+            DailyEmbryoTask task,
             ScheduleContextVo context,
             LocalDate scheduleDate,
             int usedRemainder) {
@@ -2250,7 +2250,7 @@ public class TaskGroupService {
      * @return 优先级分数（越高越优先）
      */
     public int calculateTaskPriority(
-            CoreScheduleAlgorithmService.DailyEmbryoTask task,
+            DailyEmbryoTask task,
             ScheduleContextVo context) {
 
         int score = 0;
@@ -2390,7 +2390,7 @@ public class TaskGroupService {
      * @param currentShiftConfigs  当前班次配置列表
      * @return 构建好的胎胚任务，无效记录返回 null
      */
-    private CoreScheduleAlgorithmService.DailyEmbryoTask buildSingleTask(
+    private DailyEmbryoTask buildSingleTask(
             LhScheduleResult lhResult,
             Map<String, MdmMaterialInfo> materialMap,
             Map<String, CxStock> stockMap,
@@ -2438,7 +2438,7 @@ public class TaskGroupService {
         String structureName = structureNameFromMaterial != null ? structureNameFromMaterial : lhResult.getStructureName();
 
         // 构建任务
-        CoreScheduleAlgorithmService.DailyEmbryoTask task = new CoreScheduleAlgorithmService.DailyEmbryoTask();
+        DailyEmbryoTask task = new DailyEmbryoTask();
         task.setLhId(lhResult.getId());
         task.setEmbryoCode(embryoCode);
         task.setVulcanizeDemand(vulcanizeDemand);
@@ -2529,7 +2529,7 @@ public class TaskGroupService {
             if (classField != null && classField.startsWith("CLASS")) {
                 try {
                     int classIndex = Integer.parseInt(classField.substring(5));
-                    Integer planQty = getClassPlanQtyByIndex(lhResult, classIndex);
+                    Integer planQty = productionCalculator.getClassPlanQtyByIndex(lhResult, classIndex);
                     if (planQty != null && planQty > 0) {
                         return planQty;
                     }
@@ -2565,27 +2565,6 @@ public class TaskGroupService {
             }
         }
         return 0;
-    }
-
-    /**
-     * 根据班次索引获取硫化记录的计划量
-     *
-     * @param lhResult   硫化记录
-     * @param classIndex 班次索引 (1-8)
-     * @return 计划量
-     */
-    private Integer getClassPlanQtyByIndex(LhScheduleResult lhResult, int classIndex) {
-        switch (classIndex) {
-            case 1: return lhResult.getClass1PlanQty();
-            case 2: return lhResult.getClass2PlanQty();
-            case 3: return lhResult.getClass3PlanQty();
-            case 4: return lhResult.getClass4PlanQty();
-            case 5: return lhResult.getClass5PlanQty();
-            case 6: return lhResult.getClass6PlanQty();
-            case 7: return lhResult.getClass7PlanQty();
-            case 8: return lhResult.getClass8PlanQty();
-            default: return null;
-        }
     }
 
     /**
@@ -2629,7 +2608,7 @@ public class TaskGroupService {
      * @param context      排程上下文
      */
     private void calculateStockHours(
-            CoreScheduleAlgorithmService.DailyEmbryoTask task,
+            DailyEmbryoTask task,
             LhScheduleResult lhResult,
             int currentStock,
             ScheduleContextVo context) {
@@ -2733,7 +2712,7 @@ public class TaskGroupService {
      * @param context      排程上下文
      * @param scheduleDate 排程日期
      */
-    private void calculatePlannedProduction(CoreScheduleAlgorithmService.DailyEmbryoTask task,
+    private void calculatePlannedProduction(DailyEmbryoTask task,
                                             ScheduleContextVo context,
                                             LocalDate scheduleDate) {
         // 停产日：当天产量设为0
@@ -2818,7 +2797,7 @@ public class TaskGroupService {
      * @param task    胎胚任务
      * @param context 排程上下文
      */
-    private void handleEndingRemainder(CoreScheduleAlgorithmService.DailyEmbryoTask task,
+    private void handleEndingRemainder(DailyEmbryoTask task,
                                        ScheduleContextVo context) {
         // 仅处理近3天收尾的紧急任务
         if (!Boolean.TRUE.equals(task.getIsUrgentEnding())) {
@@ -2891,7 +2870,7 @@ public class TaskGroupService {
      * @param context   排程上下文
      * @param dayShifts 当前班次配置
      */
-    private void handleOpeningClosingDay(CoreScheduleAlgorithmService.DailyEmbryoTask task,
+    private void handleOpeningClosingDay(DailyEmbryoTask task,
                                          ScheduleContextVo context,
                                          List<CxShiftConfig> dayShifts) {
         LocalDate scheduleDate = context.getCurrentScheduleDate();
@@ -3018,7 +2997,7 @@ public class TaskGroupService {
      * @param currentDayShiftOrder 当前班次序号
      * @param dayShifts          当前班次配置
      */
-    private void handleClosingDayTaskV2(CoreScheduleAlgorithmService.DailyEmbryoTask task,
+    private void handleClosingDayTaskV2(DailyEmbryoTask task,
                                         ScheduleContextVo context,
                                         LocalDate scheduleDate,
                                         int currentDayShiftOrder,
@@ -3111,7 +3090,7 @@ public class TaskGroupService {
     /**
      * 辅助方法：根据班次与停锅班次的关系计算 requiredCars
      */
-    private int cappedCapacity(CoreScheduleAlgorithmService.DailyEmbryoTask task, int cappedProduction,
+    private int cappedCapacity(DailyEmbryoTask task, int cappedProduction,
                                int tripCapacity, int closingShiftOrder, int currentDayShiftOrder) {
         if (currentDayShiftOrder == closingShiftOrder) {
             return cappedProduction > 0 ? 1 : 0; // 停锅班次不补整车
@@ -3132,7 +3111,7 @@ public class TaskGroupService {
      * @param dayShifts          当前班次配置
      * @return 反推总量（条数）
      */
-    private int calculateClosingRequiredStockV2(CoreScheduleAlgorithmService.DailyEmbryoTask task,
+    private int calculateClosingRequiredStockV2(DailyEmbryoTask task,
                                                 ScheduleContextVo context,
                                                 LocalDate scheduleDate,
                                                 int currentDayShiftOrder,
@@ -3249,7 +3228,7 @@ public class TaskGroupService {
      * @param currentDayShiftOrder 当前班次序号
      * @param dayShifts          当前班次配置
      */
-    private void handleOpeningDayTaskV2(CoreScheduleAlgorithmService.DailyEmbryoTask task,
+    private void handleOpeningDayTaskV2(DailyEmbryoTask task,
                                         ScheduleContextVo context,
                                         LocalDate scheduleDate,
                                         int currentDayShiftOrder,
@@ -3417,7 +3396,7 @@ public class TaskGroupService {
     /**
      * 根据任务查找对应的LhScheduleResult
      */
-    private LhScheduleResult findLhResultByTask(CoreScheduleAlgorithmService.DailyEmbryoTask task,
+    private LhScheduleResult findLhResultByTask(DailyEmbryoTask task,
                                                 ScheduleContextVo context) {
         if (task.getLhId() != null) {
             List<LhScheduleResult> lhResults = context.getLhScheduleResults();
@@ -3446,7 +3425,7 @@ public class TaskGroupService {
     /**
      * 获取结构硫化配比
      */
-    private int getStructureLhRatio(CoreScheduleAlgorithmService.DailyEmbryoTask task,
+    private int getStructureLhRatio(DailyEmbryoTask task,
                                     ScheduleContextVo context) {
         if (context.getStructureLhRatioMap() != null && task.getStructureName() != null) {
             com.zlt.aps.mp.api.domain.entity.MdmStructureLhRatio lhRatio =
@@ -3633,7 +3612,7 @@ public class TaskGroupService {
             Map<String, Long> machineSwitchRemainingMap,
             Map<String, List<MpCxCapacityConfiguration>> structureRecommendedMachinesCache,
             Map<String, BigDecimal> structureCumulativeTimeMap,
-            Map<String, List<CoreScheduleAlgorithmService.DailyEmbryoTask>> materialTasksMap,
+            Map<String, List<DailyEmbryoTask>> materialTasksMap,
             LocalDate scheduleDate,
             Map<String, BigDecimal> structureAdvanceAvailableCapacityMap) {
 
@@ -3791,10 +3770,10 @@ public class TaskGroupService {
      * 获取前结构任意任务的物料英寸
      */
     private String getPrecedingStructureProSize(String precedingStruct,
-                                                Map<String, List<CoreScheduleAlgorithmService.DailyEmbryoTask>> materialTasksMap,
+                                                Map<String, List<DailyEmbryoTask>> materialTasksMap,
                                                 Map<String, MdmMaterialInfo> materialMap) {
-        for (List<CoreScheduleAlgorithmService.DailyEmbryoTask> tasks : materialTasksMap.values()) {
-            for (CoreScheduleAlgorithmService.DailyEmbryoTask task : tasks) {
+        for (List<DailyEmbryoTask> tasks : materialTasksMap.values()) {
+            for (DailyEmbryoTask task : tasks) {
                 if (precedingStruct.equals(task.getStructureName())) {
                     MdmMaterialInfo mat = materialMap.get(task.getMaterialCode());
                     if (mat != null && mat.getProSize() != null) {
@@ -3815,7 +3794,7 @@ public class TaskGroupService {
             Map<String, BigDecimal> structureCumulativeTimeMap,
             Map<String, Long> machineOccupiedTimeMap,
             Map<String, Boolean> structureFullyEndedMap,
-            Map<String, List<CoreScheduleAlgorithmService.DailyEmbryoTask>> materialTasksMap) {
+            Map<String, List<DailyEmbryoTask>> materialTasksMap) {
 
         List<MpCxCapacityConfiguration> machines = structureRecommendedMachinesCache.get(structureName);
         if (machines == null || machines.isEmpty()) return;
@@ -3834,8 +3813,8 @@ public class TaskGroupService {
 
         // 判定是否全部收尾
         boolean fullyEnded = true;
-        for (List<CoreScheduleAlgorithmService.DailyEmbryoTask> tasks : materialTasksMap.values()) {
-            for (CoreScheduleAlgorithmService.DailyEmbryoTask task : tasks) {
+        for (List<DailyEmbryoTask> tasks : materialTasksMap.values()) {
+            for (DailyEmbryoTask task : tasks) {
                 if (structureName.equals(task.getStructureName())) {
                     if (task.getPlannedProduction() != null && task.getPlannedProduction() > 0
                             && !Boolean.TRUE.equals(task.getIsLastEndingBatch())) {
