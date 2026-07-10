@@ -2483,7 +2483,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
                 Object shiftLhType = buildShiftMouldMethod(result, shift, recipeTypeMap);
                 row.put("class" + shift + "IsEnd", shiftType);
                 row.put("class" + shift + "Type", shiftType);
-                row.put("class" + shift + "LhType", result.getProductStatus());
+                row.put("class" + shift + "LhType", recipeTypeMap.getOrDefault(result.getProductStatus(), result.getProductStatus()));
                 row.put("class" + shift + "MouldMethod", shiftLhType);
                 row.put("class" + shift + "Analysis", getClassAnalysis(result, shift));
                 row.put("class" + shift + "Dot", "");
