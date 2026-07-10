@@ -75,6 +75,12 @@ export default {
           format: "yyyy-MM-dd",
           clearable: false,
         },
+        {
+          label: "",
+          prop: "isAutoExecCx",
+          type: "checkbox",
+          content: this.$t("ui.data.column.lhScheduleResult.isAutoExecCx"),
+        },
       ],
     };
   },
@@ -124,12 +130,16 @@ export default {
      * @param {Object} params 排程参数
      */
     handleAutoPlan(params) {
+      const requestParams = {
+        ...params,
+        isAutoExecCx: params.isAutoExecCx ? "1" : "0",
+      };
       this.$modal.msgSuccess(
         this.$t("ui.data.column.scheduleResult.lhScheduleExecuting")
       );
       this.hide();
-      autoPlan(params)
-        .then((data) => this.handleAutoPlanResponse(data, params))
+      autoPlan(requestParams)
+        .then((data) => this.handleAutoPlanResponse(data, requestParams))
         .catch((error) => {
           console.error(error);
           this.$modal.msgWarning(
@@ -150,6 +160,7 @@ export default {
       this.form = {
         factoryCode: "116",
         scheduleDate,
+        isAutoExecCx: false,
       };
     },
     hide() {

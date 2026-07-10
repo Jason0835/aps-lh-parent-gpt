@@ -226,6 +226,7 @@
   "ui.data.column.lhScheduleResult.validation.notEnabled": "Not enabled",
   "ui.data.column.lhScheduleResult.validation.mouldStatusDisabled": "Mould status is disabled",
   "ui.data.column.lhScheduleResult.validation.abnormal": "Abnormal",
+  "ui.data.column.lhScheduleResult.isAutoExecCx": "Sync Generate Molding Schedule",
   "ui.data.column.monthPlanNoProduction.detail": "Unscheduled Schedule Detail",
   "ui.data.column.report": "Report",
   "ui.data.column.singleMachineQuota.title": "Single Machine Quota Config",
