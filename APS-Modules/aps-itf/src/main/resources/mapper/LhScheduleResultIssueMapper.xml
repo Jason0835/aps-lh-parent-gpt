@@ -15,7 +15,8 @@
             CLASS2_EXAMPLE_TYPE, CLASS2_EXAMPLE_NO,
             CLASS3_PLAN_QTY_SEQ, CLASS3_ANALYSIS_INPUT, CLASS3_ANALYSIS, CLASS3_PLAN_QTY,
             CLASS3_EXAMPLE_TYPE, CLASS3_EXAMPLE_NO,
-            LH_TIME, DATA_VERSION, COMPANY_CODE, FACTORY_CODE
+            LH_TIME, DATA_VERSION, COMPANY_CODE, FACTORY_CODE,
+            CLASS1_PLAN_TYPE, CLASS2_PLAN_TYPE, CLASS3_PLAN_TYPE
         )
         SELECT * FROM (
         <foreach collection="list" item="item" separator=" UNION ALL ">
@@ -52,7 +53,10 @@
             #{item.lhTime} AS LH_TIME,
             #{item.dataVersion} AS DATA_VERSION,
             #{item.companyCode} AS COMPANY_CODE,
-            #{item.factoryCode} AS FACTORY_CODE
+            #{item.factoryCode} AS FACTORY_CODE,
+            #{item.class1PlanType} AS CLASS1_PLAN_TYPE,
+            #{item.class2PlanType} AS CLASS2_PLAN_TYPE,
+            #{item.class3PlanType} AS CLASS3_PLAN_TYPE
         </foreach>
         ) AS t
         WHERE NOT EXISTS (
@@ -95,7 +99,10 @@
             CLASS3_EXAMPLE_NO = #{class3ExampleNo},
             LH_TIME = #{lhTime},
             COMPANY_CODE = #{companyCode},
-            FACTORY_CODE = #{factoryCode}
+            FACTORY_CODE = #{factoryCode},
+            CLASS1_PLAN_TYPE = #{class1PlanType},
+            CLASS2_PLAN_TYPE = #{class2PlanType},
+            CLASS3_PLAN_TYPE = #{class3PlanType}
         WHERE SCHEDULE_DATE = #{scheduleDate}
           AND LH_MACHINE_CODE = #{lhMachineCode}
           AND MATERIAL_CODE = #{materialCode}
@@ -127,7 +134,9 @@
             CLASS3_EXAMPLE_NO = #{class3ExampleNo},
             LH_TIME = #{lhTime},
             COMPANY_CODE = #{companyCode},
-            FACTORY_CODE = #{factoryCode}
+            FACTORY_CODE = #{factoryCode},
+            CLASS2_PLAN_TYPE = #{class2PlanType},
+            CLASS3_PLAN_TYPE = #{class3PlanType}
         WHERE SCHEDULE_DATE = #{scheduleDate}
           AND LH_MACHINE_CODE = #{lhMachineCode}
           AND MATERIAL_CODE = #{materialCode}

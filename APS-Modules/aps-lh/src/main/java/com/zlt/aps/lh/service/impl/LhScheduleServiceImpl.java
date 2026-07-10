@@ -38,7 +38,6 @@ import com.zlt.aps.lh.exception.ScheduleException;
 import com.zlt.aps.lh.mapper.*;
 import com.zlt.aps.lh.service.ILhScheduleResultService;
 import com.zlt.aps.lh.service.ILhScheduleService;
-import com.zlt.aps.lh.service.IScheduleSummaryReportService;
 import com.zlt.aps.lh.util.*;
 import com.zlt.aps.mdm.api.domain.entity.*;
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
@@ -136,9 +135,6 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
 
     @Autowired
     private LhMouldChangePlanController lhMouldChangePlanController;
-
-    @Resource
-    private IScheduleSummaryReportService scheduleSummaryReportService;
 
     @Autowired
     private ISysDictDataCacheService sysDictDataCacheService;
@@ -764,18 +760,8 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         inputStream = new ByteArrayInputStream(exportBytes);
         exportBytes =  ExcelUtils.writeMultiList(inputStream, 1, mouldChangePlanTableMap, mouldChangePlanExcelDataList);
 
-        // 节点6：排产小结数据位于模板第 3 个 sheet（下标 2），
-        // 复用 ScheduleSummaryReportService 的数据构建逻辑，将排产小结作为第三个sheet写入。
-        String factoryCode = StringUtils.defaultString(result.getFactoryCode(), FactoryConstant.DEFAULT_FACTORY_CODE);
-        Map<String, Object> summaryExportData = scheduleSummaryReportService.buildScheduleSummaryExportData(result.getScheduleDate(), factoryCode);
-        @SuppressWarnings("unchecked")
-        Map<String, Object> summaryTableMap = (Map<String, Object>) summaryExportData.get("tableMap");
-        @SuppressWarnings("unchecked")
-        List<List<Map<String, Object>>> summaryDataList = (List<List<Map<String, Object>>>) summaryExportData.get("dataList");
-
-        inputStream = new ByteArrayInputStream(exportBytes);
-        exportBytes = ExcelUtils.writeMultiList(inputStream, 2, summaryTableMap, summaryDataList);
-
+        // 排产小结已迁移至成型日计划导出（aps-cx 通过 Feign 调用 buildScheduleSummaryExportData），
+        // 硫化日计划导出不再写入排产小结 sheet。
         return fillExportSummaryFormulas(exportBytes, exportDataList.size(), placeholderMap);
     }
 
@@ -783,7 +769,8 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
      * 下载导入模板（不含物料描述列）
      * <p>物料描述通过物料编码自动带出，导入时用户无需填写物料描述</p>
      * <p>模板下载只填充表头占位符（日期、班次等），不查询数据库中的业务数据，
-     * 确保3个Sheet（硫化计划、硫化换模计划、排产小结）均为空模板。</p>
+     * 确保2个Sheet（硫化计划、硫化换模计划）均为空模板。</p>
+     * <p>排产小结已迁移至成型日计划导出，不再包含在硫化导入模板中。</p>
      *
      * @param result 查询条件（工厂、排程日期等）
      * @return 导入模板Excel字节数组
@@ -821,13 +808,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         mouldChangePlanDataList.add(new ArrayList<>());
         exportBytes = ExcelUtils.writeMultiList(new ByteArrayInputStream(exportBytes), 1, mouldChangePlanTableMap, mouldChangePlanDataList);
 
-        // Sheet 2 - 排产小结：只填充表头占位符，不查询数据库，明细数据传空列表
-        // 排产小结的 buildTableMap 内部会查询数据库获取成型/硫化汇总数据，
-        // 模板下载时不需要这些数据，因此只构建最小化的表头占位符映射
-        Map<String, Object> summaryTableMap = buildEmptySummaryTableMap(result.getScheduleDate());
-        List<List<Map<String, Object>>> summaryDataList = new ArrayList<>();
-        summaryDataList.add(new ArrayList<>());
-        exportBytes = ExcelUtils.writeMultiList(new ByteArrayInputStream(exportBytes), 2, summaryTableMap, summaryDataList);
+        // 排产小结已迁移至成型日计划导出，硫化导入模板不再包含排产小结 sheet。
 
         // 重命名 Sheet 0（硫化计划）和 Sheet 1（硫化换模计划）为国际化名称
         // 使导入时能按 i18n sheetName 匹配模板中的工作表
@@ -835,47 +816,6 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
 
         // 移除物料描述列
         return removeMaterialDescColumn(exportBytes);
-    }
-
-    /**
-     * 构建排产小结的空模板表头映射
-     * <p>仅填充标题日期等必要占位符，其余汇总数据字段置为空字符串，
-     * 避免模板下载时查询数据库产生不必要的业务数据。</p>
-     *
-     * @param scheduleDate 排程日期
-     * @return 排产小结模板表头映射
-     */
-    private Map<String, Object> buildEmptySummaryTableMap(Date scheduleDate) {
-        Map<String, Object> map = new HashMap<>(32);
-        Date reportDate = LhScheduleTimeUtil.addDays(scheduleDate, -1);
-        // 标题日期
-        map.put("titleDate", DateUtil.format(reportDate, "MM月dd日") + "计划排产\n"
-                + "Ke hoach san xuat ngay " + DateUtil.format(reportDate, "dd/MM"));
-        // 成型汇总数据置空
-        map.put("cxNightQty", "");
-        map.put("cxMorningQty", "");
-        map.put("cxMiddleQty", "");
-        map.put("cxTotalQty", "");
-        map.put("cxSetupInfo", "");
-        map.put("cxTrialInfo", "");
-        map.put("cxSpecSwitch", "");
-        // 硫化汇总数据置空
-        map.put("lhNightQty", "");
-        map.put("lhMorningQty", "");
-        map.put("lhMiddleQty", "");
-        map.put("lhTotalQty", "");
-        map.put("lhNightMachines", "");
-        map.put("lhMorningMachines", "");
-        map.put("lhMiddleMachines", "");
-        map.put("lhTotalMachines", "");
-        // 模具交替/清洗信息置空
-        map.put("mouldChangeInfo", "");
-        map.put("mouldCleanDate", DateUtil.format(reportDate, "MM月dd日"));
-        map.put("mouldCleanInfo", "");
-        // 备注置空
-        map.put("cxRemark", "");
-        map.put("lhRemark", "");
-        return map;
     }
 
     /**

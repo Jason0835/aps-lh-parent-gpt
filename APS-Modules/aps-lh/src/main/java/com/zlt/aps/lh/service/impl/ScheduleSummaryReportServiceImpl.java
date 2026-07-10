@@ -370,6 +370,7 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
                 cxNightTotal.add(cxMorningTotal).add(cxMiddleTotal));
 
         // 试制/量试信息：根据 keySuffix 选择班次的示方书类型归集（T=量试，X=试制）
+        // 取数口径：优先使用主物料描述(胎胚描述mainMaterialDesc)，若为空则回退使用物料描述(materialDesc)
         Set<String> trialSpecs = new LinkedHashSet<>();
         Set<String> setupSpecs = new LinkedHashSet<>();
         for (CxScheduleResult result : cxResults) {
@@ -379,7 +380,10 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
             if (!hasPlanQty) {
                 continue;
             }
-            String specDesc = StringUtils.defaultString(result.getMaterialDesc()).trim();
+            String specDesc = StringUtils.defaultString(result.getMainMaterialDesc()).trim();
+            if (StringUtils.isBlank(specDesc)) {
+                specDesc = StringUtils.defaultString(result.getMaterialDesc()).trim();
+            }
             if (StringUtils.isBlank(specDesc)) {
                 continue;
             }
@@ -403,8 +407,10 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
         map.put("cxTrialInfo" + keySuffix, trialSpecs.isEmpty() ? "无 Không" : String.join("，", trialSpecs));
 
         // 成型规格切换：从T_MP_STRUCTURE_ALLOCATION取切换结构数据
-        // 需同时传入reportDate和scheduleDate，支持非跨月和跨月两种场景
-        map.put("cxSpecSwitch" + keySuffix, this.buildCxSpecSwitch(reportDate, actualScheduleDate, factoryCode));
+        // 用 reportDate 作为查询日期，实现 T+1/T+2 日期隔离：
+        //   keySuffix=""  → reportDate=T+1，查T+1的结构切换
+        //   keySuffix="2" → reportDate=T+2，查T+2的结构切换
+        map.put("cxSpecSwitch" + keySuffix, this.buildCxSpecSwitch(reportDate, reportDate, factoryCode));
 
         // 硫化产量和机台数：根据 keySuffix 限制班次序号范围
         // keySuffix="" → 班次1~5（class1~5映射的01/02/03），keySuffix="2" → 班次6~8（class6~8映射的01/02/03）
@@ -815,22 +821,27 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
                     continue;
                 }
 
-                // 按主胎胚描述去重（同一胎胚下多条物料记录的胎胚描述相同，去重后保留唯一值）
-                Set<String> embryoDescSet = new LinkedHashSet<>();
+                // 按规格+花纹去重（同一胎胚下多条物料记录的规格花纹相同，去重后保留唯一值）
+                Set<String> specPatternSet = new LinkedHashSet<>();
                 for (MdmMaterialInfo materialInfo : materialsForType) {
-                    String embryoDesc = StringUtils.defaultString(materialInfo.getEmbryoDesc()).trim();
-                    if (StringUtils.isBlank(embryoDesc)) {
+                    String specifications = StringUtils.defaultString(materialInfo.getSpecifications()).trim();
+                    String pattern = StringUtils.defaultString(materialInfo.getPattern()).trim();
+                    if (StringUtils.isBlank(specifications)) {
                         continue;
                     }
-                    embryoDescSet.add(embryoDesc);
+                    String specPattern = specifications;
+                    if (StringUtils.isNotBlank(pattern)) {
+                        specPattern = specifications + "+" + pattern;
+                    }
+                    specPatternSet.add(specPattern);
                 }
 
-                if (embryoDescSet.isEmpty()) {
+                if (specPatternSet.isEmpty()) {
                     continue;
                 }
 
                 String title = this.getRecipeTypeTitle(recipeType);
-                groupParts.add(title + String.join(",", embryoDescSet));
+                groupParts.add(title + String.join(",", specPatternSet));
             }
 
             Map<String, Object> item = new HashMap<>();
@@ -1615,8 +1626,10 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
      *   <li>跨月场景：排程日期6月1号，取6月转产数据，找endDay=1且后结构beginDay=1</li>
      * </ul>
      *
-     * @param reportDate   报告日期（即排程日期）
-     * @param scheduleDate 排程日期（与reportDate相同）
+     * <p>T+1和T+2共用相同的结构切换数据（以actualScheduleDate为准），确保两个日期显示一致。</p>
+     *
+     * @param reportDate   报告日期（未使用，保留为兼容调用）
+     * @param scheduleDate 排程日期（用于确定查询年月和日号）
      * @param factoryCode  分厂编码
      * @return 规格切换信息字符串，如"结构A 换 结构B；结构C 换 结构D"
      */

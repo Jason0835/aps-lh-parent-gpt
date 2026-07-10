@@ -52,6 +52,7 @@ import com.zlt.common.utils.ImportExcelUtils;
 import com.zlt.common.utils.PubUtil;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
+ import com.ruoyi.common.exception.ServiceException;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -1163,6 +1164,11 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
         target.setCompanyCode(source.getFactoryCode());
         target.setFactoryCode(source.getFactoryCode());
 
+        // 计划类型：各班次取对应APS班次的IS_END值（0-正常 1-收尾）
+        // 窗口首日无夜班，中间表1班(夜)不赋值
+        target.setClass2PlanType(source.getClass1IsEnd());
+        target.setClass3PlanType(source.getClass2IsEnd());
+
         return target;
     }
 
@@ -1230,6 +1236,12 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
         target.setCompanyCode(source.getFactoryCode());
         target.setFactoryCode(source.getFactoryCode());
 
+        // 计划类型：各班次取对应APS班次的IS_END值（0-正常 1-收尾）
+        // 中间表1班(夜)=APS 3班, 2班(早)=APS 4班, 3班(中)=APS 5班
+        target.setClass1PlanType(source.getClass3IsEnd());
+        target.setClass2PlanType(source.getClass4IsEnd());
+        target.setClass3PlanType(source.getClass5IsEnd());
+
         return target;
     }
 
@@ -1296,6 +1308,12 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
         target.setDataVersion(null);
         target.setCompanyCode(FactoryConstant.DEFAULT_COMPANY_CODE);
         target.setFactoryCode(source.getFactoryCode());
+
+        // 计划类型：各班次取对应APS班次的IS_END值（0-正常 1-收尾）
+        // 中间表1班(夜)=APS 6班, 2班(早)=APS 7班, 3班(中)=APS 8班
+        target.setClass1PlanType(source.getClass6IsEnd());
+        target.setClass2PlanType(source.getClass7IsEnd());
+        target.setClass3PlanType(source.getClass8IsEnd());
 
         return target;
     }
@@ -1368,6 +1386,27 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
     public byte[] exportScheduleSummaryReport(@RequestBody ScheduleSummaryReportVO queryVO,
                                               @PathVariable("fileName") String fileName) {
         return scheduleSummaryReportService.exportScheduleSummaryReport(queryVO);
+    }
+
+    /**
+     * 构建排产小结导出数据（tableMap + dataList），
+     * 供成型日计划导出通过 Feign 远程调用，将排产小结作为子 sheet 嵌入 CxExport.xlsx。
+     *
+     * <p>排产小结已从硫化日计划导出迁移至成型日计划导出，本端点为迁移后成型侧的数据来源。</p>
+     *
+     * @param queryVO 查询条件，含 scheduleDate(yyyy-MM-dd)、factoryCode
+     * @return Map，含 tableMap（模板占位符映射）、dataList（列表数据）
+     */
+    @ApiOperation("构建排产小结导出数据")
+    @PostMapping("/buildScheduleSummaryExportData")
+    public Map<String, Object> buildScheduleSummaryExportData(@RequestBody ScheduleSummaryReportVO queryVO) {
+        if (queryVO == null || StringUtils.isBlank(queryVO.getScheduleDate())) {
+            throw new ServiceException("排程日期不能为空");
+        }
+        // 远程接口用 String 传日期，内部服务用 Date，在此转换
+        Date scheduleDate = cn.hutool.core.date.DateUtil.parse(queryVO.getScheduleDate(), "yyyy-MM-dd");
+        String factoryCode = StringUtils.defaultString(queryVO.getFactoryCode(), FactoryConstant.DEFAULT_FACTORY_CODE);
+        return scheduleSummaryReportService.buildScheduleSummaryExportData(scheduleDate, factoryCode);
     }
 
 }

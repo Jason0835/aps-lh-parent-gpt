@@ -18,4 +18,25 @@
         </foreach>
     </select>
 
+    <!-- 根据分厂编号和完成日期范围查询未删除的日完成量数据 -->
+    <!-- 用于芯片库存差值更新：逻辑删除前查询窗口范围内的旧数据 -->
+    <select id="selectByFactoryCodeAndDateRange" resultType="com.zlt.aps.lh.api.domain.entity.LhDayFinishQty">
+        SELECT
+            ID,
+            FINISH_DATE,
+            DAY_FINISH_QTY,
+            MATERIAL_CODE,
+            MES_MATERIAL_CODE,
+            LH_NO,
+            LH_TYPE,
+            DATA_VERSION,
+            COMPANY_CODE,
+            FACTORY_CODE
+        FROM T_LH_DAY_FINISH_QTY
+        WHERE FACTORY_CODE = #{factoryCode}
+          AND FINISH_DATE &gt;= #{startDate}
+          AND FINISH_DATE &lt;= #{endDate}
+          AND IS_DELETE = 0
+    </select>
+
 </mapper>

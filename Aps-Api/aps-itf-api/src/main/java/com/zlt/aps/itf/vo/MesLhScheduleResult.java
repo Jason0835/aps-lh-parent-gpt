@@ -262,6 +262,27 @@ public class MesLhScheduleResult implements Serializable {
     private String factoryCode;
 
     /**
+     * 1班计划类型（0-正常 1-收尾）
+     */
+    @ApiModelProperty(value = "1班计划类型", name = "class1PlanType")
+    @TableField(value = "CLASS1_PLAN_TYPE")
+    private String class1PlanType;
+
+    /**
+     * 2班计划类型（0-正常 1-收尾）
+     */
+    @ApiModelProperty(value = "2班计划类型", name = "class2PlanType")
+    @TableField(value = "CLASS2_PLAN_TYPE")
+    private String class2PlanType;
+
+    /**
+     * 3班计划类型（0-正常 1-收尾）
+     */
+    @ApiModelProperty(value = "3班计划类型", name = "class3PlanType")
+    @TableField(value = "CLASS3_PLAN_TYPE")
+    private String class3PlanType;
+
+    /**
      * 预留字段1
      */
     @ApiModelProperty(value = "预留字段1", name = "reserve1")
