@@ -33,10 +33,7 @@ import moment from "moment";
 
 import infoForm from "@/views/components/infoForm.vue";
 
-import {
-  saveGlueGroupOrder,
-  checkGlueGroupCodeUnique,
-} from "@/api/nc/glueGroupOrder";
+import { saveGlueGroupOrder } from "@/api/nc/glueGroupOrder";
 
 export default {
   components: { infoForm },
@@ -141,26 +138,6 @@ export default {
         this.loading = false;
       }
     },
-    checkGlueGroupCode(rule, value, callback) {
-      return new Promise((resolve, reject) => {
-        checkGlueGroupCodeUnique({
-          id: this.form.id,
-          glueGroupCode: this.form.glueGroupCode,
-        })
-          .then((res) => {
-            if (res === 0) {
-              resolve();
-            } else {
-              reject(new Error(this.$t("ui.glueGroup.alter.isGlueGroupExist")));
-            }
-          })
-          .catch((error) => {
-            console.error(error);
-            reject(new Error("验证失败，请稍后再试"));
-          });
-      });
-    },
-
     //utils
     show(data) {
       this.visible = true;
@@ -182,7 +159,6 @@ export default {
       this.$refs.form.triggerConfirm(async (params) => {
         try {
           this.loading = true;
-          await this.checkGlueGroupCode();
           this.save(params);
         } catch (error) {
           this.$modal.msgError(error.message);

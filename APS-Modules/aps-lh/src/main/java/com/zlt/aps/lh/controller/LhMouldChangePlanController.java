@@ -31,11 +31,9 @@ import com.zlt.aps.common.core.utils.ExcelUtils;
 import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.enums.ConstructionStageEnum;
 import com.zlt.aps.enums.YesOrNoEnum;
+import com.zlt.aps.lh.api.constant.LhScheduleParamConstant;
 import com.zlt.aps.lh.api.domain.dto.LhScheduleImportDTO;
-import com.zlt.aps.lh.api.domain.entity.LhMachineOnlineInfo;
-import com.zlt.aps.lh.api.domain.entity.LhMouldChangePlan;
-import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
-import com.zlt.aps.lh.api.domain.entity.LhSharedMouldPat;
+import com.zlt.aps.lh.api.domain.entity.*;
 import com.zlt.aps.lh.api.domain.vo.LhMouldChangePlanVo;
 import com.zlt.aps.lh.api.enums.DeleteFlagEnum;
 import com.zlt.aps.lh.api.enums.MouldChangeTypeEnum;
@@ -47,6 +45,7 @@ import com.zlt.aps.lh.mapper.LhScheduleResultMapper;
 import com.zlt.aps.lh.mapper.LhSharedMouldPatEntityMapper;
 import com.zlt.aps.lh.service.ILhMachineOnlineInfoService;
 import com.zlt.aps.lh.service.ILhMouldChangePlanService;
+import com.zlt.aps.lh.service.ILhParamsService;
 import com.zlt.aps.utils.AppUtils;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
@@ -61,12 +60,14 @@ import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.ss.usermodel.WorkbookFactory;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletResponse;
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.Field;
@@ -124,6 +125,9 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
 
     @Autowired
     private LhMachineOnlineInfoMapper lhMachineOnlineInfoMapper;
+
+    @Autowired
+    private ILhParamsService lhParamsService;
 
     @Autowired
     private LhScheduleResultMapper lhScheduleResultMapper;
@@ -358,6 +362,17 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
         setExportTitleFieldName(tableMap);
 
         byte[] resultBytes =  ExcelUtils.writeMultiList(inputStream, 0, tableMap, excelDataList);
+
+        try (ByteArrayInputStream bais = new ByteArrayInputStream(resultBytes);
+             XSSFWorkbook workbook = new XSSFWorkbook(bais);
+             ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
+            workbook.setSheetName(0, I18nUtil.getMessage("ui.data.column.lhMouldChangePlan.import.modelName"));
+            workbook.write(baos);
+            resultBytes = baos.toByteArray();
+        } catch (IOException e) {
+            log.error("重命名导入模板Sheet失败", e);
+            throw new ServiceException("生成导入模板失败");
+        }
         Date endTime = DateUtils.getNowDate();
 
         //3.组装导出日志
@@ -549,41 +564,75 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
         return dataList;
     }
 
+    /**
+     * 构建模具交替计划导出视图列表。
+     * <p>模具号取自 T_LH_MACHINE_ONLINE_INFO 在机信息：按机台（去除末尾 L/R 后缀做模糊匹配，
+     * 使 K1501L 同时命中 K1501L、K1501R）取排程日期往前追溯 N 天内（含当日）最近一条在机记录的在机模号，
+     * 多条命中时按机台编码 + 上机日期排序去重后英文逗号拼接，回写模具号字段。
+     * 追溯天数 N 由硫化参数 MOULD_CHANGE_PLAN_LOOKBACK_DAYS（SYS0302012）控制，默认 3 天。</p>
+     *
+     * @param list     模具交替计划列表
+     * @param queryVO 查询条件（含排程日期、分厂）
+     * @return 导出视图列表
+     */
     public List<LhMouldChangePlanVo> buildLhMouldChangePlanVoList(List<LhMouldChangePlan> list, LhMouldChangePlan queryVO) {
         List<LhMouldChangePlanVo> resultList = new ArrayList<>();
         int seq = 1;
-        // 查询硫化在机数据，通过机台查询，取排程日期往前最近一条数据的在机模号，拼接后回写模具号字段
-        List<String> machineCodeList = new ArrayList<>();
-        for (LhMouldChangePlan mouldChangePlan : list) {
-            String machineCode = mouldChangePlan.getLhMachineCode();
-            if (StringUtils.isNotBlank(machineCode) && !machineCodeList.contains(machineCode)) {
-                machineCodeList.add(machineCode);
+
+        // 读取硫化参数：模具交替计划模具号往前追溯天数，默认 2 天
+        int lookbackDays = 2;
+        if (queryVO != null && StringUtils.isNotBlank(queryVO.getFactoryCode())) {
+            LhParams lookbackParam = lhParamsService.selectOneByParamCode(
+                    LhScheduleParamConstant.MOULD_CHANGE_PLAN_LOOKBACK_DAYS, queryVO.getFactoryCode());
+            if (lookbackParam != null && StringUtils.isNotBlank(lookbackParam.getParamValue())) {
+                try {
+                    lookbackDays = Integer.parseInt(lookbackParam.getParamValue().trim());
+                } catch (NumberFormatException ignore) {
+                }
             }
         }
-        Map<String, LhMachineOnlineInfo> lhMachineOnlineInfoMap = new HashMap<>();
-        if (CollectionUtils.isNotEmpty(machineCodeList) && queryVO != null && queryVO.getScheduleDate() != null) {
-            Date scheduleDateEnd = DateUtils.addDays(DateUtil.endOfDay(queryVO.getScheduleDate()), -3);
+
+        // 收集机台编码前缀（去除末尾 L/R 后缀），用于模糊匹配在机信息的左右模机台
+        List<String> machinePrefixList = new ArrayList<>();
+        for (LhMouldChangePlan mouldChangePlan : list) {
+            String machineCode = mouldChangePlan.getLhMachineCode();
+            if (StringUtils.isNotBlank(machineCode) && !machinePrefixList.contains(machineCode)) {
+                // 机台编码可能带 L/R 左右模后缀，去除后缀得到前缀用于模糊匹配（K1501L -> K1501）
+                String prefix = stripLeftRightSuffix(machineCode);
+                if (!machinePrefixList.contains(prefix)) {
+                    machinePrefixList.add(prefix);
+                }
+            }
+        }
+
+        // 机台前缀 -> 命中的在机记录（按机台 + 上机日期排序、去重后拼接模号）
+        Map<String, List<LhMachineOnlineInfo>> lhMachineOnlineInfoMap = new HashMap<>();
+        if (CollectionUtils.isNotEmpty(machinePrefixList) && queryVO != null && queryVO.getScheduleDate() != null) {
+            Date scheduleDateEnd = DateUtils.addDays(DateUtil.endOfDay(queryVO.getScheduleDate()), -lookbackDays);
             LambdaQueryWrapper<LhMachineOnlineInfo> wrapper = new LambdaQueryWrapper<>();
             wrapper.eq(StringUtils.isNotBlank(queryVO.getFactoryCode()), LhMachineOnlineInfo::getFactoryCode, queryVO.getFactoryCode());
-            wrapper.in(LhMachineOnlineInfo::getLhCode, machineCodeList);
+            wrapper.and(prefixWrapper -> {
+                for (String prefix : machinePrefixList) {
+                    // 模糊匹配：K1501 命中 K1501L、K1501R 等左右模机台
+                    prefixWrapper.or().likeRight(LhMachineOnlineInfo::getLhCode, prefix);
+                }
+            });
             wrapper.isNotNull(LhMachineOnlineInfo::getOnlineDate);
             wrapper.le(LhMachineOnlineInfo::getOnlineDate, scheduleDateEnd);
             wrapper.eq(LhMachineOnlineInfo::getIsDelete, DeleteFlagEnum.NORMAL.getCode());
-            wrapper.orderByDesc(LhMachineOnlineInfo::getOnlineDate);
-            wrapper.orderByDesc(LhMachineOnlineInfo::getUpdateTime);
-            wrapper.orderByAsc(LhMachineOnlineInfo::getLhCode);
             List<LhMachineOnlineInfo> lhMachineOnlineInfoList = lhMachineOnlineInfoMapper.selectList(wrapper);
             if (CollectionUtils.isNotEmpty(lhMachineOnlineInfoList)) {
+                // 按机台编码 + 上机日期（倒序）+ 更新时间（倒序）排序，保证取每个机台最近一条
                 List<LhMachineOnlineInfo> sortedOnlineInfoList = lhMachineOnlineInfoList.stream()
                         .filter(item -> StringUtils.isNotBlank(item.getLhCode()))
                         .filter(item -> item.getOnlineDate() != null && !item.getOnlineDate().after(scheduleDateEnd))
-                        .sorted(Comparator.comparing(LhMachineOnlineInfo::getOnlineDate, Comparator.nullsLast(Comparator.reverseOrder()))
-                                .thenComparing(LhMachineOnlineInfo::getUpdateTime, Comparator.nullsLast(Comparator.reverseOrder()))
-                                .thenComparing(LhMachineOnlineInfo::getLhCode, Comparator.nullsLast(String::compareTo)))
+                        .sorted(Comparator.comparing(LhMachineOnlineInfo::getLhCode, Comparator.nullsLast(String::compareTo))
+                                .thenComparing(LhMachineOnlineInfo::getOnlineDate, Comparator.nullsLast(Comparator.reverseOrder()))
+                                .thenComparing(LhMachineOnlineInfo::getUpdateTime, Comparator.nullsLast(Comparator.reverseOrder())))
                         .collect(Collectors.toList());
                 for (LhMachineOnlineInfo onlineInfo : sortedOnlineInfoList) {
-                    // 查询结果按上机日期和更新时间倒序，首条即为该机台排程日期前最新在机记录。
-                    lhMachineOnlineInfoMap.putIfAbsent(onlineInfo.getLhCode(), onlineInfo);
+                    String prefix = stripLeftRightSuffix(onlineInfo.getLhCode());
+                    lhMachineOnlineInfoMap.computeIfAbsent(prefix, k -> new ArrayList<>()).add(onlineInfo);
                 }
             }
         }
@@ -591,9 +640,21 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
             LhMouldChangePlanVo lhMouldChangePlanVo = new LhMouldChangePlanVo();
             BeanUtil.copyProperties(lhMouldChangePlan, lhMouldChangePlanVo);
 
-            LhMachineOnlineInfo onlineInfo = lhMachineOnlineInfoMap.get(lhMouldChangePlan.getLhMachineCode());
-            if (onlineInfo != null && StringUtils.isNotBlank(onlineInfo.getInMachineMouldCode())) {
-                lhMouldChangePlanVo.setMouldCode(onlineInfo.getInMachineMouldCode());
+            // 按机台前缀匹配在机信息，将命中记录（可能同时含 L/R 左右模）的在机模号排序去重后逗号拼接
+            String machinePrefix = stripLeftRightSuffix(lhMouldChangePlan.getLhMachineCode());
+            List<LhMachineOnlineInfo> matchedOnlineInfoList = lhMachineOnlineInfoMap.get(machinePrefix);
+            if (CollectionUtils.isNotEmpty(matchedOnlineInfoList)) {
+                // 每个机台取最近一条（已按上机日期倒序），按机台编码 + 上机日期排序去重拼接
+                Map<String, LhMachineOnlineInfo> latestByMachine = new LinkedHashMap<>();
+                for (LhMachineOnlineInfo onlineInfo : matchedOnlineInfoList) {
+                    latestByMachine.putIfAbsent(onlineInfo.getLhCode(), onlineInfo);
+                }
+                List<String> mouldCodeList = latestByMachine.values().stream()
+                        .map(LhMachineOnlineInfo::getInMachineMouldCode)
+                        .filter(StringUtils::isNotBlank)
+                        .distinct()
+                        .collect(Collectors.toList());
+                lhMouldChangePlanVo.setMouldCode(CollUtil.isNotEmpty(mouldCodeList) ? String.join(",", mouldCodeList) : "");
             } else {
                 // 从模具变更计划赋值过来的要清空
                 lhMouldChangePlanVo.setMouldCode("");
@@ -619,6 +680,24 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
             resultList.add(lhMouldChangePlanVo);
         }
         return resultList;
+    }
+
+    /**
+     * 去除机台编码末尾的左右模后缀（L/R）。
+     * <p>示例：K1501L -> K1501，K1501R -> K1501，无后缀原样返回。</p>
+     *
+     * @param machineCode 机台编码
+     * @return 去除后缀后的机台前缀
+     */
+    private String stripLeftRightSuffix(String machineCode) {
+        if (StringUtils.isBlank(machineCode)) {
+            return machineCode;
+        }
+        String code = machineCode.trim().toUpperCase();
+        if (code.endsWith("L") || code.endsWith("R")) {
+            return code.substring(0, code.length() - 1);
+        }
+        return code;
     }
 
     @Override

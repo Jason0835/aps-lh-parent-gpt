@@ -11,7 +11,6 @@
 
     <groupId>com.zlt.aps.nc</groupId>
     <artifactId>aps-nc</artifactId>
-    <version>1.0.3-SNAPSHOT</version>
     <name>aps-nc</name>
     <description>内衬工序模块</description>
 
@@ -30,10 +29,10 @@
             <artifactId>swagger-bootstrap-ui</artifactId>
             <version>1.9.6</version>
         </dependency>
-
         <dependency>
             <groupId>com.zlt.aps.nc</groupId>
             <artifactId>aps-nc-api</artifactId>
+            <version>1.0.3-SNAPSHOT</version>
         </dependency>
 
         <!-- APS公共模块 -->
@@ -49,6 +48,7 @@
         <dependency>
             <groupId>com.zlt.aps.nc</groupId>
             <artifactId>aps-engine-nc</artifactId>
+            <version>1.0.3-SNAPSHOT</version>
         </dependency>
         <!-- 和客户做接口的jar -->
         <dependency>

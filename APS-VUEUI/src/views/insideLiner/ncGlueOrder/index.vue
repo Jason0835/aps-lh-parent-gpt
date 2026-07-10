@@ -307,11 +307,15 @@ export default {
         });
       } catch (error) {
         console.error(error);
+        this.$modal.msgError("获取胶料组列表失败：" + error.message);
       } finally {
       }
     },
   },
-  created() {},
+  created() {
+    this.getGlueGroup();
+    this.getList();
+  },
   activated() {
     this.getGlueGroup();
     this.getList();

@@ -1982,8 +1982,10 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
                 if (StringUtils.isEmpty(scheFinishQty.getMaterialCode())) {
                     continue;
                 }
+                //20260710+ T日夜班班次完成量Key-按产品状态
+                String materialStatusKey = scheFinishQty.getMaterialStatusKey();
                 materialScheDayFinishQtyMap.merge(
-                        scheFinishQty.getMaterialCode(),
+                        materialStatusKey,
                         resolveFinishQtyValue(scheFinishQty.getClass1FinishQty()),
                         Integer::sum);
             }

@@ -186,6 +186,8 @@ public final class LhScheduleParamConstant {
     public static final String SMALL_BATCH_SKU_THRESHOLD = "SYS0311003";
     /** 模具交替计划天数 */
     public static final String MOULD_CHANGE_PLAN_DAYS = "SYS0302011";
+    /** 模具交替计划导出模具号往前追溯天数（机台在机信息取排程日期前N天内最近一条） */
+    public static final String MOULD_CHANGE_PLAN_LOOKBACK_DAYS = "SYS0302012";
     /** 局部搜索开关（0-关闭，1-开启） */
     public static final String ENABLE_LOCAL_SEARCH = "SYS0304010";
     /** 局部搜索候选机台阈值（小于该值时启用） */

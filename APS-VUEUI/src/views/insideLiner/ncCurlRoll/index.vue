@@ -1,4 +1,3 @@
-
 <template>
   <basic-container>
     <page-table
@@ -53,23 +52,24 @@
 </template>
 <script>
 //lib
-import {mapState} from "vuex";
+import { mapState } from "vuex";
 //utils
-import {downloadLink} from "@/utils/request";
+import { downloadLink } from "@/utils/request";
 //interface
-import {listCurlRoll, removeCurlRoll} from "@/api/nc/curlRoll";
+import { listCurlRoll, removeCurlRoll } from "@/api/nc/curlRoll";
+import { getConfigKey } from "@/api/system/config";
 //components
 import tltUpload from "@/components/tltUpload/tltUpload.vue";
 
 import infoDialog from "./components/infoDialog.vue";
 
 export default {
-  name: "InsideLinerCurlRoll",
+  name: "ncCurlRoll",
   components: {
     tltUpload,
     infoDialog,
   },
-  dicts: [],
+  dicts: ["biz_factory_name"],
   provide() {
     return {
       parentDict: this.dict,
@@ -87,9 +87,11 @@ export default {
       },
       sort: {},
       search: {
+        factoryCode: '',
         mainPlanMonth: "",
       },
       query: {
+        factoryCode: '',
         mainPlanMonth: "",
       },
       importDefaultValue: {},
@@ -98,7 +100,7 @@ export default {
   },
   computed: {
     ...mapState({
-      machines: (state) => state.tm.machines,
+      machines: (state) => state.insideLiner.machines,
     }),
     columns() {
       let columns = [
@@ -107,7 +109,7 @@ export default {
           prop: "liningCode",
           align: "center",
           halign: "center",
-          label: this.$t("ui.data.column.quota.liningCode"),
+          label: this.$t("ui.nc.curlRoll.column.liningCode"),
           sortable: true,
         },
         {
@@ -160,7 +162,14 @@ export default {
     searchColumns() {
       return [
         {
-          label: this.$t("ui.data.column.quota.liningCode"),
+          label: this.$t("ui.data.column.factoryCode"),
+          prop: "factoryCode",
+          type: "select",
+          dictData: this.dict.type.biz_factory_name,
+          filterable: true,
+        },
+        {
+          label: this.$t("ui.nc.curlRoll.column.liningCode"),
           prop: "liningCode",
         },
       ];
@@ -263,10 +272,13 @@ export default {
     },
   },
   created() {
-    this.$store.dispatch("tm/getMachineList");
-  },
-  activated() {
-    this.getList();
+    getConfigKey("sys.factory.code").then(response => {
+      this.search.factoryCode = response.msg;
+      this.query.factoryCode = response.msg;
+      this.getList();
+    }).catch(() => {
+      this.getList();
+    });
   },
 };
 </script>
