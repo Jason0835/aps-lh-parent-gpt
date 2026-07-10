@@ -2091,6 +2091,7 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
         copy.setBrand(source.getBrand());
         // 计划量信息
         copy.setMonthPlanQty(source.getMonthPlanQty());
+        copy.setMonthPlanSumTotal(source.getMonthPlanSumTotal());
         copy.setFinishedQty(source.getFinishedQty());
         copy.setSurplusQty(source.getSurplusQty());
         copy.setWindowPlanQty(source.getWindowPlanQty());
