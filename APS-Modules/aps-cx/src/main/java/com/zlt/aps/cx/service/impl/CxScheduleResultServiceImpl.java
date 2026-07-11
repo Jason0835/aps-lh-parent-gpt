@@ -324,7 +324,10 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
         Map<String, int[]> lhShiftConsumptionMap = this.buildLhShiftConsumptionMap(exportList, scheduleDate);
 
         // 查询要收尾的结构名称集合（来自CxEmbryoLhTime表，这些结构在未来几天要收尾）
-        Set<String> endingStructureNames = this.loadEndingStructureNames(queryVO);
+        String factoryCode = (queryVO != null && StringUtils.isNotBlank(queryVO.getFactoryCode()))
+                ? queryVO.getFactoryCode() : FactoryConstant.DEFAULT_FACTORY_CODE;
+        Set<String> endingStructureNames = this.loadEndingStructureNames(factoryCode);
+        log.info("Sheet1过滤：收尾结构集合 = {}", endingStructureNames);
 
         // Sheet 0: 成型余量-按机台
         Map<String, Object> remainQtyTableMap = new HashMap<>(16);
@@ -1043,23 +1046,20 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
     /**
      * 加载要收尾的结构名称集合。
      * <p>从 CxEmbryoLhTime 表查询，该表记录的是未来几天要切换的结构，
-     * 其中 structureName（前结构）即为要收尾的结构。</p>
+     * 其中 structureName（前结构）即为要收尾的结构。
+     * 只按工厂编码查询，不限日期，确保能取到所有待收尾结构。</p>
      *
-     * @param queryVO 查询条件（含 factoryCode、scheduleDate）
+     * @param factoryCode 工厂编码
      * @return 要收尾的结构名称集合
      */
-    private Set<String> loadEndingStructureNames(CxScheduleResult queryVO) {
-        String factoryCode = (queryVO != null && StringUtils.isNotBlank(queryVO.getFactoryCode()))
-                ? queryVO.getFactoryCode() : FactoryConstant.DEFAULT_FACTORY_CODE;
-        Date scheduleDate = queryVO != null ? queryVO.getScheduleDate() : null;
-
+    private Set<String> loadEndingStructureNames(String factoryCode) {
         LambdaQueryWrapper<CxEmbryoLhTime> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(CxEmbryoLhTime::getFactoryCode, factoryCode);
-        if (scheduleDate != null) {
-            wrapper.eq(CxEmbryoLhTime::getScheduleDate, scheduleDate);
+        if (StringUtils.isNotBlank(factoryCode)) {
+            wrapper.eq(CxEmbryoLhTime::getFactoryCode, factoryCode);
         }
 
         List<CxEmbryoLhTime> list = cxEmbryoLhTimeMapper.selectList(wrapper);
+        log.info("loadEndingStructureNames: factoryCode={}, 查询结果{}条", factoryCode, list != null ? list.size() : 0);
         if (CollectionUtils.isEmpty(list)) {
             return Collections.emptySet();
         }
