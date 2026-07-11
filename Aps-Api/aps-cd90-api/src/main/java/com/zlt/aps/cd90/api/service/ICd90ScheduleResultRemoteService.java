@@ -30,6 +30,13 @@ public interface ICd90ScheduleResultRemoteService {
     @PostMapping("/cd90ScheduleResult/remove")
     AjaxResult removeByIds(@RequestBody List<Long> ids);
 
+    /**
+     * 执行直裁自动排程。
+     * <p>提交排程请求后返回任务ID，前端通过轮询任务状态获取排程结果。</p>
+     *
+     * @param scheduleResult 自动排程条件（工厂编码、排程日期、是否强制重排）
+     * @return 包含 taskId 的自动排程结果
+     */
     @ApiOperation("自动排程")
     @PostMapping("/cd90ScheduleResult/autoSchedule")
     AjaxResult autoSchedule(@RequestBody Cd90ScheduleResult scheduleResult);

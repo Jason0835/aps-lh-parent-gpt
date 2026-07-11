@@ -46,12 +46,21 @@ public class Cd90AutoScheduleAsyncExecutorImpl implements Cd90AutoScheduleAsyncE
                 log.warn("[直裁自动排程] 任务已被其他执行者处理, taskId={}", taskId);
                 return;
             }
+            // 先基于工厂和排程日期准备自动排程上下文，加载后续算法执行所需的参数、班次窗口和输入版本快照。
             Cd90AutoScheduleContext context = engineService.prepare(factoryCode, scheduleDate);
             updateProgress(taskId, 15, "PREPARE", "自动排程上下文准备完成");
+
+            // 注册排程过程中的进度回调，将引擎内部各阶段的进度持续同步回任务表，
+            // 便于前端轮询查看当前执行阶段和完成百分比。
             Cd90ScheduleProgressListener listener = (progress, stage, stageName, shift) ->
                     updateProgress(taskId, progress, stage, stageName);
+
+            // 执行直裁自动排程引擎，生成尚未落库的排程输出草稿。
             Cd90AutoScheduleOutputDraft output = engineService.execute(context, listener);
             updateProgress(taskId, 95, "PERSIST", "保存自动排程结果");
+
+            // 将排程结果草稿落库，并在持久化阶段复用当前分布式锁，
+            // 确保结果写入和旧数据替换过程不被并发任务打断。
             persistService.persist(taskId, context, output, lock);
         } catch (Exception exception) {
             log.error("[直裁自动排程] 异步任务执行失败, taskId={}, factoryCode={}, scheduleDate={}",
