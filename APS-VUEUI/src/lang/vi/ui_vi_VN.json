@@ -1660,6 +1660,7 @@
   "ui.data.column.cd15Params.paramName": "Tên thông số",
   "ui.data.column.cd15Params.paramValue": "Giá trị thông số",
   "ui.data.column.cd15Params.regularExpression": "Biểu thức chính quy",
+  "ui.data.column.cd15Params.remark2": "Mã định danh thông số",
   "ui.data.column.cd15Params.errorTips": "Lỗi gợi ý",
   "ui.data.column.cd15Params.checkUnique": "Mã thông số này đã tồn tại trong cùng nhà máy",
   "ui.data.column.cd15SpecifyMachine.modelName": "Máy chỉ định cắt 15 độ",

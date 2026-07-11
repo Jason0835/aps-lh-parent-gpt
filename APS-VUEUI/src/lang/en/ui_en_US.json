@@ -545,6 +545,7 @@
   "ui.data.column.cd15Params.paramName": "Param Name",
   "ui.data.column.cd15Params.paramValue": "Param Value",
   "ui.data.column.cd15Params.regularExpression": "Regular Expression",
+  "ui.data.column.cd15Params.remark2": "Param Key",
   "ui.data.column.cd15Params.errorTips": "Error Tips",
   "ui.data.column.cd15Params.checkUnique": "The same param code already exists in this factory",
   "ui.data.column.cd15SpecifyMachine.modelName": "15 Degree Cutting Specify Machine",
