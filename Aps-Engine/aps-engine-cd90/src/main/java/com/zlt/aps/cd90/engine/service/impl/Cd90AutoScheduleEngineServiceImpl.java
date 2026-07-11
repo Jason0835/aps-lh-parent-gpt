@@ -1,6 +1,8 @@
 package com.zlt.aps.cd90.engine.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.ruoyi.common.exception.ServiceException;
+import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.cd90.api.domain.entity.Cd90ShiftConfig;
 import com.zlt.aps.cd90.engine.algorithm.Cd90ShiftWindowResolver;
 import com.zlt.aps.cd90.engine.algorithm.Cd90AutoScheduleOutputDraftBuilder;
@@ -50,7 +52,14 @@ public class Cd90AutoScheduleEngineServiceImpl implements Cd90AutoScheduleEngine
     @Override
     public Cd90AutoScheduleContext prepare(String factoryCode, Date scheduleDate) {
         // 第一步只准备不可变计算上下文，不在此阶段创建任务或写入排程结果。
-        validateRequest(factoryCode, scheduleDate);
+        if (!StringUtils.hasText(factoryCode)) {
+            // 信息：自动排程工厂编码不能为空
+            throw new ServiceException(I18nUtil.getMessage("ui.cd90.autoSchedule.factoryCodeEmpty"));
+        }
+        if (scheduleDate == null) {
+            // 信息：自动排程日期不能为空
+            throw new ServiceException(I18nUtil.getMessage("ui.cd90.autoSchedule.scheduleDateEmpty"));
+        }
         LocalDate localScheduleDate = scheduleDate.toInstant()
                 .atZone(ZoneId.systemDefault())
                 .toLocalDate();
@@ -126,18 +135,5 @@ public class Cd90AutoScheduleEngineServiceImpl implements Cd90AutoScheduleEngine
         return shiftMapper.selectList(wrapper);
     }
 
-    /**
-     * 校验自动排程入口参数。
-     *
-     * @param factoryCode 工厂编码
-     * @param scheduleDate 排程日期
-     */
-    private void validateRequest(String factoryCode, Date scheduleDate) {
-        if (!StringUtils.hasText(factoryCode)) {
-            throw new IllegalArgumentException("自动排程工厂编码不能为空");
-        }
-        if (scheduleDate == null) {
-            throw new IllegalArgumentException("自动排程日期不能为空");
-        }
-    }
+
 }

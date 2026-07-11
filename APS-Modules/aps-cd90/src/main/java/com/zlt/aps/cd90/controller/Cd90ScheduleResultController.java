@@ -87,8 +87,9 @@ public class Cd90ScheduleResultController extends AbstractDocBizController<Cd90S
 
     /**
      * 自动生成直裁排程结果。
+     * <p>接收自动排程请求，转发至 Service 层执行。</p>
      *
-     * @param scheduleResult 自动排程条件，当前使用工厂编码和排程日期
+     * @param scheduleResult 自动排程条件（工厂编码、排程日期、是否强制重排）
      * @return 自动排程结果
      */
     @ApiOperation("自动排程")

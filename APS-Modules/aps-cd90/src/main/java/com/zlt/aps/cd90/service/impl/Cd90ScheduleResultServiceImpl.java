@@ -65,8 +65,17 @@ import java.util.stream.IntStream;
 
 @Service
 @Transactional(rollbackFor = Exception.class)
+/**
+ * 直裁排程结果服务实现。
+ * 负责自动排程、插单、转机台、调量、定时滚动校验等业务入口编排，
+ * 并对接排程任务、滚动重排引擎、批次级数据校验和任务状态查询能力。
+ */
 public class Cd90ScheduleResultServiceImpl extends AbstractDocService<Cd90ScheduleResult> implements ICd90ScheduleResultService {
 
+    /**
+     * 服务内部依赖的 Mapper、校验器、异步执行器和引擎入口。
+     * 分别负责排程结果读写、任务编排、批次校验、滚动预演与施工信息补充查询。
+     */
     @Resource
     private Cd90ScheduleResultMapper cd90ScheduleResultMapper;
     @Resource
@@ -106,11 +115,13 @@ public class Cd90ScheduleResultServiceImpl extends AbstractDocService<Cd90Schedu
     @Override
     public AjaxResult autoSchedule(Cd90ScheduleResult scheduleResult) {
         if (scheduleResult == null) {
-            return AjaxResult.error("自动排程请求不能为空");
+            // 信息：自动排程请求不能为空
+            return AjaxResult.error(I18nUtil.getMessage("ui.cd90.autoSchedule.planRequestEmpty"));
         }
         if (scheduleResult.getFactoryCode() == null || scheduleResult.getFactoryCode().trim().isEmpty()
                 || scheduleResult.getScheduleDate() == null) {
-            return AjaxResult.error("自动排程工厂编码和排程日期不能为空");
+            // 信息：自动排程工厂编码和排程日期不能为空
+            return AjaxResult.error(I18nUtil.getMessage("ui.cd90.autoSchedule.factoryAndDateEmpty"));
         }
         // 正式进入自动排程前，同步做1.2节批次级数据先行检查；
         // 失败时不创建PENDING任务、不占用执行锁、不进入异步执行器，直接返回结构化错误。
@@ -142,25 +153,40 @@ public class Cd90ScheduleResultServiceImpl extends AbstractDocService<Cd90Schedu
             data.put("needConfirm", true);
             return AjaxResult.success(decision.getMessage(), data);
         }
+        // 先查询当前工厂、当前排程日期是否已有进行中的自动排程任务，
+        // 如果存在则直接返回已有任务ID，避免重复提交相同日期的异步任务。
         Cd90ScheduleTask activeTask = taskService.findActive(
                 scheduleResult.getFactoryCode(), scheduleResult.getScheduleDate());
         if (activeTask != null) {
             data.put("needConfirm", false);
             data.put("taskId", activeTask.getTaskId());
-            return AjaxResult.success("当前日期已有自动排程任务正在执行", data);
+            // 信息：当前日期已有自动排程任务正在执行
+            return AjaxResult.success(I18nUtil.getMessage("ui.cd90.autoSchedule.activeTask"), data);
         }
+
+        // 组装本次触发请求的快照信息，并创建一条 PENDING 状态的自动排程任务记录，
+        // 便于异步执行链路进行状态跟踪、异常回溯和任务审计。
         String snapshot = "factoryCode=" + scheduleResult.getFactoryCode()
                 + ",scheduleDate=" + scheduleResult.getScheduleDate()
                 + ",forceRegenerate=" + Boolean.TRUE.equals(scheduleResult.getForceRegenerate());
         Cd90ScheduleTask task = taskService.createPending(scheduleResult.getFactoryCode(),
                 scheduleResult.getScheduleDate(), Cd90ScheduleTaskType.AUTO_SCHEDULE,
                 "MANUAL", snapshot, null);
+
+        // 将任务投递到异步执行器中实际启动排程计算，并把新任务ID返回给前端，
+        // 前端后续可通过 taskId 轮询任务状态和排程结果。
         asyncExecutor.execute(task.getTaskId(), task.getFactoryCode(), task.getScheduleDate());
         data.put("needConfirm", false);
         data.put("taskId", task.getTaskId());
-        return AjaxResult.success("自动排程任务已提交", data);
+        // 信息：自动排程任务已提交
+        return AjaxResult.success(I18nUtil.getMessage("ui.cd90.autoSchedule.taskSubmitted"), data);
     }
-
+    /**
+     * 计算指定排程日对应的各班次时间信息。
+     *
+     * @param request 插单请求，至少包含工厂和排程日期
+     * @return 班次日期、起止时间、是否当前班次以及是否允许调量的信息
+    */
     @Override
     public AjaxResult shiftDates(Cd90InsertOrderRequest request) {
         if (request == null || request.getScheduleDate() == null
@@ -222,6 +248,12 @@ public class Cd90ScheduleResultServiceImpl extends AbstractDocService<Cd90Schedu
                 .map(this::parseClassIndex)
                 .findFirst().orElse(7);
     }
+    /**
+     * 校验插单请求是否合法。
+     *
+     * @param request 插单请求
+     * @return 校验结果
+    */
     @Override
     public AjaxResult validateInsert(Cd90InsertOrderRequest request) {
         if (request == null || request.getScheduleDate() == null
@@ -267,7 +299,12 @@ public class Cd90ScheduleResultServiceImpl extends AbstractDocService<Cd90Schedu
         return hasPlan ? AjaxResult.success()
                 : AjaxResult.error(I18nUtil.getMessage("ui.cd90.insert.planRequired"));
     }
-
+    /**
+     * 提交插单滚动重排任务。
+     *
+     * @param request 插单请求
+     * @return 提交结果，必要时返回跨班顺延确认信息
+    */
     @Override
     public AjaxResult insertOrder(Cd90InsertOrderRequest request) {
         AjaxResult validation = this.validateInsert(request);
@@ -395,9 +432,12 @@ public class Cd90ScheduleResultServiceImpl extends AbstractDocService<Cd90Schedu
         }
         return AjaxResult.success(task);
     }
-
-
-
+    /**
+     * 校验转机台请求是否合法。
+     *
+     * @param request 转机台请求
+     * @return 校验结果
+    */
     @Override
     public AjaxResult validateTransferMachine(Cd90TransferMachineRequest request) {
         if (request == null || request.getScheduleDate() == null
@@ -452,7 +492,12 @@ public class Cd90ScheduleResultServiceImpl extends AbstractDocService<Cd90Schedu
                         .anyMatch(item -> readPlanQuantity(item, classIndex) > 0D && isLocked(item, classIndex)));
         return lockedTransfer ? AjaxResult.error("已锁定或已生产的班次计划不能转机台") : AjaxResult.success();
     }
-
+    /**
+     * 提交转机台滚动重排任务。
+     *
+     * @param request 转机台请求
+     * @return 提交结果，必要时返回跨班顺延确认信息
+    */
     @Override
     public AjaxResult transferMachine(Cd90TransferMachineRequest request) {
         AjaxResult validation = this.validateTransferMachine(request);
@@ -527,7 +572,12 @@ public class Cd90ScheduleResultServiceImpl extends AbstractDocService<Cd90Schedu
         }
         return AjaxResult.success(task);
     }
-
+    /**
+     * 校验调量请求是否合法。
+     *
+     * @param request 调量请求
+     * @return 校验结果
+    */
     @Override
     public AjaxResult validateChangeQty(Cd90ChangeQtyRequest request) {
         if (request == null || request.getScheduleDate() == null
@@ -580,7 +630,12 @@ public class Cd90ScheduleResultServiceImpl extends AbstractDocService<Cd90Schedu
         return lessThanFinish.isPresent()
                 ? AjaxResult.error("调量目标不能小于已完成数量") : AjaxResult.success();
     }
-
+    /**
+     * 提交调量滚动重排任务。
+     *
+     * @param request 调量请求
+     * @return 提交结果，必要时返回跨班顺延确认信息
+    */
     @Override
     public AjaxResult changeQty(Cd90ChangeQtyRequest request) {
         AjaxResult validation = this.validateChangeQty(request);
@@ -659,7 +714,12 @@ public class Cd90ScheduleResultServiceImpl extends AbstractDocService<Cd90Schedu
     public AjaxResult checkTimedRolling(Cd90RollingCheckRequest request) {
         return timedRollingCheckService.check(request);
     }
-
+    /**
+     * 查询定时滚动任务执行状态，并补充调整数量、未排入数量等衍生信息。
+     *
+     * @param taskId 任务编号
+     * @return 任务详情
+    */
     @Override
     public AjaxResult getTimedRollingTask(String taskId) {
         Cd90ScheduleTask task = taskService.findByTaskId(taskId);
@@ -929,7 +989,13 @@ public class Cd90ScheduleResultServiceImpl extends AbstractDocService<Cd90Schedu
             return false;
         }
     }
-
+    /**
+     * 按排程日期和工厂查询直裁排程结果。
+     *
+     * @param scheduleDate 排程日期
+     * @param factoryCode 工厂编码
+     * @return 排程结果列表
+    */
     @Override
     public List<Cd90ScheduleResult> selectByDateAndFactory(Date scheduleDate, String factoryCode) {
         if (scheduleDate == null || factoryCode == null || factoryCode.isEmpty()) {
@@ -954,6 +1020,10 @@ public class Cd90ScheduleResultServiceImpl extends AbstractDocService<Cd90Schedu
     /**
      * 批量更新发布状态。REQUIRES_NEW 独立短事务：
      * 即便外层 MES 调用 try 块抛异常，失败状态回写也能独立提交，避免状态丢失。
+     *
+     * @param list 需要更新的排程结果集合
+     * @param targetStatus 目标发布状态
+     * @return 实际更新数量
      */
     @Override
     @Transactional(rollbackFor = Exception.class, propagation = Propagation.REQUIRES_NEW)

@@ -35,6 +35,12 @@
             <artifactId>mybatis-plus-boot-starter</artifactId>
         </dependency>
 
+        <dependency>
+            <groupId>com.zlt.aps</groupId>
+            <artifactId>aps-common-core</artifactId>
+            <version>1.0.3-SNAPSHOT</version>
+            <optional>true</optional>
+        </dependency>
 
         <dependency>
             <groupId>com.ruoyi</groupId>

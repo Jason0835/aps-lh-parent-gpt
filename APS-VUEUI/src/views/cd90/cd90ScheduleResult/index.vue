@@ -381,7 +381,8 @@ export default {
             {
               label: this.$t('ui.data.column.scheduleResult.actual'),
               prop: `${classField}FinishQty`,
-              minWidth: 110
+              minWidth: 110,
+              formatter: (row, column, cellValue) => cellValue === 0 || cellValue === '0' ? '' : cellValue
             },
             {
               label: this.$t('ui.data.column.scheduleResult.produceOrder'),
