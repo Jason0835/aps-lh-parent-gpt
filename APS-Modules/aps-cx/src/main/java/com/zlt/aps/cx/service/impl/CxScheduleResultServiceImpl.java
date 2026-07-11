@@ -332,7 +332,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
         // Sheet 0: 成型余量-按机台
         Map<String, Object> remainQtyTableMap = new HashMap<>(16);
         List<List<Map<String, Object>>> remainQtyDataList = new ArrayList<>();
-        remainQtyDataList.add(buildCxRemainQtyExportDataList(exportList));
+        remainQtyDataList.add(buildCxRemainQtyExportDataList(exportList, endingStructureNames));
         byte[] exportBytes = ExcelUtils.writeMultiList(inputStream, 0, remainQtyTableMap, remainQtyDataList);
 
         // Sheet 1: 成型日计划
@@ -720,9 +720,6 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
 
     /**
      * 构建列表数据，按机台分组并在每组末尾插入小计行。
-     * <p>过滤规则：只展示 成型余量<400 或 结构在收尾结构集合中的记录。</p>
-     *
-     * @param endingStructureNames 要收尾的结构名称集合（来自CxEmbryoLhTime表）
      */
     private List<Map<String, Object>> buildCxTemplateDataList(List<CxScheduleResult> list, Map<String, String> recipeTypeMap,
                                                                Map<String, BigDecimal> totalDailyPlanQtyMap,
@@ -749,32 +746,10 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
                     item -> PubUtil.isNotEmpty(item.getMaterialCode()) ? item.getMaterialCode() : "",
                     String::compareTo));
 
-            // 过滤：只保留 余量<400 或 结构在收尾集合中的记录
-            List<CxScheduleResult> filteredList = groupList.stream()
-                    .filter(item -> {
-                        // 余量<400
-                        BigDecimal remainQty = item.getCxRemainQty();
-                        if (remainQty != null && remainQty.compareTo(new BigDecimal("400")) < 0) {
-                            return true;
-                        }
-                        // 结构在收尾集合中
-                        String structureName = item.getStructureName();
-                        if (StringUtils.isNotBlank(structureName) && endingStructureNames != null
-                                && endingStructureNames.contains(structureName.trim())) {
-                            return true;
-                        }
-                        return false;
-                    })
-                    .collect(Collectors.toList());
-
-            if (filteredList.isEmpty()) {
-                continue;
-            }
-
-            for (CxScheduleResult item : filteredList) {
+            for (CxScheduleResult item : groupList) {
                 dataList.add(buildCxTemplateRow(item, recipeTypeMap, totalDailyPlanQtyMap, todayNightFinishQtyMap, smallGlueMap, placeholderMap, shiftCapacitiesMap, keyProductEmbryoCodes, lhShiftConsumptionMap));
             }
-            dataList.add(buildCxTemplateSubtotalRow(filteredList, lhShiftConsumptionMap));
+            dataList.add(buildCxTemplateSubtotalRow(groupList, lhShiftConsumptionMap));
         }
 
         return dataList;
@@ -1637,7 +1612,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
      * @param list 成型排程结果明细列表
      * @return 模板列表行数据，字段名与cxyl.xlsx中的列表占位符保持一致
      */
-    private List<Map<String, Object>> buildCxRemainQtyExportDataList(List<CxScheduleResult> list) {
+    private List<Map<String, Object>> buildCxRemainQtyExportDataList(List<CxScheduleResult> list, Set<String> endingStructureNames) {
         List<CxScheduleResult> exportList = Objects.isNull(list) ? Collections.emptyList() :
                 list.stream().sorted(Comparator.comparing(CxScheduleResult::getCxMachineCode, String.CASE_INSENSITIVE_ORDER)
                                 .thenComparing(CxScheduleResult::getMaterialCode))
@@ -1669,6 +1644,18 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
             if (CollectionUtils.isEmpty(groupList)) {
                 continue;
             }
+
+            // 过滤：只展示 余量<400 或 结构在收尾集合中的分组
+            BigDecimal groupRemainQty = sumCxRemainQty(groupList);
+            boolean isEndingStructure = groupList.stream()
+                    .map(CxScheduleResult::getStructureName)
+                    .filter(StringUtils::isNotBlank)
+                    .map(String::trim)
+                    .anyMatch(name -> endingStructureNames != null && endingStructureNames.contains(name));
+            if (!(groupRemainQty.compareTo(new BigDecimal("400")) < 0 || isEndingStructure)) {
+                continue;
+            }
+
             CxScheduleResult first = groupList.get(0);
             Map<String, Object> row = new LinkedHashMap<>();
             row.put("cxMachineCode", first.getCxMachineCode());
