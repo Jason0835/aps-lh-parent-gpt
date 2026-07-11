@@ -19,7 +19,7 @@ export function listMachine(query) {
  */
 export function editMachine(query) {
   return request({
-    url: 'nc/machine/edit',
+    url: 'nc/machine/save',
     method: 'post',
     data: query
   })
