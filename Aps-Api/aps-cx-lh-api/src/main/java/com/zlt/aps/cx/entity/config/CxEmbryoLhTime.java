@@ -1,3 +1,4 @@
+
 package com.zlt.aps.cx.entity.config;
 
 import com.baomidou.mybatisplus.annotation.*;
@@ -32,6 +33,15 @@ public class CxEmbryoLhTime extends BaseEntity {
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;
 
+    @ApiModelProperty(value = "排程日期")
+    @JsonFormat(pattern = "yyyy-MM-dd", timezone = "GMT+8")
+    @TableField("SCHEDULE_DATE")
+    private Date scheduleDate;
+
+    @ApiModelProperty(value = "成型机台编码")
+    @TableField("CX_MACHINE_CODE")
+    private String cxMachineCode;
+
     @Excel(name = "ui.data.column.cxEmbryoLhTime.structureName")
     @ApiModelProperty(value = "结构")
     @TableField("STRUCTURE_NAME")
@@ -45,6 +55,21 @@ public class CxEmbryoLhTime extends BaseEntity {
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private Date earliestLhTime;
+
+    @ApiModelProperty(value = "收尾时间（前结构结束时间，不含切换耗时）")
+    @TableField("ENDING_TIME")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private Date endingTime;
+
+    @ApiModelProperty(value = "结构排程开始前的成型余量")
+    @TableField("STRUCTURE_CHANGE_REMAINING")
+    @ImportValidated(required = true)
+    private Integer structureChangeRemaining;
+
+    @ApiModelProperty(value = "后结构（切换后的新结构）")
+    @TableField("NEXT_STRUCTURE_NAME")
+    private String nextStructureName;
 
     @ApiModelProperty(value = "行数")
     @TableField(exist = false)

@@ -18,6 +18,7 @@ import com.zlt.aps.common.core.utils.ExcelUtils;
 import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.cx.api.domain.entity.CxStock;
 import com.zlt.aps.cx.api.domain.entity.CxStructureTreadConfig;
+import com.zlt.aps.cx.entity.config.CxEmbryoLhTime;
 import com.zlt.aps.cx.entity.config.CxKeyProduct;
 import com.zlt.aps.cx.entity.config.CxParamConfig;
 import com.zlt.aps.cx.entity.schedule.CxScheduleResult;
@@ -108,6 +109,9 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
 
     @Autowired
     private CxStockMapper stockMapper;
+
+    @Autowired
+    private CxEmbryoLhTimeMapper cxEmbryoLhTimeMapper;
 
     @Override
     public List<CxScheduleResult> listByScheduleDate(LocalDate scheduleDate) {
@@ -313,6 +317,9 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
         // 构建硫化排程6/7/8班消耗量映射（按胎胚代码匹配同日硫化计划量）
         Map<String, int[]> lhShiftConsumptionMap = this.buildLhShiftConsumptionMap(exportList, scheduleDate);
 
+        // 查询要收尾的结构名称集合（来自CxEmbryoLhTime表，这些结构在未来几天要收尾）
+        Set<String> endingStructureNames = this.loadEndingStructureNames(queryVO);
+
         // Sheet 0: 成型余量-按机台
         Map<String, Object> remainQtyTableMap = new HashMap<>(16);
         List<List<Map<String, Object>>> remainQtyDataList = new ArrayList<>();
@@ -350,7 +357,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
         }
         planTableMap.put("version", productionVersion != null ? productionVersion : "");
         List<List<Map<String, Object>>> planDataList = new ArrayList<>();
-        List<Map<String, Object>> planRows = buildCxTemplateDataList(exportList, recipeTypeMap, totalDailyPlanQtyMap, todayNightFinishQtyMap, smallGlueMap, placeholderMap, shiftCapacitiesMap, keyProductEmbryoCodes, lhShiftConsumptionMap);
+        List<Map<String, Object>> planRows = buildCxTemplateDataList(exportList, recipeTypeMap, totalDailyPlanQtyMap, todayNightFinishQtyMap, smallGlueMap, placeholderMap, shiftCapacitiesMap, keyProductEmbryoCodes, lhShiftConsumptionMap, endingStructureNames);
         planDataList.add(planRows);
 
         // 为小计行添加 DAEEF3 背景色标识 + 胎胚余量<400 红色背景
@@ -399,45 +406,76 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
 
     /**
      * 构建成型结构切换Sheet的数据列表（用于写入 CxExport.xlsx 的 Sheet 7）。
-     * 同时将颜色标识（CELL_STYLE）写入 tableMap，供 writeMultiList 渲染单元格背景色。
+     * <p>数据来源：T_CX_EMBRYO_LH_TIME 表，每条记录直接对应一行导出数据。
+     * 其中前结构月计划时间和后结构月计划时间仍从 MpStructureAllocation 取值，
+     * 其余字段直接从 CxEmbryoLhTime 实体取值。</p>
      *
-     * @param queryVO 查询条件
+     * @param queryVO 查询条件（含 factoryCode、scheduleDate）
      * @param tableMap 表头/样式数据容器，方法会向其中写入 CELL_STYLE
-     * @param exportList 成型排程结果列表，用于计算余量和班次日期
+     * @param exportList 成型排程结果列表（保留参数兼容，当前未使用）
      * @return 结构切换数据列表
      */
     private List<List<Map<String, Object>>> buildStructureChangeSheetData(CxScheduleResult queryVO,
                                                                           Map<String, Object> tableMap,
                                                                           List<CxScheduleResult> exportList) {
-        MpStructureAllocation structureQuery = buildStructureAllocationQuery(queryVO);
-        TableDataInfo structureDataInfo = mpStructureAllocationRemoteService.list(structureQuery);
-        List<MpStructureAllocation> structureList = structureDataInfo != null
-                ? convertToMpStructureAllocationList(structureDataInfo.getRows())
-                : Collections.emptyList();
+        // 1. 查询 CxEmbryoLhTime 表数据
+        String factoryCode = (queryVO != null && StringUtils.isNotBlank(queryVO.getFactoryCode()))
+                ? queryVO.getFactoryCode() : FactoryConstant.DEFAULT_FACTORY_CODE;
+        Date scheduleDate = queryVO != null ? queryVO.getScheduleDate() : null;
 
-        if (CollectionUtils.isEmpty(structureList)) {
+        LambdaQueryWrapper<CxEmbryoLhTime> lhTimeWrapper = new LambdaQueryWrapper<>();
+        lhTimeWrapper.eq(CxEmbryoLhTime::getFactoryCode, factoryCode);
+        if (scheduleDate != null) {
+            lhTimeWrapper.eq(CxEmbryoLhTime::getScheduleDate, scheduleDate);
+        }
+        lhTimeWrapper.orderByAsc(CxEmbryoLhTime::getCxMachineCode);
+
+        List<CxEmbryoLhTime> lhTimeList = cxEmbryoLhTimeMapper.selectList(lhTimeWrapper);
+
+        if (CollectionUtils.isEmpty(lhTimeList)) {
             List<List<Map<String, Object>>> emptyList = new ArrayList<>();
             emptyList.add(new ArrayList<>());
             return emptyList;
         }
 
-        Map<String, List<MpStructureAllocation>> machineGroupMap = structureList.stream()
-                .filter(Objects::nonNull)
-                .filter(s -> StringUtils.isNotBlank(s.getCxMachineCode()))
-                .collect(Collectors.groupingBy(
-                        s -> s.getCxMachineCode().trim(),
-                        LinkedHashMap::new,
-                        Collectors.toList()));
-        machineGroupMap.entrySet().removeIf(entry -> entry.getValue().size() < 2);
+        // 2. 查询 MpStructureAllocation，构建 结构名称->结构排产 的映射（用于取月计划时间）
+        MpStructureAllocation structureQuery = this.buildStructureAllocationQuery(queryVO);
+        TableDataInfo structureDataInfo = mpStructureAllocationRemoteService.list(structureQuery);
+        List<MpStructureAllocation> structureList = structureDataInfo != null
+                ? this.convertToMpStructureAllocationList(structureDataInfo.getRows())
+                : Collections.emptyList();
 
-        LocalDate scheduleDate = queryVO != null && queryVO.getScheduleDate() != null
-                ? cn.hutool.core.date.DateUtil.toLocalDateTime(queryVO.getScheduleDate()).toLocalDate()
-                : LocalDate.now();
+        Map<String, MpStructureAllocation> structureMap = new HashMap<>();
+        if (CollectionUtils.isNotEmpty(structureList)) {
+            for (MpStructureAllocation s : structureList) {
+                if (s != null && StringUtils.isNotBlank(s.getStructureName())) {
+                    structureMap.putIfAbsent(s.getStructureName().trim(), s);
+                }
+            }
+        }
 
-        List<Map<String, Object>> dataList = buildStructureChangeDataListV2(
-                machineGroupMap, scheduleDate, exportList);
+        int year = structureQuery.getYear() != null ? structureQuery.getYear() : LocalDate.now().getYear();
+        int month = structureQuery.getMonth() != null ? structureQuery.getMonth() : LocalDate.now().getMonthValue();
 
-        List<CellStyle> cellStyleList = buildCellStyleListForStructureChange(dataList);
+        // 3. 逐条构建导出行
+        List<Map<String, Object>> dataList = new ArrayList<>();
+        for (CxEmbryoLhTime lhTime : lhTimeList) {
+            dataList.add(this.buildStructureChangeRowFromEntity(lhTime, structureMap, year, month));
+        }
+
+        // 4. 排序：按后结构开产日期升序
+        dataList.sort(Comparator.comparing(
+                row -> (String) row.get("_sortKey"),
+                Comparator.nullsLast(Comparator.naturalOrder())));
+
+        // 5. 加序号
+        int rowIndex = 1;
+        for (Map<String, Object> row : dataList) {
+            row.put("stt", rowIndex++);
+        }
+
+        // 6. 构建单元格样式
+        List<CellStyle> cellStyleList = this.buildCellStyleListForStructureChange(dataList);
         if (PubUtil.isNotEmpty(cellStyleList)) {
             tableMap.put("CELL_STYLE", cellStyleList);
         }
@@ -445,6 +483,85 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
         List<List<Map<String, Object>>> excelDataList = new ArrayList<>();
         excelDataList.add(dataList);
         return excelDataList;
+    }
+
+    /**
+     * 从 CxEmbryoLhTime 实体构建单条结构切换导出行数据。
+     * <p>字段映射：
+     *   machineCode      <- cxMachineCode
+     *   structureSpec    <- structureName（前结构）
+     *   remainQty        <- structureChangeRemaining（结构排程开始前的成型余量）
+     *   receiveEstDate   <- endingTime（收尾时间）
+     *   receiveMonthPlan <- MpStructureAllocation中前结构的endDay（MM.DD格式）
+     *   remark           <- remark
+     *   nextStructure    <- nextStructureName（后结构）
+     *   startEstDate     <- earliestLhTime（最早可供硫化时间）
+     *   startMonthPlan   <- MpStructureAllocation中后结构的beginDay（MM.DD格式）
+     *   remark2          <- 空
+     * </p>
+     *
+     * @param lhTime 胎胚最早可供硫化时间实体
+     * @param structureMap 结构名称->MpStructureAllocation 映射（用于取月计划时间）
+     * @param year 年份
+     * @param month 月份
+     * @return 单行导出数据
+     */
+    private Map<String, Object> buildStructureChangeRowFromEntity(CxEmbryoLhTime lhTime,
+                                                                   Map<String, MpStructureAllocation> structureMap,
+                                                                   int year, int month) {
+        String prevStructureName = StringUtils.defaultString(lhTime.getStructureName()).trim();
+        String nextStructureName = StringUtils.defaultString(lhTime.getNextStructureName()).trim();
+
+        // 从 MpStructureAllocation 取前结构月计划时间（endDay）和后结构月计划时间（beginDay）
+        MpStructureAllocation prevStructure = structureMap.get(prevStructureName);
+        MpStructureAllocation nextStructure = structureMap.get(nextStructureName);
+
+        Map<String, Object> row = new LinkedHashMap<>();
+        row.put("stt", 0);
+        row.put("machineCode", lhTime.getCxMachineCode());
+        row.put("structureSpec", prevStructureName);
+        // 成型余量
+        Integer remainQtyVal = lhTime.getStructureChangeRemaining();
+        row.put("remainQty", remainQtyVal != null && remainQtyVal > 0 ? remainQtyVal.toString() : "");
+        // 预计收尾时间（前结构结束时间）
+        row.put("receiveEstDate", lhTime.getEndingTime() != null
+                ? cn.hutool.core.date.DateUtil.format(lhTime.getEndingTime(), "yyyy-MM-dd HH:mm") : "");
+        // 前结构月计划时间（从 MpStructureAllocation 取 endDay）
+        row.put("receiveMonthPlan", prevStructure != null
+                ? this.formatDateFromDay(year, month, prevStructure.getEndDay()) : "");
+        // 收尾备注
+        row.put("remark", lhTime.getRemark() != null ? lhTime.getRemark() : "");
+        // 后结构
+        row.put("nextStructure", nextStructureName);
+        // 预计开产时间（最早可供硫化时间）
+        row.put("startEstDate", lhTime.getEarliestLhTime() != null
+                ? cn.hutool.core.date.DateUtil.format(lhTime.getEarliestLhTime(), "yyyy-MM-dd HH:mm") : "");
+        // 后结构月计划时间（从 MpStructureAllocation 取 beginDay）
+        row.put("startMonthPlan", nextStructure != null
+                ? this.formatDateFromDay(year, month, nextStructure.getBeginDay()) : "");
+        // 开产备注
+        row.put("remark2", "");
+        // 追踪字段
+        row.put("traceTd", "");
+        row.put("traceSw", "");
+        row.put("traceIl", "");
+        row.put("traceUb", "");
+        row.put("traceBd", "");
+        row.put("traceCa", "");
+        row.put("traceBe", "");
+        row.put("traceCh", "");
+
+        // 排序键：后结构开产日期
+        LocalDate nextBeginDate = nextStructure != null && nextStructure.getBeginDay() != null
+                ? LocalDate.of(year, month, Math.min(nextStructure.getBeginDay(), LocalDate.of(year, month, 1).lengthOfMonth()))
+                : null;
+        String sortKey = nextStructure != null && nextStructure.getBeginDay() != null
+                ? String.format("%04d-%02d-%02d", year, month, nextStructure.getBeginDay())
+                : "9999-99-99";
+        row.put("_sortKey", sortKey);
+        row.put("_nextBeginDate", nextBeginDate);
+
+        return row;
     }
 
     /**
@@ -515,6 +632,9 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
 
     /**
      * 构建列表数据，按机台分组并在每组末尾插入小计行。
+     * <p>过滤规则：只展示 成型余量<400 或 结构在收尾结构集合中的记录。</p>
+     *
+     * @param endingStructureNames 要收尾的结构名称集合（来自CxEmbryoLhTime表）
      */
     private List<Map<String, Object>> buildCxTemplateDataList(List<CxScheduleResult> list, Map<String, String> recipeTypeMap,
                                                                Map<String, BigDecimal> totalDailyPlanQtyMap,
@@ -523,7 +643,8 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
                                                                Map<String, String> placeholderMap,
                                                                Map<String, String> shiftCapacitiesMap,
                                                                Set<String> keyProductEmbryoCodes,
-                                                               Map<String, int[]> lhShiftConsumptionMap) {
+                                                               Map<String, int[]> lhShiftConsumptionMap,
+                                                               Set<String> endingStructureNames) {
         List<CxScheduleResult> exportList = Objects.isNull(list) ? Collections.emptyList() : list;
 
         Map<String, List<CxScheduleResult>> groupMap = exportList.stream()
@@ -540,10 +661,32 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
                     item -> PubUtil.isNotEmpty(item.getMaterialCode()) ? item.getMaterialCode() : "",
                     String::compareTo));
 
-            for (CxScheduleResult item : groupList) {
+            // 过滤：只保留 余量<400 或 结构在收尾集合中的记录
+            List<CxScheduleResult> filteredList = groupList.stream()
+                    .filter(item -> {
+                        // 余量<400
+                        BigDecimal remainQty = item.getCxRemainQty();
+                        if (remainQty != null && remainQty.compareTo(new BigDecimal("400")) < 0) {
+                            return true;
+                        }
+                        // 结构在收尾集合中
+                        String structureName = item.getStructureName();
+                        if (StringUtils.isNotBlank(structureName) && endingStructureNames != null
+                                && endingStructureNames.contains(structureName.trim())) {
+                            return true;
+                        }
+                        return false;
+                    })
+                    .collect(Collectors.toList());
+
+            if (filteredList.isEmpty()) {
+                continue;
+            }
+
+            for (CxScheduleResult item : filteredList) {
                 dataList.add(buildCxTemplateRow(item, recipeTypeMap, totalDailyPlanQtyMap, todayNightFinishQtyMap, smallGlueMap, placeholderMap, shiftCapacitiesMap, keyProductEmbryoCodes, lhShiftConsumptionMap));
             }
-            dataList.add(buildCxTemplateSubtotalRow(groupList, lhShiftConsumptionMap));
+            dataList.add(buildCxTemplateSubtotalRow(filteredList, lhShiftConsumptionMap));
         }
 
         return dataList;
@@ -810,6 +953,36 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
                 .map(String::trim)
                 .filter(StringUtils::isNotEmpty)
                 .count();
+    }
+
+    /**
+     * 加载要收尾的结构名称集合。
+     * <p>从 CxEmbryoLhTime 表查询，该表记录的是未来几天要切换的结构，
+     * 其中 structureName（前结构）即为要收尾的结构。</p>
+     *
+     * @param queryVO 查询条件（含 factoryCode、scheduleDate）
+     * @return 要收尾的结构名称集合
+     */
+    private Set<String> loadEndingStructureNames(CxScheduleResult queryVO) {
+        String factoryCode = (queryVO != null && StringUtils.isNotBlank(queryVO.getFactoryCode()))
+                ? queryVO.getFactoryCode() : FactoryConstant.DEFAULT_FACTORY_CODE;
+        Date scheduleDate = queryVO != null ? queryVO.getScheduleDate() : null;
+
+        LambdaQueryWrapper<CxEmbryoLhTime> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(CxEmbryoLhTime::getFactoryCode, factoryCode);
+        if (scheduleDate != null) {
+            wrapper.eq(CxEmbryoLhTime::getScheduleDate, scheduleDate);
+        }
+
+        List<CxEmbryoLhTime> list = cxEmbryoLhTimeMapper.selectList(wrapper);
+        if (CollectionUtils.isEmpty(list)) {
+            return Collections.emptySet();
+        }
+        return list.stream()
+                .map(CxEmbryoLhTime::getStructureName)
+                .filter(StringUtils::isNotBlank)
+                .map(String::trim)
+                .collect(Collectors.toSet());
     }
 
     /**
