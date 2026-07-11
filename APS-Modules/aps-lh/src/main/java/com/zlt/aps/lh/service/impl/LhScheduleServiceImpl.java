@@ -144,6 +144,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
     @Resource
     private MdmSkuMouldRelMapper mdmSkuMouldRelMapper;
 
+
     @Resource
     private MdmModelInfoMapper mdmModelInfoMapper;
 
@@ -2407,6 +2408,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
 
         // 构建8班顺序值映射：同一物料按班次1~8遍历，每个班次内有计划量的记录按机台编码升序，顺序值从1~n连续编排
         Map<String, Map<Integer, Integer>> shiftOrderMap = buildContinuousShiftOrderMap(sortedList);
+        Map<LhScheduleResult, ExportRowStyleFlag> rowStyleFlagMap = buildMachinePostCloseOutStyleFlagMap(sortedList);
 
         for (LhScheduleResult result : sortedList) {
             Map<String, Object> row = new HashMap<>(112);
@@ -2473,7 +2475,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
             }
 
             // 导出着色规则
-            applyExportRowStyle(row, result);
+            applyExportRowStyle(row, rowStyleFlagMap.get(result));
 
             dataList.add(row);
         }
@@ -3094,22 +3096,24 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         vo.setRgbColor(new ExcelStyleVo.RgbColor(0xFC, 0xD5, 0xB4));
         return vo;
     }
-
     /**
      * 为导出明细行应用着色规则。
      *
-     * <p>规则 1：交替前 SKU — class3~8 中有收尾班次（classXIsEnd="1"），机台列涂灰。</p>
-     * <p>规则 2：交替后 SKU — class3~8 中第一个有计划量的班次之前全空，机台/物料号/物料描述列涂灰。</p>
+     * <p>规则：同一机台发生收尾后，后续再次排产的规格视为收尾后的新开规格或再生产，
+     * 机台/物料号/物料描述列涂灰；同时把对应收尾行的机台列涂灰。</p>
      * <p>规则 3（已移至 exportData 方法）：日计划量 ≤ 400，dailyPlanQty 列涂淡橙。</p>
      *
-     * @param row    导出行数据
-     * @param result 排程结果
+     * @param row       导出行数据
+     * @param styleFlag 导出行样式标记
      */
-    private void applyExportRowStyle(Map<String, Object> row, LhScheduleResult result) {
-        if (isPreChangeSku(result)) {
+    private void applyExportRowStyle(Map<String, Object> row, ExportRowStyleFlag styleFlag) {
+        if (Objects.isNull(styleFlag)) {
+            return;
+        }
+        if (styleFlag.isMachineCodeGray()) {
             row.put("style_lhMachineCode", GRAY_STYLE);
-        } else if (isPostChangeSku(result)) {
-            row.put("style_lhMachineCode", GRAY_STYLE);
+        }
+        if (styleFlag.isMaterialInfoGray()) {
             row.put("style_materialCode", GRAY_STYLE);
             row.put("style_materialDesc", GRAY_STYLE);
         }
@@ -3119,9 +3123,54 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
     }
 
     /**
-     * 判断是否为交替前 SKU：class3~8 中存在某个班次为收尾（classXIsEnd = "1"）。
+     * 构建导出明细行的同机台收尾后涂灰标记。
+     *
+     * <p>入参需使用最终导出顺序。同一机台出现收尾行时，先暂存该收尾行；
+     * 后续同机台仍有计划量的行，标记为收尾后的新开规格或再生产，导出时机台/物料号/物料描述列统一涂灰；
+     * 同时回标暂存收尾行的机台列涂灰。若收尾后没有后续计划量，则收尾行不涂灰。</p>
+     *
+     * @param sortedList 已按导出顺序排序的排程结果
+     * @return 每条排程结果的导出样式标记
      */
-    private boolean isPreChangeSku(LhScheduleResult result) {
+    private static Map<LhScheduleResult, ExportRowStyleFlag> buildMachinePostCloseOutStyleFlagMap(List<LhScheduleResult> sortedList) {
+        if (PubUtil.isEmpty(sortedList)) {
+            return Collections.emptyMap();
+        }
+        Map<LhScheduleResult, ExportRowStyleFlag> styleFlagMap = new IdentityHashMap<>(sortedList.size());
+        Map<String, LhScheduleResult> pendingCloseOutRowMap = new HashMap<>(sortedList.size());
+        for (LhScheduleResult result : sortedList) {
+            ExportRowStyleFlag styleFlag = new ExportRowStyleFlag();
+            styleFlagMap.put(result, styleFlag);
+
+            String machineCode = StringUtils.trimToEmpty(result.getLhMachineCode());
+            if (StringUtils.isBlank(machineCode)) {
+                continue;
+            }
+
+            LhScheduleResult pendingCloseOutRow = pendingCloseOutRowMap.get(machineCode);
+            if (Objects.nonNull(pendingCloseOutRow) && hasAnyPlanQty(result)) {
+                styleFlag.setMachineCodeGray(true);
+                styleFlag.setMaterialInfoGray(true);
+                ExportRowStyleFlag closeOutStyleFlag = styleFlagMap.get(pendingCloseOutRow);
+                if (Objects.nonNull(closeOutStyleFlag)) {
+                    closeOutStyleFlag.setMachineCodeGray(true);
+                }
+            }
+
+            if (isCloseOutSku(result)) {
+                pendingCloseOutRowMap.put(machineCode, result);
+            }
+        }
+        return styleFlagMap;
+    }
+
+    /**
+     * 判断是否为收尾行：任一班次 classXIsEnd = "1"。
+     *
+     * @param result 排程结果
+     * @return true 表示该行存在收尾班次
+     */
+    private static boolean isCloseOutSku(LhScheduleResult result) {
         for (int shift = 1; shift <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT; shift++) {
             if ("1".equals(ShiftFieldUtil.getShiftIsEnd(result, shift))) {
                 return true;
@@ -3146,38 +3195,52 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
     }
 
     /**
-     * 判断是否为交替后 SKU：class3~8 中第一个有计划量（>0）的班次，
-     * 其前面所有班次（class3~8 范围内）计划量都为 0 或空。
+     * 判断排程结果是否存在任一有计划量班次。
+     *
+     * @param result 排程结果
+     * @return true 表示存在计划量大于 0 的班次
      */
-    private boolean isPostChangeSku(LhScheduleResult result) {
-        // class1~2（今天）如果不为空，说明是延续品，不是交替后
-        //for (int shift = 1; shift <= 1; shift++) {
-        Integer planQty1 = getClassPlanQty(result, 1);
-        if (Objects.nonNull(planQty1) && planQty1 > 0) {
-            return false;
-        }
-        //}
-        int firstPlannedShift = 0;
+    private static boolean hasAnyPlanQty(LhScheduleResult result) {
         for (int shift = 1; shift <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT; shift++) {
-            Integer planQty = getClassPlanQty(result, shift);
+            Integer planQty = ShiftFieldUtil.getShiftPlanQty(result, shift);
             if (Objects.nonNull(planQty) && planQty > 0) {
-                firstPlannedShift = shift;
-                break;
+                return true;
             }
         }
-        if (firstPlannedShift == 0) {
-            return false;
-        }
-        // 第一个有计划量的班次之前（class3~8 范围内）必须全空
-        for (int shift = 1; shift < firstPlannedShift; shift++) {
-            Integer planQty = getClassPlanQty(result, shift);
-            if (Objects.nonNull(planQty) && planQty > 0) {
-                return false;
-            }
-        }
-        return true;
+        return false;
     }
 
+    /**
+     * 导出明细行样式标记。
+     */
+    private static class ExportRowStyleFlag {
+
+        /**
+         * 是否涂灰机台列。
+         */
+        private boolean machineCodeGray;
+
+        /**
+         * 是否涂灰物料号和物料描述列。
+         */
+        private boolean materialInfoGray;
+
+        private boolean isMachineCodeGray() {
+            return machineCodeGray;
+        }
+
+        private void setMachineCodeGray(boolean machineCodeGray) {
+            this.machineCodeGray = machineCodeGray;
+        }
+
+        private boolean isMaterialInfoGray() {
+            return materialInfoGray;
+        }
+
+        private void setMaterialInfoGray(boolean materialInfoGray) {
+            this.materialInfoGray = materialInfoGray;
+        }
+    }
     /**
      * 构建顺序值映射的key。
      *
