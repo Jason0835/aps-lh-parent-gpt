@@ -92,6 +92,10 @@ public interface ILhMesSyncRemoteService {
     @PostMapping("/mesSync/logicDeleteAndSaveDayFinishQty")
     AjaxResult logicDeleteAndSaveDayFinishQty(@RequestParam("factoryCode") String factoryCode, @RequestParam("finishDate") String finishDate, @RequestParam("updateBy") String updateBy, @RequestBody List<LhDayFinishQty> list);
 
+    @ApiOperation("根据分厂编号和完成日期范围查询硫化排程日完成量数据（未删除）")
+    @PostMapping("/mesSync/selectDayFinishQtyByDateRange")
+    List<LhDayFinishQty> selectDayFinishQtyByDateRange(@RequestParam("factoryCode") String factoryCode, @RequestParam("startDate") String startDate, @RequestParam("endDate") String endDate);
+
     @ApiOperation("批量保存模具交替计划完成回报")
     @PostMapping("/mesSync/saveMoldAlterPlanFinishBatch")
     @Deprecated

@@ -48,6 +48,8 @@ public class SkuScheduleDTO {
     // ========== 计划量信息 ==========
     /** 月度计划总量 */
     private int monthPlanQty;
+    /** 非断点计划总量（各月计划量汇总，不扣除断点） */
+    private int monthPlanSumTotal;
     /** 已完成合格量 */
     private int finishedQty;
     /** 硫化余量 = 月度计划量 - 已完成合格量 */

@@ -117,4 +117,13 @@ public class LhScheduleResultIssue {
 
     /** 工厂代码 */
     private String factoryCode;
+
+    /** 1班计划类型（0-正常 1-收尾） */
+    private String class1PlanType;
+
+    /** 2班计划类型（0-正常 1-收尾） */
+    private String class2PlanType;
+
+    /** 3班计划类型（0-正常 1-收尾） */
+    private String class3PlanType;
 }

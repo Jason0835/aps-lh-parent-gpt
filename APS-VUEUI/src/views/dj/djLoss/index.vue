@@ -44,8 +44,8 @@
     <!-- <el-button style="display: none" ref="hidePopoverBtnRef"></el-button> -->
     <tlt-upload
       ref="tltUpload"
-      downloadUrl="/dj/loss/importTemplate"
-      uploadUrl="/dj/loss/importData"
+      downloadUrl="/dj/lossSetting/importTemplate"
+      uploadUrl="/dj/lossSetting/importData"
       @uploadSuccess="getList"
     />
     <infoDialog ref="infoRef" @success="getList" />
@@ -65,7 +65,7 @@ import tltUpload from "@/components/tltUpload/tltUpload.vue";
 import infoDialog from "./components/infoDialog.vue";
 
 export default {
- name: "djLoss",
+ name: "DjLoss",
   components: {
     tltUpload,
     infoDialog,
@@ -257,7 +257,7 @@ export default {
       this.selection = rows;
     },
     handleExport() {
-      downloadLink("/dj/loss/export", this.formatParams(false));
+      downloadLink("/dj/lossSetting/export", this.formatParams(false));
     },
 
     // utils

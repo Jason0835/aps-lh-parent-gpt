@@ -26,7 +26,7 @@
         >
         <!-- <el-button
           type="warning"
-          v-hasPermi="['nc:glueOrder:edit']"
+          v-hasPermi="['nc:glueGroupOrder:edit']"
           @click="handleEdit(selection[0])"
           >{{ $t("ui.frame.btn.modify") }}</el-button
         > -->

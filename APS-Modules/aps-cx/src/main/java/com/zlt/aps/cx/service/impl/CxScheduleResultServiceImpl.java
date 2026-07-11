@@ -14,6 +14,7 @@ import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.utils.StringUtils;
 import com.zlt.aps.common.core.domain.CellStyle;
+import com.zlt.aps.common.core.domain.ExcelCellRangeAddress;
 import com.zlt.aps.common.core.utils.ExcelUtils;
 import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.cx.api.domain.entity.CxStock;
@@ -32,6 +33,8 @@ import com.zlt.aps.maindata.mapper.MdmMaterialConsumeDetailMapper;
 import com.zlt.aps.maindata.mapper.MdmMaterialInfoEntityMapper;
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import com.zlt.aps.mp.api.domain.entity.MdmMaterialConsumeDetail;
+import com.zlt.aps.lh.api.domain.vo.ScheduleSummaryReportVO;
+import com.zlt.aps.lh.api.service.ILhScheduleResultRemoteService;
 import com.zlt.aps.mp.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.mp.api.domain.entity.MdmMonthSurplus;
 import com.zlt.aps.mp.api.domain.entity.MpStructureAllocation;
@@ -76,6 +79,9 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
 
     @Autowired
     private IFactoryMonthPlanProductionFinalResultRemoteService factoryMonthPlanProductionFinalResultRemoteService;
+
+    @Autowired
+    private ILhScheduleResultRemoteService lhScheduleResultRemoteService;
 
     @Autowired
     private ISysDictDataCacheService sysDictDataCacheService;
@@ -401,7 +407,86 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
         inputStream = new ByteArrayInputStream(exportBytes);
         exportBytes = ExcelUtils.writeMultiList(inputStream, 7, structureTableMap, structureDataList);
 
+        // Sheet 8: 排产小结（从硫化日计划导出迁移而来）
+        // 通过 Feign 远程调用 aps-lh 的 buildScheduleSummaryExportData 复用原有数据构建逻辑
+        exportBytes = writeScheduleSummarySheet(exportBytes, scheduleDate, queryVO);
+
         return exportBytes;
+    }
+
+    /**
+     * 写入排产小结 Sheet（CxExport.xlsx 的 Sheet 8）。
+     *
+     * <p>排产小结原集成在硫化日计划导出中，现已迁移至成型日计划导出。
+     * 通过 Feign 调用 aps-lh 的 {@code buildScheduleSummaryExportData} 复用原有数据构建逻辑，
+     * 获取 tableMap（占位符映射）和 dataList（列表数据），写入 CxExport.xlsx 的第 9 个 sheet（下标 8）。</p>
+     *
+     * <p>注意：Feign 远程调用经 Jackson 序列化往返后，tableMap 中 RANGE_ADDRESS 字段的
+     * 元素类型会由 ExcelCellRangeAddress 退化为 LinkedHashMap，writeMultiList 内部强转遍历会抛
+     * ClassCastException，故在此调用 {@link #rebuildRangeAddress} 手动重建。</p>
+     *
+     * @param exportBytes 当前已写入前 8 个 sheet 的 Excel 字节数组
+     * @param scheduleDate 排程日期
+     * @param queryVO 查询条件（取 factoryCode）
+     * @return 写入排产小结 sheet 后的 Excel 字节数组
+     */
+    @SuppressWarnings("unchecked")
+    private byte[] writeScheduleSummarySheet(byte[] exportBytes, Date scheduleDate, CxScheduleResult queryVO) {
+        try {
+            ScheduleSummaryReportVO summaryQuery = new ScheduleSummaryReportVO();
+            summaryQuery.setScheduleDate(cn.hutool.core.date.DateUtil.format(scheduleDate, "yyyy-MM-dd"));
+            summaryQuery.setFactoryCode(StringUtils.defaultString(
+                    queryVO != null ? queryVO.getFactoryCode() : null, FactoryConstant.DEFAULT_FACTORY_CODE));
+
+            // 远程获取排产小结数据（复用硫化侧原有 buildScheduleSummaryExportData 逻辑）
+            Map<String, Object> summaryExportData = lhScheduleResultRemoteService.buildScheduleSummaryExportData(summaryQuery);
+            Map<String, Object> summaryTableMap = (Map<String, Object>) summaryExportData.get("tableMap");
+            List<List<Map<String, Object>>> summaryDataList =
+                    (List<List<Map<String, Object>>>) summaryExportData.get("dataList");
+
+            // 适配 Feign 反序列化导致的 RANGE_ADDRESS 类型丢失
+            rebuildRangeAddress(summaryTableMap);
+
+            return ExcelUtils.writeMultiList(new ByteArrayInputStream(exportBytes), 8, summaryTableMap, summaryDataList);
+        } catch (Exception e) {
+            // 排产小结写入失败不影响主表导出，仅记录警告日志
+            log.warn("排产小结sheet写入失败，跳过。scheduleDate={}, 原因: {}", scheduleDate, e.getMessage(), e);
+            return exportBytes;
+        }
+    }
+
+    /**
+     * 重建 tableMap 中的 RANGE_ADDRESS 字段。
+     *
+     * <p>Feign 远程调用经 Jackson 序列化往返后，{@code List<ExcelCellRangeAddress>}
+     * 反序列化为 {@code List<LinkedHashMap>}，元素类型丢失。
+     * {@link ExcelUtils#writeMultiList} 内部对 RANGE_ADDRESS 直接强转遍历，
+     * 遇 LinkedHashMap 会抛 ClassCastException，需在此手动重建为 ExcelCellRangeAddress。</p>
+     *
+     * <p>HIDDEN_ROWS（List&lt;Integer&gt;）跨 Feign 类型保留，无需处理；
+     * CELL_STYLE 在 writeMultiList 内部用 fastjson 二次转换，亦无需处理。</p>
+     *
+     * @param tableMap 排产小结模板占位符映射
+     */
+    private void rebuildRangeAddress(Map<String, Object> tableMap) {
+        Object rangeObj = tableMap.get(ExcelUtils.RANGE_ADDRESS);
+        if (!(rangeObj instanceof List)) {
+            return;
+        }
+        List<ExcelCellRangeAddress> rebuilt = new ArrayList<>();
+        for (Object item : (List<?>) rangeObj) {
+            if (item instanceof ExcelCellRangeAddress) {
+                rebuilt.add((ExcelCellRangeAddress) item);
+            } else if (item instanceof Map) {
+                Map<?, ?> m = (Map<?, ?>) item;
+                rebuilt.add(new ExcelCellRangeAddress(
+                        ((Number) m.get("firstRow")).intValue(),
+                        ((Number) m.get("lastRow")).intValue(),
+                        ((Number) m.get("firstColumn")).intValue(),
+                        ((Number) m.get("lastColumn")).intValue()));
+            }
+        }
+        tableMap.put(ExcelUtils.RANGE_ADDRESS, rebuilt);
     }
 
     /**

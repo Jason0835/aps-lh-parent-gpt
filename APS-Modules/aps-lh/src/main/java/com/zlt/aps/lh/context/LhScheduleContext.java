@@ -668,6 +668,23 @@ public class LhScheduleContext {
     }
 
     /**
+     * 获取从planStartDate的月计划总计划量
+     *
+     * @param skuInfo
+     * @return
+     */
+    public Map<YearMonth, Integer> getSumPlanQty(FactoryMonthPlanProductionFinalResult skuInfo) {
+        YearMonth firstMonth = getFirstYearMonth();
+        Date realPlanStartDate;
+        if (null == planStartDate) {
+            realPlanStartDate = SkuMonthPlanCalculator.getDate(firstMonth.atDay(BigDecimal.ONE.intValue()));
+        } else {
+            realPlanStartDate = planStartDate;
+        }
+        return SkuMonthPlanCalculator.statisticsSumPlanQtyBySku(skuInfo, realPlanStartDate, loadedMonthPlanList);
+    }
+
+    /**
      * 20260701+ 当前所有排产日集合
      *
      * @return

@@ -346,6 +346,20 @@ public class SkuMonthPlanCalculator {
         return result;
     }
 
+
+    /**
+     * 汇总月数据量
+     *
+     * @param needSumQtyMap 需汇总月数量集合
+     * @return
+     */
+    public static int sumQty(Map<YearMonth, Integer> needSumQtyMap) {
+        if (CollectionUtils.isEmpty(needSumQtyMap)) {
+            return BigDecimal.ZERO.intValue();
+        }
+        return needSumQtyMap.values().stream().mapToInt(Integer::intValue).sum();
+    }
+
     /**
      * 获取对应的排产计划
      *
@@ -405,6 +419,41 @@ public class SkuMonthPlanCalculator {
             result.put(factoryMaterialType, sumFinishQty);
         });
         return result;
+    }
+
+    /**
+     * 统计从startPlanDate开始，在allMonthPlanList中的所有计划量
+     *
+     * @param skuInfo          需统计Sku信息
+     * @param startPlanDate    开始统计日
+     * @param allMonthPlanList 所有计划
+     * @return
+     */
+    public static Map<YearMonth, Integer> statisticsSumPlanQtyBySku(FactoryMonthPlanProductionFinalResult skuInfo, Date startPlanDate, List<FactoryMonthPlanProductionFinalResult> allMonthPlanList) {
+        if (null == skuInfo || null == startPlanDate || CollectionUtils.isEmpty(allMonthPlanList)) {
+            return Collections.emptyMap();
+        }
+        List<FactoryMonthPlanProductionFinalResult> findPlanList = allMonthPlanList.stream().filter(single -> single.getMaterialStatusKey().equals(skuInfo.getMaterialStatusKey())).collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(findPlanList)) {
+            return Collections.emptyMap();
+        }
+        Map<YearMonth, Integer> sumMap = Maps.newHashMap();
+        YearMonth firstMonth = getProductionYearAndMonth(startPlanDate);
+        Integer startDay = getDate(startPlanDate).getDayOfMonth();
+        findPlanList.forEach(singleMonthPlan -> {
+            YearMonth productionYearMonth = YearMonth.of(singleMonthPlan.getYear(), singleMonthPlan.getMonth());
+            Integer monthEndDay = productionYearMonth.lengthOfMonth();
+            //同年-月
+            Integer sumQty;
+            if (productionYearMonth.equals(firstMonth)) {
+                sumQty = statisticsPlanQtyEndDay(startDay, monthEndDay, singleMonthPlan);
+            } else {
+                //下一个年月
+                sumQty = statisticsPlanQtyEndDay(BigDecimal.ONE.intValue(), monthEndDay, singleMonthPlan);
+            }
+            sumMap.put(productionYearMonth, sumQty);
+        });
+        return sumMap;
     }
 
     /**

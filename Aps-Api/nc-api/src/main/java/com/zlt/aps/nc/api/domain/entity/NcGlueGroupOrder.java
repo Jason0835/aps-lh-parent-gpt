@@ -2,6 +2,7 @@ package com.zlt.aps.nc.api.domain.entity;
 
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.ruoyi.common.core.annotation.Excel;
 import com.ruoyi.common.core.web.domain.BaseEntity;
 
 import io.swagger.annotations.ApiModel;
@@ -28,14 +29,17 @@ public class NcGlueGroupOrder extends BaseEntity {
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;
 
+    @Excel(name = "ui.glueGroup.column.glueGroupCode")
     @ApiModelProperty(value = "胶料组别code", position = 20)
     @TableField("GLUE_GROUP_CODE")
     private String glueGroupCode;
 
+    @Excel(name = "ui.glueGroup.column.glueGroupName")
     @ApiModelProperty(value = "胶料组别名称", position = 30)
     @TableField("GLUE_GROUP_NAME")
     private String glueGroupName;
 
+    @Excel(name = "ui.glueGroup.column.orderNum")
     @ApiModelProperty(value = "生产顺序", position = 40)
     @TableField("ORDER_NUM")
     private Integer orderNum;

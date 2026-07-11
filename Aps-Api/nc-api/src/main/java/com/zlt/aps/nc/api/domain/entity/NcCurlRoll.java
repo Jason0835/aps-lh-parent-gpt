@@ -33,6 +33,7 @@ public class NcCurlRoll extends ApsBaseEntity implements Serializable {
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;
 
+    @Excel(name = "ui.data.column.quota.liningCode")
     @ApiModelProperty(value = "内衬编号")
     @TableField("LINING_CODE")
     private String liningCode;

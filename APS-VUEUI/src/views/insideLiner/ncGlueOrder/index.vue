@@ -152,6 +152,13 @@ export default {
           align: "center",
         },
         {
+          prop: "glueGroupOrderNum",
+          // sortable: "custom",
+          label: this.$t("ui.glueOrder.column.groupGlue.orderNum"),
+          halign: "center",
+          align: "center",
+        },
+        {
           prop: "glueCode",
           // sortable: "custom",
           label: this.$t("ui.glueOrder.column.glueCode"),
@@ -162,13 +169,6 @@ export default {
           prop: "orderNum",
           // sortable: "custom",
           label: this.$t("ui.glueOrder.column.orderNum"),
-          halign: "center",
-          align: "center",
-        },
-        {
-          prop: "glueGroupOrderNum",
-          // sortable: "custom",
-          label: this.$t("ui.glueOrder.column.groupGlue.orderNum"),
           halign: "center",
           align: "center",
         },

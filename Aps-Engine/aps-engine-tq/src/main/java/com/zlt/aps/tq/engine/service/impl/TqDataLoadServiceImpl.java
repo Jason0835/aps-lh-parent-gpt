@@ -99,14 +99,31 @@ public class TqDataLoadServiceImpl implements ITqDataLoadService {
                     "自动排程失败，原因：成型排程数据为空，或没有在施工信息中找到对应的物料");
             throw new RuntimeException("成型排程数据为空，或没有在施工信息中找到对应的物料");
         }
+        
+        int beforeFilterCount = scheduleList.size();
+        
         // 过滤掉成型3~8班计划量都为0的数据（胎圈6班供应成型3~8班，1~2班由库存直接供应）
         scheduleList = scheduleList.stream()
                 .filter(s -> (s.getCxClass3Plan() + s.getCxClass4Plan() + s.getCxClass5Plan()
                         + s.getCxClass6Plan() + s.getCxClass7Plan() + s.getCxClass8Plan()) > 0)
                 .collect(Collectors.toList());
+        
+        int afterFilterCount = scheduleList.size();
+        
+        if (afterFilterCount == 0) {
+            autoScheduleLogService.insertTqScheduleLog(batchNo, "", "自动排程失败",
+                    "自动排程失败，原因：成型3~8班计划量全部为0，共过滤掉" + beforeFilterCount + "条记录");
+            throw new RuntimeException("成型3~8班计划量全部为0");
+        }
+        
+        if (beforeFilterCount > afterFilterCount) {
+            autoScheduleLogService.insertTqScheduleLog(batchNo, "", "数据过滤警告",
+                    "成型3~8班计划量为0的记录被过滤：总数=" + beforeFilterCount + "，过滤后=" + afterFilterCount);
+        }
+        
         context.setScheduleList(scheduleList);
         autoScheduleLogService.insertTqScheduleLog(batchNo, "", "根据'成型排程记录'统计出胎圈胶排程记录基础数据",
-                toJSONString(scheduleList));
+                "统计记录数：" + afterFilterCount);
 
         // 4. 加载外协规格（外协逻辑已废弃，6班次排程不再使用外协规格）
         // Map<String, String> assistSpecMap = loadAssistSpecMap();
