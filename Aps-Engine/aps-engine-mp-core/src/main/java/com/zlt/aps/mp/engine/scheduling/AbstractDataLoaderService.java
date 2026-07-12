@@ -432,7 +432,7 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
             return Collections.emptyList();
         }
         //同结构，同机台前后衔接则合并为一条
-        Map<String, List<MpStructureAllocation>> groupMap = allAllocationList.stream().collect(Collectors.groupingBy(MpStructureAllocation::getGroupKey));
+        Map<String, List<MpStructureAllocation>> groupMap = allAllocationList.stream().collect(Collectors.groupingBy(MpStructureAllocation::groupKey));
         if (CollectionUtils.isEmpty(groupMap)) {
             return Collections.emptyList();
         }
