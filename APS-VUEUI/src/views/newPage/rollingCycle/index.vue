@@ -2374,13 +2374,17 @@ export default {
       try {
         this.show = false;
         this.loading = true;
+        const innerVersion = this.resolveStructureAdjustSearchVersion();
         let params = {
           ...this.query,
           ...this.sort,
           adjustType: this.adjustType,
           version:
             this.adjustType == "01"
-              ? this.data[0]?.version
+              ? innerVersion ||
+                (this.data[0] && this.data[0].version != null
+                  ? String(this.data[0].version).trim()
+                  : "")
               : this.outResultData[0]?.version,
           productionVersion: this.data[0]?.productionVersion,
         };
@@ -2551,6 +2555,35 @@ export default {
     },
 
     /**
+     * 结构内（adjustType=01）autoAdjust 入参：查询区当前版本号优先，避免被表格首行旧 version 覆盖。
+     */
+    buildAutoAdjustParamsForStructureInner() {
+      const searchVersion = this.resolveStructureAdjustSearchVersion();
+      const row0 =
+        this.data && this.data.length > 0 && this.data[0] ? this.data[0] : {};
+      const rowVer =
+        row0.version != null && String(row0.version).trim() !== ""
+          ? String(row0.version).trim()
+          : "";
+      let params = {
+        ...this.query,
+        ...this.sort,
+        ...(this.formInline && typeof this.formInline === "object"
+          ? { ...this.formInline }
+          : {}),
+        adjustType: this.adjustType,
+        /** 查询区 searchColumns 切换的版本号优先于订单首行 version */
+        version: searchVersion || rowVer,
+      };
+      if (params.yearMonth) {
+        const arr = params.yearMonth.split("-");
+        params.mpYear = arr[0];
+        params.mpMonth = arr[1];
+        params.yearMonth = "";
+      }
+      return params;
+    },
+    /**
      * 结构外（adjustType=02）autoAdjust 入参：query + 排序 + listAdjusts 整行 formInline + 订单首行版本字段，
      * 与 BootUI 示例一致（含 id、monthPlanVersion、adjustStartDay/EndDay、startDay、scheduledMachines、adjVersion 等）。
      */
@@ -2639,45 +2672,17 @@ export default {
         if (this.adjustType === "02") {
           params = this.buildAutoAdjustParamsForStructureOuter();
         } else {
-          params = {
-            ...this.query,
-            ...this.sort,
-            ...(this.formInline && typeof this.formInline === "object"
-              ? { ...this.formInline }
-              : {}),
-            adjustType: this.adjustType,
-            version: this.data[0]?.version,
-          };
-          if (params.yearMonth) {
-            let arr = params.yearMonth.split("-");
-            params.mpYear = arr[0];
-            params.mpMonth = arr[1];
-            params.yearMonth = "";
-          }
+          params = this.buildAutoAdjustParamsForStructureInner();
         }
         const raw = await autoAdjust(params);
         const list = this.normalizeAutoAdjustResponse(raw);
         console.log("autoAdjust", raw, list);
-        /** 结构内独立页：closeOpenPage 之前勿改 data/show，避免表格随 list 重绘闪屏 */
+        /** 结构内独立页：自动调整成功后回到月计划调整，携带查询区当前版本号 */
         if (this.pageVariant === "structureInner") {
-          const queryExtra = {};
-          const structureName =
-            this.formInline && this.formInline.structureName != null
-              ? String(this.formInline.structureName).trim()
-              : "";
-          if (structureName) {
-            queryExtra.structureName = structureName;
-          }
-          const versionProp = this.versionSearchProp;
-          const versionVal = this.search[versionProp] ?? this.query[versionProp];
-          if (
-            versionVal != null &&
-            String(versionVal).trim() !== ""
-          ) {
-            queryExtra[versionProp] = String(versionVal).trim();
-          }
           this.$tab.closeOpenPage(
-            this.getMonthPlanFinalAdjustQueryRoute(queryExtra)
+            this.getMonthPlanFinalAdjustQueryRoute(
+              this.buildMonthPlanReturnVersionQuery()
+            )
           );
           this.loading = false;
           this.autoLoading = false;
@@ -3886,6 +3891,20 @@ export default {
     this.query = {
       ...defaultParams,
     };
+    /** 结构内/结构调整页：路由带入分厂、版本号等查询条件 */
+    if (this.pageVariant === "structureInner") {
+      if (rq.factoryCode != null && String(rq.factoryCode).trim() !== "") {
+        const fc = String(rq.factoryCode).trim();
+        this.search.factoryCode = fc;
+        this.query.factoryCode = fc;
+      }
+      const routeVer =
+        this.resolveRouteAdjustVersion(rq) ||
+        this.resolveRouteProductionVersion(rq);
+      if (routeVer) {
+        this.syncStructureAdjustVersionToSearch(routeVer);
+      }
+    }
     /** 结构调整页：路由分别带入生产版本与调整版本号 */
     if (this.pageVariant === "structureAdjust") {
       const routePv = this.resolveRouteProductionVersion(rq);

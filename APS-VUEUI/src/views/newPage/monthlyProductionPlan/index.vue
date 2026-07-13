@@ -2650,13 +2650,22 @@ export default {
       }
       return "";
     },
-    /** 跳转月计划结构内调整页（仅同步年月，与当前查询条件一致） */
+    /** 跳转月计划结构内调整页：同步年月、分厂及查询区当前生产版本（与结构调整版本传递一致） */
     handleStructureInnerAdjust() {
       const ymRaw = this.query.yearMonth || this.search.yearMonth;
       const ym = this.formatYearMonthForPicker(ymRaw);
+      const fc = this.query.factoryCode || this.search.factoryCode || "116";
+      const version = this.resolveSearchColumnsVersion();
       const query = { pageType: "inner" };
       if (ym) {
         query.yearMonth = ym;
+      }
+      if (fc) {
+        query.factoryCode = fc;
+      }
+      if (version) {
+        query.version = version;
+        query.productionVersion = version;
       }
       this.$router.push({
         path: "/newPage/monthPlanStructureInnerAdjust",
