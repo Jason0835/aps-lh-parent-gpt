@@ -1,0 +1,118 @@
+package com.zlt.aps.nc.engine.service;
+
+import java.math.BigDecimal;
+import java.util.Date;
+import java.util.List;
+
+import com.zlt.aps.nc.api.domain.entity.NcScheduleResult;
+import com.zlt.aps.nc.engine.model.CapacityValidateResult;
+import com.zlt.aps.nc.engine.model.ShiftContext;
+import com.zlt.aps.nc.engine.model.ShiftValidateResult;
+
+/**
+ * 内衬排程顺延引擎接口
+ * <p>
+ * 处理插单/调整增量时的产能校验、同班顺位顺延、跨班顺延、末端减量等核心逻辑。
+ * 对应设计文档「内衬排程调整算法设计.md」中2~3的处理逻辑。
+ * </p>
+ *
+ * @author zlt
+ */
+public interface INcScheduleShiftEngineService {
+
+    // ==================== 校验方法 ====================
+
+    /**
+     * 2.2 约束一校验（基于完成量查询）
+     *
+     * @param factoryCode   工厂编码
+     * @param scheduleDate  排产日期
+     * @param machineCode   机台编码
+     * @param targetClass   目标班次索引（1~6）
+     * @param targetSeq     目标顺位
+     * @return 校验结果
+     */
+    ShiftValidateResult validateInsertConstraint(String factoryCode, Date scheduleDate,
+                                                 String machineCode, int targetClass, int targetSeq);
+
+    /**
+     * 2.3 约束二校验 — 产能校验（三档判断）
+     * <p>
+     * 校验规则：插单/调整后该班次计划量总和不能超过机台当前班的实际剩余产能。
+     * 实际剩余产能 = 机台定额 - 当前班次已生产量（完成量）。
+     * overflowSpecs 只包含生产顺序 >= targetSeq 的规格（顺位前的规格不受影响）。
+     * </p>
+     *
+     * @param machineCode     机台编码
+     * @param classIndex      目标班次索引（1~6）
+     * @param targetSeq       目标生产顺位
+     * @param insertPlanQty   插单计划量
+     * @param currentResults  当前排程结果列表
+     * @param factoryCode     工厂编码
+     * @param scheduleDate    排产日期
+     * @return 产能校验结果（含三档判断标志）
+     */
+    CapacityValidateResult validateCapacity(String machineCode, int classIndex, int targetSeq,
+                                            BigDecimal insertPlanQty,
+                                            List<NcScheduleResult> currentResults,
+                                            String factoryCode, Date scheduleDate);
+
+    // ==================== 顺延处理 ====================
+
+    /**
+     * 2.4 插入与顺延处理（核心顺延引擎）
+     *
+     * @param context 顺延上下文
+     * @return 所有变更后的排程结果列表
+     */
+    List<NcScheduleResult> processInsertAndCascade(ShiftContext context);
+
+    /**
+     * 3.4 减量后顺位空洞整理
+     *
+     * @param machineResults 当前机台排程结果列表
+     * @param classIndex     班次索引
+     */
+    void reorganizeAfterReduce(List<NcScheduleResult> machineResults, int classIndex);
+
+    /**
+     * 3.4 减量后顺位空洞整理（支持保留指定顺位空洞，用于插单场景）
+     *
+     * @param machineResults 当前机台排程结果列表
+     * @param classIndex     班次索引
+     * @param skipSeq        需要保留的顺位（该位置不会被分配，留给新插单记录）
+     */
+    void reorganizeAfterReduce(List<NcScheduleResult> machineResults, int classIndex, Integer skipSeq);
+
+    // ==================== 班次字段访问工具方法 ====================
+
+    /**
+     * 根据班次索引获取顺位
+     */
+    Integer getSequenceByIndex(NcScheduleResult sr, int classIndex);
+
+    /**
+     * 根据班次索引设置顺位
+     */
+    void setSequenceByIndex(NcScheduleResult sr, int classIndex, Integer seq);
+
+    /**
+     * 根据班次索引获取计划量
+     */
+    BigDecimal getPlanQtyByIndex(NcScheduleResult sr, int classIndex);
+
+    /**
+     * 根据班次索引设置计划量
+     */
+    void setPlanQtyByIndex(NcScheduleResult sr, int classIndex, BigDecimal qty);
+
+    /**
+     * 根据班次索引获取原因分析
+     */
+    String getAnalysisByIndex(NcScheduleResult sr, int classIndex);
+
+    /**
+     * 根据班次索引设置原因分析
+     */
+    void setAnalysisByIndex(NcScheduleResult sr, int classIndex, String analysis);
+}

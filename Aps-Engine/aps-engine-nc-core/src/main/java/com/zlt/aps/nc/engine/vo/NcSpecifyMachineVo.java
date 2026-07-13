@@ -9,7 +9,7 @@ import lombok.Data;
 public class NcSpecifyMachineVo {
 
     /**
-     * 内衬代码
+     * 垫胶代码
      */
     private String liningCode;
 

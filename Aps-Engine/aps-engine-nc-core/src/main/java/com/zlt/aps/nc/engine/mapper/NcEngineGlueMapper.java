@@ -1,18 +1,10 @@
 package com.zlt.aps.nc.engine.mapper;
 
-
-import com.zlt.aps.nc.engine.vo.NcGlueOrderVo;
-
-import java.util.List;
+import com.zlt.aps.nc.api.domain.entity.NcGlueOrder;
+import com.zlt.core.dao.basemapper.CommBaseMapper;
 
 /**
- * 胶料顺序mapper
+ * 胶料顺序 Mapper
  */
-public interface NcEngineGlueMapper {
-
-    /**
-     * 查询胶料顺序序号列表
-     * @return
-     */
-    List<NcGlueOrderVo> listGlueSeq();
+public interface NcEngineGlueMapper extends CommBaseMapper<NcGlueOrder> {
 }
