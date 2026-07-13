@@ -976,12 +976,110 @@ export default {
     }
     this.search = { ...defaults };
     this.query = { ...defaults };
+    const routeVersion = (
+      (rq.version != null ? String(rq.version).trim() : "") ||
+      (rq.productionVersion != null
+        ? String(rq.productionVersion).trim()
+        : "")
+    );
     await this.loadVersionOptions();
+    if (routeVersion) {
+      this.syncProductionVersionToSearch(routeVersion);
+    }
     await this.fetchCurrentAdjustMachineFromRedis();
     await this.fetchLockedDays();
     this.getList();
   },
+  async activated() {
+    /** 从结构调整页返回时，路由携带 version/productionVersion 需同步到查询区生产版本下拉 */
+    const applied = await this.applyVersionFromRouteQuery();
+    if (applied) {
+      await this.fetchCurrentAdjustMachineFromRedis();
+      await this.fetchLockedDays();
+      this.getList();
+    }
+  },
   methods: {
+    /**
+     * 将指定版本同步到查询区 searchColumns.version，并补全 versionOptions 选项。
+     * @param {string} version 生产版本号
+     */
+    syncProductionVersionToSearch(version) {
+      const v = version != null ? String(version).trim() : "";
+      if (!v) {
+        return;
+      }
+      this.search = { ...this.search, version: v };
+      this.query = { ...this.query, version: v };
+      const opts = this.versionOptions || [];
+      if (!opts.some((item) => String(item.value) === v)) {
+        const raw = (this.monthPlanMpAdjustVersionRawRows || []).find(
+          (r) => r && String(r.version).trim() === v
+        );
+        const adj =
+          raw && raw.adjustType != null
+            ? String(raw.adjustType).trim()
+            : "";
+        this.versionOptions = [...opts, { label: v, value: v, adjustType: adj }];
+      }
+    },
+    /**
+     * 读取路由 query 中的 version / productionVersion，写入查询区生产版本下拉。
+     * @returns {Promise<boolean>} 是否应用了路由版本
+     */
+    async applyVersionFromRouteQuery() {
+      const rq = this.$route.query || {};
+      const routeVersion = (
+        (rq.version != null ? String(rq.version).trim() : "") ||
+        (rq.productionVersion != null
+          ? String(rq.productionVersion).trim()
+          : "")
+      );
+      if (!routeVersion) {
+        return false;
+      }
+      const current = String(
+        this.query.version || this.search.version || ""
+      ).trim();
+      if (current === routeVersion) {
+        this.syncProductionVersionToSearch(routeVersion);
+        return false;
+      }
+      this.syncProductionVersionToSearch(routeVersion);
+      if (rq.factoryCode) {
+        this.search = {
+          ...this.search,
+          factoryCode: String(rq.factoryCode),
+        };
+        this.query = {
+          ...this.query,
+          factoryCode: String(rq.factoryCode),
+        };
+      }
+      if (rq.yearMonth) {
+        this.search = {
+          ...this.search,
+          yearMonth: String(rq.yearMonth),
+        };
+        this.query = {
+          ...this.query,
+          yearMonth: String(rq.yearMonth),
+        };
+      }
+      if (rq.structureName) {
+        this.search = {
+          ...this.search,
+          structureName: String(rq.structureName),
+        };
+        this.query = {
+          ...this.query,
+          structureName: String(rq.structureName),
+        };
+      }
+      await this.loadVersionOptions();
+      this.syncProductionVersionToSearch(routeVersion);
+      return true;
+    },
     async handleBaseQueryChange() {
       const pt = this.$refs.monthPlanPageTableRef;
       const searchRef = pt && pt.$refs && pt.$refs.searchRef;
@@ -2147,11 +2245,15 @@ export default {
         const hasVersion = list.some(
           (item) => String(item.value) === currentPv
         );
-        if (hasVersion) {
-          this.search = { ...this.search, version: currentPv };
-          this.query = { ...this.query, version: currentPv };
-          return;
+        if (!hasVersion) {
+          this.versionOptions = [
+            ...list,
+            { label: currentPv, value: currentPv, adjustType: "" },
+          ];
         }
+        this.search = { ...this.search, version: currentPv };
+        this.query = { ...this.query, version: currentPv };
+        return;
       }
       const defaultPv = list[0].value;
       this.search = { ...this.search, version: defaultPv };
@@ -2589,11 +2691,8 @@ export default {
      */
     buildStructureDialogListVersionParams() {
       const row = this.data && this.data.length ? this.data[0] : null;
-      const qpv = (
-        this.query.version ||
-        this.search.version ||
-        ""
-      ).trim();
+      /** 与查询区 searchColumns.version 当前选中值一致（优先 HeaderSearch 表单） */
+      const qpv = this.resolveSearchColumnsVersion();
       const rowPv =
         row &&
         row.productionVersion != null &&
@@ -2674,19 +2773,7 @@ export default {
       if (!v) {
         return;
       }
-      this.search = { ...this.search, version: v };
-      this.query = { ...this.query, version: v };
-      const opts = this.versionOptions || [];
-      if (!opts.some((item) => String(item.value) === v)) {
-        const raw = (this.monthPlanMpAdjustVersionRawRows || []).find(
-          (r) => r && String(r.version).trim() === v
-        );
-        const adj =
-          raw && raw.adjustType != null
-            ? String(raw.adjustType).trim()
-            : "";
-        this.versionOptions = [...opts, { label: v, value: v, adjustType: adj }];
-      }
+      this.syncProductionVersionToSearch(v);
       this.$set(this.page, "current", 1);
       await this.fetchCurrentAdjustMachineFromRedis();
       this.getList();

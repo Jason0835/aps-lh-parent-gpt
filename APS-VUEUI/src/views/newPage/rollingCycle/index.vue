@@ -1583,6 +1583,131 @@ export default {
       };
     },
     /**
+     * 将携带的版本号写入结构调整页查询区 searchColumns.version，并补全 versionList 下拉项。
+     * @param {string} version 版本号
+     * @param {Array} list 接口返回的版本列表
+     * @returns {Array} 合并后的版本列表
+     */
+    ensureVersionInVersionList(version, list = []) {
+      const v = version != null ? String(version).trim() : "";
+      if (!v) {
+        return list;
+      }
+      const merged = [...list];
+      if (!merged.some((item) => String(item.value) === v)) {
+        merged.unshift({ label: v, value: v });
+      }
+      return merged;
+    },
+    /**
+     * 同步版本号到查询区 searchColumns（prop = versionSearchProp）。
+     * @param {string} version 版本号
+     */
+    syncStructureAdjustVersionToSearch(version) {
+      const v = version != null ? String(version).trim() : "";
+      if (!v) {
+        return;
+      }
+      const prop = this.versionSearchProp;
+      this.$set(this.search, prop, v);
+      this.$set(this.query, prop, v);
+      this.versionList = this.ensureVersionInVersionList(v, this.versionList);
+    },
+    /**
+     * 解析路由上的生产版本（定稿版本 I…）。
+     * @param {object} routeQuery 可选，默认取 this.$route.query
+     */
+    resolveRouteProductionVersion(routeQuery = null) {
+      const q = routeQuery || this.$route.query || {};
+      return q.productionVersion != null && String(q.productionVersion).trim() !== ""
+        ? String(q.productionVersion).trim()
+        : "";
+    },
+    /**
+     * 解析路由上的调整版本号（ADJ…），对应结构调整页 searchColumns.version。
+     * @param {object} routeQuery 可选，默认取 this.$route.query
+     */
+    resolveRouteAdjustVersion(routeQuery = null) {
+      const q = routeQuery || this.$route.query || {};
+      return q.version != null && String(q.version).trim() !== ""
+        ? String(q.version).trim()
+        : "";
+    },
+    /**
+     * 写入生产版本到 search/query（与 searchColumns.version 无关）。
+     * @param {string} productionVersion 生产版本号
+     */
+    syncStructureAdjustProductionVersion(productionVersion) {
+      const pv = productionVersion != null ? String(productionVersion).trim() : "";
+      if (!pv) {
+        return;
+      }
+      this.$set(this.search, "productionVersion", pv);
+      this.$set(this.query, "productionVersion", pv);
+    },
+    /**
+     * 读取结构调整页查询区 searchColumns 当前选中的版本号（优先 HeaderSearch 表单，与月计划页 resolveSearchColumnsVersion 一致）。
+     */
+    resolveStructureAdjustSearchVersion() {
+      const prop = this.versionSearchProp;
+      const pt = this.$refs.tableRef;
+      const searchRef = pt && pt.$refs && pt.$refs.searchRef;
+      if (searchRef && typeof searchRef.getValues === "function") {
+        const form = searchRef.getValues();
+        if (
+          form &&
+          form[prop] != null &&
+          String(form[prop]).trim() !== ""
+        ) {
+          return String(form[prop]).trim();
+        }
+      }
+      return String(
+        this.query[prop] != null
+          ? this.query[prop]
+          : this.search[prop] != null
+            ? this.search[prop]
+            : ""
+      ).trim();
+    },
+    /**
+     * 从结构调整页返回月计划调整页时，携带当前查询区选中的版本号。
+     */
+    resolveMonthPlanVersionForReturn() {
+      return (
+        this.resolveStructureAdjustSearchVersion() ||
+        (this.search.productionVersion || "").trim() ||
+        (this.query.productionVersion || "").trim() ||
+        (this.formInline && this.formInline.productionVersion != null
+          ? String(this.formInline.productionVersion).trim()
+          : "") ||
+        this.resolveRouteProductionVersion()
+      );
+    },
+    /**
+     * 从结构调整页返回月计划调整页时，携带当前查询版本作为生产版本默认值。
+     */
+    buildMonthPlanReturnVersionQuery() {
+      const productionVersion = this.resolveMonthPlanVersionForReturn();
+      const queryExtra = {};
+      if (productionVersion) {
+        /** 月计划调整页 searchColumns.version 对应字段名 version，同时兼容 productionVersion */
+        queryExtra.version = productionVersion;
+        queryExtra.productionVersion = productionVersion;
+      }
+      const structureName = (
+        (this.formInline && this.formInline.structureName) ||
+        this.search.structureName ||
+        ""
+      )
+        .toString()
+        .trim();
+      if (structureName) {
+        queryExtra.structureName = structureName;
+      }
+      return queryExtra;
+    },
+    /**
      * 月计划结构调整独立页自动调整后，带回 monthlyProductionPlan/index.vue 的 query（与 created 读取字段一致）。
      * @param {Array} resultList autoAdjust 规范化后的行列表
      */
@@ -1612,24 +1737,7 @@ export default {
         const m = Number(row0.month);
         yearMonthStr = `${row0.year}-${m < 10 ? "0" + m : m}`;
       }
-      const productionVersion = (
-        this.search.productionVersion ||
-        this.query.productionVersion ||
-        fi.productionVersion ||
-        row0.productionVersion ||
-        ""
-      )
-        .toString()
-        .trim();
-      const version = (
-        row0.version ||
-        fi.version ||
-        this.query.version ||
-        this.search.version ||
-        ""
-      )
-        .toString()
-        .trim();
+      const productionVersion = this.resolveMonthPlanVersionForReturn();
       const structureName = (
         fi.structureName ||
         routeQ.structureName ||
@@ -1644,11 +1752,10 @@ export default {
       if (yearMonthStr) {
         queryExtra.yearMonth = yearMonthStr;
       }
+      /** 月计划调整页 searchColumns.version：优先带回结构调整页查询区当前选中的版本号 */
       if (productionVersion) {
+        queryExtra.version = productionVersion;
         queryExtra.productionVersion = productionVersion;
-      }
-      if (version) {
-        queryExtra.version = version;
       }
       if (structureName) {
         queryExtra.structureName = structureName;
@@ -2087,15 +2194,14 @@ export default {
         this.$set(this.query, "version", list[0].value);
         return;
       }
-      if (this.query.version) {
-        const hasVersion = list.some(
-          (item) => item.value == this.query.version
-        );
-        if (hasVersion) {
-          this.$set(this.search, "version", this.query.version);
-          this.$set(this.query, "version", this.query.version);
-          return;
-        }
+      const preferred = (
+        (this.query.version || "").trim() ||
+        this.resolveRouteAdjustVersion()
+      );
+      if (preferred) {
+        this.versionList = this.ensureVersionInVersionList(preferred, list);
+        this.syncStructureAdjustVersionToSearch(preferred);
+        return;
       }
       this.$set(this.search, "version", list[0].value);
       this.$set(this.query, "version", list[0].value);
@@ -2234,7 +2340,11 @@ export default {
         this.monthPlanFromFinalSelect
       ) {
         this.monthPlanFromFinalSelect = false;
-        this.$router.push(this.getMonthPlanFinalAdjustQueryRoute());
+        this.$router.push(
+          this.getMonthPlanFinalAdjustQueryRoute(
+            this.buildMonthPlanReturnVersionQuery()
+          )
+        );
       }
       this.show = false;
       this.showConfirmResult = false;
@@ -3635,13 +3745,10 @@ export default {
           this.formInline,
           this._monthPlanAdjustDaySnapshot
         );
-        const qPv =
-          q.productionVersion != null &&
-          String(q.productionVersion).trim() !== ""
-            ? String(q.productionVersion).trim()
-            : "";
+        const routePv = this.resolveRouteProductionVersion(q);
+        const routeVer = this.resolveRouteAdjustVersion(q);
         const mergedPv =
-          qPv ||
+          routePv ||
           (this.formInline.productionVersion != null
             ? String(this.formInline.productionVersion).trim()
             : "");
@@ -3672,13 +3779,12 @@ export default {
             this.search.structureName ||
             "",
         };
-        const rowAdjVer =
-          this.formInline.version != null &&
-          String(this.formInline.version).trim() !== ""
-            ? String(this.formInline.version).trim()
-            : "";
-        if (rowAdjVer) {
-          this.search.version = rowAdjVer;
+        if (mergedPv) {
+          this.syncStructureAdjustProductionVersion(mergedPv);
+        }
+        /** 路由 version 为调整版本号，写入 searchColumns.version */
+        if (routeVer) {
+          this.syncStructureAdjustVersionToSearch(routeVer);
         }
         this.query = { ...this.search };
         this.adjustType = "02";
@@ -3697,20 +3803,22 @@ export default {
         return;
       }
 
-      const qPv =
-        q.productionVersion != null &&
-        String(q.productionVersion).trim() !== ""
-          ? String(q.productionVersion).trim()
-          : "";
+      const routePv = this.resolveRouteProductionVersion(q);
+      const routeVer = this.resolveRouteAdjustVersion(q);
       this.search = {
         ...this.search,
         factoryCode: q.factoryCode || this.search.factoryCode,
         yearMonth: q.yearMonth || this.search.yearMonth,
         scheduledMachines: q.scheduledMachines || q.cxMachineCode || "",
         structureName: q.structureName || "",
-        /** 月计划弹窗路由可能带 productionVersion；单结构流程仍用 formInline，列表查询版本由 getVersionList 写入 version */
-        productionVersion: qPv,
+        productionVersion: routePv,
       };
+      if (routePv) {
+        this.syncStructureAdjustProductionVersion(routePv);
+      }
+      if (routeVer) {
+        this.syncStructureAdjustVersionToSearch(routeVer);
+      }
       this.query = { ...this.search };
       this.adjustType = "02";
       let year = null;
@@ -3736,7 +3844,7 @@ export default {
             : "",
         endDay:
           q.endDay !== undefined && q.endDay !== "" ? Number(q.endDay) : "",
-        productionVersion: qPv,
+        productionVersion: routePv,
         scheduledMachines: q.scheduledMachines || q.cxMachineCode || "",
       };
       this.formInline = { ...row };
@@ -3778,6 +3886,17 @@ export default {
     this.query = {
       ...defaultParams,
     };
+    /** 结构调整页：路由分别带入生产版本与调整版本号 */
+    if (this.pageVariant === "structureAdjust") {
+      const routePv = this.resolveRouteProductionVersion(rq);
+      const routeVer = this.resolveRouteAdjustVersion(rq);
+      if (routePv) {
+        this.syncStructureAdjustProductionVersion(routePv);
+      }
+      if (routeVer) {
+        this.syncStructureAdjustVersionToSearch(routeVer);
+      }
+    }
     if (this.pageVariant === "structureAdjust") {
       this.adjustType = "02";
       this.activeName = "second";
