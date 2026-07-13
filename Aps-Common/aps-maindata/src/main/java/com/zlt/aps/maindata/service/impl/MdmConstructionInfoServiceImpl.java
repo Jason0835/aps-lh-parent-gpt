@@ -46,6 +46,7 @@ import java.util.regex.Pattern;
 public class MdmConstructionInfoServiceImpl extends AbstractDocService<MdmConstructionInfo>  implements IMdmConstructionInfoService {
 
     private static final Pattern TIRE_FABRIC_CODE_GETTER = Pattern.compile("getTireFabricCode\\d+");
+    private static final Pattern BELT_CODE_GETTER = Pattern.compile("getBeltCode\\d+");
 
     @Autowired
     private IRemoteImportLogService iRemoteImportLogService;
@@ -103,6 +104,12 @@ public class MdmConstructionInfoServiceImpl extends AbstractDocService<MdmConstr
         return collectCordSpecs(constructionInfos);
     }
 
+    @Override
+    public List<String> listSteelStripCodes() {
+        List<MdmConstructionInfo> constructionInfos = mdmConstructionInfoEntityMapper.selectList(null);
+        return collectSteelStripCodes(constructionInfos);
+    }
+
     List<String> collectCordSpecs(List<MdmConstructionInfo> constructionInfos) {
         if (constructionInfos == null || constructionInfos.isEmpty()) {
             return new ArrayList<>();
@@ -128,13 +135,29 @@ public class MdmConstructionInfoServiceImpl extends AbstractDocService<MdmConstr
                 if (!TIRE_FABRIC_CODE_GETTER.matcher(method.getName()).matches()) {
                     continue;
                 }
-                collectTireFabricCode(codeSet, constructionInfo, method);
+                collectCode(codeSet, constructionInfo, method, "读取投产胎胚施工胎体布代号失败，方法：{}");
             }
         }
         return new ArrayList<>(codeSet);
     }
 
-    private void collectTireFabricCode(Set<String> codeSet, MdmConstructionInfo constructionInfo, Method method) {
+    List<String> collectSteelStripCodes(List<MdmConstructionInfo> constructionInfos) {
+        if (constructionInfos == null || constructionInfos.isEmpty()) {
+            return new ArrayList<>();
+        }
+        Set<String> codeSet = new TreeSet<>();
+        Method[] methods = MdmConstructionInfo.class.getMethods();
+        constructionInfos.forEach(constructionInfo -> {
+            Arrays.stream(methods)
+                    .filter(method -> BELT_CODE_GETTER.matcher(method.getName()).matches())
+                    .forEach(method -> collectCode(codeSet, constructionInfo, method, "读取投产胎胚施工钢带代码失败，方法：{}"));
+            Optional.ofNullable(constructionInfo.getBeltCodeLeftCode()).map(String::trim).filter(s -> !s.isEmpty()).ifPresent(codeSet::add);
+            Optional.ofNullable(constructionInfo.getBeltCodeRightCode()).map(String::trim).filter(s -> !s.isEmpty()).ifPresent(codeSet::add);
+        });
+        return new ArrayList<>(codeSet);
+    }
+
+    private void collectCode(Set<String> codeSet, MdmConstructionInfo constructionInfo, Method method, String warnMessage) {
         try {
             Object value = method.invoke(constructionInfo);
             if (value == null) {
@@ -145,7 +168,7 @@ public class MdmConstructionInfoServiceImpl extends AbstractDocService<MdmConstr
                 codeSet.add(code);
             }
         } catch (ReflectiveOperationException e) {
-            log.warn("读取投产胎胚施工胎体布代号失败，方法：{}", method.getName(), e);
+            log.warn(warnMessage, method.getName(), e);
         }
     }
 

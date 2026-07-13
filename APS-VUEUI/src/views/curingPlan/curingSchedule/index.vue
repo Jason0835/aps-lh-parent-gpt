@@ -215,6 +215,7 @@ import {
   removeScheduleResult,
 } from "@/api/lh/scheduleResult";
 import {checkPermi} from "@/utils/permission";
+import { confirmLhSkuDecrement } from "@/api/lh/lhSkuDecrement";
 
 import TltUploadForm from "@/views/components/tltUploadForm.vue";
 import TltUpload from "@/components/tltUpload/tltUpload.vue";
@@ -746,7 +747,7 @@ export default {
         {
           prop: "rowOperator",
           label: this.$t("common.option"),
-          width: 200,
+          width: 280,
           fixed: "right",
           render: ({ row }) => {
             return (
@@ -759,6 +760,16 @@ export default {
                     onClick={() => this.handleChangePlan(row)}
                   >
                     {this.$t("ui.data.column.scheduleResult.changePlan")}
+                  </el-button>
+                ) : null}
+                {checkPermi(["lh:skuDecrement:confirm"]) ? (
+                  <el-button
+                    type="text"
+                    size="mini"
+                    icon="el-icon-check"
+                    onClick={() => this.handleConfirmSkuDecrement(row)}
+                  >
+                    {this.$t("ui.data.btn.lhSkuDecrement.confirm")}
                   </el-button>
                 ) : null}
                 {checkPermi(["lh:lhScheduleResult:remove"]) ? (
@@ -1055,6 +1066,30 @@ export default {
     },
     handleGotoSpecDescGant() {
       this.$router.push("/curingPlan/specDescGantChart");
+    },
+    buildSkuDecrementPayload(row) {
+      const scheduleMoment = moment(row.scheduleDate || this.query.scheduleDate);
+      return {
+        factoryCode: row.factoryCode || this.query.factoryCode,
+        year: scheduleMoment.isValid() ? scheduleMoment.year() : moment().year(),
+        month: scheduleMoment.isValid() ? scheduleMoment.month() + 1 : moment().month() + 1,
+        materialCode: row.materialCode,
+        materialDesc: row.materialDesc,
+        embryoDesc: row.mainMaterialDesc || row.specDesc,
+        productStatus: row.productStatus,
+        remark: row.batchNo,
+      };
+    },
+    async handleConfirmSkuDecrement(row) {
+      try {
+        await this.$confirm(this.$t("ui.data.alert.lhSkuDecrement.confirmMessage"), {
+          type: "warning",
+        });
+        const data = await confirmLhSkuDecrement(this.buildSkuDecrementPayload(row));
+        this.$modal.msgSuccess(data.msg);
+      } catch (error) {
+        console.error(error);
+      }
     },
     handleDelete(row) {
       this.$confirm(this.$t("common.confirm.delete"), {
