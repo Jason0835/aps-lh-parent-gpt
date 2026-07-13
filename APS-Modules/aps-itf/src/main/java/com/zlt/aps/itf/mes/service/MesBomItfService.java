@@ -42,4 +42,13 @@ public interface MesBomItfService {
      */
     AjaxResult syncConstructionProcessInfo(AuxReqSyncDataLogs syncDataLogs);
 
+
+    /**
+     * 成品原材料折算接口
+     *
+     * @param syncDataLogs 同步参数
+     * @return 结果
+     */
+    AjaxResult syncRawMaterialConversion(AuxReqSyncDataLogs syncDataLogs);
+
 }

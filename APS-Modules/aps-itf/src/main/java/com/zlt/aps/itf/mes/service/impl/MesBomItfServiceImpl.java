@@ -6,6 +6,7 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.utils.StringUtils;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.utils.BigDecimalUtils;
+import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.itf.constant.DataSource;
 import com.zlt.aps.itf.mes.mapper.MesBomItfMapper;
 import com.zlt.aps.itf.mes.service.MesBomItfService;
@@ -13,6 +14,7 @@ import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
 import com.zlt.aps.maindata.mapper.*;
 import com.zlt.aps.maindata.utils.ScmListUtils;
 import com.zlt.aps.mdm.api.domain.entity.MdmConstructionProcess;
+import com.zlt.aps.mdm.api.domain.entity.MdmRawMaterialConversion;
 import com.zlt.aps.mdm.api.enums.BomTypeEnum;
 import com.zlt.aps.mdm.api.enums.ProcessCodeEnum;
 import com.zlt.aps.mp.api.domain.entity.MdmBomInfo;
@@ -52,6 +54,9 @@ public class MesBomItfServiceImpl implements MesBomItfService {
 	private MdmSkuStructureRefEntityMapper mdmSkuStructureRefEntityMapper;
 	@Autowired
 	private MdmConstructionProcessEntityMapper mdmConstructionProcessEntityMapper;
+    @Autowired
+	private MdmRawMaterialConversionEntityMapper mdmRawMaterialConversionEntityMapper;
+	
 	@Autowired
 	private BaseDao baseDao;
 
@@ -118,6 +123,20 @@ public class MesBomItfServiceImpl implements MesBomItfService {
 //				info.getBomVersion(), info.getEmbryoCode()
 		);
 	}
+
+    /**
+     * 获取分组key（成品原材料折算）
+     *
+     * @param info
+     * @return
+     */
+    private String getMapKey(MdmRawMaterialConversion info) {
+        return GenerageMapKeyUtils.createMapKey(info.getFactoryCode(),
+                info.getMaterialCode(),
+                info.getRawMaterialName(),
+                info.getRawMaterialWeight()
+        );
+    }
 
 	/**
 	 * 半部件BOM接口
@@ -464,6 +483,65 @@ public class MesBomItfServiceImpl implements MesBomItfService {
             return true;
         }
         return false;
+    }
+    
+
+    /**
+     * 成品原材料折算接口
+     *
+     * @param syncDataLogs 同步参数
+     * @return 结果
+     */
+    @Override
+    public AjaxResult syncRawMaterialConversion(AuxReqSyncDataLogs syncDataLogs) {
+        List<MdmRawMaterialConversion> syncList = mesBomItfMapper.selectMdmRawMaterialConversion(syncDataLogs);
+        if (CollectionUtils.isNotEmpty(syncList)) {
+            LambdaQueryWrapper<MdmRawMaterialConversion> queryWrapper = new LambdaQueryWrapper<>();
+            queryWrapper.eq(MdmRawMaterialConversion::getIsDelete, ApsConstant.APS_YES_NO_0);
+            queryWrapper.eq(MdmRawMaterialConversion::getFactoryCode, syncDataLogs.getFactoryCode());
+            try {
+                /** 切换APS数据源 start **/
+                DynamicDataSourceContextHolder.push(DataSource.APS);
+                List<MdmRawMaterialConversion> apsDataList = mdmRawMaterialConversionEntityMapper.selectList(queryWrapper); // 取出APS数据
+                List<MdmRawMaterialConversion> saveList = new ArrayList<>();
+                if (CollectionUtils.isNotEmpty(apsDataList)) {
+                    // 先筛选出删除状态的记录
+                    Set<String> deleteSet = syncList.stream()
+                            .filter(item -> Objects.equals(item.getIsDelete(), YesOrNoEnum.YES.getValue()))
+                            .map(item -> this.getMapKey(item)).distinct().collect(Collectors.toSet());
+                    // 筛选出非删除记录
+                    Map<String, List<MdmRawMaterialConversion>> refMap = syncList.stream()
+                            .filter(item -> Objects.equals(item.getIsDelete(), YesOrNoEnum.NO.getValue())) // 拿出未删除的
+                            .collect(Collectors.groupingBy(item -> this.getMapKey(item))); // 按业务主键分组
+                    apsDataList.stream().filter(r -> refMap.containsKey(this.getMapKey(r))).forEach(item -> {
+                        // 只有删除和新增场景，没有更新
+                        String key = this.getMapKey(item);
+                        // 判断是否删除场景
+                        if (deleteSet.contains(key)) {
+                            // 原有材料被标记为删除状态，则先标记为删除后结束
+                            item.setIsDelete(YesOrNoEnum.YES.getValue());
+                            item.setBaseVale(item.getId());
+                            saveList.add(item);
+                            return;
+                        }
+                        // 判断是否新增场景
+                        List<MdmRawMaterialConversion> refList = refMap.get(key);
+                        if (CollectionUtils.isEmpty(refList)) {
+                            saveList.addAll(refList);
+                        }
+                    });
+                }
+                // 处理待保存记录
+                List<List<MdmRawMaterialConversion>> splitList = ScmListUtils.getSplitList(saveList, 1000);
+                for (List<MdmRawMaterialConversion> itemList : splitList) { // 分批保存，防止长度超出限制
+                    baseDao.saveBatch(itemList);
+                }
+            } finally {
+                DynamicDataSourceContextHolder.clear();
+                /** 切换APS数据源 end **/
+            }
+        }
+        return AjaxResult.success();
     }
     
     /**
