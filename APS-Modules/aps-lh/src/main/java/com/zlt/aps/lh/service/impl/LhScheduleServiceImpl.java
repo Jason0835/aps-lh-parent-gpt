@@ -2434,7 +2434,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
 
             // 成型机台号来自成型排程结果的 LH_SCHEDULE_IDS 反查，多个成型机台用分号拼接。
             row.put("cxMachineCode", cxMachineCodeMap.get(result.getId()));
-            row.put("todayNightFinishQty", todayNightFinishQtyMap.get(buildMaterialFactoryExportKey(result.getFactoryCode(), result.getMaterialCode())));
+            row.put("todayNightFinishQty", result.getTotalFinishQty());
             row.put("mouldSurplusQty", result.getMouldSurplusQty());
             row.put("embryoStock", result.getEmbryoStock());
             row.put("singleMouldShiftQty", result.getSingleMouldShiftQty());
@@ -2448,7 +2448,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
             // 明细行的 dailyPlanQty 已按需求从 totalDailyPlanQty 改为 dailyPlanQty。
             // totalPlanQty 只是模板“总计”占位符，为了明细行保持同一日计划量展示，
             // 当前同步写入 dailyPlanQty；首行汇总会在 buildSummaryRow 中单独计算。
-            row.put("dailyPlanQty", result.getDailyPlanQty());
+            row.put("dailyPlanQty", (Objects.isNull(result.getTotalFinishQty()) ? 0 : result.getTotalFinishQty()) - (Objects.isNull(result.getTotalDailyPlanQty()) ? 0 : result.getTotalDailyPlanQty()));
             row.put("totalPlanQty", result.getDailyPlanQty());
             row.put("totalDailyPlanQty", result.getTotalDailyPlanQty());
             row.put("monthPlanSumTotal", result.getMonthPlanSumTotal());
