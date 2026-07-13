@@ -444,30 +444,33 @@ public class GroupCapacityHandler {
         if (!groupInfo.isCycleType()) {
             return originEffectiveQty;
         }
-        //周期结构比例
-        Integer percent;
         ProductionCapacityParamConfiguration paramConfiguration = productionContext.getBaseDataContainer().getParamConfiguration();
-        if (CycleProductionModeEnum.ALL == paramConfiguration.getCycleProductionMode()) {
-            //需排产周期储备量
-            percent = paramConfiguration.getReservePercent();
-        } else {
-            percent = BigDecimal.ZERO.intValue();
-        }
-        if (null == percent || percent < BigDecimal.ZERO.intValue()) {
+        CycleProductionModeEnum productionMode = paramConfiguration.getCycleProductionMode();
+        if (CycleProductionModeEnum.ALL != productionMode) {
+            //周期结构排产模式：高、高+中
+            groupInfo.setMaxCycleQty(BigDecimal.ZERO.intValue());
             return originEffectiveQty;
         }
-        Integer sumAllNetQty = effectiveRequireList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getNetQty).sum();
+        //高+中+周期储备，则需要看周期结构比例
+        Integer percent = paramConfiguration.getReservePercent();
+        if (null == percent || percent < BigDecimal.ZERO.intValue()) {
+            groupInfo.setMaxCycleQty(BigDecimal.ZERO.intValue());
+            return originEffectiveQty;
+        }
         //所有的实单
         Integer sumActualQuantity = getAllActualQuantity(effectiveRequireList);
-        Integer addPercent = percent + ProductionConstant.PERCENTAGE;
         //得到需求上限值(实单 + 实单 * 比例)
+        Integer addPercent = percent + ProductionConstant.PERCENTAGE;
         Integer maxCycleQty = BigDecimal.valueOf(sumActualQuantity).multiply(BigDecimal.valueOf(addPercent))
                 .divide(BigDecimal.valueOf(ProductionConstant.PERCENTAGE), BigDecimal.ZERO.intValue(), RoundingMode.UP).intValue();
+        //记录日志
+        Integer sumAllNetQty = effectiveRequireList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getNetQty).sum();
         PlanRequireLogRecorder.addGroupRequireEstimateInfoLog(productionContext, percent, groupInfo.getGroupName(), sumActualQuantity, sumAllNetQty, originEffectiveQty, maxCycleQty);
         //不可超过最大需求量，二者取最小
         originEffectiveQty = Math.min(originEffectiveQty, maxCycleQty);
-        //实际储备量上限
+        //实际储备量上限:不可为负数，可为零
         Integer realMaxCycleQty = originEffectiveQty - sumActualQuantity;
+        realMaxCycleQty = Math.max(BigDecimal.ZERO.intValue(), realMaxCycleQty);
         groupInfo.setMaxCycleQty(realMaxCycleQty);
         return originEffectiveQty;
     }

@@ -1,5 +1,6 @@
 package com.zlt.aps.mp.engine.utils;
 
+import com.zlt.aps.mp.engine.domain.dto.ProductGroupCxCapacityInfo;
 import com.zlt.aps.mp.engine.domain.vo.CxMachineBaseInfoVo;
 import lombok.extern.slf4j.Slf4j;
 
@@ -13,6 +14,32 @@ import java.util.Comparator;
  */
 @Slf4j
 public class ProductionComparatorUtils {
+
+    /**
+     * sandy+ 2026.3.26
+     * 分组(结构)在产机台多于需求要求机台时，续作机台优先下机选择顺序
+     * 优先释放通用性好的（固定结构优先级差的、固定结构种类数多的），配比大的，成型编号大的
+     *
+     * @return
+     */
+    public static Comparator getContinueCxMachineOffSort() {
+        return Comparator.comparing(ProductGroupCxCapacityInfo::getFixedPriority, Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparing(ProductGroupCxCapacityInfo::getFixedProSizeTypes, Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparing(ProductGroupCxCapacityInfo::getMaxLhMachineCount, Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparing(ProductGroupCxCapacityInfo::getCxMachineCode, Comparator.nullsLast(Comparator.reverseOrder()));
+    }
+
+    /**
+     * sandy+ 2026.3.26
+     * 分组(结构)在产机台 = 需求预估机台时，标记预计可能下机选择顺序
+     * 优先释放通用性好的（固定结构优先级差的、固定结构种类数多的）
+     *
+     * @return
+     */
+    public static Comparator getContinueCxMachinePreOffSort() {
+        return Comparator.comparing(CxMachineBaseInfoVo::getFixedPriority, Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparing(CxMachineBaseInfoVo::getFixedProSizeTypes, Comparator.nullsLast(Comparator.naturalOrder()));
+    }
 
     /**
      * 分组匹配可生产机台的排产
