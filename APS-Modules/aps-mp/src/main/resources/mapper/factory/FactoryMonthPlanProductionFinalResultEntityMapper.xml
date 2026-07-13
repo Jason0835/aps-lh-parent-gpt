@@ -180,7 +180,8 @@
            - stockDay = DAYOFMONTH(IFNULL(STOCK_CAPTURE_DATE, 月初))
            - 计划量 = SUM(DAY_x) 其中 x >= stockDay（STOCK_CAPTURE_DATE 为空时累加 DAY_1~DAY_31 全部）
          已完成量：
-           - 取自 T_LH_DAY_FINISH_QTY，日期范围 = IFNULL(STOCK_CAPTURE_DATE, 月初) ~ 月底
+           - 取自 T_LH_DAY_FINISH_QTY，按(分厂+物料+示方类型LH_TYPE)匹配月计划产品状态(PRODUCT_STATUS)，
+             日期范围 = IFNULL(STOCK_CAPTURE_DATE, 月初) ~ 月底
          回填规则：
            - 按 (分厂+物料编码+产品状态) 三字段维度匹配，回填到写入目标月定稿记录
            - 有效标志判定：|超欠产值|(绝对值) > 阈值参数(overdueThresholdParamCode) → '0'(否)，否则 → '1'(是)
@@ -263,14 +264,16 @@
                 SELECT
                     FACTORY_CODE,
                     MATERIAL_CODE,
+                    LH_TYPE,
                     FINISH_DATE,
                     IFNULL(SUM(DAY_FINISH_QTY), 0) AS DAY_QTY
                 FROM T_LH_DAY_FINISH_QTY
                 WHERE IS_DELETE = 0
                   AND FINISH_DATE BETWEEN #{startDate} AND #{endDate}
-                GROUP BY FACTORY_CODE, MATERIAL_CODE, FINISH_DATE
+                GROUP BY FACTORY_CODE, MATERIAL_CODE, LH_TYPE, FINISH_DATE
             ) fin ON fin.FACTORY_CODE = f5.FACTORY_CODE
                   AND fin.MATERIAL_CODE = f5.MATERIAL_CODE
+                  AND IFNULL(fin.LH_TYPE, '') = IFNULL(f5.PRODUCT_STATUS, '')
                   AND fin.FINISH_DATE &gt;= IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})
                   AND fin.FINISH_DATE &lt;= #{endDate}
             WHERE f5.IS_DELETE = 0
@@ -307,7 +310,8 @@
          1. 计划量：按 (分厂+物料+年+月+需求版本号 MONTH_PLAN_VERSION=REQUIRE_VERSION) 取 STOCK_CAPTURE_DATE，
             stockDay = DAYOFMONTH(IFNULL(STOCK_CAPTURE_DATE, 月初))，
             累加 DAY_x (x >= stockDay)；STOCK_CAPTURE_DATE 为空时累加 DAY_1~DAY_31 全部
-         2. 已完成量：取自 T_LH_DAY_FINISH_QTY，日期范围 = IFNULL(STOCK_CAPTURE_DATE, 月初) ~ 月底
+         2. 已完成量：取自 T_LH_DAY_FINISH_QTY，按(分厂+物料+示方类型LH_TYPE)匹配月计划产品状态(PRODUCT_STATUS)，
+            日期范围 = IFNULL(STOCK_CAPTURE_DATE, 月初) ~ 月底
          3. 超欠产 = 计划量 - 完成量（仅用于标识判定，不写回值字段）
          4. 按 (分厂+物料编码+产品状态) 三字段维度匹配，回填到写入目标月定稿记录的 LAST_MONTH_VALID_FLAG
          5. 有效标志判定：|超欠产值|(绝对值) > 阈值参数(overdueThresholdParamCode) → '0'(否)，否则 → '1'(是)
@@ -375,14 +379,16 @@
                 SELECT
                     FACTORY_CODE,
                     MATERIAL_CODE,
+                    LH_TYPE,
                     FINISH_DATE,
                     IFNULL(SUM(DAY_FINISH_QTY), 0) AS DAY_QTY
                 FROM T_LH_DAY_FINISH_QTY
                 WHERE IS_DELETE = 0
                   AND FINISH_DATE BETWEEN #{startDate} AND #{endDate}
-                GROUP BY FACTORY_CODE, MATERIAL_CODE, FINISH_DATE
+                GROUP BY FACTORY_CODE, MATERIAL_CODE, LH_TYPE, FINISH_DATE
             ) fin ON fin.FACTORY_CODE = f5.FACTORY_CODE
                   AND fin.MATERIAL_CODE = f5.MATERIAL_CODE
+                  AND IFNULL(fin.LH_TYPE, '') = IFNULL(f5.PRODUCT_STATUS, '')
                   AND fin.FINISH_DATE &gt;= IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})
                   AND fin.FINISH_DATE &lt;= #{endDate}
             WHERE f5.IS_DELETE = 0
@@ -418,6 +424,7 @@
            1. 数据来源：上月定稿表 f5 LEFT JOIN T_MDM_MONTH_SURPLUS / T_LH_DAY_FINISH_QTY，
               按 (分厂+物料+产品状态) 维度聚合计算超欠产 = 计划量 - 完成量
               计划量 = 从 STOCK_CAPTURE_DATE 日号到月底累加 DAY_x（为空时累加 DAY_1~DAY_31 全部）
+              完成量 = 按(分厂+物料+示方类型LH_TYPE)匹配月计划产品状态(PRODUCT_STATUS)聚合
            2. 过滤1：当月定稿表按相同维度已存在的记录不插入（exist.ID IS NULL）
            3. 过滤2：超欠产值 = 0 的记录不插入（OVERDUE_QTY &lt;&gt; 0）
            4. 过滤3：当月无定稿版本的工厂不插入（procVer 子查询无数据，INNER JOIN 自动排除）
@@ -574,14 +581,16 @@
         SELECT
         FACTORY_CODE,
         MATERIAL_CODE,
+        LH_TYPE,
         FINISH_DATE,
         IFNULL(SUM(DAY_FINISH_QTY), 0) AS DAY_QTY
         FROM T_LH_DAY_FINISH_QTY
         WHERE IS_DELETE = 0
         AND FINISH_DATE BETWEEN #{startDate} AND #{endDate}
-        GROUP BY FACTORY_CODE, MATERIAL_CODE, FINISH_DATE
+        GROUP BY FACTORY_CODE, MATERIAL_CODE, LH_TYPE, FINISH_DATE
         ) fin ON fin.FACTORY_CODE = f5.FACTORY_CODE
         AND fin.MATERIAL_CODE = f5.MATERIAL_CODE
+        AND IFNULL(fin.LH_TYPE, '') = IFNULL(f5.PRODUCT_STATUS, '')
         AND fin.FINISH_DATE &gt;= IFNULL(surplus.STOCK_CAPTURE_DATE, #{startDate})
         AND fin.FINISH_DATE &lt;= #{endDate}
         WHERE f5.IS_DELETE = 0

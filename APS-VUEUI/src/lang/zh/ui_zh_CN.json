@@ -2934,6 +2934,7 @@
   "ui.data.column.lhMachineOnlineInfo.lrMolds": "左右模",
   "ui.data.column.lhMachineOnlineInfo.dataVersion": "版本号",
   "ui.data.column.lhMachineOnlineInfo.inMachineMouldCode": "在机模号",
+  "ui.data.column.lhMachineOnlineInfo.productStatus": "产品状态",
   "ui.data.column.cxStructureTreadConfig.modelName": "胎面整车配置",
   "ui.data.column.cxStructureTreadConfig.stockDate": "库存日期",
   "ui.data.column.cxStructureTreadConfig.structureCode": "结构",
