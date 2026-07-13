@@ -40,4 +40,11 @@ public interface IMdmConstructionInfoService  extends IDocService<MdmConstructio
      */
     List<String> listCordSpecs();
 
+    /**
+     * 查询施工钢带代码下拉数据。
+     *
+     * @return 去重后的钢带代码列表
+     */
+    List<String> listSteelStripCodes();
+
 }
