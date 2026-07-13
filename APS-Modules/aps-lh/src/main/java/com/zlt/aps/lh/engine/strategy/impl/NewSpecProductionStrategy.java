@@ -7396,6 +7396,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         result.setDailyPlanQty(0);
         result.setTotalDailyPlanQty(sku.getMonthPlanQty());
         result.setMouldSurplusQty(sku.getSurplusQty());
+        result.setMonthPlanSumTotal(sku.getMonthPlanSumTotal());
         result.setTotalFinishQty(sku.getFinishedQty());
         // 日标准产量：复用上下文 SKU 日硫化产能主数据，无主数据则为 0
         result.setStandardCapacity(ShiftCapacityResolverUtil.resolveDailyStandardQty(
