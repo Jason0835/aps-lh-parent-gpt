@@ -18,6 +18,7 @@ import com.zlt.aps.lh.api.enums.SkuTagEnum;
 import com.zlt.aps.lh.component.CuringMonthPlanTotalCalculator;
 import com.zlt.aps.lh.component.MonthPlanDateResolver;
 import com.zlt.aps.lh.component.SingleControlModeSnapshotInitializer;
+import com.zlt.aps.lh.component.SkuDecrementChecker;
 import com.zlt.aps.lh.component.TargetScheduleQtyResolver;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.strategy.IEndingJudgmentStrategy;
@@ -123,6 +124,8 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
     private TargetScheduleQtyResolver targetScheduleQtyResolver;
     @Resource
     private SingleControlModeSnapshotInitializer singleControlModeSnapshotInitializer;
+    @Resource
+    private SkuDecrementChecker skuDecrementChecker;
 
     @Override
     protected void doHandle(LhScheduleContext context) {
@@ -925,6 +928,10 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
 
         // 产品状态（来自月计划）
         dto.setProductStatus(targetMonthPlan.getProductStatus());
+
+        // 月计划所属年月（来自月计划），用于SKU减量清单按年月精确匹配
+        dto.setMonthPlanYear(targetMonthPlan.getYear());
+        dto.setMonthPlanMonth(targetMonthPlan.getMonth());
 
         // 试制SKU严格限制目标量，不允许超出dayN补满班次；量试/正规仍可按后续策略补满可用班次。
         if (StringUtils.equals(ConstructionStageEnum.TRIAL.getCode(), dto.getConstructionStage())) {
@@ -1914,6 +1921,8 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
                 context.getAllSkuScheduleDtoMap().put(blockedSku.getMaterialCode(), blockedSku);
             }
         }
+        // SKU减量清单统一前置过滤：命中减量清单的SKU不进入任何排产入口，写未排并从排产集合移除
+        skuDecrementChecker.filterDecrementSkus(context);
         log.info("续作/新增SKU区分完成, 续作: {}个, 新增: {}个", continuousSkuList.size(), newSpecSkuList.size());
     }
 
@@ -2142,6 +2151,9 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
         copy.setTextNo(source.getTextNo());
         copy.setLhNo(source.getLhNo());
         copy.setProductStatus(source.getProductStatus());
+        // 月计划所属年月（减量清单匹配用），随续作副本同步复制
+        copy.setMonthPlanYear(source.getMonthPlanYear());
+        copy.setMonthPlanMonth(source.getMonthPlanMonth());
         // 机台信息 —— 指定目标机台
         copy.setContinuousMachineCode(machineCode);
         log.debug("同物料多机台续作副本已创建, materialCode: {}, targetMachine: {}",
