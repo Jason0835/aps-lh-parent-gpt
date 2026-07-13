@@ -11,9 +11,9 @@ public class NcScheduleBaseInfoVo {
     private String cxBatchNo;
 
     /**
-     * 内衬代码
+     * 垫胶代码
      */
-    private String liningCode;
+    private String paddingCode;
 
     /**
      * 胶料代码
@@ -28,27 +28,27 @@ public class NcScheduleBaseInfoVo {
     private Double unitConsume;
 
     /**
-     * 对应成型一班的内衬胶计划量
+     * 对应成型一班的垫胶胶计划量
      */
     private Double cxClass1Plan;
 
     /**
-     * 对应成型二班的内衬胶计划量
+     * 对应成型二班的垫胶胶计划量
      */
     private Double cxClass2Plan;
 
     /**
-     * 对应成型三班的内衬胶计划量
+     * 对应成型三班的垫胶胶计划量
      */
     private Double cxClass3Plan;
 
     /**
-     * 对应成型次一班的内衬胶计划量
+     * 对应成型次一班的垫胶胶计划量
      */
     private Double cxClass4Plan;
 
     /**
-     * 对应成型次二班的内衬胶计划量
+     * 对应成型次二班的垫胶胶计划量
      */
     private Double cxClass5Plan;
 

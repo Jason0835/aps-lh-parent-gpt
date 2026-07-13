@@ -189,7 +189,7 @@ export default {
           align: 'center',
           children: [
             { label: this.$t('ui.data.column.scheduleResult.plan'), prop: `${classField}PlanQty`, minWidth: 110 },
-            { label: this.$t('ui.data.column.scheduleResult.actual'), prop: `${classField}FinishQty`, minWidth: 110 },
+            { label: this.$t('ui.data.column.scheduleResult.actual'), prop: `${classField}FinishQty`, minWidth: 110, formatter: (row, column, cellValue) => cellValue === 0 || cellValue === '0' ? '' : cellValue },
             { label: this.$t('ui.data.column.scheduleResult.produceOrder'), prop: `${classField}ProduceOrder`, minWidth: 130 },
             { label: this.$t('ui.data.column.scheduleResult.finishRate'), prop: `${classField}FinishRate`, minWidth: 110 },
             { label: this.$t('ui.data.column.scheduleResult.analysis'), prop: `${classField}Analysis`, minWidth: 140 }

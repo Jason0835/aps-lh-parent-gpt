@@ -295,6 +295,7 @@
   "ui.data.column.lhSharedMouldPat.modelName": "Shared Mold Pattern Config",
   "ui.data.column.lhSpecialMaterialBom.modelName": "Special Material BOM Config",
   "ui.data.column.lhMachineOnlineInfo.modelName": "Curing Machine Online Info",
+  "ui.data.column.lhMachineOnlineInfo.productStatus": "Product Status",
   "ui.data.column.lhChipStock.modelName": "Chip Stock",
   "lhChipStock.chipCodeExistsConfirmMerge": "Chip code already exists, merge into existing record?",
   "ui.data.column.lhRepairCapsule.modelName": "Capsule Usage Count",

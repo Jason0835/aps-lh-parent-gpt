@@ -7,6 +7,7 @@ import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.zlt.aps.cd15.api.domain.entity.Cd15ScheduleResult;
 import com.zlt.aps.cd15.api.domain.vo.Cd15ChangeQtyRequest;
 import com.zlt.aps.cd15.api.domain.vo.Cd15InsertOrderRequest;
+import com.zlt.aps.cd15.api.domain.vo.Cd15RollingCheckRequest;
 import com.zlt.aps.cd15.api.domain.vo.Cd15TransferMachineRequest;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.cloud.openfeign.FeignClient;
@@ -80,6 +81,13 @@ public interface ICd15ScheduleResultRemoteService {
     @GetMapping("/cd15ScheduleResult/changeQty/task/{taskId}")
     AjaxResult getChangeQtyTask(@PathVariable("taskId") String taskId);
 
+    @ApiOperation("CD15定时滚动排程检查")
+    @PostMapping("/cd15ScheduleResult/rollingSchedule/check")
+    AjaxResult checkTimedRolling(@RequestBody Cd15RollingCheckRequest request);
+
+    @ApiOperation("查询CD15定时滚动排程任务")
+    @GetMapping("/cd15ScheduleResult/rollingSchedule/task/{taskId}")
+    AjaxResult getTimedRollingTask(@PathVariable("taskId") String taskId);
     @ApiOperation("发布斜裁排程结果")
     @PostMapping("/cd15ScheduleResult/publish")
     AjaxResult publish(@RequestBody Cd15ScheduleResult dto,

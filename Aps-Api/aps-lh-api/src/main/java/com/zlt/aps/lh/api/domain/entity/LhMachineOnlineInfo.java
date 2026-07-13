@@ -119,5 +119,14 @@ public class LhMachineOnlineInfo extends BaseEntity implements Serializable {
     @Excel(name = "ui.data.column.lhMachineOnlineInfo.inMachineMouldCode")
     @TableField(value = "IN_MACHINE_MOULD_CODE")
     private String inMachineMouldCode;
+
+    /**
+     * 产品状态
+     * <p>标识当前机台产品的生产状态，从MES同步，字典：lh_trial_status（S-正规示方，T-量试示方，X-试验示方）</p>
+     */
+    @ApiModelProperty(value = "产品状态", name = "productStatus")
+    @Excel(name = "ui.data.column.lhMachineOnlineInfo.productStatus", dictType = "lh_trial_status")
+    @TableField(value = "PRODUCT_STATUS")
+    private String productStatus;
 }
 

@@ -1,18 +1,10 @@
 package com.zlt.aps.nc.engine.mapper;
 
-
-import com.zlt.aps.nc.engine.vo.NcLossVo;
-
-import java.util.List;
+import com.zlt.aps.nc.api.domain.entity.NcLossSetting;
+import com.zlt.core.dao.basemapper.CommBaseMapper;
 
 /**
- * 损耗率mapper
+ * 损耗率 Mapper
  */
-public interface NcEngineLossMapper {
-
-    /**
-     * 获得损耗率类别
-     * @return
-     */
-    List<NcLossVo> listLossRate();
+public interface NcEngineLossMapper extends CommBaseMapper<NcLossSetting> {
 }

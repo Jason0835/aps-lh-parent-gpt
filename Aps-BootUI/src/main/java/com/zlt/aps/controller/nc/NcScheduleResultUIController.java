@@ -1,5 +1,31 @@
 package com.zlt.aps.controller.nc;
 
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
+
+import javax.servlet.http.HttpServletResponse;
+
+import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.lang3.time.DateFormatUtils;
+import org.apache.shiro.authz.annotation.RequiresPermissions;
+import org.apache.shiro.authz.annotation.RequiresRoles;
+import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.ModelMap;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.multipart.MultipartFile;
+
 import com.alibaba.fastjson.JSON;
 import com.ruoyi.api.gateway.system.domain.ExportLog;
 import com.ruoyi.api.gateway.system.domain.ImportLog;
@@ -14,43 +40,20 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.text.Convert;
-import com.ruoyi.common.utils.StringUtils;
 import com.ruoyi.common4ui.utils.file.FileUtils4UI;
 import com.zlt.aps.common.constant.ApsBootConstant;
 import com.zlt.aps.common.core.constant.ApsConstant;
+import com.zlt.aps.common.core.utils.BigDecimalUtils;
 import com.zlt.aps.common.utils.ExportUtil;
 import com.zlt.aps.common.utils.ImportUtil;
 import com.zlt.aps.nc.api.domain.entity.NcDayFinishQty;
-import com.zlt.aps.nc.api.domain.entity.NcMachineInfo;
+import com.zlt.aps.nc.api.domain.entity.NcDayFinishQty;
 import com.zlt.aps.nc.api.domain.entity.NcScheduleResult;
-import com.zlt.aps.nc.api.domain.entity.NcScheduleResultLog;
-import com.zlt.aps.nc.api.service.INcMachineInfoRemoteService;
 import com.zlt.aps.nc.api.service.INcScheduleResultRemoteService;
-import com.zlt.file.encryptbyll.FileEncryptUtils;
 import com.zlt.framework.utils.AuthorizationUtils;
+
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
-import org.apache.commons.collections4.CollectionUtils;
-import org.apache.commons.lang3.time.DateFormatUtils;
-import org.apache.shiro.authz.annotation.RequiresPermissions;
-import org.apache.shiro.authz.annotation.RequiresRoles;
-import org.springframework.beans.BeanUtils;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Controller;
-import org.springframework.ui.ModelMap;
-import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile;
-
-import javax.servlet.http.HttpServletResponse;
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
 
 /**
  * 内衬胶排程结果Controller
@@ -61,7 +64,7 @@ import java.util.stream.Collectors;
 @Api(tags = "内衬胶排程结果")
 @Controller
 @RequestMapping("/nc/ncScheduleResult")
-public class NcScheduleResultUIController extends BaseController {
+public class NcScheduleResultUIController extends BaseController<NcScheduleResult> {
 
     @Autowired
     private INcScheduleResultRemoteService iNcScheduleResultService;
@@ -75,9 +78,6 @@ public class NcScheduleResultUIController extends BaseController {
     @Autowired
     private IImportLogService iImportLogService;
 
-    @Autowired
-    private INcMachineInfoRemoteService machineInfoService;
-
     @Value("${excelTemplateModel}")
     private String excelTemplateModel;
 
@@ -85,102 +85,9 @@ public class NcScheduleResultUIController extends BaseController {
     private String prefix = "nc/ncScheduleResult";
 
     /**
-     * 跳转至主页面
+     * 根据条件查询垫胶排程结果列表
      */
-    @RequiresPermissions("nc:ncScheduleResult:view")
-    @GetMapping()
-    public String operlog(ModelMap mmap) {
-        mmap.put("initDate", DateUtils.parseDateToStr("yyyy-MM-dd", DateUtils.addDays(new Date(), 1)));  //当前日期+1天
-        return prefix + "/ncScheduleResult";
-    }
-
-    /**
-     * 跳转至新增页面
-     */
-    @GetMapping("/add")
-    public String add(ModelMap mmap) {
-        mmap.put("initDate", DateUtils.parseDateToStr("yyyy-MM-dd", DateUtils.addDays(new Date(), 1)));  //当前日期+1天
-        mmap.put("minDate", DateUtils.parseDateToStr("yyyy-MM-dd", new Date()));  //当前日期
-        mmap.put("ncScheduleResult", new NcScheduleResult());
-        return prefix + "/add";
-    }
-
-    /**
-     * 跳转至修改页面
-     */
-    @GetMapping("/edit/{id}")
-    public String edit(@PathVariable("id") Long id, ModelMap mmap) {
-        mmap.put("ncScheduleResult", iNcScheduleResultService.getInfo(id));
-        return prefix + "/edit";
-    }
-
-    /**
-     * 跳转至转机台页面
-     */
-    @GetMapping("/changeMachine/{id}")
-    public String changeMachine(@PathVariable("id") Long id, ModelMap mmap) {
-        mmap.put("editType", "1");
-        mmap.put("ncScheduleResult", iNcScheduleResultService.getInfo(id));
-        return prefix + "/changePlanOrMachine";
-    }
-
-    /**
-     * 跳转至转机台
-     */
-    @GetMapping("/batchChangeMachine/{ids}")
-    public String batchChangeMachine(@PathVariable("ids") String ids, ModelMap mmap) {
-        String[] split = ids.split(",");
-        List<Long> idList = new ArrayList<>();
-        for (String s : split) {
-            idList.add(Long.valueOf(s));
-        }
-        NcScheduleResult scheduleResult = new NcScheduleResult();
-        scheduleResult.setIds2(idList);
-        mmap.put("selectList", iNcScheduleResultService.getInfos(scheduleResult));
-        return prefix + "/changePlanOrMachine2";
-    }
-
-    /**
-     * 跳转至调量页面
-     */
-    @GetMapping("/changePlan/{id}")
-    public String changePlan(@PathVariable("id") Long id, ModelMap mmap) {
-        mmap.put("editType", "2");
-        mmap.put("ncScheduleResult", iNcScheduleResultService.getInfo(id));
-        return prefix + "/changePlanOrMachine";
-    }
-
-    /**
-     * 跳转至自动排程日期页面
-     */
-    @GetMapping("/toAutoPlan")
-    public String toAutoPlan(ModelMap mmap) {
-        mmap.put("initDate", DateUtils.parseDateToStr("yyyy-MM-dd", DateUtils.addDays(new Date(), 1)));  //当前日期+1天
-        return prefix + "/autoPlan";
-    }
-
-    /**
-     * 跳转至均衡页面
-     */
-    @GetMapping("/toBalance")
-    public String toBalance(ModelMap mmap) {
-        mmap.put("initDate", DateUtils.parseDateToStr("yyyy-MM-dd", DateUtils.addDays(new Date(), 1)));  //当前日期+1天
-        return prefix + "/balance";
-    }
-
-    /**
-     * 跳转至归并页面
-     */
-    @GetMapping("/toMergeProduct")
-    public String toMergeProduct(ModelMap mmap) {
-        mmap.put("initDate", DateUtils.parseDateToStr("yyyy-MM-dd", DateUtils.addDays(new Date(), 1)));  //当前日期+1天
-        return prefix + "/mergeProduct";
-    }
-
-    /**
-     * 根据条件查询内衬排程结果列表
-     */
-    @ApiOperation("根据条件查询内衬排程结果列表")
+    @ApiOperation("根据条件查询垫胶排程结果列表")
     @RequiresPermissions("nc:ncScheduleResult:list")
     @PostMapping("/list")
     @ResponseBody
@@ -194,9 +101,9 @@ public class NcScheduleResultUIController extends BaseController {
     }
 
     /**
-     * 修改或新增内衬排程结果
+     * 修改或新增垫胶排程结果
      */
-    @ApiOperation("修改或新增内衬排程结果")
+    @ApiOperation("修改或新增垫胶排程结果")
     @RequiresPermissions("nc:ncScheduleResult:edit")
     @PostMapping("/edit")
     @ResponseBody
@@ -205,10 +112,10 @@ public class NcScheduleResultUIController extends BaseController {
         NcScheduleResult query = new NcScheduleResult();
         query.setId(entity.getId());
         query.setScheduleDate(entity.getScheduleDate());
-        query.setMachineId(entity.getMachineId());
+        query.setMachineCode(entity.getMachineCode());
         query.setLiningCode(entity.getLiningCode());
-        List<NcScheduleResult> list = iNcScheduleResultService.checkUnique(query);
-        if (CollectionUtils.isNotEmpty(list)) {
+        Boolean isUnique = iNcScheduleResultService.checkUnique(query);
+        if (!isUnique) {
             return AjaxResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.already.exists"));
         }
 
@@ -216,10 +123,10 @@ public class NcScheduleResultUIController extends BaseController {
         if (entity.getId() != null) {
             ajaxResult = iNcScheduleResultService.edit(entity);
         } else {
-            double dayPlanQty = entity.getDayPlanQty() == null ? 0d : entity.getDayPlanQty();
-            double nightPlanQty = entity.getNightPlanQty() == null ? 0d : entity.getNightPlanQty();
+            BigDecimal dayPlanQty = BigDecimalUtils.valueOf(entity.getClass1PlanQty());
+            BigDecimal nightPlanQty = BigDecimalUtils.valueOf(entity.getClass2PlanQty());
             // 若插单量为0报错
-            if ((dayPlanQty + nightPlanQty) == 0d) {
+            if (BigDecimalUtils.add(dayPlanQty, nightPlanQty).compareTo(BigDecimal.ZERO) == 0) {
                 return AjaxResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.qty.zero"));
             }
             entity.setDataSource("1");
@@ -239,10 +146,10 @@ public class NcScheduleResultUIController extends BaseController {
         NcScheduleResult query = new NcScheduleResult();
         query.setId(scheduleResult.getId());
         query.setScheduleDate(scheduleResult.getScheduleDate());
-        query.setMachineId(scheduleResult.getMachineId());
+        query.setMachineCode(scheduleResult.getMachineCode());
         query.setLiningCode(scheduleResult.getLiningCode());
-        List<NcScheduleResult> list = iNcScheduleResultService.checkUnique(query);
-        if (CollectionUtils.isNotEmpty(list)) {
+        Boolean isUnique = iNcScheduleResultService.checkUnique(query);
+        if (!isUnique) {
             return AjaxResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.already.exists"));
         }
         AjaxResult ajaxResult = iNcScheduleResultService.changeMachine(scheduleResult);
@@ -253,9 +160,9 @@ public class NcScheduleResultUIController extends BaseController {
      * 转机台
      */
     @ApiOperation("转机台")
-    @PostMapping("/batchChangeMachine/{machineId}")
+    @PostMapping("/batchChangeMachine/{machineCode}")
     @ResponseBody
-    public AjaxResult batchChangeMachine(@PathVariable("machineId") String machineId, String selects) {
+    public AjaxResult batchChangeMachine(@PathVariable("machineCode") String machineCode, String selects) {
         List<NcScheduleResult> scheduleResultList = JSON.parseArray(selects, NcScheduleResult.class);
         NcScheduleResult query = new NcScheduleResult();
         StringBuilder sb1 = new StringBuilder();
@@ -263,10 +170,10 @@ public class NcScheduleResultUIController extends BaseController {
         for (NcScheduleResult scheduleResult : scheduleResultList) {
             query.setId(scheduleResult.getId());
             query.setScheduleDate(scheduleResult.getScheduleDate());
-            query.setMachineId(machineId);
+            query.setMachineCode(machineCode);
             query.setLiningCode(scheduleResult.getLiningCode());
-            List<NcScheduleResult> list = iNcScheduleResultService.checkUnique(query);
-            if (CollectionUtils.isNotEmpty(list)) {
+            Boolean isUnique = iNcScheduleResultService.checkUnique(query);
+            if (!isUnique) {
                 if (sb1.length() > 0) {
                     sb1.append(",").append(query.getLiningCode());
                 } else {
@@ -274,7 +181,7 @@ public class NcScheduleResultUIController extends BaseController {
                 }
                 continue;
             }
-            scheduleResult.setMachineId(machineId);
+            scheduleResult.setMachineCode(machineCode);
             AjaxResult result = iNcScheduleResultService.changeMachine(scheduleResult);
             if (result.get(GatewayConstants.MSG_TAG).equals(I18nUtil.getMessage("ui.data.column.scheduleResult.release.isReleasingOrTimeoutById"))) {
                 if (sb2.length() > 0) {
@@ -298,6 +205,16 @@ public class NcScheduleResultUIController extends BaseController {
     }
 
     /**
+     * 调量前置校验（产能校验）
+     */
+    @ApiOperation("调量前置校验")
+    @PostMapping("/changeQtyValidate")
+    @ResponseBody
+    public AjaxResult changeQtyValidate(NcScheduleResult scheduleResult) {
+        return iNcScheduleResultService.changeQtyValidate(scheduleResult);
+    }
+
+    /**
      * 调量
      */
     @ApiOperation("调量")
@@ -309,32 +226,21 @@ public class NcScheduleResultUIController extends BaseController {
     }
 
     /**
-     * 删除内衬排程结果
+     * 删除垫胶排程结果
      */
-    @ApiOperation("删除内衬排程结果（id不为空）")
+    @ApiOperation("删除垫胶排程结果（id不为空）")
     @RequiresPermissions("nc:ncScheduleResult:remove")
     @PostMapping("/remove")
     @ResponseBody
     public AjaxResult remove(String ids) {
-        String newIds="";
-        String scheduleDate="";
-        if (StringUtils.isNotBlank(ids)){
-            newIds=ids.substring(0,ids.indexOf("|"));
-            scheduleDate=ids.substring(ids.indexOf("|")+1);
-        }
-//        NcScheduleResult queryEntity=new NcScheduleResult();
-//        queryEntity.setScheduleDate(DateUtils.parseDate(scheduleDate));
-//        if(iNcScheduleResultService.isPublish(queryEntity)){
-//            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.hasPublishedCanNotDelete"));
-//        }
-        Long[] arr = Convert.toLongArray(newIds);
+        Long[] arr = Convert.toLongArray(ids);
         return iNcScheduleResultService.remove(arr);
     }
 
     /**
-     * 导出内衬排程结果
+     * 导出垫胶排程结果
      */
-    @ApiOperation("导出内衬排程结果")
+    @ApiOperation("导出垫胶排程结果")
     @RequiresPermissions("nc:ncScheduleResult:export")
     @GetMapping("/export")
     @ResponseBody
@@ -397,9 +303,9 @@ public class NcScheduleResultUIController extends BaseController {
         if (releasingOrTimeoutByDate > 0) {
             return AjaxResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.release.isReleasingOrTimeoutByDate"));
         }
-        List<NcScheduleResult> list = iNcScheduleResultService.checkUnique(entity);
+        Boolean isUnique = iNcScheduleResultService.checkUnique(entity);
         String msg = "";
-        if (CollectionUtils.isEmpty(list)) {
+        if (isUnique) {
             //未生成，直接生成
             msg = "2";
         } else {
@@ -415,20 +321,13 @@ public class NcScheduleResultUIController extends BaseController {
     }
 
     /**
-     * 插单校验
+     * 插单校验（含跨天日期计算）
+     * <p>委派后端 {@code insertOrderValidate} 方法根据 scheduleShiftClass 计算实际排产日期后执行校验。</p>
      */
     @PostMapping("/validateAdd")
     @ResponseBody
     public AjaxResult validateAdd(NcScheduleResult entity) {
-        int releasingOrTimeoutByDate = iNcScheduleResultService.isReleasingOrTimeoutByDate(entity);
-        if (releasingOrTimeoutByDate > 0) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.release.isReleasingOrTimeoutByDate"));
-        }
-        List<NcScheduleResult> list = iNcScheduleResultService.checkUnique(entity);
-        if (CollectionUtils.isEmpty(list)) {
-            return AjaxResult.success("0");
-        }
-        return AjaxResult.success();
+        return iNcScheduleResultService.validateAdd(entity);
     }
 
     /**
@@ -444,20 +343,20 @@ public class NcScheduleResultUIController extends BaseController {
         return isPublish ? AjaxResult.error() : AjaxResult.success();
     }
 
-    /**
-     * 均衡
-     */
-    @ApiOperation("均衡")
-    @RequiresPermissions("nc:ncScheduleResult:balance")
-    @PostMapping("/balance")
-    @ResponseBody
-    public AjaxResult balance(NcScheduleResult entity) {
-        Date scheduleDate = entity.getScheduleDate();
-        if (scheduleDate == null) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.chooseScheduleDate"));
-        }
-        return iNcScheduleResultService.balance(entity);
-    }
+//    /**
+//     * 均衡
+//     */
+//    @ApiOperation("均衡")
+//    @RequiresPermissions("nc:ncScheduleResult:baladje")
+//    @PostMapping("/baladje")
+//    @ResponseBody
+//    public AjaxResult baladje(NcScheduleResult entity) {
+//        Date scheduleDate = entity.getScheduleDate();
+//        if (scheduleDate == null) {
+//            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.chooseScheduleDate"));
+//        }
+//        return iNcScheduleResultService.baladje(entity);
+//    }
 
     /**
      * 同胶料归并生产
@@ -547,7 +446,8 @@ public class NcScheduleResultUIController extends BaseController {
             return AjaxResult.error(I18nUtil.getMessage("ui.biz.alter.publishedNotImport"));
         }
         //文件解密
-        byte[] data = this.useFileEncrypt ? FileEncryptUtils.DecodeFile(file) : file.getBytes();
+//        byte[] data = this.useFileEdjrypt ? FileEdjryptUtils.DecodeFile(file) : file.getBytes();
+        byte[] data = file.getBytes();
         // 上传文件到服务器，并获取导入记录对象进行保存
         ImportLog importLog = ImportUtil.getImportLogAndUploadFile(data, ApsConstant.PROCEDURE_CODE_NC,
                 I18nUtil.getMessage("ui.data.column.ncScheduleResult.modalName"), file.getOriginalFilename());
@@ -589,7 +489,8 @@ public class NcScheduleResultUIController extends BaseController {
             return AjaxResult.error(I18nUtil.getMessage("ui.biz.alter.publishedNotImport"));
         }
         //文件解密
-        byte[] data = this.useFileEncrypt ? FileEncryptUtils.DecodeFile(file) : file.getBytes();
+//        byte[] data = this.useFileEdjrypt ? FileEdjryptUtils.DecodeFile(file) : file.getBytes();
+        byte[] data = file.getBytes();
         // 上传文件到服务器，并获取导入记录对象进行保存
         ImportLog importLog = ImportUtil.getImportLogAndUploadFile(data, ApsConstant.PROCEDURE_CODE_NC,
                 I18nUtil.getMessage("ui.data.column.ncScheduleResult.modalName"), file.getOriginalFilename());
@@ -597,11 +498,11 @@ public class NcScheduleResultUIController extends BaseController {
 
         //解析文件
         InputStream in = new ByteArrayInputStream(data);
-        ExcelUtil<NcScheduleResultLog> util = new ExcelUtil<>(NcScheduleResultLog.class);
-        List<NcScheduleResultLog> list = util.importExcel(in, 1);
+        ExcelUtil<NcScheduleResult> util = new ExcelUtil<>(NcScheduleResult.class);
+        List<NcScheduleResult> list = util.importExcel(in, 1);
         List<NcScheduleResult> newList = new ArrayList<>();
         if (CollectionUtils.isNotEmpty(list)) {
-            for (NcScheduleResultLog nc : list) {
+            for (NcScheduleResult nc : list) {
                 NcScheduleResult result = new NcScheduleResult();
                 BeanUtils.copyProperties(nc, result);
                 newList.add(result);
@@ -613,6 +514,35 @@ public class NcScheduleResultUIController extends BaseController {
         ImportUtil.saveImportErrorLogs(ajaxResult, iImportErrorLogService);
         return ajaxResult;
     }
+
+//    /**
+//     * 跳转至选机台页面
+//     */
+//    @GetMapping("/chooseMachine/{id}")
+//    public String chooseMachine(@PathVariable("id") String idAndRowIndex, ModelMap mmap) {
+//        String[] idAndRowIndexArr = idAndRowIndex.split(",");
+//        NcScheduleResult scheduleResult = iNcScheduleResultService.getInfo(Long.valueOf(idAndRowIndexArr[0]));
+//        DjMachineInfo machineInfo = new DjMachineInfo();
+//        machineInfo.setStatus("0");
+//        List<DjMachineInfo> machineInfoList = machineInfoService.exportList(machineInfo);
+//        Map<String, DjMachineInfo> machineCodeMap = machineInfoList.stream().collect(Collectors.toMap(b -> b.getId() + "", a -> a));
+//
+//        if (StringUtils.isNotEmpty(scheduleResult.getMachineCode())) {
+//            List<DjMachineInfo> newMachineInfoList = new ArrayList<>();
+//            String[] machineIds = scheduleResult.getMachineCode().split(",");
+//            for (String item : machineIds) {
+//                if (machineCodeMap.get(item) != null) {
+//                    newMachineInfoList.add(machineCodeMap.get(item));
+//                }
+//            }
+//            mmap.put("machineInfoList", newMachineInfoList);
+//        } else {
+//            mmap.put("machineInfoList", machineInfoList);
+//        }
+//        mmap.put("scheduleResult", scheduleResult);
+//        mmap.put("rowIndex", idAndRowIndexArr[1]);
+//        return prefix + "/chooseMachine";
+//    }
 
     /**
      * 选机台
@@ -704,7 +634,8 @@ public class NcScheduleResultUIController extends BaseController {
     @ResponseBody
     public AjaxResult importFinishQty(MultipartFile file) throws Exception {
         //文件解密
-        byte[] data = this.useFileEncrypt ? FileEncryptUtils.DecodeFile(file) : file.getBytes();
+//        byte[] data = this.useFileEdjrypt ? FileEdjryptUtils.DecodeFile(file) : file.getBytes();
+        byte[] data = file.getBytes();
 
         ImportLog importLog = ImportUtil.getImportLogAndUploadFile(data,
                 ApsConstant.PROCEDURE_CODE_NC,
@@ -735,5 +666,35 @@ public class NcScheduleResultUIController extends BaseController {
     @ResponseBody
     public AjaxResult getSummaryVo(NcScheduleResult scheduleResult) {
         return iNcScheduleResultService.getSummaryVo(scheduleResult);
+    }
+
+    /**
+     * 获取连续6个班次的表头（以参数scheduleDate的上一天中班作为第一个班，格式：x班MM/dd）
+     */
+    @ApiOperation("获取连续6个班次的表头")
+    @GetMapping("/getWorkClass")
+    @ResponseBody
+    public AjaxResult getWorkClass(String scheduleDate) {
+        return iNcScheduleResultService.getWorkClass(scheduleDate);
+    }
+
+    /**
+     * 获取垫胶下拉列表
+     */
+    @ApiOperation("获取垫胶下拉列表")
+    @GetMapping("/getPaddingDistList")
+    @ResponseBody
+    public AjaxResult getPaddingDistList() {
+        return iNcScheduleResultService.getPaddingDistList();
+    }
+
+    /**
+     * 获取当前服务器时间对应的班次信息
+     */
+    @ApiOperation("获取当前班次信息")
+    @GetMapping("/getCurrentShift")
+    @ResponseBody
+    public AjaxResult getCurrentShift() {
+        return iNcScheduleResultService.getCurrentShift();
     }
 }

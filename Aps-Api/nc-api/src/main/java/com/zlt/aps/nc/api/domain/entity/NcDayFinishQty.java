@@ -50,7 +50,7 @@ public class NcDayFinishQty extends BaseEntity implements IFinishQtyImport {
      * 中班(12点-24点)完成量
      */
 //    @ImportExcelValidated(required = true)
-    @Excel(name = "ui.data.column.dayFinishQty.class1Plan.metre")
+    @Excel(name = "ui.data.column.dayFinishQty.nightFinishQty")
     @ApiModelProperty(value = "中班(12点-24点)完成量", name = "dayFinishQty")
     @TableField(value = "DAY_FINISH_QTY")
     private BigDecimal dayFinishQty = BigDecimal.ZERO;
@@ -59,10 +59,18 @@ public class NcDayFinishQty extends BaseEntity implements IFinishQtyImport {
      * 夜班(0点-12点)完成量
      */
 //    @ImportExcelValidated(required = true)
-    @Excel(name = "ui.data.column.dayFinishQty.class2Plan.metre")
+    @Excel(name = "ui.data.column.dayFinishQty.dayFinishQty")
     @ApiModelProperty(value = "中班(12点-24点)完成量", name = "nightFinishQty")
     @TableField(value = "NIGHT_FINISH_QTY")
     private BigDecimal nightFinishQty = BigDecimal.ZERO;
+
+    /**
+     * 早班完成量
+     */
+    @Excel(name = "ui.data.column.dayFinishQty.midFinishQty")
+    @ApiModelProperty(value = "中班完成量", name = "midFinishQty")
+    @TableField(value = "MID_FINISH_QTY")
+    private BigDecimal midFinishQty = BigDecimal.ZERO;
 
     /**
      * 工单号

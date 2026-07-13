@@ -1,5 +1,7 @@
 package com.zlt.aps.dj.api.domain.entity;
 
+import java.math.BigDecimal;
+
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.ruoyi.common.core.annotation.Excel;
@@ -46,6 +48,6 @@ public class DjLossSetting extends BaseEntity {
     @Excel(name="ui.data.column.loss.lossRate")
     @ImportValidated(name = "ui.data.column.loss.lossRate", required = true, isCode = true, maxLength = 20)
     @TableField("LOSS_RATE")
-    private Double lossRate;
+    private BigDecimal lossRate;
 
 }

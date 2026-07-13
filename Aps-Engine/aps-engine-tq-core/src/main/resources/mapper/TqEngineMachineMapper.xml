@@ -31,7 +31,7 @@
         <if test="jobType != null and jobType != ''">
             and sm.JOB_TYPE = #{jobType}  /*限制作业 类型*/
         </if>
-        and m.STATUS = '0'
+        and m.STATUS = '1'
         and m.IS_DELETE = '0'
         group by BEAD_CODE
     </select>
@@ -44,7 +44,7 @@
         inner join T_TQ_MACHINE_INFO m on sm.machine_code = m.machine_code
         where sm.IS_DELETE = '0'
         and sm.status = '0'
-        and m.STATUS = '0'
+        and m.STATUS = '1'
         and m.IS_DELETE = '0'
         group by MOUTH_PLATE_CODE
     </select>
@@ -66,7 +66,7 @@
         from T_TQ_MACHINE_CHUCK mc
         inner join T_TQ_MACHINE_INFO m on mc.MACHINE_CODE = m.MACHINE_CODE
         where mc.IS_DELETE = '0'
-          and m.STATUS = '0'
+          and m.STATUS = '1'
           and m.IS_DELETE = '0'
           and mc.INCH_SIZE is not null
     </select>

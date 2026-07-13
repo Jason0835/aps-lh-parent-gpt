@@ -9,9 +9,9 @@ import lombok.Data;
 public class NcStockVo {
 
     /**
-     * 内衬代码
+     * 垫胶代码
      */
-    private String liningCode;
+    private String paddingCode;
 
     /**
      * 库存量

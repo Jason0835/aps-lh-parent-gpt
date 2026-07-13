@@ -55,4 +55,10 @@ public class Cd15Params extends BaseEntity implements Serializable {
     @TableField("ERROR_TIPS")
     @Excel(name = "ui.data.column.cd15Params.errorTips")
     private String errorTips;
+
+    /** 参数标识 */
+    @ImportExcelValidated(maxLength = 50)
+    @TableField("REMARK2")
+    @Excel(name = "ui.data.column.cd15Params.remark2")
+    private String remark2;
 }

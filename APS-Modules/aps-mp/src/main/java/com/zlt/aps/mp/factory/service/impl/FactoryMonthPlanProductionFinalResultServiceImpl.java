@@ -1563,8 +1563,9 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
      * 2. 计算上月日期范围（1日~月末，startDate 用于 STOCK_CAPTURE_DATE 为空时回退，endDate 为月底边界）
      * 3. 月计划月底余量(PLAN_SURPLUS_QTY)、库存抓取日(STOCK_CAPTURE_DATE) 取自 T_MDM_MONTH_SURPLUS，
      *    按 (分厂+物料+年+月+需求版本号 MONTH_PLAN_VERSION=REQUIRE_VERSION) 匹配
-     * 4. 已完成量取自硫化日完成量表，日期范围 = IFNULL(STOCK_CAPTURE_DATE, 月初) ~ 月底
-     * 5. 按分厂+物料编码匹配，回填到当月定稿记录
+     * 4. 已完成量取自硫化日完成量表，按(分厂+物料+示方类型LH_TYPE)匹配月计划产品状态(PRODUCT_STATUS)，
+     *    日期范围 = IFNULL(STOCK_CAPTURE_DATE, 月初) ~ 月底
+     * 5. 按分厂+物料编码+产品状态匹配，回填到当月定稿记录
      * 6. 有效标志判定：|超欠产值|(绝对值) > 阈值参数(SYS0206009) → 否('0')，否则 → 是('1')；
      *    月底余量为空时按0处理，超欠产 = 0 - 已完成量，统一走阈值判定
      */
@@ -1614,6 +1615,7 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
      * 计算超欠产的公共方法
      * 根据数据来源月份的月计划计划量(库存抓取日~月底累加DAY_x)和硫化日完成量计算超欠产，回填到写入目标月份的定稿记录
      * 公式：超欠产 = (库存抓取日~月底的)计划量 - (库存抓取日~月底的)已完成量
+     * 已完成量按(分厂+物料+示方类型LH_TYPE)匹配月计划产品状态(PRODUCT_STATUS)聚合
      * 匹配维度：(分厂+物料编码+产品状态) 三字段
      * 处理流程：
      *   1. UPDATE：当月定稿表按三字段能匹配上的记录，更新其上月超欠产值和有效标识

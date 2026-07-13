@@ -44,6 +44,8 @@ public class Cd15ChangeQtyRequest implements Serializable {
     private Double class4PlanQty;
     private Double class5PlanQty;
     private Double class6PlanQty;
+    private Double class7PlanQty;
+    private Double class8PlanQty;
 
     /**
      * 按班次字段模板动态读取值。

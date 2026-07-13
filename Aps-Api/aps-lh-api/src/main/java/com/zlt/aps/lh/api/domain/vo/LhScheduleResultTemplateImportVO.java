@@ -1226,4 +1226,13 @@ public class LhScheduleResultTemplateImportVO extends BaseEntity {
     @TableField(value = "REMARK")
     private String remark;
 
+
+    /**
+     * 产品状态
+     */
+//    @Excel(name = "ui.data.column.lhScheduleResult.constructionStage", dictType = "biz_construction_stage")
+    @ApiModelProperty(value = "产品状态 X 试验示方 T 量试示方 S 正规示方", name = "changedTrialStatus")
+    @TableField(value = "CHANGED_TRIAL_STATUS")
+    private String changedTrialStatus;
+
 }

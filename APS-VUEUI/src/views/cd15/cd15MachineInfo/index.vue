@@ -129,13 +129,7 @@ export default {
           label: this.$t("ui.data.column.cd15MachineInfo.machineCode"),
           minWidth: 140,
         },
-        {
-          prop: "machineName",
-          align: "center",
-          halign: "center",
-          label: this.$t("ui.data.column.cd15MachineInfo.machineName"),
-          minWidth: 140,
-        },
+
         {
           prop: "clothWidthMax",
           align: "center",
@@ -195,13 +189,6 @@ export default {
               />
             );
           },
-        },
-        {
-          prop: "steelStripWidth",
-          align: "center",
-          halign: "center",
-          label: this.$t("ui.data.column.cd15MachineInfo.steelStripWidth"),
-          minWidth: 130,
         },
         {
           prop: "remark",

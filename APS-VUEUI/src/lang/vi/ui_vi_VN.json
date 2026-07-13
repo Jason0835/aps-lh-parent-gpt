@@ -272,6 +272,7 @@
   "ui.data.column.lhMachineOnlineInfo.specDesc": "Mô tả quy cách",
   "ui.data.column.lhMachineOnlineInfo.lrMolds": "Khuôn LR",
   "ui.data.column.lhMachineOnlineInfo.inMachineMouldCode": "Mã khuôn trong máy",
+  "ui.data.column.lhMachineOnlineInfo.productStatus": "Trạng thái sản phẩm",
   "ui.data.column.lhSpecialMaterialBom.modelName": "Cấu hình danh mục vật liệu đặc biệt",
   "ui.data.column.lhSpecialMaterialBom.structureName": "Tên cấu trúc",
   "ui.data.column.lhSpecialMaterialBom.materialCode": "Mã vật liệu",

@@ -31,7 +31,7 @@ import { downloadLink } from '@/utils/request'
 
 export default {
   name: 'LhMachineOnlineInfo',
-  dicts: ['biz_factory_name'],
+  dicts: ['biz_factory_name', 'lh_trial_status'],
   provide() {
     return {
       parentDict: this.dict
@@ -120,6 +120,16 @@ export default {
           minWidth: 260
         },
         {
+          prop: 'productStatus',
+          align: 'center',
+          halign: 'center',
+          label: this.$t('ui.data.column.lhMachineOnlineInfo.productStatus'),
+          minWidth: 140,
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(this.dict.type.lh_trial_status, value)
+          }
+        },
+        {
           prop: 'updateTime',
           align: 'center',
           halign: 'center',
@@ -147,6 +157,13 @@ export default {
           label: this.$t('ui.data.column.lhMachineOnlineInfo.lhCode'),
           prop: 'lhCode',
           type: 'input'
+        },
+        {
+          label: this.$t('ui.data.column.lhMachineOnlineInfo.productStatus'),
+          prop: 'productStatus',
+          type: 'select',
+          dictData: this.dict.type.lh_trial_status,
+          filterable: true
         },
 
       ]
