@@ -1,6 +1,7 @@
 package com.zlt.aps.itf.mes.service.impl;
 
 import com.alibaba.fastjson.JSONObject;
+import com.baomidou.dynamic.datasource.annotation.DSTransactional;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.common.core.constant.ApsConstant;
@@ -19,7 +20,6 @@ import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -88,7 +88,7 @@ public class CxScheduleResultIssueServiceImpl implements ICxScheduleResultIssueS
      * @return 下发结果
      */
     @Override
-    @Transactional(rollbackFor = Exception.class)
+    @DSTransactional
     public AjaxResult issueCxScheduleResult(List<CxScheduleResultIssue> cxScheduleResultIssueList, String factoryCode, String companyCode) {
         if (CollectionUtils.isEmpty(cxScheduleResultIssueList)) {
             return AjaxResult.success();

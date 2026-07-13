@@ -25,7 +25,7 @@ import com.zlt.aps.mp.engine.domain.dto.*;
 import com.zlt.aps.mp.engine.domain.vo.*;
 import com.zlt.aps.mp.engine.enums.ContinueTypeEnum;
 import com.zlt.aps.mp.engine.enums.ProductionQtyModelEnum;
-import com.zlt.aps.mp.engine.handler.CalculateStructureCxMachineNumber;
+import com.zlt.aps.mp.engine.handler.GroupCapacityHandler;
 import com.zlt.aps.mp.engine.handler.CxLhMouldProductionCalculator;
 import com.zlt.aps.mp.engine.handler.GroupPlanDeductionDayHandler;
 import com.zlt.aps.mp.engine.handler.MouldProductionResultHandler;
@@ -89,7 +89,7 @@ public class MatchingProductionHandler extends AbstractDataLoaderService {
     @Autowired
     private ISysConfigService sysConfigService;
     @Autowired
-    private CalculateStructureCxMachineNumber calculateStructureCxMachineNumber;
+    private GroupCapacityHandler groupCapacityHandler;
     @Autowired
     private FactoryMouldingDayResultMapper factoryMouldingDayResultMapper;
     @Autowired
@@ -153,7 +153,7 @@ public class MatchingProductionHandler extends AbstractDataLoaderService {
 //                this.selectRequirePlan(productionContext, detailLogList);
         this.buildProductionContext(productionContext, planList, detailLogList, requirePlanList); // 填充上下文各项必要数据
 
-        Map<String, ProductionPlanGroupInfo> estimateGroupCxAllocationMap = calculateStructureCxMachineNumber.calculateStructureCxMachineNumber(productionContext, requirePlanList, false); // 分配成型产能
+        Map<String, ProductionPlanGroupInfo> estimateGroupCxAllocationMap = groupCapacityHandler.calculateStructureCxMachineNumber(productionContext, requirePlanList, false); // 分配成型产能
         productionContext.setGroupProductionInfo(estimateGroupCxAllocationMap);
         this.resetBeforeFormalProduction(productionContext, estimateGroupCxAllocationMap);
         Map<String, CxContinueInfoHelper> cxContinueInfoMap = this.getContinueInfo(productionContext); // 加载续作规格

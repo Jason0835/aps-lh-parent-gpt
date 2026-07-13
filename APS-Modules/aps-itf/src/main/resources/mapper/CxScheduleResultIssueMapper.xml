@@ -58,7 +58,10 @@
         ) AS t
         WHERE NOT EXISTS (
         SELECT 1 FROM MES_CX_SCHEDULE_RESULT
-        WHERE CX_BATCH_NO = t.CX_BATCH_NO AND SCHEDULE_DATE = t.SCHEDULE_DATE AND DATA_VERSION = t.DATA_VERSION
+        WHERE SCHEDULE_DATE = t.SCHEDULE_DATE
+          AND MACHINE_CODE = t.MACHINE_CODE
+          AND EMBRYO_CODE = t.EMBRYO_CODE
+          AND DATA_VERSION = t.DATA_VERSION
         )
     </insert>
 
@@ -114,7 +117,7 @@
 
     <insert id="insertCxScheduleResult">
         INSERT INTO MES_CX_SCHEDULE_RESULT (
-            ID, CX_BATCH_NO, ORDER_NO, SCHEDULE_DATE, MACHINE_CODE, MACHINE_NAME,
+            CX_BATCH_NO, ORDER_NO, SCHEDULE_DATE, MACHINE_CODE, MACHINE_NAME,
             LH_MACHINE_CODE, LH_MACHINE_NAME, AVAILABLE_MOLD_QTY, MATERIAL_CODE,
             MES_MATERIAL_CODE, SPEC_DESC, EMBRYO_CODE, EMBRYO_SPEC_DESC,
             CLASS1_PLAN_QTY_SEQ, CLASS1_ANALYSIS_INPUT, CLASS1_ANALYSIS, CLASS1_PLAN_QTY,
@@ -125,7 +128,7 @@
             CLASS3_EXAMPLE_TYPE, CLASS3_EXAMPLE_NO,
             DATA_VERSION, COMPANY_CODE, FACTORY_CODE
         ) VALUES (
-            #{item.id}, #{item.cxBatchNo}, #{item.orderNo}, #{item.scheduleDate}, #{item.machineCode}, #{item.machineName},
+            #{item.cxBatchNo}, #{item.orderNo}, #{item.scheduleDate}, #{item.machineCode}, #{item.machineName},
             #{item.lhMachineCode}, #{item.lhMachineName}, #{item.availableMoldQty}, #{item.materialCode},
             #{item.mesMaterialCode}, #{item.specDesc}, #{item.embryoCode}, #{item.embryoSpecDesc},
             #{item.class1PlanQtySeq}, #{item.class1AnalysisInput}, #{item.class1Analysis}, #{item.class1PlanQty},
