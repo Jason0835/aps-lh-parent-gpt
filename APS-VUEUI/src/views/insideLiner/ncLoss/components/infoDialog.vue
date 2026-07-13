@@ -71,24 +71,24 @@ export default {
         (this.isEdit
           ? this.$t("common.button.edit")
           : this.$t("common.button.add")) +
-        this.$t("ui.data.column.nc.loss.modelName")
+        this.$t("ui.nc.lossSetting.column.modalName")
       );
     },
     columns() {
       return [
         {
-          label: this.$t("ui.data.column.quota.liningCode"),
+          label: this.$t("ui.nc.lossSetting.column.liningCode"),
           prop: "liningCode",
           span: 24,
         },
         {
           label: this.$t("ui.data.column.loss.line"),
-          prop: "machineId",
+          prop: "machineCode",
           span: 24,
           type: "select",
           dictData: this.machines,
           labelKey: "machineName",
-          valueKey: "id",
+          valueKey: "machineCode",
         },
         {
           label: this.$t("ui.data.column.loss.lossRate"),

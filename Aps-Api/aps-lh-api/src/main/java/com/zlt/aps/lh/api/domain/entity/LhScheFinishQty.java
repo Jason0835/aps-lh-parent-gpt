@@ -138,9 +138,18 @@ public class LhScheFinishQty extends BaseEntity implements Serializable {
         }
         return null;
     }
-
     /**
      * 获取物料+计划类型Key
+     *
+     * @return
+     */
+    public String getMaterialStatusKey() {
+        String keyFormat = "%s|*|%s";
+        String trimmedProductStatus = StringUtils.trimToEmpty(getLhType());
+        return String.format(keyFormat, materialCode, trimmedProductStatus);
+    }
+    /**
+     * 获取工厂+物料+计划类型Key
      *
      * @return
      */

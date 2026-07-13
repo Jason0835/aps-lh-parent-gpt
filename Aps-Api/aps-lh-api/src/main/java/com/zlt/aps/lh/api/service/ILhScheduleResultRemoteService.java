@@ -14,6 +14,7 @@ import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 
 /**
@@ -207,4 +208,23 @@ public interface ILhScheduleResultRemoteService {
     @ApiOperation("排产小结报表导出")
     @PostMapping("/lhScheduleResult/exportScheduleSummaryReport/{fileName}")
     byte[] exportScheduleSummaryReport(@RequestBody ScheduleSummaryReportVO queryVO, @PathVariable("fileName") String fileName);
+
+    /**
+     * 构建排产小结导出数据（tableMap + dataList），
+     * 供外部模块将排产小结作为子 sheet 嵌入多 sheet 导出流程。
+     *
+     * <p>排产小结已从硫化日计划导出迁移至成型日计划导出，
+     * 成型侧（aps-cx）通过本接口远程获取排产小结数据后，
+     * 作为 CxExport.xlsx 的一个 sheet 写入。</p>
+     *
+     * <p>注意：返回的 tableMap 中 RANGE_ADDRESS 字段经 Feign 反序列化后，
+     * 元素类型会变为 LinkedHashMap，调用方需在 writeMultiList 前手动重建为
+     * ExcelCellRangeAddress，否则 writeMultiList 强转遍历会抛 ClassCastException。</p>
+     *
+     * @param queryVO 查询条件，含 scheduleDate(yyyy-MM-dd)、factoryCode
+     * @return Map，含 tableMap（模板占位符映射）、dataList（列表数据）
+     */
+    @ApiOperation("构建排产小结导出数据")
+    @PostMapping("/lhScheduleResult/buildScheduleSummaryExportData")
+    Map<String, Object> buildScheduleSummaryExportData(@RequestBody ScheduleSummaryReportVO queryVO);
 }

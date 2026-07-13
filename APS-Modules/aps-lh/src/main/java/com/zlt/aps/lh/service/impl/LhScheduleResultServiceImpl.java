@@ -837,18 +837,17 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
             FactoryMonthPlanProductionFinalResult monthPlan = SkuMonthPlanCalculator.getSkuYearMonthFinal(allMonthPlanList, skuInfo, productionYearMonth);
             Integer startDay = DateUtil.dayOfMonth(startDate);
             Map<YearMonth, Integer> yearMonthPlanQtyMap = SkuMonthPlanCalculator.getPlanQty(allProductionDate, allMonthPlanList, monthPlan, startDay);
-
-            Integer planQty;
-            if (null == yearMonthPlanQtyMap || yearMonthPlanQtyMap.isEmpty()) {
-                planQty = BigDecimal.ZERO.intValue();
-            } else {
-                planQty = yearMonthPlanQtyMap.values().stream().mapToInt(Integer::intValue).sum();
-            }
-            // ---------- TOTAL_DAILY_PLAN_QTY：月计划总量 ----------
+            Integer planQty = SkuMonthPlanCalculator.sumQty(yearMonthPlanQtyMap);
+            // ---------- TOTAL_DAILY_PLAN_QTY：到断点月计划总量 ----------
             if (Objects.nonNull(monthPlan)) {
                 result.setTotalDailyPlanQty(planQty);
             }
-
+            // ---------- MONTH_PLAN_SUM_TOTAL：非断点月计划总量 ----------
+            Map<YearMonth, Integer> yearMonthSumPlanQtyMap = SkuMonthPlanCalculator.statisticsSumPlanQtyBySku(skuInfo, startDate, allMonthPlanList);
+            Integer sumPlanQty = SkuMonthPlanCalculator.sumQty(yearMonthSumPlanQtyMap);
+            if (Objects.nonNull(sumPlanQty)) {
+                result.setMonthPlanSumTotal(sumPlanQty);
+            }
             // ---------- PRODUCTION_VERSION：排产版本 ----------
             MpFactoryProductionVersion finalVersion = productionVersionMap.get(fc);
             if (Objects.nonNull(finalVersion) && StringUtils.isNotEmpty(finalVersion.getProductionVersion())) {

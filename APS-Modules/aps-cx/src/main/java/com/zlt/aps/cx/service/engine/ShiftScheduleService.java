@@ -3,6 +3,7 @@ package com.zlt.aps.cx.service.engine;
 import com.zlt.aps.cx.entity.config.CxShiftConfig;
 import com.zlt.aps.cx.entity.schedule.LhScheduleResult;
 import com.zlt.aps.cx.vo.MonthPlanProductLhCapacityVo;
+import com.zlt.aps.cx.vo.DailyEmbryoTask;
 import com.zlt.aps.cx.vo.ScheduleContextVo;
 import com.zlt.aps.mp.api.domain.entity.MdmDevicePlanShut;
 import com.zlt.aps.mp.api.domain.entity.MdmStructureLhRatio;
@@ -90,9 +91,6 @@ public class ShiftScheduleService {
     /** 机台班初准备时间扣减（分钟），计入 calculateStartTime */
     private static final int DEFAULT_MACHINE_PREPARE_MINUTES = 30;
 
-    /** 精度计划扣减最小时长（小时），见 calculateShiftPrecisionDeduction */
-    private static final int DEFAULT_PRECISION_HOURS = 4;
-
     private static final int SECONDS_PER_DAY = 24 * 60 * 60;
     private static final int SECONDS_PER_HOUR = 3600;
 
@@ -105,7 +103,7 @@ public class ShiftScheduleService {
     /** 班次编码：中班 */
     public static final String SHIFT_AFTERNOON = "SHIFT_AFTERNOON";
 
-    private final ScheduleDayTypeHelper scheduleDayTypeHelper;
+    private final ProductionCalculator productionCalculator;
 
     // ==================== 5.3.7 精排入口 ====================
 
@@ -128,7 +126,7 @@ public class ShiftScheduleService {
      * @return 本任务在本机台上的班次排产明细（可多条，通常单班一条）
      */
     public List<ShiftProductionResult> scheduleTaskToShifts(
-            CoreScheduleAlgorithmService.DailyEmbryoTask task,
+            DailyEmbryoTask task,
             String machineCode,
             ScheduleContextVo context,
             List<CxShiftConfig> dayShifts,
@@ -229,7 +227,7 @@ public class ShiftScheduleService {
      * <p>试制始终走本方法；量试仅开产日由 {@link #scheduleTaskToShifts} 路由至此。
      */
     private List<ShiftProductionResult> scheduleTrialTask(
-            CoreScheduleAlgorithmService.DailyEmbryoTask task,
+            DailyEmbryoTask task,
             String machineCode,
             ScheduleContextVo context,
             List<CxShiftConfig> dayShifts,
@@ -343,7 +341,7 @@ public class ShiftScheduleService {
      * </ul>
      */
     private List<ShiftProductionResult> scheduleClosingTask(
-            CoreScheduleAlgorithmService.DailyEmbryoTask task,
+            DailyEmbryoTask task,
             String machineCode,
             ScheduleContextVo context,
             List<CxShiftConfig> dayShifts,
@@ -438,7 +436,7 @@ public class ShiftScheduleService {
      * 非首班按班产能整车取整。
      */
     private List<ShiftProductionResult> scheduleOpeningTask(
-            CoreScheduleAlgorithmService.DailyEmbryoTask task,
+            DailyEmbryoTask task,
             String machineCode,
             ScheduleContextVo context,
             List<CxShiftConfig> dayShifts,
@@ -540,7 +538,7 @@ public class ShiftScheduleService {
      * <p>注：当前精排主路径以 TaskGroupService 写入的 endingExtraInventory 为准；本方法供辅助计算/遗留调用。
      */
     private int calculateOpeningFirstShiftCapacity(
-            CoreScheduleAlgorithmService.DailyEmbryoTask task,
+            DailyEmbryoTask task,
             String machineCode,
             ScheduleContextVo context) {
 
@@ -597,7 +595,7 @@ public class ShiftScheduleService {
      * 非「最后一个有量班次」；{@code isLastEndingBatch} 在末班且任务标记时写入结果。
      */
     private List<ShiftProductionResult> scheduleEndingTask(
-            CoreScheduleAlgorithmService.DailyEmbryoTask task,
+            DailyEmbryoTask task,
             String machineCode,
             ScheduleContextVo context,
             List<CxShiftConfig> dayShifts,
@@ -695,7 +693,7 @@ public class ShiftScheduleService {
      * <p>班末时间不足时按可用产能折减条数，不强制补整车；未排完量打 warn。
      */
     private List<ShiftProductionResult> scheduleNormalTask(
-            CoreScheduleAlgorithmService.DailyEmbryoTask task,
+            DailyEmbryoTask task,
             String machineCode,
             ScheduleContextVo context,
             List<CxShiftConfig> dayShifts,
@@ -891,7 +889,7 @@ public class ShiftScheduleService {
      *
      * <p>从 LhScheduleResult CLASS8→CLASS1 倒序找首个 planQty&gt;0，映射为 SHIFT_NIGHT/DAY/AFTERNOON。
      */
-    private String getVulcanizeEndingShift(CoreScheduleAlgorithmService.DailyEmbryoTask task,
+    private String getVulcanizeEndingShift(DailyEmbryoTask task,
                                            ScheduleContextVo context) {
         LhScheduleResult lhResult = findLhScheduleResult(task.getLhId(), context);
         if (lhResult == null) {
@@ -900,7 +898,7 @@ public class ShiftScheduleService {
 
         // 从后往前找最后一个有计划量的班次
         for (int i = 8; i >= 1; i--) {
-            Integer planQty = getClassPlanQtyByIndex(lhResult, i);
+            Integer planQty = productionCalculator.getClassPlanQtyByIndex(lhResult, i);
             if (planQty != null && planQty > 0) {
                 // class index → shift code 映射
                 // 一般: 1-2=夜班, 3-4=早班, 5-6=中班, 7-8=次日班次
@@ -912,21 +910,6 @@ public class ShiftScheduleService {
         }
 
         return SHIFT_DAY;
-    }
-
-    /** CLASS1~8 计划量字段访问 */
-    private Integer getClassPlanQtyByIndex(LhScheduleResult lhResult, int classIndex) {
-        switch (classIndex) {
-            case 1: return lhResult.getClass1PlanQty();
-            case 2: return lhResult.getClass2PlanQty();
-            case 3: return lhResult.getClass3PlanQty();
-            case 4: return lhResult.getClass4PlanQty();
-            case 5: return lhResult.getClass5PlanQty();
-            case 6: return lhResult.getClass6PlanQty();
-            case 7: return lhResult.getClass7PlanQty();
-            case 8: return lhResult.getClass8PlanQty();
-            default: return null;
-        }
     }
 
     /** shiftCode 在 dayShifts 中的下标，未找到返回 -1 */
@@ -1140,7 +1123,7 @@ public class ShiftScheduleService {
     }
 
     /** 胎胚或物料编码命中 context.keyProductCodes 视为关键产品（开产首班不排） */
-    private boolean isKeyProduct(CoreScheduleAlgorithmService.DailyEmbryoTask task, ScheduleContextVo context) {
+    private boolean isKeyProduct(DailyEmbryoTask task, ScheduleContextVo context) {
         if (task == null || context == null) {
             return false;
         }
@@ -1160,7 +1143,7 @@ public class ShiftScheduleService {
     private ShiftProductionResult buildResult(
             String machineCode,
             CxShiftConfig shiftConfig,
-            CoreScheduleAlgorithmService.DailyEmbryoTask task,
+            DailyEmbryoTask task,
             int quantity,
             int tripCapacity,
             int cars,
@@ -1254,7 +1237,7 @@ public class ShiftScheduleService {
         /** 是否收尾最后一批（不补整车） */
         private Boolean isLastEndingBatch;
         /** 来源任务（用于均衡计算：获取硫化机数 vulcanizeMachineCount） */
-        private CoreScheduleAlgorithmService.DailyEmbryoTask sourceTask;
+        private DailyEmbryoTask sourceTask;
         /** 是否结束生产（反推需求-库存<=0，无需再排产） */
         private Boolean isEndProduction;
         /** 施工阶段（00 无工艺 01 试制 02 量试 03 正式），来自硫化任务 */

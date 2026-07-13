@@ -183,6 +183,8 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
                 throwValidationFailure(context, result, I18nUtil.getMessage("ui.data.column.lhScheduleResult.mouldCodeMissingInChangeMould"));
             }
         }
+        // 双模 SKU 的 L/R 已在新增、续作及换活字块链路按物理组同步生成。
+        // 保存前必须重新校验两侧完整性，禁止后置收尾、降模或释放逻辑拆散双模组后继续落库。
 //        validateWholeSingleControlMachineResults(context);
 
 //        TODO 这两个校验当前保持历史关闭状态。后续如需打开，应先用真实批次验证同胎胚换模和多机台补满结果。
@@ -193,9 +195,8 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
     }
 
     /**
-     * 校验正规 SKU 单控整机结果完整性。
-     * <p>试制、量试、小批量 SKU 允许单边使用单控机台；正规 SKU 只要落到配置生效的 L/R 单控机台，
-     * 就必须同时存在配对侧结果，且物料、生产开始时间、生产结束时间、各班次计划量完全一致。</p>
+     * 校验冻结为双模的 SKU 单控整机结果完整性。
+     * <p>是否执行整机校验只读取本次排程冻结模式，不再按试制、量试、小批量或正规类型判断。</p>
      *
      * @param context 排程上下文
      */
@@ -209,16 +210,16 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
             }
             LhScheduleResult pairResult = findPairSingleControlResult(context, result);
             if (Objects.isNull(pairResult)) {
-                throwValidationFailure(context, result, "正规SKU使用单控机台必须同时生成L/R两侧排产结果");
+                throwValidationFailure(context, result, "双模SKU使用单控机台必须同时生成L/R两侧排产结果");
             }
             if (!isWholeSingleControlPairResultConsistent(result, pairResult)) {
-                throwValidationFailure(context, result, "正规SKU单控机台L/R两侧物料、时间或班次计划量不一致");
+                throwValidationFailure(context, result, "双模SKU单控机台L/R两侧物料、时间、状态或班次计划量不一致");
             }
         }
     }
 
     /**
-     * 判断当前结果是否需要执行正规 SKU 单控整机校验。
+     * 判断当前结果是否需要执行冻结双模的单控整机校验。
      *
      * @param context 排程上下文
      * @param result 排程结果
@@ -232,11 +233,11 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
         }
         SkuScheduleDTO sourceSku = context.getScheduleResultSourceSkuMap().get(result);
         return Objects.nonNull(sourceSku)
-                && LhSingleControlMachineUtil.isWholeMachineGranularitySku(sourceSku);
+                && LhSingleControlMachineUtil.isWholeMachineGranularitySku(context, sourceSku);
     }
 
     /**
-     * 查找正规 SKU 单控结果的配对侧结果。
+     * 查找双模 SKU 单控结果的配对侧结果。
      *
      * @param context 排程上下文
      * @param result 当前结果
@@ -274,6 +275,11 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
         }
         if (!Objects.equals(resolveProductionStartTime(leftResult), resolveProductionStartTime(rightResult))
                 || !Objects.equals(leftResult.getSpecEndTime(), rightResult.getSpecEndTime())) {
+            return false;
+        }
+        if (!StringUtils.equals(leftResult.getIsChangeMould(), rightResult.getIsChangeMould())
+                || !StringUtils.equals(leftResult.getIsTypeBlock(), rightResult.getIsTypeBlock())
+                || !StringUtils.equals(leftResult.getIsEnd(), rightResult.getIsEnd())) {
             return false;
         }
         for (int shiftIndex = 1; shiftIndex <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT; shiftIndex++) {
@@ -787,6 +793,17 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
         for (LhScheduleResult result : changeResults) {
             RollingMachineState state = rollingStateMap.computeIfAbsent(result.getLhMachineCode(),
                     machineCode -> buildInitialState(context, machineCode));
+            String changeMouldType = determineChangeMouldType(result);
+            if (shouldSkipSameMaterialMouldChangePlan(state, result)) {
+                log.info("前后物料编码相同，跳过模具交替计划生成, 工厂: {}, 批次: {}, 机台: {}, 前物料: {}, "
+                                + "后物料: {}, 交替类型: {}, 产品状态: {}",
+                        context.getFactoryCode(), context.getBatchNo(), result.getLhMachineCode(),
+                        state.getCurrentMaterialCode(), result.getMaterialCode(), changeMouldType,
+                        result.getProductStatus());
+                // 即使不生成交替计划，也必须推进机台运行态，确保后续真实换模沿用最新物料与结束时间。
+                updateRollingState(state, result);
+                continue;
+            }
             LhMouldChangePlan plan = new LhMouldChangePlan();
             plan.setFactoryCode(context.getFactoryCode());
             plan.setLhResultBatchNo(context.getBatchNo());
@@ -814,7 +831,7 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
             plan.setChangeTime(resolvePlanChangeTime(result, state));
 
             // 判断交替类型：普通换模、换活字块、干冰清洗、喷砂清洗在这里统一落数据字典值。
-            plan.setChangeMouldType(determineChangeMouldType(result));
+            plan.setChangeMouldType(changeMouldType);
             plans.add(plan);
 
             updateRollingState(state, result);
@@ -826,6 +843,26 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
         planOrder = appendCleaningMouldChangePlans(context, plans, planOrder, changeResults);
         logOutOfWindowMouldChangePlans(context, plans);
         log.info("生成模具交替计划完成, 共 {} 条", plans.size());
+    }
+
+    /**
+     * 判断当前换模结果是否属于前后同物料的无效交替。
+     * <p>
+     * 模具交替计划只以物料编码判断前后规格是否发生变化，不比较产品状态。
+     * 前物料或后物料缺失时无法确认属于同物料，保留原有计划生成行为。
+     * </p>
+     *
+     * @param state 当前机台滚动状态
+     * @param result 本次换模排程结果
+     * @return true-前后物料编码相同且均非空，应跳过计划生成；false-保留原有生成逻辑
+     */
+    private boolean shouldSkipSameMaterialMouldChangePlan(RollingMachineState state,
+                                                          LhScheduleResult result) {
+        return Objects.nonNull(state)
+                && Objects.nonNull(result)
+                && StringUtils.isNotEmpty(state.getCurrentMaterialCode())
+                && StringUtils.isNotEmpty(result.getMaterialCode())
+                && StringUtils.equals(state.getCurrentMaterialCode(), result.getMaterialCode());
     }
 
     /**

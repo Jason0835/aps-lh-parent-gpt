@@ -3,7 +3,10 @@ package com.zlt.aps.cx.service.engine;
 import com.zlt.aps.cx.entity.config.CxParamConfig;
 import com.zlt.aps.cx.entity.config.CxShiftConfig;
 
+import com.zlt.aps.cx.vo.DailyEmbryoTask;
+import com.zlt.aps.cx.vo.MachineAllocationResult;
 import com.zlt.aps.cx.vo.ScheduleContextVo;
+import com.zlt.aps.cx.vo.TaskAllocation;
 import com.zlt.aps.mp.api.domain.entity.MdmMoldingMachine;
 import com.zlt.aps.mp.api.domain.entity.MdmStructureLhRatio;
 import com.zlt.aps.mp.api.domain.entity.MpCxCapacityConfiguration;
@@ -58,8 +61,8 @@ import java.util.stream.Collectors;
  * <h3>单位约定</h3>
  * <ul>
  *   <li><b>保底预留粒度</b>：1 台硫化机（{@code reservedVulcanizeCount=1}），不是 1 车或 1 条胎胚。</li>
- *   <li><b>机台容量占用</b>：{@link CoreScheduleAlgorithmService.MachineAllocationResult#setUsedCapacity}
- *       累加的是硫化机台数；条数写在 {@link CoreScheduleAlgorithmService.TaskAllocation#setQuantity}。</li>
+ *   <li><b>机台容量占用</b>：{@link MachineAllocationResult#setUsedCapacity}
+ *       累加的是硫化机台数；条数写在 {@link TaskAllocation#setQuantity}。</li>
  *   <li><b>任务 demand 扣减</b>：每成功预留 1 台，对应 {@code DailyEmbryoTask.vulcanizeMachineCount -= 1}，
  *       剩余 demand 由 NewTaskProcessor 并入同结构任务列表继续 DFS。</li>
  * </ul>
@@ -86,9 +89,6 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class ContinueTaskProcessor {
-
-    /** 配比缺失时单台默认最大硫化机数（与 NewTaskProcessor 兜底一致） */
-    private static final int DEFAULT_MAX_LH_MACHINE_COUNT = 10;
 
     /** 机台主数据未配置日产能时的默认值（条/天，仅用于 {@link #getMachineDailyCapacity}） */
     private static final int DEFAULT_DAILY_CAPACITY = 1200;
@@ -119,14 +119,14 @@ public class ContinueTaskProcessor {
      * @param day            排程天序号（签名保留，当前逻辑未使用）
      * @return 保底预留产生的机台分配；无预留时为空列表
      */
-    public List<CoreScheduleAlgorithmService.MachineAllocationResult> processContinueTasks(
-            List<CoreScheduleAlgorithmService.DailyEmbryoTask> continueTasks,
+    public List<MachineAllocationResult> processContinueTasks(
+            List<DailyEmbryoTask> continueTasks,
             ScheduleContextVo context,
             LocalDate scheduleDate,
             List<CxShiftConfig> dayShifts,
             int day) {
 
-        List<CoreScheduleAlgorithmService.MachineAllocationResult> results = new ArrayList<>();
+        List<MachineAllocationResult> results = new ArrayList<>();
 
         if (CollectionUtils.isEmpty(continueTasks)) {
             return results;
@@ -135,7 +135,7 @@ public class ContinueTaskProcessor {
         log.info("========== 开始处理续作任务，共 {} 个任务 ==========", continueTasks.size());
 
         // --- 5.3.1.1 续作身份标记（无论是否保底，下游精排日志与 TaskAllocation 均依赖此标志）---
-        for (CoreScheduleAlgorithmService.DailyEmbryoTask task : continueTasks) {
+        for (DailyEmbryoTask task : continueTasks) {
             task.setIsContinueTask(true);
         }
 
@@ -154,7 +154,7 @@ public class ContinueTaskProcessor {
         log.info("构建历史任务映射完成，共 {} 台机台有历史记录", machineHistoryMap.size());
 
         // --- 5.3.1.4 保底预留：外层按机台、内层按该机台历史胎胚，每台每胚最多预留 1 硫化机 ---
-        Map<String, CoreScheduleAlgorithmService.MachineAllocationResult> allocationMap = new LinkedHashMap<>();
+        Map<String, MachineAllocationResult> allocationMap = new LinkedHashMap<>();
 
         for (Map.Entry<String, Set<String>> historyEntry : machineHistoryMap.entrySet()) {
             String machineCode = historyEntry.getKey();
@@ -162,16 +162,15 @@ public class ContinueTaskProcessor {
 
             for (String embryoCode : historyEmbryos) {
 
-                // 5.3.1.4.1 在 continueTasks 中按胎胚编码匹配，且必须有正 demand 与正计划量
-                CoreScheduleAlgorithmService.DailyEmbryoTask matchedTask = null;
+                // 5.3.1.4.1 收集该机台该胎胚的所有匹配任务（有正 demand 与正计划量）
+                List<DailyEmbryoTask> matchedTasks = new ArrayList<>();
                 boolean foundAbandoned = false;
-                for (CoreScheduleAlgorithmService.DailyEmbryoTask task : continueTasks) {
+                for (DailyEmbryoTask task : continueTasks) {
                     if (embryoCode.equals(task.getEmbryoCode())) {
                         int demand = task.getVulcanizeMachineCount() != null ? task.getVulcanizeMachineCount() : 0;
                         Integer plannedProd = task.getPlannedProduction();
                         if (demand > 0 && (plannedProd != null && plannedProd > 0)) {
-                            matchedTask = task;
-                            break;
+                            matchedTasks.add(task);
                         }
                         if (plannedProd != null && plannedProd <= 0) {
                             foundAbandoned = true;
@@ -179,8 +178,8 @@ public class ContinueTaskProcessor {
                     }
                 }
 
-                // 5.3.1.4.2 无匹配：区分「计划量已舍弃」与「无剩余需求」便于排查
-                if (matchedTask == null) {
+                // 5.3.1.4.2 无匹配：区分「计划量已舍弃」与「无剩余需求」
+                if (matchedTasks.isEmpty()) {
                     if (foundAbandoned) {
                         log.info("机台 {} 的历史胎胚 {} 计划产量为0（已舍弃），跳过保底预留", machineCode, embryoCode);
                     } else {
@@ -189,29 +188,40 @@ public class ContinueTaskProcessor {
                     continue;
                 }
 
-                // 5.3.1.4.3 机台须在该结构当日排产配置（或提前生产回退列表）中，否则不能预留
+                // 5.3.1.4.3 取第一个任务检查机台可用性（同结构的任务机台配置一致）
+                DailyEmbryoTask firstTask = matchedTasks.get(0);
                 List<MpCxCapacityConfiguration> availableForTask = getAvailableMachinesForStructure(
-                        matchedTask.getStructureName(), scheduleDate, context, matchedTask.getProductionVersion());
+                        firstTask.getStructureName(), scheduleDate, context, firstTask.getProductionVersion());
                 boolean machineAvailable = availableForTask.stream()
                         .anyMatch(c -> machineCode.equals(c.getCxMachineCode()));
                 if (!machineAvailable) {
                     log.info("机台 {} 不支持结构 {} 的生产版本 {}，跳过保底预留胎胚 {}",
-                            machineCode, matchedTask.getStructureName(), matchedTask.getProductionVersion(), embryoCode);
+                            machineCode, firstTask.getStructureName(), firstTask.getProductionVersion(), embryoCode);
                     continue;
                 }
 
-                int demand = matchedTask.getVulcanizeMachineCount() != null ? matchedTask.getVulcanizeMachineCount() : 0;
+                // 5.3.1.4.4 动态保底预留：以前序班次该机台该胎胚的硫化机台数作为预留目标，无前序数据时兜底1
+                int prevCount = getDynamicReservedCount(context, machineCode, embryoCode);
+                int remainingToReserve = prevCount;
+                int totalReservedThisEmbryo = 0;
 
-                // 5.3.1.4.4 固定预留 1 台硫化机；从任务总 demand 中扣除，剩余进入 NewTaskProcessor 均衡
-                int reservedCount = 1;
-                matchedTask.setVulcanizeMachineCount(demand - reservedCount);
+                for (DailyEmbryoTask matchedTask : matchedTasks) {
+                    if (remainingToReserve <= 0) break;
 
-                CoreScheduleAlgorithmService.MachineAllocationResult allocation =
-                        allocationMap.computeIfAbsent(machineCode, code -> createMachineAllocation(code, context));
+                    int demand = matchedTask.getVulcanizeMachineCount() != null ? matchedTask.getVulcanizeMachineCount() : 0;
+                    int reservedForThisTask = Math.min(demand, remainingToReserve);
+                    matchedTask.setVulcanizeMachineCount(demand - reservedForThisTask);
 
-                allocateContinueReservation(allocation, matchedTask, reservedCount, context);
+                    MachineAllocationResult allocation =
+                            allocationMap.computeIfAbsent(machineCode, code -> createMachineAllocation(code, context));
+                    allocateContinueReservation(allocation, matchedTask, reservedForThisTask, context);
 
-                log.info("机台 {} 保底预留胎胚 {} 共 {} 个硫化机", machineCode, embryoCode, reservedCount);
+                    remainingToReserve -= reservedForThisTask;
+                    totalReservedThisEmbryo += reservedForThisTask;
+                }
+
+                log.info("机台 {} 保底预留胎胚 {} 共 {} 个硫化机（目标={}, 已满足={}）",
+                        machineCode, embryoCode, totalReservedThisEmbryo, prevCount, totalReservedThisEmbryo);
             }
         }
 
@@ -227,22 +237,22 @@ public class ContinueTaskProcessor {
      * <ul>
      *   <li>{@code TaskAllocation.quantity} — 胎胚条数，优先 {@code endingExtraInventory}（收尾后实际待产量），
      *       否则 {@code demandQuantity}；供 ShiftScheduleService 精排。</li>
-     *   <li>{@code TaskAllocation.vulcanizeMachineCount} — 本次预留的硫化机台数（恒为 1）。</li>
+     *   <li>{@code TaskAllocation.vulcanizeMachineCount} - 本次预留的硫化机台数（动态：前序班次台数或兜底1）。</li>
      *   <li>{@code allocation.usedCapacity / remainingCapacity} — 按硫化机台数增减，<b>不得</b>使用 quantity。</li>
      * </ul>
      *
      * <p>收尾/开停产/首任务/紧急收尾等标志原样透传，保证精排与日志与 TaskGroupService 一致。
      */
     private void allocateContinueReservation(
-            CoreScheduleAlgorithmService.MachineAllocationResult allocation,
-            CoreScheduleAlgorithmService.DailyEmbryoTask task,
+            MachineAllocationResult allocation,
+            DailyEmbryoTask task,
             int reservedVulcanizeCount,
             ScheduleContextVo context) {
 
         int quantity = task.getEndingExtraInventory() != null && task.getEndingExtraInventory() > 0
                 ? task.getEndingExtraInventory() : task.getDemandQuantity();
 
-        CoreScheduleAlgorithmService.TaskAllocation taskAllocation = new CoreScheduleAlgorithmService.TaskAllocation();
+        TaskAllocation taskAllocation = new TaskAllocation();
         taskAllocation.setEmbryoCode(task.getEmbryoCode());
         taskAllocation.setMaterialCode(task.getMaterialCode());
         taskAllocation.setMaterialDesc(task.getMaterialDesc());
@@ -277,6 +287,40 @@ public class ContinueTaskProcessor {
     }
 
     // ==================== 参数与历史映射 ====================
+
+    /**
+     * 获取动态保底预留目标值：以前序班次该机台该胎胚的硫化机台数作为预留目标。
+     *
+     * <p>数据来源：{@code context.previousShiftMachineEmbryoLoadMap}（机台 -> 胎胚 -> 硫化机台数）。
+     * 第一个班次从 T_CX_SHIFT_MACHINE_LOAD 加载前日最后班次数据，后续班次由
+     * CoreScheduleAlgorithmServiceImpl 用前一个班次的分配结果更新。
+     *
+     * <p>调1用方负责跨多个任务累计预留（每天任务的 {@code vulcanizeMachineCount} 为1），
+     * 直至达到本方法返回的目标值或所有任务耗尽。
+     *
+     * <p>兜底策略：无前序班次数据或查不到对应记录时，返回1（与原固定预留逻辑一致）。
+     *
+     * @param context     排程上下文
+     * @param machineCode 成型机台编码
+     * @param embryoCode  胎胚编码
+     * @return 预留目标值，默认1
+     */
+    private int getDynamicReservedCount(ScheduleContextVo context,
+                                        String machineCode, String embryoCode) {
+        Map<String, Map<String, Integer>> prevLoadMap = context.getPreviousShiftMachineEmbryoLoadMap();
+        if (prevLoadMap != null) {
+            Map<String, Integer> embryoLoadMap = prevLoadMap.get(machineCode);
+            if (embryoLoadMap != null) {
+                Integer prevCount = embryoLoadMap.get(embryoCode);
+                if (prevCount != null && prevCount > 0) {
+                    log.info("动态保底预留目标: 机台={}, 胎胚={}, 前序班次台数={}", machineCode, embryoCode, prevCount);
+                    return prevCount;
+                }
+            }
+        }
+        log.info("动态保底预留(兜底): 机台={}, 胎胚={}, 无前序数据, 目标=1", machineCode, embryoCode);
+        return 1;
+    }
 
     /**
      * 解析 SYS04070003「强制保留历史任务」。
@@ -386,9 +430,9 @@ public class ContinueTaskProcessor {
     /**
      * 创建空的机台分配结果，{@code remainingCapacity} 取自机台主数据日产能（条/天语义，与 Processor 层约定一致）。
      */
-    private CoreScheduleAlgorithmService.MachineAllocationResult createMachineAllocation(
+    private MachineAllocationResult createMachineAllocation(
             String machineCode, ScheduleContextVo context) {
-        CoreScheduleAlgorithmService.MachineAllocationResult allocation = new CoreScheduleAlgorithmService.MachineAllocationResult();
+        MachineAllocationResult allocation = new MachineAllocationResult();
         allocation.setMachineCode(machineCode);
         allocation.setTaskAllocations(new ArrayList<>());
         allocation.setUsedCapacity(0);

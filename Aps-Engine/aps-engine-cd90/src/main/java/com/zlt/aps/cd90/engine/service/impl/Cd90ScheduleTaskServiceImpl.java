@@ -106,12 +106,25 @@ public class Cd90ScheduleTaskServiceImpl implements Cd90ScheduleTaskService {
         return task;
     }
 
+    /**
+     * 根据任务ID查询任务记录。
+     *
+     * @param taskId 任务唯一标识
+     * @return 任务对象，不存在时返回 null
+     */
     @Override
     public Cd90ScheduleTask findByTaskId(String taskId) {
         return taskMapper.selectOne(new LambdaQueryWrapper<Cd90ScheduleTask>()
                 .eq(Cd90ScheduleTask::getTaskId, taskId));
     }
 
+    /**
+     * 查询指定工厂、指定日期的最新任务记录（按创建时间降序取第一条）。
+     *
+     * @param factoryCode  工厂编码
+     * @param scheduleDate 排程日期
+     * @return 最新任务对象，不存在时返回 null
+     */
     @Override
     public Cd90ScheduleTask findLatest(String factoryCode, Date scheduleDate) {
         return taskMapper.selectOne(new LambdaQueryWrapper<Cd90ScheduleTask>()
@@ -121,6 +134,14 @@ public class Cd90ScheduleTaskServiceImpl implements Cd90ScheduleTaskService {
                 .last("limit 1"));
     }
 
+    /**
+     * 查询指定工厂、指定日期是否有进行中的任务（PENDING 或 RUNNING）。
+     * <p>用于幂等性检查，防止同一日期重复创建排程任务。</p>
+     *
+     * @param factoryCode  工厂编码
+     * @param scheduleDate 排程日期
+     * @return 进行中的任务对象，不存在时返回 null
+     */
     @Override
     public Cd90ScheduleTask findActive(String factoryCode, Date scheduleDate) {
         return taskMapper.selectOne(new LambdaQueryWrapper<Cd90ScheduleTask>()
@@ -132,6 +153,14 @@ public class Cd90ScheduleTaskServiceImpl implements Cd90ScheduleTaskService {
                 .last("limit 1"));
     }
 
+    /**
+     * 将任务状态从 PENDING 更新为 RUNNING，标记任务开始执行。
+     * <p>使用乐观锁方式：通过 WHERE taskStatus = PENDING 条件确保只有等待中的任务才能被启动，
+     * 避免重复领取。更新同时设置初始进度 5% 和基础数据校验阶段。</p>
+     *
+     * @param taskId 任务唯一标识
+     * @return true 表示更新成功（任务被领取），false 表示任务已被其他执行器领取或状态异常
+     */
     @Override
     @Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
     public boolean start(String taskId) {
@@ -149,6 +178,17 @@ public class Cd90ScheduleTaskServiceImpl implements Cd90ScheduleTaskService {
         return updated;
     }
 
+    /**
+     * 更新任务进度和当前阶段。
+     * <p>仅在任务状态为 RUNNING 时允许更新，更新同时刷新心跳时间。</p>
+     *
+     * @param taskId    任务唯一标识
+     * @param progress  进度百分比（0~100）
+     * @param stage     阶段编码，对应 {@link Cd90ScheduleTaskStage}
+     * @param stageName 阶段中文名称
+     * @return true 表示更新成功，false 表示任务状态不是 RUNNING 或任务不存在
+     * @throws IllegalArgumentException 当 progress 不在 0~100 范围内时抛出
+     */
     @Override
     @Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
     public boolean updateProgress(String taskId, int progress, String stage, String stageName) {
@@ -164,18 +204,42 @@ public class Cd90ScheduleTaskServiceImpl implements Cd90ScheduleTaskService {
                 .set(Cd90ScheduleTask::getLastHeartbeatTime, new Date())) == 1;
     }
 
+    /**
+     * 将任务标记为执行成功（使用独立短事务）。
+     * <p>适用于算法执行完毕后，在独立事务中提交成功状态，不受外部事务回滚影响。</p>
+     *
+     * @param taskId  任务唯一标识
+     * @param batchNo 排程生成的批次号
+     * @return true 表示更新成功
+     */
     @Override
     @Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
     public boolean markSuccess(String taskId, String batchNo) {
         return updateSuccess(taskId, batchNo);
     }
 
+    /**
+     * 将任务标记为执行成功（使用当前事务）。
+     * <p>适用于在调用方事务内同步提交成功状态，与外部事务保持一致。</p>
+     *
+     * @param taskId  任务唯一标识
+     * @param batchNo 排程生成的批次号
+     * @return true 表示更新成功
+     */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public boolean markSuccessInCurrentTransaction(String taskId, String batchNo) {
         return updateSuccess(taskId, batchNo);
     }
 
+    /**
+     * 更新任务为成功状态的公共方法。
+     * <p>仅在任务状态为 RUNNING 时允许更新，设置进度 100%、完成阶段、批次号和结束时间。</p>
+     *
+     * @param taskId  任务唯一标识
+     * @param batchNo 排程生成的批次号
+     * @return true 表示更新成功
+     */
     private boolean updateSuccess(String taskId, String batchNo) {
         return taskMapper.update(null, new LambdaUpdateWrapper<Cd90ScheduleTask>()
                 .eq(Cd90ScheduleTask::getTaskId, taskId)
@@ -189,6 +253,14 @@ public class Cd90ScheduleTaskServiceImpl implements Cd90ScheduleTaskService {
                 .set(Cd90ScheduleTask::getLastHeartbeatTime, new Date())) == 1;
     }
 
+    /**
+     * 将任务标记为执行失败（使用独立短事务）。
+     * <p>允许从 PENDING 或 RUNNING 状态转换为 FAILED。错误信息超过 2000 字符时自动截断。</p>
+     *
+     * @param taskId       任务唯一标识
+     * @param errorMessage 失败原因描述
+     * @return true 表示更新成功
+     */
     @Override
     @Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
     public boolean markFailed(String taskId, String errorMessage) {
@@ -206,6 +278,13 @@ public class Cd90ScheduleTaskServiceImpl implements Cd90ScheduleTaskService {
                 .set(Cd90ScheduleTask::getLastHeartbeatTime, new Date())) == 1;
     }
 
+    /**
+     * 查询所有 RUNNING 状态的任务，按心跳时间升序排列。
+     * <p>用于心跳超时检测，优先处理长时间未更新心跳的任务。</p>
+     *
+     * @param limit 最大返回条数，0 或负数时使用默认值 500，上限 1000
+     * @return RUNNING 状态的任务列表
+     */
     @Override
     public List<Cd90ScheduleTask> findRunningTasks(int limit) {
         int queryLimit = limit <= 0 ? 500 : Math.min(limit, 1000);
@@ -215,6 +294,14 @@ public class Cd90ScheduleTaskServiceImpl implements Cd90ScheduleTaskService {
                 .last("limit " + queryLimit));
     }
 
+    /**
+     * 将心跳超时的任务标记为失败（使用独立短事务）。
+     * <p>由心跳超时补偿任务调用，仅处理 RUNNING 状态的任务。错误信息超过 2000 字符时自动截断。</p>
+     *
+     * @param taskId       任务唯一标识
+     * @param errorMessage 超时原因描述
+     * @return true 表示更新成功
+     */
     @Override
     @Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
     public boolean markTimeoutFailed(String taskId, String errorMessage) {

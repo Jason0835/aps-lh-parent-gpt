@@ -6,6 +6,7 @@ import com.google.common.collect.Sets;
 import com.zlt.aps.lh.api.domain.dto.*;
 import com.zlt.aps.lh.api.domain.entity.*;
 import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
+import com.zlt.aps.lh.api.enums.SingleControlMachineModeEnum;
 import com.zlt.aps.lh.engine.strategy.support.MouldResourceContext;
 import com.zlt.aps.lh.handler.SkuMonthPlanCalculator;
 import com.zlt.aps.lh.util.SkuConstructionRefResolverUtil;
@@ -220,7 +221,7 @@ public class LhScheduleContext {
      */
     private Map<String, Integer> materialMonthFinishedQtyMap = new HashMap<>();
     /**
-     * T日排程班次完成量Map, key=materialCode, value=T日class1FinishQty按物料汇总值
+     * T日排程班次完成量Map, key=materialCode+产品状态, value=T日class1FinishQty按物料汇总值
      */
     private Map<String, Integer> materialScheDayFinishQtyMap = new HashMap<>();
     /**
@@ -405,6 +406,14 @@ public class LhScheduleContext {
      * 新增SKU进入S4.5时是否命中结构五天内收尾层级快照，使用对象身份避免SKU出队后判定漂移
      */
     private Map<SkuScheduleDTO, Boolean> newSpecSingleControlStructureEndingLayerMap = new IdentityHashMap<>();
+    /** 单控模式初始目标量快照，key=materialCode_productStatus；S4.3结束时冻结，后续禁止随剩余量变化 */
+    private Map<String, Integer> singleControlInitialTargetQtyMap = new LinkedHashMap<>();
+    /** 单控模式快照，key=materialCode_productStatus；统一供新增、续作、换活字块、降模和校验消费 */
+    private Map<String, SingleControlMachineModeEnum> singleControlModeSnapshotMap = new LinkedHashMap<>();
+    /** 冻结时满足单控静态准入且仍有目标量的不同试验SKU键集合 */
+    private Set<String> singleControlEligibleTrialSkuKeySet = new LinkedHashSet<>();
+    /** 单控模式快照是否已完成初始化；完成后禁止再次按动态运行态覆盖 */
+    private boolean singleControlModeSnapshotInitialized;
     /**
      * 续作结果日额度账本是否已完成最终同步，防止同一上下文重复扣账
      */
@@ -665,6 +674,23 @@ public class LhScheduleContext {
             startDay = DateUtil.dayOfMonth(planStartDate);
         }
         return SkuMonthPlanCalculator.getPlanQty(allProductionDateList, loadedMonthPlanList, skuProductionInfo, startDay);
+    }
+
+    /**
+     * 获取从planStartDate的月计划总计划量
+     *
+     * @param skuInfo
+     * @return
+     */
+    public Map<YearMonth, Integer> getSumPlanQty(FactoryMonthPlanProductionFinalResult skuInfo) {
+        YearMonth firstMonth = getFirstYearMonth();
+        Date realPlanStartDate;
+        if (null == planStartDate) {
+            realPlanStartDate = SkuMonthPlanCalculator.getDate(firstMonth.atDay(BigDecimal.ONE.intValue()));
+        } else {
+            realPlanStartDate = planStartDate;
+        }
+        return SkuMonthPlanCalculator.statisticsSumPlanQtyBySku(skuInfo, realPlanStartDate, loadedMonthPlanList);
     }
 
     /**

@@ -24,4 +24,7 @@ public class LhScheduleRequestDTO {
     private String productionVersion;
     /** 操作人 */
     private String operator;
+
+    /** 是否自动生成成型 0-否、1-是 */
+    private String isAutoExecCx;
 }

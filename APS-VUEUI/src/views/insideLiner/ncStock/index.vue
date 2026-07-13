@@ -1,8 +1,7 @@
-
 <template>
   <basic-container>
     <page-table
-      tableRef="insideLinerStockMainTable"
+      tableRef="ncStockMainTable"
       :calcHeight="true"
       v-loading="loading"
       :columns="columns"
@@ -19,7 +18,7 @@
       :selectArea="false"
     >
       <template slot="header">
-        <el-button
+        <!-- <el-button
           type="primary"
           plain
           v-hasPermi="['nc:stock:add']"
@@ -33,20 +32,20 @@
           @click="handleEdit(selection[0])"
           >{{ $t("ui.frame.btn.modify") }}</el-button
         >
-        <!-- <el-button
+        <el-button
           type="warning"
           v-hasPermi="['nc:stock:stockRevise']"
           :disabled="selection.length !== 1"
           @click="() => handleModifyStock(selection[0])"
           >{{ $t("ui.frame.btn.stock.modify2") }}</el-button
-        > -->
+        >
         <el-button
           type="danger"
           plain
           v-hasPermi="['nc:stock:remove']"
           @click="handleBatchDelete"
           >{{ $t("ui.frame.btn.delete") }}</el-button
-        >
+        > -->
         <el-button
           v-hasPermi="['nc:stock:import']"
           @click="$refs.tltUpload.handleImport()"
@@ -73,18 +72,19 @@
 import { downloadLink } from "@/utils/request";
 //interface
 import { listStock, removeStock, releaseStock } from "@/api/nc/stock";
+import { getConfigKey } from "@/api/system/config";
 //components
 import tltUpload from "@/components/tltUpload/tltUpload.vue";
 
 import infoDialog from "./components/infoDialog.vue";
 
 export default {
-  name: "InsideLinerStock",
+  name: "ncStock",
   components: {
     tltUpload,
     infoDialog,
   },
-  dicts: [],
+  dicts: ["biz_factory_name"],
   provide() {
     return {
       parentDict: this.dict,
@@ -92,19 +92,6 @@ export default {
   },
   data() {
     return {
-      searchColumns: [
-        {
-          label: this.$t("ui.data.column.stock.stockDate"),
-          prop: "stockDate",
-          type: "date",
-          dateType: "daterange",
-          valueFormat: "yyyy-MM-dd",
-        },
-        {
-          label: this.$t("ui.data.column.quota.liningCode"),
-          prop: "materialCode",
-        },
-      ],
       loading: false,
       data: [],
       selection: [],
@@ -114,8 +101,12 @@ export default {
         total: 0,
       },
       sort: {},
-      search: {},
-      query: {},
+      search: {
+        factoryCode: '',
+      },
+      query: {
+        factoryCode: '',
+      },
     };
   },
   computed: {
@@ -135,28 +126,7 @@ export default {
           prop: "materialCode",
           align: "center",
           halign: "center",
-          label: this.$t("ui.data.column.quota.liningCode"),
-          // sortable: "custom",
-        },
-        {
-          prop: "rollStockNum",
-          align: "right",
-          halign: "center",
-          label: this.$t("ui.data.column.stock.stockNum.roll"),
-          // sortable: "custom",
-        },
-        {
-          prop: "rollModifyNum",
-          align: "right",
-          halign: "center",
-          label: this.$t("ui.data.column.stock.modifyNum.roll"),
-          // sortable: "custom",
-        },
-        {
-          prop: "rollBadNum",
-          align: "right",
-          halign: "center",
-          label: this.$t("ui.data.column.stock.badNum.roll"),
+          label: this.$t("ui.data.column.quota.paddingCode"),
           // sortable: "custom",
         },
         {
@@ -221,6 +191,28 @@ export default {
       ];
 
       return columns;
+    },
+    searchColumns() {
+      return [
+        {
+          label: this.$t("ui.data.column.factoryCode"),
+          prop: "factoryCode",
+          type: "select",
+          dictData: this.dict.type.biz_factory_name,
+          filterable: true,
+        },
+        {
+          label: this.$t("ui.data.column.stock.stockDate"),
+          prop: "stockDate",
+          type: "date",
+          dateType: "daterange",
+          valueFormat: "yyyy-MM-dd",
+        },
+        {
+          label: this.$t("ui.data.column.quota.paddingCode"),
+          prop: "materialCode",
+        },
+      ];
     },
   },
   methods: {
@@ -363,10 +355,14 @@ export default {
       }
     },
   },
-  created() {},
-  activated() {
-    this.getList();
-  },
+  created() {
+    getConfigKey("sys.factory.code").then(response => {
+      this.search.factoryCode = response.msg;
+      this.query.factoryCode = response.msg;
+      this.getList();
+    }).catch(() => {
+      this.getList();
+    });},
 };
 </script>
 <style lang="scss" scoped>

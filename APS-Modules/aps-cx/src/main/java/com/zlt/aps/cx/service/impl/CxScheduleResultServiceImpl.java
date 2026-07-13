@@ -14,10 +14,12 @@ import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.utils.StringUtils;
 import com.zlt.aps.common.core.domain.CellStyle;
+import com.zlt.aps.common.core.domain.ExcelCellRangeAddress;
 import com.zlt.aps.common.core.utils.ExcelUtils;
 import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.cx.api.domain.entity.CxStock;
 import com.zlt.aps.cx.api.domain.entity.CxStructureTreadConfig;
+import com.zlt.aps.cx.entity.config.CxEmbryoLhTime;
 import com.zlt.aps.cx.entity.config.CxKeyProduct;
 import com.zlt.aps.cx.entity.config.CxParamConfig;
 import com.zlt.aps.cx.entity.schedule.CxScheduleResult;
@@ -31,6 +33,8 @@ import com.zlt.aps.maindata.mapper.MdmMaterialConsumeDetailMapper;
 import com.zlt.aps.maindata.mapper.MdmMaterialInfoEntityMapper;
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import com.zlt.aps.mp.api.domain.entity.MdmMaterialConsumeDetail;
+import com.zlt.aps.lh.api.domain.vo.ScheduleSummaryReportVO;
+import com.zlt.aps.lh.api.service.ILhScheduleResultRemoteService;
 import com.zlt.aps.mp.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.mp.api.domain.entity.MdmMonthSurplus;
 import com.zlt.aps.mp.api.domain.entity.MpStructureAllocation;
@@ -77,6 +81,9 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
     private IFactoryMonthPlanProductionFinalResultRemoteService factoryMonthPlanProductionFinalResultRemoteService;
 
     @Autowired
+    private ILhScheduleResultRemoteService lhScheduleResultRemoteService;
+
+    @Autowired
     private ISysDictDataCacheService sysDictDataCacheService;
 
     @Autowired
@@ -108,6 +115,9 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
 
     @Autowired
     private CxStockMapper stockMapper;
+
+    @Autowired
+    private CxEmbryoLhTimeMapper cxEmbryoLhTimeMapper;
 
     @Override
     public List<CxScheduleResult> listByScheduleDate(LocalDate scheduleDate) {
@@ -310,10 +320,19 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
 
         Set<String> keyProductEmbryoCodes = loadKeyProductEmbryoCodes();
 
+        // 构建硫化排程6/7/8班消耗量映射（按胎胚代码匹配同日硫化计划量）
+        Map<String, int[]> lhShiftConsumptionMap = this.buildLhShiftConsumptionMap(exportList, scheduleDate);
+
+        // 查询要收尾的结构名称集合（来自CxEmbryoLhTime表，这些结构在未来几天要收尾）
+        String factoryCode = (queryVO != null && StringUtils.isNotBlank(queryVO.getFactoryCode()))
+                ? queryVO.getFactoryCode() : FactoryConstant.DEFAULT_FACTORY_CODE;
+        Set<String> endingStructureNames = this.loadEndingStructureNames(factoryCode);
+        log.info("Sheet1过滤：收尾结构集合 = {}", endingStructureNames);
+
         // Sheet 0: 成型余量-按机台
         Map<String, Object> remainQtyTableMap = new HashMap<>(16);
         List<List<Map<String, Object>>> remainQtyDataList = new ArrayList<>();
-        remainQtyDataList.add(buildCxRemainQtyExportDataList(exportList));
+        remainQtyDataList.add(buildCxRemainQtyExportDataList(exportList, endingStructureNames));
         byte[] exportBytes = ExcelUtils.writeMultiList(inputStream, 0, remainQtyTableMap, remainQtyDataList);
 
         // Sheet 1: 成型日计划
@@ -347,7 +366,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
         }
         planTableMap.put("version", productionVersion != null ? productionVersion : "");
         List<List<Map<String, Object>>> planDataList = new ArrayList<>();
-        List<Map<String, Object>> planRows = buildCxTemplateDataList(exportList, recipeTypeMap, totalDailyPlanQtyMap, todayNightFinishQtyMap, smallGlueMap, placeholderMap, shiftCapacitiesMap, keyProductEmbryoCodes);
+        List<Map<String, Object>> planRows = buildCxTemplateDataList(exportList, recipeTypeMap, totalDailyPlanQtyMap, todayNightFinishQtyMap, smallGlueMap, placeholderMap, shiftCapacitiesMap, keyProductEmbryoCodes, lhShiftConsumptionMap, endingStructureNames);
         planDataList.add(planRows);
 
         // 为小计行添加 DAEEF3 背景色标识 + 胎胚余量<400 红色背景
@@ -360,7 +379,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
             if ("小计".equals(rowMap.get("cxMachineCode"))) {
                 cellStyleList.add(new CellStyle(
                         rowNum, rowNum,
-                        0, 59,
+                        0, 60,
                         "#DAEEF3", true, true, null));
             } else {
                 Object cxRemainVal = rowMap.get("cxRemainQty");
@@ -369,7 +388,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
                     if (remainQty.compareTo(new BigDecimal("400")) < 0) {
                         cellStyleList.add(new CellStyle(
                                 rowNum, rowNum,
-                                8, 8,
+                                9, 9,
                                 null, true, false, null, "#FF0000"));
                     }
                 }
@@ -391,50 +410,160 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
         inputStream = new ByteArrayInputStream(exportBytes);
         exportBytes = ExcelUtils.writeMultiList(inputStream, 7, structureTableMap, structureDataList);
 
+        // Sheet 8: 排产小结（从硫化日计划导出迁移而来）
+        // 通过 Feign 远程调用 aps-lh 的 buildScheduleSummaryExportData 复用原有数据构建逻辑
+        exportBytes = writeScheduleSummarySheet(exportBytes, scheduleDate, queryVO);
+
         return exportBytes;
     }
 
     /**
-     * 构建成型结构切换Sheet的数据列表（用于写入 CxExport.xlsx 的 Sheet 7）。
-     * 同时将颜色标识（CELL_STYLE）写入 tableMap，供 writeMultiList 渲染单元格背景色。
+     * 写入排产小结 Sheet（CxExport.xlsx 的 Sheet 8）。
      *
-     * @param queryVO 查询条件
+     * <p>排产小结原集成在硫化日计划导出中，现已迁移至成型日计划导出。
+     * 通过 Feign 调用 aps-lh 的 {@code buildScheduleSummaryExportData} 复用原有数据构建逻辑，
+     * 获取 tableMap（占位符映射）和 dataList（列表数据），写入 CxExport.xlsx 的第 9 个 sheet（下标 8）。</p>
+     *
+     * <p>注意：Feign 远程调用经 Jackson 序列化往返后，tableMap 中 RANGE_ADDRESS 字段的
+     * 元素类型会由 ExcelCellRangeAddress 退化为 LinkedHashMap，writeMultiList 内部强转遍历会抛
+     * ClassCastException，故在此调用 {@link #rebuildRangeAddress} 手动重建。</p>
+     *
+     * @param exportBytes 当前已写入前 8 个 sheet 的 Excel 字节数组
+     * @param scheduleDate 排程日期
+     * @param queryVO 查询条件（取 factoryCode）
+     * @return 写入排产小结 sheet 后的 Excel 字节数组
+     */
+    @SuppressWarnings("unchecked")
+    private byte[] writeScheduleSummarySheet(byte[] exportBytes, Date scheduleDate, CxScheduleResult queryVO) {
+        try {
+            ScheduleSummaryReportVO summaryQuery = new ScheduleSummaryReportVO();
+            summaryQuery.setScheduleDate(cn.hutool.core.date.DateUtil.format(scheduleDate, "yyyy-MM-dd"));
+            summaryQuery.setFactoryCode(StringUtils.defaultString(
+                    queryVO != null ? queryVO.getFactoryCode() : null, FactoryConstant.DEFAULT_FACTORY_CODE));
+
+            // 远程获取排产小结数据（复用硫化侧原有 buildScheduleSummaryExportData 逻辑）
+            Map<String, Object> summaryExportData = lhScheduleResultRemoteService.buildScheduleSummaryExportData(summaryQuery);
+            Map<String, Object> summaryTableMap = (Map<String, Object>) summaryExportData.get("tableMap");
+            List<List<Map<String, Object>>> summaryDataList =
+                    (List<List<Map<String, Object>>>) summaryExportData.get("dataList");
+
+            // 适配 Feign 反序列化导致的 RANGE_ADDRESS 类型丢失
+            rebuildRangeAddress(summaryTableMap);
+
+            return ExcelUtils.writeMultiList(new ByteArrayInputStream(exportBytes), 8, summaryTableMap, summaryDataList);
+        } catch (Exception e) {
+            // 排产小结写入失败不影响主表导出，仅记录警告日志
+            log.warn("排产小结sheet写入失败，跳过。scheduleDate={}, 原因: {}", scheduleDate, e.getMessage(), e);
+            return exportBytes;
+        }
+    }
+
+    /**
+     * 重建 tableMap 中的 RANGE_ADDRESS 字段。
+     *
+     * <p>Feign 远程调用经 Jackson 序列化往返后，{@code List<ExcelCellRangeAddress>}
+     * 反序列化为 {@code List<LinkedHashMap>}，元素类型丢失。
+     * {@link ExcelUtils#writeMultiList} 内部对 RANGE_ADDRESS 直接强转遍历，
+     * 遇 LinkedHashMap 会抛 ClassCastException，需在此手动重建为 ExcelCellRangeAddress。</p>
+     *
+     * <p>HIDDEN_ROWS（List&lt;Integer&gt;）跨 Feign 类型保留，无需处理；
+     * CELL_STYLE 在 writeMultiList 内部用 fastjson 二次转换，亦无需处理。</p>
+     *
+     * @param tableMap 排产小结模板占位符映射
+     */
+    private void rebuildRangeAddress(Map<String, Object> tableMap) {
+        Object rangeObj = tableMap.get(ExcelUtils.RANGE_ADDRESS);
+        if (!(rangeObj instanceof List)) {
+            return;
+        }
+        List<ExcelCellRangeAddress> rebuilt = new ArrayList<>();
+        for (Object item : (List<?>) rangeObj) {
+            if (item instanceof ExcelCellRangeAddress) {
+                rebuilt.add((ExcelCellRangeAddress) item);
+            } else if (item instanceof Map) {
+                Map<?, ?> m = (Map<?, ?>) item;
+                rebuilt.add(new ExcelCellRangeAddress(
+                        ((Number) m.get("firstRow")).intValue(),
+                        ((Number) m.get("lastRow")).intValue(),
+                        ((Number) m.get("firstColumn")).intValue(),
+                        ((Number) m.get("lastColumn")).intValue()));
+            }
+        }
+        tableMap.put(ExcelUtils.RANGE_ADDRESS, rebuilt);
+    }
+
+    /**
+     * 构建成型结构切换Sheet的数据列表（用于写入 CxExport.xlsx 的 Sheet 7）。
+     * <p>数据来源：T_CX_EMBRYO_LH_TIME 表，每条记录直接对应一行导出数据。
+     * 其中前结构月计划时间和后结构月计划时间仍从 MpStructureAllocation 取值，
+     * 其余字段直接从 CxEmbryoLhTime 实体取值。</p>
+     *
+     * @param queryVO 查询条件（含 factoryCode、scheduleDate）
      * @param tableMap 表头/样式数据容器，方法会向其中写入 CELL_STYLE
-     * @param exportList 成型排程结果列表，用于计算余量和班次日期
+     * @param exportList 成型排程结果列表（保留参数兼容，当前未使用）
      * @return 结构切换数据列表
      */
     private List<List<Map<String, Object>>> buildStructureChangeSheetData(CxScheduleResult queryVO,
                                                                           Map<String, Object> tableMap,
                                                                           List<CxScheduleResult> exportList) {
-        MpStructureAllocation structureQuery = buildStructureAllocationQuery(queryVO);
-        TableDataInfo structureDataInfo = mpStructureAllocationRemoteService.list(structureQuery);
-        List<MpStructureAllocation> structureList = structureDataInfo != null
-                ? convertToMpStructureAllocationList(structureDataInfo.getRows())
-                : Collections.emptyList();
+        // 1. 查询 CxEmbryoLhTime 表数据
+        String factoryCode = (queryVO != null && StringUtils.isNotBlank(queryVO.getFactoryCode()))
+                ? queryVO.getFactoryCode() : FactoryConstant.DEFAULT_FACTORY_CODE;
+        Date scheduleDate = queryVO != null ? queryVO.getScheduleDate() : null;
 
-        if (CollectionUtils.isEmpty(structureList)) {
+        LambdaQueryWrapper<CxEmbryoLhTime> lhTimeWrapper = new LambdaQueryWrapper<>();
+        lhTimeWrapper.eq(CxEmbryoLhTime::getFactoryCode, factoryCode);
+        if (scheduleDate != null) {
+            lhTimeWrapper.eq(CxEmbryoLhTime::getScheduleDate, scheduleDate);
+        }
+        lhTimeWrapper.orderByAsc(CxEmbryoLhTime::getCxMachineCode);
+
+        List<CxEmbryoLhTime> lhTimeList = cxEmbryoLhTimeMapper.selectList(lhTimeWrapper);
+
+        if (CollectionUtils.isEmpty(lhTimeList)) {
             List<List<Map<String, Object>>> emptyList = new ArrayList<>();
             emptyList.add(new ArrayList<>());
             return emptyList;
         }
 
-        Map<String, List<MpStructureAllocation>> machineGroupMap = structureList.stream()
-                .filter(Objects::nonNull)
-                .filter(s -> StringUtils.isNotBlank(s.getCxMachineCode()))
-                .collect(Collectors.groupingBy(
-                        s -> s.getCxMachineCode().trim(),
-                        LinkedHashMap::new,
-                        Collectors.toList()));
-        machineGroupMap.entrySet().removeIf(entry -> entry.getValue().size() < 2);
+        // 2. 查询 MpStructureAllocation，构建 结构名称->结构排产 的映射（用于取月计划时间）
+        MpStructureAllocation structureQuery = this.buildStructureAllocationQuery(queryVO);
+        TableDataInfo structureDataInfo = mpStructureAllocationRemoteService.list(structureQuery);
+        List<MpStructureAllocation> structureList = structureDataInfo != null
+                ? this.convertToMpStructureAllocationList(structureDataInfo.getRows())
+                : Collections.emptyList();
 
-        LocalDate scheduleDate = queryVO != null && queryVO.getScheduleDate() != null
-                ? cn.hutool.core.date.DateUtil.toLocalDateTime(queryVO.getScheduleDate()).toLocalDate()
-                : LocalDate.now();
+        Map<String, MpStructureAllocation> structureMap = new HashMap<>();
+        if (CollectionUtils.isNotEmpty(structureList)) {
+            for (MpStructureAllocation s : structureList) {
+                if (s != null && StringUtils.isNotBlank(s.getStructureName())) {
+                    structureMap.putIfAbsent(s.getStructureName().trim(), s);
+                }
+            }
+        }
 
-        List<Map<String, Object>> dataList = buildStructureChangeDataListV2(
-                machineGroupMap, scheduleDate, exportList);
+        int year = structureQuery.getYear() != null ? structureQuery.getYear() : LocalDate.now().getYear();
+        int month = structureQuery.getMonth() != null ? structureQuery.getMonth() : LocalDate.now().getMonthValue();
 
-        List<CellStyle> cellStyleList = buildCellStyleListForStructureChange(dataList);
+        // 3. 逐条构建导出行
+        List<Map<String, Object>> dataList = new ArrayList<>();
+        for (CxEmbryoLhTime lhTime : lhTimeList) {
+            dataList.add(this.buildStructureChangeRowFromEntity(lhTime, structureMap, year, month));
+        }
+
+        // 4. 排序：按后结构开产日期升序
+        dataList.sort(Comparator.comparing(
+                row -> (String) row.get("_sortKey"),
+                Comparator.nullsLast(Comparator.naturalOrder())));
+
+        // 5. 加序号
+        int rowIndex = 1;
+        for (Map<String, Object> row : dataList) {
+            row.put("stt", rowIndex++);
+        }
+
+        // 6. 构建单元格样式
+        List<CellStyle> cellStyleList = this.buildCellStyleListForStructureChange(dataList);
         if (PubUtil.isNotEmpty(cellStyleList)) {
             tableMap.put("CELL_STYLE", cellStyleList);
         }
@@ -442,6 +571,85 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
         List<List<Map<String, Object>>> excelDataList = new ArrayList<>();
         excelDataList.add(dataList);
         return excelDataList;
+    }
+
+    /**
+     * 从 CxEmbryoLhTime 实体构建单条结构切换导出行数据。
+     * <p>字段映射：
+     *   machineCode      <- cxMachineCode
+     *   structureSpec    <- structureName（前结构）
+     *   remainQty        <- structureChangeRemaining（结构排程开始前的成型余量）
+     *   receiveEstDate   <- endingTime（收尾时间）
+     *   receiveMonthPlan <- MpStructureAllocation中前结构的endDay（MM.DD格式）
+     *   remark           <- remark
+     *   nextStructure    <- nextStructureName（后结构）
+     *   startEstDate     <- earliestLhTime（最早可供硫化时间）
+     *   startMonthPlan   <- MpStructureAllocation中后结构的beginDay（MM.DD格式）
+     *   remark2          <- 空
+     * </p>
+     *
+     * @param lhTime 胎胚最早可供硫化时间实体
+     * @param structureMap 结构名称->MpStructureAllocation 映射（用于取月计划时间）
+     * @param year 年份
+     * @param month 月份
+     * @return 单行导出数据
+     */
+    private Map<String, Object> buildStructureChangeRowFromEntity(CxEmbryoLhTime lhTime,
+                                                                   Map<String, MpStructureAllocation> structureMap,
+                                                                   int year, int month) {
+        String prevStructureName = StringUtils.defaultString(lhTime.getStructureName()).trim();
+        String nextStructureName = StringUtils.defaultString(lhTime.getNextStructureName()).trim();
+
+        // 从 MpStructureAllocation 取前结构月计划时间（endDay）和后结构月计划时间（beginDay）
+        MpStructureAllocation prevStructure = structureMap.get(prevStructureName);
+        MpStructureAllocation nextStructure = structureMap.get(nextStructureName);
+
+        Map<String, Object> row = new LinkedHashMap<>();
+        row.put("stt", 0);
+        row.put("machineCode", lhTime.getCxMachineCode());
+        row.put("structureSpec", prevStructureName);
+        // 成型余量
+        Integer remainQtyVal = lhTime.getStructureChangeRemaining();
+        row.put("remainQty", remainQtyVal != null && remainQtyVal > 0 ? remainQtyVal.toString() : "");
+        // 预计收尾时间（前结构结束时间）
+        row.put("receiveEstDate", lhTime.getEndingTime() != null
+                ? cn.hutool.core.date.DateUtil.format(lhTime.getEndingTime(), "yyyy-MM-dd HH:mm") : "");
+        // 前结构月计划时间（从 MpStructureAllocation 取 endDay）
+        row.put("receiveMonthPlan", prevStructure != null
+                ? this.formatDateFromDay(year, month, prevStructure.getEndDay()) : "");
+        // 收尾备注
+        row.put("remark", lhTime.getRemark() != null ? lhTime.getRemark() : "");
+        // 后结构
+        row.put("nextStructure", nextStructureName);
+        // 预计开产时间（最早可供硫化时间）
+        row.put("startEstDate", lhTime.getEarliestLhTime() != null
+                ? cn.hutool.core.date.DateUtil.format(lhTime.getEarliestLhTime(), "yyyy-MM-dd HH:mm") : "");
+        // 后结构月计划时间（从 MpStructureAllocation 取 beginDay）
+        row.put("startMonthPlan", nextStructure != null
+                ? this.formatDateFromDay(year, month, nextStructure.getBeginDay()) : "");
+        // 开产备注
+        row.put("remark2", "");
+        // 追踪字段
+        row.put("traceTd", "");
+        row.put("traceSw", "");
+        row.put("traceIl", "");
+        row.put("traceUb", "");
+        row.put("traceBd", "");
+        row.put("traceCa", "");
+        row.put("traceBe", "");
+        row.put("traceCh", "");
+
+        // 排序键：后结构开产日期
+        LocalDate nextBeginDate = nextStructure != null && nextStructure.getBeginDay() != null
+                ? LocalDate.of(year, month, Math.min(nextStructure.getBeginDay(), LocalDate.of(year, month, 1).lengthOfMonth()))
+                : null;
+        String sortKey = nextStructure != null && nextStructure.getBeginDay() != null
+                ? String.format("%04d-%02d-%02d", year, month, nextStructure.getBeginDay())
+                : "9999-99-99";
+        row.put("_sortKey", sortKey);
+        row.put("_nextBeginDate", nextBeginDate);
+
+        return row;
     }
 
     /**
@@ -519,7 +727,9 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
                                                                Map<String, String> smallGlueMap,
                                                                Map<String, String> placeholderMap,
                                                                Map<String, String> shiftCapacitiesMap,
-                                                               Set<String> keyProductEmbryoCodes) {
+                                                               Set<String> keyProductEmbryoCodes,
+                                                               Map<String, int[]> lhShiftConsumptionMap,
+                                                               Set<String> endingStructureNames) {
         List<CxScheduleResult> exportList = Objects.isNull(list) ? Collections.emptyList() : list;
 
         Map<String, List<CxScheduleResult>> groupMap = exportList.stream()
@@ -537,9 +747,9 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
                     String::compareTo));
 
             for (CxScheduleResult item : groupList) {
-                dataList.add(buildCxTemplateRow(item, recipeTypeMap, totalDailyPlanQtyMap, todayNightFinishQtyMap, smallGlueMap, placeholderMap, shiftCapacitiesMap, keyProductEmbryoCodes));
+                dataList.add(buildCxTemplateRow(item, recipeTypeMap, totalDailyPlanQtyMap, todayNightFinishQtyMap, smallGlueMap, placeholderMap, shiftCapacitiesMap, keyProductEmbryoCodes, lhShiftConsumptionMap));
             }
-            dataList.add(buildCxTemplateSubtotalRow(groupList));
+            dataList.add(buildCxTemplateSubtotalRow(groupList, lhShiftConsumptionMap));
         }
 
         return dataList;
@@ -554,14 +764,20 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
                                                       Map<String, String> smallGlueMap,
                                                       Map<String, String> placeholderMap,
                                                       Map<String, String> shiftCapacitiesMap,
-                                                      Set<String> keyProductEmbryoCodes) {
+                                                      Set<String> keyProductEmbryoCodes,
+                                                      Map<String, int[]> lhShiftConsumptionMap) {
         Map<String, Object> row = new LinkedHashMap<>();
+        // 硫化排程6/7/8班消耗量（按胎胚代码匹配同日硫化计划量）
+        String embryoKey = StringUtils.defaultString(item.getEmbryoCode()).trim();
+        int[] lhConsumption = lhShiftConsumptionMap != null ? lhShiftConsumptionMap.getOrDefault(embryoKey, new int[3]) : new int[3];
+        row.put("lhClass6Consumption", lhConsumption[0] != 0 ? lhConsumption[0] : "");
+        row.put("lhClass7Consumption", lhConsumption[1] != 0 ? lhConsumption[1] : "");
+        row.put("lhClass8Consumption", lhConsumption[2] != 0 ? lhConsumption[2] : "");
+
         row.put("cxMachineCode", item.getCxMachineCode());
         row.put("structureName", item.getStructureName());
         row.put("embryoCode", item.getEmbryoCode());
-        row.put("materialDesc", item.getMaterialDesc());
         row.put("mainMaterialDesc", item.getMainMaterialDesc());
-        row.put("materialCode", item.getMaterialCode());
         row.put("cxRemainQty", item.getCxRemainQty());
         row.put("lhRemainQty", item.getLhRemainQty());
         row.put("totalStock", item.getTotalStock());
@@ -670,9 +886,18 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
 
     /**
      * 构建小计行。
+     *
+     * @param groupList 机台分组内的明细列表
+     * @param lhShiftConsumptionMap 硫化排程6/7/8班消耗量映射（小计行不汇总此3列）
+     * @return 小计行数据
      */
-    private Map<String, Object> buildCxTemplateSubtotalRow(List<CxScheduleResult> groupList) {
+    private Map<String, Object> buildCxTemplateSubtotalRow(List<CxScheduleResult> groupList, Map<String, int[]> lhShiftConsumptionMap) {
         Map<String, Object> row = new LinkedHashMap<>();
+        // 小计行不汇总硫化6/7/8班消耗量，置空
+        row.put("lhClass6Consumption", "");
+        row.put("lhClass7Consumption", "");
+        row.put("lhClass8Consumption", "");
+
         row.put("cxMachineCode", "小计");
         // 小计行显示该机台分组内去重后的结构
         String structureNames = groupList.stream()
@@ -791,6 +1016,83 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
                 .map(String::trim)
                 .filter(StringUtils::isNotEmpty)
                 .count();
+    }
+
+    /**
+     * 加载要收尾的结构名称集合。
+     * <p>从 CxEmbryoLhTime 表查询，该表记录的是未来几天要切换的结构，
+     * 其中 structureName（前结构）即为要收尾的结构。
+     * 只按工厂编码查询，不限日期，确保能取到所有待收尾结构。</p>
+     *
+     * @param factoryCode 工厂编码
+     * @return 要收尾的结构名称集合
+     */
+    private Set<String> loadEndingStructureNames(String factoryCode) {
+        LambdaQueryWrapper<CxEmbryoLhTime> wrapper = new LambdaQueryWrapper<>();
+        if (StringUtils.isNotBlank(factoryCode)) {
+            wrapper.eq(CxEmbryoLhTime::getFactoryCode, factoryCode);
+        }
+
+        List<CxEmbryoLhTime> list = cxEmbryoLhTimeMapper.selectList(wrapper);
+        log.info("loadEndingStructureNames: factoryCode={}, 查询结果{}条", factoryCode, list != null ? list.size() : 0);
+        if (CollectionUtils.isEmpty(list)) {
+            return Collections.emptySet();
+        }
+        return list.stream()
+                .map(CxEmbryoLhTime::getStructureName)
+                .filter(StringUtils::isNotBlank)
+                .map(String::trim)
+                .collect(Collectors.toSet());
+    }
+
+    /**
+     * 构建硫化排程6/7/8班消耗量映射。
+     * <p>按排程日期和胎胚代码匹配硫化排程结果，分别汇总6班、7班、8班的计划量。
+     * 匹配维度：硫化排程结果中同一天（scheduleDate）+ 相同胎胚代码（embryoCode）的所有记录。</p>
+     *
+     * @param exportList  成型排程结果列表
+     * @param scheduleDate 排程日期
+     * @return key=embryoCode, value=[6班合计, 7班合计, 8班合计]
+     */
+    private Map<String, int[]> buildLhShiftConsumptionMap(List<CxScheduleResult> exportList, Date scheduleDate) {
+        if (PubUtil.isEmpty(exportList) || scheduleDate == null) {
+            return Collections.emptyMap();
+        }
+
+        // 收集所有唯一的胎胚代码
+        Set<String> embryoCodes = exportList.stream()
+                .map(CxScheduleResult::getEmbryoCode)
+                .filter(StringUtils::isNotBlank)
+                .map(String::trim)
+                .collect(Collectors.toSet());
+
+        if (embryoCodes.isEmpty()) {
+            return Collections.emptyMap();
+        }
+
+        // 查询同一天、相同胎胚的硫化排程结果
+        List<LhScheduleResult> lhResults = lhScheduleResultMapper.selectList(
+                new LambdaQueryWrapper<LhScheduleResult>()
+                        .eq(LhScheduleResult::getScheduleDate, scheduleDate)
+                        .in(LhScheduleResult::getEmbryoCode, embryoCodes));
+
+        if (PubUtil.isEmpty(lhResults)) {
+            return Collections.emptyMap();
+        }
+
+        // 按胎胚代码分组，分别累加6/7/8班计划量
+        Map<String, int[]> resultMap = new LinkedHashMap<>();
+        for (LhScheduleResult lh : lhResults) {
+            String embryoCode = StringUtils.defaultString(lh.getEmbryoCode()).trim();
+            if (StringUtils.isEmpty(embryoCode)) {
+                continue;
+            }
+            int[] sums = resultMap.computeIfAbsent(embryoCode, k -> new int[3]);
+            sums[0] += lh.getClass6PlanQty() != null ? lh.getClass6PlanQty() : 0;
+            sums[1] += lh.getClass7PlanQty() != null ? lh.getClass7PlanQty() : 0;
+            sums[2] += lh.getClass8PlanQty() != null ? lh.getClass8PlanQty() : 0;
+        }
+        return resultMap;
     }
 
     /**
@@ -941,9 +1243,8 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
 
     /**
      * 构建小胶种和占位符映射。
-     * <p>取值逻辑与 Sheet0 成型余量-按机台 的 smallGlue 完全一致：
-     * 从 CxParamConfig 读取 SYS04010002，加 AQ 前缀后精确匹配 MdmMaterialConsumeDetail，
-     * 取 CHILD_MATERIAL_NAME 去掉 AQ 前缀后直接展示参数值（如 A01）。</p>
+     * <p>直接从物料消耗明细表查询以AQ开头的胶种记录（不依赖参数配置），
+     * 取 CHILD_MATERIAL_NAME 去掉 AQ 前缀后展示。</p>
      *
      * @param exportList 成型排程结果列表
      * @return key=smallGlue/placeholder, value=embryoCode→字符串的映射
@@ -957,36 +1258,18 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
             return result;
         }
 
-        CxParamConfig config = cxParamConfigMapper.selectOne(
-                new LambdaQueryWrapper<CxParamConfig>()
-                        .eq(CxParamConfig::getParamCode, "SYS04010002")
-                        .eq(CxParamConfig::getIsActive, 1));
-
-        if (config == null || StringUtils.isBlank(config.getParamValue())) {
-            return result;
-        }
-
-        List<String> codes = Arrays.stream(config.getParamValue().split(","))
-                .map(String::trim)
-                .filter(StringUtils::isNotBlank)
-                .map(item -> "AQ" + item)
-                .collect(Collectors.toList());
-
-        if (codes.isEmpty()) {
-            return result;
-        }
-
         String factoryCode = exportList.stream()
                 .map(CxScheduleResult::getFactoryCode)
                 .filter(StringUtils::isNotBlank)
                 .findFirst()
                 .orElse(null);
 
+        // 直接查询胶种数据（CHILD_MATERIAL_NAME以AQ开头），不依赖参数配置
         List<MdmMaterialConsumeDetail> consumeDetails = mdmMaterialConsumeDetailMapper.selectList(
                 new LambdaQueryWrapper<MdmMaterialConsumeDetail>()
                         .eq(BaseEntity::getIsDelete, YesOrNoEnum.NO.getCode())
                         .eq(factoryCode != null, MdmMaterialConsumeDetail::getFactoryCode, factoryCode)
-                        .in(MdmMaterialConsumeDetail::getChildMaterialName, codes));
+                        .likeRight(MdmMaterialConsumeDetail::getChildMaterialName, "AQT"));
 
         if (CollectionUtils.isEmpty(consumeDetails)) {
             return result;
@@ -1329,7 +1612,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
      * @param list 成型排程结果明细列表
      * @return 模板列表行数据，字段名与cxyl.xlsx中的列表占位符保持一致
      */
-    private List<Map<String, Object>> buildCxRemainQtyExportDataList(List<CxScheduleResult> list) {
+    private List<Map<String, Object>> buildCxRemainQtyExportDataList(List<CxScheduleResult> list, Set<String> endingStructureNames) {
         List<CxScheduleResult> exportList = Objects.isNull(list) ? Collections.emptyList() :
                 list.stream().sorted(Comparator.comparing(CxScheduleResult::getCxMachineCode, String.CASE_INSENSITIVE_ORDER)
                                 .thenComparing(CxScheduleResult::getMaterialCode))
@@ -1342,29 +1625,17 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
                 .filter(Objects::nonNull)
                 .collect(Collectors.groupingBy(this::buildCxRemainQtyGroupKey, LinkedHashMap::new, Collectors.toList()));
 
-        // 查询胶种，使用胎胚代码关联，取对应的花纹等
-        CxParamConfig config = cxParamConfigMapper.selectOne(
-                new LambdaQueryWrapper<CxParamConfig>()
-                        .eq(CxParamConfig::getParamCode, "SYS04010002")
-                        .eq(CxParamConfig::getIsActive, 1));
-
+        // 直接查询胶种数据（CHILD_MATERIAL_NAME以AQ开头），不依赖参数配置
         Map<String, String> smallGlueMap = new HashMap<>();
-        if (config != null && StringUtils.isNotBlank(config.getParamValue())) {
-            List<String> codes = Arrays.stream(config.getParamValue().split(","))
-                    .map(String::trim)
-                    .filter(StringUtils::isNotBlank)
-                    .map(item -> "AQ" + item)
-                    .collect(Collectors.toList());
-            List<MdmMaterialConsumeDetail> mdmMaterialConsumeDetailList = mdmMaterialConsumeDetailMapper.selectList(new LambdaQueryWrapper<MdmMaterialConsumeDetail>()
-                    .eq(BaseEntity::getIsDelete, YesOrNoEnum.NO.getCode())
-                    .eq(MdmMaterialConsumeDetail::getFactoryCode, list.get(0).getFactoryCode())
-                    .in(MdmMaterialConsumeDetail::getChildMaterialName, codes));
+        List<MdmMaterialConsumeDetail> mdmMaterialConsumeDetailList = mdmMaterialConsumeDetailMapper.selectList(new LambdaQueryWrapper<MdmMaterialConsumeDetail>()
+                .eq(BaseEntity::getIsDelete, YesOrNoEnum.NO.getCode())
+                .eq(MdmMaterialConsumeDetail::getFactoryCode, list.get(0).getFactoryCode())
+                .likeRight(MdmMaterialConsumeDetail::getChildMaterialName, "AQT"));
 
-            if(CollectionUtils.isNotEmpty(mdmMaterialConsumeDetailList)) {
-                smallGlueMap = mdmMaterialConsumeDetailList.stream()
-                        .collect(Collectors.toMap(MdmMaterialConsumeDetail::getEmbryoCode,
-                                MdmMaterialConsumeDetail::getChildMaterialName, (a, b) -> a));
-            }
+        if (CollectionUtils.isNotEmpty(mdmMaterialConsumeDetailList)) {
+            smallGlueMap = mdmMaterialConsumeDetailList.stream()
+                    .collect(Collectors.toMap(MdmMaterialConsumeDetail::getEmbryoCode,
+                            MdmMaterialConsumeDetail::getChildMaterialName, (a, b) -> a));
         }
 
 
@@ -1373,6 +1644,18 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
             if (CollectionUtils.isEmpty(groupList)) {
                 continue;
             }
+
+            // 过滤：只展示 余量<400 或 结构在收尾集合中的分组
+            BigDecimal groupRemainQty = sumCxRemainQty(groupList);
+            boolean isEndingStructure = groupList.stream()
+                    .map(CxScheduleResult::getStructureName)
+                    .filter(StringUtils::isNotBlank)
+                    .map(String::trim)
+                    .anyMatch(name -> endingStructureNames != null && endingStructureNames.contains(name));
+            if (!(groupRemainQty.compareTo(new BigDecimal("400")) < 0 || isEndingStructure)) {
+                continue;
+            }
+
             CxScheduleResult first = groupList.get(0);
             Map<String, Object> row = new LinkedHashMap<>();
             row.put("cxMachineCode", first.getCxMachineCode());

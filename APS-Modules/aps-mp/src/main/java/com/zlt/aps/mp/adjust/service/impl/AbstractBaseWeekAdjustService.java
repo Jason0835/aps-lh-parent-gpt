@@ -1007,7 +1007,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
 
         // 初始化SKU排产分类
         initSkuProductionType(contextDTO);
-
+        initMaterialInfo(contextDTO);
         // 设置调整日（依赖 paramMap）
         setAdjustDate(contextDTO);
 
@@ -1804,6 +1804,8 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             // 设置周调整量
             int week = getWeekNumber(contextDTO.getAdjustDay());
             setWeekAdjustQty(monthPlan, week);
+
+            setMaterialInfoField(contextDTO,monthPlan);
             // 设置最新需求计划版本
             monthPlan.setLastMonthPlanVersion(adjustResult.getLastMonthPlanVersion());
             // 设置月度计划开始日期、结束日期
@@ -1900,8 +1902,8 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         }
         // 初始化试制量试计划
         initTrialPlan(contextDTO);
-        // 初始化物料信息
-        initMaterialInfo(contextDTO);
+        // 初始化物料信息    移到前面
+        //initMaterialInfo(contextDTO);
         // 初始化SKU日硫化产能
         initSkuLhCapacity(contextDTO);
         // 月度计划结果列表
@@ -2066,6 +2068,10 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         monthPlan.setProductCategory(materialInfo.getProductCategory());
         // 英寸
         monthPlan.setProSize(materialInfo.getProSize());
+        // 胎胚号
+        monthPlan.setEmbryoCode(materialInfo.getEmbryoCode());
+        // 胎胚描述
+        monthPlan.setMainMaterialDesc(materialInfo.getEmbryoDesc());
     }
 
     /**
@@ -2654,24 +2660,33 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             MpAdjustResult adjustResult = CollectionUtils.firstElement(adjustResultMap.get(materialCodeKey));
             if (adjustResult == null) {
                 log.warn("更新月度生产计划：物料编号:{},施工阶段:{},未查询到对应调整结果，跳过", materialCode, monthPlan.getConstructionStage());
-                if (skuAdjustInfo != null && (skuAdjustInfo.getPendingQty() == null || skuAdjustInfo.getPendingQty() == 0)){
+                /*if (skuAdjustInfo != null && (skuAdjustInfo.getPendingQty() == null || skuAdjustInfo.getPendingQty() == 0)){
                     //若待调整量 == 0 且 调整的需求计划版本与定稿的需求计划版本不一致，将”超欠产有效标识“ = 否；
                     if (!contextDTO.getAdjustMonthPlanVersion().equals(oriMonthPlanVersion)){
                         monthPlan.setLastMonthValidFlag(YesOrNoEnum.NO.getCode());
                     }
+                }*/
+                //当月只要有确认调整，将上月超产欠标志 置否 sandy+ 2026.7.9
+                if (contextDTO.getMpMonth() == contextDTO.getCurrentMonth()){
+                    monthPlan.setLastMonthValidFlag(YesOrNoEnum.NO.getCode());
                 }
+                setMaterialInfoField(contextDTO,monthPlan);
                 continue;
             }
             // 相同业务Key时以调整结果为准；调整独有数据转换为同一VO后追加返回。
             BeanUtil.copyProperties(adjustResult, monthPlan, "id");
-            //monthPlan.setId(null);
-            if (skuAdjustInfo != null && (skuAdjustInfo.getPendingQty() == null || skuAdjustInfo.getPendingQty() == 0)){
+            /*if (skuAdjustInfo != null && (skuAdjustInfo.getPendingQty() == null || skuAdjustInfo.getPendingQty() == 0)){
                 //若待调整量 == 0 且 调整的需求计划版本与定稿的需求计划版本不一致，将”超欠产有效标识“ = 否；
                 if (!contextDTO.getAdjustMonthPlanVersion().equals(oriMonthPlanVersion)){
                     monthPlan.setLastMonthValidFlag(YesOrNoEnum.NO.getCode());
                     adjustResult.setLastMonthValidFlag(YesOrNoEnum.NO.getCode());
                     updateAdjustResultValidFlagList.add(adjustResult);
                 }
+            }*/
+            if (contextDTO.getMpMonth() == contextDTO.getCurrentMonth()){
+                monthPlan.setLastMonthValidFlag(YesOrNoEnum.NO.getCode());
+                adjustResult.setLastMonthValidFlag(YesOrNoEnum.NO.getCode());
+                updateAdjustResultValidFlagList.add(adjustResult);
             }
             // 设置最新需求计划版本
             //monthPlan.setLastMonthPlanVersion(lastMonthPlanVersion);
@@ -2712,6 +2727,9 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             // 设置周调整量
             int week = getWeekNumber(contextDTO.getAdjustDay());
             setWeekAdjustQty(monthPlan, week);
+
+            setMaterialInfoField(contextDTO,monthPlan);
+
             // 将日期字段中值为0的字段设为null
             handleZeroToNull(monthPlan);
         }
@@ -3520,7 +3538,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         queryVO.setFactoryCode(contextDTO.getFactoryCode());
 
         String cacheKey = dataManager.generateCacheKey(queryVO.getFactoryCode());
-        DataDTO dataDTO = dataManager.buildDataDTO(queryVO, cacheKey, Boolean.TRUE);
+        DataDTO dataDTO = dataManager.buildDataDTO(queryVO, cacheKey, Boolean.FALSE);
         List<MdmMaterialInfo> mdmMaterialInfoList = dataManager.listMaterialInfos(dataDTO);
 
         Map<String, MdmMaterialInfo> mdmMaterialInfoMap = convertToMaterialInfoMap(mdmMaterialInfoList);

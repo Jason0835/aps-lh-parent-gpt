@@ -432,7 +432,7 @@ export default {
               formatter: (row, column, value) => this.shiftLeftRightMouldFormatter(row, column, value, 1),
             }, // 第1班-左右模
             {
-          prop: "class1LhType",
+          prop: "productStatus",
           label: this.$t("ui.data.column.lhScheduleResult.constructionStage"),
           formatter: (row, column, value) => this.shiftLhTypeFormatter(row, column, value, 1),
         }, // 第1班-示方类型
@@ -467,7 +467,7 @@ export default {
               formatter: (row, column, value) => this.shiftLeftRightMouldFormatter(row, column, value, 2),
             }, // 第2班-左右模
             {
-              prop: "class2LhType",
+              prop: "productStatus",
               label: this.$t("ui.data.column.lhScheduleResult.constructionStage"),
               formatter: (row, column, value) => this.shiftLhTypeFormatter(row, column, value, 2),
             }, // 第2班-示方类型
@@ -503,7 +503,7 @@ export default {
               formatter: (row, column, value) => this.shiftLeftRightMouldFormatter(row, column, value, 3),
             }, // 第3班-左右模
             {
-              prop: "class3LhType",
+              prop: "productStatus",
               label: this.$t("ui.data.column.lhScheduleResult.constructionStage"),
               formatter: (row, column, value) => this.shiftLhTypeFormatter(row, column, value, 3),
             }, // 第3班-示方类型
@@ -539,7 +539,7 @@ export default {
               formatter: (row, column, value) => this.shiftLeftRightMouldFormatter(row, column, value, 4),
             }, // 第4班-左右模
             {
-              prop: "class4LhType",
+              prop: "productStatus",
               label: this.$t("ui.data.column.lhScheduleResult.constructionStage"),
               formatter: (row, column, value) => this.shiftLhTypeFormatter(row, column, value, 4),
             }, // 第4班-示方类型
@@ -575,7 +575,7 @@ export default {
               formatter: (row, column, value) => this.shiftLeftRightMouldFormatter(row, column, value, 5),
             }, // 第5班-左右模
             {
-              prop: "class5LhType",
+              prop: "productStatus",
               label: this.$t("ui.data.column.lhScheduleResult.constructionStage"),
               formatter: (row, column, value) => this.shiftLhTypeFormatter(row, column, value, 5),
             }, // 第5班-示方类型
@@ -611,7 +611,7 @@ export default {
               formatter: (row, column, value) => this.shiftLeftRightMouldFormatter(row, column, value, 6),
             }, // 第6班-左右模
             {
-              prop: "class6LhType",
+              prop: "productStatus",
               label: this.$t("ui.data.column.lhScheduleResult.constructionStage"),
               formatter: (row, column, value) => this.shiftLhTypeFormatter(row, column, value, 6),
             }, // 第6班-示方类型
@@ -647,7 +647,7 @@ export default {
               formatter: (row, column, value) => this.shiftLeftRightMouldFormatter(row, column, value, 7),
             }, // 第7班-左右模
             {
-              prop: "class7LhType",
+              prop: "productStatus",
               label: this.$t("ui.data.column.lhScheduleResult.constructionStage"),
               formatter: (row, column, value) => this.shiftLhTypeFormatter(row, column, value, 7),
             }, // 第7班-示方类型
@@ -683,7 +683,7 @@ export default {
               formatter: (row, column, value) => this.shiftLeftRightMouldFormatter(row, column, value, 8),
             }, // 第8班-左右模
             {
-              prop: "class8LhType",
+              prop: "productStatus",
               label: this.$t("ui.data.column.lhScheduleResult.constructionStage"),
               formatter: (row, column, value) => this.shiftLhTypeFormatter(row, column, value, 8),
             }, // 第8班-示方类型

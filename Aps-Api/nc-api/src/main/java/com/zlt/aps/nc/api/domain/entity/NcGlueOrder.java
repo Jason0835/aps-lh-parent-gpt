@@ -4,6 +4,7 @@ import java.io.Serializable;
 
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.ruoyi.common.core.annotation.Excel;
 import com.ruoyi.common.core.web.domain.BaseEntity;
 
 import io.swagger.annotations.ApiModel;
@@ -34,15 +35,36 @@ public class NcGlueOrder extends BaseEntity implements Serializable {
     @TableField("GLUE_GROUP_ID")
     private Long glueGroupId;
 
+    @Excel(name = "ui.glueOrder.column.glueCode")
     @ApiModelProperty(value = "胶料编号")
     @TableField("GLUE_CODE")
     private String glueCode;
 
+    @Excel(name = "ui.glueOrder.column.orderNum")
     @ApiModelProperty(value = "生产顺序")
     @TableField("ORDER_NUM")
     private Integer orderNum;
 
+    @Excel(name = "ui.common.column.remark")
     @ApiModelProperty(value = "备注")
     @TableField("REMARK")
     private String remark;
+
+    /** 反显字段：胶料组代码 */
+    @Excel(name = "ui.glueGroup.column.glueGroupCode")
+    @TableField(exist = false)
+    @ApiModelProperty(value = "胶料组代码")
+    private String glueGroupCode;
+
+    /** 反显字段：胶料组名称 */
+    @Excel(name = "ui.glueGroup.column.glueGroupName")
+    @TableField(exist = false)
+    @ApiModelProperty(value = "胶料组名称")
+    private String glueGroupName;
+
+    /** 反显字段：胶料组序号 */
+    @Excel(name = "ui.glueOrder.column.groupGlue.orderNum")
+    @TableField(exist = false)
+    @ApiModelProperty(value = "胶料组序号")
+    private Integer glueGroupOrderNum;
 }

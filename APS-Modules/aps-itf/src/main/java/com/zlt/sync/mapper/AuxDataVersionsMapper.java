@@ -1,7 +1,11 @@
 package com.zlt.sync.mapper;
 
+import com.baomidou.dynamic.datasource.annotation.DS;
+import com.zlt.aps.itf.constant.DataSource;
 import com.zlt.sync.domain.AuxDataVersions;
 import com.zlt.sync.domain.vo.AuxDataVersionsVO;
+
+import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
 import java.util.List;
@@ -10,6 +14,8 @@ import java.util.Map;
 /**
  * 数据版本号接口
  */
+@DS(DataSource.MASTER)
+@Mapper
 public interface AuxDataVersionsMapper {
 
     int insert(@Param("auxDataVersions") AuxDataVersions auxDataVersions);

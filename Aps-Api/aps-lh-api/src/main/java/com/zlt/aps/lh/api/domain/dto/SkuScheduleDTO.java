@@ -48,6 +48,8 @@ public class SkuScheduleDTO {
     // ========== 计划量信息 ==========
     /** 月度计划总量 */
     private int monthPlanQty;
+    /** 非断点计划总量（各月计划量汇总，不扣除断点） */
+    private int monthPlanSumTotal;
     /** 已完成合格量 */
     private int finishedQty;
     /** 硫化余量 = 月度计划量 - 已完成合格量 */
@@ -88,7 +90,7 @@ public class SkuScheduleDTO {
     private String constructionStage;
     /** 试制量试需求量 */
     private int trialDemandQty;
-    /** 是否小批量验证SKU；正规 SKU 余量低于参数阈值时置为 true，主要影响单控/普通机台选择规则 */
+    /** 是否小批量验证SKU；正规 SKU 命中月计划表 totalQty<=100 时置为 true，主要影响单控/普通机台选择规则 */
     private boolean smallBatchValidation;
     /** 月计划结构起产日 */
     private Integer beginDay;

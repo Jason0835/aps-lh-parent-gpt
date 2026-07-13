@@ -2,7 +2,10 @@ package com.zlt.aps.cx.service.engine;
 
 import com.zlt.aps.cx.entity.config.CxParamConfig;
 import com.zlt.aps.cx.entity.config.CxShiftConfig;
+import com.zlt.aps.cx.vo.DailyEmbryoTask;
+import com.zlt.aps.cx.vo.MachineAllocationResult;
 import com.zlt.aps.cx.vo.ScheduleContextVo;
+import com.zlt.aps.cx.vo.TaskAllocation;
 import com.zlt.aps.mp.api.domain.entity.MdmMoldingMachine;
 import com.zlt.aps.mp.api.domain.entity.MdmStructureLhRatio;
 import com.zlt.aps.mp.api.domain.entity.MpCxCapacityConfiguration;
@@ -33,7 +36,7 @@ import java.util.stream.Collectors;
  *   <li><b>不</b>在 DFS 内做续作历史保底（SYS04070003=Y 时保底已在 ContinueTaskProcessor 完成；
  *       本类传入 {@code forceKeepHistory=false}，仅通过 {@code continueLoadMap} 继承预扣）。</li>
  *   <li><b>负责</b>：将「新增任务」与「续作剩余 demand&gt;0 任务」按结构合并 → 构建预扣/量试约束 →
- *       调用 DFS → 将 {@link BalancingService.BalancingResult} 转为 {@link CoreScheduleAlgorithmService.MachineAllocationResult}。</li>
+ *       调用 DFS → 将 {@link BalancingService.BalancingResult} 转为 {@link MachineAllocationResult}。</li>
  * </ul>
  *
  * <h3>单位约定</h3>
@@ -54,7 +57,7 @@ import java.util.stream.Collectors;
  * @author APS Team
  * @see ContinueTaskProcessor
  * @see BalancingService#balanceEmbryosToMachinesWithMachineCapacity
- * @see CoreScheduleAlgorithmService.DailyEmbryoTask
+ * @see DailyEmbryoTask
  */
 @Slf4j
 @Service
@@ -95,27 +98,27 @@ public class NewTaskProcessor {
      * @param trialAllocations   试制分配结果（量试约束来源）
      * @return DFS 均衡产生的新机台分配列表
      */
-    public List<CoreScheduleAlgorithmService.MachineAllocationResult> processNewTasks(
-            List<CoreScheduleAlgorithmService.DailyEmbryoTask> newTasks,
+    public List<MachineAllocationResult> processNewTasks(
+            List<DailyEmbryoTask> newTasks,
             ScheduleContextVo context,
             LocalDate scheduleDate,
             List<CxShiftConfig> dayShifts,
-            List<CoreScheduleAlgorithmService.DailyEmbryoTask> continueTasks,
-            List<CoreScheduleAlgorithmService.MachineAllocationResult> existAllocations,
-            List<CoreScheduleAlgorithmService.MachineAllocationResult> trialAllocations) {
+            List<DailyEmbryoTask> continueTasks,
+            List<MachineAllocationResult> existAllocations,
+            List<MachineAllocationResult> trialAllocations) {
 
-        List<CoreScheduleAlgorithmService.MachineAllocationResult> allResults = new ArrayList<>();
+        List<MachineAllocationResult> allResults = new ArrayList<>();
 
         log.info("========== 开始处理新增任务，新增={}，续作={} ==========",
                 CollectionUtils.isEmpty(newTasks) ? 0 : newTasks.size(),
                 CollectionUtils.isEmpty(continueTasks) ? 0 : continueTasks.size());
 
         // --- 5.3.3.1 按结构分组：收集参与 DFS 的任务 ---
-        Map<String, List<CoreScheduleAlgorithmService.DailyEmbryoTask>> structureTaskMap = new LinkedHashMap<>();
+        Map<String, List<DailyEmbryoTask>> structureTaskMap = new LinkedHashMap<>();
 
         // 5.3.3.1.a 新增任务：无实际条数则不占 DFS 搜索空间与机台种类槽
         if (!CollectionUtils.isEmpty(newTasks)) {
-            for (CoreScheduleAlgorithmService.DailyEmbryoTask task : newTasks) {
+            for (DailyEmbryoTask task : newTasks) {
                 Integer endingExtraInventory = task.getEndingExtraInventory();
                 if (endingExtraInventory == null || endingExtraInventory <= 0) {
                     log.info("跳过计划量为0的新增任务: 胎胚={}, 物料={}", task.getEmbryoCode(), task.getMaterialCode());
@@ -127,7 +130,7 @@ public class NewTaskProcessor {
 
         // 5.3.3.1.b 续作剩余：保底预留后 vulcanizeMachineCount 仍 >0 的任务与新增一并均衡
         if (!CollectionUtils.isEmpty(continueTasks)) {
-            for (CoreScheduleAlgorithmService.DailyEmbryoTask task : continueTasks) {
+            for (DailyEmbryoTask task : continueTasks) {
                 int demand = task.getVulcanizeMachineCount() != null ? task.getVulcanizeMachineCount() : 0;
                 Integer endingExtraInventory = task.getEndingExtraInventory();
                 if (demand > 0 && endingExtraInventory != null && endingExtraInventory > 0) {
@@ -145,9 +148,9 @@ public class NewTaskProcessor {
         boolean forceKeepHistoryForBalancing = false;
 
         // --- 5.3.3.2 按结构独立执行一轮「预扣 → 约束 → DFS → 转换」---
-        for (Map.Entry<String, List<CoreScheduleAlgorithmService.DailyEmbryoTask>> entry : structureTaskMap.entrySet()) {
+        for (Map.Entry<String, List<DailyEmbryoTask>> entry : structureTaskMap.entrySet()) {
             String structureName = entry.getKey();
-            List<CoreScheduleAlgorithmService.DailyEmbryoTask> newTasksForStructure = entry.getValue();
+            List<DailyEmbryoTask> newTasksForStructure = entry.getValue();
 
             log.info("--- 处理结构 {}，共 {} 个参与均衡任务 ---", structureName, newTasksForStructure.size());
 
@@ -167,14 +170,14 @@ public class NewTaskProcessor {
             Map<String, Set<String>> continueLhMachineCodeMap = new HashMap<>();
 
             if (existAllocations != null) {
-                for (CoreScheduleAlgorithmService.MachineAllocationResult allocation : existAllocations) {
+                for (MachineAllocationResult allocation : existAllocations) {
                     String machineCode = allocation.getMachineCode();
                     Set<String> embryos = new HashSet<>();
                     Set<String> types = new HashSet<>();
                     Set<String> lhMachineCodes = new HashSet<>();
                     Set<String> countedLoadKeys = new HashSet<>();
                     int load = 0;
-                    for (CoreScheduleAlgorithmService.TaskAllocation taskAlloc : allocation.getTaskAllocations()) {
+                    for (TaskAllocation taskAlloc : allocation.getTaskAllocations()) {
                         if (structureName.equals(taskAlloc.getStructureName())) {
                             embryos.add(taskAlloc.getEmbryoCode());
                             types.add(taskAlloc.getEmbryoCode());
@@ -204,10 +207,10 @@ public class NewTaskProcessor {
                     trialAllocations, existAllocations, continueTasks, structureName);
 
             // 5.3.3.2.4 量试任务打 constrainedMachineCode；全部任务仍进入 balancedTasks 参与 DFS
-            List<CoreScheduleAlgorithmService.DailyEmbryoTask> constrainedTrials = new ArrayList<>();
-            List<CoreScheduleAlgorithmService.DailyEmbryoTask> balancedTasks = new ArrayList<>();
+            List<DailyEmbryoTask> constrainedTrials = new ArrayList<>();
+            List<DailyEmbryoTask> balancedTasks = new ArrayList<>();
 
-            for (CoreScheduleAlgorithmService.DailyEmbryoTask task : newTasksForStructure) {
+            for (DailyEmbryoTask task : newTasksForStructure) {
                 task.setIsContinueTask(false);
                 if (isVolumeTrialConstrained(task, trialMachineMap)) {
                     task.setConstrainedMachineCode(trialMachineMap.get(task.getEmbryoCode()));
@@ -217,18 +220,18 @@ public class NewTaskProcessor {
             }
 
             // 约束量试：将锁定胎胚写入 machineHistoryMap，DFS 候选机台筛选时保留该种类
-            for (CoreScheduleAlgorithmService.DailyEmbryoTask constrainedTask : constrainedTrials) {
+            for (DailyEmbryoTask constrainedTask : constrainedTrials) {
                 String targetMachine = constrainedTask.getConstrainedMachineCode();
                 machineHistoryMap.computeIfAbsent(targetMachine, k -> new HashSet<>())
                         .add(constrainedTask.getEmbryoCode());
             }
 
-            List<CoreScheduleAlgorithmService.DailyEmbryoTask> allTasksForStructure = new ArrayList<>(balancedTasks);
+            List<DailyEmbryoTask> allTasksForStructure = new ArrayList<>(balancedTasks);
 
             // 日志：统计本结构续作剩余条数（demand>0 的续作任务个数）
             int continueRemaining = 0;
             if (!CollectionUtils.isEmpty(continueTasks)) {
-                for (CoreScheduleAlgorithmService.DailyEmbryoTask task : continueTasks) {
+                for (DailyEmbryoTask task : continueTasks) {
                     if (structureName.equals(task.getStructureName())) {
                         int demand = task.getVulcanizeMachineCount() != null ? task.getVulcanizeMachineCount() : 0;
                         if (demand > 0) {
@@ -272,8 +275,8 @@ public class NewTaskProcessor {
 
             // 5.3.3.2.7 BalancingResult → MachineAllocationResult（按 EmbryoAssignment 逐条转换，禁止按胎胚合并）
             for (BalancingService.MachineAssignment assignment : balancingResult.getAssignments()) {
-                CoreScheduleAlgorithmService.MachineAllocationResult result =
-                        new CoreScheduleAlgorithmService.MachineAllocationResult();
+                MachineAllocationResult result =
+                        new MachineAllocationResult();
                 result.setMachineCode(assignment.getMachineCode());
                 result.setTaskAllocations(new ArrayList<>());
 
@@ -281,7 +284,7 @@ public class NewTaskProcessor {
 
                 for (BalancingService.EmbryoAssignment embryoAssignment
                         : assignment.getEmbryoAssignments()) {
-                    CoreScheduleAlgorithmService.DailyEmbryoTask task = embryoAssignment.getTask();
+                    DailyEmbryoTask task = embryoAssignment.getTask();
 
                     // 续作预扣占位：task=null 表示该机台负荷已在 ContinueTaskProcessor 分配，此处只跳过不写 TaskAllocation
                     if (task == null) {
@@ -291,8 +294,8 @@ public class NewTaskProcessor {
                     int assignedQty = embryoAssignment.getAssignedQty();
                     usedCapacity += assignedQty;
 
-                    CoreScheduleAlgorithmService.TaskAllocation taskAlloc =
-                            new CoreScheduleAlgorithmService.TaskAllocation();
+                    TaskAllocation taskAlloc =
+                            new TaskAllocation();
                     taskAlloc.setEmbryoCode(task.getEmbryoCode());
                     taskAlloc.setMaterialCode(task.getMaterialCode());
                     taskAlloc.setMaterialDesc(task.getMaterialDesc());
@@ -331,11 +334,11 @@ public class NewTaskProcessor {
 
             // 5.3.3.2.8 约束量试分配校验日志（仅当存在约束量试时输出明细）
             if (!constrainedTrials.isEmpty()) {
-                for (CoreScheduleAlgorithmService.DailyEmbryoTask ct : constrainedTrials) {
+                for (DailyEmbryoTask ct : constrainedTrials) {
                     boolean trialAssigned = false;
-                    for (CoreScheduleAlgorithmService.MachineAllocationResult mr : allResults) {
+                    for (MachineAllocationResult mr : allResults) {
                         if (mr.getMachineCode().equals(ct.getConstrainedMachineCode())) {
-                            for (CoreScheduleAlgorithmService.TaskAllocation ta : mr.getTaskAllocations()) {
+                            for (TaskAllocation ta : mr.getTaskAllocations()) {
                                 if (ta.getEmbryoCode().equals(ct.getEmbryoCode())) {
                                     trialAssigned = true;
                                     break;
@@ -353,9 +356,9 @@ public class NewTaskProcessor {
                     }
                 }
                 log.info("均衡后机台分配结果：");
-                for (CoreScheduleAlgorithmService.MachineAllocationResult mr : allResults) {
+                for (MachineAllocationResult mr : allResults) {
                     List<String> taskDetails = new ArrayList<>();
-                    for (CoreScheduleAlgorithmService.TaskAllocation ta : mr.getTaskAllocations()) {
+                    for (TaskAllocation ta : mr.getTaskAllocations()) {
                         String detail = ta.getEmbryoCode() + "[" + ta.getMaterialCode() + "]"
                                 + "(" + ta.getVulcanizeMachineCount() + ")";
                         taskDetails.add(detail);
@@ -584,15 +587,15 @@ public class NewTaskProcessor {
      * <p>供 {@link #isVolumeTrialConstrained} 判定量试是否必须上试制机台。
      */
     private Map<String, String> buildTrialMachineMap(
-            List<CoreScheduleAlgorithmService.MachineAllocationResult> trialAllocations,
-            List<CoreScheduleAlgorithmService.MachineAllocationResult> existAllocations,
-            List<CoreScheduleAlgorithmService.DailyEmbryoTask> continueTasks,
+            List<MachineAllocationResult> trialAllocations,
+            List<MachineAllocationResult> existAllocations,
+            List<DailyEmbryoTask> continueTasks,
             String structureName) {
         Map<String, String> trialMachineMap = new HashMap<>();
         if (trialAllocations != null) {
-            for (CoreScheduleAlgorithmService.MachineAllocationResult allocation : trialAllocations) {
+            for (MachineAllocationResult allocation : trialAllocations) {
                 String machineCode = allocation.getMachineCode();
-                for (CoreScheduleAlgorithmService.TaskAllocation taskAlloc : allocation.getTaskAllocations()) {
+                for (TaskAllocation taskAlloc : allocation.getTaskAllocations()) {
                     if (structureName.equals(taskAlloc.getStructureName())
                             && taskAlloc.getEmbryoCode() != null
                             && Boolean.TRUE.equals(taskAlloc.getIsTrialTask())) {
@@ -602,9 +605,9 @@ public class NewTaskProcessor {
             }
         }
         if (existAllocations != null) {
-            for (CoreScheduleAlgorithmService.MachineAllocationResult allocation : existAllocations) {
+            for (MachineAllocationResult allocation : existAllocations) {
                 String machineCode = allocation.getMachineCode();
-                for (CoreScheduleAlgorithmService.TaskAllocation taskAlloc : allocation.getTaskAllocations()) {
+                for (TaskAllocation taskAlloc : allocation.getTaskAllocations()) {
                     if (structureName.equals(taskAlloc.getStructureName())
                             && taskAlloc.getEmbryoCode() != null
                             && Boolean.TRUE.equals(taskAlloc.getIsTrialTask())) {
@@ -614,7 +617,7 @@ public class NewTaskProcessor {
             }
         }
         if (continueTasks != null) {
-            for (CoreScheduleAlgorithmService.DailyEmbryoTask task : continueTasks) {
+            for (DailyEmbryoTask task : continueTasks) {
                 if (structureName.equals(task.getStructureName())
                         && task.getEmbryoCode() != null
                         && Boolean.TRUE.equals(task.getIsTrialTask())
@@ -640,7 +643,7 @@ public class NewTaskProcessor {
      * 满足时 DFS 仅允许分配到 {@code constrainedMachineCode}。
      */
     private boolean isVolumeTrialConstrained(
-            CoreScheduleAlgorithmService.DailyEmbryoTask task,
+            DailyEmbryoTask task,
             Map<String, String> trialMachineMap) {
         if (!Boolean.TRUE.equals(task.getIsProductionTrial())) {
             return false;

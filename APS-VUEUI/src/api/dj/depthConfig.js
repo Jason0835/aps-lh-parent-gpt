@@ -31,7 +31,7 @@ export function removeDepthConfig(ids) {
   return request({
     url: '/dj/depthConfig/remove',
     method: 'post',
-    data: ids
+    params: { ids: ids instanceof Array ? ids.join(',') : ids }
   })
 }
 

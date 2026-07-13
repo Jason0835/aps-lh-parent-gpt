@@ -29,7 +29,7 @@
 
 <script>
 import infoForm from "@/views/components/infoForm.vue";
-import { editMachine, checkMachineCodeUnique } from "@/api/nc/machine";
+import { editMachine } from "@/api/nc/machine";
 export default {
   components: { infoForm },
   inject: ["parentDict"],
@@ -146,37 +146,20 @@ export default {
           label: this.$t("ui.data.column.machine.openMachineClass"),
           prop: "openMachineClass",
           render: (form) => {
-            if (form.classShift == "2") {
-              return (
-                <el-checkbox-group v-model={form.openMachineClass}>
-                  {this.parentDict.type.CLASS_NUM.map((row) => {
-                    return (
-                      <el-checkbox
-                        key={`CLASS_NUM_${row.value}`}
-                        label={row.value}
-                      >
-                        {row.label}
-                      </el-checkbox>
-                    );
-                  })}
-                </el-checkbox-group>
-              );
-            } else {
-              return (
-                <el-checkbox-group v-model={form.openMachineClass}>
-                  {this.parentDict.type.CLASS_NUM_THREE.map((row) => {
-                    return (
-                      <el-checkbox
-                        key={`CLASS_NUM_THREE_${row.value}`}
-                        label={row.value}
-                      >
-                        {row.label}
-                      </el-checkbox>
-                    );
-                  })}
-                </el-checkbox-group>
-              );
-            }
+            return (
+              <el-checkbox-group v-model={form.openMachineClass}>
+                {this.parentDict.type.class_num_three_plan.map((row) => {
+                  return (
+                    <el-checkbox
+                      key={`CLASS_NUM_THREE_PLAN_${row.value}`}
+                      label={row.value}
+                    >
+                      {row.label}
+                    </el-checkbox>
+                  );
+                })}
+              </el-checkbox-group>
+            );
           },
         },
         {
@@ -234,49 +217,6 @@ export default {
       return this.isEmpty(val) ? undefined : val;
     },
 
-    checkMachineCode(rule, value, callback) {
-      return new Promise((resolve, reject) => {
-        checkMachineCodeUnique({
-          id: this.form.id,
-          machineCode: this.form.machineCode,
-        })
-          .then((res) => {
-            if (res === 0) {
-              resolve();
-            } else {
-              reject(new Error(this.$t("ui.data.column.cx.machine.message")));
-            }
-          })
-          .catch((error) => {
-            console.error(error);
-            reject(new Error("验证失败，请稍后再试"));
-          });
-      });
-    },
-    checkMachineName() {
-      return new Promise((resolve, reject) => {
-        setTimeout(() => {
-          checkMachineCodeUnique({
-            id: this.form.id,
-            machineName: this.form.machineName,
-          })
-            .then((res) => {
-              if (res === 0) {
-                resolve();
-              } else {
-                reject(
-                  new Error(this.$t("ui.data.column.cx.machineName.message"))
-                );
-              }
-            })
-            .catch((error) => {
-              console.error(error);
-              reject(new Error("验证失败，请稍后再试"));
-            });
-        }, 201);
-      });
-    },
-
     handleConfirm() {
       this.$refs.form.triggerConfirm(async (params) => {
         if (params.openMachineClass) {
@@ -288,16 +228,7 @@ export default {
           }
         });
 
-        try {
-          this.loading = true;
-          await this.checkMachineCode();
-          await this.checkMachineName();
-          this.save(params);
-        } catch (error) {
-          console.error(error);
-          this.$modal.msgError(error.message);
-          this.loading = false;
-        }
+        this.save(params);
       });
     },
   },

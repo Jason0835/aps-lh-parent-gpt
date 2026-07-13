@@ -524,13 +524,24 @@ public class ScheduleContextVo {
     private Map<String, List<MpCxCapacityConfiguration>> advanceProductionMachineMap;
 
     /**
-     * 跨班次机台切换剩余耗时（机台编码 → 剩余切换秒数）
+     * 跨班次机台切换剩余耗时（机台编码 -> 剩余切换秒数）
      * <p>当切换耗时超过本班次剩余可用时间时，记录剩余切换耗时，下个班次继续扣除
      * <p>场景：班次1不同英寸切换8h，但只剩6h可用，剩余2h记录到此处；
      *        班次2该机台无前结构占用时，可用产能 = 8h - 2h = 6h
      * <p>切换完成后立即清除该机台的记录
      */
     private Map<String, Long> machineSwitchRemainingMap;
+
+    /**
+     * 前序班次机台胎胚负荷映射（供保底预留参考前班次硫化机台数）
+     * <p>Key: 成型机台编码
+     * <p>Value: Map<胎胚编码, 硫化机台数>（该机台该胎胚在前序班次分配的硫化机台数）
+     * <p>第一个班次从 T_CX_SHIFT_MACHINE_LOAD 加载前日最后班次数据；
+     * 后续班次由 CoreScheduleAlgorithmServiceImpl 在每班次结束后用本班次分配结果更新。
+     * <p>ContinueTaskProcessor/BalancingService 保底预留时读取此映射，将前序班次的硫化机台数作为当前班次的预留数量，
+     * 替代原来固定预留1台的逻辑。
+     */
+    private Map<String, Map<String, Integer>> previousShiftMachineEmbryoLoadMap;
 
     /**
      * 月计划排产版本

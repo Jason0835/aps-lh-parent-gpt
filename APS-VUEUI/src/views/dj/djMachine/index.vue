@@ -33,12 +33,13 @@
           :disabled="selection.length != 1"
           >{{ $t("ui.frame.btn.modify") }}</el-button
         >
-        <!-- <el-button
+        <el-button
+          v-hasPermi="['dj:machine:remove']"
           type="danger"
-          @click="handleDeleteMulti"
+          @click="handleDelete(selection)"
           :disabled="selection.length == 0"
           >{{ $t("ui.frame.btn.delete") }}</el-button
-        > -->
+        >
         <el-button
           v-hasPermi="['dj:machine:import']"
           @click="() => $refs.tltUploadForm.handleImport(importDefaultValue)"
@@ -70,14 +71,14 @@ import {
   exportData,
   editMachine,
   publishApsMoldAdjustPlan,
-  removeApsMoldAdjustPlan,
+  removeMachine,
 } from "@/api/dj/machine";
 import { getConfigKey } from "@/api/system/config";
 import InfoDialog from "./components/infoDialog.vue";
 import TltUploadForm from "@/views/components/tltUploadForm.vue";
 
 export default {
- name: "djMachine",
+ name: "DjMachine",
   components: { InfoDialog, TltUploadForm },
   dicts: ["STATUS", "CLASS_SHIFT", "class_num_three_plan", "biz_factory_name"],
 
@@ -315,15 +316,18 @@ export default {
       }
     },
 
-    handleDelete(row) {
+    handleDelete(rows) {
+      const ids = rows.map((item) => item.id);
       this.$confirm(this.$t("common.confirm.delete"), {
         type: "warning",
       }).then(() => {
-        const ids = row.id;
-        removeApsMoldAdjustPlan({ ids }).then((data) => {
+        this.loading = true;
+        removeMachine(ids).then((data) => {
           this.$modal.msgSuccess(data.msg);
           this.$set(this.page, "current", 1);
           this.getList();
+        }).catch(() => {
+          this.loading = false;
         });
       });
     },

@@ -65,18 +65,19 @@ import {
   removeSpecifyMachine,
   removeAllSpecifyMachine,
 } from "@/api/nc/specifyMachine";
+import { getConfigKey } from "@/api/system/config";
 //components
 import tltUpload from "@/components/tltUpload/tltUpload.vue";
 
 import infoDialog from "./components/infoDialog.vue";
 
 export default {
-  name: "InsideLinerFixedPointMachine",
+  name: "ncFixedPointMachine",
   components: {
     tltUpload,
     infoDialog,
   },
-  dicts: ["LINE_TYPE", "JOB_TYPE"],
+  dicts: ["LINE_TYPE", "JOB_TYPE", "biz_factory_name"],
   provide() {
     return {
       parentDict: this.dict,
@@ -93,15 +94,19 @@ export default {
         total: 0,
       },
       sort: {},
-      search: {},
-      query: {},
+      search: {
+        factoryCode: '',
+      },
+      query: {
+        factoryCode: '',
+      },
       importDefaultValue: {},
       importRules: {},
     };
   },
   computed: {
     ...mapState({
-      machines: (state) => state.insideLiner.machines,
+      machines: (state) => state.dj.machines,
     }),
     columns() {
       let columns = [
@@ -114,7 +119,7 @@ export default {
           // sortable: "custom",
         },
         {
-          prop: "machineName",
+          prop: "machineCode",
           align: "center",
           halign: "center",
           label: this.$t("ui.specifyMachine.column.machineName"),
@@ -182,15 +187,22 @@ export default {
     searchColumns() {
       return [
         {
+          label: this.$t("ui.data.column.factoryCode"),
+          prop: "factoryCode",
+          type: "select",
+          dictData: this.dict.type.biz_factory_name,
+          filterable: true,
+        },
+        {
           label: this.$t("ui.nc.specifyMachine.column.liningCode"),
           prop: "liningCode",
         },
         {
           label: this.$t("ui.specifyMachine.column.machineName"),
-          prop: "machineId",
+          prop: "machineCode",
           type: "select",
           dictData: this.machines,
-          valueKey: "id",
+          valueKey: "machineCode",
           labelKey: "machineName",
         },
         {
@@ -298,10 +310,13 @@ export default {
     },
   },
   created() {
-    this.$store.dispatch("insideLiner/getMachineList");
-  },
-  activated() {
-    this.getList();
+    getConfigKey("sys.factory.code").then(response => {
+      this.search.factoryCode = response.msg;
+      this.query.factoryCode = response.msg;
+      this.getList();
+    }).catch(() => {
+      this.getList();
+    });
   },
 };
 </script>
