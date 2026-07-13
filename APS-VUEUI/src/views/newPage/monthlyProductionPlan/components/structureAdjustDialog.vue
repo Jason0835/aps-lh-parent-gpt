@@ -253,15 +253,25 @@ export default {
       return parts.length ? parts[0] : "";
     },
     /**
-     * 跳转结构调整页时的定稿版本：优先列表行，其次弹窗打开时月计划页传入的 productionVersion（与 buildStructureDialogListVersionParams 一致）。
+     * 跳转结构调整页时的定稿生产版本：优先弹窗打开时月计划页传入的 productionVersion，其次列表行。
      * @param {object} row 当前表格行
      */
     resolveProductionVersionForJump(row) {
+      const fromDialog = (this.productionVersion || "").trim();
       const fromRow =
         row && row.productionVersion != null
           ? String(row.productionVersion).trim()
           : "";
-      const fromDialog = (this.productionVersion || "").trim();
+      return fromDialog || fromRow;
+    },
+    /**
+     * 跳转结构调整页时的调整版本号（searchColumns.version）：优先 listAdjusts 行 version，其次月计划页传入的 listAdjustsAdjVersion。
+     * @param {object} row 当前表格行
+     */
+    resolveAdjustVersionForJump(row) {
+      const fromRow =
+        row && row.version != null ? String(row.version).trim() : "";
+      const fromDialog = (this.listAdjustsAdjVersion || "").trim();
       return fromRow || fromDialog;
     },
     show(payload) {
@@ -561,6 +571,8 @@ export default {
         return;
       }
 
+      const productionVersion = this.resolveProductionVersionForJump(row);
+      const adjustVersion = this.resolveAdjustVersionForJump(row);
       /** 跳转月计划结构调整页（与路由 path 一致），多机台时 query 只带第一台成型机 */
       this.$router.push({
         path: "/newPage/monthPlanStructureAdjust",
@@ -583,7 +595,10 @@ export default {
             adjustContext.adjustEndDay != null
               ? String(adjustContext.adjustEndDay)
               : "",
-          productionVersion: this.resolveProductionVersionForJump(row),
+          /** 生产版本（定稿版本 I…），与月计划页 searchColumns.version 一致 */
+          productionVersion,
+          /** 调整版本号（ADJ…），对应结构调整页 searchColumns.version */
+          version: adjustVersion,
         },
       });
       this.dialogVisible = false;

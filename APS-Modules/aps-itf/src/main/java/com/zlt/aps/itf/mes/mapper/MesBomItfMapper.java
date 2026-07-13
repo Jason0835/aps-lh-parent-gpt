@@ -8,6 +8,7 @@ import com.baomidou.dynamic.datasource.annotation.DS;
 import com.zlt.aps.itf.constant.DataSource;
 import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
 import com.zlt.aps.mdm.api.domain.entity.MdmConstructionProcess;
+import com.zlt.aps.mdm.api.domain.entity.MdmRawMaterialConversion;
 import com.zlt.aps.mp.api.domain.entity.MdmBomInfo;
 import com.zlt.aps.mp.api.domain.entity.MdmConstructionInfo;
 import com.zlt.aps.mp.api.domain.entity.MdmSkuConstructionRef;
@@ -53,4 +54,12 @@ public interface MesBomItfMapper {
      * @return 结果
      */
 	List<MdmConstructionProcess> selectConstructionProcessInfo(AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 成品原材料折算接口
+     *
+     * @param syncDataLogs 查询参数
+     * @return 结果
+     */
+    List<MdmRawMaterialConversion> selectMdmRawMaterialConversion(AuxReqSyncDataLogs syncDataLogs);
 }

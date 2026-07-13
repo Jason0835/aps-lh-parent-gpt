@@ -13,14 +13,16 @@ import java.util.Arrays;
  */
 public enum CycleProductionModeEnum {
     /**
-     * 正向排产
+     * 1 只排高优先级需求量-即只排高
      */
     ONLY_HIGH(1, "只排高优先级需求量-即只排高"),
     /**
-     * 逆向排产
+     * 2 只排实单需求量-即只排高+中
      */
     ONLY_ACTUAL(2, "只排实单需求量-即只排高+中"),
-
+    /**
+     * 3 排净需求量-即(高+中+周期储备)
+     */
     ALL(3, "排净需求量-即(高+中+周期储备)");
 
     private Integer value;

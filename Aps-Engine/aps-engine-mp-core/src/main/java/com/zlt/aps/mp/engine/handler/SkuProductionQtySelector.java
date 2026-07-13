@@ -1,15 +1,20 @@
 package com.zlt.aps.mp.engine.handler;
 
 import com.zlt.aps.enums.YesOrNoEnum;
+import com.zlt.aps.mp.engine.domain.Context;
+import com.zlt.aps.mp.engine.domain.dto.ProductionPlanGroupInfo;
 import com.zlt.aps.mp.engine.domain.vo.MonthPlanProductionRequirePlanVo;
 import com.zlt.aps.mp.engine.enums.ContinueTypeEnum;
+import com.zlt.aps.mp.engine.enums.CycleProductionModeEnum;
 import com.zlt.aps.mp.engine.enums.ProductionQtyModelEnum;
+import com.zlt.aps.mp.engine.scheduling.TbrProductionContext;
 import com.zlt.aps.mp.engine.scheduling.cxcapacity.SkuNeedProductionInfo;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -37,12 +42,7 @@ public class SkuProductionQtySelector {
         if (CollectionUtils.isEmpty(productionPlanList) || StringUtils.isBlank(selectedMaterialDesc)) {
             return null;
         }
-        List<MonthPlanProductionRequirePlanVo> selectedPlanList;
-        if (ContinueTypeEnum.NO_CONTINUE == continueType) {
-            selectedPlanList = productionPlanList.stream().filter(plan -> plan.hasThisRoundSelectedProduction(selectedMaterialDesc)).collect(Collectors.toList());
-        } else {
-            selectedPlanList = productionPlanList.stream().filter(plan -> plan.hasSelectedProduction(selectedMaterialDesc)).collect(Collectors.toList());
-        }
+        List<MonthPlanProductionRequirePlanVo> selectedPlanList = getEffectivePlanList(continueType, productionPlanList, selectedMaterialDesc);
         if (CollectionUtils.isEmpty(selectedPlanList)) {
             return null;
         }
@@ -69,5 +69,24 @@ public class SkuProductionQtySelector {
         return new SkuNeedProductionInfo(ProductionQtyModelEnum.NET_QTY, selectedPlanList);
     }
 
+    /**
+     * 不同类型获取不同标记的排产的计划
+     *
+     * @param continueType         续作类型
+     * @param productionPlanList   排产计划
+     * @param selectedMaterialDesc Sku物料描述
+     * @return
+     */
+    private static List<MonthPlanProductionRequirePlanVo> getEffectivePlanList(ContinueTypeEnum continueType, List<MonthPlanProductionRequirePlanVo> productionPlanList, String selectedMaterialDesc) {
+        if (CollectionUtils.isEmpty(productionPlanList)) {
+            return Collections.emptyList();
+        }
+        //非续作
+        if (ContinueTypeEnum.NO_CONTINUE == continueType) {
+            return productionPlanList.stream().filter(plan -> plan.hasThisRoundSelectedProduction(selectedMaterialDesc)).collect(Collectors.toList());
+        }
+        //续作
+        return productionPlanList.stream().filter(plan -> plan.hasSelectedProduction(selectedMaterialDesc)).collect(Collectors.toList());
+    }
 
 }

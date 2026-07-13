@@ -1,6 +1,8 @@
 package com.zlt.aps.itf.vo;
 
+import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
@@ -23,6 +25,13 @@ import java.time.LocalDate;
 public class MesCxScheduleResult implements Serializable {
 
     private static final long serialVersionUID = 1L;
+
+    /**
+     * 主键ID
+     */
+    @ApiModelProperty(value = "主键ID", name = "id")
+    @TableField(value = "ID")
+    private Long id;
 
     /**
      * 成型批次号

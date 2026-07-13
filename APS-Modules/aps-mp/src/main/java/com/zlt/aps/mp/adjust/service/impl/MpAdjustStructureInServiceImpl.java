@@ -301,7 +301,13 @@ public class MpAdjustStructureInServiceImpl extends AbstractDocService<MpAdjustS
         LambdaQueryWrapper<MpMonthPlanStatistics> queryWrapper = new LambdaQueryWrapper<>();
         queryWrapper.eq(MpMonthPlanStatistics::getFactoryCode, contextDTO.getFactoryCode());
         queryWrapper.eq(MpMonthPlanStatistics::getIsDelete, YesOrNoEnum.NO.getValue());
-        queryWrapper.eq(MpMonthPlanStatistics::getTempFlag, YesOrNoEnum.NO.getValue());
+        //queryWrapper.eq(MpMonthPlanStatistics::getTempFlag, YesOrNoEnum.NO.getValue());
+        // tempFlag 支持空值：查询 tempFlag = 0 或者 tempFlag IS NULL
+        queryWrapper.and(wrapper ->
+                wrapper.eq(MpMonthPlanStatistics::getTempFlag, YesOrNoEnum.NO.getValue())
+                        .or()
+                        .isNull(MpMonthPlanStatistics::getTempFlag)
+        );
         queryWrapper.eq(MpMonthPlanStatistics::getProductionVersion, contextDTO.getProductionVersion());
         Map<String, MpMonthPlanStatistics> statisticsMap = mpMonthPlanStatisticsEntityMapper.selectList(queryWrapper)
                 .stream().collect(

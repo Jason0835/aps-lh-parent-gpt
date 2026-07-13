@@ -32,6 +32,7 @@ import moment from "moment";
 
 import infoForm from "@/views/components/infoForm.vue";
 import { autoPlan } from "@/api/lh/scheduleResult";
+import { generatePlan } from "@/api/cx/cxScheduleResult";
 
 export default {
   components: { infoForm },
@@ -106,11 +107,50 @@ export default {
       );
     },
     /**
+     * 硫化排程成功后，按需触发生成型排程生成
+     * @param {Object} params 排程参数
+     */
+    async handleCxScheduleGenerate(params) {
+      try {
+        const result = await generatePlan({
+          factoryCode: params.factoryCode,
+          scheduleDate: moment(params.scheduleDate).format("YYYY-MM-DD"),
+          days: 3,
+        });
+        if (result.code === 200) {
+          this.$modal.msgSuccess(result.msg);
+        } else if (result.code === 423) {
+          this.$modal.msgWarning(
+            result.msg ||
+              this.$t("ui.data.column.cxScheduleResult.scheduleRunning")
+          );
+        } else if (result.code === 500) {
+          const errorData = result.data || {};
+          const errorCount = errorData.errorCount || 0;
+          const warningCount = errorData.warningCount || 0;
+          if (errorCount === 0 && warningCount === 0) {
+            this.$modal.msgWarning(
+              this.$t("ui.data.column.cxScheduleResult.scheduleValidating")
+            );
+          } else {
+            this.$modal.msgError(
+              result.msg || this.$t("ui.data.column.cxScheduleResult.scheduleFailed")
+            );
+          }
+        }
+      } catch (error) {
+        console.error(error);
+        this.$modal.msgWarning(
+          this.$t("ui.data.column.cxScheduleResult.scheduleTimeout")
+        );
+      }
+    },
+    /**
      * 处理硫化自动排程接口响应（后台异步回调）
      * @param {Object} data 接口响应
      * @param {Object} params 排程参数
      */
-    handleAutoPlanResponse(data, params) {
+    async handleAutoPlanResponse(data, params) {
       const tip = data.message || data.msg || "";
       if (data.success === false) {
         if (this.hasScheduleValidationDetails(data)) {
@@ -123,6 +163,9 @@ export default {
       this.$modal.msgSuccess(
         tip || this.$t("ui.data.column.scheduleResult.lhScheduleCompleted")
       );
+      if (params.isAutoExecCx === "1") {
+        await this.handleCxScheduleGenerate(params);
+      }
       this.$emit("success", { ...params, batchNo: data.batchNo });
     },
     /**
@@ -160,7 +203,7 @@ export default {
       this.form = {
         factoryCode: "116",
         scheduleDate,
-        isAutoExecCx: false,
+        isAutoExecCx: true,
       };
     },
     hide() {
