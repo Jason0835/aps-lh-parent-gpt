@@ -397,7 +397,7 @@ export default {
 
         {
           label: this.$t("ui.data.column.scheduleResult.finishQty"),
-          prop: "todayNightFinishQty",
+          prop: "totalFinishQty",
           minWidth: 100,
           align: "right",
         }, // 今日夜班完成数量
