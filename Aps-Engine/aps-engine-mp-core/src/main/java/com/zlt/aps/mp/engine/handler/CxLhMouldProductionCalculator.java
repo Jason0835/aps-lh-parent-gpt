@@ -229,16 +229,6 @@ public class CxLhMouldProductionCalculator {
             dayProductionInfo.updateDoubleProductionQty();
             Integer lossQty;
             if (dayProductionInfo.isProductionNextDay()) {
-//                //隔天换模，更新当前排产完毕信息
-//                doubleMouldList.forEach(productionMould -> productionMould.getFinishDaySet().add(dayProductionInfo.getProductionDay()));
-//                //记录已排产量及损耗量
-//                productionContext.addSkuProductionAndWastageQty(skuMaterialDesc, BigDecimal.ZERO.intValue(), dayProductionInfo.getLossQty());
-//                Integer beforeDay = day;
-//                day = context.getNextHasProductionDay(day, stopDay);
-//                handlerNextDayChangeMould(productionContext, beforeDay, day, endDay, skuMaterialDesc, doubleMouldList);
-//                if (day > endDay) {
-//                    break;
-//                }
                 lossQty = dayProductionInfo.getNextDayLossQty();
             } else {
                 lossQty = dayProductionInfo.getLossQty();

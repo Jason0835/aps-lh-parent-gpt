@@ -6,7 +6,6 @@ import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.exception.BusinessException;
 import com.zlt.aps.mp.api.domain.entity.MpFactoryProductionVersion;
 import com.zlt.aps.mp.api.domain.entity.MpMouldUsedStatusLog;
-import com.zlt.aps.mp.api.domain.entity.MpStructureAllocation;
 import com.zlt.aps.mp.api.enums.ProductionProcessStage;
 import com.zlt.aps.mp.engine.basedata.assemble.continueinfo.ContinueGroupInfoHandler;
 import com.zlt.aps.mp.engine.basedata.assemble.cyclegroup.CycleGroupDataHandler;
@@ -17,9 +16,8 @@ import com.zlt.aps.mp.engine.domain.Context;
 import com.zlt.aps.mp.engine.domain.dto.*;
 import com.zlt.aps.mp.engine.domain.vo.*;
 import com.zlt.aps.mp.engine.enums.LogRecorderStageEnum;
-import com.zlt.aps.mp.engine.handler.CalculateStructureCxMachineNumber;
+import com.zlt.aps.mp.engine.handler.GroupCapacityHandler;
 import com.zlt.aps.mp.engine.handler.ContinueSkuCalculator;
-import com.zlt.aps.mp.engine.handler.GroupProductionConversionHandler;
 import com.zlt.aps.mp.engine.logrecorder.KeyInformationLogRecorder;
 import com.zlt.aps.mp.engine.logrecorder.TbrBeforeProductionGroupLogRecorder;
 import com.zlt.aps.mp.engine.logrecorder.TbrProductionGroupLogRecorder;
@@ -63,7 +61,7 @@ public class TbrStructureNameCapacityProductionService extends AbstractDataLoade
 
     private final SimulateProductionHandler simulateProductionHandler;
 
-    private final CalculateStructureCxMachineNumber calculateStructureCxMachineNumber;
+    private final GroupCapacityHandler calculateStructureCxMachineNumber;
 
     private final ProductionCxMachineCalculationHandler productionCxMachineCalculationHandler;
 
@@ -78,7 +76,7 @@ public class TbrStructureNameCapacityProductionService extends AbstractDataLoade
                                                      ProductionHistoryHandler productionHistoryHandler,
                                                      SimulateProductionHandler simulateProductionHandler,
                                                      MonthProductionDataService monthProductionDataService,
-                                                     CalculateStructureCxMachineNumber calculateStructureCxMachineNumber,
+                                                     GroupCapacityHandler calculateStructureCxMachineNumber,
                                                      ProductionCxMachineCalculationHandler productionCxMachineCalculationHandler,
                                                      AdjustContinueSkuProductionQtyHandler adjustContinueSkuProductionQtyHandler) {
         super(groupListHandler, dataService, dpRequireDataService, cycleGroupDataHandler, productionHistoryHandler, monthProductionDataService);

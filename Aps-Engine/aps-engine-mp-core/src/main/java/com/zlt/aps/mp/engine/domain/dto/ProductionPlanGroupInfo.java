@@ -5,6 +5,7 @@ import com.google.common.collect.Sets;
 import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.enums.MonthPlanNoProductionReasonEnum;
 import com.zlt.aps.enums.ProductTypeEnum;
+import com.zlt.aps.enums.ProductionGroupTypeEnum;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.mp.api.domain.capacity.MpDailyCapacityLimitVo;
@@ -277,6 +278,17 @@ public class ProductionPlanGroupInfo {
         // 模具数换算成硫化机台数
         groupInfo.minLhMachineCountByMould = mouldCodeSet.size() / ProductionConstant.DOUBLE_MOULD_PRODUCTION;
         return groupInfo;
+    }
+
+    /**
+     * 判断是否周期结构
+     * true 表示是， false表示否
+     * 01 表示周期结构
+     *
+     * @return
+     */
+    public boolean isCycleType() {
+        return ProductionGroupTypeEnum.CYCLE.getGroupType().equals(getStructureType());
     }
 
     /**
