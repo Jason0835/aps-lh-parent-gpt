@@ -4,7 +4,7 @@ import com.zlt.aps.nc.api.domain.entity.NcShiftConfig;
 import com.zlt.bill.common.service.IDocService;
 
 /**
- * 垫胶班制配置Service接口
+ * 内衬班制配置Service接口
  *
  * @author zlt
  */

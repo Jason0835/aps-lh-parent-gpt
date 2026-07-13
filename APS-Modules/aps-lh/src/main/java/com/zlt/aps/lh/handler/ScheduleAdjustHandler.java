@@ -563,6 +563,7 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
         }
         return surplusCalculation.getSurplusQty();
     }
+
     /**
      * 计算SKU的硫化余量
      * <p>
@@ -804,8 +805,8 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
         dto.setMainPattern(plan.getMainPattern());
         dto.setBrand(plan.getBrand());
 
-        // 计划量信息
-        dto.setMonthPlanQty(surplus.getMonthPlanTotal());
+        // 计划量信息 20260713+ 含上月超欠产 surplus.getMonthPlanTotal()
+        dto.setMonthPlanQty(surplus.getRealMonthPlanTotal());
         dto.setFinishedQty(surplus.getActualFinishedQty());
         String materialStatusKey = MonthPlanDateResolver.buildMaterialStatusKey(
                 plan.getMaterialCode(), plan.getProductStatus());
@@ -841,7 +842,8 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
         dto.setWindowRemainingPlanQty(windowRemainingPlanQty);
 
         dto.setSurplusQty(surplus.getSurplusQty());
-        dto.setMonthPlanSumTotal(surplus.getMonthPlanSumTotal());
+        //20260713+ 含上月超欠产 surplus.getMonthPlanSumTotal()
+        dto.setMonthPlanSumTotal(surplus.getRealMonthPlanSumTotal());
         dto.setEmbryoStock(resolveRawEmbryoStock(context, plan));
         // 待排量保持"需求口径"：使用月计划余量扣减滚动继承量，再与胎胚库存取大。
         // 本月历史欠产已体现在首日日计划账本中，不能再次重复叠加。
@@ -2297,8 +2299,26 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
             return monthPlanTotal;
         }
 
+        /**
+         * 硫化月计划总量(断点)：+上个月超欠产
+         *
+         * @return
+         */
+        public int getRealMonthPlanTotal() {
+            return Math.max(BigDecimal.ZERO.intValue(), monthPlanTotal + lastMonthOverdueQty);
+        }
+
         public int getMonthPlanSumTotal() {
             return monthPlanSumTotal;
+        }
+
+        /**
+         * 硫化月计划总量(非断点)：+上个月超欠产
+         *
+         * @return
+         */
+        public int getRealMonthPlanSumTotal() {
+            return Math.max(BigDecimal.ZERO.intValue(), monthPlanSumTotal + lastMonthOverdueQty);
         }
     }
 

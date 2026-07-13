@@ -1,8 +1,11 @@
 package com.zlt.aps.nc.api.domain.entity;
 
+import java.io.Serializable;
+
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.ruoyi.common.core.annotation.Excel;
+import com.ruoyi.common.core.web.domain.BaseEntity;
 import com.zlt.aps.common.core.domain.ApsBaseEntity;
 
 import io.swagger.annotations.ApiModel;
@@ -22,7 +25,7 @@ import lombok.EqualsAndHashCode;
 @EqualsAndHashCode(callSuper = false)
 @TableName("T_NC_PARAMS")
 @ApiModel(value = "NcParams对象", description = "内衬参数信息")
-public class NcParams extends ApsBaseEntity {
+public class NcParams extends BaseEntity implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
@@ -43,7 +46,7 @@ public class NcParams extends ApsBaseEntity {
     private String productTypeCode;
 
     /**
-     * 参数编码，编码规则：SYS+工序号+分组号+三位流水号，其中垫胶的工序号为14，分组号暂时固定为01
+     * 参数编码，编码规则：SYS+工序号+分组号+三位流水号，其中内衬的工序号为14，分组号暂时固定为01
      */
     @Excel(name = "ui.dj.params.column.paramCode")
     @ApiModelProperty(value = "参数编码", name = "paramCode")

@@ -49,9 +49,9 @@ public class NcDispatcherLog extends ApsBaseEntity{
     @TableField(value = "SCHEDULE_DATE")
     private Date scheduleDate;
 
-    /** 垫胶代码 */
+    /** 内衬代码 */
     @Excel(name = "ui.data.column.dj.dispatcherlog.materialCode")
-    @ApiModelProperty(value = "垫胶代码")
+    @ApiModelProperty(value = "内衬代码")
     @TableField(value = "MATERIAL_CODE")
     private String materialCode;
 

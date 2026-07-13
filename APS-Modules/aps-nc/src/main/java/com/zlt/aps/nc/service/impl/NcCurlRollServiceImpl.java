@@ -41,7 +41,7 @@ public class NcCurlRollServiceImpl extends AbstractDocService<NcCurlRoll> implem
     @Override
     public String checkUnique(NcCurlRoll entity) {
         if (StringUtils.isEmpty(entity.getLiningCode())) {
-            throw new RuntimeException(I18nUtil.getMessage("ui.error.message.curlRoll.paddingCodeNull"));
+            throw new RuntimeException(I18nUtil.getMessage("ui.error.message.curlRoll.liningCodeNull"));
         }
         QueryWrapper<NcCurlRoll> queryWrapper = new QueryWrapper<>();
         queryWrapper.ne(PubUtil.isNotEmpty(entity.getFieldValueByFieldName("id")), "ID",

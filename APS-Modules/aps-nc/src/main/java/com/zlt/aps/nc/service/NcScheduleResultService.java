@@ -18,33 +18,33 @@ import com.zlt.bill.common.service.IBillService;
  */
 public interface NcScheduleResultService extends IBillService<NcScheduleResult> {
     /**
-     * 查询垫胶排程结果
+     * 查询内衬排程结果
      *
-     * @param id 垫胶排程结果ID
-     * @return 垫胶排程结果
+     * @param id 内衬排程结果ID
+     * @return 内衬排程结果
      */
     public NcScheduleResult selectNcScheduleResultById(Long id);
 
     /**
-     * 查询垫胶排程结果列表
+     * 查询内衬排程结果列表
      *
-     * @param djScheduleResult 垫胶排程结果
-     * @return 垫胶排程结果集合
+     * @param djScheduleResult 内衬排程结果
+     * @return 内衬排程结果集合
      */
     public List<NcScheduleResult> selectNcScheduleResultList(NcScheduleResult djScheduleResult);
 
     /**
-     * 新增垫胶排程结果
+     * 新增内衬排程结果
      *
-     * @param djScheduleResult 垫胶排程结果
+     * @param djScheduleResult 内衬排程结果
      * @return 结果
      */
     public int insertNcScheduleResult(NcScheduleResult djScheduleResult);
 
     /**
-     * 修改垫胶排程结果
+     * 修改内衬排程结果
      *
-     * @param djScheduleResult 垫胶排程结果
+     * @param djScheduleResult 内衬排程结果
      * @return 结果
      */
     public int updateNcScheduleResult(NcScheduleResult djScheduleResult);
@@ -74,17 +74,17 @@ public interface NcScheduleResultService extends IBillService<NcScheduleResult> 
     List<NcScheduleResult> selectByScheduleDateAndCode(NcScheduleResult scheduleResult);
 
     /**
-     * 批量删除垫胶排程结果
+     * 批量删除内衬排程结果
      *
-     * @param ids 需要删除的垫胶排程结果ID
+     * @param ids 需要删除的内衬排程结果ID
      * @return 结果
      */
     public int deleteNcScheduleResultByIds(Long[] ids);
 
     /**
-     * 删除垫胶排程结果信息
+     * 删除内衬排程结果信息
      *
-     * @param id 垫胶排程结果ID
+     * @param id 内衬排程结果ID
      * @return 结果
      */
     public int deleteNcScheduleResultById(Long id);

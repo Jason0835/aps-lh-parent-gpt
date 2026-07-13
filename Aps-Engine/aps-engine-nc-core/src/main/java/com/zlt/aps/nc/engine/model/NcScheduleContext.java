@@ -26,28 +26,28 @@ public class NcScheduleContext {
     /** 排产日期 */
     private Date scheduleDate;
 
-    /** 各内衬规格的成型机台数量 Map<paddingCode, machineCount> */
+    /** 各内衬规格的成型机台数量 Map<liningCode, machineCount> */
     private Map<String, Integer> paddingCxMachineCount;
 
-    /** 各内衬规格的供应窗口班次数（排产深度） Map<paddingCode, supplyDepth> */
+    /** 各内衬规格的供应窗口班次数（排产深度） Map<liningCode, supplyDepth> */
     private Map<String, Integer> paddingSupplyDepth;
 
-    /** 交班库存 Map<paddingCode, inventory> */
+    /** 交班库存 Map<liningCode, inventory> */
     private Map<String, BigDecimal> handoverInventory;
 
-    /** 有效库存 Map<paddingCode, stock> */
+    /** 有效库存 Map<liningCode, stock> */
     private Map<String, BigDecimal> effectiveStockMap;
 
-    /** 月度剩余量 Map<paddingCode, paddingRemaining>（月计划硫化余量 × 单耗） */
+    /** 月度剩余量 Map<liningCode, paddingRemaining>（月计划硫化余量 × 单耗） */
     private Map<String, BigDecimal> paddingRemainingMap;
 
     /** 机台 Map<machineCode, DjMachineInfo> */
     private Map<String, NcMachineInfo> machineMap;
 
-    /** 损耗率 Map<paddingCode+machineCode, lossRate> */
+    /** 损耗率 Map<liningCode+machineCode, lossRate> */
     private Map<String, BigDecimal> lossRateMap;
 
-    /** 卷曲长度 Map<paddingCode, curlLength> */
+    /** 卷曲长度 Map<liningCode, curlLength> */
     private Map<String, BigDecimal> curlLengthMap;
 
     /** 胶料顺序 Map<glueCode, orderNum> */
@@ -68,7 +68,7 @@ public class NcScheduleContext {
     /** 工作日历（内衬 + 成型）Map<procCode, List<MdmWorkCalendar>> */
     private Map<String, List<MdmWorkCalendar>> workCalendarMap;
 
-    /** 上一个班最后生产的规格 Map<machineCode, lastPaddingCode> */
+    /** 上一个班最后生产的规格 Map<machineCode, lastliningCode> */
     private Map<String, String> lastSpecOfPrevShift;
 
     /** 当前批次号 */

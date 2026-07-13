@@ -90,10 +90,10 @@ public class NcScheduleResultServiceImpl extends AbstractBillService<NcScheduleR
     private INcShiftConfigService ncShiftConfigService;
 
     /**
-     * 查询垫胶排程结果
+     * 查询内衬排程结果
      *
-     * @param id 垫胶排程结果ID
-     * @return 垫胶排程结果
+     * @param id 内衬排程结果ID
+     * @return 内衬排程结果
      */
     @Override
     public NcScheduleResult selectNcScheduleResultById(Long id) {
@@ -101,10 +101,10 @@ public class NcScheduleResultServiceImpl extends AbstractBillService<NcScheduleR
     }
 
     /**
-     * 查询垫胶排程结果列表
+     * 查询内衬排程结果列表
      *
-     * @param ncScheduleResult 垫胶排程结果
-     * @return 垫胶排程结果
+     * @param ncScheduleResult 内衬排程结果
+     * @return 内衬排程结果
      */
     @Override
     public List<NcScheduleResult> selectNcScheduleResultList(NcScheduleResult ncScheduleResult) {
@@ -206,7 +206,7 @@ public class NcScheduleResultServiceImpl extends AbstractBillService<NcScheduleR
         int middleClassIndex = this.realShiftToClassIndex(prevScheduleShiftClass,
                 ClassNumThreePlanEnums.CLASS_DAY.getClassIndex());
 
-        // 4. 按 machineCode + paddingCode 汇总 T-1 日数据
+        // 4. 按 machineCode + liningCode 汇总 T-1 日数据
         Map<String, NcScheduleResult> prevDayEarlyFirstMap = new HashMap<>();
         Map<String, BigDecimal> prevDayEarlyPlanSumMap = new HashMap<>();
         Map<String, NcScheduleResult> prevDayMiddleFirstMap = new HashMap<>();
@@ -353,9 +353,9 @@ public class NcScheduleResultServiceImpl extends AbstractBillService<NcScheduleR
     }
 
     /**
-     * 新增垫胶排程结果
+     * 新增内衬排程结果
      *
-     * @param ncScheduleResult 垫胶排程结果
+     * @param ncScheduleResult 内衬排程结果
      * @return 结果
      */
     @Override
@@ -368,9 +368,9 @@ public class NcScheduleResultServiceImpl extends AbstractBillService<NcScheduleR
     }
 
     /**
-     * 修改垫胶排程结果
+     * 修改内衬排程结果
      *
-     * @param scheduleResult 垫胶排程结果
+     * @param scheduleResult 内衬排程结果
      * @return 结果
      */
     @Override
@@ -453,7 +453,7 @@ public class NcScheduleResultServiceImpl extends AbstractBillService<NcScheduleR
         log.setScheduleId(newSchedule.getId());
         log.setOperType(operType);
         log.setScheduleDate(newSchedule.getScheduleDate()); // 排程日期
-        log.setMaterialCode(newSchedule.getLiningCode()); // 垫胶代码
+        log.setMaterialCode(newSchedule.getLiningCode()); // 内衬代码
         // 操作前的信息赋值
         if (oldSchedule != null) {
             log.setBeforeMachineCode(oldSchedule.getMachineCode());
@@ -495,9 +495,9 @@ public class NcScheduleResultServiceImpl extends AbstractBillService<NcScheduleR
     }
 
     /**
-     * 批量删除垫胶排程结果
+     * 批量删除内衬排程结果
      *
-     * @param ids 需要删除的垫胶排程结果ID
+     * @param ids 需要删除的内衬排程结果ID
      * @return 结果
      */
     @Override
@@ -506,9 +506,9 @@ public class NcScheduleResultServiceImpl extends AbstractBillService<NcScheduleR
     }
 
     /**
-     * 删除垫胶排程结果信息
+     * 删除内衬排程结果信息
      *
-     * @param id 垫胶排程结果ID
+     * @param id 内衬排程结果ID
      * @return 结果
      */
     @Override
@@ -582,8 +582,8 @@ public class NcScheduleResultServiceImpl extends AbstractBillService<NcScheduleR
     }
 
     /**
-     * 唯一性校验（校验该排产日期+机台+垫胶代码+工厂下是否存在排程记录）
-     * <p>注意：只使用 factoryCode、scheduleDate、machineCode、paddingCode 作为查询条件，
+     * 唯一性校验（校验该排产日期+机台+内衬代码+工厂下是否存在排程记录）
+     * <p>注意：只使用 factoryCode、scheduleDate、machineCode、liningCode 作为查询条件，
      * 排除班次计划量、顺位等班次字段，避免因待插入记录不存在完全匹配而导致误判"该日未排程"。</p>
      */
     @Override
