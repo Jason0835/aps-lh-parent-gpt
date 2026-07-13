@@ -38,7 +38,6 @@ public class Cd15MachineInfo extends BaseEntity implements Serializable {
     /** 机台名称 */
     @ApiModelProperty(value = "机台名称", name = "machineName")
     @TableField("MACHINE_NAME")
-    @Excel(name = "ui.data.column.cd15MachineInfo.machineName")
     private String machineName;
 
     /** 帘布宽度上限 */
@@ -87,6 +86,6 @@ public class Cd15MachineInfo extends BaseEntity implements Serializable {
     /** 支持的钢带宽度 */
     @ApiModelProperty(value = "支持的钢带宽度", name = "steelStripWidth")
     @TableField("STEEL_STRIP_WIDTH")
-    @Excel(name = "ui.data.column.cd15MachineInfo.steelStripWidth")
+//    @Excel(name = "ui.data.column.cd15MachineInfo.steelStripWidth")
     private Double steelStripWidth;
 }
