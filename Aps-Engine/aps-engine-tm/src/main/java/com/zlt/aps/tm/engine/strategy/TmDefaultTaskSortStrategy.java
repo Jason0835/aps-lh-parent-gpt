@@ -2,6 +2,7 @@ package com.zlt.aps.tm.engine.strategy;
 
 import com.zlt.aps.tm.engine.domain.TmScheduleContext;
 import com.zlt.aps.tm.engine.domain.TmTaskDraft;
+import com.zlt.aps.tm.engine.util.TmGlueSimilarityUtils;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -39,23 +40,23 @@ public class TmDefaultTaskSortStrategy implements ITmTaskSortStrategy {
     /**
      * 构建多级任务排序比较器。
      *
-     * @param context 胎面排程上下文（当前策略暂不使用，预留扩展）
+     * @param context 胎面排程上下文
      * @return 多级比较器
      */
     @Override
     public Comparator<TmTaskDraft> buildComparator(TmScheduleContext context) {
-        Map<String, BigDecimal> glueGroupEarliestSupplyMap = buildGlueGroupEarliestSupplyMap(context);
-        Map<TmTaskDraft, Integer> baseGlueSimilarityMap = buildBaseGlueSimilarityMap(context);
+        Map<String, BigDecimal> glueGroupEarliestSupplyMap = this.buildGlueGroupEarliestSupplyMap(context);
+        Map<TmTaskDraft, Integer> baseGlueSimilarityMap = this.buildBaseGlueSimilarityMap(context);
         return Comparator
                 // 1. 可供成型班次分组：按班次从早到晚排序
                 .comparing(TmTaskDraft::getShiftOrder, Comparator.nullsLast(Comparator.naturalOrder()))
                 // 2-3. 库存紧急度和主胶料分组：按同班次胶料组最早供应时长排序，同胶料聚在一起
-                .thenComparing(task -> resolveGlueGroupEarliestSupply(task, glueGroupEarliestSupplyMap),
+                .thenComparing(task -> this.resolveGlueGroupEarliestSupply(task, glueGroupEarliestSupplyMap),
                         Comparator.nullsLast(Comparator.naturalOrder()))
                 .thenComparing(TmTaskDraft::getGlueCode,
                         Comparator.nullsLast(Comparator.naturalOrder()))
                 // 4. 基部胶相似度：同班次基部胶相同个数越多优先级越高
-                .thenComparing(task -> resolveBaseGlueSimilarity(task, baseGlueSimilarityMap),
+                .thenComparing(task -> this.resolveBaseGlueSimilarity(task, baseGlueSimilarityMap),
                         Comparator.nullsLast(Comparator.reverseOrder()))
                 .thenComparing(TmTaskDraft::getBaseGlueCode,
                         Comparator.nullsLast(Comparator.naturalOrder()))
@@ -85,7 +86,7 @@ public class TmDefaultTaskSortStrategy implements ITmTaskSortStrategy {
             if (task == null || task.getSupplyHours() == null) {
                 continue;
             }
-            String key = buildShiftGroupKey(task.getShiftOrder(), task.getGlueCode());
+            String key = this.buildShiftGroupKey(task.getShiftOrder(), task.getGlueCode());
             BigDecimal existing = groupMap.get(key);
             if (existing == null || task.getSupplyHours().compareTo(existing) < 0) {
                 groupMap.put(key, task.getSupplyHours());
@@ -107,16 +108,19 @@ public class TmDefaultTaskSortStrategy implements ITmTaskSortStrategy {
         }
         List<TmTaskDraft> taskDraftList = context.getTaskDraftList();
         for (TmTaskDraft task : taskDraftList) {
-            Set<String> baseGlueSet = parseBaseGlueSet(task == null ? null : task.getBaseGlueCode());
+            Set<String> baseGlueSet = TmGlueSimilarityUtils.parseCodeSet(
+                    task == null ? null : task.getBaseGlueCode());
             if (baseGlueSet.isEmpty()) {
                 continue;
             }
             int similarityScore = 0;
             for (TmTaskDraft otherTask : taskDraftList) {
-                if (task == otherTask || otherTask == null || !Objects.equals(task.getShiftOrder(), otherTask.getShiftOrder())) {
+                if (task == otherTask || otherTask == null
+                        || !Objects.equals(task.getShiftOrder(), otherTask.getShiftOrder())) {
                     continue;
                 }
-                similarityScore += calculateIntersectionCount(baseGlueSet, parseBaseGlueSet(otherTask.getBaseGlueCode()));
+                similarityScore += TmGlueSimilarityUtils.calculateIntersectionCount(baseGlueSet,
+                        TmGlueSimilarityUtils.parseCodeSet(otherTask.getBaseGlueCode()));
             }
             similarityMap.put(task, similarityScore);
         }
@@ -126,7 +130,7 @@ public class TmDefaultTaskSortStrategy implements ITmTaskSortStrategy {
     /**
      * 读取任务所属胶料组的最早供应时长。
      *
-     * @param task     任务草稿
+     * @param task 任务草稿
      * @param groupMap 胶料组供应时长映射
      * @return 供应时长
      */
@@ -134,68 +138,28 @@ public class TmDefaultTaskSortStrategy implements ITmTaskSortStrategy {
         if (task == null) {
             return null;
         }
-        return groupMap.get(buildShiftGroupKey(task.getShiftOrder(), task.getGlueCode()));
+        return groupMap.get(this.buildShiftGroupKey(task.getShiftOrder(), task.getGlueCode()));
     }
 
     /**
      * 读取任务基部胶相似度分值。
      *
-     * @param task          任务草稿
+     * @param task 任务草稿
      * @param similarityMap 基部胶相似度映射
      * @return 相似度分值
      */
     private Integer resolveBaseGlueSimilarity(TmTaskDraft task, Map<TmTaskDraft, Integer> similarityMap) {
-        if (task == null || parseBaseGlueSet(task.getBaseGlueCode()).isEmpty()) {
+        if (task == null || TmGlueSimilarityUtils.parseCodeSet(task.getBaseGlueCode()).isEmpty()) {
             return null;
         }
         return similarityMap.get(task);
     }
 
     /**
-     * 将逗号分隔的基部胶编码拆分为元素集合，去除空白并忽略重复元素。
-     *
-     * @param baseGlueCode 基部胶编码串
-     * @return 基部胶元素集合
-     */
-    private Set<String> parseBaseGlueSet(String baseGlueCode) {
-        Set<String> baseGlueSet = new HashSet<>();
-        if (baseGlueCode == null || baseGlueCode.trim().isEmpty()) {
-            return baseGlueSet;
-        }
-        for (String item : baseGlueCode.split(",")) {
-            String value = item == null ? "" : item.trim();
-            if (!value.isEmpty()) {
-                baseGlueSet.add(value);
-            }
-        }
-        return baseGlueSet;
-    }
-
-    /**
-     * 计算两个基部胶集合的交集元素数量。
-     *
-     * @param leftSet  左侧基部胶集合
-     * @param rightSet 右侧基部胶集合
-     * @return 交集元素数量
-     */
-    private int calculateIntersectionCount(Set<String> leftSet, Set<String> rightSet) {
-        if (leftSet.isEmpty() || rightSet.isEmpty()) {
-            return 0;
-        }
-        int count = 0;
-        for (String item : leftSet) {
-            if (rightSet.contains(item)) {
-                count++;
-            }
-        }
-        return count;
-    }
-
-    /**
      * 构造班次维度分组键。
      *
      * @param shiftOrder 班次顺序
-     * @param code       分组编码
+     * @param code 分组编码
      * @return 分组键
      */
     private String buildShiftGroupKey(Integer shiftOrder, String code) {

@@ -5,6 +5,7 @@ import cn.hutool.core.util.StrUtil;
 import com.ruoyi.common.exception.ServiceException;
 import com.zlt.aps.common.engine.schedule.ScheduleTaskLinkedList;
 import com.zlt.aps.common.engine.schedule.ScheduleTaskNode;
+import com.zlt.aps.tm.api.constant.TmScheduleConstants;
 import com.zlt.aps.tm.api.domain.entity.TmScheduleResult;
 import com.zlt.aps.tm.api.domain.entity.TmScheduleResultExplain;
 import com.zlt.aps.tm.api.enums.*;
@@ -119,7 +120,6 @@ public class TmPersistService {
             explain.setUnplannedReasonCode(task.getUnplannedReasonCode());
             explain.setUnplannedReasonDesc(task.getUnplannedReasonDesc());
             explain.setTaskStatus(resolveTaskStatus(task));
-            explain.setResultStatus(TmScheduleReleaseStatusEnum.NOT_RELEASED.getCode());
             explain.setTreadCode(task.getTreadCode());
             explain.setGlueCode(task.getGlueCode());
             explain.setBaseGlueCode(task.getBaseGlueCode());
@@ -134,7 +134,7 @@ public class TmPersistService {
             explain.setUnplannedEvidenceJson(snapshot.getUnplannedEvidenceJson());
             explain.setSysAnalysis(snapshot.getSysAnalysis());
         }
-        explain.setGenerateMode(TmGenerateModeEnum.ENGINE_SKELETON.getCode());
+        explain.setGenerateMode(TmGenerateModeEnum.ENGINE_FULL.getCode());
         explain.setCurrentStepCode(TmScheduleStepEnum.PERSIST.getCode());
         return explain;
     }
@@ -189,54 +189,6 @@ public class TmPersistService {
         return task.getCurrentShiftDemandQty() == null ? task.getDemandQty() : task.getCurrentShiftDemandQty();
     }
 
-    /**
-     * 写入未排任务入口。
-     *
-     * <p>当前骨架版本只做参数校验和实体转换，实际批量写入由 aps-tm 业务入口接入后完成。</p>
-     *
-     * @param task     未排任务
-     * @param snapshot 解释快照
-     * @param context  胎面排程上下文
-     */
-    public void persistUnplanned(TmTaskDraft task, TmSnapshotBuildResult snapshot, TmScheduleContext context) {
-        if (task == null) {
-            throw new ServiceException(TmScheduleErrorCodeEnum.TM_TASK_NOT_FOUND.getDefaultMessage());
-        }
-        if (context == null) {
-            throw new ServiceException(TmScheduleErrorCodeEnum.TM_CONTEXT_EMPTY.getDefaultMessage());
-        }
-        convertUnplanned(task, context);
-        convertExplain(task, snapshot, context);
-    }
-
-    /**
-     * 将未排任务转换为排程结果实体。
-     *
-     * <p>未排任务仍写入 T_TM_SCHEDULE_RESULT，机台编码为空，各班次字段根据任务所属班次写入。
-     * 当前骨架版本只支持单班次写入（shiftOrder=1 对应 class1），后续如需多班支持可扩展。</p>
-     *
-     * @param task    未排任务草稿
-     * @param context 胎面排程上下文
-     * @return 排程结果实体，机台编码为空
-     */
-    public TmScheduleResult convertUnplanned(TmTaskDraft task, TmScheduleContext context) {
-        TmScheduleResult result = new TmScheduleResult();
-        result.setFactoryCode(context == null ? null : context.getFactoryCode());
-        result.setBatchNo(context == null ? null : context.getBatchNo());
-        result.setScheduleDate(context == null ? null : context.getScheduleDate());
-        if (task != null) {
-            result.setTreadCode(task.getTreadCode());
-            result.setGlueCode(task.getGlueCode());
-            result.setBaseGlueCode(task.getBaseGlueCode());
-            result.setMouthPlateCode(task.getMouthPlateCode());
-            result.setMachineCode(null);
-            applyTaskShiftFields(result, task);
-        }
-        result.setReleaseStatus(TmScheduleReleaseStatusEnum.NOT_RELEASED.getCode());
-        result.setDataSource("AUTO");
-        return result;
-    }
-
     private TmScheduleResult convertNodeToResult(ScheduleTaskNode<TmTaskDraft> node, TmScheduleContext context) {
         TmTaskDraft task = node.getTask();
         TmScheduleResult result = new TmScheduleResult();
@@ -287,48 +239,12 @@ public class TmPersistService {
      */
     private void applyShiftFields(TmScheduleResult result, Integer shiftOrder, Integer sequence, BigDecimal planQty,
                                   Date startTime, Date endTime) {
-        if (Integer.valueOf(1).equals(shiftOrder)) {
-            result.setClass1Sequence(sequence);
-            result.setClass1PlanQty(planQty);
-            result.setClass1StartTime(startTime);
-            result.setClass1EndTime(endTime);
-            return;
+        if (shiftOrder == null || shiftOrder < 1 || shiftOrder > TmScheduleConstants.TM_MAX_SHIFT_ORDER) {
+            throw new ServiceException(TmScheduleErrorCodeEnum.TM_SHIFT_INVALID.getDefaultMessage() + ":" + shiftOrder);
         }
-        if (Integer.valueOf(2).equals(shiftOrder)) {
-            result.setClass2Sequence(sequence);
-            result.setClass2PlanQty(planQty);
-            result.setClass2StartTime(startTime);
-            result.setClass2EndTime(endTime);
-            return;
-        }
-        if (Integer.valueOf(3).equals(shiftOrder)) {
-            result.setClass3Sequence(sequence);
-            result.setClass3PlanQty(planQty);
-            result.setClass3StartTime(startTime);
-            result.setClass3EndTime(endTime);
-            return;
-        }
-        if (Integer.valueOf(4).equals(shiftOrder)) {
-            result.setClass4Sequence(sequence);
-            result.setClass4PlanQty(planQty);
-            result.setClass4StartTime(startTime);
-            result.setClass4EndTime(endTime);
-            return;
-        }
-        if (Integer.valueOf(5).equals(shiftOrder)) {
-            result.setClass5Sequence(sequence);
-            result.setClass5PlanQty(planQty);
-            result.setClass5StartTime(startTime);
-            result.setClass5EndTime(endTime);
-            return;
-        }
-        if (Integer.valueOf(6).equals(shiftOrder)) {
-            result.setClass6Sequence(sequence);
-            result.setClass6PlanQty(planQty);
-            result.setClass6StartTime(startTime);
-            result.setClass6EndTime(endTime);
-            return;
-        }
-        throw new ServiceException(TmScheduleErrorCodeEnum.TM_SHIFT_INVALID.getDefaultMessage() + ":" + shiftOrder);
+        result.setFieldValueByFieldName(String.format(TmScheduleConstants.SHIFT_SEQUENCE_FIELD_TEMPLATE, shiftOrder), sequence);
+        result.setFieldValueByFieldName(String.format(TmScheduleConstants.SHIFT_PLAN_QTY_FIELD_TEMPLATE, shiftOrder), planQty);
+        result.setFieldValueByFieldName(String.format(TmScheduleConstants.SHIFT_START_TIME_FIELD_TEMPLATE, shiftOrder), startTime);
+        result.setFieldValueByFieldName(String.format(TmScheduleConstants.SHIFT_END_TIME_FIELD_TEMPLATE, shiftOrder), endTime);
     }
 }

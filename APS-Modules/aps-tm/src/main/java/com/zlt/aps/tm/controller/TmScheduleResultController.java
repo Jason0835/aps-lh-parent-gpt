@@ -196,6 +196,20 @@ public class TmScheduleResultController extends AbstractDocBizController<TmSched
     }
 
     /**
+     * 单步撤销最近一次人工操作。
+     *
+     * @param dispatcherLogId 调度日志 ID
+     * @return 撤销结果
+     */
+    @Log(title = "ui.data.column.tm.scheduleResult.modelName", businessType = BusinessType.UPDATE)
+    @ApiOperation("撤销人工操作")
+    @PostMapping("/undoLastOperation")
+    public AjaxResult undoLastOperation(@RequestParam("dispatcherLogId") Long dispatcherLogId) {
+        int restored = tmScheduleResultService.undoLastOperation(dispatcherLogId);
+        return AjaxResult.success(I18nUtil.getMessage("ui.data.alert.tm.schedule.undoSuccess"), restored);
+    }
+
+    /**
      * 调整计划量。
      *
      * @param scheduleResult 调量后的排程结果

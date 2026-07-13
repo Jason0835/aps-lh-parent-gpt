@@ -142,6 +142,21 @@ public class TmDispatcherLog extends BaseEntity {
     @TableField(value = "AFTER_CLASS6_PLAN_QTY")
     private BigDecimal afterClass6PlanQty;
 
+    /** 撤销状态：0-未撤销、1-已撤销 */
+    @ApiModelProperty(value = "撤销状态：0-未撤销、1-已撤销", name = "undoStatus")
+    @TableField(value = "UNDO_STATUS")
+    private String undoStatus;
+
+    /** 受影响结果操作前快照JSON（同机台结果行及班次字段，用于单步撤销） */
+    @ApiModelProperty(value = "受影响结果操作前快照JSON", name = "affectedBeforeJson")
+    @TableField(value = "AFFECTED_BEFORE_JSON")
+    private String affectedBeforeJson;
+
+    /** 受影响结果操作后快照JSON（同机台结果行及班次字段，用于单步撤销） */
+    @ApiModelProperty(value = "受影响结果操作后快照JSON", name = "affectedAfterJson")
+    @TableField(value = "AFFECTED_AFTER_JSON")
+    private String affectedAfterJson;
+
     /** 查询条件：开始时间 */
     @TableField(exist = false)
     private transient String startTime;

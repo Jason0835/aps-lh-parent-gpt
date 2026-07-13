@@ -12,9 +12,8 @@ import com.zlt.aps.tm.api.enums.TmScheduleErrorCodeEnum;
 import com.zlt.aps.tm.api.enums.TmUnplannedReasonEnum;
 import com.zlt.aps.tm.engine.domain.*;
 import com.zlt.aps.tm.engine.service.ITmMachineAssignService;
-import com.zlt.aps.tm.engine.strategy.ITmMachineFilterRule;
-import com.zlt.aps.tm.engine.strategy.ITmMachineScoreStrategy;
-import com.zlt.aps.tm.engine.strategy.TmStrategyRegistry;
+import com.zlt.aps.tm.engine.strategy.*;
+import com.zlt.aps.tm.engine.util.TmGlueSimilarityUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
@@ -39,9 +38,21 @@ public class TmMachineAssignService implements ITmMachineAssignService {
     /** 默认机台评分策略编码 */
     private static final String DEFAULT_SCORE_STRATEGY_CODE = "DEFAULT";
 
+    /** 机台过滤策略参数编码 */
+    private static final String PARAM_MACHINE_FILTER_STRATEGY = "TM_MACHINE_FILTER_STRATEGY";
+
+    /** 机台评分策略参数编码 */
+    private static final String PARAM_MACHINE_SCORE_STRATEGY = "TM_MACHINE_SCORE_STRATEGY";
+
+    /** 班次内任务优先策略参数编码 */
+    private static final String PARAM_CHAIN_TASK_PRIORITY_STRATEGY = "TM_CHAIN_TASK_PRIORITY_STRATEGY";
+
     private final TmTaskChainScheduleService taskChainScheduleService;
 
     private final TmStrategyRegistry strategyRegistry;
+
+    /** 损耗率四层匹配解析器 */
+    private final TmLossRateResolver lossRateResolver = new TmLossRateResolver();
 
     /**
      * 创建默认机台分配步骤服务。
@@ -137,26 +148,17 @@ public class TmMachineAssignService implements ITmMachineAssignService {
      */
     private TmTaskDraft selectNextTaskByMachinePredecessor(List<TmTaskDraft> remainingTaskList,
                                                            TmScheduleContext context) {
-        for (TmTaskDraft task : remainingTaskList) {
-            if (!task.isUnassigned()) {
-                return task;
-            }
-        }
         Map<String, TmChainSortScore> scoreMap = new LinkedHashMap<>();
         for (TmTaskDraft task : remainingTaskList) {
             scoreMap.put(task.getBusinessKey(), this.calculateBestChainSortScore(task, context));
         }
-        List<TmTaskDraft> orderedTaskList = new ArrayList<>(remainingTaskList);
-        orderedTaskList.sort(Comparator
-                .comparing((TmTaskDraft task) -> scoreMap.getOrDefault(task.getBusinessKey(), TmChainSortScore.ZERO),
-                        Comparator.reverseOrder())
-                .thenComparing(task -> StrUtil.blankToDefault(task.getBusinessKey(), "")));
-        TmTaskDraft selectedTask = orderedTaskList.get(0);
-        log.info("[TM_CHAIN_TASK_ORDER] batchNo={}, traceId={}, factoryCode={}, scheduleDate={}, shiftOrder={}, predecessorSnapshot={}, selectedBusinessKey={}, selectedTreadCode={}, selectedGlueCode={}, chainSortScores={}",
+        ITmChainTaskPriorityStrategy priorityStrategy = this.resolveChainTaskPriorityStrategy(context);
+        TmTaskDraft selectedTask = priorityStrategy.select(remainingTaskList, context, scoreMap);
+        log.info("[TM_CHAIN_TASK_ORDER] batchNo={}, traceId={}, factoryCode={}, scheduleDate={}, shiftOrder={}, predecessorSnapshot={}, selectedBusinessKey={}, selectedTreadCode={}, selectedGlueCode={}, strategyCode={}, chainSortScores={}",
                 context.getBatchNo(), context.getTraceId(), context.getFactoryCode(), this.formatScheduleDate(context),
                 this.normalizeShiftOrder(selectedTask.getShiftOrder()), this.summarizeMachinePredecessors(context,
                         this.normalizeShiftOrder(selectedTask.getShiftOrder())), selectedTask.getBusinessKey(),
-                selectedTask.getTreadCode(), selectedTask.getGlueCode(), scoreMap);
+                selectedTask.getTreadCode(), selectedTask.getGlueCode(), priorityStrategy.getStrategyCode(), scoreMap);
         return selectedTask;
     }
 
@@ -167,6 +169,24 @@ public class TmMachineAssignService implements ITmMachineAssignService {
      * @param context 胎面排程上下文
      * @return 最佳排序分
      */
+    private ITmChainTaskPriorityStrategy resolveChainTaskPriorityStrategy(TmScheduleContext context) {
+        String strategyCode = this.resolveParamValue(context, PARAM_CHAIN_TASK_PRIORITY_STRATEGY,
+                TmContinuityFirstChainTaskPriorityStrategy.STRATEGY_CODE);
+        if (TmContinuityFirstChainTaskPriorityStrategy.STRATEGY_CODE.equals(strategyCode)) {
+            return new TmContinuityFirstChainTaskPriorityStrategy();
+        }
+        if (TmEmergencyFirstChainTaskPriorityStrategy.STRATEGY_CODE.equals(strategyCode)) {
+            return new TmEmergencyFirstChainTaskPriorityStrategy();
+        }
+        throw new ServiceException(TmScheduleErrorCodeEnum.TM_STRATEGY_NOT_REGISTERED.getDefaultMessage()
+                + ":" + strategyCode);
+    }
+
+    private String resolveParamValue(TmScheduleContext context, String paramCode, String defaultValue) {
+        TmParamValue paramValue = context.getParamMap().get(paramCode);
+        return paramValue == null || StrUtil.isBlank(paramValue.getEffectiveValue())
+                ? defaultValue : paramValue.getEffectiveValue().trim();
+    }
     private TmChainSortScore calculateBestChainSortScore(TmTaskDraft task, TmScheduleContext context) {
         if (CollUtil.isEmpty(context.getMachineCandidateList())) {
             return TmChainSortScore.ZERO;
@@ -202,13 +222,19 @@ public class TmMachineAssignService implements ITmMachineAssignService {
         BigDecimal machineSpeed = this.resolveMachineSpeed(task, candidate, context);
         BigDecimal remainCapacity = this.resolveRemainCapacity(task, context, candidate, machineSpeed);
         BigDecimal capacityScore = this.capacityFitScore(task, remainCapacity);
-        boolean mainGlueMatched = this.same(task.getGlueCode(), tailMainGlueCode);
-        int baseGlueMatchedCount = mainGlueMatched ? 0 : this.calculateBaseGlueIntersectionCount(task.getBaseGlueCode(), tailBaseGlueCode);
-        boolean mouthPlateMatched = this.same(task.getMouthPlateCode(), tailMouthPlateCode);
+        boolean mainGlueMatched = TmGlueSimilarityUtils.isSameNonBlank(task.getGlueCode(), tailMainGlueCode);
+        int baseGlueMatchedCount = mainGlueMatched ? 0
+                : TmGlueSimilarityUtils.calculateIntersectionCount(
+                        TmGlueSimilarityUtils.parseCodeSet(task.getBaseGlueCode()),
+                        TmGlueSimilarityUtils.parseCodeSet(tailBaseGlueCode));
+        boolean mouthPlateMatched = TmGlueSimilarityUtils.isSameNonBlank(
+                task.getMouthPlateCode(), tailMouthPlateCode);
         BigDecimal mainGlueScore = mainGlueMatched ? BigDecimal.TEN : BigDecimal.ZERO;
-        BigDecimal baseGlueScore = mainGlueMatched ? BigDecimal.ZERO : this.calculateBaseGlueSimilarityScore(task.getBaseGlueCode(), tailBaseGlueCode);
+        BigDecimal baseGlueScore = mainGlueMatched ? BigDecimal.ZERO
+                : TmGlueSimilarityUtils.calculateSimilarityScore(
+                        task.getBaseGlueCode(), tailBaseGlueCode, BigDecimal.valueOf(8));
         BigDecimal mouthPlateScore = mouthPlateMatched ? BigDecimal.TEN : BigDecimal.ZERO;
-        BigDecimal switchCostScore = BigDecimal.TEN.subtract(nvl(candidate.getSwitchCostHours())).max(BigDecimal.ZERO);
+        BigDecimal switchCostScore = BigDecimal.TEN.subtract(this.nvl(candidate.getSwitchCostHours())).max(BigDecimal.ZERO);
         BigDecimal fixedScore = Boolean.TRUE.equals(candidate.getFixedMachineMatched()) ? BigDecimal.TEN : BigDecimal.ZERO;
         return new TmChainSortScore(mainGlueMatched ? 1 : 0, baseGlueMatchedCount,
                 mouthPlateMatched ? 1 : 0, capacityScore, mainGlueScore, baseGlueScore, mouthPlateScore,
@@ -349,85 +375,6 @@ public class TmMachineAssignService implements ITmMachineAssignService {
     }
 
     /**
-     * 判断两个编码是否非空且相同。
-     *
-     * @param left 左侧编码
-     * @param right 右侧编码
-     * @return true 表示相同
-     */
-    private boolean same(String left, String right) {
-        return StrUtil.isNotBlank(left) && left.equals(right);
-    }
-
-    /**
-     * 按基部胶交集元素数量计算相似分。
-     *
-     * @param left  当前任务基部胶编码
-     * @param right 链尾基部胶编码
-     * @return 基部胶相似分，最高 8 分
-     */
-    private BigDecimal calculateBaseGlueSimilarityScore(String left, String right) {
-        Set<String> leftSet = this.parseBaseGlueSet(left);
-        int intersectionCount = this.calculateBaseGlueIntersectionCount(leftSet, this.parseBaseGlueSet(right));
-        if (leftSet.isEmpty() || intersectionCount <= 0) {
-            return BigDecimal.ZERO;
-        }
-        return BigDecimal.valueOf(8).multiply(BigDecimal.valueOf(intersectionCount))
-                .divide(BigDecimal.valueOf(leftSet.size()), 2, java.math.RoundingMode.HALF_UP);
-    }
-
-    /**
-     * 计算两个基部胶编码的交集元素数量。
-     *
-     * @param left  左侧基部胶编码
-     * @param right 右侧基部胶编码
-     * @return 交集元素数量
-     */
-    private int calculateBaseGlueIntersectionCount(String left, String right) {
-        return this.calculateBaseGlueIntersectionCount(this.parseBaseGlueSet(left), this.parseBaseGlueSet(right));
-    }
-
-    /**
-     * 将逗号分隔的基部胶编码拆分为元素集合，去除空白并忽略重复元素。
-     *
-     * @param baseGlueCode 基部胶编码串
-     * @return 基部胶元素集合
-     */
-    private Set<String> parseBaseGlueSet(String baseGlueCode) {
-        Set<String> baseGlueSet = new HashSet<>();
-        if (StrUtil.isBlank(baseGlueCode)) {
-            return baseGlueSet;
-        }
-        for (String item : baseGlueCode.split(",")) {
-            String value = StrUtil.trim(item);
-            if (StrUtil.isNotBlank(value)) {
-                baseGlueSet.add(value);
-            }
-        }
-        return baseGlueSet;
-    }
-
-    /**
-     * 计算两个基部胶集合的交集元素数量。
-     *
-     * @param leftSet  左侧基部胶集合
-     * @param rightSet 右侧基部胶集合
-     * @return 交集元素数量
-     */
-    private int calculateBaseGlueIntersectionCount(Set<String> leftSet, Set<String> rightSet) {
-        if (CollUtil.isEmpty(leftSet) || CollUtil.isEmpty(rightSet)) {
-            return 0;
-        }
-        int count = 0;
-        for (String item : leftSet) {
-            if (rightSet.contains(item)) {
-                count++;
-            }
-        }
-        return count;
-    }
-
-    /**
      * 规范化班次序号。
      *
      * @param shiftOrder 原始班次序号
@@ -465,8 +412,8 @@ public class TmMachineAssignService implements ITmMachineAssignService {
         ruleContext.setScheduleContext(context);
 
         // 获取过滤规则和评分策略
-        ITmMachineFilterRule filterRule = strategyRegistry.getMachineFilterRule(DEFAULT_FILTER_RULE_CODE);
-        ITmMachineScoreStrategy scoreStrategy = strategyRegistry.getMachineScoreStrategy(DEFAULT_SCORE_STRATEGY_CODE);
+        ITmMachineFilterRule filterRule = strategyRegistry.getMachineFilterRule(this.resolveParamValue(context, PARAM_MACHINE_FILTER_STRATEGY, DEFAULT_FILTER_RULE_CODE));
+        ITmMachineScoreStrategy scoreStrategy = strategyRegistry.getMachineScoreStrategy(this.resolveParamValue(context, PARAM_MACHINE_SCORE_STRATEGY, DEFAULT_SCORE_STRATEGY_CODE));
 
         // 复制候选机台列表，并按当前任务动态补齐口型、胶料、定点/禁排和剩余产能判断。
         List<TmMachineCandidate> candidates = copyCandidates(candidateList);
@@ -620,8 +567,8 @@ public class TmMachineAssignService implements ITmMachineAssignService {
         if (targetShiftOrder >= 6 || CollUtil.isEmpty(context.getMachineCandidateList())) {
             return;
         }
-        ITmMachineFilterRule filterRule = strategyRegistry.getMachineFilterRule(DEFAULT_FILTER_RULE_CODE);
-        ITmMachineScoreStrategy scoreStrategy = strategyRegistry.getMachineScoreStrategy(DEFAULT_SCORE_STRATEGY_CODE);
+        ITmMachineFilterRule filterRule = strategyRegistry.getMachineFilterRule(this.resolveParamValue(context, PARAM_MACHINE_FILTER_STRATEGY, DEFAULT_FILTER_RULE_CODE));
+        ITmMachineScoreStrategy scoreStrategy = strategyRegistry.getMachineScoreStrategy(this.resolveParamValue(context, PARAM_MACHINE_SCORE_STRATEGY, DEFAULT_SCORE_STRATEGY_CODE));
         int earlyFillIndex = 1;
         boolean hasAssigned = true;
         while (hasAssigned) {
@@ -1201,7 +1148,7 @@ public class TmMachineAssignService implements ITmMachineAssignService {
                                           TmScheduleContext context) {
         BigDecimal preLossPlanQty = task.getPreLossPlanQty() == null ? nvl(task.getPlanQty()) : nvl(task.getPreLossPlanQty());
         preLossPlanQty = preLossPlanQty.setScale(6, java.math.RoundingMode.HALF_UP);
-        TmLossRuleMatchResult matchResult = this.resolveLossRule(task, selectedCandidate, context);
+        TmLossRuleMatchResult matchResult = this.lossRateResolver.resolve(context.getLossRuleList(), task.getTreadCode(), selectedCandidate == null ? task.getMachineCode() : selectedCandidate.getMachineCode());
         BigDecimal resolvedLossRate = matchResult == null || matchResult.getLossRate() == null
                 ? nvl(task.getLossRate()) : nvl(matchResult.getLossRate());
         BigDecimal lossAddQty = this.calculateLossAddQty(preLossPlanQty, resolvedLossRate);
@@ -1259,88 +1206,6 @@ public class TmMachineAssignService implements ITmMachineAssignService {
         return null;
     }
 
-    /**
-     * 按四层优先级解析最终损耗率。
-     *
-     * @param task 当前任务
-     * @param selectedCandidate 已选中机台
-     * @param context 排程上下文
-     * @return 损耗率匹配结果；未命中时返回 null
-     */
-    private TmLossRuleMatchResult resolveLossRule(TmTaskDraft task, TmMachineCandidate selectedCandidate,
-                                                  TmScheduleContext context) {
-        if (context == null || CollUtil.isEmpty(context.getLossRuleList())) {
-            return null;
-        }
-        String machineCode = selectedCandidate == null ? task.getMachineCode() : selectedCandidate.getMachineCode();
-        TmLossRuleMatchResult matchResult = this.findLossRule(context.getLossRuleList(), task.getTreadCode(), machineCode, "MACHINE_TREAD");
-        if (matchResult != null) {
-            return matchResult;
-        }
-        matchResult = this.findLossRule(context.getLossRuleList(), task.getTreadCode(), machineCode, "TREAD");
-        if (matchResult != null) {
-            return matchResult;
-        }
-        matchResult = this.findLossRule(context.getLossRuleList(), task.getTreadCode(), machineCode, "MACHINE");
-        if (matchResult != null) {
-            return matchResult;
-        }
-        return this.findLossRule(context.getLossRuleList(), task.getTreadCode(), machineCode, "DEFAULT");
-    }
-
-    /**
-     * 从指定层级规则中选择优先级最小的一条。
-     *
-     * @param ruleList 损耗率规则列表
-     * @param treadCode 胎面编码
-     * @param machineCode 机台编码
-     * @param matchLevel 匹配层级
-     * @return 命中结果；未命中返回 null
-     */
-    private TmLossRuleMatchResult findLossRule(List<TmLossRule> ruleList, String treadCode, String machineCode,
-                                               String matchLevel) {
-        TmLossRule matchedRule = ruleList.stream()
-                .filter(rule -> {
-                    String normalizedRuleTreadCode = StrUtil.emptyToNull(StrUtil.trim(rule.getTreadCode()));
-                    String normalizedRuleMachineCode = StrUtil.emptyToNull(StrUtil.trim(rule.getMachineCode()));
-                    String normalizedTreadCode = StrUtil.emptyToNull(StrUtil.trim(treadCode));
-                    String normalizedMachineCode = StrUtil.emptyToNull(StrUtil.trim(machineCode));
-                    if ("MACHINE_TREAD".equals(matchLevel)) {
-                        return this.sameNullable(normalizedRuleTreadCode, normalizedTreadCode)
-                                && this.sameNullable(normalizedRuleMachineCode, normalizedMachineCode);
-                    }
-                    if ("TREAD".equals(matchLevel)) {
-                        return this.sameNullable(normalizedRuleTreadCode, normalizedTreadCode)
-                                && normalizedRuleMachineCode == null;
-                    }
-                    if ("MACHINE".equals(matchLevel)) {
-                        return normalizedRuleTreadCode == null
-                                && this.sameNullable(normalizedRuleMachineCode, normalizedMachineCode);
-                    }
-                    return normalizedRuleTreadCode == null && normalizedRuleMachineCode == null;
-                })
-                .min(Comparator.comparing(rule -> rule.getPriority() == null ? Integer.MAX_VALUE : rule.getPriority()))
-                .orElse(null);
-        if (matchedRule == null) {
-            return null;
-        }
-        TmLossRuleMatchResult matchResult = new TmLossRuleMatchResult();
-        matchResult.setMatchLevel(matchLevel);
-        matchResult.setLossRate(nvl(matchedRule.getLossRate()));
-        matchResult.setMatchedRule(matchedRule);
-        return matchResult;
-    }
-
-    /**
-     * 判断两个可空编码是否一致。
-     *
-     * @param left 左值
-     * @param right 右值
-     * @return true 表示一致
-     */
-    private boolean sameNullable(String left, String right) {
-        return Objects.equals(StrUtil.emptyToNull(StrUtil.trim(left)), StrUtil.emptyToNull(StrUtil.trim(right)));
-    }
 
     /**
      * 计算损耗补偿量。

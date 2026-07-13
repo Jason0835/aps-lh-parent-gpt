@@ -14,6 +14,8 @@ import com.zlt.aps.tm.api.enums.TmUnplannedReasonEnum;
 import com.zlt.aps.tm.domain.vo.*;
 import com.zlt.aps.tm.engine.domain.*;
 import com.zlt.aps.tm.mapper.*;
+import com.zlt.aps.tm.service.loader.TmLossRuleLoader;
+import com.zlt.aps.tm.service.loader.TmScheduleParamLoader;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
@@ -129,8 +131,24 @@ public class TmAutoScheduleDataLoadService {
     @Resource
     private TmShiftConfigMapper tmShiftConfigMapper;
 
-    @Resource
-    private TmAutoScheduleRedisCacheService tmAutoScheduleRedisCacheService = new TmAutoScheduleRedisCacheService();
+    private final TmAutoScheduleRedisCacheService tmAutoScheduleRedisCacheService;
+
+    /** 参数装载组件，只负责构建单次排程参数快照 */
+    private final TmScheduleParamLoader tmScheduleParamLoader;
+
+    /** 损耗规则装载组件，只负责业务配置到引擎规则的转换 */
+    private final TmLossRuleLoader tmLossRuleLoader;
+
+    /**
+     * 创建胎面自动排程数据加载服务。
+     *
+     * @param tmAutoScheduleRedisCacheService 自动排程 Redis 缓存服务
+     */
+    public TmAutoScheduleDataLoadService(TmAutoScheduleRedisCacheService tmAutoScheduleRedisCacheService) {
+        this.tmAutoScheduleRedisCacheService = tmAutoScheduleRedisCacheService;
+        this.tmScheduleParamLoader = new TmScheduleParamLoader();
+        this.tmLossRuleLoader = new TmLossRuleLoader();
+    }
 
     /**
      * 加载自动排程所需数据。
@@ -140,57 +158,16 @@ public class TmAutoScheduleDataLoadService {
      */
     public void loadAllData(TmScheduleContext context) {
         validateContext(context);
-        loadParams(context);
+        this.tmScheduleParamLoader.load(context, tmParamsMapper, tmAutoScheduleRedisCacheService);
         List<TmMachineInfo> machineList = loadMachineInfo(context);
         context.setMachineCandidateList(loadMachineCandidates(context, machineList));
-        context.setLossRuleList(loadLossRules(context));
+        context.setLossRuleList(this.tmLossRuleLoader.load(context, tmLossSettingMapper));
         List<TmTaskDraft> taskDraftList = loadFormingDemandTasks(context, machineList);
         fillTaskAuxiliaryData(context, taskDraftList);
         context.setTaskDraftList(taskDraftList);
         log.info("[TM_AUTO_SCHEDULE_LOAD] factoryCode={}, scheduleDate={}, taskCount={}, machineCount={}",
                 context.getFactoryCode(), DateUtil.formatDate(context.getScheduleDate()),
                 taskDraftList.size(), machineList.size());
-    }
-
-    /**
-     * 加载胎面排程参数快照。
-     *
-     * @param context 自动排程上下文
-     */
-    private void loadParams(TmScheduleContext context) {
-        LambdaQueryWrapper<TmParams> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(TmParams::getFactoryCode, context.getFactoryCode());
-        wrapper.eq(TmParams::getEnableStatus, YES);
-        List<TmParams> paramsList = tmAutoScheduleRedisCacheService.getCachedList("params:" + context.getFactoryCode(),
-                () -> tmParamsMapper.selectList(wrapper));
-        Map<String, TmParamValue> paramMap = new HashMap<>();
-        if (CollUtil.isNotEmpty(paramsList)) {
-            for (TmParams params : paramsList) {
-                TmParamValue value = new TmParamValue();
-                value.setParamCode(params.getParamCode());
-                value.setParamValue(params.getParamValue());
-                value.setDefaultValue(params.getDefaultValue());
-                value.setSource("T_TM_PARAMS");
-                paramMap.put(params.getParamCode(), value);
-            }
-        }
-        putDefaultParam(paramMap, PARAM_ALGORITHM_SWITCH, "1");
-        putDefaultParam(paramMap, PARAM_MIN_STOCK_CLASS, "1");
-        putDefaultParam(paramMap, PARAM_MIN_START_QTY, "0");
-        putDefaultParam(paramMap, PARAM_DEFAULT_CURL_LENGTH, "0");
-        putDefaultParam(paramMap, PARAM_TOOL_TOTAL_QTY, "0");
-        putDefaultParam(paramMap, PARAM_SHUTDOWN_REDISTRIBUTION_ENABLED, "1");
-        putDefaultParam(paramMap, PARAM_PLAN_QTY_STRATEGY, "DEFAULT");
-        putDefaultParam(paramMap, PARAM_TASK_SORT_STRATEGY, "DEFAULT");
-        putDefaultParam(paramMap, PARAM_NEW_SPEC_LOOKBACK_DAYS, "7");
-        putDefaultParam(paramMap, PARAM_NEW_SPEC_ADVANCE_SHIFT_COUNT, "2");
-        putDefaultParam(paramMap, PARAM_EXPERIMENT_SPEC_LOOKBACK_DAYS, "5");
-        putDefaultParam(paramMap, PARAM_EXPERIMENT_SPEC_PLAN_QTY, "30");
-        putDefaultParam(paramMap, PARAM_FORMING_SHIFT_OFFSET, "2");
-        putDefaultParam(paramMap, PARAM_SMALL_GLUE_CODES, "");
-        putDefaultParam(paramMap, PARAM_VERSION_MATCH_MODE, VERSION_MATCH_MODE_RECIPE);
-        context.setParamMap(paramMap);
-        context.setSmallGlueCodeSet(this.parseSmallGlueCodes(paramMap.get(PARAM_SMALL_GLUE_CODES)));
     }
 
     /**
@@ -1867,41 +1844,6 @@ public class TmAutoScheduleDataLoadService {
     }
 
     /**
-     * 加载启用的胎面损耗率配置。
-     *
-     * @param context 自动排程上下文
-     * @return 损耗率配置列表；未配置时返回空集合
-     */
-    private List<TmLossRule> loadLossRules(TmScheduleContext context) {
-        if (tmLossSettingMapper == null) {
-            return Collections.emptyList();
-        }
-        LambdaQueryWrapper<TmLossSetting> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(TmLossSetting::getFactoryCode, context.getFactoryCode());
-        wrapper.eq(TmLossSetting::getEnableStatus, YES);
-        return Optional.ofNullable(tmLossSettingMapper.selectList(wrapper)).orElse(Collections.emptyList())
-                .stream()
-                .map(this::buildLossRule)
-                .collect(Collectors.toList());
-    }
-
-    /**
-     * 将业务损耗率配置映射为引擎规则对象。
-     *
-     * @param setting 损耗率业务实体
-     * @return 引擎损耗率规则
-     */
-    private TmLossRule buildLossRule(TmLossSetting setting) {
-        TmLossRule rule = new TmLossRule();
-        rule.setFactoryCode(setting.getFactoryCode());
-        rule.setTreadCode(setting.getTreadCode());
-        rule.setMachineCode(setting.getMachineCode());
-        rule.setLossRate(setting.getLossRate());
-        rule.setPriority(setting.getPriority());
-        return rule;
-    }
-
-    /**
      * 补充任务草稿的胎面辅助基础数据。
      *
      * @param context       自动排程上下文
@@ -2138,17 +2080,6 @@ public class TmAutoScheduleDataLoadService {
         return value == null ? BigDecimal.ZERO : value;
     }
 
-    private void putDefaultParam(Map<String, TmParamValue> paramMap, String paramCode, String defaultValue) {
-        if (paramMap.containsKey(paramCode)) {
-            return;
-        }
-        TmParamValue value = new TmParamValue();
-        value.setParamCode(paramCode);
-        value.setDefaultValue(defaultValue);
-        value.setSource("DEFAULT");
-        paramMap.put(paramCode, value);
-    }
-
     private String getParamValue(TmScheduleContext context, String paramCode, String defaultValue) {
         TmParamValue value = context.getParamMap().get(paramCode);
         return value == null || StrUtil.isBlank(value.getEffectiveValue()) ? defaultValue : value.getEffectiveValue();
@@ -2170,26 +2101,6 @@ public class TmAutoScheduleDataLoadService {
         } catch (NumberFormatException ex) {
             return defaultValue;
         }
-    }
-
-    /**
-     * 解析小胶种参数编码集合。
-     *
-     * @param paramValue 参数快照值
-     * @return 小胶种编码集合；参数为空时返回空集合
-     */
-    private Set<String> parseSmallGlueCodes(TmParamValue paramValue) {
-        if (paramValue == null) {
-            return new LinkedHashSet<>();
-        }
-        String effectiveValue = StrUtil.blankToDefault(paramValue.getParamValue(), paramValue.getDefaultValue());
-        if (StrUtil.isBlank(effectiveValue)) {
-            return new LinkedHashSet<>();
-        }
-        return Arrays.stream(effectiveValue.split(","))
-                .map(String::trim)
-                .filter(StrUtil::isNotBlank)
-                .collect(Collectors.toCollection(LinkedHashSet::new));
     }
 
     /**

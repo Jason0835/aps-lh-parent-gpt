@@ -16,4 +16,16 @@
           and r.SCHEDULE_DATE = #{scheduleDate}
     </update>
 
+    <update id="logicDeleteByFactoryCodeAndBatchNos">
+        update T_TM_SCHEDULE_RESULT_EXPLAIN
+        set IS_DELETE = 1,
+            UPDATE_TIME = now()
+        where IS_DELETE = 0
+          and FACTORY_CODE = #{factoryCode}
+          and BATCH_NO in
+        <foreach item="batchNo" collection="batchNoList" open="(" separator="," close=")">
+            #{batchNo}
+        </foreach>
+    </update>
+
 </mapper>

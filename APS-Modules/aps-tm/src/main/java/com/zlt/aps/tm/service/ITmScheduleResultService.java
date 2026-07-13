@@ -141,6 +141,15 @@ public interface ITmScheduleResultService extends IDocService<TmScheduleResult> 
     int changeMachine(TmScheduleResult scheduleResult);
 
     /**
+     * 单步撤销最近一次人工操作（插单/调量/转机台）。
+     *
+     * @param dispatcherLogId 调度日志 ID
+     * @return 恢复的记录数
+     * @throws com.ruoyi.common.exception.ServiceException 日志不存在、已撤销或目标记录发布中时抛出
+     */
+    int undoLastOperation(Long dispatcherLogId);
+
+    /**
      * 校验排程结果是否允许发布。
      *
      * @param ids 排程结果ID列表
