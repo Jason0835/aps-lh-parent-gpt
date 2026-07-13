@@ -243,11 +243,11 @@ public class NcEngineNewServiceImpl implements NcEngineNewService {
         context.setConstructionMap(constructionMap);
 
         // 获取所有内衬代码（从排产深度Map中获取）
-        Set<String> paddingCodes = paddingSupplyDepth.keySet();
+        Set<String> liningCodes = paddingSupplyDepth.keySet();
 
         // ==================== 步骤3：计算内衬需求清单 ====================
         // 3.1 加载库存
-        Map<String, BigDecimal> effectiveStockMap = this.loadEffectiveStock(factoryCode, new ArrayList<>(paddingCodes),
+        Map<String, BigDecimal> effectiveStockMap = this.loadEffectiveStock(factoryCode, new ArrayList<>(liningCodes),
                 context);
         context.setEffectiveStockMap(effectiveStockMap);
         log.info("步骤3.1：加载有效库存 {} 个规格", effectiveStockMap.size());
@@ -260,11 +260,11 @@ public class NcEngineNewServiceImpl implements NcEngineNewService {
         // 从排产结果表（含日志表）查询各内衬代码最近一次有排产量的排产日期
         int newSpecDaysThreshold = this.getParamAsDecimal(context, NcEngineConstants.PARAM_NEW_SPEC_DAYS_THRESHOLD).intValue();
         List<Map<String, Object>> lastScheduleList = ncEngineScheduleResultMapper.selectLastScheduleDate(
-                factoryCode, new ArrayList<>(paddingCodes));
+                factoryCode, new ArrayList<>(liningCodes));
         Map<String, Date> lastScheduleMap = new HashMap<>();
         if (lastScheduleList != null) {
             for (Map<String, Object> row : lastScheduleList) {
-                String code = (String) row.get("PADDING_CODE");
+                String code = (String) row.get("LINLING_CODE");
                 Object lastDateObj = row.get("LAST_DATE");
                 Date lastDate = null;
                 if (lastDateObj instanceof LocalDateTime) {
@@ -275,17 +275,17 @@ public class NcEngineNewServiceImpl implements NcEngineNewService {
                 lastScheduleMap.put(code, lastDate);
             }
         }
-        Set<String> newSpecPaddingCodes = new HashSet<>();
-        for (String code : paddingCodes) {
+        Set<String> newSpecliningCodes = new HashSet<>();
+        for (String code : liningCodes) {
             Date lastDate = lastScheduleMap.get(code);
             if (lastDate == null) {
                 // 从未排产过 → 新规格
-                newSpecPaddingCodes.add(code);
+                newSpecliningCodes.add(code);
             } else {
                 // 计算间隔天数
                 long daysBetween = DateUtil.betweenDay(lastDate, scheduleDate, true);
                 if (daysBetween >= newSpecDaysThreshold) {
-                    newSpecPaddingCodes.add(code);
+                    newSpecliningCodes.add(code);
                 }
             }
         }
@@ -325,8 +325,8 @@ public class NcEngineNewServiceImpl implements NcEngineNewService {
 
         // 3.3 构建内衬需求清单
         BigDecimal standardCurlLength = this.getParamAsDecimal(context, NcEngineConstants.PARAM_STANDARD_CRIMP_LENGTH);
-        List<NcPaddingDemand> demandList = this.buildDemandList(paddingCodes, cxScheduleList,
-                effectiveStockMap, constructionMap, newSpecPaddingCodes, standardCurlLength);
+        List<NcPaddingDemand> demandList = this.buildDemandList(liningCodes, cxScheduleList,
+                effectiveStockMap, constructionMap, newSpecliningCodes, standardCurlLength);
         log.info("步骤3.3：生成内衬需求清单 {} 个规格", demandList.size());
         context.appendLog("===== 步骤3.3：内衬需求清单 =====");
         for (NcPaddingDemand demand : demandList) {
@@ -355,16 +355,16 @@ public class NcEngineNewServiceImpl implements NcEngineNewService {
             }
         }
         for (NcPaddingDemand demand : demandList) {
-            String paddingCode = demand.getLiningCode();
-            BigDecimal stock = effectiveStockMap.getOrDefault(paddingCode, BigDecimal.ZERO);
-            BigDecimal addPlan = prevDayClass3Plan.getOrDefault(paddingCode, BigDecimal.ZERO);
+            String liningCode = demand.getLiningCode();
+            BigDecimal stock = effectiveStockMap.getOrDefault(liningCode, BigDecimal.ZERO);
+            BigDecimal addPlan = prevDayClass3Plan.getOrDefault(liningCode, BigDecimal.ZERO);
             // CX class1（早班）消耗量（从成型计划动态计算）
-            BigDecimal cxConsume = this.calcShiftConsume(cxScheduleList, constructionMap, paddingCode, 1);
+            BigDecimal cxConsume = this.calcShiftConsume(cxScheduleList, constructionMap, liningCode, 1);
             BigDecimal inventory = stock.add(addPlan).subtract(cxConsume);
             if (inventory.compareTo(BigDecimal.ZERO) < 0) {
                 inventory = BigDecimal.ZERO;
             }
-            handoverInventory.put(paddingCode, inventory);
+            handoverInventory.put(liningCode, inventory);
         }
         context.setHandoverInventory(handoverInventory);
         context.appendLog("===== 接班库存（第1班） =====");
@@ -389,14 +389,14 @@ public class NcEngineNewServiceImpl implements NcEngineNewService {
 
             // 4.2 加载定点机台
         List<NcSpecifyMachine> specifyMachineList = this.loadSpecifyMachines(factoryCode,
-                new ArrayList<>(paddingCodes));
+                new ArrayList<>(liningCodes));
         log.info("步骤4.2：加载定点机台 {} 条", specifyMachineList.size());
 
         // 4.3 关联机台
         this.assignMachine(demandList, machineMap, specifyMachineList);
 
         // 4.4 加载辅助配置数据
-        this.loadAuxiliaryData(factoryCode, context, new ArrayList<>(paddingCodes));
+        this.loadAuxiliaryData(factoryCode, context, new ArrayList<>(liningCodes));
         log.info("步骤4.4：辅助配置数据加载完成");
 
         context.appendLog("===== 步骤4：机台分配 =====");
@@ -482,17 +482,17 @@ public class NcEngineNewServiceImpl implements NcEngineNewService {
      *
      * @param cxScheduleList 成型计划列表
      * @param constructionMap 施工数据 Map
-     * @param paddingCode 内衬代码
+     * @param liningCode 内衬代码
      * @param shiftIndex 班次索引（1~8）
      * @return 该班次的消耗量（米）
      */
     private BigDecimal calcShiftConsume(List<CxScheduleResult> cxScheduleList,
-            Map<String, List<MdmConstructionInfo>> constructionMap, String paddingCode, int shiftIndex) {
+            Map<String, List<MdmConstructionInfo>> constructionMap, String liningCode, int shiftIndex) {
         BigDecimal totalConsume = BigDecimal.ZERO;
         for (CxScheduleResult cx : cxScheduleList) {
             // 根据班次示方书编号匹配对应的施工版本
             MdmConstructionInfo construction = this.resolveConstructionForShift(cx, shiftIndex, constructionMap);
-            if (construction == null || !paddingCode.equals(construction.getInsideCode())) {
+            if (construction == null || !liningCode.equals(construction.getInsideCode())) {
                 continue;
             }
             // 内衬长度单位是毫米(mm)，需要换算成米(m)
@@ -607,7 +607,7 @@ public class NcEngineNewServiceImpl implements NcEngineNewService {
     /**
      * 加载有效库存
      */
-    private Map<String, BigDecimal> loadEffectiveStock(String factoryCode, List<String> paddingCodes,
+    private Map<String, BigDecimal> loadEffectiveStock(String factoryCode, List<String> liningCodes,
             NcScheduleContext context) {
         Map<String, BigDecimal> stockMap = new HashMap<>();
         List<NcStock> stockList = ncEngineStockMapper.selectList(new LambdaQueryWrapper<NcStock>()
@@ -615,7 +615,7 @@ public class NcEngineNewServiceImpl implements NcEngineNewService {
                 .eq(NcStock::getStockDate, DateUtil.offsetDay(context.getScheduleDate(), -1)));
         if (stockList != null) {
             // 按内衬代码分组取最新库存
-            stockList.stream().filter(s -> paddingCodes.contains(s.getMaterialCode())).forEach(s -> {
+            stockList.stream().filter(s -> liningCodes.contains(s.getMaterialCode())).forEach(s -> {
                 BigDecimal stock = BigDecimalUtils.valueOf(s.getStockNum())
                         .add(BigDecimalUtils.valueOf(s.getModifyNum()))
                         .subtract(BigDecimalUtils.valueOf(s.getBadNum()));
@@ -716,7 +716,7 @@ public class NcEngineNewServiceImpl implements NcEngineNewService {
             if (construction == null || construction.getInsideCode() == null) {
                 continue;
             }
-            String paddingCode = construction.getInsideCode();
+            String liningCode = construction.getInsideCode();
             BigDecimal unitConsume = construction.getPaddingLength() != null ? construction.getPaddingLength()
                     : BigDecimal.ONE;
 
@@ -730,7 +730,7 @@ public class NcEngineNewServiceImpl implements NcEngineNewService {
             }
             if (maxPlan.compareTo(BigDecimal.ZERO) > 0) {
                 BigDecimal consume = maxPlan.multiply(unitConsume);
-                maxShiftConsume.merge(paddingCode, consume, BigDecimal::max);
+                maxShiftConsume.merge(liningCode, consume, BigDecimal::max);
             }
         }
         return maxShiftConsume;
@@ -756,10 +756,10 @@ public class NcEngineNewServiceImpl implements NcEngineNewService {
      * 从施工数据列表中取第一个有效的施工记录（用于计算月计划余量等不需要按班次区分的场景）
      */
     private MdmConstructionInfo getFirstValidConstruction(
-            Map<String, List<MdmConstructionInfo>> constructionMap, String paddingCode) {
+            Map<String, List<MdmConstructionInfo>> constructionMap, String liningCode) {
         for (List<MdmConstructionInfo> constructions : constructionMap.values()) {
             for (MdmConstructionInfo c : constructions) {
-                if (paddingCode.equals(c.getInsideCode())) {
+                if (liningCode.equals(c.getInsideCode())) {
                     return c;
                 }
             }
@@ -784,8 +784,8 @@ public class NcEngineNewServiceImpl implements NcEngineNewService {
                 if (construction == null) {
                     continue;
                 }
-                String paddingCode = construction.getInsideCode();
-                if (result.containsKey(paddingCode)) {
+                String liningCode = construction.getInsideCode();
+                if (result.containsKey(liningCode)) {
                     continue;
                 }
 
@@ -796,12 +796,12 @@ public class NcEngineNewServiceImpl implements NcEngineNewService {
                         .valueOf(monitor.getLhMargin() != null ? monitor.getLhMargin() : 0).multiply(unitConsume);
 
                 // 预估值不得超过月剩余量
-                BigDecimal maxShift = maxShiftConsume.getOrDefault(paddingCode, BigDecimal.ZERO);
+                BigDecimal maxShift = maxShiftConsume.getOrDefault(liningCode, BigDecimal.ZERO);
                 BigDecimal estimatedTotal = maxShift.multiply(BigDecimal.valueOf(exceedShifts));
                 if (estimatedTotal.compareTo(paddingRemaining) > 0) {
                     estimatedTotal = paddingRemaining;
                 }
-                result.put(paddingCode, estimatedTotal);
+                result.put(liningCode, estimatedTotal);
                 break;
             }
         }
@@ -810,7 +810,7 @@ public class NcEngineNewServiceImpl implements NcEngineNewService {
 
     /**
      * 计算内衬月度剩余量（原始值，不按超出班次截断）
-     * <p>返回 Map<paddingCode, paddingRemaining>，paddingRemaining = lhMargin × unitConsume</p>
+     * <p>返回 Map<liningCode, paddingRemaining>，paddingRemaining = lhMargin × unitConsume</p>
      */
     private Map<String, BigDecimal> calcRawPaddingRemaining(List<MpMonthPlanMonitor> monthPlanMonitors,
             Map<String, List<MdmConstructionInfo>> constructionMap) {
@@ -826,15 +826,15 @@ public class NcEngineNewServiceImpl implements NcEngineNewService {
                 if (construction == null) {
                     continue;
                 }
-                String paddingCode = construction.getInsideCode();
-                if (result.containsKey(paddingCode)) {
+                String liningCode = construction.getInsideCode();
+                if (result.containsKey(liningCode)) {
                     continue;
                 }
                 BigDecimal unitConsume = construction.getPaddingLength() != null ? construction.getPaddingLength()
                         : BigDecimal.ONE;
                 BigDecimal paddingRemaining = BigDecimal
                         .valueOf(monitor.getLhMargin() != null ? monitor.getLhMargin() : 0).multiply(unitConsume);
-                result.put(paddingCode, paddingRemaining);
+                result.put(liningCode, paddingRemaining);
                 break;
             }
         }
@@ -844,19 +844,19 @@ public class NcEngineNewServiceImpl implements NcEngineNewService {
     /**
      * 构建内衬需求清单
      */
-    private List<NcPaddingDemand> buildDemandList(Set<String> paddingCodes,
+    private List<NcPaddingDemand> buildDemandList(Set<String> liningCodes,
             List<CxScheduleResult> cxScheduleList, Map<String, BigDecimal> effectiveStockMap,
-            Map<String, List<MdmConstructionInfo>> constructionMap, Set<String> newSpecPaddingCodes,
+            Map<String, List<MdmConstructionInfo>> constructionMap, Set<String> newSpecliningCodes,
             BigDecimal standardCurlLength) {
         List<NcPaddingDemand> demandList = new ArrayList<>();
 
         // 收集各规格的总消耗量和最早需求时间
-        for (String paddingCode : paddingCodes) {
+        for (String liningCode : liningCodes) {
             NcPaddingDemand demand = new NcPaddingDemand();
-            demand.setLiningCode(paddingCode);
+            demand.setLiningCode(liningCode);
 
             // 从施工信息获取单耗、胶料、内衬物料名等（取第一个有效版本）
-            MdmConstructionInfo firstConstruction = this.getFirstValidConstruction(constructionMap, paddingCode);
+            MdmConstructionInfo firstConstruction = this.getFirstValidConstruction(constructionMap, liningCode);
             if (firstConstruction != null) {
                 demand.setUnitConsume(firstConstruction.getPaddingLength() != null
                         ? firstConstruction.getPaddingLength() : BigDecimal.ONE);
@@ -871,15 +871,15 @@ public class NcEngineNewServiceImpl implements NcEngineNewService {
                     NcEngineConstants.CX_PRODUCTION_STATUS_FINISHED.equals(demand.getProductionStatus()));
 
             // 判断是否新规格
-            demand.setNewSpec(newSpecPaddingCodes.contains(paddingCode));
+            demand.setNewSpec(newSpecliningCodes.contains(liningCode));
 
             // 计算所有班次的总消耗量（从成型计划动态计算）
             BigDecimal totalConsume = BigDecimal.ZERO;
             for (int i = 1; i <= NcEngineConstants.CX_SHIFT_COUNT; i++) {
                 totalConsume = totalConsume.add(
-                        this.calcShiftConsume(cxScheduleList, constructionMap, paddingCode, i));
+                        this.calcShiftConsume(cxScheduleList, constructionMap, liningCode, i));
             }
-            BigDecimal effectiveStock = effectiveStockMap.getOrDefault(paddingCode, BigDecimal.ZERO);
+            BigDecimal effectiveStock = effectiveStockMap.getOrDefault(liningCode, BigDecimal.ZERO);
             BigDecimal netDemand = totalConsume.subtract(effectiveStock);
             if (netDemand.compareTo(BigDecimal.ZERO) < 0) {
                 netDemand = BigDecimal.ZERO;
@@ -908,7 +908,7 @@ public class NcEngineNewServiceImpl implements NcEngineNewService {
     /**
      * 加载定点机台
      */
-    private List<NcSpecifyMachine> loadSpecifyMachines(String factoryCode, List<String> paddingCodes) {
+    private List<NcSpecifyMachine> loadSpecifyMachines(String factoryCode, List<String> liningCodes) {
         return ncEngineSpecifyMachineMapper.selectList(
                 new LambdaQueryWrapper<NcSpecifyMachine>().eq(NcSpecifyMachine::getFactoryCode, factoryCode));
     }
@@ -918,7 +918,7 @@ public class NcEngineNewServiceImpl implements NcEngineNewService {
      */
     private void assignMachine(List<NcPaddingDemand> demandList, Map<String, NcMachineInfo> machineMap,
             List<NcSpecifyMachine> specifyMachineList) {
-        // 整理定点机台关系 Map<paddingCode, List<定点机台>>
+        // 整理定点机台关系 Map<liningCode, List<定点机台>>
         Map<String, List<NcSpecifyMachine>> specifyMap = specifyMachineList.stream()
                 .filter(s -> NcEngineConstants.JOB_TYPE_FORBIDDEN.equals(s.getJobType()))
                 .collect(Collectors.groupingBy(NcSpecifyMachine::getLiningCode));
@@ -959,7 +959,7 @@ public class NcEngineNewServiceImpl implements NcEngineNewService {
     /**
      * 加载辅助配置数据
      */
-    private void loadAuxiliaryData(String factoryCode, NcScheduleContext context, List<String> paddingCodes) {
+    private void loadAuxiliaryData(String factoryCode, NcScheduleContext context, List<String> liningCodes) {
         // 加载卷曲信息
         Map<String, BigDecimal> curlLengthMap = new HashMap<>();
         List<NcCurlRoll> curlRollList = ncEngineCurlRollMapper
@@ -977,7 +977,7 @@ public class NcEngineNewServiceImpl implements NcEngineNewService {
         Map<String, BigDecimal> lossRateMap = new HashMap<>();
         List<NcLossSetting> lossList = ncEngineLossMapper
                 .selectList(new LambdaQueryWrapper<NcLossSetting>().eq(NcLossSetting::getFactoryCode, factoryCode)
-                        .in(NcLossSetting::getLiningCode, paddingCodes));
+                        .in(NcLossSetting::getLiningCode, liningCodes));
         if (lossList != null) {
             for (NcLossSetting loss : lossList) {
                 if (loss.getLossRate() != null) {
@@ -1661,8 +1661,8 @@ public class NcEngineNewServiceImpl implements NcEngineNewService {
     /**
      * 按规格编码查找规格
      */
-    private NcPaddingDemand findSpecByCode(List<NcPaddingDemand> demandList, String paddingCode) {
-        return demandList.stream().filter(d -> paddingCode.equals(d.getLiningCode())).findFirst().orElse(null);
+    private NcPaddingDemand findSpecByCode(List<NcPaddingDemand> demandList, String liningCode) {
+        return demandList.stream().filter(d -> liningCode.equals(d.getLiningCode())).findFirst().orElse(null);
     }
 
     /**
@@ -1680,12 +1680,12 @@ public class NcEngineNewServiceImpl implements NcEngineNewService {
         // 从成型计划动态计算前3个班的日均消耗量
         List<CxScheduleResult> cxScheduleList = context.getCxScheduleList();
         Map<String, List<MdmConstructionInfo>> constructionMap = context.getConstructionMap();
-        String paddingCode = spec.getLiningCode();
+        String liningCode = spec.getLiningCode();
 
         BigDecimal avgDailyConsume = BigDecimal.ZERO;
         int count = 0;
         for (int i = 1; i <= 3; i++) {
-            BigDecimal consume = this.calcShiftConsume(cxScheduleList, constructionMap, paddingCode, i);
+            BigDecimal consume = this.calcShiftConsume(cxScheduleList, constructionMap, liningCode, i);
             if (consume.compareTo(BigDecimal.ZERO) > 0) {
                 avgDailyConsume = avgDailyConsume.add(consume);
                 count++;
@@ -1704,9 +1704,9 @@ public class NcEngineNewServiceImpl implements NcEngineNewService {
     /**
      * 获取损耗率
      */
-    private BigDecimal getLossRate(String paddingCode, String machineCode, NcScheduleContext context) {
+    private BigDecimal getLossRate(String liningCode, String machineCode, NcScheduleContext context) {
         if (context.getLossRateMap() != null) {
-            String key1 = paddingCode + "#" + machineCode;
+            String key1 = liningCode + "#" + machineCode;
             BigDecimal rate = context.getLossRateMap().get(key1);
             if (rate != null) {
                 return rate;
@@ -1851,9 +1851,9 @@ public class NcEngineNewServiceImpl implements NcEngineNewService {
     /**
      * 获取某规格在某班次的排产量
      */
-    private BigDecimal getScheduledQty(Map<String, NcScheduleResult> resultMap, String paddingCode, int shiftIndex) {
+    private BigDecimal getScheduledQty(Map<String, NcScheduleResult> resultMap, String liningCode, int shiftIndex) {
         for (NcScheduleResult result : resultMap.values()) {
-            if (paddingCode.equals(result.getLiningCode())) {
+            if (liningCode.equals(result.getLiningCode())) {
                 String fieldName = String.format(NcEngineConstants.CLASS_PLAN_QTY_FIELD, shiftIndex);
                 return BigDecimalUtils.valueOf(result.getFieldValueByFieldName(fieldName));
             }

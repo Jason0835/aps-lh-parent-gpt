@@ -60,9 +60,9 @@ import cn.hutool.core.date.DateUtil;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * 垫胶排程调整引擎
+ * 内衬排程调整引擎
  * <p>
- * 实现设计文档「垫胶排程调整算法设计.md」中所有调整操作的计算步骤。
+ * 实现设计文档「内衬排程调整算法设计.md」中所有调整操作的计算步骤。
  * 包括：插单(2.)、调整(3.)、删除(4.)、发布(5.)、导入(6.)。
  * </p>
  *
@@ -1160,14 +1160,14 @@ public class NcScheduleAdjustServiceImpl implements INcScheduleAdjustService {
     }
 
     /**
-     * 根据垫胶编码查询施工信息
+     * 根据内衬编码查询施工信息
      * <p>
-     * 从 T_MDM_CONSTRUCTION_INFO 表中查询对应垫胶编码的施工数据，
+     * 从 T_MDM_CONSTRUCTION_INFO 表中查询对应内衬编码的施工数据，
      * 用于填充插单记录的胶料代码、物料名称等字段。
      * </p>
      *
      * @param factoryCode 工厂编码
-     * @param liningCode 垫胶编码
+     * @param liningCode 内衬编码
      * @return 施工信息，未查到返回 null
      */
     private MdmConstructionInfo loadConstructionByPadding(String factoryCode, String liningCode) {
@@ -1183,15 +1183,15 @@ public class NcScheduleAdjustServiceImpl implements INcScheduleAdjustService {
     }
 
     /**
-     * 加载垫胶 T-1 日库存
+     * 加载内衬 T-1 日库存
      * <p>
-     * 从 T_DJ_STOCK 表中查询对应垫胶编码在排产日前一天的库存量，
+     * 从 T_DJ_STOCK 表中查询对应内衬编码在排产日前一天的库存量，
      * 有效库存 = 库存量 + 修正数量 - 不良数量。
      * </p>
      *
      * @param factoryCode  工厂编码
      * @param scheduleDate 排产日期
-     * @param liningCode  垫胶编码
+     * @param liningCode  内衬编码
      * @return 有效库存量，查不到返回 null
      */
     private BigDecimal loadPaddingStock(String factoryCode, Date scheduleDate, String liningCode) {
@@ -1307,7 +1307,7 @@ public class NcScheduleAdjustServiceImpl implements INcScheduleAdjustService {
     private boolean deployToMes(List<NcScheduleResult> records) {
         // TODO: 调用 MES 中间库发布接口
         // deployNcScheduleToMid(records);
-        log.info("发布垫胶排程到MES：{}条记录", records.size());
+        log.info("发布内衬排程到MES：{}条记录", records.size());
         return true;
     }
 

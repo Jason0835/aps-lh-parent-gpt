@@ -65,8 +65,8 @@ public class NcScheduleResult extends BaseEntity {
     @TableField("LINING_CODE")
     private String liningCode;
 
-    /** 垫胶物料名 */
-    @ApiModelProperty(value = "垫胶物料名", name = "paddingName")
+    /** 内衬物料名 */
+    @ApiModelProperty(value = "内衬物料名", name = "paddingName")
     @TableField(value = "LINING_NAME")
     private String liningName;
 

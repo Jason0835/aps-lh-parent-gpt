@@ -79,9 +79,9 @@ public class NcScheduleResultController extends AbstractBillBizController<NcSche
     @Autowired
     private INcScheduleAdjustService iNcScheduleAdjustService;
     @Resource
-    private NcEngineConstructionInfoMapper djEngineConstructionInfoMapper;
+    private NcEngineConstructionInfoMapper ncEngineConstructionInfoMapper;
     @Resource
-    private INcShiftConfigService djShiftConfigService;
+    private INcShiftConfigService ncShiftConfigService;
     
 
     @ApiOperation("按条件分页查询")
@@ -101,7 +101,7 @@ public class NcScheduleResultController extends AbstractBillBizController<NcSche
     }
 
     /**
-     * 新增垫胶排程结果（插单）
+     * 新增内衬排程结果（插单）
      */
     @Log(title = "ui.data.column.ncScheduleResult.modalName", businessType = BusinessType.INSERT)
     @PostMapping("/add")
@@ -126,7 +126,7 @@ public class NcScheduleResultController extends AbstractBillBizController<NcSche
     }
 
     /**
-     * 修改垫胶排程结果
+     * 修改内衬排程结果
      */
     @Log(title = "ui.data.column.ncScheduleResult.modalName", businessType = BusinessType.UPDATE)
     @PostMapping("/edit")
@@ -150,7 +150,7 @@ public class NcScheduleResultController extends AbstractBillBizController<NcSche
     }
 
     /**
-     * 删除垫胶排程结果
+     * 删除内衬排程结果
      */
     @Log(title = "ui.data.column.ncScheduleResult.modalName", businessType = BusinessType.DELETE)
     @DeleteMapping("/{ids}")
@@ -159,7 +159,7 @@ public class NcScheduleResultController extends AbstractBillBizController<NcSche
     }
 
     /**
-     * 查询垫胶排程结果列表
+     * 查询内衬排程结果列表
      */
     @PostMapping("/getList")
     public List<NcScheduleResult> getList(@RequestBody NcScheduleResult ncScheduleResult) {
@@ -646,22 +646,22 @@ public class NcScheduleResultController extends AbstractBillBizController<NcSche
     }
 
     /**
-     * 获取垫胶下拉列表（去重，按垫胶名称排序）
+     * 获取内衬下拉列表（去重，按内衬名称排序）
      */
     @GetMapping("/getPaddingDistList")
-    @ApiOperation("获取垫胶下拉列表")
+    @ApiOperation("获取内衬下拉列表")
     public AjaxResult getPaddingDistList() {
         QueryWrapper<MdmConstructionInfo> wrapper = new QueryWrapper<>();
-        wrapper.select("DISTINCT PADDING_CODE, PADDING_NAME")
-                .isNotNull("PADDING_CODE")
-                .orderByAsc("PADDING_NAME");
-        List<MdmConstructionInfo> list = djEngineConstructionInfoMapper.selectList(wrapper);
+        wrapper.select("DISTINCT INSIDE_CODE, INSIDE_NAME")
+                .isNotNull("INSIDE_CODE")
+                .orderByAsc("INSIDE_NAME");
+        List<MdmConstructionInfo> list = ncEngineConstructionInfoMapper.selectList(wrapper);
 
         List<Map<String, String>> result = new ArrayList<>();
         for (MdmConstructionInfo item : list) {
             Map<String, String> map = new HashMap<>();
-            map.put("value", item.getPaddingCode());
-            map.put("label", item.getPaddingName());
+            map.put("value", item.getInsideCode());
+            map.put("label", item.getInsideName());
             result.add(map);
         }
         return AjaxResult.success(result);
@@ -676,7 +676,7 @@ public class NcScheduleResultController extends AbstractBillBizController<NcSche
     @ApiOperation("获取当前班次信息")
     public AjaxResult getCurrentShift() {
         // 查询开班的所有班次配置
-        List<NcShiftConfig> activeShifts = djShiftConfigService.listActiveShifts();
+        List<NcShiftConfig> activeShifts = ncShiftConfigService.listActiveShifts();
         if (CollectionUtils.isEmpty(activeShifts)) {
             return AjaxResult.error(I18nUtil.getMessage("ui.nc.shift.configNotFound"));
         }
