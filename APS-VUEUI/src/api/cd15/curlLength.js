@@ -48,3 +48,10 @@ export function delCd15CurlLength(data) {
 export function exportCd15CurlLength(query) {
   return downloadLink('/cd15/curlLength/export', query)
 }
+
+export function listSteelStripCodes() {
+  return request({
+    url: '/cd15/common/steelStripCodes',
+    method: 'post'
+  })
+}

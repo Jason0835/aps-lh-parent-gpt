@@ -20,18 +20,26 @@
     />
     <template slot="footer">
       <el-button @click="hide">{{ $t("common.button.cancel") }}</el-button>
-      <el-button type="primary" :loading="loading" @click="handleConfirm">{{ $t("common.button.confirm") }}</el-button>
+      <el-button type="primary" :loading="loading" @click="handleConfirm">
+        {{ $t("common.button.confirm") }}
+      </el-button>
     </template>
   </el-dialog>
 </template>
 
 <script>
-import { addCd15CurlLength, updateCd15CurlLength, listSteelStripCodes } from "@/api/cd15/curlLength";
+import { addStock, updateStock } from "@/api/cd15/stock";
 import infoForm from "@/views/components/infoForm.vue";
 
 export default {
   components: { infoForm },
   inject: ["parentDict"],
+  props: {
+    steelStripOptions: {
+      type: Array,
+      default: () => [],
+    },
+  },
   data() {
     const requiredSelect = {
       required: true,
@@ -48,16 +56,16 @@ export default {
       visible: false,
       isEdit: false,
       form: {},
-      steelStripOptions: [],
       rules: {
         factoryCode: [requiredSelect],
-        steelStripCode: [requiredSelect],
-        curlLength: [
+        stockDate: [requiredInput],
+        materialCode: [requiredSelect],
+        stockNum: [
           requiredInput,
           {
             validator: (rule, value, callback) => {
-              if (value === undefined || value === null || value === "" || Number(value) <= 0) {
-                callback(new Error(this.$t("ui.data.alert.cd15CurlLength.curlLengthPositive")));
+              if (value === undefined || value === null || value === "") {
+                callback(new Error(this.$t("common.rule.input")));
               } else {
                 callback();
               }
@@ -70,28 +78,59 @@ export default {
   },
   computed: {
     title() {
-      return this.isEdit ? this.$t("common.button.edit") : this.$t("common.button.add");
+      return this.isEdit
+        ? this.$t("common.button.edit")
+        : this.$t("common.button.add");
     },
     columns() {
       return [
         {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.cd15CurlLength.factoryCode"),
+          label: this.$t("ui.data.column.cd15Stock.factoryCode"),
           type: "select",
           dictData: this.parentDict.type.biz_factory_name,
           filterable: true,
         },
         {
-          prop: "steelStripCode",
-          label: this.$t("ui.data.column.cd15CurlLength.steelStripCode"),
+          prop: "stockDate",
+          label: this.$t("ui.data.column.cd15Stock.stockDate"),
+          type: "date",
+        },
+        {
+          prop: "materialCode",
+          label: this.$t("ui.data.column.cd15Stock.materialCode"),
           type: "select",
           dictData: this.steelStripOptions,
           filterable: true,
-          clearable: true,
         },
         {
-          prop: "curlLength",
-          label: this.$t("ui.data.column.cd15CurlLength.curlLength"),
+          prop: "stockNum",
+          label: this.$t("ui.data.column.cd15Stock.stockNum"),
+          type: "number",
+        },
+        {
+          prop: "modifyNum",
+          label: this.$t("ui.data.column.cd15Stock.modifyNum"),
+          type: "number",
+        },
+        {
+          prop: "badNum",
+          label: this.$t("ui.data.column.cd15Stock.badNum"),
+          type: "number",
+        },
+        {
+          prop: "rollStockNum",
+          label: this.$t("ui.data.column.cd15Stock.rollStockNum"),
+          type: "number",
+        },
+        {
+          prop: "rollModifyNum",
+          label: this.$t("ui.data.column.cd15Stock.rollModifyNum"),
+          type: "number",
+        },
+        {
+          prop: "rollBadNum",
+          label: this.$t("ui.data.column.cd15Stock.rollBadNum"),
           type: "number",
         },
         {
@@ -105,20 +144,12 @@ export default {
     },
   },
   methods: {
-    async loadSteelStripOptions() {
-      const res = await listSteelStripCodes();
-      const rows = Array.isArray(res) ? res : (res.rows || res.data || []);
-      this.steelStripOptions = rows.map((code) => ({
-        label: code,
-        value: code,
-      }));
-    },
     async save(params) {
       this.loading = true;
       try {
         const res = this.isEdit
-          ? await updateCd15CurlLength(params)
-          : await addCd15CurlLength(params);
+          ? await updateStock(params)
+          : await addStock(params);
         this.$modal.msgSuccess(res.msg);
         this.$emit("success");
         this.hide();
@@ -132,15 +163,11 @@ export default {
         this.isEdit = true;
         this.form = { ...data };
       } else {
-        this.form = {
-          factoryCode: "116",
-        };
+        this.form = { factoryCode: "116" };
       }
-      this.loadSteelStripOptions();
     },
     hide() {
       this.form = {};
-      this.steelStripOptions = [];
       this.$refs.form && this.$refs.form.triggerResetForm();
       this.isEdit = false;
       this.visible = false;

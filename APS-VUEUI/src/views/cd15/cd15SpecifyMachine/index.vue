@@ -70,9 +70,11 @@
 import {
   exportSpecifyMachine,
   listSpecifyMachine,
+  listSteelStripCodes,
   removeAllSpecifyMachine,
   removeSpecifyMachine,
 } from "@/api/cd15/specifyMachine";
+import { getCd15MachineEnableOptions } from "@/api/cd15/cd15MachineInfo";
 import TltUploadForm from "@/views/components/tltUploadForm.vue";
 import infoDialog from "./components/infoDialog.vue";
 
@@ -110,6 +112,7 @@ export default {
       data: [],
       selection: [],
       machineOptions: [],
+      steelStripOptions: [],
       page: {
         current: 1,
         pageSize: 20,
@@ -204,11 +207,15 @@ export default {
           type: "select",
           dictData: this.dict.type.biz_factory_name,
           filterable: true,
+          change: () => this.loadMachineOptions(),
         },
         {
           label: this.$t("ui.data.column.cd15SpecifyMachine.steelStripCode"),
           prop: "steelStripCode",
-          type: "input",
+          type: "select",
+          dictData: this.steelStripOptions,
+          filterable: true,
+          clearable: true,
         },
         {
           label: this.$t("ui.data.column.cd15SpecifyMachine.machineCode"),
@@ -285,6 +292,7 @@ export default {
     handleSearch(params) {
       this.page.current = 1;
       this.query = { ...params };
+      this.loadMachineOptions();
       this.getList();
     },
     handlePageChange(current, pageSize) {
@@ -298,6 +306,22 @@ export default {
     },
     handleSelectionChange(selection) {
       this.selection = selection || [];
+    },
+    async loadSteelStripOptions() {
+      const res = await listSteelStripCodes();
+      const rows = Array.isArray(res) ? res : (res.rows || res.data || []);
+      this.steelStripOptions = rows.map((code) => ({
+        label: code,
+        value: code,
+      }));
+    },
+    async loadMachineOptions() {
+      const res = await getCd15MachineEnableOptions({ factoryCode: this.query.factoryCode || "116" });
+      const rows = Array.isArray(res) ? res : (res.rows || res.data || []);
+      this.machineOptions = rows.map((item) => ({
+        label: item.machineCode,
+        value: item.machineCode,
+      }));
     },
     async getList() {
       this.loading = true;
@@ -319,6 +343,8 @@ export default {
   },
   created() {
     this.getList();
+    this.loadMachineOptions();
+    this.loadSteelStripOptions();
   },
 };
 </script>

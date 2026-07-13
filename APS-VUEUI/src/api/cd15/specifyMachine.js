@@ -8,6 +8,13 @@ export function listSpecifyMachine(query) {
   })
 }
 
+export function listSteelStripCodes() {
+  return request({
+    url: '/cd15/common/steelStripCodes',
+    method: 'post'
+  })
+}
+
 export function getSpecifyMachine(id) {
   return request({
     url: `/cd15/specifyMachine/getInfo/${id}`,
