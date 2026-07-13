@@ -317,7 +317,7 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
         ImportLog importLog = ImportExcelUtils.getImportLogAndUploadFile(importContext.getFileBytes(), importContext.getImportFilePath(), importContext.getProcedureCode(), importContext.getFunctionName(), importContext.getOriFileName(), 1);
         importLog = this.iImportLogService.add(importLog);
         ExcelUtil<LhScheduleResultTemplateImportVO> util = new ExcelUtil<>(LhScheduleResultTemplateImportVO.class);
-        // 模板第1行为key表头，第9行开始是明细数据，因此表头行数传9，并关闭二级表头。
+        // 模板第1行为key表头，第6行开始是明细数据，因此表头行数传5，并关闭二级表头。
         List<LhScheduleResultTemplateImportVO> list = util.importExcel(
                 sheetName, new ByteArrayInputStream(fileBytes), 0, 5, -1);
         AjaxResult ajaxResult = lhScheduleService.importScheduleTemplate(list, result, updateSupport, importLog.getId());

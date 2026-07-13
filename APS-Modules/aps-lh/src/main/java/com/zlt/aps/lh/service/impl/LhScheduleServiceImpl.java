@@ -93,6 +93,11 @@ import java.util.zip.ZipOutputStream;
 @Service
 public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> implements ILhScheduleService {
 
+    /**
+     * 硫化排程导入模板首条明细所在 Excel 行号。
+     */
+    private static final int LH_SCHEDULE_IMPORT_DATA_START_ROW = 6;
+
     @Resource
     private IScheduleExecutor scheduleExecutor;
 
@@ -1245,9 +1250,9 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         int successNum = 0;
         int failureNum = 0;
 
-        // 第一轮：注解必填和Excel内重复校验（模板数据从第9行开始）
+        // 第一轮：注解必填和Excel内重复校验（模板数据从第6行开始）
         for (int i = 0; i < list.size(); i++) {
-            int rowNum = i + 9;
+            int rowNum = i + LH_SCHEDULE_IMPORT_DATA_START_ROW;
             LhScheduleResultTemplateImportVO row = list.get(i);
             if (Objects.isNull(row)) {
                 failureNum++;
@@ -1258,7 +1263,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
             row.setFactoryCode(factoryCode);
             row.setScheduleDate(scheduleDate);
             List<ImportErrorLog> validated = ImportExcelValidatedUtils.validated(id, rowNum, row);
-            ImportExcelValidatedUtils.validatedRepeat(list, row, i, 9, id, validated, "lhMachineCode", "materialCode");
+            ImportExcelValidatedUtils.validatedRepeat(list, row, i, LH_SCHEDULE_IMPORT_DATA_START_ROW, id, validated, "lhMachineCode", "materialCode");
             if (PubUtil.isNotEmpty(validated)) {
                 failureNum++;
                 row.setId(-999L);
@@ -1294,7 +1299,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         List<LhScheduleResult> insertList = new ArrayList<>();
         for (int i = 0; i < list.size(); i++) {
             LhScheduleResultTemplateImportVO row = list.get(i);
-            int rowNum = i + 9;
+            int rowNum = i + LH_SCHEDULE_IMPORT_DATA_START_ROW;
             if (Objects.isNull(row) || Objects.equals(row.getId(), -999L)) {
                 continue;
             }
