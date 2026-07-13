@@ -2102,6 +2102,13 @@ export default {
       this.query = {
         ...this.search,
       };
+      /** 结构内/结构调整独立页：切换版本号后自动刷新列表 */
+      if (this.isStructureInnerPage || this.isStructureAdjustPage) {
+        if (this.page && this.activeName === "second") {
+          this.page = { ...this.page, current: 1 };
+        }
+        this.getList();
+      }
     },
 
     handleYearMonthChange(val) {
