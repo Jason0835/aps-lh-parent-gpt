@@ -2,6 +2,7 @@ package com.zlt.aps.cd90.engine.algorithm;
 
 import com.zlt.aps.cd90.engine.model.Cd90AutoScheduleContext;
 import com.zlt.aps.cd90.engine.model.Cd90AutoScheduleOutputDraft;
+import com.zlt.aps.cd90.engine.model.Cd90ClothSourceTrace;
 import com.zlt.aps.cd90.engine.model.Cd90LaneAllocationDraft;
 import com.zlt.aps.cd90.engine.model.Cd90MultiShiftExecutionResult;
 import com.zlt.aps.cd90.engine.model.Cd90NewSpecAdvanceInfo;
@@ -61,7 +62,7 @@ public class Cd90AutoScheduleOutputDraftBuilder {
             validateTask(task, shiftDates);
             String resultKey = resultKey(task);
             Cd90ScheduleResultDraft result = resultByKey.computeIfAbsent(resultKey,
-                    key -> newResultDraft(key, task));
+                    key -> newResultDraft(key, task, execution.getClothSourceTraceByCloth()));
             // 同一主结果可能由多个任务段组成，每个任务段使用的库排都要汇总到主表展示字段。
             mergePrimaryLaneCodes(result, task);
             mergeSlot(result, task, shiftDates.get(task.getClassField()));
@@ -97,10 +98,17 @@ public class Cd90AutoScheduleOutputDraftBuilder {
                 .build();
     }
 
-    private Cd90ScheduleResultDraft newResultDraft(String key, Cd90ShiftScheduleTask task) {
+    private Cd90ScheduleResultDraft newResultDraft(
+            String key, Cd90ShiftScheduleTask task,
+            Map<String, Cd90ClothSourceTrace> clothSourceTraceByCloth) {
+        Cd90ClothSourceTrace sourceTrace = clothSourceTraceByCloth == null
+                ? null : clothSourceTraceByCloth.get(task.getClothCode());
         return Cd90ScheduleResultDraft.builder()
                 .resultKey(key).clothCode(task.getClothCode())
                 .bigRollCode(task.getBigRollCode()).cordSpec(task.getCordSpec())
+                .cxBatchNo(sourceTrace == null ? null : sourceTrace.getCxBatchNo())
+                .cxMachineCodes(sourceTrace == null ? null : sourceTrace.getCxMachineCodes())
+                .planSurplusQty(sourceTrace == null ? null : sourceTrace.getPlanSurplusQty())
                 .machineCode(task.getMachineCode())
                 .dataSource(AUTO_SOURCE).shiftSlots(new ArrayList<>()).build();
     }

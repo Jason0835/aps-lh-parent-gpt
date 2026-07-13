@@ -7,6 +7,7 @@ import com.zlt.aps.cd90.api.domain.entity.Cd90Stock;
 import com.zlt.aps.cd90.api.domain.entity.Cd90StorageLaneLimit;
 import com.zlt.aps.cd90.engine.algorithm.Cd90BigRollAgingStockBuilder;
 import com.zlt.aps.cd90.engine.algorithm.Cd90ClothDepthResolver;
+import com.zlt.aps.cd90.engine.algorithm.Cd90ClothSourceTraceResolver;
 import com.zlt.aps.cd90.engine.mapper.Cd90AutoScheduleSourceMapper;
 import com.zlt.aps.cd90.engine.mapper.Cd90ConstructionMaterialMapper;
 import com.zlt.aps.cd90.engine.algorithm.Cd90FormingDemandExpander;
@@ -21,6 +22,7 @@ import com.zlt.aps.cd90.engine.mapper.Cd90EngineXwyyScheduleResultMapper;
 import com.zlt.aps.cd90.engine.mapper.Cd90EngineXwyyStockMapper;
 import com.zlt.aps.cd90.engine.model.Cd90AutoScheduleInput;
 import com.zlt.aps.cd90.engine.model.Cd90BigRollAgingBuildResult;
+import com.zlt.aps.cd90.engine.model.Cd90ClothSourceTrace;
 import com.zlt.aps.cd90.engine.model.Cd90ConstructionMaterial;
 import com.zlt.aps.cd90.engine.model.Cd90DemandShift;
 import com.zlt.aps.cd90.engine.model.Cd90FormingScheduleSource;
@@ -70,6 +72,7 @@ public class Cd90AutoScheduleInputServiceImpl implements Cd90AutoScheduleInputSe
     private final Cd90AutoScheduleSourceMapper sourceMapper;
     private final Cd90FormingDemandExpander formingDemandExpander;
     private final Cd90ClothDepthResolver clothDepthResolver;
+    private final Cd90ClothSourceTraceResolver clothSourceTraceResolver;
 
     /**
      * 加载第1至5步所需的成型计划、施工、6点库存和当前班次库排快照。
@@ -122,6 +125,9 @@ public class Cd90AutoScheduleInputServiceImpl implements Cd90AutoScheduleInputSe
                 formingSchedules, constructionMaterials);
         List<Cd90EmbryoPlanSurplus> embryoPlanSurpluses = loadEmbryoPlanSurpluses(
                 factoryCode, scheduleDate, embryoCodes);
+        Map<String, Cd90ClothSourceTrace> clothSourceTraceByCloth =
+                clothSourceTraceResolver.resolve(
+                        formingSchedules, constructionMaterials, embryoPlanSurpluses);
 
         List<Cd90StockSource> stocksAtSix = stockMapper.selectList(Wrappers.<Cd90Stock>lambdaQuery()
                         .eq(Cd90Stock::getFactoryCode, factoryCode)
@@ -174,6 +180,7 @@ public class Cd90AutoScheduleInputServiceImpl implements Cd90AutoScheduleInputSe
                 .stocksAtSix(stocksAtSix)
                 .embryoPlanSurpluses(embryoPlanSurpluses)
                 .demandShifts(demandShifts)
+                .clothSourceTraceByCloth(clothSourceTraceByCloth)
                 .depthClassQtyByCloth(depthClassQtyByCloth)
                 .storageLanesAtSix(storageLanesAtSix)
                 .bigRollAgingStocks(agingResult.getStocks())

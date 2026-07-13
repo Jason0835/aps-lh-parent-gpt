@@ -43,6 +43,15 @@ public class Cd90ParamsServiceImpl extends AbstractDocService<Cd90Params> implem
     }
 
     @Override
+    public String getParamValue(String factoryCode, String paramCode) {
+        LambdaQueryWrapper<Cd90Params> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(Cd90Params::getFactoryCode, factoryCode);
+        wrapper.eq(Cd90Params::getParamCode, paramCode);
+        Cd90Params params = cd90ParamsMapper.selectOne(wrapper);
+        return params == null ? null : params.getParamValue();
+    }
+
+    @Override
     public AjaxResult importData(List<Cd90Params> list, boolean updateSupport, Long importLogId) {
         int successNum = 0, failureNum = 0;
         List<Cd90Params> importList = new ArrayList<>();
