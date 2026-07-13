@@ -1245,24 +1245,10 @@ export default {
       return lockDays === 0 ? today - 1 : today + lockDays - 1;
     },
     /**
-     * 某日是否在锁定期内（全表同一规则）：
-     * 查询月 < 当前月 → 1–31 号全部锁定；
-     * 查询月 = 当前月 → 按 SYS0206001 接口规则锁定；
-     * 查询月 > 当前月 → 不锁定。
+     * 去除锁定条件：1–31 号单元格全部可编辑，不再锁定。
      */
     isDayLocked(day) {
-      const monthCompare = this.getQueryMonthCompareToCurrent();
-      if (monthCompare === 1) {
-        return false;
-      }
-      if (monthCompare === -1) {
-        return day >= 1 && day <= 31;
-      }
-      const lockEndDay = this.getLockEndDay();
-      if (lockEndDay < 1) {
-        return false;
-      }
-      return day <= lockEndDay;
+      return false;
     },
     /** 统计行（胎胚种类数、硫化机台数等）不可编辑日排产 */
     isStatisticsRow(row) {
