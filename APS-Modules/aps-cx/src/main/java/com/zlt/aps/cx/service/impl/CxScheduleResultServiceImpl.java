@@ -1191,7 +1191,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
             // 临时调试日志：打印指定胎胚描述的明细
             if (embryoDesc.startsWith("295/80R22.5 152/149M 18PR JF518")) {
                 log.info("调试-JF518明细: materialCode={}, constructionStage={}, daySum={}, overdueFlag={}, overdueQty={}, 当前累计={}",
-                        plan.getMaterialCode(), constructionStage, daySum, plan.getLastMonthValidFlag(), overdueVal, sum);
+                        plan.getMaterialCode(), productStatus, daySum, plan.getLastMonthValidFlag(), overdueVal, sum);
             }
         }
 
