@@ -16,6 +16,7 @@
         <result column="UPDATE_BY" property="updateBy"/>
         <result column="UPDATE_TIME" property="updateTime"/>
         <result column="REMARK" property="remark"/>
+        <result column="REMARK2" property="remark2"/>
     </resultMap>
 
 </mapper>
