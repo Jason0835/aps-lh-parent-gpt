@@ -557,8 +557,7 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
         allIssueList.addAll(day2IssueList);
         allIssueList.addAll(day3IssueList);
 
-        // 下发前补全MES物料编码和示方号
-        enrichMaterialAndExampleInfo(allIssueList);
+        // 示方类型/示方号已在convertToDayXIssueEntity中按班次直接映射，不再需要enrichMaterialAndExampleInfo补全
 
         return mesItfService.issueCxScheduleResult(allIssueList);
     }
@@ -706,8 +705,7 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
         allIssueList.addAll(day2IssueList);
         allIssueList.addAll(day3IssueList);
 
-        // 下发前补全MES物料编码和示方号
-        enrichMaterialAndExampleInfo(allIssueList);
+        // 示方类型/示方号已在convertToDayXIssueEntity中按班次直接映射，不再需要enrichMaterialAndExampleInfo补全
 
         // 通过Feign客户端调用itf模块的下发接口
         return mesItfService.issueCxScheduleResult(allIssueList);
@@ -753,21 +751,21 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
         target.setClass1ExampleType(null);
         target.setClass1ExampleNo(null);
 
-        // 中间表2班 = 早班（1班数据）
+        // 中间表2班 = 早班（1班数据），示方类型/示方号直接取源表对应班次
         target.setClass2PlanQtySeq(BigDecimal.valueOf(2));
         target.setClass2AnalysisInput(source.getClass1AnalysisInput());
         target.setClass2Analysis(source.getClass1Analysis());
         target.setClass2PlanQty(source.getClass1PlanQty());
-        target.setClass2ExampleType(null); // 示方类型需要另外查询
-        target.setClass2ExampleNo(null); // 示方号需要另外查询
+        target.setClass2ExampleType(source.getClass1RecipeType());
+        target.setClass2ExampleNo(source.getClass1RecipeNo());
 
-        // 中间表3班 = 中班（2班数据）
+        // 中间表3班 = 中班（2班数据），示方类型/示方号直接取源表对应班次
         target.setClass3PlanQtySeq(BigDecimal.valueOf(3));
         target.setClass3AnalysisInput(source.getClass2AnalysisInput());
         target.setClass3Analysis(source.getClass2Analysis());
         target.setClass3PlanQty(source.getClass2PlanQty());
-        target.setClass3ExampleType(null);
-        target.setClass3ExampleNo(null);
+        target.setClass3ExampleType(source.getClass2RecipeType());
+        target.setClass3ExampleNo(source.getClass2RecipeNo());
 
         return target;
     }
@@ -804,29 +802,29 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
         target.setEmbryoCode(source.getEmbryoCode());
         target.setEmbryoSpecDesc(source.getMainMaterialDesc());
 
-        // 中间表1班 = 夜班（3班数据）
+        // 中间表1班 = 夜班（3班数据），示方类型/示方号直接取源表对应班次
         target.setClass1PlanQtySeq(BigDecimal.valueOf(1));
         target.setClass1AnalysisInput(source.getClass3AnalysisInput());
         target.setClass1Analysis(source.getClass3Analysis());
         target.setClass1PlanQty(source.getClass3PlanQty());
-        target.setClass1ExampleType(null);
-        target.setClass1ExampleNo(null);
+        target.setClass1ExampleType(source.getClass3RecipeType());
+        target.setClass1ExampleNo(source.getClass3RecipeNo());
 
-        // 中间表2班 = 早班（4班数据）
+        // 中间表2班 = 早班（4班数据），示方类型/示方号直接取源表对应班次
         target.setClass2PlanQtySeq(BigDecimal.valueOf(2));
         target.setClass2AnalysisInput(source.getClass4AnalysisInput());
         target.setClass2Analysis(source.getClass4Analysis());
         target.setClass2PlanQty(source.getClass4PlanQty());
-        target.setClass2ExampleType(null);
-        target.setClass2ExampleNo(null);
+        target.setClass2ExampleType(source.getClass4RecipeType());
+        target.setClass2ExampleNo(source.getClass4RecipeNo());
 
-        // 中间表3班 = 中班（5班数据）
+        // 中间表3班 = 中班（5班数据），示方类型/示方号直接取源表对应班次
         target.setClass3PlanQtySeq(BigDecimal.valueOf(3));
         target.setClass3AnalysisInput(source.getClass5AnalysisInput());
         target.setClass3Analysis(source.getClass5Analysis());
         target.setClass3PlanQty(source.getClass5PlanQty());
-        target.setClass3ExampleType(null);
-        target.setClass3ExampleNo(null);
+        target.setClass3ExampleType(source.getClass5RecipeType());
+        target.setClass3ExampleNo(source.getClass5RecipeNo());
 
         return target;
     }
@@ -863,29 +861,29 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
         target.setEmbryoCode(source.getEmbryoCode());
         target.setEmbryoSpecDesc(source.getMainMaterialDesc());
 
-        // 中间表1班 = 夜班（6班数据）
+        // 中间表1班 = 夜班（6班数据），示方类型/示方号直接取源表对应班次
         target.setClass1PlanQtySeq(BigDecimal.valueOf(1));
         target.setClass1AnalysisInput(source.getClass6AnalysisInput());
         target.setClass1Analysis(source.getClass6Analysis());
         target.setClass1PlanQty(source.getClass6PlanQty());
-        target.setClass1ExampleType(null);
-        target.setClass1ExampleNo(null);
+        target.setClass1ExampleType(source.getClass6RecipeType());
+        target.setClass1ExampleNo(source.getClass6RecipeNo());
 
-        // 中间表2班 = 早班（7班数据）
+        // 中间表2班 = 早班（7班数据），示方类型/示方号直接取源表对应班次
         target.setClass2PlanQtySeq(BigDecimal.valueOf(2));
         target.setClass2AnalysisInput(source.getClass7AnalysisInput());
         target.setClass2Analysis(source.getClass7Analysis());
         target.setClass2PlanQty(source.getClass7PlanQty());
-        target.setClass2ExampleType(null);
-        target.setClass2ExampleNo(null);
+        target.setClass2ExampleType(source.getClass7RecipeType());
+        target.setClass2ExampleNo(source.getClass7RecipeNo());
 
-        // 中间表3班 = 中班（8班数据）
+        // 中间表3班 = 中班（8班数据），示方类型/示方号直接取源表对应班次
         target.setClass3PlanQtySeq(BigDecimal.valueOf(3));
         target.setClass3AnalysisInput(source.getClass8AnalysisInput());
         target.setClass3Analysis(source.getClass8Analysis());
         target.setClass3PlanQty(source.getClass8PlanQty());
-        target.setClass3ExampleType(null);
-        target.setClass3ExampleNo(null);
+        target.setClass3ExampleType(source.getClass8RecipeType());
+        target.setClass3ExampleNo(source.getClass8RecipeNo());
 
         return target;
     }

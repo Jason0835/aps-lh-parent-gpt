@@ -1,5 +1,6 @@
 package com.zlt.aps.cx.service.engine;
 
+import com.zlt.aps.cx.constant.ScheduleConstants;
 import com.zlt.aps.cx.entity.config.CxParamConfig;
 import com.zlt.aps.cx.entity.config.CxShiftConfig;
 
@@ -89,12 +90,6 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class ContinueTaskProcessor {
-
-    /** 机台主数据未配置日产能时的默认值（条/天，仅用于 {@link #getMachineDailyCapacity}） */
-    private static final int DEFAULT_DAILY_CAPACITY = 1200;
-
-    /** 参数编码：强制保留历史任务 — Y/true 启用保底预留，N/false 仅标记续作 */
-    private static final String PARAM_FORCE_KEEP_HISTORY = "SYS04070003";
 
     // ==================== 5.3.1 续作处理入口 ====================
 
@@ -190,8 +185,8 @@ public class ContinueTaskProcessor {
 
                 // 5.3.1.4.3 取第一个任务检查机台可用性（同结构的任务机台配置一致）
                 DailyEmbryoTask firstTask = matchedTasks.get(0);
-                List<MpCxCapacityConfiguration> availableForTask = getAvailableMachinesForStructure(
-                        firstTask.getStructureName(), scheduleDate, context, firstTask.getProductionVersion());
+                List<MpCxCapacityConfiguration> availableForTask = context.getAvailableMachinesForStructure(
+                        firstTask.getStructureName(), scheduleDate, firstTask.getProductionVersion());
                 boolean machineAvailable = availableForTask.stream()
                         .anyMatch(c -> machineCode.equals(c.getCxMachineCode()));
                 if (!machineAvailable) {
@@ -252,34 +247,7 @@ public class ContinueTaskProcessor {
         int quantity = task.getEndingExtraInventory() != null && task.getEndingExtraInventory() > 0
                 ? task.getEndingExtraInventory() : task.getDemandQuantity();
 
-        TaskAllocation taskAllocation = new TaskAllocation();
-        taskAllocation.setEmbryoCode(task.getEmbryoCode());
-        taskAllocation.setMaterialCode(task.getMaterialCode());
-        taskAllocation.setMaterialDesc(task.getMaterialDesc());
-        taskAllocation.setMainMaterialDesc(task.getMainMaterialDesc());
-        taskAllocation.setStructureName(task.getStructureName());
-        taskAllocation.setQuantity(quantity);
-        taskAllocation.setVulcanizeMachineCount(reservedVulcanizeCount);
-        taskAllocation.setPriority(task.getPriority());
-        taskAllocation.setStockHours(task.getStockHours());
-        taskAllocation.setIsTrialTask(task.getIsTrialTask());
-        taskAllocation.setIsProductionTrial(task.getIsProductionTrial());
-        taskAllocation.setIsEndingTask(task.getIsEndingTask());
-        taskAllocation.setEndingSurplusQty(task.getEndingSurplusQty());
-        taskAllocation.setEndingExtraInventory(task.getEndingExtraInventory());
-        taskAllocation.setIsLastEndingBatch(task.getIsLastEndingBatch());
-        taskAllocation.setIsEndProduction(task.getIsEndProduction());
-        taskAllocation.setEndingAbandoned(task.getEndingAbandoned());
-        taskAllocation.setIsOpeningDayTask(task.getIsOpeningDayTask());
-        taskAllocation.setIsClosingDayTask(task.getIsClosingDayTask());
-        taskAllocation.setIsMainProduct(task.getIsMainProduct());
-        taskAllocation.setIsContinueTask(true);
-        taskAllocation.setLhId(task.getLhId());
-        taskAllocation.setLhMachineCode(task.getLhMachineCode());
-        taskAllocation.setConstructionStage(task.getConstructionStage());
-        taskAllocation.setIsFirstTask(task.getIsFirstTask());
-        taskAllocation.setIsUrgentEnding(task.getIsUrgentEnding());
-        taskAllocation.setIsNearEnding(task.getIsNearEnding());
+        TaskAllocation taskAllocation = task.toTaskAllocation(quantity, reservedVulcanizeCount);
 
         allocation.getTaskAllocations().add(taskAllocation);
         allocation.setUsedCapacity(allocation.getUsedCapacity() + reservedVulcanizeCount);
@@ -329,7 +297,7 @@ public class ContinueTaskProcessor {
      */
     private boolean getForceKeepHistoryConfig(ScheduleContextVo context) {
         if (context.getParamConfigMap() != null) {
-            CxParamConfig config = context.getParamConfigMap().get(PARAM_FORCE_KEEP_HISTORY);
+            CxParamConfig config = context.getParamConfigMap().get(ScheduleConstants.PARAM_FORCE_KEEP_HISTORY);
             if (config != null && config.getParamValue() != null) {
                 boolean result = "Y".equalsIgnoreCase(config.getParamValue()) || "true".equalsIgnoreCase(config.getParamValue());
                 log.info("SYS04070003 数据库配置值: {}, 解析结果: {}", config.getParamValue(), result);
@@ -359,72 +327,6 @@ public class ContinueTaskProcessor {
         return historyMap;
     }
 
-    // ==================== 结构可用机台解析（与 NewTaskProcessor 同构） ====================
-
-    /**
-     * 获取某结构在排程日可用的成型机台配置列表。
-     *
-     * <p><b>优先级</b>：
-     * <ol>
-     *   <li>{@code structureAllocationMap} 中按年月 + 当月日区间（beginDay~endDay）过滤，机台编码去重</li>
-     *   <li>当日无配置时回退 {@link #getAdvanceProductionMachines}（TaskGroupService 已写入
-     *       {@code advanceProductionMachineMap} 并完成版本/冲突处理）</li>
-     * </ol>
-     *
-     * <p>保底预留前必须确认目标机台出现在此列表中，避免给不可排产机台预留负荷。
-     */
-    private List<MpCxCapacityConfiguration> getAvailableMachinesForStructure(
-            String structureName, LocalDate scheduleDate, ScheduleContextVo context,
-            String productionVersion) {
-        if (context.getStructureAllocationMap() != null) {
-            List<MpCxCapacityConfiguration> configs =
-                    context.getStructureAllocationMap().get(structureName);
-            if (configs != null && !configs.isEmpty()) {
-                int day = scheduleDate.getDayOfMonth();
-                int dateYear = scheduleDate.getYear();
-                int dateMonth = scheduleDate.getMonthValue();
-                List<MpCxCapacityConfiguration> result = configs.stream()
-                        .filter(c -> c.getBeginDay() != null && c.getEndDay() != null)
-                        .filter(c -> c.getBeginDay() <= day && c.getEndDay() >= day)
-                        .filter(c -> c.getYear() != null && c.getYear() == dateYear
-                                && c.getMonth() != null && c.getMonth() == dateMonth)
-                        .collect(Collectors.collectingAndThen(
-                                Collectors.toMap(MpCxCapacityConfiguration::getCxMachineCode, c -> c, (a, b) -> a, LinkedHashMap::new),
-                                m -> new ArrayList<>(m.values())));
-                if (!result.isEmpty()) {
-                    return result;
-                }
-            }
-        }
-        return getAdvanceProductionMachines(structureName, context, productionVersion);
-    }
-
-    /**
-     * 提前生产机台回退（当日 structureAllocationMap 无机台时）。
-     *
-     * <p>{@code advanceProductionMachineMap} 在 TaskGroupService 按结构解析未来排产配置时已做：
-     * 版本过滤、机台占用三态判定、跨结构冲突剔除。此处直接取用，<b>不再</b>按 productionVersion 二次过滤，
-     * 避免跨月机台因版本字段与当月不一致被误删。
-     *
-     * @param productionVersion 保留参数以与 NewTaskProcessor 签名一致，本方法内未使用
-     */
-    private List<MpCxCapacityConfiguration> getAdvanceProductionMachines(
-            String structureName, ScheduleContextVo context, String productionVersion) {
-        if (context.getAdvanceProductionMachineMap() != null) {
-            List<MpCxCapacityConfiguration> advanceMachines =
-                    context.getAdvanceProductionMachineMap().get(structureName);
-            if (advanceMachines != null && !advanceMachines.isEmpty()) {
-                log.info("【提前生产】ContinueTaskProcessor 结构={} 使用提前生产机台={}",
-                        structureName,
-                        advanceMachines.stream()
-                                .map(MpCxCapacityConfiguration::getCxMachineCode)
-                                .collect(Collectors.toList()));
-                return new ArrayList<>(advanceMachines);
-            }
-        }
-        return new ArrayList<>();
-    }
-
     // ==================== 机台分配壳对象 ====================
 
     /**
@@ -440,15 +342,25 @@ public class ContinueTaskProcessor {
         return allocation;
     }
 
-    /** 从 {@code context.availableMachines} 读取机台 {@code maxDayCapacity}，缺失时用 {@link #DEFAULT_DAILY_CAPACITY}。 */
-    private int getMachineDailyCapacity(String machineCode, ScheduleContextVo context) {
-        if (context.getAvailableMachines() != null) {
-            for (MdmMoldingMachine machine : context.getAvailableMachines()) {
-                if (machine.getCxMachineCode().equals(machineCode)) {
-                    return machine.getMaxDayCapacity() != null ? machine.getMaxDayCapacity() : DEFAULT_DAILY_CAPACITY;
-                }
+    /** 在机台主数据列表中按编码查找 */
+    private MdmMoldingMachine findMachine(String machineCode, List<MdmMoldingMachine> machines) {
+        if (machines == null) {
+            return null;
+        }
+        for (MdmMoldingMachine m : machines) {
+            if (m.getCxMachineCode().equals(machineCode)) {
+                return m;
             }
         }
-        return DEFAULT_DAILY_CAPACITY;
+        return null;
+    }
+
+    /** 从 {@code context.availableMachines} 读取机台 {@code maxDayCapacity}，缺失时用 {@link ScheduleConstants#DEFAULT_DAILY_CAPACITY}。 */
+    private int getMachineDailyCapacity(String machineCode, ScheduleContextVo context) {
+        MdmMoldingMachine machine = findMachine(machineCode, context.getAvailableMachines());
+        if (machine != null) {
+            return machine.getMaxDayCapacity() != null ? machine.getMaxDayCapacity() : ScheduleConstants.DEFAULT_DAILY_CAPACITY;
+        }
+        return ScheduleConstants.DEFAULT_DAILY_CAPACITY;
     }
 }

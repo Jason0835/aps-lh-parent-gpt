@@ -1,6 +1,8 @@
 package com.zlt.aps.tm.engine.strategy;
 
 import com.ruoyi.common.exception.ServiceException;
+import com.zlt.aps.tm.api.constant.TmScheduleConstants;
+import com.zlt.aps.tm.api.enums.TmDemandAlgorithmEnum;
 import com.zlt.aps.tm.api.enums.TmScheduleErrorCodeEnum;
 import com.zlt.aps.tm.engine.domain.TmDemandQtyInput;
 import com.zlt.aps.tm.engine.domain.TmDemandQtyResult;
@@ -20,9 +22,6 @@ import java.math.RoundingMode;
 @Component
 public class TmGuardDemandQtyStrategy implements ITmDemandQtyStrategy {
 
-    /** 库存最低保证班数缺省值 */
-    public static final int DEFAULT_GUARD_SHIFT_COUNT = 2;
-
     /**
      * 获取算法编码。
      *
@@ -30,7 +29,7 @@ public class TmGuardDemandQtyStrategy implements ITmDemandQtyStrategy {
      */
     @Override
     public String getAlgorithmCode() {
-        return "1";
+        return TmDemandAlgorithmEnum.GUARD.getCode();
     }
 
     /**
@@ -50,7 +49,7 @@ public class TmGuardDemandQtyStrategy implements ITmDemandQtyStrategy {
         BigDecimal guardDemand = nvl(input.getGuardDemandQty());
         BigDecimal rollingStock = nvl(input.getRollingStockQty());
         int guardShiftCount = input.getGuardShiftCount() == null || input.getGuardShiftCount() <= 0
-                ? DEFAULT_GUARD_SHIFT_COUNT : input.getGuardShiftCount();
+                ? TmScheduleConstants.DEFAULT_GUARD_SHIFT_COUNT : input.getGuardShiftCount();
         BigDecimal currentShiftStockGap = currentDemand.subtract(rollingStock).max(BigDecimal.ZERO);
         BigDecimal stockGap = guardDemand.subtract(rollingStock).max(BigDecimal.ZERO);
         BigDecimal demandQty = currentShiftStockGap.max(stockGap);
@@ -82,7 +81,8 @@ public class TmGuardDemandQtyStrategy implements ITmDemandQtyStrategy {
         if (demand.compareTo(BigDecimal.ZERO) <= 0 || hours.compareTo(BigDecimal.ZERO) <= 0) {
             return null;
         }
-        BigDecimal futureDemandPerHour = demand.divide(hours, 6, RoundingMode.HALF_UP);
+        BigDecimal futureDemandPerHour = demand.divide(hours,
+                TmScheduleConstants.DECIMAL_CALCULATION_SCALE, RoundingMode.HALF_UP);
         if (futureDemandPerHour.compareTo(BigDecimal.ZERO) <= 0) {
             return null;
         }

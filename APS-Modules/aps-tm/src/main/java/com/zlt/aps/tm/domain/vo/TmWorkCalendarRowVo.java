@@ -2,6 +2,8 @@ package com.zlt.aps.tm.domain.vo;
 
 import lombok.Data;
 
+import java.util.Date;
+
 /**
  * 胎面自动排程工作日历查询行对象。
  *
@@ -9,6 +11,9 @@ import lombok.Data;
  */
 @Data
 public class TmWorkCalendarRowVo {
+
+    /** 生产日期 */
+    private Date productionDate;
 
     /** 工作日标识，1表示工作日，0表示停产日 */
     private String dayFlag;

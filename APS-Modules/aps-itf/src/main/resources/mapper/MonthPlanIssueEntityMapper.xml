@@ -6,7 +6,7 @@
 
     <insert id="batchInsertMonthPlanIssue" parameterType="list">
         INSERT INTO MONTH_PLAN_ISSUE (
-        MP_VERSION_NO, MP_YEAR, MP_MONTH, ORDER_NO, STRUC_CODE,
+        MP_VERSION_NO, LAST_MONTH_PLAN_VERSION, MP_YEAR, MP_MONTH, ORDER_NO, STRUC_CODE,
         MES_MATERIAL_CODE, SPEC_DESC, EMBRYO_SPEC, PATTERN, CAVITY,
         LIVE_BLOCK, NET_DEMAND, ADV_NUM, MONTH_AVG_NUM, STOCK_SALE_RATIO,
         DAY_VUL_QTY, ADJUST_QTY1, ADJUST_QTY2, ADJUST_QTY3, ADJUST_QTY4,
@@ -20,6 +20,7 @@
         <foreach collection="list" item="item" separator=" UNION ALL ">
             SELECT
             #{item.mpVersionNo} AS MP_VERSION_NO,
+            #{item.lastMonthPlanVersion} AS LAST_MONTH_PLAN_VERSION,
             #{item.mpYear} AS MP_YEAR,
             #{item.mpMonth} AS MP_MONTH,
             #{item.orderNo} AS ORDER_NO,
@@ -85,6 +86,7 @@
         <foreach collection="list" item="item" separator=";">
             UPDATE MONTH_PLAN_ISSUE SET
             MP_VERSION_NO = #{item.mpVersionNo},
+            LAST_MONTH_PLAN_VERSION = #{item.lastMonthPlanVersion},
             MP_YEAR = #{item.mpYear},
             MP_MONTH = #{item.mpMonth},
             STRUC_CODE = #{item.strucCode},

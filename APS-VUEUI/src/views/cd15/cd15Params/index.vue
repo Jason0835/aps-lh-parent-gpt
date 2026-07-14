@@ -19,54 +19,27 @@
     >
       <template slot="header">
         <el-button
-          type="primary"
-          plain
-          v-hasPermi="['cd15:params:add']"
-          @click="handleAdd"
-        >{{ $t("ui.frame.btn.add") }}</el-button>
-        <el-button
           v-hasPermi="['cd15:params:edit']"
           @click="handleBatchEdit"
           :disabled="selection.length !== 1"
         >{{ $t("ui.frame.btn.update") }}</el-button>
-        <el-button
-          type="danger"
-          v-hasPermi="['cd15:params:remove']"
-          :disabled="selection.length === 0"
-          @click="handleBatchDelete"
-        >{{ $t("ui.frame.btn.delete") }}</el-button>
-        <el-button
-          v-hasPermi="['cd15:params:import']"
-          @click="$refs.tltUpload.handleImport()"
-        >{{ $t("ui.frame.btn.import") }}</el-button>
         <el-button
           @click="handleExport"
           v-hasPermi="['cd15:params:export']"
         >{{ $t("ui.frame.btn.export") }}</el-button>
       </template>
     </page-table>
-    <tlt-upload-form
-      ref="tltUpload"
-      :updateSupport="true"
-      downloadUrl="/cd15/cd15Params/importTemplate"
-      uploadUrl="/cd15/cd15Params/importData"
-      @uploadSuccess="getList"
-      labelWidth="0"
-      :columns="importColumns"
-    />
     <info-dialog ref="infoRef" @success="getList" />
   </basic-container>
 </template>
 
 <script>
-import { listCd15Params, delCd15Params, exportCd15Params } from "@/api/cd15/cd15Params";
-import TltUploadForm from "@/views/components/tltUploadForm.vue";
+import { listCd15Params, exportCd15Params } from "@/api/cd15/cd15Params";
 import infoDialog from "./components/infoDialog.vue";
 
 export default {
   name: "Cd15Params",
   components: {
-    TltUploadForm,
     infoDialog,
   },
   dicts: ["biz_factory_name"],
@@ -77,22 +50,6 @@ export default {
   },
   data() {
     return {
-      importColumns: [
-        {
-          label: "",
-          prop: "updateSupport",
-          render: (form) => {
-            return (
-              <el-checkbox
-                label={this.$t("common.rule.updateSupport")}
-                v-model={form.updateSupport}
-              >
-                {this.$t("common.rule.updateSupport")}
-              </el-checkbox>
-            );
-          },
-        },
-      ],
       loading: false,
       data: [],
       selection: [],
@@ -144,20 +101,6 @@ export default {
           minWidth: 130,
         },
         {
-          prop: "regularExpression",
-          align: "center",
-          halign: "center",
-          label: this.$t("ui.data.column.cd15Params.regularExpression"),
-          minWidth: 160,
-        },
-        {
-          prop: "errorTips",
-          align: "center",
-          halign: "center",
-          label: this.$t("ui.data.column.cd15Params.errorTips"),
-          minWidth: 160,
-        },
-        {
           prop: "remark",
           halign: "center",
           label: this.$t("ui.common.column.remark"),
@@ -180,14 +123,6 @@ export default {
                   onClick={() => this.handleEdit(row)}
                 >
                   {this.$t("ui.frame.btn.update")}
-                </el-button>
-                <el-button
-                  v-hasPermi={["cd15:params:remove"]}
-                  class="minus"
-                  type="danger"
-                  onClick={() => this.handleDelete(row)}
-                >
-                  {this.$t("ui.frame.btn.delete")}
                 </el-button>
               </div>
             );
@@ -216,9 +151,6 @@ export default {
     },
   },
   methods: {
-    handleAdd() {
-      this.$refs.infoRef && this.$refs.infoRef.show();
-    },
     handleEdit(row) {
       this.$refs.infoRef && this.$refs.infoRef.show(row);
     },
@@ -226,34 +158,6 @@ export default {
       if (this.selection.length === 1) {
         this.handleEdit(this.selection[0]);
       }
-    },
-    handleDelete(row) {
-      this.$confirm(this.$t("common.confirm.delete"), {
-        type: "warning",
-      }).then(() => {
-        const ids = row.id;
-        delCd15Params({ ids }).then((data) => {
-          this.$modal.msgSuccess(data.msg);
-          this.$set(this.page, "current", 1);
-          this.getList();
-        });
-      });
-    },
-    handleBatchDelete() {
-      if (!this.selection || this.selection.length === 0) {
-        return;
-      }
-      this.$confirm(this.$t("common.confirm.delete"), {
-        type: "warning",
-      }).then(() => {
-        const ids = this.selection.map((item) => item.id).join(",");
-        delCd15Params({ ids }).then((data) => {
-          this.$modal.msgSuccess(data.msg);
-          this.selection = [];
-          this.$set(this.page, "current", 1);
-          this.getList();
-        });
-      });
     },
     handleExport() {
       exportCd15Params(this.query);

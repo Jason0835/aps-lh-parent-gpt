@@ -7,6 +7,7 @@ import com.zlt.aps.common.engine.schedule.ScheduleChainChangeResult;
 import com.zlt.aps.common.engine.schedule.ScheduleOperationContext;
 import com.zlt.aps.common.engine.schedule.ScheduleTaskLinkedList;
 import com.zlt.aps.common.engine.schedule.ScheduleTaskNode;
+import com.zlt.aps.tm.api.constant.TmScheduleConstants;
 import com.zlt.aps.tm.api.enums.TmScheduleErrorCodeEnum;
 import com.zlt.aps.tm.engine.domain.*;
 import lombok.extern.slf4j.Slf4j;
@@ -16,6 +17,8 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.Date;
+import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 /**
@@ -47,10 +50,12 @@ public class TmTaskChainScheduleService {
         ScheduleTaskLinkedList<TmTaskDraft> chain = context.getTaskChainGroup()
                 .getOrCreate(machine.getMachineCode(), toLocalDate(context), shiftOrder);
         ScheduleTaskNode<TmTaskDraft> node = toNode(task, machine.getMachineCode(), shiftOrder, context);
-        ScheduleChainChangeResult<TmTaskDraft> result = chain.append(node, operationContext(context, "AUTO_APPEND"));
+        ScheduleChainChangeResult<TmTaskDraft> result = chain.append(node,
+                operationContext(context, TmScheduleConstants.CHAIN_OPERATION_AUTO_APPEND));
         context.registerTaskNode(node.getTaskId(), node);
         this.recalculateChainTimes(context, chain, machine.getMachineCode(), shiftOrder);
-        this.logChainState(context, chain, "AUTO_APPEND", machine.getMachineCode(), shiftOrder, node.getTaskId());
+        this.logChainState(context, chain, TmScheduleConstants.CHAIN_OPERATION_AUTO_APPEND,
+                machine.getMachineCode(), shiftOrder, node.getTaskId());
         return result;
     }
 
@@ -75,10 +80,12 @@ public class TmTaskChainScheduleService {
         ScheduleTaskLinkedList<TmTaskDraft> chain = context.getTaskChainGroup()
                 .getOrCreate(machine.getMachineCode(), toLocalDate(context), shiftOrder);
         ScheduleTaskNode<TmTaskDraft> node = toNode(task, machine.getMachineCode(), shiftOrder, context);
-        ScheduleChainChangeResult<TmTaskDraft> result = chain.prepend(node, operationContext(context, "AUTO_PREPEND"));
+        ScheduleChainChangeResult<TmTaskDraft> result = chain.prepend(node,
+                operationContext(context, TmScheduleConstants.CHAIN_OPERATION_AUTO_PREPEND));
         context.registerTaskNode(node.getTaskId(), node);
         this.recalculateChainTimes(context, chain, machine.getMachineCode(), shiftOrder);
-        this.logChainState(context, chain, "AUTO_PREPEND", machine.getMachineCode(), shiftOrder, node.getTaskId());
+        this.logChainState(context, chain, TmScheduleConstants.CHAIN_OPERATION_AUTO_PREPEND,
+                machine.getMachineCode(), shiftOrder, node.getTaskId());
         return result;
     }
 
@@ -104,10 +111,12 @@ public class TmTaskChainScheduleService {
             anchor = chain.findByTaskId(position.getAnchorTaskId());
         }
         ScheduleTaskNode<TmTaskDraft> node = toNode(task, position.getMachineCode(), position.getShiftOrder(), context);
-        ScheduleChainChangeResult<TmTaskDraft> result = chain.insertAfter(anchor, node, operationContext(context, "MANUAL_INSERT"));
+        ScheduleChainChangeResult<TmTaskDraft> result = chain.insertAfter(anchor, node,
+                operationContext(context, TmScheduleConstants.CHAIN_OPERATION_MANUAL_INSERT));
         context.registerTaskNode(node.getTaskId(), node);
         this.recalculateChainTimes(context, chain, position.getMachineCode(), position.getShiftOrder());
-        this.logChainState(context, chain, "MANUAL_INSERT", position.getMachineCode(), position.getShiftOrder(), node.getTaskId());
+        this.logChainState(context, chain, TmScheduleConstants.CHAIN_OPERATION_MANUAL_INSERT,
+                position.getMachineCode(), position.getShiftOrder(), node.getTaskId());
         return result;
     }
 
@@ -134,7 +143,8 @@ public class TmTaskChainScheduleService {
             ScheduleTaskLinkedList<TmTaskDraft> ownerChain = (ScheduleTaskLinkedList<TmTaskDraft>) indexedNode.getOwnerList();
             Integer shiftOrder = indexedNode.getShiftOrder();
             String machineCode = indexedNode.getMachineCode();
-            ScheduleChainChangeResult<TmTaskDraft> result = ownerChain.remove(indexedNode, operationContext(context, "MANUAL_DELETE"));
+            ScheduleChainChangeResult<TmTaskDraft> result = ownerChain.remove(indexedNode,
+                    operationContext(context, TmScheduleConstants.CHAIN_OPERATION_MANUAL_DELETE));
             context.removeTaskNode(taskId);
             this.recalculateChainTimes(context, ownerChain, machineCode, shiftOrder);
             return result;
@@ -170,7 +180,8 @@ public class TmTaskChainScheduleService {
             throw new ServiceException(TmScheduleErrorCodeEnum.TM_CONTEXT_EMPTY.getDefaultMessage());
         }
         LocalDate localDate = toLocalDate(context);
-        ScheduleOperationContext opCtx = operationContext(context, "MANUAL_TRANSFER");
+        ScheduleOperationContext opCtx = operationContext(context,
+                TmScheduleConstants.CHAIN_OPERATION_MANUAL_TRANSFER);
 
         // 在原链中查找目标节点
         ScheduleTaskNode<TmTaskDraft> sourceNode = findNode(taskId, context);
@@ -245,9 +256,11 @@ public class TmTaskChainScheduleService {
         }
 
         // 触发重新编号和时间重算
-        ScheduleChainChangeResult<TmTaskDraft> result = targetChain.resequence(operationContext(context, "CHANGE_QTY"));
+        ScheduleChainChangeResult<TmTaskDraft> result = targetChain.resequence(
+                operationContext(context, TmScheduleConstants.CHAIN_OPERATION_CHANGE_QTY));
         this.recalculateChainTimes(context, targetChain, targetNode.getMachineCode(), shiftOrder);
-        this.logChainState(context, targetChain, "CHANGE_QTY", targetNode.getMachineCode(), shiftOrder, taskId);
+        this.logChainState(context, targetChain, TmScheduleConstants.CHAIN_OPERATION_CHANGE_QTY,
+                targetNode.getMachineCode(), shiftOrder, taskId);
         return result;
     }
 
@@ -297,11 +310,18 @@ public class TmTaskChainScheduleService {
                     context.getBatchNo(), context.getTraceId(), machineCode, shiftOrder);
             return;
         }
+        TmTaskDraft previousTask = null;
+        TmTaskPredecessor externalPredecessor = this.resolvePreviousShiftPredecessor(context, machineCode, shiftOrder);
         for (ScheduleTaskNode<TmTaskDraft> node : chain.toList()) {
+            TmTaskDraft currentTask = node.getTask();
             BigDecimal planQty = this.nvl(node.getPlanQty());
             if (planQty.compareTo(BigDecimal.ZERO) <= 0) {
                 node.setStartTime(null);
                 node.setEndTime(null);
+                if (currentTask != null) {
+                    currentTask.setPreviousSpecSwitchHours(BigDecimal.ZERO);
+                    currentTask.setPreviousGlueSwitchHours(BigDecimal.ZERO);
+                }
                 continue;
             }
             BigDecimal machineSpeed = this.resolveNodeMachineSpeed(node);
@@ -309,16 +329,36 @@ public class TmTaskChainScheduleService {
                 node.setStartTime(null);
                 node.setEndTime(null);
                 cursorTime = null;
+                if (currentTask != null) {
+                    currentTask.setPreviousSpecSwitchHours(BigDecimal.ZERO);
+                    currentTask.setPreviousGlueSwitchHours(BigDecimal.ZERO);
+                }
                 log.warn("[TM_TASK_TIME] batchNo={}, traceId={}, machineCode={}, shiftOrder={}, taskId={}, reason=MACHINE_SPEED_MISSING",
                         context.getBatchNo(), context.getTraceId(), machineCode, shiftOrder, node.getTaskId());
                 continue;
             }
+            BigDecimal specSwitchHours = this.resolveSpecSwitchHours(context, previousTask, externalPredecessor,
+                    currentTask);
+            BigDecimal glueSwitchHours = this.resolveGlueSwitchHours(context, previousTask, externalPredecessor,
+                    currentTask);
+            if (currentTask != null) {
+                currentTask.setPreviousSpecSwitchHours(specSwitchHours);
+                currentTask.setPreviousGlueSwitchHours(glueSwitchHours);
+            }
+            long switchSeconds = specSwitchHours.add(glueSwitchHours)
+                    .multiply(BigDecimal.valueOf(TmScheduleConstants.SECONDS_PER_HOUR))
+                    .setScale(0, RoundingMode.HALF_UP).longValue();
+            Date startTime = new Date(cursorTime.getTime() + switchSeconds * 1000L);
             long durationSeconds = this.calculateDurationSeconds(planQty, machineSpeed);
-            Date startTime = cursorTime;
             Date endTime = new Date(startTime.getTime() + durationSeconds * 1000L);
             node.setStartTime(startTime);
             node.setEndTime(endTime);
             cursorTime = endTime;
+            previousTask = currentTask;
+            externalPredecessor = null;
+            log.info("[TM_TASK_SWITCH] batchNo={}, traceId={}, machineCode={}, shiftOrder={}, taskId={}, specSwitchHours={}, glueSwitchHours={}, switchCapacityDeduct={}",
+                    context.getBatchNo(), context.getTraceId(), machineCode, shiftOrder, node.getTaskId(),
+                    specSwitchHours, glueSwitchHours, specSwitchHours.add(glueSwitchHours).multiply(machineSpeed));
         }
     }
 
@@ -335,7 +375,8 @@ public class TmTaskChainScheduleService {
             return null;
         }
         try {
-            return DateUtil.parse(DateUtil.formatDate(context.getScheduleDate()) + " " + window.getPlanStartTime());
+            Date shiftDate = DateUtil.offsetDay(context.getScheduleDate(), (shiftOrder - 1) / 3);
+            return DateUtil.parse(DateUtil.formatDate(shiftDate) + " " + window.getPlanStartTime());
         } catch (Exception exception) {
             log.warn("[TM_TASK_TIME] batchNo={}, traceId={}, shiftOrder={}, planStartTime={}, reason=SHIFT_START_PARSE_FAILED",
                     context.getBatchNo(), context.getTraceId(), shiftOrder, window.getPlanStartTime(), exception);
@@ -343,6 +384,101 @@ public class TmTaskChainScheduleService {
         }
     }
 
+    /**
+     * 解析当前班首任务之前的有效前置任务。
+     *
+     * @param context     排程上下文
+     * @param machineCode 机台编码
+     * @param shiftOrder  当前班次
+     * @return 上一班链尾或排程日前置快照
+     */
+    private TmTaskPredecessor resolvePreviousShiftPredecessor(TmScheduleContext context, String machineCode,
+                                                              Integer shiftOrder) {
+        for (int previousShiftOrder = shiftOrder - 1; previousShiftOrder >= 1; previousShiftOrder--) {
+            ScheduleTaskLinkedList<TmTaskDraft> previousChain = context.getTaskChain(machineCode, previousShiftOrder);
+            if (previousChain == null || previousChain.toList().isEmpty()) {
+                continue;
+            }
+            List<ScheduleTaskNode<TmTaskDraft>> nodes = previousChain.toList();
+            TmTaskDraft tailTask = nodes.get(nodes.size() - 1).getTask();
+            if (tailTask == null) {
+                continue;
+            }
+            TmTaskPredecessor predecessor = new TmTaskPredecessor();
+            predecessor.setTreadCode(tailTask.getTreadCode());
+            predecessor.setGlueCode(tailTask.getGlueCode());
+            predecessor.setShiftOrder(previousShiftOrder);
+            predecessor.setBusinessKey(tailTask.getBusinessKey());
+            return predecessor;
+        }
+        return context.getMachinePredecessorMap().get(machineCode);
+    }
+
+    /**
+     * 计算规格切换小时数。
+     *
+     * @param context             排程上下文
+     * @param previousTask        当前链内前置任务
+     * @param externalPredecessor 上一班或排程日前置任务
+     * @param currentTask         当前任务
+     * @return 规格切换小时数
+     */
+    private BigDecimal resolveSpecSwitchHours(TmScheduleContext context, TmTaskDraft previousTask,
+                                              TmTaskPredecessor externalPredecessor, TmTaskDraft currentTask) {
+        String previousTreadCode = previousTask == null
+                ? (externalPredecessor == null ? null : externalPredecessor.getTreadCode())
+                : previousTask.getTreadCode();
+        if (currentTask == null || previousTreadCode == null
+                || Objects.equals(previousTreadCode, currentTask.getTreadCode())) {
+            return BigDecimal.ZERO;
+        }
+        return this.resolveSwitchParamHours(context, TmScheduleConstants.PARAM_SPEC_CHANGE_MINUTES);
+    }
+
+    /**
+     * 计算胶料切换小时数。
+     *
+     * @param context             排程上下文
+     * @param previousTask        当前链内前置任务
+     * @param externalPredecessor 上一班或排程日前置任务
+     * @param currentTask         当前任务
+     * @return 胶料切换小时数
+     */
+    private BigDecimal resolveGlueSwitchHours(TmScheduleContext context, TmTaskDraft previousTask,
+                                              TmTaskPredecessor externalPredecessor, TmTaskDraft currentTask) {
+        String previousGlueCode = previousTask == null
+                ? (externalPredecessor == null ? null : externalPredecessor.getGlueCode())
+                : previousTask.getGlueCode();
+        if (currentTask == null || previousGlueCode == null
+                || Objects.equals(previousGlueCode, currentTask.getGlueCode())) {
+            return BigDecimal.ZERO;
+        }
+        return this.resolveSwitchParamHours(context, TmScheduleConstants.PARAM_GLUE_CHANGE_MINUTES);
+    }
+
+    /**
+     * 将切换分钟数参数转换为小时数。
+     *
+     * @param context   排程上下文
+     * @param paramCode 参数编码
+     * @return 非负切换小时数，参数缺失或非法时返回0
+     */
+    private BigDecimal resolveSwitchParamHours(TmScheduleContext context, String paramCode) {
+        TmParamValue paramValue = context.getParamMap().get(paramCode);
+        String value = paramValue == null ? "0" : StrUtil.blankToDefault(paramValue.getEffectiveValue(), "0");
+        try {
+            BigDecimal switchMinutes = new BigDecimal(value).max(BigDecimal.ZERO);
+            if (switchMinutes.compareTo(BigDecimal.ZERO) == 0) {
+                return BigDecimal.ZERO;
+            }
+            return switchMinutes.divide(BigDecimal.valueOf(TmScheduleConstants.MINUTES_PER_HOUR),
+                    TmScheduleConstants.DECIMAL_CALCULATION_SCALE, RoundingMode.HALF_UP);
+        } catch (NumberFormatException exception) {
+            log.warn("[TM_SWITCH_PARAM] batchNo={}, traceId={}, paramCode={}, paramValue={}, reason=INVALID_NUMBER",
+                    context.getBatchNo(), context.getTraceId(), paramCode, value, exception);
+            return BigDecimal.ZERO;
+        }
+    }
     /**
      * 解析节点使用的机台速度。
      *
@@ -364,7 +500,7 @@ public class TmTaskChainScheduleService {
      * @return 向上取整后的生产秒数
      */
     private long calculateDurationSeconds(BigDecimal planQty, BigDecimal machineSpeed) {
-        long durationSeconds = planQty.multiply(BigDecimal.valueOf(3600))
+        long durationSeconds = planQty.multiply(BigDecimal.valueOf(TmScheduleConstants.SECONDS_PER_HOUR))
                 .divide(machineSpeed, 0, RoundingMode.CEILING)
                 .longValue();
         if (durationSeconds < 1L) {

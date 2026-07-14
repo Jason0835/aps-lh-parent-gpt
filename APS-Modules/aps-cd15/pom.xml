@@ -61,6 +61,10 @@
             <groupId>com.zlt.aps</groupId>
             <artifactId>aps-base</artifactId>
         </dependency>
+        <dependency>
+            <groupId>com.zlt.aps</groupId>
+            <artifactId>aps-maindata</artifactId>
+        </dependency>
         <!-- 90度裁断 -->
 <!--        <dependency>-->
 <!--            <groupId>com.zlt.aps.cd90</groupId>-->

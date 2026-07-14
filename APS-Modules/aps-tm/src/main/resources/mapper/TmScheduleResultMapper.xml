@@ -3,6 +3,16 @@
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.zlt.aps.tm.mapper.TmScheduleResultMapper">
+    <select id="selectBatchIdsForUpdate" resultType="com.zlt.aps.tm.api.domain.entity.TmScheduleResult">
+        select *
+        from T_TM_SCHEDULE_RESULT
+        where ID in
+        <foreach item="id" collection="ids" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+        order by ID
+        for update
+    </select>
 
     <select id="isReleasingOrTimeoutByIds" parameterType="string" resultType="int">
         select count(1) from T_TM_SCHEDULE_RESULT

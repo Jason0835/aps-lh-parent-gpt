@@ -9,9 +9,10 @@ import lombok.EqualsAndHashCode;
 import java.time.LocalDate;
 
 /**
- * 胎面排程结果下发对象
- * 用于将胎面排程结果下发到MES系统
- * 一条胎面排程结果（6班）拆分为3条下发记录，分别对应D日、D+1日、D+2日
+ * 胎面排程结果下发契约对象。
+ *
+ * <p>用于 APS 到 MES 的接口传输，不是 MyBatis 数据库实体。一条胎面排程结果（6班）
+ * 拆分为3条下发记录，分别对应D日、D+1日、D+2日。</p>
  *
  * @author APS
  */

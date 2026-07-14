@@ -1,10 +1,12 @@
 package com.zlt.aps.cx.service.engine;
 
+import com.zlt.aps.cx.constant.ScheduleConstants;
 import com.zlt.aps.cx.entity.config.CxShiftConfig;
 import com.zlt.aps.cx.entity.schedule.LhScheduleResult;
 import com.zlt.aps.cx.vo.MonthPlanProductLhCapacityVo;
 import com.zlt.aps.cx.vo.DailyEmbryoTask;
 import com.zlt.aps.cx.vo.ScheduleContextVo;
+import com.zlt.aps.cx.vo.ShiftProductionResult;
 import com.zlt.aps.mp.api.domain.entity.MdmDevicePlanShut;
 import com.zlt.aps.mp.api.domain.entity.MdmStructureLhRatio;
 import com.zlt.aps.cx.api.domain.entity.CxPrecisionPlan;
@@ -44,7 +46,7 @@ import java.util.Set;
  *       <b>非</b> {@code plannedProduction}。</li>
  *   <li>机台与硫化机台数：由 ContinueTaskProcessor / NewTaskProcessor / TrialTaskProcessor 已确定。</li>
  *   <li>开停产标志：{@code isOpeningDayTask} / {@code isClosingDayTask} 等由 TaskGroupService 写入；
- *       班次类型语义与 {@link ScheduleDayTypeHelper.ShiftType} 对齐。</li>
+ *       班次类型语义与 {@link com.zlt.aps.cx.enums.ShiftType} 对齐。</li>
  * </ul>
  *
  * <h3>任务类型路由（{@link #scheduleTaskToShifts}，优先级不可调换）</h3>
@@ -76,9 +78,6 @@ public class ShiftScheduleService {
 
     // ==================== 业务阈值常量 ====================
 
-    /** 结构未配置胎面时的默认单车容量（条/车） */
-    private static final int DEFAULT_TRIP_CAPACITY = 12;
-
     /** 无法从日硫化量+配比推算时的小时产能兜底（条/小时） */
     private static final int DEFAULT_HOURLY_CAPACITY = 50;
 
@@ -90,9 +89,6 @@ public class ShiftScheduleService {
 
     /** 机台班初准备时间扣减（分钟），计入 calculateStartTime */
     private static final int DEFAULT_MACHINE_PREPARE_MINUTES = 30;
-
-    private static final int SECONDS_PER_DAY = 24 * 60 * 60;
-    private static final int SECONDS_PER_HOUR = 3600;
 
     // ==================== 班次编码（与 CxShiftConfig.shiftCode 对齐） ====================
 
@@ -568,11 +564,11 @@ public class ShiftScheduleService {
         }
 
         // 3. 成型一条胎时间(s) = 24×3600 / (配比 × 日硫化量)
-        BigDecimal formingTimePerTire = BigDecimal.valueOf(SECONDS_PER_DAY)
+        BigDecimal formingTimePerTire = BigDecimal.valueOf(ScheduleConstants.SECONDS_PER_DAY)
                 .divide(BigDecimal.valueOf((long) ratio * dailyLhCapacity), 2, RoundingMode.HALF_UP);
 
         // 4. 首班6小时产量 = 6×3600 / 成型一条胎时间(s)
-        int firstShiftCapacity = BigDecimal.valueOf(OPENING_FIRST_SHIFT_HOURS * SECONDS_PER_HOUR)
+        int firstShiftCapacity = BigDecimal.valueOf(OPENING_FIRST_SHIFT_HOURS * ScheduleConstants.SECONDS_PER_HOUR)
                 .divide(formingTimePerTire, 0, RoundingMode.FLOOR)
                 .intValue();
 
@@ -1082,12 +1078,12 @@ public class ShiftScheduleService {
 
         if (dailyLhCapacity != null && dailyLhCapacity > 0) {
             // 3. 成型一条胎的时间(s) = 86400 / (配比 × 日硫化量)
-            BigDecimal timePerTire = BigDecimal.valueOf(SECONDS_PER_DAY)
+            BigDecimal timePerTire = BigDecimal.valueOf(ScheduleConstants.SECONDS_PER_DAY)
                     .divide(BigDecimal.valueOf((long) ratio * dailyLhCapacity), 2, RoundingMode.HALF_UP);
 
             // 4. 小时产能 = 3600 / 成型一条胎的时间(s)，保留2位小数避免整数截断导致产能低估
             if (timePerTire.compareTo(BigDecimal.ZERO) > 0) {
-                double hourlyCapacity = BigDecimal.valueOf(SECONDS_PER_HOUR)
+                double hourlyCapacity = BigDecimal.valueOf(ScheduleConstants.SECONDS_PER_HOUR)
                         .divide(timePerTire, 2, RoundingMode.HALF_UP)
                         .doubleValue();
                 log.info("机台 {} 物料 {} 小时产能计算: 日硫化量={}, 配比={}, 单条耗时={}s, 产能={}条/h",
@@ -1101,7 +1097,7 @@ public class ShiftScheduleService {
         return (double) DEFAULT_HOURLY_CAPACITY;
     }
 
-    /** 结构+胎胚匹配 CxStructureTreadConfig.treadCount，否则 context 默认或 {@link #DEFAULT_TRIP_CAPACITY} */
+    /** 结构+胎胚匹配 CxStructureTreadConfig.treadCount，否则 context 默认或 {@link ScheduleConstants#DEFAULT_TRIP_CAPACITY} */
     private int getTripCapacity(String structureCode, String embryoCode, ScheduleContextVo context) {
         if (context.getStructureShiftCapacities() != null) {
             for (CxStructureTreadConfig capacity : context.getStructureShiftCapacities()) {
@@ -1114,7 +1110,7 @@ public class ShiftScheduleService {
                 }
             }
         }
-        return context.getDefaultTripCapacity() != null ? context.getDefaultTripCapacity() : DEFAULT_TRIP_CAPACITY;
+        return context.getDefaultTripCapacity() != null ? context.getDefaultTripCapacity() : ScheduleConstants.DEFAULT_TRIP_CAPACITY;
     }
 
     /** 机台班初准备时间（分钟），当前为全局常量 */
@@ -1182,69 +1178,5 @@ public class ShiftScheduleService {
         result.setConstructionStage(task.getConstructionStage());
 
         return result;
-    }
-
-    // ==================== ShiftProductionResult：精排输出 DTO ====================
-
-    /**
-     * 班次级排产结果 — 汇总为 CxScheduleResult 前的最小持久化单元。
-     *
-     * <p>一条记录 = 某机台、某班次、某任务的一次计划量（条）及计划起止时间。
-     * {@link #sourceTask} 保留原始 DailyEmbryoTask，供合并阶段读取硫化机台数等字段。
-     */
-    @lombok.Data
-    public static class ShiftProductionResult {
-        /** 机台编码 */
-        private String machineCode;
-        /** 班次编码 */
-        private String shiftCode;
-        /** 班次名称 */
-        private String shiftName;
-        /** 胎胚编码 */
-        private String embryoCode;
-        /** 物料编号（成品物料编码） */
-        private String materialCode;
-        /** 物料描述 */
-        private String materialDesc;
-        /** 主物料描述（胎胚描述） */
-        private String mainMaterialDesc;
-        /** 结构名称 */
-        private String structureName;
-        /** 排产数量（条） */
-        private Integer quantity;
-        /** 车次号（班次内第几车） */
-        private String tripNo;
-        /** 本车次容量（整车条数） */
-        private Integer tripCapacity;
-        /** 库存可供硫化时长（小时） */
-        private BigDecimal stockHours;
-        /** 顺位（班次内排序） */
-        private Integer sequence;
-        /** 计划开始时间 */
-        private LocalDateTime planStartTime;
-        /** 计划结束时间 */
-        private LocalDateTime planEndTime;
-        /** 是否试制任务 */
-        private Boolean isTrialTask;
-        /** 是否收尾任务 */
-        private Boolean isEndingTask;
-        /** 是否续作任务 */
-        private Boolean isContinueTask;
-        /** 该班次分配的车数 */
-        private Integer carsForShift;
-        /** 机台小时产能（条/小时） */
-        private Integer hourCapacity;
-        /** 是否收尾最后一批（不补整车） */
-        private Boolean isLastEndingBatch;
-        /** 来源任务（用于均衡计算：获取硫化机数 vulcanizeMachineCount） */
-        private DailyEmbryoTask sourceTask;
-        /** 是否结束生产（反推需求-库存<=0，无需再排产） */
-        private Boolean isEndProduction;
-        /** 施工阶段（00 无工艺 01 试制 02 量试 03 正式），来自硫化任务 */
-        private String constructionStage;
-        /** 合并的所有物料编码（用于判断是否全部收尾） */
-        private Set<String> allMaterialCodes;
-        /** 收尾物料编码集合（部分收尾时用于精确标记） */
-        private Set<String> endingMaterialCodes;
     }
 }

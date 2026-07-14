@@ -7,14 +7,14 @@ import lombok.extern.slf4j.Slf4j;
 /**
  * 胎圈排程模板方法抽象类。
  *
- * <p>定义胎圈排程不可变的算法骨架：S1 → S2 → S3 → S3.5 → S4 → S5 → S6，
+ * <p>定义胎圈排程不可变的算法骨架：S1 → S2 → S3 → S3.5 → S4 → S5 → S5.5 → S6，
  * 每步之间检查中断状态，任何一步中断则后续步骤全部跳过。</p>
  *
  * <p>子类 {@link TqScheduleTemplateImpl} 通过注入7个Handler来填充具体实现。</p>
  *
  * <pre>
  * 执行流程：
- * S1(前置校验与数据加载) → S2(需求计算) → S3(班次排产分配) → S3.5(剩余产能分配) → S4(成型/胎圈停产协调) → S5(班次均衡调整) → S6(结果校验与持久化)
+ * S1(前置校验与数据加载) → S2(需求计算) → S3(班次排产分配) → S3.5(剩余产能分配) → S4(成型/胎圈停产协调) → S5(班次均衡调整) → S5.5(定额校验与顺序重置) → S6(结果校验与持久化)
  *       ↓ 中断检查              ↓ 中断检查         ↓ 中断检查              ↓ 中断检查              ↓ 中断检查              ↓ 中断检查
  * </pre>
  *
@@ -34,6 +34,7 @@ public abstract class AbsTqScheduleTemplate {
      *   <li>S3.5: 剩余产能分配</li>
      *   <li>S4: 成型/胎圈停产协调</li>
      *   <li>S5: 班次均衡调整</li>
+     *   <li>S5.5: 定额校验与顺序重置</li>
      *   <li>S6: 结果校验与持久化</li>
      * </ol>
      *
@@ -89,6 +90,14 @@ public abstract class AbsTqScheduleTemplate {
             // S5: 班次均衡调整
             context.setCurrentStep(TqScheduleStepEnum.S5_BALANCE.getCode());
             doBalance(context);
+            if (context.isInterrupted()) {
+                logInterrupt(context);
+                return;
+            }
+
+            // S5.5: 定额校验与顺序重置（在S4/S5修改计划量之后统一校验，防止超定额且重置生产顺序）
+            context.setCurrentStep(TqScheduleStepEnum.S5_5_QUOTA_VALIDATE.getCode());
+            doQuotaValidate(context);
             if (context.isInterrupted()) {
                 logInterrupt(context);
                 return;
@@ -168,6 +177,19 @@ public abstract class AbsTqScheduleTemplate {
      * @param context 排程上下文
      */
     protected abstract void doBalance(TqScheduleContext context);
+
+    /**
+     * S5.5: 定额校验与顺序重置。
+     *
+     * <p>职责：在S4(停产协调)和S5(班次均衡)修改计划量之后，统一校验所有机台所有班次是否超定额，
+     * 超出部分按优先级延后到下一班次；最后统一重置6个班次的生产顺序值。</p>
+     *
+     * <p>背景：S4/S5修改计划量时不检查机台定额，可能导致单机台单班次总排产量超过quota。
+     * 本步骤作为所有计划量修改的最终校验出口，确保数据一致性。</p>
+     *
+     * @param context 排程上下文
+     */
+    protected abstract void doQuotaValidate(TqScheduleContext context);
 
     /**
      * S6: 结果校验与持久化。

@@ -70,7 +70,7 @@ export default {
     TltUploadForm,
     infoDialog,
   },
-  dicts: ["biz_factory_name", "class_num"],
+  dicts: ["biz_factory_name", "class_num_three_plan"],
   provide() {
     return {
       parentDict: this.dict,
@@ -144,7 +144,7 @@ export default {
           halign: "center",
           label: this.$t("ui.data.column.cd15MachineRollMapping.shiftCode"),
           minWidth: 140,
-          formatter: (row, column, value) => this.selectDictLabels(this.dict.type.class_num, value),
+          formatter: (row, column, value) => this.selectDictLabels(this.dict.type.class_num_three_plan, value),
         },
         {
           prop: "remark",
@@ -210,7 +210,7 @@ export default {
           label: this.$t("ui.data.column.cd15MachineRollMapping.shiftCode"),
           prop: "shiftCode",
           type: "select",
-          dictData: this.dict.type.class_num,
+          dictData: this.dict.type.class_num_three_plan,
           filterable: true,
           clearable: true,
         },

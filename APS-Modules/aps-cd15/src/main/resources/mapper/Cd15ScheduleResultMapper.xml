@@ -9,6 +9,7 @@
         <result column="SCHEDULE_DATE" property="scheduleDate"/>
         <result column="CD15_BATCH_NO" property="cd15BatchNo"/>
         <result column="CX_BATCH_NO" property="cxBatchNo"/>
+        <result column="CX_MACHINE_CODES" property="cxMachineCodes"/>
         <result column="ORDER_NO" property="orderNo"/>
         <result column="GROUP_NO" property="groupNo"/>
         <result column="RELEASE_STATUS" property="releaseStatus"/>
@@ -20,7 +21,7 @@
         <result column="STORAGE_LANE_CODE" property="storageLaneCode"/>
         <result column="STEEL_STRIP_CODE" property="steelStripCode"/>
         <result column="STOCK_QTY" property="stockQty"/>
-        <result column="MONTH_SURPLUS_QTY" property="monthSurplusQty"/>
+        <result column="PLAN_SURPLUS_QTY" property="planSurplusQty"/>
         <result column="CUT_MODE" property="cutMode"/>
         <result column="SOURCE_TYPE" property="sourceType"/>
         <result column="IS_LOCKED" property="isLocked"/>

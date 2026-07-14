@@ -203,6 +203,7 @@ public class ExcelUtils {
 
     /**
      * 根据模板生成Excel文件
+     * Excel模板中同一个key只能有一个值，多个位置需用不同key名
      *
      * @param context      表头或表尾数据集合
      * @param dataList     列表
@@ -626,6 +627,7 @@ public class ExcelUtils {
     /**
      * 多个列表支持，按顺序写入excel。 列表数据数量需等于列表表达式数量，不然多余的表达式不会被清空。多余的列表数据不会被写入
      * Map<String, Object> 中的String 只能是字母结尾，不能以数字结尾 否则无法匹配
+     * Excel模板中同一个key只能有一个值，多个位置需用不同key名
      * @param templateFile
      * @param sheetIndex sheetIndex
      * @param context
@@ -654,6 +656,7 @@ public class ExcelUtils {
     /**
      * 多个列表支持，按顺序写入excel。 列表数据数量需等于列表表达式数量，不然多余的表达式不会被清空。多余的列表数据不会被写入
      * Map<String, Object> 中的String 只能是字母结尾，不能以数字结尾 否则无法匹配
+     * Excel模板中同一个key只能有一个值，多个位置需用不同key名
      * @param is
      * @param sheetIndex sheetIndex
      * @param context

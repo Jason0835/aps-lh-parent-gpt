@@ -194,13 +194,13 @@ public class LhScheduleResultValidationStrategy extends BaseValidationStrategy {
                     String embryo = config.getEmbryoCode();
                     return structure + "|" + embryo;
                 })
-                .filter(Objects::nonNull)
+                .filter(obj -> true)
                 .filter(s -> !s.trim().isEmpty())
                 .collect(Collectors.toSet());
 
         Set<String> lhStructures = lhResults.stream()
                 .map(lh -> lh.getStructureName() + "|" + lh.getEmbryoCode())
-                .filter(Objects::nonNull)
+                .filter(obj -> true)
                 .filter(s -> !s.trim().isEmpty())
                 .collect(Collectors.toSet());
 

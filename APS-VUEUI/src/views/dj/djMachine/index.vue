@@ -164,6 +164,14 @@ export default {
           },
         },
         {
+          label: this.$t("ui.data.column.factoryCode"),
+          prop: "factoryCode",
+          minWidth: 100,
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(this.dict.type.biz_factory_name, value);
+          },
+        },
+        {
           label: this.$t("ui.data.column.machine.machineCode"),
           prop: "machineCode",
           minWidth: 100,
@@ -192,6 +200,13 @@ export default {
         {
           label: this.$t("ui.data.column.machine.thickMin"),
           prop: "thickMin",
+          minWidth: 100,
+          // sortable: "custom",
+          type: "number",
+        },
+        {
+          label: this.$t("ui.data.column.machine.thickMax"),
+          prop: "thickMax",
           minWidth: 100,
           // sortable: "custom",
           type: "number",

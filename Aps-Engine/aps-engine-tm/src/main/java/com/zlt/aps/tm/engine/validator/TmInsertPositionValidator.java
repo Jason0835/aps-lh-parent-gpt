@@ -1,6 +1,7 @@
 package com.zlt.aps.tm.engine.validator;
 
 import com.ruoyi.common.exception.ServiceException;
+import com.zlt.aps.tm.api.constant.TmScheduleConstants;
 import com.zlt.aps.tm.api.domain.entity.TmScheduleResult;
 import com.zlt.aps.tm.api.enums.TmScheduleErrorCodeEnum;
 
@@ -15,8 +16,6 @@ import java.util.List;
  * 按同机台同班次在产规格数量执行数据库口径校验。</p>
  */
 public class TmInsertPositionValidator {
-
-    private static final int MIN_INSERT_SEQUENCE = 2;
 
     private TmInsertPositionValidator() {
     }
@@ -46,7 +45,8 @@ public class TmInsertPositionValidator {
         List<Integer> sequenceList = Arrays.asList(scheduleResult.getClass1Sequence(), scheduleResult.getClass2Sequence(),
                 scheduleResult.getClass3Sequence(), scheduleResult.getClass4Sequence(), scheduleResult.getClass5Sequence(),
                 scheduleResult.getClass6Sequence());
-        return sequenceList.stream().noneMatch(sequence -> sequence != null && sequence <= MIN_INSERT_SEQUENCE);
+        return sequenceList.stream().noneMatch(sequence -> sequence != null
+                && sequence <= TmScheduleConstants.MIN_INSERT_SEQUENCE);
     }
 
     /**

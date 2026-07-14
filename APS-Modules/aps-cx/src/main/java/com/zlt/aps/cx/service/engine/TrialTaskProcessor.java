@@ -1,5 +1,6 @@
 package com.zlt.aps.cx.service.engine;
 
+import com.zlt.aps.cx.constant.ScheduleConstants;
 import com.zlt.aps.cx.entity.config.CxShiftConfig;
 import com.zlt.aps.cx.vo.DailyEmbryoTask;
 import com.zlt.aps.cx.vo.MachineAllocationResult;
@@ -63,9 +64,6 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class TrialTaskProcessor {
 
-    /** 机台主数据缺省日产能（条/天） */
-    private static final int DEFAULT_DAILY_CAPACITY = 1200;
-
     // ==================== 5.3.2 试制处理入口 ====================
 
     /**
@@ -122,8 +120,8 @@ public class TrialTaskProcessor {
 
             // 5.3.2.3.1 结构候选机台（当日排产配置或提前生产回退）
             String productionVersion = tasks.get(0).getProductionVersion();
-            List<MpCxCapacityConfiguration> structMachines = getAvailableMachinesForStructure(
-                    structureName, scheduleDate, context, productionVersion);
+            List<MpCxCapacityConfiguration> structMachines = context.getAvailableMachinesForStructure(
+                    structureName, scheduleDate, productionVersion);
             if (structMachines.isEmpty()) {
                 log.warn("结构 {} 没有可安排的机台，跳过", structureName);
                 continue;
@@ -276,61 +274,6 @@ public class TrialTaskProcessor {
         return null;
     }
 
-    // ==================== 结构可用机台（与 NewTaskProcessor / ContinueTaskProcessor 同构） ====================
-
-    /**
-     * 获取结构在排程日可安排的机台配置。
-     *
-     * <p>优先 {@code structureAllocationMap}（年月 + beginDay~endDay + 机台去重）；
-     * 无配置时回退 {@link #getAdvanceProductionMachines}。
-     */
-    private List<MpCxCapacityConfiguration> getAvailableMachinesForStructure(
-            String structureName, LocalDate scheduleDate, ScheduleContextVo context,
-            String productionVersion) {
-        if (context.getStructureAllocationMap() != null) {
-            List<MpCxCapacityConfiguration> configs =
-                    context.getStructureAllocationMap().get(structureName);
-            if (configs != null && !configs.isEmpty()) {
-                int day = scheduleDate.getDayOfMonth();
-                int dateYear = scheduleDate.getYear();
-                int dateMonth = scheduleDate.getMonthValue();
-                List<MpCxCapacityConfiguration> result = configs.stream()
-                        .filter(c -> c.getBeginDay() != null && c.getEndDay() != null)
-                        .filter(c -> c.getBeginDay() <= day && c.getEndDay() >= day)
-                        .filter(c -> c.getYear() != null && c.getYear() == dateYear
-                                && c.getMonth() != null && c.getMonth() == dateMonth)
-                        .collect(Collectors.collectingAndThen(
-                                Collectors.toMap(MpCxCapacityConfiguration::getCxMachineCode, c -> c, (a, b) -> a, LinkedHashMap::new),
-                                m -> new ArrayList<>(m.values())));
-                if (!result.isEmpty()) {
-                    return result;
-                }
-            }
-        }
-        return getAdvanceProductionMachines(structureName, context, productionVersion);
-    }
-
-    /**
-     * 提前生产机台回退；{@code advanceProductionMachineMap} 已在 TaskGroupService 完成版本与冲突处理，
-     * 此处不再按 productionVersion 过滤。
-     */
-    private List<MpCxCapacityConfiguration> getAdvanceProductionMachines(
-            String structureName, ScheduleContextVo context, String productionVersion) {
-        if (context.getAdvanceProductionMachineMap() != null) {
-            List<MpCxCapacityConfiguration> advanceMachines =
-                    context.getAdvanceProductionMachineMap().get(structureName);
-            if (advanceMachines != null && !advanceMachines.isEmpty()) {
-                log.info("【提前生产】TrialTaskProcessor 结构={} 使用提前生产机台={}",
-                        structureName,
-                        advanceMachines.stream()
-                                .map(MpCxCapacityConfiguration::getCxMachineCode)
-                                .collect(Collectors.toList()));
-                return new ArrayList<>(advanceMachines);
-            }
-        }
-        return new ArrayList<>();
-    }
-
     /**
      * 机台固定配置约束 — {@code MdmCxMachineFixed.disableStructure} 包含当前结构则不可选。
      *
@@ -367,14 +310,11 @@ public class TrialTaskProcessor {
     }
 
     private int getMachineDailyCapacity(String machineCode, ScheduleContextVo context) {
-        if (context.getAvailableMachines() != null) {
-            for (MdmMoldingMachine machine : context.getAvailableMachines()) {
-                if (machine.getCxMachineCode().equals(machineCode)) {
-                    return machine.getMaxDayCapacity() != null ? machine.getMaxDayCapacity() : DEFAULT_DAILY_CAPACITY;
-                }
-            }
+        MdmMoldingMachine machine = findMachine(machineCode, context.getAvailableMachines());
+        if (machine != null) {
+            return machine.getMaxDayCapacity() != null ? machine.getMaxDayCapacity() : ScheduleConstants.DEFAULT_DAILY_CAPACITY;
         }
-        return DEFAULT_DAILY_CAPACITY;
+        return ScheduleConstants.DEFAULT_DAILY_CAPACITY;
     }
 
     /**
@@ -390,34 +330,13 @@ public class TrialTaskProcessor {
             MachineAllocationResult allocation,
             DailyEmbryoTask task) {
 
-        TaskAllocation taskAllocation =
-                new TaskAllocation();
-        taskAllocation.setEmbryoCode(task.getEmbryoCode());
-        taskAllocation.setMaterialCode(task.getMaterialCode());
-        taskAllocation.setMaterialDesc(task.getMaterialDesc());
-        taskAllocation.setMainMaterialDesc(task.getMainMaterialDesc());
-        taskAllocation.setStructureName(task.getStructureName());
-        taskAllocation.setQuantity(task.getPlannedProduction());
-        taskAllocation.setVulcanizeMachineCount(task.getVulcanizeMachineCount() != null ? task.getVulcanizeMachineCount() : 1);
-        taskAllocation.setEndingExtraInventory(task.getEndingExtraInventory() != null ? task.getEndingExtraInventory() : task.getPlannedProduction());
-        taskAllocation.setPriority(task.getPriority());
-        taskAllocation.setStockHours(task.getStockHours());
-        taskAllocation.setIsTrialTask(task.getIsTrialTask());
-        taskAllocation.setIsProductionTrial(task.getIsProductionTrial());
-        taskAllocation.setIsEndingTask(task.getIsEndingTask());
-        taskAllocation.setEndingSurplusQty(task.getEndingSurplusQty());
-        taskAllocation.setIsLastEndingBatch(task.getIsLastEndingBatch());
-        taskAllocation.setIsEndProduction(task.getIsEndProduction());
-        taskAllocation.setEndingAbandoned(task.getEndingAbandoned());
-        taskAllocation.setIsOpeningDayTask(task.getIsOpeningDayTask());
-        taskAllocation.setIsClosingDayTask(task.getIsClosingDayTask());
-        taskAllocation.setIsMainProduct(task.getIsMainProduct());
-        taskAllocation.setLhId(task.getLhId());
-        taskAllocation.setLhMachineCode(task.getLhMachineCode());
-        taskAllocation.setConstructionStage(task.getConstructionStage());
-        taskAllocation.setIsFirstTask(task.getIsFirstTask());
-        taskAllocation.setIsUrgentEnding(task.getIsUrgentEnding());
-        taskAllocation.setIsNearEnding(task.getIsNearEnding());
+        TaskAllocation taskAllocation = task.toTaskAllocation(
+                task.getPlannedProduction(),
+                task.getVulcanizeMachineCount() != null ? task.getVulcanizeMachineCount() : 1);
+        // TrialTaskProcessor 特有 fallback：未设置 endingExtraInventory 时用 plannedProduction
+        if (taskAllocation.getEndingExtraInventory() == null) {
+            taskAllocation.setEndingExtraInventory(task.getPlannedProduction());
+        }
 
         allocation.getTaskAllocations().add(taskAllocation);
         allocation.setUsedCapacity(allocation.getUsedCapacity() + task.getPlannedProduction());

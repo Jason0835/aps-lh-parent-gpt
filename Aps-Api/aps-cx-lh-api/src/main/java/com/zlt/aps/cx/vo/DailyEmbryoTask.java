@@ -149,4 +149,48 @@ public class DailyEmbryoTask {
     private Map<String, Integer> shiftAllocation;
     /** 是否已被精度计划扣减产量 */
     private Boolean precisionDeducted;
+
+    // ==================== 辅助方法 ====================
+
+    /**
+     * 将本任务转化为机台级任务分配对象。
+     *
+     * <p>除 {@code quantity} 和 {@code vulcanizeMachineCount} 由调用方传入外，
+     * 其余字段均从本任务直接拷贝。
+     *
+     * @param quantity              计划条数（各调用方语义不同：续作=endingExtraInventory|demandQuantity，新增=同上，试制=plannedProduction）
+     * @param vulcanizeMachineCount 硫化机台数
+     * @return 填充完整的 TaskAllocation 对象
+     */
+    public TaskAllocation toTaskAllocation(int quantity, int vulcanizeMachineCount) {
+        TaskAllocation ta = new TaskAllocation();
+        ta.setEmbryoCode(this.embryoCode);
+        ta.setMaterialCode(this.materialCode);
+        ta.setMaterialDesc(this.materialDesc);
+        ta.setMainMaterialDesc(this.mainMaterialDesc);
+        ta.setStructureName(this.structureName);
+        ta.setQuantity(quantity);
+        ta.setVulcanizeMachineCount(vulcanizeMachineCount);
+        ta.setEndingExtraInventory(this.endingExtraInventory);
+        ta.setPriority(this.priority);
+        ta.setStockHours(this.stockHours);
+        ta.setIsTrialTask(this.isTrialTask);
+        ta.setIsProductionTrial(this.isProductionTrial);
+        ta.setIsContinueTask(this.isContinueTask);
+        ta.setIsEndingTask(this.isEndingTask);
+        ta.setEndingSurplusQty(this.endingSurplusQty);
+        ta.setIsMainProduct(this.isMainProduct);
+        ta.setLhId(this.lhId);
+        ta.setLhMachineCode(this.lhMachineCode);
+        ta.setIsLastEndingBatch(this.isLastEndingBatch);
+        ta.setIsEndProduction(this.isEndProduction);
+        ta.setEndingAbandoned(this.endingAbandoned);
+        ta.setIsOpeningDayTask(this.isOpeningDayTask);
+        ta.setIsClosingDayTask(this.isClosingDayTask);
+        ta.setConstructionStage(this.constructionStage);
+        ta.setIsFirstTask(this.isFirstTask);
+        ta.setIsUrgentEnding(this.isUrgentEnding);
+        ta.setIsNearEnding(this.isNearEnding);
+        return ta;
+    }
 }

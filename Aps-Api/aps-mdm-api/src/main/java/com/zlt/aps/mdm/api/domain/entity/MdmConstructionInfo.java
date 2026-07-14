@@ -293,6 +293,11 @@ public class MdmConstructionInfo extends BaseEntity {
     @TableField(value = "INSIDE_CRAFT")
     private BigDecimal insideCraft;
 
+    /** 内衬长 */
+    @ApiModelProperty(value = "内衬长", name = "insideLength")
+    @TableField(value = "INSIDE_LENGTH")
+    private BigDecimal insideLength;
+
     /** 胎侧代号 */
     @Excel(name = "ui.data.column.mdmConstructionInfo.sidewallCode", sort = 9)
     @ApiModelProperty(value = "胎侧代号", name = "sidewallCode")

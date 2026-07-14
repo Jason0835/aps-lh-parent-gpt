@@ -1,7 +1,9 @@
-package com.zlt.aps.tm.engine.domain;
+package com.zlt.aps.tm.engine.service.collector;
 
 import cn.hutool.core.collection.CollUtil;
 import com.zlt.aps.tm.api.domain.vo.TmAutoScheduleIssueVo;
+import com.zlt.aps.tm.api.enums.TmAutoScheduleIssueCategoryEnum;
+import com.zlt.aps.tm.api.enums.TmAutoScheduleIssueLevelEnum;
 import com.zlt.aps.tm.api.enums.TmScheduleStepEnum;
 
 import java.util.ArrayList;
@@ -15,12 +17,6 @@ import java.util.List;
  * 包括可继续排程的警告和阻断执行的错误。</p>
  */
 public class TmAutoScheduleIssueCollector {
-
-    /** 错误级别 */
-    public static final String LEVEL_ERROR = "ERROR";
-
-    /** 警告级别 */
-    public static final String LEVEL_WARN = "WARN";
 
     private final List<TmAutoScheduleIssueVo> issues = new ArrayList<>();
 
@@ -36,13 +32,15 @@ public class TmAutoScheduleIssueCollector {
      * @param fieldName     字段名称
      * @param message       异常说明
      */
-    public void addConstructionIssue(String level, String category, String sourceOrderNo, String embryoCode,
-                                     String recipeNo, Integer shiftOrder, String fieldName, String message) {
+    public void addConstructionIssue(TmAutoScheduleIssueLevelEnum level,
+                                     TmAutoScheduleIssueCategoryEnum category,
+                                     String sourceOrderNo, String embryoCode, String recipeNo,
+                                     Integer shiftOrder, String fieldName, String message) {
         TmAutoScheduleIssueVo issue = new TmAutoScheduleIssueVo();
-        issue.setLevel(level);
+        issue.setLevel(level.getCode());
         issue.setStageCode(TmScheduleStepEnum.BOOTSTRAP.getCode());
         issue.setStageName(TmScheduleStepEnum.BOOTSTRAP.getDesc());
-        issue.setCategory(category);
+        issue.setCategory(category.getCode());
         issue.setSourceOrderNo(sourceOrderNo);
         issue.setEmbryoCode(embryoCode);
         issue.setRecipeNo(recipeNo);
@@ -60,12 +58,13 @@ public class TmAutoScheduleIssueCollector {
      * @param category  异常类别
      * @param message   异常说明
      */
-    public void addIssue(String level, TmScheduleStepEnum stepEnum, String category, String message) {
+    public void addIssue(TmAutoScheduleIssueLevelEnum level, TmScheduleStepEnum stepEnum,
+                         TmAutoScheduleIssueCategoryEnum category, String message) {
         TmAutoScheduleIssueVo issue = new TmAutoScheduleIssueVo();
-        issue.setLevel(level);
+        issue.setLevel(level.getCode());
         issue.setStageCode(stepEnum.getCode());
         issue.setStageName(stepEnum.getDesc());
-        issue.setCategory(category);
+        issue.setCategory(category.getCode());
         issue.setMessage(message);
         issues.add(issue);
     }

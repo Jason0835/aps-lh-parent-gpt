@@ -1,9 +1,11 @@
 package com.zlt.aps.cx.service.engine;
 
 import com.zlt.aps.cx.api.domain.entity.CxStock;
+import com.zlt.aps.cx.constant.ScheduleConstants;
 import com.zlt.aps.cx.entity.CxMaterialEnding;
 import com.zlt.aps.cx.entity.config.CxParamConfig;
 import com.zlt.aps.cx.entity.config.CxShiftConfig;
+import com.zlt.aps.cx.enums.ShiftType;
 import com.zlt.aps.cx.entity.schedule.LhScheduleResult;
 import com.zlt.aps.cx.vo.MonthPlanProductLhCapacityVo;
 import com.zlt.aps.cx.vo.ScheduleContextVo;
@@ -93,23 +95,8 @@ public class TaskGroupService {
     /** 参数编码：可供硫化时长封顶开关（Y=开启，N=关闭） */
     private static final String PARAM_STOCK_HOURS_CAP_ENABLED = "SYS04080005";
 
-    /** 参数编码：提前生产同英寸切换耗时（小时） */
-    private static final String PARAM_ADVANCE_SAME_INCH_SWITCH_HOURS = "SYS04020004";
-
-    /** 参数编码：提前生产不同英寸切换耗时（小时） */
-    private static final String PARAM_ADVANCE_DIFF_INCH_SWITCH_HOURS = "SYS04020005";
-
-    /** 默认：同英寸切换耗时（小时） */
-    private static final int DEFAULT_SAME_INCH_SWITCH_HOURS = 2;
-
-    /** 默认：不同英寸切换耗时（小时） */
-    private static final int DEFAULT_DIFF_INCH_SWITCH_HOURS = 8;
-
     /** 单个班次总秒数（8小时） */
     private static final int SECONDS_PER_SHIFT = 8 * 60 * 60;
-
-    /** 秒转小时的除数 */
-    private static final int SECONDS_PER_HOUR = 3600;
 
     // ==================== 优先级分值常量 ====================
 
@@ -393,9 +380,9 @@ public class TaskGroupService {
             if (currentShift.getDayShiftOrder() != null) {
                 LocalDate currentScheduleDate = context.getCurrentScheduleDate();
                 String factoryCode = context.getFactoryCode();
-                ScheduleDayTypeHelper.ShiftType st = scheduleDayTypeHelper.determineShiftType(
+                ShiftType st = scheduleDayTypeHelper.determineShiftType(
                         currentScheduleDate, currentShift.getDayShiftOrder(), factoryCode);
-                isOpeningShift = st == ScheduleDayTypeHelper.ShiftType.OPEN_START;
+                isOpeningShift = st == ShiftType.OPEN_START;
             }
         }
 
@@ -818,10 +805,10 @@ public class TaskGroupService {
                             deferredNeedsClosingStock = true;
                             deferredTrigger = "当天停产日";
                         } else {
-                            ScheduleDayTypeHelper.ShiftType deferredShiftType = scheduleDayTypeHelper.determineShiftType(
+                            ShiftType deferredShiftType = scheduleDayTypeHelper.determineShiftType(
                                     closingScheduleDate, deferredDayShiftOrder, closingFactoryCode);
-                            boolean deferredIsClosing = deferredShiftType == ScheduleDayTypeHelper.ShiftType.CLOSED;
-                            boolean deferredIsBeforeClosing = deferredShiftType == ScheduleDayTypeHelper.ShiftType.BEFORE_CLOSE;
+                            boolean deferredIsClosing = deferredShiftType == ShiftType.CLOSED;
+                            boolean deferredIsBeforeClosing = deferredShiftType == ShiftType.BEFORE_CLOSE;
                             boolean deferredIsStopFlagDay = scheduleDayTypeHelper.isStopFlagDay(closingScheduleDate, closingFactoryCode);
                             if (deferredIsClosing || deferredIsBeforeClosing || deferredIsStopFlagDay) {
                                 deferredNeedsClosingStock = true;
@@ -924,13 +911,13 @@ public class TaskGroupService {
                                     avgRatio.stripTrailingZeros().toPlainString(), timePerTireStr,
                                     plannedProduction,
                                     itemTimeSeconds.stripTrailingZeros().toPlainString(),
-                                    itemTimeSeconds.divide(BigDecimal.valueOf(SECONDS_PER_HOUR), 1, BigDecimal.ROUND_HALF_UP),
+                                    itemTimeSeconds.divide(BigDecimal.valueOf(ScheduleConstants.SECONDS_PER_HOUR), 1, BigDecimal.ROUND_HALF_UP),
                                     newCumulative.stripTrailingZeros().toPlainString(),
-                                    newCumulative.divide(BigDecimal.valueOf(SECONDS_PER_HOUR), 1, BigDecimal.ROUND_HALF_UP),
+                                    newCumulative.divide(BigDecimal.valueOf(ScheduleConstants.SECONDS_PER_HOUR), 1, BigDecimal.ROUND_HALF_UP),
                                     totalCapacitySeconds.stripTrailingZeros().toPlainString(),
-                                    totalCapacitySeconds.divide(BigDecimal.valueOf(SECONDS_PER_HOUR), 1, BigDecimal.ROUND_HALF_UP),
+                                    totalCapacitySeconds.divide(BigDecimal.valueOf(ScheduleConstants.SECONDS_PER_HOUR), 1, BigDecimal.ROUND_HALF_UP),
                                     remaining.stripTrailingZeros().toPlainString(),
-                                    remaining.divide(BigDecimal.valueOf(SECONDS_PER_HOUR), 1, BigDecimal.ROUND_HALF_UP),
+                                    remaining.divide(BigDecimal.valueOf(ScheduleConstants.SECONDS_PER_HOUR), 1, BigDecimal.ROUND_HALF_UP),
                                     lhMachineCode, lhResult.getLeftRightMould(), isNewLhMachine);
                         }
                     }
@@ -1195,11 +1182,11 @@ public class TaskGroupService {
                     structureRemainingCapacityMap.put(structName, remaining.compareTo(BigDecimal.ZERO) > 0 ? remaining : BigDecimal.ZERO);
                     log.info("  结构 {} 剩余产能: 总={}s({}h), 第一轮已用={}s({}h), 剩余={}s({}h)",
                             structName, totalCapacitySeconds.toBigInteger(),
-                            totalCapacitySeconds.divide(BigDecimal.valueOf(SECONDS_PER_HOUR), 1, BigDecimal.ROUND_HALF_UP),
+                            totalCapacitySeconds.divide(BigDecimal.valueOf(ScheduleConstants.SECONDS_PER_HOUR), 1, BigDecimal.ROUND_HALF_UP),
                             cumulativeTime.toBigInteger(),
-                            cumulativeTime.divide(BigDecimal.valueOf(SECONDS_PER_HOUR), 1, BigDecimal.ROUND_HALF_UP),
+                            cumulativeTime.divide(BigDecimal.valueOf(ScheduleConstants.SECONDS_PER_HOUR), 1, BigDecimal.ROUND_HALF_UP),
                             remaining.toBigInteger(),
-                            remaining.divide(BigDecimal.valueOf(SECONDS_PER_HOUR), 1, BigDecimal.ROUND_HALF_UP));
+                            remaining.divide(BigDecimal.valueOf(ScheduleConstants.SECONDS_PER_HOUR), 1, BigDecimal.ROUND_HALF_UP));
                 }
 
                 // 按结构独立处理：变更2c - 最小优先策略 + R2预处理 + 6h退出条件
@@ -1210,7 +1197,7 @@ public class TaskGroupService {
 
                     log.info("==================== 结构={}, 剩余产能={}s({}h), 任务数={} ====================",
                             structName, remainingCapacity.stripTrailingZeros().toPlainString(),
-                            remainingCapacity.divide(BigDecimal.valueOf(SECONDS_PER_HOUR), 1, BigDecimal.ROUND_HALF_UP),
+                            remainingCapacity.divide(BigDecimal.valueOf(ScheduleConstants.SECONDS_PER_HOUR), 1, BigDecimal.ROUND_HALF_UP),
                             structTasks.size());
 
                     if (remainingCapacity.compareTo(BigDecimal.ZERO) <= 0) {
@@ -1227,7 +1214,7 @@ public class TaskGroupService {
                             .multiply(BigDecimal.valueOf(SECONDS_PER_SHIFT));
                     log.info("  结构={}, 总产能={}s({}h), 推荐机台数={}",
                             structName, totalCapacity.toBigInteger(),
-                            totalCapacity.divide(BigDecimal.valueOf(SECONDS_PER_HOUR), 1, BigDecimal.ROUND_HALF_UP),
+                            totalCapacity.divide(BigDecimal.valueOf(ScheduleConstants.SECONDS_PER_HOUR), 1, BigDecimal.ROUND_HALF_UP),
                             totalRecommendedMachines);
 
                     // ==================== 变更2c: R2预处理 - 移出当前stockHours已超阈值的任务 ====================
@@ -1636,9 +1623,9 @@ public class TaskGroupService {
                         structureCumulativeTimeMap.merge(structName, structDeferredTime, BigDecimal::add);
                         log.info("  结构 {} R2回写耗时={}s({}h), 累计={}s({}h)", structName,
                                 structDeferredTime.stripTrailingZeros().toPlainString(),
-                                structDeferredTime.divide(BigDecimal.valueOf(SECONDS_PER_HOUR), 1, BigDecimal.ROUND_HALF_UP),
+                                structDeferredTime.divide(BigDecimal.valueOf(ScheduleConstants.SECONDS_PER_HOUR), 1, BigDecimal.ROUND_HALF_UP),
                                 structureCumulativeTimeMap.get(structName).stripTrailingZeros().toPlainString(),
-                                structureCumulativeTimeMap.get(structName).divide(BigDecimal.valueOf(SECONDS_PER_HOUR), 1, BigDecimal.ROUND_HALF_UP));
+                                structureCumulativeTimeMap.get(structName).divide(BigDecimal.valueOf(ScheduleConstants.SECONDS_PER_HOUR), 1, BigDecimal.ROUND_HALF_UP));
                     }
                 }
 
@@ -1736,11 +1723,11 @@ public class TaskGroupService {
                     r3RemainingCapacityMap.put(structName, remaining.compareTo(BigDecimal.ZERO) > 0 ? remaining : BigDecimal.ZERO);
                     log.info("  结构 {} R3剩余产能: 总={}s({}h), 已用={}s({}h), 剩余={}s({}h)",
                             structName, totalCapacitySeconds.toBigInteger(),
-                            totalCapacitySeconds.divide(BigDecimal.valueOf(SECONDS_PER_HOUR), 1, BigDecimal.ROUND_HALF_UP),
+                            totalCapacitySeconds.divide(BigDecimal.valueOf(ScheduleConstants.SECONDS_PER_HOUR), 1, BigDecimal.ROUND_HALF_UP),
                             cumulativeTime.toBigInteger(),
-                            cumulativeTime.divide(BigDecimal.valueOf(SECONDS_PER_HOUR), 1, BigDecimal.ROUND_HALF_UP),
+                            cumulativeTime.divide(BigDecimal.valueOf(ScheduleConstants.SECONDS_PER_HOUR), 1, BigDecimal.ROUND_HALF_UP),
                             remaining.toBigInteger(),
-                            remaining.divide(BigDecimal.valueOf(SECONDS_PER_HOUR), 1, BigDecimal.ROUND_HALF_UP));
+                            remaining.divide(BigDecimal.valueOf(ScheduleConstants.SECONDS_PER_HOUR), 1, BigDecimal.ROUND_HALF_UP));
                 }
 
                 // R3 核心逻辑：最小优先、逐车轮询、结构全局轮次，不检查6h限制
@@ -1751,7 +1738,7 @@ public class TaskGroupService {
 
                     log.info("==================== R3 结构={}, 剩余产能={}s({}h), 初始任务数={} ====================",
                             structName, remainingCapacity.stripTrailingZeros().toPlainString(),
-                            remainingCapacity.divide(BigDecimal.valueOf(SECONDS_PER_HOUR), 1, BigDecimal.ROUND_HALF_UP),
+                            remainingCapacity.divide(BigDecimal.valueOf(ScheduleConstants.SECONDS_PER_HOUR), 1, BigDecimal.ROUND_HALF_UP),
                             structTasks.size());
 
                     if (remainingCapacity.compareTo(BigDecimal.ZERO) <= 0) {
@@ -2053,9 +2040,9 @@ public class TaskGroupService {
                         structureCumulativeTimeMap.merge(structName, structDeferredTime, BigDecimal::add);
                         log.info("  结构 {} R3回写耗时={}s({}h), 累计={}s({}h)", structName,
                                 structDeferredTime.stripTrailingZeros().toPlainString(),
-                                structDeferredTime.divide(BigDecimal.valueOf(SECONDS_PER_HOUR), 1, BigDecimal.ROUND_HALF_UP),
+                                structDeferredTime.divide(BigDecimal.valueOf(ScheduleConstants.SECONDS_PER_HOUR), 1, BigDecimal.ROUND_HALF_UP),
                                 structureCumulativeTimeMap.get(structName).stripTrailingZeros().toPlainString(),
-                                structureCumulativeTimeMap.get(structName).divide(BigDecimal.valueOf(SECONDS_PER_HOUR), 1, BigDecimal.ROUND_HALF_UP));
+                                structureCumulativeTimeMap.get(structName).divide(BigDecimal.valueOf(ScheduleConstants.SECONDS_PER_HOUR), 1, BigDecimal.ROUND_HALF_UP));
                     }
                 }
 
@@ -2892,10 +2879,10 @@ public class TaskGroupService {
         // ==================== 停产逻辑调整（v2）====================
         // 每个班次都检查：今天有没有包含停产班次
         // 通过一次 determineShiftType 获取班次类型，避免重复调用
-        ScheduleDayTypeHelper.ShiftType shiftType = scheduleDayTypeHelper.determineShiftType(
+        ShiftType shiftType = scheduleDayTypeHelper.determineShiftType(
                 scheduleDate, currentDayShiftOrder, factoryCode);
-        boolean isCurrentClosingShift = shiftType == ScheduleDayTypeHelper.ShiftType.CLOSED;
-        boolean isBeforeClosingShift = shiftType == ScheduleDayTypeHelper.ShiftType.BEFORE_CLOSE;
+        boolean isCurrentClosingShift = shiftType == ShiftType.CLOSED;
+        boolean isBeforeClosingShift = shiftType == ShiftType.BEFORE_CLOSE;
         // 判断条件3：当前班次本身是否是停产标识日的班次（包含停产班次的当天）
         boolean isStopFlagDayToday = scheduleDayTypeHelper.isStopFlagDay(scheduleDate, factoryCode);
 
@@ -2918,7 +2905,7 @@ public class TaskGroupService {
         boolean isNextDayStop = scheduleDayTypeHelper.hasAnyClosingShift(nextDay, factoryCode);
 
         // ==================== 开产处理（仅 OPEN_START 班次）====================
-        boolean isOpening = shiftType == ScheduleDayTypeHelper.ShiftType.OPEN_START;
+        boolean isOpening = shiftType == ShiftType.OPEN_START;
         if (isOpening) {
             handleOpeningDayTaskV2(task, context, scheduleDate, currentDayShiftOrder, dayShifts);
             if (isNextDayStop) {
@@ -3715,11 +3702,11 @@ public class TaskGroupService {
                 // 前结构全部收尾 → FREE，计算切换耗时（从参数配置读取）
                 long switchCost;
                 if (precedingProSize != null && precedingProSize.equals(advanceProSize)) {
-                    int sameInchHours = getIntParamValue(context, PARAM_ADVANCE_SAME_INCH_SWITCH_HOURS, DEFAULT_SAME_INCH_SWITCH_HOURS);
-                    switchCost = sameInchHours * SECONDS_PER_HOUR;
+                    int sameInchHours = getIntParamValue(context, ScheduleConstants.PARAM_SAME_INCH_SWITCH_HOURS, ScheduleConstants.DEFAULT_SAME_INCH_SWITCH_HOURS);
+                    switchCost = sameInchHours * ScheduleConstants.SECONDS_PER_HOUR;
                 } else {
-                    int diffInchHours = getIntParamValue(context, PARAM_ADVANCE_DIFF_INCH_SWITCH_HOURS, DEFAULT_DIFF_INCH_SWITCH_HOURS);
-                    switchCost = diffInchHours * SECONDS_PER_HOUR;
+                    int diffInchHours = getIntParamValue(context, ScheduleConstants.PARAM_DIFF_INCH_SWITCH_HOURS, ScheduleConstants.DEFAULT_DIFF_INCH_SWITCH_HOURS);
+                    switchCost = diffInchHours * ScheduleConstants.SECONDS_PER_HOUR;
                 }
 
                 long availableSeconds = SECONDS_PER_SHIFT - maxOccupiedTime - switchCost;
@@ -3728,9 +3715,9 @@ public class TaskGroupService {
                     available.add(config);
                     totalAvailableSeconds += availableSeconds;
                     log.info("【提前生产-机台可用产能】机台={}, 前结构占用={}s({}h), 切换={}s({}h), 可用={}s({}h)",
-                            machineCode, maxOccupiedTime, maxOccupiedTime / SECONDS_PER_HOUR,
-                            switchCost, switchCost / SECONDS_PER_HOUR,
-                            availableSeconds, availableSeconds / SECONDS_PER_HOUR);
+                            machineCode, maxOccupiedTime, maxOccupiedTime / ScheduleConstants.SECONDS_PER_HOUR,
+                            switchCost, switchCost / ScheduleConstants.SECONDS_PER_HOUR,
+                            availableSeconds, availableSeconds / ScheduleConstants.SECONDS_PER_HOUR);
                 } else {
                     // 切换无法完成，记录剩余切换耗时
                     long remainingSwitch = -availableSeconds;
@@ -3761,7 +3748,7 @@ public class TaskGroupService {
             log.info("【提前生产】结构={}, 分配未来机台={}, 总可用产能={}s({}h)",
                     structureName,
                     available.stream().map(MpCxCapacityConfiguration::getCxMachineCode).collect(Collectors.toList()),
-                    totalAvailableSeconds, totalAvailableSeconds / SECONDS_PER_HOUR);
+                    totalAvailableSeconds, totalAvailableSeconds / ScheduleConstants.SECONDS_PER_HOUR);
         }
         return available;
     }

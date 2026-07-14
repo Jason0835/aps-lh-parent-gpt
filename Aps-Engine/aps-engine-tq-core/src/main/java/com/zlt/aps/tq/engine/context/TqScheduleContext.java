@@ -102,7 +102,7 @@ public class TqScheduleContext {
     /** 工装车整车容量，key=胎圈编码, value=整车容量 */
     private Map<String, Integer> cartCapacityMap = new HashMap<>();
 
-    /** 检修计划机台，key=日期班次(如"2025-01-01|3"), value=该班次检修中的机台编号列表 */
+    /** 检修计划机台，key=日期班次(如"2025-01-01|03"), value=该班次检修中的机台编号列表。班次编码使用两位格式：01=夜班,02=早班,03=中班 */
     private Map<String, List<String>> maintenanceMachineMap = new HashMap<>();
 
     /** 胎圈-胎胚关联关系，key=胎圈编码, value=关联胎胚编码列表（一个胎圈可能对应多个胎胚） */
@@ -164,6 +164,15 @@ public class TqScheduleContext {
 
     /** 插入记录数 */
     private int insertedCount;
+
+    // ========== S3阶段临时传递字段 ==========
+
+    /**
+     * 当前正在排产的班次编码（CLASS_NUM_THREE字典值："01"=夜班, "02"=早班, "03"=中班）。
+     * 由TqMachineAssignHandler.searchOptionalMachineList在策略链过滤前设置，
+     * 供MaintenanceFilter等策略按班次精确过滤维修机台使用。
+     */
+    private String currentClassCode;
 
     // ========== 流程控制 ==========
 

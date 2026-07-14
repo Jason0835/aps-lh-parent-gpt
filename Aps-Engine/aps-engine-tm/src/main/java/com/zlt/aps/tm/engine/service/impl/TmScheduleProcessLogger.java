@@ -1,4 +1,4 @@
-package com.zlt.aps.tm.engine.service;
+package com.zlt.aps.tm.engine.service.impl;
 
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.date.DateUtil;
@@ -6,6 +6,7 @@ import cn.hutool.core.util.StrUtil;
 import com.zlt.aps.common.engine.schedule.IScheduleProcessLogger;
 import com.zlt.aps.common.engine.schedule.ScheduleChainChangeResult;
 import com.zlt.aps.common.engine.schedule.ScheduleRuleResult;
+import com.zlt.aps.tm.api.enums.TmMachineFilterReasonEnum;
 import com.zlt.aps.tm.engine.domain.TmMachineCandidate;
 import com.zlt.aps.tm.engine.domain.TmRuleTrace;
 import com.zlt.aps.tm.engine.domain.TmScheduleContext;
@@ -110,7 +111,8 @@ public class TmScheduleProcessLogger implements IScheduleProcessLogger<TmSchedul
         }
         return candidates.stream()
                 .filter(TmMachineCandidate::isFiltered)
-                .collect(Collectors.groupingBy(candidate -> StrUtil.blankToDefault(candidate.getFilterReasonCode(), "UNKNOWN"),
+                .collect(Collectors.groupingBy(candidate -> StrUtil.blankToDefault(candidate.getFilterReasonCode(),
+                                TmMachineFilterReasonEnum.UNKNOWN.getCode()),
                         LinkedHashMap::new, Collectors.counting()));
     }
     private String batchNo(TmScheduleContext context) {

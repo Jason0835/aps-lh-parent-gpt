@@ -310,7 +310,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
                 .max(Date::compareTo)
                 .orElse(queryVO != null && queryVO.getScheduleDate() != null ? queryVO.getScheduleDate() : DateUtil.date());
 
-        Map<String, BigDecimal> totalDailyPlanQtyMap = buildTotalDailyPlanQtyMap(exportList);
+        Map<String, BigDecimal> totalDailyPlanQtyMap = this.buildTotalDailyPlanQtyMap(exportList, scheduleDate);
         Map<String, BigDecimal> todayNightFinishQtyMap = buildTodayNightFinishQtyMap(exportList, scheduleDate);
         Map<String, Map<String, String>> smallGlueMaps = buildSmallGlueMaps(exportList);
         Map<String, String> smallGlueMap = smallGlueMaps.getOrDefault("smallGlue", Collections.emptyMap());
@@ -372,6 +372,14 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
         // 为小计行添加 DAEEF3 背景色标识 + 胎胚余量<400 红色背景
         List<CellStyle> cellStyleList = new ArrayList<>();
         int templateListStartRow = 4;
+        // 从明细行计算实际列数，避免CellStyle引用超出模板列范围导致Excel损坏
+        int maxColIndex = 0;
+        for (Map<String, Object> rowMap : planRows) {
+            if (!"小计".equals(rowMap.get("cxMachineCode"))) {
+                maxColIndex = rowMap.size() - 1;
+                break;
+            }
+        }
         for (int i = 0; i < planRows.size(); i++) {
             Map<String, Object> rowMap = planRows.get(i);
             int rowNum = templateListStartRow + i;
@@ -379,17 +387,18 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
             if ("小计".equals(rowMap.get("cxMachineCode"))) {
                 cellStyleList.add(new CellStyle(
                         rowNum, rowNum,
-                        0, 60,
+                        0, maxColIndex,
                         "#DAEEF3", true, true, null));
             } else {
                 Object cxRemainVal = rowMap.get("cxRemainQty");
                 if (cxRemainVal instanceof Number) {
                     BigDecimal remainQty = new BigDecimal(cxRemainVal.toString());
                     if (remainQty.compareTo(new BigDecimal("400")) < 0) {
+                        // color传白色避免setFillPattern(SOLID_FOREGROUND)无填充色导致Excel损坏
                         cellStyleList.add(new CellStyle(
                                 rowNum, rowNum,
-                                9, 9,
-                                null, true, false, null, "#FF0000"));
+                                7, 7,
+                                "#FFFFFF", true, false, null, "#FF0000"));
                     }
                 }
             }
@@ -513,9 +522,6 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
 
         LambdaQueryWrapper<CxEmbryoLhTime> lhTimeWrapper = new LambdaQueryWrapper<>();
         lhTimeWrapper.eq(CxEmbryoLhTime::getFactoryCode, factoryCode);
-        if (scheduleDate != null) {
-            lhTimeWrapper.eq(CxEmbryoLhTime::getScheduleDate, scheduleDate);
-        }
         lhTimeWrapper.orderByAsc(CxEmbryoLhTime::getCxMachineCode);
 
         List<CxEmbryoLhTime> lhTimeList = cxEmbryoLhTimeMapper.selectList(lhTimeWrapper);
@@ -606,7 +612,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
 
         Map<String, Object> row = new LinkedHashMap<>();
         row.put("stt", 0);
-        row.put("machineCode", lhTime.getCxMachineCode());
+        row.put("machineCode", StringUtils.defaultString(lhTime.getCxMachineCode()));
         row.put("structureSpec", prevStructureName);
         // 成型余量
         Integer remainQtyVal = lhTime.getStructureChangeRemaining();
@@ -850,12 +856,10 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
         row.put("remark", item.getRemark());
         row.put("lhMachineQty", countLhScheduleIds(item.getLhScheduleIds()));
 
-        BigDecimal tdpq = totalDailyPlanQtyMap.get(item.getLhScheduleIds());
+        BigDecimal tdpq = totalDailyPlanQtyMap.get(StringUtils.defaultString(item.getMainMaterialDesc()).trim());
         row.put("totalDailyPlanQty", zeroToEmpty(tdpq));
 
-        String tnfKey = StringUtils.defaultString(item.getFactoryCode()).trim() + "|"
-                + StringUtils.defaultString(item.getMaterialCode()).trim();
-        BigDecimal tnfq = todayNightFinishQtyMap.get(tnfKey);
+        BigDecimal tnfq = todayNightFinishQtyMap.get(StringUtils.defaultString(item.getMainMaterialDesc()).trim());
         row.put("todayNightFinishQty", zeroToEmpty(tnfq));
 
         BigDecimal ylSum = (tnfq != null ? tnfq : BigDecimal.ZERO)
@@ -1096,74 +1100,80 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
     }
 
     /**
-     * 通过 lhScheduleIds 查询 LH 排程结果，汇总 totalDailyPlanQty。
-     * 处理逻辑：解析每个 CX 行的 lhScheduleIds（逗号拼接），
-     * 批量查询对应的 LhScheduleResult，按 lhScheduleIds 分组累加 totalDailyPlanQty。
+     * 构建日计划总量Map。
+     * <p>计算逻辑：取导出日期前一天所在月份的月计划数据，
+     * 按胎胚描述（mainMaterialDesc）汇总整月所有天的累计计划量（day1~day末）。</p>
      *
-     * @param list 成型排程结果列表
-     * @return key=lhScheduleIds逗号串, value=汇总后的总计划数量
+     * @param list         成型排程结果列表，用于提取工厂编码
+     * @param scheduleDate 导出排程日期（T日）
+     * @return key=胎胚描述, value=整月累计计划量
      */
-    private Map<String, BigDecimal> buildTotalDailyPlanQtyMap(List<CxScheduleResult> list) {
-        if (PubUtil.isEmpty(list)) {
+    private Map<String, BigDecimal> buildTotalDailyPlanQtyMap(List<CxScheduleResult> list, Date scheduleDate) {
+        if (PubUtil.isEmpty(list) || scheduleDate == null) {
             return Collections.emptyMap();
         }
-        // 收集所有唯一的 lhScheduleIds，解析为 Long 集合
-        Set<Long> allLhIds = list.stream()
-                .map(CxScheduleResult::getLhScheduleIds)
-                .filter(StringUtils::isNotEmpty)
-                .flatMap(ids -> Arrays.stream(ids.split("[,，]")))
+        // 取导出日期的前一天
+        LocalDate prevDay = cn.hutool.core.date.DateUtil.toLocalDateTime(scheduleDate).toLocalDate().minusDays(1);
+        int year = prevDay.getYear();
+        int month = prevDay.getMonthValue();
+        int yearMonth = year * 100 + month;
+        // 前一天所在月的最后一天
+        int lastDayOfMonth = prevDay.lengthOfMonth();
+
+        // 获取工厂编码
+        String factoryCode = list.stream()
+                .map(CxScheduleResult::getFactoryCode)
+                .filter(StringUtils::isNotBlank)
                 .map(String::trim)
-                .filter(StringUtils::isNotEmpty)
-                .map(Long::parseLong)
-                .collect(Collectors.toSet());
+                .findFirst()
+                .orElse(FactoryConstant.DEFAULT_FACTORY_CODE);
 
-        if (allLhIds.isEmpty()) {
+        // 查询月计划数据
+        List<FactoryMonthPlanProductionFinalResult> plans = monthPlanMapper.selectByFactoryAndYearMonth(factoryCode, yearMonth);
+        if (PubUtil.isEmpty(plans)) {
             return Collections.emptyMap();
         }
 
-        // 批量查询 LH 排程结果
-        List<LhScheduleResult> lhResults = lhScheduleResultMapper.selectBatchIds(allLhIds);
-
-        // lhScheduleId → totalDailyPlanQty（仅做ID映射，不去重）
-        Map<Long, Integer> lhIdToPlanQty = new LinkedHashMap<>();
-        for (LhScheduleResult r : lhResults) {
-            Integer qty = r.getTotalDailyPlanQty() != null ? r.getTotalDailyPlanQty() : 0;
-            lhIdToPlanQty.put(r.getId(), qty);
-        }
-
-        // 按 lhScheduleIds 原字符串汇总（行内量去重）
+        // 按胎胚描述汇总整月累计计划量
         Map<String, BigDecimal> resultMap = new HashMap<>();
-        for (CxScheduleResult item : list) {
-            String ids = item.getLhScheduleIds();
-            if (StringUtils.isEmpty(ids) || resultMap.containsKey(ids)) {
+
+        for (FactoryMonthPlanProductionFinalResult plan : plans) {
+            String embryoDesc = plan.getMainMaterialDesc();
+            if (StringUtils.isBlank(embryoDesc)) {
                 continue;
             }
-            Set<Integer> rowUsedQtySet = new HashSet<>();
-            BigDecimal sum = BigDecimal.ZERO;
-            for (String idStr : ids.split("[,，]")) {
-                String trimmed = idStr.trim();
-                if (StringUtils.isEmpty(trimmed)) continue;
-                Long lhId = Long.parseLong(trimmed);
-                Integer qty = lhIdToPlanQty.get(lhId);
-                if (qty == null || qty == 0) continue;
-                if (rowUsedQtySet.add(qty)) {
+            embryoDesc = embryoDesc.trim();
+            BigDecimal sum = resultMap.getOrDefault(embryoDesc, BigDecimal.ZERO);
+            for (int day = 1; day <= lastDayOfMonth; day++) {
+                Integer qty = plan.getDayQty(day);
+                if (qty != null && qty > 0) {
                     sum = sum.add(BigDecimal.valueOf(qty));
                 }
             }
-            resultMap.put(ids, sum);
+            resultMap.put(embryoDesc, sum);
         }
+
+        log.info("buildTotalDailyPlanQtyMap: 前一天={}, 年月={}, 工厂={}, 月计划记录数={}, 胎胚描述数={}",
+                prevDay, yearMonth, factoryCode, plans.size(), resultMap.size());
+
         return resultMap;
     }
 
     /**
-     * 构建硫化产量今天夜班Map，复刻 LH 的 buildTodayNightFinishQtyExportMap 计算逻辑。
-     * 计算规则：本月1日~排程日当天T_LH_DAY_FINISH_QTY.dayFinishQty 求和
-     * + 排程日当天T_LH_SCHE_FINISH_QTY.class1FinishQty 求和，
-     * 按工厂+物料聚合。
+     * 构建完成量Map。
+     * <p>计算逻辑：取导出日期前一天所在月份的完成量数据，
+     * 从两表查询（T_LH_DAY_FINISH_QTY 和 T_LH_SCHE_FINISH_QTY），
+     * 按胎胚描述（mainMaterialDesc）汇总。</p>
+     * <p>日期范围：
+     * <ul>
+     *   <li>dayFinish: 前一天所在月的1日 ~ 前一天（不含前一天）</li>
+     *   <li>scheFinish: 前一天当天</li>
+     * </ul>
+     * </p>
      *
-     * @param list         成型排程结果列表，用于提取工厂和物料查询范围
-     * @param scheduleDate 排程日期（T日）
-     * @return key=工厂编码|物料编码, value=今天夜班完成量
+     * @param list         成型排程结果列表，用于提取工厂、物料和胎胚描述映射
+     * @param scheduleDate 导出排程日期（T日）
+     * @return key=胎胚描述, value=完成量合计
      */
     private Map<String, BigDecimal> buildTodayNightFinishQtyMap(List<CxScheduleResult> list, Date scheduleDate) {
         if (PubUtil.isEmpty(list)) {
@@ -1183,57 +1193,73 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
                 .distinct()
                 .collect(Collectors.toList());
 
-        log.info("buildTodayNightFinishQtyMap factoryCodes:{}, materialCodes:{}, scheduleDate:{}",
-                factoryCodes, materialCodes, scheduleDate);
-
         if (factoryCodes.isEmpty() || materialCodes.isEmpty()) {
-            log.warn("buildTodayNightFinishQtyMap empty factoryCodes or materialCodes, return empty");
             return Collections.emptyMap();
         }
 
+        // 构建物料编码 -> 胎胚描述的映射
+        Map<String, String> materialToEmbryoDesc = new HashMap<>();
+        for (CxScheduleResult item : list) {
+            String mc = StringUtils.defaultString(item.getMaterialCode()).trim();
+            String desc = StringUtils.defaultString(item.getMainMaterialDesc()).trim();
+            if (StringUtils.isNotBlank(mc) && StringUtils.isNotBlank(desc)) {
+                materialToEmbryoDesc.putIfAbsent(mc, desc);
+            }
+        }
+
+        // 取导出日期的前一天
         Date targetScheduleDate = Objects.nonNull(scheduleDate)
                 ? DateUtil.beginOfDay(scheduleDate)
                 : DateUtil.beginOfDay(DateUtil.date());
-        Date monthStart = DateUtil.beginOfMonth(targetScheduleDate);
-        Date nextDayStart = DateUtil.offsetDay(targetScheduleDate, 1);
+        // 前一天
+        Date prevDay = DateUtil.offsetDay(targetScheduleDate, -1);
+        Date prevDayStart = DateUtil.beginOfDay(prevDay);
+        Date prevDayNextStart = DateUtil.offsetDay(prevDayStart, 1);
+        // 前一天所在月的起始日
+        Date monthStart = DateUtil.beginOfMonth(prevDay);
 
-        log.info("buildTodayNightFinishQtyMap monthStart:{}, targetScheduleDate:{}, nextDayStart:{}",
-                monthStart, targetScheduleDate, nextDayStart);
+        log.info("buildTodayNightFinishQtyMap: 前一天={}, 月份起始={}, factoryCodes={}, materialCodes={}",
+                prevDay, monthStart, factoryCodes, materialCodes);
 
         Map<String, BigDecimal> resultMap = new HashMap<>();
 
+        // 1. 查询日完成量：月份起始日 ~ 前一天（不含前一天）
         List<Map<String, Object>> dayFinishList = lhFinishQtyMapper.sumDayFinishQty(
-                factoryCodes, materialCodes, monthStart, nextDayStart);
+                factoryCodes, materialCodes, monthStart, prevDayStart);
         log.info("buildTodayNightFinishQtyMap dayFinishList size:{}", dayFinishList != null ? dayFinishList.size() : 0);
+
+        // 2. 查询班次完成量：前一天当天
+        List<Map<String, Object>> scheFinishList = lhFinishQtyMapper.sumScheFinishQty(
+                factoryCodes, materialCodes, prevDayStart, prevDayNextStart);
+        log.info("buildTodayNightFinishQtyMap scheFinishList size:{}", scheFinishList != null ? scheFinishList.size() : 0);
+
+        // 合并两表结果，按物料编码汇总后映射到胎胚描述
         for (Map<String, Object> row : dayFinishList) {
-            String fCode = (String) row.get("FACTORY_CODE");
             String mCode = (String) row.get("MATERIAL_CODE");
-            if (StringUtils.isEmpty(fCode) || StringUtils.isEmpty(mCode)) {
-                log.warn("buildTodayNightFinishQtyMap dayFinishList row has empty fCode:{}, mCode:{}, row keys:{}",
-                        fCode, mCode, row.keySet());
+            if (StringUtils.isEmpty(mCode)) {
                 continue;
             }
-            String key = fCode.trim() + "|" + mCode.trim();
+            String embryoDesc = materialToEmbryoDesc.get(mCode.trim());
+            if (StringUtils.isBlank(embryoDesc)) {
+                continue;
+            }
             Object totalObj = row.get("TOTAL_FINISH_QTY");
             BigDecimal val = totalObj != null ? new BigDecimal(totalObj.toString()) : BigDecimal.ZERO;
-            resultMap.merge(key, val, BigDecimal::add);
+            resultMap.merge(embryoDesc, val, BigDecimal::add);
         }
 
-        List<Map<String, Object>> scheFinishList = lhFinishQtyMapper.sumScheFinishQty(
-                factoryCodes, materialCodes, targetScheduleDate, nextDayStart);
-        log.info("buildTodayNightFinishQtyMap scheFinishList size:{}", scheFinishList != null ? scheFinishList.size() : 0);
         for (Map<String, Object> row : scheFinishList) {
-            String fCode = (String) row.get("FACTORY_CODE");
             String mCode = (String) row.get("MATERIAL_CODE");
-            if (StringUtils.isEmpty(fCode) || StringUtils.isEmpty(mCode)) {
-                log.warn("buildTodayNightFinishQtyMap scheFinishList row has empty fCode:{}, mCode:{}, row keys:{}",
-                        fCode, mCode, row.keySet());
+            if (StringUtils.isEmpty(mCode)) {
                 continue;
             }
-            String key = fCode.trim() + "|" + mCode.trim();
+            String embryoDesc = materialToEmbryoDesc.get(mCode.trim());
+            if (StringUtils.isBlank(embryoDesc)) {
+                continue;
+            }
             Object totalObj = row.get("TOTAL_FINISH_QTY");
             BigDecimal val = totalObj != null ? new BigDecimal(totalObj.toString()) : BigDecimal.ZERO;
-            resultMap.merge(key, val, BigDecimal::add);
+            resultMap.merge(embryoDesc, val, BigDecimal::add);
         }
 
         log.info("buildTodayNightFinishQtyMap resultMap size:{}, keys:{}", resultMap.size(), resultMap.keySet());

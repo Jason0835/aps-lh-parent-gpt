@@ -27,7 +27,7 @@ public interface CoreScheduleAlgorithmService {
      * <p><b>天间滚动</b>：每班次结束后更新 context（库存消耗、成型/硫化余量、在机胎胚映射等），
      * 供下一班次 TaskGroupService 使用。
      *
-     * <p><b>输出聚合</b>：将各班次 {@link com.zlt.aps.cx.service.engine.ShiftScheduleService.ShiftProductionResult}
+     * <p><b>输出聚合</b>：将各班次 {@link com.zlt.aps.cx.vo.ShiftProductionResult}
      * 按「机台 + 胎胚 + 物料」维度合并为 {@link CxScheduleResult}，
      * 每条记录的 CLASS1~CLASS8 对应该物料在 8 个班次上的计划条数。
      *

@@ -160,19 +160,20 @@ public class CxScheduleResultIssueServiceImpl implements ICxScheduleResultIssueS
             return;
         }
         log.info("upsert处理开始，总记录数：{}", mesList.size());
-        // 分批查询已有记录，按排程日期+机台编码+胎胚编码+版本号匹配
+        // 分批查询已有记录，按排程日期+机台编码+胎胚编码+工单号+版本号匹配
+        // 工单号加入匹配键：避免同机台同胎胚下正规/量试/试制工单互相覆盖
         Set<String> existingKeys = new HashSet<>();
         for (List<MesCxScheduleResult> batch : partitionList(mesList)) {
             List<MesCxScheduleResult> existingRecords = cxScheduleResultIssueMapper.selectExistingByScheduleDateAndMachine(batch);
             existingRecords.stream()
-                    .map(r -> r.getScheduleDate() + "|" + r.getMachineCode() + "|" + r.getEmbryoCode() + "|" + r.getDataVersion())
+                    .map(r -> r.getScheduleDate() + "|" + r.getMachineCode() + "|" + r.getEmbryoCode() + "|" + r.getOrderNo() + "|" + r.getDataVersion())
                     .forEach(existingKeys::add);
         }
         // 根据查询结果分组：已有记录走批量更新，不存在记录走批量新增
         List<MesCxScheduleResult> updateList = new ArrayList<>();
         List<MesCxScheduleResult> insertList = new ArrayList<>();
         for (MesCxScheduleResult mesItem : mesList) {
-            String key = mesItem.getScheduleDate() + "|" + mesItem.getMachineCode() + "|" + mesItem.getEmbryoCode() + "|" + mesItem.getDataVersion();
+            String key = mesItem.getScheduleDate() + "|" + mesItem.getMachineCode() + "|" + mesItem.getEmbryoCode() + "|" + mesItem.getOrderNo() + "|" + mesItem.getDataVersion();
             if (existingKeys.contains(key)) {
                 updateList.add(mesItem);
             } else {
