@@ -6,6 +6,7 @@ import com.google.common.collect.Sets;
 import com.zlt.aps.lh.api.domain.dto.*;
 import com.zlt.aps.lh.api.domain.entity.*;
 import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
+import com.zlt.aps.lh.api.enums.SingleControlMachineModeEnum;
 import com.zlt.aps.lh.engine.strategy.support.MouldResourceContext;
 import com.zlt.aps.lh.handler.SkuMonthPlanCalculator;
 import com.zlt.aps.lh.util.SkuConstructionRefResolverUtil;
@@ -405,6 +406,14 @@ public class LhScheduleContext {
      * 新增SKU进入S4.5时是否命中结构五天内收尾层级快照，使用对象身份避免SKU出队后判定漂移
      */
     private Map<SkuScheduleDTO, Boolean> newSpecSingleControlStructureEndingLayerMap = new IdentityHashMap<>();
+    /** 单控模式初始目标量快照，key=materialCode_productStatus；S4.3结束时冻结，后续禁止随剩余量变化 */
+    private Map<String, Integer> singleControlInitialTargetQtyMap = new LinkedHashMap<>();
+    /** 单控模式快照，key=materialCode_productStatus；统一供新增、续作、换活字块、降模和校验消费 */
+    private Map<String, SingleControlMachineModeEnum> singleControlModeSnapshotMap = new LinkedHashMap<>();
+    /** 冻结时满足单控静态准入且初始待排量大于0的不同试制SKU键集合 */
+    private Set<String> singleControlEligibleTrialSkuKeySet = new LinkedHashSet<>();
+    /** 单控模式快照是否已完成初始化；完成后禁止再次按动态运行态覆盖 */
+    private boolean singleControlModeSnapshotInitialized;
     /**
      * 续作结果日额度账本是否已完成最终同步，防止同一上下文重复扣账
      */
@@ -520,6 +529,10 @@ public class LhScheduleContext {
      * 全量SKU排程信息索引Map，key=物料编码，value=SkuScheduleDTO。在S4.3创建SKU时填充，永不清空，供S4.5.1置换等后置阶段按物料编码查找SKU排程信息
      */
     private Map<String, SkuScheduleDTO> allSkuScheduleDtoMap = new LinkedHashMap<>();
+    /** SKU减量清单索引集合，key=year+SEP+month+SEP+materialCode+SEP+productStatus（归一化）。S4.2批量加载，S4.3归集后统一过滤命中SKU */
+    private Set<String> skuDecrementKeySet = new HashSet<>();
+    /** 已处理减量命中SKU去重集合，key=materialCode+SEP+productStatus+SEP+yearMonth，保证同一SKU多入口只写一次未排结果 */
+    private Set<String> decrementHandledSkuKeySet = new HashSet<>();
 
 
     // ========== 排程输出结果 ==========

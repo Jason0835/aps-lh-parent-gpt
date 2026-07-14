@@ -8,5 +8,6 @@ import java.util.List;
 
 public interface ICd90ParamsService extends IDocService<Cd90Params> {
     String checkUnique(Cd90Params entity);
+    String getParamValue(String factoryCode, String paramCode);
     AjaxResult importData(List<Cd90Params> list, boolean updateSupport, Long importLogId);
 }

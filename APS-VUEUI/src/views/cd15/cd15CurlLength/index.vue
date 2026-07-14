@@ -59,7 +59,7 @@
 </template>
 
 <script>
-import { listCd15CurlLength, delCd15CurlLength, exportCd15CurlLength } from "@/api/cd15/curlLength";
+import { listCd15CurlLength, delCd15CurlLength, exportCd15CurlLength, listSteelStripCodes } from "@/api/cd15/curlLength";
 import TltUploadForm from "@/views/components/tltUploadForm.vue";
 import infoDialog from "./components/infoDialog.vue";
 
@@ -96,6 +96,7 @@ export default {
       loading: false,
       data: [],
       selection: [],
+      steelStripOptions: [],
       page: {
         current: 1,
         pageSize: 20,
@@ -193,7 +194,10 @@ export default {
         {
           label: this.$t("ui.data.column.cd15CurlLength.steelStripCode"),
           prop: "steelStripCode",
-          type: "input",
+          type: "select",
+          dictData: this.steelStripOptions,
+          filterable: true,
+          clearable: true,
         },
       ];
     },
@@ -258,6 +262,14 @@ export default {
     handleSelectionChange(selection) {
       this.selection = selection || [];
     },
+    async loadSteelStripOptions() {
+      const res = await listSteelStripCodes();
+      const rows = Array.isArray(res) ? res : (res.rows || res.data || []);
+      this.steelStripOptions = rows.map((code) => ({
+        label: code,
+        value: code,
+      }));
+    },
     async getList() {
       this.loading = true;
       try {
@@ -278,6 +290,7 @@ export default {
   },
   created() {
     this.getList();
+    this.loadSteelStripOptions();
   },
 };
 </script>

@@ -6,10 +6,11 @@ import com.alibaba.fastjson.JSON;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.zlt.aps.tm.api.constant.TmScheduleConstants;
 import com.zlt.aps.tm.api.domain.vo.TmAutoScheduleIssueVo;
 import com.zlt.aps.tm.api.domain.vo.TmAutoScheduleRequestVo;
 import com.zlt.aps.tm.api.domain.vo.TmAutoScheduleResponseVo;
-import com.zlt.aps.tm.constant.TmAutoScheduleTaskStatus;
+import com.zlt.aps.tm.api.enums.TmAutoScheduleTaskStatusEnum;
 import com.zlt.aps.tm.domain.TmAutoScheduleTask;
 import com.zlt.aps.tm.mapper.TmAutoScheduleTaskMapper;
 import com.zlt.aps.tm.service.TmAutoScheduleTaskService;
@@ -34,8 +35,6 @@ import java.util.List;
 @RequiredArgsConstructor
 public class TmAutoScheduleTaskServiceImpl implements TmAutoScheduleTaskService {
 
-    private static final int MAX_ERROR_LENGTH = 2000;
-
     private final TmAutoScheduleTaskMapper taskMapper;
 
     /**
@@ -53,14 +52,15 @@ public class TmAutoScheduleTaskServiceImpl implements TmAutoScheduleTaskService 
             return activeTask;
         }
         TmAutoScheduleTask task = new TmAutoScheduleTask();
-        task.setTaskId("TM-" + IdUtil.fastSimpleUUID().toUpperCase());
+        task.setTaskId(TmScheduleConstants.AUTO_SCHEDULE_TASK_ID_PREFIX
+                + IdUtil.fastSimpleUUID().toUpperCase());
         task.setFactoryCode(request.getFactoryCode());
         task.setScheduleDate(request.getScheduleDate());
         task.setBatchNo(response.getBatchNo());
         task.setTraceId(response.getTraceId());
-        task.setTaskStatus(TmAutoScheduleTaskStatus.PENDING);
+        task.setTaskStatus(TmAutoScheduleTaskStatusEnum.PENDING.getCode());
         task.setProgress(0);
-        task.setCurrentStage("PENDING");
+        task.setCurrentStage(TmAutoScheduleTaskStatusEnum.PENDING.getCode());
         task.setCurrentStageName(this.resolveTmMessage("ui.data.alert.tm.schedule.taskPending", "等待自动排程执行"));
         task.setRequestSnapshot(JSON.toJSONString(request));
         task.setCreateBy(StrUtil.blankToDefault(request.getOperator(), "system"));
@@ -92,7 +92,8 @@ public class TmAutoScheduleTaskServiceImpl implements TmAutoScheduleTaskService 
                 .eq(TmAutoScheduleTask::getFactoryCode, factoryCode)
                 .eq(TmAutoScheduleTask::getScheduleDate, scheduleDate)
                 .in(TmAutoScheduleTask::getTaskStatus,
-                        Arrays.asList(TmAutoScheduleTaskStatus.PENDING, TmAutoScheduleTaskStatus.RUNNING))
+                        Arrays.asList(TmAutoScheduleTaskStatusEnum.PENDING.getCode(),
+                                TmAutoScheduleTaskStatusEnum.RUNNING.getCode()))
                 .orderByDesc(TmAutoScheduleTask::getCreateTime)
                 .last("limit 1"));
     }
@@ -103,10 +104,11 @@ public class TmAutoScheduleTaskServiceImpl implements TmAutoScheduleTaskService 
         Date now = new Date();
         return taskMapper.update(null, new LambdaUpdateWrapper<TmAutoScheduleTask>()
                 .eq(TmAutoScheduleTask::getTaskId, taskId)
-                .eq(TmAutoScheduleTask::getTaskStatus, TmAutoScheduleTaskStatus.PENDING)
-                .set(TmAutoScheduleTask::getTaskStatus, TmAutoScheduleTaskStatus.RUNNING)
+                .eq(TmAutoScheduleTask::getTaskStatus, TmAutoScheduleTaskStatusEnum.PENDING.getCode())
+                .set(TmAutoScheduleTask::getTaskStatus, TmAutoScheduleTaskStatusEnum.RUNNING.getCode())
                 .set(TmAutoScheduleTask::getProgress, 5)
-                .set(TmAutoScheduleTask::getCurrentStage, "REQUEST_VALIDATED")
+                .set(TmAutoScheduleTask::getCurrentStage,
+                        TmScheduleConstants.AUTO_SCHEDULE_STAGE_REQUEST_VALIDATED)
                 .set(TmAutoScheduleTask::getCurrentStageName, this.resolveTmMessage("ui.data.alert.tm.schedule.taskRequestAccepted", "自动排程请求已接收"))
                 .set(TmAutoScheduleTask::getStartTime, now)
                 .set(TmAutoScheduleTask::getLastHeartbeatTime, now)) == 1;
@@ -120,7 +122,7 @@ public class TmAutoScheduleTaskServiceImpl implements TmAutoScheduleTaskService 
         }
         return taskMapper.update(null, new LambdaUpdateWrapper<TmAutoScheduleTask>()
                 .eq(TmAutoScheduleTask::getTaskId, taskId)
-                .eq(TmAutoScheduleTask::getTaskStatus, TmAutoScheduleTaskStatus.RUNNING)
+                .eq(TmAutoScheduleTask::getTaskStatus, TmAutoScheduleTaskStatusEnum.RUNNING.getCode())
                 .set(TmAutoScheduleTask::getProgress, progress)
                 .set(TmAutoScheduleTask::getCurrentStage, stage)
                 .set(TmAutoScheduleTask::getCurrentStageName, stageName)
@@ -132,18 +134,18 @@ public class TmAutoScheduleTaskServiceImpl implements TmAutoScheduleTaskService 
     public boolean markSuccess(String taskId, TmAutoScheduleResponseVo response, List<TmAutoScheduleIssueVo> issues) {
         List<TmAutoScheduleIssueVo> issueList = issues == null ? new ArrayList<>() : issues;
         response.setTaskId(taskId);
-        response.setTaskStatus(TmAutoScheduleTaskStatus.SUCCESS);
+        response.setTaskStatus(TmAutoScheduleTaskStatusEnum.SUCCESS.getCode());
         response.setProgress(100);
-        response.setCurrentStage("COMPLETE");
+        response.setCurrentStage(TmScheduleConstants.AUTO_SCHEDULE_STAGE_COMPLETE);
         response.setCurrentStageName(this.resolveTmMessage("ui.data.alert.tm.schedule.taskCompleted", "执行完成"));
         response.setIssues(issueList);
         response.setIssueCount(issueList.size());
         return taskMapper.update(null, new LambdaUpdateWrapper<TmAutoScheduleTask>()
                 .eq(TmAutoScheduleTask::getTaskId, taskId)
-                .eq(TmAutoScheduleTask::getTaskStatus, TmAutoScheduleTaskStatus.RUNNING)
-                .set(TmAutoScheduleTask::getTaskStatus, TmAutoScheduleTaskStatus.SUCCESS)
+                .eq(TmAutoScheduleTask::getTaskStatus, TmAutoScheduleTaskStatusEnum.RUNNING.getCode())
+                .set(TmAutoScheduleTask::getTaskStatus, TmAutoScheduleTaskStatusEnum.SUCCESS.getCode())
                 .set(TmAutoScheduleTask::getProgress, 100)
-                .set(TmAutoScheduleTask::getCurrentStage, "COMPLETE")
+                .set(TmAutoScheduleTask::getCurrentStage, TmScheduleConstants.AUTO_SCHEDULE_STAGE_COMPLETE)
                 .set(TmAutoScheduleTask::getCurrentStageName, this.resolveTmMessage("ui.data.alert.tm.schedule.taskCompleted", "执行完成"))
                 .set(TmAutoScheduleTask::getBatchNo, response.getBatchNo())
                 .set(TmAutoScheduleTask::getTraceId, response.getTraceId())
@@ -157,16 +159,17 @@ public class TmAutoScheduleTaskServiceImpl implements TmAutoScheduleTaskService 
     @Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
     public boolean markFailed(String taskId, String errorMessage, List<TmAutoScheduleIssueVo> issues) {
         String summary = StrUtil.blankToDefault(errorMessage, this.resolveTmMessage("ui.data.alert.tm.schedule.taskExecuteFailed", "胎面自动排程执行失败"));
-        if (summary.length() > MAX_ERROR_LENGTH) {
-            summary = summary.substring(0, MAX_ERROR_LENGTH);
+        if (summary.length() > TmScheduleConstants.MAX_ERROR_MESSAGE_LENGTH) {
+            summary = summary.substring(0, TmScheduleConstants.MAX_ERROR_MESSAGE_LENGTH);
         }
         List<TmAutoScheduleIssueVo> issueList = issues == null ? new ArrayList<>() : issues;
         return taskMapper.update(null, new LambdaUpdateWrapper<TmAutoScheduleTask>()
                 .eq(TmAutoScheduleTask::getTaskId, taskId)
                 .in(TmAutoScheduleTask::getTaskStatus,
-                        Arrays.asList(TmAutoScheduleTaskStatus.PENDING, TmAutoScheduleTaskStatus.RUNNING))
-                .set(TmAutoScheduleTask::getTaskStatus, TmAutoScheduleTaskStatus.FAILED)
-                .set(TmAutoScheduleTask::getCurrentStage, "FAILED")
+                        Arrays.asList(TmAutoScheduleTaskStatusEnum.PENDING.getCode(),
+                                TmAutoScheduleTaskStatusEnum.RUNNING.getCode()))
+                .set(TmAutoScheduleTask::getTaskStatus, TmAutoScheduleTaskStatusEnum.FAILED.getCode())
+                .set(TmAutoScheduleTask::getCurrentStage, TmAutoScheduleTaskStatusEnum.FAILED.getCode())
                 .set(TmAutoScheduleTask::getCurrentStageName, this.resolveTmMessage("ui.data.alert.tm.schedule.taskFailed", "执行失败"))
                 .set(TmAutoScheduleTask::getErrorMessage, summary)
                 .set(TmAutoScheduleTask::getIssueJson, JSON.toJSONString(issueList))
@@ -194,7 +197,7 @@ public class TmAutoScheduleTaskServiceImpl implements TmAutoScheduleTaskService 
         response.setTraceId(StrUtil.blankToDefault(response.getTraceId(), task.getTraceId()));
         response.setIssues(issues);
         response.setIssueCount(issues.size());
-        if (TmAutoScheduleTaskStatus.FAILED.equals(task.getTaskStatus())) {
+        if (TmAutoScheduleTaskStatusEnum.FAILED.getCode().equals(task.getTaskStatus())) {
             response.setSuccess(Boolean.FALSE);
             response.setMessage(task.getErrorMessage());
         }

@@ -14,39 +14,36 @@ import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.utils.StringUtils;
 import com.zlt.aps.common.core.constant.ApsConstant;
-import com.zlt.aps.common.engine.schedule.ScheduleOperationContext;
-import com.zlt.aps.common.engine.schedule.ScheduleTaskLinkedList;
-import com.zlt.aps.common.engine.schedule.ScheduleTaskNode;
-import com.zlt.aps.constant.FactoryConstant;
+import com.zlt.aps.tm.api.constant.TmScheduleConstants;
 import com.zlt.aps.tm.api.domain.entity.TmDispatcherLog;
 import com.zlt.aps.tm.api.domain.entity.TmMachineInfo;
 import com.zlt.aps.tm.api.domain.entity.TmScheduleResult;
 import com.zlt.aps.tm.api.domain.vo.TmAutoScheduleRequestVo;
 import com.zlt.aps.tm.api.domain.vo.TmAutoScheduleResponseVo;
 import com.zlt.aps.tm.api.domain.vo.TmScheduleShiftDateVO;
-import com.zlt.aps.tm.api.enums.TmScheduleErrorCodeEnum;
+import com.zlt.aps.tm.api.enums.TmAutoScheduleIssueCategoryEnum;
+import com.zlt.aps.tm.api.enums.TmAutoScheduleIssueLevelEnum;
+import com.zlt.aps.tm.api.enums.TmReleaseStatusTransition;
 import com.zlt.aps.tm.api.enums.TmScheduleStepEnum;
 import com.zlt.aps.tm.domain.TmAutoScheduleTask;
-import com.zlt.aps.tm.engine.domain.*;
-import com.zlt.aps.tm.engine.service.TmScheduleOperationFacade;
+import com.zlt.aps.tm.engine.domain.TmPersistResult;
+import com.zlt.aps.tm.engine.domain.TmScheduleContext;
 import com.zlt.aps.tm.engine.template.TmScheduleTemplateImpl;
-import com.zlt.aps.tm.engine.validator.TmInsertPositionValidator;
 import com.zlt.aps.tm.mapper.*;
 import com.zlt.aps.tm.service.ITmScheduleResultService;
 import com.zlt.aps.tm.service.TmAutoScheduleAsyncExecutor;
-import com.zlt.aps.tm.service.TmAutoScheduleRedisCacheService;
 import com.zlt.aps.tm.service.TmAutoScheduleTaskService;
+import com.zlt.aps.tm.service.cache.TmAutoScheduleRedisCacheService;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.common.enums.ImportErrorTypeEnums;
 import com.zlt.common.utils.ImportExcelValidatedUtils;
 import com.zlt.sysdef.domain.SysDocType;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import javax.annotation.Resource;
-import java.math.BigDecimal;
-import java.time.LocalDate;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
@@ -56,13 +53,7 @@ import java.util.stream.Collectors;
  */
 @Slf4j
 @Service
-@Transactional(rollbackFor = Exception.class)
 public class TmScheduleResultServiceImpl extends AbstractDocService<TmScheduleResult> implements ITmScheduleResultService {
-
-    private static final String TM_AUTO_PLAN_LOG_PREFIX = "[TM_AUTO_PLAN]";
-
-    /** 胎面自动排程批次号前缀 */
-    private static final String TM_AUTO_BATCH_NO_PREFIX = "TM";
 
     /** 进程内最后一次批次号时间戳，用于避免同一毫秒内连续生成重复批次号 */
     private static final AtomicLong LAST_BATCH_TIME_MILLIS = new AtomicLong(0L);
@@ -86,9 +77,6 @@ public class TmScheduleResultServiceImpl extends AbstractDocService<TmScheduleRe
     private TmScheduleTemplateImpl tmScheduleTemplate;
 
     @Resource
-    private TmScheduleOperationFacade tmScheduleOperationFacade;
-
-    @Resource
     private TmAutoScheduleRedisCacheService tmAutoScheduleRedisCacheService;
 
     @Resource
@@ -98,7 +86,10 @@ public class TmScheduleResultServiceImpl extends AbstractDocService<TmScheduleRe
     private TmAutoScheduleAsyncExecutor tmAutoScheduleAsyncExecutor;
 
     @Resource
-    private TmManualInsertRollingService tmManualInsertRollingService;
+    private TmManualOperationFacade tmManualOperationFacade;
+
+    @Resource
+    private PlatformTransactionManager platformTransactionManager;
 
     @Override
     protected String getDocTypeCode() {
@@ -119,6 +110,28 @@ public class TmScheduleResultServiceImpl extends AbstractDocService<TmScheduleRe
             throw new ServiceException(I18nUtil.getMessage("ui.data.alert.tm.scheduleResult.notUnique"));
         }
         return unique;
+    }
+
+
+    /**
+     * 保存非排程字段，禁止通过通用保存入口新增或直接修改排程字段。
+     *
+     * @param scheduleResult 待保存排程结果
+     * @return 更新行数
+     * @throws ServiceException 新增或排程字段被直接修改时抛出
+     */
+    @Override
+    public int save(TmScheduleResult scheduleResult) {
+        if (scheduleResult == null || scheduleResult.getId() == null) {
+            throw new ServiceException(I18nUtil.getMessage("ui.data.alert.tm.schedule.directCreateForbidden"));
+        }
+        TmScheduleResult persisted = tmScheduleResultMapper.selectById(scheduleResult.getId());
+        if (persisted == null) {
+            throw new ServiceException(I18nUtil.getMessage("ui.data.alert.tm.schedule.resultNotFound"));
+        }
+        this.validateDirectSchedulingFields(persisted, scheduleResult);
+        scheduleResult.setReleaseStatus(persisted.getReleaseStatus());
+        return baseDao.save(scheduleResult);
     }
 
     @Override
@@ -163,52 +176,107 @@ public class TmScheduleResultServiceImpl extends AbstractDocService<TmScheduleRe
                 return Boolean.FALSE;
             }
         }
+        TmScheduleResult persisted = this.findExistingImportResult(importDocEntity);
+        if (persisted != null && this.isSchedulingFieldChanged(persisted, importDocEntity)) {
+            String message = I18nUtil.getMessage("ui.data.alert.tm.schedule.directScheduleEditForbidden");
+            ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(),
+                    errorRowNum, message, importErrorLogs);
+            return Boolean.FALSE;
+        }
         return super.serviceCheckAndDataHandle(importDocEntity, importErrorLogs, importLogId, errorRowNum, serviceCheckParams);
     }
 
     /**
-     * 修改胎面排程结果
+     * 修改胎面排程结果。
+     *
      * @param scheduleResult 胎面排程结果
-     * @return 结果
+     * @return 更新行数
+     * @throws ServiceException 记录不存在或排程字段被直接修改时抛出
      */
     @Override
     public int updateTmScheduleResult(TmScheduleResult scheduleResult) {
-        scheduleResult.setBaseVale(scheduleResult.getId());
-        // 校验字段是否修改，修改则改状态为未发布
-        if (!ApsConstant.RELEASING.equals(scheduleResult.getReleaseStatus())
-                && !ApsConstant.TIMEOUT_FAILURE.equals(scheduleResult.getReleaseStatus())) {
-            TmScheduleResult old = tmScheduleResultMapper.selectById(scheduleResult.getId());
-            if (old != null) {
-                boolean flag = compare(old.getMachineCode(), scheduleResult.getMachineCode());
-                flag = flag && compare(old.getClass1PlanQty(), scheduleResult.getClass1PlanQty());
-                flag = flag && compare(old.getClass2PlanQty(), scheduleResult.getClass2PlanQty());
-                flag = flag && compare(old.getClass3PlanQty(), scheduleResult.getClass3PlanQty());
-                flag = flag && compare(old.getClass4PlanQty(), scheduleResult.getClass4PlanQty());
-                flag = flag && compare(old.getClass5PlanQty(), scheduleResult.getClass5PlanQty());
-                flag = flag && compare(old.getClass6PlanQty(), scheduleResult.getClass6PlanQty());
-                if (!flag) {
-                    scheduleResult.setReleaseStatus(scheduleResult.getReleaseStatus() == null || "".equals(scheduleResult.getReleaseStatus())
-                            ? ApsConstant.NO_RELEASE : ApsConstant.WAIT_RELEASING);
-                }
-            }
+        if (scheduleResult == null || scheduleResult.getId() == null) {
+            throw new ServiceException(I18nUtil.getMessage("ui.data.alert.tm.schedule.resultNotFound"));
         }
+        TmScheduleResult persisted = tmScheduleResultMapper.selectById(scheduleResult.getId());
+        if (persisted == null) {
+            throw new ServiceException(I18nUtil.getMessage("ui.data.alert.tm.schedule.resultNotFound"));
+        }
+        this.validateDirectSchedulingFields(persisted, scheduleResult);
+        scheduleResult.setBaseVale(scheduleResult.getId());
+        scheduleResult.setReleaseStatus(persisted.getReleaseStatus());
         return tmScheduleResultMapper.updateById(scheduleResult);
     }
 
     /**
-     * 比较两个值是否相等
-     * @param oldVal 旧值
-     * @param newVal 新值
-     * @return true表示相等
+     * 校验通用保存不得修改机台、六班计划量和六班顺序。
+     *
+     * @param persisted     数据库当前结果
+     * @param scheduleResult 待保存结果
+     * @throws ServiceException 排程字段发生变化时抛出
      */
-    private boolean compare(Object oldVal, Object newVal) {
-        if (oldVal == null && newVal == null) {
+    private void validateDirectSchedulingFields(TmScheduleResult persisted, TmScheduleResult scheduleResult) {
+        if (this.isSchedulingFieldChanged(persisted, scheduleResult)) {
+            throw new ServiceException(I18nUtil.getMessage("ui.data.alert.tm.schedule.directScheduleEditForbidden"));
+        }
+    }
+
+    /**
+     * 判断机台、六班计划量或六班顺序是否变化。
+     *
+     * @param persisted     数据库当前结果
+     * @param scheduleResult 待比较结果
+     * @return true 表示排程字段发生变化
+     */
+    private boolean isSchedulingFieldChanged(TmScheduleResult persisted, TmScheduleResult scheduleResult) {
+        if (!Objects.equals(persisted.getMachineCode(), scheduleResult.getMachineCode())) {
             return true;
         }
-        if (oldVal != null) {
-            return oldVal.equals(newVal);
+        for (int shiftOrder = 1; shiftOrder <= TmScheduleConstants.TM_MAX_SHIFT_ORDER; shiftOrder++) {
+            String planQtyField = String.format(TmScheduleConstants.SHIFT_PLAN_QTY_FIELD_TEMPLATE, shiftOrder);
+            String sequenceField = String.format(TmScheduleConstants.SHIFT_SEQUENCE_FIELD_TEMPLATE, shiftOrder);
+            if (!this.isSameFieldValue(persisted.getFieldValueByFieldName(planQtyField),
+                    scheduleResult.getFieldValueByFieldName(planQtyField))
+                    || !Objects.equals(persisted.getFieldValueByFieldName(sequenceField),
+                    scheduleResult.getFieldValueByFieldName(sequenceField))) {
+                return true;
+            }
         }
         return false;
+    }
+
+    /**
+     * 比较字段业务值，BigDecimal 忽略小数位差异。
+     *
+     * @param firstValue  第一个值
+     * @param secondValue 第二个值
+     * @return true 表示业务值相同
+     */
+    private boolean isSameFieldValue(Object firstValue, Object secondValue) {
+        if (firstValue instanceof java.math.BigDecimal && secondValue instanceof java.math.BigDecimal) {
+            return ((java.math.BigDecimal) firstValue).compareTo((java.math.BigDecimal) secondValue) == 0;
+        }
+        return Objects.equals(firstValue, secondValue);
+    }
+
+    /**
+     * 按导入结果当前粒度查询已有排程。
+     *
+     * @param importResult 导入排程结果
+     * @return 已有结果；不存在时返回 null
+     */
+    private TmScheduleResult findExistingImportResult(TmScheduleResult importResult) {
+        if (importResult.getId() != null) {
+            return tmScheduleResultMapper.selectById(importResult.getId());
+        }
+        LambdaQueryWrapper<TmScheduleResult> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(TmScheduleResult::getFactoryCode, importResult.getFactoryCode());
+        wrapper.eq(TmScheduleResult::getBatchNo, importResult.getBatchNo());
+        wrapper.eq(TmScheduleResult::getScheduleDate, importResult.getScheduleDate());
+        wrapper.eq(TmScheduleResult::getTreadCode, importResult.getTreadCode());
+        wrapper.eq(TmScheduleResult::getMachineCode, importResult.getMachineCode());
+        wrapper.last("LIMIT 1");
+        return tmScheduleResultMapper.selectOne(wrapper);
     }
 
     /**
@@ -257,6 +325,18 @@ public class TmScheduleResultServiceImpl extends AbstractDocService<TmScheduleRe
         log.setAfterClass6PlanQty(newSchedule.getClass6PlanQty());
         // 调用插入日志方法
         tmDispatcherLogMapper.insert(log);
+    }
+
+    /**
+     * 撤销指定的最新人工操作。
+     *
+     * @param dispatcherLogId 调度日志 ID
+     * @return 恢复行数
+     * @throws ServiceException 门面安全校验失败时抛出
+     */
+    @Override
+    public int undoLastOperation(Long dispatcherLogId) {
+        return tmManualOperationFacade.undoLastOperation(dispatcherLogId);
     }
 
     /**
@@ -331,14 +411,15 @@ public class TmScheduleResultServiceImpl extends AbstractDocService<TmScheduleRe
         TmAutoScheduleResponseVo response = null;
         TmScheduleContext context = null;
         log.info("{} step=REQUEST_RECEIVED factoryCode={}, scheduleDate={}, traceId={}, operator={}, dataSource={}, confirmOverwrite={}",
-                TM_AUTO_PLAN_LOG_PREFIX, request == null ? null : request.getFactoryCode(),
+                TmScheduleConstants.AUTO_PLAN_LOG_PREFIX, request == null ? null : request.getFactoryCode(),
                 formatAutoPlanDate(request == null ? null : request.getScheduleDate()), request == null ? null : request.getTraceId(),
                 request == null ? null : request.getOperator(), request == null ? null : request.getDataSource(),
                 request == null ? null : request.getConfirmOverwrite());
         try {
             validateAutoScheduleRequest(request);
             log.info("{} step=REQUEST_VALIDATED factoryCode={}, scheduleDate={}, traceId={}, operator={}, dataSource={}, confirmOverwrite={}",
-                    TM_AUTO_PLAN_LOG_PREFIX, request.getFactoryCode(), formatAutoPlanDate(request.getScheduleDate()), request.getTraceId(),
+                    TmScheduleConstants.AUTO_PLAN_LOG_PREFIX, request.getFactoryCode(),
+                    formatAutoPlanDate(request.getScheduleDate()), request.getTraceId(),
                     request.getOperator(), request.getDataSource(), request.getConfirmOverwrite());
 
             response = new TmAutoScheduleResponseVo();
@@ -348,51 +429,43 @@ public class TmScheduleResultServiceImpl extends AbstractDocService<TmScheduleRe
             response.setUnplannedCount(0);
             response.setConfirmRequired(Boolean.FALSE);
             log.info("{} step=RESPONSE_INITIALIZED factoryCode={}, scheduleDate={}, batchNo={}, traceId={}, operator={}",
-                    TM_AUTO_PLAN_LOG_PREFIX, request.getFactoryCode(), formatAutoPlanDate(request.getScheduleDate()),
+                    TmScheduleConstants.AUTO_PLAN_LOG_PREFIX, request.getFactoryCode(), formatAutoPlanDate(request.getScheduleDate()),
                     response.getBatchNo(), response.getTraceId(), StrUtil.blankToDefault(request.getOperator(), "system"));
 
             List<TmScheduleResult> currentResultList = listForOverwriteCheck(request);
             log.info("{} step=OLD_RESULT_CHECKED factoryCode={}, scheduleDate={}, batchNo={}, traceId={}, oldResultCount={}, releaseStatusSummary={}",
-                    TM_AUTO_PLAN_LOG_PREFIX, request.getFactoryCode(), formatAutoPlanDate(request.getScheduleDate()),
+                    TmScheduleConstants.AUTO_PLAN_LOG_PREFIX, request.getFactoryCode(), formatAutoPlanDate(request.getScheduleDate()),
                     response.getBatchNo(), response.getTraceId(), currentResultList.size(), summarizeReleaseStatus(currentResultList));
 
             fillOverwriteCheckResult(request, response, currentResultList, true);
             log.info("{} step=OVERWRITE_DECIDED factoryCode={}, scheduleDate={}, batchNo={}, traceId={}, oldResultCount={}, confirmRequired={}, confirmOverwrite={}",
-                    TM_AUTO_PLAN_LOG_PREFIX, request.getFactoryCode(), formatAutoPlanDate(request.getScheduleDate()),
+                    TmScheduleConstants.AUTO_PLAN_LOG_PREFIX, request.getFactoryCode(), formatAutoPlanDate(request.getScheduleDate()),
                     response.getBatchNo(), response.getTraceId(), currentResultList.size(), response.getConfirmRequired(),
                     request.getConfirmOverwrite());
 
-            if (CollUtil.isNotEmpty(currentResultList)) {
-                log.info("{} step=OLD_RESULT_DELETE_STARTED factoryCode={}, scheduleDate={}, batchNo={}, traceId={}, oldResultCount={}",
-                        TM_AUTO_PLAN_LOG_PREFIX, request.getFactoryCode(), formatAutoPlanDate(request.getScheduleDate()),
-                        response.getBatchNo(), response.getTraceId(), currentResultList.size());
-                logicDeleteByFactoryCodeAndScheduleDate(request.getFactoryCode(), request.getScheduleDate());
-                log.info("{} step=OLD_RESULT_DELETE_FINISHED factoryCode={}, scheduleDate={}, batchNo={}, traceId={}, oldResultCount={}",
-                        TM_AUTO_PLAN_LOG_PREFIX, request.getFactoryCode(), formatAutoPlanDate(request.getScheduleDate()),
-                        response.getBatchNo(), response.getTraceId(), currentResultList.size());
-            } else {
-                log.info("{} step=OLD_RESULT_DELETE_SKIPPED factoryCode={}, scheduleDate={}, batchNo={}, traceId={}, reason=noOldResult",
-                        TM_AUTO_PLAN_LOG_PREFIX, request.getFactoryCode(), formatAutoPlanDate(request.getScheduleDate()),
-                        response.getBatchNo(), response.getTraceId());
-            }
-
+            log.info("{} step=OLD_RESULT_REPLACEMENT_DEFERRED factoryCode={}, scheduleDate={}, batchNo={}, traceId={}, oldResultCount={}, reason=replaceInsideFinalTransaction",
+                    TmScheduleConstants.AUTO_PLAN_LOG_PREFIX, request.getFactoryCode(), formatAutoPlanDate(request.getScheduleDate()),
+                    response.getBatchNo(), response.getTraceId(), currentResultList.size());
             context = buildScheduleContext(request, response);
             context.setProgressListener((progress, stage, stageName) ->
                     tmAutoScheduleTaskService.updateProgress(taskId, progress, stage, stageName));
             log.info("{} step=CONTEXT_BUILT factoryCode={}, scheduleDate={}, batchNo={}, traceId={}, operator={}, taskCount={}, machineCount={}, paramCount={}",
-                    TM_AUTO_PLAN_LOG_PREFIX, context.getFactoryCode(), formatAutoPlanDate(context.getScheduleDate()),
+                    TmScheduleConstants.AUTO_PLAN_LOG_PREFIX, context.getFactoryCode(),
+                    formatAutoPlanDate(context.getScheduleDate()),
                     context.getBatchNo(), context.getTraceId(), context.getOperator(), context.getTaskDraftList().size(),
                     context.getMachineCandidateList().size(), context.getParamMap().size());
 
             log.info("{} step=TEMPLATE_STARTED factoryCode={}, scheduleDate={}, batchNo={}, traceId={}, taskCount={}, machineCount={}, stockForecastCount={}, chainCount={}, snapshotCount={}",
-                    TM_AUTO_PLAN_LOG_PREFIX, context.getFactoryCode(), formatAutoPlanDate(context.getScheduleDate()),
+                    TmScheduleConstants.AUTO_PLAN_LOG_PREFIX, context.getFactoryCode(),
+                    formatAutoPlanDate(context.getScheduleDate()),
                     context.getBatchNo(), context.getTraceId(), context.getTaskDraftList().size(),
                     context.getMachineCandidateList().size(), context.getStockForecastMap().size(),
                     countTaskChain(context), context.getSnapshotMap().size());
             tmScheduleTemplate.execute(context);
             TmPersistResult persistResult = Optional.ofNullable(context.getPersistResult()).orElseGet(TmPersistResult::new);
             log.info("{} step=TEMPLATE_FINISHED factoryCode={}, scheduleDate={}, batchNo={}, traceId={}, taskCount={}, machineCount={}, stockForecastCount={}, chainCount={}, snapshotCount={}, resultCount={}, explainCount={}, unplannedCount={}, errorCount={}, lastErrorMsg={}",
-                    TM_AUTO_PLAN_LOG_PREFIX, context.getFactoryCode(), formatAutoPlanDate(context.getScheduleDate()),
+                    TmScheduleConstants.AUTO_PLAN_LOG_PREFIX, context.getFactoryCode(),
+                    formatAutoPlanDate(context.getScheduleDate()),
                     context.getBatchNo(), context.getTraceId(), context.getTaskDraftList().size(),
                     context.getMachineCandidateList().size(), context.getStockForecastMap().size(),
                     countTaskChain(context), context.getSnapshotMap().size(), persistResult.getResultCount(),
@@ -406,24 +479,27 @@ public class TmScheduleResultServiceImpl extends AbstractDocService<TmScheduleRe
             response.setResultCount(persistResult.getResultCount());
             response.setUnplannedCount(persistResult.getUnplannedCount());
             if (persistResult.getErrorCount() > 0) {
-                context.getIssueCollector().addIssue(TmAutoScheduleIssueCollector.LEVEL_ERROR,
-                        TmScheduleStepEnum.PERSIST, "PERSIST_PARTIAL_FAILED", persistResult.getLastErrorMsg());
+                context.getIssueCollector().addIssue(TmAutoScheduleIssueLevelEnum.ERROR,
+                        TmScheduleStepEnum.PERSIST, TmAutoScheduleIssueCategoryEnum.PERSIST_PARTIAL_FAILED,
+                        persistResult.getLastErrorMsg());
                 response.setMessage(resolveTmMessage("ui.data.alert.tm.schedule.executePartialFailed", "胎面自动排程执行完成，部分记录落库失败，请联系管理员处理"));
                 log.warn("{} step=PERSIST_PARTIAL_FAILED factoryCode={}, scheduleDate={}, batchNo={}, traceId={}, errorCount={}, lastErrorMsg={}",
-                        TM_AUTO_PLAN_LOG_PREFIX, context.getFactoryCode(), formatAutoPlanDate(context.getScheduleDate()),
+                        TmScheduleConstants.AUTO_PLAN_LOG_PREFIX, context.getFactoryCode(),
+                        formatAutoPlanDate(context.getScheduleDate()),
                         context.getBatchNo(), context.getTraceId(), persistResult.getErrorCount(), persistResult.getLastErrorMsg());
             } else {
                 response.setMessage(resolveTmMessage("ui.data.alert.tm.schedule.executeFinished", "胎面自动排程执行完成"));
             }
             tmAutoScheduleTaskService.markSuccess(taskId, response, context.getIssueCollector().getIssues());
             log.info("{} step=FINISHED factoryCode={}, scheduleDate={}, batchNo={}, traceId={}, success={}, resultCount={}, unplannedCount={}, message={}, elapsedMs={}",
-                    TM_AUTO_PLAN_LOG_PREFIX, request.getFactoryCode(), formatAutoPlanDate(request.getScheduleDate()),
+                    TmScheduleConstants.AUTO_PLAN_LOG_PREFIX, request.getFactoryCode(),
+                    formatAutoPlanDate(request.getScheduleDate()),
                     response.getBatchNo(), response.getTraceId(), response.getSuccess(), response.getResultCount(),
                     response.getUnplannedCount(), response.getMessage(), System.currentTimeMillis() - startMillis);
             return response;
         } catch (ServiceException ex) {
             log.warn("{} step=FAILED factoryCode={}, scheduleDate={}, batchNo={}, traceId={}, elapsedMs={}, exceptionType={}, message={}",
-                    TM_AUTO_PLAN_LOG_PREFIX, request == null ? null : request.getFactoryCode(),
+                    TmScheduleConstants.AUTO_PLAN_LOG_PREFIX, request == null ? null : request.getFactoryCode(),
                     formatAutoPlanDate(request == null ? null : request.getScheduleDate()),
                     context == null ? response == null ? null : response.getBatchNo() : context.getBatchNo(),
                     context == null ? response == null ? request == null ? null : request.getTraceId() : response.getTraceId() : context.getTraceId(),
@@ -433,7 +509,7 @@ public class TmScheduleResultServiceImpl extends AbstractDocService<TmScheduleRe
             throw ex;
         } catch (RuntimeException ex) {
             log.error("{} step=FAILED factoryCode={}, scheduleDate={}, batchNo={}, traceId={}, elapsedMs={}, exceptionType={}, message={}",
-                    TM_AUTO_PLAN_LOG_PREFIX, request == null ? null : request.getFactoryCode(),
+                    TmScheduleConstants.AUTO_PLAN_LOG_PREFIX, request == null ? null : request.getFactoryCode(),
                     formatAutoPlanDate(request == null ? null : request.getScheduleDate()),
                     context == null ? response == null ? null : response.getBatchNo() : context.getBatchNo(),
                     context == null ? response == null ? request == null ? null : request.getTraceId() : response.getTraceId() : context.getTraceId(),
@@ -540,73 +616,34 @@ public class TmScheduleResultServiceImpl extends AbstractDocService<TmScheduleRe
      *
      * @param scheduleResult 插单排程结果
      * @return 写入行数
-     * @throws ServiceException 必填字段缺失时抛出
+     * @throws ServiceException 门面安全校验失败时抛出
      */
     @Override
     public int insertTask(TmScheduleResult scheduleResult) {
-        if (scheduleResult == null) {
-            throw new ServiceException(resolveTmMessage("ui.data.alert.tm.schedule.insertTaskEmpty", "插单排程结果不能为空"));
-        }
-        if (StrUtil.isBlank(scheduleResult.getFactoryCode())) {
-            scheduleResult.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
-        }
-        if (scheduleResult.getScheduleDate() == null) {
-            throw new ServiceException(resolveTmMessage("ui.data.alert.tm.schedule.insertScheduleDateEmpty", "插单排程日期不能为空"));
-        }
-        if (StrUtil.isBlank(scheduleResult.getTreadCode())) {
-            throw new ServiceException(resolveTmMessage("ui.data.alert.tm.schedule.insertTreadCodeEmpty", "插单胎面不能为空"));
-        }
-        validateInsertAfterSecondSequence(scheduleResult);
-        int insertCount = tmManualInsertRollingService.insertAndRoll(scheduleResult);
-        scheduleResult.setBaseVale(scheduleResult.getId());
-        insetDispatcherLog(ApsConstant.DISPATCHER_OPER_INSERT_ORDER, scheduleResult);
-        return insertCount;
+        return tmManualOperationFacade.insertTask(scheduleResult);
     }
-
     /**
      * 调整排程计划量。
      *
      * @param scheduleResult 调整后的排程结果
      * @return 更新行数
-     * @throws ServiceException 记录不存在或不可调整时抛出
+     * @throws ServiceException 门面安全校验失败时抛出
      */
     @Override
     public int changeQty(TmScheduleResult scheduleResult) {
-        if (scheduleResult == null || scheduleResult.getId() == null) {
-            throw new ServiceException(resolveTmMessage("ui.data.alert.tm.schedule.changeQtyIdEmpty", "调量排程结果不能为空"));
-        }
-        if (isReleasingOrTimeoutByIds(new Long[]{scheduleResult.getId()}) > 0) {
-            throw new ServiceException(I18nUtil.getMessage("ui.data.column.scheduleResult.release.isReleasingOrTimeoutById"));
-        }
-        invokeChangeQtyFacade(scheduleResult);
-        int updateCount = tmManualInsertRollingService.changeQtyAndRoll(scheduleResult);
-        scheduleResult.setBaseVale(scheduleResult.getId());
-        insetDispatcherLog(ApsConstant.DISPATCHER_OPER_PLAN, scheduleResult);
-        return updateCount;
+        return tmManualOperationFacade.changeQty(scheduleResult);
     }
-
     /**
      * 调整排程机台。
      *
      * @param scheduleResult 转机台后的排程结果
      * @return 更新行数
-     * @throws ServiceException 记录不存在或不可调整时抛出
+     * @throws ServiceException 门面安全校验失败时抛出
      */
     @Override
     public int changeMachine(TmScheduleResult scheduleResult) {
-        if (scheduleResult == null || scheduleResult.getId() == null) {
-            throw new ServiceException(resolveTmMessage("ui.data.alert.tm.schedule.changeMachineIdEmpty", "转机台排程结果不能为空"));
-        }
-        if (isReleasingOrTimeoutByIds(new Long[]{scheduleResult.getId()}) > 0) {
-            throw new ServiceException(I18nUtil.getMessage("ui.data.column.scheduleResult.release.isReleasingOrTimeoutById"));
-        }
-        invokeTransferMachineFacade(scheduleResult);
-        int updateCount = tmManualInsertRollingService.changeMachineAndRoll(scheduleResult);
-        scheduleResult.setBaseVale(scheduleResult.getId());
-        insetDispatcherLog(ApsConstant.DISPATCHER_OPER_MACHINE, scheduleResult);
-        return updateCount;
+        return tmManualOperationFacade.changeMachine(scheduleResult);
     }
-
     /**
      * 校验排程结果是否允许发布。
      *
@@ -634,11 +671,8 @@ public class TmScheduleResultServiceImpl extends AbstractDocService<TmScheduleRe
      */
     @Override
     public int publish(List<Long> ids) {
-        publishValidate(ids);
-        LambdaUpdateWrapper<TmScheduleResult> wrapper = new LambdaUpdateWrapper<>();
-        wrapper.in(TmScheduleResult::getId, ids);
-        wrapper.set(TmScheduleResult::getReleaseStatus, ApsConstant.WAIT_RELEASING);
-        return tmScheduleResultMapper.update(null, wrapper);
+        this.publishValidate(ids);
+        return this.updateReleaseStatusesAtomically(ids, ApsConstant.WAIT_RELEASING);
     }
 
     /**
@@ -651,13 +685,50 @@ public class TmScheduleResultServiceImpl extends AbstractDocService<TmScheduleRe
     @Override
     public int changeReleaseStatus(String ids, String releaseStatus) {
         if (StringUtils.isBlank(ids)) {
-            throw new ServiceException(resolveTmMessage("ui.data.alert.tm.schedule.publishIdsEmpty", "请选择要更改发布状态的排程记录"));
+            throw new ServiceException(I18nUtil.getMessage("ui.data.alert.tm.schedule.publishIdsEmpty"));
+        }
+        if (!TmReleaseStatusTransition.isValidCode(releaseStatus)) {
+            throw new ServiceException(I18nUtil.getMessage("ui.data.alert.tm.schedule.illegalReleaseStatus"));
         }
         Long[] idArray = com.ruoyi.common.text.Convert.toLongArray(ids);
-        LambdaUpdateWrapper<TmScheduleResult> wrapper = new LambdaUpdateWrapper<>();
-        wrapper.in(TmScheduleResult::getId, Arrays.asList(idArray));
-        wrapper.set(TmScheduleResult::getReleaseStatus, releaseStatus);
-        return tmScheduleResultMapper.update(null, wrapper);
+        return this.updateReleaseStatusesAtomically(Arrays.asList(idArray), releaseStatus);
+    }
+
+    /**
+     * 在短事务中加行锁、校验并批量修改发布状态。
+     *
+     * @param ids          排程结果 ID
+     * @param targetStatus 目标发布状态
+     * @return 更新行数
+     * @throws ServiceException 记录缺失、并发变化或任一状态迁移非法时抛出
+     */
+    private int updateReleaseStatusesAtomically(List<Long> ids, String targetStatus) {
+        List<Long> normalizedIds = ids.stream().filter(Objects::nonNull).distinct().sorted().collect(Collectors.toList());
+        TransactionTemplate transactionTemplate = new TransactionTemplate(platformTransactionManager);
+        Integer updatedRows = transactionTemplate.execute(transactionStatus -> {
+            List<TmScheduleResult> resultList = tmScheduleResultMapper.selectBatchIdsForUpdate(normalizedIds);
+            if (resultList == null || resultList.size() != normalizedIds.size()) {
+                throw new ServiceException(I18nUtil.getMessage("ui.data.alert.tm.schedule.resultNotFound"));
+            }
+            boolean invalidTransition = resultList.stream()
+                    .anyMatch(result -> !TmReleaseStatusTransition.canTransit(result.getReleaseStatus(), targetStatus));
+            if (invalidTransition) {
+                throw new ServiceException(I18nUtil.getMessage("ui.data.alert.tm.schedule.illegalReleaseTransition"));
+            }
+            LambdaUpdateWrapper<TmScheduleResult> wrapper = new LambdaUpdateWrapper<>();
+            wrapper.in(TmScheduleResult::getId, normalizedIds);
+            wrapper.set(TmScheduleResult::getReleaseStatus, targetStatus);
+            int affectedRows = tmScheduleResultMapper.update(null, wrapper);
+            if (affectedRows != normalizedIds.size()) {
+                throw new ServiceException(I18nUtil.getMessage(
+                        "ui.data.alert.tm.schedule.operationConcurrentChanged"));
+            }
+            return affectedRows;
+        });
+        if (updatedRows == null) {
+            throw new ServiceException(I18nUtil.getMessage("ui.data.alert.tm.schedule.operationFailed"));
+        }
+        return updatedRows;
     }
 
     /**
@@ -706,7 +777,8 @@ public class TmScheduleResultServiceImpl extends AbstractDocService<TmScheduleRe
         long currentMillis = System.currentTimeMillis();
         long uniqueMillis = LAST_BATCH_TIME_MILLIS.updateAndGet(lastMillis ->
                 currentMillis > lastMillis ? currentMillis : lastMillis + 1);
-        return TM_AUTO_BATCH_NO_PREFIX + DateUtil.format(new Date(uniqueMillis), "yyyyMMddHHmmssSSS");
+        return TmScheduleConstants.AUTO_PLAN_BATCH_NO_PREFIX
+                + DateUtil.format(new Date(uniqueMillis), "yyyyMMddHHmmssSSS");
     }
 
     /**
@@ -749,184 +821,6 @@ public class TmScheduleResultServiceImpl extends AbstractDocService<TmScheduleRe
         if (executeMode && !Boolean.TRUE.equals(request.getConfirmOverwrite())) {
             throw new ServiceException(resolveTmMessage("ui.data.alert.tm.schedule.confirmOverwriteRequired", "当前排程日期已有未发布计划，请确认后重新生成"));
         }
-    }
-
-    /**
-     * 校验人工插单只能插到第二个在产规格之后。
-     *
-     * <p>按同工厂、同日期、同机台、同班次内完成量大于 0 的记录识别在产规格。
-     * 若已存在两个及以上在产规格，插单顺序必须大于第二个在产规格顺序。
-     * 未传顺序、班次或机台时保持旧接口兼容。</p>
-     *
-     * @param scheduleResult 插单排程结果
-     * @throws ServiceException 插单位置不在第二顺序之后时抛出
-     */
-    private void validateInsertAfterSecondSequence(TmScheduleResult scheduleResult) {
-        Integer shiftOrder = TmInsertPositionValidator.resolveShiftOrder(scheduleResult);
-        Integer insertSequence = TmInsertPositionValidator.resolveSequence(scheduleResult, shiftOrder);
-        if (shiftOrder == null || insertSequence == null || StrUtil.isBlank(scheduleResult.getMachineCode())) {
-            return;
-        }
-        LambdaQueryWrapper<TmScheduleResult> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(TmScheduleResult::getFactoryCode, scheduleResult.getFactoryCode());
-        wrapper.eq(TmScheduleResult::getScheduleDate, scheduleResult.getScheduleDate());
-        wrapper.eq(TmScheduleResult::getMachineCode, scheduleResult.getMachineCode());
-        List<TmScheduleResult> resultList = tmScheduleResultMapper.selectList(wrapper);
-        List<Integer> inProductionSequenceList = resultList.stream()
-                .filter(item -> TmInsertPositionValidator.getFinishQty(item, shiftOrder).compareTo(BigDecimal.ZERO) > 0)
-                .map(item -> TmInsertPositionValidator.resolveSequence(item, shiftOrder))
-                .filter(Objects::nonNull)
-                .sorted()
-                .collect(Collectors.toList());
-        if (inProductionSequenceList.size() >= 2 && insertSequence <= inProductionSequenceList.get(1)) {
-            throw new ServiceException(scheduleErrorMessage(TmScheduleErrorCodeEnum.TM_INSERT_POSITION_INVALID));
-        }
-    }
-
-    /**
-     * 调用排程操作门面处理人工插单任务链。
-     *
-     * @param scheduleResult 插单排程结果
-     */
-    private void invokeInsertFacade(TmScheduleResult scheduleResult) {
-        Integer shiftOrder = Optional.ofNullable(TmInsertPositionValidator.resolveShiftOrder(scheduleResult)).orElse(1);
-        TmTaskDraft taskDraft = buildTaskDraft(scheduleResult, shiftOrder);
-        TmInsertPosition position = new TmInsertPosition();
-        position.setMachineCode(scheduleResult.getMachineCode());
-        position.setShiftOrder(shiftOrder);
-        tmScheduleOperationFacade.insertTask(taskDraft, position, buildOperationContext(scheduleResult));
-    }
-
-    /**
-     * 调用排程操作门面处理调量任务链。
-     *
-     * @param scheduleResult 调量后的排程结果
-     */
-    private void invokeChangeQtyFacade(TmScheduleResult scheduleResult) {
-        TmScheduleResult oldSchedule = tmScheduleResultMapper.selectById(scheduleResult.getId());
-        if (oldSchedule == null) {
-            throw new ServiceException(resolveTmMessage("ui.data.alert.tm.schedule.changeQtyResultNotFound", "调量排程结果不存在或已失效"));
-        }
-        Integer shiftOrder = Optional.ofNullable(TmInsertPositionValidator.resolveShiftOrder(scheduleResult))
-                .orElseGet(() -> Optional.ofNullable(TmInsertPositionValidator.resolveShiftOrder(oldSchedule)).orElse(1));
-        TmScheduleContext context = buildOperationContext(oldSchedule);
-        TmTaskDraft taskDraft = buildTaskDraft(oldSchedule, shiftOrder);
-        seedOperationTask(context, taskDraft, oldSchedule.getMachineCode(), shiftOrder);
-        tmScheduleOperationFacade.changeQty(taskDraft.getBusinessKey(), resolvePlanQty(scheduleResult, shiftOrder), shiftOrder, context);
-    }
-
-    /**
-     * 调用排程操作门面处理转机台任务链。
-     *
-     * @param scheduleResult 转机台后的排程结果
-     */
-    private void invokeTransferMachineFacade(TmScheduleResult scheduleResult) {
-        TmScheduleResult oldSchedule = tmScheduleResultMapper.selectById(scheduleResult.getId());
-        if (oldSchedule == null) {
-            throw new ServiceException(resolveTmMessage("ui.data.alert.tm.schedule.changeMachineResultNotFound", "转机台排程结果不存在或已失效"));
-        }
-        Integer shiftOrder = Optional.ofNullable(TmInsertPositionValidator.resolveShiftOrder(scheduleResult))
-                .orElseGet(() -> Optional.ofNullable(TmInsertPositionValidator.resolveShiftOrder(oldSchedule)).orElse(1));
-        TmScheduleContext context = buildOperationContext(oldSchedule);
-        TmTaskDraft taskDraft = buildTaskDraft(oldSchedule, shiftOrder);
-        seedOperationTask(context, taskDraft, oldSchedule.getMachineCode(), shiftOrder);
-        TmTransferPosition position = new TmTransferPosition();
-        position.setShiftOrder(shiftOrder);
-        tmScheduleOperationFacade.transferMachine(taskDraft.getBusinessKey(), scheduleResult.getMachineCode(), position, context);
-    }
-
-    /**
-     * 构造人工操作运行上下文。
-     *
-     * @param scheduleResult 排程结果
-     * @return 排程运行上下文
-     */
-    private TmScheduleContext buildOperationContext(TmScheduleResult scheduleResult) {
-        TmScheduleContext context = new TmScheduleContext();
-        context.setFactoryCode(scheduleResult.getFactoryCode());
-        context.setScheduleDate(scheduleResult.getScheduleDate());
-        context.setBatchNo(scheduleResult.getBatchNo());
-        context.setTraceId(IdUtil.fastSimpleUUID());
-        context.setOperator("system");
-        return context;
-    }
-
-    /**
-     * 根据排程结果构造任务草稿。
-     *
-     * @param scheduleResult 排程结果
-     * @param shiftOrder     班次顺序
-     * @return 任务草稿
-     */
-    private TmTaskDraft buildTaskDraft(TmScheduleResult scheduleResult, Integer shiftOrder) {
-        TmTaskDraft taskDraft = new TmTaskDraft();
-        taskDraft.setOrderNo(StrUtil.blankToDefault(scheduleResult.getOrderNo(),
-                scheduleResult.getId() == null ? IdUtil.fastSimpleUUID() : String.valueOf(scheduleResult.getId())));
-        taskDraft.setTreadCode(StrUtil.blankToDefault(scheduleResult.getTreadCode(), ""));
-        taskDraft.setGlueCode(StrUtil.blankToDefault(scheduleResult.getGlueCode(), ""));
-        taskDraft.setMouthPlateCode(StrUtil.blankToDefault(scheduleResult.getMouthPlateCode(), ""));
-        taskDraft.setMachineCode(scheduleResult.getMachineCode());
-        taskDraft.setShiftOrder(shiftOrder);
-        taskDraft.setPlanQty(resolvePlanQty(scheduleResult, shiftOrder));
-        return taskDraft;
-    }
-
-    /**
-     * 将当前任务种入操作上下文，供 Facade 后续转机台、调量查找节点。
-     *
-     * @param context     操作上下文
-     * @param taskDraft   任务草稿
-     * @param machineCode 机台编码
-     * @param shiftOrder  班次顺序
-     */
-    private void seedOperationTask(TmScheduleContext context, TmTaskDraft taskDraft, String machineCode, Integer shiftOrder) {
-        LocalDate localDate = DateUtil.toLocalDateTime(context.getScheduleDate()).toLocalDate();
-        ScheduleTaskLinkedList<TmTaskDraft> chain = context.getTaskChainGroup().getOrCreate(machineCode, localDate, shiftOrder);
-        ScheduleTaskNode<TmTaskDraft> node = new ScheduleTaskNode<>(taskDraft.getBusinessKey(), taskDraft, machineCode,
-                localDate, "CLASS" + shiftOrder, shiftOrder, taskDraft.getPlanQty());
-        chain.append(node, new ScheduleOperationContext(context.getOperator(), "MANUAL_SEED", context.getTraceId()));
-        context.registerTaskNode(taskDraft.getBusinessKey(), node);
-    }
-
-    /**
-     * 解析指定班次计划量。
-     *
-     * @param scheduleResult 排程结果
-     * @param shiftOrder     班次顺序
-     * @return 计划量
-     */
-    private BigDecimal resolvePlanQty(TmScheduleResult scheduleResult, Integer shiftOrder) {
-        if (Integer.valueOf(1).equals(shiftOrder)) {
-            return Optional.ofNullable(scheduleResult.getClass1PlanQty()).orElse(BigDecimal.ZERO);
-        }
-        if (Integer.valueOf(2).equals(shiftOrder)) {
-            return Optional.ofNullable(scheduleResult.getClass2PlanQty()).orElse(BigDecimal.ZERO);
-        }
-        if (Integer.valueOf(3).equals(shiftOrder)) {
-            return Optional.ofNullable(scheduleResult.getClass3PlanQty()).orElse(BigDecimal.ZERO);
-        }
-        if (Integer.valueOf(4).equals(shiftOrder)) {
-            return Optional.ofNullable(scheduleResult.getClass4PlanQty()).orElse(BigDecimal.ZERO);
-        }
-        if (Integer.valueOf(5).equals(shiftOrder)) {
-            return Optional.ofNullable(scheduleResult.getClass5PlanQty()).orElse(BigDecimal.ZERO);
-        }
-        if (Integer.valueOf(6).equals(shiftOrder)) {
-            return Optional.ofNullable(scheduleResult.getClass6PlanQty()).orElse(BigDecimal.ZERO);
-        }
-        return BigDecimal.ZERO;
-    }
-
-    /**
-     * 获取胎面排程错误提示。
-     *
-     * @param errorCode 错误码
-     * @return 当前语言环境下的错误提示
-     */
-    private String scheduleErrorMessage(TmScheduleErrorCodeEnum errorCode) {
-        String message = I18nUtil.getMessage(errorCode.getMessageKey());
-        return StringUtils.isBlank(message) || errorCode.getMessageKey().equals(message)
-                ? errorCode.getDefaultMessage() : message;
     }
 
     /**

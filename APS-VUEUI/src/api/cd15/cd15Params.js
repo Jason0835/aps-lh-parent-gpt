@@ -15,6 +15,13 @@ export function getCd15Params(id) {
   })
 }
 
+export function getCd15ParamValue(factoryCode, paramCode) {
+  return request({
+    url: `/cd15/cd15Params/getParamValue/${factoryCode}/${paramCode}`,
+    method: 'get'
+  })
+}
+
 export function addCd15Params(data) {
   return request({
     url: '/cd15/cd15Params/add',

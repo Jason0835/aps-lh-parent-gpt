@@ -6,11 +6,26 @@
         SELECT ci.TREAD_CODE AS treadCode,
                SUM(IFNULL(cx.CLASS1_PLAN_QTY, 0) * IFNULL(ci.TREAD_SHOULDER_LENGTH, 0)) AS qty
         FROM T_CX_SCHEDULE_RESULT cx
-        LEFT JOIN T_MDM_CONSTRUCTION_INFO ci
-               ON cx.EMBRYO_CODE = ci.CONSTRUCTION_CODE
-              AND (cx.BOM_DATA_VERSION = ci.CONSTRUCTION_VERSION
-                   OR (cx.BOM_DATA_VERSION IS NULL AND ci.CONSTRUCTION_VERSION IS NULL))
-              AND ci.IS_DELETE = 0
+        /* BOM 模式早班需求：与主流程 selectFormingDemandRows 同口径，同一胎胚按胎面分组各取一条施工版本（择一），
+           优先匹配 BOM_DATA_VERSION，未匹配或为空时取最新有效记录，避免版本 join 失败导致早班需求归 0 */
+        LEFT JOIN LATERAL (
+            SELECT *
+            FROM (
+                SELECT c.TREAD_CODE,
+                       c.TREAD_SHOULDER_LENGTH,
+                       ROW_NUMBER() OVER (
+                           PARTITION BY c.TREAD_CODE
+                           ORDER BY (CASE WHEN cx.BOM_DATA_VERSION IS NOT NULL
+                                         AND c.CONSTRUCTION_VERSION = cx.BOM_DATA_VERSION THEN 0 ELSE 1 END),
+                                    c.UPDATE_TIME DESC,
+                                    c.ID DESC
+                       ) AS rn
+                FROM T_MDM_CONSTRUCTION_INFO c
+                WHERE c.CONSTRUCTION_CODE = cx.EMBRYO_CODE
+                  AND c.IS_DELETE = 0
+            ) ranked
+            WHERE ranked.rn = 1
+        ) ci ON TRUE
         WHERE cx.FACTORY_CODE = #{factoryCode}
           AND cx.SCHEDULE_DATE = #{scheduleDate}
           AND ci.TREAD_CODE IN

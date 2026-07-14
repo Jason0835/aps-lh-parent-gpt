@@ -83,7 +83,7 @@ public class TbrCxCapacityAllocationService extends AbstractDataLoaderService {
 
     private final SimulateProductionResultHandler simulateProductionResultHandler;
 
-    private final CalculateStructureCxMachineNumber calculateStructureCxMachineNumber;
+    private final GroupCapacityHandler calculateStructureCxMachineNumber;
 
     private final ProductionCxMachineCalculationHandler productionCxMachineCalculationHandler;
 
@@ -109,7 +109,7 @@ public class TbrCxCapacityAllocationService extends AbstractDataLoaderService {
                                           InitNoProductionRecordHandler initNoProductionRecordHandler,
                                           DayProductionStatisticsHandler dayProductionStatisticsHandler,
                                           SimulateProductionResultHandler simulateProductionResultHandler,
-                                          CalculateStructureCxMachineNumber calculateStructureCxMachineNumber,
+                                          GroupCapacityHandler calculateStructureCxMachineNumber,
                                           ProductionCxMachineCalculationHandler productionCxMachineCalculationHandler,
                                           AdjustContinueSkuProductionQtyHandler adjustContinueSkuProductionQtyHandler,
                                           MatchingProductionHandler matchingProductionHandler) {

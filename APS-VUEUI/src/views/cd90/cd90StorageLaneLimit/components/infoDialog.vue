@@ -10,7 +10,11 @@
 
 <script>
 import { addStorageLaneLimit, updateStorageLaneLimit } from "@/api/cd90/storageLaneLimit";
+import { getCd90ParamValue } from "@/api/cd90/params";
 import infoForm from "@/views/components/infoForm.vue";
+
+const DEFAULT_FACTORY_CODE = "116";
+const DEFAULT_MAX_CAR_NUM_PARAM_CODE = "SYS0701039";
 
 export default {
   components: { infoForm },
@@ -75,7 +79,24 @@ export default {
   },
   methods: {
     async save(params) { this.loading = true; try { const res = this.isEdit ? await updateStorageLaneLimit(params) : await addStorageLaneLimit(params); this.$modal.msgSuccess(res.msg); this.$emit("success"); this.hide(); } finally { this.loading = false; } },
-    show(data) { this.visible = true; if (data) { this.isEdit = true; this.form = { ...data }; } else { this.form = { factoryCode: "116" }; } },
+    async show(data) {
+      this.visible = true;
+      if (data) {
+        this.isEdit = true;
+        this.form = { ...data };
+      } else {
+        this.form = { factoryCode: DEFAULT_FACTORY_CODE };
+        try {
+          const response = await getCd90ParamValue(DEFAULT_FACTORY_CODE, DEFAULT_MAX_CAR_NUM_PARAM_CODE);
+          const paramValue = response && response.data !== undefined ? response.data : response;
+          if (/^\d+$/.test(String(paramValue)) && Number(paramValue) > 0) {
+            this.form = { ...this.form, maxCarNum: Number(paramValue) };
+          }
+        } catch {
+          this.form = { ...this.form };
+        }
+      }
+    },
     hide() { this.form = {}; this.$refs.form && this.$refs.form.triggerResetForm(); this.isEdit = false; this.visible = false; },
     handleConfirm() { this.$refs.form.triggerConfirm(this.save); },
   },

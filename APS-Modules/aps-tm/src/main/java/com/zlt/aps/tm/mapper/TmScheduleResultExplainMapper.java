@@ -6,6 +6,7 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
 import java.util.Date;
+import java.util.List;
 
 /**
  * 胎面排程结果解释表 Mapper接口
@@ -20,4 +21,14 @@ public interface TmScheduleResultExplainMapper extends CommBaseMapper<TmSchedule
      * @return 影响行数
      */
     int logicDeleteByFactoryCodeAndScheduleDate(@Param("factoryCode") String factoryCode, @Param("scheduleDate") Date scheduleDate);
+
+    /**
+     * 按工厂和旧批次号逻辑删除解释，覆盖未排任务没有结果 ID 的解释行。
+     *
+     * @param factoryCode 工厂编号
+     * @param batchNoList 旧批次号
+     * @return 影响行数
+     */
+    int logicDeleteByFactoryCodeAndBatchNos(@Param("factoryCode") String factoryCode,
+                                             @Param("batchNoList") List<String> batchNoList);
 }

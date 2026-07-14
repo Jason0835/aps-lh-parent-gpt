@@ -149,13 +149,15 @@ export default {
           formatter: (row, column, value) => this.selectDictLabel(this.dict.type.IS_RELEASE, value)
         },
         { label: this.$t('ui.data.column.cd15ScheduleResult.groupNo'), prop: 'groupNo', minWidth: 150 },
+        { label: this.$t('ui.data.column.cd15ScheduleResult.cxBatchNo'), prop: 'cxBatchNo', minWidth: 220, showOverflowTooltip: true },
+        { label: this.$t('ui.data.column.cd15ScheduleResult.cxMachineCodes'), prop: 'cxMachineCodes', minWidth: 180, showOverflowTooltip: true },
         { label: this.$t('ui.data.column.cd15ScheduleResult.steelStripCode'), prop: 'steelStripCode', minWidth: 150 },
         { label: this.$t('ui.data.column.cd15ScheduleResult.cuttingAngle'), prop: 'cuttingAngle', minWidth: 110 },
         { label: this.$t('ui.data.column.cd15ScheduleResult.bigRollCode'), prop: 'bigRollCode', minWidth: 140 },
         { label: this.$t('ui.data.column.cd15ScheduleResult.machineCode'), prop: 'machineCode', minWidth: 120 },
         { label: this.$t('ui.data.column.cd15ScheduleResult.storageLaneCode'), prop: 'storageLaneCode', minWidth: 160, showOverflowTooltip: true },
         { label: this.$t('ui.data.column.cd15ScheduleResult.stockQty'), prop: 'stockQty', minWidth: 110, align: 'right' },
-        { label: this.$t('ui.data.column.cd15ScheduleResult.monthSurplusQty'), prop: 'monthSurplusQty', minWidth: 140, align: 'right' },
+        { label: this.$t('ui.data.column.cd15ScheduleResult.planSurplusQty'), prop: 'planSurplusQty', minWidth: 140, align: 'right' },
         ...this.buildShiftColumns(),
         { label: this.$t('ui.common.column.remark'), prop: 'remark', minWidth: 160 }
       ]
@@ -189,7 +191,7 @@ export default {
           align: 'center',
           children: [
             { label: this.$t('ui.data.column.scheduleResult.plan'), prop: `${classField}PlanQty`, minWidth: 110 },
-            { label: this.$t('ui.data.column.scheduleResult.actual'), prop: `${classField}FinishQty`, minWidth: 110 },
+            { label: this.$t('ui.data.column.scheduleResult.actual'), prop: `${classField}FinishQty`, minWidth: 110, formatter: (row, column, cellValue) => cellValue === 0 || cellValue === '0' ? '' : cellValue },
             { label: this.$t('ui.data.column.scheduleResult.produceOrder'), prop: `${classField}ProduceOrder`, minWidth: 130 },
             { label: this.$t('ui.data.column.scheduleResult.finishRate'), prop: `${classField}FinishRate`, minWidth: 110 },
             { label: this.$t('ui.data.column.scheduleResult.analysis'), prop: `${classField}Analysis`, minWidth: 140 }

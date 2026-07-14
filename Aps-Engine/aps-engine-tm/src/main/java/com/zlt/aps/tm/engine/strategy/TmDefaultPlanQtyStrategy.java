@@ -2,6 +2,8 @@ package com.zlt.aps.tm.engine.strategy;
 
 import com.ruoyi.common.exception.ServiceException;
 import com.zlt.aps.tm.api.enums.TmScheduleErrorCodeEnum;
+import com.zlt.aps.tm.api.enums.TmScheduleStrategyEnum;
+import com.zlt.aps.tm.api.enums.TmYesNoEnum;
 import com.zlt.aps.tm.engine.domain.TmPlanQtyResult;
 import com.zlt.aps.tm.engine.domain.TmScheduleContext;
 import com.zlt.aps.tm.engine.domain.TmTaskDraft;
@@ -19,12 +21,9 @@ import java.math.RoundingMode;
 @Component
 public class TmDefaultPlanQtyStrategy implements ITmPlanQtyStrategy {
 
-    /** 是 */
-    private static final String YES = "1";
-
     @Override
     public String getStrategyCode() {
-        return "DEFAULT";
+        return TmScheduleStrategyEnum.DEFAULT.getCode();
     }
 
     @Override
@@ -77,7 +76,7 @@ public class TmDefaultPlanQtyStrategy implements ITmPlanQtyStrategy {
 
     private boolean isTailTask(TmTaskDraft taskDraft, BigDecimal baseDemandQty) {
         BigDecimal tailBaseQty = nvl(taskDraft.getTailBalanceQty()).multiply(nvl(taskDraft.getTreadShoulderLength()));
-        return YES.equals(taskDraft.getTailFlag())
+        return TmYesNoEnum.YES.getCode().equals(taskDraft.getTailFlag())
                 && nvl(taskDraft.getTailBalanceQty()).compareTo(BigDecimal.ZERO) > 0
                 && nvl(taskDraft.getTreadShoulderLength()).compareTo(BigDecimal.ZERO) > 0
                 && tailBaseQty.compareTo(nvl(baseDemandQty)) <= 0;

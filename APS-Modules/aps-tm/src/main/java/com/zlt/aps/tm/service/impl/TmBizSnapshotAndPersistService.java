@@ -2,13 +2,17 @@ package com.zlt.aps.tm.service.impl;
 
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.StrUtil;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.ruoyi.common.core.web.domain.BaseEntity;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.common.engine.schedule.ScheduleTaskLinkedList;
 import com.zlt.aps.common.engine.schedule.ScheduleTaskNode;
+import com.zlt.aps.tm.api.constant.TmScheduleConstants;
 import com.zlt.aps.tm.api.domain.entity.TmScheduleResult;
 import com.zlt.aps.tm.api.domain.entity.TmScheduleResultExplain;
 import com.zlt.aps.tm.api.domain.entity.TmScheduleUnplanned;
+import com.zlt.aps.tm.api.enums.TmMachineAssignStatusEnum;
 import com.zlt.aps.tm.engine.domain.TmPersistResult;
 import com.zlt.aps.tm.engine.domain.TmScheduleContext;
 import com.zlt.aps.tm.engine.domain.TmSnapshotBuildResult;
@@ -19,12 +23,18 @@ import com.zlt.aps.tm.engine.service.impl.TmSnapshotBuildService;
 import com.zlt.aps.tm.mapper.TmScheduleResultExplainMapper;
 import com.zlt.aps.tm.mapper.TmScheduleResultMapper;
 import com.zlt.aps.tm.mapper.TmScheduleUnplannedMapper;
+import com.zlt.core.dao.basedao.BaseDao;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionStatus;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
+import java.text.MessageFormat;
 import java.util.*;
+import java.util.function.BiFunction;
 
 /**
  * 胎面自动排程业务快照和落库步骤服务。
@@ -46,25 +56,37 @@ public class TmBizSnapshotAndPersistService implements ITmSnapshotAndPersistServ
 
     private final TmScheduleUnplannedMapper scheduleUnplannedMapper;
 
+    /** 通用批量写入服务。 */
+    private final BaseDao baseDao;
+
+    /** 最终持久化短事务模板。 */
+    private final TransactionTemplate transactionTemplate;
+
     /**
      * 创建胎面自动排程业务快照和落库步骤服务。
      *
-     * @param snapshotBuildService       解释快照构建服务
-     * @param persistService             落库实体转换服务
-     * @param scheduleResultMapper       胎面排程结果 Mapper
+     * @param snapshotBuildService        解释快照构建服务
+     * @param persistService              落库实体转换服务
+     * @param scheduleResultMapper        胎面排程结果 Mapper
      * @param scheduleResultExplainMapper 胎面排程解释 Mapper
      * @param scheduleUnplannedMapper     胎面未排任务 Mapper
+     * @param baseDao                     通用批量写入服务
+     * @param transactionManager          事务管理器
      */
     public TmBizSnapshotAndPersistService(TmSnapshotBuildService snapshotBuildService,
                                           TmPersistService persistService,
                                           TmScheduleResultMapper scheduleResultMapper,
                                           TmScheduleResultExplainMapper scheduleResultExplainMapper,
-                                          TmScheduleUnplannedMapper scheduleUnplannedMapper) {
+                                          TmScheduleUnplannedMapper scheduleUnplannedMapper,
+                                          BaseDao baseDao,
+                                          PlatformTransactionManager transactionManager) {
         this.snapshotBuildService = snapshotBuildService;
         this.persistService = persistService;
         this.scheduleResultMapper = scheduleResultMapper;
         this.scheduleResultExplainMapper = scheduleResultExplainMapper;
         this.scheduleUnplannedMapper = scheduleUnplannedMapper;
+        this.baseDao = baseDao;
+        this.transactionTemplate = new TransactionTemplate(transactionManager);
     }
 
     /**
@@ -77,8 +99,16 @@ public class TmBizSnapshotAndPersistService implements ITmSnapshotAndPersistServ
         if (context == null) {
             throw new IllegalArgumentException("胎面排程上下文不能为空");
         }
-        buildSnapshot(context);
-        context.setPersistResult(persistScheduleContext(context));
+        // 解释快照在事务外完成；最终事务只承担旧批次删除与新批次写入。
+        this.buildSnapshot(context);
+        TmPersistResult persistResult = transactionTemplate.execute(transactionStatus -> {
+            this.logicDeleteOldSchedule(context);
+            return this.persistScheduleContext(context, transactionStatus);
+        });
+        if (persistResult == null) {
+            throw new ServiceException(I18nUtil.getMessage("ui.data.alert.tm.schedule.persistFailed"));
+        }
+        context.setPersistResult(persistResult);
     }
 
     /**
@@ -102,7 +132,7 @@ public class TmBizSnapshotAndPersistService implements ITmSnapshotAndPersistServ
      * @param context 自动排程上下文
      * @return 落库汇总
      */
-    private TmPersistResult persistScheduleContext(TmScheduleContext context) {
+    private TmPersistResult persistScheduleContext(TmScheduleContext context, TransactionStatus transactionStatus) {
         TmPersistResult persistResult = new TmPersistResult();
         if (CollUtil.isEmpty(context.getTaskDraftList())) {
             return persistResult;
@@ -130,45 +160,116 @@ public class TmBizSnapshotAndPersistService implements ITmSnapshotAndPersistServ
         List<TmScheduleResult> visibleResultList = filterVisibleScheduleResults(mergedResultList, mergedResultBusinessKeyMap);
         assignTmOrderNo(visibleResultList, context.getBatchNo());
         resequenceVisibleShiftSequences(visibleResultList);
+        this.batchSaveWithFallback(visibleResultList, transactionStatus, "RESULT", this::buildResultErrorMsg);
         for (TmScheduleResult result : visibleResultList) {
-            try {
-                scheduleResultMapper.insert(result);
-                registerInsertedResultId(result, mergedResultBusinessKeyMap, resultIdMap);
-                persistResult.setResultCount(persistResult.getResultCount() + 1);
-            } catch (RuntimeException ex) {
-                String errorMsg = buildResultErrorMsg(result, ex);
-                log.error("[TM_SCHEDULE_PERSIST_RESULT_FAIL] {}", errorMsg, ex);
-                throw new ServiceException(errorMsg);
-            }
+            this.registerInsertedResultId(result, mergedResultBusinessKeyMap, resultIdMap);
         }
-        Map<String, TmScheduleUnplanned> unplannedMap = buildMergedUnplannedMap(unplannedTaskList, context);
-        for (TmScheduleUnplanned unplanned : unplannedMap.values()) {
-            try {
-                scheduleUnplannedMapper.insert(unplanned);
-                persistResult.setUnplannedCount(persistResult.getUnplannedCount() + 1);
-            } catch (RuntimeException ex) {
-                String errorMsg = buildUnplannedErrorMsg(unplanned, ex);
-                log.error("[TM_SCHEDULE_PERSIST_UNPLANNED_FAIL] {}", errorMsg, ex);
-                throw new ServiceException(errorMsg);
-            }
+        persistResult.setResultCount(visibleResultList.size());
+        // 未排表落库统一批量写入，批量失败时回滚保存点并逐行定位失败对象。
+        Map<String, TmScheduleUnplanned> unplannedMap = this.buildMergedUnplannedMap(unplannedTaskList, context);
+        if (CollUtil.isNotEmpty(unplannedMap)) {
+            List<TmScheduleUnplanned> unplannedList = new ArrayList<>(unplannedMap.values());
+            this.batchSaveWithFallback(unplannedList, transactionStatus,
+                    TmMachineAssignStatusEnum.UNPLANNED.getCode(), this::buildUnplannedErrorMsg);
+            persistResult.setUnplannedCount(unplannedList.size());
         }
+        // 解释表落库统一批量写入，任何单行失败都会回滚整个最终事务。
+        List<TmScheduleResultExplain> explainList = new ArrayList<>();
         for (TmTaskDraft taskDraft : context.getTaskDraftList()) {
             TmSnapshotBuildResult snapshot = context.getSnapshotMap().get(taskDraft.getBusinessKey());
             TmScheduleResultExplain explain = persistService.convertExplain(taskDraft, snapshot, context);
-            try {
-                Long resultId = resolveOptionalResultId(taskDraft, resultIdMap);
-                if (resultId != null) {
-                    explain.setResultId(resultId);
-                }
-                scheduleResultExplainMapper.insert(explain);
-                persistResult.setExplainCount(persistResult.getExplainCount() + 1);
-            } catch (RuntimeException ex) {
-                String errorMsg = buildExplainErrorMsg(taskDraft, ex);
-                log.error("[TM_SCHEDULE_PERSIST_EXPLAIN_FAIL] {}", errorMsg, ex);
-                throw new ServiceException(errorMsg);
+            Long resultId = resolveOptionalResultId(taskDraft, resultIdMap);
+            if (resultId != null) {
+                explain.setResultId(resultId);
             }
+            explainList.add(explain);
+        }
+        if (CollUtil.isNotEmpty(explainList)) {
+            this.batchSaveWithFallback(explainList, transactionStatus, "EXPLAIN",
+                    (explain, exception) -> this.buildExplainErrorMsg(null, exception));
+            persistResult.setExplainCount(explainList.size());
         }
         return persistResult;
+    }
+
+    /**
+     * 删除同工厂、同排程日期的旧解释、未排和结果。
+     *
+     * <p>该方法只在最终短事务内调用，删除和新批次写入任一失败都会整体回滚。</p>
+     *
+     * @param context 自动排程上下文
+     */
+    private void logicDeleteOldSchedule(TmScheduleContext context) {
+        LambdaQueryWrapper<TmScheduleResult> resultWrapper = new LambdaQueryWrapper<>();
+        resultWrapper.eq(TmScheduleResult::getFactoryCode, context.getFactoryCode());
+        resultWrapper.eq(TmScheduleResult::getScheduleDate, context.getScheduleDate());
+        List<TmScheduleResult> oldResultList = scheduleResultMapper.selectList(resultWrapper);
+
+        LambdaQueryWrapper<TmScheduleUnplanned> unplannedWrapper = new LambdaQueryWrapper<>();
+        unplannedWrapper.eq(TmScheduleUnplanned::getFactoryCode, context.getFactoryCode());
+        unplannedWrapper.eq(TmScheduleUnplanned::getScheduleDate, context.getScheduleDate());
+        List<TmScheduleUnplanned> oldUnplannedList = scheduleUnplannedMapper.selectList(unplannedWrapper);
+
+        Set<String> oldBatchNoSet = new LinkedHashSet<>();
+        oldResultList.stream().map(TmScheduleResult::getBatchNo).filter(StrUtil::isNotBlank).forEach(oldBatchNoSet::add);
+        oldUnplannedList.stream().map(TmScheduleUnplanned::getBatchNo).filter(StrUtil::isNotBlank).forEach(oldBatchNoSet::add);
+        if (CollUtil.isNotEmpty(oldBatchNoSet)) {
+            scheduleResultExplainMapper.logicDeleteByFactoryCodeAndBatchNos(context.getFactoryCode(),
+                    new ArrayList<>(oldBatchNoSet));
+        }
+        scheduleResultExplainMapper.logicDeleteByFactoryCodeAndScheduleDate(context.getFactoryCode(), context.getScheduleDate());
+        scheduleUnplannedMapper.logicDeleteByFactoryCodeAndScheduleDate(context.getFactoryCode(), context.getScheduleDate());
+        scheduleResultMapper.logicDeleteByFactoryCodeAndScheduleDate(context.getFactoryCode(), context.getScheduleDate());
+    }
+
+    /**
+     * 分批保存实体；批量失败时回滚当前保存点并逐行重试定位失败对象。
+     *
+     * @param entityList       待保存实体
+     * @param transactionStatus 当前事务状态
+     * @param dataType         数据类型
+     * @param errorMessageBuilder 单行失败消息构建器
+     * @param <T>              实体类型
+     */
+    private <T extends BaseEntity> void batchSaveWithFallback(List<T> entityList, TransactionStatus transactionStatus,
+                                                               String dataType,
+                                                               BiFunction<T, RuntimeException, String> errorMessageBuilder) {
+        if (CollUtil.isEmpty(entityList)) {
+            return;
+        }
+        int batchSize = 1000;
+        for (int startIndex = 0; startIndex < entityList.size(); startIndex += batchSize) {
+            int endIndex = Math.min(startIndex + batchSize, entityList.size());
+            List<T> batchList = entityList.subList(startIndex, endIndex);
+            Object savepoint = transactionStatus.createSavepoint();
+            try {
+                Integer affectedRows = baseDao.saveBatch(batchList);
+                if (!Objects.equals(affectedRows, batchList.size())) {
+                    throw new ServiceException("批量写入影响行数异常，expected=" + batchList.size()
+                            + "，actual=" + affectedRows);
+                }
+                transactionStatus.releaseSavepoint(savepoint);
+            } catch (RuntimeException batchException) {
+                transactionStatus.rollbackToSavepoint(savepoint);
+                log.warn("[TM_SCHEDULE_PERSIST_BATCH_RETRY] dataType={}, batchStart={}, batchSize={}",
+                        dataType, startIndex, batchList.size(), batchException);
+                for (T entity : batchList) {
+                    try {
+                        int affectedRows = baseDao.save(entity);
+                        if (affectedRows != 1) {
+                            throw new ServiceException(MessageFormat.format(
+                                    I18nUtil.getMessage("ui.data.alert.tm.schedule.rowAffectedRowsInvalid"), affectedRows));
+                        }
+                    } catch (RuntimeException rowException) {
+                        String errorMessage = errorMessageBuilder.apply(entity, rowException);
+                        log.error("[TM_SCHEDULE_PERSIST_ROW_FAIL] dataType={}, errorMessage={}",
+                                dataType, errorMessage, rowException);
+                        throw new ServiceException(errorMessage);
+                    }
+                }
+                transactionStatus.releaseSavepoint(savepoint);
+            }
+        }
     }
 
     /**
@@ -216,7 +317,7 @@ public class TmBizSnapshotAndPersistService implements ITmSnapshotAndPersistServ
         if (result == null) {
             return false;
         }
-        for (int shiftOrder = 1; shiftOrder <= 6; shiftOrder++) {
+        for (int shiftOrder = 1; shiftOrder <= TmScheduleConstants.TM_MAX_SHIFT_ORDER; shiftOrder++) {
             if (isPositiveQty(getShiftPlanQty(result, shiftOrder))) {
                 return true;
             }
@@ -304,33 +405,15 @@ public class TmBizSnapshotAndPersistService implements ITmSnapshotAndPersistServ
         if (result == null) {
             return;
         }
-        if (StrUtil.isBlank(result.getMachineCode())) {
-            clearAllShiftFields(result);
-            result.setClass1PlanQty(BigDecimal.ZERO);
-            result.setClass2PlanQty(BigDecimal.ZERO);
-            result.setClass3PlanQty(BigDecimal.ZERO);
-            result.setClass4PlanQty(BigDecimal.ZERO);
-            result.setClass5PlanQty(BigDecimal.ZERO);
-            result.setClass6PlanQty(BigDecimal.ZERO);
-            return;
-        }
-        if (!isPositiveQty(result.getClass1PlanQty())) {
-            clearClass1ShiftFields(result);
-        }
-        if (!isPositiveQty(result.getClass2PlanQty())) {
-            clearClass2ShiftFields(result);
-        }
-        if (!isPositiveQty(result.getClass3PlanQty())) {
-            clearClass3ShiftFields(result);
-        }
-        if (!isPositiveQty(result.getClass4PlanQty())) {
-            clearClass4ShiftFields(result);
-        }
-        if (!isPositiveQty(result.getClass5PlanQty())) {
-            clearClass5ShiftFields(result);
-        }
-        if (!isPositiveQty(result.getClass6PlanQty())) {
-            clearClass6ShiftFields(result);
+        for (int shiftOrder = 1; shiftOrder <= TmScheduleConstants.TM_MAX_SHIFT_ORDER; shiftOrder++) {
+            String planQtyField = String.format(TmScheduleConstants.SHIFT_PLAN_QTY_FIELD_TEMPLATE, shiftOrder);
+            BigDecimal planQty = this.getShiftPlanQty(result, shiftOrder);
+            if (StrUtil.isBlank(result.getMachineCode())) {
+                result.setFieldValueByFieldName(planQtyField, BigDecimal.ZERO);
+            }
+            if (StrUtil.isBlank(result.getMachineCode()) || !this.isPositiveQty(planQty)) {
+                this.clearShiftFields(result, shiftOrder);
+            }
         }
     }
 
@@ -345,7 +428,7 @@ public class TmBizSnapshotAndPersistService implements ITmSnapshotAndPersistServ
         if (CollUtil.isEmpty(resultList)) {
             return;
         }
-        for (int shiftOrder = 1; shiftOrder <= 6; shiftOrder++) {
+        for (int shiftOrder = 1; shiftOrder <= TmScheduleConstants.TM_MAX_SHIFT_ORDER; shiftOrder++) {
             Map<String, List<TmScheduleResult>> machineShiftResultMap = new LinkedHashMap<>();
             for (TmScheduleResult result : resultList) {
                 if (!isVisibleShiftResult(result, shiftOrder)) {
@@ -398,7 +481,7 @@ public class TmBizSnapshotAndPersistService implements ITmSnapshotAndPersistServ
      * @return 班次计划量
      */
     private BigDecimal getShiftPlanQty(TmScheduleResult result, int shiftOrder) {
-        Object planQty = result.getFieldValueByFieldName(String.format("class%dPlanQty", shiftOrder));
+        Object planQty = result.getFieldValueByFieldName(String.format(TmScheduleConstants.SHIFT_PLAN_QTY_FIELD_TEMPLATE, shiftOrder));
         return planQty instanceof BigDecimal ? (BigDecimal) planQty : null;
     }
 
@@ -410,7 +493,7 @@ public class TmBizSnapshotAndPersistService implements ITmSnapshotAndPersistServ
      * @param sequence   展示顺序
      */
     private void setShiftSequence(TmScheduleResult result, int shiftOrder, Integer sequence) {
-        result.setFieldValueByFieldName(String.format("class%dSequence", shiftOrder), sequence);
+        result.setFieldValueByFieldName(String.format(TmScheduleConstants.SHIFT_SEQUENCE_FIELD_TEMPLATE, shiftOrder), sequence);
     }
 
     /**
@@ -421,7 +504,7 @@ public class TmBizSnapshotAndPersistService implements ITmSnapshotAndPersistServ
      * @return 排序用顺序值
      */
     private Integer resolveSortSequence(TmScheduleResult result, int shiftOrder) {
-        Object sequence = result.getFieldValueByFieldName(String.format("class%dSequence", shiftOrder));
+        Object sequence = result.getFieldValueByFieldName(String.format(TmScheduleConstants.SHIFT_SEQUENCE_FIELD_TEMPLATE, shiftOrder));
         if (sequence instanceof Integer) {
             return (Integer) sequence;
         }
@@ -439,85 +522,16 @@ public class TmBizSnapshotAndPersistService implements ITmSnapshotAndPersistServ
     }
 
     /**
-     * 清空全部班次顺序和时间字段。
+     * 清空指定班次的顺序和时间字段。
      *
-     * @param result 排程结果
+     * @param result     排程结果
+     * @param shiftOrder 班次顺序
      */
-    private void clearAllShiftFields(TmScheduleResult result) {
-        clearClass1ShiftFields(result);
-        clearClass2ShiftFields(result);
-        clearClass3ShiftFields(result);
-        clearClass4ShiftFields(result);
-        clearClass5ShiftFields(result);
-        clearClass6ShiftFields(result);
+    private void clearShiftFields(TmScheduleResult result, int shiftOrder) {
+        result.setFieldValueByFieldName(String.format(TmScheduleConstants.SHIFT_SEQUENCE_FIELD_TEMPLATE, shiftOrder), null);
+        result.setFieldValueByFieldName(String.format(TmScheduleConstants.SHIFT_START_TIME_FIELD_TEMPLATE, shiftOrder), null);
+        result.setFieldValueByFieldName(String.format(TmScheduleConstants.SHIFT_END_TIME_FIELD_TEMPLATE, shiftOrder), null);
     }
-
-    /**
-     * 清空 1 班顺序和时间字段。
-     *
-     * @param result 排程结果
-     */
-    private void clearClass1ShiftFields(TmScheduleResult result) {
-        result.setClass1Sequence(null);
-        result.setClass1StartTime(null);
-        result.setClass1EndTime(null);
-    }
-
-    /**
-     * 清空 2 班顺序和时间字段。
-     *
-     * @param result 排程结果
-     */
-    private void clearClass2ShiftFields(TmScheduleResult result) {
-        result.setClass2Sequence(null);
-        result.setClass2StartTime(null);
-        result.setClass2EndTime(null);
-    }
-
-    /**
-     * 清空 3 班顺序和时间字段。
-     *
-     * @param result 排程结果
-     */
-    private void clearClass3ShiftFields(TmScheduleResult result) {
-        result.setClass3Sequence(null);
-        result.setClass3StartTime(null);
-        result.setClass3EndTime(null);
-    }
-
-    /**
-     * 清空 4 班顺序和时间字段。
-     *
-     * @param result 排程结果
-     */
-    private void clearClass4ShiftFields(TmScheduleResult result) {
-        result.setClass4Sequence(null);
-        result.setClass4StartTime(null);
-        result.setClass4EndTime(null);
-    }
-
-    /**
-     * 清空 5 班顺序和时间字段。
-     *
-     * @param result 排程结果
-     */
-    private void clearClass5ShiftFields(TmScheduleResult result) {
-        result.setClass5Sequence(null);
-        result.setClass5StartTime(null);
-        result.setClass5EndTime(null);
-    }
-
-    /**
-     * 清空 6 班顺序和时间字段。
-     *
-     * @param result 排程结果
-     */
-    private void clearClass6ShiftFields(TmScheduleResult result) {
-        result.setClass6Sequence(null);
-        result.setClass6StartTime(null);
-        result.setClass6EndTime(null);
-    }
-
     /**
      * 将任务链转换后的结果实体与原任务业务键建立关联。
      *
@@ -640,30 +654,24 @@ public class TmBizSnapshotAndPersistService implements ITmSnapshotAndPersistServ
      * @param source 来源结果
      */
     private void mergeResultShiftFields(TmScheduleResult target, TmScheduleResult source) {
-        target.setClass1PlanQty(addQty(target.getClass1PlanQty(), source.getClass1PlanQty()));
-        target.setClass1Sequence(minSequence(target.getClass1Sequence(), source.getClass1Sequence()));
-        target.setClass1StartTime(minDate(target.getClass1StartTime(), source.getClass1StartTime()));
-        target.setClass1EndTime(maxDate(target.getClass1EndTime(), source.getClass1EndTime()));
-        target.setClass2PlanQty(addQty(target.getClass2PlanQty(), source.getClass2PlanQty()));
-        target.setClass2Sequence(minSequence(target.getClass2Sequence(), source.getClass2Sequence()));
-        target.setClass2StartTime(minDate(target.getClass2StartTime(), source.getClass2StartTime()));
-        target.setClass2EndTime(maxDate(target.getClass2EndTime(), source.getClass2EndTime()));
-        target.setClass3PlanQty(addQty(target.getClass3PlanQty(), source.getClass3PlanQty()));
-        target.setClass3Sequence(minSequence(target.getClass3Sequence(), source.getClass3Sequence()));
-        target.setClass3StartTime(minDate(target.getClass3StartTime(), source.getClass3StartTime()));
-        target.setClass3EndTime(maxDate(target.getClass3EndTime(), source.getClass3EndTime()));
-        target.setClass4PlanQty(addQty(target.getClass4PlanQty(), source.getClass4PlanQty()));
-        target.setClass4Sequence(minSequence(target.getClass4Sequence(), source.getClass4Sequence()));
-        target.setClass4StartTime(minDate(target.getClass4StartTime(), source.getClass4StartTime()));
-        target.setClass4EndTime(maxDate(target.getClass4EndTime(), source.getClass4EndTime()));
-        target.setClass5PlanQty(addQty(target.getClass5PlanQty(), source.getClass5PlanQty()));
-        target.setClass5Sequence(minSequence(target.getClass5Sequence(), source.getClass5Sequence()));
-        target.setClass5StartTime(minDate(target.getClass5StartTime(), source.getClass5StartTime()));
-        target.setClass5EndTime(maxDate(target.getClass5EndTime(), source.getClass5EndTime()));
-        target.setClass6PlanQty(addQty(target.getClass6PlanQty(), source.getClass6PlanQty()));
-        target.setClass6Sequence(minSequence(target.getClass6Sequence(), source.getClass6Sequence()));
-        target.setClass6StartTime(minDate(target.getClass6StartTime(), source.getClass6StartTime()));
-        target.setClass6EndTime(maxDate(target.getClass6EndTime(), source.getClass6EndTime()));
+        for (int shiftOrder = 1; shiftOrder <= TmScheduleConstants.TM_MAX_SHIFT_ORDER; shiftOrder++) {
+            String planQtyField = String.format(TmScheduleConstants.SHIFT_PLAN_QTY_FIELD_TEMPLATE, shiftOrder);
+            String sequenceField = String.format(TmScheduleConstants.SHIFT_SEQUENCE_FIELD_TEMPLATE, shiftOrder);
+            String startTimeField = String.format(TmScheduleConstants.SHIFT_START_TIME_FIELD_TEMPLATE, shiftOrder);
+            String endTimeField = String.format(TmScheduleConstants.SHIFT_END_TIME_FIELD_TEMPLATE, shiftOrder);
+            BigDecimal targetPlanQty = (BigDecimal) target.getFieldValueByFieldName(planQtyField);
+            BigDecimal sourcePlanQty = (BigDecimal) source.getFieldValueByFieldName(planQtyField);
+            Integer targetSequence = (Integer) target.getFieldValueByFieldName(sequenceField);
+            Integer sourceSequence = (Integer) source.getFieldValueByFieldName(sequenceField);
+            Date targetStartTime = (Date) target.getFieldValueByFieldName(startTimeField);
+            Date sourceStartTime = (Date) source.getFieldValueByFieldName(startTimeField);
+            Date targetEndTime = (Date) target.getFieldValueByFieldName(endTimeField);
+            Date sourceEndTime = (Date) source.getFieldValueByFieldName(endTimeField);
+            target.setFieldValueByFieldName(planQtyField, this.addQty(targetPlanQty, sourcePlanQty));
+            target.setFieldValueByFieldName(sequenceField, this.minSequence(targetSequence, sourceSequence));
+            target.setFieldValueByFieldName(startTimeField, this.minDate(targetStartTime, sourceStartTime));
+            target.setFieldValueByFieldName(endTimeField, this.maxDate(targetEndTime, sourceEndTime));
+        }
     }
 
     /**

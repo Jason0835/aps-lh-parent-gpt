@@ -26,6 +26,7 @@
     </resultMap>
 
     <resultMap id="TmWorkCalendarRowResult" type="com.zlt.aps.tm.domain.vo.TmWorkCalendarRowVo">
+        <result column="PRODUCTION_DATE" property="productionDate"/>
         <result column="DAY_FLAG" property="dayFlag"/>
         <result column="ONE_SHIFT_FLAG" property="oneShiftFlag"/>
         <result column="TWO_SHIFT_FLAG" property="twoShiftFlag"/>
@@ -65,11 +66,28 @@
                ci.TREAD_MOUTH_PLATE,
                ci.TREAD_RUBBER_CATEGORY
         FROM T_CX_SCHEDULE_RESULT cx
-                 LEFT JOIN T_MDM_CONSTRUCTION_INFO ci
-                           ON cx.EMBRYO_CODE = ci.CONSTRUCTION_CODE
-        <!-- AND (cx.BOM_DATA_VERSION = ci.CONSTRUCTION_VERSION
-             OR (cx.BOM_DATA_VERSION IS NULL AND ci.CONSTRUCTION_VERSION IS NULL)) -->
-                               AND ci.IS_DELETE = 0
+                 /* BOM 模式施工关联（择一）：同一胎胚按胎面分组各取一条施工版本，优先匹配 BOM_DATA_VERSION，
+                    未匹配或为空时取最新有效记录（UPDATE_TIME DESC, ID DESC），避免多版本变体满量重复展开 */
+                 LEFT JOIN LATERAL (
+                     SELECT *
+                     FROM (
+                         SELECT c.TREAD_CODE,
+                                c.TREAD_SHOULDER_LENGTH,
+                                c.TREAD_MOUTH_PLATE,
+                                c.TREAD_RUBBER_CATEGORY,
+                                ROW_NUMBER() OVER (
+                                    PARTITION BY c.TREAD_CODE
+                                    ORDER BY (CASE WHEN cx.BOM_DATA_VERSION IS NOT NULL
+                                                  AND c.CONSTRUCTION_VERSION = cx.BOM_DATA_VERSION THEN 0 ELSE 1 END),
+                                             c.UPDATE_TIME DESC,
+                                             c.ID DESC
+                                ) AS rn
+                         FROM T_MDM_CONSTRUCTION_INFO c
+                         WHERE c.CONSTRUCTION_CODE = cx.EMBRYO_CODE
+                           AND c.IS_DELETE = 0
+                     ) ranked
+                     WHERE ranked.rn = 1
+                 ) ci ON TRUE
         WHERE cx.IS_DELETE = 0
           AND cx.FACTORY_CODE = #{factoryCode}
           AND cx.SCHEDULE_DATE = #{scheduleDate}
@@ -101,7 +119,7 @@
                            ON final_plan.EMBRYO_CODE = construction_info.CONSTRUCTION_CODE
         WHERE final_plan.FACTORY_CODE = #{factoryCode}
           AND final_plan.YEAR_MONTH = #{yearMonth}
-          AND final_plan.CONSTRUCTION_STAGE = '01'
+          AND final_plan.CONSTRUCTION_STAGE = #{constructionStage}
           AND final_plan.IS_DELETE = 0
           AND final_plan.${dayColumn} > 0
         ORDER BY final_plan.PRODUCTION_SEQUENCE, final_plan.ID
@@ -117,6 +135,18 @@
           AND PRODUCTION_DATE = #{productionDate}
     </select>
 
+    <select id="selectWorkCalendarRowsByRange" resultMap="TmWorkCalendarRowResult">
+        SELECT PRODUCTION_DATE,
+               DAY_FLAG,
+               ONE_SHIFT_FLAG,
+               TWO_SHIFT_FLAG,
+               THREE_SHIFT_FLAG
+        FROM T_MDM_WORK_CALENDAR
+        WHERE FACTORY_CODE = #{factoryCode}
+          AND PROC_CODE = #{procCode}
+          AND PRODUCTION_DATE BETWEEN #{startDate} AND #{endDate}
+        ORDER BY PRODUCTION_DATE
+    </select>
     <resultMap id="TmFormingDemandRecipeRowResult" type="com.zlt.aps.tm.domain.vo.TmFormingDemandRecipeRowVo">
         <result column="ORDER_NO" property="orderNo"/>
         <result column="EMBRYO_CODE" property="embryoCode"/>

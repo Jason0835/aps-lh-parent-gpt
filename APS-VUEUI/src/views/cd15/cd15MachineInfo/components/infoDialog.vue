@@ -100,11 +100,7 @@ export default {
           label: this.$t("ui.data.column.cd15MachineInfo.machineCode"),
           maxlength: 30,
         },
-        {
-          prop: "machineName",
-          label: this.$t("ui.data.column.cd15MachineInfo.machineName"),
-          maxlength: 60,
-        },
+
         {
           prop: "clothWidthMax",
           label: this.$t("ui.data.column.cd15MachineInfo.clothWidthMax"),
@@ -150,11 +146,6 @@ export default {
           type: "switch",
           activeValue: "1",
           inactiveValue: "0",
-        },
-        {
-          prop: "steelStripWidth",
-          label: this.$t("ui.data.column.cd15MachineInfo.steelStripWidth"),
-          type: "number",
         },
         {
           prop: "remark",

@@ -1,21 +1,18 @@
 package com.zlt.aps.nc.api.domain.entity;
 
+import java.math.BigDecimal;
+import java.util.Date;
+
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.ruoyi.common.core.annotation.Excel;
-import com.zlt.aps.common.core.annotation.ImportValidated;
-import com.zlt.aps.common.core.domain.ApsBaseEntity;
-import com.zlt.aps.common.core.utils.BigDecimalUtils;
+import com.ruoyi.common.core.web.domain.BaseEntity;
+
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
-import org.apache.commons.lang3.ObjectUtils;
-
-import java.math.RoundingMode;
-import java.util.Date;
-import java.util.List;
 
 /**
  * 内衬胶排程结果对象 nc_schedule_result
@@ -27,533 +24,341 @@ import java.util.List;
 @EqualsAndHashCode(callSuper = false)
 @ApiModel(value = "内衬胶排程结果对象", description = "内衬胶排程结果对象 ")
 @TableName("T_NC_SCHEDULE_RESULT")
-public class NcScheduleResult extends ApsBaseEntity {
+public class NcScheduleResult extends BaseEntity {
 
     private static final long serialVersionUID = 1L;
 
-    @ApiModelProperty(value = "工厂编码")
+    /** 工厂编号 */
+    @ApiModelProperty(value = "工厂编号", name = "factoryCode")
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;
 
-    /**
-     * 排程日期
-     */
-    @JsonFormat(pattern = "yyyy-MM-dd")
-    @Excel(name = "ui.data.column.scheduleResult.scheduleDate",dateFormat = "yyyy-MM-dd")
-    @ImportValidated(required = true, date = true)
-    @ApiModelProperty(value = "排程日期")
-    @TableField("SCHEDULE_DATE")
-    private Date scheduleDate;
-
-    /**
-     * 对应的成型批次号
-     */
-    @ApiModelProperty(value = "对应的成型批次号")
-    @TableField("CX_BATCH_NO")
-    private String cxBatchNo;
-
-    /**
-     * 批次号，每重新生成一次排程结果，批次号就递增。规则：工序+年月日+3位定长自增序号
-     */
-    @ApiModelProperty(value = "批次号，每重新生成一次排程结果，批次号就递增。规则：工序+年月日+3位定长自增序号")
-    @TableField("BATCH_NO")
+    /** 批次号 */
+    @Excel(name = "ui.data.column.nc.scheduleResult.batchNo")
+    @ApiModelProperty(value = "批次号", name = "batchNo")
+    @TableField(value = "BATCH_NO")
     private String batchNo;
 
     /**
      * 工单号，自动生成（批次号+4位定长自增序号）
      */
-    @ApiModelProperty(value = "工单号，自动生成")
-    @TableField("ORDER_NO")
+    @Excel(name = "ui.data.column.nc.scheduleResult.orderNo")
+    @ApiModelProperty(value = "工单号")
+    @TableField(value = "ORDER_NO")
     private String orderNo;
 
-    /**
-     * 内衬代码
-     */
-    @ImportValidated(required = true,maxLength = 20,isCode = true)
-    @Excel(name = "ui.data.column.quota.liningCode")
-    @ApiModelProperty(value = "内衬代码")
+    /** 排程日期 */
+    @Excel(name = "ui.data.column.nc.scheduleResult.scheduleDate")
+    @ApiModelProperty(value = "排程日期", name = "scheduleDate")
+    @JsonFormat(pattern = "yyyy-MM-dd")
+    @TableField(value = "SCHEDULE_DATE")
+    private Date scheduleDate;
+
+    /** 机台编码 */
+    @Excel(name = "ui.data.column.nc.scheduleResult.machineCode")
+    @ApiModelProperty(value = "机台", name = "machineCode")
+    @TableField(value = "MACHINE_CODE")
+    private String machineCode;
+
+    /** 内衬编码 */
+    @ApiModelProperty(value = "内衬", name = "liningCode")
     @TableField("LINING_CODE")
     private String liningCode;
+
+    /** 内衬物料名 */
+    @ApiModelProperty(value = "内衬物料名", name = "paddingName")
+    @TableField(value = "LINING_NAME")
+    private String liningName;
 
     /**
      * 胶料代码
      */
-    //@Excel(name = "ui.data.column.scheduleResult.glueCode")
-    @ApiModelProperty(value = "胶料代码")
+    @Excel(name = "ui.data.column.nc.scheduleResult.glueCode")
+    @ApiModelProperty(value = "胶料")
     @TableField("GLUE_CODE")
     private String glueCode;
 
-    @ApiModelProperty(value = "胶料代码(完整没有截取的)")
-    @TableField("WHOLE_GLUE_CODE")
-    private String wholeGlueCode;
-
-    /**
-     * 胶料序号
-     */
-    //@Excel(name = "ui.data.column.scheduleResult.glueSeq}")
-    @ApiModelProperty(value = "胶料序号")
-    @TableField("GLUE_SEQ")
-    private String glueSeq;
-
-    /**
-     * 口型板代码
-     */
-    @ApiModelProperty(value = "口型板代码")
-    @TableField("MOUTH_PLATE_CODE")
+    /** 口型板编码 */
+    @Excel(name = "ui.data.column.nc.scheduleResult.mouthPlateCode")
+    @ApiModelProperty(value = "口型板编码", name = "mouthPlateCode")
+    @TableField(value = "MOUTH_PLATE_CODE")
     private String mouthPlateCode;
 
-    /**
-     * 单耗
-     */
-    @ApiModelProperty(value = "单耗")
-    @TableField("UNIT_CONSUME")
-    private Double unitConsume;
+    /** 1班顺序 */
+    @Excel(name = "ui.data.column.nc.scheduleResult.class1Sequence")
+    @ApiModelProperty(value = "1班顺序", name = "class1Sequence")
+    @TableField(value = "CLASS1_SEQUENCE")
+    private Integer class1Sequence;
 
+    /** 1班计划量 */
+    @Excel(name = "ui.data.column.nc.scheduleResult.class1PlanQty")
+    @ApiModelProperty(value = "1班计划量", name = "class1PlanQty")
+    @TableField(value = "CLASS1_PLAN_QTY")
+    private BigDecimal class1PlanQty;
 
-    /**
-     * 生产线(机台名称)
-     */
-    @ImportValidated(required = true,maxLength = 20)
-    @Excel(name = "ui.data.column.scheduleResult.produceLine")
-    @ApiModelProperty(value = "生产线")
-    @TableField("MACHINE_ID")
-    private String machineId;
+    /** 1班完成量 */
+    @Excel(name = "ui.data.column.nc.scheduleResult.class1FinishQty")
+    @ApiModelProperty(value = "1班完成量", name = "class1FinishQty")
+    @TableField(exist = false)
+    private BigDecimal class1FinishQty;
 
-    /**
-     * 库存数量
-     */
-    //@Excel(name = "ui.data.column.scheduleResult.stockQty")
-    @ApiModelProperty(value = "库存数量")
-    @TableField("STOCK_QTY")
-    private Double stockQty;
+    /** 1班原因分析 */
+    @Excel(name = "ui.data.column.nc.scheduleResult.class1Analysis")
+    @ApiModelProperty(value = "1班原因分析", name = "class1Analysis")
+    @TableField(value = "CLASS1_ANALYSIS")
+    private String class1Analysis;
 
-    /**
-     * 库存供应成型时长，单位：小时
-     */
-    //@Excel(name = "ui.data.column.scheduleResult.supplyTime")
-    @ApiModelProperty(value = "库存供应成型时长，单位：小时")
-    @TableField("SUPPLY_TIME")
-    private Double supplyTime;
+    /** 2班顺序 */
+    @Excel(name = "ui.data.column.nc.scheduleResult.class2Sequence")
+    @ApiModelProperty(value = "2班顺序", name = "class2Sequence")
+    @TableField(value = "CLASS2_SEQUENCE")
+    private Integer class2Sequence;
 
-    /**
-     * 当日日计划量合计
-     */
-    @Excel(name = "ui.data.column.scheduleResult.dailyTotalQty")
-    @ApiModelProperty(value = "当日日计划量合计")
-    @TableField("DAILY_TOTAL_QTY")
-    private Double dailyTotalQty;
+    /** 2班计划量 */
+    @Excel(name = "ui.data.column.nc.scheduleResult.class2PlanQty")
+    @ApiModelProperty(value = "2班计划量", name = "class2PlanQty")
+    @TableField(value = "CLASS2_PLAN_QTY")
+    private BigDecimal class2PlanQty;
 
-    /**
-     * 中班(12点-24点)计划量
-     */
-    @ImportValidated(number = true,max = 9999999,min = 0,digits=true)
-    @Excel(name = "ui.data.column.scheduleResult.dayPlanQty")
-    @ApiModelProperty(value = "中班(12点-24点)计划量")
-    @TableField("DAY_PLAN_QTY")
-    private Double dayPlanQty;
+    /** 2班完成量 */
+    @Excel(name = "ui.data.column.nc.scheduleResult.class2FinishQty")
+    @ApiModelProperty(value = "2班完成量", name = "class2FinishQty")
+    @TableField(exist = false)
+    private BigDecimal class2FinishQty;
 
-    /**
-     * 中班(12点-24点)完成量
-     */
-   ////@Excel(name = "中班(12点-24点)完成量")
-    @ApiModelProperty(value = "中班(12点-24点)完成量")
-    @TableField("DAY_FINISH_QTY")
-    private Double dayFinishQty;
+    /** 2班原因分析 */
+    @Excel(name = "ui.data.column.nc.scheduleResult.class2Analysis")
+    @ApiModelProperty(value = "2班原因分析", name = "class2Analysis")
+    @TableField(value = "CLASS2_ANALYSIS")
+    private String class2Analysis;
 
-    /**
-     * 中班(12点-24点)生产顺序
-     */
-    @ImportValidated(number = true,min = 0,max = 999999,isInteger = true)
-    @Excel(name = "ui.data.column.scheduleResult.dayProduceOrder")
-    @ApiModelProperty(value = "中班(12点-24点)生产顺序")
-    @TableField("DAY_PRODUCE_ORDER")
-    private Long dayProduceOrder;
+    /** 3班顺序 */
+    @Excel(name = "ui.data.column.nc.scheduleResult.class3Sequence")
+    @ApiModelProperty(value = "3班顺序", name = "class3Sequence")
+    @TableField(value = "CLASS3_SEQUENCE")
+    private Integer class3Sequence;
 
-    /**
-     * 中班(12点-24点)完成率
-     */
-   ////@Excel(name = "中班(12点-24点)完成率")
-    @ApiModelProperty(value = "中班(12点-24点)完成率")
-    @TableField("DAY_FINISH_RATE")
-    private Double dayFinishRate;
+    /** 3班计划量 */
+    @Excel(name = "ui.data.column.nc.scheduleResult.class3PlanQty")
+    @ApiModelProperty(value = "3班计划量", name = "class3PlanQty")
+    @TableField(value = "CLASS3_PLAN_QTY")
+    private BigDecimal class3PlanQty;
 
-    /**
-     * 中班(12点-24点)系统原因分析
-     */
-   ////@Excel(name = "中班(12点-24点)系统原因分析")
-    @ApiModelProperty(value = "中班(12点-24点)系统原因分析")
-    @TableField("DAY_SYS_ANALYSIS")
-    private String daySysAnalysis;
+    /** 3班完成量 */
+    @Excel(name = "ui.data.column.nc.scheduleResult.class3FinishQty")
+    @ApiModelProperty(value = "3班完成量", name = "class3FinishQty")
+    @TableField(exist = false)
+    private BigDecimal class3FinishQty;
 
-    /**
-     * 中班(12点-24点)手动输入原因分析
-     */
-    @ImportValidated(maxLength = 100)
-    @Excel(name = "ui.data.column.scheduleResult.dayAnalysis")
-    @ApiModelProperty(value = "中班(12点-24点)手动输入原因分析")
-    @TableField("DAY_HAND_ANALYSIS")
-    private String dayHandAnalysis;
+    /** 3班原因分析 */
+    @Excel(name = "ui.data.column.nc.scheduleResult.class3Analysis")
+    @ApiModelProperty(value = "3班原因分析", name = "class3Analysis")
+    @TableField(value = "CLASS3_ANALYSIS")
+    private String class3Analysis;
 
-    /**
-     * 夜班(0点-12点)计划量
-     */
-    @ImportValidated(number = true,max = 9999999,min = 0,digits=true)
-    @Excel(name = "ui.data.column.scheduleResult.nightPlanQty")
-    @ApiModelProperty(value = "夜班(0点-12点)计划量")
-    @TableField("NIGHT_PLAN_QTY")
-    private Double nightPlanQty;
+    /** 4班顺序 */
+    @Excel(name = "ui.data.column.nc.scheduleResult.class4Sequence")
+    @ApiModelProperty(value = "4班顺序", name = "class4Sequence")
+    @TableField(value = "CLASS4_SEQUENCE")
+    private Integer class4Sequence;
 
-    /**
-     * 夜班(0点-12点)完成量
-     */
-   ////@Excel(name = "夜班(0点-12点)完成量")
-    @ApiModelProperty(value = "夜班(0点-12点)完成量")
-    @TableField("NIGHT_FINISH_QTY")
-    private Double nightFinishQty;
+    /** 4班计划量 */
+    @Excel(name = "ui.data.column.nc.scheduleResult.class4PlanQty")
+    @ApiModelProperty(value = "4班计划量", name = "class4PlanQty")
+    @TableField(value = "CLASS4_PLAN_QTY")
+    private BigDecimal class4PlanQty;
 
-    /**
-     * 夜班(0点-12点)生产顺序
-     */
-    @ImportValidated(number = true,min = 0,max = 999999,isInteger = true)
-    @Excel(name = "ui.data.column.scheduleResult.nightProduceOrder")
-    @ApiModelProperty(value = "夜班(0点-12点)生产顺序")
-    @TableField("NIGHT_PRODUCE_ORDER")
-    private Long nightProduceOrder;
+    /** 4班完成量 */
+    @Excel(name = "ui.data.column.nc.scheduleResult.class4FinishQty")
+    @ApiModelProperty(value = "4班完成量", name = "class4FinishQty")
+    @TableField(exist = false)
+    private BigDecimal class4FinishQty;
 
-    /**
-     * 夜班(0点-12点)完成率
-     */
-   ////@Excel(name = "夜班(0点-12点)完成率")
-    @ApiModelProperty(value = "夜班(0点-12点)完成率")
-    @TableField("NIGHT_FINISH_RATE")
-    private Double nightFinishRate;
+    /** 4班原因分析 */
+    @Excel(name = "ui.data.column.nc.scheduleResult.class4Analysis")
+    @ApiModelProperty(value = "4班原因分析", name = "class4Analysis")
+    @TableField(value = "CLASS4_ANALYSIS")
+    private String class4Analysis;
 
-    /**
-     * 夜班(0点-12点)系统原因分析
-     */
-   ////@Excel(name = "夜班(0点-12点)系统原因分析")
-    @ApiModelProperty(value = "夜班(0点-12点)系统原因分析")
-    @TableField("NIGHT_SYS_ANALYSIS")
-    private String nightSysAnalysis;
+    /** 5班顺序 */
+    @Excel(name = "ui.data.column.nc.scheduleResult.class5Sequence")
+    @ApiModelProperty(value = "5班顺序", name = "class5Sequence")
+    @TableField(value = "CLASS5_SEQUENCE")
+    private Integer class5Sequence;
 
-    /**
-     * 夜班(0点-12点)手动输入原因分析
-     */
-    @ImportValidated(maxLength = 100)
-    @Excel(name = "ui.data.column.scheduleResult.nightAnalysis")
-    @ApiModelProperty(value = "夜班(0点-12点)手动输入原因分析")
-    @TableField("NIGHT_HAND_ANALYSIS")
-    private String nightHandAnalysis;
+    /** 5班计划量 */
+    @Excel(name = "ui.data.column.nc.scheduleResult.class5PlanQty")
+    @ApiModelProperty(value = "5班计划量", name = "class5PlanQty")
+    @TableField(value = "CLASS5_PLAN_QTY")
+    private BigDecimal class5PlanQty;
 
-    @ApiModelProperty(value = "预计划", position = 44)
-    @TableField("PRE_PLAN_QTY")
-    private Double prePlanQty;
+    /** 5班完成量 */
+    @Excel(name = "ui.data.column.nc.scheduleResult.class5FinishQty")
+    @ApiModelProperty(value = "5班完成量", name = "class5FinishQty")
+    @TableField(exist = false)
+    private BigDecimal class5FinishQty;
 
-    /**
-     * 对应成型一班的计划量
-     */
-   ////@Excel(name = "对应成型一班的计划量")
-    @ApiModelProperty(value = "对应成型一班的计划量")
-    @TableField("CX_CLASS1_PLAN")
-    private Double cxClass1Plan;
+    /** 5班原因分析 */
+    @Excel(name = "ui.data.column.nc.scheduleResult.class5Analysis")
+    @ApiModelProperty(value = "5班原因分析", name = "class5Analysis")
+    @TableField(value = "CLASS5_ANALYSIS")
+    private String class5Analysis;
 
-    /**
-     * 对应成型二班的计划量
-     */
-   ////@Excel(name = "对应成型二班的计划量")
-    @ApiModelProperty(value = "对应成型二班的计划量")
-    @TableField("CX_CLASS2_PLAN")
-    private Double cxClass2Plan;
+    /** 6班顺序 */
+    @Excel(name = "ui.data.column.nc.scheduleResult.class6Sequence")
+    @ApiModelProperty(value = "6班顺序", name = "class6Sequence")
+    @TableField(value = "CLASS6_SEQUENCE")
+    private Integer class6Sequence;
 
-    /**
-     * 对应成型三班的计划量
-     */
-   ////@Excel(name = "对应成型三班的计划量")
-    @ApiModelProperty(value = "对应成型三班的计划量")
-    @TableField("CX_CLASS3_PLAN")
-    private Double cxClass3Plan;
+    /** 6班计划量 */
+    @Excel(name = "ui.data.column.nc.scheduleResult.class6PlanQty")
+    @ApiModelProperty(value = "6班计划量", name = "class6PlanQty")
+    @TableField(value = "CLASS6_PLAN_QTY")
+    private BigDecimal class6PlanQty;
+
+    /** 6班完成量 */
+    @Excel(name = "ui.data.column.nc.scheduleResult.class6FinishQty")
+    @ApiModelProperty(value = "6班完成量", name = "class6FinishQty")
+    @TableField(exist = false)
+    private BigDecimal class6FinishQty;
+
+    /** 6班原因分析 */
+    @Excel(name = "ui.data.column.nc.scheduleResult.class6Analysis")
+    @ApiModelProperty(value = "6班原因分析", name = "class6Analysis")
+    @TableField(value = "CLASS6_ANALYSIS")
+    private String class6Analysis;
+
+    /** 发布状态 */
+    @Excel(name = "ui.data.column.nc.scheduleResult.releaseStatus")
+    @ApiModelProperty(value = "发布状态", name = "releaseStatus")
+    @TableField(value = "RELEASE_STATUS")
+    private String releaseStatus;
+
+    /** 排程首班班次（ClassNumThreePlanEnums.classIndex），如 "03"=中班、"01"=夜班、"02"=早班 */
+    @Excel(name = "ui.data.column.nc.scheduleResult.scheduleShiftClass")
+    @ApiModelProperty(value = "排程首班班次")
+    @TableField(value = "SCHEDULE_SHIFT_CLASS")
+    private String scheduleShiftClass;
+
+    /** 数据来源，1=自动生成，2=插单，3=导入 */
+    @ApiModelProperty(value = "数据来源", name = "dataSource")
+    @TableField(value = "DATA_SOURCE")
+    private String dataSource;
+
+    /** 是否收尾任务 */
+    @ApiModelProperty(value = "是否收尾任务", name = "tailFlag")
+    @TableField(value = "TAIL_FLAG")
+    private String tailFlag;
 
     /**
-     * 对应成型次一班的计划量
+     * 对应成型8的计划量
      */
-   ////@Excel(name = "对应成型次一班的计划量")
-    @ApiModelProperty(value = "对应成型次一班的计划量")
-    @TableField("CX_CLASS4_PLAN")
-    private Double cxClass4Plan;
+    @ApiModelProperty(value = "对应成型8班的计划量")
+    @TableField(exist = false)
+    private BigDecimal cxClass8Plan;
+
+    @ApiModelProperty(value = "发布成功计数器，每点击一次发布并成功的话，计数器累加")
+    private Integer publishSuccessCount;
 
     /**
-     * 对应成型次二班的计划量
+     * 库存数量（排程时使用的有效库存）
      */
-   ////@Excel(name = "对应成型次二班的计划量")
-    @ApiModelProperty(value = "对应成型次二班的计划量")
-    @TableField("CX_CLASS5_PLAN")
-    private Double cxClass5Plan;
+    @Excel(name = "ui.data.column.scheduleResult.stockQty")
+    @ApiModelProperty(value = "库存")
+    @TableField(value = "STOCK_QTY")
+    private BigDecimal stockQty;
 
-    /**
-     * 是否发布，0--未发布，1--已发布。对应数据字典为：IS_RELEASE
-     */
-   ////@Excel(name = "是否发布，0--未发布，1--已发布。对应数据字典为：IS_RELEASE")
-    @ApiModelProperty(value = "是否发布，0--未发布，1--已发布。对应数据字典为：IS_RELEASE")
-    @TableField("IS_RELEASE")
-    private String isRelease;
-
-    @ApiModelProperty(value = "月计划需求量")
-    @TableField("MONTH_PLAN")
-    private Double monthPlan;
-
+    @Excel(name = "ui.data.column.scheduleResult.monthPlanOs")
     @ApiModelProperty(value = "月计划剩余量")
-    @TableField("MONTH_PLAN_OS")
+    @TableField(exist = false)
     private Double monthPlanOs;
 
-    @TableField("YEAR")
+    @Excel(name = "ui.data.column.scheduleResult.finish")
+    @ApiModelProperty(value = "1班完成率", name = "class1FinishRate")
+    @TableField(exist = false)
+    private BigDecimal class1FinishRate;
+
+    @Excel(name = "ui.data.column.scheduleResult.finish")
+    @ApiModelProperty(value = "2班完成率", name = "class2FinishRate")
+    @TableField(exist = false)
+    private BigDecimal class2FinishRate;
+
+    @Excel(name = "ui.data.column.scheduleResult.finish")
+    @ApiModelProperty(value = "3班完成率", name = "class3FinishRate")
+    @TableField(exist = false)
+    private BigDecimal class3FinishRate;
+
+    @Excel(name = "ui.data.column.scheduleResult.finish")
+    @ApiModelProperty(value = "4班完成率", name = "class4FinishRate")
+    @TableField(exist = false)
+    private BigDecimal class4FinishRate;
+
+    @Excel(name = "ui.data.column.scheduleResult.finish")
+    @ApiModelProperty(value = "5班完成率", name = "class5FinishRate")
+    @TableField(exist = false)
+    private BigDecimal class5FinishRate;
+
+    @Excel(name = "ui.data.column.scheduleResult.finish")
+    @ApiModelProperty(value = "6班完成率", name = "class6FinishRate")
+    @TableField(exist = false)
+    private BigDecimal class6FinishRate;
+
+    @TableField(exist = false)
     private String year;
 
-    @TableField("MONTH")
+    @TableField(exist = false)
     private String month;
+
+    /** 机台名称（非数据库字段，用于前端展示） */
+    @ApiModelProperty(value = "机台名称", name = "machineName")
+    @TableField(exist = false)
+    private String machineName;
+
+    /** T-1日早班数据（非数据库字段，从 T-1 日排产结果 class3 加载） */
+    @ApiModelProperty(value = "T-1日早班顺序", name = "prevDayClass3Sequence")
+    @TableField(exist = false)
+    private Integer prevDayClass3Sequence;
+
+    @ApiModelProperty(value = "T-1日早班计划量", name = "prevDayClass3PlanQty")
+    @TableField(exist = false)
+    private BigDecimal prevDayClass3PlanQty;
+
+    @ApiModelProperty(value = "T-1日早班完成量", name = "prevDayClass3FinishQty")
+    @TableField(exist = false)
+    private BigDecimal prevDayClass3FinishQty;
+
+    @ApiModelProperty(value = "T-1日早班完成率", name = "prevDayClass3FinishRate")
+    @TableField(exist = false)
+    private BigDecimal prevDayClass3FinishRate;
+
+    @ApiModelProperty(value = "T-1日早班原因分析", name = "prevDayClass3Analysis")
+    @TableField(exist = false)
+    private String prevDayClass3Analysis;
+
+    /** T-1日中班数据（非数据库字段，从 T-1 日排产结果加载，首班为夜班时使用） */
+    @ApiModelProperty(value = "T-1日中班顺序", name = "prevDayClass1Sequence")
+    @TableField(exist = false)
+    private Integer prevDayClass1Sequence;
+
+    @ApiModelProperty(value = "T-1日中班计划量", name = "prevDayClass1PlanQty")
+    @TableField(exist = false)
+    private BigDecimal prevDayClass1PlanQty;
+
+    @ApiModelProperty(value = "T-1日中班完成量", name = "prevDayClass1FinishQty")
+    @TableField(exist = false)
+    private BigDecimal prevDayClass1FinishQty;
+
+    @ApiModelProperty(value = "T-1日中班完成率", name = "prevDayClass1FinishRate")
+    @TableField(exist = false)
+    private BigDecimal prevDayClass1FinishRate;
+
+    @ApiModelProperty(value = "T-1日中班原因分析", name = "prevDayClass1Analysis")
+    @TableField(exist = false)
+    private String prevDayClass1Analysis;
 
     @TableField(exist = false)
     private Long[] ids;
 
-    /**
-     * 供应时长查询条件
-     */
     @TableField(exist = false)
-    private transient Double supplyStartTime;
-    @TableField(exist = false)
-    private transient Double supplyEndTime;
-
-    @ApiModelProperty(value = "生产状态")
-    @TableField("PRODUCTION_STATUS")
-    private String productionStatus;
-
-    @Excel(name = "ui.data.column.stock.remark")
-    @ImportValidated(name = "ui.data.column.stock.remark", maxLength = 300)
-    private String remark;
-
-    @ApiModelProperty(value = "收尾提示标识(0:提示收尾；1:不需要提示)")
-    @TableField("MARK_CLOSE_OUT_TIP")
-    private String markCloseOutTip;
-
-    @ApiModelProperty(value = "数据来源：0>自动排程；1>APS插单；2>导入；")
-    @TableField("DATA_SOURCE")
-    private String dataSource;
-
-    @ApiModelProperty(value = "调度员是否修改了生产线，0：否，1：是")
-    @TableField("CHANGE_MACHINE")
-    private Integer changeMachine;
-
-    @ApiModelProperty(value = "调度员是否修改了中班计划量，0：否，1：是")
-    @TableField("CHANGE_DAY_PLAN")
-    private Integer changeDayPlan;
-
-    @ApiModelProperty(value = "调度员是否修改了夜班计划量，0：否，1：是")
-    @TableField("CHANGE_NIGHT_PLAN")
-    private Integer changeNightPlan;
-
-    @ApiModelProperty(value = "发布成功计数器，每点击一次发布并成功的话，计数器累加")
-    @TableField("PUBLISH_SUCCESS_COUNT")
-    private Integer publishSuccessCount;
-
-    /**
-     * 最新发布时间
-     */
-    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
-    @ApiModelProperty(value = "最新发布时间")
-    @TableField("NEWEST_PUBLISH_TIME")
     private Date newestPublishTime;
-
-    @TableField(exist = false)
-    private transient List<Long> ids2;
-
-    @ApiModelProperty(value = "机台名称")
-    @TableField(exist = false)
-    private String machineName;
-
-    /**
-     * 昨日早班计划量
-     */
-    @ApiModelProperty(value = "昨日早班计划量")
-    @TableField(value = "LAST_MID_PLAN_QTY")
-    private Double lastMidPlanQty = 0D;
-
-    /**
-     * 次日夜班计划量
-     */
-    @ApiModelProperty(value = "次日夜班计划量")
-    @TableField(value = "NEXT_DAY_PLAN_QTY")
-    private Double nextDayPlanQty = 0D;
-
-    /**
-     * 次日夜班顺序
-     */
-    @ApiModelProperty(value = "次日夜班顺序")
-    @TableField(value = "NEXT_DAY_PRODUCE_ORDER")
-    private Integer nextDayProduceOrder;
-
-    /**
-     * 次日夜班计划量(卷)
-     */
-    @ApiModelProperty(value = "次日夜班计划量(卷)")
-    @TableField(exist = false)
-    private Double nextDayPlanQtyRollNum = 0D;
-
-    /**
-     * 卷曲长度
-     */
-    @ApiModelProperty(value = "卷曲长度")
-    @TableField(exist = false)
-    private Double curlLength;
-
-    /**
-     * 理论交班库存=昨日早班计划+库存+夜班计划-(成型昨日早班消耗量+成型夜班消耗量)
-     */
-    @ApiModelProperty(value = "理论交班库存")
-    @TableField(exist = false)
-    private Double theoreticClassStockQty = 0D;
-
-    /**
-     * 理论交班库存=成型消耗量
-     */
-    @ApiModelProperty(value = "成型消耗量")
-    @TableField(exist = false)
-    private Double cxConsumeQty = 0D;
-
-    /**
-     * 库存数量(卷)
-     */
-    @ApiModelProperty(value = "库存数量(卷)")
-    @TableField(exist = false)
-    private Double stockQtyRollNum = 0D;
-
-    @ApiModelProperty(value = "月计划剩余量(卷)", position = 51)
-    @TableField(exist = false)
-    private Double monthPlanOsRollNum = 0D;
-
-    /**
-     * 当日日计划量合计(卷)
-     */
-    @ApiModelProperty(value = "当日日计划量合计(卷)")
-    @TableField(exist = false)
-    private Double dailyTotalQtyRollNum = 0D;
-
-    /**
-     * 夜班计划量(卷)
-     */
-    @ApiModelProperty(value = "夜班计划量(卷)")
-    @TableField(exist = false)
-    private Double dayPlanQtyRollNum = 0D;
-
-    /**
-     * 早班计划量(卷)
-     */
-    @ApiModelProperty(value = "早班计划量(卷)")
-    @TableField(exist = false)
-    private Double nightPlanQtyRollNum = 0D;
-
-    /**
-     * 预计划量(卷)
-     */
-    @ApiModelProperty(value = "预计划量(卷)")
-    @TableField(exist = false)
-    private Double prePlanQtyRollNum = 0D;
-
-    /**
-     * 昨日早班计划用量(卷)
-     */
-    @ApiModelProperty(value = "昨日早班计划用量(卷)")
-    @TableField(exist = false)
-    private Double cxClass1PlanRollNum = 0D;
-
-    /**
-     * 夜班计划用量(卷)
-     */
-    @ApiModelProperty(value = "夜班计划用量(卷)")
-    @TableField(exist = false)
-    private Double cxClass2PlanRollNum = 0D;
-
-    /**
-     * 早班计划用量(卷)
-     */
-    @ApiModelProperty(value = "早班计划用量(卷)")
-    @TableField(exist = false)
-    private Double cxClass3PlanRollNum = 0D;
-
-    /**
-     * 次日夜班计划用量(卷)
-     */
-    @ApiModelProperty(value = "次日夜班计划用量(卷)")
-    @TableField(exist = false)
-    private Double cxClass4PlanRollNum = 0D;
-
-    /**
-     * 次日早班计划用量(卷)
-     */
-    @ApiModelProperty(value = "次日早班计划用量(卷)")
-    @TableField(exist = false)
-    private Double cxClass5PlanRollNum = 0D;
-
-    /**
-     * 昨日早班计划量(卷)
-     */
-    @ApiModelProperty(value = "昨日早班计划量(卷)")
-    @TableField(exist = false)
-    private Double lastMidPlanQtyRollNum = 0D;
-
-    /**
-     * 理论交接班库存(卷)
-     */
-    @ApiModelProperty(value = "理论交接班库存(卷)")
-    @TableField(exist = false)
-    private Double theoreticClassStockQtyRollNum = 0D;
-
-    /**
-     * 中班(12点-24点)完成量(卷)
-     */
-    @ApiModelProperty(value = "中班(12点-24点)完成量(卷)", position = 34)
-    @TableField(exist = false)
-    private Double dayFinishQtyRollNum = 0D;
-
-    /**
-     * 夜班(0点-12点)完成量(卷)
-     */
-    @ApiModelProperty(value = "夜班(0点-12点)完成量(卷)", position = 40)
-    @TableField(exist = false)
-    private Double nightFinishQtyRollNum = 0D;
-
-    /**
-     * 理论昨日早班计划量
-     */
-    public void calculateTheoreticClassLastDayPlanQty() {
-        Double lastMidPlanQty = ObjectUtils.defaultIfNull(this.lastMidPlanQty, 0D);
-        Double stockQty = ObjectUtils.defaultIfNull(this.stockQty, 0D);
-        Double dayPlanQty = ObjectUtils.defaultIfNull(this.dayPlanQty, 0D);
-        Double cxConsumeQty = ObjectUtils.defaultIfNull(this.cxConsumeQty, 0D);
-        this.theoreticClassStockQty = lastMidPlanQty + stockQty + dayPlanQty - cxConsumeQty;
-    }
-
-    /**
-     * 计算计划量对应卷数
-     */
-    public void calculatePlanQty() {
-        Double curlLengthValue = this.curlLength;
-        if (curlLengthValue == null || curlLengthValue <= 0) {
-            return;
-        }
-        this.stockQtyRollNum = BigDecimalUtils.div(ObjectUtils.defaultIfNull(this.stockQty, 0D), curlLengthValue).setScale(2, RoundingMode.HALF_UP).doubleValue();
-        this.monthPlanOsRollNum = BigDecimalUtils.div(ObjectUtils.defaultIfNull(this.monthPlanOs, 0D), curlLengthValue).setScale(2, RoundingMode.HALF_UP).doubleValue();
-        this.dailyTotalQtyRollNum = BigDecimalUtils.div(ObjectUtils.defaultIfNull(this.dailyTotalQty, 0D), curlLengthValue).setScale(2, RoundingMode.HALF_UP).doubleValue();
-        this.dayPlanQtyRollNum = BigDecimalUtils.div(ObjectUtils.defaultIfNull(this.dayPlanQty, 0D), curlLengthValue).setScale(2, RoundingMode.HALF_UP).doubleValue();
-        this.nightPlanQtyRollNum = BigDecimalUtils.div(ObjectUtils.defaultIfNull(this.nightPlanQty, 0D), curlLengthValue).setScale(2, RoundingMode.HALF_UP).doubleValue();
-        this.nextDayPlanQtyRollNum = BigDecimalUtils.div(ObjectUtils.defaultIfNull(this.nextDayPlanQty, 0D), curlLengthValue).setScale(2, RoundingMode.HALF_UP).doubleValue();
-        this.prePlanQtyRollNum = BigDecimalUtils.div(ObjectUtils.defaultIfNull(this.prePlanQty, 0D), curlLengthValue).setScale(2, RoundingMode.HALF_UP).doubleValue();
-        this.dayFinishQtyRollNum = BigDecimalUtils.div(ObjectUtils.defaultIfNull(this.dayFinishQty, 0D), curlLengthValue).setScale(2, RoundingMode.HALF_UP).doubleValue();
-        this.nightFinishQtyRollNum = BigDecimalUtils.div(ObjectUtils.defaultIfNull(this.nightFinishQty, 0D), curlLengthValue).setScale(2, RoundingMode.HALF_UP).doubleValue();
-        this.cxClass1PlanRollNum = BigDecimalUtils.div(ObjectUtils.defaultIfNull(this.cxClass1Plan, 0D), curlLengthValue).setScale(2, RoundingMode.HALF_UP).doubleValue();
-        this.cxClass2PlanRollNum = BigDecimalUtils.div(ObjectUtils.defaultIfNull(this.cxClass2Plan, 0D), curlLengthValue).setScale(2, RoundingMode.HALF_UP).doubleValue();
-        this.cxClass3PlanRollNum = BigDecimalUtils.div(ObjectUtils.defaultIfNull(this.cxClass3Plan, 0D), curlLengthValue).setScale(2, RoundingMode.HALF_UP).doubleValue();
-        this.cxClass4PlanRollNum = BigDecimalUtils.div(ObjectUtils.defaultIfNull(this.cxClass4Plan, 0D), curlLengthValue).setScale(2, RoundingMode.HALF_UP).doubleValue();
-        this.cxClass5PlanRollNum = BigDecimalUtils.div(ObjectUtils.defaultIfNull(this.cxClass5Plan, 0D), curlLengthValue).setScale(2, RoundingMode.HALF_UP).doubleValue();
-        this.lastMidPlanQtyRollNum = BigDecimalUtils.div(ObjectUtils.defaultIfNull(this.lastMidPlanQty, 0D), curlLengthValue).setScale(2, RoundingMode.HALF_UP).doubleValue();
-        this.theoreticClassStockQtyRollNum = BigDecimalUtils.div(ObjectUtils.defaultIfNull(this.theoreticClassStockQty, 0D), curlLengthValue).setScale(2, RoundingMode.HALF_UP).doubleValue();
-    }
 }

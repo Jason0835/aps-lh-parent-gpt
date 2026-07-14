@@ -35,6 +35,9 @@ public class Cd90AutoScheduleDraftMapper {
         result.setBatchNo(batchNo);
         result.setOrderNo(orderNo);
         result.setClothCode(draft.getClothCode());
+        result.setCxBatchNo(draft.getCxBatchNo());
+        result.setCxMachineCodes(draft.getCxMachineCodes());
+        result.setPlanSurplusQty(draft.getPlanSurplusQty());
         result.setBigRollCode(draft.getBigRollCode());
         result.setMachineCode(draft.getMachineCode());
         result.setStorageLaneCode(draft.getPrimaryLaneCode());

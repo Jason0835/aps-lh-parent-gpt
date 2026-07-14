@@ -93,6 +93,11 @@ import java.util.zip.ZipOutputStream;
 @Service
 public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> implements ILhScheduleService {
 
+    /**
+     * 硫化排程导入模板首条明细所在 Excel 行号。
+     */
+    private static final int LH_SCHEDULE_IMPORT_DATA_START_ROW = 6;
+
     @Resource
     private IScheduleExecutor scheduleExecutor;
 
@@ -1245,9 +1250,12 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         int successNum = 0;
         int failureNum = 0;
 
-        // 第一轮：注解必填和Excel内重复校验（模板数据从第9行开始）
+        list.stream()
+                .filter(Objects::nonNull)
+                .forEach(this::fillImportChangedTrialStatus);
+        // 第一轮：注解必填和Excel内重复校验（模板数据从第6行开始）
         for (int i = 0; i < list.size(); i++) {
-            int rowNum = i + 9;
+            int rowNum = i + LH_SCHEDULE_IMPORT_DATA_START_ROW;
             LhScheduleResultTemplateImportVO row = list.get(i);
             if (Objects.isNull(row)) {
                 failureNum++;
@@ -1258,7 +1266,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
             row.setFactoryCode(factoryCode);
             row.setScheduleDate(scheduleDate);
             List<ImportErrorLog> validated = ImportExcelValidatedUtils.validated(id, rowNum, row);
-            ImportExcelValidatedUtils.validatedRepeat(list, row, i, 9, id, validated, "lhMachineCode", "materialCode");
+            ImportExcelValidatedUtils.validatedRepeat(list, row, i, LH_SCHEDULE_IMPORT_DATA_START_ROW, id, validated, "lhMachineCode", "materialCode", "changedTrialStatus");
             if (PubUtil.isNotEmpty(validated)) {
                 failureNum++;
                 row.setId(-999L);
@@ -1294,7 +1302,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         List<LhScheduleResult> insertList = new ArrayList<>();
         for (int i = 0; i < list.size(); i++) {
             LhScheduleResultTemplateImportVO row = list.get(i);
-            int rowNum = i + 9;
+            int rowNum = i + LH_SCHEDULE_IMPORT_DATA_START_ROW;
             if (Objects.isNull(row) || Objects.equals(row.getId(), -999L)) {
                 continue;
             }
@@ -1932,7 +1940,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
             errors.add(buildRequiredMessage(rowNum, "ui.data.column.lhScheduleResult.materialCode", "materialCode"));
         }
         if (errors.isEmpty()) {
-            String uniqueKey = buildImportUniqueKey(factoryCode, scheduleDate, row.getLhMachineCode(), row.getMaterialCode());
+            String uniqueKey = buildImportUniqueKey(factoryCode, scheduleDate, row.getLhMachineCode(), row.getMaterialCode(), row.getChangedTrialStatus());
             if (!importUniqueKeys.add(uniqueKey)) {
                 errors.add(I18nUtil.getMessage("ui.data.message.lhScheduleResult.import.excel.repeat.machineMaterial"));
             }
@@ -1949,15 +1957,32 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         return String.format(requiredMsg, rowNum, fieldName);
     }
 
-    private String buildImportUniqueKey(LhScheduleResult entity) {
-        return buildImportUniqueKey(entity.getFactoryCode(), entity.getScheduleDate(), entity.getLhMachineCode(), entity.getMaterialCode());
-    }
 
-    private String buildImportUniqueKey(String factoryCode, Date scheduleDate, String lhMachineCode, String materialCode) {
+    private String buildImportUniqueKey(String factoryCode, Date scheduleDate, String lhMachineCode, String materialCode, String changedTrialStatus) {
         return StringUtils.defaultString(factoryCode).trim() + "|"
                 + DateUtil.format(DateUtil.beginOfDay(scheduleDate), "yyyy-MM-dd") + "|"
                 + StringUtils.defaultString(lhMachineCode).trim() + "|"
-                + StringUtils.defaultString(materialCode).trim();
+                + StringUtils.defaultString(materialCode).trim() + "|"
+                + StringUtils.defaultString(changedTrialStatus).trim();
+    }
+
+    private void fillImportChangedTrialStatus(LhScheduleResultTemplateImportVO row) {
+        if (Objects.isNull(row)) {
+            return;
+        }
+        String changedTrialStatus = Stream.of(
+                row.getClass1IsEnd(),
+                row.getClass2IsEnd(),
+                row.getClass3IsEnd(),
+                row.getClass4IsEnd(),
+                row.getClass5IsEnd(),
+                row.getClass6IsEnd(),
+                row.getClass7IsEnd(),
+                row.getClass8IsEnd()
+        ).filter(StringUtils::isNotBlank).findFirst().orElse(null);
+        if (StringUtils.isNotBlank(changedTrialStatus)) {
+            row.setChangedTrialStatus(changedTrialStatus);
+        }
     }
 
     private void copyImportRowToEntity(LhScheduleResultTemplateImportVO source, LhScheduleResult target) {
@@ -2002,6 +2027,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         target.setDailyPlanQty(source.getDailyPlanQty());
         target.setTotalDailyPlanQty(source.getDailyPlanQty());
         target.setRemark(source.getRemark());
+        target.setChangedTrialStatus(source.getChangedTrialStatus());
 
         target.setClass1PlanQty(source.getClass1PlanQty());
         target.setClass1FinishQty(source.getClass1FinishQty());
@@ -2429,7 +2455,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
 
             // 成型机台号来自成型排程结果的 LH_SCHEDULE_IDS 反查，多个成型机台用分号拼接。
             row.put("cxMachineCode", cxMachineCodeMap.get(result.getId()));
-            row.put("todayNightFinishQty", todayNightFinishQtyMap.get(buildMaterialFactoryExportKey(result.getFactoryCode(), result.getMaterialCode())));
+            row.put("todayNightFinishQty", result.getTotalFinishQty());
             row.put("mouldSurplusQty", result.getMouldSurplusQty());
             row.put("embryoStock", result.getEmbryoStock());
             row.put("singleMouldShiftQty", result.getSingleMouldShiftQty());
@@ -2443,7 +2469,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
             // 明细行的 dailyPlanQty 已按需求从 totalDailyPlanQty 改为 dailyPlanQty。
             // totalPlanQty 只是模板“总计”占位符，为了明细行保持同一日计划量展示，
             // 当前同步写入 dailyPlanQty；首行汇总会在 buildSummaryRow 中单独计算。
-            row.put("dailyPlanQty", result.getDailyPlanQty());
+            row.put("dailyPlanQty", (Objects.isNull(result.getTotalFinishQty()) ? 0 : result.getTotalFinishQty()) - (Objects.isNull(result.getTotalDailyPlanQty()) ? 0 : result.getTotalDailyPlanQty()));
             row.put("totalPlanQty", result.getDailyPlanQty());
             row.put("totalDailyPlanQty", result.getTotalDailyPlanQty());
             row.put("monthPlanSumTotal", result.getMonthPlanSumTotal());

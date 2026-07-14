@@ -178,6 +178,7 @@ public class MonthPlanIssueServiceImpl implements IMonthPlanIssueService {
                 }
                 MonthPlanIssue monthPlanIssue = new MonthPlanIssue();
                 monthPlanIssue.setMpVersionNo(finalResult.getProductionVersion());
+                monthPlanIssue.setLastMonthPlanVersion(finalResult.getLastMonthPlanVersion());
                 monthPlanIssue.setMpYear(String.valueOf(finalResult.getYear()));
                 monthPlanIssue.setMpMonth(String.valueOf(finalResult.getMonth()));
                 monthPlanIssue.setOrderNo(finalResult.getProductionNo());

@@ -62,6 +62,11 @@ public enum MesInterfaceCodeEnum {
     CONSTRUCTION_PROCESS_INFO("CONSTRUCTION_PROCESS_INFO", "mesBomItfService", "syncConstructionProcessInfo", "示方书工艺信息同步"),
 
     /**
+     * 成品原材料折算接口
+     */
+    MES_RAW_MATERIAL_CONVERSION("MES_RAW_MATERIAL_CONVERSION", "mesBomItfService", "syncRawMaterialConversion", "成品原材料折算接口"),
+
+    /**
      * 成品物料信息同步
      */
     BAS_MATERIAL("MES_BAS_MATERIAL", "mesItfService", "syncMaterial", "成品物料信息同步"),

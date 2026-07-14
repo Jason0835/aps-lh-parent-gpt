@@ -76,7 +76,7 @@ public class TbrMouldProductionService extends AbstractDataLoaderService {
 
     private final DayProductionStatisticsHandler dayProductionStatisticsHandler;
 
-    private final CalculateStructureCxMachineNumber calculateStructureCxMachineNumber;
+    private final GroupCapacityHandler calculateStructureCxMachineNumber;
 
     private final ProductionCxMachineCalculationHandler productionCxMachineCalculationHandler;
 
@@ -96,7 +96,7 @@ public class TbrMouldProductionService extends AbstractDataLoaderService {
                                      ClearProductionInfoHandler clearProductionInfoHandler,
                                      InitNoProductionRecordHandler initNoProductionRecordHandler,
                                      DayProductionStatisticsHandler dayProductionStatisticsHandler,
-                                     CalculateStructureCxMachineNumber calculateStructureCxMachineNumber,
+                                     GroupCapacityHandler calculateStructureCxMachineNumber,
                                      ProductionCxMachineCalculationHandler productionCxMachineCalculationHandler,
                                      AdjustContinueSkuProductionQtyHandler adjustContinueSkuProductionQtyHandler) {
         super(groupListHandler, dataService, dpRequireDataService, cycleGroupDataHandler, productionHistoryHandler, monthProductionDataService);

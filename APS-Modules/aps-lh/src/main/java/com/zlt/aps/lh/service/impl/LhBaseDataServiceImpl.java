@@ -11,6 +11,7 @@ import com.zlt.aps.lh.api.constant.LhScheduleParamConstant;
 import com.zlt.aps.lh.api.domain.entity.*;
 import com.zlt.aps.lh.api.enums.*;
 import com.zlt.aps.lh.component.MonthPlanDateResolver;
+import com.zlt.aps.lh.component.SkuDecrementChecker;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.exception.ScheduleDomainExceptionHelper;
 import com.zlt.aps.lh.exception.ScheduleErrorCode;
@@ -97,6 +98,9 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
      * 胎胚收尾标识：非收尾
      */
     private static final int EMBRYO_ENDING_FLAG_NO = 0;
+
+    @Resource
+    private SkuDecrementChecker skuDecrementChecker;
 
     @Resource
     private FactoryMonthPlanProductionFinalResultMapper monthPlanMapper;
@@ -202,6 +206,10 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
         // SKU提前生产需要从窗口结束日继续向后观察N个自然日，月计划和结构机台数按真实年月批量加载。
         Date earlyProductionLookupEndDate = LhScheduleTimeUtil.addDays(endDate, earlyProductionDaysThreshold);
         Map<String, LocalDate> requiredMonthMap = resolveRequiredMonthMap(startDate, earlyProductionLookupEndDate);
+        // 续作 T 日降模需要比较 T 日与 T-1 日原始月计划量；月初排程时，月计划和定稿版本必须额外加载上月。
+        // 该扩展范围只用于月计划链路，结构机台统计、月完成量等其他基础数据仍沿用原排程窗口月份范围。
+        Map<String, LocalDate> monthPlanRequiredMonthMap =
+                resolveMonthPlanRequiredMonthMap(startDate, earlyProductionLookupEndDate);
         // 设备停机、工作日历沿用 T-1 覆盖范围，保证滚动继承和跨日停机判断可复用同一窗口。
         Date calendarControlStartDate = LhScheduleTimeUtil.addDays(startDate, -1);
 
@@ -214,7 +222,7 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
         // 1. 定稿排产版本是月计划、周程滚动调整等任务的前置条件，先单独同步完成。
         //    （若不先同步获取 productionVersion，后续月计划查询会因缺少版本号导致加载不准确。）
         waitForDataInitTasks(runDataInitTaskAsync("月生产计划版本",
-                () -> loadFinalProductionVersions(context, factoryCode, requiredMonthMap, year, month),
+                () -> loadFinalProductionVersions(context, factoryCode, monthPlanRequiredMonthMap, year, month),
                 () -> StringUtils.isNotEmpty(context.getProductionVersion()) ? 1 : 0));
         if (context.isInterrupted()) {
             log.warn("[DataInit] 基础数据初始化中断：totalCost={}ms, reason={}",
@@ -232,7 +240,7 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
         //    - 干冰/喷砂清洗已统一并入设备停机计划，不再加载旧模具清洗表。
         //    - 机台信息与月计划无依赖关系，两者可并发加载。
         CompletableFuture<Void> monthPlanFuture = runDataInitTaskAsync("月生产计划",
-                () -> loadMonthPlan(context, factoryCode, requiredMonthMap),
+                () -> loadMonthPlan(context, factoryCode, monthPlanRequiredMonthMap),
                 () -> sizeOf(context.getMonthPlanList()));
         CompletableFuture<Void> monthPlanStatisticsFuture = runDataInitTaskAsync("月计划结构机台统计",
                 () -> loadMonthPlanStatistics(context, factoryCode, requiredMonthMap, startDate,
@@ -318,7 +326,11 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
                         () -> sizeOf(context.getSkuConstructionRefMap())),
                 runDataInitTaskAsync("硫化示方历史排程结果",
                         () -> loadHistoryCureFormulaResults(context, factoryCode, targetDate),
-                        () -> sizeOf(context.getPreviousCureFormulaResultList()))
+                        () -> sizeOf(context.getPreviousCureFormulaResultList())),
+                // SKU减量清单：按工厂批量加载并构建四维索引，供S4.3归集后统一前置过滤命中SKU
+                runDataInitTaskAsync("SKU减量清单",
+                        () -> skuDecrementChecker.loadAndAttachDecrementIndex(context),
+                        () -> sizeOf(context.getSkuDecrementKeySet()))
         );
 
         // 4. 胎胚收尾标识：依赖月计划、胎胚库存、月累计完成量、T日班次完成量、前日排程结果等均已就绪，
@@ -523,6 +535,21 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
             cursor = cursor.plusDays(1);
         }
         return requiredMonthMap;
+    }
+
+    /**
+     * 解析月计划及定稿版本需要加载的月份集合。
+     * <p>续作 T 日降模需要比较 T 日和 T-1 日原始月计划量，因此月计划链路从 T-1 开始加载；
+     * 该范围不用于结构统计、完成量等其他基础数据，避免扩大无关业务口径。</p>
+     *
+     * @param scheduleStartDate 排程窗口开始日期 T
+     * @param endDateExclusive 月计划后看结束日期，不含当天
+     * @return key=year_month，value=该月月初
+     */
+    private Map<String, LocalDate> resolveMonthPlanRequiredMonthMap(Date scheduleStartDate,
+                                                                    Date endDateExclusive) {
+        Date monthPlanStartDate = LhScheduleTimeUtil.addDays(scheduleStartDate, -1);
+        return resolveRequiredMonthMap(monthPlanStartDate, endDateExclusive);
     }
 
     /**
@@ -1453,7 +1480,9 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
     /**
      * 加载设备停机计划。
      * <p>普通维修、精度等停机仍按排程窗口交集加载；干冰/喷砂清洗需要额外按计划开始时间加载
-     * T 日及之后的未来候选，后续由清洗排程服务按班次和每日上限重新安排实际执行时间。</p>
+     * T 日及之后的未来候选，后续由清洗排程服务按班次和每日上限重新安排实际执行时间。
+     * 两类查询均只加载实际完成时间为空的记录；实际完成时间非空代表设备或 MES 已确认停机完成，
+     * 不得再参与产能扣减、机台阻断或清洗重排。</p>
      *
      * @param context     排程上下文
      * @param factoryCode 分厂编号
@@ -1461,26 +1490,28 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
      * @param endDate     结束日期
      */
     private void loadDevicePlanShut(LhScheduleContext context, String factoryCode, Date startDate, Date endDate) {
-        // 普通设备停机只加载与排程窗口相交的数据，避免扩大维修、精度等正常停机扣减范围。
+        // 普通设备停机只加载与排程窗口相交且尚未实际完成的数据，避免已完成停机重复扣减产能。
         List<MdmDevicePlanShut> normalDevicePlanShutList = devicePlanShutMapper.selectList(
                 new LambdaQueryWrapper<MdmDevicePlanShut>()
                         .eq(MdmDevicePlanShut::getFactoryCode, factoryCode)
                         .le(MdmDevicePlanShut::getBeginDate, endDate)
                         .ge(MdmDevicePlanShut::getEndDate, startDate)
+                        .isNull(MdmDevicePlanShut::getActualFinishDate)
                         .eq(MdmDevicePlanShut::getIsDelete, DeleteFlagEnum.NORMAL.getCode()));
         Date cleaningCandidateStartDate = LhScheduleTimeUtil.clearTime(context.getScheduleDate());
-        // 清洗候选按 T 日及之后的计划开始时间单独加载，允许候选来源超出 T～T+2 排程窗口。
+        // 清洗候选按 T 日及之后的计划开始时间单独加载，且排除已实际完成记录，允许未完成候选来源超出 T～T+2 排程窗口。
         // 注意：本方法入参 startDate 是普通停机使用的 T-1 覆盖起点，清洗候选必须回到 T 日口径。
         List<MdmDevicePlanShut> futureCleaningPlanList = devicePlanShutMapper.selectList(
                 new LambdaQueryWrapper<MdmDevicePlanShut>()
                         .eq(MdmDevicePlanShut::getFactoryCode, factoryCode)
                         .ge(MdmDevicePlanShut::getBeginDate, cleaningCandidateStartDate)
                         .in(MdmDevicePlanShut::getMachineStopType, resolveCleaningStopTypeList())
+                        .isNull(MdmDevicePlanShut::getActualFinishDate)
                         .eq(MdmDevicePlanShut::getIsDelete, DeleteFlagEnum.NORMAL.getCode()));
         List<MdmDevicePlanShut> devicePlanShutList = mergeDevicePlanShutList(
                 normalDevicePlanShutList, futureCleaningPlanList);
         context.setDevicePlanShutList(devicePlanShutList);
-        log.debug("设备停机计划加载完成, 数量: {}", context.getDevicePlanShutList().size());
+        log.debug("设备停机计划加载完成（已过滤实际完成记录）, 数量: {}", context.getDevicePlanShutList().size());
     }
 
     /**
@@ -2277,7 +2308,9 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
     }
 
     /**
-     * 加载硫化精度保养计划，按机台编号建立Map
+     * 加载硫化精度保养计划，按机台编号建立Map。
+     * <p>仅加载完成状态为未完成且实际完成时间为空的计划；保留完成状态原有筛选口径，
+     * 同时以实际完成时间拦截已由设备或 MES 确认完成、但状态尚未同步的精度计划。</p>
      *
      * @param context     排程上下文
      * @param factoryCode 分厂编号
@@ -2289,6 +2322,7 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
                         .eq(LhPrecisionPlan::getFactoryCode, factoryCode)
                         .eq(LhPrecisionPlan::getYear, BigDecimal.valueOf(scheduleYear))
                         .eq(LhPrecisionPlan::getCompletionStatus, "0")
+                        .isNull(LhPrecisionPlan::getActualDate)
                         .eq(LhPrecisionPlan::getIsDelete, DeleteFlagEnum.NORMAL.getCode()));
         Map<String, LhPrecisionPlan> maintenancePlanMap = new HashMap<>(32);
         if (maintenancePlanList != null) {
@@ -2299,7 +2333,8 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
             }
         }
         context.setMaintenancePlanMap(maintenancePlanMap);
-        log.debug("硫化精度保养计划加载完成, 年度: {}, 数量: {}", scheduleYear, maintenancePlanMap.size());
+        log.debug("硫化精度保养计划加载完成（已过滤实际完成记录）, 年度: {}, 数量: {}",
+                scheduleYear, maintenancePlanMap.size());
     }
 
     /**

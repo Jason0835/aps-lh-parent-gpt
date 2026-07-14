@@ -119,16 +119,17 @@ class WeekRollAdjustMachineCrossChecker {
         }
 
         // 2. 检查相邻区间是否有重叠或间隔
+        // 下一个开始可以等于当前的结束
         for (int i = 0; i < sorted.size() - 1; i++) {
             MpStructureAllocation curr = sorted.get(i);
             MpStructureAllocation next = sorted.get(i + 1);
 
-            // 重叠判断：下一个的开始 <= 当前的结束
-            if (next.getBeginDay() <= curr.getEndDay()) {
+            // 重叠判断：下一个的开始 < 当前的结束
+            if (next.getBeginDay() < curr.getEndDay()) {
                 return false; // 存在交叉/重叠
             }
-            // 间隔判断：下一个的开始 != 当前的结束 + 1
-            if (next.getBeginDay() != curr.getEndDay() + 1) {
+            // 间隔判断：下一个的开始 != 当前的结束  && 下一个的开始 != 当前的结束 + 1
+            if ((next.getBeginDay() != curr.getEndDay()) && next.getBeginDay() != curr.getEndDay() + 1) {
                 return false; // 存在空闲间隔
             }
         }

@@ -6,6 +6,9 @@ export function listParams(query) {
 export function getParams(id) {
   return request({ url: `/cd90/cd90Params/getInfo/${id}`, method: 'get' })
 }
+export function getCd90ParamValue(factoryCode, paramCode) {
+  return request({ url: `/cd90/cd90Params/getParamValue/${factoryCode}/${paramCode}`, method: 'get' })
+}
 export function addParams(data) {
   return request({ url: '/cd90/cd90Params/add', method: 'post', headers: { 'Content-Type': 'application/json;charset=UTF-8' }, data })
 }

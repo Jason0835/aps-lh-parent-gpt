@@ -222,11 +222,6 @@ public class TmScheduleResultExplain extends BaseEntity {
     @TableField(value = "GENERATE_MODE")
     private String generateMode;
 
-    /** 结果状态 */
-    @ApiModelProperty(value = "结果状态", name = "resultStatus")
-    @TableField(value = "RESULT_STATUS")
-    private String resultStatus;
-
     /** 当前步骤编码 */
     @ApiModelProperty(value = "当前步骤编码", name = "currentStepCode")
     @TableField(value = "CURRENT_STEP_CODE")

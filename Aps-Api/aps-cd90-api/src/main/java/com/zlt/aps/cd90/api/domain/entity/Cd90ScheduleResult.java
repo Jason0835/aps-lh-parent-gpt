@@ -13,6 +13,7 @@ import com.fasterxml.jackson.annotation.JsonFormat;
 
 import java.io.Serializable;
 import java.lang.reflect.Field;
+import java.math.BigDecimal;
 import java.util.Date;
 
 @Data
@@ -37,6 +38,17 @@ public class Cd90ScheduleResult extends BaseEntity implements Serializable {
     @TableField("CX_BATCH_NO")
     @Excel(name = "ui.data.column.cd90ScheduleResult.cxBatchNo")
     private String cxBatchNo;
+    /** 成型机台编码集合 */
+    @ApiModelProperty("成型机台编码集合")
+    @TableField("CX_MACHINE_CODES")
+    @Excel(name = "ui.data.column.cd90ScheduleResult.cxMachineCodes")
+    private String cxMachineCodes;
+    /** 月计划剩余量 */
+    @ApiModelProperty("月计划剩余量")
+    @TableField("PLAN_SURPLUS_QTY")
+    @Excel(name = "ui.data.column.cd90ScheduleResult.planSurplusQty")
+    private BigDecimal planSurplusQty;
+
     /** 批次号 */
     @ApiModelProperty("批次号")
     @TableField("BATCH_NO")

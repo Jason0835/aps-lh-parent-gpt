@@ -69,19 +69,19 @@ public class Cd15Stock extends BaseEntity implements Serializable {
     /** 库存量(卷) */
     @ApiModelProperty(value = "库存量(卷)", name = "rollStockNum")
     @TableField("ROLL_STOCK_NUM")
-    @Excel(name = "ui.data.column.cd15Stock.rollStockNum")
+    // @Excel(name = "ui.data.column.cd15Stock.rollStockNum")
     private Double rollStockNum;
 
     /** 修正数量(卷) */
     @ApiModelProperty(value = "修正数量(卷)", name = "rollModifyNum")
     @TableField("ROLL_MODIFY_NUM")
-    @Excel(name = "ui.data.column.cd15Stock.rollModifyNum")
+    // @Excel(name = "ui.data.column.cd15Stock.rollModifyNum")
     private Double rollModifyNum;
 
     /** 不良数量(卷) */
     @ApiModelProperty(value = "不良数量(卷)", name = "rollBadNum")
     @TableField("ROLL_BAD_NUM")
-    @Excel(name = "ui.data.column.cd15Stock.rollBadNum")
+    // @Excel(name = "ui.data.column.cd15Stock.rollBadNum")
     private Double rollBadNum;
 
     /** 库存日期开始 */

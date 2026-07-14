@@ -36,17 +36,27 @@ import { autoPlan, validateAutoPlan } from "@/api/nc/ncScheduleResult";
 
 export default {
   components: { infoForm },
+  inject: ['parentDict'],
   data() {
     return {
       loading: false,
       visible: false,
       isEdit: false,
       editType: null,
+      factoryCode: '',
       form: {
         scheduleDate: moment().add(1, "days").format("yyyy-MM-DD"),
+        factoryCode: '',
       },
       rules: {
         scheduleDate: [
+          {
+            required: true,
+            message: this.$t("common.rule.select"),
+            trigger: "blur",
+          },
+        ],
+        factoryCode: [
           {
             required: true,
             message: this.$t("common.rule.select"),
@@ -62,6 +72,14 @@ export default {
     },
     columns: function () {
       return [
+        {
+          label: this.$t("ui.data.column.factoryCode"),
+          prop: "factoryCode",
+          span: 24,
+          type: "select",
+          dictData: this.parentDict.type.biz_factory_name,
+          filterable: true,
+        },
         {
           label: this.$t("ui.data.column.scheduleResult.scheduleDate"),
           prop: "scheduleDate",
@@ -85,7 +103,7 @@ export default {
               this.loading = false;
               if (result.code == 200) {
                 this.$modal.msgSuccess(result.msg);
-                this.$emit("success");
+                this.$emit("success", this.form.scheduleDate);
                 this.hide();
               }
             })
@@ -93,13 +111,13 @@ export default {
               this.loading = false;
             });
         } else if (valid.msg == "1") {
-          this.$confirm(this.$t("ui.biz.alter.makeSureRecreate"))
+          this.$confirm(this.$t("ui.biz.alter.makeSureRecreateDj"))
             .then(async () => {
               let result = await autoPlan(params);
               this.loading = false;
               if (result.code == 200) {
                 this.$modal.msgSuccess(result.msg);
-                this.$emit("success");
+                this.$emit("success", this.form.scheduleDate);
                 this.hide();
               }
             })
@@ -111,7 +129,7 @@ export default {
           this.loading = false;
           if (result.code == 200) {
             this.$modal.msgSuccess(result.msg);
-            this.$emit("success");
+            this.$emit("success", this.form.scheduleDate);
             this.hide();
           }
         } else if (valid.msg == "3") {
@@ -128,16 +146,20 @@ export default {
     },
 
     //utils
-    show(data, editType) {
+    show(data, editType, factoryCode) {
       this.visible = true;
+      // 记录当前工厂编码
+      this.factoryCode = factoryCode || '';
       if (data) {
         this.isEdit = true;
         this.form = {
           ...data,
+          factoryCode: factoryCode || '',
         };
       } else {
         this.form = {
           scheduleDate: moment().add(1, "days").format("yyyy-MM-DD"),
+          factoryCode: factoryCode || '',
         };
       }
     },

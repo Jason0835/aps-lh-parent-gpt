@@ -32,6 +32,13 @@ public interface ICd15ParamsRemoteService {
     Cd15Params getInfo(@PathVariable("id") Long id);
 
     /**
+     * Get parameter value by factory code and parameter code.
+     */
+    @ApiOperation("get param value")
+    @GetMapping("/cd15Params/getParamValue/{factoryCode}/{paramCode}")
+    AjaxResult getParamValue(@PathVariable("factoryCode") String factoryCode, @PathVariable("paramCode") String paramCode);
+
+    /**
      * 新增
      */
     @ApiOperation("新增")

@@ -26,7 +26,7 @@
 </template>
 
 <script>
-import { addCd15CurlLength, updateCd15CurlLength } from "@/api/cd15/curlLength";
+import { addCd15CurlLength, updateCd15CurlLength, listSteelStripCodes } from "@/api/cd15/curlLength";
 import infoForm from "@/views/components/infoForm.vue";
 
 export default {
@@ -48,9 +48,10 @@ export default {
       visible: false,
       isEdit: false,
       form: {},
+      steelStripOptions: [],
       rules: {
         factoryCode: [requiredSelect],
-        steelStripCode: [requiredInput],
+        steelStripCode: [requiredSelect],
         curlLength: [
           requiredInput,
           {
@@ -83,7 +84,10 @@ export default {
         {
           prop: "steelStripCode",
           label: this.$t("ui.data.column.cd15CurlLength.steelStripCode"),
-          type: "input",
+          type: "select",
+          dictData: this.steelStripOptions,
+          filterable: true,
+          clearable: true,
         },
         {
           prop: "curlLength",
@@ -101,6 +105,14 @@ export default {
     },
   },
   methods: {
+    async loadSteelStripOptions() {
+      const res = await listSteelStripCodes();
+      const rows = Array.isArray(res) ? res : (res.rows || res.data || []);
+      this.steelStripOptions = rows.map((code) => ({
+        label: code,
+        value: code,
+      }));
+    },
     async save(params) {
       this.loading = true;
       try {
@@ -124,9 +136,11 @@ export default {
           factoryCode: "116",
         };
       }
+      this.loadSteelStripOptions();
     },
     hide() {
       this.form = {};
+      this.steelStripOptions = [];
       this.$refs.form && this.$refs.form.triggerResetForm();
       this.isEdit = false;
       this.visible = false;

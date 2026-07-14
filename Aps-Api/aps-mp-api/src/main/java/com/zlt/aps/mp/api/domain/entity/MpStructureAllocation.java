@@ -233,7 +233,7 @@ public class MpStructureAllocation extends BaseEntity {
      *
      * @return 分组
      */
-    public String getGroupKey() {
+    public String groupKey() {
         String keyFormat = "%s|*|%s";
         return String.format(keyFormat, structureName, cxMachineCode);
     }

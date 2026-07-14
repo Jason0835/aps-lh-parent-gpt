@@ -93,3 +93,15 @@ export function publishScheduleResult(data) {
 export function exportScheduleResult(query) {
   return downloadLink('/cd15/cd15ScheduleResult/export', query)
 }
+export function checkTimedRolling(data) {
+  return request({
+    url: '/cd15/cd15ScheduleResult/rollingSchedule/check',
+    method: 'post',
+    headers: { 'Content-Type': 'application/json;charset=UTF-8' },
+    data
+  })
+}
+
+export function getTimedRollingTask(taskId) {
+  return request({ url: `/cd15/cd15ScheduleResult/rollingSchedule/task/${taskId}`, method: 'get' })
+}

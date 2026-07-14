@@ -24,7 +24,6 @@ utf-8 no bom
 - 调用类内部的私有方法时统一在调用前加 `this.` 前缀，例如 `this.loadCxSchedule(factoryCode, scheduleDate)`
 - 所有 `if`、`else`、`for`、`while` 等控制语句必须使用大括号 `{}`，且左大括号不换行、右大括号独立一行。禁止单行写法
 - 编写或重构 Java 代码时，对于集合的过滤、映射、收集等操作，优先使用 Stream API 替代传统 for 循环，使代码更简洁易读。例如：
-
 ```java
 // 反例：for 循环
 List<String> result = new ArrayList<>();
@@ -44,7 +43,6 @@ List<String> result = list.stream()
         .distinct()
         .collect(Collectors.toList());
 ```
-
 - **动态字段访问**：实体类中批量读写类似命名规则的字段（如 class1PlanQty ~ class6PlanQty、class1Sequence ~ class6Sequence、class1Analysis ~ class6Analysis 等）时，禁止使用逐个字段的 switch/case 或 if-else 硬编码获取/设置值，统一通过实体的 `getFieldValueByFieldName(String)` / `setFieldValueByFieldName(String, Object)` 方法配合字段名模板常量（如 `String.format("class%dPlanQty", index)`）动态访问。
 - **国际化规则**：所有返回给前端的信息（包括错误提示、校验失败提示等）必须使用 `I18nUtil.getMessage()` 抽取国际化 key，禁止硬编码中文/英文/越南语字符串直接返回前端。i18n key 统一以模块前缀命名（如 `ui.dj.*`），并同步更新 `apsui.properties`、`apsui_zh_CN.properties`、`apsui_en_US.properties`、`apsui_vi_VN.properties` 四个语言文件。
   - **占位符规范**：properties 文件中使用 `{0}`、`{1}`、`{2}` 等格式作为占位符（`java.text.MessageFormat` 风格），代码中必须使用 `MessageFormat.format()` 进行参数替换，禁止使用 `String.format()`。
@@ -113,3 +111,10 @@ UIController extends BaseUIController<Entity>
 ### 胎面部分调整
 - 有涉及到胎面业务调整的部分，都需要同步更新到详设文档：docs/tm/tm_schedule_detailed_design.md
 - 扩展 JSON 场景测试框架和断言，新增对应的测试场景
+- 成型排程与施工信息（T_CX_SCHEDULE_RESULT ↔ T_MDM_CONSTRUCTION_INFO）的版本匹配由参数 `TM_VERSION_MATCH_MODE` 控制：`RECIPE`（默认）按 CD90 式 `(EMBRYO_CODE, CLASSn_RECIPE_NO)` 逐班解析（`TmAutoScheduleDataLoadService.loadFormingDemandTasksByRecipe`，跳过示方书为空的班次）；`B` 模式（`loadFormingDemandTasksByBom`）同一胎胚按 `TREAD_CODE` 分组择一取施工版本（LATERAL + ROW_NUMBER，优先 `BOM_DATA_VERSION` 匹配，否则取最新有效记录），避免"仅按胎胚关联致多版本变体满量重复展开"及"严格版本等值 join 在 `BOM_DATA_VERSION` 为空时归 0"两种极端。库存预测 `TmEngineInventoryPredictMapper.selectFirstShiftDemandRows` 与主流程 `selectFormingDemandRows` 同口径择一；`selectFirstShiftDemandRowsByRecipe` 为 RECIPE 模式。多胎面共用同一胎胚时各胎面独立成任务，`BOM_DATA_VERSION` 为空无法精确归属工单到胎面时建议补全该字段。
+
+### 胎侧部分调整
+- 胎侧排程详设文档：docs/tc/tc_schedule_detailed_design.md，基于胎面详设方法论与 `07-APS详细设计-胎侧.xlsx` 整理；胎侧与胎面共享通用排程引擎 `Aps-Common/aps-engine-common`，差异逻辑放在 `APS-Modules/aps-tc` / `Aps-Api/tc-api` 的 `com.zlt.aps.tc.engine` 包下，不通过修改胎面实现兼容胎侧。
+- 有涉及到胎侧业务调整的部分，都需要同步更新到详设文档：docs/tc/tc_schedule_detailed_design.md
+- 胎侧独有业务点（与胎面差异，落地和调整时需保留）：整车率 `TC_VEHICLE_RATE`（工装可用量因子，默认1）、单班最大可排量 `TC_SHIFT_MAX_CAPACITY`（默认5500米）、库存最低保证班数 `TC_MIN_STOCK_CLASS`（默认3班，胎面为1班）、胎侧+垫胶共用机台 `T_TC_DJ_SHARED_MACHINE` 班次错开约束、机台选择"优先排满一台"口径。
+- 参数与表名统一 `TC_` / `T_TC_*` 前缀，班次映射、版本匹配 `TC_VERSION_MATCH_MODE`、成型偏移 `TC_FORMING_SHIFT_OFFSET` 等与胎面 `TM_*` 对齐。

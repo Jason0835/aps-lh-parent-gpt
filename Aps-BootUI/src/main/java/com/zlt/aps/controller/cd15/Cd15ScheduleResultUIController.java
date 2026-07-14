@@ -10,6 +10,7 @@ import com.ruoyi.common4ui.core.controller.BaseUIController;
 import com.zlt.aps.cd15.api.domain.entity.Cd15ScheduleResult;
 import com.zlt.aps.cd15.api.domain.vo.Cd15ChangeQtyRequest;
 import com.zlt.aps.cd15.api.domain.vo.Cd15InsertOrderRequest;
+import com.zlt.aps.cd15.api.domain.vo.Cd15RollingCheckRequest;
 import com.zlt.aps.cd15.api.domain.vo.Cd15TransferMachineRequest;
 import com.zlt.aps.cd15.api.service.ICd15ScheduleResultRemoteService;
 import com.zlt.file.encryptbyll.FileEncryptUtils;
@@ -155,6 +156,21 @@ public class Cd15ScheduleResultUIController extends BaseUIController<Cd15Schedul
         return cd15ScheduleResultRemoteService.getChangeQtyTask(taskId);
     }
 
+    @ApiOperation("CD15定时滚动排程检查")
+    @RequiresPermissions("cd15:cd15ScheduleResult:autoSchedule")
+    @PostMapping("/rollingSchedule/check")
+    @ResponseBody
+    public AjaxResult checkTimedRolling(@RequestBody Cd15RollingCheckRequest request) {
+        return cd15ScheduleResultRemoteService.checkTimedRolling(request);
+    }
+
+    @ApiOperation("查询CD15定时滚动排程任务")
+    @RequiresPermissions("cd15:cd15ScheduleResult:autoSchedule")
+    @GetMapping("/rollingSchedule/task/{taskId}")
+    @ResponseBody
+    public AjaxResult getTimedRollingTask(@PathVariable("taskId") String taskId) {
+        return cd15ScheduleResultRemoteService.getTimedRollingTask(taskId);
+    }
     @ApiOperation("发布斜裁排程结果")
     @RequiresPermissions("cd15:cd15ScheduleResult:publish")
     @PostMapping("/publish")

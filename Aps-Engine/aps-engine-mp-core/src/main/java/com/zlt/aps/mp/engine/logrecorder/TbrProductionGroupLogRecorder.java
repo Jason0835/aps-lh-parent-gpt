@@ -11,7 +11,6 @@ import com.zlt.aps.mp.engine.utils.TbrProductionLogUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.util.CollectionUtils;
 
-import java.math.BigDecimal;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -102,26 +101,15 @@ public class TbrProductionGroupLogRecorder {
      * 增加结构粗算成型机台数日志信息记录
      * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 粗算：最大排产量：%s 最低硫化机台数：%s 最小日硫化量：%s 需排产天数：%s 估算机台数：%s====
      *
-     * @param context           排程上下文
-     * @param groupName         分组
-     * @param maxCapacity       最大排产量
-     * @param minLhMachineCount 最小硫化机台数
-     * @param minDayQty         最小日产能(单模)
-     * @param sumProductionDay  总生产天数
-     * @param cxMachineCount    估算机台数
+     * @param context   排程上下文
+     * @param groupInfo 分组信息对象
      * @return
      */
-    public static String addGroupCalculateCxMachineCountLog(Context context,
-                                                            String groupName,
-                                                            Integer maxCapacity,
-                                                            Integer minLhMachineCount,
-                                                            Integer minDayQty,
-                                                            Integer sumProductionDay,
-                                                            BigDecimal cxMachineCount) {
+    public static String addGroupCalculateCxMachineCountLog(Context context, ProductionPlanGroupInfo groupInfo) {
         String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 粗算：最大排产量：%s 最低硫化机台数：%s 最小日硫化量：%s 需排产天数：%s 估算机台数：%s====",
                 context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
-                groupName, maxCapacity, minLhMachineCount, minDayQty,
-                sumProductionDay, cxMachineCount);
+                groupInfo.getGroupName(), groupInfo.getSumPlanQty(), groupInfo.getMinLhMachineCount(), groupInfo.getMinLhDayCapacityQty(),
+                groupInfo.getTheoryDays(), groupInfo.getNeedCxCapacityMachineCount());
         ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
         TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.GROUP_SUM_CAPACITY_CX_MACHINE_INFO, logContent);
         return logContent;
@@ -720,6 +708,7 @@ public class TbrProductionGroupLogRecorder {
         TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.GROUP_CX_MACHINE_BASE_MACHE, logContent);
         return logContent;
     }
+
     /**
      * 增加结构没有匹配到成型机-重复切换英寸次数限制日志信息记录
      * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s, 结构：%s 零度：%s 成型机台：%s 机型：%s 达到重复切换英寸次数限制%s====
