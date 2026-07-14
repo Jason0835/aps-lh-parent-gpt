@@ -369,34 +369,34 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
         List<Map<String, Object>> planRows = buildCxTemplateDataList(exportList, recipeTypeMap, totalDailyPlanQtyMap, todayNightFinishQtyMap, smallGlueMap, placeholderMap, shiftCapacitiesMap, keyProductEmbryoCodes, lhShiftConsumptionMap, endingStructureNames);
         planDataList.add(planRows);
 
-        // 为小计行添加 DAEEF3 背景色标识 + 胎胚余量<400 红色背景
-        List<CellStyle> cellStyleList = new ArrayList<>();
-        int templateListStartRow = 4;
-        for (int i = 0; i < planRows.size(); i++) {
-            Map<String, Object> rowMap = planRows.get(i);
-            int rowNum = templateListStartRow + i;
-
-            if ("小计".equals(rowMap.get("cxMachineCode"))) {
-                cellStyleList.add(new CellStyle(
-                        rowNum, rowNum,
-                        0, 60,
-                        "#DAEEF3", true, true, null));
-            } else {
-                Object cxRemainVal = rowMap.get("cxRemainQty");
-                if (cxRemainVal instanceof Number) {
-                    BigDecimal remainQty = new BigDecimal(cxRemainVal.toString());
-                    if (remainQty.compareTo(new BigDecimal("400")) < 0) {
-                        cellStyleList.add(new CellStyle(
-                                rowNum, rowNum,
-                                7, 7,
-                                null, true, false, null, "#FF0000"));
-                    }
-                }
-            }
-        }
-        if (!cellStyleList.isEmpty()) {
-            planTableMap.put("CELL_STYLE", cellStyleList);
-        }
+        // 为小计行添加 DAEEF3 背景色标识 + 胎胚余量<400 红色背景（临时禁用用于排查Excel损坏问题）
+        // List<CellStyle> cellStyleList = new ArrayList<>();
+        // int templateListStartRow = 4;
+        // for (int i = 0; i < planRows.size(); i++) {
+        //     Map<String, Object> rowMap = planRows.get(i);
+        //     int rowNum = templateListStartRow + i;
+        //
+        //     if ("小计".equals(rowMap.get("cxMachineCode"))) {
+        //         cellStyleList.add(new CellStyle(
+        //                 rowNum, rowNum,
+        //                 0, 60,
+        //                 "#DAEEF3", true, true, null));
+        //     } else {
+        //         Object cxRemainVal = rowMap.get("cxRemainQty");
+        //         if (cxRemainVal instanceof Number) {
+        //             BigDecimal remainQty = new BigDecimal(cxRemainVal.toString());
+        //             if (remainQty.compareTo(new BigDecimal("400")) < 0) {
+        //                 cellStyleList.add(new CellStyle(
+        //                         rowNum, rowNum,
+        //                         7, 7,
+        //                         null, true, false, null, "#FF0000"));
+        //             }
+        //         }
+        //     }
+        // }
+        // if (!cellStyleList.isEmpty()) {
+        //     planTableMap.put("CELL_STYLE", cellStyleList);
+        // }
 
         inputStream = new ByteArrayInputStream(exportBytes);
         exportBytes = ExcelUtils.writeMultiList(inputStream, 1, planTableMap, planDataList);

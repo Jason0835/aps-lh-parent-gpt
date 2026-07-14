@@ -678,45 +678,53 @@ public class ScheduleServiceImpl implements ScheduleService {
     private void loadMaterials(ScheduleContextVo context) {
         List<LhScheduleResult> lhScheduleResults = context.getLhScheduleResults();
 
-        // 合并硫化任务物料和成型在机物料
+        // 合并硫化任务物料和成型在机物料（同时收集 MATERIAL_CODE 和 EMBRYO_CODE）
         Set<String> materialCodes = new HashSet<>();
+        Set<String> embryoCodes = new HashSet<>();
 
-        // 1. 从硫化排程结果提取物料编码
+        // 1. 从硫化排程结果提取物料编码和胎胚编码
         if (lhScheduleResults != null && !lhScheduleResults.isEmpty()) {
             Set<String> lhMaterialCodes = lhScheduleResults.stream()
                     .map(LhScheduleResult::getMaterialCode)
                     .filter(Objects::nonNull)
                     .collect(Collectors.toSet());
+            Set<String> lhEmbryoCodes = lhScheduleResults.stream()
+                    .map(LhScheduleResult::getEmbryoCode)
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toSet());
             materialCodes.addAll(lhMaterialCodes);
-            log.debug("从硫化排程结果提取到 {} 个不重复的外胎代码", lhMaterialCodes.size());
+            embryoCodes.addAll(lhEmbryoCodes);
+            log.debug("从硫化排程结果提取到 {} 个 MATERIAL_CODE、{} 个 EMBRYO_CODE",
+                    lhMaterialCodes.size(), lhEmbryoCodes.size());
         }
 
-        if (materialCodes.isEmpty()) {
+        if (materialCodes.isEmpty() && embryoCodes.isEmpty()) {
             log.info("硫化排程结果和成型在机信息均为空，加载物料信息 0 条");
             context.setMaterials(new ArrayList<>());
             return;
         }
 
-        log.info("合并后共有 {} 个不重复的外胎代码（硫化任务 + 成型在机）", materialCodes.size());
+        log.info("合并后共有 {} 个 MATERIAL_CODE、{} 个 EMBRYO_CODE", materialCodes.size(), embryoCodes.size());
 
-        // 查询物料详情
+        // 查询物料详情（同时按 MATERIAL_CODE 和 EMBRYO_CODE 匹配，避免编码交叉遗漏）
         List<MdmMaterialInfo> materials = materialInfoMapper.selectList(
                 new LambdaQueryWrapper<MdmMaterialInfo>()
-                        .in(MdmMaterialInfo::getMaterialCode, materialCodes)
+                        .and(wrapper -> wrapper
+                                .in(MdmMaterialInfo::getMaterialCode, materialCodes)
+                                .or()
+                                .in(MdmMaterialInfo::getEmbryoCode, embryoCodes))
                         .eq(MdmMaterialInfo::getIsDelete, "0"));
         log.info("加载物料信息 {} 条", materials.size());
-
-        context.setMaterials(materials);
     }
 
-    /**
-     * 加载胎胚库存
-     *
-     * <p>根据排程日期获取早上6点那一刻的库存
-     *
-     * @param context       排程上下文
-     * @param scheduleDate  排程日期
-     */
+        /**
+         * 加载胎胚库存
+         *
+         * <p>根据排程日期获取早上6点那一刻的库存
+         *
+         * @param context       排程上下文
+         * @param scheduleDate  排程日期
+         */
     private void loadStocks(ScheduleContextVo context, LocalDate scheduleDate) {
         // 将 LocalDate 转换为 java.sql.Date 用于数据库查询
         Date stockDate = Date.from(scheduleDate.atStartOfDay(java.time.ZoneId.systemDefault()).toInstant());
