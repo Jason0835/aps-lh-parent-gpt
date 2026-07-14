@@ -2,6 +2,7 @@ package com.zlt.aps.cd90.engine.algorithm;
 
 import com.zlt.aps.cd90.engine.model.Cd90AutoScheduleContext;
 import com.zlt.aps.cd90.engine.model.Cd90AutoScheduleInput;
+import com.zlt.aps.cd90.engine.model.Cd90ClothSourceTrace;
 import com.zlt.aps.cd90.engine.model.Cd90ConstructionMaterial;
 import com.zlt.aps.cd90.engine.model.Cd90MultiShiftExecutionResult;
 import com.zlt.aps.cd90.engine.model.Cd90NewSpecAdvanceResult;
@@ -60,6 +61,7 @@ public class Cd90MultiShiftScheduleExecutor {
         List<Cd90ShiftExecutionResult> shiftResults = new ArrayList<>();
         List<Cd90ScheduleAttemptTrace> attemptTraces = new ArrayList<>();
         Cd90RollingScheduleContext rolling = null;
+        Map<String, Cd90ClothSourceTrace> clothSourceTraceByCloth = Collections.emptyMap();
 
         log.info("[直裁自动排程] 多班循环执行开始, factoryCode={}, scheduleDate={}, shiftCount={}",
                 context.getFactoryCode(), context.getScheduleDate(), context.getShifts().size());
@@ -77,6 +79,10 @@ public class Cd90MultiShiftScheduleExecutor {
                     context.getFactoryCode(), context.getScheduleDate(),
                     shift.getClassField(), shift.getShiftCode(), context.getParameters().getAgingPeriodHours());
             if (rolling == null) {
+                clothSourceTraceByCloth = input.getClothSourceTraceByCloth() == null
+                        ? Collections.emptyMap()
+                        : Collections.unmodifiableMap(
+                                new HashMap<>(input.getClothSourceTraceByCloth()));
                 // 首班锁定新增规格判定与需求搬移快照，后续班次不得重查历史改变同批次口径。
                 Cd90NewSpecAdvanceResult advanceResult = this.newSpecAdvanceInputPreparer
                         .prepare(context, input);
@@ -125,6 +131,7 @@ public class Cd90MultiShiftScheduleExecutor {
                 .shiftResults(shiftResults).rollingContext(rolling)
                 .attemptTraces(attemptTraces)
                 .unscheduledResults(unscheduledResultAggregator.aggregate(attemptTraces))
+                .clothSourceTraceByCloth(clothSourceTraceByCloth)
                 .build();
     }
 

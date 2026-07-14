@@ -983,7 +983,7 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
             for (DjLossSetting loss : lossList) {
                 if (loss.getLossRate() != null) {
                     String lossKey = loss.getPaddingCode() + "#" + loss.getMachineCode();
-                    lossRateMap.put(lossKey, BigDecimal.valueOf(loss.getLossRate()));
+                    lossRateMap.put(lossKey, BigDecimalUtils.valueOf(loss.getLossRate()));
                 }
             }
         }

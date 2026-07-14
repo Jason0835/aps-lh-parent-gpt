@@ -10,7 +10,11 @@
 
 <script>
 import { addStorageLaneLimit, updateStorageLaneLimit } from "@/api/cd15/storageLaneLimit";
+import { getCd15ParamValue } from "@/api/cd15/cd15Params";
 import infoForm from "@/views/components/infoForm.vue";
+
+const DEFAULT_FACTORY_CODE = "116";
+const DEFAULT_MAX_CAR_NUM_PARAM_CODE = "SYS0601039";
 
 export default {
   components: { infoForm },
@@ -122,13 +126,22 @@ export default {
         this.loading = false;
       }
     },
-    show(data) {
+    async show(data) {
       this.visible = true;
       if (data) {
         this.isEdit = true;
         this.form = { ...data };
       } else {
-        this.form = { factoryCode: "116", carNum: 0, maxCarNum: 7 };
+        this.form = { factoryCode: DEFAULT_FACTORY_CODE, carNum: 0 };
+        try {
+          const response = await getCd15ParamValue(DEFAULT_FACTORY_CODE, DEFAULT_MAX_CAR_NUM_PARAM_CODE);
+          const paramValue = response && response.data !== undefined ? response.data : response;
+          if (/^\d+$/.test(String(paramValue)) && Number(paramValue) > 0) {
+            this.form = { ...this.form, maxCarNum: Number(paramValue) };
+          }
+        } catch {
+          this.form = { ...this.form };
+        }
       }
     },
     hide() {

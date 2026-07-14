@@ -26,7 +26,7 @@
 </template>
 
 <script>
-import { addSpecifyMachine, editSpecifyMachine } from "@/api/cd15/specifyMachine";
+import { addSpecifyMachine, editSpecifyMachine, listSteelStripCodes } from "@/api/cd15/specifyMachine";
 import { getCd15MachineEnableOptions } from "@/api/cd15/cd15MachineInfo";
 import infoForm from "@/views/components/infoForm.vue";
 
@@ -39,20 +39,16 @@ export default {
       message: this.$t("common.rule.select"),
       trigger: "change",
     };
-    const requiredInput = {
-      required: true,
-      message: this.$t("common.rule.input"),
-      trigger: "blur",
-    };
     return {
       loading: false,
       visible: false,
       isEdit: false,
       form: {},
       machineOptions: [],
+      steelStripOptions: [],
       rules: {
         factoryCode: [requiredSelect],
-        steelStripCode: [requiredInput],
+        steelStripCode: [requiredSelect],
         machineCode: [requiredSelect],
         jobType: [requiredSelect],
       },
@@ -70,11 +66,16 @@ export default {
           type: "select",
           dictData: this.parentDict.type.biz_factory_name,
           filterable: true,
+          listeners: {
+            change: () => this.handleFactoryChange(),
+          },
         },
         {
           prop: "steelStripCode",
           label: this.$t("ui.data.column.cd15SpecifyMachine.steelStripCode"),
-          type: "input",
+          type: "select",
+          dictData: this.steelStripOptions,
+          filterable: true,
         },
         {
           prop: "machineCode",
@@ -82,6 +83,7 @@ export default {
           type: "select",
           dictData: this.machineOptions,
           filterable: true,
+          clearable: true,
         },
         {
           prop: "jobType",
@@ -101,6 +103,14 @@ export default {
     },
   },
   methods: {
+    async loadSteelStripOptions() {
+      const res = await listSteelStripCodes();
+      const rows = Array.isArray(res) ? res : (res.rows || res.data || []);
+      this.steelStripOptions = rows.map((code) => ({
+        label: code,
+        value: code,
+      }));
+    },
     async loadMachineOptions() {
       const res = await getCd15MachineEnableOptions({ factoryCode: this.form.factoryCode });
       const rows = Array.isArray(res) ? res : (res.rows || res.data || []);
@@ -108,6 +118,10 @@ export default {
         label: item.machineCode,
         value: item.machineCode,
       }));
+    },
+    handleFactoryChange() {
+      this.form.machineCode = "";
+      this.loadMachineOptions();
     },
     async save(params) {
       this.loading = true;
@@ -135,10 +149,12 @@ export default {
         };
       }
       this.loadMachineOptions();
+      this.loadSteelStripOptions();
     },
     hide() {
       this.form = {};
       this.machineOptions = [];
+      this.steelStripOptions = [];
       this.$refs.form && this.$refs.form.triggerResetForm();
       this.isEdit = false;
       this.visible = false;

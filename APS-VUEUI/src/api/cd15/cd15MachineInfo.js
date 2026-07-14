@@ -61,6 +61,9 @@ export function changeCd15MachineStatus(data) {
   return request({
     url: '/cd15/cd15MachineInfo/changeStatus',
     method: 'post',
+    headers: {
+      'Content-Type': 'application/json;charset=UTF-8'
+    },
     data
   })
 }

@@ -38,7 +38,7 @@ public class NcSpecifyMachine extends ApsBaseEntity implements Serializable {
     @Excel(name="ui.specifyMachine.column.machineName")
     @ApiModelProperty(value = "机台Code（对应T_NC_MACHINE_INFO表machineCode）")
     @TableField("MACHINE_CODE")
-    private Long machineCode;
+    private String machineCode;
 
     @Excel(name="ui.specifyMachine.column.lineType", dictType="LINE_TYPE")
     @ApiModelProperty(value = "线路，数据维护在数据字典：0-生产线、1-备用线")

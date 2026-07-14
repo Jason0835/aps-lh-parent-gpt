@@ -4,6 +4,7 @@ import lombok.Builder;
 import lombok.Data;
 
 import java.util.List;
+import java.util.Map;
 
 /** 多班滚动排程的内存执行结果。 */
 @Data
@@ -18,4 +19,6 @@ public class Cd90MultiShiftExecutionResult {
     private List<Cd90ScheduleAttemptTrace> attemptTraces;
     /** 窗口结束后的未排结果内存模型。 */
     private List<Cd90UnscheduledResultModel> unscheduledResults;
+    /** 首班输入锁定的帘布成型来源追溯信息。 */
+    private Map<String, Cd90ClothSourceTrace> clothSourceTraceByCloth;
 }

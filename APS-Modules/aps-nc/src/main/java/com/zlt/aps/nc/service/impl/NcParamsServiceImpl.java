@@ -31,10 +31,10 @@ public class NcParamsServiceImpl extends ServiceImpl<NcParamsMapper, NcParams> i
     private NcParamsMapper paramsMapper;
 
     /**
-     * 查询垫胶参数信息
+     * 查询内衬参数信息
      *
-     * @param id 垫胶参数信息ID
-     * @return 垫胶参数信息
+     * @param id 内衬参数信息ID
+     * @return 内衬参数信息
      */
     @Override
     public NcParams selectParamsById(Long id) {
@@ -44,10 +44,10 @@ public class NcParamsServiceImpl extends ServiceImpl<NcParamsMapper, NcParams> i
     }
 
     /**
-     * 查询垫胶参数信息列表
+     * 查询内衬参数信息列表
      *
-     * @param params 垫胶参数信息
-     * @return 垫胶参数信息
+     * @param params 内衬参数信息
+     * @return 内衬参数信息
      */
     @Override
     public List<NcParams> selectParamsList(NcParams params) {
@@ -61,9 +61,9 @@ public class NcParamsServiceImpl extends ServiceImpl<NcParamsMapper, NcParams> i
     }
 
     /**
-     * 修改垫胶参数信息
+     * 修改内衬参数信息
      *
-     * @param params 垫胶参数信息
+     * @param params 内衬参数信息
      * @return 结果
      */
     @Override
@@ -83,7 +83,7 @@ public class NcParamsServiceImpl extends ServiceImpl<NcParamsMapper, NcParams> i
     /**
      * 校验参数代码唯一性
      *
-     * @param params 垫胶参数信息
+     * @param params 内衬参数信息
      * @return 是否唯一
      */
     @Override
@@ -100,12 +100,12 @@ public class NcParamsServiceImpl extends ServiceImpl<NcParamsMapper, NcParams> i
     }
 
     /**
-     * 根据条件查询垫胶参数
+     * 根据条件查询内衬参数
      *
      * @param factoryCode     工厂编码
      * @param productTypeCode 产品品类
      * @param paramCode       参数编码
-     * @return 垫胶参数信息
+     * @return 内衬参数信息
      */
     @Override
     public NcParams getParamsByCondition(String factoryCode, String productTypeCode, String paramCode) {

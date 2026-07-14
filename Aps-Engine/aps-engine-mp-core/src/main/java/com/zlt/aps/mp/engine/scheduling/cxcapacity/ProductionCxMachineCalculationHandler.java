@@ -12,6 +12,7 @@ import com.zlt.aps.mp.engine.enums.ProductionStageEnum;
 import com.zlt.aps.mp.engine.logrecorder.TbrBeforeProductionGroupLogRecorder;
 import com.zlt.aps.mp.engine.logrecorder.TbrProductionGroupLogRecorder;
 import com.zlt.aps.mp.engine.scheduling.TbrProductionContext;
+import com.zlt.aps.mp.engine.utils.ProductionComparatorUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -248,8 +249,7 @@ public class ProductionCxMachineCalculationHandler {
             cxMachineInfo.setFixedProSizeTypes(cxMachineInfo.getAllFixedProSizeTypes());
         });
         //根据分配信息，优先释放通用性好的（固定结构优先级差的、固定结构种类数多的） sandy+ 2026.3.26
-        onlineMachineList.sort(Comparator.comparing(CxMachineBaseInfoVo::getFixedPriority, Comparator.nullsLast(Comparator.naturalOrder()))
-                .thenComparing(CxMachineBaseInfoVo::getFixedProSizeTypes, Comparator.nullsLast(Comparator.naturalOrder())));
+        onlineMachineList.sort(ProductionComparatorUtils.getContinueCxMachinePreOffSort());
         //构建分配信息，(20260410+ 并设置释放优先级)
         int releasePriority = BigDecimal.ZERO.intValue();
         for (CxMachineBaseInfoVo cxMachineInfo : onlineMachineList) {
@@ -468,12 +468,9 @@ public class ProductionCxMachineCalculationHandler {
         if (null == initReleaseInfo) {
             return cxCapacityInfoList;
         }
-        //根据分配信息，优先释放通用性好的（固定结构优先级差的、固定结构种类数多的），配比大的，成型编号大的 sandy+ 2026.3.26
-        cxCapacityInfoList.sort(Comparator.comparing(ProductGroupCxCapacityInfo::getFixedPriority, Comparator.nullsLast(Comparator.naturalOrder()))
-                .thenComparing(ProductGroupCxCapacityInfo::getFixedProSizeTypes, Comparator.nullsLast(Comparator.naturalOrder()))
-                .thenComparing(ProductGroupCxCapacityInfo::getMaxLhMachineCount, Comparator.nullsLast(Comparator.naturalOrder()))
-                .thenComparing(ProductGroupCxCapacityInfo::getCxMachineCode, Comparator.nullsLast(Comparator.reverseOrder())));
-
+        //优先下机：通用性好的（固定结构优先级差的、固定结构种类数多的），配比大的，成型编号大的 sandy+ 2026.3.26
+        cxCapacityInfoList.sort(ProductionComparatorUtils.getContinueCxMachineOffSort());
+        //需要释放台数
         Integer releaseCount = initReleaseInfo.getReleaseMachineCount();
         if (releaseCount <= BigDecimal.ZERO.intValue()) {
             return cxCapacityInfoList;

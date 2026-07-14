@@ -1,15 +1,22 @@
 package com.zlt.aps.nc.api.service;
 
+import java.util.List;
+
+import org.springframework.cloud.openfeign.FeignClient;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
+
 import com.ruoyi.common.constant.ServiceNameConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.zlt.aps.nc.api.domain.entity.NcDayFinishQty;
 import com.zlt.aps.nc.api.domain.entity.NcScheduleResult;
-import io.swagger.annotations.ApiOperation;
-import org.springframework.cloud.openfeign.FeignClient;
-import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
+import io.swagger.annotations.ApiOperation;
 
 
 /**
@@ -25,27 +32,39 @@ public interface INcScheduleResultRemoteService {
      * 查询内衬排程结果列表
      */
     @PostMapping("/ncScheduleResult/list")
-    TableDataInfo list(@RequestBody NcScheduleResult ncScheduleResult);
+    TableDataInfo list(@RequestBody NcScheduleResult djScheduleResult);
 
 
     /**
-     * 新增内衬排程结果
+     * 内衬排程插单
      */
-    @PostMapping("/ncScheduleResult")
-    AjaxResult add(@RequestBody NcScheduleResult ncScheduleResult);
+    @PostMapping("/ncScheduleResult/add")
+    AjaxResult add(@RequestBody NcScheduleResult djScheduleResult);
+
+    /**
+     * 插单前置校验（含跨天日期计算）
+     */
+    @PostMapping("/ncScheduleResult/validateAdd")
+    AjaxResult validateAdd(@RequestBody NcScheduleResult djScheduleResult);
 
 
     /**
      * 修改内衬排程结果
      */
     @PostMapping("/ncScheduleResult/edit")
-    AjaxResult edit(@RequestBody NcScheduleResult ncScheduleResult);
+    AjaxResult edit(@RequestBody NcScheduleResult djScheduleResult);
+
+    /**
+     * 调量前置校验（产能校验）
+     */
+    @PostMapping("/ncScheduleResult/changeQtyValidate")
+    AjaxResult changeQtyValidate(@RequestBody NcScheduleResult scheduleResult);
 
     /**
      * 调量
      */
     @PostMapping("/ncScheduleResult/changeQty")
-    public AjaxResult changeQty(@RequestBody NcScheduleResult scheduleResult);
+    AjaxResult changeQty(@RequestBody NcScheduleResult scheduleResult);
 
     /**
      * 转机台
@@ -72,35 +91,35 @@ public interface INcScheduleResultRemoteService {
      * 获取排程结果
      */
     @PostMapping("/ncScheduleResult/getList")
-    List<NcScheduleResult> getList(@RequestBody NcScheduleResult ncScheduleResult);
+    List<NcScheduleResult> getList(@RequestBody NcScheduleResult djScheduleResult);
 
     /**
      * 唯一性校验
      */
     @PostMapping("/ncScheduleResult/checkUnique")
-    List<NcScheduleResult> checkUnique(@RequestBody NcScheduleResult entity);
+    Boolean checkUnique(@RequestBody NcScheduleResult entity);
 
     /**
      * 导出列表
      */
     @PostMapping("/ncScheduleResult/export")
-    byte[] export(@RequestBody NcScheduleResult ncScheduleResult);
+    byte[] export(@RequestBody NcScheduleResult djScheduleResult);
 
     /**
      * 自动排程
-     * @param ncScheduleResult
+     * @param djScheduleResult
      * @return
      */
     @PostMapping("/ncScheduleResult/autoPlan")
-    AjaxResult autoPlan(@RequestBody NcScheduleResult ncScheduleResult);
+    AjaxResult autoPlan(@RequestBody NcScheduleResult djScheduleResult);
 
     /**
      * 自动排程
-     * @param ncScheduleResult
+     * @param djScheduleResult
      * @return
      */
     @PostMapping("/ncScheduleResult/publish")
-    AjaxResult publish(@RequestBody NcScheduleResult ncScheduleResult);
+    AjaxResult publish(@RequestBody NcScheduleResult djScheduleResult);
 
     /**
      * 查询排程日期是否已发布
@@ -186,4 +205,25 @@ public interface INcScheduleResultRemoteService {
     @PostMapping("/ncScheduleResult/getSummaryVo")
     @ApiOperation("获取排程日期的排程结果合计")
     public AjaxResult getSummaryVo(@RequestBody NcScheduleResult scheduleResult);
+
+    /**
+     * 获取连续6个班次的表头
+     */
+    @GetMapping("/ncScheduleResult/getWorkClass")
+    @ApiOperation("获取连续6个班次的表头")
+    public AjaxResult getWorkClass(@RequestParam(value = "scheduleDate", required = false) String scheduleDate);
+
+    /**
+     * 获取内衬下拉列表
+     */
+    @GetMapping("/ncScheduleResult/getPaddingDistList")
+    @ApiOperation("获取内衬下拉列表")
+    AjaxResult getPaddingDistList();
+
+    /**
+     * 获取当前服务器时间对应的班次信息
+     */
+    @GetMapping("/ncScheduleResult/getCurrentShift")
+    @ApiOperation("获取当前班次信息")
+    AjaxResult getCurrentShift();
 }

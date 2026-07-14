@@ -43,6 +43,10 @@ public class Cd15TransferMachineRequest implements Serializable {
     private Integer class5ProduceOrder;
     @ApiModelProperty("六班目标机台插入顺序")
     private Integer class6ProduceOrder;
+    @ApiModelProperty("七班目标机台插入顺序")
+    private Integer class7ProduceOrder;
+    @ApiModelProperty("八班目标机台插入顺序")
+    private Integer class8ProduceOrder;
     @ApiModelProperty("备注")
     private String remark;
     @ApiModelProperty("是否已确认影响")

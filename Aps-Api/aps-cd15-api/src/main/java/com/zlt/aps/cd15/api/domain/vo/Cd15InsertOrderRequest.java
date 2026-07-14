@@ -29,6 +29,8 @@ public class Cd15InsertOrderRequest implements Serializable {
     private String steelStripCode;
     @ApiModelProperty("大卷编号")
     private String bigRollCode;
+    @ApiModelProperty("裁断角度")
+    private String cuttingAngle;
     @ApiModelProperty("库排号")
     private String storageLaneCode;
     @ApiModelProperty("备注")
@@ -54,6 +56,12 @@ public class Cd15InsertOrderRequest implements Serializable {
     private Double class6PlanQty;
     private Integer class6ProduceOrder;
     private String class6AnalysisInput;
+    private Double class7PlanQty;
+    private Integer class7ProduceOrder;
+    private String class7AnalysisInput;
+    private Double class8PlanQty;
+    private Integer class8ProduceOrder;
+    private String class8AnalysisInput;
 
     /**
      * 按班次字段模板动态读取值。

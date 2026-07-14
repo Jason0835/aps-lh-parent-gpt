@@ -11,6 +11,7 @@ import lombok.Data;
 
 import java.io.Serializable;
 import java.lang.reflect.Field;
+import java.math.BigDecimal;
 import java.util.Date;
 
 /**
@@ -47,6 +48,12 @@ public class Cd15ScheduleResult extends BaseEntity implements Serializable {
     @TableField("CX_BATCH_NO")
     @Excel(name = "ui.data.column.cd15ScheduleResult.cxBatchNo")
     private String cxBatchNo;
+
+    /** 成型机台编码集合 */
+    @ApiModelProperty("成型机台编码集合")
+    @TableField("CX_MACHINE_CODES")
+    @Excel(name = "ui.data.column.cd15ScheduleResult.cxMachineCodes")
+    private String cxMachineCodes;
 
     /** 工单号 */
     @ApiModelProperty("工单号")
@@ -115,9 +122,9 @@ public class Cd15ScheduleResult extends BaseEntity implements Serializable {
 
     /** 月计划剩余量 */
     @ApiModelProperty("月计划剩余量")
-    @TableField("MONTH_SURPLUS_QTY")
-    @Excel(name = "ui.data.column.cd15ScheduleResult.monthSurplusQty")
-    private Double monthSurplusQty;
+    @TableField("PLAN_SURPLUS_QTY")
+    @Excel(name = "ui.data.column.cd15ScheduleResult.planSurplusQty")
+    private BigDecimal planSurplusQty;
 
     /** 裁断模式 */
     @ApiModelProperty("裁断模式")

@@ -21,6 +21,10 @@ public interface ICd90ParamsRemoteService {
     @GetMapping("/cd90Params/getInfo/{id}")
     Cd90Params getInfo(@PathVariable("id") Long id);
 
+    @ApiOperation("获取参数值")
+    @GetMapping("/cd90Params/getParamValue/{factoryCode}/{paramCode}")
+    AjaxResult getParamValue(@PathVariable("factoryCode") String factoryCode, @PathVariable("paramCode") String paramCode);
+
     @ApiOperation("新增")
     @PostMapping("/cd90Params/add")
     AjaxResult add(@RequestBody Cd90Params entity);

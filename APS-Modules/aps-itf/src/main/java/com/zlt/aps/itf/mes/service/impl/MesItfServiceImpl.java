@@ -2298,14 +2298,23 @@ public class MesItfServiceImpl implements MesItfService {
         // 额外插入一条正规(S)记录（值取自量试T数据），用于量试合格品充抵正规订单。
         // 注意：必须在 handleTrialFinishQtyRule 之前调用，因为充抵记录使用的是 MES 原始值，不能被试制/量试规则调整。
         // 新增的正规记录 lhType=S，handleTrialFinishQtyRule 会跳过（isTrialOrMassTrial 返回 false），不受影响。
-        List<LhDayFinishQty> extraFormalRecords = buildMassTrialToFormalRecords(
+        List<LhDayFinishQty> extraFormalRecords = this.buildMassTrialToFormalRecords(
                 syncDataLogs.getFactoryCode(), syncList);
         if (CollectionUtils.isNotEmpty(extraFormalRecords)) {
+            // 补充审计字段（与 syncLhScheDayFinishQtyByLatestVersion 保持一致）
+            for (LhDayFinishQty extra : extraFormalRecords) {
+                extra.setCreateBy("MES");
+                extra.setUpdateBy("MES");
+                extra.setCreateTime(DateUtils.getNowDate());
+                extra.setUpdateTime(DateUtils.getNowDate());
+                extra.setIsDelete(0);
+            }
             insertList.addAll(extraFormalRecords);
         }
 
-        // 处理试制/量试完成量回报规则（跨日合并计划量；≤日计划量按计划量回报、>日计划量按实际回报；计划量查不到则过滤）
-        handleTrialFinishQtyRule(insertList, syncDataLogs.getFactoryCode());
+        // 处理试制/量试完成量回报规则（跨日合并计划量；≤日计划量按计划量回报、>日计划量按实际回报；
+        // 无计划量视为0，按规则3.1/3.2处理，不过滤不同步）
+        this.handleTrialFinishQtyRule(insertList, syncDataLogs.getFactoryCode());
         if (CollectionUtils.isEmpty(insertList)) {
             log.info("硫化排程日完成量同步：试制/量试规则处理后待同步列表为空，factoryCode={}", syncDataLogs.getFactoryCode());
             return AjaxResult.success("试制/量试规则处理后无数据可同步");
@@ -2432,7 +2441,7 @@ public class MesItfServiceImpl implements MesItfService {
         // 注意：必须在 handleTrialFinishQtyRule 之前调用，因为充抵记录使用的是 MES 原始值，不能被试制/量试规则调整。
         // 新增的正规记录 lhType=S，handleTrialFinishQtyRule 会跳过（isTrialOrMassTrial 返回 false），不受影响。
         String factoryCodeForBuild = insertList.get(0).getFactoryCode();
-        List<LhDayFinishQty> extraFormalRecords = buildMassTrialToFormalRecords(
+        List<LhDayFinishQty> extraFormalRecords = this.buildMassTrialToFormalRecords(
                 factoryCodeForBuild, syncList);
         if (CollectionUtils.isNotEmpty(extraFormalRecords)) {
             // 补充审计字段
@@ -2446,10 +2455,11 @@ public class MesItfServiceImpl implements MesItfService {
             insertList.addAll(extraFormalRecords);
         }
 
-        // 处理试制/量试完成量回报规则（跨日合并计划量；≤日计划量按计划量回报、>日计划量按实际回报；计划量查不到则过滤）
+        // 处理试制/量试完成量回报规则（跨日合并计划量；≤日计划量按计划量回报、>日计划量按实际回报；
+        // 无计划量视为0，按规则3.1/3.2处理，不过滤不同步）
         // 注意：此处统一处理所有日期的试制/量试数据，规则处理后再按完成日期分组同步
         String trialFactoryCode = insertList.get(0).getFactoryCode();
-        handleTrialFinishQtyRule(insertList, trialFactoryCode);
+        this.handleTrialFinishQtyRule(insertList, trialFactoryCode);
         if (CollectionUtils.isEmpty(insertList)) {
             log.info("硫化排程日完成量按最新版本号同步：试制/量试规则处理后待同步列表为空，dataVersion={}", dataVersion);
             return AjaxResult.success("试制/量试规则处理后无数据可同步");
@@ -2541,11 +2551,12 @@ public class MesItfServiceImpl implements MesItfService {
      *   <li>排程日期(D+1)的CLASS2（D日中班，滚动排程后D+1版本最新）</li>
      * </ul>
      * 三个班次各自带示方类型，按物料编码+示方类型分组汇总。</p>
-     * <p>匹配维度：物料编码 + 示方类型。若三个班次示方类型均为NULL，则key不存在，过滤不同步。</p>
+     * <p>匹配维度：物料编码 + 示方类型。若三个班次示方类型均为NULL或排程数据不存在，
+     * 视为当日计划量=0，按业务规则3.1/3.2处理（完成量>0按实际值回报、完成量<=0按0回报），不再过滤不同步。</p>
      * <p>正规(S)数据不做处理，原样同步。</p>
-     * <p>完成量为0或null时：若计划量查得到（key存在），落入规则2按日计划量回报（0值放大）。</p>
+     * <p>完成量为0或null时：落入规则3.1按日计划量回报（0值放大）。</p>
      *
-     * @param insertList 待同步的日完成量列表（会被原地修改：调整dayFinishQty或移除元素）
+     * @param insertList 待同步的日完成量列表（会被原地修改：调整dayFinishQty）
      * @param factoryCode 工厂编码
      */
     private void handleTrialFinishQtyRule(List<LhDayFinishQty> insertList, String factoryCode) {
@@ -2554,7 +2565,7 @@ public class MesItfServiceImpl implements MesItfService {
         }
         // 过滤出试制(X)/量试(T)数据，正规(S)数据保持原样不同步处理
         List<LhDayFinishQty> trialList = insertList.stream()
-                .filter(item -> isTrialOrMassTrial(item.getLhType()))
+                .filter(item -> this.isTrialOrMassTrial(item.getLhType()))
                 .collect(Collectors.toList());
         if (CollectionUtils.isEmpty(trialList)) {
             return;
@@ -2573,10 +2584,10 @@ public class MesItfServiceImpl implements MesItfService {
                 .distinct()
                 .collect(Collectors.toList());
 
-        // 需要过滤的记录（计划量查不到，三个班次示方类型均为NULL或排程数据不存在）
-        List<LhDayFinishQty> toRemove = new ArrayList<>();
         // 完成量为0按日计划量放大的记录计数，用于WARN日志追踪
         int zeroFilledCount = 0;
+        // 无计划量(视为0)仍按实际值回报的记录计数，用于INFO日志追踪
+        int noPlanQtyKeepCount = 0;
 
         for (Map.Entry<java.time.LocalDate, List<LhDayFinishQty>> dateEntry : dateGroupedMap.entrySet()) {
             java.time.LocalDate scheduleLocalDate = dateEntry.getKey();
@@ -2617,14 +2628,15 @@ public class MesItfServiceImpl implements MesItfService {
                 if (isZeroFinishQty) {
                     finishQty = BigDecimal.ZERO;
                 }
-                // 获取当日计划量；若key不存在说明三个班次示方类型均为NULL或排程数据不存在，过滤不同步
+                // 获取当日计划量；若key不存在说明三个班次示方类型均为NULL或排程数据不存在，
+                // 视为当日计划量=0（MES回报的试制/量试数据即使APS无对应计划量也应同步），
+                // 按业务规则3.1/3.2处理：完成量>0按实际值回报、完成量<=0按0回报
                 String key = item.getMaterialCode() + "|" + item.getLhType();
-                if (!planQtyMap.containsKey(key)) {
-                    toRemove.add(item);
-                    continue;
-                }
-                BigDecimal dayPlanQty = BigDecimal.valueOf(planQtyMap.get(key));
-                // 2) 完成量 ≤ 日计划量：按当日计划量回报
+                boolean hasPlanQty = planQtyMap.containsKey(key);
+                BigDecimal dayPlanQty = hasPlanQty
+                        ? BigDecimal.valueOf(planQtyMap.get(key))
+                        : BigDecimal.ZERO;
+                // 3.1) 完成量 ≤ 日计划量：按当日计划量回报
                 // 注：完成量为0时落入此分支按日计划量回报（日计划量=0时回报0，>0时回报日计划量即0值放大）
                 if (finishQty.compareTo(dayPlanQty) <= 0) {
                     if (isZeroFinishQty && dayPlanQty.compareTo(BigDecimal.ZERO) > 0) {
@@ -2632,23 +2644,26 @@ public class MesItfServiceImpl implements MesItfService {
                     }
                     item.setDayFinishQty(dayPlanQty);
                 }
-                // 3) 完成量 > 日计划量：按实际完成量回报（保持原值，无需处理）
+                // 3.2) 完成量 > 日计划量：按实际完成量回报（保持原值，无需处理）
+                // 无计划量(=0)且完成量>0时落入此分支，保留MES原始实际完成量
+                if (!hasPlanQty && finishQty.compareTo(BigDecimal.ZERO) > 0) {
+                    noPlanQtyKeepCount++;
+                }
             }
 
             log.info("试制/量试完成量回报规则处理：factoryCode={}, finishDate={}, 当日计划量匹配数={}, 当日试制/量试数据数={}",
                     factoryCode, scheduleLocalDate, planQtyMap.size(), dayItems.size());
         }
 
-        // 从待同步列表中移除计划量查不到的记录（三个班次示方类型均为NULL或排程数据不存在）
-        if (!toRemove.isEmpty()) {
-            insertList.removeAll(toRemove);
-            log.warn("试制/量试完成量回报规则处理：计划量查不到被过滤的记录数={}, 剩余待同步数量={}, factoryCode={}",
-                    toRemove.size(), insertList.size(), factoryCode);
-        }
         // 完成量为0但按日计划量放大的记录，输出WARN便于上线追踪影响范围
         if (zeroFilledCount > 0) {
             log.warn("试制/量试完成量回报规则处理：完成量为0按日计划量放大的记录数={}, factoryCode={}",
                     zeroFilledCount, factoryCode);
+        }
+        // 无计划量(视为0)仍按实际值回报的记录，输出INFO便于上线追踪
+        if (noPlanQtyKeepCount > 0) {
+            log.info("试制/量试完成量回报规则处理：无计划量(视为0)按实际值回报的记录数={}, factoryCode={}",
+                    noPlanQtyKeepCount, factoryCode);
         }
     }
 
@@ -4538,7 +4553,31 @@ public class MesItfServiceImpl implements MesItfService {
             List<List<DevPlanCloseVo>> splitList = ScmListUtils.getSplitList(syncList, 1000);
             List<MdmDevicePlanShut> insertOrUpdateList = null;
             for (List<DevPlanCloseVo> saveList : splitList) {
-                // 查询APS已有数据（按唯一键批量查询）
+                // 1. 优先按MES_ID批量查询APS已有数据（用于精准匹配更新实际完成日期）
+                List<MdmDevicePlanShut> mesIdQueryList = saveList.stream()
+                        .map(DevPlanCloseVo::getId)
+                        .filter(Objects::nonNull)
+                        .map(id -> {
+                            MdmDevicePlanShut shut = new MdmDevicePlanShut();
+                            shut.setMesId(id);
+                            return shut;
+                        })
+                        .collect(Collectors.toList());
+                Map<Long, MdmDevicePlanShut> existsByMesIdMap = new HashMap<>(16);
+                if (CollectionUtils.isNotEmpty(mesIdQueryList)) {
+                    List<MdmDevicePlanShut> existsByMesIdList = devicePlanShutEntityMapper.selectByMesIdList(mesIdQueryList);
+                    if (CollectionUtils.isNotEmpty(existsByMesIdList)) {
+                        existsByMesIdMap = existsByMesIdList.stream()
+                                .filter(item -> item.getMesId() != null)
+                                .collect(Collectors.toMap(
+                                        MdmDevicePlanShut::getMesId,
+                                        Function.identity(),
+                                        (v1, v2) -> v1
+                                ));
+                    }
+                }
+
+                // 2. 回退方案：按唯一键批量查询APS已有数据（兼容历史无MES_ID的APS数据，同时回填MES_ID）
                 List<MdmDevicePlanShut> existsList = devicePlanShutEntityMapper.selectByUniqueKeyList(
                         saveList.stream().map(item -> {
                             MdmDevicePlanShut shut = new MdmDevicePlanShut();
@@ -4579,6 +4618,10 @@ public class MesItfServiceImpl implements MesItfService {
                     entity.setDataSource("0"); // 数据来源：0-MES
                     entity.setCreateBy("MES");
                     entity.setUpdateBy("MES");
+                    // 存储MES设备停机计划表ID，用于后续同步按MES_ID精准匹配
+                    entity.setMesId(item.getId());
+                    // 实际完成日期（MES同步时携带）
+                    entity.setActualFinishDate(item.getActualFinishDate());
 
                     // 处理删除标识：MES的DEL_FLAG映射为APS的IS_DELETE
                     if (StringUtils.isNotBlank(item.getDelFlag())) {
@@ -4587,14 +4630,22 @@ public class MesItfServiceImpl implements MesItfService {
                         entity.setIsDelete(0);
                     }
 
-                    // 判断是否已存在，存在则设置ID进行更新
-                    String mapKey = GenerageMapKeyUtils.createMapKey(
-                            entity.getFactoryCode(), entity.getMachineCode(),
-                            entity.getMachineType(), entity.getMachineStopType(),
-                            entity.getBeginDate() != null ? String.valueOf(entity.getBeginDate().getTime()) : "");
-                    if (existsMap.containsKey(mapKey)) {
-                        MdmDevicePlanShut existsData = existsMap.get(mapKey);
+                    // 匹配策略：优先按MES_ID匹配（精准，确保实际完成日期更新到正确记录），
+                    // 未命中时回退唯一键匹配（兼容历史无MES_ID数据，同时回填MES_ID），都未命中则插入
+                    if (item.getId() != null && existsByMesIdMap.containsKey(item.getId())) {
+                        // 按MES_ID命中 → 更新（含ACTUAL_FINISH_DATE）
+                        MdmDevicePlanShut existsData = existsByMesIdMap.get(item.getId());
                         entity.setId(existsData.getId());
+                    } else {
+                        // 回退唯一键匹配
+                        String mapKey = GenerageMapKeyUtils.createMapKey(
+                                entity.getFactoryCode(), entity.getMachineCode(),
+                                entity.getMachineType(), entity.getMachineStopType(),
+                                entity.getBeginDate() != null ? String.valueOf(entity.getBeginDate().getTime()) : "");
+                        if (existsMap.containsKey(mapKey)) {
+                            MdmDevicePlanShut existsData = existsMap.get(mapKey);
+                            entity.setId(existsData.getId());
+                        }
                     }
                     insertOrUpdateList.add(entity);
                 }

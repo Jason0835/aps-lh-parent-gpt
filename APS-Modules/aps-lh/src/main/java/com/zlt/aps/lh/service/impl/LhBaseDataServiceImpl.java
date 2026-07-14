@@ -11,6 +11,7 @@ import com.zlt.aps.lh.api.constant.LhScheduleParamConstant;
 import com.zlt.aps.lh.api.domain.entity.*;
 import com.zlt.aps.lh.api.enums.*;
 import com.zlt.aps.lh.component.MonthPlanDateResolver;
+import com.zlt.aps.lh.component.SkuDecrementChecker;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.exception.ScheduleDomainExceptionHelper;
 import com.zlt.aps.lh.exception.ScheduleErrorCode;
@@ -97,6 +98,9 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
      * 胎胚收尾标识：非收尾
      */
     private static final int EMBRYO_ENDING_FLAG_NO = 0;
+
+    @Resource
+    private SkuDecrementChecker skuDecrementChecker;
 
     @Resource
     private FactoryMonthPlanProductionFinalResultMapper monthPlanMapper;
@@ -322,7 +326,11 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
                         () -> sizeOf(context.getSkuConstructionRefMap())),
                 runDataInitTaskAsync("硫化示方历史排程结果",
                         () -> loadHistoryCureFormulaResults(context, factoryCode, targetDate),
-                        () -> sizeOf(context.getPreviousCureFormulaResultList()))
+                        () -> sizeOf(context.getPreviousCureFormulaResultList())),
+                // SKU减量清单：按工厂批量加载并构建四维索引，供S4.3归集后统一前置过滤命中SKU
+                runDataInitTaskAsync("SKU减量清单",
+                        () -> skuDecrementChecker.loadAndAttachDecrementIndex(context),
+                        () -> sizeOf(context.getSkuDecrementKeySet()))
         );
 
         // 4. 胎胚收尾标识：依赖月计划、胎胚库存、月累计完成量、T日班次完成量、前日排程结果等均已就绪，
@@ -1472,7 +1480,9 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
     /**
      * 加载设备停机计划。
      * <p>普通维修、精度等停机仍按排程窗口交集加载；干冰/喷砂清洗需要额外按计划开始时间加载
-     * T 日及之后的未来候选，后续由清洗排程服务按班次和每日上限重新安排实际执行时间。</p>
+     * T 日及之后的未来候选，后续由清洗排程服务按班次和每日上限重新安排实际执行时间。
+     * 两类查询均只加载实际完成时间为空的记录；实际完成时间非空代表设备或 MES 已确认停机完成，
+     * 不得再参与产能扣减、机台阻断或清洗重排。</p>
      *
      * @param context     排程上下文
      * @param factoryCode 分厂编号
@@ -1480,26 +1490,28 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
      * @param endDate     结束日期
      */
     private void loadDevicePlanShut(LhScheduleContext context, String factoryCode, Date startDate, Date endDate) {
-        // 普通设备停机只加载与排程窗口相交的数据，避免扩大维修、精度等正常停机扣减范围。
+        // 普通设备停机只加载与排程窗口相交且尚未实际完成的数据，避免已完成停机重复扣减产能。
         List<MdmDevicePlanShut> normalDevicePlanShutList = devicePlanShutMapper.selectList(
                 new LambdaQueryWrapper<MdmDevicePlanShut>()
                         .eq(MdmDevicePlanShut::getFactoryCode, factoryCode)
                         .le(MdmDevicePlanShut::getBeginDate, endDate)
                         .ge(MdmDevicePlanShut::getEndDate, startDate)
+                        .isNull(MdmDevicePlanShut::getActualFinishDate)
                         .eq(MdmDevicePlanShut::getIsDelete, DeleteFlagEnum.NORMAL.getCode()));
         Date cleaningCandidateStartDate = LhScheduleTimeUtil.clearTime(context.getScheduleDate());
-        // 清洗候选按 T 日及之后的计划开始时间单独加载，允许候选来源超出 T～T+2 排程窗口。
+        // 清洗候选按 T 日及之后的计划开始时间单独加载，且排除已实际完成记录，允许未完成候选来源超出 T～T+2 排程窗口。
         // 注意：本方法入参 startDate 是普通停机使用的 T-1 覆盖起点，清洗候选必须回到 T 日口径。
         List<MdmDevicePlanShut> futureCleaningPlanList = devicePlanShutMapper.selectList(
                 new LambdaQueryWrapper<MdmDevicePlanShut>()
                         .eq(MdmDevicePlanShut::getFactoryCode, factoryCode)
                         .ge(MdmDevicePlanShut::getBeginDate, cleaningCandidateStartDate)
                         .in(MdmDevicePlanShut::getMachineStopType, resolveCleaningStopTypeList())
+                        .isNull(MdmDevicePlanShut::getActualFinishDate)
                         .eq(MdmDevicePlanShut::getIsDelete, DeleteFlagEnum.NORMAL.getCode()));
         List<MdmDevicePlanShut> devicePlanShutList = mergeDevicePlanShutList(
                 normalDevicePlanShutList, futureCleaningPlanList);
         context.setDevicePlanShutList(devicePlanShutList);
-        log.debug("设备停机计划加载完成, 数量: {}", context.getDevicePlanShutList().size());
+        log.debug("设备停机计划加载完成（已过滤实际完成记录）, 数量: {}", context.getDevicePlanShutList().size());
     }
 
     /**
@@ -2296,7 +2308,9 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
     }
 
     /**
-     * 加载硫化精度保养计划，按机台编号建立Map
+     * 加载硫化精度保养计划，按机台编号建立Map。
+     * <p>仅加载完成状态为未完成且实际完成时间为空的计划；保留完成状态原有筛选口径，
+     * 同时以实际完成时间拦截已由设备或 MES 确认完成、但状态尚未同步的精度计划。</p>
      *
      * @param context     排程上下文
      * @param factoryCode 分厂编号
@@ -2308,6 +2322,7 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
                         .eq(LhPrecisionPlan::getFactoryCode, factoryCode)
                         .eq(LhPrecisionPlan::getYear, BigDecimal.valueOf(scheduleYear))
                         .eq(LhPrecisionPlan::getCompletionStatus, "0")
+                        .isNull(LhPrecisionPlan::getActualDate)
                         .eq(LhPrecisionPlan::getIsDelete, DeleteFlagEnum.NORMAL.getCode()));
         Map<String, LhPrecisionPlan> maintenancePlanMap = new HashMap<>(32);
         if (maintenancePlanList != null) {
@@ -2318,7 +2333,8 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
             }
         }
         context.setMaintenancePlanMap(maintenancePlanMap);
-        log.debug("硫化精度保养计划加载完成, 年度: {}, 数量: {}", scheduleYear, maintenancePlanMap.size());
+        log.debug("硫化精度保养计划加载完成（已过滤实际完成记录）, 年度: {}, 数量: {}",
+                scheduleYear, maintenancePlanMap.size());
     }
 
     /**

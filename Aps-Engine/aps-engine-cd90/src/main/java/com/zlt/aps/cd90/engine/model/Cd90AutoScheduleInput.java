@@ -25,6 +25,8 @@ public class Cd90AutoScheduleInput {
     private List<Cd90StockSource> stocksAtSix;
     /** 胎胚月计划剩余量。 */
     private List<Cd90EmbryoPlanSurplus> embryoPlanSurpluses;
+    /** 按帘布汇总的成型来源追溯信息。 */
+    private Map<String, Cd90ClothSourceTrace> clothSourceTraceByCloth;
 
     /** 当前班次需求窗口明细。 */
     private List<Cd90DemandShift> demandShifts;

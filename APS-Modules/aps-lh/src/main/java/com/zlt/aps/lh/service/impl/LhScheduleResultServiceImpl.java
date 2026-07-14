@@ -837,16 +837,22 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
             FactoryMonthPlanProductionFinalResult monthPlan = SkuMonthPlanCalculator.getSkuYearMonthFinal(allMonthPlanList, skuInfo, productionYearMonth);
             Integer startDay = DateUtil.dayOfMonth(startDate);
             Map<YearMonth, Integer> yearMonthPlanQtyMap = SkuMonthPlanCalculator.getPlanQty(allProductionDate, allMonthPlanList, monthPlan, startDay);
+            //20260713+ 计划总量加上上个月的超欠产
+            Map<YearMonth, Integer> monthOverdueQtyMap = SkuMonthPlanCalculator.getOverdueProduction(isNextMonthFinal, allProductionDate, allMonthPlanList, skuInfo);
+            int lastMonthOverdueQty = BigDecimal.ZERO.intValue();
+            if (null != monthOverdueQtyMap && !monthOverdueQtyMap.isEmpty()) {
+                lastMonthOverdueQty = monthOverdueQtyMap.values().stream().mapToInt(Integer::intValue).sum();
+            }
             Integer planQty = SkuMonthPlanCalculator.sumQty(yearMonthPlanQtyMap);
             // ---------- TOTAL_DAILY_PLAN_QTY：到断点月计划总量 ----------
             if (Objects.nonNull(monthPlan)) {
-                result.setTotalDailyPlanQty(planQty);
+                result.setTotalDailyPlanQty(planQty + lastMonthOverdueQty);
             }
             // ---------- MONTH_PLAN_SUM_TOTAL：非断点月计划总量 ----------
             Map<YearMonth, Integer> yearMonthSumPlanQtyMap = SkuMonthPlanCalculator.statisticsSumPlanQtyBySku(skuInfo, startDate, allMonthPlanList);
             Integer sumPlanQty = SkuMonthPlanCalculator.sumQty(yearMonthSumPlanQtyMap);
             if (Objects.nonNull(sumPlanQty)) {
-                result.setMonthPlanSumTotal(sumPlanQty);
+                result.setMonthPlanSumTotal(sumPlanQty + lastMonthOverdueQty);
             }
             // ---------- PRODUCTION_VERSION：排产版本 ----------
             MpFactoryProductionVersion finalVersion = productionVersionMap.get(fc);
@@ -943,7 +949,7 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
 //                int surplus = monthPlan.getTotalQty() - finishedQty + lastMonthOverdue;
 //                result.setMouldSurplusQty(Math.max(surplus, 0));
 //            }
-            Map<YearMonth, Integer> monthOverdueQtyMap = SkuMonthPlanCalculator.getOverdueProduction(isNextMonthFinal, allProductionDate, allMonthPlanList, skuInfo);
+
             //硫化余量计算：不在排产后期内：
             Map<YearMonth, FactoryMonthPlanProductionFinalResult> hasProductionPlanMap = SkuMonthPlanCalculator.getHasProductionPlan(allMonthPlanList, allProductionDate, fc, machineCode, result.getLhType());
             int surplus = SkuMonthPlanCalculator.getSurplusQty(productionYearMonth, allProductionDate, hasProductionPlanMap, monthOverdueQtyMap, yearMonthPlanQtyMap, finishedQty);

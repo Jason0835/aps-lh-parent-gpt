@@ -48,6 +48,14 @@ public class Cd90ParamsUIController extends BaseUIController<Cd90Params> {
         return remoteService.getInfo(id);
     }
 
+    @ApiOperation("获取参数值")
+    @GetMapping("/getParamValue/{factoryCode}/{paramCode}")
+    @ResponseBody
+    public AjaxResult getParamValue(@PathVariable("factoryCode") String factoryCode, @PathVariable("paramCode") String paramCode) {
+        return remoteService.getParamValue(factoryCode, paramCode);
+    }
+
+
     @ApiOperation("新增")
     @RequiresPermissions("cd90:params:add")
     @PostMapping("/add")

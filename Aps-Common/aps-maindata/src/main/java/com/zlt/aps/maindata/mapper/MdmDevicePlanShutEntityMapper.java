@@ -32,4 +32,13 @@ public interface MdmDevicePlanShutEntityMapper extends CommBaseMapper<MdmDeviceP
      * @return 查询结果
      */
     List<MdmDevicePlanShut> selectByUniqueKeyList(@Param("list") List<MdmDevicePlanShut> list);
+
+    /**
+     * 批量根据MES_ID查询设备计划停机
+     * 用于MES同步时按MES_ID匹配更新实际完成日期
+     *
+     * @param list 数据列表（仅需mesId有值）
+     * @return 查询结果
+     */
+    List<MdmDevicePlanShut> selectByMesIdList(@Param("list") List<MdmDevicePlanShut> list);
 }

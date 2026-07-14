@@ -40,6 +40,8 @@ public class Cd90ParamsController extends AbstractDocBizController<Cd90Params> {
     public AjaxResult removeByIds(@RequestBody List<Long> ids) { return super.removeByIds(ids); }
     @ApiOperation("获取详情") @GetMapping("/getInfo/{id}") @Override
     public Cd90Params getInfo(@PathVariable("id") Long id) { return super.getInfo(id); }
+    @ApiOperation("获取参数值") @GetMapping("/getParamValue/{factoryCode}/{paramCode}")
+    public AjaxResult getParamValue(@PathVariable("factoryCode") String factoryCode, @PathVariable("paramCode") String paramCode) { return AjaxResult.success("", cd90ParamsService.getParamValue(factoryCode, paramCode)); }
     @ApiOperation("校验唯一性") @PostMapping("/checkUnique")
     public String checkUnique(@RequestBody Cd90Params entity) { return cd90ParamsService.checkUnique(entity); }
     @Log(title = "ui.data.column.params.modelName", businessType = BusinessType.IMPORT) @ApiOperation("导入") @PostMapping("/importData") @Override
