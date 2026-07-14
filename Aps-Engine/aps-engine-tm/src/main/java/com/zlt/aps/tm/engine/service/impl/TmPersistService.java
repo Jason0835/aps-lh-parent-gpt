@@ -201,7 +201,7 @@ public class TmPersistService {
         result.setBaseGlueCode(task.getBaseGlueCode());
         result.setMouthPlateCode(task.getMouthPlateCode());
         result.setReleaseStatus(TmScheduleReleaseStatusEnum.NOT_RELEASED.getCode());
-        result.setDataSource("AUTO");
+        result.setDataSource(TmScheduleConstants.AUTO_SCHEDULE_DATA_SOURCE);
         applyShiftFields(result, node);
         return result;
     }

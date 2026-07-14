@@ -3,9 +3,12 @@ package com.zlt.aps.tm.engine.service.impl;
 import cn.hutool.core.date.DateUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ruoyi.common.exception.ServiceException;
+import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.common.core.utils.BigDecimalUtils;
+import com.zlt.aps.tm.api.constant.TmScheduleConstants;
 import com.zlt.aps.tm.api.domain.entity.TmStock;
 import com.zlt.aps.tm.api.enums.TmScheduleErrorCodeEnum;
+import com.zlt.aps.tm.api.enums.TmVersionMatchModeEnum;
 import com.zlt.aps.tm.engine.domain.*;
 import com.zlt.aps.tm.engine.mapper.TmEngineInventoryPredictMapper;
 import com.zlt.aps.tm.engine.mapper.TmEngineStockMapper;
@@ -30,7 +33,9 @@ import java.util.stream.Collectors;
  *   <li>6点库存：取排程日期前一天的 T_TM_STOCK 记录</li>
  *   <li>早班需求量：取排程日期当天的 T_CX_SCHEDULE_RESULT 早班(CLASS1)成型计划量，
  *       关联 T_MDM_CONSTRUCTION_INFO 获取胎面标准长度，按胎面编码汇总
- *       Σ(CLASS1_PLAN_QTY × TREAD_SHOULDER_LENGTH)</li>
+ *       Σ(CLASS1_PLAN_QTY × TREAD_SHOULDER_LENGTH)；同一胎胚按胎面分组择一取施工版本
+ *       （优先 BOM_DATA_VERSION 匹配，否则取最新有效记录），与主流程 selectFormingDemandRows 同口径，
+ *       避免版本 join 失败导致早班需求归 0</li>
  *   <li>早班计划量：取排程日期前一天的 T_TM_SCHEDULE_RESULT 夜班(CLASS3)胎面计划量，
  *       按胎面编码汇总 CLASS3_PLAN_QTY</li>
  * </ul></p>
@@ -115,12 +120,12 @@ public class TmInventoryPredictService implements ITmInventoryPredictService {
         if (context == null || context.getParamMap() == null) {
             return true;
         }
-        TmParamValue value = context.getParamMap().get("TM_VERSION_MATCH_MODE");
+        TmParamValue value = context.getParamMap().get(TmScheduleConstants.PARAM_VERSION_MATCH_MODE);
         if (value == null) {
             return true;
         }
         String mode = value.getEffectiveValue();
-        return mode == null || !"BOM".equalsIgnoreCase(mode.trim());
+        return TmVersionMatchModeEnum.BOM != TmVersionMatchModeEnum.resolve(mode);
     }
 
     /**
@@ -187,7 +192,7 @@ public class TmInventoryPredictService implements ITmInventoryPredictService {
         } catch (RuntimeException ex) {
             log.error("查询早班需求量失败，factoryCode={}, scheduleDate={}, useRecipe={}",
                     factoryCode, DateUtil.formatDate(scheduleDate), useRecipe, ex);
-            return new HashMap<>();
+            throw new ServiceException(I18nUtil.getMessage("ui.data.alert.tm.schedule.firstShiftDemandQueryFailed"), ex);
         }
         if (rowList == null || rowList.isEmpty()) {
             log.info("排程日期[{}]当天无早班成型计划数据，早班需求量按0处理（useRecipe={}）", DateUtil.formatDate(scheduleDate), useRecipe);
@@ -227,7 +232,7 @@ public class TmInventoryPredictService implements ITmInventoryPredictService {
         } catch (RuntimeException ex) {
             log.error("查询早班计划量失败，factoryCode={}, scheduleDate={}",
                     factoryCode, DateUtil.formatDate(yesterday), ex);
-            return new HashMap<>();
+            throw new ServiceException(I18nUtil.getMessage("ui.data.alert.tm.schedule.firstShiftPlanQueryFailed"), ex);
         }
         if (rowList == null || rowList.isEmpty()) {
             log.info("排程日期[{}]前一天[{}]无夜班胎面排程结果，早班计划量按0处理",

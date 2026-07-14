@@ -1,4 +1,4 @@
-package com.zlt.aps.tm.engine.domain;
+package com.zlt.aps.tm.engine.service;
 
 /**
  * 胎面自动排程进度监听器。

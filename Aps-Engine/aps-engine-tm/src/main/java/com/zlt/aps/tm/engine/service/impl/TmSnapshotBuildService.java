@@ -5,6 +5,9 @@ import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONArray;
 import cn.hutool.json.JSONObject;
 import cn.hutool.json.JSONUtil;
+import com.zlt.aps.tm.api.enums.TmMachineAssignStatusEnum;
+import com.zlt.aps.tm.api.enums.TmScheduleRuleCodeEnum;
+import com.zlt.aps.tm.api.enums.TmScheduleRuleResultEnum;
 import com.zlt.aps.tm.api.enums.TmScheduleTaskStatusEnum;
 import com.zlt.aps.tm.engine.domain.*;
 import org.springframework.stereotype.Service;
@@ -56,7 +59,7 @@ public class TmSnapshotBuildService {
      */
     private String resolveAssignStatus(TmTaskDraft task) {
         if (task == null || isUnplannedTask(task)) {
-            return "UNPLANNED";
+            return TmMachineAssignStatusEnum.UNPLANNED.getCode();
         }
         if (isNoProductionNeeded(task)) {
             return TmScheduleTaskStatusEnum.NO_PRODUCTION_NEEDED.getCode();
@@ -148,11 +151,13 @@ public class TmSnapshotBuildService {
                     continue;
                 }
                 String ruleCode = item.getRuleCode();
-                if ("MACHINE_FILTER".equals(ruleCode) && "REJECT".equals(item.getResult())) {
+                if (TmScheduleRuleCodeEnum.MACHINE_FILTER.getCode().equals(ruleCode)
+                        && TmScheduleRuleResultEnum.REJECT.getCode().equals(item.getResult())) {
                     rejectedCandidates.add(buildFilterEvidenceObject(item.getEvidence()));
-                } else if ("TOOL_LIMIT_UNPLANNED".equals(ruleCode)
-                        || "CAPACITY_OVERFLOW_UNPLANNED".equals(ruleCode)
-                        || ("MACHINE_ASSIGN".equals(ruleCode) && "REJECT".equals(item.getResult()))) {
+                } else if (TmScheduleRuleCodeEnum.TOOL_LIMIT_UNPLANNED.getCode().equals(ruleCode)
+                        || TmScheduleRuleCodeEnum.CAPACITY_OVERFLOW_UNPLANNED.getCode().equals(ruleCode)
+                        || (TmScheduleRuleCodeEnum.MACHINE_ASSIGN.getCode().equals(ruleCode)
+                        && TmScheduleRuleResultEnum.REJECT.getCode().equals(item.getResult()))) {
                     JSONObject evObj = new JSONObject();
                     evObj.set("ruleCode", ruleCode);
                     evObj.set("result", item.getResult());

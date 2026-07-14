@@ -2,6 +2,7 @@ package com.zlt.aps.tm.service.loader;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.zlt.aps.tm.api.domain.entity.TmLossSetting;
+import com.zlt.aps.tm.api.enums.TmYesNoEnum;
 import com.zlt.aps.tm.engine.domain.TmLossRule;
 import com.zlt.aps.tm.engine.domain.TmScheduleContext;
 import com.zlt.aps.tm.mapper.TmLossSettingMapper;
@@ -17,8 +18,6 @@ import java.util.stream.Collectors;
  * <p>负责把启用的业务损耗配置转换为引擎运行态规则，不参与损耗率匹配和计划量计算。</p>
  */
 public class TmLossRuleLoader {
-
-    private static final String ENABLED = "1";
 
     /**
      * 加载并转换损耗规则。
@@ -37,7 +36,7 @@ public class TmLossRuleLoader {
         }
         LambdaQueryWrapper<TmLossSetting> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(TmLossSetting::getFactoryCode, context.getFactoryCode());
-        wrapper.eq(TmLossSetting::getEnableStatus, ENABLED);
+        wrapper.eq(TmLossSetting::getEnableStatus, TmYesNoEnum.YES.getCode());
         return Optional.ofNullable(lossSettingMapper.selectList(wrapper)).orElse(Collections.emptyList())
                 .stream()
                 .map(this::toLossRule)

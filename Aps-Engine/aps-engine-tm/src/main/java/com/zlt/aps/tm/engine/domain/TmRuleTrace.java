@@ -4,6 +4,8 @@ import cn.hutool.json.JSONArray;
 import cn.hutool.json.JSONConfig;
 import cn.hutool.json.JSONObject;
 import cn.hutool.json.JSONUtil;
+import com.zlt.aps.tm.api.enums.TmScheduleRuleCodeEnum;
+import com.zlt.aps.tm.api.enums.TmScheduleRuleResultEnum;
 import lombok.Getter;
 
 import java.util.ArrayList;
@@ -29,8 +31,8 @@ public class TmRuleTrace {
      * @param result   规则结果
      * @param evidence 规则证据
      */
-    public void addRuleHit(String ruleCode, String result, Object evidence) {
-        ruleHits.add(new TmRuleTraceItem(ruleCode, result, evidence));
+    public void addRuleHit(TmScheduleRuleCodeEnum ruleCode, TmScheduleRuleResultEnum result, Object evidence) {
+        ruleHits.add(new TmRuleTraceItem(ruleCode.getCode(), result.getCode(), evidence));
     }
 
     /**

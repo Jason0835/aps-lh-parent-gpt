@@ -61,16 +61,31 @@ public interface TmAutoScheduleDataLoadMapper {
                                                      @Param("productionDate") Date productionDate);
 
     /**
+     * 按日期区间查询指定工序工作日历。
+     *
+     * @param factoryCode 工厂编号
+     * @param procCode    工序编码
+     * @param startDate   开始日期
+     * @param endDate     结束日期
+     * @return 日期区间内工作日历
+     */
+    List<TmWorkCalendarRowVo> selectWorkCalendarRowsByRange(@Param("factoryCode") String factoryCode,
+                                                            @Param("procCode") String procCode,
+                                                            @Param("startDate") Date startDate,
+                                                            @Param("endDate") Date endDate);
+    /**
      * 查询月计划定稿实验规格数据。
      *
      * @param factoryCode        工厂编号
      * @param yearMonth          年月，格式 yyyyMM
      * @param dayColumn          月计划日期列，格式 DAY_1 到 DAY_31
      * @param experimentPlanDate 月计划定稿生产日期
+     * @param constructionStage  实验规格施工阶段编码
      * @return 实验规格月计划行数据
      */
     List<TmExperimentSpecMonthPlanRowVo> selectExperimentSpecMonthPlanRows(@Param("factoryCode") String factoryCode,
                                                                            @Param("yearMonth") Integer yearMonth,
                                                                            @Param("dayColumn") String dayColumn,
-                                                                           @Param("experimentPlanDate") Date experimentPlanDate);
+                                                                           @Param("experimentPlanDate") Date experimentPlanDate,
+                                                                           @Param("constructionStage") String constructionStage);
 }

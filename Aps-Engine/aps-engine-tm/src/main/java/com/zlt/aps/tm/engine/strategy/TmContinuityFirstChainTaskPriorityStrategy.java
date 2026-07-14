@@ -2,6 +2,7 @@ package com.zlt.aps.tm.engine.strategy;
 
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.StrUtil;
+import com.zlt.aps.tm.api.enums.TmScheduleStrategyEnum;
 import com.zlt.aps.tm.engine.domain.TmChainSortScore;
 import com.zlt.aps.tm.engine.domain.TmScheduleContext;
 import com.zlt.aps.tm.engine.domain.TmTaskDraft;
@@ -13,12 +14,10 @@ import java.util.Map;
 
 /** 连续性优先策略，保持二期实施前的生产排序口径。 */
 public class TmContinuityFirstChainTaskPriorityStrategy implements ITmChainTaskPriorityStrategy {
-    /** 连续性优先策略编码 */
-    public static final String STRATEGY_CODE = "CONTINUITY_FIRST";
 
     @Override
     public String getStrategyCode() {
-        return STRATEGY_CODE;
+        return TmScheduleStrategyEnum.CONTINUITY_FIRST.getCode();
     }
 
     @Override

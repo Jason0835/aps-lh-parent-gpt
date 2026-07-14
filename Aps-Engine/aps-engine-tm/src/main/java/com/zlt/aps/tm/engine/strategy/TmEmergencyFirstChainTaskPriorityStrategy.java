@@ -2,6 +2,7 @@ package com.zlt.aps.tm.engine.strategy;
 
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.StrUtil;
+import com.zlt.aps.tm.api.enums.TmScheduleStrategyEnum;
 import com.zlt.aps.tm.engine.domain.TmChainSortScore;
 import com.zlt.aps.tm.engine.domain.TmScheduleContext;
 import com.zlt.aps.tm.engine.domain.TmTaskDraft;
@@ -15,12 +16,10 @@ import java.util.stream.Collectors;
 
 /** 库存紧急优先策略，预置机台仍作为硬约束优先处理。 */
 public class TmEmergencyFirstChainTaskPriorityStrategy implements ITmChainTaskPriorityStrategy {
-    /** 紧急优先策略编码 */
-    public static final String STRATEGY_CODE = "EMERGENCY_FIRST";
 
     @Override
     public String getStrategyCode() {
-        return STRATEGY_CODE;
+        return TmScheduleStrategyEnum.EMERGENCY_FIRST.getCode();
     }
 
     @Override

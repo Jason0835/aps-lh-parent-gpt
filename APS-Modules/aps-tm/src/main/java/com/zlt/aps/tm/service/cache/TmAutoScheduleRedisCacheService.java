@@ -1,8 +1,9 @@
-package com.zlt.aps.tm.service;
+package com.zlt.aps.tm.service.cache;
 
 import cn.hutool.core.date.DateUtil;
 import cn.hutool.core.util.StrUtil;
 import com.ruoyi.common.redis.service.RedisService;
+import com.zlt.aps.tm.api.constant.TmScheduleConstants;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
@@ -19,12 +20,6 @@ import java.util.function.Supplier;
 @Slf4j
 @Service
 public class TmAutoScheduleRedisCacheService {
-
-    /** 胎面自动排程基础资料 Redis key 前缀 */
-    private static final String CACHE_KEY_PREFIX = "aps:tm:autoSchedule:baseData:";
-
-    /** 基础资料缓存有效期 */
-    private static final long BASE_DATA_CACHE_TTL_MINUTES = 5L;
 
     @Resource
     private RedisService redisService;
@@ -53,7 +48,7 @@ public class TmAutoScheduleRedisCacheService {
      * @return 集合副本
      */
     public <T> List<T> getCachedList(String cacheKeySuffix, Supplier<List<T>> loader) {
-        String cacheKey = CACHE_KEY_PREFIX + cacheKeySuffix;
+        String cacheKey = TmScheduleConstants.BASE_DATA_CACHE_KEY_PREFIX + cacheKeySuffix;
         if (redisService == null) {
             return copyList(loader.get());
         }
@@ -69,7 +64,8 @@ public class TmAutoScheduleRedisCacheService {
         }
         List<T> loadedList = copyList(loader.get());
         try {
-            redisService.setCacheObject(cacheKey, loadedList, BASE_DATA_CACHE_TTL_MINUTES, TimeUnit.MINUTES);
+            redisService.setCacheObject(cacheKey, loadedList,
+                    TmScheduleConstants.BASE_DATA_CACHE_TTL_MINUTES, TimeUnit.MINUTES);
         } catch (RuntimeException ex) {
             log.warn("[TM_AUTO_SCHEDULE_CACHE] 写入 Redis 缓存失败，cacheKey={}，原因={}，本次使用回源数据",
                     cacheKey, ex.getMessage());
@@ -90,14 +86,16 @@ public class TmAutoScheduleRedisCacheService {
         }
         Set<String> deleteKeySet = new LinkedHashSet<>();
         if (StrUtil.isBlank(factoryCode)) {
-            deleteKeySet.addAll(findKeys(CACHE_KEY_PREFIX + "*"));
+            deleteKeySet.addAll(findKeys(TmScheduleConstants.BASE_DATA_CACHE_KEY_PREFIX + "*"));
         } else {
-            deleteKeySet.addAll(findKeys(CACHE_KEY_PREFIX + "params:" + factoryCode));
-            deleteKeySet.addAll(findKeys(CACHE_KEY_PREFIX + "machine:" + factoryCode));
+            deleteKeySet.addAll(findKeys(TmScheduleConstants.BASE_DATA_CACHE_KEY_PREFIX + "params:" + factoryCode));
+            deleteKeySet.addAll(findKeys(TmScheduleConstants.BASE_DATA_CACHE_KEY_PREFIX + "machine:" + factoryCode));
             if (scheduleDate == null) {
-                deleteKeySet.addAll(findKeys(CACHE_KEY_PREFIX + "calendar:" + factoryCode + ":*"));
+                deleteKeySet.addAll(findKeys(TmScheduleConstants.BASE_DATA_CACHE_KEY_PREFIX
+                        + "calendar:" + factoryCode + ":*"));
             } else {
-                deleteKeySet.addAll(findKeys(CACHE_KEY_PREFIX + "calendar:" + factoryCode + ":*:" + DateUtil.formatDate(scheduleDate)));
+                deleteKeySet.addAll(findKeys(TmScheduleConstants.BASE_DATA_CACHE_KEY_PREFIX
+                        + "calendar:" + factoryCode + ":*:" + DateUtil.formatDate(scheduleDate)));
             }
         }
         if (deleteKeySet.isEmpty()) {

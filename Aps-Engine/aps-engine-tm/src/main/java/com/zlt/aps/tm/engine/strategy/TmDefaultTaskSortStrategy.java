@@ -1,5 +1,6 @@
 package com.zlt.aps.tm.engine.strategy;
 
+import com.zlt.aps.tm.api.enums.TmScheduleStrategyEnum;
 import com.zlt.aps.tm.engine.domain.TmScheduleContext;
 import com.zlt.aps.tm.engine.domain.TmTaskDraft;
 import com.zlt.aps.tm.engine.util.TmGlueSimilarityUtils;
@@ -15,6 +16,7 @@ import java.util.*;
  * 排序维度（优先级从高到低）：
  * <ol>
  *   <li>可供成型班次分组：按班次从早到晚排序</li>
+ *   <li>最晚开始时间：同一班次内越早越优先，未计算时保持既有规则</li>
  *   <li>库存紧急度：supplyHours 越小越优先</li>
  *   <li>主胶料分组：同一班次内按主胶料分组</li>
  *   <li>基部胶相似度：基部胶相同个数越多优先级越高</li>
@@ -22,7 +24,8 @@ import java.util.*;
  *   <li>口型聚集：同种预口型尽量安排在一起生产</li>
  *   <li>稳定兜底：按 businessKey 升序，保证相同输入重复运行结果一致</li>
  * </ol>
- * 通过 {@link Component} 注册为 Spring Bean，由 {@link TmStrategyRegistry} 按编码 "DEFAULT" 收集。</p>
+ * 通过 {@link Component} 注册为 Spring Bean，由 {@link TmStrategyRegistry}
+ * 按 {@link TmScheduleStrategyEnum#DEFAULT} 编码收集。</p>
  */
 @Component
 public class TmDefaultTaskSortStrategy implements ITmTaskSortStrategy {
@@ -34,7 +37,7 @@ public class TmDefaultTaskSortStrategy implements ITmTaskSortStrategy {
      */
     @Override
     public String getStrategyCode() {
-        return "DEFAULT";
+        return TmScheduleStrategyEnum.DEFAULT.getCode();
     }
 
     /**
@@ -50,7 +53,10 @@ public class TmDefaultTaskSortStrategy implements ITmTaskSortStrategy {
         return Comparator
                 // 1. 可供成型班次分组：按班次从早到晚排序
                 .comparing(TmTaskDraft::getShiftOrder, Comparator.nullsLast(Comparator.naturalOrder()))
-                // 2-3. 库存紧急度和主胶料分组：按同班次胶料组最早供应时长排序，同胶料聚在一起
+                // 2. 同一班次内最晚开始时间越早越优先；无法计算时落到既有排序规则。
+                .thenComparing(TmTaskDraft::getLatestStartTime,
+                        Comparator.nullsLast(Comparator.naturalOrder()))
+                // 3-4. 库存紧急度和主胶料分组：按同班次胶料组最早供应时长排序，同胶料聚在一起
                 .thenComparing(task -> this.resolveGlueGroupEarliestSupply(task, glueGroupEarliestSupplyMap),
                         Comparator.nullsLast(Comparator.naturalOrder()))
                 .thenComparing(TmTaskDraft::getGlueCode,

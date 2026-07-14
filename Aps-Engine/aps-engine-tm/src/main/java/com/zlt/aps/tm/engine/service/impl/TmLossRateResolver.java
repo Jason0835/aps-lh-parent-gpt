@@ -2,6 +2,7 @@ package com.zlt.aps.tm.engine.service.impl;
 
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.StrUtil;
+import com.zlt.aps.tm.api.enums.TmLossMatchLevelEnum;
 import com.zlt.aps.tm.engine.domain.TmLossRule;
 import com.zlt.aps.tm.engine.domain.TmLossRuleMatchResult;
 
@@ -24,7 +25,7 @@ public class TmLossRateResolver {
         if (CollUtil.isEmpty(ruleList)) {
             return null;
         }
-        for (String matchLevel : new String[]{"MACHINE_TREAD", "TREAD", "MACHINE", "DEFAULT"}) {
+        for (TmLossMatchLevelEnum matchLevel : TmLossMatchLevelEnum.values()) {
             TmLossRuleMatchResult result = this.find(ruleList, treadCode, machineCode, matchLevel);
             if (result != null) {
                 return result;
@@ -34,20 +35,20 @@ public class TmLossRateResolver {
     }
 
     private TmLossRuleMatchResult find(List<TmLossRule> ruleList, String treadCode, String machineCode,
-                                       String matchLevel) {
+                                       TmLossMatchLevelEnum matchLevel) {
         String normalizedTreadCode = normalize(treadCode);
         String normalizedMachineCode = normalize(machineCode);
         TmLossRule matchedRule = ruleList.stream().filter(rule -> {
             String ruleTreadCode = normalize(rule.getTreadCode());
             String ruleMachineCode = normalize(rule.getMachineCode());
-            if ("MACHINE_TREAD".equals(matchLevel)) {
+            if (TmLossMatchLevelEnum.MACHINE_TREAD == matchLevel) {
                 return Objects.equals(ruleTreadCode, normalizedTreadCode)
                         && Objects.equals(ruleMachineCode, normalizedMachineCode);
             }
-            if ("TREAD".equals(matchLevel)) {
+            if (TmLossMatchLevelEnum.TREAD == matchLevel) {
                 return Objects.equals(ruleTreadCode, normalizedTreadCode) && ruleMachineCode == null;
             }
-            if ("MACHINE".equals(matchLevel)) {
+            if (TmLossMatchLevelEnum.MACHINE == matchLevel) {
                 return ruleTreadCode == null && Objects.equals(ruleMachineCode, normalizedMachineCode);
             }
             return ruleTreadCode == null && ruleMachineCode == null;
@@ -57,7 +58,7 @@ public class TmLossRateResolver {
             return null;
         }
         TmLossRuleMatchResult result = new TmLossRuleMatchResult();
-        result.setMatchLevel(matchLevel);
+        result.setMatchLevel(matchLevel.getCode());
         result.setLossRate(matchedRule.getLossRate() == null ? BigDecimal.ZERO : matchedRule.getLossRate());
         result.setMatchedRule(matchedRule);
         return result;

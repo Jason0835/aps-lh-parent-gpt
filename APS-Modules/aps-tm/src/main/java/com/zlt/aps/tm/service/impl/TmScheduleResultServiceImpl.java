@@ -21,18 +21,19 @@ import com.zlt.aps.tm.api.domain.entity.TmScheduleResult;
 import com.zlt.aps.tm.api.domain.vo.TmAutoScheduleRequestVo;
 import com.zlt.aps.tm.api.domain.vo.TmAutoScheduleResponseVo;
 import com.zlt.aps.tm.api.domain.vo.TmScheduleShiftDateVO;
+import com.zlt.aps.tm.api.enums.TmAutoScheduleIssueCategoryEnum;
+import com.zlt.aps.tm.api.enums.TmAutoScheduleIssueLevelEnum;
 import com.zlt.aps.tm.api.enums.TmReleaseStatusTransition;
 import com.zlt.aps.tm.api.enums.TmScheduleStepEnum;
 import com.zlt.aps.tm.domain.TmAutoScheduleTask;
-import com.zlt.aps.tm.engine.domain.TmAutoScheduleIssueCollector;
 import com.zlt.aps.tm.engine.domain.TmPersistResult;
 import com.zlt.aps.tm.engine.domain.TmScheduleContext;
 import com.zlt.aps.tm.engine.template.TmScheduleTemplateImpl;
 import com.zlt.aps.tm.mapper.*;
 import com.zlt.aps.tm.service.ITmScheduleResultService;
 import com.zlt.aps.tm.service.TmAutoScheduleAsyncExecutor;
-import com.zlt.aps.tm.service.TmAutoScheduleRedisCacheService;
 import com.zlt.aps.tm.service.TmAutoScheduleTaskService;
+import com.zlt.aps.tm.service.cache.TmAutoScheduleRedisCacheService;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.common.enums.ImportErrorTypeEnums;
 import com.zlt.common.utils.ImportExcelValidatedUtils;
@@ -53,11 +54,6 @@ import java.util.stream.Collectors;
 @Slf4j
 @Service
 public class TmScheduleResultServiceImpl extends AbstractDocService<TmScheduleResult> implements ITmScheduleResultService {
-
-    private static final String TM_AUTO_PLAN_LOG_PREFIX = "[TM_AUTO_PLAN]";
-
-    /** 胎面自动排程批次号前缀 */
-    private static final String TM_AUTO_BATCH_NO_PREFIX = "TM";
 
     /** 进程内最后一次批次号时间戳，用于避免同一毫秒内连续生成重复批次号 */
     private static final AtomicLong LAST_BATCH_TIME_MILLIS = new AtomicLong(0L);
@@ -415,14 +411,15 @@ public class TmScheduleResultServiceImpl extends AbstractDocService<TmScheduleRe
         TmAutoScheduleResponseVo response = null;
         TmScheduleContext context = null;
         log.info("{} step=REQUEST_RECEIVED factoryCode={}, scheduleDate={}, traceId={}, operator={}, dataSource={}, confirmOverwrite={}",
-                TM_AUTO_PLAN_LOG_PREFIX, request == null ? null : request.getFactoryCode(),
+                TmScheduleConstants.AUTO_PLAN_LOG_PREFIX, request == null ? null : request.getFactoryCode(),
                 formatAutoPlanDate(request == null ? null : request.getScheduleDate()), request == null ? null : request.getTraceId(),
                 request == null ? null : request.getOperator(), request == null ? null : request.getDataSource(),
                 request == null ? null : request.getConfirmOverwrite());
         try {
             validateAutoScheduleRequest(request);
             log.info("{} step=REQUEST_VALIDATED factoryCode={}, scheduleDate={}, traceId={}, operator={}, dataSource={}, confirmOverwrite={}",
-                    TM_AUTO_PLAN_LOG_PREFIX, request.getFactoryCode(), formatAutoPlanDate(request.getScheduleDate()), request.getTraceId(),
+                    TmScheduleConstants.AUTO_PLAN_LOG_PREFIX, request.getFactoryCode(),
+                    formatAutoPlanDate(request.getScheduleDate()), request.getTraceId(),
                     request.getOperator(), request.getDataSource(), request.getConfirmOverwrite());
 
             response = new TmAutoScheduleResponseVo();
@@ -432,40 +429,43 @@ public class TmScheduleResultServiceImpl extends AbstractDocService<TmScheduleRe
             response.setUnplannedCount(0);
             response.setConfirmRequired(Boolean.FALSE);
             log.info("{} step=RESPONSE_INITIALIZED factoryCode={}, scheduleDate={}, batchNo={}, traceId={}, operator={}",
-                    TM_AUTO_PLAN_LOG_PREFIX, request.getFactoryCode(), formatAutoPlanDate(request.getScheduleDate()),
+                    TmScheduleConstants.AUTO_PLAN_LOG_PREFIX, request.getFactoryCode(), formatAutoPlanDate(request.getScheduleDate()),
                     response.getBatchNo(), response.getTraceId(), StrUtil.blankToDefault(request.getOperator(), "system"));
 
             List<TmScheduleResult> currentResultList = listForOverwriteCheck(request);
             log.info("{} step=OLD_RESULT_CHECKED factoryCode={}, scheduleDate={}, batchNo={}, traceId={}, oldResultCount={}, releaseStatusSummary={}",
-                    TM_AUTO_PLAN_LOG_PREFIX, request.getFactoryCode(), formatAutoPlanDate(request.getScheduleDate()),
+                    TmScheduleConstants.AUTO_PLAN_LOG_PREFIX, request.getFactoryCode(), formatAutoPlanDate(request.getScheduleDate()),
                     response.getBatchNo(), response.getTraceId(), currentResultList.size(), summarizeReleaseStatus(currentResultList));
 
             fillOverwriteCheckResult(request, response, currentResultList, true);
             log.info("{} step=OVERWRITE_DECIDED factoryCode={}, scheduleDate={}, batchNo={}, traceId={}, oldResultCount={}, confirmRequired={}, confirmOverwrite={}",
-                    TM_AUTO_PLAN_LOG_PREFIX, request.getFactoryCode(), formatAutoPlanDate(request.getScheduleDate()),
+                    TmScheduleConstants.AUTO_PLAN_LOG_PREFIX, request.getFactoryCode(), formatAutoPlanDate(request.getScheduleDate()),
                     response.getBatchNo(), response.getTraceId(), currentResultList.size(), response.getConfirmRequired(),
                     request.getConfirmOverwrite());
 
             log.info("{} step=OLD_RESULT_REPLACEMENT_DEFERRED factoryCode={}, scheduleDate={}, batchNo={}, traceId={}, oldResultCount={}, reason=replaceInsideFinalTransaction",
-                    TM_AUTO_PLAN_LOG_PREFIX, request.getFactoryCode(), formatAutoPlanDate(request.getScheduleDate()),
+                    TmScheduleConstants.AUTO_PLAN_LOG_PREFIX, request.getFactoryCode(), formatAutoPlanDate(request.getScheduleDate()),
                     response.getBatchNo(), response.getTraceId(), currentResultList.size());
             context = buildScheduleContext(request, response);
             context.setProgressListener((progress, stage, stageName) ->
                     tmAutoScheduleTaskService.updateProgress(taskId, progress, stage, stageName));
             log.info("{} step=CONTEXT_BUILT factoryCode={}, scheduleDate={}, batchNo={}, traceId={}, operator={}, taskCount={}, machineCount={}, paramCount={}",
-                    TM_AUTO_PLAN_LOG_PREFIX, context.getFactoryCode(), formatAutoPlanDate(context.getScheduleDate()),
+                    TmScheduleConstants.AUTO_PLAN_LOG_PREFIX, context.getFactoryCode(),
+                    formatAutoPlanDate(context.getScheduleDate()),
                     context.getBatchNo(), context.getTraceId(), context.getOperator(), context.getTaskDraftList().size(),
                     context.getMachineCandidateList().size(), context.getParamMap().size());
 
             log.info("{} step=TEMPLATE_STARTED factoryCode={}, scheduleDate={}, batchNo={}, traceId={}, taskCount={}, machineCount={}, stockForecastCount={}, chainCount={}, snapshotCount={}",
-                    TM_AUTO_PLAN_LOG_PREFIX, context.getFactoryCode(), formatAutoPlanDate(context.getScheduleDate()),
+                    TmScheduleConstants.AUTO_PLAN_LOG_PREFIX, context.getFactoryCode(),
+                    formatAutoPlanDate(context.getScheduleDate()),
                     context.getBatchNo(), context.getTraceId(), context.getTaskDraftList().size(),
                     context.getMachineCandidateList().size(), context.getStockForecastMap().size(),
                     countTaskChain(context), context.getSnapshotMap().size());
             tmScheduleTemplate.execute(context);
             TmPersistResult persistResult = Optional.ofNullable(context.getPersistResult()).orElseGet(TmPersistResult::new);
             log.info("{} step=TEMPLATE_FINISHED factoryCode={}, scheduleDate={}, batchNo={}, traceId={}, taskCount={}, machineCount={}, stockForecastCount={}, chainCount={}, snapshotCount={}, resultCount={}, explainCount={}, unplannedCount={}, errorCount={}, lastErrorMsg={}",
-                    TM_AUTO_PLAN_LOG_PREFIX, context.getFactoryCode(), formatAutoPlanDate(context.getScheduleDate()),
+                    TmScheduleConstants.AUTO_PLAN_LOG_PREFIX, context.getFactoryCode(),
+                    formatAutoPlanDate(context.getScheduleDate()),
                     context.getBatchNo(), context.getTraceId(), context.getTaskDraftList().size(),
                     context.getMachineCandidateList().size(), context.getStockForecastMap().size(),
                     countTaskChain(context), context.getSnapshotMap().size(), persistResult.getResultCount(),
@@ -479,24 +479,27 @@ public class TmScheduleResultServiceImpl extends AbstractDocService<TmScheduleRe
             response.setResultCount(persistResult.getResultCount());
             response.setUnplannedCount(persistResult.getUnplannedCount());
             if (persistResult.getErrorCount() > 0) {
-                context.getIssueCollector().addIssue(TmAutoScheduleIssueCollector.LEVEL_ERROR,
-                        TmScheduleStepEnum.PERSIST, "PERSIST_PARTIAL_FAILED", persistResult.getLastErrorMsg());
+                context.getIssueCollector().addIssue(TmAutoScheduleIssueLevelEnum.ERROR,
+                        TmScheduleStepEnum.PERSIST, TmAutoScheduleIssueCategoryEnum.PERSIST_PARTIAL_FAILED,
+                        persistResult.getLastErrorMsg());
                 response.setMessage(resolveTmMessage("ui.data.alert.tm.schedule.executePartialFailed", "胎面自动排程执行完成，部分记录落库失败，请联系管理员处理"));
                 log.warn("{} step=PERSIST_PARTIAL_FAILED factoryCode={}, scheduleDate={}, batchNo={}, traceId={}, errorCount={}, lastErrorMsg={}",
-                        TM_AUTO_PLAN_LOG_PREFIX, context.getFactoryCode(), formatAutoPlanDate(context.getScheduleDate()),
+                        TmScheduleConstants.AUTO_PLAN_LOG_PREFIX, context.getFactoryCode(),
+                        formatAutoPlanDate(context.getScheduleDate()),
                         context.getBatchNo(), context.getTraceId(), persistResult.getErrorCount(), persistResult.getLastErrorMsg());
             } else {
                 response.setMessage(resolveTmMessage("ui.data.alert.tm.schedule.executeFinished", "胎面自动排程执行完成"));
             }
             tmAutoScheduleTaskService.markSuccess(taskId, response, context.getIssueCollector().getIssues());
             log.info("{} step=FINISHED factoryCode={}, scheduleDate={}, batchNo={}, traceId={}, success={}, resultCount={}, unplannedCount={}, message={}, elapsedMs={}",
-                    TM_AUTO_PLAN_LOG_PREFIX, request.getFactoryCode(), formatAutoPlanDate(request.getScheduleDate()),
+                    TmScheduleConstants.AUTO_PLAN_LOG_PREFIX, request.getFactoryCode(),
+                    formatAutoPlanDate(request.getScheduleDate()),
                     response.getBatchNo(), response.getTraceId(), response.getSuccess(), response.getResultCount(),
                     response.getUnplannedCount(), response.getMessage(), System.currentTimeMillis() - startMillis);
             return response;
         } catch (ServiceException ex) {
             log.warn("{} step=FAILED factoryCode={}, scheduleDate={}, batchNo={}, traceId={}, elapsedMs={}, exceptionType={}, message={}",
-                    TM_AUTO_PLAN_LOG_PREFIX, request == null ? null : request.getFactoryCode(),
+                    TmScheduleConstants.AUTO_PLAN_LOG_PREFIX, request == null ? null : request.getFactoryCode(),
                     formatAutoPlanDate(request == null ? null : request.getScheduleDate()),
                     context == null ? response == null ? null : response.getBatchNo() : context.getBatchNo(),
                     context == null ? response == null ? request == null ? null : request.getTraceId() : response.getTraceId() : context.getTraceId(),
@@ -506,7 +509,7 @@ public class TmScheduleResultServiceImpl extends AbstractDocService<TmScheduleRe
             throw ex;
         } catch (RuntimeException ex) {
             log.error("{} step=FAILED factoryCode={}, scheduleDate={}, batchNo={}, traceId={}, elapsedMs={}, exceptionType={}, message={}",
-                    TM_AUTO_PLAN_LOG_PREFIX, request == null ? null : request.getFactoryCode(),
+                    TmScheduleConstants.AUTO_PLAN_LOG_PREFIX, request == null ? null : request.getFactoryCode(),
                     formatAutoPlanDate(request == null ? null : request.getScheduleDate()),
                     context == null ? response == null ? null : response.getBatchNo() : context.getBatchNo(),
                     context == null ? response == null ? request == null ? null : request.getTraceId() : response.getTraceId() : context.getTraceId(),
@@ -774,7 +777,8 @@ public class TmScheduleResultServiceImpl extends AbstractDocService<TmScheduleRe
         long currentMillis = System.currentTimeMillis();
         long uniqueMillis = LAST_BATCH_TIME_MILLIS.updateAndGet(lastMillis ->
                 currentMillis > lastMillis ? currentMillis : lastMillis + 1);
-        return TM_AUTO_BATCH_NO_PREFIX + DateUtil.format(new Date(uniqueMillis), "yyyyMMddHHmmssSSS");
+        return TmScheduleConstants.AUTO_PLAN_BATCH_NO_PREFIX
+                + DateUtil.format(new Date(uniqueMillis), "yyyyMMddHHmmssSSS");
     }
 
     /**

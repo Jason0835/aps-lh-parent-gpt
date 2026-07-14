@@ -7,6 +7,8 @@ import com.zlt.aps.common.engine.schedule.MachineShiftTaskChain;
 import com.zlt.aps.common.engine.schedule.ScheduleTaskLinkedList;
 import com.zlt.aps.common.engine.schedule.ScheduleTaskNode;
 import com.zlt.aps.tm.api.enums.TmScheduleErrorCodeEnum;
+import com.zlt.aps.tm.engine.service.TmAutoScheduleProgressListener;
+import com.zlt.aps.tm.engine.service.collector.TmAutoScheduleIssueCollector;
 import lombok.Data;
 
 import java.math.BigDecimal;
@@ -94,6 +96,12 @@ public class TmScheduleContext {
 
     /** 班次小时数映射，key=班次顺序(1~6)，来自 T_TM_SHIFT_CONFIG */
     private Map<Integer, BigDecimal> shiftHoursMap = new HashMap<>();
+
+    /** 整日停产后的首个开班班次集合 */
+    private Set<Integer> startupShiftOrderSet = new HashSet<>();
+
+    /** 当前日停产需求重分配证据，key=目标班次 */
+    private Map<Integer, Map<String, Object>> currentDayShutdownEvidenceMap = new LinkedHashMap<>();
 
     /** 班次时间窗口映射，key=班次顺序(1~6)，来自 T_TM_SHIFT_CONFIG */
     private Map<Integer, TmShiftTimeWindow> shiftTimeWindowMap = new HashMap<>();
@@ -218,6 +226,10 @@ public class TmScheduleContext {
 
     public void setShiftHoursMap(Map<Integer, BigDecimal> shiftHoursMap) {
         this.shiftHoursMap = shiftHoursMap == null ? new HashMap<>() : shiftHoursMap;
+    }
+
+    public void setStartupShiftOrderSet(Set<Integer> startupShiftOrderSet) {
+        this.startupShiftOrderSet = startupShiftOrderSet == null ? new HashSet<>() : startupShiftOrderSet;
     }
 
     public void setShiftTimeWindowMap(Map<Integer, TmShiftTimeWindow> shiftTimeWindowMap) {

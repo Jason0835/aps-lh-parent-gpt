@@ -3,11 +3,16 @@ package com.zlt.aps.tm.service.loader;
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.zlt.aps.tm.api.constant.TmScheduleConstants;
 import com.zlt.aps.tm.api.domain.entity.TmParams;
+import com.zlt.aps.tm.api.enums.TmParamValueSourceEnum;
+import com.zlt.aps.tm.api.enums.TmScheduleStrategyEnum;
+import com.zlt.aps.tm.api.enums.TmVersionMatchModeEnum;
+import com.zlt.aps.tm.api.enums.TmYesNoEnum;
 import com.zlt.aps.tm.engine.domain.TmParamValue;
 import com.zlt.aps.tm.engine.domain.TmScheduleContext;
 import com.zlt.aps.tm.mapper.TmParamsMapper;
-import com.zlt.aps.tm.service.TmAutoScheduleRedisCacheService;
+import com.zlt.aps.tm.service.cache.TmAutoScheduleRedisCacheService;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -19,46 +24,6 @@ import java.util.stream.Collectors;
  * 机台或排程结果，参数 Redis 缓存键和回源行为继续由既有缓存服务统一管理。</p>
  */
 public class TmScheduleParamLoader {
-
-    private static final String PARAM_ALGORITHM_SWITCH = "TM_ALGORITHM_SWITCH";
-
-    private static final String PARAM_MIN_STOCK_CLASS = "TM_MIN_STOCK_CLASS";
-
-    private static final String PARAM_MIN_START_QTY = "TM_MIN_START_QTY";
-
-    private static final String PARAM_DEFAULT_CURL_LENGTH = "TM_DEFAULT_CURL_LENGTH";
-
-    private static final String PARAM_TOOL_TOTAL_QTY = "TM_TOOL_TOTAL_QTY";
-
-    private static final String PARAM_SHUTDOWN_REDISTRIBUTION_ENABLED = "TM_SHUTDOWN_REDISTRIBUTION_ENABLED";
-
-    private static final String PARAM_PLAN_QTY_STRATEGY = "TM_PLAN_QTY_STRATEGY";
-
-    private static final String PARAM_TASK_SORT_STRATEGY = "TM_TASK_SORT_STRATEGY";
-
-    private static final String PARAM_NEW_SPEC_LOOKBACK_DAYS = "TM_NEW_SPEC_LOOKBACK_DAYS";
-
-    private static final String PARAM_NEW_SPEC_ADVANCE_SHIFT_COUNT = "TM_NEW_SPEC_ADVANCE_SHIFT_COUNT";
-
-    private static final String PARAM_EXPERIMENT_SPEC_LOOKBACK_DAYS = "TM_EXPERIMENT_SPEC_LOOKBACK_DAYS";
-
-    private static final String PARAM_EXPERIMENT_SPEC_PLAN_QTY = "TM_EXPERIMENT_SPEC_PLAN_QTY";
-
-    private static final String PARAM_FORMING_SHIFT_OFFSET = "TM_FORMING_SHIFT_OFFSET";
-
-    private static final String PARAM_SMALL_GLUE_CODES = "TM_SMALL_GLUE_CODES";
-
-    private static final String PARAM_VERSION_MATCH_MODE = "TM_VERSION_MATCH_MODE";
-
-    private static final String PARAM_MACHINE_FILTER_STRATEGY = "TM_MACHINE_FILTER_STRATEGY";
-
-    private static final String PARAM_MACHINE_SCORE_STRATEGY = "TM_MACHINE_SCORE_STRATEGY";
-
-    private static final String PARAM_CHAIN_TASK_PRIORITY_STRATEGY = "TM_CHAIN_TASK_PRIORITY_STRATEGY";
-
-    private static final String VERSION_MATCH_MODE_RECIPE = "RECIPE";
-
-    private static final String ENABLED = "1";
 
     /**
      * 加载参数并写入自动排程上下文。
@@ -81,7 +46,7 @@ public class TmScheduleParamLoader {
         }
         LambdaQueryWrapper<TmParams> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(TmParams::getFactoryCode, context.getFactoryCode());
-        wrapper.eq(TmParams::getEnableStatus, ENABLED);
+        wrapper.eq(TmParams::getEnableStatus, TmYesNoEnum.YES.getCode());
         List<TmParams> paramsList = cacheService.getCachedList("params:" + context.getFactoryCode(),
                 () -> paramsMapper.selectList(wrapper));
         Map<String, TmParamValue> paramMap = new HashMap<>();
@@ -92,7 +57,8 @@ public class TmScheduleParamLoader {
         }
         this.fillDefaultParams(paramMap);
         context.setParamMap(paramMap);
-        context.setSmallGlueCodeSet(this.parseSmallGlueCodes(paramMap.get(PARAM_SMALL_GLUE_CODES)));
+        context.setSmallGlueCodeSet(this.parseSmallGlueCodes(
+                paramMap.get(TmScheduleConstants.PARAM_SMALL_GLUE_CODES)));
     }
 
     /**
@@ -106,7 +72,7 @@ public class TmScheduleParamLoader {
         value.setParamCode(params.getParamCode());
         value.setParamValue(params.getParamValue());
         value.setDefaultValue(params.getDefaultValue());
-        value.setSource("T_TM_PARAMS");
+        value.setSource(TmParamValueSourceEnum.TABLE.getCode());
         return value;
     }
 
@@ -116,24 +82,54 @@ public class TmScheduleParamLoader {
      * @param paramMap 参数快照映射
      */
     private void fillDefaultParams(Map<String, TmParamValue> paramMap) {
-        this.putDefaultParam(paramMap, PARAM_ALGORITHM_SWITCH, "1");
-        this.putDefaultParam(paramMap, PARAM_MIN_STOCK_CLASS, "1");
-        this.putDefaultParam(paramMap, PARAM_MIN_START_QTY, "0");
-        this.putDefaultParam(paramMap, PARAM_DEFAULT_CURL_LENGTH, "0");
-        this.putDefaultParam(paramMap, PARAM_TOOL_TOTAL_QTY, "0");
-        this.putDefaultParam(paramMap, PARAM_SHUTDOWN_REDISTRIBUTION_ENABLED, "1");
-        this.putDefaultParam(paramMap, PARAM_PLAN_QTY_STRATEGY, "DEFAULT");
-        this.putDefaultParam(paramMap, PARAM_TASK_SORT_STRATEGY, "DEFAULT");
-        this.putDefaultParam(paramMap, PARAM_NEW_SPEC_LOOKBACK_DAYS, "7");
-        this.putDefaultParam(paramMap, PARAM_NEW_SPEC_ADVANCE_SHIFT_COUNT, "2");
-        this.putDefaultParam(paramMap, PARAM_EXPERIMENT_SPEC_LOOKBACK_DAYS, "5");
-        this.putDefaultParam(paramMap, PARAM_EXPERIMENT_SPEC_PLAN_QTY, "30");
-        this.putDefaultParam(paramMap, PARAM_FORMING_SHIFT_OFFSET, "2");
-        this.putDefaultParam(paramMap, PARAM_SMALL_GLUE_CODES, "");
-        this.putDefaultParam(paramMap, PARAM_VERSION_MATCH_MODE, VERSION_MATCH_MODE_RECIPE);
-        this.putDefaultParam(paramMap, PARAM_MACHINE_FILTER_STRATEGY, "DEFAULT");
-        this.putDefaultParam(paramMap, PARAM_MACHINE_SCORE_STRATEGY, "DEFAULT");
-        this.putDefaultParam(paramMap, PARAM_CHAIN_TASK_PRIORITY_STRATEGY, "CONTINUITY_FIRST");
+        this.putDefaultParam(paramMap, TmScheduleConstants.PARAM_ALGORITHM_SWITCH,
+                TmScheduleConstants.DEFAULT_ALGORITHM_SWITCH);
+        this.putDefaultParam(paramMap, TmScheduleConstants.PARAM_MIN_STOCK_CLASS,
+                TmScheduleConstants.DEFAULT_MIN_STOCK_CLASS);
+        this.putDefaultParam(paramMap, TmScheduleConstants.PARAM_MIN_START_QTY,
+                TmScheduleConstants.DEFAULT_MIN_START_QTY);
+        this.putDefaultParam(paramMap, TmScheduleConstants.PARAM_DEFAULT_CURL_LENGTH,
+                TmScheduleConstants.DEFAULT_CURL_LENGTH);
+        this.putDefaultParam(paramMap, TmScheduleConstants.PARAM_TOOL_TOTAL_QTY,
+                TmScheduleConstants.DEFAULT_TOOL_TOTAL_QTY);
+        this.putDefaultParam(paramMap, TmScheduleConstants.PARAM_SHUTDOWN_REDISTRIBUTION_ENABLED,
+                TmScheduleConstants.DEFAULT_SHUTDOWN_REDISTRIBUTION_ENABLED);
+        this.putDefaultParam(paramMap, TmScheduleConstants.PARAM_PLAN_QTY_STRATEGY,
+                TmScheduleStrategyEnum.DEFAULT.getCode());
+        this.putDefaultParam(paramMap, TmScheduleConstants.PARAM_TASK_SORT_STRATEGY,
+                TmScheduleStrategyEnum.DEFAULT.getCode());
+        this.putDefaultParam(paramMap, TmScheduleConstants.PARAM_NEW_SPEC_LOOKBACK_DAYS,
+                TmScheduleConstants.DEFAULT_NEW_SPEC_LOOKBACK_DAYS);
+        this.putDefaultParam(paramMap, TmScheduleConstants.PARAM_NEW_SPEC_ADVANCE_SHIFT_COUNT,
+                TmScheduleConstants.DEFAULT_NEW_SPEC_ADVANCE_SHIFT_COUNT);
+        this.putDefaultParam(paramMap, TmScheduleConstants.PARAM_EXPERIMENT_SPEC_LOOKBACK_DAYS,
+                TmScheduleConstants.DEFAULT_EXPERIMENT_SPEC_LOOKBACK_DAYS);
+        this.putDefaultParam(paramMap, TmScheduleConstants.PARAM_EXPERIMENT_SPEC_PLAN_QTY,
+                TmScheduleConstants.DEFAULT_EXPERIMENT_SPEC_PLAN_QTY);
+        this.putDefaultParam(paramMap, TmScheduleConstants.PARAM_FORMING_SHIFT_OFFSET,
+                TmScheduleConstants.DEFAULT_FORMING_SHIFT_OFFSET);
+        this.putDefaultParam(paramMap, TmScheduleConstants.PARAM_SMALL_GLUE_CODES,
+                TmScheduleConstants.DEFAULT_SMALL_GLUE_CODES);
+        this.putDefaultParam(paramMap, TmScheduleConstants.PARAM_VERSION_MATCH_MODE,
+                TmVersionMatchModeEnum.RECIPE.getCode());
+        this.putDefaultParam(paramMap, TmScheduleConstants.PARAM_MACHINE_FILTER_STRATEGY,
+                TmScheduleStrategyEnum.DEFAULT.getCode());
+        this.putDefaultParam(paramMap, TmScheduleConstants.PARAM_MACHINE_SCORE_STRATEGY,
+                TmScheduleStrategyEnum.DEFAULT.getCode());
+        this.putDefaultParam(paramMap, TmScheduleConstants.PARAM_CHAIN_TASK_PRIORITY_STRATEGY,
+                TmScheduleStrategyEnum.CONTINUITY_FIRST.getCode());
+        this.putDefaultParam(paramMap, TmScheduleConstants.PARAM_PROCESS_STANDING_HOURS,
+                TmScheduleConstants.DEFAULT_PROCESS_STANDING_HOURS);
+        this.putDefaultParam(paramMap, TmScheduleConstants.PARAM_DEFAULT_PRODUCTION_SPEED,
+                TmScheduleConstants.DEFAULT_PRODUCTION_SPEED);
+        this.putDefaultParam(paramMap, TmScheduleConstants.PARAM_SHUTDOWN_CHECK_WINDOW,
+                TmScheduleConstants.DEFAULT_SHUTDOWN_CHECK_WINDOW);
+        this.putDefaultParam(paramMap, TmScheduleConstants.PARAM_OPEN_SHIFT_THRESHOLD,
+                TmScheduleConstants.DEFAULT_OPEN_SHIFT_THRESHOLD);
+        this.putDefaultParam(paramMap, TmScheduleConstants.PARAM_SPEC_CHANGE_MINUTES,
+                TmScheduleConstants.DEFAULT_SPEC_CHANGE_MINUTES);
+        this.putDefaultParam(paramMap, TmScheduleConstants.PARAM_GLUE_CHANGE_MINUTES,
+                TmScheduleConstants.DEFAULT_GLUE_CHANGE_MINUTES);
     }
 
     /**
@@ -150,7 +146,7 @@ public class TmScheduleParamLoader {
         TmParamValue value = new TmParamValue();
         value.setParamCode(paramCode);
         value.setDefaultValue(defaultValue);
-        value.setSource("DEFAULT");
+        value.setSource(TmParamValueSourceEnum.DEFAULT.getCode());
         paramMap.put(paramCode, value);
     }
 

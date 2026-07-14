@@ -12,6 +12,7 @@ import com.zlt.aps.tm.api.constant.TmScheduleConstants;
 import com.zlt.aps.tm.api.domain.entity.TmScheduleResult;
 import com.zlt.aps.tm.api.domain.entity.TmScheduleResultExplain;
 import com.zlt.aps.tm.api.domain.entity.TmScheduleUnplanned;
+import com.zlt.aps.tm.api.enums.TmMachineAssignStatusEnum;
 import com.zlt.aps.tm.engine.domain.TmPersistResult;
 import com.zlt.aps.tm.engine.domain.TmScheduleContext;
 import com.zlt.aps.tm.engine.domain.TmSnapshotBuildResult;
@@ -168,7 +169,8 @@ public class TmBizSnapshotAndPersistService implements ITmSnapshotAndPersistServ
         Map<String, TmScheduleUnplanned> unplannedMap = this.buildMergedUnplannedMap(unplannedTaskList, context);
         if (CollUtil.isNotEmpty(unplannedMap)) {
             List<TmScheduleUnplanned> unplannedList = new ArrayList<>(unplannedMap.values());
-            this.batchSaveWithFallback(unplannedList, transactionStatus, "UNPLANNED", this::buildUnplannedErrorMsg);
+            this.batchSaveWithFallback(unplannedList, transactionStatus,
+                    TmMachineAssignStatusEnum.UNPLANNED.getCode(), this::buildUnplannedErrorMsg);
             persistResult.setUnplannedCount(unplannedList.size());
         }
         // 解释表落库统一批量写入，任何单行失败都会回滚整个最终事务。

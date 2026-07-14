@@ -4,7 +4,11 @@ import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.date.DateUtil;
 import cn.hutool.core.util.StrUtil;
 import com.ruoyi.common.exception.ServiceException;
+import com.zlt.aps.tm.api.constant.TmScheduleConstants;
 import com.zlt.aps.tm.api.enums.TmScheduleErrorCodeEnum;
+import com.zlt.aps.tm.api.enums.TmScheduleRuleCodeEnum;
+import com.zlt.aps.tm.api.enums.TmScheduleRuleResultEnum;
+import com.zlt.aps.tm.api.enums.TmScheduleStrategyEnum;
 import com.zlt.aps.tm.engine.domain.TmParamValue;
 import com.zlt.aps.tm.engine.domain.TmRuleTrace;
 import com.zlt.aps.tm.engine.domain.TmScheduleContext;
@@ -24,17 +28,12 @@ import java.util.stream.Collectors;
  * 胎面待排任务默认排序步骤服务。
  *
  * <p>通过 {@link TmStrategyRegistry} 获取排序策略，替代直接按 businessKey 排序。
- * 排序策略编码从上下文参数读取（参数码 {@code TM_TASK_SORT_STRATEGY}，缺省 {@code "DEFAULT"}）。</p>
+ * 排序策略编码从上下文参数读取，参数键和默认策略分别由
+ * {@link TmScheduleConstants#PARAM_TASK_SORT_STRATEGY}、{@link TmScheduleStrategyEnum#DEFAULT} 统一定义。</p>
  */
 @Slf4j
 @Service
 public class TmTaskSortService implements ITmTaskSortService {
-
-    /** 任务排序策略编码参数码 */
-    private static final String PARAM_TASK_SORT_STRATEGY = "TM_TASK_SORT_STRATEGY";
-
-    /** 默认排序策略编码 */
-    private static final String DEFAULT_TASK_SORT_STRATEGY = "DEFAULT";
 
     private final TmStrategyRegistry strategyRegistry;
 
@@ -56,7 +55,8 @@ public class TmTaskSortService implements ITmTaskSortService {
             return;
         }
         // 读取排序策略编码，缺省 DEFAULT
-        String strategyCode = readParam(context, PARAM_TASK_SORT_STRATEGY, DEFAULT_TASK_SORT_STRATEGY);
+        String strategyCode = readParam(context, TmScheduleConstants.PARAM_TASK_SORT_STRATEGY,
+                TmScheduleStrategyEnum.DEFAULT.getCode());
         ITmTaskSortStrategy sortStrategy = strategyRegistry.getTaskSortStrategy(strategyCode);
         Comparator<TmTaskDraft> comparator = sortStrategy.buildComparator(context);
         String beforeOrder = summarizeTaskOrder(context);
@@ -74,7 +74,8 @@ public class TmTaskSortService implements ITmTaskSortService {
             evidence.put("glueCode", task.getGlueCode());
             evidence.put("baseGlueCode", task.getBaseGlueCode());
             evidence.put("mouthPlateCode", task.getMouthPlateCode());
-            traceOf(context, task).addRuleHit("TASK_SORT", "PASS", evidence);
+            traceOf(context, task).addRuleHit(TmScheduleRuleCodeEnum.TASK_SORT,
+                    TmScheduleRuleResultEnum.PASS, evidence);
             log.info("[TM_TASK_SORT_DETAIL] batchNo={}, traceId={}, factoryCode={}, scheduleDate={}, strategyCode={}, sortIndex={}, businessKey={}, treadCode={}, shiftOrder={}, supplyHours={}, glueCode={}, baseGlueCode={}, mouthPlateCode={}, planQty={}, demandQty={}",
                     context.getBatchNo(), context.getTraceId(), context.getFactoryCode(), formatScheduleDate(context),
                     strategyCode, i + 1, task.getBusinessKey(), task.getTreadCode(), task.getShiftOrder(),
@@ -94,7 +95,7 @@ public class TmTaskSortService implements ITmTaskSortService {
             return "";
         }
         return context.getTaskDraftList().stream()
-                .limit(20)
+                .limit(TmScheduleConstants.TASK_ORDER_SUMMARY_LIMIT)
                 .map(TmTaskDraft::getBusinessKey)
                 .collect(Collectors.joining(","));
     }

@@ -113,3 +113,10 @@ UIController extends BaseUIController<Entity>
 ### 胎面部分调整
 - 有涉及到胎面业务调整的部分，都需要同步更新到详设文档：docs/tm/tm_schedule_detailed_design.md
 - 扩展 JSON 场景测试框架和断言，新增对应的测试场景
+- 成型排程与施工信息（T_CX_SCHEDULE_RESULT ↔ T_MDM_CONSTRUCTION_INFO）的版本匹配由参数 `TM_VERSION_MATCH_MODE` 控制：`RECIPE`（默认）按 CD90 式 `(EMBRYO_CODE, CLASSn_RECIPE_NO)` 逐班解析（`TmAutoScheduleDataLoadService.loadFormingDemandTasksByRecipe`，跳过示方书为空的班次）；`B` 模式（`loadFormingDemandTasksByBom`）同一胎胚按 `TREAD_CODE` 分组择一取施工版本（LATERAL + ROW_NUMBER，优先 `BOM_DATA_VERSION` 匹配，否则取最新有效记录），避免"仅按胎胚关联致多版本变体满量重复展开"及"严格版本等值 join 在 `BOM_DATA_VERSION` 为空时归 0"两种极端。库存预测 `TmEngineInventoryPredictMapper.selectFirstShiftDemandRows` 与主流程 `selectFormingDemandRows` 同口径择一；`selectFirstShiftDemandRowsByRecipe` 为 RECIPE 模式。多胎面共用同一胎胚时各胎面独立成任务，`BOM_DATA_VERSION` 为空无法精确归属工单到胎面时建议补全该字段。
+
+### 胎侧部分调整
+- 胎侧排程详设文档：docs/tc/tc_schedule_detailed_design.md，基于胎面详设方法论与 `07-APS详细设计-胎侧.xlsx` 整理；胎侧与胎面共享通用排程引擎 `Aps-Common/aps-engine-common`，差异逻辑放在 `APS-Modules/aps-tc` / `Aps-Api/tc-api` 的 `com.zlt.aps.tc.engine` 包下，不通过修改胎面实现兼容胎侧。
+- 有涉及到胎侧业务调整的部分，都需要同步更新到详设文档：docs/tc/tc_schedule_detailed_design.md
+- 胎侧独有业务点（与胎面差异，落地和调整时需保留）：整车率 `TC_VEHICLE_RATE`（工装可用量因子，默认1）、单班最大可排量 `TC_SHIFT_MAX_CAPACITY`（默认5500米）、库存最低保证班数 `TC_MIN_STOCK_CLASS`（默认3班，胎面为1班）、胎侧+垫胶共用机台 `T_TC_DJ_SHARED_MACHINE` 班次错开约束、机台选择"优先排满一台"口径。
+- 参数与表名统一 `TC_` / `T_TC_*` 前缀，班次映射、版本匹配 `TC_VERSION_MATCH_MODE`、成型偏移 `TC_FORMING_SHIFT_OFFSET` 等与胎面 `TM_*` 对齐。

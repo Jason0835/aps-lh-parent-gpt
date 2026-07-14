@@ -4,7 +4,11 @@ import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.date.DateUtil;
 import cn.hutool.core.util.StrUtil;
 import com.ruoyi.common.exception.ServiceException;
+import com.zlt.aps.tm.api.constant.TmScheduleConstants;
 import com.zlt.aps.tm.api.enums.TmScheduleErrorCodeEnum;
+import com.zlt.aps.tm.api.enums.TmScheduleRuleCodeEnum;
+import com.zlt.aps.tm.api.enums.TmScheduleRuleResultEnum;
+import com.zlt.aps.tm.api.enums.TmScheduleStrategyEnum;
 import com.zlt.aps.tm.engine.domain.*;
 import com.zlt.aps.tm.engine.service.ITmPlanCalcService;
 import com.zlt.aps.tm.engine.strategy.ITmDemandQtyStrategy;
@@ -15,33 +19,19 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.Map;
+import java.util.*;
 
 /**
  * 胎面需求量和计划量默认计算步骤服务。
  *
  * <p>通过 {@link TmStrategyRegistry} 获取计划量策略，替代直接 new 策略对象。
- * 计划量策略编码从上下文参数读取（参数码 {@code TM_PLAN_QTY_STRATEGY}，缺省 {@code "DEFAULT"}）。
+ * 计划量策略编码从上下文参数读取，参数键和默认策略分别由
+ * {@link TmScheduleConstants#PARAM_PLAN_QTY_STRATEGY}、{@link TmScheduleStrategyEnum#DEFAULT} 统一定义。
  * 计划量计算使用当前任务班初 rollingStockQty，同一胎面按班次逐班回写交接班库存。</p>
  */
 @Slf4j
 @Service
 public class TmPlanCalcService implements ITmPlanCalcService {
-
-    /** 计划量策略编码参数码 */
-    private static final String PARAM_PLAN_QTY_STRATEGY = "TM_PLAN_QTY_STRATEGY";
-
-    /** 需求量算法开关参数码 */
-    private static final String PARAM_ALGORITHM_SWITCH = "TM_ALGORITHM_SWITCH";
-
-    /** 默认计划量策略编码 */
-    private static final String DEFAULT_PLAN_QTY_STRATEGY = "DEFAULT";
-
-    /** 默认需求量算法编码 */
-    private static final String DEFAULT_ALGORITHM_CODE = "1";
 
     private final TmStrategyRegistry strategyRegistry;
 
@@ -67,7 +57,8 @@ public class TmPlanCalcService implements ITmPlanCalcService {
         Map<String, TmStockForecast> stockForecastMap = context.getStockForecastMap();
 
         // 读取计划量策略编码，缺省 DEFAULT
-        String planQtyStrategyCode = readParam(context, PARAM_PLAN_QTY_STRATEGY, DEFAULT_PLAN_QTY_STRATEGY);
+        String planQtyStrategyCode = readParam(context, TmScheduleConstants.PARAM_PLAN_QTY_STRATEGY,
+                TmScheduleStrategyEnum.DEFAULT.getCode());
         ITmPlanQtyStrategy planQtyStrategy = strategyRegistry.getPlanQtyStrategy(planQtyStrategyCode);
         String demandQtyAlgorithmCode = readAlgorithmCode(context);
         ITmDemandQtyStrategy demandQtyStrategy = strategyRegistry.getDemandQtyStrategy(demandQtyAlgorithmCode);
@@ -146,7 +137,10 @@ public class TmPlanCalcService implements ITmPlanCalcService {
                 TmPlanQtyResult planQtyResult = planQtyStrategy.calculate(task, context);
                 applyPlanQtyResult(task, planQtyResult);
             }
-            task.setToolUsedQty(BigDecimal.ZERO.setScale(6, RoundingMode.HALF_UP));
+            this.applyStartupThreshold(context, task);
+            this.calculateLatestStartPriority(context, task);
+            task.setToolUsedQty(BigDecimal.ZERO.setScale(TmScheduleConstants.DECIMAL_CALCULATION_SCALE,
+                    RoundingMode.HALF_UP));
             task.setRemainingToolQty(remainingToolQty);
             context.setCurrentAvailableToolQty(remainingToolQty);
             updateRollingStockState(context, task);
@@ -186,6 +180,154 @@ public class TmPlanCalcService implements ITmPlanCalcService {
     }
 
     /**
+     * 对整日停产后的首个开班应用计划量阈值上限。
+     *
+     * @param context 排程上下文
+     * @param task    当前任务
+     */
+    private void applyStartupThreshold(TmScheduleContext context, TmTaskDraft task) {
+        if (context.getStartupShiftOrderSet() == null
+                || !context.getStartupShiftOrderSet().contains(task.getShiftOrder())) {
+            return;
+        }
+        BigDecimal threshold = this.readDecimalParam(context,
+                TmScheduleConstants.PARAM_OPEN_SHIFT_THRESHOLD, BigDecimal.ONE);
+        BigDecimal originalPlanQty = nvl(task.getPlanQty());
+        BigDecimal planQtyLimit = nvl(task.getCurrentShiftDemandQty()).multiply(threshold)
+                .subtract(nvl(task.getRollingStockQty())).max(BigDecimal.ZERO);
+        BigDecimal finalPlanQty = originalPlanQty.min(planQtyLimit);
+        task.setPlanQty(finalPlanQty);
+        task.setPlanStockQty(nvl(task.getRollingStockQty()).add(finalPlanQty)
+                .subtract(nvl(task.getCurrentShiftDemandQty())).max(BigDecimal.ZERO));
+        Map<String, Object> evidence = new LinkedHashMap<>();
+        evidence.put("ruleCode", TmScheduleRuleCodeEnum.STARTUP_THRESHOLD_ADJUST.getCode());
+        evidence.put("date", this.formatScheduleDate(context));
+        evidence.put("sourceShiftOrder", task.getShiftOrder());
+        evidence.put("targetShiftOrder", task.getShiftOrder());
+        evidence.put("shiftOrder", task.getShiftOrder());
+        evidence.put("currentShiftDemandQty", task.getCurrentShiftDemandQty());
+        evidence.put("rollingStockQty", task.getRollingStockQty());
+        evidence.put("threshold", threshold);
+        evidence.put("originalPlanQty", originalPlanQty);
+        evidence.put("planQtyLimit", planQtyLimit);
+        evidence.put("adjustedQty", finalPlanQty.subtract(originalPlanQty));
+        evidence.put("finalPlanQty", finalPlanQty);
+        traceOf(context, task).addRuleHit(TmScheduleRuleCodeEnum.STARTUP_THRESHOLD_ADJUST,
+                finalPlanQty.compareTo(originalPlanQty) < 0
+                        ? TmScheduleRuleResultEnum.PASS : TmScheduleRuleResultEnum.SKIP,
+                evidence);
+    }
+    /**
+     * 计算库存不足时间、预计生产时长和最晚开始时间，并写入排序规则证据。
+     *
+     * <p>统一默认速度未配置或非正数、班次开始时间无法解析时不阻断排程，
+     * 仅记录跳过原因并保持既有排序结果。</p>
+     *
+     * @param context 排程上下文
+     * @param task    当前任务
+     */
+    private void calculateLatestStartPriority(TmScheduleContext context, TmTaskDraft task) {
+        Map<String, Object> evidence = new LinkedHashMap<>();
+        BigDecimal defaultSpeed = this.readDecimalParam(context,
+                TmScheduleConstants.PARAM_DEFAULT_PRODUCTION_SPEED, BigDecimal.ZERO);
+        BigDecimal standingHours = this.readDecimalParam(context,
+                TmScheduleConstants.PARAM_PROCESS_STANDING_HOURS, BigDecimal.ZERO);
+        evidence.put("defaultProductionSpeed", defaultSpeed);
+        evidence.put("processStandingHours", standingHours);
+        evidence.put("planQty", task.getPlanQty());
+        evidence.put("supplyHours", task.getSupplyHours());
+        Date shiftStartTime = this.resolveShiftStartTime(context, task.getShiftOrder());
+        evidence.put("shiftStartTime", shiftStartTime);
+        if (defaultSpeed.compareTo(BigDecimal.ZERO) <= 0) {
+            evidence.put("reason", TmScheduleConstants.SKIP_REASON_DEFAULT_PRODUCTION_SPEED_NON_POSITIVE);
+            traceOf(context, task).addRuleHit(TmScheduleRuleCodeEnum.LATEST_START_PRIORITY,
+                    TmScheduleRuleResultEnum.SKIP, evidence);
+            return;
+        }
+        if (shiftStartTime == null) {
+            evidence.put("reason", TmScheduleConstants.SKIP_REASON_SHIFT_START_TIME_INVALID);
+            traceOf(context, task).addRuleHit(TmScheduleRuleCodeEnum.LATEST_START_PRIORITY,
+                    TmScheduleRuleResultEnum.SKIP, evidence);
+            return;
+        }
+        BigDecimal supplyHours = nvl(task.getSupplyHours());
+        BigDecimal estimatedProductionHours = nvl(task.getPlanQty())
+                .divide(defaultSpeed, TmScheduleConstants.DECIMAL_CALCULATION_SCALE, RoundingMode.HALF_UP);
+        Date stockShortageTime = this.offsetHours(shiftStartTime, supplyHours);
+        Date latestStartTime = this.offsetHours(stockShortageTime,
+                standingHours.add(estimatedProductionHours).negate());
+        task.setStockShortageTime(stockShortageTime);
+        task.setEstimatedProductionHours(estimatedProductionHours);
+        task.setLatestStartTime(latestStartTime);
+        evidence.put("stockShortageTime", stockShortageTime);
+        evidence.put("estimatedProductionHours", estimatedProductionHours);
+        evidence.put("latestStartTime", latestStartTime);
+        evidence.put("formula", "shiftStart+supplyHours-standingHours-planQty/defaultSpeed");
+        traceOf(context, task).addRuleHit(TmScheduleRuleCodeEnum.LATEST_START_PRIORITY,
+                TmScheduleRuleResultEnum.PASS, evidence);
+    }
+
+    /**
+     * 解析任务班次开始时间，第二天三个班次按班次顺序偏移一天。
+     *
+     * @param context    排程上下文
+     * @param shiftOrder 六班任务顺序
+     * @return 班次开始时间；配置缺失或格式非法时返回 null
+     */
+    private Date resolveShiftStartTime(TmScheduleContext context, Integer shiftOrder) {
+        if (context == null || context.getScheduleDate() == null || shiftOrder == null
+                || context.getShiftTimeWindowMap() == null) {
+            return null;
+        }
+        TmShiftTimeWindow window = context.getShiftTimeWindowMap().get(shiftOrder);
+        if (window == null || StrUtil.isBlank(window.getPlanStartTime())) {
+            return null;
+        }
+        try {
+            Date shiftDate = DateUtil.offsetDay(context.getScheduleDate(), (shiftOrder - 1) / 3);
+            return DateUtil.parse(DateUtil.formatDate(shiftDate) + " " + window.getPlanStartTime());
+        } catch (RuntimeException exception) {
+            log.warn("[TM_LATEST_START_PRIORITY] batchNo={}, traceId={}, shiftOrder={}, planStartTime={}, reason=SHIFT_START_PARSE_FAILED",
+                    context.getBatchNo(), context.getTraceId(), shiftOrder, window.getPlanStartTime(), exception);
+            return null;
+        }
+    }
+
+    /**
+     * 按小时偏移时间。
+     *
+     * @param source 原时间
+     * @param hours  偏移小时数，可为负数
+     * @return 偏移后的时间
+     */
+    private Date offsetHours(Date source, BigDecimal hours) {
+        long offsetMillis = hours.multiply(BigDecimal.valueOf(TmScheduleConstants.MILLIS_PER_HOUR))
+                .setScale(0, RoundingMode.HALF_UP).longValue();
+        return new Date(source.getTime() + offsetMillis);
+    }
+
+    /**
+     * 读取非必填数值参数，无法解析时使用缺省值。
+     *
+     * @param context      排程上下文
+     * @param paramCode    参数编码
+     * @param defaultValue 缺省值
+     * @return 参数数值
+     */
+    private BigDecimal readDecimalParam(TmScheduleContext context, String paramCode, BigDecimal defaultValue) {
+        String value = readParam(context, paramCode, null);
+        if (StrUtil.isBlank(value)) {
+            return defaultValue;
+        }
+        try {
+            return new BigDecimal(value.trim());
+        } catch (NumberFormatException exception) {
+            log.warn("[TM_PARAM_PARSE] batchNo={}, traceId={}, paramCode={}, paramValue={}, reason=INVALID_DECIMAL",
+                    context.getBatchNo(), context.getTraceId(), paramCode, value, exception);
+            return defaultValue;
+        }
+    }
+    /**
      * 写入新规格判断和提前排产窗口证据。
      *
      * @param context 排程上下文
@@ -207,7 +349,10 @@ public class TmPlanCalcService implements ITmPlanCalcService {
         detectEvidence.put("historyEndDate", info.getHistoryEndDate());
         detectEvidence.put("historySchedulePlanExists", info.getHistorySchedulePlanExists());
         detectEvidence.put("reason", info.getReason());
-        traceOf(context, task).addRuleHit("NEW_SPEC_DETECT", Boolean.TRUE.equals(info.getNewSpec()) ? "PASS" : "SKIP", detectEvidence);
+        traceOf(context, task).addRuleHit(TmScheduleRuleCodeEnum.NEW_SPEC_DETECT,
+                Boolean.TRUE.equals(info.getNewSpec())
+                        ? TmScheduleRuleResultEnum.PASS : TmScheduleRuleResultEnum.SKIP,
+                detectEvidence);
         if (!info.isNewSpecHit()) {
             return;
         }
@@ -219,7 +364,8 @@ public class TmPlanCalcService implements ITmPlanCalcService {
         windowEvidence.put("adjustedTargetWindow", info.getAdjustedTargetWindow());
         windowEvidence.put("demandShift", info.getDemandShift());
         windowEvidence.put("demandQty", info.getDemandQty());
-        traceOf(context, task).addRuleHit("NEW_SPEC_ADVANCE_WINDOW", "PASS", windowEvidence);
+        traceOf(context, task).addRuleHit(TmScheduleRuleCodeEnum.NEW_SPEC_ADVANCE_WINDOW,
+                TmScheduleRuleResultEnum.PASS, windowEvidence);
     }
 
     /**
@@ -245,8 +391,9 @@ public class TmPlanCalcService implements ITmPlanCalcService {
         detectEvidence.put("embryoCodes", info.getEmbryoCodes());
         detectEvidence.put("mergedToExistingTask", info.getMergedToExistingTask());
         detectEvidence.put("reason", info.getReason());
-        traceOf(context, task).addRuleHit("EXPERIMENT_SPEC_DETECT",
-                info.isExperimentSpecHit() ? "PASS" : "SKIP", detectEvidence);
+        traceOf(context, task).addRuleHit(TmScheduleRuleCodeEnum.EXPERIMENT_SPEC_DETECT,
+                info.isExperimentSpecHit() ? TmScheduleRuleResultEnum.PASS : TmScheduleRuleResultEnum.SKIP,
+                detectEvidence);
         if (!info.isExperimentSpecHit()) {
             return;
         }
@@ -256,7 +403,8 @@ public class TmPlanCalcService implements ITmPlanCalcService {
         planQtyEvidence.put("finalTaskPlanQty", task.getPlanQty());
         planQtyEvidence.put("currentShiftDemandQty", task.getCurrentShiftDemandQty());
         planQtyEvidence.put("guardDemandQty", task.getGuardDemandQty());
-        traceOf(context, task).addRuleHit("EXPERIMENT_SPEC_PLAN_QTY", "PASS", planQtyEvidence);
+        traceOf(context, task).addRuleHit(TmScheduleRuleCodeEnum.EXPERIMENT_SPEC_PLAN_QTY,
+                TmScheduleRuleResultEnum.PASS, planQtyEvidence);
     }
     /**
      * 写入需求量计算规则证据。
@@ -275,7 +423,8 @@ public class TmPlanCalcService implements ITmPlanCalcService {
         evidence.put("stockGapQty", task.getStockGapQty());
         evidence.put("demandQty", task.getDemandQty());
         evidence.put("sourceOrderNos", task.getSourceOrderNos());
-        traceOf(context, task).addRuleHit("DEMAND_QTY_CALC", "PASS", evidence);
+        traceOf(context, task).addRuleHit(TmScheduleRuleCodeEnum.DEMAND_QTY_CALC,
+                TmScheduleRuleResultEnum.PASS, evidence);
     }
 
     /**
@@ -305,7 +454,8 @@ public class TmPlanCalcService implements ITmPlanCalcService {
         evidence.put("preLossPlanQty", task.getPreLossPlanQty());
         evidence.put("planQtyBeforeToolLimit", task.getPlanQtyBeforeToolLimit());
         evidence.put("calcFormulaDesc", task.getCalcFormulaDesc());
-        traceOf(context, task).addRuleHit("PLAN_QTY_CALC", "PASS", evidence);
+        traceOf(context, task).addRuleHit(TmScheduleRuleCodeEnum.PLAN_QTY_CALC,
+                TmScheduleRuleResultEnum.PASS, evidence);
     }
 
     /**
@@ -384,9 +534,11 @@ public class TmPlanCalcService implements ITmPlanCalcService {
                 continue;
             }
             BigDecimal forecastStockQty = this.resolveForecastRollingStock(entry.getKey(), entry.getValue(), stockForecastMap);
-            initialUsedToolQty = initialUsedToolQty.add(forecastStockQty.divide(curlLength, 6, RoundingMode.HALF_UP));
+            initialUsedToolQty = initialUsedToolQty.add(forecastStockQty.divide(curlLength,
+                    TmScheduleConstants.DECIMAL_CALCULATION_SCALE, RoundingMode.HALF_UP));
         }
-        return totalToolQty.subtract(initialUsedToolQty).max(BigDecimal.ZERO).setScale(6, RoundingMode.HALF_UP);
+        return totalToolQty.subtract(initialUsedToolQty).max(BigDecimal.ZERO)
+                .setScale(TmScheduleConstants.DECIMAL_CALCULATION_SCALE, RoundingMode.HALF_UP);
     }
 
     /**
@@ -443,17 +595,19 @@ public class TmPlanCalcService implements ITmPlanCalcService {
         }
         BigDecimal curlLength = this.resolveCurlLength(task);
         if (curlLength.compareTo(BigDecimal.ZERO) <= 0) {
-            task.setToolUsedQty(BigDecimal.ZERO.setScale(6, RoundingMode.HALF_UP));
+            task.setToolUsedQty(BigDecimal.ZERO.setScale(TmScheduleConstants.DECIMAL_CALCULATION_SCALE,
+                    RoundingMode.HALF_UP));
             task.setRemainingToolQty(currentAvailableToolQty);
             return currentAvailableToolQty;
         }
         BigDecimal netUsedToolQty = nvl(task.getPlanQty()).subtract(nvl(task.getCurrentShiftDemandQty()))
-                .divide(curlLength, 6, RoundingMode.HALF_UP);
+                .divide(curlLength, TmScheduleConstants.DECIMAL_CALCULATION_SCALE, RoundingMode.HALF_UP);
         BigDecimal remainingToolQty = currentAvailableToolQty.subtract(netUsedToolQty).max(BigDecimal.ZERO);
         if (task.getTotalToolQty() != null) {
             remainingToolQty = remainingToolQty.min(task.getTotalToolQty());
         }
-        remainingToolQty = remainingToolQty.setScale(6, RoundingMode.HALF_UP);
+        remainingToolQty = remainingToolQty.setScale(TmScheduleConstants.DECIMAL_CALCULATION_SCALE,
+                RoundingMode.HALF_UP);
         task.setToolUsedQty(netUsedToolQty);
         task.setRemainingToolQty(remainingToolQty);
         return remainingToolQty;
@@ -546,6 +700,7 @@ public class TmPlanCalcService implements ITmPlanCalcService {
      * @return 需求量算法编码
      */
     public String readAlgorithmCode(TmScheduleContext context) {
-        return readParam(context, PARAM_ALGORITHM_SWITCH, DEFAULT_ALGORITHM_CODE);
+        return readParam(context, TmScheduleConstants.PARAM_ALGORITHM_SWITCH,
+                TmScheduleConstants.DEFAULT_ALGORITHM_SWITCH);
     }
 }

@@ -2,7 +2,9 @@ package com.zlt.aps.tm.engine.strategy;
 
 import com.ruoyi.common.exception.ServiceException;
 import com.zlt.aps.common.engine.schedule.ScheduleScoreResult;
+import com.zlt.aps.tm.api.constant.TmScheduleConstants;
 import com.zlt.aps.tm.api.enums.TmScheduleErrorCodeEnum;
+import com.zlt.aps.tm.api.enums.TmScheduleStrategyEnum;
 import com.zlt.aps.tm.engine.domain.TmMachineCandidate;
 import com.zlt.aps.tm.engine.domain.TmMachineRuleContext;
 import com.zlt.aps.tm.engine.domain.TmTaskDraft;
@@ -19,7 +21,8 @@ import java.util.Map;
  *
  * <p>仅对未过滤候选机台评分，按剩余产能适配(10)、主胶料连续(10)、基部胶相似(8)、
  * 同口型连续(10)、切换成本(10)和定点生产(10)加权求和。方法会修改候选机台评分，不修改任务链。
- * 通过 {@link Component} 注册为 Spring Bean，由 {@link TmStrategyRegistry} 按编码 "DEFAULT" 收集。</p>
+ * 通过 {@link Component} 注册为 Spring Bean，由 {@link TmStrategyRegistry}
+ * 按 {@link TmScheduleStrategyEnum#DEFAULT} 编码收集。</p>
  */
 @Component
 public class TmDefaultMachineScoreStrategy implements ITmMachineScoreStrategy {
@@ -31,7 +34,7 @@ public class TmDefaultMachineScoreStrategy implements ITmMachineScoreStrategy {
      */
     @Override
     public String getStrategyCode() {
-        return "DEFAULT";
+        return TmScheduleStrategyEnum.DEFAULT.getCode();
     }
 
     /**
@@ -117,7 +120,8 @@ public class TmDefaultMachineScoreStrategy implements ITmMachineScoreStrategy {
         }
         // 产能利用率越高分越高：产能完全利用得满分 10，剩余越多浪费越多分越低
         BigDecimal wasteRatio = remainCapacity.subtract(planQty)
-                .divide(remainCapacity, 6, RoundingMode.HALF_UP);
+                .divide(remainCapacity, TmScheduleConstants.DECIMAL_CALCULATION_SCALE,
+                        RoundingMode.HALF_UP);
         return BigDecimal.TEN.multiply(BigDecimal.ONE.subtract(wasteRatio))
                 .max(BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP);
     }

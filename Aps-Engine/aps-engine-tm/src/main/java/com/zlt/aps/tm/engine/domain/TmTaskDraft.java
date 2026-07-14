@@ -3,6 +3,7 @@ package com.zlt.aps.tm.engine.domain;
 import lombok.Data;
 
 import java.math.BigDecimal;
+import java.util.Date;
 
 /**
  * 胎面待排任务草稿。
@@ -158,6 +159,15 @@ public class TmTaskDraft {
 
     /** 上个胶料切换时长，单位小时 */
     private BigDecimal previousGlueSwitchHours;
+
+    /** 按当前班次开始时间和库存供应时长推算的库存不足时间 */
+    private Date stockShortageTime;
+
+    /** 按统一默认速度折算的预计生产小时数 */
+    private BigDecimal estimatedProductionHours;
+
+    /** 扣除工艺停放时间和预计生产时间后的最晚开始时间 */
+    private Date latestStartTime;
 
     /** 是否命中定点生产机台 */
     private Boolean fixedMachineMatched;
