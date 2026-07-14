@@ -45,6 +45,9 @@ public class Cd15MachineRollMapping extends BaseEntity implements Serializable {
     @ApiModelProperty(value = "班次", name = "shiftCode")
     @ImportExcelValidated(required = true, maxLength = 50)
     @TableField("SHIFT_CODE")
-    @Excel(name = "ui.data.column.cd15MachineRollMapping.shiftCode", dictType = "class_num")
+    @Excel(name = "ui.data.column.cd15MachineRollMapping.shiftCode", dictType = "class_num_three_plan")
     private String shiftCode;
+
+    @TableField(exist = false)
+    private Boolean confirmOutOfOpenShift;
 }
