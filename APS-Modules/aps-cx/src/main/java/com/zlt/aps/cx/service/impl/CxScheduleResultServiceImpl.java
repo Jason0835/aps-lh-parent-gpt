@@ -1208,16 +1208,6 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
             return Collections.emptyMap();
         }
 
-        // 构建物料编码 -> 胎胚描述的映射
-        Map<String, String> materialToEmbryoDesc = new HashMap<>();
-        for (CxScheduleResult item : list) {
-            String mc = StringUtils.defaultString(item.getMaterialCode()).trim();
-            String desc = StringUtils.defaultString(item.getMainMaterialDesc()).trim();
-            if (StringUtils.isNotBlank(mc) && StringUtils.isNotBlank(desc)) {
-                materialToEmbryoDesc.putIfAbsent(mc, desc);
-            }
-        }
-
         // 取导出日期的前一天
         Date targetScheduleDate = Objects.nonNull(scheduleDate)
                 ? DateUtil.beginOfDay(scheduleDate)
@@ -1229,8 +1219,24 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
         // 前一天所在月的起始日
         Date monthStart = DateUtil.beginOfMonth(prevDay);
 
-        log.info("buildTodayNightFinishQtyMap: 前一天={}, 月份起始={}, factoryCodes={}, materialCodes={}",
-                prevDay, monthStart, factoryCodes, materialCodes);
+        // 从月计划表构建物料编码 -> 胎胚描述的映射（与totalDailyPlanQtyMap使用同一个月计划数据）
+        LocalDate prevLocalDate = cn.hutool.core.date.DateUtil.toLocalDateTime(prevDay).toLocalDate();
+        int yearMonth = prevLocalDate.getYear() * 100 + prevLocalDate.getMonthValue();
+        String factoryCode = factoryCodes.stream().findFirst().orElse(FactoryConstant.DEFAULT_FACTORY_CODE);
+        List<FactoryMonthPlanProductionFinalResult> plans = monthPlanMapper.selectByFactoryAndYearMonth(factoryCode, yearMonth);
+        Map<String, String> materialToEmbryoDesc = new HashMap<>();
+        if (PubUtil.isNotEmpty(plans)) {
+            for (FactoryMonthPlanProductionFinalResult plan : plans) {
+                String mc = StringUtils.defaultString(plan.getMaterialCode()).trim();
+                String desc = StringUtils.defaultString(plan.getMainMaterialDesc()).trim();
+                if (StringUtils.isNotBlank(mc) && StringUtils.isNotBlank(desc)) {
+                    materialToEmbryoDesc.putIfAbsent(mc, desc);
+                }
+            }
+        }
+
+        log.info("buildTodayNightFinishQtyMap: 前一天={}, 月份起始={}, factoryCodes={}, materialCodes={}, 月计划映射数={}",
+                prevDay, monthStart, factoryCodes, materialCodes, materialToEmbryoDesc.size());
 
         Map<String, BigDecimal> resultMap = new HashMap<>();
 
