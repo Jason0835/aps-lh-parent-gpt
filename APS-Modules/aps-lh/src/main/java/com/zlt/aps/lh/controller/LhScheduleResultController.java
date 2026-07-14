@@ -17,6 +17,7 @@ import com.ruoyi.common.core.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.domain.BaseEntity;
 import com.ruoyi.common.core.web.page.TableDataInfo;
+import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
@@ -52,7 +53,6 @@ import com.zlt.common.utils.ImportExcelUtils;
 import com.zlt.common.utils.PubUtil;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
- import com.ruoyi.common.exception.ServiceException;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -323,7 +323,7 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
         AjaxResult ajaxResult = lhScheduleService.importScheduleTemplate(list, result, updateSupport, importLog.getId());
         // 硫化换模计划导入
         AjaxResult lhMouldChangePlanAjaxResult = lhMouldChangePlanController.importData(importDTO, Boolean.TRUE);
-        // 导入成功后，补全模具交替计划的批次号、交替类型、交替时间
+        // 导入成功后，补全模具交替计划的批次号
         if (!lhMouldChangePlanAjaxResult.get(AjaxResult.CODE_TAG).equals(AjaxResult.Type.ERROR.value())) {
             if (CollectionUtils.isNotEmpty(list)) {
                 LhScheduleResult scheduleResult = importDTO.getScheduleResult();
