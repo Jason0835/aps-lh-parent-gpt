@@ -964,6 +964,7 @@
   "ui.data.column.cd15ScheduleResult.scheduleDate": "Schedule Date",
   "ui.data.column.cd15ScheduleResult.cd15BatchNo": "CD15 Batch No.",
   "ui.data.column.cd15ScheduleResult.cxBatchNo": "CX Batch No.",
+  "ui.data.column.cd15ScheduleResult.cxMachineCodes": "Forming Machine Codes",
   "ui.data.column.cd15ScheduleResult.orderNo": "Order No.",
   "ui.data.column.cd15ScheduleResult.groupNo": "Group No.",
   "ui.data.column.cd15ScheduleResult.releaseStatus": "Release Status",
@@ -976,7 +977,7 @@
   "ui.data.column.cd15ScheduleResult.storageLaneCode": "Storage Lane Code",
   "ui.data.column.cd15ScheduleResult.steelStripCode": "Steel Strip Code",
   "ui.data.column.cd15ScheduleResult.stockQty": "Stock Qty",
-  "ui.data.column.cd15ScheduleResult.monthSurplusQty": "Month Surplus Qty",
+  "ui.data.column.cd15ScheduleResult.planSurplusQty": "Plan Surplus Qty",
   "ui.data.column.cd15ScheduleResult.cutMode": "Cut Mode",
   "ui.data.column.cd15ScheduleResult.sourceType": "Source Type",
   "ui.data.column.cd15ScheduleResult.isLocked": "Locked",
@@ -1222,5 +1223,8 @@
   "ui.data.column.lhSkuDecrement.embryoDesc": "Embryo Description",
   "ui.data.column.lhSkuDecrement.productStatus": "Product Status",
   "ui.data.btn.lhSkuDecrement.confirm": "Confirm Decrement",
-  "ui.data.alert.lhSkuDecrement.confirmMessage": "Confirm creating the SKU decrement record?"
+  "ui.data.alert.lhSkuDecrement.confirmMessage": "Confirm creating the SKU decrement record?",
+  "ui.data.column.cd90ScheduleResult.cxBatchNo": "Forming Batch No",
+  "ui.data.column.cd90ScheduleResult.cxMachineCodes": "Forming Machine Codes",
+  "ui.data.column.cd90ScheduleResult.planSurplusQty": "Plan Surplus Qty"
 }

@@ -1980,6 +1980,7 @@
   "ui.data.column.cd15ScheduleResult.scheduleDate": "Ngay lap lich",
   "ui.data.column.cd15ScheduleResult.cd15BatchNo": "So lo CD15",
   "ui.data.column.cd15ScheduleResult.cxBatchNo": "So lo CX",
+  "ui.data.column.cd15ScheduleResult.cxMachineCodes": "Danh sách mã máy thành hình",
   "ui.data.column.cd15ScheduleResult.orderNo": "So lenh",
   "ui.data.column.cd15ScheduleResult.groupNo": "So nhom",
   "ui.data.column.cd15ScheduleResult.releaseStatus": "Trang thai phat hanh",
@@ -1992,7 +1993,7 @@
   "ui.data.column.cd15ScheduleResult.storageLaneCode": "Ma vi tri kho",
   "ui.data.column.cd15ScheduleResult.steelStripCode": "Ma thep",
   "ui.data.column.cd15ScheduleResult.stockQty": "So luong ton",
-  "ui.data.column.cd15ScheduleResult.monthSurplusQty": "So luong du thang",
+  "ui.data.column.cd15ScheduleResult.planSurplusQty": "Số lượng kế hoạch còn lại",
   "ui.data.column.cd15ScheduleResult.cutMode": "Che do cat",
   "ui.data.column.cd15ScheduleResult.sourceType": "Nguon du lieu",
   "ui.data.column.cd15ScheduleResult.isLocked": "Da khoa",
@@ -2199,5 +2200,8 @@
   "ui.data.column.lhSkuDecrement.embryoDesc": "Mô tả phôi",
   "ui.data.column.lhSkuDecrement.productStatus": "Trạng thái sản phẩm",
   "ui.data.btn.lhSkuDecrement.confirm": "Xác nhận giảm lượng",
-  "ui.data.alert.lhSkuDecrement.confirmMessage": "Xác nhận tạo bản ghi giảm SKU?"
+  "ui.data.alert.lhSkuDecrement.confirmMessage": "Xác nhận tạo bản ghi giảm SKU?",
+  "ui.data.column.cd90ScheduleResult.cxBatchNo": "Số lô thành hình",
+  "ui.data.column.cd90ScheduleResult.cxMachineCodes": "Danh sách mã máy thành hình",
+  "ui.data.column.cd90ScheduleResult.planSurplusQty": "Số lượng kế hoạch còn lại"
 }

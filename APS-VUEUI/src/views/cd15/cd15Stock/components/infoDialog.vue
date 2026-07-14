@@ -119,21 +119,6 @@ export default {
           type: "number",
         },
         {
-          prop: "rollStockNum",
-          label: this.$t("ui.data.column.cd15Stock.rollStockNum"),
-          type: "number",
-        },
-        {
-          prop: "rollModifyNum",
-          label: this.$t("ui.data.column.cd15Stock.rollModifyNum"),
-          type: "number",
-        },
-        {
-          prop: "rollBadNum",
-          label: this.$t("ui.data.column.cd15Stock.rollBadNum"),
-          type: "number",
-        },
-        {
           prop: "remark",
           label: this.$t("ui.common.column.remark"),
           type: "textarea",

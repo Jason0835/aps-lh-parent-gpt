@@ -167,27 +167,6 @@ export default {
           minWidth: 130,
         },
         {
-          prop: "rollStockNum",
-          align: "center",
-          halign: "center",
-          label: this.$t("ui.data.column.cd15Stock.rollStockNum"),
-          minWidth: 130,
-        },
-        {
-          prop: "rollModifyNum",
-          align: "center",
-          halign: "center",
-          label: this.$t("ui.data.column.cd15Stock.rollModifyNum"),
-          minWidth: 140,
-        },
-        {
-          prop: "rollBadNum",
-          align: "center",
-          halign: "center",
-          label: this.$t("ui.data.column.cd15Stock.rollBadNum"),
-          minWidth: 140,
-        },
-        {
           prop: "remark",
           halign: "center",
           label: this.$t("ui.common.column.remark"),
