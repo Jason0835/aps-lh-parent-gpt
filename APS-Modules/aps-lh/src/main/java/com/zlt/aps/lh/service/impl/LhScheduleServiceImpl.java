@@ -1,5 +1,6 @@
 package com.zlt.aps.lh.service.impl;
 
+import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.date.DateUtil;
 import cn.hutool.json.JSONUtil;
@@ -3191,14 +3192,17 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
     }
 
     /**
-     * 判断是否为收尾行：任一班次 classXIsEnd = "1"。
+     * 判断是否为收尾行：任一班次 classXIsEnd 为收尾或试验标记。
      *
      * @param result 排程结果
      * @return true 表示该行存在收尾班次
      */
     private static boolean isCloseOutSku(LhScheduleResult result) {
         for (int shift = 1; shift <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT; shift++) {
-            if ("1".equals(ShiftFieldUtil.getShiftIsEnd(result, shift))) {
+            String isEnd = StringUtils.trimToEmpty(String.valueOf(BeanUtil.getProperty(result, "class" + shift + "IsEnd")));
+            if (ApsConstant.APS_STRING_1.equals(isEnd)
+                    || ApsConstant.APS_STRING_3.equals(isEnd)
+                    || ApsConstant.APS_STRING_4.equals(isEnd)) {
                 return true;
             }
         }
