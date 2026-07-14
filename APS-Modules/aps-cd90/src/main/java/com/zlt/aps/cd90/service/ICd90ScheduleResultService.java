@@ -85,4 +85,13 @@ public interface ICd90ScheduleResultService extends IDocService<Cd90ScheduleResu
      * @return 受影响行数
      */
     int batchUpdateReleaseStatus(List<Cd90ScheduleResult> list, String targetStatus);
+
+    /**
+     * 使用固定模板导出直裁排程结果。
+     *
+     * @param currentResults 已按现有导出条件查询的本批排程结果
+     * @param queryVO 导出条件，必须包含工厂和排程日期
+     * @return Excel文件字节
+     */
+    byte[] exportData(List<Cd90ScheduleResult> currentResults, Cd90ScheduleResult queryVO);
 }

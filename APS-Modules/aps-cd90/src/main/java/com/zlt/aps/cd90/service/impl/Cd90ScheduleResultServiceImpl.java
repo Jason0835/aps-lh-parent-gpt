@@ -1,19 +1,23 @@
 package com.zlt.aps.cd90.service.impl;
 
+import cn.hutool.core.date.DateUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.cd90.api.domain.entity.Cd90UnscheduleResult;
 import com.zlt.aps.cd90.api.domain.entity.Cd90ScheduleRollingAdjustLog;
 import com.zlt.aps.cd90.api.domain.entity.Cd90ScheduleResult;
 import com.zlt.aps.cd90.api.domain.entity.Cd90ShiftConfig;
+import com.zlt.aps.cd90.api.domain.entity.Cd90Stock;
 import com.zlt.aps.cd90.api.domain.vo.Cd90ChangeQtyRequest;
 import com.zlt.aps.cd90.api.domain.vo.Cd90InsertOrderRequest;
 import com.zlt.aps.cd90.api.domain.vo.Cd90RollingCheckRequest;
 import com.zlt.aps.cd90.api.domain.vo.Cd90TransferMachineRequest;
+import com.zlt.aps.cd90.component.Cd90ScheduleResultExportAssembler;
 import com.zlt.aps.cd90.engine.domain.Cd90ScheduleTask;
 import com.zlt.aps.cd90.engine.constant.Cd90ScheduleTaskType;
 import com.zlt.aps.cd90.engine.model.Cd90BatchDataCheckResult;
@@ -25,9 +29,11 @@ import com.zlt.aps.cd90.engine.service.Cd90InsertRollingService;
 import com.zlt.aps.cd90.engine.service.Cd90ScheduleTaskService;
 import com.zlt.aps.cd90.engine.mapper.Cd90AutoScheduleShiftMapper;
 import com.zlt.aps.cd90.engine.mapper.Cd90EngineConstructionMapper;
+import com.zlt.aps.cd90.engine.mapper.Cd90EngineCxScheduleMapper;
 import com.zlt.aps.cd90.mapper.Cd90ScheduleRollingAdjustLogMapper;
 import com.zlt.aps.cd90.mapper.Cd90UnscheduleResultMapper;
 import com.zlt.aps.cd90.mapper.Cd90ScheduleResultMapper;
+import com.zlt.aps.cd90.mapper.Cd90StockMapper;
 import com.zlt.aps.cd90.model.Cd90ScheduleOverwriteDecision;
 import com.zlt.aps.cd90.service.Cd90AutoScheduleAsyncExecutor;
 import com.zlt.aps.cd90.service.Cd90InsertOrderAsyncExecutor;
@@ -35,7 +41,10 @@ import com.zlt.aps.cd90.service.Cd90ScheduleOverwriteValidator;
 import com.zlt.aps.cd90.service.Cd90TimedRollingCheckService;
 import com.zlt.aps.cd90.service.ICd90ScheduleResultService;
 import com.zlt.aps.common.core.constant.ApsConstant;
+import com.zlt.aps.common.core.utils.ExcelUtils;
+import com.zlt.aps.cx.api.domain.entity.CxScheduleResult;
 import com.zlt.aps.mdm.api.domain.entity.MdmConstructionInfo;
+import com.zlt.common.utils.PubUtil;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.sysdef.domain.SysDocType;
 import org.redisson.api.RLock;
@@ -44,6 +53,7 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
+import java.io.InputStream;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -51,15 +61,18 @@ import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Objects;
 import java.util.Comparator;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -104,6 +117,188 @@ public class Cd90ScheduleResultServiceImpl extends AbstractDocService<Cd90Schedu
     private Cd90InsertRollingService insertRollingService;
     @Resource
     private Cd90AutoScheduleLockService lockService;
+    @Resource
+    private Cd90StockMapper cd90StockMapper;
+    @Resource
+    private Cd90EngineCxScheduleMapper cxScheduleMapper;
+    @Resource
+    private Cd90ScheduleResultExportAssembler exportAssembler;
+
+    /**
+     * 使用固定模板导出直裁四班排程结果。
+     * <p>
+     * 流程：校验导出条件 → 加载前一日排程结果 → 解析早班编码 → 加载前一日库存
+     * → 加载当日成型排程 → 加载施工BOM → 组装数据行 → 读取模板 → 写入Excel。
+     *
+     * @param currentResults 已按现有导出条件查询的本批排程结果
+     * @param queryVO 导出条件（含工厂、排程日期等）
+     * @return Excel文件字节
+     * @throws ServiceException 模板文件不存在时抛出
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public byte[] exportData(List<Cd90ScheduleResult> currentResults, Cd90ScheduleResult queryVO) {
+        // 校验导出条件
+        if (queryVO == null || !PubUtil.isNotEmpty(queryVO.getFactoryCode())
+                || queryVO.getScheduleDate() == null) {
+            throw new ServiceException(I18nUtil.getMessage(
+                    "ui.data.column.cd90ScheduleResult.exportRequired"));
+        }
+        // 排程日期的前一天，用于加载前一日排程结果和库存
+        Date previousDate = DateUtil.offsetDay(queryVO.getScheduleDate(), -1);
+        // 加载前一日排程结果（用于计算前一日各班实际剩余量）
+        List<Cd90ScheduleResult> previousResults = this.loadPreviousResults(queryVO, previousDate);
+        // 解析工厂早班班次编码
+        String earlyShiftCode = this.resolveEarlyShiftCode(queryVO.getFactoryCode());
+        // 加载前一日早班起至当日早班前的库存
+        List<Cd90Stock> stocks = this.loadStocks(
+                queryVO.getFactoryCode(), previousDate, earlyShiftCode);
+        // 加载当日成型排程结果（用于计算施工BOM需求）
+        List<CxScheduleResult> formingResults = this.loadFormingResults(
+                queryVO.getFactoryCode(), queryVO.getScheduleDate());
+        // 加载施工BOM，获取直裁宽度、大卷幅宽等参数
+        List<MdmConstructionInfo> constructions = this.loadConstructions(
+                queryVO.getFactoryCode(), formingResults);
+        // 组装导出数据行：前日排程 + 当日排程 + 库存 + 成型需求 + 施工BOM
+        List<Map<String, Object>> rows = this.exportAssembler.assembleRows(
+                previousResults, currentResults, stocks, formingResults, constructions);
+
+        // 读取Excel模板
+        InputStream inputStream = this.getClass().getClassLoader()
+                .getResourceAsStream("excelModel/cd90ScheduleResult.xlsx");
+        if (inputStream == null) {
+            throw new ServiceException(I18nUtil.getMessage(
+                    "ui.data.column.cd90ScheduleResult.exportTemplateNotFound"));
+        }
+        // 将数据写入模板并返回字节流
+        Map<String, Object> tableMap = new HashMap<>(this.exportAssembler.buildTableMap(queryVO.getScheduleDate()));
+        List<List<Map<String, Object>>> excelDataList = Collections.singletonList(rows);
+        byte[] bytes = ExcelUtils.writeMultiList(
+                inputStream,
+                0,
+                tableMap,
+                excelDataList);
+        return bytes;
+    }
+
+    /**
+     * 加载前一日排程结果。
+     * 按工厂编码、前一日日期查询排程记录，可选按帘布代号、机台编码、发布状态过滤。
+     * 结果按机台编码、大卷编码、各班生产顺序升序排列，用于导出时计算前日剩余量。
+     *
+     * @param queryVO     导出条件查询对象
+     * @param previousDate 前一日日期
+     * @return 前一日排程结果列表
+     */
+    private List<Cd90ScheduleResult> loadPreviousResults(Cd90ScheduleResult queryVO,
+                                                         Date previousDate) {
+        LambdaQueryWrapper<Cd90ScheduleResult> wrapper = Wrappers.lambdaQuery();
+        wrapper.eq(Cd90ScheduleResult::getFactoryCode, queryVO.getFactoryCode());
+        wrapper.eq(Cd90ScheduleResult::getScheduleDate, previousDate);
+        wrapper.eq(PubUtil.isNotEmpty(queryVO.getClothCode()),
+                Cd90ScheduleResult::getClothCode, queryVO.getClothCode());
+        wrapper.eq(PubUtil.isNotEmpty(queryVO.getMachineCode()),
+                Cd90ScheduleResult::getMachineCode, queryVO.getMachineCode());
+        wrapper.eq(PubUtil.isNotEmpty(queryVO.getIsRelease()),
+                Cd90ScheduleResult::getIsRelease, queryVO.getIsRelease());
+        wrapper.orderByAsc(Cd90ScheduleResult::getMachineCode);
+        wrapper.orderByAsc(Cd90ScheduleResult::getBigRollCode);
+        wrapper.orderByAsc(Cd90ScheduleResult::getClass3ProduceOrder);
+        return this.cd90ScheduleResultMapper.selectList(wrapper);
+    }
+
+    /**
+     * 解析工厂早班（CLASS3）的班次编码。
+     * 按班次排序取第一个有效的班次编码，用于加载前一日早班库存数据。
+     *
+     * @param factoryCode 工厂编码
+     * @return 早班班次编码，无配置时返回 null
+     */
+    private String resolveEarlyShiftCode(String factoryCode) {
+        return this.shiftMapper.selectList(Wrappers.<Cd90ShiftConfig>lambdaQuery()
+                        .eq(Cd90ShiftConfig::getFactoryCode, factoryCode)
+                        .eq(Cd90ShiftConfig::getIsActive, 1)
+                        .eq(Cd90ShiftConfig::getClassField, "CLASS3")
+                        .orderByAsc(Cd90ShiftConfig::getScheduleDay)
+                        .orderByAsc(Cd90ShiftConfig::getDayShiftOrder)
+                        .orderByAsc(Cd90ShiftConfig::getShiftOrder))
+                .stream()
+                .map(Cd90ShiftConfig::getShiftCode)
+                .filter(PubUtil::isNotEmpty)
+                .findFirst()
+                .orElse(null);
+    }
+
+    /**
+     * 加载指定日期和班次的库存数据。
+     * 按工厂编码、库存日期、班次编码查询，结果按物料编码升序排列。
+     *
+     * @param factoryCode 工厂编码
+     * @param stockDate   库存日期
+     * @param shiftCode   班次编码
+     * @return 库存列表，班次编码为空时返回空列表
+     */
+    private List<Cd90Stock> loadStocks(String factoryCode, Date stockDate, String shiftCode) {
+        if (!PubUtil.isNotEmpty(shiftCode)) {
+            return Collections.emptyList();
+        }
+        return this.cd90StockMapper.selectList(Wrappers.<Cd90Stock>lambdaQuery()
+                .eq(Cd90Stock::getFactoryCode, factoryCode)
+                .eq(Cd90Stock::getStockDate, stockDate)
+                .eq(Cd90Stock::getShiftCode, shiftCode)
+                .orderByAsc(Cd90Stock::getMaterialCode));
+    }
+
+    /**
+     * 加载指定日期的成型排程结果。
+     * 用于导出时关联成型计划的胎胚编号、配方版本等信息。
+     *
+     * @param factoryCode  工厂编码
+     * @param scheduleDate 排程日期
+     * @return 成型排程结果列表，按胎胚编号和ID升序排列
+     */
+    private List<CxScheduleResult> loadFormingResults(String factoryCode, Date scheduleDate) {
+        return this.cxScheduleMapper.selectList(Wrappers.<CxScheduleResult>lambdaQuery()
+                .eq(CxScheduleResult::getFactoryCode, factoryCode)
+                .eq(CxScheduleResult::getScheduleDate, scheduleDate)
+                .orderByAsc(CxScheduleResult::getEmbryoCode)
+                .orderByAsc(CxScheduleResult::getId));
+    }
+
+    /**
+     * 加载施工BOM信息。
+     * 从成型排程结果中提取施工编号和施工版本，批量查询施工信息主数据，
+     * 用于获取直裁宽度、大卷幅宽等导出所需参数。
+     *
+     * @param factoryCode    工厂编码
+     * @param formingResults 成型排程结果列表
+     * @return 施工信息列表，按施工编号和版本升序排列
+     */
+    private List<MdmConstructionInfo> loadConstructions(String factoryCode,
+                                                         List<CxScheduleResult> formingResults) {
+        Set<String> constructionCodes = formingResults.stream()
+                .map(CxScheduleResult::getEmbryoCode)
+                .filter(PubUtil::isNotEmpty)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+        Set<String> constructionVersions = formingResults.stream()
+                .flatMap(result -> Arrays.asList(
+                        result.getClass1RecipeNo(),
+                        result.getClass2RecipeNo(),
+                        result.getClass3RecipeNo(),
+                        result.getClass4RecipeNo()).stream())
+                .filter(PubUtil::isNotEmpty)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+        if (constructionCodes.isEmpty() || constructionVersions.isEmpty()) {
+            return Collections.emptyList();
+        }
+        LambdaQueryWrapper<MdmConstructionInfo> constructionWrapper = new LambdaQueryWrapper<>();
+        constructionWrapper.eq(MdmConstructionInfo::getFactoryCode, factoryCode);
+        constructionWrapper.in(MdmConstructionInfo::getConstructionCode, constructionCodes);
+        constructionWrapper.in(MdmConstructionInfo::getConstructionVersion, constructionVersions);
+        constructionWrapper.orderByAsc(MdmConstructionInfo::getConstructionCode);
+        constructionWrapper.orderByAsc(MdmConstructionInfo::getConstructionVersion);
+        return this.constructionMapper.selectList(constructionWrapper);
+    }
 
     /**
      * 接收自动排程请求。
@@ -216,6 +411,13 @@ public class Cd90ScheduleResultServiceImpl extends AbstractDocService<Cd90Schedu
         return AjaxResult.success(values);
     }
 
+    /**
+     * 查询工厂所有启用的班次配置。
+     * 按 scheduleDay、dayShiftOrder、shiftOrder 升序排列，用于计算班次时间和可编辑窗口。
+     *
+     * @param factoryCode 工厂编码
+     * @return 启用状态的班次配置列表
+     */
     private List<Cd90ShiftConfig> activeShiftConfigs(String factoryCode) {
         return shiftMapper.selectList(
                         new LambdaQueryWrapper<Cd90ShiftConfig>()
@@ -228,16 +430,40 @@ public class Cd90ScheduleResultServiceImpl extends AbstractDocService<Cd90Schedu
                 .collect(Collectors.toList());
     }
 
+    /**
+     * 获取班次配置的排程日偏移值。
+     * 若配置中 scheduleDay 为空则默认返回2，表示该班次归属排程日的第二天。
+     *
+     * @param config 班次配置
+     * @return 排程日偏移值
+     */
     private int scheduleDay(Cd90ShiftConfig config) {
         return config.getScheduleDay() == null ? 2 : config.getScheduleDay();
     }
 
+    /**
+     * 计算班次结束时间。
+     * 根据 isCrossDay 标志判断是否跨日：跨日时结束日期加1天，否则与开始日期相同。
+     *
+     * @param shiftDate 班次开始日期
+     * @param config    班次配置
+     * @return 班次结束日期时间
+     */
     private LocalDateTime resolveShiftEnd(LocalDate shiftDate, Cd90ShiftConfig config) {
         LocalDate endDate = Integer.valueOf(1).equals(config.getIsCrossDay())
                 ? shiftDate.plusDays(1) : shiftDate;
         return LocalDateTime.of(endDate, LocalTime.parse(config.getEndTime()));
     }
 
+    /**
+     * 解析当前可编辑的班次起始索引。
+     * 遍历所有启用班次，找到当前时间尚未结束的第一个班次，返回其 CLASS 编号。
+     * 所有班次均已结束时返回7（超出1-6范围），表示排程窗口已关闭。
+     *
+     * @param scheduleDateValue 排程日期
+     * @param factoryCode       工厂编码
+     * @return 可编辑班次索引（1-6），窗口关闭时返回7
+     */
     private int resolveChangeQtyEditableFromClassIndex(Date scheduleDateValue, String factoryCode) {
         LocalDate scheduleDate = scheduleDateValue.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
         LocalDateTime now = LocalDateTime.now();
@@ -354,6 +580,12 @@ public class Cd90ScheduleResultServiceImpl extends AbstractDocService<Cd90Schedu
 
     /**
      * 使用正式滚动内核执行只读预演，跨班顺延时返回确认明细。
+     * 获取分布式锁后执行滚动排程，若产生跨班顺延影响则返回 needConfirm 结构，
+     * 由前端展示顺延详情让用户确认后正式提交。
+     *
+     * @param request      插单请求
+     * @param scheduleDate 排程日期
+     * @return 有跨班顺延时返回确认信息，无顺延时返回 null，获取锁失败时返回错误
      */
     private AjaxResult previewInsertOrder(Cd90InsertOrderRequest request,
                                           LocalDate scheduleDate) {
@@ -424,6 +656,13 @@ public class Cd90ScheduleResultServiceImpl extends AbstractDocService<Cd90Schedu
         return I18nUtil.getMessage("ui.cd90.insert.reason.other");
     }
 
+    /**
+     * 查询插单异步任务状态。
+     * 按任务ID查询，校验任务类型为 INSERT_ORDER 后返回任务详情。
+     *
+     * @param taskId 任务编号
+     * @return 任务详情，任务不存在或类型不匹配时返回错误
+     */
     @Override
     public AjaxResult getInsertTask(String taskId) {
         Cd90ScheduleTask task = taskService.findByTaskId(taskId);
@@ -535,6 +774,15 @@ public class Cd90ScheduleResultServiceImpl extends AbstractDocService<Cd90Schedu
         return AjaxResult.success("转机台任务已提交", data);
     }
 
+    /**
+     * 使用正式滚动内核执行转机台只读预演，跨班顺延时返回确认明细。
+     * 获取分布式锁后执行转机台滚动排程，若产生跨班顺延影响则返回 needConfirm 结构，
+     * 由前端展示顺延详情让用户确认后正式提交。
+     *
+     * @param request      转机台请求
+     * @param scheduleDate 排程日期
+     * @return 有跨班顺延时返回确认信息，无顺延时返回 null，获取锁失败时返回错误
+     */
     private AjaxResult previewTransferMachine(Cd90TransferMachineRequest request,
                                               LocalDate scheduleDate) {
         RLock lock = lockService.getLock(request.getFactoryCode(), scheduleDate);
@@ -564,6 +812,13 @@ public class Cd90ScheduleResultServiceImpl extends AbstractDocService<Cd90Schedu
         }
     }
 
+    /**
+     * 查询转机台异步任务状态。
+     * 按任务ID查询，校验任务类型为 TRANSFER_MACHINE 后返回任务详情。
+     *
+     * @param taskId 任务编号
+     * @return 任务详情，任务不存在或类型不匹配时返回错误
+     */
     @Override
     public AjaxResult getTransferMachineTask(String taskId) {
         Cd90ScheduleTask task = taskService.findByTaskId(taskId);
@@ -702,6 +957,13 @@ public class Cd90ScheduleResultServiceImpl extends AbstractDocService<Cd90Schedu
         }
     }
 
+    /**
+     * 查询调量异步任务状态。
+     * 按任务ID查询，校验任务类型为 CHANGE_QTY 后返回任务详情。
+     *
+     * @param taskId 任务编号
+     * @return 任务详情，任务不存在或类型不匹配时返回错误
+     */
     @Override
     public AjaxResult getChangeQtyTask(String taskId) {
         Cd90ScheduleTask task = taskService.findByTaskId(taskId);
@@ -710,6 +972,13 @@ public class Cd90ScheduleResultServiceImpl extends AbstractDocService<Cd90Schedu
         }
         return AjaxResult.success(task);
     }
+    /**
+     * 执行定时滚动校验。
+     * 委托给 Cd90TimedRollingCheckService 执行具体的滚动校验逻辑。
+     *
+     * @param request 滚动校验请求
+     * @return 校验结果
+     */
     @Override
     public AjaxResult checkTimedRolling(Cd90RollingCheckRequest request) {
         return timedRollingCheckService.check(request);
@@ -758,10 +1027,28 @@ public class Cd90ScheduleResultServiceImpl extends AbstractDocService<Cd90Schedu
         response.put("unscheduledCount", unscheduledCount);
         return AjaxResult.success(response);
     }
+    /**
+     * 判断字符串是否为空白。
+     * null 或去除首尾空格后长度为0时返回 true。
+     *
+     * @param value 待判断的字符串
+     * @return 是否为空白
+     */
     private boolean isBlank(String value) {
         return value == null || value.trim().isEmpty();
     }
 
+    /**
+     * 判断指定班次是否已锁定。
+     * 锁定条件满足以下任一：
+     * 1. 实体级 isLocked 标志为1；
+     * 2. 该班次已完成数量（finishQty）大于0；
+     * 3. 生产状态为"1"（生产中）且完成数量小于计划数量。
+     *
+     * @param result     排程结果实体
+     * @param classIndex 班次索引（1-6）
+     * @return 是否已锁定
+     */
     private boolean isLocked(Cd90ScheduleResult result, int classIndex) {
         Double finishQuantity = this.readDouble(result, String.format("class%dFinishQty", classIndex));
         Double planQuantity = this.readDouble(result, String.format("class%dPlanQty", classIndex));
@@ -771,16 +1058,41 @@ public class Cd90ScheduleResultServiceImpl extends AbstractDocService<Cd90Schedu
                 && planQuantity != null && (finishQuantity == null || finishQuantity < planQuantity));
     }
 
+    /**
+     * 读取指定班次的生产顺序值。
+     *
+     * @param result     排程结果实体
+     * @param classIndex 班次索引（1-6）
+     * @return 生产顺序值，未设置时返回 null
+     */
     private Integer readProduceOrder(Cd90ScheduleResult result, int classIndex) {
         return (Integer) result.getFieldValueByFieldName(String.format(
                 "class%dProduceOrder", classIndex));
     }
 
+    /**
+     * 读取指定班次的计划量。
+     *
+     * @param result     排程结果实体
+     * @param classIndex 班次索引（1-6）
+     * @return 计划量，未设置或为null时返回0
+     */
     private double readPlanQuantity(Cd90ScheduleResult result, int classIndex) {
         Double value = this.readDouble(result, String.format("class%dPlanQty", classIndex));
         return value == null ? 0D : value;
     }
 
+    /**
+     * 解析调量请求中的目标计划量。
+     * 支持两种方式传入调量目标：
+     * 1. 通过 startClassField + targetPlanQty 指定单个班次的目标量；
+     * 2. 通过 class1PlanQty~class6PlanQty 批量指定多个班次的目标量。
+     * 两种方式可混合使用，最终合并为按班次索引映射的目标量集合。
+     *
+     * @param request 调量请求
+     * @return 班次索引到目标计划量的映射
+     * @throws IllegalArgumentException 调量参数不合法时抛出
+     */
     private Map<Integer, Double> resolveChangeQtyTargets(Cd90ChangeQtyRequest request) {
         Map<Integer, Double> targetQtyByClass = new LinkedHashMap<>();
         if (!isBlank(request.getStartClassField()) || request.getTargetPlanQty() != null) {
@@ -808,6 +1120,14 @@ public class Cd90ScheduleResultServiceImpl extends AbstractDocService<Cd90Schedu
         return targetQtyByClass;
     }
 
+    /**
+     * 将班次字段名（如 CLASS1）解析为数字索引（1）。
+     * 校验解析结果在1-6范围内，超出范围或格式错误时抛出 IllegalArgumentException。
+     *
+     * @param classField 班次字段名
+     * @return 班次数字索引
+     * @throws IllegalArgumentException 格式错误或超出范围时抛出
+     */
     private int parseClassIndex(String classField) {
         try {
             int classIndex = Integer.parseInt(classField.replace("CLASS", ""));
@@ -820,6 +1140,14 @@ public class Cd90ScheduleResultServiceImpl extends AbstractDocService<Cd90Schedu
         }
     }
 
+    /**
+     * 从排程结果列表中筛选最新批次的数据。
+     * 取 batchNo 最大的记录作为最新批次，过滤出该批次的所有记录返回。
+     * 用于调量时确保基于最新一次排程结果进行操作。
+     *
+     * @param results 排程结果列表
+     * @return 最新批次的排程结果列表
+     */
     private List<Cd90ScheduleResult> latestBatchResults(List<Cd90ScheduleResult> results) {
         if (results == null || results.isEmpty()) {
             return Collections.emptyList();
@@ -831,6 +1159,14 @@ public class Cd90ScheduleResultServiceImpl extends AbstractDocService<Cd90Schedu
                 .collect(Collectors.toList());
     }
 
+    /**
+     * 查找调量目标排程结果。
+     * 按排程结果ID（可选）、机台编码、帘布代号匹配目标记录。
+     *
+     * @param request  调量请求
+     * @param existing 现有排程结果列表
+     * @return 匹配的目标排程结果，未找到时返回空 Optional
+     */
     private Optional<Cd90ScheduleResult> findChangeQtyTarget(Cd90ChangeQtyRequest request,
                                                              List<Cd90ScheduleResult> existing) {
         return existing.stream()
@@ -840,19 +1176,47 @@ public class Cd90ScheduleResultServiceImpl extends AbstractDocService<Cd90Schedu
                 .filter(item -> request.getClothCode().equals(item.getClothCode()))
                 .findFirst();
     }
+    /**
+     * 读取转机台请求中指定班次的生产顺序值。
+     * 仅当值大于0时返回，否则返回 null（视为未设置）。
+     *
+     * @param request    转机台请求
+     * @param classIndex 班次索引（1-6）
+     * @return 生产顺序值，未设置或为0时返回 null
+     */
     private Integer readTransferProduceOrder(Cd90TransferMachineRequest request, int classIndex) {
         Integer produceOrder = (Integer) request.getFieldValueByFieldName(String.format(
                 "class%dProduceOrder", classIndex));
         return produceOrder != null && produceOrder > 0 ? produceOrder : null;
     }
 
+    /**
+     * 读取排程结果中指定字段的 Double 值。
+     * 通过动态字段名访问实体的 class1~class6 系列字段。
+     *
+     * @param result    排程结果实体
+     * @param fieldName 字段名（如 class1PlanQty）
+     * @return Double 值，未设置时返回 null
+     */
     private Double readDouble(Cd90ScheduleResult result, String fieldName) {
         return (Double) result.getFieldValueByFieldName(fieldName);
     }
 
+    /**
+     * 获取文档类型编码。
+     * 返回 CD90_SCHEDULE_RESULT 用于单据类型识别。
+     *
+     * @return 文档类型编码
+     */
     @Override
     protected String getDocTypeCode() { return "CD90_SCHEDULE_RESULT"; }
 
+    /**
+     * 获取系统文档类型对象。
+     * 构建包含 CD90_SCHEDULE_RESULT 编码的 SysDocType 实例。
+     *
+     * @return 系统文档类型对象
+     */
     @Override
     protected SysDocType getSysDocType() {
         SysDocType sysDocType = new SysDocType();
@@ -993,9 +1357,9 @@ public class Cd90ScheduleResultServiceImpl extends AbstractDocService<Cd90Schedu
      * 按排程日期和工厂查询直裁排程结果。
      *
      * @param scheduleDate 排程日期
-     * @param factoryCode 工厂编码
-     * @return 排程结果列表
-    */
+     * @param factoryCode  工厂编码
+     * @return 排程结果列表，参数为空时返回空列表
+     */
     @Override
     public List<Cd90ScheduleResult> selectByDateAndFactory(Date scheduleDate, String factoryCode) {
         if (scheduleDate == null || factoryCode == null || factoryCode.isEmpty()) {
@@ -1007,6 +1371,12 @@ public class Cd90ScheduleResultServiceImpl extends AbstractDocService<Cd90Schedu
         return cd90ScheduleResultMapper.selectList(wrapper);
     }
 
+    /**
+     * 按ID列表批量查询排程结果。
+     *
+     * @param ids 排程结果ID列表
+     * @return 匹配的排程结果列表，ID列表为空时返回空列表
+     */
     @Override
     public List<Cd90ScheduleResult> getCd90ScheduleResultListByIds(List<Long> ids) {
         if (ids == null || ids.isEmpty()) {
