@@ -715,16 +715,18 @@ public class ScheduleServiceImpl implements ScheduleService {
                                 .in(MdmMaterialInfo::getEmbryoCode, embryoCodes))
                         .eq(MdmMaterialInfo::getIsDelete, "0"));
         log.info("加载物料信息 {} 条", materials.size());
+
+        context.setMaterials(materials);
     }
 
-        /**
-         * 加载胎胚库存
-         *
-         * <p>根据排程日期获取早上6点那一刻的库存
-         *
-         * @param context       排程上下文
-         * @param scheduleDate  排程日期
-         */
+    /**
+     * 加载胎胚库存
+     *
+     * <p>根据排程日期获取早上6点那一刻的库存
+     *
+     * @param context       排程上下文
+     * @param scheduleDate  排程日期
+     */
     private void loadStocks(ScheduleContextVo context, LocalDate scheduleDate) {
         // 将 LocalDate 转换为 java.sql.Date 用于数据库查询
         Date stockDate = Date.from(scheduleDate.atStartOfDay(java.time.ZoneId.systemDefault()).toInstant());
