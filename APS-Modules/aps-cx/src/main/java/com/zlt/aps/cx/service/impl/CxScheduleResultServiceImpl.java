@@ -1240,14 +1240,14 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
 
         Map<String, BigDecimal> resultMap = new HashMap<>();
 
-        // 1. 查询日完成量：月份起始日 ~ 前一天（不含前一天）
+        // 1. 查询日完成量：月份起始日 ~ 前一天（不含前一天），不按物料编码过滤
         List<Map<String, Object>> dayFinishList = lhFinishQtyMapper.sumDayFinishQty(
-                factoryCodes, materialCodes, monthStart, prevDayStart);
+                factoryCodes, null, monthStart, prevDayStart);
         log.info("buildTodayNightFinishQtyMap dayFinishList size:{}", dayFinishList != null ? dayFinishList.size() : 0);
 
-        // 2. 查询班次完成量：前一天当天
+        // 2. 查询班次完成量：前一天当天，不按物料编码过滤
         List<Map<String, Object>> scheFinishList = lhFinishQtyMapper.sumScheFinishQty(
-                factoryCodes, materialCodes, prevDayStart, prevDayNextStart);
+                factoryCodes, null, prevDayStart, prevDayNextStart);
         log.info("buildTodayNightFinishQtyMap scheFinishList size:{}", scheFinishList != null ? scheFinishList.size() : 0);
 
         // 合并两表结果，按物料编码汇总后映射到胎胚描述

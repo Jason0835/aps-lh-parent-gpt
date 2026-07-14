@@ -16,10 +16,12 @@
         <foreach item="code" collection="factoryCodes" open="(" separator="," close=")">
             #{code}
         </foreach>
+        <if test="materialCodes != null and materialCodes.size() > 0">
           AND MATERIAL_CODE IN
         <foreach item="code" collection="materialCodes" open="(" separator="," close=")">
             #{code}
         </foreach>
+        </if>
           AND (IS_DELETE = 0 OR IS_DELETE IS NULL)
         GROUP BY FACTORY_CODE, MATERIAL_CODE
     </select>
@@ -36,10 +38,12 @@
         <foreach item="code" collection="factoryCodes" open="(" separator="," close=")">
             #{code}
         </foreach>
+        <if test="materialCodes != null and materialCodes.size() > 0">
           AND MATERIAL_CODE IN
         <foreach item="code" collection="materialCodes" open="(" separator="," close=")">
             #{code}
         </foreach>
+        </if>
           AND (IS_DELETE = 0 OR IS_DELETE IS NULL)
         GROUP BY FACTORY_CODE, MATERIAL_CODE
     </select>
