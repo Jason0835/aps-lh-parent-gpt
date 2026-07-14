@@ -1156,20 +1156,30 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
             embryoDesc = embryoDesc.trim();
             BigDecimal sum = resultMap.getOrDefault(embryoDesc, BigDecimal.ZERO);
             // 累加 day1 ~ day末 的日计划量
+            BigDecimal daySum = BigDecimal.ZERO;
             for (int day = 1; day <= lastDayOfMonth; day++) {
                 Integer qty = plan.getDayQty(day);
                 if (qty != null && qty > 0) {
-                    sum = sum.add(BigDecimal.valueOf(qty));
+                    daySum = daySum.add(BigDecimal.valueOf(qty));
                 }
             }
+            sum = sum.add(daySum);
             // 上月超欠产量：lastMonthValidFlag="1"时累加 lastMonthOverdueQty
+            BigDecimal overdueVal = BigDecimal.ZERO;
             if ("1".equals(plan.getLastMonthValidFlag())) {
                 Integer overdueQty = plan.getLastMonthOverdueQty();
                 if (overdueQty != null && overdueQty != 0) {
-                    sum = sum.add(BigDecimal.valueOf(overdueQty));
+                    overdueVal = BigDecimal.valueOf(overdueQty);
+                    sum = sum.add(overdueVal);
                 }
             }
             resultMap.put(embryoDesc, sum);
+
+            // 临时调试日志：打印指定胎胚描述的明细
+            if ("295/80R22.5 152/149M 18PR JF518 BL4EJY".equals(embryoDesc)) {
+                log.info("调试-JF518明细: materialCode={}, daySum={}, overdueFlag={}, overdueQty={}, 当前累计={}",
+                        plan.getMaterialCode(), daySum, plan.getLastMonthValidFlag(), overdueVal, sum);
+            }
         }
 
         log.info("buildTotalDailyPlanQtyMap: 前一天={}, 年月={}, 工厂={}, 月计划记录数={}, 胎胚描述数={}",
