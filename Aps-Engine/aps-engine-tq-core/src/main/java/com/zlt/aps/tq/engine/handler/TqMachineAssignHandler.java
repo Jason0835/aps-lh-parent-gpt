@@ -77,10 +77,7 @@ public class TqMachineAssignHandler extends AbsTqScheduleStepHandler {
         // 2. 机台分配
         chooseMachine(context, sortedStrategies);
 
-        // 3. 设置6个班次的生产顺序
-        setProduceOrder(context.getScheduleList());
-
-        // 4. 构建任务链
+        // 3. 构建任务链（生产顺序设置移到S3.5之后执行，确保所有计划量修改完成后再设置顺序值）
         buildTaskChain(context);
 
         log.info("[S3] 班次排产分配完成");
@@ -255,24 +252,27 @@ public class TqMachineAssignHandler extends AbsTqScheduleStepHandler {
                     boolean isMultiSpecMachine = !isSingleSpecMachine(machineCode, machineSpecCountMap);
 
                     if (isBackupSpec && isMultiSpecMachine) {
-                        // 备库胎圈多规格机台：只排 min(计划量, 阈值, 剩余产能)，不延后
-                        // 未排量累加到 backupRemainingQty，由 S3.5 按优先级回填
-                        double assignQty = Math.min(planQty, effectiveCapacity);
-                        if (assignQty < 0) assignQty = 0;
-                        setClassPlanQty(scheduleVo, classIdx + 1, assignQty);
-                        if (assignQty > 0) {
+                        // 备库胎圈多规格机台：满排到阈值(有效产能)，超出部分延后到下一班继续满排
+                        if (effectiveCapacity <= 0) {
+                            // 机台本班已排满，全部计划量延后到下一班
+                            setClassPlanQty(scheduleVo, classIdx + 1, 0D);
+                            deferToNextClass(scheduleVo, classIdx + 1, planQty);
+                        } else if (planQty > effectiveCapacity) {
+                            // 当班先排满阈值产能，超出部分延后到下一班
+                            setClassPlanQty(scheduleVo, classIdx + 1, effectiveCapacity);
                             capacityMaps[classIdx].put(machineCode, capacityMaps[classIdx].getOrDefault(machineCode, BigDecimal.ZERO)
-                                    .add(BigDecimalUtils.valueOf(assignQty)));
-                        }
-                        // 未排量累加到 backupRemainingQty（供 S3.5 回填使用）
-                        double unplanQty = BigDecimalUtil.sub(planQty, assignQty);
-                        if (unplanQty > 0) {
-                            double current = scheduleVo.getBackupRemainingQty() == null ? 0D : scheduleVo.getBackupRemainingQty();
-                            scheduleVo.setBackupRemainingQty(BigDecimalUtil.add(current, unplanQty));
+                                    .add(BigDecimalUtils.valueOf(effectiveCapacity)));
+                            double overflowQty = BigDecimalUtil.sub(planQty, effectiveCapacity);
+                            deferToNextClass(scheduleVo, classIdx + 1, overflowQty);
                             autoScheduleLogService.insertTqScheduleLog(scheduleVo.getBatchNo(), scheduleVo.getOrderNo(),
-                                    "备库胎圈阈值限制-未排量累计", "胎圈代码：" + scheduleVo.getBeadCode()
-                                            + "，" + (classIdx + 1) + "班排" + assignQty
-                                            + "，未排量" + unplanQty + "累计到backupRemainingQty");
+                                    "备库胎圈满排阈值-剩余延后", "胎圈代码：" + scheduleVo.getBeadCode()
+                                            + "，" + (classIdx + 1) + "班排满" + effectiveCapacity
+                                            + "，剩余" + overflowQty + "延后至下一班");
+                        } else {
+                            // 全部可排
+                            setClassPlanQty(scheduleVo, classIdx + 1, planQty);
+                            capacityMaps[classIdx].put(machineCode, capacityMaps[classIdx].getOrDefault(machineCode, BigDecimal.ZERO)
+                                    .add(BigDecimalUtils.valueOf(planQty)));
                         }
                     } else if (effectiveCapacity <= 0) {
                         // 非备库或单规格机台：当前机台本班已排满，全部计划量延后到下一班
@@ -329,15 +329,9 @@ public class TqMachineAssignHandler extends AbsTqScheduleStepHandler {
                 putMachineCode(scheduleVo.getGlueCode(), machineCode, glueMap);
                 putMachineCode(scheduleVo.getMouthPlateCode(), machineCode, mouthPlatMap);
 
-                // 占用机台其他班产能（避免其他规格在同一机台其他班次超定额）
-                for (int i = 0; i < 6; i++) {
-                    if (i == classIdx) continue;
-                    double classPlan = getClassPlanQty(scheduleVo, i + 1);
-                    if (classPlan > 0) {
-                        capacityMaps[i].put(machineCode, capacityMaps[i].getOrDefault(machineCode, BigDecimal.ZERO)
-                                .add(BigDecimalUtils.valueOf(classPlan)));
-                    }
-                }
+                // 不预占其他班次产能：预占会导致S2计划量与S3实际排产量双重计算，
+                // 使机台在后续班次"假满"（capacityMap包含S2预占值+实际排产值），无法正常排产。
+                // 每个班次独立按实际已排产量计算剩余产能即可。
 
                 // 备库胎圈多规格阈值限制（同已分配机台分支逻辑）
                 double backupThreshold = context.getParams().getBackupShiftThreshold() == null ? 1000D
@@ -352,23 +346,27 @@ public class TqMachineAssignHandler extends AbsTqScheduleStepHandler {
                 boolean isMultiSpecMachine = !isSingleSpecMachine(machineCode, machineSpecCountMap);
 
                 if (isBackupSpec && isMultiSpecMachine) {
-                    // 备库胎圈多规格机台：只排 min(计划量, 阈值, 剩余产能)，不延后
-                    double assignQty = Math.min(planQty, effectiveCapacity);
-                    if (assignQty < 0) assignQty = 0;
-                    setClassPlanQty(scheduleVo, classIdx + 1, assignQty);
-                    if (assignQty > 0) {
+                    // 备库胎圈多规格机台：满排到阈值(有效产能)，超出部分延后到下一班继续满排
+                    if (effectiveCapacity <= 0) {
+                        // 机台本班已排满，全部计划量延后到下一班
+                        setClassPlanQty(scheduleVo, classIdx + 1, 0D);
+                        deferToNextClass(scheduleVo, classIdx + 1, planQty);
+                    } else if (planQty > effectiveCapacity) {
+                        // 当班先排满阈值产能，超出部分延后到下一班
+                        setClassPlanQty(scheduleVo, classIdx + 1, effectiveCapacity);
                         capacityMaps[classIdx].put(machineCode, capacityMaps[classIdx].getOrDefault(machineCode, BigDecimal.ZERO)
-                                .add(BigDecimalUtils.valueOf(assignQty)));
-                    }
-                    // 未排量累加到 backupRemainingQty（供 S3.5 回填使用）
-                    double unplanQty = BigDecimalUtil.sub(planQty, assignQty);
-                    if (unplanQty > 0) {
-                        double current = scheduleVo.getBackupRemainingQty() == null ? 0D : scheduleVo.getBackupRemainingQty();
-                        scheduleVo.setBackupRemainingQty(BigDecimalUtil.add(current, unplanQty));
+                                .add(BigDecimalUtils.valueOf(effectiveCapacity)));
+                        double overflowQty = BigDecimalUtil.sub(planQty, effectiveCapacity);
+                        deferToNextClass(scheduleVo, classIdx + 1, overflowQty);
                         autoScheduleLogService.insertTqScheduleLog(scheduleVo.getBatchNo(), scheduleVo.getOrderNo(),
-                                "备库胎圈阈值限制-未排量累计", "胎圈代码：" + scheduleVo.getBeadCode()
-                                        + "，" + (classIdx + 1) + "班排" + assignQty
-                                        + "，未排量" + unplanQty + "累计到backupRemainingQty");
+                                "备库胎圈满排阈值-剩余延后", "胎圈代码：" + scheduleVo.getBeadCode()
+                                        + "，" + (classIdx + 1) + "班排满" + effectiveCapacity
+                                        + "，剩余" + overflowQty + "延后至下一班");
+                    } else {
+                        // 全部可排
+                        setClassPlanQty(scheduleVo, classIdx + 1, planQty);
+                        capacityMaps[classIdx].put(machineCode, capacityMaps[classIdx].getOrDefault(machineCode, BigDecimal.ZERO)
+                                .add(BigDecimalUtils.valueOf(planQty)));
                     }
                 } else if (effectiveCapacity <= 0) {
                     // 非备库或单规格机台：机台本班已排满，全部计划量延后到下一班
@@ -565,7 +563,10 @@ public class TqMachineAssignHandler extends AbsTqScheduleStepHandler {
                                                           TqScheduleContext context,
                                                           List<IMachineFilterStrategy> sortedStrategies,
                                                           Map<String, String> plannedMachineMap) {
-        // 1. 通过策略链过滤
+        // 1. 设置当前班次编码到上下文，供策略链中的MaintenanceFilter按班次精确过滤
+        context.setCurrentClassCode(classCode);
+
+        // 2. 通过策略链过滤
         List<TqMachineInfo> filtered = new ArrayList<>(allMachineList);
         for (IMachineFilterStrategy strategy : sortedStrategies) {
             filtered = strategy.filter(filtered, scheduleVo, context);
@@ -574,12 +575,12 @@ public class TqMachineAssignHandler extends AbsTqScheduleStepHandler {
             }
         }
 
-        // 2. 过滤对应班次可用的机台
+        // 3. 过滤对应班次可用的机台
         filtered = filtered.stream()
                 .filter(m -> StringUtils.contains(m.getOpenMachineClass(), classCode))
                 .collect(Collectors.toList());
 
-        // 3. 按优先级排序
+        // 4. 按优先级排序
         String beadCode = scheduleVo.getBeadCode();
         filtered = filtered.stream().sorted((m1, m2) -> {
             // 同一个规格优先排在已排过相同规格的机台上
@@ -608,7 +609,7 @@ public class TqMachineAssignHandler extends AbsTqScheduleStepHandler {
      *
      * <p>排序规则：1.相同英寸连续生产 2.同英寸内按库存供应时长升序排序</p>
      */
-    private void setProduceOrder(List<TqScheduleResultVo> scheduleList) {
+    public void setProduceOrder(List<TqScheduleResultVo> scheduleList) {
         // 按机台分组：顺序值应按机台独立编号（同一机台同一班次内的规格顺序1,2,3...）
         // 而非全局编号，避免"机台只有2个规格但顺序值=4"的问题
         Map<String, List<TqScheduleResultVo>> machineGroupMap = scheduleList.stream()

@@ -666,9 +666,8 @@ public class TqDemandCalcHandler extends AbsTqScheduleStepHandler {
         double threshold = params.getBackupShiftThreshold() == null ? 1000D : params.getBackupShiftThreshold();
 
         // 按阈值分摊到 triggerClass ~ 6 班
+        // 每班分摊量不超过阈值，超出部分累积到后续班次；第6班塞入所有剩余量
         double remainingQty = totalPlanQty;
-        int remainingClasses = 6 - triggerClass + 1;
-        double minPerClass = remainingClasses > 0 && totalPlanQty > 0 ? totalPlanQty / remainingClasses / 2 : 0;
 
         for (int classNum = triggerClass; classNum <= 6 && remainingQty > 0; classNum++) {
             double classPlan;
@@ -676,8 +675,8 @@ public class TqDemandCalcHandler extends AbsTqScheduleStepHandler {
                 // 第6班：把剩余量全部塞入（即使超过阈值，避免超出6班范围丢失量）
                 classPlan = remainingQty;
             } else {
-                // 确保每个班次至少分配minPerClass，避免总量较小时只集中在前几个班次
-                classPlan = Math.max(minPerClass, Math.min(remainingQty, threshold));
+                // 每班最多排阈值量，剩余量留给后续班次
+                classPlan = Math.min(remainingQty, threshold);
             }
             // 对单班计划量做取整和工装限制
             classPlan = planQtyRounding(scheduleVo, classPlan, toolCapacity, totalConsumeQty, context);
