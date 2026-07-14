@@ -856,11 +856,22 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
         row.put("remark", item.getRemark());
         row.put("lhMachineQty", countLhScheduleIds(item.getLhScheduleIds()));
 
-        BigDecimal tdpq = totalDailyPlanQtyMap.get(StringUtils.defaultString(item.getMainMaterialDesc()).trim());
+        String embryoDescKey = StringUtils.defaultString(item.getMainMaterialDesc()).trim();
+        BigDecimal tdpq = totalDailyPlanQtyMap.get(embryoDescKey);
         row.put("totalDailyPlanQty", zeroToEmpty(tdpq));
 
-        BigDecimal tnfq = todayNightFinishQtyMap.get(StringUtils.defaultString(item.getMainMaterialDesc()).trim());
+        BigDecimal tnfq = todayNightFinishQtyMap.get(embryoDescKey);
         row.put("todayNightFinishQty", zeroToEmpty(tnfq));
+
+        // 临时调试日志：验证mainMaterialDesc匹配情况
+        if (tdpq == null && StringUtils.isNotBlank(embryoDescKey)) {
+            log.warn("totalDailyPlanQtyMap未匹配: mainMaterialDesc=[{}], mapKeys示例={}",
+                    embryoDescKey, totalDailyPlanQtyMap.keySet().stream().limit(3).collect(Collectors.toList()));
+        }
+        if (tnfq == null && StringUtils.isNotBlank(embryoDescKey)) {
+            log.warn("todayNightFinishQtyMap未匹配: mainMaterialDesc=[{}], mapKeys示例={}",
+                    embryoDescKey, todayNightFinishQtyMap.keySet().stream().limit(3).collect(Collectors.toList()));
+        }
 
         BigDecimal ylSum = (tnfq != null ? tnfq : BigDecimal.ZERO)
                 .subtract(tdpq != null ? tdpq : BigDecimal.ZERO);
