@@ -8,7 +8,7 @@ import java.util.Map;
 /**
  * 机台班次计划汇总结构。
  *
- * <p>当前实现中精排结果以 ShiftScheduleService.ShiftProductionResult 为主路径输出；
+ * <p>当前实现中精排结果以 ShiftProductionResult 为主路径输出；
  * 本类保留作班次维度聚合的扩展占位。
  *
  * @author APS Team

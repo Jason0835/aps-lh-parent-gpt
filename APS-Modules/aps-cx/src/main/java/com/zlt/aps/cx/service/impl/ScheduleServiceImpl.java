@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.cx.component.ScheduleExecutionGuard;
+import com.zlt.aps.cx.constant.ScheduleConstants;
 import com.zlt.aps.cx.entity.CxMaterialEnding;
 import com.zlt.aps.cx.api.domain.entity.CxStock;
 import com.zlt.aps.cx.entity.config.CxKeyProduct;
@@ -105,9 +106,6 @@ public class ScheduleServiceImpl implements ScheduleService {
 
     /** 默认工厂编号 */
     private static final String DEFAULT_FACTORY_CODE = "116";
-
-    /** 默认排程天数 */
-    private static final int DEFAULT_SCHEDULE_DAYS = 3;
 
     /** 机台类型：成型 */
     private static final String MACHINE_TYPE_MOLDING = "成型";
@@ -586,8 +584,8 @@ public class ScheduleServiceImpl implements ScheduleService {
                 .filter(c -> c.getScheduleDay() != null)
                 .collect(Collectors.groupingBy(CxShiftConfig::getScheduleDay));
 
-        int scheduleDays = dayShiftMap.isEmpty() ? DEFAULT_SCHEDULE_DAYS
-                : dayShiftMap.keySet().stream().max(Integer::compareTo).orElse(DEFAULT_SCHEDULE_DAYS);
+        int scheduleDays = dayShiftMap.isEmpty() ? ScheduleConstants.DEFAULT_SCHEDULE_DAYS
+                : dayShiftMap.keySet().stream().max(Integer::compareTo).orElse(ScheduleConstants.DEFAULT_SCHEDULE_DAYS);
         context.setScheduleDays(scheduleDays);
         log.info("根据班次配置计算排程天数: {}, 班次分布: {}", scheduleDays,
                 dayShiftMap.entrySet().stream()
@@ -833,12 +831,7 @@ public class ScheduleServiceImpl implements ScheduleService {
                     LocalDateTime stopDateTime = productionCalculator.parseFlexibleDateTime(stopTimeValue);
                     if (stopDateTime != null) {
                         context.setVulcanizingStopDateTime(stopDateTime);
-                        log.info("硫化机停锅时间配置（完整日期时间）：{}", stopDateTime);
-                    } else {
-                        log.info("硫化机停锅时间配置（HH:mm格式）：{}", stopTimeValue);
                     }
-                } else {
-                    log.info("硫化机停锅时间配置（HH:mm格式）：{}", stopTimeValue);
                 }
             } catch (Exception e) {
                 log.warn("解析硫化机停锅时间失败（非日期时间格式），使用原始值：{}", stopTimeValue);
@@ -863,12 +856,7 @@ public class ScheduleServiceImpl implements ScheduleService {
                     LocalDateTime openDateTime = productionCalculator.parseFlexibleDateTime(openTimeValue);
                     if (openDateTime != null) {
                         context.setVulcanizingOpenDateTime(openDateTime);
-                        log.info("硫化开模时间配置（完整日期时间）：{}", openDateTime);
-                    } else {
-                        log.info("硫化开模时间配置（HH:mm格式）：{}", openTimeValue);
                     }
-                } else {
-                    log.info("硫化开模时间配置（HH:mm格式）：{}", openTimeValue);
                 }
             } catch (Exception e) {
                 log.warn("解析硫化开模时间失败（非日期时间格式），使用原始值：{}", openTimeValue);
@@ -988,7 +976,7 @@ public class ScheduleServiceImpl implements ScheduleService {
         String factoryCode = context.getFactoryCode() != null ? context.getFactoryCode() : DEFAULT_FACTORY_CODE;
 
         // 判断排程是否跨月
-        int scheduleDays = context.getScheduleDays() != null ? context.getScheduleDays() : DEFAULT_SCHEDULE_DAYS;
+        int scheduleDays = context.getScheduleDays() != null ? context.getScheduleDays() : ScheduleConstants.DEFAULT_SCHEDULE_DAYS;
         LocalDate scheduleEndDate = tDay.plusDays(scheduleDays - 1);
         boolean crossMonth = scheduleEndDate.getMonth() != tDay.getMonth()
                 || scheduleEndDate.getYear() != tDay.getYear();
@@ -1160,7 +1148,7 @@ public class ScheduleServiceImpl implements ScheduleService {
      */
     private void loadMonthSurplusAndCalculateFormingRemainder(ScheduleContextVo context, LocalDate scheduleDate) {
         String factoryCode = context.getFactoryCode();
-        int scheduleDays = context.getScheduleDays() != null ? context.getScheduleDays() : DEFAULT_SCHEDULE_DAYS;
+        int scheduleDays = context.getScheduleDays() != null ? context.getScheduleDays() : ScheduleConstants.DEFAULT_SCHEDULE_DAYS;
         LocalDate scheduleEndDate = scheduleDate.plusDays(scheduleDays - 1);
 
         // 跨月判定：排程结束日的年月 ≠ T日年月
@@ -2075,9 +2063,6 @@ public class ScheduleServiceImpl implements ScheduleService {
             return new ShiftPlanResult(defaultQty, "未知");
         }
 
-        // 排程起始日期
-        LocalDate scheduleStartDate = scheduleDate;
-
         // 构建 日期→WorkCalendar 映射
         Map<LocalDate, MdmWorkCalendar> calendarMap = new HashMap<>();
         if (workCalendarList != null) {
@@ -2097,7 +2082,7 @@ public class ScheduleServiceImpl implements ScheduleService {
 
         for (int day = 1; day <= scheduleDays; day++) {
             // 计算该天的日期
-            LocalDate currentDate = scheduleStartDate.plusDays(day - 1);
+            LocalDate currentDate = scheduleDate.plusDays(day - 1);
 
             // 获取该天的班次配置
             final int currentDay = day;

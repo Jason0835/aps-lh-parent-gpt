@@ -1,6 +1,8 @@
 package com.zlt.aps.cx.service.engine;
 
 import com.zlt.aps.cx.api.domain.entity.CxStructureTreadConfig;
+import com.zlt.aps.cx.constant.ScheduleConstants;
+import com.zlt.aps.cx.entity.config.CxShiftConfig;
 import com.zlt.aps.cx.entity.schedule.LhScheduleResult;
 import com.zlt.aps.cx.vo.MonthPlanProductLhCapacityVo;
 import com.zlt.aps.cx.vo.ScheduleContextVo;
@@ -45,21 +47,6 @@ import java.util.Map;
 @Service
 public class ProductionCalculator {
 
-    /** 默认整车容量 */
-    public static final int DEFAULT_TRIP_CAPACITY = 12;
-
-    /** 默认机台种类上限（被 BalancingService / TrialTaskProcessor 等引用） */
-    public static final int DEFAULT_MAX_TYPES_PER_MACHINE = 4;
-
-    /** 默认机台最大硫化机数（配比缺失时单台最多生产的硫化机数） */
-    public static final int DEFAULT_MAX_LH_MACHINE_QTY = 10;
-
-    /** 一天总秒数 */
-    public static final int SECONDS_PER_DAY = 24 * 60 * 60;
-
-    /** 秒转小时的除数 */
-    public static final int SECONDS_PER_HOUR = 3600;
-
     /**
      * 正常任务的整车取整：将待排条数向上取整到整车（胎面）。
      *
@@ -91,7 +78,7 @@ public class ProductionCalculator {
         }
         return context.getDefaultTripCapacity() != null
                 ? context.getDefaultTripCapacity()
-                : DEFAULT_TRIP_CAPACITY;
+                : ScheduleConstants.DEFAULT_TRIP_CAPACITY;
     }
 
     // ==================== 硫化时长与产能计算 ====================
@@ -111,7 +98,7 @@ public class ProductionCalculator {
         if (singleMoldDailyLhCapacity <= 0) {
             return BigDecimal.ZERO;
         }
-        return BigDecimal.valueOf(SECONDS_PER_DAY)
+        return BigDecimal.valueOf(ScheduleConstants.SECONDS_PER_DAY)
                 .divide(BigDecimal.valueOf(singleMoldDailyLhCapacity), 2, RoundingMode.HALF_UP);
     }
 
@@ -133,7 +120,7 @@ public class ProductionCalculator {
         return BigDecimal.valueOf(stock)
                 .multiply(singleTireMoldSeconds)
                 .divide(BigDecimal.valueOf(moldQty), 2, RoundingMode.HALF_UP)
-                .divide(BigDecimal.valueOf(SECONDS_PER_HOUR), 2, RoundingMode.HALF_UP);
+                .divide(BigDecimal.valueOf(ScheduleConstants.SECONDS_PER_HOUR), 2, RoundingMode.HALF_UP);
     }
 
     /**
@@ -152,7 +139,7 @@ public class ProductionCalculator {
                 || avgRatio == null || avgRatio.compareTo(BigDecimal.ZERO) <= 0) {
             return BigDecimal.ZERO;
         }
-        return BigDecimal.valueOf(SECONDS_PER_DAY)
+        return BigDecimal.valueOf(ScheduleConstants.SECONDS_PER_DAY)
                 .divide(avgRatio.multiply(BigDecimal.valueOf(doubleMoldDailyLhCapacity)), 2, RoundingMode.HALF_UP);
     }
 
@@ -269,7 +256,7 @@ public class ProductionCalculator {
     public int calculateMaxStockForCapHours(int stockHoursCap, int moldQty, int singleMoldLhCap) {
         BigDecimal singleTireMoldSeconds = calculateSingleTireMoldSeconds(singleMoldLhCap);
         return BigDecimal.valueOf(stockHoursCap)
-                .multiply(BigDecimal.valueOf(SECONDS_PER_HOUR))
+                .multiply(BigDecimal.valueOf(ScheduleConstants.SECONDS_PER_HOUR))
                 .multiply(BigDecimal.valueOf(moldQty))
                 .divide(singleTireMoldSeconds, 0, RoundingMode.UP)
                 .intValue();
@@ -355,7 +342,7 @@ public class ProductionCalculator {
         int total = 0;
         for (MpCxCapacityConfiguration config : machines) {
             Integer maxLh = getMachineLhMaxQty(config.getCxMachineCode(), structureName, context);
-            total += (maxLh != null ? maxLh : DEFAULT_MAX_LH_MACHINE_QTY);
+            total += (maxLh != null ? maxLh : ScheduleConstants.DEFAULT_MAX_LH_MACHINE_QTY);
         }
         return total;
     }
@@ -539,5 +526,159 @@ public class ProductionCalculator {
             }
         }
         return total;
+    }
+
+    // ==================== 班次字段解析 ====================
+
+    /**
+     * 从班次配置中解析班次索引。
+     *
+     * @param shiftConfig 班次配置
+     * @return 班次索引 (1-8)，解析失败返回 0
+     */
+    public int parseClassIndex(CxShiftConfig shiftConfig) {
+        if (shiftConfig == null || shiftConfig.getClassField() == null) {
+            return 0;
+        }
+        return parseClassIndex(shiftConfig.getClassField());
+    }
+
+    /**
+     * 从 CLASS 字段字符串中解析班次索引。
+     *
+     * @param classField 班次字段（如 "CLASS1"）
+     * @return 班次索引 (1-8)，解析失败返回 0
+     */
+    public int parseClassIndex(String classField) {
+        if (classField != null && classField.startsWith("CLASS")) {
+            try {
+                return Integer.parseInt(classField.substring(5));
+            } catch (NumberFormatException e) {
+                log.warn("无法解析班次字段: {}", classField);
+            }
+        }
+        return 0;
+    }
+
+    /**
+     * 按班次索引设置硫化记录的计划量。
+     *
+     * @param lhResult   硫化记录
+     * @param classIndex 班次索引（1~8）
+     * @param value      计划量
+     */
+    public void setClassPlanQtyByIndex(LhScheduleResult lhResult, int classIndex, int value) {
+        switch (classIndex) {
+            case 1: lhResult.setClass1PlanQty(value); break;
+            case 2: lhResult.setClass2PlanQty(value); break;
+            case 3: lhResult.setClass3PlanQty(value); break;
+            case 4: lhResult.setClass4PlanQty(value); break;
+            case 5: lhResult.setClass5PlanQty(value); break;
+            case 6: lhResult.setClass6PlanQty(value); break;
+            case 7: lhResult.setClass7PlanQty(value); break;
+            case 8: lhResult.setClass8PlanQty(value); break;
+            default: break;
+        }
+    }
+
+    /**
+     * 按班次索引追加分析文本到硫化记录。
+     *
+     * @param lhResult   硫化记录
+     * @param classIndex 班次索引（1~8）
+     * @param text       分析文本
+     */
+    public void appendClassAnalysisByIndex(LhScheduleResult lhResult, int classIndex, String text) {
+        String original;
+        switch (classIndex) {
+            case 1: original = lhResult.getClass1Analysis();
+                lhResult.setClass1Analysis(original != null && !original.isEmpty() ? original + "," + text : text); break;
+            case 2: original = lhResult.getClass2Analysis();
+                lhResult.setClass2Analysis(original != null && !original.isEmpty() ? original + "," + text : text); break;
+            case 3: original = lhResult.getClass3Analysis();
+                lhResult.setClass3Analysis(original != null && !original.isEmpty() ? original + "," + text : text); break;
+            case 4: original = lhResult.getClass4Analysis();
+                lhResult.setClass4Analysis(original != null && !original.isEmpty() ? original + "," + text : text); break;
+            case 5: original = lhResult.getClass5Analysis();
+                lhResult.setClass5Analysis(original != null && !original.isEmpty() ? original + "," + text : text); break;
+            case 6: original = lhResult.getClass6Analysis();
+                lhResult.setClass6Analysis(original != null && !original.isEmpty() ? original + "," + text : text); break;
+            case 7: original = lhResult.getClass7Analysis();
+                lhResult.setClass7Analysis(original != null && !original.isEmpty() ? original + "," + text : text); break;
+            case 8: original = lhResult.getClass8Analysis();
+                lhResult.setClass8Analysis(original != null && !original.isEmpty() ? original + "," + text : text); break;
+            default: break;
+        }
+    }
+
+    // ==================== 硫化消耗计算 ====================
+
+    /**
+     * 计算单条硫化记录在当天所有班次的硫化消耗总量。
+     *
+     * <p>遍历当天班次配置，按 CLASS 字段获取对应计划量并累加。
+     *
+     * @param lhResult  硫化记录
+     * @param dayShifts 当天班次配置
+     * @return 硫化消耗总量
+     */
+    public int getVulcanizingConsumptionForDay(LhScheduleResult lhResult, List<CxShiftConfig> dayShifts) {
+        int total = 0;
+        if (dayShifts == null || dayShifts.isEmpty()) {
+            return total;
+        }
+        for (CxShiftConfig shiftConfig : dayShifts) {
+            int classIndex = parseClassIndex(shiftConfig);
+            if (classIndex > 0) {
+                Integer planQty = getClassPlanQtyByIndex(lhResult, classIndex);
+                if (planQty != null && planQty > 0) {
+                    total += planQty;
+                }
+            }
+        }
+        return total;
+    }
+
+    // ==================== 机台小时产能 ====================
+
+    /**
+     * 计算机台小时产能。
+     *
+     * <p>公式：hourlyCapacity = 3600 / (86400 / (配比 × 日硫化量))
+     *
+     * <p>内部复用 {@link #calculateTimePerTire} 计算单胎耗时。
+     *
+     * @param machineCode   机台编码
+     * @param materialCode  物料编码
+     * @param structureName 结构名称
+     * @param context       排程上下文
+     * @return 小时产能（条/小时），无法计算时返回 12
+     */
+    public int calculateHourlyCapacity(String machineCode, String materialCode,
+                                       String structureName, ScheduleContextVo context) {
+        Integer dailyLhCapacity = getDoubleMoldDailyLhCapacity(materialCode, context);
+        if (dailyLhCapacity == null || dailyLhCapacity <= 0) {
+            return ScheduleConstants.DEFAULT_TRIP_CAPACITY;
+        }
+
+        int ratio = 1;
+        if (context.getStructureLhRatioMap() != null && structureName != null && machineCode != null) {
+            Map<String, String> machineTypeCodeMap = context.getMachineTypeCodeMap();
+            String machineTypeCode = machineTypeCodeMap != null ? machineTypeCodeMap.get(machineCode) : null;
+            if (machineTypeCode != null) {
+                MdmStructureLhRatio lhRatio = context.getStructureLhRatioMap().get(machineTypeCode + "|" + structureName);
+                if (lhRatio != null && lhRatio.getLhMachineMaxQty() != null && lhRatio.getLhMachineMaxQty() > 0) {
+                    ratio = lhRatio.getLhMachineMaxQty();
+                }
+            }
+        }
+
+        BigDecimal timePerTire = calculateTimePerTire(BigDecimal.valueOf(ratio), dailyLhCapacity);
+        if (timePerTire.compareTo(BigDecimal.ZERO) > 0) {
+            return BigDecimal.valueOf(ScheduleConstants.SECONDS_PER_HOUR)
+                    .divide(timePerTire, 0, RoundingMode.FLOOR)
+                    .intValue();
+        }
+        return ScheduleConstants.DEFAULT_TRIP_CAPACITY;
     }
 }

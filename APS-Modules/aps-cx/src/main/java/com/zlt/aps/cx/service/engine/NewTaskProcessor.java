@@ -1,9 +1,13 @@
 package com.zlt.aps.cx.service.engine;
 
+import com.zlt.aps.cx.constant.ScheduleConstants;
 import com.zlt.aps.cx.entity.config.CxParamConfig;
 import com.zlt.aps.cx.entity.config.CxShiftConfig;
+import com.zlt.aps.cx.vo.BalancingResult;
 import com.zlt.aps.cx.vo.DailyEmbryoTask;
+import com.zlt.aps.cx.vo.EmbryoAssignment;
 import com.zlt.aps.cx.vo.MachineAllocationResult;
+import com.zlt.aps.cx.vo.MachineAssignment;
 import com.zlt.aps.cx.vo.ScheduleContextVo;
 import com.zlt.aps.cx.vo.TaskAllocation;
 import com.zlt.aps.mp.api.domain.entity.MdmMoldingMachine;
@@ -16,6 +20,7 @@ import org.springframework.util.CollectionUtils;
 
 import java.time.LocalDate;
 import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -36,7 +41,7 @@ import java.util.stream.Collectors;
  *   <li><b>不</b>在 DFS 内做续作历史保底（SYS04070003=Y 时保底已在 ContinueTaskProcessor 完成；
  *       本类传入 {@code forceKeepHistory=false}，仅通过 {@code continueLoadMap} 继承预扣）。</li>
  *   <li><b>负责</b>：将「新增任务」与「续作剩余 demand&gt;0 任务」按结构合并 → 构建预扣/量试约束 →
- *       调用 DFS → 将 {@link BalancingService.BalancingResult} 转为 {@link MachineAllocationResult}。</li>
+ *       调用 DFS → 将 {@link BalancingResult} 转为 {@link MachineAllocationResult}。</li>
  * </ul>
  *
  * <h3>单位约定</h3>
@@ -51,8 +56,18 @@ import java.util.stream.Collectors;
  * <h3>主流程（{@link #processNewTasks}）</h3>
  * <ol>
  *   <li>5.3.3.1 — 按结构分组：newTasks（endingExtraInventory&gt;0）+ 续作剩余（demand&gt;0 且有余量）</li>
- *   <li>5.3.3.2 — 逐结构：候选机台 → 续作预扣映射 → 量试约束 → 机台上限映射 → DFS → 结果转换</li>
+ *   <li>5.3.3.2 - 逐结构：候选机台 -> 续作预扣映射 -> 量试约束 -> 机台上限映射 -> DFS -> 结果转换</li>
  * </ol>
+ *
+ * <h3>续作负荷预/后均衡</h3>
+ * <ul>
+ *   <li>{@link #preBalanceContinueLoad}：DFS 前调整续作分配，使机台间负荷差和种类差在阈值内。
+ *       Phase 1 修正负荷差（移动同胎胚续作任务），Phase 2 修正种类差（交换/移动/三方轮换）。</li>
+ *   <li>{@link #postBalanceContinueLoad}：DFS 后基于总负荷（续作+新增）再次均衡。
+ *       逻辑同 preBalance，但 loadMap 为 totalLoadMap（续作+新增），continueLoadMap 独立维护。</li>
+ *   <li>共享方法：{@link #executeTypeSwap}（两机台间任务交换）、{@link #executeTypeMove}（单向移动）、
+ *       {@link #tryThreeWayRotation}（三方轮换）供 pre/post 复用。</li>
+ * </ul>
  *
  * @author APS Team
  * @see ContinueTaskProcessor
@@ -66,8 +81,8 @@ public class NewTaskProcessor {
 
     private final BalancingService balancingService;
 
-    /** 配比缺失时单台默认最大硫化机数（传入 BalancingService 机台 maxCapacity） */
-    private static final int DEFAULT_MAX_LH_MACHINE_COUNT = 10;
+    /** 续作均衡最大迭代次数 */
+    private static final int MAX_BALANCE_ITERATIONS = 50;
 
     // ==================== 5.3.3 新增均衡入口 ====================
 
@@ -157,7 +172,7 @@ public class NewTaskProcessor {
             // 5.3.3.2.1 结构候选机台（当日排产配置 ∩ 可用机台，或提前生产回退）
             String productionVersion = newTasksForStructure.get(0).getProductionVersion();
             List<MpCxCapacityConfiguration> availableMachines =
-                    getAvailableMachinesForStructure(structureName, scheduleDate, context, productionVersion);
+                    context.getAvailableMachinesForStructure(structureName, scheduleDate, productionVersion);
             if (availableMachines.isEmpty()) {
                 log.warn("结构 {} 没有可安排的机台，跳过", structureName);
                 continue;
@@ -227,32 +242,26 @@ public class NewTaskProcessor {
             }
 
             List<DailyEmbryoTask> allTasksForStructure = new ArrayList<>(balancedTasks);
-
-            // 日志：统计本结构续作剩余条数（demand>0 的续作任务个数）
-            int continueRemaining = 0;
-            if (!CollectionUtils.isEmpty(continueTasks)) {
-                for (DailyEmbryoTask task : continueTasks) {
-                    if (structureName.equals(task.getStructureName())) {
-                        int demand = task.getVulcanizeMachineCount() != null ? task.getVulcanizeMachineCount() : 0;
-                        if (demand > 0) {
-                            continueRemaining++;
-                        }
-                    }
-                }
-            }
+            int continueRemaining = countContinueRemaining(continueTasks, structureName);
 
             log.info("结构 {}：续作预扣机台={}, 续作剩余任务={}, 约束量试={}, 参与DFS总任务={}",
                     structureName, continueLoadMap.size(), continueRemaining,
                     constrainedTrials.size(), allTasksForStructure.size());
 
-            // 5.3.3.2.5 机台维度上限：最大硫化机数、最大胎胚种类数 → 传入 BalancingService
+            // 5.3.3.2.5 机台维度上限：最大硫化机数、最大胎胚种类数
             Map<String, Integer> machineMaxLhMap = buildMachineMaxLhMap(
                     availableMachines, structureName, context);
             Map<String, Integer> machineMaxEmbryoTypesMap = buildMachineMaxEmbryoTypesMap(
                     availableMachines, structureName, context);
 
+            // 5.3.3.2.5.1 续作负荷预均衡（在 BalancingService 之前调整续作分配，使机台间负荷差 ≤ 阈值）
+            int loadDiffThreshold = balancingService.getLoadDiffThreshold(context);
+            int typeDiffThreshold = balancingService.getTypeDiffThreshold(context);
+            preBalanceContinueLoad(existAllocations, continueLoadMap, continueTypeMap,
+                    continueLhMachineCodeMap, loadDiffThreshold, typeDiffThreshold);
+
             // 5.3.3.2.6 DFS 均衡（10 参数重载：含 continueLoadMap / continueTypeMap / continueLhMachineCodeMap 预扣）
-            BalancingService.BalancingResult balancingResult =
+            BalancingResult balancingResult =
                     balancingService.balanceEmbryosToMachinesWithMachineCapacity(
                             allTasksForStructure,
                             availableMachines,
@@ -271,10 +280,16 @@ public class NewTaskProcessor {
                 continue;
             }
 
+            // 5.3.3.2.6.1 后置续作重分配：若均衡后机台间负荷差或种类差仍超阈值，
+            // 尝试通过移动或交换续作任务来修正（交换可同时修负荷差和种类差）。
+            postBalanceContinueLoad(balancingResult, existAllocations,
+                    continueLoadMap, continueTypeMap, continueLhMachineCodeMap,
+                    loadDiffThreshold, typeDiffThreshold);
+
             log.info("结构 {} 均衡分配完成", structureName);
 
             // 5.3.3.2.7 BalancingResult → MachineAllocationResult（按 EmbryoAssignment 逐条转换，禁止按胎胚合并）
-            for (BalancingService.MachineAssignment assignment : balancingResult.getAssignments()) {
+            for (MachineAssignment assignment : balancingResult.getAssignments()) {
                 MachineAllocationResult result =
                         new MachineAllocationResult();
                 result.setMachineCode(assignment.getMachineCode());
@@ -282,7 +297,7 @@ public class NewTaskProcessor {
 
                 int usedCapacity = 0;
 
-                for (BalancingService.EmbryoAssignment embryoAssignment
+                for (EmbryoAssignment embryoAssignment
                         : assignment.getEmbryoAssignments()) {
                     DailyEmbryoTask task = embryoAssignment.getTask();
 
@@ -294,36 +309,9 @@ public class NewTaskProcessor {
                     int assignedQty = embryoAssignment.getAssignedQty();
                     usedCapacity += assignedQty;
 
-                    TaskAllocation taskAlloc =
-                            new TaskAllocation();
-                    taskAlloc.setEmbryoCode(task.getEmbryoCode());
-                    taskAlloc.setMaterialCode(task.getMaterialCode());
-                    taskAlloc.setMaterialDesc(task.getMaterialDesc());
-                    taskAlloc.setMainMaterialDesc(task.getMainMaterialDesc());
-                    taskAlloc.setStructureName(task.getStructureName());
                     int taskPlannedQty = task.getEndingExtraInventory() != null && task.getEndingExtraInventory() > 0
                             ? task.getEndingExtraInventory() : task.getDemandQuantity();
-                    taskAlloc.setQuantity(taskPlannedQty);
-                    taskAlloc.setVulcanizeMachineCount(assignedQty);
-                    taskAlloc.setEndingExtraInventory(task.getEndingExtraInventory());
-                    taskAlloc.setPriority(task.getPriority());
-                    taskAlloc.setStockHours(task.getStockHours());
-                    taskAlloc.setIsTrialTask(task.getIsTrialTask());
-                    taskAlloc.setIsProductionTrial(task.getIsProductionTrial());
-                    taskAlloc.setIsContinueTask(task.getIsContinueTask());
-                    taskAlloc.setIsEndingTask(task.getIsEndingTask());
-                    taskAlloc.setEndingSurplusQty(task.getEndingSurplusQty());
-                    taskAlloc.setIsMainProduct(task.getIsMainProduct());
-                    taskAlloc.setLhId(task.getLhId());
-                    taskAlloc.setIsLastEndingBatch(task.getIsLastEndingBatch());
-                    taskAlloc.setIsEndProduction(task.getIsEndProduction());
-                    taskAlloc.setEndingAbandoned(task.getEndingAbandoned());
-                    taskAlloc.setIsOpeningDayTask(task.getIsOpeningDayTask());
-                    taskAlloc.setIsClosingDayTask(task.getIsClosingDayTask());
-                    taskAlloc.setConstructionStage(task.getConstructionStage());
-                    taskAlloc.setIsFirstTask(task.getIsFirstTask());
-                    taskAlloc.setIsUrgentEnding(task.getIsUrgentEnding());
-                    taskAlloc.setIsNearEnding(task.getIsNearEnding());
+                    TaskAllocation taskAlloc = task.toTaskAllocation(taskPlannedQty, assignedQty);
 
                     result.getTaskAllocations().add(taskAlloc);
                 }
@@ -372,85 +360,64 @@ public class NewTaskProcessor {
         return allResults;
     }
 
-    // ==================== 结构可用机台解析（与 ContinueTaskProcessor 同构，多 availableMachines 交集） ====================
-
-    /**
-     * 获取某结构在排程日可参与 DFS 的成型机台列表。
-     *
-     * <p><b>过滤链</b>：
-     * <ol>
-     *   <li>{@code structureAllocationMap}：年月 + 月内日区间（beginDay~endDay）</li>
-     *   <li>机台编码必须存在于 {@code context.availableMachines}（主数据启用机台）</li>
-     *   <li>按机台编码去重</li>
-     *   <li>无结果时回退 {@link #getAdvanceProductionMachines}</li>
-     * </ol>
-     *
-     * <p>排产版本已在 context 加载阶段按各月配置过滤，此处不再按 productionVersion 二次过滤。
-     */
-    private List<MpCxCapacityConfiguration> getAvailableMachinesForStructure(
-            String structureName, LocalDate scheduleDate, ScheduleContextVo context,
-            String productionVersion) {
-        Set<String> availableMachineCodes = new HashSet<>();
-        if (context.getAvailableMachines() != null) {
-            for (MdmMoldingMachine machine : context.getAvailableMachines()) {
-                availableMachineCodes.add(machine.getCxMachineCode());
-            }
-        }
-
-        if (context.getStructureAllocationMap() != null) {
-            List<MpCxCapacityConfiguration> configs =
-                    context.getStructureAllocationMap().get(structureName);
-            if (configs != null && !configs.isEmpty()) {
-                int dayOfMonth = scheduleDate.getDayOfMonth();
-                int dateYear = scheduleDate.getYear();
-                int dateMonth = scheduleDate.getMonthValue();
-
-                List<MpCxCapacityConfiguration> result = configs.stream()
-                        .filter(c -> c.getBeginDay() != null && c.getEndDay() != null)
-                        .filter(c -> c.getBeginDay() <= dayOfMonth && c.getEndDay() >= dayOfMonth)
-                        .filter(c -> c.getYear() != null && c.getYear() == dateYear
-                                && c.getMonth() != null && c.getMonth() == dateMonth)
-                        .filter(c -> availableMachineCodes.contains(c.getCxMachineCode()))
-                        .collect(Collectors.collectingAndThen(
-                                Collectors.toMap(MpCxCapacityConfiguration::getCxMachineCode, c -> c, (a, b) -> a, LinkedHashMap::new),
-                                m -> new ArrayList<>(m.values())));
-                if (!result.isEmpty()) {
-                    return result;
-                }
-            }
-        }
-        return getAdvanceProductionMachines(structureName, context, productionVersion);
-    }
-
-    /**
-     * 提前生产机台回退（当日 structureAllocationMap 无机台时）。
-     *
-     * <p>数据由 TaskGroupService 写入 {@code advanceProductionMachineMap}，已做版本与占用冲突处理；
-     * {@code productionVersion} 参数保留签名兼容，本方法内不再过滤。
-     */
-    private List<MpCxCapacityConfiguration> getAdvanceProductionMachines(
-            String structureName, ScheduleContextVo context, String productionVersion) {
-        if (context.getAdvanceProductionMachineMap() != null) {
-            List<MpCxCapacityConfiguration> advanceMachines =
-                    context.getAdvanceProductionMachineMap().get(structureName);
-            if (advanceMachines != null && !advanceMachines.isEmpty()) {
-                log.info("【提前生产】NewTaskProcessor 结构={} 使用提前生产机台={}",
-                        structureName,
-                        advanceMachines.stream()
-                                .map(MpCxCapacityConfiguration::getCxMachineCode)
-                                .collect(Collectors.toList()));
-                return new ArrayList<>(advanceMachines);
-            }
-        }
-        return new ArrayList<>();
-    }
-
     // ==================== 机台上限映射（传入 BalancingService MachineState） ====================
 
     /**
-     * 构建「机台编码 → 最大硫化机数」映射。
+     * 统计本结构续作剩余任务数（demand>0 的续作任务个数）。
+     */
+    private int countContinueRemaining(List<DailyEmbryoTask> continueTasks, String structureName) {
+        int count = 0;
+        if (!CollectionUtils.isEmpty(continueTasks)) {
+            for (DailyEmbryoTask task : continueTasks) {
+                if (structureName.equals(task.getStructureName())) {
+                    int demand = task.getVulcanizeMachineCount() != null ? task.getVulcanizeMachineCount() : 0;
+                    if (demand > 0) {
+                        count++;
+                    }
+                }
+            }
+        }
+        return count;
+    }
+
+    /**
+     * 构建「机台编码 -> 机型编码」映射。
+     */
+    private Map<String, String> buildMachineTypeMap(ScheduleContextVo context) {
+        Map<String, String> machineTypeMap = new HashMap<>();
+        if (context.getAvailableMachines() != null) {
+            for (MdmMoldingMachine machine : context.getAvailableMachines()) {
+                machineTypeMap.put(machine.getCxMachineCode(), machine.getCxMachineTypeCode());
+            }
+        }
+        return machineTypeMap;
+    }
+
+    /**
+     * 构建「机型_结构 -> 配比值」映射。
      *
-     * <p>查找顺序：机型+结构（{@code MdmStructureLhRatio}）→ 仅结构 → {@link #DEFAULT_MAX_LH_MACHINE_COUNT}。
+     * @param valueExtractor 从 MdmStructureLhRatio 中提取目标字段（如 lhMachineMaxQty / maxEmbryoQty）
+     */
+    private Map<String, Integer> buildTypeStructureRatioMap(
+            ScheduleContextVo context, Function<MdmStructureLhRatio, Integer> valueExtractor) {
+        Map<String, Integer> typeStructureMap = new HashMap<>();
+        List<MdmStructureLhRatio> ratios = context.getStructureLhRatios();
+        if (ratios != null) {
+            for (MdmStructureLhRatio ratio : ratios) {
+                String key = ratio.getCxMachineTypeCode() + "_" + ratio.getStructureName();
+                Integer value = valueExtractor.apply(ratio);
+                if (value != null) {
+                    typeStructureMap.put(key, value);
+                }
+            }
+        }
+        return typeStructureMap;
+    }
+
+    /**
+     * 构建「机台编码 -> 最大硫化机数」映射。
+     *
+     * <p>查找顺序：机型+结构（{@code MdmStructureLhRatio}）-> 仅结构 -> {@link ScheduleConstants#DEFAULT_MAX_LH_MACHINE_QTY}。
      */
     private Map<String, Integer> buildMachineMaxLhMap(
             List<MpCxCapacityConfiguration> machineConfigs,
@@ -459,23 +426,9 @@ public class NewTaskProcessor {
 
         Map<String, Integer> result = new HashMap<>();
 
-        Map<String, String> machineTypeMap = new HashMap<>();
-        if (context.getAvailableMachines() != null) {
-            for (MdmMoldingMachine machine : context.getAvailableMachines()) {
-                machineTypeMap.put(machine.getCxMachineCode(), machine.getCxMachineTypeCode());
-            }
-        }
-
-        Map<String, Integer> typeStructureMap = new HashMap<>();
-        List<MdmStructureLhRatio> ratios = context.getStructureLhRatios();
-        if (ratios != null) {
-            for (MdmStructureLhRatio ratio : ratios) {
-                String key = ratio.getCxMachineTypeCode() + "_" + ratio.getStructureName();
-                if (ratio.getLhMachineMaxQty() != null) {
-                    typeStructureMap.put(key, ratio.getLhMachineMaxQty());
-                }
-            }
-        }
+        Map<String, String> machineTypeMap = buildMachineTypeMap(context);
+        Map<String, Integer> typeStructureMap = buildTypeStructureRatioMap(
+                context, MdmStructureLhRatio::getLhMachineMaxQty);
 
         for (MpCxCapacityConfiguration config : machineConfigs) {
             String machineCode = config.getCxMachineCode();
@@ -491,7 +444,7 @@ public class NewTaskProcessor {
             }
 
             if (maxLh == null) {
-                maxLh = DEFAULT_MAX_LH_MACHINE_COUNT;
+                maxLh = ScheduleConstants.DEFAULT_MAX_LH_MACHINE_QTY;
             }
             result.put(machineCode, maxLh);
         }
@@ -503,7 +456,7 @@ public class NewTaskProcessor {
      * 构建「机台编码 → 最大胎胚种类数」映射。
      *
      * <p>查找顺序：机台前缀参数（SYS04040001）→ 机型+结构 → {@code context.maxTypesPerMachine} /
-     * {@link BalancingService#DEFAULT_MAX_TYPES_PER_MACHINE}。
+     * {@link ScheduleConstants#DEFAULT_MAX_TYPES_PER_MACHINE}。
      */
     private Map<String, Integer> buildMachineMaxEmbryoTypesMap(
             List<MpCxCapacityConfiguration> machineConfigs,
@@ -512,23 +465,9 @@ public class NewTaskProcessor {
 
         Map<String, Integer> result = new HashMap<>();
 
-        Map<String, String> machineTypeMap = new HashMap<>();
-        if (context.getAvailableMachines() != null) {
-            for (MdmMoldingMachine machine : context.getAvailableMachines()) {
-                machineTypeMap.put(machine.getCxMachineCode(), machine.getCxMachineTypeCode());
-            }
-        }
-
-        Map<String, Integer> typeStructureMap = new HashMap<>();
-        List<MdmStructureLhRatio> ratios = context.getStructureLhRatios();
-        if (ratios != null) {
-            for (MdmStructureLhRatio ratio : ratios) {
-                String key = ratio.getCxMachineTypeCode() + "_" + ratio.getStructureName();
-                if (ratio.getMaxEmbryoQty() != null) {
-                    typeStructureMap.put(key, ratio.getMaxEmbryoQty());
-                }
-            }
-        }
+        Map<String, String> machineTypeMap = buildMachineTypeMap(context);
+        Map<String, Integer> typeStructureMap = buildTypeStructureRatioMap(
+                context, MdmStructureLhRatio::getMaxEmbryoQty);
 
         Map<String, Integer> machineMaxEmbryoTypes = context.getMachineMaxEmbryoTypes();
 
@@ -563,7 +502,7 @@ public class NewTaskProcessor {
 
             if (maxTypes == null) {
                 maxTypes = context.getMaxTypesPerMachine() != null
-                        ? context.getMaxTypesPerMachine() : BalancingService.DEFAULT_MAX_TYPES_PER_MACHINE;
+                        ? context.getMaxTypesPerMachine() : ScheduleConstants.DEFAULT_MAX_TYPES_PER_MACHINE;
             }
             log.info("  机台 {} (机型={}): 最大胎胚种类数={}", machineCode, machineType, maxTypes);
             result.put(machineCode, maxTypes);
@@ -649,5 +588,976 @@ public class NewTaskProcessor {
             return false;
         }
         return trialMachineMap.containsKey(task.getEmbryoCode());
+    }
+
+    // ==================== 续作负荷预均衡 ====================
+
+    /**
+     * 续作负荷预均衡：在调用 BalancingService 之前，检查各机台续作负荷是否均衡，
+     * 若超过阈值则将高负荷机台上的续作任务移到低负荷机台（仅移动双方都有的同胎胚）。
+     *
+     * <p>原理：ContinueTaskProcessor 按历史分配续作任务，可能导致机台间负荷不均
+     * （如 H1302=7台、H1403=8台）。若不预均衡，后续新任务分配时会因高负荷机台
+     * 容量不足而无法分配，或分配后 gap 超阈值。
+     *
+     * <p>移动条件：
+     * <ul>
+     *   <li>高负荷与低负荷机台差值 > loadDiffThreshold</li>
+     *   <li>高负荷机台上有续作任务，其胎胚在低负荷机台上也存在（不占新种类槽）</li>
+     * </ul>
+     *
+     * @param existAllocations      续作分配结果（可修改 machineCode 实现重分配）
+     * @param continueLoadMap       机台 -> 续作负荷（可变，会被更新）
+     * @param continueTypeMap       机台 -> 续作种类集合（可变，会被更新）
+     * @param continueLhMachineCodeMap 机台 -> 续作硫化机编号集合（可变，会被更新）
+     * @param loadDiffThreshold     负荷差额阈值
+     * @param typeDiffThreshold     种类差额阈值
+     */
+    private void preBalanceContinueLoad(
+            List<MachineAllocationResult> existAllocations,
+            Map<String, Integer> continueLoadMap,
+            Map<String, Set<String>> continueTypeMap,
+            Map<String, Set<String>> continueLhMachineCodeMap,
+            int loadDiffThreshold,
+            int typeDiffThreshold) {
+
+        if (existAllocations == null || existAllocations.size() < 2) {
+            return;
+        }
+
+        for (int iter = 0; iter < MAX_BALANCE_ITERATIONS; iter++) {
+            // 找最高和最低负荷机台
+            String highMachine = null;
+            String lowMachine = null;
+            int highLoad = -1;
+            int lowLoad = Integer.MAX_VALUE;
+
+            for (Map.Entry<String, Integer> entry : continueLoadMap.entrySet()) {
+                String mc = entry.getKey();
+                int load = entry.getValue();
+                if (load > highLoad) {
+                    highLoad = load;
+                    highMachine = mc;
+                }
+                if (load < lowLoad) {
+                    lowLoad = load;
+                    lowMachine = mc;
+                }
+            }
+
+            if (highMachine == null || lowMachine == null || highMachine.equals(lowMachine)) {
+                break;
+            }
+            if (highLoad - lowLoad <= loadDiffThreshold) {
+                break;
+            }
+
+            // 在高负荷机台上找一个续作任务，其胎胚在低负荷机台上也存在
+            Set<String> lowTypes = continueTypeMap.getOrDefault(lowMachine, Collections.emptySet());
+            if (lowTypes.isEmpty()) {
+                break;
+            }
+
+            TaskAllocation taskToMove = null;
+            MachineAllocationResult highAlloc = null;
+
+            outer:
+            for (MachineAllocationResult alloc : existAllocations) {
+                if (!highMachine.equals(alloc.getMachineCode())) {
+                    continue;
+                }
+                for (TaskAllocation ta : alloc.getTaskAllocations()) {
+                    if (lowTypes.contains(ta.getEmbryoCode())) {
+                        // 胎胚在低负荷机台已有，移动不占新种类槽
+                        taskToMove = ta;
+                        highAlloc = alloc;
+                        break outer;
+                    }
+                }
+            }
+
+            if (taskToMove == null) {
+                log.info("续作预均衡: {} -> {} 无可移动的同胎胚续作任务，终止", highMachine, lowMachine);
+                break;
+            }
+
+            // 执行移动：从 highMachine 的 allocation 中移除 taskToMove，添加到 lowMachine 的 allocation
+            String embryoCode = taskToMove.getEmbryoCode();
+            String lhMc = taskToMove.getLhMachineCode();
+            int vulcCount = taskToMove.getVulcanizeMachineCount() != null ? taskToMove.getVulcanizeMachineCount() : 0;
+
+            // 从高负荷机台移除
+            highAlloc.getTaskAllocations().remove(taskToMove);
+
+            // 更新高负荷机台的 loadMap
+            int highNewLoad = continueLoadMap.getOrDefault(highMachine, 0) - vulcCount;
+            continueLoadMap.put(highMachine, Math.max(0, highNewLoad));
+
+            // 更新高负荷机台的 lhMachineCodeMap
+            if (lhMc != null && !lhMc.isEmpty()) {
+                // 检查是否还有其他任务使用这个 lhMachineCode
+                boolean stillUsed = highAlloc.getTaskAllocations().stream()
+                        .anyMatch(ta -> lhMc.equals(ta.getLhMachineCode()));
+                if (!stillUsed) {
+                    Set<String> highLhCodes = continueLhMachineCodeMap.get(highMachine);
+                    if (highLhCodes != null) {
+                        highLhCodes.remove(lhMc);
+                    }
+                }
+            }
+
+            // 检查高负荷机台是否还保留该胎胚
+            boolean highStillHasEmbryo = highAlloc.getTaskAllocations().stream()
+                    .anyMatch(ta -> embryoCode.equals(ta.getEmbryoCode()));
+            if (!highStillHasEmbryo) {
+                Set<String> highTypes = continueTypeMap.get(highMachine);
+                if (highTypes != null) {
+                    highTypes.remove(embryoCode);
+                }
+            }
+
+            // 添加到低负荷机台
+            final String lowMachineCode = lowMachine;
+            MachineAllocationResult lowAlloc = existAllocations.stream()
+                    .filter(a -> lowMachineCode.equals(a.getMachineCode()))
+                    .findFirst().orElse(null);
+            if (lowAlloc == null) {
+                lowAlloc = new MachineAllocationResult();
+                lowAlloc.setMachineCode(lowMachine);
+                lowAlloc.setTaskAllocations(new ArrayList<>());
+                existAllocations.add(lowAlloc);
+            }
+            lowAlloc.getTaskAllocations().add(taskToMove);
+
+            // 更新低负荷机台的 loadMap
+            int lowNewLoad = continueLoadMap.getOrDefault(lowMachine, 0) + vulcCount;
+            continueLoadMap.put(lowMachine, lowNewLoad);
+
+            // 更新低负荷机台的 typeMap
+            Set<String> lowTypeSet = continueTypeMap.computeIfAbsent(lowMachine, k -> new HashSet<>());
+            lowTypeSet.add(embryoCode);
+
+            // 更新低负荷机台的 lhMachineCodeMap
+            if (lhMc != null && !lhMc.isEmpty()) {
+                Set<String> lowLhCodes = continueLhMachineCodeMap.computeIfAbsent(lowMachine, k -> new HashSet<>());
+                lowLhCodes.add(lhMc);
+            }
+
+            log.info("续作预均衡(负荷): {} 的 {}({}台) -> {}, 负荷: {}->{}, {}->{}",
+                    highMachine, embryoCode, vulcCount, lowMachine,
+                    highLoad, highNewLoad, lowLoad, lowNewLoad);
+        }
+
+        // ---- Phase 2: 种类差修正（通过交换续作任务，保持负荷不变）----
+        for (int iter = 0; iter < MAX_BALANCE_ITERATIONS; iter++) {
+            // 找种类最多的机台，和所有种类较少的候选机台（按种类数升序）
+            String highTypeMachine = null;
+            int highTypeCount = -1;
+            List<Map.Entry<String, Integer>> lowCandidates = new ArrayList<>();
+
+            for (Map.Entry<String, Set<String>> entry : continueTypeMap.entrySet()) {
+                int count = entry.getValue().size();
+                if (count > highTypeCount) {
+                    // 之前的最高变成候选（用新高减旧高判断差值）
+                    if (highTypeMachine != null && count - highTypeCount > typeDiffThreshold) {
+                        lowCandidates.add(new AbstractMap.SimpleEntry<>(highTypeMachine, highTypeCount));
+                    }
+                    highTypeCount = count;
+                    highTypeMachine = entry.getKey();
+                } else if (highTypeCount - count > typeDiffThreshold) {
+                    lowCandidates.add(new AbstractMap.SimpleEntry<>(entry.getKey(), count));
+                }
+            }
+            lowCandidates.sort(Comparator.comparingInt(Map.Entry::getValue));
+
+            if (highTypeMachine == null || lowCandidates.isEmpty()) {
+                break;
+            }
+
+            boolean swapped = false;
+            Set<String> highEmbryos = continueTypeMap.getOrDefault(highTypeMachine, Collections.emptySet());
+
+            for (Map.Entry<String, Integer> lowCandidate : lowCandidates) {
+                String lowTypeMachine = lowCandidate.getKey();
+                int lowTypeCount = lowCandidate.getValue();
+                Set<String> lowEmbryos = continueTypeMap.getOrDefault(lowTypeMachine, Collections.emptySet());
+
+                // 在 highTypeMachine 上找一个续作任务，其胎胚在 lowTypeMachine 上不存在（独占胎胚）
+                TaskAllocation highTaskToSwap = null;
+                MachineAllocationResult highSwapAlloc = null;
+
+                outerHigh:
+                for (MachineAllocationResult alloc : existAllocations) {
+                    if (!highTypeMachine.equals(alloc.getMachineCode())) continue;
+                    for (TaskAllocation ta : alloc.getTaskAllocations()) {
+                        if (!lowEmbryos.contains(ta.getEmbryoCode())) {
+                            highTaskToSwap = ta;
+                            highSwapAlloc = alloc;
+                            break outerHigh;
+                        }
+                    }
+                }
+
+                if (highTaskToSwap == null) continue;
+
+                // 在 lowTypeMachine 上找一个续作任务，其胎胚在 highTypeMachine 上已存在（交换后不增种类）
+                TaskAllocation lowTaskToSwap = null;
+                MachineAllocationResult lowSwapAlloc = null;
+
+                final Set<String> highEmbryoSet = highEmbryos;
+                for (MachineAllocationResult alloc : existAllocations) {
+                    if (!lowTypeMachine.equals(alloc.getMachineCode())) continue;
+                    for (TaskAllocation ta : alloc.getTaskAllocations()) {
+                        if (highEmbryoSet.contains(ta.getEmbryoCode())) {
+                            lowTaskToSwap = ta;
+                            lowSwapAlloc = alloc;
+                            break;
+                        }
+                    }
+                    if (lowTaskToSwap != null) break;
+                }
+
+                if (lowTaskToSwap == null) {
+                    // 交换失败（无共有胎胚），尝试直接移动：从高种类机台移独占胎胚到低种类机台
+                    if (executeTypeMove(highTaskToSwap, highSwapAlloc,
+                            highTypeMachine, lowTypeMachine, existAllocations,
+                            continueLoadMap, continueLoadMap,
+                            continueTypeMap, continueLhMachineCodeMap,
+                            highTypeCount, lowTypeCount, loadDiffThreshold, "续作预均衡")) {
+                        swapped = true;
+                        break;
+                    }
+                    // MOVE 也失败，尝试三方轮换
+                    if (tryThreeWayRotation(existAllocations, highTaskToSwap, highSwapAlloc,
+                            highTypeMachine, lowTypeMachine, highEmbryos,
+                            continueTypeMap, continueLoadMap, continueLoadMap,
+                            continueTypeMap, continueLhMachineCodeMap,
+                            loadDiffThreshold, "续作预均衡", false)) {
+                        swapped = true;
+                        break;
+                    }
+                    continue;
+                }
+
+                // 检查交换后负荷差是否在阈值内
+                int highVulc = highTaskToSwap.getVulcanizeMachineCount() != null ? highTaskToSwap.getVulcanizeMachineCount() : 0;
+                int lowVulc = lowTaskToSwap.getVulcanizeMachineCount() != null ? lowTaskToSwap.getVulcanizeMachineCount() : 0;
+                int highNewLoad = continueLoadMap.getOrDefault(highTypeMachine, 0) - highVulc + lowVulc;
+                int lowNewLoad = continueLoadMap.getOrDefault(lowTypeMachine, 0) - lowVulc + highVulc;
+                if (Math.abs(highNewLoad - lowNewLoad) > loadDiffThreshold) continue;
+
+                // 执行交换
+                executeTypeSwap(highTaskToSwap, lowTaskToSwap, highSwapAlloc, lowSwapAlloc,
+                        highTypeMachine, lowTypeMachine,
+                        continueLoadMap, continueLoadMap,
+                        continueTypeMap, continueLhMachineCodeMap,
+                        highTypeCount, lowTypeCount, "续作预均衡");
+                swapped = true;
+                break;
+            }
+
+            if (!swapped) break;
+        }
+    }
+
+    /**
+     * 后置续作重分配：BalancingService 返回后，若机台间总负荷差（续作+新增）仍超阈值，
+     * 将高负荷机台上的续作任务移到低负荷机台（仅移动双方都有的同胎胚，不占新种类槽）。
+     *
+     * <p>与 {@link #preBalanceContinueLoad} 的区别：
+     * <ul>
+     *   <li>preBalance 在贪心前运行，只看续作负荷</li>
+     *   <li>postBalance 在贪心后运行，看续作+新增的总负荷，能处理贪心分配后产生的不均衡</li>
+     * </ul>
+     *
+     * <p>典型场景：H1302 续作7台/4种(满)，H1403 续作8台+新增1台=9台，gap=2。
+     * postBalance 会把 H1403 的续作（如215101877，H1302也有）移到 H1302，
+     * 使 H1302=8、H1403=8，gap=0。
+     *
+     * @param balancingResult        BalancingService 返回的新任务分配结果
+     * @param existAllocations       续作分配结果（可修改，移动续作 TaskAllocation）
+     * @param continueLoadMap        机台 -> 续作负荷（可变，会被更新）
+     * @param continueTypeMap        机台 -> 续作种类集合（可变，会被更新）
+     * @param continueLhMachineCodeMap 机台 -> 续作硫化机编号集合（可变，会被更新）
+     * @param loadDiffThreshold      负荷差额阈值
+     * @param typeDiffThreshold      种类差额阈值
+     */
+    private void postBalanceContinueLoad(
+            BalancingResult balancingResult,
+            List<MachineAllocationResult> existAllocations,
+            Map<String, Integer> continueLoadMap,
+            Map<String, Set<String>> continueTypeMap,
+            Map<String, Set<String>> continueLhMachineCodeMap,
+            int loadDiffThreshold,
+            int typeDiffThreshold) {
+
+        if (existAllocations == null || existAllocations.size() < 2 || balancingResult == null) {
+            return;
+        }
+
+        // 构建总负荷映射 = 续作负荷 + 新增负荷
+        Map<String, Integer> totalLoadMap = new HashMap<>(continueLoadMap);
+        // 构建各机台全部胎胚集合 = 续作胎胚 + 新增胎胚（用于判断移动续作后是否占新种类槽）
+        Map<String, Set<String>> allEmbryosMap = new HashMap<>();
+        for (Map.Entry<String, Set<String>> entry : continueTypeMap.entrySet()) {
+            allEmbryosMap.put(entry.getKey(), new HashSet<>(entry.getValue()));
+        }
+        for (MachineAssignment ma : balancingResult.getAssignments()) {
+            String mc = ma.getMachineCode();
+            int newLoad = ma.getEmbryoAssignments().stream()
+                    .filter(ea -> ea.getTask() != null)
+                    .mapToInt(EmbryoAssignment::getAssignedQty)
+                    .sum();
+            totalLoadMap.merge(mc, newLoad, Integer::sum);
+            Set<String> embryos = allEmbryosMap.computeIfAbsent(mc, k -> new HashSet<>());
+            for (EmbryoAssignment ea : ma.getEmbryoAssignments()) {
+                if (ea.getTask() != null) {
+                    embryos.add(ea.getEmbryoCode());
+                }
+            }
+        }
+
+        for (int iter = 0; iter < MAX_BALANCE_ITERATIONS; iter++) {
+            // 找最高和最低总负荷机台
+            String highMachine = null;
+            String lowMachine = null;
+            int highLoad = -1;
+            int lowLoad = Integer.MAX_VALUE;
+
+            for (Map.Entry<String, Integer> entry : totalLoadMap.entrySet()) {
+                String mc = entry.getKey();
+                int load = entry.getValue();
+                if (load > highLoad) {
+                    highLoad = load;
+                    highMachine = mc;
+                }
+                if (load < lowLoad) {
+                    lowLoad = load;
+                    lowMachine = mc;
+                }
+            }
+
+            if (highMachine == null || lowMachine == null || highMachine.equals(lowMachine)) {
+                break;
+            }
+            if (highLoad - lowLoad <= loadDiffThreshold) {
+                break;
+            }
+
+            // 在高负荷机台上找一个续作任务，其胎胚在低负荷机台上也存在（续作或新增均可）
+            Set<String> lowTypes = allEmbryosMap.getOrDefault(lowMachine, Collections.emptySet());
+            if (lowTypes.isEmpty()) {
+                break;
+            }
+
+            TaskAllocation taskToMove = null;
+            MachineAllocationResult highAlloc = null;
+
+            outer:
+            for (MachineAllocationResult alloc : existAllocations) {
+                if (!highMachine.equals(alloc.getMachineCode())) {
+                    continue;
+                }
+                for (TaskAllocation ta : alloc.getTaskAllocations()) {
+                    if (lowTypes.contains(ta.getEmbryoCode())) {
+                        taskToMove = ta;
+                        highAlloc = alloc;
+                        break outer;
+                    }
+                }
+            }
+
+            if (taskToMove == null) {
+                log.info("后置续作重分配: {} -> {} 无可移动的同胎胚续作任务，终止", highMachine, lowMachine);
+                break;
+            }
+
+            // 执行移动（同 preBalanceContinueLoad 逻辑）
+            String embryoCode = taskToMove.getEmbryoCode();
+            String lhMc = taskToMove.getLhMachineCode();
+            int vulcCount = taskToMove.getVulcanizeMachineCount() != null ? taskToMove.getVulcanizeMachineCount() : 0;
+
+            // 从高负荷机台移除
+            highAlloc.getTaskAllocations().remove(taskToMove);
+
+            int highNewContinueLoad = continueLoadMap.getOrDefault(highMachine, 0) - vulcCount;
+            continueLoadMap.put(highMachine, Math.max(0, highNewContinueLoad));
+            totalLoadMap.put(highMachine, highLoad - vulcCount);
+
+            if (lhMc != null && !lhMc.isEmpty()) {
+                boolean stillUsed = highAlloc.getTaskAllocations().stream()
+                        .anyMatch(ta -> lhMc.equals(ta.getLhMachineCode()));
+                if (!stillUsed) {
+                    Set<String> highLhCodes = continueLhMachineCodeMap.get(highMachine);
+                    if (highLhCodes != null) {
+                        highLhCodes.remove(lhMc);
+                    }
+                }
+            }
+
+            boolean highStillHasEmbryo = highAlloc.getTaskAllocations().stream()
+                    .anyMatch(ta -> embryoCode.equals(ta.getEmbryoCode()));
+            if (!highStillHasEmbryo) {
+                Set<String> highTypes = continueTypeMap.get(highMachine);
+                if (highTypes != null) {
+                    highTypes.remove(embryoCode);
+                }
+            }
+
+            // 添加到低负荷机台
+            final String lowMachineCode = lowMachine;
+            MachineAllocationResult lowAlloc = existAllocations.stream()
+                    .filter(a -> lowMachineCode.equals(a.getMachineCode()))
+                    .findFirst().orElse(null);
+            if (lowAlloc == null) {
+                lowAlloc = new MachineAllocationResult();
+                lowAlloc.setMachineCode(lowMachine);
+                lowAlloc.setTaskAllocations(new ArrayList<>());
+                existAllocations.add(lowAlloc);
+            }
+            lowAlloc.getTaskAllocations().add(taskToMove);
+
+            int lowNewContinueLoad = continueLoadMap.getOrDefault(lowMachine, 0) + vulcCount;
+            continueLoadMap.put(lowMachine, lowNewContinueLoad);
+            totalLoadMap.put(lowMachine, lowLoad + vulcCount);
+
+            Set<String> lowTypeSet = continueTypeMap.computeIfAbsent(lowMachine, k -> new HashSet<>());
+            lowTypeSet.add(embryoCode);
+
+            if (lhMc != null && !lhMc.isEmpty()) {
+                Set<String> lowLhCodes = continueLhMachineCodeMap.computeIfAbsent(lowMachine, k -> new HashSet<>());
+                lowLhCodes.add(lhMc);
+            }
+
+            log.info("后置续作重分配(负荷): {} 的 {}({}台) -> {}, 总负荷: {}->{}, {}->{}",
+                    highMachine, embryoCode, vulcCount, lowMachine,
+                    highLoad, highLoad - vulcCount, lowLoad, lowLoad + vulcCount);
+        }
+
+        // ---- Phase 2: 种类差修正（通过交换续作任务，保持负荷不变）----
+        // 循环外预计算新增任务的胎胚集合（静态，不随迭代变化）
+        Map<String, Set<String>> newTaskEmbryosMap = new HashMap<>();
+        for (MachineAssignment ma : balancingResult.getAssignments()) {
+            Set<String> embryos = newTaskEmbryosMap.computeIfAbsent(ma.getMachineCode(), k -> new HashSet<>());
+            for (EmbryoAssignment ea : ma.getEmbryoAssignments()) {
+                if (ea.getTask() != null) {
+                    embryos.add(ea.getEmbryoCode());
+                }
+            }
+        }
+
+        for (int iter = 0; iter < MAX_BALANCE_ITERATIONS; iter++) {
+            // 仅合并 continueTypeMap（变化部分）+ newTaskEmbryosMap（静态部分）
+            Map<String, Set<String>> currentAllEmbryos = new HashMap<>();
+            for (Map.Entry<String, Set<String>> entry : continueTypeMap.entrySet()) {
+                Set<String> merged = new HashSet<>(entry.getValue());
+                Set<String> newTaskEmbryos = newTaskEmbryosMap.get(entry.getKey());
+                if (newTaskEmbryos != null) {
+                    merged.addAll(newTaskEmbryos);
+                }
+                currentAllEmbryos.put(entry.getKey(), merged);
+            }
+            // 也处理只在 newTaskEmbryosMap 中的机台
+            for (Map.Entry<String, Set<String>> entry : newTaskEmbryosMap.entrySet()) {
+                if (!currentAllEmbryos.containsKey(entry.getKey())) {
+                    currentAllEmbryos.put(entry.getKey(), new HashSet<>(entry.getValue()));
+                }
+            }
+
+            // 找种类最多的机台，和所有种类较少的候选机台（按种类数升序）
+            String highTypeMachine = null;
+            int highTypeCount = -1;
+            List<Map.Entry<String, Integer>> lowCandidates = new ArrayList<>();
+
+            for (Map.Entry<String, Set<String>> entry : currentAllEmbryos.entrySet()) {
+                int count = entry.getValue().size();
+                if (count > highTypeCount) {
+                    // 之前的最高变成候选（用新高减旧高判断差值）
+                    if (highTypeMachine != null && count - highTypeCount > typeDiffThreshold) {
+                        lowCandidates.add(new AbstractMap.SimpleEntry<>(highTypeMachine, highTypeCount));
+                    }
+                    highTypeCount = count;
+                    highTypeMachine = entry.getKey();
+                } else if (highTypeCount - count > typeDiffThreshold) {
+                    lowCandidates.add(new AbstractMap.SimpleEntry<>(entry.getKey(), count));
+                }
+            }
+            // 按种类数升序排列候选（优先和种类最少的交换）
+            lowCandidates.sort(Comparator.comparingInt(Map.Entry::getValue));
+
+            if (highTypeMachine == null || lowCandidates.isEmpty()) {
+                break;
+            }
+
+            // 尝试与每个低种类机台交换，直到成功
+            boolean swapped = false;
+            Set<String> highEmbryos = currentAllEmbryos.getOrDefault(highTypeMachine, Collections.emptySet());
+
+            for (Map.Entry<String, Integer> lowCandidate : lowCandidates) {
+                String lowTypeMachine = lowCandidate.getKey();
+                int lowTypeCount = lowCandidate.getValue();
+
+                // 在 highTypeMachine 上找一个续作任务，其胎胚在 lowTypeMachine 上不存在（独占胎胚）
+                Set<String> lowEmbryos = currentAllEmbryos.getOrDefault(lowTypeMachine, Collections.emptySet());
+
+                TaskAllocation highTaskToSwap = null;
+                MachineAllocationResult highSwapAlloc = null;
+
+                outerHigh:
+                for (MachineAllocationResult alloc : existAllocations) {
+                    if (!highTypeMachine.equals(alloc.getMachineCode())) {
+                        continue;
+                    }
+                    for (TaskAllocation ta : alloc.getTaskAllocations()) {
+                        if (!lowEmbryos.contains(ta.getEmbryoCode())) {
+                            highTaskToSwap = ta;
+                            highSwapAlloc = alloc;
+                            break outerHigh;
+                        }
+                    }
+                }
+
+                if (highTaskToSwap == null) {
+                    log.info("后置续作重分配(种类): {} -> {} 无可交换的独占续作胎胚，尝试下一个候选",
+                            highTypeMachine, lowTypeMachine);
+                    continue;
+                }
+
+                // 在 lowTypeMachine 上找一个续作任务，其胎胚在 highTypeMachine 上已存在（交换后不增种类）
+                // 且 vulcCount 与 highTaskToSwap 相同（保持负荷不变）
+                int targetVulcCount = highTaskToSwap.getVulcanizeMachineCount() != null
+                        ? highTaskToSwap.getVulcanizeMachineCount() : 0;
+
+                TaskAllocation lowTaskToSwap = null;
+                MachineAllocationResult lowSwapAlloc = null;
+
+                final Set<String> highEmbryoSet = highEmbryos;
+                outerLow:
+                for (MachineAllocationResult alloc : existAllocations) {
+                    if (!lowTypeMachine.equals(alloc.getMachineCode())) {
+                        continue;
+                    }
+                    for (TaskAllocation ta : alloc.getTaskAllocations()) {
+                        if (highEmbryoSet.contains(ta.getEmbryoCode())) {
+                            int vc = ta.getVulcanizeMachineCount() != null ? ta.getVulcanizeMachineCount() : 0;
+                            if (vc == targetVulcCount) {
+                                lowTaskToSwap = ta;
+                                lowSwapAlloc = alloc;
+                                break outerLow;
+                            }
+                        }
+                    }
+                }
+
+                // 如果没找到相同 vulcCount 的，找任意 vulcCount 的（允许负荷微调）
+                if (lowTaskToSwap == null) {
+                    for (MachineAllocationResult alloc : existAllocations) {
+                        if (!lowTypeMachine.equals(alloc.getMachineCode())) {
+                            continue;
+                        }
+                        for (TaskAllocation ta : alloc.getTaskAllocations()) {
+                            if (highEmbryoSet.contains(ta.getEmbryoCode())) {
+                                lowTaskToSwap = ta;
+                                lowSwapAlloc = alloc;
+                                break;
+                            }
+                        }
+                        if (lowTaskToSwap != null) break;
+                    }
+                }
+
+                if (lowTaskToSwap == null) {
+                    // 交换失败（无共有胎胚），尝试直接移动：从高种类机台移独占胎胚到低种类机台
+                    if (executeTypeMove(highTaskToSwap, highSwapAlloc,
+                            highTypeMachine, lowTypeMachine, existAllocations,
+                            totalLoadMap, continueLoadMap,
+                            continueTypeMap, continueLhMachineCodeMap,
+                            highTypeCount, lowTypeCount, loadDiffThreshold, "后置续作重分配")) {
+                        swapped = true;
+                        break;
+                    }
+                    // MOVE 也失败，尝试三方轮换
+                    if (tryThreeWayRotation(existAllocations, highTaskToSwap, highSwapAlloc,
+                            highTypeMachine, lowTypeMachine, highEmbryos,
+                            currentAllEmbryos, totalLoadMap, continueLoadMap,
+                            continueTypeMap, continueLhMachineCodeMap,
+                            loadDiffThreshold, "后置续作重分配", true)) {
+                        swapped = true;
+                        break;
+                    }
+                    log.info("后置续作重分配(种类): {} -> {} 交换/移动/轮换均失败，尝试下一个候选",
+                            highTypeMachine, lowTypeMachine);
+                    continue;
+                }
+
+                // 检查交换后负荷差是否在阈值内
+                int highVulc = highTaskToSwap.getVulcanizeMachineCount() != null ? highTaskToSwap.getVulcanizeMachineCount() : 0;
+                int lowVulc = lowTaskToSwap.getVulcanizeMachineCount() != null ? lowTaskToSwap.getVulcanizeMachineCount() : 0;
+                int highNewLoad = totalLoadMap.getOrDefault(highTypeMachine, 0) - highVulc + lowVulc;
+                int lowNewLoad = totalLoadMap.getOrDefault(lowTypeMachine, 0) - lowVulc + highVulc;
+                if (Math.abs(highNewLoad - lowNewLoad) > loadDiffThreshold) {
+                    log.info("后置续作重分配(种类): {} <-> {} 交换后负荷差={}超阈值，尝试下一个候选",
+                            highTypeMachine, lowTypeMachine, Math.abs(highNewLoad - lowNewLoad));
+                    continue;
+                }
+
+                // 执行交换
+                executeTypeSwap(highTaskToSwap, lowTaskToSwap, highSwapAlloc, lowSwapAlloc,
+                        highTypeMachine, lowTypeMachine,
+                        totalLoadMap, continueLoadMap,
+                        continueTypeMap, continueLhMachineCodeMap,
+                        highTypeCount, lowTypeCount, "后置续作重分配");
+                swapped = true;
+                break;
+            } // end for lowCandidates
+
+            if (!swapped) {
+                break;
+            }
+        }
+    }
+
+    // ==================== 续作均衡共享方法 ====================
+
+    /**
+     * 执行两机台间的续作任务交换，同步更新负荷/种类/lhMachineCode 映射。
+     *
+     * @param highTaskToSwap      高种类机台上要移走的任务
+     * @param lowTaskToSwap       低种类机台上要移走的任务
+     * @param highSwapAlloc       高种类机台的分配对象
+     * @param lowSwapAlloc        低种类机台的分配对象
+     * @param highTypeMachine     高种类机台编码
+     * @param lowTypeMachine      低种类机台编码
+     * @param loadMap             主负荷映射（会被更新）
+     * @param continueLoadMap     续作负荷映射（会被更新）
+     * @param continueTypeMap     续作种类集合映射（会被更新）
+     * @param continueLhMachineCodeMap 续作硫化机编号集合映射（会被更新）
+     * @param highTypeCount       交换前高种类机台种类数
+     * @param lowTypeCount        交换前低种类机台种类数
+     * @param logPrefix           日志前缀
+     */
+    private void executeTypeSwap(
+            TaskAllocation highTaskToSwap,
+            TaskAllocation lowTaskToSwap,
+            MachineAllocationResult highSwapAlloc,
+            MachineAllocationResult lowSwapAlloc,
+            String highTypeMachine,
+            String lowTypeMachine,
+            Map<String, Integer> loadMap,
+            Map<String, Integer> continueLoadMap,
+            Map<String, Set<String>> continueTypeMap,
+            Map<String, Set<String>> continueLhMachineCodeMap,
+            int highTypeCount,
+            int lowTypeCount,
+            String logPrefix) {
+
+        int highVulc = highTaskToSwap.getVulcanizeMachineCount() != null ? highTaskToSwap.getVulcanizeMachineCount() : 0;
+        int lowVulc = lowTaskToSwap.getVulcanizeMachineCount() != null ? lowTaskToSwap.getVulcanizeMachineCount() : 0;
+        int highNewLoad = loadMap.getOrDefault(highTypeMachine, 0) - highVulc + lowVulc;
+        int lowNewLoad = loadMap.getOrDefault(lowTypeMachine, 0) - lowVulc + highVulc;
+
+        String highEmbryo = highTaskToSwap.getEmbryoCode();
+        String lowEmbryo = lowTaskToSwap.getEmbryoCode();
+        String highLhMc = highTaskToSwap.getLhMachineCode();
+        String lowLhMc = lowTaskToSwap.getLhMachineCode();
+
+        // 从各自机台移除
+        highSwapAlloc.getTaskAllocations().remove(highTaskToSwap);
+        lowSwapAlloc.getTaskAllocations().remove(lowTaskToSwap);
+
+        // 添加到对方机台
+        highSwapAlloc.getTaskAllocations().add(lowTaskToSwap);
+        lowSwapAlloc.getTaskAllocations().add(highTaskToSwap);
+
+        // 更新负荷
+        loadMap.put(highTypeMachine, highNewLoad);
+        loadMap.put(lowTypeMachine, lowNewLoad);
+        if (loadMap != continueLoadMap) {
+            continueLoadMap.merge(highTypeMachine, -highVulc + lowVulc, Integer::sum);
+            continueLoadMap.merge(lowTypeMachine, -lowVulc + highVulc, Integer::sum);
+        }
+
+        // 更新种类集合
+        boolean highStillHas = highSwapAlloc.getTaskAllocations().stream()
+                .anyMatch(ta -> highEmbryo.equals(ta.getEmbryoCode()));
+        if (!highStillHas) {
+            Set<String> highTypes = continueTypeMap.get(highTypeMachine);
+            if (highTypes != null) highTypes.remove(highEmbryo);
+        }
+        boolean lowStillHas = lowSwapAlloc.getTaskAllocations().stream()
+                .anyMatch(ta -> lowEmbryo.equals(ta.getEmbryoCode()));
+        if (!lowStillHas) {
+            Set<String> lowTypes = continueTypeMap.get(lowTypeMachine);
+            if (lowTypes != null) lowTypes.remove(lowEmbryo);
+        }
+        continueTypeMap.computeIfAbsent(lowTypeMachine, k -> new HashSet<>()).add(highEmbryo);
+
+        // 更新 lhMachineCode 集合
+        if (highLhMc != null && !highLhMc.isEmpty()) {
+            boolean highStillUsesLh = highSwapAlloc.getTaskAllocations().stream()
+                    .anyMatch(ta -> highLhMc.equals(ta.getLhMachineCode()));
+            if (!highStillUsesLh) {
+                Set<String> highLhCodes = continueLhMachineCodeMap.get(highTypeMachine);
+                if (highLhCodes != null) highLhCodes.remove(highLhMc);
+            }
+            continueLhMachineCodeMap.computeIfAbsent(lowTypeMachine, k -> new HashSet<>()).add(highLhMc);
+        }
+        if (lowLhMc != null && !lowLhMc.isEmpty()) {
+            boolean lowStillUsesLh = lowSwapAlloc.getTaskAllocations().stream()
+                    .anyMatch(ta -> lowLhMc.equals(ta.getLhMachineCode()));
+            if (!lowStillUsesLh) {
+                Set<String> lowLhCodes = continueLhMachineCodeMap.get(lowTypeMachine);
+                if (lowLhCodes != null) lowLhCodes.remove(lowLhMc);
+            }
+            continueLhMachineCodeMap.computeIfAbsent(highTypeMachine, k -> new HashSet<>()).add(lowLhMc);
+        }
+
+        log.info("{}(种类交换): {} 的 {}({}台) <-> {} 的 {}({}台), 种类: {}/{} -> {}/{}, 负荷: {}/{}",
+                logPrefix, highTypeMachine, highEmbryo, highVulc, lowTypeMachine, lowEmbryo, lowVulc,
+                highTypeCount, lowTypeCount, highTypeCount - 1, lowTypeCount + 1,
+                highNewLoad, lowNewLoad);
+    }
+
+    /**
+     * 执行续作任务从高种类机台到低种类机台的单向移动，同步更新负荷/种类/lhMachineCode 映射。
+     *
+     * @param highTaskToSwap      高种类机台上要移走的任务
+     * @param highSwapAlloc       高种类机台的分配对象
+     * @param highTypeMachine     高种类机台编码
+     * @param lowTypeMachine      低种类机台编码
+     * @param existAllocations    所有机台分配结果（用于查找/创建低种类机台分配对象）
+     * @param loadMap             主负荷映射（会被更新）
+     * @param continueLoadMap     续作负荷映射（会被更新）
+     * @param continueTypeMap     续作种类集合映射（会被更新）
+     * @param continueLhMachineCodeMap 续作硫化机编号集合映射（会被更新）
+     * @param highTypeCount       移动前高种类机台种类数
+     * @param lowTypeCount        移动前低种类机台种类数
+     * @param loadDiffThreshold   负荷差额阈值
+     * @param logPrefix           日志前缀
+     * @return true 如果移动成功
+     */
+    private boolean executeTypeMove(
+            TaskAllocation highTaskToSwap,
+            MachineAllocationResult highSwapAlloc,
+            String highTypeMachine,
+            String lowTypeMachine,
+            List<MachineAllocationResult> existAllocations,
+            Map<String, Integer> loadMap,
+            Map<String, Integer> continueLoadMap,
+            Map<String, Set<String>> continueTypeMap,
+            Map<String, Set<String>> continueLhMachineCodeMap,
+            int highTypeCount,
+            int lowTypeCount,
+            int loadDiffThreshold,
+            String logPrefix) {
+
+        int moveVulc = highTaskToSwap.getVulcanizeMachineCount() != null ? highTaskToSwap.getVulcanizeMachineCount() : 0;
+        int highMoveLoad = loadMap.getOrDefault(highTypeMachine, 0) - moveVulc;
+        int lowMoveLoad = loadMap.getOrDefault(lowTypeMachine, 0) + moveVulc;
+        if (Math.abs(highMoveLoad - lowMoveLoad) > loadDiffThreshold) {
+            return false;
+        }
+
+        String moveEmbryo = highTaskToSwap.getEmbryoCode();
+        String moveLhMc = highTaskToSwap.getLhMachineCode();
+
+        highSwapAlloc.getTaskAllocations().remove(highTaskToSwap);
+        MachineAllocationResult lowMoveAlloc = existAllocations.stream()
+                .filter(a -> lowTypeMachine.equals(a.getMachineCode()))
+                .findFirst().orElse(null);
+        if (lowMoveAlloc == null) {
+            lowMoveAlloc = new MachineAllocationResult();
+            lowMoveAlloc.setMachineCode(lowTypeMachine);
+            lowMoveAlloc.setTaskAllocations(new ArrayList<>());
+            existAllocations.add(lowMoveAlloc);
+        }
+        lowMoveAlloc.getTaskAllocations().add(highTaskToSwap);
+
+        loadMap.put(highTypeMachine, highMoveLoad);
+        loadMap.put(lowTypeMachine, lowMoveLoad);
+        if (loadMap != continueLoadMap) {
+            continueLoadMap.merge(highTypeMachine, -moveVulc, Integer::sum);
+            continueLoadMap.merge(lowTypeMachine, moveVulc, Integer::sum);
+        }
+
+        // 更新种类集合
+        boolean highStillHasMove = highSwapAlloc.getTaskAllocations().stream()
+                .anyMatch(ta -> moveEmbryo.equals(ta.getEmbryoCode()));
+        if (!highStillHasMove) {
+            Set<String> highTypes = continueTypeMap.get(highTypeMachine);
+            if (highTypes != null) highTypes.remove(moveEmbryo);
+        }
+        continueTypeMap.computeIfAbsent(lowTypeMachine, k -> new HashSet<>()).add(moveEmbryo);
+
+        // 更新 lhMachineCode 集合
+        if (moveLhMc != null && !moveLhMc.isEmpty()) {
+            boolean highStillUsesLh = highSwapAlloc.getTaskAllocations().stream()
+                    .anyMatch(ta -> moveLhMc.equals(ta.getLhMachineCode()));
+            if (!highStillUsesLh) {
+                Set<String> highLhCodes = continueLhMachineCodeMap.get(highTypeMachine);
+                if (highLhCodes != null) highLhCodes.remove(moveLhMc);
+            }
+            continueLhMachineCodeMap.computeIfAbsent(lowTypeMachine, k -> new HashSet<>()).add(moveLhMc);
+        }
+
+        log.info("{}(种类移动): {} 的 {}({}台) -> {}, 种类: {}/{} -> {}/{}, 负荷: {}/{}",
+                logPrefix, highTypeMachine, moveEmbryo, moveVulc, lowTypeMachine,
+                highTypeCount, lowTypeCount, highTypeCount - 1, lowTypeCount + 1,
+                highMoveLoad, lowMoveLoad);
+        return true;
+    }
+
+    /**
+     * 尝试三方轮换：A(高种类)给B(低种类)独占胎胚X，B给C独占胎胚Y，C给A共有胎胚Z。
+     * 净效果：A种类-1，B和C种类不变，负荷可能微调（需在阈值内）。
+     *
+     * @param existAllocations       所有机台分配结果
+     * @param highTaskToSwap         高种类机台上要移走的任务（胎胚X）
+     * @param highSwapAlloc          高种类机台的分配对象
+     * @param highTypeMachine        高种类机台编码
+     * @param lowTypeMachine         低种类机台编码
+     * @param highEmbryos            高种类机台的胎胚集合
+     * @param typeMapForLookup       用于查找C机台胎胚集合的映射（pre: continueTypeMap, post: currentAllEmbryos）
+     * @param loadMap                主负荷映射（pre: continueLoadMap, post: totalLoadMap）
+     * @param continueLoadMap        续作负荷映射（pre: 同loadMap, post: 独立映射）
+     * @param continueTypeMap        续作种类集合映射（用于更新种类）
+     * @param continueLhMachineCodeMap 续作硫化机编号集合映射
+     * @param loadDiffThreshold      负荷差额阈值
+     * @param logPrefix              日志前缀
+     * @param updateContinueLoadMap  是否同步更新 continueLoadMap（pre: false, post: true）
+     * @return true if rotation succeeded
+     */
+    private boolean tryThreeWayRotation(
+            List<MachineAllocationResult> existAllocations,
+            TaskAllocation highTaskToSwap,
+            MachineAllocationResult highSwapAlloc,
+            String highTypeMachine,
+            String lowTypeMachine,
+            Set<String> highEmbryos,
+            Map<String, Set<String>> typeMapForLookup,
+            Map<String, Integer> loadMap,
+            Map<String, Integer> continueLoadMap,
+            Map<String, Set<String>> continueTypeMap,
+            Map<String, Set<String>> continueLhMachineCodeMap,
+            int loadDiffThreshold,
+            String logPrefix,
+            boolean updateContinueLoadMap) {
+
+        String embryoX = highTaskToSwap.getEmbryoCode();
+        int vulcX = highTaskToSwap.getVulcanizeMachineCount() != null ? highTaskToSwap.getVulcanizeMachineCount() : 0;
+
+        MachineAllocationResult allocB = existAllocations.stream()
+                .filter(a -> lowTypeMachine.equals(a.getMachineCode()))
+                .findFirst().orElse(null);
+        if (allocB == null) return false;
+
+        for (MachineAllocationResult allocC : existAllocations) {
+            String machineC = allocC.getMachineCode();
+            if (machineC.equals(highTypeMachine) || machineC.equals(lowTypeMachine)) continue;
+
+            Set<String> embryosC = typeMapForLookup.getOrDefault(machineC, Collections.emptySet());
+
+            for (TaskAllocation taskZ : allocC.getTaskAllocations()) {
+                String embryoZ = taskZ.getEmbryoCode();
+                if (!highEmbryos.contains(embryoZ)) continue;
+
+                int vulcZ = taskZ.getVulcanizeMachineCount() != null ? taskZ.getVulcanizeMachineCount() : 0;
+
+                for (TaskAllocation taskY : allocB.getTaskAllocations()) {
+                    String embryoY = taskY.getEmbryoCode();
+                    if (embryosC.contains(embryoY) || embryoY.equals(embryoX)) continue;
+
+                    int vulcY = taskY.getVulcanizeMachineCount() != null ? taskY.getVulcanizeMachineCount() : 0;
+
+                    int loadA = loadMap.getOrDefault(highTypeMachine, 0) - vulcX + vulcZ;
+                    int loadB = loadMap.getOrDefault(lowTypeMachine, 0) + vulcX - vulcY;
+                    int loadC = loadMap.getOrDefault(machineC, 0) + vulcY - vulcZ;
+                    int newMax = Math.max(Math.max(loadA, loadB), loadC);
+                    int newMin = Math.min(Math.min(loadA, loadB), loadC);
+                    for (Map.Entry<String, Integer> e : loadMap.entrySet()) {
+                        if (e.getKey().equals(highTypeMachine) || e.getKey().equals(lowTypeMachine) || e.getKey().equals(machineC)) continue;
+                        newMax = Math.max(newMax, e.getValue());
+                        newMin = Math.min(newMin, e.getValue());
+                    }
+                    if (newMax - newMin > loadDiffThreshold) continue;
+
+                    // 执行三方轮换
+                    highSwapAlloc.getTaskAllocations().remove(highTaskToSwap);
+                    allocB.getTaskAllocations().remove(taskY);
+                    allocC.getTaskAllocations().remove(taskZ);
+                    highSwapAlloc.getTaskAllocations().add(taskZ);
+                    allocB.getTaskAllocations().add(highTaskToSwap);
+                    allocC.getTaskAllocations().add(taskY);
+
+                    loadMap.put(highTypeMachine, loadA);
+                    loadMap.put(lowTypeMachine, loadB);
+                    loadMap.put(machineC, loadC);
+                    if (updateContinueLoadMap) {
+                        continueLoadMap.merge(highTypeMachine, -vulcX + vulcZ, Integer::sum);
+                        continueLoadMap.merge(lowTypeMachine, vulcX - vulcY, Integer::sum);
+                        continueLoadMap.merge(machineC, vulcY - vulcZ, Integer::sum);
+                    }
+
+                    // 更新种类集合
+                    Set<String> aTypes = continueTypeMap.get(highTypeMachine);
+                    boolean aStillHasX = highSwapAlloc.getTaskAllocations().stream()
+                            .anyMatch(ta -> embryoX.equals(ta.getEmbryoCode()));
+                    if (!aStillHasX) {
+                        if (aTypes != null) aTypes.remove(embryoX);
+                    }
+                    continueTypeMap.computeIfAbsent(lowTypeMachine, k -> new HashSet<>()).add(embryoX);
+                    boolean bStillHasY = allocB.getTaskAllocations().stream()
+                            .anyMatch(ta -> embryoY.equals(ta.getEmbryoCode()));
+                    if (!bStillHasY) {
+                        Set<String> bTypes = continueTypeMap.get(lowTypeMachine);
+                        if (bTypes != null) bTypes.remove(embryoY);
+                    }
+                    continueTypeMap.computeIfAbsent(machineC, k -> new HashSet<>()).add(embryoY);
+                    boolean cStillHasZ = allocC.getTaskAllocations().stream()
+                            .anyMatch(ta -> embryoZ.equals(ta.getEmbryoCode()));
+                    if (!cStillHasZ) {
+                        Set<String> cTypes = continueTypeMap.get(machineC);
+                        if (cTypes != null) cTypes.remove(embryoZ);
+                    }
+
+                    // 更新 lhMachineCode 集合
+                    updateLhAfterRotation(continueLhMachineCodeMap, highSwapAlloc, highTypeMachine, highTaskToSwap.getLhMachineCode(), lowTypeMachine);
+                    updateLhAfterRotation(continueLhMachineCodeMap, allocB, lowTypeMachine, taskY.getLhMachineCode(), machineC);
+                    updateLhAfterRotation(continueLhMachineCodeMap, allocC, machineC, taskZ.getLhMachineCode(), highTypeMachine);
+
+                    log.info("{}(三方轮换): {}的{}({}台)->{}, {}的{}({}台)->{}, {}的{}({}台)->{}, 负荷: {}/{}/{}",
+                            logPrefix, highTypeMachine, embryoX, vulcX, lowTypeMachine,
+                            lowTypeMachine, embryoY, vulcY, machineC,
+                            machineC, embryoZ, vulcZ, highTypeMachine,
+                            loadA, loadB, loadC);
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
+     * 三方轮换后更新 lhMachineCode 集合。
+     * 从 fromMachine 移走任务后，若该 lhMachineCode 不再被使用则移除；添加到 toMachine。
+     */
+    private void updateLhAfterRotation(
+            Map<String, Set<String>> continueLhMachineCodeMap,
+            MachineAllocationResult fromAlloc, String fromMachine,
+            String movedLhMc, String toMachine) {
+        if (movedLhMc == null || movedLhMc.isEmpty()) {
+            return;
+        }
+        // 检查 fromMachine 是否还有其他任务使用这个 lhMachineCode
+        boolean stillUsed = fromAlloc.getTaskAllocations().stream()
+                .anyMatch(ta -> movedLhMc.equals(ta.getLhMachineCode()));
+        if (!stillUsed) {
+            Set<String> fromLhCodes = continueLhMachineCodeMap.get(fromMachine);
+            if (fromLhCodes != null) {
+                fromLhCodes.remove(movedLhMc);
+            }
+        }
+        // 添加到 toMachine
+        continueLhMachineCodeMap.computeIfAbsent(toMachine, k -> new HashSet<>()).add(movedLhMc);
     }
 }

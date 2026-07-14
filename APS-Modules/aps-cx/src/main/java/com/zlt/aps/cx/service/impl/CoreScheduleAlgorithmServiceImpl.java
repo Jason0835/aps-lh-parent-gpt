@@ -2,9 +2,11 @@ package com.zlt.aps.cx.service.impl;
 
 import com.zlt.aps.cx.api.domain.entity.CxPrecisionPlan;
 import com.zlt.aps.cx.api.domain.entity.CxStock;
+import com.zlt.aps.cx.constant.ScheduleConstants;
 import com.zlt.aps.cx.entity.config.CxParamConfig;
 import com.zlt.aps.cx.entity.config.CxShiftConfig;
 import com.zlt.aps.cx.entity.config.CxEmbryoLhTime;
+import com.zlt.aps.cx.enums.ShiftType;
 import com.zlt.aps.cx.entity.schedule.CxScheduleDetail;
 import com.zlt.aps.cx.entity.schedule.CxScheduleResult;
 import com.zlt.aps.cx.entity.schedule.LhScheduleResult;
@@ -17,13 +19,17 @@ import com.zlt.aps.cx.vo.DailyEmbryoTask;
 import com.zlt.aps.cx.vo.MachineAllocationResult;
 import com.zlt.aps.cx.vo.MonthPlanProductLhCapacityVo;
 import com.zlt.aps.cx.vo.ScheduleContextVo;
-import com.zlt.aps.cx.vo.ShiftAllocationResult;
+import com.zlt.aps.cx.vo.ShiftScheduleResult;
+import com.zlt.aps.cx.vo.ShiftProductionResult;
 import com.zlt.aps.cx.vo.TaskAllocation;
+import com.zlt.aps.cx.vo.TaskAllocationR;
+import com.zlt.aps.cx.vo.TaskDemandSimple;
+import com.zlt.aps.cx.vo.TripRecord;
+import com.zlt.aps.cx.vo.MachineAgg;
 import com.zlt.aps.mp.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.mp.api.domain.entity.MdmMoldingMachine;
 import com.zlt.aps.mp.api.domain.entity.MdmMonthSurplus;
 import com.zlt.aps.mp.api.domain.entity.MdmSkuConstructionRef;
-import com.zlt.aps.mp.api.domain.entity.MdmStructureLhRatio;
 import com.zlt.aps.mp.api.domain.entity.MpCxCapacityConfiguration;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.extern.slf4j.Slf4j;
@@ -85,8 +91,7 @@ import java.util.stream.Collectors;
  * </pre>
  *
  * <h3>日期换算</h3>
- * <p>前端 {@code scheduleDate} 为「中间天」；班次实际日期 =
- * {@code scheduleDate - SCHEDULE_START_OFFSET_DAYS + scheduleDay - 1}。
+ * <p>前端 {@code scheduleDate} 为「中间天」；班次实际日期由 {@link ScheduleDayTypeHelper#calculateShiftDate} 计算。
  *
  * @author APS Team
  * @see ScheduleServiceImpl#executeSchedule
@@ -136,31 +141,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         this.embryoLhTimeMapper = embryoLhTimeMapper;
     }
 
-    /** 默认排程天数 */
-    private static final int DEFAULT_SCHEDULE_DAYS = 3;
-
-    /** 一天总秒数 */
-    private static final int SECONDS_PER_DAY = 24 * 60 * 60;
-
-    /** 秒转小时的除数 */
-    private static final int SECONDS_PER_HOUR = 3600;
-
-    /** 前端 scheduleDate 为中间天时，排产起始日向前偏移天数 */
-    private static final int SCHEDULE_START_OFFSET_DAYS = 1;
-
     private static final int DEFAULT_MAX_TRIAL_SKU_PER_DAY = 2;
-
-    /** 参数编码：同英寸切换耗时（小时） */
-    private static final String PARAM_SAME_INCH_SWITCH_HOURS = "SYS04020004";
-
-    /** 参数编码：不同英寸切换耗时（小时） */
-    private static final String PARAM_DIFF_INCH_SWITCH_HOURS = "SYS04020005";
-
-    /** 默认：同英寸切换耗时（小时） */
-    private static final int DEFAULT_SAME_INCH_SWITCH_HOURS = 2;
-
-    /** 默认：不同英寸切换耗时（小时） */
-    private static final int DEFAULT_DIFF_INCH_SWITCH_HOURS = 8;
 
     /**
      * 执行完整成型排程（实现 {@link CoreScheduleAlgorithmService#executeSchedule}）。
@@ -172,15 +153,15 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
     public List<CxScheduleResult> executeSchedule(ScheduleContextVo context) {
         log.info("开始执行排程算法，日期: {}", context.getScheduleDate());
 
-        // 2.1 预加载工作日历缓存（ScheduleDayTypeHelper，供开停产/停产跳过判定）
+        // 1.1 预加载工作日历缓存（ScheduleDayTypeHelper，供开停产/停产跳过判定）
         LocalDate scheduleDate = context.getScheduleDate();
         String factoryCode = context.getFactoryCode();
-        int scheduleDays = context.getScheduleDays() != null ? context.getScheduleDays() : DEFAULT_SCHEDULE_DAYS;
+        int scheduleDays = context.getScheduleDays() != null ? context.getScheduleDays() : ScheduleConstants.DEFAULT_SCHEDULE_DAYS;
         if (scheduleDate != null) {
             scheduleDayTypeHelper.preloadCache(scheduleDate, scheduleDate.plusDays(scheduleDays - 1), factoryCode);
         }
 
-        // 2.2 获取并排序班次配置（scheduleDay → dayShiftOrder，共约8班次/3天）
+        // 1.2 获取并排序班次配置（scheduleDay → dayShiftOrder，共约8班次/3天）
         List<CxShiftConfig> allShiftConfigs = context.getShiftConfigList();
         if (allShiftConfigs == null || allShiftConfigs.isEmpty()) {
             log.error("班次配置为空，请先调用 buildScheduleContext 加载班次配置");
@@ -192,16 +173,16 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                         .thenComparingInt(c -> c.getDayShiftOrder() != null ? c.getDayShiftOrder() : 0))
                 .collect(Collectors.toList());
 
-        // 2.3 跨班次状态：机台在产胎胚映射（每班次结束后滚动替换，见 2.4.4）
+        // 1.3 跨班次状态：机台在产胎胚映射（每班次结束后滚动替换，见 2.4.4）
         Map<String, Set<String>> machineOnlineEmbryoMap = context.getMachineOnlineEmbryoMap();
         if (machineOnlineEmbryoMap == null) {
             machineOnlineEmbryoMap = new HashMap<>();
         }
 
-        // 2.3.1 收集每个班次的排产结果（全部班次完成后汇总主表/子表）
+        // 1.3.1 收集每个班次的排产结果（全部班次完成后用于汇总主表/子表）
         List<ShiftScheduleResult> shiftResults = new ArrayList<>();
 
-        // 2.3.2 保存初始胎胚库存快照（排程循环中 updateCxStockEntities 会修改 context.getStocks()，
+        // 1.3.2 保存初始胎胚库存快照（排程循环中 updateCxStockEntities 会修改 context.getStocks()，
         //        totalStock 字段需要使用排程前的初始库存，而非排程后的剩余库存）
         Map<String, Integer> initialEmbryoStockMap = new HashMap<>();
         if (context.getStocks() != null) {
@@ -212,7 +193,6 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             }
         }
 
-        Set<Integer> processedDays = new HashSet<>();
         int lastDay = 0;
 
         // 2.4 按班次逐个执行排程（核心循环，顺序=班次1→8，不可并行）
@@ -221,8 +201,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         for (CxShiftConfig shiftConfig : sortedShiftConfigs) {
             shiftIndex++;
             int day = shiftConfig.getScheduleDay();
-            LocalDate currentScheduleDate = context.getScheduleDate()
-                    .minusDays(SCHEDULE_START_OFFSET_DAYS).plusDays(day - 1);
+            LocalDate currentScheduleDate = scheduleDayTypeHelper.calculateShiftDate(context.getScheduleDate(), shiftConfig);
 
             // 2.4.1 停产跳过：整天停产或当前班次停产
             if (scheduleDayTypeHelper.isFullDayStopped(currentScheduleDate, factoryCode)) {
@@ -281,7 +260,6 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             detectEarlyAbandonment(context, shiftResult);
 
             lastDay = day;
-            processedDays.add(day);
         }
 
         // 2.5 汇总多班次结果：机台+胎胚+物料 -> CLASS1~8 主表记录
@@ -379,15 +357,15 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         Map<String, String> machineFutureStructureMap = buildMachineFutureStructureMap(context);
 
         // 4. 读取切换耗时参数
-        int sameInchHours = getIntParamValue(context, PARAM_SAME_INCH_SWITCH_HOURS, DEFAULT_SAME_INCH_SWITCH_HOURS);
-        int diffInchHours = getIntParamValue(context, PARAM_DIFF_INCH_SWITCH_HOURS, DEFAULT_DIFF_INCH_SWITCH_HOURS);
+        int sameInchHours = getIntParamValue(context, ScheduleConstants.PARAM_SAME_INCH_SWITCH_HOURS, ScheduleConstants.DEFAULT_SAME_INCH_SWITCH_HOURS);
+        int diffInchHours = getIntParamValue(context, ScheduleConstants.PARAM_DIFF_INCH_SWITCH_HOURS, ScheduleConstants.DEFAULT_DIFF_INCH_SWITCH_HOURS);
 
         // 5. 收集所有 ShiftProductionResult，按结构分组
         // structureName -> machineCode -> List<SPR>（按班次顺序）
-        Map<String, Map<String, List<ShiftScheduleService.ShiftProductionResult>>> structureMachineSprMap = new LinkedHashMap<>();
+        Map<String, Map<String, List<ShiftProductionResult>>> structureMachineSprMap = new LinkedHashMap<>();
         for (ShiftScheduleResult sr : shiftResults) {
             if (sr.getShiftProductionResults() == null) continue;
-            for (ShiftScheduleService.ShiftProductionResult spr : sr.getShiftProductionResults()) {
+            for (ShiftProductionResult spr : sr.getShiftProductionResults()) {
                 if (spr.getQuantity() == null || spr.getQuantity() <= 0) continue;
                 String structName = spr.getStructureName();
                 String mCode = spr.getMachineCode();
@@ -403,9 +381,9 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
 
         // 6. 遍历每个结构，判定场景并计算最早可供硫化时间
         List<CxEmbryoLhTime> records = new ArrayList<>();
-        for (Map.Entry<String, Map<String, List<ShiftScheduleService.ShiftProductionResult>>> entry : structureMachineSprMap.entrySet()) {
+        for (Map.Entry<String, Map<String, List<ShiftProductionResult>>> entry : structureMachineSprMap.entrySet()) {
             String structureName = entry.getKey();
-            Map<String, List<ShiftScheduleService.ShiftProductionResult>> machineSprMap = entry.getValue();
+            Map<String, List<ShiftProductionResult>> machineSprMap = entry.getValue();
 
             // 判定是否所有机台都收尾
             boolean allFullyEnded = checkAllMachinesFullyEnded(machineSprMap);
@@ -452,20 +430,20 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
      * @param machineSprMap 机台->SPR列表映射
      * @return 所有机台所有胎胚都收尾返回true
      */
-    private boolean checkAllMachinesFullyEnded(Map<String, List<ShiftScheduleService.ShiftProductionResult>> machineSprMap) {
-        for (Map.Entry<String, List<ShiftScheduleService.ShiftProductionResult>> machineEntry : machineSprMap.entrySet()) {
-            List<ShiftScheduleService.ShiftProductionResult> sprList = machineEntry.getValue();
+    private boolean checkAllMachinesFullyEnded(Map<String, List<ShiftProductionResult>> machineSprMap) {
+        for (Map.Entry<String, List<ShiftProductionResult>> machineEntry : machineSprMap.entrySet()) {
+            List<ShiftProductionResult> sprList = machineEntry.getValue();
             if (sprList.isEmpty()) continue;
 
             // 按胎胚分组，每个胎胚取最后一条记录检查 isLastEndingBatch
-            Map<String, ShiftScheduleService.ShiftProductionResult> embryoLastSprMap = new LinkedHashMap<>();
-            for (ShiftScheduleService.ShiftProductionResult spr : sprList) {
+            Map<String, ShiftProductionResult> embryoLastSprMap = new LinkedHashMap<>();
+            for (ShiftProductionResult spr : sprList) {
                 String embryoCode = spr.getEmbryoCode();
                 if (embryoCode != null) {
                     embryoLastSprMap.put(embryoCode, spr); // 后出现的覆盖前面的，保留最后一条
                 }
             }
-            for (ShiftScheduleService.ShiftProductionResult lastSpr : embryoLastSprMap.values()) {
+            for (ShiftProductionResult lastSpr : embryoLastSprMap.values()) {
                 if (!Boolean.TRUE.equals(lastSpr.getIsLastEndingBatch())) {
                     return false;
                 }
@@ -481,7 +459,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
      */
     private CxEmbryoLhTime processScenario1(
             String structureName,
-            Map<String, List<ShiftScheduleService.ShiftProductionResult>> machineSprMap,
+            Map<String, List<ShiftProductionResult>> machineSprMap,
             ScheduleContextVo context,
             Map<String, MdmMaterialInfo> materialByEmbryoMap,
             Map<String, MdmMaterialInfo> materialByCodeMap,
@@ -492,9 +470,9 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         // 1. 取所有机台中最晚的 planEndTime，并记录对应机台
         LocalDateTime latestEndTime = null;
         String latestMachineCode = null;
-        for (Map.Entry<String, List<ShiftScheduleService.ShiftProductionResult>> machineEntry : machineSprMap.entrySet()) {
+        for (Map.Entry<String, List<ShiftProductionResult>> machineEntry : machineSprMap.entrySet()) {
             String machineCode = machineEntry.getKey();
-            for (ShiftScheduleService.ShiftProductionResult spr : machineEntry.getValue()) {
+            for (ShiftProductionResult spr : machineEntry.getValue()) {
                 if (spr.getPlanEndTime() != null) {
                     if (latestEndTime == null || spr.getPlanEndTime().isAfter(latestEndTime)) {
                         latestEndTime = spr.getPlanEndTime();
@@ -542,7 +520,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
      */
     private CxEmbryoLhTime processScenario2(
             String structureName,
-            Map<String, List<ShiftScheduleService.ShiftProductionResult>> machineSprMap,
+            Map<String, List<ShiftProductionResult>> machineSprMap,
             ScheduleContextVo context,
             Map<String, MdmMaterialInfo> materialByEmbryoMap,
             Map<String, MdmMaterialInfo> materialByCodeMap,
@@ -554,8 +532,8 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
 
         // 1. 汇总该结构所有机台8班次计划量
         int totalProduction = 0;
-        for (List<ShiftScheduleService.ShiftProductionResult> sprList : machineSprMap.values()) {
-            for (ShiftScheduleService.ShiftProductionResult spr : sprList) {
+        for (List<ShiftProductionResult> sprList : machineSprMap.values()) {
+            for (ShiftProductionResult spr : sprList) {
                 if (spr.getQuantity() != null) {
                     totalProduction += spr.getQuantity();
                 }
@@ -592,8 +570,8 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
 
         // 6. 取该班次的结束时间
         CxShiftConfig targetShiftConfig = sortedShiftConfigs.get(targetShiftIndex - 1);
-        LocalDate shiftDate = calculateShiftDate(context.getScheduleDate(), targetShiftConfig);
-        LocalDateTime shiftEndTime = calculateShiftEndTimeLocal(targetShiftConfig, shiftDate);
+        LocalDate shiftDate = scheduleDayTypeHelper.calculateShiftDate(context.getScheduleDate(), targetShiftConfig);
+        LocalDateTime shiftEndTime = scheduleDayTypeHelper.calculateShiftEndTimeLocal(targetShiftConfig, shiftDate);
         if (shiftEndTime == null) {
             log.warn("场景2：结构 {} 无法计算班次 {} 的结束时间，跳过", structureName, targetShiftConfig.getShiftCode());
             return null;
@@ -613,7 +591,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         // 9. earliestLhTime = 班次结束时间 + 切换耗时
         LocalDateTime earliestLhTime = shiftEndTime.plusHours(switchHours);
 
-        // 10. 记录机台（取该结构下任一机台，优先取有未来结构配置的机台）
+        // 10. 记录机台（取该结构下任意一个机台，优先取有未来结构配置的机台）
         String recordMachineCode = null;
         for (String mCode : machineSprMap.keySet()) {
             if (recordMachineCode == null) {
@@ -644,7 +622,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
      * 查找后结构：优先从排程结果中找（同机台后续出现的其他结构），回退到未来结构配置。
      */
     private String findNextStructure(String prevStructureName,
-                                     Map<String, List<ShiftScheduleService.ShiftProductionResult>> machineSprMap,
+                                     Map<String, List<ShiftProductionResult>> machineSprMap,
                                      ScheduleContextVo context,
                                      Map<String, String> machineFutureStructureMap) {
         // 1. 从排程结果中找：同机台后续出现的其他结构
@@ -664,7 +642,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
      */
     private String findFutureStructureForStructure(String structureName,
                                                    Map<String, String> machineFutureStructureMap,
-                                                   Map<String, List<ShiftScheduleService.ShiftProductionResult>> machineSprMap) {
+                                                   Map<String, List<ShiftProductionResult>> machineSprMap) {
         for (String machineCode : machineSprMap.keySet()) {
             String futureStruct = machineFutureStructureMap.get(machineCode);
             if (futureStruct != null && !futureStruct.equals(structureName)) {
@@ -692,7 +670,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
     }
 
     /**
-     * 查找结构的英寸（proSize）：从物料主数据中找该结构任一物料的 proSize。
+     * 查找结构的英寸（proSize）：从物料主数据中找该结构任意一个物料的 proSize。
      */
     private String findStructureProSize(String structureName,
                                         ScheduleContextVo context,
@@ -748,32 +726,6 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             }
         }
         return result;
-    }
-
-    /**
-     * 计算班次实际日期。
-     * <p>scheduleDate 为中间天，班次实际日期 = scheduleDate - 1 + scheduleDay - 1。
-     */
-    private LocalDate calculateShiftDate(LocalDate scheduleDate, CxShiftConfig shiftConfig) {
-        if (scheduleDate == null || shiftConfig.getScheduleDay() == null) {
-            return scheduleDate;
-        }
-        return scheduleDate.minusDays(SCHEDULE_START_OFFSET_DAYS).plusDays(shiftConfig.getScheduleDay() - 1);
-    }
-
-    /**
-     * 计算班次结束时间（LocalDateTime）。
-     * <p>IS_CROSS_DAY=1 时结束日期 +1 天。
-     */
-    private LocalDateTime calculateShiftEndTimeLocal(CxShiftConfig shiftConfig, LocalDate shiftDate) {
-        if (shiftConfig.getShiftEndTime() == null) {
-            return null;
-        }
-        LocalDateTime endTime = LocalDateTime.of(shiftDate, shiftConfig.getShiftEndTime());
-        if (shiftConfig.getIsCrossDay() != null && shiftConfig.getIsCrossDay() == 1) {
-            endTime = endTime.plusDays(1);
-        }
-        return endTime;
     }
 
     /**
@@ -877,7 +829,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         applyPrecisionPlanSelection(context, scheduleDate, shiftConfig, allAllocations);
 
         // 5.3.7 班次精排（逐机台逐任务调用 ShiftScheduleService.scheduleTaskToShifts）
-        List<ShiftScheduleService.ShiftProductionResult> shiftProductionResults = new ArrayList<>();
+        List<ShiftProductionResult> shiftProductionResults = new ArrayList<>();
 
         for (MachineAllocationResult allocation : allAllocations) {
             String machineCode = allocation.getMachineCode();
@@ -908,12 +860,12 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                 task.setIsClosingDayTask(taskAlloc.getIsClosingDayTask());
                 if (task.getIsOpeningDayTask() == null || task.getIsClosingDayTask() == null) {
                     int shiftOrder = shiftConfig.getDayShiftOrder() != null ? shiftConfig.getDayShiftOrder() : 1;
-                    ScheduleDayTypeHelper.ShiftType shiftType = scheduleDayTypeHelper.determineShiftType(scheduleDate, shiftOrder, factoryCode);
+                    ShiftType shiftType = scheduleDayTypeHelper.determineShiftType(scheduleDate, shiftOrder, factoryCode);
                     if (task.getIsOpeningDayTask() == null) {
-                        task.setIsOpeningDayTask(shiftType == ScheduleDayTypeHelper.ShiftType.OPEN_START);
+                        task.setIsOpeningDayTask(shiftType == ShiftType.OPEN_START);
                     }
                     if (task.getIsClosingDayTask() == null) {
-                        task.setIsClosingDayTask(shiftType == ScheduleDayTypeHelper.ShiftType.CLOSED);
+                        task.setIsClosingDayTask(shiftType == ShiftType.CLOSED);
                     }
                 }
                 task.setStockHours(taskAlloc.getStockHours());
@@ -946,7 +898,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                         String.format("%.1f", taskAlloc.getStockHours()),
                         task.getVulcanizeMachineCount() != null ? task.getVulcanizeMachineCount() : 0);
 
-                List<ShiftScheduleService.ShiftProductionResult> taskShiftResults =
+                List<ShiftProductionResult> taskShiftResults =
                         shiftScheduleService.scheduleTaskToShifts(task, machineCode, context, singleShiftList, scheduleDate);
                 shiftProductionResults.addAll(taskShiftResults);
             }
@@ -955,7 +907,6 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
 
         // 注意：精度计划扣量和班次量均衡在 executeSchedule 主流程的 L193-197 统一调用
         // 这里每个班次独立排程，不需要额外处理
-
         // 封装该班次排产结果
         ShiftScheduleResult shiftResult = new ShiftScheduleResult();
         shiftResult.setDay(day);
@@ -1443,46 +1394,6 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         }
     }
 
-    /**
-     * 机台维度聚合（均衡算法内部使用）。
-     *
-     * <p>{@code actualQty} / {@code load} 包含该机台该结构下的<b>所有</b>任务（含试制/收尾），
-     * 用于计算合理量和跨班次比较；{@code eligibleQty} / {@code embryoTaskMap} 仅含可参与调拨的任务。
-     */
-    private static class MachineAgg {
-        /** 机台编码 */
-        final String machineCode;
-        /** 实际排量（条，含所有任务） */
-        int actualQty;
-        /** 硫化机台数（负荷，含所有任务） */
-        int load;
-        /** 合理量（条，整车对齐） */
-        int reasonable;
-        /** 调拨目标（条）= 合理量钳制到跨班次合法区间，无历史时=合理量 */
-        int target;
-        /** 跨班次合法区间下界（条），hasHistory=true 时有效 */
-        int validLow;
-        /** 跨班次合法区间上界（条），hasHistory=true 时有效 */
-        int validHigh;
-        /** 是否有可比较的历史班次（同机台+同结构+同负荷） */
-        boolean hasHistory;
-        /** 历史中是否存在该机台+结构（负荷可能不同），用于判断负荷是否变化 */
-        boolean historyExisted;
-        /** 可参与调拨任务的总排量（条，排除试制/量试/收尾） */
-        int eligibleQty;
-        /** 该机台可参与任务中最小 stockHours（代表值） */
-        BigDecimal minStockHours;
-        /** 该机台可参与任务中最大 stockHours */
-        BigDecimal maxStockHours;
-        /** 可参与任务列表 */
-        final List<TaskAllocation> eligibleTasks = new ArrayList<>();
-        /** 胎胚编码 -> 可参与任务（同胎胚取首条） */
-        final Map<String, TaskAllocation> embryoTaskMap = new LinkedHashMap<>();
-
-        MachineAgg(String machineCode) {
-            this.machineCode = machineCode;
-        }
-    }
 
     /**
      * 单日试制/量试 SKU 上限与周日约束（直接修改 taskGroup 三个列表）。
@@ -1607,7 +1518,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         }
 
         // 精度计划只能安排在早班（06:00开始），夜班和中班不执行
-        boolean isMorningShift = isMorningShift(shiftConfig);
+        boolean isMorningShift = scheduleDayTypeHelper.isMorningShift(shiftConfig);
         if (!isMorningShift) {
             log.info("精度计划跳过: 当前班次{}不是早班，精度计划只安排在早班",
                     shiftConfig.getShiftCode());
@@ -1829,7 +1740,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         Map<Long, LhScheduleResult> lhResultCache = buildLhResultIdMap(context);
         Map<String, Integer> materialStockMap = context.getMaterialStockMap();
 
-        int classIndex = parseClassIndex(shiftConfig);
+        int classIndex = productionCalculator.parseClassIndex(shiftConfig);
         log.info("精度扣量硫化联动: 机台={}, lhResultCache大小={}, classIndex={}",
                 machineCode, lhResultCache.size(), classIndex);
         Set<LhScheduleResult> modifiedLhResults = new HashSet<>();
@@ -1886,8 +1797,8 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             if (totalAvailable < currentClassPlan) {
                 String precisionNote = String.format("成型精度影响: 库存%d+产量%d=%d<硫化计划%d, 缺口%d条",
                         stock, newQty, totalAvailable, currentClassPlan, currentClassPlan - totalAvailable);
-                appendClassAnalysisByIndex(lhResult, classIndex, precisionNote);
-                setClassPlanQtyByIndex(lhResult, classIndex, totalAvailable);
+                productionCalculator.appendClassAnalysisByIndex(lhResult, classIndex, precisionNote);
+                productionCalculator.setClassPlanQtyByIndex(lhResult, classIndex, totalAvailable);
                 modifiedLhResults.add(lhResult);
                 log.info("  硫化联动写入原因分析+更新计划量: 胎胚={}, lhId={}, CLASS{}硫化计划{}→{}, 库存={}+扣后产量={}={}, 缺口={}条, 原因={}",
                         taskAlloc.getEmbryoCode(), lhId, classIndex,
@@ -1925,56 +1836,11 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         return map;
     }
 
-    private int parseClassIndex(CxShiftConfig shiftConfig) {
-        if (shiftConfig == null || shiftConfig.getClassField() == null) {
-            return 0;
-        }
-        String cf = shiftConfig.getClassField();
-        if (cf.startsWith("CLASS")) {
-            try {
-                return Integer.parseInt(cf.substring(5));
-            } catch (NumberFormatException ignored) {
-            }
-        }
-        return 0;
-    }
+    // parseClassIndex 已移至 ProductionCalculator
 
-    private void setClassPlanQtyByIndex(LhScheduleResult lhResult, int classIndex, int value) {
-        switch (classIndex) {
-            case 1: lhResult.setClass1PlanQty(value); break;
-            case 2: lhResult.setClass2PlanQty(value); break;
-            case 3: lhResult.setClass3PlanQty(value); break;
-            case 4: lhResult.setClass4PlanQty(value); break;
-            case 5: lhResult.setClass5PlanQty(value); break;
-            case 6: lhResult.setClass6PlanQty(value); break;
-            case 7: lhResult.setClass7PlanQty(value); break;
-            case 8: lhResult.setClass8PlanQty(value); break;
-            default: break;
-        }
-    }
+    // setClassPlanQtyByIndex 已移至 ProductionCalculator
 
-    private void appendClassAnalysisByIndex(LhScheduleResult lhResult, int classIndex, String text) {
-        String original;
-        switch (classIndex) {
-            case 1: original = lhResult.getClass1Analysis();
-                lhResult.setClass1Analysis(original != null && !original.isEmpty() ? original + "," + text : text); break;
-            case 2: original = lhResult.getClass2Analysis();
-                lhResult.setClass2Analysis(original != null && !original.isEmpty() ? original + "," + text : text); break;
-            case 3: original = lhResult.getClass3Analysis();
-                lhResult.setClass3Analysis(original != null && !original.isEmpty() ? original + "," + text : text); break;
-            case 4: original = lhResult.getClass4Analysis();
-                lhResult.setClass4Analysis(original != null && !original.isEmpty() ? original + "," + text : text); break;
-            case 5: original = lhResult.getClass5Analysis();
-                lhResult.setClass5Analysis(original != null && !original.isEmpty() ? original + "," + text : text); break;
-            case 6: original = lhResult.getClass6Analysis();
-                lhResult.setClass6Analysis(original != null && !original.isEmpty() ? original + "," + text : text); break;
-            case 7: original = lhResult.getClass7Analysis();
-                lhResult.setClass7Analysis(original != null && !original.isEmpty() ? original + "," + text : text); break;
-            case 8: original = lhResult.getClass8Analysis();
-                lhResult.setClass8Analysis(original != null && !original.isEmpty() ? original + "," + text : text); break;
-            default: break;
-        }
-    }
+    // appendClassAnalysisByIndex 已移至 ProductionCalculator
 
 
     /**
@@ -2058,39 +1924,6 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         return sb.toString();
     }
 
-    /**
-     * 单班次排产结果容器 — {@link #executeShiftSchedule} 返回值，供 2.5～2.7 汇总。
-     *
-     * <p>{@code materialStockSnapshot}：本班精排<b>前</b>的 lhId→库存分配快照，
-     * 子表 stockHours 按班独立计算，避免跨班滚动污染。
-     */
-    public static class ShiftScheduleResult {
-        /** 排产日（1-3），与 CxShiftConfig.scheduleDay 对应 */
-        private int day;
-        /** 排产日期 */
-        private LocalDate scheduleDate;
-        /** 该班次的班次配置 */
-        private CxShiftConfig shiftConfig;
-        /** 该班次所有机台的任务分配结果（包含续作/新任务/试制任务分配） */
-        private List<MachineAllocationResult> allAllocations;
-        /** 该班次的精排结果（包含班次级别的车数/数量） */
-        private List<ShiftScheduleService.ShiftProductionResult> shiftProductionResults;
-        /** 该班次排程前的 materialStockMap 快照（lhId → 分配库存），用于子表 stockHours 计算 */
-        private Map<String, Integer> materialStockSnapshot;
-
-        public int getDay() { return day; }
-        public void setDay(int day) { this.day = day; }
-        public LocalDate getScheduleDate() { return scheduleDate; }
-        public void setScheduleDate(LocalDate scheduleDate) { this.scheduleDate = scheduleDate; }
-        public CxShiftConfig getShiftConfig() { return shiftConfig; }
-        public void setShiftConfig(CxShiftConfig shiftConfig) { this.shiftConfig = shiftConfig; }
-        public List<MachineAllocationResult> getAllAllocations() { return allAllocations; }
-        public void setAllAllocations(List<MachineAllocationResult> allAllocations) { this.allAllocations = allAllocations; }
-        public List<ShiftScheduleService.ShiftProductionResult> getShiftProductionResults() { return shiftProductionResults; }
-        public void setShiftProductionResults(List<ShiftScheduleService.ShiftProductionResult> shiftProductionResults) { this.shiftProductionResults = shiftProductionResults; }
-        public Map<String, Integer> getMaterialStockSnapshot() { return materialStockSnapshot; }
-        public void setMaterialStockSnapshot(Map<String, Integer> materialStockSnapshot) { this.materialStockSnapshot = materialStockSnapshot; }
-    }
 
     // ==================== 2.5 主表汇总（机台+胎胚+物料 → CLASS1~8） ====================
 
@@ -2114,7 +1947,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         }
 
         // 2.5.1 按 机台|胎胚|施工阶段 三维汇总班次排量（同 CLASS 合并 quantity）
-        Map<String, Map<String, ShiftScheduleService.ShiftProductionResult>> taskClassSprMap = new LinkedHashMap<>();
+        Map<String, Map<String, ShiftProductionResult>> taskClassSprMap = new LinkedHashMap<>();
         Map<String, Integer> taskTotalQtyMap = new LinkedHashMap<>();
         Map<String, String> taskStructureMap = new LinkedHashMap<>();
         Map<String, List<Long>> taskLhIdListMap = new LinkedHashMap<>();
@@ -2138,7 +1971,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                     shiftResult.getShiftConfig() != null ? shiftResult.getShiftConfig().getShiftCode() : null,
                     shiftResult.getShiftProductionResults() != null ? shiftResult.getShiftProductionResults().size() : 0);
 
-            for (ShiftScheduleService.ShiftProductionResult spr : shiftResult.getShiftProductionResults()) {
+            for (ShiftProductionResult spr : shiftResult.getShiftProductionResults()) {
                 String machineCode = spr.getMachineCode();
                 String embryoCode = spr.getEmbryoCode();
                 String materialCode = spr.getMaterialCode() != null ? spr.getMaterialCode() : "";
@@ -2179,7 +2012,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                                 spr.setEndingMaterialCodes(endingMats);
                                 return spr;
                             }
-                            ShiftScheduleService.ShiftProductionResult merged = new ShiftScheduleService.ShiftProductionResult();
+                            ShiftProductionResult merged = new ShiftProductionResult();
                             merged.setMachineCode(existing.getMachineCode());
                             merged.setEmbryoCode(existing.getEmbryoCode());
                             merged.setMaterialCode(existing.getMaterialCode());
@@ -2377,7 +2210,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         {
             // 1. 收集每个机台每个结构的最早有产量班次序号
             Map<String, Map<String, Integer>> machineStructEarliestClass = new LinkedHashMap<>();
-            for (Map.Entry<String, Map<String, ShiftScheduleService.ShiftProductionResult>> e : taskClassSprMap.entrySet()) {
+            for (Map.Entry<String, Map<String, ShiftProductionResult>> e : taskClassSprMap.entrySet()) {
                 String[] kParts = e.getKey().split("\\|", 3);
                 String mCode = kParts[0];
                 String structName = taskStructureMap.get(e.getKey());
@@ -2385,10 +2218,10 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                     continue;
                 }
                 int earliestClass = Integer.MAX_VALUE;
-                for (Map.Entry<String, ShiftScheduleService.ShiftProductionResult> ce : e.getValue().entrySet()) {
-                    ShiftScheduleService.ShiftProductionResult spr = ce.getValue();
+                for (Map.Entry<String, ShiftProductionResult> ce : e.getValue().entrySet()) {
+                    ShiftProductionResult spr = ce.getValue();
                     if (spr != null && spr.getQuantity() != null && spr.getQuantity() > 0) {
-                        int classNum = extractClassNumber(ce.getKey());
+                        int classNum = productionCalculator.parseClassIndex(ce.getKey());
                         if (classNum > 0 && classNum < earliestClass) {
                             earliestClass = classNum;
                         }
@@ -2416,9 +2249,9 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             log.info("新开规格预计算完成: newSpecKeys={}", newSpecKeys);
         }
 
-        for (Map.Entry<String, Map<String, ShiftScheduleService.ShiftProductionResult>> entry : taskClassSprMap.entrySet()) {
+        for (Map.Entry<String, Map<String, ShiftProductionResult>> entry : taskClassSprMap.entrySet()) {
             String taskKey = entry.getKey();
-            Map<String, ShiftScheduleService.ShiftProductionResult> classSprMap = entry.getValue();
+            Map<String, ShiftProductionResult> classSprMap = entry.getValue();
 
             String[] parts = taskKey.split("\\|", 3);
             String machineCode = parts[0];
@@ -2611,7 +2444,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             log.info("开始遍历classSprMap.values()设置颜色标记: machineCode={}, embryoCode={}, materialCode={}, classSprMap.size={}",
                     machineCode, embryoCode, materialCode, classSprMap.size());
             int sprIndex = 0;
-            for (ShiftScheduleService.ShiftProductionResult spr : classSprMap.values()) {
+            for (ShiftProductionResult spr : classSprMap.values()) {
                 sprIndex++;
                 if (spr == null) {
                     continue;
@@ -2667,8 +2500,8 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
 
             // ---- 找到第一个有排量的班次（头班），"新增"文本仅在头班标识 ----
             String firstProductiveClass = null;
-            for (Map.Entry<String, ShiftScheduleService.ShiftProductionResult> classEntry : classSprMap.entrySet()) {
-                ShiftScheduleService.ShiftProductionResult spr = classEntry.getValue();
+            for (Map.Entry<String, ShiftProductionResult> classEntry : classSprMap.entrySet()) {
+                ShiftProductionResult spr = classEntry.getValue();
                 if (spr != null && spr.getQuantity() != null && spr.getQuantity() > 0) {
                     firstProductiveClass = classEntry.getKey();
                     break;
@@ -2676,7 +2509,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             }
 
             // ---- 映射班次排量到 CLASS1~8 ----
-            for (Map.Entry<String, ShiftScheduleService.ShiftProductionResult> classEntry : classSprMap.entrySet()) {
+            for (Map.Entry<String, ShiftProductionResult> classEntry : classSprMap.entrySet()) {
                 boolean isFirstProductive = classEntry.getKey().equals(firstProductiveClass);
                 setClassFieldValue(result, classEntry.getKey(), classEntry.getValue(), primaryLh, recipeType, newSpecKeys, isFirstProductive);
             }
@@ -2749,10 +2582,10 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             // ---- 合并步骤：按 机台+胎胚+施工阶段 汇总当班排产量（同主表merge逻辑）----
             // mergeKey = machineCode|embryoCode|constructionStage（剔除物料编码维度）
             // 同时收集每个合并组的 lhId 列表（用于查询模数、日硫化量、分配库存、硫化消耗）
-            Map<String, ShiftScheduleService.ShiftProductionResult> mergedSprMap = new LinkedHashMap<>();
+            Map<String, ShiftProductionResult> mergedSprMap = new LinkedHashMap<>();
             Map<String, List<Long>> mergeKeyLhIdMap = new HashMap<>();
 
-            for (ShiftScheduleService.ShiftProductionResult spr : shiftResult.getShiftProductionResults()) {
+            for (ShiftProductionResult spr : shiftResult.getShiftProductionResults()) {
                 if (spr.getQuantity() == null || spr.getQuantity() <= 0) continue;
 
                 String mCode = spr.getMachineCode();
@@ -2766,7 +2599,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                             .add(spr.getSourceTask().getLhId());
                 }
 
-                ShiftScheduleService.ShiftProductionResult existing = mergedSprMap.get(mergeKey);
+                ShiftProductionResult existing = mergedSprMap.get(mergeKey);
                 if (existing == null) {
                     mergedSprMap.put(mergeKey, spr);
                 } else {
@@ -2792,7 +2625,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             }
 
             // ---- 从合并后的排产结果生成车次 ----
-            for (ShiftScheduleService.ShiftProductionResult spr : mergedSprMap.values()) {
+            for (ShiftProductionResult spr : mergedSprMap.values()) {
                 String embryoCode = spr.getEmbryoCode();
                 String materialCode = spr.getMaterialCode() != null ? spr.getMaterialCode() : "";
                 String constructionStage = spr.getConstructionStage() != null ? spr.getConstructionStage() : "";
@@ -2809,7 +2642,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                 if (classField == null) {
                     classField = shiftToClassField.getOrDefault(spr.getShiftCode(), spr.getShiftCode());
                 }
-                int vulcanizeClassIndex = getClassIndex(classField);
+                int vulcanizeClassIndex = productionCalculator.parseClassIndex(classField);
 
                 int totalMoldQty = 0;
                 int totalAllocatedStock = 0;
@@ -2850,7 +2683,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
 
                 // 单胎单模时长(秒) = 86400 / 平均日硫化量(单模)
                 double singleTireMoldSeconds = avgSingleMoldDailyCap > 0
-                        ? (double) SECONDS_PER_DAY / avgSingleMoldDailyCap : 0;
+                        ? (double) ScheduleConstants.SECONDS_PER_DAY / avgSingleMoldDailyCap : 0;
 
                 // 获取小时产能（用于车次时间计算）
                 int hourlyCapacity = 12;
@@ -2859,7 +2692,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                     if (task.getHourCapacity() != null && task.getHourCapacity() > 0) {
                         hourlyCapacity = task.getHourCapacity();
                     } else {
-                        hourlyCapacity = calculateHourlyCapacity(
+                        hourlyCapacity = productionCalculator.calculateHourlyCapacity(
                                 spr.getMachineCode(), materialCode, task.getStructureName(), context);
                     }
                 }
@@ -2890,7 +2723,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                     double stockHours = 0;
                     if (totalMoldQty > 0 && singleTireMoldSeconds > 0) {
                         stockHours = (double) projectedStock * singleTireMoldSeconds
-                                / SECONDS_PER_HOUR / totalMoldQty;
+                                / ScheduleConstants.SECONDS_PER_HOUR / totalMoldQty;
                     }
 
                     // 计算车次时间
@@ -3108,61 +2941,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         }
     }
 
-    /**
-     * 内部类：车次记录（用于计算顺位）
-     */
-    private static class TripRecord {
-        private String embryoCode;
-        private String materialCode;
-        private String machineCode;
-        private int day;
-        private String shiftCode;
-        private String classField;
-        private int tripNo;
-        private int tripCapacity;
-        private int planQty;
-        private BigDecimal stockHours;
-        private LocalDateTime planStartTime;
-        private LocalDateTime planEndTime;
-        private boolean isTrialTask;
-        private boolean isEndingTask;
-        private int vulcanizeMachineCount;
-        private int sequence;
-
-        // getters and setters
-        public String getEmbryoCode() { return embryoCode; }
-        public void setEmbryoCode(String embryoCode) { this.embryoCode = embryoCode; }
-        public String getMaterialCode() { return materialCode; }
-        public void setMaterialCode(String materialCode) { this.materialCode = materialCode; }
-        public String getMachineCode() { return machineCode; }
-        public void setMachineCode(String machineCode) { this.machineCode = machineCode; }
-        public int getDay() { return day; }
-        public void setDay(int day) { this.day = day; }
-        public String getShiftCode() { return shiftCode; }
-        public void setShiftCode(String shiftCode) { this.shiftCode = shiftCode; }
-        public String getClassField() { return classField; }
-        public void setClassField(String classField) { this.classField = classField; }
-        public int getTripNo() { return tripNo; }
-        public void setTripNo(int tripNo) { this.tripNo = tripNo; }
-        public int getTripCapacity() { return tripCapacity; }
-        public void setTripCapacity(int tripCapacity) { this.tripCapacity = tripCapacity; }
-        public int getPlanQty() { return planQty; }
-        public void setPlanQty(int planQty) { this.planQty = planQty; }
-        public BigDecimal getStockHours() { return stockHours; }
-        public void setStockHours(BigDecimal stockHours) { this.stockHours = stockHours; }
-        public LocalDateTime getPlanStartTime() { return planStartTime; }
-        public void setPlanStartTime(LocalDateTime planStartTime) { this.planStartTime = planStartTime; }
-        public LocalDateTime getPlanEndTime() { return planEndTime; }
-        public void setPlanEndTime(LocalDateTime planEndTime) { this.planEndTime = planEndTime; }
-        public boolean getIsTrialTask() { return isTrialTask; }
-        public void setIsTrialTask(boolean isTrialTask) { this.isTrialTask = isTrialTask; }
-        public boolean getIsEndingTask() { return isEndingTask; }
-        public void setIsEndingTask(boolean isEndingTask) { this.isEndingTask = isEndingTask; }
-        public int getVulcanizeMachineCount() { return vulcanizeMachineCount; }
-        public void setVulcanizeMachineCount(int vulcanizeMachineCount) { this.vulcanizeMachineCount = vulcanizeMachineCount; }
-        public int getSequence() { return sequence; }
-        public void setSequence(int sequence) { this.sequence = sequence; }
-    }
+    // TripRecord 已移至 com.zlt.aps.cx.vo.TripRecord
 
     /**
      * 解析示方书类型：将 constructionStage 映射为 trialStatus 后从SKU关系匹配
@@ -3255,7 +3034,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
      * @param newSpecKeys 新开规格集合（透传给 buildTaskAnalysis）
      * @param isFirstProductive 是否为第一个有排量的班次（头班）
      */
-    private void setClassFieldValue(CxScheduleResult result, String classField, ShiftScheduleService.ShiftProductionResult spr,
+    private void setClassFieldValue(CxScheduleResult result, String classField, ShiftProductionResult spr,
                                     LhScheduleResult primaryLh, String recipeType, Set<String> newSpecKeys,
                                     boolean isFirstProductive) {
         if (classField == null || spr == null) {
@@ -3355,11 +3134,11 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
      * 有产量的班次（CLASS索引最大者），清除其他班次的收尾标记。
      */
     private void fixEndingFlagsPerClass(
-            Map<String, Map<String, ShiftScheduleService.ShiftProductionResult>> taskClassSprMap) {
+            Map<String, Map<String, ShiftProductionResult>> taskClassSprMap) {
         if (taskClassSprMap == null) return;
 
-        for (Map.Entry<String, Map<String, ShiftScheduleService.ShiftProductionResult>> entry : taskClassSprMap.entrySet()) {
-            Map<String, ShiftScheduleService.ShiftProductionResult> classSprMap = entry.getValue();
+        for (Map.Entry<String, Map<String, ShiftProductionResult>> entry : taskClassSprMap.entrySet()) {
+            Map<String, ShiftProductionResult> classSprMap = entry.getValue();
             if (classSprMap == null || classSprMap.isEmpty()) continue;
 
             // 找出最后一个有产量（quantity > 0）的 CLASS
@@ -3367,7 +3146,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             int lastClassIndex = -1;
             for (int i = 1; i <= 8; i++) {
                 String classField = "CLASS" + i;
-                ShiftScheduleService.ShiftProductionResult spr = classSprMap.get(classField);
+                ShiftProductionResult spr = classSprMap.get(classField);
                 if (spr != null && spr.getQuantity() != null && spr.getQuantity() > 0) {
                     lastEndingClass = classField;
                     lastClassIndex = i;
@@ -3377,9 +3156,9 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             if (lastEndingClass == null) continue;
 
             // 清除非最后班次的收尾标记
-            for (Map.Entry<String, ShiftScheduleService.ShiftProductionResult> classEntry : classSprMap.entrySet()) {
+            for (Map.Entry<String, ShiftProductionResult> classEntry : classSprMap.entrySet()) {
                 if (classEntry.getKey().equals(lastEndingClass)) continue;
-                ShiftScheduleService.ShiftProductionResult spr = classEntry.getValue();
+                ShiftProductionResult spr = classEntry.getValue();
                 if (spr != null) {
                     spr.setIsEndingTask(false);
                     spr.setIsLastEndingBatch(false);
@@ -3395,7 +3174,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
      * 判断班次排产结果是否为收尾任务
      * <p>检查 isLastEndingBatch、isEndingTask、endingAbandoned 等标记
      */
-    private boolean isSprEnding(ShiftScheduleService.ShiftProductionResult spr) {
+    private boolean isSprEnding(ShiftProductionResult spr) {
         if (spr == null) return false;
         boolean isLastEndingBatch = Boolean.TRUE.equals(spr.getIsLastEndingBatch());
         boolean isEndingTask = Boolean.TRUE.equals(spr.getIsEndingTask());
@@ -3414,20 +3193,6 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
     }
 
     /**
-     * 从班次字段名提取班次序号
-     * <p>例如 "CLASS1" → 1, "CLASS8" → 8, 无法解析返回 0
-     */
-    private int extractClassNumber(String classField) {
-        if (classField == null) return 0;
-        String num = classField.replaceAll("[^0-9]", "");
-        try {
-            return Integer.parseInt(num);
-        } catch (NumberFormatException e) {
-            return 0;
-        }
-    }
-
-    /**
      * 构建任务原因分析字符串
      * <p>根据任务类型组合原因标记，多个原因用逗号分隔
      *
@@ -3435,7 +3200,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
      * @param newSpecKeys 新开规格集合（machineCode|structureName），同机台2+种结构时后结构为新开规格
      * @param isFirstProductive 是否为第一个有排量的班次（头班），"新增"仅在头班标识
      */
-    private String buildTaskAnalysis(ShiftScheduleService.ShiftProductionResult spr, Set<String> newSpecKeys,
+    private String buildTaskAnalysis(ShiftProductionResult spr, Set<String> newSpecKeys,
                                      boolean isFirstProductive) {
         if (spr == null) {
             return null;
@@ -3512,7 +3277,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             List<MachineAllocationResult> shiftAllocations,
             List<CxShiftConfig> shiftConfigs,
             CxShiftConfig currentShiftConfig,
-            List<ShiftScheduleService.ShiftProductionResult> shiftProductionResults) {
+            List<ShiftProductionResult> shiftProductionResults) {
         // 直接复用 updateContextForNextDay 逻辑，它已经按班次配置计算硫化消耗
         updateContextForNextDay(context, shiftAllocations, shiftConfigs, currentShiftConfig, shiftProductionResults);
     }
@@ -3535,7 +3300,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             List<MachineAllocationResult> dayAllocations,
             List<CxShiftConfig> dayShifts,
             CxShiftConfig currentShiftConfig,
-            List<ShiftScheduleService.ShiftProductionResult> shiftProductionResults) {
+            List<ShiftProductionResult> shiftProductionResults) {
 
         LocalDate scheduleDate = context.getCurrentScheduleDate();
         int currentDay = context.getCurrentScheduleDay();
@@ -3618,7 +3383,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
     private Map<String, Integer> calculateFormingOutputByEmbryo(List<MachineAllocationResult> dayAllocations,
                                                                 ScheduleContextVo context,
                                                                 CxShiftConfig currentShiftConfig,
-                                                                List<ShiftScheduleService.ShiftProductionResult> shiftProductionResults) {
+                                                                List<ShiftProductionResult> shiftProductionResults) {
         Map<String, Integer> outputMap = new HashMap<>();
 
         if (shiftProductionResults == null || shiftProductionResults.isEmpty()) {
@@ -3631,7 +3396,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                 shiftProductionResults.size());
 
         // 从 ShiftProductionResult 中汇总成型产出
-        for (ShiftScheduleService.ShiftProductionResult spr : shiftProductionResults) {
+        for (ShiftProductionResult spr : shiftProductionResults) {
             String embryoCode = spr.getEmbryoCode();
             Integer qty = spr.getQuantity();
 
@@ -3679,7 +3444,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             }
 
             // 获取当天班次对应的硫化计划量
-            int consumption = getVulcanizingConsumptionForDay(lhResult, dayShifts);
+            int consumption = productionCalculator.getVulcanizingConsumptionForDay(lhResult, dayShifts);
             if (consumption > 0) {
                 vulcanizingConsumptionByEmbryo.merge(embryoCode, consumption, Integer::sum);
                 if (lhResult.getId() != null) {
@@ -3712,55 +3477,16 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             }
 
             // 获取当天班次对应的硫化计划量
-            int consumption = getVulcanizingConsumptionForDay(lhResult, dayShifts);
+            int consumption = productionCalculator.getVulcanizingConsumptionForDay(lhResult, dayShifts);
             if (consumption > 0) {
                 vulcanizingConsumptionByMaterial.merge(materialCode, consumption, Integer::sum);
             }
         }
     }
 
-    /**
-     * 获取硫化记录在指定班次的计划量（即当天的硫化消耗）
-     *
-     * @param lhResult  硫化记录
-     * @param dayShifts 当天班次配置
-     * @return 该硫化记录在当天班次的计划量之和
-     */
-    private int getVulcanizingConsumptionForDay(LhScheduleResult lhResult, List<CxShiftConfig> dayShifts) {
-        int total = 0;
-        for (CxShiftConfig shiftConfig : dayShifts) {
-            String classField = shiftConfig.getClassField();
-            if (classField != null && classField.startsWith("CLASS")) {
-                try {
-                    int classIndex = Integer.parseInt(classField.substring(5));
-                    Integer planQty = productionCalculator.getClassPlanQtyByIndex(lhResult, classIndex);
-                    if (planQty != null && planQty > 0) {
-                        total += planQty;
-                    }
-                } catch (NumberFormatException e) {
-                    log.warn("无法解析班次字段: {}", classField);
-                }
-            }
-        }
-        return total;
-    }
+    // getVulcanizingConsumptionForDay 已移至 ProductionCalculator
 
-    /**
-     * 根据班次字段获取班次索引
-     *
-     * @param classField 班次字段（如 "CLASS1"）
-     * @return 班次索引 (1-8)，解析失败返回 0
-     */
-    private int getClassIndex(String classField) {
-        if (classField != null && classField.startsWith("CLASS")) {
-            try {
-                return Integer.parseInt(classField.substring(5));
-            } catch (NumberFormatException e) {
-                log.warn("无法解析班次字段: {}", classField);
-            }
-        }
-        return 0;
-    }
+    // getClassIndex 已移至 ProductionCalculator (parseClassIndex)
 
     /**
      * 按日硫化量比例重新分配库存给硫化任务
@@ -3983,79 +3709,9 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         return roundAllocated;
     }
 
-    /**
-     * 任务分配追踪（内部类），用于多任务胎胚的多轮分配。
-     */
-    private static class TaskAllocationR {
-        String taskKey;
-        int demand;
-        String materialCode;
-        int surplus;      // 硫化余量上限
-        int allocated;    // 已分配量
+    // TaskAllocationR 已移至 com.zlt.aps.cx.vo.TaskAllocationR
+    // TaskDemandSimple 已移至 com.zlt.aps.cx.vo.TaskDemandSimple
 
-        TaskAllocationR(TaskDemandSimple td, int allocated, int surplus) {
-            this.taskKey = td.taskKey;
-            this.demand = td.demand;
-            this.materialCode = td.materialCode;
-            this.allocated = allocated;
-            this.surplus = surplus;
-        }
-    }
-
-    /**
-     * 硫化任务需求（内部类）
-     */
-    private static class TaskDemandSimple {
-        String taskKey;
-        int demand;
-        String materialCode;
-
-        TaskDemandSimple(Long lhId, int demand, String materialCode) {
-            this.taskKey = String.valueOf(lhId);
-            this.demand = demand;
-            this.materialCode = materialCode;
-        }
-    }
-
-    /**
-     * 班次计划量查询结果（内部类）
-     */
-    private static class ShiftPlanResultSimple {
-        int planQty;
-
-        ShiftPlanResultSimple(int planQty) {
-            this.planQty = planQty;
-        }
-    }
-
-    /**
-     * 获取硫化任务的班次计划量（简化版）
-     */
-    private ShiftPlanResultSimple getShiftPlanQtyWithShiftNameSimple(
-            LhScheduleResult lhResult, List<CxShiftConfig> dayShifts, LocalDate scheduleDate) {
-        int defaultQty = lhResult.getDailyPlanQty() != null ? lhResult.getDailyPlanQty() : 0;
-        if (dayShifts == null || dayShifts.isEmpty()) {
-            return new ShiftPlanResultSimple(defaultQty);
-        }
-
-        // 简单返回第一个班次的计划量
-        for (CxShiftConfig shiftConfig : dayShifts) {
-            String classField = shiftConfig.getClassField();
-            if (classField != null && classField.startsWith("CLASS")) {
-                try {
-                    int classIndex = Integer.parseInt(classField.substring(5));
-                    Integer planQty = productionCalculator.getClassPlanQtyByIndex(lhResult, classIndex);
-                    if (planQty != null && planQty > 0) {
-                        return new ShiftPlanResultSimple(planQty);
-                    }
-                } catch (NumberFormatException e) {
-                    log.warn("无法解析班次字段: {}", classField);
-                }
-            }
-        }
-
-        return new ShiftPlanResultSimple(defaultQty);
-    }
     /*
      *
      * <p>逻辑：
@@ -4310,14 +3966,14 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
      * @return 最后一批=true且本班次有硫化消耗的物料编码集合
      */
     private Set<String> collectLastBatchMaterials(
-            List<ShiftScheduleService.ShiftProductionResult> shiftProductionResults,
+            List<ShiftProductionResult> shiftProductionResults,
             Map<String, Integer> vulcanizingConsumptionByMaterial) {
         Set<String> lastBatchMaterials = new HashSet<>();
         if (shiftProductionResults == null || shiftProductionResults.isEmpty()) {
             return lastBatchMaterials;
         }
 
-        for (ShiftScheduleService.ShiftProductionResult spr : shiftProductionResults) {
+        for (ShiftProductionResult spr : shiftProductionResults) {
             if (Boolean.TRUE.equals(spr.getIsLastEndingBatch()) && spr.getMaterialCode() != null) {
                 String materialCode = spr.getMaterialCode();
                 if (vulcanizingConsumptionByMaterial != null
@@ -4385,62 +4041,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         }
     }
 
-    /**
-     * 计算机台小时产能
-     *
-     * <p>参考 ShiftScheduleService.getMachineHourlyCapacity：
-     * <ol>
-     *   <li>从 materialLhCapacityMap 获取该物料的日硫化量</li>
-     *   <li>从 structureLhRatioMap 通过 结构+机型 获取配比 (lhMachineMaxQty)</li>
-     *   <li>成型一条胎的时间(s) = 86400 / (配比 × 日硫化量)</li>
-     *   <li>小时产能 = 3600 / 成型一条胎的时间(s)</li>
-     * </ol>
-     *
-     * @param machineCode   机台编码
-     * @param materialCode  物料编码
-     * @param structureName 结构名称
-     * @param context       排程上下文
-     * @return 小时产能（条/小时）
-     */
-    private int calculateHourlyCapacity(String machineCode, String materialCode,
-                                        String structureName, ScheduleContextVo context) {
-        // 1. 获取日硫化量
-        Integer dailyLhCapacity = null;
-        Map<String, MonthPlanProductLhCapacityVo> lhCapacityMap = context.getMaterialLhCapacityMap();
-        if (lhCapacityMap != null && materialCode != null) {
-            MonthPlanProductLhCapacityVo capacityVo = lhCapacityMap.get(materialCode);
-            if (capacityVo != null) {
-                dailyLhCapacity = capacityVo.getDayVulcanizationQty();
-            }
-        }
-
-        // 2. 获取配比
-        int ratio = 1;
-        if (context.getStructureLhRatioMap() != null && structureName != null && machineCode != null) {
-            Map<String, String> machineTypeCodeMap = context.getMachineTypeCodeMap();
-            String machineTypeCode = machineTypeCodeMap != null ? machineTypeCodeMap.get(machineCode) : null;
-            if (machineTypeCode != null) {
-                MdmStructureLhRatio lhRatio = context.getStructureLhRatioMap().get(machineTypeCode + "|" + structureName);
-                if (lhRatio != null && lhRatio.getLhMachineMaxQty() != null && lhRatio.getLhMachineMaxQty() > 0) {
-                    ratio = lhRatio.getLhMachineMaxQty();
-                }
-            }
-        }
-
-        if (dailyLhCapacity != null && dailyLhCapacity > 0) {
-            // 3. 成型一条胎的时间(s) = 86400 / (配比 × 日硫化量)
-            BigDecimal timePerTire = BigDecimal.valueOf(86400)
-                    .divide(BigDecimal.valueOf((long) ratio * dailyLhCapacity), 2, RoundingMode.HALF_UP);
-            // 4. 小时产能 = 3600 / 成型一条胎的时间(s)
-            if (timePerTire.compareTo(BigDecimal.ZERO) > 0) {
-                return BigDecimal.valueOf(3600)
-                        .divide(timePerTire, 0, RoundingMode.FLOOR)
-                        .intValue();
-            }
-        }
-
-        return 12; // 默认值
-    }
+    // calculateHourlyCapacity 已移至 ProductionCalculator
 
     /**
      * 重算 formingRemainderMap（成型余量 = 硫化余量 - 库存）
@@ -4516,7 +4117,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             return;
         }
 
-        List<ShiftScheduleService.ShiftProductionResult> productionResults = shiftResult.getShiftProductionResults();
+        List<ShiftProductionResult> productionResults = shiftResult.getShiftProductionResults();
         if (productionResults == null) {
             return;
         }
@@ -4557,7 +4158,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             }
 
             // 创建占位记录，标识该物料的剩余余量被舍弃
-            ShiftScheduleService.ShiftProductionResult spr = new ShiftScheduleService.ShiftProductionResult();
+            ShiftProductionResult spr = new ShiftProductionResult();
             spr.setMachineCode(foundMachineCode);
             spr.setEmbryoCode(foundTask.getEmbryoCode());
             spr.setMaterialCode(materialCode);
@@ -4605,32 +4206,5 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             }
         }
         return 2;
-    }
-
-    /**
-     * 判断是否是早班
-     *
-     * <p>精度计划只能安排在早班执行。判断规则：
-     * <ul>
-     *   <li>班次名称包含"早班"</li>
-     *   <li>或班次编码以"DAY_"开头</li>
-     *   <li>或班次开始时间在06:00~12:00之间</li>
-     * </ul>
-     */
-    private boolean isMorningShift(CxShiftConfig shiftConfig) {
-        if (shiftConfig == null) {
-            return false;
-        }
-        // 规则1：班次名称包含"早班"
-        if (shiftConfig.getShiftName() != null && shiftConfig.getShiftName().contains("早班")) {
-            return true;
-        }
-        // 规则2：班次编码以"DAY_"开头（如DAY_D1, DAY_D2, DAY_D3）
-        if (shiftConfig.getShiftCode() != null && shiftConfig.getShiftCode().startsWith("DAY_")) {
-            return true;
-        }
-        // 规则3：班次开始时间在06:00~12:00之间
-        LocalTime startTime = shiftConfig.getShiftStartTime();
-        return !startTime.isBefore(LocalTime.of(6, 0)) && startTime.isBefore(LocalTime.of(12, 0));
     }
 }

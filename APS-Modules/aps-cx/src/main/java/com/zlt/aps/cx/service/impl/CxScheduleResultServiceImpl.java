@@ -388,7 +388,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
                     if (remainQty.compareTo(new BigDecimal("400")) < 0) {
                         cellStyleList.add(new CellStyle(
                                 rowNum, rowNum,
-                                9, 9,
+                                7, 7,
                                 null, true, false, null, "#FF0000"));
                     }
                 }
@@ -513,9 +513,6 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
 
         LambdaQueryWrapper<CxEmbryoLhTime> lhTimeWrapper = new LambdaQueryWrapper<>();
         lhTimeWrapper.eq(CxEmbryoLhTime::getFactoryCode, factoryCode);
-        if (scheduleDate != null) {
-            lhTimeWrapper.eq(CxEmbryoLhTime::getScheduleDate, scheduleDate);
-        }
         lhTimeWrapper.orderByAsc(CxEmbryoLhTime::getCxMachineCode);
 
         List<CxEmbryoLhTime> lhTimeList = cxEmbryoLhTimeMapper.selectList(lhTimeWrapper);
@@ -606,7 +603,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
 
         Map<String, Object> row = new LinkedHashMap<>();
         row.put("stt", 0);
-        row.put("machineCode", lhTime.getCxMachineCode());
+        row.put("machineCode", StringUtils.defaultString(lhTime.getCxMachineCode()));
         row.put("structureSpec", prevStructureName);
         // 成型余量
         Integer remainQtyVal = lhTime.getStructureChangeRemaining();
