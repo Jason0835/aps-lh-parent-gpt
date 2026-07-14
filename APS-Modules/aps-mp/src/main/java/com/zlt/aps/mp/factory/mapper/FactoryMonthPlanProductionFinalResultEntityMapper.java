@@ -1,5 +1,6 @@
 package com.zlt.aps.mp.factory.mapper;
 
+import com.zlt.aps.mp.api.domain.dto.StockCaptureDateDTO;
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import com.zlt.aps.mp.api.domain.vo.FactoryMonthPlanFinalAdjustVo;
 import com.zlt.core.dao.basemapper.CommBaseMapper;
@@ -66,7 +67,8 @@ public interface FactoryMonthPlanProductionFinalResultEntityMapper extends CommB
                                 @Param("currentMonth") Integer currentMonth,
                                 @Param("startDate") Date startDate,
                                 @Param("endDate") Date endDate,
-                                @Param("overdueThresholdParamCode") String overdueThresholdParamCode);
+                                @Param("overdueThresholdParamCode") String overdueThresholdParamCode,
+                                @Param("stockCaptureDateList") List<StockCaptureDateDTO> stockCaptureDateList);
 
     /**
      * 查询上月定稿存在但当月定稿缺失的超欠产记录（用于 Java 层补充工单号后批量插入）
@@ -109,7 +111,8 @@ public interface FactoryMonthPlanProductionFinalResultEntityMapper extends CommB
                                                                                @Param("currentMonth") Integer currentMonth,
                                                                                @Param("startDate") Date startDate,
                                                                                @Param("endDate") Date endDate,
-                                                                               @Param("overdueThresholdParamCode") String overdueThresholdParamCode);
+                                                                               @Param("overdueThresholdParamCode") String overdueThresholdParamCode,
+                                                                               @Param("stockCaptureDateList") List<StockCaptureDateDTO> stockCaptureDateList);
 
     /**
      * 查询当月定稿表 PRODUCTION_NO 工单号最大值（用于 Java 层递增生成新工单号）
@@ -150,5 +153,30 @@ public interface FactoryMonthPlanProductionFinalResultEntityMapper extends CommB
                                     @Param("currentMonth") Integer currentMonth,
                                     @Param("startDate") Date startDate,
                                     @Param("endDate") Date endDate,
-                                    @Param("overdueThresholdParamCode") String overdueThresholdParamCode);
+                                    @Param("overdueThresholdParamCode") String overdueThresholdParamCode,
+                                    @Param("stockCaptureDateList") List<StockCaptureDateDTO> stockCaptureDateList);
+
+    /**
+     * 查询上月定稿表的版本号信息（用于 Java 层计算库存抓取日）
+     * 仅查询必要字段：分厂、物料、产品状态、需求版本号、最新需求版本号
+     *
+     * @param lastYear  数据来源月年份
+     * @param lastMonth 数据来源月月份
+     * @return 定稿记录列表（仅含版本号相关字段）
+     */
+    List<FactoryMonthPlanProductionFinalResult> selectVersionInfoForStockCapture(
+            @Param("lastYear") Integer lastYear,
+            @Param("lastMonth") Integer lastMonth);
+
+    /**
+     * 查询余量表库存抓取日映射
+     * 按需求版本号关联，返回每条余量记录的分厂+物料+库存抓取日
+     *
+     * @param lastYear  数据来源月年份
+     * @param lastMonth 数据来源月月份
+     * @return 库存抓取日列表
+     */
+    List<StockCaptureDateDTO> selectSurplusStockCaptureDateMap(
+            @Param("lastYear") Integer lastYear,
+            @Param("lastMonth") Integer lastMonth);
 }
