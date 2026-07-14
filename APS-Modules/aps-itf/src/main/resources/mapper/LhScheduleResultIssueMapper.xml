@@ -64,6 +64,7 @@
             WHERE LH_MACHINE_CODE = t.LH_MACHINE_CODE
               AND MATERIAL_CODE = t.MATERIAL_CODE
               AND SCHEDULE_DATE = t.SCHEDULE_DATE
+              AND ORDER_NO = t.ORDER_NO
               AND DATA_VERSION = t.DATA_VERSION
         )
     </insert>
@@ -106,6 +107,7 @@
         WHERE SCHEDULE_DATE = #{scheduleDate}
           AND LH_MACHINE_CODE = #{lhMachineCode}
           AND MATERIAL_CODE = #{materialCode}
+          AND ORDER_NO = #{orderNo}
           AND DATA_VERSION = #{dataVersion}
     </update>
 
@@ -140,6 +142,7 @@
         WHERE SCHEDULE_DATE = #{scheduleDate}
           AND LH_MACHINE_CODE = #{lhMachineCode}
           AND MATERIAL_CODE = #{materialCode}
+          AND ORDER_NO = #{orderNo}
           AND DATA_VERSION = #{dataVersion}
     </update>
 
