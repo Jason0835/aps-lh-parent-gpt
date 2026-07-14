@@ -14,13 +14,12 @@ import com.zlt.aps.mp.api.domain.entity.*;
 import com.zlt.aps.cx.entity.schedule.CxScheduleResult;
 import com.zlt.aps.cx.entity.schedule.LhScheduleResult;
 import lombok.Data;
+import lombok.extern.slf4j.Slf4j;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * 排程上下文VO
@@ -29,6 +28,7 @@ import java.util.Set;
  * @author APS Team
  */
 @Data
+@Slf4j
 public class ScheduleContextVo {
 
     /**
@@ -569,6 +569,85 @@ public class ScheduleContextVo {
     }
 
     // ==================== 辅助方法 ====================
+
+    /**
+     * 获取某结构在排程日可用的成型机台配置列表。
+     *
+     * <p><b>过滤链</b>：
+     * <ol>
+     *   <li>{@code structureAllocationMap}：年月 + 月内日区间（beginDay~endDay）</li>
+     *   <li>机台编码必须存在于 {@code availableMachines}（主数据启用机台）</li>
+     *   <li>按机台编码去重（{@link LinkedHashMap} 保持插入顺序）</li>
+     *   <li>无结果时回退 {@link #getAdvanceProductionMachines}</li>
+     * </ol>
+     *
+     * <p>排产版本已在 context 加载阶段按各月配置过滤，此处不再按 productionVersion 二次过滤。
+     *
+     * @param structureName   结构名称
+     * @param scheduleDate    排程日期
+     * @param productionVersion 排产版本（保留参数，当前方法未过滤）
+     * @return 可用的机台配置列表，无匹配时返回空列表（非 null）
+     */
+    public List<MpCxCapacityConfiguration> getAvailableMachinesForStructure(
+            String structureName, LocalDate scheduleDate, String productionVersion) {
+        Set<String> availableMachineCodes = new HashSet<>();
+        if (availableMachines != null) {
+            for (MdmMoldingMachine machine : availableMachines) {
+                availableMachineCodes.add(machine.getCxMachineCode());
+            }
+        }
+
+        if (structureAllocationMap != null) {
+            List<MpCxCapacityConfiguration> configs = structureAllocationMap.get(structureName);
+            if (configs != null && !configs.isEmpty()) {
+                int dayOfMonth = scheduleDate.getDayOfMonth();
+                int dateYear = scheduleDate.getYear();
+                int dateMonth = scheduleDate.getMonthValue();
+                List<MpCxCapacityConfiguration> result = configs.stream()
+                        .filter(c -> c.getBeginDay() != null && c.getEndDay() != null)
+                        .filter(c -> c.getBeginDay() <= dayOfMonth && c.getEndDay() >= dayOfMonth)
+                        .filter(c -> c.getYear() != null && c.getYear() == dateYear
+                                && c.getMonth() != null && c.getMonth() == dateMonth)
+                        .filter(c -> availableMachineCodes.contains(c.getCxMachineCode()))
+                        .collect(Collectors.collectingAndThen(
+                                Collectors.toMap(MpCxCapacityConfiguration::getCxMachineCode,
+                                        c -> c, (a, b) -> a, LinkedHashMap::new),
+                                m -> new ArrayList<>(m.values())));
+                if (!result.isEmpty()) {
+                    return result;
+                }
+            }
+        }
+        return getAdvanceProductionMachines(structureName, productionVersion);
+    }
+
+    /**
+     * 提前生产机台回退（当日 structureAllocationMap 无机台时）。
+     *
+     * <p>数据由 TaskGroupService 写入 {@code advanceProductionMachineMap}，
+     * 已做版本过滤、机台占用三态判定、跨结构冲突剔除。
+     * 此处直接取用，不再按 productionVersion 二次过滤。
+     *
+     * @param structureName   结构名称
+     * @param productionVersion 保留参数以与各 Processor 调用方兼容，本方法内未使用
+     * @return 提前生产机台列表，无匹配时返回空列表（非 null）
+     */
+    public List<MpCxCapacityConfiguration> getAdvanceProductionMachines(
+            String structureName, String productionVersion) {
+        if (advanceProductionMachineMap != null) {
+            List<MpCxCapacityConfiguration> advanceMachines =
+                    advanceProductionMachineMap.get(structureName);
+            if (advanceMachines != null && !advanceMachines.isEmpty()) {
+                log.info("【提前生产】结构={} 使用提前生产机台={}",
+                        structureName,
+                        advanceMachines.stream()
+                                .map(MpCxCapacityConfiguration::getCxMachineCode)
+                                .collect(Collectors.toList()));
+                return new ArrayList<>(advanceMachines);
+            }
+        }
+        return new ArrayList<>();
+    }
 
     /**
      * 获取结构胎面整车条数映射

@@ -5,6 +5,7 @@ import com.zlt.aps.tq.engine.handler.TqBalanceHandler;
 import com.zlt.aps.tq.engine.handler.TqDemandCalcHandler;
 import com.zlt.aps.tq.engine.handler.TqMachineAssignHandler;
 import com.zlt.aps.tq.engine.handler.TqPreValidationHandler;
+import com.zlt.aps.tq.engine.handler.TqQuotaValidateHandler;
 import com.zlt.aps.tq.engine.handler.TqResidualCapacityHandler;
 import com.zlt.aps.tq.engine.handler.TqResultPersistHandler;
 import com.zlt.aps.tq.engine.handler.TqStopCoordinationHandler;
@@ -16,7 +17,7 @@ import javax.annotation.Resource;
 /**
  * 胎圈排程模板方法实现类。
  *
- * <p>绑定7个Handler到模板方法的7个阶段：</p>
+ * <p>绑定8个Handler到模板方法的8个阶段：</p>
  * <ul>
  *   <li>S1: TqPreValidationHandler - 前置校验与数据加载</li>
  *   <li>S2: TqDemandCalcHandler - 需求计算</li>
@@ -24,6 +25,7 @@ import javax.annotation.Resource;
  *   <li>S3.5: TqResidualCapacityHandler - 剩余产能分配</li>
  *   <li>S4: TqStopCoordinationHandler - 成型/胎圈停产协调</li>
  *   <li>S5: TqBalanceHandler - 班次均衡调整</li>
+ *   <li>S5.5: TqQuotaValidateHandler - 定额校验与顺序重置</li>
  *   <li>S6: TqResultPersistHandler - 结果校验与持久化</li>
  * </ul>
  *
@@ -50,6 +52,9 @@ public class TqScheduleTemplateImpl extends AbsTqScheduleTemplate {
 
     @Resource
     private TqBalanceHandler balanceHandler;
+
+    @Resource
+    private TqQuotaValidateHandler quotaValidateHandler;
 
     @Resource
     private TqResultPersistHandler resultPersistHandler;
@@ -82,6 +87,11 @@ public class TqScheduleTemplateImpl extends AbsTqScheduleTemplate {
     @Override
     protected void doBalance(TqScheduleContext context) {
         balanceHandler.handle(context);
+    }
+
+    @Override
+    protected void doQuotaValidate(TqScheduleContext context) {
+        quotaValidateHandler.handle(context);
     }
 
     @Override

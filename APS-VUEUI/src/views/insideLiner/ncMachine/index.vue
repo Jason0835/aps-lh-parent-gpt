@@ -163,6 +163,14 @@ export default {
           },
         },
         {
+          label: this.$t("ui.data.column.factoryCode"),
+          prop: "factoryCode",
+          minWidth: 100,
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(this.dict.type.biz_factory_name, value);
+          },
+        },
+        {
           label: this.$t("ui.data.column.machine.machineCode"),
           prop: "machineCode",
           minWidth: 100,

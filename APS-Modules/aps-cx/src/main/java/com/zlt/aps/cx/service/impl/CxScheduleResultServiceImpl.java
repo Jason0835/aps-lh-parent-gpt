@@ -372,6 +372,14 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
         // 为小计行添加 DAEEF3 背景色标识 + 胎胚余量<400 红色背景
         List<CellStyle> cellStyleList = new ArrayList<>();
         int templateListStartRow = 4;
+        // 从明细行计算实际列数，避免CellStyle引用超出模板列范围导致Excel损坏
+        int maxColIndex = 0;
+        for (Map<String, Object> rowMap : planRows) {
+            if (!"小计".equals(rowMap.get("cxMachineCode"))) {
+                maxColIndex = rowMap.size() - 1;
+                break;
+            }
+        }
         for (int i = 0; i < planRows.size(); i++) {
             Map<String, Object> rowMap = planRows.get(i);
             int rowNum = templateListStartRow + i;
@@ -379,17 +387,18 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
             if ("小计".equals(rowMap.get("cxMachineCode"))) {
                 cellStyleList.add(new CellStyle(
                         rowNum, rowNum,
-                        0, 60,
+                        0, maxColIndex,
                         "#DAEEF3", true, true, null));
             } else {
                 Object cxRemainVal = rowMap.get("cxRemainQty");
                 if (cxRemainVal instanceof Number) {
                     BigDecimal remainQty = new BigDecimal(cxRemainVal.toString());
                     if (remainQty.compareTo(new BigDecimal("400")) < 0) {
+                        // color传白色避免setFillPattern(SOLID_FOREGROUND)无填充色导致Excel损坏
                         cellStyleList.add(new CellStyle(
                                 rowNum, rowNum,
-                                9, 9,
-                                null, true, false, null, "#FF0000"));
+                                7, 7,
+                                "#FFFFFF", true, false, null, "#FF0000"));
                     }
                 }
             }
@@ -513,9 +522,6 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
 
         LambdaQueryWrapper<CxEmbryoLhTime> lhTimeWrapper = new LambdaQueryWrapper<>();
         lhTimeWrapper.eq(CxEmbryoLhTime::getFactoryCode, factoryCode);
-        if (scheduleDate != null) {
-            lhTimeWrapper.eq(CxEmbryoLhTime::getScheduleDate, scheduleDate);
-        }
         lhTimeWrapper.orderByAsc(CxEmbryoLhTime::getCxMachineCode);
 
         List<CxEmbryoLhTime> lhTimeList = cxEmbryoLhTimeMapper.selectList(lhTimeWrapper);
@@ -606,7 +612,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
 
         Map<String, Object> row = new LinkedHashMap<>();
         row.put("stt", 0);
-        row.put("machineCode", lhTime.getCxMachineCode());
+        row.put("machineCode", StringUtils.defaultString(lhTime.getCxMachineCode()));
         row.put("structureSpec", prevStructureName);
         // 成型余量
         Integer remainQtyVal = lhTime.getStructureChangeRemaining();

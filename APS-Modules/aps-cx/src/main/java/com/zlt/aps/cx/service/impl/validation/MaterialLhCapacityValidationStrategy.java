@@ -112,10 +112,9 @@ public class MaterialLhCapacityValidationStrategy extends BaseValidationStrategy
         switch (mode) {
             case MES_CAPACITY:
                 return MonthPlanProductLhCapacityVo::getMesCapacity;
-            case STANDARD_CAPACITY:
-                return MonthPlanProductLhCapacityVo::getStandardCapacity;
             case APS_CAPACITY:
                 return MonthPlanProductLhCapacityVo::getApsCapacity;
+            case STANDARD_CAPACITY:
             default:
                 return MonthPlanProductLhCapacityVo::getStandardCapacity;
         }

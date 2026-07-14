@@ -41,8 +41,16 @@ export default {
       form: {
         classShift: "2",
         openMachineClass: [],
+        factoryCode: '',
       },
       rules: {
+        factoryCode: [
+          {
+            required: true,
+            message: this.$t("common.rule.select"),
+            trigger: "blur",
+          },
+        ],
         machineCode: [
           {
             required: true,
@@ -71,6 +79,14 @@ export default {
     },
     columns() {
       return [
+        {
+          label: this.$t("ui.data.column.factoryCode"),
+          prop: "factoryCode",
+          type: "select",
+          dictData: this.parentDict.type.biz_factory_name,
+          filterable: true,
+          required: true,
+        },
         {
           label: this.$t("ui.data.column.machine.machineCode"),
           prop: "machineCode",
@@ -166,6 +182,8 @@ export default {
           label: this.$t("ui.data.column.machine.status"),
           prop: "status",
           type: "switch",
+          activeValue: "0",
+          inactiveValue: "1",
         },
         {
           label: this.$t("ui.common.column.remark"),
@@ -207,7 +225,7 @@ export default {
       }
     },
     hide() {
-      this.form = { classShift: "2", openMachineClass: [] };
+      this.form = { classShift: "2", openMachineClass: [], factoryCode: '' };
       this.$refs.form.triggerResetForm();
       // this.resetForm("infoForm");
       this.isEdit = false;

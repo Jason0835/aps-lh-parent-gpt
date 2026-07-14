@@ -278,7 +278,8 @@ public class TqDataLoadServiceImpl implements ITqDataLoadService {
 
     /**
      * 加载检修计划数据（按工厂过滤）
-     * key=日期班次(如"2025-01-01|3"), value=该班次检修中的机台编号列表
+     * key=日期班次(如"2025-01-01|03"), value=该班次检修中的机台编号列表
+     * 班次编码使用两位格式：01=夜班,02=早班,03=中班（与CLASS_NUM_THREE字典值一致）
      */
     private void loadMaintenanceData(TqScheduleContext context, String scheduleDate, String factoryCode) {
         List<Map<String, Object>> maintenanceList = tqEngineMapper.listMaintenancePlan(scheduleDate, factoryCode);
