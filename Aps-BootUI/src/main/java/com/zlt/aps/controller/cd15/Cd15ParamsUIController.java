@@ -48,6 +48,13 @@ public class Cd15ParamsUIController extends BaseUIController<Cd15Params> {
         return remoteService.getInfo(id);
     }
 
+    @ApiOperation("get param value")
+    @GetMapping("/getParamValue/{factoryCode}/{paramCode}")
+    @ResponseBody
+    public AjaxResult getParamValue(@PathVariable("factoryCode") String factoryCode, @PathVariable("paramCode") String paramCode) {
+        return remoteService.getParamValue(factoryCode, paramCode);
+    }
+
     @ApiOperation("新增")
     @RequiresPermissions("cd15:params:add")
     @PostMapping("/add")
