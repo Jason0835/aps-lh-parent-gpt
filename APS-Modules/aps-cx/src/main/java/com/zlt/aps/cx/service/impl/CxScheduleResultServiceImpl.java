@@ -1145,7 +1145,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
             return Collections.emptyMap();
         }
 
-        // 按胎胚描述汇总整月累计计划量
+        // 按胎胚描述汇总整月累计计划量（含上月超欠产量）
         Map<String, BigDecimal> resultMap = new HashMap<>();
 
         for (FactoryMonthPlanProductionFinalResult plan : plans) {
@@ -1155,10 +1155,18 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
             }
             embryoDesc = embryoDesc.trim();
             BigDecimal sum = resultMap.getOrDefault(embryoDesc, BigDecimal.ZERO);
+            // 累加 day1 ~ day末 的日计划量
             for (int day = 1; day <= lastDayOfMonth; day++) {
                 Integer qty = plan.getDayQty(day);
                 if (qty != null && qty > 0) {
                     sum = sum.add(BigDecimal.valueOf(qty));
+                }
+            }
+            // 上月超欠产量：lastMonthValidFlag="1"时累加 lastMonthOverdueQty
+            if ("1".equals(plan.getLastMonthValidFlag())) {
+                Integer overdueQty = plan.getLastMonthOverdueQty();
+                if (overdueQty != null && overdueQty != 0) {
+                    sum = sum.add(BigDecimal.valueOf(overdueQty));
                 }
             }
             resultMap.put(embryoDesc, sum);
