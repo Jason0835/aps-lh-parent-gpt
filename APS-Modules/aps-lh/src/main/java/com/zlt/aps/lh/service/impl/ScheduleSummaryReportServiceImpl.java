@@ -413,8 +413,8 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
         map.put("cxSpecSwitch" + keySuffix, this.buildCxSpecSwitch(reportDate, reportDate, factoryCode));
 
         // 硫化产量和机台数：根据 keySuffix 限制班次序号范围
-        // keySuffix="" → 班次1~5（class1~5映射的01/02/03），keySuffix="2" → 班次6~8（class6~8映射的01/02/03）
-        int shiftIndexMin = "".equals(keySuffix) ? 1 : 6;
+        // keySuffix="" → 班次3~5（class3~5映射的01/02/03，与成型T+1班次范围一致），keySuffix="2" → 班次6~8（class6~8映射的01/02/03）
+        int shiftIndexMin = "".equals(keySuffix) ? 3 : 6;
         int shiftIndexMax = "".equals(keySuffix) ? 5 : 8;
 
         BigDecimal lhNightTotal = BigDecimal.ZERO;
@@ -831,7 +831,7 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
                     }
                     String specPattern = specifications;
                     if (StringUtils.isNotBlank(pattern)) {
-                        specPattern = specifications + "+" + pattern;
+                        specPattern = specifications + " " + pattern;
                     }
                     specPatternSet.add(specPattern);
                 }

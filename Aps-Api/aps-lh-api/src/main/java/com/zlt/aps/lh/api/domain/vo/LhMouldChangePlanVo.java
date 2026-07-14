@@ -116,15 +116,15 @@ public class LhMouldChangePlanVo extends BaseEntity implements Serializable {
     private String changeType;
 
     @ApiModelProperty(value = "是否干冰清洗")
-    @Excel(name = "ui.data.column.lhMouldChangePlan.changeMouldType", readConverterExp = "1=是Có")
+    @Excel(name = "ui.data.column.lhMouldChangePlan.isDryIceClean", readConverterExp = "1=是Có")
     private String isDryIceClean;
 
     @ApiModelProperty(value = "是否喷砂清洗")
-    @Excel(name = "ui.data.column.lhMouldChangePlan.changeMouldType", readConverterExp = "1=是Có")
+    @Excel(name = "ui.data.column.lhMouldChangePlan.isSandblastingClean", readConverterExp = "1=是Có")
     private String isSandblastingClean;
 
     @ApiModelProperty(value = "是否换活字块")
-    @Excel(name = "ui.data.column.lhMouldChangePlan.changeMouldType", readConverterExp = "1=是Có")
+    @Excel(name = "ui.data.column.lhMouldChangePlan.isReplaceBlock", readConverterExp = "1=是Có")
     private String isReplaceBlock;
 
     @ApiModelProperty(value = "模具号")

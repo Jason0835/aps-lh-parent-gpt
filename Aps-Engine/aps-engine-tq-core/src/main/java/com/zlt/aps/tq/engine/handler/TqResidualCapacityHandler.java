@@ -141,8 +141,15 @@ public class TqResidualCapacityHandler extends AbsTqScheduleStepHandler {
                 .sorted(buildResidualPriorityComparator(supplyTimeThreshold, classNum))
                 .collect(Collectors.toList());
 
-        // 3. 逐规格回填剩余产能
+        // 3. 逐规格回填剩余产能（每次迭代前重新计算剩余产能，确保不超定额）
         for (TqScheduleResultVo spec : candidates) {
+            // 每次迭代前重新计算剩余产能，防止累积超量
+            usedCapacity = 0D;
+            for (TqScheduleResultVo s : specList) {
+                usedCapacity = BigDecimalUtil.add(usedCapacity, getClassPlanQty(s, classNum));
+            }
+            residualCapacity = BigDecimalUtil.sub(machineQuota, usedCapacity);
+
             if (residualCapacity <= 0) {
                 break;
             }
@@ -159,7 +166,6 @@ public class TqResidualCapacityHandler extends AbsTqScheduleStepHandler {
                 assignQty = applyRoundingIfNeeded(assignQty);
                 addClassPlanQty(spec, classNum, assignQty);
                 spec.setBackupRemainingQty(BigDecimalUtil.sub(backupRemaining, assignQty));
-                residualCapacity = BigDecimalUtil.sub(residualCapacity, assignQty);
 
                 autoScheduleLogService.insertTqScheduleLog(spec.getBatchNo(), spec.getOrderNo(),
                         "S3.5-剩余产能回填备库胎圈",

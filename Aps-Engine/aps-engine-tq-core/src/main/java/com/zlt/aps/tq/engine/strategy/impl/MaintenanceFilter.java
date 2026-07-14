@@ -7,7 +7,6 @@ import com.zlt.aps.tq.engine.vo.TqScheduleResultVo;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -15,7 +14,10 @@ import java.util.stream.Collectors;
  * 维修计划过滤策略。
  *
  * <p>过滤规则：根据T_TQ_MACHINE_MAINTENANCE_PLAN表，
- * 排除在排程日期对应班次处于检修状态的机台。</p>
+ * 排除在排程日期<b>当前班次</b>处于检修状态的机台。</p>
+ *
+ * <p>注意：只排除当前正在排产的班次有检修计划的机台，
+ * 其他班次的检修不影响当前班次的机台可选性。</p>
  */
 @Slf4j
 @Component
@@ -34,26 +36,28 @@ public class MaintenanceFilter implements IMachineFilterStrategy {
             return candidateMachines;
         }
 
-        List<String> todayMaintenanceMachines = new ArrayList<>();
-        String[] shifts = {"01", "02", "03"};
-        for (String shift : shifts) {
-            String key = scheduleDate + "|" + shift;
-            List<String> machines = context.getMaintenanceMachineMap().get(key);
-            if (machines != null) {
-                todayMaintenanceMachines.addAll(machines);
-            }
+        // 获取当前正在排产的班次编码（由TqMachineAssignHandler.searchOptionalMachineList设置）
+        String currentClassCode = context.getCurrentClassCode();
+        if (currentClassCode == null || currentClassCode.isEmpty()) {
+            log.warn("[维修计划过滤] 当前班次编码为空，跳过过滤");
+            return candidateMachines;
         }
 
-        if (todayMaintenanceMachines.isEmpty()) {
+        // 按当前班次精确查询检修机台，不影响其他班次的机台可选性
+        String key = scheduleDate + "|" + currentClassCode;
+        List<String> maintenanceMachines = context.getMaintenanceMachineMap().get(key);
+
+        if (maintenanceMachines == null || maintenanceMachines.isEmpty()) {
             return candidateMachines;
         }
 
         List<TqMachineInfo> filtered = candidateMachines.stream()
-                .filter(m -> !todayMaintenanceMachines.contains(m.getMachineCode()))
+                .filter(m -> !maintenanceMachines.contains(m.getMachineCode()))
                 .collect(Collectors.toList());
 
         if (filtered.size() < candidateMachines.size()) {
-            log.debug("[维修计划过滤] 排程日期{}过滤掉{}台检修中的机台", scheduleDate, candidateMachines.size() - filtered.size());
+            log.debug("[维修计划过滤] 排程日期{}班次{}过滤掉{}台检修中的机台",
+                    scheduleDate, currentClassCode, candidateMachines.size() - filtered.size());
         }
 
         return filtered;

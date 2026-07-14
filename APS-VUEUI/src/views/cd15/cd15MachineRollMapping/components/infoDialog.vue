@@ -54,13 +54,27 @@ export default {
       loading: false,
       visible: false,
       isEdit: false,
-      form: {},
+      form: {
+        shiftCode: [],
+      },
       localMachineOptions: [],
       rules: {
         factoryCode: [requiredSelect],
         bigRollCode: [requiredInput],
         machineCode: [requiredSelect],
-        shiftCode: [requiredSelect],
+        shiftCode: [
+          {
+            required: true,
+            validator: (rule, value, callback) => {
+              if (!value || value.length === 0) {
+                callback(new Error(this.$t("common.rule.select")));
+              } else {
+                callback();
+              }
+            },
+            trigger: "change",
+          },
+        ],
       },
     };
   },
@@ -93,11 +107,19 @@ export default {
         {
           prop: "shiftCode",
           label: this.$t("ui.data.column.cd15MachineRollMapping.shiftCode"),
-          type: "select",
-          dictData: this.parentDict.type.class_num,
-          filterable: true,
-          attrs: {
-            multiple: true,
+          render: (form) => {
+            return (
+              <el-checkbox-group v-model={form.shiftCode}>
+                {this.parentDict.type.class_num_three_plan.map((row) => {
+                  const value = this.getDictValue(row);
+                  return (
+                    <el-checkbox key={`SHIFT_${value}`} label={value}>
+                      {this.getDictLabel(row)}
+                    </el-checkbox>
+                  );
+                })}
+              </el-checkbox-group>
+            );
           },
         },
         {
@@ -111,13 +133,37 @@ export default {
     },
   },
   methods: {
-    async save(params) {
+    getDictValue(row) {
+      const value = row.value !== undefined && row.value !== null && row.value !== "" ? row.value : row.dictValue;
+      return value === undefined || value === null ? "" : `${value}`;
+    },
+    getDictLabel(row) {
+      return row.label !== undefined ? row.label : row.dictLabel;
+    },
+    normalizeShiftCode(value) {
+      if (Array.isArray(value)) {
+        return value.map((item) => `${item}`).filter((item) => item);
+      }
+      if (!value) {
+        return [];
+      }
+      return `${value}`.split(",").map((item) => item.trim()).filter((item) => item);
+    },
+    async save(params, confirmOutOfOpenShift = false) {
       this.loading = true;
       try {
-        const saveParams = this.normalizeParams(params);
+        const saveParams = this.normalizeParams({
+          ...params,
+          confirmOutOfOpenShift,
+        });
         const res = this.isEdit
           ? await updateMachineRollMapping(saveParams)
           : await addMachineRollMapping(saveParams);
+        if (res.needConfirm) {
+          this.loading = false;
+          this.$confirm(res.msg, this.$t("common.tip"), { type: "warning" }).then(() => this.save(params, true));
+          return;
+        }
         this.$modal.msgSuccess(res.msg);
         this.$emit("success");
         this.hide();
@@ -137,23 +183,24 @@ export default {
       this.localMachineOptions = rows.map((item) => ({ label: item.machineCode, value: item.machineCode }));
     },
     show(data) {
-      this.visible = true;
       if (data) {
         this.isEdit = true;
-        this.form = { ...data };
-        if (this.form.shiftCode) {
-          this.form.shiftCode = this.form.shiftCode.split(",").filter((item) => item);
-        }
+        this.form = {
+          ...data,
+          shiftCode: this.normalizeShiftCode(data.shiftCode),
+        };
       } else {
         this.form = {
           factoryCode: "116",
+          shiftCode: [],
         };
       }
       this.localMachineOptions = this.machineOptions;
+      this.visible = true;
       this.loadMachineOptions();
     },
     hide() {
-      this.form = {};
+      this.form = { shiftCode: [] };
       this.$refs.form && this.$refs.form.triggerResetForm();
       this.isEdit = false;
       this.visible = false;
