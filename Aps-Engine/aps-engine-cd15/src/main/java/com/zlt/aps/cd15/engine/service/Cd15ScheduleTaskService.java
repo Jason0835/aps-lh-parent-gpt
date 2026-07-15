@@ -17,6 +17,15 @@ public interface Cd15ScheduleTaskService {
                                    String triggerType, String requestSnapshot, String inputVersion,
                                    String createBy);
 
+    /** 创建带业务幂等键的任务，TIMED_ROLLING 用于自动滚动排程去重。 */
+    Cd15ScheduleTask createPending(String factoryCode, Date scheduleDate, String taskType,
+                                   String triggerType, String requestSnapshot, String inputVersion,
+                                   String createBy, String idempotencyKey);
+
+    /** 查询同工厂、同任务类型、同幂等键已成功的任务。 */
+    Cd15ScheduleTask findSuccessfulByIdempotencyKey(String factoryCode, String taskType,
+                                                     String idempotencyKey);
+
     Cd15ScheduleTask findByTaskId(String taskId);
 
     Cd15ScheduleTask findLatest(String factoryCode, Date scheduleDate);

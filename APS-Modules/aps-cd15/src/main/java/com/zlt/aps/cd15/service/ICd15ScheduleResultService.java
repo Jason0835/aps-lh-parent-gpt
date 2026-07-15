@@ -4,6 +4,7 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.cd15.api.domain.entity.Cd15ScheduleResult;
 import com.zlt.aps.cd15.api.domain.vo.Cd15ChangeQtyRequest;
 import com.zlt.aps.cd15.api.domain.vo.Cd15InsertOrderRequest;
+import com.zlt.aps.cd15.api.domain.vo.Cd15RollingCheckRequest;
 import com.zlt.aps.cd15.api.domain.vo.Cd15TransferMachineRequest;
 import com.zlt.bill.common.service.IDocService;
 
@@ -45,6 +46,11 @@ public interface ICd15ScheduleResultService extends IDocService<Cd15ScheduleResu
     /** 查询调量任务 */
     AjaxResult getChangeQtyTask(String taskId);
 
+    /** 定时滚动检查入口。 */
+    AjaxResult checkTimedRolling(Cd15RollingCheckRequest request);
+
+    /** 查询定时滚动任务。 */
+    AjaxResult getTimedRollingTask(String taskId);
     /** 发布入口，首期仅保留链路 */
     AjaxResult publish(Cd15ScheduleResult dto, String ids);
 }

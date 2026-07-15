@@ -18,7 +18,7 @@ public class Cd15ConstructionMaterial {
     private String constructionVersion;
     /** 钢带或加强层代码。 */
     private String steelStripCode;
-    /** 大卷代码，对应施工 CORD_SPEC。 */
+    /** 大卷代码，对应施工 ARTICLE_CROWN_SPEC。 */
     private String bigRollCode;
     /** 大卷幅宽，对应施工 CORD_WIDTH，入口不做必填拦截。 */
     private BigDecimal cordWidth;

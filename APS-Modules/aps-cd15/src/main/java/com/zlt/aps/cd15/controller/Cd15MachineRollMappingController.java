@@ -50,7 +50,7 @@ public class Cd15MachineRollMappingController extends AbstractDocBizController<C
     @ApiOperation("新增斜裁大卷与机台映射")
     @PostMapping("/add")
     public AjaxResult add(@RequestBody Cd15MachineRollMapping entity) {
-        return super.save(entity);
+        return cd15MachineRollMappingService.saveWithConfirm(entity);
     }
 
     /** 编辑斜裁大卷与机台映射 */
@@ -58,7 +58,7 @@ public class Cd15MachineRollMappingController extends AbstractDocBizController<C
     @ApiOperation("编辑斜裁大卷与机台映射")
     @PostMapping("/edit")
     public AjaxResult edit(@RequestBody Cd15MachineRollMapping entity) {
-        return super.save(entity);
+        return cd15MachineRollMappingService.saveWithConfirm(entity);
     }
 
     /** 删除斜裁大卷与机台映射 */

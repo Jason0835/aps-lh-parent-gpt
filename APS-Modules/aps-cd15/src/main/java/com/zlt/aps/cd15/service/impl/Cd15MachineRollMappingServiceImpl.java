@@ -26,7 +26,9 @@ import javax.annotation.Resource;
 import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -48,9 +50,25 @@ public class Cd15MachineRollMappingServiceImpl extends AbstractDocService<Cd15Ma
     }
 
     @Override
+    public AjaxResult saveWithConfirm(Cd15MachineRollMapping entity) {
+        this.normalize(entity);
+        Cd15MachineInfo machineInfo = this.getEnabledMachineInfo(entity);
+        if (machineInfo == null) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.cd15MachineRollMapping.machineInvalid"));
+        }
+        if (!Boolean.TRUE.equals(entity.getConfirmOutOfOpenShift()) && this.hasOutOfOpenShift(entity, machineInfo)) {
+            AjaxResult result = AjaxResult.success(I18nUtil.getMessage("ui.data.column.cd15MachineRollMapping.shiftOutOfOpenMachineClassConfirm"));
+            result.put("needConfirm", true);
+            return result;
+        }
+        super.save(entity);
+        return AjaxResult.success();
+    }
+
+    @Override
     public int save(Cd15MachineRollMapping entity) {
         this.normalize(entity);
-        if (!this.isMachineEnabled(entity)) {
+        if (this.getEnabledMachineInfo(entity) == null) {
             throw new RuntimeException(I18nUtil.getMessage("ui.data.column.cd15MachineRollMapping.machineInvalid"));
         }
         return super.save(entity);
@@ -89,7 +107,7 @@ public class Cd15MachineRollMappingServiceImpl extends AbstractDocService<Cd15Ma
             List<ImportErrorLog> validated = ImportExcelValidatedUtils.validated(importLogId, errorNum, docEntity);
             ImportExcelValidatedUtils.validatedRepeat(list, docEntity, index, 2, importLogId, validated,
                     this.getCheckUniqueFields().toArray(new String[0]));
-            if (!this.isMachineEnabled(docEntity)) {
+            if (this.getEnabledMachineInfo(docEntity) == null) {
                 ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(),
                         errorNum, I18nUtil.getMessage("ui.data.column.cd15MachineRollMapping.machineInvalid"), validated);
             }
@@ -142,15 +160,33 @@ public class Cd15MachineRollMappingServiceImpl extends AbstractDocService<Cd15Ma
         return cd15MachineRollMappingMapper.selectOne(wrapper);
     }
 
-    private boolean isMachineEnabled(Cd15MachineRollMapping entity) {
+    private Cd15MachineInfo getEnabledMachineInfo(Cd15MachineRollMapping entity) {
         if (entity == null || StringUtils.isBlank(entity.getFactoryCode()) || StringUtils.isBlank(entity.getMachineCode())) {
-            return false;
+            return null;
         }
         LambdaQueryWrapper<Cd15MachineInfo> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(Cd15MachineInfo::getFactoryCode, entity.getFactoryCode());
         wrapper.eq(Cd15MachineInfo::getMachineCode, entity.getMachineCode());
         wrapper.eq(Cd15MachineInfo::getStatus, ApsConstant.APS_STRING_1);
-        return cd15MachineInfoMapper.selectCount(wrapper) > 0;
+        return cd15MachineInfoMapper.selectOne(wrapper);
+    }
+
+    private boolean hasOutOfOpenShift(Cd15MachineRollMapping entity, Cd15MachineInfo machineInfo) {
+        Set<String> openShifts = splitShiftCodes(machineInfo.getOpenMachineClass());
+        if (openShifts.isEmpty()) {
+            return StringUtils.isNotBlank(entity.getShiftCode());
+        }
+        return !openShifts.containsAll(splitShiftCodes(entity.getShiftCode()));
+    }
+
+    private Set<String> splitShiftCodes(String shiftCode) {
+        if (StringUtils.isBlank(shiftCode)) {
+            return new HashSet<>();
+        }
+        return Arrays.stream(shiftCode.split(","))
+                .map(StringUtils::trimToEmpty)
+                .filter(StringUtils::isNotBlank)
+                .collect(Collectors.toSet());
     }
 
     private void normalize(Cd15MachineRollMapping entity) {

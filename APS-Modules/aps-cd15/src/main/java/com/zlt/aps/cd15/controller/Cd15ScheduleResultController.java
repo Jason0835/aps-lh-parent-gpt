@@ -9,6 +9,7 @@ import com.ruoyi.common.log.enums.BusinessType;
 import com.zlt.aps.cd15.api.domain.entity.Cd15ScheduleResult;
 import com.zlt.aps.cd15.api.domain.vo.Cd15ChangeQtyRequest;
 import com.zlt.aps.cd15.api.domain.vo.Cd15InsertOrderRequest;
+import com.zlt.aps.cd15.api.domain.vo.Cd15RollingCheckRequest;
 import com.zlt.aps.cd15.api.domain.vo.Cd15TransferMachineRequest;
 import com.zlt.aps.cd15.mapper.Cd15ScheduleResultMapper;
 import com.zlt.aps.cd15.service.ICd15ScheduleResultService;
@@ -133,6 +134,17 @@ public class Cd15ScheduleResultController extends AbstractDocBizController<Cd15S
         return cd15ScheduleResultService.getChangeQtyTask(taskId);
     }
 
+    @ApiOperation("CD15定时滚动排程检查")
+    @PostMapping("/rollingSchedule/check")
+    public AjaxResult checkTimedRolling(@RequestBody Cd15RollingCheckRequest request) {
+        return cd15ScheduleResultService.checkTimedRolling(request);
+    }
+
+    @ApiOperation("查询CD15定时滚动排程任务")
+    @GetMapping("/rollingSchedule/task/{taskId}")
+    public AjaxResult getTimedRollingTask(@PathVariable("taskId") String taskId) {
+        return cd15ScheduleResultService.getTimedRollingTask(taskId);
+    }
     @ApiOperation("发布斜裁排程结果")
     @PostMapping("/publish")
     public AjaxResult publish(@RequestBody Cd15ScheduleResult dto,

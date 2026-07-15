@@ -9,6 +9,7 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.cd15.api.domain.entity.Cd15CurlLength;
 import com.zlt.aps.cd15.mapper.Cd15CurlLengthMapper;
 import com.zlt.aps.cd15.service.ICd15CurlLengthService;
+import com.zlt.aps.maindata.service.IMdmConstructionInfoService;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.common.enums.ImportErrorTypeEnums;
 import com.zlt.common.utils.ImportExcelValidatedUtils;
@@ -22,7 +23,9 @@ import org.springframework.transaction.annotation.Transactional;
 import javax.annotation.Resource;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * 斜裁卷曲长度业务实现。
@@ -33,6 +36,9 @@ public class Cd15CurlLengthServiceImpl extends AbstractDocService<Cd15CurlLength
 
     @Resource
     private Cd15CurlLengthMapper cd15CurlLengthMapper;
+
+    @Resource
+    private IMdmConstructionInfoService mdmConstructionInfoService;
 
     @Override
     protected String getDocTypeCode() {
@@ -68,6 +74,10 @@ public class Cd15CurlLengthServiceImpl extends AbstractDocService<Cd15CurlLength
         int failureNum = 0;
         List<Cd15CurlLength> importList = new ArrayList<>();
         List<ImportErrorLog> importErrorLogs = new ArrayList<>();
+        List<String> steelStripCodeList = mdmConstructionInfoService.listSteelStripCodes();
+        Set<String> steelStripCodes = CollectionUtils.isEmpty(steelStripCodeList)
+                ? new HashSet<>()
+                : new HashSet<>(steelStripCodeList);
         String uniqueMsg = I18nUtil.getMessage("import.validated.unique");
 
         for (int i = 0; i < list.size(); i++) {
@@ -75,6 +85,10 @@ public class Cd15CurlLengthServiceImpl extends AbstractDocService<Cd15CurlLength
             Cd15CurlLength docEntity = list.get(i);
             List<ImportErrorLog> validated = ImportExcelValidatedUtils.validated(importLogId, errorNum, docEntity);
             ImportExcelValidatedUtils.validatedRepeat(list, docEntity, i, 2, importLogId, validated);
+            if (!isSteelStripCodeExists(docEntity, steelStripCodes)) {
+                ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(),
+                        errorNum, I18nUtil.getMessage("ui.data.column.cd15CurlLength.steelStripInvalid"), validated);
+            }
             if (CollectionUtils.isNotEmpty(validated)) {
                 failureNum++;
                 docEntity.setId(-999L);
@@ -121,6 +135,13 @@ public class Cd15CurlLengthServiceImpl extends AbstractDocService<Cd15CurlLength
             return AjaxResult.error(I18nUtil.getMessage("ui.message.import.fail") + "," + successNum + "," + failureNum, importErrorLogs);
         }
         return AjaxResult.success(I18nUtil.getMessage("ui.message.import.success") + "," + successNum);
+    }
+
+    private boolean isSteelStripCodeExists(Cd15CurlLength entity, Set<String> steelStripCodes) {
+        if (StringUtils.isBlank(entity.getSteelStripCode())) {
+            return true;
+        }
+        return steelStripCodes.contains(entity.getSteelStripCode());
     }
 
     private Cd15CurlLength getExistCurlLength(Cd15CurlLength entity) {

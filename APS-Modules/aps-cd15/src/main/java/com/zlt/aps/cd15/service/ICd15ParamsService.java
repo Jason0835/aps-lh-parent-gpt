@@ -18,6 +18,15 @@ public interface ICd15ParamsService extends IDocService<Cd15Params> {
     String checkUnique(Cd15Params entity);
 
     /**
+     * Get parameter value by factory code and parameter code.
+     *
+     * @param factoryCode factory code
+     * @param paramCode parameter code
+     * @return parameter value
+     */
+    String getParamValue(String factoryCode, String paramCode);
+
+    /**
      * 导入数据
      * @param list 数据列表
      * @param updateSupport 是否更新已存在数据

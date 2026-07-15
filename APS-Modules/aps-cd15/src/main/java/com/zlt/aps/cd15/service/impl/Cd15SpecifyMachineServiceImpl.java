@@ -12,6 +12,7 @@ import com.zlt.aps.cd15.mapper.Cd15MachineInfoMapper;
 import com.zlt.aps.cd15.mapper.Cd15SpecifyMachineMapper;
 import com.zlt.aps.cd15.service.ICd15SpecifyMachineService;
 import com.zlt.aps.common.core.constant.ApsConstant;
+import com.zlt.aps.maindata.service.IMdmConstructionInfoService;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.common.enums.ImportErrorTypeEnums;
 import com.zlt.common.utils.ImportExcelValidatedUtils;
@@ -25,7 +26,9 @@ import org.springframework.transaction.annotation.Transactional;
 import javax.annotation.Resource;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * 斜裁定点机台业务实现。
@@ -39,6 +42,9 @@ public class Cd15SpecifyMachineServiceImpl extends AbstractDocService<Cd15Specif
 
     @Resource
     private Cd15MachineInfoMapper cd15MachineInfoMapper;
+
+    @Resource
+    private IMdmConstructionInfoService mdmConstructionInfoService;
 
     @Override
     protected String getDocTypeCode() {
@@ -74,6 +80,10 @@ public class Cd15SpecifyMachineServiceImpl extends AbstractDocService<Cd15Specif
         int failureNum = 0;
         List<Cd15SpecifyMachine> importList = new ArrayList<>();
         List<ImportErrorLog> importErrorLogs = new ArrayList<>();
+        List<String> steelStripCodeList = mdmConstructionInfoService.listSteelStripCodes();
+        Set<String> steelStripCodes = CollectionUtils.isEmpty(steelStripCodeList)
+                ? new HashSet<>()
+                : new HashSet<>(steelStripCodeList);
         String uniqueMsg = I18nUtil.getMessage("import.validated.unique");
 
         for (int i = 0; i < list.size(); i++) {
@@ -86,6 +96,10 @@ public class Cd15SpecifyMachineServiceImpl extends AbstractDocService<Cd15Specif
             if (!isMachineEnabled(docEntity)) {
                 ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(),
                         errorNum, I18nUtil.getMessage("ui.data.column.cd15SpecifyMachine.machineInvalid"), validated);
+            }
+            if (!isSteelStripCodeExists(docEntity, steelStripCodes)) {
+                ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(),
+                        errorNum, I18nUtil.getMessage("ui.data.column.cd15SpecifyMachine.steelStripInvalid"), validated);
             }
             if (CollectionUtils.isNotEmpty(validated)) {
                 failureNum++;
@@ -144,6 +158,13 @@ public class Cd15SpecifyMachineServiceImpl extends AbstractDocService<Cd15Specif
         wrapper.eq(Cd15MachineInfo::getMachineCode, specifyMachine.getMachineCode());
         wrapper.eq(Cd15MachineInfo::getStatus, ApsConstant.APS_STRING_1);
         return cd15MachineInfoMapper.selectCount(wrapper) > 0;
+    }
+
+    private boolean isSteelStripCodeExists(Cd15SpecifyMachine specifyMachine, Set<String> steelStripCodes) {
+        if (StringUtils.isBlank(specifyMachine.getSteelStripCode())) {
+            return true;
+        }
+        return steelStripCodes.contains(specifyMachine.getSteelStripCode());
     }
 
     private void normalize(Cd15SpecifyMachine specifyMachine) {
