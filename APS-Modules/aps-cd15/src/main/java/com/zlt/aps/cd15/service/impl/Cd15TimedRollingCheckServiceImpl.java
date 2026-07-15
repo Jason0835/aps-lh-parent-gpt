@@ -17,6 +17,7 @@ import com.zlt.aps.cd15.mapper.Cd15ScheduleResultMapper;
 import com.zlt.aps.cd15.service.Cd15RollingStabilityService;
 import com.zlt.aps.cd15.service.Cd15TimedRollingAsyncExecutor;
 import com.zlt.aps.cd15.service.Cd15TimedRollingCheckService;
+import com.zlt.aps.common.core.enums.ThreeShiftEnum;
 import lombok.Builder;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
@@ -26,7 +27,6 @@ import org.springframework.util.StringUtils;
 import java.sql.Date;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -54,9 +54,12 @@ public class Cd15TimedRollingCheckServiceImpl implements Cd15TimedRollingCheckSe
     private static final int DEFAULT_LATE_MINUTES = 15;
     private static final int DEFAULT_STABLE_MINUTES = 5;
     private static final List<ShiftPoint> SHIFT_POINTS = Arrays.asList(
-            new ShiftPoint("01", "CLASS1", LocalTime.parse("06:00")),
-            new ShiftPoint("02", "CLASS2", LocalTime.parse("14:00")),
-            new ShiftPoint("03", "CLASS3", LocalTime.parse("22:00")));
+            new ShiftPoint(ThreeShiftEnum.MIDDLE, "CLASS1", -1),
+            new ShiftPoint(ThreeShiftEnum.NIGHT, "CLASS2", -1),
+            new ShiftPoint(ThreeShiftEnum.MORNING, "CLASS3", 0),
+            new ShiftPoint(ThreeShiftEnum.MIDDLE, "CLASS4", 0),
+            new ShiftPoint(ThreeShiftEnum.NIGHT, "CLASS5", 0),
+            new ShiftPoint(ThreeShiftEnum.MORNING, "CLASS6", 1));
 
     private final Cd15ParamsMapper paramsMapper;
     private final Cd15ScheduleResultMapper resultMapper;
@@ -103,7 +106,8 @@ public class Cd15TimedRollingCheckServiceImpl implements Cd15TimedRollingCheckSe
             return;
         }
         String inputVersion = inputVersionService.fingerprint(factoryCode, target.getScheduleDate());
-        String stateKey = factoryCode + ":" + target.getScheduleDate() + ":" + target.getTargetShiftCode();
+        String stateKey = factoryCode + ":" + target.getScheduleDate() + ":"
+                + target.getTargetClassField() + ":" + target.getTargetShiftCode();
         boolean stable = rollingStabilityService.observe(stateKey, inputVersion,
                 triggerTime.atZone(ZoneId.systemDefault()).toInstant(), parameters.getStableMinutes());
         if (!stable) {
@@ -197,12 +201,13 @@ public class Cd15TimedRollingCheckServiceImpl implements Cd15TimedRollingCheckSe
 
     private Cd15RollingTarget target(String factoryCode, LocalDate scheduleDate, String batchNo,
                                  ShiftPoint shift, RollingParameters parameters) {
-        LocalDateTime handoverTime = LocalDateTime.of(scheduleDate, shift.getHandoverTime());
+        LocalDateTime handoverTime = LocalDateTime.of(
+                scheduleDate.plusDays(shift.getStartDateOffset()), shift.getShift().getStartTime());
         return Cd15RollingTarget.builder()
                 .factoryCode(factoryCode)
                 .scheduleDate(scheduleDate)
                 .batchNo(batchNo)
-                .targetShiftCode(shift.getShiftCode())
+                .targetShiftCode(shift.getShift().getCode())
                 .targetClassField(shift.getClassField())
                 .targetClassIndex(this.classIndex(shift.getClassField()))
                 .handoverTime(handoverTime)
@@ -283,26 +288,26 @@ public class Cd15TimedRollingCheckServiceImpl implements Cd15TimedRollingCheckSe
     }
 
     private static class ShiftPoint {
-        private final String shiftCode;
+        private final ThreeShiftEnum shift;
         private final String classField;
-        private final LocalTime handoverTime;
+        private final int startDateOffset;
 
-        ShiftPoint(String shiftCode, String classField, LocalTime handoverTime) {
-            this.shiftCode = shiftCode;
+        ShiftPoint(ThreeShiftEnum shift, String classField, int startDateOffset) {
+            this.shift = shift;
             this.classField = classField;
-            this.handoverTime = handoverTime;
+            this.startDateOffset = startDateOffset;
         }
 
-        String getShiftCode() {
-            return shiftCode;
+        ThreeShiftEnum getShift() {
+            return shift;
         }
 
         String getClassField() {
             return classField;
         }
 
-        LocalTime getHandoverTime() {
-            return handoverTime;
+        int getStartDateOffset() {
+            return startDateOffset;
         }
     }
 

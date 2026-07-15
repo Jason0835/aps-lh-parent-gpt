@@ -1,10 +1,11 @@
 package com.zlt.aps.cd15.engine.algorithm;
 
+import com.zlt.aps.common.core.enums.ThreeShiftEnum;
+
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
 import java.time.ZoneId;
 import java.util.Date;
 
@@ -13,9 +14,9 @@ import java.util.Date;
  */
 public final class Cd15ShiftDisplayHelper {
 
-    private static final String SHIFT_NAME_MIDDLE = "中班";
-    private static final String SHIFT_NAME_NIGHT = "夜班";
-    private static final String SHIFT_NAME_DAY = "早班";
+    private static final ThreeShiftEnum[] CLASS_SHIFT_ORDER = {
+            ThreeShiftEnum.MIDDLE, ThreeShiftEnum.NIGHT, ThreeShiftEnum.MORNING
+    };
 
     private Cd15ShiftDisplayHelper() {
     }
@@ -77,13 +78,12 @@ public final class Cd15ShiftDisplayHelper {
         if (displayDate == null) {
             displayDate = LocalDate.now();
         }
-        if ("02".equals(shiftCode)) {
-            return LocalDateTime.of(displayDate.minusDays(1), LocalTime.of(22, 0));
+        ThreeShiftEnum shift = ThreeShiftEnum.getByCode(shiftCode);
+        if (shift == null) {
+            return null;
         }
-        if ("03".equals(shiftCode)) {
-            return LocalDateTime.of(displayDate, LocalTime.of(6, 0));
-        }
-        return LocalDateTime.of(displayDate, LocalTime.of(14, 0));
+        LocalDate startDate = shift.isCrossDay() ? displayDate.minusDays(1) : displayDate;
+        return LocalDateTime.of(startDate, shift.getStartTime());
     }
 
     /**
@@ -96,16 +96,8 @@ public final class Cd15ShiftDisplayHelper {
         if (!StringUtils.hasText(shiftCode)) {
             return null;
         }
-        switch (shiftCode) {
-            case "01":
-                return SHIFT_NAME_MIDDLE;
-            case "02":
-                return SHIFT_NAME_NIGHT;
-            case "03":
-                return SHIFT_NAME_DAY;
-            default:
-                return null;
-        }
+        ThreeShiftEnum shift = ThreeShiftEnum.getByCode(shiftCode);
+        return shift == null ? null : shift.getName();
     }
 
     /**
@@ -116,7 +108,7 @@ public final class Cd15ShiftDisplayHelper {
      */
     public static String classIndexToShiftCode(int classIndex) {
         int normalized = ((Math.max(classIndex, 1) - 1) % 3) + 1;
-        return String.format("%02d", normalized);
+        return CLASS_SHIFT_ORDER[normalized - 1].getCode();
     }
 
     /**
