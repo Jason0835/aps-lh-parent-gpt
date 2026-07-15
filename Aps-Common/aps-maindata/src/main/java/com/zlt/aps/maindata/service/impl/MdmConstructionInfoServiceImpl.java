@@ -57,11 +57,21 @@ public class MdmConstructionInfoServiceImpl extends AbstractDocService<MdmConstr
     @Autowired
     private MdmConstructionInfoEntityMapper mdmConstructionInfoEntityMapper;
 
+    /**
+     * 返回单据类型编码
+     *
+     * @return 单据类型编码 MDM0124
+     */
     @Override
     protected String getDocTypeCode() {
         return "MDM0124";
     }
 
+    /**
+     * 返回系统单据类型对象
+     *
+     * @return 系统单据类型对象
+     */
     @Override
     protected SysDocType getSysDocType() {
         SysDocType sysDocType = new SysDocType();
@@ -69,6 +79,12 @@ public class MdmConstructionInfoServiceImpl extends AbstractDocService<MdmConstr
         return sysDocType;
     }
 
+    /**
+     * 唯一性校验，不唯一时抛出业务异常
+     *
+     * @param docEntityVO 投产胎胚施工信息实体
+     * @return 唯一性结果
+     */
     @Override
     public String checkUnique(MdmConstructionInfo docEntityVO) {
         String unique = super.checkUnique(docEntityVO);
@@ -78,12 +94,27 @@ public class MdmConstructionInfoServiceImpl extends AbstractDocService<MdmConstr
         return unique;
     }
 
+    /**
+     * 返回唯一性校验字段列表
+     *
+     * @return 唯一性校验字段：工厂编码、施工编码、施工版本
+     */
     @Override
     protected List<String> getCheckUniqueFields() {
         // 唯一校验字段
         return new ArrayList<>(Arrays.asList("factoryCode", "constructionCode", "constructionVersion"));
     }
 
+    /**
+     * 导入数据时的业务校验与数据处理，补充物料编码和MES物料编码
+     *
+     * @param importDocEntity  导入的实体对象
+     * @param importErrorLogs  错误日志列表
+     * @param importLogId      导入日志ID
+     * @param errorRowNum      错误行号
+     * @param serviceCheckParams 业务校验参数
+     * @return 校验结果
+     */
     @Override
     protected Boolean serviceCheckAndDataHandle(MdmConstructionInfo importDocEntity, List<ImportErrorLog> importErrorLogs, Long importLogId, int errorRowNum, Map<Object, Object> serviceCheckParams) {
         Boolean result = super.serviceCheckAndDataHandle(importDocEntity, importErrorLogs, importLogId, errorRowNum, serviceCheckParams);
@@ -92,25 +123,25 @@ public class MdmConstructionInfoServiceImpl extends AbstractDocService<MdmConstr
         return result;
     }
 
+    /**
+     * 查询所有投产胎胚施工信息中的胎体布代号列表，去重排序
+     *
+     * @return 胎体布代号列表
+     */
     @Override
     public List<String> listTireFabricCodes() {
         List<MdmConstructionInfo> constructionInfos = mdmConstructionInfoEntityMapper.selectList(null);
         return collectTireFabricCodes(constructionInfos);
     }
 
+    /**
+     * 查询所有投产胎胚施工信息中的帘布规格列表，去重排序
+     *
+     * @return 帘布规格列表
+     */
     @Override
     public List<String> listCordSpecs() {
         List<MdmConstructionInfo> constructionInfos = mdmConstructionInfoEntityMapper.selectList(null);
-        return collectCordSpecs(constructionInfos);
-    }
-
-    @Override
-    public List<String> listSteelStripCodes() {
-        List<MdmConstructionInfo> constructionInfos = mdmConstructionInfoEntityMapper.selectList(null);
-        return collectSteelStripCodes(constructionInfos);
-    }
-
-    List<String> collectCordSpecs(List<MdmConstructionInfo> constructionInfos) {
         if (constructionInfos == null || constructionInfos.isEmpty()) {
             return new ArrayList<>();
         }
@@ -124,6 +155,35 @@ public class MdmConstructionInfoServiceImpl extends AbstractDocService<MdmConstr
                 .collect(java.util.stream.Collectors.toList());
     }
 
+    /**
+     * 查询所有投产胎胚施工信息中的钢带代码列表，去重排序
+     *
+     * @return 钢带代码列表
+     */
+    @Override
+    public List<String> listSteelStripCodes() {
+        List<MdmConstructionInfo> constructionInfos = mdmConstructionInfoEntityMapper.selectList(null);
+        if (constructionInfos == null || constructionInfos.isEmpty()) {
+            return new ArrayList<>();
+        }
+        Set<String> codeSet = new TreeSet<>();
+        Method[] methods = MdmConstructionInfo.class.getMethods();
+        constructionInfos.forEach(constructionInfo -> {
+            Arrays.stream(methods)
+                    .filter(method -> BELT_CODE_GETTER.matcher(method.getName()).matches())
+                    .forEach(method -> collectCode(codeSet, constructionInfo, method, "读取投产胎胚施工钢带代码失败，方法：{}"));
+            Optional.ofNullable(constructionInfo.getBeltCodeLeftCode()).map(String::trim).filter(s -> !s.isEmpty()).ifPresent(codeSet::add);
+            Optional.ofNullable(constructionInfo.getBeltCodeRightCode()).map(String::trim).filter(s -> !s.isEmpty()).ifPresent(codeSet::add);
+        });
+        return new ArrayList<>(codeSet);
+    }
+
+    /**
+     * 从施工信息列表中收集所有胎体布代号，通过反射读取动态字段 TireFabricCode1~N，去重排序后返回
+     *
+     * @param constructionInfos 投产胎胚施工信息列表
+     * @return 去重排序的胎体布代号列表
+     */
     List<String> collectTireFabricCodes(List<MdmConstructionInfo> constructionInfos) {
         if (constructionInfos == null || constructionInfos.isEmpty()) {
             return new ArrayList<>();
@@ -141,22 +201,14 @@ public class MdmConstructionInfoServiceImpl extends AbstractDocService<MdmConstr
         return new ArrayList<>(codeSet);
     }
 
-    List<String> collectSteelStripCodes(List<MdmConstructionInfo> constructionInfos) {
-        if (constructionInfos == null || constructionInfos.isEmpty()) {
-            return new ArrayList<>();
-        }
-        Set<String> codeSet = new TreeSet<>();
-        Method[] methods = MdmConstructionInfo.class.getMethods();
-        constructionInfos.forEach(constructionInfo -> {
-            Arrays.stream(methods)
-                    .filter(method -> BELT_CODE_GETTER.matcher(method.getName()).matches())
-                    .forEach(method -> collectCode(codeSet, constructionInfo, method, "读取投产胎胚施工钢带代码失败，方法：{}"));
-            Optional.ofNullable(constructionInfo.getBeltCodeLeftCode()).map(String::trim).filter(s -> !s.isEmpty()).ifPresent(codeSet::add);
-            Optional.ofNullable(constructionInfo.getBeltCodeRightCode()).map(String::trim).filter(s -> !s.isEmpty()).ifPresent(codeSet::add);
-        });
-        return new ArrayList<>(codeSet);
-    }
-
+    /**
+     * 通过反射调用 getter 方法获取字段值，非空非空白时加入集合
+     *
+     * @param codeSet          目标代码集合
+     * @param constructionInfo 施工信息实体
+     * @param method           反射获取的 getter 方法
+     * @param warnMessage      反射调用失败时的告警日志模板
+     */
     private void collectCode(Set<String> codeSet, MdmConstructionInfo constructionInfo, Method method, String warnMessage) {
         try {
             Object value = method.invoke(constructionInfo);
@@ -172,6 +224,16 @@ public class MdmConstructionInfoServiceImpl extends AbstractDocService<MdmConstr
         }
     }
 
+    /**
+     * 异步执行投产胎胚施工信息导入，记录导入耗时和错误日志
+     *
+     * @param list          待导入数据列表
+     * @param updateSupport 是否支持更新
+     * @param importLogId   导入日志ID
+     * @param importLog     导入日志对象
+     * @param beginTime     导入开始时间
+     * @param attributes    Servlet请求属性
+     */
     @Async
     @Override
     public void importDataAsync(List<MdmConstructionInfo> list, boolean updateSupport, long importLogId, ImportLog importLog, Date beginTime, ServletRequestAttributes attributes) {
