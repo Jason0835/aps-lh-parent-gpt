@@ -1477,7 +1477,7 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
         log.debug("SKU日硫化产能加载完成, 数量: {}", skuLhCapacityMap.size());
     }
 
-    
+
     /**
      * 加载设备停机计划。
      * <p>普通维修、精度等停机仍按排程窗口交集加载；干冰/喷砂清洗需要额外按计划开始时间加载
@@ -1990,12 +1990,13 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
     }
 
     /**
-     * 加载T日排程班次完成量（来自LhScheFinishQty表），按物料编号汇总class1FinishQty。
-     * <p>同一物料在同一T日可能有多条记录（不同机台），需按materialCode汇总。</p>
+     * 加载T日排程班次完成量（来自LhScheFinishQty表），按物料编码和一班产品状态汇总class1FinishQty。
+     * <p>同一业务SKU在同一T日可能有多条机台记录，需要共享本状态完成量账本；
+     * 同物料其他产品状态的完成量不得参与本状态月计划及日计划扣减。</p>
      *
-     * @param context      排程上下文
-     * @param factoryCode  分厂编号
-     * @param scheduleDate 排程窗口起点T日
+     * @param context       排程上下文
+     * @param factoryCode   分厂编号
+     * @param scheduleDate  排程窗口起点T日
      */
     private void loadScheDayFinishQty(LhScheduleContext context, String factoryCode, Date scheduleDate) {
         Date tDay = LhScheduleTimeUtil.clearTime(scheduleDate);

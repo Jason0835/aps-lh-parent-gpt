@@ -59,7 +59,7 @@
 </template>
 
 <script>
-import { listMachineRollMapping, removeMachineRollMapping, exportMachineRollMapping } from "@/api/cd15/machineRollMapping";
+import { listMachineRollMapping, removeMachineRollMapping, exportMachineRollMapping, listArticleCrownSpecs } from "@/api/cd15/machineRollMapping";
 import { getCd15MachineEnableOptions } from "@/api/cd15/cd15MachineInfo";
 import TltUploadForm from "@/views/components/tltUploadForm.vue";
 import infoDialog from "./components/infoDialog.vue";
@@ -98,6 +98,7 @@ export default {
       data: [],
       selection: [],
       machineOptions: [],
+      articleCrownSpecOptions: [],
       page: {
         current: 1,
         pageSize: 20,
@@ -197,6 +198,10 @@ export default {
         {
           label: this.$t("ui.data.column.cd15MachineRollMapping.bigRollCode"),
           prop: "bigRollCode",
+          type: "select",
+          dictData: this.articleCrownSpecOptions,
+          filterable: true,
+          clearable: true,
         },
         {
           label: this.$t("ui.data.column.cd15MachineRollMapping.machineCode"),
@@ -277,6 +282,11 @@ export default {
     handleSelectionChange(selection) {
       this.selection = selection || [];
     },
+    async loadArticleCrownSpecOptions() {
+      const res = await listArticleCrownSpecs();
+      const rows = Array.isArray(res) ? res : (res.data || []);
+      this.articleCrownSpecOptions = rows.map((code) => ({ label: code, value: code }));
+    },
     async loadMachineOptions() {
       const res = await getCd15MachineEnableOptions({ factoryCode: this.query.factoryCode || "116" });
       const rows = Array.isArray(res) ? res : (res.rows || res.data || []);
@@ -303,6 +313,7 @@ export default {
   created() {
     this.getList();
     this.loadMachineOptions();
+    this.loadArticleCrownSpecOptions();
   },
 };
 </script>

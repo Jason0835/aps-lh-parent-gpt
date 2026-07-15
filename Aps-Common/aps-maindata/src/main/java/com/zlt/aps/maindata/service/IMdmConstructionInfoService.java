@@ -47,4 +47,11 @@ public interface IMdmConstructionInfoService  extends IDocService<MdmConstructio
      */
     List<String> listSteelStripCodes();
 
+    /**
+     * 查询投产胎胚施工中的钢压大卷规格（ARTICLE_CROWN_SPEC）下拉数据。
+     *
+     * @return 去重后的钢压大卷规格列表
+     */
+    List<String> listArticleCrownSpecs();
+
 }

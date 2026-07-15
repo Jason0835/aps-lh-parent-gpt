@@ -31,4 +31,15 @@ public class Cd15CommonController {
     public AjaxResult steelStripCodes() {
         return AjaxResult.success(mdmConstructionInfoService.listSteelStripCodes());
     }
+
+    /**
+     * 钢压大卷规格下拉（ARTICLE_CROWN_SPEC）。
+     *
+     * @return 去重后的钢压大卷规格列表
+     */
+    @ApiOperation("钢压大卷规格下拉")
+    @PostMapping("/articleCrownSpecs")
+    public AjaxResult articleCrownSpecs() {
+        return AjaxResult.success(mdmConstructionInfoService.listArticleCrownSpecs());
+    }
 }

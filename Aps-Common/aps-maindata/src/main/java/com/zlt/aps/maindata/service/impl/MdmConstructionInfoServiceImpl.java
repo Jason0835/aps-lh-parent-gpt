@@ -156,6 +156,27 @@ public class MdmConstructionInfoServiceImpl extends AbstractDocService<MdmConstr
     }
 
     /**
+     * 查询投产胎胚施工中的钢压大卷规格（ARTICLE_CROWN_SPEC）列表，去重排序
+     *
+     * @return 钢压大卷规格列表
+     */
+    @Override
+    public List<String> listArticleCrownSpecs() {
+        List<MdmConstructionInfo> constructionInfos = mdmConstructionInfoEntityMapper.selectList(null);
+        if (constructionInfos == null || constructionInfos.isEmpty()) {
+            return new ArrayList<>();
+        }
+        return constructionInfos.stream()
+                .map(MdmConstructionInfo::getArticleCrownSpec)
+                .filter(Objects::nonNull)
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .collect(java.util.stream.Collectors.toCollection(TreeSet::new))
+                .stream()
+                .collect(java.util.stream.Collectors.toList());
+    }
+
+    /**
      * 查询所有投产胎胚施工信息中的钢带代码列表，去重排序
      *
      * @return 钢带代码列表

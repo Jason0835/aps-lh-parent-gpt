@@ -67,6 +67,18 @@ public class TqResultPersistHandler extends AbsTqScheduleStepHandler {
         // 给所有排程结果设置分厂编码
         scheduleList.forEach(r -> r.setFactoryCode(factoryCode));
 
+        // 过滤掉6个班次都没排计划量的无效数据（避免无效数据落库）
+        int beforeFilterSize = scheduleList.size();
+        scheduleList.removeIf(this::isAllClassPlanEmpty);
+        int filteredCount = beforeFilterSize - scheduleList.size();
+        if (filteredCount > 0) {
+            log.info("[S6] 过滤掉6个班次均无计划量的无效数据:{}条, 剩余有效数据:{}条",
+                    filteredCount, scheduleList.size());
+            autoScheduleLogService.insertTqScheduleLog(batchNo, "",
+                    "S6-过滤无效数据", "6个班次均无计划量的记录数:" + filteredCount
+                            + "，剩余有效数据:" + scheduleList.size() + "条");
+        }
+
         // 1. 分离外协排程数据（外协逻辑已废弃，所有数据统一作为非外协处理）
         // List<TqScheduleResultVo> assistScheduleList = scheduleList.stream()
         //         .filter(r -> assistSpecMap.containsKey(r.getBeadCode()))
@@ -208,5 +220,29 @@ public class TqResultPersistHandler extends AbsTqScheduleStepHandler {
             return String.valueOf(value.longValue());
         }
         return String.valueOf(value);
+    }
+
+    /**
+     * 判断6个班次的计划量是否全部为空或0。
+     *
+     * <p>用于过滤无效排程数据：6个班次都没排计划量的记录不应落库。</p>
+     *
+     * @param scheduleVo 排程记录
+     * @return true表示6个班次计划量均为空或0，应过滤掉；false表示至少有一个班次有计划量
+     */
+    private boolean isAllClassPlanEmpty(TqScheduleResultVo scheduleVo) {
+        return isPlanEmpty(scheduleVo.getClass1PlanQty())
+                && isPlanEmpty(scheduleVo.getClass2PlanQty())
+                && isPlanEmpty(scheduleVo.getClass3PlanQty())
+                && isPlanEmpty(scheduleVo.getClass4PlanQty())
+                && isPlanEmpty(scheduleVo.getClass5PlanQty())
+                && isPlanEmpty(scheduleVo.getClass6PlanQty());
+    }
+
+    /**
+     * 判断单个班次计划量是否为空或0
+     */
+    private boolean isPlanEmpty(Double planQty) {
+        return planQty == null || planQty <= 0;
     }
 }
