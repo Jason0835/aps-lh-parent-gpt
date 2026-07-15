@@ -598,6 +598,8 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
                 continue;
             }
             if (StringUtils.equals(sku.getMaterialCode(), continuousSku.getMaterialCode())
+                    && StringUtils.equals(StringUtils.trimToEmpty(sku.getProductStatus()),
+                    StringUtils.trimToEmpty(continuousSku.getProductStatus()))
                     && continuousSku.getDailyPlanQuotaMap() == sku.getDailyPlanQuotaMap()) {
                 sameQuotaContinuousCount++;
                 if (sameQuotaContinuousCount > 1) {
@@ -622,12 +624,14 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
             return sourceSku;
         }
         SkuScheduleDTO continuousSku = findValidationSourceSku(
-                context.getContinuousSkuList(), sourceSku.getMaterialCode(), sourceSku.getDailyPlanQuotaMap());
+                context.getContinuousSkuList(), sourceSku.getMaterialCode(), sourceSku.getProductStatus(),
+                sourceSku.getDailyPlanQuotaMap());
         if (continuousSku != null) {
             return continuousSku;
         }
         SkuScheduleDTO newSpecSku = findValidationSourceSku(
-                context.getNewSpecSkuList(), sourceSku.getMaterialCode(), sourceSku.getDailyPlanQuotaMap());
+                context.getNewSpecSkuList(), sourceSku.getMaterialCode(), sourceSku.getProductStatus(),
+                sourceSku.getDailyPlanQuotaMap());
         return newSpecSku != null ? newSpecSku : sourceSku;
     }
 
@@ -636,11 +640,13 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
      *
      * @param skuList SKU列表
      * @param materialCode 物料编码
+     * @param productStatus 产品状态
      * @param quotaMap 共享日计划账本
      * @return 逻辑来源SKU
      */
     private SkuScheduleDTO findValidationSourceSku(List<SkuScheduleDTO> skuList,
                                                    String materialCode,
+                                                   String productStatus,
                                                    Map<LocalDate, SkuDailyPlanQuotaDTO> quotaMap) {
         if (CollectionUtils.isEmpty(skuList) || StringUtils.isEmpty(materialCode) || quotaMap == null) {
             return null;
@@ -650,6 +656,8 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
                 continue;
             }
             if (StringUtils.equals(materialCode, sku.getMaterialCode())
+                    && StringUtils.equals(StringUtils.trimToEmpty(productStatus),
+                    StringUtils.trimToEmpty(sku.getProductStatus()))
                     && sku.getDailyPlanQuotaMap() == quotaMap) {
                 return sku;
             }
@@ -670,6 +678,8 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
         }
         for (LhUnscheduledResult unscheduledResult : context.getUnscheduledResultList()) {
             if (StringUtils.equals(sku.getMaterialCode(), unscheduledResult.getMaterialCode())
+                    && StringUtils.equals(StringUtils.trimToEmpty(sku.getProductStatus()),
+                    StringUtils.trimToEmpty(unscheduledResult.getProductStatus()))
                     && Objects.nonNull(unscheduledResult.getUnscheduledQty())
                     && unscheduledResult.getUnscheduledQty() > 0) {
                 return true;
@@ -1332,7 +1342,7 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
         // 输出满班补齐超排汇总
         for (Map.Entry<String, Integer> entry : skuShiftFillOverMap.entrySet()) {
             totalShiftFillOverQty += entry.getValue();
-            log.info("满班补齐超排汇总, 物料: {}, 超排量: {}", entry.getKey(), entry.getValue());
+            log.info("满班补齐超排汇总, SKU复合键: {}, 超排量: {}", entry.getKey(), entry.getValue());
         }
 
         LhScheduleProcessLog dailyPlanLog = new LhScheduleProcessLog();

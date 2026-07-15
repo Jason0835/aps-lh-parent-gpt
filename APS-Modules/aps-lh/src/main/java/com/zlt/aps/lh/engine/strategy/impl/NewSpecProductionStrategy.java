@@ -181,7 +181,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         log.info("新增排产 - 胎胚库存调整");
         // 按物料编码汇总多机台排产量，再统一做库存裁剪（避免多机台场景下各机台独立比对导致总量超库存）
         Map<String, Integer> materialTotalPlanMap = new LinkedHashMap<>(16);
-        Map<String, SkuScheduleDTO> materialSkuMap = new LinkedHashMap<>(16);
+        Map<String, Integer> materialEmbryoStockMap = new LinkedHashMap<>(16);
         Map<String, List<LhScheduleResult>> materialResultMap = new LinkedHashMap<>(16);
         for (LhScheduleResult result : context.getScheduleResultList()) {
             if (!NEW_SPEC_SCHEDULE_TYPE.equals(result.getScheduleType())
@@ -191,13 +191,14 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
             if (result.getEmbryoCode() == null) {
                 continue;
             }
-            SkuScheduleDTO sku = findSkuDto(context, result.getMaterialCode());
+            SkuScheduleDTO sku = findSkuDto(
+                    context, result.getMaterialCode(), result.getProductStatus());
             if (sku == null || sku.getEmbryoStock() < 0) {
                 continue;
             }
             int planQty = ShiftFieldUtil.resolveScheduledQty(result);
             materialTotalPlanMap.merge(result.getMaterialCode(), planQty, Integer::sum);
-            materialSkuMap.putIfAbsent(result.getMaterialCode(), sku);
+            materialEmbryoStockMap.merge(result.getMaterialCode(), sku.getEmbryoStock(), Math::max);
             materialResultMap.computeIfAbsent(result.getMaterialCode(), key -> new ArrayList<LhScheduleResult>())
                     .add(result);
         }
@@ -206,17 +207,17 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         for (Map.Entry<String, List<LhScheduleResult>> entry : materialResultMap.entrySet()) {
             String materialCode = entry.getKey();
             int totalPlan = materialTotalPlanMap.getOrDefault(materialCode, 0);
-            SkuScheduleDTO sku = materialSkuMap.get(materialCode);
-            if (sku == null || totalPlan <= 0 || totalPlan <= sku.getEmbryoStock()) {
+            int embryoStock = materialEmbryoStockMap.getOrDefault(materialCode, 0);
+            if (totalPlan <= 0 || totalPlan <= embryoStock) {
                 continue;
             }
-            if (shouldKeepFormalNewSpecFullCapacity(sku, entry.getValue())) {
+            if (shouldKeepAllProductStatusFullCapacity(context, entry.getValue())) {
                 log.info("正式新增跳过胎胚库存后置裁减, materialCode: {}, totalPlan: {}, embryoStock: {}",
-                        materialCode, totalPlan, sku.getEmbryoStock());
+                        materialCode, totalPlan, embryoStock);
                 continue;
             }
             // 库存不足时按物料整体裁剪，避免逐条逐班取整导致总量丢失。
-            ShiftFieldUtil.scaleGroupedShiftPlanQty(entry.getValue(), shifts, sku.getEmbryoStock());
+            ShiftFieldUtil.scaleGroupedShiftPlanQty(entry.getValue(), shifts, embryoStock);
             for (LhScheduleResult result : entry.getValue()) {
                 refreshResultSummary(context, result);
             }
@@ -251,6 +252,39 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
             return false;
         }
         return true;
+    }
+
+    /**
+     * 判断同物料全部产品状态是否都允许保留满班结果。
+     * <p>库存仍按物料整体约束，但严格目标状态不得被其它非严格状态带着跳过库存裁剪。</p>
+     *
+     * @param context 排程上下文
+     * @param materialResults 同物料结果列表
+     * @return true-全部状态均允许保留满班结果
+     */
+    private boolean shouldKeepAllProductStatusFullCapacity(LhScheduleContext context,
+                                                           List<LhScheduleResult> materialResults) {
+        if (CollectionUtils.isEmpty(materialResults)) {
+            return false;
+        }
+        Map<String, List<LhScheduleResult>> skuResultMap = new LinkedHashMap<String, List<LhScheduleResult>>(4);
+        for (LhScheduleResult result : materialResults) {
+            if (result == null) {
+                continue;
+            }
+            String skuKey = MonthPlanDateResolver.buildMaterialStatusKey(
+                    result.getMaterialCode(), result.getProductStatus());
+            skuResultMap.computeIfAbsent(skuKey, key -> new ArrayList<LhScheduleResult>(2)).add(result);
+        }
+        for (List<LhScheduleResult> skuResults : skuResultMap.values()) {
+            LhScheduleResult firstResult = skuResults.get(0);
+            SkuScheduleDTO sku = findSkuDto(
+                    context, firstResult.getMaterialCode(), firstResult.getProductStatus());
+            if (!shouldKeepFormalNewSpecFullCapacity(sku, skuResults)) {
+                return false;
+            }
+        }
+        return !skuResultMap.isEmpty();
     }
 
     @Override
@@ -1594,6 +1628,8 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
             for (SkuScheduleDTO pendingSku : context.getNewSpecSkuList()) {
                 if (pendingSku != null
                         && StringUtils.equals(sourceSku.getMaterialCode(), pendingSku.getMaterialCode())
+                        && StringUtils.equals(StringUtils.trimToEmpty(sourceSku.getProductStatus()),
+                        StringUtils.trimToEmpty(pendingSku.getProductStatus()))
                         && pendingSku.getDailyPlanQuotaMap() == sourceSku.getDailyPlanQuotaMap()) {
                     return true;
                 }
@@ -1603,6 +1639,8 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
             for (SkuScheduleDTO pendingSku : deferredCompensationSkuList) {
                 if (pendingSku != null
                         && StringUtils.equals(sourceSku.getMaterialCode(), pendingSku.getMaterialCode())
+                        && StringUtils.equals(StringUtils.trimToEmpty(sourceSku.getProductStatus()),
+                        StringUtils.trimToEmpty(pendingSku.getProductStatus()))
                         && pendingSku.getDailyPlanQuotaMap() == sourceSku.getDailyPlanQuotaMap()) {
                     return true;
                 }
@@ -1666,7 +1704,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         if (sourceSku != null) {
             return sourceSku;
         }
-        return findSkuDto(context, result.getMaterialCode());
+        return findSkuDto(context, result.getMaterialCode(), result.getProductStatus());
     }
 
     /**
@@ -4304,14 +4342,15 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         }
         for (LocalDate businessDate : recordedDateSet) {
             context.recordScheduledMachine(businessDate, result.getStructureName(),
-                    result.getMaterialCode(), result.getLhMachineCode());
+                    result.getMaterialCode(), result.getProductStatus(), result.getLhMachineCode());
             if (logEnabled) {
                 log.info("新增机台回写提前生产统计, factoryCode: {}, businessDate: {}, materialCode: {}, "
                                 + "structureName: {}, machineCode: {}, structureScheduledTotal: {}, skuScheduledTotal: {}",
                         context.getFactoryCode(), businessDate, result.getMaterialCode(), result.getStructureName(),
                         result.getLhMachineCode(),
                         context.getStructureScheduledMachineCount(businessDate, result.getStructureName()),
-                        context.getSkuScheduledMachineCount(businessDate, result.getMaterialCode()));
+                        context.getSkuScheduledMachineCount(
+                                businessDate, result.getMaterialCode(), result.getProductStatus()));
             }
         }
         return recordedDateSet.size();
@@ -4793,7 +4832,8 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                     context.getFactoryCode(), sku.getMaterialCode(), sku.getStructureName(),
                     currentProductionDate, firstFuturePlanDate, currentPlanMachineCount, futurePlanMachineCount,
                     monthlyHistoryShortageQty,
-                    context.getSkuScheduledMachineCount(currentProductionDate, sku.getMaterialCode()),
+                    context.getSkuScheduledMachineCount(
+                            currentProductionDate, sku.getMaterialCode(), sku.getProductStatus()),
                     Math.max(0, sku.getDailyCapacity()));
         }
         request.setSceneType("newSpec");
@@ -4932,7 +4972,8 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                 || StringUtils.isEmpty(sku.getMaterialCode())) {
             return false;
         }
-        Set<String> continuousMachineCodes = resolvePureContinuousMachineCodes(context, sku.getMaterialCode());
+        Set<String> continuousMachineCodes = resolvePureContinuousMachineCodes(
+                context, sku.getMaterialCode(), sku.getProductStatus());
         if (CollectionUtils.isEmpty(continuousMachineCodes)) {
             return false;
         }
@@ -4996,9 +5037,12 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
      *
      * @param context 排程上下文
      * @param materialCode 物料编码
+     * @param productStatus 产品状态
      * @return 纯续作机台编码集合
      */
-    private Set<String> resolvePureContinuousMachineCodes(LhScheduleContext context, String materialCode) {
+    private Set<String> resolvePureContinuousMachineCodes(LhScheduleContext context,
+                                                          String materialCode,
+                                                          String productStatus) {
         Set<String> machineCodes = new LinkedHashSet<String>(4);
         if (Objects.isNull(context) || StringUtils.isEmpty(materialCode)
                 || CollectionUtils.isEmpty(context.getScheduleResultList())) {
@@ -5007,6 +5051,8 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         for (LhScheduleResult result : context.getScheduleResultList()) {
             if (Objects.isNull(result)
                     || !StringUtils.equals(materialCode, result.getMaterialCode())
+                    || !StringUtils.equals(StringUtils.trimToEmpty(productStatus),
+                    StringUtils.trimToEmpty(result.getProductStatus()))
                     || !StringUtils.equals(ScheduleTypeEnum.CONTINUOUS.getCode(), result.getScheduleType())
                     || StringUtils.equals("1", result.getIsTypeBlock())
                     || StringUtils.isEmpty(result.getLhMachineCode())
@@ -5704,6 +5750,8 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                 || sku == null
                 || StringUtils.isEmpty(sku.getMaterialCode())
                 || !StringUtils.equals(sku.getMaterialCode(), result.getMaterialCode())
+                || !StringUtils.equals(StringUtils.trimToEmpty(sku.getProductStatus()),
+                StringUtils.trimToEmpty(result.getProductStatus()))
                 || StringUtils.equals(currentMachineCode, result.getLhMachineCode())
                 || StringUtils.isEmpty(result.getLhMachineCode())
                 || resolveResultScheduledQty(result) <= 0) {
@@ -7390,6 +7438,8 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
             return 0;
         }
         if (!StringUtils.equals(sku.getMaterialCode(), result.getMaterialCode())
+                || !StringUtils.equals(StringUtils.trimToEmpty(sku.getProductStatus()),
+                StringUtils.trimToEmpty(result.getProductStatus()))
                 || !StringUtils.equals(result.getLhMachineCode(), segment.getMachineCode())
                 || CollectionUtils.isEmpty(segment.getShiftCapacityMap())) {
             return 0;
@@ -8079,6 +8129,8 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                         || !NEW_SPEC_SCHEDULE_TYPE.equals(result.getScheduleType())
                         || "1".equals(result.getIsTypeBlock())
                         || !StringUtils.equals(sku.getMaterialCode(), result.getMaterialCode())
+                        || !StringUtils.equals(StringUtils.trimToEmpty(sku.getProductStatus()),
+                        StringUtils.trimToEmpty(result.getProductStatus()))
                         || ShiftFieldUtil.resolveScheduledQty(result) <= 0) {
                     continue;
                 }
@@ -8089,6 +8141,8 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                 && NEW_SPEC_SCHEDULE_TYPE.equals(currentResult.getScheduleType())
                 && !"1".equals(currentResult.getIsTypeBlock())
                 && StringUtils.equals(sku.getMaterialCode(), currentResult.getMaterialCode())
+                && StringUtils.equals(StringUtils.trimToEmpty(sku.getProductStatus()),
+                StringUtils.trimToEmpty(currentResult.getProductStatus()))
                 && !sameSkuResults.contains(currentResult)) {
             sameSkuResults.add(currentResult);
         }
@@ -8681,7 +8735,9 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         if (context != null && !CollectionUtils.isEmpty(context.getScheduleResultList())) {
             for (LhScheduleResult result : context.getScheduleResultList()) {
                 if (result == null || result == currentResult
-                        || !StringUtils.equals(sku.getMaterialCode(), result.getMaterialCode())) {
+                        || !StringUtils.equals(sku.getMaterialCode(), result.getMaterialCode())
+                        || !StringUtils.equals(StringUtils.trimToEmpty(sku.getProductStatus()),
+                        StringUtils.trimToEmpty(result.getProductStatus()))) {
                     continue;
                 }
                 scheduledQty += ShiftFieldUtil.resolveScheduledQty(result);
@@ -8886,9 +8942,9 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         if (context == null || CollectionUtils.isEmpty(context.getScheduleResultList())) {
             return;
         }
-        // 按物料编码汇总新增结果的总计划量（支持多机台同SKU排产）
-        Map<String, Integer> materialTotalPlanQtyMap = new LinkedHashMap<>(16);
-        Map<String, SkuScheduleDTO> materialSkuMap = new LinkedHashMap<>(16);
+        // 按物料状态复合键汇总新增结果，避免S/T/X共用收尾目标。
+        Map<String, Integer> skuTotalPlanQtyMap = new LinkedHashMap<>(16);
+        Map<String, SkuScheduleDTO> skuMap = new LinkedHashMap<>(16);
         for (LhScheduleResult result : context.getScheduleResultList()) {
             if (result == null || !NEW_SPEC_SCHEDULE_TYPE.equals(result.getScheduleType())) {
                 continue;
@@ -8897,10 +8953,12 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
             if (StringUtils.isEmpty(materialCode)) {
                 continue;
             }
+            String skuKey = MonthPlanDateResolver.buildMaterialStatusKey(
+                    materialCode, result.getProductStatus());
             int planQty = resolveResultScheduledQty(result);
-            materialTotalPlanQtyMap.merge(materialCode, planQty, Integer::sum);
-            if (!materialSkuMap.containsKey(materialCode)) {
-                materialSkuMap.put(materialCode, findSkuDto(context, materialCode));
+            skuTotalPlanQtyMap.merge(skuKey, planQty, Integer::sum);
+            if (!skuMap.containsKey(skuKey)) {
+                skuMap.put(skuKey, findSkuDto(context, materialCode, result.getProductStatus()));
             }
         }
         // 基于汇总计划量统一设置同物料所有结果的收尾标记
@@ -8909,8 +8967,10 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                     || StringUtils.isEmpty(result.getMaterialCode())) {
                 continue;
             }
-            int totalPlanQty = materialTotalPlanQtyMap.getOrDefault(result.getMaterialCode(), 0);
-            SkuScheduleDTO sku = materialSkuMap.get(result.getMaterialCode());
+            String skuKey = MonthPlanDateResolver.buildMaterialStatusKey(
+                    result.getMaterialCode(), result.getProductStatus());
+            int totalPlanQty = skuTotalPlanQtyMap.getOrDefault(skuKey, 0);
+            SkuScheduleDTO sku = skuMap.get(skuKey);
             result.setIsEnd(endingJudgmentStrategy.isFinalEnding(context, sku, totalPlanQty) ? "1" : "0");
         }
     }
@@ -8925,7 +8985,8 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
      * @return 收尾比较量
      */
     private int resolveEndingDemandQty(LhScheduleContext context, LhScheduleResult result) {
-        SkuScheduleDTO sku = findSkuDto(context, result.getMaterialCode());
+        SkuScheduleDTO sku = findSkuDto(
+                context, result.getMaterialCode(), result.getProductStatus());
         int surplusQty = sku != null ? Math.max(0, sku.getSurplusQty())
                 : Math.max(0, result.getMouldSurplusQty() == null ? 0 : result.getMouldSurplusQty());
         int embryoStock = sku != null ? Math.max(0, sku.getEmbryoStock())
@@ -9580,6 +9641,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
             return;
         }
         Map<String, Integer> zeroPlanQtyMap = new LinkedHashMap<>(8);
+        Map<String, SkuScheduleDTO> zeroPlanSkuMap = new LinkedHashMap<>(8);
         List<LhScheduleResult> zeroPlanResults = new ArrayList<>(8);
         for (LhScheduleResult result : context.getScheduleResultList()) {
             // 排除换活字块（换活字块不需要零计划量裁剪）
@@ -9596,19 +9658,24 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
             if (StringUtils.isEmpty(result.getMaterialCode())) {
                 continue;
             }
-            int unscheduledQty = resolveRemainingUnscheduledQty(context, result.getMaterialCode());
+            SkuScheduleDTO sku = findSkuDto(
+                    context, result.getMaterialCode(), result.getProductStatus());
+            int unscheduledQty = resolveRemainingUnscheduledQty(context, sku);
             if (unscheduledQty > 0) {
-                zeroPlanQtyMap.putIfAbsent(result.getMaterialCode(), unscheduledQty);
+                String skuKey = MonthPlanDateResolver.buildMaterialStatusKey(
+                        result.getMaterialCode(), result.getProductStatus());
+                zeroPlanQtyMap.putIfAbsent(skuKey, unscheduledQty);
+                zeroPlanSkuMap.putIfAbsent(skuKey, sku);
             }
         }
         for (Map.Entry<String, Integer> entry : zeroPlanQtyMap.entrySet()) {
-            mergeUnscheduledResultByMaterial(context, entry.getKey(), entry.getValue());
+            mergeUnscheduledResultBySku(context, zeroPlanSkuMap.get(entry.getKey()), entry.getValue());
         }
         if (!CollectionUtils.isEmpty(zeroPlanResults)) {
             context.getScheduleResultList().removeAll(zeroPlanResults);
             removeResultsFromMachineAssignments(context, zeroPlanResults);
         }
-        normalizeUnscheduledResultsByMaterial(context);
+        normalizeUnscheduledResultsBySku(context);
     }
 
     private Date calcSpecEndTime(LhScheduleContext context,
@@ -10386,7 +10453,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
      *
      * @param context 排程上下文
      * @param machineCode 机台编码
-     * @param materialCode 物料编码
+     * @param sku 来源SKU
      */
     private void clearSpecifyReservation(LhScheduleContext context, String machineCode, String materialCode) {
         if (context == null || StringUtils.isEmpty(machineCode)) {
@@ -10547,6 +10614,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         unscheduled.setFactoryCode(context.getFactoryCode());
         unscheduled.setBatchNo(context.getBatchNo());
         unscheduled.setMaterialCode(sku.getMaterialCode());
+        unscheduled.setProductStatus(sku.getProductStatus());
         unscheduled.setMaterialDesc(sku.getMaterialDesc());
         unscheduled.setScheduleDate(context.getScheduleTargetDate());
         unscheduled.setUnscheduledReason(reason);
@@ -10659,7 +10727,9 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         if (totalShiftFillOverQty > 0) {
             sku.setShiftFillOverQty(sku.getShiftFillOverQty() + totalShiftFillOverQty);
             // 同步写入上下文累加器，确保SKU从待排列表移除后汇总日志仍可读取
-            context.getSkuShiftFillOverQtyMap().merge(sku.getMaterialCode(), totalShiftFillOverQty, Integer::sum);
+            String skuKey = MonthPlanDateResolver.buildMaterialStatusKey(
+                    sku.getMaterialCode(), sku.getProductStatus());
+            context.getSkuShiftFillOverQtyMap().merge(skuKey, totalShiftFillOverQty, Integer::sum);
         }
         refreshResultSummary(context, result);
         int actualQty = result.getDailyPlanQty() != null ? result.getDailyPlanQty() : 0;
@@ -10737,7 +10807,9 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         }
         if (totalShiftFillOverQty > 0) {
             sku.setShiftFillOverQty(sku.getShiftFillOverQty() + totalShiftFillOverQty);
-            context.getSkuShiftFillOverQtyMap().merge(sku.getMaterialCode(), totalShiftFillOverQty, Integer::sum);
+            String skuKey = MonthPlanDateResolver.buildMaterialStatusKey(
+                    sku.getMaterialCode(), sku.getProductStatus());
+            context.getSkuShiftFillOverQtyMap().merge(skuKey, totalShiftFillOverQty, Integer::sum);
         }
         copyWholeSingleControlGroupQtyToSides(context, groupResult, primaryResult, pairResult);
         int actualQty = resolveWholeSingleControlActualQty(context, primaryResult, pairResult);
@@ -10996,6 +11068,18 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
     }
 
     /**
+     * 解析新增规格本轮可继续落结果的剩余量。
+     * <p>仅保留给历史单元测试的无上下文入口；真实排程必须调用带上下文方法，
+     * 以便按“物料+产品状态”共享运行态账本。</p>
+     *
+     * @param sku SKU排程DTO
+     * @return 本轮可继续排产量
+     */
+    private int resolveSchedulableRemainingQty(SkuScheduleDTO sku) {
+        return resolveSchedulableRemainingQty(null, sku);
+    }
+
+    /**
      * 解析窗口总量封顶后的剩余可排量。
      *
      * @param sku SKU排程DTO
@@ -11055,19 +11139,66 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
     }
 
     /**
+     * 按物料编码与产品状态精确查找SKU。
+     *
+     * @param context 排程上下文
+     * @param materialCode 物料编码
+     * @param productStatus 产品状态
+     * @return 精确匹配的SKU，未找到返回null
+     */
+    private SkuScheduleDTO findSkuDto(LhScheduleContext context,
+                                      String materialCode,
+                                      String productStatus) {
+        if (context == null || StringUtils.isEmpty(materialCode)) {
+            return null;
+        }
+        String skuKey = MonthPlanDateResolver.buildMaterialStatusKey(materialCode, productStatus);
+        SkuScheduleDTO indexedSku = context.getAllSkuScheduleDtoMap().get(skuKey);
+        if (indexedSku != null) {
+            return indexedSku;
+        }
+        for (SkuScheduleDTO sku : context.getNewSpecSkuList()) {
+            if (isSameSku(materialCode, productStatus, sku)) {
+                return sku;
+            }
+        }
+        for (SkuScheduleDTO sku : context.getContinuousSkuList()) {
+            if (isSameSku(materialCode, productStatus, sku)) {
+                return sku;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * 判断物料编码和产品状态是否同时一致。
+     *
+     * @param materialCode 物料编码
+     * @param productStatus 产品状态
+     * @param sku 待比较SKU
+     * @return true-同一业务SKU
+     */
+    private boolean isSameSku(String materialCode, String productStatus, SkuScheduleDTO sku) {
+        return sku != null
+                && StringUtils.equals(materialCode, sku.getMaterialCode())
+                && StringUtils.equals(StringUtils.trimToEmpty(productStatus),
+                StringUtils.trimToEmpty(sku.getProductStatus()));
+    }
+
+    /**
      * 计算新增零计划结果转未排时的剩余待排数量。
      *
      * @param context 排程上下文
      * @param materialCode 物料编码
      * @return 未排数量
      */
-    private int resolveRemainingUnscheduledQty(LhScheduleContext context, String materialCode) {
-        SkuScheduleDTO sku = findSkuDto(context, materialCode);
+    private int resolveRemainingUnscheduledQty(LhScheduleContext context, SkuScheduleDTO sku) {
         if (sku == null) {
             return 0;
         }
         int targetScheduleQty = sku.resolveTargetScheduleQty();
-        int retainedQty = resolveEffectiveScheduledQty(context, materialCode);
+        int retainedQty = resolveEffectiveScheduledQty(
+                context, sku.getMaterialCode(), sku.getProductStatus());
         return Math.max(targetScheduleQty - retainedQty, 0);
     }
 
@@ -11076,9 +11207,12 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
      *
      * @param context 排程上下文
      * @param materialCode 物料编码
+     * @param productStatus 产品状态
      * @return 有效计划量
      */
-    private int resolveEffectiveScheduledQty(LhScheduleContext context, String materialCode) {
+    private int resolveEffectiveScheduledQty(LhScheduleContext context,
+                                             String materialCode,
+                                             String productStatus) {
         if (context == null || StringUtils.isEmpty(materialCode) || CollectionUtils.isEmpty(context.getScheduleResultList())) {
             return 0;
         }
@@ -11086,6 +11220,8 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         for (LhScheduleResult result : context.getScheduleResultList()) {
             if (result == null
                     || !StringUtils.equals(materialCode, result.getMaterialCode())
+                    || !StringUtils.equals(StringUtils.trimToEmpty(productStatus),
+                    StringUtils.trimToEmpty(result.getProductStatus()))
                     || !NEW_SPEC_SCHEDULE_TYPE.equals(result.getScheduleType())
                     || "1".equals(result.getIsTypeBlock())  // 排除换活字块
                     || result.getDailyPlanQty() == null
@@ -11101,14 +11237,15 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
      * 按物料维度写入或合并未排结果。
      *
      * @param context 排程上下文
-     * @param materialCode 物料编码
+     * @param sku 来源SKU
      * @param unscheduledQty 未排数量
      */
-    private void mergeUnscheduledResultByMaterial(LhScheduleContext context, String materialCode, int unscheduledQty) {
-        if (context == null || StringUtils.isEmpty(materialCode) || unscheduledQty <= 0) {
+    private void mergeUnscheduledResultBySku(LhScheduleContext context, SkuScheduleDTO sku, int unscheduledQty) {
+        if (context == null || sku == null || StringUtils.isEmpty(sku.getMaterialCode()) || unscheduledQty <= 0) {
             return;
         }
-        LhUnscheduledResult existing = findUnscheduledResultByMaterial(context, materialCode);
+        LhUnscheduledResult existing = findUnscheduledResultBySku(
+                context, sku.getMaterialCode(), sku.getProductStatus());
         if (existing != null) {
             int existingQty = existing.getUnscheduledQty() != null ? existing.getUnscheduledQty() : 0;
             existing.setUnscheduledQty(existingQty + unscheduledQty);
@@ -11117,15 +11254,12 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
             }
             return;
         }
-        SkuScheduleDTO sku = findSkuDto(context, materialCode);
-        if (sku == null) {
-            return;
-        }
         LhUnscheduledResult unscheduled = new LhUnscheduledResult();
         unscheduled.setFactoryCode(context.getFactoryCode());
         unscheduled.setBatchNo(context.getBatchNo());
         unscheduled.setScheduleDate(context.getScheduleTargetDate());
-        unscheduled.setMaterialCode(materialCode);
+        unscheduled.setMaterialCode(sku.getMaterialCode());
+        unscheduled.setProductStatus(sku.getProductStatus());
         unscheduled.setMaterialDesc(sku.getMaterialDesc());
         unscheduled.setStructureName(sku.getStructureName());
         unscheduled.setMainMaterialDesc(sku.getMainMaterialDesc());
@@ -11144,14 +11278,19 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
      *
      * @param context 排程上下文
      * @param materialCode 物料编码
+     * @param productStatus 产品状态
      * @return 未排结果
      */
-    private LhUnscheduledResult findUnscheduledResultByMaterial(LhScheduleContext context, String materialCode) {
+    private LhUnscheduledResult findUnscheduledResultBySku(LhScheduleContext context,
+                                                           String materialCode,
+                                                           String productStatus) {
         if (context == null || CollectionUtils.isEmpty(context.getUnscheduledResultList())) {
             return null;
         }
         for (LhUnscheduledResult unscheduledResult : context.getUnscheduledResultList()) {
-            if (StringUtils.equals(materialCode, unscheduledResult.getMaterialCode())) {
+            if (StringUtils.equals(materialCode, unscheduledResult.getMaterialCode())
+                    && StringUtils.equals(StringUtils.trimToEmpty(productStatus),
+                    StringUtils.trimToEmpty(unscheduledResult.getProductStatus()))) {
                 return unscheduledResult;
             }
         }
@@ -11159,11 +11298,11 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
     }
 
     /**
-     * 对未排结果按物料编码去重合并。
+     * 对未排结果按物料编码与产品状态去重合并。
      *
      * @param context 排程上下文
      */
-    private void normalizeUnscheduledResultsByMaterial(LhScheduleContext context) {
+    private void normalizeUnscheduledResultsBySku(LhScheduleContext context) {
         if (context == null || CollectionUtils.isEmpty(context.getUnscheduledResultList())) {
             return;
         }
@@ -11172,12 +11311,13 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
             if (unscheduledResult == null || StringUtils.isEmpty(unscheduledResult.getMaterialCode())) {
                 continue;
             }
-            String materialCode = unscheduledResult.getMaterialCode();
-            if (!mergedMap.containsKey(materialCode)) {
-                mergedMap.put(materialCode, unscheduledResult);
+            String skuKey = MonthPlanDateResolver.buildMaterialStatusKey(
+                    unscheduledResult.getMaterialCode(), unscheduledResult.getProductStatus());
+            if (!mergedMap.containsKey(skuKey)) {
+                mergedMap.put(skuKey, unscheduledResult);
                 continue;
             }
-            LhUnscheduledResult existing = mergedMap.get(materialCode);
+            LhUnscheduledResult existing = mergedMap.get(skuKey);
             int existingQty = existing.getUnscheduledQty() != null ? existing.getUnscheduledQty() : 0;
             int currentQty = unscheduledResult.getUnscheduledQty() != null ? unscheduledResult.getUnscheduledQty() : 0;
             existing.setUnscheduledQty(existingQty + currentQty);
@@ -11227,8 +11367,8 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         if (context == null || CollectionUtils.isEmpty(context.getScheduleResultList())) {
             return;
         }
-        // 按物料编码汇总新增结果（排除换活字块）
-        Map<String, List<LhScheduleResult>> materialResultsMap = new LinkedHashMap<>(16);
+        // 按物料状态复合键汇总新增结果（排除换活字块）。
+        Map<String, List<LhScheduleResult>> skuResultsMap = new LinkedHashMap<>(16);
         for (LhScheduleResult result : context.getScheduleResultList()) {
             if (!NEW_SPEC_SCHEDULE_TYPE.equals(result.getScheduleType())
                     || "1".equals(result.getIsTypeBlock())) {
@@ -11240,16 +11380,20 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
             if (result.getDailyPlanQty() == null || result.getDailyPlanQty() <= 0) {
                 continue;
             }
-            materialResultsMap.computeIfAbsent(result.getMaterialCode(), k -> new ArrayList<>()).add(result);
+            String skuKey = MonthPlanDateResolver.buildMaterialStatusKey(
+                    result.getMaterialCode(), result.getProductStatus());
+            skuResultsMap.computeIfAbsent(skuKey, k -> new ArrayList<>()).add(result);
         }
         // 同一物料的每条新增机台结果统一保留SKU级胎胚库存。
-        for (Map.Entry<String, List<LhScheduleResult>> entry : materialResultsMap.entrySet()) {
+        for (Map.Entry<String, List<LhScheduleResult>> entry : skuResultsMap.entrySet()) {
             List<LhScheduleResult> materialResults = entry.getValue();
             if (materialResults.size() <= 1) {
                 continue;
             }
-            String materialCode = entry.getKey();
-            SkuScheduleDTO sku = findSkuDto(context, materialCode);
+            LhScheduleResult firstResult = materialResults.get(0);
+            String materialCode = firstResult.getMaterialCode();
+            SkuScheduleDTO sku = findSkuDto(
+                    context, materialCode, firstResult.getProductStatus());
             if (sku == null) {
                 continue;
             }
@@ -11352,7 +11496,8 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                 previousMaterialDesc = initialMachine.getCurrentMaterialDesc();
             }
         }
-        SkuScheduleDTO sku = findSkuDto(context, result.getMaterialCode());
+        SkuScheduleDTO sku = findSkuDto(
+                context, result.getMaterialCode(), result.getProductStatus());
         machine.setCurrentMaterialCode(result.getMaterialCode());
         machine.setCurrentMaterialDesc(result.getMaterialDesc());
         machine.setPreviousMaterialCode(previousMaterialCode);
