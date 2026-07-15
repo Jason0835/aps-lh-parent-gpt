@@ -532,19 +532,26 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
         List<CxScheduleResultIssue> day3IssueList = new ArrayList<>();
 
         for (CxScheduleResult source : scheduleResultList) {
-            CxScheduleResultIssue day1Issue = convertToDay1IssueEntity(source, day1);
-            if (day1Issue != null) {
-                day1IssueList.add(day1Issue);
+            // day1对应源1、2班(早中)，同时为空则不下发T-1日
+            if (!isCxQtyAllEmpty(source.getClass1PlanQty(), source.getClass2PlanQty())) {
+                CxScheduleResultIssue day1Issue = convertToDay1IssueEntity(source, day1);
+                if (day1Issue != null) {
+                    day1IssueList.add(day1Issue);
+                }
             }
-
-            CxScheduleResultIssue day2Issue = convertToDay2IssueEntity(source, day2);
-            if (day2Issue != null) {
-                day2IssueList.add(day2Issue);
+            // day2对应源3、4、5班(夜早中)，同时为空则不下发T日
+            if (!isCxQtyAllEmpty(source.getClass3PlanQty(), source.getClass4PlanQty(), source.getClass5PlanQty())) {
+                CxScheduleResultIssue day2Issue = convertToDay2IssueEntity(source, day2);
+                if (day2Issue != null) {
+                    day2IssueList.add(day2Issue);
+                }
             }
-
-            CxScheduleResultIssue day3Issue = convertToDay3IssueEntity(source, day3);
-            if (day3Issue != null) {
-                day3IssueList.add(day3Issue);
+            // day3对应源6、7、8班(夜早中)，同时为空则不下发T+1日
+            if (!isCxQtyAllEmpty(source.getClass6PlanQty(), source.getClass7PlanQty(), source.getClass8PlanQty())) {
+                CxScheduleResultIssue day3Issue = convertToDay3IssueEntity(source, day3);
+                if (day3Issue != null) {
+                    day3IssueList.add(day3Issue);
+                }
             }
         }
 
@@ -571,6 +578,23 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
      *
      * @param issueList 成型排程结果下发列表
      */
+
+    /**
+     * 判断成型排程结果某天对应班次的计划量是否全为空(null或0)
+     * 用于下发MES前过滤：某天班次组全空则不下发该天数据
+     *
+     * @param qtys 班次计划量（BigDecimal）
+     * @return true=全空，false=至少有一个班次有量
+     */
+    private boolean isCxQtyAllEmpty(BigDecimal... qtys) {
+        for (BigDecimal qty : qtys) {
+            if (qty != null && qty.compareTo(BigDecimal.ZERO) > 0) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     private void enrichMaterialAndExampleInfo(List<CxScheduleResultIssue> issueList) {
         if (CollectionUtils.isEmpty(issueList)) {
             return;
@@ -676,22 +700,26 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
         List<CxScheduleResultIssue> day3IssueList = new ArrayList<>();    // T+1日（插入）
 
         for (CxScheduleResult source : scheduleResultList) {
-            // 第1天（T-1）- 更新2班数据（早中班）
-            CxScheduleResultIssue day1Issue = convertToDay1IssueEntity(source, day1);
-            if (day1Issue != null) {
-                day1IssueList.add(day1Issue);
+            // 第1天（T-1）- 源1、2班(早中)同时为空则不下发
+            if (!isCxQtyAllEmpty(source.getClass1PlanQty(), source.getClass2PlanQty())) {
+                CxScheduleResultIssue day1Issue = convertToDay1IssueEntity(source, day1);
+                if (day1Issue != null) {
+                    day1IssueList.add(day1Issue);
+                }
             }
-
-            // 第2天（T）- 更新3班数据（夜早中班）
-            CxScheduleResultIssue day2Issue = convertToDay2IssueEntity(source, day2);
-            if (day2Issue != null) {
-                day2IssueList.add(day2Issue);
+            // 第2天（T）- 源3、4、5班(夜早中)同时为空则不下发
+            if (!isCxQtyAllEmpty(source.getClass3PlanQty(), source.getClass4PlanQty(), source.getClass5PlanQty())) {
+                CxScheduleResultIssue day2Issue = convertToDay2IssueEntity(source, day2);
+                if (day2Issue != null) {
+                    day2IssueList.add(day2Issue);
+                }
             }
-
-            // 第3天（T+1）- 下发3班数据（夜早中班）
-            CxScheduleResultIssue day3Issue = convertToDay3IssueEntity(source, day3);
-            if (day3Issue != null) {
-                day3IssueList.add(day3Issue);
+            // 第3天（T+1）- 源6、7、8班(夜早中)同时为空则不下发
+            if (!isCxQtyAllEmpty(source.getClass6PlanQty(), source.getClass7PlanQty(), source.getClass8PlanQty())) {
+                CxScheduleResultIssue day3Issue = convertToDay3IssueEntity(source, day3);
+                if (day3Issue != null) {
+                    day3IssueList.add(day3Issue);
+                }
             }
         }
 

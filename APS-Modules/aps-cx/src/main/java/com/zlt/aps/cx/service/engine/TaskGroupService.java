@@ -1,5 +1,6 @@
 package com.zlt.aps.cx.service.engine;
 
+import com.zlt.aps.common.engine.utils.MonthPlanSurplusCalculator;
 import com.zlt.aps.cx.api.domain.entity.CxStock;
 import com.zlt.aps.cx.constant.ScheduleConstants;
 import com.zlt.aps.cx.entity.CxMaterialEnding;
@@ -705,8 +706,10 @@ public class TaskGroupService {
 
                 // 检查1：硫化余量 <= 0，说明该物料已超产，不再需要生产
                 String materialCode = lhResult.getMaterialCode();
+                String materialStatusKey = MonthPlanSurplusCalculator.buildMaterialStatusKey(
+                        materialCode, lhResult.getProductStatus());
                 if (context.getMonthSurplusMap() != null && materialCode != null) {
-                    MdmMonthSurplus monthSurplus = context.getMonthSurplusMap().get(materialCode);
+                    MdmMonthSurplus monthSurplus = context.getMonthSurplusMap().get(materialStatusKey);
                     if (monthSurplus != null && monthSurplus.getPlanSurplusQty() != null) {
                         int vulcanizeSurplus = monthSurplus.getPlanSurplusQty().intValue();
                         if (vulcanizeSurplus <= 0) {
@@ -718,7 +721,8 @@ public class TaskGroupService {
                 }
 
                 // 检查2：成型余量 <= 0，说明胎胚库存已满足硫化需求，不再需要成型生产
-                Integer formingRemainder = getFormingRemainder(materialCode, context);
+                Integer formingRemainder = this.getFormingRemainder(
+                        materialCode, lhResult.getProductStatus(), context);
                 if (formingRemainder != null && formingRemainder <= 0) {
                     log.info("[检查2-成型余量] 跳过：物料={}, 成型余量={} <= 0", materialCode, formingRemainder);
                     skippedFormingRemainderZero++;
@@ -760,13 +764,14 @@ public class TaskGroupService {
                 task.setIsProductionTrial(isProductionTrial);
                 task.setContinueMachineCodes(continueMachineCodes);
                 task.setIsFirstTask(!isContinueTask && !isTrialTask && !isProductionTrial);
+                task.setProductStatus(lhResult.getProductStatus());
                 task.setConstructionStage(constructionStage);
 
                 // 将任务添加到物料任务列表（用于回溯更新）
-                materialTasksMap.computeIfAbsent(materialCode, k -> new ArrayList<>()).add(task);
+                materialTasksMap.computeIfAbsent(materialStatusKey, key -> new ArrayList<>()).add(task);
 
                 // S5.2.4 计算收尾属性（传入已使用的成型余量）
-                int usedRemainder = materialUsedFormingRemainder.getOrDefault(materialCode, 0);
+                int usedRemainder = materialUsedFormingRemainder.getOrDefault(materialStatusKey, 0);
                 calculateEndingInfo(task, context, scheduleDate, usedRemainder);
 
                 // S5.2.4.2 暂存待第二轮分配：
@@ -928,7 +933,7 @@ public class TaskGroupService {
 
                 // S5.2.6.1 收尾余量处理后再次检查：如果 handleEndingRemainder 标记了 isLastEndingBatch，需要回溯更新
                 if (Boolean.TRUE.equals(task.getIsLastEndingBatch())) {
-                    List<DailyEmbryoTask> allTasksForMaterial = materialTasksMap.get(materialCode);
+                    List<DailyEmbryoTask> allTasksForMaterial = materialTasksMap.get(materialStatusKey);
                     if (allTasksForMaterial != null) {
                         for (DailyEmbryoTask prevTask : allTasksForMaterial) {
                             if (prevTask != task && !Boolean.TRUE.equals(prevTask.getIsLastEndingBatch())) {
@@ -1059,9 +1064,12 @@ public class TaskGroupService {
                 // 共用胎胚：计划量不超过剩余共享成型余量（第三种场景：多任务同物料共用成型余量）
                 // handleEndingRemainder已处理收尾任务（isLastEndingBatch），此处仅封顶非收尾任务
                 if (!Boolean.TRUE.equals(task.getIsLastEndingBatch())) {
-                    Integer r1FormingRemainder = getFormingRemainder(materialCode, context);
+                    Integer r1FormingRemainder = this.getFormingRemainder(
+                            materialCode, task.getProductStatus(), context);
                     if (r1FormingRemainder != null) {
-                        int r1UsedRemainder = materialUsedFormingRemainder.getOrDefault(materialCode, 0);
+                        String taskStatusKey = MonthPlanSurplusCalculator.buildMaterialStatusKey(
+                                materialCode, task.getProductStatus());
+                        int r1UsedRemainder = materialUsedFormingRemainder.getOrDefault(taskStatusKey, 0);
                         int r1RemainingForming = r1FormingRemainder - r1UsedRemainder;
                         int r1EndingInventory = task.getEndingExtraInventory() != null ? task.getEndingExtraInventory() : 0;
                         if (r1RemainingForming >= 0 && r1EndingInventory > r1RemainingForming) {
@@ -1077,8 +1085,11 @@ public class TaskGroupService {
 
                 // 更新已使用的成型余量（累加封顶后的 endingExtraInventory）
                 if (task.getEndingExtraInventory() != null && task.getEndingExtraInventory() > 0) {
-                    materialUsedFormingRemainder.merge(materialCode, task.getEndingExtraInventory(), Integer::sum);
-                    log.info("物料 {} 已使用成型余量累计: {}", materialCode, materialUsedFormingRemainder.get(materialCode));
+                    String taskStatusKey = MonthPlanSurplusCalculator.buildMaterialStatusKey(
+                            materialCode, task.getProductStatus());
+                    materialUsedFormingRemainder.merge(taskStatusKey, task.getEndingExtraInventory(), Integer::sum);
+                    log.info("物料状态账户 {} 已使用成型余量累计: {}",
+                            taskStatusKey, materialUsedFormingRemainder.get(taskStatusKey));
                 }
 
                 // S5.2.7 停产特殊处理
@@ -1114,8 +1125,11 @@ public class TaskGroupService {
                 int enrolledCount = 0;
                 for (DailyEmbryoTask completedTask : firstRoundCompletedTasks) {
                     String ctMaterialCode = completedTask.getMaterialCode();
-                    Integer totalFormingRemainder = getFormingRemainder(ctMaterialCode, context);
-                    int usedRemainder = materialUsedFormingRemainder.getOrDefault(ctMaterialCode, 0);
+                    String completedTaskStatusKey = MonthPlanSurplusCalculator.buildMaterialStatusKey(
+                            ctMaterialCode, completedTask.getProductStatus());
+                    Integer totalFormingRemainder = this.getFormingRemainder(
+                            ctMaterialCode, completedTask.getProductStatus(), context);
+                    int usedRemainder = materialUsedFormingRemainder.getOrDefault(completedTaskStatusKey, 0);
                     if (totalFormingRemainder != null) {
                         int remainingSurplus = totalFormingRemainder - usedRemainder;
                         if (remainingSurplus > 0) {
@@ -1222,10 +1236,13 @@ public class TaskGroupService {
                     while (preIter.hasNext()) {
                         DailyEmbryoTask dt = preIter.next();
                         String preMaterialCode = dt.getMaterialCode();
+                        String preMaterialStatusKey = MonthPlanSurplusCalculator.buildMaterialStatusKey(
+                                preMaterialCode, dt.getProductStatus());
 
                         // 检查成型余量是否已耗尽
-                        Integer preFormingRemainder = getFormingRemainder(preMaterialCode, context);
-                        int preUsedRemainder = materialUsedFormingRemainder.getOrDefault(preMaterialCode, 0);
+                        Integer preFormingRemainder = this.getFormingRemainder(
+                                preMaterialCode, dt.getProductStatus(), context);
+                        int preUsedRemainder = materialUsedFormingRemainder.getOrDefault(preMaterialStatusKey, 0);
                         if (preFormingRemainder != null && (preFormingRemainder - preUsedRemainder) <= 0) {
                             log.info("  [R2-预处理-成型余量耗尽] 胎胚={}, 物料={}, 已用{}/总量{}, 移入R3退出队列",
                                     dt.getEmbryoCode(), preMaterialCode, preUsedRemainder, preFormingRemainder);
@@ -1301,6 +1318,8 @@ public class TaskGroupService {
 
                         String dtMaterialCode = minTask.getMaterialCode();
                         String dtEmbryoCode = minTask.getEmbryoCode();
+                        String dtMaterialStatusKey = MonthPlanSurplusCalculator.buildMaterialStatusKey(
+                                dtMaterialCode, minTask.getProductStatus());
 
                         // 检查：剩余需求
                         int remainingDemand = minTask.getDeferredRemainingDemand() != null ? minTask.getDeferredRemainingDemand() : 0;
@@ -1322,8 +1341,9 @@ public class TaskGroupService {
                         }
 
                         // 检查：成型余量是否已耗尽（多任务共享同一物料余量）
-                        Integer dtFormingRemainder = getFormingRemainder(dtMaterialCode, context);
-                        int dtUsedRemainder = materialUsedFormingRemainder.getOrDefault(dtMaterialCode, 0);
+                        Integer dtFormingRemainder = this.getFormingRemainder(
+                                dtMaterialCode, minTask.getProductStatus(), context);
+                        int dtUsedRemainder = materialUsedFormingRemainder.getOrDefault(dtMaterialStatusKey, 0);
                         int dtRemainingForming = dtFormingRemainder != null
                                 ? (dtFormingRemainder - dtUsedRemainder) : Integer.MAX_VALUE;
                         // 共用胎胚：剩余需求取per-task需求和共享成型余量的较小值，确保共用物料任务间剩余需求正确递减
@@ -1372,7 +1392,7 @@ public class TaskGroupService {
                                 // 成型余量已耗尽，强制标记最后一批并回溯同物料其他任务
                                 minTask.setIsLastEndingBatch(true);
                                 log.info("  [R2-成型余量耗尽] 胎胚={} 强制标记 isLastEndingBatch=true", dtEmbryoCode);
-                                List<DailyEmbryoTask> allTasksForMaterial = materialTasksMap.get(dtMaterialCode);
+                                List<DailyEmbryoTask> allTasksForMaterial = materialTasksMap.get(dtMaterialStatusKey);
                                 if (allTasksForMaterial != null) {
                                     for (DailyEmbryoTask prevTask : allTasksForMaterial) {
                                         if (prevTask != minTask && !Boolean.TRUE.equals(prevTask.getIsLastEndingBatch())) {
@@ -1541,7 +1561,7 @@ public class TaskGroupService {
 
                         // 更新已使用的成型余量
                         if (fallbackProduction > 0) {
-                            materialUsedFormingRemainder.merge(dtMaterialCode, fallbackProduction, Integer::sum);
+                            materialUsedFormingRemainder.merge(dtMaterialStatusKey, fallbackProduction, Integer::sum);
                         }
 
                         // 6h退出 → 移入 r2ExitedTasks
@@ -1557,8 +1577,9 @@ public class TaskGroupService {
                         if (newRemaining <= 0) {
                             minTask.setEndingExtraInventory(minTask.getPlannedProduction());
                             // 刷新endingSurplusQty为当前剩余成型余量，使handleEndingRemainder能正确判断isLastDay
-                            Integer r2EndFormingRemainder = getFormingRemainder(dtMaterialCode, context);
-                            int r2EndUsedRemainder = materialUsedFormingRemainder.getOrDefault(dtMaterialCode, 0);
+                            Integer r2EndFormingRemainder = this.getFormingRemainder(
+                                    dtMaterialCode, minTask.getProductStatus(), context);
+                            int r2EndUsedRemainder = materialUsedFormingRemainder.getOrDefault(dtMaterialStatusKey, 0);
                             int r2EndRemainingForming = r2EndFormingRemainder != null
                                     ? Math.max(0, r2EndFormingRemainder - r2EndUsedRemainder) : 0;
                             minTask.setEndingSurplusQty(r2EndRemainingForming);
@@ -1581,7 +1602,7 @@ public class TaskGroupService {
                             }
 
                             if (Boolean.TRUE.equals(minTask.getIsLastEndingBatch())) {
-                                List<DailyEmbryoTask> allTasksForMaterial = materialTasksMap.get(dtMaterialCode);
+                                List<DailyEmbryoTask> allTasksForMaterial = materialTasksMap.get(dtMaterialStatusKey);
                                 if (allTasksForMaterial != null) {
                                     for (DailyEmbryoTask prevTask : allTasksForMaterial) {
                                         if (prevTask != minTask && !Boolean.TRUE.equals(prevTask.getIsLastEndingBatch())) {
@@ -1758,8 +1779,11 @@ public class TaskGroupService {
                     while (r3PreIter.hasNext()) {
                         DailyEmbryoTask dt = r3PreIter.next();
                         String preMaterialCode = dt.getMaterialCode();
-                        Integer preFormingRemainder = getFormingRemainder(preMaterialCode, context);
-                        int preUsedRemainder = materialUsedFormingRemainder.getOrDefault(preMaterialCode, 0);
+                        String preMaterialStatusKey = MonthPlanSurplusCalculator.buildMaterialStatusKey(
+                                preMaterialCode, dt.getProductStatus());
+                        Integer preFormingRemainder = this.getFormingRemainder(
+                                preMaterialCode, dt.getProductStatus(), context);
+                        int preUsedRemainder = materialUsedFormingRemainder.getOrDefault(preMaterialStatusKey, 0);
                         if (preFormingRemainder != null && (preFormingRemainder - preUsedRemainder) <= 0) {
                             log.info("  [R3-预处理-成型余量耗尽] 胎胚={}, 物料={}, 已用{}/总量{}, 跳过",
                                     dt.getEmbryoCode(), preMaterialCode, preUsedRemainder, preFormingRemainder);
@@ -1808,6 +1832,8 @@ public class TaskGroupService {
 
                         String dtMaterialCode = minTask.getMaterialCode();
                         String dtEmbryoCode = minTask.getEmbryoCode();
+                        String dtMaterialStatusKey = MonthPlanSurplusCalculator.buildMaterialStatusKey(
+                                dtMaterialCode, minTask.getProductStatus());
 
                         // 检查：剩余需求
                         int remainingDemand = minTask.getDeferredRemainingDemand() != null ? minTask.getDeferredRemainingDemand() : 0;
@@ -1824,8 +1850,9 @@ public class TaskGroupService {
                         }
 
                         // 检查：成型余量是否已耗尽（多任务共享同一物料余量）
-                        Integer dtFormingRemainder = getFormingRemainder(dtMaterialCode, context);
-                        int dtUsedRemainder = materialUsedFormingRemainder.getOrDefault(dtMaterialCode, 0);
+                        Integer dtFormingRemainder = this.getFormingRemainder(
+                                dtMaterialCode, minTask.getProductStatus(), context);
+                        int dtUsedRemainder = materialUsedFormingRemainder.getOrDefault(dtMaterialStatusKey, 0);
                         int dtRemainingForming = dtFormingRemainder != null
                                 ? (dtFormingRemainder - dtUsedRemainder) : Integer.MAX_VALUE;
                         // 共用胎胚：剩余需求取per-task需求和共享成型余量的较小值，确保共用物料任务间剩余需求正确递减
@@ -1873,7 +1900,7 @@ public class TaskGroupService {
                                 // 成型余量已耗尽，强制标记最后一批并回溯同物料其他任务
                                 minTask.setIsLastEndingBatch(true);
                                 log.info("  [R3-成型余量耗尽] 胎胚={} 强制标记 isLastEndingBatch=true", dtEmbryoCode);
-                                List<DailyEmbryoTask> allTasksForMaterial = materialTasksMap.get(dtMaterialCode);
+                                List<DailyEmbryoTask> allTasksForMaterial = materialTasksMap.get(dtMaterialStatusKey);
                                 if (allTasksForMaterial != null) {
                                     for (DailyEmbryoTask prevTask : allTasksForMaterial) {
                                         if (prevTask != minTask && !Boolean.TRUE.equals(prevTask.getIsLastEndingBatch())) {
@@ -1974,15 +2001,16 @@ public class TaskGroupService {
 
                         // 更新已使用的成型余量
                         if (fallbackProduction > 0) {
-                            materialUsedFormingRemainder.merge(dtMaterialCode, fallbackProduction, Integer::sum);
+                            materialUsedFormingRemainder.merge(dtMaterialStatusKey, fallbackProduction, Integer::sum);
                         }
 
                         // 剩余需求耗尽：收尾处理 + 加入结果列表
                         if (newRemaining <= 0) {
                             minTask.setEndingExtraInventory(minTask.getPlannedProduction());
                             // 刷新endingSurplusQty为当前剩余成型余量，使handleEndingRemainder能正确判断isLastDay
-                            Integer r3EndFormingRemainder = getFormingRemainder(dtMaterialCode, context);
-                            int r3EndUsedRemainder = materialUsedFormingRemainder.getOrDefault(dtMaterialCode, 0);
+                            Integer r3EndFormingRemainder = this.getFormingRemainder(
+                                    dtMaterialCode, minTask.getProductStatus(), context);
+                            int r3EndUsedRemainder = materialUsedFormingRemainder.getOrDefault(dtMaterialStatusKey, 0);
                             int r3EndRemainingForming = r3EndFormingRemainder != null
                                     ? Math.max(0, r3EndFormingRemainder - r3EndUsedRemainder) : 0;
                             minTask.setEndingSurplusQty(r3EndRemainingForming);
@@ -1993,7 +2021,7 @@ public class TaskGroupService {
                             if (r3EndRemainingForming <= 0 && !Boolean.TRUE.equals(minTask.getIsLastEndingBatch())) {
                                 minTask.setIsLastEndingBatch(true);
                                 log.info("  [R3-分配完成] 胎胚={} 强制标记 isLastEndingBatch=true（成型余量耗尽）", dtEmbryoCode);
-                                List<DailyEmbryoTask> allTasksForMaterial = materialTasksMap.get(dtMaterialCode);
+                                List<DailyEmbryoTask> allTasksForMaterial = materialTasksMap.get(dtMaterialStatusKey);
                                 if (allTasksForMaterial != null) {
                                     for (DailyEmbryoTask prevTask : allTasksForMaterial) {
                                         if (prevTask != minTask && !Boolean.TRUE.equals(prevTask.getIsLastEndingBatch())) {
@@ -2066,7 +2094,9 @@ public class TaskGroupService {
                             // 回溯更新 isLastEndingBatch（与R1/R2保持一致）
                             if (Boolean.TRUE.equals(rt.getIsLastEndingBatch())) {
                                 String rtMaterialCode = rt.getMaterialCode();
-                                List<DailyEmbryoTask> allTasksForMaterial = materialTasksMap.get(rtMaterialCode);
+                                String rtMaterialStatusKey = MonthPlanSurplusCalculator.buildMaterialStatusKey(
+                                        rtMaterialCode, rt.getProductStatus());
+                                List<DailyEmbryoTask> allTasksForMaterial = materialTasksMap.get(rtMaterialStatusKey);
                                 if (allTasksForMaterial != null) {
                                     for (DailyEmbryoTask prevTask : allTasksForMaterial) {
                                         if (prevTask != rt && !Boolean.TRUE.equals(prevTask.getIsLastEndingBatch())) {
@@ -2151,6 +2181,8 @@ public class TaskGroupService {
             int usedRemainder) {
 
         String materialCode = task.getMaterialCode();
+        String materialStatusKey = MonthPlanSurplusCalculator.buildMaterialStatusKey(
+                materialCode, task.getProductStatus());
 
         // 获取成型余量（从预计算的映射中获取）
         Map<String, Integer> formingRemainderMap = context.getFormingRemainderMap();
@@ -2159,15 +2191,15 @@ public class TaskGroupService {
 
         // 从月计划余量获取硫化余量
         if (context.getMonthSurplusMap() != null) {
-            MdmMonthSurplus monthSurplus = context.getMonthSurplusMap().get(materialCode);
+            MdmMonthSurplus monthSurplus = context.getMonthSurplusMap().get(materialStatusKey);
             if (monthSurplus != null && monthSurplus.getPlanSurplusQty() != null) {
                 vulcanizeSurplusQty = monthSurplus.getPlanSurplusQty().intValue();
             }
         }
 
         // 获取总成型余量
-        if (formingRemainderMap != null && formingRemainderMap.containsKey(materialCode)) {
-            totalFormingRemainder = formingRemainderMap.get(materialCode);
+        if (formingRemainderMap != null && formingRemainderMap.containsKey(materialStatusKey)) {
+            totalFormingRemainder = formingRemainderMap.get(materialStatusKey);
         }
 
         // 计算当前任务的剩余成型余量 = 总成型余量 - 已使用成型余量
@@ -2286,15 +2318,16 @@ public class TaskGroupService {
      * @param context      排程上下文
      * @return 成型余量，无法计算时返回 null
      */
-    private Integer getFormingRemainder(String materialCode, ScheduleContextVo context) {
+    private Integer getFormingRemainder(String materialCode, String productStatus, ScheduleContextVo context) {
         if (materialCode == null) {
             return null;
         }
 
-        // 从context.getFormingRemainderMap映射中获取（key 是物料编码）
+        String materialStatusKey = MonthPlanSurplusCalculator.buildMaterialStatusKey(materialCode, productStatus);
+        // 从context.getFormingRemainderMap映射中获取（key 是物料编码+产品状态）
         Map<String, Integer> formingRemainderMap = context.getFormingRemainderMap();
-        if (formingRemainderMap != null && formingRemainderMap.containsKey(materialCode)) {
-            return formingRemainderMap.get(materialCode);
+        if (formingRemainderMap != null && formingRemainderMap.containsKey(materialStatusKey)) {
+            return formingRemainderMap.get(materialStatusKey);
         }
 
         return 0;

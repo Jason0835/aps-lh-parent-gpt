@@ -9,6 +9,7 @@ public class TaskAllocationR {
     public String taskKey;
     public int demand;
     public String materialCode;
+    public String productStatus;
     public int surplus;      // 硫化余量上限
     public int allocated;    // 已分配量
 
@@ -16,6 +17,7 @@ public class TaskAllocationR {
         this.taskKey = td.taskKey;
         this.demand = td.demand;
         this.materialCode = td.materialCode;
+        this.productStatus = td.productStatus;
         this.allocated = allocated;
         this.surplus = surplus;
     }

@@ -37,6 +37,8 @@ public class DailyEmbryoTask {
     private String lhMachineCode;
     /** 月计划排产版本（PRODUCTION_VERSION），过滤结构可用机台 */
     private String productionVersion;
+    /** 产品状态/计划类型（硫化余量分账维度） */
+    private String productStatus;
     /** 施工阶段：00 无工艺 / 01 试制 / 02 量试 / 03 正式（来自硫化任务） */
     private String constructionStage;
 
@@ -182,6 +184,7 @@ public class DailyEmbryoTask {
         ta.setIsMainProduct(this.isMainProduct);
         ta.setLhId(this.lhId);
         ta.setLhMachineCode(this.lhMachineCode);
+        ta.setProductStatus(this.productStatus);
         ta.setIsLastEndingBatch(this.isLastEndingBatch);
         ta.setIsEndProduction(this.isEndProduction);
         ta.setEndingAbandoned(this.endingAbandoned);

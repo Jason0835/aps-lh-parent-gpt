@@ -71,6 +71,11 @@
             <groupId>com.zlt.aps</groupId>
             <artifactId>aps-mp-api</artifactId>
         </dependency>
+        <dependency>
+            <groupId>com.zlt.aps.common.engine</groupId>
+            <artifactId>aps-engine-common</artifactId>
+            <version>1.0.3-SNAPSHOT</version>
+        </dependency>
         <!-- Hutool工具库 -->
         <dependency>
             <groupId>cn.hutool</groupId>

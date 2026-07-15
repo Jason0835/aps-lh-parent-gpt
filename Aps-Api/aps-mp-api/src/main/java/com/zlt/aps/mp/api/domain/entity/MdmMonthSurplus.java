@@ -104,6 +104,13 @@ public class MdmMonthSurplus extends BaseEntity {
     private String materialCode;
 
     /**
+     * 产品状态/计划类型，仅用于运行时硫化余量分账
+     */
+    @ApiModelProperty(value = "产品状态/计划类型", name = "productStatus")
+    @TableField(exist = false)
+    private String productStatus;
+
+    /**
      * 物料描述
      */
     @ImportExcelValidated(maxLength = 256)

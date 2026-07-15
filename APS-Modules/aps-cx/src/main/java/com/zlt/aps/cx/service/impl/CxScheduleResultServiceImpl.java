@@ -784,8 +784,8 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
         row.put("structureName", item.getStructureName());
         row.put("embryoCode", item.getEmbryoCode());
         row.put("mainMaterialDesc", item.getMainMaterialDesc());
-        row.put("cxRemainQty", item.getCxRemainQty());
-        row.put("lhRemainQty", item.getLhRemainQty());
+
+        // 先放totalStock，后面计算cxRemainQty要用
         row.put("totalStock", item.getTotalStock());
         row.put("lhClassQty", item.getLhClassQty());
 
@@ -886,6 +886,12 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
         BigDecimal ylSum = (tnfq != null ? tnfq : BigDecimal.ZERO)
                 .subtract(tdpq != null ? tdpq : BigDecimal.ZERO);
         row.put("ylSum", zeroToEmpty(ylSum));
+
+        // lhRemainQty = ylSum，cxRemainQty = lhRemainQty - totalStock
+        BigDecimal newLhRemainQty = ylSum;
+        row.put("lhRemainQty", zeroToEmpty(newLhRemainQty));
+        BigDecimal totalStock = item.getTotalStock() != null ? item.getTotalStock() : BigDecimal.ZERO;
+        row.put("cxRemainQty", zeroToEmpty(newLhRemainQty.subtract(totalStock)));
 
         String embryoCode = item.getEmbryoCode();
         String smallGlueVal = smallGlueMap.getOrDefault(embryoCode, "");

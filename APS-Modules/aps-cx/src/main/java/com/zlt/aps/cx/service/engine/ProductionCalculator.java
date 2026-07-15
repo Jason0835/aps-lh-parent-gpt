@@ -1,5 +1,6 @@
 package com.zlt.aps.cx.service.engine;
 
+import com.zlt.aps.common.engine.utils.MonthPlanSurplusCalculator;
 import com.zlt.aps.cx.api.domain.entity.CxStructureTreadConfig;
 import com.zlt.aps.cx.constant.ScheduleConstants;
 import com.zlt.aps.cx.entity.config.CxShiftConfig;
@@ -397,15 +398,18 @@ public class ProductionCalculator {
      * 判断物料的硫化余量是否已耗尽（<=0 视为超产）
      *
      * @param materialCode    物料编码
+     * @param productStatus   产品状态/计划类型
      * @param monthSurplusMap 月度硫化余量映射
      * @return true=已耗尽（跳过该物料的库存分配）
      */
     public boolean isVulcanizeSurplusExhausted(String materialCode,
+                                               String productStatus,
                                                Map<String, MdmMonthSurplus> monthSurplusMap) {
         if (materialCode == null || monthSurplusMap == null) {
             return false;
         }
-        MdmMonthSurplus monthSurplus = monthSurplusMap.get(materialCode);
+        String materialStatusKey = MonthPlanSurplusCalculator.buildMaterialStatusKey(materialCode, productStatus);
+        MdmMonthSurplus monthSurplus = monthSurplusMap.get(materialStatusKey);
         return monthSurplus != null
                 && monthSurplus.getPlanSurplusQty() != null
                 && monthSurplus.getPlanSurplusQty().compareTo(BigDecimal.ZERO) <= 0;
@@ -415,15 +419,18 @@ public class ProductionCalculator {
      * 从 monthSurplusMap 读取物料的硫化余量数值
      *
      * @param materialCode    物料编码
+     * @param productStatus   产品状态/计划类型
      * @param monthSurplusMap 月度硫化余量映射
      * @return 硫化余量，无记录时返回 Integer.MAX_VALUE（无上限约束）
      */
     public int getVulcanizingSurplus(String materialCode,
+                                     String productStatus,
                                      Map<String, MdmMonthSurplus> monthSurplusMap) {
         if (materialCode == null || monthSurplusMap == null) {
             return Integer.MAX_VALUE;
         }
-        MdmMonthSurplus monthSurplus = monthSurplusMap.get(materialCode);
+        String materialStatusKey = MonthPlanSurplusCalculator.buildMaterialStatusKey(materialCode, productStatus);
+        MdmMonthSurplus monthSurplus = monthSurplusMap.get(materialStatusKey);
         if (monthSurplus != null && monthSurplus.getPlanSurplusQty() != null) {
             return monthSurplus.getPlanSurplusQty().intValue();
         }

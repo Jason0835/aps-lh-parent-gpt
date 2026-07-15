@@ -4,6 +4,7 @@ import cn.hutool.core.date.DateUtil;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
+import com.zlt.aps.common.engine.utils.MonthPlanSurplusCalculator;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.lh.api.domain.entity.LhDayFinishQty;
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
@@ -11,10 +12,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
-import java.time.Instant;
 import java.time.LocalDate;
 import java.time.YearMonth;
-import java.time.ZoneId;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -38,9 +37,7 @@ public class SkuMonthPlanCalculator {
      * @return
      */
     public static Date getDate(LocalDate localDate) {
-        ZoneId zoneId = ZoneId.systemDefault();
-        Instant instantTime = localDate.atStartOfDay(zoneId).toInstant();
-        return new Date(instantTime.toEpochMilli());
+        return MonthPlanSurplusCalculator.getDate(localDate);
     }
 
     /**
@@ -50,11 +47,7 @@ public class SkuMonthPlanCalculator {
      * @return
      */
     public static LocalDate getDate(Date date) {
-        if (null == date) {
-            return null;
-        }
-        ZoneId zoneId = ZoneId.systemDefault();
-        return date.toInstant().atZone(zoneId).toLocalDate();
+        return MonthPlanSurplusCalculator.getDate(date);
     }
 
     /**
@@ -64,20 +57,7 @@ public class SkuMonthPlanCalculator {
      * @return
      */
     public static boolean isCrossMonthByProductionDateInfo(List<Date> allProductionDateList) {
-        if (CollectionUtils.isEmpty(allProductionDateList)) {
-            return false;
-        }
-        int size = allProductionDateList.size();
-        if (size == BigDecimal.ONE.intValue()) {
-            return false;
-        }
-        allProductionDateList.sort(Comparator.naturalOrder());
-        Date first = allProductionDateList.get(BigDecimal.ZERO.intValue());
-        int lastIndex = allProductionDateList.size() - BigDecimal.ONE.intValue();
-        Date last = allProductionDateList.get(lastIndex);
-        YearMonth firstInfo = getProductionYearAndMonth(first);
-        YearMonth lastInfo = getProductionYearAndMonth(last);
-        return !firstInfo.equals(lastInfo);
+        return MonthPlanSurplusCalculator.isCrossMonthByProductionDateInfo(allProductionDateList);
     }
 
     /**
@@ -87,18 +67,7 @@ public class SkuMonthPlanCalculator {
      * @return
      */
     public static YearMonth getNextMonth(List<Date> allProductionDate) {
-        if (CollectionUtils.isEmpty(allProductionDate)) {
-            return null;
-        }
-        YearMonth firstYearMonth = getFirstYearMonth(allProductionDate);
-        boolean isCrossMonth = isCrossMonthByProductionDateInfo(allProductionDate);
-        YearMonth nextMonth;
-        if (isCrossMonth) {
-            nextMonth = SkuMonthPlanCalculator.getLastYearMonth(allProductionDate);
-        } else {
-            nextMonth = firstYearMonth.plusMonths(BigDecimal.ONE.longValue());
-        }
-        return nextMonth;
+        return MonthPlanSurplusCalculator.getNextMonth(allProductionDate);
     }
 
     /**
@@ -107,12 +76,7 @@ public class SkuMonthPlanCalculator {
      * @return
      */
     public static YearMonth getFirstYearMonth(List<Date> allProductionDateList) {
-        if (CollectionUtils.isEmpty(allProductionDateList)) {
-            return null;
-        }
-        allProductionDateList.sort(Comparator.naturalOrder());
-        Date first = allProductionDateList.get(BigDecimal.ZERO.intValue());
-        return getProductionYearAndMonth(first);
+        return MonthPlanSurplusCalculator.getFirstYearMonth(allProductionDateList);
     }
 
     /**
@@ -121,12 +85,7 @@ public class SkuMonthPlanCalculator {
      * @return
      */
     public static YearMonth getLastYearMonth(List<Date> allProductionDateList) {
-        if (CollectionUtils.isEmpty(allProductionDateList)) {
-            return null;
-        }
-        allProductionDateList.sort(Comparator.naturalOrder());
-        Date last = allProductionDateList.get(allProductionDateList.size() - BigDecimal.ONE.intValue());
-        return getProductionYearAndMonth(last);
+        return MonthPlanSurplusCalculator.getLastYearMonth(allProductionDateList);
     }
 
     /**
@@ -137,25 +96,8 @@ public class SkuMonthPlanCalculator {
      * @return
      */
     public static FactoryMonthPlanProductionFinalResult getSkuYearMonthFinal(List<FactoryMonthPlanProductionFinalResult> allMonthPlanList, FactoryMonthPlanProductionFinalResult skuMonthProductionInfo, YearMonth yearMonth) {
-        if (null == skuMonthProductionInfo || null == yearMonth || CollectionUtils.isEmpty(allMonthPlanList)) {
-            return null;
-        }
-        List<FactoryMonthPlanProductionFinalResult> resultList = Lists.newArrayList();
-        allMonthPlanList.forEach(singlePlan -> {
-            if (!singlePlan.isSameYearMonth(yearMonth)) {
-                //不同年月
-                return;
-            }
-            if (!skuMonthProductionInfo.getMaterialStatusKey().equals(singlePlan.getMaterialStatusKey())) {
-                //不同Sku + 计划类型
-                return;
-            }
-            resultList.add(singlePlan);
-        });
-        if (CollectionUtils.isEmpty(resultList)) {
-            return null;
-        }
-        return resultList.get(BigDecimal.ZERO.intValue());
+        return MonthPlanSurplusCalculator.getSkuYearMonthFinal(
+                allMonthPlanList, skuMonthProductionInfo, yearMonth);
     }
 
     /**
@@ -170,25 +112,8 @@ public class SkuMonthPlanCalculator {
      * @return
      */
     public static Map<YearMonth, Integer> getOverdueProduction(boolean isNextMonthFinal, List<Date> allProductionList, List<FactoryMonthPlanProductionFinalResult> allMonthPlanList, FactoryMonthPlanProductionFinalResult skuInfo) {
-        if (CollectionUtils.isEmpty(allMonthPlanList) || null == skuInfo) {
-            return Collections.emptyMap();
-        }
-        Map<YearMonth, Integer> result = Maps.newHashMap();
-        YearMonth firstMonth = getFirstYearMonth(allProductionList);
-        //如果跨月，只看后面的
-        if (isCrossMonthByProductionDateInfo(allProductionList)) {
-            result.put(firstMonth, BigDecimal.ZERO.intValue());
-            YearMonth lastMonth = getLastYearMonth(allProductionList);
-            result.put(lastMonth, getOverdueProduction(allMonthPlanList, skuInfo, lastMonth));
-            return result;
-        }
-        //当月
-        if (isNextMonthFinal) {
-            result.put(firstMonth, BigDecimal.ZERO.intValue());
-            return result;
-        }
-        result.put(firstMonth, getOverdueProduction(allMonthPlanList, skuInfo, firstMonth));
-        return result;
+        return MonthPlanSurplusCalculator.getOverdueProduction(
+                isNextMonthFinal, allProductionList, allMonthPlanList, skuInfo);
     }
 
     /**
@@ -204,69 +129,9 @@ public class SkuMonthPlanCalculator {
      * @return
      */
     public static Integer getSurplusQty(YearMonth productionYearMonth, List<Date> allProductionDate, Map<YearMonth, FactoryMonthPlanProductionFinalResult> hasProductionPlanMap, Map<YearMonth, Integer> monthOverdueQtyMap, Map<YearMonth, Integer> yearMonthPlanQtyMap, Integer finishedQty) {
-        if (null == finishedQty) {
-            finishedQty = BigDecimal.ZERO.intValue();
-        }
-        YearMonth firstMonth = getFirstYearMonth(allProductionDate);
-        boolean isCrossMonth = isCrossMonthByProductionDateInfo(allProductionDate);
-        //三天内有计划量,不跨月
-        if (!CollectionUtils.isEmpty(hasProductionPlanMap) && !isCrossMonth) {
-            Integer overdueQty = monthOverdueQtyMap.get(productionYearMonth);
-            if (null == overdueQty) {
-                overdueQty = BigDecimal.ZERO.intValue();
-            }
-            Integer planQty = yearMonthPlanQtyMap.get(productionYearMonth);
-            if (null == planQty) {
-                planQty = BigDecimal.ZERO.intValue();
-            }
-            return planQty - finishedQty + overdueQty;
-        }
-        //三天内有计划量，跨月
-        if (!CollectionUtils.isEmpty(hasProductionPlanMap) && isCrossMonth) {
-            YearMonth lastMonth = getLastYearMonth(allProductionDate);
-            boolean isCrossMonthPlanQty = hasProductionPlanMap.containsKey(lastMonth);
-            if (isCrossMonthPlanQty) {
-                FactoryMonthPlanProductionFinalResult lastYearPlan = hasProductionPlanMap.get(lastMonth);
-                Integer sumPlanQty = getSumPlanQty(yearMonthPlanQtyMap);
-                Integer overdueQty = BigDecimal.ZERO.intValue();
-                if (YesOrNoEnum.NO.getCode().equals(lastYearPlan.getLastMonthValidFlag()) && null != lastYearPlan.getLastMonthOverdueQty()) {
-                    overdueQty = -lastYearPlan.getLastMonthOverdueQty();
-                }
-                return sumPlanQty - finishedQty + overdueQty;
-            }
-            //没有跨月计划量
-            Integer planQty = yearMonthPlanQtyMap.get(firstMonth);
-            if (null == planQty) {
-                planQty = BigDecimal.ZERO.intValue();
-            }
-            return planQty - finishedQty;
-        }
-        //三天内没有计划量
-        Integer productionYearMonthPlanQty;
-        if (firstMonth.equals(productionYearMonth)) {
-            productionYearMonthPlanQty = yearMonthPlanQtyMap.get(productionYearMonth);
-        } else {
-            productionYearMonthPlanQty = yearMonthPlanQtyMap.get(firstMonth);
-        }
-        if (null == productionYearMonthPlanQty) {
-            productionYearMonthPlanQty = BigDecimal.ZERO.intValue();
-        }
-        Integer overdueQty;
-        int surplus;
-        if (isCrossMonth) {
-            overdueQty = monthOverdueQtyMap.get(productionYearMonth);
-        } else {
-            overdueQty = monthOverdueQtyMap.get(firstMonth);
-        }
-        surplus = productionYearMonthPlanQty - finishedQty + overdueQty;
-        if (surplus <= BigDecimal.ZERO.intValue() && isCrossMonth) {
-            YearMonth lastMonth = SkuMonthPlanCalculator.getLastYearMonth(allProductionDate);
-            Integer lastMonthPlanQty = yearMonthPlanQtyMap.get(lastMonth);
-            if (null != lastMonthPlanQty) {
-                surplus = surplus + lastMonthPlanQty;
-            }
-        }
-        return surplus;
+        return MonthPlanSurplusCalculator.getSurplusQty(
+                productionYearMonth, allProductionDate, hasProductionPlanMap,
+                monthOverdueQtyMap, yearMonthPlanQtyMap, finishedQty);
     }
 
     /**
@@ -293,13 +158,8 @@ public class SkuMonthPlanCalculator {
      * @return
      */
     public static Map<YearMonth, Integer> getPlanQty(List<Date> allProductionDate, List<FactoryMonthPlanProductionFinalResult> allMonthPlanList, FactoryMonthPlanProductionFinalResult skuMonthProductionInfo, Integer startDay) {
-        if (CollectionUtils.isEmpty(allProductionDate) || CollectionUtils.isEmpty(allMonthPlanList) || null == skuMonthProductionInfo || null == startDay) {
-            return Collections.emptyMap();
-        }
-        if (startDay < BigDecimal.ONE.intValue()) {
-            return Collections.emptyMap();
-        }
-        return getPlanQtyByMonthPlan(skuMonthProductionInfo, startDay, allProductionDate, allMonthPlanList);
+        return MonthPlanSurplusCalculator.getPlanQty(
+                allProductionDate, allMonthPlanList, skuMonthProductionInfo, startDay);
     }
 
     /**
@@ -354,10 +214,7 @@ public class SkuMonthPlanCalculator {
      * @return
      */
     public static int sumQty(Map<YearMonth, Integer> needSumQtyMap) {
-        if (CollectionUtils.isEmpty(needSumQtyMap)) {
-            return BigDecimal.ZERO.intValue();
-        }
-        return needSumQtyMap.values().stream().mapToInt(Integer::intValue).sum();
+        return MonthPlanSurplusCalculator.sumQty(needSumQtyMap);
     }
 
     /**
@@ -371,12 +228,8 @@ public class SkuMonthPlanCalculator {
      * @return
      */
     public static Map<YearMonth, FactoryMonthPlanProductionFinalResult> getHasProductionPlan(List<FactoryMonthPlanProductionFinalResult> allMonthPlanList, List<Date> allProductionList, String factoryCode, String materialCode, String productStatus) {
-        Map<YearMonth, List<Date>> yearMonthMap = getYearMonthProductionDateInfo(allProductionList);
-        FactoryMonthPlanProductionFinalResult skuInfo = new FactoryMonthPlanProductionFinalResult();
-        skuInfo.setFactoryCode(factoryCode);
-        skuInfo.setMaterialCode(materialCode);
-        skuInfo.setProductStatus(productStatus);
-        return getHasProductionPlan(allMonthPlanList, yearMonthMap, skuInfo);
+        return MonthPlanSurplusCalculator.getHasProductionPlan(
+                allMonthPlanList, allProductionList, factoryCode, materialCode, productStatus);
     }
 
     /**
@@ -386,11 +239,7 @@ public class SkuMonthPlanCalculator {
      * @return
      */
     public static YearMonth getProductionYearAndMonth(Date productionDate) {
-        //年份
-        int year = DateUtil.year(productionDate);
-        //月份 0~11，故而要+1
-        int month = DateUtil.month(productionDate) + BigDecimal.ONE.intValue();
-        return YearMonth.of(year, month);
+        return MonthPlanSurplusCalculator.getProductionYearAndMonth(productionDate);
     }
 
     /**
@@ -430,30 +279,8 @@ public class SkuMonthPlanCalculator {
      * @return
      */
     public static Map<YearMonth, Integer> statisticsSumPlanQtyBySku(FactoryMonthPlanProductionFinalResult skuInfo, Date startPlanDate, List<FactoryMonthPlanProductionFinalResult> allMonthPlanList) {
-        if (null == skuInfo || null == startPlanDate || CollectionUtils.isEmpty(allMonthPlanList)) {
-            return Collections.emptyMap();
-        }
-        List<FactoryMonthPlanProductionFinalResult> findPlanList = allMonthPlanList.stream().filter(single -> single.getMaterialStatusKey().equals(skuInfo.getMaterialStatusKey())).collect(Collectors.toList());
-        if (CollectionUtils.isEmpty(findPlanList)) {
-            return Collections.emptyMap();
-        }
-        Map<YearMonth, Integer> sumMap = Maps.newHashMap();
-        YearMonth firstMonth = getProductionYearAndMonth(startPlanDate);
-        Integer startDay = getDate(startPlanDate).getDayOfMonth();
-        findPlanList.forEach(singleMonthPlan -> {
-            YearMonth productionYearMonth = YearMonth.of(singleMonthPlan.getYear(), singleMonthPlan.getMonth());
-            Integer monthEndDay = productionYearMonth.lengthOfMonth();
-            //同年-月
-            Integer sumQty;
-            if (productionYearMonth.equals(firstMonth)) {
-                sumQty = statisticsPlanQtyEndDay(startDay, monthEndDay, singleMonthPlan);
-            } else {
-                //下一个年月
-                sumQty = statisticsPlanQtyEndDay(BigDecimal.ONE.intValue(), monthEndDay, singleMonthPlan);
-            }
-            sumMap.put(productionYearMonth, sumQty);
-        });
-        return sumMap;
+        return MonthPlanSurplusCalculator.statisticsSumPlanQtyBySku(
+                skuInfo, startPlanDate, allMonthPlanList);
     }
 
     /**

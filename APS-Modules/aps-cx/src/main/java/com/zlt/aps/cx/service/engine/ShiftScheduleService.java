@@ -1175,6 +1175,7 @@ public class ShiftScheduleService {
         result.setIsLastEndingBatch(task.getIsLastEndingBatch());
         result.setSourceTask(task);
         result.setIsEndProduction(task.getIsEndProduction());
+        result.setProductStatus(task.getProductStatus());
         result.setConstructionStage(task.getConstructionStage());
 
         return result;
