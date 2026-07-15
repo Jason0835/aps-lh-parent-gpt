@@ -1,5 +1,12 @@
 import request, { downloadLink } from '@/utils/request'
 
+export function listArticleCrownSpecs() {
+  return request({
+    url: '/cd15/common/articleCrownSpecs',
+    method: 'post'
+  })
+}
+
 export function listMachineRollMapping(query) {
   return request({ url: '/cd15/machineRollMapping/list', method: 'post', data: query })
 }

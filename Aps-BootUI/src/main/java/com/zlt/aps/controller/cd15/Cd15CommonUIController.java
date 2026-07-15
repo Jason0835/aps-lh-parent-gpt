@@ -33,4 +33,16 @@ public class Cd15CommonUIController {
     public AjaxResult steelStripCodes() {
         return cd15CommonRemoteService.steelStripCodes();
     }
+
+    /**
+     * 钢压大卷规格下拉（ARTICLE_CROWN_SPEC）。
+     *
+     * @return 去重后的钢压大卷规格列表
+     */
+    @ApiOperation("钢压大卷规格下拉")
+    @PostMapping("/articleCrownSpecs")
+    @ResponseBody
+    public AjaxResult articleCrownSpecs() {
+        return cd15CommonRemoteService.articleCrownSpecs();
+    }
 }

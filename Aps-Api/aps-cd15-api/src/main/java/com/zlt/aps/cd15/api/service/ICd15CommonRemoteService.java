@@ -20,4 +20,13 @@ public interface ICd15CommonRemoteService {
     @ApiOperation("钢带代码下拉")
     @PostMapping("/common/steelStripCodes")
     AjaxResult steelStripCodes();
+
+    /**
+     * 钢压大卷规格下拉（ARTICLE_CROWN_SPEC）。
+     *
+     * @return 去重后的钢压大卷规格列表
+     */
+    @ApiOperation("钢压大卷规格下拉")
+    @PostMapping("/common/articleCrownSpecs")
+    AjaxResult articleCrownSpecs();
 }
