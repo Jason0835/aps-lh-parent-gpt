@@ -161,7 +161,7 @@ export default {
           : await addMachineRollMapping(saveParams);
         if (res.needConfirm) {
           this.loading = false;
-          this.$confirm(res.msg, this.$t("common.tip"), { type: "warning" }).then(() => this.save(params, true));
+          this.$confirm(res.msg, this.$t("newPage.common.tips"), { type: "warning" }).then(() => this.save(params, true));
           return;
         }
         this.$modal.msgSuccess(res.msg);
