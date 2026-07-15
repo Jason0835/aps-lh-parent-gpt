@@ -873,15 +873,11 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
         BigDecimal tnfq = todayNightFinishQtyMap.get(matchKey);
         row.put("todayNightFinishQty", zeroToEmpty(tnfq));
 
-        // 临时调试日志：验证mainMaterialDesc+施工阶段匹配情况
-        if (tdpq == null && StringUtils.isNotBlank(embryoDescKey)) {
-            log.warn("totalDailyPlanQtyMap未匹配: matchKey=[{}], mapKeys示例={}",
-                    matchKey, totalDailyPlanQtyMap.keySet().stream().limit(3).collect(Collectors.toList()));
-        }
-        if (tnfq == null && StringUtils.isNotBlank(embryoDescKey)) {
-            log.warn("todayNightFinishQtyMap未匹配: matchKey=[{}], mapKeys示例={}",
-                    matchKey, todayNightFinishQtyMap.keySet().stream().limit(3).collect(Collectors.toList()));
-        }
+        // 调试日志：打印每条记录的匹配情况
+        log.info("匹配调试: embryoDesc=[{}], recipeType=[{}], matchKey=[{}], tdpq={}, tnfq={}",
+                embryoDescKey, recipeType, matchKey,
+                tdpq != null ? tdpq : "null",
+                tnfq != null ? tnfq : "null");
 
         // ylSum = todayNightFinishQty - totalDailyPlanQty
         BigDecimal ylSum = (tnfq != null ? tnfq : BigDecimal.ZERO)
