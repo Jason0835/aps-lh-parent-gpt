@@ -925,19 +925,26 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
         List<LhScheduleResultIssue> day3IssueList = new ArrayList<>();
 
         for (LhScheduleResult source : scheduleResultList) {
-            LhScheduleResultIssue day1Issue = convertToDay1IssueEntity(source, day1);
-            if (day1Issue != null) {
-                day1IssueList.add(day1Issue);
+            // day1对应源1、2班(早中)，同时为空则不下发T日
+            if (!isLhQtyAllEmpty(source.getClass1PlanQty(), source.getClass2PlanQty())) {
+                LhScheduleResultIssue day1Issue = convertToDay1IssueEntity(source, day1);
+                if (day1Issue != null) {
+                    day1IssueList.add(day1Issue);
+                }
             }
-
-            LhScheduleResultIssue day2Issue = convertToDay2IssueEntity(source, day2);
-            if (day2Issue != null) {
-                day2IssueList.add(day2Issue);
+            // day2对应源3、4、5班(夜早中)，同时为空则不下发T+1日
+            if (!isLhQtyAllEmpty(source.getClass3PlanQty(), source.getClass4PlanQty(), source.getClass5PlanQty())) {
+                LhScheduleResultIssue day2Issue = convertToDay2IssueEntity(source, day2);
+                if (day2Issue != null) {
+                    day2IssueList.add(day2Issue);
+                }
             }
-
-            LhScheduleResultIssue day3Issue = convertToDay3IssueEntity(source, day3);
-            if (day3Issue != null) {
-                day3IssueList.add(day3Issue);
+            // day3对应源6、7、8班(夜早中)，同时为空则不下发T+2日
+            if (!isLhQtyAllEmpty(source.getClass6PlanQty(), source.getClass7PlanQty(), source.getClass8PlanQty())) {
+                LhScheduleResultIssue day3Issue = convertToDay3IssueEntity(source, day3);
+                if (day3Issue != null) {
+                    day3IssueList.add(day3Issue);
+                }
             }
         }
 
@@ -965,6 +972,23 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
      *
      * @param issueList 硫化排程结果下发列表
      */
+
+    /**
+     * 判断硫化排程结果某天对应班次的计划量是否全为空(null或0)
+     * 用于下发MES前过滤：某天班次组全空则不下发该天数据
+     *
+     * @param qtys 班次计划量（Integer）
+     * @return true=全空，false=至少有一个班次有量
+     */
+    private boolean isLhQtyAllEmpty(Integer... qtys) {
+        for (Integer qty : qtys) {
+            if (qty != null && qty > 0) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     private void enrichMaterialAndExampleInfo(List<LhScheduleResultIssue> issueList) {
         if (CollectionUtils.isEmpty(issueList)) {
             return;
