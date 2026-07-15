@@ -5,6 +5,7 @@ import lombok.Data;
 
 import java.math.BigDecimal;
 import java.util.Date;
+import java.util.List;
 
 /**
  * CD15 排程结果草稿，落库前在 Engine 内部流转。
@@ -20,6 +21,8 @@ public class Cd15ScheduleResultDraft {
     private String factoryCode;
     private Date scheduleDate;
     private String cxBatchNo;
+    private String cxMachineCodes;
+    private BigDecimal planSurplusQty;
     private String bigRollCode;
     private String bigRollBarcode;
     private String steelStripCode;
@@ -27,6 +30,7 @@ public class Cd15ScheduleResultDraft {
     private String machineCode;
     private String machineName;
     private String classField;
+    private String shiftDisplayName;
     private int classIndex;
     private BigDecimal cxPlanQty;
     private BigDecimal planQty;
@@ -34,6 +38,9 @@ public class Cd15ScheduleResultDraft {
     private BigDecimal pieceCount;
     private BigDecimal netDemandMeters;
     private BigDecimal bigRollConsumeMeters;
+    private BigDecimal vehiclePlanQuantity;
+    private String storageLaneCode;
+    private List<Cd15LaneAllocationDraft> laneAllocations;
     private BigDecimal stockMetersAtSix;
     private String cutMode;
     private String sourceType;

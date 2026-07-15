@@ -12,9 +12,13 @@ import java.util.Set;
  */
 public final class Cd15ScheduleTaskStatus {
 
+    /** 等待执行 */
     public static final String PENDING = "PENDING";
+    /** 执行中 */
     public static final String RUNNING = "RUNNING";
+    /** 执行成功 */
     public static final String SUCCESS = "SUCCESS";
+    /** 执行失败 */
     public static final String FAILED = "FAILED";
 
     private static final Map<String, Set<String>> TRANSITIONS;

@@ -11,6 +11,8 @@ import java.util.List;
  */
 public interface ICd15MachineRollMappingService extends IDocService<Cd15MachineRollMapping> {
 
+    AjaxResult saveWithConfirm(Cd15MachineRollMapping entity);
+
     String checkUnique(Cd15MachineRollMapping entity);
 
     AjaxResult importData(List<Cd15MachineRollMapping> list, boolean updateSupport, Long importLogId);

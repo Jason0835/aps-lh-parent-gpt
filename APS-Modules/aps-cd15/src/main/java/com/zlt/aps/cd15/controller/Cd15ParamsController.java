@@ -88,6 +88,15 @@ public class Cd15ParamsController extends AbstractDocBizController<Cd15Params> {
     }
 
     /**
+     * 根据工厂编码和参数编码获取参数值。
+     */
+    @ApiOperation("获取参数值")
+    @GetMapping("/getParamValue/{factoryCode}/{paramCode}")
+    public AjaxResult getParamValue(@PathVariable("factoryCode") String factoryCode, @PathVariable("paramCode") String paramCode) {
+        return AjaxResult.success("", cd15ParamsService.getParamValue(factoryCode, paramCode));
+    }
+
+    /**
      * 校验唯一性
      */
     @ApiOperation("校验唯一性")

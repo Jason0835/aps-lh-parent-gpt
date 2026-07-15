@@ -1,10 +1,12 @@
 package com.zlt.aps.cd15.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.cd15.api.domain.entity.Cd15ScheduleResult;
 import com.zlt.aps.cd15.api.domain.vo.Cd15ChangeQtyRequest;
 import com.zlt.aps.cd15.api.domain.vo.Cd15InsertOrderRequest;
+import com.zlt.aps.cd15.api.domain.vo.Cd15RollingCheckRequest;
 import com.zlt.aps.cd15.api.domain.vo.Cd15TransferMachineRequest;
 import com.zlt.aps.cd15.engine.constant.Cd15ScheduleTaskType;
 import com.zlt.aps.cd15.engine.domain.Cd15ScheduleTask;
@@ -12,6 +14,12 @@ import com.zlt.aps.cd15.engine.model.Cd15BatchDataCheckResult;
 import com.zlt.aps.cd15.engine.service.Cd15AutoScheduleBatchDataValidator;
 import com.zlt.aps.cd15.engine.service.Cd15AutoScheduleInputVersionService;
 import com.zlt.aps.cd15.engine.service.Cd15ScheduleTaskService;
+import com.zlt.aps.cd15.mapper.Cd15ScheduleResultMapper;
+import com.zlt.aps.cd15.model.Cd15ScheduleOverwriteDecision;
+import com.zlt.aps.cd15.service.Cd15AutoScheduleAsyncExecutor;
+import com.zlt.aps.cd15.service.Cd15InsertOrderAsyncExecutor;
+import com.zlt.aps.cd15.service.Cd15ScheduleOverwriteValidator;
+import com.zlt.aps.cd15.service.Cd15TimedRollingCheckService;
 import com.zlt.aps.cd15.service.ICd15ScheduleResultService;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.sysdef.domain.SysDocType;
@@ -36,14 +44,31 @@ import java.util.stream.IntStream;
 @Transactional(rollbackFor = Exception.class)
 public class Cd15ScheduleResultServiceImpl extends AbstractDocService<Cd15ScheduleResult> implements ICd15ScheduleResultService {
 
+    private static final int CLASS_COUNT = 8;
+
     @Resource
     private Cd15ScheduleTaskService taskService;
+
+    @Resource
+    private Cd15ScheduleResultMapper resultMapper;
+
+    @Resource
+    private Cd15AutoScheduleAsyncExecutor autoScheduleAsyncExecutor;
 
     @Resource
     private Cd15AutoScheduleBatchDataValidator batchDataValidator;
 
     @Resource
     private Cd15AutoScheduleInputVersionService inputVersionService;
+
+    @Resource
+    private Cd15ScheduleOverwriteValidator overwriteValidator;
+
+    @Resource
+    private Cd15InsertOrderAsyncExecutor insertOrderAsyncExecutor;
+
+    @Resource
+    private Cd15TimedRollingCheckService timedRollingCheckService;
 
     /**
      * 斜裁自动排程 Service 入口。
@@ -74,12 +99,33 @@ public class Cd15ScheduleResultServiceImpl extends AbstractDocService<Cd15Schedu
             data.put("warnings", this.toErrorList(batchCheck.getWarnings()));
             return AjaxResult.success(batchCheck.getPrimaryMessage(), data);
         }
+        List<Cd15ScheduleResult> existing = resultMapper.selectList(new LambdaQueryWrapper<Cd15ScheduleResult>()
+                .eq(Cd15ScheduleResult::getFactoryCode, scheduleResult.getFactoryCode())
+                .eq(Cd15ScheduleResult::getScheduleDate, scheduleResult.getScheduleDate()));
+        Cd15ScheduleOverwriteDecision overwriteDecision = overwriteValidator.validate(
+                existing, Boolean.TRUE.equals(scheduleResult.getForceRegenerate()));
+        if (overwriteDecision.isRejected()) {
+            return AjaxResult.error(overwriteDecision.getMessage());
+        }
+        if (overwriteDecision.isNeedConfirm()) {
+            Map<String, Object> data = new LinkedHashMap<>();
+            data.put("needConfirm", true);
+            data.put("existingCount", existing.size());
+            return AjaxResult.success(overwriteDecision.getMessage(), data);
+        }
+        Cd15ScheduleTask activeTask = taskService.findActive(
+                scheduleResult.getFactoryCode(), scheduleResult.getScheduleDate());
+        if (activeTask != null) {
+            return AjaxResult.success("当前日期已有斜裁排程任务正在执行", this.toTaskData(activeTask));
+        }
         String inputVersion = inputVersionService.fingerprint(scheduleResult.getFactoryCode(), localScheduleDate);
         String snapshot = "factoryCode=" + scheduleResult.getFactoryCode()
                 + ",scheduleDate=" + scheduleResult.getScheduleDate()
                 + ",forceRegenerate=" + Boolean.TRUE.equals(scheduleResult.getForceRegenerate());
-        return this.createTask(scheduleResult.getFactoryCode(), scheduleResult.getScheduleDate(),
-                Cd15ScheduleTaskType.AUTO_SCHEDULE, snapshot, inputVersion);
+        Cd15ScheduleTask task = taskService.createPending(scheduleResult.getFactoryCode(), scheduleResult.getScheduleDate(),
+                Cd15ScheduleTaskType.AUTO_SCHEDULE, "MANUAL", snapshot, inputVersion, null);
+        autoScheduleAsyncExecutor.execute(task.getTaskId(), task.getFactoryCode(), task.getScheduleDate());
+        return AjaxResult.success(I18nUtil.getMessage("ui.message.operation.success"), this.toTaskData(task));
     }
 
     @Override
@@ -109,10 +155,19 @@ public class Cd15ScheduleResultServiceImpl extends AbstractDocService<Cd15Schedu
         if (!Objects.equals(200, validation.get("code"))) {
             return validation;
         }
-        return this.createTask(request.getFactoryCode(), request.getScheduleDate(),
-                Cd15ScheduleTaskType.INSERT_ORDER, request.toString());
+        AjaxResult batchValidation = this.validateBatchData(request.getFactoryCode(), request.getScheduleDate());
+        if (batchValidation != null) {
+            return batchValidation;
+        }
+        Cd15ScheduleTask activeTask = taskService.findActive(request.getFactoryCode(), request.getScheduleDate());
+        if (activeTask != null) {
+            return AjaxResult.error("当前日期已有斜裁排程任务正在执行");
+        }
+        Cd15ScheduleTask task = taskService.createPending(request.getFactoryCode(), request.getScheduleDate(),
+                Cd15ScheduleTaskType.INSERT_ORDER, "MANUAL", request.toString(), null);
+        insertOrderAsyncExecutor.execute(task.getTaskId(), request);
+        return AjaxResult.success(I18nUtil.getMessage("ui.message.operation.success"), this.toTaskData(task));
     }
-
     @Override
     public AjaxResult getInsertTask(String taskId) {
         return this.taskView(taskId, Cd15ScheduleTaskType.INSERT_ORDER);
@@ -154,10 +209,19 @@ public class Cd15ScheduleResultServiceImpl extends AbstractDocService<Cd15Schedu
         if (!Objects.equals(200, validation.get("code"))) {
             return validation;
         }
-        return this.createTask(request.getFactoryCode(), request.getScheduleDate(),
-                Cd15ScheduleTaskType.TRANSFER_MACHINE, request.toString());
+        AjaxResult batchValidation = this.validateBatchData(request.getFactoryCode(), request.getScheduleDate());
+        if (batchValidation != null) {
+            return batchValidation;
+        }
+        Cd15ScheduleTask activeTask = taskService.findActive(request.getFactoryCode(), request.getScheduleDate());
+        if (activeTask != null) {
+            return AjaxResult.error("当前日期已有斜裁排程任务正在执行");
+        }
+        Cd15ScheduleTask task = taskService.createPending(request.getFactoryCode(), request.getScheduleDate(),
+                Cd15ScheduleTaskType.TRANSFER_MACHINE, "MANUAL", request.toString(), null);
+        insertOrderAsyncExecutor.executeTransfer(task.getTaskId(), request);
+        return AjaxResult.success(I18nUtil.getMessage("ui.message.operation.success"), this.toTaskData(task));
     }
-
     @Override
     public AjaxResult getTransferMachineTask(String taskId) {
         return this.taskView(taskId, Cd15ScheduleTaskType.TRANSFER_MACHINE);
@@ -181,7 +245,7 @@ public class Cd15ScheduleResultServiceImpl extends AbstractDocService<Cd15Schedu
             return this.required("steelStripCode");
         }
         boolean hasTargetQty = request.getTargetPlanQty() != null
-                || IntStream.rangeClosed(1, 6)
+                || IntStream.rangeClosed(1, CLASS_COUNT)
                 .mapToObj(classIndex -> this.readPlanQty(request, classIndex))
                 .anyMatch(Objects::nonNull);
         if (!hasTargetQty) {
@@ -203,13 +267,32 @@ public class Cd15ScheduleResultServiceImpl extends AbstractDocService<Cd15Schedu
         if (!Objects.equals(200, validation.get("code"))) {
             return validation;
         }
-        return this.createTask(request.getFactoryCode(), request.getScheduleDate(),
-                Cd15ScheduleTaskType.CHANGE_QTY, request.toString());
+        AjaxResult batchValidation = this.validateBatchData(request.getFactoryCode(), request.getScheduleDate());
+        if (batchValidation != null) {
+            return batchValidation;
+        }
+        Cd15ScheduleTask activeTask = taskService.findActive(request.getFactoryCode(), request.getScheduleDate());
+        if (activeTask != null) {
+            return AjaxResult.error("当前日期已有斜裁排程任务正在执行");
+        }
+        Cd15ScheduleTask task = taskService.createPending(request.getFactoryCode(), request.getScheduleDate(),
+                Cd15ScheduleTaskType.CHANGE_QTY, "MANUAL", request.toString(), null);
+        insertOrderAsyncExecutor.executeChangeQty(task.getTaskId(), request);
+        return AjaxResult.success(I18nUtil.getMessage("ui.message.operation.success"), this.toTaskData(task));
     }
-
     @Override
     public AjaxResult getChangeQtyTask(String taskId) {
         return this.taskView(taskId, Cd15ScheduleTaskType.CHANGE_QTY);
+    }
+
+    @Override
+    public AjaxResult checkTimedRolling(Cd15RollingCheckRequest request) {
+        return timedRollingCheckService.check(request);
+    }
+
+    @Override
+    public AjaxResult getTimedRollingTask(String taskId) {
+        return this.taskView(taskId, Cd15ScheduleTaskType.TIMED_ROLLING);
     }
 
     @Override
@@ -237,12 +320,12 @@ public class Cd15ScheduleResultServiceImpl extends AbstractDocService<Cd15Schedu
     }
 
     private AjaxResult validatePlanAndProduceOrder(Cd15InsertOrderRequest request) {
-        boolean pairInvalid = IntStream.rangeClosed(1, 6)
+        boolean pairInvalid = IntStream.rangeClosed(1, CLASS_COUNT)
                 .anyMatch(classIndex -> this.isPlanAndProduceOrderPairInvalid(request, classIndex));
         if (pairInvalid) {
             return AjaxResult.error(I18nUtil.getMessage("ui.message.parameter.error"));
         }
-        boolean hasPlan = IntStream.rangeClosed(1, 6)
+        boolean hasPlan = IntStream.rangeClosed(1, CLASS_COUNT)
                 .mapToObj(classIndex -> this.hasPositivePlan(request, classIndex))
                 .anyMatch(Boolean::booleanValue);
         return hasPlan ? AjaxResult.success() : this.required("classPlanQty");
@@ -264,6 +347,19 @@ public class Cd15ScheduleResultServiceImpl extends AbstractDocService<Cd15Schedu
         return (Double) request.getFieldValueByFieldName(String.format("class%dPlanQty", classIndex));
     }
 
+    private AjaxResult validateBatchData(String factoryCode, Date scheduleDate) {
+        Cd15BatchDataCheckResult batchCheck = batchDataValidator.check(
+                factoryCode, this.toLocalDate(scheduleDate));
+        if (!batchCheck.isFailed()) {
+            return null;
+        }
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("needConfirm", false);
+        data.put("batchCheckFailed", true);
+        data.put("errors", this.toErrorList(batchCheck.getErrors()));
+        data.put("warnings", this.toErrorList(batchCheck.getWarnings()));
+        return AjaxResult.success(batchCheck.getPrimaryMessage(), data);
+    }
     private AjaxResult createTask(String factoryCode, Date scheduleDate, String taskType, String requestSnapshot) {
         return this.createTask(factoryCode, scheduleDate, taskType, requestSnapshot, null);
     }
@@ -315,7 +411,11 @@ public class Cd15ScheduleResultServiceImpl extends AbstractDocService<Cd15Schedu
         data.put("batchNo", task.getBatchNo());
         data.put("inputVersion", task.getInputVersion());
         data.put("errorMessage", task.getErrorMessage());
-        data.put("engineImplemented", false);
+        data.put("engineImplemented", Cd15ScheduleTaskType.AUTO_SCHEDULE.equals(task.getTaskType())
+                || Cd15ScheduleTaskType.INSERT_ORDER.equals(task.getTaskType())
+                || Cd15ScheduleTaskType.TRANSFER_MACHINE.equals(task.getTaskType())
+                || Cd15ScheduleTaskType.CHANGE_QTY.equals(task.getTaskType())
+                || Cd15ScheduleTaskType.TIMED_ROLLING.equals(task.getTaskType()));
         return data;
     }
 

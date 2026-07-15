@@ -15,6 +15,7 @@ import com.zlt.common.utils.ImportExcelValidatedUtils;
 import com.zlt.common.utils.PubUtil;
 import com.zlt.sysdef.domain.SysDocType;
 import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -45,6 +46,19 @@ public class Cd15ParamsServiceImpl extends AbstractDocService<Cd15Params> implem
         wrapper.eq(Cd15Params::getParamCode, entity.getParamCode());
         wrapper.ne(entity.getId() != null, Cd15Params::getId, entity.getId());
         return cd15ParamsMapper.selectCount(wrapper) > 0 ? UserConstants.NOT_UNIQUE : UserConstants.UNIQUE;
+    }
+
+    @Override
+    public String getParamValue(String factoryCode, String paramCode) {
+        if (StringUtils.isBlank(factoryCode) || StringUtils.isBlank(paramCode)) {
+            return null;
+        }
+        LambdaQueryWrapper<Cd15Params> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(Cd15Params::getFactoryCode, factoryCode);
+        wrapper.eq(Cd15Params::getParamCode, paramCode);
+        wrapper.last("limit 1");
+        Cd15Params params = cd15ParamsMapper.selectOne(wrapper);
+        return params == null ? null : params.getParamValue();
     }
 
     @Override
@@ -86,6 +100,7 @@ public class Cd15ParamsServiceImpl extends AbstractDocService<Cd15Params> implem
                 exist.setRegularExpression(docEntity.getRegularExpression());
                 exist.setErrorTips(docEntity.getErrorTips());
                 exist.setRemark(docEntity.getRemark());
+                exist.setRemark2(docEntity.getRemark2());
                 cd15ParamsMapper.updateById(exist);
                 successNum++;
             } else {

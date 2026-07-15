@@ -1,6 +1,5 @@
 package com.zlt.aps.cd15.engine.model;
 
-import com.zlt.aps.gdyy.api.domain.entity.GdyyStock;
 import lombok.Builder;
 import lombok.Data;
 
@@ -17,6 +16,10 @@ public class Cd15RollingResourceSnapshot {
 
     /** 按钢带代码汇总的 6 点库存米数。 */
     private Map<String, BigDecimal> stockMetersBySteelStrip;
-    /** 按大卷代码分组的 GDYY 成熟库存。 */
-    private Map<String, List<GdyyStock>> gdyyStocksByBigRoll;
+    /** 按大卷代码分组的 GDYY 成熟流水。 */
+    private Map<String, List<Cd15BigRollAgingStock>> gdyyAgingStocksByBigRoll;
+    /** 当前可分配库排状态。 */
+    private List<Cd15StorageLaneState> storageLanes;
+    /** 无法确定成熟时间或单卷米数的大卷代码。 */
+    private List<String> dataMissingBigRollCodes;
 }
