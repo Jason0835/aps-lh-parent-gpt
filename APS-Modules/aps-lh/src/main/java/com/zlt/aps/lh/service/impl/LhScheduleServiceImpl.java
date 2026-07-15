@@ -898,24 +898,25 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         if (Objects.nonNull(style)) {
             target.setCellStyle(style);
         }
-        switch (source.getCellType()) {
-            case STRING:
-                target.setCellValue(source.getStringCellValue());
-                break;
-            case NUMERIC:
-                target.setCellValue(source.getNumericCellValue());
-                break;
-            case BOOLEAN:
-                target.setCellValue(source.getBooleanCellValue());
-                break;
-            case FORMULA:
-                target.setCellFormula(source.getCellFormula());
-                break;
-            case BLANK:
-                target.setBlank();
-                break;
-            default:
-                break;
+        CellType cellType = source.getCellType();
+        if (CellType.FORMULA.equals(cellType)) {
+            target.setCellFormula(source.getCellFormula());
+            return;
+        }
+        if (CellType.STRING.equals(cellType)) {
+            target.setCellValue(source.getRichStringCellValue());
+            return;
+        }
+        if (CellType.NUMERIC.equals(cellType)) {
+            target.setCellValue(source.getNumericCellValue());
+            return;
+        }
+        if (CellType.BOOLEAN.equals(cellType)) {
+            target.setCellValue(source.getBooleanCellValue());
+            return;
+        }
+        if (CellType.BLANK.equals(cellType)) {
+            target.setBlank();
         }
     }
 
