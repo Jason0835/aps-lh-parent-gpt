@@ -856,11 +856,32 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
         row.put("remark", item.getRemark());
         row.put("lhMachineQty", countLhScheduleIds(item.getLhScheduleIds()));
 
-        BigDecimal tdpq = totalDailyPlanQtyMap.get(StringUtils.defaultString(item.getMainMaterialDesc()).trim());
+        String embryoDescKey = StringUtils.defaultString(item.getMainMaterialDesc()).trim();
+        // 取第一个有值的classXRecipeType作为施工阶段
+        String recipeType = "";
+        for (int i = 1; i <= 8; i++) {
+            Object val = item.getFieldValueByFieldName("class" + i + "RecipeType");
+            if (val != null && StringUtils.isNotBlank(val.toString().trim())) {
+                recipeType = val.toString().trim();
+                break;
+            }
+        }
+        String matchKey = embryoDescKey + "|" + recipeType;
+        BigDecimal tdpq = totalDailyPlanQtyMap.get(matchKey);
         row.put("totalDailyPlanQty", zeroToEmpty(tdpq));
 
-        BigDecimal tnfq = todayNightFinishQtyMap.get(StringUtils.defaultString(item.getMainMaterialDesc()).trim());
+        BigDecimal tnfq = todayNightFinishQtyMap.get(matchKey);
         row.put("todayNightFinishQty", zeroToEmpty(tnfq));
+
+        // 临时调试日志：验证mainMaterialDesc+施工阶段匹配情况
+        if (tdpq == null && StringUtils.isNotBlank(embryoDescKey)) {
+            log.warn("totalDailyPlanQtyMap未匹配: matchKey=[{}], mapKeys示例={}",
+                    matchKey, totalDailyPlanQtyMap.keySet().stream().limit(3).collect(Collectors.toList()));
+        }
+        if (tnfq == null && StringUtils.isNotBlank(embryoDescKey)) {
+            log.warn("todayNightFinishQtyMap未匹配: matchKey=[{}], mapKeys示例={}",
+                    matchKey, todayNightFinishQtyMap.keySet().stream().limit(3).collect(Collectors.toList()));
+        }
 
         BigDecimal ylSum = (tnfq != null ? tnfq : BigDecimal.ZERO)
                 .subtract(tdpq != null ? tdpq : BigDecimal.ZERO);
@@ -1134,7 +1155,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
             return Collections.emptyMap();
         }
 
-        // 按胎胚描述汇总整月累计计划量
+        // 按胎胚描述汇总整月累计计划量（含上月超欠产量）
         Map<String, BigDecimal> resultMap = new HashMap<>();
 
         for (FactoryMonthPlanProductionFinalResult plan : plans) {
@@ -1143,14 +1164,35 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
                 continue;
             }
             embryoDesc = embryoDesc.trim();
-            BigDecimal sum = resultMap.getOrDefault(embryoDesc, BigDecimal.ZERO);
+            // 按产品状态区分（与lhType、classXRecipeType同字典trial_status），构建 key 为 embryoDesc + "|" + productStatus
+            String productStatus = StringUtils.defaultString(plan.getProductStatus()).trim();
+            String planKey = embryoDesc + "|" + productStatus;
+            BigDecimal sum = resultMap.getOrDefault(planKey, BigDecimal.ZERO);
+            // 累加 day1 ~ day末 的日计划量
+            BigDecimal daySum = BigDecimal.ZERO;
             for (int day = 1; day <= lastDayOfMonth; day++) {
                 Integer qty = plan.getDayQty(day);
                 if (qty != null && qty > 0) {
-                    sum = sum.add(BigDecimal.valueOf(qty));
+                    daySum = daySum.add(BigDecimal.valueOf(qty));
                 }
             }
-            resultMap.put(embryoDesc, sum);
+            sum = sum.add(daySum);
+            // 上月超欠产量：lastMonthValidFlag="1"时累加 lastMonthOverdueQty
+            BigDecimal overdueVal = BigDecimal.ZERO;
+            if ("1".equals(plan.getLastMonthValidFlag())) {
+                Integer overdueQty = plan.getLastMonthOverdueQty();
+                if (overdueQty != null && overdueQty != 0) {
+                    overdueVal = BigDecimal.valueOf(overdueQty);
+                    sum = sum.add(overdueVal);
+                }
+            }
+            resultMap.put(planKey, sum);
+
+            // 临时调试日志：打印指定胎胚描述的明细
+            if (embryoDesc.startsWith("295/80R22.5 152/149M 18PR JF518")) {
+                log.info("调试-JF518明细: materialCode={}, constructionStage={}, daySum={}, overdueFlag={}, overdueQty={}, 当前累计={}",
+                        plan.getMaterialCode(), productStatus, daySum, plan.getLastMonthValidFlag(), overdueVal, sum);
+            }
         }
 
         log.info("buildTotalDailyPlanQtyMap: 前一天={}, 年月={}, 工厂={}, 月计划记录数={}, 胎胚描述数={}",
@@ -1180,33 +1222,6 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
             return Collections.emptyMap();
         }
 
-        List<String> factoryCodes = list.stream()
-                .map(CxScheduleResult::getFactoryCode)
-                .filter(StringUtils::isNotBlank)
-                .map(String::trim)
-                .distinct()
-                .collect(Collectors.toList());
-        List<String> materialCodes = list.stream()
-                .map(CxScheduleResult::getMaterialCode)
-                .filter(StringUtils::isNotBlank)
-                .map(String::trim)
-                .distinct()
-                .collect(Collectors.toList());
-
-        if (factoryCodes.isEmpty() || materialCodes.isEmpty()) {
-            return Collections.emptyMap();
-        }
-
-        // 构建物料编码 -> 胎胚描述的映射
-        Map<String, String> materialToEmbryoDesc = new HashMap<>();
-        for (CxScheduleResult item : list) {
-            String mc = StringUtils.defaultString(item.getMaterialCode()).trim();
-            String desc = StringUtils.defaultString(item.getMainMaterialDesc()).trim();
-            if (StringUtils.isNotBlank(mc) && StringUtils.isNotBlank(desc)) {
-                materialToEmbryoDesc.putIfAbsent(mc, desc);
-            }
-        }
-
         // 取导出日期的前一天
         Date targetScheduleDate = Objects.nonNull(scheduleDate)
                 ? DateUtil.beginOfDay(scheduleDate)
@@ -1218,22 +1233,55 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
         // 前一天所在月的起始日
         Date monthStart = DateUtil.beginOfMonth(prevDay);
 
-        log.info("buildTodayNightFinishQtyMap: 前一天={}, 月份起始={}, factoryCodes={}, materialCodes={}",
-                prevDay, monthStart, factoryCodes, materialCodes);
+        // 从月计划表取工厂、物料编码和胎胚描述映射（全部以月计划表为准）
+        LocalDate prevLocalDate = cn.hutool.core.date.DateUtil.toLocalDateTime(prevDay).toLocalDate();
+        int yearMonth = prevLocalDate.getYear() * 100 + prevLocalDate.getMonthValue();
+        String factoryCode = list.stream()
+                .map(CxScheduleResult::getFactoryCode)
+                .filter(StringUtils::isNotBlank)
+                .map(String::trim)
+                .findFirst()
+                .orElse(FactoryConstant.DEFAULT_FACTORY_CODE);
+
+        List<FactoryMonthPlanProductionFinalResult> plans = monthPlanMapper.selectByFactoryAndYearMonth(factoryCode, yearMonth);
+        if (PubUtil.isEmpty(plans)) {
+            return Collections.emptyMap();
+        }
+
+        // 从月计划表构建物料编码 -> 胎胚描述的映射，同时收集物料编码列表
+        Map<String, String> materialToEmbryoDesc = new HashMap<>();
+        List<String> materialCodes = new ArrayList<>();
+        for (FactoryMonthPlanProductionFinalResult plan : plans) {
+            String mc = StringUtils.defaultString(plan.getMaterialCode()).trim();
+            String desc = StringUtils.defaultString(plan.getMainMaterialDesc()).trim();
+            if (StringUtils.isNotBlank(mc) && StringUtils.isNotBlank(desc)) {
+                materialToEmbryoDesc.putIfAbsent(mc, desc);
+                materialCodes.add(mc);
+            }
+        }
+
+        if (materialCodes.isEmpty()) {
+            return Collections.emptyMap();
+        }
+
+        List<String> factoryCodes = Collections.singletonList(factoryCode);
+
+        log.info("buildTodayNightFinishQtyMap: 前一天={}, 月份起始={}, factoryCodes={}, 月计划物料数={}, 映射数={}",
+                prevDay, monthStart, factoryCodes, materialCodes.size(), materialToEmbryoDesc.size());
 
         Map<String, BigDecimal> resultMap = new HashMap<>();
 
-        // 1. 查询日完成量：月份起始日 ~ 前一天（不含前一天）
+        // 1. 查询日完成量：月份起始日 ~ 前一天（不含前一天），不按物料编码过滤
         List<Map<String, Object>> dayFinishList = lhFinishQtyMapper.sumDayFinishQty(
-                factoryCodes, materialCodes, monthStart, prevDayStart);
+                factoryCodes, null, monthStart, prevDayStart);
         log.info("buildTodayNightFinishQtyMap dayFinishList size:{}", dayFinishList != null ? dayFinishList.size() : 0);
 
-        // 2. 查询班次完成量：前一天当天
+        // 2. 查询班次完成量：前一天当天，不按物料编码过滤
         List<Map<String, Object>> scheFinishList = lhFinishQtyMapper.sumScheFinishQty(
-                factoryCodes, materialCodes, prevDayStart, prevDayNextStart);
+                factoryCodes, null, prevDayStart, prevDayNextStart);
         log.info("buildTodayNightFinishQtyMap scheFinishList size:{}", scheFinishList != null ? scheFinishList.size() : 0);
 
-        // 合并两表结果，按物料编码汇总后映射到胎胚描述
+        // 合并两表结果，按物料编码汇总后映射到胎胚描述+示方类型
         for (Map<String, Object> row : dayFinishList) {
             String mCode = (String) row.get("MATERIAL_CODE");
             if (StringUtils.isEmpty(mCode)) {
@@ -1243,9 +1291,12 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
             if (StringUtils.isBlank(embryoDesc)) {
                 continue;
             }
+            // 按示方类型区分，key 为 embryoDesc + "|" + lhType
+            String lhType = (String) row.get("LH_TYPE");
+            String finishKey = embryoDesc + "|" + StringUtils.defaultString(lhType).trim();
             Object totalObj = row.get("TOTAL_FINISH_QTY");
             BigDecimal val = totalObj != null ? new BigDecimal(totalObj.toString()) : BigDecimal.ZERO;
-            resultMap.merge(embryoDesc, val, BigDecimal::add);
+            resultMap.merge(finishKey, val, BigDecimal::add);
         }
 
         for (Map<String, Object> row : scheFinishList) {
@@ -1257,9 +1308,12 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
             if (StringUtils.isBlank(embryoDesc)) {
                 continue;
             }
+            // 按示方类型区分，key 为 embryoDesc + "|" + lhType
+            String lhType = (String) row.get("CLASS1_LH_TYPE");
+            String finishKey = embryoDesc + "|" + StringUtils.defaultString(lhType).trim();
             Object totalObj = row.get("TOTAL_FINISH_QTY");
             BigDecimal val = totalObj != null ? new BigDecimal(totalObj.toString()) : BigDecimal.ZERO;
-            resultMap.merge(embryoDesc, val, BigDecimal::add);
+            resultMap.merge(finishKey, val, BigDecimal::add);
         }
 
         log.info("buildTodayNightFinishQtyMap resultMap size:{}, keys:{}", resultMap.size(), resultMap.keySet());
