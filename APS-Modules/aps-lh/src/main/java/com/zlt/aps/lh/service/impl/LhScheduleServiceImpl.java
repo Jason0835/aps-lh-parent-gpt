@@ -742,20 +742,23 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         // 以及 8 个班次标题里的 shiftDate1 ~ shiftDate8。
         Map<String, Object> tableMap = buildExportTableMap(exportList, result.getScheduleDate());
 
+        // 换模计划同时用于硫化计划的一班顺序和换模计划Sheet导出，查询一次后复用。
+        LhMouldChangePlan mouldChangePlan = BeanCopyUtils.copyBean(result, LhMouldChangePlan.class);
+        QueryWrapper<LhMouldChangePlan> wrapper = new QueryWrapper<>();
+        lhMouldChangePlanController.builderCondition(wrapper, mouldChangePlan);
+        List<LhMouldChangePlan> mouldChangePlanList = lhMouldChangePlanMapper.selectList(wrapper);
+
         // 节点4：模板第 7 行为 {.xxx} 明细模板行，writeMultiList 会从该行开始复制填充。
         // 当前只有一个明细列表，因此只放入一个 List<Map<String,Object>>。
         List<List<Map<String, Object>>> excelDataList = new ArrayList<>();
-        List<Map<String, Object>> exportDataList = buildExportDataList(exportList, result.getScheduleDate());
+        List<Map<String, Object>> exportDataList = buildExportDataList(
+                exportList, result.getScheduleDate(), mouldChangePlanList);
         excelDataList.add(exportDataList);
 
         // 节点5：硫化计划数据位于模板第 0 个 sheet（下标 0）的“硫化计划”页。
         byte[] exportBytes = ExcelUtils.writeMultiList(new ByteArrayInputStream(templateBytes), 0, tableMap, excelDataList);
 
         //1.获取导出数据
-        LhMouldChangePlan mouldChangePlan = BeanCopyUtils.copyBean(result, LhMouldChangePlan.class);
-        QueryWrapper<LhMouldChangePlan> wrapper = new QueryWrapper<>();
-        lhMouldChangePlanController.builderCondition(wrapper, mouldChangePlan);
-        List<LhMouldChangePlan> mouldChangePlanList = lhMouldChangePlanMapper.selectList(wrapper);
         AppUtils.formatData(mouldChangePlanList, lhMouldChangePlanController.getQueryFormulas());
         List<LhMouldChangePlanVo> mouldChangePlanExportList = lhMouldChangePlanController.buildLhMouldChangePlanVoList(mouldChangePlanList, mouldChangePlan);
 
@@ -2415,10 +2418,12 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
      * 构建模板列表数据
      *
      * @param list         排程结果列表
-     * @param scheduleDate 导出入口传入的排程日期，用于固定 T 日完成量查询口径
+     * @param scheduleDate        导出入口传入的排程日期，用于固定 T 日完成量查询口径
+     * @param mouldChangePlanList 模具交替计划，用于按同批次、同排程日、同机台修正一班顺序
      * @return 模板列表数据
      */
-    private List<Map<String, Object>> buildExportDataList(List<LhScheduleResult> list, Date scheduleDate) {
+    private List<Map<String, Object>> buildExportDataList(List<LhScheduleResult> list, Date scheduleDate,
+                                                          List<LhMouldChangePlan> mouldChangePlanList) {
         List<Map<String, Object>> dataList = new ArrayList<>(list.size() + 1);
         Map<String, LhRepairCapsule> capsuleMap = buildRepairCapsuleExportMap(list);
         Map<Long, String> cxMachineCodeMap = buildCxMachineCodeExportMap(list);
@@ -2436,6 +2441,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
 
         // 构建8班顺序值映射：同一物料按班次1~8遍历，每个班次内有计划量的记录按机台编码升序，顺序值从1~n连续编排
         Map<String, Map<Integer, Integer>> shiftOrderMap = buildContinuousShiftOrderMap(sortedList);
+        Map<String, Integer> class1MouldChangeOrderMap = buildClass1MouldChangeOrderMap(mouldChangePlanList);
         Map<LhScheduleResult, ExportRowStyleFlag> rowStyleFlagMap = buildMachinePostCloseOutStyleFlagMap(sortedList);
 
         for (LhScheduleResult result : sortedList) {
@@ -2488,7 +2494,8 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
             // 与模板中的 {.class1PlanQty}、{.class8Analysis} 等占位符一一对应。
             for (int shift = 1; shift <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT; shift++) {
                 row.put("class" + shift + "LeftRightMould", buildShiftLeftRightMould(result, shift));
-                row.put("class" + shift + "Order", getContinuousShiftOrder(shiftOrderMap, result, shift));
+                row.put("class" + shift + "Order", resolveExportShiftOrder(
+                        shiftOrderMap, class1MouldChangeOrderMap, result, shift));
                 row.put("class" + shift + "PlanQty", getClassPlanQty(result, shift));
                 row.put("class" + shift + "FinishQty", getClassFinishQty(result, shift));
                 Object shiftType = buildShiftType(result, shift, endTypeMap);
@@ -2508,6 +2515,69 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
             dataList.add(row);
         }
         return dataList;
+    }
+
+    /**
+     * 构建模具交替计划对应的一班顺序映射。
+     * 同一硫化结果批次、排程日期和机台内，前规格为1，后规格为2。
+     *
+     * @param mouldChangePlanList 模具交替计划
+     * @return key=批次号|排程日期|机台|物料编码，value=一班顺序
+     */
+    private Map<String, Integer> buildClass1MouldChangeOrderMap(List<LhMouldChangePlan> mouldChangePlanList) {
+        Map<String, Integer> orderMap = new HashMap<>();
+        if (CollUtil.isEmpty(mouldChangePlanList)) {
+            return orderMap;
+        }
+        mouldChangePlanList.forEach(plan -> {
+            if (StringUtils.isNotBlank(plan.getBeforeMaterialCode())) {
+                orderMap.put(buildMouldChangeOrderKey(plan.getLhResultBatchNo(), plan.getScheduleDate(),
+                        plan.getLhMachineCode(), plan.getBeforeMaterialCode()), 1);
+            }
+            if (StringUtils.isNotBlank(plan.getAfterMaterialCode())) {
+                orderMap.put(buildMouldChangeOrderKey(plan.getLhResultBatchNo(), plan.getScheduleDate(),
+                        plan.getLhMachineCode(), plan.getAfterMaterialCode()), 2);
+            }
+        });
+        return orderMap;
+    }
+
+    /**
+     * 获取导出班次顺序。仅一班命中模具交替计划时覆盖为前规格1、后规格2，其他情况保持原顺序。
+     *
+     * @param shiftOrderMap             原连续顺序映射
+     * @param class1MouldChangeOrderMap 一班模具交替顺序映射
+     * @param result                    排程结果
+     * @param shift                     班次序号
+     * @return 导出顺序
+     */
+    private Object resolveExportShiftOrder(Map<String, Map<Integer, Integer>> shiftOrderMap,
+                                           Map<String, Integer> class1MouldChangeOrderMap,
+                                           LhScheduleResult result, int shift) {
+        Object currentOrder = getContinuousShiftOrder(shiftOrderMap, result, shift);
+        if (shift != 1 || !(currentOrder instanceof Integer)) {
+            return currentOrder;
+        }
+        String key = buildMouldChangeOrderKey(result.getBatchNo(), result.getScheduleDate(),
+                result.getLhMachineCode(), result.getMaterialCode());
+        return class1MouldChangeOrderMap.getOrDefault(key, (Integer) currentOrder);
+    }
+
+    /**
+     * 构建模具交替顺序匹配Key。
+     *
+     * @param batchNo     硫化结果批次号
+     * @param scheduleDate 排程日期
+     * @param machineCode 硫化机台编码
+     * @param materialCode 物料编码
+     * @return 匹配Key
+     */
+    private String buildMouldChangeOrderKey(String batchNo, Date scheduleDate,
+                                            String machineCode, String materialCode) {
+        String scheduleDay = Objects.nonNull(scheduleDate) ? DateUtil.formatDate(scheduleDate) : "";
+        return StringUtils.defaultString(batchNo).trim() + "|" + scheduleDay + "|"
+                + StringUtils.defaultString(machineCode).trim() + "|"
+                + StringUtils.defaultString(materialCode).trim();
     }
 
     /**
@@ -3200,7 +3270,8 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
      */
     private static boolean isCloseOutSku(LhScheduleResult result) {
         for (int shift = 1; shift <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT; shift++) {
-            String isEnd = StringUtils.trimToEmpty(String.valueOf(BeanUtil.getProperty(result, "class" + shift + "IsEnd")));
+            Object isEndValue = BeanUtil.getProperty(result, "class" + shift + "IsEnd");
+            String isEnd = StringUtils.trimToEmpty(Objects.toString(isEndValue, ""));
             if (ApsConstant.APS_STRING_1.equals(isEnd)
                     || ApsConstant.APS_STRING_3.equals(isEnd)
                     || ApsConstant.APS_STRING_4.equals(isEnd)) {
