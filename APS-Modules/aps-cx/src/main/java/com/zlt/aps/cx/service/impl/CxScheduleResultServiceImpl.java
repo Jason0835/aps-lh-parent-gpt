@@ -883,13 +883,16 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
                     matchKey, todayNightFinishQtyMap.keySet().stream().limit(3).collect(Collectors.toList()));
         }
 
+        // ylSum = todayNightFinishQty - totalDailyPlanQty
         BigDecimal ylSum = (tnfq != null ? tnfq : BigDecimal.ZERO)
                 .subtract(tdpq != null ? tdpq : BigDecimal.ZERO);
         row.put("ylSum", zeroToEmpty(ylSum));
 
-        // lhRemainQty = ylSum，cxRemainQty = lhRemainQty - totalStock
-        BigDecimal newLhRemainQty = ylSum;
+        // lhRemainQty = totalDailyPlanQty - todayNightFinishQty（与ylSum互为相反数）
+        BigDecimal newLhRemainQty = (tdpq != null ? tdpq : BigDecimal.ZERO)
+                .subtract(tnfq != null ? tnfq : BigDecimal.ZERO);
         row.put("lhRemainQty", zeroToEmpty(newLhRemainQty));
+        // cxRemainQty = lhRemainQty - totalStock
         BigDecimal totalStock = item.getTotalStock() != null ? item.getTotalStock() : BigDecimal.ZERO;
         row.put("cxRemainQty", zeroToEmpty(newLhRemainQty.subtract(totalStock)));
 
