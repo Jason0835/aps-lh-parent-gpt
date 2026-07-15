@@ -92,7 +92,7 @@ public class Cd15AutoScheduleInputVersionServiceImpl implements Cd15AutoSchedule
                         .orderByAsc(MdmConstructionInfo::getId))
                 .stream()
                 .map(item -> item.getId() + ":" + item.getConstructionCode() + ":" + item.getConstructionVersion()
-                        + ":" + item.getCordSpec() + ":" + item.getBeltCuttingAngle() + ":" + item.getUpdateTime())
+                        + ":" + item.getArticleCrownSpec() + ":" + item.getBeltCuttingAngle() + ":" + item.getUpdateTime())
                 .collect(Collectors.joining("|"));
         String stock = stockMapper.selectList(Wrappers.<Cd15Stock>lambdaQuery()
                         .eq(Cd15Stock::getFactoryCode, factoryCode)

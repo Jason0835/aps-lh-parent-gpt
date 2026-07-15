@@ -15,6 +15,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 
 /**
  * CD15 单规格单班排程执行器实现。
@@ -88,6 +89,7 @@ public class Cd15SingleShiftScheduleExecutorImpl implements Cd15SingleShiftSched
                 .pieceCount(pieceCount)
                 .netDemandMeters(netDemandMeters)
                 .bigRollConsumeMeters(bigRollConsumeMeters)
+                .vehiclePlanQuantity(this.vehiclePlanQuantity(material))
                 .stockMetersAtSix(request.getStockMetersAtSix())
                 .cutMode("SINGLE")
                 .sourceType("AUTO_SCHEDULE")
@@ -95,6 +97,16 @@ public class Cd15SingleShiftScheduleExecutorImpl implements Cd15SingleShiftSched
                 .build();
     }
 
+
+    private BigDecimal vehiclePlanQuantity(Cd15ConstructionMaterial material) {
+        BigDecimal unitConsumeMeters = material.getUnitConsumeMillimeter().divide(BigDecimal.valueOf(1000), 10, RoundingMode.HALF_UP);
+        if (unitConsumeMeters.signum() <= 0) {
+            return BigDecimal.ZERO;
+        }
+        BigDecimal piecePerVehicle = material.getCurlLength().divide(unitConsumeMeters, 0, RoundingMode.FLOOR);
+        BigDecimal craftWidthMeters = material.getCraftWidth().divide(BigDecimal.valueOf(1000), 10, RoundingMode.HALF_UP);
+        return piecePerVehicle.multiply(craftWidthMeters);
+    }
     private String validateRequired(Cd15SingleShiftScheduleRequest request) {
         if (request == null || request.getMaterial() == null || request.getDemand() == null
                 || request.getMachine() == null || request.getGdyyStock() == null) {
