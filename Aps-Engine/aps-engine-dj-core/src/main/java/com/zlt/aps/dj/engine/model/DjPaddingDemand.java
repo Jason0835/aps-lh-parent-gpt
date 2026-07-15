@@ -18,10 +18,7 @@ public class DjPaddingDemand {
     /** 垫胶物料名 */
     private String paddingName;
 
-    /** 净需求量（总需求 - 有效库存），单位：米 */
-    private BigDecimal netDemand;
-
-    /** 剩余待排产量，初始 = netDemand */
+    /** 剩余待排产量（每班由 checkDemandForShift 动态计算），单位：米 */
     private BigDecimal remainingDemand;
 
     /** 本班接班库存（米） */
