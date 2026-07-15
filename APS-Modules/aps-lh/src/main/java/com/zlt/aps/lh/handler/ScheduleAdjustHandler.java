@@ -1,6 +1,7 @@
 package com.zlt.aps.lh.handler;
 
 import com.google.common.collect.Lists;
+import com.zlt.aps.common.engine.utils.MonthPlanSurplusCalculator;
 import com.zlt.aps.lh.api.constant.LhScheduleConstant;
 import com.zlt.aps.lh.api.constant.LhScheduleParamConstant;
 import com.zlt.aps.lh.api.domain.dto.CuringMonthPlanTotalResult;
@@ -579,18 +580,25 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
     private SurplusCalculation calculateSurplusQty(LhScheduleContext context, FactoryMonthPlanProductionFinalResult plan) {
         int actualFinishedQty = calculateFinishedQty(context, plan);
         int scheDayFinishQty = resolveScheDayFinishQty(context, plan);
-        YearMonth productionYearMonth = SkuMonthPlanCalculator.getProductionYearAndMonth(context.getScheduleDate());
+        YearMonth productionYearMonth = MonthPlanSurplusCalculator.getProductionYearAndMonth(
+                context.getScheduleDate());
         //20260702+ 欠产都只看当月
         List<Date> allProductionDate = Lists.newArrayList(context.getAllProductionDateInfo());
         List<FactoryMonthPlanProductionFinalResult> allMonthPlanList = context.getLoadedMonthPlanList();
-        Map<YearMonth, Integer> monthOverdueQtyMap = SkuMonthPlanCalculator.getOverdueProduction(context.isNextMonthFinal(), allProductionDate, allMonthPlanList, plan);
+        Map<YearMonth, Integer> monthOverdueQtyMap = MonthPlanSurplusCalculator.getOverdueProduction(
+                context.isNextMonthFinal(), allProductionDate, allMonthPlanList, plan);
         //20260702+ 计划量，支持跨月连续
-        Map<YearMonth, FactoryMonthPlanProductionFinalResult> dayProductionPlanMap = SkuMonthPlanCalculator.getHasProductionPlan(allMonthPlanList, allProductionDate, plan.getFactoryCode(), plan.getMaterialCode(), plan.getProductStatus());
+        Map<YearMonth, FactoryMonthPlanProductionFinalResult> dayProductionPlanMap =
+                MonthPlanSurplusCalculator.getHasProductionPlan(
+                        allMonthPlanList, allProductionDate, plan.getFactoryCode(),
+                        plan.getMaterialCode(), plan.getProductStatus());
         Map<YearMonth, Integer> monthPlanQtyMap = context.getMonthPlanQty(plan);
         boolean isCrossMonth = context.isCrossMonthByProductionDateInfo();
         //当前排产计划总量
-        int totalPlanQty = SkuMonthPlanCalculator.sumQty(monthPlanQtyMap);
-        int remainingDemandQty = SkuMonthPlanCalculator.getSurplusQty(productionYearMonth, allProductionDate, dayProductionPlanMap, monthOverdueQtyMap, monthPlanQtyMap, actualFinishedQty);
+        int totalPlanQty = MonthPlanSurplusCalculator.sumQty(monthPlanQtyMap);
+        int remainingDemandQty = MonthPlanSurplusCalculator.getSurplusQty(
+                productionYearMonth, allProductionDate, dayProductionPlanMap,
+                monthOverdueQtyMap, monthPlanQtyMap, actualFinishedQty);
         remainingDemandQty = Math.max(BigDecimal.ZERO.intValue(), remainingDemandQty);
         // 保留逐日超产统计用于诊断日志，不参与余量计算
         int ignoredOverProductionQty = calculateIgnoredOverProductionQty(context, plan);
@@ -608,7 +616,7 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
         int lastMonthOverdueQty = monthOverdueQtyMap.values().stream().mapToInt(Integer::intValue).sum();
         //月计划总量
         Map<YearMonth, Integer> monthTotalMap = context.getSumPlanQty(plan);
-        int monthPlanTotalQty = SkuMonthPlanCalculator.sumQty(monthTotalMap);
+        int monthPlanTotalQty = MonthPlanSurplusCalculator.sumQty(monthTotalMap);
         if (lastMonthOverdueQty != 0 || scheDayFinishQty > 0 || isCrossMonth) {
             log.info("硫化余量计算完成, materialCode: {}, monthPlanQty: {}, monthFinishedAndScheDayQty: {}, "
                             + "scheDayFinishQty: {}, lastMonthValidFlag: {}, lastMonthOverdueQty: {}, surplusQty: {}, "

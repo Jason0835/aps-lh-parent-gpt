@@ -256,7 +256,7 @@ public class ScheduleContextVo {
     private Map<String, MdmStructureLhRatio> structureLhRatioMap;
 
     /**
-     * 成型余量映射（物料编码 -> 成型余量）
+     * 成型余量映射（物料编码+产品状态 -> 成型余量）
      * 成型余量 = 硫化余量 - 该物料对应的所有胎胚库存
      * 用于收尾计算
      */
@@ -264,7 +264,7 @@ public class ScheduleContextVo {
 
     /**
      * 初始成型余量映射（排程开始前的快照，不会被后续班次更新影响）
-     * Key: 物料编码 (materialCode)
+     * Key: 物料编码+产品状态
      * Value: 初始成型余量
      */
     private Map<String, Integer> initialFormingRemainderMap;
@@ -462,14 +462,14 @@ public class ScheduleContextVo {
     private List<com.zlt.aps.mp.api.domain.entity.MdmMonthSurplus> monthSurplusList;
 
     /**
-     * 月度计划余量映射（物料编码 -> 余量信息）
+     * 月度计划余量映射（物料编码+产品状态 -> 余量信息）
      * 快速查询用
      */
     private Map<String, com.zlt.aps.mp.api.domain.entity.MdmMonthSurplus> monthSurplusMap;
 
     /**
      * 初始月度计划余量映射（排程开始前的快照，不会被后续班次硫化消耗影响）
-     * Key: 物料编码 (materialCode)
+     * Key: 物料编码+产品状态
      * Value: 初始计划余量
      */
     private Map<String, java.math.BigDecimal> initialMonthSurplusMap;

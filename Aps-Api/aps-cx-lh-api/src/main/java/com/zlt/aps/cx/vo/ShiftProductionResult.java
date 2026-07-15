@@ -62,6 +62,8 @@ public class ShiftProductionResult {
     private DailyEmbryoTask sourceTask;
     /** 是否结束生产（反推需求-库存<=0，无需再排产） */
     private Boolean isEndProduction;
+    /** 产品状态/计划类型（硫化余量分账维度） */
+    private String productStatus;
     /** 施工阶段（00 无工艺 01 试制 02 量试 03 正式），来自硫化任务 */
     private String constructionStage;
     /** 合并的所有物料编码（用于判断是否全部收尾） */

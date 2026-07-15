@@ -9,10 +9,12 @@ public class TaskDemandSimple {
     public String taskKey;
     public int demand;
     public String materialCode;
+    public String productStatus;
 
-    public TaskDemandSimple(Long lhId, int demand, String materialCode) {
+    public TaskDemandSimple(Long lhId, int demand, String materialCode, String productStatus) {
         this.taskKey = String.valueOf(lhId);
         this.demand = demand;
         this.materialCode = materialCode;
+        this.productStatus = productStatus;
     }
 }

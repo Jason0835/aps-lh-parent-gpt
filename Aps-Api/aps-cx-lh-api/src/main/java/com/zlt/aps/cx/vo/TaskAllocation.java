@@ -38,6 +38,8 @@ public class TaskAllocation {
     private Long lhId;
     /** 硫化机台编号（续作预扣去重用） */
     private String lhMachineCode;
+    /** 产品状态/计划类型（硫化余量分账维度） */
+    private String productStatus;
     /** 施工阶段 00/01/02/03 */
     private String constructionStage;
 

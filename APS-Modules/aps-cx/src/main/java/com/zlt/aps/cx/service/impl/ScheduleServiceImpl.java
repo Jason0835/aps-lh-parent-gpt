@@ -3,6 +3,7 @@ package com.zlt.aps.cx.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 
 import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.zlt.aps.common.engine.utils.MonthPlanSurplusCalculator;
 import com.zlt.aps.cx.component.ScheduleExecutionGuard;
 import com.zlt.aps.cx.constant.ScheduleConstants;
 import com.zlt.aps.cx.entity.CxMaterialEnding;
@@ -56,6 +57,7 @@ import java.time.YearMonth;
 import java.time.ZoneId;
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * 排程服务实现 — HTTP/API 层入口（S5.1），负责上下文构建、校验、持久化。
@@ -1182,26 +1184,40 @@ public class ScheduleServiceImpl implements ScheduleService {
                 ? monthPlanMapper.selectByFactoryAndYearMonth(factoryCode, nextYearMonth)
                 : Collections.emptyList();
 
-        // 按物料分组（同一物料可能有多条记录）
-        Map<String, List<FactoryMonthPlanProductionFinalResult>> prevPlansByMaterial = prevMonthPlans.stream()
+        // 按物料+产品状态分组，避免同一物料不同计划类型互相占用余量
+        Map<String, List<FactoryMonthPlanProductionFinalResult>> prevPlansByStatusKey = prevMonthPlans.stream()
                 .filter(p -> p.getMaterialCode() != null)
-                .collect(Collectors.groupingBy(FactoryMonthPlanProductionFinalResult::getMaterialCode));
-        Map<String, List<FactoryMonthPlanProductionFinalResult>> nextPlansByMaterial = nextMonthPlans.stream()
+                .collect(Collectors.groupingBy(p -> MonthPlanSurplusCalculator.buildMaterialStatusKey(
+                        p.getMaterialCode(), p.getProductStatus())));
+        Map<String, List<FactoryMonthPlanProductionFinalResult>> nextPlansByStatusKey = nextMonthPlans.stream()
                 .filter(p -> p.getMaterialCode() != null)
-                .collect(Collectors.groupingBy(FactoryMonthPlanProductionFinalResult::getMaterialCode));
+                .collect(Collectors.groupingBy(p -> MonthPlanSurplusCalculator.buildMaterialStatusKey(
+                        p.getMaterialCode(), p.getProductStatus())));
 
-        // 2. 收集所有物料编码（当月 + 次月 + 硫化排程结果）
-        Set<String> allMaterialCodes = new HashSet<>(prevPlansByMaterial.keySet());
+        // 2. 收集全部余量账户及查询完成量所需的物料编码
+        Set<String> allStatusKeys = new HashSet<>(prevPlansByStatusKey.keySet());
         if (crossMonth) {
-            allMaterialCodes.addAll(nextPlansByMaterial.keySet());
+            allStatusKeys.addAll(nextPlansByStatusKey.keySet());
         }
+        if (context.getLhScheduleResults() != null) {
+            context.getLhScheduleResults().stream()
+                    .filter(result -> result.getMaterialCode() != null)
+                    .map(result -> MonthPlanSurplusCalculator.buildMaterialStatusKey(
+                            result.getMaterialCode(), result.getProductStatus()))
+                    .forEach(allStatusKeys::add);
+        }
+        List<String> materialCodeList = Stream.concat(prevMonthPlans.stream(), nextMonthPlans.stream())
+                .map(FactoryMonthPlanProductionFinalResult::getMaterialCode)
+                .filter(Objects::nonNull)
+                .distinct()
+                .collect(Collectors.toList());
         if (context.getLhScheduleResults() != null) {
             context.getLhScheduleResults().stream()
                     .map(LhScheduleResult::getMaterialCode)
                     .filter(Objects::nonNull)
-                    .forEach(allMaterialCodes::add);
+                    .filter(materialCode -> !materialCodeList.contains(materialCode))
+                    .forEach(materialCodeList::add);
         }
-        List<String> materialCodeList = new ArrayList<>(allMaterialCodes);
         List<String> factoryCodeList = Collections.singletonList(factoryCode);
 
         // 3. 查询已完成量
@@ -1218,18 +1234,22 @@ public class ScheduleServiceImpl implements ScheduleService {
                     factoryCodeList, materialCodeList, prevMonthStart, scheduleDateStart);
             for (Map<String, Object> row : dayFinishList) {
                 String mc = (String) row.get("MATERIAL_CODE");
+                String productStatus = (String) row.get("PRODUCT_STATUS");
                 Object qtyObj = row.get("TOTAL_FINISH_QTY");
                 int qty = qtyObj != null ? ((Number) qtyObj).intValue() : 0;
-                prevDayFinishedQtyMap.merge(mc, qty, Integer::sum);
+                String statusKey = MonthPlanSurplusCalculator.buildMaterialStatusKey(mc, productStatus);
+                prevDayFinishedQtyMap.merge(statusKey, qty, Integer::sum);
             }
             // T日班次完成量
             List<Map<String, Object>> scheFinishList = lhFinishQtyMapper.sumScheFinishQty(
                     factoryCodeList, materialCodeList, scheduleDateStart, nextDayStart);
             for (Map<String, Object> row : scheFinishList) {
                 String mc = (String) row.get("MATERIAL_CODE");
+                String productStatus = (String) row.get("PRODUCT_STATUS");
                 Object qtyObj = row.get("TOTAL_FINISH_QTY");
                 int qty = qtyObj != null ? ((Number) qtyObj).intValue() : 0;
-                prevScheFinishedQtyMap.merge(mc, qty, Integer::sum);
+                String statusKey = MonthPlanSurplusCalculator.buildMaterialStatusKey(mc, productStatus);
+                prevScheFinishedQtyMap.merge(statusKey, qty, Integer::sum);
             }
         }
 
@@ -1244,9 +1264,11 @@ public class ScheduleServiceImpl implements ScheduleService {
                     factoryCodeList, materialCodeList, nextMonthStart, scheduleDateStart);
             for (Map<String, Object> row : nextDayFinishList) {
                 String mc = (String) row.get("MATERIAL_CODE");
+                String productStatus = (String) row.get("PRODUCT_STATUS");
                 Object qtyObj = row.get("TOTAL_FINISH_QTY");
                 int qty = qtyObj != null ? ((Number) qtyObj).intValue() : 0;
-                nextDayFinishedQtyMap.merge(mc, qty, Integer::sum);
+                String statusKey = MonthPlanSurplusCalculator.buildMaterialStatusKey(mc, productStatus);
+                nextDayFinishedQtyMap.merge(statusKey, qty, Integer::sum);
             }
             // T日班次完成量与当月查询结果相同（同一个T日）
             nextScheFinishedQtyMap = new HashMap<>(prevScheFinishedQtyMap);
@@ -1258,24 +1280,44 @@ public class ScheduleServiceImpl implements ScheduleService {
 
         // 4. 计算每个物料的硫化余量（按断点日累加计划量，支持跨月）
         List<MdmMonthSurplus> monthSurplusList = new ArrayList<>();
-        for (String materialCode : materialCodeList) {
-            List<FactoryMonthPlanProductionFinalResult> prevPlans = prevPlansByMaterial.getOrDefault(materialCode, Collections.emptyList());
+        for (String statusKey : allStatusKeys) {
+            List<FactoryMonthPlanProductionFinalResult> prevPlans = prevPlansByStatusKey.getOrDefault(statusKey, Collections.emptyList());
             List<FactoryMonthPlanProductionFinalResult> nextPlans = crossMonth
-                    ? nextPlansByMaterial.getOrDefault(materialCode, Collections.emptyList())
+                    ? nextPlansByStatusKey.getOrDefault(statusKey, Collections.emptyList())
                     : Collections.emptyList();
 
-            int prevDayFinishedQty = prevDayFinishedQtyMap.getOrDefault(materialCode, 0);
-            int prevScheFinishedQty = prevScheFinishedQtyMap.getOrDefault(materialCode, 0);
-            int nextDayFinishedQty = nextDayFinishedQtyMap.getOrDefault(materialCode, 0);
-            int nextScheFinishedQty = nextScheFinishedQtyMap.getOrDefault(materialCode, 0);
+            FactoryMonthPlanProductionFinalResult representativePlan = Stream.concat(prevPlans.stream(), nextPlans.stream())
+                    .findFirst()
+                    .orElse(null);
+            LhScheduleResult representativeLhResult = context.getLhScheduleResults() == null
+                    ? null
+                    : context.getLhScheduleResults().stream()
+                    .filter(result -> statusKey.equals(MonthPlanSurplusCalculator.buildMaterialStatusKey(
+                            result.getMaterialCode(), result.getProductStatus())))
+                    .findFirst()
+                    .orElse(null);
+            String materialCode = representativePlan != null
+                    ? representativePlan.getMaterialCode()
+                    : representativeLhResult != null ? representativeLhResult.getMaterialCode() : null;
+            String productStatus = representativePlan != null
+                    ? representativePlan.getProductStatus()
+                    : representativeLhResult != null ? representativeLhResult.getProductStatus() : null;
+            if (materialCode == null) {
+                continue;
+            }
 
-            int surplusQty = calculateSurplusQtyWithBreakpoint(
-                    prevPlans, nextPlans, scheduleDate, scheduleEndDate, crossMonth,
-                    prevYear, prevMonth, nextYear, nextMonth,
+            int prevDayFinishedQty = prevDayFinishedQtyMap.getOrDefault(statusKey, 0);
+            int prevScheFinishedQty = prevScheFinishedQtyMap.getOrDefault(statusKey, 0);
+            int nextDayFinishedQty = nextDayFinishedQtyMap.getOrDefault(statusKey, 0);
+            int nextScheFinishedQty = nextScheFinishedQtyMap.getOrDefault(statusKey, 0);
+
+            int surplusQty = this.calculateSurplusQtyBySharedCalculator(
+                    prevPlans, nextPlans, scheduleDate, scheduleEndDate,
                     prevDayFinishedQty, prevScheFinishedQty, nextDayFinishedQty, nextScheFinishedQty);
 
             MdmMonthSurplus surplus = new MdmMonthSurplus();
             surplus.setMaterialCode(materialCode);
+            surplus.setProductStatus(productStatus);
             surplus.setPlanSurplusQty(BigDecimal.valueOf(surplusQty));
             monthSurplusList.add(surplus);
         }
@@ -1283,11 +1325,13 @@ public class ScheduleServiceImpl implements ScheduleService {
         context.setMonthSurplusList(monthSurplusList);
 
         Map<String, MdmMonthSurplus> monthSurplusMap = monthSurplusList.stream()
-                .collect(Collectors.toMap(MdmMonthSurplus::getMaterialCode, s -> s, (a, b) -> a));
+                .collect(Collectors.toMap(s -> MonthPlanSurplusCalculator.buildMaterialStatusKey(
+                        s.getMaterialCode(), s.getProductStatus()), s -> s));
         context.setMonthSurplusMap(monthSurplusMap);
         context.setInitialMonthSurplusMap(monthSurplusList.stream()
                 .filter(s -> s.getMaterialCode() != null && s.getPlanSurplusQty() != null)
-                .collect(Collectors.toMap(MdmMonthSurplus::getMaterialCode, MdmMonthSurplus::getPlanSurplusQty, (a, b) -> a)));
+                .collect(Collectors.toMap(s -> MonthPlanSurplusCalculator.buildMaterialStatusKey(
+                        s.getMaterialCode(), s.getProductStatus()), MdmMonthSurplus::getPlanSurplusQty)));
         log.info("加载月度计划余量 {} 条（按断点日累加计划量-完成量动态计算，支持跨月）", monthSurplusList.size());
 
         // 获取当前天的班次配置（用于获取硫化任务的班次计划量）
@@ -1337,127 +1381,55 @@ public class ScheduleServiceImpl implements ScheduleService {
     }
 
     /**
-     * 计算单个物料的硫化余量（支持跨月与月计划断点）。
-     * <p>
-     * 三种情况：
-     * <ul>
-     *   <li>A：排程范围内最晚有计划量的日期在当月 → 从该日往后在当月找断点，按 day1~断点日 累加</li>
-     *   <li>B：最晚有计划量的日期在次月 → 当月部分(若当月范围内有计划量则找断点，否则0) + 次月部分(从该日往后找断点)</li>
-     *   <li>C：排程范围内均无计划量 → 前余量>0取前余量；否则从T日往后找断点，跨月时再检查次月</li>
-     * </ul>
-     * </p>
+     * 使用硫化、成型共享计算器计算单个物料状态账户的硫化余量。
      *
-     * @param prevPlans           当月月计划记录（按物料过滤）
-     * @param nextPlans           次月月计划记录（按物料过滤，非跨月时为空）
-     * @param scheduleDate        T日（排程起始日）
+     * @param prevPlans           当月月计划记录（已按物料+产品状态过滤）
+     * @param nextPlans           次月月计划记录（已按物料+产品状态过滤）
+     * @param scheduleDate        排程起始日
      * @param scheduleEndDate     排程结束日
-     * @param crossMonth          是否跨月
-     * @param prevYear/prevMonth  当月年月
-     * @param nextYear/nextMonth  次月年月
-     * @param prevDayFinishedQty  当月月累计完成量（当月1日~T-1日）
-     * @param prevScheFinishedQty 当月T日班次完成量
-     * @param nextDayFinishedQty  次月月累计完成量（T日在次月时）
-     * @param nextScheFinishedQty 次月T日班次完成量（T日在次月时）
+     * @param prevDayFinishedQty  当月月累计完成量
+     * @param prevScheFinishedQty 当月排程班次完成量
+     * @param nextDayFinishedQty  次月月累计完成量
+     * @param nextScheFinishedQty 次月排程班次完成量
      * @return 硫化余量
      */
-    private int calculateSurplusQtyWithBreakpoint(
+    private int calculateSurplusQtyBySharedCalculator(
             List<FactoryMonthPlanProductionFinalResult> prevPlans,
             List<FactoryMonthPlanProductionFinalResult> nextPlans,
-            LocalDate scheduleDate, LocalDate scheduleEndDate, boolean crossMonth,
-            int prevYear, int prevMonth, int nextYear, int nextMonth,
+            LocalDate scheduleDate, LocalDate scheduleEndDate,
             int prevDayFinishedQty, int prevScheFinishedQty,
             int nextDayFinishedQty, int nextScheFinishedQty) {
-
-        // 1. 找排程范围内最晚有计划量的日期
-        LocalDate lastPlanDate = findLastPlanDateInRange(prevPlans, nextPlans, scheduleDate, scheduleEndDate,
-                crossMonth, prevYear, prevMonth, nextYear, nextMonth);
-
-        if (lastPlanDate != null) {
-            boolean lastPlanInNextMonth = crossMonth
-                    && lastPlanDate.getYear() == nextYear && lastPlanDate.getMonthValue() == nextMonth;
-
-            if (!lastPlanInNextMonth) {
-                // 情况A：lastPlanDate 在当月
-                int breakpointDay = findBreakpointDay(prevPlans, lastPlanDate.getDayOfMonth(), prevYear, prevMonth);
-                if (breakpointDay == 0) {
-                    return 0;
-                }
-                int planQty = sumPlanQtyByDayRange(prevPlans, breakpointDay);
-                int overdueQty = getEffectiveOverdueQty(prevPlans);
-                int finishedQty = prevDayFinishedQty + prevScheFinishedQty;
-                return Math.max(0, planQty + overdueQty - finishedQty);
-            } else {
-                // 情况B：lastPlanDate 在次月
-                // 当月部分：在排程范围内找当月最晚有计划量的日期
-                LocalDate prevLastPlanDate = findLastPlanDateInMonthInRange(prevPlans, scheduleDate, scheduleEndDate,
-                        prevYear, prevMonth);
-                int prevSurplus;
-                if (prevLastPlanDate != null) {
-                    int prevBreakpointDay = findBreakpointDay(prevPlans, prevLastPlanDate.getDayOfMonth(), prevYear, prevMonth);
-                    if (prevBreakpointDay > 0) {
-                        int prevPlanQty = sumPlanQtyByDayRange(prevPlans, prevBreakpointDay);
-                        int prevOverdueQty = getEffectiveOverdueQty(prevPlans);
-                        int prevFinishedQty = prevDayFinishedQty + prevScheFinishedQty;
-                        prevSurplus = Math.max(0, prevPlanQty + prevOverdueQty - prevFinishedQty);
-                    } else {
-                        prevSurplus = 0;
-                    }
-                } else {
-                    // 当月排程范围内无计划量 → 当月硫化余量 = 0
-                    prevSurplus = 0;
-                }
-
-                // 次月部分：从 lastPlanDate 往后在次月找断点
-                int nextBreakpointDay = findBreakpointDay(nextPlans, lastPlanDate.getDayOfMonth(), nextYear, nextMonth);
-                int nextSurplus = 0;
-                if (nextBreakpointDay > 0) {
-                    int nextPlanQty = sumPlanQtyByDayRange(nextPlans, nextBreakpointDay);
-                    int nextOverdueQty = getEffectiveOverdueQty(nextPlans);
-                    int nextFinishedQty = nextDayFinishedQty + nextScheFinishedQty;
-                    nextSurplus = Math.max(0, nextPlanQty + nextOverdueQty - nextFinishedQty);
-                }
-
-                return prevSurplus + nextSurplus;
-            }
-        } else {
-            // 情况C：排程范围内均无计划量
-            int tDayOfMonth = scheduleDate.getDayOfMonth();
-            // 前余量 = Σ(当月 day1 ~ T日) + 当月超欠产 - 当月已完成量
-            int prevPlanQtyToT = sumPlanQtyByDayRange(prevPlans, tDayOfMonth);
-            int prevOverdueQty = getEffectiveOverdueQty(prevPlans);
-            int prevFinishedQty = prevDayFinishedQty + prevScheFinishedQty;
-            int preRemainder = prevPlanQtyToT + prevOverdueQty - prevFinishedQty;
-
-            if (preRemainder > 0) {
-                // C1：前余量 > 0（当日之前还有余量）
-                return preRemainder;
-            } else {
-                // C2：前余量 <= 0（当日之前没有余量）
-                // 从 T日 往后在当月找断点
-                int breakpointDay = findBreakpointDay(prevPlans, tDayOfMonth, prevYear, prevMonth);
-                int prevSurplus = 0;
-                if (breakpointDay > 0) {
-                    int planQty = sumPlanQtyByDayRange(prevPlans, breakpointDay);
-                    prevSurplus = Math.max(0, planQty + prevOverdueQty - prevFinishedQty);
-                }
-
-                if (!crossMonth) {
-                    return prevSurplus;
-                }
-
-                // 跨月，检查次月：从次月1日往后找断点
-                int nextBreakpointDay = findBreakpointDay(nextPlans, 1, nextYear, nextMonth);
-                int nextSurplus = 0;
-                if (nextBreakpointDay > 0) {
-                    int nextPlanQty = sumPlanQtyByDayRange(nextPlans, nextBreakpointDay);
-                    int nextOverdueQty = getEffectiveOverdueQty(nextPlans);
-                    int nextFinishedQty = nextDayFinishedQty + nextScheFinishedQty;
-                    nextSurplus = Math.max(0, nextPlanQty + nextOverdueQty - nextFinishedQty);
-                }
-
-                return prevSurplus + nextSurplus;
-            }
+        List<FactoryMonthPlanProductionFinalResult> allMonthPlans = Stream.concat(
+                prevPlans.stream(), nextPlans.stream()).collect(Collectors.toList());
+        if (allMonthPlans.isEmpty()) {
+            return 0;
         }
+
+        FactoryMonthPlanProductionFinalResult plan = allMonthPlans.get(0);
+        List<Date> productionDates = new ArrayList<>();
+        for (LocalDate productionDate = scheduleDate;
+             !productionDate.isAfter(scheduleEndDate);
+             productionDate = productionDate.plusDays(1)) {
+            productionDates.add(MonthPlanSurplusCalculator.getDate(productionDate));
+        }
+
+        YearMonth productionYearMonth = YearMonth.from(scheduleDate);
+        Map<YearMonth, FactoryMonthPlanProductionFinalResult> hasProductionPlanMap =
+                MonthPlanSurplusCalculator.getHasProductionPlan(
+                        allMonthPlans, productionDates, plan.getFactoryCode(),
+                        plan.getMaterialCode(), plan.getProductStatus());
+        Map<YearMonth, Integer> monthOverdueQtyMap =
+                MonthPlanSurplusCalculator.getOverdueProduction(
+                        false, productionDates, allMonthPlans, plan);
+        Map<YearMonth, Integer> monthPlanQtyMap =
+                MonthPlanSurplusCalculator.getPlanQty(
+                        productionDates, allMonthPlans, plan, 1);
+        int finishedQty = prevDayFinishedQty + prevScheFinishedQty
+                + nextDayFinishedQty + nextScheFinishedQty;
+        int surplusQty = MonthPlanSurplusCalculator.getSurplusQty(
+                productionYearMonth, productionDates, hasProductionPlanMap,
+                monthOverdueQtyMap, monthPlanQtyMap, finishedQty);
+        return Math.max(0, surplusQty);
     }
 
     /**
@@ -1946,29 +1918,31 @@ public class ScheduleServiceImpl implements ScheduleService {
             materialStockMap = allocateStockByMaterialRatio(stocks, lhScheduleResults, dayShifts, scheduleDate, materialLhCapacityMap, monthSurplusMap);
             log.debug("按硫化任务维度分配胎胚库存 {} 条", materialStockMap.size());
 
-            // 按物料编码汇总库存（从 materialStockMap 按硫化任务汇总）
-            Map<String, Integer> stockByMaterial = new HashMap<>();
+            // 按物料+产品状态汇总库存（从 materialStockMap 按硫化任务汇总）
+            Map<String, Integer> stockByMaterialStatus = new HashMap<>();
             if (lhScheduleResults != null) {
                 for (LhScheduleResult lh : lhScheduleResults) {
                     if (lh.getMaterialCode() != null && lh.getId() != null) {
                         String taskKey = String.valueOf(lh.getId());
                         int stock = materialStockMap.getOrDefault(taskKey, 0);
-                        stockByMaterial.merge(lh.getMaterialCode(), stock, Integer::sum);
+                        String materialStatusKey = MonthPlanSurplusCalculator.buildMaterialStatusKey(
+                                lh.getMaterialCode(), lh.getProductStatus());
+                        stockByMaterialStatus.merge(materialStatusKey, stock, Integer::sum);
                     }
                 }
             }
 
             // 计算成型余量
             for (Map.Entry<String, MdmMonthSurplus> entry : monthSurplusMap.entrySet()) {
-                String materialCode = entry.getKey();
+                String materialStatusKey = entry.getKey();
                 MdmMonthSurplus surplus = entry.getValue();
 
                 int vulcanizingRemainder = surplus.getPlanSurplusQty() != null
                         ? surplus.getPlanSurplusQty().intValue() : 0;
-                int materialStock = stockByMaterial.getOrDefault(materialCode, 0);
+                int materialStock = stockByMaterialStatus.getOrDefault(materialStatusKey, 0);
                 int formingRemainder = Math.max(0, vulcanizingRemainder - materialStock);
 
-                formingRemainderMap.put(materialCode, formingRemainder);
+                formingRemainderMap.put(materialStatusKey, formingRemainder);
             }
 
             log.info("计算成型余量映射完成，共 {} 条", formingRemainderMap.size());
@@ -1979,7 +1953,7 @@ public class ScheduleServiceImpl implements ScheduleService {
                 log.info("物料库存分配: taskKey={}, stock={}", entry.getKey(), entry.getValue());
             }
             for (Map.Entry<String, MdmMonthSurplus> entry : monthSurplusMap.entrySet()) {
-                log.info("硫化余量: materialCode={}, planSurplusQty={}", entry.getKey(),
+                log.info("硫化余量: materialStatusKey={}, planSurplusQty={}", entry.getKey(),
                         entry.getValue().getPlanSurplusQty());
             }
 
@@ -1999,9 +1973,17 @@ public class ScheduleServiceImpl implements ScheduleService {
      * @return 本轮实际分配量
      */
     private int distributeRound(List<StockTaskAllocation> allocations, int remainingStock, boolean demandZero) {
-        // 筛选尚有容量的物料
+        Map<String, Integer> allocatedByStatusKey = allocations.stream()
+                .collect(Collectors.groupingBy(allocation -> MonthPlanSurplusCalculator.buildMaterialStatusKey(
+                                allocation.getMaterialCode(), allocation.getProductStatus()),
+                        Collectors.summingInt(StockTaskAllocation::getAllocated)));
+        // 同一物料状态账户下的多个硫化任务共享余量上限
         List<StockTaskAllocation> withCapacity = allocations.stream()
-                .filter(a -> a.getAllocated() < a.getSurplus())
+                .filter(allocation -> {
+                    String statusKey = MonthPlanSurplusCalculator.buildMaterialStatusKey(
+                            allocation.getMaterialCode(), allocation.getProductStatus());
+                    return allocatedByStatusKey.getOrDefault(statusKey, 0) < allocation.getSurplus();
+                })
                 .collect(Collectors.toList());
 
         if (withCapacity.isEmpty()) {
@@ -2032,9 +2014,12 @@ public class ScheduleServiceImpl implements ScheduleService {
                     add = (int) ((long) remainingStock * a.getDemand() / totalCapacityDemand);
                 }
             }
-            int cap = a.getSurplus() - a.getAllocated();
+            String statusKey = MonthPlanSurplusCalculator.buildMaterialStatusKey(
+                    a.getMaterialCode(), a.getProductStatus());
+            int cap = a.getSurplus() - allocatedByStatusKey.getOrDefault(statusKey, 0);
             int actual = Math.min(add, cap);
             a.setAllocated(a.getAllocated() + actual);
+            allocatedByStatusKey.merge(statusKey, actual, Integer::sum);
             roundAllocated += actual;
         }
         return roundAllocated;
@@ -2193,13 +2178,18 @@ public class ScheduleServiceImpl implements ScheduleService {
                 String taskKey = String.valueOf(task.getId());
 
                 // 检查硫化余量：如果已超产（<=0），跳过分配
-                if (productionCalculator.isVulcanizeSurplusExhausted(task.getMaterialCode(), monthSurplusMap)) {
+                if (productionCalculator.isVulcanizeSurplusExhausted(
+                        task.getMaterialCode(), task.getProductStatus(), monthSurplusMap)) {
                     log.debug("胎胚 {} 硫化任务 {} 硫化余量<=0，跳过库存分配", embryoCode, taskKey);
                     continue;
                 }
 
-                materialStockMap.merge(taskKey, totalStock, Integer::sum);
-                log.debug("胎胚 {} 只对应硫化任务 {}，分配库存 {}", embryoCode, taskKey, totalStock);
+                int surplus = productionCalculator.getVulcanizingSurplus(
+                        task.getMaterialCode(), task.getProductStatus(), monthSurplusMap);
+                int allocatedStock = Math.min(totalStock, surplus);
+                materialStockMap.merge(taskKey, allocatedStock, Integer::sum);
+                log.debug("胎胚 {} 只对应硫化任务 {}，按状态余量上限分配库存 {}",
+                        embryoCode, taskKey, allocatedStock);
             } else {
                 // 胎胚对应多个硫化任务，按物料的日硫化量比例分配
                 int totalDemand = 0;
@@ -2210,7 +2200,8 @@ public class ScheduleServiceImpl implements ScheduleService {
                     int dayVulcanizationQty = 0;
 
                     // 检查硫化余量：如果已超产（<=0），跳过分配
-                    if (productionCalculator.isVulcanizeSurplusExhausted(materialCode, monthSurplusMap)) {
+                    if (productionCalculator.isVulcanizeSurplusExhausted(
+                            materialCode, lh.getProductStatus(), monthSurplusMap)) {
                         log.debug("胎胚 {} 硫化任务 {} 物料 {} 硫化余量<=0，跳过库存分配",
                                 embryoCode, lh.getId(), materialCode);
                         continue;
@@ -2230,7 +2221,8 @@ public class ScheduleServiceImpl implements ScheduleService {
                         continue;
                     }
 
-                    taskDemands.add(new TaskDemand(String.valueOf(lh.getId()), dayVulcanizationQty, materialCode, "日硫化量"));
+                    taskDemands.add(new TaskDemand(String.valueOf(lh.getId()), dayVulcanizationQty,
+                            materialCode, lh.getProductStatus(), "日硫化量"));
                     totalDemand += dayVulcanizationQty;
                 }
 
@@ -2242,7 +2234,8 @@ public class ScheduleServiceImpl implements ScheduleService {
                 // 构建分配追踪列表，每个任务记录硫化余量上限
                 List<StockTaskAllocation> allocations = new ArrayList<>();
                 for (TaskDemand td : taskDemands) {
-                    int surplus = productionCalculator.getVulcanizingSurplus(td.getMaterialCode(), monthSurplusMap);
+                    int surplus = productionCalculator.getVulcanizingSurplus(
+                            td.getMaterialCode(), td.getProductStatus(), monthSurplusMap);
                     allocations.add(new StockTaskAllocation(td, 0, surplus));
                 }
 
@@ -2252,12 +2245,9 @@ public class ScheduleServiceImpl implements ScheduleService {
                 for (int round = 1; remaining > 0; round++) {
                     int roundAllocated = distributeRound(allocations, remaining, demandZero);
                     if (roundAllocated == 0) {
-                        // 所有物料已达硫化余量上限，剩余库存倒扣给最后一个物料（库存不丢失）
-                        StockTaskAllocation last = allocations.get(allocations.size() - 1);
-                        last.setAllocated(last.getAllocated() + remaining);
-                        log.debug("胎胚 {} 所有物料已达硫化余量上限，剩余库存 {} 倒扣给物料 {}",
-                                embryoCode, remaining, last.getMaterialCode());
-                        remaining = 0;
+                        // 所有状态账户均达到硫化余量上限，剩余物理库存保留为未分配库存
+                        log.debug("胎胚 {} 所有物料状态账户已达硫化余量上限，剩余库存 {} 不再分配",
+                                embryoCode, remaining);
                         break;
                     }
                     remaining -= roundAllocated;
@@ -2320,6 +2310,17 @@ public class ScheduleServiceImpl implements ScheduleService {
         Map<String, MdmMonthSurplus> monthSurplusMap = context.getMonthSurplusMap() != null
                 ? context.getMonthSurplusMap()
                 : new HashMap<>();
+        Map<String, Integer> formingRemainderByMaterial = new HashMap<>();
+        formingRemainderMap.forEach((statusKey, remainder) -> {
+            MdmMonthSurplus surplus = monthSurplusMap.get(statusKey);
+            if (surplus != null && surplus.getMaterialCode() != null && remainder != null) {
+                formingRemainderByMaterial.merge(surplus.getMaterialCode(), remainder, Integer::sum);
+            }
+        });
+        Map<String, BigDecimal> monthSurplusByMaterial = monthSurplusMap.values().stream()
+                .filter(surplus -> surplus.getMaterialCode() != null && surplus.getPlanSurplusQty() != null)
+                .collect(Collectors.toMap(MdmMonthSurplus::getMaterialCode, MdmMonthSurplus::getPlanSurplusQty,
+                        BigDecimal::add));
 
         // 4. 如果已有收尾信息，直接使用
         if (!existingEndings.isEmpty()) {
@@ -2355,13 +2356,13 @@ public class ScheduleServiceImpl implements ScheduleService {
             }
 
             // 获取硫化余量
-            MdmMonthSurplus surplus = monthSurplusMap.get(materialCode);
-            if (surplus != null && surplus.getPlanSurplusQty() != null) {
-                ending.setVulcanizingRemainder(surplus.getPlanSurplusQty().intValue());
+            BigDecimal materialMonthSurplus = monthSurplusByMaterial.get(materialCode);
+            if (materialMonthSurplus != null) {
+                ending.setVulcanizingRemainder(materialMonthSurplus.intValue());
             }
 
             // 获取成型余量
-            Integer formingRemainder = formingRemainderMap.get(materialCode);
+            Integer formingRemainder = formingRemainderByMaterial.get(materialCode);
             if (formingRemainder != null) {
                 ending.setFormingRemainder(formingRemainder);
             } else if (ending.getVulcanizingRemainder() != null) {
@@ -2455,20 +2456,20 @@ public class ScheduleServiceImpl implements ScheduleService {
             return;
         }
 
-        // 构建已收尾物料集合（成型余量 <= 0）
-        Set<String> completedMaterialCodes = new HashSet<>();
+        // 构建已收尾状态账户集合（成型余量 <= 0）
+        Set<String> completedStatusKeys = new HashSet<>();
         for (Map.Entry<String, Integer> entry : formingRemainderMap.entrySet()) {
             if (entry.getValue() != null && entry.getValue() <= 0) {
-                completedMaterialCodes.add(entry.getKey());
+                completedStatusKeys.add(entry.getKey());
             }
         }
 
-        if (completedMaterialCodes.isEmpty()) {
+        if (completedStatusKeys.isEmpty()) {
             log.debug("没有已收尾的物料，跳过过滤");
             return;
         }
 
-        log.info("发现 {} 个已收尾物料，开始过滤", completedMaterialCodes.size());
+        log.info("发现 {} 个已收尾物料状态账户，开始过滤", completedStatusKeys.size());
 
         // 1. 过滤硫化排程结果
         int originalLhCount = context.getLhScheduleResults() != null ? context.getLhScheduleResults().size() : 0;
@@ -2476,10 +2477,12 @@ public class ScheduleServiceImpl implements ScheduleService {
             List<LhScheduleResult> filteredLhResults = context.getLhScheduleResults().stream()
                     .filter(r -> {
                         String materialCode = r.getMaterialCode();
-                        // 如果物料编码在已收尾集合中，则过滤掉
-                        if (materialCode != null && completedMaterialCodes.contains(materialCode)) {
-                            log.debug("过滤硫化排程结果：物料={}，成型余量={}",
-                                    materialCode, formingRemainderMap.get(materialCode));
+                        String materialStatusKey = MonthPlanSurplusCalculator.buildMaterialStatusKey(
+                                materialCode, r.getProductStatus());
+                        // 仅过滤已收尾的对应产品状态，保留同物料的其他计划类型
+                        if (materialCode != null && completedStatusKeys.contains(materialStatusKey)) {
+                            log.debug("过滤硫化排程结果：物料状态账户={}，成型余量={}",
+                                    materialStatusKey, formingRemainderMap.get(materialStatusKey));
                             return false;
                         }
                         return true;
@@ -2493,6 +2496,20 @@ public class ScheduleServiceImpl implements ScheduleService {
         // 2. 过滤在机信息
         int originalOnlineCount = context.getOnlineInfos() != null ? context.getOnlineInfos().size() : 0;
         if (context.getOnlineInfos() != null) {
+            // 在机信息没有产品状态，只有同一物料所有状态均已完成时才能过滤
+            Collection<MdmMonthSurplus> monthSurplusValues = context.getMonthSurplusMap() != null
+                    ? context.getMonthSurplusMap().values() : Collections.emptyList();
+            Set<String> completedMaterialCodes = monthSurplusValues.stream()
+                    .filter(surplus -> surplus.getMaterialCode() != null)
+                    .collect(Collectors.groupingBy(MdmMonthSurplus::getMaterialCode))
+                    .entrySet().stream()
+                    .filter(entry -> entry.getValue().stream().allMatch(surplus -> {
+                        String statusKey = MonthPlanSurplusCalculator.buildMaterialStatusKey(
+                                surplus.getMaterialCode(), surplus.getProductStatus());
+                        return completedStatusKeys.contains(statusKey);
+                    }))
+                    .map(Map.Entry::getKey)
+                    .collect(Collectors.toSet());
             // 在机信息的key格式是：物料编码|胎胚描述，需要保持一致
             Set<String> completedKeys = getCompletedKeys(context, completedMaterialCodes);
 
@@ -2534,9 +2551,9 @@ public class ScheduleServiceImpl implements ScheduleService {
 
         // 4. 记录被过滤的物料信息
         StringBuilder sb = new StringBuilder("已收尾物料列表：\n");
-        for (String materialCode : completedMaterialCodes) {
-            Integer remainder = formingRemainderMap.get(materialCode);
-            sb.append(String.format("  - 物料: %s, 成型余量: %d\n", materialCode, remainder));
+        for (String materialStatusKey : completedStatusKeys) {
+            Integer remainder = formingRemainderMap.get(materialStatusKey);
+            sb.append(String.format("  - 物料状态账户: %s, 成型余量: %d\n", materialStatusKey, remainder));
         }
         log.info(sb.toString());
     }
