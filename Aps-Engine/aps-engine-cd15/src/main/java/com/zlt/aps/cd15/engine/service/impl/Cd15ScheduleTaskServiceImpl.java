@@ -20,7 +20,6 @@ import java.util.UUID;
 
 /**
  * 斜裁自动排程任务状态服务实现。
- *
  * <p>任务状态与 CD90 保持一致，算法执行链路后续补齐。</p>
  */
 @Slf4j
@@ -37,7 +36,7 @@ public class Cd15ScheduleTaskServiceImpl implements Cd15ScheduleTaskService {
     public Cd15ScheduleTask createPending(String factoryCode, Date scheduleDate, String taskType,
                                           String triggerType, String requestSnapshot, String createBy) {
         return this.createPending(factoryCode, scheduleDate, taskType, triggerType,
-                requestSnapshot, null, createBy);
+                requestSnapshot, null, createBy, null);
     }
 
     @Override
@@ -45,6 +44,16 @@ public class Cd15ScheduleTaskServiceImpl implements Cd15ScheduleTaskService {
     public Cd15ScheduleTask createPending(String factoryCode, Date scheduleDate, String taskType,
                                           String triggerType, String requestSnapshot,
                                           String inputVersion, String createBy) {
+        return this.createPending(factoryCode, scheduleDate, taskType, triggerType,
+                requestSnapshot, inputVersion, createBy, null);
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
+    public Cd15ScheduleTask createPending(String factoryCode, Date scheduleDate, String taskType,
+                                          String triggerType, String requestSnapshot,
+                                          String inputVersion, String createBy,
+                                          String idempotencyKey) {
         Cd15ScheduleTask activeTask = this.findActive(factoryCode, scheduleDate);
         if (activeTask != null) {
             return activeTask;
@@ -55,6 +64,7 @@ public class Cd15ScheduleTaskServiceImpl implements Cd15ScheduleTaskService {
         task.setFactoryCode(factoryCode);
         task.setScheduleDate(scheduleDate);
         task.setTaskType(taskType);
+        task.setIdempotencyKey(idempotencyKey);
         task.setTriggerType(triggerType);
         task.setTaskStatus(Cd15ScheduleTaskStatus.PENDING);
         task.setProgress(0);
@@ -68,6 +78,23 @@ public class Cd15ScheduleTaskServiceImpl implements Cd15ScheduleTaskService {
         log.info("[斜裁排程任务] 创建等待执行任务, taskId={}, factoryCode={}, scheduleDate={}, taskType={}, triggerType={}",
                 task.getTaskId(), factoryCode, scheduleDate, taskType, triggerType);
         return task;
+    }
+
+    @Override
+    public Cd15ScheduleTask findSuccessfulByIdempotencyKey(String factoryCode, String taskType,
+                                                           String idempotencyKey) {
+        if (factoryCode == null || factoryCode.trim().isEmpty()
+                || taskType == null || taskType.trim().isEmpty()
+                || idempotencyKey == null || idempotencyKey.trim().isEmpty()) {
+            return null;
+        }
+        return taskMapper.selectOne(new LambdaQueryWrapper<Cd15ScheduleTask>()
+                .eq(Cd15ScheduleTask::getFactoryCode, factoryCode)
+                .eq(Cd15ScheduleTask::getTaskType, taskType)
+                .eq(Cd15ScheduleTask::getIdempotencyKey, idempotencyKey)
+                .eq(Cd15ScheduleTask::getTaskStatus, Cd15ScheduleTaskStatus.SUCCESS)
+                .orderByDesc(Cd15ScheduleTask::getCreateTime)
+                .last("limit 1"));
     }
 
     @Override
