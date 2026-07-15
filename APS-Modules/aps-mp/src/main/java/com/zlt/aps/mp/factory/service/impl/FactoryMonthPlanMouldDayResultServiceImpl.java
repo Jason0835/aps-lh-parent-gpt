@@ -26,6 +26,7 @@ import com.zlt.aps.maindata.mapper.RawSpecialMaterialRecordEntityMapper;
 import com.zlt.aps.maindata.mapper.RawSpecialMaterialStockEntityMapper;
 import com.zlt.aps.maindata.service.IFactoryParamService;
 import com.zlt.aps.maindata.utils.FactoryParamUtils;
+import com.zlt.aps.mp.adjust.mapper.MpAdjustResultEntityMapper;
 import com.zlt.aps.mp.api.domain.entity.*;
 import com.zlt.aps.mp.api.domain.vo.DailyMouldAvailabilityResult;
 import com.zlt.aps.mp.api.domain.vo.MpDayProductionStatisticsDetailVo;
@@ -47,6 +48,8 @@ import com.zlt.aps.mp.factory.service.IMpMonthPlanStatisticsService;
 import com.zlt.aps.utils.GenerageMapKeyUtils;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.sysdef.domain.SysDocType;
+
+import cn.hutool.core.bean.BeanUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
@@ -109,6 +112,8 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
     private FactoryMonthPlanProductMouldMapper factoryMonthPlanProductMouldMapper;
     @Autowired
     private MdmMaterialInfoEntityMapper mdmMaterialInfoEntityMapper;
+    @Autowired
+    private MpAdjustResultEntityMapper mpAdjustResultEntityMapper;
 
     @Autowired
     private ISysDictDataCacheService sysDictDataCacheService;
@@ -185,22 +190,24 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
         if (CollectionUtils.isEmpty(recordList)) {
             return recordList;
         }
-        
-        // 1.3.1、计算上个月的天数
+        // 1.3、定稿导出，需要加载调整结果表，调整记录有的每日计划需要以调整的为准
+        this.mergeAdjustResult(recordList, params, isFinal);
+        // 1.4、需要补上上个月最后10天的排产计划
+        // 1.4.1、计算上个月的天数
         Calendar lastMonthCalendar = Calendar.getInstance();
         lastMonthCalendar.set(params.getYear(), params.getMonth() - 1, 1); // 通过日历获取上本月一号的日历
         lastMonthCalendar.add(Calendar.DAY_OF_MONTH, -1); // 切换到上个月最后一天
         Integer lastDayOfMonth = lastMonthCalendar.getActualMaximum(Calendar.DAY_OF_MONTH); // 上个月最后一天的日期
-        // 1.3.2、填充上个月的定稿记录信息，同时获取上个月的定稿版本
+        // 1.4.2、填充上个月的定稿记录信息，同时获取上个月的定稿版本
         String lastProductionVersion = this.fillLastFinalResultList(params, recordList, lastMonthCalendar);
-        // 1.3.3、加载本次版本已生成的统计记录
+        // 1.4.3、加载本次版本已生成的统计记录
         String productionVersion = params.getProductionVersion();
         Map<String, MpMonthPlanStatistics> statisticsMap = this.loadMpMonthPlanStatistics(params, productionVersion, isFinal);
-        // 1.4、加载上个月的统计记录，固定取定稿版本
+        // 1.5、加载上个月的统计记录，固定取定稿版本
         Map<String, MpMonthPlanStatistics> lastStatisticsMap = this.loadMpMonthPlanStatistics(params, lastProductionVersion, true);
-        // 1.5、加载结构排产数据
+        // 1.6、加载结构排产数据
         Map<String, MpStructureAllocation> structureAllocationMap = this.loadStructureAllocationMap(params);
-        // 1.6、加载型腔数活块数
+        // 1.7、加载型腔数活块数
         Map<String, Integer> cavityResults = new HashMap<>(0); // 型腔可用量（按结构+主花纹分组）
         Map<String, Integer> insertResults = new HashMap<>(0); // 活块可用量（按物料描述分组）
         List<DailyMouldAvailabilityResult> moldResult = moldCavityInsertMaxValueCalculator
@@ -408,6 +415,72 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
     }
 
     /**
+     * 定稿导出，需要将调整结果表合并到导出结果中
+     * @param recordList
+     * @param params
+     * @param isFinal
+     */
+    private void mergeAdjustResult(List<FactoryMonthPlanMouldDayResultExportVo> recordList,
+            FactoryMonthPlanMouldDayResult params, boolean isFinal) {
+        if (!isFinal) {
+            return;
+        }
+        LambdaQueryWrapper<MpAdjustResult> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(MpAdjustResult::getFactoryCode, params.getFactoryCode());
+        queryWrapper.eq(MpAdjustResult::getProductionVersion, params.getProductionVersion());
+        queryWrapper.eq(MpAdjustResult::getVersion, params.getMonthPlanVersion());
+        List<MpAdjustResult> adjustList = mpAdjustResultEntityMapper.selectList(queryWrapper);
+        Map<String, FactoryMonthPlanMouldDayResultExportVo> recordMap = recordList.stream()
+                .collect(Collectors.toMap(s -> this.getMapKey(s), Function.identity(), (s1, s2) -> s1));
+        // 调整有但是final表没有的，需要补充记录
+        adjustList.forEach(adjust -> {
+            String key = this.getMapKey(adjust);
+            FactoryMonthPlanMouldDayResultExportVo result = recordMap.get(key);
+            if (result == null) {// 调整有但是final表没有的，需要补充记录
+                result = new FactoryMonthPlanMouldDayResultExportVo();
+                BeanUtil.copyProperties(adjust, result);
+                result.setLocationType("2"); // TODO 暂时固定外销
+                recordMap.put(key, result);
+            } else { // 调整有且final表也有的，每日量需要以调整的为准
+                for (int day = FactoryConstant.MONTH_START_DAY; day <= FactoryConstant.MONTH_MAX_DAY; day++) {
+                    String fieldName = String.format(DAY_FIELD_NAME_FORMAT, day);
+                    result.setFieldValueByFieldName(fieldName, adjust.getFieldValueByFieldName(fieldName));
+                }
+                result.statisticsTotalQty(); // 重新统计合计值
+            }
+        });
+    }
+    
+    /**
+     * 构建导出记录的Key
+     * @param adjustResult
+     * @return
+     */
+    private String getMapKey(FactoryMonthPlanMouldDayResultExportVo adjustResult) {
+        return GenerageMapKeyUtils.createMapKey(adjustResult.getMaterialCode(), adjustResult.getConstructionStage());
+    }
+
+    
+    /**
+     * 构建调整记录的Key
+     * @param adjustResult
+     * @return
+     */
+    private String getMapKey(MpAdjustResult adjustResult) {
+        return GenerageMapKeyUtils.createMapKey(adjustResult.getMaterialCode(), adjustResult.getConstructionStage());
+    }
+
+    /**
+     * 构建定稿记录的Key
+     * @param adjustResult
+     * @return
+     */
+    private String getMapKey(FactoryMonthPlanProductionFinalResult adjustResult) {
+        return GenerageMapKeyUtils.createMapKey(adjustResult.getMaterialCode(), adjustResult.getConstructionStage());
+    }
+    
+
+    /**
      * 加载本月工作日历
      * @param params
      * @return
@@ -475,7 +548,7 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
         Set<String> matchedKeys = new HashSet<>();
         // 遍历 recordList，匹配上则赋值 lastDay1~lastDay10
         for (FactoryMonthPlanMouldDayResultExportVo record : recordList) {
-            String key = GenerageMapKeyUtils.createMapKey(record.getMaterialCode(), record.getConstructionStage());
+            String key = this.getMapKey(record);
             FactoryMonthPlanProductionFinalResult matchedFinal = lastFinalResultMap.get(key);
             if (matchedFinal != null) {
                 matchedKeys.add(key);
@@ -492,8 +565,8 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
                         .contains(GenerageMapKeyUtils.createMapKey(r.getMaterialCode(), r.getConstructionStage())))
                 .map(FactoryMonthPlanProductionFinalResult::getMaterialCode).filter(Objects::nonNull).distinct()
                 .collect(Collectors.toSet());
-        if (CollectionUtils.isEmpty(noMatchMaterialCodeSet)) { // 如果没有匹配不上的情况，直接返回
-            
+        if (CollectionUtils.isEmpty(noMatchMaterialCodeSet)) { // 如果没有匹配上的情况，直接返回
+            return null;
         }
         LambdaQueryWrapper<MdmMaterialInfo> mdmMaterialInfoQueryWrapper = new LambdaQueryWrapper<>();
         mdmMaterialInfoQueryWrapper.eq(MdmMaterialInfo::getFactoryCode, params.getFactoryCode());
@@ -504,7 +577,7 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
 
         // 未匹配的 lastFinalResult 新增到 recordList
         for (FactoryMonthPlanProductionFinalResult finalResult : lastFinalResultList) {
-            String key = GenerageMapKeyUtils.createMapKey(finalResult.getMaterialCode(), finalResult.getConstructionStage());
+            String key = this.getMapKey(finalResult);
             if (matchedKeys.contains(key)) {
                 continue;
             }

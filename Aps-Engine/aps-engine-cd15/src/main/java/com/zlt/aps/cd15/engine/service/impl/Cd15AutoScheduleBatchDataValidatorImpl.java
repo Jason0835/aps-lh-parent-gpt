@@ -211,10 +211,10 @@ public class Cd15AutoScheduleBatchDataValidatorImpl implements Cd15AutoScheduleB
         String prefix = "胎胚 " + code + " 施工版本 " + version + " ";
         String cuttingAngle = this.trim(construction.getBeltCuttingAngle());
 
-        if (!StringUtils.hasText(construction.getCordSpec())) {
+        if (!StringUtils.hasText(construction.getArticleCrownSpec())) {
             builder.addError("施工信息", DATA_MISSING,
-                    prefix + "大卷代码(CORD_SPEC)缺失",
-                    "请在施工信息页面维护大卷代码");
+                    prefix + "钢带规格(ARTICLE_CROWN_SPEC)缺失",
+                    "请在施工信息页面维护钢带规格");
         }
         if (!StringUtils.hasText(cuttingAngle)) {
             builder.addError("施工信息", DATA_MISSING,

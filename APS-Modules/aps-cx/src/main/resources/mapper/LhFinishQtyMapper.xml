@@ -8,7 +8,7 @@
         SELECT
             FACTORY_CODE,
             MATERIAL_CODE,
-            LH_TYPE AS PRODUCT_STATUS,
+            LH_TYPE,
             SUM(DAY_FINISH_QTY) AS TOTAL_FINISH_QTY
         FROM T_LH_DAY_FINISH_QTY
         WHERE FINISH_DATE &gt;= #{monthStart}
@@ -31,7 +31,7 @@
         SELECT
             FACTORY_CODE,
             MATERIAL_CODE,
-            CLASS1_LH_TYPE AS PRODUCT_STATUS,
+            CLASS1_LH_TYPE,
             SUM(CLASS1_FINISH_QTY) AS TOTAL_FINISH_QTY
         FROM T_LH_SCHE_FINISH_QTY
         WHERE SCHEDULE_DATE &gt;= #{scheduleDate}
