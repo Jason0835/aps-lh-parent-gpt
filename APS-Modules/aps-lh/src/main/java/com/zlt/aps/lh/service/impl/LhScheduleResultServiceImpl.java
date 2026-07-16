@@ -831,7 +831,7 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
             String fcMatKey = result.getFactoryMaterialStatusKey();
             FactoryMonthPlanProductionFinalResult skuInfo = new FactoryMonthPlanProductionFinalResult();
             skuInfo.setFactoryCode(fc);
-            skuInfo.setMaterialCode(machineCode);
+            skuInfo.setMaterialCode(matCode);
             skuInfo.setProductStatus(result.getLhType());
             // 月计划对象（用于获取 productStatus、totalQty、constructionStage、monthPlanVersion）
             FactoryMonthPlanProductionFinalResult monthPlan = SkuMonthPlanCalculator.getSkuYearMonthFinal(allMonthPlanList, skuInfo, productionYearMonth);
@@ -951,7 +951,7 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
 //            }
 
             //硫化余量计算：不在排产后期内：
-            Map<YearMonth, FactoryMonthPlanProductionFinalResult> hasProductionPlanMap = SkuMonthPlanCalculator.getHasProductionPlan(allMonthPlanList, allProductionDate, fc, machineCode, result.getLhType());
+            Map<YearMonth, FactoryMonthPlanProductionFinalResult> hasProductionPlanMap = SkuMonthPlanCalculator.getHasProductionPlan(allMonthPlanList, allProductionDate, fc, matCode, result.getLhType());
             int surplus = SkuMonthPlanCalculator.getSurplusQty(productionYearMonth, allProductionDate, hasProductionPlanMap, monthOverdueQtyMap, yearMonthPlanQtyMap, finishedQty);
             result.setMouldSurplusQty(Math.max(surplus, BigDecimal.ZERO.intValue()));
             // ---------- SPEC_CODE：规格编码 ----------
