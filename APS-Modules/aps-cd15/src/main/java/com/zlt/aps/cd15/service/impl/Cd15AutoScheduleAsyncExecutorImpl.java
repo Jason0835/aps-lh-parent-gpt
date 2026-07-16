@@ -11,7 +11,6 @@ import com.zlt.aps.cd15.engine.service.Cd15AutoScheduleLockService;
 import com.zlt.aps.cd15.engine.service.Cd15MultiShiftScheduleExecutor;
 import com.zlt.aps.cd15.engine.service.Cd15ScheduleTaskService;
 import com.zlt.aps.cd15.engine.service.Cd15ScheduleProgressListener;
-import com.zlt.aps.common.core.enums.ThreeShiftEnum;
 import com.zlt.aps.cd15.mapper.Cd15ParamsMapper;
 import com.zlt.aps.cd15.service.Cd15AutoScheduleAsyncExecutor;
 import com.zlt.aps.cd15.service.Cd15AutoSchedulePersistService;
@@ -57,9 +56,8 @@ public class Cd15AutoScheduleAsyncExecutorImpl implements Cd15AutoScheduleAsyncE
                 return;
             }
             this.updateProgress(taskId, 15, "LOAD_INPUT", "加载自动排程输入");
-            Cd15AutoScheduleInput input = inputService.load(factoryCode, localDate, "CLASS1",
-                    ThreeShiftEnum.MIDDLE.getCode(),
-                    this.resolveAgingPeriodHours(factoryCode));
+            Cd15AutoScheduleInput input = inputService.load(
+                    factoryCode, localDate, this.resolveAgingPeriodHours(factoryCode));
             this.updateProgress(taskId, 40, "SCHEDULE_TRIAL", "执行自动排程试排");
             Cd15ScheduleProgressListener listener = (progress, stage, stageName) ->
                     this.updateProgress(taskId, progress, stage, stageName);

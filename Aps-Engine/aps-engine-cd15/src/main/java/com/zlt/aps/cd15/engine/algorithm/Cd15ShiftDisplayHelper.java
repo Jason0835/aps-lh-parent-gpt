@@ -1,130 +1,32 @@
 package com.zlt.aps.cd15.engine.algorithm;
 
-import com.zlt.aps.common.core.enums.ThreeShiftEnum;
-
+import com.zlt.aps.cd15.engine.model.Cd15ShiftDescriptor;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Date;
 
 /**
- * CD15 班次展示与业务日期解析工具。
+ * CD15 班次展示与日期类型转换工具。
  */
 public final class Cd15ShiftDisplayHelper {
-
-    private static final ThreeShiftEnum[] CLASS_SHIFT_ORDER = {
-            ThreeShiftEnum.MIDDLE, ThreeShiftEnum.NIGHT, ThreeShiftEnum.MORNING
-    };
 
     private Cd15ShiftDisplayHelper() {
     }
 
     /**
-     * 生成面向页面和任务进度的班次展示名，夜班按跨日后的归属日期展示。
+     * 获取动态班次描述中的展示名称。
      *
-     * @param scheduleDate 排程日期
-     * @param classIndex CLASS 序号
-     * @return 例如：中班07/08、夜班07/09、早班07/09
+     * @param shift 班次描述
+     * @return 班次展示名称
      */
-    public static String shiftDisplayName(Date scheduleDate, int classIndex) {
-        return shiftDisplayName(toLocalDate(scheduleDate), classIndex);
-    }
-
-    /**
-     * 生成面向页面和任务进度的班次展示名，夜班按跨日后的归属日期展示。
-     *
-     * @param scheduleDate 排程日期
-     * @param classIndex CLASS 序号
-     * @return 例如：中班07/08、夜班07/09、早班07/09
-     */
-    public static String shiftDisplayName(LocalDate scheduleDate, int classIndex) {
-        LocalDate displayDate = displayDate(scheduleDate, classIndex);
-        String shiftName = shiftNameForDisplay(classIndexToShiftCode(classIndex));
-        if (!StringUtils.hasText(shiftName) || displayDate == null) {
-            return "CLASS" + Math.max(classIndex, 1);
-        }
-        return shiftName + String.format("%02d/%02d", displayDate.getMonthValue(), displayDate.getDayOfMonth());
-    }
-
-    /**
-     * 获取排程结果归属日期。CLASS1 为排程日前一天中班，CLASS2~4 为排程日，后续每3班顺延一天。
-     *
-     * @param scheduleDate 排程日期
-     * @param classIndex CLASS 序号
-     * @return 排程结果归属日期
-     */
-    public static LocalDate displayDate(LocalDate scheduleDate, int classIndex) {
-        if (scheduleDate == null) {
-            return null;
-        }
-        if (classIndex <= 1) {
-            return scheduleDate.minusDays(1);
-        }
-        return scheduleDate.plusDays((classIndex - 2L) / 3L);
-    }
-
-    /**
-     * 获取班次开始时间。夜班展示归属次日，但资源计算开始时点仍为前一日22点。
-     *
-     * @param scheduleDate 排程日期
-     * @param classIndex CLASS 序号
-     * @return 班次开始时间
-     */
-    public static LocalDateTime shiftStartTime(Date scheduleDate, int classIndex) {
-        LocalDate displayDate = displayDate(toLocalDate(scheduleDate), classIndex);
-        String shiftCode = classIndexToShiftCode(classIndex);
-        if (displayDate == null) {
-            displayDate = LocalDate.now();
-        }
-        ThreeShiftEnum shift = ThreeShiftEnum.getByCode(shiftCode);
+    public static String shiftDisplayName(Cd15ShiftDescriptor shift) {
         if (shift == null) {
             return null;
         }
-        LocalDate startDate = shift.isCrossDay() ? displayDate.minusDays(1) : displayDate;
-        return LocalDateTime.of(startDate, shift.getStartTime());
-    }
-
-    /**
-     * 班次中文集中在此方法，后续多语言替换时只需要调整映射来源。
-     *
-     * @param shiftCode 班次编码
-     * @return 班次名称
-     */
-    public static String shiftNameForDisplay(String shiftCode) {
-        if (!StringUtils.hasText(shiftCode)) {
-            return null;
-        }
-        ThreeShiftEnum shift = ThreeShiftEnum.getByCode(shiftCode);
-        return shift == null ? null : shift.getName();
-    }
-
-    /**
-     * 将 CLASS 序号映射为 CD15 班次编码。
-     *
-     * @param classIndex CLASS 序号
-     * @return 班次编码
-     */
-    public static String classIndexToShiftCode(int classIndex) {
-        int normalized = ((Math.max(classIndex, 1) - 1) % 3) + 1;
-        return CLASS_SHIFT_ORDER[normalized - 1].getCode();
-    }
-
-    /**
-     * Date 转 LocalDate。
-     *
-     * @param value 日期
-     * @return LocalDate
-     */
-    public static LocalDate toLocalDate(Date value) {
-        if (value == null) {
-            return null;
-        }
-        if (value instanceof java.sql.Date) {
-            return ((java.sql.Date) value).toLocalDate();
-        }
-        return value.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+        return StringUtils.hasText(shift.getShiftDisplayName())
+                ? shift.getShiftDisplayName() : shift.getClassField();
     }
 
     /**
@@ -134,6 +36,7 @@ public final class Cd15ShiftDisplayHelper {
      * @return Date
      */
     public static Date toDate(LocalDate value) {
-        return value == null ? null : Date.from(value.atStartOfDay(ZoneId.systemDefault()).toInstant());
+        return value == null ? null
+                : Date.from(value.atStartOfDay(ZoneId.systemDefault()).toInstant());
     }
 }

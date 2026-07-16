@@ -28,6 +28,8 @@ public class Cd15AutoScheduleInput {
 
     /** 排程日期。 */
     private Date scheduleDate;
+    /** 当前工厂启用的班次配置解析结果。 */
+    private List<Cd15ShiftDescriptor> shifts;
     /** 成型排程来源数据。 */
     private List<CxScheduleResult> formingSchedules;
     /** 施工拆解后的钢带和加强层材料。 */
@@ -58,8 +60,8 @@ public class Cd15AutoScheduleInput {
     private List<GdyyStock> gdyyStocks;
     /** GDYY 排程结果，用于后续成熟库存推算。 */
     private List<GdyyScheduleResult> gdyyPlans;
-    /** 大卷成熟期小时数。 */
     /** 定时滚动目标班次之前已保留排程占用的资源。 */
     private List<Cd15RollingPrefixResourceUsage> prefixResourceUsages;
+    /** 大卷成熟期小时数。 */
     private int agingPeriodHours;
 }

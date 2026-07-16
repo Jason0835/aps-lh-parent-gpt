@@ -8,6 +8,7 @@ import com.zlt.aps.cd15.api.domain.entity.Cd15MachineMaintenancePlan;
 import com.zlt.aps.cd15.api.domain.entity.Cd15MachineRollMapping;
 import com.zlt.aps.cd15.api.domain.entity.Cd15SpecifyMachine;
 import com.zlt.aps.cd15.api.domain.entity.Cd15Stock;
+import com.zlt.aps.cd15.api.domain.entity.Cd15ShiftConfig;
 import com.zlt.aps.cd15.engine.mapper.Cd15EngineAngleWidthMappingMapper;
 import com.zlt.aps.cd15.engine.mapper.Cd15EngineConstructionMapper;
 import com.zlt.aps.cd15.engine.mapper.Cd15EngineCurlLengthMapper;
@@ -19,6 +20,7 @@ import com.zlt.aps.cd15.engine.mapper.Cd15EngineMachineRollMappingMapper;
 import com.zlt.aps.cd15.engine.mapper.Cd15EngineMaintenanceMapper;
 import com.zlt.aps.cd15.engine.mapper.Cd15EngineSpecifyMachineMapper;
 import com.zlt.aps.cd15.engine.mapper.Cd15EngineStockMapper;
+import com.zlt.aps.cd15.engine.mapper.Cd15EngineShiftConfigMapper;
 import com.zlt.aps.cd15.engine.service.Cd15AutoScheduleInputVersionService;
 import com.zlt.aps.cx.api.domain.entity.CxScheduleResult;
 import com.zlt.aps.gdyy.api.domain.entity.GdyyScheduleResult;
@@ -51,6 +53,7 @@ public class Cd15AutoScheduleInputVersionServiceImpl implements Cd15AutoSchedule
     private final Cd15EngineMaintenanceMapper maintenanceMapper;
     private final Cd15EngineGdyyStockMapper gdyyStockMapper;
     private final Cd15EngineGdyyScheduleResultMapper gdyyScheduleResultMapper;
+    private final Cd15EngineShiftConfigMapper shiftConfigMapper;
 
     public Cd15AutoScheduleInputVersionServiceImpl(Cd15EngineCxScheduleMapper cxMapper,
                                                    Cd15EngineConstructionMapper constructionMapper,
@@ -62,7 +65,8 @@ public class Cd15AutoScheduleInputVersionServiceImpl implements Cd15AutoSchedule
                                                    Cd15EngineSpecifyMachineMapper specifyMachineMapper,
                                                    Cd15EngineMaintenanceMapper maintenanceMapper,
                                                    Cd15EngineGdyyStockMapper gdyyStockMapper,
-                                                   Cd15EngineGdyyScheduleResultMapper gdyyScheduleResultMapper) {
+                                                   Cd15EngineGdyyScheduleResultMapper gdyyScheduleResultMapper,
+                                                   Cd15EngineShiftConfigMapper shiftConfigMapper) {
         this.cxMapper = cxMapper;
         this.constructionMapper = constructionMapper;
         this.stockMapper = stockMapper;
@@ -74,6 +78,7 @@ public class Cd15AutoScheduleInputVersionServiceImpl implements Cd15AutoSchedule
         this.maintenanceMapper = maintenanceMapper;
         this.gdyyStockMapper = gdyyStockMapper;
         this.gdyyScheduleResultMapper = gdyyScheduleResultMapper;
+        this.shiftConfigMapper = shiftConfigMapper;
     }
 
     @Override
@@ -149,6 +154,16 @@ public class Cd15AutoScheduleInputVersionServiceImpl implements Cd15AutoSchedule
                         + ":" + item.getDowntimeStartTime() + ":" + item.getDowntimeEndTime()
                         + ":" + item.getUpdateTime())
                 .collect(Collectors.joining("|"));
+        String shifts = shiftConfigMapper.selectList(Wrappers.<Cd15ShiftConfig>lambdaQuery()
+                        .eq(Cd15ShiftConfig::getFactoryCode, factoryCode)
+                        .orderByAsc(Cd15ShiftConfig::getId))
+                .stream()
+                .map(item -> item.getId() + ":" + item.getShiftCode() + ":" + item.getShiftName()
+                        + ":" + item.getShiftOrder() + ":" + item.getStartTime() + ":" + item.getEndTime()
+                        + ":" + item.getShiftHours() + ":" + item.getIsCrossDay()
+                        + ":" + item.getScheduleDay() + ":" + item.getDayShiftOrder()
+                        + ":" + item.getClassField() + ":" + item.getIsActive() + ":" + item.getUpdateTime())
+                .collect(Collectors.joining("|"));
         String gdyyStock = gdyyStockMapper.selectList(Wrappers.<GdyyStock>lambdaQuery()
                         .eq(GdyyStock::getFactoryCode, factoryCode)
                         .orderByAsc(GdyyStock::getId))
@@ -166,7 +181,7 @@ public class Cd15AutoScheduleInputVersionServiceImpl implements Cd15AutoSchedule
                         + ":" + item.getMachineCode() + ":" + item.getUpdateTime())
                 .collect(Collectors.joining("|"));
         return this.sha256(String.join("#", forming, constructions, stock, curls, angleWidths, machines,
-                machineRolls, specifyMachines, maintenances, gdyyStock, gdyyPlan));
+                machineRolls, specifyMachines, maintenances, shifts, gdyyStock, gdyyPlan));
     }
 
     private String sha256(String value) {

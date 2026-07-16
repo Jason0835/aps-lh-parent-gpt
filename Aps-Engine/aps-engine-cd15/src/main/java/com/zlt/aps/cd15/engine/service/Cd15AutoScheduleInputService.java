@@ -10,7 +10,17 @@ import java.time.LocalDate;
 public interface Cd15AutoScheduleInputService {
 
     /**
-     * 加载指定排程日期和班次的自动排程输入快照。
+     * 加载完整自动排程输入快照，资源基线取启用配置中的首个班次。
+     *
+     * @param factoryCode 工厂编码
+     * @param scheduleDate 排程日期
+     * @param agingPeriodHours 大卷成熟期小时数
+     * @return 自动排程输入快照
+     */
+    Cd15AutoScheduleInput load(String factoryCode, LocalDate scheduleDate, int agingPeriodHours);
+
+    /**
+     * 加载指定排程日期和班次的滚动排程输入快照。
      *
      * @param factoryCode 工厂编码
      * @param scheduleDate 排程日期

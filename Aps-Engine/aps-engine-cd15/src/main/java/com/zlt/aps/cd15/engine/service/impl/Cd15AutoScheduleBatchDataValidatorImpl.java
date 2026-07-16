@@ -4,12 +4,16 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.zlt.aps.cd15.api.domain.entity.Cd15AngleWidthMapping;
 import com.zlt.aps.cd15.api.domain.entity.Cd15CurlLength;
 import com.zlt.aps.cd15.api.domain.entity.Cd15MachineInfo;
+import com.zlt.aps.cd15.api.domain.entity.Cd15ShiftConfig;
+import com.zlt.aps.cd15.engine.algorithm.Cd15ShiftWindowResolver;
 import com.zlt.aps.cd15.engine.mapper.Cd15EngineAngleWidthMappingMapper;
 import com.zlt.aps.cd15.engine.mapper.Cd15EngineConstructionMapper;
 import com.zlt.aps.cd15.engine.mapper.Cd15EngineCurlLengthMapper;
 import com.zlt.aps.cd15.engine.mapper.Cd15EngineCxScheduleMapper;
 import com.zlt.aps.cd15.engine.mapper.Cd15EngineMachineInfoMapper;
+import com.zlt.aps.cd15.engine.mapper.Cd15EngineShiftConfigMapper;
 import com.zlt.aps.cd15.engine.model.Cd15BatchDataCheckResult;
+import com.zlt.aps.cd15.engine.model.Cd15ShiftDescriptor;
 import com.zlt.aps.cd15.engine.service.Cd15AutoScheduleBatchDataValidator;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.cx.api.domain.entity.CxScheduleResult;
@@ -24,6 +28,7 @@ import java.math.BigDecimal;
 import java.sql.Date;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -44,7 +49,7 @@ import java.util.stream.IntStream;
 public class Cd15AutoScheduleBatchDataValidatorImpl implements Cd15AutoScheduleBatchDataValidator {
 
     private static final int CONSTRUCTION_LAYERS = 3;
-    private static final int CLASS_COUNT = 8;
+    private static final int ACTIVE = 1;
     private static final String DATA_MISSING = "DATA_MISSING";
     private static final String ANGLE_WIDTH_CONFIG_MISSING = "ANGLE_WIDTH_CONFIG_MISSING";
     private static final String[] MAIN_LAYER_CODE_COLUMNS = {"BELT_CODE1", "BELT_CODE2", "BELT_CODE3"};
@@ -56,6 +61,8 @@ public class Cd15AutoScheduleBatchDataValidatorImpl implements Cd15AutoScheduleB
     private final Cd15EngineCurlLengthMapper curlLengthMapper;
     private final Cd15EngineMachineInfoMapper machineInfoMapper;
     private final Cd15EngineAngleWidthMappingMapper angleWidthMappingMapper;
+    private final Cd15EngineShiftConfigMapper shiftConfigMapper;
+    private final Cd15ShiftWindowResolver shiftWindowResolver;
 
     @Override
     public Cd15BatchDataCheckResult check(String factoryCode, LocalDate scheduleDate) {
@@ -71,9 +78,15 @@ public class Cd15AutoScheduleBatchDataValidatorImpl implements Cd15AutoScheduleB
         }
 
         Cd15BatchDataCheckResult.Builder builder = Cd15BatchDataCheckResult.builder();
+        List<Cd15ShiftDescriptor> shifts = this.checkShiftConfig(
+                builder, factoryCode, scheduleDate);
+        Set<Integer> activeClassIndexes = shifts.stream()
+                .map(Cd15ShiftDescriptor::getClassIndex)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
         List<CxScheduleResult> formingSchedules = this.checkFormingSchedule(builder, factoryCode, scheduleDate);
         this.checkMachineInfo(builder, factoryCode);
-        ConstructionCheckScope scope = this.checkConstructionInfo(builder, factoryCode, formingSchedules);
+        ConstructionCheckScope scope = this.checkConstructionInfo(
+                builder, factoryCode, formingSchedules, activeClassIndexes);
         this.checkCurlLength(builder, factoryCode, scope.getSteelStripCodes());
         this.checkAngleWidthMapping(builder, factoryCode, scope.getCuttingAngles());
 
@@ -86,6 +99,30 @@ public class Cd15AutoScheduleBatchDataValidatorImpl implements Cd15AutoScheduleB
                     factoryCode, scheduleDate);
         }
         return result;
+    }
+
+    /** 检查并解析排程、滚动共用的启用班次配置。 */
+    private List<Cd15ShiftDescriptor> checkShiftConfig(Cd15BatchDataCheckResult.Builder builder,
+                                                       String factoryCode,
+                                                       LocalDate scheduleDate) {
+        List<Cd15ShiftConfig> configs = this.shiftConfigMapper.selectList(
+                Wrappers.<Cd15ShiftConfig>lambdaQuery()
+                        .eq(Cd15ShiftConfig::getFactoryCode, factoryCode)
+                        .eq(Cd15ShiftConfig::getIsActive, ACTIVE));
+        try {
+            List<Cd15ShiftDescriptor> shifts = this.shiftWindowResolver.resolve(scheduleDate, configs);
+            if (shifts.isEmpty()) {
+                builder.addError("班次配置", DATA_MISSING,
+                        "未找到启用的CD15班次配置",
+                        "请在CD15班次配置页面维护并启用至少一个班次");
+            }
+            return shifts;
+        } catch (IllegalArgumentException exception) {
+            builder.addError("班次配置", DATA_MISSING,
+                    "CD15班次配置无效: " + exception.getMessage(),
+                    "请按标准三班编码和CLASS1至CLASS8规则修正班次配置");
+            return Collections.emptyList();
+        }
     }
 
     /** 检查排程日成型计划是否存在。 */
@@ -119,7 +156,8 @@ public class Cd15AutoScheduleBatchDataValidatorImpl implements Cd15AutoScheduleB
     /** 检查施工记录和施工层位字段。 */
     private ConstructionCheckScope checkConstructionInfo(Cd15BatchDataCheckResult.Builder builder,
                                                          String factoryCode,
-                                                         List<CxScheduleResult> formingSchedules) {
+                                                         List<CxScheduleResult> formingSchedules,
+                                                         Set<Integer> activeClassIndexes) {
         ConstructionCheckScope scope = new ConstructionCheckScope();
         if (formingSchedules == null || formingSchedules.isEmpty()) {
             return scope;
@@ -136,13 +174,14 @@ public class Cd15AutoScheduleBatchDataValidatorImpl implements Cd15AutoScheduleB
                         "请检查成型排程数据的胎胚代号"));
 
         Set<String> constructionVersions = formingSchedules.stream()
-                .flatMap(schedule -> IntStream.rangeClosed(1, CLASS_COUNT)
+                .flatMap(schedule -> activeClassIndexes.stream()
                         .filter(classIndex -> this.hasPositivePlan(schedule, classIndex))
-                        .mapToObj(classIndex -> this.readString(schedule, String.format("class%dRecipeNo", classIndex))))
+                        .map(classIndex -> this.readString(schedule, String.format("class%dRecipeNo", classIndex))))
                 .filter(StringUtils::hasText)
                 .collect(Collectors.toCollection(LinkedHashSet::new));
         Set<String> constructionPairs = new LinkedHashSet<>();
-        formingSchedules.forEach(schedule -> this.collectConstructionPairs(builder, schedule, constructionPairs));
+        formingSchedules.forEach(schedule -> this.collectConstructionPairs(
+                builder, schedule, constructionPairs, activeClassIndexes));
 
         if (embryoCodes.isEmpty() || constructionVersions.isEmpty()) {
             return scope;
@@ -164,12 +203,14 @@ public class Cd15AutoScheduleBatchDataValidatorImpl implements Cd15AutoScheduleB
     /** 收集有正需求班次的胎胚和施工版本配对。 */
     private void collectConstructionPairs(Cd15BatchDataCheckResult.Builder builder,
                                           CxScheduleResult schedule,
-                                          Set<String> constructionPairs) {
+                                          Set<String> constructionPairs,
+                                          Set<Integer> activeClassIndexes) {
         String embryoCode = schedule.getEmbryoCode();
         if (!StringUtils.hasText(embryoCode)) {
             return;
         }
-        IntStream.rangeClosed(1, CLASS_COUNT)
+        activeClassIndexes.stream()
+                .sorted()
                 .filter(classIndex -> this.hasPositivePlan(schedule, classIndex))
                 .forEach(classIndex -> {
                     String fieldName = String.format("CLASS%d_RECIPE_NO", classIndex);

@@ -1241,6 +1241,6 @@
   "ui.data.column.cd15ShiftConfig.classField": "Result Class Field",
   "ui.data.column.cd15ShiftConfig.isActive": "Active Status",
   "ui.data.column.cd15ShiftConfig.remark": "Remark",
-  "ui.data.column.cd15ShiftConfig.checkUnique": "Shift code already exists in the same factory",
+  "ui.data.column.cd15ShiftConfig.checkUnique": "Result class field already exists in the same factory",
   "ui.data.alert.cd15ShiftConfig.shiftHoursPositive": "Shift hours must be greater than 0"
 }

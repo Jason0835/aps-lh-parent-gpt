@@ -5,6 +5,7 @@ import com.zlt.aps.cd15.engine.model.Cd15ConstructionMaterial;
 import com.zlt.aps.cd15.engine.model.Cd15NaturalDemand;
 import com.zlt.aps.cd15.engine.model.Cd15RollingResourceSnapshot;
 import com.zlt.aps.cd15.engine.model.Cd15ScheduleCandidate;
+import com.zlt.aps.cd15.engine.model.Cd15ShiftDescriptor;
 import com.zlt.aps.cx.api.domain.entity.CxScheduleResult;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
@@ -15,16 +16,14 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.Function;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 
 /**
  * CD15 成型逐班自然需求候选构建器。
  */
 @Component
 public class Cd15ScheduleCandidateBuilder {
-
-    private static final int CLASS_COUNT = 8;
 
     /**
      * 根据成型结果的 class1~class8 计划量与施工版本，动态展开自然需求。
@@ -35,10 +34,13 @@ public class Cd15ScheduleCandidateBuilder {
     public List<Cd15NaturalDemand> buildNaturalDemands(Cd15AutoScheduleInput input) {
         List<CxScheduleResult> formingSchedules = input == null || input.getFormingSchedules() == null
                 ? Collections.emptyList() : input.getFormingSchedules();
+        List<Cd15ShiftDescriptor> shifts = input == null || input.getShifts() == null
+                ? Collections.emptyList() : input.getShifts();
         return formingSchedules.stream()
                 .filter(Objects::nonNull)
-                .flatMap(schedule -> IntStream.rangeClosed(1, CLASS_COUNT)
-                        .mapToObj(classIndex -> this.toNaturalDemand(schedule, classIndex)))
+                .flatMap(schedule -> shifts.stream()
+                        .map(Cd15ShiftDescriptor::getClassIndex)
+                        .map(classIndex -> this.toNaturalDemand(schedule, classIndex)))
                 .filter(Objects::nonNull)
                 .collect(Collectors.toList());
     }
@@ -57,10 +59,15 @@ public class Cd15ScheduleCandidateBuilder {
         Map<String, BigDecimal> stockMetersBySteelStrip = snapshot == null
                 || snapshot.getStockMetersBySteelStrip() == null
                 ? Collections.emptyMap() : snapshot.getStockMetersBySteelStrip();
+        Map<Integer, Cd15ShiftDescriptor> shiftByClassIndex = input == null || input.getShifts() == null
+                ? Collections.emptyMap() : input.getShifts().stream()
+                .collect(Collectors.toMap(Cd15ShiftDescriptor::getClassIndex,
+                        Function.identity(), (first, second) -> first));
         return this.buildNaturalDemands(input).stream()
                 .flatMap(demand -> materials.stream()
                         .filter(material -> this.match(demand, material))
-                        .map(material -> this.toCandidate(demand, material, stockMetersBySteelStrip)))
+                        .map(material -> this.toCandidate(demand, material,
+                                shiftByClassIndex.get(demand.getClassIndex()), stockMetersBySteelStrip)))
                 .collect(Collectors.toList());
     }
 
@@ -88,12 +95,14 @@ public class Cd15ScheduleCandidateBuilder {
 
     private Cd15ScheduleCandidate toCandidate(Cd15NaturalDemand demand,
                                               Cd15ConstructionMaterial material,
+                                              Cd15ShiftDescriptor shift,
                                               Map<String, BigDecimal> stockMetersBySteelStrip) {
         BigDecimal stockMetersAtSix = stockMetersBySteelStrip.getOrDefault(
                 material.getSteelStripCode(), BigDecimal.ZERO);
         return Cd15ScheduleCandidate.builder()
                 .demand(demand)
                 .material(material)
+                .shift(shift)
                 .classIndex(demand.getClassIndex())
                 .cuttingAngle(material.getCuttingAngle())
                 .steelStripCode(material.getSteelStripCode())

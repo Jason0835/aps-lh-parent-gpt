@@ -8,14 +8,17 @@ import com.zlt.aps.cd15.api.domain.entity.Cd15Params;
 import com.zlt.aps.cd15.api.domain.entity.Cd15ScheduleLaneAllocation;
 import com.zlt.aps.cd15.api.domain.entity.Cd15ScheduleResult;
 import com.zlt.aps.cd15.api.domain.entity.Cd15ScheduleResultLog;
+import com.zlt.aps.cd15.api.domain.entity.Cd15ShiftConfig;
 import com.zlt.aps.cd15.api.domain.vo.Cd15ChangeQtyRequest;
 import com.zlt.aps.cd15.api.domain.vo.Cd15InsertOrderRequest;
 import com.zlt.aps.cd15.api.domain.vo.Cd15TransferMachineRequest;
-import com.zlt.aps.cd15.engine.algorithm.Cd15ShiftDisplayHelper;
+import com.zlt.aps.cd15.engine.algorithm.Cd15ShiftWindowResolver;
 import com.zlt.aps.cd15.engine.constant.Cd15ScheduleTaskStatus;
 import com.zlt.aps.cd15.engine.domain.Cd15ScheduleTask;
+import com.zlt.aps.cd15.engine.mapper.Cd15EngineShiftConfigMapper;
 import com.zlt.aps.cd15.engine.model.Cd15RollingPrefixResourceUsage;
 import com.zlt.aps.cd15.engine.model.Cd15RollingTarget;
+import com.zlt.aps.cd15.engine.model.Cd15ShiftDescriptor;
 import com.zlt.aps.cd15.engine.model.Cd15TimedRollingOutput;
 import com.zlt.aps.cd15.engine.service.Cd15AutoScheduleInputVersionService;
 import com.zlt.aps.cd15.engine.service.Cd15TimedRollingService;
@@ -52,6 +55,7 @@ import java.util.stream.IntStream;
 public class Cd15InsertRollingPersistServiceImpl implements Cd15InsertRollingPersistService {
 
     private static final int CLASS_COUNT = 8;
+    private static final int ACTIVE = 1;
     private static final String AGING_PERIOD_PARAM_CODE = "SYS0601032";
     private static final int DEFAULT_AGING_PERIOD_HOURS = 24;
     private static final String UNRELEASED = "0";
@@ -66,6 +70,8 @@ public class Cd15InsertRollingPersistServiceImpl implements Cd15InsertRollingPer
     private final Cd15TimedRollingPersistService rollingPersistService;
     private final Cd15AutoScheduleInputVersionService inputVersionService;
     private final Cd15ParamsMapper paramsMapper;
+    private final Cd15EngineShiftConfigMapper shiftConfigMapper;
+    private final Cd15ShiftWindowResolver shiftWindowResolver;
     private final ObjectMapper objectMapper;
 
     @Override
@@ -327,7 +333,7 @@ public class Cd15InsertRollingPersistServiceImpl implements Cd15InsertRollingPer
 
     private void runSuffixRolling(String taskId, Cd15RollingTarget target, RLock lock,
                                   String batchNo, String actionName) {
-        if (target.getTargetClassIndex() > CLASS_COUNT) {
+        if (target == null || target.getTargetClassIndex() > CLASS_COUNT) {
             this.markSuccess(taskId, batchNo, actionName);
             return;
         }
@@ -342,13 +348,26 @@ public class Cd15InsertRollingPersistServiceImpl implements Cd15InsertRollingPer
     private Cd15RollingTarget manualTarget(String factoryCode, Date scheduleDate, String batchNo,
                                            int targetClassIndex) {
         int safeClassIndex = Math.max(1, targetClassIndex);
+        LocalDate localScheduleDate = this.localDate(scheduleDate);
+        List<Cd15ShiftConfig> configs = this.shiftConfigMapper.selectList(
+                new LambdaQueryWrapper<Cd15ShiftConfig>()
+                        .eq(Cd15ShiftConfig::getFactoryCode, factoryCode)
+                        .eq(Cd15ShiftConfig::getIsActive, ACTIVE));
+        Cd15ShiftDescriptor shift = this.shiftWindowResolver.resolve(localScheduleDate, configs).stream()
+                .filter(item -> item.getClassIndex() >= safeClassIndex)
+                .findFirst()
+                .orElse(null);
+        if (shift == null) {
+            return null;
+        }
         return Cd15RollingTarget.builder()
                 .factoryCode(factoryCode)
-                .scheduleDate(this.localDate(scheduleDate))
+                .scheduleDate(localScheduleDate)
                 .batchNo(batchNo)
-                .targetShiftCode(this.classIndexToShiftCode(safeClassIndex))
-                .targetClassField("CLASS" + safeClassIndex)
-                .targetClassIndex(safeClassIndex)
+                .targetShiftCode(shift.getShiftCode())
+                .targetClassField(shift.getClassField())
+                .targetClassIndex(shift.getClassIndex())
+                .handoverTime(shift.getStartTime())
                 .build();
     }
 
@@ -369,10 +388,6 @@ public class Cd15InsertRollingPersistServiceImpl implements Cd15InsertRollingPer
                         && this.readDouble(result, String.format("class%dPlanQty", classIndex)) > 0D)
                 .max()
                 .orElse(0);
-    }
-
-    private String classIndexToShiftCode(int classIndex) {
-        return Cd15ShiftDisplayHelper.classIndexToShiftCode(classIndex);
     }
 
     private int resolveAgingPeriodHours(String factoryCode) {

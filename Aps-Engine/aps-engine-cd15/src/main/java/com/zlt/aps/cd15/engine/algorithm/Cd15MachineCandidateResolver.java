@@ -6,14 +6,13 @@ import com.zlt.aps.cd15.api.domain.entity.Cd15MachineRollMapping;
 import com.zlt.aps.cd15.api.domain.entity.Cd15SpecifyMachine;
 import com.zlt.aps.cd15.engine.model.Cd15AutoScheduleInput;
 import com.zlt.aps.cd15.engine.model.Cd15ScheduleCandidate;
+import com.zlt.aps.cd15.engine.model.Cd15ShiftDescriptor;
 import com.zlt.aps.cd15.engine.model.Cd15SplitCutGroup;
 import com.zlt.aps.common.core.constant.ApsConstant;
-import com.zlt.aps.common.core.enums.ThreeShiftEnum;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.sql.Timestamp;
@@ -27,7 +26,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 /**
  * CD15 机台硬条件候选过滤。
@@ -58,7 +56,7 @@ public class Cd15MachineCandidateResolver {
             return Optional.empty();
         }
         return this.resolveInternal(input, candidate.getBigRollCode(), candidate.getCuttingAngle(),
-                effectiveWidth, candidate.getClassIndex(), Collections.singletonList(candidate.getSteelStripCode()));
+                effectiveWidth, candidate.getShift(), Collections.singletonList(candidate.getSteelStripCode()));
     }
 
     /**
@@ -70,7 +68,7 @@ public class Cd15MachineCandidateResolver {
         }
         Cd15ScheduleCandidate firstCandidate = splitGroup.getFirstCandidate();
         return this.resolveInternal(input, firstCandidate.getBigRollCode(), firstCandidate.getCuttingAngle(),
-                splitGroup.getCombinedWidth(), firstCandidate.getClassIndex(),
+                splitGroup.getCombinedWidth(), firstCandidate.getShift(),
                 Arrays.asList(firstCandidate.getSteelStripCode(), splitGroup.getSecondCandidate().getSteelStripCode()));
     }
 
@@ -87,7 +85,7 @@ public class Cd15MachineCandidateResolver {
             return NO_AVAILABLE_MACHINE;
         }
         return this.resolveFailureReason(input, candidate.getBigRollCode(), candidate.getCuttingAngle(),
-                effectiveWidth, candidate.getClassIndex(), Collections.singletonList(candidate.getSteelStripCode()));
+                effectiveWidth, candidate.getShift(), Collections.singletonList(candidate.getSteelStripCode()));
     }
 
     public String resolveFailureReason(Cd15AutoScheduleInput input, Cd15SplitCutGroup splitGroup) {
@@ -96,7 +94,7 @@ public class Cd15MachineCandidateResolver {
         }
         Cd15ScheduleCandidate firstCandidate = splitGroup.getFirstCandidate();
         return this.resolveFailureReason(input, firstCandidate.getBigRollCode(), firstCandidate.getCuttingAngle(),
-                splitGroup.getCombinedWidth(), firstCandidate.getClassIndex(),
+                splitGroup.getCombinedWidth(), firstCandidate.getShift(),
                 Arrays.asList(firstCandidate.getSteelStripCode(), splitGroup.getSecondCandidate().getSteelStripCode()));
     }
 
@@ -112,10 +110,10 @@ public class Cd15MachineCandidateResolver {
                                                       String bigRollCode,
                                                       String cuttingAngle,
                                                       BigDecimal effectiveWidth,
-                                                      int classIndex,
+                                                      Cd15ShiftDescriptor shift,
                                                       List<String> steelStripCodes) {
         MachineFilterContext context = this.context(input, bigRollCode, cuttingAngle,
-                effectiveWidth, classIndex, steelStripCodes);
+                effectiveWidth, shift, steelStripCodes);
         return this.safe(input == null ? Collections.emptyList() : input.getMachines()).stream()
                 .filter(machine -> this.machineMatched(machine, context))
                 .sorted(Comparator.comparing((Cd15MachineInfo machine) -> this.preferred(machine, context)).reversed()
@@ -130,10 +128,10 @@ public class Cd15MachineCandidateResolver {
                                         String bigRollCode,
                                         String cuttingAngle,
                                         BigDecimal effectiveWidth,
-                                        int classIndex,
+                                        Cd15ShiftDescriptor shift,
                                         List<String> steelStripCodes) {
         MachineFilterContext context = this.context(input, bigRollCode, cuttingAngle,
-                effectiveWidth, classIndex, steelStripCodes);
+                effectiveWidth, shift, steelStripCodes);
         boolean onlyWidthMismatch = this.safe(input == null ? Collections.emptyList() : input.getMachines()).stream()
                 .anyMatch(machine -> this.machineMatchedExceptWidth(machine, context)
                         && !this.widthMatched(machine, effectiveWidth));
@@ -190,16 +188,18 @@ public class Cd15MachineCandidateResolver {
                                          String bigRollCode,
                                          String cuttingAngle,
                                          BigDecimal effectiveWidth,
-                                         int classIndex,
+                                         Cd15ShiftDescriptor shift,
                                          List<String> steelStripCodes) {
-        String shiftCode = this.classIndexToShiftCode(classIndex);
+        String shiftCode = shift == null ? null : shift.getShiftCode();
         List<String> normalizedSteelStripCodes = this.safe(steelStripCodes).stream()
                 .filter(StringUtils::hasText)
                 .map(String::trim)
                 .collect(Collectors.toList());
         List<Cd15MachineRollMapping> rollMappings = this.safe(input == null ? null : input.getMachineRollMappings());
-        Set<String> boundMachineCodes = rollMappings.stream()
+        List<Cd15MachineRollMapping> bigRollMappings = rollMappings.stream()
                 .filter(item -> Objects.equals(this.trim(item.getBigRollCode()), this.trim(bigRollCode)))
+                .collect(Collectors.toList());
+        Set<String> boundMachineCodes = bigRollMappings.stream()
                 .filter(item -> this.shiftMatched(item.getShiftCode(), shiftCode))
                 .map(Cd15MachineRollMapping::getMachineCode)
                 .filter(StringUtils::hasText)
@@ -220,53 +220,13 @@ public class Cd15MachineCandidateResolver {
                 .filter(StringUtils::hasText)
                 .map(String::trim)
                 .collect(Collectors.toSet());
-        LocalDate shiftDate = this.shiftDate(input, classIndex);
-        LocalDateTime shiftStart = this.shiftStart(shiftDate, shiftCode);
-        LocalDateTime shiftEnd = this.shiftEnd(shiftDate, shiftCode);
+        LocalDateTime shiftStart = shift == null ? null : shift.getStartTime();
+        LocalDateTime shiftEnd = shift == null ? null : shift.getEndTime();
         return new MachineFilterContext(bigRollCode, cuttingAngle, effectiveWidth, shiftCode,
                 input == null || input.getAngleWidthMaxByAngle() == null
                         ? Collections.emptyMap() : input.getAngleWidthMaxByAngle(),
-                !boundMachineCodes.isEmpty(), boundMachineCodes, prohibitedMachineCodes, preferredMachineCodes,
+                !bigRollMappings.isEmpty(), boundMachineCodes, prohibitedMachineCodes, preferredMachineCodes,
                 this.safe(input == null ? null : input.getMaintenancePlans()), shiftStart, shiftEnd);
-    }
-
-    private LocalDate shiftDate(Cd15AutoScheduleInput input, int classIndex) {
-        Date baseDate = input == null ? null : input.getScheduleDate();
-        LocalDate scheduleDate = this.toLocalDate(baseDate);
-        if (scheduleDate == null) {
-            return null;
-        }
-        if (classIndex <= 1) {
-            return scheduleDate.minusDays(1);
-        }
-        return scheduleDate.plusDays((classIndex - 2) / 3);
-    }
-
-    private String classIndexToShiftCode(int classIndex) {
-        return Cd15ShiftDisplayHelper.classIndexToShiftCode(classIndex);
-    }
-
-    private LocalDateTime shiftStart(LocalDate shiftDate, String shiftCode) {
-        if (shiftDate == null) {
-            return null;
-        }
-        ThreeShiftEnum shift = ThreeShiftEnum.getByCode(shiftCode);
-        if (shift == null) {
-            return null;
-        }
-        LocalDate startDate = shift.isCrossDay() ? shiftDate.minusDays(1) : shiftDate;
-        return LocalDateTime.of(startDate, shift.getStartTime());
-    }
-
-    private LocalDateTime shiftEnd(LocalDate shiftDate, String shiftCode) {
-        if (shiftDate == null) {
-            return null;
-        }
-        ThreeShiftEnum shift = ThreeShiftEnum.getByCode(shiftCode);
-        if (shift == null) {
-            return null;
-        }
-        return LocalDateTime.of(shiftDate, shift.getEndTime());
     }
 
     private boolean openShiftMatched(String openMachineClass, String shiftCode) {
@@ -277,7 +237,8 @@ public class Cd15MachineCandidateResolver {
     }
 
     private boolean shiftMatched(String configShiftCodes, String shiftCode) {
-        return !StringUtils.hasText(configShiftCodes) || Arrays.stream(configShiftCodes.split(","))
+        return StringUtils.hasText(configShiftCodes) && StringUtils.hasText(shiftCode)
+                && Arrays.stream(configShiftCodes.split(","))
                 .map(String::trim)
                 .anyMatch(shiftCode::equals);
     }
@@ -300,11 +261,6 @@ public class Cd15MachineCandidateResolver {
                 && downtimeStart.isBefore(shiftEnd) && downtimeEnd.isAfter(shiftStart);
     }
 
-    private LocalDate toLocalDate(Date value) {
-        LocalDateTime dateTime = this.toLocalDateTime(value);
-        return dateTime == null ? null : dateTime.toLocalDate();
-    }
-
     private LocalDateTime toLocalDateTime(Date value) {
         if (value == null) {
             return null;
@@ -314,7 +270,6 @@ public class Cd15MachineCandidateResolver {
         }
         return LocalDateTime.ofInstant(value.toInstant(), ZoneId.systemDefault());
     }
-
     private BigDecimal toBigDecimal(Double value) {
         return value == null ? null : BigDecimal.valueOf(value);
     }

@@ -8,8 +8,8 @@ import com.zlt.aps.cd15.engine.algorithm.Cd15ResourceSnapshotBuilder;
 import com.zlt.aps.cd15.engine.algorithm.Cd15RollingPrefixResourceDeductor;
 import com.zlt.aps.cd15.engine.algorithm.Cd15ScheduleCandidateBuilder;
 import com.zlt.aps.cd15.engine.algorithm.Cd15ScheduleCandidateSorter;
-import com.zlt.aps.cd15.engine.algorithm.Cd15ShiftDisplayHelper;
 import com.zlt.aps.cd15.engine.algorithm.Cd15SplitCutGroupBuilder;
+import com.zlt.aps.cd15.engine.algorithm.Cd15ShiftDisplayHelper;
 import com.zlt.aps.cd15.engine.algorithm.Cd15StorageLaneAllocator;
 import com.zlt.aps.cd15.engine.model.Cd15AutoScheduleInput;
 import com.zlt.aps.cd15.engine.model.Cd15BigRollAgingAllocation;
@@ -20,6 +20,7 @@ import com.zlt.aps.cd15.engine.model.Cd15MultiShiftScheduleResult;
 import com.zlt.aps.cd15.engine.model.Cd15RollingResourceSnapshot;
 import com.zlt.aps.cd15.engine.model.Cd15ScheduleCandidate;
 import com.zlt.aps.cd15.engine.model.Cd15ScheduleResultDraft;
+import com.zlt.aps.cd15.engine.model.Cd15ShiftDescriptor;
 import com.zlt.aps.cd15.engine.model.Cd15SteelStripSourceTrace;
 import com.zlt.aps.cd15.engine.model.Cd15SingleShiftScheduleRequest;
 import com.zlt.aps.cd15.engine.model.Cd15SingleShiftScheduleResult;
@@ -36,7 +37,6 @@ import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -164,7 +164,7 @@ public class Cd15MultiShiftScheduleExecutorImpl implements Cd15MultiShiftSchedul
                 .add(this.value(secondResult.getDraft().getBigRollConsumeMeters()));
         Cd15BigRollAgingAllocation allocation = this.allocateBigRoll(snapshot,
                 splitGroup.getFirstCandidate().getBigRollCode(), totalBigRollConsume,
-                this.shiftStartTime(input, splitGroup.getFirstCandidate().getClassIndex()));
+                this.shiftStartTime(splitGroup.getFirstCandidate()));
         if (!allocation.isSuccess()) {
             this.addSplitUnscheduled(unscheduledResults, splitGroup, allocation.getFailureReason(),
                     "GDYY大卷成熟库存不足，无法满足分裁组合");
@@ -214,7 +214,7 @@ public class Cd15MultiShiftScheduleExecutorImpl implements Cd15MultiShiftSchedul
                 return;
             }
             Cd15BigRollAgingAllocation allocation = this.allocateBigRoll(snapshot, candidate.getBigRollCode(),
-                    draft.getBigRollConsumeMeters(), this.shiftStartTime(input, candidate.getClassIndex()));
+                    draft.getBigRollConsumeMeters(), this.shiftStartTime(candidate));
             if (!allocation.isSuccess()) {
                 unscheduledResults.add(this.unscheduled(candidate, allocation.getFailureReason(), "GDYY大卷成熟库存不足"));
                 return;
@@ -424,19 +424,15 @@ public class Cd15MultiShiftScheduleExecutorImpl implements Cd15MultiShiftSchedul
     }
 
     private String shiftDisplayName(Cd15ScheduleCandidate candidate) {
-        if (candidate == null || candidate.getDemand() == null) {
-            return "CLASS1";
-        }
-        return Cd15ShiftDisplayHelper.shiftDisplayName(candidate.getDemand().getScheduleDate(), candidate.getClassIndex());
+        Cd15ShiftDescriptor shift = candidate == null ? null : candidate.getShift();
+        String displayName = Cd15ShiftDisplayHelper.shiftDisplayName(shift);
+        return StringUtils.hasText(displayName) ? displayName
+                : candidate == null ? "CLASS1" : "CLASS" + Math.max(candidate.getClassIndex(), 1);
     }
 
     private Date shiftDate(Cd15ScheduleCandidate candidate) {
-        if (candidate == null || candidate.getDemand() == null) {
-            return null;
-        }
-        LocalDate displayDate = Cd15ShiftDisplayHelper.displayDate(
-                Cd15ShiftDisplayHelper.toLocalDate(candidate.getDemand().getScheduleDate()), candidate.getClassIndex());
-        return Cd15ShiftDisplayHelper.toDate(displayDate);
+        Cd15ShiftDescriptor shift = candidate == null ? null : candidate.getShift();
+        return Cd15ShiftDisplayHelper.toDate(shift == null ? null : shift.getScheduleDate());
     }
 
     private String prefixedAnalysis(String shiftDisplayName, String analysis) {
@@ -450,8 +446,9 @@ public class Cd15MultiShiftScheduleExecutorImpl implements Cd15MultiShiftSchedul
         return analysis.startsWith(prefix) ? analysis : prefix + analysis;
     }
 
-    private LocalDateTime shiftStartTime(Cd15AutoScheduleInput input, int classIndex) {
-        return Cd15ShiftDisplayHelper.shiftStartTime(input == null ? null : input.getScheduleDate(), classIndex);
+    private LocalDateTime shiftStartTime(Cd15ScheduleCandidate candidate) {
+        Cd15ShiftDescriptor shift = candidate == null ? null : candidate.getShift();
+        return shift == null ? null : shift.getStartTime();
     }
     private String orderNo(Cd15ScheduleCandidate candidate, int sequence) {
         return String.format("CD15-%s-%02d-%03d", candidate.getDemand().getCxBatchNo(),

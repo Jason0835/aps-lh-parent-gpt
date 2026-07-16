@@ -14,6 +14,7 @@ public class Cd15ScheduleCandidate {
 
     private Cd15NaturalDemand demand;
     private Cd15ConstructionMaterial material;
+    private Cd15ShiftDescriptor shift;
     private int classIndex;
     private String cuttingAngle;
     private String steelStripCode;

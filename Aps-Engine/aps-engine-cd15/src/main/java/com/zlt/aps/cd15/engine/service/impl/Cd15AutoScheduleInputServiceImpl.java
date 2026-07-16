@@ -9,6 +9,8 @@ import com.zlt.aps.cd15.api.domain.entity.Cd15MachineRollMapping;
 import com.zlt.aps.cd15.api.domain.entity.Cd15SpecifyMachine;
 import com.zlt.aps.cd15.api.domain.entity.Cd15Stock;
 import com.zlt.aps.cd15.api.domain.entity.Cd15StorageLaneLimit;
+import com.zlt.aps.cd15.api.domain.entity.Cd15ShiftConfig;
+import com.zlt.aps.cd15.engine.algorithm.Cd15ShiftWindowResolver;
 import com.zlt.aps.cd15.engine.algorithm.Cd15SteelStripSourceTraceResolver;
 import com.zlt.aps.cd15.engine.mapper.Cd15EngineAngleWidthMappingMapper;
 import com.zlt.aps.cd15.engine.mapper.Cd15EngineConstructionMapper;
@@ -23,9 +25,11 @@ import com.zlt.aps.cd15.engine.mapper.Cd15EngineMonthSurplusMapper;
 import com.zlt.aps.cd15.engine.mapper.Cd15EngineSpecifyMachineMapper;
 import com.zlt.aps.cd15.engine.mapper.Cd15EngineStockMapper;
 import com.zlt.aps.cd15.engine.mapper.Cd15EngineStorageLaneMapper;
+import com.zlt.aps.cd15.engine.mapper.Cd15EngineShiftConfigMapper;
 import com.zlt.aps.cd15.engine.model.Cd15AutoScheduleInput;
 import com.zlt.aps.cd15.engine.model.Cd15ConstructionMaterial;
 import com.zlt.aps.cd15.engine.model.Cd15EmbryoPlanSurplus;
+import com.zlt.aps.cd15.engine.model.Cd15ShiftDescriptor;
 import com.zlt.aps.cd15.engine.model.Cd15SteelStripSourceTrace;
 import com.zlt.aps.cd15.engine.service.Cd15AutoScheduleInputService;
 import com.zlt.aps.common.core.constant.ApsConstant;
@@ -61,7 +65,7 @@ import java.util.stream.Stream;
 @RequiredArgsConstructor
 public class Cd15AutoScheduleInputServiceImpl implements Cd15AutoScheduleInputService {
 
-    private static final int CLASS_COUNT = 8;
+    private static final int ACTIVE = 1;
 
     private final Cd15EngineCxScheduleMapper cxScheduleMapper;
     private final Cd15EngineConstructionMapper constructionMapper;
@@ -76,7 +80,17 @@ public class Cd15AutoScheduleInputServiceImpl implements Cd15AutoScheduleInputSe
     private final Cd15EngineGdyyStockMapper gdyyStockMapper;
     private final Cd15EngineGdyyScheduleResultMapper gdyyScheduleResultMapper;
     private final Cd15EngineMonthSurplusMapper monthSurplusMapper;
+    private final Cd15EngineShiftConfigMapper shiftConfigMapper;
+    private final Cd15ShiftWindowResolver shiftWindowResolver;
     private final Cd15SteelStripSourceTraceResolver steelStripSourceTraceResolver;
+
+    @Override
+    public Cd15AutoScheduleInput load(String factoryCode, LocalDate scheduleDate, int agingPeriodHours) {
+        Assert.hasText(factoryCode, "工厂编码不能为空");
+        Assert.notNull(scheduleDate, "排程日期不能为空");
+        List<Cd15ShiftDescriptor> shifts = this.loadShifts(factoryCode, scheduleDate);
+        return this.load(factoryCode, scheduleDate, shifts.get(0), shifts, agingPeriodHours);
+    }
 
     @Override
     public Cd15AutoScheduleInput load(String factoryCode, LocalDate scheduleDate,
@@ -85,7 +99,25 @@ public class Cd15AutoScheduleInputServiceImpl implements Cd15AutoScheduleInputSe
         Assert.notNull(scheduleDate, "排程日期不能为空");
         Assert.hasText(classField, "班次字段不能为空");
         Assert.hasText(shiftCode, "班次编码不能为空");
+        List<Cd15ShiftDescriptor> shifts = this.loadShifts(factoryCode, scheduleDate);
+        Cd15ShiftDescriptor targetShift = shifts.stream()
+                .filter(shift -> shift.getClassField().equalsIgnoreCase(classField.trim()))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("未找到启用班次配置: " + classField));
+        if (!targetShift.getShiftCode().equals(shiftCode.trim())) {
+            throw new IllegalArgumentException("目标班次编码与当前配置不一致: " + classField);
+        }
+        return this.load(factoryCode, scheduleDate, targetShift, shifts, agingPeriodHours);
+    }
 
+    /** 加载除班次配置外的排程输入，并使用指定班次读取资源基线。 */
+    private Cd15AutoScheduleInput load(String factoryCode,
+                                       LocalDate scheduleDate,
+                                       Cd15ShiftDescriptor resourceBaseline,
+                                       List<Cd15ShiftDescriptor> shifts,
+                                       int agingPeriodHours) {
+        String classField = resourceBaseline.getClassField();
+        String shiftCode = resourceBaseline.getShiftCode();
         LocalDate formingStartDate = scheduleDate.minusDays(1);
         LocalDate formingEndDate = scheduleDate.plusDays(3);
         List<CxScheduleResult> formingSchedules = this.loadFormingSchedules(
@@ -95,8 +127,9 @@ public class Cd15AutoScheduleInputServiceImpl implements Cd15AutoScheduleInputSe
                 .filter(StringUtils::hasText)
                 .collect(Collectors.toSet());
         Set<String> constructionVersions = formingSchedules.stream()
-                .flatMap(schedule -> IntStream.rangeClosed(1, CLASS_COUNT)
-                        .mapToObj(classIndex -> this.readString(schedule, String.format("class%dRecipeNo", classIndex))))
+                .flatMap(schedule -> shifts.stream()
+                        .map(Cd15ShiftDescriptor::getClassIndex)
+                        .map(classIndex -> this.readString(schedule, String.format("class%dRecipeNo", classIndex))))
                 .filter(StringUtils::hasText)
                 .collect(Collectors.toSet());
         List<Cd15ConstructionMaterial> constructionMaterials = this.loadConstructionMaterials(
@@ -172,6 +205,7 @@ public class Cd15AutoScheduleInputServiceImpl implements Cd15AutoScheduleInputSe
 
         Cd15AutoScheduleInput input = Cd15AutoScheduleInput.builder()
                 .scheduleDate(Date.valueOf(scheduleDate))
+                .shifts(shifts)
                 .formingSchedules(formingSchedules)
                 .constructionMaterials(constructionMaterials)
                 .stocksAtSix(stocksAtSix)
@@ -192,6 +226,23 @@ public class Cd15AutoScheduleInputServiceImpl implements Cd15AutoScheduleInputSe
                 this.steelStripSourceTraceResolver.resolve(input, embryoPlanSurpluses);
         input.setSteelStripSourceTraceBySteelStrip(sourceTraceBySteelStrip);
         return input;
+    }
+
+    /** 加载并解析当前工厂的启用班次配置。 */
+    private List<Cd15ShiftDescriptor> loadShifts(String factoryCode, LocalDate scheduleDate) {
+        List<Cd15ShiftConfig> configs = this.shiftConfigMapper.selectList(
+                Wrappers.<Cd15ShiftConfig>lambdaQuery()
+                        .eq(Cd15ShiftConfig::getFactoryCode, factoryCode)
+                        .eq(Cd15ShiftConfig::getIsActive, ACTIVE)
+                        .orderByAsc(Cd15ShiftConfig::getScheduleDay)
+                        .orderByAsc(Cd15ShiftConfig::getDayShiftOrder)
+                        .orderByAsc(Cd15ShiftConfig::getShiftOrder)
+                        .orderByAsc(Cd15ShiftConfig::getClassField));
+        List<Cd15ShiftDescriptor> shifts = this.shiftWindowResolver.resolve(scheduleDate, configs);
+        if (shifts.isEmpty()) {
+            throw new IllegalArgumentException("当前工厂未维护启用的CD15班次配置");
+        }
+        return shifts;
     }
 
     /**

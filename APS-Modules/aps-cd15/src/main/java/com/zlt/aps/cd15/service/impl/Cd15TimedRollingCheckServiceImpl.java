@@ -6,10 +6,14 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.cd15.api.domain.entity.Cd15Params;
 import com.zlt.aps.cd15.api.domain.entity.Cd15ScheduleResult;
+import com.zlt.aps.cd15.api.domain.entity.Cd15ShiftConfig;
 import com.zlt.aps.cd15.api.domain.vo.Cd15RollingCheckRequest;
+import com.zlt.aps.cd15.engine.algorithm.Cd15ShiftWindowResolver;
 import com.zlt.aps.cd15.engine.constant.Cd15ScheduleTaskType;
 import com.zlt.aps.cd15.engine.domain.Cd15ScheduleTask;
+import com.zlt.aps.cd15.engine.mapper.Cd15EngineShiftConfigMapper;
 import com.zlt.aps.cd15.engine.model.Cd15RollingTarget;
+import com.zlt.aps.cd15.engine.model.Cd15ShiftDescriptor;
 import com.zlt.aps.cd15.engine.service.Cd15AutoScheduleInputVersionService;
 import com.zlt.aps.cd15.engine.service.Cd15ScheduleTaskService;
 import com.zlt.aps.cd15.mapper.Cd15ParamsMapper;
@@ -17,7 +21,6 @@ import com.zlt.aps.cd15.mapper.Cd15ScheduleResultMapper;
 import com.zlt.aps.cd15.service.Cd15RollingStabilityService;
 import com.zlt.aps.cd15.service.Cd15TimedRollingAsyncExecutor;
 import com.zlt.aps.cd15.service.Cd15TimedRollingCheckService;
-import com.zlt.aps.common.core.enums.ThreeShiftEnum;
 import lombok.Builder;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
@@ -53,13 +56,7 @@ public class Cd15TimedRollingCheckServiceImpl implements Cd15TimedRollingCheckSe
     private static final int DEFAULT_EARLY_MINUTES = 30;
     private static final int DEFAULT_LATE_MINUTES = 15;
     private static final int DEFAULT_STABLE_MINUTES = 5;
-    private static final List<ShiftPoint> SHIFT_POINTS = Arrays.asList(
-            new ShiftPoint(ThreeShiftEnum.MIDDLE, "CLASS1", -1),
-            new ShiftPoint(ThreeShiftEnum.NIGHT, "CLASS2", -1),
-            new ShiftPoint(ThreeShiftEnum.MORNING, "CLASS3", 0),
-            new ShiftPoint(ThreeShiftEnum.MIDDLE, "CLASS4", 0),
-            new ShiftPoint(ThreeShiftEnum.NIGHT, "CLASS5", 0),
-            new ShiftPoint(ThreeShiftEnum.MORNING, "CLASS6", 1));
+    private static final int ACTIVE = 1;
 
     private final Cd15ParamsMapper paramsMapper;
     private final Cd15ScheduleResultMapper resultMapper;
@@ -67,6 +64,8 @@ public class Cd15TimedRollingCheckServiceImpl implements Cd15TimedRollingCheckSe
     private final Cd15RollingStabilityService rollingStabilityService;
     private final Cd15ScheduleTaskService taskService;
     private final Cd15TimedRollingAsyncExecutor timedRollingAsyncExecutor;
+    private final Cd15EngineShiftConfigMapper shiftConfigMapper;
+    private final Cd15ShiftWindowResolver shiftWindowResolver;
     private final ObjectMapper objectMapper;
 
     @Override
@@ -166,6 +165,13 @@ public class Cd15TimedRollingCheckServiceImpl implements Cd15TimedRollingCheckSe
     private Optional<Cd15RollingTarget> resolveTarget(String factoryCode, LocalDateTime triggerTime,
                                                   RollingParameters parameters) {
         LocalDate triggerDate = triggerTime.toLocalDate();
+        List<Cd15ShiftConfig> shifts = this.shiftConfigMapper.selectList(
+                new LambdaQueryWrapper<Cd15ShiftConfig>()
+                        .eq(Cd15ShiftConfig::getFactoryCode, factoryCode)
+                        .eq(Cd15ShiftConfig::getIsActive, ACTIVE));
+        if (shifts.isEmpty()) {
+            return Optional.empty();
+        }
         List<Cd15ScheduleResult> results = resultMapper.selectList(
                 new LambdaQueryWrapper<Cd15ScheduleResult>()
                         .select(Cd15ScheduleResult::getScheduleDate,
@@ -181,7 +187,7 @@ public class Cd15TimedRollingCheckServiceImpl implements Cd15TimedRollingCheckSe
                 .collect(Collectors.toMap(this::batchKey, Function.identity(),
                         (first, second) -> first, LinkedHashMap::new));
         return batches.values().stream()
-                .flatMap(batch -> this.targets(factoryCode, batch, parameters).stream())
+                .flatMap(batch -> this.targets(factoryCode, batch, shifts, parameters).stream())
                 .filter(target -> !triggerTime.isBefore(target.getWindowStart())
                         && !triggerTime.isAfter(target.getWindowEnd()))
                 .sorted(Comparator
@@ -191,25 +197,30 @@ public class Cd15TimedRollingCheckServiceImpl implements Cd15TimedRollingCheckSe
                 .findFirst();
     }
 
-    private List<Cd15RollingTarget> targets(String factoryCode, Cd15ScheduleResult batch,
-                                        RollingParameters parameters) {
+    private List<Cd15RollingTarget> targets(String factoryCode,
+                                                Cd15ScheduleResult batch,
+                                                List<Cd15ShiftConfig> shifts,
+                                                RollingParameters parameters) {
         LocalDate scheduleDate = this.localDate(batch.getScheduleDate());
-        return SHIFT_POINTS.stream()
-                .map(shift -> this.target(factoryCode, scheduleDate, batch.getCd15BatchNo(), shift, parameters))
+        return this.shiftWindowResolver.resolve(scheduleDate, shifts).stream()
+                .map(shift -> this.target(factoryCode, scheduleDate,
+                        batch.getCd15BatchNo(), shift, parameters))
                 .collect(Collectors.toList());
     }
 
-    private Cd15RollingTarget target(String factoryCode, LocalDate scheduleDate, String batchNo,
-                                 ShiftPoint shift, RollingParameters parameters) {
-        LocalDateTime handoverTime = LocalDateTime.of(
-                scheduleDate.plusDays(shift.getStartDateOffset()), shift.getShift().getStartTime());
+    private Cd15RollingTarget target(String factoryCode,
+                                     LocalDate scheduleDate,
+                                     String batchNo,
+                                     Cd15ShiftDescriptor shift,
+                                     RollingParameters parameters) {
+        LocalDateTime handoverTime = shift.getStartTime();
         return Cd15RollingTarget.builder()
                 .factoryCode(factoryCode)
                 .scheduleDate(scheduleDate)
                 .batchNo(batchNo)
-                .targetShiftCode(shift.getShift().getCode())
+                .targetShiftCode(shift.getShiftCode())
                 .targetClassField(shift.getClassField())
-                .targetClassIndex(this.classIndex(shift.getClassField()))
+                .targetClassIndex(shift.getClassIndex())
                 .handoverTime(handoverTime)
                 .windowStart(handoverTime.minusMinutes(parameters.getEarlyMinutes()))
                 .windowEnd(handoverTime.plusMinutes(parameters.getLateMinutes()))
@@ -240,17 +251,6 @@ public class Cd15TimedRollingCheckServiceImpl implements Cd15TimedRollingCheckSe
             return Math.max(0, Integer.parseInt(parameter.getParamValue().trim()));
         } catch (NumberFormatException exception) {
             return defaultValue;
-        }
-    }
-
-    private int classIndex(String classField) {
-        if (!StringUtils.hasText(classField)) {
-            return 0;
-        }
-        try {
-            return Integer.parseInt(classField.trim().toUpperCase().replace("CLASS", ""));
-        } catch (NumberFormatException exception) {
-            return 0;
         }
     }
 
@@ -285,30 +285,6 @@ public class Cd15TimedRollingCheckServiceImpl implements Cd15TimedRollingCheckSe
             return ((Date) value).toLocalDate();
         }
         return value.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
-    }
-
-    private static class ShiftPoint {
-        private final ThreeShiftEnum shift;
-        private final String classField;
-        private final int startDateOffset;
-
-        ShiftPoint(ThreeShiftEnum shift, String classField, int startDateOffset) {
-            this.shift = shift;
-            this.classField = classField;
-            this.startDateOffset = startDateOffset;
-        }
-
-        ThreeShiftEnum getShift() {
-            return shift;
-        }
-
-        String getClassField() {
-            return classField;
-        }
-
-        int getStartDateOffset() {
-            return startDateOffset;
-        }
     }
 
     @Data
