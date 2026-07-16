@@ -8,13 +8,13 @@ import com.zlt.aps.cd15.engine.model.Cd15AutoScheduleInput;
 import com.zlt.aps.cd15.engine.model.Cd15ScheduleCandidate;
 import com.zlt.aps.cd15.engine.model.Cd15SplitCutGroup;
 import com.zlt.aps.common.core.constant.ApsConstant;
+import com.zlt.aps.common.core.enums.ThreeShiftEnum;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
 import java.time.ZoneId;
 import java.sql.Timestamp;
 import java.util.Arrays;
@@ -243,34 +243,30 @@ public class Cd15MachineCandidateResolver {
     }
 
     private String classIndexToShiftCode(int classIndex) {
-        int normalized = ((Math.max(classIndex, 1) - 1) % 3) + 1;
-        return String.format("%02d", normalized);
+        return Cd15ShiftDisplayHelper.classIndexToShiftCode(classIndex);
     }
 
     private LocalDateTime shiftStart(LocalDate shiftDate, String shiftCode) {
         if (shiftDate == null) {
             return null;
         }
-        if ("02".equals(shiftCode)) {
-            return LocalDateTime.of(shiftDate, LocalTime.of(22, 0));
+        ThreeShiftEnum shift = ThreeShiftEnum.getByCode(shiftCode);
+        if (shift == null) {
+            return null;
         }
-        if ("03".equals(shiftCode)) {
-            return LocalDateTime.of(shiftDate, LocalTime.of(6, 0));
-        }
-        return LocalDateTime.of(shiftDate, LocalTime.of(14, 0));
+        LocalDate startDate = shift.isCrossDay() ? shiftDate.minusDays(1) : shiftDate;
+        return LocalDateTime.of(startDate, shift.getStartTime());
     }
 
     private LocalDateTime shiftEnd(LocalDate shiftDate, String shiftCode) {
         if (shiftDate == null) {
             return null;
         }
-        if ("02".equals(shiftCode)) {
-            return LocalDateTime.of(shiftDate.plusDays(1), LocalTime.of(6, 0));
+        ThreeShiftEnum shift = ThreeShiftEnum.getByCode(shiftCode);
+        if (shift == null) {
+            return null;
         }
-        if ("03".equals(shiftCode)) {
-            return LocalDateTime.of(shiftDate, LocalTime.of(14, 0));
-        }
-        return LocalDateTime.of(shiftDate, LocalTime.of(22, 0));
+        return LocalDateTime.of(shiftDate, shift.getEndTime());
     }
 
     private boolean openShiftMatched(String openMachineClass, String shiftCode) {

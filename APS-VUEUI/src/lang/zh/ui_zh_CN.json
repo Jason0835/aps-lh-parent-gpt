@@ -4022,5 +4022,21 @@
   "ui.data.column.lhSkuDecrement.embryoDesc": "胎胚描述",
   "ui.data.column.lhSkuDecrement.productStatus": "产品状态",
   "ui.data.btn.lhSkuDecrement.confirm": "确认减量",
-  "ui.data.alert.lhSkuDecrement.confirmMessage": "是否确认生成SKU减量记录？"
+  "ui.data.alert.lhSkuDecrement.confirmMessage": "是否确认生成SKU减量记录？",
+  "ui.data.column.cd15ShiftConfig.modelName": "CD15班次配置",
+  "ui.data.column.cd15ShiftConfig.factoryCode": "工厂",
+  "ui.data.column.cd15ShiftConfig.shiftCode": "班次编码",
+  "ui.data.column.cd15ShiftConfig.shiftName": "班次名称",
+  "ui.data.column.cd15ShiftConfig.shiftOrder": "班次序号",
+  "ui.data.column.cd15ShiftConfig.startTime": "开始时间",
+  "ui.data.column.cd15ShiftConfig.endTime": "结束时间",
+  "ui.data.column.cd15ShiftConfig.shiftHours": "班次时长",
+  "ui.data.column.cd15ShiftConfig.isCrossDay": "是否跨天",
+  "ui.data.column.cd15ShiftConfig.scheduleDay": "排程天数",
+  "ui.data.column.cd15ShiftConfig.dayShiftOrder": "当天班次序号",
+  "ui.data.column.cd15ShiftConfig.classField": "对应结果表字段",
+  "ui.data.column.cd15ShiftConfig.isActive": "启用状态",
+  "ui.data.column.cd15ShiftConfig.remark": "备注",
+  "ui.data.column.cd15ShiftConfig.checkUnique": "同工厂下班次编码已存在",
+  "ui.data.alert.cd15ShiftConfig.shiftHoursPositive": "班次时长必须大于0"
 }

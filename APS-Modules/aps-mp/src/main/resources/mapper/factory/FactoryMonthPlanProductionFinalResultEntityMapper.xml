@@ -201,7 +201,7 @@
             f5.FACTORY_CODE,
             f5.MATERIAL_CODE,
             f5.PRODUCT_STATUS,
-            f5.MONTH_PLAN_VERSION AS CURRENT_VERSION,
+            pv7.MONTH_PLAN_VERSION AS CURRENT_VERSION,
             (
             -- 计划量：从库存抓取日日号到月底累加 DAY_x
             -- 库存抓取日由 Java 层根据 LAST_MONTH_PLAN_VERSION(ADJ前缀解析) 或余量表回退计算后传入
@@ -246,6 +246,17 @@
                 AND pv.MONTH = f5.MONTH
                 AND pv.IS_FINAL = '1'
                 AND pv.IS_DELETE = 0
+            -- 关联当月定稿版本表(IS_FINAL='1')，取当月版本号用于外层 f 表关联
+            -- 一个分厂当月可能有多个定稿版本，取任意一条用于关联，避免笛卡尔积
+            INNER JOIN (
+                SELECT FACTORY_CODE, ANY_VALUE(MONTH_PLAN_VERSION) AS MONTH_PLAN_VERSION
+                FROM T_MP_PROC_VERSION
+                WHERE IS_DELETE = 0
+                  AND IS_FINAL = '1'
+                  AND YEAR = #{currentYear}
+                  AND MONTH = #{currentMonth}
+                GROUP BY FACTORY_CODE
+            ) pv7 ON pv7.FACTORY_CODE = f5.FACTORY_CODE
             -- Java 层计算好的库存抓取日映射，替代原 surplus 关联
             LEFT JOIN (
                 <foreach collection="stockCaptureDateList" item="item" separator="UNION ALL">
@@ -277,7 +288,7 @@
             WHERE f5.IS_DELETE = 0
             AND f5.YEAR = #{lastYear}
             AND f5.MONTH = #{lastMonth}
-            GROUP BY f5.FACTORY_CODE, f5.MATERIAL_CODE, f5.PRODUCT_STATUS, f5.MONTH_PLAN_VERSION,
+            GROUP BY f5.FACTORY_CODE, f5.MATERIAL_CODE, f5.PRODUCT_STATUS, pv7.MONTH_PLAN_VERSION,
             stockMap.STOCK_CAPTURE_DATE,
             f5.DAY_1, f5.DAY_2, f5.DAY_3, f5.DAY_4, f5.DAY_5, f5.DAY_6, f5.DAY_7, f5.DAY_8,
             f5.DAY_9, f5.DAY_10, f5.DAY_11, f5.DAY_12, f5.DAY_13, f5.DAY_14, f5.DAY_15, f5.DAY_16,

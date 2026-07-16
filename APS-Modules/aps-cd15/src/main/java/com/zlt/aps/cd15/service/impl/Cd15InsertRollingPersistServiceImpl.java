@@ -11,6 +11,7 @@ import com.zlt.aps.cd15.api.domain.entity.Cd15ScheduleResultLog;
 import com.zlt.aps.cd15.api.domain.vo.Cd15ChangeQtyRequest;
 import com.zlt.aps.cd15.api.domain.vo.Cd15InsertOrderRequest;
 import com.zlt.aps.cd15.api.domain.vo.Cd15TransferMachineRequest;
+import com.zlt.aps.cd15.engine.algorithm.Cd15ShiftDisplayHelper;
 import com.zlt.aps.cd15.engine.constant.Cd15ScheduleTaskStatus;
 import com.zlt.aps.cd15.engine.domain.Cd15ScheduleTask;
 import com.zlt.aps.cd15.engine.model.Cd15RollingPrefixResourceUsage;
@@ -371,8 +372,7 @@ public class Cd15InsertRollingPersistServiceImpl implements Cd15InsertRollingPer
     }
 
     private String classIndexToShiftCode(int classIndex) {
-        int normalized = ((Math.max(classIndex, 1) - 1) % 3) + 1;
-        return String.format("%02d", normalized);
+        return Cd15ShiftDisplayHelper.classIndexToShiftCode(classIndex);
     }
 
     private int resolveAgingPeriodHours(String factoryCode) {

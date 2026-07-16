@@ -79,6 +79,9 @@ public class DjScheduleContext {
     /** 班次索引→classIndex 映射数组（长度6），根据排程首班班次参数动态构建 */
     private String[] shiftClassMap;
 
+    /** 成型班次偏移量 = Integer.parseInt(shiftClassMap[0]) - 1，用于将垫胶班次索引映射到成型班次索引 */
+    private Integer formingShiftOffset;
+
     /** 成型计划列表 */
     private List<CxScheduleResult> cxScheduleList;
 
