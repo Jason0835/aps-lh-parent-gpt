@@ -18,10 +18,7 @@ public class NcPaddingDemand {
     /** 内衬物料名 */
     private String liningName;
 
-    /** 净需求量（总需求 - 有效库存），单位：米 */
-    private BigDecimal netDemand;
-
-    /** 剩余待排产量，初始 = netDemand */
+    /** 剩余待排产量（每班由 checkDemandForShift 动态计算），单位：米 */
     private BigDecimal remainingDemand;
 
     /** 本班接班库存（米） */
@@ -47,9 +44,6 @@ public class NcPaddingDemand {
 
     /** 胶料代码 */
     private String glueCode;
-
-    /** 口型板编码 */
-    private String mouthPlateCode;
 
     /** 胶料序号（从 DjGlueOrder 获取） */
     private Integer glueSeq;

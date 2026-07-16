@@ -55,11 +55,7 @@ public class DjDepthConfigController extends AbstractDocBizController<DjDepthCon
     @ApiOperation("保存信息（id为空新增，id不为空修改）")
     @PostMapping("/save")
     public AjaxResult save(@RequestBody DjDepthConfig entity) {
-        // 校验业务唯一约束（同一工厂下同台数同范围条件只能有一条）
-        if (UserConstants.NOT_UNIQUE.equals(depthConfigService.checkUnique(entity))) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.djMachine.embryoCodeNotUnique"));
-        }
-        // 校验范围交叉（新增/修改的规则不能与现有规则有交集）
+        // 校验区间连续性（新增/修改不能破坏区间连续性）
         if (UserConstants.NOT_UNIQUE.equals(depthConfigService.checkRangeCross(entity))) {
             return AjaxResult.error(I18nUtil.getMessage("ui.dj.depthConfig.rangeCross"));
         }
@@ -67,16 +63,7 @@ public class DjDepthConfigController extends AbstractDocBizController<DjDepthCon
     }
 
     /**
-     * 校验唯一性
-     */
-    @ApiOperation("校验唯一性")
-    @PostMapping("/checkUnique")
-    public String checkUnique(@RequestBody DjDepthConfig entity) {
-        return depthConfigService.checkUnique(entity);
-    }
-
-    /**
-     * 校验范围交叉
+     * 校验区间连续性
      */
     @ApiOperation("校验范围交叉")
     @PostMapping("/checkRangeCross")
@@ -106,6 +93,6 @@ public class DjDepthConfigController extends AbstractDocBizController<DjDepthCon
 
     @Override
     protected String getOrderBy() {
-        return "MACHINE_QTY";
+        return "MIN_MACHINE_QTY";
     }
 }

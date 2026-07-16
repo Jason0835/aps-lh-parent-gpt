@@ -72,7 +72,7 @@ export default {
     infoDialog,
     TltUploadForm,
   },
-  dicts: ["biz_factory_name", "machine_range"],
+  dicts: ["biz_factory_name"],
   provide() {
     return {
       parentDict: this.dict,
@@ -108,8 +108,8 @@ export default {
           filterable: true,
         },
         {
-          label: this.$t("ui.dj.depthConfig.column.machineQty"),
-          prop: "machineQty",
+          label: this.$t("ui.dj.depthConfig.column.minMachineQty"),
+          prop: "minMachineQty",
           type: "input",
         },
       ];
@@ -118,15 +118,15 @@ export default {
       let columns = [
         { type: "selection", fixed: "left" },
         {
-          prop: "machineRange",
+          prop: "minMachineQty",
           halign: "center",
-          label: this.$t("ui.dj.depthConfig.column.machineRange"),
-          formatter: (row, column, value) => this.selectDictLabel(this.dict.type.machine_range, value),
+          label: this.$t("ui.dj.depthConfig.column.minMachineQty"),
         },
         {
-          prop: "machineQty",
+          prop: "maxMachineQty",
           halign: "center",
-          label: this.$t("ui.dj.depthConfig.column.machineQty"),
+          label: this.$t("ui.dj.depthConfig.column.maxMachineQty"),
+          formatter: (row, column, value) => value !== null && value !== undefined ? value : '∞',
         },
         {
           prop: "depthClassQty",

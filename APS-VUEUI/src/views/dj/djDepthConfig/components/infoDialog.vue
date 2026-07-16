@@ -34,7 +34,6 @@ import { saveDepthConfig } from "@/api/dj/depthConfig";
 
 export default {
   components: { infoForm },
-  dicts: ["machine_range"],
   data() {
     return {
       loading: false,
@@ -49,7 +48,7 @@ export default {
             trigger: "blur",
           },
         ],
-        machineQty: [
+        minMachineQty: [
           {
             required: true,
             message: this.$t("common.rule.input"),
@@ -66,11 +65,16 @@ export default {
             trigger: 'blur',
           },
         ],
-        machineRange: [
+        maxMachineQty: [
           {
-            required: true,
-            message: this.$t("common.rule.select"),
-            trigger: "change",
+            validator: (rule, value, callback) => {
+              if (value !== '' && value !== null && value !== undefined && Number(value) <= 0) {
+                callback(new Error('数值必须大于0'));
+              } else {
+                callback();
+              }
+            },
+            trigger: 'blur',
           },
         ],
         depthClassQty: [
@@ -95,7 +99,6 @@ export default {
   },
   computed: {
     columns() {
-      const machineRangeDict = this.dict?.type?.machine_range || [];
       return [
         {
           label: this.$t("ui.data.column.factoryCode"),
@@ -108,20 +111,20 @@ export default {
           hidden: true,
         },
         {
-          label: this.$t("ui.dj.depthConfig.column.machineRange"),
-          prop: "machineRange",
-          span: 12,
-          type: "select",
-          dictData: machineRangeDict,
-          required: true,
-        },
-        {
-          label: this.$t("ui.dj.depthConfig.column.machineQty"),
-          prop: "machineQty",
+          label: this.$t("ui.dj.depthConfig.column.minMachineQty"),
+          prop: "minMachineQty",
           span: 12,
           type: "number",
           min: 1,
           required: true,
+        },
+        {
+          label: this.$t("ui.dj.depthConfig.column.maxMachineQty"),
+          prop: "maxMachineQty",
+          span: 12,
+          type: "number",
+          min: 1,
+          tips: '为空表示无上限（仅末行允许）',
         },
         {
           label: this.$t("ui.dj.depthConfig.column.depthClassQty"),
@@ -175,7 +178,6 @@ export default {
         this.isEdit = false;
         this.form = {
           factoryCode: defaultFactoryCode || '',
-          machineRange: 'EQ',
         };
       }
     },
