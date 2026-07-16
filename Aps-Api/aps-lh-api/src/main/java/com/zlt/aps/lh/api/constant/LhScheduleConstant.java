@@ -299,6 +299,11 @@ public final class LhScheduleConstant {
     /** 小批量验证SKU默认阈值 */
     public static final int SMALL_BATCH_SKU_THRESHOLD = 100;
 
+    // ======================== 量试充抵正规 ========================
+
+    /** 量试充抵正规开关默认值（0-关闭，1-开启）；默认开启，与存量行为一致 */
+    public static final String ENABLE_MASS_TRIAL_TO_FORMAL = "1";
+
     // ======================== 模具交替计划天数 ========================
 
     /** 模具交替计划天数 */

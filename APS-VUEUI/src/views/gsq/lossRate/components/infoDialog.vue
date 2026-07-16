@@ -29,7 +29,7 @@
 
 <script>
 import infoForm from "@/views/components/infoForm.vue";
-import { saveLossRate } from "@/api/gsq/lossRate";
+import { addLossRate, editLossRate } from "@/api/gsq/lossRate";
 import { listEnabledMachines } from "@/api/gsq/machine";
 
 export default {
@@ -150,7 +150,9 @@ export default {
     async save(params) {
       try {
         this.loading = true;
-        const res = await saveLossRate(params);
+        const res = this.isEdit
+          ? await editLossRate(params)
+          : await addLossRate(params);
         this.$modal.msgSuccess(res.msg);
         this.$emit("success");
         this.hide();

@@ -16,27 +16,27 @@ import java.util.Date;
  * @date 2026-07-08
  */
 @Data
-public class GsqSteelRingStockExportVO extends BaseEntity implements Serializable {
+public class GsqStockExportVO extends BaseEntity implements Serializable {
     private static final long serialVersionUID = 1L;
 
     /** 库存日期 */
-    @Excel(name = "ui.data.column.gsq.steelRingStock.stockDate", width = 30, dateFormat = "yyyy-MM-dd")
+    @Excel(name = "ui.data.column.gsq.stock.stockDate", width = 30, dateFormat = "yyyy-MM-dd")
     private Date stockDate;
 
     /** 钢丝圈代码 */
-    @Excel(name = "ui.data.column.gsq.steelRingStock.steelRingCode")
+    @Excel(name = "ui.data.column.gsq.stock.steelRingCode")
     private String steelRingCode;
 
     /** 库存量(米) */
-    @Excel(name = "ui.data.column.gsq.steelRingStock.stockNum", scale = 1)
+    @Excel(name = "ui.data.column.gsq.stock.stockNum", scale = 1)
     private BigDecimal stockNum;
 
     /** 修正数量(米) */
-    @Excel(name = "ui.data.column.gsq.steelRingStock.modifyNum", scale = 1)
+    @Excel(name = "ui.data.column.gsq.stock.modifyNum", scale = 1)
     private BigDecimal modifyNum;
 
     /** 不良数量(米) */
-    @Excel(name = "ui.data.column.gsq.steelRingStock.badNum", scale = 1)
+    @Excel(name = "ui.data.column.gsq.stock.badNum", scale = 1)
     private BigDecimal badNum;
 
     /** 备注 */
@@ -44,6 +44,6 @@ public class GsqSteelRingStockExportVO extends BaseEntity implements Serializabl
     private String remark;
 
     /** 更新时间 */
-    @Excel(name = "ui.data.column.gsq.steelRingStock.updateDate", width = 30, dateFormat = "yyyy-MM-dd HH:mm:ss")
+    @Excel(name = "ui.data.column.gsq.stock.updateDate", width = 30, dateFormat = "yyyy-MM-dd HH:mm:ss")
     private Date updateTime;
 }

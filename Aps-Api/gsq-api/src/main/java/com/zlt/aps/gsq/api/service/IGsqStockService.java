@@ -1,88 +1,104 @@
 package com.zlt.aps.gsq.api.service;
 
+import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.constant.ServiceNameConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.zlt.aps.gsq.api.domain.entity.GsqStock;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.cloud.openfeign.FeignClient;
-import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
 /**
- * 钢丝圈库存信息对外暴露接口
+ * 钢丝圈库存管理对外暴露接口
+ *
+ * @author zlt
+ * @date 2026-07-08
  */
 @FeignClient(contextId = "iGsqStockService", value = ServiceNameConstants.GATEWAY_SERVICE, path = "${api.path.gsq:gsq}")
 public interface IGsqStockService {
 
     /**
-     * 获取钢丝圈库存信息列表
+     * 查询钢丝圈库存列表
      *
-     * @param stock
-     * @return
+     * @param entity 查询条件
+     * @return 列表数据
      */
     @PostMapping("/gsq/stock/list")
-    TableDataInfo list(@RequestBody GsqStock stock);
+    @ApiOperation("查询钢丝圈库存列表")
+    TableDataInfo list(@RequestBody GsqStock entity);
 
     /**
-     * 删除钢丝圈库存信息
+     * 获取钢丝圈库存详细信息
      *
-     * @param ids
-     * @return
+     * @param id 主键ID
+     * @return 详细信息
      */
-    @DeleteMapping("/gsq/stock/{ids}")
-    AjaxResult remove(@PathVariable("ids") Long[] ids);
+    @GetMapping(value = "/gsq/stock/getInfo/{id}")
+    @ApiOperation("获取钢丝圈库存详细信息")
+    GsqStock getInfo(@PathVariable("id") Long id);
 
     /**
-     * 新增钢丝圈库存信息
+     * 新增钢丝圈库存
      *
-     * @param stock
-     * @return
+     * @param entity 实体
+     * @return 操作结果
      */
-    @PostMapping("/gsq/stock")
-    AjaxResult add(@Validated @RequestBody GsqStock stock);
-
+    @PostMapping("/gsq/stock/add")
+    @ApiOperation("新增钢丝圈库存")
+    AjaxResult add(@RequestBody GsqStock entity);
 
     /**
-     * 根据ID获取详细信息
+     * 编辑钢丝圈库存
      *
-     * @param id
-     * @return
+     * @param entity 实体
+     * @return 操作结果
      */
-    @GetMapping(value = "/gsq/stock/selectStockById/{id}")
-    GsqStock selectStockById(@PathVariable("id") Long id);
+    @PostMapping("/gsq/stock/edit")
+    @ApiOperation("编辑钢丝圈库存")
+    AjaxResult edit(@RequestBody GsqStock entity);
 
     /**
-     * 根据ID获取详细信息
+     * 删除钢丝圈库存
      *
-     * @param id
-     * @return
+     * @param ids 主键ID集合
+     * @return 操作结果
      */
-    @GetMapping(value = "/gsq/stock/{id}")
-    AjaxResult getInfo(@PathVariable("id") Long id);
+    @PostMapping("/gsq/stock/remove")
+    @ApiOperation("删除钢丝圈库存")
+    AjaxResult removeByIds(@RequestBody List<Long> ids);
 
     /**
-     * 修改钢丝圈库存信息
+     * 导出钢丝圈库存
      *
-     * @param stock
-     * @return
+     * @param entity   查询条件
+     * @param fileName 文件名
+     * @return 文件字节
      */
-    @PutMapping("/gsq/stock")
-    AjaxResult edit(@Validated @RequestBody GsqStock stock);
+    @PostMapping("/gsq/stock/exportData/{fileName}")
+    @ApiOperation("导出钢丝圈库存")
+    byte[] exportData(@RequestBody GsqStock entity, @PathVariable("fileName") String fileName);
 
     /**
-     * 导出钢丝圈库存信息
+     * 导入钢丝圈库存
      *
-     * @param stock
-     * @return
+     * @param importContext 导入上下文
+     * @param updateSupport 已存在是否更新
+     * @return 操作结果
      */
-    @PostMapping("/gsq/stock/exportList")
-    List<GsqStock> exportList(@RequestBody GsqStock stock);
-
     @PostMapping("/gsq/stock/importData")
-    @ApiOperation("导入钢丝圈库存信息")
-    public AjaxResult importData(@RequestBody List<GsqStock> list, @RequestParam("updateSupport") boolean updateSupport, @RequestParam("importLogId") Long importLogId);
+    @ApiOperation("导入钢丝圈库存")
+    AjaxResult importData(@RequestBody ImportContext importContext, @RequestParam("updateSupport") boolean updateSupport);
 
+    /**
+     * 校验钢丝圈库存唯一性
+     *
+     * @param entity 实体
+     * @return 唯一性结果
+     */
+    @PostMapping("/gsq/stock/checkUnique")
+    @ApiOperation("校验钢丝圈库存唯一性")
+    String checkUnique(@RequestBody GsqStock entity);
 }

@@ -1,444 +1,314 @@
 package com.zlt.aps.gsq.controller;
 
-import java.util.Arrays;
-import java.util.Date;
-import java.util.List;
-import java.util.stream.Collectors;
-
-import javax.annotation.Resource;
-
-import org.apache.commons.collections4.CollectionUtils;
-import org.apache.commons.lang3.ObjectUtils;
-import org.apache.commons.lang3.time.DateFormatUtils;
-import org.springframework.beans.BeanUtils;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
-
-import com.github.pagehelper.util.StringUtil;
+import cn.hutool.core.date.DateUtil;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.core.utils.DateUtils;
-import com.ruoyi.common.core.web.controller.BaseController;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
-import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
-import com.ruoyi.common.utils.StringUtils;
-import com.zlt.aps.common.core.constant.ApsConstant;
-import com.zlt.aps.common.engine.service.FactoryService;
-import com.zlt.aps.gsq.api.domain.dto.GsqScheduleResultDto;
-import com.zlt.aps.gsq.api.domain.entity.GsqDayFinishQty;
+import com.zlt.aps.gsq.api.domain.dto.GsqChangeMachineDTO;
+import com.zlt.aps.gsq.api.domain.dto.GsqInsertOrderDTO;
+import com.zlt.aps.gsq.api.domain.entity.GsqScheduleResult;
+import com.zlt.aps.gsq.api.domain.vo.GsqScheduleShiftDateVO;
 import com.zlt.aps.gsq.engine.service.GsqEngineService;
-import com.zlt.aps.gsq.entity.GsqScheduleResult;
-import com.zlt.aps.gsq.service.GsqScheduleResultService;
-import com.zlt.aps.itf.vo.SyncDataLogs;
-import com.zlt.sync.api.service.ISyncDataLogsApiService;
-
+import com.zlt.aps.gsq.mapper.GsqScheduleResultMapper;
+import com.zlt.aps.gsq.service.IGsqScheduleResultService;
+import com.zlt.bill.common.controller.AbstractDocBizController;
+import com.zlt.bill.common.service.IDocService;
+import com.zlt.common.utils.PubUtil;
 import io.swagger.annotations.Api;
-import io.swagger.annotations.ApiImplicitParam;
-import io.swagger.annotations.ApiImplicitParams;
 import io.swagger.annotations.ApiOperation;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.*;
+
+import javax.annotation.Resource;
+import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
 
 /**
  * 钢丝圈排程结果Controller
  *
- * @author chen
- * @date 2021-06-21
+ * <p>6班次制：1班=D日中班，2班=D+1日夜班，3班=D+1日早班，4班=D+1日中班，5班=D+2日夜班，6班=D+2日早班
+ * 其中 D+1 = 排程日期（SCHEDULE_DATE）
+ *
+ * @author APS
  */
+@Slf4j
+@Api(tags = "钢丝圈排程结果")
 @RestController
-@RequestMapping("/gsq/scheduleResult")
-@Api(tags = "钢丝圈排程结果信息维护接口")
-public class GsqScheduleResultController extends BaseController {
+@RequestMapping("/scheduleResult")
+public class GsqScheduleResultController extends AbstractDocBizController<GsqScheduleResult> {
+
     @Autowired
-    private GsqScheduleResultService gsqScheduleResultService;
+    private IGsqScheduleResultService gsqScheduleResultService;
+
     @Resource
-    private GsqEngineService gsqEngineService;
+    private GsqScheduleResultMapper gsqScheduleResultMapper;
+
     @Autowired
-    private FactoryService factoryService;
-	@Resource
-	private ISyncDataLogsApiService syncDataLogsService;
+    private GsqEngineService gsqEngineService;
 
     /**
      * 查询钢丝圈排程结果列表
      */
     @ApiOperation("查询钢丝圈排程结果列表")
     @PostMapping("/list")
-    public TableDataInfo list(@RequestBody GsqScheduleResultDto dto) {
-//        startPage("a.STEEL_TYPE");
-        GsqScheduleResult scheduleResult = new GsqScheduleResult();
-        BeanUtils.copyProperties(dto, scheduleResult);
-        scheduleResult.setOrderStr(orderStr());  //拿到前端传的排序字段+排序方式
-        List<GsqScheduleResultDto> list = gsqScheduleResultService.selectScheduleResultList(scheduleResult);
+    @Override
+    public TableDataInfo list(@RequestBody GsqScheduleResult queryVO) {
+        startPage();
+        LambdaQueryWrapper<GsqScheduleResult> wrapper = buildQueryWrapper(queryVO);
+        List<GsqScheduleResult> list = gsqScheduleResultMapper.selectList(wrapper);
         return getDataTable(list);
     }
 
     /**
-     * 获取钢丝圈排程结果详细信息
+     * 保存（新增/修改）
      */
-    @ApiOperation("获取钢丝圈排程结果详细信息")
-    @GetMapping(value = "/{id}")
-    @ApiImplicitParams({
-            @ApiImplicitParam(name = "id", dataType = "int", value = "主键id", paramType = "query")
-    })
-    public GsqScheduleResultDto getInfo(@PathVariable("id") Long id) {
-        return gsqScheduleResultService.selectScheduleResultById(id);
-    }
-
-
-    @PostMapping(value = "/getInfos")
-    public List<GsqScheduleResultDto> getInfos(@RequestBody GsqScheduleResultDto scheduleResult) {
-        return gsqScheduleResultService.selectByIds(scheduleResult.getIds2());
+    @Log(title = "钢丝圈排程结果", businessType = BusinessType.INSERT_OR_UPDATE)
+    @ApiOperation("保存")
+    @PostMapping("/save")
+    @Override
+    public AjaxResult save(@RequestBody GsqScheduleResult billVO) {
+        return super.save(billVO);
     }
 
     /**
-     * 修改钢丝圈排程结果
+     * 删除
      */
-    @Log(title = "ui.data.column.gsq.scheduleResult.modelName", businessType = BusinessType.UPDATE)
-    @PostMapping("/edit")
-    @ApiOperation("修改钢丝圈排程结果")
-    public AjaxResult edit(@RequestBody GsqScheduleResultDto dto) {
-        GsqScheduleResult scheduleResult = new GsqScheduleResult();
-        BeanUtils.copyProperties(dto, scheduleResult);
-        if (scheduleResult.getId() != null) {
-            int releasingOrTimeoutByIds = gsqScheduleResultService.isReleasingOrTimeoutByIds(new long[]{scheduleResult.getId()});
-            if (releasingOrTimeoutByIds > 0) {
-                return AjaxResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.release.isReleasingOrTimeoutById"));
-            }
-        }
-        gsqScheduleResultService.editScheduleResult(scheduleResult);
-        return AjaxResult.success();
+    @Log(title = "钢丝圈排程结果", businessType = BusinessType.DELETE)
+    @ApiOperation("删除")
+    @PostMapping("/delete/{ids}")
+    public AjaxResult deleteByIds(@PathVariable("ids") List<Long> ids) {
+        return super.removeByIds(ids);
     }
 
     /**
-     * 插单
+     * 获取详细信息
      */
-    @Log(title = "ui.data.column.gsq.scheduleResult.modelName", businessType = BusinessType.INSERT)
-    @PostMapping("/add")
-    @ApiOperation("插单")
-    public AjaxResult add(@RequestBody GsqScheduleResultDto dto) {
-        GsqScheduleResult scheduleResult = new GsqScheduleResult();
-        BeanUtils.copyProperties(dto, scheduleResult);
-        int exist = gsqScheduleResultService.checkGsqCodeExist(scheduleResult);
-        if (exist == 0) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.specNotExist"));
-        }
-        // 插单校验
-        dto.setYear(DateFormatUtils.format(dto.getScheduleDate(), "yyyy"));
-        dto.setMonth(DateFormatUtils.format(dto.getScheduleDate(), "MM"));
-        // 根据传入的日期查询是否已有对应排程记录
-        Boolean unique = gsqScheduleResultService.checkUnique(scheduleResult);
-        if (!unique) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.already.exists"));
-        }
-        List<GsqScheduleResult> scheduleResults = gsqScheduleResultService.selectByScheduleDateAndCode(scheduleResult);
-        gsqScheduleResultService.addScheduleResult(scheduleResult);
-        gsqScheduleResultService.insetDispatcherLogInsertOrder(ApsConstant.DISPATCHER_OPER_INSERT_ORDER, scheduleResults, scheduleResult);
-        return AjaxResult.success();
+    @ApiOperation("获取详细信息")
+    @GetMapping("/{id}")
+    @Override
+    public GsqScheduleResult getInfo(@PathVariable("id") Long id) {
+        return super.getInfo(id);
     }
 
     /**
-     * 调量
+     * 导入数据
      */
-    @Log(title = "ui.data.column.gsq.scheduleResult.modelName", businessType = BusinessType.CHANGE_QTY)
-    @PostMapping("/changeQty")
-    @ApiOperation("调量")
-    public AjaxResult changeQty(@RequestBody GsqScheduleResultDto dto) {
-        GsqScheduleResult scheduleResult = new GsqScheduleResult();
-        BeanUtils.copyProperties(dto, scheduleResult);
-        int releasingOrTimeoutByIds = gsqScheduleResultService.isReleasingOrTimeoutByIds(new long[]{scheduleResult.getId()});
-        if (releasingOrTimeoutByIds > 0) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.release.isReleasingOrTimeoutById"));
-        }
-        scheduleResult.setMidPlanQty(scheduleResult.getMidPlanQty() == null ? 0D : scheduleResult.getMidPlanQty());
-        scheduleResult.setNightPlanQty(scheduleResult.getNightPlanQty() == null ? 0D : scheduleResult.getNightPlanQty());
-        scheduleResult.setDayPlanQty(scheduleResult.getDayPlanQty() == null ? 0D : scheduleResult.getDayPlanQty());
-        gsqScheduleResultService.insetDispatcherLog(ApsConstant.DISPATCHER_OPER_PLAN, scheduleResult);  //如果是调度员操作，则需要增加操作日志
-        gsqScheduleResultService.editScheduleResult(scheduleResult);
-        return AjaxResult.success();
+    @Log(title = "钢丝圈排程结果", businessType = BusinessType.IMPORT)
+    @ApiOperation("导入数据")
+    @PostMapping("/importData")
+    @Override
+    public AjaxResult importData(@RequestBody ImportContext importContext,
+                                 @RequestParam("updateSupport") boolean updateSupport) throws Exception {
+        return super.importData(importContext, updateSupport);
     }
 
     /**
-     * 转机台
+     * 导出数据
      */
-    @Log(title = "ui.data.column.gsq.scheduleResult.modelName", businessType = BusinessType.CHANGE_MACHINE)
-    @PostMapping("/changeMachine")
-    @ApiOperation("转机台")
-    public AjaxResult changeMachine(@RequestBody GsqScheduleResultDto dto) {
-        GsqScheduleResult scheduleResult = new GsqScheduleResult();
-        BeanUtils.copyProperties(dto, scheduleResult);
-        int releasingOrTimeoutByIds = gsqScheduleResultService.isReleasingOrTimeoutByIds(new long[]{scheduleResult.getId()});
-        if (releasingOrTimeoutByIds > 0) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.release.isReleasingOrTimeoutById"));
-        }
-        // 唯一校验
-        dto.setYear(DateFormatUtils.format(dto.getScheduleDate(), "yyyy"));
-        dto.setMonth(DateFormatUtils.format(dto.getScheduleDate(), "MM"));
-        // 根据传入的日期查询是否已有对应排程记录
-        Boolean unique = gsqScheduleResultService.checkUnique(scheduleResult);
-        if (!unique) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.already.exists"));
-        }
-        gsqScheduleResultService.insetDispatcherLog(ApsConstant.DISPATCHER_OPER_MACHINE, scheduleResult);  //如果是调度员操作，则需要增加操作日志
-        gsqScheduleResultService.editScheduleResult(scheduleResult);
-        return AjaxResult.success();
+    @Log(title = "钢丝圈排程结果", businessType = BusinessType.EXPORT)
+    @ApiOperation("导出数据")
+    @PostMapping("/exportData/{fileName}")
+    @Override
+    public byte[] exportData(@RequestBody GsqScheduleResult queryVO, @PathVariable("fileName") String fileName,
+                             HttpServletResponse response) throws IOException {
+        return super.exportData(queryVO, fileName, response);
+    }
+
+    @Override
+    protected IDocService getDocService() {
+        return gsqScheduleResultService;
+    }
+
+    @Override
+    protected String getTypeCode() {
+        return "0";
+    }
+
+    @Override
+    protected String getOrderBy() {
+        // 默认排序：排程日期倒序、机台号正序、一班次顺序正序（用于导出等场景）
+        return "SCHEDULE_DATE desc, MACHINE_CODE asc, CLASS1_SEQUENCE asc";
     }
 
     /**
-     * 选机台
-     * @param dto 更改后机台信息
-     * @return 结果
+     * 构建查询条件
+     * 注意：isDelete 已由框架通过注解自动过滤，禁止手动追加条件
      */
-    @PostMapping("/chooseMachine")
-    public AjaxResult chooseMachine(@RequestBody GsqScheduleResultDto dto){
-        int releasingOrTimeoutByIds = gsqScheduleResultService.isReleasingOrTimeoutByIds(new long[]{dto.getId()});
-        if (releasingOrTimeoutByIds > 0) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.release.isReleasingOrTimeoutById"));
-        }
-        // 校验机台字段是否修改，未修改则返回成功
-        GsqScheduleResultDto result = gsqScheduleResultService.selectScheduleResultById(dto.getId());
-        if (ObjectUtils.compare(result.getMachineId(), dto.getMachineId()) == 0) {
-            return AjaxResult.success();
-        }
-        result.setMachineId(dto.getMachineId());
-        GsqScheduleResult gsqScheduleResult = new GsqScheduleResult();
-        BeanUtils.copyProperties(result, gsqScheduleResult);
-        if (!gsqScheduleResultService.checkUnique(gsqScheduleResult)){
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.already.exists"));
-        }
-        //确认机台后，重新计算耗损率
-        this.gsqEngineService.confirmGsqMachine(result);
-        gsqScheduleResult = new GsqScheduleResult();
-        BeanUtils.copyProperties(result, gsqScheduleResult);
-
-        gsqScheduleResultService.chooseMachine(gsqScheduleResult);
-        return AjaxResult.success();
-    }
-
-    /**
-     * 删除钢丝圈排程结果
-     */
-    @Log(title = "ui.data.column.gsq.scheduleResult.modelName", businessType = BusinessType.DELETE)
-    @PostMapping("/{ids}")
-    @ApiOperation("删除钢丝圈排程结果信息")
-    @ApiImplicitParams({
-            @ApiImplicitParam(name = "ids", dataType = "Array", value = "id数组", paramType = "query")
-    })
-    public AjaxResult remove(@PathVariable("ids") long[] ids) {
-//        int releasingOrTimeoutByIds = gsqScheduleResultService.isReleasingOrTimeoutByIds(ids);
-//        if (releasingOrTimeoutByIds > 0) {
-//            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.release.isReleasingOrTimeoutById"));
-//        }
-        if (gsqScheduleResultService.isPublishByIds(ids) != ids.length) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.release.isPublishById"));
-        }
-        gsqScheduleResultService.deleteScheduleResultByIds(ids);
-        return AjaxResult.success();
-    }
-
-    /**
-     * 导出钢丝圈排程结果列表
-     */
-    @Log(title = "ui.data.column.gsq.scheduleResult.modelName", businessType = BusinessType.EXPORT)
-    @ApiOperation("导出钢丝圈排程结果列表")
-    @PostMapping("/export")
-    public byte[] export(@RequestBody GsqScheduleResultDto dto) {
-//        startPage("a.CREATE_TIME");
-        GsqScheduleResult scheduleResult = new GsqScheduleResult();
-        BeanUtils.copyProperties(dto, scheduleResult);
-        scheduleResult.setOrderStr(orderStr());  //拿到前端传的排序字段+排序方式
-        List<GsqScheduleResultDto> list = gsqScheduleResultService.selectScheduleResultList(scheduleResult);
-        return gsqScheduleResultService.export(list);
-    }
-
-    /**
-     * 查询钢丝圈排程结果列表
-     */
-    @ApiOperation("查询钢丝圈排程结果列表")
-    @PostMapping("/getList")
-    public List<GsqScheduleResultDto> getList(@RequestBody GsqScheduleResultDto dto) {
-        GsqScheduleResult scheduleResult = new GsqScheduleResult();
-        BeanUtils.copyProperties(dto, scheduleResult);
-        return gsqScheduleResultService.selectScheduleResultList(scheduleResult);
-    }
-
-    /**
-     * 发布当天未发布的排程结果
-     */
-    @Log(title = "ui.data.column.gsq.scheduleResult.modelName", businessType = BusinessType.PUBLISH)
-    @ApiOperation("发布排程")
-    @PostMapping("/publish")
-    public AjaxResult publish(@RequestBody GsqScheduleResultDto dto) {
-    	// 发布前需要先获得同步锁，防止在集群环境下出现一个前端命令发送两次mes请求，modify by hak 20220708
-    	if (syncDataLogsService.checkPublishLocking("gsq:publish:lock", dto.getIds())) {
-    		return AjaxResult.success(); // 如果已经被锁定了，则直接返回
-    	}
-        GsqScheduleResult scheduleResult = new GsqScheduleResult();
-        BeanUtils.copyProperties(dto, scheduleResult);
-        Date scheduleDate = scheduleResult.getScheduleDate();
-        int releasingOrTimeoutByIds = gsqScheduleResultService.isReleasingOrTimeoutByIds(Arrays.stream(scheduleResult.getIds()).mapToLong(Long::longValue).toArray());
-        if (releasingOrTimeoutByIds > 0) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.release.isReleasingOrTimeoutById"));
-        }
-        scheduleResult.setYear(DateFormatUtils.format(scheduleDate, "yyyy"));
-        scheduleResult.setMonth(DateFormatUtils.format(scheduleDate, "MM"));
-        // 查询今日所有排程结果
-        // 过滤未发布及发布失败的数据
-        List<GsqScheduleResultDto> list = gsqScheduleResultService.selectScheduleResultList(scheduleResult).stream()
-                .filter(item -> ApsConstant.NO_RELEASE.equals(item.getIsRelease()) || ApsConstant.FAILURE_RELEASE.equals(item.getIsRelease()) || ApsConstant.WAIT_RELEASING.equals(item.getIsRelease())).collect(Collectors.toList());
-        if (CollectionUtils.isEmpty(list)) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.errorPublish"));
-        }
-        // 获取机台id为空和多机台的记录
-        List<GsqScheduleResultDto> collect = list.stream().filter(item -> StringUtil.isEmpty(item.getMachineId()) || item.getMachineId().contains(",")).collect(Collectors.toList());
-        if (collect.size() > 0) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.hasMultipleIds"));
-        }
-        long[] arr = list.stream().mapToLong(GsqScheduleResultDto::getId).toArray();
-        // 获取下发接口版本号
-        String dataVersion = syncDataLogsService.getDataVersion(ApsConstant.GSQ_DEPLOY_SYNC_KEY);
-        // 厂别、分公司编号
-        String factoryCode = factoryService.getFactoryCode();
-        String companyCode = factoryService.getCompanyCode();
-        AjaxResult ajaxResult = null;
-        try {
-            //ids为空或数组大小为0，发布今日所有未发布的排程记录
-            gsqScheduleResultService.publish(scheduleResult, arr, dataVersion, factoryCode, companyCode);
-            // TODO 调整为itf接口
-//            //数据同步到中间库后，往 mq中发送消息通知 MES去取数据
-//            SyncParamsVO syncParamsVO = new SyncParamsVO();
-//            syncParamsVO.setSyncKey(ApsConstant.GSQ_DEPLOY_SYNC_KEY);
-//            syncParamsVO.setDataVersion(dataVersion);
-//            // 请求参数
-//            JSONObject params = new JSONObject();
-//            params.put("scheduleDate", DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD, scheduleDate));
-//			params.put("rowCount", arr.length);
-//            syncParamsVO.setParams(params);
-//            syncParamsVO.setFactoryCode(factoryCode);
-//            syncParamsVO.setCompanyCode(companyCode);
-//            //往消息队列发送消息
-//            gsqSyncDataHandle.syncNotice(syncParamsVO);
-
-			// 取回mes的反馈结果
-			SyncDataLogs logs = syncDataLogsService.getSyncDataResult(dataVersion);
-			String status = logs.getStatus();
-			// 更新状态
-			gsqScheduleResultService.updateRelaseStatus(dataVersion, arr, status);
-			if (ApsConstant.IS_RELEASE.equals(status)) {
-				// 成功
-				ajaxResult = AjaxResult.success(I18nUtil.getMessage("ui.data.column.scheduleResult.successPublish"));
-			} else {
-				// 失败，需要返回异常信息
-				ajaxResult = AjaxResult.error(logs.getMsg());
-			}
-        } catch (Exception e) {
-            e.printStackTrace();
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.failedPublish"));
-        }
-        return ajaxResult;
+    private LambdaQueryWrapper<GsqScheduleResult> buildQueryWrapper(GsqScheduleResult queryVO) {
+        LambdaQueryWrapper<GsqScheduleResult> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(queryVO.getScheduleDateQuery() != null,
+                GsqScheduleResult::getScheduleDate, queryVO.getScheduleDateQuery());
+        wrapper.like(PubUtil.isNotEmpty(queryVO.getSteelRingCode()),
+                GsqScheduleResult::getSteelRingCode, queryVO.getSteelRingCode());
+        wrapper.like(PubUtil.isNotEmpty(queryVO.getProSize()),
+                GsqScheduleResult::getProSize, queryVO.getProSize());
+        wrapper.like(PubUtil.isNotEmpty(queryVO.getTwiningDiscCode()),
+                GsqScheduleResult::getTwiningDiscCode, queryVO.getTwiningDiscCode());
+        wrapper.eq(PubUtil.isNotEmpty(queryVO.getIsRelease()),
+                GsqScheduleResult::getIsRelease, queryVO.getIsRelease());
+        wrapper.eq(PubUtil.isNotEmpty(queryVO.getMachineCode()),
+                GsqScheduleResult::getMachineCode, queryVO.getMachineCode());
+        // 默认排序：排程日期倒序、机台号正序、一班次顺序正序
+        wrapper.orderByDesc(GsqScheduleResult::getScheduleDate);
+        wrapper.orderByAsc(GsqScheduleResult::getMachineCode);
+        wrapper.orderByAsc(GsqScheduleResult::getClass1Sequence);
+        return wrapper;
     }
 
     /**
      * 自动排程
      */
-    @Log(title = "ui.data.column.gsq.scheduleResult.modelName", businessType = BusinessType.AUTOPLAN)
+    @Log(title = "钢丝圈排程结果", businessType = BusinessType.AUTOPLAN)
     @ApiOperation("自动排程")
     @PostMapping("/autoPlan")
-    public AjaxResult autoPlan(@RequestBody GsqScheduleResultDto dto) {
-        Date scheduleDate = dto.getScheduleDate();
-        gsqEngineService.autoGsqSchedule(DateUtils.parseDateToStr("yyyy-MM-dd", scheduleDate));
+    public AjaxResult autoPlan(@RequestBody GsqScheduleResult queryVO) {
+        Date scheduleDate = queryVO.getScheduleDateQuery();
+        String factoryCode = queryVO.getFactoryCode();
+        if (scheduleDate == null) {
+            return AjaxResult.error("排程日期不能为空");
+        }
+        if (StringUtils.isEmpty(factoryCode)) {
+            return AjaxResult.error("分厂不能为空");
+        }
+        gsqEngineService.autoGsqSchedule(DateUtils.parseDateToStr("yyyy-MM-dd", scheduleDate), factoryCode);
         return AjaxResult.success();
+    }
+
+    /**
+     * 插单前校验
+     */
+    @ApiOperation("插单前校验")
+    @PostMapping("/validateInsertOrder")
+    public AjaxResult validateInsertOrder(@RequestBody GsqInsertOrderDTO dto) {
+        return gsqScheduleResultService.validateInsertOrder(dto);
+    }
+
+    /**
+     * 插单
+     */
+    @Log(title = "钢丝圈排程结果", businessType = BusinessType.INSERT_OR_UPDATE)
+    @ApiOperation("插单")
+    @PostMapping("/insertOrder")
+    public AjaxResult insertOrder(@RequestBody GsqInsertOrderDTO dto) {
+        return gsqScheduleResultService.insertOrder(dto);
+    }
+
+    /**
+     * 转机台前校验
+     */
+    @ApiOperation("转机台前校验")
+    @PostMapping("/validateChangeMachine")
+    public AjaxResult validateChangeMachine(@RequestBody GsqChangeMachineDTO dto) {
+        return gsqScheduleResultService.validateChangeMachine(dto);
+    }
+
+    /**
+     * 转机台
+     */
+    @Log(title = "钢丝圈排程结果", businessType = BusinessType.CHANGE_MACHINE)
+    @ApiOperation("转机台")
+    @PostMapping("/changeMachine")
+    public AjaxResult changeMachine(@RequestBody GsqChangeMachineDTO dto) {
+        return gsqScheduleResultService.changeMachine(dto);
+    }
+
+    /**
+     * 调量前校验
+     */
+    @ApiOperation("调量前校验")
+    @PostMapping("/validateChangeQty")
+    public AjaxResult validateChangeQty(@RequestBody GsqScheduleResult entity) {
+        return gsqScheduleResultService.validateChangeQty(entity);
+    }
+
+    /**
+     * 调量
+     */
+    @Log(title = "钢丝圈排程结果", businessType = BusinessType.CHANGE_QTY)
+    @ApiOperation("调量")
+    @PostMapping("/changeQty")
+    public AjaxResult changeQty(@RequestBody GsqScheduleResult entity) {
+        // 先校验，校验通过再执行调量
+        AjaxResult validateResult = gsqScheduleResultService.validateChangeQty(entity);
+        if (!validateResult.get(AjaxResult.CODE_TAG).equals(200)) {
+            return validateResult;
+        }
+        return gsqScheduleResultService.changeQty(entity);
+    }
+
+    /**
+     * 逻辑删除排程记录
+     * 只能删除发布成功次数等于0的计划
+     */
+    @Log(title = "钢丝圈排程结果", businessType = BusinessType.DELETE)
+    @ApiOperation("逻辑删除排程记录")
+    @PostMapping("/logicDelete")
+    public AjaxResult logicDelete(@RequestBody List<Long> ids) {
+        return gsqScheduleResultService.logicDeleteByIds(ids);
+    }
+
+    /**
+     * 发布排程到MES
+     * 前端传入选中记录ID列表（ids），后端按发布状态过滤可发布记录：
+     * 仅处理"未发布(0)"、"待发布(5)"、"发布失败(2)"三种状态，其余状态忽略。
+     *
+     * @param queryVO 查询条件（含 scheduleDate、factoryCode、ids）
+     * @return 发布结果
+     */
+    @Log(title = "钢丝圈排程结果", businessType = BusinessType.PUBLISH)
+    @ApiOperation("发布排程")
+    @PostMapping("/publish")
+    public AjaxResult publish(@RequestBody GsqScheduleResult queryVO) {
+        return gsqScheduleResultService.publish(queryVO);
     }
 
     /**
      * 查询排程日期是否已发布
-     * @param scheduleDate 排程日期
-     * @return 是否已经发布
      */
     @ApiOperation("查询排程日期是否已发布")
     @PostMapping("/isPublish")
-    public Boolean isPublish(@RequestBody GsqScheduleResultDto dto){
-        return gsqScheduleResultService.isPublish(dto.getScheduleDate());
+    public Boolean isPublish(@RequestBody GsqScheduleResult queryVO) {
+        return gsqScheduleResultService.isPublish(queryVO.getScheduleDateQuery());
     }
 
     /**
-     * 根据排程日期、物料编号、机台id校验唯一性
-     *
-     * @param scheduleResult 要校验记录
-     * @return 查询到的记录数
+     * 唯一性校验
      */
-    @ApiOperation("根据排程日期、物料编号、机台id校验唯一性")
+    @ApiOperation("唯一性校验")
     @PostMapping("/checkUnique")
-    public Boolean checkUnique(@RequestBody GsqScheduleResultDto dto) {
-        GsqScheduleResult scheduleResult = new GsqScheduleResult();
-        BeanUtils.copyProperties(dto, scheduleResult);
-        return gsqScheduleResultService.checkUnique(scheduleResult);
-    }
-
-    @Log(title = "ui.data.column.gsq.scheduleResult.modelName", businessType = BusinessType.IMPORT)
-    @PostMapping("/importData")
-    @ApiOperation("导入钢丝圈排程结果信息")
-    public AjaxResult importData(@RequestBody List<GsqScheduleResultDto> list, @RequestParam("importLogId") Long importLogId, @RequestParam("scheduleDate") String scheduleDate) {
-        if (StringUtils.isNull(list) || list.size() == 0) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.import.nodata"));
-        }
-        return gsqScheduleResultService.importData(list, importLogId, DateUtils.parseDate(scheduleDate));
+    public Boolean checkUnique(@RequestBody GsqScheduleResult queryVO) {
+        return gsqScheduleResultService.checkUnique(queryVO);
     }
 
     /**
-     * 根据排程日期查询当前日期发布状态为"发布中"或"超时失败"的记录
-     * @param scheduleDate 排程日期
-     * @return 查询到的记录数
+     * 根据排程日期查询发布中或超时失败的记录数
      */
+    @ApiOperation("根据排程日期查询发布中或超时失败的记录数")
     @PostMapping("/isReleasingOrTimeoutByDate")
-    public int isReleasingOrTimeoutByDate(@RequestBody GsqScheduleResultDto scheduleResult){
-        return gsqScheduleResultService.isReleasingOrTimeoutByDate(scheduleResult.getScheduleDate());
+    public int isReleasingOrTimeoutByDate(@RequestBody GsqScheduleResult queryVO) {
+        return gsqScheduleResultService.isReleasingOrTimeoutByDate(queryVO.getScheduleDateQuery());
     }
 
     /**
-     * 更改发布状态
-     * @param scheduleDate 排程日期
-     * @return 结果
-     */
-    @Log(title = "ui.data.column.tcScheduleResult.modalName")
-    @PostMapping("/changeReleaseStatus")
-    public AjaxResult changeReleaseStatus(@RequestBody GsqScheduleResultDto entity){
-        GsqScheduleResult gsqScheduleResult = new GsqScheduleResult();
-        BeanUtils.copyProperties(entity, gsqScheduleResult);
-        gsqScheduleResultService.changeReleaseStatus(gsqScheduleResult);
-        return AjaxResult.success();
-    }
-
-    /**
-     * 导入完成量
-     * @param list 完成量集合
-     * @param importLogId 导入记录id
-     * @return 结果
-     */
-    @PostMapping("/importFinishQty")
-    @ApiOperation("导入完成量")
-    public AjaxResult importFinishQty(@RequestBody List<GsqDayFinishQty> list, @RequestParam("importLogId") Long importLogId) {
-        if (StringUtils.isNull(list) || list.isEmpty()) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.import.nodata"));
-        }
-        return gsqScheduleResultService.importFinishQty(list, importLogId);
-    }
-
-    /**
-     * 获取排程日期的昨日早班合计，夜班合计，早班合计，库存合计，理论交班库存合计
+     * 根据排程日期构建6个班次的日期展示列表
+     * 钢丝圈排程6个班次覆盖D日中班、D+1日夜早中、D+2日夜早（D=排程日期-2，即今天）：
+     * 班次1：D日中班，班次2~4：D+1日(夜/早/中)，班次5~6：D+2日(夜/早)
      *
-     * @param scheduleResult 排程日期
-     * @return 结果
+     * @param queryVO 查询条件
+     * @return 班次日期列表
      */
-    @PostMapping("/getSummaryVo")
-    @ApiOperation("获取排程日期的排程结果合计")
-    public AjaxResult getSummaryVo(@RequestBody GsqScheduleResultDto scheduleResult) {
-        GsqScheduleResult gsqScheduleResult = new GsqScheduleResult();
-        BeanUtils.copyProperties(scheduleResult, gsqScheduleResult);
-        return gsqScheduleResultService.getSummaryVo(gsqScheduleResult);
+    @ApiOperation("获取钢丝圈排程班次日期列表")
+    @PostMapping("/listScheduleShiftDates")
+    public List<GsqScheduleShiftDateVO> listScheduleShiftDates(@RequestBody GsqScheduleResult queryVO) {
+        return gsqScheduleResultService.listScheduleShiftDates(queryVO);
     }
 }

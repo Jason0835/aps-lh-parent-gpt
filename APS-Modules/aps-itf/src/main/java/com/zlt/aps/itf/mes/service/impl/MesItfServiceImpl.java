@@ -2293,23 +2293,29 @@ public class MesItfServiceImpl implements MesItfService {
             insertList.add(entity);
         }
 
-        // 量试合格品充抵正规订单：在 handleTrialFinishQtyRule 之前调用，
+        // 量试合格品充抵正规订单：由开关 SYS0312001 控制，
+        // 开启时在 handleTrialFinishQtyRule 之前调用，
         // 判断条件：同一完成日期+同一SKU在 MES 回传数据中同时存在量试(T)和正规(S)两条数据时，
         // 额外插入一条正规(S)记录（值取自量试T数据），用于量试合格品充抵正规订单。
         // 注意：必须在 handleTrialFinishQtyRule 之前调用，因为充抵记录使用的是 MES 原始值，不能被试制/量试规则调整。
         // 新增的正规记录 lhType=S，handleTrialFinishQtyRule 会跳过（isTrialOrMassTrial 返回 false），不受影响。
-        List<LhDayFinishQty> extraFormalRecords = this.buildMassTrialToFormalRecords(
-                syncDataLogs.getFactoryCode(), syncList);
-        if (CollectionUtils.isNotEmpty(extraFormalRecords)) {
-            // 补充审计字段（与 syncLhScheDayFinishQtyByLatestVersion 保持一致）
-            for (LhDayFinishQty extra : extraFormalRecords) {
-                extra.setCreateBy("MES");
-                extra.setUpdateBy("MES");
-                extra.setCreateTime(DateUtils.getNowDate());
-                extra.setUpdateTime(DateUtils.getNowDate());
-                extra.setIsDelete(0);
+        if (this.isMassTrialToFormalEnabled(syncDataLogs.getFactoryCode())) {
+            List<LhDayFinishQty> extraFormalRecords = this.buildMassTrialToFormalRecords(
+                    syncDataLogs.getFactoryCode(), syncList);
+            if (CollectionUtils.isNotEmpty(extraFormalRecords)) {
+                // 补充审计字段（与 syncLhScheDayFinishQtyByLatestVersion 保持一致）
+                for (LhDayFinishQty extra : extraFormalRecords) {
+                    extra.setCreateBy("MES");
+                    extra.setUpdateBy("MES");
+                    extra.setCreateTime(DateUtils.getNowDate());
+                    extra.setUpdateTime(DateUtils.getNowDate());
+                    extra.setIsDelete(0);
+                }
+                insertList.addAll(extraFormalRecords);
             }
-            insertList.addAll(extraFormalRecords);
+        } else {
+            log.info("量试充抵正规开关已关闭（SYS0312001=0），跳过量试→正规充抵记录，factoryCode={}",
+                    syncDataLogs.getFactoryCode());
         }
 
         // 处理试制/量试完成量回报规则（跨日合并计划量；≤日计划量按计划量回报、>日计划量按实际回报；
@@ -2435,24 +2441,30 @@ public class MesItfServiceImpl implements MesItfService {
             insertList.add(entity);
         }
 
-        // 量试合格品充抵正规订单：在 handleTrialFinishQtyRule 之前调用，
+        // 量试合格品充抵正规订单：由开关 SYS0312001 控制，
+        // 开启时在 handleTrialFinishQtyRule 之前调用，
         // 判断条件：同一完成日期+同一SKU在 MES 回传数据中同时存在量试(T)和正规(S)两条数据时，
         // 额外插入一条正规(S)记录（值取自量试T数据），用于量试合格品充抵正规订单。
         // 注意：必须在 handleTrialFinishQtyRule 之前调用，因为充抵记录使用的是 MES 原始值，不能被试制/量试规则调整。
         // 新增的正规记录 lhType=S，handleTrialFinishQtyRule 会跳过（isTrialOrMassTrial 返回 false），不受影响。
         String factoryCodeForBuild = insertList.get(0).getFactoryCode();
-        List<LhDayFinishQty> extraFormalRecords = this.buildMassTrialToFormalRecords(
-                factoryCodeForBuild, syncList);
-        if (CollectionUtils.isNotEmpty(extraFormalRecords)) {
-            // 补充审计字段
-            for (LhDayFinishQty extra : extraFormalRecords) {
-                extra.setCreateBy("MES");
-                extra.setUpdateBy("MES");
-                extra.setCreateTime(DateUtils.getNowDate());
-                extra.setUpdateTime(DateUtils.getNowDate());
-                extra.setIsDelete(0);
+        if (this.isMassTrialToFormalEnabled(factoryCodeForBuild)) {
+            List<LhDayFinishQty> extraFormalRecords = this.buildMassTrialToFormalRecords(
+                    factoryCodeForBuild, syncList);
+            if (CollectionUtils.isNotEmpty(extraFormalRecords)) {
+                // 补充审计字段
+                for (LhDayFinishQty extra : extraFormalRecords) {
+                    extra.setCreateBy("MES");
+                    extra.setUpdateBy("MES");
+                    extra.setCreateTime(DateUtils.getNowDate());
+                    extra.setUpdateTime(DateUtils.getNowDate());
+                    extra.setIsDelete(0);
+                }
+                insertList.addAll(extraFormalRecords);
             }
-            insertList.addAll(extraFormalRecords);
+        } else {
+            log.info("量试充抵正规开关已关闭（SYS0312001=0），跳过量试→正规充抵记录，factoryCode={}",
+                    factoryCodeForBuild);
         }
 
         // 处理试制/量试完成量回报规则（跨日合并计划量；≤日计划量按计划量回报、>日计划量按实际回报；
@@ -2676,6 +2688,33 @@ public class MesItfServiceImpl implements MesItfService {
     private boolean isTrialOrMassTrial(String lhType) {
         TrialStatusEnum status = TrialStatusEnum.getByCode(lhType);
         return TrialStatusEnum.TRIAL == status || TrialStatusEnum.MASS_TRIAL == status;
+    }
+
+    /**
+     * 判断量试充抵正规开关是否开启。
+     * <p>读取硫化参数 SYS0312001 的值，默认为开启（"1"），与存量行为一致。
+     * 参数值为 "0" 时关闭，不再额外插入量试→正规充抵记录。</p>
+     *
+     * @param factoryCode 分厂编码
+     * @return true-开关开启（执行充抵），false-开关关闭（跳过充抵）
+     */
+    private boolean isMassTrialToFormalEnabled(String factoryCode) {
+        try {
+            LhParams paramResult = FeignTokenHelper.callWithToken(() ->
+                    lhMesSyncRemoteService.selectLhParamsByCode(
+                            LhScheduleParamConstant.ENABLE_MASS_TRIAL_TO_FORMAL, factoryCode));
+            if (paramResult == null || StringUtils.isBlank(paramResult.getParamValue())) {
+                // 未配置时默认开启，与存量行为一致
+                return true;
+            }
+            boolean enabled = "1".equals(paramResult.getParamValue().trim());
+            log.info("量试充抵正规开关：factoryCode={}, paramValue={}, enabled={}",
+                    factoryCode, paramResult.getParamValue(), enabled);
+            return enabled;
+        } catch (Exception e) {
+            log.error("量试充抵正规开关：读取硫化参数异常，factoryCode={}，默认开启", factoryCode, e);
+            return true;
+        }
     }
 
     /**

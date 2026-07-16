@@ -135,4 +135,13 @@ public class MdmDevicePlanShut extends BaseEntity {
     @ApiModelProperty(value = "MES设备停机计划表ID", name = "mesId")
     @TableField(value = "MES_ID")
     private Long mesId;
+
+    /**
+     * 排程日期（硫化排程回填给精度计划/清洗计划）
+     */
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    @Excel(name = "ui.data.column.mdmDevicePlanShut.scheduleDate", width = 30, dateFormat = "yyyy-MM-dd HH:mm:ss")
+    @ApiModelProperty(value = "排程日期（硫化排程回填给精度计划/清洗计划）", name = "scheduleDate")
+    @TableField(value = "SCHEDULE_DATE")
+    private Date scheduleDate;
 }

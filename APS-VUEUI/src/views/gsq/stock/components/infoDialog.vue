@@ -29,7 +29,7 @@
 
 <script>
 import infoForm from "@/views/components/infoForm.vue";
-import { addSteelRingStock, editSteelRingStock } from "@/api/gsq/steelRingStock";
+import { addStock, editStock } from "@/api/gsq/stock";
 
 export default {
   components: { infoForm },
@@ -70,13 +70,13 @@ export default {
         (this.isEdit
           ? this.$t("common.button.edit")
           : this.$t("common.button.add")) +
-        this.$t("ui.data.column.gsq.steelRingStock.modalName")
+        this.$t("ui.data.column.gsq.stock.modalName")
       );
     },
     columns() {
       return [
         {
-          label: this.$t("ui.data.column.gsq.steelRingStock.stockDate"),
+          label: this.$t("ui.data.column.gsq.stock.stockDate"),
           prop: "stockDate",
           span: 24,
           required: true,
@@ -84,7 +84,7 @@ export default {
           valueFormat: "yyyy-MM-dd",
         },
         {
-          label: this.$t("ui.data.column.gsq.steelRingStock.steelRingCode"),
+          label: this.$t("ui.data.column.gsq.stock.steelRingCode"),
           prop: "steelRingCode",
           span: 24,
           required: true,
@@ -92,7 +92,7 @@ export default {
           maxlength: 60,
         },
         {
-          label: this.$t("ui.data.column.gsq.steelRingStock.stockNum"),
+          label: this.$t("ui.data.column.gsq.stock.stockNum"),
           prop: "stockNum",
           span: 24,
           required: true,
@@ -100,13 +100,13 @@ export default {
           min: 0,
         },
         {
-          label: this.$t("ui.data.column.gsq.steelRingStock.modifyNum"),
+          label: this.$t("ui.data.column.gsq.stock.modifyNum"),
           prop: "modifyNum",
           span: 24,
           type: "number",
         },
         {
-          label: this.$t("ui.data.column.gsq.steelRingStock.badNum"),
+          label: this.$t("ui.data.column.gsq.stock.badNum"),
           prop: "badNum",
           span: 24,
           type: "number",
@@ -127,8 +127,8 @@ export default {
       try {
         this.loading = true;
         const res = this.isEdit
-          ? await editSteelRingStock(params)
-          : await addSteelRingStock(params);
+          ? await editStock(params)
+          : await addStock(params);
         this.$modal.msgSuccess(res.msg);
         this.$emit("success");
         this.hide();

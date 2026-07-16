@@ -200,6 +200,10 @@ export default {
           label: this.$t("ui.data.column.mdmDevicePlanShut.actualFinishDate"),
         },
         {
+          prop: "scheduleDate",
+          label: this.$t("ui.data.column.mdmDevicePlanShut.scheduleDate"),
+        },
+        {
           prop: "dataSource",
           label: this.$t("ui.data.column.mdmDevicePlanShut.dataSource"),
           formatter: (row, column, value) => {

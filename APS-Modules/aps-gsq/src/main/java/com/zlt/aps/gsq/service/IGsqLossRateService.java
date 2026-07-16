@@ -7,7 +7,7 @@ import com.zlt.bill.common.service.IDocService;
 import java.util.List;
 
 /**
- * 钢丝圈损耗率管理Service接口
+ * 钢丝圈损耗率管理Service接口（本地）
  *
  * @author zlt
  * @date 2026-07-08
@@ -16,6 +16,9 @@ public interface IGsqLossRateService extends IDocService<GsqLossRate> {
 
     /**
      * 校验"钢丝圈编码+机台编码"组合唯一性
+     * 同时承担业务前置校验：
+     *   1. 钢丝圈编码与机台编码不能同时为空
+     *   2. 损耗率必填
      *
      * @param entity 实体
      * @return 唯一性结果（UserConstants.UNIQUE=唯一，UserConstants.NOT_UNIQUE=不唯一）

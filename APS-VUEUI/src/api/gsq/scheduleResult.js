@@ -1,232 +1,153 @@
-import request from '@/utils/request'
+import request, { downloadLink } from '@/utils/request'
 
+/** 查询钢丝圈排程结果列表 */
 export function listScheduleResult(query) {
   return request({
-    url: 'gsq/scheduleResult/list',
-    method: 'post',
-    data: query
-  })
-}
-export function removeScheduleResult(query) {
-  return request({
-    url: 'gsq/scheduleResult/remove',
+    url: '/gsq/scheduleResult/list',
     method: 'post',
     data: query
   })
 }
 
-//
-export function validateAutoPlan(query) {
+/** 保存钢丝圈排程结果（新增/修改） */
+export function saveScheduleResult(query) {
   return request({
-    url: 'gsq/scheduleResult/validateAutoPlan',
-    method: 'post',
-    data: query
-  })
-}
-export function autoPlan(query) {
-  return request({
-    url: 'gsq/scheduleResult/autoPlan',
-    method: 'post',
-    data: query
-  })
-}
-export function balance(query) {
-  return request({
-    url: 'gsq/scheduleResult/balance',
-    method: 'post',
-    data: query
-  })
-}
-// export function modelChange(query) {
-//   return request({
-//     url: 'gsq/scheduleResult/modelChange',
-//     method: 'post',
-//     data: query
-//   })
-// }
-// export function modelAdjustPlan(query) {
-//   return request({
-//     url: 'gsq/scheduleResult/modelAdjustPlan',
-//     method: 'post',
-//     data: query
-//   })
-// }
-
-// // 获取胎胚版本
-// export function getProductEmbryoVersions(query) {
-//   return request({
-//     url: 'gsq/scheduleResult/getProductEmbryoVersions',
-//     method: 'post',
-//     data: query
-//   })
-// }
-// export function getCxMachines(query) {
-//   return request({
-//     url: 'gsq/scheduleResult/getCxMachines',
-//     method: 'post',
-//     data: query
-//   })
-// }
-// export function validateBeforeAdd(query) {
-//   return request({
-//     url: 'gsq/scheduleResult/validateBeforeAdd',
-//     method: 'post',
-//     data: query
-//   })
-// }
-export function validateAdd(query) {
-  return request({
-    url: 'gsq/scheduleResult/validateAdd',
+    url: '/gsq/scheduleResult/save',
     method: 'post',
     data: query
   })
 }
 
-export function editScheduleResult(query) {
+/** 删除钢丝圈排程结果 */
+export function removeScheduleResult(ids) {
   return request({
-    url: 'gsq/scheduleResult/edit',
+    url: '/gsq/scheduleResult/remove',
     method: 'post',
-    data: query
-  })
-}
-export function batchChangeMachine(machineId, query) {
-  return request({
-    url: 'gsq/scheduleResult/batchChangeMachine/' + machineId,
-    method: 'post',
-    data: query
-  })
-}
-export function chooseMachine(query) {
-  return request({
-    url: 'gsq/scheduleResult/chooseMachine',
-    method: 'post',
-    data: query
-  })
-}
-export function mergeProduct(query) {
-  return request({
-    url: 'gsq/scheduleResult/mergeProduct',
-    method: 'post',
-    data: query
+    params: { ids: ids }
   })
 }
 
+/** 导出钢丝圈排程结果 */
+export function exportScheduleResult(query) {
+  return downloadLink("/gsq/scheduleResult/export", query)
+}
 
-
-// //
-// export function modifyMoldsValidate(query) {
-//   return request({
-//     url: 'gsq/scheduleResult/modifyMoldsValidate',
-//     method: 'post',
-//     data: query
-//   })
-// }
-// export function modifyMolds(query) {
-//   return request({
-//     url: 'gsq/scheduleResult/modifyMolds',
-//     method: 'post',
-//     data: query
-//   })
-// }
-
-
-// export function validateChangeMachine(query) {
-//   return request({
-//     url: 'gsq/scheduleResult/validateChangeMachine',
-//     method: 'post',
-//     data: query
-//   })
-// }
-export function publishValidate(query) {
+/** 导入钢丝圈排程结果 */
+export function importScheduleResult(data) {
   return request({
-    url: 'gsq/scheduleResult/publishValidate',
+    url: '/gsq/scheduleResult/importData',
     method: 'post',
-    data: query
+    data: data
   })
 }
-export function publishScheduleResult(query) {
+
+/** 获取6班次日期列表（D日中班/D+1日夜早中/D+2日夜早） */
+export function listScheduleShiftDates(query) {
   return request({
-    url: 'gsq/scheduleResult/publish',
+    url: '/gsq/scheduleResult/listScheduleShiftDates',
     method: 'post',
     data: query
   })
 }
 
-// export function hasRecordValidate(query) {
-//   return request({
-//     url: 'gsq/scheduleResult/hasRecordValidate',
-//     method: 'post',
-//     data: query
-//   })
-// }
-
-// export function modifyQty(query) {
-//   return request({
-//     url: `gsq/scheduleResult/modifyQty/${query}`,
-//     method: 'post',
-//     // data: query
-//   })
-// }
-
-// export function manualClose(query) {
-//   return request({
-//     url: `gsq/scheduleResult/manualClose`,
-//     method: 'post',
-//     data: query
-//   })
-// }
-
-// export function listFinished(query) {
-//   return request({
-//     url: `gsq/scheduleResult/finished/list`,
-//     method: 'post',
-//     data: query
-//   })
-// }
-// export function producingIssue(query) {
-//   return request({
-//    url: `gsq/scheduleResult/producingIssue`,
-//     method: 'post',
-//     data: query
-//   })
-// }
-// export function validateConstruction(query) {
-//   return request({
-//    url: `gsq/scheduleResult/validateConstruction`,
-//     method: 'post',
-//     data: query
-//   })
-// }
-export function changeReleaseStatus(query) {
+/** 自动排程 */
+export function autoPlan(data) {
   return request({
-   url: `gsq/scheduleResult/changeReleaseStatus`,
+    url: '/gsq/scheduleResult/autoPlan',
     method: 'post',
-    data: query
+    data: data
   })
 }
 
-export function changeQty(query) {
+/** 插单 */
+export function insertOrder(data) {
   return request({
-   url: `gsq/scheduleResult/changeQty`,
+    url: '/gsq/scheduleResult/insertOrder',
     method: 'post',
-    data: query
+    data: data
   })
 }
 
-
-export function combinationMiddleAndNight(query) {
+/** 插单前校验 */
+export function validateInsertOrder(data) {
   return request({
-   url: `gsq/scheduleResult/combinationMiddleAndNight`,
+    url: '/gsq/scheduleResult/validateInsertOrder',
     method: 'post',
-    data: query
+    data: data
   })
 }
 
-
-export function getSummaryVo(query) {
+/** 转机台 */
+export function changeMachine(data) {
   return request({
-   url: `gsq/scheduleResult/getSummaryVo`,
+    url: '/gsq/scheduleResult/changeMachine',
     method: 'post',
-    data: query
+    data: data
+  })
+}
+
+/** 转机台前校验 */
+export function validateChangeMachine(data) {
+  return request({
+    url: '/gsq/scheduleResult/validateChangeMachine',
+    method: 'post',
+    data: data
+  })
+}
+
+/** 调量前校验 */
+export function validateChangeQty(data) {
+  return request({
+    url: '/gsq/scheduleResult/validateChangeQty',
+    method: 'post',
+    data: data
+  })
+}
+
+/** 调量 */
+export function changeQty(data) {
+  return request({
+    url: '/gsq/scheduleResult/changeQty',
+    method: 'post',
+    data: data
+  })
+}
+
+/** 发布排程到MES（6班→3天拆分下发），传入选中记录ID列表 */
+export function publishSchedule(data) {
+  return request({
+    url: '/gsq/scheduleResult/publish',
+    method: 'post',
+    data: { scheduleDate: data.scheduleDate, factoryCode: data.factoryCode, ids: data.ids },
+    headers: {
+      'Content-Type': 'application/json;charset=UTF-8'
+    }
+  })
+}
+
+/** 查询排程日期是否已发布 */
+export function isPublish(data) {
+  return request({
+    url: '/gsq/scheduleResult/isPublish',
+    method: 'post',
+    data: data
+  })
+}
+
+/** 唯一性校验（排程日期+钢丝圈代码+机台编号） */
+export function checkUnique(data) {
+  return request({
+    url: '/gsq/scheduleResult/checkUnique',
+    method: 'post',
+    data: data
+  })
+}
+
+/** 逻辑删除排程记录（已发布成功的计划不允许删除） */
+export function logicDeleteScheduleResult(ids) {
+  return request({
+    url: '/gsq/scheduleResult/logicDelete',
+    method: 'post',
+    params: { ids: ids }
   })
 }

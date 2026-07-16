@@ -1,7 +1,7 @@
 package com.zlt.aps.gsq.service;
 
 import com.ruoyi.common.core.web.domain.AjaxResult;
-import com.zlt.aps.gsq.api.domain.entity.GsqSteelRingStock;
+import com.zlt.aps.gsq.api.domain.entity.GsqStock;
 import com.zlt.bill.common.service.IDocService;
 
 import java.util.List;
@@ -12,7 +12,7 @@ import java.util.List;
  * @author zlt
  * @date 2026-07-08
  */
-public interface IGsqSteelRingStockService extends IDocService<GsqSteelRingStock> {
+public interface IGsqStockService extends IDocService<GsqStock> {
 
     /**
      * 校验"库存日期+钢丝圈代码"组合唯一性
@@ -20,7 +20,7 @@ public interface IGsqSteelRingStockService extends IDocService<GsqSteelRingStock
      * @param entity 实体
      * @return 唯一性结果（UserConstants.UNIQUE=唯一，UserConstants.NOT_UNIQUE=不唯一）
      */
-    String checkUnique(GsqSteelRingStock entity);
+    String checkUnique(GsqStock entity);
 
     /**
      * 导入数据，并保存记录
@@ -30,5 +30,5 @@ public interface IGsqSteelRingStockService extends IDocService<GsqSteelRingStock
      * @param importLogId   导入日志id
      * @return 导入后提示信息
      */
-    AjaxResult importData(List<GsqSteelRingStock> list, boolean updateSupport, Long importLogId);
+    AjaxResult importData(List<GsqStock> list, boolean updateSupport, Long importLogId);
 }
