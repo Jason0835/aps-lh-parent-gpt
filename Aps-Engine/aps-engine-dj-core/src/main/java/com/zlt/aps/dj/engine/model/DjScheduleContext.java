@@ -130,7 +130,17 @@ public class DjScheduleContext {
         if (processLog == null) {
             processLog = new StringBuilder(4096);
         }
-        processLog.append(java.text.MessageFormat.format(format, args)).append("\n");
+        // BigDecimal 转为纯数字字符串（避免 MessageFormat 自动加千分符）
+        Object[] plainArgs = args;
+        for (int i = 0; i < args.length; i++) {
+            if (args[i] instanceof BigDecimal) {
+                if (plainArgs == args) {
+                    plainArgs = args.clone();
+                }
+                plainArgs[i] = ((BigDecimal) args[i]).toPlainString();
+            }
+        }
+        processLog.append(java.text.MessageFormat.format(format, plainArgs)).append("\n");
     }
 
     /**

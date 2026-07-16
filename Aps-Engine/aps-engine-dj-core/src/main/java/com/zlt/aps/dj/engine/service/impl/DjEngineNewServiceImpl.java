@@ -1124,6 +1124,15 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
             BigDecimal shiftRemainingCapacity = shiftTotalCapacity;
             context.appendLog("班次 {0} 总产能上限：{1}", shiftIndex, shiftTotalCapacity);
 
+            // 计算本班初始剩余台车数：工装总数 - 交班库存 / 卷曲米数 / 整车率（向下取整）
+            BigDecimal shiftRemainingTrolleys = calcRemainingTrolleys(context, handoverInventory);
+            BigDecimal trolleyStdCurlLength = this.getParamAsDecimal(context, DjEngineConstants.PARAM_STANDARD_CRIMP_LENGTH);
+            BigDecimal trolleyFullRate = this.getParamAsDecimal(context, DjEngineConstants.PARAM_TROLLEY_FULL_RATE);
+            if (trolleyFullRate.compareTo(BigDecimal.ZERO) <= 0) {
+                trolleyFullRate = BigDecimal.ONE;
+            }
+            context.appendLog("班次 {0} 初始剩余台车数：{1}", shiftIndex, shiftRemainingTrolleys);
+
             // 遍历所有机台
             for (Map.Entry<String, DjMachineInfo> machineEntry : machineMap.entrySet()) {
                 String machineCode = machineEntry.getKey();
@@ -1184,6 +1193,12 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
                 // 机台剩余产能不能超过本班台车约束的剩余量
                 remainingCapacity = remainingCapacity.min(shiftRemainingCapacity);
 
+                // 累计本机台本班规格切换损耗
+                BigDecimal totalSwitchLoss = BigDecimal.ZERO;
+                // 平均（免费）切换次数，超过()后才算损失
+                int avgSwitchCount = this.getParamAsInt(context, DjEngineConstants.PARAM_AVG_SWITCH_COUNT, 3);
+                int switchCount = 0;
+
                 // 逐个规格安排排产
                 for (DjPaddingDemand spec : pendingSpecs) {
                     if (!spec.isNeedProduce() || spec.getRemainingDemand() == null
@@ -1197,6 +1212,14 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
                     // 计算机台切换损失
                     BigDecimal mouthPlateSwitchTime = this.getParamAsDecimal(context, DjEngineConstants.PARAM_MOUTH_PLATE_SWITCH_TIME);
                     BigDecimal switchLoss = this.calcSwitchLoss(machine, lastSpecCode, spec, mouthPlateSwitchTime);
+
+                    // 前 avgSwitchCount 次实际切换不计算产能损失（平均切换次数内免费）
+                    if (lastSpecCode != null && !lastSpecCode.equals(spec.getPaddingCode())) {
+                        switchCount++;
+                        if (switchCount <= avgSwitchCount) {
+                            switchLoss = BigDecimal.ZERO;
+                        }
+                    }
 
                     // 生产量计算
                     BigDecimal produceQty = calcProduceQty(spec, remainingCapacity.subtract(switchLoss),
@@ -1244,14 +1267,26 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
                     remainingCapacity = remainingCapacity.subtract(produceQty).subtract(switchLoss);
                     machineCapacity.put(shiftIndex, remainingCapacity);
 
+                    // 累计规格切换损耗
+                    totalSwitchLoss = totalSwitchLoss.add(switchLoss);
+
                     // 扣减本班台车约束剩余量
                     shiftRemainingCapacity = shiftRemainingCapacity.subtract(produceQty);
                     if (shiftRemainingCapacity.compareTo(BigDecimal.ZERO) < 0) {
                         shiftRemainingCapacity = BigDecimal.ZERO;
                     }
+
+                    // 扣减剩余台车数：生产量 / 卷曲米数 / 整车率，结果向下取整
+                    BigDecimal consumedTrolleys = produceQty.divide(trolleyStdCurlLength, 4, RoundingMode.HALF_UP)
+                            .divide(trolleyFullRate, 4, RoundingMode.HALF_UP)
+                            .setScale(0, RoundingMode.FLOOR);
+                    shiftRemainingTrolleys = shiftRemainingTrolleys.subtract(consumedTrolleys);
+                    if (shiftRemainingTrolleys.compareTo(BigDecimal.ZERO) < 0) {
+                        shiftRemainingTrolleys = BigDecimal.ZERO;
+                    }
                 }
-                context.appendLog("  机台 {0} 班次 {1} 剩余产能：{2}", machineCode, shiftIndex,
-                        remainingCapacity.max(BigDecimal.ZERO));
+                context.appendLog("  机台 {0} 班次 {1} 剩余产能：{2}，剩余台车数：{3}，班次剩余产能（台车约束）：{4}，规格切换损耗：{5}", machineCode, shiftIndex,
+                        remainingCapacity.max(BigDecimal.ZERO), shiftRemainingTrolleys.max(BigDecimal.ZERO), shiftRemainingCapacity.max(BigDecimal.ZERO), totalSwitchLoss);
             }
 
             // 本班排产完毕后，计算各规格交班库存
@@ -1479,7 +1514,7 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
             context.appendLog("  规格 {0}：胎胚={1}，成型机={2}，深度={3}班，单耗={4}，成型窗口内计划：{5}",
                     DjScheduleContext.buildDisplayName(spec.getPaddingName(), spec.getPaddingCode()), embryoCodes,
                     cxMachineCodes,
-                    specSupplyDepth, spec.getUnitConsume().toPlainString(), shiftInfo.toString());
+                    specSupplyDepth, spec.getUnitConsume(), shiftInfo.toString());
         }
     }
 
@@ -1587,6 +1622,45 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
         log.debug("台车约束计算：工装总数={}, 有效库存={}, 整车率={}, 标准卷曲={}, 可用台车={}, 上限={}",
                 toolTotalNum, totalEffectiveStock, trolleyFullRate, standardCurlLength, availableTrolleys, limit);
         return limit;
+    }
+
+    /**
+     * 计算本班初始剩余台车数
+     * <p>公式：工装总数 - 交班库存 / 卷曲米数 / 整车率，结果向下取整</p>
+     *
+     * @param context           排产上下文
+     * @param handoverInventory 当前交班库存 Map<paddingCode, inventory>
+     * @return 剩余台车数（向下取整）
+     */
+    private BigDecimal calcRemainingTrolleys(DjScheduleContext context, Map<String, BigDecimal> handoverInventory) {
+        Map<String, DjParams> paramsMap = context.getParamsMap();
+
+        // 工装（台车）总数
+        BigDecimal toolTotalNum = this.getParamAsDecimal(paramsMap, DjEngineConstants.PARAM_TOOL_TOTAL_NUM);
+
+        // 标准卷曲米数
+        BigDecimal standardCurlLength = this.getParamAsDecimal(paramsMap,
+                DjEngineConstants.PARAM_STANDARD_CRIMP_LENGTH);
+
+        // 整车率
+        BigDecimal trolleyFullRate = this.getParamAsDecimal(paramsMap, DjEngineConstants.PARAM_TROLLEY_FULL_RATE);
+        if (trolleyFullRate.compareTo(BigDecimal.ZERO) <= 0) {
+            trolleyFullRate = BigDecimal.ONE;
+        }
+
+        // 交班库存总和
+        BigDecimal totalHandoverInv = handoverInventory.values().stream()
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        // 计算：工装总数 - 交班库存 / 卷曲米数 / 整车率
+        BigDecimal invTrolleys = totalHandoverInv.divide(standardCurlLength, 4, RoundingMode.HALF_UP)
+                .divide(trolleyFullRate, 4, RoundingMode.HALF_UP);
+        BigDecimal remaining = toolTotalNum.subtract(invTrolleys);
+        if (remaining.compareTo(BigDecimal.ZERO) < 0) {
+            remaining = BigDecimal.ZERO;
+        }
+        // 向下取整
+        return remaining.setScale(0, RoundingMode.FLOOR);
     }
 
     /**
@@ -2137,5 +2211,21 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
      */
     private BigDecimal getParamAsDecimal(DjScheduleContext context, String key) {
         return this.getParamAsDecimal(context.getParamsMap(), key);
+    }
+
+    /**
+     * 获取参数整型值（通过 context），参数不存在时返回默认值
+     */
+    private int getParamAsInt(DjScheduleContext context, String key, int defaultValue) {
+        DjParams param = (context.getParamsMap() != null) ? context.getParamsMap().get(key) : null;
+        String val = this.resolveParamValue(param);
+        if (val == null) {
+            return defaultValue;
+        }
+        try {
+            return Integer.parseInt(val.trim());
+        } catch (NumberFormatException e) {
+            return defaultValue;
+        }
     }
 }
