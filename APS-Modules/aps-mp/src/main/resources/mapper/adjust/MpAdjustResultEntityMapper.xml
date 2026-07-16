@@ -136,7 +136,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
          1. 写入目标表为 T_MP_ADJUST_RESULT
          2. 数据来源取上月调整结果表 DAY_x
          3. 当月版本号从 T_MP_ADJUST_RESULT 取 MAX(VERSION)（ADJ前缀）
-         4. 按 (分厂+物料+产品状态+VERSION=当月ADJ版本号) 维度匹配更新
+         4. 按 (分厂+物料+VERSION=当月ADJ版本号) 维度匹配更新（调整结果表无 PRODUCT_STATUS 字段）
+         5. stockMap 按(分厂+物料)聚合取 MIN(STOCK_CAPTURE_DATE)，因为调整结果表不区分示方类型
+         6. fin 按(分厂+物料+FINISH_DATE)聚合，对该分厂+物料下所有示方类型完成量求和
          防御：stockCaptureDate 若因任何原因超出 [startDate, endDate] 范围，
                SQL 层通过 CASE WHEN ... BETWEEN 夹紧到 startDate，避免 start > end 的非法区间
     -->
@@ -146,7 +148,6 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             SELECT
             f5.FACTORY_CODE,
             f5.MATERIAL_CODE,
-            f5.PRODUCT_STATUS,
             pv7.VERSION AS CURRENT_ADJ_VERSION,
             (
             IFNULL(CASE WHEN DAYOFMONTH(CASE WHEN stockMap.STOCK_CAPTURE_DATE BETWEEN #{startDate} AND #{endDate} THEN stockMap.STOCK_CAPTURE_DATE ELSE #{startDate} END) &lt;= 1 THEN f5.DAY_1 ELSE 0 END, 0) +
@@ -193,38 +194,40 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                   AND VERSION LIKE 'ADJ%'
                 GROUP BY FACTORY_CODE
             ) pv7 ON pv7.FACTORY_CODE = f5.FACTORY_CODE
+            -- 库存抓取日映射（调整结果表无 PRODUCT_STATUS，按 分厂+物料 维度聚合取 MIN）
             LEFT JOIN (
-                <foreach collection="stockCaptureDateList" item="item" separator="UNION ALL">
-                    SELECT
-                        #{item.factoryCode} AS FACTORY_CODE,
-                        #{item.materialCode} AS MATERIAL_CODE,
-                        #{item.productStatus} AS PRODUCT_STATUS,
-                        #{item.stockCaptureDate} AS STOCK_CAPTURE_DATE
-                </foreach>
+                SELECT FACTORY_CODE, MATERIAL_CODE, MIN(STOCK_CAPTURE_DATE) AS STOCK_CAPTURE_DATE
+                FROM (
+                    <foreach collection="stockCaptureDateList" item="item" separator="UNION ALL">
+                        SELECT
+                            #{item.factoryCode} AS FACTORY_CODE,
+                            #{item.materialCode} AS MATERIAL_CODE,
+                            #{item.stockCaptureDate} AS STOCK_CAPTURE_DATE
+                    </foreach>
+                ) stockRaw
+                GROUP BY FACTORY_CODE, MATERIAL_CODE
             ) stockMap ON stockMap.FACTORY_CODE = f5.FACTORY_CODE
                       AND stockMap.MATERIAL_CODE = f5.MATERIAL_CODE
-                      AND IFNULL(stockMap.PRODUCT_STATUS, '') = IFNULL(f5.PRODUCT_STATUS, '')
+            -- 完成量按(分厂+物料+FINISH_DATE)聚合，不区分示方类型LH_TYPE
             LEFT JOIN (
                 SELECT
                     FACTORY_CODE,
                     MATERIAL_CODE,
-                    LH_TYPE,
                     FINISH_DATE,
                     IFNULL(SUM(DAY_FINISH_QTY), 0) AS DAY_QTY
                 FROM T_LH_DAY_FINISH_QTY
                 WHERE IS_DELETE = 0
                   AND FINISH_DATE BETWEEN #{startDate} AND #{endDate}
-                GROUP BY FACTORY_CODE, MATERIAL_CODE, LH_TYPE, FINISH_DATE
+                GROUP BY FACTORY_CODE, MATERIAL_CODE, FINISH_DATE
             ) fin ON fin.FACTORY_CODE = f5.FACTORY_CODE
                   AND fin.MATERIAL_CODE = f5.MATERIAL_CODE
-                  AND IFNULL(fin.LH_TYPE, '') = IFNULL(f5.PRODUCT_STATUS, '')
                   AND fin.FINISH_DATE &gt;= IFNULL(CASE WHEN stockMap.STOCK_CAPTURE_DATE BETWEEN #{startDate} AND #{endDate} THEN stockMap.STOCK_CAPTURE_DATE ELSE #{startDate} END, #{startDate})
                   AND fin.FINISH_DATE &lt;= #{endDate}
             WHERE f5.IS_DELETE = 0
             AND f5.YEAR = #{lastYear}
             AND f5.MONTH = #{lastMonth}
             AND f5.VERSION LIKE 'ADJ%'
-            GROUP BY f5.FACTORY_CODE, f5.MATERIAL_CODE, f5.PRODUCT_STATUS, pv7.VERSION,
+            GROUP BY f5.FACTORY_CODE, f5.MATERIAL_CODE, pv7.VERSION,
             stockMap.STOCK_CAPTURE_DATE,
             f5.DAY_1, f5.DAY_2, f5.DAY_3, f5.DAY_4, f5.DAY_5, f5.DAY_6, f5.DAY_7, f5.DAY_8,
             f5.DAY_9, f5.DAY_10, f5.DAY_11, f5.DAY_12, f5.DAY_13, f5.DAY_14, f5.DAY_15, f5.DAY_16,
@@ -232,7 +235,6 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             f5.DAY_25, f5.DAY_26, f5.DAY_27, f5.DAY_28, f5.DAY_29, f5.DAY_30, f5.DAY_31
             ) calc ON f.FACTORY_CODE = calc.FACTORY_CODE
             AND f.MATERIAL_CODE = calc.MATERIAL_CODE
-            AND IFNULL(f.PRODUCT_STATUS, '') = IFNULL(calc.PRODUCT_STATUS, '')
             AND f.VERSION = calc.CURRENT_ADJ_VERSION
             LEFT JOIN T_MP_FACTORY_PARAM fp ON fp.FACTORY_CODE = f.FACTORY_CODE
             AND fp.PRODUCT_TYPE_CODE = f.PRODUCT_TYPE_CODE
@@ -255,7 +257,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
          逻辑同定稿表 selectMissingLastMonthOverProd，区别：
          1. 数据来源表为 T_MP_ADJUST_RESULT
          2. 当月版本号从 T_MP_ADJUST_RESULT 取 MAX(VERSION)（ADJ前缀）
-         3. 防重判断增加 VERSION 维度
+         3. 调整结果表无 PRODUCT_STATUS 字段，按 (分厂+物料) 维度计算
+         4. stockMap 按(分厂+物料)聚合取 MIN(STOCK_CAPTURE_DATE)
+         5. fin 按(分厂+物料+FINISH_DATE)聚合，对该分厂+物料下所有示方类型完成量求和
          字段映射：
            - 年月取当月
            - VERSION 取当月最新ADJ版本号
@@ -278,7 +282,6 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             f5.PRODUCTION_VERSION AS productionVersion,
             '03' AS adjustType,
             calc.MATERIAL_CODE AS materialCode,
-            f5.PRODUCT_STATUS AS productStatus,
             f5.PRODUCT_TYPE_CODE AS productTypeCode,
             f5.EMBRYO_CODE AS embryoCode,
             f5.BRAND AS brand,
@@ -321,7 +324,6 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             SELECT
                 f5.FACTORY_CODE,
                 f5.MATERIAL_CODE,
-                f5.PRODUCT_STATUS,
                 (
                     IFNULL(CASE WHEN DAYOFMONTH(CASE WHEN stockMap.STOCK_CAPTURE_DATE BETWEEN #{startDate} AND #{endDate} THEN stockMap.STOCK_CAPTURE_DATE ELSE #{startDate} END) &lt;= 1 THEN f5.DAY_1 ELSE 0 END, 0) +
         IFNULL(CASE WHEN DAYOFMONTH(CASE WHEN stockMap.STOCK_CAPTURE_DATE BETWEEN #{startDate} AND #{endDate} THEN stockMap.STOCK_CAPTURE_DATE ELSE #{startDate} END) &lt;= 2 THEN f5.DAY_2 ELSE 0 END, 0) +
@@ -356,38 +358,40 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         IFNULL(CASE WHEN DAYOFMONTH(CASE WHEN stockMap.STOCK_CAPTURE_DATE BETWEEN #{startDate} AND #{endDate} THEN stockMap.STOCK_CAPTURE_DATE ELSE #{startDate} END) &lt;= 31 THEN f5.DAY_31 ELSE 0 END, 0)
         ) - IFNULL(SUM(fin.DAY_QTY), 0) AS OVERDUE_QTY
         FROM T_MP_ADJUST_RESULT f5
+        -- 库存抓取日映射（调整结果表无 PRODUCT_STATUS，按 分厂+物料 维度聚合取 MIN）
         LEFT JOIN (
-            <foreach collection="stockCaptureDateList" item="item" separator="UNION ALL">
-                SELECT
-                    #{item.factoryCode} AS FACTORY_CODE,
-                    #{item.materialCode} AS MATERIAL_CODE,
-                    #{item.productStatus} AS PRODUCT_STATUS,
-                    #{item.stockCaptureDate} AS STOCK_CAPTURE_DATE
-            </foreach>
+            SELECT FACTORY_CODE, MATERIAL_CODE, MIN(STOCK_CAPTURE_DATE) AS STOCK_CAPTURE_DATE
+            FROM (
+                <foreach collection="stockCaptureDateList" item="item" separator="UNION ALL">
+                    SELECT
+                        #{item.factoryCode} AS FACTORY_CODE,
+                        #{item.materialCode} AS MATERIAL_CODE,
+                        #{item.stockCaptureDate} AS STOCK_CAPTURE_DATE
+                </foreach>
+            ) stockRaw
+            GROUP BY FACTORY_CODE, MATERIAL_CODE
         ) stockMap ON stockMap.FACTORY_CODE = f5.FACTORY_CODE
                   AND stockMap.MATERIAL_CODE = f5.MATERIAL_CODE
-                  AND IFNULL(stockMap.PRODUCT_STATUS, '') = IFNULL(f5.PRODUCT_STATUS, '')
+        -- 完成量按(分厂+物料+FINISH_DATE)聚合，不区分示方类型LH_TYPE
         LEFT JOIN (
         SELECT
         FACTORY_CODE,
         MATERIAL_CODE,
-        LH_TYPE,
         FINISH_DATE,
         IFNULL(SUM(DAY_FINISH_QTY), 0) AS DAY_QTY
         FROM T_LH_DAY_FINISH_QTY
         WHERE IS_DELETE = 0
         AND FINISH_DATE BETWEEN #{startDate} AND #{endDate}
-        GROUP BY FACTORY_CODE, MATERIAL_CODE, LH_TYPE, FINISH_DATE
+        GROUP BY FACTORY_CODE, MATERIAL_CODE, FINISH_DATE
         ) fin ON fin.FACTORY_CODE = f5.FACTORY_CODE
         AND fin.MATERIAL_CODE = f5.MATERIAL_CODE
-        AND IFNULL(fin.LH_TYPE, '') = IFNULL(f5.PRODUCT_STATUS, '')
         AND fin.FINISH_DATE &gt;= IFNULL(CASE WHEN stockMap.STOCK_CAPTURE_DATE BETWEEN #{startDate} AND #{endDate} THEN stockMap.STOCK_CAPTURE_DATE ELSE #{startDate} END, #{startDate})
         AND fin.FINISH_DATE &lt;= #{endDate}
         WHERE f5.IS_DELETE = 0
         AND f5.YEAR = #{lastYear}
         AND f5.MONTH = #{lastMonth}
         AND f5.VERSION LIKE 'ADJ%'
-        GROUP BY f5.FACTORY_CODE, f5.MATERIAL_CODE, f5.PRODUCT_STATUS, stockMap.STOCK_CAPTURE_DATE,
+        GROUP BY f5.FACTORY_CODE, f5.MATERIAL_CODE, stockMap.STOCK_CAPTURE_DATE,
         f5.DAY_1, f5.DAY_2, f5.DAY_3, f5.DAY_4, f5.DAY_5, f5.DAY_6, f5.DAY_7, f5.DAY_8,
         f5.DAY_9, f5.DAY_10, f5.DAY_11, f5.DAY_12, f5.DAY_13, f5.DAY_14, f5.DAY_15, f5.DAY_16,
         f5.DAY_17, f5.DAY_18, f5.DAY_19, f5.DAY_20, f5.DAY_21, f5.DAY_22, f5.DAY_23, f5.DAY_24,
@@ -396,7 +400,6 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         INNER JOIN T_MP_ADJUST_RESULT f5
         ON f5.FACTORY_CODE = calc.FACTORY_CODE
         AND f5.MATERIAL_CODE = calc.MATERIAL_CODE
-        AND IFNULL(f5.PRODUCT_STATUS, '') = IFNULL(calc.PRODUCT_STATUS, '')
         AND f5.YEAR = #{lastYear}
         AND f5.MONTH = #{lastMonth}
         AND f5.VERSION LIKE 'ADJ%'
@@ -417,11 +420,10 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         AND fp.PRODUCT_TYPE_CODE = f5.PRODUCT_TYPE_CODE
         AND fp.PARAM_CODE = #{overdueThresholdParamCode}
         AND fp.IS_DELETE = 0
-        -- 防重：当月调整结果表按相同维度(含VERSION)已存在的不插入
+        -- 防重：当月调整结果表按相同维度(分厂+物料+VERSION)已存在的不插入
         LEFT JOIN T_MP_ADJUST_RESULT exist
         ON exist.FACTORY_CODE = calc.FACTORY_CODE
         AND exist.MATERIAL_CODE = calc.MATERIAL_CODE
-        AND IFNULL(exist.PRODUCT_STATUS, '') = IFNULL(calc.PRODUCT_STATUS, '')
         AND exist.VERSION = procVer.VERSION
         AND exist.YEAR = #{currentYear}
         AND exist.MONTH = #{currentMonth}
@@ -436,6 +438,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
          1. 写入目标表为 T_MP_ADJUST_RESULT
          2. 数据来源取上月调整结果表
          3. 当月版本号从 T_MP_ADJUST_RESULT 取 MAX(VERSION)（ADJ前缀）
+         4. 按 (分厂+物料+VERSION=当月ADJ版本号) 维度匹配更新（调整结果表无 PRODUCT_STATUS 字段）
+         5. stockMap 按(分厂+物料)聚合取 MIN(STOCK_CAPTURE_DATE)，因为调整结果表不区分示方类型
+         6. fin 按(分厂+物料+FINISH_DATE)聚合，对该分厂+物料下所有示方类型完成量求和
          防御：stockCaptureDate 若因任何原因超出 [startDate, endDate] 范围，
                SQL 层通过 CASE WHEN ... BETWEEN 夹紧到 startDate，避免 start > end 的非法区间
     -->
@@ -445,7 +450,6 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             SELECT
             f5.FACTORY_CODE,
             f5.MATERIAL_CODE,
-            f5.PRODUCT_STATUS,
             pv7.VERSION AS CURRENT_ADJ_VERSION,
             (
             IFNULL(CASE WHEN DAYOFMONTH(CASE WHEN stockMap.STOCK_CAPTURE_DATE BETWEEN #{startDate} AND #{endDate} THEN stockMap.STOCK_CAPTURE_DATE ELSE #{startDate} END) &lt;= 1 THEN f5.DAY_1 ELSE 0 END, 0) +
@@ -491,38 +495,40 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                   AND VERSION LIKE 'ADJ%'
                 GROUP BY FACTORY_CODE
             ) pv7 ON pv7.FACTORY_CODE = f5.FACTORY_CODE
+            -- 库存抓取日映射（调整结果表无 PRODUCT_STATUS，按 分厂+物料 维度聚合取 MIN）
             LEFT JOIN (
-                <foreach collection="stockCaptureDateList" item="item" separator="UNION ALL">
-                    SELECT
-                        #{item.factoryCode} AS FACTORY_CODE,
-                        #{item.materialCode} AS MATERIAL_CODE,
-                        #{item.productStatus} AS PRODUCT_STATUS,
-                        #{item.stockCaptureDate} AS STOCK_CAPTURE_DATE
-                </foreach>
+                SELECT FACTORY_CODE, MATERIAL_CODE, MIN(STOCK_CAPTURE_DATE) AS STOCK_CAPTURE_DATE
+                FROM (
+                    <foreach collection="stockCaptureDateList" item="item" separator="UNION ALL">
+                        SELECT
+                            #{item.factoryCode} AS FACTORY_CODE,
+                            #{item.materialCode} AS MATERIAL_CODE,
+                            #{item.stockCaptureDate} AS STOCK_CAPTURE_DATE
+                    </foreach>
+                ) stockRaw
+                GROUP BY FACTORY_CODE, MATERIAL_CODE
             ) stockMap ON stockMap.FACTORY_CODE = f5.FACTORY_CODE
                       AND stockMap.MATERIAL_CODE = f5.MATERIAL_CODE
-                      AND IFNULL(stockMap.PRODUCT_STATUS, '') = IFNULL(f5.PRODUCT_STATUS, '')
+            -- 完成量按(分厂+物料+FINISH_DATE)聚合，不区分示方类型LH_TYPE
             LEFT JOIN (
                 SELECT
                     FACTORY_CODE,
                     MATERIAL_CODE,
-                    LH_TYPE,
                     FINISH_DATE,
                     IFNULL(SUM(DAY_FINISH_QTY), 0) AS DAY_QTY
                 FROM T_LH_DAY_FINISH_QTY
                 WHERE IS_DELETE = 0
                   AND FINISH_DATE BETWEEN #{startDate} AND #{endDate}
-                GROUP BY FACTORY_CODE, MATERIAL_CODE, LH_TYPE, FINISH_DATE
+                GROUP BY FACTORY_CODE, MATERIAL_CODE, FINISH_DATE
             ) fin ON fin.FACTORY_CODE = f5.FACTORY_CODE
                   AND fin.MATERIAL_CODE = f5.MATERIAL_CODE
-                  AND IFNULL(fin.LH_TYPE, '') = IFNULL(f5.PRODUCT_STATUS, '')
                   AND fin.FINISH_DATE &gt;= IFNULL(CASE WHEN stockMap.STOCK_CAPTURE_DATE BETWEEN #{startDate} AND #{endDate} THEN stockMap.STOCK_CAPTURE_DATE ELSE #{startDate} END, #{startDate})
                   AND fin.FINISH_DATE &lt;= #{endDate}
             WHERE f5.IS_DELETE = 0
             AND f5.YEAR = #{lastYear}
             AND f5.MONTH = #{lastMonth}
             AND f5.VERSION LIKE 'ADJ%'
-            GROUP BY f5.FACTORY_CODE, f5.MATERIAL_CODE, f5.PRODUCT_STATUS, pv7.VERSION,
+            GROUP BY f5.FACTORY_CODE, f5.MATERIAL_CODE, pv7.VERSION,
             stockMap.STOCK_CAPTURE_DATE,
             f5.DAY_1, f5.DAY_2, f5.DAY_3, f5.DAY_4, f5.DAY_5, f5.DAY_6, f5.DAY_7, f5.DAY_8,
             f5.DAY_9, f5.DAY_10, f5.DAY_11, f5.DAY_12, f5.DAY_13, f5.DAY_14, f5.DAY_15, f5.DAY_16,
@@ -530,7 +536,6 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             f5.DAY_25, f5.DAY_26, f5.DAY_27, f5.DAY_28, f5.DAY_29, f5.DAY_30, f5.DAY_31
             ) calc ON f.FACTORY_CODE = calc.FACTORY_CODE
             AND f.MATERIAL_CODE = calc.MATERIAL_CODE
-            AND IFNULL(f.PRODUCT_STATUS, '') = IFNULL(calc.PRODUCT_STATUS, '')
             AND f.VERSION = calc.CURRENT_ADJ_VERSION
             LEFT JOIN T_MP_FACTORY_PARAM fp ON fp.FACTORY_CODE = f.FACTORY_CODE
             AND fp.PRODUCT_TYPE_CODE = f.PRODUCT_TYPE_CODE
