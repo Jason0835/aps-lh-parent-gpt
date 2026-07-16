@@ -317,16 +317,27 @@ public class MonthPlanSurplusCalculator {
     }
 
     /**
-     * 根据SKU日排产周期内的月计划安排情况，获取SKU对应的计划量
-     * <p>
-     * 需要看日排产周期是否存在跨月，按断点日累加计划量，支持跨月连续。
-     * </p>
+     * 根据Sku日排产周期内的月计划安排情况，获取Sku对应的计划量
+     * 需要看日排产周期是否存在跨月
+     * 1、不存在跨月
+     * 1.1、看下个月是否定稿
+     * 1.1.1、如果定稿则计划量计算起始日为下一个月定稿对应需求的库存抓取日
+     * 1.1.2、如果没有定稿，则计划量计算起始日为当月计划的第一天
+     * 1.2、看日排产周期内是否有计划量
+     * 1.2.1、没有计划量，则取当前周期日之前的所有月计划量(计划量计算起始日~当前周期日)
+     * 1.2.2、有计划量，则取得最晚计划量日，从最晚日往后找，找到第一个没有计划量日前一日，统计从计划量计算起始日~找到的日之间的计划量
+     * 2、存在跨月
+     * 2.1、日排产周期内是否有计划量
+     * 2.1.1、没有计划量，则取前一个月的所有计划量(计划量计算起始日~当月月底)
+     * 2.1.2、有计划量，则看最晚一个计划量所处月
+     * 2.1.2.1、如果最晚日计划量所处月份为后一个月，则从最晚日开始，查找后一个月最晚日往后，第一个没有计划量日前一日，统计前一个月的所有计划量(计划量计算起始日~当月月底)+后一个月开始日~找到的日之间的计划量
+     * 2.1.2.2、如果最晚日计划量所处月份为前一个月，则统计前一个月的所有计划量(计划量计算起始日~当月月底)
      *
-     * @param allProductionDate      日排产周期信息
+     * @param allProductionDate      日排产周期信息(通常为三天8个班)
      * @param allMonthPlanList       所有月计划量
-     * @param skuMonthProductionInfo SKU信息
+     * @param skuMonthProductionInfo Sku信息
      * @param startDay               第一个月的计划量起始日
-     * @return 年-月 -> 计划量
+     * @return
      */
     public static Map<YearMonth, Integer> getPlanQty(List<Date> allProductionDate,
                                                      List<FactoryMonthPlanProductionFinalResult> allMonthPlanList,
@@ -417,7 +428,24 @@ public class MonthPlanSurplusCalculator {
     // ==================== 以下为内部计算方法 ====================
 
     /**
-     * 根据SKU日排产周期内的月计划安排情况，获取SKU对应的计划量（内部实现）
+     * 根据Sku日排产周期内的月计划安排情况，获取Sku对应的计划量
+     * 需要看日排产周期是否存在跨月
+     * 1、不存在跨月
+     * 1.1、看日排产周期内是否有计划量
+     * 1.1.1、没有计划量，则取当前周期日之前的所有月计划量
+     * 1.1.2、有计划量，则取得最晚计划量日，从最晚日往后找，找到第一个没有计划量日前一日，统计从月周期起始日~找到的日之间的计划量
+     * 2、存在跨月
+     * 2.1、日排产周期内是否有计划量
+     * 2.1.1、没有计划量，则取前一个月的所有计划量
+     * 2.1.2、有计划量，则看最晚一个计划量所处月
+     * 2.1.2.1、如果最晚日计划量所处月份为后一个月，则从最晚日开始，查找后一个月最晚日往后，第一个没有计划量日前一日，统计前一个月的所有计划量+后一个月开始日~找到的日之间的计划量
+     * 2.1.2.2、如果最晚日计划量所处月份为前一个月，则统计前一个月的所有计划量
+     *
+     * @param skuMonthProductionInfo Sku信息
+     * @param startDay               前一个月份计划量计算起始日
+     * @param allProductionList      日排产周期
+     * @param allMonthPlanList       所有月排产计划
+     * @return
      */
     private static Map<YearMonth, Integer> getPlanQtyByMonthPlan(FactoryMonthPlanProductionFinalResult skuMonthProductionInfo,
                                                                  Integer startDay, List<Date> allProductionList,
@@ -484,8 +512,16 @@ public class MonthPlanSurplusCalculator {
     }
 
     /**
-     * 根据排产日信息，获取在dateList中最晚出现计划量的日期，
-     * 以此日为起始往后查找连续段终点，统计从startDay到终点的计划量
+     * 根据排产日信息，获取在dateList中最晚出现计划量的日期
+     * 1、以此日为起始，往后查找，直到第一个没有排产量的排产日
+     * 以找到的排产日，统计从计划量起始日~找到的排产日前一个日的计划量
+     * 2、如果在dateList中都没有计划量，则从dateList之后一个日开始，
+     * 找到最早一段连续排产量的最后一个有计划量的排产日，统计从计划量起始日startDay~找到的排产日的计划量
+     *
+     * @param skuMonthProductionInfo Sku信息
+     * @param startDay               计算计划量起始日
+     * @param dateList               有计划量排产日集合
+     * @return
      */
     private static Integer getEarliestContinuousPlanQty(FactoryMonthPlanProductionFinalResult skuMonthProductionInfo,
                                                         Integer startDay, List<Date> dateList) {
@@ -533,6 +569,9 @@ public class MonthPlanSurplusCalculator {
 
     /**
      * 排产日按年月分组处理
+     *
+     * @param allProductionList
+     * @return
      */
     private static Map<YearMonth, List<Date>> getYearMonthProductionDateInfo(List<Date> allProductionList) {
         if (CollectionUtils.isEmpty(allProductionList)) {
@@ -553,6 +592,11 @@ public class MonthPlanSurplusCalculator {
 
     /**
      * 排产日是否有排产计划量
+     *
+     * @param allMonthPlanList       所有排产计划
+     * @param yearMonthMap           年-月信息
+     * @param skuMonthProductionInfo Sku信息
+     * @return
      */
     private static Map<YearMonth, FactoryMonthPlanProductionFinalResult> getHasProductionPlan(
             List<FactoryMonthPlanProductionFinalResult> allMonthPlanList, Map<YearMonth, List<Date>> yearMonthMap,
@@ -579,7 +623,10 @@ public class MonthPlanSurplusCalculator {
     }
 
     /**
-     * 获取排产日所在月份的天数集合
+     * 获取排日所在月份的天数集合
+     *
+     * @param dateList
+     * @return
      */
     private static List<Integer> getMonthDayList(List<Date> dateList) {
         if (CollectionUtils.isEmpty(dateList)) {
@@ -591,7 +638,12 @@ public class MonthPlanSurplusCalculator {
     }
 
     /**
-     * 在月计划中获取dayList集合中最后一个有计划量的排产日
+     * 在skuMonthProductionInfo中获取dayList集合中
+     * 最后一个有计划量的排产日
+     *
+     * @param dayList                需要排产日集合
+     * @param skuMonthProductionInfo 月排产信息
+     * @return
      */
     private static Integer getLastHasPlanQtyDay(List<Integer> dayList, FactoryMonthPlanProductionFinalResult skuMonthProductionInfo) {
         if (null == skuMonthProductionInfo || CollectionUtils.isEmpty(dayList)) {
@@ -612,8 +664,13 @@ public class MonthPlanSurplusCalculator {
     }
 
     /**
-     * 获取从startDay开始，连续有计划量的最后一个排产日
+     * 获取从startDay开始，连续有计划量的最后一个排产日：
      * 即获取最早没有计划排产量的排产日的前一日
+     *
+     * @param startDay               开始日
+     * @param yearMonth              年份-月份
+     * @param skuMonthProductionInfo sku月排产信息
+     * @return
      */
     private static Integer getEarliestContinuousDay(Integer startDay, YearMonth yearMonth,
                                                     FactoryMonthPlanProductionFinalResult skuMonthProductionInfo) {
@@ -641,7 +698,13 @@ public class MonthPlanSurplusCalculator {
     }
 
     /**
-     * 在月计划中取得从startDay开始往后，第一段连续排产计划的最后一个排产日
+     * 获取从startDay开始，连续有计划量的最后一个排产日：
+     * 即获取最早没有计划排产量的排产日的前一日
+     *
+     * @param startDay               开始日
+     * @param yearMonth              年份-月份
+     * @param skuMonthProductionInfo sku月排产信息
+     * @return
      */
     private static Integer getEarliestContinuousEndDay(Integer startDay, YearMonth yearMonth,
                                                        FactoryMonthPlanProductionFinalResult skuMonthProductionInfo) {
@@ -667,7 +730,12 @@ public class MonthPlanSurplusCalculator {
     }
 
     /**
-     * 统计从startDay~endDay的所有计划量
+     * 统计从第startDay~endDay的所有计划量
+     *
+     * @param startDay               计算起始日
+     * @param endDay                 结束统计日
+     * @param skuMonthProductionInfo Sku月排产信息
+     * @return
      */
     private static Integer statisticsPlanQtyEndDay(Integer startDay, Integer endDay,
                                                    FactoryMonthPlanProductionFinalResult skuMonthProductionInfo) {
@@ -692,6 +760,11 @@ public class MonthPlanSurplusCalculator {
 
     /**
      * 获取对应年份的超欠产信息
+     *
+     * @param allMonthPlanList 所有计划
+     * @param skuInfo          Sku信息
+     * @param yearMonth        年-月信息
+     * @return
      */
     private static Integer getOverdueProduction(List<FactoryMonthPlanProductionFinalResult> allMonthPlanList,
                                                 FactoryMonthPlanProductionFinalResult skuInfo, YearMonth yearMonth) {
@@ -709,7 +782,10 @@ public class MonthPlanSurplusCalculator {
     }
 
     /**
-     * 获取所有计划量总和
+     * 获取所有计划计划量
+     *
+     * @param yearMonthPlanQtyMap
+     * @return
      */
     private static Integer getSumPlanQty(Map<YearMonth, Integer> yearMonthPlanQtyMap) {
         if (CollectionUtils.isEmpty(yearMonthPlanQtyMap)) {
