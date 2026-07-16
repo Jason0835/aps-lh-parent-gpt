@@ -1,6 +1,6 @@
 package com.zlt.aps.dj.engine.model;
 
-import com.zlt.aps.cx.entity.schedule.CxScheduleResult;
+import com.zlt.aps.cx.api.domain.entity.CxScheduleResult;
 import com.zlt.aps.dj.api.domain.entity.DjMachineInfo;
 import com.zlt.aps.dj.api.domain.entity.DjMachineMaintenance;
 import com.zlt.aps.dj.api.domain.entity.DjParams;
@@ -12,6 +12,7 @@ import java.math.BigDecimal;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * 排产上下文，承载步骤间共享数据
@@ -27,6 +28,9 @@ public class DjScheduleContext {
 
     /** 各垫胶规格的成型机台数量 Map<paddingCode, machineCount> */
     private Map<String, Integer> paddingCxMachineCount;
+
+    /** 各垫胶规格关联的成型机台号集合 Map<paddingCode, Set<machineCode>> */
+    private Map<String, Set<String>> paddingCxMachineSet;
 
     /** 各垫胶规格的供应窗口班次数（排产深度） Map<paddingCode, supplyDepth> */
     private Map<String, Integer> paddingSupplyDepth;
@@ -88,8 +92,33 @@ public class DjScheduleContext {
     /** 施工数据 Map<constructionCode, List<MdmConstructionInfo>>，同一施工号可能存在多个BOM版本 */
     private Map<String, List<MdmConstructionInfo>> constructionMap;
 
+    /** 垫胶编码→物料名映射 Map<paddingCode, paddingName> */
+    private Map<String, String> paddingCodeToNameMap;
+
     /** 排程过程日志收集器 */
     private StringBuilder processLog;
+
+    /**
+     * 构建日志显示的规格名称：物料名(编码)
+     *
+     * @param name 物料名，可为 null
+     * @param code 编码
+     * @return 物料名(编码)，name 为 null 时回退显示编码本身
+     */
+    public static String buildDisplayName(String name, String code) {
+        return name != null ? name + "(" + code + ")" : code;
+    }
+
+    /**
+     * 根据垫胶编码获取物料名(编码)（日志输出用，编码不存在时回退显示编码本身）
+     */
+    public String getPaddingNameByCode(String paddingCode) {
+        if (paddingCodeToNameMap != null && paddingCode != null) {
+            String name = paddingCodeToNameMap.get(paddingCode);
+            return buildDisplayName(name, paddingCode);
+        }
+        return paddingCode;
+    }
 
     /**
      * 追加排程日志

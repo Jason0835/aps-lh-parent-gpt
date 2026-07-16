@@ -68,4 +68,7 @@ public class DjPaddingDemand {
 
     /** 当前接班库存可覆盖的成型生产班次数（由 checkDemandForShift 计算） */
     private int coverableShiftCount;
+
+    /** 是否开产模式：多个规格同时低于阈值时，前 n-1 个采用开产模式，仅补到安全水位即切换 */
+    private boolean startupMode;
 }

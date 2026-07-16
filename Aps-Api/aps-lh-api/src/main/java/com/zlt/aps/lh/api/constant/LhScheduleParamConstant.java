@@ -233,4 +233,6 @@ public final class LhScheduleParamConstant {
     public static final String ENDING_AUTO_FILL_ENABLED = "SYS0304029";
     /** 量试充抵正规开关（0-关闭，1-开启）；控制同步硫化排程日完成量时，量试(T)与正规(S)同时存在是否额外插入正规充抵记录 */
     public static final String ENABLE_MASS_TRIAL_TO_FORMAL = "SYS0312001";
+    /** 在机模具下机时前后计划校验天数 */
+    public static final String CONTINUOUS_MOULD_OFFLINE_CHECK_DAYS = "SYS0304030";
 }
