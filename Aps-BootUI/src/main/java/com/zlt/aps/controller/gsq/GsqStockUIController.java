@@ -16,6 +16,7 @@ import io.swagger.annotations.ApiOperation;
 import org.apache.commons.io.IOUtils;
 import org.apache.shiro.authz.annotation.RequiresPermissions;
 import org.springframework.stereotype.Controller;
+import org.springframework.ui.ModelMap;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -36,8 +37,42 @@ import java.util.Arrays;
 @RequestMapping("/gsq/stock")
 public class GsqStockUIController extends BaseUIController<GsqStock> {
 
+    /** 模板路径前缀 */
+    private final String prefix = "gsq/stock";
+
     @Resource
     private IGsqStockService gsqStockService;
+
+    /** 跳转至钢丝圈库存列表页面 */
+    @RequiresPermissions("gsq:stock:view")
+    @GetMapping()
+    public String toIndex() {
+        return prefix + "/stock";
+    }
+
+    /** 跳转至新增钢丝圈库存页面 */
+    @GetMapping("/add")
+    public String add(ModelMap mmap) {
+        mmap.put("stock", new GsqStock());
+        mmap.put("editType", "0");
+        return prefix + "/edit";
+    }
+
+    /** 跳转至编辑钢丝圈库存页面 */
+    @GetMapping("/edit/{id}")
+    public String edit(@PathVariable("id") Long id, ModelMap mmap) {
+        mmap.put("stock", gsqStockService.getInfo(id));
+        mmap.put("editType", "1");
+        return prefix + "/edit";
+    }
+
+    /** 跳转至钢丝圈库存修正页面 */
+    @GetMapping("/modifyStock/{id}")
+    public String modifyStock(@PathVariable("id") Long id, ModelMap mmap) {
+        mmap.put("stock", gsqStockService.getInfo(id));
+        mmap.put("editType", "2");
+        return prefix + "/edit";
+    }
 
     /** 查询钢丝圈库存列表 */
     @ApiOperation("查询钢丝圈库存列表")
@@ -107,6 +142,8 @@ public class GsqStockUIController extends BaseUIController<GsqStock> {
 
     /** 下载导入模板 */
     @ApiOperation("下载导入模板")
+    @GetMapping("/importTemplate")
+    @ResponseBody
     @Override
     public AjaxResult importTemplate(HttpServletResponse response) throws IOException {
         String fileName = getExportTemplateFileName();
