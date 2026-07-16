@@ -1189,22 +1189,6 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
 
         }
 
-        // 完成量纠正：如果完成量 > 订单量 或 相差<=2条，则完成量 = 订单量
-        if (totalDailyPlanQtyMap != null && !totalDailyPlanQtyMap.isEmpty()) {
-            for (Map.Entry<String, BigDecimal> entry : resultMap.entrySet()) {
-                String key = entry.getKey();
-                BigDecimal finishQty = entry.getValue();
-                BigDecimal planQty = totalDailyPlanQtyMap.get(key);
-                if (planQty != null) {
-                    BigDecimal diff = finishQty.subtract(planQty);
-                    // 完成量 > 订单量 或 相差<=2条，纠正完成量 = 订单量
-                    if (diff.compareTo(BigDecimal.ZERO) > 0 || diff.abs().compareTo(new BigDecimal("2")) <= 0) {
-                        entry.setValue(planQty);
-                    }
-                }
-            }
-        }
-
         return resultMap;
     }
 
@@ -1319,6 +1303,22 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
             Object totalObj = row.get("TOTAL_FINISH_QTY");
             BigDecimal val = totalObj != null ? new BigDecimal(totalObj.toString()) : BigDecimal.ZERO;
             resultMap.merge(finishKey, val, BigDecimal::add);
+        }
+
+        // 完成量纠正：如果完成量 > 订单量 或 相差<=2条，则完成量 = 订单量
+        if (totalDailyPlanQtyMap != null && !totalDailyPlanQtyMap.isEmpty()) {
+            for (Map.Entry<String, BigDecimal> entry : resultMap.entrySet()) {
+                String key = entry.getKey();
+                BigDecimal finishQty = entry.getValue();
+                BigDecimal planQty = totalDailyPlanQtyMap.get(key);
+                if (planQty != null) {
+                    BigDecimal diff = finishQty.subtract(planQty);
+                    // 完成量 > 订单量 或 相差<=2条，纠正完成量 = 订单量
+                    if (diff.compareTo(BigDecimal.ZERO) > 0 || diff.abs().compareTo(new BigDecimal("2")) <= 0) {
+                        entry.setValue(planQty);
+                    }
+                }
+            }
         }
 
         return resultMap;
