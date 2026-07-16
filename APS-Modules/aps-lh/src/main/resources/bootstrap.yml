@@ -53,3 +53,9 @@ aps:
         queue-capacity: 32
         keep-alive-seconds: 60
         thread-name-prefix: lh-data-init-
+
+mq:
+  scheduleLog:
+    queue: lh.schedule.log.queue
+    exchange: lh.schedule.log.exchange
+    rutekey: lh.schedule.log.rutekey
