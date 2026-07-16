@@ -1,6 +1,10 @@
 package com.zlt.sync.mapper;
 
+import com.baomidou.dynamic.datasource.annotation.DS;
+import com.zlt.aps.itf.constant.DataSource;
 import com.zlt.sync.domain.AuxSyncStatusRecords;
+
+import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
 import java.util.List;
@@ -11,6 +15,8 @@ import java.util.Map;
  *  - 记录首日
  *  - 最大时间等
  */
+@DS(DataSource.MASTER)
+@Mapper
 public interface AuxSyncStatusRecordsMapper {
 
     /**

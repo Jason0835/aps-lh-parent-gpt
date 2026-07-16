@@ -1,5 +1,7 @@
 package com.zlt.sync.mapper;
 
+import com.baomidou.dynamic.datasource.annotation.DS;
+import com.zlt.aps.itf.constant.DataSource;
 import com.zlt.aps.itf.vo.SyncDataLogs;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -10,6 +12,7 @@ import org.apache.ibatis.annotations.Param;
  * @Author zlt
  * @Date 2022-3-9 14:09:16
  */
+@DS(DataSource.MASTER)
 @Mapper
 public interface SyncDataLogsMapper {
 

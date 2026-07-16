@@ -1,6 +1,10 @@
 package com.zlt.sync.mapper;
 
+import com.baomidou.dynamic.datasource.annotation.DS;
+import com.zlt.aps.itf.constant.DataSource;
 import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
+
+import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
 import java.util.List;
@@ -9,6 +13,8 @@ import java.util.Map;
 /**
  * 请求数据历史记录
  */
+@DS(DataSource.MASTER)
+@Mapper
 public interface AuxReqSyncDataLogsMapper {
 
     List<AuxReqSyncDataLogs> queryReqSyncDataLogs(Map<String, Object> params);
