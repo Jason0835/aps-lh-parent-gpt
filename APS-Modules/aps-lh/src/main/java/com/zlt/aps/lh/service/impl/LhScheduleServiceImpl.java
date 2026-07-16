@@ -3263,7 +3263,9 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
     }
 
     /**
-     * 判断是否为收尾行：任一班次 classXIsEnd 为收尾或试验标记。
+     * 判断是否为收尾行：任一班次 classXIsEnd 为收尾、量试或试验标记。
+     *
+     * <p>取值含义：0-正规正常，1-正规收尾，2-量试，3-试验/试制。</p>
      *
      * @param result 排程结果
      * @return true 表示该行存在收尾班次
@@ -3273,8 +3275,8 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
             Object isEndValue = BeanUtil.getProperty(result, "class" + shift + "IsEnd");
             String isEnd = StringUtils.trimToEmpty(Objects.toString(isEndValue, ""));
             if (ApsConstant.APS_STRING_1.equals(isEnd)
-                    || ApsConstant.APS_STRING_3.equals(isEnd)
-                    || ApsConstant.APS_STRING_4.equals(isEnd)) {
+                    || ApsConstant.APS_STRING_2.equals(isEnd)
+                    || ApsConstant.APS_STRING_3.equals(isEnd)) {
                 return true;
             }
         }
