@@ -311,7 +311,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
                 .orElse(queryVO != null && queryVO.getScheduleDate() != null ? queryVO.getScheduleDate() : DateUtil.date());
 
         Map<String, BigDecimal> totalDailyPlanQtyMap = this.buildTotalDailyPlanQtyMap(exportList, scheduleDate);
-        Map<String, BigDecimal> todayNightFinishQtyMap = buildTodayNightFinishQtyMap(exportList, scheduleDate);
+        Map<String, BigDecimal> todayNightFinishQtyMap = buildTodayNightFinishQtyMap(exportList, scheduleDate, totalDailyPlanQtyMap);
         Map<String, Map<String, String>> smallGlueMaps = buildSmallGlueMaps(exportList);
         Map<String, String> smallGlueMap = smallGlueMaps.getOrDefault("smallGlue", Collections.emptyMap());
         Map<String, String> placeholderMap = smallGlueMaps.getOrDefault("placeholder", Collections.emptyMap());
@@ -873,12 +873,6 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
         BigDecimal tnfq = todayNightFinishQtyMap.get(matchKey);
         row.put("todayNightFinishQty", zeroToEmpty(tnfq));
 
-        // 调试日志：打印每条记录的匹配情况
-        log.info("匹配调试: embryoDesc=[{}], recipeType=[{}], matchKey=[{}], tdpq={}, tnfq={}",
-                embryoDescKey, recipeType, matchKey,
-                tdpq != null ? tdpq : "null",
-                tnfq != null ? tnfq : "null");
-
         // ylSum = todayNightFinishQty - totalDailyPlanQty
         BigDecimal ylSum = (tnfq != null ? tnfq : BigDecimal.ZERO)
                 .subtract(tdpq != null ? tdpq : BigDecimal.ZERO);
@@ -1193,15 +1187,23 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
             }
             resultMap.put(planKey, sum);
 
-            // 临时调试日志：打印指定胎胚描述的明细
-            if (embryoDesc.startsWith("295/80R22.5 152/149M 18PR JF518")) {
-                log.info("调试-JF518明细: materialCode={}, constructionStage={}, daySum={}, overdueFlag={}, overdueQty={}, 当前累计={}",
-                        plan.getMaterialCode(), productStatus, daySum, plan.getLastMonthValidFlag(), overdueVal, sum);
-            }
         }
 
-        log.info("buildTotalDailyPlanQtyMap: 前一天={}, 年月={}, 工厂={}, 月计划记录数={}, 胎胚描述数={}",
-                prevDay, yearMonth, factoryCode, plans.size(), resultMap.size());
+        // 完成量纠正：如果完成量 > 订单量 或 相差<=2条，则完成量 = 订单量
+        if (totalDailyPlanQtyMap != null && !totalDailyPlanQtyMap.isEmpty()) {
+            for (Map.Entry<String, BigDecimal> entry : resultMap.entrySet()) {
+                String key = entry.getKey();
+                BigDecimal finishQty = entry.getValue();
+                BigDecimal planQty = totalDailyPlanQtyMap.get(key);
+                if (planQty != null) {
+                    BigDecimal diff = finishQty.subtract(planQty);
+                    // 完成量 > 订单量 或 相差<=2条，纠正完成量 = 订单量
+                    if (diff.compareTo(BigDecimal.ZERO) > 0 || diff.abs().compareTo(new BigDecimal("2")) <= 0) {
+                        entry.setValue(planQty);
+                    }
+                }
+            }
+        }
 
         return resultMap;
     }
@@ -1220,9 +1222,11 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
      *
      * @param list         成型排程结果列表，用于提取工厂、物料和胎胚描述映射
      * @param scheduleDate 导出排程日期（T日）
-     * @return key=胎胚描述, value=完成量合计
+     * @param totalDailyPlanQtyMap 订单总量Map（用于完成量纠正）
+     * @return key=胎胚描述|示方类型, value=完成量合计
      */
-    private Map<String, BigDecimal> buildTodayNightFinishQtyMap(List<CxScheduleResult> list, Date scheduleDate) {
+    private Map<String, BigDecimal> buildTodayNightFinishQtyMap(List<CxScheduleResult> list, Date scheduleDate,
+                                                                 Map<String, BigDecimal> totalDailyPlanQtyMap) {
         if (PubUtil.isEmpty(list)) {
             return Collections.emptyMap();
         }
@@ -1271,20 +1275,16 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
 
         List<String> factoryCodes = Collections.singletonList(factoryCode);
 
-        log.info("buildTodayNightFinishQtyMap: 前一天={}, 月份起始={}, factoryCodes={}, 月计划物料数={}, 映射数={}",
-                prevDay, monthStart, factoryCodes, materialCodes.size(), materialToEmbryoDesc.size());
 
         Map<String, BigDecimal> resultMap = new HashMap<>();
 
         // 1. 查询日完成量：月份起始日 ~ 前一天（不含前一天），不按物料编码过滤
         List<Map<String, Object>> dayFinishList = lhFinishQtyMapper.sumDayFinishQty(
                 factoryCodes, null, monthStart, prevDayStart);
-        log.info("buildTodayNightFinishQtyMap dayFinishList size:{}", dayFinishList != null ? dayFinishList.size() : 0);
 
         // 2. 查询班次完成量：前一天当天，不按物料编码过滤
         List<Map<String, Object>> scheFinishList = lhFinishQtyMapper.sumScheFinishQty(
                 factoryCodes, null, prevDayStart, prevDayNextStart);
-        log.info("buildTodayNightFinishQtyMap scheFinishList size:{}", scheFinishList != null ? scheFinishList.size() : 0);
 
         // 合并两表结果，按物料编码汇总后映射到胎胚描述+示方类型
         for (Map<String, Object> row : dayFinishList) {
@@ -1320,8 +1320,6 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
             BigDecimal val = totalObj != null ? new BigDecimal(totalObj.toString()) : BigDecimal.ZERO;
             resultMap.merge(finishKey, val, BigDecimal::add);
         }
-
-        log.info("buildTodayNightFinishQtyMap resultMap size:{}, keys:{}", resultMap.size(), resultMap.keySet());
 
         return resultMap;
     }
