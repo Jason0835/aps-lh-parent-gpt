@@ -205,11 +205,11 @@ public interface IGsqScheduleResultService {
      * 唯一性校验
      *
      * @param queryVO 查询条件
-     * @return true=唯一 false=不唯一
+     * @return UserConstants.UNIQUE="0" 唯一，UserConstants.NOT_UNIQUE="1" 不唯一
      */
     @PostMapping("/scheduleResult/checkUnique")
     @ApiOperation("唯一性校验")
-    Boolean checkUnique(@RequestBody GsqScheduleResult queryVO);
+    String checkUnique(@RequestBody GsqScheduleResult queryVO);
 
     /**
      * 根据排程日期构建6个班次的日期展示列表
