@@ -101,33 +101,6 @@ public interface MpAdjustResultEntityMapper extends CommBaseMapper<MpAdjustResul
                                          @Param("startDate") Date startDate,
                                          @Param("endDate") Date endDate,
                                          @Param("overdueThresholdParamCode") String overdueThresholdParamCode,
-                                         @Param("stockCaptureDateList") List<StockCaptureDateDTO> stockCaptureDateList);
-
-    /**
-     * 查询上月调整结果表存在、当月调整结果表缺失的超欠产记录
-     * 用于 Java 层补充必要字段后批量插入到当月调整结果表
-     * 规则同定稿表 selectMissingLastMonthOverProd，区别：
-     *   1. 数据来源表为 T_MP_ADJUST_RESULT
-     *   2. 当月版本号从 T_MP_ADJUST_RESULT 取 MAX(VERSION)（ADJ前缀）
-     *
-     * @param lastYear                 数据来源月年份
-     * @param lastMonth                数据来源月月份
-     * @param currentYear              写入目标月年份
-     * @param currentMonth             写入目标月月份
-     * @param startDate                数据来源月开始日期
-     * @param endDate                  数据来源月结束日期
-     * @param overdueThresholdParamCode 超欠产有效标志判定阈值参数编码
-     * @param stockCaptureDateList     Java 层计算好的库存抓取日列表
-     * @return 待插入的调整结果记录列表
-     */
-    List<MpAdjustResult> selectMissingLastMonthOverProdForAdjust(
-            @Param("lastYear") Integer lastYear,
-            @Param("lastMonth") Integer lastMonth,
-            @Param("currentYear") Integer currentYear,
-            @Param("currentMonth") Integer currentMonth,
-            @Param("startDate") Date startDate,
-            @Param("endDate") Date endDate,
-            @Param("overdueThresholdParamCode") String overdueThresholdParamCode,
             @Param("stockCaptureDateList") List<StockCaptureDateDTO> stockCaptureDateList);
 
     /**
