@@ -1279,9 +1279,6 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
 
         List<String> factoryCodes = Collections.singletonList(factoryCode);
 
-
-        Map<String, BigDecimal> resultMap = new HashMap<>();
-
         // 1. 查询日完成量：月份起始日 ~ 前一天（不含前一天），不按物料编码过滤
         List<Map<String, Object>> dayFinishList = lhFinishQtyMapper.sumDayFinishQty(
                 factoryCodes, null, monthStart, prevDayStart);
