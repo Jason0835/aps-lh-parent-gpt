@@ -21,24 +21,29 @@
         <el-button type="primary" plain v-hasPermi="['cd15:depthConfig:add']" @click="handleAdd">{{ $t("ui.frame.btn.add") }}</el-button>
         <el-button v-hasPermi="['cd15:depthConfig:edit']" @click="handleBatchEdit" :disabled="selection.length !== 1">{{ $t("ui.frame.btn.update") }}</el-button>
         <el-button type="danger" v-hasPermi="['cd15:depthConfig:remove']" :disabled="selection.length === 0" @click="handleBatchDelete">{{ $t("ui.frame.btn.delete") }}</el-button>
+        <el-button v-hasPermi="['cd15:depthConfig:import']" @click="$refs.tltUpload.handleImport()">{{ $t("ui.frame.btn.import") }}</el-button>
+        <el-button @click="handleExport" v-hasPermi="['cd15:depthConfig:export']">{{ $t("ui.frame.btn.export") }}</el-button>
       </template>
     </page-table>
+    <tlt-upload-form ref="tltUpload" :updateSupport="true" downloadUrl="/cd15/cd15DepthConfig/importTemplate" uploadUrl="/cd15/cd15DepthConfig/importData" @uploadSuccess="getList" labelWidth="0" :columns="importColumns" />
     <info-dialog ref="infoRef" @success="getList" />
   </basic-container>
 </template>
 
 <script>
-import { listDepthConfig, delDepthConfig } from "@/api/cd15/depthConfig";
+import { listDepthConfig, delDepthConfig, exportDepthConfig } from "@/api/cd15/depthConfig";
+import TltUploadForm from "@/views/components/tltUploadForm.vue";
 import infoDialog from "./components/infoDialog.vue";
 
 export default {
   name: "Cd15DepthConfig",
-  components: { infoDialog },
+  components: { TltUploadForm, infoDialog },
   dicts: ["biz_factory_name", "machine_range"],
   provide() { return { parentDict: this.dict }; },
   data() {
     return {
       loading: false,
+      importColumns: [{ label: "", prop: "updateSupport", render: (form) => { return (<el-checkbox label={this.$t("common.rule.updateSupport")} v-model={form.updateSupport}>{this.$t("common.rule.updateSupport")}</el-checkbox>); } }],
       data: [],
       selection: [],
       page: { current: 1, pageSize: 20, total: 0 },
@@ -112,6 +117,7 @@ export default {
         });
       });
     },
+    handleExport() { exportDepthConfig(this.query); },
     handleSearch(params) {
       this.page.current = 1;
       this.query = { ...params };

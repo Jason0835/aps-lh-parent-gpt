@@ -40,9 +40,63 @@
         <el-button v-hasPermi="['cd15:cd15ScheduleResult:export']" @click="handleExport">
           {{ $t("ui.frame.btn.export") }}
         </el-button>
+        <el-button type="primary" v-hasPermi="['cd15:cd15ScheduleResult:list']" @click="handleShowUnscheduleResult">
+          {{ $t("ui.data.column.scheduleResult.unscheduleResult") }}
+        </el-button>
       </template>
     </page-table>
 
+    <auto-schedule-dialog
+      ref="autoScheduleRef"
+      @success="handleAutoScheduleSuccess"
+    />
+    <insert-order-dialog
+      ref="insertOrderRef"
+      @success="handleInsertSuccess"
+    />
+    <el-dialog
+      :title="scheduleTaskTitle"
+      :visible.sync="autoScheduleProgressVisible"
+      width="420px"
+      :close-on-click-modal="false"
+      :close-on-press-escape="false"
+      :show-close="false"
+      append-to-body
+    >
+      <div style="text-align:center;margin-bottom:12px;color:#606266;font-size:14px;">
+        {{ autoScheduleProgressStage }}
+      </div>
+      <el-progress
+        :percentage="autoScheduleProgressValue"
+        :status="autoScheduleProgressStatus"
+        :stroke-width="18"
+        :text-inside="true"
+      />
+      <div style="margin-top:10px;color:#909399;font-size:12px;text-align:center;">
+        {{ autoScheduleProgressHint }}
+      </div>
+    </el-dialog>
+    <el-dialog
+      :title="$t('ui.data.column.scheduleResult.unscheduleResult')"
+      :visible.sync="unscheduleResultDialogVisible"
+      width="80%"
+      append-to-body
+    >
+      <page-table
+        v-loading="unscheduleLoading"
+        :calcHeight="false"
+        :columns="unscheduleColumns"
+        :data="unscheduleData"
+        :page="unschedulePage"
+        :search="unscheduleSearch"
+        :searchColumns="unscheduleSearchColumns"
+        :showSummary="false"
+        :selectArea="false"
+        @search="handleUnscheduleSearch"
+        @reset="handleUnscheduleReset"
+        @pageChange="handleUnschedulePageChange"
+      />
+    </el-dialog>
     <el-dialog :title="dialogTitle" :visible.sync="dialogVisible" width="520px" append-to-body>
       <el-form ref="actionForm" :model="actionForm" label-width="110px">
         <el-form-item :label="$t('ui.data.column.cd15ScheduleResult.factoryCode')">
@@ -83,7 +137,6 @@
 <script>
 import moment from 'moment'
 import {
-  autoSchedule,
   changeQty,
   delScheduleResult,
   exportScheduleResult,
@@ -91,15 +144,16 @@ import {
   getChangeQtyTask,
   getInsertTask,
   getTransferMachineTask,
-  insert,
   listScheduleResult,
   publishScheduleResult,
   transferMachine,
   validateChangeQty,
-  validateInsert,
   validateTransferMachine
 } from '@/api/cd15/scheduleResult'
 import { getCd15MachineEnableOptions } from '@/api/cd15/cd15MachineInfo'
+import { listUnscheduleResult } from '@/api/cd15/unscheduleResult'
+import AutoScheduleDialog from './components/autoScheduleDialog.vue'
+import InsertOrderDialog from './components/insertOrderDialog.vue'
 
 const SHIFT_CONFIG = [
   { classField: 'class1', shiftKey: 'middleShift', dayOffset: -1 },
@@ -112,7 +166,13 @@ const SHIFT_CONFIG = [
 
 export default {
   name: 'Cd15ScheduleResult',
+  components: { AutoScheduleDialog, InsertOrderDialog },
   dicts: ['biz_factory_name', 'IS_RELEASE'],
+  provide() {
+    return {
+      parentDict: this.dict
+    }
+  },
   data() {
     const defaultScheduleDate = moment().add(1, 'days').format('YYYY-MM-DD')
     return {
@@ -125,6 +185,21 @@ export default {
       sort: {},
       search: { factoryCode: '116', scheduleDate: defaultScheduleDate },
       query: { factoryCode: '116', scheduleDate: defaultScheduleDate },
+      autoScheduleTimer: null,
+      autoSchedulePollTimes: 0,
+      maxAutoSchedulePollTimes: 120,
+      autoScheduleProgressVisible: false,
+      autoScheduleProgressValue: 0,
+      autoScheduleProgressStage: '',
+      autoScheduleProgressStatus: null,
+      autoScheduleProgressHint: '',
+      scheduleTaskTitle: this.$t('ui.data.column.cd15ScheduleResult.autoScheduleProgress'),
+      unscheduleResultDialogVisible: false,
+      unscheduleLoading: false,
+      unscheduleData: [],
+      unschedulePage: { current: 1, pageSize: 20, total: 0, pageSizes: [10, 20, 50, 100] },
+      unscheduleSearch: { factoryCode: '116', scheduleDate: defaultScheduleDate },
+      unscheduleQuery: { factoryCode: '116', scheduleDate: defaultScheduleDate },
       dialogVisible: false,
       dialogType: '',
       dialogTitle: '',
@@ -171,11 +246,43 @@ export default {
         { label: this.$t('ui.data.column.cd15ScheduleResult.machineCode'), prop: 'machineCode', type: 'select', dictData: this.machineOptions, filterable: true, clearable: true },
         { label: this.$t('ui.data.column.cd15ScheduleResult.releaseStatus'), prop: 'releaseStatus', type: 'select', dictData: this.dict.type.IS_RELEASE, clearable: true }
       ]
+    },
+    unscheduleColumns() {
+      return [
+        { label: this.$t('ui.data.column.cd15UnscheduleResult.scheduleDate'), prop: 'scheduleDate', align: 'center', minWidth: 120 },
+        { label: this.$t('ui.data.column.cd15UnscheduleResult.batchNo'), prop: 'batchNo', align: 'left', minWidth: 160 },
+        { label: this.$t('ui.data.column.cd15UnscheduleResult.steelStripCode'), prop: 'steelStripCode', minWidth: 150 },
+        { label: this.$t('ui.data.column.cd15UnscheduleResult.bigRollCode'), prop: 'bigRollCode', minWidth: 140 },
+        { label: this.$t('ui.data.column.cd15UnscheduleResult.cuttingAngle'), prop: 'cuttingAngle', minWidth: 110 },
+        { label: this.$t('ui.data.column.cd15UnscheduleResult.groupNo'), prop: 'groupNo', minWidth: 150 },
+        { label: this.$t('ui.data.column.cd15UnscheduleResult.orderNo'), prop: 'orderNo', align: 'left', minWidth: 160 },
+        { label: this.$t('ui.data.column.cd15UnscheduleResult.machineCode'), prop: 'machineCode', minWidth: 120 },
+        { label: this.$t('ui.data.column.cd15UnscheduleResult.classField'), prop: 'classField', minWidth: 120 },
+        { label: this.$t('ui.data.column.cd15UnscheduleResult.demandQty'), prop: 'demandQty', minWidth: 120, align: 'right' },
+        { label: this.$t('ui.data.column.cd15UnscheduleResult.scheduledQty'), prop: 'scheduledQty', minWidth: 120, align: 'right' },
+        { label: this.$t('ui.data.column.cd15UnscheduleResult.unscheduledQty'), prop: 'unscheduledQty', minWidth: 120, align: 'right' },
+        { label: this.$t('ui.data.column.cd15UnscheduleResult.failStage'), prop: 'failStage', minWidth: 140 },
+        { label: this.$t('ui.data.column.cd15UnscheduleResult.unscheduleReasonCode'), prop: 'unscheduleReasonCode', minWidth: 180 },
+        { label: this.$t('ui.data.column.cd15UnscheduleResult.reasonOrder'), prop: 'reasonOrder', minWidth: 100, align: 'right' },
+        { label: this.$t('ui.data.column.cd15UnscheduleResult.unscheduledReason'), prop: 'unscheduledReason', minWidth: 260, showOverflowTooltip: true },
+        { label: this.$t('ui.data.column.cd15UnscheduleResult.candidateMachineCodes'), prop: 'candidateMachineCodes', minWidth: 200, showOverflowTooltip: true }
+      ]
+    },
+    unscheduleSearchColumns() {
+      return [
+        { label: this.$t('ui.data.column.cd15UnscheduleResult.factoryCode'), prop: 'factoryCode', type: 'select', dictData: this.dict.type.biz_factory_name, filterable: true },
+        { label: this.$t('ui.data.column.cd15UnscheduleResult.scheduleDate'), prop: 'scheduleDate', type: 'date', valueFormat: 'yyyy-MM-dd' },
+        { label: this.$t('ui.data.column.cd15UnscheduleResult.steelStripCode'), prop: 'steelStripCode' },
+        { label: this.$t('ui.data.column.cd15UnscheduleResult.batchNo'), prop: 'batchNo' }
+      ]
     }
   },
   created() {
     this.getList()
     this.loadMachineOptions()
+  },
+  beforeDestroy() {
+    this.clearAutoScheduleTimer()
   },
   methods: {
     buildDateList(scheduleDate) {
@@ -228,10 +335,158 @@ export default {
       this.selection = selection || []
     },
     handleAutoSchedule() {
-      this.openActionDialog('autoSchedule')
+      this.$refs.autoScheduleRef.show({
+        factoryCode: this.search.factoryCode,
+        scheduleDate: this.search.scheduleDate
+      })
+    },
+    handleAutoScheduleSuccess(scheduleDate, payload) {
+      if (scheduleDate) {
+        this.query = { ...this.query, scheduleDate }
+        this.search = { ...this.search, scheduleDate }
+        this.dateList = this.buildDateList(scheduleDate)
+      }
+      const data = payload || {}
+      if (data.taskId) {
+        this.pollAutoScheduleTask(data.taskId)
+      } else {
+        this.page.current = 1
+        this.getList()
+      }
+    },
+    pollAutoScheduleTask(taskId) {
+      this.clearAutoScheduleTimer()
+      this.autoSchedulePollTimes = 0
+      this.autoScheduleProgressVisible = true
+      this.autoScheduleProgressValue = 0
+      this.autoScheduleProgressStage = ''
+      this.autoScheduleProgressStatus = null
+      this.autoScheduleProgressHint = this.$t('ui.data.column.cd15ScheduleResult.autoScheduleProgressHint')
+      this.scheduleTaskTitle = this.$t('ui.data.column.cd15ScheduleResult.autoScheduleProgress')
+      const poll = () => {
+        getAutoScheduleTask(taskId).then(res => {
+          this.autoSchedulePollTimes += 1
+          const task = (res && res.data) ? res.data : (res || {})
+          if (task.progress != null) {
+            this.autoScheduleProgressValue = Math.min(100, Math.max(0, task.progress))
+          }
+          if (task.currentStageName) {
+            this.autoScheduleProgressStage = task.currentStageName
+          }
+          if (task.taskStatus === 'SUCCESS') {
+            this.clearAutoScheduleTimer()
+            this.autoScheduleProgressValue = 100
+            this.autoScheduleProgressStatus = 'success'
+            this.autoScheduleProgressStage = this.$t('ui.data.column.cd15ScheduleResult.autoScheduleSuccess')
+            window.setTimeout(() => { this.closeAutoScheduleProgress() }, 600)
+            this.$modal.msgSuccess(this.$t('ui.data.column.cd15ScheduleResult.autoScheduleSuccess'))
+            this.getList()
+            return
+          }
+          if (task.taskStatus === 'FAILED') {
+            this.clearAutoScheduleTimer()
+            this.autoScheduleProgressStatus = 'exception'
+            this.autoScheduleProgressStage = this.$t('ui.data.column.cd15ScheduleResult.autoScheduleFailed')
+            this.$modal.msgError(task.errorMessage || this.$t('ui.data.column.cd15ScheduleResult.autoScheduleFailed'))
+            window.setTimeout(() => { this.closeAutoScheduleProgress() }, 3000)
+            return
+          }
+          if (this.autoSchedulePollTimes >= this.maxAutoSchedulePollTimes) {
+            this.clearAutoScheduleTimer()
+            this.autoScheduleProgressStatus = 'exception'
+            this.autoScheduleProgressStage = this.$t('ui.data.column.cxScheduleResult.scheduleTimeout')
+            this.$modal.msgWarning(this.$t('ui.data.column.cxScheduleResult.scheduleTimeout'))
+            window.setTimeout(() => { this.closeAutoScheduleProgress() }, 3000)
+            return
+          }
+          this.autoScheduleTimer = window.setTimeout(poll, 3000)
+        }).catch(() => {
+          this.clearAutoScheduleTimer()
+          this.autoScheduleProgressStatus = 'exception'
+          this.autoScheduleProgressStage = this.$t('ui.data.column.cxScheduleResult.scheduleTimeout')
+          this.$modal.msgWarning(this.$t('ui.data.column.cxScheduleResult.scheduleTimeout'))
+          window.setTimeout(() => { this.closeAutoScheduleProgress() }, 3000)
+        })
+      }
+      poll()
+    },
+    closeAutoScheduleProgress() {
+      this.autoScheduleProgressVisible = false
+      this.autoScheduleProgressValue = 0
+      this.autoScheduleProgressStage = ''
+      this.autoScheduleProgressStatus = null
+      this.autoScheduleProgressHint = ''
+    },
+    clearAutoScheduleTimer() {
+      if (this.autoScheduleTimer) {
+        window.clearTimeout(this.autoScheduleTimer)
+        this.autoScheduleTimer = null
+      }
+    },
+    handleShowUnscheduleResult() {
+      this.unscheduleResultDialogVisible = true
+      this.unscheduleSearch = {
+        factoryCode: this.search.factoryCode,
+        scheduleDate: this.search.scheduleDate
+      }
+      this.unscheduleQuery = { ...this.unscheduleSearch }
+      this.unschedulePage.current = 1
+      this.getUnscheduleList()
+    },
+    handleUnscheduleSearch(data) {
+      this.unscheduleQuery = Object.keys(data || {}).reduce((result, key) => {
+        const value = data[key]
+        if (value !== null && value !== undefined && value !== '') {
+          result[key] = value
+        }
+        return result
+      }, {})
+      this.unschedulePage.current = 1
+      this.getUnscheduleList()
+    },
+    handleUnscheduleReset() {
+      const scheduleDate = moment().add(1, 'days').format('YYYY-MM-DD')
+      this.unscheduleSearch = { factoryCode: '116', scheduleDate }
+      this.unscheduleQuery = { ...this.unscheduleSearch }
+      this.unschedulePage.current = 1
+      this.getUnscheduleList()
+    },
+    handleUnschedulePageChange(current, pageSize) {
+      this.unschedulePage.current = current
+      this.unschedulePage.pageSize = pageSize
+      this.getUnscheduleList()
+    },
+    getUnscheduleList() {
+      this.unscheduleLoading = true
+      listUnscheduleResult({
+        ...this.unscheduleQuery,
+        pageNum: this.unschedulePage.current,
+        pageSize: this.unschedulePage.pageSize
+      }).then(res => {
+        this.unscheduleData = res.rows || res.data || []
+        this.unschedulePage.total = res.total || 0
+      }).finally(() => {
+        this.unscheduleLoading = false
+      })
     },
     handleInsert() {
-      this.openActionDialog('insert')
+      this.$refs.insertOrderRef.show({
+        factoryCode: this.search.factoryCode,
+        scheduleDate: this.search.scheduleDate
+      })
+    },
+    handleInsertSuccess(scheduleDate, payload) {
+      if (scheduleDate) {
+        this.query = { ...this.query, scheduleDate }
+        this.search = { ...this.search, scheduleDate }
+        this.dateList = this.buildDateList(scheduleDate)
+      }
+      const data = payload || {}
+      if (data.taskId) {
+        this.handleTaskResult({ data }, getInsertTask).then(() => this.getList())
+      } else {
+        this.getList()
+      }
     },
     handleTransferMachine() {
       this.openActionDialog('transferMachine', this.selection[0])
@@ -265,8 +520,6 @@ export default {
     },
     submitAction() {
       const actionMap = {
-        autoSchedule: () => autoSchedule(this.actionForm).then(res => this.handleTaskResult(res, getAutoScheduleTask)),
-        insert: () => validateInsert(this.actionForm).then(() => insert(this.actionForm)).then(res => this.handleTaskResult(res, getInsertTask)),
         transferMachine: () => validateTransferMachine(this.actionForm).then(() => transferMachine(this.actionForm)).then(res => this.handleTaskResult(res, getTransferMachineTask)),
         changeQty: () => validateChangeQty(this.actionForm).then(() => changeQty(this.actionForm)).then(res => this.handleTaskResult(res, getChangeQtyTask))
       }
