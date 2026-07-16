@@ -1303,7 +1303,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
                 return AjaxResult.error(I18nUtil.getMessage("ui.message.import.fail") + "," + successNum + "," + failureNum, importErrorLogs);
             }
         }
-
+        String batchNo = lhScheduleResultService.generateNextBatchNo(scheduleDate, factoryCode);
         List<LhScheduleResult> insertList = new ArrayList<>();
         for (int i = 0; i < list.size(); i++) {
             LhScheduleResultTemplateImportVO row = list.get(i);
@@ -1335,7 +1335,6 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
             copyImportRowToEntity(row, target);
             fillShiftTimes(target, shiftTimeMap);
 
-            String batchNo = lhScheduleResultService.generateNextBatchNo(scheduleDate, factoryCode);
             String orderNo = lhScheduleResultService.generateInsertOrderNo(scheduleDate);
             target.setBatchNo(batchNo);
             target.setOrderNo(orderNo);
