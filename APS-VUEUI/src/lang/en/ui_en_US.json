@@ -1226,5 +1226,21 @@
   "ui.data.alert.lhSkuDecrement.confirmMessage": "Confirm creating the SKU decrement record?",
   "ui.data.column.cd90ScheduleResult.cxBatchNo": "Forming Batch No",
   "ui.data.column.cd90ScheduleResult.cxMachineCodes": "Forming Machine Codes",
-  "ui.data.column.cd90ScheduleResult.planSurplusQty": "Plan Surplus Qty"
+  "ui.data.column.cd90ScheduleResult.planSurplusQty": "Plan Surplus Qty",
+  "ui.data.column.cd15ShiftConfig.modelName": "CD15 Shift Config",
+  "ui.data.column.cd15ShiftConfig.factoryCode": "Factory",
+  "ui.data.column.cd15ShiftConfig.shiftCode": "Shift Code",
+  "ui.data.column.cd15ShiftConfig.shiftName": "Shift Name",
+  "ui.data.column.cd15ShiftConfig.shiftOrder": "Shift Order",
+  "ui.data.column.cd15ShiftConfig.startTime": "Start Time",
+  "ui.data.column.cd15ShiftConfig.endTime": "End Time",
+  "ui.data.column.cd15ShiftConfig.shiftHours": "Shift Hours",
+  "ui.data.column.cd15ShiftConfig.isCrossDay": "Cross Day",
+  "ui.data.column.cd15ShiftConfig.scheduleDay": "Schedule Day",
+  "ui.data.column.cd15ShiftConfig.dayShiftOrder": "Day Shift Order",
+  "ui.data.column.cd15ShiftConfig.classField": "Result Class Field",
+  "ui.data.column.cd15ShiftConfig.isActive": "Active Status",
+  "ui.data.column.cd15ShiftConfig.remark": "Remark",
+  "ui.data.column.cd15ShiftConfig.checkUnique": "Shift code already exists in the same factory",
+  "ui.data.alert.cd15ShiftConfig.shiftHoursPositive": "Shift hours must be greater than 0"
 }

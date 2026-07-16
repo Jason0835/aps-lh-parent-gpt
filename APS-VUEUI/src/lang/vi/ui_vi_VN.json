@@ -2203,5 +2203,21 @@
   "ui.data.alert.lhSkuDecrement.confirmMessage": "Xác nhận tạo bản ghi giảm SKU?",
   "ui.data.column.cd90ScheduleResult.cxBatchNo": "Số lô thành hình",
   "ui.data.column.cd90ScheduleResult.cxMachineCodes": "Danh sách mã máy thành hình",
-  "ui.data.column.cd90ScheduleResult.planSurplusQty": "Số lượng kế hoạch còn lại"
+  "ui.data.column.cd90ScheduleResult.planSurplusQty": "Số lượng kế hoạch còn lại",
+  "ui.data.column.cd15ShiftConfig.modelName": "Cấu hình ca CD15",
+  "ui.data.column.cd15ShiftConfig.factoryCode": "Nhà máy",
+  "ui.data.column.cd15ShiftConfig.shiftCode": "Mã ca",
+  "ui.data.column.cd15ShiftConfig.shiftName": "Tên ca",
+  "ui.data.column.cd15ShiftConfig.shiftOrder": "Thứ tự ca",
+  "ui.data.column.cd15ShiftConfig.startTime": "Thời gian bắt đầu",
+  "ui.data.column.cd15ShiftConfig.endTime": "Thời gian kết thúc",
+  "ui.data.column.cd15ShiftConfig.shiftHours": "Thời lượng ca",
+  "ui.data.column.cd15ShiftConfig.isCrossDay": "Qua ngày",
+  "ui.data.column.cd15ShiftConfig.scheduleDay": "Ngày lập lịch",
+  "ui.data.column.cd15ShiftConfig.dayShiftOrder": "Thứ tự ca trong ngày",
+  "ui.data.column.cd15ShiftConfig.classField": "Trường ca kết quả",
+  "ui.data.column.cd15ShiftConfig.isActive": "Trạng thái bật",
+  "ui.data.column.cd15ShiftConfig.remark": "Ghi chú",
+  "ui.data.column.cd15ShiftConfig.checkUnique": "Mã ca đã tồn tại trong cùng nhà máy",
+  "ui.data.alert.cd15ShiftConfig.shiftHoursPositive": "Thời lượng ca phải lớn hơn 0"
 }
