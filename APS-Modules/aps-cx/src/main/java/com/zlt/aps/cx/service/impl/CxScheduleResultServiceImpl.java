@@ -1241,15 +1241,35 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
             return Collections.emptyMap();
         }
 
-        // 从月计划表构建物料编码 -> 胎胚描述的映射，同时收集物料编码列表
+        // 从月计划表构建物料编码 -> 胎胚描述的映射，同时收集物料编码列表和物料维度订单量
         Map<String, String> materialToEmbryoDesc = new HashMap<>();
         List<String> materialCodes = new ArrayList<>();
+        // 物料编码|productStatus -> 订单量（用于按物料维度纠正完成量）
+        Map<String, BigDecimal> materialPlanQtyMap = new HashMap<>();
+        int lastDayOfMonth = prevLocalDate.lengthOfMonth();
         for (FactoryMonthPlanProductionFinalResult plan : plans) {
             String mc = StringUtils.defaultString(plan.getMaterialCode()).trim();
             String desc = StringUtils.defaultString(plan.getMainMaterialDesc()).trim();
+            String ps = StringUtils.defaultString(plan.getProductStatus()).trim();
             if (StringUtils.isNotBlank(mc) && StringUtils.isNotBlank(desc)) {
                 materialToEmbryoDesc.putIfAbsent(mc, desc);
                 materialCodes.add(mc);
+                // 构建物料维度订单量
+                String matPlanKey = mc + "|" + ps;
+                BigDecimal matSum = materialPlanQtyMap.getOrDefault(matPlanKey, BigDecimal.ZERO);
+                for (int day = 1; day <= lastDayOfMonth; day++) {
+                    Integer qty = plan.getDayQty(day);
+                    if (qty != null && qty > 0) {
+                        matSum = matSum.add(BigDecimal.valueOf(qty));
+                    }
+                }
+                if ("1".equals(plan.getLastMonthValidFlag())) {
+                    Integer overdueQty = plan.getLastMonthOverdueQty();
+                    if (overdueQty != null && overdueQty != 0) {
+                        matSum = matSum.add(BigDecimal.valueOf(overdueQty));
+                    }
+                }
+                materialPlanQtyMap.merge(matPlanKey, matSum, BigDecimal::add);
             }
         }
 
@@ -1270,22 +1290,18 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
         List<Map<String, Object>> scheFinishList = lhFinishQtyMapper.sumScheFinishQty(
                 factoryCodes, null, prevDayStart, prevDayNextStart);
 
-        // 合并两表结果，按物料编码汇总后映射到胎胚描述+示方类型
+        // 先按 物料编码|示方类型 汇总完成量（两表合并）
+        Map<String, BigDecimal> materialFinishMap = new HashMap<>();
         for (Map<String, Object> row : dayFinishList) {
             String mCode = (String) row.get("MATERIAL_CODE");
             if (StringUtils.isEmpty(mCode)) {
                 continue;
             }
-            String embryoDesc = materialToEmbryoDesc.get(mCode.trim());
-            if (StringUtils.isBlank(embryoDesc)) {
-                continue;
-            }
-            // 按示方类型区分，key 为 embryoDesc + "|" + lhType
             String lhType = (String) row.get("LH_TYPE");
-            String finishKey = embryoDesc + "|" + StringUtils.defaultString(lhType).trim();
+            String matFinishKey = mCode.trim() + "|" + StringUtils.defaultString(lhType).trim();
             Object totalObj = row.get("TOTAL_FINISH_QTY");
             BigDecimal val = totalObj != null ? new BigDecimal(totalObj.toString()) : BigDecimal.ZERO;
-            resultMap.merge(finishKey, val, BigDecimal::add);
+            materialFinishMap.merge(matFinishKey, val, BigDecimal::add);
         }
 
         for (Map<String, Object> row : scheFinishList) {
@@ -1293,32 +1309,36 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
             if (StringUtils.isEmpty(mCode)) {
                 continue;
             }
-            String embryoDesc = materialToEmbryoDesc.get(mCode.trim());
-            if (StringUtils.isBlank(embryoDesc)) {
-                continue;
-            }
-            // 按示方类型区分，key 为 embryoDesc + "|" + lhType
             String lhType = (String) row.get("CLASS1_LH_TYPE");
-            String finishKey = embryoDesc + "|" + StringUtils.defaultString(lhType).trim();
+            String matFinishKey = mCode.trim() + "|" + StringUtils.defaultString(lhType).trim();
             Object totalObj = row.get("TOTAL_FINISH_QTY");
             BigDecimal val = totalObj != null ? new BigDecimal(totalObj.toString()) : BigDecimal.ZERO;
-            resultMap.merge(finishKey, val, BigDecimal::add);
+            materialFinishMap.merge(matFinishKey, val, BigDecimal::add);
         }
 
-        // 完成量纠正：diff = 完成量 - 订单量
-        // 如果 diff > 0（超产）或 -2 <= diff <= 0（差1~2条），则完成量 = 订单量
-        if (totalDailyPlanQtyMap != null && !totalDailyPlanQtyMap.isEmpty()) {
-            for (Map.Entry<String, BigDecimal> entry : resultMap.entrySet()) {
-                String key = entry.getKey();
-                BigDecimal finishQty = entry.getValue();
-                BigDecimal planQty = totalDailyPlanQtyMap.get(key);
-                if (planQty != null) {
-                    BigDecimal diff = finishQty.subtract(planQty);
-                    // 超产 或 差异在2条以内，纠正完成量 = 订单量
-                    if (diff.compareTo(BigDecimal.ZERO) > 0 || diff.compareTo(new BigDecimal("-2")) >= 0) {
-                        entry.setValue(planQty);
-                    }
+        // 按物料维度纠正完成量，再汇总到胎胚描述|示方类型维度
+        Map<String, BigDecimal> resultMap = new HashMap<>();
+        for (Map.Entry<String, BigDecimal> entry : materialFinishMap.entrySet()) {
+            String[] parts = entry.getKey().split("\\|", 2);
+            String mCode = parts[0];
+            String lhType = parts.length > 1 ? parts[1] : "";
+            BigDecimal finishQty = entry.getValue();
+
+            // 查物料维度订单量进行纠正
+            BigDecimal matPlanQty = materialPlanQtyMap.get(entry.getKey());
+            if (matPlanQty != null) {
+                BigDecimal diff = finishQty.subtract(matPlanQty);
+                // 超产 或 差异在2条以内，纠正完成量 = 订单量
+                if (diff.compareTo(BigDecimal.ZERO) > 0 || diff.compareTo(new BigDecimal("-2")) >= 0) {
+                    finishQty = matPlanQty;
                 }
+            }
+
+            // 映射到胎胚描述维度
+            String embryoDesc = materialToEmbryoDesc.get(mCode);
+            if (StringUtils.isNotBlank(embryoDesc)) {
+                String finishKey = embryoDesc + "|" + lhType;
+                resultMap.merge(finishKey, finishQty, BigDecimal::add);
             }
         }
 
