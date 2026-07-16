@@ -1305,7 +1305,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
             resultMap.merge(finishKey, val, BigDecimal::add);
         }
 
-        // 完成量纠正：如果完成量 > 订单量 或 相差<=2条，则完成量 = 订单量
+        // 完成量纠正：diff = 完成量 - 订单量，如果 diff > 0（超产）或 diff <= 2（差异小），则完成量 = 订单量
         if (totalDailyPlanQtyMap != null && !totalDailyPlanQtyMap.isEmpty()) {
             for (Map.Entry<String, BigDecimal> entry : resultMap.entrySet()) {
                 String key = entry.getKey();
@@ -1313,8 +1313,8 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
                 BigDecimal planQty = totalDailyPlanQtyMap.get(key);
                 if (planQty != null) {
                     BigDecimal diff = finishQty.subtract(planQty);
-                    // 完成量 > 订单量 或 相差<=2条，纠正完成量 = 订单量
-                    if (diff.compareTo(BigDecimal.ZERO) > 0 || diff.abs().compareTo(new BigDecimal("2")) <= 0) {
+                    // 完成量 > 订单量 或 完成量 - 订单量 <= 2，纠正完成量 = 订单量
+                    if (diff.compareTo(BigDecimal.ZERO) > 0 || diff.compareTo(new BigDecimal("2")) <= 0) {
                         entry.setValue(planQty);
                     }
                 }
