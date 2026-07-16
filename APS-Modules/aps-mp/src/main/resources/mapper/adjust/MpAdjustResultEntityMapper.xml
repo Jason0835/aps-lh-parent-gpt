@@ -182,7 +182,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             IFNULL(CASE WHEN DAYOFMONTH(CASE WHEN stockMap.STOCK_CAPTURE_DATE BETWEEN #{startDate} AND #{endDate} THEN stockMap.STOCK_CAPTURE_DATE ELSE #{startDate} END) &lt;= 30 THEN f5.DAY_30 ELSE 0 END, 0) +
             IFNULL(CASE WHEN DAYOFMONTH(CASE WHEN stockMap.STOCK_CAPTURE_DATE BETWEEN #{startDate} AND #{endDate} THEN stockMap.STOCK_CAPTURE_DATE ELSE #{startDate} END) &lt;= 31 THEN f5.DAY_31 ELSE 0 END, 0)
             ) AS PLAN_QTY,
-            IFNULL(SUM(fin.DAY_QTY), 0) AS FINISH_QTY
+            IFNULL(SUM(fin.DAY_QTY), 0) AS FINISH_QTY,
+            MAX(IFNULL(stockMap.FORCE_ZERO, 0)) AS FORCE_ZERO
             FROM T_MP_ADJUST_RESULT f5
             -- 关联当月调整结果表，取当月各分厂最新ADJ版本号用于外层关联
             INNER JOIN (
@@ -310,7 +311,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             IFNULL(CASE WHEN DAYOFMONTH(CASE WHEN stockMap.STOCK_CAPTURE_DATE BETWEEN #{startDate} AND #{endDate} THEN stockMap.STOCK_CAPTURE_DATE ELSE #{startDate} END) &lt;= 30 THEN f5.DAY_30 ELSE 0 END, 0) +
             IFNULL(CASE WHEN DAYOFMONTH(CASE WHEN stockMap.STOCK_CAPTURE_DATE BETWEEN #{startDate} AND #{endDate} THEN stockMap.STOCK_CAPTURE_DATE ELSE #{startDate} END) &lt;= 31 THEN f5.DAY_31 ELSE 0 END, 0)
             ) AS PLAN_QTY,
-            IFNULL(SUM(fin.DAY_QTY), 0) AS FINISH_QTY
+            IFNULL(SUM(fin.DAY_QTY), 0) AS FINISH_QTY,
+            MAX(IFNULL(stockMap.FORCE_ZERO, 0)) AS FORCE_ZERO
             FROM T_MP_ADJUST_RESULT f5
             INNER JOIN (
                 SELECT FACTORY_CODE, MAX(VERSION) AS VERSION
