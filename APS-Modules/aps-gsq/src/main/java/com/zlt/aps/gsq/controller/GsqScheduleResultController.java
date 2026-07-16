@@ -1,9 +1,7 @@
 package com.zlt.aps.gsq.controller;
 
-import cn.hutool.core.date.DateUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
-import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.log.annotation.Log;
@@ -21,15 +19,12 @@ import com.zlt.common.utils.PubUtil;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
 
 /**
@@ -65,6 +60,8 @@ public class GsqScheduleResultController extends AbstractDocBizController<GsqSch
         startPage();
         LambdaQueryWrapper<GsqScheduleResult> wrapper = buildQueryWrapper(queryVO);
         List<GsqScheduleResult> list = gsqScheduleResultMapper.selectList(wrapper);
+        // 回填胎圈排程结果数据到 TQ_CLASS1~6_PLAN 字段
+        gsqScheduleResultService.fillTqPlanQty(list);
         return getDataTable(list);
     }
 
@@ -171,16 +168,7 @@ public class GsqScheduleResultController extends AbstractDocBizController<GsqSch
     @ApiOperation("自动排程")
     @PostMapping("/autoPlan")
     public AjaxResult autoPlan(@RequestBody GsqScheduleResult queryVO) {
-        Date scheduleDate = queryVO.getScheduleDateQuery();
-        String factoryCode = queryVO.getFactoryCode();
-        if (scheduleDate == null) {
-            return AjaxResult.error("排程日期不能为空");
-        }
-        if (StringUtils.isEmpty(factoryCode)) {
-            return AjaxResult.error("分厂不能为空");
-        }
-        gsqEngineService.autoGsqSchedule(DateUtils.parseDateToStr("yyyy-MM-dd", scheduleDate), factoryCode);
-        return AjaxResult.success();
+        return gsqScheduleResultService.autoPlan(queryVO);
     }
 
     /**
@@ -285,7 +273,7 @@ public class GsqScheduleResultController extends AbstractDocBizController<GsqSch
      */
     @ApiOperation("唯一性校验")
     @PostMapping("/checkUnique")
-    public Boolean checkUnique(@RequestBody GsqScheduleResult queryVO) {
+    public String checkUnique(@RequestBody GsqScheduleResult queryVO) {
         return gsqScheduleResultService.checkUnique(queryVO);
     }
 

@@ -4,6 +4,7 @@ import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.date.DateUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.core.web.page.TableDataInfo;
@@ -105,27 +106,6 @@ public class GsqScheduleResultServiceImpl extends AbstractDocService<GsqSchedule
     @Override
     public String getDocTypeCode() {
         return "GSQ_SCHEDULE_RESULT";
-    }
-
-    /**
-     * 查询钢丝圈排程结果列表
-     * 业务逻辑：
-     * 1. 按查询条件查询钢丝圈排程结果
-     * 2. 回填对应胎圈排程结果数据到 TQ_CLASS1~6_PLAN 字段
-     *
-     * @param queryVO 查询条件
-     * @return 分页结果
-     */
-    @Override
-    public TableDataInfo list(GsqScheduleResult queryVO) {
-        TableDataInfo result = super.list(queryVO);
-        if (result != null && result.getRows() != null) {
-            @SuppressWarnings("unchecked")
-            List<GsqScheduleResult> rows = (List<GsqScheduleResult>) result.getRows();
-            // 回填胎圈排程结果数据
-            fillTqPlanQty(rows);
-        }
-        return result;
     }
 
     /**
@@ -245,7 +225,7 @@ public class GsqScheduleResultServiceImpl extends AbstractDocService<GsqSchedule
         uniqueCheck.setScheduleDate(dto.getScheduleDate());
         uniqueCheck.setSteelRingCode(dto.getSteelRingCode());
         uniqueCheck.setMachineCode(dto.getMachineCode());
-        if (!checkUnique(uniqueCheck)) {
+        if (UserConstants.NOT_UNIQUE.equals(checkUnique(uniqueCheck))) {
             return AjaxResult.error("同一排程日期、机台、钢丝圈已存在排程记录，不允许重复插单");
         }
 
@@ -904,14 +884,14 @@ public class GsqScheduleResultServiceImpl extends AbstractDocService<GsqSchedule
      * 根据排程日期、钢丝圈代码、机台编号校验唯一性
      *
      * @param entity 待校验记录
-     * @return true=唯一 false=不唯一
+     * @return UserConstants.UNIQUE="0" 唯一，UserConstants.NOT_UNIQUE="1" 不唯一
      */
     @Override
-    public Boolean checkUnique(GsqScheduleResult entity) {
+    public String checkUnique(GsqScheduleResult entity) {
         if (entity == null || entity.getScheduleDate() == null
                 || StringUtils.isBlank(entity.getSteelRingCode())
                 || StringUtils.isBlank(entity.getMachineCode())) {
-            return true;
+            return UserConstants.UNIQUE;
         }
         LambdaQueryWrapper<GsqScheduleResult> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(GsqScheduleResult::getScheduleDate, entity.getScheduleDate());
@@ -923,7 +903,7 @@ public class GsqScheduleResultServiceImpl extends AbstractDocService<GsqSchedule
             wrapper.ne(GsqScheduleResult::getId, entity.getId());
         }
         Long count = gsqScheduleResultMapper.selectCount(wrapper);
-        return count == null || count == 0;
+        return count != null && count > 0 ? UserConstants.NOT_UNIQUE : UserConstants.UNIQUE;
     }
 
     /**
@@ -1003,7 +983,8 @@ public class GsqScheduleResultServiceImpl extends AbstractDocService<GsqSchedule
      *
      * @param scheduleList 钢丝圈排程结果列表
      */
-    private void fillTqPlanQty(List<GsqScheduleResult> scheduleList) {
+    @Override
+    public void fillTqPlanQty(List<GsqScheduleResult> scheduleList) {
         if (CollectionUtils.isEmpty(scheduleList)) {
             return;
         }

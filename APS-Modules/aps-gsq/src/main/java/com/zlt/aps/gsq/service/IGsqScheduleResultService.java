@@ -18,6 +18,23 @@ import java.util.List;
 public interface IGsqScheduleResultService extends IDocService<GsqScheduleResult> {
 
     /**
+     * 自动排程
+     * 委托给 GsqEngineService.autoGsqSchedule 执行自动排程
+     *
+     * @param queryVO 排程参数（含排程日期、分厂编码）
+     * @return 排程结果
+     */
+    AjaxResult autoPlan(GsqScheduleResult queryVO);
+
+    /**
+     * 回填胎圈排程结果数据到 TQ_CLASS1~6_PLAN 字段
+     * 根据钢丝圈代码和排程日期查询对应的胎圈排程结果，将胎圈6班计划量回填到钢丝圈排程结果
+     *
+     * @param scheduleList 钢丝圈排程结果列表
+     */
+    void fillTqPlanQty(List<GsqScheduleResult> scheduleList);
+
+    /**
      * 插单前校验
      * 校验规则：
      * 1. 排程日期不能为空，且需在生产周期内
@@ -115,9 +132,9 @@ public interface IGsqScheduleResultService extends IDocService<GsqScheduleResult
      * 根据排程日期、钢丝圈代码、机台编号校验唯一性
      *
      * @param entity 待校验记录
-     * @return true=唯一 false=不唯一
+     * @return UserConstants.UNIQUE="0" 唯一，UserConstants.NOT_UNIQUE="1" 不唯一
      */
-    Boolean checkUnique(GsqScheduleResult entity);
+    String checkUnique(GsqScheduleResult entity);
 
     /**
      * 根据排程日期查询当前日期发布状态为"发布中"或"超时失败"的记录数
