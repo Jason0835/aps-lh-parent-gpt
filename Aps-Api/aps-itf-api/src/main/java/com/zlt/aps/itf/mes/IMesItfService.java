@@ -9,6 +9,7 @@ import com.zlt.aps.itf.vo.MesBrandDict;
 import com.zlt.aps.lh.api.domain.entity.LhMachineOnlineInfo;
 import com.zlt.aps.mdm.api.domain.entity.MdmMoldAlterPlan;
 import com.zlt.aps.mp.api.domain.entity.*;
+import com.zlt.aps.gsq.api.domain.entity.GsqScheduleResultIssue;
 import com.zlt.aps.tq.api.domain.entity.TqScheduleResultIssue;import io.swagger.annotations.ApiOperation;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -362,6 +363,21 @@ public interface IMesItfService {
     @ApiOperation("胎圈排程结果下发到MES")
     @PostMapping("/mesItf/issueTqScheduleResult")
     public AjaxResult issueTqScheduleResult(@RequestBody List<TqScheduleResultIssue> tqScheduleResultIssueList);
+
+    /**
+     * 钢丝圈排程结果下发到MES
+     * 业务规则：
+     * 1. D日（今天）：更新中班数据（钢丝圈1班→MES中班），夜班早班已过不下发
+     * 2. D+1日（明天）：更新夜早中3班数据（钢丝圈2/3/4班→MES夜/早/中班）
+     * 3. D+2日（后天）：先删后插夜早2班数据（钢丝圈5/6班→MES夜/早班），中班尚未排产不下发
+     * 钢丝圈6班覆盖胎圈1~6班，TQ_CLASS1~6_PLAN全量传递
+     *
+     * @param gsqScheduleResultIssueList 钢丝圈排程结果列表（已按3天拆分）
+     * @return 结果
+     */
+    @ApiOperation("钢丝圈排程结果下发到MES")
+    @PostMapping("/mesItf/issueGsqScheduleResult")
+    public AjaxResult issueGsqScheduleResult(@RequestBody List<GsqScheduleResultIssue> gsqScheduleResultIssueList);
 
     /**
      * 直裁排程结果下发到MES

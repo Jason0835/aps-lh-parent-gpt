@@ -106,9 +106,26 @@
           AND DATA_VERSION = #{dataVersion}
           AND CHILD_CODE IS NOT NULL
     </select>
-
+    
+    <!-- 示方书工艺信息同步 -->
+    <select id="selectConstructionProcessInfo" resultType="com.zlt.aps.mdm.api.domain.entity.MdmConstructionProcess">
+        SELECT
+            MATERIAL_CODE,
+            MATERIAL_VERSION,
+            MATERIAL_DESC,
+            PROCESS_CODE,
+            PRODUCT_TYPE_CODE,
+            PROCESS_VALUE,
+            UNIT,
+            DATA_VERSION,
+            FACTORY_CODE
+        FROM MES_CONSTRUCTION_PROCESS
+        WHERE FACTORY_CODE = #{factoryCode}
+          AND DATA_VERSION = #{dataVersion}
+    </select>
+    
     <!-- 成品原材料折算接口 -->
-    <select id="selectConstructionProcessInfo" resultType="com.zlt.aps.mdm.api.domain.entity.MdmRawMaterialConversion">
+    <select id="selectMdmRawMaterialConversion" resultType="com.zlt.aps.mdm.api.domain.entity.MdmRawMaterialConversion">
         SELECT
             ID,
             MATERIAL_CODE,
@@ -119,9 +136,9 @@
             RAW_MATERIAL_CODE,
             RAW_MATERIAL_WEIGHT,
             FACTORY_CODE,
-            DEL_FLAG IS_DELETE
+            DEL_FLAG IS_DELETE,
             REMARK
-        FROM T_MDM_RAW_MATERIAL_CONVERSION
+        FROM MES_RAW_MATERIAL_CONVERSION
         WHERE FACTORY_CODE = #{factoryCode}
           AND DATA_VERSION = #{dataVersion}
     </select>

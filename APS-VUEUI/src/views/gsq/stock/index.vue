@@ -1,7 +1,7 @@
 <template>
   <basic-container>
     <page-table
-      tableRef="gsqSteelRingStockMainTable"
+      tableRef="gsqStockMainTable"
       :calcHeight="true"
       v-loading="loading"
       :columns="columns"
@@ -21,29 +21,29 @@
         <el-button
           type="primary"
           plain
-          v-hasPermi="['gsq:steelRingStock:add']"
+          v-hasPermi="['gsq:stock:add']"
           @click="handleAdd"
         >{{ $t("ui.frame.btn.add") }}</el-button>
         <el-button
           type="danger"
           plain
-          v-hasPermi="['gsq:steelRingStock:remove']"
+          v-hasPermi="['gsq:stock:remove']"
           @click="handleBatchDelete"
         >{{ $t("ui.frame.btn.delete") }}</el-button>
         <el-button
-          v-hasPermi="['gsq:steelRingStock:import']"
+          v-hasPermi="['gsq:stock:import']"
           @click="$refs.tltUpload.handleImport()"
         >{{ $t("ui.frame.btn.import") }}</el-button>
         <el-button
           @click="handleExport"
-          v-hasPermi="['gsq:steelRingStock:export']"
+          v-hasPermi="['gsq:stock:export']"
         >{{ $t("ui.frame.btn.export") }}</el-button>
       </template>
     </page-table>
     <tlt-upload
       ref="tltUpload"
-      downloadUrl="/gsq/steelRingStock/importTemplate"
-      uploadUrl="/gsq/steelRingStock/importData"
+      downloadUrl="/gsq/stock/importTemplate"
+      uploadUrl="/gsq/stock/importData"
       @uploadSuccess="getList"
     />
     <InfoDialog ref="infoRef" @success="getList" />
@@ -51,15 +51,15 @@
 </template>
 <script>
 import {
-  listSteelRingStock,
-  removeSteelRingStock,
-  exportSteelRingStock,
-} from "@/api/gsq/steelRingStock";
+  listStock,
+  removeStock,
+  exportStock,
+} from "@/api/gsq/stock";
 import tltUpload from "@/components/tltUpload/tltUpload.vue";
 import InfoDialog from "./components/infoDialog.vue";
 
 export default {
-  name: "GsqSteelRingStock",
+  name: "GsqStock",
   components: {
     tltUpload,
     InfoDialog,
@@ -83,15 +83,15 @@ export default {
     searchColumns() {
       return [
         {
-          label: this.$t("ui.data.column.gsq.steelRingStock.stockDate"),
+          label: this.$t("ui.data.column.gsq.stock.stockDate"),
           prop: "stockDate",
           type: "daterange",
         },
         {
-          label: this.$t("ui.data.column.gsq.steelRingStock.steelRingCode"),
+          label: this.$t("ui.data.column.gsq.stock.steelRingCode"),
           prop: "steelRingCode",
           type: "input",
-          placeholder: this.$t("ui.data.column.gsq.steelRingStock.steelRingCode"),
+          placeholder: this.$t("ui.data.column.gsq.stock.steelRingCode"),
         },
       ];
     },
@@ -102,7 +102,7 @@ export default {
           prop: "stockDate",
           align: "center",
           halign: "center",
-          label: this.$t("ui.data.column.gsq.steelRingStock.stockDate"),
+          label: this.$t("ui.data.column.gsq.stock.stockDate"),
           minWidth: 120,
           formatter: (row) => {
             return row.stockDate || "-";
@@ -112,7 +112,7 @@ export default {
           prop: "steelRingCode",
           align: "center",
           halign: "center",
-          label: this.$t("ui.data.column.gsq.steelRingStock.steelRingCode"),
+          label: this.$t("ui.data.column.gsq.stock.steelRingCode"),
           minWidth: 120,
           formatter: (row) => {
             return row.steelRingCode || "-";
@@ -122,21 +122,21 @@ export default {
           prop: "stockNum",
           align: "center",
           halign: "center",
-          label: this.$t("ui.data.column.gsq.steelRingStock.stockNum"),
+          label: this.$t("ui.data.column.gsq.stock.stockNum"),
           minWidth: 120,
         },
         {
           prop: "modifyNum",
           align: "center",
           halign: "center",
-          label: this.$t("ui.data.column.gsq.steelRingStock.modifyNum"),
+          label: this.$t("ui.data.column.gsq.stock.modifyNum"),
           minWidth: 120,
         },
         {
           prop: "badNum",
           align: "center",
           halign: "center",
-          label: this.$t("ui.data.column.gsq.steelRingStock.badNum"),
+          label: this.$t("ui.data.column.gsq.stock.badNum"),
           minWidth: 120,
         },
         {
@@ -151,7 +151,7 @@ export default {
         {
           prop: "updateTime",
           halign: "center",
-          label: this.$t("ui.data.column.gsq.steelRingStock.updateDate"),
+          label: this.$t("ui.data.column.gsq.stock.updateDate"),
           minWidth: 150,
         },
         {
@@ -165,7 +165,7 @@ export default {
             return (
               <div>
                 <el-button
-                  v-hasPermi={["gsq:steelRingStock:edit"]}
+                  v-hasPermi={["gsq:stock:edit"]}
                   class="minus"
                   type="primary"
                   onClick={() => this.handleEdit(row)}
@@ -173,7 +173,7 @@ export default {
                   {this.$t("ui.frame.btn.modify")}
                 </el-button>
                 <el-button
-                  v-hasPermi={["gsq:steelRingStock:remove"]}
+                  v-hasPermi={["gsq:stock:remove"]}
                   class="minus"
                   type="danger"
                   onClick={() => this.handleDelete(row)}
@@ -202,7 +202,7 @@ export default {
       this.$confirm(this.$t("common.confirm.delete"), {
         type: "warning",
       }).then(() => {
-        removeSteelRingStock(row.id).then((data) => {
+        removeStock(row.id).then((data) => {
           this.$modal.msgSuccess(data.msg);
           this.$set(this.page, "current", 1);
           this.getList();
@@ -220,7 +220,7 @@ export default {
         type: "warning",
       }).then(() => {
         const ids = this.selection.map((row) => row.id);
-        removeSteelRingStock(ids).then((data) => {
+        removeStock(ids).then((data) => {
           this.$modal.msgSuccess(data.msg);
           this.$set(this.page, "current", 1);
           this.getList();
@@ -228,7 +228,7 @@ export default {
       });
     },
     handleExport() {
-      this.$confirm(this.$t("ui.data.column.gsq.steelRingStock.confirm.export"), {
+      this.$confirm(this.$t("ui.data.column.gsq.stock.confirm.export"), {
         type: "warning",
       }).then(() => {
         try {
@@ -239,7 +239,7 @@ export default {
             pageSize: undefined,
             pageNum: undefined,
           };
-          exportSteelRingStock(params);
+          exportStock(params);
         } catch (error) {
           console.error(error);
         } finally {
@@ -294,7 +294,7 @@ export default {
     async getList() {
       try {
         this.loading = true;
-        const data = await listSteelRingStock(this.formatParams());
+        const data = await listStock(this.formatParams());
         this.data = data.rows;
         this.page.total = data.total;
       } catch (error) {

@@ -73,6 +73,19 @@ public class GsqEngineServiceImpl implements GsqEngineService {
      * 钢丝圈胶自动排程
      *
      * @param scheduleDate 排程日期，格式：yyyy-MM-dd
+     * @param factoryCode  分厂编码
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public void autoGsqSchedule(String scheduleDate, String factoryCode) {
+        // TODO 待适配新6班制DDL及factoryCode过滤逻辑，暂委托给旧3班制实现
+        log.warn("autoGsqSchedule(scheduleDate, factoryCode) 暂未实现6班制新DDL适配，回退到旧实现，scheduleDate={}, factoryCode={}", scheduleDate, factoryCode);
+        autoGsqSchedule(scheduleDate);
+    }
+
+    /**
+     * 钢丝圈胶自动排程（兼容旧调用，分厂默认取当前用户所在分厂）
+     *
+     * @param scheduleDate 排程日期，格式：yyyy-MM-dd
      */
     @Transactional(rollbackFor=Exception.class)
     public void autoGsqSchedule(String scheduleDate) {

@@ -10,6 +10,13 @@ public interface GsqEngineService {
     /**
      * 钢丝圈胶自动排程
      * @param scheduleDate 排程日期，格式：yyyy-MM-dd
+     * @param factoryCode  分厂编码
+     */
+    void autoGsqSchedule(String scheduleDate, String factoryCode);
+
+    /**
+     * 钢丝圈胶自动排程（兼容旧调用，分厂默认取当前用户所在分厂）
+     * @param scheduleDate 排程日期，格式：yyyy-MM-dd
      */
     void autoGsqSchedule(String scheduleDate);
 

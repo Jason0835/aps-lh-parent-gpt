@@ -51,6 +51,12 @@
             <version>1.0.3-SNAPSHOT</version>
             <scope>compile</scope>
         </dependency>
+        <dependency>
+            <groupId>com.zlt.aps.gsq</groupId>
+            <artifactId>aps-gsq-api</artifactId>
+            <version>1.0.3-SNAPSHOT</version>
+            <scope>compile</scope>
+        </dependency>
 
     </dependencies>
 </project>

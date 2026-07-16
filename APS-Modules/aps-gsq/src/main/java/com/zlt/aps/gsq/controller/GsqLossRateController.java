@@ -33,7 +33,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
- * 钢丝圈损耗率管理Controller
+ * 钢丝圈损耗率管理控制层
  * 路径：/gsq/lossRate
  * 业务规则：
  *   1. 钢丝圈编码与机台编码至少一个有值
@@ -59,7 +59,7 @@ public class GsqLossRateController extends AbstractDocBizController<GsqLossRate>
     private GsqLossRateMapper gsqLossRateMapper;
 
     /**
-     * 查询钢丝圈损耗率列表
+     * 查询钢丝圈损耗率列表（左联机台信息表反显机台名称）
      */
     @ApiOperation("查询钢丝圈损耗率列表")
     @PostMapping("/list")
@@ -71,43 +71,63 @@ public class GsqLossRateController extends AbstractDocBizController<GsqLossRate>
     }
 
     /**
-     * 保存钢丝圈损耗率（id为空新增，id不为空修改）
+     * 新增钢丝圈损耗率
      * 父类内部会调用 Service 的 checkUnique 进行唯一性校验，
      * 同时 checkUnique 内置了"钢丝圈编码与机台编码至少一个有值"和"损耗率必填"的前置校验
      */
-    @Log(title = "钢丝圈损耗率管理", businessType = BusinessType.INSERT_OR_UPDATE)
-    @ApiOperation("保存")
-    @PostMapping("/save")
-    @Override
-    public AjaxResult save(@RequestBody GsqLossRate billVO) {
-        return super.save(billVO);
+    @Log(title = "ui.data.column.gsq.lossRate.modalName", businessType = BusinessType.INSERT)
+    @ApiOperation("新增钢丝圈损耗率")
+    @PostMapping("/add")
+    public AjaxResult add(@RequestBody GsqLossRate entity) {
+        return super.save(entity);
+    }
+
+    /**
+     * 编辑钢丝圈损耗率
+     */
+    @Log(title = "ui.data.column.gsq.lossRate.modalName", businessType = BusinessType.UPDATE)
+    @ApiOperation("编辑钢丝圈损耗率")
+    @PostMapping("/edit")
+    public AjaxResult edit(@RequestBody GsqLossRate entity) {
+        return super.save(entity);
     }
 
     /**
      * 删除钢丝圈损耗率（逻辑删除）
      */
-    @Log(title = "钢丝圈损耗率管理", businessType = BusinessType.DELETE)
-    @ApiOperation("删除")
-    @PostMapping("/delete/{ids}")
-    public AjaxResult deleteByIds(@PathVariable("ids") List<Long> ids) {
+    @Log(title = "ui.data.column.gsq.lossRate.modalName", businessType = BusinessType.DELETE)
+    @ApiOperation("删除钢丝圈损耗率")
+    @PostMapping("/remove")
+    @Override
+    public AjaxResult removeByIds(@RequestBody List<Long> ids) {
         return super.removeByIds(ids);
     }
 
     /**
      * 获取钢丝圈损耗率详细信息
      */
-    @ApiOperation("获取详细信息")
-    @GetMapping("/{id}")
+    @ApiOperation("获取钢丝圈损耗率详细信息")
+    @GetMapping("/getInfo/{id}")
     @Override
     public GsqLossRate getInfo(@PathVariable("id") Long id) {
         return super.getInfo(id);
     }
 
     /**
+     * 校验钢丝圈损耗率唯一性
+     * 同时承担"钢丝圈编码与机台编码至少一个有值"和"损耗率必填"的前置校验
+     */
+    @ApiOperation("校验钢丝圈损耗率唯一性")
+    @PostMapping("/checkUnique")
+    public String checkUnique(@RequestBody GsqLossRate entity) {
+        return gsqLossRateService.checkUnique(entity);
+    }
+
+    /**
      * 导入钢丝圈损耗率
      */
-    @Log(title = "钢丝圈损耗率管理", businessType = BusinessType.IMPORT)
-    @ApiOperation("导入数据")
+    @Log(title = "ui.data.column.gsq.lossRate.modalName", businessType = BusinessType.IMPORT)
+    @ApiOperation("导入钢丝圈损耗率")
     @PostMapping("/importData")
     @Override
     public AjaxResult importData(@RequestBody ImportContext importContext,
@@ -118,8 +138,8 @@ public class GsqLossRateController extends AbstractDocBizController<GsqLossRate>
     /**
      * 导出钢丝圈损耗率
      */
-    @Log(title = "钢丝圈损耗率管理", businessType = BusinessType.EXPORT)
-    @ApiOperation("导出数据")
+    @Log(title = "ui.data.column.gsq.lossRate.modalName", businessType = BusinessType.EXPORT)
+    @ApiOperation("导出钢丝圈损耗率")
     @PostMapping("/exportData/{fileName}")
     @Override
     public byte[] exportData(@RequestBody GsqLossRate queryVO,
@@ -133,16 +153,6 @@ public class GsqLossRateController extends AbstractDocBizController<GsqLossRate>
         return out.toByteArray();
     }
 
-    /**
-     * 校验钢丝圈损耗率唯一性
-     * 同时承担"钢丝圈编码与机台编码至少一个有值"和"损耗率必填"的前置校验
-     */
-    @ApiOperation("校验钢丝圈损耗率唯一性")
-    @PostMapping("/checkUnique")
-    public String checkUnique(@RequestBody GsqLossRate entity) {
-        return gsqLossRateService.checkUnique(entity);
-    }
-
     @Override
     protected IDocService getDocService() {
         return gsqLossRateService;
@@ -150,7 +160,7 @@ public class GsqLossRateController extends AbstractDocBizController<GsqLossRate>
 
     @Override
     protected String getTypeCode() {
-        return "0";
+        return "GSQ_LOSS_RATE";
     }
 
     @Override
@@ -159,12 +169,12 @@ public class GsqLossRateController extends AbstractDocBizController<GsqLossRate>
     }
 
     /**
-     * 构建查询条件（手动追加 IS_DELETE=0 过滤逻辑删除数据）
+     * 构建查询条件
      * 钢丝圈编码按模糊匹配 %xxx%，机台编码精确匹配
+     * 框架已自动过滤逻辑删除数据，无需手动追加 IS_DELETE 条件
      */
     @Override
     protected void builderCondition(QueryWrapper<GsqLossRate> queryWrapper, GsqLossRate queryVO) {
-        queryWrapper.eq("IS_DELETE", "0");
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getSteelRingCode()), "STEEL_RING_CODE", queryVO.getSteelRingCode());
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getMachineCode()), "MACHINE_CODE", queryVO.getMachineCode());
     }
