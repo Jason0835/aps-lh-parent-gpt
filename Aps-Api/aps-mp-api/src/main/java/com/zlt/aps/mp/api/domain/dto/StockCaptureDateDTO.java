@@ -18,4 +18,6 @@ public class StockCaptureDateDTO {
     private String productStatus;
     /** 库存抓取日（Java 层根据 LAST_MONTH_PLAN_VERSION 解析或回退到余量表） */
     private Date stockCaptureDate;
+    /** 是否强制置零（当月定稿表的 LAST_MONTH_PLAN_VERSION 为当月ADJ版本时，超欠产直接为0，跳过计划量/完成量累加） */
+    private boolean forceZero;
 }

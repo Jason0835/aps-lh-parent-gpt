@@ -89,6 +89,60 @@ public class TmScheduleResult extends BaseEntity {
     @TableField(value = "MOUTH_PLATE_CODE")
     private String mouthPlateCode;
 
+    /** 胎面长度，单位米 */
+    @Excel(name = "ui.data.column.tm.scheduleResult.treadShoulderLength", type = Excel.Type.EXPORT)
+    @ApiModelProperty(value = "胎面长度", name = "treadShoulderLength")
+    @TableField(value = "TREAD_SHOULDER_LENGTH")
+    private BigDecimal treadShoulderLength;
+
+    /** 成型余量，单位条 */
+    @Excel(name = "ui.data.column.tm.scheduleResult.cxRemainQty", type = Excel.Type.EXPORT)
+    @ApiModelProperty(value = "成型余量", name = "cxRemainQty")
+    @TableField(value = "CX_REMAIN_QTY")
+    private BigDecimal cxRemainQty;
+
+    /** 成型物料编号，多个编号使用英文逗号分隔 */
+    @Excel(name = "ui.data.column.tm.scheduleResult.materialCode", type = Excel.Type.EXPORT)
+    @ApiModelProperty(value = "物料编号", name = "materialCode")
+    @TableField(value = "MATERIAL_CODE")
+    private String materialCode;
+
+    /** 成型物料描述，多个描述使用英文逗号分隔 */
+    @Excel(name = "ui.data.column.tm.scheduleResult.materialDesc", type = Excel.Type.EXPORT)
+    @ApiModelProperty(value = "物料描述", name = "materialDesc")
+    @TableField(value = "MATERIAL_DESC")
+    private String materialDesc;
+
+    /** 胎胚代码，多个代码使用英文逗号分隔 */
+    @Excel(name = "ui.data.column.tm.scheduleResult.embryoCode", type = Excel.Type.EXPORT)
+    @ApiModelProperty(value = "胎胚代码", name = "embryoCode")
+    @TableField(value = "EMBRYO_CODE")
+    private String embryoCode;
+
+    /** 胎胚描述，多个描述使用英文逗号分隔 */
+    @Excel(name = "ui.data.column.tm.scheduleResult.mainMaterialDesc", type = Excel.Type.EXPORT)
+    @ApiModelProperty(value = "胎胚描述", name = "mainMaterialDesc")
+    @TableField(value = "MAIN_MATERIAL_DESC")
+    private String mainMaterialDesc;
+
+    /** 成型机台编号，多个编号使用英文逗号分隔 */
+    @Excel(name = "ui.data.column.tm.scheduleResult.cxMachineCode", type = Excel.Type.EXPORT)
+    @ApiModelProperty(value = "成型机台编号", name = "cxMachineCode")
+    @TableField(value = "CX_MACHINE_CODE")
+    private String cxMachineCode;
+
+    /** 6 点库存，单位米 */
+    @Excel(name = "ui.data.column.tm.scheduleResult.sixClockStockQty", type = Excel.Type.EXPORT)
+    @ApiModelProperty(value = "6点库存", name = "sixClockStockQty")
+    @TableField(value = "SIX_CLOCK_STOCK_QTY")
+    private BigDecimal sixClockStockQty;
+
+    /** 卷曲长度，单位米/条 */
+    @Excel(name = "ui.data.column.tm.scheduleResult.curlRollLength", type = Excel.Type.EXPORT)
+    @ApiModelProperty(value = "卷曲长度", name = "curlRollLength")
+    @TableField(value = "CURL_ROLL_LENGTH")
+    private BigDecimal curlRollLength;
+
     /** 1班顺序 */
     @Excel(name = "ui.data.column.tm.scheduleResult.class1Sequence")
     @ApiModelProperty(value = "1班顺序", name = "class1Sequence")
@@ -334,4 +388,9 @@ public class TmScheduleResult extends BaseEntity {
     @ApiModelProperty(value = "是否收尾任务", name = "tailFlag")
     @TableField(value = "TAIL_FLAG")
     private String tailFlag;
+
+    /** 是否仅导出空模板，不映射数据库字段。 */
+    @ApiModelProperty(value = "是否仅导出空模板", name = "exportTemplate")
+    @TableField(exist = false)
+    private Boolean exportTemplate;
 }

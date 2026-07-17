@@ -9,11 +9,13 @@ import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.redissonLock.annotation.DistributedLock;
+import com.zlt.aps.tm.api.domain.dto.TmScheduleResultImportDTO;
 import com.zlt.aps.tm.api.domain.entity.TmScheduleResult;
 import com.zlt.aps.tm.api.domain.vo.TmAutoScheduleRequestVo;
 import com.zlt.aps.tm.api.domain.vo.TmScheduleShiftDateVO;
 import com.zlt.aps.tm.domain.TmAutoScheduleTask;
 import com.zlt.aps.tm.mapper.TmScheduleResultMapper;
+import com.zlt.aps.tm.service.ITmScheduleResultExcelService;
 import com.zlt.aps.tm.service.ITmScheduleResultService;
 import com.zlt.aps.tm.service.TmAutoScheduleTaskService;
 import com.zlt.bill.common.controller.AbstractDocBizController;
@@ -51,6 +53,9 @@ public class TmScheduleResultController extends AbstractDocBizController<TmSched
     @Resource
     private TmAutoScheduleTaskService tmAutoScheduleTaskService;
 
+    @Resource
+    private ITmScheduleResultExcelService tmScheduleResultExcelService;
+
     @ApiOperation("查询列表")
     @PostMapping("/list")
     @Override
@@ -74,7 +79,7 @@ public class TmScheduleResultController extends AbstractDocBizController<TmSched
     @DeleteMapping("/remove")
     @Override
     public AjaxResult removeByIds(@RequestBody List<Long> ids) {
-        return super.removeByIds(ids);
+        return toAjax(tmScheduleResultService.removeScheduleResults(ids));
     }
 
     @ApiOperation("获取详细信息")
@@ -196,6 +201,21 @@ public class TmScheduleResultController extends AbstractDocBizController<TmSched
     }
 
     /**
+     * 在单个事务中批量转机台。
+     *
+     * @param machineCode 目标机台编码
+     * @param scheduleResultList 待转机的排程结果
+     * @return 批量转机结果
+     */
+    @Log(title = "ui.data.column.tm.scheduleResult.modelName", businessType = BusinessType.UPDATE)
+    @ApiOperation("批量转机台")
+    @PostMapping("/batchChangeMachine/{machineCode}")
+    public AjaxResult batchChangeMachine(@PathVariable("machineCode") String machineCode,
+                                         @RequestBody List<TmScheduleResult> scheduleResultList) {
+        return toAjax(tmScheduleResultService.batchChangeMachine(machineCode, scheduleResultList));
+    }
+
+    /**
      * 单步撤销最近一次人工操作。
      *
      * @param dispatcherLogId 调度日志 ID
@@ -275,6 +295,22 @@ public class TmScheduleResultController extends AbstractDocBizController<TmSched
         return super.importData(importContext, updateSupport);
     }
 
+    /**
+     * 按专用模板导入胎面排程结果。
+     *
+     * @param importDTO 导入文件和工厂、模板日期上下文
+     * @param updateSupport 已存在记录是否更新
+     * @return 导入结果和错误明细
+     * @throws Exception 文件解析或日志处理失败时抛出
+     */
+    @Log(title = "ui.data.column.tm.scheduleResult.modelName", businessType = BusinessType.IMPORT)
+    @ApiOperation("按专用模板导入胎面排程结果")
+    @PostMapping("/importDataScheduleResult")
+    public AjaxResult importDataScheduleResult(@RequestBody TmScheduleResultImportDTO importDTO,
+                                               @RequestParam("updateSupport") boolean updateSupport) throws Exception {
+        return tmScheduleResultExcelService.importDataScheduleResult(importDTO, updateSupport);
+    }
+
     @Log(title = "ui.data.column.tm.scheduleResult.modelName", businessType = BusinessType.EXPORT)
     @ApiOperation("导出数据")
     @PostMapping("/exportData/{fileName}")
@@ -282,6 +318,21 @@ public class TmScheduleResultController extends AbstractDocBizController<TmSched
     public byte[] exportData(@RequestBody TmScheduleResult queryVO, @PathVariable("fileName") String fileName,
                              HttpServletResponse response) throws IOException {
         return super.exportData(queryVO, fileName, response);
+    }
+
+    /**
+     * 按专用模板导出胎面排程结果。
+     *
+     * @param queryVO 查询条件，必须包含工厂和排程日期
+     * @param fileName 导出文件名称
+     * @return Excel 文件字节
+     */
+    @Log(title = "ui.data.column.tm.scheduleResult.modelName", businessType = BusinessType.EXPORT)
+    @ApiOperation("按专用模板导出胎面排程结果")
+    @PostMapping("/exportDataScheduleResult/{fileName}")
+    public byte[] exportDataScheduleResult(@RequestBody TmScheduleResult queryVO,
+                                           @PathVariable("fileName") String fileName) {
+        return tmScheduleResultExcelService.exportDataScheduleResult(queryVO, fileName);
     }
 
     @Override

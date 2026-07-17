@@ -39,7 +39,6 @@ export default {
   name: "DjParams",
   components: {
     infoDialog,
-    TltUploadForm,
   },
   dicts: ["biz_factory_name", "biz_product_type"],
   provide() {

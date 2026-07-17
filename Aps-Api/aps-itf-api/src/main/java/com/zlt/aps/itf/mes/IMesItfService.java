@@ -10,7 +10,10 @@ import com.zlt.aps.lh.api.domain.entity.LhMachineOnlineInfo;
 import com.zlt.aps.mdm.api.domain.entity.MdmMoldAlterPlan;
 import com.zlt.aps.mp.api.domain.entity.*;
 import com.zlt.aps.gsq.api.domain.entity.GsqScheduleResultIssue;
-import com.zlt.aps.tq.api.domain.entity.TqScheduleResultIssue;import io.swagger.annotations.ApiOperation;
+import com.zlt.aps.tc.api.domain.entity.TcScheduleResultIssue;
+import com.zlt.aps.tc.api.domain.vo.TcReleaseFeedbackVo;
+import com.zlt.aps.tq.api.domain.entity.TqScheduleResultIssue;
+import io.swagger.annotations.ApiOperation;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -549,4 +552,54 @@ public interface IMesItfService {
     @ApiOperation("同步设备停机计划")
     @PostMapping("/mesItf/syncDevPlanClose")
     public AjaxResult syncDevPlanClose(@RequestBody AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 同步胎侧库存。
+     *
+     * @param syncDataLogs 同步参数
+     * @return 同步结果
+     */
+    @ApiOperation("同步胎侧库存")
+    @PostMapping("/mesItf/syncSidewallStock")
+    AjaxResult syncSidewallStock(@RequestBody AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 同步胎侧班次完成量并回写排程结果。
+     *
+     * @param syncDataLogs 同步参数
+     * @return 同步结果
+     */
+    @ApiOperation("同步胎侧班次完成量")
+    @PostMapping("/mesItf/syncTcClassShiftFinishQty")
+    AjaxResult syncTcClassShiftFinishQty(@RequestBody AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 同步胎侧日完成量。
+     *
+     * @param syncDataLogs 同步参数
+     * @return 同步结果
+     */
+    @ApiOperation("同步胎侧日完成量")
+    @PostMapping("/mesItf/syncTcScheDayFinishQty")
+    AjaxResult syncTcScheDayFinishQty(@RequestBody AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 下发胎侧排程结果。
+     *
+     * @param issueList 已按MES业务日期拆分的结果
+     * @return 下发结果
+     */
+    @ApiOperation("胎侧排程结果下发到MES")
+    @PostMapping("/mesItf/issueTcScheduleResult")
+    AjaxResult issueTcScheduleResult(@RequestBody List<TcScheduleResultIssue> issueList);
+
+    /**
+     * 查询胎侧排程发布处理状态。
+     *
+     * @param dataVersion 发布数据版本
+     * @return MES反馈
+     */
+    @ApiOperation("查询胎侧排程发布处理状态")
+    @PostMapping("/mesItf/queryTcScheduleIssueStatus")
+    TcReleaseFeedbackVo queryTcScheduleIssueStatus(@RequestParam("dataVersion") String dataVersion);
 }

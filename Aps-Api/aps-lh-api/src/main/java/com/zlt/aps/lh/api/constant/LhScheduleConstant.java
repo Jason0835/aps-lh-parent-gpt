@@ -92,6 +92,9 @@ public final class LhScheduleConstant {
     /** 每班最大首检次数（-1 表示不限制） */
     public static final int MAX_FIRST_INSPECTION_PER_SHIFT = -1;
 
+    /** 同物料多产品状态续作切换标记，用于跨滚动窗口还原原正规承接机台 */
+    public static final String SAME_MATERIAL_STATUS_CONTINUATION_ANALYSIS = "同物料多状态续作切换";
+
     // ======================== 收尾判定 ========================
 
     /** 收尾判定天数 */
@@ -233,10 +236,10 @@ public final class LhScheduleConstant {
     /** 胶囊预警次数 */
     public static final int CAPSULE_WARNING_COUNT = 430;
 
-    /** 胶囊强制下机次数 */
+    /** 胶囊使用次数上限默认值 */
     public static final int CAPSULE_FORCE_DOWN_COUNT = 450;
 
-    /** 胶囊更换损失数量 */
+    /** 换胶囊班次固定扣减计划量默认值；2条对应固定占用1小时 */
     public static final int CAPSULE_CHANGE_LOSS_QTY = 2;
 
     // ======================== 工作日历工序代码 ========================

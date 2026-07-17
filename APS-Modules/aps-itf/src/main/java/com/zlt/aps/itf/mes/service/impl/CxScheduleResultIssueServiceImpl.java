@@ -154,46 +154,54 @@ public class CxScheduleResultIssueServiceImpl implements ICxScheduleResultIssueS
      * 批量更新或插入数据（存在则更新，不存在则插入）
      * 中间表MES_CX_SCHEDULE_RESULT建在MES分库，Mapper已通过@DS(DataSource.MES)指定数据源
      * 分批处理避免SQL Server参数上限2100的问题
+     * 匹配键：排程日期+机台编码+胎胚编码+工单号（不含版本号）
+     * 实现方式：delete + insert（而非 update）
+     *   - 历史问题：旧版本使用 UPDATE 时，若 MES 表存在同 4 字段的多版本残留数据，
+     *     一条 UPDATE 会命中多条记录，把它们全部改成新版本，造成"同版本同日期同机台"重复数据。
+     *   - 现在改为：对已存在的 4 字段记录，先批量删除该键的所有历史版本数据，再批量插入本次发布的新版本数据。
+     *   - 这样无论历史有多少版本残留，最终每个 4 字段只会保留本次发布的 1 条最新版本记录。
+     *   - MES 侧无回写字段，删除不会丢失业务数据。
      */
     private void upsertCxScheduleResult(List<MesCxScheduleResult> mesList, String dataVersion) {
         if (CollectionUtils.isEmpty(mesList)) {
             return;
         }
         log.info("upsert处理开始，总记录数：{}", mesList.size());
-        // 分批查询已有记录，按排程日期+机台编码+胎胚编码+工单号+版本号匹配
+        // 分批查询已有记录，按排程日期+机台编码+胎胚编码+工单号匹配（不含版本号，保证同键覆盖旧版本）
         // 工单号加入匹配键：避免同机台同胎胚下正规/量试/试制工单互相覆盖
         Set<String> existingKeys = new HashSet<>();
         for (List<MesCxScheduleResult> batch : partitionList(mesList)) {
             List<MesCxScheduleResult> existingRecords = cxScheduleResultIssueMapper.selectExistingByScheduleDateAndMachine(batch);
             existingRecords.stream()
-                    .map(r -> r.getScheduleDate() + "|" + r.getMachineCode() + "|" + r.getEmbryoCode() + "|" + r.getOrderNo() + "|" + r.getDataVersion())
+                    .map(r -> r.getScheduleDate() + "|" + r.getMachineCode() + "|" + r.getEmbryoCode() + "|" + r.getOrderNo())
                     .forEach(existingKeys::add);
         }
-        // 根据查询结果分组：已有记录走批量更新，不存在记录走批量新增
-        List<MesCxScheduleResult> updateList = new ArrayList<>();
+        // 根据查询结果分组：已有记录走"删除+插入"覆盖，不存在记录走新增
+        List<MesCxScheduleResult> replaceList = new ArrayList<>();
         List<MesCxScheduleResult> insertList = new ArrayList<>();
         for (MesCxScheduleResult mesItem : mesList) {
-            String key = mesItem.getScheduleDate() + "|" + mesItem.getMachineCode() + "|" + mesItem.getEmbryoCode() + "|" + mesItem.getOrderNo() + "|" + mesItem.getDataVersion();
+            String key = mesItem.getScheduleDate() + "|" + mesItem.getMachineCode() + "|" + mesItem.getEmbryoCode() + "|" + mesItem.getOrderNo();
             if (existingKeys.contains(key)) {
-                updateList.add(mesItem);
+                replaceList.add(mesItem);
             } else {
                 insertList.add(mesItem);
             }
         }
-        log.info("upsert分组结果：更新{}条，新增{}条", updateList.size(), insertList.size());
-        // 分批更新
-        int updateBatchCount = 0;
-        for (List<MesCxScheduleResult> batch : partitionList(updateList)) {
-            cxScheduleResultIssueMapper.batchUpdateByScheduleDateAndMachine(batch);
-            updateBatchCount += batch.size();
+        log.info("upsert分组结果：需覆盖{}条，需新增{}条", replaceList.size(), insertList.size());
+        // 覆盖处理：先批量删除该4字段的所有历史版本记录，再批量插入本次发布的新版本数据
+        int replaceBatchCount = 0;
+        for (List<MesCxScheduleResult> batch : partitionList(replaceList)) {
+            cxScheduleResultIssueMapper.batchDeleteByScheduleDateAndMachine(batch);
+            cxScheduleResultIssueMapper.batchInsertCxScheduleResult(batch);
+            replaceBatchCount += batch.size();
         }
-        // 分批插入
+        // 新增处理
         int insertBatchCount = 0;
         for (List<MesCxScheduleResult> batch : partitionList(insertList)) {
             cxScheduleResultIssueMapper.batchInsertCxScheduleResult(batch);
             insertBatchCount += batch.size();
         }
-        log.info("upsert处理完成：实际更新{}条，实际新增{}条", updateBatchCount, insertBatchCount);
+        log.info("upsert处理完成：实际覆盖{}条，实际新增{}条", replaceBatchCount, insertBatchCount);
     }
 
     /**

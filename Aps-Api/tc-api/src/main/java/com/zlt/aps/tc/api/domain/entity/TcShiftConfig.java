@@ -2,12 +2,15 @@ package com.zlt.aps.tc.api.domain.entity;
 
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.ruoyi.common.core.annotation.Excel;
 import com.ruoyi.common.core.web.domain.BaseEntity;
 import com.zlt.aps.common.core.annotation.ImportValidated;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
+
+import java.util.Date;
 
 
 @ApiModel(value = "胎侧班制配置对象", description = "胎侧班制配置对象")
@@ -22,6 +25,14 @@ public class TcShiftConfig extends BaseEntity {
     @ApiModelProperty(value = "工厂编号", name = "factoryCode")
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;
+
+    /** 自动排程日期，历史空日期配置不参与自动排程 */
+    @JsonFormat(pattern = "yyyy-MM-dd", timezone = "GMT+8")
+    @Excel(name = "ui.data.column.tc.shiftConfig.scheduleDate", width = 20, dateFormat = "yyyy-MM-dd")
+    @ImportValidated(required = true, date = true)
+    @ApiModelProperty(value = "排程日期", name = "scheduleDate", required = true)
+    @TableField(value = "SCHEDULE_DATE")
+    private Date scheduleDate;
 
     @Excel(name = "ui.data.column.tc.shiftConfig.shiftCode")
     @ImportValidated(required = true, isCode = true, maxLength = 30)

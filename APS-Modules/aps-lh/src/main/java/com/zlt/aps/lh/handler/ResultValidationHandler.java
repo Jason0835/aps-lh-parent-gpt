@@ -17,6 +17,7 @@ import com.zlt.aps.lh.api.enums.CleaningTypeEnum;
 import com.zlt.aps.lh.api.enums.MouldChangeTypeEnum;
 import com.zlt.aps.lh.api.enums.ScheduleStepEnum;
 import com.zlt.aps.lh.api.enums.ShiftEnum;
+import com.zlt.aps.lh.component.CapsuleReplacementRuleService;
 import com.zlt.aps.lh.component.IncrSerialGenerator;
 import com.zlt.aps.lh.component.MonthPlanDateResolver;
 import com.zlt.aps.lh.component.TargetScheduleQtyResolver;
@@ -70,6 +71,9 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
 
     @Resource
     private TargetScheduleQtyResolver targetScheduleQtyResolver;
+    /** 最终结果阶段只重建并核对胶囊运行态，不得再次扣减班次计划量 */
+    @Resource
+    private CapsuleReplacementRuleService capsuleReplacementRuleService = new CapsuleReplacementRuleService();
 
     private static final AtomicInteger ORDER_SEQ = new AtomicInteger(0);
     private static final AtomicInteger CHG_SEQ = new AtomicInteger(0);
@@ -86,6 +90,9 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
         try {
             // S4.6.1 排程后置校验：保存前校验结果必填字段和关键数量约束。
             postValidation(context);
+
+            // 模数规范化完成后按最终实际班次量重建胶囊次数；这里只核对，不得再次扣减计划量。
+            capsuleReplacementRuleService.verifyFinalState(context);
 
             // S4.6.2 生成模具交替计划：基于结果真实换模开始时间和机台滚动状态生成前后规格。
             generateMouldChangePlan(context);
@@ -138,7 +145,7 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
      * 排程后置校验：检查结果完整性。
      *
      * <p>该方法会补齐部分保存所需的默认字段，例如批次号、工厂、目标日和发布状态；
-     * 但不会改变机台、班次计划量、排序结果、换模判断和收尾判断。</p>
+     * 普通双模/多模结果会在保存前按模台数收敛，但同物料多状态续作切换必须保留专用链已确定的精确尾量。</p>
      *
      * @param context 排程上下文
      */
@@ -180,9 +187,9 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
                     result.getLeftRightMould(), result.getLhMachineCode()));
             requireField(result.getMaterialCode(), "materialCode", context, result);
             requireField(result.getScheduleType(), "scheduleType", context, result);
-            if (result.getSpecEndTime() == null) {
-                throwValidationFailure(context, result, I18nUtil.getMessage("ui.data.column.lhScheduleResult.specEndTimeMissing"));
-            }
+//            if (result.getSpecEndTime() == null) {
+//                throwValidationFailure(context, result, I18nUtil.getMessage("ui.data.column.lhScheduleResult.specEndTimeMissing"));
+//            }
             if ("1".equals(result.getIsChangeMould()) && StringUtils.isBlank(result.getMouldCode())) {
                 throwValidationFailure(context, result, I18nUtil.getMessage("ui.data.column.lhScheduleResult.mouldCodeMissingInChangeMould"));
             }
@@ -312,6 +319,14 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
         if (mouldQty <= 1) {
             return;
         }
+        // 同物料X/T临时占用续作机台时，收尾班必须严格按剩余量落库，不得在S4.6再向上补齐模数。
+        if (containsSameMaterialStatusContinuationAnalysis(result)) {
+            log.info("同物料多状态续作切换跳过模台数保存前收敛, batchNo: {}, "
+                            + "materialCode: {}, productStatus: {}, machineCode: {}, mouldQty: {}, planQty: {}",
+                    context.getBatchNo(), result.getMaterialCode(), result.getProductStatus(),
+                    result.getLhMachineCode(), mouldQty, ShiftFieldUtil.resolveScheduledQty(result));
+            return;
+        }
         if (getTargetScheduleQtyResolver().isEmbryoStockEnding(context, result)) {
             log.info("成型胎胚库存收尾结果跳过模台数保存前收敛, batchNo: {}, materialCode: {}, embryoCode: {}, "
                             + "machineCode: {}, mouldQty: {}",
@@ -341,6 +356,28 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
         if (adjusted) {
             ShiftFieldUtil.syncDailyPlanQty(result);
         }
+    }
+
+    /**
+     * 判断结果任一有效班次是否带有同物料多状态续作切换标记。
+     *
+     * @param result 排程结果
+     * @return true-专用切换链结果；false-普通排程结果
+     */
+    private boolean containsSameMaterialStatusContinuationAnalysis(LhScheduleResult result) {
+        if (Objects.isNull(result)) {
+            return false;
+        }
+        for (int shiftIndex = 1;
+             shiftIndex <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT;
+             shiftIndex++) {
+            if (StringUtils.contains(
+                    ShiftFieldUtil.getShiftAnalysis(result, shiftIndex),
+                    LhScheduleConstant.SAME_MATERIAL_STATUS_CONTINUATION_ANALYSIS)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

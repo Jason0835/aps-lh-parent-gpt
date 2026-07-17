@@ -122,8 +122,7 @@ export default {
           label: this.$t("ui.dj.depthConfig.column.maxMachineQty"),
           prop: "maxMachineQty",
           span: 12,
-          type: "number",
-          min: 1,
+          type: "input",
           tips: '为空表示无上限（仅末行允许）',
         },
         {
@@ -156,6 +155,10 @@ export default {
     async save(params) {
       try {
         this.loading = true;
+        // 将空字符串的 maxMachineQty 转为 null 提交
+        if (params.maxMachineQty === '') {
+          params.maxMachineQty = null;
+        }
         let res;
         res = await saveDepthConfig(params);
         this.$modal.msgSuccess(res.msg);
@@ -173,6 +176,7 @@ export default {
         this.isEdit = true;
         this.form = {
           ...data,
+          maxMachineQty: data.maxMachineQty != null ? data.maxMachineQty : '',
         };
       } else {
         this.isEdit = false;

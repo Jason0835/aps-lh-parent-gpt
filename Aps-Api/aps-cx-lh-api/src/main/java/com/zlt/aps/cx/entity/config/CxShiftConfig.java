@@ -36,7 +36,7 @@ public class CxShiftConfig extends BaseEntity {
     @TableField("SHIFT_CODE")
     private String shiftCode;
 
-    @ApiModelProperty(value = "班次名称")
+    @ApiModelProperty(value = "班次名称，存班次编码：01夜班，02早班，03中班")
     @TableField("SHIFT_NAME")
     private String shiftName;
 

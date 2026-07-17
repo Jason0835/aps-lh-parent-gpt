@@ -8,6 +8,7 @@ import com.zlt.aps.lh.api.domain.entity.*;
 import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
 import com.zlt.aps.lh.api.enums.SingleControlMachineModeEnum;
 import com.zlt.aps.lh.component.MonthPlanDateResolver;
+import com.zlt.aps.lh.engine.strategy.support.HistoricalReverseSelectionDirective;
 import com.zlt.aps.lh.engine.strategy.support.MouldResourceContext;
 import com.zlt.aps.lh.handler.SkuMonthPlanCalculator;
 import com.zlt.aps.lh.util.SkuConstructionRefResolverUtil;
@@ -40,6 +41,11 @@ import java.util.*;
  */
 @Data
 public class LhScheduleContext {
+
+    /**
+     * 历史交替计划缺少产品状态时统一使用的正规状态
+     */
+    private static final String FORMAL_PRODUCT_STATUS = "S";
 
     // ========== 排程基本参数 ==========
     /**
@@ -261,6 +267,30 @@ public class LhScheduleContext {
      */
     private Map<String, LhRepairCapsule> capsuleUsageMap = new HashMap<>();
     /**
+     * 本批排程胶囊运行态使用次数，key=物理机台编码 + 胶囊位置（1/2）。
+     * <p>初值来自 {@link #capsuleUsageMap}，后续只按当前排程结果的实际班次计划量重建，
+     * 不回写胶囊维修表，避免候选预演或结果回滚污染基础数据。</p>
+     */
+    private Map<String, Integer> capsuleRuntimeUsageMap = new LinkedHashMap<String, Integer>();
+    /**
+     * 已执行换胶囊的物理机台班次键集合，key=物理机台编码 + 工作日期 + 班次索引。
+     * <p>同一物理机台同一班次只允许扣减一次，即使该班存在多个结果行或L/R两侧结果。</p>
+     */
+    private Set<String> capsuleReplacementShiftKeySet = new LinkedHashSet<String>();
+    /**
+     * 已在指定班次完成更换的胶囊位置集合，key=物理机台班次键 + 胶囊位置。
+     * <p>该集合用于区分双模机台本次究竟更换了左侧、右侧还是两侧胶囊，重建运行态时
+     * 仍能按实际产量正确计算新胶囊次数。</p>
+     */
+    private Set<String> capsuleReplacementPositionShiftKeySet = new LinkedHashSet<String>();
+    /**
+     * 已换胶囊结果班次允许写入的最大计划量，key=物理机台班次键 + 结果业务键。
+     * <p>首次换胶囊时记录扣减后的精确上限，供日标准收敛、班次重分配和补量复用，
+     * 防止后置逻辑按理论班产重新补回固定损失，也避免重复查询时再次扣减。</p>
+     */
+    private Map<String, Integer> capsuleReplacementShiftCapacityLimitMap =
+            new LinkedHashMap<String, Integer>();
+    /**
      * 硫化精度保养计划Map, key=machineCode
      */
     private Map<String, LhPrecisionPlan> maintenancePlanMap = new HashMap<>();
@@ -303,6 +333,19 @@ public class LhScheduleContext {
      * 前日模具交替计划列表，供滚动衔接继承到本批次
      */
     private List<LhMouldChangePlan> previousMouldChangePlanList = new ArrayList<>();
+    /**
+     * 业务目标日前一日模具交替计划列表，仅供“前日交替计划机台反选SKU”使用。
+     * <p>该列表固定按 {@link #scheduleTargetDate} 前一日查询，不复用滚动排程的
+     * {@link #previousMouldChangePlanList}，避免强制重排时两种历史日期口径互相污染。</p>
+     */
+    private List<LhMouldChangePlan> historicalReverseMouldChangePlanList = new ArrayList<>();
+    /**
+     * 解析、去重并绑定当前产品状态后的反选指令。
+     * <p>换活字块指令在S4.4内立即委托既有换活字块主链；其余指令由S4.5新增主链在普通候选
+     * 排序前优先尝试指定机台。失败指令不会删除SKU，后续仍按普通新增候选继续排产。</p>
+     */
+    private List<HistoricalReverseSelectionDirective> historicalReverseSelectionDirectiveList =
+            new ArrayList<HistoricalReverseSelectionDirective>();
     /**
      * 滚动排程继承结果列表，仅存放本批次继承的排程结果
      */
@@ -482,6 +525,20 @@ public class LhScheduleContext {
      * 运行态结果来源SKU映射，使用对象身份避免结果行可变字段影响Map命中，供后置校验回到原始日计划账本
      */
     private Map<LhScheduleResult, SkuScheduleDTO> scheduleResultSourceSkuMap = new IdentityHashMap<>();
+    /**
+     * 前日交替计划反选成功的机台集合。
+     * <p>key=物料+产品状态复合键，value=本阶段已经成功占用的机台编码。
+     * 后续普通新增排产只排除同一SKU重复选择这些机台，不会永久锁定机台给其他SKU。</p>
+     */
+    private Map<String, Set<String>> historicalReverseSelectedMachineCodeMap =
+            new LinkedHashMap<String, Set<String>>(8);
+    /**
+     * 前日交替计划反选成功且必须保留的结果集合。
+     * <p>使用对象身份保存，防止同SKU多机台尾量收口再次搬空或删除反选结果，
+     * 同时不改变其他普通新增结果的收口规则。</p>
+     */
+    private Set<LhScheduleResult> historicalReverseProtectedResultSet =
+            Collections.newSetFromMap(new IdentityHashMap<LhScheduleResult, Boolean>());
     /**
      * S4.5新增链路模具资源运行态，只限制新增机台数量，不反向裁剪S4.4续作结果
      */
@@ -851,8 +908,111 @@ public class LhScheduleContext {
     public int getSkuScheduledMachineCount(LocalDate productionDate,
                                            String materialCode,
                                            String productStatus) {
-        String skuKey = MonthPlanDateResolver.buildMaterialStatusKey(materialCode, productStatus);
+        // 历史交替计划没有产品状态，项目统一口径要求空状态按正规S归一化。
+        String normalizedProductStatus = StringUtils.isEmpty(productStatus)
+                ? FORMAL_PRODUCT_STATUS : productStatus;
+        String skuKey = MonthPlanDateResolver.buildMaterialStatusKey(
+                materialCode, normalizedProductStatus);
         return getScheduledMachineCount(skuScheduledMachineCodeMap, productionDate, skuKey);
+    }
+
+    /**
+     * 登记前日交替计划反选成功的机台。
+     *
+     * @param materialCode 物料编码
+     * @param productStatus 产品状态
+     * @param machineCode 机台编码
+     */
+    public void registerHistoricalReverseSelectedMachine(String materialCode,
+                                                         String productStatus,
+                                                         String machineCode) {
+        if (StringUtils.isEmpty(materialCode) || StringUtils.isEmpty(machineCode)) {
+            return;
+        }
+        String normalizedProductStatus = StringUtils.isEmpty(productStatus)
+                ? FORMAL_PRODUCT_STATUS : productStatus;
+        String skuKey = MonthPlanDateResolver.buildMaterialStatusKey(
+                materialCode, normalizedProductStatus);
+        historicalReverseSelectedMachineCodeMap
+                .computeIfAbsent(skuKey, key -> new LinkedHashSet<String>(2))
+                .add(machineCode);
+    }
+
+    /**
+     * 获取前日交替计划已为指定SKU反选成功的机台。
+     *
+     * @param materialCode 物料编码
+     * @param productStatus 产品状态
+     * @return 已成功机台编码集合；没有时返回空集合
+     */
+    public Set<String> getHistoricalReverseSelectedMachineCodes(String materialCode,
+                                                                String productStatus) {
+        if (StringUtils.isEmpty(materialCode)) {
+            return Collections.emptySet();
+        }
+        String skuKey = MonthPlanDateResolver.buildMaterialStatusKey(materialCode, productStatus);
+        Set<String> machineCodeSet = historicalReverseSelectedMachineCodeMap.get(skuKey);
+        return CollectionUtils.isEmpty(machineCodeSet)
+                ? Collections.<String>emptySet() : machineCodeSet;
+    }
+
+    /**
+     * 撤销后置资源裁剪后已经失效的反选机台登记。
+     *
+     * @param materialCode 物料编码
+     * @param productStatus 产品状态
+     * @param machineCode 历史指定机台编码
+     */
+    public void unregisterHistoricalReverseSelectedMachine(String materialCode,
+                                                           String productStatus,
+                                                           String machineCode) {
+        if (StringUtils.isEmpty(materialCode) || StringUtils.isEmpty(machineCode)) {
+            return;
+        }
+        String normalizedProductStatus = StringUtils.isEmpty(productStatus)
+                ? FORMAL_PRODUCT_STATUS : productStatus;
+        String skuKey = MonthPlanDateResolver.buildMaterialStatusKey(
+                materialCode, normalizedProductStatus);
+        Set<String> machineCodeSet = historicalReverseSelectedMachineCodeMap.get(skuKey);
+        if (CollectionUtils.isEmpty(machineCodeSet)) {
+            return;
+        }
+        machineCodeSet.remove(machineCode);
+        if (machineCodeSet.isEmpty()) {
+            historicalReverseSelectedMachineCodeMap.remove(skuKey);
+        }
+    }
+
+    /**
+     * 保护前日交替计划反选成功的排程结果。
+     *
+     * @param result 反选成功结果
+     */
+    public void protectHistoricalReverseResult(LhScheduleResult result) {
+        if (Objects.nonNull(result)) {
+            historicalReverseProtectedResultSet.add(result);
+        }
+    }
+
+    /**
+     * 判断结果是否为前日交替计划反选成功结果。
+     *
+     * @param result 排程结果
+     * @return true-需要保持原机台关系；false-普通结果
+     */
+    public boolean isHistoricalReverseProtectedResult(LhScheduleResult result) {
+        return Objects.nonNull(result) && historicalReverseProtectedResultSet.contains(result);
+    }
+
+    /**
+     * 取消后置资源裁剪后已经失效结果的反选保护。
+     *
+     * @param result 已失效排程结果
+     */
+    public void unprotectHistoricalReverseResult(LhScheduleResult result) {
+        if (Objects.nonNull(result)) {
+            historicalReverseProtectedResultSet.remove(result);
+        }
     }
 
     /**

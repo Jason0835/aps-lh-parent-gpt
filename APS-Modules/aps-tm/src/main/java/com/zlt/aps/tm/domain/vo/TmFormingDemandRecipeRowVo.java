@@ -19,6 +19,18 @@ public class TmFormingDemandRecipeRowVo {
     /** 胚胎编码 */
     private String embryoCode;
 
+    /** 物料编号 */
+    private String materialCode;
+
+    /** 物料描述 */
+    private String materialDesc;
+
+    /** 胎胚描述 */
+    private String mainMaterialDesc;
+
+    /** 成型机台编号 */
+    private String cxMachineCode;
+
     /** 硫化机编码，多个编码使用英文逗号分隔 */
     private String lhMachineCode;
 

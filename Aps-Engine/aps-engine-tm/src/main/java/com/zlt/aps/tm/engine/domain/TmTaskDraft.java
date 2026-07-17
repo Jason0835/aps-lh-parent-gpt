@@ -20,6 +20,21 @@ public class TmTaskDraft {
     /** 来源成型工单号集合，仅用于解释追踪，不写入胎面排程结果工单号 */
     private String sourceOrderNos;
 
+    /** 成型物料编号 */
+    private String materialCode;
+
+    /** 成型物料描述 */
+    private String materialDesc;
+
+    /** 胎胚代码 */
+    private String embryoCode;
+
+    /** 胎胚描述 */
+    private String mainMaterialDesc;
+
+    /** 成型机台编号 */
+    private String cxMachineCode;
+
     /** 胎面规格编码 */
     private String treadCode;
 

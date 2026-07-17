@@ -428,9 +428,19 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
     }
 
     public List<Map<String, Object>> buildExportDataList(List<LhMouldChangePlanVo> list, LhMouldChangePlan queryVO) {
-        // 按计划日期、班次、机台排序，计划日期仅按年月日比较，避免时分秒影响导出顺序
-        list = list.stream().sorted(Comparator.comparing((LhMouldChangePlanVo item) ->
-                                DateUtil.beginOfDay(item.getPlanDate()))
+        // 按 干冰清洗 > 喷砂清洗 > 其余、计划日期、班次、机台排序，计划日期仅按年月日比较，避免时分秒影响导出顺序
+        list = list.stream().sorted(
+                Comparator.comparingInt((LhMouldChangePlanVo item) -> {
+                    // 干冰清洗排最前(0)，喷砂清洗次之(1)，其余(2)
+                    if (YesOrNoEnum.YES.getCode().equals(item.getIsDryIceClean())) {
+                        return 0;
+                    }
+                    if (YesOrNoEnum.YES.getCode().equals(item.getIsSandblastingClean())) {
+                        return 1;
+                    }
+                    return 2;
+                })
+                .thenComparing(item -> DateUtil.beginOfDay(item.getPlanDate()))
                 .thenComparing(item -> StringUtils.defaultIfBlank(item.getClassIndex(), ""))
                 .thenComparing(item -> StringUtils.defaultIfBlank(item.getLhMachineCode(), "")))
                 .collect(Collectors.toList());

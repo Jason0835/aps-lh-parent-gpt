@@ -93,8 +93,8 @@
 
         <!--   API模块：成型计划（CxScheduleResult）     -->
         <dependency>
-            <groupId>com.zlt.aps.cx</groupId>
-            <artifactId>aps-cx-api</artifactId>
+            <groupId>com.zlt.aps</groupId>
+            <artifactId>aps-cx-lh-api</artifactId>
             <version>1.0.3-SNAPSHOT</version>
         </dependency>
 

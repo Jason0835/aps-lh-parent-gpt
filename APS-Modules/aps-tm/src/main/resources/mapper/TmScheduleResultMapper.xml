@@ -10,6 +10,7 @@
         <foreach item="id" collection="ids" open="(" separator="," close=")">
             #{id}
         </foreach>
+        and IS_DELETE = 0
         order by ID
         for update
     </select>

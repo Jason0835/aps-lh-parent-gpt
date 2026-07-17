@@ -18,6 +18,18 @@ public class TmFormingDemandRowVo {
     /** 胚胎编码 */
     private String embryoCode;
 
+    /** 物料编号 */
+    private String materialCode;
+
+    /** 物料描述 */
+    private String materialDesc;
+
+    /** 胎胚描述 */
+    private String mainMaterialDesc;
+
+    /** 成型机台编号 */
+    private String cxMachineCode;
+
     /** BOM 数据版本 */
     private String bomDataVersion;
 
