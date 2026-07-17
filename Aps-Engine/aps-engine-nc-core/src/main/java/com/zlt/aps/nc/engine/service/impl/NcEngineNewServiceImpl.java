@@ -1193,6 +1193,12 @@ public class NcEngineNewServiceImpl implements NcEngineNewService {
             }
 
             // 本班排产完毕后，计算各规格交班库存
+            // 先保存本班接班库存快照，用于日志显示（避免被后续 clamp 修改后无法反推准确值）
+            Map<String, BigDecimal> shiftStartInventory = new HashMap<>();
+            for (NcPaddingDemand spec : demandList) {
+                shiftStartInventory.put(spec.getLiningCode(),
+                        handoverInventory.getOrDefault(spec.getLiningCode(), BigDecimal.ZERO));
+            }
             for (NcPaddingDemand spec : demandList) {
                 BigDecimal produceQtyThisShift = this.getScheduledQty(resultMap, spec.getLiningCode(), shiftIndex);
                 // 本班成型消耗量（从成型计划动态计算）
@@ -1211,13 +1217,14 @@ public class NcEngineNewServiceImpl implements NcEngineNewService {
             context.appendLog("--- 班次 {0} 交班库存 ---", shiftIndex);
             for (NcPaddingDemand spec : demandList) {
                 BigDecimal endInv = handoverInventory.getOrDefault(spec.getLiningCode(), BigDecimal.ZERO);
+                BigDecimal startInv = shiftStartInventory.getOrDefault(spec.getLiningCode(), BigDecimal.ZERO);
                 BigDecimal produced = this.getScheduledQty(resultMap, spec.getLiningCode(), shiftIndex);
                 BigDecimal consumed = this.calcShiftConsume(
                         context.getCxScheduleList(), context.getConstructionMap(),
                         spec.getLiningCode(), shiftIndex);
                 context.appendLog("  规格 {0}：接班={1} + 生产={2} - 消耗={3} = 交班={4}",
                         spec.getLiningCode(),
-                        endInv.add(consumed).subtract(produced), produced, consumed, endInv);
+                        startInv, produced, consumed, endInv);
             }
 
             // 检查终止条件：所有需求已排完
