@@ -61,13 +61,25 @@ public class MonthPlanIssueServiceImpl implements IMonthPlanIssueService {
      */
     private static final int MONTH_PLAN_ISSUE_BATCH_SIZE = 30;
 
-    private static void genCxMonthPlanIssuesList(Map<String, FactoryMonthPlanProductionFinalResult> groupMap, List<CxMonthPlanIssue> cxMonthPlanIssuesList, String dataVersion) {
+    /**
+     * 根据物料粒度的月计划汇总结果生成成型月计划中间表数据。
+     *
+     * @param groupMap 按工厂、年月、物料编码汇总的月计划结果
+     * @param cxMonthPlanIssuesList 成型月计划下发数据
+     * @param dataVersion 接口数据版本号
+     * @return 无
+     * @throws RuntimeException 月计划字段读取异常时抛出
+     */
+    private void genCxMonthPlanIssuesList(Map<String, FactoryMonthPlanProductionFinalResult> groupMap,
+                                          List<CxMonthPlanIssue> cxMonthPlanIssuesList, String dataVersion) {
         Set<Map.Entry<String, FactoryMonthPlanProductionFinalResult>> entrySet = groupMap.entrySet();
         for (Map.Entry<String, FactoryMonthPlanProductionFinalResult> entry : entrySet) {
             FactoryMonthPlanProductionFinalResult value = entry.getValue();
             CxMonthPlanIssue cxMonthPlanIssue = new CxMonthPlanIssue();
+            cxMonthPlanIssue.setYear(value.getYear());
             cxMonthPlanIssue.setMonth(value.getMonth());
-            cxMonthPlanIssue.setMaterialCode(value.getMaterialCode());
+            cxMonthPlanIssue.setEmbryoCode(value.getEmbryoCode());
+            cxMonthPlanIssue.setEmbryoDesc(value.getMainMaterialDesc());
             cxMonthPlanIssue.setConstructionStage(value.getConstructionStage());
             cxMonthPlanIssue.setDataVersion(dataVersion);
             Map<String, Object> params = value.getParams();
@@ -93,16 +105,16 @@ public class MonthPlanIssueServiceImpl implements IMonthPlanIssueService {
 
         List<MonthPlanIssue> monthPlanIssues = new ArrayList<>();
         Map<String, FactoryMonthPlanProductionFinalResult> groupMap = new HashMap<>(16);
-        genMonthPlanIssueList(monthPlanIssueList, groupMap, monthPlanIssues, dataVersion);
+        this.genMonthPlanIssueList(monthPlanIssueList, groupMap, monthPlanIssues, dataVersion);
 
         List<CxMonthPlanIssue> cxMonthPlanIssuesList = new ArrayList<>();
-        genCxMonthPlanIssuesList(groupMap, cxMonthPlanIssuesList, dataVersion);
+        this.genCxMonthPlanIssuesList(groupMap, cxMonthPlanIssuesList, dataVersion);
 
-        executeByBatch(monthPlanIssues, monthPlanIssueEntityMapper::batchUpdateMonthPlanIssue);
-        executeByBatch(monthPlanIssues, monthPlanIssueEntityMapper::batchInsertMonthPlanIssue);
+        this.executeByBatch(monthPlanIssues, monthPlanIssueEntityMapper::batchUpdateMonthPlanIssue);
+        this.executeByBatch(monthPlanIssues, monthPlanIssueEntityMapper::batchInsertMonthPlanIssue);
         // 成型月计划
-        executeByBatch(cxMonthPlanIssuesList, monthPlanIssueEntityMapper::batchUpdateCxMonthPlanIssue);
-        executeByBatch(cxMonthPlanIssuesList, monthPlanIssueEntityMapper::batchInsertCxMonthPlanIssue);
+        this.executeByBatch(cxMonthPlanIssuesList, monthPlanIssueEntityMapper::batchUpdateCxMonthPlanIssue);
+        this.executeByBatch(cxMonthPlanIssuesList, monthPlanIssueEntityMapper::batchInsertCxMonthPlanIssue);
         // 发送MQ
         AjaxResult ajaxResult = null;
         String factoryCode = monthPlanIssueList.get(0).getFactoryCode();
@@ -164,7 +176,8 @@ public class MonthPlanIssueServiceImpl implements IMonthPlanIssueService {
         List<List<FactoryMonthPlanProductionFinalResult>> splitList = ScmListUtils.getSplitList(monthPlanIssueList, 1000);
         for (List<FactoryMonthPlanProductionFinalResult> finalResultList : splitList) {
             for (FactoryMonthPlanProductionFinalResult finalResult : finalResultList) {
-                String mapKey = GenerageMapKeyUtils.createMapKey(finalResult.getFactoryCode(), finalResult.getMonth(), finalResult.getMaterialCode());
+                String mapKey = GenerageMapKeyUtils.createMapKey(finalResult.getFactoryCode(), finalResult.getYear(),
+                        finalResult.getMonth(), finalResult.getMaterialCode());
                 if (groupMap.containsKey(mapKey)) {
                     FactoryMonthPlanProductionFinalResult result = groupMap.get(mapKey);
                     BigDecimal totalDayResult = this.getTotalDayResult(result);

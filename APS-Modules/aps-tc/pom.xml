@@ -46,6 +46,12 @@
             <groupId>com.zlt.aps.tc</groupId>
             <artifactId>aps-engine-tc</artifactId>
         </dependency>
+        <!-- TC 业务模块直接使用公共排程任务链、规则结果和评分类型，显式声明直接依赖。 -->
+        <dependency>
+            <groupId>com.zlt.aps.common.engine</groupId>
+            <artifactId>aps-engine-common</artifactId>
+            <version>1.0.3-SNAPSHOT</version>
+        </dependency>
         <!-- 和客户做接口的jar -->
         <dependency>
             <groupId>com.zlt.aps.itf</groupId>
@@ -56,9 +62,20 @@
             <groupId>com.ruoyi</groupId>
             <artifactId>ruoyi-common-log</artifactId>
         </dependency>
+        <!-- 胎侧自动排程基础资料缓存与分布式执行锁 -->
+        <dependency>
+            <groupId>com.ruoyi</groupId>
+            <artifactId>ruoyi-common-redis</artifactId>
+        </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- 与胎面 JSON 场景框架保持一致，使用 JUnit 4 执行隔离单元测试 -->
+        <dependency>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>

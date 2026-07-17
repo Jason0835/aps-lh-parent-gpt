@@ -795,6 +795,11 @@ public class TmAutoScheduleDataLoadService {
                 TmTaskDraft taskDraft = new TmTaskDraft();
                 taskDraft.setOrderNo(row.getOrderNo() + "-CLASS" + shiftOrder);
                 taskDraft.setSourceOrderNos(row.getOrderNo());
+                taskDraft.setMaterialCode(row.getMaterialCode());
+                taskDraft.setMaterialDesc(row.getMaterialDesc());
+                taskDraft.setEmbryoCode(row.getEmbryoCode());
+                taskDraft.setMainMaterialDesc(row.getMainMaterialDesc());
+                taskDraft.setCxMachineCode(row.getCxMachineCode());
                 taskDraft.setBusinessKeySuffix(buildSourceTaskBusinessKeySuffix(row, sourceRowIndex, shiftOrder));
                 taskDraft.setTreadCode(treadCode);
                 // 拆分胶料类别：第一个值为主胶料编码，其余值为基部胶编码
@@ -824,6 +829,7 @@ public class TmAutoScheduleDataLoadService {
                         formingShiftOffset).multiply(treadLength));
                 taskDraft.setDemandQty(demandQty);
                 taskDraft.setGuardShiftCount(guardShiftCount);
+                this.fillGuardRangeHours(context, taskDraft, shiftOrder, guardShiftCount, formingShiftOffset);
                 taskDraft.setMinStartQty(minStartQty);
                 taskDraft.setDefaultCurlRollLength(defaultCurlLength);
                 if (toolTotalQty.compareTo(BigDecimal.ZERO) > 0) {
@@ -1040,6 +1046,11 @@ public class TmAutoScheduleDataLoadService {
                 TmTaskDraft taskDraft = new TmTaskDraft();
                 taskDraft.setOrderNo(row.getOrderNo() + "-CLASS" + shiftOrder);
                 taskDraft.setSourceOrderNos(row.getOrderNo());
+                taskDraft.setMaterialCode(row.getMaterialCode());
+                taskDraft.setMaterialDesc(row.getMaterialDesc());
+                taskDraft.setEmbryoCode(row.getEmbryoCode());
+                taskDraft.setMainMaterialDesc(row.getMainMaterialDesc());
+                taskDraft.setCxMachineCode(row.getCxMachineCode());
                 taskDraft.setBusinessKeySuffix(buildSourceTaskBusinessKeySuffix(row, sourceRowIndex, shiftOrder));
                 taskDraft.setTreadCode(treadCode);
                 // 拆分胶料类别：第一个值为主胶料编码，其余值为基部胶编码
@@ -1068,6 +1079,7 @@ public class TmAutoScheduleDataLoadService {
                         guardShiftCount, formingShiftOffset));
                 taskDraft.setDemandQty(demandQty);
                 taskDraft.setGuardShiftCount(guardShiftCount);
+                this.fillGuardRangeHours(context, taskDraft, shiftOrder, guardShiftCount, formingShiftOffset);
                 taskDraft.setMinStartQty(minStartQty);
                 taskDraft.setDefaultCurlRollLength(defaultCurlLength);
                 if (toolTotalQty.compareTo(BigDecimal.ZERO) > 0) {
@@ -2090,6 +2102,11 @@ public class TmAutoScheduleDataLoadService {
         TmTaskDraft targetTask = new TmTaskDraft();
         targetTask.setOrderNo(sourceTask.getOrderNo());
         targetTask.setSourceOrderNos(sourceTask.getSourceOrderNos());
+        targetTask.setMaterialCode(sourceTask.getMaterialCode());
+        targetTask.setMaterialDesc(sourceTask.getMaterialDesc());
+        targetTask.setEmbryoCode(sourceTask.getEmbryoCode());
+        targetTask.setMainMaterialDesc(sourceTask.getMainMaterialDesc());
+        targetTask.setCxMachineCode(sourceTask.getCxMachineCode());
         targetTask.setBusinessKeySuffix("FUTURE_SHUTDOWN_" + DateUtil.format(sourceDate, "yyyyMMdd")
                 + "_CLASS" + sourceShiftCode + "_TO_CLASS" + targetShift);
         targetTask.setTreadCode(sourceTask.getTreadCode());
@@ -2104,8 +2121,11 @@ public class TmAutoScheduleDataLoadService {
         targetTask.setGuardDemandQty(allocatedQty);
         targetTask.setDemandQty(allocatedQty);
         targetTask.setGuardShiftCount(sourceTask.getGuardShiftCount());
+        targetTask.setGuardRangeHours(sourceTask.getGuardRangeHours());
         targetTask.setMinStartQty(sourceTask.getMinStartQty());
         targetTask.setDefaultCurlRollLength(sourceTask.getDefaultCurlRollLength());
+        targetTask.setCurlRollLength(sourceTask.getCurlRollLength());
+        targetTask.setSixClockStockQty(sourceTask.getSixClockStockQty());
         targetTask.setTotalToolQty(sourceTask.getTotalToolQty());
         targetTask.setSmallGlueFlag(sourceTask.getSmallGlueFlag());
         return targetTask;
@@ -2308,6 +2328,71 @@ public class TmAutoScheduleDataLoadService {
             total = total.add(readClassQty(classQtyArray, index));
         }
         return total;
+    }
+
+    /**
+     * 按需求计算使用的逻辑班次窗口累计库存保证范围时长。
+     *
+     * <p>逻辑班次一至六直接使用对应配置，超过六班后按三班日周期映射到
+     * CLASS1 至 CLASS3。窗口中任一班次时长缺失或非正数时不使用固定时长兜底，
+     * 保持 {@code guardRangeHours} 为空并写入跳过证据。</p>
+     *
+     * @param context 排程上下文
+     * @param taskDraft 任务草稿
+     * @param shiftOrder 胎面排程班次
+     * @param guardShiftCount 库存保证班数
+     * @param formingShiftOffset 成型班次偏移量
+     */
+    private void fillGuardRangeHours(TmScheduleContext context, TmTaskDraft taskDraft, int shiftOrder,
+                                     int guardShiftCount, int formingShiftOffset) {
+        int logicalStartShiftOrder = this.resolveFormingStartIndex(shiftOrder, formingShiftOffset) + 1;
+        int count = Math.max(guardShiftCount, 1);
+        BigDecimal guardRangeHours = BigDecimal.ZERO;
+        List<Integer> mappedShiftOrders = new ArrayList<>();
+        List<BigDecimal> shiftHours = new ArrayList<>();
+        String skipReason = null;
+        for (int index = 0; index < count; index++) {
+            int logicalShiftOrder = logicalStartShiftOrder + index;
+            int mappedShiftOrder = this.mapGuardLogicalShiftOrder(logicalShiftOrder);
+            BigDecimal currentShiftHours = context.getShiftHoursMap().get(mappedShiftOrder);
+            mappedShiftOrders.add(mappedShiftOrder);
+            shiftHours.add(currentShiftHours);
+            if (currentShiftHours == null || currentShiftHours.compareTo(BigDecimal.ZERO) <= 0) {
+                skipReason = "SHIFT_HOURS_MISSING_OR_NON_POSITIVE";
+                break;
+            }
+            guardRangeHours = guardRangeHours.add(currentShiftHours);
+        }
+        Map<String, Object> evidence = new LinkedHashMap<>();
+        evidence.put("logicalStartShiftOrder", logicalStartShiftOrder);
+        evidence.put("guardShiftCount", count);
+        evidence.put("mappedShiftOrders", mappedShiftOrders);
+        evidence.put("shiftHours", shiftHours);
+        if (skipReason == null) {
+            taskDraft.setGuardRangeHours(guardRangeHours);
+            evidence.put("guardRangeHours", guardRangeHours);
+            context.getRuleTraceMap().computeIfAbsent(taskDraft.getBusinessKey(), key -> new TmRuleTrace())
+                    .addRuleHit(TmScheduleRuleCodeEnum.GUARD_RANGE_HOURS, TmScheduleRuleResultEnum.PASS, evidence);
+            return;
+        }
+        taskDraft.setGuardRangeHours(null);
+        evidence.put("guardRangeHours", null);
+        evidence.put("reason", skipReason);
+        context.getRuleTraceMap().computeIfAbsent(taskDraft.getBusinessKey(), key -> new TmRuleTrace())
+                .addRuleHit(TmScheduleRuleCodeEnum.GUARD_RANGE_HOURS, TmScheduleRuleResultEnum.SKIP, evidence);
+    }
+
+    /**
+     * 将超过六班的逻辑班次按三班日周期映射到实际班次配置。
+     *
+     * @param logicalShiftOrder 从一开始连续增长的逻辑班次
+     * @return 一至六范围内的实际班次顺序
+     */
+    private int mapGuardLogicalShiftOrder(int logicalShiftOrder) {
+        if (logicalShiftOrder <= TmScheduleConstants.TM_MAX_SHIFT_ORDER) {
+            return logicalShiftOrder;
+        }
+        return ((logicalShiftOrder - TmScheduleConstants.TM_MAX_SHIFT_ORDER - 1) % 3) + 1;
     }
 
     /**

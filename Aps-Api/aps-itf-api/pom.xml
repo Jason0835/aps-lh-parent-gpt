@@ -57,6 +57,12 @@
             <version>1.0.3-SNAPSHOT</version>
             <scope>compile</scope>
         </dependency>
+        <dependency>
+            <groupId>com.zlt.aps.tc</groupId>
+            <artifactId>aps-tc-api</artifactId>
+            <version>1.0.3-SNAPSHOT</version>
+            <scope>compile</scope>
+        </dependency>
 
     </dependencies>
 </project>

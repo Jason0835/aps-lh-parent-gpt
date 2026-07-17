@@ -54,7 +54,7 @@
         <el-button
           type="primary"
           v-hasPermi="['tm:tmScheduleResult:import']"
-          @click="$refs.tltUpload.handleImport()"
+          @click="handleImport"
         >{{ $t("ui.frame.btn.import") }}</el-button>
         <el-button
           type="primary"
@@ -73,11 +73,13 @@
     <tlt-upload-form
       ref="tltUpload"
       :updateSupport="true"
-      downloadUrl="/tm/tmScheduleResult/importTemplate"
-      uploadUrl="/tm/tmScheduleResult/importData"
+      :download-url-formatter="(form) => handleTemplateDownload('/tm/tmScheduleResult/importTemplateCust', form)"
+      :rules="importRules"
+      downloadUrl="/tm/tmScheduleResult/importTemplateCust"
       @uploadSuccess="getList"
       labelWidth="0"
       :columns="importColumns"
+      uploadUrl="/tm/tmScheduleResult/importDataCust"
     ></tlt-upload-form>
     <autoPlanDialog ref="autoPlanRef" @success="handleAutoPlanSuccess" />
     <infoDialog ref="infoRef" @success="getList" />
@@ -179,6 +181,22 @@ export default {
     return {
       importColumns: [
         {
+          label: this.$t("ui.data.column.tm.scheduleResult.factoryCode"),
+          prop: "factoryCode",
+          type: "select",
+          dictData: this.dict.type.biz_factory_name,
+          filterable: true,
+          clearable: false,
+        },
+        {
+          label: this.$t("ui.data.column.tm.scheduleResult.scheduleDate"),
+          prop: "scheduleDate",
+          type: "date",
+          dateType: "date",
+          valueFormat: "yyyy-MM-dd",
+          clearable: false,
+        },
+        {
           label: "",
           prop: "updateSupport",
           render: (form) => {
@@ -205,7 +223,22 @@ export default {
       search: {},
       query: {},
       importDefaultValue: {},
-      importRules: {},
+      importRules: {
+        factoryCode: [
+          {
+            required: true,
+            message: this.$t("common.rule.select"),
+            trigger: "change",
+          },
+        ],
+        scheduleDate: [
+          {
+            required: true,
+            message: this.$t("common.rule.select"),
+            trigger: "change",
+          },
+        ],
+      },
       autoPlanTimer: null,
       autoPlanPollTimes: 0,
       maxAutoPlanPollTimes: 120,
@@ -759,7 +792,29 @@ export default {
     handleSelectionChange(rows) {
       this.selection = rows;
     },
+    handleImport() {
+      this.$refs.tltUpload.handleImport({
+        factoryCode: this.query.factoryCode || this.search.factoryCode,
+        scheduleDate: this.query.scheduleDate || this.search.scheduleDate,
+        updateSupport: true,
+      });
+    },
+    handleTemplateDownload(url, formValues) {
+      const params = {
+        ...formValues,
+        exportTemplate: true,
+      };
+      const paramsStr = Object.keys(params)
+        .filter(key => params[key] !== undefined && params[key] !== null && params[key] !== "")
+        .map(key => `${encodeURIComponent(key)}=${encodeURIComponent(params[key])}`)
+        .join("&");
+      return `${url}${paramsStr ? "?" + paramsStr : ""}`;
+    },
     handleExport() {
+      if (!this.query.factoryCode || !this.query.scheduleDate) {
+        this.$message.warning(this.$t("ui.tm.schedule.excelFactoryDateRequired"));
+        return;
+      }
       downloadLink("/tm/tmScheduleResult/export", this.formatParams(false));
     },
 

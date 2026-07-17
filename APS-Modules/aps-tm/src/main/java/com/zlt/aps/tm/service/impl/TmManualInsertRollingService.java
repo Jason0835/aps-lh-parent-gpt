@@ -103,6 +103,9 @@ public class TmManualInsertRollingService {
         if (changeQty.compareTo(finishQty) < 0) {
             throw new ServiceException(this.resolveTmMessage("ui.data.alert.tm.schedule.changeQtyLessThanFinish", "调量计划量不能小于已完成量"));
         }
+        Object changeAnalysis = changeResult.getFieldValueByFieldName(
+                String.format(TmScheduleConstants.SHIFT_ANALYSIS_FIELD_TEMPLATE, shiftOrder));
+        this.setShiftAnalysis(oldResult, shiftOrder, changeAnalysis == null ? null : changeAnalysis.toString());
         TmManualRollingTask changeTask = this.buildExistingTask(oldResult, shiftOrder);
         changeTask.setPlanQty(changeQty);
 
@@ -194,6 +197,52 @@ public class TmManualInsertRollingService {
                 oldResult.getFactoryCode(), oldResult.getScheduleDate(), sourceMachineCode, transferResult.getMachineCode(),
                 shiftOrder, totalResult.getUpdateCount(), totalResult.getUnplannedQty());
         return totalResult.getUpdateCount();
+    }
+
+    /**
+     * 删除排程结果并滚动更新同机台后续任务。
+     *
+     * <p>从被删除记录最早存在计划或顺序的班次开始重排，任务流排除被删除记录，
+     * 其它任务的完成量由统一滚动算法原样保留。</p>
+     *
+     * @param deleteResult 待删除排程结果
+     * @return 逻辑删除行数
+     * @throws ServiceException 记录不存在、机台产能缺失或并发删除时抛出
+     */
+    int deleteAndRoll(TmScheduleResult deleteResult) {
+        TmScheduleResult oldResult = this.loadResultById(deleteResult.getId(),
+                "ui.data.alert.tm.schedule.resultNotFound", "排程结果不存在或已删除");
+        int startShiftOrder = this.resolveDeleteStartShift(oldResult);
+        Integer startSequence = this.getShiftSequence(oldResult, startShiftOrder);
+        if (startSequence == null) {
+            startSequence = 1;
+        }
+        this.rollMachineWindow(oldResult, startShiftOrder, startSequence,
+                this.loadSameMachineResults(oldResult), this.loadMachineCapacity(oldResult), oldResult.getId(), false);
+        int deletedRows = tmScheduleResultMapper.deleteById(oldResult.getId());
+        if (deletedRows != 1) {
+            throw new ServiceException(this.resolveTmMessage(
+                    "ui.data.alert.tm.schedule.operationConcurrentChanged", "排程状态已变化，请刷新后重试"));
+        }
+        log.info("[TM_MANUAL_ROLL] operation=DELETE, factoryCode={}, scheduleDate={}, machineCode={}, startShiftOrder={}, deleteCount={}",
+                oldResult.getFactoryCode(), oldResult.getScheduleDate(), oldResult.getMachineCode(), startShiftOrder, deletedRows);
+        return deletedRows;
+    }
+
+    /**
+     * 解析删除滚动的最早受影响班次。
+     *
+     * @param scheduleResult 待删除排程结果
+     * @return 最早受影响班次，记录无班次任务时返回 1
+     */
+    private int resolveDeleteStartShift(TmScheduleResult scheduleResult) {
+        for (int shiftOrder = 1; shiftOrder <= TmScheduleConstants.TM_MAX_SHIFT_ORDER; shiftOrder++) {
+            if (this.isPositive(this.getShiftPlanQty(scheduleResult, shiftOrder))
+                    || this.getShiftSequence(scheduleResult, shiftOrder) != null) {
+                return shiftOrder;
+            }
+        }
+        return 1;
     }
 
     /**
@@ -694,6 +743,15 @@ public class TmManualInsertRollingService {
         result.setWholeGlueCode(templateResult.getWholeGlueCode());
         result.setGlueSeq(templateResult.getGlueSeq());
         result.setMouthPlateCode(templateResult.getMouthPlateCode());
+        result.setTreadShoulderLength(templateResult.getTreadShoulderLength());
+        result.setCxRemainQty(templateResult.getCxRemainQty());
+        result.setMaterialCode(templateResult.getMaterialCode());
+        result.setMaterialDesc(templateResult.getMaterialDesc());
+        result.setEmbryoCode(templateResult.getEmbryoCode());
+        result.setMainMaterialDesc(templateResult.getMainMaterialDesc());
+        result.setCxMachineCode(templateResult.getCxMachineCode());
+        result.setSixClockStockQty(templateResult.getSixClockStockQty());
+        result.setCurlRollLength(templateResult.getCurlRollLength());
         result.setTailFlag(templateResult.getTailFlag());
         return result;
     }
@@ -743,6 +801,17 @@ public class TmManualInsertRollingService {
      */
     private void setShiftPlanQty(TmScheduleResult result, int shiftOrder, BigDecimal planQty) {
         result.setFieldValueByFieldName(String.format(TmScheduleConstants.SHIFT_PLAN_QTY_FIELD_TEMPLATE, shiftOrder), planQty);
+    }
+
+    /**
+     * 设置班次原因分析。
+     *
+     * @param result     排程结果
+     * @param shiftOrder 班次顺序
+     * @param analysis   原因分析
+     */
+    private void setShiftAnalysis(TmScheduleResult result, int shiftOrder, String analysis) {
+        result.setFieldValueByFieldName(String.format(TmScheduleConstants.SHIFT_ANALYSIS_FIELD_TEMPLATE, shiftOrder), analysis);
     }
 
     /**

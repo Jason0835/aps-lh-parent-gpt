@@ -47,6 +47,11 @@
             <version>1.0.3-SNAPSHOT</version>
             <scope>compile</scope>
         </dependency>
+        <!-- MPS完成量兼容链路直接使用硫化日完成量契约，显式声明依赖以保证模块可独立编译。 -->
+        <dependency>
+            <groupId>com.zlt.aps.lh</groupId>
+            <artifactId>aps-lh-api</artifactId>
+        </dependency>
 
         <dependency>
             <groupId>com.zlt</groupId>

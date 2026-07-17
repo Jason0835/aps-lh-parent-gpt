@@ -32,6 +32,13 @@ public class CxMonthPlanIssue implements Serializable {
     private static final long serialVersionUID = 1L;
 
     /**
+     * 年份
+     */
+    @ApiModelProperty(value = "年份", name = "year")
+    @TableField(value = "YEAR")
+    private Integer year;
+
+    /**
      * 月份
      */
     @ApiModelProperty(value = "月份", name = "mpMonth")
@@ -39,11 +46,18 @@ public class CxMonthPlanIssue implements Serializable {
     private Integer month;
 
     /**
-     * 物料编码
+     * 胎胚编码
      */
-    @ApiModelProperty(value = "物料编码", name = "materialCode")
-    @TableField(value = "MATERIAL_CODE")
-    private String materialCode;
+    @ApiModelProperty(value = "胎胚编码", name = "embryoCode")
+    @TableField(value = "EMBRYO_CODE")
+    private String embryoCode;
+
+    /**
+     * 胎胚描述
+     */
+    @ApiModelProperty(value = "胎胚描述", name = "embryoDesc")
+    @TableField(value = "EMBRYO_DESC")
+    private String embryoDesc;
 
     /**
      * 示方类型

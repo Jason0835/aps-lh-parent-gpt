@@ -12,10 +12,12 @@ import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.tm.api.constant.TmScheduleConstants;
 import com.zlt.aps.tm.api.domain.entity.TmDispatcherLog;
 import com.zlt.aps.tm.api.domain.entity.TmScheduleResult;
+import com.zlt.aps.tm.api.domain.entity.TmScheduleResultExplain;
 import com.zlt.aps.tm.api.enums.TmReleaseStatusTransition;
 import com.zlt.aps.tm.api.enums.TmScheduleErrorCodeEnum;
 import com.zlt.aps.tm.engine.validator.TmInsertPositionValidator;
 import com.zlt.aps.tm.mapper.TmDispatcherLogMapper;
+import com.zlt.aps.tm.mapper.TmScheduleResultExplainMapper;
 import com.zlt.aps.tm.mapper.TmScheduleResultMapper;
 import lombok.RequiredArgsConstructor;
 import org.redisson.RedissonMultiLock;
@@ -26,6 +28,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
+import java.text.MessageFormat;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
@@ -56,6 +59,8 @@ public class TmManualOperationFacade {
     private final TmDispatcherLogMapper tmDispatcherLogMapper;
 
     private final TmManualInsertRollingService tmManualInsertRollingService;
+
+    private final TmScheduleResultExplainMapper tmScheduleResultExplainMapper;
 
     /**
      * 执行人工插单。
@@ -90,6 +95,7 @@ public class TmManualOperationFacade {
         TmScheduleResult persisted = this.loadOperationResult(scheduleResult,
                 "ui.data.alert.tm.schedule.changeQtyIdEmpty", "调量排程结果不能为空",
                 "ui.data.alert.tm.schedule.changeQtyResultNotFound", "调量排程结果不存在或已失效");
+        this.validateChangeQtyEditableFields(scheduleResult, persisted);
         this.normalizeExistingOperationRequest(scheduleResult, persisted, false);
         List<String> machineCodes = Collections.singletonList(persisted.getMachineCode());
         return this.executeWithMachineLocks(persisted.getFactoryCode(), persisted.getScheduleDate(), machineCodes,
@@ -118,24 +124,201 @@ public class TmManualOperationFacade {
         TmScheduleResult persisted = this.loadOperationResult(scheduleResult,
                 "ui.data.alert.tm.schedule.changeMachineIdEmpty", "转机台排程结果不能为空",
                 "ui.data.alert.tm.schedule.changeMachineResultNotFound", "转机台排程结果不存在或已失效");
-        String targetMachineCode = StrUtil.trim(scheduleResult.getMachineCode());
+        String targetMachineCode = this.normalizeTargetMachineCode(scheduleResult.getMachineCode());
         this.normalizeExistingOperationRequest(scheduleResult, persisted, true);
         scheduleResult.setMachineCode(targetMachineCode);
         List<String> machineCodes = Arrays.asList(persisted.getMachineCode(), targetMachineCode);
         return this.executeWithMachineLocks(persisted.getFactoryCode(), persisted.getScheduleDate(), machineCodes,
-                () -> this.executeInTransaction(() -> {
-                    TmScheduleResult current = this.reloadAndValidateOperationResult(scheduleResult.getId(),
-                            "ui.data.alert.tm.schedule.changeMachineResultNotFound", "转机台排程结果不存在或已失效");
-                    this.validateLockedSourceMachine(persisted, current);
-                    this.normalizeExistingOperationRequest(scheduleResult, current, true);
-                    scheduleResult.setMachineCode(targetMachineCode);
-                    List<TmScheduleResult> beforeList = this.lockAndValidateManualOpSnapshot(current, machineCodes);
-                    int changedCount = tmManualInsertRollingService.changeMachineAndRoll(scheduleResult);
-                    List<TmScheduleResult> afterList = this.loadManualOpSnapshot(current, machineCodes);
-                    scheduleResult.setBaseVale(scheduleResult.getId());
-                    this.recordDispatcherLog(ApsConstant.DISPATCHER_OPER_MACHINE, scheduleResult, beforeList, afterList);
-                    return changedCount;
-                }));
+                () -> this.executeInTransaction(() -> this.changeMachineInsideTransaction(
+                        targetMachineCode, scheduleResult, persisted)));
+    }
+
+    /**
+     * 在一个分布式锁范围和一个数据库事务中批量转机台。
+     *
+     * <p>先完整读取全部源记录并生成全局排序锁键，获得全部源、目标机台锁后才开始写入。
+     * 任一记录校验、滚动或审计失败都会使前面已经执行的记录一起回滚。</p>
+     *
+     * @param machineCode 目标机台编码
+     * @param scheduleResultList 待转机的排程结果
+     * @return 更新行数
+     * @throws ServiceException 请求为空、记录重复或任一转机失败时抛出
+     */
+    public int batchChangeMachine(String machineCode, List<TmScheduleResult> scheduleResultList) {
+        String targetMachineCode = this.normalizeTargetMachineCode(machineCode);
+        List<TmScheduleResult> requestList = this.normalizeBatchChangeMachineRequests(scheduleResultList);
+        List<TmScheduleResult> initialResultList = requestList.stream()
+                .map(request -> this.loadOperationResult(request,
+                        "ui.data.alert.tm.schedule.changeMachineIdEmpty", "转机台排程结果不能为空",
+                        "ui.data.alert.tm.schedule.changeMachineResultNotFound", "转机台排程结果不存在或已失效"))
+                .collect(Collectors.toList());
+        List<String> lockKeyList = this.buildBatchChangeMachineLockKeys(targetMachineCode, initialResultList);
+        return this.executeWithLockKeys(lockKeyList,
+                () -> this.executeBatchChangeMachineTransaction(
+                        targetMachineCode, requestList, initialResultList));
+    }
+
+    /**
+     * 在一个短事务中依次执行批量转机台。
+     *
+     * @param targetMachineCode 目标机台编码
+     * @param requestList 转机请求
+     * @param initialResultList 获锁前读取的源记录
+     * @return 更新行数
+     * @throws ServiceException 任一记录并发变化或转机失败时抛出
+     */
+    int executeBatchChangeMachineTransaction(String targetMachineCode,
+                                               List<TmScheduleResult> requestList,
+                                               List<TmScheduleResult> initialResultList) {
+        return this.executeInTransaction(() -> {
+            int changedCount = 0;
+            for (int index = 0; index < requestList.size(); index++) {
+                changedCount += this.changeMachineInsideTransaction(
+                        targetMachineCode, requestList.get(index), initialResultList.get(index));
+            }
+            return changedCount;
+        });
+    }
+
+    /**
+     * 执行单条转机台的行锁校验、滚动和审计。
+     *
+     * @param targetMachineCode 目标机台编码
+     * @param scheduleResult 转机请求
+     * @param persisted 获锁前读取的源记录
+     * @return 更新行数
+     * @throws ServiceException 记录并发变化、滚动或审计失败时抛出
+     */
+    private int changeMachineInsideTransaction(String targetMachineCode,
+                                                TmScheduleResult scheduleResult,
+                                                TmScheduleResult persisted) {
+        TmScheduleResult current = this.reloadAndValidateOperationResult(scheduleResult.getId(),
+                "ui.data.alert.tm.schedule.changeMachineResultNotFound", "转机台排程结果不存在或已失效");
+        this.validateLockedSourceMachine(persisted, current);
+        this.normalizeExistingOperationRequest(scheduleResult, current, true);
+        scheduleResult.setMachineCode(targetMachineCode);
+        List<String> machineCodes = Arrays.asList(current.getMachineCode(), targetMachineCode);
+        List<TmScheduleResult> beforeList = this.lockAndValidateManualOpSnapshot(current, machineCodes);
+        int changedCount = tmManualInsertRollingService.changeMachineAndRoll(scheduleResult);
+        List<TmScheduleResult> afterList = this.loadManualOpSnapshot(current, machineCodes);
+        scheduleResult.setBaseVale(scheduleResult.getId());
+        this.recordDispatcherLog(ApsConstant.DISPATCHER_OPER_MACHINE, scheduleResult, beforeList, afterList);
+        return changedCount;
+    }
+
+    /**
+     * 批量删除未发布排程结果。
+     *
+     * <p>按工厂、日期、机台生成全局有序分布式锁，在同一短事务中完成目标行锁、
+     * 局部滚动、逻辑删除、解释记录逻辑删除和调度日志写入，任一步失败整批回滚。</p>
+     *
+     * @param ids 排程结果 ID
+     * @return 删除行数
+     * @throws ServiceException ID 为空、记录缺失、状态非法、锁失败或并发变化时抛出
+     */
+    public int deleteTasks(List<Long> ids) {
+        List<Long> normalizedIds = this.normalizeDeleteIds(ids);
+        List<TmScheduleResult> initialResultList = tmScheduleResultMapper.selectBatchIds(normalizedIds);
+        this.validateDeleteResults(normalizedIds, initialResultList);
+        List<String> lockKeyList = this.buildDeleteLockKeys(initialResultList);
+        return this.executeWithLockKeys(lockKeyList,
+                () -> this.executeInTransaction(() -> this.deleteTasksInsideTransaction(normalizedIds, lockKeyList)));
+    }
+
+    /**
+     * 在短事务内执行批量逻辑删除、滚动重排和审计写入。
+     *
+     * @param ids 规范化后的排程结果 ID
+     * @param expectedLockKeyList 获锁前计算的锁键
+     * @return 删除行数
+     * @throws ServiceException 数据或锁定范围发生变化时抛出
+     */
+    private int deleteTasksInsideTransaction(List<Long> ids, List<String> expectedLockKeyList) {
+        List<TmScheduleResult> lockedTargetList = tmScheduleResultMapper.selectBatchIdsForUpdate(ids);
+        this.validateDeleteResults(ids, lockedTargetList);
+        if (!expectedLockKeyList.equals(this.buildDeleteLockKeys(lockedTargetList))) {
+            throw new ServiceException(this.resolveTmMessage(
+                    "ui.data.alert.tm.schedule.operationConcurrentChanged", "排程状态已变化，请刷新后重试"));
+        }
+
+        List<TmScheduleResult> sortedTargetList = lockedTargetList.stream()
+                .sorted(Comparator.comparing(TmScheduleResult::getId)).collect(Collectors.toList());
+        int deletedCount = 0;
+        for (TmScheduleResult targetResult : sortedTargetList) {
+            List<String> machineCodes = Collections.singletonList(targetResult.getMachineCode());
+            List<TmScheduleResult> beforeList = this.lockAndValidateManualOpSnapshot(targetResult, machineCodes);
+            TmScheduleResult currentTarget = beforeList.stream()
+                    .filter(result -> Objects.equals(result.getId(), targetResult.getId()))
+                    .findFirst().orElse(null);
+            this.validateDeleteResults(Collections.singletonList(targetResult.getId()),
+                    currentTarget == null ? Collections.emptyList() : Collections.singletonList(currentTarget));
+            deletedCount += tmManualInsertRollingService.deleteAndRoll(currentTarget);
+            List<TmScheduleResult> afterList = this.loadManualOpSnapshot(targetResult, machineCodes);
+            this.recordDispatcherLog(ApsConstant.DISPATCHER_OPER_DELETE, currentTarget, beforeList, afterList);
+        }
+
+        LambdaQueryWrapper<TmScheduleResultExplain> explainWrapper = new LambdaQueryWrapper<>();
+        explainWrapper.in(TmScheduleResultExplain::getResultId, ids);
+        tmScheduleResultExplainMapper.delete(explainWrapper);
+        return deletedCount;
+    }
+
+    /**
+     * 规范化批量删除 ID。
+     *
+     * @param ids 原始 ID
+     * @return 去空、去重并排序后的 ID
+     * @throws ServiceException 未提供有效 ID 时抛出
+     */
+    List<Long> normalizeDeleteIds(List<Long> ids) {
+        List<Long> normalizedIds = ids == null ? Collections.emptyList()
+                : ids.stream().filter(Objects::nonNull).distinct().sorted().collect(Collectors.toList());
+        if (normalizedIds.isEmpty()) {
+            throw new ServiceException(this.resolveTmMessage(
+                    "ui.data.alert.tm.schedule.deleteIdsEmpty", "删除排程结果不能为空"));
+        }
+        return normalizedIds;
+    }
+
+    /**
+     * 校验批量删除记录完整且全部处于未发布状态。
+     *
+     * @param ids 请求 ID
+     * @param resultList 数据库排程结果
+     * @throws ServiceException 记录缺失或任一状态非未发布时抛出
+     */
+    void validateDeleteResults(List<Long> ids, List<TmScheduleResult> resultList) {
+        if (resultList == null || resultList.size() != ids.size()) {
+            throw new ServiceException(this.resolveTmMessage(
+                    "ui.data.alert.tm.schedule.resultNotFound", "排程结果不存在或已删除"));
+        }
+        boolean containsInvalidStatus = resultList.stream()
+                .anyMatch(result -> !ApsConstant.NO_RELEASE.equals(result.getReleaseStatus()));
+        if (containsInvalidStatus) {
+            throw new ServiceException(this.resolveTmMessage(
+                    "ui.data.alert.tm.schedule.deleteStatusInvalid", "只有未发布排程结果允许删除"));
+        }
+    }
+
+    /**
+     * 构建批量删除涉及的全局有序机台锁键。
+     *
+     * @param resultList 待删除排程结果
+     * @return 去重并排序后的锁键
+     * @throws ServiceException 记录缺少工厂、日期或机台时抛出
+     */
+    List<String> buildDeleteLockKeys(List<TmScheduleResult> resultList) {
+        boolean containsInvalidScope = resultList == null || resultList.stream().anyMatch(result -> result == null
+                || StrUtil.isBlank(result.getFactoryCode()) || result.getScheduleDate() == null
+                || StrUtil.isBlank(result.getMachineCode()));
+        if (containsInvalidScope) {
+            throw new ServiceException(this.resolveTmMessage(
+                    "ui.data.alert.tm.schedule.operationFailed", "人工排程操作失败"));
+        }
+        return resultList.stream()
+                .map(result -> LOCK_PREFIX + StrUtil.trim(result.getFactoryCode()) + ":"
+                        + DateUtil.formatDate(result.getScheduleDate()) + ":" + StrUtil.trim(result.getMachineCode()))
+                .distinct().sorted().collect(Collectors.toList());
     }
 
     /**
@@ -281,6 +464,16 @@ public class TmManualOperationFacade {
         scheduleResult.setMachineCode(StrUtil.trim(scheduleResult.getMachineCode()));
         scheduleResult.setBatchNo(StrUtil.trim(scheduleResult.getBatchNo()));
         scheduleResult.setTreadCode(StrUtil.trim(scheduleResult.getTreadCode()));
+        // 人工新插单没有自动排程来源，禁止接收调用方伪造的来源快照。
+        scheduleResult.setTreadShoulderLength(null);
+        scheduleResult.setCxRemainQty(null);
+        scheduleResult.setMaterialCode(null);
+        scheduleResult.setMaterialDesc(null);
+        scheduleResult.setEmbryoCode(null);
+        scheduleResult.setMainMaterialDesc(null);
+        scheduleResult.setCxMachineCode(null);
+        scheduleResult.setSixClockStockQty(null);
+        scheduleResult.setCurlRollLength(null);
         if (StrUtil.isBlank(scheduleResult.getMachineCode())) {
             throw new ServiceException(this.resolveTmMessage("ui.data.alert.tm.schedule.machineCodeEmpty", "排程机台不能为空"));
         }
@@ -357,12 +550,119 @@ public class TmManualOperationFacade {
         request.setWholeGlueCode(persisted.getWholeGlueCode());
         request.setGlueSeq(persisted.getGlueSeq());
         request.setMouthPlateCode(persisted.getMouthPlateCode());
+        request.setTreadShoulderLength(persisted.getTreadShoulderLength());
+        request.setCxRemainQty(persisted.getCxRemainQty());
+        request.setMaterialCode(persisted.getMaterialCode());
+        request.setMaterialDesc(persisted.getMaterialDesc());
+        request.setEmbryoCode(persisted.getEmbryoCode());
+        request.setMainMaterialDesc(persisted.getMainMaterialDesc());
+        request.setCxMachineCode(persisted.getCxMachineCode());
+        request.setSixClockStockQty(persisted.getSixClockStockQty());
+        request.setCurlRollLength(persisted.getCurlRollLength());
         request.setTailFlag(persisted.getTailFlag());
         request.setReleaseStatus(persisted.getReleaseStatus());
+        request.setDataSource(persisted.getDataSource());
+        request.setRemark(persisted.getRemark());
+        if (!keepTargetMachine) {
+            this.normalizeProtectedShiftFields(request, persisted);
+        }
         request.setMachineCode(keepTargetMachine ? StrUtil.trim(targetMachineCode) : persisted.getMachineCode());
         if (StrUtil.isBlank(request.getMachineCode())) {
             throw new ServiceException(this.resolveTmMessage("ui.data.alert.tm.schedule.machineCodeEmpty", "排程机台不能为空"));
         }
+    }
+
+    /**
+     * 校验调量请求只修改计划量和原因分析。
+     *
+     * @param request   调量请求
+     * @param persisted 数据库当前排程结果
+     * @throws ServiceException 请求显式篡改非调量字段时抛出
+     */
+    void validateChangeQtyEditableFields(TmScheduleResult request, TmScheduleResult persisted) {
+        this.validateProtectedField("factoryCode", request.getFactoryCode(), persisted.getFactoryCode());
+        this.validateProtectedField("batchNo", request.getBatchNo(), persisted.getBatchNo());
+        this.validateProtectedField("orderNo", request.getOrderNo(), persisted.getOrderNo());
+        this.validateProtectedField("scheduleDate", request.getScheduleDate(), persisted.getScheduleDate());
+        this.validateProtectedField("machineCode", request.getMachineCode(), persisted.getMachineCode());
+        this.validateProtectedField("treadCode", request.getTreadCode(), persisted.getTreadCode());
+        this.validateProtectedField("glueCode", request.getGlueCode(), persisted.getGlueCode());
+        this.validateProtectedField("baseGlueCode", request.getBaseGlueCode(), persisted.getBaseGlueCode());
+        this.validateProtectedField("wholeGlueCode", request.getWholeGlueCode(), persisted.getWholeGlueCode());
+        this.validateProtectedField("glueSeq", request.getGlueSeq(), persisted.getGlueSeq());
+        this.validateProtectedField("mouthPlateCode", request.getMouthPlateCode(), persisted.getMouthPlateCode());
+        this.validateProtectedField("treadShoulderLength", request.getTreadShoulderLength(), persisted.getTreadShoulderLength());
+        this.validateProtectedField("cxRemainQty", request.getCxRemainQty(), persisted.getCxRemainQty());
+        this.validateProtectedField("materialCode", request.getMaterialCode(), persisted.getMaterialCode());
+        this.validateProtectedField("materialDesc", request.getMaterialDesc(), persisted.getMaterialDesc());
+        this.validateProtectedField("embryoCode", request.getEmbryoCode(), persisted.getEmbryoCode());
+        this.validateProtectedField("mainMaterialDesc", request.getMainMaterialDesc(), persisted.getMainMaterialDesc());
+        this.validateProtectedField("cxMachineCode", request.getCxMachineCode(), persisted.getCxMachineCode());
+        this.validateProtectedField("sixClockStockQty", request.getSixClockStockQty(), persisted.getSixClockStockQty());
+        this.validateProtectedField("curlRollLength", request.getCurlRollLength(), persisted.getCurlRollLength());
+        this.validateProtectedField("releaseStatus", request.getReleaseStatus(), persisted.getReleaseStatus());
+        this.validateProtectedField("dataSource", request.getDataSource(), persisted.getDataSource());
+        this.validateProtectedField("tailFlag", request.getTailFlag(), persisted.getTailFlag());
+        this.validateProtectedField("remark", request.getRemark(), persisted.getRemark());
+        for (int shiftOrder = 1; shiftOrder <= TmScheduleConstants.TM_MAX_SHIFT_ORDER; shiftOrder++) {
+            this.validateProtectedShiftField(request, persisted,
+                    String.format(TmScheduleConstants.SHIFT_SEQUENCE_FIELD_TEMPLATE, shiftOrder));
+            this.validateProtectedShiftField(request, persisted,
+                    String.format(TmScheduleConstants.SHIFT_START_TIME_FIELD_TEMPLATE, shiftOrder));
+            this.validateProtectedShiftField(request, persisted,
+                    String.format(TmScheduleConstants.SHIFT_END_TIME_FIELD_TEMPLATE, shiftOrder));
+            this.validateProtectedShiftField(request, persisted,
+                    String.format(TmScheduleConstants.SHIFT_FINISH_QTY_FIELD_TEMPLATE, shiftOrder));
+        }
+    }
+
+    /**
+     * 使用数据库值覆盖调量请求中的班次受保护字段。
+     *
+     * @param request   调量请求
+     * @param persisted 数据库当前排程结果
+     */
+    private void normalizeProtectedShiftFields(TmScheduleResult request, TmScheduleResult persisted) {
+        List<String> protectedFieldTemplates = Arrays.asList(
+                TmScheduleConstants.SHIFT_SEQUENCE_FIELD_TEMPLATE,
+                TmScheduleConstants.SHIFT_START_TIME_FIELD_TEMPLATE,
+                TmScheduleConstants.SHIFT_END_TIME_FIELD_TEMPLATE,
+                TmScheduleConstants.SHIFT_FINISH_QTY_FIELD_TEMPLATE);
+        for (int shiftOrder = 1; shiftOrder <= TmScheduleConstants.TM_MAX_SHIFT_ORDER; shiftOrder++) {
+            for (String fieldTemplate : protectedFieldTemplates) {
+                String fieldName = String.format(fieldTemplate, shiftOrder);
+                request.setFieldValueByFieldName(fieldName, persisted.getFieldValueByFieldName(fieldName));
+            }
+        }
+    }
+
+    /**
+     * 校验单个班次受保护字段。
+     *
+     * @param request   调量请求
+     * @param persisted 数据库当前排程结果
+     * @param fieldName 字段名
+     * @throws ServiceException 请求显式篡改受保护字段时抛出
+     */
+    private void validateProtectedShiftField(TmScheduleResult request, TmScheduleResult persisted, String fieldName) {
+        this.validateProtectedField(fieldName, request.getFieldValueByFieldName(fieldName),
+                persisted.getFieldValueByFieldName(fieldName));
+    }
+
+    /**
+     * 校验单个受保护字段。
+     *
+     * @param fieldName      字段名
+     * @param requestValue   请求值
+     * @param persistedValue 数据库值
+     * @throws ServiceException 请求值非空且与数据库值不同时抛出
+     */
+    private void validateProtectedField(String fieldName, Object requestValue, Object persistedValue) {
+        if (requestValue == null || this.isSameFieldValue(requestValue, persistedValue)) {
+            return;
+        }
+        throw new ServiceException(MessageFormat.format(
+                I18nUtil.getMessage("ui.data.alert.tm.schedule.changeQtyFieldNotAllowed"), fieldName));
     }
 
     /**
@@ -386,6 +686,70 @@ public class TmManualOperationFacade {
         return machineCodes.stream().filter(StrUtil::isNotBlank).map(StrUtil::trim).distinct().sorted()
                 .map(machineCode -> LOCK_PREFIX + normalizedFactoryCode + ":" + DateUtil.formatDate(scheduleDate)
                         + ":" + machineCode)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * 规范化并校验目标机台编码。
+     *
+     * @param machineCode 目标机台编码
+     * @return 去除首尾空白后的机台编码
+     * @throws ServiceException 目标机台为空时抛出
+     */
+    private String normalizeTargetMachineCode(String machineCode) {
+        String targetMachineCode = StrUtil.trim(machineCode);
+        if (StrUtil.isBlank(targetMachineCode)) {
+            throw new ServiceException(this.resolveTmMessage(
+                    "ui.data.alert.tm.schedule.machineCodeEmpty", "排程机台不能为空"));
+        }
+        return targetMachineCode;
+    }
+
+    /**
+     * 规范化批量转机请求并拒绝空记录、空 ID 和重复 ID。
+     *
+     * @param scheduleResultList 批量转机请求
+     * @return 保持原操作顺序的请求副本
+     * @throws ServiceException 请求为空或存在重复 ID 时抛出
+     */
+    List<TmScheduleResult> normalizeBatchChangeMachineRequests(List<TmScheduleResult> scheduleResultList) {
+        if (scheduleResultList == null || scheduleResultList.isEmpty()) {
+            throw new ServiceException(this.resolveTmMessage(
+                    "ui.data.alert.tm.schedule.batchChangeMachineEmpty", "批量转机台记录不能为空"));
+        }
+        Set<Long> resultIdSet = new LinkedHashSet<>();
+        List<TmScheduleResult> requestList = new ArrayList<>();
+        for (TmScheduleResult scheduleResult : scheduleResultList) {
+            if (scheduleResult == null || scheduleResult.getId() == null) {
+                throw new ServiceException(this.resolveTmMessage(
+                        "ui.data.alert.tm.schedule.changeMachineIdEmpty", "转机台排程结果不能为空"));
+            }
+            if (!resultIdSet.add(scheduleResult.getId())) {
+                throw new ServiceException(this.resolveTmMessage(
+                        "ui.data.alert.tm.schedule.batchChangeMachineDuplicate", "批量转机台包含重复排程结果"));
+            }
+            requestList.add(scheduleResult);
+        }
+        return requestList;
+    }
+
+    /**
+     * 生成批量转机台所需的全局排序锁键。
+     *
+     * @param targetMachineCode 目标机台编码
+     * @param initialResultList 获锁前读取的源记录
+     * @return 所有工厂、日期、源机台和目标机台的去重排序锁键
+     */
+    List<String> buildBatchChangeMachineLockKeys(String targetMachineCode,
+                                                  List<TmScheduleResult> initialResultList) {
+        if (initialResultList == null) {
+            return Collections.emptyList();
+        }
+        return initialResultList.stream()
+                .flatMap(result -> this.buildMachineLockKeys(result.getFactoryCode(), result.getScheduleDate(),
+                        Arrays.asList(result.getMachineCode(), targetMachineCode)).stream())
+                .distinct()
+                .sorted()
                 .collect(Collectors.toList());
     }
 
@@ -416,10 +780,27 @@ public class TmManualOperationFacade {
      * @throws ServiceException 锁获取失败或线程被中断时抛出
      */
     private <T> T executeWithMachineLocks(String factoryCode, Date scheduleDate, List<String> machineCodes,
-                                           Supplier<T> action) {
+                                            Supplier<T> action) {
         List<String> lockKeyList = this.buildMachineLockKeys(factoryCode, scheduleDate, machineCodes);
         if (lockKeyList.isEmpty()) {
             throw new ServiceException(this.resolveTmMessage("ui.data.alert.tm.schedule.machineCodeEmpty", "排程机台不能为空"));
+        }
+        return this.executeWithLockKeys(lockKeyList, action);
+    }
+
+    /**
+     * 获取已排序的分布式锁键并执行操作。
+     *
+     * @param lockKeyList 分布式锁键
+     * @param action 获锁后动作
+     * @param <T> 返回类型
+     * @return 动作结果
+     * @throws ServiceException 锁获取失败或线程被中断时抛出
+     */
+    private <T> T executeWithLockKeys(List<String> lockKeyList, Supplier<T> action) {
+        if (lockKeyList == null || lockKeyList.isEmpty()) {
+            throw new ServiceException(this.resolveTmMessage(
+                    "ui.data.alert.tm.schedule.machineCodeEmpty", "排程机台不能为空"));
         }
         RLock[] lockArray = lockKeyList.stream().map(redissonClient::getLock).toArray(RLock[]::new);
         RedissonMultiLock multiLock = new RedissonMultiLock(lockArray);
@@ -538,8 +919,11 @@ public class TmManualOperationFacade {
         if (beforePrimary != null) {
             this.copyBeforePlanQty(dispatcherLog, beforePrimary);
         }
-        this.copyAfterPlanQty(dispatcherLog, scheduleResult);
-        dispatcherLog.setUndoStatus(UNDO_STATUS_NORMAL);
+        boolean deleteOperation = ApsConstant.DISPATCHER_OPER_DELETE.equals(operType);
+        if (!deleteOperation) {
+            this.copyAfterPlanQty(dispatcherLog, scheduleResult);
+        }
+        dispatcherLog.setUndoStatus(deleteOperation ? UNDO_STATUS_DONE : UNDO_STATUS_NORMAL);
         dispatcherLog.setAffectedBeforeJson(JSON.toJSONString(beforeList));
         dispatcherLog.setAffectedAfterJson(JSON.toJSONString(afterList));
         if (tmDispatcherLogMapper.insert(dispatcherLog) != 1) {
