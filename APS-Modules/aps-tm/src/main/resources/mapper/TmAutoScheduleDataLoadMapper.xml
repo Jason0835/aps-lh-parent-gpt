@@ -7,6 +7,10 @@
     <resultMap id="TmFormingDemandRowResult" type="com.zlt.aps.tm.domain.vo.TmFormingDemandRowVo">
         <result column="ORDER_NO" property="orderNo"/>
         <result column="EMBRYO_CODE" property="embryoCode"/>
+        <result column="MATERIAL_CODE" property="materialCode"/>
+        <result column="MATERIAL_DESC" property="materialDesc"/>
+        <result column="MAIN_MATERIAL_DESC" property="mainMaterialDesc"/>
+        <result column="CX_MACHINE_CODE" property="cxMachineCode"/>
         <result column="BOM_DATA_VERSION" property="bomDataVersion"/>
         <result column="LH_MACHINE_CODE" property="lhMachineCode"/>
         <result column="CLASS1_PLAN_QTY" property="class1PlanQty"/>
@@ -49,6 +53,10 @@
     <select id="selectFormingDemandRows" resultMap="TmFormingDemandRowResult">
         SELECT cx.ORDER_NO,
                cx.EMBRYO_CODE,
+               cx.MATERIAL_CODE,
+               cx.MATERIAL_DESC,
+               cx.MAIN_MATERIAL_DESC,
+               cx.CX_MACHINE_CODE,
                cx.BOM_DATA_VERSION,
                cx.LH_MACHINE_CODE,
                cx.CLASS1_PLAN_QTY,
@@ -150,6 +158,10 @@
     <resultMap id="TmFormingDemandRecipeRowResult" type="com.zlt.aps.tm.domain.vo.TmFormingDemandRecipeRowVo">
         <result column="ORDER_NO" property="orderNo"/>
         <result column="EMBRYO_CODE" property="embryoCode"/>
+        <result column="MATERIAL_CODE" property="materialCode"/>
+        <result column="MATERIAL_DESC" property="materialDesc"/>
+        <result column="MAIN_MATERIAL_DESC" property="mainMaterialDesc"/>
+        <result column="CX_MACHINE_CODE" property="cxMachineCode"/>
         <result column="LH_MACHINE_CODE" property="lhMachineCode"/>
         <result column="CLASS1_PLAN_QTY" property="class1PlanQty"/>
         <result column="CLASS2_PLAN_QTY" property="class2PlanQty"/>
@@ -184,6 +196,10 @@
     <select id="selectFormingDemandRowsByRecipe" resultMap="TmFormingDemandRecipeRowResult">
         SELECT cx.ORDER_NO,
                cx.EMBRYO_CODE,
+               cx.MATERIAL_CODE,
+               cx.MATERIAL_DESC,
+               cx.MAIN_MATERIAL_DESC,
+               cx.CX_MACHINE_CODE,
                cx.LH_MACHINE_CODE,
                cx.CLASS1_PLAN_QTY,
                cx.CLASS2_PLAN_QTY,

@@ -43,6 +43,6 @@ public class TcShiftConfigServiceImpl extends AbstractDocService<TcShiftConfig> 
 
     @Override
     protected List<String> getCheckUniqueFields() {
-        return new ArrayList<>(Arrays.asList("factoryCode", "shiftCode", "shiftOrder"));
+        return new ArrayList<>(Arrays.asList("factoryCode", "scheduleDate", "shiftOrder"));
     }
 }

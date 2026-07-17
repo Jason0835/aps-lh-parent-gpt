@@ -39,9 +39,9 @@ public class TmDispatcherLog extends BaseEntity {
     @TableField(value = "SCHEDULE_ID")
     private Long scheduleId;
 
-    /** 操作类型：0-转机台、1-调量 */
+    /** 操作类型：0-转机台、1-调量、2-插单、3-删除 */
     @Excel(name = "ui.data.column.tm.dispatcherLog.operType", dictType = "DISPATCHER_OPER_TYPE")
-    @ApiModelProperty(value = "操作类型：0-转机台、1-调量", name = "operType")
+    @ApiModelProperty(value = "操作类型：0-转机台、1-调量、2-插单、3-删除", name = "operType")
     @TableField(value = "OPER_TYPE")
     private String operType;
 

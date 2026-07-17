@@ -7,6 +7,7 @@ import io.swagger.annotations.ApiImplicitParam;
 import io.swagger.annotations.ApiImplicitParams;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -61,6 +62,10 @@ public class MesMergeController {
     @Autowired
     private MonthPlanSumService monthPlanSumService;
 
+    /** 新胎侧ITF直连同步启用后禁用本控制器内旧TC写入口。 */
+    @Value("${aps.tc.mes-direct-sync-enabled:false}")
+    private boolean tcMesDirectSyncEnabled;
+
     @ApiOperation("MPS同步测试")
     @ApiImplicitParams({
             @ApiImplicitParam(name = "dataVersion", dataType = "String", value = "同步版本", required = true),
@@ -99,7 +104,9 @@ public class MesMergeController {
             halfPartService.mergeTm(dataVersion);
         } else if (syncKey.equals(SyncKeyEnum.SIDEWALL_STOCK.getDescription())) {
             // 胎侧库存
-            halfPartService.mergeTc(dataVersion);
+            result1 = this.tcMesDirectSyncEnabled
+                    ? AjaxResult.success(I18nUtil.getMessage("ui.tc.schedule.mes.legacyWriterDisabled"))
+                    : halfPartService.mergeTc(dataVersion);
         } else if (syncKey.equals(SyncKeyEnum.LINING_STOCK.getDescription())) {
             // 内衬库存
             halfPartService.mergeNc(dataVersion);
@@ -162,7 +169,9 @@ public class MesMergeController {
             result1 = result;
         } else if (syncKey.equals(SyncKeyEnum.SIDEWALL_COMPLETE_QUANTITY.getDescription())) {
             // 胎侧完成量回报
-            AjaxResult result = finishService.mergeTcFinish(dataVersion);
+            AjaxResult result = this.tcMesDirectSyncEnabled
+                    ? AjaxResult.success(I18nUtil.getMessage("ui.tc.schedule.mes.legacyWriterDisabled"))
+                    : finishService.mergeTcFinish(dataVersion);
             if ((int)result.get(Constants.CODE) == HttpStatus.ERROR) {
                 log.setServiceResult((String) result.get(GatewayConstants.MSG_TAG));
             }
@@ -234,7 +243,9 @@ public class MesMergeController {
             result1 = result;
         } else if (syncKey.equals(SyncKeyEnum.TC_DAY_COMPLETE.getDescription())) {
             // 胎侧日完成量回报
-            AjaxResult result = finishService.mergeTcDayFinish(dataVersion);
+            AjaxResult result = this.tcMesDirectSyncEnabled
+                    ? AjaxResult.success(I18nUtil.getMessage("ui.tc.schedule.mes.legacyWriterDisabled"))
+                    : finishService.mergeTcDayFinish(dataVersion);
             if ((int)result.get(Constants.CODE) == HttpStatus.ERROR) {
                 log.setServiceResult((String) result.get(GatewayConstants.MSG_TAG));
             }

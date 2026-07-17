@@ -78,6 +78,12 @@
         </dependency>
 
         <dependency>
+            <groupId>com.zlt.aps.tc</groupId>
+            <artifactId>aps-tc-api</artifactId>
+            <version>1.0.3-SNAPSHOT</version>
+        </dependency>
+
+        <dependency>
             <groupId>com.zlt.aps.cd90</groupId>
             <artifactId>aps-cd90-api</artifactId>
             <version>1.0.3-SNAPSHOT</version>
@@ -86,6 +92,12 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
+        </dependency>
+        <!-- 使用 JUnit 4 兼容当前模块的 Maven Surefire 版本，确保单元测试被实际执行。 -->
+        <dependency>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
+            <scope>test</scope>
         </dependency>
 
         <!-- log4j-slf4j-impl cannot be present with log4j-to-slf4j 报错 -->

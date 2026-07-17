@@ -82,11 +82,19 @@ export function changeQty(data) {
   })
 }
 
+export function batchChangeMachine(machineCode, data) {
+  return request({
+    url: '/tm/tmScheduleResult/batchChangeMachine/' + machineCode,
+    method: 'post',
+    data: data
+  })
+}
+
 export function publishValidate(ids) {
   return request({
     url: '/tm/tmScheduleResult/publishValidate',
     method: 'post',
-    data: ids
+    data: { ids: ids.join(',') }
   })
 }
 
@@ -94,7 +102,7 @@ export function publishScheduleResult(ids) {
   return request({
     url: '/tm/tmScheduleResult/publish',
     method: 'post',
-    data: ids
+    data: { ids: ids.join(',') }
   })
 }
 

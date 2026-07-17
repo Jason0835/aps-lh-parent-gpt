@@ -39,11 +39,23 @@ public class TcDispatcherLog extends BaseEntity {
     @TableField(value = "SCHEDULE_ID")
     private Long scheduleId;
 
-    /** 操作类型：0-转机台、1-调量 */
+    /** 操作类型：0-转机台、1-调量、2-插单、3-删除、4-自动滚动 */
     @Excel(name = "ui.data.column.tc.dispatcherLog.operType", dictType = "DISPATCHER_OPER_TYPE")
-    @ApiModelProperty(value = "操作类型：0-转机台、1-调量", name = "operType")
+    @ApiModelProperty(value = "操作类型：0-转机台、1-调量、2-插单、3-删除、4-自动滚动", name = "operType")
     @TableField(value = "OPER_TYPE")
     private String operType;
+
+    /** 本次人工操作的班次顺序 */
+    @Excel(name = "ui.data.column.tc.dispatcherLog.shiftOrder")
+    @ApiModelProperty(value = "本次人工操作的班次顺序", name = "shiftOrder")
+    @TableField(value = "SHIFT_ORDER")
+    private Integer shiftOrder;
+
+    /** 人工操作原因 */
+    @Excel(name = "ui.data.column.tc.dispatcherLog.reason")
+    @ApiModelProperty(value = "人工操作原因", name = "reason")
+    @TableField(value = "REASON")
+    private String reason;
 
     /** 排程日期 */
     @JsonFormat(pattern = "yyyy-MM-dd", timezone = "GMT+8")
@@ -141,6 +153,16 @@ public class TcDispatcherLog extends BaseEntity {
     @ApiModelProperty(value = "操作后6班计划量", name = "afterClass6PlanQty")
     @TableField(value = "AFTER_CLASS6_PLAN_QTY")
     private BigDecimal afterClass6PlanQty;
+
+    /** 本次操作前受影响结果快照 JSON */
+    @ApiModelProperty(value = "本次操作前受影响结果快照 JSON", name = "affectedBeforeJson")
+    @TableField(value = "AFFECTED_BEFORE_JSON")
+    private String affectedBeforeJson;
+
+    /** 本次操作后受影响结果快照 JSON */
+    @ApiModelProperty(value = "本次操作后受影响结果快照 JSON", name = "affectedAfterJson")
+    @TableField(value = "AFFECTED_AFTER_JSON")
+    private String affectedAfterJson;
 
     /** 查询条件：开始时间 */
     @TableField(exist = false)

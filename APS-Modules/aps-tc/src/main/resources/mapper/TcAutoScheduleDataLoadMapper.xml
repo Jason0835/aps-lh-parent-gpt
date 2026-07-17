@@ -1,0 +1,277 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.tc.mapper.TcAutoScheduleDataLoadMapper">
+
+    <resultMap id="TcFormingDemandRowResult" type="com.zlt.aps.tc.domain.vo.TcFormingDemandRowVo">
+        <result column="ORDER_NO" property="orderNo"/>
+        <result column="EMBRYO_CODE" property="embryoCode"/>
+        <result column="BOM_DATA_VERSION" property="bomDataVersion"/>
+        <result column="LH_MACHINE_CODE" property="lhMachineCode"/>
+        <result column="CLASS1_PLAN_QTY" property="class1PlanQty"/>
+        <result column="CLASS2_PLAN_QTY" property="class2PlanQty"/>
+        <result column="CLASS3_PLAN_QTY" property="class3PlanQty"/>
+        <result column="CLASS4_PLAN_QTY" property="class4PlanQty"/>
+        <result column="CLASS5_PLAN_QTY" property="class5PlanQty"/>
+        <result column="CLASS6_PLAN_QTY" property="class6PlanQty"/>
+        <result column="CLASS7_PLAN_QTY" property="class7PlanQty"/>
+        <result column="CLASS8_PLAN_QTY" property="class8PlanQty"/>
+        <result column="MARK_CLOSE_OUT_TIP" property="markCloseOutTip"/>
+        <result column="CX_REMAIN_QTY" property="cxRemainQty"/>
+        <result column="SIDEWALL_CODE" property="sidewallCode"/>
+        <result column="SIDEWALL_VERSION" property="constructionVersion"/>
+        <result column="SIDEWALL_CRAFT" property="sidewallCraft"/>
+        <result column="SIDEWALL_LENGTH" property="sidewallLength"/>
+        <result column="SIDEWALL_MOUTH_PLATE" property="sidewallMouthPlate"/>
+        <result column="SIDEWALL_RUBBER" property="sidewallRubber"/>
+        <result column="SIDEWALL_WEIGHT" property="sidewallWeight"/>
+        <result column="SIDEWALL_WEARP_RUBBER_WEIGHT" property="sidewallWearpRubberWeight"/>
+    </resultMap>
+
+    <resultMap id="TcWorkCalendarRowResult" type="com.zlt.aps.tc.domain.vo.TcWorkCalendarRowVo">
+        <result column="PRODUCTION_DATE" property="productionDate"/>
+        <result column="DAY_FLAG" property="dayFlag"/>
+        <result column="ONE_SHIFT_FLAG" property="oneShiftFlag"/>
+        <result column="TWO_SHIFT_FLAG" property="twoShiftFlag"/>
+        <result column="THREE_SHIFT_FLAG" property="threeShiftFlag"/>
+    </resultMap>
+
+    <resultMap id="TcExperimentSpecMonthPlanRowResult" type="com.zlt.aps.tc.domain.vo.TcExperimentSpecMonthPlanRowVo">
+        <result column="MONTH_PLAN_ID" property="monthPlanId"/>
+        <result column="PRODUCTION_NO" property="productionNo"/>
+        <result column="FACTORY_CODE" property="factoryCode"/>
+        <result column="EXPERIMENT_PLAN_DATE" property="experimentPlanDate"/>
+        <result column="DAY_QTY" property="dayQty"/>
+        <result column="EMBRYO_CODE" property="embryoCode"/>
+        <result column="CONSTRUCTION_STAGE" property="constructionStage"/>
+        <result column="SIDEWALL_CODE" property="sidewallCode"/>
+        <result column="SIDEWALL_VERSION" property="constructionVersion"/>
+        <result column="SIDEWALL_CRAFT" property="sidewallCraft"/>
+        <result column="SIDEWALL_LENGTH" property="sidewallLength"/>
+        <result column="SIDEWALL_MOUTH_PLATE" property="sidewallMouthPlate"/>
+        <result column="SIDEWALL_RUBBER" property="sidewallRubber"/>
+        <result column="SIDEWALL_WEIGHT" property="sidewallWeight"/>
+        <result column="SIDEWALL_WEARP_RUBBER_WEIGHT" property="sidewallWearpRubberWeight"/>
+    </resultMap>
+    <select id="selectFormingDemandRows" resultMap="TcFormingDemandRowResult">
+        SELECT cx.ORDER_NO,
+               cx.EMBRYO_CODE,
+               cx.BOM_DATA_VERSION,
+               cx.LH_MACHINE_CODE,
+               cx.CLASS1_PLAN_QTY,
+               cx.CLASS2_PLAN_QTY,
+               cx.CLASS3_PLAN_QTY,
+               cx.CLASS4_PLAN_QTY,
+               cx.CLASS5_PLAN_QTY,
+               cx.CLASS6_PLAN_QTY,
+               cx.CLASS7_PLAN_QTY,
+               cx.CLASS8_PLAN_QTY,
+               cx.MARK_CLOSE_OUT_TIP,
+               cx.CX_REMAIN_QTY,
+               ci.SIDEWALL_CODE,
+               ci.SIDEWALL_VERSION,
+               ci.SIDEWALL_CRAFT,
+               ci.SIDEWALL_LENGTH,
+               ci.SIDEWALL_MOUTH_PLATE,
+               ci.SIDEWALL_RUBBER,
+               ci.SIDEWALL_WEIGHT,
+               ci.SIDEWALL_WEARP_RUBBER_WEIGHT
+        FROM T_CX_SCHEDULE_RESULT cx
+                 /* BOM 模式施工关联（择一）：同一胎胚按胎侧分组各取一条施工版本，优先匹配 BOM_DATA_VERSION，
+                    未匹配或为空时取最新有效记录（UPDATE_TIME DESC, ID DESC），避免多版本变体满量重复展开 */
+                 LEFT JOIN LATERAL (
+                     SELECT *
+                     FROM (
+                         SELECT c.SIDEWALL_CODE,
+                                c.SIDEWALL_VERSION,
+                                c.SIDEWALL_CRAFT,
+                                c.SIDEWALL_LENGTH,
+                                c.SIDEWALL_MOUTH_PLATE,
+                                c.SIDEWALL_RUBBER,
+                                c.SIDEWALL_WEIGHT,
+                                c.SIDEWALL_WEARP_RUBBER_WEIGHT,
+                                ROW_NUMBER() OVER (
+                                    PARTITION BY c.SIDEWALL_CODE
+                                    ORDER BY (CASE WHEN cx.BOM_DATA_VERSION IS NOT NULL
+                                                  AND c.CONSTRUCTION_VERSION = cx.BOM_DATA_VERSION THEN 0 ELSE 1 END),
+                                             c.UPDATE_TIME DESC,
+                                             c.ID DESC
+                                ) AS rn
+                         FROM T_MDM_CONSTRUCTION_INFO c
+                         WHERE c.CONSTRUCTION_CODE = cx.EMBRYO_CODE
+                     ) ranked
+                     WHERE ranked.rn = 1
+                 ) ci ON TRUE
+        WHERE cx.FACTORY_CODE = #{factoryCode}
+          AND cx.SCHEDULE_DATE = #{scheduleDate}
+    </select>
+
+    <select id="selectExperimentSpecMonthPlanRows" resultMap="TcExperimentSpecMonthPlanRowResult">
+        SELECT final_plan.ID AS MONTH_PLAN_ID,
+               final_plan.PRODUCTION_NO,
+               final_plan.FACTORY_CODE,
+               #{experimentPlanDate} AS EXPERIMENT_PLAN_DATE,
+               final_plan.${dayColumn} AS DAY_QTY,
+               final_plan.EMBRYO_CODE,
+               final_plan.CONSTRUCTION_STAGE,
+               construction_info.SIDEWALL_CODE,
+               construction_info.SIDEWALL_VERSION,
+               construction_info.SIDEWALL_CRAFT,
+               construction_info.SIDEWALL_LENGTH,
+               construction_info.SIDEWALL_MOUTH_PLATE,
+               construction_info.SIDEWALL_RUBBER,
+               construction_info.SIDEWALL_WEIGHT,
+               construction_info.SIDEWALL_WEARP_RUBBER_WEIGHT
+        FROM T_MP_MONTH_PLAN_PROD_FINAL final_plan
+                 LEFT JOIN (
+                     SELECT ranked_info.*
+                     FROM (
+                              SELECT ci.*,
+                                     ROW_NUMBER() OVER (PARTITION BY ci.CONSTRUCTION_CODE ORDER BY ci.UPDATE_TIME DESC, ci.ID DESC) AS rn
+                              FROM T_MDM_CONSTRUCTION_INFO ci
+                          ) ranked_info
+                     WHERE ranked_info.rn = 1
+                 ) construction_info
+                           ON final_plan.EMBRYO_CODE = construction_info.CONSTRUCTION_CODE
+        WHERE final_plan.FACTORY_CODE = #{factoryCode}
+          AND final_plan.YEAR_MONTH = #{yearMonth}
+          AND final_plan.CONSTRUCTION_STAGE = #{constructionStage}
+          AND final_plan.${dayColumn} > 0
+        ORDER BY final_plan.PRODUCTION_SEQUENCE, final_plan.ID
+    </select>
+    <select id="selectWorkCalendarRows" resultMap="TcWorkCalendarRowResult">
+        SELECT DAY_FLAG,
+               ONE_SHIFT_FLAG,
+               TWO_SHIFT_FLAG,
+               THREE_SHIFT_FLAG
+        FROM T_MDM_WORK_CALENDAR
+        WHERE FACTORY_CODE = #{factoryCode}
+          AND PROC_CODE = #{procCode}
+          AND PRODUCTION_DATE = #{productionDate}
+    </select>
+
+    <select id="selectWorkCalendarRowsByRange" resultMap="TcWorkCalendarRowResult">
+        SELECT PRODUCTION_DATE,
+               DAY_FLAG,
+               ONE_SHIFT_FLAG,
+               TWO_SHIFT_FLAG,
+               THREE_SHIFT_FLAG
+        FROM T_MDM_WORK_CALENDAR
+        WHERE FACTORY_CODE = #{factoryCode}
+          AND PROC_CODE = #{procCode}
+          AND PRODUCTION_DATE BETWEEN #{startDate} AND #{endDate}
+        ORDER BY PRODUCTION_DATE
+    </select>
+    <resultMap id="TcFormingDemandRecipeRowResult" type="com.zlt.aps.tc.domain.vo.TcFormingDemandRecipeRowVo">
+        <result column="ORDER_NO" property="orderNo"/>
+        <result column="EMBRYO_CODE" property="embryoCode"/>
+        <result column="LH_MACHINE_CODE" property="lhMachineCode"/>
+        <result column="CLASS1_PLAN_QTY" property="class1PlanQty"/>
+        <result column="CLASS2_PLAN_QTY" property="class2PlanQty"/>
+        <result column="CLASS3_PLAN_QTY" property="class3PlanQty"/>
+        <result column="CLASS4_PLAN_QTY" property="class4PlanQty"/>
+        <result column="CLASS5_PLAN_QTY" property="class5PlanQty"/>
+        <result column="CLASS6_PLAN_QTY" property="class6PlanQty"/>
+        <result column="CLASS7_PLAN_QTY" property="class7PlanQty"/>
+        <result column="CLASS8_PLAN_QTY" property="class8PlanQty"/>
+        <result column="CLASS1_RECIPE_NO" property="class1RecipeNo"/>
+        <result column="CLASS2_RECIPE_NO" property="class2RecipeNo"/>
+        <result column="CLASS3_RECIPE_NO" property="class3RecipeNo"/>
+        <result column="CLASS4_RECIPE_NO" property="class4RecipeNo"/>
+        <result column="CLASS5_RECIPE_NO" property="class5RecipeNo"/>
+        <result column="CLASS6_RECIPE_NO" property="class6RecipeNo"/>
+        <result column="CLASS7_RECIPE_NO" property="class7RecipeNo"/>
+        <result column="CLASS8_RECIPE_NO" property="class8RecipeNo"/>
+        <result column="MARK_CLOSE_OUT_TIP" property="markCloseOutTip"/>
+        <result column="CX_REMAIN_QTY" property="cxRemainQty"/>
+    </resultMap>
+
+    <resultMap id="TcConstructionSidewallRowResult" type="com.zlt.aps.tc.domain.vo.TcConstructionSidewallRowVo">
+        <result column="CONSTRUCTION_CODE" property="constructionCode"/>
+        <result column="CONSTRUCTION_VERSION" property="constructionVersion"/>
+        <result column="SIDEWALL_CODE" property="sidewallCode"/>
+        <result column="SIDEWALL_VERSION" property="sidewallVersion"/>
+        <result column="SIDEWALL_CRAFT" property="sidewallCraft"/>
+        <result column="SIDEWALL_LENGTH" property="sidewallLength"/>
+        <result column="SIDEWALL_MOUTH_PLATE" property="sidewallMouthPlate"/>
+        <result column="SIDEWALL_RUBBER" property="sidewallRubber"/>
+        <result column="SIDEWALL_WEIGHT" property="sidewallWeight"/>
+        <result column="SIDEWALL_WEARP_RUBBER_WEIGHT" property="sidewallWearpRubberWeight"/>
+    </resultMap>
+
+    <!-- RECIPE 模式：仅查成型排程结果，不 JOIN 施工表，施工信息由 Java 按 (EMBRYO_CODE, CLASSn_RECIPE_NO) 关联解析 -->
+    <select id="selectFormingDemandRowsByRecipe" resultMap="TcFormingDemandRecipeRowResult">
+        SELECT cx.ORDER_NO,
+               cx.EMBRYO_CODE,
+               cx.LH_MACHINE_CODE,
+               cx.CLASS1_PLAN_QTY,
+               cx.CLASS2_PLAN_QTY,
+               cx.CLASS3_PLAN_QTY,
+               cx.CLASS4_PLAN_QTY,
+               cx.CLASS5_PLAN_QTY,
+               cx.CLASS6_PLAN_QTY,
+               cx.CLASS7_PLAN_QTY,
+               cx.CLASS8_PLAN_QTY,
+               cx.CLASS1_RECIPE_NO,
+               cx.CLASS2_RECIPE_NO,
+               cx.CLASS3_RECIPE_NO,
+               cx.CLASS4_RECIPE_NO,
+               cx.CLASS5_RECIPE_NO,
+               cx.CLASS6_RECIPE_NO,
+               cx.CLASS7_RECIPE_NO,
+               cx.CLASS8_RECIPE_NO,
+               cx.MARK_CLOSE_OUT_TIP,
+               cx.CX_REMAIN_QTY
+        FROM T_CX_SCHEDULE_RESULT cx
+        WHERE cx.FACTORY_CODE = #{factoryCode}
+          AND cx.SCHEDULE_DATE = #{scheduleDate}
+    </select>
+
+    <!-- RECIPE 模式：按 (CONSTRUCTION_CODE, CONSTRUCTION_VERSION) 批量加载施工胎侧属性 -->
+    <select id="selectConstructionInfoRows" resultMap="TcConstructionSidewallRowResult">
+        SELECT ci.CONSTRUCTION_CODE,
+               ci.CONSTRUCTION_VERSION,
+               ci.SIDEWALL_CODE,
+               ci.SIDEWALL_VERSION,
+               ci.SIDEWALL_CRAFT,
+               ci.SIDEWALL_LENGTH,
+               ci.SIDEWALL_MOUTH_PLATE,
+               ci.SIDEWALL_RUBBER,
+               ci.SIDEWALL_WEIGHT,
+               ci.SIDEWALL_WEARP_RUBBER_WEIGHT
+        FROM T_MDM_CONSTRUCTION_INFO ci
+        WHERE ci.FACTORY_CODE = #{factoryCode}
+          AND ci.CONSTRUCTION_CODE IN
+        <foreach collection="embryoCodes" item="embryoCode" open="(" separator="," close=")">
+            #{embryoCode}
+        </foreach>
+          AND ci.CONSTRUCTION_VERSION IN
+        <foreach collection="constructionVersions" item="constructionVersion" open="(" separator="," close=")">
+            #{constructionVersion}
+        </foreach>
+    </select>
+
+    <!-- 人工插单选项：后端按胎侧编码和胎侧施工版本去重，并解析胶料分段 -->
+    <select id="selectManualConstructionOptions" resultMap="TcConstructionSidewallRowResult">
+        SELECT DISTINCT
+               ci.CONSTRUCTION_CODE,
+               ci.CONSTRUCTION_VERSION,
+               ci.SIDEWALL_CODE,
+               ci.SIDEWALL_VERSION,
+               ci.SIDEWALL_CRAFT,
+               ci.SIDEWALL_LENGTH,
+               ci.SIDEWALL_MOUTH_PLATE,
+               ci.SIDEWALL_RUBBER,
+               ci.SIDEWALL_WEIGHT,
+               ci.SIDEWALL_WEARP_RUBBER_WEIGHT
+        FROM T_MDM_CONSTRUCTION_INFO ci
+        WHERE ci.FACTORY_CODE = #{factoryCode}
+          AND ci.SIDEWALL_CODE IS NOT NULL
+          AND ci.SIDEWALL_CODE &lt;&gt; ''
+          AND ci.SIDEWALL_VERSION IS NOT NULL
+          AND ci.SIDEWALL_VERSION &lt;&gt; ''
+        ORDER BY ci.SIDEWALL_CODE, ci.SIDEWALL_VERSION
+    </select>
+
+</mapper>
