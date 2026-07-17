@@ -26,6 +26,7 @@ import org.springframework.util.CollectionUtils;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.zlt.aps.cx.api.domain.entity.CxScheduleResult;
+import com.zlt.aps.cx.entity.config.CxShiftConfig;
 import com.zlt.aps.common.core.utils.BigDecimalUtils;
 import com.zlt.aps.dj.api.domain.entity.DjCurlRoll;
 import com.zlt.aps.dj.api.domain.entity.DjDepthConfig;
@@ -49,6 +50,7 @@ import com.zlt.aps.dj.engine.mapper.DjEngineLossMapper;
 import com.zlt.aps.dj.engine.mapper.DjEngineMachineMapper;
 import com.zlt.aps.dj.engine.mapper.DjEngineMonthPlanMonitorMapper;
 import com.zlt.aps.dj.engine.mapper.DjEngineParamsMapper;
+import com.zlt.aps.dj.engine.mapper.DjEngineCxShiftConfigMapper;
 import com.zlt.aps.dj.engine.mapper.DjEngineScheduleResultLogMapper;
 import com.zlt.aps.dj.engine.mapper.DjEngineScheduleProcessLogMapper;
 import com.zlt.aps.dj.engine.mapper.DjEngineScheduleResultMapper;
@@ -130,6 +132,9 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
 
     @Autowired
     private DjEngineScheduleProcessLogMapper djEngineScheduleProcessLogMapper;
+
+    @Autowired
+    private DjEngineCxShiftConfigMapper djEngineCxShiftConfigMapper;
 
     // ==================== 主入口 ====================
 
@@ -259,6 +264,24 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
         log.info("步骤2.2：排程首班班次={}，班次映射={}，成型班次偏移量={}",
                 startShiftValue, String.join(",", shiftClassMap), formingShiftOffset);
         context.setFormingShiftOffset(formingShiftOffset);
+
+        // 加载成型班次配置映射（scheduleDay + shiftName → classField序号）
+        List<CxShiftConfig> cxShiftConfigs = djEngineCxShiftConfigMapper.selectList(
+                new LambdaQueryWrapper<CxShiftConfig>()
+                        .eq(CxShiftConfig::getFactoryCode, factoryCode)
+                        .eq(CxShiftConfig::getIsActive, 1));
+        Map<String, Integer> cxShiftClassMap = new HashMap<>();
+        for (CxShiftConfig cfg : cxShiftConfigs) {
+            if (cfg.getScheduleDay() != null && cfg.getShiftName() != null && cfg.getClassField() != null) {
+                // classField格式"CLASS1"~"CLASS8"，提取末尾数字
+                String classField = cfg.getClassField().replace("CLASS", "");
+                int cxShiftNum = Integer.parseInt(classField);
+                String key = cfg.getScheduleDay() + "|" + cfg.getShiftName();
+                cxShiftClassMap.put(key, cxShiftNum);
+            }
+        }
+        context.setCxShiftClassMap(cxShiftClassMap);
+        log.info("步骤2.2：加载成型班次配置 {} 条", cxShiftConfigs.size());
 
         // 按垫胶规格分别解析供应窗口（不同规格排产深度可能不同）
         Map<String, Integer> paddingSupplyDepth = new HashMap<>();
@@ -1290,6 +1313,12 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
             }
 
             // 本班排产完毕后，计算各规格交班库存
+            // 先保存本班接班库存快照，用于日志显示（避免被后续 clamp 修改后无法反推准确值）
+            Map<String, BigDecimal> shiftStartInventory = new HashMap<>();
+            for (DjPaddingDemand spec : demandList) {
+                shiftStartInventory.put(spec.getPaddingCode(),
+                        handoverInventory.getOrDefault(spec.getPaddingCode(), BigDecimal.ZERO));
+            }
             for (DjPaddingDemand spec : demandList) {
                 BigDecimal produceQtyThisShift = this.getScheduledQty(resultMap, spec.getPaddingCode(), shiftIndex);
                 // 本班成型消耗量（从成型计划动态计算）
@@ -1308,13 +1337,14 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
             context.appendLog("--- 班次 {0} 交班库存 ---", shiftIndex);
             for (DjPaddingDemand spec : demandList) {
                 BigDecimal endInv = handoverInventory.getOrDefault(spec.getPaddingCode(), BigDecimal.ZERO);
+                BigDecimal startInv = shiftStartInventory.getOrDefault(spec.getPaddingCode(), BigDecimal.ZERO);
                 BigDecimal produced = this.getScheduledQty(resultMap, spec.getPaddingCode(), shiftIndex);
                 BigDecimal consumed = this.calcShiftConsume(
                         context.getCxScheduleList(), context.getConstructionMap(),
                         spec.getPaddingCode(), shiftIndex);
                 context.appendLog("  规格 {0}：接班={1} + 生产={2} - 消耗={3} = 交班={4}",
                         context.getPaddingNameByCode(spec.getPaddingCode()),
-                        endInv.add(consumed).subtract(produced), produced, consumed, endInv);
+                        startInv, produced, consumed, endInv);
             }
 
             // 检查终止条件：所有需求已排完
@@ -1348,6 +1378,37 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
         }
 
         return results;
+    }
+
+    /**
+     * 根据垫胶班次索引获取对应的成型班次序号
+     * <p>优先通过成型班次配置表(CxShiftConfig)的映射获取，回退使用偏移量计算</p>
+     *
+     * @param shiftIndex 垫胶班次索引（1~6）
+     * @param context 排程上下文
+     * @return 成型班次序号（1~8），无法映射时返回 -1
+     */
+    private int getFormingClassByShiftIndex(int shiftIndex, DjScheduleContext context) {
+        Map<String, Integer> cxShiftClassMap = context.getCxShiftClassMap();
+        if (cxShiftClassMap != null && !cxShiftClassMap.isEmpty()) {
+            int scheduleDay = ((shiftIndex - 1) / 3) + 1;
+            String[] shiftClassMap = context.getShiftClassMap();
+            if (shiftClassMap != null && shiftIndex - 1 < shiftClassMap.length) {
+                String shiftName = shiftClassMap[shiftIndex - 1];
+                String key = scheduleDay + "|" + shiftName;
+                Integer cxShiftNum = cxShiftClassMap.get(key);
+                if (cxShiftNum != null) {
+                    return cxShiftNum;
+                }
+            }
+        }
+        // 回退：使用偏移量计算
+        int formingShiftOffset = context.getFormingShiftOffset() != null ? context.getFormingShiftOffset() : 0;
+        int formingClass = shiftIndex + formingShiftOffset;
+        if (formingClass >= 1 && formingClass <= DjEngineConstants.CX_SHIFT_COUNT) {
+            return formingClass;
+        }
+        return -1;
     }
 
     /**
@@ -1385,13 +1446,18 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
                     DjEngineConstants.CX_SHIFT_COUNT);
 
             // ===== 步骤1：从当前班次开始，动态计算各班成型消耗量 =====
-            // 计算范围：当前班次 ~ 当前班次 + 排产深度 - 1（最多到 CX_SHIFT_COUNT - formingShiftOffset）
+            // 计算范围：当前班次 ~ 当前班次 + 排产深度 - 1
+            // 通过 getFormingClassByShiftIndex 获取成型班次序号，优先使用 CxShiftConfig 配置
             int checkEndShift = Math.min(shiftIndex + specSupplyDepth - 1,
                     DjEngineConstants.CX_SHIFT_COUNT - formingShiftOffset);
             Map<Integer, BigDecimal> shiftConsume = new HashMap<>();
             for (int k = shiftIndex; k <= checkEndShift; k++) {
+                int formingClass = this.getFormingClassByShiftIndex(k, context);
+                if (formingClass < 1) {
+                    break; // 无法映射成型班次序号，后续班次不再检查
+                }
                 shiftConsume.put(k, this.calcShiftConsume(cxScheduleList, constructionMap,
-                        spec.getPaddingCode(), k + formingShiftOffset));
+                        spec.getPaddingCode(), formingClass));
             }
 
             BigDecimal accumulateConsume = BigDecimal.ZERO;
@@ -1414,6 +1480,16 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
             // ===== 步骤2：判断是否触发排产 =====
             if (coverableShiftCount > scheduleThreshold) {
                 spec.setNeedProduce(false); // 库存充足，不排产
+                // 从成型班次配置表获取当班消耗量：通过(scheduleDay, shiftName)匹配成型班次序号
+                BigDecimal shiftConsumeQty = getShiftConsumeQty(shiftIndex, context, cxScheduleList, constructionMap, spec);
+                if (shiftConsumeQty.compareTo(BigDecimal.ZERO) > 0) { // 当班排产量大于0的情况下，也需要记录日志 
+                    String embryoCodes = getEmbryoCodes(shiftIndex, cxScheduleList, constructionMap, formingShiftOffset,
+                            spec);
+                    context.appendLog("  规格 {0}：胎胚={1}，成型机={2}，深度={3}班，单耗={4}，当班消耗={5}，成型窗口内计划：{6}",
+                            DjScheduleContext.buildDisplayName(spec.getPaddingName(), spec.getPaddingCode()), embryoCodes,
+                            "",
+                            specSupplyDepth, spec.getUnitConsume(), shiftConsumeQty, "");
+                }
                 continue;
             }
 
@@ -1425,8 +1501,12 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
                 // 全部在成型计划范围内（n ≤ 8）
                 BigDecimal demandInWindow = BigDecimal.ZERO;
                 for (int i = shiftIndex; i < shiftIndex + specSupplyDepth; i++) {
+                    int formingClass = this.getFormingClassByShiftIndex(i, context);
+                    if (formingClass < 1) {
+                        formingClass = i + formingShiftOffset; // 回退
+                    }
                     demandInWindow = demandInWindow.add(this.calcShiftConsume(
-                            cxScheduleList, constructionMap, spec.getPaddingCode(), i + formingShiftOffset));
+                            cxScheduleList, constructionMap, spec.getPaddingCode(), formingClass));
                 }
                 netDemand = demandInWindow.subtract(incomingInventory);
                 if (netDemand.compareTo(BigDecimal.ZERO) < 0) {
@@ -1437,8 +1517,12 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
                 // part1: 第 shiftIndex~(CX_SHIFT_COUNT - formingShiftOffset) 班部分
                 BigDecimal part1 = BigDecimal.ZERO;
                 for (int i = shiftIndex; i <= DjEngineConstants.CX_SHIFT_COUNT - formingShiftOffset; i++) {
+                    int formingClass = this.getFormingClassByShiftIndex(i, context);
+                    if (formingClass < 1) {
+                        formingClass = i + formingShiftOffset; // 回退
+                    }
                     part1 = part1.add(this.calcShiftConsume(
-                            cxScheduleList, constructionMap, spec.getPaddingCode(), i + formingShiftOffset));
+                            cxScheduleList, constructionMap, spec.getPaddingCode(), formingClass));
                 }
                 part1 = part1.subtract(incomingInventory);
                 if (part1.compareTo(BigDecimal.ZERO) < 0) {
@@ -1492,30 +1576,57 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
 
             // ===== 日志：输出该规格的详细计算信息 =====
             // 遍历成型计划窗口期，按示方书版本匹配施工后取胎胚代码（与 calcShiftConsume 同口径）
-            Set<String> embryoSet = new HashSet<>();
-            for (CxScheduleResult cx : cxScheduleList) {
-                for (int k = shiftIndex; k <= checkEndShift; k++) {
-                    MdmConstructionInfo construction = this.resolveConstructionForShift(
-                            cx, k + formingShiftOffset, constructionMap);
-                    if (construction != null && spec.getPaddingCode().equals(construction.getPaddingCode())) {
-                        embryoSet.add(cx.getEmbryoCode());
-                        break;
-                    }
-                }
-            }
-            String embryoCodes = String.join("/", embryoSet);
+            String embryoCodes = getEmbryoCodes(shiftIndex, cxScheduleList, constructionMap, formingShiftOffset,
+                    spec);
             StringBuilder shiftInfo = new StringBuilder();
             for (int i = shiftIndex; i <= checkEndShift; i++) {
                 BigDecimal consume = shiftConsume.getOrDefault(i, BigDecimal.ZERO);
-                shiftInfo.append("班").append(i + formingShiftOffset).append("=").append(consume).append(" ");
+                int formingClass = this.getFormingClassByShiftIndex(i, context);
+                if (formingClass < 1) {
+                    formingClass = i + formingShiftOffset;
+                }
+                shiftInfo.append("班").append(formingClass).append("=").append(consume).append(" ");
             }
             Set<String> cxMachineSet = context.getPaddingCxMachineSet().get(spec.getPaddingCode());
             String cxMachineCodes = cxMachineSet != null ? String.join("/", cxMachineSet) : "无";
-            context.appendLog("  规格 {0}：胎胚={1}，成型机={2}，深度={3}班，单耗={4}，成型窗口内计划：{5}",
+            // 从成型班次配置表获取当班消耗量：通过(scheduleDay, shiftName)匹配成型班次序号
+            BigDecimal shiftConsumeQty = getShiftConsumeQty(shiftIndex, context, cxScheduleList, constructionMap, spec);
+            context.appendLog("  规格 {0}：胎胚={1}，成型机={2}，深度={3}班，单耗={4}，当班消耗={5}，成型窗口内计划：{6}",
                     DjScheduleContext.buildDisplayName(spec.getPaddingName(), spec.getPaddingCode()), embryoCodes,
                     cxMachineCodes,
-                    specSupplyDepth, spec.getUnitConsume(), shiftInfo.toString());
+                    specSupplyDepth, spec.getUnitConsume(), shiftConsumeQty, shiftInfo.toString());
         }
+    }
+
+    private String getEmbryoCodes(int shiftIndex, List<CxScheduleResult> cxScheduleList,
+            Map<String, List<MdmConstructionInfo>> constructionMap, int formingShiftOffset, DjPaddingDemand spec) {
+        Set<String> embryoSet = new HashSet<>();
+        for (CxScheduleResult cx : cxScheduleList) {
+            MdmConstructionInfo construction = this.resolveConstructionForShift(
+                    cx, shiftIndex + formingShiftOffset - 1, constructionMap);
+            if (construction != null && spec.getPaddingCode().equals(construction.getPaddingCode())) {
+                embryoSet.add(cx.getEmbryoCode());
+                break;
+            }
+        }
+        String embryoCodes = String.join("/", embryoSet);
+        return embryoCodes;
+    }
+
+    private BigDecimal getShiftConsumeQty(int shiftIndex, DjScheduleContext context,
+            List<CxScheduleResult> cxScheduleList, Map<String, List<MdmConstructionInfo>> constructionMap,
+            DjPaddingDemand spec) {
+        BigDecimal shiftConsumeQty = BigDecimal.ZERO;
+        Map<String, Integer> cxShiftClassMap = context.getCxShiftClassMap();
+        int scheduleDay = ((shiftIndex - 1) / 3) + 1;
+        String shiftName = context.getShiftClassMap()[shiftIndex - 1];
+        String cxShiftKey = scheduleDay + "|" + shiftName;
+        Integer cxShiftNum = cxShiftClassMap != null ? cxShiftClassMap.get(cxShiftKey) : null;
+        if (cxShiftNum != null) {
+            return this.calcShiftConsume(cxScheduleList, constructionMap,
+                    spec.getPaddingCode(), cxShiftNum);
+        }
+        return shiftConsumeQty;
     }
 
     /**
@@ -1935,8 +2046,12 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
             Map<String, List<MdmConstructionInfo>> constructionMap = context.getConstructionMap();
             int formingShiftOffset = context.getFormingShiftOffset() != null ? context.getFormingShiftOffset() : 0;
             for (int k = 0; k < safetyStockLevel; k++) {
+                int formingClass = this.getFormingClassByShiftIndex(shiftIndex + k, context);
+                if (formingClass < 1) {
+                    formingClass = shiftIndex + k + formingShiftOffset; // 回退
+                }
                 safetyStockDemand = safetyStockDemand.add(this.calcShiftConsume(
-                        cxScheduleList, constructionMap, spec.getPaddingCode(), shiftIndex + k + formingShiftOffset));
+                        cxScheduleList, constructionMap, spec.getPaddingCode(), formingClass));
             }
             BigDecimal incomingInv = spec.getIncomingInventory() != null ? spec.getIncomingInventory() : BigDecimal.ZERO;
             BigDecimal startupCap = safetyStockDemand.subtract(incomingInv);

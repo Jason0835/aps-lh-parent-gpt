@@ -88,4 +88,14 @@ public interface CxScheduleResultIssueMapper {
      * @return 已存在的记录列表（仅包含SCHEDULE_DATE, MACHINE_CODE, EMBRYO_CODE, ORDER_NO）
      */
     List<MesCxScheduleResult> selectExistingByScheduleDateAndMachine(@Param("list") List<MesCxScheduleResult> list);
+
+    /**
+     * 批量删除中间表中已存在的记录（按排程日期+机台编码+胎胚编码+工单号匹配，会删除该键的所有版本数据）
+     * 说明：用于重新发布场景，先删除该 4 字段的所有历史版本数据，再插入本次发布的新版本数据，
+     *      彻底避免多版本残留造成的同版本同日期同机台重复记录。
+     *
+     * @param list 数据列表
+     * @return 影响行数
+     */
+    int batchDeleteByScheduleDateAndMachine(@Param("list") List<MesCxScheduleResult> list);
 }

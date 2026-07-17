@@ -187,9 +187,9 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
                     result.getLeftRightMould(), result.getLhMachineCode()));
             requireField(result.getMaterialCode(), "materialCode", context, result);
             requireField(result.getScheduleType(), "scheduleType", context, result);
-            if (result.getSpecEndTime() == null) {
-                throwValidationFailure(context, result, I18nUtil.getMessage("ui.data.column.lhScheduleResult.specEndTimeMissing"));
-            }
+//            if (result.getSpecEndTime() == null) {
+//                throwValidationFailure(context, result, I18nUtil.getMessage("ui.data.column.lhScheduleResult.specEndTimeMissing"));
+//            }
             if ("1".equals(result.getIsChangeMould()) && StringUtils.isBlank(result.getMouldCode())) {
                 throwValidationFailure(context, result, I18nUtil.getMessage("ui.data.column.lhScheduleResult.mouldCodeMissingInChangeMould"));
             }
