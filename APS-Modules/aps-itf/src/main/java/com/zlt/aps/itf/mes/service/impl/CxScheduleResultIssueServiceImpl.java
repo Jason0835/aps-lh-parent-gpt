@@ -154,26 +154,30 @@ public class CxScheduleResultIssueServiceImpl implements ICxScheduleResultIssueS
      * 批量更新或插入数据（存在则更新，不存在则插入）
      * 中间表MES_CX_SCHEDULE_RESULT建在MES分库，Mapper已通过@DS(DataSource.MES)指定数据源
      * 分批处理避免SQL Server参数上限2100的问题
+     * 匹配键：排程日期+机台编码+胎胚编码+工单号（不含版本号）
+     * 说明：匹配键不含版本号是为了让同一天的重新发布能覆盖旧版本数据，避免中间表多版本残留。
+     *      若包含版本号，每次发布都会因版本号变化而判定为"不存在"，全部走新增分支，造成数据堆积。
+     *      更新时会把新版本号写入 DATA_VERSION 字段，MES 侧按 DATA_VERSION 取最新版本即可读到本次发布的数据。
      */
     private void upsertCxScheduleResult(List<MesCxScheduleResult> mesList, String dataVersion) {
         if (CollectionUtils.isEmpty(mesList)) {
             return;
         }
         log.info("upsert处理开始，总记录数：{}", mesList.size());
-        // 分批查询已有记录，按排程日期+机台编码+胎胚编码+工单号+版本号匹配
+        // 分批查询已有记录，按排程日期+机台编码+胎胚编码+工单号匹配（不含版本号，保证同键覆盖旧版本）
         // 工单号加入匹配键：避免同机台同胎胚下正规/量试/试制工单互相覆盖
         Set<String> existingKeys = new HashSet<>();
         for (List<MesCxScheduleResult> batch : partitionList(mesList)) {
             List<MesCxScheduleResult> existingRecords = cxScheduleResultIssueMapper.selectExistingByScheduleDateAndMachine(batch);
             existingRecords.stream()
-                    .map(r -> r.getScheduleDate() + "|" + r.getMachineCode() + "|" + r.getEmbryoCode() + "|" + r.getOrderNo() + "|" + r.getDataVersion())
+                    .map(r -> r.getScheduleDate() + "|" + r.getMachineCode() + "|" + r.getEmbryoCode() + "|" + r.getOrderNo())
                     .forEach(existingKeys::add);
         }
-        // 根据查询结果分组：已有记录走批量更新，不存在记录走批量新增
+        // 根据查询结果分组：已有记录走批量更新（覆盖旧版本），不存在记录走批量新增
         List<MesCxScheduleResult> updateList = new ArrayList<>();
         List<MesCxScheduleResult> insertList = new ArrayList<>();
         for (MesCxScheduleResult mesItem : mesList) {
-            String key = mesItem.getScheduleDate() + "|" + mesItem.getMachineCode() + "|" + mesItem.getEmbryoCode() + "|" + mesItem.getOrderNo() + "|" + mesItem.getDataVersion();
+            String key = mesItem.getScheduleDate() + "|" + mesItem.getMachineCode() + "|" + mesItem.getEmbryoCode() + "|" + mesItem.getOrderNo();
             if (existingKeys.contains(key)) {
                 updateList.add(mesItem);
             } else {
