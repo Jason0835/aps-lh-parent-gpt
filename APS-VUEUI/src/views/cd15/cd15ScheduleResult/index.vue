@@ -54,6 +54,14 @@
       ref="insertOrderRef"
       @success="handleInsertSuccess"
     />
+    <change-machine-dialog
+      ref="changeMachineRef"
+      @success="handleChangeMachineSuccess"
+    />
+    <change-qty-dialog
+      ref="changeQtyRef"
+      @success="handleChangeQtySuccess"
+    />
     <el-dialog
       :title="scheduleTaskTitle"
       :visible.sync="autoScheduleProgressVisible"
@@ -97,47 +105,12 @@
         @pageChange="handleUnschedulePageChange"
       />
     </el-dialog>
-    <el-dialog :title="dialogTitle" :visible.sync="dialogVisible" width="520px" append-to-body>
-      <el-form ref="actionForm" :model="actionForm" label-width="110px">
-        <el-form-item :label="$t('ui.data.column.cd15ScheduleResult.factoryCode')">
-          <el-input v-model="actionForm.factoryCode" />
-        </el-form-item>
-        <el-form-item :label="$t('ui.data.column.cd15ScheduleResult.scheduleDate')">
-          <el-date-picker v-model="actionForm.scheduleDate" type="date" value-format="yyyy-MM-dd" style="width: 100%;" />
-        </el-form-item>
-        <el-form-item v-if="dialogType !== 'autoSchedule'" :label="$t('ui.data.column.cd15ScheduleResult.machineCode')">
-          <el-input v-model="actionForm.machineCode" />
-        </el-form-item>
-        <el-form-item v-if="dialogType === 'transferMachine'" :label="$t('ui.data.column.cd15ScheduleResult.targetMachineCode')">
-          <el-select v-model="actionForm.targetMachineCode" filterable clearable style="width: 100%;">
-            <el-option v-for="item in machineOptions" :key="item.value" :label="item.label" :value="item.value" />
-          </el-select>
-        </el-form-item>
-        <el-form-item v-if="dialogType === 'insert' || dialogType === 'changeQty'" :label="$t('ui.data.column.cd15ScheduleResult.steelStripCode')">
-          <el-input v-model="actionForm.steelStripCode" />
-        </el-form-item>
-        <el-form-item v-if="dialogType === 'insert' || dialogType === 'changeQty'" :label="$t('ui.data.column.scheduleResult.plan')">
-          <el-input-number v-model="actionForm.class1PlanQty" :min="0" :precision="2" style="width: 100%;" />
-        </el-form-item>
-        <el-form-item v-if="dialogType === 'insert'" :label="$t('ui.data.column.scheduleResult.produceOrder')">
-          <el-input-number v-model="actionForm.class1ProduceOrder" :min="1" :precision="0" style="width: 100%;" />
-        </el-form-item>
-        <el-form-item :label="$t('ui.common.column.remark')">
-          <el-input v-model="actionForm.remark" type="textarea" />
-        </el-form-item>
-      </el-form>
-      <span slot="footer" class="dialog-footer">
-        <el-button @click="dialogVisible = false">{{ $t("ui.frame.btn.cancel") }}</el-button>
-        <el-button type="primary" @click="submitAction">{{ $t("ui.frame.btn.submit") }}</el-button>
-      </span>
-    </el-dialog>
   </basic-container>
 </template>
 
 <script>
 import moment from 'moment'
 import {
-  changeQty,
   delScheduleResult,
   exportScheduleResult,
   getAutoScheduleTask,
@@ -145,15 +118,14 @@ import {
   getInsertTask,
   getTransferMachineTask,
   listScheduleResult,
-  publishScheduleResult,
-  transferMachine,
-  validateChangeQty,
-  validateTransferMachine
+  publishScheduleResult
 } from '@/api/cd15/scheduleResult'
 import { getCd15MachineEnableOptions } from '@/api/cd15/cd15MachineInfo'
 import { listUnscheduleResult } from '@/api/cd15/unscheduleResult'
 import AutoScheduleDialog from './components/autoScheduleDialog.vue'
 import InsertOrderDialog from './components/insertOrderDialog.vue'
+import ChangeMachineDialog from './components/changeMachineDialog.vue'
+import ChangeQtyDialog from './components/changeQtyDialog.vue'
 
 const SHIFT_CONFIG = [
   { classField: 'class1', shiftKey: 'middleShift', dayOffset: -1 },
@@ -166,7 +138,7 @@ const SHIFT_CONFIG = [
 
 export default {
   name: 'Cd15ScheduleResult',
-  components: { AutoScheduleDialog, InsertOrderDialog },
+  components: { AutoScheduleDialog, InsertOrderDialog, ChangeMachineDialog, ChangeQtyDialog },
   dicts: ['biz_factory_name', 'IS_RELEASE'],
   provide() {
     return {
@@ -199,11 +171,7 @@ export default {
       unscheduleData: [],
       unschedulePage: { current: 1, pageSize: 20, total: 0, pageSizes: [10, 20, 50, 100] },
       unscheduleSearch: { factoryCode: '116', scheduleDate: defaultScheduleDate },
-      unscheduleQuery: { factoryCode: '116', scheduleDate: defaultScheduleDate },
-      dialogVisible: false,
-      dialogType: '',
-      dialogTitle: '',
-      actionForm: {}
+      unscheduleQuery: { factoryCode: '116', scheduleDate: defaultScheduleDate }
     }
   },
   computed: {
@@ -489,48 +457,36 @@ export default {
       }
     },
     handleTransferMachine() {
-      this.openActionDialog('transferMachine', this.selection[0])
+      this.$refs.changeMachineRef.show(this.selection[0])
+    },
+    handleChangeMachineSuccess(scheduleDate, payload) {
+      if (scheduleDate) {
+        this.query = { ...this.query, scheduleDate }
+        this.search = { ...this.search, scheduleDate }
+        this.dateList = this.buildDateList(scheduleDate)
+      }
+      const data = payload || {}
+      if (data.taskId) {
+        this.handleTaskResult({ data }, getTransferMachineTask).then(() => this.getList())
+      } else {
+        this.getList()
+      }
     },
     handleChangeQty() {
-      this.openActionDialog('changeQty', this.selection[0])
+      this.$refs.changeQtyRef.show(this.selection[0])
     },
-    openActionDialog(type, row = {}) {
-      this.dialogType = type
-      this.dialogTitle = this.resolveDialogTitle(type)
-      this.actionForm = {
-        factoryCode: row.factoryCode || this.query.factoryCode || this.search.factoryCode,
-        scheduleDate: row.scheduleDate || this.query.scheduleDate || this.search.scheduleDate,
-        machineCode: row.machineCode,
-        sourceMachineCode: row.machineCode,
-        steelStripCode: row.steelStripCode,
-        scheduleResultId: row.id,
-        class1PlanQty: row.class1PlanQty,
-        class1ProduceOrder: row.class1ProduceOrder
+    handleChangeQtySuccess(scheduleDate, payload) {
+      if (scheduleDate) {
+        this.query = { ...this.query, scheduleDate }
+        this.search = { ...this.search, scheduleDate }
+        this.dateList = this.buildDateList(scheduleDate)
       }
-      this.dialogVisible = true
-    },
-    resolveDialogTitle(type) {
-      const titleMap = {
-        autoSchedule: this.$t('ui.data.column.scheduleResult.autoPlan'),
-        insert: this.$t('ui.data.column.scheduleResult.insertOrder'),
-        transferMachine: this.$t('ui.data.column.scheduleResult.changeMachine'),
-        changeQty: this.$t('ui.data.column.scheduleResult.changePlan')
-      }
-      return titleMap[type] || ''
-    },
-    submitAction() {
-      const actionMap = {
-        transferMachine: () => validateTransferMachine(this.actionForm).then(() => transferMachine(this.actionForm)).then(res => this.handleTaskResult(res, getTransferMachineTask)),
-        changeQty: () => validateChangeQty(this.actionForm).then(() => changeQty(this.actionForm)).then(res => this.handleTaskResult(res, getChangeQtyTask))
-      }
-      const action = actionMap[this.dialogType]
-      if (!action) {
-        return
-      }
-      action().then(() => {
-        this.dialogVisible = false
+      const data = payload || {}
+      if (data.taskId) {
+        this.handleTaskResult({ data }, getChangeQtyTask).then(() => this.getList())
+      } else {
         this.getList()
-      })
+      }
     },
     handleTaskResult(res, taskGetter) {
       const data = res && res.data ? res.data : {}

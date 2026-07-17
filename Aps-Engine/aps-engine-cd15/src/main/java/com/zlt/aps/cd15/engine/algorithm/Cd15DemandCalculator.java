@@ -50,6 +50,22 @@ public class Cd15DemandCalculator {
         return netDemand.signum() < 0 ? BigDecimal.ZERO : netDemand;
     }
 
+    /**
+     * 含损耗需求 = 净需求 * (1 + 损耗率 / 100)。
+     */
+    public BigDecimal calculateDemandWithLoss(BigDecimal netDemandMeters,
+                                              BigDecimal lossRatePercent) {
+        BigDecimal netDemand = netDemandMeters == null ? BigDecimal.ZERO : netDemandMeters;
+        if (netDemand.signum() <= 0) {
+            return BigDecimal.ZERO;
+        }
+        if (lossRatePercent == null || lossRatePercent.signum() < 0) {
+            throw new IllegalArgumentException("损耗率不能为空或小于0");
+        }
+        return netDemand.multiply(BigDecimal.ONE.add(lossRatePercent
+                .divide(BigDecimal.valueOf(100), 8, RoundingMode.HALF_UP)))
+                .setScale(4, RoundingMode.HALF_UP);
+    }
     private boolean isPositive(BigDecimal value) {
         return value != null && value.signum() > 0;
     }

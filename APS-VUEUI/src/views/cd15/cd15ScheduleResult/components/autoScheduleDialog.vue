@@ -95,6 +95,12 @@ export default {
         const result = await autoSchedule({ ...params, forceRegenerate: false });
         const data = (result && result.data) ? result.data : (result || {});
         const msg = result && result.msg ? result.msg : "";
+        const batchCheckFailed = !!(data.batchCheckFailed || result.batchCheckFailed);
+        if (batchCheckFailed) {
+          this.loading = false;
+          this.showBatchCheckAlert(data, msg);
+          return;
+        }
         const needConfirm = !!(data.needConfirm || result.needConfirm);
         const taskId = data.taskId || result.taskId;
         if (needConfirm) {
@@ -127,6 +133,91 @@ export default {
         this.loading = false;
       }
     },
+    showBatchCheckAlert(data, fallbackMsg) {
+      const errors = (data && data.errors) || [];
+      const warnings = (data && data.warnings) || [];
+      const summary = fallbackMsg
+        || (errors.length > 0 ? errors[0].message : "")
+        || this.$t("ui.data.column.cxScheduleResult.scheduleFailed");
+
+      let html = '';
+      html += '<div style="margin-bottom:16px;padding:10px;background:#fef0f0;border:1px solid #fde2e2;border-radius:4px;">';
+      html += '<div style="color:#F56C6C;font-size:14px;font-weight:bold;">'
+        + this.$t("ui.data.column.cxScheduleResult.scheduleFailed") + '</div>';
+      html += '<div style="color:#909399;font-size:13px;margin-top:4px;">' + summary + '</div>';
+      html += '</div>';
+
+      if (errors.length > 0) {
+        html += '<div style="margin-bottom:12px;">';
+        html += '<div style="color:#F56C6C;font-size:13px;font-weight:bold;margin-bottom:8px;display:flex;align-items:center;">';
+        html += '<span style="display:inline-block;width:4px;height:14px;background:#F56C6C;margin-right:6px;border-radius:2px;"></span>';
+        html += this.$t("ui.data.column.cxScheduleResult.errorLabel") + ' ('
+          + errors.length + ' ' + this.$t("ui.data.column.cxScheduleResult.itemsLabel") + ')</div>';
+        errors.forEach((item) => {
+          html += '<div style="margin-bottom:12px;padding:10px;background:#fef0f0;border-left:3px solid #F56C6C;border-radius:3px;">';
+          html += '<div style="font-weight:bold;color:#303133;font-size:13px;margin-bottom:6px;">' + (item.field || item.reasonCode || '') + '</div>';
+          html += '<div style="color:#F56C6C;font-size:13px;line-height:1.6;margin-bottom:4px;">' + (item.message || '') + '</div>';
+          if (item.suggestion) {
+            html += '<div style="color:#909399;font-size:12px;line-height:1.6;">' + item.suggestion + '</div>';
+          }
+          html += '</div>';
+        });
+        html += '</div>';
+      }
+
+      if (warnings.length > 0) {
+        if (errors.length > 0) {
+          html += '<hr style="border:none;border-top:1px solid #EBEEF5;margin:16px 0;"/>';
+        }
+        html += '<div>';
+        html += '<div style="color:#E6A23C;font-size:13px;font-weight:bold;margin-bottom:8px;display:flex;align-items:center;">';
+        html += '<span style="display:inline-block;width:4px;height:14px;background:#E6A23C;margin-right:6px;border-radius:2px;"></span>';
+        html += this.$t("ui.data.column.cxScheduleResult.warningLabel") + ' ('
+          + warnings.length + ' ' + this.$t("ui.data.column.cxScheduleResult.itemsLabel") + ')</div>';
+        warnings.forEach((item) => {
+          html += '<div style="margin-bottom:12px;padding:10px;background:#fdf6ec;border-left:3px solid #E6A23C;border-radius:3px;">';
+          html += '<div style="font-weight:bold;color:#303133;font-size:13px;margin-bottom:6px;">' + (item.field || item.reasonCode || '') + '</div>';
+          html += '<div style="color:#E6A23C;font-size:13px;line-height:1.6;margin-bottom:4px;">' + (item.message || '') + '</div>';
+          if (item.suggestion) {
+            html += '<div style="color:#909399;font-size:12px;line-height:1.6;">' + item.suggestion + '</div>';
+          }
+          html += '</div>';
+        });
+        html += '</div>';
+      }
+
+      this.$alert(html, this.$t("ui.data.column.cxScheduleResult.scheduleFailed"), {
+        dangerouslyUseHTMLString: true,
+        type: 'error',
+        customClass: 'cd15-auto-schedule-batch-check',
+        confirmButtonText: this.$t("ui.data.column.cxScheduleResult.gotIt"),
+      });
+    },
   },
 };
 </script>
+<style>
+.cd15-auto-schedule-batch-check {
+  width: auto !important;
+  max-width: 1200px;
+  max-height: 85vh;
+  margin: 0 auto;
+  position: relative;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+}
+.cd15-auto-schedule-batch-check .el-message-box__content {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.cd15-auto-schedule-batch-check .el-message-box__message {
+  flex: 1;
+  overflow-y: auto;
+  max-height: calc(85vh - 130px);
+  padding-right: 8px;
+}
+</style>

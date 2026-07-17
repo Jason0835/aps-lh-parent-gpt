@@ -2,6 +2,8 @@ package com.zlt.aps.cd15.engine.model;
 
 import com.zlt.aps.cd15.api.domain.entity.Cd15AngleWidthMapping;
 import com.zlt.aps.cd15.api.domain.entity.Cd15CurlLength;
+import com.zlt.aps.cd15.api.domain.entity.Cd15DepthConfig;
+import com.zlt.aps.cd15.api.domain.entity.Cd15LossSetting;
 import com.zlt.aps.cd15.api.domain.entity.Cd15MachineInfo;
 import com.zlt.aps.cd15.api.domain.entity.Cd15MachineMaintenancePlan;
 import com.zlt.aps.cd15.api.domain.entity.Cd15MachineRollMapping;
@@ -46,6 +48,12 @@ public class Cd15AutoScheduleInput {
     private List<Cd15CurlLength> curlLengths;
     /** 角度宽度配置。 */
     private List<Cd15AngleWidthMapping> angleWidthMappings;
+    /** 备库深度配置。 */
+    private List<Cd15DepthConfig> depthConfigs;
+    /** 按钢带解析后的备库班数。 */
+    private Map<String, BigDecimal> depthClassQtyBySteelStrip;
+    /** 钢带/机台损耗率配置。 */
+    private List<Cd15LossSetting> lossSettings;
     /** 按裁断角度归集的最大可分裁宽度。 */
     private Map<String, BigDecimal> angleWidthMaxByAngle;
     /** 机台大卷映射配置。 */

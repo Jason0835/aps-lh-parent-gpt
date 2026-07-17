@@ -12,7 +12,10 @@ import org.springframework.util.StringUtils;
 
 import java.lang.reflect.Method;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.Collections;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -63,14 +66,91 @@ public class Cd15ScheduleCandidateBuilder {
                 ? Collections.emptyMap() : input.getShifts().stream()
                 .collect(Collectors.toMap(Cd15ShiftDescriptor::getClassIndex,
                         Function.identity(), (first, second) -> first));
-        return this.buildNaturalDemands(input).stream()
+        List<Cd15ScheduleCandidate> candidates = this.buildNaturalDemands(input).stream()
                 .flatMap(demand -> materials.stream()
                         .filter(material -> this.match(demand, material))
                         .map(material -> this.toCandidate(demand, material,
                                 shiftByClassIndex.get(demand.getClassIndex()), stockMetersBySteelStrip)))
                 .collect(Collectors.toList());
+        return this.applyDepthWindow(candidates, input);
     }
 
+    /** 按钢带备库深度截取自然班次窗口，小数部分按比例计入末班。 */
+    private List<Cd15ScheduleCandidate> applyDepthWindow(List<Cd15ScheduleCandidate> candidates,
+                                                         Cd15AutoScheduleInput input) {
+        if (input == null || input.getDepthClassQtyBySteelStrip() == null) {
+            throw new IllegalArgumentException("按钢带备库深度不能为空");
+        }
+        List<Cd15ShiftDescriptor> orderedShifts = input.getShifts() == null
+                ? Collections.emptyList() : input.getShifts().stream()
+                .sorted(Comparator.comparing(Cd15ShiftDescriptor::getStartTime,
+                                Comparator.nullsLast(Comparator.naturalOrder()))
+                        .thenComparingInt(Cd15ShiftDescriptor::getClassIndex))
+                .collect(Collectors.toList());
+        return candidates.stream()
+                .collect(Collectors.groupingBy(Cd15ScheduleCandidate::getSteelStripCode,
+                        LinkedHashMap::new, Collectors.toList()))
+                .entrySet().stream()
+                .flatMap(entry -> {
+                    BigDecimal depth = input.getDepthClassQtyBySteelStrip().get(entry.getKey());
+                    Map<Integer, BigDecimal> weights = this.shiftWeights(entry.getKey(), depth, orderedShifts);
+                    return entry.getValue().stream()
+                            .filter(candidate -> weights.containsKey(candidate.getClassIndex()))
+                            .map(candidate -> this.copyWithWeight(candidate,
+                                    weights.get(candidate.getClassIndex())));
+                })
+                .collect(Collectors.toList());
+    }
+
+    private Map<Integer, BigDecimal> shiftWeights(String steelStripCode,
+                                                   BigDecimal depth,
+                                                   List<Cd15ShiftDescriptor> orderedShifts) {
+        if (depth == null || depth.signum() <= 0) {
+            throw new IllegalArgumentException("钢带未匹配有效备库深度, steelStripCode=" + steelStripCode);
+        }
+        int requiredShiftCount;
+        try {
+            requiredShiftCount = depth.setScale(0, RoundingMode.CEILING).intValueExact();
+        } catch (ArithmeticException exception) {
+            throw new IllegalArgumentException("钢带备库深度超出支持范围, steelStripCode=" + steelStripCode, exception);
+        }
+        int fullShiftCount = depth.setScale(0, RoundingMode.FLOOR).intValue();
+        BigDecimal fraction = depth.subtract(BigDecimal.valueOf(fullShiftCount));
+        Map<Integer, BigDecimal> weights = new LinkedHashMap<>();
+        for (int index = 0; index < Math.min(requiredShiftCount, orderedShifts.size()); index++) {
+            BigDecimal weight = index == fullShiftCount && fraction.signum() > 0
+                    ? fraction : BigDecimal.ONE;
+            weights.put(orderedShifts.get(index).getClassIndex(), weight);
+        }
+        return weights;
+    }
+
+    private Cd15ScheduleCandidate copyWithWeight(Cd15ScheduleCandidate source, BigDecimal weight) {
+        Cd15NaturalDemand demand = source.getDemand();
+        Cd15NaturalDemand weightedDemand = Cd15NaturalDemand.builder()
+                .factoryCode(demand.getFactoryCode())
+                .scheduleDate(demand.getScheduleDate())
+                .cxBatchNo(demand.getCxBatchNo())
+                .cxMachineCode(demand.getCxMachineCode())
+                .constructionCode(demand.getConstructionCode())
+                .constructionVersion(demand.getConstructionVersion())
+                .classField(demand.getClassField())
+                .classIndex(demand.getClassIndex())
+                .naturalDemandQty(demand.getNaturalDemandQty().multiply(weight))
+                .build();
+        return Cd15ScheduleCandidate.builder()
+                .demand(weightedDemand)
+                .material(source.getMaterial())
+                .shift(source.getShift())
+                .classIndex(source.getClassIndex())
+                .cuttingAngle(source.getCuttingAngle())
+                .steelStripCode(source.getSteelStripCode())
+                .bigRollCode(source.getBigRollCode())
+                .stockMetersAtSix(source.getStockMetersAtSix())
+                .shortageInCurrentShift(source.isShortageInCurrentShift())
+                .continueFromPreviousShift(source.isContinueFromPreviousShift())
+                .build();
+    }
     private Cd15NaturalDemand toNaturalDemand(CxScheduleResult schedule, int classIndex) {
         BigDecimal planQty = this.toBigDecimal(this.getFieldValue(schedule,
                 String.format("class%dPlanQty", classIndex)));

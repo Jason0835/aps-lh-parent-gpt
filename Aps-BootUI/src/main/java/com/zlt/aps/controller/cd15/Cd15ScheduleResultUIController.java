@@ -84,6 +84,14 @@ public class Cd15ScheduleResultUIController extends BaseUIController<Cd15Schedul
         return cd15ScheduleResultRemoteService.getAutoScheduleTask(taskId);
     }
 
+    @ApiOperation("查询斜裁班次日期")
+    @RequiresPermissions("cd15:cd15ScheduleResult:list")
+    @PostMapping("/shiftDates")
+    @ResponseBody
+    public AjaxResult shiftDates(@RequestBody Cd15InsertOrderRequest request) {
+        return cd15ScheduleResultRemoteService.shiftDates(request);
+    }
+
     @ApiOperation("斜裁插单预校验")
     @RequiresPermissions("cd15:cd15ScheduleResult:insert")
     @PostMapping("/validateInsert")

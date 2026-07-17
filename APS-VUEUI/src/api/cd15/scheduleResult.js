@@ -20,6 +20,14 @@ export function getAutoScheduleTask(taskId) {
   return request({ url: `/cd15/cd15ScheduleResult/autoSchedule/task/${taskId}`, method: 'get' })
 }
 
+export function shiftDates(data) {
+  return request({
+    url: '/cd15/cd15ScheduleResult/shiftDates',
+    method: 'post',
+    headers: { 'Content-Type': 'application/json;charset=UTF-8' },
+    data
+  })
+}
 export function validateInsert(data) {
   return request({
     url: '/cd15/cd15ScheduleResult/validateInsert',

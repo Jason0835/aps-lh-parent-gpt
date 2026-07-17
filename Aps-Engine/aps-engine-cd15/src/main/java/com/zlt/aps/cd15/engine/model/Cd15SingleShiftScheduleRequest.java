@@ -25,4 +25,6 @@ public class Cd15SingleShiftScheduleRequest {
     private BigDecimal stockMetersAtSix;
     /** 大卷幅宽 CORD_WIDTH，单位毫米；为空时按当前净需求口径兜底。 */
     private BigDecimal cordWidthMillimeter;
+    /** 当前钢带在候选机台上的损耗率，百分比。 */
+    private BigDecimal lossRatePercent;
 }

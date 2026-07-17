@@ -52,10 +52,17 @@ public class Cd15MachineCandidateResolver {
     public Optional<Cd15MachineInfo> resolve(Cd15AutoScheduleInput input,
                                              Cd15ScheduleCandidate candidate,
                                              BigDecimal effectiveWidth) {
+        return this.resolveCandidates(input, candidate, effectiveWidth).stream().findFirst();
+    }
+
+    /** 返回满足单条候选全部硬约束的有序机台。 */
+    public List<Cd15MachineInfo> resolveCandidates(Cd15AutoScheduleInput input,
+                                                    Cd15ScheduleCandidate candidate,
+                                                    BigDecimal effectiveWidth) {
         if (candidate == null) {
-            return Optional.empty();
+            return Collections.emptyList();
         }
-        return this.resolveInternal(input, candidate.getBigRollCode(), candidate.getCuttingAngle(),
+        return this.resolveCandidatesInternal(input, candidate.getBigRollCode(), candidate.getCuttingAngle(),
                 effectiveWidth, candidate.getShift(), Collections.singletonList(candidate.getSteelStripCode()));
     }
 
@@ -63,11 +70,16 @@ public class Cd15MachineCandidateResolver {
      * 按完整输入约束筛选分裁组合机台。
      */
     public Optional<Cd15MachineInfo> resolve(Cd15AutoScheduleInput input, Cd15SplitCutGroup splitGroup) {
+        return this.resolveCandidates(input, splitGroup).stream().findFirst();
+    }
+
+    /** 返回满足分裁组合全部硬约束的有序机台。 */
+    public List<Cd15MachineInfo> resolveCandidates(Cd15AutoScheduleInput input, Cd15SplitCutGroup splitGroup) {
         if (splitGroup == null || splitGroup.getFirstCandidate() == null || splitGroup.getSecondCandidate() == null) {
-            return Optional.empty();
+            return Collections.emptyList();
         }
         Cd15ScheduleCandidate firstCandidate = splitGroup.getFirstCandidate();
-        return this.resolveInternal(input, firstCandidate.getBigRollCode(), firstCandidate.getCuttingAngle(),
+        return this.resolveCandidatesInternal(input, firstCandidate.getBigRollCode(), firstCandidate.getCuttingAngle(),
                 splitGroup.getCombinedWidth(), firstCandidate.getShift(),
                 Arrays.asList(firstCandidate.getSteelStripCode(), splitGroup.getSecondCandidate().getSteelStripCode()));
     }
@@ -106,19 +118,19 @@ public class Cd15MachineCandidateResolver {
         return NO_AVAILABLE_MACHINE;
     }
 
-    private Optional<Cd15MachineInfo> resolveInternal(Cd15AutoScheduleInput input,
-                                                      String bigRollCode,
-                                                      String cuttingAngle,
-                                                      BigDecimal effectiveWidth,
-                                                      Cd15ShiftDescriptor shift,
-                                                      List<String> steelStripCodes) {
+    private List<Cd15MachineInfo> resolveCandidatesInternal(Cd15AutoScheduleInput input,
+                                                             String bigRollCode,
+                                                             String cuttingAngle,
+                                                             BigDecimal effectiveWidth,
+                                                             Cd15ShiftDescriptor shift,
+                                                             List<String> steelStripCodes) {
         MachineFilterContext context = this.context(input, bigRollCode, cuttingAngle,
                 effectiveWidth, shift, steelStripCodes);
         return this.safe(input == null ? Collections.emptyList() : input.getMachines()).stream()
                 .filter(machine -> this.machineMatched(machine, context))
                 .sorted(Comparator.comparing((Cd15MachineInfo machine) -> this.preferred(machine, context)).reversed()
                         .thenComparing(Cd15MachineInfo::getMachineCode))
-                .findFirst();
+                .collect(Collectors.toList());
     }
 
     /**

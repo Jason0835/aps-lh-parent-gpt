@@ -50,19 +50,26 @@ public class Cd15SingleShiftScheduleExecutorImpl implements Cd15SingleShiftSched
                 material.getUnitConsumeMillimeter(), material.getCurlLength());
         BigDecimal netDemandMeters = demandCalculator.calculateNetDemandMeters(pieceCount,
                 material.getCraftWidth(), request.getStockMetersAtSix());
-        BigDecimal bigRollConsumeMeters = bigRollMeterCalculator.calculateBigRollConsumeMeters(pieceCount,
-                material.getUnitConsumeMillimeter(), material.getCraftWidth(),
-                request.getCordWidthMillimeter(), netDemandMeters);
+        BigDecimal planQty = demandCalculator.calculateDemandWithLoss(
+                netDemandMeters, request.getLossRatePercent());
+        BigDecimal rawBigRollConsumeMeters = netDemandMeters.signum() <= 0
+                ? BigDecimal.ZERO
+                : bigRollMeterCalculator.calculateBigRollConsumeMeters(pieceCount,
+                        material.getUnitConsumeMillimeter(), material.getCraftWidth(),
+                        request.getCordWidthMillimeter(), netDemandMeters);
+        BigDecimal bigRollConsumeMeters = demandCalculator.calculateDemandWithLoss(
+                rawBigRollConsumeMeters, request.getLossRatePercent());
         if (this.stockMeters(request.getGdyyStock()).compareTo(bigRollConsumeMeters) < 0) {
             return Cd15SingleShiftScheduleResult.unscheduled(NO_BIG_ROLL_STOCK,
                     "GDYY大卷库存不足，无法满足当前单班试排");
         }
         return Cd15SingleShiftScheduleResult.scheduled(this.toDraft(request, pieceCount,
-                netDemandMeters, bigRollConsumeMeters));
+                planQty, netDemandMeters, bigRollConsumeMeters));
     }
 
     private Cd15ScheduleResultDraft toDraft(Cd15SingleShiftScheduleRequest request,
                                             BigDecimal pieceCount,
+                                            BigDecimal planQty,
                                             BigDecimal netDemandMeters,
                                             BigDecimal bigRollConsumeMeters) {
         Cd15ConstructionMaterial material = request.getMaterial();
@@ -84,10 +91,11 @@ public class Cd15SingleShiftScheduleExecutorImpl implements Cd15SingleShiftSched
                 .classField(demand.getClassField())
                 .classIndex(demand.getClassIndex())
                 .cxPlanQty(demand.getNaturalDemandQty())
-                .planQty(netDemandMeters)
+                .planQty(planQty)
                 .produceOrder(request.getProduceOrder())
                 .pieceCount(pieceCount)
                 .netDemandMeters(netDemandMeters)
+                .lossRatePercent(request.getLossRatePercent())
                 .bigRollConsumeMeters(bigRollConsumeMeters)
                 .vehiclePlanQuantity(this.vehiclePlanQuantity(material))
                 .stockMetersAtSix(request.getStockMetersAtSix())
@@ -116,6 +124,9 @@ public class Cd15SingleShiftScheduleExecutorImpl implements Cd15SingleShiftSched
                 || request.getMaterial().getUnitConsumeMillimeter() == null
                 || request.getMaterial().getCurlLength() == null) {
             return "施工宽度、单耗或卷曲长度缺失";
+        }
+        if (request.getLossRatePercent() == null || request.getLossRatePercent().signum() < 0) {
+            return "损耗率缺失或为负数";
         }
         return null;
     }

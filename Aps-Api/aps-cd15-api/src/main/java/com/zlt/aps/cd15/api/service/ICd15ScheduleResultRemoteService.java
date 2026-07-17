@@ -45,6 +45,10 @@ public interface ICd15ScheduleResultRemoteService {
     @GetMapping("/cd15ScheduleResult/autoSchedule/task/{taskId}")
     AjaxResult getAutoScheduleTask(@PathVariable("taskId") String taskId);
 
+    @ApiOperation("查询斜裁班次日期")
+    @PostMapping("/cd15ScheduleResult/shiftDates")
+    AjaxResult shiftDates(@RequestBody Cd15InsertOrderRequest request);
+
     @ApiOperation("斜裁插单预校验")
     @PostMapping("/cd15ScheduleResult/validateInsert")
     AjaxResult validateInsert(@RequestBody Cd15InsertOrderRequest request);

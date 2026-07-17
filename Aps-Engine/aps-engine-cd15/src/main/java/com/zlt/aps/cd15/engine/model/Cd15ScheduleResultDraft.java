@@ -37,6 +37,7 @@ public class Cd15ScheduleResultDraft {
     private Integer produceOrder;
     private BigDecimal pieceCount;
     private BigDecimal netDemandMeters;
+    private BigDecimal lossRatePercent;
     private BigDecimal bigRollConsumeMeters;
     private BigDecimal vehiclePlanQuantity;
     private String storageLaneCode;

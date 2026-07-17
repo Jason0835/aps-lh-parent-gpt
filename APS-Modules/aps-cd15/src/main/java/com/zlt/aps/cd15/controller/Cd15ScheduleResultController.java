@@ -80,6 +80,12 @@ public class Cd15ScheduleResultController extends AbstractDocBizController<Cd15S
         return cd15ScheduleResultService.getAutoScheduleTask(taskId);
     }
 
+    @ApiOperation("查询斜裁班次日期")
+    @PostMapping("/shiftDates")
+    public AjaxResult shiftDates(@RequestBody Cd15InsertOrderRequest request) {
+        return cd15ScheduleResultService.shiftDates(request);
+    }
+
     @ApiOperation("斜裁插单预校验")
     @PostMapping("/validateInsert")
     public AjaxResult validateInsert(@RequestBody Cd15InsertOrderRequest request) {
@@ -201,6 +207,6 @@ public class Cd15ScheduleResultController extends AbstractDocBizController<Cd15S
 
     @Override
     protected String getOrderBy() {
-        return "SCHEDULE_DATE desc, MACHINE_CODE asc, UPDATE_TIME desc";
+        return " MACHINE_CODE ASC,BIG_ROLL_CODE ASC,CLASS1_PRODUCE_ORDER IS NULL ASC,CLASS1_PRODUCE_ORDER ASC";
     }
 }

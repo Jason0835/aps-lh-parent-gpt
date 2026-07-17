@@ -1,16 +1,21 @@
 package com.zlt.aps.cd15.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.cd15.api.domain.entity.Cd15ScheduleResult;
+import com.zlt.aps.cd15.api.domain.entity.Cd15ShiftConfig;
 import com.zlt.aps.cd15.api.domain.vo.Cd15ChangeQtyRequest;
 import com.zlt.aps.cd15.api.domain.vo.Cd15InsertOrderRequest;
 import com.zlt.aps.cd15.api.domain.vo.Cd15RollingCheckRequest;
 import com.zlt.aps.cd15.api.domain.vo.Cd15TransferMachineRequest;
+import com.zlt.aps.cd15.engine.algorithm.Cd15ShiftWindowResolver;
 import com.zlt.aps.cd15.engine.constant.Cd15ScheduleTaskType;
+import com.zlt.aps.cd15.engine.mapper.Cd15EngineShiftConfigMapper;
 import com.zlt.aps.cd15.engine.domain.Cd15ScheduleTask;
 import com.zlt.aps.cd15.engine.model.Cd15BatchDataCheckResult;
+import com.zlt.aps.cd15.engine.model.Cd15ShiftDescriptor;
 import com.zlt.aps.cd15.engine.service.Cd15AutoScheduleBatchDataValidator;
 import com.zlt.aps.cd15.engine.service.Cd15AutoScheduleInputVersionService;
 import com.zlt.aps.cd15.engine.service.Cd15ScheduleTaskService;
@@ -29,12 +34,15 @@ import org.springframework.transaction.annotation.Transactional;
 import javax.annotation.Resource;
 import java.text.MessageFormat;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 /**
@@ -51,6 +59,12 @@ public class Cd15ScheduleResultServiceImpl extends AbstractDocService<Cd15Schedu
 
     @Resource
     private Cd15ScheduleResultMapper resultMapper;
+
+    @Resource
+    private Cd15EngineShiftConfigMapper shiftConfigMapper;
+
+    @Resource
+    private Cd15ShiftWindowResolver shiftWindowResolver;
 
     @Resource
     private Cd15AutoScheduleAsyncExecutor autoScheduleAsyncExecutor;
@@ -133,6 +147,44 @@ public class Cd15ScheduleResultServiceImpl extends AbstractDocService<Cd15Schedu
         return this.taskView(taskId, Cd15ScheduleTaskType.AUTO_SCHEDULE);
     }
 
+    /**
+     * 查询排程日期对应的启用班次窗口。
+     *
+     * @param request 查询条件，使用工厂编码和排程日期
+     * @return 班次日期、时间窗口、当前班次和可编辑状态
+     */
+    @Override
+    public AjaxResult shiftDates(Cd15InsertOrderRequest request) {
+        if (request == null) {
+            return this.required("request");
+        }
+        if (this.isBlank(request.getFactoryCode())) {
+            return this.required("factoryCode");
+        }
+        if (request.getScheduleDate() == null) {
+            return this.required("scheduleDate");
+        }
+        LocalDate scheduleDate = this.toLocalDate(request.getScheduleDate());
+        LocalDateTime now = LocalDateTime.now();
+        List<Cd15ShiftDescriptor> shifts = shiftWindowResolver.resolve(scheduleDate,
+                shiftConfigMapper.selectList(Wrappers.<Cd15ShiftConfig>lambdaQuery()
+                        .eq(Cd15ShiftConfig::getFactoryCode, request.getFactoryCode())));
+        List<Map<String, Object>> values = shifts.stream()
+                .map(shift -> {
+                    Map<String, Object> item = new LinkedHashMap<>();
+                    item.put("classField", shift.getClassField());
+                    item.put("shiftCode", shift.getShiftCode());
+                    item.put("shiftName", shift.getShiftName());
+                    item.put("shiftDate", shift.getScheduleDate().format(DateTimeFormatter.ISO_LOCAL_DATE));
+                    item.put("startTime", shift.getStartTime().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
+                    item.put("endTime", shift.getEndTime().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
+                    item.put("currentShift", !now.isBefore(shift.getStartTime()) && now.isBefore(shift.getEndTime()));
+                    item.put("changeQtyEditable", now.isBefore(shift.getEndTime()));
+                    return item;
+                })
+                .collect(Collectors.toList());
+        return AjaxResult.success(values);
+    }
     @Override
     public AjaxResult validateInsert(Cd15InsertOrderRequest request) {
         AjaxResult requiredResult = this.validateInsertRequired(request);

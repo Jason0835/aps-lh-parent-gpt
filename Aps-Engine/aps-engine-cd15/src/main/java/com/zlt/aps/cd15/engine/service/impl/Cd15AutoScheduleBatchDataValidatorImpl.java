@@ -94,6 +94,14 @@ public class Cd15AutoScheduleBatchDataValidatorImpl implements Cd15AutoScheduleB
         if (result.isFailed()) {
             log.warn("[斜裁自动排程] 批次级数据先行检查失败, factoryCode={}, scheduleDate={}, errorCount={}, warningCount={}",
                     factoryCode, scheduleDate, result.getErrors().size(), result.getWarnings().size());
+            result.getErrors().forEach(error ->
+                    log.warn("[斜裁自动排程] 批次级数据检查错误明细, factoryCode={}, scheduleDate={}, field={}, reasonCode={}, message={}, suggestion={}",
+                            factoryCode, scheduleDate, error.getField(), error.getReasonCode(),
+                            error.getMessage(), error.getSuggestion()));
+            result.getWarnings().forEach(warning ->
+                    log.warn("[斜裁自动排程] 批次级数据检查警告明细, factoryCode={}, scheduleDate={}, field={}, reasonCode={}, message={}, suggestion={}",
+                            factoryCode, scheduleDate, warning.getField(), warning.getReasonCode(),
+                            warning.getMessage(), warning.getSuggestion()));
         } else {
             log.info("[斜裁自动排程] 批次级数据先行检查通过, factoryCode={}, scheduleDate={}",
                     factoryCode, scheduleDate);

@@ -3,6 +3,8 @@ package com.zlt.aps.cd15.engine.service.impl;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.zlt.aps.cd15.api.domain.entity.Cd15AngleWidthMapping;
 import com.zlt.aps.cd15.api.domain.entity.Cd15CurlLength;
+import com.zlt.aps.cd15.api.domain.entity.Cd15DepthConfig;
+import com.zlt.aps.cd15.api.domain.entity.Cd15LossSetting;
 import com.zlt.aps.cd15.api.domain.entity.Cd15MachineInfo;
 import com.zlt.aps.cd15.api.domain.entity.Cd15MachineMaintenancePlan;
 import com.zlt.aps.cd15.api.domain.entity.Cd15MachineRollMapping;
@@ -11,13 +13,16 @@ import com.zlt.aps.cd15.api.domain.entity.Cd15Stock;
 import com.zlt.aps.cd15.api.domain.entity.Cd15StorageLaneLimit;
 import com.zlt.aps.cd15.api.domain.entity.Cd15ShiftConfig;
 import com.zlt.aps.cd15.engine.algorithm.Cd15ShiftWindowResolver;
+import com.zlt.aps.cd15.engine.algorithm.Cd15SteelStripDepthResolver;
 import com.zlt.aps.cd15.engine.algorithm.Cd15SteelStripSourceTraceResolver;
 import com.zlt.aps.cd15.engine.mapper.Cd15EngineAngleWidthMappingMapper;
 import com.zlt.aps.cd15.engine.mapper.Cd15EngineConstructionMapper;
 import com.zlt.aps.cd15.engine.mapper.Cd15EngineCurlLengthMapper;
 import com.zlt.aps.cd15.engine.mapper.Cd15EngineCxScheduleMapper;
+import com.zlt.aps.cd15.engine.mapper.Cd15EngineDepthConfigMapper;
 import com.zlt.aps.cd15.engine.mapper.Cd15EngineGdyyScheduleResultMapper;
 import com.zlt.aps.cd15.engine.mapper.Cd15EngineGdyyStockMapper;
+import com.zlt.aps.cd15.engine.mapper.Cd15EngineLossSettingMapper;
 import com.zlt.aps.cd15.engine.mapper.Cd15EngineMachineInfoMapper;
 import com.zlt.aps.cd15.engine.mapper.Cd15EngineMachineRollMappingMapper;
 import com.zlt.aps.cd15.engine.mapper.Cd15EngineMaintenanceMapper;
@@ -77,11 +82,14 @@ public class Cd15AutoScheduleInputServiceImpl implements Cd15AutoScheduleInputSe
     private final Cd15EngineSpecifyMachineMapper specifyMachineMapper;
     private final Cd15EngineMaintenanceMapper maintenanceMapper;
     private final Cd15EngineAngleWidthMappingMapper angleWidthMappingMapper;
+    private final Cd15EngineDepthConfigMapper depthConfigMapper;
+    private final Cd15EngineLossSettingMapper lossSettingMapper;
     private final Cd15EngineGdyyStockMapper gdyyStockMapper;
     private final Cd15EngineGdyyScheduleResultMapper gdyyScheduleResultMapper;
     private final Cd15EngineMonthSurplusMapper monthSurplusMapper;
     private final Cd15EngineShiftConfigMapper shiftConfigMapper;
     private final Cd15ShiftWindowResolver shiftWindowResolver;
+    private final Cd15SteelStripDepthResolver steelStripDepthResolver;
     private final Cd15SteelStripSourceTraceResolver steelStripSourceTraceResolver;
 
     @Override
@@ -135,6 +143,18 @@ public class Cd15AutoScheduleInputServiceImpl implements Cd15AutoScheduleInputSe
         List<Cd15ConstructionMaterial> constructionMaterials = this.loadConstructionMaterials(
                 factoryCode, embryoCodes, constructionVersions);
         this.fillStandardCurlLength(factoryCode, constructionMaterials);
+        List<Cd15DepthConfig> depthConfigs = depthConfigMapper.selectList(
+                Wrappers.<Cd15DepthConfig>lambdaQuery()
+                        .eq(Cd15DepthConfig::getFactoryCode, factoryCode)
+                        .orderByAsc(Cd15DepthConfig::getMachineQty)
+                        .orderByAsc(Cd15DepthConfig::getMachineRange));
+        Map<String, BigDecimal> depthClassQtyBySteelStrip = steelStripDepthResolver.resolve(
+                formingSchedules, constructionMaterials, shifts, depthConfigs);
+        List<Cd15LossSetting> lossSettings = lossSettingMapper.selectList(
+                Wrappers.<Cd15LossSetting>lambdaQuery()
+                        .eq(Cd15LossSetting::getFactoryCode, factoryCode)
+                        .orderByAsc(Cd15LossSetting::getSteelStripCode)
+                        .orderByAsc(Cd15LossSetting::getMachineCode));
 
         List<Cd15EmbryoPlanSurplus> embryoPlanSurpluses = this.loadEmbryoPlanSurpluses(
                 factoryCode, scheduleDate, embryoCodes);
@@ -213,6 +233,9 @@ public class Cd15AutoScheduleInputServiceImpl implements Cd15AutoScheduleInputSe
                 .embryoPlanSurpluses(embryoPlanSurpluses)
                 .curlLengths(curlLengths)
                 .angleWidthMappings(angleWidthMappings)
+                .depthConfigs(depthConfigs)
+                .depthClassQtyBySteelStrip(depthClassQtyBySteelStrip)
+                .lossSettings(lossSettings)
                 .angleWidthMaxByAngle(angleWidthMaxByAngle)
                 .machineRollMappings(machineRollMappings)
                 .specifyMachines(specifyMachines)

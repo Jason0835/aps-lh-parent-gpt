@@ -19,6 +19,9 @@ public interface ICd15ScheduleResultService extends IDocService<Cd15ScheduleResu
     /** 查询自动排程任务 */
     AjaxResult getAutoScheduleTask(String taskId);
 
+    /** 查询排程日期对应的启用班次窗口 */
+    AjaxResult shiftDates(Cd15InsertOrderRequest request);
+
     /** 插单预校验 */
     AjaxResult validateInsert(Cd15InsertOrderRequest request);
 

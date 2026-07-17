@@ -3,6 +3,8 @@ package com.zlt.aps.cd15.engine.service.impl;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.zlt.aps.cd15.api.domain.entity.Cd15AngleWidthMapping;
 import com.zlt.aps.cd15.api.domain.entity.Cd15CurlLength;
+import com.zlt.aps.cd15.api.domain.entity.Cd15DepthConfig;
+import com.zlt.aps.cd15.api.domain.entity.Cd15LossSetting;
 import com.zlt.aps.cd15.api.domain.entity.Cd15MachineInfo;
 import com.zlt.aps.cd15.api.domain.entity.Cd15MachineMaintenancePlan;
 import com.zlt.aps.cd15.api.domain.entity.Cd15MachineRollMapping;
@@ -13,8 +15,10 @@ import com.zlt.aps.cd15.engine.mapper.Cd15EngineAngleWidthMappingMapper;
 import com.zlt.aps.cd15.engine.mapper.Cd15EngineConstructionMapper;
 import com.zlt.aps.cd15.engine.mapper.Cd15EngineCurlLengthMapper;
 import com.zlt.aps.cd15.engine.mapper.Cd15EngineCxScheduleMapper;
+import com.zlt.aps.cd15.engine.mapper.Cd15EngineDepthConfigMapper;
 import com.zlt.aps.cd15.engine.mapper.Cd15EngineGdyyScheduleResultMapper;
 import com.zlt.aps.cd15.engine.mapper.Cd15EngineGdyyStockMapper;
+import com.zlt.aps.cd15.engine.mapper.Cd15EngineLossSettingMapper;
 import com.zlt.aps.cd15.engine.mapper.Cd15EngineMachineInfoMapper;
 import com.zlt.aps.cd15.engine.mapper.Cd15EngineMachineRollMappingMapper;
 import com.zlt.aps.cd15.engine.mapper.Cd15EngineMaintenanceMapper;
@@ -54,6 +58,8 @@ public class Cd15AutoScheduleInputVersionServiceImpl implements Cd15AutoSchedule
     private final Cd15EngineGdyyStockMapper gdyyStockMapper;
     private final Cd15EngineGdyyScheduleResultMapper gdyyScheduleResultMapper;
     private final Cd15EngineShiftConfigMapper shiftConfigMapper;
+    private final Cd15EngineDepthConfigMapper depthConfigMapper;
+    private final Cd15EngineLossSettingMapper lossSettingMapper;
 
     public Cd15AutoScheduleInputVersionServiceImpl(Cd15EngineCxScheduleMapper cxMapper,
                                                    Cd15EngineConstructionMapper constructionMapper,
@@ -66,7 +72,9 @@ public class Cd15AutoScheduleInputVersionServiceImpl implements Cd15AutoSchedule
                                                    Cd15EngineMaintenanceMapper maintenanceMapper,
                                                    Cd15EngineGdyyStockMapper gdyyStockMapper,
                                                    Cd15EngineGdyyScheduleResultMapper gdyyScheduleResultMapper,
-                                                   Cd15EngineShiftConfigMapper shiftConfigMapper) {
+                                                   Cd15EngineShiftConfigMapper shiftConfigMapper,
+                                                   Cd15EngineDepthConfigMapper depthConfigMapper,
+                                                   Cd15EngineLossSettingMapper lossSettingMapper) {
         this.cxMapper = cxMapper;
         this.constructionMapper = constructionMapper;
         this.stockMapper = stockMapper;
@@ -79,6 +87,8 @@ public class Cd15AutoScheduleInputVersionServiceImpl implements Cd15AutoSchedule
         this.gdyyStockMapper = gdyyStockMapper;
         this.gdyyScheduleResultMapper = gdyyScheduleResultMapper;
         this.shiftConfigMapper = shiftConfigMapper;
+        this.depthConfigMapper = depthConfigMapper;
+        this.lossSettingMapper = lossSettingMapper;
     }
 
     @Override
@@ -164,6 +174,20 @@ public class Cd15AutoScheduleInputVersionServiceImpl implements Cd15AutoSchedule
                         + ":" + item.getScheduleDay() + ":" + item.getDayShiftOrder()
                         + ":" + item.getClassField() + ":" + item.getIsActive() + ":" + item.getUpdateTime())
                 .collect(Collectors.joining("|"));
+        String depthConfigs = depthConfigMapper.selectList(Wrappers.<Cd15DepthConfig>lambdaQuery()
+                        .eq(Cd15DepthConfig::getFactoryCode, factoryCode)
+                        .orderByAsc(Cd15DepthConfig::getId))
+                .stream()
+                .map(item -> item.getId() + ":" + item.getMachineQty() + ":" + item.getMachineRange()
+                        + ":" + item.getDepthClassQty() + ":" + item.getUpdateTime())
+                .collect(Collectors.joining("|"));
+        String lossSettings = lossSettingMapper.selectList(Wrappers.<Cd15LossSetting>lambdaQuery()
+                        .eq(Cd15LossSetting::getFactoryCode, factoryCode)
+                        .orderByAsc(Cd15LossSetting::getId))
+                .stream()
+                .map(item -> item.getId() + ":" + item.getSteelStripCode() + ":" + item.getMachineCode()
+                        + ":" + item.getLossRate() + ":" + item.getUpdateTime())
+                .collect(Collectors.joining("|"));
         String gdyyStock = gdyyStockMapper.selectList(Wrappers.<GdyyStock>lambdaQuery()
                         .eq(GdyyStock::getFactoryCode, factoryCode)
                         .orderByAsc(GdyyStock::getId))
@@ -181,7 +205,8 @@ public class Cd15AutoScheduleInputVersionServiceImpl implements Cd15AutoSchedule
                         + ":" + item.getMachineCode() + ":" + item.getUpdateTime())
                 .collect(Collectors.joining("|"));
         return this.sha256(String.join("#", forming, constructions, stock, curls, angleWidths, machines,
-                machineRolls, specifyMachines, maintenances, shifts, gdyyStock, gdyyPlan));
+                machineRolls, specifyMachines, maintenances, shifts, depthConfigs, lossSettings,
+                gdyyStock, gdyyPlan));
     }
 
     private String sha256(String value) {

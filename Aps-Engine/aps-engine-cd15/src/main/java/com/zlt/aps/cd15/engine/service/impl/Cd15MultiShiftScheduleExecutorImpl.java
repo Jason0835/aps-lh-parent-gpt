@@ -3,6 +3,7 @@ package com.zlt.aps.cd15.engine.service.impl;
 import com.zlt.aps.cd15.api.domain.entity.Cd15MachineInfo;
 import com.zlt.aps.cd15.engine.algorithm.Cd15BigRollAgingAllocator;
 import com.zlt.aps.cd15.engine.algorithm.Cd15DemandCalculator;
+import com.zlt.aps.cd15.engine.algorithm.Cd15LossRateResolver;
 import com.zlt.aps.cd15.engine.algorithm.Cd15MachineCandidateResolver;
 import com.zlt.aps.cd15.engine.algorithm.Cd15ResourceSnapshotBuilder;
 import com.zlt.aps.cd15.engine.algorithm.Cd15RollingPrefixResourceDeductor;
@@ -61,6 +62,7 @@ public class Cd15MultiShiftScheduleExecutorImpl implements Cd15MultiShiftSchedul
     private final Cd15ScheduleCandidateSorter candidateSorter;
     private final Cd15SplitCutGroupBuilder splitCutGroupBuilder;
     private final Cd15MachineCandidateResolver machineCandidateResolver;
+    private final Cd15LossRateResolver lossRateResolver;
     private final Cd15BigRollAgingAllocator bigRollAgingAllocator;
     private final Cd15StorageLaneAllocator storageLaneAllocator;
     private final Cd15DemandCalculator demandCalculator;
@@ -125,24 +127,36 @@ public class Cd15MultiShiftScheduleExecutorImpl implements Cd15MultiShiftSchedul
                                     AtomicInteger produceOrder,
                                     List<Cd15ScheduleResultDraft> scheduledDrafts,
                                     List<Cd15SingleShiftScheduleResult> unscheduledResults) {
-        Optional<Cd15MachineInfo> machine = machineCandidateResolver.resolve(input, splitGroup);
-        if (!machine.isPresent()) {
+        List<Cd15MachineInfo> machineCandidates = machineCandidateResolver.resolveCandidates(input, splitGroup);
+        if (machineCandidates.isEmpty()) {
             this.addSplitUnscheduled(unscheduledResults, splitGroup,
                     machineCandidateResolver.resolveFailureReason(input, splitGroup), "未找到满足分裁组合硬约束的可用机台");
+            return;
+        }
+        Optional<MachineLossSelection> selection = machineCandidates.stream()
+                .map(machine -> this.resolveSplitMachineLoss(input, splitGroup, machine))
+                .filter(item -> item != null)
+                .findFirst();
+        if (!selection.isPresent()) {
+            this.addSplitUnscheduled(unscheduledResults, splitGroup, DATA_MISSING,
+                    "分裁钢带在候选机台上未配置损耗率");
             return;
         }
         if (this.hasAgingDataMissing(snapshot, splitGroup.getFirstCandidate().getBigRollCode())) {
             this.addSplitUnscheduled(unscheduledResults, splitGroup, DATA_MISSING, "GDYY大卷入库时间或单卷米数缺失");
             return;
         }
+        MachineLossSelection selected = selection.get();
         int sameProduceOrder = produceOrder.getAndIncrement();
         String sameOrderNo = this.orderNo(splitGroup.getFirstCandidate(), sameProduceOrder);
         String sameGroupNo = sameOrderNo;
         GdyyStock trialStock = this.trialStock(splitGroup.getFirstCandidate().getBigRollCode());
-        Cd15SingleShiftScheduleResult firstResult = this.executeCandidate(snapshot, splitGroup.getFirstCandidate(), machine.get(),
-                trialStock, sameOrderNo, sameGroupNo, sameProduceOrder);
-        Cd15SingleShiftScheduleResult secondResult = this.executeCandidate(snapshot, splitGroup.getSecondCandidate(), machine.get(),
-                trialStock, sameOrderNo, sameGroupNo, sameProduceOrder);
+        Cd15SingleShiftScheduleResult firstResult = this.executeCandidate(snapshot, splitGroup.getFirstCandidate(),
+                selected.machine, selected.firstLossRate, trialStock,
+                sameOrderNo, sameGroupNo, sameProduceOrder);
+        Cd15SingleShiftScheduleResult secondResult = this.executeCandidate(snapshot, splitGroup.getSecondCandidate(),
+                selected.machine, selected.secondLossRate, trialStock,
+                sameOrderNo, sameGroupNo, sameProduceOrder);
         if (!firstResult.isScheduled() || !secondResult.isScheduled()) {
             unscheduledResults.add(firstResult.isScheduled() ? secondResult : firstResult);
             return;
@@ -190,22 +204,32 @@ public class Cd15MultiShiftScheduleExecutorImpl implements Cd15MultiShiftSchedul
                                    AtomicInteger produceOrder,
                                    List<Cd15ScheduleResultDraft> scheduledDrafts,
                                    List<Cd15SingleShiftScheduleResult> unscheduledResults) {
-        Optional<Cd15MachineInfo> machine = machineCandidateResolver.resolve(input, candidate,
+        List<Cd15MachineInfo> machineCandidates = machineCandidateResolver.resolveCandidates(input, candidate,
                 candidate.getMaterial().getCraftWidth());
-        if (!machine.isPresent()) {
+        if (machineCandidates.isEmpty()) {
             unscheduledResults.add(this.unscheduled(candidate,
                     machineCandidateResolver.resolveFailureReason(input, candidate, candidate.getMaterial().getCraftWidth()),
                     "未找到满足机台硬约束的可用机台"));
+            return;
+        }
+        Optional<MachineLossSelection> selection = machineCandidates.stream()
+                .map(machine -> this.resolveSingleMachineLoss(input, candidate, machine))
+                .filter(item -> item != null)
+                .findFirst();
+        if (!selection.isPresent()) {
+            unscheduledResults.add(this.unscheduled(candidate, DATA_MISSING,
+                    "钢带在候选机台上未配置损耗率"));
             return;
         }
         if (this.hasAgingDataMissing(snapshot, candidate.getBigRollCode())) {
             unscheduledResults.add(this.unscheduled(candidate, DATA_MISSING, "GDYY大卷入库时间或单卷米数缺失"));
             return;
         }
+        MachineLossSelection selected = selection.get();
         int sequence = produceOrder.getAndIncrement();
-        Cd15SingleShiftScheduleResult result = this.executeCandidate(snapshot, candidate, machine.get(),
-                this.trialStock(candidate.getBigRollCode()), this.orderNo(candidate, sequence),
-                this.orderNo(candidate, sequence), sequence);
+        Cd15SingleShiftScheduleResult result = this.executeCandidate(snapshot, candidate, selected.machine,
+                selected.firstLossRate, this.trialStock(candidate.getBigRollCode()),
+                this.orderNo(candidate, sequence), this.orderNo(candidate, sequence), sequence);
         if (result.isScheduled()) {
             Cd15ScheduleResultDraft draft = result.getDraft();
             Cd15StorageLaneAllocationResult laneAllocation = this.allocateStorageLane(snapshot, draft);
@@ -233,6 +257,7 @@ public class Cd15MultiShiftScheduleExecutorImpl implements Cd15MultiShiftSchedul
     private Cd15SingleShiftScheduleResult executeCandidate(Cd15RollingResourceSnapshot snapshot,
                                                            Cd15ScheduleCandidate candidate,
                                                            Cd15MachineInfo machine,
+                                                           BigDecimal lossRatePercent,
                                                            GdyyStock gdyyStock,
                                                            String sameOrderNo,
                                                            String sameGroupNo,
@@ -241,6 +266,7 @@ public class Cd15MultiShiftScheduleExecutorImpl implements Cd15MultiShiftSchedul
                 .material(candidate.getMaterial())
                 .demand(candidate.getDemand())
                 .machine(machine)
+                .lossRatePercent(lossRatePercent)
                 .gdyyStock(gdyyStock)
                 .stockMetersAtSix(this.stockMeters(snapshot, candidate.getSteelStripCode()))
                 .cordWidthMillimeter(candidate.getMaterial().getCordWidth())
@@ -251,6 +277,26 @@ public class Cd15MultiShiftScheduleExecutorImpl implements Cd15MultiShiftSchedul
         return this.enrichShiftInfo(candidate, result);
     }
 
+    private MachineLossSelection resolveSingleMachineLoss(Cd15AutoScheduleInput input,
+                                                           Cd15ScheduleCandidate candidate,
+                                                           Cd15MachineInfo machine) {
+        Optional<BigDecimal> lossRate = lossRateResolver.resolve(candidate.getSteelStripCode(),
+                machine.getMachineCode(), input == null ? Collections.emptyList() : input.getLossSettings());
+        return lossRate.map(rate -> new MachineLossSelection(machine, rate, null)).orElse(null);
+    }
+
+    private MachineLossSelection resolveSplitMachineLoss(Cd15AutoScheduleInput input,
+                                                          Cd15SplitCutGroup splitGroup,
+                                                          Cd15MachineInfo machine) {
+        Optional<BigDecimal> firstLossRate = lossRateResolver.resolve(
+                splitGroup.getFirstCandidate().getSteelStripCode(), machine.getMachineCode(),
+                input == null ? Collections.emptyList() : input.getLossSettings());
+        Optional<BigDecimal> secondLossRate = lossRateResolver.resolve(
+                splitGroup.getSecondCandidate().getSteelStripCode(), machine.getMachineCode(),
+                input == null ? Collections.emptyList() : input.getLossSettings());
+        return firstLossRate.isPresent() && secondLossRate.isPresent()
+                ? new MachineLossSelection(machine, firstLossRate.get(), secondLossRate.get()) : null;
+    }
     private void markSplitDraft(Cd15ScheduleResultDraft draft,
                                 String sameOrderNo,
                                 String sameGroupNo,
@@ -457,5 +503,18 @@ public class Cd15MultiShiftScheduleExecutorImpl implements Cd15MultiShiftSchedul
 
     private BigDecimal value(BigDecimal value) {
         return value == null ? BigDecimal.ZERO : value;
+    }
+    private static class MachineLossSelection {
+        private final Cd15MachineInfo machine;
+        private final BigDecimal firstLossRate;
+        private final BigDecimal secondLossRate;
+
+        private MachineLossSelection(Cd15MachineInfo machine,
+                                     BigDecimal firstLossRate,
+                                     BigDecimal secondLossRate) {
+            this.machine = machine;
+            this.firstLossRate = firstLossRate;
+            this.secondLossRate = secondLossRate;
+        }
     }
 }
