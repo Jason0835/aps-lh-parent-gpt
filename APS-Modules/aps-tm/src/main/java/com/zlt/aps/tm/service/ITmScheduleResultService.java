@@ -123,6 +123,15 @@ public interface ITmScheduleResultService extends IDocService<TmScheduleResult> 
     int insertTask(TmScheduleResult scheduleResult);
 
     /**
+     * 批量删除未发布排程结果并滚动重排受影响机台。
+     *
+     * @param ids 排程结果 ID
+     * @return 删除行数
+     * @throws com.ruoyi.common.exception.ServiceException ID 为空、记录缺失或包含非未发布状态时抛出
+     */
+    int removeScheduleResults(List<Long> ids);
+
+    /**
      * 调整排程计划量。
      *
      * @param scheduleResult 调量后的排程结果
@@ -139,6 +148,16 @@ public interface ITmScheduleResultService extends IDocService<TmScheduleResult> 
      * @throws com.ruoyi.common.exception.ServiceException 记录不存在或处于不可调整状态时抛出
      */
     int changeMachine(TmScheduleResult scheduleResult);
+
+    /**
+     * 在单个事务中批量调整排程机台。
+     *
+     * @param machineCode 目标机台编码
+     * @param scheduleResultList 待转机的排程结果
+     * @return 更新行数
+     * @throws com.ruoyi.common.exception.ServiceException 任一记录校验或转机失败时抛出并整批回滚
+     */
+    int batchChangeMachine(String machineCode, List<TmScheduleResult> scheduleResultList);
 
     /**
      * 单步撤销最近一次人工操作（插单/调量/转机台）。

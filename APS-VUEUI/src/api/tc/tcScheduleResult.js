@@ -1,231 +1,151 @@
 import request from '@/utils/request'
 
-export function listScheduleResult(query) {
+export function queryScheduleBoard(query) {
   return request({
-    url: 'tc/tcScheduleResult/list',
+    url: '/tc/tcScheduleResult/board',
     method: 'post',
-    data: query
-  })
-}
-export function removeScheduleResult(query) {
-  return request({
-    url: 'tc/tcScheduleResult/remove',
-    method: 'post',
+    headers: { 'Content-Type': 'application/json;charset=UTF-8' },
     data: query
   })
 }
 
-//
-export function validateAutoPlan(query) {
+export function listUnplanned(query) {
   return request({
-    url: 'tc/tcScheduleResult/validateAutoPlan',
+    url: '/tc/tcScheduleResult/unplanned/list',
     method: 'post',
-    data: query
-  })
-}
-export function autoPlan(query) {
-  return request({
-    url: 'tc/tcScheduleResult/autoPlan',
-    method: 'post',
-    data: query
-  })
-}
-export function balance(query) {
-  return request({
-    url: 'tc/tcScheduleResult/balance',
-    method: 'post',
-    data: query
-  })
-}
-// export function modelChange(query) {
-//   return request({
-//     url: 'tc/tcScheduleResult/modelChange',
-//     method: 'post',
-//     data: query
-//   })
-// }
-// export function modelAdjustPlan(query) {
-//   return request({
-//     url: 'tc/tcScheduleResult/modelAdjustPlan',
-//     method: 'post',
-//     data: query
-//   })
-// }
-
-// // 获取胎胚版本
-// export function getProductEmbryoVersions(query) {
-//   return request({
-//     url: 'tc/tcScheduleResult/getProductEmbryoVersions',
-//     method: 'post',
-//     data: query
-//   })
-// }
-// export function getCxMachines(query) {
-//   return request({
-//     url: 'tc/tcScheduleResult/getCxMachines',
-//     method: 'post',
-//     data: query
-//   })
-// }
-// export function validateBeforeAdd(query) {
-//   return request({
-//     url: 'tc/tcScheduleResult/validateBeforeAdd',
-//     method: 'post',
-//     data: query
-//   })
-// }
-export function validateAdd(query) {
-  return request({
-    url: 'tc/tcScheduleResult/validateAdd',
-    method: 'post',
+    headers: { 'Content-Type': 'application/json;charset=UTF-8' },
     data: query
   })
 }
 
-export function editScheduleResult(query) {
+export function getResultExplain(resultId) {
   return request({
-    url: 'tc/tcScheduleResult/edit',
-    method: 'post',
-    data: query
-  })
-}
-export function batchChangeMachine(machineId, query) {
-  return request({
-    url: 'tc/tcScheduleResult/batchChangeMachine/' + machineId,
-    method: 'post',
-    data: query
-  })
-}
-export function chooseMachine(query) {
-  return request({
-    url: 'tc/tcScheduleResult/chooseMachine',
-    method: 'post',
-    data: query
-  })
-}
-export function mergeProduct(query) {
-  return request({
-    url: 'tc/tcScheduleResult/mergeProduct',
-    method: 'post',
-    data: query
+    url: `/tc/tcScheduleResult/explain/result/${resultId}`,
+    method: 'get'
   })
 }
 
-
-
-// //
-// export function modifyMoldsValidate(query) {
-//   return request({
-//     url: 'tc/tcScheduleResult/modifyMoldsValidate',
-//     method: 'post',
-//     data: query
-//   })
-// }
-// export function modifyMolds(query) {
-//   return request({
-//     url: 'tc/tcScheduleResult/modifyMolds',
-//     method: 'post',
-//     data: query
-//   })
-// }
-
-
-// export function validateChangeMachine(query) {
-//   return request({
-//     url: 'tc/tcScheduleResult/validateChangeMachine',
-//     method: 'post',
-//     data: query
-//   })
-// }
-export function publishValidate(query) {
+export function getUnplannedExplain(unplannedId) {
   return request({
-    url: 'tc/tcScheduleResult/publishValidate',
-    method: 'post',
-    data: query
-  })
-}
-export function publishScheduleResult(query) {
-  return request({
-    url: 'tc/tcScheduleResult/publish',
-    method: 'post',
-    data: query
+    url: `/tc/tcScheduleResult/explain/unplanned/${unplannedId}`,
+    method: 'get'
   })
 }
 
-// export function hasRecordValidate(query) {
-//   return request({
-//     url: 'tc/tcScheduleResult/hasRecordValidate',
-//     method: 'post',
-//     data: query
-//   })
-// }
-
-// export function modifyQty(query) {
-//   return request({
-//     url: `tc/tcScheduleResult/modifyQty/${query}`,
-//     method: 'post',
-//     // data: query
-//   })
-// }
-
-// export function manualClose(query) {
-//   return request({
-//     url: `tc/tcScheduleResult/manualClose`,
-//     method: 'post',
-//     data: query
-//   })
-// }
-
-// export function listFinished(query) {
-//   return request({
-//     url: `tc/tcScheduleResult/finished/list`,
-//     method: 'post',
-//     data: query
-//   })
-// }
-// export function producingIssue(query) {
-//   return request({
-//    url: `tc/tcScheduleResult/producingIssue`,
-//     method: 'post',
-//     data: query
-//   })
-// }
-// export function validateConstruction(query) {
-//   return request({
-//    url: `tc/tcScheduleResult/validateConstruction`,
-//     method: 'post',
-//     data: query
-//   })
-// }
-export function changeReleaseStatus(query) {
+export function getManualOptions(query) {
   return request({
-   url: `tc/tcScheduleResult/changeReleaseStatus`,
-    method: 'post',
-    data: query
+    url: '/tc/tcScheduleResult/manual/options',
+    method: 'get',
+    params: query
   })
 }
 
+export function insertTask(query) {
+  return request({
+    url: '/tc/tcScheduleResult/insertTask',
+    method: 'post',
+    headers: { 'Content-Type': 'application/json;charset=UTF-8' },
+    data: query
+  })
+}
 
 export function changeQty(query) {
   return request({
-    url: 'tc/tcScheduleResult/changeQty',
+    url: '/tc/tcScheduleResult/changeQty',
     method: 'post',
+    headers: { 'Content-Type': 'application/json;charset=UTF-8' },
     data: query
   })
 }
 
-export function combinationMiddleAndNight(query) {
+export function changeMachine(query) {
   return request({
-   url: `tc/tcScheduleResult/combinationMiddleAndNight`,
+    url: '/tc/tcScheduleResult/changeMachine',
     method: 'post',
+    headers: { 'Content-Type': 'application/json;charset=UTF-8' },
     data: query
   })
 }
 
-export function getSummaryVo(query) {
+export function removeScheduleResult(resultIdList) {
   return request({
-   url: `tc/tcScheduleResult/getSummaryVo`,
+    url: '/tc/tcScheduleResult/remove',
+    method: 'delete',
+    headers: { 'Content-Type': 'application/json;charset=UTF-8' },
+    data: resultIdList
+  })
+}
+
+export function validateAutoPlan(query) {
+  return request({
+    url: '/tc/tcScheduleResult/validateAutoPlan',
     method: 'post',
+    headers: { 'Content-Type': 'application/json;charset=UTF-8' },
     data: query
+  })
+}
+
+export function autoPlan(query) {
+  return request({
+    url: '/tc/tcScheduleResult/autoPlan',
+    method: 'post',
+    headers: { 'Content-Type': 'application/json;charset=UTF-8' },
+    data: query
+  })
+}
+
+export function getAutoPlanTask(taskId) {
+  return request({
+    url: `/tc/tcScheduleResult/autoPlan/task/${taskId}`,
+    method: 'get'
+  })
+}
+
+export function getLatestAutoPlanTask(query) {
+  return request({
+    url: '/tc/tcScheduleResult/autoPlan/task/latest',
+    method: 'get',
+    params: query
+  })
+}
+
+export function clearAutoPlanRedisCache(query) {
+  return request({
+    url: '/tc/tcScheduleResult/clearAutoPlanRedisCache',
+    method: 'post',
+    params: query
+  })
+}
+
+export function validateRelease(query) {
+  return request({
+    url: '/tc/tcScheduleResult/release/validate',
+    method: 'post',
+    headers: { 'Content-Type': 'application/json;charset=UTF-8' },
+    data: query
+  })
+}
+
+export function releaseScheduleResult(query) {
+  return request({
+    url: '/tc/tcScheduleResult/release',
+    method: 'post',
+    headers: { 'Content-Type': 'application/json;charset=UTF-8' },
+    data: query
+  })
+}
+
+export function getReleaseTask(taskId) {
+  return request({
+    url: `/tc/tcScheduleResult/release/task/${taskId}`,
+    method: 'get'
+  })
+}
+
+export function getLatestReleaseTask(query) {
+  return request({
+    url: '/tc/tcScheduleResult/release/task/latest',
+    method: 'get',
+    params: query
   })
 }

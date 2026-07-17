@@ -32,6 +32,21 @@
 import infoForm from "@/views/components/infoForm.vue";
 import {changeQty, insertTask} from "@/api/tm/scheduleResult";
 
+const CHANGE_QTY_EDITABLE_FIELDS = [
+  "class1PlanQty",
+  "class1Analysis",
+  "class2PlanQty",
+  "class2Analysis",
+  "class3PlanQty",
+  "class3Analysis",
+  "class4PlanQty",
+  "class4Analysis",
+  "class5PlanQty",
+  "class5Analysis",
+  "class6PlanQty",
+  "class6Analysis",
+];
+
 export default {
   components: { infoForm },
   inject: ["parentDict"],
@@ -62,7 +77,7 @@ export default {
       );
     },
     columns() {
-      return [
+      const columns = [
         {
           prop: "factoryCode",
           label: this.$t("ui.data.column.tm.scheduleResult.factoryCode"),
@@ -429,6 +444,13 @@ export default {
           maxlength: 200,
         },
       ];
+      return columns.map((column) => ({
+        ...column,
+        disabled:
+          this.isEdit && !CHANGE_QTY_EDITABLE_FIELDS.includes(column.prop)
+            ? true
+            : column.disabled,
+      }));
     },
   },
   methods: {

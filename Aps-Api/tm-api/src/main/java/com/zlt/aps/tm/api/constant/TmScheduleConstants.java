@@ -88,7 +88,7 @@ public final class TmScheduleConstants {
     /** 最小开机量默认值。 */
     public static final String DEFAULT_MIN_START_QTY = "0";
 
-    /** 默认卷长缺省值。 */
+    /** 默认卷长缺省值，单位米/条。 */
     public static final String DEFAULT_CURL_LENGTH = "0";
 
     /** 工装总量默认值。 */
@@ -222,6 +222,9 @@ public final class TmScheduleConstants {
 
     /** 自动排程结果数据来源编码。 */
     public static final String AUTO_SCHEDULE_DATA_SOURCE = "AUTO";
+
+    /** 模板导入排程结果数据来源编码。 */
+    public static final String IMPORT_SCHEDULE_DATA_SOURCE = "IMPORT";
 
     /** 预置机台绑定来源。 */
     public static final String PRESET_MACHINE_BIND_SOURCE = "PRESET_MACHINE";

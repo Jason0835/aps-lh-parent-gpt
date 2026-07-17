@@ -1395,6 +1395,11 @@ public class TmMachineAssignService implements ITmMachineAssignService {
         TmTaskDraft target = new TmTaskDraft();
         target.setOrderNo(source.getOrderNo());
         target.setSourceOrderNos(source.getSourceOrderNos());
+        target.setMaterialCode(source.getMaterialCode());
+        target.setMaterialDesc(source.getMaterialDesc());
+        target.setEmbryoCode(source.getEmbryoCode());
+        target.setMainMaterialDesc(source.getMainMaterialDesc());
+        target.setCxMachineCode(source.getCxMachineCode());
         target.setTreadCode(source.getTreadCode());
         target.setGlueCode(source.getGlueCode());
         target.setBaseGlueCode(source.getBaseGlueCode());
