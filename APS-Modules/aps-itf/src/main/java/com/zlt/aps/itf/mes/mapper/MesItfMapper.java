@@ -87,6 +87,16 @@ public interface MesItfMapper {
     List<LhMachineOnlineInfo> selectLhMachineOnlineSyncList(LhMachineOnlineInfo lhMachineOnlineInfo);
 
     /**
+     * 按指定版本号查询硫化在机同步数据（不限日期），用于临时任务
+     * 与selectLhMachineOnlineSyncList的区别：去掉当天日期过滤和按LH_CODE取MAX(DATA_VERSION)子查询，
+     * 直接按指定版本号查询所有日期数据，用于临时任务按版本号抓取历史数据
+     *
+     * @param lhMachineOnlineInfo 参数（dataVersion必传，factoryCode/companyCode可选）
+     * @return 列表
+     */
+    List<LhMachineOnlineInfo> selectLhMachineOnlineSyncListByVersion(LhMachineOnlineInfo lhMachineOnlineInfo);
+
+    /**
      * 查询设备保养计划同步数据
      *
      * @param syncDataLogs 参数

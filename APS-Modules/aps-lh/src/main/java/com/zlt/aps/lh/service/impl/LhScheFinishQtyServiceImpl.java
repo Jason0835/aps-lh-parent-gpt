@@ -110,6 +110,11 @@ public class LhScheFinishQtyServiceImpl extends AbstractDocService<LhScheFinishQ
             queryWrapper.eq(LhScheduleResult::getLhMachineCode, summary.getLhMachineCode());
             queryWrapper.eq(LhScheduleResult::getMaterialCode, summary.getMaterialCode());
             queryWrapper.in(LhScheduleResult::getScheduleDate, Arrays.asList(dateDMinus1, dateD, dateDPlus1));
+            // 按产品状态过滤：避免同一物料+机台+日期下不同产品状态（正规/量试）的排程记录被错误回填
+            String mesProductStatus = summary.getLhType();
+            if (StringUtils.isNotEmpty(mesProductStatus)) {
+                queryWrapper.eq(LhScheduleResult::getProductStatus, mesProductStatus);
+            }
             List<LhScheduleResult> resultList = lhScheduleResultMapper.selectList(queryWrapper);
 
             if (CollectionUtils.isEmpty(resultList)) {
@@ -244,6 +249,17 @@ public class LhScheFinishQtyServiceImpl extends AbstractDocService<LhScheFinishQ
      * @return true-校验通过可回填；false-校验不通过跳过
      */
     private boolean validateLhTypeConsistency(LhScheduleResult result, int dayOffset, LhScheFinishQty summary) {
+        // 产品状态前置校验：MES回报的产品状态与排程结果的产品状态必须一致，
+        // 避免班次示方类型为空时跳过校验导致正规完成量回填到量试记录（或反之）
+        String mesProductStatus = summary.getLhType();
+        if (StringUtils.isNotEmpty(mesProductStatus)
+                && StringUtils.isNotEmpty(result.getProductStatus())
+                && !mesProductStatus.equals(result.getProductStatus())) {
+            log.warn("【产品状态校验】不一致！物料={}，MES产品状态={}，排程结果产品状态={}",
+                    summary.getMaterialCode(), mesProductStatus, result.getProductStatus());
+            return false;
+        }
+
         List<String> mismatchShifts = new ArrayList<>();
 
         if (dayOffset == -1) {
@@ -334,6 +350,11 @@ public class LhScheFinishQtyServiceImpl extends AbstractDocService<LhScheFinishQ
         LambdaUpdateWrapper<LhScheduleResult> updateWrapper = new LambdaUpdateWrapper<>();
         updateWrapper.eq(LhScheduleResult::getId, result.getId());
         updateWrapper.eq(LhScheduleResult::getIsDelete, ApsConstant.APS_YES_NO_0);
+        // 产品状态匹配条件：确保只更新对应产品状态的记录，避免正规完成量回填到量试记录（或反之）
+        String productStatus = summary.getLhType();
+        if (StringUtils.isNotEmpty(productStatus)) {
+            updateWrapper.eq(LhScheduleResult::getProductStatus, productStatus);
+        }
         // 示方类型匹配条件：用示方类型而非示方号匹配，避免不同示方类型示方号相同时回填错误
         if (StringUtils.isNotEmpty(summary.getClass1LhType())) {
             updateWrapper.eq(LhScheduleResult::getClass6LhType, summary.getClass1LhType());  // 6班=MES1班
@@ -368,6 +389,11 @@ public class LhScheFinishQtyServiceImpl extends AbstractDocService<LhScheFinishQ
         LambdaUpdateWrapper<LhScheduleResult> updateWrapper = new LambdaUpdateWrapper<>();
         updateWrapper.eq(LhScheduleResult::getId, result.getId());
         updateWrapper.eq(LhScheduleResult::getIsDelete, ApsConstant.APS_YES_NO_0);
+        // 产品状态匹配条件：确保只更新对应产品状态的记录，避免正规完成量回填到量试记录（或反之）
+        String productStatus = summary.getLhType();
+        if (StringUtils.isNotEmpty(productStatus)) {
+            updateWrapper.eq(LhScheduleResult::getProductStatus, productStatus);
+        }
         // 示方类型匹配条件：用示方类型而非示方号匹配，避免不同示方类型示方号相同时回填错误
         if (StringUtils.isNotEmpty(summary.getClass1LhType())) {
             updateWrapper.eq(LhScheduleResult::getClass3LhType, summary.getClass1LhType());  // 3班=MES1班
@@ -402,6 +428,11 @@ public class LhScheFinishQtyServiceImpl extends AbstractDocService<LhScheFinishQ
         LambdaUpdateWrapper<LhScheduleResult> updateWrapper = new LambdaUpdateWrapper<>();
         updateWrapper.eq(LhScheduleResult::getId, result.getId());
         updateWrapper.eq(LhScheduleResult::getIsDelete, ApsConstant.APS_YES_NO_0);
+        // 产品状态匹配条件：确保只更新对应产品状态的记录，避免正规完成量回填到量试记录（或反之）
+        String productStatus = summary.getLhType();
+        if (StringUtils.isNotEmpty(productStatus)) {
+            updateWrapper.eq(LhScheduleResult::getProductStatus, productStatus);
+        }
         // 示方类型匹配条件：用示方类型而非示方号匹配，避免不同示方类型示方号相同时回填错误
         if (StringUtils.isNotEmpty(summary.getClass2LhType())) {
             updateWrapper.eq(LhScheduleResult::getClass1LhType, summary.getClass2LhType());  // 1班=MES2班

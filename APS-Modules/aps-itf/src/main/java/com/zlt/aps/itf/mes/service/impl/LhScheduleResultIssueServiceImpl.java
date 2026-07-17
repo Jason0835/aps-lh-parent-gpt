@@ -197,22 +197,52 @@ public class LhScheduleResultIssueServiceImpl implements ILhScheduleResultIssueS
      * 更新或插入数据（存在则更新，不存在则插入）
      * 中间表MES_LH_SCHEDULE_RESULT建在MES分库，Mapper已通过@DS(DataSource.MES)指定数据源
      * 分批处理避免SQL Server参数上限2100的问题
+     * 匹配键：排程日期+硫化机台编码+物料编码+工单号（不含版本号）
+     * 实现方式：delete + insert（而非逐条 update）
+     *   - 历史问题：旧版本逐条UPDATE时WHERE含DATA_VERSION，重新发布因版本号变化导致0条更新、全部走insert，造成多版本残留。
+     *   - 现在改为：对已存在的键，先批量删除该键的所有历史版本数据，再批量插入本次发布的新版本数据。
+     *   - 这样无论历史有多少版本残留，最终每个键只会保留本次发布的 1 条最新版本记录。
+     *   - MES 侧无回写字段，删除不会丢失业务数据。
      */
     private void upsertLhScheduleResult(List<MesLhScheduleResult> mesList, String dataVersion) {
         if (CollectionUtils.isEmpty(mesList)) {
             return;
         }
+        log.info("upsert处理开始，总记录数：{}", mesList.size());
+        // 分批查询已有记录，按排程日期+硫化机台编码+物料编码+工单号匹配（不含版本号）
+        Set<String> existingKeys = new HashSet<>();
+        for (List<MesLhScheduleResult> batch : partitionList(mesList)) {
+            List<MesLhScheduleResult> existingRecords = lhScheduleResultIssueMapper.selectExistingByScheduleDateAndMachine(batch);
+            existingRecords.stream()
+                    .map(r -> r.getScheduleDate() + "|" + r.getLhMachineCode() + "|" + r.getMaterialCode() + "|" + r.getOrderNo())
+                    .forEach(existingKeys::add);
+        }
+        // 根据查询结果分组：已有记录走"删除+插入"覆盖，不存在记录走新增
+        List<MesLhScheduleResult> replaceList = new ArrayList<>();
         List<MesLhScheduleResult> insertList = new ArrayList<>();
         for (MesLhScheduleResult mesItem : mesList) {
-            int updateCount = lhScheduleResultIssueMapper.updateByScheduleDateAndMachine(mesItem);
-            if (updateCount == 0) {
+            String key = mesItem.getScheduleDate() + "|" + mesItem.getLhMachineCode() + "|" + mesItem.getMaterialCode() + "|" + mesItem.getOrderNo();
+            if (existingKeys.contains(key)) {
+                replaceList.add(mesItem);
+            } else {
                 insertList.add(mesItem);
             }
         }
-        // 分批插入不存在的记录
+        log.info("upsert分组结果：需覆盖{}条，需新增{}条", replaceList.size(), insertList.size());
+        // 覆盖处理：先批量删除该键的所有历史版本记录，再批量插入本次发布的新版本数据
+        int replaceBatchCount = 0;
+        for (List<MesLhScheduleResult> batch : partitionList(replaceList)) {
+            lhScheduleResultIssueMapper.batchDeleteByScheduleDateAndMachine(batch);
+            lhScheduleResultIssueMapper.batchInsertLhScheduleResult(batch);
+            replaceBatchCount += batch.size();
+        }
+        // 新增处理
+        int insertBatchCount = 0;
         for (List<MesLhScheduleResult> batch : partitionList(insertList)) {
             lhScheduleResultIssueMapper.batchInsertLhScheduleResult(batch);
+            insertBatchCount += batch.size();
         }
+        log.info("upsert处理完成：实际覆盖{}条，实际新增{}条", replaceBatchCount, insertBatchCount);
     }
 
     /**
@@ -221,22 +251,62 @@ public class LhScheduleResultIssueServiceImpl implements ILhScheduleResultIssueS
      * 窗口首日无夜班排产数据，避免将MES已有的夜班数据覆盖为空
      * 中间表MES_LH_SCHEDULE_RESULT建在MES分库，Mapper已通过@DS(DataSource.MES)指定数据源
      * 分批处理避免SQL Server参数上限2100的问题
+     *
+     * 实现方式：delete + insert（而非逐条 update）
+     *   - 先查询已有记录的完整数据（含class1），将class1数据合并到本次下发数据中
+     *   - 然后对已存在的键，先删除所有历史版本，再插入含class1的合并数据
+     *   - 对不存在的键，直接插入（class1为null，因为窗口首日无夜班数据）
      */
     private void upsertDay1LhScheduleResult(List<MesLhScheduleResult> mesList, String dataVersion) {
         if (CollectionUtils.isEmpty(mesList)) {
             return;
         }
+        log.info("Day1 upsert处理开始，总记录数：{}", mesList.size());
+        // 分批查询已有记录（返回完整记录，含class1数据），按排程日期+硫化机台编码+物料编码+工单号匹配（不含版本号）
+        Map<String, MesLhScheduleResult> existingMap = new HashMap<>();
+        for (List<MesLhScheduleResult> batch : partitionList(mesList)) {
+            List<MesLhScheduleResult> existingRecords = lhScheduleResultIssueMapper.selectExistingByScheduleDateAndMachine(batch);
+            for (MesLhScheduleResult existing : existingRecords) {
+                String key = existing.getScheduleDate() + "|" + existing.getLhMachineCode() + "|" + existing.getMaterialCode() + "|" + existing.getOrderNo();
+                // 保留最后一个版本的数据（按查询顺序，实际上同一键可能有多版本残留，取最后一个即可）
+                existingMap.put(key, existing);
+            }
+        }
+        // 根据查询结果分组：已有记录需合并class1后走"删除+插入"覆盖，不存在记录走新增
+        List<MesLhScheduleResult> replaceList = new ArrayList<>();
         List<MesLhScheduleResult> insertList = new ArrayList<>();
         for (MesLhScheduleResult mesItem : mesList) {
-            int updateCount = lhScheduleResultIssueMapper.updateDay1ByScheduleDateAndMachine(mesItem);
-            if (updateCount == 0) {
+            String key = mesItem.getScheduleDate() + "|" + mesItem.getLhMachineCode() + "|" + mesItem.getMaterialCode() + "|" + mesItem.getOrderNo();
+            if (existingMap.containsKey(key)) {
+                // 合并class1数据：从已有记录中保留class1（夜班）数据，本次下发只更新class2/class3
+                MesLhScheduleResult existing = existingMap.get(key);
+                mesItem.setClass1PlanQty(existing.getClass1PlanQty());
+                mesItem.setClass1PlanQtySeq(existing.getClass1PlanQtySeq());
+                mesItem.setClass1AnalysisInput(existing.getClass1AnalysisInput());
+                mesItem.setClass1Analysis(existing.getClass1Analysis());
+                mesItem.setClass1ExampleType(existing.getClass1ExampleType());
+                mesItem.setClass1ExampleNo(existing.getClass1ExampleNo());
+                mesItem.setClass1PlanType(existing.getClass1PlanType());
+                replaceList.add(mesItem);
+            } else {
                 insertList.add(mesItem);
             }
         }
-        // 分批插入不存在的记录
+        log.info("Day1 upsert分组结果：需覆盖{}条，需新增{}条", replaceList.size(), insertList.size());
+        // 覆盖处理：先批量删除该键的所有历史版本记录，再批量插入含class1合并数据的新版本记录
+        int replaceBatchCount = 0;
+        for (List<MesLhScheduleResult> batch : partitionList(replaceList)) {
+            lhScheduleResultIssueMapper.batchDeleteByScheduleDateAndMachine(batch);
+            lhScheduleResultIssueMapper.batchInsertLhScheduleResult(batch);
+            replaceBatchCount += batch.size();
+        }
+        // 新增处理
+        int insertBatchCount = 0;
         for (List<MesLhScheduleResult> batch : partitionList(insertList)) {
             lhScheduleResultIssueMapper.batchInsertLhScheduleResult(batch);
+            insertBatchCount += batch.size();
         }
+        log.info("Day1 upsert处理完成：实际覆盖{}条，实际新增{}条", replaceBatchCount, insertBatchCount);
     }
 
     /**

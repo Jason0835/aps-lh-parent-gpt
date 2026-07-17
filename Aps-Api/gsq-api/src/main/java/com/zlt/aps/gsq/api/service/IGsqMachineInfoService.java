@@ -92,11 +92,13 @@ public interface IGsqMachineInfoService {
 
     /**
      * 获取所有启用的钢丝圈机台信息（status=0），供下拉框数据源使用
+     * 返回AjaxResult，因为Gateway会将响应包装为统一响应体对象，
+     * 若声明为List会导致Feign反序列化时MismatchedInputException
      *
-     * @return 启用状态的机台列表
+     * @return 启用状态的机台列表（包装在AjaxResult中）
      */
     @GetMapping("/gsq/machine/listEnabledMachines")
-    List<GsqMachineInfo> listEnabledMachines();
+    AjaxResult listEnabledMachines();
 
     /**
      * 导入钢丝圈机台信息（基于ImportContext的标准导入接口，供UIController调用）

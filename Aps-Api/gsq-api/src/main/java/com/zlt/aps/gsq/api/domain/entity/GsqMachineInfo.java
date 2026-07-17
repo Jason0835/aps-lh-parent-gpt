@@ -1,11 +1,10 @@
 package com.zlt.aps.gsq.api.domain.entity;
 
 import com.baomidou.mybatisplus.annotation.TableField;
-import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.ruoyi.common.core.annotation.Excel;
+import com.ruoyi.common.core.web.domain.BaseEntity;
 import com.zlt.aps.common.core.annotation.ImportValidated;
-import com.zlt.aps.common.core.domain.ApsBaseEntity;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
@@ -23,15 +22,8 @@ import java.math.BigDecimal;
 @EqualsAndHashCode(callSuper = false)
 @TableName("t_gsq_machine_info")
 @ApiModel(value = "钢丝圈机台信息对象", description = "钢丝圈机台信息对象 ")
-public class GsqMachineInfo extends ApsBaseEntity {
+public class GsqMachineInfo extends BaseEntity {
     private static final long serialVersionUID = 1L;
-
-    /**
-     * 主键ID，对应自增序列为：SEQ_PUBLIC
-     */
-    @ApiModelProperty(value = "主键ID", position = 10)
-    @TableId("ID")
-    private Long id;
 
     /**
      * 机台编号
@@ -96,16 +88,19 @@ public class GsqMachineInfo extends ApsBaseEntity {
     @ImportValidated(maxLength = 2, required = true)
     private String status;
 
+    /**
+     * 备注
+     */
     @Excel(name = "ui.common.column.remark")
     @TableField("REMARK")
     @ImportValidated(maxLength = 300)
     private String remark;
 
     /**
-     * 删除标识：0--正常，1-删除.对应数据字典DEL_FLAG
+     * 排序字段（非数据库字段，用于自定义排序）
      */
-    @TableField("DEL_FLAG")
-    private String delFlag;
+    @TableField(exist = false)
+    private String orderStr;
 
     @Override
     public String getRemark() {
@@ -115,93 +110,5 @@ public class GsqMachineInfo extends ApsBaseEntity {
     @Override
     public void setRemark(String remark) {
         this.remark = remark;
-    }
-
-    public void setId(Long id) {
-        this.id = id;
-    }
-
-    public Long getId() {
-        return id;
-    }
-
-    public void setMachineCode(String machineCode) {
-        this.machineCode = machineCode;
-    }
-
-    public String getMachineCode() {
-        return machineCode;
-    }
-
-    public void setMachineName(String machineName) {
-        this.machineName = machineName;
-    }
-
-    public String getMachineName() {
-        return machineName;
-    }
-
-    public String getToolingInfo() {
-        return toolingInfo;
-    }
-
-    public void setToolingInfo(String toolingInfo) {
-        this.toolingInfo = toolingInfo;
-    }
-
-    public void setQuata(BigDecimal quata) {
-        this.quata = quata;
-    }
-
-    public BigDecimal getQuata() {
-        return quata;
-    }
-
-    public String getClassShift() {
-        return classShift;
-    }
-
-    public void setClassShift(String classShift) {
-        this.classShift = classShift;
-    }
-
-    public void setOpenMachineClass(String openMachineClass) {
-        this.openMachineClass = openMachineClass;
-    }
-
-    public String getOpenMachineClass() {
-        return openMachineClass;
-    }
-
-    public void setStatus(String status) {
-        this.status = status;
-    }
-
-    public String getStatus() {
-        return status;
-    }
-
-    public void setDelFlag(String delFlag) {
-        this.delFlag = delFlag;
-    }
-
-    public String getDelFlag() {
-        return delFlag;
-    }
-
-    @Override
-    public String toString() {
-        return "GsqMachineInfo{" +
-                "id=" + id +
-                ", machineCode='" + machineCode + '\'' +
-                ", machineName='" + machineName + '\'' +
-                ", toolingInfo='" + toolingInfo + '\'' +
-                ", quata=" + quata +
-                ", classShift='" + classShift + '\'' +
-                ", openMachineClass='" + openMachineClass + '\'' +
-                ", status='" + status + '\'' +
-                ", remark='" + remark + '\'' +
-                ", delFlag='" + delFlag + '\'' +
-                '}';
     }
 }

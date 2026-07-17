@@ -178,6 +178,18 @@ public interface IMesItfService {
     public AjaxResult syncLhMachineOnlineInfo(@RequestBody LhMachineOnlineInfo lhMachineOnlineInfo);
 
     /**
+     * 按指定版本号同步硫化在机数据（临时任务）
+     * 与原syncLhMachineOnlineInfo的区别：不限日期，按指定版本号查询MES中间表所有日期数据
+     * 同步逻辑与硫化排程完成量回报按版本号同步一致：按onlineDate分组后逐组调用逻辑删除+插入
+     *
+     * @param dataVersion 指定版本号
+     * @return 结果
+     */
+    @ApiOperation("按指定版本号同步硫化在机数据（临时任务）")
+    @PostMapping("/mesItf/syncLhMachineOnlineInfoByVersion")
+    public AjaxResult syncLhMachineOnlineInfoByVersion(@RequestParam("dataVersion") String dataVersion);
+
+    /**
      * 同步设备保养计划
      * @param syncDataLogs 参数
      * @return 结果

@@ -50,6 +50,26 @@ public interface LhScheduleResultIssueMapper {
      * @param dataVersion 版本号
      * @return 影响行数
      */
-    int deleteByScheduleDate(@Param("scheduleDate") String scheduleDate, 
+    int deleteByScheduleDate(@Param("scheduleDate") String scheduleDate,
                              @Param("dataVersion") String dataVersion);
+
+    /**
+     * 批量查询中间表中已存在的记录（按排程日期+硫化机台编码+物料编码+工单号匹配，不含版本号）
+     * 返回完整记录（含各班次数据），供Day1场景合并class1数据使用
+     * 说明：匹配键不含版本号，目的是让同一天的重新发布能覆盖旧版本数据，避免中间表多版本残留。
+     *
+     * @param list 数据列表
+     * @return 已存在的记录列表
+     */
+    List<MesLhScheduleResult> selectExistingByScheduleDateAndMachine(@Param("list") List<MesLhScheduleResult> list);
+
+    /**
+     * 批量删除中间表中已存在的记录（按排程日期+硫化机台编码+物料编码+工单号匹配，会删除该键的所有版本数据）
+     * 说明：用于重新发布场景，先删除该键的所有历史版本数据，再插入本次发布的新版本数据，
+     *      彻底避免多版本残留造成的同版本同日期同机台重复记录。
+     *
+     * @param list 数据列表
+     * @return 影响行数
+     */
+    int batchDeleteByScheduleDateAndMachine(@Param("list") List<MesLhScheduleResult> list);
 }

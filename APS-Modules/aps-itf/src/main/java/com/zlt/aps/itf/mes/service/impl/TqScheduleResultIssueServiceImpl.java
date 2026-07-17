@@ -111,38 +111,53 @@ public class TqScheduleResultIssueServiceImpl implements ITqScheduleResultIssueS
     /**
      * 批量更新或插入数据（存在则更新，不存在则插入）
      * 分批处理避免SQL Server参数上限2100的问题
+     * 匹配键：排程日期+机台编码+胎圈编码（不含版本号）
+     * 实现方式：delete + insert（而非 update）
+     *   - 历史问题：旧版本使用 UPDATE 时，若 MES 表存在同键的多版本残留数据，
+     *     一条 UPDATE 会命中多条记录，把它们全部改成新版本，造成重复数据。
+     *   - 现在改为：对已存在的键，先批量删除该键的所有历史版本数据，再批量插入本次发布的新版本数据。
+     *   - 这样无论历史有多少版本残留，最终每个键只会保留本次发布的 1 条最新版本记录。
+     *   - MES 侧无回写字段，删除不会丢失业务数据。
      */
     private void upsertTqScheduleResult(List<MesTqScheduleResult> mesList, String dataVersion) {
         if (CollectionUtils.isEmpty(mesList)) {
             return;
         }
-        // 分批查询已有记录，按排程日期+机台编码+胎圈编码+版本号匹配
+        log.info("upsert处理开始，总记录数：{}", mesList.size());
+        // 分批查询已有记录，按排程日期+机台编码+胎圈编码匹配（不含版本号）
         Set<String> existingKeys = new HashSet<>();
         for (List<MesTqScheduleResult> batch : partitionList(mesList)) {
             List<MesTqScheduleResult> existingRecords = tqScheduleResultIssueMapper.selectExistingByScheduleDateAndMachine(batch);
             existingRecords.stream()
-                    .map(r -> r.getScheduleDate() + "|" + r.getMachineCode() + "|" + r.getBeadCode() + "|" + r.getDataVersion())
+                    .map(r -> r.getScheduleDate() + "|" + r.getMachineCode() + "|" + r.getBeadCode())
                     .forEach(existingKeys::add);
         }
-        // 根据查询结果分组：已有记录走批量更新，不存在记录走批量新增
-        List<MesTqScheduleResult> updateList = new ArrayList<>();
+        // 根据查询结果分组：已有记录走"删除+插入"覆盖，不存在记录走新增
+        List<MesTqScheduleResult> replaceList = new ArrayList<>();
         List<MesTqScheduleResult> insertList = new ArrayList<>();
         for (MesTqScheduleResult mesItem : mesList) {
-            String key = mesItem.getScheduleDate() + "|" + mesItem.getMachineCode() + "|" + mesItem.getBeadCode() + "|" + mesItem.getDataVersion();
+            String key = mesItem.getScheduleDate() + "|" + mesItem.getMachineCode() + "|" + mesItem.getBeadCode();
             if (existingKeys.contains(key)) {
-                updateList.add(mesItem);
+                replaceList.add(mesItem);
             } else {
                 insertList.add(mesItem);
             }
         }
-        // 分批更新
-        for (List<MesTqScheduleResult> batch : partitionList(updateList)) {
-            tqScheduleResultIssueMapper.batchUpdateByScheduleDateAndMachine(batch);
+        log.info("upsert分组结果：需覆盖{}条，需新增{}条", replaceList.size(), insertList.size());
+        // 覆盖处理：先批量删除该键的所有历史版本记录，再批量插入本次发布的新版本数据
+        int replaceBatchCount = 0;
+        for (List<MesTqScheduleResult> batch : partitionList(replaceList)) {
+            tqScheduleResultIssueMapper.batchDeleteByScheduleDateAndMachine(batch);
+            tqScheduleResultIssueMapper.batchInsertTqScheduleResult(batch);
+            replaceBatchCount += batch.size();
         }
-        // 分批插入
+        // 新增处理
+        int insertBatchCount = 0;
         for (List<MesTqScheduleResult> batch : partitionList(insertList)) {
             tqScheduleResultIssueMapper.batchInsertTqScheduleResult(batch);
+            insertBatchCount += batch.size();
         }
+        log.info("upsert处理完成：实际覆盖{}条，实际新增{}条", replaceBatchCount, insertBatchCount);
     }
 
     /**
