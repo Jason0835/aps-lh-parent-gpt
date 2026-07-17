@@ -235,4 +235,14 @@
         </foreach>
     </select>
 
+    <delete id="batchDeleteByScheduleDateAndMachine">
+        DELETE FROM MES_CX_SCHEDULE_RESULT WHERE
+        <foreach collection="list" item="item" separator=" OR ">
+            (SCHEDULE_DATE = #{item.scheduleDate}
+             AND MACHINE_CODE = #{item.machineCode}
+             AND EMBRYO_CODE = #{item.embryoCode}
+             AND ORDER_NO = #{item.orderNo})
+        </foreach>
+    </delete>
+
 </mapper>
