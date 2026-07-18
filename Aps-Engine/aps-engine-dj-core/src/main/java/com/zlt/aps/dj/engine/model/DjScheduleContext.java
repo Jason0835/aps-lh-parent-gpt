@@ -10,6 +10,7 @@ import lombok.Data;
 
 import java.math.BigDecimal;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -98,6 +99,16 @@ public class DjScheduleContext {
 
     /** 垫胶编码→物料名映射 Map<paddingCode, paddingName> */
     private Map<String, String> paddingCodeToNameMap;
+
+    /** 施工信息缓存 Map<embryoCode, Map<shiftIndex, MdmConstructionInfo>>，避免重复解析施工版本 */
+    private Map<String, Map<Integer, MdmConstructionInfo>> constructionCache = new HashMap<>();
+
+    /** 各班各规格垫胶消耗量缓存 Map<paddingCode, Map<formingClassIndex, consumeQty>> */
+    private Map<String, Map<Integer, BigDecimal>> shiftConsumeCache = new HashMap<>();
+
+    /** 各班次索引对应的排产日数组（长度6），根据 DjShiftConfig 班次顺序动态构建
+     *  scheduleDay 从1开始，当班次从last shift绕回first shift时递增 */
+    private int[] scheduleDays;
 
     /** 排程过程日志收集器 */
     private StringBuilder processLog;
