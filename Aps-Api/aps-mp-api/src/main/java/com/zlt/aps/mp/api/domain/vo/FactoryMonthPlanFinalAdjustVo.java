@@ -222,6 +222,13 @@ public class FactoryMonthPlanFinalAdjustVo extends FactoryMonthPlanProductionFin
     private Integer sumTotalQty;
 
     /**
+     * 当前调整版本,
+     */
+    @ApiModelProperty(value = "当前调整版本", name = "currentAdjustVersion")
+    @TableField(exist = false)
+    private String currentAdjustVersion;
+
+    /**
      * 获取待调整量的key
      *
      * @return

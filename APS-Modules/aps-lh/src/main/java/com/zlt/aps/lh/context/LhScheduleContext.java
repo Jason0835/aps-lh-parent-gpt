@@ -189,6 +189,14 @@ public class LhScheduleContext {
      */
     private List<MdmDevicePlanShut> loadedCleaningPlanShutList = new ArrayList<>();
     /**
+     * 清洗计划排程日期回填项列表。
+     * <p>清洗实际安排成功时记录实际清洗开始时间；因 SKU 3 天内收尾跳过清洗时记录收尾日期。
+     * 该列表在排程结果落库事务（{@code replaceScheduleAtomically}）内统一回填到
+     * {@code T_MDM_DEVICE_PLAN_SHUT.SCHEDULE_DATE}，按设备停机计划主键 id 去重更新。
+     * 配对侧派生窗口、超窗口上限、配置非法、最晚日期超限等未安排场景不收集回填项。</p>
+     */
+    private List<CleaningScheduleDateFillItem> cleaningScheduleDateFillList = new ArrayList<>();
+    /**
      * SKU与模具关系Map, key=materialCode
      */
     private Map<String, List<MdmSkuMouldRel>> skuMouldRelMap = new HashMap<>();
@@ -266,6 +274,30 @@ public class LhScheduleContext {
      * 硫化机胶囊已使用次数Map, key=machineCode
      */
     private Map<String, LhRepairCapsule> capsuleUsageMap = new HashMap<>();
+    /**
+     * 本批排程胶囊运行态使用次数，key=物理机台编码 + 胶囊位置（1/2）。
+     * <p>初值来自 {@link #capsuleUsageMap}，后续只按当前排程结果的实际班次计划量重建，
+     * 不回写胶囊维修表，避免候选预演或结果回滚污染基础数据。</p>
+     */
+    private Map<String, Integer> capsuleRuntimeUsageMap = new LinkedHashMap<String, Integer>();
+    /**
+     * 已执行换胶囊的物理机台班次键集合，key=物理机台编码 + 工作日期 + 班次索引。
+     * <p>同一物理机台同一班次只允许扣减一次，即使该班存在多个结果行或L/R两侧结果。</p>
+     */
+    private Set<String> capsuleReplacementShiftKeySet = new LinkedHashSet<String>();
+    /**
+     * 已在指定班次完成更换的胶囊位置集合，key=物理机台班次键 + 胶囊位置。
+     * <p>该集合用于区分双模机台本次究竟更换了左侧、右侧还是两侧胶囊，重建运行态时
+     * 仍能按实际产量正确计算新胶囊次数。</p>
+     */
+    private Set<String> capsuleReplacementPositionShiftKeySet = new LinkedHashSet<String>();
+    /**
+     * 已换胶囊结果班次允许写入的最大计划量，key=物理机台班次键 + 结果业务键。
+     * <p>首次换胶囊时记录扣减后的精确上限，供日标准收敛、班次重分配和补量复用，
+     * 防止后置逻辑按理论班产重新补回固定损失，也避免重复查询时再次扣减。</p>
+     */
+    private Map<String, Integer> capsuleReplacementShiftCapacityLimitMap =
+            new LinkedHashMap<String, Integer>();
     /**
      * 硫化精度保养计划Map, key=machineCode
      */

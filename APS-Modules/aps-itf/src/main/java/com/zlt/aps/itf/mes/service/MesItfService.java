@@ -159,6 +159,16 @@ public interface MesItfService {
     AjaxResult syncLhMachineOnlineInfo(LhMachineOnlineInfo lhMachineOnlineInfo);
 
     /**
+     * 按指定版本号同步硫化在机数据（临时任务）
+     * 与原syncLhMachineOnlineInfo的区别：不限日期，按指定版本号查询MES中间表所有日期数据
+     * 同步后按onlineDate分组逐组调用逻辑删除+插入，无需回填排程结果
+     *
+     * @param dataVersion 指定版本号
+     * @return 结果
+     */
+    AjaxResult syncLhMachineOnlineInfoByVersion(String dataVersion);
+
+    /**
      * 同步设备保养计划
      *
      * @param syncDataLogs 同步参数

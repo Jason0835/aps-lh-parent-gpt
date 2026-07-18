@@ -1002,6 +1002,74 @@ public class MesItfServiceImpl implements MesItfService {
     }
 
     /**
+     * 按指定版本号同步硫化在机数据（临时任务）
+     * 与原syncLhMachineOnlineInfo的区别：不限日期，按指定版本号查询MES中间表所有日期数据
+     * 同步逻辑参考硫化排程完成量回报按版本号同步（syncLhClassShiftFinishQtyByVersion）：
+     * 由于指定版本可能包含多个onlineDate的数据，按onlineDate分组后逐组调用逻辑删除+插入
+     * 硫化在机数据不涉及排程结果回填，无需调用回填接口
+     *
+     * @param dataVersion 指定版本号
+     * @return 结果
+     */
+    @Override
+    public AjaxResult syncLhMachineOnlineInfoByVersion(String dataVersion) {
+        LhMachineOnlineInfo queryParam = new LhMachineOnlineInfo();
+        queryParam.setDataVersion(dataVersion);
+
+        DynamicDataSourceContextHolder.push(DataSource.MES);
+        List<LhMachineOnlineInfo> syncList = mesItfMapper.selectLhMachineOnlineSyncListByVersion(queryParam);
+        DynamicDataSourceContextHolder.poll();
+
+        if (CollectionUtils.isEmpty(syncList)) {
+            log.warn("硫化在机按版本号同步：MES中间表查询结果为空，dataVersion={}", dataVersion);
+            return AjaxResult.success("MES中间表无数据可同步");
+        }
+
+        List<LhMachineOnlineInfo> insertList = new ArrayList<>();
+        for (LhMachineOnlineInfo item : syncList) {
+            LhMachineOnlineInfo entity = new LhMachineOnlineInfo();
+            BeanUtils.copyProperties(item, entity);
+            entity.setCreateBy("MES");
+            entity.setUpdateBy("MES");
+            entity.setCreateTime(DateUtils.getNowDate());
+            entity.setUpdateTime(DateUtils.getNowDate());
+            entity.setIsDelete(0);
+            insertList.add(entity);
+        }
+
+        // 按onlineDate分组，逐组同步（原逻辑按单个onlineDate做逻辑删除+插入，跨日期需分组避免误删）
+        Map<String, List<LhMachineOnlineInfo>> groupByOnlineDate = insertList.stream()
+                .collect(Collectors.groupingBy(item -> {
+                    Date onlineDate = item.getOnlineDate();
+                    return onlineDate != null ? DateUtil.formatDate(onlineDate) : "unknown";
+                }));
+
+        for (Map.Entry<String, List<LhMachineOnlineInfo>> entry : groupByOnlineDate.entrySet()) {
+            String onlineDateStr = entry.getKey();
+            List<LhMachineOnlineInfo> groupList = entry.getValue();
+            String factoryCode = groupList.get(0).getFactoryCode();
+
+            try {
+                log.info("硫化在机按版本号同步：开始同步，dataVersion={}, factoryCode={}, onlineDate={}, 待插入数量={}",
+                        dataVersion, factoryCode, onlineDateStr, groupList.size());
+
+                String finalFactoryCode = factoryCode;
+                FeignTokenHelper.runWithToken(() -> {
+                    lhMesSyncRemoteService.logicDeleteAndSaveMachineOnlineInfo(finalFactoryCode, onlineDateStr, "MES", groupList);
+                });
+
+                log.info("硫化在机按版本号同步：同步完成，dataVersion={}, factoryCode={}, onlineDate={}, 插入数量={}",
+                        dataVersion, factoryCode, onlineDateStr, groupList.size());
+            } catch (Exception e) {
+                log.error("硫化在机按版本号同步：Feign调用异常，dataVersion={}, factoryCode={}, onlineDate={}",
+                        dataVersion, factoryCode, onlineDateStr, e);
+                return AjaxResult.error("硫化在机按版本号同步失败：" + e.getMessage());
+            }
+        }
+        return AjaxResult.success();
+    }
+
+    /**
      * 同步设备保养计划
      * 采用更新删除标识模式，而不是先删后插
      * @param syncDataLogs 同步参数

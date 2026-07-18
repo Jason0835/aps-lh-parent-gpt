@@ -86,6 +86,10 @@ public class DjScheduleContext {
     /** 成型班次偏移量 = Integer.parseInt(shiftClassMap[0]) - 1，用于将垫胶班次索引映射到成型班次索引 */
     private Integer formingShiftOffset;
 
+    /** 成型班次配置映射：(scheduleDay, shiftName) → classField序号（CLASS1→1, CLASS8→8）
+     * 例如：(1, "03") → 3 表示 t-1日中班对应CLASS3 */
+    private Map<String, Integer> cxShiftClassMap;
+
     /** 成型计划列表 */
     private List<CxScheduleResult> cxScheduleList;
 

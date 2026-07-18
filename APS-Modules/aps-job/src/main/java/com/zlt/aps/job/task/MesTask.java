@@ -86,6 +86,28 @@ public class MesTask {
     }
 
     /**
+     * 临时任务：按指定版本号APS_MES_AH01_20260717060600011抓取硫化在机数据
+     * 逻辑参考硫化排程完成量回报按版本号同步（syncLhClassShiftFinishQtyByVersion），调同步硫化在机接口
+     * 执行步骤：
+     * 1. 从MES中间表按指定版本号查询硫化在机数据（不限日期）
+     * 2. 按onlineDate分组，逐组逻辑删除APS旧数据并插入新数据
+     */
+    @ApiOperation("临时任务-按版本号APS_MES_AH01_20260717060600011抓取硫化在机数据")
+    public void syncLhMachineOnlineInfoByVersion() {
+        String dataVersion = "APS_MES_AH01_20260717060600011";
+        log.info("临时任务-开始按版本号{}抓取硫化在机数据", dataVersion);
+        try {
+            FeignTokenHelper.runWithToken(() -> {
+                AjaxResult result = iMesItfService.syncLhMachineOnlineInfoByVersion(dataVersion);
+                log.info("临时任务-按版本号{}抓取硫化在机数据结果：{}", dataVersion, result);
+            });
+        } catch (Exception e) {
+            log.error("临时任务-按版本号{}抓取硫化在机数据异常", dataVersion, e);
+        }
+        log.info("临时任务-按版本号{}抓取硫化在机数据完成", dataVersion);
+    }
+
+    /**
      * 同步设备保养计划
      */
     @ApiOperation("同步设备保养计划")

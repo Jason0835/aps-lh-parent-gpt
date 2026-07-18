@@ -73,7 +73,6 @@
             WHERE SCHEDULE_DATE = t.SCHEDULE_DATE
             AND MACHINE_CODE = t.MACHINE_CODE
             AND BEAD_CODE = t.BEAD_CODE
-            AND DATA_VERSION = t.DATA_VERSION
         )
     </insert>
 
@@ -84,7 +83,7 @@
         AND DATA_VERSION = #{dataVersion}
     </delete>
 
-    <!-- 批量根据排程日期+机台+胎圈编码更新数据 -->
+    <!-- 批量根据排程日期+机台+胎圈编码更新数据（WHERE不含版本号，SET更新版本号） -->
     <update id="batchUpdateByScheduleDateAndMachine">
         <foreach collection="list" item="item" separator=";">
             UPDATE MES_TQ_SCHEDULE_RESULT SET
@@ -122,6 +121,7 @@
                 CX_CLASS6_PLAN = #{item.cxClass6Plan},
                 CX_CLASS7_PLAN = #{item.cxClass7Plan},
                 CX_CLASS8_PLAN = #{item.cxClass8Plan},
+                DATA_VERSION = #{item.dataVersion},
                 MARK_CLOSE_OUT_TIP = #{item.markCloseOutTip},
                 PRODUCTION_STATUS = #{item.productionStatus},
                 REMARK = #{item.remark},
@@ -130,21 +130,29 @@
             WHERE SCHEDULE_DATE = #{item.scheduleDate}
             AND MACHINE_CODE = #{item.machineCode}
             AND BEAD_CODE = #{item.beadCode}
-            AND DATA_VERSION = #{item.dataVersion}
         </foreach>
     </update>
 
-    <!-- 批量查询中间表中已存在的记录（按排程日期+机台编码+胎圈编码+版本号匹配） -->
+    <!-- 批量查询中间表中已存在的记录（按排程日期+机台编码+胎圈编码匹配，不含版本号） -->
     <select id="selectExistingByScheduleDateAndMachine" resultType="com.zlt.aps.itf.vo.MesTqScheduleResult">
-        SELECT SCHEDULE_DATE, MACHINE_CODE, BEAD_CODE, DATA_VERSION
+        SELECT SCHEDULE_DATE, MACHINE_CODE, BEAD_CODE
         FROM MES_TQ_SCHEDULE_RESULT
         WHERE
         <foreach collection="list" item="item" separator=" OR ">
             (SCHEDULE_DATE = #{item.scheduleDate}
              AND MACHINE_CODE = #{item.machineCode}
-             AND BEAD_CODE = #{item.beadCode}
-             AND DATA_VERSION = #{item.dataVersion})
+             AND BEAD_CODE = #{item.beadCode})
         </foreach>
     </select>
+
+    <!-- 批量删除中间表中已存在的记录（按排程日期+机台编码+胎圈编码匹配，删除该键的所有版本） -->
+    <delete id="batchDeleteByScheduleDateAndMachine">
+        DELETE FROM MES_TQ_SCHEDULE_RESULT WHERE
+        <foreach collection="list" item="item" separator=" OR ">
+            (SCHEDULE_DATE = #{item.scheduleDate}
+             AND MACHINE_CODE = #{item.machineCode}
+             AND BEAD_CODE = #{item.beadCode})
+        </foreach>
+    </delete>
 
 </mapper>

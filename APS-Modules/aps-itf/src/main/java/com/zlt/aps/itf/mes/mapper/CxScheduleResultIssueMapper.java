@@ -73,7 +73,7 @@ public interface CxScheduleResultIssueMapper {
     int updateByScheduleDateAndMachine(@Param("item") MesCxScheduleResult mesCxScheduleResult);
 
     /**
-     * 批量根据排程日期和机台编码更新数据
+     * 批量根据排程日期和机台编码更新数据（匹配键不含版本号，更新时把新版本号写入 DATA_VERSION 字段）
      *
      * @param list 数据列表
      * @return 影响行数
@@ -81,10 +81,21 @@ public interface CxScheduleResultIssueMapper {
     int batchUpdateByScheduleDateAndMachine(@Param("list") List<MesCxScheduleResult> list);
 
     /**
-     * 批量查询中间表中已存在的记录（按排程日期+机台编码+版本号匹配）
+     * 批量查询中间表中已存在的记录（按排程日期+机台编码+胎胚编码+工单号匹配，不含版本号）
+     * 说明：匹配键不含版本号，目的是让同一天的重新发布能覆盖旧版本数据，避免中间表多版本残留。
      *
      * @param list 数据列表
-     * @return 已存在的记录列表（仅包含SCHEDULE_DATE, MACHINE_CODE, DATA_VERSION）
+     * @return 已存在的记录列表（仅包含SCHEDULE_DATE, MACHINE_CODE, EMBRYO_CODE, ORDER_NO）
      */
     List<MesCxScheduleResult> selectExistingByScheduleDateAndMachine(@Param("list") List<MesCxScheduleResult> list);
+
+    /**
+     * 批量删除中间表中已存在的记录（按排程日期+机台编码+胎胚编码+工单号匹配，会删除该键的所有版本数据）
+     * 说明：用于重新发布场景，先删除该 4 字段的所有历史版本数据，再插入本次发布的新版本数据，
+     *      彻底避免多版本残留造成的同版本同日期同机台重复记录。
+     *
+     * @param list 数据列表
+     * @return 影响行数
+     */
+    int batchDeleteByScheduleDateAndMachine(@Param("list") List<MesCxScheduleResult> list);
 }

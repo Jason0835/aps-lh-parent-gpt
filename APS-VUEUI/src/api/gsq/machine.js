@@ -20,7 +20,7 @@ export function listMachine(query) {
 export function listEnabledMachines() {
   return request({
     url: '/gsq/machine/listEnabledMachines',
-    method: 'post'
+    method: 'get'
   })
 }
 
