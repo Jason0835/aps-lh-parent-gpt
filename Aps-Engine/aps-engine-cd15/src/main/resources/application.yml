@@ -22,14 +22,6 @@ spring:
     password: aps_mq
     host: 192.168.2.93
     port: 5672
-
-# 日志配置
-logging:
-  level:
-    com.ruoyi: debug
-    org.springframework: warn
-    com.zlt: debug
-
 #引用包时，要加入的配置参数，否则找不到mapper
 mybatis:
   # 配置mapper的扫描，找到所有的mapper.xml映射文件

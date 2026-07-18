@@ -17,7 +17,7 @@ import com.zlt.aps.cd15.engine.domain.Cd15ScheduleTask;
 import com.zlt.aps.cd15.engine.model.Cd15BatchDataCheckResult;
 import com.zlt.aps.cd15.engine.model.Cd15ShiftDescriptor;
 import com.zlt.aps.cd15.engine.service.Cd15AutoScheduleBatchDataValidator;
-import com.zlt.aps.cd15.engine.service.Cd15AutoScheduleInputVersionService;
+
 import com.zlt.aps.cd15.engine.service.Cd15ScheduleTaskService;
 import com.zlt.aps.cd15.mapper.Cd15ScheduleResultMapper;
 import com.zlt.aps.cd15.model.Cd15ScheduleOverwriteDecision;
@@ -72,8 +72,6 @@ public class Cd15ScheduleResultServiceImpl extends AbstractDocService<Cd15Schedu
     @Resource
     private Cd15AutoScheduleBatchDataValidator batchDataValidator;
 
-    @Resource
-    private Cd15AutoScheduleInputVersionService inputVersionService;
 
     @Resource
     private Cd15ScheduleOverwriteValidator overwriteValidator;
@@ -132,12 +130,12 @@ public class Cd15ScheduleResultServiceImpl extends AbstractDocService<Cd15Schedu
         if (activeTask != null) {
             return AjaxResult.success("当前日期已有斜裁排程任务正在执行", this.toTaskData(activeTask));
         }
-        String inputVersion = inputVersionService.fingerprint(scheduleResult.getFactoryCode(), localScheduleDate);
         String snapshot = "factoryCode=" + scheduleResult.getFactoryCode()
                 + ",scheduleDate=" + scheduleResult.getScheduleDate()
                 + ",forceRegenerate=" + Boolean.TRUE.equals(scheduleResult.getForceRegenerate());
-        Cd15ScheduleTask task = taskService.createPending(scheduleResult.getFactoryCode(), scheduleResult.getScheduleDate(),
-                Cd15ScheduleTaskType.AUTO_SCHEDULE, "MANUAL", snapshot, inputVersion, null);
+        Cd15ScheduleTask task = taskService.createPending(
+                scheduleResult.getFactoryCode(), scheduleResult.getScheduleDate(),
+                Cd15ScheduleTaskType.AUTO_SCHEDULE, "MANUAL", snapshot, null);
         autoScheduleAsyncExecutor.execute(task.getTaskId(), task.getFactoryCode(), task.getScheduleDate());
         return AjaxResult.success(I18nUtil.getMessage("ui.message.operation.success"), this.toTaskData(task));
     }
@@ -174,7 +172,7 @@ public class Cd15ScheduleResultServiceImpl extends AbstractDocService<Cd15Schedu
                     Map<String, Object> item = new LinkedHashMap<>();
                     item.put("classField", shift.getClassField());
                     item.put("shiftCode", shift.getShiftCode());
-                    item.put("shiftName", shift.getShiftName());
+                    item.put("shiftName", shift.getShiftDisplayName());
                     item.put("shiftDate", shift.getScheduleDate().format(DateTimeFormatter.ISO_LOCAL_DATE));
                     item.put("startTime", shift.getStartTime().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
                     item.put("endTime", shift.getEndTime().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
@@ -344,7 +342,7 @@ public class Cd15ScheduleResultServiceImpl extends AbstractDocService<Cd15Schedu
 
     @Override
     public AjaxResult getTimedRollingTask(String taskId) {
-        return this.taskView(taskId, Cd15ScheduleTaskType.TIMED_ROLLING);
+        return this.taskView(taskId, Cd15ScheduleTaskType.ROLLING_SCHEDULE);
     }
 
     @Override
@@ -412,16 +410,6 @@ public class Cd15ScheduleResultServiceImpl extends AbstractDocService<Cd15Schedu
         data.put("warnings", this.toErrorList(batchCheck.getWarnings()));
         return AjaxResult.success(batchCheck.getPrimaryMessage(), data);
     }
-    private AjaxResult createTask(String factoryCode, Date scheduleDate, String taskType, String requestSnapshot) {
-        return this.createTask(factoryCode, scheduleDate, taskType, requestSnapshot, null);
-    }
-
-    private AjaxResult createTask(String factoryCode, Date scheduleDate, String taskType,
-                                  String requestSnapshot, String inputVersion) {
-        Cd15ScheduleTask task = taskService.createPending(factoryCode, scheduleDate, taskType,
-                "MANUAL", requestSnapshot, inputVersion, null);
-        return AjaxResult.success(I18nUtil.getMessage("ui.message.operation.success"), this.toTaskData(task));
-    }
 
     private AjaxResult taskView(String taskId, String expectedTaskType) {
         if (this.isBlank(taskId)) {
@@ -461,13 +449,13 @@ public class Cd15ScheduleResultServiceImpl extends AbstractDocService<Cd15Schedu
         data.put("currentStage", task.getCurrentStage());
         data.put("currentStageName", task.getCurrentStageName());
         data.put("batchNo", task.getBatchNo());
-        data.put("inputVersion", task.getInputVersion());
+
         data.put("errorMessage", task.getErrorMessage());
         data.put("engineImplemented", Cd15ScheduleTaskType.AUTO_SCHEDULE.equals(task.getTaskType())
                 || Cd15ScheduleTaskType.INSERT_ORDER.equals(task.getTaskType())
                 || Cd15ScheduleTaskType.TRANSFER_MACHINE.equals(task.getTaskType())
                 || Cd15ScheduleTaskType.CHANGE_QTY.equals(task.getTaskType())
-                || Cd15ScheduleTaskType.TIMED_ROLLING.equals(task.getTaskType()));
+                || Cd15ScheduleTaskType.ROLLING_SCHEDULE.equals(task.getTaskType()));
         return data;
     }
 

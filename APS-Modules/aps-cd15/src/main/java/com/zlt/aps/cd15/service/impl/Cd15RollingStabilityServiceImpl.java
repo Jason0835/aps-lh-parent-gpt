@@ -17,7 +17,7 @@ import java.time.Instant;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 
-/** 使用Redis保存CD15定时滚动输入版本首次观察时间。 */
+/** 使用Redis保存跨节点输入版本首次观察时间。 */
 @Service
 @RequiredArgsConstructor
 public class Cd15RollingStabilityServiceImpl implements Cd15RollingStabilityService {
@@ -27,6 +27,7 @@ public class Cd15RollingStabilityServiceImpl implements Cd15RollingStabilityServ
     private final RedissonClient redissonClient;
     private final ObjectMapper objectMapper;
 
+    /** 在短锁内读取或更新观察状态，防止多个Job节点互相覆盖。 */
     @Override
     public boolean observe(String stateKey, String inputVersion, Instant observedAt,
                            int stableMinutes) {
@@ -40,11 +41,13 @@ public class Cd15RollingStabilityServiceImpl implements Cd15RollingStabilityServ
             RBucket<String> bucket = redissonClient.getBucket(bucketKey);
             VersionState current = this.read(bucket.get());
             if (current == null || !Objects.equals(inputVersion, current.getInputVersion())) {
-                this.write(bucket, new VersionState(inputVersion, observedAt.toString()), stableMinutes);
+                this.write(bucket, new VersionState(inputVersion, observedAt.toString()),
+                        stableMinutes);
                 return stableMinutes <= 0;
             }
             Instant firstSeenTime = Instant.parse(current.getFirstSeenTime());
-            return Duration.between(firstSeenTime, observedAt).toMinutes() >= Math.max(0, stableMinutes);
+            return Duration.between(firstSeenTime, observedAt).toMinutes()
+                    >= Math.max(0, stableMinutes);
         } finally {
             if (lock.isHeldByCurrentThread()) {
                 lock.unlock();
@@ -52,6 +55,7 @@ public class Cd15RollingStabilityServiceImpl implements Cd15RollingStabilityServ
         }
     }
 
+    /** 反序列化Redis状态，空值或旧格式按首次观察处理。 */
     private VersionState read(String value) {
         if (value == null || value.trim().isEmpty()) {
             return null;
@@ -63,12 +67,13 @@ public class Cd15RollingStabilityServiceImpl implements Cd15RollingStabilityServ
         }
     }
 
+    /** 写入版本和首次观察时间，并确保状态覆盖完整滚动窗口。 */
     private void write(RBucket<String> bucket, VersionState state, int stableMinutes) {
         try {
             int ttlMinutes = Math.max(MIN_TTL_MINUTES, stableMinutes + 120);
             bucket.set(objectMapper.writeValueAsString(state), ttlMinutes, TimeUnit.MINUTES);
         } catch (JsonProcessingException exception) {
-            throw new IllegalStateException("CD15滚动输入稳定状态序列化失败", exception);
+            throw new IllegalStateException("滚动输入稳定状态序列化失败", exception);
         }
     }
 

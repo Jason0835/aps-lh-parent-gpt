@@ -1,21 +1,24 @@
 package com.zlt.aps.cd15.engine.model;
 
+import com.zlt.aps.cd15.api.domain.entity.Cd15ScheduleLaneAllocation;
+import com.zlt.aps.cd15.api.domain.entity.Cd15ScheduleResult;
+import com.zlt.aps.cd15.api.domain.entity.Cd15UnscheduleResult;
 import lombok.Builder;
 import lombok.Data;
 
 import java.util.List;
 
-/** CD15目标班次后缀滚动试排输出。 */
+/** 定时滚动排程的内存差异输出。 */
 @Data
 @Builder
 public class Cd15TimedRollingOutput {
 
-    /** 试排输入版本，持久化前需要二次校验。 */
+    private String batchNo;
     private String inputVersion;
-    /** 需要替换落库的目标班次及后续班次结果草稿。 */
-    private List<Cd15ScheduleResultDraft> replacementResults;
-    /** 需要替换落库的库排分配草稿。 */
-    private List<Cd15LaneAllocationDraft> replacementLaneAllocations;
-    /** 目标班次及后续班次仍未排结果。 */
-    private List<Cd15SingleShiftScheduleResult> unscheduledResults;
+    private List<Cd15ScheduleResult> insertedResults;
+    private List<Cd15ScheduleResult> updatedResults;
+    private List<Cd15ScheduleResult> logicallyDeletedResults;
+    private List<Cd15ScheduleLaneAllocation> replacementLaneAllocations;
+    private List<Cd15UnscheduleResult> unscheduledResults;
+    private List<Cd15RollingAdjustmentDraft> adjustments;
 }

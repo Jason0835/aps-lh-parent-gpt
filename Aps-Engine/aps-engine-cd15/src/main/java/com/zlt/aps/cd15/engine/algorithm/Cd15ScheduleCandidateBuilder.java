@@ -1,228 +1,194 @@
 package com.zlt.aps.cd15.engine.algorithm;
 
-import com.zlt.aps.cd15.engine.model.Cd15AutoScheduleInput;
-import com.zlt.aps.cd15.engine.model.Cd15ConstructionMaterial;
-import com.zlt.aps.cd15.engine.model.Cd15NaturalDemand;
-import com.zlt.aps.cd15.engine.model.Cd15RollingResourceSnapshot;
+import com.zlt.aps.cd15.engine.model.Cd15DemandShift;
+import com.zlt.aps.cd15.engine.model.Cd15InventoryProjection;
 import com.zlt.aps.cd15.engine.model.Cd15ScheduleCandidate;
-import com.zlt.aps.cd15.engine.model.Cd15ShiftDescriptor;
-import com.zlt.aps.cx.api.domain.entity.CxScheduleResult;
+import com.zlt.aps.cd15.engine.model.Cd15StockGuaranteeResult;
+import com.zlt.aps.cd15.engine.model.Cd15StockSource;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
-import java.lang.reflect.Method;
 import java.math.BigDecimal;
-import java.math.RoundingMode;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * CD15 成型逐班自然需求候选构建器。
+ * 根据逐班钢带需求和6点库存构建当前斜裁班次的待排候选规格。
  */
+@Slf4j
 @Component
+@RequiredArgsConstructor
 public class Cd15ScheduleCandidateBuilder {
 
-    /**
-     * 根据成型结果的 class1~class8 计划量与施工版本，动态展开自然需求。
-     *
-     * @param input 自动排程输入
-     * @return 成型自然需求列表
-     */
-    public List<Cd15NaturalDemand> buildNaturalDemands(Cd15AutoScheduleInput input) {
-        List<CxScheduleResult> formingSchedules = input == null || input.getFormingSchedules() == null
-                ? Collections.emptyList() : input.getFormingSchedules();
-        List<Cd15ShiftDescriptor> shifts = input == null || input.getShifts() == null
-                ? Collections.emptyList() : input.getShifts();
-        return formingSchedules.stream()
-                .filter(Objects::nonNull)
-                .flatMap(schedule -> shifts.stream()
-                        .map(Cd15ShiftDescriptor::getClassIndex)
-                        .map(classIndex -> this.toNaturalDemand(schedule, classIndex)))
-                .filter(Objects::nonNull)
-                .collect(Collectors.toList());
-    }
+    private final Cd15InventoryCalculator inventoryCalculator;
+    private final Cd15StockGuaranteeCalculator stockGuaranteeCalculator;
+    private final Cd15ScheduleCandidateSorter candidateSorter;
+    private final Cd15FractionalDemandWindowSelector demandWindowSelector;
 
     /**
-     * 将自然需求与施工材料层位合并为待排候选。
+     * 构建并排序当前供应窗口的候选规格。
      *
-     * @param input 自动排程输入
-     * @param snapshot 滚动资源快照
-     * @return 待排候选
+     * @param demandShifts 钢带逐自然班次需求
+     * @param stocksAtSix 6点库存快照
+     * @param currentDemandStart 当前斜裁班次对应的首个成型供应班次
+     * @param depthClassQtyBySteelStrip 按钢带匹配的备库班数
+     * @param cumulativeConsumptionBySteelStrip 6点至本班开始前的累计成型消耗，按钢带代号分组；> 0 表示续作规格
+     * @return 已按缺料优先级稳定排序的候选规格
      */
-    public List<Cd15ScheduleCandidate> build(Cd15AutoScheduleInput input,
-                                             Cd15RollingResourceSnapshot snapshot) {
-        List<Cd15ConstructionMaterial> materials = input == null || input.getConstructionMaterials() == null
-                ? Collections.emptyList() : input.getConstructionMaterials();
-        Map<String, BigDecimal> stockMetersBySteelStrip = snapshot == null
-                || snapshot.getStockMetersBySteelStrip() == null
-                ? Collections.emptyMap() : snapshot.getStockMetersBySteelStrip();
-        Map<Integer, Cd15ShiftDescriptor> shiftByClassIndex = input == null || input.getShifts() == null
-                ? Collections.emptyMap() : input.getShifts().stream()
-                .collect(Collectors.toMap(Cd15ShiftDescriptor::getClassIndex,
-                        Function.identity(), (first, second) -> first));
-        List<Cd15ScheduleCandidate> candidates = this.buildNaturalDemands(input).stream()
-                .flatMap(demand -> materials.stream()
-                        .filter(material -> this.match(demand, material))
-                        .map(material -> this.toCandidate(demand, material,
-                                shiftByClassIndex.get(demand.getClassIndex()), stockMetersBySteelStrip)))
-                .collect(Collectors.toList());
-        return this.applyDepthWindow(candidates, input);
-    }
-
-    /** 按钢带备库深度截取自然班次窗口，小数部分按比例计入末班。 */
-    private List<Cd15ScheduleCandidate> applyDepthWindow(List<Cd15ScheduleCandidate> candidates,
-                                                         Cd15AutoScheduleInput input) {
-        if (input == null || input.getDepthClassQtyBySteelStrip() == null) {
-            throw new IllegalArgumentException("按钢带备库深度不能为空");
+    public List<Cd15ScheduleCandidate> build(List<Cd15DemandShift> demandShifts,
+                                             List<Cd15StockSource> stocksAtSix,
+                                             LocalDateTime currentDemandStart,
+                                             Map<String, BigDecimal> depthClassQtyBySteelStrip,
+                                             Map<String, BigDecimal> continueDemandBySteelStrip) {
+        if (currentDemandStart == null) {
+            throw new IllegalArgumentException("当前成型供应班次不能为空");
         }
-        List<Cd15ShiftDescriptor> orderedShifts = input.getShifts() == null
-                ? Collections.emptyList() : input.getShifts().stream()
-                .sorted(Comparator.comparing(Cd15ShiftDescriptor::getStartTime,
-                                Comparator.nullsLast(Comparator.naturalOrder()))
-                        .thenComparingInt(Cd15ShiftDescriptor::getClassIndex))
-                .collect(Collectors.toList());
-        return candidates.stream()
-                .collect(Collectors.groupingBy(Cd15ScheduleCandidate::getSteelStripCode,
-                        LinkedHashMap::new, Collectors.toList()))
-                .entrySet().stream()
-                .flatMap(entry -> {
-                    BigDecimal depth = input.getDepthClassQtyBySteelStrip().get(entry.getKey());
-                    Map<Integer, BigDecimal> weights = this.shiftWeights(entry.getKey(), depth, orderedShifts);
-                    return entry.getValue().stream()
-                            .filter(candidate -> weights.containsKey(candidate.getClassIndex()))
-                            .map(candidate -> this.copyWithWeight(candidate,
-                                    weights.get(candidate.getClassIndex())));
-                })
-                .collect(Collectors.toList());
+        if (depthClassQtyBySteelStrip == null) {
+            throw new IllegalArgumentException("逐钢带备库深度不能为空");
+        }
+
+        // 先将多条6点库存按钢带汇总，后续所有窗口投影都使用同一库存基准。
+        Map<String, BigDecimal> stockBySteelStrip = aggregateStock(stocksAtSix);
+        Map<String, List<Cd15DemandShift>> shiftsByMaterial = safe(demandShifts).stream()
+                .filter(item -> item != null && StringUtils.hasText(item.getSteelStripCode()))
+                .filter(item -> StringUtils.hasText(item.getMaterialKey()))
+                .filter(item -> item.getStartTime() != null)
+                .collect(Collectors.groupingBy(Cd15DemandShift::getMaterialKey,
+                        LinkedHashMap::new, Collectors.toList()));
+
+        List<Cd15ScheduleCandidate> candidates = new ArrayList<>();
+        for (Map.Entry<String, List<Cd15DemandShift>> entry : shiftsByMaterial.entrySet()) {
+            // 每种施工材料按自然班次排序，避免数据库返回顺序影响缺料时间判断。
+            List<Cd15DemandShift> allShifts = entry.getValue().stream()
+                    .sorted(Comparator.comparing(Cd15DemandShift::getStartTime))
+                    .collect(Collectors.toList());
+            Cd15DemandShift materialDemand = allShifts.get(0);
+            String steelStripCode = materialDemand.getSteelStripCode();
+            // 当前供应窗口之前已经发生的成型消耗必须先从6点库存扣除。
+            BigDecimal consumedBeforeWindow = allShifts.stream()
+                    .filter(item -> item.getStartTime().isBefore(currentDemandStart))
+                    .map(item -> value(item.getSteelStripDemandQuantity()))
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            List<Cd15DemandShift> availableShifts = allShifts.stream()
+                    .filter(item -> !item.getStartTime().isBefore(currentDemandStart))
+                    .collect(Collectors.toList());
+            boolean hasAnyPositiveDemand = availableShifts.stream()
+                    .anyMatch(item -> item.isIncluded()
+                            && value(item.getSteelStripDemandQuantity()).signum() > 0);
+            if (!hasAnyPositiveDemand) {
+                continue;
+            }
+            // 每个钢带按自身供成型机台数匹配需求深度，小数末班由选择器按比例换算。
+            BigDecimal depthClassQty = this.requiredDepth(depthClassQtyBySteelStrip, steelStripCode);
+            List<Cd15DemandShift> windowShifts = demandWindowSelector.select(
+                    availableShifts, depthClassQty);
+            boolean hasPositiveDemand = windowShifts.stream()
+                    .anyMatch(item -> item.isIncluded()
+                            && value(item.getSteelStripDemandQuantity()).signum() > 0);
+            if (!hasPositiveDemand) {
+                continue;
+            }
+
+            //取6点库存
+            BigDecimal stockAtSix = stockBySteelStrip.getOrDefault(steelStripCode, BigDecimal.ZERO);
+            // 投影库存用于同时计算可供应时长和最早缺料班次，两者共同决定候选优先级。
+            Cd15InventoryProjection projection = inventoryCalculator.project(
+                    stockAtSix, consumedBeforeWindow, BigDecimal.ZERO);
+            Cd15StockGuaranteeResult guarantee = stockGuaranteeCalculator.calculate(
+                    projection.getExpectedAvailableStock(), windowShifts);
+            LocalDateTime earliestShortageTime = findEarliestShortageTime(
+                    projection.getExpectedAvailableStock(), windowShifts);
+            LocalDateTime firstWindowStart = windowShifts.get(0).getStartTime();
+
+            candidates.add(Cd15ScheduleCandidate.builder()
+                    .materialKey(materialDemand.getMaterialKey())
+                    .steelStripCode(steelStripCode)
+                    .bigRollCode(materialDemand.getBigRollCode())
+                    .cuttingAngle(materialDemand.getCuttingAngle())
+                    .craftWidth(materialDemand.getCraftWidth())
+                    .unitConsumeMillimeter(materialDemand.getUnitConsumeMillimeter())
+                    .reinforcement(materialDemand.isReinforcement())
+                    .shortageInCurrentShift(firstWindowStart.equals(earliestShortageTime))
+                    .continueFromPreviousShift(isContinueFromPrevious(
+                            continueDemandBySteelStrip, materialDemand.getMaterialKey()))
+                    .earliestShortageTime(earliestShortageTime)
+                    .stockSupplyHours(guarantee.getSupplyHours())
+                    .build());
+        }
+
+        // 排序器负责稳定处理同缺料时间候选，避免重复执行时结果顺序抖动。
+        List<Cd15ScheduleCandidate> sorted = candidateSorter.sort(candidates);
+        long continueCount = sorted.stream()
+                .filter(Cd15ScheduleCandidate::isContinueFromPreviousShift)
+                .count();
+        log.info("[斜裁自动排程] 当前班次候选规格构建完成, demandStart={}, depthBySteelStrip={}, "
+                        + "materialCount={}, candidateCount={}, continueCount={}",
+                currentDemandStart, depthClassQtyBySteelStrip, shiftsByMaterial.size(), sorted.size(), continueCount);
+        return sorted;
     }
 
-    private Map<Integer, BigDecimal> shiftWeights(String steelStripCode,
-                                                   BigDecimal depth,
-                                                   List<Cd15ShiftDescriptor> orderedShifts) {
-        if (depth == null || depth.signum() <= 0) {
+    /** 续作判定：6点至本班开始前累计成型消耗 > 0 表示前序班次已为该规格排过产。 */
+    private boolean isContinueFromPrevious(Map<String, BigDecimal> cumulative, String steelStripCode) {
+        BigDecimal value = cumulative == null ? null : cumulative.get(steelStripCode);
+        return value != null && value.signum() > 0;
+    }
+
+    /** 获取当前钢带的必填备库深度。 */
+    private BigDecimal requiredDepth(Map<String, BigDecimal> depthClassQtyBySteelStrip, String steelStripCode) {
+        BigDecimal depthClassQty = depthClassQtyBySteelStrip.get(steelStripCode);
+        if (depthClassQty == null || depthClassQty.signum() <= 0) {
             throw new IllegalArgumentException("钢带未匹配有效备库深度, steelStripCode=" + steelStripCode);
         }
-        int requiredShiftCount;
-        try {
-            requiredShiftCount = depth.setScale(0, RoundingMode.CEILING).intValueExact();
-        } catch (ArithmeticException exception) {
-            throw new IllegalArgumentException("钢带备库深度超出支持范围, steelStripCode=" + steelStripCode, exception);
-        }
-        int fullShiftCount = depth.setScale(0, RoundingMode.FLOOR).intValue();
-        BigDecimal fraction = depth.subtract(BigDecimal.valueOf(fullShiftCount));
-        Map<Integer, BigDecimal> weights = new LinkedHashMap<>();
-        for (int index = 0; index < Math.min(requiredShiftCount, orderedShifts.size()); index++) {
-            BigDecimal weight = index == fullShiftCount && fraction.signum() > 0
-                    ? fraction : BigDecimal.ONE;
-            weights.put(orderedShifts.get(index).getClassIndex(), weight);
-        }
-        return weights;
+        return depthClassQty;
     }
 
-    private Cd15ScheduleCandidate copyWithWeight(Cd15ScheduleCandidate source, BigDecimal weight) {
-        Cd15NaturalDemand demand = source.getDemand();
-        Cd15NaturalDemand weightedDemand = Cd15NaturalDemand.builder()
-                .factoryCode(demand.getFactoryCode())
-                .scheduleDate(demand.getScheduleDate())
-                .cxBatchNo(demand.getCxBatchNo())
-                .cxMachineCode(demand.getCxMachineCode())
-                .constructionCode(demand.getConstructionCode())
-                .constructionVersion(demand.getConstructionVersion())
-                .classField(demand.getClassField())
-                .classIndex(demand.getClassIndex())
-                .naturalDemandQty(demand.getNaturalDemandQty().multiply(weight))
-                .build();
-        return Cd15ScheduleCandidate.builder()
-                .demand(weightedDemand)
-                .material(source.getMaterial())
-                .shift(source.getShift())
-                .classIndex(source.getClassIndex())
-                .cuttingAngle(source.getCuttingAngle())
-                .steelStripCode(source.getSteelStripCode())
-                .bigRollCode(source.getBigRollCode())
-                .stockMetersAtSix(source.getStockMetersAtSix())
-                .shortageInCurrentShift(source.isShortageInCurrentShift())
-                .continueFromPreviousShift(source.isContinueFromPreviousShift())
-                .build();
-    }
-    private Cd15NaturalDemand toNaturalDemand(CxScheduleResult schedule, int classIndex) {
-        BigDecimal planQty = this.toBigDecimal(this.getFieldValue(schedule,
-                String.format("class%dPlanQty", classIndex)));
-        String recipeNo = this.toString(this.getFieldValue(schedule,
-                String.format("class%dRecipeNo", classIndex)));
-        if (planQty.signum() <= 0 || !StringUtils.hasText(recipeNo)
-                || !StringUtils.hasText(schedule.getEmbryoCode())) {
-            return null;
+    private Map<String, BigDecimal> aggregateStock(List<Cd15StockSource> stocksAtSix) {
+        Map<String, BigDecimal> result = new LinkedHashMap<>();
+        for (Cd15StockSource stock : safe(stocksAtSix)) {
+            if (stock == null || !StringUtils.hasText(stock.getSteelStripCode())) {
+                continue;
+            }
+            BigDecimal quantity = value(stock.getStockQuantity());
+            if (quantity.signum() < 0) {
+                throw new IllegalArgumentException("6点库存不能小于0, steelStripCode=" + stock.getSteelStripCode());
+            }
+            result.merge(stock.getSteelStripCode(), quantity, BigDecimal::add);
         }
-        return Cd15NaturalDemand.builder()
-                .factoryCode(schedule.getFactoryCode())
-                .scheduleDate(schedule.getScheduleDate())
-                .cxBatchNo(schedule.getCxBatchNo())
-                .cxMachineCode(schedule.getCxMachineCode())
-                .constructionCode(schedule.getEmbryoCode())
-                .constructionVersion(recipeNo)
-                .classField("class" + classIndex)
-                .classIndex(classIndex)
-                .naturalDemandQty(planQty)
-                .build();
+        return result;
     }
 
-    private Cd15ScheduleCandidate toCandidate(Cd15NaturalDemand demand,
-                                              Cd15ConstructionMaterial material,
-                                              Cd15ShiftDescriptor shift,
-                                              Map<String, BigDecimal> stockMetersBySteelStrip) {
-        BigDecimal stockMetersAtSix = stockMetersBySteelStrip.getOrDefault(
-                material.getSteelStripCode(), BigDecimal.ZERO);
-        return Cd15ScheduleCandidate.builder()
-                .demand(demand)
-                .material(material)
-                .shift(shift)
-                .classIndex(demand.getClassIndex())
-                .cuttingAngle(material.getCuttingAngle())
-                .steelStripCode(material.getSteelStripCode())
-                .bigRollCode(material.getBigRollCode())
-                .stockMetersAtSix(stockMetersAtSix)
-                .shortageInCurrentShift(stockMetersAtSix.signum() <= 0)
-                .continueFromPreviousShift(false)
-                .build();
+    private LocalDateTime findEarliestShortageTime(BigDecimal availableStock,
+                                                    List<Cd15DemandShift> windowShifts) {
+        BigDecimal remaining = availableStock;
+        for (Cd15DemandShift shift : windowShifts) {
+            if (!shift.isIncluded()) {
+                continue;
+            }
+            BigDecimal demand = value(shift.getSteelStripDemandQuantity());
+            if (demand.signum() <= 0) {
+                continue;
+            }
+            if (remaining.compareTo(demand) < 0) {
+                return shift.getStartTime();
+            }
+            remaining = remaining.subtract(demand);
+        }
+        return null;
     }
 
-    private boolean match(Cd15NaturalDemand demand, Cd15ConstructionMaterial material) {
-        return material != null
-                && Objects.equals(demand.getConstructionCode(), material.getConstructionCode())
-                && Objects.equals(demand.getConstructionVersion(), material.getConstructionVersion());
+    private <T> List<T> safe(List<T> values) {
+        return values == null ? Collections.emptyList() : values;
     }
 
-    private Object getFieldValue(Object source, String fieldName) {
-        if (source == null || !StringUtils.hasText(fieldName)) {
-            return null;
-        }
-        String methodName = "get" + fieldName.substring(0, 1).toUpperCase() + fieldName.substring(1);
-        try {
-            Method method = source.getClass().getMethod(methodName);
-            return method.invoke(source);
-        } catch (ReflectiveOperationException exception) {
-            throw new IllegalStateException("读取字段失败: " + source.getClass().getSimpleName() + "." + fieldName, exception);
-        }
-    }
-
-    private BigDecimal toBigDecimal(Object value) {
-        if (value instanceof BigDecimal) {
-            return (BigDecimal) value;
-        }
-        if (value instanceof Number) {
-            return BigDecimal.valueOf(((Number) value).doubleValue());
-        }
-        return BigDecimal.ZERO;
-    }
-
-    private String toString(Object value) {
-        return value == null ? null : value.toString().trim();
+    private BigDecimal value(BigDecimal value) {
+        return value == null ? BigDecimal.ZERO : value;
     }
 }

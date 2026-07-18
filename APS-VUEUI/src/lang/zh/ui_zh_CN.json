@@ -4157,7 +4157,7 @@
   "ui.data.column.cd15ShiftConfig.isActive": "启用状态",
   "ui.data.column.cd15ShiftConfig.remark": "备注",
   "ui.data.column.cd15ShiftConfig.checkUnique": "同工厂下结果班次字段已存在",
-  "ui.data.alert.cd15ShiftConfig.shiftHoursPositive": "班次时长必须大于0"
+  "ui.data.alert.cd15ShiftConfig.shiftHoursPositive": "班次时长必须大于0",
   "ui.data.column.cd15ShiftConfig.checkUnique": "同工厂下班次编码已存在",
   "ui.data.alert.cd15ShiftConfig.shiftHoursPositive": "班次时长必须大于0",
   "ui.tc.schedule.assigned": "已排",

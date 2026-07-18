@@ -5,7 +5,7 @@ import com.zlt.aps.cd15.api.domain.entity.Cd15Stock;
 import org.apache.ibatis.annotations.Mapper;
 
 /**
- * 斜裁自动排程库存快照只读 Mapper。
+ * 自动排程6点库存只读Mapper。
  */
 @Mapper
 public interface Cd15EngineStockMapper extends BaseMapper<Cd15Stock> {

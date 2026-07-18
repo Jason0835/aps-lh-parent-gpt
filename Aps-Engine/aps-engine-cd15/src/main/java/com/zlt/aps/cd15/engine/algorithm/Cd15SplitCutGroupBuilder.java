@@ -6,72 +6,94 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
 /**
- * CD15 分裁组合构建器。
+ * 在当前班次候选池中构建两条钢带的分裁组合。
  */
 @Component
 public class Cd15SplitCutGroupBuilder {
 
     /**
-     * 从剩余候选中寻找可与当前候选组成分裁的第二条候选。
+     * 按同大卷、同角度、不同钢带和角度最大宽度寻找稳定的第二条候选。
      *
-     * @param candidate 当前候选
-     * @param remainingCandidates 当前 CLASS 下仍未处理的候选池
-     * @param angleWidthMaxByAngle 角度最大分裁宽度配置
-     * @return 可分裁组合
+     * @param first 第一条候选
+     * @param remainingCandidates 当前班尚未执行的候选
+     * @param angleWidthMaxByAngle 角度最大宽度配置
+     * @param classField 当前班次字段
+     * @return 分裁组合；不存在时返回空
      */
-    public Optional<Cd15SplitCutGroup> findSplitGroup(Cd15ScheduleCandidate candidate,
-                                                      List<Cd15ScheduleCandidate> remainingCandidates,
-                                                      Map<String, BigDecimal> angleWidthMaxByAngle) {
-        if (!this.canTrySplit(candidate, angleWidthMaxByAngle) || remainingCandidates == null) {
+    public Optional<Cd15SplitCutGroup> find(
+            Cd15ScheduleCandidate first,
+            List<Cd15ScheduleCandidate> remainingCandidates,
+            Map<String, BigDecimal> angleWidthMaxByAngle,
+            String classField) {
+        if (!this.canSplit(first) || remainingCandidates == null) {
             return Optional.empty();
         }
-        BigDecimal maxWidth = angleWidthMaxByAngle.get(candidate.getCuttingAngle());
+        Map<String, BigDecimal> widthByAngle = angleWidthMaxByAngle == null
+                ? Collections.emptyMap() : angleWidthMaxByAngle;
+        BigDecimal maxWidth = widthByAngle.get(first.getCuttingAngle().trim());
+        if (maxWidth == null || maxWidth.signum() <= 0) {
+            return Optional.empty();
+        }
         return remainingCandidates.stream()
-                .filter(item -> item != candidate)
-                .filter(item -> this.sameSplitScope(candidate, item))
-                .map(item -> this.toGroup(candidate, item))
+                .filter(this::canSplit)
+                .filter(second -> this.sameScope(first, second))
+                .map(second -> this.group(first, second, classField))
                 .filter(group -> group.getCombinedWidth().compareTo(maxWidth) <= 0)
                 .findFirst();
     }
 
-    private boolean canTrySplit(Cd15ScheduleCandidate candidate,
-                                Map<String, BigDecimal> angleWidthMaxByAngle) {
-        if (candidate == null || candidate.getMaterial() == null
-                || candidate.getMaterial().isReinforcement()) {
-            return false;
-        }
-        if (!StringUtils.hasText(candidate.getCuttingAngle()) || angleWidthMaxByAngle == null) {
-            return false;
-        }
-        BigDecimal maxWidth = angleWidthMaxByAngle.get(candidate.getCuttingAngle());
-        return maxWidth != null && maxWidth.signum() > 0;
+    private boolean canSplit(Cd15ScheduleCandidate candidate) {
+        return candidate != null
+                && !candidate.isReinforcement()
+                && !candidate.isContinueFromPreviousShift()
+                && !candidate.isNewSpecAdvance()
+                && StringUtils.hasText(candidate.getMaterialKey())
+                && StringUtils.hasText(candidate.getSteelStripCode())
+                && StringUtils.hasText(candidate.getBigRollCode())
+                && StringUtils.hasText(candidate.getCuttingAngle())
+                && candidate.getCraftWidth() != null
+                && candidate.getCraftWidth().signum() > 0;
     }
 
-    private boolean sameSplitScope(Cd15ScheduleCandidate candidate, Cd15ScheduleCandidate other) {
-        return other != null && other.getMaterial() != null
-                && !other.getMaterial().isReinforcement()
-                && candidate.getClassIndex() == other.getClassIndex()
-                && Objects.equals(candidate.getCuttingAngle(), other.getCuttingAngle())
-                && Objects.equals(candidate.getBigRollCode(), other.getBigRollCode())
-                && !Objects.equals(candidate.getSteelStripCode(), other.getSteelStripCode());
+    private boolean sameScope(Cd15ScheduleCandidate first,
+                              Cd15ScheduleCandidate second) {
+        boolean rollingPair = first.getRollingRequestedQuantity() != null
+                || second.getRollingRequestedQuantity() != null;
+        boolean sameExistingGroup = "SPLIT".equals(first.getCutMode())
+                && "SPLIT".equals(second.getCutMode())
+                && StringUtils.hasText(first.getSplitGroupKey())
+                && Objects.equals(first.getSplitGroupKey(), second.getSplitGroupKey());
+        return (!rollingPair || sameExistingGroup)
+                && !Objects.equals(first.getMaterialKey(), second.getMaterialKey())
+                && !Objects.equals(first.getSteelStripCode(), second.getSteelStripCode())
+                && Objects.equals(first.getBigRollCode(), second.getBigRollCode())
+                && Objects.equals(first.getCuttingAngle(), second.getCuttingAngle());
     }
 
-    private Cd15SplitCutGroup toGroup(Cd15ScheduleCandidate first, Cd15ScheduleCandidate second) {
+    private Cd15SplitCutGroup group(Cd15ScheduleCandidate first,
+                                    Cd15ScheduleCandidate second,
+                                    String classField) {
+        String firstKey = first.getMaterialKey();
+        String secondKey = second.getMaterialKey();
+        String lowKey = firstKey.compareTo(secondKey) <= 0 ? firstKey : secondKey;
+        String highKey = firstKey.compareTo(secondKey) <= 0 ? secondKey : firstKey;
+        String existingGroupKey = Objects.equals(
+                first.getSplitGroupKey(), second.getSplitGroupKey())
+                ? first.getSplitGroupKey() : null;
         return Cd15SplitCutGroup.builder()
                 .firstCandidate(first)
                 .secondCandidate(second)
-                .combinedWidth(this.width(first).add(this.width(second)))
+                .combinedWidth(first.getCraftWidth().add(second.getCraftWidth()))
+                .groupKey(StringUtils.hasText(existingGroupKey)
+                        ? existingGroupKey
+                        : "SPLIT|" + classField + "|" + lowKey + "|" + highKey)
                 .build();
-    }
-
-    private BigDecimal width(Cd15ScheduleCandidate candidate) {
-        return candidate.getMaterial().getCraftWidth() == null
-                ? BigDecimal.ZERO : candidate.getMaterial().getCraftWidth();
     }
 }

@@ -15,6 +15,6 @@ public class Cd15BigRollAgingBuildResult {
 
     /** 可参与斜裁试算的实际及计划库存成熟流水。 */
     private List<Cd15BigRollAgingStock> stocks;
-    /** 无法确定成熟时间的大卷代码，按规格记录DATA_MISSING。 */
+    /** 无法确定成熟时间的大卷编码，按规格记录DATA_MISSING。 */
     private Set<String> dataMissingBigRollCodes;
 }

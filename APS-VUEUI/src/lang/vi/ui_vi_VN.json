@@ -2285,7 +2285,7 @@
   "ui.data.column.cd15ShiftConfig.isActive": "Trạng thái bật",
   "ui.data.column.cd15ShiftConfig.remark": "Ghi chú",
   "ui.data.column.cd15ShiftConfig.checkUnique": "Trường ca kết quả đã tồn tại trong cùng nhà máy",
-  "ui.data.alert.cd15ShiftConfig.shiftHoursPositive": "Thời lượng ca phải lớn hơn 0"
+  "ui.data.alert.cd15ShiftConfig.shiftHoursPositive": "Thời lượng ca phải lớn hơn 0",
   "ui.data.column.cd15ShiftConfig.checkUnique": "Mã ca đã tồn tại trong cùng nhà máy",
   "ui.data.alert.cd15ShiftConfig.shiftHoursPositive": "Thời lượng ca phải lớn hơn 0",
   "ui.tc.schedule.assigned": "Đã xếp lịch",

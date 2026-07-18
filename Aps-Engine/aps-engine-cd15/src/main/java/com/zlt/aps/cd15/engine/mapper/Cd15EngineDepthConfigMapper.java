@@ -4,10 +4,7 @@ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.zlt.aps.cd15.api.domain.entity.Cd15DepthConfig;
 import org.apache.ibatis.annotations.Mapper;
 
-/**
- * ???????????? Mapper?
- */
+/** 斜裁自动排程读取备库深度配置的只读Mapper。 */
 @Mapper
 public interface Cd15EngineDepthConfigMapper extends BaseMapper<Cd15DepthConfig> {
 }
-

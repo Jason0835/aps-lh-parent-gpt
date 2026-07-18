@@ -6,7 +6,7 @@ import lombok.Data;
 import java.math.BigDecimal;
 
 /**
- * 单笔GDYY大卷成熟流水占用明细。
+ * 单笔大卷成熟流水占用明细。
  */
 @Data
 @Builder

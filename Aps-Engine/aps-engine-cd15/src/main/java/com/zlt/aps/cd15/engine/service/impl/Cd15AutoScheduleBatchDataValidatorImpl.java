@@ -33,6 +33,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -81,7 +82,8 @@ public class Cd15AutoScheduleBatchDataValidatorImpl implements Cd15AutoScheduleB
         List<Cd15ShiftDescriptor> shifts = this.checkShiftConfig(
                 builder, factoryCode, scheduleDate);
         Set<Integer> activeClassIndexes = shifts.stream()
-                .map(Cd15ShiftDescriptor::getClassIndex)
+                .map(Cd15ShiftDescriptor::getShiftOrder)
+                .filter(Objects::nonNull)
                 .collect(Collectors.toCollection(LinkedHashSet::new));
         List<CxScheduleResult> formingSchedules = this.checkFormingSchedule(builder, factoryCode, scheduleDate);
         this.checkMachineInfo(builder, factoryCode);

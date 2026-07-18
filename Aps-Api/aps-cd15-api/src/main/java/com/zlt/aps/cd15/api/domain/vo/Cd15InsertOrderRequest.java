@@ -78,4 +78,20 @@ public class Cd15InsertOrderRequest implements Serializable {
             throw new IllegalArgumentException("斜裁插单字段不存在: " + fieldName, exception);
         }
     }
+
+    /**
+     * 按班次字段模板动态写入值。
+     *
+     * @param fieldName Java字段名
+     * @param value 字段值
+     */
+    public void setFieldValueByFieldName(String fieldName, Object value) {
+        try {
+            Field field = this.getClass().getDeclaredField(fieldName);
+            field.setAccessible(true);
+            field.set(this, value);
+        } catch (ReflectiveOperationException exception) {
+            throw new IllegalArgumentException("斜裁插单字段不存在: " + fieldName, exception);
+        }
+    }
 }
