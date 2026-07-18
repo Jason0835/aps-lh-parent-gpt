@@ -135,13 +135,14 @@ public class GsqMachineInfoUIController extends BaseUIController<GsqMachineInfo>
 
     /**
      * 查询未删除且启用的机台列表
+     * 改为GET请求，与Feign接口和后端微服务Controller保持一致
+     * 直接透传Feign返回的AjaxResult，避免二次包装
      */
     @ApiOperation("查询未删除且启用的机台列表")
-    @PostMapping("/listEnabledMachines")
+    @GetMapping("/listEnabledMachines")
     @ResponseBody
     public AjaxResult listEnabledMachines() {
-        List<GsqMachineInfo> list = gsqMachineInfoService.listEnabledMachines();
-        return AjaxResult.success(list);
+        return gsqMachineInfoService.listEnabledMachines();
     }
 
     @Override

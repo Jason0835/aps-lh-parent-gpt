@@ -3,6 +3,7 @@ package com.zlt.aps.gsq.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
 import com.ruoyi.common.constant.UserConstants;
+import com.ruoyi.common.core.utils.SecurityUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.common.core.utils.ImportUtil;
@@ -14,12 +15,12 @@ import com.zlt.bill.common.service.AbstractDocService;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang.StringUtils;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -78,7 +79,7 @@ public class GsqMachineInfoServiceImpl extends AbstractDocService<GsqMachineInfo
      */
     @Override
     public int insertMachineInfo(GsqMachineInfo machineInfo) {
-        machineInfo.setBaseVale(null);
+        setBaseFieldValue(machineInfo, null);
         return machineInfoMapper.insertMachineInfo(machineInfo);
     }
 
@@ -90,7 +91,7 @@ public class GsqMachineInfoServiceImpl extends AbstractDocService<GsqMachineInfo
      */
     @Override
     public int updateMachineInfo(GsqMachineInfo machineInfo) {
-        machineInfo.setBaseVale(machineInfo.getId());
+        setBaseFieldValue(machineInfo, machineInfo.getId());
         return machineInfoMapper.updateMachineInfo(machineInfo);
     }
 
@@ -116,7 +117,6 @@ public class GsqMachineInfoServiceImpl extends AbstractDocService<GsqMachineInfo
         LambdaQueryWrapper<GsqMachineInfo> wrapper = new LambdaQueryWrapper<>();
         wrapper.ne(machineInfo.getId() != null, GsqMachineInfo::getId, machineInfo.getId());
         wrapper.eq(GsqMachineInfo::getMachineCode, machineInfo.getMachineCode());
-        wrapper.eq(GsqMachineInfo::getDelFlag, "0");
         if (machineInfoMapper.selectCount(wrapper) > 0) {
             return UserConstants.NOT_UNIQUE;
         }
@@ -134,7 +134,6 @@ public class GsqMachineInfoServiceImpl extends AbstractDocService<GsqMachineInfo
         LambdaQueryWrapper<GsqMachineInfo> wrapper = new LambdaQueryWrapper<>();
         wrapper.ne(machineInfo.getId() != null, GsqMachineInfo::getId, machineInfo.getId());
         wrapper.eq(GsqMachineInfo::getMachineCode, machineInfo.getMachineCode());
-        wrapper.eq(GsqMachineInfo::getDelFlag, "0");
         if (machineInfoMapper.selectCount(wrapper) > 0) {
             return UserConstants.NOT_UNIQUE;
         }
@@ -254,7 +253,7 @@ public class GsqMachineInfoServiceImpl extends AbstractDocService<GsqMachineInfo
                     continue;
                 }
 
-                machineInfo.setBaseVale(null);
+                setBaseFieldValue(machineInfo, null);
                 importList.add(machineInfo);
             }
         }
@@ -289,6 +288,37 @@ public class GsqMachineInfoServiceImpl extends AbstractDocService<GsqMachineInfo
             return AjaxResult.error(I18nUtil.getMessage("ui.message.import.fail") + "," + successNum + "," + failureNum, importErrorLogs);
         } else {
             return AjaxResult.success(I18nUtil.getMessage("ui.message.import.success") + "," + successNum);
+        }
+    }
+
+    /**
+     * 设置基础字段值（替代原ApsBaseEntity.setBaseVale）
+     * id为null时为新增操作，设置isDelete、createBy、createTime
+     * id不为null时为更新操作，设置updateBy、updateTime
+     *
+     * @param entity 实体对象
+     * @param id     主键ID，null表示新增，非null表示更新
+     */
+    private void setBaseFieldValue(GsqMachineInfo entity, Long id) {
+        try {
+            String username = SecurityUtils.getUsername();
+            if (id == null) {
+                entity.setIsDelete(0);
+                entity.setCreateBy(username);
+                entity.setCreateTime(new Date());
+            } else {
+                entity.setUpdateBy(username);
+                entity.setUpdateTime(new Date());
+            }
+        } catch (Exception e) {
+            if (id == null) {
+                entity.setIsDelete(0);
+                entity.setCreateBy("system");
+                entity.setCreateTime(new Date());
+            } else {
+                entity.setUpdateBy("system");
+                entity.setUpdateTime(new Date());
+            }
         }
     }
 }

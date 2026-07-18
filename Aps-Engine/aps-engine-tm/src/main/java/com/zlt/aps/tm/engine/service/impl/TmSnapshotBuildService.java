@@ -74,7 +74,14 @@ public class TmSnapshotBuildService {
      * @return true 表示任务需要进入未排语义
      */
     private boolean isUnplannedTask(TmTaskDraft task) {
-        return task != null && (task.isUnassigned() || StrUtil.isNotBlank(task.getUnplannedReasonCode()));
+        if (task == null) {
+            return false;
+        }
+        if (StrUtil.isNotBlank(task.getUnplannedReasonCode())) {
+            return true;
+        }
+        return task.isUnassigned() && task.getPlanQty() != null
+                && task.getPlanQty().compareTo(BigDecimal.ZERO) > 0;
     }
 
     /**

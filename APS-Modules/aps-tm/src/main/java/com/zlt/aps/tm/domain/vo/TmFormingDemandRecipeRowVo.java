@@ -58,6 +58,30 @@ public class TmFormingDemandRecipeRowVo {
     /** 8班成型计划量 */
     private BigDecimal class8PlanQty;
 
+    /** 1班成型完成量 */
+    private BigDecimal class1FinishQty;
+
+    /** 2班成型完成量 */
+    private BigDecimal class2FinishQty;
+
+    /** 3班成型完成量 */
+    private BigDecimal class3FinishQty;
+
+    /** 4班成型完成量 */
+    private BigDecimal class4FinishQty;
+
+    /** 5班成型完成量 */
+    private BigDecimal class5FinishQty;
+
+    /** 6班成型完成量 */
+    private BigDecimal class6FinishQty;
+
+    /** 7班成型完成量 */
+    private BigDecimal class7FinishQty;
+
+    /** 8班成型完成量 */
+    private BigDecimal class8FinishQty;
+
     /** 1班示方书编号，对应施工信息 CONSTRUCTION_VERSION */
     private String class1RecipeNo;
 

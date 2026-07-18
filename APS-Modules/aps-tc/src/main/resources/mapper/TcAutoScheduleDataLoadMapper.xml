@@ -100,10 +100,12 @@
                                 ) AS rn
                          FROM T_MDM_CONSTRUCTION_INFO c
                          WHERE c.CONSTRUCTION_CODE = cx.EMBRYO_CODE
+                           AND c.IS_DELETE = 0
                      ) ranked
                      WHERE ranked.rn = 1
                  ) ci ON TRUE
-        WHERE cx.FACTORY_CODE = #{factoryCode}
+        WHERE cx.IS_DELETE = 0
+          AND cx.FACTORY_CODE = #{factoryCode}
           AND cx.SCHEDULE_DATE = #{scheduleDate}
     </select>
 
@@ -130,6 +132,7 @@
                               SELECT ci.*,
                                      ROW_NUMBER() OVER (PARTITION BY ci.CONSTRUCTION_CODE ORDER BY ci.UPDATE_TIME DESC, ci.ID DESC) AS rn
                               FROM T_MDM_CONSTRUCTION_INFO ci
+                              WHERE ci.IS_DELETE = 0
                           ) ranked_info
                      WHERE ranked_info.rn = 1
                  ) construction_info
@@ -137,6 +140,7 @@
         WHERE final_plan.FACTORY_CODE = #{factoryCode}
           AND final_plan.YEAR_MONTH = #{yearMonth}
           AND final_plan.CONSTRUCTION_STAGE = #{constructionStage}
+          AND final_plan.IS_DELETE = 0
           AND final_plan.${dayColumn} > 0
         ORDER BY final_plan.PRODUCTION_SEQUENCE, final_plan.ID
     </select>
@@ -149,6 +153,7 @@
         WHERE FACTORY_CODE = #{factoryCode}
           AND PROC_CODE = #{procCode}
           AND PRODUCTION_DATE = #{productionDate}
+          AND IS_DELETE = 0
     </select>
 
     <select id="selectWorkCalendarRowsByRange" resultMap="TcWorkCalendarRowResult">
@@ -161,6 +166,7 @@
         WHERE FACTORY_CODE = #{factoryCode}
           AND PROC_CODE = #{procCode}
           AND PRODUCTION_DATE BETWEEN #{startDate} AND #{endDate}
+          AND IS_DELETE = 0
         ORDER BY PRODUCTION_DATE
     </select>
     <resultMap id="TcFormingDemandRecipeRowResult" type="com.zlt.aps.tc.domain.vo.TcFormingDemandRecipeRowVo">
@@ -224,7 +230,8 @@
                cx.MARK_CLOSE_OUT_TIP,
                cx.CX_REMAIN_QTY
         FROM T_CX_SCHEDULE_RESULT cx
-        WHERE cx.FACTORY_CODE = #{factoryCode}
+        WHERE cx.IS_DELETE = 0
+          AND cx.FACTORY_CODE = #{factoryCode}
           AND cx.SCHEDULE_DATE = #{scheduleDate}
     </select>
 
@@ -241,7 +248,8 @@
                ci.SIDEWALL_WEIGHT,
                ci.SIDEWALL_WEARP_RUBBER_WEIGHT
         FROM T_MDM_CONSTRUCTION_INFO ci
-        WHERE ci.FACTORY_CODE = #{factoryCode}
+        WHERE ci.IS_DELETE = 0
+          AND ci.FACTORY_CODE = #{factoryCode}
           AND ci.CONSTRUCTION_CODE IN
         <foreach collection="embryoCodes" item="embryoCode" open="(" separator="," close=")">
             #{embryoCode}
@@ -266,7 +274,8 @@
                ci.SIDEWALL_WEIGHT,
                ci.SIDEWALL_WEARP_RUBBER_WEIGHT
         FROM T_MDM_CONSTRUCTION_INFO ci
-        WHERE ci.FACTORY_CODE = #{factoryCode}
+        WHERE ci.IS_DELETE = 0
+          AND ci.FACTORY_CODE = #{factoryCode}
           AND ci.SIDEWALL_CODE IS NOT NULL
           AND ci.SIDEWALL_CODE &lt;&gt; ''
           AND ci.SIDEWALL_VERSION IS NOT NULL

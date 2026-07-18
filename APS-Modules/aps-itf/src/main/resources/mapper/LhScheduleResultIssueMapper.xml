@@ -65,7 +65,6 @@
               AND MATERIAL_CODE = t.MATERIAL_CODE
               AND SCHEDULE_DATE = t.SCHEDULE_DATE
               AND ORDER_NO = t.ORDER_NO
-              AND DATA_VERSION = t.DATA_VERSION
         )
     </insert>
 
@@ -150,6 +149,37 @@
         DELETE FROM MES_LH_SCHEDULE_RESULT
         WHERE SCHEDULE_DATE = #{scheduleDate}
           AND DATA_VERSION = #{dataVersion}
+    </delete>
+
+    <!-- 批量查询中间表中已存在的记录（按排程日期+硫化机台编码+物料编码+工单号匹配，不含版本号） -->
+    <!-- 返回完整记录（含各班次数据），供Day1场景合并class1数据使用 -->
+    <select id="selectExistingByScheduleDateAndMachine" resultType="com.zlt.aps.itf.vo.MesLhScheduleResult">
+        SELECT SCHEDULE_DATE, LH_MACHINE_CODE, MATERIAL_CODE, ORDER_NO,
+               CLASS1_PLAN_QTY, CLASS1_PLAN_QTY_SEQ, CLASS1_ANALYSIS_INPUT, CLASS1_ANALYSIS,
+               CLASS1_EXAMPLE_TYPE, CLASS1_EXAMPLE_NO, CLASS1_PLAN_TYPE,
+               CLASS2_PLAN_QTY, CLASS2_PLAN_QTY_SEQ, CLASS2_ANALYSIS_INPUT, CLASS2_ANALYSIS,
+               CLASS2_EXAMPLE_TYPE, CLASS2_EXAMPLE_NO, CLASS2_PLAN_TYPE,
+               CLASS3_PLAN_QTY, CLASS3_PLAN_QTY_SEQ, CLASS3_ANALYSIS_INPUT, CLASS3_ANALYSIS,
+               CLASS3_EXAMPLE_TYPE, CLASS3_EXAMPLE_NO, CLASS3_PLAN_TYPE
+        FROM MES_LH_SCHEDULE_RESULT
+        WHERE
+        <foreach collection="list" item="item" separator=" OR ">
+            (SCHEDULE_DATE = #{item.scheduleDate}
+             AND LH_MACHINE_CODE = #{item.lhMachineCode}
+             AND MATERIAL_CODE = #{item.materialCode}
+             AND ORDER_NO = #{item.orderNo})
+        </foreach>
+    </select>
+
+    <!-- 批量删除中间表中已存在的记录（按排程日期+硫化机台编码+物料编码+工单号匹配，删除该键的所有版本） -->
+    <delete id="batchDeleteByScheduleDateAndMachine">
+        DELETE FROM MES_LH_SCHEDULE_RESULT WHERE
+        <foreach collection="list" item="item" separator=" OR ">
+            (SCHEDULE_DATE = #{item.scheduleDate}
+             AND LH_MACHINE_CODE = #{item.lhMachineCode}
+             AND MATERIAL_CODE = #{item.materialCode}
+             AND ORDER_NO = #{item.orderNo})
+        </foreach>
     </delete>
 
 </mapper>

@@ -7,7 +7,6 @@ import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
-import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.utils.BigDecimalUtils;
 import com.zlt.aps.common.engine.utils.DepthConfigResolver;
 import com.zlt.aps.tm.api.constant.TmScheduleConstants;
@@ -107,14 +106,13 @@ public class TmAutoScheduleDataLoadService {
      * 加载胎面机台基础资料。
      *
      * @param context 自动排程上下文
-     * @return 已启用或可参与排程的机台列表
+     * @return 工厂下全部机台列表，停用机台由引擎硬约束过滤并保留拒绝证据
      */
     private List<TmMachineInfo> loadMachineInfo(TmScheduleContext context) {
         LambdaQueryWrapper<TmMachineInfo> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(TmMachineInfo::getFactoryCode, context.getFactoryCode());
-        wrapper.eq(TmMachineInfo::getMachineStatus, ApsConstant.APS_YES_NO_1);
         wrapper.orderByAsc(TmMachineInfo::getMachineCode);
-        return tmAutoScheduleRedisCacheService.getCachedList("machine:" + context.getFactoryCode(),
+        return tmAutoScheduleRedisCacheService.getCachedList("machine:v2:" + context.getFactoryCode(),
                 () -> tmMachineInfoMapper.selectList(wrapper)).stream()
                 .filter(machine -> StrUtil.isNotBlank(machine.getMachineCode()))
                 .collect(Collectors.toList());
@@ -781,6 +779,7 @@ public class TmAutoScheduleDataLoadService {
                 continue;
             }
             BigDecimal[] classQtyArray = buildClassQtyArray(row);
+            BigDecimal[] classFinishQtyArray = buildClassFinishQtyArray(row);
             Integer guardShiftCount = this.resolveGuardShiftCount(context, row.getLhMachineCode(), row.getOrderNo(),
                     depthConfigList, fallbackGuardShiftCount);
             boolean noShutdownAvailableShift = redistributeShutdownDemand(context, classQtyArray, tmCalendar, cxCalendar);
@@ -819,12 +818,15 @@ public class TmAutoScheduleDataLoadService {
                 taskDraft.setSmallGlueFlag(this.isSmallGlueCode(context, taskDraft.getGlueCode()));
                 taskDraft.setMouthPlateCode(row.getTreadMouthPlate());
                 taskDraft.setShiftOrder(targetShiftOrder);
+                taskDraft.setSourceShiftOrder(shiftOrder);
                 taskDraft.setNewSpecInfo(taskNewSpecInfo);
                 taskDraft.setTreadShoulderLength(treadLength);
             taskDraft.setTailFlag(TmCloseOutTipEnum.NEED.getCode().equals(row.getMarkCloseOutTip())
                     ? TmYesNoEnum.YES.getCode() : TmYesNoEnum.NO.getCode());
                 taskDraft.setTailBalanceQty(nvl(row.getCxRemainQty()));
                 taskDraft.setCurrentShiftDemandQty(demandQty);
+                taskDraft.setCurrentShiftFormingFinishQty(resolveFormingQty(classFinishQtyArray, shiftOrder,
+                        algorithmCode, formingShiftOffset).multiply(treadLength));
                 taskDraft.setGuardDemandQty(calculateGuardDemand(classQtyArray, shiftOrder, guardShiftCount,
                         formingShiftOffset).multiply(treadLength));
                 taskDraft.setDemandQty(demandQty);
@@ -934,6 +936,7 @@ public class TmAutoScheduleDataLoadService {
 
         // 预解析每行各班次施工规格，并收集有效胎面编码用于新规格判断
         List<BigDecimal[]> classQtyArrayList = new ArrayList<>();
+        List<BigDecimal[]> classFinishQtyArrayList = new ArrayList<>();
         List<TmConstructionTreadRowVo[]> specByClassList = new ArrayList<>();
         Set<String> allTreadCodes = new LinkedHashSet<>();
         Set<String> treadCodeEmptyList = new LinkedHashSet<>();
@@ -943,6 +946,7 @@ public class TmAutoScheduleDataLoadService {
         for (TmFormingDemandRecipeRowVo row : rowList) {
             BigDecimal[] classQtyArray = buildClassQtyArrayByRecipe(row);
             classQtyArrayList.add(classQtyArray);
+            classFinishQtyArrayList.add(buildClassFinishQtyArrayByRecipe(row));
             String[] recipeNoByClass = buildRecipeNoArray(row);
             TmConstructionTreadRowVo[] specByClass = new TmConstructionTreadRowVo[8];
             for (int i = 0; i < 8; i++) {
@@ -1008,6 +1012,7 @@ public class TmAutoScheduleDataLoadService {
             TmFormingDemandRecipeRowVo row = rowList.get(rowIdx);
             sourceRowIndex++;
             BigDecimal[] classQtyArray = classQtyArrayList.get(rowIdx);
+            BigDecimal[] classFinishQtyArray = classFinishQtyArrayList.get(rowIdx);
             TmConstructionTreadRowVo[] specByClass = specByClassList.get(rowIdx);
             Integer guardShiftCount = this.resolveGuardShiftCount(context, row.getLhMachineCode(), row.getOrderNo(),
                     depthConfigList, fallbackGuardShiftCount);
@@ -1069,12 +1074,15 @@ public class TmAutoScheduleDataLoadService {
                 taskDraft.setSmallGlueFlag(this.isSmallGlueCode(context, taskDraft.getGlueCode()));
                 taskDraft.setMouthPlateCode(primarySpec.getTreadMouthPlate());
                 taskDraft.setShiftOrder(targetShiftOrder);
+                taskDraft.setSourceShiftOrder(shiftOrder);
                 taskDraft.setNewSpecInfo(taskNewSpecInfo);
                 taskDraft.setTreadShoulderLength(treadLength);
             taskDraft.setTailFlag(TmCloseOutTipEnum.NEED.getCode().equals(row.getMarkCloseOutTip())
                     ? TmYesNoEnum.YES.getCode() : TmYesNoEnum.NO.getCode());
                 taskDraft.setTailBalanceQty(nvl(row.getCxRemainQty()));
                 taskDraft.setCurrentShiftDemandQty(demandQty);
+                taskDraft.setCurrentShiftFormingFinishQty(resolveFormingQty(classFinishQtyArray, shiftOrder,
+                        algorithmCode, formingShiftOffset).multiply(treadLength));
                 taskDraft.setGuardDemandQty(calculateGuardDemandByRecipe(classQtyArray, specByClass, shiftOrder,
                         guardShiftCount, formingShiftOffset));
                 taskDraft.setDemandQty(demandQty);
@@ -1145,6 +1153,25 @@ public class TmAutoScheduleDataLoadService {
                 nvl(row.getClass6PlanQty()),
                 nvl(row.getClass7PlanQty()),
                 nvl(row.getClass8PlanQty())
+        };
+    }
+
+    /**
+     * 构建成型班次完成量数组（RECIPE 模式）。
+     *
+     * @param row 成型需求行
+     * @return 一至八班成型完成量数组，空值按零处理
+     */
+    private BigDecimal[] buildClassFinishQtyArrayByRecipe(TmFormingDemandRecipeRowVo row) {
+        return new BigDecimal[]{
+                nvl(row.getClass1FinishQty()),
+                nvl(row.getClass2FinishQty()),
+                nvl(row.getClass3FinishQty()),
+                nvl(row.getClass4FinishQty()),
+                nvl(row.getClass5FinishQty()),
+                nvl(row.getClass6FinishQty()),
+                nvl(row.getClass7FinishQty()),
+                nvl(row.getClass8FinishQty())
         };
     }
 
@@ -2434,14 +2461,32 @@ public class TmAutoScheduleDataLoadService {
     }
 
     /**
+     * 构建成型班次完成量数组（BOM 模式）。
+     *
+     * @param row 成型需求行
+     * @return 一至八班成型完成量数组，空值按零处理
+     */
+    private BigDecimal[] buildClassFinishQtyArray(TmFormingDemandRowVo row) {
+        return new BigDecimal[]{
+                nvl(row.getClass1FinishQty()),
+                nvl(row.getClass2FinishQty()),
+                nvl(row.getClass3FinishQty()),
+                nvl(row.getClass4FinishQty()),
+                nvl(row.getClass5FinishQty()),
+                nvl(row.getClass6FinishQty()),
+                nvl(row.getClass7FinishQty()),
+                nvl(row.getClass8FinishQty())
+        };
+    }
+
+    /**
      * 判断机台是否启用。
      *
      * @param machineInfo 机台基础资料
      * @return true 表示可参与排程
      */
     private boolean isMachineEnabled(TmMachineInfo machineInfo) {
-        return machineInfo != null && (StrUtil.isBlank(machineInfo.getMachineStatus())
-                || TmYesNoEnum.YES.getCode().equals(machineInfo.getMachineStatus()));
+        return machineInfo != null && TmYesNoEnum.YES.getCode().equals(machineInfo.getMachineStatus());
     }
 
     /**

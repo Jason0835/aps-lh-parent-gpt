@@ -383,6 +383,18 @@ public class MesItfController {
     }
 
     /**
+     * 按指定版本号同步硫化在机数据（临时任务）
+     * @param dataVersion 指定版本号
+     * @return 结果
+     */
+    @ApiOperation("按指定版本号同步硫化在机数据（临时任务）")
+    @PostMapping("/syncLhMachineOnlineInfoByVersion")
+    @AutoLoginLog
+    public AjaxResult syncLhMachineOnlineInfoByVersion(@RequestParam("dataVersion") String dataVersion) {
+        return mesItfService.syncLhMachineOnlineInfoByVersion(dataVersion);
+    }
+
+    /**
      * 同步设备保养计划
      * @param syncDataLogs 参数
      * @return 结果

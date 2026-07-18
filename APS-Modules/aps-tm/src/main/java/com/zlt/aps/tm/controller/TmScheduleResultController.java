@@ -2,6 +2,7 @@ package com.zlt.aps.tm.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
+import com.ruoyi.common.core.utils.SecurityUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.i18n.utils.I18nUtil;
@@ -9,6 +10,7 @@ import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.redissonLock.annotation.DistributedLock;
+import com.zlt.aps.tm.api.domain.dto.TmRollingRecalcRequestDTO;
 import com.zlt.aps.tm.api.domain.dto.TmScheduleResultImportDTO;
 import com.zlt.aps.tm.api.domain.entity.TmScheduleResult;
 import com.zlt.aps.tm.api.domain.vo.TmAutoScheduleRequestVo;
@@ -240,6 +242,22 @@ public class TmScheduleResultController extends AbstractDocBizController<TmSched
     @PostMapping("/changeQty")
     public AjaxResult changeQty(@RequestBody TmScheduleResult scheduleResult) {
         return toAjax(tmScheduleResultService.changeQty(scheduleResult));
+    }
+
+    /**
+     * 手动触发胎面自动滚动重算。
+     *
+     * <p>操作人只从微服务安全上下文读取，覆盖请求体中的同名字段，防止外部伪造审计用户。</p>
+     *
+     * @param request 滚动重算请求
+     * @return 滚动重算统计
+     */
+    @Log(title = "ui.data.column.tm.scheduleResult.modelName", businessType = BusinessType.UPDATE)
+    @ApiOperation("胎面自动滚动重算")
+    @PostMapping("/rollingRecalc")
+    public AjaxResult rollingRecalc(@RequestBody TmRollingRecalcRequestDTO request) {
+        request.setOperator(SecurityUtils.getUsername());
+        return AjaxResult.success(tmScheduleResultService.rollingRecalc(request));
     }
 
     /**

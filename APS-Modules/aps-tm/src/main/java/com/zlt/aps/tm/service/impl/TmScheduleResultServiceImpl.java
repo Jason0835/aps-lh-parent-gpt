@@ -15,11 +15,13 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.utils.StringUtils;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.tm.api.constant.TmScheduleConstants;
+import com.zlt.aps.tm.api.domain.dto.TmRollingRecalcRequestDTO;
 import com.zlt.aps.tm.api.domain.entity.TmDispatcherLog;
 import com.zlt.aps.tm.api.domain.entity.TmMachineInfo;
 import com.zlt.aps.tm.api.domain.entity.TmScheduleResult;
 import com.zlt.aps.tm.api.domain.vo.TmAutoScheduleRequestVo;
 import com.zlt.aps.tm.api.domain.vo.TmAutoScheduleResponseVo;
+import com.zlt.aps.tm.api.domain.vo.TmRollingRecalcResponseVO;
 import com.zlt.aps.tm.api.domain.vo.TmScheduleShiftDateVO;
 import com.zlt.aps.tm.api.enums.TmAutoScheduleIssueCategoryEnum;
 import com.zlt.aps.tm.api.enums.TmAutoScheduleIssueLevelEnum;
@@ -31,6 +33,7 @@ import com.zlt.aps.tm.engine.domain.TmPersistResult;
 import com.zlt.aps.tm.engine.domain.TmScheduleContext;
 import com.zlt.aps.tm.engine.template.TmScheduleTemplateImpl;
 import com.zlt.aps.tm.mapper.*;
+import com.zlt.aps.tm.service.ITmRollingUpdateService;
 import com.zlt.aps.tm.service.ITmScheduleResultService;
 import com.zlt.aps.tm.service.TmAutoScheduleAsyncExecutor;
 import com.zlt.aps.tm.service.TmAutoScheduleTaskService;
@@ -84,6 +87,9 @@ public class TmScheduleResultServiceImpl extends AbstractDocService<TmScheduleRe
 
     @Resource
     private TmManualOperationFacade tmManualOperationFacade;
+
+    @Resource
+    private ITmRollingUpdateService tmRollingUpdateService;
 
     @Resource
     private PlatformTransactionManager platformTransactionManager;
@@ -669,6 +675,17 @@ public class TmScheduleResultServiceImpl extends AbstractDocService<TmScheduleRe
     @Override
     public int batchChangeMachine(String machineCode, List<TmScheduleResult> scheduleResultList) {
         return tmManualOperationFacade.batchChangeMachine(machineCode, scheduleResultList);
+    }
+
+    /**
+     * 委托自动滚动服务执行手动重算入口。
+     *
+     * @param request 滚动重算请求
+     * @return 滚动重算统计
+     */
+    @Override
+    public TmRollingRecalcResponseVO rollingRecalc(TmRollingRecalcRequestDTO request) {
+        return tmRollingUpdateService.rollingRecalc(request);
     }
     /**
      * 校验排程结果是否允许发布。

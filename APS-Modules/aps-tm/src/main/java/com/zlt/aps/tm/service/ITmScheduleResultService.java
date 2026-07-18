@@ -1,8 +1,10 @@
 package com.zlt.aps.tm.service;
 
+import com.zlt.aps.tm.api.domain.dto.TmRollingRecalcRequestDTO;
 import com.zlt.aps.tm.api.domain.entity.TmScheduleResult;
 import com.zlt.aps.tm.api.domain.vo.TmAutoScheduleRequestVo;
 import com.zlt.aps.tm.api.domain.vo.TmAutoScheduleResponseVo;
+import com.zlt.aps.tm.api.domain.vo.TmRollingRecalcResponseVO;
 import com.zlt.aps.tm.api.domain.vo.TmScheduleShiftDateVO;
 import com.zlt.bill.common.service.IDocService;
 
@@ -158,6 +160,15 @@ public interface ITmScheduleResultService extends IDocService<TmScheduleResult> 
      * @throws com.ruoyi.common.exception.ServiceException 任一记录校验或转机失败时抛出并整批回滚
      */
     int batchChangeMachine(String machineCode, List<TmScheduleResult> scheduleResultList);
+
+    /**
+     * 手动触发自动滚动重算。
+     *
+     * @param request 工厂、日期和目标班次
+     * @return 滚动重算统计
+     * @throws com.ruoyi.common.exception.ServiceException 参数、状态、锁或事务失败时抛出
+     */
+    TmRollingRecalcResponseVO rollingRecalc(TmRollingRecalcRequestDTO request);
 
     /**
      * 单步撤销最近一次人工操作（插单/调量/转机台）。
