@@ -8,12 +8,14 @@ import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.text.Convert;
 import com.ruoyi.common4ui.core.controller.BaseUIController;
+import com.zlt.aps.tm.api.domain.dto.TmRollingRecalcRequestDTO;
 import com.zlt.aps.tm.api.domain.dto.TmScheduleResultImportDTO;
 import com.zlt.aps.tm.api.domain.entity.TmScheduleResult;
 import com.zlt.aps.tm.api.domain.vo.TmAutoScheduleRequestVo;
 import com.zlt.aps.tm.api.domain.vo.TmScheduleShiftDateVO;
 import com.zlt.aps.tm.api.service.ITmScheduleResultRemoteService;
 import com.zlt.file.encryptbyll.FileEncryptUtils;
+import com.zlt.framework.utils.AuthorizationUtils;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
@@ -250,6 +252,21 @@ public class TmScheduleResultUIController extends BaseUIController<TmScheduleRes
     public AjaxResult batchChangeMachine(@PathVariable("machineCode") String machineCode, String selects) {
         List<TmScheduleResult> scheduleResultList = JSON.parseArray(selects, TmScheduleResult.class);
         return iTmScheduleResultService.batchChangeMachine(machineCode, scheduleResultList);
+    }
+
+    /**
+     * 手动触发胎面自动滚动重算，不增加页面按钮。
+     *
+     * @param request 工厂、排程日期和目标班次
+     * @return 滚动重算统计
+     */
+    @ApiOperation("胎面自动滚动重算")
+    @PostMapping("/rollingRecalc")
+    @RequiresPermissions("tm:tmScheduleResult:autoPlan")
+    @ResponseBody
+    public AjaxResult rollingRecalc(TmRollingRecalcRequestDTO request) {
+        request.setOperator(AuthorizationUtils.getLoginName());
+        return iTmScheduleResultService.rollingRecalc(request);
     }
 
     @ApiOperation("导出数据")

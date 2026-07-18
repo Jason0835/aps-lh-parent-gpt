@@ -53,8 +53,14 @@ public class TmTaskDraft {
     /** 班次顺序 */
     private Integer shiftOrder;
 
+    /** 成型需求原始映射到的胎面逻辑班次，自动提前时与实际排程班次不同。 */
+    private Integer sourceShiftOrder;
+
     /** 当前班成型胎面需求量，单位米 */
     private BigDecimal currentShiftDemandQty;
+
+    /** 当前逻辑班次对应的成型实际完成折米量。 */
+    private BigDecimal currentShiftFormingFinishQty;
 
     /** 保证范围内成型胎面需求量，单位米 */
     private BigDecimal guardDemandQty;

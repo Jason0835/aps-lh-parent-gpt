@@ -4,8 +4,9 @@ import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.constant.ServiceNameConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
-import com.zlt.aps.tm.api.domain.entity.TmScheduleResult;
+import com.zlt.aps.tm.api.domain.dto.TmRollingRecalcRequestDTO;
 import com.zlt.aps.tm.api.domain.dto.TmScheduleResultImportDTO;
+import com.zlt.aps.tm.api.domain.entity.TmScheduleResult;
 import com.zlt.aps.tm.api.domain.vo.TmAutoScheduleRequestVo;
 import com.zlt.aps.tm.api.domain.vo.TmScheduleShiftDateVO;
 import io.swagger.annotations.ApiOperation;
@@ -140,6 +141,16 @@ public interface ITmScheduleResultRemoteService {
     @PostMapping("/tmScheduleResult/batchChangeMachine/{machineCode}")
     AjaxResult batchChangeMachine(@PathVariable("machineCode") String machineCode,
                                   @RequestBody List<TmScheduleResult> scheduleResultList);
+
+    /**
+     * 手动触发胎面自动滚动重算。
+     *
+     * @param request 工厂、日期和目标班次
+     * @return 滚动重算统计
+     */
+    @ApiOperation("胎面自动滚动重算")
+    @PostMapping("/tmScheduleResult/rollingRecalc")
+    AjaxResult rollingRecalc(@RequestBody TmRollingRecalcRequestDTO request);
 
     /**
      * 人工插入排程任务。

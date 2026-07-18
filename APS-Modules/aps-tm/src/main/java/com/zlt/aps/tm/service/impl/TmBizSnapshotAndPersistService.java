@@ -307,7 +307,13 @@ public class TmBizSnapshotAndPersistService implements ITmSnapshotAndPersistServ
      * @return true 表示任务未分配到机台，需要写入未排表
      */
     private boolean isUnplannedTask(TmTaskDraft taskDraft) {
-        return taskDraft != null && (taskDraft.isUnassigned() || StrUtil.isNotBlank(taskDraft.getUnplannedReasonCode()));
+        if (taskDraft == null) {
+            return false;
+        }
+        if (StrUtil.isNotBlank(taskDraft.getUnplannedReasonCode())) {
+            return true;
+        }
+        return taskDraft.isUnassigned() && isPositiveQty(taskDraft.getPlanQty());
     }
 
     /**

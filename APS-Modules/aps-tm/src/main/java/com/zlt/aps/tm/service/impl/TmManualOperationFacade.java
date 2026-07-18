@@ -998,7 +998,7 @@ public class TmManualOperationFacade {
      * @param scheduleResult 插单请求
      * @throws ServiceException 插入位置非法时抛出
      */
-    private void validateInsertAfterSecondSequence(TmScheduleResult scheduleResult) {
+    void validateInsertAfterSecondSequence(TmScheduleResult scheduleResult) {
         Integer shiftOrder = TmInsertPositionValidator.resolveShiftOrder(scheduleResult);
         Integer insertSequence = TmInsertPositionValidator.resolveSequence(scheduleResult, shiftOrder);
         if (shiftOrder == null || insertSequence == null || StrUtil.isBlank(scheduleResult.getMachineCode())) {

@@ -61,6 +61,24 @@ public final class TmScheduleConstants {
     /** 链任务优先策略参数键。 */
     public static final String PARAM_CHAIN_TASK_PRIORITY_STRATEGY = "TM_CHAIN_TASK_PRIORITY_STRATEGY";
 
+    /** 自动滚动开关参数键。 */
+    public static final String PARAM_ROLLING_ENABLED = "TM_ROLLING_ENABLED";
+
+    /** 自动滚动提前触发分钟数参数键。 */
+    public static final String PARAM_ROLLING_LEAD_MINUTES = "TM_ROLLING_LEAD_MINUTES";
+
+    /** 自动滚动上修阈值班数参数键。 */
+    public static final String PARAM_ROLLING_UP_THRESHOLD = "TM_ROLLING_UP_THRESHOLD";
+
+    /** 自动滚动下修阈值班数参数键。 */
+    public static final String PARAM_ROLLING_DOWN_THRESHOLD = "TM_ROLLING_DOWN_THRESHOLD";
+
+    /** 自动滚动下修目标班数参数键。 */
+    public static final String PARAM_ROLLING_DOWN_TARGET = "TM_ROLLING_DOWN_TARGET";
+
+    /** 自动滚动需求窗口班次数参数键。 */
+    public static final String PARAM_ROLLING_SHIFT_COUNT = "TM_ROLLING_SHIFT_COUNT";
+
     /** 工序停放小时数参数键。 */
     public static final String PARAM_PROCESS_STANDING_HOURS = "TM_PROCESS_STANDING_HOURS";
 
@@ -123,6 +141,33 @@ public final class TmScheduleConstants {
 
     /** 链任务优先策略默认编码。 */
     public static final String DEFAULT_CHAIN_TASK_PRIORITY_STRATEGY = "CONTINUITY_FIRST";
+
+    /** 自动滚动开关默认关闭。 */
+    public static final String DEFAULT_ROLLING_ENABLED = "0";
+
+    /** 自动滚动默认提前触发分钟数。 */
+    public static final int DEFAULT_ROLLING_LEAD_MINUTES = 30;
+
+    /** 自动滚动默认上修阈值班数。 */
+    public static final String DEFAULT_ROLLING_UP_THRESHOLD = "1.0";
+
+    /** 自动滚动默认下修阈值班数。 */
+    public static final String DEFAULT_ROLLING_DOWN_THRESHOLD = "3.5";
+
+    /** 自动滚动默认下修目标班数。 */
+    public static final String DEFAULT_ROLLING_DOWN_TARGET = "3.0";
+
+    /** 自动滚动默认需求窗口班次数。 */
+    public static final int DEFAULT_ROLLING_SHIFT_COUNT = 3;
+
+    /** 自动滚动分布式锁前缀。 */
+    public static final String ROLLING_LOCK_KEY_PREFIX = "TM_SCHEDULE:ROLLING_LOCK:";
+
+    /** 自动滚动运行键前缀。 */
+    public static final String ROLLING_RUN_KEY_PREFIX = "ROLLING:";
+
+    /** 自动滚动调度日志操作类型。 */
+    public static final String DISPATCHER_OPER_ROLLING = "4";
 
     /** 工序停放小时数默认值。 */
     public static final String DEFAULT_PROCESS_STANDING_HOURS = "0";

@@ -83,6 +83,20 @@ public class TmMachineAssignService implements ITmMachineAssignService {
      * @param context 胎面排程上下文
      */
     private void assignSingleTask(TmTaskDraft task, TmScheduleContext context) {
+        if (this.nvl(task.getPlanQty()).compareTo(BigDecimal.ZERO) <= 0
+                && this.nvl(task.getToolOverflowQty()).compareTo(BigDecimal.ZERO) <= 0) {
+            // 零计划任务只保留解释，不执行硬约束过滤，避免资料不匹配被误写为未排任务。
+            context.getMachineCandidateList().stream()
+                    .filter(candidate -> candidate != null && Boolean.TRUE.equals(candidate.getEnabled()))
+                    .sorted(Comparator.comparing(TmMachineCandidate::getMachineCode,
+                            Comparator.nullsLast(String::compareTo)))
+                    .findFirst().ifPresent(candidate -> task.setMachineCode(candidate.getMachineCode()));
+            context.getCandidateTraceMap().put(task.getBusinessKey(), Collections.emptyList());
+            this.addAssignTrace(context, task, TmScheduleRuleResultEnum.SKIP, null,
+                    TmScheduleTaskStatusEnum.NO_PRODUCTION_NEEDED.getCode(),
+                    TmScheduleTaskStatusEnum.NO_PRODUCTION_NEEDED.getDesc());
+            return;
+        }
         if (task.isUnassigned()) {
             // 未预置机台的任务走完整过滤评分流程
             this.assignByFilterAndScore(task, context);
@@ -535,7 +549,7 @@ public class TmMachineAssignService implements ITmMachineAssignService {
                 }
                 this.settleAssignedTaskToolState(task, context);
                 this.addContextTask(context, task);
-                context.getCandidateTraceMap().put(task.getBusinessKey(), Collections.singletonList(runtimeCandidate));
+                this.mergeSelectedCandidateTrace(context, task, runtimeCandidate);
                 this.addCapacitySplitTrace(context, task, currentShiftPlanQty, assignedQty, capacityOverflowQty,
                         remainCapacity, runtimeCandidate.getMachineCode(), true);
                 this.bindSmallGlueMachine(context, task, runtimeCandidate.getMachineCode(),
@@ -551,6 +565,37 @@ public class TmMachineAssignService implements ITmMachineAssignService {
             this.appendCarryoverQty(task, selectedCandidate, firstShiftCandidates, filterRule, scoreStrategy, context,
                     carryoverQty, capacityOverflowQty, toolOverflowQty, startShiftOrder);
         }
+    }
+
+    /**
+     * 刷新选中机台运行态信息，同时保留同一任务已记录的被拒绝候选证据。
+     *
+     * @param context          排程上下文
+     * @param task             当前任务
+     * @param runtimeCandidate 选中机台运行态候选
+     */
+    private void mergeSelectedCandidateTrace(TmScheduleContext context, TmTaskDraft task,
+                                             TmMachineCandidate runtimeCandidate) {
+        List<TmMachineCandidate> existingCandidates = context.getCandidateTraceMap().get(task.getBusinessKey());
+        if (CollUtil.isEmpty(existingCandidates)) {
+            context.getCandidateTraceMap().put(task.getBusinessKey(),
+                    Collections.singletonList(runtimeCandidate));
+            return;
+        }
+        List<TmMachineCandidate> mergedCandidates = new ArrayList<>();
+        boolean replaced = false;
+        for (TmMachineCandidate existingCandidate : existingCandidates) {
+            if (Objects.equals(existingCandidate.getMachineCode(), runtimeCandidate.getMachineCode())) {
+                mergedCandidates.add(runtimeCandidate);
+                replaced = true;
+            } else {
+                mergedCandidates.add(existingCandidate);
+            }
+        }
+        if (!replaced) {
+            mergedCandidates.add(runtimeCandidate);
+        }
+        context.getCandidateTraceMap().put(task.getBusinessKey(), mergedCandidates);
     }
 
     /**
@@ -933,6 +978,8 @@ public class TmMachineAssignService implements ITmMachineAssignService {
             unplannedTask.setUnplannedReasonCode(TmUnplannedReasonEnum.CAPACITY_NOT_ENOUGH.getCode());
             unplannedTask.setUnplannedReasonDesc(TmUnplannedReasonEnum.CAPACITY_NOT_ENOUGH.getDesc());
             this.addContextTask(context, unplannedTask);
+            // 以第六班最终产能重新执行候选过滤，使未排任务的运行态与持久化快照保留终态拒绝原因。
+            this.buildPassedAndScoredCandidates(unplannedTask, context, filterRule, scoreStrategy);
             this.addCapacityUnplannedTrace(context, unplannedTask, remainingQty);
             this.addCarryoverTrace(context, unplannedTask, sourceTask, sourceType, remainingQty, sourceShiftOrder,
                     TmScheduleConstants.TM_MAX_SHIFT_ORDER, null,
@@ -2039,6 +2086,9 @@ public class TmMachineAssignService implements ITmMachineAssignService {
         copy.setTailMouthPlateCode(source.getTailMouthPlateCode());
         copy.setSwitchCostHours(source.getSwitchCostHours());
         copy.setFixedMachineMatched(source.getFixedMachineMatched());
+        // 运行态候选机台需要保留本轮评分，否则解释快照会将已选机台分数降为 0，并丢失六项评分明细。
+        copy.setScore(source.getScore());
+        copy.applyScore(source.getScoreResult());
         copy.getEvidence().putAll(source.getEvidence());
         return copy;
     }
@@ -2095,7 +2145,9 @@ public class TmMachineAssignService implements ITmMachineAssignService {
         if (StrUtil.isBlank(task.getMouthPlateCode())) {
             return true;
         }
-        if (!contains(candidate.getConfiguredMouthPlateCodes(), task.getMouthPlateCode())) {
+        // 工厂完全未维护口型板时按不限制处理；只要已维护任一口型板，候选机台必须明确具备任务口型板。
+        if (candidate.getConfiguredMouthPlateCodes() == null
+                || candidate.getConfiguredMouthPlateCodes().isEmpty()) {
             return true;
         }
         return contains(candidate.getMouthPlateCodes(), task.getMouthPlateCode());

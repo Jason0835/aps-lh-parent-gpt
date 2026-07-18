@@ -22,10 +22,12 @@
                        ) AS rn
                 FROM T_MDM_CONSTRUCTION_INFO c
                 WHERE c.CONSTRUCTION_CODE = cx.EMBRYO_CODE
+                  AND c.IS_DELETE = 0
             ) ranked
             WHERE ranked.rn = 1
         ) ci ON TRUE
-        WHERE cx.FACTORY_CODE = #{factoryCode}
+        WHERE cx.IS_DELETE = 0
+          AND cx.FACTORY_CODE = #{factoryCode}
           AND cx.SCHEDULE_DATE = #{scheduleDate}
           AND ci.SIDEWALL_CODE IN
           <foreach collection="sidewallCodes" item="sidewallCode" open="(" separator="," close=")">
@@ -42,7 +44,9 @@
         INNER JOIN T_MDM_CONSTRUCTION_INFO ci
                ON cx.EMBRYO_CODE = ci.CONSTRUCTION_CODE
               AND cx.CLASS1_RECIPE_NO = ci.CONSTRUCTION_VERSION
-        WHERE cx.FACTORY_CODE = #{factoryCode}
+              AND ci.IS_DELETE = 0
+        WHERE cx.IS_DELETE = 0
+          AND cx.FACTORY_CODE = #{factoryCode}
           AND cx.SCHEDULE_DATE = #{scheduleDate}
           AND ci.SIDEWALL_CODE IN
           <foreach collection="sidewallCodes" item="sidewallCode" open="(" separator="," close=")">
@@ -55,7 +59,8 @@
         SELECT SIDEWALL_CODE AS sidewallCode,
                SUM(IFNULL(CLASS3_PLAN_QTY, 0)) AS qty
         FROM T_TC_SCHEDULE_RESULT
-        WHERE FACTORY_CODE = #{factoryCode}
+        WHERE IS_DELETE = 0
+          AND FACTORY_CODE = #{factoryCode}
           AND SCHEDULE_DATE = #{scheduleDate}
           AND SIDEWALL_CODE IN
           <foreach collection="sidewallCodes" item="sidewallCode" open="(" separator="," close=")">

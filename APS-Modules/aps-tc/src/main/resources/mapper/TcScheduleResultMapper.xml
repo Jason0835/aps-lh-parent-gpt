@@ -5,7 +5,7 @@
 <mapper namespace="com.zlt.aps.tc.mapper.TcScheduleResultMapper">
     <select id="isReleasingOrTimeoutByIds" parameterType="string" resultType="int">
         select count(1) from T_TC_SCHEDULE_RESULT
-        where (RELEASE_STATUS = '3' or RELEASE_STATUS = '4')
+        where is_delete = 0 and (RELEASE_STATUS = '3' or RELEASE_STATUS = '4')
         and id in
         <foreach item="id" collection="array" open="(" separator="," close=")">
             #{id}
