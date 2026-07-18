@@ -107,6 +107,7 @@ UIController extends BaseUIController<Entity>
 - 如果当前模块依赖 `tm-api`、`api`、`common` 等上游模块，必须带 `-am`。
 - 仓库存在无测试模块时，必须带 `-DfailIfNoTests=false`。
 - 命令失败时，先判断是 shell 参数解析问题、Maven 模块依赖问题，还是代码编译/测试问题，不要直接认定代码失败。
+- **代码修改后无需执行 Maven 编译验证**，由用户自行处理编译问题。
 
 ### 胎面部分调整
 - 有涉及到胎面业务调整的部分，都需要同步更新到详设文档：docs/tm/tm_schedule_detailed_design.md
