@@ -899,7 +899,6 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
 
                 // 3. 计算机台可开工时间（考虑机台当前预计完工和能力策略约束）
                 Date endingTime = resolveMachineOccupationEndTime(context, sku, candidateMachine, shifts);
-                getMaintenanceScheduleService().tryAttachLongOnlineMaintenance(context, candidateMachine);
                 if (isEnding) {
                     getMaintenanceScheduleService().tryAttachMaintenanceAfterFirstEnding(
                             context, candidateMachine, endingTime);
@@ -922,7 +921,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                                 sku.getMaterialCode(), machineCode,
                                 LhScheduleTimeUtil.formatDateTime(endingTime),
                                 LhScheduleTimeUtil.formatDateTime(trialSwitchStartTime), trialNormalSwitchHours);
-                        getMaintenanceScheduleService().clearMaintenanceWindows(candidateMachine);
+                        getMaintenanceScheduleService().clearMaintenanceWindows(context, candidateMachine);
                     }
                 }
                 // 保养窗口挂载会改变候选机台运行态，提前清理窗口产能缓存，避免后续复用旧产能。
@@ -5274,13 +5273,22 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
             requiredMachineCountByDailyCapacity =
                     Math.min(requiredMachineCountByDailyCapacity, dailyRhythmMachineCountCap);
         }
-        if (isExistingSameMaterialSimulationSatisfied(
-                request, existingMachineCapacityMaps, simulationResult.getFinalActiveMachines())) {
+        // 已有同物料机台是否满足 dayN 节奏，按 dayN 节奏总机台数（dailyRhythmMachineCountCap）判断，
+        // 不使用按月计划余量扩出的 finalActiveMachines，避免余量大时误扩机台（如 3302001271 dayN=46,46,46，
+        // 余量 700 驱动 finalActiveMachines=2，但 dayN 节奏只需 1 台，已有 1 台即满足、不再增机）。
+        // 续作增机台补偿SKU已由续作链路按 dayN 节奏确定需要新增机台（continuationShortageMachineCount>0），
+        // 此处不得因 simulateExpansion 在当前日满足即停止而误判已有续作机台满足，导致补偿SKU无法落第2台
+        // （如 3302001590 dayN=48,48,68，T+3=96，缺口1台）；shortage=0 的补偿SKU（如 dayN 全满足）仍受此约束。
+        boolean compensationShortageAddMachine = sku.isContinuousCompensationSku()
+                && Math.max(0, sku.getContinuationShortageMachineCount()) > 0;
+        if (!compensationShortageAddMachine
+                && isExistingSameMaterialSimulationSatisfied(
+                request, existingMachineCapacityMaps, dailyRhythmMachineCountCap)) {
             segment.setExistingSameMaterialSatisfied(true);
             log.info("新增SKU已有同物料机台满足dayN增机台规则, materialCode: {}, machineCode: {}, "
-                            + "existingMachineCount: {}, requiredMachineCount: {}, remainingTargetQty: {}",
+                            + "existingMachineCount: {}, dailyRhythmMachineCountCap: {}, remainingTargetQty: {}",
                     sku.getMaterialCode(), segment.getMachineCode(), existingMachineCapacityMaps.size(),
-                    simulationResult.getFinalActiveMachines(), remainingTargetQty);
+                    dailyRhythmMachineCountCap, remainingTargetQty);
             return 0;
         }
         segment.setAddMachineProductionDateList(resolveAddMachineProductionDateList(simulationResult));
