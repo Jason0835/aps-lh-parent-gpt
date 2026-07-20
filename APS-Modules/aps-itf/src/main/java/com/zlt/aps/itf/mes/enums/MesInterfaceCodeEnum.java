@@ -140,6 +140,14 @@ public enum MesInterfaceCodeEnum {
      * 设备计划停机同步
      */
     DEV_PLAN_CLOSE("DEV_PLAN_CLOSE", "mesItfService", "syncDevPlanClose", "设备计划停机同步"),
+    
+    /**
+     * 垫胶接口
+     */
+    PAD_STOCK("PAD_STOCK", "mesItfDjService", "syncStock", "垫胶库存同步"),
+    PAD_COMPLETE_QUANTITY("PAD_COMPLETE_QUANTITY", "mesItfDjService", "syncStock", "垫胶排程完成量同步"),
+    PAD_DAY_COMPLETE("PAD_DAY_COMPLETE", "mesItfDjService", "syncStock", "垫胶排程日完成量同步"),
+    
     ;
 
     private final String code;

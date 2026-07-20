@@ -150,9 +150,29 @@ public enum ItfSyncKeyEnum {
     TC_CLASS_SHIFT_FINISH_QTY("SIDEWALL_COMPLETE_QUANTITY", "MES", "APS", "胎侧排程完成量同步"),
 
     /**
-     * 胎侧排程日完成量同步
+     * 垫胶排程日完成量同步
      */
     TC_SCHE_DAY_FINISH_QTY("TC_DAY_COMPLETE", "MES", "APS", "胎侧排程日完成量同步"),
+
+    /**
+     * 垫胶库存同步
+     */
+    PAD_STOCK("PAD_STOCK", "MES", "APS", "垫胶库存同步"),
+
+    /**
+     * 垫胶排程结果下发
+     */
+    PAD_SCHE_FBK("PAD_SCHE_FBK", "APS", "MES", "垫胶排程结果下发接口"),
+
+    /**
+     * 垫胶排程完成量同步
+     */
+    PAD_COMPLETE_QUANTITY("PAD_COMPLETE_QUANTITY", "MES", "APS", "垫胶排程完成量同步"),
+
+    /**
+     * 垫胶排程日完成量同步
+     */
+    PAD_DAY_COMPLETE("PAD_DAY_COMPLETE", "MES", "APS", "垫胶排程日完成量同步"),
 
     /**
      * 斜裁排程结果下发

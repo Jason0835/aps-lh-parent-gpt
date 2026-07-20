@@ -119,7 +119,7 @@
             UNIT,
             DATA_VERSION,
             FACTORY_CODE
-        FROM MES_CONSTRUCTION_PROCESS
+        FROM MES_CONSTRUCTION_PROCESS_INFO
         WHERE FACTORY_CODE = #{factoryCode}
           AND DATA_VERSION = #{dataVersion}
     </select>
