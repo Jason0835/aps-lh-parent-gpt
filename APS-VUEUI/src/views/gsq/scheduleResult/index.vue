@@ -194,7 +194,15 @@ export default {
       changeQtyVisible: false,
       importDialogVisible: false,
       // 6班次日期展示（D日中班/D+1日夜早中/D+2日夜早）
-      shiftDateList: [],
+      // 默认值与 tq 保持一致，未拿到数据时也能显示班次类型
+      shiftDateList: [
+        { shift: 1, shiftType: "afternoon", shiftDate: "" },
+        { shift: 2, shiftType: "night", shiftDate: "" },
+        { shift: 3, shiftType: "morning", shiftDate: "" },
+        { shift: 4, shiftType: "afternoon", shiftDate: "" },
+        { shift: 5, shiftType: "night", shiftDate: "" },
+        { shift: 6, shiftType: "morning", shiftDate: "" },
+      ],
       // 导入默认值
       importDefaultValue: {
         scheduleDate: moment().add(2, "days").format("YYYY-MM-DD"),
@@ -238,6 +246,8 @@ export default {
           component: "el-date-picker",
           type: "date",
           valueFormat: "yyyy-MM-dd",
+          // 与 tq 一致：日期变更时即时刷新6班次表头
+          listeners: { change: this.handleScheduleDateChange },
         },
         {
           label: this.$t("ui.data.column.gsqScheduleResult.steelRingCode"),
@@ -305,13 +315,61 @@ export default {
           prop: "monthSurplusQty",
           width: 100,
         },
-        // ===== 6班次动态列（含日期头） =====
-        this.buildShiftColumnGroup(1),
-        this.buildShiftColumnGroup(2),
-        this.buildShiftColumnGroup(3),
-        this.buildShiftColumnGroup(4),
-        this.buildShiftColumnGroup(5),
-        this.buildShiftColumnGroup(6),
+        // ===== 6班次动态列（含日期头，与 tq 写法对齐） =====
+        {
+          label: this.getShiftLabel(1),
+          children: [
+            { label: this.$t("ui.data.column.gsqScheduleResult.planQty"), prop: "class1PlanQty", width: 90 },
+            { label: this.$t("ui.data.column.gsqScheduleResult.finishQty"), prop: "class1FinishQty", width: 90 },
+            { label: this.$t("ui.data.column.gsqScheduleResult.sequence"), prop: "class1Sequence", width: 80 },
+            { label: this.$t("ui.data.column.gsqScheduleResult.handAnalysis"), prop: "class1HandAnalysis", width: 130 },
+          ],
+        },
+        {
+          label: this.getShiftLabel(2),
+          children: [
+            { label: this.$t("ui.data.column.gsqScheduleResult.planQty"), prop: "class2PlanQty", width: 90 },
+            { label: this.$t("ui.data.column.gsqScheduleResult.finishQty"), prop: "class2FinishQty", width: 90 },
+            { label: this.$t("ui.data.column.gsqScheduleResult.sequence"), prop: "class2Sequence", width: 80 },
+            { label: this.$t("ui.data.column.gsqScheduleResult.handAnalysis"), prop: "class2HandAnalysis", width: 130 },
+          ],
+        },
+        {
+          label: this.getShiftLabel(3),
+          children: [
+            { label: this.$t("ui.data.column.gsqScheduleResult.planQty"), prop: "class3PlanQty", width: 90 },
+            { label: this.$t("ui.data.column.gsqScheduleResult.finishQty"), prop: "class3FinishQty", width: 90 },
+            { label: this.$t("ui.data.column.gsqScheduleResult.sequence"), prop: "class3Sequence", width: 80 },
+            { label: this.$t("ui.data.column.gsqScheduleResult.handAnalysis"), prop: "class3HandAnalysis", width: 130 },
+          ],
+        },
+        {
+          label: this.getShiftLabel(4),
+          children: [
+            { label: this.$t("ui.data.column.gsqScheduleResult.planQty"), prop: "class4PlanQty", width: 90 },
+            { label: this.$t("ui.data.column.gsqScheduleResult.finishQty"), prop: "class4FinishQty", width: 90 },
+            { label: this.$t("ui.data.column.gsqScheduleResult.sequence"), prop: "class4Sequence", width: 80 },
+            { label: this.$t("ui.data.column.gsqScheduleResult.handAnalysis"), prop: "class4HandAnalysis", width: 130 },
+          ],
+        },
+        {
+          label: this.getShiftLabel(5),
+          children: [
+            { label: this.$t("ui.data.column.gsqScheduleResult.planQty"), prop: "class5PlanQty", width: 90 },
+            { label: this.$t("ui.data.column.gsqScheduleResult.finishQty"), prop: "class5FinishQty", width: 90 },
+            { label: this.$t("ui.data.column.gsqScheduleResult.sequence"), prop: "class5Sequence", width: 80 },
+            { label: this.$t("ui.data.column.gsqScheduleResult.handAnalysis"), prop: "class5HandAnalysis", width: 130 },
+          ],
+        },
+        {
+          label: this.getShiftLabel(6),
+          children: [
+            { label: this.$t("ui.data.column.gsqScheduleResult.planQty"), prop: "class6PlanQty", width: 90 },
+            { label: this.$t("ui.data.column.gsqScheduleResult.finishQty"), prop: "class6FinishQty", width: 90 },
+            { label: this.$t("ui.data.column.gsqScheduleResult.sequence"), prop: "class6Sequence", width: 80 },
+            { label: this.$t("ui.data.column.gsqScheduleResult.handAnalysis"), prop: "class6HandAnalysis", width: 130 },
+          ],
+        },
         // ===== 状态/操作列 =====
         {
           label: this.$t("ui.data.column.gsqScheduleResult.isRelease"),
@@ -325,92 +383,73 @@ export default {
           label: this.$t("ui.data.column.gsqScheduleResult.remark"),
           prop: "remark",
           width: 150,
-        },
-        {
-          label: this.$t("ui.frame.btn.operation"),
-          prop: "operation",
-          width: 160,
-          fixed: "right",
-          slot: true,
-        },
+        }
       ];
     },
   },
   created() {
-    this.loadShiftDates();
+    // 首次进入页面时加载数据（getList 内部会先 await getDate() 拉取班次日期）
     this.getList();
   },
   methods: {
     /**
-     * 构建6班次列分组（计划量/完成量/顺序/原因分析）
-     * @param shift 班次序号 1~6
+     * 获取班次列表头标签（班次名 + 日期）
+     * 与 tq 写法保持一致：未拿到数据时显示默认班次类型，拿到数据后显示"班次名 日期"
+     * @param shiftIndex 班次序号 1~6
      */
-    buildShiftColumnGroup(shift) {
-      const shiftDateVo = this.shiftDateList.find((s) => s.shift === shift);
-      const dateLabel = shiftDateVo ? shiftDateVo.shiftDate : "";
-      const shiftTypeLabel = shiftDateVo ? this.shiftTypeLabel(shiftDateVo.shiftType) : "";
-      const prefix = `class${shift}`;
-      return {
-        label: `${dateLabel} ${shiftTypeLabel}（${shift}班）`,
-        children: [
-          {
-            label: this.$t("ui.data.column.gsqScheduleResult.planQty"),
-            prop: `${prefix}PlanQty`,
-            width: 90,
-          },
-          {
-            label: this.$t("ui.data.column.gsqScheduleResult.finishQty"),
-            prop: `${prefix}FinishQty`,
-            width: 90,
-          },
-          {
-            label: this.$t("ui.data.column.gsqScheduleResult.sequence"),
-            prop: `${prefix}Sequence`,
-            width: 80,
-          },
-          {
-            label: this.$t("ui.data.column.gsqScheduleResult.handAnalysis"),
-            prop: `${prefix}HandAnalysis`,
-            width: 130,
-          },
-        ],
+    getShiftLabel(shiftIndex) {
+      const item = this.shiftDateList[shiftIndex - 1];
+      if (!item) return "";
+      // 多语言 key 与 tq 共用通用 key
+      const shiftNameMap = {
+        night: this.$t("ui.data.column.scheduleResult.nightShift"),
+        morning: this.$t("ui.data.column.scheduleResult.morningShift"),
+        afternoon: this.$t("ui.data.column.scheduleResult.middleShift"),
       };
+      const shiftName = shiftNameMap[item.shiftType] || "";
+      return shiftName + " " + (item.shiftDate || "");
     },
-    /** 班次类型中文标签 */
-    shiftTypeLabel(type) {
-      if (type === "night") return this.$t("ui.data.column.gsqScheduleResult.nightShift");
-      if (type === "morning") return this.$t("ui.data.column.gsqScheduleResult.morningShift");
-      if (type === "afternoon") return this.$t("ui.data.column.gsqScheduleResult.afternoonShift");
-      return "";
-    },
-    /** 加载6班次日期 */
-    loadShiftDates() {
-      listScheduleShiftDates({ scheduleDate: this.search.scheduleDate }).then((res) => {
-        this.shiftDateList = res.data || [];
-      });
-    },
-    /** 查询列表 */
-    getList() {
-      this.loading = true;
-      const params = {
-        ...this.search,
-        scheduleDateQuery: this.search.scheduleDate,
-        pageNum: this.page.pageNum,
-        pageSize: this.page.pageSize,
-      };
-      listScheduleResult(params)
-        .then((res) => {
-          this.data = res.rows || [];
-          this.page.total = res.total || 0;
-        })
-        .finally(() => {
-          this.loading = false;
+    /** 加载6班次日期（拦截器已返回数组本身，无需再 .data） */
+    async getDate() {
+      try {
+        const res = await listScheduleShiftDates({
+          scheduleDate: this.search.scheduleDate,
         });
+        if (Array.isArray(res) && res.length > 0) {
+          this.shiftDateList = res;
+        }
+      } catch (error) {
+        console.error(error);
+      }
+    },
+    /** 查询列表（先 await getDate() 保证表头先就绪，与 tq 一致） */
+    async getList() {
+      this.loading = true;
+      try {
+        await this.getDate();
+        const params = {
+          ...this.search,
+          scheduleDateQuery: this.search.scheduleDate,
+          pageNum: this.page.pageNum,
+          pageSize: this.page.pageSize,
+        };
+        const res = await listScheduleResult(params);
+        this.data = res.rows || [];
+        this.page.total = res.total || 0;
+      } catch (error) {
+        console.error(error);
+      } finally {
+        this.loading = false;
+      }
     },
     handleSearch() {
       this.page.pageNum = 1;
-      this.loadShiftDates();
       this.getList();
+    },
+    /** 排程日期变更：同步到 search.scheduleDate 并即时刷新6班次日期 */
+    handleScheduleDateChange(val) {
+      this.search.scheduleDate = val;
+      this.getDate();
     },
     handlePageChange(val) {
       this.page.pageNum = val.pageNum;

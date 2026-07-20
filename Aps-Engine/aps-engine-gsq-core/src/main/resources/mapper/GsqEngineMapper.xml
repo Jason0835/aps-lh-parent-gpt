@@ -2,70 +2,85 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.zlt.aps.gsq.engine.mapper.GsqEngineMapper">
 
-    <select id="statGsqScheduleBase" resultType="com.zlt.aps.gsq.engine.vo.GsqScheduleResultVo" parameterType="string">
-        select a.*, b.CX_CLASS1_PLAN,b.CX_CLASS2_PLAN,b.CX_CLASS3_PLAN,b.CX_CLASS4_PLAN,b.CX_CLASS5_PLAN
-        from (
-                select max(cxr.SCHEDULE_DATE) SCHEDULE_DATE,  /*排程日期*/
-                       max(cxr.BATCH_NO) TQ_BATCH_NO,     /*胎圈批次号*/
-                       ci.BEAD_CODE STEEL_RING_CODE,        /*钢丝圈代码*/
-                       max(ci.BEAD_TYPE) STEEL_TYPE,       /*钢丝类型*/
-                       max(ci.BEAD_ARRANGE) `RANK`,         /*排列*/
-                       max(ci.DIMENSION) DIMENSION,         /*寸口*/
-                       1 unit_consume,     /*对应成型单耗*/
-                       IFNULL(sum(txr.NIGHT_PLAN_QTY),0) LAST_MID_TQ_PLAN_QTY,  /* 胎圈前日早班计划量 */
-                       IFNULL(sum(cxr.MID_PLAN_QTY),0) LAST_NIGHT_TQ_PLAN_QTY,  /* 胎圈前日夜班计划量 */
-                       IFNULL(sum(cxr.NIGHT_PLAN_QTY),0) MID_PLAN_QTY,  /* 夜班计划量=胎圈早班计划量   */
-                       IFNULL(sum(cxr.DAY_PLAN_QTY),0) NIGHT_PLAN_QTY,  /* 早班计划量 = 胎圈次日夜班计划量 */
-                       max(cxr.CLOSE_OUT_SPEC_FLAG) CLOSE_OUT_SPEC_FLAG,
-                       0 DAY_PLAN_QTY
-                from T_TQ_SCHEDULE_RESULT cxr /*胎圈排程结果表*/
-                inner join (SELECT TIRE_RING_CODE, MAX(BEAD_CODE) BEAD_CODE, MAX(BEAD_ARRANGE) BEAD_ARRANGE, MAX(BEAD_TYPE) BEAD_TYPE,
-                                   max(Dimension) DIMENSION
-                            FROM T_PRODUCT_CONSTRUCTION_INFO
-                            WHERE DEL_FLAG = 0
-                            <if test="productionStage == '1'.toString()">
-                                and PRODUCTION_STAGE = '0'
-                            </if>
-                            GROUP BY TIRE_RING_CODE) ci on cxr.BEAD_CODE = ci.TIRE_RING_CODE  /*施工信息表*/
-                left join (
-                   SELECT BEAD_CODE, IFNULL(sum(NIGHT_PLAN_QTY),0) NIGHT_PLAN_QTY
-                     FROM T_TQ_SCHEDULE_RESULT
-                    WHERE schedule_date = DATE_ADD(#{scheduleDate}, INTERVAL -1 day) /*上一天的胎圈计划*/
-                      AND DEL_FLAG = 0
-                    GROUP BY BEAD_CODE
-                ) txr ON txr.BEAD_CODE = cxr.BEAD_CODE
-                where schedule_date = STR_TO_DATE(#{scheduleDate}, '%Y-%m-%d')
-                and cxr.DEL_FLAG = 0
-                group by ci.BEAD_CODE) a
-        left join (
+    <!--
+        根据胎圈6班次排程记录 + 施工BOM，统计出钢丝圈6班次排程记录基础数据。
+        班次映射：钢丝圈N班 → 供应胎圈N+1班（钢丝圈提前1班备货）
+        因此：钢丝圈1班计划量 = 胎圈2班消耗 × BOM用量
+              钢丝圈2班计划量 = 胎圈3班消耗 × BOM用量
+              ...
+              钢丝圈6班计划量 = 胎圈7班消耗（末班估值，由Service层填充）
+    -->
+    <select id="statGsqScheduleBase" resultType="com.zlt.aps.gsq.engine.vo.GsqScheduleResultVo">
         select
-                           BEAD_CODE,
-                           IFNULL(sum(cxr.CLASS1_PLAN_QTY*1),0) CX_CLASS1_PLAN,  /*对应成型一班的钢丝圈胶计划量=成型计划量*1   */
-                           IFNULL(sum(cxr.CLASS2_PLAN_QTY*1),0) CX_CLASS2_PLAN,  /*对应成型二班的钢丝圈胶计划量*/
-                           IFNULL(sum(cxr.CLASS3_PLAN_QTY*1),0) CX_CLASS3_PLAN,  /*对应成型三班的钢丝圈胶计划量*/
-                           IFNULL(sum(cxr.CLASS4_PLAN_QTY*1),0) CX_CLASS4_PLAN,  /*对应成型次一班的钢丝圈胶计划量*/
-                           IFNULL(sum(cxr.CLASS5_PLAN_QTY*1),0) CX_CLASS5_PLAN  /*对应成型次二班的钢丝圈胶计划量*/
-                      from T_CX_SCHEDULE_RESULT cxr /*成型排程结果表*/
-                      inner join T_PRODUCT_CONSTRUCTION_INFO ci on cxr.EMBRYO_CODE = ci.embryo_code and cxr.BOM_DATA_VERSION = ci.EMBRYO_VERSION /*施工信息表*/
-                      where schedule_date = STR_TO_DATE(#{scheduleDate}, '%Y-%m-%d')
-                      <if test="productionStage == '1'.toString()">
-                          and ci.PRODUCTION_STAGE = '0'
-                      </if>
-                      and cxr.DEL_FLAG = 0
-                      and ci.DEL_FLAG = 0
+            max(tqr.SCHEDULE_DATE)                                   as scheduleDate,
+            max(tqr.BATCH_NO)                                        as tqBatchNo,
+            ci.BEAD_CODE                                             as steelRingCode,
+            max(ci.BEAD_TYPE)                                        as steelType,
+            max(ci.BEAD_ARRANGE)                                     as rank,
+            max(ci.DIMENSION)                                        as dimension,
+            max(ci.PRO_SIZE)                                         as proSize,
+            1                                                         as unitConsume,
+            /* 胎圈1班消耗量 */
+            sum(IFNULL(tqr.CLASS1_PLAN_QTY, 0) * IFNULL(ci.BOM_QTY, 1)) as tqClass1Plan,
+            /* 胎圈2班消耗量 = 钢丝圈1班需求 */
+            sum(IFNULL(tqr.CLASS2_PLAN_QTY, 0) * IFNULL(ci.BOM_QTY, 1)) as tqClass2Plan,
+            /* 胎圈3班消耗量 = 钢丝圈2班需求 */
+            sum(IFNULL(tqr.CLASS3_PLAN_QTY, 0) * IFNULL(ci.BOM_QTY, 1)) as tqClass3Plan,
+            /* 胎圈4班消耗量 = 钢丝圈3班需求 */
+            sum(IFNULL(tqr.CLASS4_PLAN_QTY, 0) * IFNULL(ci.BOM_QTY, 1)) as tqClass4Plan,
+            /* 胎圈5班消耗量 = 钢丝圈4班需求 */
+            sum(IFNULL(tqr.CLASS5_PLAN_QTY, 0) * IFNULL(ci.BOM_QTY, 1)) as tqClass5Plan,
+            /* 胎圈6班消耗量 = 钢丝圈5班需求 */
+            sum(IFNULL(tqr.CLASS6_PLAN_QTY, 0) * IFNULL(ci.BOM_QTY, 1)) as tqClass6Plan,
+            max(tqr.CLOSE_OUT_SPEC_FLAG)                             as closeOutSpecFlag,
+            /* 上一天胎圈夜班（昨日2班）剩余库存来源 */
+            IFNULL(sum(prevTqr.CLASS2_PLAN_QTY), 0)                  as lastMidPlanQty,
+            /* 钢丝圈1班计划量初始值 = 胎圈2班消耗量 */
+            sum(IFNULL(tqr.CLASS2_PLAN_QTY, 0) * IFNULL(ci.BOM_QTY, 1)) as class1PlanQty,
+            sum(IFNULL(tqr.CLASS3_PLAN_QTY, 0) * IFNULL(ci.BOM_QTY, 1)) as class2PlanQty,
+            sum(IFNULL(tqr.CLASS4_PLAN_QTY, 0) * IFNULL(ci.BOM_QTY, 1)) as class3PlanQty,
+            sum(IFNULL(tqr.CLASS5_PLAN_QTY, 0) * IFNULL(ci.BOM_QTY, 1)) as class4PlanQty,
+            sum(IFNULL(tqr.CLASS6_PLAN_QTY, 0) * IFNULL(ci.BOM_QTY, 1)) as class5PlanQty,
+            0                                                          as class6PlanQty
+        from T_TQ_SCHEDULE_RESULT tqr
+        inner join (
+            SELECT
+                TIRE_RING_CODE,
+                MAX(BEAD_CODE)    BEAD_CODE,
+                MAX(BEAD_ARRANGE) BEAD_ARRANGE,
+                MAX(BEAD_TYPE)    BEAD_TYPE,
+                MAX(Dimension)    DIMENSION,
+                MAX(PRO_SIZE)     PRO_SIZE,
+                MAX(IFNULL(BOM_QTY, 1)) BOM_QTY
+            FROM T_PRODUCT_CONSTRUCTION_INFO
+            WHERE DEL_FLAG = 0
+            <if test="productionStage == '1'.toString()">
+                and PRODUCTION_STAGE = '0'
+            </if>
+            GROUP BY TIRE_RING_CODE
+        ) ci on tqr.BEAD_CODE = ci.TIRE_RING_CODE
+        left join (
+            SELECT
+                BEAD_CODE,
+                IFNULL(sum(CLASS2_PLAN_QTY), 0) CLASS2_PLAN_QTY
+            FROM T_TQ_SCHEDULE_RESULT
+            WHERE SCHEDULE_DATE = DATE_ADD(STR_TO_DATE(#{scheduleDate}, '%Y-%m-%d'), INTERVAL -1 DAY)
+              AND DEL_FLAG = 0
+            GROUP BY BEAD_CODE
+        ) prevTqr ON prevTqr.BEAD_CODE = tqr.BEAD_CODE
+        where tqr.SCHEDULE_DATE = STR_TO_DATE(#{scheduleDate}, '%Y-%m-%d')
+          and tqr.DEL_FLAG = 0
         group by ci.BEAD_CODE
-        ) b on a.STEEL_RING_CODE = b.BEAD_CODE
-      WHERE LAST_MID_TQ_PLAN_QTY > 0
-         OR LAST_NIGHT_TQ_PLAN_QTY > 0
-         OR MID_PLAN_QTY > 0
-         OR NIGHT_PLAN_QTY > 0
+        having sum(IFNULL(tqr.CLASS1_PLAN_QTY, 0) + IFNULL(tqr.CLASS2_PLAN_QTY, 0)
+                 + IFNULL(tqr.CLASS3_PLAN_QTY, 0) + IFNULL(tqr.CLASS4_PLAN_QTY, 0)
+                 + IFNULL(tqr.CLASS5_PLAN_QTY, 0) + IFNULL(tqr.CLASS6_PLAN_QTY, 0)) > 0
     </select>
 
     <select id="listQuotaParam" parameterType="string" resultType="com.zlt.aps.gsq.engine.vo.GsqQuotaParam">
-        select ci.BEAD_CODE STEEL_RING_CODE,   /*钢丝圈代码*/
-               GROUP_CONCAT(DISTINCT concat(cxr.CX_MACHINE_CODE,'$',cxr.EMBRYO_CODE,'$',cxr.BOM_DATA_VERSION) order by cxr.CX_MACHINE_CODE,cxr.EMBRYO_CODE,cxr.BOM_DATA_VERSION SEPARATOR ',') as quotaKeys /*机台code$胎胚代码*/
-        from T_CX_SCHEDULE_RESULT cxr /*成型排程结果表*/
-        inner join T_PRODUCT_CONSTRUCTION_INFO ci on cxr.EMBRYO_CODE = ci.embryo_code and cxr.BOM_DATA_VERSION = ci.EMBRYO_VERSION /*施工信息表*/
+        select ci.BEAD_CODE STEEL_RING_CODE,
+               GROUP_CONCAT(DISTINCT concat(cxr.CX_MACHINE_CODE,'$',cxr.EMBRYO_CODE,'$',cxr.BOM_DATA_VERSION) order by cxr.CX_MACHINE_CODE,cxr.EMBRYO_CODE,cxr.BOM_DATA_VERSION SEPARATOR ',') as quotaKeys
+        from T_CX_SCHEDULE_RESULT cxr
+        inner join T_PRODUCT_CONSTRUCTION_INFO ci on cxr.EMBRYO_CODE = ci.embryo_code and cxr.BOM_DATA_VERSION = ci.EMBRYO_VERSION
         where schedule_date = STR_TO_DATE(#{scheduleDate}, '%Y-%m-%d')
         and cxr.DEL_FLAG = 0
         and ci.DEL_FLAG = 0
@@ -76,222 +91,258 @@
     </select>
 
     <insert id="syncGsqScheduleToLog">
-        insert into T_GSQ_SCHEDULE_RESULT_LOG (ID, SCHEDULE_DATE, TQ_BATCH_NO, BATCH_NO, ORDER_NO, STEEL_TYPE, STEEL_RING_CODE,
-                                               `RANK`, MACHINE_ID, UNIT_CONSUME, STOCK_QTY, SUPPLY_TIME, MID_PLAN_QTY, MID_FINISH_QTY, MID_PRODUCE_ORDER, MID_FINISH_RATE,
-                                               MID_SYS_ANALYSIS, MID_HAND_ANALYSIS, NIGHT_PLAN_QTY, NIGHT_FINISH_QTY, NIGHT_PRODUCE_ORDER, NIGHT_FINISH_RATE,
-                                               NIGHT_SYS_ANALYSIS, NIGHT_HAND_ANALYSIS, DAY_PLAN_QTY, DAY_FINISH_QTY, DAY_PRODUCE_ORDER, DAY_FINISH_RATE,
-                                               DAY_SYS_ANALYSIS, DAY_HAND_ANALYSIS, CX_CLASS1_PLAN, CX_CLASS2_PLAN, CX_CLASS3_PLAN, CX_CLASS4_PLAN, CX_CLASS5_PLAN,
-                                               IS_RELEASE, MARK_CLOSE_OUT_TIP, PRODUCTION_STATUS, REMARK, DEL_FLAG, CREATE_BY, CREATE_TIME, UPDATE_BY, UPDATE_TIME,data_source,
-                                               PUBLISH_SUCCESS_COUNT, NEWEST_PUBLISH_TIME)
-        select ID, SCHEDULE_DATE, TQ_BATCH_NO, BATCH_NO, ORDER_NO, STEEL_TYPE, STEEL_RING_CODE,
-               `RANK`, MACHINE_ID, UNIT_CONSUME, STOCK_QTY, SUPPLY_TIME, MID_PLAN_QTY, MID_FINISH_QTY, MID_PRODUCE_ORDER, MID_FINISH_RATE,
-               MID_SYS_ANALYSIS, MID_HAND_ANALYSIS, NIGHT_PLAN_QTY, NIGHT_FINISH_QTY, NIGHT_PRODUCE_ORDER, NIGHT_FINISH_RATE,
-               NIGHT_SYS_ANALYSIS, NIGHT_HAND_ANALYSIS, DAY_PLAN_QTY, DAY_FINISH_QTY, DAY_PRODUCE_ORDER, DAY_FINISH_RATE,
-               DAY_SYS_ANALYSIS, DAY_HAND_ANALYSIS, CX_CLASS1_PLAN, CX_CLASS2_PLAN, CX_CLASS3_PLAN, CX_CLASS4_PLAN, CX_CLASS5_PLAN,
-               IS_RELEASE, MARK_CLOSE_OUT_TIP, PRODUCTION_STATUS, REMARK, DEL_FLAG, CREATE_BY, CREATE_TIME, UPDATE_BY, UPDATE_TIME,data_source,
-               PUBLISH_SUCCESS_COUNT, NEWEST_PUBLISH_TIME
+        insert into T_GSQ_SCHEDULE_RESULT_LOG (
+            ID, SCHEDULE_DATE, TQ_BATCH_NO, BATCH_NO, ORDER_NO, STEEL_TYPE, STEEL_RING_CODE,
+            TWINING_DISC_CODE, PRO_SIZE, `RANK`, DIMENSION, MACHINE_CODE, UNIT_CONSUME, STOCK_QTY, SUPPLY_TIME,
+            CLASS1_SEQUENCE, CLASS1_PLAN_QTY, CLASS1_ANALYSIS,
+            CLASS2_SEQUENCE, CLASS2_PLAN_QTY, CLASS2_ANALYSIS,
+            CLASS3_SEQUENCE, CLASS3_PLAN_QTY, CLASS3_ANALYSIS,
+            CLASS4_SEQUENCE, CLASS4_PLAN_QTY, CLASS4_ANALYSIS,
+            CLASS5_SEQUENCE, CLASS5_PLAN_QTY, CLASS5_ANALYSIS,
+            CLASS6_SEQUENCE, CLASS6_PLAN_QTY, CLASS6_ANALYSIS,
+            TQ_CLASS1_PLAN, TQ_CLASS2_PLAN, TQ_CLASS3_PLAN, TQ_CLASS4_PLAN, TQ_CLASS5_PLAN, TQ_CLASS6_PLAN,
+            IS_RELEASE, MARK_CLOSE_OUT_TIP, PRODUCTION_STATUS, CLOSE_OUT_SPEC_FLAG,
+            UNSCHEDULED_FLAG, FRESH_EXPIRED_FLAG,
+            DATA_SOURCE, FACTORY_CODE, REMARK, DEL_FLAG, CREATE_BY, CREATE_TIME, UPDATE_BY, UPDATE_TIME,
+            PUBLISH_SUCCESS_COUNT, NEWEST_PUBLISH_TIME
+        )
+        select
+            ID, SCHEDULE_DATE, TQ_BATCH_NO, BATCH_NO, ORDER_NO, STEEL_TYPE, STEEL_RING_CODE,
+            TWINING_DISC_CODE, PRO_SIZE, `RANK`, DIMENSION, MACHINE_CODE, UNIT_CONSUME, STOCK_QTY, SUPPLY_TIME,
+            CLASS1_SEQUENCE, CLASS1_PLAN_QTY, CLASS1_ANALYSIS,
+            CLASS2_SEQUENCE, CLASS2_PLAN_QTY, CLASS2_ANALYSIS,
+            CLASS3_SEQUENCE, CLASS3_PLAN_QTY, CLASS3_ANALYSIS,
+            CLASS4_SEQUENCE, CLASS4_PLAN_QTY, CLASS4_ANALYSIS,
+            CLASS5_SEQUENCE, CLASS5_PLAN_QTY, CLASS5_ANALYSIS,
+            CLASS6_SEQUENCE, CLASS6_PLAN_QTY, CLASS6_ANALYSIS,
+            TQ_CLASS1_PLAN, TQ_CLASS2_PLAN, TQ_CLASS3_PLAN, TQ_CLASS4_PLAN, TQ_CLASS5_PLAN, TQ_CLASS6_PLAN,
+            IS_RELEASE, MARK_CLOSE_OUT_TIP, PRODUCTION_STATUS, CLOSE_OUT_SPEC_FLAG,
+            UNSCHEDULED_FLAG, FRESH_EXPIRED_FLAG,
+            DATA_SOURCE, FACTORY_CODE, REMARK, DEL_FLAG, CREATE_BY, CREATE_TIME, UPDATE_BY, UPDATE_TIME,
+            PUBLISH_SUCCESS_COUNT, NEWEST_PUBLISH_TIME
         from T_GSQ_SCHEDULE_RESULT
-        where schedule_date = STR_TO_DATE(#{scheduleDate}, '%Y-%m-%d')
+        where SCHEDULE_DATE = STR_TO_DATE(#{scheduleDate}, '%Y-%m-%d')
     </insert>
 
     <delete id="deleteGsqSchedule" parameterType="string">
-        delete from T_GSQ_SCHEDULE_RESULT where schedule_date = STR_TO_DATE(#{scheduleDate}, '%Y-%m-%d')
+        delete from T_GSQ_SCHEDULE_RESULT where SCHEDULE_DATE = STR_TO_DATE(#{scheduleDate}, '%Y-%m-%d')
     </delete>
 
-    <update id="deleteGsqAssistSchedule" parameterType="string">
-        update T_GSQ_ASSIST_SCHEDULE set DEL_FLAG = '1', UPDATE_TIME = NOW() where schedule_date = STR_TO_DATE(#{scheduleDate}, '%Y-%m-%d')
-    </update>
+    <delete id="deleteGsqAssistSchedule" parameterType="string">
+        delete from T_GSQ_ASSIST_SCHEDULE where SCHEDULE_DATE = STR_TO_DATE(#{scheduleDate}, '%Y-%m-%d')
+    </delete>
 
     <insert id="createScheduleRecord" parameterType="map">
-        insert into T_GSQ_AUTO_SCHEDULE_RECORD (ID, TQ_BATCH_NO, BATCH_NO, STATUS, SCHEDULE_DATE, CREATE_BY, CREATE_TIME, DEL_FLAG)
-        values (NULL, #{tqBatchNo}, #{batchNo}, '0', STR_TO_DATE(#{scheduleDate}, '%Y-%m-%d'), #{userName}, NOW(),  '0')
+        insert into T_GSQ_AUTO_SCHEDULE_LOG (BATCH_NO, TQ_BATCH_NO, STEP_CODE, STEP_NAME, LOG_CONTENT, CREATE_BY, CREATE_TIME)
+        values (#{batchNo}, #{tqBatchNo}, 'S0', '初始化', #{logContent}, #{username}, now())
     </insert>
 
-    <insert id="batchCreateScheduleResult" parameterType="list">
-        insert into T_GSQ_SCHEDULE_RESULT (ID, SCHEDULE_DATE, TQ_BATCH_NO, BATCH_NO, ORDER_NO, STEEL_TYPE, STEEL_RING_CODE,
-                                           `RANK`, MACHINE_ID, UNIT_CONSUME, STOCK_QTY, SUPPLY_TIME, MID_PLAN_QTY, MID_PRODUCE_ORDER,
-                                           MID_SYS_ANALYSIS, MID_HAND_ANALYSIS, NIGHT_PLAN_QTY, NIGHT_PRODUCE_ORDER,
-                                           NIGHT_SYS_ANALYSIS, NIGHT_HAND_ANALYSIS, DAY_PLAN_QTY, DAY_PRODUCE_ORDER,
-                                           DAY_SYS_ANALYSIS, DAY_HAND_ANALYSIS,CX_CLASS1_PLAN, CX_CLASS2_PLAN, CX_CLASS3_PLAN, CX_CLASS4_PLAN, CX_CLASS5_PLAN,
-        IS_RELEASE, MARK_CLOSE_OUT_TIP, PRODUCTION_STATUS, REMARK, DEL_FLAG, CREATE_BY,
-        CREATE_TIME,PUBLISH_SUCCESS_COUNT, NEWEST_PUBLISH_TIME, last_mid_plan_qty)
-        values
-
-              <foreach collection="scheduleResultList" item="schedule" separator=",">
-                   (NULL,
-                          #{schedule.scheduleDate}, #{schedule.tqBatchNo,jdbcType=VARCHAR}, #{schedule.batchNo}, #{schedule.orderNo}, #{schedule.steelType,jdbcType=VARCHAR}, #{schedule.steelRingCode,jdbcType=VARCHAR},
-                          #{schedule.rank,jdbcType=VARCHAR}, #{schedule.machineId,jdbcType=VARCHAR}, #{schedule.unitConsume,jdbcType=DOUBLE}, #{schedule.stockQty,jdbcType=DOUBLE}, #{schedule.supplyTime,jdbcType=DOUBLE}, #{schedule.midPlanQty,jdbcType=DOUBLE}, #{schedule.midProduceOrder,jdbcType=DOUBLE},
-                          #{schedule.midSysAnalysis,jdbcType=VARCHAR}, #{schedule.midHandAnalysis,jdbcType=VARCHAR}, #{schedule.nightPlanQty,jdbcType=DOUBLE},  #{schedule.nightProduceOrder,jdbcType=DOUBLE},
-                          #{schedule.nightSysAnalysis,jdbcType=VARCHAR}, #{schedule.nightHandAnalysis,jdbcType=VARCHAR}, #{schedule.dayPlanQty,jdbcType=DOUBLE}, #{schedule.dayProduceOrder,jdbcType=DOUBLE},
-                          #{schedule.daySysAnalysis,jdbcType=VARCHAR}, #{schedule.dayHandAnalysis,jdbcType=VARCHAR},#{schedule.cxClass1Plan,jdbcType=DOUBLE},#{schedule.cxClass2Plan,jdbcType=DOUBLE},#{schedule.cxClass3Plan,jdbcType=DOUBLE},#{schedule.cxClass4Plan,jdbcType=DOUBLE},#{schedule.cxClass5Plan,jdbcType=DOUBLE},
-                  #{schedule.isRelease}, #{schedule.markCloseOutTip}, #{schedule.productionStatus},
-                  #{schedule.remark,jdbcType=VARCHAR}, #{schedule.delFlag}, #{schedule.createBy},
-                  #{schedule.createTime},IFNULL(#{schedule.publishSuccessCount,jdbcType=DOUBLE},0),#{schedule.newestPublishTime,jdbcType=DATE},
-                  #{schedule.lastMidPlanQty,jdbcType=DOUBLE}
-                  )
-              </foreach>
+    <!-- 6班次批量新增排程结果 -->
+    <insert id="batchCreateScheduleResult" parameterType="java.util.List">
+        insert into T_GSQ_SCHEDULE_RESULT (
+            SCHEDULE_DATE, TQ_BATCH_NO, BATCH_NO, ORDER_NO, STEEL_TYPE, STEEL_RING_CODE,
+            TWINING_DISC_CODE, PRO_SIZE, `RANK`, DIMENSION, MACHINE_CODE, UNIT_CONSUME, STOCK_QTY, SUPPLY_TIME,
+            CLASS1_SEQUENCE, CLASS1_PLAN_QTY, CLASS1_ANALYSIS,
+            CLASS2_SEQUENCE, CLASS2_PLAN_QTY, CLASS2_ANALYSIS,
+            CLASS3_SEQUENCE, CLASS3_PLAN_QTY, CLASS3_ANALYSIS,
+            CLASS4_SEQUENCE, CLASS4_PLAN_QTY, CLASS4_ANALYSIS,
+            CLASS5_SEQUENCE, CLASS5_PLAN_QTY, CLASS5_ANALYSIS,
+            CLASS6_SEQUENCE, CLASS6_PLAN_QTY, CLASS6_ANALYSIS,
+            TQ_CLASS1_PLAN, TQ_CLASS2_PLAN, TQ_CLASS3_PLAN, TQ_CLASS4_PLAN, TQ_CLASS5_PLAN, TQ_CLASS6_PLAN,
+            IS_RELEASE, MARK_CLOSE_OUT_TIP, PRODUCTION_STATUS, CLOSE_OUT_SPEC_FLAG,
+            UNSCHEDULED_FLAG, FRESH_EXPIRED_FLAG, DATA_SOURCE, FACTORY_CODE,
+            DEL_FLAG, CREATE_BY, CREATE_TIME
+        ) values
+        <foreach collection="scheduleResultList" item="item" separator=",">
+            (
+                #{item.scheduleDate}, #{item.tqBatchNo}, #{item.batchNo}, #{item.orderNo}, #{item.steelType}, #{item.steelRingCode},
+                #{item.twiningDiscCode}, #{item.proSize}, #{item.rank}, #{item.dimension}, #{item.machineCode}, #{item.unitConsume}, #{item.stockQty}, #{item.supplyTime},
+                #{item.class1Sequence}, #{item.class1PlanQty}, #{item.class1Analysis},
+                #{item.class2Sequence}, #{item.class2PlanQty}, #{item.class2Analysis},
+                #{item.class3Sequence}, #{item.class3PlanQty}, #{item.class3Analysis},
+                #{item.class4Sequence}, #{item.class4PlanQty}, #{item.class4Analysis},
+                #{item.class5Sequence}, #{item.class5PlanQty}, #{item.class5Analysis},
+                #{item.class6Sequence}, #{item.class6PlanQty}, #{item.class6Analysis},
+                #{item.tqClass1Plan}, #{item.tqClass2Plan}, #{item.tqClass3Plan}, #{item.tqClass4Plan}, #{item.tqClass5Plan}, #{item.tqClass6Plan},
+                #{item.isRelease}, #{item.markCloseOutTip}, #{item.productionStatus}, #{item.closeOutSpecFlag},
+                #{item.unscheduledFlag}, #{item.freshExpiredFlag}, #{item.dataSource}, #{item.factoryCode},
+                0, #{item.createBy}, now()
+            )
+        </foreach>
     </insert>
 
-    <insert id="batchCreateAssistScheduleResult" parameterType="list">
-        insert into T_GSQ_ASSIST_SCHEDULE (ID, SCHEDULE_DATE, TQ_BATCH_NO, BATCH_NO, ORDER_NO, STEEL_TYPE, STEEL_RING_CODE,
-                                           `RANK`, MACHINE_ID, UNIT_CONSUME, STOCK_QTY, SUPPLY_TIME, MID_PLAN_QTY, MID_PRODUCE_ORDER,
-                                           MID_SYS_ANALYSIS, MID_HAND_ANALYSIS, NIGHT_PLAN_QTY, NIGHT_PRODUCE_ORDER,
-                                           NIGHT_SYS_ANALYSIS, NIGHT_HAND_ANALYSIS, DAY_PLAN_QTY, DAY_PRODUCE_ORDER,
-                                           DAY_SYS_ANALYSIS, DAY_HAND_ANALYSIS,CX_CLASS1_PLAN, CX_CLASS2_PLAN, CX_CLASS3_PLAN, CX_CLASS4_PLAN, CX_CLASS5_PLAN,
-                                           IS_RELEASE, MARK_CLOSE_OUT_TIP, PRODUCTION_STATUS, REMARK, DEL_FLAG, CREATE_BY, CREATE_TIME)
-        values
-              <foreach collection="scheduleResultList" item="schedule" separator=",">
-                   (NULL,
-                          #{schedule.scheduleDate}, #{schedule.tqBatchNo}, #{schedule.batchNo}, #{schedule.orderNo}, #{schedule.steelType,jdbcType=VARCHAR}, #{schedule.steelRingCode,jdbcType=VARCHAR},
-                          #{schedule.rank,jdbcType=VARCHAR}, #{schedule.machineId,jdbcType=VARCHAR}, #{schedule.unitConsume,jdbcType=DOUBLE}, #{schedule.stockQty,jdbcType=DOUBLE}, #{schedule.supplyTime,jdbcType=DOUBLE}, #{schedule.midPlanQty,jdbcType=DOUBLE}, #{schedule.midProduceOrder,jdbcType=DOUBLE},
-                          #{schedule.midSysAnalysis,jdbcType=VARCHAR}, #{schedule.midHandAnalysis,jdbcType=VARCHAR}, #{schedule.nightPlanQty,jdbcType=DOUBLE},  #{schedule.nightProduceOrder,jdbcType=DOUBLE},
-                          #{schedule.nightSysAnalysis,jdbcType=VARCHAR}, #{schedule.nightHandAnalysis,jdbcType=VARCHAR}, #{schedule.dayPlanQty,jdbcType=DOUBLE}, #{schedule.dayProduceOrder,jdbcType=DOUBLE},
-                          #{schedule.daySysAnalysis,jdbcType=VARCHAR}, #{schedule.dayHandAnalysis,jdbcType=VARCHAR},#{schedule.cxClass1Plan,jdbcType=DOUBLE},#{schedule.cxClass2Plan,jdbcType=DOUBLE},#{schedule.cxClass3Plan,jdbcType=DOUBLE},#{schedule.cxClass4Plan,jdbcType=DOUBLE},#{schedule.cxClass5Plan,jdbcType=DOUBLE},
-                          #{schedule.isRelease}, #{schedule.markCloseOutTip}, #{schedule.productionStatus}, #{schedule.remark,jdbcType=VARCHAR}, #{schedule.delFlag}, #{schedule.createBy}, #{schedule.createTime}
-                  )
-              </foreach>
+    <insert id="batchCreateAssistScheduleResult" parameterType="java.util.List">
+        insert into T_GSQ_ASSIST_SCHEDULE (
+            SCHEDULE_DATE, TQ_BATCH_NO, BATCH_NO, ORDER_NO, STEEL_TYPE, STEEL_RING_CODE,
+            MACHINE_CODE, UNIT_CONSUME, STOCK_QTY, SUPPLY_TIME,
+            CLASS1_PLAN_QTY, CLASS2_PLAN_QTY, CLASS3_PLAN_QTY, CLASS4_PLAN_QTY, CLASS5_PLAN_QTY, CLASS6_PLAN_QTY,
+            DEL_FLAG, CREATE_BY, CREATE_TIME
+        ) values
+        <foreach collection="scheduleResultList" item="item" separator=",">
+            (
+                #{item.scheduleDate}, #{item.tqBatchNo}, #{item.batchNo}, #{item.orderNo}, #{item.steelType}, #{item.steelRingCode},
+                #{item.machineCode}, #{item.unitConsume}, #{item.stockQty}, #{item.supplyTime},
+                #{item.class1PlanQty}, #{item.class2PlanQty}, #{item.class3PlanQty}, #{item.class4PlanQty}, #{item.class5PlanQty}, #{item.class6PlanQty},
+                0, #{item.createBy}, now()
+            )
+        </foreach>
     </insert>
 
     <select id="listGsqParams" resultType="com.zlt.aps.gsq.engine.vo.GsqParamsVo">
-        select param_code, param_value
+        select PARAM_CODE paramCode, PARAM_NAME paramName, PARAM_VALUE paramValue,
+               REGULAR_EXPRESSION regularExpression, ERROR_TIPS errorTips
         from T_GSQ_PARAMS
         where DEL_FLAG = '0'
     </select>
 
-    <select id="getGsqCurrentBatchNo" resultType="string" parameterType="string">
-        SELECT MAX(BATCH_NO) BATCH_NO
-        FROM t_gsq_auto_schedule_record
-        where schedule_date = STR_TO_DATE(#{scheduleDate}, '%Y-%m-%d')
+    <select id="getGsqCurrentBatchNo" parameterType="string" resultType="string">
+        select max(BATCH_NO) from T_GSQ_SCHEDULE_RESULT where SCHEDULE_DATE = STR_TO_DATE(#{scheduleDate}, '%Y-%m-%d')
     </select>
 
-    <select id="listGsqScheduleBaseInfo" parameterType="string" resultType="com.zlt.aps.gsq.engine.vo.GsqScheduleBaseInfoVo">
-        select c.BEAD_CODE steelRingCode,
-               max(c.BEAD_ARRANGE) `RANK`,
-               max(c.BEAD_TYPE) steelType
-        from T_CONSTRUCTION_VERSION_INFO c
-        where c.Del_Flag = '0'
+    <!-- 读取钢丝圈施工信息（含BOM用量、关联胎圈等） -->
+    <select id="listGsqScheduleBaseInfo" resultType="com.zlt.aps.gsq.engine.vo.GsqScheduleBaseInfoVo">
+        select
+            ci.BEAD_CODE    as steelRingCode,
+            max(ci.BEAD_TYPE)    as steelType,
+            max(ci.BEAD_ARRANGE) as rank,
+            1                     as unitConsume,
+            max(ci.DIMENSION)    as dimension,
+            max(ci.PRO_SIZE)     as proSize,
+            max(IFNULL(ci.BOM_QTY, 1)) as bomQty,
+            max(ci.WIRE_DIAMETER) as wireDiameter,
+            null                 as tireRingCodeList,
+            null                 as embryoCodeList,
+            null                 as cxClass1Plan,
+            null                 as cxClass2Plan,
+            null                 as cxClass3Plan,
+            null                 as cxClass4Plan,
+            null                 as cxClass5Plan,
+            null                 as quotaKeys
+        from T_PRODUCT_CONSTRUCTION_INFO ci
+        where ci.DEL_FLAG = 0
         <if test="productionStage == '1'.toString()">
-            and PRODUCTION_STAGE = '0'
+            and ci.PRODUCTION_STAGE = '0'
         </if>
-        and c.BEAD_CODE in <foreach collection="steelRingCodes" item="steelRingCode" open="(" close=")" separator=",">#{steelRingCode}</foreach>
-        group by c.BEAD_CODE
-    </select>
-
-    <select id="listGsqEnginSchedule" resultType="com.zlt.aps.gsq.engine.vo.GsqScheduleResultVo">
-        select ID, SCHEDULE_DATE, TQ_BATCH_NO, BATCH_NO, ORDER_NO, STEEL_TYPE, STEEL_RING_CODE, `RANK`, MACHINE_ID, UNIT_CONSUME, STOCK_QTY, SUPPLY_TIME, IFNULL(MID_PLAN_QTY,0) MID_PLAN_QTY, MID_FINISH_QTY,
-               MID_PRODUCE_ORDER, MID_FINISH_RATE, MID_SYS_ANALYSIS, MID_HAND_ANALYSIS, IFNULL(NIGHT_PLAN_QTY, 0) NIGHT_PLAN_QTY, NIGHT_FINISH_QTY, NIGHT_PRODUCE_ORDER, NIGHT_FINISH_RATE, NIGHT_SYS_ANALYSIS,
-               NIGHT_HAND_ANALYSIS, IFNULL(DAY_PLAN_QTY,0) DAY_PLAN_QTY, DAY_FINISH_QTY, DAY_PRODUCE_ORDER, DAY_FINISH_RATE, DAY_SYS_ANALYSIS, DAY_HAND_ANALYSIS, CX_CLASS1_PLAN, CX_CLASS2_PLAN, CX_CLASS3_PLAN,
-               CX_CLASS4_PLAN, CX_CLASS5_PLAN, IS_RELEASE, MARK_CLOSE_OUT_TIP, PRODUCTION_STATUS, REMARK, DEL_FLAG, CREATE_BY, CREATE_TIME, UPDATE_BY, UPDATE_TIME, DATA_SOURCE,PUBLISH_SUCCESS_COUNT, NEWEST_PUBLISH_TIME
-        from t_gsq_schedule_result r
-        where schedule_date = STR_TO_DATE(#{scheduleDate}, '%Y-%m-%d')
-        and DEL_FLAG = 0
-    </select>
-
-    <insert id="mergeGsqScheduleResult">
-        INSERT INTO t_gsq_schedule_result (
-        schedule_date, tq_batch_no, batch_no, order_no, steel_type, steel_ring_code, `RANK`, machine_id,
-        unit_consume, stock_qty, supply_time, mid_plan_qty, mid_produce_order, mid_sys_analysis,
-        mid_hand_analysis, night_plan_qty, night_produce_order, night_sys_analysis, night_hand_analysis,
-        day_plan_qty, day_produce_order, day_sys_analysis, day_hand_analysis, is_release, mark_close_out_tip,
-        production_status, remark, del_flag, create_by, create_time, data_source, cx_class1_plan,
-        cx_class2_plan, cx_class3_plan, cx_class4_plan, cx_class5_plan
-        )
-        VALUES
-        <foreach collection="scheduleResultList" item="schedule" separator=",">
-            (
-            #{schedule.scheduleDate},
-            #{schedule.tqBatchNo,jdbcType=VARCHAR},
-            #{schedule.batchNo,jdbcType=VARCHAR},
-            #{schedule.orderNo,jdbcType=VARCHAR},
-            #{schedule.steelType,jdbcType=VARCHAR},
-            #{schedule.steelRingCode,jdbcType=VARCHAR},
-            #{schedule.rank,jdbcType=VARCHAR},
-            #{schedule.machineId,jdbcType=VARCHAR},
-            #{schedule.unitConsume,jdbcType=DOUBLE},
-            #{schedule.stockQty,jdbcType=DOUBLE},
-            #{schedule.supplyTime,jdbcType=DOUBLE},
-            #{schedule.midPlanQty,jdbcType=DOUBLE},
-            #{schedule.midProduceOrder,jdbcType=DOUBLE},
-            #{schedule.midSysAnalysis,jdbcType=VARCHAR},
-            #{schedule.midHandAnalysis,jdbcType=VARCHAR},
-            #{schedule.nightPlanQty,jdbcType=DOUBLE},
-            #{schedule.nightProduceOrder,jdbcType=DOUBLE},
-            #{schedule.nightSysAnalysis,jdbcType=VARCHAR},
-            #{schedule.nightHandAnalysis,jdbcType=VARCHAR},
-            #{schedule.dayPlanQty,jdbcType=DOUBLE},
-            #{schedule.dayProduceOrder,jdbcType=DOUBLE},
-            #{schedule.daySysAnalysis,jdbcType=VARCHAR},
-            #{schedule.dayHandAnalysis,jdbcType=VARCHAR},
-            #{schedule.isRelease,jdbcType=VARCHAR},
-            #{schedule.markCloseOutTip,jdbcType=VARCHAR},
-            #{schedule.productionStatus,jdbcType=VARCHAR},
-            #{schedule.remark,jdbcType=VARCHAR},
-            '0',
-            #{schedule.createBy,jdbcType=VARCHAR},
-            NOW(),
-            #{schedule.dataSource,jdbcType=VARCHAR},
-            #{schedule.cxClass1Plan,jdbcType=DOUBLE},
-            #{schedule.cxClass2Plan,jdbcType=DOUBLE},
-            #{schedule.cxClass3Plan,jdbcType=DOUBLE},
-            #{schedule.cxClass4Plan,jdbcType=DOUBLE},
-            #{schedule.cxClass5Plan,jdbcType=DOUBLE}
-            )
+        and ci.BEAD_CODE in
+        <foreach collection="steelRingCodes" item="code" open="(" separator="," close=")">
+            #{code}
         </foreach>
-        ON DUPLICATE KEY UPDATE
-        mid_plan_qty = VALUES(mid_plan_qty),
-        mid_hand_analysis = VALUES(mid_hand_analysis),
-        night_plan_qty = VALUES(night_plan_qty),
-        night_hand_analysis = VALUES(night_hand_analysis),
-        day_plan_qty = VALUES(day_plan_qty),
-        day_hand_analysis = VALUES(day_hand_analysis),
-        update_by = VALUES(create_by),
-        update_time = NOW(),
-        remark = VALUES(remark),
-        data_source = VALUES(data_source),
-        cx_class1_plan = VALUES(cx_class1_plan),
-        cx_class2_plan = VALUES(cx_class2_plan),
-        cx_class3_plan = VALUES(cx_class3_plan),
-        cx_class4_plan = VALUES(cx_class4_plan),
-        cx_class5_plan = VALUES(cx_class5_plan)
+        group by ci.BEAD_CODE
+    </select>
+
+    <select id="listGsqEnginSchedule" parameterType="string" resultType="com.zlt.aps.gsq.engine.vo.GsqScheduleResultVo">
+        select * from T_GSQ_SCHEDULE_RESULT where SCHEDULE_DATE = STR_TO_DATE(#{scheduleDate}, '%Y-%m-%d') and DEL_FLAG = 0
+    </select>
+
+    <insert id="mergeGsqScheduleResult" parameterType="java.util.List">
+        <foreach collection="scheduleResultList" item="item">
+            update T_GSQ_SCHEDULE_RESULT
+            set
+                MACHINE_CODE = #{item.machineCode},
+                CLASS1_SEQUENCE = #{item.class1Sequence},
+                CLASS1_PLAN_QTY = #{item.class1PlanQty},
+                CLASS2_SEQUENCE = #{item.class2Sequence},
+                CLASS2_PLAN_QTY = #{item.class2PlanQty},
+                CLASS3_SEQUENCE = #{item.class3Sequence},
+                CLASS3_PLAN_QTY = #{item.class3PlanQty},
+                CLASS4_SEQUENCE = #{item.class4Sequence},
+                CLASS4_PLAN_QTY = #{item.class4PlanQty},
+                CLASS5_SEQUENCE = #{item.class5Sequence},
+                CLASS5_PLAN_QTY = #{item.class5PlanQty},
+                CLASS6_SEQUENCE = #{item.class6Sequence},
+                CLASS6_PLAN_QTY = #{item.class6PlanQty},
+                STOCK_QTY = #{item.stockQty},
+                SUPPLY_TIME = #{item.supplyTime},
+                MARK_CLOSE_OUT_TIP = #{item.markCloseOutTip},
+                PRODUCTION_STATUS = #{item.productionStatus},
+                CLOSE_OUT_SPEC_FLAG = #{item.closeOutSpecFlag},
+                UNSCHEDULED_FLAG = #{item.unscheduledFlag},
+                FRESH_EXPIRED_FLAG = #{item.freshExpiredFlag},
+                UPDATE_BY = #{item.updateBy},
+                UPDATE_TIME = now()
+            where BATCH_NO = #{item.batchNo} and ORDER_NO = #{item.orderNo}
+        </foreach>
     </insert>
 
     <select id="listGsqNeedConstruction" resultType="com.zlt.aps.common.engine.domain.EngineConstructionInfo">
-        select concat(cxr.EMBRYO_CODE , ',' ,ci.EMBRYO_CODE) EMBRYO_CODE,  /*成型排程胎胚代码，施工表的胎胚代码*/
-               concat(cxr.BOM_DATA_VERSION , ',' , ci.EMBRYO_VERSION) as BOM_DATA_VERSION, /*成型排程胎胚版本，施工表的胎胚版本*/
-               ci.BEAD_CODE,   /*钢丝圈代码*/
-               ci.BEAD_TYPE,
-               ci.BEAD_ARRANGE,   /*排列*/
-               ci.DIMENSION  /*寸口*/
-        from (
-              select EMBRYO_CODE,BOM_DATA_VERSION
-              from T_CX_SCHEDULE_RESULT
-              where DEL_FLAG = 0
-              and schedule_date = STR_TO_DATE(#{scheduleDate}, '%Y-%m-%d')
-              group by EMBRYO_CODE, BOM_DATA_VERSION
-              ) cxr /*成型排程结果表*/
-        left join T_PRODUCT_CONSTRUCTION_INFO ci on cxr.EMBRYO_CODE = ci.embryo_code and cxr.BOM_DATA_VERSION = ci.EMBRYO_VERSION and ci.DEL_FLAG = 0 /*施工信息表*/
-        where 1=1
+        select
+            ci.BEAD_CODE    as beadCode,
+            ci.BEAD_TYPE    as beadType,
+            ci.BEAD_ARRANGE as beadArrange,
+            ci.TIRE_RING_CODE as tireRingCode,
+            ci.EMBRYO_CODE  as embryoCode,
+            ci.EMBRYO_VERSION as bomDataVersion,
+            ci.DIMENSION    as dimension,
+            ci.PRO_SIZE     as proSize,
+            ci.WIRE_DIAMETER as wireDiameter
+        from T_PRODUCT_CONSTRUCTION_INFO ci
+        inner join (
+            select distinct BEAD_CODE
+            from T_TQ_SCHEDULE_RESULT
+            where SCHEDULE_DATE = STR_TO_DATE(#{scheduleDate}, '%Y-%m-%d')
+              and DEL_FLAG = 0
+        ) tqr on ci.BEAD_CODE = tqr.BEAD_CODE
+        where ci.DEL_FLAG = 0
         <if test="productionStage == '1'.toString()">
-            and (ci.PRODUCTION_STAGE = '0' or ci.PRODUCTION_STAGE is null)
+            and ci.PRODUCTION_STAGE = '0'
         </if>
     </select>
 
     <select id="listAssistSpec" resultType="string">
-        select MATERIAL_CODE
-        from T_GSQ_ASSIST_SPEC
-        where DEL_FLAG='0'
+        select SPEC_CODE from T_GSQ_ASSIST_SPEC where DEL_FLAG = '0'
     </select>
 
-    <update id="batchUpdateBatchNoAndOrderNo">
-        UPDATE T_GSQ_SCHEDULE_RESULT as a
-        JOIN (
-        <foreach item="item" collection="list" separator=" UNION ALL ">
-            SELECT #{item.id} AS id, #{item.batchNo} as batch_no, #{item.orderNo} as order_no FROM DUAL
+    <update id="batchUpdateBatchNoAndOrderNo" parameterType="java.util.List">
+        <foreach collection="list" item="item">
+            update T_GSQ_SCHEDULE_RESULT
+            set BATCH_NO = #{item.batchNo}, ORDER_NO = #{item.orderNo}
+            where ID = #{item.id}
         </foreach>
-        ) tempTable ON a.id = tempTable.id
-        SET
-        a.batch_no = tempTable.batch_no,
-        a.order_no = tempTable.order_no
-        where a.del_flag = '0'
     </update>
+
+    <!-- 读取胎圈6班次排程结果（按胎圈代码聚合），用于S2阶段BOM分解计算 -->
+    <select id="listTqScheduleResult6Class" resultType="java.util.Map">
+        select
+            tqr.BEAD_CODE as beadCode,
+            sum(IFNULL(tqr.CLASS1_PLAN_QTY, 0)) as class1PlanQty,
+            sum(IFNULL(tqr.CLASS2_PLAN_QTY, 0)) as class2PlanQty,
+            sum(IFNULL(tqr.CLASS3_PLAN_QTY, 0)) as class3PlanQty,
+            sum(IFNULL(tqr.CLASS4_PLAN_QTY, 0)) as class4PlanQty,
+            sum(IFNULL(tqr.CLASS5_PLAN_QTY, 0)) as class5PlanQty,
+            sum(IFNULL(tqr.CLASS6_PLAN_QTY, 0)) as class6PlanQty
+        from T_TQ_SCHEDULE_RESULT tqr
+        where tqr.SCHEDULE_DATE = STR_TO_DATE(#{scheduleDate}, '%Y-%m-%d')
+          and tqr.DEL_FLAG = 0
+        group by tqr.BEAD_CODE
+    </select>
+
+    <!-- 读取胎圈停产班次配置（工作日历） -->
+    <select id="listTqStopShiftConfig" resultType="java.util.Map">
+        select SHIFT_DATE as shiftDate, SHIFT_CODE as shiftCode, STOP_FLAG as stopFlag
+        from T_TQ_STOP_SHIFT_CONFIG
+        where SHIFT_DATE between DATE_ADD(STR_TO_DATE(#{scheduleDate}, '%Y-%m-%d'), INTERVAL -1 DAY)
+                             and DATE_ADD(STR_TO_DATE(#{scheduleDate}, '%Y-%m-%d'), INTERVAL 1 DAY)
+          and DEL_FLAG = 0
+    </select>
+
+    <!-- 读取钢丝圈停产班次配置 -->
+    <select id="listGsqStopShiftConfig" resultType="java.util.Map">
+        select SHIFT_DATE as shiftDate, SHIFT_CODE as shiftCode, STOP_FLAG as stopFlag
+        from T_GSQ_STOP_SHIFT_CONFIG
+        where SHIFT_DATE between DATE_ADD(STR_TO_DATE(#{scheduleDate}, '%Y-%m-%d'), INTERVAL -1 DAY)
+                             and DATE_ADD(STR_TO_DATE(#{scheduleDate}, '%Y-%m-%d'), INTERVAL 1 DAY)
+          and DEL_FLAG = 0
+    </select>
+
+    <!-- 读取机台检修计划 -->
+    <select id="listMachineMaintenancePlan" resultType="java.util.Map">
+        select
+            MACHINE_CODE as machineCode,
+            MAINTENANCE_DATE as maintenanceDate,
+            SHIFT_CODE as shiftCode
+        from T_GSQ_MACHINE_MAINTENANCE_PLAN
+        where MAINTENANCE_DATE between STR_TO_DATE(#{startDate}, '%Y-%m-%d')
+                                   and STR_TO_DATE(#{endDate}, '%Y-%m-%d')
+          and DEL_FLAG = 0
+    </select>
 </mapper>

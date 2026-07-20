@@ -73,4 +73,8 @@ public class GsqTwiningDisc extends BaseEntity implements Serializable {
     /** 钢丝圈缠绕盘明细列表（非数据库字段，主子表编辑时使用） */
     @TableField(exist = false)
     private List<GsqTwiningDiscSub> subList;
+
+    /** 排序字段（非数据库字段，用于列表动态排序，格式：字段名+排列方式） */
+    @TableField(exist = false)
+    private String orderStr;
 }
