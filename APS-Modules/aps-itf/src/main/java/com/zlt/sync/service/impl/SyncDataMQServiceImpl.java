@@ -15,8 +15,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
 
 import com.alibaba.fastjson.JSONObject;
+import com.baomidou.dynamic.datasource.toolkit.DynamicDataSourceContextHolder;
 import com.ruoyi.common.utils.StringUtils;
 import com.zlt.aps.common.core.constant.ApsConstant;
+import com.zlt.aps.itf.constant.DataSource;
 import com.zlt.aps.itf.constant.SysCode;
 import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
 import com.zlt.sync.constants.SyncConstants;
@@ -73,66 +75,71 @@ public class SyncDataMQServiceImpl implements SyncDataMQService {
                 return dataLogs;
             }
 
-            List<AuxReqSyncDataLogs> dataLogsDbs;
-            if (StringUtils.isNotEmpty(dataLogs.getMsgId())) {
-            	Map<String, Object> params = new HashMap<>();
-            	params.put("msgId", dataLogs.getMsgId());
-            	dataLogsDbs = auxReqSyncDataLogsMapper.queryReqSyncDataLogs(params);
-            } else {
-            	dataLogsDbs = new ArrayList<>();
+            DynamicDataSourceContextHolder.push(DataSource.MASTER);
+            try {
+                List<AuxReqSyncDataLogs> dataLogsDbs;
+                if (StringUtils.isNotEmpty(dataLogs.getMsgId())) {
+                    Map<String, Object> params = new HashMap<>();
+                    params.put("msgId", dataLogs.getMsgId());
+                    dataLogsDbs = auxReqSyncDataLogsMapper.queryReqSyncDataLogs(params);
+                } else {
+                    dataLogsDbs = new ArrayList<>();
+                }
+
+                AuxReqSyncDataLogs dataLogsDb = new AuxReqSyncDataLogs();
+
+                if (CollectionUtils.isEmpty(dataLogsDbs)) {
+                    logger.warn("defaultMQProcess-0051 接收同步反馈消息: 本地中间库没有msgId: " + dataLogs.getMsgId() + "; 数据; (对接系统主动推送消息)");
+
+                    if (StringUtils.isEmpty(dataLogs.getSyncKey())) {
+                        logger.error("defaultMQProcess-00511 接收同步反馈消息: SyncKey不存在; ");
+                        return dataLogs;
+                    }
+
+                    dataLogs.setDataSys(SysCode.MES);
+                    dataLogs.setDockSys(SysCode.APS);
+                    dataLogs.setBackIssue(ApsConstant.APS_YES_NO_0);
+
+                    SpringBeanUtils.copyPropertiesIgnoreNull(dataLogs, dataLogsDb);
+                    dataLogsDb.setCreateDate(new Date());
+                    dataLogsDb.setUpdateDate(new Date());
+
+                    auxReqSyncDataLogsMapper.insert(dataLogsDb);
+                } else {
+                    dataLogsDb = dataLogsDbs.get(0);
+
+                    if (!StringUtils.isEmpty(dataLogs.getSyncKey()) && !dataLogs.getSyncKey().equals(dataLogsDb.getSyncKey())) {
+                        logger.error("defaultMQProcess-0051 接收同步反馈消息: 消息与源状态SyncKey不一致: " + dataLogs.getSyncKey() + "_" + dataLogsDb.getSyncKey());
+                        return dataLogs;
+                    }
+
+                    if (!StringUtils.isEmpty(dataLogs.getDockSys()) && !dataLogs.getDockSys().equals(dataLogsDb.getDockSys())) {
+                        logger.error("defaultMQProcess-0052 接收同步反馈消息: 消息与源状态DockSys不一致: " + dataLogs.getDockSys() + "_" + dataLogsDb.getDockSys());
+                        return dataLogs;
+                    }
+
+                    if (!StringUtils.isEmpty(dataLogs.getDataSys()) && !dataLogs.getDataSys().equals(dataLogsDb.getDataSys())) {
+                        logger.error("defaultMQProcess-0053 接收同步反馈消息: 消息与源状态DataSys不一致: " + dataLogs.getDataSys() + "_" + dataLogsDb.getDataSys());
+                        return dataLogs;
+                    }
+
+                    SpringBeanUtils.copyPropertiesIgnoreNull(dataLogs, dataLogsDb);
+                    dataLogs.setUpdateDate(new Date());
+                    auxReqSyncDataLogsMapper.update(dataLogsDb);
+                }
+
+                // 插入历史 记录
+                AuxReqSyncDataLogsHis logsHis = new AuxReqSyncDataLogsHis();
+                SpringBeanUtils.copyPropertiesIgnoreNull(dataLogsDb, logsHis);
+                logsHis.setMsgId(UUID.randomUUID().toString());
+                logsHis.setCreateDate(new Date());
+                logsHis.setUpdateDate(logsHis.getCreateDate());
+                auxReqSyncDataLogsHisMapper.insert(logsHis);
+
+                logger.info("defaultMQProcess-006 接收同步反馈消息: 状态及历史记录更新添加成功");
+            } finally {
+                DynamicDataSourceContextHolder.poll();
             }
-
-            AuxReqSyncDataLogs dataLogsDb = new AuxReqSyncDataLogs();
-
-            if (CollectionUtils.isEmpty(dataLogsDbs)) {
-                logger.warn("defaultMQProcess-0051 接收同步反馈消息: 本地中间库没有msgId: " + dataLogs.getMsgId() + "; 数据; (对接系统主动推送消息)");
-
-                if (StringUtils.isEmpty(dataLogs.getSyncKey())) {
-                    logger.error("defaultMQProcess-00511 接收同步反馈消息: SyncKey不存在; ");
-                    return dataLogs;
-                }
-
-                dataLogs.setDataSys(SysCode.MES);
-                dataLogs.setDockSys(SysCode.APS);
-                dataLogs.setBackIssue(ApsConstant.APS_YES_NO_0);
-
-                SpringBeanUtils.copyPropertiesIgnoreNull(dataLogs, dataLogsDb);
-                dataLogsDb.setCreateDate(new Date());
-                dataLogsDb.setUpdateDate(new Date());
-
-                auxReqSyncDataLogsMapper.insert(dataLogsDb);
-            } else {
-                dataLogsDb = dataLogsDbs.get(0);
-
-                if (!StringUtils.isEmpty(dataLogs.getSyncKey()) && !dataLogs.getSyncKey().equals(dataLogsDb.getSyncKey())) {
-                    logger.error("defaultMQProcess-0051 接收同步反馈消息: 消息与源状态SyncKey不一致: " + dataLogs.getSyncKey() + "_" + dataLogsDb.getSyncKey());
-                    return dataLogs;
-                }
-
-                if (!StringUtils.isEmpty(dataLogs.getDockSys()) && !dataLogs.getDockSys().equals(dataLogsDb.getDockSys())) {
-                    logger.error("defaultMQProcess-0052 接收同步反馈消息: 消息与源状态DockSys不一致: " + dataLogs.getDockSys() + "_" + dataLogsDb.getDockSys());
-                    return dataLogs;
-                }
-
-                if (!StringUtils.isEmpty(dataLogs.getDataSys()) && !dataLogs.getDataSys().equals(dataLogsDb.getDataSys())) {
-                    logger.error("defaultMQProcess-0053 接收同步反馈消息: 消息与源状态DataSys不一致: " + dataLogs.getDataSys() + "_" + dataLogsDb.getDataSys());
-                    return dataLogs;
-                }
-
-                SpringBeanUtils.copyPropertiesIgnoreNull(dataLogs, dataLogsDb);
-                dataLogs.setUpdateDate(new Date());
-                auxReqSyncDataLogsMapper.update(dataLogsDb);
-            }
-
-            // 插入历史 记录
-            AuxReqSyncDataLogsHis logsHis = new AuxReqSyncDataLogsHis();
-            SpringBeanUtils.copyPropertiesIgnoreNull(dataLogsDb, logsHis);
-            logsHis.setMsgId(UUID.randomUUID().toString());
-            logsHis.setCreateDate(new Date());
-            logsHis.setUpdateDate(logsHis.getCreateDate());
-            auxReqSyncDataLogsHisMapper.insert(logsHis);
-
-            logger.info("defaultMQProcess-006 接收同步反馈消息: 状态及历史记录更新添加成功");
         } catch (Exception ex) {
             logger.error("defaultMQProcess-007 接收同步反馈消息， 操作异常: " + ex.getMessage(), ex);
         }

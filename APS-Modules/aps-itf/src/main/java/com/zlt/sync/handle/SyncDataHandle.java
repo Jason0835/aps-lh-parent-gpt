@@ -15,10 +15,12 @@ import org.springframework.util.CollectionUtils;
 
 import com.alibaba.fastjson.JSONObject;
 import com.alibaba.nacos.common.utils.MD5Utils;
+import com.baomidou.dynamic.datasource.toolkit.DynamicDataSourceContextHolder;
 import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.exception.CustomException;
 import com.ruoyi.common.utils.StringUtils;
+import com.zlt.aps.itf.constant.DataSource;
 import com.zlt.aps.itf.mes.enums.ItfSyncKeyEnum;
 import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
 import com.zlt.sync.domain.AuxDataVersions;
@@ -112,32 +114,37 @@ public class SyncDataHandle {
             return AjaxResult.error("请求数据(保证分钟内不重复提交), msgKey: " + mergeStr + "; 生成md5 报错: " + ex.getMessage());
         }
 
-        Map<String, Object> params = new HashMap<>();
-        params.put("msgKey", msgKey);
-        params.put("interval", MIN_INTERVAL_TIME);
-        params.put("searchType", "interval");
-        List<AuxReqSyncDataLogs> existsLog = auxReqSyncDataLogsMapper.queryReqSyncDataLogs(params);
-
-        if (!CollectionUtils.isEmpty(existsLog)) {
-            logger.error("syncRequest-006 重复提交请求, msgKey: " + msgKey);
-            return AjaxResult.error("重复提交请求, msgKey: " + msgKey);
-        }
-
-        // 生成版本号
-        initVersion(paramsVO);
-
-        AuxReqSyncDataLogs dataLogs = getAuxReqSyncDataLogsInit(paramsVO, msgKey);
-
-        // 转到对应系统处理类
+        DynamicDataSourceContextHolder.push(DataSource.MASTER);
         try {
-            DockSysFactory.handle(paramsVO, dataLogs);
-        } catch (Exception ex) {
-            logger.error("syncRequest-007 提交请求发生异常: " + ex.getMessage(), ex);
-            return AjaxResult.error(ex.getMessage());
-        }
-        logger.info("syncRequest-008 请求数据提交成功: " + paramsVO.toString());
+            Map<String, Object> params = new HashMap<>();
+            params.put("msgKey", msgKey);
+            params.put("interval", MIN_INTERVAL_TIME);
+            params.put("searchType", "interval");
+            List<AuxReqSyncDataLogs> existsLog = auxReqSyncDataLogsMapper.queryReqSyncDataLogs(params);
 
-        return AjaxResult.success();
+            if (!CollectionUtils.isEmpty(existsLog)) {
+                logger.error("syncRequest-006 重复提交请求, msgKey: " + msgKey);
+                return AjaxResult.error("重复提交请求, msgKey: " + msgKey);
+            }
+
+            // 生成版本号
+            initVersion(paramsVO);
+
+            AuxReqSyncDataLogs dataLogs = getAuxReqSyncDataLogsInit(paramsVO, msgKey);
+
+            // 转到对应系统处理类
+            try {
+                DockSysFactory.handle(paramsVO, dataLogs);
+            } catch (Exception ex) {
+                logger.error("syncRequest-007 提交请求发生异常: " + ex.getMessage(), ex);
+                return AjaxResult.error(ex.getMessage());
+            }
+            logger.info("syncRequest-008 请求数据提交成功: " + paramsVO.toString());
+
+            return AjaxResult.success();
+        } finally {
+            DynamicDataSourceContextHolder.poll();
+        }
     }
 
     protected AuxReqSyncDataLogs getAuxReqSyncDataLogsInit(SyncParamsVO paramsVO, String msgKey) {
@@ -208,38 +215,43 @@ public class SyncDataHandle {
             return AjaxResult.error("通知同步服务(保证分钟内不重复提交), msgKey: " + mergeStr + "; 生成md5 报错: " + ex.getMessage());
         }
 
-        Map<String, Object> searParams = new HashMap<>();
-        searParams.put("msgKey", msgKey);
-        searParams.put("interval", MIN_INTERVAL_TIME);
-        searParams.put("searchType", "interval");
-        List<AuxReqSyncDataLogs> existsLog = auxReqSyncDataLogsMapper.queryReqSyncDataLogs(searParams);
-
-        if (!CollectionUtils.isEmpty(existsLog)) {
-            logger.error("syncNotice-007 重复提交请求, msgKey: " + msgKey);
-            return AjaxResult.error("重复提交请求, msgKey: " + msgKey);
-        }
-
-        paramsVO.setHasData(1); //主动通知同步数据, 表示有数据同步
-        paramsVO.setStatus(1);
-
-        AuxReqSyncDataLogs dataLogs = new AuxReqSyncDataLogs();
-        SpringBeanUtils.copyPropertiesIgnoreNull(paramsVO, dataLogs);
-        dataLogs.setMsgId(UUID.randomUUID().toString());
-        dataLogs.setStatus(1);
-        dataLogs.setMsgKey(msgKey);
-        dataLogs.setCreateDate(new Date());
-        dataLogs.setUpdateDate(new Date());
-
-        // 转到对应系统处理类
+        DynamicDataSourceContextHolder.push(DataSource.MASTER);
         try {
-            DockSysFactory.handle(paramsVO, dataLogs);
-        } catch (Exception ex) {
-            logger.error("syncNotice-008 通知同步服务发生异常: " + ex.getMessage(), ex);
-            return AjaxResult.error(ex.getMessage());
-        }
-        logger.info("syncNotice-009 通知同步服务提交成功: " + paramsVO.toString());
+            Map<String, Object> searParams = new HashMap<>();
+            searParams.put("msgKey", msgKey);
+            searParams.put("interval", MIN_INTERVAL_TIME);
+            searParams.put("searchType", "interval");
+            List<AuxReqSyncDataLogs> existsLog = auxReqSyncDataLogsMapper.queryReqSyncDataLogs(searParams);
 
-        return AjaxResult.success();
+            if (!CollectionUtils.isEmpty(existsLog)) {
+                logger.error("syncNotice-007 重复提交请求, msgKey: " + msgKey);
+                return AjaxResult.error("重复提交请求, msgKey: " + msgKey);
+            }
+
+            paramsVO.setHasData(1); //主动通知同步数据, 表示有数据同步
+            paramsVO.setStatus(1);
+
+            AuxReqSyncDataLogs dataLogs = new AuxReqSyncDataLogs();
+            SpringBeanUtils.copyPropertiesIgnoreNull(paramsVO, dataLogs);
+            dataLogs.setMsgId(UUID.randomUUID().toString());
+            dataLogs.setStatus(1);
+            dataLogs.setMsgKey(msgKey);
+            dataLogs.setCreateDate(new Date());
+            dataLogs.setUpdateDate(new Date());
+
+            // 转到对应系统处理类
+            try {
+                DockSysFactory.handle(paramsVO, dataLogs);
+            } catch (Exception ex) {
+                logger.error("syncNotice-008 通知同步服务发生异常: " + ex.getMessage(), ex);
+                return AjaxResult.error(ex.getMessage());
+            }
+            logger.info("syncNotice-009 通知同步服务提交成功: " + paramsVO.toString());
+
+            return AjaxResult.success();
+        } finally {
+            DynamicDataSourceContextHolder.poll();
+        }
     }
 
     /**
@@ -285,6 +297,7 @@ public class SyncDataHandle {
             throw new CustomException("没有获取版本锁，请重试");
         }
 
+        DynamicDataSourceContextHolder.push(DataSource.MASTER);
         try {
             logger.info("getDataVersion-005 获取数据版本号: FROM_SYS: " + itfSyncKey.getDataSys() + "_TO_SYS: " + itfSyncKey.getDockSys() + ", 获取到REDIS 锁");
             //获取当前最新版本号
@@ -367,6 +380,7 @@ public class SyncDataHandle {
             return dataVersion;
 
         } finally {
+            DynamicDataSourceContextHolder.poll();
             redisLock.unlock(lockKey);
             logger.info("getDataVersion-010 获取数据版本号: FROM_SYS: " + itfSyncKey.getDataSys() + "_TO_SYS: " + itfSyncKey.getDockSys() + ", 释放 Redis 锁");
         }
@@ -407,17 +421,22 @@ public class SyncDataHandle {
      */
     private void setSyncDataStatus(List<AuxReqSyncDataLogs> dataLogs) {
 
-        for (AuxReqSyncDataLogs dataLog : dataLogs) {
-            dataLog.setUpdateDate(new Date());
-            auxReqSyncDataLogsMapper.update(dataLog);
+        DynamicDataSourceContextHolder.push(DataSource.MASTER);
+        try {
+            for (AuxReqSyncDataLogs dataLog : dataLogs) {
+                dataLog.setUpdateDate(new Date());
+                auxReqSyncDataLogsMapper.update(dataLog);
 
-            AuxReqSyncDataLogsHis logsHis = new AuxReqSyncDataLogsHis();
-            SpringBeanUtils.copyPropertiesIgnoreNull(dataLog, logsHis);
+                AuxReqSyncDataLogsHis logsHis = new AuxReqSyncDataLogsHis();
+                SpringBeanUtils.copyPropertiesIgnoreNull(dataLog, logsHis);
 
-            logsHis.setMsgId(UUID.randomUUID().toString());
-            logsHis.setCreateDate(new Date());
-            logsHis.setUpdateDate(logsHis.getCreateDate());
-            auxReqSyncDataLogsHisMapper.insert(logsHis);
+                logsHis.setMsgId(UUID.randomUUID().toString());
+                logsHis.setCreateDate(new Date());
+                logsHis.setUpdateDate(logsHis.getCreateDate());
+                auxReqSyncDataLogsHisMapper.insert(logsHis);
+            }
+        } finally {
+            DynamicDataSourceContextHolder.poll();
         }
     }
 
