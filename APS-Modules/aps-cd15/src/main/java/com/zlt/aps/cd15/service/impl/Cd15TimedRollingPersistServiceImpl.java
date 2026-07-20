@@ -20,6 +20,7 @@ import com.zlt.aps.cd15.mapper.Cd15ScheduleResultMapper;
 import com.zlt.aps.cd15.mapper.Cd15ScheduleRollingAdjustLogMapper;
 import com.zlt.aps.cd15.mapper.Cd15UnscheduleResultMapper;
 import com.zlt.aps.cd15.service.Cd15TimedRollingPersistService;
+import com.zlt.aps.common.core.constant.ApsConstant;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RLock;
@@ -67,23 +68,42 @@ public class Cd15TimedRollingPersistServiceImpl implements Cd15TimedRollingPersi
 
         List<Cd15ScheduleLaneAllocation> replacementLanes =
                 safe(output.getReplacementLaneAllocations());
+        List<Cd15ScheduleResult> logicallyDeleted =
+                safe(output.getLogicallyDeletedResults());
+        List<Cd15ScheduleResult> retainedPublishedResults =
+                logicallyDeleted.stream()
+                        .filter(this::isPreviouslyPublished)
+                        .collect(Collectors.toList());
+        List<Cd15ScheduleResult> removableResults =
+                logicallyDeleted.stream()
+                        .filter(result -> !this.isPreviouslyPublished(result))
+                        .collect(Collectors.toList());
         applyStorageLaneCodes(output, replacementLanes);
         safe(output.getInsertedResults()).forEach(this::insertResult);
         safe(output.getUpdatedResults()).forEach(this::updateResult);
-        safe(output.getLogicallyDeletedResults()).stream()
+        retainedPublishedResults.forEach(result -> {
+            result.setStorageLaneCode(null);
+            this.updateResult(result);
+        });
+        removableResults.stream()
                 .map(Cd15ScheduleResult::getId).filter(Objects::nonNull)
                 .forEach(resultMapper::deleteById);
         replaceLaneAllocations(output, replacementLanes);
         replaceUnscheduled(target, output);
         saveAdjustments(taskId, target, output);
-        if (!taskService.markSuccessInCurrentTransaction(taskId, target.getBatchNo())) {
+        if (!taskService.markSuccessInCurrentTransaction(
+                taskId, target.getBatchNo())) {
             throw new IllegalStateException("定时滚动任务状态已变化，不能提交结果");
         }
-        log.info("[斜裁定时滚动] 最终事务提交完成, taskId={}, batchNo={}, inserted={}, updated={}, deleted={}, unscheduled={}, adjustments={}",
-                taskId, target.getBatchNo(), safe(output.getInsertedResults()).size(),
+        log.info("[斜裁定时滚动] 最终事务提交完成, taskId={}, batchNo={}, "
+                        + "inserted={}, updated={}, retainedPublished={}, deleted={}, "
+                        + "unscheduled={}, adjustments={}",
+                taskId, target.getBatchNo(),
+                safe(output.getInsertedResults()).size(),
                 safe(output.getUpdatedResults()).size(),
-                safe(output.getLogicallyDeletedResults()).size(),
-                safe(output.getUnscheduledResults()).size(), safe(output.getAdjustments()).size());
+                retainedPublishedResults.size(), removableResults.size(),
+                safe(output.getUnscheduledResults()).size(),
+                safe(output.getAdjustments()).size());
     }
 
     private void validateCommitState(String taskId, Cd15RollingTarget target,
@@ -108,17 +128,58 @@ public class Cd15TimedRollingPersistServiceImpl implements Cd15TimedRollingPersi
         }
     }
 
+    /** 是否曾成功发布到 MES。 */
+    private boolean isPreviouslyPublished(Cd15ScheduleResult result) {
+        return result != null
+                && result.getPublishSuccessCount() != null
+                && result.getPublishSuccessCount() > 0;
+    }
+
     private void updateResult(Cd15ScheduleResult result) {
         if (result.getId() == null) {
             throw new IllegalStateException("定时滚动更新结果缺少主键");
         }
-        if (result.getReleaseStatus() != null && !"0".equals(result.getReleaseStatus())) {
-            result.setReleaseStatus("5");
+        if (this.isPreviouslyPublished(result)) {
+            result.setReleaseStatus(ApsConstant.WAIT_RELEASING);
             result.setRemark("ROLLING_DEGRADE");
         }
         if (resultMapper.updateById(result) != 1) {
             throw new IllegalStateException("更新定时滚动排程结果失败");
         }
+        if (this.updateNullableFields(result) != 1) {
+            throw new IllegalStateException("清空定时滚动排程结果旧字段失败");
+        }
+    }
+
+    /**
+     * 显式更新允许被滚动清空的字段，绕过MyBatis-Plus NOT_NULL更新策略。
+     */
+    private int updateNullableFields(Cd15ScheduleResult result) {
+        com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper<Cd15ScheduleResult> wrapper =
+                new com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper<>();
+        wrapper.eq("ID", result.getId());
+        for (int classIndex = 1; classIndex <= 8; classIndex++) {
+            String dbPrefix = String.format("CLASS%d_", classIndex);
+            String fieldPrefix = String.format("class%d", classIndex);
+            wrapper.set(dbPrefix + "SCHEDULE_DATE",
+                    result.getFieldValueByFieldName(
+                            fieldPrefix + "ScheduleDate"));
+            wrapper.set(dbPrefix + "PLAN_QTY",
+                    result.getFieldValueByFieldName(fieldPrefix + "PlanQty"));
+            wrapper.set(dbPrefix + "PRODUCE_ORDER",
+                    result.getFieldValueByFieldName(
+                            fieldPrefix + "ProduceOrder"));
+            wrapper.set(dbPrefix + "ANALYSIS",
+                    result.getFieldValueByFieldName(fieldPrefix + "Analysis"));
+            wrapper.set(dbPrefix + "ANALYSIS_INPUT",
+                    result.getFieldValueByFieldName(
+                            fieldPrefix + "AnalysisInput"));
+        }
+        wrapper.set("STORAGE_LANE_CODE", result.getStorageLaneCode());
+        wrapper.set("RELEASE_STATUS", result.getReleaseStatus());
+        wrapper.set("REMARK", result.getRemark());
+        wrapper.set("BIG_ROLL_CONSUME_QTY", result.getBigRollConsumeQty());
+        return resultMapper.update(null, wrapper);
     }
 
     private void applyStorageLaneCodes(Cd15TimedRollingOutput output,

@@ -58,7 +58,7 @@ public class Cd15MachineCandidateResolverTest {
     }
 
     @Test
-    public void shouldExcludeMaintenanceOverlap() {
+    public void shouldKeepMaintenanceMachineForCapacityDeduction() {
         Cd15MachineResource machine = machine("M1", "1", "NIGHT");
         machine.setMaintenanceStart(shiftStart().plusHours(2));
         machine.setMaintenanceEnd(shiftStart().plusHours(4));
@@ -68,7 +68,8 @@ public class Cd15MachineCandidateResolverTest {
                 Collections.singletonList(binding("BR001", "M1")),
                 Collections.emptyList(), Collections.emptyList());
 
-        assertEquals(0, result.size());
+        assertEquals(1, result.size());
+        assertEquals("M1", result.get(0).getMachineCode());
     }
 
     @Test
@@ -229,13 +230,13 @@ public class Cd15MachineCandidateResolverTest {
 
     private Cd15MachineResource machine(String code, String status, String openShift) {
         return Cd15MachineResource.builder().machineCode(code).status(status)
-                .openMachineClass(openShift).quota(new BigDecimal("1000")).build();
+                .openMachineClass(openShift).build();
     }
 
     private Cd15MachineResource machine(String code, String status, String openShift,
                                         String clothWidthMin, String clothWidthMax) {
         return Cd15MachineResource.builder().machineCode(code).status(status)
-                .openMachineClass(openShift).quota(new BigDecimal("1000"))
+                .openMachineClass(openShift)
                 .clothWidthMin(new BigDecimal(clothWidthMin))
                 .clothWidthMax(new BigDecimal(clothWidthMax)).build();
     }

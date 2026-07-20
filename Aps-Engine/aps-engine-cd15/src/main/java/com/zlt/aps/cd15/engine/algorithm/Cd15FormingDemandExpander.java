@@ -113,8 +113,7 @@ public class Cd15FormingDemandExpander {
                 + this.text(material.getCuttingAngle()) + "|"
                 + this.decimalText(material.getCraftWidth()) + "|"
                 + this.decimalText(material.getUnitConsumeMillimeter()) + "|"
-                + this.decimalText(material.getCurlLength()) + "|"
-                + material.isReinforcement();
+                + this.decimalText(material.getCurlLength());
     }
 
     private String constructionKey(String constructionCode, String constructionVersion) {
@@ -171,7 +170,8 @@ public class Cd15FormingDemandExpander {
                     .cuttingAngle(material.getCuttingAngle())
                     .craftWidth(material.getCraftWidth())
                     .unitConsumeMillimeter(material.getUnitConsumeMillimeter())
-                    .reinforcement(material.isReinforcement())
+                    .cordWidth(material.getCordWidth())
+                    .curlLength(material.getCurlLength())
                     .classField(classField)
                     .shiftKey(materialKey + "|" + startTime)
                     .startTime(startTime)

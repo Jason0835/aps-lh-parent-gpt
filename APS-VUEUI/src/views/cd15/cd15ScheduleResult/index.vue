@@ -516,10 +516,16 @@ export default {
     },
     handlePublish() {
       const ids = this.selection.map(item => item.id).join(',')
-      publishScheduleResult({ ids, factoryCode: this.query.factoryCode, scheduleDate: this.query.scheduleDate }).then(res => {
-        this.$modal.msgSuccess(res.msg)
-        this.getList()
-      })
+      return this.$confirm(this.$t('ui.biz.alter.makeSurePublish'), { type: 'warning' })
+        .then(() => publishScheduleResult({
+          ids,
+          factoryCode: this.query.factoryCode,
+          scheduleDate: this.query.scheduleDate
+        }))
+        .then(res => {
+          this.$modal.msgSuccess(res.msg)
+          this.getList()
+        })
     },
     handleExport() {
       exportScheduleResult(this.formatParams(false))

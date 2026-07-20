@@ -111,6 +111,36 @@ public class Cd15ScheduleResultLog extends BaseEntity implements Serializable {
     @Excel(name = "ui.data.column.cd15ScheduleResultLog.steelStripCode")
     private String steelStripCode;
 
+    /** 施工材料稳定键 */
+    @ApiModelProperty("施工材料稳定键")
+    @TableField("MATERIAL_KEY")
+    private String materialKey;
+
+    /** 斜裁宽度，单位毫米 */
+    @ApiModelProperty("斜裁宽度")
+    @TableField("CRAFT_WIDTH")
+    private BigDecimal craftWidth;
+
+    /** 单耗，单位毫米/条 */
+    @ApiModelProperty("单耗")
+    @TableField("UNIT_CONSUME_MILLIMETER")
+    private BigDecimal unitConsumeMillimeter;
+
+    /** 标准卷曲长度，单位米 */
+    @ApiModelProperty("标准卷曲长度")
+    @TableField("CURL_LENGTH")
+    private BigDecimal curlLength;
+
+    /** 大卷幅宽，单位毫米 */
+    @ApiModelProperty("大卷幅宽")
+    @TableField("CORD_WIDTH")
+    private BigDecimal cordWidth;
+
+    /** GDYY大卷消耗量，单位米 */
+    @ApiModelProperty("GDYY大卷消耗量")
+    @TableField("BIG_ROLL_CONSUME_QTY")
+    private BigDecimal bigRollConsumeQty;
+
     /** 裁断角度 */
     @ApiModelProperty("裁断角度")
     @TableField("CUTTING_ANGLE")

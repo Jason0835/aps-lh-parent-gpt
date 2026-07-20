@@ -23,6 +23,10 @@ public class Cd15TransferMachineRequest implements Serializable {
     @ApiModelProperty("排程日期")
     @JsonFormat(pattern = "yyyy-MM-dd")
     private Date scheduleDate;
+    @ApiModelProperty("排程结果ID")
+    private Long scheduleResultId;
+    @ApiModelProperty("分裁组号")
+    private String groupNo;
     @ApiModelProperty("原机台编码")
     private String sourceMachineCode;
     @ApiModelProperty("目标机台编码")

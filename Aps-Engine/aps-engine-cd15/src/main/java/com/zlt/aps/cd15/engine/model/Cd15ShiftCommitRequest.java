@@ -24,9 +24,11 @@ public class Cd15ShiftCommitRequest {
     private BigDecimal craftWidth;
     /** 单耗，单位毫米/条。 */
     private BigDecimal unitConsumeMillimeter;
-    /** 是否加强层。 */
-    private boolean reinforcement;
-    /** 裁断模式。 */
+    /** 大卷幅宽，单位毫米。 */
+    private BigDecimal cordWidth;
+    /** 标准卷曲长度，单位米。 */
+    private BigDecimal curlLength;
+        /** 裁断模式。 */
     private String cutMode;
     /** 分裁任务组稳定键。 */
     private String splitGroupKey;

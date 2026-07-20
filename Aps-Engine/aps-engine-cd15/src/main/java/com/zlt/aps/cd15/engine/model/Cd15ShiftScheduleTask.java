@@ -29,9 +29,13 @@ public class Cd15ShiftScheduleTask {
     private BigDecimal craftWidth;
     /** 单耗，单位毫米/条。 */
     private BigDecimal unitConsumeMillimeter;
-    /** 是否加强层。 */
-    private boolean reinforcement;
-    /** 裁断模式：SINGLE或SPLIT。 */
+    /** 大卷幅宽，单位毫米。 */
+    private BigDecimal cordWidth;
+    /** 标准卷曲长度，单位米。 */
+    private BigDecimal curlLength;
+    /** 本任务GDYY大卷实际占用量，单位米。 */
+    private BigDecimal bigRollConsumeQuantity;
+        /** 裁断模式：SINGLE或SPLIT。 */
     private String cutMode;
     /** 分裁任务组稳定键。 */
     private String splitGroupKey;

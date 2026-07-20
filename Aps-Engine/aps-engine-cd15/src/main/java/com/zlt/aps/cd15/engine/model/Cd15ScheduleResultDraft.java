@@ -23,7 +23,17 @@ public class Cd15ScheduleResultDraft {
     private String cordSpec;
     /** 裁断角度。 */
     private String cuttingAngle;
-    /** 裁断模式：SINGLE或SPLIT。 */
+    /** 斜裁宽度，单位毫米。 */
+    private BigDecimal craftWidth;
+    /** 单耗，单位毫米/条。 */
+    private BigDecimal unitConsumeMillimeter;
+    /** 标准卷曲长度，单位米。 */
+    private BigDecimal curlLength;
+    /** 大卷幅宽，单位毫米。 */
+    private BigDecimal cordWidth;
+    /** GDYY大卷实际占用量，单位米。 */
+    private BigDecimal bigRollConsumeQuantity;
+        /** 裁断模式：SINGLE或SPLIT。 */
     private String cutMode;
     /** 分裁组合稳定键，仅用于两条结果共用工单号。 */
     private String splitGroupKey;

@@ -44,6 +44,7 @@ public class Cd15SplitCutGroupBuilder {
         return remainingCandidates.stream()
                 .filter(this::canSplit)
                 .filter(second -> this.sameScope(first, second))
+                .filter(second -> this.sameSupplyClasses(first, second))
                 .map(second -> this.group(first, second, classField))
                 .filter(group -> group.getCombinedWidth().compareTo(maxWidth) <= 0)
                 .findFirst();
@@ -51,7 +52,6 @@ public class Cd15SplitCutGroupBuilder {
 
     private boolean canSplit(Cd15ScheduleCandidate candidate) {
         return candidate != null
-                && !candidate.isReinforcement()
                 && !candidate.isContinueFromPreviousShift()
                 && !candidate.isNewSpecAdvance()
                 && StringUtils.hasText(candidate.getMaterialKey())
@@ -75,6 +75,18 @@ public class Cd15SplitCutGroupBuilder {
                 && !Objects.equals(first.getSteelStripCode(), second.getSteelStripCode())
                 && Objects.equals(first.getBigRollCode(), second.getBigRollCode())
                 && Objects.equals(first.getCuttingAngle(), second.getCuttingAngle());
+    }
+
+    /** 分裁要求两条规格的库存可供成型班数一致。 */
+    private boolean sameSupplyClasses(
+            Cd15ScheduleCandidate first, Cd15ScheduleCandidate second) {
+        if (first.getStockSupplyHours() == null
+                || second.getStockSupplyHours() == null) {
+            return first.getStockSupplyHours() == null
+                    && second.getStockSupplyHours() == null;
+        }
+        return first.getStockSupplyHours().compareTo(
+                second.getStockSupplyHours()) == 0;
     }
 
     private Cd15SplitCutGroup group(Cd15ScheduleCandidate first,

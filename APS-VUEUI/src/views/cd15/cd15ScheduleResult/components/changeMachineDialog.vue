@@ -105,6 +105,8 @@ import { shiftDates, validateTransferMachine, transferMachine } from '@/api/cd15
 const DEFAULT_FORM = () => ({
   factoryCode: '116',
   scheduleDate: '',
+  scheduleResultId: null,
+  groupNo: '',
   sourceMachineCode: '',
   targetMachineCode: '',
   steelStripCode: '',
@@ -157,6 +159,8 @@ export default {
         ...DEFAULT_FORM(),
         factoryCode: this.currentRow.factoryCode || '116',
         scheduleDate: this.normalizeDate(this.currentRow.scheduleDate),
+        scheduleResultId: this.currentRow.id || null,
+        groupNo: this.currentRow.groupNo || '',
         sourceMachineCode: this.currentRow.machineCode || '',
         steelStripCode: this.currentRow.steelStripCode || ''
       }

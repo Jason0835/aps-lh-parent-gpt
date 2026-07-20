@@ -25,9 +25,11 @@ public class Cd15DemandShift {
     private BigDecimal craftWidth;
     /** 单片长度，单位毫米/条。 */
     private BigDecimal unitConsumeMillimeter;
-    /** 是否左右加强层。 */
-    private boolean reinforcement;
-    /** 成型排程来源字段，取CLASS1至CLASS8。 */
+    /** 大卷幅宽，单位毫米。 */
+    private BigDecimal cordWidth;
+    /** 标准卷曲长度，单位米。 */
+    private BigDecimal curlLength;
+        /** 成型排程来源字段，取CLASS1至CLASS8。 */
     private String classField;
     /** 成型班次唯一标识。 */
     private String shiftKey;

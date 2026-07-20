@@ -23,8 +23,11 @@ public class Cd15MachineResourceMapper {
                 .machineCode(source.getMachineCode())
                 .status(source.getStatus())
                 .openMachineClass(source.getOpenMachineClass())
-                .splitCutSupported("0".equals(source.getIsOutTwo()))
-                .quota(decimal(source.getQuota()))
+                .singleCutSupported("1".equals(source.getSingleCutFlag()))
+                .splitCutSupported("1".equals(source.getSplitCutFlag()))
+                .defaultCutMode(source.getDefaultCutMode())
+                .singleShiftCapacity(decimal(source.getSingleShiftCapacity()))
+                .splitShiftCapacity(decimal(source.getSplitShiftCapacity()))
                 .clothWidthMax(decimal(source.getClothWidthMax()))
                 .clothWidthMin(decimal(source.getClothWidthMin()))
                 .build();

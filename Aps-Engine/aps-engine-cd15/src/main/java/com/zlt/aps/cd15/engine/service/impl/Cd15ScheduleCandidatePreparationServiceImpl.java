@@ -145,7 +145,8 @@ public class Cd15ScheduleCandidatePreparationServiceImpl
                 .cuttingAngle(demand.getCuttingAngle())
                 .craftWidth(demand.getCraftWidth())
                 .unitConsumeMillimeter(demand.getUnitConsumeMillimeter())
-                .reinforcement(demand.isReinforcement())
+                .cordWidth(demand.getCordWidth())
+                .curlLength(demand.getCurlLength())
                 .build();
     }
 

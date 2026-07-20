@@ -13,6 +13,8 @@
         <result column="ORDER_NO" property="orderNo"/>
         <result column="GROUP_NO" property="groupNo"/>
         <result column="RELEASE_STATUS" property="releaseStatus"/>
+        <result column="PUBLISH_SUCCESS_COUNT" property="publishSuccessCount"/>
+        <result column="NEWEST_PUBLISH_TIME" property="newestPublishTime"/>
         <result column="PRODUCTION_STATUS" property="productionStatus"/>
         <result column="BIG_ROLL_CODE" property="bigRollCode"/>
         <result column="CUTTING_ANGLE" property="cuttingAngle"/>
@@ -20,6 +22,12 @@
         <result column="MACHINE_NAME" property="machineName"/>
         <result column="STORAGE_LANE_CODE" property="storageLaneCode"/>
         <result column="STEEL_STRIP_CODE" property="steelStripCode"/>
+        <result column="MATERIAL_KEY" property="materialKey"/>
+        <result column="CRAFT_WIDTH" property="craftWidth"/>
+        <result column="UNIT_CONSUME_MILLIMETER" property="unitConsumeMillimeter"/>
+        <result column="CURL_LENGTH" property="curlLength"/>
+        <result column="CORD_WIDTH" property="cordWidth"/>
+        <result column="BIG_ROLL_CONSUME_QTY" property="bigRollConsumeQty"/>
         <result column="STOCK_QTY" property="stockQty"/>
         <result column="PLAN_SURPLUS_QTY" property="planSurplusQty"/>
         <result column="CUT_MODE" property="cutMode"/>

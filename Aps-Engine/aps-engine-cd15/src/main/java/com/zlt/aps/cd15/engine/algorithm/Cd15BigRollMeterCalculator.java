@@ -32,6 +32,35 @@ public class Cd15BigRollMeterCalculator {
     }
 
     /**
+     * 根据斜裁计划量换算GDYY大卷占用量。
+     *
+     * @param planQuantity 斜裁计划量，单位米
+     * @param unitConsumeMillimeter 单耗，单位毫米/条
+     * @param craftWidthMillimeter 斜裁宽度，单位毫米
+     * @param cordWidthMillimeter 大卷幅宽，单位毫米
+     * @return GDYY大卷占用量，单位米
+     */
+    public BigDecimal calculateForPlanQuantity(BigDecimal planQuantity,
+                                               BigDecimal unitConsumeMillimeter,
+                                               BigDecimal craftWidthMillimeter,
+                                               BigDecimal cordWidthMillimeter) {
+        requirePositive(planQuantity, "斜裁计划量");
+        requirePositive(unitConsumeMillimeter, "单耗");
+        requirePositive(craftWidthMillimeter, "斜裁宽度");
+        if (cordWidthMillimeter == null || cordWidthMillimeter.signum() <= 0) {
+            return normalize(planQuantity);
+        }
+        BigDecimal totalCutLength = planQuantity.multiply(unitConsumeMillimeter)
+                .divide(craftWidthMillimeter, 10, RoundingMode.HALF_UP);
+        return calculate(totalCutLength, craftWidthMillimeter, cordWidthMillimeter);
+    }
+
+    private BigDecimal normalize(BigDecimal value) {
+        BigDecimal normalized = value.stripTrailingZeros();
+        return normalized.scale() < 0 ? normalized.setScale(0) : normalized;
+    }
+
+    /**
      * 校验计算尺寸必须存在且大于0。
      */
     private void requirePositive(BigDecimal value, String fieldName) {

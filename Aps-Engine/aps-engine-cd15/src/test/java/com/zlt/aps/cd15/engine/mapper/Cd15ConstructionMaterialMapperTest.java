@@ -37,6 +37,33 @@ public class Cd15ConstructionMaterialMapperTest {
         assertEquals(new BigDecimal("1000"), result.get(0).getUnitConsumeMillimeter());
         assertEquals(3, result.get(2).getLayerNo());
     }
+    /**
+     * 左右层与1至3层必须映射到相同的钢带材料模型。
+     */
+    @Test
+    public void shouldMapLeftRightLayersThroughUnifiedMaterialModel() {
+        MdmConstructionInfo construction = new MdmConstructionInfo();
+        construction.setConstructionCode("E001");
+        construction.setBeltCode1("C1");
+        construction.setBeltCraft1(new BigDecimal("100"));
+        construction.setBelt1Length(new BigDecimal("500"));
+        construction.setBeltCodeLeftCode("CL");
+        construction.setBeltCodeLeftCraft(new BigDecimal("120"));
+        construction.setBeltCodeLeftLength(new BigDecimal("600"));
+        construction.setBeltCodeRightCode("CR");
+        construction.setBeltCodeRightCraft(new BigDecimal("140"));
+        construction.setBeltCodeRightLength(new BigDecimal("700"));
+
+        List<Cd15ConstructionMaterial> result = mapper.map(construction);
+
+        assertEquals(3, result.size());
+        assertEquals("CL", result.get(1).getSteelStripCode());
+        assertEquals(101, result.get(1).getLayerNo());
+        assertEquals(new BigDecimal("120"), result.get(1).getCraftWidth());
+        assertEquals("CR", result.get(2).getSteelStripCode());
+        assertEquals(102, result.get(2).getLayerNo());
+    }
+
 
     /**
      * 代码存在但单耗缺失的层位仍进入映射，交由批次前置检查输出明确错误。

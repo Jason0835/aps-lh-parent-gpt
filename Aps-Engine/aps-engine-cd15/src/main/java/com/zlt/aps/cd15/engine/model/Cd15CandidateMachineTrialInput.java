@@ -30,12 +30,18 @@ public class Cd15CandidateMachineTrialInput {
     private BigDecimal equalShareThreshold;
     /** 单车按胎体长度方向卷取后，对应的斜裁排程米数。 */
     private BigDecimal vehiclePlanQuantity;
+    /** 斜裁宽度，单位毫米。 */
+    private BigDecimal craftWidth;
+    /** 单耗，单位毫米/条。 */
+    private BigDecimal unitConsumeMillimeter;
+    /** 大卷幅宽，单位毫米。 */
+    private BigDecimal cordWidth;
     /** 工装总数。 */
     private int totalToolingCount;
     /** 当前库排占用车数。 */
     private int occupiedVehicleCount;
-    /** 机台满班理论定额。 */
-    private BigDecimal quota;
+    /** 当前裁断模式的满班产能，单位米/班。 */
+    private BigDecimal shiftCapacity;
     /** 班次时长小时数。 */
     private int shiftHours;
     /** 已扣除检修和前序任务后的剩余秒数。 */

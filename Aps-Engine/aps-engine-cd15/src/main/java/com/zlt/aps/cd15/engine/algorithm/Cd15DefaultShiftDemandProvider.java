@@ -75,45 +75,157 @@ public class Cd15DefaultShiftDemandProvider implements Cd15ShiftDemandProvider {
         List<Cd15DemandShift> window = demandWindowSelector.select(availableShifts, depthClassQty);
         BigDecimal demandQuantity = calculateWindowDemand(
                 window, context.getParameters().getDemandCalcMode(), depthClassQty);
-        // 窗口前成型消耗用于重算6点库存余额，不属于本次待排需求。
-        BigDecimal consumedBeforeWindow = materialShifts.stream()
-                .filter(item -> item.getStartTime().isBefore(demandStart))
-                .map(item -> value(item.getSteelStripDemandQuantity()))
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-        BigDecimal stockAtSix = safe(input.getStocksAtSix()).stream()
-                .filter(item -> item != null && candidate.getSteelStripCode().equals(item.getSteelStripCode()))
-                .map(item -> value(item.getStockQuantity()))
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-        // 实际入库优先于同任务计划入库，解析器会消除互斥记录，避免重复抵扣需求。
-        List<Cd15InboundRecord> effectiveInbound = effectiveInbound(rolling);
-        // 班次开始前已入库数量进入当前可用库存；班次后但需求截止前入库用于抵扣未来需求。
-        BigDecimal inboundBeforeShift = inboundQuantity(effectiveInbound, candidate.getSteelStripCode(),
-                record -> record.getInboundTime() == null
-                        || !record.getInboundTime().isAfter(shift.getStartTime()),
-                curlLength(input, candidate.getSteelStripCode(), context.getParameters().getRollCoilMeter()));
-        LocalDateTime demandDeadline = window.isEmpty()
-                ? demandStart : window.get(window.size() - 1).getStartTime();
-        BigDecimal futureEffectivePlan = inboundQuantity(effectiveInbound, candidate.getSteelStripCode(),
-                record -> record.getInboundTime() != null
-                        && record.getInboundTime().isAfter(shift.getStartTime())
-                        && !record.getInboundTime().isAfter(demandDeadline),
-                curlLength(input, candidate.getSteelStripCode(), context.getParameters().getRollCoilMeter()));
-
-        // 余额为负时拆成历史缺口，余额为正时作为现有库存，两者不能同时重复参与净需求。
-        BigDecimal inventoryBalance = stockAtSix.add(inboundBeforeShift).subtract(consumedBeforeWindow);
-        BigDecimal expectedStock = inventoryBalance.max(BigDecimal.ZERO);
-        BigDecimal shortage = inventoryBalance.signum() < 0
-                ? inventoryBalance.abs() : BigDecimal.ZERO;
-        // 净需求口径：窗口需求 + 历史缺口 - 可用库存 - 截止前有效计划入库，最低为0。
-        BigDecimal netDemand = demandCalculator.calculateNetDemand(
-                demandQuantity, shortage, expectedStock, futureEffectivePlan);
+        BigDecimal netDemand = this.sharedNetDemand(
+                context, input, shift, candidate, rolling, demandStart);
         log.debug("[斜裁自动排程] 当前班次净需求计算完成, classField={}, steelStripCode={}, "
-                        + "demandQuantity={}, expectedStock={}, shortage={}, futurePlan={}, netDemand={}",
-                shift.getClassField(), candidate.getSteelStripCode(), demandQuantity,
-                expectedStock, shortage, futureEffectivePlan, netDemand);
+                        + "materialKey={}, demandQuantity={}, sharedNetDemand={}",
+                shift.getClassField(), candidate.getSteelStripCode(),
+                candidate.getMaterialKey(), demandQuantity, netDemand);
         return Cd15ShiftDemandDecision.builder()
                 .netDemandQuantity(netDemand).planSurplusQuantity(null).build();
+    }
+
+    /**
+     * 同一钢带的不同施工材料共用6点库存及有效入库，按首个需求时间和材料键稳定分配。
+     */
+    private BigDecimal sharedNetDemand(
+            Cd15AutoScheduleContext context,
+            Cd15AutoScheduleInput input,
+            Cd15ShiftDescriptor shift,
+            Cd15ScheduleCandidate candidate,
+            Cd15RollingScheduleContext rolling,
+            LocalDateTime demandStart) {
+        String steelStripCode = candidate.getSteelStripCode();
+        BigDecimal depthClassQty = this.requiredDepth(input, steelStripCode);
+        List<MaterialWindowDemand> profiles = this.materialWindowDemands(
+                context, input, steelStripCode, demandStart, depthClassQty);
+        if (profiles.stream().noneMatch(
+                profile -> candidate.getMaterialKey().equals(profile.materialKey))) {
+            return BigDecimal.ZERO;
+        }
+
+        BigDecimal stockAtSix = this.safe(input.getStocksAtSix()).stream()
+                .filter(item -> item != null
+                        && steelStripCode.equals(item.getSteelStripCode()))
+                .map(item -> this.value(item.getStockQuantity()))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal consumedBeforeWindow = this.planningDemands(input).stream()
+                .filter(item -> item != null
+                        && steelStripCode.equals(item.getSteelStripCode()))
+                .filter(item -> item.getStartTime() != null
+                        && item.getStartTime().isBefore(demandStart))
+                .map(item -> this.value(item.getSteelStripDemandQuantity()))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        List<Cd15InboundRecord> effectiveInbound = this.effectiveInbound(rolling);
+        BigDecimal coilMeter = this.curlLength(
+                input, steelStripCode, context.getParameters().getRollCoilMeter());
+        BigDecimal inboundBeforeShift = this.inboundQuantity(
+                effectiveInbound, steelStripCode,
+                record -> record.getInboundTime() == null
+                        || !record.getInboundTime().isAfter(shift.getStartTime()),
+                coilMeter);
+        List<Cd15InboundRecord> futureInbound = effectiveInbound.stream()
+                .filter(item -> item != null
+                        && steelStripCode.equals(item.getSteelStripCode()))
+                .filter(item -> item.getInboundTime() != null
+                        && item.getInboundTime().isAfter(shift.getStartTime()))
+                .sorted(Comparator.comparing(Cd15InboundRecord::getInboundTime)
+                        .thenComparing(item -> Objects.toString(item.getTaskKey(), ""))
+                        .thenComparing(item -> Objects.toString(item.getLaneCode(), "")))
+                .collect(Collectors.toList());
+
+        BigDecimal inventoryBalance = stockAtSix.add(inboundBeforeShift)
+                .subtract(consumedBeforeWindow);
+        BigDecimal available = inventoryBalance.max(BigDecimal.ZERO);
+        BigDecimal backlog = inventoryBalance.signum() < 0
+                ? inventoryBalance.abs() : BigDecimal.ZERO;
+        int inboundIndex = 0;
+        for (MaterialWindowDemand profile : profiles) {
+            while (inboundIndex < futureInbound.size()
+                    && !futureInbound.get(inboundIndex).getInboundTime()
+                            .isAfter(profile.deadline)) {
+                available = available.add(this.inboundQuantity(
+                        futureInbound.get(inboundIndex), coilMeter));
+                inboundIndex++;
+            }
+            BigDecimal netDemand = demandCalculator.calculateNetDemand(
+                    profile.demandQuantity, backlog, available, BigDecimal.ZERO);
+            BigDecimal totalNeed = profile.demandQuantity.add(backlog);
+            available = available.subtract(totalNeed).max(BigDecimal.ZERO);
+            backlog = BigDecimal.ZERO;
+            if (candidate.getMaterialKey().equals(profile.materialKey)) {
+                return netDemand;
+            }
+        }
+        return BigDecimal.ZERO;
+    }
+
+    /** 构建同一钢带下各材料的当前需求窗口。 */
+    private List<MaterialWindowDemand> materialWindowDemands(
+            Cd15AutoScheduleContext context,
+            Cd15AutoScheduleInput input,
+            String steelStripCode,
+            LocalDateTime demandStart,
+            BigDecimal depthClassQty) {
+        return this.planningDemands(input).stream()
+                .filter(item -> item != null
+                        && steelStripCode.equals(item.getSteelStripCode()))
+                .filter(item -> item.getStartTime() != null
+                        && !item.getStartTime().isBefore(demandStart))
+                .filter(item -> item.getMaterialKey() != null)
+                .collect(Collectors.groupingBy(
+                        Cd15DemandShift::getMaterialKey,
+                        LinkedHashMap::new, Collectors.toList()))
+                .entrySet().stream()
+                .map(entry -> {
+                    List<Cd15DemandShift> shifts = entry.getValue().stream()
+                            .sorted(Comparator.comparing(Cd15DemandShift::getStartTime))
+                            .collect(Collectors.toList());
+                    List<Cd15DemandShift> window =
+                            demandWindowSelector.select(shifts, depthClassQty);
+                    BigDecimal quantity = this.calculateWindowDemand(
+                            window, context.getParameters().getDemandCalcMode(),
+                            depthClassQty);
+                    LocalDateTime firstStart = shifts.get(0).getStartTime();
+                    LocalDateTime deadline = window.isEmpty()
+                            ? firstStart : window.get(window.size() - 1).getStartTime();
+                    return new MaterialWindowDemand(
+                            entry.getKey(), firstStart, deadline, quantity);
+                })
+                .filter(profile -> profile.demandQuantity.signum() > 0)
+                .sorted(Comparator
+                        .comparing((MaterialWindowDemand profile) -> profile.firstStart)
+                        .thenComparing(profile -> profile.materialKey))
+                .collect(Collectors.toList());
+    }
+
+    /** 单条入库记录的精确米数；缺少精确数量时按车数和卷曲长度折算。 */
+    private BigDecimal inboundQuantity(
+            Cd15InboundRecord record, BigDecimal coilMeter) {
+        return record.getInboundQuantity() == null
+                ? this.value(coilMeter).multiply(
+                        BigDecimal.valueOf(record.getVehicleCount()))
+                : record.getInboundQuantity();
+    }
+
+    /** 材料级共享库存分配窗口。 */
+    private static final class MaterialWindowDemand {
+        private final String materialKey;
+        private final LocalDateTime firstStart;
+        private final LocalDateTime deadline;
+        private final BigDecimal demandQuantity;
+
+        private MaterialWindowDemand(
+                String materialKey,
+                LocalDateTime firstStart,
+                LocalDateTime deadline,
+                BigDecimal demandQuantity) {
+            this.materialKey = materialKey;
+            this.firstStart = firstStart;
+            this.deadline = deadline;
+            this.demandQuantity = demandQuantity;
+        }
     }
 
     /**
@@ -234,7 +346,8 @@ public class Cd15DefaultShiftDemandProvider implements Cd15ShiftDemandProvider {
                           Cd15ShiftDescriptor shift, Cd15ScheduleCandidate candidate) {
         if (context == null || context.getScheduleDate() == null || context.getParameters() == null
                 || input == null || shift == null || candidate == null
-                || candidate.getSteelStripCode() == null) {
+                || candidate.getSteelStripCode() == null
+                || candidate.getMaterialKey() == null) {
             throw new IllegalArgumentException("班次需求计算上下文、输入、班次和候选不能为空");
         }
     }

@@ -34,6 +34,12 @@
             <scope>compile</scope>
         </dependency>
         <dependency>
+            <groupId>com.zlt.aps.cd15</groupId>
+            <artifactId>aps-cd15-api</artifactId>
+            <version>1.0.3-SNAPSHOT</version>
+            <scope>compile</scope>
+        </dependency>
+        <dependency>
             <groupId>com.zlt.aps.cx</groupId>
             <artifactId>aps-cx-api</artifactId>
             <version>1.0.3-SNAPSHOT</version>

@@ -31,6 +31,7 @@ public class Cd15MachineTrialPreparationService {
     private final Cd15CandidateMachineTrialCalculator trialCalculator;
     private final Cd15MachineTrialSelector trialSelector;
     private final Cd15VehiclePlanQuantityCalculator vehiclePlanQuantityCalculator;
+    private final Cd15MachineModeResolver machineModeResolver;
 
     public Cd15MachineTrialPlan prepare(Cd15MachineTrialRequest request,
                                         Cd15MachineResourceSnapshot snapshot) {
@@ -89,18 +90,23 @@ public class Cd15MachineTrialPreparationService {
                         .equalShareThreshold(parameters.getEqualShareThreshold())
                         // 单车等价排程量，用于整车取整及工装数量试算
                         .vehiclePlanQuantity(vehiclePlanQuantity)
+                        .craftWidth(request.getCraftWidth())
+                        .unitConsumeMillimeter(request.getUnitConsumeMillimeter())
+                        .cordWidth(request.getCordWidth())
                         // 工装总数（卷轴），决定单机同时可上多少卷
                         .totalToolingCount(parameters.getRollTotalCount())
                         // 已占用车数（前序班次已安排入库的部分）
                         .occupiedVehicleCount(request.getOccupiedVehicleCount())
-                        // 该候选机台定额分配比例
-                        .quota(candidate.getQuota())
+                        // 当前裁断模式的满班产能
+                        .shiftCapacity(this.shiftCapacity(
+                                request, candidate.getMachineCode(), snapshot))
                         // 班次可用小时数
                         .shiftHours(request.getShiftHours())
                         // 机台班次剩余秒数（扣除前序任务后）
-                        .remainingSeconds(seconds.getOrDefault(candidate.getMachineCode(),
-                                request.getShiftHours() * 3600))
-                        .originalStartTime(originalStartTime(request, candidate.getMachineCode()))
+                        .remainingSeconds(this.remainingSeconds(
+                                request, candidate.getMachineCode(), snapshot, seconds))
+                        .originalStartTime(this.originalStartTime(
+                                request, candidate.getMachineCode(), snapshot, seconds))
                         .bigRollAgingStocks(request.getBigRollAgingStocks())
                         // 机台上次规格（用于计算换规格耗时）
                         .previousSpec(previousSpecs.get(candidate.getMachineCode()))
@@ -143,38 +149,79 @@ public class Cd15MachineTrialPreparationService {
     }
 
     /**
-     * 加强层固定分裁只允许G1201；普通分裁要求机台支持一出二；
-     * G1201不参与普通单裁。
+     * 机台模式完全由机台主数据决定；指定机台约束由候选机台解析器统一处理。
      */
     private boolean machineModeMatched(
             Cd15MachineTrialRequest request,
             String machineCode,
             Cd15MachineResourceSnapshot snapshot) {
         com.zlt.aps.cd15.engine.model.Cd15MachineResource machine =
-                snapshot.getMachines() == null ? null : snapshot.getMachines().stream()
-                        .filter(item -> item != null
-                                && java.util.Objects.equals(machineCode, item.getMachineCode()))
-                        .findFirst().orElse(null);
+                this.findMachine(machineCode, snapshot);
         if (machine == null) {
             return false;
         }
-        if (request.isReinforcement()) {
-            return "G1201".equals(machineCode) && machine.isSplitCutSupported();
-        }
-        if (request.isSplitCut()) {
-            return machine.isSplitCutSupported();
-        }
-        return !"G1201".equals(machineCode);
+        return this.machineModeResolver.matches(machine, request.isSplitCut());
     }
 
-    private java.time.LocalDateTime originalStartTime(Cd15MachineTrialRequest request, String machineCode) {
+    /** 按本次裁断模式选择班产能力。 */
+    private BigDecimal shiftCapacity(
+            Cd15MachineTrialRequest request,
+            String machineCode,
+            Cd15MachineResourceSnapshot snapshot) {
+        com.zlt.aps.cd15.engine.model.Cd15MachineResource machine =
+                this.findMachine(machineCode, snapshot);
+        if (machine == null) {
+            return BigDecimal.ZERO;
+        }
+        return this.machineModeResolver.capacity(machine, request.isSplitCut());
+    }
+
+    /** 检修只扣除与当前班次重叠的秒数，不再整班排除机台。 */
+    private int remainingSeconds(
+            Cd15MachineTrialRequest request,
+            String machineCode,
+            Cd15MachineResourceSnapshot snapshot,
+            Map<String, Integer> configuredSeconds) {
+        int fullSeconds = this.fullShiftSeconds(request);
+        com.zlt.aps.cd15.engine.model.Cd15MachineResource machine =
+                this.findMachine(machineCode, snapshot);
+        int maintenanceSeconds = machine == null ? 0 : machine.getMaintenanceSeconds();
+        int availableSeconds = Math.max(0, fullSeconds - maintenanceSeconds);
+        int currentRemaining = configuredSeconds == null
+                ? fullSeconds : configuredSeconds.getOrDefault(machineCode, fullSeconds);
+        return Math.min(currentRemaining, availableSeconds);
+    }
+
+    private java.time.LocalDateTime originalStartTime(
+            Cd15MachineTrialRequest request,
+            String machineCode,
+            Cd15MachineResourceSnapshot snapshot,
+            Map<String, Integer> configuredSeconds) {
         if (request.getShiftStart() == null) {
             return null;
         }
-        int fullSeconds = Math.max(1, request.getShiftHours()) * 3600;
-        int remainingSeconds = request.getRemainingSecondsByMachine() == null
-                ? fullSeconds : request.getRemainingSecondsByMachine().getOrDefault(machineCode, fullSeconds);
-        return request.getShiftStart().plusSeconds(Math.max(0, fullSeconds - remainingSeconds));
+        int fullSeconds = this.fullShiftSeconds(request);
+        int remainingSeconds = this.remainingSeconds(
+                request, machineCode, snapshot, configuredSeconds);
+        return request.getShiftStart().plusSeconds(
+                Math.max(0, fullSeconds - remainingSeconds));
+    }
+
+    private int fullShiftSeconds(Cd15MachineTrialRequest request) {
+        if (request.getShiftStart() != null && request.getShiftEnd() != null) {
+            return Math.toIntExact(java.time.Duration.between(
+                    request.getShiftStart(), request.getShiftEnd()).getSeconds());
+        }
+        return Math.max(1, request.getShiftHours()) * 3600;
+    }
+
+    private com.zlt.aps.cd15.engine.model.Cd15MachineResource findMachine(
+            String machineCode, Cd15MachineResourceSnapshot snapshot) {
+        return snapshot == null || snapshot.getMachines() == null
+                ? null : snapshot.getMachines().stream()
+                        .filter(item -> item != null
+                                && java.util.Objects.equals(machineCode, item.getMachineCode()))
+                        .findFirst().orElse(null);
     }
     private int changeMinutes(Cd15AutoScheduleParameters parameters, int configuredMinutes) {
         return configuredMinutes == 0 && parameters.getSourceValues() == null

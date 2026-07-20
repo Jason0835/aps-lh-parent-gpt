@@ -54,6 +54,13 @@ public class Cd15FractionalDemandWindowSelector {
         }
         return Cd15DemandShift.builder()
                 .steelStripCode(source.getSteelStripCode())
+                .materialKey(source.getMaterialKey())
+                .bigRollCode(source.getBigRollCode())
+                .cuttingAngle(source.getCuttingAngle())
+                .craftWidth(source.getCraftWidth())
+                .unitConsumeMillimeter(source.getUnitConsumeMillimeter())
+                .cordWidth(source.getCordWidth())
+                .curlLength(source.getCurlLength())
                 .classField(source.getClassField())
                 .shiftKey(source.getShiftKey())
                 .startTime(source.getStartTime())

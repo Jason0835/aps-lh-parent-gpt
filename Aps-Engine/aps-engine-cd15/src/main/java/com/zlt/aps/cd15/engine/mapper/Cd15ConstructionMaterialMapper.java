@@ -28,16 +28,16 @@ public class Cd15ConstructionMaterialMapper {
         List<Cd15ConstructionMaterial> result = new ArrayList<>();
         String bigRollCode = construction.getArticleCrownSpec();
         String cuttingAngle = construction.getBeltCuttingAngle();
-        this.addLayer(result, construction, bigRollCode, cuttingAngle, 1, false,
+        this.addLayer(result, construction, bigRollCode, cuttingAngle, 1,
                 construction.getBeltCode1(), construction.getBeltCraft1(), construction.getBelt1Length());
-        this.addLayer(result, construction, bigRollCode, cuttingAngle, 2, false,
+        this.addLayer(result, construction, bigRollCode, cuttingAngle, 2,
                 construction.getBeltCode2(), construction.getBeltCraft2(), construction.getBelt2Length());
-        this.addLayer(result, construction, bigRollCode, cuttingAngle, 3, false,
+        this.addLayer(result, construction, bigRollCode, cuttingAngle, 3,
                 construction.getBeltCode3(), construction.getBeltCraft3(), construction.getBelt3Length());
-        this.addLayer(result, construction, bigRollCode, cuttingAngle, 101, true,
+        this.addLayer(result, construction, bigRollCode, cuttingAngle, 101,
                 construction.getBeltCodeLeftCode(), construction.getBeltCodeLeftCraft(),
                 construction.getBeltCodeLeftLength());
-        this.addLayer(result, construction, bigRollCode, cuttingAngle, 102, true,
+        this.addLayer(result, construction, bigRollCode, cuttingAngle, 102,
                 construction.getBeltCodeRightCode(), construction.getBeltCodeRightCraft(),
                 construction.getBeltCodeRightLength());
         return result;
@@ -51,7 +51,6 @@ public class Cd15ConstructionMaterialMapper {
                           String bigRollCode,
                           String cuttingAngle,
                           int layerNo,
-                          boolean reinforcement,
                           String steelStripCode,
                           java.math.BigDecimal craftWidth,
                           java.math.BigDecimal unitConsumeMillimeter) {
@@ -66,7 +65,6 @@ public class Cd15ConstructionMaterialMapper {
                 .cordWidth(construction.getCordWidth())
                 .cuttingAngle(this.trim(cuttingAngle))
                 .layerNo(layerNo)
-                .reinforcement(reinforcement)
                 .unitConsumeMillimeter(unitConsumeMillimeter)
                 .craftWidth(craftWidth)
                 .build());

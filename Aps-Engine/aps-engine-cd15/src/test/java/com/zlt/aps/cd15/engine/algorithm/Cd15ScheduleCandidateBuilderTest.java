@@ -117,6 +117,30 @@ public class Cd15ScheduleCandidateBuilderTest {
         assertFalse("CF003 不在累计 map 不应标记为续作", cf003.isContinueFromPreviousShift());
     }
 
+    /** 同一钢带的不同施工材料只能依次使用一份共享库存。 */
+    @Test
+    public void shouldShareStockAcrossMaterialsOfSameSteelStrip() {
+        LocalDateTime currentStart = LocalDateTime.of(2026, 6, 12, 22, 0);
+        Cd15DemandShift first = shift("CF001", "2026-06-12T22:00:00", "100");
+        first.setMaterialKey("M1");
+        Cd15DemandShift second = shift("CF001", "2026-06-12T22:00:00", "100");
+        second.setMaterialKey("M2");
+
+        List<Cd15ScheduleCandidate> result = builder.build(
+                Arrays.asList(second, first),
+                Collections.singletonList(stock("CF001", "150")),
+                currentStart,
+                Collections.singletonMap("CF001", BigDecimal.ONE),
+                Collections.emptyMap());
+
+        Cd15ScheduleCandidate firstCandidate = result.stream()
+                .filter(item -> "M1".equals(item.getMaterialKey())).findFirst().orElse(null);
+        Cd15ScheduleCandidate secondCandidate = result.stream()
+                .filter(item -> "M2".equals(item.getMaterialKey())).findFirst().orElse(null);
+        assertFalse(firstCandidate.isShortageInCurrentShift());
+        assertTrue(secondCandidate.isShortageInCurrentShift());
+    }
+
     private Map<String, BigDecimal> depths(String... steelStripCodes) {
         return Stream.of(steelStripCodes).collect(Collectors.toMap(
                 steelStripCode -> steelStripCode, steelStripCode -> BigDecimal.ONE));

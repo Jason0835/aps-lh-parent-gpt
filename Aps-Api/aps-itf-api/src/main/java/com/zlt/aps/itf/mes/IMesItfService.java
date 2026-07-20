@@ -1,5 +1,6 @@
 package com.zlt.aps.itf.mes;
 
+import com.zlt.aps.cd15.api.domain.entity.Cd15ScheduleResultIssue;
 import com.ruoyi.common.constant.ServiceNameConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.cx.api.domain.entity.CxMachineOnlineInfo;
@@ -407,6 +408,17 @@ public interface IMesItfService {
     @ApiOperation("直裁排程结果下发到MES")
     @PostMapping("/mesItf/issueCd90ScheduleResult")
     public AjaxResult issueCd90ScheduleResult(@RequestBody List<Cd90ScheduleResultIssue> cd90ScheduleResultIssueList);
+    /**
+     * 斜裁排程结果下发到 MES。
+     *
+     * @param issueList 按班次展开的斜裁排程结果
+     * @return 下发结果
+     */
+    @ApiOperation("斜裁排程结果下发到MES")
+    @PostMapping("/mesItf/issueCd15ScheduleResult")
+    AjaxResult issueCd15ScheduleResult(
+            @RequestBody List<Cd15ScheduleResultIssue> issueList);
+
 
     /**
      * 同步出库未扫描订单

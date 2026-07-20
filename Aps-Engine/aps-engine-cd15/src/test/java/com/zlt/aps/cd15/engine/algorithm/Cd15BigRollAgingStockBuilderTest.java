@@ -1,5 +1,6 @@
 package com.zlt.aps.cd15.engine.algorithm;
 
+import com.zlt.aps.cd15.api.domain.entity.Cd15ShiftConfig;
 import com.zlt.aps.cd15.engine.model.Cd15BigRollAgingBuildResult;
 import com.zlt.aps.cd15.engine.model.Cd15BigRollAgingStock;
 import com.zlt.aps.gdyy.api.domain.entity.GdyyScheduleResult;
@@ -30,7 +31,8 @@ public class Cd15BigRollAgingStockBuilderTest {
         stock.setBadNum(new BigDecimal("0.5"));
 
         Cd15BigRollAgingBuildResult result = builder.build(
-                Collections.singletonList(stock), Collections.emptyList(), 24);
+                Collections.singletonList(stock), Collections.emptyList(),
+                Collections.emptyList(), 24);
 
         assertEquals(1, result.getStocks().size());
         assertEquals(0, new BigDecimal("300").compareTo(result.getStocks().get(0).getAvailableQuantity()));
@@ -43,7 +45,8 @@ public class Cd15BigRollAgingStockBuilderTest {
         GdyyStock stock = stock("BR001", "1", "120", null);
 
         Cd15BigRollAgingBuildResult result = builder.build(
-                Collections.singletonList(stock), Collections.emptyList(), 24);
+                Collections.singletonList(stock), Collections.emptyList(),
+                Collections.emptyList(), 24);
 
         assertTrue(result.getStocks().isEmpty());
         assertTrue(result.getDataMissingBigRollCodes().contains("BR001"));
@@ -54,7 +57,8 @@ public class Cd15BigRollAgingStockBuilderTest {
         GdyyStock stock = stock("BR001", "1", null, Timestamp.valueOf("2026-06-12 10:00:00"));
 
         Cd15BigRollAgingBuildResult result = builder.build(
-                Collections.singletonList(stock), Collections.emptyList(), 24);
+                Collections.singletonList(stock), Collections.emptyList(),
+                Collections.emptyList(), 24);
 
         assertTrue(result.getStocks().isEmpty());
         assertTrue(result.getDataMissingBigRollCodes().contains("BR001"));
@@ -65,7 +69,8 @@ public class Cd15BigRollAgingStockBuilderTest {
         GdyyStock stock = stock("BR001", "1", "0", Timestamp.valueOf("2026-06-12 10:00:00"));
 
         Cd15BigRollAgingBuildResult result = builder.build(
-                Collections.singletonList(stock), Collections.emptyList(), 24);
+                Collections.singletonList(stock), Collections.emptyList(),
+                Collections.emptyList(), 24);
 
         assertTrue(result.getStocks().isEmpty());
         assertTrue(result.getDataMissingBigRollCodes().contains("BR001"));
@@ -76,7 +81,8 @@ public class Cd15BigRollAgingStockBuilderTest {
         GdyyScheduleResult plan = plan("BR001", "2026-06-12 00:00:00", "100");
 
         Cd15BigRollAgingBuildResult result = builder.build(
-                Collections.emptyList(), Collections.singletonList(plan), 24);
+                Collections.emptyList(), Collections.singletonList(plan),
+                Collections.singletonList(shift("CLASS3", "06:00:00", "14:00:00", 0)), 24);
 
         Cd15BigRollAgingStock stock = result.getStocks().get(0);
         assertEquals("GDYY_PLAN", stock.getSourceType());
@@ -90,11 +96,36 @@ public class Cd15BigRollAgingStockBuilderTest {
         GdyyScheduleResult plan = plan("BR001", "2026-06-12 00:00:00", "100");
 
         Cd15BigRollAgingBuildResult result = builder.build(
-                Collections.singletonList(actual), Collections.singletonList(plan), 24);
+                Collections.singletonList(actual), Collections.singletonList(plan),
+                Collections.singletonList(shift("CLASS3", "06:00:00", "14:00:00", 0)), 24);
 
         assertEquals(1, result.getStocks().size());
         assertFalse(result.getStocks().stream()
                 .anyMatch(item -> "GDYY_PLAN".equals(item.getSourceType())));
+    }
+
+    @Test
+    public void shouldUseConfiguredShiftEndTime() {
+        GdyyScheduleResult plan = plan("BR001", "2026-06-12 00:00:00", "100");
+
+        Cd15BigRollAgingBuildResult result = builder.build(
+                Collections.emptyList(), Collections.singletonList(plan),
+                Collections.singletonList(shift("CLASS3", "07:00:00", "16:00:00", 0)), 24);
+
+        assertEquals(LocalDateTime.of(2026, 6, 13, 16, 0),
+                result.getStocks().get(0).getReleaseTime());
+    }
+
+    @Test
+    public void shouldMarkPlanAsDataMissingWhenShiftConfigIsMissing() {
+        GdyyScheduleResult plan = plan("BR001", "2026-06-12 00:00:00", "100");
+
+        Cd15BigRollAgingBuildResult result = builder.build(
+                Collections.emptyList(), Collections.singletonList(plan),
+                Collections.emptyList(), 24);
+
+        assertTrue(result.getStocks().isEmpty());
+        assertTrue(result.getDataMissingBigRollCodes().contains("BR001"));
     }
 
     private GdyyStock stock(String bigRollCode, String quantity, String stockMeters, Date stockInTime) {
@@ -117,5 +148,17 @@ public class Cd15BigRollAgingStockBuilderTest {
         plan.setClass3ScheduleDate(Timestamp.valueOf(class3Date));
         plan.setClass3PlanQty(Double.valueOf(quantity));
         return plan;
+    }
+
+    private Cd15ShiftConfig shift(String classField, String startTime,
+                                  String endTime, int crossDay) {
+        Cd15ShiftConfig config = new Cd15ShiftConfig();
+        config.setShiftCode("02");
+        config.setClassField(classField);
+        config.setStartTime(startTime);
+        config.setEndTime(endTime);
+        config.setIsCrossDay(crossDay);
+        config.setIsActive(1);
+        return config;
     }
 }

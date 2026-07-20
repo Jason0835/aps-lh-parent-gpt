@@ -27,6 +27,7 @@ public class Cd15FractionalDemandWindowSelectorTest {
         assertEquals(new BigDecimal("120"), result.get(1).getSteelStripDemandQuantity());
         assertEquals(new BigDecimal("40"), result.get(2).getSteelStripDemandQuantity());
         assertEquals(new BigDecimal("0.5"), result.get(2).getWindowWeight());
+        assertEquals("M-C01", result.get(2).getMaterialKey());
     }
 
     @Test(expected = IllegalArgumentException.class)
@@ -37,6 +38,7 @@ public class Cd15FractionalDemandWindowSelectorTest {
     private Cd15DemandShift shift(int hours, String demand) {
         return Cd15DemandShift.builder()
                 .steelStripCode("C01")
+                .materialKey("M-C01")
                 .classField("CLASS1")
                 .shiftKey("S" + hours)
                 .startTime(LocalDateTime.of(2026, 6, 13, 6, 0).plusHours(hours))

@@ -26,9 +26,7 @@ public class Cd15ConstructionMaterial {
     private String cuttingAngle;
     /** 层位，1至3为主钢带，101/102表示左右加强层。 */
     private int layerNo;
-    /** 是否加强层。 */
-    private boolean reinforcement;
-    /** 单耗，单位毫米/条。 */
+        /** 单耗，单位毫米/条。 */
     private BigDecimal unitConsumeMillimeter;
     /** 斜裁宽度。 */
     private BigDecimal craftWidth;

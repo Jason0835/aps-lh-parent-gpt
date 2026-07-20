@@ -15,6 +15,8 @@ public class Cd15InsertLaneAllocationDraft {
     private Long scheduleResultId;
     /** 是否归属于本次新增插单主结果。 */
     private boolean insertResult;
+    /** 新增主结果稳定键，用于分裁组合的两条新增结果分别挂接库排明细。 */
+    private String newResultKey;
     private String classField;
     private Date shiftScheduleDate;
     private String laneCode;

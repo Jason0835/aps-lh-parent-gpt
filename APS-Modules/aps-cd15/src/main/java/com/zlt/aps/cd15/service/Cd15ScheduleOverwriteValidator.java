@@ -13,7 +13,6 @@ import java.util.List;
 public class Cd15ScheduleOverwriteValidator {
 
     private static final String LOCKED = "1";
-    private static final String RELEASED_SUCCESS = "1";
 
     /**
      * 校验旧结果覆盖规则。
@@ -57,7 +56,8 @@ public class Cd15ScheduleOverwriteValidator {
         if (LOCKED.equals(result.getIsLocked())) {
             return I18nUtil.getMessage("ui.cd15.scheduleResult.overwrite.locked");
         }
-        if (RELEASED_SUCCESS.equals(result.getReleaseStatus())) {
+        if (result.getPublishSuccessCount() != null
+                && result.getPublishSuccessCount() > 0) {
             return I18nUtil.getMessage("ui.cd15.scheduleResult.overwrite.released");
         }
         if (this.hasFinishedQuantity(result)) {

@@ -120,6 +120,39 @@ public class Cd15DefaultShiftDemandProviderTest {
 
         assertEquals(new BigDecimal("100"), result);
     }
+
+    /** 同一钢带下两个材料按稳定顺序共享库存，不能各自重复抵扣完整库存。 */
+    @Test
+    public void shouldAllocateSharedSteelStripStockOnceAcrossMaterials() {
+        Cd15AutoScheduleInput input = Cd15AutoScheduleInput.builder()
+                .stocksAtSix(Collections.singletonList(Cd15StockSource.builder()
+                        .steelStripCode("C1")
+                        .stockQuantity(new BigDecimal("150")).build()))
+                .constructionMaterials(Collections.singletonList(
+                        Cd15ConstructionMaterial.builder()
+                                .steelStripCode("C1")
+                                .curlLength(new BigDecimal("80")).build()))
+                .depthClassQtyBySteelStrip(Collections.singletonMap(
+                        "C1", BigDecimal.ONE))
+                .demandShifts(Arrays.asList(
+                        demand("M2", LocalDateTime.of(2026, 6, 12, 22, 0), "100"),
+                        demand("M1", LocalDateTime.of(2026, 6, 12, 22, 0), "100")))
+                .build();
+        Cd15RollingScheduleContext rolling = Cd15RollingScheduleContext.builder()
+                .actualInboundRecords(Collections.emptyList())
+                .plannedInboundRecords(Collections.emptyList()).build();
+
+        Cd15ShiftDemandDecision first = provider.resolve(
+                context(), input, shift(), Cd15ScheduleCandidate.builder()
+                        .steelStripCode("C1").materialKey("M1").build(), rolling);
+        Cd15ShiftDemandDecision second = provider.resolve(
+                context(), input, shift(), Cd15ScheduleCandidate.builder()
+                        .steelStripCode("C1").materialKey("M2").build(), rolling);
+
+        assertEquals(BigDecimal.ZERO, first.getNetDemandQuantity());
+        assertEquals(new BigDecimal("50"), second.getNetDemandQuantity());
+    }
+
     private Cd15AutoScheduleContext context() {
         return context("SUM");
     }
@@ -163,6 +196,13 @@ public class Cd15DefaultShiftDemandProviderTest {
                 .steelStripCode("C1").materialKey("C1")
                 .steelStripDemandQuantity(new BigDecimal(quantity)).included(true)
                 .shiftHours(new BigDecimal("8")).build();
+    }
+
+    private Cd15DemandShift demand(
+            String materialKey, LocalDateTime start, String quantity) {
+        Cd15DemandShift demand = this.demand(start, quantity);
+        demand.setMaterialKey(materialKey);
+        return demand;
     }
 
     private Cd15ShiftDescriptor shift() {

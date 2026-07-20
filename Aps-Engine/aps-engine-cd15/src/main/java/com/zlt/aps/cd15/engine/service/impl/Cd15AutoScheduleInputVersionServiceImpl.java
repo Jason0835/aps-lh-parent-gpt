@@ -146,10 +146,14 @@ public class Cd15AutoScheduleInputVersionServiceImpl implements Cd15AutoSchedule
                         .eq(Cd15MachineInfo::getFactoryCode, factoryCode)
                         .orderByAsc(Cd15MachineInfo::getId))
                 .stream()
-                .map(item -> item.getId() + ":" + item.getMachineCode() + ":" + item.getStatus()
-                        + ":" + item.getQuota() + ":" + item.getClothWidthMin() + ":" + item.getClothWidthMax()
-                        + ":" + item.getOpenMachineClass() + ":" + item.getIsOutTwo()
-                        + ":" + item.getUpdateTime())
+                .map(item -> this.row(item.getId(), item.getMachineCode(),
+                        item.getStatus(), item.getClothWidthMin(),
+                        item.getClothWidthMax(), item.getOpenMachineClass(),
+                        item.getIsOutTwo(),
+                        item.getSingleCutFlag(), item.getSplitCutFlag(),
+                        item.getDefaultCutMode(),
+                        item.getSingleShiftCapacity(), item.getSplitShiftCapacity(),
+                        item.getUpdateTime()))
                 .collect(Collectors.joining("|"));
         String machineRolls = machineRollMappingMapper.selectList(Wrappers.<Cd15MachineRollMapping>lambdaQuery()
                         .eq(Cd15MachineRollMapping::getFactoryCode, factoryCode)

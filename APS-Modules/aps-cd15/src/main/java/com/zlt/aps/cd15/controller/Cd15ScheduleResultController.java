@@ -1,9 +1,11 @@
 package com.zlt.aps.cd15.controller;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
+import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.zlt.aps.cd15.api.domain.entity.Cd15ScheduleResult;
@@ -12,6 +14,8 @@ import com.zlt.aps.cd15.api.domain.vo.Cd15InsertOrderRequest;
 import com.zlt.aps.cd15.api.domain.vo.Cd15RollingCheckRequest;
 import com.zlt.aps.cd15.api.domain.vo.Cd15TransferMachineRequest;
 import com.zlt.aps.cd15.mapper.Cd15ScheduleResultMapper;
+import com.zlt.aps.cd15.service.Cd15ScheduleResultPublishService;
+import com.zlt.aps.cd15.service.Cd15ScheduleTaskRecoveryService;
 import com.zlt.aps.cd15.service.ICd15ScheduleResultService;
 import com.zlt.aps.utils.AppUtils;
 import com.zlt.bill.common.controller.AbstractDocBizController;
@@ -30,7 +34,11 @@ import org.springframework.web.bind.annotation.RestController;
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * 斜裁排程结果控制层。
@@ -45,6 +53,12 @@ public class Cd15ScheduleResultController extends AbstractDocBizController<Cd15S
 
     @Resource
     private Cd15ScheduleResultMapper cd15ScheduleResultMapper;
+
+    @Resource
+    private Cd15ScheduleResultPublishService scheduleResultPublishService;
+
+    @Resource
+    private Cd15ScheduleTaskRecoveryService scheduleTaskRecoveryService;
 
     @ApiOperation("查询斜裁排程结果列表")
     @PostMapping("/list")
@@ -65,6 +79,10 @@ public class Cd15ScheduleResultController extends AbstractDocBizController<Cd15S
     @PostMapping("/remove")
     @Override
     public AjaxResult removeByIds(@RequestBody List<Long> ids) {
+        AjaxResult validation = this.validateDelete(ids);
+        if (validation != null) {
+            return validation;
+        }
         return super.removeByIds(ids);
     }
 
@@ -151,11 +169,26 @@ public class Cd15ScheduleResultController extends AbstractDocBizController<Cd15S
     public AjaxResult getTimedRollingTask(@PathVariable("taskId") String taskId) {
         return cd15ScheduleResultService.getTimedRollingTask(taskId);
     }
+
+    @ApiOperation("补偿斜裁自动排程超时任务")
+    @PostMapping("/autoSchedule/recoverTimeoutTasks")
+    public AjaxResult recoverAutoScheduleTimeoutTasks(
+            @RequestParam(value = "timeoutMinutes", required = false)
+            Integer timeoutMinutes) {
+        if (timeoutMinutes != null && timeoutMinutes <= 0) {
+            return AjaxResult.error(I18nUtil.getMessage(
+                    "ui.cd15.taskRecovery.invalidTimeout"));
+        }
+        return AjaxResult.success(scheduleTaskRecoveryService.recover(timeoutMinutes));
+    }
+
+    @Log(title = "ui.data.column.cd15ScheduleResult.modalName",
+            businessType = BusinessType.PUBLISH)
     @ApiOperation("发布斜裁排程结果")
     @PostMapping("/publish")
     public AjaxResult publish(@RequestBody Cd15ScheduleResult dto,
                               @RequestParam(value = "ids", required = false) String ids) {
-        return cd15ScheduleResultService.publish(dto, ids);
+        return scheduleResultPublishService.publish(dto, ids);
     }
 
     @Log(title = "ui.data.column.cd15ScheduleResult.modalName", businessType = BusinessType.IMPORT)
@@ -198,6 +231,77 @@ public class Cd15ScheduleResultController extends AbstractDocBizController<Cd15S
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getBigRollCode()), "BIG_ROLL_CODE", queryVO.getBigRollCode());
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getMachineCode()), "MACHINE_CODE", queryVO.getMachineCode());
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getReleaseStatus()), "RELEASE_STATUS", queryVO.getReleaseStatus());
+    }
+
+    /**
+     * 已成功发布的结果不得删除；分裁组合必须两条一起删除。
+     *
+     * @param ids 待删除结果主键
+     * @return 校验失败结果；通过时返回 null
+     */
+    private AjaxResult validateDelete(List<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return null;
+        }
+        List<Cd15ScheduleResult> selected = cd15ScheduleResultMapper.selectList(
+                new LambdaQueryWrapper<Cd15ScheduleResult>()
+                        .in(Cd15ScheduleResult::getId, ids));
+        boolean published = selected.stream().anyMatch(result ->
+                result.getPublishSuccessCount() != null
+                        && result.getPublishSuccessCount() > 0);
+        if (published) {
+            return AjaxResult.error(I18nUtil.getMessage(
+                    "ui.cd15.scheduleResult.publishedCannotDelete"));
+        }
+        boolean missingGroupNo = selected.stream()
+                .filter(result -> "SPLIT".equalsIgnoreCase(result.getCutMode()))
+                .anyMatch(result -> result.getGroupNo() == null
+                        || result.getGroupNo().trim().isEmpty());
+        if (missingGroupNo) {
+            return AjaxResult.error(I18nUtil.getMessage(
+                    "ui.cd15.scheduleResult.splitDeleteTogether"));
+        }
+        Map<String, List<Cd15ScheduleResult>> splitGroups = selected.stream()
+                .filter(result -> "SPLIT".equalsIgnoreCase(result.getCutMode()))
+                .collect(Collectors.groupingBy(this::splitGroupKey,
+                        LinkedHashMap::new, Collectors.toList()));
+        for (List<Cd15ScheduleResult> selectedGroup : splitGroups.values()) {
+            Cd15ScheduleResult sample = selectedGroup.get(0);
+            List<Cd15ScheduleResult> completeGroup =
+                    cd15ScheduleResultMapper.selectList(
+                            new LambdaQueryWrapper<Cd15ScheduleResult>()
+                                    .eq(Cd15ScheduleResult::getFactoryCode,
+                                            sample.getFactoryCode())
+                                    .eq(Cd15ScheduleResult::getScheduleDate,
+                                            sample.getScheduleDate())
+                                    .eq(Cd15ScheduleResult::getGroupNo,
+                                            sample.getGroupNo())
+                                    .eq(Cd15ScheduleResult::getCutMode, "SPLIT"));
+            Set<Long> selectedIds = selectedGroup.stream()
+                    .map(Cd15ScheduleResult::getId)
+                    .collect(Collectors.toSet());
+            boolean complete = completeGroup.size() == 2
+                    && selectedGroup.size() == 2
+                    && completeGroup.stream()
+                    .map(Cd15ScheduleResult::getId)
+                    .allMatch(selectedIds::contains)
+                    && completeGroup.stream()
+                    .map(Cd15ScheduleResult::getSteelStripCode)
+                    .filter(code -> code != null && !code.trim().isEmpty())
+                    .distinct().count() == 2L;
+            if (!complete) {
+                return AjaxResult.error(I18nUtil.getMessage(
+                        "ui.cd15.scheduleResult.splitDeleteTogether"));
+            }
+        }
+        return null;
+    }
+
+    /** 构造分裁组合删除校验键。 */
+    private String splitGroupKey(Cd15ScheduleResult result) {
+        return String.valueOf(result.getFactoryCode()) + "|"
+                + String.valueOf(result.getScheduleDate()) + "|"
+                + String.valueOf(result.getGroupNo());
     }
 
     @Override

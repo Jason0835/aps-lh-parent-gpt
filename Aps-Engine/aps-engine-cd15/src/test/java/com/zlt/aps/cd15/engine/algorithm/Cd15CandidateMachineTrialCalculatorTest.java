@@ -25,7 +25,8 @@ public class Cd15CandidateMachineTrialCalculatorTest {
                     new Cd15ScheduleQuantityCalculator(),
                     new Cd15ToolingCalculator(),
                     new Cd15MachineCapacityCalculator(),
-                    new Cd15BigRollAgingAllocator());
+                    new Cd15BigRollAgingAllocator(),
+                    new Cd15BigRollMeterCalculator());
 
     /**
      * 最终可排量取实际排产量、工装可排量和机台产能可排量的最小值。
@@ -42,7 +43,7 @@ public class Cd15CandidateMachineTrialCalculatorTest {
                 .vehiclePlanQuantity(new BigDecimal("87"))
                 .totalToolingCount(10)
                 .occupiedVehicleCount(9)
-                .quota(new BigDecimal("2400"))
+                .shiftCapacity(new BigDecimal("2400"))
                 .shiftHours(8)
                 .remainingSeconds(28800)
                 .previousSpec("A")
@@ -72,9 +73,12 @@ public class Cd15CandidateMachineTrialCalculatorTest {
                 .minimumStartQuantity(new BigDecimal("10"))
                 .equalShareThreshold(new BigDecimal("2000"))
                 .vehiclePlanQuantity(new BigDecimal("80"))
+                .craftWidth(new BigDecimal("1000"))
+                .unitConsumeMillimeter(new BigDecimal("1000"))
+                .cordWidth(new BigDecimal("1000"))
                 .totalToolingCount(10)
                 .occupiedVehicleCount(0)
-                .quota(new BigDecimal("800"))
+                .shiftCapacity(new BigDecimal("800"))
                 .shiftHours(8)
                 .remainingSeconds(28800)
                 .originalStartTime(start)

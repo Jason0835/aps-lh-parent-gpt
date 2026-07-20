@@ -66,6 +66,9 @@ public class MesItfController {
     private com.zlt.aps.itf.mes.service.ICd90ScheduleResultIssueService cd90ScheduleResultIssueService;
 
     @Autowired
+    private ICd15ScheduleResultIssueService cd15ScheduleResultIssueService;
+
+    @Autowired
     private ITcMesBridgeService tcMesBridgeService;
 
     @Autowired
@@ -879,6 +882,26 @@ public class MesItfController {
         String factoryCode = FactoryConstant.DEFAULT_FACTORY_CODE;
         String companyCode = factoryCode;
         return cd90ScheduleResultIssueService.issueCd90ScheduleResult(cd90ScheduleResultIssueList, factoryCode, companyCode);
+    }
+
+    /**
+     * 斜裁排程结果下发到 MES。
+     *
+     * @param issueList 按班次展开的斜裁结果
+     * @return 下发结果
+     */
+    @ApiOperation("斜裁排程结果下发到MES")
+    @PostMapping("/issueCd15ScheduleResult")
+    @AutoLoginLog
+    public AjaxResult issueCd15ScheduleResult(
+            @RequestBody List<com.zlt.aps.cd15.api.domain.entity.Cd15ScheduleResultIssue> issueList) {
+        String factoryCode = issueList != null && !issueList.isEmpty()
+                && StringUtils.isNotBlank(issueList.get(0).getFactoryCode())
+                ? issueList.get(0).getFactoryCode()
+                : FactoryConstant.DEFAULT_FACTORY_CODE;
+        String companyCode = factoryCode;
+        return cd15ScheduleResultIssueService.issueCd15ScheduleResult(
+                issueList, factoryCode, companyCode);
     }
 
     /**

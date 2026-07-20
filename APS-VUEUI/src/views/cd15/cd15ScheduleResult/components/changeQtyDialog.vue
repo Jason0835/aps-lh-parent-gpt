@@ -101,6 +101,7 @@ const DEFAULT_FORM = () => ({
   factoryCode: '116',
   scheduleDate: '',
   scheduleResultId: null,
+  groupNo: '',
   machineCode: '',
   steelStripCode: '',
   remark: '',
@@ -147,6 +148,7 @@ export default {
         factoryCode: this.currentRow.factoryCode || '116',
         scheduleDate: this.normalizeDate(this.currentRow.scheduleDate),
         scheduleResultId: this.currentRow.id || null,
+        groupNo: this.currentRow.groupNo || '',
         machineCode: this.currentRow.machineCode || '',
         steelStripCode: this.currentRow.steelStripCode || ''
       }

@@ -30,9 +30,11 @@ public class Cd15MachineTrialPreparationServiceTest {
                             new Cd15LossRateResolver(),
                             new Cd15ScheduleQuantityCalculator(),
                             new Cd15ToolingCalculator(),
-                            new Cd15MachineCapacityCalculator(), new Cd15BigRollAgingAllocator()),
+                            new Cd15MachineCapacityCalculator(), new Cd15BigRollAgingAllocator(),
+                            new Cd15BigRollMeterCalculator()),
                     new Cd15MachineTrialSelector(),
-                    new Cd15VehiclePlanQuantityCalculator());
+                    new Cd15VehiclePlanQuantityCalculator(),
+                    new Cd15MachineModeResolver());
 
     @Test
     public void shouldBuildTrialsAndSelectPreferredMachine() {
@@ -45,11 +47,27 @@ public class Cd15MachineTrialPreparationServiceTest {
     }
 
     @Test
+    public void shouldDeductMaintenanceOverlapFromMachineSeconds() {
+        Cd15MachineTrialPlan baseline = service.prepare(request(), snapshot());
+        Cd15MachineResourceSnapshot maintenanceSnapshot = snapshot();
+        maintenanceSnapshot.getMachines().get(1).setMaintenanceSeconds(7200);
+
+        Cd15MachineTrialPlan maintenance =
+                service.prepare(request(), maintenanceSnapshot);
+
+        assertEquals(
+                baseline.getSelectedTrial().getRemainingSeconds() - 7200,
+                maintenance.getSelectedTrial().getRemainingSeconds());
+    }
+
+    @Test
     public void shouldOnlyUseMachineSupportingSplitCutForOrdinarySplit() {
         Cd15MachineTrialRequest request = request();
         request.setSplitCut(true);
         Cd15MachineResourceSnapshot snapshot = snapshot();
         snapshot.getMachines().get(1).setSplitCutSupported(true);
+        snapshot.getMachines().get(1).setDefaultCutMode("SPLIT");
+        snapshot.getMachines().get(1).setSplitShiftCapacity(new BigDecimal("1000"));
 
         Cd15MachineTrialPlan result = service.prepare(request, snapshot);
 
@@ -58,23 +76,11 @@ public class Cd15MachineTrialPreparationServiceTest {
     }
 
     @Test
-    public void shouldOnlyUseG1201ForReinforcementFixedSplit() {
-        Cd15MachineTrialRequest request = request();
-        request.setSplitCut(true);
-        request.setReinforcement(true);
-
-        Cd15MachineTrialPlan result = service.prepare(request, modeSnapshot());
-
-        assertEquals(1, result.getTrials().size());
-        assertEquals("G1201", result.getSelectedTrial().getMachineCode());
-    }
-
-    @Test
     public void shouldExcludeG1201FromOrdinarySingleCut() {
         Cd15MachineTrialPlan result = service.prepare(request(), modeSnapshot());
 
         assertEquals(1, result.getTrials().size());
-        assertEquals("G1401", result.getSelectedTrial().getMachineCode());
+        assertEquals("G1101", result.getSelectedTrial().getMachineCode());
     }
 
     private Cd15MachineTrialRequest request() {
@@ -121,9 +127,9 @@ public class Cd15MachineTrialPreparationServiceTest {
     private Cd15MachineResourceSnapshot modeSnapshot() {
         return Cd15MachineResourceSnapshot.builder()
                 .machines(Arrays.asList(
-                        modeMachine("G1201"), modeMachine("G1401")))
+                        modeMachine("G1201"), modeMachine("G1101")))
                 .bindings(Arrays.asList(
-                        binding("G1201"), binding("G1401")))
+                        binding("G1201"), binding("G1101")))
                 .restrictions(Collections.emptyList())
                 .lossRateRules(Collections.singletonList(
                         Cd15LossRateRule.builder()
@@ -134,14 +140,24 @@ public class Cd15MachineTrialPreparationServiceTest {
     }
 
     private Cd15MachineResource modeMachine(String code) {
-        return Cd15MachineResource.builder().machineCode(code).status("1")
-                .openMachineClass("NIGHT").splitCutSupported(true)
-                .quota(new BigDecimal("1000")).build();
+        boolean split = "G1201".equals(code);
+        return Cd15MachineResource.builder()
+                .machineCode(code).status("1")
+                .openMachineClass("NIGHT")
+                .singleCutSupported(!split)
+                .splitCutSupported(split)
+                .defaultCutMode(split ? "SPLIT" : "SINGLE")
+                .singleShiftCapacity(new BigDecimal("1000"))
+                .splitShiftCapacity(new BigDecimal("1000"))
+                .build();
     }
 
     private Cd15MachineResource machine(String code) {
         return Cd15MachineResource.builder().machineCode(code).status("1")
-                .openMachineClass("NIGHT").quota(new BigDecimal("1000")).build();
+                .openMachineClass("NIGHT")
+                .singleCutSupported(true).defaultCutMode("SINGLE")
+                .singleShiftCapacity(new BigDecimal("1000"))
+                .build();
     }
 
     private Cd15MachineRollBinding binding(String machineCode) {

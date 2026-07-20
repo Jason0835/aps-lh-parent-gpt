@@ -25,6 +25,8 @@ public class Cd15ChangeQtyRequest implements Serializable {
     private Date scheduleDate;
     @ApiModelProperty("排程结果ID")
     private Long scheduleResultId;
+    @ApiModelProperty("分裁组号")
+    private String groupNo;
     @ApiModelProperty("机台编码")
     private String machineCode;
     @ApiModelProperty("钢带代码")

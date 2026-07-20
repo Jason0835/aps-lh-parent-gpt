@@ -53,10 +53,12 @@ public class Cd15ScheduleCandidateSorter {
                 .thenComparing(Cd15ScheduleCandidate::getEarliestShortageTime,
                         Comparator.nullsLast(LocalDateTime::compareTo))
                 .thenComparingInt(item -> continuityRank(item, tails))
-                .thenComparing(item -> value(item.getStockSupplyHours()))
-                .thenComparing(Cd15ScheduleCandidate::getSteelStripCode,
+                .thenComparing(Cd15ScheduleCandidate::getBigRollCode,
                         Comparator.nullsLast(String::compareTo))
                 .thenComparing(Cd15ScheduleCandidate::getCuttingAngle,
+                        Comparator.nullsLast(String::compareTo))
+                .thenComparing(item -> value(item.getStockSupplyHours()))
+                .thenComparing(Cd15ScheduleCandidate::getSteelStripCode,
                         Comparator.nullsLast(String::compareTo))
                 .thenComparing(Cd15ScheduleCandidate::getMaterialKey,
                         Comparator.nullsLast(String::compareTo)));

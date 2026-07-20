@@ -101,6 +101,7 @@ public class Cd15SingleShiftScheduleExecutor implements Cd15SingleShiftScheduleS
             candidates = new ArrayList<>(preparedCandidates);
         }
         attachConstructionFields(candidates, input.getConstructionMaterials());
+
         int candidateCount = candidates.size();
         Deque<Cd15ScheduleCandidate> immediateContinueCandidates = new ArrayDeque<>();
         Deque<Cd15ScheduleCandidate> shiftStartTailCandidates = preservePreparedOrder
@@ -198,11 +199,10 @@ public class Cd15SingleShiftScheduleExecutor implements Cd15SingleShiftScheduleS
             Cd15MachineTrialPlan trialPlan = trialPreparationService.prepare(
                     trialRequest(context, shift, state, construction, netDemand,
                             closeOut.isCloseOut(), candidate, rolling,
-                            construction.isReinforcement()),
+                            false),
                     machineSnapshot);
-            String cutMode = construction.isReinforcement() ? "SPLIT" : "SINGLE";
-            String splitGroupKey = construction.isReinforcement()
-                    ? this.reinforcementGroupKey(shift, candidate) : null;
+            String cutMode = "SINGLE";
+            String splitGroupKey = null;
             Cd15ShiftCommitResult commit = resourceCommitter.commit(
                     commitRequest(context, shift, construction, candidate, trialPlan,
                             closeOut.isCloseOut(), cutMode, splitGroupKey), state);
@@ -223,10 +223,6 @@ public class Cd15SingleShiftScheduleExecutor implements Cd15SingleShiftScheduleS
             if (sourceTask != null) {
                 commit.getTask().setSourceTaskKey(sourceTask.getTaskKey());
                 commit.getTask().setSourceResultId(sourceTask.getSourceResultId());
-            }
-            if (construction.isReinforcement()) {
-                candidate.setCutMode(cutMode);
-                candidate.setSplitGroupKey(splitGroupKey);
             }
             if (scheduledQuantity.compareTo(netDemand) < 0 && !StringUtils.hasText(partialReason)) {
                 partialReason = "EQUAL_SHARE";
@@ -278,65 +274,70 @@ public class Cd15SingleShiftScheduleExecutor implements Cd15SingleShiftScheduleS
                         first.construction, first.netDemand, first.closeOut,
                         first.candidate, rolling, true),
                 machineSnapshot);
-        for (Cd15MachineTrial firstTrial : this.safe(firstPlan.getTrials())) {
-            if (firstTrial == null || firstTrial.getFinalSchedulableQuantity() == null
-                    || firstTrial.getFinalSchedulableQuantity().signum() <= 0) {
-                continue;
-            }
-            Cd15MachineTrialPlan firstMachinePlan = this.singleMachinePlan(
-                    firstPlan, firstTrial);
-            Cd15ShiftCommitResult firstCommit = this.resourceCommitter.commit(
-                    this.commitRequest(context, shift, first.construction,
-                            first.candidate, firstMachinePlan, first.closeOut,
-                            "SPLIT", group.getGroupKey()),
-                    originalState);
-            if (!firstCommit.isSuccess()) {
-                continue;
-            }
-
-            Cd15MachineTrialPlan secondPlan = this.trialPreparationService.prepare(
-                    this.trialRequest(context, shift, firstCommit.getState(),
-                            second.construction, second.netDemand, second.closeOut,
-                            second.candidate, rolling, true),
-                    machineSnapshot);
-            Cd15MachineTrial secondTrial = this.safe(secondPlan.getTrials()).stream()
-                    .filter(item -> item != null
-                            && firstTrial.getMachineCode().equals(item.getMachineCode()))
-                    .findFirst().orElse(null);
-            if (secondTrial == null || secondTrial.getFinalSchedulableQuantity() == null
-                    || secondTrial.getFinalSchedulableQuantity().signum() <= 0) {
-                continue;
-            }
-            Cd15ShiftCommitResult secondCommit = this.resourceCommitter.commit(
-                    this.commitRequest(context, shift, second.construction,
-                            second.candidate, this.singleMachinePlan(secondPlan, secondTrial),
-                            second.closeOut, "SPLIT", group.getGroupKey()),
-                    firstCommit.getState());
-            if (!secondCommit.isSuccess()) {
-                continue;
-            }
-
-            first.candidate.setCutMode("SPLIT");
-            first.candidate.setSplitGroupKey(group.getGroupKey());
-            second.candidate.setCutMode("SPLIT");
-            second.candidate.setSplitGroupKey(group.getGroupKey());
-            this.attachRollingSource(first.candidate, firstCommit.getTask(), sourceTasks);
-            this.attachRollingSource(second.candidate, secondCommit.getTask(), sourceTasks);
-            this.alignSplitTasks(firstCommit.getTask(), secondCommit.getTask());
-            this.recordSplitSuccess(shift, first, firstCommit, rolling,
-                    attemptTraces, continueDemandBySteelStrip, immediateContinueCandidates);
-            this.recordSplitSuccess(shift, second, secondCommit, rolling,
-                    attemptTraces, continueDemandBySteelStrip, immediateContinueCandidates);
-            failures.remove(this.candidateKey(first.candidate));
-            failures.remove(this.candidateKey(second.candidate));
-            log.info("[斜裁自动排程] 分裁组合原子提交成功, classField={}, groupKey={}, "
-                            + "machineCode={}, firstSteelStrip={}, secondSteelStrip={}, combinedWidth={}",
-                    shift.getClassField(), group.getGroupKey(), firstTrial.getMachineCode(),
-                    first.candidate.getSteelStripCode(), second.candidate.getSteelStripCode(),
-                    group.getCombinedWidth());
-            return secondCommit.getState();
+        Cd15MachineTrialPlan secondPlan = this.trialPreparationService.prepare(
+                this.trialRequest(context, shift, originalState,
+                        second.construction, second.netDemand, second.closeOut,
+                        second.candidate, rolling, true),
+                machineSnapshot);
+        Set<String> firstMachineCodes = this.safe(firstPlan.getTrials()).stream()
+                .filter(item -> item != null
+                        && item.getFinalSchedulableQuantity() != null
+                        && item.getFinalSchedulableQuantity().signum() > 0)
+                .map(com.zlt.aps.cd15.engine.model.Cd15MachineTrial::getMachineCode)
+                .collect(Collectors.toSet());
+        Set<String> secondMachineCodes = this.safe(secondPlan.getTrials()).stream()
+                .filter(item -> item != null
+                        && item.getFinalSchedulableQuantity() != null
+                        && item.getFinalSchedulableQuantity().signum() > 0)
+                .map(com.zlt.aps.cd15.engine.model.Cd15MachineTrial::getMachineCode)
+                .collect(Collectors.toSet());
+        if (firstMachineCodes.isEmpty() || !firstMachineCodes.equals(secondMachineCodes)) {
+            return null;
         }
-        return null;
+        com.zlt.aps.cd15.engine.model.Cd15SplitShiftCommitResult splitCommit =
+                this.resourceCommitter.commitSplit(
+                        this.commitRequest(context, shift, first.construction,
+                                first.candidate, firstPlan, first.closeOut,
+                                "SPLIT", group.getGroupKey()),
+                        this.commitRequest(context, shift, second.construction,
+                                second.candidate, secondPlan, second.closeOut,
+                                "SPLIT", group.getGroupKey()),
+                        originalState);
+        if (!splitCommit.isSuccess()) {
+            return null;
+        }
+
+        first.candidate.setCutMode("SPLIT");
+        first.candidate.setSplitGroupKey(group.getGroupKey());
+        second.candidate.setCutMode("SPLIT");
+        second.candidate.setSplitGroupKey(group.getGroupKey());
+        this.attachRollingSource(
+                first.candidate, splitCommit.getFirstTask(), sourceTasks);
+        this.attachRollingSource(
+                second.candidate, splitCommit.getSecondTask(), sourceTasks);
+        Cd15ShiftCommitResult firstCommit = Cd15ShiftCommitResult.builder()
+                .success(true).state(splitCommit.getState())
+                .task(splitCommit.getFirstTask())
+                .partialReason(splitCommit.getFirstPartialReason()).build();
+        Cd15ShiftCommitResult secondCommit = Cd15ShiftCommitResult.builder()
+                .success(true).state(splitCommit.getState())
+                .task(splitCommit.getSecondTask())
+                .partialReason(splitCommit.getSecondPartialReason()).build();
+        this.recordSplitSuccess(shift, first, firstCommit, rolling,
+                attemptTraces, continueDemandBySteelStrip,
+                immediateContinueCandidates);
+        this.recordSplitSuccess(shift, second, secondCommit, rolling,
+                attemptTraces, continueDemandBySteelStrip,
+                immediateContinueCandidates);
+        failures.remove(this.candidateKey(first.candidate));
+        failures.remove(this.candidateKey(second.candidate));
+        log.info("[斜裁自动排程] 分裁组合原子提交成功, classField={}, groupKey={}, "
+                        + "machineCode={}, firstSteelStrip={}, secondSteelStrip={}, combinedWidth={}",
+                shift.getClassField(), group.getGroupKey(),
+                splitCommit.getFirstTask().getMachineCode(),
+                first.candidate.getSteelStripCode(),
+                second.candidate.getSteelStripCode(), group.getCombinedWidth());
+        return splitCommit.getState();
     }
 
     private SplitPreparedCandidate prepareSplitCandidate(
@@ -654,7 +655,8 @@ public class Cd15SingleShiftScheduleExecutor implements Cd15SingleShiftScheduleS
                 .cuttingAngle(candidate.getCuttingAngle())
                 .craftWidth(candidate.getCraftWidth())
                 .unitConsumeMillimeter(candidate.getUnitConsumeMillimeter())
-                .reinforcement(candidate.isReinforcement())
+                .cordWidth(candidate.getCordWidth())
+                .curlLength(candidate.getCurlLength())
                 .cutMode(candidate.getCutMode())
                 .splitGroupKey(candidate.getSplitGroupKey())
                 .sourceMachineCode(sourceMachineCode)
@@ -827,10 +829,11 @@ public class Cd15SingleShiftScheduleExecutor implements Cd15SingleShiftScheduleS
                 .cuttingAngle(construction.getCuttingAngle())
                 .cordSpec(construction.getSteelStripCode())
                 .splitCut(splitCut)
-                .reinforcement(construction.isReinforcement())
                 .craftWidth(construction.getCraftWidth())
                 .unitConsumeMillimeter(construction.getUnitConsumeMillimeter())
                 .curlLength(effectiveCurlLength(context, construction))
+                .cordWidth(construction.getCordWidth())
+
                 .shiftCode(shift.getShiftCode())
                 .shiftStart(shift.getStartTime()).shiftEnd(shift.getEndTime())
                 .netDemandQuantity(netDemand).closeOut(closeOut)
@@ -861,7 +864,8 @@ public class Cd15SingleShiftScheduleExecutor implements Cd15SingleShiftScheduleS
                 .cuttingAngle(construction.getCuttingAngle())
                 .craftWidth(construction.getCraftWidth())
                 .unitConsumeMillimeter(construction.getUnitConsumeMillimeter())
-                .reinforcement(construction.isReinforcement())
+                .cordWidth(construction.getCordWidth())
+                .curlLength(effectiveCurlLength(context, construction))
                 .cutMode(cutMode)
                 .splitGroupKey(splitGroupKey)
                 .classField(shift.getClassField())
@@ -869,18 +873,6 @@ public class Cd15SingleShiftScheduleExecutor implements Cd15SingleShiftScheduleS
                 .closeOut(closeOut)
                 .partialMinVehicleCount(context.getParameters().getPartialMinVehicleCount())
                 .trialPlan(trialPlan).build();
-    }
-
-    /**
-     * 加强层固定按独立分裁组排程；定时滚动时优先沿用原分组，首次排程生成稳定分组键。
-     */
-    private String reinforcementGroupKey(Cd15ShiftDescriptor shift,
-                                         Cd15ScheduleCandidate candidate) {
-        if (StringUtils.hasText(candidate.getSplitGroupKey())) {
-            return candidate.getSplitGroupKey();
-        }
-        return "REINFORCEMENT|" + shift.getClassField() + "|"
-                + this.candidateKey(candidate);
     }
 
     /**
@@ -942,7 +934,8 @@ public class Cd15SingleShiftScheduleExecutor implements Cd15SingleShiftScheduleS
             candidate.setCuttingAngle(material.getCuttingAngle());
             candidate.setCraftWidth(material.getCraftWidth());
             candidate.setUnitConsumeMillimeter(material.getUnitConsumeMillimeter());
-            candidate.setReinforcement(material.isReinforcement());
+            candidate.setCordWidth(material.getCordWidth());
+            candidate.setCurlLength(material.getCurlLength());
         }
     }
 
@@ -955,8 +948,9 @@ public class Cd15SingleShiftScheduleExecutor implements Cd15SingleShiftScheduleS
                 .cuttingAngle(material.getCuttingAngle())
                 .craftWidth(material.getCraftWidth())
                 .unitConsumeMillimeter(material.getUnitConsumeMillimeter())
-                .reinforcement(material.isReinforcement())
                 .continueFromPreviousShift(true)
+                .cordWidth(material.getCordWidth())
+                .curlLength(material.getCurlLength())
                 .sourceMachineCode(sourceMachineCode)
                 .build();
     }
@@ -972,8 +966,7 @@ public class Cd15SingleShiftScheduleExecutor implements Cd15SingleShiftScheduleS
                 + this.text(material.getCuttingAngle()) + "|"
                 + this.decimalText(material.getCraftWidth()) + "|"
                 + this.decimalText(material.getUnitConsumeMillimeter()) + "|"
-                + this.decimalText(material.getCurlLength()) + "|"
-                + material.isReinforcement();
+                + this.decimalText(material.getCurlLength());
     }
 
     private String text(String value) {

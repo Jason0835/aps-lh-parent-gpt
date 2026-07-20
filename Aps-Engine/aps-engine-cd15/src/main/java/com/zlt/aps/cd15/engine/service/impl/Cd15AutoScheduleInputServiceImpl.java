@@ -3,6 +3,7 @@ package com.zlt.aps.cd15.engine.service.impl;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.zlt.aps.cd15.api.domain.entity.Cd15CurlLength;
 import com.zlt.aps.cd15.api.domain.entity.Cd15DepthConfig;
+import com.zlt.aps.cd15.api.domain.entity.Cd15ShiftConfig;
 import com.zlt.aps.cd15.api.domain.entity.Cd15Stock;
 import com.zlt.aps.cd15.api.domain.entity.Cd15StorageLaneLimit;
 import com.zlt.aps.cd15.engine.algorithm.Cd15BigRollAgingStockBuilder;
@@ -17,6 +18,7 @@ import com.zlt.aps.cd15.engine.mapper.Cd15EngineDepthConfigMapper;
 import com.zlt.aps.cd15.engine.mapper.Cd15EngineCxScheduleMapper;
 import com.zlt.aps.cd15.engine.mapper.Cd15EngineStockMapper;
 import com.zlt.aps.cd15.engine.mapper.Cd15EngineStorageLaneMapper;
+import com.zlt.aps.cd15.engine.mapper.Cd15EngineShiftConfigMapper;
 import com.zlt.aps.cd15.engine.mapper.Cd15EngineMonthSurplusMapper;
 import com.zlt.aps.cd15.engine.mapper.Cd15EngineGdyyScheduleResultMapper;
 import com.zlt.aps.cd15.engine.mapper.Cd15EngineGdyyStockMapper;
@@ -68,6 +70,7 @@ public class Cd15AutoScheduleInputServiceImpl implements Cd15AutoScheduleInputSe
     private final Cd15ConstructionMaterialMapper constructionMaterialMapper;
     private final Cd15EngineGdyyStockMapper gdyyStockMapper;
     private final Cd15EngineGdyyScheduleResultMapper gdyyScheduleResultMapper;
+    private final Cd15EngineShiftConfigMapper shiftConfigMapper;
     private final Cd15BigRollAgingStockBuilder bigRollAgingStockBuilder;
     private final Cd15AutoScheduleSourceMapper sourceMapper;
     private final Cd15FormingDemandExpander formingDemandExpander;
@@ -161,8 +164,14 @@ public class Cd15AutoScheduleInputServiceImpl implements Cd15AutoScheduleInputSe
                                 Date.valueOf(scheduleDate.plusDays(2)))
                         .orderByAsc(GdyyScheduleResult::getScheduleDate)
                         .orderByAsc(GdyyScheduleResult::getId));
+        List<Cd15ShiftConfig> shiftConfigs = shiftConfigMapper.selectList(
+                Wrappers.<Cd15ShiftConfig>lambdaQuery()
+                        .eq(Cd15ShiftConfig::getFactoryCode, factoryCode)
+                        .eq(Cd15ShiftConfig::getIsActive, 1)
+                        .orderByAsc(Cd15ShiftConfig::getShiftOrder)
+                        .orderByAsc(Cd15ShiftConfig::getClassField));
         Cd15BigRollAgingBuildResult agingResult = bigRollAgingStockBuilder.build(
-                gdyyActualStocks, gdyyPlans, agingPeriodHours);
+                gdyyActualStocks, gdyyPlans, shiftConfigs, agingPeriodHours);
 
         log.info("[斜裁自动排程] 输入数据加载完成, factoryCode={}, scheduleDate={}, classField={}, shiftCode={}, "
                         + "formingRange={}~{}, formingCount={}, constructionMaterialCount={}, "

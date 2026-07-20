@@ -19,8 +19,8 @@ public class Cd15InsertRollingOutput {
 
     /** 原排程批次号。 */
     private String batchNo;
-    /** 待新增的插单主记录。 */
-    private Cd15ScheduleResult insertResult;
+    /** 待新增的插单或转机台主记录；分裁组合固定包含两条。 */
+    private List<Cd15ScheduleResult> insertedResults;
     /** 原批次内需要更新的排程结果。 */
     private List<Cd15ScheduleResult> updatedResults;
     /** 原批次内需要删除的排程结果。*/

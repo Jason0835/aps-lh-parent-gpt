@@ -11,12 +11,15 @@ import org.junit.Test;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 
 /**
@@ -25,7 +28,8 @@ import static org.junit.Assert.assertTrue;
 public class Cd15ShiftResourceCommitterTest {
 
     private final Cd15ShiftResourceCommitter committer =
-            new Cd15ShiftResourceCommitter(new Cd15StorageLaneAllocator(), new Cd15MachineTrialSelector(), new Cd15BigRollAgingAllocator());
+            new Cd15ShiftResourceCommitter(new Cd15StorageLaneAllocator(), new Cd15MachineTrialSelector(),
+                    new Cd15BigRollAgingAllocator(), new Cd15BigRollMeterCalculator());
 
     @Test
     public void shouldCommitLaneToolingMachineAndTaskChainAtomically() {
@@ -204,6 +208,51 @@ public class Cd15ShiftResourceCommitterTest {
         assertEquals(new BigDecimal("1316"), result.getTask().getPlanQuantity());
     }
 
+    @Test
+    public void shouldCommitSplitPairWithSharedOrderAndCapacityOnce() {
+        Cd15ShiftResourceState state = splitState(2, 2);
+
+        com.zlt.aps.cd15.engine.model.Cd15SplitShiftCommitResult result =
+                committer.commitSplit(
+                        splitRequest("C1", trial("M1", "200", 20000, true)),
+                        splitRequest("C2", trial("M1", "200", 20000, true)),
+                        state);
+
+        assertTrue(result.isSuccess());
+        assertEquals(result.getFirstTask().getProduceOrder(),
+                result.getSecondTask().getProduceOrder());
+        assertEquals(result.getFirstTask().getMachineCode(),
+                result.getSecondTask().getMachineCode());
+        assertEquals(Integer.valueOf(20000),
+                result.getState().getRemainingSecondsByMachine().get("M1"));
+        assertEquals(4, result.getState().getOccupiedToolingCount());
+        assertEquals(2, result.getState().getTasks().size());
+        assertEquals("L1", result.getFirstTask()
+                .getLaneAllocations().get(0).getLaneCode());
+        assertEquals("L2", result.getSecondTask()
+                .getLaneAllocations().get(0).getLaneCode());
+        assertEquals(0, state.getOccupiedToolingCount());
+        assertTrue(state.getTasks().isEmpty());
+    }
+
+    @Test
+    public void shouldKeepOriginalStateWhenSecondSplitLaneFails() {
+        Cd15ShiftResourceState state = splitState(2);
+
+        com.zlt.aps.cd15.engine.model.Cd15SplitShiftCommitResult result =
+                committer.commitSplit(
+                        splitRequest("C1", trial("M1", "200", 20000, true)),
+                        splitRequest("C2", trial("M1", "200", 20000, true)),
+                        state);
+
+        assertFalse(result.isSuccess());
+        assertEquals("STORAGE_LANE_LIMIT", result.getFailureReason());
+        assertSame(state, result.getState());
+        assertEquals(0, state.getLanes().get(0).getVehicleCount());
+        assertEquals(null, state.getLanes().get(0).getSteelStripCode());
+        assertTrue(state.getTasks().isEmpty());
+    }
+
     private Cd15ShiftCommitRequest request(Cd15MachineTrialPlan plan) {
         return request(plan, 4);
     }
@@ -213,10 +262,28 @@ public class Cd15ShiftResourceCommitterTest {
                 .materialKey("C1|BR001|15|100|100|100|false")
                 .steelStripCode("C1").bigRollCode("BR001").cuttingAngle("15")
                 .cordSpec("BR001").classField("CLASS1")
+                .craftWidth(new BigDecimal("100"))
+                .unitConsumeMillimeter(new BigDecimal("100"))
+                .cordWidth(new BigDecimal("100"))
                 .shiftStart(LocalDateTime.of(2026, 6, 12, 14, 0))
                 .shiftEnd(LocalDateTime.of(2026, 6, 12, 22, 0))
                 .closeOut(false)
                 .partialMinVehicleCount(partialMinVehicleCount).trialPlan(plan).build();
+    }
+
+    private Cd15ShiftCommitRequest splitRequest(
+            String steelStripCode, Cd15MachineTrial machineTrial) {
+        return Cd15ShiftCommitRequest.builder()
+                .materialKey(steelStripCode + "|BR001|15|100|100|100|false")
+                .steelStripCode(steelStripCode).bigRollCode("BR001")
+                .cuttingAngle("15").cordSpec("BR001").classField("CLASS1")
+                .craftWidth(new BigDecimal("100"))
+                .unitConsumeMillimeter(new BigDecimal("100"))
+                .cordWidth(new BigDecimal("100"))
+                .shiftStart(LocalDateTime.of(2026, 6, 12, 14, 0))
+                .shiftEnd(LocalDateTime.of(2026, 6, 12, 22, 0))
+                .cutMode("SPLIT").splitGroupKey("GROUP-1")
+                .partialMinVehicleCount(2).trialPlan(plan(machineTrial)).build();
     }
 
     private Cd15MachineTrialPlan plan(Cd15MachineTrial... trials) {
@@ -252,6 +319,23 @@ public class Cd15ShiftResourceCommitterTest {
                 .occupiedToolingCount(0).totalToolingCount(10)
                 .remainingSecondsByMachine(seconds).tailSpecByMachine(new HashMap<>())
                 .tasks(new java.util.ArrayList<>()).build();
+    }
+
+    private Cd15ShiftResourceState splitState(int... laneCapacities) {
+        HashMap<String, Integer> seconds = new HashMap<>();
+        seconds.put("M1", 28800);
+        List<Cd15StorageLaneState> lanes = new ArrayList<>();
+        for (int index = 0; index < laneCapacities.length; index++) {
+            lanes.add(Cd15StorageLaneState.builder()
+                    .laneCode("L" + (index + 1)).vehicleCount(0)
+                    .maxVehicleCount(laneCapacities[index]).build());
+        }
+        return Cd15ShiftResourceState.builder().lanes(lanes)
+                .occupiedToolingCount(0).totalToolingCount(10)
+                .remainingSecondsByMachine(seconds)
+                .tailSpecByMachine(new HashMap<>())
+                .tailByMachine(new HashMap<>())
+                .tasks(new ArrayList<>()).build();
     }
 
     private Cd15BigRollAgingStock agingStock(String bigRollCode, LocalDateTime releaseTime,

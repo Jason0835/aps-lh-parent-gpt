@@ -145,10 +145,8 @@ public class Cd15MachineCandidateResolver {
                 .filter(item -> angleWidthMatched)
                 .filter(item -> openShiftMatched(item.getOpenMachineClass(), shiftCode))
                 .filter(item -> !prohibited.contains(item.getMachineCode()))
-                .filter(item -> !overlaps(item, shiftStart, shiftEnd))
                 .map(item -> Cd15MachineCandidate.builder()
                         .machineCode(item.getMachineCode())
-                        .quota(item.getQuota())
                         .preferredMachine(preferred.contains(item.getMachineCode()))
                         .priorityOrder(priorityIndex(priority, item.getMachineCode()))
                         .build())
@@ -214,7 +212,6 @@ public class Cd15MachineCandidateResolver {
             if (ApsConstant.APS_STRING_1.equals(item.getStatus())
                     && openShiftMatched(item.getOpenMachineClass(), shiftCode)
                     && !prohibited.contains(item.getMachineCode())
-                    && !overlaps(item, shiftStart, shiftEnd)
                     && !widthMatched(item, craftWidth)) {
                 return "WIDTH_MISMATCH";
             }

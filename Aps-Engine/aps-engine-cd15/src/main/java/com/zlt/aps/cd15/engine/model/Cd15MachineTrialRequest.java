@@ -27,14 +27,16 @@ public class Cd15MachineTrialRequest {
     private String cordSpec;
     /** 是否按分裁模式试算机台。 */
     private boolean splitCut;
-    /** 是否加强层固定分裁。 */
-    private boolean reinforcement;
-    /** 当前层位斜裁宽度，来自施工表BELT_CRAFT1/2/3 */
+        /** 当前层位斜裁宽度，来自施工表BELT_CRAFT1/2/3 */
     private BigDecimal craftWidth;
     /** 单片胎体长度，单位毫米/片，来自施工表BELT1_LENGTH/BELT2_LENGTH/BELT3_LENGTH。 */
     private BigDecimal unitConsumeMillimeter;
     /** 本规格采用的标准卷曲长度，单位米；标准表缺失时由CRIMP_LENGTH兜底 */
     private BigDecimal curlLength;
+    /** 大卷幅宽，单位毫米；为空时大卷占用按计划量兜底。 */
+    private BigDecimal cordWidth;
+
+
     /** 班次代码 */
     private String shiftCode;
     /** 班次开始时间 */

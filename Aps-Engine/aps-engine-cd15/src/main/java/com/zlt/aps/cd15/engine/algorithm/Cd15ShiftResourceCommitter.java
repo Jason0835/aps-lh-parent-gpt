@@ -35,6 +35,7 @@ public class Cd15ShiftResourceCommitter {
     private final Cd15StorageLaneAllocator laneAllocator;
     private final Cd15MachineTrialSelector trialSelector;
     private final Cd15BigRollAgingAllocator agingAllocator;
+    private final Cd15BigRollMeterCalculator bigRollMeterCalculator;
 
     /**
      * 按试算优先级逐方案尝试，并原子提交当前班次内存资源。
@@ -91,12 +92,15 @@ public class Cd15ShiftResourceCommitter {
             int beforeSeconds = working.getRemainingSecondsByMachine().getOrDefault(
                     trial.getMachineCode(), fullShiftSeconds(request));
             BigDecimal committedQuantity = committedQuantity(trial, vehiclePlanQuantity, allocatedVehicles);
+            BigDecimal bigRollConsumeQuantity = bigRollMeterCalculator.calculateForPlanQuantity(
+                    committedQuantity, request.getUnitConsumeMillimeter(),
+                    request.getCraftWidth(), request.getCordWidth());
             int afterSeconds = adjustedRemainingSeconds(request, trial, beforeSeconds, committedQuantity);
             int elapsedBefore = Math.max(0, fullShiftSeconds(request) - beforeSeconds);
             int productionDurationSeconds = Math.max(0, beforeSeconds - afterSeconds - trial.getAgingDelaySeconds());
             LocalDateTime originalStart = request.getShiftStart().plusSeconds(elapsedBefore);
             Cd15BigRollAgingAllocation agingAllocation = commitAgingAllocation(
-                    working, request.getBigRollCode(), committedQuantity, originalStart);
+                    working, request.getBigRollCode(), bigRollConsumeQuantity, originalStart);
             if (agingAllocation != null && !agingAllocation.isSuccess()) {
                 lastFailureReason = Cd15BigRollAgingAllocator.AGING_PERIOD_LIMIT;
                 continue;
@@ -114,7 +118,9 @@ public class Cd15ShiftResourceCommitter {
                     .cuttingAngle(request.getCuttingAngle())
                     .craftWidth(request.getCraftWidth())
                     .unitConsumeMillimeter(request.getUnitConsumeMillimeter())
-                    .reinforcement(request.isReinforcement())
+                    .cordWidth(request.getCordWidth())
+                    .curlLength(request.getCurlLength())
+                    .bigRollConsumeQuantity(bigRollConsumeQuantity)
                     .cutMode(request.getCutMode()).splitGroupKey(request.getSplitGroupKey())
                     .machineCode(trial.getMachineCode())
                     .planQuantity(committedQuantity)
@@ -146,6 +152,250 @@ public class Cd15ShiftResourceCommitter {
                 request.getClassField(), request.getSteelStripCode(), lastFailureReason);
         return Cd15ShiftCommitResult.builder().success(false).failureReason(lastFailureReason)
                 .state(originalState).build();
+    }
+
+    /**
+     * 将两条分裁钢带作为同一作业单元提交。
+     *
+     * <p>库排和工装按钢带分别占用；机台切换、生产时长和大卷成熟等待按组合只扣一次。
+     * 任一钢带资源不足时丢弃工作副本，保证组合不会拆开。</p>
+     *
+     * @param firstRequest 第一条钢带请求
+     * @param secondRequest 第二条钢带请求
+     * @param originalState 原资源状态
+     * @return 分裁组合提交结果
+     */
+    public com.zlt.aps.cd15.engine.model.Cd15SplitShiftCommitResult commitSplit(
+            Cd15ShiftCommitRequest firstRequest,
+            Cd15ShiftCommitRequest secondRequest,
+            Cd15ShiftResourceState originalState) {
+        if (firstRequest == null || secondRequest == null || originalState == null
+                || firstRequest.getTrialPlan() == null
+                || secondRequest.getTrialPlan() == null) {
+            throw new IllegalArgumentException("分裁组合请求、试算方案和资源状态不能为空");
+        }
+        if (!java.util.Objects.equals(firstRequest.getClassField(), secondRequest.getClassField())
+                || !java.util.Objects.equals(firstRequest.getBigRollCode(), secondRequest.getBigRollCode())
+                || !java.util.Objects.equals(firstRequest.getSplitGroupKey(), secondRequest.getSplitGroupKey())) {
+            throw new IllegalArgumentException("分裁组合必须同班次、同大卷并共用分组键");
+        }
+
+        List<Cd15MachineTrial> remainingFirstTrials =
+                firstRequest.getTrialPlan().getTrials() == null
+                        ? new ArrayList<>()
+                        : new ArrayList<>(firstRequest.getTrialPlan().getTrials());
+        String lastFailureReason = "NO_AVAILABLE_MACHINE";
+        while (!remainingFirstTrials.isEmpty()) {
+            Cd15MachineTrial firstTrial = trialSelector.select(remainingFirstTrials);
+            if (firstTrial == null) {
+                break;
+            }
+            remainingFirstTrials.remove(firstTrial);
+            Cd15MachineTrial secondTrial = secondRequest.getTrialPlan().getTrials() == null
+                    ? null : secondRequest.getTrialPlan().getTrials().stream()
+                            .filter(item -> item != null
+                                    && java.util.Objects.equals(
+                                            firstTrial.getMachineCode(), item.getMachineCode()))
+                            .findFirst().orElse(null);
+            if (secondTrial == null
+                    || firstTrial.getFinalSchedulableQuantity() == null
+                    || secondTrial.getFinalSchedulableQuantity() == null
+                    || firstTrial.getFinalSchedulableQuantity().signum() <= 0
+                    || secondTrial.getFinalSchedulableQuantity().signum() <= 0) {
+                lastFailureReason = secondTrial == null
+                        ? "NO_AVAILABLE_MACHINE"
+                        : java.util.Objects.toString(secondTrial.getLimitReason(),
+                                java.util.Objects.toString(firstTrial.getLimitReason(),
+                                        lastFailureReason));
+                continue;
+            }
+
+            Cd15ShiftResourceState working = this.copy(originalState);
+            Cd15StorageLaneAllocationResult firstAllocation = laneAllocator.allocate(
+                    firstRequest.getSteelStripCode(),
+                    firstTrial.getFinalSchedulableQuantity(),
+                    firstTrial.getVehiclePlanQuantity(), working.getLanes());
+            if (!firstAllocation.isSuccess()
+                    || !this.acceptPartialAllocation(firstAllocation, firstRequest)) {
+                lastFailureReason = "STORAGE_LANE_LIMIT";
+                continue;
+            }
+            working.setLanes(firstAllocation.getLanes());
+            Cd15StorageLaneAllocationResult secondAllocation = laneAllocator.allocate(
+                    secondRequest.getSteelStripCode(),
+                    secondTrial.getFinalSchedulableQuantity(),
+                    secondTrial.getVehiclePlanQuantity(), working.getLanes());
+            if (!secondAllocation.isSuccess()
+                    || !this.acceptPartialAllocation(secondAllocation, secondRequest)) {
+                lastFailureReason = "STORAGE_LANE_LIMIT";
+                continue;
+            }
+
+            int firstVehicles = firstAllocation.getAllocatedVehicleCount();
+            int secondVehicles = secondAllocation.getAllocatedVehicleCount();
+            int toolingRequired = firstVehicles + secondVehicles;
+            int toolingAvailable = working.getTotalToolingCount()
+                    - working.getOccupiedToolingCount();
+            if (toolingRequired > toolingAvailable) {
+                lastFailureReason = "ROLL_TOOL_LIMIT";
+                continue;
+            }
+
+            BigDecimal firstQuantity = this.committedQuantity(
+                    firstTrial, firstTrial.getVehiclePlanQuantity(), firstVehicles);
+            BigDecimal secondQuantity = this.committedQuantity(
+                    secondTrial, secondTrial.getVehiclePlanQuantity(), secondVehicles);
+            BigDecimal firstBigRollConsume = bigRollMeterCalculator.calculateForPlanQuantity(
+                    firstQuantity, firstRequest.getUnitConsumeMillimeter(),
+                    firstRequest.getCraftWidth(), firstRequest.getCordWidth());
+            BigDecimal secondBigRollConsume = bigRollMeterCalculator.calculateForPlanQuantity(
+                    secondQuantity, secondRequest.getUnitConsumeMillimeter(),
+                    secondRequest.getCraftWidth(), secondRequest.getCordWidth());
+            BigDecimal combinedBigRollConsume =
+                    firstBigRollConsume.add(secondBigRollConsume);
+
+            int beforeSeconds = working.getRemainingSecondsByMachine().getOrDefault(
+                    firstTrial.getMachineCode(), this.fullShiftSeconds(firstRequest));
+            int elapsedBefore = Math.max(
+                    0, this.fullShiftSeconds(firstRequest) - beforeSeconds);
+            LocalDateTime originalStart =
+                    firstRequest.getShiftStart().plusSeconds(elapsedBefore);
+            Cd15BigRollAgingAllocation agingAllocation = this.commitAgingAllocation(
+                    working, firstRequest.getBigRollCode(),
+                    combinedBigRollConsume, originalStart);
+            if (agingAllocation != null && !agingAllocation.isSuccess()) {
+                lastFailureReason = Cd15BigRollAgingAllocator.AGING_PERIOD_LIMIT;
+                continue;
+            }
+
+            int agingDelaySeconds = agingAllocation == null
+                    ? 0 : agingAllocation.getDelaySeconds();
+            int changeSeconds = Math.max(
+                    firstTrial.getChangeSeconds(), secondTrial.getChangeSeconds());
+            int productionSeconds = Math.max(
+                    this.scaledProductionSeconds(firstTrial, firstQuantity),
+                    this.scaledProductionSeconds(secondTrial, secondQuantity));
+            int occupiedSeconds = agingDelaySeconds + changeSeconds + productionSeconds;
+            if (occupiedSeconds > beforeSeconds) {
+                lastFailureReason = "CAPACITY_LIMIT";
+                continue;
+            }
+            int afterSeconds = beforeSeconds - occupiedSeconds;
+            LocalDateTime expectedStart = agingAllocation == null
+                    ? originalStart : agingAllocation.getTaskStartTime();
+            LocalDateTime expectedEnd =
+                    expectedStart.plusSeconds(changeSeconds + productionSeconds);
+            int produceOrder = working.getTasks().stream()
+                    .filter(item -> firstTrial.getMachineCode().equals(
+                            item.getMachineCode()))
+                    .map(Cd15ShiftScheduleTask::getProduceOrder)
+                    .max(Integer::compareTo).orElse(0) + 1;
+
+            Cd15ShiftScheduleTask firstTask = this.splitTask(
+                    firstRequest, firstTrial.getMachineCode(),
+                    firstQuantity, firstBigRollConsume, firstVehicles,
+                    firstAllocation, produceOrder, expectedStart, expectedEnd);
+            Cd15ShiftScheduleTask secondTask = this.splitTask(
+                    secondRequest, firstTrial.getMachineCode(),
+                    secondQuantity, secondBigRollConsume, secondVehicles,
+                    secondAllocation, produceOrder, expectedStart, expectedEnd);
+
+            working.setLanes(secondAllocation.getLanes());
+            working.setOccupiedToolingCount(
+                    working.getOccupiedToolingCount() + toolingRequired);
+            working.getRemainingSecondsByMachine().put(
+                    firstTrial.getMachineCode(), afterSeconds);
+            working.getTailSpecByMachine().put(
+                    firstTrial.getMachineCode(), secondRequest.getCordSpec());
+            working.getTailByMachine().put(
+                    firstTrial.getMachineCode(), Cd15MachineTailState.builder()
+                            .materialKey(firstRequest.getSplitGroupKey())
+                            .steelStripCode(firstRequest.getSteelStripCode()
+                                    + "+" + secondRequest.getSteelStripCode())
+                            .bigRollCode(firstRequest.getBigRollCode())
+                            .cuttingAngle(firstRequest.getCuttingAngle())
+                            .build());
+            working.getTasks().add(firstTask);
+            working.getTasks().add(secondTask);
+
+            log.info("[斜裁自动排程] 分裁组合资源提交成功, classField={}, groupKey={}, "
+                            + "machineCode={}, firstSteelStrip={}, secondSteelStrip={}, "
+                            + "firstQuantity={}, secondQuantity={}, bigRollConsume={}",
+                    firstRequest.getClassField(), firstRequest.getSplitGroupKey(),
+                    firstTrial.getMachineCode(), firstRequest.getSteelStripCode(),
+                    secondRequest.getSteelStripCode(), firstQuantity,
+                    secondQuantity, combinedBigRollConsume);
+            return com.zlt.aps.cd15.engine.model.Cd15SplitShiftCommitResult.builder()
+                    .success(true).state(working)
+                    .firstTask(firstTask).secondTask(secondTask)
+                    .firstPartialReason(this.partialReason(
+                            firstAllocation, firstTrial))
+                    .secondPartialReason(this.partialReason(
+                            secondAllocation, secondTrial))
+                    .build();
+        }
+        log.warn("[斜裁自动排程] 分裁组合资源提交失败, classField={}, groupKey={}, reason={}",
+                firstRequest.getClassField(), firstRequest.getSplitGroupKey(),
+                lastFailureReason);
+        return com.zlt.aps.cd15.engine.model.Cd15SplitShiftCommitResult.builder()
+                .success(false).state(originalState)
+                .failureReason(lastFailureReason).build();
+    }
+
+    private Cd15ShiftScheduleTask splitTask(
+            Cd15ShiftCommitRequest request,
+            String machineCode,
+            BigDecimal quantity,
+            BigDecimal bigRollConsumeQuantity,
+            int vehicles,
+            Cd15StorageLaneAllocationResult allocation,
+            int produceOrder,
+            LocalDateTime expectedStart,
+            LocalDateTime expectedEnd) {
+        return Cd15ShiftScheduleTask.builder()
+                .classField(request.getClassField())
+                .materialKey(request.getMaterialKey())
+                .steelStripCode(request.getSteelStripCode())
+                .bigRollCode(request.getBigRollCode())
+                .cordSpec(request.getCordSpec())
+                .cuttingAngle(request.getCuttingAngle())
+                .craftWidth(request.getCraftWidth())
+                .unitConsumeMillimeter(request.getUnitConsumeMillimeter())
+                .cordWidth(request.getCordWidth())
+                .curlLength(request.getCurlLength())
+                .bigRollConsumeQuantity(bigRollConsumeQuantity)
+                .cutMode(request.getCutMode())
+                .splitGroupKey(request.getSplitGroupKey())
+                .machineCode(machineCode)
+                .planQuantity(quantity)
+                .vehicleCount(vehicles)
+                .produceOrder(produceOrder)
+                .expectedStartTime(expectedStart)
+                .expectedEndTime(expectedEnd)
+                .laneAllocations(allocation.getAllocations())
+                .build();
+    }
+
+    private int scaledProductionSeconds(
+            Cd15MachineTrial trial, BigDecimal committedQuantity) {
+        if (trial.getProductionSeconds() <= 0
+                || trial.getFinalSchedulableQuantity() == null
+                || trial.getFinalSchedulableQuantity().signum() <= 0) {
+            return 0;
+        }
+        return committedQuantity.multiply(
+                        BigDecimal.valueOf(trial.getProductionSeconds()))
+                .divide(trial.getFinalSchedulableQuantity(),
+                        0, RoundingMode.CEILING)
+                .intValueExact();
+    }
+
+    private String partialReason(
+            Cd15StorageLaneAllocationResult allocation,
+            Cd15MachineTrial trial) {
+        return allocation.getAllocatedVehicleCount()
+                < allocation.getRequiredVehicleCount()
+                ? "STORAGE_LANE_LIMIT" : trial.getLimitReason();
     }
 
     private boolean acceptPartialAllocation(Cd15StorageLaneAllocationResult allocation,

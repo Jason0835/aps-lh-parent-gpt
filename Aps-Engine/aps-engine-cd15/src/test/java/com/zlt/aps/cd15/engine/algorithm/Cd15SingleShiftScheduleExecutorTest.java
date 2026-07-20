@@ -52,13 +52,17 @@ public class Cd15SingleShiftScheduleExecutorTest {
         assertEquals("C2", result.getTasks().get(0).getSteelStripCode());
         assertEquals("CONSTRUCTION_MISSING", result.getFailures().get("C1"));
         assertEquals(2, result.getAttemptTraces().size());
-        assertEquals(new BigDecimal("100"),
-                result.getAttemptTraces().get(0).getNetDemandQuantity());
-
-        assertEquals("CONSTRUCTION_MISSING",
-                result.getAttemptTraces().get(0).getFailureReason());
-        assertEquals(new BigDecimal("160"),
-                result.getAttemptTraces().get(1).getScheduledQuantity());
+        com.zlt.aps.cd15.engine.model.Cd15ScheduleAttemptTrace missingTrace =
+                result.getAttemptTraces().stream()
+                        .filter(item -> "C1".equals(item.getSteelStripCode()))
+                        .findFirst().orElseThrow(AssertionError::new);
+        com.zlt.aps.cd15.engine.model.Cd15ScheduleAttemptTrace scheduledTrace =
+                result.getAttemptTraces().stream()
+                        .filter(item -> "C2".equals(item.getSteelStripCode()))
+                        .findFirst().orElseThrow(AssertionError::new);
+        assertEquals(new BigDecimal("100"), missingTrace.getNetDemandQuantity());
+        assertEquals("CONSTRUCTION_MISSING", missingTrace.getFailureReason());
+        assertEquals(new BigDecimal("160"), scheduledTrace.getScheduledQuantity());
         assertEquals(2, result.getTasks().get(0).getVehicleCount());
     }
 
@@ -236,7 +240,7 @@ public class Cd15SingleShiftScheduleExecutorTest {
         context.getParameters().setMinStartQty(BigDecimal.ONE);
 
         Cd15ShiftExecutionResult result = executor.execute(
-                context, splitInput(false), shift(), splitState(), null);
+                context, splitInput(), shift(), splitState(), null);
 
         assertEquals(result.getFailures().toString(), 2, result.getTasks().size());
         assertEquals("G1401", result.getTasks().get(0).getMachineCode());
@@ -247,33 +251,6 @@ public class Cd15SingleShiftScheduleExecutorTest {
                 result.getTasks().get(1).getSplitGroupKey());
         assertEquals(result.getTasks().get(0).getProduceOrder(),
                 result.getTasks().get(1).getProduceOrder());
-    }
-
-    /** 左右加强层固定按独立分裁组排程，且只能进入G1201。 */
-    @Test
-    public void shouldScheduleReinforcementAsStandaloneSplitOnG1201() {
-        Cd15ScheduleCandidate reinforcement = splitCandidate("CF_RL");
-        reinforcement.setReinforcement(true);
-        Cd15SingleShiftScheduleExecutor executor = new Cd15SingleShiftScheduleExecutor(
-                (context, input, classField, rolling) ->
-                        Collections.singletonList(reinforcement),
-                (context, input, shift, candidate, rolling) ->
-                        Cd15ShiftDemandDecision.builder()
-                                .netDemandQuantity(new BigDecimal("100")).build(),
-                (factoryCode, start, end) -> reinforcementMachineSnapshot(),
-                trialPreparation(), committer(), new Cd15CloseOutCalculator(),
-                new Cd15ScheduleCandidateSorter(), new Cd15SplitCutGroupBuilder());
-        Cd15AutoScheduleContext context = context();
-        context.getParameters().setMinStartQty(BigDecimal.ONE);
-
-        Cd15ShiftExecutionResult result = executor.execute(
-                context, splitInput(true), shift(), reinforcementState(), null);
-
-        assertEquals(result.getFailures().toString(), 1, result.getTasks().size());
-        assertEquals("G1201", result.getTasks().get(0).getMachineCode());
-        assertEquals("SPLIT", result.getTasks().get(0).getCutMode());
-        assertEquals(true, result.getTasks().get(0).getSplitGroupKey()
-                .startsWith("REINFORCEMENT|CLASS1|"));
     }
 
     /** 定时滚动重排已有分裁组时必须沿用原分组键。 */
@@ -299,7 +276,7 @@ public class Cd15SingleShiftScheduleExecutorTest {
         context.getParameters().setMinStartQty(BigDecimal.ONE);
 
         Cd15ShiftExecutionResult result = executor.executePrepared(
-                context, splitInput(false), shift(), splitState(), null,
+                context, splitInput(), shift(), splitState(), null,
                 Arrays.asList(first, second), Collections.emptyMap(), true);
 
         assertEquals(result.getFailures().toString(), 2, result.getTasks().size());
@@ -314,14 +291,17 @@ public class Cd15SingleShiftScheduleExecutorTest {
                 new Cd15MachineCandidateResolver(),
                 new Cd15CandidateMachineTrialCalculator(
                         new Cd15LossRateResolver(), new Cd15ScheduleQuantityCalculator(),
-                        new Cd15ToolingCalculator(), new Cd15MachineCapacityCalculator(), new Cd15BigRollAgingAllocator()),
+                        new Cd15ToolingCalculator(), new Cd15MachineCapacityCalculator(),
+                        new Cd15BigRollAgingAllocator(), new Cd15BigRollMeterCalculator()),
                 new Cd15MachineTrialSelector(),
-                new Cd15VehiclePlanQuantityCalculator());
+                new Cd15VehiclePlanQuantityCalculator(),
+                new Cd15MachineModeResolver());
     }
 
     private Cd15ShiftResourceCommitter committer() {
         return new Cd15ShiftResourceCommitter(
-                new Cd15StorageLaneAllocator(), new Cd15MachineTrialSelector(), new Cd15BigRollAgingAllocator());
+                new Cd15StorageLaneAllocator(), new Cd15MachineTrialSelector(),
+                new Cd15BigRollAgingAllocator(), new Cd15BigRollMeterCalculator());
     }
 
     private Cd15ScheduleCandidate splitCandidate(String steelStripCode) {
@@ -334,20 +314,14 @@ public class Cd15SingleShiftScheduleExecutorTest {
                 .build();
     }
 
-    private Cd15AutoScheduleInput splitInput(boolean reinforcement) {
-        if (reinforcement) {
-            return Cd15AutoScheduleInput.builder()
-                    .constructionMaterials(Collections.singletonList(
-                            splitMaterial("CF_RL", true))).build();
-        }
+    private Cd15AutoScheduleInput splitInput() {
         return Cd15AutoScheduleInput.builder()
                 .constructionMaterials(Arrays.asList(
-                        splitMaterial("C1", false), splitMaterial("C2", false)))
+                        splitMaterial("C1"), splitMaterial("C2")))
                 .build();
     }
 
-    private Cd15ConstructionMaterial splitMaterial(
-            String steelStripCode, boolean reinforcement) {
+    private Cd15ConstructionMaterial splitMaterial(String steelStripCode) {
         return Cd15ConstructionMaterial.builder()
                 .steelStripCode(steelStripCode)
                 .bigRollCode("BR-SPLIT")
@@ -355,7 +329,6 @@ public class Cd15SingleShiftScheduleExecutorTest {
                 .unitConsumeMillimeter(new BigDecimal("80"))
                 .craftWidth(new BigDecimal("80"))
                 .curlLength(new BigDecimal("80"))
-                .reinforcement(reinforcement)
                 .build();
     }
 
@@ -363,11 +336,15 @@ public class Cd15SingleShiftScheduleExecutorTest {
         return Cd15MachineResourceSnapshot.builder()
                 .machines(Arrays.asList(
                         Cd15MachineResource.builder().machineCode("G1101").status("1")
-                                .openMachineClass("SHIFT1").splitCutSupported(false)
-                                .quota(new BigDecimal("800")).build(),
+                                .openMachineClass("SHIFT1").singleCutSupported(true)
+                                .defaultCutMode("SINGLE")
+                                .singleShiftCapacity(new BigDecimal("800"))
+                                .build(),
                         Cd15MachineResource.builder().machineCode("G1401").status("1")
                                 .openMachineClass("SHIFT1").splitCutSupported(true)
-                                .quota(new BigDecimal("800")).build()))
+                                .defaultCutMode("SPLIT")
+                                .splitShiftCapacity(new BigDecimal("800"))
+                                .build()))
                 .bindings(Arrays.asList(
                         Cd15MachineRollBinding.builder().machineCode("G1101")
                                 .bigRollCode("BR-SPLIT").shiftCode("SHIFT1").build(),
@@ -379,23 +356,6 @@ public class Cd15SingleShiftScheduleExecutorTest {
                 .angleWidthMaxByAngle(Collections.singletonMap(
                         "15", new BigDecimal("1000")))
                 .build();
-    }
-
-    private Cd15MachineResourceSnapshot reinforcementMachineSnapshot() {
-        Cd15MachineResourceSnapshot snapshot = splitMachineSnapshot();
-        snapshot.setMachines(Arrays.asList(
-                Cd15MachineResource.builder().machineCode("G1201").status("1")
-                        .openMachineClass("SHIFT1").splitCutSupported(true)
-                        .quota(new BigDecimal("800")).build(),
-                Cd15MachineResource.builder().machineCode("G1401").status("1")
-                        .openMachineClass("SHIFT1").splitCutSupported(true)
-                        .quota(new BigDecimal("800")).build()));
-        snapshot.setBindings(Arrays.asList(
-                Cd15MachineRollBinding.builder().machineCode("G1201")
-                        .bigRollCode("BR-SPLIT").shiftCode("SHIFT1").build(),
-                Cd15MachineRollBinding.builder().machineCode("G1401")
-                        .bigRollCode("BR-SPLIT").shiftCode("SHIFT1").build()));
-        return snapshot;
     }
 
     private Cd15ShiftResourceState splitState() {
@@ -415,18 +375,13 @@ public class Cd15SingleShiftScheduleExecutorTest {
                 .tasks(new java.util.ArrayList<>()).build();
     }
 
-    private Cd15ShiftResourceState reinforcementState() {
-        Cd15ShiftResourceState state = splitState();
-        state.getRemainingSecondsByMachine().remove("G1101");
-        state.getRemainingSecondsByMachine().put("G1201", 28800);
-        return state;
-    }
-
     private Cd15MachineResourceSnapshot machineSnapshot() {
         return Cd15MachineResourceSnapshot.builder()
                 .machines(Collections.singletonList(Cd15MachineResource.builder()
                         .machineCode("M1").status("1").openMachineClass("SHIFT1")
-                        .quota(new BigDecimal("800")).build()))
+                        .singleCutSupported(true).defaultCutMode("SINGLE")
+                        .singleShiftCapacity(new BigDecimal("800"))
+                        .build()))
                 .bindings(Collections.singletonList(Cd15MachineRollBinding.builder()
                         .machineCode("M1").bigRollCode("BR2")
                         .shiftCode("SHIFT1").build()))
@@ -442,9 +397,13 @@ public class Cd15SingleShiftScheduleExecutorTest {
         return Cd15MachineResourceSnapshot.builder()
                 .machines(Arrays.asList(
                         Cd15MachineResource.builder().machineCode("G1301").status("1")
-                                .openMachineClass("SHIFT1").quota(new BigDecimal("800")).build(),
+                                .openMachineClass("SHIFT1").singleCutSupported(true)
+                                .defaultCutMode("SINGLE")
+                                .singleShiftCapacity(new BigDecimal("800")).build(),
                         Cd15MachineResource.builder().machineCode("G1302").status("1")
-                                .openMachineClass("SHIFT1").quota(new BigDecimal("800")).build()))
+                                .openMachineClass("SHIFT1").singleCutSupported(true)
+                                .defaultCutMode("SINGLE")
+                                .singleShiftCapacity(new BigDecimal("800")).build()))
                 .bindings(Arrays.asList(
                         Cd15MachineRollBinding.builder().machineCode("G1301").bigRollCode("CSTA6023")
                                 .shiftCode("SHIFT1").build(),

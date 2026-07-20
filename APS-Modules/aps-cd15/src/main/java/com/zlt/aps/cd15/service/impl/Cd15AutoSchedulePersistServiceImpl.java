@@ -170,6 +170,14 @@ public class Cd15AutoSchedulePersistServiceImpl implements Cd15AutoSchedulePersi
             entity.setOrderNo(parent.getOrderNo());
             entity.setBigRollCode(parent.getBigRollCode());
             entity.setSteelStripCode(parent.getSteelStripCode());
+            entity.setGroupNo(parent.getGroupNo());
+            entity.setCuttingAngle(parent.getCuttingAngle());
+            entity.setMaterialKey(parent.getMaterialKey());
+            entity.setCraftWidth(parent.getCraftWidth());
+            entity.setUnitConsumeMillimeter(parent.getUnitConsumeMillimeter());
+            entity.setCurlLength(parent.getCurlLength());
+            entity.setCordWidth(parent.getCordWidth());
+            entity.setBigRollConsumeQty(parent.getBigRollConsumeQty());
             entity.setMachineCode(parent.getMachineCode());
             entity.setStorageLaneCode(parent.getStorageLaneCode());
             entity.setLogType(draft.getLogType());
@@ -222,6 +230,8 @@ public class Cd15AutoSchedulePersistServiceImpl implements Cd15AutoSchedulePersi
             entity.setScheduleDate(date(context.getScheduleDate()));
             entity.setBatchNo(batchNo);
             entity.setSteelStripCode(trace.getSteelStripCode());
+            entity.setBigRollCode(trace.getBigRollCode());
+            entity.setCuttingAngle(trace.getCuttingAngle());
             entity.setClassField(trace.getClassField());
             entity.setDemandTime(context.getShifts().stream()
                     .filter(item -> trace.getClassField().equals(item.getClassField()))

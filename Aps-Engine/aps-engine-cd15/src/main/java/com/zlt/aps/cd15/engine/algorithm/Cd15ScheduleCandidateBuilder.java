@@ -55,7 +55,7 @@ public class Cd15ScheduleCandidateBuilder {
             throw new IllegalArgumentException("逐钢带备库深度不能为空");
         }
 
-        // 先将多条6点库存按钢带汇总，后续所有窗口投影都使用同一库存基准。
+        // 6点库存按钢带形成唯一共享池，先统一扣除窗口前全部材料的成型消耗。
         Map<String, BigDecimal> stockBySteelStrip = aggregateStock(stocksAtSix);
         Map<String, List<Cd15DemandShift>> shiftsByMaterial = safe(demandShifts).stream()
                 .filter(item -> item != null && StringUtils.hasText(item.getSteelStripCode()))
@@ -63,20 +63,43 @@ public class Cd15ScheduleCandidateBuilder {
                 .filter(item -> item.getStartTime() != null)
                 .collect(Collectors.groupingBy(Cd15DemandShift::getMaterialKey,
                         LinkedHashMap::new, Collectors.toList()));
+        Map<String, BigDecimal> consumedBeforeBySteelStrip = safe(demandShifts).stream()
+                .filter(item -> item != null && StringUtils.hasText(item.getSteelStripCode()))
+                .filter(item -> item.getStartTime() != null
+                        && item.getStartTime().isBefore(currentDemandStart))
+                .collect(Collectors.groupingBy(Cd15DemandShift::getSteelStripCode,
+                        Collectors.reducing(BigDecimal.ZERO,
+                                item -> value(item.getSteelStripDemandQuantity()),
+                                BigDecimal::add)));
+        Map<String, BigDecimal> remainingStockBySteelStrip = new LinkedHashMap<>();
+        shiftsByMaterial.values().stream().flatMap(List::stream)
+                .map(Cd15DemandShift::getSteelStripCode).distinct()
+                .forEach(steelStripCode -> remainingStockBySteelStrip.put(
+                        steelStripCode,
+                        stockBySteelStrip.getOrDefault(steelStripCode, BigDecimal.ZERO)
+                                .subtract(consumedBeforeBySteelStrip.getOrDefault(
+                                        steelStripCode, BigDecimal.ZERO))
+                                .max(BigDecimal.ZERO)));
+        List<Map.Entry<String, List<Cd15DemandShift>>> materialEntries =
+                shiftsByMaterial.entrySet().stream()
+                        .sorted(Comparator
+                                .comparing((Map.Entry<String, List<Cd15DemandShift>> entry) ->
+                                        entry.getValue().get(0).getSteelStripCode())
+                                .thenComparing(entry -> entry.getValue().stream()
+                                        .map(Cd15DemandShift::getStartTime)
+                                        .min(LocalDateTime::compareTo)
+                                        .orElse(LocalDateTime.MAX))
+                                .thenComparing(Map.Entry::getKey))
+                        .collect(Collectors.toList());
 
         List<Cd15ScheduleCandidate> candidates = new ArrayList<>();
-        for (Map.Entry<String, List<Cd15DemandShift>> entry : shiftsByMaterial.entrySet()) {
+        for (Map.Entry<String, List<Cd15DemandShift>> entry : materialEntries) {
             // 每种施工材料按自然班次排序，避免数据库返回顺序影响缺料时间判断。
             List<Cd15DemandShift> allShifts = entry.getValue().stream()
                     .sorted(Comparator.comparing(Cd15DemandShift::getStartTime))
                     .collect(Collectors.toList());
             Cd15DemandShift materialDemand = allShifts.get(0);
             String steelStripCode = materialDemand.getSteelStripCode();
-            // 当前供应窗口之前已经发生的成型消耗必须先从6点库存扣除。
-            BigDecimal consumedBeforeWindow = allShifts.stream()
-                    .filter(item -> item.getStartTime().isBefore(currentDemandStart))
-                    .map(item -> value(item.getSteelStripDemandQuantity()))
-                    .reduce(BigDecimal.ZERO, BigDecimal::add);
             List<Cd15DemandShift> availableShifts = allShifts.stream()
                     .filter(item -> !item.getStartTime().isBefore(currentDemandStart))
                     .collect(Collectors.toList());
@@ -97,11 +120,11 @@ public class Cd15ScheduleCandidateBuilder {
                 continue;
             }
 
-            //取6点库存
-            BigDecimal stockAtSix = stockBySteelStrip.getOrDefault(steelStripCode, BigDecimal.ZERO);
-            // 投影库存用于同时计算可供应时长和最早缺料班次，两者共同决定候选优先级。
+            BigDecimal sharedAvailableStock = remainingStockBySteelStrip.getOrDefault(
+                    steelStripCode, BigDecimal.ZERO);
+            // 当前材料只使用共享池尚未被前序材料占用的库存。
             Cd15InventoryProjection projection = inventoryCalculator.project(
-                    stockAtSix, consumedBeforeWindow, BigDecimal.ZERO);
+                    sharedAvailableStock, BigDecimal.ZERO, BigDecimal.ZERO);
             Cd15StockGuaranteeResult guarantee = stockGuaranteeCalculator.calculate(
                     projection.getExpectedAvailableStock(), windowShifts);
             LocalDateTime earliestShortageTime = findEarliestShortageTime(
@@ -115,13 +138,17 @@ public class Cd15ScheduleCandidateBuilder {
                     .cuttingAngle(materialDemand.getCuttingAngle())
                     .craftWidth(materialDemand.getCraftWidth())
                     .unitConsumeMillimeter(materialDemand.getUnitConsumeMillimeter())
-                    .reinforcement(materialDemand.isReinforcement())
                     .shortageInCurrentShift(firstWindowStart.equals(earliestShortageTime))
+                    .cordWidth(materialDemand.getCordWidth())
+                    .curlLength(materialDemand.getCurlLength())
                     .continueFromPreviousShift(isContinueFromPrevious(
                             continueDemandBySteelStrip, materialDemand.getMaterialKey()))
                     .earliestShortageTime(earliestShortageTime)
                     .stockSupplyHours(guarantee.getSupplyHours())
                     .build());
+            BigDecimal remainingStock = sharedAvailableStock.subtract(
+                    this.windowDemand(windowShifts)).max(BigDecimal.ZERO);
+            remainingStockBySteelStrip.put(steelStripCode, remainingStock);
         }
 
         // 排序器负责稳定处理同缺料时间候选，避免重复执行时结果顺序抖动。
@@ -182,6 +209,16 @@ public class Cd15ScheduleCandidateBuilder {
             remaining = remaining.subtract(demand);
         }
         return null;
+    }
+
+    /** 汇总当前材料窗口内实际参与排程的钢带需求量。 */
+    private BigDecimal windowDemand(List<Cd15DemandShift> windowShifts) {
+        return safe(windowShifts).stream()
+                .filter(Cd15DemandShift::isIncluded)
+                .map(Cd15DemandShift::getSteelStripDemandQuantity)
+                .map(this::value)
+                .filter(quantity -> quantity.signum() > 0)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
     private <T> List<T> safe(List<T> values) {

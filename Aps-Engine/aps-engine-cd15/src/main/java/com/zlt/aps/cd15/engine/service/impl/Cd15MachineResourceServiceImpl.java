@@ -79,7 +79,9 @@ public class Cd15MachineResourceServiceImpl implements Cd15MachineResourceServic
                                 Date.valueOf(shiftEnd.toLocalDate())));
         maintenances.stream()
                 .filter(item -> overlaps(item, shiftStart, shiftEnd))
-                .forEach(item -> markMaintenance(machineByCode.get(item.getMachineCode()), item));
+                .collect(Collectors.groupingBy(Cd15MachineMaintenancePlan::getMachineCode))
+                .forEach((machineCode, plans) -> this.applyMaintenance(
+                        machineByCode.get(machineCode), plans, shiftStart, shiftEnd));
 
         // 绑定、限制和损耗与机台一起冻结为本班快照，保证同班所有规格使用同一规则版本。
         Cd15MachineResourceSnapshot snapshot = Cd15MachineResourceSnapshot.builder()
@@ -121,20 +123,58 @@ public class Cd15MachineResourceServiceImpl implements Cd15MachineResourceServic
         return start != null && end != null && start.isBefore(shiftEnd) && end.isAfter(shiftStart);
     }
 
-    private void markMaintenance(Cd15MachineResource machine,
-                                 Cd15MachineMaintenancePlan maintenance) {
-        if (machine == null) {
+    /**
+     * 合并当前班次内相互重叠的检修区间，只扣一次真实重叠时长。
+     */
+    private void applyMaintenance(
+            Cd15MachineResource machine,
+            List<Cd15MachineMaintenancePlan> plans,
+            LocalDateTime shiftStart,
+            LocalDateTime shiftEnd) {
+        if (machine == null || plans == null || plans.isEmpty()) {
             return;
         }
-        LocalDateTime start = toLocalDateTime(maintenance.getDowntimeStartTime());
-        LocalDateTime end = toLocalDateTime(maintenance.getDowntimeEndTime());
-        // 同班存在多段检修时取最早开始和最晚结束，保守覆盖全部不可用区间。
-        if (machine.getMaintenanceStart() == null || start.isBefore(machine.getMaintenanceStart())) {
-            machine.setMaintenanceStart(start);
+        List<LocalDateTime[]> intervals = plans.stream()
+                .map(item -> new LocalDateTime[]{
+                        this.toLocalDateTime(item.getDowntimeStartTime()),
+                        this.toLocalDateTime(item.getDowntimeEndTime())})
+                .filter(interval -> interval[0] != null && interval[1] != null)
+                .map(interval -> new LocalDateTime[]{
+                        interval[0].isBefore(shiftStart) ? shiftStart : interval[0],
+                        interval[1].isAfter(shiftEnd) ? shiftEnd : interval[1]})
+                .filter(interval -> interval[0].isBefore(interval[1]))
+                .sorted(java.util.Comparator.comparing(interval -> interval[0]))
+                .collect(Collectors.toList());
+        if (intervals.isEmpty()) {
+            return;
         }
-        if (machine.getMaintenanceEnd() == null || end.isAfter(machine.getMaintenanceEnd())) {
-            machine.setMaintenanceEnd(end);
+        LocalDateTime mergedStart = intervals.get(0)[0];
+        LocalDateTime mergedEnd = intervals.get(0)[1];
+        LocalDateTime firstStart = mergedStart;
+        LocalDateTime lastEnd = mergedEnd;
+        long unavailableSeconds = 0L;
+        for (int index = 1; index < intervals.size(); index++) {
+            LocalDateTime currentStart = intervals.get(index)[0];
+            LocalDateTime currentEnd = intervals.get(index)[1];
+            if (!currentStart.isAfter(mergedEnd)) {
+                if (currentEnd.isAfter(mergedEnd)) {
+                    mergedEnd = currentEnd;
+                }
+            } else {
+                unavailableSeconds += java.time.Duration.between(
+                        mergedStart, mergedEnd).getSeconds();
+                mergedStart = currentStart;
+                mergedEnd = currentEnd;
+            }
+            if (currentEnd.isAfter(lastEnd)) {
+                lastEnd = currentEnd;
+            }
         }
+        unavailableSeconds += java.time.Duration.between(
+                mergedStart, mergedEnd).getSeconds();
+        machine.setMaintenanceStart(firstStart);
+        machine.setMaintenanceEnd(lastEnd);
+        machine.setMaintenanceSeconds(Math.toIntExact(unavailableSeconds));
     }
 
     private LocalDateTime toLocalDateTime(java.util.Date value) {

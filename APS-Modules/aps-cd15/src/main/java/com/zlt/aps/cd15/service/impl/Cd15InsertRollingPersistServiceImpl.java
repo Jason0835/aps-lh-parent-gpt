@@ -23,6 +23,7 @@ import com.zlt.aps.cd15.mapper.Cd15UnscheduleResultMapper;
 import com.zlt.aps.cd15.service.Cd15InsertRollingPersistService;
 import com.zlt.aps.cd15.service.Cd15AutoScheduleVersionVerifier;
 import com.zlt.aps.cd15.service.Cd15ScheduleNumberService;
+import com.zlt.aps.common.core.constant.ApsConstant;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RLock;
@@ -84,34 +85,60 @@ public class Cd15InsertRollingPersistServiceImpl implements Cd15InsertRollingPer
                                  String degradeReason, String actionName) {
         this.validateCommitState(taskId, lock);
         versionVerifier.verify(output.getContext());
-        Cd15ScheduleResult insertResult = output.getInsertResult();
-        this.applyStorageLaneCodes(output);
-        boolean insertSaved = this.hasScheduledQuantity(insertResult);
-        if (insertSaved) {
-            insertResult.setOrderNo(numberService.nextOrderNo(output.getBatchNo()));
-            insertResult.setGroupNo(insertResult.getOrderNo());
-            if (resultMapper.insert(insertResult) != 1) {
+        List<Cd15ScheduleResult> insertedResults = output.getInsertedResults() == null
+                ? Collections.emptyList() : output.getInsertedResults().stream()
+                        .filter(this::hasScheduledQuantity).collect(Collectors.toList());
+        Map<String, Cd15ScheduleResult> insertedByKey = new LinkedHashMap<>();
+        insertedResults.forEach(result -> {
+            String resultKey = this.newResultKey(result);
+            if (insertedByKey.put(resultKey, result) != null) {
+                throw new IllegalStateException("新增斜裁结果稳定键重复: " + resultKey);
+            }
+        });
+        this.applyStorageLaneCodes(output, insertedByKey);
+        this.assignOrderNumbers(insertedResults, output.getBatchNo());
+        for (Cd15ScheduleResult insertedResult : insertedResults) {
+            if (resultMapper.insert(insertedResult) != 1) {
                 throw new IllegalStateException("保存斜裁" + actionName + "结果失败");
             }
-            this.saveLog(insertResult, "CREATE", createReason, request);
+            this.saveLog(insertedResult, "CREATE", createReason, request);
         }
         List<Cd15ScheduleResult> deletedResults = output.getDeletedResults() == null
                 ? Collections.emptyList() : output.getDeletedResults();
+        List<Cd15ScheduleResult> retainedPublishedResults = deletedResults.stream()
+                .filter(this::isPreviouslyPublished)
+                .collect(Collectors.toList());
+        List<Cd15ScheduleResult> removableResults = deletedResults.stream()
+                .filter(result -> !this.isPreviouslyPublished(result))
+                .collect(Collectors.toList());
         for (Cd15ScheduleResult result : output.getUpdatedResults()) {
-            if (result.getId() == null || this.updateScheduleResultForcibly(result) != 1) {
+            if (result.getId() == null) {
                 throw new IllegalStateException("更新" + actionName + "受影响排程结果失败");
             }
-            if (result.getReleaseStatus() != null && !"0".equals(result.getReleaseStatus())) {
-                result.setReleaseStatus("5");
-                if (this.updateScheduleResultForcibly(result) != 1) {
-                    throw new IllegalStateException("更新" + actionName + "受影响发布状态失败");
-                }
-                this.saveLog(result, "UPDATE", degradeReason, request);
-            } else {
-                this.saveLog(result, "UPDATE", updateReason, request);
+            boolean requiresRepublish = this.isPreviouslyPublished(result);
+            if (requiresRepublish) {
+                result.setReleaseStatus(ApsConstant.WAIT_RELEASING);
             }
+            if (this.updateScheduleResultForcibly(result) != 1) {
+                throw new IllegalStateException("更新" + actionName + "受影响排程结果失败");
+            }
+            this.saveLog(result, "UPDATE",
+                    requiresRepublish ? degradeReason : updateReason, request);
         }
-        for (Cd15ScheduleResult result : deletedResults) {
+        for (Cd15ScheduleResult result : retainedPublishedResults) {
+            if (result.getId() == null) {
+                throw new IllegalStateException("保留" + actionName + "已发布结果失败");
+            }
+            result.setReleaseStatus(ApsConstant.WAIT_RELEASING);
+            result.setStorageLaneCode(null);
+            if (this.updateScheduleResultForcibly(result) != 1) {
+                throw new IllegalStateException("保留" + actionName + "已发布结果失败");
+            }
+            this.saveLog(result, "UPDATE", degradeReason, request);
+            laneMapper.delete(new LambdaQueryWrapper<Cd15ScheduleLaneAllocation>()
+                    .eq(Cd15ScheduleLaneAllocation::getScheduleResultId, result.getId()));
+        }
+        for (Cd15ScheduleResult result : removableResults) {
             if (result.getId() == null) {
                 throw new IllegalStateException("删除" + actionName + "转出排程结果失败");
             }
@@ -127,22 +154,27 @@ public class Cd15InsertRollingPersistServiceImpl implements Cd15InsertRollingPer
                 throw new IllegalStateException("保存" + actionName + "未排结果失败");
             }
         }
-        this.replaceLaneAllocations(output, insertSaved);
+        this.replaceLaneAllocations(output, insertedByKey);
         if (!taskService.markSuccessInCurrentTransaction(taskId, output.getBatchNo())) {
             throw new IllegalStateException(actionName + "任务状态已变化，不能提交结果");
         }
-        log.info("[斜裁{}] 最终事务提交完成, taskId={}, batchNo={}, insertSaved={}, updatedCount={}, deletedCount={}, unscheduledCount={}",
-                actionName, taskId, output.getBatchNo(), insertSaved, output.getUpdatedResults().size(),
-                deletedResults.size(), output.getUnscheduledResults().size());
+        log.info("[斜裁{}] 最终事务提交完成, taskId={}, batchNo={}, "
+                        + "insertedCount={}, updatedCount={}, retainedPublishedCount={}, "
+                        + "deletedCount={}, unscheduledCount={}",
+                actionName, taskId, output.getBatchNo(), insertedResults.size(),
+                output.getUpdatedResults().size(), retainedPublishedResults.size(),
+                removableResults.size(), output.getUnscheduledResults().size());
     }
-    private void applyStorageLaneCodes(Cd15InsertRollingOutput output) {
+    private void applyStorageLaneCodes(
+            Cd15InsertRollingOutput output,
+            Map<String, Cd15ScheduleResult> insertedByKey) {
         List<Cd15InsertLaneAllocationDraft> lanes = output.getLaneAllocations() == null
                 ? Collections.emptyList() : output.getLaneAllocations();
-        if (output.getInsertResult() != null) {
-            output.getInsertResult().setStorageLaneCode(joinLaneCodes(lanes.stream()
-                    .filter(Cd15InsertLaneAllocationDraft::isInsertResult)
-                    .collect(Collectors.toList())));
-        }
+        insertedByKey.forEach((resultKey, result) -> result.setStorageLaneCode(
+                joinLaneCodes(lanes.stream()
+                        .filter(Cd15InsertLaneAllocationDraft::isInsertResult)
+                        .filter(item -> resultKey.equals(item.getNewResultKey()))
+                        .collect(Collectors.toList()))));
         output.getUpdatedResults().forEach(result -> result.setStorageLaneCode(
                 joinLaneCodes(lanes.stream()
                         .filter(item -> !item.isInsertResult())
@@ -157,7 +189,49 @@ public class Cd15InsertRollingPersistServiceImpl implements Cd15InsertRollingPer
         return value.isEmpty() ? null : value;
     }
 
-    private void replaceLaneAllocations(Cd15InsertRollingOutput output, boolean insertSaved) {
+    /** 分裁组合共用一个新工单号，单裁结果各自生成工单号。 */
+    private void assignOrderNumbers(List<Cd15ScheduleResult> insertedResults,
+                                    String batchNo) {
+        Map<String, String> orderBySplitGroup = new LinkedHashMap<>();
+        insertedResults.forEach(result -> {
+            boolean splitCut = "SPLIT".equalsIgnoreCase(result.getCutMode());
+            String orderNo;
+            if (splitCut) {
+                if (result.getGroupNo() == null || result.getGroupNo().trim().isEmpty()) {
+                    throw new IllegalStateException("新增分裁结果缺少组号");
+                }
+                orderNo = orderBySplitGroup.computeIfAbsent(
+                        result.getGroupNo(), key -> numberService.nextOrderNo(batchNo));
+            } else {
+                orderNo = numberService.nextOrderNo(batchNo);
+            }
+            result.setOrderNo(orderNo);
+            result.setGroupNo(orderNo);
+        });
+    }
+
+    private String newResultKey(Cd15ScheduleResult result) {
+        return this.text(result.getSteelStripCode()) + "|"
+                + this.text(result.getBigRollCode()) + "|"
+                + this.text(result.getCuttingAngle()) + "|"
+                + this.decimalText(result.getCraftWidth()) + "|"
+                + this.decimalText(result.getUnitConsumeMillimeter()) + "|"
+                + this.decimalText(result.getCurlLength()) + "|"
+                + this.text(result.getGroupNo()) + "|"
+                + this.text(result.getMachineCode());
+    }
+
+    private String text(String value) {
+        return value == null ? "" : value.trim();
+    }
+
+    private String decimalText(java.math.BigDecimal value) {
+        return value == null ? "" : value.stripTrailingZeros().toPlainString();
+    }
+
+    private void replaceLaneAllocations(
+            Cd15InsertRollingOutput output,
+            Map<String, Cd15ScheduleResult> insertedByKey) {
         List<Cd15InsertLaneAllocationDraft> drafts = output.getLaneAllocations() == null
                 ? Collections.emptyList() : output.getLaneAllocations();
         Set<Long> updatedIds = output.getUpdatedResults().stream()
@@ -167,14 +241,15 @@ public class Cd15InsertRollingPersistServiceImpl implements Cd15InsertRollingPer
                     .in(Cd15ScheduleLaneAllocation::getScheduleResultId, updatedIds));
         }
         for (Cd15InsertLaneAllocationDraft draft : drafts) {
-            Long resultId = draft.isInsertResult()
-                    ? (insertSaved ? output.getInsertResult().getId() : null)
-                    : draft.getScheduleResultId();
+            Cd15ScheduleResult insertedParent = draft.isInsertResult()
+                    ? insertedByKey.get(draft.getNewResultKey()) : null;
+            Long resultId = draft.isInsertResult() && insertedParent != null
+                    ? insertedParent.getId() : draft.getScheduleResultId();
             if (resultId == null) {
                 continue;
             }
             Cd15ScheduleResult parent = draft.isInsertResult()
-                    ? output.getInsertResult() : output.getUpdatedResults().stream()
+                    ? insertedParent : output.getUpdatedResults().stream()
                             .filter(item -> resultId.equals(item.getId())).findFirst()
                             .orElseThrow(() -> new IllegalStateException(
                                     "插单库排明细找不到主结果: " + resultId));
@@ -243,8 +318,16 @@ public class Cd15InsertRollingPersistServiceImpl implements Cd15InsertRollingPer
                     result.getFieldValueByFieldName(fieldPrefix + "AnalysisInput"));
         }
         wrapper.set("STORAGE_LANE_CODE", result.getStorageLaneCode());
+        wrapper.set("BIG_ROLL_CONSUME_QTY", result.getBigRollConsumeQty());
         wrapper.set("RELEASE_STATUS", result.getReleaseStatus());
         return resultMapper.update(null, wrapper);
+    }
+
+    /** 是否曾成功发布到 MES。 */
+    private boolean isPreviouslyPublished(Cd15ScheduleResult result) {
+        return result != null
+                && result.getPublishSuccessCount() != null
+                && result.getPublishSuccessCount() > 0;
     }
 
     private boolean hasScheduledQuantity(Cd15ScheduleResult result) {
@@ -271,10 +354,19 @@ public class Cd15InsertRollingPersistServiceImpl implements Cd15InsertRollingPer
         entity.setOrderNo(result.getOrderNo());
         entity.setBigRollCode(result.getBigRollCode());
         entity.setSteelStripCode(result.getSteelStripCode());
+        entity.setMaterialKey(result.getMaterialKey());
+        entity.setCraftWidth(result.getCraftWidth());
+        entity.setUnitConsumeMillimeter(result.getUnitConsumeMillimeter());
+        entity.setCurlLength(result.getCurlLength());
+        entity.setCordWidth(result.getCordWidth());
+        entity.setBigRollConsumeQty(result.getBigRollConsumeQty());
         entity.setCuttingAngle(result.getCuttingAngle());
         entity.setMachineCode(result.getMachineCode());
         entity.setGroupNo(result.getGroupNo());
         entity.setStorageLaneCode(result.getStorageLaneCode());
+        entity.setSourceType(result.getSourceType());
+        entity.setReleaseStatus(result.getReleaseStatus());
+        entity.setProductionStatus(result.getProductionStatus());
         entity.setLogType(logType);
         entity.setLogTime(new Date());
         entity.setReasonCode(reasonCode);

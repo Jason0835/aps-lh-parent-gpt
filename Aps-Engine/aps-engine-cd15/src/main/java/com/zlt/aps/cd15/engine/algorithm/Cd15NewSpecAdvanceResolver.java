@@ -150,7 +150,6 @@ public class Cd15NewSpecAdvanceResolver {
                 .cuttingAngle(source.getCuttingAngle())
                 .craftWidth(source.getCraftWidth())
                 .unitConsumeMillimeter(source.getUnitConsumeMillimeter())
-                .reinforcement(source.isReinforcement())
                 .classField(source.getClassField())
                 .shiftKey(source.getShiftKey())
                 .startTime(source.getStartTime())

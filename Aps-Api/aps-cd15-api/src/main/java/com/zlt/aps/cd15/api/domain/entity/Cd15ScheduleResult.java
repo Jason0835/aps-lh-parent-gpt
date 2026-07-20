@@ -73,6 +73,17 @@ public class Cd15ScheduleResult extends BaseEntity implements Serializable {
     @Excel(name = "ui.data.column.cd15ScheduleResult.releaseStatus", dictType = "IS_RELEASE")
     private String releaseStatus;
 
+    /** 发布成功次数；大于0的结果不得删除或被自动排程覆盖 */
+    @ApiModelProperty("发布成功次数")
+    @TableField("PUBLISH_SUCCESS_COUNT")
+    private Integer publishSuccessCount;
+
+    /** 最近一次发布成功时间 */
+    @ApiModelProperty("最近一次发布成功时间")
+    @TableField("NEWEST_PUBLISH_TIME")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private Date newestPublishTime;
+
     /** 生产状态 */
     @ApiModelProperty("生产状态")
     @TableField("PRODUCTION_STATUS")
@@ -113,6 +124,42 @@ public class Cd15ScheduleResult extends BaseEntity implements Serializable {
     @TableField("STEEL_STRIP_CODE")
     @Excel(name = "ui.data.column.cd15ScheduleResult.steelStripCode")
     private String steelStripCode;
+
+    /** 施工材料稳定键 */
+    @ApiModelProperty("施工材料稳定键")
+    @TableField("MATERIAL_KEY")
+    @Excel(name = "ui.data.column.cd15ScheduleResult.materialKey")
+    private String materialKey;
+
+    /** 斜裁宽度，单位毫米 */
+    @ApiModelProperty("斜裁宽度")
+    @TableField("CRAFT_WIDTH")
+    @Excel(name = "ui.data.column.cd15ScheduleResult.craftWidth")
+    private BigDecimal craftWidth;
+
+    /** 单耗，单位毫米/条 */
+    @ApiModelProperty("单耗")
+    @TableField("UNIT_CONSUME_MILLIMETER")
+    @Excel(name = "ui.data.column.cd15ScheduleResult.unitConsumeMillimeter")
+    private BigDecimal unitConsumeMillimeter;
+
+    /** 标准卷曲长度，单位米 */
+    @ApiModelProperty("标准卷曲长度")
+    @TableField("CURL_LENGTH")
+    @Excel(name = "ui.data.column.cd15ScheduleResult.curlLength")
+    private BigDecimal curlLength;
+
+    /** 大卷幅宽，单位毫米 */
+    @ApiModelProperty("大卷幅宽")
+    @TableField("CORD_WIDTH")
+    @Excel(name = "ui.data.column.cd15ScheduleResult.cordWidth")
+    private BigDecimal cordWidth;
+
+    /** GDYY大卷消耗量，单位米 */
+    @ApiModelProperty("GDYY大卷消耗量")
+    @TableField("BIG_ROLL_CONSUME_QTY")
+    @Excel(name = "ui.data.column.cd15ScheduleResult.bigRollConsumeQty")
+    private BigDecimal bigRollConsumeQty;
 
     /** 库存数量 */
     @ApiModelProperty("库存数量")

@@ -27,6 +27,7 @@ public class Cd15CandidateMachineTrialCalculator {
     private final Cd15ToolingCalculator toolingCalculator;
     private final Cd15MachineCapacityCalculator capacityCalculator;
     private final Cd15BigRollAgingAllocator agingAllocator;
+    private final Cd15BigRollMeterCalculator bigRollMeterCalculator;
 
     /**
      * 计算单台候选机台方案。
@@ -81,10 +82,10 @@ public class Cd15CandidateMachineTrialCalculator {
         // 产能试算：无尾匹时按规格切换耗时计算，有尾匹时按尾匹切换耗时计算
         Cd15MachineCapacityTrial capacity = input.getCurrentTail() == null
                 ? capacityCalculator.calculateWithRemainingSeconds(
-                        input.getQuota(), input.getShiftHours(), remainingSeconds,
+                        input.getShiftCapacity(), input.getShiftHours(), remainingSeconds,
                         input.getPreviousSpec(), input.getCurrentSpec(), input.getSpecChangeMinutes(), actualQuantity)
                 : capacityCalculator.calculateWithRemainingSeconds(
-                        input.getQuota(), input.getShiftHours(), remainingSeconds,
+                        input.getShiftCapacity(), input.getShiftHours(), remainingSeconds,
                         input.getPreviousTail(), input.getCurrentTail(),
                         input.getSameRollDiffSpecChangeMinutes(), input.getDiffRollSameSpecChangeMinutes(),
                         input.getDiffRollDiffSpecChangeMinutes(), actualQuantity);
@@ -146,8 +147,11 @@ public class Cd15CandidateMachineTrialCalculator {
                 || input.getOriginalStartTime() == null) {
             return null;
         }
+        BigDecimal bigRollConsumeQuantity = bigRollMeterCalculator.calculateForPlanQuantity(
+                actualQuantity, input.getUnitConsumeMillimeter(),
+                input.getCraftWidth(), input.getCordWidth());
         return agingAllocator.preview(input.getBigRollAgingStocks(), input.getBigRollCode(),
-                actualQuantity, input.getOriginalStartTime());
+                bigRollConsumeQuantity, input.getOriginalStartTime());
     }
     private String limitReason(BigDecimal actualQuantity, BigDecimal toolingQuantity,
                                BigDecimal capacityQuantity, BigDecimal finalQuantity) {

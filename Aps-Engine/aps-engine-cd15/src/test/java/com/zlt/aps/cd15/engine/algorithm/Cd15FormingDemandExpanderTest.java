@@ -104,6 +104,30 @@ public class Cd15FormingDemandExpanderTest {
         assertEquals(4L, classOne.stream()
                 .map(Cd15DemandShift::getMaterialKey).distinct().count());
     }
+    /**
+     * 主钢带层与左右层材料身份相同时必须按同一钢带需求累计。
+     */
+    @Test
+    public void shouldAggregateNumberedAndLeftRightLayersByMaterialIdentity() {
+        Cd15ConstructionMaterial numberedLayer = angleMaterial("15");
+        numberedLayer.setLayerNo(1);
+        Cd15ConstructionMaterial leftLayer = angleMaterial("15");
+        leftLayer.setLayerNo(101);
+        Cd15ConstructionMaterial rightLayer = angleMaterial("15");
+        rightLayer.setLayerNo(102);
+
+        List<Cd15DemandShift> classOne = expander.expand(
+                        Collections.singletonList(schedule("EM001", "10")),
+                        Arrays.asList(numberedLayer, leftLayer, rightLayer)).stream()
+                .filter(item -> "CLASS1".equals(item.getClassField()))
+                .collect(Collectors.toList());
+
+        assertEquals(1, classOne.size());
+        assertEquals(new BigDecimal("30"), classOne.get(0).getFormingQuantity());
+        assertEquals(new BigDecimal("2.61"),
+                classOne.get(0).getSteelStripDemandQuantity());
+    }
+
 
     /**
      * 0计划量班次仍占用自然窗口位置，并标记为停产班次。

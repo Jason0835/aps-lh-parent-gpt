@@ -27,8 +27,12 @@ public class Cd15ScheduleCandidate {
     private BigDecimal craftWidth;
     /** 单片长度，单位毫米/条。 */
     private BigDecimal unitConsumeMillimeter;
-    /** 是否左右加强层。 */
-    private boolean reinforcement;
+    /** 大卷幅宽，单位毫米。 */
+    private BigDecimal cordWidth;
+    /** 标准卷曲长度，单位米。 */
+    private BigDecimal curlLength;
+
+
     /** 裁断模式：SINGLE或SPLIT。 */
     private String cutMode;
     /** 已有分裁组合稳定键。 */

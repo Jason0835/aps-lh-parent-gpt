@@ -20,6 +20,14 @@ public interface ICd15MachineInfoService extends IDocService<Cd15MachineInfo> {
     String checkUnique(Cd15MachineInfo machineInfo);
 
     /**
+     * 校验机台裁断模式及对应能力配置。
+     *
+     * @param machineInfo 斜裁机台信息
+     * @return 校验失败结果，校验通过返回null
+     */
+    AjaxResult validateForSave(Cd15MachineInfo machineInfo);
+
+    /**
      * 导入斜裁机台数据。
      *
      * @param list 导入数据

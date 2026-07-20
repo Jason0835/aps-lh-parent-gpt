@@ -8,6 +8,9 @@ import com.zlt.aps.cd15.api.domain.vo.Cd15RollingCheckRequest;
 import com.zlt.aps.cd15.api.domain.vo.Cd15TransferMachineRequest;
 import com.zlt.bill.common.service.IDocService;
 
+import java.util.Date;
+import java.util.List;
+
 /**
  * 斜裁排程结果业务接口。
  */
@@ -54,6 +57,10 @@ public interface ICd15ScheduleResultService extends IDocService<Cd15ScheduleResu
 
     /** 查询定时滚动任务。 */
     AjaxResult getTimedRollingTask(String taskId);
-    /** 发布入口，首期仅保留链路 */
-    AjaxResult publish(Cd15ScheduleResult dto, String ids);
+
+    /** 按工厂和排程日期查询排程结果。 */
+    List<Cd15ScheduleResult> selectByDateAndFactory(Date scheduleDate, String factoryCode);
+
+    /** 独立短事务批量更新发布状态。 */
+    int batchUpdateReleaseStatus(List<Cd15ScheduleResult> list, String targetStatus);
 }

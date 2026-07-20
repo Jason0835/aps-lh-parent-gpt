@@ -53,16 +53,36 @@ export default {
       rules: {
         factoryCode: [requiredSelect],
         machineCode: [requiredInput],
-        quota: [
-          requiredInput,
+        singleCutFlag: [requiredSelect],
+        splitCutFlag: [requiredSelect],
+        defaultCutMode: [
+          requiredSelect,
           {
             validator: (rule, value, callback) => {
-              if (value === undefined || value === null || value === "" || Number(value) <= 0) {
-                callback(new Error(this.$t("ui.data.alert.cd15MachineInfo.quotaPositive")));
-              } else {
-                callback();
-              }
+              const singleSupported = this.form.singleCutFlag === "1";
+              const splitSupported = this.form.splitCutFlag === "1";
+              const invalid = !singleSupported && !splitSupported
+                || value === "SINGLE" && !singleSupported
+                || value === "SPLIT" && !splitSupported
+                || value === "DAILY_OUTPUT" && (!singleSupported || !splitSupported);
+              callback(invalid
+                ? new Error(this.$t("ui.data.alert.cd15MachineInfo.modeCapabilityMismatch"))
+                : undefined);
             },
+            trigger: "change",
+          },
+        ],
+        singleShiftCapacity: [
+          {
+            validator: (rule, value, callback) => this.validateModeCapacity(
+              "SINGLE", value, callback),
+            trigger: "blur",
+          },
+        ],
+        splitShiftCapacity: [
+          {
+            validator: (rule, value, callback) => this.validateModeCapacity(
+              "SPLIT", value, callback),
             trigger: "blur",
           },
         ],
@@ -112,11 +132,6 @@ export default {
           type: "number",
         },
         {
-          prop: "quota",
-          label: this.$t("ui.data.column.cd15MachineInfo.quota"),
-          type: "number",
-        },
-        {
           prop: "openMachineClass",
           label: this.$t("ui.data.column.cd15MachineInfo.openMachineClass"),
           render: (form) => {
@@ -134,11 +149,47 @@ export default {
           },
         },
         {
-          prop: "isOutTwo",
-          label: this.$t("ui.data.column.cd15MachineInfo.isOutTwo"),
+          prop: "singleCutFlag",
+          label: this.$t("ui.data.column.cd15MachineInfo.singleCutFlag"),
           type: "select",
           dictData: this.parentDict.type.biz_yes_no,
           filterable: true,
+        },
+        {
+          prop: "splitCutFlag",
+          label: this.$t("ui.data.column.cd15MachineInfo.splitCutFlag"),
+          type: "select",
+          dictData: this.parentDict.type.biz_yes_no,
+          filterable: true,
+        },
+        {
+          prop: "defaultCutMode",
+          label: this.$t("ui.data.column.cd15MachineInfo.defaultCutMode"),
+          type: "select",
+          dictData: [
+            {
+              value: "SINGLE",
+              label: this.$t("ui.data.value.cd15MachineInfo.cutModeSingle"),
+            },
+            {
+              value: "SPLIT",
+              label: this.$t("ui.data.value.cd15MachineInfo.cutModeSplit"),
+            },
+            {
+              value: "DAILY_OUTPUT",
+              label: this.$t("ui.data.value.cd15MachineInfo.cutModeDailyOutput"),
+            },
+          ],
+        },
+        {
+          prop: "singleShiftCapacity",
+          label: this.$t("ui.data.column.cd15MachineInfo.singleShiftCapacity"),
+          type: "number",
+        },
+        {
+          prop: "splitShiftCapacity",
+          label: this.$t("ui.data.column.cd15MachineInfo.splitShiftCapacity"),
+          type: "number",
         },
         {
           prop: "status",
@@ -158,9 +209,21 @@ export default {
     },
   },
   methods: {
+    validateModeCapacity(mode, value, callback) {
+      const required = this.form.defaultCutMode === mode
+        || this.form.defaultCutMode === "DAILY_OUTPUT";
+      const empty = value === undefined || value === null || value === "";
+      if ((required && empty) || (!empty && Number(value) <= 0)) {
+        callback(new Error(this.$t("ui.data.alert.cd15MachineInfo.modeCapacityPositive")));
+        return;
+      }
+      callback();
+    },
     async save(params) {
       this.loading = true;
       try {
+        delete params.quota;
+        delete params.dailyOutputModeThreshold;
         if (params.openMachineClass && Array.isArray(params.openMachineClass)) {
           params.openMachineClass = params.openMachineClass.join(",");
         }
@@ -187,8 +250,10 @@ export default {
       } else {
         this.form = {
           factoryCode: "116",
-          isOutTwo: "0",
           status: "1",
+          singleCutFlag: "1",
+          splitCutFlag: "0",
+          defaultCutMode: "SINGLE",
           openMachineClass: [],
         };
       }

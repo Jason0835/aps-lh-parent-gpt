@@ -3,6 +3,8 @@ package com.zlt.aps.cd15.engine.algorithm;
 import com.zlt.aps.cd15.api.domain.entity.Cd15ScheduleLaneAllocation;
 import com.zlt.aps.cd15.api.domain.entity.Cd15ScheduleResult;
 import com.zlt.aps.cd15.engine.model.Cd15AutoScheduleContext;
+import com.zlt.aps.cd15.engine.model.Cd15AutoScheduleInput;
+import com.zlt.aps.cd15.engine.model.Cd15BigRollAgingStock;
 import com.zlt.aps.cd15.engine.model.Cd15AutoScheduleParameters;
 import com.zlt.aps.cd15.engine.model.Cd15MachineResource;
 import com.zlt.aps.cd15.engine.model.Cd15MachineResourceSnapshot;
@@ -29,19 +31,31 @@ public class Cd15ExistingScheduleResourceReserverTest {
     public void shouldReserveMachineLaneToolingAndTaskIdentityTogether() {
         Cd15MachineResourceService machineService = mock(Cd15MachineResourceService.class);
         Cd15MachineResource machine = Cd15MachineResource.builder().machineCode("M1")
-                .quota(new BigDecimal("800")).build();
+                .singleCutSupported(true)
+                .defaultCutMode("SINGLE")
+                .singleShiftCapacity(new BigDecimal("800")).build();
         when(machineService.load("F1", start(), start().plusHours(8)))
                 .thenReturn(Cd15MachineResourceSnapshot.builder()
                         .machines(Collections.singletonList(machine)).build());
         Cd15ExistingScheduleResourceReserver reserver =
                 new Cd15ExistingScheduleResourceReserver(
-                        machineService, new Cd15MachineCapacityCalculator());
+                        machineService, new Cd15MachineCapacityCalculator(),
+                        new Cd15MachineModeResolver(),
+                        new Cd15BigRollMeterCalculator(),
+                        new Cd15BigRollAgingAllocator());
 
         Cd15ScheduleResult result = new Cd15ScheduleResult();
         result.setId(1L);
         result.setMachineCode("M1");
         result.setSteelStripCode("C1");
         result.setBigRollCode("B1");
+        result.setMaterialKey("C1|B1|15|100|100|1000|false");
+        result.setCuttingAngle("15");
+        result.setCraftWidth(new BigDecimal("100"));
+        result.setUnitConsumeMillimeter(new BigDecimal("100"));
+        result.setCordWidth(new BigDecimal("1000"));
+        result.setCurlLength(new BigDecimal("1000"));
+        result.setCutMode("SINGLE");
         result.setClass1PlanQty(100D);
         result.setClass1ProduceOrder(1);
         Cd15ScheduleLaneAllocation lane = new Cd15ScheduleLaneAllocation();
@@ -57,12 +71,23 @@ public class Cd15ExistingScheduleResourceReserverTest {
                 .totalToolingCount(10).occupiedToolingCount(0)
                 .remainingSecondsByMachine(new HashMap<>())
                 .tailSpecByMachine(new HashMap<>()).tailByMachine(new HashMap<>())
-                .tasks(new ArrayList<>()).build();
+                .tasks(new ArrayList<>())
+                .bigRollAgingStocks(new ArrayList<>(Collections.singletonList(
+                        Cd15BigRollAgingStock.builder().bigRollCode("B1")
+                                .availableQuantity(new BigDecimal("10000"))
+                                .allocatedQuantity(BigDecimal.ZERO)
+                                .releaseTime(start().minusHours(1)).build())))
+                .build();
         state.getRemainingSecondsByMachine().put("M1", 28800);
+
+        Cd15AutoScheduleInput input = Cd15AutoScheduleInput.builder()
+                .demandShifts(Collections.emptyList())
+                .bigRollAgingDataMissingCodes(Collections.emptySet()).build();
 
         reserver.reserve(context(), shift(), state,
                 Collections.singletonList(result),
-                Collections.singletonMap(1L, Collections.singletonList(lane)));
+                Collections.singletonMap(1L, Collections.singletonList(lane)),
+                input);
 
         assertTrue(state.getRemainingSecondsByMachine().get("M1") < 28800);
         assertEquals(2, state.getLanes().get(0).getVehicleCount());

@@ -155,6 +155,11 @@ public enum ItfSyncKeyEnum {
     TC_SCHE_DAY_FINISH_QTY("TC_DAY_COMPLETE", "MES", "APS", "胎侧排程日完成量同步"),
 
     /**
+     * 斜裁排程结果下发
+     */
+    SYNC_CD15_SCHEDULE_RESULT("ADJUDI15_SCHE_FBK", "APS", "MES", "斜裁排程结果下发接口"),
+
+    /**
      * 直裁排程结果下发
      */
     SYNC_CD90_SCHEDULE_RESULT("CUT90_SCHE_RST_FBK", "APS", "MES", "直裁排程结果下发接口"),

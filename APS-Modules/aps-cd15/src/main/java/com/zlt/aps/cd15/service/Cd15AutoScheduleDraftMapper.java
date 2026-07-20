@@ -34,8 +34,14 @@ public class Cd15AutoScheduleDraftMapper {
         result.setScheduleDate(date(scheduleDate));
         result.setCd15BatchNo(batchNo);
         result.setOrderNo(orderNo);
-        result.setGroupNo(orderNo);
+        result.setGroupNo(draft.getSplitGroupKey() == null ? null : orderNo);
         result.setSteelStripCode(draft.getSteelStripCode());
+        result.setMaterialKey(draft.getMaterialKey());
+        result.setCraftWidth(draft.getCraftWidth());
+        result.setUnitConsumeMillimeter(draft.getUnitConsumeMillimeter());
+        result.setCurlLength(draft.getCurlLength());
+        result.setCordWidth(draft.getCordWidth());
+        result.setBigRollConsumeQty(draft.getBigRollConsumeQuantity());
         result.setCxBatchNo(draft.getCxBatchNo());
         result.setCxMachineCodes(draft.getCxMachineCodes());
         result.setPlanSurplusQty(draft.getPlanSurplusQty());
@@ -46,6 +52,7 @@ public class Cd15AutoScheduleDraftMapper {
         result.setStorageLaneCode(draft.getPrimaryLaneCode());
         result.setSourceType("AUTO");
         result.setReleaseStatus("0");
+        result.setPublishSuccessCount(0);
         result.setIsLocked("0");
         if (draft.getShiftSlots() != null) {
             draft.getShiftSlots().forEach(slot -> applySlot(result, slot));

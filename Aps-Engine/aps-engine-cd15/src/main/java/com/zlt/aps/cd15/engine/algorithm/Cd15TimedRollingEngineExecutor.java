@@ -68,6 +68,7 @@ public class Cd15TimedRollingEngineExecutor {
     private final Cd15ExistingScheduleResourceReserver existingResourceReserver;
     private final Cd15SingleShiftScheduleExecutor singleShiftExecutor;
     private final Cd15UnscheduledResultAggregator unscheduledResultAggregator;
+    private final Cd15BigRollMeterCalculator bigRollMeterCalculator;
 
     /** 读取原批次，在内存副本上从目标班开始滚动并输出差异。 */
     public Cd15TimedRollingOutput execute(Cd15RollingTarget target, String inputVersion,
@@ -127,7 +128,7 @@ public class Cd15TimedRollingEngineExecutor {
                     .filter(item -> readPlan(item, shift.getClassField()).signum() > 0)
                     .filter(item -> isLocked(item, shift.getClassField()))
                     .collect(Collectors.toList());
-            existingResourceReserver.reserve(context, shift, state, locked, sourceLanes);
+            existingResourceReserver.reserve(context, shift, state, locked, sourceLanes, input);
             List<Cd15RollingPendingTask> originals = sourceResults.stream()
                     .filter(item -> readPlan(item, shift.getClassField()).signum() > 0)
                     .filter(item -> !isLocked(item, shift.getClassField()))
@@ -181,7 +182,8 @@ public class Cd15TimedRollingEngineExecutor {
                         .cuttingAngle(item.getCuttingAngle())
                         .craftWidth(item.getCraftWidth())
                         .unitConsumeMillimeter(item.getUnitConsumeMillimeter())
-                        .reinforcement(item.isReinforcement())
+                        .cordWidth(item.getCordWidth())
+                        .curlLength(item.getCurlLength())
                         .stableOrder(Integer.MAX_VALUE)
                         .urgentCurrentShiftShortage(item.isShortageInCurrentShift()).build())
                 .collect(Collectors.toList());
@@ -205,7 +207,8 @@ public class Cd15TimedRollingEngineExecutor {
                 task.setCuttingAngle(source.getCuttingAngle());
                 task.setCraftWidth(source.getCraftWidth());
                 task.setUnitConsumeMillimeter(source.getUnitConsumeMillimeter());
-                task.setReinforcement(source.isReinforcement());
+                task.setCordWidth(source.getCordWidth());
+                task.setCurlLength(source.getCurlLength());
             }
             candidate.setMaterialKey(source == null
                     ? task.getMaterialKey() : source.getMaterialKey());
@@ -217,8 +220,10 @@ public class Cd15TimedRollingEngineExecutor {
                     ? task.getCraftWidth() : source.getCraftWidth());
             candidate.setUnitConsumeMillimeter(source == null
                     ? task.getUnitConsumeMillimeter() : source.getUnitConsumeMillimeter());
-            candidate.setReinforcement(source == null
-                    ? task.isReinforcement() : source.isReinforcement());
+            candidate.setCordWidth(source == null
+                    ? task.getCordWidth() : source.getCordWidth());
+            candidate.setCurlLength(source == null
+                    ? task.getCurlLength() : source.getCurlLength());
             candidate.setCutMode(task.getCutMode());
             candidate.setSplitGroupKey(task.getSplitGroupKey());
             candidate.setSourceMachineCode(task.getSourceMachineCode());
@@ -324,6 +329,8 @@ public class Cd15TimedRollingEngineExecutor {
         committedTasks.stream().filter(task -> affectedShifts.stream().anyMatch(
                 shift -> Objects.equals(shift.getClassField(), task.getClassField())))
                 .forEach(task -> applyTask(target, workingById, insertedByKey, lanes, task));
+        workingById.values().forEach(this::recalculateBigRollConsumption);
+        insertedByKey.values().forEach(this::recalculateBigRollConsumption);
         List<Cd15ScheduleResult> updated = workingById.values().stream()
                 .filter(item -> !affectedFingerprint(item, affectedShifts).equals(
                         affectedFingerprint(beforeById.get(item.getId()), affectedShifts)))
@@ -398,20 +405,30 @@ public class Cd15TimedRollingEngineExecutor {
                         .toUpperCase()
                 : "ROLLING-" + Integer.toHexString(key.hashCode()).toUpperCase();
         result.setOrderNo(rollingOrderNo);
-        result.setGroupNo(rollingOrderNo);
+        result.setGroupNo("SPLIT".equals(task.getCutMode()) ? rollingOrderNo : null);
         result.setSteelStripCode(task.getSteelStripCode());
         result.setBigRollCode(task.getBigRollCode());
+        result.setMaterialKey(task.getMaterialKey());
+        result.setCraftWidth(task.getCraftWidth());
+        result.setUnitConsumeMillimeter(task.getUnitConsumeMillimeter());
+        result.setCurlLength(task.getCurlLength());
+        result.setCordWidth(task.getCordWidth());
+        result.setBigRollConsumeQty(task.getBigRollConsumeQuantity());
         result.setCuttingAngle(task.getCuttingAngle());
         result.setCutMode(task.getCutMode());
         result.setMachineCode(task.getMachineCode());
         result.setSourceType("AUTO");
         result.setReleaseStatus("0");
+        result.setPublishSuccessCount(0);
         result.setIsLocked("0");
         return result;
     }
 
     private void writeTask(Cd15ScheduleResult result, Cd15ShiftScheduleTask task) {
         BeanWrapper wrapper = wrapper(result);
+        wrapper.setPropertyValue(property(task.getClassField(), "ScheduleDate"),
+                Date.from(task.getExpectedStartTime()
+                        .atZone(ZoneId.systemDefault()).toInstant()));
         wrapper.setPropertyValue(property(task.getClassField(), "PlanQty"),
                 task.getPlanQuantity().doubleValue());
         wrapper.setPropertyValue(property(task.getClassField(), "ProduceOrder"),
@@ -430,6 +447,29 @@ public class Cd15TimedRollingEngineExecutor {
         wrapper.setPropertyValue(property(classField, "Analysis"), null);
     }
 
+    /** 按结果全部班次计划量重算GDYY大卷消耗，避免滚动后保留旧汇总值。 */
+    private void recalculateBigRollConsumption(Cd15ScheduleResult result) {
+        if (result == null || result.getUnitConsumeMillimeter() == null
+                || result.getUnitConsumeMillimeter().signum() <= 0
+                || result.getCraftWidth() == null
+                || result.getCraftWidth().signum() <= 0
+                || result.getCordWidth() == null
+                || result.getCordWidth().signum() <= 0) {
+            throw new IllegalStateException("滚动结果缺少大卷消耗计算尺寸: "
+                    + (result == null ? null : result.getId()));
+        }
+        BigDecimal totalQuantity = BigDecimal.ZERO;
+        for (int classIndex = 1; classIndex <= 8; classIndex++) {
+            totalQuantity = totalQuantity.add(
+                    this.readPlan(result, "CLASS" + classIndex));
+        }
+        result.setBigRollConsumeQty(totalQuantity.signum() <= 0
+                ? BigDecimal.ZERO
+                : bigRollMeterCalculator.calculateForPlanQuantity(
+                        totalQuantity, result.getUnitConsumeMillimeter(),
+                        result.getCraftWidth(), result.getCordWidth()));
+    }
+
     private Cd15RollingPendingTask pending(Cd15ScheduleResult result,
                                            Cd15ShiftDescriptor shift) {
         BigDecimal quantity = readPlan(result, shift.getClassField());
@@ -445,15 +485,24 @@ public class Cd15TimedRollingEngineExecutor {
                 .cuttingAngle(result.getCuttingAngle())
                 .cutMode(result.getCutMode())
                 .splitGroupKey(result.getGroupNo())
+                .craftWidth(result.getCraftWidth())
+                .unitConsumeMillimeter(result.getUnitConsumeMillimeter())
+                .cordWidth(result.getCordWidth())
+                .curlLength(result.getCurlLength())
+                .bigRollConsumeQuantity(result.getBigRollConsumeQty())
                 .sourceMachineCode(result.getMachineCode())
                 .originalQuantity(quantity).remainingQuantity(quantity)
                 .stableOrder(defaultOrder(readOrder(result, shift.getClassField()))).build();
     }
 
     private String resultMaterialKey(Cd15ScheduleResult result) {
-        return String.valueOf(result.getSteelStripCode()) + "|"
-                + String.valueOf(result.getBigRollCode()) + "|"
-                + String.valueOf(result.getCuttingAngle());
+        if (result.getMaterialKey() == null
+                || result.getMaterialKey().trim().isEmpty()) {
+            throw new IllegalStateException(
+                    "原排程结果缺少MATERIAL_KEY，请先重新执行自动排程: "
+                            + result.getId());
+        }
+        return result.getMaterialKey();
     }
 
     private List<Cd15UnscheduleResult> toUnscheduled(

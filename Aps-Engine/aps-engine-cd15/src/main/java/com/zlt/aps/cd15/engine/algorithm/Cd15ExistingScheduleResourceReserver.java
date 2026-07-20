@@ -2,6 +2,9 @@ package com.zlt.aps.cd15.engine.algorithm;
 
 import com.zlt.aps.cd15.api.domain.entity.Cd15ScheduleLaneAllocation;
 import com.zlt.aps.cd15.api.domain.entity.Cd15ScheduleResult;
+import com.zlt.aps.cd15.engine.constant.Cd15CutMode;
+import com.zlt.aps.cd15.engine.model.Cd15AutoScheduleInput;
+import com.zlt.aps.cd15.engine.model.Cd15BigRollAgingAllocation;
 import com.zlt.aps.cd15.engine.model.Cd15AutoScheduleContext;
 import com.zlt.aps.cd15.engine.model.Cd15MachineCapacityTrial;
 import com.zlt.aps.cd15.engine.model.Cd15MachineResource;
@@ -19,6 +22,7 @@ import org.springframework.beans.PropertyAccessorFactory;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -36,13 +40,17 @@ public class Cd15ExistingScheduleResourceReserver {
 
     private final Cd15MachineResourceService machineResourceService;
     private final Cd15MachineCapacityCalculator capacityCalculator;
+    private final Cd15MachineModeResolver machineModeResolver;
+    private final Cd15BigRollMeterCalculator bigRollMeterCalculator;
+    private final Cd15BigRollAgingAllocator bigRollAgingAllocator;
 
     /** 将锁定任务按原机台和原顺序写入当前班资源快照。 */
     public void reserve(Cd15AutoScheduleContext context,
                         Cd15ShiftDescriptor shift,
                         Cd15ShiftResourceState state,
                         List<Cd15ScheduleResult> lockedResults,
-                        Map<Long, List<Cd15ScheduleLaneAllocation>> sourceLanes) {
+                        Map<Long, List<Cd15ScheduleLaneAllocation>> sourceLanes,
+                        Cd15AutoScheduleInput input) {
         if (lockedResults == null || lockedResults.isEmpty()) {
             return;
         }
@@ -55,14 +63,39 @@ public class Cd15ExistingScheduleResourceReserver {
                         Function.identity(), (left, right) -> left, LinkedHashMap::new));
         Map<Long, List<Cd15ScheduleLaneAllocation>> lanesByResult = sourceLanes == null
                 ? Collections.emptyMap() : sourceLanes;
-
-        lockedResults.stream().filter(Objects::nonNull)
+        safeMachines(snapshot).stream()
+                .filter(item -> item.getMachineCode() != null)
+                .forEach(machine -> state.getRemainingSecondsByMachine().putIfAbsent(
+                        machine.getMachineCode(), Math.max(0,
+                                shift.getDurationSeconds()
+                                        - machine.getMaintenanceSeconds())));
+        List<Cd15ScheduleResult> orderedResults = lockedResults.stream()
+                .filter(Objects::nonNull)
                 .sorted(Comparator.comparing(Cd15ScheduleResult::getMachineCode,
                                 Comparator.nullsLast(String::compareTo))
                         .thenComparing(item -> readOrder(item, shift.getClassField()),
                                 Comparator.nullsLast(Integer::compareTo)))
-                .forEach(result -> reserveOne(context, shift, state, result,
-                        machineByCode, lanesByResult));
+                .collect(Collectors.toList());
+        java.util.Set<String> processedGroups = new java.util.HashSet<>();
+        orderedResults.forEach(result -> {
+            if (!Cd15CutMode.SPLIT.equals(this.cutMode(result))) {
+                this.reserveOne(context, shift, state, result,
+                        machineByCode, lanesByResult, input);
+                return;
+            }
+            String groupKey = result.getGroupNo();
+            if (groupKey == null || groupKey.trim().isEmpty()) {
+                throw new IllegalStateException("锁定分裁任务缺少组号");
+            }
+            if (!processedGroups.add(groupKey)) {
+                return;
+            }
+            List<Cd15ScheduleResult> splitResults = orderedResults.stream()
+                    .filter(item -> groupKey.equals(item.getGroupNo()))
+                    .collect(Collectors.toList());
+            this.reserveSplit(context, shift, state, splitResults,
+                    machineByCode, lanesByResult, input);
+        });
     }
 
     private void reserveOne(Cd15AutoScheduleContext context,
@@ -70,22 +103,36 @@ public class Cd15ExistingScheduleResourceReserver {
                             Cd15ShiftResourceState state,
                             Cd15ScheduleResult result,
                             Map<String, Cd15MachineResource> machineByCode,
-                            Map<Long, List<Cd15ScheduleLaneAllocation>> lanesByResult) {
+                            Map<Long, List<Cd15ScheduleLaneAllocation>> lanesByResult,
+                            Cd15AutoScheduleInput input) {
         BigDecimal quantity = readPlan(result, shift.getClassField());
         if (quantity.signum() <= 0) {
             return;
         }
+        this.validateMaterial(result);
         Cd15MachineResource machine = machineByCode.get(result.getMachineCode());
-        if (machine == null || machine.getQuota() == null || machine.getQuota().signum() <= 0) {
+        if (machine == null || !machineModeResolver.matches(machine, false)) {
             throw new IllegalStateException("锁定任务原机台不可用: " + result.getMachineCode());
+        }
+        BigDecimal shiftCapacity = machineModeResolver.capacity(machine, false);
+        if (shiftCapacity == null || shiftCapacity.signum() <= 0) {
+            throw new IllegalStateException("锁定任务原机台单裁能力未维护: " + result.getMachineCode());
         }
         int remainingSeconds = state.getRemainingSecondsByMachine()
                 .getOrDefault(result.getMachineCode(), 0);
         Cd15MachineTailState currentTail = Cd15MachineTailState.builder()
-                .steelStripCode(result.getSteelStripCode()).bigRollCode(result.getBigRollCode()).build();
+                .materialKey(result.getMaterialKey())
+                .steelStripCode(result.getSteelStripCode())
+                .bigRollCode(result.getBigRollCode())
+                .cuttingAngle(result.getCuttingAngle()).build();
+        BigDecimal bigRollConsume = this.bigRollConsume(result, quantity);
+        Cd15BigRollAgingAllocation agingAllocation = this.reserveBigRoll(
+                state, result, bigRollConsume, shift, remainingSeconds, input);
+        int availableSeconds = Math.max(0,
+                remainingSeconds - agingAllocation.getDelaySeconds());
         Cd15MachineCapacityTrial trial = capacityCalculator.calculateWithRemainingSeconds(
-                machine.getQuota(), Math.max(1, shift.getDurationSeconds() / 3600),
-                remainingSeconds, state.getTailByMachine().get(result.getMachineCode()),
+                shiftCapacity, Math.max(1, shift.getDurationSeconds() / 3600),
+                availableSeconds, state.getTailByMachine().get(result.getMachineCode()),
                 currentTail, context.getParameters().getSameRollDiffSpecChangeMinutes(),
                 context.getParameters().getDiffRollSameSpecChangeMinutes(),
                 context.getParameters().getDiffRollDiffSpecChangeMinutes(), quantity);
@@ -105,16 +152,169 @@ public class Cd15ExistingScheduleResourceReserver {
                 result.getMachineCode(), trial.getRemainingSeconds());
         state.getTailByMachine().put(result.getMachineCode(), currentTail);
         state.getTailSpecByMachine().put(result.getMachineCode(), result.getSteelStripCode());
+        LocalDateTime expectedStart = agingAllocation.getTaskStartTime();
+        LocalDateTime expectedEnd = expectedStart.plusSeconds(
+                trial.getChangeSeconds() + trial.getProductionSeconds());
         state.getTasks().add(Cd15ShiftScheduleTask.builder()
                 .classField(shift.getClassField())
                 .sourceTaskKey(result.getId() + ":" + shift.getClassField())
                 .sourceResultId(result.getId())
-                .steelStripCode(result.getSteelStripCode()).bigRollCode(result.getBigRollCode())
+                .materialKey(result.getMaterialKey())
+                .steelStripCode(result.getSteelStripCode())
+                .bigRollCode(result.getBigRollCode())
+                .cuttingAngle(result.getCuttingAngle())
+                .craftWidth(result.getCraftWidth())
+                .unitConsumeMillimeter(result.getUnitConsumeMillimeter())
+                .cordWidth(result.getCordWidth()).curlLength(result.getCurlLength())
+                .bigRollConsumeQuantity(bigRollConsume)
+                .cutMode(Cd15CutMode.SINGLE)
                 .cordSpec(result.getSteelStripCode()).machineCode(result.getMachineCode())
                 .planQuantity(quantity).vehicleCount(vehicleCount)
                 .produceOrder(defaultOrder(readOrder(result, shift.getClassField())))
-                .expectedStartTime(shift.getStartTime()).expectedEndTime(shift.getEndTime())
+                .expectedStartTime(expectedStart).expectedEndTime(expectedEnd)
                 .laneAllocations(allocations).build());
+    }
+
+    /** 锁定分裁组按一次机台作业恢复，两条库排和大卷占用一起提交。 */
+    private void reserveSplit(
+            Cd15AutoScheduleContext context,
+            Cd15ShiftDescriptor shift,
+            Cd15ShiftResourceState state,
+            List<Cd15ScheduleResult> splitResults,
+            Map<String, Cd15MachineResource> machineByCode,
+            Map<Long, List<Cd15ScheduleLaneAllocation>> lanesByResult,
+            Cd15AutoScheduleInput input) {
+        if (splitResults.size() != 2) {
+            throw new IllegalStateException("锁定分裁组必须包含两条排程结果");
+        }
+        Cd15ScheduleResult first = splitResults.get(0);
+        Cd15ScheduleResult second = splitResults.get(1);
+        BigDecimal firstQuantity = this.readPlan(first, shift.getClassField());
+        BigDecimal secondQuantity = this.readPlan(second, shift.getClassField());
+        if (firstQuantity.signum() <= 0 || secondQuantity.signum() <= 0
+                || Objects.equals(first.getSteelStripCode(), second.getSteelStripCode())
+                || !Objects.equals(first.getMachineCode(), second.getMachineCode())
+                || !Objects.equals(first.getBigRollCode(), second.getBigRollCode())
+                || !Objects.equals(first.getCuttingAngle(), second.getCuttingAngle())) {
+            throw new IllegalStateException("锁定分裁组必须是同机台、同大卷、同角度的两条不同钢带计划");
+        }
+        Integer firstOrder = this.readOrder(first, shift.getClassField());
+        Integer secondOrder = this.readOrder(second, shift.getClassField());
+        if (firstOrder == null || firstOrder <= 0
+                || !Objects.equals(firstOrder, secondOrder)) {
+            throw new IllegalStateException("锁定分裁组两条结果必须共用生产顺序");
+        }
+        this.validateMaterial(first);
+        this.validateMaterial(second);
+        Cd15MachineResource machine = machineByCode.get(first.getMachineCode());
+        if (machine == null || !machineModeResolver.matches(machine, true)) {
+            throw new IllegalStateException("锁定分裁组原机台当前模式不可用: "
+                    + first.getMachineCode());
+        }
+        BigDecimal firstShiftCapacity = machineModeResolver.capacity(machine, true);
+        BigDecimal secondShiftCapacity = machineModeResolver.capacity(machine, true);
+        if (firstShiftCapacity == null || firstShiftCapacity.signum() <= 0
+                || secondShiftCapacity == null || secondShiftCapacity.signum() <= 0) {
+            throw new IllegalStateException("锁定分裁组原机台分裁能力未维护");
+        }
+        int remainingSeconds = state.getRemainingSecondsByMachine()
+                .getOrDefault(first.getMachineCode(), 0);
+        BigDecimal firstConsume = this.bigRollConsume(first, firstQuantity);
+        BigDecimal secondConsume = this.bigRollConsume(second, secondQuantity);
+        Cd15BigRollAgingAllocation agingAllocation = this.reserveBigRoll(
+                state, first, firstConsume.add(secondConsume), shift,
+                remainingSeconds, input);
+        int availableSeconds = Math.max(0,
+                remainingSeconds - agingAllocation.getDelaySeconds());
+        Cd15MachineTailState splitTail = Cd15MachineTailState.builder()
+                .materialKey(first.getGroupNo())
+                .steelStripCode(first.getSteelStripCode()
+                        + "+" + second.getSteelStripCode())
+                .bigRollCode(first.getBigRollCode())
+                .cuttingAngle(first.getCuttingAngle()).build();
+        Cd15MachineTailState previousTail = state.getTailByMachine()
+                .get(first.getMachineCode());
+        int shiftHours = Math.max(1, shift.getDurationSeconds() / 3600);
+        Cd15MachineCapacityTrial firstTrial = capacityCalculator
+                .calculateWithRemainingSeconds(firstShiftCapacity, shiftHours,
+                        availableSeconds, previousTail, splitTail,
+                        context.getParameters().getSameRollDiffSpecChangeMinutes(),
+                        context.getParameters().getDiffRollSameSpecChangeMinutes(),
+                        context.getParameters().getDiffRollDiffSpecChangeMinutes(),
+                        firstQuantity);
+        Cd15MachineCapacityTrial secondTrial = capacityCalculator
+                .calculateWithRemainingSeconds(secondShiftCapacity, shiftHours,
+                        availableSeconds, previousTail, splitTail,
+                        context.getParameters().getSameRollDiffSpecChangeMinutes(),
+                        context.getParameters().getDiffRollSameSpecChangeMinutes(),
+                        context.getParameters().getDiffRollDiffSpecChangeMinutes(),
+                        secondQuantity);
+        int changeSeconds = Math.max(firstTrial.getChangeSeconds(),
+                secondTrial.getChangeSeconds());
+        int productionSeconds = Math.max(firstTrial.getProductionSeconds(),
+                secondTrial.getProductionSeconds());
+        if (!firstTrial.isFullyAccommodated() || !secondTrial.isFullyAccommodated()
+                || changeSeconds + productionSeconds > availableSeconds) {
+            throw new IllegalStateException("锁定分裁组超过原机台剩余产能");
+        }
+        List<Cd15StorageLaneAllocation> firstAllocations = this.reserveLanes(
+                shift, state, first, lanesByResult.getOrDefault(
+                        first.getId(), Collections.emptyList()));
+        List<Cd15StorageLaneAllocation> secondAllocations = this.reserveLanes(
+                shift, state, second, lanesByResult.getOrDefault(
+                        second.getId(), Collections.emptyList()));
+        int firstVehicles = firstAllocations.stream()
+                .mapToInt(Cd15StorageLaneAllocation::getVehicleCount).sum();
+        int secondVehicles = secondAllocations.stream()
+                .mapToInt(Cd15StorageLaneAllocation::getVehicleCount).sum();
+        if (state.getOccupiedToolingCount() + firstVehicles + secondVehicles
+                > state.getTotalToolingCount()) {
+            throw new IllegalStateException("锁定分裁组占用工装超过当前可用数量");
+        }
+        state.setOccupiedToolingCount(state.getOccupiedToolingCount()
+                + firstVehicles + secondVehicles);
+        int afterSeconds = availableSeconds - changeSeconds - productionSeconds;
+        state.getRemainingSecondsByMachine().put(first.getMachineCode(), afterSeconds);
+        state.getTailByMachine().put(first.getMachineCode(), splitTail);
+        state.getTailSpecByMachine().put(first.getMachineCode(),
+                first.getSteelStripCode() + "+" + second.getSteelStripCode());
+        LocalDateTime expectedStart = agingAllocation.getTaskStartTime();
+        LocalDateTime expectedEnd = expectedStart.plusSeconds(
+                changeSeconds + productionSeconds);
+        state.getTasks().add(this.lockedSplitTask(first, shift, firstQuantity,
+                firstConsume, firstVehicles, firstAllocations,
+                firstOrder, expectedStart, expectedEnd));
+        state.getTasks().add(this.lockedSplitTask(second, shift, secondQuantity,
+                secondConsume, secondVehicles, secondAllocations,
+                firstOrder, expectedStart, expectedEnd));
+    }
+
+    private Cd15ShiftScheduleTask lockedSplitTask(
+            Cd15ScheduleResult result,
+            Cd15ShiftDescriptor shift,
+            BigDecimal quantity,
+            BigDecimal bigRollConsume,
+            int vehicleCount,
+            List<Cd15StorageLaneAllocation> allocations,
+            int produceOrder,
+            LocalDateTime expectedStart,
+            LocalDateTime expectedEnd) {
+        return Cd15ShiftScheduleTask.builder()
+                .classField(shift.getClassField())
+                .sourceTaskKey(result.getId() + ":" + shift.getClassField())
+                .sourceResultId(result.getId()).materialKey(result.getMaterialKey())
+                .steelStripCode(result.getSteelStripCode())
+                .bigRollCode(result.getBigRollCode())
+                .cuttingAngle(result.getCuttingAngle())
+                .craftWidth(result.getCraftWidth())
+                .unitConsumeMillimeter(result.getUnitConsumeMillimeter())
+                .cordWidth(result.getCordWidth()).curlLength(result.getCurlLength())
+                .bigRollConsumeQuantity(bigRollConsume)
+                .cutMode(Cd15CutMode.SPLIT).splitGroupKey(result.getGroupNo())
+                .cordSpec(result.getSteelStripCode()).machineCode(result.getMachineCode())
+                .planQuantity(quantity).vehicleCount(vehicleCount)
+                .produceOrder(produceOrder).expectedStartTime(expectedStart)
+                .expectedEndTime(expectedEnd).laneAllocations(allocations).build();
     }
 
     private List<Cd15StorageLaneAllocation> reserveLanes(
@@ -150,6 +350,72 @@ public class Cd15ExistingScheduleResourceReserver {
                     .laneCode(row.getStorageLaneCode()).vehicleCount(vehicles).build());
         });
         return allocations;
+    }
+
+    private String cutMode(Cd15ScheduleResult result) {
+        String mode = result == null || result.getCutMode() == null
+                ? "" : result.getCutMode().trim().toUpperCase();
+        if (!Cd15CutMode.SINGLE.equals(mode)
+                && !Cd15CutMode.SPLIT.equals(mode)) {
+            throw new IllegalStateException("锁定排程结果裁断模式必须为SINGLE或SPLIT");
+        }
+        return mode;
+    }
+
+    private void validateMaterial(Cd15ScheduleResult result) {
+        if (result == null || result.getMaterialKey() == null
+                || result.getMaterialKey().trim().isEmpty()
+                || result.getBigRollCode() == null
+                || result.getBigRollCode().trim().isEmpty()
+                || result.getCuttingAngle() == null
+                || result.getCuttingAngle().trim().isEmpty()
+                || result.getCraftWidth() == null
+                || result.getCraftWidth().signum() <= 0
+                || result.getUnitConsumeMillimeter() == null
+                || result.getUnitConsumeMillimeter().signum() <= 0
+                || result.getCordWidth() == null
+                || result.getCordWidth().signum() <= 0) {
+            throw new IllegalStateException("锁定排程结果缺少完整施工尺寸: "
+                    + (result == null ? null : result.getId()));
+        }
+    }
+
+    private BigDecimal bigRollConsume(Cd15ScheduleResult result,
+                                      BigDecimal quantity) {
+        return bigRollMeterCalculator.calculateForPlanQuantity(
+                quantity, result.getUnitConsumeMillimeter(),
+                result.getCraftWidth(), result.getCordWidth());
+    }
+
+    private Cd15BigRollAgingAllocation reserveBigRoll(
+            Cd15ShiftResourceState state,
+            Cd15ScheduleResult result,
+            BigDecimal consumption,
+            Cd15ShiftDescriptor shift,
+            int remainingSeconds,
+            Cd15AutoScheduleInput input) {
+        if (input != null && input.getBigRollAgingDataMissingCodes() != null
+                && input.getBigRollAgingDataMissingCodes().contains(
+                        result.getBigRollCode())) {
+            throw new IllegalStateException("锁定任务GDYY大卷资料缺失: "
+                    + result.getBigRollCode());
+        }
+        if (state.getBigRollAgingStocks() == null
+                || state.getBigRollAgingStocks().isEmpty()) {
+            throw new IllegalStateException("锁定任务没有可用GDYY成熟大卷: "
+                    + result.getBigRollCode());
+        }
+        int fullSeconds = Math.max(1, shift.getDurationSeconds());
+        LocalDateTime originalStart = shift.getStartTime().plusSeconds(
+                Math.max(0, fullSeconds - remainingSeconds));
+        Cd15BigRollAgingAllocation allocation = bigRollAgingAllocator.allocate(
+                state.getBigRollAgingStocks(), result.getBigRollCode(),
+                consumption, originalStart);
+        if (!allocation.isSuccess()) {
+            throw new IllegalStateException("锁定任务GDYY大卷库存或成熟时间不足: "
+                    + result.getBigRollCode());
+        }
+        return allocation;
     }
 
     private BigDecimal readPlan(Cd15ScheduleResult result, String classField) {

@@ -67,6 +67,7 @@ public class Cd15AutoScheduleOutputDraftBuilder {
             String resultKey = resultKey(task);
             Cd15ScheduleResultDraft result = resultByKey.computeIfAbsent(resultKey,
                     key -> newResultDraft(key, task, sourceTraceBySteelStrip));
+            this.mergeBigRollConsumption(result, task);
             // 同一主结果可能由多个任务段组成，每个任务段使用的库排都要汇总到主表展示字段。
             mergePrimaryLaneCodes(result, task);
             mergeSlot(result, task, shiftDates.get(task.getClassField()));
@@ -111,6 +112,11 @@ public class Cd15AutoScheduleOutputDraftBuilder {
                 .steelStripCode(task.getSteelStripCode())
                 .bigRollCode(task.getBigRollCode()).cordSpec(task.getCordSpec())
                 .cuttingAngle(task.getCuttingAngle())
+                .craftWidth(task.getCraftWidth())
+                .unitConsumeMillimeter(task.getUnitConsumeMillimeter())
+                .curlLength(task.getCurlLength())
+                .cordWidth(task.getCordWidth())
+                .bigRollConsumeQuantity(BigDecimal.ZERO)
                 .cutMode(task.getCutMode())
                 .splitGroupKey(task.getSplitGroupKey())
                 .cxBatchNo(sourceTrace == null ? null : sourceTrace.getCxBatchNo())
@@ -118,6 +124,16 @@ public class Cd15AutoScheduleOutputDraftBuilder {
                 .planSurplusQty(sourceTrace == null ? null : sourceTrace.getPlanSurplusQty())
                 .machineCode(task.getMachineCode())
                 .dataSource(AUTO_SOURCE).shiftSlots(new ArrayList<>()).build();
+    }
+
+    /** 同一材料跨任务段归并时累计GDYY大卷占用量。 */
+    private void mergeBigRollConsumption(
+            Cd15ScheduleResultDraft result, Cd15ShiftScheduleTask task) {
+        BigDecimal existing = result.getBigRollConsumeQuantity() == null
+                ? BigDecimal.ZERO : result.getBigRollConsumeQuantity();
+        BigDecimal current = task.getBigRollConsumeQuantity() == null
+                ? BigDecimal.ZERO : task.getBigRollConsumeQuantity();
+        result.setBigRollConsumeQuantity(existing.add(current));
     }
 
     /** 按任务出现顺序汇总主结果使用过的库排号，并在跨任务场景下去重。 */

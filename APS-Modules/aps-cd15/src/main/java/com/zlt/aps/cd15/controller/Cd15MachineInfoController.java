@@ -51,6 +51,10 @@ public class Cd15MachineInfoController extends AbstractDocBizController<Cd15Mach
     @ApiOperation("新增斜裁机台")
     @PostMapping("/add")
     public AjaxResult add(@RequestBody Cd15MachineInfo machineInfo) {
+        AjaxResult validateResult = cd15MachineInfoService.validateForSave(machineInfo);
+        if (validateResult != null) {
+            return validateResult;
+        }
         return super.save(machineInfo);
     }
 
@@ -59,6 +63,10 @@ public class Cd15MachineInfoController extends AbstractDocBizController<Cd15Mach
     @ApiOperation("编辑斜裁机台")
     @PostMapping("/edit")
     public AjaxResult edit(@RequestBody Cd15MachineInfo machineInfo) {
+        AjaxResult validateResult = cd15MachineInfoService.validateForSave(machineInfo);
+        if (validateResult != null) {
+            return validateResult;
+        }
         return super.save(machineInfo);
     }
 

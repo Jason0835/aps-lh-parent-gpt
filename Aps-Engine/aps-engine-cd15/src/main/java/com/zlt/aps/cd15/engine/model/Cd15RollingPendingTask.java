@@ -38,9 +38,13 @@ public class Cd15RollingPendingTask {
     private BigDecimal craftWidth;
     /** 单耗，单位毫米/条。 */
     private BigDecimal unitConsumeMillimeter;
-    /** 是否加强层。 */
-    private boolean reinforcement;
-    /** 裁断模式：SINGLE或SPLIT。 */
+    /** 大卷幅宽，单位毫米。 */
+    private BigDecimal cordWidth;
+    /** 标准卷曲长度，单位米。 */
+    private BigDecimal curlLength;
+    /** 当前已排部分的GDYY大卷占用量，单位米。 */
+    private BigDecimal bigRollConsumeQuantity;
+        /** 裁断模式：SINGLE或SPLIT。 */
     private String cutMode;
     /** 分裁组合稳定键。 */
     private String splitGroupKey;

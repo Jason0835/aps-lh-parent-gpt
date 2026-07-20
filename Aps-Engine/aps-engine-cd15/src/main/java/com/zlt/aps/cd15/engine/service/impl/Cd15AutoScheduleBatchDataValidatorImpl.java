@@ -5,6 +5,7 @@ import com.zlt.aps.cd15.api.domain.entity.Cd15AngleWidthMapping;
 import com.zlt.aps.cd15.api.domain.entity.Cd15CurlLength;
 import com.zlt.aps.cd15.api.domain.entity.Cd15MachineInfo;
 import com.zlt.aps.cd15.api.domain.entity.Cd15ShiftConfig;
+import com.zlt.aps.cd15.engine.constant.Cd15CutMode;
 import com.zlt.aps.cd15.engine.algorithm.Cd15ShiftWindowResolver;
 import com.zlt.aps.cd15.engine.mapper.Cd15EngineAngleWidthMappingMapper;
 import com.zlt.aps.cd15.engine.mapper.Cd15EngineConstructionMapper;
@@ -151,16 +152,51 @@ public class Cd15AutoScheduleBatchDataValidatorImpl implements Cd15AutoScheduleB
         return schedules;
     }
 
-    /** 检查至少存在一台启用斜裁机台。 */
+    /** 检查启用机台及其当前模式所需班产能力。 */
     private void checkMachineInfo(Cd15BatchDataCheckResult.Builder builder, String factoryCode) {
-        Long count = machineInfoMapper.selectCount(Wrappers.<Cd15MachineInfo>lambdaQuery()
+        List<Cd15MachineInfo> machines = machineInfoMapper.selectList(
+                Wrappers.<Cd15MachineInfo>lambdaQuery()
                 .eq(Cd15MachineInfo::getFactoryCode, factoryCode)
                 .eq(Cd15MachineInfo::getStatus, ApsConstant.APS_STRING_1));
-        if (count == null || count == 0L) {
+        if (machines == null || machines.isEmpty()) {
             builder.addError("机台档案", DATA_MISSING,
                     "未找到启用的斜裁机台",
                     "请在斜裁机台档案页面启用至少一台机台");
+            return;
         }
+        machines.forEach(machine -> this.checkMachineModeCapacity(builder, machine));
+    }
+
+    /** 当前模式能力是自动排程唯一产能口径，不再回退历史生产定额。 */
+    private void checkMachineModeCapacity(Cd15BatchDataCheckResult.Builder builder,
+                                          Cd15MachineInfo machine) {
+        String machineCode = Objects.toString(machine.getMachineCode(), "");
+        String mode = machine.getDefaultCutMode();
+        if (!Cd15CutMode.SINGLE.equals(mode)
+                && !Cd15CutMode.SPLIT.equals(mode)
+                && !Cd15CutMode.DAILY_OUTPUT.equals(mode)) {
+            builder.addError("机台档案", DATA_MISSING,
+                    "机台 " + machineCode + " 默认裁断模式缺失或无效",
+                    "请维护SINGLE、SPLIT或DAILY_OUTPUT裁断模式");
+            return;
+        }
+        if ((Cd15CutMode.SINGLE.equals(mode) || Cd15CutMode.DAILY_OUTPUT.equals(mode))
+                && !this.positive(machine.getSingleShiftCapacity())) {
+            builder.addError("机台档案", DATA_MISSING,
+                    "机台 " + machineCode + " 单裁班产能力缺失或非正",
+                    "请维护大于0的单裁班产能力（米/班）");
+        }
+        if ((Cd15CutMode.SPLIT.equals(mode) || Cd15CutMode.DAILY_OUTPUT.equals(mode))
+                && !this.positive(machine.getSplitShiftCapacity())) {
+            builder.addError("机台档案", DATA_MISSING,
+                    "机台 " + machineCode + " 分裁班产能力缺失或非正",
+                    "请维护大于0的分裁班产能力（米/班）");
+        }
+    }
+
+    /** 判断数值字段是否已维护有效正数。 */
+    private boolean positive(Double value) {
+        return value != null && value > 0D;
     }
 
     /** 检查施工记录和施工层位字段。 */
@@ -275,10 +311,10 @@ public class Cd15AutoScheduleBatchDataValidatorImpl implements Cd15AutoScheduleB
 
         IntStream.rangeClosed(1, CONSTRUCTION_LAYERS)
                 .forEach(layer -> this.checkMainLayer(builder, construction, scope, prefix, cuttingAngle, layer));
-        this.checkReinforcement(builder, construction, scope, prefix, cuttingAngle,
+        this.checkOptionalLayer(builder, construction, scope, prefix, cuttingAngle,
                 "左加强层", "BELT_CODE_LEFT_CODE", "BELT_CODE_LEFT_CRAFT", "BELT_CODE_LEFT_LENGTH",
                 "beltCodeLeftCode", "beltCodeLeftCraft", "beltCodeLeftLength");
-        this.checkReinforcement(builder, construction, scope, prefix, cuttingAngle,
+        this.checkOptionalLayer(builder, construction, scope, prefix, cuttingAngle,
                 "右加强层", "BELT_CODE_RIGHT_CODE", "BELT_CODE_RIGHT_CRAFT", "BELT_CODE_RIGHT_LENGTH",
                 "beltCodeRightCode", "beltCodeRightCraft", "beltCodeRightLength");
     }
@@ -311,8 +347,8 @@ public class Cd15AutoScheduleBatchDataValidatorImpl implements Cd15AutoScheduleB
         }
     }
 
-    /** 校验左右加强层字段。 */
-    private void checkReinforcement(Cd15BatchDataCheckResult.Builder builder,
+    /** 按与BELT_CODE1/2/3相同的规则校验左右可选层位字段。 */
+    private void checkOptionalLayer(Cd15BatchDataCheckResult.Builder builder,
                                     MdmConstructionInfo construction,
                                     ConstructionCheckScope scope,
                                     String prefix,
@@ -341,7 +377,7 @@ public class Cd15AutoScheduleBatchDataValidatorImpl implements Cd15AutoScheduleB
                     prefix + layerName + "钢带 " + steelStripCode + " 单耗缺失或非正(" + lengthColumn + ")",
                     "请维护 " + lengthColumn + " 且大于0");
         }
-        log.debug("[斜裁自动排程] 已纳入加强层检查, column={}, steelStripCode={}", codeColumn, steelStripCode);
+        log.debug("[斜裁自动排程] 已纳入可选钢带层位检查, column={}, steelStripCode={}", codeColumn, steelStripCode);
     }
 
     /** 检查施工材料使用到的卷曲长度配置。 */
