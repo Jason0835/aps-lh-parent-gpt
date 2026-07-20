@@ -100,11 +100,10 @@ public class SyncScheduleTask {
             } else {
                 logger.info("querySyncDatasByType-003: 可同步数据数: " + lists.size());
             }
+            return lists;
         } finally {
             DynamicDataSourceContextHolder.poll();
         }
-
-        return lists;
     }
 
     /**

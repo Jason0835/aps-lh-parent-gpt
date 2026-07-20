@@ -1,5 +1,6 @@
 package com.zlt.sync.aspectj;
 
+import com.zlt.aps.itf.constant.DataSource;
 import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
 import com.zlt.sync.domain.AuxReqSyncDataLogsHis;
 import com.zlt.sync.mapper.AuxReqSyncDataLogsHisMapper;
