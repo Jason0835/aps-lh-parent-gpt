@@ -15,7 +15,7 @@ class GsqScheduleResultTest {
 	
 	@Test
 	public void test() throws IOException {
-	    gsqEngineService.autoGsqSchedule("2025-06-30");
+	    gsqEngineService.autoGsqSchedule("2025-06-30", "默认分厂");
 	}
 
 }

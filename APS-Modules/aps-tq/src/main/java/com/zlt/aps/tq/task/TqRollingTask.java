@@ -1,6 +1,9 @@
 package com.zlt.aps.tq.task;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.zlt.aps.itf.mes.IMesItfService;
+import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
 import com.zlt.aps.tq.api.domain.entity.TqScheduleResult;
 import com.zlt.aps.tq.engine.vo.RollingUpdateResult;
 import com.zlt.aps.tq.mapper.TqScheduleResultMapper;
@@ -24,6 +27,7 @@ import java.util.stream.Collectors;
  *   <li>在定时任务管理界面配置任务，调用目标示例：tqRollingTask.autoRollingUpdate()</li>
  *   <li>预警频率通过系统定时任务的cron表达式配置</li>
  *   <li>建议在班次开始前一段时间执行，以便提前发现排程冲突</li>
+ *   <li>执行滚动更新前会先调用MES接口同步胎圈库存，保证库存基准为准实时数据</li>
  * </ol>
  *
  * @author APS
@@ -39,9 +43,16 @@ public class TqRollingTask {
     private TqScheduleResultMapper tqScheduleResultMapper;
 
     /**
+     * MES接口Feign服务（用于滚动更新前同步胎圈库存，保证库存基准为准实时数据）
+     */
+    @Autowired
+    private IMesItfService mesItfService;
+
+    /**
      * 自动滚动更新（当天所有机台）
      *
      * <p>扫描当天所有机台的排程数据，逐机台执行滚动更新。</p>
+     * <p>执行前会先同步一次MES胎圈库存，避免使用滞后的库存快照做推算。</p>
      * <p>调用目标：tqRollingTask.autoRollingUpdate()</p>
      */
     public void autoRollingUpdate() {
@@ -49,6 +60,10 @@ public class TqRollingTask {
         long startTime = System.currentTimeMillis();
         try {
             Date today = new Date();
+
+            // 滚动更新前先同步MES胎圈库存，保证库存基准为准实时数据
+            // 同步失败不阻断主流程，仅记录警告，按现有本地最新库存继续推算
+            syncMesTqStockBeforeRolling();
 
             // 查询当天所有机台编号
             LambdaQueryWrapper<TqScheduleResult> wrapper = new LambdaQueryWrapper<>();
@@ -113,6 +128,7 @@ public class TqRollingTask {
     /**
      * 自动滚动更新（指定机台）
      *
+     * <p>执行前会先同步一次MES胎圈库存，避免使用滞后的库存快照做推算。</p>
      * <p>调用目标：tqRollingTask.autoRollingUpdateByMachine('M001')</p>
      *
      * @param machineCode 机台编号
@@ -122,6 +138,11 @@ public class TqRollingTask {
         long startTime = System.currentTimeMillis();
         try {
             Date today = new Date();
+
+            // 滚动更新前先同步MES胎圈库存，保证库存基准为准实时数据
+            // 同步失败不阻断主流程，仅记录警告，按现有本地最新库存继续推算
+            syncMesTqStockBeforeRolling();
+
             TqScheduleResult firstSchedule = getFirstSchedule(today, machineCode);
             if (firstSchedule == null) {
                 log.info("胎圈排程自动滚动更新：机台{}当天无排程数据", machineCode);
@@ -139,6 +160,31 @@ public class TqRollingTask {
             }
         } catch (Exception e) {
             log.error("胎圈排程自动滚动更新异常：机台={}", machineCode, e);
+        }
+    }
+
+    /**
+     * 滚动更新前同步MES胎圈库存
+     *
+     * <p>在执行滚动更新前主动调用MES接口同步胎圈库存到本地表 T_TQ_STOCK，
+     * 保证后续 calculateExpectedStock 取到的 stockDate 是准实时数据，
+     * 避免使用凌晨定时任务同步的滞后库存做班次推算。</p>
+     *
+     * <p>容错策略：同步失败仅记录警告，不阻断滚动更新主流程，
+     * 后续库存计算仍按本地表最新数据继续执行。</p>
+     */
+    private void syncMesTqStockBeforeRolling() {
+        try {
+            long syncStart = System.currentTimeMillis();
+            AjaxResult result = mesItfService.syncMesTqStock(new AuxReqSyncDataLogs());
+            if (result != null && result.get(AjaxResult.CODE_TAG) != null
+                    && result.get(AjaxResult.CODE_TAG).equals(200)) {
+                log.info("胎圈滚动更新前MES库存同步成功，耗时{}ms", System.currentTimeMillis() - syncStart);
+            } else {
+                log.warn("胎圈滚动更新前MES库存同步返回失败：{}", result);
+            }
+        } catch (Exception e) {
+            log.warn("胎圈滚动更新前MES库存同步异常，将使用本地最新库存继续推算", e);
         }
     }
 
