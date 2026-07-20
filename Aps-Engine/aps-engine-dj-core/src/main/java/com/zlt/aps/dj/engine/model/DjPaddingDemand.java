@@ -71,4 +71,7 @@ public class DjPaddingDemand {
 
     /** 是否供应缺口填补模式：多规格接班库存不足以支撑本班消耗时，仅补本班消耗缺口 */
     private boolean supplyGapMode;
+
+    /** 供应窗口（当前班之后）是否有成型需求，false 表示后续窗口无需求，若本班不生产则无补救机会 */
+    private boolean windowHasDemand;
 }

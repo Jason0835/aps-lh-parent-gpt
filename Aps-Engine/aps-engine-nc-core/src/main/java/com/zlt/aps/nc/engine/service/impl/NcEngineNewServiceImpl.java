@@ -1743,9 +1743,9 @@ public class NcEngineNewServiceImpl implements NcEngineNewService {
         }
         // 需要切换，需知道上一规格的胶料和口型
         // 这里简化处理：按切换胶料处理（全量切换），调用方需传入上下文中的上一规格信息
-        // 切换损失 = (切换时长 / 8小时) × 定额
+        // 切换损失 = (切换时长（分钟） / 480分钟) × 定额
         BigDecimal quata = machine.getQuata() != null ? machine.getQuata() : BigDecimal.ZERO;
-        return mouthPlateSwitchTime.divide(NcEngineConstants.SHIFT_HOURS, 4, RoundingMode.HALF_UP).multiply(quata).setScale(2,
+        return mouthPlateSwitchTime.divide(NcEngineConstants.SHIFT_MINUTES, 4, RoundingMode.HALF_UP).multiply(quata).setScale(2,
                 RoundingMode.HALF_UP);
     }
 
