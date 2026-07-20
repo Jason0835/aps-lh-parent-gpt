@@ -946,7 +946,6 @@
         MACHINE_STOP_TYPE,
         BEGIN_DATE,
         END_DATE,
-        ACTUAL_FINISH_DATE,
         REMARK,
         DEL_FLAG,
         DATA_VERSION,

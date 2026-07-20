@@ -176,13 +176,6 @@ export default {
           valueFormat: "yyyy-MM-dd HH:mm:ss",
         },
         {
-          prop: "actualFinishDate",
-          label: this.$t("ui.data.column.mdmDevicePlanShut.actualFinishDate"),
-          type: "date",
-          dateType: "datetime",
-          valueFormat: "yyyy-MM-dd HH:mm:ss",
-        },
-        {
           prop: "scheduleDate",
           label: this.$t("ui.data.column.mdmDevicePlanShut.scheduleDate"),
           type: "date",

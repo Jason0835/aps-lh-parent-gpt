@@ -4660,7 +4660,7 @@ public class MesItfServiceImpl implements MesItfService {
             List<List<DevPlanCloseVo>> splitList = ScmListUtils.getSplitList(syncList, 1000);
             List<MdmDevicePlanShut> insertOrUpdateList = null;
             for (List<DevPlanCloseVo> saveList : splitList) {
-                // 1. 优先按MES_ID批量查询APS已有数据（用于精准匹配更新实际完成日期）
+                // 1. 优先按MES_ID批量查询APS已有数据（用于精准匹配更新）
                 List<MdmDevicePlanShut> mesIdQueryList = saveList.stream()
                         .map(DevPlanCloseVo::getId)
                         .filter(Objects::nonNull)
@@ -4727,8 +4727,6 @@ public class MesItfServiceImpl implements MesItfService {
                     entity.setUpdateBy("MES");
                     // 存储MES设备停机计划表ID，用于后续同步按MES_ID精准匹配
                     entity.setMesId(item.getId());
-                    // 实际完成日期（MES同步时携带）
-                    entity.setActualFinishDate(item.getActualFinishDate());
 
                     // 处理删除标识：MES的DEL_FLAG映射为APS的IS_DELETE
                     if (StringUtils.isNotBlank(item.getDelFlag())) {
@@ -4737,10 +4735,10 @@ public class MesItfServiceImpl implements MesItfService {
                         entity.setIsDelete(0);
                     }
 
-                    // 匹配策略：优先按MES_ID匹配（精准，确保实际完成日期更新到正确记录），
-                    // 未命中时回退唯一键匹配（兼容历史无MES_ID数据，同时回填MES_ID），都未命中则插入
+                    // 匹配策略：优先按MES_ID匹配（精准），未命中时回退唯一键匹配
+                    // （兼容历史无MES_ID数据，同时回填MES_ID），都未命中则插入
                     if (item.getId() != null && existsByMesIdMap.containsKey(item.getId())) {
-                        // 按MES_ID命中 → 更新（含ACTUAL_FINISH_DATE）
+                        // 按MES_ID命中 → 更新
                         MdmDevicePlanShut existsData = existsByMesIdMap.get(item.getId());
                         entity.setId(existsData.getId());
                     } else {
