@@ -1624,6 +1624,7 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
             //   b) 供应窗口可覆盖班次数 ≤ 阈值
             if (!hasCurrentGap && coverableShiftCount > scheduleThreshold) {
                 spec.setNeedProduce(false); // 库存充足，不排产
+                spec.setRemainingDemand(BigDecimal.ZERO); // 清空剩余需求，避免残留到后续班次
                 // 从成型班次配置表获取当班消耗量：通过(scheduleDay, shiftName)匹配成型班次序号
                 BigDecimal shiftConsumeQty = this.getShiftConsumeQty(shiftIndex, context, spec);
                 if (shiftConsumeQty.compareTo(BigDecimal.ZERO) > 0) {
@@ -1709,10 +1710,8 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
                 netDemand = netDemand.multiply(BigDecimal.ONE.add(lossRate)).setScale(2, RoundingMode.HALF_UP);
             }
 
-            // 剩余待排产量初始=净需求
-            if (spec.getRemainingDemand() == null || spec.getRemainingDemand().compareTo(netDemand) < 0) {
-                spec.setRemainingDemand(netDemand);
-            }
+            // 每个班次重新计算剩余需求，基于当前接班库存和排产深度
+            spec.setRemainingDemand(netDemand);
 
             // ===== 日志：输出该规格的详细计算信息 =====
             // 遍历成型窗口班次，按示方书版本匹配施工后取胎胚代码（与 calcShiftConsume 同口径）
@@ -1749,7 +1748,6 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
                     context);
             if (construction != null && spec.getPaddingCode().equals(construction.getPaddingCode())) {
                 embryoSet.add(cx.getEmbryoCode());
-                break;
             }
         }
         String embryoCodes = String.join("/", embryoSet);
