@@ -135,6 +135,11 @@
       <template slot="headerRight">
         <span class="stat-info">
           <span>
+            <!-- 当前生产版本 -->
+            {{ $t("ui.data.column.monthPlanFinalAdjustQuery.currentProduceVersion") }}：
+            <span class="stat-value">{{ currentAdjustVersionDisplay }}</span>
+          </span>
+          <span>
             {{ $t("ui.data.column.monthPlanFinalAdjustQuery.sumTotalQty") }}：
             <span class="stat-value">{{ sumTotalQtyDisplay }}</span>
           </span>
@@ -367,6 +372,8 @@ export default {
       currentAdjustEndDay: "",
       /** 生产实际排产量合计（list4Adjust 列表首行 sumTotalQty） */
       sumTotalQty: 0,
+      /** 当前调整版本（list4Adjust 列表首行 currentAdjustVersion） */
+      currentAdjustVersion: "",
       /** 调整版本号（来自 Redis） */
       currentAdjustMonthPlanVersion: "",
       confirmAdjustLoading: false,
@@ -409,6 +416,13 @@ export default {
     /** 当前调整机台有值则视为「调整进行中」 */
     adjustFlowInProgress() {
       return (this.currentAdjustMachine || "").trim() !== "";
+    },
+    /** 当前生产版本展示值 */
+    currentAdjustVersionDisplay() {
+      if (this.currentAdjustVersion == null || this.currentAdjustVersion === "") {
+        return "";
+      }
+      return this.currentAdjustVersion;
     },
     /** 生产实际排产量合计展示值 */
     sumTotalQtyDisplay() {
@@ -2473,11 +2487,18 @@ export default {
           firstRow.sumTotalQty !== ""
             ? firstRow.sumTotalQty
             : 0;
+        this.currentAdjustVersion =
+          firstRow &&
+          firstRow.currentAdjustVersion != null &&
+          firstRow.currentAdjustVersion !== ""
+            ? firstRow.currentAdjustVersion
+            : "";
         await this.applyAdjustmentStatisticsRows(rawRows);
       } catch (e) {
         console.error(e);
         this.data = [];
         this.sumTotalQty = 0;
+        this.currentAdjustVersion = "";
       } finally {
         this.loading = false;
         this.dayCellActive = null;
