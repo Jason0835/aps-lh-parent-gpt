@@ -50,6 +50,9 @@ public class TmManualRollingTask {
     /** 数据来源 */
     private String dataSource;
 
+    /** 随任务移动的原因分析 */
+    private String analysis;
+
     /** 是否人工插单任务 */
     private boolean insertTask;
 

@@ -12,6 +12,7 @@ import com.zlt.aps.tc.mapper.*;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -120,7 +121,6 @@ public class TcManualMachineRuleValidator {
     private TcShiftConfig requireOpenShift(TcScheduleResult sourceResult, Integer shiftOrder) {
         LambdaQueryWrapper<TcShiftConfig> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(TcShiftConfig::getFactoryCode, sourceResult.getFactoryCode());
-        wrapper.eq(TcShiftConfig::getScheduleDate, sourceResult.getScheduleDate());
         wrapper.eq(TcShiftConfig::getShiftOrder, shiftOrder);
         List<TcShiftConfig> shiftConfigList = this.shiftConfigMapper.selectList(wrapper);
         if (shiftConfigList == null || shiftConfigList.isEmpty()
@@ -302,7 +302,6 @@ public class TcManualMachineRuleValidator {
         }
         LambdaQueryWrapper<TcShiftConfig> shiftWrapper = new LambdaQueryWrapper<>();
         shiftWrapper.eq(TcShiftConfig::getFactoryCode, sourceResult.getFactoryCode());
-        shiftWrapper.eq(TcShiftConfig::getScheduleDate, sourceResult.getScheduleDate());
         shiftWrapper.eq(TcShiftConfig::getShiftOrder, shiftOrder);
         List<TcShiftConfig> shiftConfigList = this.shiftConfigMapper.selectList(shiftWrapper);
         if (shiftConfigList == null || shiftConfigList.isEmpty()
@@ -327,7 +326,6 @@ public class TcManualMachineRuleValidator {
         }
         LambdaQueryWrapper<TcShiftConfig> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(TcShiftConfig::getFactoryCode, sourceResult.getFactoryCode());
-        wrapper.eq(TcShiftConfig::getScheduleDate, sourceResult.getScheduleDate());
         wrapper.eq(TcShiftConfig::getShiftOrder, shiftOrder);
         List<TcShiftConfig> shiftConfigList = this.shiftConfigMapper.selectList(wrapper);
         if (shiftConfigList == null || shiftConfigList.isEmpty()
@@ -403,10 +401,6 @@ public class TcManualMachineRuleValidator {
         wrapper.eq(TcParams::getFactoryCode, sourceResult.getFactoryCode());
         wrapper.eq(TcParams::getParamCode, TcScheduleConstants.PARAM_SHIFT_MAX_CAPACITY);
         wrapper.eq(TcParams::getEnableStatus, "1");
-        wrapper.and(condition -> condition.isNull(TcParams::getEffectiveStartTime)
-                .or().le(TcParams::getEffectiveStartTime, sourceResult.getScheduleDate()));
-        wrapper.and(condition -> condition.isNull(TcParams::getEffectiveEndTime)
-                .or().ge(TcParams::getEffectiveEndTime, sourceResult.getScheduleDate()));
         List<TcParams> paramsList = this.paramsMapper.selectList(wrapper);
         if (paramsList == null) {
             return new BigDecimal(TcScheduleConstants.DEFAULT_SHIFT_MAX_CAPACITY);
@@ -467,12 +461,29 @@ public class TcManualMachineRuleValidator {
         wrapper.eq(TcMachineMaintenance::getMachineCode, targetMachineCode);
         List<TcMachineMaintenance> maintenanceList = this.machineMaintenanceMapper.selectList(wrapper);
         return maintenanceList == null ? BigDecimal.ZERO : maintenanceList.stream()
-                .filter(item -> item.getStopDate() != null
-                        && DateUtil.isSameDay(item.getStopDate(), sourceResult.getScheduleDate()))
+                .filter(item -> item.getStopStartTime() != null
+                        && DateUtil.isSameDay(item.getStopStartTime(), sourceResult.getScheduleDate()))
                 .filter(item -> StringUtils.isBlank(item.getStopShift())
                         || Objects.equals(item.getStopShift(), shiftCode))
-                .map(TcMachineMaintenance::getStopHours).filter(Objects::nonNull)
+                .map(this::calculateMaintenanceHours)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    /**
+     * 根据维修开始、结束时间计算停机小时数。
+     *
+     * @param maintenance 维修计划
+     * @return 有效停机小时数；时间窗口无效时返回 0
+     */
+    private BigDecimal calculateMaintenanceHours(TcMachineMaintenance maintenance) {
+        if (maintenance.getStopStartTime() == null || maintenance.getStopEndTime() == null
+                || !maintenance.getStopEndTime().after(maintenance.getStopStartTime())) {
+            return BigDecimal.ZERO;
+        }
+        long maintenanceMillis = maintenance.getStopEndTime().getTime()
+                - maintenance.getStopStartTime().getTime();
+        return BigDecimal.valueOf(maintenanceMillis)
+                .divide(BigDecimal.valueOf(TcScheduleConstants.MILLIS_PER_HOUR), 4, RoundingMode.HALF_UP);
     }
 
     /**

@@ -708,10 +708,10 @@ public class ScheduleDayTypeHelper {
         if (shiftConfig == null) {
             return false;
         }
-        if (shiftConfig.getShiftName() != null && shiftConfig.getShiftName().contains("早班")) {
+        if (shiftConfig.getShiftCode() != null && shiftConfig.getShiftCode().startsWith("DAY_")) {
             return true;
         }
-        if (shiftConfig.getShiftCode() != null && shiftConfig.getShiftCode().startsWith("DAY_")) {
+        if (shiftConfig.getShiftName() != null && shiftConfig.getShiftName().contains("早班")) {
             return true;
         }
         LocalTime startTime = shiftConfig.getShiftStartTime();

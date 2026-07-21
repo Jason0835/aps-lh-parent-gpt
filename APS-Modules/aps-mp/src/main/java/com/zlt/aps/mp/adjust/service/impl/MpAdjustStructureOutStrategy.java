@@ -353,7 +353,7 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
 
         //6.在搭配排产前，重算每日产能限制，包括硫化机台数、胎胚种类数
         MpAdjustDailyCapacityLimit adjustDailyCapacityLimitObj = new MpAdjustDailyCapacityLimit();
-        reCalcAdjustDailyCapacityLimit(contextDTO, oneStructMpFinalList, adjustDailyCapacityLimitObj);
+        reCalcAdjustDailyCapacityLimit(contextDTO, oneStructMpFinalList, adjustDailyCapacityLimitObj,null);
 
         //7 执行结构间搭配排产,暂不考虑特殊结构
         //=========================================================
@@ -361,7 +361,7 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
         //=========================================================
 
         //8.在搭配排产前，重算每日产能限制，包括硫化机台数、胎胚种类数
-        reCalcAdjustDailyCapacityLimit(contextDTO, oneStructMpFinalList, adjustDailyCapacityLimitObj);
+        reCalcAdjustDailyCapacityLimit(contextDTO, oneStructMpFinalList, adjustDailyCapacityLimitObj,null);
 
         //9.设置模具变化信息
         for (FactoryMonthPlanFinalAdjustVo mpFinalVo:oneStructMpFinalList){

@@ -315,11 +315,6 @@ public class TcAutoRollingAsyncExecutorImpl implements TcAutoRollingAsyncExecuto
                 .eq(TcParams::getFactoryCode, task.getFactoryCode())
                 .eq(TcParams::getParamCode, TcScheduleConstants.PARAM_AUTO_ROLLING_MAX_STOCK_CLASS)
                 .eq(TcParams::getEnableStatus, "1")
-                .and(condition -> condition.isNull(TcParams::getEffectiveStartTime)
-                        .or().le(TcParams::getEffectiveStartTime, task.getScheduleDate()))
-                .and(condition -> condition.isNull(TcParams::getEffectiveEndTime)
-                        .or().ge(TcParams::getEffectiveEndTime, task.getScheduleDate()))
-                .orderByDesc(TcParams::getEffectiveStartTime)
                 .last("limit 1"));
         String value = params == null ? TcScheduleConstants.DEFAULT_AUTO_ROLLING_MAX_STOCK_CLASS
                 : StrUtil.blankToDefault(params.getParamValue(),

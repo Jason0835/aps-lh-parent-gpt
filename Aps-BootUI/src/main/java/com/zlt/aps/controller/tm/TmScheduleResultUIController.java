@@ -12,6 +12,7 @@ import com.zlt.aps.tm.api.domain.dto.TmRollingRecalcRequestDTO;
 import com.zlt.aps.tm.api.domain.dto.TmScheduleResultImportDTO;
 import com.zlt.aps.tm.api.domain.entity.TmScheduleResult;
 import com.zlt.aps.tm.api.domain.vo.TmAutoScheduleRequestVo;
+import com.zlt.aps.tm.api.domain.vo.TmInsertTaskRequestVo;
 import com.zlt.aps.tm.api.domain.vo.TmScheduleShiftDateVO;
 import com.zlt.aps.tm.api.service.ITmScheduleResultRemoteService;
 import com.zlt.file.encryptbyll.FileEncryptUtils;
@@ -187,15 +188,15 @@ public class TmScheduleResultUIController extends BaseUIController<TmScheduleRes
     /**
      * 人工插入排程任务。
      *
-     * @param scheduleResult 插单内容
+     * @param requestVo 插单内容
      * @return 插单结果
      */
     @ApiOperation("人工插单")
     @PostMapping("/insertTask")
     @RequiresPermissions("tm:tmScheduleResult:add")
     @ResponseBody
-    public AjaxResult insertTask(TmScheduleResult scheduleResult) {
-        return iTmScheduleResultService.insertTask(scheduleResult);
+    public AjaxResult insertTask(TmInsertTaskRequestVo requestVo) {
+        return iTmScheduleResultService.insertTask(requestVo);
     }
 
     /**

@@ -64,7 +64,7 @@ public class TcAutoRollingApplicationService {
         List<TcRollingWindow> windowList = this.resolveRollingWindows(factoryCode, triggerTime);
         List<TcRollingTaskVo> taskList = new ArrayList<>();
         for (TcRollingWindow window : windowList) {
-            if (!this.isRollingEnabled(window.getFactoryCode(), window.getScheduleDate())) {
+            if (!this.isRollingEnabled(window.getFactoryCode())) {
                 continue;
             }
             this.syncStock(window.getFactoryCode());
@@ -90,10 +90,8 @@ public class TcAutoRollingApplicationService {
         Date startScheduleDate = DateUtil.beginOfDay(DateUtil.offsetDay(triggerTime, -1));
         Date endScheduleDate = DateUtil.endOfDay(DateUtil.offsetDay(triggerTime, 1));
         LambdaQueryWrapper<TcShiftConfig> wrapper = new LambdaQueryWrapper<TcShiftConfig>()
-                .between(TcShiftConfig::getScheduleDate, startScheduleDate, endScheduleDate)
                 .eq(TcShiftConfig::getOpenFlag, "1")
                 .orderByAsc(TcShiftConfig::getFactoryCode)
-                .orderByAsc(TcShiftConfig::getScheduleDate)
                 .orderByAsc(TcShiftConfig::getShiftOrder);
         wrapper.eq(StrUtil.isNotBlank(factoryCode), TcShiftConfig::getFactoryCode, factoryCode);
         List<TcShiftConfig> configList = this.shiftConfigMapper.selectList(wrapper);
@@ -102,28 +100,30 @@ public class TcAutoRollingApplicationService {
                 .filter(config -> config.getShiftOrder() != null && config.getShiftOrder() >= 1
                         && config.getShiftOrder() <= TcScheduleConstants.TC_MAX_SHIFT_ORDER)
                 .forEach(config -> {
-                    int earlyMinutes = this.readIntegerParam(config.getFactoryCode(), config.getScheduleDate(),
-                            TcScheduleConstants.PARAM_ROLLING_EARLY_MINUTES,
-                            TcScheduleConstants.DEFAULT_ROLLING_EARLY_MINUTES);
-                    int lateMinutes = this.readIntegerParam(config.getFactoryCode(), config.getScheduleDate(),
-                            TcScheduleConstants.PARAM_ROLLING_LATE_MINUTES,
-                            TcScheduleConstants.DEFAULT_ROLLING_LATE_MINUTES);
-                    Date shiftStartTime = this.resolveShiftStartTime(config);
-                    if (shiftStartTime == null || triggerTime.before(DateUtil.offsetMinute(shiftStartTime, -earlyMinutes))
-                            || triggerTime.after(DateUtil.offsetMinute(shiftStartTime, lateMinutes))) {
-                        return;
-                    }
-                    TcRollingWindow candidate = new TcRollingWindow();
-                    candidate.setFactoryCode(config.getFactoryCode());
-                    candidate.setScheduleDate(config.getScheduleDate());
-                    candidate.setTargetShiftOrder(config.getShiftOrder());
-                    candidate.setShiftStartTime(shiftStartTime);
-                    String mapKey = config.getFactoryCode() + "|" + DateUtil.formatDate(config.getScheduleDate());
-                    TcRollingWindow existing = closestWindowMap.get(mapKey);
-                    if (existing == null || Math.abs(shiftStartTime.getTime() - triggerTime.getTime())
-                            < Math.abs(existing.getShiftStartTime().getTime() - triggerTime.getTime())) {
-                        closestWindowMap.put(mapKey, candidate);
-                    }
+                    this.listScheduleDates(startScheduleDate, endScheduleDate).forEach(scheduleDate -> {
+                        int earlyMinutes = this.readIntegerParam(config.getFactoryCode(),
+                                TcScheduleConstants.PARAM_ROLLING_EARLY_MINUTES,
+                                TcScheduleConstants.DEFAULT_ROLLING_EARLY_MINUTES);
+                        int lateMinutes = this.readIntegerParam(config.getFactoryCode(),
+                                TcScheduleConstants.PARAM_ROLLING_LATE_MINUTES,
+                                TcScheduleConstants.DEFAULT_ROLLING_LATE_MINUTES);
+                        Date shiftStartTime = this.resolveShiftStartTime(config, scheduleDate);
+                        if (shiftStartTime == null || triggerTime.before(DateUtil.offsetMinute(shiftStartTime, -earlyMinutes))
+                                || triggerTime.after(DateUtil.offsetMinute(shiftStartTime, lateMinutes))) {
+                            return;
+                        }
+                        TcRollingWindow candidate = new TcRollingWindow();
+                        candidate.setFactoryCode(config.getFactoryCode());
+                        candidate.setScheduleDate(scheduleDate);
+                        candidate.setTargetShiftOrder(config.getShiftOrder());
+                        candidate.setShiftStartTime(shiftStartTime);
+                        String mapKey = config.getFactoryCode() + "|" + DateUtil.formatDate(scheduleDate);
+                        TcRollingWindow existing = closestWindowMap.get(mapKey);
+                        if (existing == null || Math.abs(shiftStartTime.getTime() - triggerTime.getTime())
+                                < Math.abs(existing.getShiftStartTime().getTime() - triggerTime.getTime())) {
+                            closestWindowMap.put(mapKey, candidate);
+                        }
+                    });
                 });
         return new ArrayList<>(closestWindowMap.values());
     }
@@ -233,7 +233,7 @@ public class TcAutoRollingApplicationService {
     }
 
     /**
-     * 按库存版本、结果任务版本和目标班次构造稳定指纹。
+     * 按库存数量、结果任务版本和目标班次构造稳定指纹。
      *
      * @param window 滚动窗口
      * @param resultList 当前结果
@@ -249,7 +249,9 @@ public class TcAutoRollingApplicationService {
         partList.add(DateUtil.formatDate(window.getScheduleDate()));
         partList.add(String.valueOf(window.getTargetShiftOrder()));
         CollectionUtils.emptyIfNull(stockList).stream().map(stock -> StrUtil.blankToDefault(
-                stock.getSidewallCode(), "") + ":" + StrUtil.blankToDefault(stock.getDataVersion(), ""))
+                stock.getSidewallCode(), "") + ":" + Objects.toString(stock.getStockQty(), "")
+                + ":" + Objects.toString(stock.getBadQty(), "")
+                + ":" + Objects.toString(stock.getAdjustQty(), ""))
                 .forEach(partList::add);
         resultList.stream().map(result -> result.getId() + ":"
                 + (result.getTaskVersion() == null ? 0L : result.getTaskVersion()))
@@ -268,7 +270,7 @@ public class TcAutoRollingApplicationService {
      * @return 已稳定或没有库存快照时返回true
      */
     private boolean isStockInputStable(TcRollingWindow window, Date triggerTime) {
-        int stableMinutes = this.readIntegerParam(window.getFactoryCode(), window.getScheduleDate(),
+        int stableMinutes = this.readIntegerParam(window.getFactoryCode(),
                 TcScheduleConstants.PARAM_ROLLING_STABLE_MINUTES,
                 TcScheduleConstants.DEFAULT_ROLLING_STABLE_MINUTES);
         if (stableMinutes <= 0) {
@@ -285,15 +287,13 @@ public class TcAutoRollingApplicationService {
     }
 
     /**
-     * 判断工厂日期自动滚动参数是否开启。
+     * 判断工厂自动滚动参数是否开启。
      *
      * @param factoryCode 工厂编码
-     * @param scheduleDate 排程日期
      * @return 开启返回true
      */
-    private boolean isRollingEnabled(String factoryCode, Date scheduleDate) {
-        String value = this.readParam(factoryCode, scheduleDate,
-                TcScheduleConstants.PARAM_AUTO_ROLLING_ENABLED,
+    private boolean isRollingEnabled(String factoryCode) {
+        String value = this.readParam(factoryCode, TcScheduleConstants.PARAM_AUTO_ROLLING_ENABLED,
                 TcScheduleConstants.DEFAULT_AUTO_ROLLING_ENABLED);
         return "1".equals(value) || "true".equalsIgnoreCase(value);
     }
@@ -302,38 +302,31 @@ public class TcAutoRollingApplicationService {
      * 读取整数参数。
      *
      * @param factoryCode 工厂编码
-     * @param scheduleDate 排程日期
      * @param paramCode 参数编码
      * @param defaultValue 默认值
      * @return 整数参数
      */
-    private int readIntegerParam(String factoryCode, Date scheduleDate, String paramCode, String defaultValue) {
+    private int readIntegerParam(String factoryCode, String paramCode, String defaultValue) {
         try {
-            return Integer.parseInt(this.readParam(factoryCode, scheduleDate, paramCode, defaultValue));
+            return Integer.parseInt(this.readParam(factoryCode, paramCode, defaultValue));
         } catch (NumberFormatException exception) {
             return Integer.parseInt(defaultValue);
         }
     }
 
     /**
-     * 读取指定日期生效参数。
+     * 读取工厂启用参数。
      *
      * @param factoryCode 工厂编码
-     * @param scheduleDate 排程日期
      * @param paramCode 参数编码
      * @param defaultValue 默认值
      * @return 参数值
      */
-    private String readParam(String factoryCode, Date scheduleDate, String paramCode, String defaultValue) {
+    private String readParam(String factoryCode, String paramCode, String defaultValue) {
         LambdaQueryWrapper<TcParams> wrapper = new LambdaQueryWrapper<TcParams>()
                 .eq(TcParams::getFactoryCode, factoryCode)
                 .eq(TcParams::getParamCode, paramCode)
                 .eq(TcParams::getEnableStatus, "1")
-                .and(condition -> condition.isNull(TcParams::getEffectiveStartTime)
-                        .or().le(TcParams::getEffectiveStartTime, scheduleDate))
-                .and(condition -> condition.isNull(TcParams::getEffectiveEndTime)
-                        .or().ge(TcParams::getEffectiveEndTime, scheduleDate))
-                .orderByDesc(TcParams::getEffectiveStartTime)
                 .last("limit 1");
         TcParams params = this.paramsMapper.selectOne(wrapper);
         return params == null ? defaultValue
@@ -345,16 +338,17 @@ public class TcAutoRollingApplicationService {
      * 根据六班MES日期偏移和配置时刻解析实际开始时间。
      *
      * @param config 班次配置
+     * @param scheduleDate 排程日期
      * @return 实际开始时间，配置无效时返回null
      */
-    private Date resolveShiftStartTime(TcShiftConfig config) {
-        if (config.getScheduleDate() == null || config.getShiftOrder() == null
+    private Date resolveShiftStartTime(TcShiftConfig config, Date scheduleDate) {
+        if (scheduleDate == null || config.getShiftOrder() == null
                 || StrUtil.isBlank(config.getPlanStartTime())) {
             return null;
         }
         try {
             Date businessDate = TcShiftBusinessDateResolver.resolveMesBusinessDate(
-                    config.getScheduleDate(), config.getShiftOrder());
+                    scheduleDate, config.getShiftOrder());
             String clockTime = config.getPlanStartTime().trim();
             if (clockTime.length() == 5) {
                 clockTime += ":00";
@@ -362,9 +356,27 @@ public class TcAutoRollingApplicationService {
             return DateUtil.parseDateTime(DateUtil.formatDate(businessDate) + " " + clockTime);
         } catch (RuntimeException exception) {
             log.warn("胎侧自动滚动班次时间配置无效, factoryCode={}, scheduleDate={}, shiftOrder={}",
-                    config.getFactoryCode(), config.getScheduleDate(), config.getShiftOrder());
+                    config.getFactoryCode(), scheduleDate, config.getShiftOrder());
             return null;
         }
+    }
+
+    /**
+     * 构建自动滚动候选排程日期。
+     *
+     * @param startScheduleDate 起始日期
+     * @param endScheduleDate 结束日期
+     * @return 按日期升序排列的候选日期
+     */
+    private List<Date> listScheduleDates(Date startScheduleDate, Date endScheduleDate) {
+        List<Date> scheduleDateList = new ArrayList<>();
+        Date currentDate = DateUtil.beginOfDay(startScheduleDate);
+        Date lastDate = DateUtil.beginOfDay(endScheduleDate);
+        while (!currentDate.after(lastDate)) {
+            scheduleDateList.add(currentDate);
+            currentDate = DateUtil.offsetDay(currentDate, 1);
+        }
+        return scheduleDateList;
     }
 
     /**

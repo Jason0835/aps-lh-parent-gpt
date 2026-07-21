@@ -399,8 +399,8 @@ public class TcAutoScheduleDataLoadService {
         Date dayEnd = DateUtil.endOfDay(context.getScheduleDate());
         for (TcMachineMaintenance maintenance : nullToEmpty(maintenanceList)) {
             TcMachineCandidate candidate = candidateMap.get(maintenance.getMachineCode());
-            Date maintenanceStartTime = this.resolveMaintenanceStartTime(maintenance, shiftWindowMap);
-            Date maintenanceEndTime = this.resolveMaintenanceEndTime(maintenance, maintenanceStartTime);
+            Date maintenanceStartTime = maintenance.getStopStartTime();
+            Date maintenanceEndTime = maintenance.getStopEndTime();
             if (candidate == null || maintenanceStartTime == null || maintenanceEndTime == null) {
                 continue;
             }
@@ -420,54 +420,6 @@ public class TcAutoScheduleDataLoadService {
                 candidate.getMaintenanceHoursByShift().merge(entry.getKey(), shiftHours, BigDecimal::add);
             }
         }
-    }
-
-    /**
-     * 解析维修计划停机开始时间，兼容时间窗口字段和停机日期、班次字段。
-     *
-     * @param maintenance 维修计划
-     * @param shiftWindowMap 班次时间窗口
-     * @return 停机开始时间，无法解析时返回 null
-     */
-    private Date resolveMaintenanceStartTime(TcMachineMaintenance maintenance, Map<Integer, Date[]> shiftWindowMap) {
-        if (maintenance.getStopStartTime() != null) {
-            return maintenance.getStopStartTime();
-        }
-        if (maintenance.getStopDate() == null) {
-            return null;
-        }
-        if (StrUtil.isNotBlank(maintenance.getStopShift())) {
-            try {
-                Date[] shiftWindow = shiftWindowMap.get(Integer.valueOf(maintenance.getStopShift()));
-                if (shiftWindow != null) {
-                    return shiftWindow[0];
-                }
-            } catch (NumberFormatException exception) {
-                log.warn("[TC_AUTO_PLAN] 维修计划停机班次无法解析, machineCode={}, stopShift={}",
-                        maintenance.getMachineCode(), maintenance.getStopShift());
-            }
-        }
-        return DateUtil.beginOfDay(maintenance.getStopDate());
-    }
-
-    /**
-     * 解析维修计划停机结束时间，优先使用结束时间，其次按停机小时数推算。
-     *
-     * @param maintenance 维修计划
-     * @param maintenanceStartTime 已解析的开始时间
-     * @return 停机结束时间，无法解析时返回 null
-     */
-    private Date resolveMaintenanceEndTime(TcMachineMaintenance maintenance, Date maintenanceStartTime) {
-        if (maintenance.getStopEndTime() != null) {
-            return maintenance.getStopEndTime();
-        }
-        if (maintenanceStartTime == null || maintenance.getStopHours() == null
-                || maintenance.getStopHours().compareTo(BigDecimal.ZERO) <= 0) {
-            return null;
-        }
-        long offsetMillis = maintenance.getStopHours()
-                .multiply(BigDecimal.valueOf(TcScheduleConstants.MILLIS_PER_HOUR)).longValue();
-        return new Date(maintenanceStartTime.getTime() + offsetMillis);
     }
 
     /**
@@ -614,7 +566,6 @@ public class TcAutoScheduleDataLoadService {
         List<TcShiftConfig> configs = tmShiftConfigMapper.selectList(
                 new LambdaQueryWrapper<TcShiftConfig>()
                         .eq(TcShiftConfig::getFactoryCode, context.getFactoryCode())
-                        .eq(TcShiftConfig::getScheduleDate, context.getScheduleDate())
                         .eq(TcShiftConfig::getOpenFlag, TcYesNoEnum.YES.getCode()));
         return nullToEmpty(configs).stream()
                 .filter(config -> config.getShiftOrder() != null)
@@ -763,7 +714,7 @@ public class TcAutoScheduleDataLoadService {
                 TcScheduleConstants.DEFAULT_VERSION_MATCH_MODE);
         log.info("[TC_BOOTSTRAP_DETAIL] factoryCode={}, scheduleDate={} 版本匹配模式={}",
                 context.getFactoryCode(), DateUtil.formatDate(context.getScheduleDate()), versionMatchMode);
-        if (TcVersionMatchModeEnum.B == TcVersionMatchModeEnum.resolve(versionMatchMode)) {
+        if (TcVersionMatchModeEnum.BOM == TcVersionMatchModeEnum.resolve(versionMatchMode)) {
             return loadFormingDemandTasksByBom(context, machineList);
         }
         return loadFormingDemandTasksByRecipe(context, machineList);

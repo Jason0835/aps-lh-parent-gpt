@@ -2,7 +2,6 @@ package com.zlt.aps.tc.api.domain.entity;
 
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
-import com.fasterxml.jackson.annotation.JsonFormat;
 import com.ruoyi.common.core.annotation.Excel;
 import com.ruoyi.common.core.web.domain.BaseEntity;
 import com.zlt.aps.common.core.annotation.ImportValidated;
@@ -10,7 +9,6 @@ import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 
-import java.util.Date;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -88,22 +86,6 @@ public class TcParams extends BaseEntity {
     @ApiModelProperty(value = "是否启用", name = "enableStatus")
     @TableField(value = "ENABLE_STATUS")
     private String enableStatus;
-
-    /** 参数生效开始时间，为空表示不限制开始时间 */
-    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
-    @Excel(name = "ui.data.column.tc.params.effectiveStartTime", width = 30, dateFormat = "yyyy-MM-dd HH:mm:ss")
-    @ImportValidated(date = true)
-    @ApiModelProperty(value = "生效开始时间", name = "effectiveStartTime")
-    @TableField(value = "EFFECTIVE_START_TIME")
-    private Date effectiveStartTime;
-
-    /** 参数生效结束时间，为空表示长期有效 */
-    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
-    @Excel(name = "ui.data.column.tc.params.effectiveEndTime", width = 30, dateFormat = "yyyy-MM-dd HH:mm:ss")
-    @ImportValidated(date = true)
-    @ApiModelProperty(value = "生效结束时间", name = "effectiveEndTime")
-    @TableField(value = "EFFECTIVE_END_TIME")
-    private Date effectiveEndTime;
 
     @Excel(name = "ui.common.column.remark")
     @ImportValidated(maxLength = 500)

@@ -94,8 +94,12 @@ public final class TmScheduleConstants {
     /** 换规格时间参数键。 */
     public static final String PARAM_SPEC_CHANGE_MINUTES = "TM_SPEC_CHANGE_MINUTES";
 
-    /** 换胶时间参数键。 */
+    /** 换胶时间参数键，已废弃，自动排程不再按时间折算换胶产能。 */
+    @Deprecated
     public static final String PARAM_GLUE_CHANGE_MINUTES = "TM_GLUE_CHANGE_MINUTES";
+
+    /** 主胶料切换固定产能扣减参数键。 */
+    public static final String PARAM_GLUE_CHANGE_CAPACITY_DEDUCT = "TM_GLUE_CHANGE_CAPACITY_DEDUCT";
 
     /** 需求量算法默认编码。 */
     public static final String DEFAULT_ALGORITHM_SWITCH = "1";
@@ -184,8 +188,12 @@ public final class TmScheduleConstants {
     /** 换规格时间默认值。 */
     public static final String DEFAULT_SPEC_CHANGE_MINUTES = "0";
 
-    /** 换胶时间默认值。 */
+    /** 换胶时间默认值，已废弃。 */
+    @Deprecated
     public static final String DEFAULT_GLUE_CHANGE_MINUTES = "0";
+
+    /** 主胶料切换固定产能扣减默认值，单位米。 */
+    public static final String DEFAULT_GLUE_CHANGE_CAPACITY_DEDUCT = "200";
 
     /** 自动排程基础资料缓存键前缀。 */
     public static final String BASE_DATA_CACHE_KEY_PREFIX = "aps:tm:autoSchedule:baseData:";

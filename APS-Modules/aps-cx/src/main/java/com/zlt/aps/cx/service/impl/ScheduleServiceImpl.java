@@ -1234,7 +1234,7 @@ public class ScheduleServiceImpl implements ScheduleService {
                     factoryCodeList, materialCodeList, prevMonthStart, scheduleDateStart);
             for (Map<String, Object> row : dayFinishList) {
                 String mc = (String) row.get("MATERIAL_CODE");
-                String productStatus = (String) row.get("PRODUCT_STATUS");
+                String productStatus = (String) row.get("LH_TYPE");
                 Object qtyObj = row.get("TOTAL_FINISH_QTY");
                 int qty = qtyObj != null ? ((Number) qtyObj).intValue() : 0;
                 String statusKey = MonthPlanSurplusCalculator.buildMaterialStatusKey(mc, productStatus);
@@ -1245,7 +1245,7 @@ public class ScheduleServiceImpl implements ScheduleService {
                     factoryCodeList, materialCodeList, scheduleDateStart, nextDayStart);
             for (Map<String, Object> row : scheFinishList) {
                 String mc = (String) row.get("MATERIAL_CODE");
-                String productStatus = (String) row.get("PRODUCT_STATUS");
+                String productStatus = (String) row.get("CLASS1_LH_TYPE");
                 Object qtyObj = row.get("TOTAL_FINISH_QTY");
                 int qty = qtyObj != null ? ((Number) qtyObj).intValue() : 0;
                 String statusKey = MonthPlanSurplusCalculator.buildMaterialStatusKey(mc, productStatus);
@@ -1264,7 +1264,7 @@ public class ScheduleServiceImpl implements ScheduleService {
                     factoryCodeList, materialCodeList, nextMonthStart, scheduleDateStart);
             for (Map<String, Object> row : nextDayFinishList) {
                 String mc = (String) row.get("MATERIAL_CODE");
-                String productStatus = (String) row.get("PRODUCT_STATUS");
+                String productStatus = (String) row.get("LH_TYPE");
                 Object qtyObj = row.get("TOTAL_FINISH_QTY");
                 int qty = qtyObj != null ? ((Number) qtyObj).intValue() : 0;
                 String statusKey = MonthPlanSurplusCalculator.buildMaterialStatusKey(mc, productStatus);

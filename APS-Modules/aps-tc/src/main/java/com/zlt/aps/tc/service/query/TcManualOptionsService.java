@@ -180,7 +180,6 @@ public class TcManualOptionsService {
     private List<TcManualShiftOptionVo> listShiftOptions(String factoryCode, Date scheduleDate) {
         LambdaQueryWrapper<TcShiftConfig> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(TcShiftConfig::getFactoryCode, factoryCode);
-        wrapper.eq(TcShiftConfig::getScheduleDate, scheduleDate);
         wrapper.orderByAsc(TcShiftConfig::getShiftOrder);
         List<TcShiftConfig> shiftConfigList = this.shiftConfigMapper.selectList(wrapper);
         if (shiftConfigList == null) {
@@ -188,7 +187,7 @@ public class TcManualOptionsService {
         }
         return shiftConfigList.stream().map(shiftConfig -> {
             TcManualShiftOptionVo optionVo = new TcManualShiftOptionVo();
-            optionVo.setScheduleDate(shiftConfig.getScheduleDate());
+            optionVo.setScheduleDate(scheduleDate);
             optionVo.setShiftOrder(shiftConfig.getShiftOrder());
             optionVo.setShiftCode(shiftConfig.getShiftCode());
             optionVo.setShiftName(shiftConfig.getShiftName());

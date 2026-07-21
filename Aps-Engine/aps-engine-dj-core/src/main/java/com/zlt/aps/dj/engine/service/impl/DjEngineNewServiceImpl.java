@@ -60,6 +60,7 @@ import com.zlt.aps.dj.engine.mapper.DjEngineStockMapper;
 import com.zlt.aps.dj.engine.constant.DjEngineConstants;
 import com.zlt.aps.dj.engine.model.DjPaddingDemand;
 import com.zlt.aps.dj.engine.model.DjScheduleContext;
+import com.zlt.aps.dj.engine.model.SupplementaryResult;
 import com.zlt.aps.dj.engine.service.DjEngineNewService;
 import com.zlt.aps.dj.engine.service.IDjOrderGeneratorService;
 import com.zlt.aps.exception.BusinessException;
@@ -1250,37 +1251,10 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
             this.checkDemandForShift(demandList, shiftIndex, context);
 
             // 记录 checkDemandForShift 后的需求判定结果
-            context.appendLog("--- 班次 {0} 需求判定结果 ---", shiftIndex);
-            for (DjPaddingDemand spec : demandList) {
-                String needProduceStr = spec.isNeedProduce() ? "需要排产" : "库存充足不排产";
-                if (spec.isNeedProduce()) {
-                    context.appendLog("  规格 {0}：{1}，可覆盖班次={2}，触发阈值≤{3}，剩余待排={4}",
-                            context.getPaddingNameByCode(spec.getPaddingCode()), needProduceStr, spec.getCoverableShiftCount(),
-                            this.getParamAsDecimal(context, DjEngineConstants.PARAM_SCHEDULE_THRESHOLD).intValue(),
-                            spec.getRemainingDemand());
-                } else if (spec.getRemainingDemand() != null
-                        && spec.getRemainingDemand().compareTo(BigDecimal.ZERO) > 0) {
-                    context.appendLog("  规格 {0}：{1}，可覆盖班次={2}，触发阈值≤{3}",
-                            context.getPaddingNameByCode(spec.getPaddingCode()), needProduceStr, spec.getCoverableShiftCount(),
-                            this.getParamAsDecimal(context, DjEngineConstants.PARAM_SCHEDULE_THRESHOLD).intValue());
-                }
-            }
+            this.logDemandDecision(demandList, context, shiftIndex);
 
             // 多规格不足场景：当本班有多个规格接班库存不足以支撑本班消耗时，前 n-1 个仅补供应缺口
-            List<DjPaddingDemand> needProduceSpecs = demandList.stream()
-                    .filter(s -> s.isNeedProduce() && s.getRemainingDemand() != null
-                            && s.getRemainingDemand().compareTo(BigDecimal.ZERO) > 0)
-                    .collect(Collectors.toList());
-            if (needProduceSpecs.size() >= 2) {
-                // 按优先级排序，使用 null lastSpecCode（班次级别的全局排序）
-                needProduceSpecs.sort(buildPriorityComparator(demandList, null, context, shiftIndex));
-                // 前 n-1 个标记为供应缺口填补模式，仅补本班成型消耗缺口
-                for (int i = 0; i < needProduceSpecs.size() - 1; i++) {
-                    needProduceSpecs.get(i).setSupplyGapMode(true);
-                }
-                context.appendLog("当班多规格接班库存不足：共 {0} 个规格需补量，前 {1} 个按供应缺口填补（仅补本班消耗缺口）",
-                        needProduceSpecs.size(), needProduceSpecs.size() - 1);
-            }
+            this.markMultiSpecGapMode(demandList, context, shiftIndex);
 
             // 计算本班实际可用的产能上限 = min(班次总产量上限, 所有开机机台产能之和)
             BigDecimal shiftTotalCapacity = this.calcShiftTotalCapacity(capacityMatrix, shiftIndex,
@@ -1449,6 +1423,14 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
                         shiftRemainingTrolleys = BigDecimal.ZERO;
                     }
                 }
+                // ===== 补量阶段：主循环排产后机台仍有剩余产能，进行二次补量 =====
+                SupplementaryResult supplResult = this.executeSupplementaryProduction(
+                        pendingSpecs, shiftIndex, machineCode, resultMap, lastSpecInShift,
+                        machineCapacity, shiftRemainingCapacity, shiftRemainingTrolleys,
+                        trolleyStdCurlLength, trolleyFullRate, context);
+                shiftRemainingCapacity = supplResult.getShiftRemainingCapacity();
+                shiftRemainingTrolleys = supplResult.getShiftRemainingTrolleys();
+                remainingCapacity = machineCapacity.get(shiftIndex);
                 context.appendLog("  机台 {0} 班次 {1} 剩余产能：{2}，剩余台车数：{3}，规格切换损耗：{4}", machineCode, shiftIndex,
                         remainingCapacity.max(BigDecimal.ZERO), shiftRemainingTrolleys.max(BigDecimal.ZERO), totalSwitchLoss);
             }
@@ -1499,6 +1481,173 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
         }
 
         return results;
+    }
+
+    // ===== 以下为 executeSchedule 的提取方法 =====
+
+    /**
+     * 记录 checkDemandForShift 后的需求判定结果日志
+     */
+    private void logDemandDecision(List<DjPaddingDemand> demandList, DjScheduleContext context, int shiftIndex) {
+        context.appendLog("--- 班次 {0} 需求判定结果 ---", shiftIndex);
+        for (DjPaddingDemand spec : demandList) {
+            String needProduceStr = spec.isNeedProduce() ? "需要排产" : "库存充足不排产";
+            if (spec.isNeedProduce()) {
+                context.appendLog("  规格 {0}：{1}，可覆盖班次={2}，触发阈值≤{3}，剩余待排={4}",
+                        context.getPaddingNameByCode(spec.getPaddingCode()), needProduceStr, spec.getCoverableShiftCount(),
+                        this.getParamAsDecimal(context, DjEngineConstants.PARAM_SCHEDULE_THRESHOLD).intValue(),
+                        spec.getRemainingDemand());
+            } else if (spec.getRemainingDemand() != null
+                    && spec.getRemainingDemand().compareTo(BigDecimal.ZERO) > 0) {
+                context.appendLog("  规格 {0}：{1}，可覆盖班次={2}，触发阈值≤{3}",
+                        context.getPaddingNameByCode(spec.getPaddingCode()), needProduceStr, spec.getCoverableShiftCount(),
+                        this.getParamAsDecimal(context, DjEngineConstants.PARAM_SCHEDULE_THRESHOLD).intValue());
+            }
+        }
+    }
+
+    /**
+     * 当班多规格接班库存不足时，前 n-1 个标记为供应缺口填补模式
+     */
+    private void markMultiSpecGapMode(List<DjPaddingDemand> demandList, DjScheduleContext context, int shiftIndex) {
+        List<DjPaddingDemand> needProduceSpecs = demandList.stream()
+                .filter(s -> s.isNeedProduce() && s.getRemainingDemand() != null
+                        && s.getRemainingDemand().compareTo(BigDecimal.ZERO) > 0)
+                .collect(Collectors.toList());
+        if (needProduceSpecs.size() >= 2) {
+            needProduceSpecs.sort(buildPriorityComparator(demandList, null, context, shiftIndex));
+            for (int i = 0; i < needProduceSpecs.size() - 1; i++) {
+                needProduceSpecs.get(i).setSupplyGapMode(true);
+            }
+            context.appendLog("当班多规格接班库存不足：共 {0} 个规格需补量，前 {1} 个按供应缺口填补（仅补本班消耗缺口）",
+                    needProduceSpecs.size(), needProduceSpecs.size() - 1);
+        }
+    }
+
+    /**
+     * 主循环排产后机台仍有剩余产能时，进行二次补量
+     * <p>第一轮：supplyGapMode 规格各补 SCHEDULE_THRESHOLD 班消耗量</p>
+     * <p>第二轮：所有规格补满供应窗口需求量</p>
+     *
+     * @return 补量后的班次状态（shiftRemainingCapacity + shiftRemainingTrolleys）
+     */
+    private SupplementaryResult executeSupplementaryProduction(
+            List<DjPaddingDemand> pendingSpecs, int shiftIndex, String machineCode,
+            Map<String, DjScheduleResult> resultMap, Map<String, String> lastSpecInShift,
+            Map<Integer, BigDecimal> machineCapacity, BigDecimal shiftRemainingCapacity,
+            BigDecimal shiftRemainingTrolleys, BigDecimal trolleyStdCurlLength,
+            BigDecimal trolleyFullRate, DjScheduleContext context) {
+
+        BigDecimal remainingCapacity = machineCapacity.get(shiftIndex);
+        if (remainingCapacity == null || remainingCapacity.compareTo(BigDecimal.ZERO) <= 0
+                || shiftRemainingTrolleys == null || shiftRemainingTrolleys.compareTo(BigDecimal.ZERO) <= 0) {
+            return new SupplementaryResult(shiftRemainingCapacity, shiftRemainingTrolleys);
+        }
+
+        int scheduleThreshold = this.getParamAsDecimal(context, DjEngineConstants.PARAM_SCHEDULE_THRESHOLD).intValue();
+
+        // 第一轮补量：对 supplyGapMode=true 的规格，各补 SCHEDULE_THRESHOLD 班消耗量
+        int firstFormingClass = this.getFormingClassByShiftIndex(shiftIndex, context);
+        if (firstFormingClass < 1) {
+            firstFormingClass = shiftIndex + (context.getFormingShiftOffset() != null ? context.getFormingShiftOffset() : 0);
+        }
+        context.appendLog("  --- 补量第一轮：供应缺口规格各补 {0} 班 ---", scheduleThreshold);
+        for (DjPaddingDemand spec : pendingSpecs) {
+            if (remainingCapacity.compareTo(BigDecimal.ZERO) <= 0
+                    || shiftRemainingTrolleys.compareTo(BigDecimal.ZERO) <= 0) {
+                break;
+            }
+            if (!spec.isSupplyGapMode()) continue;
+            if (spec.getRemainingDemand() == null || spec.getRemainingDemand().compareTo(BigDecimal.ZERO) <= 0) continue;
+
+            // 计算 SCHEDULE_THRESHOLD 个成型班次的消耗量
+            BigDecimal thresholdConsume = BigDecimal.ZERO;
+            for (int fc = firstFormingClass + 1; fc <= firstFormingClass + scheduleThreshold; fc++) {
+                if (fc > DjEngineConstants.CX_SHIFT_COUNT) break;
+                thresholdConsume = thresholdConsume.add(this.calcShiftConsume(context, spec.getPaddingCode(), fc));
+            }
+            // 补量上限 = min(阈值消耗量, 剩余需求, 剩余产能)
+            BigDecimal maxProduce = thresholdConsume.min(spec.getRemainingDemand()).min(remainingCapacity);
+            if (maxProduce.compareTo(BigDecimal.ZERO) <= 0) continue;
+
+            // 向上取整到整台车
+            BigDecimal trolleyCapacity = spec.getTrolleyCapacity();
+            if (trolleyCapacity == null || trolleyCapacity.compareTo(BigDecimal.ZERO) <= 0) continue;
+            int maxTrolleys = remainingCapacity.divide(trolleyCapacity, 0, RoundingMode.FLOOR).intValue();
+            int needTrolleys = maxProduce.divide(trolleyCapacity, 0, RoundingMode.CEILING).intValue();
+            int actualTrolleys = Math.min(maxTrolleys, needTrolleys);
+            if (actualTrolleys <= 0) continue;
+
+            BigDecimal produceQty = BigDecimal.valueOf(actualTrolleys).multiply(trolleyCapacity);
+            if (produceQty.compareTo(BigDecimal.ZERO) <= 0) continue;
+
+            // 扣减剩余需求
+            spec.setRemainingDemand(spec.getRemainingDemand().subtract(produceQty));
+
+            // 记录排产结果
+            this.recordSchedule(resultMap, spec, shiftIndex, produceQty, machineCode, context);
+            context.appendLog("  补量规格 {0}：生产 {1}，剩余待排={2}",
+                    context.getPaddingNameByCode(spec.getPaddingCode()), produceQty, spec.getRemainingDemand());
+
+            lastSpecInShift.put(machineCode, spec.getPaddingCode());
+            remainingCapacity = remainingCapacity.subtract(produceQty);
+            machineCapacity.put(shiftIndex, remainingCapacity);
+            shiftRemainingCapacity = shiftRemainingCapacity.subtract(produceQty).max(BigDecimal.ZERO);
+
+            BigDecimal consumedTrolleys = produceQty.divide(trolleyStdCurlLength, 4, RoundingMode.HALF_UP)
+                    .divide(trolleyFullRate, 4, RoundingMode.HALF_UP)
+                    .setScale(0, RoundingMode.FLOOR);
+            shiftRemainingTrolleys = shiftRemainingTrolleys.subtract(consumedTrolleys).max(BigDecimal.ZERO);
+        }
+
+        // 第二轮补量：所有规格补满供应窗口需求量
+        context.appendLog("  --- 补量第二轮：所有规格补满供应窗口 ---");
+        for (DjPaddingDemand spec : pendingSpecs) {
+            if (remainingCapacity.compareTo(BigDecimal.ZERO) <= 0
+                    || shiftRemainingTrolleys.compareTo(BigDecimal.ZERO) <= 0) {
+                break;
+            }
+            // 供应缺口模式规格已在第1轮补量，本轮跳过
+            if (spec.isSupplyGapMode()) continue;
+
+            // 计算供应窗口净需求量
+            BigDecimal windowDemand = this.calcWindowNetDemand(spec, shiftIndex, context);
+            if (windowDemand.compareTo(BigDecimal.ZERO) <= 0) continue;
+
+            // 已排产量
+            BigDecimal scheduledQty = this.getScheduledQty(resultMap, spec.getPaddingCode(), shiftIndex);
+            BigDecimal remainingWindowDemand = windowDemand.subtract(scheduledQty);
+            if (remainingWindowDemand.compareTo(BigDecimal.ZERO) <= 0) continue;
+
+            // 临时设置 remainingDemand 以复用 calcProduceQty
+            BigDecimal oldRemainingDemand = spec.getRemainingDemand();
+            spec.setRemainingDemand(remainingWindowDemand);
+            boolean oldSupplyGapMode = spec.isSupplyGapMode();
+            spec.setSupplyGapMode(false);
+            BigDecimal produceQty = this.calcProduceQty(spec, remainingCapacity, shiftIndex, context);
+            spec.setSupplyGapMode(oldSupplyGapMode);
+            spec.setRemainingDemand(oldRemainingDemand);
+
+            if (produceQty == null || produceQty.compareTo(BigDecimal.ZERO) <= 0) continue;
+
+            // 记录排产结果
+            this.recordSchedule(resultMap, spec, shiftIndex, produceQty, machineCode, context);
+            context.appendLog("  补量规格 {0}：生产 {1}（窗口剩余={2}）",
+                    context.getPaddingNameByCode(spec.getPaddingCode()), produceQty, remainingWindowDemand);
+
+            lastSpecInShift.put(machineCode, spec.getPaddingCode());
+            remainingCapacity = remainingCapacity.subtract(produceQty);
+            machineCapacity.put(shiftIndex, remainingCapacity);
+            shiftRemainingCapacity = shiftRemainingCapacity.subtract(produceQty).max(BigDecimal.ZERO);
+
+            BigDecimal consumedTrolleys = produceQty.divide(trolleyStdCurlLength, 4, RoundingMode.HALF_UP)
+                    .divide(trolleyFullRate, 4, RoundingMode.HALF_UP)
+                    .setScale(0, RoundingMode.FLOOR);
+            shiftRemainingTrolleys = shiftRemainingTrolleys.subtract(consumedTrolleys).max(BigDecimal.ZERO);
+        }
+
+        machineCapacity.put(shiftIndex, remainingCapacity);
+        return new SupplementaryResult(shiftRemainingCapacity, shiftRemainingTrolleys);
     }
 
     /**
@@ -1586,10 +1735,15 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
             int windowEndClass = Math.min(firstFormingClass + specSupplyDepth,
                     DjEngineConstants.CX_SHIFT_COUNT);
             Map<Integer, BigDecimal> shiftConsume = new HashMap<>();
+            BigDecimal windowDemandSum = BigDecimal.ZERO;
             for (int fc = windowStartClass; fc <= windowEndClass; fc++) {
-                shiftConsume.put(fc, this.calcShiftConsume(context,
-                        spec.getPaddingCode(), fc));
+                BigDecimal consume = this.calcShiftConsume(context,
+                        spec.getPaddingCode(), fc);
+                shiftConsume.put(fc, consume);
+                windowDemandSum = windowDemandSum.add(consume);
             }
+            // 供应窗口（当前班之后）是否有成型需求：非开产模式下若后续无需求，本班不生产则无补救机会
+            spec.setWindowHasDemand(windowDemandSum.compareTo(BigDecimal.ZERO) > 0);
 
             // 供应窗口实际可用库存 = max(0, 接班库存 - 当前班成型消耗量)
             BigDecimal windowEffectiveInventory = incomingInventory.subtract(currentShiftConsume);
@@ -2002,17 +2156,24 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
     }
 
     /**
-     * 构建优先级比较器（9级规则）
+     * 构建优先级比较器（10级规则）
      */
     private Comparator<DjPaddingDemand> buildPriorityComparator(List<DjPaddingDemand> demandList, String lastSpecCode,
             DjScheduleContext context, int shiftIndex) {
         return (a, b) -> {
-            // 1. 本班有缺口优先
+            // 1. 本班有供应缺口且后续窗口无需求的最优先（若本班不生产则无补救机会）
+            boolean aCritical = a.isNeedProduce() && !a.isWindowHasDemand();
+            boolean bCritical = b.isNeedProduce() && !b.isWindowHasDemand();
+            if (aCritical != bCritical) {
+                return aCritical ? -1 : 1;
+            }
+
+            // 2. 本班有缺口优先
             if (a.isNeedProduce() != b.isNeedProduce()) {
                 return a.isNeedProduce() ? -1 : 1;
             }
 
-            // 2. 规格续作优先
+            // 3. 规格续作优先
             boolean aIsLast = a.getPaddingCode() != null && a.getPaddingCode().equals(lastSpecCode);
             boolean bIsLast = b.getPaddingCode() != null && b.getPaddingCode().equals(lastSpecCode);
             if (aIsLast != bIsLast) {
@@ -2157,9 +2318,9 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
         }
         // 需要切换，需知道上一规格的胶料和口型
         // 这里简化处理：按切换胶料处理（全量切换），调用方需传入上下文中的上一规格信息
-        // 切换损失 = (切换时长 / 8小时) × 定额
+        // 切换损失 = (切换时长（分钟） / 480分钟) × 定额
         BigDecimal quata = machine.getQuata() != null ? machine.getQuata() : BigDecimal.ZERO;
-        return mouthPlateSwitchTime.divide(DjEngineConstants.SHIFT_HOURS, 4, RoundingMode.HALF_UP).multiply(quata).setScale(2,
+        return mouthPlateSwitchTime.divide(DjEngineConstants.SHIFT_MINUTES, 4, RoundingMode.HALF_UP).multiply(quata).setScale(2,
                 RoundingMode.HALF_UP);
     }
 
@@ -2266,6 +2427,52 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
     }
 
     /**
+     * 计算规格在供应窗口内的净需求量（与 checkDemandForShift 步骤3同口径）
+     *
+     * @param spec      规格
+     * @param shiftIndex 当前垫胶班次索引
+     * @param context   排程上下文
+     * @return 供应窗口净需求量
+     */
+    private BigDecimal calcWindowNetDemand(DjPaddingDemand spec, int shiftIndex, DjScheduleContext context) {
+        Map<String, BigDecimal> handoverInventory = context.getHandoverInventory();
+        Map<String, Integer> paddingSupplyDepth = context.getPaddingSupplyDepth();
+
+        BigDecimal incomingInventory = handoverInventory.getOrDefault(spec.getPaddingCode(), BigDecimal.ZERO);
+        int specSupplyDepth = paddingSupplyDepth.getOrDefault(spec.getPaddingCode(),
+                DjEngineConstants.CX_SHIFT_COUNT);
+
+        int formingShiftOffset = context.getFormingShiftOffset() != null ? context.getFormingShiftOffset() : 0;
+        int firstFormingClass = this.getFormingClassByShiftIndex(shiftIndex, context);
+        if (firstFormingClass < 1) {
+            firstFormingClass = shiftIndex + formingShiftOffset;
+        }
+
+        int windowStartClass = firstFormingClass + 1;
+        int windowEndClass = Math.min(firstFormingClass + specSupplyDepth,
+                DjEngineConstants.CX_SHIFT_COUNT);
+
+        BigDecimal demandInWindow = BigDecimal.ZERO;
+        for (int fc = windowStartClass; fc <= windowEndClass; fc++) {
+            demandInWindow = demandInWindow.add(this.calcShiftConsume(
+                    context, spec.getPaddingCode(), fc));
+        }
+
+        BigDecimal netDemand = demandInWindow.subtract(incomingInventory);
+        if (netDemand.compareTo(BigDecimal.ZERO) < 0) {
+            netDemand = BigDecimal.ZERO;
+        }
+
+        // 已收尾规格含损耗率
+        if (spec.isTailFinished()) {
+            BigDecimal lossRate = this.getLossRate(spec.getPaddingCode(), spec.getMachineCode(), context);
+            netDemand = netDemand.multiply(BigDecimal.ONE.add(lossRate)).setScale(2, RoundingMode.HALF_UP);
+        }
+
+        return netDemand;
+    }
+
+    /**
      * 记录排产结果
      */
     private void recordSchedule(Map<String, DjScheduleResult> resultMap, DjPaddingDemand spec, int shiftIndex,
@@ -2296,7 +2503,10 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
         machineShiftSeq.put(shiftIndex, seq);
 
         // 使用 setFieldValueByFieldName 动态设置对应班次的计划量和顺序
-        result.setFieldValueByFieldName(String.format(DjEngineConstants.CLASS_PLAN_QTY_FIELD, shiftIndex), produceQty);
+        // 需累加已有排产量（主循环和补量阶段可能多次记录同一规格同一班次）
+        String planQtyFieldName = String.format(DjEngineConstants.CLASS_PLAN_QTY_FIELD, shiftIndex);
+        BigDecimal currentQty = BigDecimalUtils.valueOf(result.getFieldValueByFieldName(planQtyFieldName));
+        result.setFieldValueByFieldName(planQtyFieldName, currentQty.add(produceQty));
         result.setFieldValueByFieldName(String.format(DjEngineConstants.CLASS_SEQUENCE_FIELD, shiftIndex), seq);
     }
 

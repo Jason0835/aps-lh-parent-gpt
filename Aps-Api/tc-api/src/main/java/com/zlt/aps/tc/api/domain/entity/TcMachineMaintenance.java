@@ -11,7 +11,6 @@ import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 
 import java.util.Date;
-import java.math.BigDecimal;
 
 @ApiModel(value = "胎侧机台维修计划", description = "胎侧机台维修计划")
 @Data
@@ -51,20 +50,6 @@ public class TcMachineMaintenance extends BaseEntity {
     @ApiModelProperty(value = "停机班次", name = "stopShift")
     @TableField(value = "STOP_SHIFT")
     private String stopShift;
-
-    /** 兼容按生产日维护的停机日期 */
-    @JsonFormat(pattern = "yyyy-MM-dd", timezone = "GMT+8")
-    @Excel(name = "ui.data.column.tc.machineMaintenance.stopDate", width = 20, dateFormat = "yyyy-MM-dd")
-    @ImportValidated(date = true)
-    @ApiModelProperty(value = "停机日期", name = "stopDate")
-    @TableField(value = "STOP_DATE")
-    private Date stopDate;
-
-    /** 兼容按班次维护的停机时长，单位小时 */
-    @Excel(name = "ui.data.column.tc.machineMaintenance.stopHours")
-    @ApiModelProperty(value = "停机时长（小时）", name = "stopHours")
-    @TableField(value = "STOP_TIME_HOURS")
-    private BigDecimal stopHours;
 
     @Excel(name = "ui.common.column.remark")
     @ImportValidated(maxLength = 500)

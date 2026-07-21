@@ -252,7 +252,6 @@ public class TcManualScheduleApplicationService {
         }
         LambdaQueryWrapper<TcShiftConfig> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(TcShiftConfig::getFactoryCode, factoryCode);
-        wrapper.eq(TcShiftConfig::getScheduleDate, scheduleDate);
         List<TcShiftConfig> shiftConfigList = this.shiftConfigMapper.selectList(wrapper);
         Map<Integer, TcShiftConfig> shiftConfigMap = shiftConfigList == null ? Collections.emptyMap()
                 : shiftConfigList.stream().filter(item -> item.getShiftOrder() != null)
@@ -263,7 +262,7 @@ public class TcManualScheduleApplicationService {
             if (shiftConfig == null || !"1".equals(shiftConfig.getOpenFlag())) {
                 throw new ServiceException(I18nUtil.getMessage("ui.tc.schedule.manual.shiftClosed"));
             }
-            if (targetDate.equals(today) && this.resolveShiftEndTime(shiftConfig).before(new Date())) {
+            if (targetDate.equals(today) && this.resolveShiftEndTime(shiftConfig, scheduleDate).before(new Date())) {
                 throw new ServiceException(I18nUtil.getMessage("ui.tc.schedule.manual.pastShiftBlocked"));
             }
         }
@@ -273,14 +272,15 @@ public class TcManualScheduleApplicationService {
      * 解析班次结束时间，跨天班次顺延一天。
      *
      * @param shiftConfig 班次配置
+     * @param scheduleDate 排程日期
      * @return 班次结束时间
      */
-    private Date resolveShiftEndTime(TcShiftConfig shiftConfig) {
+    private Date resolveShiftEndTime(TcShiftConfig shiftConfig, Date scheduleDate) {
         String endTime = shiftConfig.getPlanEndTime();
         if (endTime != null && endTime.length() == 5) {
             endTime = endTime + ":00";
         }
-        Date shiftEndTime = DateUtil.parseDateTime(DateUtil.formatDate(shiftConfig.getScheduleDate()) + " " + endTime);
+        Date shiftEndTime = DateUtil.parseDateTime(DateUtil.formatDate(scheduleDate) + " " + endTime);
         return "1".equals(shiftConfig.getCrossDayFlag()) ? DateUtil.offsetDay(shiftEndTime, 1) : shiftEndTime;
     }
 

@@ -57,16 +57,6 @@ public class TcStock extends BaseEntity {
     @TableField(value = "ADJUST_QTY")
     private BigDecimal adjustQty;
 
-    /** MES数据版本，用于库存快照幂等和滚动输入指纹。 */
-    @ApiModelProperty(value = "MES数据版本", name = "dataVersion")
-    @TableField(value = "DATA_VERSION")
-    private String dataVersion;
-
-    /** 公司编码，仅用于MES数据归属，不在界面展示。 */
-    @ApiModelProperty(value = "公司编码", name = "companyCode")
-    @TableField(value = "COMPANY_CODE")
-    private String companyCode;
-
     @Excel(name = "ui.common.column.remark")
     @ImportValidated(maxLength = 500)
     @ApiModelProperty("备注")
