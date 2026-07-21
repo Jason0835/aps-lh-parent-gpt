@@ -144,8 +144,10 @@ export default {
             span: 12,
             type: "select",
             dictData: this.machineOptions,
-            labelKey: "machineCode",
-            valueKey: "machineCode",
+            props: {
+              label: "machineCode",
+              value: "machineCode",
+            },
             filterable: true,
           },
           {
