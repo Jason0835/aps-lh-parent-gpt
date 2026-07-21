@@ -822,9 +822,9 @@ public class TbrProductionContext extends Context {
                         // 如果需求量超过实际库存量，则最多只能处理至低于库存量的最大批次数
                         // 需小于最小批次数则不需要处理
                         if (sumProductionQty.compareTo(stockQty) > 0) {
-                            finalProductionQty = BigDecimalUtils.floor(stockQty, standardLength);
+                            finalProductionQty = BigDecimalUtils.ceil(stockQty, standardLength);
                         } else if (sumProductionQty.compareTo(standardLength) > 0) {
-                            finalProductionQty = BigDecimalUtils.floor(sumProductionQty, standardLength);
+                            finalProductionQty = BigDecimalUtils.ceil(sumProductionQty, standardLength);
                         }
                         stockInfo.setSumProductionQty(finalProductionQty.longValue()); // 计算结果设置到取整后的
                     });
