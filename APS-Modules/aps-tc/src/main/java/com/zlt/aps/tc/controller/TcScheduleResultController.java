@@ -31,7 +31,7 @@ import java.util.List;
 /**
  * 胎侧自动排程结果只读查询与自动排程任务接口。
  */
-@Api(tags = "胎侧自动排程")
+@Api(tags = "胎侧排程结果")
 @RestController
 @RequestMapping("/tcScheduleResult")
 public class TcScheduleResultController extends AbstractDocBizController<TcScheduleResult> {

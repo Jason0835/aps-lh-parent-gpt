@@ -8,6 +8,7 @@ import com.zlt.aps.tm.api.domain.dto.TmRollingRecalcRequestDTO;
 import com.zlt.aps.tm.api.domain.dto.TmScheduleResultImportDTO;
 import com.zlt.aps.tm.api.domain.entity.TmScheduleResult;
 import com.zlt.aps.tm.api.domain.vo.TmAutoScheduleRequestVo;
+import com.zlt.aps.tm.api.domain.vo.TmInsertTaskRequestVo;
 import com.zlt.aps.tm.api.domain.vo.TmScheduleShiftDateVO;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.cloud.openfeign.FeignClient;
@@ -155,12 +156,12 @@ public interface ITmScheduleResultRemoteService {
     /**
      * 人工插入排程任务。
      *
-     * @param scheduleResult 插单内容
+     * @param requestVo 插单内容
      * @return 插单结果
      */
     @ApiOperation("人工插单")
     @PostMapping("/tmScheduleResult/insertTask")
-    AjaxResult insertTask(@RequestBody TmScheduleResult scheduleResult);
+    AjaxResult insertTask(@RequestBody TmInsertTaskRequestVo requestVo);
 
     /**
      * 调整排程计划量。

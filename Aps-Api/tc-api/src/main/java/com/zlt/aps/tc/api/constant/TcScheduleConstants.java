@@ -76,8 +76,12 @@ public final class TcScheduleConstants {
     /** 换规格时间参数键。 */
     public static final String PARAM_SPEC_CHANGE_MINUTES = "TC_SPEC_CHANGE_MINUTES";
 
-    /** 换胶时间参数键。 */
+    /** 换胶时间参数键，已废弃，自动排程不再按时间折算换胶产能。 */
+    @Deprecated
     public static final String PARAM_GLUE_CHANGE_MINUTES = "TC_GLUE_CHANGE_MINUTES";
+
+    /** 主胶料切换固定产能扣减参数键。 */
+    public static final String PARAM_GLUE_CHANGE_CAPACITY_DEDUCT = "TC_GLUE_CHANGE_CAPACITY_DEDUCT";
 
     /** 整车率参数键，控制工厂级工装实际可用比例。 */
     public static final String PARAM_VEHICLE_RATE = "TC_VEHICLE_RATE";
@@ -196,8 +200,12 @@ public final class TcScheduleConstants {
     /** 换规格时间默认值。 */
     public static final String DEFAULT_SPEC_CHANGE_MINUTES = "0";
 
-    /** 换胶时间默认值。 */
+    /** 换胶时间默认值，已废弃。 */
+    @Deprecated
     public static final String DEFAULT_GLUE_CHANGE_MINUTES = "0";
+
+    /** 主胶料切换固定产能扣减默认值，单位米。 */
+    public static final String DEFAULT_GLUE_CHANGE_CAPACITY_DEDUCT = "200";
 
     /** 整车率默认值。 */
     public static final String DEFAULT_VEHICLE_RATE = "1";

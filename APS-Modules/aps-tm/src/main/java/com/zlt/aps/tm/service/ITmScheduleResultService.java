@@ -2,10 +2,7 @@ package com.zlt.aps.tm.service;
 
 import com.zlt.aps.tm.api.domain.dto.TmRollingRecalcRequestDTO;
 import com.zlt.aps.tm.api.domain.entity.TmScheduleResult;
-import com.zlt.aps.tm.api.domain.vo.TmAutoScheduleRequestVo;
-import com.zlt.aps.tm.api.domain.vo.TmAutoScheduleResponseVo;
-import com.zlt.aps.tm.api.domain.vo.TmRollingRecalcResponseVO;
-import com.zlt.aps.tm.api.domain.vo.TmScheduleShiftDateVO;
+import com.zlt.aps.tm.api.domain.vo.*;
 import com.zlt.bill.common.service.IDocService;
 
 import java.util.Date;
@@ -118,11 +115,11 @@ public interface ITmScheduleResultService extends IDocService<TmScheduleResult> 
     /**
      * 插入人工插单排程结果。
      *
-     * @param scheduleResult 插单结果
+     * @param requestVo 插单请求
      * @return 写入行数
      * @throws com.ruoyi.common.exception.ServiceException 必填字段缺失时抛出
      */
-    int insertTask(TmScheduleResult scheduleResult);
+    int insertTask(TmInsertTaskRequestVo requestVo);
 
     /**
      * 批量删除未发布排程结果并滚动重排受影响机台。

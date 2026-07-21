@@ -321,6 +321,7 @@ public class TcTaskChainScheduleService {
                 if (currentTask != null) {
                     currentTask.setPreviousSpecSwitchHours(BigDecimal.ZERO);
                     currentTask.setPreviousGlueSwitchHours(BigDecimal.ZERO);
+                    currentTask.setPreviousGlueSwitchCapacityDeduct(BigDecimal.ZERO);
                 }
                 continue;
             }
@@ -332,6 +333,7 @@ public class TcTaskChainScheduleService {
                 if (currentTask != null) {
                     currentTask.setPreviousSpecSwitchHours(BigDecimal.ZERO);
                     currentTask.setPreviousGlueSwitchHours(BigDecimal.ZERO);
+                    currentTask.setPreviousGlueSwitchCapacityDeduct(BigDecimal.ZERO);
                 }
                 log.warn("[TC_TASK_TIME] batchNo={}, traceId={}, machineCode={}, shiftOrder={}, taskId={}, reason=MACHINE_SPEED_MISSING",
                         context.getBatchNo(), context.getTraceId(), machineCode, shiftOrder, node.getTaskId());
@@ -339,11 +341,16 @@ public class TcTaskChainScheduleService {
             }
             BigDecimal specSwitchHours = this.resolveSpecSwitchHours(context, previousTask, externalPredecessor,
                     currentTask);
-            BigDecimal glueSwitchHours = this.resolveGlueSwitchHours(context, previousTask, externalPredecessor,
-                    currentTask);
+            String previousGlueCode = previousTask == null
+                    ? (externalPredecessor == null ? null : externalPredecessor.getGlueCode())
+                    : previousTask.getGlueCode();
+            BigDecimal glueSwitchCapacityDeduct = this.resolveGlueSwitchCapacityDeduct(context, previousTask,
+                    externalPredecessor, currentTask);
+            BigDecimal glueSwitchHours = this.convertCapacityDeductToHours(glueSwitchCapacityDeduct, machineSpeed);
             if (currentTask != null) {
                 currentTask.setPreviousSpecSwitchHours(specSwitchHours);
                 currentTask.setPreviousGlueSwitchHours(glueSwitchHours);
+                currentTask.setPreviousGlueSwitchCapacityDeduct(glueSwitchCapacityDeduct);
             }
             long switchSeconds = specSwitchHours.add(glueSwitchHours)
                     .multiply(BigDecimal.valueOf(TcScheduleConstants.SECONDS_PER_HOUR))
@@ -356,9 +363,11 @@ public class TcTaskChainScheduleService {
             cursorTime = endTime;
             previousTask = currentTask;
             externalPredecessor = null;
-            log.info("[TC_TASK_SWITCH] batchNo={}, traceId={}, machineCode={}, shiftOrder={}, taskId={}, specSwitchHours={}, glueSwitchHours={}, switchCapacityDeduct={}",
+            log.info("[TC_TASK_SWITCH] batchNo={}, traceId={}, machineCode={}, shiftOrder={}, taskId={}, previousGlueCode={}, currentGlueCode={}, specSwitchHours={}, glueSwitchHours={}, glueSwitchCapacityDeduct={}, switchCapacityDeduct={}",
                     context.getBatchNo(), context.getTraceId(), machineCode, shiftOrder, node.getTaskId(),
-                    specSwitchHours, glueSwitchHours, specSwitchHours.add(glueSwitchHours).multiply(machineSpeed));
+                    previousGlueCode, currentTask == null ? null : currentTask.getGlueCode(),
+                    specSwitchHours, glueSwitchHours, glueSwitchCapacityDeduct,
+                    specSwitchHours.multiply(machineSpeed).add(glueSwitchCapacityDeduct));
         }
     }
 
@@ -436,24 +445,61 @@ public class TcTaskChainScheduleService {
     }
 
     /**
-     * 计算胶料切换小时数。
+     * 计算主胶料切换固定产能扣减量。
      *
      * @param context             排程上下文
      * @param previousTask        当前链内前置任务
      * @param externalPredecessor 上一班或排程日前置任务
      * @param currentTask         当前任务
-     * @return 胶料切换小时数
+     * @return 主胶料切换固定产能扣减量
      */
-    private BigDecimal resolveGlueSwitchHours(TcScheduleContext context, TcTaskDraft previousTask,
-                                              TcTaskPredecessor externalPredecessor, TcTaskDraft currentTask) {
+    private BigDecimal resolveGlueSwitchCapacityDeduct(TcScheduleContext context, TcTaskDraft previousTask,
+                                                       TcTaskPredecessor externalPredecessor,
+                                                       TcTaskDraft currentTask) {
         String previousGlueCode = previousTask == null
                 ? (externalPredecessor == null ? null : externalPredecessor.getGlueCode())
                 : previousTask.getGlueCode();
-        if (currentTask == null || previousGlueCode == null
-                || Objects.equals(previousGlueCode, currentTask.getGlueCode())) {
+        if (currentTask == null || StrUtil.isBlank(previousGlueCode) || StrUtil.isBlank(currentTask.getGlueCode())
+                || Objects.equals(previousGlueCode.trim(), currentTask.getGlueCode().trim())) {
             return BigDecimal.ZERO;
         }
-        return this.resolveSwitchParamHours(context, TcScheduleConstants.PARAM_GLUE_CHANGE_MINUTES);
+        TcParamValue paramValue = context.getParamMap().get(TcScheduleConstants.PARAM_GLUE_CHANGE_CAPACITY_DEDUCT);
+        String value = paramValue == null
+                ? TcScheduleConstants.DEFAULT_GLUE_CHANGE_CAPACITY_DEDUCT
+                : StrUtil.blankToDefault(paramValue.getEffectiveValue(),
+                TcScheduleConstants.DEFAULT_GLUE_CHANGE_CAPACITY_DEDUCT);
+        try {
+            BigDecimal deduct = new BigDecimal(value);
+            if (deduct.compareTo(BigDecimal.ZERO) < 0) {
+                log.warn("[TC_SWITCH_PARAM] batchNo={}, traceId={}, paramCode={}, paramValue={}, reason=NEGATIVE_VALUE",
+                        context.getBatchNo(), context.getTraceId(),
+                        TcScheduleConstants.PARAM_GLUE_CHANGE_CAPACITY_DEDUCT, value);
+                return BigDecimal.ZERO;
+            }
+            return deduct;
+        } catch (NumberFormatException exception) {
+            log.warn("[TC_SWITCH_PARAM] batchNo={}, traceId={}, paramCode={}, paramValue={}, defaultValue={}, reason=INVALID_NUMBER",
+                    context.getBatchNo(), context.getTraceId(),
+                    TcScheduleConstants.PARAM_GLUE_CHANGE_CAPACITY_DEDUCT, value,
+                    TcScheduleConstants.DEFAULT_GLUE_CHANGE_CAPACITY_DEDUCT, exception);
+            return new BigDecimal(TcScheduleConstants.DEFAULT_GLUE_CHANGE_CAPACITY_DEDUCT);
+        }
+    }
+
+    /**
+     * 将固定产能扣减量按当前任务速度折算为切换小时数。
+     *
+     * @param capacityDeduct 固定产能扣减量
+     * @param machineSpeed 当前任务机台速度
+     * @return 切换小时数；速度无效时返回0
+     */
+    private BigDecimal convertCapacityDeductToHours(BigDecimal capacityDeduct, BigDecimal machineSpeed) {
+        if (this.nvl(capacityDeduct).compareTo(BigDecimal.ZERO) <= 0
+                || this.nvl(machineSpeed).compareTo(BigDecimal.ZERO) <= 0) {
+            return BigDecimal.ZERO;
+        }
+        return capacityDeduct.divide(machineSpeed, TcScheduleConstants.DECIMAL_CALCULATION_SCALE,
+                RoundingMode.HALF_UP);
     }
 
     /**

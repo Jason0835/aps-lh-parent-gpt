@@ -247,22 +247,29 @@ public class TcScheduleBoardQueryService {
     private List<TcScheduleBoardDateColumnVo> loadDateColumns(TcScheduleBoardQueryVo queryVo) {
         LambdaQueryWrapper<TcShiftConfig> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(TcShiftConfig::getFactoryCode, queryVo.getFactoryCode());
-        wrapper.ge(TcShiftConfig::getScheduleDate, queryVo.getStartDate());
-        wrapper.le(TcShiftConfig::getScheduleDate, queryVo.getEndDate());
-        wrapper.orderByAsc(TcShiftConfig::getScheduleDate, TcShiftConfig::getShiftOrder);
+        wrapper.orderByAsc(TcShiftConfig::getShiftOrder);
         List<TcShiftConfig> shiftConfigList = this.emptyIfNull(this.shiftConfigMapper.selectList(wrapper));
-        return shiftConfigList.stream().map(this::buildDateColumn).collect(Collectors.toList());
+        List<TcScheduleBoardDateColumnVo> columnList = new ArrayList<>();
+        Date currentDate = DateUtil.beginOfDay(queryVo.getStartDate());
+        Date endDate = DateUtil.beginOfDay(queryVo.getEndDate());
+        while (!currentDate.after(endDate)) {
+            Date scheduleDate = currentDate;
+            shiftConfigList.forEach(shiftConfig -> columnList.add(this.buildDateColumn(scheduleDate, shiftConfig)));
+            currentDate = DateUtil.offsetDay(currentDate, 1);
+        }
+        return columnList;
     }
 
     /**
      * 转换班次列对象。
      *
+     * @param scheduleDate 排程日期
      * @param shiftConfig 班次配置
      * @return 日期班次列
      */
-    private TcScheduleBoardDateColumnVo buildDateColumn(TcShiftConfig shiftConfig) {
+    private TcScheduleBoardDateColumnVo buildDateColumn(Date scheduleDate, TcShiftConfig shiftConfig) {
         TcScheduleBoardDateColumnVo columnVo = new TcScheduleBoardDateColumnVo();
-        columnVo.setScheduleDate(shiftConfig.getScheduleDate());
+        columnVo.setScheduleDate(scheduleDate);
         columnVo.setShiftOrder(shiftConfig.getShiftOrder());
         columnVo.setShiftCode(shiftConfig.getShiftCode());
         columnVo.setShiftName(shiftConfig.getShiftName());

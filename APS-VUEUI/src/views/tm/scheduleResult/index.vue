@@ -179,38 +179,6 @@ export default {
   },
   data() {
     return {
-      importColumns: [
-        {
-          label: this.$t("ui.data.column.tm.scheduleResult.factoryCode"),
-          prop: "factoryCode",
-          type: "select",
-          dictData: this.dict.type.biz_factory_name,
-          filterable: true,
-          clearable: false,
-        },
-        {
-          label: this.$t("ui.data.column.tm.scheduleResult.scheduleDate"),
-          prop: "scheduleDate",
-          type: "date",
-          dateType: "date",
-          valueFormat: "yyyy-MM-dd",
-          clearable: false,
-        },
-        {
-          label: "",
-          prop: "updateSupport",
-          render: (form) => {
-            return (
-              <el-checkbox
-                label={this.$t("common.rule.updateSupport")}
-                v-model={form.updateSupport}
-              >
-                {this.$t("common.rule.updateSupport")}
-              </el-checkbox>
-            );
-          },
-        },
-      ],
       loading: false,
       data: [],
       selection: [],
@@ -263,6 +231,41 @@ export default {
     ...mapState({
       machines: (state) => state.tm.machines,
     }),
+    // 导入弹窗列配置放在 computed 中，确保 this.dict 已初始化（data() 执行时字典 mixin 尚未注入 dict）
+    importColumns() {
+      return [
+        {
+          label: this.$t("ui.data.column.tm.scheduleResult.factoryCode"),
+          prop: "factoryCode",
+          type: "select",
+          dictData: this.dict.type.biz_factory_name,
+          filterable: true,
+          clearable: false,
+        },
+        {
+          label: this.$t("ui.data.column.tm.scheduleResult.scheduleDate"),
+          prop: "scheduleDate",
+          type: "date",
+          dateType: "date",
+          valueFormat: "yyyy-MM-dd",
+          clearable: false,
+        },
+        {
+          label: "",
+          prop: "updateSupport",
+          render: (form) => {
+            return (
+              <el-checkbox
+                label={this.$t("common.rule.updateSupport")}
+                v-model={form.updateSupport}
+              >
+                {this.$t("common.rule.updateSupport")}
+              </el-checkbox>
+            );
+          },
+        },
+      ];
+    },
     columns() {
       return [
         { type: "selection", fixed: "left" },
@@ -582,7 +585,10 @@ export default {
     },
     handleAdd() {
       if (this.$refs.infoRef) {
-        this.$refs.infoRef.show();
+        this.$refs.infoRef.show({
+          factoryCode: this.query.factoryCode || this.search.factoryCode || "116",
+          scheduleDate: this.query.scheduleDate || this.search.scheduleDate,
+        });
       }
     },
     // 自动排程入口：打开弹窗选择工厂和排程日期，具体接口由弹窗调用胎面接口。

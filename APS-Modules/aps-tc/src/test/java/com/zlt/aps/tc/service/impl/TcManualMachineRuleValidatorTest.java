@@ -11,6 +11,7 @@ import org.mockito.junit.MockitoJUnitRunner;
 
 import java.math.BigDecimal;
 import java.sql.Date;
+import java.sql.Timestamp;
 import java.time.LocalDate;
 import java.util.Collections;
 
@@ -68,7 +69,6 @@ public class TcManualMachineRuleValidatorTest {
 
         TcShiftConfig shiftConfig = new TcShiftConfig();
         shiftConfig.setFactoryCode("116");
-        shiftConfig.setScheduleDate(Date.valueOf(LocalDate.of(2026, 7, 15)));
         shiftConfig.setShiftOrder(1);
         shiftConfig.setShiftCode("CLASS1");
         shiftConfig.setShiftHours(8);
@@ -209,9 +209,9 @@ public class TcManualMachineRuleValidatorTest {
         TcMachineMaintenance maintenance = new TcMachineMaintenance();
         maintenance.setFactoryCode("116");
         maintenance.setMachineCode("TC02");
-        maintenance.setStopDate(Date.valueOf(LocalDate.of(2026, 7, 15)));
+        maintenance.setStopStartTime(Timestamp.valueOf("2026-07-15 00:00:00"));
+        maintenance.setStopEndTime(Timestamp.valueOf("2026-07-15 01:00:00"));
         maintenance.setStopShift("CLASS1");
-        maintenance.setStopHours(BigDecimal.ONE);
         TcMachineSpeed commonSpeed = new TcMachineSpeed();
         commonSpeed.setSidewallCode("SW01");
         commonSpeed.setProductSpeed(new BigDecimal("5000"));

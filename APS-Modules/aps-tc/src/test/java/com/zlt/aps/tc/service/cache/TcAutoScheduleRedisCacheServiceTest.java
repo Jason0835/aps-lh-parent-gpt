@@ -57,16 +57,16 @@ public class TcAutoScheduleRedisCacheServiceTest {
     public void shouldFallbackAndCacheEmptyListForFiveMinutes() {
         TcAutoScheduleRedisCacheService cacheService = new TcAutoScheduleRedisCacheService(this.redisService);
         AtomicInteger loadCount = new AtomicInteger();
-        when(this.redisService.getCacheObject("aps:tc:autoSchedule:baseData:params:F1:2026-07-14")).thenReturn(null);
+        when(this.redisService.getCacheObject("aps:tc:autoSchedule:baseData:params:F1")).thenReturn(null);
 
-        List<String> resultList = cacheService.getCachedList("params:F1:2026-07-14", () -> {
+        List<String> resultList = cacheService.getCachedList("params:F1", () -> {
             loadCount.incrementAndGet();
             return Collections.emptyList();
         });
 
         assertTrue(resultList.isEmpty());
         assertEquals(1, loadCount.get());
-        verify(this.redisService).setCacheObject(eq("aps:tc:autoSchedule:baseData:params:F1:2026-07-14"),
+        verify(this.redisService).setCacheObject(eq("aps:tc:autoSchedule:baseData:params:F1"),
                 eq(Collections.emptyList()), eq(5L), eq(TimeUnit.MINUTES));
     }
 
@@ -76,8 +76,8 @@ public class TcAutoScheduleRedisCacheServiceTest {
     @Test
     public void shouldClearFactoryAndScheduleDateCacheKeys() {
         TcAutoScheduleRedisCacheService cacheService = new TcAutoScheduleRedisCacheService(this.redisService);
-        when(this.redisService.keys("aps:tc:autoSchedule:baseData:params:F1:2026-07-14"))
-                .thenReturn(Collections.singletonList("aps:tc:autoSchedule:baseData:params:F1:2026-07-14"));
+        when(this.redisService.keys("aps:tc:autoSchedule:baseData:params:F1"))
+                .thenReturn(Collections.singletonList("aps:tc:autoSchedule:baseData:params:F1"));
         when(this.redisService.keys("aps:tc:autoSchedule:baseData:machine:F1"))
                 .thenReturn(Collections.singletonList("aps:tc:autoSchedule:baseData:machine:F1"));
         when(this.redisService.keys("aps:tc:autoSchedule:baseData:calendar:F1:*:2026-07-14"))

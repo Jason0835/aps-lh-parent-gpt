@@ -19,10 +19,7 @@ import com.zlt.aps.tm.api.domain.dto.TmRollingRecalcRequestDTO;
 import com.zlt.aps.tm.api.domain.entity.TmDispatcherLog;
 import com.zlt.aps.tm.api.domain.entity.TmMachineInfo;
 import com.zlt.aps.tm.api.domain.entity.TmScheduleResult;
-import com.zlt.aps.tm.api.domain.vo.TmAutoScheduleRequestVo;
-import com.zlt.aps.tm.api.domain.vo.TmAutoScheduleResponseVo;
-import com.zlt.aps.tm.api.domain.vo.TmRollingRecalcResponseVO;
-import com.zlt.aps.tm.api.domain.vo.TmScheduleShiftDateVO;
+import com.zlt.aps.tm.api.domain.vo.*;
 import com.zlt.aps.tm.api.enums.TmAutoScheduleIssueCategoryEnum;
 import com.zlt.aps.tm.api.enums.TmAutoScheduleIssueLevelEnum;
 import com.zlt.aps.tm.api.enums.TmReleaseStatusTransition;
@@ -87,6 +84,9 @@ public class TmScheduleResultServiceImpl extends AbstractDocService<TmScheduleRe
 
     @Resource
     private TmManualOperationFacade tmManualOperationFacade;
+
+    @Resource
+    private TmManualScheduleApplicationService tmManualScheduleApplicationService;
 
     @Resource
     private ITmRollingUpdateService tmRollingUpdateService;
@@ -620,13 +620,13 @@ public class TmScheduleResultServiceImpl extends AbstractDocService<TmScheduleRe
     /**
      * 插入人工插单排程结果。
      *
-     * @param scheduleResult 插单排程结果
+     * @param requestVo 插单请求
      * @return 写入行数
      * @throws ServiceException 门面安全校验失败时抛出
      */
     @Override
-    public int insertTask(TmScheduleResult scheduleResult) {
-        return tmManualOperationFacade.insertTask(scheduleResult);
+    public int insertTask(TmInsertTaskRequestVo requestVo) {
+        return tmManualScheduleApplicationService.insertTask(requestVo);
     }
 
     /**

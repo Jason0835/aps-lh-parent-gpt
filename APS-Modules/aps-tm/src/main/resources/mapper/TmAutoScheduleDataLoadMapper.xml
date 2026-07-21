@@ -280,4 +280,24 @@
         </foreach>
     </select>
 
+    <!-- 人工插单：按施工版本、更新时间和主键稳定选择指定胎面的最新有效施工资料 -->
+    <select id="selectLatestConstructionByTread" resultMap="TmConstructionTreadRowResult">
+        SELECT ci.CONSTRUCTION_CODE,
+               ci.CONSTRUCTION_VERSION,
+               ci.TREAD_CODE,
+               ci.TREAD_SHOULDER_LENGTH,
+               ci.TREAD_MOUTH_PLATE,
+               ci.TREAD_RUBBER_CATEGORY
+        FROM T_MDM_CONSTRUCTION_INFO ci
+        WHERE ci.IS_DELETE = 0
+          AND ci.FACTORY_CODE = #{factoryCode}
+          AND ci.TREAD_CODE = #{treadCode}
+          AND ci.CONSTRUCTION_VERSION IS NOT NULL
+          AND ci.CONSTRUCTION_VERSION &lt;&gt; ''
+        ORDER BY ci.CONSTRUCTION_VERSION DESC,
+                 COALESCE(ci.UPDATE_TIME, ci.CREATE_TIME) DESC,
+                 ci.ID DESC
+        LIMIT 1
+    </select>
+
 </mapper>

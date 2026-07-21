@@ -14,6 +14,7 @@ import com.zlt.aps.tm.api.domain.dto.TmRollingRecalcRequestDTO;
 import com.zlt.aps.tm.api.domain.dto.TmScheduleResultImportDTO;
 import com.zlt.aps.tm.api.domain.entity.TmScheduleResult;
 import com.zlt.aps.tm.api.domain.vo.TmAutoScheduleRequestVo;
+import com.zlt.aps.tm.api.domain.vo.TmInsertTaskRequestVo;
 import com.zlt.aps.tm.api.domain.vo.TmScheduleShiftDateVO;
 import com.zlt.aps.tm.domain.TmAutoScheduleTask;
 import com.zlt.aps.tm.mapper.TmScheduleResultMapper;
@@ -183,14 +184,14 @@ public class TmScheduleResultController extends AbstractDocBizController<TmSched
     /**
      * 人工插单。
      *
-     * @param scheduleResult 插单排程结果
+     * @param requestVo 插单请求
      * @return 插入结果
      */
     @Log(title = "ui.data.column.tm.scheduleResult.modelName", businessType = BusinessType.INSERT)
     @ApiOperation("人工插单")
     @PostMapping("/insertTask")
-    public AjaxResult insertTask(@RequestBody TmScheduleResult scheduleResult) {
-        return toAjax(tmScheduleResultService.insertTask(scheduleResult));
+    public AjaxResult insertTask(@RequestBody TmInsertTaskRequestVo requestVo) {
+        return toAjax(tmScheduleResultService.insertTask(requestVo));
     }
 
     /**

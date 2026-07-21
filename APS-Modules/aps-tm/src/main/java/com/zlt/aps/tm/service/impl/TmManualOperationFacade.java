@@ -464,21 +464,53 @@ public class TmManualOperationFacade {
         scheduleResult.setMachineCode(StrUtil.trim(scheduleResult.getMachineCode()));
         scheduleResult.setBatchNo(StrUtil.trim(scheduleResult.getBatchNo()));
         scheduleResult.setTreadCode(StrUtil.trim(scheduleResult.getTreadCode()));
-        // 人工新插单没有自动排程来源，禁止接收调用方伪造的来源快照。
-        scheduleResult.setTreadShoulderLength(null);
-        scheduleResult.setCxRemainQty(null);
-        scheduleResult.setMaterialCode(null);
-        scheduleResult.setMaterialDesc(null);
-        scheduleResult.setEmbryoCode(null);
-        scheduleResult.setMainMaterialDesc(null);
-        scheduleResult.setCxMachineCode(null);
-        scheduleResult.setSixClockStockQty(null);
-        scheduleResult.setCurlRollLength(null);
         if (StrUtil.isBlank(scheduleResult.getMachineCode())) {
             throw new ServiceException(this.resolveTmMessage("ui.data.alert.tm.schedule.machineCodeEmpty", "排程机台不能为空"));
         }
         if (StrUtil.isBlank(scheduleResult.getTreadCode())) {
             throw new ServiceException(this.resolveTmMessage("ui.data.alert.tm.schedule.insertTreadCodeEmpty", "插单胎面不能为空"));
+        }
+        this.validateInsertShiftFields(scheduleResult);
+    }
+
+    /**
+     * 校验人工插单只包含 class1~class3，并且每个参与班次的计划量和顺序成对。
+     *
+     * @param scheduleResult 插单排程结果
+     * @throws ServiceException 班次字段不符合插单契约时抛出
+     */
+    private void validateInsertShiftFields(TmScheduleResult scheduleResult) {
+        boolean hasPlanQty = false;
+        for (int shiftOrder = 1; shiftOrder <= TmScheduleConstants.TM_MAX_SHIFT_ORDER; shiftOrder++) {
+            String planQtyField = String.format(TmScheduleConstants.SHIFT_PLAN_QTY_FIELD_TEMPLATE, shiftOrder);
+            String sequenceField = String.format(TmScheduleConstants.SHIFT_SEQUENCE_FIELD_TEMPLATE, shiftOrder);
+            String analysisField = String.format(TmScheduleConstants.SHIFT_ANALYSIS_FIELD_TEMPLATE, shiftOrder);
+            BigDecimal planQty = (BigDecimal) scheduleResult.getFieldValueByFieldName(planQtyField);
+            Integer sequence = (Integer) scheduleResult.getFieldValueByFieldName(sequenceField);
+            Object analysis = scheduleResult.getFieldValueByFieldName(analysisField);
+            if (shiftOrder > 3 && (planQty != null || sequence != null || analysis != null)) {
+                throw new ServiceException(this.resolveTmMessage(
+                        "ui.data.alert.tm.schedule.insertShiftPairRequired", "插单班次计划量和顺序必须成对填写"));
+            }
+            if (shiftOrder > 3) {
+                continue;
+            }
+            if (planQty == null) {
+                if (sequence != null || analysis != null) {
+                    throw new ServiceException(this.resolveTmMessage(
+                            "ui.data.alert.tm.schedule.insertShiftPairRequired", "插单班次计划量和顺序必须成对填写"));
+                }
+                continue;
+            }
+            if (planQty.compareTo(BigDecimal.ZERO) <= 0 || sequence == null || sequence < 1) {
+                throw new ServiceException(this.resolveTmMessage(
+                        "ui.data.alert.tm.schedule.insertShiftPairRequired", "插单班次计划量和顺序必须成对填写"));
+            }
+            hasPlanQty = true;
+        }
+        if (!hasPlanQty) {
+            throw new ServiceException(this.resolveTmMessage(
+                    "ui.data.alert.tm.schedule.insertPlanQtyRequired", "至少填写一个班次的计划量和顺序"));
         }
     }
 
@@ -999,20 +1031,27 @@ public class TmManualOperationFacade {
      * @throws ServiceException 插入位置非法时抛出
      */
     void validateInsertAfterSecondSequence(TmScheduleResult scheduleResult) {
-        Integer shiftOrder = TmInsertPositionValidator.resolveShiftOrder(scheduleResult);
-        Integer insertSequence = TmInsertPositionValidator.resolveSequence(scheduleResult, shiftOrder);
-        if (shiftOrder == null || insertSequence == null || StrUtil.isBlank(scheduleResult.getMachineCode())) {
+        if (scheduleResult == null || StrUtil.isBlank(scheduleResult.getMachineCode())) {
             return;
         }
         List<TmScheduleResult> resultList = this.loadManualOpSnapshot(scheduleResult,
                 Collections.singletonList(scheduleResult.getMachineCode()));
-        List<Integer> inProductionSequenceList = resultList.stream()
-                .filter(item -> TmInsertPositionValidator.getFinishQty(item, shiftOrder).compareTo(BigDecimal.ZERO) > 0)
-                .map(item -> TmInsertPositionValidator.resolveSequence(item, shiftOrder))
-                .filter(Objects::nonNull).sorted().collect(Collectors.toList());
-        if (inProductionSequenceList.size() >= 2 && insertSequence <= inProductionSequenceList.get(1)) {
-            TmScheduleErrorCodeEnum errorCode = TmScheduleErrorCodeEnum.TM_INSERT_POSITION_INVALID;
-            throw new ServiceException(this.resolveTmMessage(errorCode.getMessageKey(), errorCode.getDefaultMessage()));
+        for (int shiftOrder = 1; shiftOrder <= 3; shiftOrder++) {
+            Integer insertSequence = (Integer) scheduleResult.getFieldValueByFieldName(
+                    String.format(TmScheduleConstants.SHIFT_SEQUENCE_FIELD_TEMPLATE, shiftOrder));
+            if (insertSequence == null) {
+                continue;
+            }
+            final int currentShiftOrder = shiftOrder;
+            List<Integer> inProductionSequenceList = resultList.stream()
+                    .filter(item -> TmInsertPositionValidator.getFinishQty(item, currentShiftOrder)
+                            .compareTo(BigDecimal.ZERO) > 0)
+                    .map(item -> TmInsertPositionValidator.resolveSequence(item, currentShiftOrder))
+                    .filter(Objects::nonNull).sorted().collect(Collectors.toList());
+            if (inProductionSequenceList.size() >= 2 && insertSequence <= inProductionSequenceList.get(1)) {
+                TmScheduleErrorCodeEnum errorCode = TmScheduleErrorCodeEnum.TM_INSERT_POSITION_INVALID;
+                throw new ServiceException(this.resolveTmMessage(errorCode.getMessageKey(), errorCode.getDefaultMessage()));
+            }
         }
     }
 

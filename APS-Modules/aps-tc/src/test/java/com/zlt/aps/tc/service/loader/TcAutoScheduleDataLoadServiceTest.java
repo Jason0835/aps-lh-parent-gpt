@@ -234,8 +234,8 @@ public class TcAutoScheduleDataLoadServiceTest {
      */
     @Test
     public void shouldResolveBAndLegacyBomVersionMode() {
-        assertEquals(TcVersionMatchModeEnum.B, TcVersionMatchModeEnum.resolve("B"));
-        assertEquals(TcVersionMatchModeEnum.B, TcVersionMatchModeEnum.resolve("BOM"));
+        assertEquals(TcVersionMatchModeEnum.BOM, TcVersionMatchModeEnum.resolve("B"));
+        assertEquals(TcVersionMatchModeEnum.BOM, TcVersionMatchModeEnum.resolve("BOM"));
         assertEquals(TcVersionMatchModeEnum.RECIPE, TcVersionMatchModeEnum.resolve("UNKNOWN"));
     }
 

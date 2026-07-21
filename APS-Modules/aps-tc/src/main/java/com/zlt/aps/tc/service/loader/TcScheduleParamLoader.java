@@ -1,7 +1,6 @@
 package com.zlt.aps.tc.service.loader;
 
 import cn.hutool.core.collection.CollUtil;
-import cn.hutool.core.date.DateUtil;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ruoyi.common.i18n.utils.I18nUtil;
@@ -49,13 +48,8 @@ public class TcScheduleParamLoader {
         LambdaQueryWrapper<TcParams> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(TcParams::getFactoryCode, context.getFactoryCode());
         wrapper.eq(TcParams::getEnableStatus, TcYesNoEnum.YES.getCode());
-        wrapper.and(condition -> condition.isNull(TcParams::getEffectiveStartTime)
-                .or().le(TcParams::getEffectiveStartTime, context.getScheduleDate()));
-        wrapper.and(condition -> condition.isNull(TcParams::getEffectiveEndTime)
-                .or().ge(TcParams::getEffectiveEndTime, context.getScheduleDate()));
-        String scheduleDateText = DateUtil.formatDate(context.getScheduleDate());
         List<TcParams> paramsList = cacheService.getCachedList(
-                "params:" + context.getFactoryCode() + ":" + scheduleDateText,
+                "params:" + context.getFactoryCode(),
                 () -> paramsMapper.selectList(wrapper));
         Map<String, TcParamValue> paramMap = new HashMap<>();
         if (CollUtil.isNotEmpty(paramsList)) {
@@ -136,8 +130,8 @@ public class TcScheduleParamLoader {
                 TcScheduleConstants.DEFAULT_OPEN_SHIFT_THRESHOLD);
         this.putDefaultParam(paramMap, TcScheduleConstants.PARAM_SPEC_CHANGE_MINUTES,
                 TcScheduleConstants.DEFAULT_SPEC_CHANGE_MINUTES);
-        this.putDefaultParam(paramMap, TcScheduleConstants.PARAM_GLUE_CHANGE_MINUTES,
-                TcScheduleConstants.DEFAULT_GLUE_CHANGE_MINUTES);
+        this.putDefaultParam(paramMap, TcScheduleConstants.PARAM_GLUE_CHANGE_CAPACITY_DEDUCT,
+                TcScheduleConstants.DEFAULT_GLUE_CHANGE_CAPACITY_DEDUCT);
         this.putDefaultParam(paramMap, TcScheduleConstants.PARAM_VEHICLE_RATE,
                 TcScheduleConstants.DEFAULT_VEHICLE_RATE);
         this.putDefaultParam(paramMap, TcScheduleConstants.PARAM_SHIFT_MAX_CAPACITY,

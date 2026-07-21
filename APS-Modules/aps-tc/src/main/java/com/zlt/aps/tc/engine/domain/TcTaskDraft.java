@@ -175,6 +175,9 @@ public class TcTaskDraft {
     /** 上个胶料切换时长，单位小时 */
     private BigDecimal previousGlueSwitchHours;
 
+    /** 上个主胶料切换固定产能扣减量，单位米 */
+    private BigDecimal previousGlueSwitchCapacityDeduct;
+
     /** 按当前班次开始时间和库存供应时长推算的库存不足时间 */
     private Date stockShortageTime;
 
