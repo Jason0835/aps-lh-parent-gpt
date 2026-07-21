@@ -50,6 +50,26 @@ public class Cd15SplitCutGroupBuilder {
                 .findFirst();
     }
 
+    /**
+     * 判断单个规格是否满足一出二的静态条件。
+     * 动态机台模式、产能、库排和工装条件由后续试算与提交阶段校验。
+     */
+    public boolean canSingleSpecSplit(
+            Cd15ScheduleCandidate candidate,
+            Map<String, BigDecimal> angleWidthMaxByAngle) {
+        if (!this.canSplit(candidate) || angleWidthMaxByAngle == null) {
+            return false;
+        }
+        BigDecimal maxWidth = angleWidthMaxByAngle.get(
+                candidate.getCuttingAngle().trim());
+        if (maxWidth == null || maxWidth.signum() <= 0) {
+            return false;
+        }
+        BigDecimal occupiedWidth = candidate.getCraftWidth()
+                .multiply(new BigDecimal("2"));
+        return occupiedWidth.compareTo(maxWidth) <= 0;
+    }
+
     private boolean canSplit(Cd15ScheduleCandidate candidate) {
         return candidate != null
                 && !candidate.isContinueFromPreviousShift()

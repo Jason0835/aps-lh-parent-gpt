@@ -10,6 +10,7 @@ import com.zlt.aps.cd15.api.domain.entity.Cd15MachineInfo;
 import com.zlt.aps.cd15.engine.constant.Cd15CutMode;
 import com.zlt.aps.cd15.mapper.Cd15MachineInfoMapper;
 import com.zlt.aps.cd15.service.ICd15MachineInfoService;
+import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.common.enums.ImportErrorTypeEnums;
 import com.zlt.common.utils.ImportExcelValidatedUtils;
@@ -165,8 +166,8 @@ public class Cd15MachineInfoServiceImpl extends AbstractDocService<Cd15MachineIn
                 || !this.validFlag(machineInfo.getSplitCutFlag())) {
             return I18nUtil.getMessage("ui.data.alert.cd15MachineInfo.capabilityFlagInvalid");
         }
-        boolean singleSupported = "1".equals(machineInfo.getSingleCutFlag());
-        boolean splitSupported = "1".equals(machineInfo.getSplitCutFlag());
+        boolean singleSupported = ApsConstant.APS_YES_NO_1.toString().equals(machineInfo.getSingleCutFlag());
+        boolean splitSupported = ApsConstant.APS_YES_NO_1.toString().equals(machineInfo.getSplitCutFlag());
         if (!singleSupported && !splitSupported) {
             return I18nUtil.getMessage("ui.data.alert.cd15MachineInfo.cutCapabilityRequired");
         }
@@ -203,7 +204,8 @@ public class Cd15MachineInfoServiceImpl extends AbstractDocService<Cd15MachineIn
     }
 
     private boolean validFlag(String value) {
-        return "0".equals(value) || "1".equals(value);
+        return ApsConstant.APS_YES_NO_0.toString().equals(value)
+                || ApsConstant.APS_YES_NO_1.toString().equals(value);
     }
 
     /** 判断模式班产字段是否已维护有效正数。 */

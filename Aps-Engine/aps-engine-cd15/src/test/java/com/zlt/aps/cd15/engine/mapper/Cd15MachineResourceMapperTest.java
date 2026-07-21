@@ -5,6 +5,7 @@ import com.zlt.aps.cd15.api.domain.entity.Cd15MachineInfo;
 import com.zlt.aps.cd15.api.domain.entity.Cd15MachineRollMapping;
 import com.zlt.aps.cd15.api.domain.entity.Cd15SpecifyMachine;
 import com.zlt.aps.cd15.engine.model.Cd15LossRateRule;
+import com.zlt.aps.common.core.constant.ApsConstant;
 import org.junit.Test;
 
 import java.math.BigDecimal;
@@ -26,9 +27,9 @@ public class Cd15MachineResourceMapperTest {
         machine.setMachineCode("M1");
         machine.setStatus("1");
         machine.setOpenMachineClass("NIGHT");
-        machine.setIsOutTwo("1");
-        machine.setSingleCutFlag("1");
-        machine.setSplitCutFlag("1");
+        machine.setIsOutTwo(ApsConstant.APS_YES_NO_1.toString());
+        machine.setSingleCutFlag(ApsConstant.APS_YES_NO_1.toString());
+        machine.setSplitCutFlag(ApsConstant.APS_YES_NO_1.toString());
         machine.setQuota(1200D);
         machine.setSingleShiftCapacity(900D);
         machine.setSplitShiftCapacity(1800D);
@@ -42,9 +43,9 @@ public class Cd15MachineResourceMapperTest {
         assertTrue(mapper.mapMachine(machine).isSplitCutSupported());
 
         // Engine只读取单裁/分裁支持标志，不使用IS_OUT_TWO替代分裁支持。
-        machine.setIsOutTwo("0");
-        machine.setSingleCutFlag("0");
-        machine.setSplitCutFlag("0");
+        machine.setIsOutTwo(ApsConstant.APS_YES_NO_0.toString());
+        machine.setSingleCutFlag(ApsConstant.APS_YES_NO_0.toString());
+        machine.setSplitCutFlag(ApsConstant.APS_YES_NO_0.toString());
         assertFalse(mapper.mapMachine(machine).isSingleCutSupported());
         assertFalse(mapper.mapMachine(machine).isSplitCutSupported());
 

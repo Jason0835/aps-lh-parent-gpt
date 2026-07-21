@@ -272,6 +272,9 @@ public class Cd15ScheduleResultPublishServiceImpl
 
     /** 校验分裁两条结果共用机台、工单、大卷和角度。 */
     private boolean isValidSplitGroup(List<Cd15ScheduleResult> group) {
+        if (group.size() == 1) {
+            return true;
+        }
         if (group.size() != 2
                 || group.stream().map(Cd15ScheduleResult::getSteelStripCode)
                 .filter(StringUtils::isNotBlank).distinct().count() != 2L) {

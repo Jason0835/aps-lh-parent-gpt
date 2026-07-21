@@ -46,8 +46,10 @@ public class Cd15MachineTrialPreparationService {
                 request.getUnitConsumeMillimeter(), request.getCraftWidth(),
                 request.getCurlLength());
         // 先执行启用状态、大卷绑定、指定/禁止机台、检修和班次开放等硬约束过滤。
+        BigDecimal machineMatchWidth = request.getMachineMatchWidth() == null
+                ? request.getCraftWidth() : request.getMachineMatchWidth();
         Cd15MachineCandidateResolution resolution = candidateResolver.resolveDetailed(
-                request.getSteelStripCode(), request.getBigRollCode(), request.getCraftWidth(),
+                request.getSteelStripCode(), request.getBigRollCode(), machineMatchWidth,
                 request.getCuttingAngle(), snapshot.getAngleWidthMaxByAngle(),
                 request.getShiftCode(), request.getShiftStart(), request.getShiftEnd(), snapshot.getMachines(),
                 snapshot.getBindings(), snapshot.getRestrictions(), parameters.getMachinePriority());
@@ -85,6 +87,7 @@ public class Cd15MachineTrialPreparationService {
                         .netDemandQuantity(request.getNetDemandQuantity())
                         // 是否为清尾：清尾时起排量门槛降低、允许跨机台合并
                         .closeOut(request.isCloseOut())
+                        .singleSpecSplit(request.isSingleSpecSplit())
                         // 最小起排量、均分阈值
                         .minimumStartQuantity(parameters.getMinStartQty())
                         .equalShareThreshold(parameters.getEqualShareThreshold())

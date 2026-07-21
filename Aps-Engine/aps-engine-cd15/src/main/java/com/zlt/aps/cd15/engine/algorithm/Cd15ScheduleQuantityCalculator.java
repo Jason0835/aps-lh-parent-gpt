@@ -50,6 +50,62 @@ public class Cd15ScheduleQuantityCalculator {
         return normalize(vehicleCount.multiply(vehiclePlanQuantity));
     }
 
+    /**
+     * 计算单规格一出二的成品总计划量。
+     * 非收尾按两路各一车的总量取整，收尾按完整双片步长取整。
+     */
+    public BigDecimal calculateSingleSpecSplitActualQuantity(
+            BigDecimal netDemandQuantity,
+            boolean closeOut,
+            BigDecimal lossRatePercent,
+            BigDecimal minimumStartQuantity,
+            BigDecimal vehiclePlanQuantity,
+            BigDecimal equalShareThreshold,
+            BigDecimal craftWidthMillimeter) {
+        requireNonNegative(netDemandQuantity, "净需求量");
+        requireNonNegative(lossRatePercent, "损耗率");
+        requirePositive(minimumStartQuantity, "最小起排量");
+        requirePositive(vehiclePlanQuantity, "单车斜裁排程米数");
+        requirePositive(equalShareThreshold, "各班计划量均分阈值");
+        requirePositive(craftWidthMillimeter, "斜裁宽度");
+        BigDecimal baseDemandQuantity = this.adjustDemandForEqualShare(
+                netDemandQuantity, closeOut, equalShareThreshold);
+        BigDecimal quantityWithLoss = baseDemandQuantity.multiply(
+                BigDecimal.ONE.add(lossRatePercent.divide(
+                        ONE_HUNDRED, 10, RoundingMode.HALF_UP)));
+        if (closeOut) {
+            return this.roundSingleSpecSplitUp(
+                    quantityWithLoss, craftWidthMillimeter);
+        }
+        BigDecimal startQuantity = quantityWithLoss.max(minimumStartQuantity);
+        BigDecimal twoStreamVehicleQuantity = vehiclePlanQuantity
+                .multiply(new BigDecimal("2"));
+        BigDecimal vehiclePairCount = startQuantity.divide(
+                twoStreamVehicleQuantity, 0, RoundingMode.CEILING);
+        return normalize(vehiclePairCount.multiply(twoStreamVehicleQuantity));
+    }
+
+    /** 将受限可排量向下归整为完整的一出二双片步长。 */
+    public BigDecimal roundSingleSpecSplitDown(
+            BigDecimal quantity, BigDecimal craftWidthMillimeter) {
+        requireNonNegative(quantity, "单规格分裁可排量");
+        BigDecimal pairQuantity = this.pairQuantity(craftWidthMillimeter);
+        return normalize(quantity.divide(pairQuantity, 0, RoundingMode.FLOOR)
+                .multiply(pairQuantity));
+    }
+
+    private BigDecimal roundSingleSpecSplitUp(
+            BigDecimal quantity, BigDecimal craftWidthMillimeter) {
+        BigDecimal pairQuantity = this.pairQuantity(craftWidthMillimeter);
+        return normalize(quantity.divide(pairQuantity, 0, RoundingMode.CEILING)
+                .multiply(pairQuantity));
+    }
+
+    private BigDecimal pairQuantity(BigDecimal craftWidthMillimeter) {
+        requirePositive(craftWidthMillimeter, "斜裁宽度");
+        return craftWidthMillimeter.multiply(new BigDecimal("2"))
+                .divide(new BigDecimal("1000"), 10, RoundingMode.HALF_UP);
+    }
 
     /**
      * 非收尾规格按加损耗前的净需求量判断是否触发均分；触发后先除以2，再进入损耗和整卷计算。

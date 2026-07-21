@@ -61,6 +61,52 @@ public class Cd15CandidateMachineTrialCalculatorTest {
         assertEquals(new BigDecimal("87"), result.getFinalSchedulableQuantity());
         assertFalse(result.isFullyAccommodated());
     }
+
+    /** 单规格一出二完整排程必须把奇数片需求补齐为偶数片。 */
+    @Test
+    public void shouldRoundSingleSpecSplitDemandUpToCompletePair() {
+        Cd15CandidateMachineTrialInput input = singleSpecSplitInput("309", "1000");
+        Cd15MachineTrial result = calculator.calculate(input);
+        assertEquals(new BigDecimal("310"), result.getActualQuantity());
+        assertEquals(new BigDecimal("310"), result.getFinalSchedulableQuantity());
+    }
+
+    /** 单规格一出二受产能限制时必须向下取完整的双片步长。 */
+    @Test
+    public void shouldRoundSingleSpecSplitPartialQuantityDownToCompletePair() {
+        Cd15CandidateMachineTrialInput input = singleSpecSplitInput("309", "309");
+        Cd15MachineTrial result = calculator.calculate(input);
+        assertEquals(new BigDecimal("310"), result.getActualQuantity());
+        assertEquals(new BigDecimal("308"), result.getFinalSchedulableQuantity());
+        assertFalse(result.isFullyAccommodated());
+    }
+
+    private Cd15CandidateMachineTrialInput singleSpecSplitInput(
+            String demandQuantity, String shiftCapacity) {
+        return Cd15CandidateMachineTrialInput.builder()
+                .machineCode("M1")
+                .netDemandQuantity(new BigDecimal(demandQuantity))
+                .closeOut(true)
+                .singleSpecSplit(true)
+                .minimumStartQuantity(BigDecimal.ONE)
+                .equalShareThreshold(new BigDecimal("2000"))
+                .vehiclePlanQuantity(new BigDecimal("100"))
+                .craftWidth(new BigDecimal("1000"))
+                .totalToolingCount(10)
+                .occupiedVehicleCount(0)
+                .shiftCapacity(new BigDecimal(shiftCapacity))
+                .shiftHours(8)
+                .remainingSeconds(28800)
+                .previousSpec("A")
+                .currentSpec("A")
+                .specChangeMinutes(0)
+                .lossRateRules(Collections.singletonList(
+                        Cd15LossRateRule.builder()
+                                .lossRatePercent(BigDecimal.ZERO)
+                                .build()))
+                .build();
+    }
+
     @Test
     public void shouldDelayTrialStartByAgingAllocation() {
         LocalDateTime start = LocalDateTime.of(2026, 6, 13, 8, 0);

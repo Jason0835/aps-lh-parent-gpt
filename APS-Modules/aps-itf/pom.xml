@@ -84,6 +84,18 @@
         </dependency>
 
         <dependency>
+            <groupId>com.zlt.aps.dj</groupId>
+            <artifactId>aps-dj-api</artifactId>
+            <version>1.0.3-SNAPSHOT</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.zlt.aps.nc</groupId>
+            <artifactId>aps-nc-api</artifactId>
+            <version>1.0.3-SNAPSHOT</version>
+        </dependency>
+
+        <dependency>
             <groupId>com.zlt.aps.cd90</groupId>
             <artifactId>aps-cd90-api</artifactId>
             <version>1.0.3-SNAPSHOT</version>

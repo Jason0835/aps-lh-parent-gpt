@@ -46,6 +46,7 @@ import com.zlt.aps.lh.mapper.LhSharedMouldPatEntityMapper;
 import com.zlt.aps.lh.service.ILhMachineOnlineInfoService;
 import com.zlt.aps.lh.service.ILhMouldChangePlanService;
 import com.zlt.aps.lh.service.ILhParamsService;
+import com.zlt.aps.lh.service.ILhScheduleResultService;
 import com.zlt.aps.utils.AppUtils;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
@@ -131,6 +132,9 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
 
     @Autowired
     private LhScheduleResultMapper lhScheduleResultMapper;
+
+    @Autowired
+    private ILhScheduleResultService lhScheduleResultService;
 
     /**
      * 查询模具交替计划列表
@@ -265,6 +269,13 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
                 sheetName, new ByteArrayInputStream(fileBytes), 0, 4, -1);
         List<LhMouldChangePlan> mouldChangePlanList = buildLhMouldChangePlanList(list, scheduleDate);
         AjaxResult ajaxResult = this.doImportData(mouldChangePlanList, updateSupport, importLog.getId());
+        // 导入成功后，补全模具交替计划的批次号
+        if (!ajaxResult.get(AjaxResult.CODE_TAG).equals(AjaxResult.Type.ERROR.value())) {
+            if (CollectionUtils.isNotEmpty(list)) {
+                String factoryCode = scheduleResult.getFactoryCode().trim();
+                lhScheduleResultService.fillMouldChangePlanFieldsAfterImport(factoryCode, scheduleDate);
+            }
+        }
         Date endTime = DateUtils.getNowDate();
         importLog.setRowCount(list.size());
         importLog.setBeginTime(beginTime);
