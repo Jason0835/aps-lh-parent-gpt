@@ -8,6 +8,7 @@ import com.zlt.aps.cd15.engine.model.Cd15LossRateRule;
 import com.zlt.aps.cd15.engine.model.Cd15MachineResource;
 import com.zlt.aps.cd15.engine.model.Cd15MachineRestriction;
 import com.zlt.aps.cd15.engine.model.Cd15MachineRollBinding;
+import com.zlt.aps.common.core.constant.ApsConstant;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -23,8 +24,8 @@ public class Cd15MachineResourceMapper {
                 .machineCode(source.getMachineCode())
                 .status(source.getStatus())
                 .openMachineClass(source.getOpenMachineClass())
-                .singleCutSupported("1".equals(source.getSingleCutFlag()))
-                .splitCutSupported("1".equals(source.getSplitCutFlag()))
+                .singleCutSupported(ApsConstant.APS_YES_NO_1.toString().equals(source.getSingleCutFlag()))
+                .splitCutSupported(ApsConstant.APS_YES_NO_1.toString().equals(source.getSplitCutFlag()))
                 .defaultCutMode(source.getDefaultCutMode())
                 .singleShiftCapacity(decimal(source.getSingleShiftCapacity()))
                 .splitShiftCapacity(decimal(source.getSplitShiftCapacity()))

@@ -201,6 +201,35 @@ public class Cd15SingleShiftScheduleExecutorTest {
         assertEquals("G1302", result.getTasks().get(1).getMachineCode());
     }
 
+    /** 与CD90一致，班初先执行上一班真实机尾候选，再处理普通候选。 */
+    @Test
+    public void shouldPrioritizeInheritedMachineTailAtShiftStartLikeCd90() {
+        Cd15ScheduleCandidate inheritedTail = candidate("211400161");
+        Cd15ScheduleCandidate ordinaryCandidate = candidate("211400022");
+        Cd15ScheduleCandidatePreparationService candidates =
+                (context, input, classField, rolling) -> Arrays.asList(
+                        ordinaryCandidate, inheritedTail);
+        Cd15ShiftDemandProvider demandProvider = (context, input, shift, candidate, rolling) ->
+                Cd15ShiftDemandDecision.builder().netDemandQuantity(
+                        new BigDecimal("100")).build();
+        Cd15SingleShiftScheduleExecutor executor = new Cd15SingleShiftScheduleExecutor(
+                candidates, demandProvider, (factoryCode, start, end) -> twoMachineSnapshot(),
+                trialPreparation(), committer(), new Cd15CloseOutCalculator(),
+                new Cd15ScheduleCandidateSorter(), new Cd15SplitCutGroupBuilder());
+        Cd15ShiftResourceState state = twoMachineTailState();
+        state.getTailByMachine().put("G1301", Cd15MachineTailState.builder()
+                .steelStripCode("211400161").build());
+        Cd15AutoScheduleContext context = context();
+        context.getParameters().setMinStartQty(BigDecimal.ONE);
+
+        Cd15ShiftExecutionResult result = executor.execute(
+                context, twoTailInput(), shift(), state, null);
+
+        assertEquals(result.getFailures().toString(), 2, result.getTasks().size());
+        assertEquals("211400161", result.getTasks().get(0).getSteelStripCode());
+        assertEquals("211400022", result.getTasks().get(1).getSteelStripCode());
+    }
+
     /** 滚动规划器已给出稳定顺序时，班初机尾连续性不能再次打乱候选顺序。 */
     @Test
     public void shouldPreservePreparedOrderBeforeShiftStartTailPriority() {
@@ -223,9 +252,9 @@ public class Cd15SingleShiftScheduleExecutorTest {
         assertEquals("211400022", result.getTasks().get(1).getSteelStripCode());
     }
 
-    /** 普通分裁两条钢带必须原子提交到同一台支持一出二的机台。 */
+    /** 新排程仅生成单规格分裁，不再把两个不同钢带组成新分裁组。 */
     @Test
-    public void shouldCommitOrdinarySplitPairOnSameSplitCapableMachine() {
+    public void shouldCommitEachCandidateAsIndependentSingleSpecSplit() {
         Cd15ScheduleCandidatePreparationService candidates = (context, input, classField, rolling) ->
                 Arrays.asList(splitCandidate("C1"), splitCandidate("C2"));
         Cd15SingleShiftScheduleExecutor executor = new Cd15SingleShiftScheduleExecutor(
@@ -247,10 +276,10 @@ public class Cd15SingleShiftScheduleExecutorTest {
         assertEquals("G1401", result.getTasks().get(1).getMachineCode());
         assertEquals("SPLIT", result.getTasks().get(0).getCutMode());
         assertEquals("SPLIT", result.getTasks().get(1).getCutMode());
-        assertEquals(result.getTasks().get(0).getSplitGroupKey(),
-                result.getTasks().get(1).getSplitGroupKey());
-        assertEquals(result.getTasks().get(0).getProduceOrder(),
-                result.getTasks().get(1).getProduceOrder());
+        assertEquals(null, result.getTasks().get(0).getSplitGroupKey());
+        assertEquals(null, result.getTasks().get(1).getSplitGroupKey());
+        assertEquals(false, result.getTasks().get(0).getProduceOrder()
+                == result.getTasks().get(1).getProduceOrder());
     }
 
     /** 定时滚动重排已有分裁组时必须沿用原分组键。 */
@@ -306,6 +335,7 @@ public class Cd15SingleShiftScheduleExecutorTest {
 
     private Cd15ScheduleCandidate splitCandidate(String steelStripCode) {
         return Cd15ScheduleCandidate.builder()
+                .materialKey(steelStripCode + "|BR-SPLIT|15|80|80|80|false")
                 .steelStripCode(steelStripCode)
                 .bigRollCode("BR-SPLIT")
                 .cuttingAngle("15")

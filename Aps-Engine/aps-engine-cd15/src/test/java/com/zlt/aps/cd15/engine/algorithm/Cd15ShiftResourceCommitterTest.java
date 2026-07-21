@@ -253,6 +253,38 @@ public class Cd15ShiftResourceCommitterTest {
         assertTrue(state.getTasks().isEmpty());
     }
 
+    /** 单规格一出二只生成一条任务，但必须按两路同时占用小车和工装。 */
+    @Test
+    public void shouldCommitSingleSpecSplitAsOneTaskWithTwoReceivingStreams() {
+        Cd15ShiftResourceState state = splitState(2);
+        Cd15ShiftCommitResult result = committer.commitSingleSpecSplit(
+                splitRequest("C1", trial("M1", "200", 20000, true)), state);
+        assertTrue(result.isSuccess());
+        assertEquals("SPLIT", result.getTask().getCutMode());
+        assertEquals(new BigDecimal("200"), result.getTask().getPlanQuantity());
+        assertEquals(2, result.getTask().getVehicleCount());
+        assertEquals(2, result.getState().getOccupiedToolingCount());
+        assertEquals(1, result.getState().getTasks().size());
+        assertEquals(new BigDecimal("200"),
+                result.getTask().getBigRollConsumeQuantity());
+        assertEquals(0, state.getOccupiedToolingCount());
+        assertTrue(state.getTasks().isEmpty());
+    }
+
+    /** 单规格一出二第二路无法分配时必须丢弃工作副本。 */
+    @Test
+    public void shouldKeepOriginalStateWhenSecondSingleSpecSplitLaneFails() {
+        Cd15ShiftResourceState state = splitState(1);
+        Cd15ShiftCommitResult result = committer.commitSingleSpecSplit(
+                splitRequest("C1", trial("M1", "200", 20000, true)), state);
+        assertFalse(result.isSuccess());
+        assertEquals("STORAGE_LANE_LIMIT", result.getFailureReason());
+        assertSame(state, result.getState());
+        assertEquals(0, state.getLanes().get(0).getVehicleCount());
+        assertEquals(0, state.getOccupiedToolingCount());
+        assertTrue(state.getTasks().isEmpty());
+    }
+
     private Cd15ShiftCommitRequest request(Cd15MachineTrialPlan plan) {
         return request(plan, 4);
     }
