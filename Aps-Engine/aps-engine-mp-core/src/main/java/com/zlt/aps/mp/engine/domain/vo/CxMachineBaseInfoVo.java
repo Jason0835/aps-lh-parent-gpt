@@ -1260,6 +1260,8 @@ public class CxMachineBaseInfoVo implements Serializable {
         }
         ProductGroupCxCapacityInfo lhRatioInfo = continueGroup.getLhRatioByCxMachine(this);
         CxMachineAllocationPlanHelper before = CxCapacityAllocationHandler.createAllocationPlanHelper(this, lhRatioInfo, continueGroup, null, allocationDays, startDay, endDay);
+        //20260721+ 为后续已分配日补充延长排产日需要
+        before.setTimeExtensionDayByChangeLimit(endDay);
         allocationList.add(before);
         allocationList.sort(Comparator.comparing(CxMachineAllocationPlanHelper::getStartDay));
         return before;
