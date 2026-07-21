@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.itf.mes.mapper.MesDjScheduleResultMapper">
+
+    <insert id="batchInsert">
+        INSERT INTO MES_PAD_SCHEDULE_RESULT (
+            SCHEDULE_DATE, BATCH_NO, ORDER_NO, LINING_CODE, MATERIAL_CODE,
+            GLUE_CODE, BASE_GLUE_CODE, WHOLE_GLUE_CODE, GLUE_SEQ,
+            MOUTH_PLATE_CODE, SPEC_SIZE, MACHINE_CODE, UNIT_CONSUME, STOCK_QTY, SUPPLY_TIME,
+            MID_PLAN_QTY, MID_PRODUCE_ORDER, MID_SYS_ANALYSIS, MID_HAND_ANALYSIS,
+            NIGHT_PLAN_QTY, NIGHT_PRODUCE_ORDER, NIGHT_SYS_ANALYSIS, NIGHT_HAND_ANALYSIS,
+            DAY_PLAN_QTY, DAY_PRODUCE_ORDER, DAY_SYS_ANALYSIS, DAY_HAND_ANALYSIS,
+            NEXT_MID_PLAN_QTY, NEXT_MID_PRODUCE_ORDER, NEXT_MID_SYS_ANALYSIS, NEXT_MID_HAND_ANALYSIS,
+            IS_RELEASE, MARK_CLOSE_OUT_TIP, TAIL_FLAG, PRODUCTION_STATUS, REMARK,
+            DATA_VERSION, COMPANY_CODE, FACTORY_CODE
+        ) VALUES
+        <foreach collection="list" item="item" separator=",">
+            (#{item.scheduleDate}, #{item.batchNo}, #{item.orderNo}, #{item.liningCode}, #{item.materialCode},
+             #{item.glueCode}, #{item.baseGlueCode}, #{item.wholeGlueCode}, #{item.glueSeq},
+             #{item.mouthPlateCode}, #{item.specSize}, #{item.machineCode}, #{item.unitConsume}, #{item.stockQty}, #{item.supplyTime},
+             #{item.midPlanQty}, #{item.midProduceOrder}, #{item.midSysAnalysis}, #{item.midHandAnalysis},
+             #{item.nightPlanQty}, #{item.nightProduceOrder}, #{item.nightSysAnalysis}, #{item.nightHandAnalysis},
+             #{item.dayPlanQty}, #{item.dayProduceOrder}, #{item.daySysAnalysis}, #{item.dayHandAnalysis},
+             #{item.nextMidPlanQty}, #{item.nextMidProduceOrder}, #{item.nextMidSysAnalysis}, #{item.nextMidHandAnalysis},
+             #{item.isRelease}, #{item.markCloseOutTip}, #{item.tailFlag}, #{item.productionStatus}, #{item.remark},
+             #{item.dataVersion}, #{item.companyCode}, #{item.factoryCode})
+        </foreach>
+    </insert>
+</mapper>

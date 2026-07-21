@@ -2,6 +2,7 @@ package com.zlt.aps.lh.handler;
 
 import com.zlt.aps.lh.api.enums.ScheduleStepEnum;
 import com.zlt.aps.lh.api.enums.ScheduleTypeEnum;
+import com.zlt.aps.lh.component.StructureMinMachineRetentionService;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.factory.ScheduleStrategyFactory;
 import com.zlt.aps.lh.engine.strategy.ICapacityCalculateStrategy;
@@ -37,6 +38,9 @@ public class NewProductionHandler extends AbsScheduleStepHandler {
 
     @Resource
     private ScheduleStrategyFactory strategyFactory;
+    @Resource
+    private StructureMinMachineRetentionService structureMinMachineRetentionService =
+            new StructureMinMachineRetentionService();
 
     @Override
     protected void doHandle(LhScheduleContext context) {
@@ -87,6 +91,8 @@ public class NewProductionHandler extends AbsScheduleStepHandler {
                 context.getScheduleResultList().size(), context.getNewSpecSkuList().size(),
                 context.getUnscheduledResultList().size());
         strategy.scheduleReduceMould(context);
+        // 新增后置库存裁剪和机台状态同步完成后再刷新一次，确保统一释放时间不会被后置同步提前覆盖。
+        structureMinMachineRetentionService.refreshRetention(context);
         log.info("新增规格排产处理完成, 排程结果数: {}, 未排产数: {}",
                 context.getScheduleResultList().size(), context.getUnscheduledResultList().size());
     }
