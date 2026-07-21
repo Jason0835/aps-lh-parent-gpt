@@ -657,14 +657,14 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
      * @param contextDTO      周程滚动上下文
      * @param mpProdFinalList 定稿记录列表
      */
-    public void reCalcAdjustDailyCapacityLimit(MpRollAdjustContextDTO contextDTO, List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList, MpAdjustDailyCapacityLimit adjustDailyCapacityLimitObj) {
+    public void reCalcAdjustDailyCapacityLimit(MpRollAdjustContextDTO contextDTO, List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList, MpAdjustDailyCapacityLimit adjustDailyCapacityLimitObj, String mainPattern) {
 
         Map<Integer, MpDailyCapacityLimitVo> dailyCapacityLimitVoMap = contextDTO.getDailyCapacityLimitVoMap();
         for (int i = contextDTO.getStructureStartDay(); i <= contextDTO.getStructureDeadLine(); i++) {
             if (dailyCapacityLimitVoMap.get(i) == null) {
                 continue;
             }
-            adjustDailyCapacityLimitObj.calcLhMachinesWithEmbryoTypes(mpProdFinalList, i, dailyCapacityLimitVoMap.get(i), contextDTO.getParamMap(), null, null);
+            adjustDailyCapacityLimitObj.calcLhMachinesWithEmbryoTypes(mpProdFinalList, i, dailyCapacityLimitVoMap.get(i), contextDTO.getParamMap(), mainPattern, null);
         }
     }
 
@@ -1365,6 +1365,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         MpWeekRollAdjustEngine weekRollAdjustEngine = new MpWeekRollAdjustEngine();
         // 月计划统计结果列表
         List<MpMonthPlanStatistics> monthPlanStatisticsList = new ArrayList<>();
+        StringBuilder sbError = new StringBuilder();
         for (String structureName : structureNameSet) {
             contextDTO.setStructureName(structureName);
 
@@ -1388,23 +1389,18 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             // 初始结构开始日\收尾日
             initStructureStartAndEndDay(contextDTO);
             // 检查排产日是否超出结构起产日-收尾日
-            checkStruct2MaterialDate(contextDTO, targetMonthPlanList,maxDays);
+            checkStruct2MaterialDate(contextDTO, targetMonthPlanList,maxDays,sbError);
 
             // 初始化日产信息
             Map<Integer, MpDailyCapacityLimitVo> dailyCapacityLimitVoMap = adjustDailyCapacityLimitObj.getDailyCapacityLimitMap(contextDTO);
             weekRollAdjustEngine.initDayProductionInfo(contextDTO, dailyCapacityLimitVoMap);
             // 设置日产能限制Map
             contextDTO.setDailyCapacityLimitVoMap(ObjectUtils.defaultIfNull(dailyCapacityLimitVoMap, new HashMap<Integer, MpDailyCapacityLimitVo>()));
-            /*StringBuilder errorSb = new StringBuilder();
-            for (FactoryMonthPlanFinalAdjustVo mpFinalVo : targetMonthPlanList){
-                //检查产能限
-                checkCapacityLimit(contextDTO, mpFinalVo, targetMonthPlanList, dailyCapacityLimitVoMap,errorSb);
-            }*/
-            /*if (!StringUtil.isEmptyWithTrim(errorSb.toString())){
-                throw new BusinessException(errorSb.toString());
-            }*/
+            // 假设 targetMonthPlanList 已有数据
+            checkMouldSatisfyByMainPattern(contextDTO,targetMonthPlanList,sbError);
+
             // 重算每日产能限制，包括硫化机台数、胎胚种类数、换模次数
-            reCalcAdjustDailyCapacityLimit(contextDTO, targetMonthPlanList, adjustDailyCapacityLimitObj);
+            reCalcAdjustDailyCapacityLimit(contextDTO, targetMonthPlanList, adjustDailyCapacityLimitObj,null);
 
             //9.设置模具变化信息
             for (FactoryMonthPlanFinalAdjustVo mpFinalVo : targetMonthPlanList) {
@@ -1417,10 +1413,47 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                 monthPlanStatisticsList.add(monthPlanStatistics);
             }
         }
+        if (!StringUtil.isEmptyWithTrim(sbError.toString())) {
+            throw new BusinessException(sbError.toString());
+        }
 
         contextDTO.setMonthPlanStatisticsList(monthPlanStatisticsList);
         // 保存月计划统计结果
         saveMonthPlanStatisticsResult(contextDTO, tempFlag);
+    }
+
+    /**
+     * 按主花纹检查型腔数
+     * @param contextDTO
+     * @param targetMonthPlanList
+     * @param sbError
+     */
+    private  void checkMouldSatisfyByMainPattern(MpRollAdjustContextDTO contextDTO,List<FactoryMonthPlanFinalAdjustVo> targetMonthPlanList, StringBuilder sbError) {
+        if (PubUtil.isEmpty(targetMonthPlanList)){
+            return;
+        }
+        MpAdjustDailyCapacityLimit adjustDailyCapacityLimitObj = new MpAdjustDailyCapacityLimit();
+        MpWeekRollAdjustEngine weekRollAdjustEngine = new MpWeekRollAdjustEngine();
+        Map<String, List<FactoryMonthPlanFinalAdjustVo>> mainPatternMap =
+                targetMonthPlanList.stream()
+                        .filter(vo -> vo != null && vo.getMainPattern() != null)
+                        .collect(Collectors.groupingBy(FactoryMonthPlanFinalAdjustVo::getMainPattern));
+        // 遍历分组结果
+        for (Map.Entry<String, List<FactoryMonthPlanFinalAdjustVo>> entry : mainPatternMap.entrySet()) {
+            // 重算每日产能限制，包括硫化机台数、胎胚种类数、换模次数
+            Map<Integer, MpDailyCapacityLimitVo> dailyCapacityLimitVoMap = contextDTO.getDailyCapacityLimitVoMap();
+            for (int i = contextDTO.getStructureStartDay(); i <= contextDTO.getStructureDeadLine(); i++) {
+                if (dailyCapacityLimitVoMap.get(i) == null) {
+                    continue;
+                }
+                adjustDailyCapacityLimitObj.calcLhMachinesWithEmbryoTypes(targetMonthPlanList, i, dailyCapacityLimitVoMap.get(i), contextDTO.getParamMap(), entry.getKey(), null);
+                // 检查型腔数
+                int cavityQty = weekRollAdjustEngine.getNewCavityQty(contextDTO,entry.getValue().get(0), i);
+                if (!weekRollAdjustEngine.checkMouldSatisfy(dailyCapacityLimitVoMap.get(i),cavityQty)){
+                    sbError.append(String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.confirm.mainPatternLimit"), contextDTO.getStructureName(), entry.getKey(), i, dailyCapacityLimitVoMap.get(i).getPatternUsedLhMachines()*2,cavityQty)).append(BusiConstant.WeekRollAdjust.SPLIT_FRONT_NEW_LINE);
+                }
+            }
+        }
     }
 
     /**
@@ -1489,12 +1522,11 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
      * @param contextDTO
      * @param monthPlanList
      */
-    private void checkStruct2MaterialDate(MpRollAdjustContextDTO contextDTO, List<FactoryMonthPlanFinalAdjustVo> monthPlanList, int maxDays) {
+    private void checkStruct2MaterialDate(MpRollAdjustContextDTO contextDTO, List<FactoryMonthPlanFinalAdjustVo> monthPlanList, int maxDays, StringBuilder beginDaySb) {
         if (PubUtil.isEmpty(monthPlanList)) {
             return;
         }
         //检查：物料编码：[%s]，排产日超出结构起产日[%s]-收尾日[%s]！
-        StringBuilder beginDaySb = new StringBuilder();
         for (FactoryMonthPlanFinalAdjustVo finalAdjustVo : monthPlanList) {
             if (finalAdjustVo.getBeginDay() == null || finalAdjustVo.getEndDay() == null) {
                 continue;
@@ -1503,17 +1535,13 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                 continue;
             }
             if (finalAdjustVo.getEndDay() > maxDays){
-                beginDaySb.append(String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.confirm.checkMaterialMaxDay"),
+                beginDaySb.append(String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.confirm.checkMaterialMaxDay"),contextDTO.getStructureName(),
                         finalAdjustVo.getMaterialCode(), maxDays)).append(BusiConstant.WeekRollAdjust.SPLIT_FRONT_NEW_LINE);
             }
             if (finalAdjustVo.getBeginDay() < contextDTO.getStructureStartDay() || finalAdjustVo.getEndDay() > contextDTO.getStructureDeadLine()) {
-                beginDaySb.append(String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.confirm.checkStructMaterialDay"),
+                beginDaySb.append(String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.confirm.checkStructMaterialDay"),contextDTO.getStructureName(),
                         finalAdjustVo.getMaterialCode(), contextDTO.getStructureStartDay(), contextDTO.getStructureDeadLine())).append(BusiConstant.WeekRollAdjust.SPLIT_FRONT_NEW_LINE);
             }
-        }
-
-        if (!StringUtil.isEmptyWithTrim(beginDaySb.toString())) {
-            throw new BusinessException(beginDaySb.toString());
         }
     }
 
