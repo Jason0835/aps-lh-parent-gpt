@@ -3,10 +3,7 @@ package com.zlt.aps.tc.service.query;
 import com.baomidou.mybatisplus.core.MybatisConfiguration;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.zlt.aps.tc.api.domain.entity.TcScheduleResult;
-import com.zlt.aps.tc.api.domain.entity.TcScheduleResultExplain;
-import com.zlt.aps.tc.api.domain.entity.TcScheduleUnplanned;
-import com.zlt.aps.tc.api.domain.entity.TcShiftConfig;
+import com.zlt.aps.tc.api.domain.entity.*;
 import com.zlt.aps.tc.api.domain.vo.TcScheduleBoardQueryVo;
 import com.zlt.aps.tc.api.domain.vo.TcScheduleBoardVo;
 import com.zlt.aps.tc.mapper.TcScheduleResultExplainMapper;
@@ -26,6 +23,7 @@ import java.time.LocalDate;
 import java.util.Collections;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
@@ -57,6 +55,30 @@ public class TcScheduleBoardQueryServiceTest {
         TableInfoHelper.initTableInfo(new MapperBuilderAssistant(configuration, ""), TcScheduleUnplanned.class);
         TableInfoHelper.initTableInfo(new MapperBuilderAssistant(configuration, ""), TcScheduleResultExplain.class);
         TableInfoHelper.initTableInfo(new MapperBuilderAssistant(configuration, ""), TcShiftConfig.class);
+        TableInfoHelper.initTableInfo(new MapperBuilderAssistant(configuration, ""), TcParams.class);
+    }
+
+    /**
+     * 验证胎侧班次配置与胎面一致，仅按工厂和班次顺序维护，不映射日期字段。
+     */
+    @Test
+    public void shiftConfigShouldNotMapScheduleDateColumn() {
+        boolean containsScheduleDate = TableInfoHelper.getTableInfo(TcShiftConfig.class).getFieldList().stream()
+                .anyMatch(fieldInfo -> "SCHEDULE_DATE".equalsIgnoreCase(fieldInfo.getColumn()));
+
+        assertFalse("胎侧班次配置不应映射不存在的 SCHEDULE_DATE 字段", containsScheduleDate);
+    }
+
+    /**
+     * 验证胎侧参数与胎面一致，不映射按日期生效字段。
+     */
+    @Test
+    public void paramsShouldNotMapEffectiveTimeColumns() {
+        boolean containsEffectiveTime = TableInfoHelper.getTableInfo(TcParams.class).getFieldList().stream()
+                .anyMatch(fieldInfo -> "EFFECTIVE_START_TIME".equalsIgnoreCase(fieldInfo.getColumn())
+                        || "EFFECTIVE_END_TIME".equalsIgnoreCase(fieldInfo.getColumn()));
+
+        assertFalse("胎侧参数不应映射不存在的生效时间字段", containsEffectiveTime);
     }
 
     /**
@@ -79,7 +101,6 @@ public class TcScheduleBoardQueryServiceTest {
         resultPage.setTotal(1L);
 
         TcShiftConfig shiftConfig = new TcShiftConfig();
-        shiftConfig.setScheduleDate(result.getScheduleDate());
         shiftConfig.setShiftOrder(1);
         shiftConfig.setShiftCode("CLASS1");
         shiftConfig.setShiftName("中班");
@@ -102,7 +123,7 @@ public class TcScheduleBoardQueryServiceTest {
         assertEquals(1L, board.getScheduledPage().getTotal().longValue());
         assertEquals(Long.valueOf(2L), board.getScheduledPage().getRows().get(0).getTaskVersion());
         assertEquals(Long.valueOf(2L), board.getScheduledPage().getRows().get(0).getCurrentTaskVersion());
-        assertEquals(1, board.getDateColumns().size());
+        assertEquals(3, board.getDateColumns().size());
         assertEquals("TC202607150001", board.getBatchMap().get("2026-07-15"));
         assertEquals(new BigDecimal("100"), board.getSummary().getTotalPlanQty());
         assertEquals(new BigDecimal("20"), board.getSummary().getTotalFinishQty());

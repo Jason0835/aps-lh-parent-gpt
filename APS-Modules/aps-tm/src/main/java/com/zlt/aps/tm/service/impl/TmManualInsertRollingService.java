@@ -1,6 +1,7 @@
 package com.zlt.aps.tm.service.impl;
 
 import cn.hutool.core.collection.CollUtil;
+import cn.hutool.core.util.IdUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
@@ -69,18 +70,64 @@ public class TmManualInsertRollingService {
      * @throws ServiceException 插单班次、顺序或机台产能缺失时抛出
      */
     int insertAndRoll(TmScheduleResult insertResult) {
-        Integer startShiftOrder = TmInsertPositionValidator.resolveShiftOrder(insertResult);
-        Integer insertSequence = TmInsertPositionValidator.resolveSequence(insertResult, startShiftOrder);
-        if (startShiftOrder == null || insertSequence == null) {
+        List<Integer> insertShiftOrderList = this.resolveInsertShiftOrderList(insertResult);
+        if (CollUtil.isEmpty(insertShiftOrderList)) {
             throw new ServiceException(this.resolveTmMessage("ui.data.alert.tm.schedule.insertShiftEmpty", "插单班次和顺序不能为空"));
         }
-        TmManualRollingTask insertTask = this.buildInsertTask(insertResult, startShiftOrder, insertSequence);
-        TmManualRollingWriteResult writeResult = this.rollMachineWindow(insertResult, startShiftOrder, insertSequence,
-                this.loadSameMachineResults(insertResult), this.loadMachineCapacity(insertResult), null, false, insertTask);
-        log.info("[TM_MANUAL_ROLL] operation=INSERT, factoryCode={}, scheduleDate={}, machineCode={}, startShiftOrder={}, insertCount={}, updateCount={}, unplannedQty={}",
-                insertResult.getFactoryCode(), insertResult.getScheduleDate(), insertResult.getMachineCode(), startShiftOrder,
-                writeResult.getInsertCount(), writeResult.getUpdateCount(), writeResult.getUnplannedQty());
-        return writeResult.getInsertCount();
+        TmManualRollingWriteResult totalWriteResult = new TmManualRollingWriteResult();
+        BigDecimal machineCapacity = this.loadMachineCapacity(insertResult);
+        for (Integer shiftOrder : insertShiftOrderList) {
+            Integer insertSequence = this.getShiftSequence(insertResult, shiftOrder);
+            TmScheduleResult shiftInsertResult = this.buildShiftInsertResult(insertResult, shiftOrder);
+            TmManualRollingTask insertTask = this.buildInsertTask(shiftInsertResult, shiftOrder, insertSequence);
+            totalWriteResult.add(this.rollMachineWindow(shiftInsertResult, shiftOrder, insertSequence,
+                    this.loadSameMachineResults(shiftInsertResult), machineCapacity, null, false, insertTask));
+        }
+        log.info("[TM_MANUAL_ROLL] operation=INSERT, factoryCode={}, scheduleDate={}, machineCode={}, insertShiftOrders={}, insertCount={}, updateCount={}, unplannedQty={}",
+                insertResult.getFactoryCode(), insertResult.getScheduleDate(), insertResult.getMachineCode(),
+                insertShiftOrderList, totalWriteResult.getInsertCount(), totalWriteResult.getUpdateCount(),
+                totalWriteResult.getUnplannedQty());
+        return totalWriteResult.getInsertCount();
+    }
+
+    /**
+     * 解析人工插单中计划量和顺序均有效的班次。
+     *
+     * @param insertResult 人工插单结果模板
+     * @return 按班次升序排列的有效班次
+     */
+    private List<Integer> resolveInsertShiftOrderList(TmScheduleResult insertResult) {
+        if (insertResult == null) {
+            return Collections.emptyList();
+        }
+        List<Integer> shiftOrderList = new ArrayList<>();
+        for (int shiftOrder = 1; shiftOrder <= TmScheduleConstants.TM_MAX_SHIFT_ORDER; shiftOrder++) {
+            if (this.isPositive(this.getShiftPlanQty(insertResult, shiftOrder))
+                    && this.getShiftSequence(insertResult, shiftOrder) != null) {
+                shiftOrderList.add(shiftOrder);
+            }
+        }
+        return shiftOrderList;
+    }
+
+    /**
+     * 为指定插单班次生成独立任务级结果模板。
+     *
+     * @param insertResult 原始插单结果
+     * @param shiftOrder 班次顺序
+     * @return 只承载指定班次字段的插单结果模板
+     */
+    private TmScheduleResult buildShiftInsertResult(TmScheduleResult insertResult, int shiftOrder) {
+        TmScheduleResult shiftInsertResult = this.copyBaseResult(insertResult);
+        shiftInsertResult.setOrderNo(insertResult.getBatchNo() + "-MANUAL-"
+                + IdUtil.fastSimpleUUID().substring(0, 8));
+        this.setShiftPlanQty(shiftInsertResult, shiftOrder, this.getShiftPlanQty(insertResult, shiftOrder));
+        this.setShiftSequence(shiftInsertResult, shiftOrder, this.getShiftSequence(insertResult, shiftOrder));
+        Object analysis = insertResult.getFieldValueByFieldName(
+                String.format(TmScheduleConstants.SHIFT_ANALYSIS_FIELD_TEMPLATE, shiftOrder));
+        shiftInsertResult.setFieldValueByFieldName(
+                String.format(TmScheduleConstants.SHIFT_ANALYSIS_FIELD_TEMPLATE, shiftOrder), analysis);
+        return shiftInsertResult;
     }
 
     /**
@@ -553,6 +600,9 @@ public class TmManualInsertRollingService {
         task.setGlueCode(result.getGlueCode());
         task.setMouthPlateCode(result.getMouthPlateCode());
         task.setDataSource(result.getDataSource());
+        Object analysis = result.getFieldValueByFieldName(
+                String.format(TmScheduleConstants.SHIFT_ANALYSIS_FIELD_TEMPLATE, shiftOrder));
+        task.setAnalysis(analysis == null ? null : analysis.toString());
         return task;
     }
 
@@ -576,6 +626,9 @@ public class TmManualInsertRollingService {
         task.setGlueCode(insertResult.getGlueCode());
         task.setMouthPlateCode(insertResult.getMouthPlateCode());
         task.setDataSource(INSERT_DATA_SOURCE);
+        Object analysis = insertResult.getFieldValueByFieldName(
+                String.format(TmScheduleConstants.SHIFT_ANALYSIS_FIELD_TEMPLATE, startShiftOrder));
+        task.setAnalysis(analysis == null ? null : analysis.toString());
         task.setInsertTask(true);
         return task;
     }
@@ -604,6 +657,7 @@ public class TmManualInsertRollingService {
             this.setShiftPlanQty(result, shiftOrder, null);
             result.setFieldValueByFieldName(String.format(TmScheduleConstants.SHIFT_START_TIME_FIELD_TEMPLATE, shiftOrder), null);
             result.setFieldValueByFieldName(String.format(TmScheduleConstants.SHIFT_END_TIME_FIELD_TEMPLATE, shiftOrder), null);
+            result.setFieldValueByFieldName(String.format(TmScheduleConstants.SHIFT_ANALYSIS_FIELD_TEMPLATE, shiftOrder), null);
         }
     }
 
@@ -652,6 +706,8 @@ public class TmManualInsertRollingService {
         }
         this.setShiftSequence(targetResult, shiftOrder, sequence);
         this.setShiftPlanQty(targetResult, shiftOrder, assignedQty);
+        targetResult.setFieldValueByFieldName(
+                String.format(TmScheduleConstants.SHIFT_ANALYSIS_FIELD_TEMPLATE, shiftOrder), task.getAnalysis());
         return targetResult;
     }
 
@@ -696,6 +752,7 @@ public class TmManualInsertRollingService {
         carryTask.setGlueCode(sourceTask.getGlueCode());
         carryTask.setMouthPlateCode(sourceTask.getMouthPlateCode());
         carryTask.setDataSource(sourceTask.getDataSource());
+        carryTask.setAnalysis(sourceTask.getAnalysis());
         carryTask.setInsertTask(sourceTask.isInsertTask());
         carryTask.setCarryoverTask(true);
         return carryTask;
@@ -753,6 +810,7 @@ public class TmManualInsertRollingService {
         result.setSixClockStockQty(templateResult.getSixClockStockQty());
         result.setCurlRollLength(templateResult.getCurlRollLength());
         result.setTailFlag(templateResult.getTailFlag());
+        result.setRemark(templateResult.getRemark());
         return result;
     }
 

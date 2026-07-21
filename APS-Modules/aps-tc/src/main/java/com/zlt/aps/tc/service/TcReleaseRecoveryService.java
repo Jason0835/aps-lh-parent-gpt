@@ -87,11 +87,6 @@ public class TcReleaseRecoveryService {
                 .eq(TcParams::getFactoryCode, task.getFactoryCode())
                 .eq(TcParams::getParamCode, TcScheduleConstants.PARAM_RELEASE_TIMEOUT_MINUTES)
                 .eq(TcParams::getEnableStatus, "1")
-                .and(condition -> condition.isNull(TcParams::getEffectiveStartTime)
-                        .or().le(TcParams::getEffectiveStartTime, task.getScheduleDate()))
-                .and(condition -> condition.isNull(TcParams::getEffectiveEndTime)
-                        .or().ge(TcParams::getEffectiveEndTime, task.getScheduleDate()))
-                .orderByDesc(TcParams::getEffectiveStartTime)
                 .last("limit 1"));
         String timeoutValue = params == null ? TcScheduleConstants.DEFAULT_RELEASE_TIMEOUT_MINUTES
                 : StrUtil.blankToDefault(params.getParamValue(),

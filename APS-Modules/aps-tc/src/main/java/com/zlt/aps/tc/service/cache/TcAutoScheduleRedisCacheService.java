@@ -89,15 +89,12 @@ public class TcAutoScheduleRedisCacheService {
             deleteKeySet.addAll(findKeys(TcScheduleConstants.BASE_DATA_CACHE_KEY_PREFIX + "*"));
         } else {
             deleteKeySet.addAll(findKeys(TcScheduleConstants.BASE_DATA_CACHE_KEY_PREFIX + "machine:" + factoryCode));
+            deleteKeySet.addAll(findKeys(TcScheduleConstants.BASE_DATA_CACHE_KEY_PREFIX + "params:" + factoryCode));
             if (scheduleDate == null) {
-                deleteKeySet.addAll(findKeys(TcScheduleConstants.BASE_DATA_CACHE_KEY_PREFIX
-                        + "params:" + factoryCode + ":*"));
                 deleteKeySet.addAll(findKeys(TcScheduleConstants.BASE_DATA_CACHE_KEY_PREFIX
                         + "calendar:" + factoryCode + ":*"));
             } else {
                 String scheduleDateText = DateUtil.formatDate(scheduleDate);
-                deleteKeySet.addAll(findKeys(TcScheduleConstants.BASE_DATA_CACHE_KEY_PREFIX
-                        + "params:" + factoryCode + ":" + scheduleDateText));
                 deleteKeySet.addAll(findKeys(TcScheduleConstants.BASE_DATA_CACHE_KEY_PREFIX
                         + "calendar:" + factoryCode + ":*:" + scheduleDateText));
             }

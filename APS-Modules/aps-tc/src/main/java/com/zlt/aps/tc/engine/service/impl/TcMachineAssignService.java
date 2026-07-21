@@ -1469,6 +1469,7 @@ public class TcMachineAssignService implements ITcMachineAssignService {
         target.setMinStartQty(source.getMinStartQty());
         target.setPreviousSpecSwitchHours(source.getPreviousSpecSwitchHours());
         target.setPreviousGlueSwitchHours(source.getPreviousGlueSwitchHours());
+        target.setPreviousGlueSwitchCapacityDeduct(source.getPreviousGlueSwitchCapacityDeduct());
         target.setFixedMachineMatched(source.getFixedMachineMatched());
         target.setDemandQty(source.getDemandQty());
         target.setNewSpecInfo(source.getNewSpecInfo());
@@ -2109,10 +2110,16 @@ public class TcMachineAssignService implements ITcMachineAssignService {
             log.info("[TC_MACHINE_CAPACITY] sidewallCode={}, machineCode={}, shiftOrder={}, 最大产能【maxCapacity】-检修折算量【maintenanceDeduct】-已排计划量【assignedPlanQty】-已发生切换折算量【existingSwitchDeduct】-当前切换折算量【currentSwitchDeduct】=剩余产能【remainCapacity】",
                     task.getSidewallCode(), candidate.getMachineCode(), task.getShiftOrder());
             BigDecimal shiftMaintenanceHours = this.resolveMaintenanceHours(task, candidate);
-            log.info("[TC_MACHINE_CAPACITY_DETAIL] sidewallCode={}, machineCode={}, shiftOrder={}, maxCapacity={}, maintenanceHours={}, totalMaintenanceHours={}, machineSpeed={}, assignedPlanQty={}, remainCapacity={}",
+            log.info("[TC_MACHINE_CAPACITY_DETAIL] sidewallCode={}, machineCode={}, shiftOrder={}, maxCapacity={}, maintenanceHours={}, totalMaintenanceHours={}, machineSpeed={}, assignedPlanQty={}, previousGlueCode={}, currentGlueCode={}, glueChangeCapacityDeductParam={}, currentGlueSwitchCapacityDeduct={}, existingSwitchCapacityDeduct={}, currentSwitchCapacityDeduct={}, remainCapacity={}",
                     task.getSidewallCode(), candidate.getMachineCode(), task.getShiftOrder(),
                     candidate.getMaxCapacity(), shiftMaintenanceHours, candidate.getMaintenanceHours(), machineSpeed,
                     resolveAssignedPlanQty(context, candidate.getMachineCode(), task.getShiftOrder()),
+                    candidate.getTailMainGlueCode(), task.getGlueCode(),
+                    this.resolveParamValue(context, TcScheduleConstants.PARAM_GLUE_CHANGE_CAPACITY_DEDUCT,
+                            TcScheduleConstants.DEFAULT_GLUE_CHANGE_CAPACITY_DEDUCT),
+                    candidate.getEvidence().get("glueSwitchCapacityDeduct"),
+                    candidate.getEvidence().get("existingSwitchCapacityDeduct"),
+                    candidate.getEvidence().get("currentSwitchCapacityDeduct"),
                     remainCapacity);
         }
     }
@@ -2198,8 +2205,12 @@ public class TcMachineAssignService implements ITcMachineAssignService {
         BigDecimal existingSwitchDeduct = this.resolveExistingSwitchDeduct(context, candidate.getMachineCode(),
                 task.getShiftOrder());
         candidate.setSwitchCostHours(BigDecimal.ZERO);
+        task.setPreviousSpecSwitchHours(BigDecimal.ZERO);
+        task.setPreviousGlueSwitchHours(BigDecimal.ZERO);
+        task.setPreviousGlueSwitchCapacityDeduct(BigDecimal.ZERO);
         candidate.getEvidence().put("specSwitchHours", BigDecimal.ZERO);
         candidate.getEvidence().put("glueSwitchHours", BigDecimal.ZERO);
+        candidate.getEvidence().put("glueSwitchCapacityDeduct", BigDecimal.ZERO);
         candidate.getEvidence().put("accumulatedSwitchHours",
                 this.resolveExistingSwitchHours(context, candidate.getMachineCode(), task.getShiftOrder()));
         candidate.getEvidence().put("existingSwitchCapacityDeduct", existingSwitchDeduct);
@@ -2250,28 +2261,31 @@ public class TcMachineAssignService implements ITcMachineAssignService {
                     && !Objects.equals(predecessor.getSidewallCode(), currentTask.getSidewallCode())
                 ? this.resolveSwitchParamHours(context, TcScheduleConstants.PARAM_SPEC_CHANGE_MINUTES)
                 : BigDecimal.ZERO;
-            BigDecimal glueSwitchHours = predecessor != null
-                    && !Objects.equals(predecessor.getGlueCode(), currentTask.getGlueCode())
-                ? this.resolveSwitchParamHours(context, TcScheduleConstants.PARAM_GLUE_CHANGE_MINUTES)
-                : BigDecimal.ZERO;
+            BigDecimal glueSwitchCapacityDeduct = predecessor != null
+                    && this.isGlueSwitch(predecessor.getGlueCode(), currentTask.getGlueCode())
+                ? this.resolveGlueSwitchCapacityDeduct(context) : BigDecimal.ZERO;
+            BigDecimal glueSwitchHours = this.convertCapacityDeductToHours(glueSwitchCapacityDeduct, currentSpeed);
             BigDecimal switchHours = specSwitchHours.add(glueSwitchHours);
             if (currentTask == task) {
                 currentTask.setPreviousSpecSwitchHours(specSwitchHours);
                 currentTask.setPreviousGlueSwitchHours(glueSwitchHours);
+                currentTask.setPreviousGlueSwitchCapacityDeduct(glueSwitchCapacityDeduct);
                 candidate.setSwitchCostHours(switchHours);
                 candidate.getEvidence().put("specSwitchHours", specSwitchHours);
                 candidate.getEvidence().put("glueSwitchHours", glueSwitchHours);
+                candidate.getEvidence().put("glueSwitchCapacityDeduct", glueSwitchCapacityDeduct);
             }
             totalSwitchHours = totalSwitchHours.add(switchHours);
-            totalSwitchDeduct = totalSwitchDeduct.add(switchHours.multiply(currentSpeed));
+            totalSwitchDeduct = totalSwitchDeduct.add(specSwitchHours.multiply(currentSpeed))
+                    .add(glueSwitchCapacityDeduct);
             predecessor = this.buildPredecessorFromTask(candidate.getMachineCode(), task.getShiftOrder(), currentTask);
         }
         candidate.getEvidence().put("accumulatedSwitchHours", totalSwitchHours);
         candidate.getEvidence().put("existingSwitchCapacityDeduct",
                 this.resolveExistingSwitchDeduct(context, candidate.getMachineCode(), task.getShiftOrder()));
         candidate.getEvidence().put("currentSwitchCapacityDeduct",
-                this.nvl(task.getPreviousSpecSwitchHours()).add(this.nvl(task.getPreviousGlueSwitchHours()))
-                        .multiply(this.nvl(machineSpeed)));
+                this.nvl(task.getPreviousSpecSwitchHours()).multiply(this.nvl(machineSpeed))
+                        .add(this.nvl(task.getPreviousGlueSwitchCapacityDeduct())));
         candidate.getEvidence().put("reorderedTotalSwitchCapacityDeduct", totalSwitchDeduct);
         return this.nvl(maxCapacity).subtract(maintenanceDeduct).subtract(assignedPlanQty)
                 .subtract(totalSwitchDeduct).max(BigDecimal.ZERO);
@@ -2314,10 +2328,13 @@ public class TcMachineAssignService implements ITcMachineAssignService {
         BigDecimal existingSwitchDeduct = this.resolveExistingSwitchDeduct(context, candidate.getMachineCode(),
                 task.getShiftOrder());
         BigDecimal currentSwitchHours = this.resolveCurrentSwitchHours(task, context, candidate);
-        BigDecimal currentSwitchDeduct = currentSwitchHours.multiply(nvl(machineSpeed));
+        BigDecimal currentSwitchDeduct = this.nvl(task.getPreviousSpecSwitchHours()).multiply(this.nvl(machineSpeed))
+                .add(this.nvl(task.getPreviousGlueSwitchCapacityDeduct()));
         candidate.setSwitchCostHours(currentSwitchHours);
         candidate.getEvidence().put("specSwitchHours", this.nvl(task.getPreviousSpecSwitchHours()));
         candidate.getEvidence().put("glueSwitchHours", this.nvl(task.getPreviousGlueSwitchHours()));
+        candidate.getEvidence().put("glueSwitchCapacityDeduct",
+                this.nvl(task.getPreviousGlueSwitchCapacityDeduct()));
         candidate.getEvidence().put("accumulatedSwitchHours",
                 this.resolveExistingSwitchHours(context, candidate.getMachineCode(), task.getShiftOrder()));
         candidate.getEvidence().put("existingSwitchCapacityDeduct", existingSwitchDeduct);
@@ -2360,12 +2377,16 @@ public class TcMachineAssignService implements ITcMachineAssignService {
                 task.getShiftOrder());
         BigDecimal specSwitchHours = BigDecimal.ZERO;
         BigDecimal glueSwitchHours = BigDecimal.ZERO;
+        task.setPreviousGlueSwitchCapacityDeduct(BigDecimal.ZERO);
         if (predecessor != null) {
             if (!Objects.equals(predecessor.getSidewallCode(), task.getSidewallCode())) {
             specSwitchHours = this.resolveSwitchParamHours(context, TcScheduleConstants.PARAM_SPEC_CHANGE_MINUTES);
             }
-            if (!Objects.equals(predecessor.getGlueCode(), task.getGlueCode())) {
-            glueSwitchHours = this.resolveSwitchParamHours(context, TcScheduleConstants.PARAM_GLUE_CHANGE_MINUTES);
+            if (this.isGlueSwitch(predecessor.getGlueCode(), task.getGlueCode())) {
+                BigDecimal glueSwitchCapacityDeduct = this.resolveGlueSwitchCapacityDeduct(context);
+                task.setPreviousGlueSwitchCapacityDeduct(glueSwitchCapacityDeduct);
+                glueSwitchHours = this.convertCapacityDeductToHours(glueSwitchCapacityDeduct,
+                        this.resolveMachineSpeed(task, candidate, context));
             }
         }
         task.setPreviousSpecSwitchHours(specSwitchHours);
@@ -2390,9 +2411,64 @@ public class TcMachineAssignService implements ITcMachineAssignService {
                 .map(ScheduleTaskNode::getTask)
                 .filter(Objects::nonNull)
                 .map(chainTask -> this.nvl(chainTask.getPreviousSpecSwitchHours())
-                        .add(this.nvl(chainTask.getPreviousGlueSwitchHours()))
-                        .multiply(this.nvl(chainTask.getMachineSpeed())))
+                        .multiply(this.nvl(chainTask.getMachineSpeed()))
+                        .add(this.nvl(chainTask.getPreviousGlueSwitchCapacityDeduct())))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    /**
+     * 解析主胶料切换固定产能扣减量。
+     *
+     * @param context 排程上下文
+     * @return 非负固定扣减量；参数缺失或非法时返回默认值
+     */
+    private BigDecimal resolveGlueSwitchCapacityDeduct(TcScheduleContext context) {
+        String value = this.resolveParamValue(context, TcScheduleConstants.PARAM_GLUE_CHANGE_CAPACITY_DEDUCT,
+                TcScheduleConstants.DEFAULT_GLUE_CHANGE_CAPACITY_DEDUCT);
+        try {
+            BigDecimal deduct = new BigDecimal(value);
+            if (deduct.compareTo(BigDecimal.ZERO) < 0) {
+                log.warn("[TC_SWITCH_PARAM] batchNo={}, traceId={}, paramCode={}, paramValue={}, reason=NEGATIVE_VALUE",
+                        context.getBatchNo(), context.getTraceId(),
+                        TcScheduleConstants.PARAM_GLUE_CHANGE_CAPACITY_DEDUCT, value);
+                return BigDecimal.ZERO;
+            }
+            return deduct;
+        } catch (NumberFormatException exception) {
+            log.warn("[TC_SWITCH_PARAM] batchNo={}, traceId={}, paramCode={}, paramValue={}, defaultValue={}, reason=INVALID_NUMBER",
+                    context.getBatchNo(), context.getTraceId(),
+                    TcScheduleConstants.PARAM_GLUE_CHANGE_CAPACITY_DEDUCT, value,
+                    TcScheduleConstants.DEFAULT_GLUE_CHANGE_CAPACITY_DEDUCT, exception);
+            return new BigDecimal(TcScheduleConstants.DEFAULT_GLUE_CHANGE_CAPACITY_DEDUCT);
+        }
+    }
+
+    /**
+     * 将固定产能扣减量按当前任务速度折算为切换小时数。
+     *
+     * @param capacityDeduct 固定产能扣减量
+     * @param machineSpeed 当前任务机台速度
+     * @return 切换小时数；速度无效时返回0
+     */
+    private BigDecimal convertCapacityDeductToHours(BigDecimal capacityDeduct, BigDecimal machineSpeed) {
+        if (this.nvl(capacityDeduct).compareTo(BigDecimal.ZERO) <= 0
+                || this.nvl(machineSpeed).compareTo(BigDecimal.ZERO) <= 0) {
+            return BigDecimal.ZERO;
+        }
+        return capacityDeduct.divide(machineSpeed, TcScheduleConstants.DECIMAL_CALCULATION_SCALE,
+                java.math.RoundingMode.HALF_UP);
+    }
+
+    /**
+     * 判断前后任务是否发生可确认的主胶料切换。
+     *
+     * @param previousGlueCode 前置任务主胶料编码
+     * @param currentGlueCode 当前任务主胶料编码
+     * @return 两个编码均非空且不相同时返回true
+     */
+    private boolean isGlueSwitch(String previousGlueCode, String currentGlueCode) {
+        return StrUtil.isNotBlank(previousGlueCode) && StrUtil.isNotBlank(currentGlueCode)
+                && !Objects.equals(previousGlueCode.trim(), currentGlueCode.trim());
     }
 
     /**

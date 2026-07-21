@@ -1,12 +1,9 @@
 package com.zlt.aps.tc.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.ruoyi.common.constant.UserConstants;
-import com.ruoyi.common.core.web.domain.BaseEntity;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
-import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.engine.enums.ClassNumThreePlanEnums;
 import com.zlt.aps.common.engine.utils.GenerageMapKeyUtils;
 import com.zlt.aps.tc.api.domain.entity.TcMachineInfo;
@@ -74,7 +71,6 @@ public class TcMachineMaintenanceServiceImpl extends AbstractDocService<TcMachin
     protected Map<Object, Object> getServiceCheckParams(List<TcMachineMaintenance> list, List<TcMachineMaintenance> importList) {
         Map<Object, Object> serviceCheckParams = super.getServiceCheckParams(list, importList);
         LambdaQueryWrapper<TcMachineInfo> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(BaseEntity::getIsDelete, ApsConstant.DEL_FLAG_NORMAL);
         List<TcMachineInfo> machineInfoList = tcMachineInfoMapper.selectList(wrapper);
         Map<String, TcMachineInfo> machineInfoMap = machineInfoList.stream().collect(Collectors.toMap(item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), item.getMachineCode()), Function.identity(), (s1, s2) -> s1));
         serviceCheckParams.put("machineMap", machineInfoMap);
@@ -112,8 +108,8 @@ public class TcMachineMaintenanceServiceImpl extends AbstractDocService<TcMachin
         }
 
         List<TcShiftConfig> shiftConfigs = tcShiftConfigMapper.selectList(
-                new QueryWrapper<TcShiftConfig>()
-                        .eq("OPEN_FLAG", "1")
+                new LambdaQueryWrapper<TcShiftConfig>()
+                        .eq(TcShiftConfig::getOpenFlag, "1")
         );
 
         if (shiftConfigs == null || shiftConfigs.isEmpty()) {

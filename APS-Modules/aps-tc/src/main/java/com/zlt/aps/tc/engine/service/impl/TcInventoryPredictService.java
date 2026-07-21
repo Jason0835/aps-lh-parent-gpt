@@ -159,7 +159,7 @@ public class TcInventoryPredictService implements ITcInventoryPredictService {
             return true;
         }
         String mode = value.getEffectiveValue();
-        return TcVersionMatchModeEnum.B != TcVersionMatchModeEnum.resolve(mode);
+        return TcVersionMatchModeEnum.BOM != TcVersionMatchModeEnum.resolve(mode);
     }
 
     /**

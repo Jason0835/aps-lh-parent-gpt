@@ -9,7 +9,7 @@ public enum TcVersionMatchModeEnum {
     RECIPE("RECIPE", "示方书模式"),
 
     /** 按物料清单版本匹配。 */
-    B("B", "物料清单模式");
+    BOM("BOM", "物料清单模式");
 
     private final String code;
 
@@ -27,9 +27,8 @@ public enum TcVersionMatchModeEnum {
      * @return 匹配到的版本模式，未知值返回 RECIPE
      */
     public static TcVersionMatchModeEnum resolve(String code) {
-        // 兼容早期内部实现使用的 BOM 值，对外配置口径统一为 B。
         if ("BOM".equalsIgnoreCase(code)) {
-            return B;
+            return BOM;
         }
         for (TcVersionMatchModeEnum mode : values()) {
             if (mode.code.equalsIgnoreCase(code)) {
