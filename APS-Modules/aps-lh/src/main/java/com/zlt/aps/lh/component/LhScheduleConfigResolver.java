@@ -177,6 +177,8 @@ public class LhScheduleConfigResolver {
                 LhScheduleConstant.ALLOW_MAINTENANCE_ON_INVENTORY_DAY);
         putDoubleValue(resolvedParamMap, lhParamsMap, LhScheduleParamConstant.CAPSULE_PREHEAT_HOURS,
                 LhScheduleConstant.CAPSULE_PREHEAT_HOURS.doubleValue());
+        // 胶囊参数统一在配置快照入口校验，非法值回到业务默认值，禁止把负数静默修正成其他业务含义。
+        putCapsuleReplacementParams(resolvedParamMap, lhParamsMap);
         putIntValue(resolvedParamMap, lhParamsMap, LhScheduleParamConstant.MAINTENANCE_OVERLAP_SWITCH_HOURS,
                 LhScheduleConstant.MAINTENANCE_OVERLAP_SWITCH_HOURS);
 
@@ -220,6 +222,8 @@ public class LhScheduleConfigResolver {
         putEarlyProductionDaysThreshold(resolvedParamMap, lhParamsMap);
         // 收尾自动补量只允许0/1，在配置快照入口统一校验，避免两条补量链各自解析。
         putEndingAutoFillEnabled(resolvedParamMap, lhParamsMap);
+        // 续作停产保机前后观察天数只允许1～3，非法配置统一回退默认值2。
+        putContinuousMouldOfflineCheckDays(resolvedParamMap, lhParamsMap);
         putStringValue(resolvedParamMap, lhParamsMap, LhScheduleParamConstant.ODD_SHIFT_CAPACITY_PLUS_SHIFT_TYPE,
                 LhScheduleConstant.ODD_SHIFT_CAPACITY_PLUS_SHIFT_TYPE);
         putIntValue(resolvedParamMap, lhParamsMap, LhScheduleParamConstant.DAILY_STANDARD_CAPACITY_REMAIN_SHIFT_TYPE,
@@ -304,6 +308,58 @@ public class LhScheduleConfigResolver {
     }
 
     /**
+     * 解析换胶囊参数。
+     *
+     * <p>使用次数上限必须大于0，班次扣减量必须大于等于0。空值、非数字或越界值均使用
+     * 常量默认值，避免上限被修正为1或扣减量被修正为0后改变业务语义。</p>
+     *
+     * @param resolvedParamMap 解析后参数
+     * @param lhParamsMap 原始参数
+     */
+    private void putCapsuleReplacementParams(Map<String, String> resolvedParamMap,
+                                             Map<String, String> lhParamsMap) {
+        putCapsuleReplacementParam(resolvedParamMap, lhParamsMap,
+                LhScheduleParamConstant.CAPSULE_FORCE_DOWN_COUNT,
+                LhScheduleConstant.CAPSULE_FORCE_DOWN_COUNT, false);
+        putCapsuleReplacementParam(resolvedParamMap, lhParamsMap,
+                LhScheduleParamConstant.CAPSULE_CHANGE_LOSS_QTY,
+                LhScheduleConstant.CAPSULE_CHANGE_LOSS_QTY, true);
+    }
+
+    /**
+     * 解析单个换胶囊整数参数。
+     *
+     * @param resolvedParamMap 解析后参数
+     * @param lhParamsMap 原始参数
+     * @param paramCode 参数编码
+     * @param defaultValue 默认值
+     * @param allowZero 是否允许配置为0
+     */
+    private void putCapsuleReplacementParam(Map<String, String> resolvedParamMap,
+                                            Map<String, String> lhParamsMap,
+                                            String paramCode,
+                                            int defaultValue,
+                                            boolean allowZero) {
+        String value = lhParamsMap.get(paramCode);
+        int resolvedValue = defaultValue;
+        if (StringUtils.isNotEmpty(value)) {
+            try {
+                int parsedValue = Integer.parseInt(value.trim());
+                if (parsedValue > 0 || allowZero && parsedValue == 0) {
+                    resolvedValue = parsedValue;
+                } else {
+                    log.warn("换胶囊参数配置越界，使用默认值, paramCode={}, value={}, defaultValue={}",
+                            paramCode, value, defaultValue);
+                }
+            } catch (NumberFormatException e) {
+                log.warn("换胶囊参数解析失败，使用默认值, paramCode={}, value={}, defaultValue={}",
+                        paramCode, value, defaultValue);
+            }
+        }
+        resolvedParamMap.put(paramCode, String.valueOf(resolvedValue));
+    }
+
+    /**
      * 解析SKU提前生产天数阈值。
      * <p>提前生产最多允许向后查看31个自然日，非法、缺失或小于等于0时统一回退默认值2。</p>
      *
@@ -364,6 +420,41 @@ public class LhScheduleConfigResolver {
         }
         log.warn("收尾自动补量开关配置非法，使用默认值, paramCode={}, value={}, defaultValue={}",
                 paramCode, value, defaultValue);
+        resolvedParamMap.put(paramCode, String.valueOf(defaultValue));
+    }
+
+    /**
+     * 解析在机模具下机时前后计划校验天数。
+     * <p>业务允许范围为1～3天，空值、非数字和越界值均使用默认值2，避免无效配置扩大月计划读取范围。</p>
+     *
+     * @param resolvedParamMap 解析后的参数快照
+     * @param lhParamsMap 原始硫化参数
+     */
+    private void putContinuousMouldOfflineCheckDays(Map<String, String> resolvedParamMap,
+                                                     Map<String, String> lhParamsMap) {
+        String paramCode = LhScheduleParamConstant.CONTINUOUS_MOULD_OFFLINE_CHECK_DAYS;
+        int defaultValue = LhScheduleConstant.CONTINUOUS_MOULD_OFFLINE_CHECK_DAYS;
+        String value = lhParamsMap.get(paramCode);
+        if (StringUtils.isEmpty(value)) {
+            log.warn("在机模具下机校验天数未配置或为空, paramCode={}, 使用默认值: {}",
+                    paramCode, defaultValue);
+            resolvedParamMap.put(paramCode, String.valueOf(defaultValue));
+            return;
+        }
+        try {
+            int days = Integer.parseInt(value.trim());
+            if (days >= LhScheduleConstant.MIN_CONTINUOUS_MOULD_OFFLINE_CHECK_DAYS
+                    && days <= LhScheduleConstant.MAX_CONTINUOUS_MOULD_OFFLINE_CHECK_DAYS) {
+                resolvedParamMap.put(paramCode, String.valueOf(days));
+                return;
+            }
+            log.warn("在机模具下机校验天数配置越界, paramCode={}, value={}, 合法范围={}～{}, 使用默认值: {}",
+                    paramCode, value, LhScheduleConstant.MIN_CONTINUOUS_MOULD_OFFLINE_CHECK_DAYS,
+                    LhScheduleConstant.MAX_CONTINUOUS_MOULD_OFFLINE_CHECK_DAYS, defaultValue);
+        } catch (NumberFormatException e) {
+            log.warn("在机模具下机校验天数解析失败, paramCode={}, value={}, 使用默认值: {}",
+                    paramCode, value, defaultValue);
+        }
         resolvedParamMap.put(paramCode, String.valueOf(defaultValue));
     }
 

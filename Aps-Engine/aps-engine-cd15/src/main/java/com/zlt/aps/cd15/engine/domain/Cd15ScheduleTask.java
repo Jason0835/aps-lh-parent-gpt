@@ -26,19 +26,19 @@ public class Cd15ScheduleTask extends BaseEntity implements Serializable {
     /** 排程日期。 */
     @TableField("SCHEDULE_DATE")
     private Date scheduleDate;
-    /** 任务类型。 */
+    /** 任务类型：自动排程或插单滚动重排。 */
     @TableField("TASK_TYPE")
     private String taskType;
-    /** 业务幂等键。 */
+    /** 定时滚动业务幂等键。 */
     @TableField("IDEMPOTENCY_KEY")
     private String idempotencyKey;
-    /** 触发类型：TIMER 或 MANUAL。 */
+    /** 触发类型：TIMER或MANUAL。 */
     @TableField("TRIGGER_TYPE")
     private String triggerType;
     /** 任务状态。 */
     @TableField("TASK_STATUS")
     private String taskStatus;
-    /** 执行进度，范围 0 到 100。 */
+    /** 执行进度，范围0至100。 */
     @TableField("PROGRESS")
     private Integer progress;
     /** 当前阶段编码。 */
@@ -50,13 +50,10 @@ public class Cd15ScheduleTask extends BaseEntity implements Serializable {
     /** 成功后生成的排程批次号。 */
     @TableField("BATCH_NO")
     private String batchNo;
-    /** 输入数据版本指纹。 */
-    @TableField("INPUT_VERSION")
-    private String inputVersion;
     /** 失败错误摘要，不保存完整异常堆栈。 */
     @TableField("ERROR_MESSAGE")
     private String errorMessage;
-    /** 请求参数快照。 */
+    /** 请求参数JSON快照。 */
     @TableField("REQUEST_SNAPSHOT")
     private String requestSnapshot;
     /** 开始执行时间。 */

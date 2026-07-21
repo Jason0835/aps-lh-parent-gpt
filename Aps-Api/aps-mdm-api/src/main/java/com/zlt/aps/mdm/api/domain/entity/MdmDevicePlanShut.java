@@ -99,16 +99,6 @@ public class MdmDevicePlanShut extends BaseEntity {
     private Date endDate;
 
     /**
-     * 实际完成日期:yyyy-MM-dd HH:mm:ss
-     */
-    @ImportExcelValidated(date = true)
-    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
-    @Excel(name = "ui.data.column.mdmDevicePlanShut.actualFinishDate", width = 30, dateFormat = "yyyy-MM-dd HH:mm:ss")
-    @ApiModelProperty(value = "实际完成日期:yyyy-MM-dd HH:mm:ss", name = "actualFinishDate")
-    @TableField(value = "ACTUAL_FINISH_DATE")
-    private Date actualFinishDate;
-
-    /**
      * 数据来源，字典：lh_precision_data_source；0-MES，1-系统
      */
     @Excel(name = "ui.data.column.mdmDevicePlanShut.dataSource", dictType = "lh_precision_data_source")
@@ -135,4 +125,13 @@ public class MdmDevicePlanShut extends BaseEntity {
     @ApiModelProperty(value = "MES设备停机计划表ID", name = "mesId")
     @TableField(value = "MES_ID")
     private Long mesId;
+
+    /**
+     * 排程日期（硫化排程回填给精度计划/清洗计划）
+     */
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    @Excel(name = "ui.data.column.mdmDevicePlanShut.scheduleDate", width = 30, dateFormat = "yyyy-MM-dd HH:mm:ss")
+    @ApiModelProperty(value = "排程日期（硫化排程回填给精度计划/清洗计划）", name = "scheduleDate")
+    @TableField(value = "SCHEDULE_DATE")
+    private Date scheduleDate;
 }

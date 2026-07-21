@@ -11,6 +11,9 @@ import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
 import com.zlt.aps.lh.api.enums.ShiftEnum;
 import com.zlt.aps.lh.api.util.ShiftBoundaryUtil;
 import com.zlt.aps.lh.context.LhScheduleContext;
+import org.apache.commons.lang3.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.util.CollectionUtils;
 
 import java.text.ParseException;
@@ -31,6 +34,9 @@ import java.util.Objects;
  * @author APS
  */
 public final class LhScheduleTimeUtil {
+
+    /** 时间参数解析日志 */
+    private static final Logger LOG = LoggerFactory.getLogger(LhScheduleTimeUtil.class);
 
     private static final ZoneId DEFAULT_ZONE = ZoneId.systemDefault();
 
@@ -294,7 +300,8 @@ public final class LhScheduleTimeUtil {
     }
 
     /**
-     * 获取胶囊预热时间（分钟）
+     * 获取胶囊预热时间（分钟）。
+     * <p>SYS0307009 为精度保养和计划性维修共用参数，修改配置会同步影响两条时间轴。</p>
      *
      * @param context 排程上下文
      * @return 预热分钟数
@@ -302,18 +309,28 @@ public final class LhScheduleTimeUtil {
     public static int getCapsulePreheatMinutes(LhScheduleContext context) {
         double capsulePreheatHours = LhScheduleConstant.CAPSULE_PREHEAT_HOURS.doubleValue();
         if (Objects.nonNull(context)) {
-            if (Objects.nonNull(context.getScheduleConfig())) {
-                capsulePreheatHours = context.getScheduleConfig().getCapsulePreheatHours();
-            } else {
-                String paramValue = context.getParamValue(
+            String paramValue = context.getParamValue(
+                    LhScheduleParamConstant.CAPSULE_PREHEAT_HOURS, null);
+            if (StringUtils.isEmpty(paramValue)) {
+                LOG.warn("胶囊预热参数为空，使用默认值, paramCode: {}, defaultValue: {}",
                         LhScheduleParamConstant.CAPSULE_PREHEAT_HOURS,
-                        LhScheduleConstant.CAPSULE_PREHEAT_HOURS.toPlainString());
-                try {
-                    capsulePreheatHours = Double.parseDouble(paramValue.trim());
-                } catch (NumberFormatException ignored) {
-                    capsulePreheatHours = LhScheduleConstant.CAPSULE_PREHEAT_HOURS.doubleValue();
-                }
+                        LhScheduleConstant.CAPSULE_PREHEAT_HOURS);
+                paramValue = LhScheduleConstant.CAPSULE_PREHEAT_HOURS.toPlainString();
             }
+            try {
+                capsulePreheatHours = Double.parseDouble(paramValue.trim());
+            } catch (NumberFormatException e) {
+                LOG.warn("胶囊预热参数格式非法，使用默认值, paramCode: {}, rawValue: {}, defaultValue: {}",
+                        LhScheduleParamConstant.CAPSULE_PREHEAT_HOURS, paramValue,
+                        LhScheduleConstant.CAPSULE_PREHEAT_HOURS);
+                capsulePreheatHours = LhScheduleConstant.CAPSULE_PREHEAT_HOURS.doubleValue();
+            }
+        }
+        if (capsulePreheatHours < 0D) {
+            LOG.warn("胶囊预热参数为负数，使用默认值, paramCode: {}, rawValue: {}, defaultValue: {}",
+                    LhScheduleParamConstant.CAPSULE_PREHEAT_HOURS, capsulePreheatHours,
+                    LhScheduleConstant.CAPSULE_PREHEAT_HOURS);
+            capsulePreheatHours = LhScheduleConstant.CAPSULE_PREHEAT_HOURS.doubleValue();
         }
         return (int) Math.round(capsulePreheatHours * 60D);
     }

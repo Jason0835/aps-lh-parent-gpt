@@ -39,7 +39,7 @@ public class Cd15ShiftConfigServiceImpl extends AbstractDocService<Cd15ShiftConf
     }
 
     /**
-     * 校验同一工厂下班次编码是否唯一。
+     * 校验同一工厂下结果 CLASS 字段是否唯一。
      *
      * @param shiftConfig 班次配置信息
      * @return 唯一性标识
@@ -48,7 +48,7 @@ public class Cd15ShiftConfigServiceImpl extends AbstractDocService<Cd15ShiftConf
     public String checkUnique(Cd15ShiftConfig shiftConfig) {
         LambdaQueryWrapper<Cd15ShiftConfig> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(Cd15ShiftConfig::getFactoryCode, shiftConfig.getFactoryCode());
-        wrapper.eq(Cd15ShiftConfig::getShiftCode, shiftConfig.getShiftCode());
+        wrapper.eq(Cd15ShiftConfig::getClassField, shiftConfig.getClassField());
         wrapper.ne(shiftConfig.getId() != null, Cd15ShiftConfig::getId, shiftConfig.getId());
         return cd15ShiftConfigMapper.selectCount(wrapper) > 0 ? UserConstants.NOT_UNIQUE : UserConstants.UNIQUE;
     }
@@ -135,7 +135,7 @@ public class Cd15ShiftConfigServiceImpl extends AbstractDocService<Cd15ShiftConf
     private Cd15ShiftConfig getExistShiftConfig(Cd15ShiftConfig shiftConfig) {
         LambdaQueryWrapper<Cd15ShiftConfig> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(Cd15ShiftConfig::getFactoryCode, shiftConfig.getFactoryCode());
-        wrapper.eq(Cd15ShiftConfig::getShiftCode, shiftConfig.getShiftCode());
+        wrapper.eq(Cd15ShiftConfig::getClassField, shiftConfig.getClassField());
         return cd15ShiftConfigMapper.selectOne(wrapper);
     }
 
@@ -148,6 +148,6 @@ public class Cd15ShiftConfigServiceImpl extends AbstractDocService<Cd15ShiftConf
 
     @Override
     protected List<String> getCheckUniqueFields() {
-        return Arrays.asList("factoryCode", "shiftCode");
+        return Arrays.asList("factoryCode", "classField");
     }
 }

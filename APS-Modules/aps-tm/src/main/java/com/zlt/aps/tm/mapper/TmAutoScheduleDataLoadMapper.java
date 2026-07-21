@@ -49,6 +49,16 @@ public interface TmAutoScheduleDataLoadMapper {
                                                               @Param("constructionVersions") Collection<String> constructionVersions);
 
     /**
+     * 按工厂和胎面编码查询最新有效施工版本。
+     *
+     * @param factoryCode 工厂编码
+     * @param treadCode 胎面编码
+     * @return 最新有效施工胎面属性，不存在时返回 null
+     */
+    TmConstructionTreadRowVo selectLatestConstructionByTread(@Param("factoryCode") String factoryCode,
+                                                              @Param("treadCode") String treadCode);
+
+    /**
      * 查询指定工序的工作日历。
      *
      * @param factoryCode    工厂编号

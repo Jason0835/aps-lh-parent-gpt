@@ -14,6 +14,12 @@
         <result column="CLASS_SHIFT" property="classShift"/>
         <result column="OPEN_MACHINE_CLASS" property="openMachineClass"/>
         <result column="IS_OUT_TWO" property="isOutTwo"/>
+        <result column="SINGLE_CUT_FLAG" property="singleCutFlag"/>
+        <result column="SPLIT_CUT_FLAG" property="splitCutFlag"/>
+        <result column="DEFAULT_CUT_MODE" property="defaultCutMode"/>
+        <result column="DAILY_OUTPUT_MODE_THRESHOLD" property="dailyOutputModeThreshold"/>
+        <result column="SINGLE_SHIFT_CAPACITY" property="singleShiftCapacity"/>
+        <result column="SPLIT_SHIFT_CAPACITY" property="splitShiftCapacity"/>
         <result column="STATUS" property="status"/>
         <result column="STEEL_STRIP_WIDTH" property="steelStripWidth"/>
         <result column="IS_DELETE" property="isDelete"/>

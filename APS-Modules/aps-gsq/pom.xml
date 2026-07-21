@@ -53,6 +53,11 @@
             <groupId>com.zlt.aps.itf</groupId>
             <artifactId>aps-itf-api</artifactId>
         </dependency>
+        <!-- 胎圈排程API（用于钢丝圈排程时回填胎圈排程结果数据） -->
+        <dependency>
+            <groupId>com.zlt.aps.tq</groupId>
+            <artifactId>aps-tq-api</artifactId>
+        </dependency>
         <!-- 操作日志jar -->
         <dependency>
             <groupId>com.ruoyi</groupId>

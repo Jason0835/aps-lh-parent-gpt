@@ -36,20 +36,20 @@ public class DjDepthConfig extends BaseEntity implements Serializable {
     private String factoryCode;
 
     /**
-     * 供成型机台数（成型工序生产某垫胶规格所使用的机台数量）
+     * 区间起始机台数（含），第1条必须为 1
      */
-    @Excel(name = "ui.dj.depthConfig.column.machineQty")
-    @ApiModelProperty(value = "供成型机台数")
-    @TableField("MACHINE_QTY")
-    private Integer machineQty;
+    @Excel(name = "ui.dj.depthConfig.column.minMachineQty")
+    @ApiModelProperty(value = "区间起始机台数（含）")
+    @TableField("MIN_MACHINE_QTY")
+    private Integer minMachineQty;
 
     /**
-     * 机台范围（数据字典 machine_range，选项：小于、小于等于、等于、大于等于、大于）
+     * 区间结束机台数（含），NULL 表示无上限（仅末行允许）
      */
-    @Excel(name = "ui.dj.depthConfig.column.machineRange", dictType = "machine_range")
-    @ApiModelProperty(value = "机台范围，数据字典 machine_range")
-    @TableField("MACHINE_RANGE")
-    private String machineRange;
+    @Excel(name = "ui.dj.depthConfig.column.maxMachineQty")
+    @ApiModelProperty(value = "区间结束机台数（含），NULL 表示无上限")
+    @TableField("MAX_MACHINE_QTY")
+    private Integer maxMachineQty;
 
     /**
      * 垫胶备库班数（该机台数范围对应的排产深度/供应窗口班次数）

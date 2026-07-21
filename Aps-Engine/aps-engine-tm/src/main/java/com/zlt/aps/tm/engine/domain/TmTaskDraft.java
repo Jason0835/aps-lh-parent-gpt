@@ -20,6 +20,21 @@ public class TmTaskDraft {
     /** 来源成型工单号集合，仅用于解释追踪，不写入胎面排程结果工单号 */
     private String sourceOrderNos;
 
+    /** 成型物料编号 */
+    private String materialCode;
+
+    /** 成型物料描述 */
+    private String materialDesc;
+
+    /** 胎胚代码 */
+    private String embryoCode;
+
+    /** 胎胚描述 */
+    private String mainMaterialDesc;
+
+    /** 成型机台编号 */
+    private String cxMachineCode;
+
     /** 胎面规格编码 */
     private String treadCode;
 
@@ -38,8 +53,14 @@ public class TmTaskDraft {
     /** 班次顺序 */
     private Integer shiftOrder;
 
+    /** 成型需求原始映射到的胎面逻辑班次，自动提前时与实际排程班次不同。 */
+    private Integer sourceShiftOrder;
+
     /** 当前班成型胎面需求量，单位米 */
     private BigDecimal currentShiftDemandQty;
+
+    /** 当前逻辑班次对应的成型实际完成折米量。 */
+    private BigDecimal currentShiftFormingFinishQty;
 
     /** 保证范围内成型胎面需求量，单位米 */
     private BigDecimal guardDemandQty;
@@ -159,6 +180,9 @@ public class TmTaskDraft {
 
     /** 上个胶料切换时长，单位小时 */
     private BigDecimal previousGlueSwitchHours;
+
+    /** 上个主胶料切换固定产能扣减量，单位米 */
+    private BigDecimal previousGlueSwitchCapacityDeduct;
 
     /** 按当前班次开始时间和库存供应时长推算的库存不足时间 */
     private Date stockShortageTime;

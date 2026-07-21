@@ -101,8 +101,7 @@ public class Cd90AutoScheduleOutputDraftBuilder {
     private Cd90ScheduleResultDraft newResultDraft(
             String key, Cd90ShiftScheduleTask task,
             Map<String, Cd90ClothSourceTrace> clothSourceTraceByCloth) {
-        Cd90ClothSourceTrace sourceTrace = clothSourceTraceByCloth == null
-                ? null : clothSourceTraceByCloth.get(task.getClothCode());
+        Cd90ClothSourceTrace sourceTrace = clothSourceTraceByCloth.get(task.getClothCode());
         return Cd90ScheduleResultDraft.builder()
                 .resultKey(key).clothCode(task.getClothCode())
                 .bigRollCode(task.getBigRollCode()).cordSpec(task.getCordSpec())

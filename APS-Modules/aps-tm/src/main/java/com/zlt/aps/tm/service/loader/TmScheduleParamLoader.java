@@ -128,8 +128,8 @@ public class TmScheduleParamLoader {
                 TmScheduleConstants.DEFAULT_OPEN_SHIFT_THRESHOLD);
         this.putDefaultParam(paramMap, TmScheduleConstants.PARAM_SPEC_CHANGE_MINUTES,
                 TmScheduleConstants.DEFAULT_SPEC_CHANGE_MINUTES);
-        this.putDefaultParam(paramMap, TmScheduleConstants.PARAM_GLUE_CHANGE_MINUTES,
-                TmScheduleConstants.DEFAULT_GLUE_CHANGE_MINUTES);
+        this.putDefaultParam(paramMap, TmScheduleConstants.PARAM_GLUE_CHANGE_CAPACITY_DEDUCT,
+                TmScheduleConstants.DEFAULT_GLUE_CHANGE_CAPACITY_DEDUCT);
     }
 
     /**

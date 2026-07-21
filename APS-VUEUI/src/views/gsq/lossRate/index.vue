@@ -198,8 +198,7 @@ export default {
       this.$confirm(this.$t("common.confirm.delete"), {
         type: "warning",
       }).then(() => {
-        const ids = row.id;
-        removeLossRate(ids).then((data) => {
+        removeLossRate(row.id).then((data) => {
           this.$modal.msgSuccess(data.msg);
           this.$set(this.page, "current", 1);
           this.getList();
@@ -216,7 +215,7 @@ export default {
       this.$confirm(this.$t("common.confirm.delete"), {
         type: "warning",
       }).then(() => {
-        const ids = this.selection.map((row) => row.id).join(",");
+        const ids = this.selection.map((row) => row.id);
         removeLossRate(ids).then((data) => {
           this.$modal.msgSuccess(data.msg);
           this.$set(this.page, "current", 1);

@@ -184,6 +184,28 @@
         <if test="companyCode != null and companyCode != ''">AND t.COMPANY_CODE = #{companyCode}</if>
     </select>
 
+    <!-- 按指定版本号查询硫化在机同步数据（不限日期），用于临时任务 -->
+    <!-- 与selectLhMachineOnlineSyncList的区别：去掉当天日期过滤和按LH_CODE取MAX(DATA_VERSION)子查询，直接按版本号查询所有日期数据 -->
+    <select id="selectLhMachineOnlineSyncListByVersion" resultType="com.zlt.aps.lh.api.domain.entity.LhMachineOnlineInfo">
+        SELECT
+        t.ONLINE_DATE,
+        t.LH_CODE,
+        t.MATERIAL_CODE,
+        t.MES_MATERIAL_CODE,
+        t.SPEC_DESC,
+        t.LR_MOLDS,
+        t.IN_MACHINE_MOULD_CODE,
+        t.PRODUCT_STATUS,
+        t.DATA_VERSION,
+        t.COMPANY_CODE,
+        t.FACTORY_CODE
+        FROM LH_MACHINE_ONLINE_SYNC t
+        WHERE t.DATA_VERSION = #{dataVersion}
+        <if test="factoryCode != null and factoryCode != ''">AND t.FACTORY_CODE = #{factoryCode}</if>
+        <if test="companyCode != null and companyCode != ''">AND t.COMPANY_CODE = #{companyCode}</if>
+    </select>
+
+
     <select id="selectDevMaintenancePlanList" resultType="com.zlt.aps.itf.vo.DevMaintenancePlan">
         SELECT
         DEV_CODE,
@@ -924,7 +946,6 @@
         MACHINE_STOP_TYPE,
         BEGIN_DATE,
         END_DATE,
-        ACTUAL_FINISH_DATE,
         REMARK,
         DEL_FLAG,
         DATA_VERSION,

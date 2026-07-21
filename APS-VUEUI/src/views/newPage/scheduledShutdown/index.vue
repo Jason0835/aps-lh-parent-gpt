@@ -196,8 +196,8 @@ export default {
           label: this.$t("ui.data.column.mdmDevicePlanShut.endDate"),
         },
         {
-          prop: "actualFinishDate",
-          label: this.$t("ui.data.column.mdmDevicePlanShut.actualFinishDate"),
+          prop: "scheduleDate",
+          label: this.$t("ui.data.column.mdmDevicePlanShut.scheduleDate"),
         },
         {
           prop: "dataSource",

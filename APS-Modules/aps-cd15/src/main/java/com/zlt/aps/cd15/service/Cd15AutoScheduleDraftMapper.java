@@ -1,14 +1,10 @@
 package com.zlt.aps.cd15.service;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.zlt.aps.cd15.api.domain.entity.Cd15ScheduleLaneAllocation;
 import com.zlt.aps.cd15.api.domain.entity.Cd15ScheduleResult;
-import com.zlt.aps.cd15.api.domain.entity.Cd15ScheduleResultLog;
 import com.zlt.aps.cd15.api.domain.entity.Cd15UnscheduleResult;
-import com.zlt.aps.cd15.engine.model.Cd15LaneAllocationDraft;
 import com.zlt.aps.cd15.engine.model.Cd15ScheduleResultDraft;
-import com.zlt.aps.cd15.engine.model.Cd15SingleShiftScheduleResult;
+import com.zlt.aps.cd15.engine.model.Cd15ScheduleShiftSlotDraft;
+import com.zlt.aps.cd15.engine.model.Cd15UnscheduledResultModel;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -16,141 +12,94 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.Date;
 
-/** 将CD15 Engine草稿转换为持久化实体。 */
+/** 将Engine输出草稿转换为斜裁业务持久化实体。 */
 @Component
 public class Cd15AutoScheduleDraftMapper {
 
-    private static final String AUTO_SOURCE = "AUTO_SCHEDULE";
-    private static final String AUTO_SOURCE_CODE = "0";
-    private static final String UNRELEASED = "0";
-    private static final String UNLOCKED = "0";
-
-    private final ObjectMapper objectMapper;
-
-    public Cd15AutoScheduleDraftMapper(ObjectMapper objectMapper) {
-        this.objectMapper = objectMapper;
-    }
-
+    /**
+     * 转换排程主结果。
+     *
+     * @param factoryCode 工厂编码
+     * @param scheduleDate 排程日期
+     * @param batchNo 批次号
+     * @param orderNo 工单号
+     * @param draft 输出草稿
+     * @return 排程主结果实体
+     */
     public Cd15ScheduleResult toScheduleResult(String factoryCode, LocalDate scheduleDate,
-                                               String batchNo, Cd15ScheduleResultDraft draft) {
+                                               String batchNo, String orderNo,
+                                               Cd15ScheduleResultDraft draft) {
         Cd15ScheduleResult result = new Cd15ScheduleResult();
         result.setFactoryCode(factoryCode);
-        result.setScheduleDate(this.date(scheduleDate));
+        result.setScheduleDate(date(scheduleDate));
         result.setCd15BatchNo(batchNo);
+        result.setOrderNo(orderNo);
+        result.setGroupNo(draft.getSplitGroupKey() == null ? null : orderNo);
+        result.setSteelStripCode(draft.getSteelStripCode());
+        result.setMaterialKey(draft.getMaterialKey());
+        result.setCraftWidth(draft.getCraftWidth());
+        result.setUnitConsumeMillimeter(draft.getUnitConsumeMillimeter());
+        result.setCurlLength(draft.getCurlLength());
+        result.setCordWidth(draft.getCordWidth());
+        result.setBigRollConsumeQty(draft.getBigRollConsumeQuantity());
         result.setCxBatchNo(draft.getCxBatchNo());
         result.setCxMachineCodes(draft.getCxMachineCodes());
         result.setPlanSurplusQty(draft.getPlanSurplusQty());
-        result.setOrderNo(draft.getOrderNo());
-        result.setGroupNo(draft.getGroupNo());
-        result.setReleaseStatus(UNRELEASED);
         result.setBigRollCode(draft.getBigRollCode());
         result.setCuttingAngle(draft.getCuttingAngle());
-        result.setMachineCode(draft.getMachineCode());
-        result.setMachineName(draft.getMachineName());
-        result.setSteelStripCode(draft.getSteelStripCode());
-        result.setStockQty(this.decimal(draft.getStockMetersAtSix()));
         result.setCutMode(draft.getCutMode());
-        result.setSourceType(draft.getSourceType() == null ? AUTO_SOURCE : draft.getSourceType());
-        result.setIsLocked(UNLOCKED);
-        this.applyClassSlot(result, draft);
+        result.setMachineCode(draft.getMachineCode());
+        result.setStorageLaneCode(draft.getPrimaryLaneCode());
+        result.setSourceType("AUTO");
+        result.setReleaseStatus("0");
+        result.setPublishSuccessCount(0);
+        result.setIsLocked("0");
+        if (draft.getShiftSlots() != null) {
+            draft.getShiftSlots().forEach(slot -> applySlot(result, slot));
+        }
         return result;
     }
 
-    public Cd15UnscheduleResult toUnscheduleResult(String factoryCode, LocalDate scheduleDate,
-                                                   String batchNo, Cd15SingleShiftScheduleResult source,
-                                                   int reasonOrder) {
+    /** 将未排内存模型原样转换为持久化实体。 */
+    public Cd15UnscheduleResult toUnscheduleResult(String factoryCode, Date scheduleDate,
+                                                   String batchNo,
+                                                   Cd15UnscheduledResultModel source) {
         Cd15UnscheduleResult result = new Cd15UnscheduleResult();
-        result.setFactoryCode(this.firstText(source.getFactoryCode(), factoryCode));
-        result.setScheduleDate(source.getScheduleDate() == null ? this.date(scheduleDate) : source.getScheduleDate());
+        result.setFactoryCode(factoryCode);
+        result.setScheduleDate(scheduleDate);
         result.setBatchNo(batchNo);
-        result.setSteelStripCode(this.firstText(source.getSteelStripCode(), "UNKNOWN"));
+        result.setSteelStripCode(source.getSteelStripCode());
         result.setBigRollCode(source.getBigRollCode());
         result.setCuttingAngle(source.getCuttingAngle());
-        result.setMachineCode(source.getMachineCode());
-        result.setClassField(source.getClassField());
-        result.setDemandQty(source.getDemandQty());
-        result.setScheduledQty(source.getScheduledQty() == null ? BigDecimal.ZERO : source.getScheduledQty());
-        result.setUnscheduledQty(source.getUnscheduledQty() == null ? source.getDemandQty() : source.getUnscheduledQty());
-        result.setFailStage(source.getUnscheduledReasonCode());
-        result.setUnscheduleReasonCode(this.firstText(source.getUnscheduledReasonCode(), "DATA_MISSING"));
-        result.setReasonOrder(reasonOrder);
-        result.setPrimaryReason(reasonOrder == 1 ? "1" : "0");
-        result.setUnscheduledReason(source.getUnscheduledReason());
-        result.setDataSource(AUTO_SOURCE_CODE);
-        result.setOrderNo(source.getOrderNo());
-        result.setGroupNo(source.getGroupNo());
+        result.setDemandQty(source.getDemandQuantity());
+        result.setScheduledQty(source.getScheduledQuantity());
+        result.setUnscheduledQty(source.getUnscheduledQuantity());
+        result.setFailStage(source.getFailStage());
+        result.setUnscheduleReasonCode(source.getReasonCode());
+        result.setReasonOrder(source.getReasonOrder());
+        result.setPrimaryReason(source.isPrimaryReason() ? "1" : "0");
+        result.setUnscheduledReason(source.getReasonDescription());
+        result.setCandidateMachineCodes(source.getCandidateMachineCodes());
+        result.setDataSource("0");
         return result;
     }
 
-
-    public Cd15ScheduleLaneAllocation toLaneAllocation(String batchNo,
-                                                       Cd15ScheduleResult parent,
-                                                       Cd15ScheduleResultDraft draft,
-                                                       Cd15LaneAllocationDraft laneDraft,
-                                                       int allocationOrder) {
-        Cd15ScheduleLaneAllocation entity = new Cd15ScheduleLaneAllocation();
-        entity.setFactoryCode(parent.getFactoryCode());
-        entity.setScheduleDate(parent.getScheduleDate());
-        entity.setBatchNo(batchNo);
-        entity.setScheduleResultId(parent.getId());
-        entity.setOrderNo(parent.getOrderNo());
-        entity.setGroupNo(parent.getGroupNo());
-        entity.setClassField(laneDraft.getClassField());
-        entity.setShiftScheduleDate(draft.getScheduleDate());
-        entity.setStorageLaneCode(laneDraft.getLaneCode());
-        entity.setSteelStripCode(parent.getSteelStripCode());
-        entity.setBigRollCode(parent.getBigRollCode());
-        entity.setCuttingAngle(parent.getCuttingAngle());
-        entity.setMachineCode(parent.getMachineCode());
-        entity.setAllocatedQty(laneDraft.getAllocationQuantity());
-        entity.setAllocatedCartCount(laneDraft.getVehicleCount());
-        entity.setAllocationOrder(allocationOrder);
-        return entity;
-    }
-    public Cd15ScheduleResultLog toCreateLog(String taskId, String batchNo,
-                                             Cd15ScheduleResult entity,
-                                             Cd15ScheduleResultDraft draft) {
-        Cd15ScheduleResultLog log = new Cd15ScheduleResultLog();
-        log.setScheduleResultId(entity.getId());
-        log.setTaskId(taskId);
-        log.setLogType("AUTO_SCHEDULE");
-        log.setLogTime(new Date());
-        log.setReasonCode("AUTO_SCHEDULE");
-        log.setReasonDetail(this.json(draft));
-        log.setFactoryCode(entity.getFactoryCode());
-        log.setScheduleDate(entity.getScheduleDate());
-        log.setCxBatchNo(entity.getCxBatchNo());
-        log.setBatchNo(batchNo);
-        log.setOrderNo(entity.getOrderNo());
-        log.setGroupNo(entity.getGroupNo());
-        log.setBigRollCode(entity.getBigRollCode());
-        log.setSteelStripCode(entity.getSteelStripCode());
-        log.setCuttingAngle(entity.getCuttingAngle());
-        log.setMachineCode(entity.getMachineCode());
-        log.setStorageLaneCode(entity.getStorageLaneCode());
-        log.setStockQty(draft.getStockMetersAtSix());
-        log.setSourceType(entity.getSourceType());
-        log.setReleaseStatus(entity.getReleaseStatus());
-        log.setProductionStatus(entity.getProductionStatus());
-        log.setClassField(draft.getClassField());
-        log.setAfterJson(this.json(entity));
-        log.setChangeReason("CD15自动排程生成");
-        return log;
-    }
-
-    private void applyClassSlot(Cd15ScheduleResult result, Cd15ScheduleResultDraft draft) {
-        int classIndex = draft.getClassIndex();
-        if (classIndex <= 0 && draft.getClassField() != null && draft.getClassField().startsWith("CLASS")) {
-            classIndex = Integer.parseInt(draft.getClassField().replace("CLASS", ""));
+    private void applySlot(Cd15ScheduleResult result, Cd15ScheduleShiftSlotDraft slot) {
+        Date scheduleDate = date(slot.getScheduleDate());
+        Double plan = decimal(slot.getPlanQuantity());
+        Double finish = decimal(slot.getFinishQuantity());
+        Double rate = decimal(slot.getFinishRate());
+        switch (slot.getClassField()) {
+            case "CLASS1": result.setClass1ScheduleDate(scheduleDate); result.setClass1PlanQty(plan); result.setClass1FinishQty(finish); result.setClass1ProduceOrder(slot.getProduceOrder()); result.setClass1FinishRate(rate); result.setClass1Analysis(slot.getAnalysis()); break;
+            case "CLASS2": result.setClass2ScheduleDate(scheduleDate); result.setClass2PlanQty(plan); result.setClass2FinishQty(finish); result.setClass2ProduceOrder(slot.getProduceOrder()); result.setClass2FinishRate(rate); result.setClass2Analysis(slot.getAnalysis()); break;
+            case "CLASS3": result.setClass3ScheduleDate(scheduleDate); result.setClass3PlanQty(plan); result.setClass3FinishQty(finish); result.setClass3ProduceOrder(slot.getProduceOrder()); result.setClass3FinishRate(rate); result.setClass3Analysis(slot.getAnalysis()); break;
+            case "CLASS4": result.setClass4ScheduleDate(scheduleDate); result.setClass4PlanQty(plan); result.setClass4FinishQty(finish); result.setClass4ProduceOrder(slot.getProduceOrder()); result.setClass4FinishRate(rate); result.setClass4Analysis(slot.getAnalysis()); break;
+            case "CLASS5": result.setClass5ScheduleDate(scheduleDate); result.setClass5PlanQty(plan); result.setClass5FinishQty(finish); result.setClass5ProduceOrder(slot.getProduceOrder()); result.setClass5FinishRate(rate); result.setClass5Analysis(slot.getAnalysis()); break;
+            case "CLASS6": result.setClass6ScheduleDate(scheduleDate); result.setClass6PlanQty(plan); result.setClass6FinishQty(finish); result.setClass6ProduceOrder(slot.getProduceOrder()); result.setClass6FinishRate(rate); result.setClass6Analysis(slot.getAnalysis()); break;
+            case "CLASS7": result.setClass7ScheduleDate(scheduleDate); result.setClass7PlanQty(plan); result.setClass7FinishQty(finish); result.setClass7ProduceOrder(slot.getProduceOrder()); result.setClass7FinishRate(rate); result.setClass7Analysis(slot.getAnalysis()); break;
+            case "CLASS8": result.setClass8ScheduleDate(scheduleDate); result.setClass8PlanQty(plan); result.setClass8FinishQty(finish); result.setClass8ProduceOrder(slot.getProduceOrder()); result.setClass8FinishRate(rate); result.setClass8Analysis(slot.getAnalysis()); break;
+            default: throw new IllegalArgumentException("不支持的斜裁班次字段: " + slot.getClassField());
         }
-        String prefix = "class" + classIndex;
-        result.setFieldValueByFieldName(prefix + "ScheduleDate", draft.getScheduleDate());
-        result.setFieldValueByFieldName(prefix + "CxPlanQty", this.decimal(draft.getCxPlanQty()));
-        result.setFieldValueByFieldName(prefix + "PlanQty", this.decimal(draft.getPlanQty()));
-        result.setFieldValueByFieldName(prefix + "FinishQty", 0D);
-        result.setFieldValueByFieldName(prefix + "ProduceOrder", draft.getProduceOrder());
-        result.setFieldValueByFieldName(prefix + "FinishRate", 0D);
-        result.setFieldValueByFieldName(prefix + "Analysis", draft.getAnalysis());
     }
 
     private Date date(LocalDate value) {
@@ -159,17 +108,5 @@ public class Cd15AutoScheduleDraftMapper {
 
     private Double decimal(BigDecimal value) {
         return value == null ? null : value.doubleValue();
-    }
-
-    private String firstText(String value, String fallback) {
-        return value == null || value.trim().isEmpty() ? fallback : value;
-    }
-
-    private String json(Object value) {
-        try {
-            return objectMapper.writeValueAsString(value);
-        } catch (JsonProcessingException exception) {
-            throw new IllegalStateException("CD15自动排程日志序列化失败", exception);
-        }
     }
 }

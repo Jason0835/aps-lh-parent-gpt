@@ -20,9 +20,10 @@ public class Cd15TimedRollingAsyncExecutorImpl implements Cd15TimedRollingAsyncE
     @Async
     @Override
     public void execute(String taskId, Cd15RollingTarget target, String inputVersion) {
-        Cd15TimedRollingExecutionService executionService = executionServiceProvider.getIfAvailable();
+        Cd15TimedRollingExecutionService executionService =
+                executionServiceProvider.getIfAvailable();
         if (executionService == null) {
-            taskService.markFailed(taskId, "CD15定时滚动排程执行服务未就绪");
+            taskService.markFailed(taskId, "定时滚动排程执行服务未就绪");
             return;
         }
         executionService.execute(taskId, target, inputVersion);

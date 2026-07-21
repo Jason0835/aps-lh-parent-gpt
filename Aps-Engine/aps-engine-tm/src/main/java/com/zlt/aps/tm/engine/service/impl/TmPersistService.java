@@ -200,10 +200,32 @@ public class TmPersistService {
         result.setGlueCode(task.getGlueCode());
         result.setBaseGlueCode(task.getBaseGlueCode());
         result.setMouthPlateCode(task.getMouthPlateCode());
+        result.setTreadShoulderLength(task.getTreadShoulderLength());
+        result.setCxRemainQty(task.getTailBalanceQty());
+        result.setMaterialCode(task.getMaterialCode());
+        result.setMaterialDesc(task.getMaterialDesc());
+        result.setEmbryoCode(task.getEmbryoCode());
+        result.setMainMaterialDesc(task.getMainMaterialDesc());
+        result.setCxMachineCode(task.getCxMachineCode());
+        result.setSixClockStockQty(task.getSixClockStockQty());
+        result.setCurlRollLength(this.resolveEffectiveCurlRollLength(task));
         result.setReleaseStatus(TmScheduleReleaseStatusEnum.NOT_RELEASED.getCode());
         result.setDataSource(TmScheduleConstants.AUTO_SCHEDULE_DATA_SOURCE);
         applyShiftFields(result, node);
         return result;
+    }
+
+    /**
+     * 解析任务最终使用的卷曲长度。
+     *
+     * @param task 待排任务草稿
+     * @return 优先返回胎面卷曲配置；配置缺失或无效时返回默认卷曲长度
+     */
+    private BigDecimal resolveEffectiveCurlRollLength(TmTaskDraft task) {
+        if (task.getCurlRollLength() != null && task.getCurlRollLength().compareTo(BigDecimal.ZERO) > 0) {
+            return task.getCurlRollLength();
+        }
+        return task.getDefaultCurlRollLength();
     }
 
     /**

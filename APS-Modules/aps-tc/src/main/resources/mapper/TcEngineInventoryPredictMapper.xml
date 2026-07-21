@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.tc.engine.mapper.TcEngineInventoryPredictMapper">
+
+    <select id="selectFirstShiftDemandRows" resultType="com.zlt.aps.tc.engine.domain.TcInventoryPredictQtyVo">
+        SELECT ci.SIDEWALL_CODE AS sidewallCode,
+               SUM(IFNULL(cx.CLASS1_PLAN_QTY, 0) * IFNULL(ci.SIDEWALL_LENGTH, 0)) AS qty
+        FROM T_CX_SCHEDULE_RESULT cx
+        /* BOM 模式早班需求：与主流程 selectFormingDemandRows 同口径，同一胎胚按胎侧分组各取一条施工版本（择一），
+           优先匹配 BOM_DATA_VERSION，未匹配或为空时取最新有效记录，避免版本 join 失败导致早班需求归 0 */
+        LEFT JOIN LATERAL (
+            SELECT *
+            FROM (
+                SELECT c.SIDEWALL_CODE,
+                       c.SIDEWALL_LENGTH,
+                       ROW_NUMBER() OVER (
+                           PARTITION BY c.SIDEWALL_CODE
+                           ORDER BY (CASE WHEN cx.BOM_DATA_VERSION IS NOT NULL
+                                         AND c.CONSTRUCTION_VERSION = cx.BOM_DATA_VERSION THEN 0 ELSE 1 END),
+                                    c.UPDATE_TIME DESC,
+                                    c.ID DESC
+                       ) AS rn
+                FROM T_MDM_CONSTRUCTION_INFO c
+                WHERE c.CONSTRUCTION_CODE = cx.EMBRYO_CODE
+                  AND c.IS_DELETE = 0
+            ) ranked
+            WHERE ranked.rn = 1
+        ) ci ON TRUE
+        WHERE cx.IS_DELETE = 0
+          AND cx.FACTORY_CODE = #{factoryCode}
+          AND cx.SCHEDULE_DATE = #{scheduleDate}
+          AND ci.SIDEWALL_CODE IN
+          <foreach collection="sidewallCodes" item="sidewallCode" open="(" separator="," close=")">
+              #{sidewallCode}
+          </foreach>
+        GROUP BY ci.SIDEWALL_CODE
+    </select>
+
+    <!-- RECIPE 模式：按 (EMBRYO_CODE, CLASS1_RECIPE_NO) 关联施工，recipe 为空时不匹配、该行不计入汇总 -->
+    <select id="selectFirstShiftDemandRowsByRecipe" resultType="com.zlt.aps.tc.engine.domain.TcInventoryPredictQtyVo">
+        SELECT ci.SIDEWALL_CODE AS sidewallCode,
+               SUM(IFNULL(cx.CLASS1_PLAN_QTY, 0) * IFNULL(ci.SIDEWALL_LENGTH, 0)) AS qty
+        FROM T_CX_SCHEDULE_RESULT cx
+        INNER JOIN T_MDM_CONSTRUCTION_INFO ci
+               ON cx.EMBRYO_CODE = ci.CONSTRUCTION_CODE
+              AND cx.CLASS1_RECIPE_NO = ci.CONSTRUCTION_VERSION
+              AND ci.IS_DELETE = 0
+        WHERE cx.IS_DELETE = 0
+          AND cx.FACTORY_CODE = #{factoryCode}
+          AND cx.SCHEDULE_DATE = #{scheduleDate}
+          AND ci.SIDEWALL_CODE IN
+          <foreach collection="sidewallCodes" item="sidewallCode" open="(" separator="," close=")">
+              #{sidewallCode}
+          </foreach>
+        GROUP BY ci.SIDEWALL_CODE
+    </select>
+
+    <select id="selectFirstShiftPlanRows" resultType="com.zlt.aps.tc.engine.domain.TcInventoryPredictQtyVo">
+        SELECT SIDEWALL_CODE AS sidewallCode,
+               SUM(IFNULL(CLASS3_PLAN_QTY, 0)) AS qty
+        FROM T_TC_SCHEDULE_RESULT
+        WHERE IS_DELETE = 0
+          AND FACTORY_CODE = #{factoryCode}
+          AND SCHEDULE_DATE = #{scheduleDate}
+          AND SIDEWALL_CODE IN
+          <foreach collection="sidewallCodes" item="sidewallCode" open="(" separator="," close=")">
+              #{sidewallCode}
+          </foreach>
+        GROUP BY SIDEWALL_CODE
+    </select>
+
+</mapper>

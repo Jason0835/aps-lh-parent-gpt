@@ -71,14 +71,6 @@ public class DevPlanCloseVo implements Serializable {
     private Date endDate;
 
     /**
-     * 实际完成日期
-     */
-    @ApiModelProperty(value = "实际完成日期")
-    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
-    @TableField(value = "ACTUAL_FINISH_DATE")
-    private Date actualFinishDate;
-
-    /**
      * 备注
      */
     @ApiModelProperty(value = "备注")

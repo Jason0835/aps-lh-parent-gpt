@@ -1,7 +1,9 @@
 package com.zlt.aps.cd15.engine.algorithm;
 
+import com.zlt.aps.cd15.api.domain.entity.Cd15ShiftConfig;
 import com.zlt.aps.cd15.engine.model.Cd15BigRollAgingBuildResult;
 import com.zlt.aps.cd15.engine.model.Cd15BigRollAgingStock;
+import com.zlt.aps.common.core.enums.ThreeShiftEnum;
 import com.zlt.aps.gdyy.api.domain.entity.GdyyScheduleResult;
 import com.zlt.aps.gdyy.api.domain.entity.GdyyStock;
 import org.springframework.stereotype.Component;
@@ -10,15 +12,19 @@ import org.springframework.util.StringUtils;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.ZoneId;
+import java.time.format.DateTimeParseException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -37,6 +43,7 @@ public class Cd15BigRollAgingStockBuilder {
      */
     public Cd15BigRollAgingBuildResult build(List<GdyyStock> actualStocks,
                                              List<GdyyScheduleResult> scheduleResults,
+                                             List<Cd15ShiftConfig> shiftConfigs,
                                              int agingPeriodHours) {
         int agingHours = Math.max(0, agingPeriodHours);
         List<GdyyStock> actual = this.safe(actualStocks).stream()
@@ -56,20 +63,21 @@ public class Cd15BigRollAgingStockBuilder {
                 .map(item -> this.actualStock(item, agingHours))
                 .collect(Collectors.toList());
 
+        Map<String, ShiftTiming> shiftTimings = this.shiftTimings(shiftConfigs);
         List<PlanShift> planShifts = this.safe(scheduleResults).stream()
                 .filter(Objects::nonNull)
-                .flatMap(this::planShifts)
+                .flatMap(result -> this.planShifts(result, shiftTimings))
                 .filter(item -> StringUtils.hasText(item.bigRollCode))
                 .filter(item -> item.quantity.signum() > 0)
                 .collect(Collectors.toList());
 
         missingCodes.addAll(planShifts.stream()
-                .filter(item -> item.shiftDate == null)
+                .filter(item -> item.shiftDate == null || item.shiftTiming == null)
                 .map(item -> item.bigRollCode)
                 .collect(Collectors.toSet()));
 
         List<Cd15BigRollAgingStock> planAgingStocks = planShifts.stream()
-                .filter(item -> item.shiftDate != null)
+                .filter(item -> item.shiftDate != null && item.shiftTiming != null)
                 .filter(item -> !this.coveredByActual(item, actual))
                 .map(item -> this.planStock(item, agingHours))
                 .collect(Collectors.toList());
@@ -122,25 +130,66 @@ public class Cd15BigRollAgingStockBuilder {
                 .anyMatch(time -> !time.isBefore(start) && time.isBefore(end));
     }
 
-    private Stream<PlanShift> planShifts(GdyyScheduleResult result) {
+    private Stream<PlanShift> planShifts(GdyyScheduleResult result,
+                                         Map<String, ShiftTiming> shiftTimings) {
         String sourceId = Objects.toString(result.getId(), "NO_ID");
         return Arrays.asList(
-                this.planShift(sourceId, result.getBigRollCode(), "CLASS1", result.getClass1ScheduleDate(), result.getClass1PlanQty(), 14),
-                this.planShift(sourceId, result.getBigRollCode(), "CLASS2", result.getClass2ScheduleDate(), result.getClass2PlanQty(), 22),
-                this.planShift(sourceId, result.getBigRollCode(), "CLASS3", result.getClass3ScheduleDate(), result.getClass3PlanQty(), 6),
-                this.planShift(sourceId, result.getBigRollCode(), "CLASS4", result.getClass4ScheduleDate(), result.getClass4PlanQty(), 14),
-                this.planShift(sourceId, result.getBigRollCode(), "CLASS5", result.getClass5ScheduleDate(), result.getClass5PlanQty(), 22),
-                this.planShift(sourceId, result.getBigRollCode(), "CLASS6", result.getClass6ScheduleDate(), result.getClass6PlanQty(), 6),
-                this.planShift(sourceId, result.getBigRollCode(), "CLASS7", result.getClass7ScheduleDate(), result.getClass7PlanQty(), 14),
-                this.planShift(sourceId, result.getBigRollCode(), "CLASS8", result.getClass8ScheduleDate(), result.getClass8PlanQty(), 22))
+                this.planShift(sourceId, result.getBigRollCode(), "CLASS1", result.getClass1ScheduleDate(), result.getClass1PlanQty(), shiftTimings),
+                this.planShift(sourceId, result.getBigRollCode(), "CLASS2", result.getClass2ScheduleDate(), result.getClass2PlanQty(), shiftTimings),
+                this.planShift(sourceId, result.getBigRollCode(), "CLASS3", result.getClass3ScheduleDate(), result.getClass3PlanQty(), shiftTimings),
+                this.planShift(sourceId, result.getBigRollCode(), "CLASS4", result.getClass4ScheduleDate(), result.getClass4PlanQty(), shiftTimings),
+                this.planShift(sourceId, result.getBigRollCode(), "CLASS5", result.getClass5ScheduleDate(), result.getClass5PlanQty(), shiftTimings),
+                this.planShift(sourceId, result.getBigRollCode(), "CLASS6", result.getClass6ScheduleDate(), result.getClass6PlanQty(), shiftTimings),
+                this.planShift(sourceId, result.getBigRollCode(), "CLASS7", result.getClass7ScheduleDate(), result.getClass7PlanQty(), shiftTimings),
+                this.planShift(sourceId, result.getBigRollCode(), "CLASS8", result.getClass8ScheduleDate(), result.getClass8PlanQty(), shiftTimings))
                 .stream();
     }
 
     private PlanShift planShift(String sourceId, String bigRollCode, String classField,
-                                Date shiftDate, Double quantity, int startHour) {
+                                Date shiftDate, Double quantity,
+                                Map<String, ShiftTiming> shiftTimings) {
         return new PlanShift(sourceId, bigRollCode, classField,
                 shiftDate == null ? null : this.toLocalDate(shiftDate),
-                this.value(quantity), startHour);
+                this.value(quantity), shiftTimings.get(classField));
+    }
+
+    /**
+     * 按结果班次字段解析启用配置。重复、非标准编码或时间非法的配置不参与成熟时间计算。
+     */
+    private Map<String, ShiftTiming> shiftTimings(List<Cd15ShiftConfig> shiftConfigs) {
+        Map<String, List<Cd15ShiftConfig>> configsByClass = this.safe(shiftConfigs).stream()
+                .filter(Objects::nonNull)
+                .filter(config -> Integer.valueOf(1).equals(config.getIsActive()))
+                .filter(config -> StringUtils.hasText(config.getClassField()))
+                .collect(Collectors.groupingBy(config ->
+                        config.getClassField().trim().toUpperCase()));
+        return configsByClass.entrySet().stream()
+                .filter(entry -> entry.getValue().size() == 1)
+                .map(entry -> this.shiftTiming(entry.getKey(), entry.getValue().get(0)))
+                .filter(Objects::nonNull)
+                .collect(Collectors.toMap(ShiftTiming::getClassField,
+                        Function.identity()));
+    }
+
+    private ShiftTiming shiftTiming(String classField, Cd15ShiftConfig config) {
+        if (!ThreeShiftEnum.isValidCode(this.trim(config.getShiftCode()))
+                || !StringUtils.hasText(config.getStartTime())
+                || !StringUtils.hasText(config.getEndTime())
+                || (!Integer.valueOf(0).equals(config.getIsCrossDay())
+                && !Integer.valueOf(1).equals(config.getIsCrossDay()))) {
+            return null;
+        }
+        try {
+            LocalTime startTime = LocalTime.parse(config.getStartTime().trim());
+            LocalTime endTime = LocalTime.parse(config.getEndTime().trim());
+            boolean crossDay = Integer.valueOf(1).equals(config.getIsCrossDay());
+            if (!crossDay && !endTime.isAfter(startTime)) {
+                return null;
+            }
+            return new ShiftTiming(classField, startTime, endTime, crossDay);
+        } catch (DateTimeParseException exception) {
+            return null;
+        }
     }
 
     private boolean isActualDataMissing(GdyyStock stock) {
@@ -192,6 +241,30 @@ public class Cd15BigRollAgingStockBuilder {
         return values == null ? Collections.emptyList() : values;
     }
 
+    private String trim(String value) {
+        return value == null ? null : value.trim();
+    }
+
+    /** GDYY计划班次对应的CD15运行时间。 */
+    private static final class ShiftTiming {
+        private final String classField;
+        private final LocalTime startTime;
+        private final LocalTime endTime;
+        private final boolean crossDay;
+
+        private ShiftTiming(String classField, LocalTime startTime,
+                            LocalTime endTime, boolean crossDay) {
+            this.classField = classField;
+            this.startTime = startTime;
+            this.endTime = endTime;
+            this.crossDay = crossDay;
+        }
+
+        private String getClassField() {
+            return classField;
+        }
+    }
+
     /** 单条GDYY计划班次的窄模型。 */
     private static final class PlanShift {
         private final String sourceId;
@@ -199,24 +272,27 @@ public class Cd15BigRollAgingStockBuilder {
         private final String classField;
         private final LocalDate shiftDate;
         private final BigDecimal quantity;
-        private final int startHour;
+        private final ShiftTiming shiftTiming;
 
         private PlanShift(String sourceId, String bigRollCode, String classField,
-                          LocalDate shiftDate, BigDecimal quantity, int startHour) {
+                          LocalDate shiftDate, BigDecimal quantity,
+                          ShiftTiming shiftTiming) {
             this.sourceId = sourceId;
             this.bigRollCode = bigRollCode;
             this.classField = classField;
             this.shiftDate = shiftDate;
             this.quantity = quantity;
-            this.startHour = startHour;
+            this.shiftTiming = shiftTiming;
         }
 
         private LocalDateTime startTime() {
-            return shiftDate.atTime(startHour, 0);
+            return shiftDate.atTime(shiftTiming.startTime);
         }
 
         private LocalDateTime endTime() {
-            return this.startTime().plusHours(8);
+            LocalDate endDate = shiftTiming.crossDay
+                    ? shiftDate.plusDays(1) : shiftDate;
+            return endDate.atTime(shiftTiming.endTime);
         }
     }
 }

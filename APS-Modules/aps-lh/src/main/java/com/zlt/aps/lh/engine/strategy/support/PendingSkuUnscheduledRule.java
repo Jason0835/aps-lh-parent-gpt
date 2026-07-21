@@ -2,9 +2,12 @@ package com.zlt.aps.lh.engine.strategy.support;
 
 import com.zlt.aps.lh.api.domain.dto.SkuDailyPlanQuotaDTO;
 import com.zlt.aps.lh.api.domain.dto.SkuScheduleDTO;
+import com.zlt.aps.lh.api.domain.entity.LhMouldChangePlan;
 import com.zlt.aps.lh.api.domain.entity.LhUnscheduledResult;
 import com.zlt.aps.lh.component.MonthPlanDateResolver;
 import com.zlt.aps.lh.context.LhScheduleContext;
+import com.zlt.aps.lh.util.LhScheduleTimeUtil;
+import com.zlt.aps.lh.util.PriorityTraceLogHelper;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;
@@ -24,6 +27,10 @@ import java.util.Objects;
 @Slf4j
 public final class PendingSkuUnscheduledRule {
 
+    /** 非续作SKU在排程及提前生产范围内无日计划、且无前日交替承接关系的统一未排原因 */
+    public static final String DAILY_PLAN_ADMISSION_UNSCHEDULED_REASON =
+            "排程窗口及提前生产范围内无日计划量，且无前日排程T+1交替计划";
+
     /** 仅历史欠产且最近一次已有完成量的统一未排原因 */
     public static final String HISTORY_SHORTAGE_UNSCHEDULED_REASON =
             "仅历史欠产、后续无月计划，且最近一次（前一次）已有完成量，本次跳过不排";
@@ -32,6 +39,107 @@ public final class PendingSkuUnscheduledRule {
     private static final String AUTO_DATA_SOURCE = "0";
 
     private PendingSkuUnscheduledRule() {
+    }
+
+    /**
+     * 评估非续作SKU是否因完整准入范围无日计划量且无前日交替承接关系而直接进入未排。
+     * <p>判断范围由两部分组成：SKU已初始化的排程窗口计划量覆盖窗口首日至窗口末日；窗口结束日之后
+     * 复用提前生产判断器，按硫化参数配置的提前生产天数阈值继续向后查找。完整范围无正计划量时，
+     * 再按“后物料”检查前日排程生成的T+1交替计划；任一条件放行仅代表继续进入现有排产流程，
+     * 不代表必须生成排程结果。</p>
+     * <p>日计划严格沿用物料编码和产品状态复合维度；历史交替计划没有产品状态字段，因此承接关系
+     * 只按物料编码匹配。前日排程的T+1日对应当前排程窗口首日，仅该日计划可作为本次准入依据。</p>
+     * <p>本方法只负责判断和构造未排结果，不修改SKU目标量、排产集合、胎胚库存或日计划账本。</p>
+     *
+     * @param context 排程上下文，提供排程窗口、提前生产参数和跨月月计划数据
+     * @param sku 待评估的新增SKU
+     * @return 命中规则时返回未排结果；未命中返回null
+     */
+    public static LhUnscheduledResult evaluateDailyPlanAdmission(LhScheduleContext context,
+                                                                  SkuScheduleDTO sku) {
+        if (Objects.isNull(context) || Objects.isNull(sku)
+                || sku.getWindowPlanQty() > 0
+                || Objects.isNull(context.getWindowEndDate())) {
+            return null;
+        }
+        LocalDate windowStartDate = toLocalDate(context.getScheduleDate());
+        LocalDate windowEndDate = toLocalDate(context.getWindowEndDate());
+        if (Objects.isNull(windowEndDate)) {
+            return null;
+        }
+
+        // 以窗口最后一天为基准继续后看N天，与提前生产准入共用同一参数、跨月取数和产品状态口径。
+        LocalDate firstFuturePlanDate = EarlyProductionChecker.resolveFirstFuturePlanDate(
+                context, sku, windowEndDate);
+        if (Objects.nonNull(firstFuturePlanDate)) {
+            return null;
+        }
+
+        // 前日排程T+1日交替计划已明确安排当前物料承接时，保留SKU并继续复用历史反选和普通新增主链。
+        if (hasPreviousT1MouldChangePlan(context, sku.getMaterialCode())) {
+            return null;
+        }
+
+        int earlyProductionDaysThreshold = EarlyProductionChecker.resolveEarlyProductionDaysThreshold(context);
+        LocalDate admissionEndDate = windowEndDate.plusDays(earlyProductionDaysThreshold);
+        String detail = String.format("工厂: %s, 批次: %s, 物料: %s, 产品状态: %s, 施工阶段: %s, "
+                        + "排程窗口: %s～%s, 提前生产天数: %d, 准入截止日: %s, T+1交替计划命中: 否, 原因: %s",
+                context.getFactoryCode(), context.getBatchNo(), sku.getMaterialCode(), sku.getProductStatus(),
+                sku.getConstructionStage(), windowStartDate, windowEndDate, earlyProductionDaysThreshold,
+                admissionEndDate, DAILY_PLAN_ADMISSION_UNSCHEDULED_REASON);
+        log.info("非续作SKU日计划准入拦截, factoryCode: {}, batchNo: {}, materialCode: {}, "
+                        + "productStatus: {}, constructionStage: {}, windowStartDate: {}, windowEndDate: {}, "
+                        + "earlyProductionDaysThreshold: {}, admissionEndDate: {}, previousT1ChangeoverMatched: false, "
+                        + "reason: {}",
+                context.getFactoryCode(), context.getBatchNo(), sku.getMaterialCode(), sku.getProductStatus(),
+                sku.getConstructionStage(), windowStartDate, windowEndDate, earlyProductionDaysThreshold,
+                admissionEndDate, DAILY_PLAN_ADMISSION_UNSCHEDULED_REASON);
+        PriorityTraceLogHelper.appendProcessLog(context, "SKU无计划量不排产", detail);
+        LhUnscheduledResult unscheduledResult = buildUnscheduledResult(
+                context, sku, 0, DAILY_PLAN_ADMISSION_UNSCHEDULED_REASON);
+        // 月计划版本和生产版本属于本次准入未排结果的对账字段，仅在新增规则命中时回填，
+        // 避免扩展公共构造方法后改变既有收尾小余量、仅历史欠产规则的落库内容。
+        unscheduledResult.setMonthPlanVersion(sku.getMonthPlanVersion());
+        unscheduledResult.setProductionVersion(sku.getProductionVersion());
+        return unscheduledResult;
+    }
+
+    /**
+     * 判断前日排程生成的T+1模具交替计划是否由当前物料承接。
+     * <p>基础数据层已将查询日期固定为当前业务目标日前一日，并只加载换模、换活字块类型；
+     * 此处继续校验交替实际日期必须属于当前窗口首日，避免把历史窗口其他日期的计划误当成T+1承接。</p>
+     *
+     * @param context 排程上下文
+     * @param materialCode 当前SKU物料编码
+     * @return true-存在以后物料匹配的T+1交替计划；false-不存在
+     */
+    private static boolean hasPreviousT1MouldChangePlan(LhScheduleContext context, String materialCode) {
+        if (Objects.isNull(context) || StringUtils.isEmpty(materialCode)
+                || Objects.isNull(context.getScheduleDate())
+                || CollectionUtils.isEmpty(context.getHistoricalReverseMouldChangePlanList())) {
+            return false;
+        }
+        for (LhMouldChangePlan plan : context.getHistoricalReverseMouldChangePlanList()) {
+            if (Objects.nonNull(plan)
+                    && StringUtils.equals(materialCode, plan.getAfterMaterialCode())
+                    && LhScheduleTimeUtil.isSameDay(plan.getPlanDate(), context.getScheduleDate())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * 将日期转换为排程业务日。
+     *
+     * @param date 日期
+     * @return 本地业务日；日期为空时返回null
+     */
+    private static LocalDate toLocalDate(java.util.Date date) {
+        if (Objects.isNull(date)) {
+            return null;
+        }
+        return date.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
     }
 
     /**

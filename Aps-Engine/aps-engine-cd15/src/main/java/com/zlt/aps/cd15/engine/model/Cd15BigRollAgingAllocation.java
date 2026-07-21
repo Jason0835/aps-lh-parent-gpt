@@ -8,7 +8,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 /**
- * GDYY大卷成熟流水分配结果。
+ * 大卷成熟流水分配结果。
  */
 @Data
 @Builder

@@ -196,6 +196,33 @@ public final class ShiftFieldUtil {
     }
 
     /**
+     * 将有量班次的开始时间向后对齐到指定最早时刻，计划量和结束时间保持不变。
+     * <p>该方法用于维修、预热及切换完成后的最终时间校正。只有当前班次确实有量、
+     * 原开始时间早于最早时刻且结束时间晚于最早时刻时才会修改，避免产生开始晚于结束的无效结果。</p>
+     *
+     * @param result 排程结果
+     * @param shiftIndex 班次索引1～8
+     * @param earliestStartTime 允许生产的最早时刻
+     * @return true-开始时间发生调整；false-无需调整或字段不完整
+     */
+    public static boolean alignShiftStartTimeNotBefore(LhScheduleResult result,
+                                                       int shiftIndex,
+                                                       Date earliestStartTime) {
+        Integer planQty = getShiftPlanQty(result, shiftIndex);
+        Date currentStartTime = getShiftStartTime(result, shiftIndex);
+        Date currentEndTime = getShiftEndTime(result, shiftIndex);
+        if (Objects.isNull(planQty) || planQty <= 0
+                || Objects.isNull(currentStartTime) || Objects.isNull(currentEndTime)
+                || Objects.isNull(earliestStartTime)
+                || !currentStartTime.before(earliestStartTime)
+                || !currentEndTime.after(earliestStartTime)) {
+            return false;
+        }
+        setShiftPlanQty(result, shiftIndex, planQty, earliestStartTime, currentEndTime);
+        return true;
+    }
+
+    /**
      * 获取班次完成量
      *
      * @param result     排程结果
@@ -422,6 +449,40 @@ public final class ShiftFieldUtil {
             }
         }
         setShiftAnalysis(result, shiftIndex, currentAnalysis + ANALYSIS_SEPARATOR + analysis);
+    }
+
+    /**
+     * 从指定班次原因分析中移除一个原因，其他已有原因保持原顺序不变。
+     *
+     * <p>主要用于L/R整机结果复制后移除配对侧重复的“换胶囊”备注，保证同一物理机台
+     * 同一班次只展示一次换胶囊动作。</p>
+     *
+     * @param result 排程结果
+     * @param shiftIndex 班次索引
+     * @param analysis 待移除原因
+     */
+    public static void removeShiftAnalysis(LhScheduleResult result, int shiftIndex, String analysis) {
+        if (Objects.isNull(result) || StringUtils.isEmpty(analysis) || !isValidIndex(shiftIndex)) {
+            return;
+        }
+        String currentAnalysis = getShiftAnalysis(result, shiftIndex);
+        if (StringUtils.isEmpty(currentAnalysis)) {
+            return;
+        }
+        StringBuilder retainedAnalysis = new StringBuilder(currentAnalysis.length());
+        String[] analysisArray = currentAnalysis.split(ANALYSIS_SEPARATOR);
+        for (String currentItem : analysisArray) {
+            String trimmedItem = StringUtils.trim(currentItem);
+            if (StringUtils.isEmpty(trimmedItem) || StringUtils.equals(trimmedItem, analysis)) {
+                continue;
+            }
+            if (retainedAnalysis.length() > 0) {
+                retainedAnalysis.append(ANALYSIS_SEPARATOR);
+            }
+            retainedAnalysis.append(trimmedItem);
+        }
+        setShiftAnalysis(result, shiftIndex,
+                retainedAnalysis.length() > 0 ? retainedAnalysis.toString() : null);
     }
 
     /**

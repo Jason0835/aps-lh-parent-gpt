@@ -14,6 +14,7 @@ import com.zlt.sync.handle.SyncDataHandle;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.Resource;
@@ -55,6 +56,10 @@ public class MpsSyncHandle {
 //    private TMpsConstructionInfoMapper constructionInfoMapper;
     @Resource
     private MesConstructionInfoService mesConstructionInfoService;
+
+    /** 新胎侧ITF直连同步启用后，旧MPS链路只确认消息，不再重复写TC业务表。 */
+    @Value("${aps.tc.mes-direct-sync-enabled:false}")
+    private boolean tcMesDirectSyncEnabled;
 
     private static final Logger logger = LoggerFactory.getLogger(MpsSyncHandle.class);
 
@@ -108,8 +113,13 @@ public class MpsSyncHandle {
                     buildSuccessOrFailList(failList, successList, syncDataLog, result);
                 } else if (syncKey.equals(SyncKeyEnum.SIDEWALL_STOCK.getDescription())) {
                     // 胎侧库存
-                    AjaxResult result = halfPartService.mergeTc(dataVersion);
-                    buildSuccessOrFailList(failList, successList, syncDataLog, result);
+                    if (this.tcMesDirectSyncEnabled) {
+                        logger.warn("胎侧库存已启用ITF直连同步，跳过旧MPS写入，dataVersion={}", dataVersion);
+                        successList.add(syncDataLog);
+                    } else {
+                        AjaxResult result = halfPartService.mergeTc(dataVersion);
+                        buildSuccessOrFailList(failList, successList, syncDataLog, result);
+                    }
                 } else if (syncKey.equals(SyncKeyEnum.LINING_STOCK.getDescription())) {
                     // 内衬库存
                     AjaxResult result = halfPartService.mergeNc(dataVersion);
@@ -193,11 +203,16 @@ public class MpsSyncHandle {
                     buildSuccessOrFailList(failList, successList, syncDataLog, result);
                 } else if (syncKey.equals(SyncKeyEnum.SIDEWALL_COMPLETE_QUANTITY.getDescription())) {
                     // 胎侧完成量回报
-                    AjaxResult result = finishService.mergeTcFinish(dataVersion);
-                    if ((int)result.get(Constants.CODE) == HttpStatus.ERROR) {
-                        log.setServiceResult((String) result.get(GatewayConstants.MSG_TAG));
+                    if (this.tcMesDirectSyncEnabled) {
+                        logger.warn("胎侧完成量已启用ITF直连同步，跳过旧MPS写入，dataVersion={}", dataVersion);
+                        successList.add(syncDataLog);
+                    } else {
+                        AjaxResult result = finishService.mergeTcFinish(dataVersion);
+                        if ((int)result.get(Constants.CODE) == HttpStatus.ERROR) {
+                            log.setServiceResult((String) result.get(GatewayConstants.MSG_TAG));
+                        }
+                        buildSuccessOrFailList(failList, successList, syncDataLog, result);
                     }
-                    buildSuccessOrFailList(failList, successList, syncDataLog, result);
                 } else if (syncKey.equals(SyncKeyEnum.LINING_COMPLETE_QUANTITY.getDescription())) {
                     // 内衬完成量回报
                     AjaxResult result = finishService.mergeNcFinish(dataVersion);
@@ -286,11 +301,16 @@ public class MpsSyncHandle {
                     buildSuccessOrFailList(failList, successList, syncDataLog, result);
                 } else if (syncKey.equals(SyncKeyEnum.TC_DAY_COMPLETE.getDescription())) {
                     // 胎侧日完成量回报
-                    AjaxResult result = finishService.mergeTcDayFinish(dataVersion);
-                    if ((int)result.get(Constants.CODE) == HttpStatus.ERROR) {
-                        log.setServiceResult((String) result.get(GatewayConstants.MSG_TAG));
+                    if (this.tcMesDirectSyncEnabled) {
+                        logger.warn("胎侧日完成量已启用ITF直连同步，跳过旧MPS写入，dataVersion={}", dataVersion);
+                        successList.add(syncDataLog);
+                    } else {
+                        AjaxResult result = finishService.mergeTcDayFinish(dataVersion);
+                        if ((int)result.get(Constants.CODE) == HttpStatus.ERROR) {
+                            log.setServiceResult((String) result.get(GatewayConstants.MSG_TAG));
+                        }
+                        buildSuccessOrFailList(failList, successList, syncDataLog, result);
                     }
-                    buildSuccessOrFailList(failList, successList, syncDataLog, result);
                 } else if (syncKey.equals(SyncKeyEnum.TQ_DAY_COMPLETE.getDescription())) {
                     // 胎圈日完成量回报
                     AjaxResult result = finishService.mergeTqDayFinish(dataVersion);

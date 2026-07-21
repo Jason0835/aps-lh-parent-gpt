@@ -45,6 +45,10 @@ public interface ICd15ScheduleResultRemoteService {
     @GetMapping("/cd15ScheduleResult/autoSchedule/task/{taskId}")
     AjaxResult getAutoScheduleTask(@PathVariable("taskId") String taskId);
 
+    @ApiOperation("查询斜裁班次日期")
+    @PostMapping("/cd15ScheduleResult/shiftDates")
+    AjaxResult shiftDates(@RequestBody Cd15InsertOrderRequest request);
+
     @ApiOperation("斜裁插单预校验")
     @PostMapping("/cd15ScheduleResult/validateInsert")
     AjaxResult validateInsert(@RequestBody Cd15InsertOrderRequest request);
@@ -88,6 +92,13 @@ public interface ICd15ScheduleResultRemoteService {
     @ApiOperation("查询CD15定时滚动排程任务")
     @GetMapping("/cd15ScheduleResult/rollingSchedule/task/{taskId}")
     AjaxResult getTimedRollingTask(@PathVariable("taskId") String taskId);
+
+    @ApiOperation("补偿斜裁自动排程超时任务")
+    @PostMapping("/cd15ScheduleResult/autoSchedule/recoverTimeoutTasks")
+    AjaxResult recoverAutoScheduleTimeoutTasks(
+            @RequestParam(value = "timeoutMinutes", required = false)
+            Integer timeoutMinutes);
+
     @ApiOperation("发布斜裁排程结果")
     @PostMapping("/cd15ScheduleResult/publish")
     AjaxResult publish(@RequestBody Cd15ScheduleResult dto,

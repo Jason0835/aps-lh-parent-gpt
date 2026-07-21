@@ -1,0 +1,98 @@
+package com.zlt.aps.cd15.api.domain.entity;
+
+import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableName;
+import com.ruoyi.common.core.web.domain.BaseEntity;
+import io.swagger.annotations.ApiModel;
+import lombok.Data;
+
+import java.io.Serializable;
+import java.math.BigDecimal;
+import java.util.Date;
+
+/** 斜裁滚动调整日志。 */
+@Data
+@ApiModel(value = "斜裁滚动调整日志", description = "记录插单、转机台、调量和自动滚动前后差异")
+@TableName("t_cd15_schedule_rolling_adjust_log")
+public class Cd15ScheduleRollingAdjustLog extends BaseEntity implements Serializable {
+    private static final long serialVersionUID = 1L;
+
+    /** 工厂编码。 */
+    @TableField("FACTORY_CODE")
+    private String factoryCode;
+    /** 调整任务ID。 */
+    @TableField("TASK_ID")
+    private String taskId;
+    /** 原排程批次号。 */
+    @TableField("BATCH_NO")
+    private String batchNo;
+    /** 排程日期。 */
+    @TableField("SCHEDULE_DATE")
+    private Date scheduleDate;
+    /** 目标班次编码。 */
+    @TableField("TARGET_SHIFT_CODE")
+    private String targetShiftCode;
+    /** 滚动任务项稳定业务键。 */
+    @TableField("ROLLING_ITEM_KEY")
+    private String rollingItemKey;
+    /** 对应排程结果ID。 */
+    @TableField("SCHEDULE_RESULT_ID")
+    private Long scheduleResultId;
+    /** 分裁组合号。 */
+    @TableField("GROUP_NO")
+    private String groupNo;
+    /** 钢带代码。 */
+    @TableField("STEEL_STRIP_CODE")
+    private String steelStripCode;
+    /** 大卷代码。 */
+    @TableField("BIG_ROLL_CODE")
+    private String bigRollCode;
+    /** 裁断角度。 */
+    @TableField("CUTTING_ANGLE")
+    private String cuttingAngle;
+    /** 调整类型。 */
+    @TableField("ADJUST_TYPE")
+    private String adjustType;
+    /** 调整前班次序号。 */
+    @TableField("OLD_CLASS_INDEX")
+    private Integer oldClassIndex;
+    /** 调整后班次序号。 */
+    @TableField("NEW_CLASS_INDEX")
+    private Integer newClassIndex;
+    /** 调整前生产顺序。 */
+    @TableField("OLD_PRODUCE_ORDER")
+    private Integer oldProduceOrder;
+    /** 调整后生产顺序。 */
+    @TableField("NEW_PRODUCE_ORDER")
+    private Integer newProduceOrder;
+    /** 调整前计划量。 */
+    @TableField("OLD_PLAN_QTY")
+    private BigDecimal oldPlanQty;
+    /** 调整后计划量。 */
+    @TableField("NEW_PLAN_QTY")
+    private BigDecimal newPlanQty;
+    /** 调整前机台。 */
+    @TableField("OLD_MACHINE_CODE")
+    private String oldMachineCode;
+    /** 调整后机台。 */
+    @TableField("NEW_MACHINE_CODE")
+    private String newMachineCode;
+    /** 调整原因编码。 */
+    @TableField("REASON_CODE")
+    private String reasonCode;
+    /** 决策及限制原因JSON。 */
+    @TableField("REASON_DETAIL")
+    private String reasonDetail;
+    /** 本次滚动输入版本。 */
+    @TableField("INPUT_VERSION")
+    private String inputVersion;
+    /** 快照结构版本。 */
+    @TableField("SNAPSHOT_SCHEMA_VERSION")
+    private String snapshotSchemaVersion;
+    /** 调整前完整快照。 */
+    @TableField("BEFORE_SNAPSHOT_JSON")
+    private String beforeSnapshotJson;
+    /** 调整后完整快照。 */
+    @TableField("AFTER_SNAPSHOT_JSON")
+    private String afterSnapshotJson;
+}

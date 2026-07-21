@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.itf.mes.mapper.TcScheduleResultIssueMapper">
+
+    <sql id="issueColumns">
+        SCHEDULE_DATE, BATCH_NO, ORDER_NO, SIDEWALL_CODE, MACHINE_CODE,
+        GLUE_CODE, BASE_GLUE_CODE, WHOLE_GLUE_CODE, GLUE_SEQ, MOUTH_PLATE_CODE,
+        CONSTRUCTION_VERSION, SIDEWALL_CRAFT,
+        MID_PLAN_QTY, MID_PRODUCE_ORDER, MID_ANALYSIS,
+        NIGHT_PLAN_QTY, NIGHT_PRODUCE_ORDER, NIGHT_ANALYSIS,
+        DAY_PLAN_QTY, DAY_PRODUCE_ORDER, DAY_ANALYSIS,
+        TAIL_FLAG, IS_RELEASE, DATA_VERSION, TASK_VERSION, IDEMPOTENCY_KEY,
+        COMPANY_CODE, FACTORY_CODE
+    </sql>
+
+    <!-- 使用NOT EXISTS保障重复下发幂等。 -->
+    <insert id="batchInsert">
+        INSERT INTO MES_TC_SCHEDULE_RESULT (<include refid="issueColumns"/>)
+        SELECT * FROM (
+        <foreach collection="list" item="item" separator=" UNION ALL ">
+            SELECT
+                #{item.scheduleDate} AS SCHEDULE_DATE,
+                #{item.batchNo} AS BATCH_NO,
+                #{item.orderNo} AS ORDER_NO,
+                #{item.sidewallCode} AS SIDEWALL_CODE,
+                #{item.machineCode} AS MACHINE_CODE,
+                #{item.glueCode} AS GLUE_CODE,
+                #{item.baseGlueCode} AS BASE_GLUE_CODE,
+                #{item.wholeGlueCode} AS WHOLE_GLUE_CODE,
+                #{item.glueSeq} AS GLUE_SEQ,
+                #{item.mouthPlateCode} AS MOUTH_PLATE_CODE,
+                #{item.constructionVersion} AS CONSTRUCTION_VERSION,
+                #{item.sidewallCraft} AS SIDEWALL_CRAFT,
+                #{item.midPlanQty} AS MID_PLAN_QTY,
+                #{item.midProduceOrder} AS MID_PRODUCE_ORDER,
+                #{item.midAnalysis} AS MID_ANALYSIS,
+                #{item.nightPlanQty} AS NIGHT_PLAN_QTY,
+                #{item.nightProduceOrder} AS NIGHT_PRODUCE_ORDER,
+                #{item.nightAnalysis} AS NIGHT_ANALYSIS,
+                #{item.dayPlanQty} AS DAY_PLAN_QTY,
+                #{item.dayProduceOrder} AS DAY_PRODUCE_ORDER,
+                #{item.dayAnalysis} AS DAY_ANALYSIS,
+                #{item.tailFlag} AS TAIL_FLAG,
+                '1' AS IS_RELEASE,
+                #{item.dataVersion} AS DATA_VERSION,
+                #{item.taskVersion} AS TASK_VERSION,
+                #{item.idempotencyKey} AS IDEMPOTENCY_KEY,
+                #{item.companyCode} AS COMPANY_CODE,
+                #{item.factoryCode} AS FACTORY_CODE
+        </foreach>
+        ) AS source_data
+        WHERE NOT EXISTS (
+            SELECT 1 FROM MES_TC_SCHEDULE_RESULT target_data
+            WHERE target_data.SCHEDULE_DATE = source_data.SCHEDULE_DATE
+              AND target_data.MACHINE_CODE = source_data.MACHINE_CODE
+              AND target_data.SIDEWALL_CODE = source_data.SIDEWALL_CODE
+              AND target_data.DATA_VERSION = source_data.DATA_VERSION
+        )
+    </insert>
+
+    <update id="batchUpdate">
+        <foreach collection="list" item="item" separator=";">
+            UPDATE MES_TC_SCHEDULE_RESULT
+            SET BATCH_NO = #{item.batchNo}, ORDER_NO = #{item.orderNo},
+                GLUE_CODE = #{item.glueCode}, BASE_GLUE_CODE = #{item.baseGlueCode},
+                WHOLE_GLUE_CODE = #{item.wholeGlueCode}, GLUE_SEQ = #{item.glueSeq},
+                MOUTH_PLATE_CODE = #{item.mouthPlateCode},
+                CONSTRUCTION_VERSION = #{item.constructionVersion}, SIDEWALL_CRAFT = #{item.sidewallCraft},
+                MID_PLAN_QTY = #{item.midPlanQty}, MID_PRODUCE_ORDER = #{item.midProduceOrder},
+                MID_ANALYSIS = #{item.midAnalysis}, NIGHT_PLAN_QTY = #{item.nightPlanQty},
+                NIGHT_PRODUCE_ORDER = #{item.nightProduceOrder}, NIGHT_ANALYSIS = #{item.nightAnalysis},
+                DAY_PLAN_QTY = #{item.dayPlanQty}, DAY_PRODUCE_ORDER = #{item.dayProduceOrder},
+                DAY_ANALYSIS = #{item.dayAnalysis}, TAIL_FLAG = #{item.tailFlag},
+                TASK_VERSION = #{item.taskVersion}, IDEMPOTENCY_KEY = #{item.idempotencyKey},
+                COMPANY_CODE = #{item.companyCode}, FACTORY_CODE = #{item.factoryCode}
+            WHERE SCHEDULE_DATE = #{item.scheduleDate}
+              AND MACHINE_CODE = #{item.machineCode}
+              AND SIDEWALL_CODE = #{item.sidewallCode}
+              AND DATA_VERSION = #{item.dataVersion}
+        </foreach>
+    </update>
+
+    <select id="selectExisting" resultType="com.zlt.aps.tc.api.domain.entity.TcScheduleResultIssue">
+        SELECT SCHEDULE_DATE, MACHINE_CODE, SIDEWALL_CODE, DATA_VERSION
+        FROM MES_TC_SCHEDULE_RESULT
+        WHERE
+        <foreach collection="list" item="item" separator=" OR ">
+            (SCHEDULE_DATE = #{item.scheduleDate}
+             AND MACHINE_CODE = #{item.machineCode}
+             AND SIDEWALL_CODE = #{item.sidewallCode}
+             AND DATA_VERSION = #{item.dataVersion})
+        </foreach>
+    </select>
+
+    <delete id="deleteByScheduleDate">
+        DELETE FROM MES_TC_SCHEDULE_RESULT
+        WHERE SCHEDULE_DATE = #{scheduleDate}
+          AND DATA_VERSION = #{dataVersion}
+    </delete>
+
+    <select id="selectIdempotencyKeys" resultType="java.lang.String">
+        SELECT DISTINCT IDEMPOTENCY_KEY
+        FROM MES_TC_SCHEDULE_RESULT
+        WHERE DATA_VERSION = #{dataVersion}
+          AND IDEMPOTENCY_KEY IS NOT NULL
+    </select>
+</mapper>

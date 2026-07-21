@@ -4,45 +4,51 @@ import lombok.Builder;
 import lombok.Data;
 
 import java.math.BigDecimal;
-import java.util.Date;
 import java.util.List;
 
-/**
- * CD15 排程结果草稿，落库前在 Engine 内部流转。
- */
+/** 按钢带、大卷和机台归并的排程主结果草稿。 */
 @Data
 @Builder
 public class Cd15ScheduleResultDraft {
 
-    /** ORDER_NO/GROUP_NO：分裁两条结果共用，单裁时 GROUP_NO 可为空。 */
-    private String orderNo;
-    /** ORDER_NO/GROUP_NO：分裁组合号。 */
-    private String groupNo;
-    private String factoryCode;
-    private Date scheduleDate;
-    private String cxBatchNo;
-    private String cxMachineCodes;
-    private BigDecimal planSurplusQty;
-    private String bigRollCode;
-    private String bigRollBarcode;
+    /** 钢带、大卷和机台组成的草稿归并键，仅用于排程结果构建阶段。 */
+    private String resultKey;
+    /** 施工材料稳定键，仅用于结果归并。 */
+    private String materialKey;
+    /** 钢带代码。 */
     private String steelStripCode;
+    /** 钢带大卷编号。 */
+    private String bigRollCode;
+    /** 帘线规格。 */
+    private String cordSpec;
+    /** 裁断角度。 */
     private String cuttingAngle;
-    private String machineCode;
-    private String machineName;
-    private String classField;
-    private String shiftDisplayName;
-    private int classIndex;
-    private BigDecimal cxPlanQty;
-    private BigDecimal planQty;
-    private Integer produceOrder;
-    private BigDecimal pieceCount;
-    private BigDecimal netDemandMeters;
-    private BigDecimal bigRollConsumeMeters;
-    private BigDecimal vehiclePlanQuantity;
-    private String storageLaneCode;
-    private List<Cd15LaneAllocationDraft> laneAllocations;
-    private BigDecimal stockMetersAtSix;
+    /** 斜裁宽度，单位毫米。 */
+    private BigDecimal craftWidth;
+    /** 单耗，单位毫米/条。 */
+    private BigDecimal unitConsumeMillimeter;
+    /** 标准卷曲长度，单位米。 */
+    private BigDecimal curlLength;
+    /** 大卷幅宽，单位毫米。 */
+    private BigDecimal cordWidth;
+    /** GDYY大卷实际占用量，单位米。 */
+    private BigDecimal bigRollConsumeQuantity;
+        /** 裁断模式：SINGLE或SPLIT。 */
     private String cutMode;
-    private String sourceType;
-    private String analysis;
+    /** 分裁组合稳定键，仅用于两条结果共用工单号。 */
+    private String splitGroupKey;
+    /** 斜裁机台编码。 */
+    private String machineCode;
+    /** 排程结果使用的库排号，多个库排按任务出现顺序去重并以逗号分隔。 */
+    private String primaryLaneCode;
+    /** 数据来源，自动排程结果固定为0。 */
+    private String dataSource;
+    /** 去重排序后的来源成型批次号，多个值使用逗号分隔。 */
+    private String cxBatchNo;
+    /** 去重排序后的来源成型机台编码，多个值使用逗号分隔。 */
+    private String cxMachineCodes;
+    /** 相关胎胚的月计划剩余量合计。 */
+    private BigDecimal planSurplusQty;
+    /** CLASS1至CLASS8的班次排程槽位。 */
+    private List<Cd15ScheduleShiftSlotDraft> shiftSlots;
 }

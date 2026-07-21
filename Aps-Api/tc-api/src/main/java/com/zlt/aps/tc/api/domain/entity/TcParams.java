@@ -9,6 +9,7 @@ import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 
+
 /**
  * Copyright (c) 2022, All rights reserved。
  * 文件名称：TcParams.java

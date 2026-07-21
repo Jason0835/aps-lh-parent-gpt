@@ -769,6 +769,17 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
 
         inputStream = new ByteArrayInputStream(exportBytes);
         exportBytes = ExcelUtils.writeMultiList(inputStream, 1, mouldChangePlanTableMap, mouldChangePlanExcelDataList);
+        // 模具交替计划sheet名称
+        try (ByteArrayInputStream bais = new ByteArrayInputStream(exportBytes);
+             XSSFWorkbook workbook = new XSSFWorkbook(bais);
+             ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
+            workbook.setSheetName(1, I18nUtil.getMessage("ui.data.column.lhMouldChangePlan.import.modelName"));
+            workbook.write(baos);
+            exportBytes = baos.toByteArray();
+        } catch (IOException e) {
+            log.error("重命名导入模板Sheet失败", e);
+            throw new ServiceException("生成导入模板失败");
+        }
 
         // 排产小结已迁移至成型日计划导出（aps-cx 通过 Feign 调用 buildScheduleSummaryExportData），
         // 硫化日计划导出不再写入排产小结 sheet。
@@ -1303,7 +1314,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
                 return AjaxResult.error(I18nUtil.getMessage("ui.message.import.fail") + "," + successNum + "," + failureNum, importErrorLogs);
             }
         }
-
+        String batchNo = lhScheduleResultService.generateNextBatchNo(scheduleDate, factoryCode);
         List<LhScheduleResult> insertList = new ArrayList<>();
         for (int i = 0; i < list.size(); i++) {
             LhScheduleResultTemplateImportVO row = list.get(i);
@@ -1335,7 +1346,6 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
             copyImportRowToEntity(row, target);
             fillShiftTimes(target, shiftTimeMap);
 
-            String batchNo = lhScheduleResultService.generateNextBatchNo(scheduleDate, factoryCode);
             String orderNo = lhScheduleResultService.generateInsertOrderNo(scheduleDate);
             target.setBatchNo(batchNo);
             target.setOrderNo(orderNo);
@@ -3263,7 +3273,9 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
     }
 
     /**
-     * 判断是否为收尾行：任一班次 classXIsEnd 为收尾或试验标记。
+     * 判断是否为收尾行：任一班次 classXIsEnd 为收尾、量试或试验标记。
+     *
+     * <p>取值含义：0-正规正常，1-正规收尾，2-量试，3-试验/试制。</p>
      *
      * @param result 排程结果
      * @return true 表示该行存在收尾班次
@@ -3273,8 +3285,8 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
             Object isEndValue = BeanUtil.getProperty(result, "class" + shift + "IsEnd");
             String isEnd = StringUtils.trimToEmpty(Objects.toString(isEndValue, ""));
             if (ApsConstant.APS_STRING_1.equals(isEnd)
-                    || ApsConstant.APS_STRING_3.equals(isEnd)
-                    || ApsConstant.APS_STRING_4.equals(isEnd)) {
+                    || ApsConstant.APS_STRING_2.equals(isEnd)
+                    || ApsConstant.APS_STRING_3.equals(isEnd)) {
                 return true;
             }
         }

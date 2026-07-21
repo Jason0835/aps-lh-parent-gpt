@@ -2,10 +2,12 @@ package com.zlt.sync.handle;
 
 import com.alibaba.fastjson.JSONObject;
 import com.alibaba.fastjson.JSONValidator;
+import com.baomidou.dynamic.datasource.toolkit.DynamicDataSourceContextHolder;
 import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.utils.SpringUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.utils.StringUtils;
+import com.zlt.aps.itf.constant.DataSource;
 import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
 import com.zlt.sync.configuration.QueueConfigDatas;
 import com.zlt.sync.constants.ParamConstants;
@@ -88,16 +90,20 @@ public class SyncScheduleTask {
         params.put("dataSys", queueConfigDatas.getDataSys());
         params.put("searchType", searchType);
         params.put("syncKeys", syncKeys);
-        List<AuxReqSyncDataLogs> lists = auxReqSyncDataLogsMapper.queryReqSyncDataLogs(params);
+        DynamicDataSourceContextHolder.push(DataSource.MASTER);
+        try {
+            List<AuxReqSyncDataLogs> lists = auxReqSyncDataLogsMapper.queryReqSyncDataLogs(params);
 
-        logger.info("querySyncDatasByType-001, 同步需要系统数据: " + queueConfigDatas.getDataSys() + "; searchType: " + searchType + "; syncKeys: " + StringUtils.join(syncKeys, ","));
-        if (CollectionUtils.isEmpty(lists)) {
-            logger.info("querySyncDatasByType-002: 可同步数据为空");
-        } else {
-            logger.info("querySyncDatasByType-003: 可同步数据数: " + lists.size());
+            logger.info("querySyncDatasByType-001, 同步需要系统数据: " + queueConfigDatas.getDataSys() + "; searchType: " + searchType + "; syncKeys: " + StringUtils.join(syncKeys, ","));
+            if (CollectionUtils.isEmpty(lists)) {
+                logger.info("querySyncDatasByType-002: 可同步数据为空");
+            } else {
+                logger.info("querySyncDatasByType-003: 可同步数据数: " + lists.size());
+            }
+            return lists;
+        } finally {
+            DynamicDataSourceContextHolder.poll();
         }
-
-        return lists;
     }
 
     /**
@@ -322,16 +328,21 @@ public class SyncScheduleTask {
     public void syncCntSuccedHandle(AuxReqSyncDataLogs dataLogs) {
         logger.info("syncCntSuccedHandle-001 回传至中间库成功后发送消息 - 更改请求状态=1");
 
-        // 先更改状态
-        dataLogs.setStatus(1);
-        dataLogs.setUpdateDate(new Date());
-        auxReqSyncDataLogsMapper.update(dataLogs);
+        DynamicDataSourceContextHolder.push(DataSource.MASTER);
+        try {
+            // 先更改状态
+            dataLogs.setStatus(1);
+            dataLogs.setUpdateDate(new Date());
+            auxReqSyncDataLogsMapper.update(dataLogs);
 
-        logger.info("syncCntSuccedHandle-001 回传至中间库成功后发送消息 - 添加历史记录");
-        AuxReqSyncDataLogsHis logsHis = new AuxReqSyncDataLogsHis();
-        SpringBeanUtils.copyPropertiesIgnoreNull(dataLogs, logsHis);
-        logsHis.setMsgId(UUID.randomUUID().toString());
-        auxReqSyncDataLogsHisMapper.insert(logsHis);
+            logger.info("syncCntSuccedHandle-001 回传至中间库成功后发送消息 - 添加历史记录");
+            AuxReqSyncDataLogsHis logsHis = new AuxReqSyncDataLogsHis();
+            SpringBeanUtils.copyPropertiesIgnoreNull(dataLogs, logsHis);
+            logsHis.setMsgId(UUID.randomUUID().toString());
+            auxReqSyncDataLogsHisMapper.insert(logsHis);
+        } finally {
+            DynamicDataSourceContextHolder.poll();
+        }
 
         logger.info("syncCntSuccedHandle-001 回传至中间库成功后发送消息 - 发送消息给对接系统");
         SyncParamsVO paramsVO = new SyncParamsVO();
@@ -449,15 +460,20 @@ public class SyncScheduleTask {
      * @param dataLogs
      */
     private void setTimeoutHis(AuxReqSyncDataLogs dataLogs) {
-        dataLogs.setStatus(4);
-        dataLogs.setUpdateDate(new Date());
-        auxReqSyncDataLogsMapper.update(dataLogs);
+        DynamicDataSourceContextHolder.push(DataSource.MASTER);
+        try {
+            dataLogs.setStatus(4);
+            dataLogs.setUpdateDate(new Date());
+            auxReqSyncDataLogsMapper.update(dataLogs);
 
-        logger.info("setTimeoutHis-001 置超状态，记录历史 - 添加历史记录");
-        AuxReqSyncDataLogsHis logsHis = new AuxReqSyncDataLogsHis();
-        SpringBeanUtils.copyPropertiesIgnoreNull(dataLogs, logsHis);
-        logsHis.setMsgId(UUID.randomUUID().toString());
-        auxReqSyncDataLogsHisMapper.insert(logsHis);
+            logger.info("setTimeoutHis-001 置超状态，记录历史 - 添加历史记录");
+            AuxReqSyncDataLogsHis logsHis = new AuxReqSyncDataLogsHis();
+            SpringBeanUtils.copyPropertiesIgnoreNull(dataLogs, logsHis);
+            logsHis.setMsgId(UUID.randomUUID().toString());
+            auxReqSyncDataLogsHisMapper.insert(logsHis);
+        } finally {
+            DynamicDataSourceContextHolder.poll();
+        }
     }
 
 }

@@ -18,6 +18,18 @@ public class TmFormingDemandRowVo {
     /** 胚胎编码 */
     private String embryoCode;
 
+    /** 物料编号 */
+    private String materialCode;
+
+    /** 物料描述 */
+    private String materialDesc;
+
+    /** 胎胚描述 */
+    private String mainMaterialDesc;
+
+    /** 成型机台编号 */
+    private String cxMachineCode;
+
     /** BOM 数据版本 */
     private String bomDataVersion;
 
@@ -47,6 +59,30 @@ public class TmFormingDemandRowVo {
 
     /** 8班成型计划量 */
     private BigDecimal class8PlanQty;
+
+    /** 1班成型完成量 */
+    private BigDecimal class1FinishQty;
+
+    /** 2班成型完成量 */
+    private BigDecimal class2FinishQty;
+
+    /** 3班成型完成量 */
+    private BigDecimal class3FinishQty;
+
+    /** 4班成型完成量 */
+    private BigDecimal class4FinishQty;
+
+    /** 5班成型完成量 */
+    private BigDecimal class5FinishQty;
+
+    /** 6班成型完成量 */
+    private BigDecimal class6FinishQty;
+
+    /** 7班成型完成量 */
+    private BigDecimal class7FinishQty;
+
+    /** 8班成型完成量 */
+    private BigDecimal class8FinishQty;
 
     /** 收尾提示标识，0 表示提示收尾 */
     private String markCloseOutTip;

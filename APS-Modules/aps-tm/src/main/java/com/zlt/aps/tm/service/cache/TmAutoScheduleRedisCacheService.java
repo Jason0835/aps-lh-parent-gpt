@@ -89,7 +89,9 @@ public class TmAutoScheduleRedisCacheService {
             deleteKeySet.addAll(findKeys(TmScheduleConstants.BASE_DATA_CACHE_KEY_PREFIX + "*"));
         } else {
             deleteKeySet.addAll(findKeys(TmScheduleConstants.BASE_DATA_CACHE_KEY_PREFIX + "params:" + factoryCode));
+            // 同时清理旧版和包含停用机台证据的 v2 机台缓存，避免管理端清理后仍命中旧数据。
             deleteKeySet.addAll(findKeys(TmScheduleConstants.BASE_DATA_CACHE_KEY_PREFIX + "machine:" + factoryCode));
+            deleteKeySet.addAll(findKeys(TmScheduleConstants.BASE_DATA_CACHE_KEY_PREFIX + "machine:v2:" + factoryCode));
             if (scheduleDate == null) {
                 deleteKeySet.addAll(findKeys(TmScheduleConstants.BASE_DATA_CACHE_KEY_PREFIX
                         + "calendar:" + factoryCode + ":*"));

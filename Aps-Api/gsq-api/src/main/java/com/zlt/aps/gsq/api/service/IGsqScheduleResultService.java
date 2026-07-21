@@ -1,198 +1,235 @@
 package com.zlt.aps.gsq.api.service;
 
+import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.constant.ServiceNameConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
-import com.zlt.aps.gsq.api.domain.dto.GsqScheduleResultDto;
-import com.zlt.aps.gsq.api.domain.entity.GsqDayFinishQty;
-import io.swagger.annotations.ApiImplicitParam;
-import io.swagger.annotations.ApiImplicitParams;
+import com.zlt.aps.gsq.api.domain.dto.GsqChangeMachineDTO;
+import com.zlt.aps.gsq.api.domain.dto.GsqInsertOrderDTO;
+import com.zlt.aps.gsq.api.domain.entity.GsqScheduleResult;
+import com.zlt.aps.gsq.api.domain.vo.GsqScheduleShiftDateVO;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
-
 /**
- * 钢丝圈排程结果Service接口
- * @author chen
- * @date 2021-06-21
+ * 钢丝圈排程结果Feign Service接口
+ *
+ * <p>6班次制：1班=D日中班，2班=D+1日夜班，3班=D+1日早班，4班=D+1日中班，5班=D+2日夜班，6班=D+2日早班
+ * 其中 D+1 = 排程日期（SCHEDULE_DATE）
+ *
+ * @author APS
  */
-@FeignClient(contextId = "IGsqScheduleResultService", value =ServiceNameConstants.GATEWAY_SERVICE, path = "${api.path.gsq:gsq}")
+@FeignClient(contextId = "IGsqScheduleResultService", value = ServiceNameConstants.GATEWAY_SERVICE, path = "${api.path.gsq:gsq}")
 public interface IGsqScheduleResultService {
-    
+
     /**
      * 查询钢丝圈排程结果列表
      *
-     * @param dto 钢丝圈排程结果
-     * @return 钢丝圈排程结果集合
+     * @param queryVO 查询条件
+     * @return 分页列表数据
      */
-    @PostMapping("/gsq/scheduleResult/list")
-    @ApiOperation("查询钢丝圈排程结果信息维护列表")
-    public TableDataInfo list(@RequestBody GsqScheduleResultDto dto);
+    @PostMapping("/scheduleResult/list")
+    @ApiOperation("查询钢丝圈排程结果列表")
+    TableDataInfo list(@RequestBody GsqScheduleResult queryVO);
 
     /**
-     * 查询钢丝圈排程结果
+     * 获取详细信息
      *
-     * @param id 钢丝圈排程结果ID
-     * @return 钢丝圈排程结果
+     * @param id 主键id
+     * @return 详细信息
      */
-    @GetMapping("/gsq/scheduleResult/{id}")
-    @ApiOperation("查询钢丝圈排程结果信息维护列表")
-    @ApiImplicitParams({
-            @ApiImplicitParam(name = "id", dataType = "int", value = "主键id", paramType = "query")
-    })
-    public GsqScheduleResultDto getInfo(@PathVariable("id") Long id);
+    @GetMapping("/scheduleResult/{id}")
+    @ApiOperation("获取钢丝圈排程结果详细信息")
+    GsqScheduleResult getInfo(@PathVariable("id") Long id);
 
     /**
-     * 修改钢丝圈排程结果
+     * 保存（新增/修改）
      *
-     * @param dto 钢丝圈排程结果
+     * @param entity 业务对象
      * @return 结果
      */
-    @PostMapping("/gsq/scheduleResult/edit")
-    @ApiOperation("修改钢丝圈排程结果")
-    public AjaxResult edit(@RequestBody GsqScheduleResultDto dto);
+    @PostMapping("/scheduleResult/save")
+    @ApiOperation("保存钢丝圈排程结果")
+    AjaxResult save(@RequestBody GsqScheduleResult entity);
+
+    /**
+     * 删除（按ID列表）
+     *
+     * @param ids 主键ID列表
+     * @return 结果
+     */
+    @PostMapping("/scheduleResult/delete/{ids}")
+    @ApiOperation("删除钢丝圈排程结果")
+    AjaxResult removeByIds(@PathVariable("ids") List<Long> ids);
+
+    /**
+     * 逻辑删除排程记录（已发布成功的计划不允许删除）
+     *
+     * @param ids 主键ID列表
+     * @return 结果
+     */
+    @PostMapping("/scheduleResult/logicDelete")
+    @ApiOperation("逻辑删除排程记录")
+    AjaxResult logicDelete(@RequestBody List<Long> ids);
+
+    /**
+     * 导出排程结果
+     *
+     * @param queryVO  查询条件
+     * @param fileName 文件名
+     * @return 字节流
+     */
+    @PostMapping("/scheduleResult/exportData/{fileName}")
+    @ApiOperation("导出钢丝圈排程结果")
+    byte[] exportData(@RequestBody GsqScheduleResult queryVO, @PathVariable("fileName") String fileName);
+
+    /**
+     * 导出排程结果列表（无分页）
+     *
+     * @param queryVO 查询条件
+     * @return 列表
+     */
+    @PostMapping("/scheduleResult/exportList")
+    @ApiOperation("导出钢丝圈排程结果列表")
+    List<GsqScheduleResult> exportList(@RequestBody GsqScheduleResult queryVO);
+
+    /**
+     * 导入数据
+     *
+     * @param importContext 导入上下文
+     * @param updateSupport  是否支持更新
+     * @return 结果
+     */
+    @PostMapping("/scheduleResult/importData")
+    @ApiOperation("导入钢丝圈排程结果")
+    AjaxResult importData(@RequestBody ImportContext importContext, @RequestParam("updateSupport") boolean updateSupport);
+
+    /**
+     * 自动排程
+     *
+     * @param queryVO 排程参数（含排程日期、分厂）
+     * @return 结果
+     */
+    @PostMapping("/scheduleResult/autoPlan")
+    @ApiOperation("自动排程")
+    AjaxResult autoPlan(@RequestBody GsqScheduleResult queryVO);
+
+    /**
+     * 插单前校验
+     *
+     * @param dto 插单数据
+     * @return 校验结果
+     */
+    @PostMapping("/scheduleResult/validateInsertOrder")
+    @ApiOperation("插单前校验")
+    AjaxResult validateInsertOrder(@RequestBody GsqInsertOrderDTO dto);
 
     /**
      * 插单
      *
-     * @param dto 钢丝圈排程结果
+     * @param dto 插单数据
      * @return 结果
      */
-    @PostMapping("/gsq/scheduleResult/add")
+    @PostMapping("/scheduleResult/insertOrder")
     @ApiOperation("插单")
-    public AjaxResult add(@RequestBody GsqScheduleResultDto dto);
+    AjaxResult insertOrder(@RequestBody GsqInsertOrderDTO dto);
 
     /**
-     * 调量
+     * 转机台前校验
      *
-     * @param dto 钢丝圈排程结果
-     * @return 结果
+     * @param dto 转机台数据
+     * @return 校验结果
      */
-    @PostMapping("/gsq/scheduleResult/changeQty")
-    @ApiOperation("调量")
-    public AjaxResult changeQty(@RequestBody GsqScheduleResultDto dto);
+    @PostMapping("/scheduleResult/validateChangeMachine")
+    @ApiOperation("转机台前校验")
+    AjaxResult validateChangeMachine(@RequestBody GsqChangeMachineDTO dto);
 
     /**
      * 转机台
      *
-     * @param dto 钢丝圈排程结果
+     * @param dto 转机台数据
      * @return 结果
      */
-    @PostMapping("/gsq/scheduleResult/changeMachine")
+    @PostMapping("/scheduleResult/changeMachine")
     @ApiOperation("转机台")
-    public AjaxResult changeMachine(@RequestBody GsqScheduleResultDto dto);
+    AjaxResult changeMachine(@RequestBody GsqChangeMachineDTO dto);
 
     /**
-     * 选机台
-     */
-    @PostMapping("/gsq/scheduleResult/chooseMachine")
-    public AjaxResult chooseMachine(@RequestBody GsqScheduleResultDto dto);
-
-    /**
-     * 删除钢丝圈排程结果
+     * 调量前校验
      *
-     * @param ids 需要删除的钢丝圈排程结果ID
+     * @param entity 调量数据
+     * @return 校验结果
+     */
+    @PostMapping("/scheduleResult/validateChangeQty")
+    @ApiOperation("调量前校验")
+    AjaxResult validateChangeQty(@RequestBody GsqScheduleResult entity);
+
+    /**
+     * 调量
+     *
+     * @param entity 调量数据
      * @return 结果
      */
-    @PostMapping("/gsq/scheduleResult/{ids}")
-    @ApiOperation("删除钢丝圈排程结果信息")
-    @ApiImplicitParams({
-            @ApiImplicitParam(name = "ids", dataType = "Array", value = "id数组", paramType = "query")
-    })
-    public AjaxResult remove(@PathVariable("ids") Long[] ids);
+    @PostMapping("/scheduleResult/changeQty")
+    @ApiOperation("调量")
+    AjaxResult changeQty(@RequestBody GsqScheduleResult entity);
 
     /**
-     * 导出钢丝圈排程结果信息
-     */
-    @PostMapping("/gsq/scheduleResult/export")
-    @ApiOperation("导出钢丝圈排程结果信息")
-    public byte[] exportData(@RequestBody GsqScheduleResultDto dto);
-
-    /**
-     * 查询钢丝圈排程结果列表
+     * 发布排程到MES
+     * 6班→3天拆分映射：
+     * Day1(D日)：MID=钢丝圈1班
+     * Day2(D+1日)：NIGHT=钢丝圈2班, DAY=钢丝圈3班, MID=钢丝圈4班
+     * Day3(D+2日)：NIGHT=钢丝圈5班, DAY=钢丝圈6班
      *
-     * @param dto 钢丝圈排程结果
-     * @return 钢丝圈排程结果集合
+     * @param queryVO 查询条件
+     * @return 结果
      */
-    @PostMapping("/gsq/scheduleResult/getList")
-    @ApiOperation("查询钢丝圈排程结果信息维护列表")
-    public List<GsqScheduleResultDto> getList(@RequestBody GsqScheduleResultDto dto);
-
-    /**
-     * 发布所有排程结果
-     * @param dto 查询条件
-     */
-    @PostMapping("/gsq/scheduleResult/publish")
-    public AjaxResult publish(@RequestBody GsqScheduleResultDto dto);
-
-    /**
-     * 自动排程
-     */
-    @PostMapping("/gsq/scheduleResult/autoPlan")
-    public AjaxResult autoPlan(@RequestBody GsqScheduleResultDto dto);
-
-    /**
-     * 根据IDS获取详细信息
-     */
-    @PostMapping(value = "/gsq/scheduleResult/getInfos")
-    List<GsqScheduleResultDto> getInfos(@RequestBody GsqScheduleResultDto scheduleResult);
+    @PostMapping("/scheduleResult/publish")
+    @ApiOperation("发布排程")
+    AjaxResult publish(@RequestBody GsqScheduleResult queryVO);
 
     /**
      * 查询排程日期是否已发布
-     * @param scheduleDate 排程日期
-     * @return 是否已经发布
-     */
-    @PostMapping("/gsq/scheduleResult/isPublish")
-    Boolean isPublish(@RequestBody GsqScheduleResultDto dto);
-
-    /**
-     * 根据排程日期、物料编号、机台id校验唯一性
-     * @param scheduleResult 要校验记录
-     * @return 查询到的记录数
-     */
-    @PostMapping("/gsq/scheduleResult/checkUnique")
-    public Boolean checkUnique(@RequestBody GsqScheduleResultDto dto);
-
-    @PostMapping("/gsq/scheduleResult/importData")
-    @ApiOperation("导入钢丝圈排程结果信息")
-    public AjaxResult importData(@RequestBody List<GsqScheduleResultDto> list, @RequestParam("importLogId") Long importLogId, @RequestParam("scheduleDate") String scheduleDate);
-
-    /**
-     * 根据排程日期查询当前日期发布状态为"发布中"或"超时失败"的记录
-     * @param scheduleDate 排程日期
-     * @return 查询到的记录数
-     */
-    @PostMapping("/gsq/scheduleResult/isReleasingOrTimeoutByDate")
-    public int isReleasingOrTimeoutByDate(@RequestBody GsqScheduleResultDto scheduleResult);
-
-    /**
-     * 更改发布状态
-     * @param scheduleDate 排程日期
-     * @return 结果
-     */
-    @PostMapping("/gsq/scheduleResult/changeReleaseStatus")
-    public AjaxResult changeReleaseStatus(@RequestBody GsqScheduleResultDto entity);
-
-    /**
-     * 导入完成量
-     * @param list 完成量集合
-     * @param importLogId 导入记录id
-     * @return 结果
-     */
-    @PostMapping("/gsq/scheduleResult/importFinishQty")
-    @ApiOperation("导入完成量")
-    AjaxResult importFinishQty(@RequestBody List<GsqDayFinishQty> list, @RequestParam("importLogId") Long importLogId);
-
-    /**
-     * 获取排程日期的昨日早班合计，夜班合计，早班合计，库存合计，理论交班库存合计
      *
-     * @param scheduleResult 排程日期
-     * @return 结果
+     * @param queryVO 查询条件
+     * @return 是否已发布
      */
-    @PostMapping("/gsq/scheduleResult/getSummaryVo")
-    @ApiOperation("获取排程日期的排程结果合计")
-    public AjaxResult getSummaryVo(@RequestBody GsqScheduleResultDto scheduleResult);
+    @PostMapping("/scheduleResult/isPublish")
+    @ApiOperation("查询排程日期是否已发布")
+    Boolean isPublish(@RequestBody GsqScheduleResult queryVO);
+
+    /**
+     * 唯一性校验
+     *
+     * @param queryVO 查询条件
+     * @return UserConstants.UNIQUE="0" 唯一，UserConstants.NOT_UNIQUE="1" 不唯一
+     */
+    @PostMapping("/scheduleResult/checkUnique")
+    @ApiOperation("唯一性校验")
+    String checkUnique(@RequestBody GsqScheduleResult queryVO);
+
+    /**
+     * 根据排程日期构建6个班次的日期展示列表
+     * 钢丝圈排程6个班次覆盖D日中班、D+1日夜早中、D+2日夜早（D=排程日期-2，即今天）：
+     * 班次1：D日中班，班次2~4：D+1日(夜/早/中)，班次5~6：D+2日(夜/早)
+     *
+     * @param queryVO 查询条件
+     * @return 班次日期列表
+     */
+    @PostMapping("/scheduleResult/listScheduleShiftDates")
+    @ApiOperation("获取钢丝圈排程班次日期列表")
+    List<GsqScheduleShiftDateVO> listScheduleShiftDates(@RequestBody GsqScheduleResult queryVO);
+
+    /**
+     * 根据排程日期查询发布中或超时失败的记录数
+     *
+     * @param queryVO 查询条件
+     * @return 记录数
+     */
+    @PostMapping("/scheduleResult/isReleasingOrTimeoutByDate")
+    @ApiOperation("根据排程日期查询发布中或超时失败的记录数")
+    int isReleasingOrTimeoutByDate(@RequestBody GsqScheduleResult queryVO);
 }

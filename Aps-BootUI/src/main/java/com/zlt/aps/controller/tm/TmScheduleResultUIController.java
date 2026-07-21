@@ -2,18 +2,21 @@ package com.zlt.aps.controller.tm;
 
 import com.alibaba.fastjson.JSON;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
-import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.text.Convert;
 import com.ruoyi.common4ui.core.controller.BaseUIController;
+import com.zlt.aps.tm.api.domain.dto.TmRollingRecalcRequestDTO;
+import com.zlt.aps.tm.api.domain.dto.TmScheduleResultImportDTO;
 import com.zlt.aps.tm.api.domain.entity.TmScheduleResult;
 import com.zlt.aps.tm.api.domain.vo.TmAutoScheduleRequestVo;
+import com.zlt.aps.tm.api.domain.vo.TmInsertTaskRequestVo;
 import com.zlt.aps.tm.api.domain.vo.TmScheduleShiftDateVO;
 import com.zlt.aps.tm.api.service.ITmScheduleResultRemoteService;
 import com.zlt.file.encryptbyll.FileEncryptUtils;
+import com.zlt.framework.utils.AuthorizationUtils;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
@@ -21,6 +24,7 @@ import org.apache.commons.io.IOUtils;
 import org.apache.shiro.authz.annotation.RequiresPermissions;
 import org.apache.shiro.authz.annotation.RequiresRoles;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.ModelMap;
 import org.springframework.web.bind.annotation.*;
@@ -167,6 +171,78 @@ public class TmScheduleResultUIController extends BaseUIController<TmScheduleRes
                                             @RequestParam("scheduleDate") String scheduleDate) {
         return iTmScheduleResultService.getLatestAutoPlanTask(factoryCode, scheduleDate);
     }
+
+    /**
+     * 查询胎面排程看板。
+     *
+     * @param query 看板查询条件
+     * @return 看板数据
+     */
+    @ApiOperation("查询胎面排程看板")
+    @PostMapping("/board")
+    @ResponseBody
+    public AjaxResult board(TmScheduleResult query) {
+        return iTmScheduleResultService.board(query);
+    }
+
+    /**
+     * 人工插入排程任务。
+     *
+     * @param requestVo 插单内容
+     * @return 插单结果
+     */
+    @ApiOperation("人工插单")
+    @PostMapping("/insertTask")
+    @RequiresPermissions("tm:tmScheduleResult:add")
+    @ResponseBody
+    public AjaxResult insertTask(TmInsertTaskRequestVo requestVo) {
+        return iTmScheduleResultService.insertTask(requestVo);
+    }
+
+    /**
+     * 调整排程计划量。
+     *
+     * @param scheduleResult 调量内容
+     * @return 调量结果
+     */
+    @ApiOperation("调整计划量")
+    @PostMapping("/changeQty")
+    @RequiresPermissions("tm:tmScheduleResult:edit")
+    @ResponseBody
+    public AjaxResult changeQty(TmScheduleResult scheduleResult) {
+        return iTmScheduleResultService.changeQty(scheduleResult);
+    }
+
+    /**
+     * 校验页面发布请求。
+     *
+     * @param ids 逗号分隔的排程结果 ID
+     * @return 校验结果
+     */
+    @ApiOperation("校验胎面发布")
+    @PostMapping("/publishValidate")
+    @RequiresPermissions("tm:tmScheduleResult:publish")
+    @ResponseBody
+    public AjaxResult publishValidate(@RequestParam("ids") String ids) {
+        Long[] idArray = Convert.toLongArray(ids);
+        return iTmScheduleResultService.publishValidate(Arrays.asList(idArray));
+    }
+
+    /**
+     * 将排程结果置为待发布。
+     *
+     * @param ids 逗号分隔的排程结果 ID
+     * @return 发布状态变更结果
+     */
+    @ApiOperation("发布胎面排程")
+    @PostMapping("/publish")
+    @RequiresPermissions("tm:tmScheduleResult:publish")
+    @ResponseBody
+    public AjaxResult publish(@RequestParam("ids") String ids) {
+        Long[] idArray = Convert.toLongArray(ids);
+        return iTmScheduleResultService.publish(Arrays.asList(idArray));
+    }
+
     /**
      * 批量转机台
      */
@@ -176,46 +252,22 @@ public class TmScheduleResultUIController extends BaseUIController<TmScheduleRes
     @ResponseBody
     public AjaxResult batchChangeMachine(@PathVariable("machineCode") String machineCode, String selects) {
         List<TmScheduleResult> scheduleResultList = JSON.parseArray(selects, TmScheduleResult.class);
-        TmScheduleResult query = new TmScheduleResult();
-        StringBuilder sb1 = new StringBuilder();
-        StringBuilder sb2 = new StringBuilder();
-        for (TmScheduleResult scheduleResult : scheduleResultList) {
-            query.setId(scheduleResult.getId());
-            query.setScheduleDate(scheduleResult.getScheduleDate());
-            query.setMachineCode(machineCode);
-            query.setTreadCode(scheduleResult.getTreadCode());
-            // 唯一性校验：tm的checkUnique返回String，"0"表示唯一，"1"表示不唯一
-            String uniqueResult = iTmScheduleResultService.checkUnique(query);
-            if (UserConstants.NOT_UNIQUE.equals(uniqueResult)) {
-                if (sb1.length() > 0) {
-                    sb1.append(",").append(query.getTreadCode());
-                } else {
-                    sb1.append(query.getTreadCode());
-                }
-                continue;
-            }
-            scheduleResult.setMachineCode(machineCode);
-            AjaxResult result = iTmScheduleResultService.changeMachine(scheduleResult);
-            if (result.get(com.ruoyi.common.constant.GatewayConstants.MSG_TAG)
-                    .equals(I18nUtil.getMessage("ui.data.column.scheduleResult.release.isReleasingOrTimeoutById"))) {
-                if (sb2.length() > 0) {
-                    sb2.append(",").append(query.getTreadCode());
-                } else {
-                    sb2.append(query.getTreadCode());
-                }
-            }
-        }
-        if (sb1.length() > 0) {
-            sb1.append(I18nUtil.getMessage("ui.data.column.scheduleResult.already.exists"));
-        }
-        if (sb2.length() > 0) {
-            sb2.append(I18nUtil.getMessage("ui.data.column.scheduleResult.release.isReleasingOrTimeoutById2"));
-        }
-        sb1.append(sb2);
-        if (sb1.length() > 0) {
-            return AjaxResult.error(sb1.toString());
-        }
-        return AjaxResult.success();
+        return iTmScheduleResultService.batchChangeMachine(machineCode, scheduleResultList);
+    }
+
+    /**
+     * 手动触发胎面自动滚动重算，不增加页面按钮。
+     *
+     * @param request 工厂、排程日期和目标班次
+     * @return 滚动重算统计
+     */
+    @ApiOperation("胎面自动滚动重算")
+    @PostMapping("/rollingRecalc")
+    @RequiresPermissions("tm:tmScheduleResult:autoPlan")
+    @ResponseBody
+    public AjaxResult rollingRecalc(TmRollingRecalcRequestDTO request) {
+        request.setOperator(AuthorizationUtils.getLoginName());
+        return iTmScheduleResultService.rollingRecalc(request);
     }
 
     @ApiOperation("导出数据")
@@ -223,7 +275,7 @@ public class TmScheduleResultUIController extends BaseUIController<TmScheduleRes
     @RequiresPermissions("tm:tmScheduleResult:export")
     public void export(HttpServletResponse response, TmScheduleResult entity) throws IOException {
         String fileName = I18nUtil.getMessage("ui.data.column.tm.scheduleResult.modelName");
-        byte[] excelBytes = iTmScheduleResultService.exportData(entity, fileName);
+        byte[] excelBytes = iTmScheduleResultService.exportDataScheduleResult(entity, fileName);
         ByteArrayInputStream in = new ByteArrayInputStream(excelBytes);
         ExcelUtil.setResponseHeader(response, fileName, ".xlsx");
         IOUtils.copy(in, response.getOutputStream());
@@ -231,27 +283,41 @@ public class TmScheduleResultUIController extends BaseUIController<TmScheduleRes
     }
 
     @ApiOperation("导入数据")
-    @PostMapping("/importData")
+    @PostMapping("/importDataCust")
+    @RequiresPermissions("tm:tmScheduleResult:import")
     @ResponseBody
-    public AjaxResult importData(@RequestParam("file") MultipartFile file, @RequestParam("updateSupport") boolean updateSupport) throws Exception {
+    public AjaxResult importData(@RequestParam("file") MultipartFile file,
+                                 @RequestParam("factoryCode") String factoryCode,
+                                 @RequestParam("scheduleDate")
+                                 @DateTimeFormat(pattern = "yyyy-MM-dd") Date scheduleDate,
+                                 @RequestParam("updateSupport") boolean updateSupport) throws Exception {
         byte[] data = this.useFileEncrypt ? FileEncryptUtils.DecodeFile(file) : file.getBytes();
         ImportContext context = new ImportContext();
+        context.setImportFilePath(this.importFilePath);
         context.setFunctionName(I18nUtil.getMessage("ui.data.column.tm.scheduleResult.modelName"));
         context.setProcedureCode(I18nUtil.getMessage("ui.data.column.tm.scheduleResult.modelName"));
         context.setOriFileName(file.getOriginalFilename());
         context.setFileBytes(data);
-        AjaxResult ajaxResult = iTmScheduleResultService.importData(context, updateSupport);
-        return ajaxResult;
+        TmScheduleResult condition = new TmScheduleResult();
+        condition.setFactoryCode(factoryCode);
+        condition.setScheduleDate(scheduleDate);
+        TmScheduleResultImportDTO importDTO = new TmScheduleResultImportDTO();
+        importDTO.setImportContext(context);
+        importDTO.setScheduleResult(condition);
+        return iTmScheduleResultService.importDataScheduleResult(importDTO, updateSupport);
     }
 
     @ApiOperation("下载导入模板")
-    @GetMapping("/importTemplate")
-    @ResponseBody
-    public AjaxResult importTemplate(HttpServletResponse response) throws IOException {
+    @GetMapping("/importTemplateCust")
+    @RequiresPermissions("tm:tmScheduleResult:import")
+    public void importTemplate(HttpServletResponse response, TmScheduleResult entity) throws IOException {
         String fileName = I18nUtil.getMessage("ui.data.column.tm.scheduleResult.modelName");
-        ExcelUtil<TmScheduleResult> util = new ExcelUtil<>(TmScheduleResult.class);
-        util.exportExcel(response, null, fileName, fileName);
-        return AjaxResult.success();
+        entity.setExportTemplate(Boolean.TRUE);
+        byte[] excelBytes = iTmScheduleResultService.exportDataScheduleResult(entity, fileName);
+        ByteArrayInputStream in = new ByteArrayInputStream(excelBytes);
+        ExcelUtil.setResponseHeader(response, fileName, ".xlsx");
+        IOUtils.copy(in, response.getOutputStream());
+        response.flushBuffer();
     }
 
     /**

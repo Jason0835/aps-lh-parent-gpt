@@ -92,6 +92,9 @@ public final class LhScheduleConstant {
     /** 每班最大首检次数（-1 表示不限制） */
     public static final int MAX_FIRST_INSPECTION_PER_SHIFT = -1;
 
+    /** 同物料多产品状态续作切换标记，用于跨滚动窗口还原原正规承接机台 */
+    public static final String SAME_MATERIAL_STATUS_CONTINUATION_ANALYSIS = "同物料多状态续作切换";
+
     // ======================== 收尾判定 ========================
 
     /** 收尾判定天数 */
@@ -233,10 +236,10 @@ public final class LhScheduleConstant {
     /** 胶囊预警次数 */
     public static final int CAPSULE_WARNING_COUNT = 430;
 
-    /** 胶囊强制下机次数 */
+    /** 胶囊使用次数上限默认值 */
     public static final int CAPSULE_FORCE_DOWN_COUNT = 450;
 
-    /** 胶囊更换损失数量 */
+    /** 换胶囊班次固定扣减计划量默认值；2条对应固定占用1小时 */
     public static final int CAPSULE_CHANGE_LOSS_QTY = 2;
 
     // ======================== 工作日历工序代码 ========================
@@ -299,6 +302,11 @@ public final class LhScheduleConstant {
     /** 小批量验证SKU默认阈值 */
     public static final int SMALL_BATCH_SKU_THRESHOLD = 100;
 
+    // ======================== 量试充抵正规 ========================
+
+    /** 量试充抵正规开关默认值（0-关闭，1-开启）；默认开启，与存量行为一致 */
+    public static final String ENABLE_MASS_TRIAL_TO_FORMAL = "1";
+
     // ======================== 模具交替计划天数 ========================
 
     /** 模具交替计划天数 */
@@ -353,6 +361,15 @@ public final class LhScheduleConstant {
 
     /** 收尾落在夜班或错开模具交替自动补量开关默认值（0-关闭，1-开启） */
     public static final int ENDING_AUTO_FILL_ENABLED = 1;
+
+    /** 在机模具下机时前后计划校验天数默认值 */
+    public static final int CONTINUOUS_MOULD_OFFLINE_CHECK_DAYS = 2;
+
+    /** 在机模具下机时前后计划校验最小天数 */
+    public static final int MIN_CONTINUOUS_MOULD_OFFLINE_CHECK_DAYS = 1;
+
+    /** 在机模具下机时前后计划校验最大天数 */
+    public static final int MAX_CONTINUOUS_MOULD_OFFLINE_CHECK_DAYS = 3;
 
     /** 奇数班产计划量加一班别默认值，空值表示不启用 */
     public static final String ODD_SHIFT_CAPACITY_PLUS_SHIFT_TYPE = "";

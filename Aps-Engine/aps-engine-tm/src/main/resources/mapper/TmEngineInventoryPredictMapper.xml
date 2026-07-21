@@ -26,7 +26,8 @@
             ) ranked
             WHERE ranked.rn = 1
         ) ci ON TRUE
-        WHERE cx.FACTORY_CODE = #{factoryCode}
+        WHERE cx.IS_DELETE = 0
+          AND cx.FACTORY_CODE = #{factoryCode}
           AND cx.SCHEDULE_DATE = #{scheduleDate}
           AND ci.TREAD_CODE IN
           <foreach collection="treadCodes" item="treadCode" open="(" separator="," close=")">
@@ -44,7 +45,8 @@
                ON cx.EMBRYO_CODE = ci.CONSTRUCTION_CODE
               AND cx.CLASS1_RECIPE_NO = ci.CONSTRUCTION_VERSION
               AND ci.IS_DELETE = 0
-        WHERE cx.FACTORY_CODE = #{factoryCode}
+        WHERE cx.IS_DELETE = 0
+          AND cx.FACTORY_CODE = #{factoryCode}
           AND cx.SCHEDULE_DATE = #{scheduleDate}
           AND ci.TREAD_CODE IN
           <foreach collection="treadCodes" item="treadCode" open="(" separator="," close=")">

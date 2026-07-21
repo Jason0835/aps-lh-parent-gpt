@@ -3,7 +3,6 @@ package com.zlt.aps.gsq.service.impl;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -92,6 +91,7 @@ public class GsqDispatcherLogServiceImpl implements GsqDispatcherLogService
 
     /**
      * 导出Excel
+     * 6班次制：操作前/后各6个班次计划量，变更的单元格以珊瑚色高亮
      *
      * @param dispatcherLog 参数
      * @return 字节数组
@@ -103,9 +103,11 @@ public class GsqDispatcherLogServiceImpl implements GsqDispatcherLogService
         InputStream in = this.getClass().getClassLoader().getResourceAsStream(excelModelPath +
                 I18nUtil.getMessage("ui.data.column.gsq.dispatcherlog.modelName") + ".xlsx");
         List<GsqMachineInfo> machineInfoList = machineInfoService.selectMachineInfoList(new GsqMachineInfo());
+        // 机台编码 → 机台名称 映射（6班次制使用 machineCode 作为关联键）
         Map<String, String> machineMap = new HashMap<>();
         if (CollectionUtils.isNotEmpty(machineInfoList)) {
-            machineMap = machineInfoList.stream().collect(Collectors.toMap(item -> item.getId().toString(), GsqMachineInfo::getMachineName));
+            machineMap = machineInfoList.stream()
+                    .collect(Collectors.toMap(GsqMachineInfo::getMachineCode, GsqMachineInfo::getMachineName, (k1, k2) -> k1));
         }
         Workbook webBook = ExcelUtils.readExcel(in);
         //填充数据
@@ -123,55 +125,52 @@ public class GsqDispatcherLogServiceImpl implements GsqDispatcherLogService
                 String operType = log.getOperType();
                 row.createCell(cellNum++).setCellValue(operType == null ? "" : operationTypeDictMap.getOrDefault(operType, ""));
                 row.createCell(cellNum++).setCellValue(log.getScheduleDate() == null ? "" : DateFormatUtils.format(log.getScheduleDate(), "yyyy-MM-dd"));
-                row.createCell(cellNum++).setCellValue(log.getMaterialCode() == null ? "" : log.getMaterialCode());
+                row.createCell(cellNum++).setCellValue(log.getSteelRingCode() == null ? "" : log.getSteelRingCode());
                 row.createCell(cellNum++).setCellValue(log.getCreateBy() == null ? "" : log.getCreateBy());
                 row.createCell(cellNum++).setCellValue(log.getCreateTime() == null ? "" : DateFormatUtils.format(log.getCreateTime(), "yyyy-MM-dd HH:mm:ss"));
-                String beforeMachine = log.getBeforeMachineId() == null ? "" : log.getBeforeMachineId();
-                String[] beforeMachineArr = beforeMachine.split(",");
-                StringBuilder beforeMachineStr = new StringBuilder();
-                for (String machineId : beforeMachineArr) {
-                    beforeMachineStr.append(machineMap.getOrDefault(machineId, "")).append(",");
+                // 操作前机台（按机台编码反显机台名称）
+                String beforeMachine = log.getBeforeMachineCode() == null ? "" : log.getBeforeMachineCode();
+                String beforeMachineName = machineMap.getOrDefault(beforeMachine, beforeMachine);
+                row.createCell(cellNum++).setCellValue(beforeMachineName);
+                // 操作前6班次计划量
+                Integer[] beforePlans = {
+                        log.getBeforeClass1Plan(), log.getBeforeClass2Plan(), log.getBeforeClass3Plan(),
+                        log.getBeforeClass4Plan(), log.getBeforeClass5Plan(), log.getBeforeClass6Plan()
+                };
+                for (Integer plan : beforePlans) {
+                    row.createCell(cellNum++).setCellValue(plan == null ? 0 : plan);
                 }
-                row.createCell(cellNum++).setCellValue(beforeMachineStr.substring(0, beforeMachineStr.length() - 1));
-                double beforeMidPlan = log.getBeforeMidPlan() == null ? BigDecimal.ZERO.doubleValue() : log.getBeforeMidPlan();
-                row.createCell(cellNum++).setCellValue(beforeMidPlan);
-                double beforeNightPlan = log.getBeforeNightPlan() == null ? BigDecimal.ZERO.doubleValue() : log.getBeforeNightPlan();
-                row.createCell(cellNum++).setCellValue(beforeNightPlan);
-                double beforeDayPlan = log.getBeforeDayPlan() == null ? BigDecimal.ZERO.doubleValue() : log.getBeforeDayPlan();
-                row.createCell(cellNum++).setCellValue(beforeDayPlan);
+                // 操作后机台
                 Cell afterMachineCell = row.createCell(cellNum++);
-                String afterMachine = log.getAfterMachineId() == null ? "" : log.getAfterMachineId();
-                String[] afterMachineArr = afterMachine.split(",");
-                StringBuilder afterMachineStr = new StringBuilder();
-                for (String machineId : afterMachineArr) {
-                    afterMachineStr.append(machineMap.getOrDefault(machineId, "")).append(",");
+                String afterMachine = log.getAfterMachineCode() == null ? "" : log.getAfterMachineCode();
+                String afterMachineName = machineMap.getOrDefault(afterMachine, afterMachine);
+                afterMachineCell.setCellValue(afterMachineName);
+                // 操作后6班次计划量
+                Integer[] afterPlans = {
+                        log.getAfterClass1Plan(), log.getAfterClass2Plan(), log.getAfterClass3Plan(),
+                        log.getAfterClass4Plan(), log.getAfterClass5Plan(), log.getAfterClass6Plan()
+                };
+                Cell[] afterPlanCells = new Cell[6];
+                for (int j = 0; j < 6; j++) {
+                    afterPlanCells[j] = row.createCell(cellNum++);
+                    afterPlanCells[j].setCellValue(afterPlans[j] == null ? 0 : afterPlans[j]);
                 }
-                afterMachineCell.setCellValue(afterMachineStr.substring(0, afterMachineStr.length() - 1));
-                Cell afterMidPlanCell = row.createCell(cellNum++);
-                double afterMidPlan = log.getAfterMidPlan() == null ? BigDecimal.ZERO.doubleValue() : log.getAfterMidPlan();
-                afterMidPlanCell.setCellValue(afterMidPlan);
-                Cell afterNightPlanCell = row.createCell(cellNum++);
-                double afterNightPlan = log.getAfterNightPlan() == null ? BigDecimal.ZERO.doubleValue() : log.getAfterNightPlan();
-                afterNightPlanCell.setCellValue(afterNightPlan);
-                Cell afterDayPlanCell = row.createCell(cellNum);
-                double afterDayPlan = log.getAfterDayPlan() == null ? BigDecimal.ZERO.doubleValue() : log.getAfterDayPlan();
-                afterDayPlanCell.setCellValue(afterDayPlan);
                 //设置单元格样式
-                int a = row.getPhysicalNumberOfCells();
-                for (int j = 0; j < a; j++) {
+                int cellCount = row.getPhysicalNumberOfCells();
+                for (int j = 0; j < cellCount; j++) {
                     row.getCell(j).setCellStyle(cellStyle);
                 }
+                //机台变更高亮
                 if (!beforeMachine.equals(afterMachine)) {
                     afterMachineCell.setCellStyle(redCellStyle);
                 }
-                if (!(beforeMidPlan == afterMidPlan)) {
-                    afterMidPlanCell.setCellStyle(redCellStyle);
-                }
-                if (!(beforeNightPlan == afterNightPlan)) {
-                    afterNightPlanCell.setCellStyle(redCellStyle);
-                }
-                if (!(beforeDayPlan == afterDayPlan)) {
-                    afterDayPlanCell.setCellStyle(redCellStyle);
+                //6班次计划量变更高亮
+                for (int j = 0; j < 6; j++) {
+                    int beforeVal = beforePlans[j] == null ? 0 : beforePlans[j];
+                    int afterVal = afterPlans[j] == null ? 0 : afterPlans[j];
+                    if (beforeVal != afterVal) {
+                        afterPlanCells[j].setCellStyle(redCellStyle);
+                    }
                 }
             }
         }

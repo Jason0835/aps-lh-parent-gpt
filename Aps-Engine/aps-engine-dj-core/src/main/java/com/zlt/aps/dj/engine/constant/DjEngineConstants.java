@@ -31,6 +31,9 @@ public class DjEngineConstants {
     /** SYS1401012 新规格判定天数阈值（天），连续N天未排产则视为新规格 */
     public static final String PARAM_NEW_SPEC_DAYS_THRESHOLD = "SYS1401012";
 
+    /** SYS1401014 每班平均（免费）切换次数，不超过此次数不计算切换产能损失，默认3 */
+    public static final String PARAM_AVG_SWITCH_COUNT = "SYS1401014";
+
     /** SYS1401013 单规格每班最大排产量（米），默认3000 */
     public static final String PARAM_MAX_SHIFT_PRODUCE_QTY = "SYS1401013";
 
@@ -44,6 +47,9 @@ public class DjEngineConstants {
 
     /** 每班小时数 */
     public static final BigDecimal SHIFT_HOURS = new BigDecimal("8");
+
+    /** 每班分钟数 */
+    public static final BigDecimal SHIFT_MINUTES = new BigDecimal("480");
 
     // ==================== 批次号常量 ====================
 

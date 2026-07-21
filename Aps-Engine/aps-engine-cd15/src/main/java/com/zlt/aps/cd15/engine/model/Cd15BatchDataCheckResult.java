@@ -9,6 +9,11 @@ import java.util.stream.Collectors;
 
 /**
  * 斜裁自动排程批次级数据检查结果。
+ * <p>
+ * 用于在正式进入自动排程前同步返回公共数据缺失或非法的结构化提示，
+ * 不进入异步任务、不创建PENDING记录、不占用执行锁。
+ * 规格级失败（施工缺失、大卷绑定缺失等）不在此处收集，仍由排程算法写入未排结果。
+ * </p>
  */
 public class Cd15BatchDataCheckResult {
 
@@ -42,11 +47,12 @@ public class Cd15BatchDataCheckResult {
         return Collections.unmodifiableList(warnings);
     }
 
-    /** 返回按字段聚合后的主错误消息，便于自动排程入口同步提示。 */
+    /** 主错误信息，用于AjaxResult.success(msg, data)的简短提示；无错误时返回空串。按field分组聚合。 */
     public String getPrimaryMessage() {
         if (errors.isEmpty()) {
             return "";
         }
+        // 按 field 分组聚合，同一 field 多条时显示条数
         Map<String, List<CheckError>> byField = errors.stream()
                 .collect(Collectors.groupingBy(CheckError::getField,
                         LinkedHashMap::new, Collectors.toList()));
@@ -54,11 +60,11 @@ public class Cd15BatchDataCheckResult {
                 .map(entry -> {
                     String field = entry.getKey();
                     int count = entry.getValue().size();
-                    String firstMessage = entry.getValue().get(0).getMessage();
+                    String firstMsg = entry.getValue().get(0).getMessage();
                     if (count == 1) {
-                        return field + ": " + firstMessage;
+                        return field + ": " + firstMsg;
                     }
-                    return field + "(" + count + "项): " + firstMessage;
+                    return field + "(" + count + "项): " + firstMsg;
                 })
                 .collect(Collectors.joining("; "));
     }
@@ -92,7 +98,9 @@ public class Cd15BatchDataCheckResult {
         }
     }
 
-    /** 单条检查错误或告警。 */
+    /**
+     * 单条检查错误/告警。
+     */
     public static class CheckError {
         private final String field;
         private final String reasonCode;

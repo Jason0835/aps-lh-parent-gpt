@@ -5,7 +5,7 @@ import com.zlt.aps.gdyy.api.domain.entity.GdyyScheduleResult;
 import org.apache.ibatis.annotations.Mapper;
 
 /**
- * 斜裁自动排程 GDYY 排程结果只读 Mapper。
+ * 斜裁自动排程读取GDYY计划库存的只读Mapper。
  */
 @Mapper
 public interface Cd15EngineGdyyScheduleResultMapper extends BaseMapper<GdyyScheduleResult> {

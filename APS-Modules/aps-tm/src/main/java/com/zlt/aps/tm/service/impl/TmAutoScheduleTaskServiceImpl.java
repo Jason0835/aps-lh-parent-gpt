@@ -123,6 +123,8 @@ public class TmAutoScheduleTaskServiceImpl implements TmAutoScheduleTaskService 
         return taskMapper.update(null, new LambdaUpdateWrapper<TmAutoScheduleTask>()
                 .eq(TmAutoScheduleTask::getTaskId, taskId)
                 .eq(TmAutoScheduleTask::getTaskStatus, TmAutoScheduleTaskStatusEnum.RUNNING.getCode())
+                // 只接受不小于数据库当前值的进度，避免异步阶段回调乱序造成页面进度倒退。
+                .le(TmAutoScheduleTask::getProgress, progress)
                 .set(TmAutoScheduleTask::getProgress, progress)
                 .set(TmAutoScheduleTask::getCurrentStage, stage)
                 .set(TmAutoScheduleTask::getCurrentStageName, stageName)

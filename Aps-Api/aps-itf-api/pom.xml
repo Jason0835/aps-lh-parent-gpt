@@ -34,6 +34,12 @@
             <scope>compile</scope>
         </dependency>
         <dependency>
+            <groupId>com.zlt.aps.cd15</groupId>
+            <artifactId>aps-cd15-api</artifactId>
+            <version>1.0.3-SNAPSHOT</version>
+            <scope>compile</scope>
+        </dependency>
+        <dependency>
             <groupId>com.zlt.aps.cx</groupId>
             <artifactId>aps-cx-api</artifactId>
             <version>1.0.3-SNAPSHOT</version>
@@ -48,6 +54,18 @@
         <dependency>
             <groupId>com.zlt.aps.tq</groupId>
             <artifactId>aps-tq-api</artifactId>
+            <version>1.0.3-SNAPSHOT</version>
+            <scope>compile</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.zlt.aps.gsq</groupId>
+            <artifactId>aps-gsq-api</artifactId>
+            <version>1.0.3-SNAPSHOT</version>
+            <scope>compile</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.zlt.aps.tc</groupId>
+            <artifactId>aps-tc-api</artifactId>
             <version>1.0.3-SNAPSHOT</version>
             <scope>compile</scope>
         </dependency>

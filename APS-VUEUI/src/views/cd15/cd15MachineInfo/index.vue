@@ -145,13 +145,6 @@ export default {
           minWidth: 150,
         },
         {
-          prop: "quota",
-          align: "center",
-          halign: "center",
-          label: this.$t("ui.data.column.cd15MachineInfo.quota"),
-          minWidth: 130,
-        },
-        {
           prop: "openMachineClass",
           align: "center",
           halign: "center",
@@ -166,12 +159,42 @@ export default {
           },
         },
         {
-          prop: "isOutTwo",
+          prop: "singleCutFlag",
           align: "center",
           halign: "center",
-          label: this.$t("ui.data.column.cd15MachineInfo.isOutTwo"),
+          label: this.$t("ui.data.column.cd15MachineInfo.singleCutFlag"),
           minWidth: 130,
           formatter: (row, column, value) => this.selectDictLabel(this.dict.type.biz_yes_no, value),
+        },
+        {
+          prop: "splitCutFlag",
+          align: "center",
+          halign: "center",
+          label: this.$t("ui.data.column.cd15MachineInfo.splitCutFlag"),
+          minWidth: 130,
+          formatter: (row, column, value) => this.selectDictLabel(this.dict.type.biz_yes_no, value),
+        },
+        {
+          prop: "defaultCutMode",
+          align: "center",
+          halign: "center",
+          label: this.$t("ui.data.column.cd15MachineInfo.defaultCutMode"),
+          minWidth: 150,
+          formatter: (row, column, value) => this.cutModeLabel(value),
+        },
+        {
+          prop: "singleShiftCapacity",
+          align: "center",
+          halign: "center",
+          label: this.$t("ui.data.column.cd15MachineInfo.singleShiftCapacity"),
+          minWidth: 170,
+        },
+        {
+          prop: "splitShiftCapacity",
+          align: "center",
+          halign: "center",
+          label: this.$t("ui.data.column.cd15MachineInfo.splitShiftCapacity"),
+          minWidth: 170,
         },
         {
           prop: "status",
@@ -252,6 +275,14 @@ export default {
     },
   },
   methods: {
+    cutModeLabel(value) {
+      const labels = {
+        SINGLE: this.$t("ui.data.value.cd15MachineInfo.cutModeSingle"),
+        SPLIT: this.$t("ui.data.value.cd15MachineInfo.cutModeSplit"),
+        DAILY_OUTPUT: this.$t("ui.data.value.cd15MachineInfo.cutModeDailyOutput"),
+      };
+      return labels[value] || value || "";
+    },
     handleStatusChange(row, value) {
       changeCd15MachineStatus({ id: row.id, status: value }).then((res) => {
         this.$modal.msgSuccess(res.msg);

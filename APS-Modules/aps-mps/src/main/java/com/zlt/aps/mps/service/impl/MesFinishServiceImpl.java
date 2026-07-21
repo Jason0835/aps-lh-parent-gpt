@@ -218,7 +218,9 @@ public class MesFinishServiceImpl implements MesFinishService {
         if (!CollectionUtil.isEmpty(oldList)) {
             for (TCxMonthPlanSurplus old : oldList) {
                 LhDayFinishQty lh = finishMap.get(old.getSapCode());
-                old.setMonthFinishQty(lh.getDayFinishQty());
+                // 月计划结余沿用整数完成量口径，将MES小数完成量按原规则截取为整数。
+                BigDecimal dayFinishQty = lh.getDayFinishQty();
+                old.setMonthFinishQty(dayFinishQty == null ? 0 : dayFinishQty.intValue());
                 old.setMonthRemainQty(getMonthRemainQty(old));
                 old.setUpdateTime(new Date());
             }

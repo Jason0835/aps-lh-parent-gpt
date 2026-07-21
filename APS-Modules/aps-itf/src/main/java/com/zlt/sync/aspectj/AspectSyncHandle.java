@@ -1,5 +1,6 @@
 package com.zlt.sync.aspectj;
 
+import com.zlt.aps.itf.constant.DataSource;
 import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
 import com.zlt.sync.domain.AuxReqSyncDataLogsHis;
 import com.zlt.sync.mapper.AuxReqSyncDataLogsHisMapper;
@@ -7,6 +8,7 @@ import com.zlt.sync.mapper.AuxReqSyncDataLogsMapper;
 import com.zlt.sync.povo.SyncParamsVO;
 import com.zlt.sync.service.SyncMsgSenderService;
 import com.zlt.sync.utils.SpringBeanUtils;
+import com.baomidou.dynamic.datasource.toolkit.DynamicDataSourceContextHolder;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
@@ -79,14 +81,24 @@ public class AspectSyncHandle {
             //========================
             // 记录请求状态日志
             dataLogs.setUpdateDate(new Date());
-            auxReqSyncDataLogsMapper.insert(dataLogs);
+            DynamicDataSourceContextHolder.push(DataSource.MASTER);
+            try {
+                auxReqSyncDataLogsMapper.insert(dataLogs);
+            } finally {
+                DynamicDataSourceContextHolder.poll();
+            }
 
             logger.info("AspectSyncHandle-around-005 同步数据请求或通知 记录状态日志成功, SYNC_KEY: " + paramsVO.getSyncKey());
 
             // 记录请求历史日志
             AuxReqSyncDataLogsHis logsHis = new AuxReqSyncDataLogsHis();
             SpringBeanUtils.copyPropertiesIgnoreNull(dataLogs, logsHis);
-            auxReqSyncDataLogsHisMapper.insert(logsHis);
+            DynamicDataSourceContextHolder.push(DataSource.MASTER);
+            try {
+                auxReqSyncDataLogsHisMapper.insert(logsHis);
+            } finally {
+                DynamicDataSourceContextHolder.poll();
+            }
 
             logger.info("AspectSyncHandle-around-006 同步数据请求或通知 记录历史记录成功, SYNC_KEY: " + paramsVO.getSyncKey());
             //===========================

@@ -13,8 +13,8 @@ public final class Cd15ScheduleTaskType {
     public static final String TRANSFER_MACHINE = "TRANSFER_MACHINE";
     /** 调量滚动重排。 */
     public static final String CHANGE_QTY = "CHANGE_QTY";
-    /** 自动滚动排程。 */
-    public static final String TIMED_ROLLING = "TIMED_ROLLING";
+    /** 定时滚动排程。 */
+    public static final String ROLLING_SCHEDULE = "ROLLING_SCHEDULE";
 
     private Cd15ScheduleTaskType() {
     }

@@ -13,6 +13,8 @@ import com.zlt.aps.itf.vo.MesBrandDict;
 import com.zlt.aps.lh.api.domain.entity.LhMachineOnlineInfo;
 import com.zlt.aps.mdm.api.domain.entity.MdmMoldAlterPlan;
 import com.zlt.aps.mp.api.domain.entity.*;
+import com.zlt.aps.tc.api.domain.entity.TcScheduleResultIssue;
+import com.zlt.aps.tc.api.domain.vo.TcReleaseFeedbackVo;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
@@ -62,6 +64,15 @@ public class MesItfController {
 
     @Autowired
     private com.zlt.aps.itf.mes.service.ICd90ScheduleResultIssueService cd90ScheduleResultIssueService;
+
+    @Autowired
+    private ICd15ScheduleResultIssueService cd15ScheduleResultIssueService;
+
+    @Autowired
+    private ITcMesBridgeService tcMesBridgeService;
+
+    @Autowired
+    private ITcScheduleResultIssueService tcScheduleResultIssueService;
 
     /**
      * 同步SKU与模具关系
@@ -372,6 +383,18 @@ public class MesItfController {
             lhMachineOnlineInfo.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
         }
         return mesItfService.syncLhMachineOnlineInfo(lhMachineOnlineInfo);
+    }
+
+    /**
+     * 按指定版本号同步硫化在机数据（临时任务）
+     * @param dataVersion 指定版本号
+     * @return 结果
+     */
+    @ApiOperation("按指定版本号同步硫化在机数据（临时任务）")
+    @PostMapping("/syncLhMachineOnlineInfoByVersion")
+    @AutoLoginLog
+    public AjaxResult syncLhMachineOnlineInfoByVersion(@RequestParam("dataVersion") String dataVersion) {
+        return mesItfService.syncLhMachineOnlineInfoByVersion(dataVersion);
     }
 
     /**
@@ -778,6 +801,71 @@ public class MesItfController {
     }
 
     /**
+     * 同步胎侧库存。
+     *
+     * @param syncDataLogs 同步请求
+     * @return 同步结果
+     */
+    @ApiOperation("同步胎侧库存")
+    @PostMapping("/syncSidewallStock")
+    @AutoLoginLog
+    public AjaxResult syncSidewallStock(@RequestBody AuxReqSyncDataLogs syncDataLogs) {
+        return this.tcMesBridgeService.syncStock(syncDataLogs);
+    }
+
+    /**
+     * 同步胎侧三班完成量并回写六班排程结果。
+     *
+     * @param syncDataLogs 同步请求
+     * @return 同步结果
+     */
+    @ApiOperation("同步胎侧排程完成量")
+    @PostMapping("/syncTcClassShiftFinishQty")
+    @AutoLoginLog
+    public AjaxResult syncTcClassShiftFinishQty(@RequestBody AuxReqSyncDataLogs syncDataLogs) {
+        return this.tcMesBridgeService.syncShiftFinishQty(syncDataLogs);
+    }
+
+    /**
+     * 同步胎侧日完成量。
+     *
+     * @param syncDataLogs 同步请求
+     * @return 同步结果
+     */
+    @ApiOperation("同步胎侧排程日完成量")
+    @PostMapping("/syncTcScheDayFinishQty")
+    @AutoLoginLog
+    public AjaxResult syncTcScheDayFinishQty(@RequestBody AuxReqSyncDataLogs syncDataLogs) {
+        return this.tcMesBridgeService.syncDayFinishQty(syncDataLogs);
+    }
+
+    /**
+     * 下发胎侧排程结果到MES。
+     *
+     * @param issueList 胎侧排程结果
+     * @return 下发结果
+     */
+    @ApiOperation("胎侧排程结果下发到MES")
+    @PostMapping("/issueTcScheduleResult")
+    @AutoLoginLog
+    public AjaxResult issueTcScheduleResult(@RequestBody List<TcScheduleResultIssue> issueList) {
+        return this.tcScheduleResultIssueService.issue(issueList);
+    }
+
+    /**
+     * 查询胎侧排程发布处理状态。
+     *
+     * @param dataVersion 发布数据版本
+     * @return MES发布反馈
+     */
+    @ApiOperation("查询胎侧排程发布处理状态")
+    @PostMapping("/queryTcScheduleIssueStatus")
+    @AutoLoginLog
+    public TcReleaseFeedbackVo queryTcScheduleIssueStatus(@RequestParam("dataVersion") String dataVersion) {
+        return this.tcScheduleResultIssueService.queryStatus(dataVersion);
+    }
+
+    /**
      * 直裁排程结果下发到MES
      * 业务规则：
      * 1. 班次配置由 t_cd90_shift_config 启用项决定，默认 CLASS1~CLASS6
@@ -794,6 +882,26 @@ public class MesItfController {
         String factoryCode = FactoryConstant.DEFAULT_FACTORY_CODE;
         String companyCode = factoryCode;
         return cd90ScheduleResultIssueService.issueCd90ScheduleResult(cd90ScheduleResultIssueList, factoryCode, companyCode);
+    }
+
+    /**
+     * 斜裁排程结果下发到 MES。
+     *
+     * @param issueList 按班次展开的斜裁结果
+     * @return 下发结果
+     */
+    @ApiOperation("斜裁排程结果下发到MES")
+    @PostMapping("/issueCd15ScheduleResult")
+    @AutoLoginLog
+    public AjaxResult issueCd15ScheduleResult(
+            @RequestBody List<com.zlt.aps.cd15.api.domain.entity.Cd15ScheduleResultIssue> issueList) {
+        String factoryCode = issueList != null && !issueList.isEmpty()
+                && StringUtils.isNotBlank(issueList.get(0).getFactoryCode())
+                ? issueList.get(0).getFactoryCode()
+                : FactoryConstant.DEFAULT_FACTORY_CODE;
+        String companyCode = factoryCode;
+        return cd15ScheduleResultIssueService.issueCd15ScheduleResult(
+                issueList, factoryCode, companyCode);
     }
 
     /**

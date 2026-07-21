@@ -32,6 +32,38 @@
 import infoForm from "@/views/components/infoForm.vue";
 import {changeQty, insertTask} from "@/api/tm/scheduleResult";
 
+const CHANGE_QTY_EDITABLE_FIELDS = [
+  "class1PlanQty",
+  "class1Analysis",
+  "class2PlanQty",
+  "class2Analysis",
+  "class3PlanQty",
+  "class3Analysis",
+  "class4PlanQty",
+  "class4Analysis",
+  "class5PlanQty",
+  "class5Analysis",
+  "class6PlanQty",
+  "class6Analysis",
+];
+
+const INSERT_TASK_FIELDS = [
+  "factoryCode",
+  "scheduleDate",
+  "machineCode",
+  "treadCode",
+  "class1PlanQty",
+  "class1Sequence",
+  "class1Analysis",
+  "class2PlanQty",
+  "class2Sequence",
+  "class2Analysis",
+  "class3PlanQty",
+  "class3Sequence",
+  "class3Analysis",
+  "remark",
+];
+
 export default {
   components: { infoForm },
   inject: ["parentDict"],
@@ -49,6 +81,27 @@ export default {
             trigger: "change",
           },
         ],
+        scheduleDate: [
+          {
+            required: true,
+            message: this.$t("common.rule.select"),
+            trigger: "change",
+          },
+        ],
+        machineCode: [
+          {
+            required: true,
+            message: this.$t("common.rule.input"),
+            trigger: "blur",
+          },
+        ],
+        treadCode: [
+          {
+            required: true,
+            message: this.$t("common.rule.input"),
+            trigger: "blur",
+          },
+        ],
       },
     };
   },
@@ -62,7 +115,124 @@ export default {
       );
     },
     columns() {
-      return [
+      if (!this.isEdit) {
+        return [
+          {
+            prop: "factoryCode",
+            label: this.$t("ui.data.column.tm.scheduleResult.factoryCode"),
+            type: "select",
+            span: 12,
+            dictData: this.parentDict.type.biz_factory_name,
+            filterable: true,
+          },
+          {
+            prop: "scheduleDate",
+            label: this.$t("ui.data.column.tm.scheduleResult.scheduleDate"),
+            type: "date",
+            span: 12,
+            valueFormat: "yyyy-MM-dd",
+          },
+          {
+            prop: "machineCode",
+            label: this.$t("ui.data.column.tm.scheduleResult.machineCode"),
+            span: 12,
+            maxlength: 50,
+          },
+          {
+            prop: "treadCode",
+            label: this.$t("ui.data.column.tm.scheduleResult.treadCode"),
+            span: 12,
+            maxlength: 50,
+          },
+          {
+            label: this.$t("ui.tm.schedule.insert.middleShift"),
+            span: 24,
+            type: "title",
+          },
+          {
+            prop: "class1PlanQty",
+            label: this.$t("ui.tm.schedule.insert.middlePlanQty"),
+            span: 8,
+            type: "number",
+            min: 0,
+          },
+          {
+            prop: "class1Sequence",
+            label: this.$t("ui.tm.schedule.insert.middleSequence"),
+            span: 8,
+            type: "number",
+            min: 1,
+            precision: 0,
+          },
+          {
+            prop: "class1Analysis",
+            label: this.$t("ui.tm.schedule.insert.middleAnalysis"),
+            span: 8,
+            maxlength: 200,
+          },
+          {
+            label: this.$t("ui.tm.schedule.insert.nightShift"),
+            span: 24,
+            type: "title",
+          },
+          {
+            prop: "class2PlanQty",
+            label: this.$t("ui.tm.schedule.insert.nightPlanQty"),
+            span: 8,
+            type: "number",
+            min: 0,
+          },
+          {
+            prop: "class2Sequence",
+            label: this.$t("ui.tm.schedule.insert.nightSequence"),
+            span: 8,
+            type: "number",
+            min: 1,
+            precision: 0,
+          },
+          {
+            prop: "class2Analysis",
+            label: this.$t("ui.tm.schedule.insert.nightAnalysis"),
+            span: 8,
+            maxlength: 200,
+          },
+          {
+            label: this.$t("ui.tm.schedule.insert.morningShift"),
+            span: 24,
+            type: "title",
+          },
+          {
+            prop: "class3PlanQty",
+            label: this.$t("ui.tm.schedule.insert.morningPlanQty"),
+            span: 8,
+            type: "number",
+            min: 0,
+          },
+          {
+            prop: "class3Sequence",
+            label: this.$t("ui.tm.schedule.insert.morningSequence"),
+            span: 8,
+            type: "number",
+            min: 1,
+            precision: 0,
+          },
+          {
+            prop: "class3Analysis",
+            label: this.$t("ui.tm.schedule.insert.morningAnalysis"),
+            span: 8,
+            maxlength: 200,
+          },
+          {
+            prop: "remark",
+            label: this.$t("ui.data.column.tm.scheduleResult.remark"),
+            span: 24,
+            type: "textarea",
+            rows: 3,
+            maxlength: 500,
+          },
+        ];
+      }
+      const columns = [
         {
           prop: "factoryCode",
           label: this.$t("ui.data.column.tm.scheduleResult.factoryCode"),
@@ -429,13 +599,28 @@ export default {
           maxlength: 200,
         },
       ];
+      return columns.map((column) => ({
+        ...column,
+        disabled:
+          this.isEdit && !CHANGE_QTY_EDITABLE_FIELDS.includes(column.prop)
+            ? true
+            : column.disabled,
+      }));
     },
   },
   methods: {
     async save(params) {
       try {
         this.loading = true;
-        const res = this.isEdit ? await changeQty(params) : await insertTask(params);
+        const requestParams = this.isEdit
+          ? params
+          : INSERT_TASK_FIELDS.reduce((result, fieldName) => {
+              result[fieldName] = params[fieldName];
+              return result;
+            }, {});
+        const res = this.isEdit
+          ? await changeQty(requestParams)
+          : await insertTask(requestParams);
         this.$modal.msgSuccess(res.msg);
         this.$emit("success");
         this.hide();
@@ -448,14 +633,16 @@ export default {
 
     show(data) {
       this.visible = true;
-      if (data) {
+      if (data && data.id) {
         this.isEdit = true;
         this.form = {
           ...data,
         };
       } else {
+        this.isEdit = false;
         this.form = {
-          factoryCode: "116",
+          factoryCode: (data && data.factoryCode) || "116",
+          scheduleDate: data && data.scheduleDate,
         };
       }
     },
@@ -466,7 +653,38 @@ export default {
       this.visible = false;
     },
     handleConfirm() {
+      if (!this.isEdit && !this.validateInsertShiftFields()) {
+        return;
+      }
       this.$refs.form.triggerConfirm(this.save);
+    },
+    validateInsertShiftFields() {
+      let hasPlanQty = false;
+      for (let shiftOrder = 1; shiftOrder <= 3; shiftOrder += 1) {
+        const planQty = this.form[`class${shiftOrder}PlanQty`];
+        const sequence = this.form[`class${shiftOrder}Sequence`];
+        const analysis = this.form[`class${shiftOrder}Analysis`];
+        const hasPlanValue = planQty !== null && planQty !== undefined && planQty !== "";
+        const hasSequence = sequence !== null && sequence !== undefined && sequence !== "";
+        const hasAnalysis = typeof analysis === "string" && analysis.trim().length > 0;
+        if (!hasPlanValue) {
+          if (hasSequence || hasAnalysis) {
+            this.$modal.msgWarning(this.$t("ui.tm.schedule.insert.shiftPairRequired"));
+            return false;
+          }
+          continue;
+        }
+        if (Number(planQty) <= 0 || !hasSequence || Number(sequence) < 1 || !Number.isInteger(Number(sequence))) {
+          this.$modal.msgWarning(this.$t("ui.tm.schedule.insert.shiftPairRequired"));
+          return false;
+        }
+        hasPlanQty = true;
+      }
+      if (!hasPlanQty) {
+        this.$modal.msgWarning(this.$t("ui.tm.schedule.insert.planQtyRequired"));
+        return false;
+      }
+      return true;
     },
   },
 };

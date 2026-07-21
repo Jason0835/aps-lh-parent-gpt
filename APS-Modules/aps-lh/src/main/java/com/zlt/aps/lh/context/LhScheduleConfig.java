@@ -214,6 +214,32 @@ public class LhScheduleConfig {
     }
 
     /**
+     * 获取胶囊使用次数上限。
+     *
+     * <p>只有“当前使用次数 + 当前班次扣减前实际可排量”严格大于该值时，
+     * 当前班次才执行换胶囊；刚好达到上限不扣减班次计划量。</p>
+     *
+     * @return 胶囊使用次数上限，最小为1
+     */
+    public int getCapsuleUsageUpperLimit() {
+        return Math.max(1, getParamIntValue(LhScheduleParamConstant.CAPSULE_FORCE_DOWN_COUNT,
+                LhScheduleConstant.CAPSULE_FORCE_DOWN_COUNT));
+    }
+
+    /**
+     * 获取换胶囊班次固定扣减量。
+     *
+     * <p>默认值2代表换胶囊固定占用1小时，对应减少2条可排量；配置为0时仍可记录
+     * 换胶囊动作，但不减少班次计划量。</p>
+     *
+     * @return 换胶囊班次扣减量，最小为0
+     */
+    public int getCapsuleChangeLossQty() {
+        return Math.max(0, getParamIntValue(LhScheduleParamConstant.CAPSULE_CHANGE_LOSS_QTY,
+                LhScheduleConstant.CAPSULE_CHANGE_LOSS_QTY));
+    }
+
+    /**
      * 获取同班次总计划量上限。
      * <p>该参数只由新增排产入口消费，配置为0或负数时由策略入口按不限制处理。</p>
      *
@@ -582,6 +608,22 @@ public class LhScheduleConfig {
     public boolean isEndingAutoFillEnabled() {
         return getParamIntValue(LhScheduleParamConstant.ENDING_AUTO_FILL_ENABLED,
                 LhScheduleConstant.ENDING_AUTO_FILL_ENABLED) == 1;
+    }
+
+    /**
+     * 获取在机模具下机时前后计划校验天数。
+     * <p>配置快照入口已完成1～3范围校验；直接构造配置对象的测试场景仍在此保留相同保护。</p>
+     *
+     * @return 前后校验自然日数量，范围1～3
+     */
+    public int getContinuousMouldOfflineCheckDays() {
+        int days = getParamIntValue(LhScheduleParamConstant.CONTINUOUS_MOULD_OFFLINE_CHECK_DAYS,
+                LhScheduleConstant.CONTINUOUS_MOULD_OFFLINE_CHECK_DAYS);
+        if (days < LhScheduleConstant.MIN_CONTINUOUS_MOULD_OFFLINE_CHECK_DAYS
+                || days > LhScheduleConstant.MAX_CONTINUOUS_MOULD_OFFLINE_CHECK_DAYS) {
+            return LhScheduleConstant.CONTINUOUS_MOULD_OFFLINE_CHECK_DAYS;
+        }
+        return days;
     }
 
     /**

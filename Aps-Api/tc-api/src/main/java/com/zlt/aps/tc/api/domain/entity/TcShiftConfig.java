@@ -9,7 +9,6 @@ import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 
-
 @ApiModel(value = "胎侧班制配置对象", description = "胎侧班制配置对象")
 @Data
 @TableName(value = "T_TC_SHIFT_CONFIG")

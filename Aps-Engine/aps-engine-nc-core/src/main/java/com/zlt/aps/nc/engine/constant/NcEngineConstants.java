@@ -45,6 +45,9 @@ public class NcEngineConstants {
     /** 每班小时数 */
     public static final BigDecimal SHIFT_HOURS = new BigDecimal("8");
 
+    /** 每班分钟数 */
+    public static final BigDecimal SHIFT_MINUTES = new BigDecimal("480");
+
     // ==================== 批次号常量 ====================
 
     /** 批次号前缀 */

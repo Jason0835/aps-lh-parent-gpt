@@ -61,6 +61,24 @@ public final class TmScheduleConstants {
     /** 链任务优先策略参数键。 */
     public static final String PARAM_CHAIN_TASK_PRIORITY_STRATEGY = "TM_CHAIN_TASK_PRIORITY_STRATEGY";
 
+    /** 自动滚动开关参数键。 */
+    public static final String PARAM_ROLLING_ENABLED = "TM_ROLLING_ENABLED";
+
+    /** 自动滚动提前触发分钟数参数键。 */
+    public static final String PARAM_ROLLING_LEAD_MINUTES = "TM_ROLLING_LEAD_MINUTES";
+
+    /** 自动滚动上修阈值班数参数键。 */
+    public static final String PARAM_ROLLING_UP_THRESHOLD = "TM_ROLLING_UP_THRESHOLD";
+
+    /** 自动滚动下修阈值班数参数键。 */
+    public static final String PARAM_ROLLING_DOWN_THRESHOLD = "TM_ROLLING_DOWN_THRESHOLD";
+
+    /** 自动滚动下修目标班数参数键。 */
+    public static final String PARAM_ROLLING_DOWN_TARGET = "TM_ROLLING_DOWN_TARGET";
+
+    /** 自动滚动需求窗口班次数参数键。 */
+    public static final String PARAM_ROLLING_SHIFT_COUNT = "TM_ROLLING_SHIFT_COUNT";
+
     /** 工序停放小时数参数键。 */
     public static final String PARAM_PROCESS_STANDING_HOURS = "TM_PROCESS_STANDING_HOURS";
 
@@ -76,8 +94,12 @@ public final class TmScheduleConstants {
     /** 换规格时间参数键。 */
     public static final String PARAM_SPEC_CHANGE_MINUTES = "TM_SPEC_CHANGE_MINUTES";
 
-    /** 换胶时间参数键。 */
+    /** 换胶时间参数键，已废弃，自动排程不再按时间折算换胶产能。 */
+    @Deprecated
     public static final String PARAM_GLUE_CHANGE_MINUTES = "TM_GLUE_CHANGE_MINUTES";
+
+    /** 主胶料切换固定产能扣减参数键。 */
+    public static final String PARAM_GLUE_CHANGE_CAPACITY_DEDUCT = "TM_GLUE_CHANGE_CAPACITY_DEDUCT";
 
     /** 需求量算法默认编码。 */
     public static final String DEFAULT_ALGORITHM_SWITCH = "1";
@@ -88,7 +110,7 @@ public final class TmScheduleConstants {
     /** 最小开机量默认值。 */
     public static final String DEFAULT_MIN_START_QTY = "0";
 
-    /** 默认卷长缺省值。 */
+    /** 默认卷长缺省值，单位米/条。 */
     public static final String DEFAULT_CURL_LENGTH = "0";
 
     /** 工装总量默认值。 */
@@ -124,6 +146,33 @@ public final class TmScheduleConstants {
     /** 链任务优先策略默认编码。 */
     public static final String DEFAULT_CHAIN_TASK_PRIORITY_STRATEGY = "CONTINUITY_FIRST";
 
+    /** 自动滚动开关默认关闭。 */
+    public static final String DEFAULT_ROLLING_ENABLED = "0";
+
+    /** 自动滚动默认提前触发分钟数。 */
+    public static final int DEFAULT_ROLLING_LEAD_MINUTES = 30;
+
+    /** 自动滚动默认上修阈值班数。 */
+    public static final String DEFAULT_ROLLING_UP_THRESHOLD = "1.0";
+
+    /** 自动滚动默认下修阈值班数。 */
+    public static final String DEFAULT_ROLLING_DOWN_THRESHOLD = "3.5";
+
+    /** 自动滚动默认下修目标班数。 */
+    public static final String DEFAULT_ROLLING_DOWN_TARGET = "3.0";
+
+    /** 自动滚动默认需求窗口班次数。 */
+    public static final int DEFAULT_ROLLING_SHIFT_COUNT = 3;
+
+    /** 自动滚动分布式锁前缀。 */
+    public static final String ROLLING_LOCK_KEY_PREFIX = "TM_SCHEDULE:ROLLING_LOCK:";
+
+    /** 自动滚动运行键前缀。 */
+    public static final String ROLLING_RUN_KEY_PREFIX = "ROLLING:";
+
+    /** 自动滚动调度日志操作类型。 */
+    public static final String DISPATCHER_OPER_ROLLING = "4";
+
     /** 工序停放小时数默认值。 */
     public static final String DEFAULT_PROCESS_STANDING_HOURS = "0";
 
@@ -139,8 +188,12 @@ public final class TmScheduleConstants {
     /** 换规格时间默认值。 */
     public static final String DEFAULT_SPEC_CHANGE_MINUTES = "0";
 
-    /** 换胶时间默认值。 */
+    /** 换胶时间默认值，已废弃。 */
+    @Deprecated
     public static final String DEFAULT_GLUE_CHANGE_MINUTES = "0";
+
+    /** 主胶料切换固定产能扣减默认值，单位米。 */
+    public static final String DEFAULT_GLUE_CHANGE_CAPACITY_DEDUCT = "200";
 
     /** 自动排程基础资料缓存键前缀。 */
     public static final String BASE_DATA_CACHE_KEY_PREFIX = "aps:tm:autoSchedule:baseData:";
@@ -222,6 +275,9 @@ public final class TmScheduleConstants {
 
     /** 自动排程结果数据来源编码。 */
     public static final String AUTO_SCHEDULE_DATA_SOURCE = "AUTO";
+
+    /** 模板导入排程结果数据来源编码。 */
+    public static final String IMPORT_SCHEDULE_DATA_SOURCE = "IMPORT";
 
     /** 预置机台绑定来源。 */
     public static final String PRESET_MACHINE_BIND_SOURCE = "PRESET_MACHINE";

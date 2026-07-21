@@ -15,21 +15,22 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.utils.StringUtils;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.tm.api.constant.TmScheduleConstants;
+import com.zlt.aps.tm.api.domain.dto.TmRollingRecalcRequestDTO;
 import com.zlt.aps.tm.api.domain.entity.TmDispatcherLog;
 import com.zlt.aps.tm.api.domain.entity.TmMachineInfo;
 import com.zlt.aps.tm.api.domain.entity.TmScheduleResult;
-import com.zlt.aps.tm.api.domain.vo.TmAutoScheduleRequestVo;
-import com.zlt.aps.tm.api.domain.vo.TmAutoScheduleResponseVo;
-import com.zlt.aps.tm.api.domain.vo.TmScheduleShiftDateVO;
+import com.zlt.aps.tm.api.domain.vo.*;
 import com.zlt.aps.tm.api.enums.TmAutoScheduleIssueCategoryEnum;
 import com.zlt.aps.tm.api.enums.TmAutoScheduleIssueLevelEnum;
 import com.zlt.aps.tm.api.enums.TmReleaseStatusTransition;
 import com.zlt.aps.tm.api.enums.TmScheduleStepEnum;
+import com.zlt.aps.tm.component.TmScheduleBatchNoGenerator;
 import com.zlt.aps.tm.domain.TmAutoScheduleTask;
 import com.zlt.aps.tm.engine.domain.TmPersistResult;
 import com.zlt.aps.tm.engine.domain.TmScheduleContext;
 import com.zlt.aps.tm.engine.template.TmScheduleTemplateImpl;
 import com.zlt.aps.tm.mapper.*;
+import com.zlt.aps.tm.service.ITmRollingUpdateService;
 import com.zlt.aps.tm.service.ITmScheduleResultService;
 import com.zlt.aps.tm.service.TmAutoScheduleAsyncExecutor;
 import com.zlt.aps.tm.service.TmAutoScheduleTaskService;
@@ -45,7 +46,6 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import javax.annotation.Resource;
 import java.util.*;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
 /**
@@ -54,9 +54,6 @@ import java.util.stream.Collectors;
 @Slf4j
 @Service
 public class TmScheduleResultServiceImpl extends AbstractDocService<TmScheduleResult> implements ITmScheduleResultService {
-
-    /** 进程内最后一次批次号时间戳，用于避免同一毫秒内连续生成重复批次号 */
-    private static final AtomicLong LAST_BATCH_TIME_MILLIS = new AtomicLong(0L);
 
     @Resource
     private TmScheduleResultMapper tmScheduleResultMapper;
@@ -89,7 +86,16 @@ public class TmScheduleResultServiceImpl extends AbstractDocService<TmScheduleRe
     private TmManualOperationFacade tmManualOperationFacade;
 
     @Resource
+    private TmManualScheduleApplicationService tmManualScheduleApplicationService;
+
+    @Resource
+    private ITmRollingUpdateService tmRollingUpdateService;
+
+    @Resource
     private PlatformTransactionManager platformTransactionManager;
+
+    @Resource
+    private TmScheduleBatchNoGenerator tmScheduleBatchNoGenerator;
 
     @Override
     protected String getDocTypeCode() {
@@ -614,14 +620,27 @@ public class TmScheduleResultServiceImpl extends AbstractDocService<TmScheduleRe
     /**
      * 插入人工插单排程结果。
      *
-     * @param scheduleResult 插单排程结果
+     * @param requestVo 插单请求
      * @return 写入行数
      * @throws ServiceException 门面安全校验失败时抛出
      */
     @Override
-    public int insertTask(TmScheduleResult scheduleResult) {
-        return tmManualOperationFacade.insertTask(scheduleResult);
+    public int insertTask(TmInsertTaskRequestVo requestVo) {
+        return tmManualScheduleApplicationService.insertTask(requestVo);
     }
+
+    /**
+     * 批量删除未发布排程结果并滚动重排。
+     *
+     * @param ids 排程结果 ID
+     * @return 删除行数
+     * @throws ServiceException 门面状态、并发或审计校验失败时抛出
+     */
+    @Override
+    public int removeScheduleResults(List<Long> ids) {
+        return tmManualOperationFacade.deleteTasks(ids);
+    }
+
     /**
      * 调整排程计划量。
      *
@@ -644,6 +663,30 @@ public class TmScheduleResultServiceImpl extends AbstractDocService<TmScheduleRe
     public int changeMachine(TmScheduleResult scheduleResult) {
         return tmManualOperationFacade.changeMachine(scheduleResult);
     }
+
+    /**
+     * 在 aps-tm 单个事务中批量调整排程机台。
+     *
+     * @param machineCode 目标机台编码
+     * @param scheduleResultList 待转机的排程结果
+     * @return 更新行数
+     * @throws ServiceException 任一记录校验或转机失败时抛出并整批回滚
+     */
+    @Override
+    public int batchChangeMachine(String machineCode, List<TmScheduleResult> scheduleResultList) {
+        return tmManualOperationFacade.batchChangeMachine(machineCode, scheduleResultList);
+    }
+
+    /**
+     * 委托自动滚动服务执行手动重算入口。
+     *
+     * @param request 滚动重算请求
+     * @return 滚动重算统计
+     */
+    @Override
+    public TmRollingRecalcResponseVO rollingRecalc(TmRollingRecalcRequestDTO request) {
+        return tmRollingUpdateService.rollingRecalc(request);
+    }
     /**
      * 校验排程结果是否允许发布。
      *
@@ -653,12 +696,9 @@ public class TmScheduleResultServiceImpl extends AbstractDocService<TmScheduleRe
      */
     @Override
     public boolean publishValidate(List<Long> ids) {
-        if (CollUtil.isEmpty(ids)) {
-            throw new ServiceException(resolveTmMessage("ui.data.alert.tm.schedule.publishIdsEmpty", "发布排程结果不能为空"));
-        }
-        if (isReleasingOrTimeoutByIds(ids.toArray(new Long[0])) > 0) {
-            throw new ServiceException(I18nUtil.getMessage("ui.data.column.scheduleResult.release.isReleasingOrTimeoutById"));
-        }
+        List<Long> normalizedIds = this.normalizePublishIds(ids);
+        List<TmScheduleResult> resultList = tmScheduleResultMapper.selectBatchIds(normalizedIds);
+        this.validatePublishSourceStatuses(normalizedIds, resultList);
         return true;
     }
 
@@ -671,8 +711,7 @@ public class TmScheduleResultServiceImpl extends AbstractDocService<TmScheduleRe
      */
     @Override
     public int publish(List<Long> ids) {
-        this.publishValidate(ids);
-        return this.updateReleaseStatusesAtomically(ids, ApsConstant.WAIT_RELEASING);
+        return this.updateReleaseStatusesAtomically(this.normalizePublishIds(ids), ApsConstant.WAIT_RELEASING, true);
     }
 
     /**
@@ -691,7 +730,47 @@ public class TmScheduleResultServiceImpl extends AbstractDocService<TmScheduleRe
             throw new ServiceException(I18nUtil.getMessage("ui.data.alert.tm.schedule.illegalReleaseStatus"));
         }
         Long[] idArray = com.ruoyi.common.text.Convert.toLongArray(ids);
-        return this.updateReleaseStatusesAtomically(Arrays.asList(idArray), releaseStatus);
+        return this.updateReleaseStatusesAtomically(Arrays.asList(idArray), releaseStatus, false);
+    }
+
+    /**
+     * 规范化页面发布 ID，去除空值、重复值并固定加锁顺序。
+     *
+     * @param ids 排程结果 ID
+     * @return 规范化后的 ID 列表
+     * @throws ServiceException 未提供有效 ID 时抛出
+     */
+    private List<Long> normalizePublishIds(List<Long> ids) {
+        List<Long> normalizedIds = CollUtil.isEmpty(ids) ? Collections.emptyList()
+                : ids.stream().filter(Objects::nonNull).distinct().sorted().collect(Collectors.toList());
+        if (normalizedIds.isEmpty()) {
+            throw new ServiceException(resolveTmMessage(
+                    "ui.data.alert.tm.schedule.publishIdsEmpty", "发布排程结果不能为空"));
+        }
+        return normalizedIds;
+    }
+
+    /**
+     * 校验页面发布入口允许的来源状态。
+     *
+     * <p>页面发布只允许未发布、发布失败和待发布三种状态。已发布记录只有在人工编辑后
+     * 才能通过人工操作链路回退为待发布，禁止在发布按钮入口直接回退。</p>
+     *
+     * @param ids 请求 ID
+     * @param resultList 数据库排程结果
+     * @throws ServiceException 记录缺失或任一来源状态非法时抛出
+     */
+    private void validatePublishSourceStatuses(List<Long> ids, List<TmScheduleResult> resultList) {
+        if (resultList == null || resultList.size() != ids.size()) {
+            throw new ServiceException(I18nUtil.getMessage("ui.data.alert.tm.schedule.resultNotFound"));
+        }
+        Set<String> publishSourceStatuses = new HashSet<>(Arrays.asList(
+                ApsConstant.NO_RELEASE, ApsConstant.FAILURE_RELEASE, ApsConstant.WAIT_RELEASING));
+        boolean containsIllegalStatus = resultList.stream()
+                .anyMatch(result -> !publishSourceStatuses.contains(result.getReleaseStatus()));
+        if (containsIllegalStatus) {
+            throw new ServiceException(I18nUtil.getMessage("ui.data.alert.tm.schedule.illegalReleaseTransition"));
+        }
     }
 
     /**
@@ -699,19 +778,31 @@ public class TmScheduleResultServiceImpl extends AbstractDocService<TmScheduleRe
      *
      * @param ids          排程结果 ID
      * @param targetStatus 目标发布状态
+     * @param publishOperation 是否页面发布操作
      * @return 更新行数
      * @throws ServiceException 记录缺失、并发变化或任一状态迁移非法时抛出
      */
-    private int updateReleaseStatusesAtomically(List<Long> ids, String targetStatus) {
+    private int updateReleaseStatusesAtomically(List<Long> ids, String targetStatus, boolean publishOperation) {
         List<Long> normalizedIds = ids.stream().filter(Objects::nonNull).distinct().sorted().collect(Collectors.toList());
+        if (normalizedIds.isEmpty()) {
+            throw new ServiceException(I18nUtil.getMessage("ui.data.alert.tm.schedule.publishIdsEmpty"));
+        }
         TransactionTemplate transactionTemplate = new TransactionTemplate(platformTransactionManager);
         Integer updatedRows = transactionTemplate.execute(transactionStatus -> {
             List<TmScheduleResult> resultList = tmScheduleResultMapper.selectBatchIdsForUpdate(normalizedIds);
             if (resultList == null || resultList.size() != normalizedIds.size()) {
                 throw new ServiceException(I18nUtil.getMessage("ui.data.alert.tm.schedule.resultNotFound"));
             }
-            boolean invalidTransition = resultList.stream()
-                    .anyMatch(result -> !TmReleaseStatusTransition.canTransit(result.getReleaseStatus(), targetStatus));
+            boolean invalidTransition;
+            if (publishOperation) {
+                Set<String> publishSourceStatuses = new HashSet<>(Arrays.asList(
+                        ApsConstant.NO_RELEASE, ApsConstant.FAILURE_RELEASE, ApsConstant.WAIT_RELEASING));
+                invalidTransition = resultList.stream()
+                        .anyMatch(result -> !publishSourceStatuses.contains(result.getReleaseStatus()));
+            } else {
+                invalidTransition = resultList.stream()
+                        .anyMatch(result -> !TmReleaseStatusTransition.canTransit(result.getReleaseStatus(), targetStatus));
+            }
             if (invalidTransition) {
                 throw new ServiceException(I18nUtil.getMessage("ui.data.alert.tm.schedule.illegalReleaseTransition"));
             }
@@ -757,28 +848,12 @@ public class TmScheduleResultServiceImpl extends AbstractDocService<TmScheduleRe
      */
     private TmAutoScheduleResponseVo buildAutoScheduleResponse(TmAutoScheduleRequestVo request) {
         TmAutoScheduleResponseVo response = new TmAutoScheduleResponseVo();
-        response.setBatchNo(generateAutoBatchNo());
+        response.setBatchNo(tmScheduleBatchNoGenerator.generate());
         response.setTraceId(StrUtil.blankToDefault(request.getTraceId(), IdUtil.fastSimpleUUID()));
         response.setResultCount(0);
         response.setUnplannedCount(0);
         response.setConfirmRequired(Boolean.FALSE);
         return response;
-    }
-
-    /**
-     * 生成胎面自动排程批次号。
-     *
-     * <p>批次号按执行时刻生成，同一天多次自动排程可生成不同批次；若同一进程内连续调用落在同一毫秒，
-     * 使用递增毫秒兜底，保证本进程内不重复。</p>
-     *
-     * @return 批次号，格式 TMyyyyMMddHHmmssSSS
-     */
-    private String generateAutoBatchNo() {
-        long currentMillis = System.currentTimeMillis();
-        long uniqueMillis = LAST_BATCH_TIME_MILLIS.updateAndGet(lastMillis ->
-                currentMillis > lastMillis ? currentMillis : lastMillis + 1);
-        return TmScheduleConstants.AUTO_PLAN_BATCH_NO_PREFIX
-                + DateUtil.format(new Date(uniqueMillis), "yyyyMMddHHmmssSSS");
     }
 
     /**

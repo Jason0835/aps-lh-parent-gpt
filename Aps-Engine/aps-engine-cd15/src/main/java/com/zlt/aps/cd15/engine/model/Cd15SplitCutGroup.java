@@ -6,16 +6,18 @@ import lombok.Data;
 import java.math.BigDecimal;
 
 /**
- * CD15 分裁组合，组合内两条结果共用 ORDER_NO/GROUP_NO。
+ * 新任务链中的斜裁分裁组合。
  */
 @Data
 @Builder
 public class Cd15SplitCutGroup {
 
-    /** 分裁组合第一条候选。 */
+    /** 第一条候选。 */
     private Cd15ScheduleCandidate firstCandidate;
-    /** 分裁组合第二条候选。 */
+    /** 第二条候选。 */
     private Cd15ScheduleCandidate secondCandidate;
-    /** 两条候选的组合宽度。 */
+    /** 两条钢带的组合有效宽度，单位毫米。 */
     private BigDecimal combinedWidth;
+    /** 分裁组合稳定键。 */
+    private String groupKey;
 }

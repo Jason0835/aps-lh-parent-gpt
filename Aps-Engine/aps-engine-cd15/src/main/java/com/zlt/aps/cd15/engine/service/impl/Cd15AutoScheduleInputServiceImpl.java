@@ -1,47 +1,48 @@
 package com.zlt.aps.cd15.engine.service.impl;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
-import com.zlt.aps.cd15.api.domain.entity.Cd15AngleWidthMapping;
 import com.zlt.aps.cd15.api.domain.entity.Cd15CurlLength;
-import com.zlt.aps.cd15.api.domain.entity.Cd15MachineInfo;
-import com.zlt.aps.cd15.api.domain.entity.Cd15MachineMaintenancePlan;
-import com.zlt.aps.cd15.api.domain.entity.Cd15MachineRollMapping;
-import com.zlt.aps.cd15.api.domain.entity.Cd15SpecifyMachine;
+import com.zlt.aps.cd15.api.domain.entity.Cd15DepthConfig;
+import com.zlt.aps.cd15.api.domain.entity.Cd15ShiftConfig;
 import com.zlt.aps.cd15.api.domain.entity.Cd15Stock;
 import com.zlt.aps.cd15.api.domain.entity.Cd15StorageLaneLimit;
+import com.zlt.aps.cd15.engine.algorithm.Cd15BigRollAgingStockBuilder;
+import com.zlt.aps.cd15.engine.algorithm.Cd15SteelStripDepthResolver;
 import com.zlt.aps.cd15.engine.algorithm.Cd15SteelStripSourceTraceResolver;
-import com.zlt.aps.cd15.engine.mapper.Cd15EngineAngleWidthMappingMapper;
+import com.zlt.aps.cd15.engine.mapper.Cd15AutoScheduleSourceMapper;
+import com.zlt.aps.cd15.engine.mapper.Cd15ConstructionMaterialMapper;
+import com.zlt.aps.cd15.engine.algorithm.Cd15FormingDemandExpander;
 import com.zlt.aps.cd15.engine.mapper.Cd15EngineConstructionMapper;
 import com.zlt.aps.cd15.engine.mapper.Cd15EngineCurlLengthMapper;
+import com.zlt.aps.cd15.engine.mapper.Cd15EngineDepthConfigMapper;
 import com.zlt.aps.cd15.engine.mapper.Cd15EngineCxScheduleMapper;
-import com.zlt.aps.cd15.engine.mapper.Cd15EngineGdyyScheduleResultMapper;
-import com.zlt.aps.cd15.engine.mapper.Cd15EngineGdyyStockMapper;
-import com.zlt.aps.cd15.engine.mapper.Cd15EngineMachineInfoMapper;
-import com.zlt.aps.cd15.engine.mapper.Cd15EngineMachineRollMappingMapper;
-import com.zlt.aps.cd15.engine.mapper.Cd15EngineMaintenanceMapper;
-import com.zlt.aps.cd15.engine.mapper.Cd15EngineMonthSurplusMapper;
-import com.zlt.aps.cd15.engine.mapper.Cd15EngineSpecifyMachineMapper;
 import com.zlt.aps.cd15.engine.mapper.Cd15EngineStockMapper;
 import com.zlt.aps.cd15.engine.mapper.Cd15EngineStorageLaneMapper;
+import com.zlt.aps.cd15.engine.mapper.Cd15EngineShiftConfigMapper;
+import com.zlt.aps.cd15.engine.mapper.Cd15EngineMonthSurplusMapper;
+import com.zlt.aps.cd15.engine.mapper.Cd15EngineGdyyScheduleResultMapper;
+import com.zlt.aps.cd15.engine.mapper.Cd15EngineGdyyStockMapper;
 import com.zlt.aps.cd15.engine.model.Cd15AutoScheduleInput;
-import com.zlt.aps.cd15.engine.model.Cd15ConstructionMaterial;
-import com.zlt.aps.cd15.engine.model.Cd15EmbryoPlanSurplus;
+import com.zlt.aps.cd15.engine.model.Cd15BigRollAgingBuildResult;
 import com.zlt.aps.cd15.engine.model.Cd15SteelStripSourceTrace;
+import com.zlt.aps.cd15.engine.model.Cd15ConstructionMaterial;
+import com.zlt.aps.cd15.engine.model.Cd15DemandShift;
+import com.zlt.aps.cd15.engine.model.Cd15FormingScheduleSource;
+import com.zlt.aps.cd15.engine.model.Cd15EmbryoPlanSurplus;
+import com.zlt.aps.cd15.engine.model.Cd15StockSource;
+import com.zlt.aps.cd15.engine.model.Cd15StorageLaneState;
 import com.zlt.aps.cd15.engine.service.Cd15AutoScheduleInputService;
-import com.zlt.aps.common.core.constant.ApsConstant;
-import com.zlt.aps.common.core.utils.BigDecimalUtils;
 import com.zlt.aps.cx.api.domain.entity.CxScheduleResult;
-import com.zlt.aps.gdyy.api.domain.entity.GdyyScheduleResult;
-import com.zlt.aps.gdyy.api.domain.entity.GdyyStock;
 import com.zlt.aps.mdm.api.domain.entity.MdmConstructionInfo;
 import com.zlt.aps.mdm.api.domain.entity.MdmMonthSurplus;
+import com.zlt.aps.gdyy.api.domain.entity.GdyyScheduleResult;
+import com.zlt.aps.gdyy.api.domain.entity.GdyyStock;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.util.Assert;
 import org.springframework.util.StringUtils;
 
-import java.lang.reflect.Method;
 import java.math.BigDecimal;
 import java.sql.Date;
 import java.time.LocalDate;
@@ -50,8 +51,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
-import java.util.stream.Stream;
 
 /**
  * 斜裁自动排程输入数据加载实现。
@@ -61,23 +60,32 @@ import java.util.stream.Stream;
 @RequiredArgsConstructor
 public class Cd15AutoScheduleInputServiceImpl implements Cd15AutoScheduleInputService {
 
-    private static final int CLASS_COUNT = 8;
-
     private final Cd15EngineCxScheduleMapper cxScheduleMapper;
     private final Cd15EngineConstructionMapper constructionMapper;
     private final Cd15EngineStockMapper stockMapper;
     private final Cd15EngineStorageLaneMapper storageLaneMapper;
+    private final Cd15EngineMonthSurplusMapper monthSurplusMapper;
     private final Cd15EngineCurlLengthMapper curlLengthMapper;
-    private final Cd15EngineMachineInfoMapper machineInfoMapper;
-    private final Cd15EngineMachineRollMappingMapper machineRollMappingMapper;
-    private final Cd15EngineSpecifyMachineMapper specifyMachineMapper;
-    private final Cd15EngineMaintenanceMapper maintenanceMapper;
-    private final Cd15EngineAngleWidthMappingMapper angleWidthMappingMapper;
+    private final Cd15EngineDepthConfigMapper depthConfigMapper;
+    private final Cd15ConstructionMaterialMapper constructionMaterialMapper;
     private final Cd15EngineGdyyStockMapper gdyyStockMapper;
     private final Cd15EngineGdyyScheduleResultMapper gdyyScheduleResultMapper;
-    private final Cd15EngineMonthSurplusMapper monthSurplusMapper;
+    private final Cd15EngineShiftConfigMapper shiftConfigMapper;
+    private final Cd15BigRollAgingStockBuilder bigRollAgingStockBuilder;
+    private final Cd15AutoScheduleSourceMapper sourceMapper;
+    private final Cd15FormingDemandExpander formingDemandExpander;
+    private final Cd15SteelStripDepthResolver steelStripDepthResolver;
     private final Cd15SteelStripSourceTraceResolver steelStripSourceTraceResolver;
 
+    /**
+     * 加载第1至5步所需的成型计划、施工、6点库存和当前班次库排快照。
+     *
+     * @param factoryCode 工厂编码
+     * @param scheduleDate 排程日期
+     * @param classField 斜裁结果班次字段
+     * @param shiftCode 业务班次编码，用于匹配库排班次
+     * @return 标准化输入数据
+     */
     @Override
     public Cd15AutoScheduleInput load(String factoryCode, LocalDate scheduleDate,
                                       String classField, String shiftCode, int agingPeriodHours) {
@@ -88,70 +96,66 @@ public class Cd15AutoScheduleInputServiceImpl implements Cd15AutoScheduleInputSe
 
         LocalDate formingStartDate = scheduleDate.minusDays(1);
         LocalDate formingEndDate = scheduleDate.plusDays(3);
-        List<CxScheduleResult> formingSchedules = this.loadFormingSchedules(
+        log.info("[斜裁自动排程] 加载成型计划, factoryCode={}, scheduleDate={}, formingStartDate={}, formingEndDate={}",
+                factoryCode, scheduleDate, formingStartDate, formingEndDate);
+        List<CxScheduleResult> formingEntities = loadFormingSchedules(
                 factoryCode, formingStartDate, formingEndDate);
-        Set<String> embryoCodes = formingSchedules.stream()
+        log.info("[斜裁自动排程] 成型计划加载结果, factoryCode={}, formingStartDate={}, formingEndDate={}, recordCount={}",
+                factoryCode, formingStartDate, formingEndDate, formingEntities.size());
+        List<Cd15FormingScheduleSource> formingSchedules = formingEntities.stream()
+                .map(sourceMapper::mapFormingSchedule)
+                .collect(Collectors.toList());
+
+        Set<String> embryoCodes = formingEntities.stream()
                 .map(CxScheduleResult::getEmbryoCode)
                 .filter(StringUtils::hasText)
                 .collect(Collectors.toSet());
         Set<String> constructionVersions = formingSchedules.stream()
-                .flatMap(schedule -> IntStream.rangeClosed(1, CLASS_COUNT)
-                        .mapToObj(classIndex -> this.readString(schedule, String.format("class%dRecipeNo", classIndex))))
+                .flatMap(schedule -> safe(schedule.getClassRecipeNos()).stream())
                 .filter(StringUtils::hasText)
                 .collect(Collectors.toSet());
-        List<Cd15ConstructionMaterial> constructionMaterials = this.loadConstructionMaterials(
+        List<Cd15ConstructionMaterial> constructionMaterials = loadConstructionMaterials(
                 factoryCode, embryoCodes, constructionVersions);
-        this.fillStandardCurlLength(factoryCode, constructionMaterials);
-
-        List<Cd15EmbryoPlanSurplus> embryoPlanSurpluses = this.loadEmbryoPlanSurpluses(
+        fillStandardCurlLength(factoryCode, constructionMaterials);
+        List<Cd15DepthConfig> depthConfigs = depthConfigMapper.selectList(
+                Wrappers.<Cd15DepthConfig>lambdaQuery()
+                        .eq(Cd15DepthConfig::getFactoryCode, factoryCode)
+                        .orderByDesc(Cd15DepthConfig::getMachineQty)
+                        .orderByAsc(Cd15DepthConfig::getMachineRange));
+        Map<String, BigDecimal> depthClassQtyBySteelStrip = steelStripDepthResolver.resolve(
+                formingSchedules, constructionMaterials, depthConfigs);
+        List<Cd15DemandShift> demandShifts = formingDemandExpander.expand(
+                formingSchedules, constructionMaterials);
+        List<Cd15EmbryoPlanSurplus> embryoPlanSurpluses = loadEmbryoPlanSurpluses(
                 factoryCode, scheduleDate, embryoCodes);
-        List<Cd15Stock> stocksAtSix = stockMapper.selectList(Wrappers.<Cd15Stock>lambdaQuery()
-                .eq(Cd15Stock::getFactoryCode, factoryCode)
-                .eq(Cd15Stock::getStockDate, Date.valueOf(scheduleDate))
-                .orderByAsc(Cd15Stock::getMaterialCode));
-        List<Cd15StorageLaneLimit> storageLanesAtSix = storageLaneMapper.selectList(Wrappers.<Cd15StorageLaneLimit>lambdaQuery()
-                .eq(Cd15StorageLaneLimit::getFactoryCode, factoryCode)
-                .eq(Cd15StorageLaneLimit::getLaneDate, Date.valueOf(scheduleDate))
-                .eq(Cd15StorageLaneLimit::getShiftCode, shiftCode)
-                .orderByAsc(Cd15StorageLaneLimit::getStorageLaneCode));
-        List<Cd15MachineInfo> machines = machineInfoMapper.selectList(Wrappers.<Cd15MachineInfo>lambdaQuery()
-                .eq(Cd15MachineInfo::getFactoryCode, factoryCode)
-                .eq(Cd15MachineInfo::getStatus, ApsConstant.APS_STRING_1)
-                .orderByAsc(Cd15MachineInfo::getMachineCode));
-        List<Cd15CurlLength> curlLengths = curlLengthMapper.selectList(Wrappers.<Cd15CurlLength>lambdaQuery()
-                .eq(Cd15CurlLength::getFactoryCode, factoryCode)
-                .orderByAsc(Cd15CurlLength::getSteelStripCode));
-        List<Cd15AngleWidthMapping> angleWidthMappings = angleWidthMappingMapper.selectList(
-                Wrappers.<Cd15AngleWidthMapping>lambdaQuery()
-                        .eq(Cd15AngleWidthMapping::getFactoryCode, factoryCode)
-                        .orderByAsc(Cd15AngleWidthMapping::getCutAngle));
-        Map<String, BigDecimal> angleWidthMaxByAngle = angleWidthMappings.stream()
-                .filter(item -> item != null && StringUtils.hasText(item.getCutAngle()))
-                .collect(Collectors.toMap(item -> item.getCutAngle().trim(),
-                        Cd15AngleWidthMapping::getClothWidthMax, (first, second) -> first));
-        List<Cd15MachineRollMapping> machineRollMappings = machineRollMappingMapper.selectList(
-                Wrappers.<Cd15MachineRollMapping>lambdaQuery()
-                        .eq(Cd15MachineRollMapping::getFactoryCode, factoryCode)
-                        .orderByAsc(Cd15MachineRollMapping::getBigRollCode)
-                        .orderByAsc(Cd15MachineRollMapping::getMachineCode));
-        List<Cd15SpecifyMachine> specifyMachines = specifyMachineMapper.selectList(
-                Wrappers.<Cd15SpecifyMachine>lambdaQuery()
-                        .eq(Cd15SpecifyMachine::getFactoryCode, factoryCode)
-                        .orderByAsc(Cd15SpecifyMachine::getSteelStripCode)
-                        .orderByAsc(Cd15SpecifyMachine::getMachineCode));
-        List<Cd15MachineMaintenancePlan> maintenancePlans = maintenanceMapper.selectList(
-                Wrappers.<Cd15MachineMaintenancePlan>lambdaQuery()
-                        .eq(Cd15MachineMaintenancePlan::getFactoryCode, factoryCode)
-                        .between(Cd15MachineMaintenancePlan::getDowntimeDate,
-                                Date.valueOf(scheduleDate.minusDays(1)),
-                                Date.valueOf(scheduleDate.plusDays(3)))
-                        .orderByAsc(Cd15MachineMaintenancePlan::getDowntimeStartTime)
-                        .orderByAsc(Cd15MachineMaintenancePlan::getMachineCode));
-        List<GdyyStock> gdyyStocks = gdyyStockMapper.selectList(Wrappers.<GdyyStock>lambdaQuery()
-                .eq(GdyyStock::getFactoryCode, factoryCode)
-                .orderByAsc(GdyyStock::getInboundTime)
-                .orderByAsc(GdyyStock::getBigRollCode)
-                .orderByAsc(GdyyStock::getId));
+        Map<String, Cd15SteelStripSourceTrace> steelStripSourceTraceBySteelStrip =
+                steelStripSourceTraceResolver.resolve(
+                        formingSchedules, constructionMaterials, embryoPlanSurpluses);
+
+        List<Cd15StockSource> stocksAtSix = stockMapper.selectList(Wrappers.<Cd15Stock>lambdaQuery()
+                        .eq(Cd15Stock::getFactoryCode, factoryCode)
+                        .eq(Cd15Stock::getStockDate, Date.valueOf(scheduleDate))
+                        .orderByAsc(Cd15Stock::getMaterialCode))
+                .stream()
+                .map(sourceMapper::mapStock)
+                .collect(Collectors.toList());
+
+        List<Cd15StorageLaneState> storageLanesAtSix = storageLaneMapper.selectList(
+                        Wrappers.<Cd15StorageLaneLimit>lambdaQuery()
+                                .eq(Cd15StorageLaneLimit::getFactoryCode, factoryCode)
+                                .eq(Cd15StorageLaneLimit::getLaneDate, Date.valueOf(scheduleDate))
+                                .eq(Cd15StorageLaneLimit::getShiftCode, shiftCode)
+                                .orderByAsc(Cd15StorageLaneLimit::getStorageLaneCode))
+                .stream()
+                .map(sourceMapper::mapStorageLane)
+                .collect(Collectors.toList());
+
+        List<GdyyStock> gdyyActualStocks = gdyyStockMapper.selectList(
+                Wrappers.<GdyyStock>lambdaQuery()
+                        .eq(GdyyStock::getFactoryCode, factoryCode)
+                        .orderByAsc(GdyyStock::getInboundTime)
+                        .orderByAsc(GdyyStock::getBigRollCode)
+                        .orderByAsc(GdyyStock::getId));
         List<GdyyScheduleResult> gdyyPlans = gdyyScheduleResultMapper.selectList(
                 Wrappers.<GdyyScheduleResult>lambdaQuery()
                         .eq(GdyyScheduleResult::getFactoryCode, factoryCode)
@@ -160,73 +164,84 @@ public class Cd15AutoScheduleInputServiceImpl implements Cd15AutoScheduleInputSe
                                 Date.valueOf(scheduleDate.plusDays(2)))
                         .orderByAsc(GdyyScheduleResult::getScheduleDate)
                         .orderByAsc(GdyyScheduleResult::getId));
+        List<Cd15ShiftConfig> shiftConfigs = shiftConfigMapper.selectList(
+                Wrappers.<Cd15ShiftConfig>lambdaQuery()
+                        .eq(Cd15ShiftConfig::getFactoryCode, factoryCode)
+                        .eq(Cd15ShiftConfig::getIsActive, 1)
+                        .orderByAsc(Cd15ShiftConfig::getShiftOrder)
+                        .orderByAsc(Cd15ShiftConfig::getClassField));
+        Cd15BigRollAgingBuildResult agingResult = bigRollAgingStockBuilder.build(
+                gdyyActualStocks, gdyyPlans, shiftConfigs, agingPeriodHours);
 
         log.info("[斜裁自动排程] 输入数据加载完成, factoryCode={}, scheduleDate={}, classField={}, shiftCode={}, "
-                        + "formingCount={}, constructionMaterialCount={}, stockCount={}, machineCount={}, "
-                        + "angleWidthCount={}, machineRollMappingCount={}, specifyMachineCount={}, "
-                        + "maintenanceCount={}, storageLaneCount={}, gdyyStockCount={}, gdyyPlanCount={}",
-                factoryCode, scheduleDate, classField, shiftCode, formingSchedules.size(),
-                constructionMaterials.size(), stocksAtSix.size(), machines.size(), angleWidthMappings.size(),
-                machineRollMappings.size(), specifyMachines.size(), maintenancePlans.size(), storageLanesAtSix.size(), gdyyStocks.size(),
-                gdyyPlans.size());
+                        + "formingRange={}~{}, formingCount={}, constructionMaterialCount={}, "
+                        + "demandShiftCount={}, depthSteelStripCount={}, resourceBaselineShiftCode={}, "
+                        + "stockCount={}, storageLaneCount={}",
+                factoryCode, scheduleDate, classField, shiftCode, formingStartDate, formingEndDate,
+                formingSchedules.size(), constructionMaterials.size(), demandShifts.size(),
+                depthClassQtyBySteelStrip.size(), shiftCode, stocksAtSix.size(),
+                storageLanesAtSix.size());
 
-        Cd15AutoScheduleInput input = Cd15AutoScheduleInput.builder()
-                .scheduleDate(Date.valueOf(scheduleDate))
+        return Cd15AutoScheduleInput.builder()
                 .formingSchedules(formingSchedules)
                 .constructionMaterials(constructionMaterials)
                 .stocksAtSix(stocksAtSix)
-                .machines(machines)
                 .embryoPlanSurpluses(embryoPlanSurpluses)
-                .curlLengths(curlLengths)
-                .angleWidthMappings(angleWidthMappings)
-                .angleWidthMaxByAngle(angleWidthMaxByAngle)
-                .machineRollMappings(machineRollMappings)
-                .specifyMachines(specifyMachines)
-                .maintenancePlans(maintenancePlans)
+                .demandShifts(demandShifts)
+                .steelStripSourceTraceBySteelStrip(steelStripSourceTraceBySteelStrip)
+                .depthClassQtyBySteelStrip(depthClassQtyBySteelStrip)
                 .storageLanesAtSix(storageLanesAtSix)
-                .gdyyStocks(gdyyStocks)
-                .gdyyPlans(gdyyPlans)
-                .agingPeriodHours(Math.max(0, agingPeriodHours))
+                .bigRollAgingStocks(agingResult.getStocks())
+                .bigRollAgingDataMissingCodes(agingResult.getDataMissingBigRollCodes())
+                .inboundRecords(Collections.emptyList())
                 .build();
-        Map<String, Cd15SteelStripSourceTrace> sourceTraceBySteelStrip =
-                this.steelStripSourceTraceResolver.resolve(input, embryoPlanSurpluses);
-        input.setSteelStripSourceTraceBySteelStrip(sourceTraceBySteelStrip);
-        return input;
     }
 
-    /**
-     * 按胎胚代码加载当前排程月份的月计划剩余量。
-     *
-     * @param factoryCode 工厂编码
-     * @param scheduleDate 排程日期
-     * @param embryoCodes 胎胚代码集合
-     * @return 胎胚月计划剩余量
-     */
-    private List<Cd15EmbryoPlanSurplus> loadEmbryoPlanSurpluses(
-            String factoryCode, LocalDate scheduleDate, Set<String> embryoCodes) {
+    /** 按胎胚代码加载当前排程月份的月计划剩余量。 */
+    private List<Cd15EmbryoPlanSurplus> loadEmbryoPlanSurpluses(String factoryCode,
+                                                                LocalDate scheduleDate,
+                                                                Set<String> embryoCodes) {
         if (embryoCodes.isEmpty()) {
             return Collections.emptyList();
         }
-        return this.monthSurplusMapper.selectList(Wrappers.<MdmMonthSurplus>lambdaQuery()
-                        .select(MdmMonthSurplus::getMaterialCode,
-                                MdmMonthSurplus::getPlanSurplusQty)
+        return monthSurplusMapper.selectList(Wrappers.<MdmMonthSurplus>lambdaQuery()
+                        .select(MdmMonthSurplus::getMaterialCode, MdmMonthSurplus::getPlanSurplusQty)
                         .eq(MdmMonthSurplus::getFactoryCode, factoryCode)
                         .eq(MdmMonthSurplus::getYear, scheduleDate.getYear())
                         .eq(MdmMonthSurplus::getMonth, scheduleDate.getMonthValue())
                         .in(MdmMonthSurplus::getMaterialCode, embryoCodes)
                         .orderByAsc(MdmMonthSurplus::getMaterialCode))
-                .stream()
-                .map(item -> Cd15EmbryoPlanSurplus.builder()
+                .stream().map(item -> Cd15EmbryoPlanSurplus.builder()
                         .embryoCode(item.getMaterialCode())
-                        .planSurplusQuantity(item.getPlanSurplusQty())
-                        .build())
+                        .planSurplusQuantity(item.getPlanSurplusQty()).build())
                 .collect(Collectors.toList());
     }
 
     private List<CxScheduleResult> loadFormingSchedules(String factoryCode,
-                                                        LocalDate startDate,
-                                                        LocalDate endDate) {
+                                                         LocalDate startDate,
+                                                         LocalDate endDate) {
+        // 斜裁按胎胚代码分解施工层位，仅查询需求计算所需字段，避免共享实体的展示字段影响排程。
         return cxScheduleMapper.selectList(Wrappers.<CxScheduleResult>lambdaQuery()
+                .select(CxScheduleResult::getCxBatchNo,
+                        CxScheduleResult::getScheduleDate,
+                        CxScheduleResult::getEmbryoCode,
+                        CxScheduleResult::getCxMachineCode,
+                        CxScheduleResult::getClass1PlanQty,
+                        CxScheduleResult::getClass1RecipeNo,
+                        CxScheduleResult::getClass2PlanQty,
+                        CxScheduleResult::getClass2RecipeNo,
+                        CxScheduleResult::getClass3PlanQty,
+                        CxScheduleResult::getClass3RecipeNo,
+                        CxScheduleResult::getClass4PlanQty,
+                        CxScheduleResult::getClass4RecipeNo,
+                        CxScheduleResult::getClass5PlanQty,
+                        CxScheduleResult::getClass5RecipeNo,
+                        CxScheduleResult::getClass6PlanQty,
+                        CxScheduleResult::getClass6RecipeNo,
+                        CxScheduleResult::getClass7PlanQty,
+                        CxScheduleResult::getClass7RecipeNo,
+                        CxScheduleResult::getClass8PlanQty,
+                        CxScheduleResult::getClass8RecipeNo)
                 .eq(CxScheduleResult::getFactoryCode, factoryCode)
                 .between(CxScheduleResult::getScheduleDate,
                         Date.valueOf(startDate), Date.valueOf(endDate))
@@ -235,9 +250,14 @@ public class Cd15AutoScheduleInputServiceImpl implements Cd15AutoScheduleInputSe
     }
 
     private List<Cd15ConstructionMaterial> loadConstructionMaterials(String factoryCode,
-                                                                     Set<String> embryoCodes,
-                                                                     Set<String> constructionVersions) {
-        if (embryoCodes.isEmpty() || constructionVersions.isEmpty()) {
+                                                                      Set<String> embryoCodes,
+                                                                      Set<String> constructionVersions) {
+        if (embryoCodes.isEmpty()) {
+            log.warn("[斜裁自动排程] 成型计划未找到胎胚代码, factoryCode={}", factoryCode);
+            return Collections.emptyList();
+        }
+        if (constructionVersions.isEmpty()) {
+            log.warn("[斜裁自动排程] 成型计划未找到施工版本CLASSn_RECIPE_NO, factoryCode={}", factoryCode);
             return Collections.emptyList();
         }
         return constructionMapper.selectList(Wrappers.<MdmConstructionInfo>lambdaQuery()
@@ -247,78 +267,27 @@ public class Cd15AutoScheduleInputServiceImpl implements Cd15AutoScheduleInputSe
                         .orderByAsc(MdmConstructionInfo::getConstructionCode)
                         .orderByAsc(MdmConstructionInfo::getConstructionVersion))
                 .stream()
-                .flatMap(this::mapConstructionMaterials)
+                .flatMap(construction -> constructionMaterialMapper.map(construction).stream())
                 .collect(Collectors.toList());
     }
 
-    private Stream<Cd15ConstructionMaterial> mapConstructionMaterials(MdmConstructionInfo construction) {
-        String cuttingAngle = this.trim(construction.getBeltCuttingAngle());
-        String bigRollCode = this.trim(construction.getArticleCrownSpec());
-        Stream<Cd15ConstructionMaterial> mainLayers = IntStream.rangeClosed(1, 3)
-                .mapToObj(layer -> this.mapMainLayer(construction, cuttingAngle, bigRollCode, layer));
-        Stream<Cd15ConstructionMaterial> reinforcementLayers = Stream.of(
-                this.mapReinforcement(construction, cuttingAngle, bigRollCode, 101,
-                        "beltCodeLeftCode", "beltCodeLeftCraft", "beltCodeLeftLength"),
-                this.mapReinforcement(construction, cuttingAngle, bigRollCode, 102,
-                        "beltCodeRightCode", "beltCodeRightCraft", "beltCodeRightLength"));
-        return Stream.concat(mainLayers, reinforcementLayers)
-                .filter(item -> item != null && StringUtils.hasText(item.getSteelStripCode()));
-    }
-
-    private Cd15ConstructionMaterial mapMainLayer(MdmConstructionInfo construction,
-                                                  String cuttingAngle,
-                                                  String bigRollCode,
-                                                  int layer) {
-        String steelStripCode = this.readString(construction, "beltCode" + layer);
-        if (!StringUtils.hasText(steelStripCode)) {
-            return null;
-        }
-        return this.materialBuilder(construction, steelStripCode, cuttingAngle, bigRollCode, layer, false)
-                .craftWidth(BigDecimalUtils.valueOf(this.readValue(construction, "beltCraft" + layer)))
-                .unitConsumeMillimeter(BigDecimalUtils.valueOf(this.readValue(construction, "belt" + layer + "Length")))
-                .build();
-    }
-
-    private Cd15ConstructionMaterial mapReinforcement(MdmConstructionInfo construction,
-                                                      String cuttingAngle,
-                                                      String bigRollCode,
-                                                      int layerNo,
-                                                      String codeProperty,
-                                                      String craftProperty,
-                                                      String lengthProperty) {
-        String steelStripCode = this.readString(construction, codeProperty);
-        if (!StringUtils.hasText(steelStripCode)) {
-            return null;
-        }
-        return this.materialBuilder(construction, steelStripCode, cuttingAngle, bigRollCode, layerNo, true)
-                .craftWidth(BigDecimalUtils.valueOf(this.readValue(construction, craftProperty)))
-                .unitConsumeMillimeter(BigDecimalUtils.valueOf(this.readValue(construction, lengthProperty)))
-                .build();
-    }
-
-    private Cd15ConstructionMaterial.Cd15ConstructionMaterialBuilder materialBuilder(
-            MdmConstructionInfo construction, String steelStripCode, String cuttingAngle,
-            String bigRollCode, int layerNo, boolean reinforcement) {
-        return Cd15ConstructionMaterial.builder()
-                .constructionCode(construction.getConstructionCode())
-                .constructionVersion(construction.getConstructionVersion())
-                .steelStripCode(steelStripCode.trim())
-                .bigRollCode(bigRollCode)
-                .cordWidth(BigDecimalUtils.valueOf(construction.getCordWidth()))
-                .cuttingAngle(cuttingAngle)
-                .layerNo(layerNo)
-                .reinforcement(reinforcement);
-    }
-
+    /**
+     * 按钢带代号补充标准卷曲长度，单位米。
+     * <p>
+     * 这里只读取t_cd15_curl_length的标准值；如果标准表没有维护或维护了非正数，
+     * 后续排程会在拿到参数快照后再使用CRIMP_LENGTH兜底，避免输入加载接口反向依赖参数解析。
+     * </p>
+     */
     private void fillStandardCurlLength(String factoryCode, List<Cd15ConstructionMaterial> materials) {
-        Set<String> steelStripCodes = materials.stream()
+        Set<String> steelStripCodes = safe(materials).stream()
+                .filter(item -> item != null)
                 .map(Cd15ConstructionMaterial::getSteelStripCode)
                 .filter(StringUtils::hasText)
                 .collect(Collectors.toSet());
         if (steelStripCodes.isEmpty()) {
             return;
         }
-        Map<String, BigDecimal> curlLengthBySteel = curlLengthMapper.selectList(
+        Map<String, BigDecimal> curlLengthBySteelStrip = curlLengthMapper.selectList(
                         Wrappers.<Cd15CurlLength>lambdaQuery()
                                 .select(Cd15CurlLength::getSteelStripCode, Cd15CurlLength::getCurlLength)
                                 .eq(Cd15CurlLength::getFactoryCode, factoryCode)
@@ -326,32 +295,23 @@ public class Cd15AutoScheduleInputServiceImpl implements Cd15AutoScheduleInputSe
                                 .orderByAsc(Cd15CurlLength::getSteelStripCode))
                 .stream()
                 .filter(item -> item != null && StringUtils.hasText(item.getSteelStripCode())
-                        && item.getCurlLength() != null && item.getCurlLength() > 0D)
+                        && item.getCurlLength() != null && item.getCurlLength() > 0)
                 .collect(Collectors.toMap(Cd15CurlLength::getSteelStripCode,
-                        item -> BigDecimalUtils.valueOf(item.getCurlLength()),
+                        item -> BigDecimal.valueOf(item.getCurlLength()),
                         (first, second) -> first));
-        materials.forEach(item -> item.setCurlLength(curlLengthBySteel.get(item.getSteelStripCode())));
-    }
-
-    private String readString(Object source, String fieldName) {
-        Object value = this.readValue(source, fieldName);
-        return value == null ? null : value.toString().trim();
-    }
-
-    private Object readValue(Object source, String fieldName) {
-        if (source == null || !StringUtils.hasText(fieldName)) {
-            return null;
-        }
-        String methodName = "get" + fieldName.substring(0, 1).toUpperCase() + fieldName.substring(1);
-        try {
-            Method method = source.getClass().getMethod(methodName);
-            return method.invoke(source);
-        } catch (ReflectiveOperationException exception) {
-            throw new IllegalStateException("读取字段失败: " + source.getClass().getSimpleName() + "." + fieldName, exception);
+        safe(materials).stream()
+                .filter(item -> item != null)
+                .forEach(item -> item.setCurlLength(curlLengthBySteelStrip.get(item.getSteelStripCode())));
+        Set<String> missing = steelStripCodes.stream()
+                .filter(steelStripCode -> !curlLengthBySteelStrip.containsKey(steelStripCode))
+                .collect(Collectors.toSet());
+        if (!missing.isEmpty()) {
+            log.warn("[斜裁自动排程] 标准卷曲长度未维护或非正数，将使用参数CRIMP_LENGTH兜底, factoryCode={}, steelStripCodes={}",
+                    factoryCode, missing);
         }
     }
 
-    private String trim(String value) {
-        return value == null ? null : value.trim();
+    private <T> List<T> safe(List<T> values) {
+        return values == null ? Collections.emptyList() : values;
     }
 }

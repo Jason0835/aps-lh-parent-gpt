@@ -1,65 +1,30 @@
 package com.zlt.aps.gsq.mapper;
 
+import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.zlt.aps.gsq.api.domain.entity.GsqStock;
 
 import java.util.List;
 
 /**
- * 钢丝圈库存信息Mapper接口
+ * 钢丝圈库存管理Mapper接口
  *
  * @author zlt
- * @date 2021-05-31
+ * @date 2026-07-08
  */
-public interface GsqStockMapper {
-    /**
-     * 查询钢丝圈库存信息
-     *
-     * @param id 钢丝圈库存信息ID
-     * @return 钢丝圈库存信息
-     */
-    public GsqStock selectStockById(Long id);
+public interface GsqStockMapper extends BaseMapper<GsqStock> {
 
     /**
-     * 查询钢丝圈库存信息列表
+     * 校验"库存日期+钢丝圈代码"组合是否已存在
      *
-     * @param stock 钢丝圈库存信息
-     * @return 钢丝圈库存信息集合
+     * @param entity 实体
+     * @return 已存在数量（0表示唯一，>0表示不唯一）
      */
-    public List<GsqStock> selectStockList(GsqStock stock);
+    int checkUnique(GsqStock entity);
 
     /**
-     * 新增钢丝圈库存信息
+     * 批量合并保存（存在则更新，否则新增），用于导入场景
      *
-     * @param stock 钢丝圈库存信息
-     * @return 结果
+     * @param list 待保存数据集合
      */
-    public int insertStock(GsqStock stock);
-
-    /**
-     * 修改钢丝圈库存信息
-     *
-     * @param stock 钢丝圈库存信息
-     * @return 结果
-     */
-    public int updateStock(GsqStock stock);
-
-    /**
-     * 批量删除钢丝圈库存信息
-     *
-     * @param ids 需要删除的数据ID
-     * @return 结果
-     */
-    public int deleteStockByIds(Long[] ids);
-
-    /**
-     * 校验库存唯一性
-     */
-    public List<GsqStock> checkStockListUnic(GsqStock stock);
-
-    /**
-     * 合并操作，如果记录存在则更新，否则新增
-     *
-     * @param list 要合并的集合
-     */
-    public void mergeSql(List<GsqStock> list);
+    void mergeSql(List<GsqStock> list);
 }

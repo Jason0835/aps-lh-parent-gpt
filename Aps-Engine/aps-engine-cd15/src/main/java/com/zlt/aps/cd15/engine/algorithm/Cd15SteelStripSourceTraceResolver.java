@@ -1,11 +1,9 @@
 package com.zlt.aps.cd15.engine.algorithm;
 
-import com.zlt.aps.cd15.engine.model.Cd15AutoScheduleInput;
+import com.zlt.aps.cd15.engine.model.Cd15SteelStripSourceTrace;
 import com.zlt.aps.cd15.engine.model.Cd15ConstructionMaterial;
 import com.zlt.aps.cd15.engine.model.Cd15EmbryoPlanSurplus;
-import com.zlt.aps.cd15.engine.model.Cd15NaturalDemand;
-import com.zlt.aps.cd15.engine.model.Cd15SteelStripSourceTrace;
-import lombok.RequiredArgsConstructor;
+import com.zlt.aps.cd15.engine.model.Cd15FormingScheduleSource;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
@@ -13,56 +11,50 @@ import java.math.BigDecimal;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
+import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
-/** 按实际成型需求和施工BOM解析钢带来源追溯信息。 */
+/** 解析实际参与钢带需求的成型批次、机台及月计划剩余量。 */
 @Component
-@RequiredArgsConstructor
 public class Cd15SteelStripSourceTraceResolver {
 
     private static final int CX_BATCH_NO_MAX_LENGTH = 500;
     private static final int CX_MACHINE_CODES_MAX_LENGTH = 300;
 
-    private final Cd15ScheduleCandidateBuilder scheduleCandidateBuilder;
-
     /**
-     * 按钢带生成成型批次、成型机台和胎胚月计划剩余量。
+     * 按钢带生成来源追溯信息。
      *
-     * @param input 自动排程输入
+     * @param formingSchedules 成型计划
+     * @param constructionMaterials 施工BOM钢带材料
      * @param embryoPlanSurpluses 胎胚月计划剩余量
      * @return 以钢带代码为键的来源追溯信息
      */
     public Map<String, Cd15SteelStripSourceTrace> resolve(
-            Cd15AutoScheduleInput input,
+            List<Cd15FormingScheduleSource> formingSchedules,
+            List<Cd15ConstructionMaterial> constructionMaterials,
             List<Cd15EmbryoPlanSurplus> embryoPlanSurpluses) {
-        List<Cd15ConstructionMaterial> materials = input == null
-                || input.getConstructionMaterials() == null
-                ? Collections.emptyList() : input.getConstructionMaterials();
         Map<ConstructionKey, List<Cd15ConstructionMaterial>> materialsByConstruction =
-                materials.stream()
+                safe(constructionMaterials).stream()
                         .filter(item -> item != null
                                 && StringUtils.hasText(item.getConstructionCode())
                                 && StringUtils.hasText(item.getConstructionVersion())
                                 && StringUtils.hasText(item.getSteelStripCode()))
-                        .collect(Collectors.groupingBy(item -> new ConstructionKey(
-                                item.getConstructionCode(), item.getConstructionVersion())));
+                        .collect(Collectors.groupingBy(
+                                item -> new ConstructionKey(item.getConstructionCode(),
+                                        item.getConstructionVersion())));
 
         Map<String, SourceAccumulator> accumulators = new LinkedHashMap<>();
-        this.scheduleCandidateBuilder.buildNaturalDemands(input).stream()
-                .forEach(demand -> materialsByConstruction
-                        .getOrDefault(new ConstructionKey(
-                                demand.getConstructionCode(), demand.getConstructionVersion()),
-                                Collections.emptyList())
-                        .forEach(material -> accumulators
-                                .computeIfAbsent(material.getSteelStripCode().trim(),
-                                        ignored -> new SourceAccumulator())
-                                .add(demand)));
+        safe(formingSchedules).stream()
+                .filter(schedule -> schedule != null
+                        && StringUtils.hasText(schedule.getEmbryoCode()))
+                .forEach(schedule -> collectScheduleSources(
+                        schedule, materialsByConstruction, accumulators));
 
-        Map<String, BigDecimal> surplusByEmbryo = this.safe(embryoPlanSurpluses).stream()
+        Map<String, BigDecimal> surplusByEmbryo = safe(embryoPlanSurpluses).stream()
                 .filter(item -> item != null && StringUtils.hasText(item.getEmbryoCode())
                         && item.getPlanSurplusQuantity() != null)
                 .collect(Collectors.toMap(
@@ -72,28 +64,41 @@ public class Cd15SteelStripSourceTraceResolver {
 
         return accumulators.entrySet().stream().collect(Collectors.toMap(
                 Map.Entry::getKey,
-                entry -> this.buildTrace(entry.getKey(), entry.getValue(), surplusByEmbryo),
+                entry -> buildTrace(entry.getKey(), entry.getValue(), surplusByEmbryo),
                 (first, second) -> first,
                 LinkedHashMap::new));
     }
 
-    /** 根据字段长度限制生成稳定的逗号分隔值。 */
-    private String joinAndValidate(Set<String> values, int maxLength, String columnName) {
-        String joined = values.isEmpty() ? null : String.join(",", values);
-        if (joined != null && joined.length() > maxLength) {
-            throw new IllegalArgumentException(columnName + "长度超过" + maxLength);
-        }
-        return joined;
+    /** 只有正计划量及其对应CLASS配方命中的施工钢带才计入来源。 */
+    private void collectScheduleSources(
+            Cd15FormingScheduleSource schedule,
+            Map<ConstructionKey, List<Cd15ConstructionMaterial>> materialsByConstruction,
+            Map<String, SourceAccumulator> accumulators) {
+        List<BigDecimal> quantities = safe(schedule.getClassPlanQuantities());
+        List<String> recipeNos = safe(schedule.getClassRecipeNos());
+        String embryoCode = schedule.getEmbryoCode().trim();
+        IntStream.range(0, Math.min(quantities.size(), recipeNos.size()))
+                .filter(index -> quantities.get(index) != null
+                        && quantities.get(index).signum() > 0
+                        && StringUtils.hasText(recipeNos.get(index)))
+                .mapToObj(index -> new ConstructionKey(embryoCode, recipeNos.get(index)))
+                .flatMap(key -> materialsByConstruction
+                        .getOrDefault(key, Collections.emptyList()).stream())
+                .forEach(material -> accumulators
+                        .computeIfAbsent(material.getSteelStripCode().trim(),
+                                ignored -> new SourceAccumulator())
+                        .add(embryoCode, schedule.getCxBatchNo(),
+                                schedule.getCxMachineCode()));
     }
 
-    /** 生成单个钢带的来源追溯信息。 */
+    /** PLAN_SURPLUS_QTY按实际关联胎胚去重求和，任一胎胚缺失时保留空值。 */
     private Cd15SteelStripSourceTrace buildTrace(
             String steelStripCode,
             SourceAccumulator accumulator,
             Map<String, BigDecimal> surplusByEmbryo) {
-        String cxBatchNo = this.joinAndValidate(
+        String cxBatchNo = joinAndValidate(
                 accumulator.batchNos, CX_BATCH_NO_MAX_LENGTH, "CX_BATCH_NO");
-        String cxMachineCodes = this.joinAndValidate(
+        String cxMachineCodes = joinAndValidate(
                 accumulator.machineCodes, CX_MACHINE_CODES_MAX_LENGTH, "CX_MACHINE_CODES");
         boolean missingSurplus = accumulator.distinctEmbryoCodes.stream()
                 .anyMatch(embryoCode -> !surplusByEmbryo.containsKey(embryoCode)
@@ -109,6 +114,14 @@ public class Cd15SteelStripSourceTraceResolver {
         return Cd15SteelStripSourceTrace.builder().steelStripCode(steelStripCode)
                 .cxBatchNo(cxBatchNo).cxMachineCodes(cxMachineCodes)
                 .planSurplusQty(planSurplusQty).build();
+    }
+
+    private String joinAndValidate(Set<String> values, int maxLength, String columnName) {
+        String joined = values.isEmpty() ? null : String.join(",", values);
+        if (joined != null && joined.length() > maxLength) {
+            throw new IllegalArgumentException(columnName + "长度超过" + maxLength);
+        }
+        return joined;
     }
 
     private <T> List<T> safe(List<T> values) {
@@ -144,19 +157,18 @@ public class Cd15SteelStripSourceTraceResolver {
         }
     }
 
-    /** 单个钢带的来源集合累加器。 */
     private static final class SourceAccumulator {
         private final Set<String> batchNos = new TreeSet<>();
         private final Set<String> machineCodes = new TreeSet<>();
         private final Set<String> distinctEmbryoCodes = new TreeSet<>();
 
-        private void add(Cd15NaturalDemand demand) {
-            this.distinctEmbryoCodes.add(demand.getConstructionCode().trim());
-            if (StringUtils.hasText(demand.getCxBatchNo())) {
-                this.batchNos.add(demand.getCxBatchNo().trim());
+        private void add(String embryoCode, String batchNo, String machineCode) {
+            this.distinctEmbryoCodes.add(embryoCode);
+            if (StringUtils.hasText(batchNo)) {
+                this.batchNos.add(batchNo.trim());
             }
-            if (StringUtils.hasText(demand.getCxMachineCode())) {
-                this.machineCodes.add(demand.getCxMachineCode().trim());
+            if (StringUtils.hasText(machineCode)) {
+                this.machineCodes.add(machineCode.trim());
             }
         }
     }

@@ -1,253 +1,349 @@
 package com.zlt.aps.cd15.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.zlt.aps.cd15.api.domain.entity.Cd15ScheduleLaneAllocation;
 import com.zlt.aps.cd15.api.domain.entity.Cd15ScheduleResult;
-import com.zlt.aps.cd15.api.domain.entity.Cd15ScheduleResultLog;
+import com.zlt.aps.cd15.api.domain.entity.Cd15ScheduleRollingAdjustLog;
 import com.zlt.aps.cd15.api.domain.entity.Cd15UnscheduleResult;
 import com.zlt.aps.cd15.engine.constant.Cd15ScheduleTaskStatus;
 import com.zlt.aps.cd15.engine.constant.Cd15ScheduleTaskType;
 import com.zlt.aps.cd15.engine.domain.Cd15ScheduleTask;
-import com.zlt.aps.cd15.engine.model.Cd15LaneAllocationDraft;
+import com.zlt.aps.cd15.engine.model.Cd15RollingAdjustmentDraft;
 import com.zlt.aps.cd15.engine.model.Cd15RollingTarget;
-import com.zlt.aps.cd15.engine.model.Cd15ScheduleResultDraft;
-import com.zlt.aps.cd15.engine.model.Cd15SingleShiftScheduleResult;
 import com.zlt.aps.cd15.engine.model.Cd15TimedRollingOutput;
-import com.zlt.aps.cd15.engine.service.Cd15AutoScheduleInputVersionService;
+import com.zlt.aps.cd15.engine.service.Cd15RollingInputVersionService;
 import com.zlt.aps.cd15.engine.service.Cd15ScheduleTaskService;
 import com.zlt.aps.cd15.mapper.Cd15ScheduleLaneAllocationMapper;
-import com.zlt.aps.cd15.mapper.Cd15ScheduleResultLogMapper;
 import com.zlt.aps.cd15.mapper.Cd15ScheduleResultMapper;
+import com.zlt.aps.cd15.mapper.Cd15ScheduleRollingAdjustLogMapper;
 import com.zlt.aps.cd15.mapper.Cd15UnscheduleResultMapper;
-import com.zlt.aps.cd15.model.Cd15ScheduleOverwriteDecision;
-import com.zlt.aps.cd15.service.Cd15AutoScheduleDraftMapper;
-import com.zlt.aps.cd15.service.Cd15ScheduleOverwriteValidator;
 import com.zlt.aps.cd15.service.Cd15TimedRollingPersistService;
+import com.zlt.aps.common.core.constant.ApsConstant;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RLock;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.io.Serializable;
-import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.Date;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
-import java.util.stream.Stream;
 
-/** CD15定时滚动排程最终短事务持久化。 */
+/** CD15定时滚动排程最终短事务实现。 */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class Cd15TimedRollingPersistServiceImpl implements Cd15TimedRollingPersistService {
 
-    private static final int CLASS_COUNT = 8;
-    private static final String ROLLING_LOG_TYPE = "TIMED_ROLLING";
+    private static final String SNAPSHOT_SCHEMA_VERSION = "1";
 
     private final Cd15ScheduleResultMapper resultMapper;
     private final Cd15ScheduleLaneAllocationMapper laneMapper;
     private final Cd15UnscheduleResultMapper unscheduleMapper;
-    private final Cd15ScheduleResultLogMapper logMapper;
+    private final Cd15ScheduleRollingAdjustLogMapper adjustLogMapper;
     private final Cd15ScheduleTaskService taskService;
-    private final Cd15AutoScheduleInputVersionService inputVersionService;
-    private final Cd15AutoScheduleDraftMapper draftMapper;
-    private final Cd15ScheduleOverwriteValidator overwriteValidator;
+    private final Cd15RollingInputVersionService versionService;
+    private final ObjectMapper objectMapper;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void persist(String taskId, Cd15RollingTarget target, Cd15TimedRollingOutput output, RLock lock) {
-        this.validateCommitState(taskId, target, output, lock);
-        String currentVersion = inputVersionService.fingerprint(target.getFactoryCode(), target.getScheduleDate());
+    public void persist(String taskId, Cd15RollingTarget target,
+                        Cd15TimedRollingOutput output, RLock lock) {
+        validateCommitState(taskId, target, output, lock);
+        String currentVersion = versionService.fingerprint(target);
         if (!Objects.equals(output.getInputVersion(), currentVersion)) {
-            throw new IllegalStateException("CD15定时滚动期间输入数据已变化");
+            throw new IllegalStateException("定时滚动期间输入数据已变化");
         }
-        this.replaceSuffixResults(taskId, target, output);
-        this.replaceUnscheduled(target, output);
-        if (!taskService.markSuccessInCurrentTransaction(taskId, target.getBatchNo())) {
-            throw new IllegalStateException("CD15定时滚动任务状态已变化，不能提交结果");
+
+        List<Cd15ScheduleLaneAllocation> replacementLanes =
+                safe(output.getReplacementLaneAllocations());
+        List<Cd15ScheduleResult> logicallyDeleted =
+                safe(output.getLogicallyDeletedResults());
+        List<Cd15ScheduleResult> retainedPublishedResults =
+                logicallyDeleted.stream()
+                        .filter(this::isPreviouslyPublished)
+                        .collect(Collectors.toList());
+        List<Cd15ScheduleResult> removableResults =
+                logicallyDeleted.stream()
+                        .filter(result -> !this.isPreviouslyPublished(result))
+                        .collect(Collectors.toList());
+        applyStorageLaneCodes(output, replacementLanes);
+        safe(output.getInsertedResults()).forEach(this::insertResult);
+        safe(output.getUpdatedResults()).forEach(this::updateResult);
+        retainedPublishedResults.forEach(result -> {
+            result.setStorageLaneCode(null);
+            this.updateResult(result);
+        });
+        removableResults.stream()
+                .map(Cd15ScheduleResult::getId).filter(Objects::nonNull)
+                .forEach(resultMapper::deleteById);
+        replaceLaneAllocations(output, replacementLanes);
+        replaceUnscheduled(target, output);
+        saveAdjustments(taskId, target, output);
+        if (!taskService.markSuccessInCurrentTransaction(
+                taskId, target.getBatchNo())) {
+            throw new IllegalStateException("定时滚动任务状态已变化，不能提交结果");
         }
-        log.info("[斜裁定时滚动] 最终事务提交完成 taskId={}, batchNo={}, targetClassIndex={}, replacement={}, unscheduled={}",
-                taskId, target.getBatchNo(), target.getTargetClassIndex(),
-                this.safeReplacement(output).size(), this.safeUnscheduled(output).size());
+        log.info("[斜裁定时滚动] 最终事务提交完成, taskId={}, batchNo={}, "
+                        + "inserted={}, updated={}, retainedPublished={}, deleted={}, "
+                        + "unscheduled={}, adjustments={}",
+                taskId, target.getBatchNo(),
+                safe(output.getInsertedResults()).size(),
+                safe(output.getUpdatedResults()).size(),
+                retainedPublishedResults.size(), removableResults.size(),
+                safe(output.getUnscheduledResults()).size(),
+                safe(output.getAdjustments()).size());
     }
 
-    private boolean supportedRollingTaskType(String taskType) {
-        return Cd15ScheduleTaskType.TIMED_ROLLING.equals(taskType)
-                || Cd15ScheduleTaskType.INSERT_ORDER.equals(taskType)
-                || Cd15ScheduleTaskType.TRANSFER_MACHINE.equals(taskType)
-                || Cd15ScheduleTaskType.CHANGE_QTY.equals(taskType);
-    }
     private void validateCommitState(String taskId, Cd15RollingTarget target,
                                      Cd15TimedRollingOutput output, RLock lock) {
         Cd15ScheduleTask task = taskService.findByTaskId(taskId);
-        if (task == null || !this.supportedRollingTaskType(task.getTaskType())
+        if (task == null || !Cd15ScheduleTaskType.ROLLING_SCHEDULE.equals(task.getTaskType())
                 || !Cd15ScheduleTaskStatus.RUNNING.equals(task.getTaskStatus())) {
-            throw new IllegalStateException("CD15定时滚动任务不是执行中状态");
-        }
-        if (target == null || target.getTargetClassIndex() <= 0) {
-            throw new IllegalStateException("CD15定时滚动目标班次无效");
-        }
-        if (output == null) {
-            throw new IllegalStateException("CD15定时滚动试排输出为空");
+            throw new IllegalStateException("定时滚动任务不是执行中状态");
         }
         if (lock == null || !lock.isHeldByCurrentThread()) {
-            throw new IllegalStateException("CD15定时滚动执行锁已失效");
+            throw new IllegalStateException("定时滚动执行锁已失效");
+        }
+        if (target == null || output == null
+                || !Objects.equals(target.getBatchNo(), output.getBatchNo())) {
+            throw new IllegalStateException("定时滚动目标批次与输出批次不一致");
         }
     }
 
-    private void replaceSuffixResults(String taskId, Cd15RollingTarget target, Cd15TimedRollingOutput output) {
-        List<Cd15ScheduleResult> oldResults = resultMapper.selectList(new LambdaQueryWrapper<Cd15ScheduleResult>()
-                .eq(Cd15ScheduleResult::getFactoryCode, target.getFactoryCode())
-                .eq(Cd15ScheduleResult::getScheduleDate, this.date(target.getScheduleDate()))
-                .eq(Cd15ScheduleResult::getCd15BatchNo, target.getBatchNo()));
-        List<Cd15ScheduleResult> suffixResults = oldResults.stream()
-                .filter(item -> this.resultClassIndex(item) >= target.getTargetClassIndex())
-                .collect(Collectors.toList());
-        Cd15ScheduleOverwriteDecision overwriteDecision = overwriteValidator.validate(suffixResults, true);
-        if (overwriteDecision.isRejected()) {
-            throw new IllegalStateException(overwriteDecision.getMessage());
-        }
-        this.deleteSuffixResults(suffixResults);
-        this.safeReplacement(output).forEach(draft -> this.saveResult(taskId, target, draft));
-    }
-
-    private void deleteSuffixResults(List<Cd15ScheduleResult> suffixResults) {
-        List<Long> ids = suffixResults.stream()
-                .map(Cd15ScheduleResult::getId)
-                .filter(Objects::nonNull)
-                .collect(Collectors.toList());
-        if (ids.isEmpty()) {
-            return;
-        }
-        laneMapper.update(null, new LambdaUpdateWrapper<Cd15ScheduleLaneAllocation>()
-                .in(Cd15ScheduleLaneAllocation::getScheduleResultId, ids)
-                .set(Cd15ScheduleLaneAllocation::getIsDelete, 1));
-        logMapper.update(null, new LambdaUpdateWrapper<Cd15ScheduleResultLog>()
-                .in(Cd15ScheduleResultLog::getScheduleResultId, ids)
-                .set(Cd15ScheduleResultLog::getIsDelete, 1));
-        ids.forEach(resultMapper::deleteById);
-    }
-
-    private void saveResult(String taskId, Cd15RollingTarget target,
-                            Cd15ScheduleResultDraft draft) {
-        Cd15ScheduleResult entity = draftMapper.toScheduleResult(target.getFactoryCode(),
-                target.getScheduleDate(), target.getBatchNo(), draft);
-        if (resultMapper.insert(entity) != 1) {
-            throw new IllegalStateException("保存CD15定时滚动排程结果失败");
-        }
-        this.replaceLaneAllocations(target, entity, draft);
-        Cd15ScheduleResultLog createLog = draftMapper.toCreateLog(taskId, target.getBatchNo(), entity, draft);
-        createLog.setLogType(ROLLING_LOG_TYPE);
-        createLog.setReasonCode(ROLLING_LOG_TYPE);
-        createLog.setChangeReason("CD15定时滚动生成目标班次后缀结果");
-        if (logMapper.insert(createLog) != 1) {
-            throw new IllegalStateException("保存CD15定时滚动操作日志失败");
+    private void insertResult(Cd15ScheduleResult result) {
+        if (resultMapper.insert(result) != 1 || result.getId() == null) {
+            throw new IllegalStateException("新增定时滚动排程结果失败");
         }
     }
 
-    private void replaceLaneAllocations(Cd15RollingTarget target, Cd15ScheduleResult entity,
-                                        Cd15ScheduleResultDraft draft) {
-        List<Cd15LaneAllocationDraft> laneAllocations = draft.getLaneAllocations() == null
-                ? Collections.emptyList() : draft.getLaneAllocations();
-        AtomicInteger allocationOrder = new AtomicInteger(1);
-        laneAllocations.forEach(laneDraft -> {
-            Cd15ScheduleLaneAllocation lane = draftMapper.toLaneAllocation(
-                    target.getBatchNo(), entity, draft, laneDraft, allocationOrder.getAndIncrement());
-            if (laneMapper.insert(lane) != 1) {
-                throw new IllegalStateException("保存CD15定时滚动库排分配明细失败");
-            }
-        });
+    /** 是否曾成功发布到 MES。 */
+    private boolean isPreviouslyPublished(Cd15ScheduleResult result) {
+        return result != null
+                && result.getPublishSuccessCount() != null
+                && result.getPublishSuccessCount() > 0;
     }
 
-    private void replaceUnscheduled(Cd15RollingTarget target, Cd15TimedRollingOutput output) {
-        List<String> classFields = this.suffixClassFields(target.getTargetClassIndex());
-        if (!classFields.isEmpty()) {
-            unscheduleMapper.update(null, new LambdaUpdateWrapper<Cd15UnscheduleResult>()
-                    .eq(Cd15UnscheduleResult::getFactoryCode, target.getFactoryCode())
-                    .eq(Cd15UnscheduleResult::getScheduleDate, this.date(target.getScheduleDate()))
-                    .eq(Cd15UnscheduleResult::getBatchNo, target.getBatchNo())
-                    .in(Cd15UnscheduleResult::getClassField, classFields)
-                    .set(Cd15UnscheduleResult::getIsDelete, 1));
+    private void updateResult(Cd15ScheduleResult result) {
+        if (result.getId() == null) {
+            throw new IllegalStateException("定时滚动更新结果缺少主键");
         }
-        AtomicInteger reasonOrder = new AtomicInteger(1);
-        this.safeUnscheduled(output).stream()
-                .sorted(Comparator.comparingInt(this::reasonPriority)
-                        .thenComparing(source -> this.safeText(source.getSteelStripCode()))
-                        .thenComparing(source -> this.safeText(source.getBigRollCode()))
-                        .thenComparing(source -> this.safeText(source.getCuttingAngle()))
-                        .thenComparing(source -> this.safeText(source.getClassField())))
-                .forEach(source -> {
-                    Cd15UnscheduleResult entity = draftMapper.toUnscheduleResult(target.getFactoryCode(),
-                            target.getScheduleDate(), target.getBatchNo(), source, reasonOrder.getAndIncrement());
-                    if (unscheduleMapper.insert(entity) != 1) {
-                        throw new IllegalStateException("保存CD15定时滚动未排结果失败");
+        if (this.isPreviouslyPublished(result)) {
+            result.setReleaseStatus(ApsConstant.WAIT_RELEASING);
+            result.setRemark("ROLLING_DEGRADE");
+        }
+        if (resultMapper.updateById(result) != 1) {
+            throw new IllegalStateException("更新定时滚动排程结果失败");
+        }
+        if (this.updateNullableFields(result) != 1) {
+            throw new IllegalStateException("清空定时滚动排程结果旧字段失败");
+        }
+    }
+
+    /**
+     * 显式更新允许被滚动清空的字段，绕过MyBatis-Plus NOT_NULL更新策略。
+     */
+    private int updateNullableFields(Cd15ScheduleResult result) {
+        com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper<Cd15ScheduleResult> wrapper =
+                new com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper<>();
+        wrapper.eq("ID", result.getId());
+        for (int classIndex = 1; classIndex <= 8; classIndex++) {
+            String dbPrefix = String.format("CLASS%d_", classIndex);
+            String fieldPrefix = String.format("class%d", classIndex);
+            wrapper.set(dbPrefix + "SCHEDULE_DATE",
+                    result.getFieldValueByFieldName(
+                            fieldPrefix + "ScheduleDate"));
+            wrapper.set(dbPrefix + "PLAN_QTY",
+                    result.getFieldValueByFieldName(fieldPrefix + "PlanQty"));
+            wrapper.set(dbPrefix + "PRODUCE_ORDER",
+                    result.getFieldValueByFieldName(
+                            fieldPrefix + "ProduceOrder"));
+            wrapper.set(dbPrefix + "ANALYSIS",
+                    result.getFieldValueByFieldName(fieldPrefix + "Analysis"));
+            wrapper.set(dbPrefix + "ANALYSIS_INPUT",
+                    result.getFieldValueByFieldName(
+                            fieldPrefix + "AnalysisInput"));
+        }
+        wrapper.set("STORAGE_LANE_CODE", result.getStorageLaneCode());
+        wrapper.set("RELEASE_STATUS", result.getReleaseStatus());
+        wrapper.set("REMARK", result.getRemark());
+        wrapper.set("BIG_ROLL_CONSUME_QTY", result.getBigRollConsumeQty());
+        return resultMapper.update(null, wrapper);
+    }
+
+    private void applyStorageLaneCodes(Cd15TimedRollingOutput output,
+                                       List<Cd15ScheduleLaneAllocation> lanes) {
+        Map<String, String> laneCodesByResult = lanes.stream()
+                .filter(item -> item.getOrderNo() != null)
+                .filter(item -> item.getStorageLaneCode() != null)
+                .collect(Collectors.groupingBy(
+                        item -> this.resultKey(
+                                item.getOrderNo(), item.getSteelStripCode()),
+                        LinkedHashMap::new, Collectors.mapping(
+                                Cd15ScheduleLaneAllocation::getStorageLaneCode,
+                                Collectors.collectingAndThen(
+                                        Collectors.toCollection(LinkedHashSet::new),
+                                        values -> String.join(",", values)))));
+        safe(output.getInsertedResults()).forEach(result ->
+                result.setStorageLaneCode(laneCodesByResult.get(this.resultKey(
+                        result.getOrderNo(), result.getSteelStripCode()))));
+        safe(output.getUpdatedResults()).forEach(result ->
+                result.setStorageLaneCode(laneCodesByResult.get(this.resultKey(
+                        result.getOrderNo(), result.getSteelStripCode()))));
+    }
+
+    private void replaceLaneAllocations(Cd15TimedRollingOutput output,
+                                        List<Cd15ScheduleLaneAllocation> lanes) {
+        Set<Long> affectedIds = new LinkedHashSet<>();
+        safe(output.getUpdatedResults()).stream().map(Cd15ScheduleResult::getId)
+                .filter(Objects::nonNull).forEach(affectedIds::add);
+        safe(output.getLogicallyDeletedResults()).stream().map(Cd15ScheduleResult::getId)
+                .filter(Objects::nonNull).forEach(affectedIds::add);
+        if (!affectedIds.isEmpty()) {
+            laneMapper.delete(new LambdaQueryWrapper<Cd15ScheduleLaneAllocation>()
+                    .in(Cd15ScheduleLaneAllocation::getScheduleResultId, affectedIds));
+        }
+        List<Cd15ScheduleResult> parents = new ArrayList<>();
+        parents.addAll(safe(output.getInsertedResults()));
+        parents.addAll(safe(output.getUpdatedResults()));
+        Map<String, Cd15ScheduleResult> parentByResult = parents.stream()
+                .filter(item -> item.getOrderNo() != null)
+                .collect(Collectors.toMap(
+                        item -> this.resultKey(
+                                item.getOrderNo(), item.getSteelStripCode()),
+                        Function.identity(), (left, right) -> left));
+        lanes.stream()
+                .filter(lane -> parentByResult.containsKey(this.resultKey(
+                        lane.getOrderNo(), lane.getSteelStripCode())))
+                .forEach(lane -> {
+                    Cd15ScheduleResult parent = parentByResult.get(this.resultKey(
+                            lane.getOrderNo(), lane.getSteelStripCode()));
+                    if (parent.getId() == null) {
+                        throw new IllegalStateException("滚动库排主结果缺少ID: " + lane.getOrderNo());
+                    }
+                    lane.setScheduleResultId(parent.getId());
+                    if (laneMapper.insert(lane) != 1) {
+                        throw new IllegalStateException("保存定时滚动库排分配失败");
                     }
                 });
     }
 
-    private List<String> suffixClassFields(int targetClassIndex) {
-        return IntStream.rangeClosed(targetClassIndex, CLASS_COUNT)
-                .boxed()
-                .flatMap(index -> Stream.of("class" + index, "CLASS" + index))
-                .collect(Collectors.toList());
-    }
-
-    private int resultClassIndex(Cd15ScheduleResult result) {
-        return IntStream.rangeClosed(1, CLASS_COUNT)
-                .filter(index -> this.positive(result, index))
-                .findFirst()
-                .orElse(0);
-    }
-
-    private boolean positive(Cd15ScheduleResult result, int classIndex) {
-        Serializable value = result.getFieldValueByFieldName(String.format("class%dPlanQty", classIndex));
-        if (value instanceof Number) {
-            return ((Number) value).doubleValue() > 0D;
+    private void replaceUnscheduled(Cd15RollingTarget target,
+                                    Cd15TimedRollingOutput output) {
+        Set<String> steelStripCodes = new LinkedHashSet<>();
+        safe(output.getAdjustments()).stream().map(Cd15RollingAdjustmentDraft::getSteelStripCode)
+                .filter(Objects::nonNull).forEach(steelStripCodes::add);
+        safe(output.getUnscheduledResults()).stream().map(Cd15UnscheduleResult::getSteelStripCode)
+                .filter(Objects::nonNull).forEach(steelStripCodes::add);
+        if (!steelStripCodes.isEmpty()) {
+            unscheduleMapper.delete(new LambdaQueryWrapper<Cd15UnscheduleResult>()
+                    .eq(Cd15UnscheduleResult::getFactoryCode, target.getFactoryCode())
+                    .eq(Cd15UnscheduleResult::getScheduleDate, date(target))
+                    .eq(Cd15UnscheduleResult::getBatchNo, target.getBatchNo())
+                    .in(Cd15UnscheduleResult::getSteelStripCode, steelStripCodes));
         }
-        Serializable scheduleDate = result.getFieldValueByFieldName(String.format("class%dScheduleDate", classIndex));
-        return scheduleDate != null;
+        safe(output.getUnscheduledResults()).forEach(result -> {
+            if (unscheduleMapper.insert(result) != 1) {
+                throw new IllegalStateException("保存定时滚动未排结果失败");
+            }
+        });
     }
 
-    private int reasonPriority(Cd15SingleShiftScheduleResult source) {
-        String reasonCode = source == null ? null : source.getUnscheduledReasonCode();
-        if ("DATA_MISSING".equals(reasonCode) || "ANGLE_WIDTH_CONFIG_MISSING".equals(reasonCode)) {
-            return 10;
+    private void saveAdjustments(String taskId, Cd15RollingTarget target,
+                                 Cd15TimedRollingOutput output) {
+        Map<String, Long> insertedIdByResult = safe(output.getInsertedResults()).stream()
+                .filter(item -> item.getOrderNo() != null && item.getId() != null)
+                .collect(Collectors.toMap(
+                        item -> this.resultKey(
+                                item.getOrderNo(), item.getSteelStripCode()),
+                        Cd15ScheduleResult::getId, (left, right) -> left));
+        safe(output.getAdjustments()).forEach(draft -> {
+            Cd15ScheduleRollingAdjustLog entity = new Cd15ScheduleRollingAdjustLog();
+            entity.setFactoryCode(target.getFactoryCode());
+            entity.setTaskId(taskId);
+            entity.setBatchNo(target.getBatchNo());
+            entity.setScheduleDate(date(target));
+            entity.setTargetShiftCode(target.getTargetShiftCode());
+            entity.setRollingItemKey(draft.getRollingItemKey());
+            entity.setScheduleResultId(draft.getScheduleResultId() == null
+                    ? insertedIdByResult.get(this.resultKey(
+                            draft.getRollingItemKey(), draft.getSteelStripCode()))
+                    : draft.getScheduleResultId());
+            entity.setSteelStripCode(draft.getSteelStripCode());
+            entity.setBigRollCode(draft.getBigRollCode());
+            entity.setAdjustType(draft.getAdjustType());
+            entity.setOldClassIndex(classIndex(draft.getBeforeClassField()));
+            entity.setNewClassIndex(classIndex(draft.getAfterClassField()));
+            entity.setOldProduceOrder(draft.getBeforeProduceOrder());
+            entity.setNewProduceOrder(draft.getAfterProduceOrder());
+            entity.setOldPlanQty(draft.getBeforeQuantity());
+            entity.setNewPlanQty(draft.getAfterQuantity());
+            entity.setOldMachineCode(draft.getBeforeMachineCode());
+            entity.setNewMachineCode(draft.getAfterMachineCode());
+            entity.setReasonCode(draft.getReasonCode());
+            entity.setReasonDetail(draft.getReasonDetail());
+            entity.setInputVersion(output.getInputVersion());
+            entity.setSnapshotSchemaVersion(SNAPSHOT_SCHEMA_VERSION);
+            entity.setBeforeSnapshotJson(snapshotJson(
+                    draft.getBeforeSnapshot(), output, draft.getSteelStripCode()));
+            entity.setAfterSnapshotJson(snapshotJson(
+                    draft.getAfterSnapshot(), output, draft.getSteelStripCode()));
+            if (adjustLogMapper.insert(entity) != 1) {
+                throw new IllegalStateException("保存定时滚动调整日志失败");
+            }
+        });
+    }
+
+    private String snapshotJson(Object source, Cd15TimedRollingOutput output,
+                                String steelStripCode) {
+        Map<String, Object> snapshot = source instanceof Map
+                ? new LinkedHashMap<>((Map<String, Object>) source)
+                : new LinkedHashMap<>();
+        snapshot.putIfAbsent("scheduleResult", source);
+        snapshot.putIfAbsent("laneAllocations", Collections.emptyList());
+        snapshot.put("unscheduledResults", safe(output.getUnscheduledResults()).stream()
+                .filter(item -> Objects.equals(steelStripCode, item.getSteelStripCode()))
+                .collect(Collectors.toList()));
+        snapshot.putIfAbsent("publishState", null);
+        try {
+            return objectMapper.writeValueAsString(snapshot);
+        } catch (JsonProcessingException exception) {
+            throw new IllegalStateException("定时滚动双快照序列化失败", exception);
         }
-        if ("NO_BIG_ROLL_STOCK".equals(reasonCode) || "AGING_PERIOD_LIMIT".equals(reasonCode)) {
-            return 20;
+    }
+
+    private String resultKey(String orderNo, String steelStripCode) {
+        return String.valueOf(orderNo) + "|" + String.valueOf(steelStripCode);
+    }
+
+    private Integer classIndex(String classField) {
+        if (classField == null || !classField.startsWith("CLASS")) {
+            return null;
         }
-        if ("STORAGE_LANE_LIMIT".equals(reasonCode)) {
-            return 30;
+        try {
+            return Integer.valueOf(classField.substring(5));
+        } catch (NumberFormatException exception) {
+            return null;
         }
-        if ("WIDTH_MISMATCH".equals(reasonCode) || "NO_AVAILABLE_MACHINE".equals(reasonCode)) {
-            return 40;
-        }
-        return 90;
     }
 
-    private String safeText(String value) {
-        return value == null ? "" : value;
+    private Date date(Cd15RollingTarget target) {
+        return Date.from(target.getScheduleDate().atStartOfDay(
+                ZoneId.systemDefault()).toInstant());
     }
 
-    private List<Cd15ScheduleResultDraft> safeReplacement(Cd15TimedRollingOutput output) {
-        return output == null || output.getReplacementResults() == null
-                ? Collections.emptyList() : output.getReplacementResults();
-    }
-
-    private List<Cd15SingleShiftScheduleResult> safeUnscheduled(Cd15TimedRollingOutput output) {
-        return output == null || output.getUnscheduledResults() == null
-                ? Collections.emptyList() : output.getUnscheduledResults();
-    }
-
-    private Date date(LocalDate value) {
-        return value == null ? null : Date.from(value.atStartOfDay(ZoneId.systemDefault()).toInstant());
+    private <T> List<T> safe(List<T> values) {
+        return values == null ? Collections.emptyList() : values;
     }
 }

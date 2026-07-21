@@ -12,7 +12,6 @@
         <result column="MACHINE_STOP_TYPE" property="machineStopType"/>
         <result column="BEGIN_DATE" property="beginDate"/>
         <result column="END_DATE" property="endDate"/>
-        <result column="ACTUAL_FINISH_DATE" property="actualFinishDate"/>
         <result column="MES_ID" property="mesId"/>
         <result column="DATA_SOURCE" property="dataSource"/>
         <result column="DATA_VERSION" property="dataVersion"/>
@@ -28,7 +27,7 @@
     <select id="selectByUniqueKeyList" resultMap="BaseResultMap">
         SELECT
             ID, FACTORY_CODE, MACHINE_TYPE, MACHINE_CODE, MACHINE_STOP_TYPE,
-            BEGIN_DATE, END_DATE, ACTUAL_FINISH_DATE, MES_ID,
+            BEGIN_DATE, END_DATE, MES_ID,
             DATA_SOURCE, DATA_VERSION,
             IS_DELETE, CREATE_BY, CREATE_TIME, UPDATE_BY, UPDATE_TIME, REMARK
         FROM T_MDM_DEVICE_PLAN_SHUT
@@ -38,11 +37,11 @@
         </foreach>
     </select>
 
-    <!-- 批量根据MES_ID查询设备计划停机（用于MES同步按MES_ID匹配更新实际完成日期） -->
+    <!-- 批量根据MES_ID查询设备计划停机（用于MES同步按MES_ID匹配更新） -->
     <select id="selectByMesIdList" resultMap="BaseResultMap">
         SELECT
             ID, FACTORY_CODE, MACHINE_TYPE, MACHINE_CODE, MACHINE_STOP_TYPE,
-            BEGIN_DATE, END_DATE, ACTUAL_FINISH_DATE, MES_ID,
+            BEGIN_DATE, END_DATE, MES_ID,
             DATA_SOURCE, DATA_VERSION,
             IS_DELETE, CREATE_BY, CREATE_TIME, UPDATE_BY, UPDATE_TIME, REMARK
         FROM T_MDM_DEVICE_PLAN_SHUT

@@ -1,370 +1,288 @@
 package com.zlt.aps.cd15.engine.algorithm;
 
-import com.zlt.aps.cd15.api.domain.entity.Cd15MachineInfo;
-import com.zlt.aps.cd15.api.domain.entity.Cd15MachineMaintenancePlan;
-import com.zlt.aps.cd15.api.domain.entity.Cd15MachineRollMapping;
-import com.zlt.aps.cd15.api.domain.entity.Cd15SpecifyMachine;
-import com.zlt.aps.cd15.engine.model.Cd15AutoScheduleInput;
-import com.zlt.aps.cd15.engine.model.Cd15ScheduleCandidate;
-import com.zlt.aps.cd15.engine.model.Cd15SplitCutGroup;
+import com.zlt.aps.cd15.engine.model.Cd15MachineCandidate;
+import com.zlt.aps.cd15.engine.model.Cd15MachineResource;
+import com.zlt.aps.cd15.engine.model.Cd15MachineRestriction;
+import com.zlt.aps.cd15.engine.model.Cd15MachineRollBinding;
+import com.zlt.aps.cd15.engine.model.Cd15MachineCandidateResolution;
 import com.zlt.aps.common.core.constant.ApsConstant;
-import com.zlt.aps.common.core.enums.ThreeShiftEnum;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.ZoneId;
-import java.sql.Timestamp;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.Date;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 /**
- * CD15 机台硬条件候选过滤。
+ * 候选机台硬约束过滤器。
  */
+@Slf4j
 @Component
 public class Cd15MachineCandidateResolver {
 
-    public static final String WIDTH_MISMATCH = "WIDTH_MISMATCH";
-    public static final String NO_AVAILABLE_MACHINE = "NO_AVAILABLE_MACHINE";
-
     /**
-     * 兼容单班试排的最小过滤：启用状态与 CLOTH_WIDTH_MIN/CLOTH_WIDTH_MAX 宽度过滤。
+     * 按大卷绑定、机台状态、开机班次、不可作业和检修约束生成候选机台。
+     *
+     * @param steelStripCode 钢带代码
+     * @param bigRollCode 大卷代码，对应施工CORD_SPEC
+     * @param shiftCode 当前班次编码
+     * @param shiftStart 班次开始时间
+     * @param shiftEnd 班次结束时间
+     * @param machines 机台资源
+     * @param bindings 大卷机台绑定
+     * @param restrictions 定点及不可作业配置
+     * @param machinePriority 参数机台优先顺序
+     * @return 已过滤并排序的候选机台
      */
-    public Optional<Cd15MachineInfo> resolve(List<Cd15MachineInfo> machines, BigDecimal effectiveWidth) {
-        return this.safe(machines).stream()
-                .filter(machine -> this.supports(machine, effectiveWidth))
-                .sorted(Comparator.comparing(Cd15MachineInfo::getMachineCode))
-                .findFirst();
+    public List<Cd15MachineCandidate> resolve(String steelStripCode,
+                                              String bigRollCode,
+                                              String shiftCode,
+                                              LocalDateTime shiftStart,
+                                              LocalDateTime shiftEnd,
+                                              List<Cd15MachineResource> machines,
+                                              List<Cd15MachineRollBinding> bindings,
+                                              List<Cd15MachineRestriction> restrictions,
+                                              List<String> machinePriority) {
+        return resolveDetailed(steelStripCode, bigRollCode, shiftCode, shiftStart, shiftEnd,
+                machines, bindings, restrictions, machinePriority).getCandidates();
     }
 
-    /**
-     * 按完整输入约束筛选单条候选机台。
-     */
-    public Optional<Cd15MachineInfo> resolve(Cd15AutoScheduleInput input,
-                                             Cd15ScheduleCandidate candidate,
-                                             BigDecimal effectiveWidth) {
-        if (candidate == null) {
-            return Optional.empty();
-        }
-        return this.resolveInternal(input, candidate.getBigRollCode(), candidate.getCuttingAngle(),
-                effectiveWidth, candidate.getClassIndex(), Collections.singletonList(candidate.getSteelStripCode()));
+    public List<Cd15MachineCandidate> resolve(String steelStripCode,
+                                              String bigRollCode,
+                                              BigDecimal craftWidth,
+                                              String shiftCode,
+                                              LocalDateTime shiftStart,
+                                              LocalDateTime shiftEnd,
+                                              List<Cd15MachineResource> machines,
+                                              List<Cd15MachineRollBinding> bindings,
+                                              List<Cd15MachineRestriction> restrictions,
+                                              List<String> machinePriority) {
+        return resolveDetailed(steelStripCode, bigRollCode, craftWidth, shiftCode, shiftStart, shiftEnd,
+                machines, bindings, restrictions, machinePriority).getCandidates();
     }
 
-    /**
-     * 按完整输入约束筛选分裁组合机台。
-     */
-    public Optional<Cd15MachineInfo> resolve(Cd15AutoScheduleInput input, Cd15SplitCutGroup splitGroup) {
-        if (splitGroup == null || splitGroup.getFirstCandidate() == null || splitGroup.getSecondCandidate() == null) {
-            return Optional.empty();
-        }
-        Cd15ScheduleCandidate firstCandidate = splitGroup.getFirstCandidate();
-        return this.resolveInternal(input, firstCandidate.getBigRollCode(), firstCandidate.getCuttingAngle(),
-                splitGroup.getCombinedWidth(), firstCandidate.getClassIndex(),
-                Arrays.asList(firstCandidate.getSteelStripCode(), splitGroup.getSecondCandidate().getSteelStripCode()));
+    /** 生成候选机台并区分无绑定与绑定机台全部不可作业。 */
+    public Cd15MachineCandidateResolution resolveDetailed(String steelStripCode,
+                                              String bigRollCode,
+                                              String shiftCode,
+                                              LocalDateTime shiftStart,
+                                              LocalDateTime shiftEnd,
+                                              List<Cd15MachineResource> machines,
+                                              List<Cd15MachineRollBinding> bindings,
+                                              List<Cd15MachineRestriction> restrictions,
+                                              List<String> machinePriority) {
+        return resolveDetailed(steelStripCode, bigRollCode, null, shiftCode, shiftStart, shiftEnd,
+                machines, bindings, restrictions, machinePriority);
     }
 
-    public boolean supports(Cd15MachineInfo machine, BigDecimal effectiveWidth) {
-        return machine != null
-                && ApsConstant.APS_STRING_1.equals(machine.getStatus())
-                && this.widthMatched(machine, effectiveWidth);
+    /** 兼容不需要角度宽度约束的独立调用。 */
+    public Cd15MachineCandidateResolution resolveDetailed(String steelStripCode,
+                                              String bigRollCode,
+                                              BigDecimal craftWidth,
+                                              String shiftCode,
+                                              LocalDateTime shiftStart,
+                                              LocalDateTime shiftEnd,
+                                              List<Cd15MachineResource> machines,
+                                              List<Cd15MachineRollBinding> bindings,
+                                              List<Cd15MachineRestriction> restrictions,
+                                              List<String> machinePriority) {
+        return this.resolveDetailed(steelStripCode, bigRollCode, craftWidth,
+                null, Collections.emptyMap(), shiftCode, shiftStart, shiftEnd,
+                machines, bindings, restrictions, machinePriority);
     }
 
-    public String resolveFailureReason(Cd15AutoScheduleInput input,
-                                       Cd15ScheduleCandidate candidate,
-                                       BigDecimal effectiveWidth) {
-        if (candidate == null) {
-            return NO_AVAILABLE_MACHINE;
-        }
-        return this.resolveFailureReason(input, candidate.getBigRollCode(), candidate.getCuttingAngle(),
-                effectiveWidth, candidate.getClassIndex(), Collections.singletonList(candidate.getSteelStripCode()));
-    }
-
-    public String resolveFailureReason(Cd15AutoScheduleInput input, Cd15SplitCutGroup splitGroup) {
-        if (splitGroup == null || splitGroup.getFirstCandidate() == null || splitGroup.getSecondCandidate() == null) {
-            return NO_AVAILABLE_MACHINE;
-        }
-        Cd15ScheduleCandidate firstCandidate = splitGroup.getFirstCandidate();
-        return this.resolveFailureReason(input, firstCandidate.getBigRollCode(), firstCandidate.getCuttingAngle(),
-                splitGroup.getCombinedWidth(), firstCandidate.getClassIndex(),
-                Arrays.asList(firstCandidate.getSteelStripCode(), splitGroup.getSecondCandidate().getSteelStripCode()));
-    }
-
-    public String resolveFailureReason(Cd15MachineInfo machine, BigDecimal effectiveWidth) {
-        if (machine != null && ApsConstant.APS_STRING_1.equals(machine.getStatus())
-                && !this.widthMatched(machine, effectiveWidth)) {
-            return WIDTH_MISMATCH;
-        }
-        return NO_AVAILABLE_MACHINE;
-    }
-
-    private Optional<Cd15MachineInfo> resolveInternal(Cd15AutoScheduleInput input,
-                                                      String bigRollCode,
-                                                      String cuttingAngle,
-                                                      BigDecimal effectiveWidth,
-                                                      int classIndex,
-                                                      List<String> steelStripCodes) {
-        MachineFilterContext context = this.context(input, bigRollCode, cuttingAngle,
-                effectiveWidth, classIndex, steelStripCodes);
-        return this.safe(input == null ? Collections.emptyList() : input.getMachines()).stream()
-                .filter(machine -> this.machineMatched(machine, context))
-                .sorted(Comparator.comparing((Cd15MachineInfo machine) -> this.preferred(machine, context)).reversed()
-                        .thenComparing(Cd15MachineInfo::getMachineCode))
-                .findFirst();
-    }
-
-    /**
-     * 候选为空时，只有存在“除宽度外其它硬约束均通过”的机台时才返回 WIDTH_MISMATCH。
-     */
-    private String resolveFailureReason(Cd15AutoScheduleInput input,
-                                        String bigRollCode,
-                                        String cuttingAngle,
-                                        BigDecimal effectiveWidth,
-                                        int classIndex,
-                                        List<String> steelStripCodes) {
-        MachineFilterContext context = this.context(input, bigRollCode, cuttingAngle,
-                effectiveWidth, classIndex, steelStripCodes);
-        boolean onlyWidthMismatch = this.safe(input == null ? Collections.emptyList() : input.getMachines()).stream()
-                .anyMatch(machine -> this.machineMatchedExceptWidth(machine, context)
-                        && !this.widthMatched(machine, effectiveWidth));
-        return onlyWidthMismatch ? WIDTH_MISMATCH : NO_AVAILABLE_MACHINE;
-    }
-
-    private boolean machineMatched(Cd15MachineInfo machine, MachineFilterContext context) {
-        return this.machineMatchedExceptWidth(machine, context)
-                && this.widthMatched(machine, context.effectiveWidth);
-    }
-
-    private boolean machineMatchedExceptWidth(Cd15MachineInfo machine, MachineFilterContext context) {
-        return machine != null
-                && ApsConstant.APS_STRING_1.equals(machine.getStatus())
-                && this.boundMatched(machine, context)
-                && this.openShiftMatched(machine.getOpenMachineClass(), context.shiftCode)
-                && !context.prohibitedMachineCodes.contains(machine.getMachineCode())
-                && !this.maintenanceOverlapped(machine, context)
-                && this.angleWidthMatched(context);
-    }
-
-    private boolean boundMatched(Cd15MachineInfo machine, MachineFilterContext context) {
-        return !context.hasRollBinding || context.boundMachineCodes.contains(machine.getMachineCode());
-    }
-
-    private boolean preferred(Cd15MachineInfo machine, MachineFilterContext context) {
-        return context.preferredMachineCodes.contains(machine.getMachineCode());
-    }
-
-    private boolean angleWidthMatched(MachineFilterContext context) {
-        if (!StringUtils.hasText(context.cuttingAngle)) {
-            return false;
-        }
-        BigDecimal maxWidth = context.angleWidthMaxByAngle.get(context.cuttingAngle);
-        return maxWidth != null && maxWidth.signum() > 0
-                && context.effectiveWidth != null
-                && context.effectiveWidth.compareTo(maxWidth) <= 0;
-    }
-
-    /**
-     * 机台上下限为空或为 0 时视为未限制。
-     */
-    private boolean widthMatched(Cd15MachineInfo machine, BigDecimal effectiveWidth) {
-        if (machine == null || effectiveWidth == null || effectiveWidth.signum() <= 0) {
-            return false;
-        }
-        BigDecimal min = this.toBigDecimal(machine.getClothWidthMin());
-        BigDecimal max = this.toBigDecimal(machine.getClothWidthMax());
-        return (min == null || BigDecimal.ZERO.compareTo(min) == 0 || effectiveWidth.compareTo(min) >= 0)
-                && (max == null || BigDecimal.ZERO.compareTo(max) == 0 || effectiveWidth.compareTo(max) <= 0);
-    }
-
-    private MachineFilterContext context(Cd15AutoScheduleInput input,
-                                         String bigRollCode,
-                                         String cuttingAngle,
-                                         BigDecimal effectiveWidth,
-                                         int classIndex,
-                                         List<String> steelStripCodes) {
-        String shiftCode = this.classIndexToShiftCode(classIndex);
-        List<String> normalizedSteelStripCodes = this.safe(steelStripCodes).stream()
-                .filter(StringUtils::hasText)
-                .map(String::trim)
+    /** 生成候选机台并执行角度最大宽度约束。 */
+    public Cd15MachineCandidateResolution resolveDetailed(String steelStripCode,
+                                              String bigRollCode,
+                                              BigDecimal craftWidth,
+                                              String cuttingAngle,
+                                              Map<String, BigDecimal> angleWidthMaxByAngle,
+                                              String shiftCode,
+                                              LocalDateTime shiftStart,
+                                              LocalDateTime shiftEnd,
+                                              List<Cd15MachineResource> machines,
+                                              List<Cd15MachineRollBinding> bindings,
+                                              List<Cd15MachineRestriction> restrictions,
+                                              List<String> machinePriority) {
+        List<Cd15MachineRollBinding> bigRollBindings = safe(bindings).stream()
+                .filter(item -> bigRollCode != null && bigRollCode.equals(item.getBigRollCode()))
                 .collect(Collectors.toList());
-        List<Cd15MachineRollMapping> rollMappings = this.safe(input == null ? null : input.getMachineRollMappings());
-        Set<String> boundMachineCodes = rollMappings.stream()
-                .filter(item -> Objects.equals(this.trim(item.getBigRollCode()), this.trim(bigRollCode)))
+        Set<String> boundMachines = bigRollBindings.stream()
                 .filter(item -> this.shiftMatched(item.getShiftCode(), shiftCode))
-                .map(Cd15MachineRollMapping::getMachineCode)
-                .filter(StringUtils::hasText)
-                .map(String::trim)
+                .map(Cd15MachineRollBinding::getMachineCode)
                 .collect(Collectors.toSet());
-        List<Cd15SpecifyMachine> restrictions = this.safe(input == null ? null : input.getSpecifyMachines()).stream()
-                .filter(item -> normalizedSteelStripCodes.contains(this.trim(item.getSteelStripCode())))
-                .collect(Collectors.toList());
-        Set<String> prohibitedMachineCodes = restrictions.stream()
+        // 大卷维护过绑定时必须命中当前班次；只维护其它班次不能放开到全部机台。
+        boolean hasBinding = !bigRollBindings.isEmpty();
+        Set<String> prohibited = safe(restrictions).stream()
+                .filter(item -> steelStripCode != null && steelStripCode.equals(item.getSteelStripCode()))
                 .filter(item -> ApsConstant.APS_STRING_1.equals(item.getJobType()))
-                .map(Cd15SpecifyMachine::getMachineCode)
-                .filter(StringUtils::hasText)
-                .map(String::trim)
+                .map(Cd15MachineRestriction::getMachineCode)
                 .collect(Collectors.toSet());
-        Set<String> preferredMachineCodes = restrictions.stream()
+        Set<String> preferred = safe(restrictions).stream()
+                .filter(item -> steelStripCode != null && steelStripCode.equals(item.getSteelStripCode()))
                 .filter(item -> ApsConstant.APS_STRING_0.equals(item.getJobType()))
-                .map(Cd15SpecifyMachine::getMachineCode)
-                .filter(StringUtils::hasText)
-                .map(String::trim)
+                .map(Cd15MachineRestriction::getMachineCode)
                 .collect(Collectors.toSet());
-        LocalDate shiftDate = this.shiftDate(input, classIndex);
-        LocalDateTime shiftStart = this.shiftStart(shiftDate, shiftCode);
-        LocalDateTime shiftEnd = this.shiftEnd(shiftDate, shiftCode);
-        return new MachineFilterContext(bigRollCode, cuttingAngle, effectiveWidth, shiftCode,
-                input == null || input.getAngleWidthMaxByAngle() == null
-                        ? Collections.emptyMap() : input.getAngleWidthMaxByAngle(),
-                !boundMachineCodes.isEmpty(), boundMachineCodes, prohibitedMachineCodes, preferredMachineCodes,
-                this.safe(input == null ? null : input.getMaintenancePlans()), shiftStart, shiftEnd);
-    }
 
-    private LocalDate shiftDate(Cd15AutoScheduleInput input, int classIndex) {
-        Date baseDate = input == null ? null : input.getScheduleDate();
-        LocalDate scheduleDate = this.toLocalDate(baseDate);
-        if (scheduleDate == null) {
-            return null;
+        List<String> priority = machinePriority == null ? Collections.emptyList() : machinePriority;
+        boolean angleConfigured = !StringUtils.hasText(cuttingAngle)
+                || angleWidthMaxByAngle != null
+                && angleWidthMaxByAngle.get(cuttingAngle.trim()) != null
+                && angleWidthMaxByAngle.get(cuttingAngle.trim()).signum() > 0;
+        boolean angleWidthMatched = angleConfigured
+                && this.angleWidthMatched(cuttingAngle, craftWidth, angleWidthMaxByAngle);
+        List<Cd15MachineCandidate> candidates = safe(machines).stream()
+                .filter(item -> !hasBinding || boundMachines.contains(item.getMachineCode()))
+                .filter(item -> ApsConstant.APS_STRING_1.equals(item.getStatus()))
+                .filter(item -> widthMatched(item, craftWidth))
+                .filter(item -> angleWidthMatched)
+                .filter(item -> openShiftMatched(item.getOpenMachineClass(), shiftCode))
+                .filter(item -> !prohibited.contains(item.getMachineCode()))
+                .map(item -> Cd15MachineCandidate.builder()
+                        .machineCode(item.getMachineCode())
+                        .preferredMachine(preferred.contains(item.getMachineCode()))
+                        .priorityOrder(priorityIndex(priority, item.getMachineCode()))
+                        .build())
+                .sorted(Comparator.comparing(Cd15MachineCandidate::isPreferredMachine).reversed()
+                        .thenComparingInt(Cd15MachineCandidate::getPriorityOrder)
+                        .thenComparing(Cd15MachineCandidate::getMachineCode))
+                .collect(Collectors.toList());
+        if (candidates.isEmpty() && !safe(machines).isEmpty()) {
+            for (Cd15MachineResource item : safe(machines)) {
+                if (!hasBinding || boundMachines.contains(item.getMachineCode())) {
+                    log.warn("[斜裁自动排程] 机台被硬约束过滤, steelStripCode={}, bigRollCode={}, machineCode={}, "
+                                    + "status={}, openMachineClass={}, shiftCode={}, craftWidth={}, "
+                                    + "clothWidthMin={}, clothWidthMax={}, widthMatched={}, openShiftMatched={}, "
+                                    + "prohibited={}, maintenanceStart={}, maintenanceEnd={}",
+                            steelStripCode, bigRollCode, item.getMachineCode(), item.getStatus(),
+                            item.getOpenMachineClass(), shiftCode, craftWidth,
+                            item.getClothWidthMin(), item.getClothWidthMax(),
+                            widthMatched(item, craftWidth),
+                            openShiftMatched(item.getOpenMachineClass(), shiftCode),
+                            prohibited.contains(item.getMachineCode()),
+                            item.getMaintenanceStart(), item.getMaintenanceEnd());
+                }
+            }
         }
-        if (classIndex <= 1) {
-            return scheduleDate.minusDays(1);
+        String failureReason = null;
+        if (!angleConfigured) {
+            failureReason = "ANGLE_WIDTH_CONFIG_MISSING";
+        } else if (!angleWidthMatched) {
+            failureReason = "ANGLE_WIDTH_MISMATCH";
+        } else if (hasBinding && boundMachines.stream().allMatch(prohibited::contains)) {
+            failureReason = "MACHINE_PROHIBITED";
+        } else if (candidates.isEmpty()) {
+            failureReason = resolveEmptyFailureReason(machines, hasBinding, boundMachines,
+                    craftWidth, shiftCode, prohibited, shiftStart, shiftEnd);
         }
-        return scheduleDate.plusDays((classIndex - 2) / 3);
+        return Cd15MachineCandidateResolution.builder().candidates(candidates)
+                .boundMachineCodes(boundMachines.stream().sorted().collect(Collectors.toList()))
+                .failureReason(failureReason).build();
     }
 
-    private String classIndexToShiftCode(int classIndex) {
-        return Cd15ShiftDisplayHelper.classIndexToShiftCode(classIndex);
-    }
-
-    private LocalDateTime shiftStart(LocalDate shiftDate, String shiftCode) {
-        if (shiftDate == null) {
-            return null;
+    /**
+     * 候选集合为空时按硬约束过滤原因细分失败编码。
+     * 若至少存在一台机台仅因宽度不匹配被排除（其它硬约束均通过），返回 WIDTH_MISMATCH；
+     * 否则返回 NO_AVAILABLE_MACHINE，由上层按动态状态或产能约束兜底。
+     */
+    private String resolveEmptyFailureReason(List<Cd15MachineResource> machines,
+                                             boolean hasBinding,
+                                             Set<String> boundMachines,
+                                             BigDecimal craftWidth,
+                                             String shiftCode,
+                                             Set<String> prohibited,
+                                             LocalDateTime shiftStart,
+                                             LocalDateTime shiftEnd) {
+        if (craftWidth == null) {
+            return "NO_AVAILABLE_MACHINE";
         }
-        ThreeShiftEnum shift = ThreeShiftEnum.getByCode(shiftCode);
-        if (shift == null) {
-            return null;
+        for (Cd15MachineResource item : safe(machines)) {
+            if (hasBinding && !boundMachines.contains(item.getMachineCode())) {
+                continue;
+            }
+
+            // 若有机台仅因宽度不匹配被排除，但其它硬约束均通过，则视为宽度不匹配场景。
+            if (ApsConstant.APS_STRING_1.equals(item.getStatus())
+                    && openShiftMatched(item.getOpenMachineClass(), shiftCode)
+                    && !prohibited.contains(item.getMachineCode())
+                    && !widthMatched(item, craftWidth)) {
+                return "WIDTH_MISMATCH";
+            }
         }
-        LocalDate startDate = shift.isCrossDay() ? shiftDate.minusDays(1) : shiftDate;
-        return LocalDateTime.of(startDate, shift.getStartTime());
+        return "NO_AVAILABLE_MACHINE";
+
     }
 
-    private LocalDateTime shiftEnd(LocalDate shiftDate, String shiftCode) {
-        if (shiftDate == null) {
-            return null;
+    /**
+     * 斜裁宽度来自施工表TIRE_FABRIC_CRAFT1/2/3；CORD_WIDTH是大卷宽、斜裁长，不参与宽度适配。
+     * 机台上下限为空时视为未限制，避免历史基础数据未维护宽度时把全部机台过滤掉。
+     */
+    private boolean widthMatched(Cd15MachineResource machine, BigDecimal craftWidth) {
+        if (craftWidth == null || machine == null) {
+            return true;
         }
-        ThreeShiftEnum shift = ThreeShiftEnum.getByCode(shiftCode);
-        if (shift == null) {
-            return null;
+        BigDecimal min = machine.getClothWidthMin();
+        BigDecimal max = machine.getClothWidthMax();
+        return (min == null || BigDecimal.ZERO.compareTo(min) == 0 || craftWidth.compareTo(min) >= 0)
+                && (max == null || BigDecimal.ZERO.compareTo(max) == 0 || craftWidth.compareTo(max) <= 0);
+    }
+
+    /** 检查施工宽度是否不超过当前裁断角度允许的最大宽度。 */
+    private boolean angleWidthMatched(String cuttingAngle,
+                                      BigDecimal craftWidth,
+                                      Map<String, BigDecimal> angleWidthMaxByAngle) {
+        if (!StringUtils.hasText(cuttingAngle)) {
+            return true;
         }
-        return LocalDateTime.of(shiftDate, shift.getEndTime());
-    }
-
-    private boolean openShiftMatched(String openMachineClass, String shiftCode) {
-        return StringUtils.hasText(openMachineClass) && StringUtils.hasText(shiftCode)
-                && Arrays.stream(openMachineClass.split(","))
-                .map(String::trim)
-                .anyMatch(shiftCode::equals);
-    }
-
-    private boolean shiftMatched(String configShiftCodes, String shiftCode) {
-        return !StringUtils.hasText(configShiftCodes) || Arrays.stream(configShiftCodes.split(","))
-                .map(String::trim)
-                .anyMatch(shiftCode::equals);
-    }
-
-    private boolean maintenanceOverlapped(Cd15MachineInfo machine, MachineFilterContext context) {
-        if (context.shiftStart == null || context.shiftEnd == null) {
+        if (angleWidthMaxByAngle == null) {
             return false;
         }
-        return context.maintenancePlans.stream()
-                .filter(item -> Objects.equals(this.trim(item.getMachineCode()), this.trim(machine.getMachineCode())))
-                .anyMatch(item -> this.overlaps(item, context.shiftStart, context.shiftEnd));
+        BigDecimal maxWidth = angleWidthMaxByAngle.get(cuttingAngle.trim());
+        return maxWidth != null && maxWidth.signum() > 0
+                && craftWidth != null && craftWidth.signum() > 0
+                && craftWidth.compareTo(maxWidth) <= 0;
     }
 
-    private boolean overlaps(Cd15MachineMaintenancePlan plan,
+    /** 机台开机班次支持逗号多选存储，例如01,02,03；匹配时按完整班次编码精确比较。 */
+    /** 大卷机台绑定班次支持逗号多选存储。 */
+    private boolean shiftMatched(String configuredShiftCodes, String shiftCode) {
+        return configuredShiftCodes != null && shiftCode != null
+                && Arrays.stream(configuredShiftCodes.split(","))
+                .map(String::trim)
+                .anyMatch(shiftCode::equals);
+    }
+    private boolean openShiftMatched(String openMachineClass, String shiftCode) {
+        if (openMachineClass == null || shiftCode == null) {
+            return false;
+        }
+        return Arrays.stream(openMachineClass.split(","))
+                .map(String::trim)
+                .anyMatch(shiftCode::equals);
+    }
+
+    private boolean overlaps(Cd15MachineResource machine,
                              LocalDateTime shiftStart,
                              LocalDateTime shiftEnd) {
-        LocalDateTime downtimeStart = this.toLocalDateTime(plan.getDowntimeStartTime());
-        LocalDateTime downtimeEnd = this.toLocalDateTime(plan.getDowntimeEndTime());
-        return downtimeStart != null && downtimeEnd != null
-                && downtimeStart.isBefore(shiftEnd) && downtimeEnd.isAfter(shiftStart);
-    }
-
-    private LocalDate toLocalDate(Date value) {
-        LocalDateTime dateTime = this.toLocalDateTime(value);
-        return dateTime == null ? null : dateTime.toLocalDate();
-    }
-
-    private LocalDateTime toLocalDateTime(Date value) {
-        if (value == null) {
-            return null;
+        if (machine.getMaintenanceStart() == null || machine.getMaintenanceEnd() == null) {
+            return false;
         }
-        if (value instanceof java.sql.Date && !(value instanceof Timestamp)) {
-            return ((java.sql.Date) value).toLocalDate().atStartOfDay();
-        }
-        return LocalDateTime.ofInstant(value.toInstant(), ZoneId.systemDefault());
+        return machine.getMaintenanceStart().isBefore(shiftEnd)
+                && machine.getMaintenanceEnd().isAfter(shiftStart);
     }
 
-    private BigDecimal toBigDecimal(Double value) {
-        return value == null ? null : BigDecimal.valueOf(value);
-    }
-
-    private String trim(String value) {
-        return value == null ? null : value.trim();
+    private int priorityIndex(List<String> priorities, String machineCode) {
+        int index = priorities.indexOf(machineCode);
+        return index < 0 ? Integer.MAX_VALUE : index;
     }
 
     private <T> List<T> safe(List<T> values) {
         return values == null ? Collections.emptyList() : values;
-    }
-
-    private static class MachineFilterContext {
-        private final String bigRollCode;
-        private final String cuttingAngle;
-        private final BigDecimal effectiveWidth;
-        private final String shiftCode;
-        private final Map<String, BigDecimal> angleWidthMaxByAngle;
-        private final boolean hasRollBinding;
-        private final Set<String> boundMachineCodes;
-        private final Set<String> prohibitedMachineCodes;
-        private final Set<String> preferredMachineCodes;
-        private final List<Cd15MachineMaintenancePlan> maintenancePlans;
-        private final LocalDateTime shiftStart;
-        private final LocalDateTime shiftEnd;
-
-        private MachineFilterContext(String bigRollCode,
-                                     String cuttingAngle,
-                                     BigDecimal effectiveWidth,
-                                     String shiftCode,
-                                     Map<String, BigDecimal> angleWidthMaxByAngle,
-                                     boolean hasRollBinding,
-                                     Set<String> boundMachineCodes,
-                                     Set<String> prohibitedMachineCodes,
-                                     Set<String> preferredMachineCodes,
-                                     List<Cd15MachineMaintenancePlan> maintenancePlans,
-                                     LocalDateTime shiftStart,
-                                     LocalDateTime shiftEnd) {
-            this.bigRollCode = bigRollCode;
-            this.cuttingAngle = cuttingAngle;
-            this.effectiveWidth = effectiveWidth;
-            this.shiftCode = shiftCode;
-            this.angleWidthMaxByAngle = angleWidthMaxByAngle;
-            this.hasRollBinding = hasRollBinding;
-            this.boundMachineCodes = boundMachineCodes;
-            this.prohibitedMachineCodes = prohibitedMachineCodes;
-            this.preferredMachineCodes = preferredMachineCodes;
-            this.maintenancePlans = maintenancePlans;
-            this.shiftStart = shiftStart;
-            this.shiftEnd = shiftEnd;
-        }
     }
 }

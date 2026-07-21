@@ -1002,6 +1002,74 @@ public class MesItfServiceImpl implements MesItfService {
     }
 
     /**
+     * 按指定版本号同步硫化在机数据（临时任务）
+     * 与原syncLhMachineOnlineInfo的区别：不限日期，按指定版本号查询MES中间表所有日期数据
+     * 同步逻辑参考硫化排程完成量回报按版本号同步（syncLhClassShiftFinishQtyByVersion）：
+     * 由于指定版本可能包含多个onlineDate的数据，按onlineDate分组后逐组调用逻辑删除+插入
+     * 硫化在机数据不涉及排程结果回填，无需调用回填接口
+     *
+     * @param dataVersion 指定版本号
+     * @return 结果
+     */
+    @Override
+    public AjaxResult syncLhMachineOnlineInfoByVersion(String dataVersion) {
+        LhMachineOnlineInfo queryParam = new LhMachineOnlineInfo();
+        queryParam.setDataVersion(dataVersion);
+
+        DynamicDataSourceContextHolder.push(DataSource.MES);
+        List<LhMachineOnlineInfo> syncList = mesItfMapper.selectLhMachineOnlineSyncListByVersion(queryParam);
+        DynamicDataSourceContextHolder.poll();
+
+        if (CollectionUtils.isEmpty(syncList)) {
+            log.warn("硫化在机按版本号同步：MES中间表查询结果为空，dataVersion={}", dataVersion);
+            return AjaxResult.success("MES中间表无数据可同步");
+        }
+
+        List<LhMachineOnlineInfo> insertList = new ArrayList<>();
+        for (LhMachineOnlineInfo item : syncList) {
+            LhMachineOnlineInfo entity = new LhMachineOnlineInfo();
+            BeanUtils.copyProperties(item, entity);
+            entity.setCreateBy("MES");
+            entity.setUpdateBy("MES");
+            entity.setCreateTime(DateUtils.getNowDate());
+            entity.setUpdateTime(DateUtils.getNowDate());
+            entity.setIsDelete(0);
+            insertList.add(entity);
+        }
+
+        // 按onlineDate分组，逐组同步（原逻辑按单个onlineDate做逻辑删除+插入，跨日期需分组避免误删）
+        Map<String, List<LhMachineOnlineInfo>> groupByOnlineDate = insertList.stream()
+                .collect(Collectors.groupingBy(item -> {
+                    Date onlineDate = item.getOnlineDate();
+                    return onlineDate != null ? DateUtil.formatDate(onlineDate) : "unknown";
+                }));
+
+        for (Map.Entry<String, List<LhMachineOnlineInfo>> entry : groupByOnlineDate.entrySet()) {
+            String onlineDateStr = entry.getKey();
+            List<LhMachineOnlineInfo> groupList = entry.getValue();
+            String factoryCode = groupList.get(0).getFactoryCode();
+
+            try {
+                log.info("硫化在机按版本号同步：开始同步，dataVersion={}, factoryCode={}, onlineDate={}, 待插入数量={}",
+                        dataVersion, factoryCode, onlineDateStr, groupList.size());
+
+                String finalFactoryCode = factoryCode;
+                FeignTokenHelper.runWithToken(() -> {
+                    lhMesSyncRemoteService.logicDeleteAndSaveMachineOnlineInfo(finalFactoryCode, onlineDateStr, "MES", groupList);
+                });
+
+                log.info("硫化在机按版本号同步：同步完成，dataVersion={}, factoryCode={}, onlineDate={}, 插入数量={}",
+                        dataVersion, factoryCode, onlineDateStr, groupList.size());
+            } catch (Exception e) {
+                log.error("硫化在机按版本号同步：Feign调用异常，dataVersion={}, factoryCode={}, onlineDate={}",
+                        dataVersion, factoryCode, onlineDateStr, e);
+                return AjaxResult.error("硫化在机按版本号同步失败：" + e.getMessage());
+            }
+        }
+        return AjaxResult.success();
+    }
+
+    /**
      * 同步设备保养计划
      * 采用更新删除标识模式，而不是先删后插
      * @param syncDataLogs 同步参数
@@ -2293,23 +2361,29 @@ public class MesItfServiceImpl implements MesItfService {
             insertList.add(entity);
         }
 
-        // 量试合格品充抵正规订单：在 handleTrialFinishQtyRule 之前调用，
+        // 量试合格品充抵正规订单：由开关 SYS0312001 控制，
+        // 开启时在 handleTrialFinishQtyRule 之前调用，
         // 判断条件：同一完成日期+同一SKU在 MES 回传数据中同时存在量试(T)和正规(S)两条数据时，
         // 额外插入一条正规(S)记录（值取自量试T数据），用于量试合格品充抵正规订单。
         // 注意：必须在 handleTrialFinishQtyRule 之前调用，因为充抵记录使用的是 MES 原始值，不能被试制/量试规则调整。
         // 新增的正规记录 lhType=S，handleTrialFinishQtyRule 会跳过（isTrialOrMassTrial 返回 false），不受影响。
-        List<LhDayFinishQty> extraFormalRecords = this.buildMassTrialToFormalRecords(
-                syncDataLogs.getFactoryCode(), syncList);
-        if (CollectionUtils.isNotEmpty(extraFormalRecords)) {
-            // 补充审计字段（与 syncLhScheDayFinishQtyByLatestVersion 保持一致）
-            for (LhDayFinishQty extra : extraFormalRecords) {
-                extra.setCreateBy("MES");
-                extra.setUpdateBy("MES");
-                extra.setCreateTime(DateUtils.getNowDate());
-                extra.setUpdateTime(DateUtils.getNowDate());
-                extra.setIsDelete(0);
+        if (this.isMassTrialToFormalEnabled(syncDataLogs.getFactoryCode())) {
+            List<LhDayFinishQty> extraFormalRecords = this.buildMassTrialToFormalRecords(
+                    syncDataLogs.getFactoryCode(), syncList);
+            if (CollectionUtils.isNotEmpty(extraFormalRecords)) {
+                // 补充审计字段（与 syncLhScheDayFinishQtyByLatestVersion 保持一致）
+                for (LhDayFinishQty extra : extraFormalRecords) {
+                    extra.setCreateBy("MES");
+                    extra.setUpdateBy("MES");
+                    extra.setCreateTime(DateUtils.getNowDate());
+                    extra.setUpdateTime(DateUtils.getNowDate());
+                    extra.setIsDelete(0);
+                }
+                insertList.addAll(extraFormalRecords);
             }
-            insertList.addAll(extraFormalRecords);
+        } else {
+            log.info("量试充抵正规开关已关闭（SYS0312001=0），跳过量试→正规充抵记录，factoryCode={}",
+                    syncDataLogs.getFactoryCode());
         }
 
         // 处理试制/量试完成量回报规则（跨日合并计划量；≤日计划量按计划量回报、>日计划量按实际回报；
@@ -2435,24 +2509,30 @@ public class MesItfServiceImpl implements MesItfService {
             insertList.add(entity);
         }
 
-        // 量试合格品充抵正规订单：在 handleTrialFinishQtyRule 之前调用，
+        // 量试合格品充抵正规订单：由开关 SYS0312001 控制，
+        // 开启时在 handleTrialFinishQtyRule 之前调用，
         // 判断条件：同一完成日期+同一SKU在 MES 回传数据中同时存在量试(T)和正规(S)两条数据时，
         // 额外插入一条正规(S)记录（值取自量试T数据），用于量试合格品充抵正规订单。
         // 注意：必须在 handleTrialFinishQtyRule 之前调用，因为充抵记录使用的是 MES 原始值，不能被试制/量试规则调整。
         // 新增的正规记录 lhType=S，handleTrialFinishQtyRule 会跳过（isTrialOrMassTrial 返回 false），不受影响。
         String factoryCodeForBuild = insertList.get(0).getFactoryCode();
-        List<LhDayFinishQty> extraFormalRecords = this.buildMassTrialToFormalRecords(
-                factoryCodeForBuild, syncList);
-        if (CollectionUtils.isNotEmpty(extraFormalRecords)) {
-            // 补充审计字段
-            for (LhDayFinishQty extra : extraFormalRecords) {
-                extra.setCreateBy("MES");
-                extra.setUpdateBy("MES");
-                extra.setCreateTime(DateUtils.getNowDate());
-                extra.setUpdateTime(DateUtils.getNowDate());
-                extra.setIsDelete(0);
+        if (this.isMassTrialToFormalEnabled(factoryCodeForBuild)) {
+            List<LhDayFinishQty> extraFormalRecords = this.buildMassTrialToFormalRecords(
+                    factoryCodeForBuild, syncList);
+            if (CollectionUtils.isNotEmpty(extraFormalRecords)) {
+                // 补充审计字段
+                for (LhDayFinishQty extra : extraFormalRecords) {
+                    extra.setCreateBy("MES");
+                    extra.setUpdateBy("MES");
+                    extra.setCreateTime(DateUtils.getNowDate());
+                    extra.setUpdateTime(DateUtils.getNowDate());
+                    extra.setIsDelete(0);
+                }
+                insertList.addAll(extraFormalRecords);
             }
-            insertList.addAll(extraFormalRecords);
+        } else {
+            log.info("量试充抵正规开关已关闭（SYS0312001=0），跳过量试→正规充抵记录，factoryCode={}",
+                    factoryCodeForBuild);
         }
 
         // 处理试制/量试完成量回报规则（跨日合并计划量；≤日计划量按计划量回报、>日计划量按实际回报；
@@ -2676,6 +2756,33 @@ public class MesItfServiceImpl implements MesItfService {
     private boolean isTrialOrMassTrial(String lhType) {
         TrialStatusEnum status = TrialStatusEnum.getByCode(lhType);
         return TrialStatusEnum.TRIAL == status || TrialStatusEnum.MASS_TRIAL == status;
+    }
+
+    /**
+     * 判断量试充抵正规开关是否开启。
+     * <p>读取硫化参数 SYS0312001 的值，默认为开启（"1"），与存量行为一致。
+     * 参数值为 "0" 时关闭，不再额外插入量试→正规充抵记录。</p>
+     *
+     * @param factoryCode 分厂编码
+     * @return true-开关开启（执行充抵），false-开关关闭（跳过充抵）
+     */
+    private boolean isMassTrialToFormalEnabled(String factoryCode) {
+        try {
+            LhParams paramResult = FeignTokenHelper.callWithToken(() ->
+                    lhMesSyncRemoteService.selectLhParamsByCode(
+                            LhScheduleParamConstant.ENABLE_MASS_TRIAL_TO_FORMAL, factoryCode));
+            if (paramResult == null || StringUtils.isBlank(paramResult.getParamValue())) {
+                // 未配置时默认开启，与存量行为一致
+                return true;
+            }
+            boolean enabled = "1".equals(paramResult.getParamValue().trim());
+            log.info("量试充抵正规开关：factoryCode={}, paramValue={}, enabled={}",
+                    factoryCode, paramResult.getParamValue(), enabled);
+            return enabled;
+        } catch (Exception e) {
+            log.error("量试充抵正规开关：读取硫化参数异常，factoryCode={}，默认开启", factoryCode, e);
+            return true;
+        }
     }
 
     /**
@@ -4553,7 +4660,7 @@ public class MesItfServiceImpl implements MesItfService {
             List<List<DevPlanCloseVo>> splitList = ScmListUtils.getSplitList(syncList, 1000);
             List<MdmDevicePlanShut> insertOrUpdateList = null;
             for (List<DevPlanCloseVo> saveList : splitList) {
-                // 1. 优先按MES_ID批量查询APS已有数据（用于精准匹配更新实际完成日期）
+                // 1. 优先按MES_ID批量查询APS已有数据（用于精准匹配更新）
                 List<MdmDevicePlanShut> mesIdQueryList = saveList.stream()
                         .map(DevPlanCloseVo::getId)
                         .filter(Objects::nonNull)
@@ -4620,8 +4727,6 @@ public class MesItfServiceImpl implements MesItfService {
                     entity.setUpdateBy("MES");
                     // 存储MES设备停机计划表ID，用于后续同步按MES_ID精准匹配
                     entity.setMesId(item.getId());
-                    // 实际完成日期（MES同步时携带）
-                    entity.setActualFinishDate(item.getActualFinishDate());
 
                     // 处理删除标识：MES的DEL_FLAG映射为APS的IS_DELETE
                     if (StringUtils.isNotBlank(item.getDelFlag())) {
@@ -4630,10 +4735,10 @@ public class MesItfServiceImpl implements MesItfService {
                         entity.setIsDelete(0);
                     }
 
-                    // 匹配策略：优先按MES_ID匹配（精准，确保实际完成日期更新到正确记录），
-                    // 未命中时回退唯一键匹配（兼容历史无MES_ID数据，同时回填MES_ID），都未命中则插入
+                    // 匹配策略：优先按MES_ID匹配（精准），未命中时回退唯一键匹配
+                    // （兼容历史无MES_ID数据，同时回填MES_ID），都未命中则插入
                     if (item.getId() != null && existsByMesIdMap.containsKey(item.getId())) {
-                        // 按MES_ID命中 → 更新（含ACTUAL_FINISH_DATE）
+                        // 按MES_ID命中 → 更新
                         MdmDevicePlanShut existsData = existsByMesIdMap.get(item.getId());
                         entity.setId(existsData.getId());
                     } else {

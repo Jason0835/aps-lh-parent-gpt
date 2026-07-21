@@ -1,108 +1,81 @@
 package com.zlt.aps.gsq.service.impl;
 
-import static com.zlt.aps.common.core.utils.ImportUtil.addImportErrorLog;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
+import com.ruoyi.common.constant.UserConstants;
+import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.zlt.aps.common.core.utils.ImportUtil;
+import com.zlt.aps.gsq.api.domain.entity.GsqStock;
+import com.zlt.aps.gsq.mapper.GsqStockMapper;
+import com.zlt.aps.gsq.service.IGsqStockService;
+import com.zlt.bill.common.service.AbstractDocService;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
 
-import java.math.BigDecimal;
+import javax.annotation.Resource;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-import org.apache.commons.collections.CollectionUtils;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-
-import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
-import com.ruoyi.common.core.web.domain.AjaxResult;
-import com.ruoyi.common.i18n.utils.I18nUtil;
-import com.ruoyi.common.utils.StringUtils;
-import com.zlt.aps.common.core.utils.ImportUtil;
-import com.zlt.aps.gsq.api.domain.entity.GsqStock;
-import com.zlt.aps.gsq.mapper.GsqStockMapper;
-import com.zlt.aps.gsq.service.GsqStockService;
+import static com.zlt.aps.common.core.utils.ImportUtil.addImportErrorLog;
 
 /**
- * 钢丝圈库存信息Service业务层处理
+ * 钢丝圈库存管理Service实现
  *
  * @author zlt
- * @date 2021-05-31
+ * @date 2026-07-08
  */
+@Slf4j
 @Service
-public class GsqStockServiceImpl implements GsqStockService {
-    @Autowired
-    private GsqStockMapper stockMapper;
+public class GsqStockServiceImpl extends AbstractDocService<GsqStock>
+        implements IGsqStockService {
+
+    @Resource
+    private GsqStockMapper gsqStockMapper;
 
     /**
-     * 查询钢丝圈库存信息
-     *
-     * @param id 钢丝圈库存信息ID
-     * @return 钢丝圈库存信息
+     * 单据类型编码
      */
     @Override
-    public GsqStock selectStockById(Long id) {
-        return stockMapper.selectStockById(id);
+    protected String getDocTypeCode() {
+        return "GSQ_STEEL_RING_STOCK";
     }
 
     /**
-     * 查询钢丝圈库存信息列表
-     *
-     * @param GsqStock 钢丝圈库存信息
-     * @return 钢丝圈库存信息
+     * 唯一性校验字段：库存日期+钢丝圈代码
      */
     @Override
-    public List<GsqStock> selectStockList(GsqStock stock) {
-        if (StringUtils.isNotEmpty(stock.getEndTime())) {
-            stock.setEndTime(stock.getEndTime() + " 23:59:59");
+    protected List<String> getCheckUniqueFields() {
+        return java.util.Arrays.asList("stockDate", "steelRingCode");
+    }
+
+    /**
+     * 校验"库存日期+钢丝圈代码"组合唯一性
+     * 框架已自动过滤逻辑删除数据，无需手动追加 IS_DELETE 条件
+     *
+     * @param entity 实体
+     * @return UserConstants.UNIQUE=唯一，UserConstants.NOT_UNIQUE=不唯一
+     */
+    @Override
+    public String checkUnique(GsqStock entity) {
+        LambdaQueryWrapper<GsqStock> wrapper = new LambdaQueryWrapper<>();
+        wrapper.ne(entity.getId() != null, GsqStock::getId, entity.getId());
+        wrapper.eq(GsqStock::getStockDate, entity.getStockDate());
+        wrapper.eq(GsqStock::getSteelRingCode, entity.getSteelRingCode());
+        wrapper.eq(GsqStock::getIsDelete, "0");
+        if (gsqStockMapper.selectCount(wrapper) > 0) {
+            return UserConstants.NOT_UNIQUE;
         }
-        return stockMapper.selectStockList(stock);
-    }
-
-    /**
-     * 新增钢丝圈库存信息
-     *
-     * @param GsqStock 钢丝圈库存信息
-     * @return 结果
-     */
-    @Override
-    public int insertStock(GsqStock stock) {
-        stock.setBaseVale(null);
-        return stockMapper.insertStock(stock);
-    }
-
-    /**
-     * 修改钢丝圈库存信息
-     *
-     * @param stock 钢丝圈库存信息
-     * @return 结果
-     */
-    @Override
-    public int updateStock(GsqStock stock) {
-        stock.setBaseVale(stock.getId());
-        return stockMapper.updateStock(stock);
-    }
-
-    /**
-     * 批量删除钢丝圈库存信息
-     *
-     * @param ids 需要删除的钢丝圈库存信息ID
-     * @return 结果
-     */
-    @Override
-    public int deleteStockByIds(Long[] ids) {
-        return stockMapper.deleteStockByIds(ids);
-    }
-
-    /**
-     * 校验钢丝圈库存唯一性（根据库存日期+物料编号+id）
-     */
-    public List<GsqStock> checkStockListUnic(GsqStock stock) {
-        return stockMapper.checkStockListUnic(stock);
+        return UserConstants.UNIQUE;
     }
 
     /**
      * 导入数据，并保存记录
+     * 校验规则：钢丝圈代码、库存日期、库存量必填；按"库存日期+钢丝圈代码"校验重复
      *
-     * @param list          要导入数据
+     * @param list          要导入的数据
      * @param updateSupport 已存在是否更新
      * @param importLogId   导入日志id
      * @return 导入后提示信息
@@ -111,91 +84,74 @@ public class GsqStockServiceImpl implements GsqStockService {
     public AjaxResult importData(List<GsqStock> list, boolean updateSupport, Long importLogId) {
         int successNum = 0;
         int failureNum = 0;
-        //做校验
         List<ImportErrorLog> importErrorLogs = new ArrayList<>();
         List<GsqStock> importList = new ArrayList<>();
 
-        //按业务主键分组
-        Map<String, Long> groupMap = list.stream().collect(Collectors.groupingBy(a -> (a.getStockDate()+a.getMaterialCode()), Collectors.counting()));
+        // 按"库存日期+钢丝圈代码"分组，识别文件内重复数据
+        Map<String, Long> groupMap = list.stream()
+                .collect(Collectors.groupingBy(
+                        a -> (a.getStockDate() + "_" + a.getSteelRingCode()),
+                        Collectors.counting()));
 
+        // 逐行校验
         for (int i = 0; i < list.size(); i++) {
-            GsqStock stock = list.get(i);
+            GsqStock entity = list.get(i);
 
-            //重复记录校验
-            Long hasValue = groupMap.get(stock.getStockDate()+stock.getMaterialCode());
-            if (hasValue > 1) {
+            // 文件内重复校验
+            String groupKey = entity.getStockDate() + "_" + entity.getSteelRingCode();
+            Long hasValue = groupMap.get(groupKey);
+            if (hasValue != null && hasValue > 1) {
                 failureNum++;
-                stock.setId(-999L);
+                entity.setId(-999L);
                 String message = I18nUtil.getMessage("ui.data.column.all.conflictRecord");
-                String columnName = I18nUtil.getMessage("ui.data.column.stock.stockDate");
-                String columnName2 = I18nUtil.getMessage("ui.data.column.quota.steelRingCode");
-                message=String.format(message,columnName+"+"+columnName2);
-                addImportErrorLog(importLogId, i + 2,message, importErrorLogs);
+                String columnName = I18nUtil.getMessage("ui.data.column.gsq.stock.stockDate")
+                        + "+" + I18nUtil.getMessage("ui.data.column.gsq.stock.steelRingCode");
+                message = String.format(message, columnName);
+                addImportErrorLog(importLogId, i + 2, message, importErrorLogs);
                 continue;
             }
 
-            List<ImportErrorLog> validated = ImportUtil.validated(importLogId, i + 2, stock);
-            if (CollectionUtils.isNotEmpty(validated)) {
-                // 校验失败
-                failureNum++;
-                stock.setId(-999L);
-                importErrorLogs.addAll(validated);
+            // 字段格式校验（必填+数据类型）
+            List<ImportErrorLog> validated = ImportUtil.validated(importLogId, i + 2, entity);
+            if (validated.isEmpty()) {
+                importList.add(entity);
             } else {
-
-                BigDecimal StockNum =stock.getStockNum()==null?new BigDecimal(0):stock.getStockNum();
-                BigDecimal ModifyNum =stock.getModifyNum()==null?new BigDecimal(0):stock.getModifyNum();
-                BigDecimal BadNum =stock.getBadNum()==null?new BigDecimal(0):stock.getBadNum();
-                BigDecimal dd= StockNum.add(ModifyNum).subtract(BadNum);
-                if(dd.compareTo(new BigDecimal(0))<0){
-                    failureNum++;
-                    stock.setId(-999L);
-                    addImportErrorLog(importLogId, i + 2,
-                            I18nUtil.getMessage("ui.data.column.stock.stockNumValidate"), importErrorLogs);
-                    continue;
-                }
-
-                stock.setBaseVale(null);
-                importList.add(stock);
+                failureNum++;
+                entity.setId(-999L);
+                importErrorLogs.addAll(validated);
             }
         }
+
+        // 保存：updateSupport=true 走 mergeSql（存在则更新）；否则逐条校验唯一后 save
         try {
-            //勾选更新记录，调用merge即可
-            if (updateSupport && CollectionUtils.isNotEmpty(importList)) {
+            if (updateSupport && !importList.isEmpty()) {
                 successNum = importList.size();
-                stockMapper.mergeSql(importList);
+                gsqStockMapper.mergeSql(importList);
             } else {
-                //查询数据库已存在对象
                 for (int i = 0; i < list.size(); i++) {
                     GsqStock excelItem = list.get(i);
-                    // 错误记录跳过
                     if (excelItem.getId() != null && excelItem.getId().equals(-999L)) {
                         continue;
                     }
-
-                    // 唯一性校验
-                    List<GsqStock> unic = stockMapper.checkStockListUnic(excelItem);
-                    if (CollectionUtils.isEmpty(unic)) {
-                        //不存在插入
+                    int unique = gsqStockMapper.checkUnique(excelItem);
+                    if (unique == 0) {
                         successNum++;
-                        stockMapper.insertStock(excelItem);
+                        baseDao.save(excelItem);
                     } else {
-                        // 存在，插入错误详细日志
                         failureNum++;
                         addImportErrorLog(importLogId, i + 2,
-                                I18nUtil.getMessage("ui.stock.message.unique"), importErrorLogs);
-                        continue;
+                                I18nUtil.getMessage("ui.data.column.gsq.stock.conflict"), importErrorLogs);
                     }
-
                 }
             }
         } catch (Exception e) {
-            e.printStackTrace();
-            // 执行sql失败，插入导入失败记录
+            log.error("导入钢丝圈库存管理异常", e);
             successNum = 0;
             failureNum = list.size();
             importErrorLogs.clear();
             addImportErrorLog(importLogId, null, e.getMessage(), importErrorLogs);
         }
+
         if (failureNum > 0) {
             return AjaxResult.error(I18nUtil.getMessage("ui.message.import.fail") + "," + successNum + "," + failureNum, importErrorLogs);
         } else {

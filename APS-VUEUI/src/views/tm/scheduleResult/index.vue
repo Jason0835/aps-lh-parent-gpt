@@ -54,7 +54,7 @@
         <el-button
           type="primary"
           v-hasPermi="['tm:tmScheduleResult:import']"
-          @click="$refs.tltUpload.handleImport()"
+          @click="handleImport"
         >{{ $t("ui.frame.btn.import") }}</el-button>
         <el-button
           type="primary"
@@ -73,11 +73,13 @@
     <tlt-upload-form
       ref="tltUpload"
       :updateSupport="true"
-      downloadUrl="/tm/tmScheduleResult/importTemplate"
-      uploadUrl="/tm/tmScheduleResult/importData"
+      :download-url-formatter="(form) => handleTemplateDownload('/tm/tmScheduleResult/importTemplateCust', form)"
+      :rules="importRules"
+      downloadUrl="/tm/tmScheduleResult/importTemplateCust"
       @uploadSuccess="getList"
       labelWidth="0"
       :columns="importColumns"
+      uploadUrl="/tm/tmScheduleResult/importDataCust"
     ></tlt-upload-form>
     <autoPlanDialog ref="autoPlanRef" @success="handleAutoPlanSuccess" />
     <infoDialog ref="infoRef" @success="getList" />
@@ -177,22 +179,6 @@ export default {
   },
   data() {
     return {
-      importColumns: [
-        {
-          label: "",
-          prop: "updateSupport",
-          render: (form) => {
-            return (
-              <el-checkbox
-                label={this.$t("common.rule.updateSupport")}
-                v-model={form.updateSupport}
-              >
-                {this.$t("common.rule.updateSupport")}
-              </el-checkbox>
-            );
-          },
-        },
-      ],
       loading: false,
       data: [],
       selection: [],
@@ -205,7 +191,22 @@ export default {
       search: {},
       query: {},
       importDefaultValue: {},
-      importRules: {},
+      importRules: {
+        factoryCode: [
+          {
+            required: true,
+            message: this.$t("common.rule.select"),
+            trigger: "change",
+          },
+        ],
+        scheduleDate: [
+          {
+            required: true,
+            message: this.$t("common.rule.select"),
+            trigger: "change",
+          },
+        ],
+      },
       autoPlanTimer: null,
       autoPlanPollTimes: 0,
       maxAutoPlanPollTimes: 120,
@@ -230,6 +231,41 @@ export default {
     ...mapState({
       machines: (state) => state.tm.machines,
     }),
+    // 导入弹窗列配置放在 computed 中，确保 this.dict 已初始化（data() 执行时字典 mixin 尚未注入 dict）
+    importColumns() {
+      return [
+        {
+          label: this.$t("ui.data.column.tm.scheduleResult.factoryCode"),
+          prop: "factoryCode",
+          type: "select",
+          dictData: this.dict.type.biz_factory_name,
+          filterable: true,
+          clearable: false,
+        },
+        {
+          label: this.$t("ui.data.column.tm.scheduleResult.scheduleDate"),
+          prop: "scheduleDate",
+          type: "date",
+          dateType: "date",
+          valueFormat: "yyyy-MM-dd",
+          clearable: false,
+        },
+        {
+          label: "",
+          prop: "updateSupport",
+          render: (form) => {
+            return (
+              <el-checkbox
+                label={this.$t("common.rule.updateSupport")}
+                v-model={form.updateSupport}
+              >
+                {this.$t("common.rule.updateSupport")}
+              </el-checkbox>
+            );
+          },
+        },
+      ];
+    },
     columns() {
       return [
         { type: "selection", fixed: "left" },
@@ -549,7 +585,10 @@ export default {
     },
     handleAdd() {
       if (this.$refs.infoRef) {
-        this.$refs.infoRef.show();
+        this.$refs.infoRef.show({
+          factoryCode: this.query.factoryCode || this.search.factoryCode || "116",
+          scheduleDate: this.query.scheduleDate || this.search.scheduleDate,
+        });
       }
     },
     // 自动排程入口：打开弹窗选择工厂和排程日期，具体接口由弹窗调用胎面接口。
@@ -759,7 +798,29 @@ export default {
     handleSelectionChange(rows) {
       this.selection = rows;
     },
+    handleImport() {
+      this.$refs.tltUpload.handleImport({
+        factoryCode: this.query.factoryCode || this.search.factoryCode,
+        scheduleDate: this.query.scheduleDate || this.search.scheduleDate,
+        updateSupport: true,
+      });
+    },
+    handleTemplateDownload(url, formValues) {
+      const params = {
+        ...formValues,
+        exportTemplate: true,
+      };
+      const paramsStr = Object.keys(params)
+        .filter(key => params[key] !== undefined && params[key] !== null && params[key] !== "")
+        .map(key => `${encodeURIComponent(key)}=${encodeURIComponent(params[key])}`)
+        .join("&");
+      return `${url}${paramsStr ? "?" + paramsStr : ""}`;
+    },
     handleExport() {
+      if (!this.query.factoryCode || !this.query.scheduleDate) {
+        this.$message.warning(this.$t("ui.tm.schedule.excelFactoryDateRequired"));
+        return;
+      }
       downloadLink("/tm/tmScheduleResult/export", this.formatParams(false));
     },
 

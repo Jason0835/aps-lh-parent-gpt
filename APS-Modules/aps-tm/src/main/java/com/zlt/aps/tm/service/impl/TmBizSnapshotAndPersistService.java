@@ -140,6 +140,7 @@ public class TmBizSnapshotAndPersistService implements ITmSnapshotAndPersistServ
         List<TmScheduleResult> resultList = new ArrayList<>();
         List<TmTaskDraft> unplannedTaskList = new ArrayList<>();
         Map<TmScheduleResult, List<String>> resultBusinessKeyMap = new IdentityHashMap<>();
+        Map<String, TmTaskDraft> taskBusinessKeyMap = new LinkedHashMap<>();
         Map<String, Long> resultIdMap = new HashMap<>();
         for (TmTaskDraft taskDraft : context.getTaskDraftList()) {
             if (isUnplannedTask(taskDraft)) {
@@ -148,6 +149,11 @@ public class TmBizSnapshotAndPersistService implements ITmSnapshotAndPersistServ
         }
         for (ScheduleTaskLinkedList<TmTaskDraft> chain : context.getTaskChainGroup().values()) {
             List<ScheduleTaskNode<TmTaskDraft>> nodeList = chain.toList();
+            nodeList.stream()
+                    .filter(Objects::nonNull)
+                    .map(ScheduleTaskNode::getTask)
+                    .filter(Objects::nonNull)
+                    .forEach(task -> taskBusinessKeyMap.putIfAbsent(task.getBusinessKey(), task));
             List<TmScheduleResult> chainResultList = persistService.convertChainToResult(chain, context);
             registerChainResultBusinessKey(nodeList, chainResultList, resultBusinessKeyMap);
             resultList.addAll(chainResultList);
@@ -155,6 +161,7 @@ public class TmBizSnapshotAndPersistService implements ITmSnapshotAndPersistServ
         Map<TmScheduleResult, List<String>> mergedResultBusinessKeyMap = new IdentityHashMap<>();
         List<TmScheduleResult> mergedResultList = mergeScheduleResults(resultList, resultBusinessKeyMap, mergedResultBusinessKeyMap);
         for (TmScheduleResult result : mergedResultList) {
+            this.aggregateResultSnapshot(result, mergedResultBusinessKeyMap, taskBusinessKeyMap);
             normalizeResultShiftFields(result);
         }
         List<TmScheduleResult> visibleResultList = filterVisibleScheduleResults(mergedResultList, mergedResultBusinessKeyMap);
@@ -190,6 +197,27 @@ public class TmBizSnapshotAndPersistService implements ITmSnapshotAndPersistServ
             persistResult.setExplainCount(explainList.size());
         }
         return persistResult;
+    }
+
+    /**
+     * 按归并结果关联的任务业务键汇总来源快照。
+     *
+     * @param result                     已归并的胎面排程结果
+     * @param mergedResultBusinessKeyMap 归并结果与任务业务键映射
+     * @param taskBusinessKeyMap         任务业务键与任务映射
+     */
+    private void aggregateResultSnapshot(TmScheduleResult result,
+                                         Map<TmScheduleResult, List<String>> mergedResultBusinessKeyMap,
+                                         Map<String, TmTaskDraft> taskBusinessKeyMap) {
+        List<String> businessKeyList = mergedResultBusinessKeyMap.get(result);
+        if (CollUtil.isEmpty(businessKeyList) || CollUtil.isEmpty(taskBusinessKeyMap)) {
+            return;
+        }
+        List<TmTaskDraft> sourceTaskList = businessKeyList.stream()
+                .map(taskBusinessKeyMap::get)
+                .filter(Objects::nonNull)
+                .collect(java.util.stream.Collectors.toList());
+        TmScheduleResultSnapshotAssembler.assemble(result, sourceTaskList);
     }
 
     /**
@@ -279,7 +307,13 @@ public class TmBizSnapshotAndPersistService implements ITmSnapshotAndPersistServ
      * @return true 表示任务未分配到机台，需要写入未排表
      */
     private boolean isUnplannedTask(TmTaskDraft taskDraft) {
-        return taskDraft != null && (taskDraft.isUnassigned() || StrUtil.isNotBlank(taskDraft.getUnplannedReasonCode()));
+        if (taskDraft == null) {
+            return false;
+        }
+        if (StrUtil.isNotBlank(taskDraft.getUnplannedReasonCode())) {
+            return true;
+        }
+        return taskDraft.isUnassigned() && isPositiveQty(taskDraft.getPlanQty());
     }
 
     /**

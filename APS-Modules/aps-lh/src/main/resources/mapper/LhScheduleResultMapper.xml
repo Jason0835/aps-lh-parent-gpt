@@ -41,6 +41,7 @@
             STRUCTURE_SCHEDULED_MACHINE_COUNT_RANGE,
             SKU_SCHEDULED_MACHINE_COUNT_RANGE,
             IS_EMBRYO_ENDING,
+            IS_STRUCTURE_MIN_MACHINE_RETAINED,
             MONTH_PLAN_SUM_TOTAL,
             CREATE_BY, CREATE_TIME, UPDATE_BY, UPDATE_TIME, REMARK, IS_DELETE
         ) VALUES
@@ -81,6 +82,7 @@
                 #{item.structureScheduledMachineCountRange},
                 #{item.skuScheduledMachineCountRange},
                 #{item.isEmbryoEnding},
+                #{item.isStructureMinMachineRetained},
                 #{item.monthPlanSumTotal},
                 #{item.createBy}, #{item.createTime}, #{item.updateBy}, #{item.updateTime}, #{item.remark}, #{item.isDelete}
             )

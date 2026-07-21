@@ -1,6 +1,6 @@
 package com.zlt.aps.dj.engine.model;
 
-import com.zlt.aps.cx.entity.schedule.CxScheduleResult;
+import com.zlt.aps.cx.api.domain.entity.CxScheduleResult;
 import com.zlt.aps.dj.api.domain.entity.DjMachineInfo;
 import com.zlt.aps.dj.api.domain.entity.DjMachineMaintenance;
 import com.zlt.aps.dj.api.domain.entity.DjParams;
@@ -10,8 +10,10 @@ import lombok.Data;
 
 import java.math.BigDecimal;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * 排产上下文，承载步骤间共享数据
@@ -27,6 +29,9 @@ public class DjScheduleContext {
 
     /** 各垫胶规格的成型机台数量 Map<paddingCode, machineCount> */
     private Map<String, Integer> paddingCxMachineCount;
+
+    /** 各垫胶规格关联的成型机台号集合 Map<paddingCode, Set<machineCode>> */
+    private Map<String, Set<String>> paddingCxMachineSet;
 
     /** 各垫胶规格的供应窗口班次数（排产深度） Map<paddingCode, supplyDepth> */
     private Map<String, Integer> paddingSupplyDepth;
@@ -82,14 +87,53 @@ public class DjScheduleContext {
     /** 成型班次偏移量 = Integer.parseInt(shiftClassMap[0]) - 1，用于将垫胶班次索引映射到成型班次索引 */
     private Integer formingShiftOffset;
 
+    /** 成型班次配置映射：(scheduleDay, shiftName) → classField序号（CLASS1→1, CLASS8→8）
+     * 例如：(1, "03") → 3 表示 t-1日中班对应CLASS3 */
+    private Map<String, Integer> cxShiftClassMap;
+
     /** 成型计划列表 */
     private List<CxScheduleResult> cxScheduleList;
 
     /** 施工数据 Map<constructionCode, List<MdmConstructionInfo>>，同一施工号可能存在多个BOM版本 */
     private Map<String, List<MdmConstructionInfo>> constructionMap;
 
+    /** 垫胶编码→物料名映射 Map<paddingCode, paddingName> */
+    private Map<String, String> paddingCodeToNameMap;
+
+    /** 施工信息缓存 Map<embryoCode, Map<shiftIndex, MdmConstructionInfo>>，避免重复解析施工版本 */
+    private Map<String, Map<Integer, MdmConstructionInfo>> constructionCache = new HashMap<>();
+
+    /** 各班各规格垫胶消耗量缓存 Map<paddingCode, Map<formingClassIndex, consumeQty>> */
+    private Map<String, Map<Integer, BigDecimal>> shiftConsumeCache = new HashMap<>();
+
+    /** 各班次索引对应的排产日数组（长度6），根据 DjShiftConfig 班次顺序动态构建
+     *  scheduleDay 从1开始，当班次从last shift绕回first shift时递增 */
+    private int[] scheduleDays;
+
     /** 排程过程日志收集器 */
     private StringBuilder processLog;
+
+    /**
+     * 构建日志显示的规格名称：物料名(编码)
+     *
+     * @param name 物料名，可为 null
+     * @param code 编码
+     * @return 物料名(编码)，name 为 null 时回退显示编码本身
+     */
+    public static String buildDisplayName(String name, String code) {
+        return name != null ? name + "(" + code + ")" : code;
+    }
+
+    /**
+     * 根据垫胶编码获取物料名(编码)（日志输出用，编码不存在时回退显示编码本身）
+     */
+    public String getPaddingNameByCode(String paddingCode) {
+        if (paddingCodeToNameMap != null && paddingCode != null) {
+            String name = paddingCodeToNameMap.get(paddingCode);
+            return buildDisplayName(name, paddingCode);
+        }
+        return paddingCode;
+    }
 
     /**
      * 追加排程日志
@@ -101,7 +145,17 @@ public class DjScheduleContext {
         if (processLog == null) {
             processLog = new StringBuilder(4096);
         }
-        processLog.append(java.text.MessageFormat.format(format, args)).append("\n");
+        // BigDecimal 转为纯数字字符串（避免 MessageFormat 自动加千分符）
+        Object[] plainArgs = args;
+        for (int i = 0; i < args.length; i++) {
+            if (args[i] instanceof BigDecimal) {
+                if (plainArgs == args) {
+                    plainArgs = args.clone();
+                }
+                plainArgs[i] = ((BigDecimal) args[i]).toPlainString();
+            }
+        }
+        processLog.append(java.text.MessageFormat.format(format, plainArgs)).append("\n");
     }
 
     /**

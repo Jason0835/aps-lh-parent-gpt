@@ -1,9 +1,8 @@
 package com.zlt.aps.tm.service;
 
+import com.zlt.aps.tm.api.domain.dto.TmRollingRecalcRequestDTO;
 import com.zlt.aps.tm.api.domain.entity.TmScheduleResult;
-import com.zlt.aps.tm.api.domain.vo.TmAutoScheduleRequestVo;
-import com.zlt.aps.tm.api.domain.vo.TmAutoScheduleResponseVo;
-import com.zlt.aps.tm.api.domain.vo.TmScheduleShiftDateVO;
+import com.zlt.aps.tm.api.domain.vo.*;
 import com.zlt.bill.common.service.IDocService;
 
 import java.util.Date;
@@ -116,11 +115,20 @@ public interface ITmScheduleResultService extends IDocService<TmScheduleResult> 
     /**
      * 插入人工插单排程结果。
      *
-     * @param scheduleResult 插单结果
+     * @param requestVo 插单请求
      * @return 写入行数
      * @throws com.ruoyi.common.exception.ServiceException 必填字段缺失时抛出
      */
-    int insertTask(TmScheduleResult scheduleResult);
+    int insertTask(TmInsertTaskRequestVo requestVo);
+
+    /**
+     * 批量删除未发布排程结果并滚动重排受影响机台。
+     *
+     * @param ids 排程结果 ID
+     * @return 删除行数
+     * @throws com.ruoyi.common.exception.ServiceException ID 为空、记录缺失或包含非未发布状态时抛出
+     */
+    int removeScheduleResults(List<Long> ids);
 
     /**
      * 调整排程计划量。
@@ -139,6 +147,25 @@ public interface ITmScheduleResultService extends IDocService<TmScheduleResult> 
      * @throws com.ruoyi.common.exception.ServiceException 记录不存在或处于不可调整状态时抛出
      */
     int changeMachine(TmScheduleResult scheduleResult);
+
+    /**
+     * 在单个事务中批量调整排程机台。
+     *
+     * @param machineCode 目标机台编码
+     * @param scheduleResultList 待转机的排程结果
+     * @return 更新行数
+     * @throws com.ruoyi.common.exception.ServiceException 任一记录校验或转机失败时抛出并整批回滚
+     */
+    int batchChangeMachine(String machineCode, List<TmScheduleResult> scheduleResultList);
+
+    /**
+     * 手动触发自动滚动重算。
+     *
+     * @param request 工厂、日期和目标班次
+     * @return 滚动重算统计
+     * @throws com.ruoyi.common.exception.ServiceException 参数、状态、锁或事务失败时抛出
+     */
+    TmRollingRecalcResponseVO rollingRecalc(TmRollingRecalcRequestDTO request);
 
     /**
      * 单步撤销最近一次人工操作（插单/调量/转机台）。

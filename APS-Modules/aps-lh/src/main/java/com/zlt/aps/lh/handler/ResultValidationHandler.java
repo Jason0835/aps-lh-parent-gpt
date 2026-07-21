@@ -4,10 +4,13 @@ import cn.hutool.core.date.DateUtil;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.lh.api.constant.LhScheduleConstant;
 import com.zlt.aps.lh.api.constant.LhScheduleParamConstant;
+import com.zlt.aps.lh.api.domain.dto.CleaningScheduleDateFillItem;
 import com.zlt.aps.lh.api.domain.dto.MachineCleaningWindowDTO;
+import com.zlt.aps.lh.api.domain.dto.MachineMaintenanceWindowDTO;
 import com.zlt.aps.lh.api.domain.dto.MachineScheduleDTO;
 import com.zlt.aps.lh.api.domain.dto.SkuDailyPlanQuotaDTO;
 import com.zlt.aps.lh.api.domain.dto.SkuScheduleDTO;
+import com.zlt.aps.lh.api.domain.entity.LhMachineOnlineInfo;
 import com.zlt.aps.lh.api.domain.entity.LhMouldChangePlan;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleProcessLog;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
@@ -17,6 +20,8 @@ import com.zlt.aps.lh.api.enums.CleaningTypeEnum;
 import com.zlt.aps.lh.api.enums.MouldChangeTypeEnum;
 import com.zlt.aps.lh.api.enums.ScheduleStepEnum;
 import com.zlt.aps.lh.api.enums.ShiftEnum;
+import com.zlt.aps.lh.api.enums.TrialStatusEnum;
+import com.zlt.aps.lh.component.CapsuleReplacementRuleService;
 import com.zlt.aps.lh.component.IncrSerialGenerator;
 import com.zlt.aps.lh.component.MonthPlanDateResolver;
 import com.zlt.aps.lh.component.TargetScheduleQtyResolver;
@@ -70,18 +75,42 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
 
     @Resource
     private TargetScheduleQtyResolver targetScheduleQtyResolver;
+    /** 最终结果阶段只重建并核对胶囊运行态，不得再次扣减班次计划量 */
+    @Resource
+    private CapsuleReplacementRuleService capsuleReplacementRuleService = new CapsuleReplacementRuleService();
 
     private static final AtomicInteger ORDER_SEQ = new AtomicInteger(0);
     private static final AtomicInteger CHG_SEQ = new AtomicInteger(0);
     private static final int ENABLED = 1;
     private static final String CLEANING_DATA_SOURCE_MANUAL = "0";
+    /** 按余量收尾下机：除续作降模且前物料本次不能收尾的场景外统一使用该值。 */
+    private static final String END_TYPE_BY_REMAINING_QTY = "0";
+    /** 按时间下机：用于续作降模且前物料本次排程不能收尾的场景，与交替类型无关。 */
+    private static final String END_TYPE_BY_TIME = "1";
+    /** 干冰清洗因三天内收尾跳过时的固定原因 */
+    private static final String DRY_ICE_ENDING_ANALYSIS = "干冰清洗+收尾";
+    /** 喷砂清洗因三天内收尾跳过时的固定原因 */
+    private static final String SAND_BLAST_ENDING_ANALYSIS = "喷砂清洗+收尾";
 
     @Override
     protected void doHandle(LhScheduleContext context) {
         String scheduleOrderBusinessKey = buildScheduleOrderBusinessKey(context);
         try {
+            // 保存前对齐计划性维修后的首个有量班次：只修正时间与原因，不重新扣减任何业务账本。
+            alignPlannedRepairResumeTimeToFinalResults(context);
+
+            // 保存前按机台实际挂载窗口绑定保养摘要：只处理本批班次覆盖范围内的保养，
+            // 优先绑定首条保养后结果，无后续SKU时绑定最后一条结果，并统一写入“精度计划”。
+            bindMaintenanceWindowsToFinalResults(context);
+
             // S4.6.1 排程后置校验：保存前校验结果必填字段和关键数量约束。
             postValidation(context);
+
+            // 模数规范化完成后按最终实际班次量重建胶囊次数；这里只核对，不得再次扣减计划量。
+            capsuleReplacementRuleService.verifyFinalState(context);
+
+            // 最终排程结果确定后统一收口清洗处置和停机日期回填，避免初始化判断覆盖真实收尾/换模结论。
+            finalizeCleaningDisposition(context);
 
             // S4.6.2 生成模具交替计划：基于结果真实换模开始时间和机台滚动状态生成前后规格。
             generateMouldChangePlan(context);
@@ -117,6 +146,333 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
     }
 
     /**
+     * 将计划性维修结束并完成 SYS0307009 预热后的首个有量班次对齐到最早开产时间。
+     * <p>维修容量窗口由设备停机计划临时构造，不写入机台精度保养列表，因此本方法不会生成
+     * 精度计划摘要、占用保养额度或改变计划回填；班次量、月/日计划账本、胎胚库存和胶囊次数
+     * 均保持排程主链已经确定的值，仅校正最终展示时间并补充组合原因。</p>
+     *
+     * @param context 排程上下文
+     */
+    private void alignPlannedRepairResumeTimeToFinalResults(LhScheduleContext context) {
+        if (Objects.isNull(context) || CollectionUtils.isEmpty(context.getScheduleResultList())
+                || CollectionUtils.isEmpty(context.getDevicePlanShutList())) {
+            return;
+        }
+        for (LhScheduleResult result : context.getScheduleResultList()) {
+            if (Objects.isNull(result) || StringUtils.isEmpty(result.getLhMachineCode())) {
+                continue;
+            }
+            List<MachineMaintenanceWindowDTO> repairWindowList =
+                    ShiftCapacityResolverUtil.resolvePlannedRepairCapacityWindowList(
+                            context, context.getDevicePlanShutList(), result.getLhMachineCode());
+            for (MachineMaintenanceWindowDTO repairWindow : repairWindowList) {
+                alignResultShiftStartAfterPlannedRepair(context, result, repairWindow);
+            }
+        }
+    }
+
+    /**
+     * 校正单条结果在计划性维修预热后的首个生产班次，并追加可对账的组合原因。
+     * <p>维修开始班次固定排产量的结束时间已在主链截到维修开始，因此不会被当作维修后结果；
+     * 维修后首个有量班次即使仍保留标准班次起点，也会向后对齐到预热完成时刻。
+     * 若该结果属于换模或换活字块，则原因中同步体现切换类型。</p>
+     *
+     * @param context 排程上下文
+     * @param result 排程结果
+     * @param repairWindow 计划性维修容量窗口
+     */
+    private void alignResultShiftStartAfterPlannedRepair(LhScheduleContext context,
+                                                         LhScheduleResult result,
+                                                         MachineMaintenanceWindowDTO repairWindow) {
+        if (Objects.isNull(repairWindow)
+                || Objects.isNull(repairWindow.getMaintenanceStartTime())
+                || Objects.isNull(repairWindow.getProductionResumeTime())) {
+            return;
+        }
+        for (int shiftIndex = 1; shiftIndex <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT; shiftIndex++) {
+            Integer planQty = ShiftFieldUtil.getShiftPlanQty(result, shiftIndex);
+            Date shiftStartTime = ShiftFieldUtil.getShiftStartTime(result, shiftIndex);
+            Date shiftEndTime = ShiftFieldUtil.getShiftEndTime(result, shiftIndex);
+            if (Objects.isNull(planQty) || planQty <= 0
+                    || Objects.isNull(shiftStartTime) || Objects.isNull(shiftEndTime)
+                    || !shiftEndTime.after(repairWindow.getProductionResumeTime())) {
+                continue;
+            }
+            // 维修开始班次固定2条的结束时间已被主链截到维修开始，不会进入本分支；
+            // 因此即使结果仍保留标准班次起点，也可以安全向后对齐到预热完成时间。
+            ShiftFieldUtil.alignShiftStartTimeNotBefore(
+                    result, shiftIndex, repairWindow.getProductionResumeTime());
+            String analysis = "计划性维修+预热";
+            if ("1".equals(result.getIsChangeMould())) {
+                analysis = "计划性维修+换模+预热";
+            } else if ("1".equals(result.getIsTypeBlock())) {
+                analysis = "计划性维修+换活字块+预热";
+            }
+            ShiftFieldUtil.appendShiftAnalysis(result, shiftIndex, analysis);
+            log.info("计划性维修后班次开产时间对齐完成, machineCode: {}, materialCode: {}, "
+                            + "shiftIndex: {}, repairStartTime: {}, repairEndTime: {}, "
+                            + "originalStartTime: {}, productionResumeTime: {}, planQty: {}, analysis: {}",
+                    result.getLhMachineCode(), result.getMaterialCode(), shiftIndex,
+                    LhScheduleTimeUtil.formatDateTime(repairWindow.getMaintenanceStartTime()),
+                    LhScheduleTimeUtil.formatDateTime(repairWindow.getMaintenanceEndTime()),
+                    LhScheduleTimeUtil.formatDateTime(shiftStartTime),
+                    LhScheduleTimeUtil.formatDateTime(repairWindow.getProductionResumeTime()), planQty, analysis);
+            StringBuilder detailBuilder = new StringBuilder(256);
+            PriorityTraceLogHelper.appendLine(detailBuilder,
+                    "机台=" + result.getLhMachineCode() + ", SKU=" + result.getMaterialCode()
+                            + ", 组合原因=" + analysis);
+            PriorityTraceLogHelper.appendLine(detailBuilder,
+                    "维修开始=" + LhScheduleTimeUtil.formatDateTime(repairWindow.getMaintenanceStartTime())
+                            + ", 维修结束=" + LhScheduleTimeUtil.formatDateTime(repairWindow.getMaintenanceEndTime())
+                            + ", 预热分钟数=" + LhScheduleTimeUtil.getCapsulePreheatMinutes(context));
+            PriorityTraceLogHelper.appendLine(detailBuilder,
+                    "最早开产=" + LhScheduleTimeUtil.formatDateTime(repairWindow.getProductionResumeTime())
+                            + ", 首个有量班次=" + shiftIndex + ", 计划量=" + planQty);
+            PriorityTraceLogHelper.appendProcessLog(
+                    context, "计划性维修恢复时间轴", detailBuilder.toString().trim());
+            return;
+        }
+    }
+
+    /**
+     * 将精度保养窗口绑定到每台机台唯一的最终结果。
+     *
+     * @param context 排程上下文
+     */
+    private void bindMaintenanceWindowsToFinalResults(LhScheduleContext context) {
+        if (Objects.isNull(context) || CollectionUtils.isEmpty(context.getMachineScheduleMap())
+                || CollectionUtils.isEmpty(context.getScheduleResultList())) {
+            return;
+        }
+        for (MachineScheduleDTO machine : context.getMachineScheduleMap().values()) {
+            if (Objects.isNull(machine) || CollectionUtils.isEmpty(machine.getMaintenanceWindowList())) {
+                continue;
+            }
+            // 班次产能已经按保养及预热区间扣减，但跨占用边界的班次结果仍可能保留标准班次开始时间。
+            // 保存前将实际只能在预热后生产的班次开始时间对齐到最早开产时间，保证时间轴字段可直接对账。
+            alignMachineShiftStartAfterMaintenance(context, machine);
+            // 最终绑定前先清除该机台所有中间结果上的保养摘要和固定原因，随后只向唯一目标结果回填。
+            // 清洗、维修及其他原因不会被清除，避免 K1605 一类同班次多结果重复出现“精度计划”。
+            clearMachineMaintenanceBinding(context, machine.getMachineCode());
+            LhScheduleResult bindingResult = resolveMaintenanceBindingResult(context, machine);
+            if (Objects.isNull(bindingResult)) {
+                log.warn("精度计划已触发但机台没有可绑定排程结果，保留窗口过程日志和计划日期回填, machineCode: {}",
+                        machine.getMachineCode());
+                continue;
+            }
+            boolean bound = ResultDowntimeSummaryUtil.bindMaintenanceSummaryAndAnalysis(
+                    bindingResult, machine.getMaintenanceWindowList(), context.getScheduleWindowShifts());
+            if (!bound) {
+                log.info("精度计划已安排但保养结束时间尚未进入当前排程班次窗口，"
+                                + "本批不绑定结果摘要和班次原因，保留过程日志及计划日期回填, "
+                                + "machineCode: {}, maintenanceResumeTime: {}",
+                        machine.getMachineCode(), LhScheduleTimeUtil.formatDateTime(
+                                resolveMaintenanceResumeTime(machine.getMaintenanceWindowList())));
+                continue;
+            }
+            log.info("精度计划班次原因绑定完成, machineCode: {}, materialCode: {}, maintenanceStart: {}, "
+                            + "maintenanceEnd: {}, analysis: 精度计划",
+                    machine.getMachineCode(), bindingResult.getMaterialCode(),
+                    LhScheduleTimeUtil.formatDateTime(bindingResult.getMaintenanceStartTime()),
+                    LhScheduleTimeUtil.formatDateTime(bindingResult.getMaintenanceEndTime()));
+        }
+    }
+
+    /**
+     * 将保养及预热结束后才能生产的班次开始时间对齐到最早开产时间。
+     * <p>统一产能计算已经扣除了不可生产分钟数，本方法不修改班次计划量、日计划量、库存或账本；
+     * 只修正“标准班次从14:00开始、实际因预热只能17:30开产”这类结果展示时间。保养前已经开始
+     * 生产的班次保持原开始时间，避免抹掉08:00前的真实可生产时段。</p>
+     *
+     * @param context 排程上下文
+     * @param machine 运行态机台
+     */
+    private void alignMachineShiftStartAfterMaintenance(LhScheduleContext context,
+                                                        MachineScheduleDTO machine) {
+        for (MachineMaintenanceWindowDTO window : machine.getMaintenanceWindowList()) {
+            if (Objects.isNull(window)
+                    || Objects.isNull(window.getMaintenanceStartTime())
+                    || Objects.isNull(window.getProductionResumeTime())) {
+                continue;
+            }
+            for (LhScheduleResult result : context.getScheduleResultList()) {
+                if (Objects.isNull(result)
+                        || !StringUtils.equals(machine.getMachineCode(), result.getLhMachineCode())) {
+                    continue;
+                }
+                alignResultShiftStartAfterMaintenance(result, window);
+            }
+        }
+    }
+
+    /**
+     * 修正单条结果中落入保养占用区间且在预热完成后仍有可生产时间的班次开始时刻。
+     *
+     * @param result 排程结果
+     * @param window 精度保养窗口
+     */
+    private void alignResultShiftStartAfterMaintenance(LhScheduleResult result,
+                                                       MachineMaintenanceWindowDTO window) {
+        for (int shiftIndex = 1; shiftIndex <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT; shiftIndex++) {
+            Integer planQty = ShiftFieldUtil.getShiftPlanQty(result, shiftIndex);
+            Date shiftStartTime = ShiftFieldUtil.getShiftStartTime(result, shiftIndex);
+            Date shiftEndTime = ShiftFieldUtil.getShiftEndTime(result, shiftIndex);
+            if (Objects.isNull(planQty) || planQty <= 0
+                    || Objects.isNull(shiftStartTime) || Objects.isNull(shiftEndTime)
+                    || shiftStartTime.before(window.getMaintenanceStartTime())
+                    || !shiftStartTime.before(window.getProductionResumeTime())
+                    || !shiftEndTime.after(window.getProductionResumeTime())) {
+                continue;
+            }
+            ShiftFieldUtil.setShiftPlanQty(result, shiftIndex, planQty,
+                    window.getProductionResumeTime(), shiftEndTime);
+            log.info("精度保养后班次开产时间对齐完成, machineCode: {}, materialCode: {}, shiftIndex: {}, "
+                            + "originalStartTime: {}, productionResumeTime: {}, planQty: {}",
+                    result.getLhMachineCode(), result.getMaterialCode(), shiftIndex,
+                    LhScheduleTimeUtil.formatDateTime(shiftStartTime),
+                    LhScheduleTimeUtil.formatDateTime(window.getProductionResumeTime()), planQty);
+        }
+    }
+
+    /**
+     * 清除指定机台全部结果上的保养摘要和固定原因。
+     * <p>排程过程中同一结果可能多次同步停机摘要，最终阶段必须先按机台清理，再选择唯一结果绑定，
+     * 从而保证一台运行侧的一次保养只形成一条结果摘要和一个对应班次原因。</p>
+     *
+     * @param context 排程上下文
+     * @param machineCode 机台编码
+     */
+    private void clearMachineMaintenanceBinding(LhScheduleContext context, String machineCode) {
+        for (LhScheduleResult result : context.getScheduleResultList()) {
+            if (Objects.nonNull(result)
+                    && StringUtils.equals(machineCode, result.getLhMachineCode())) {
+                ResultDowntimeSummaryUtil.clearMaintenanceSummaryAndAnalysis(result);
+            }
+        }
+    }
+
+    /**
+     * 解析精度保养窗口应绑定的排程结果。
+     * <p>优先选择生产开始时间不早于胶囊预热完成时间的第一条结果；若当前排程窗口内的保养后
+     * 没有后续生产结果，则回退到该机台最后一条结果。未来保养是否进入当前结果班次范围由统一
+     * 绑定工具再次校验，未进入时不会把未来摘要错误挂到当前最后结果。</p>
+     *
+     * @param context 排程上下文
+     * @param machine 运行态机台
+     * @return 待绑定结果；机台没有任何结果时返回 null
+     */
+    private LhScheduleResult resolveMaintenanceBindingResult(LhScheduleContext context,
+                                                             MachineScheduleDTO machine) {
+        Date maintenanceResumeTime = resolveMaintenanceResumeTime(machine.getMaintenanceWindowList());
+        LhScheduleResult firstPostMaintenanceResult = null;
+        Date firstPostMaintenanceTime = null;
+        LhScheduleResult lastMachineResult = null;
+        for (LhScheduleResult result : context.getScheduleResultList()) {
+            if (Objects.isNull(result)
+                    || !StringUtils.equals(machine.getMachineCode(), result.getLhMachineCode())) {
+                continue;
+            }
+            if (Objects.isNull(lastMachineResult)
+                    || compareResultTime(result, lastMachineResult) > 0) {
+                lastMachineResult = result;
+            }
+            // 一条SKU结果可能同时包含保养前班次和预热后的恢复生产班次，不能只看整条结果的最早开始时间。
+            // 应逐班次定位预热完成后的第一段实际生产，把摘要和“精度计划”原因绑定到真实承接恢复生产的结果。
+            Date productionStartTime = resolveFirstProductionTimeAfterMaintenance(
+                    result, maintenanceResumeTime);
+            if (Objects.nonNull(productionStartTime)
+                    && (Objects.isNull(firstPostMaintenanceTime)
+                    || productionStartTime.before(firstPostMaintenanceTime))) {
+                firstPostMaintenanceResult = result;
+                firstPostMaintenanceTime = productionStartTime;
+            }
+        }
+        return Objects.nonNull(firstPostMaintenanceResult) ? firstPostMaintenanceResult : lastMachineResult;
+    }
+
+    /**
+     * 解析单条结果在精度保养及胶囊预热结束后的第一段实际生产时间。
+     * <p>班次必须存在正计划量且实际结束时间晚于恢复时间。若班次开始时间早于恢复时间，说明该结果
+     * 跨越保养占用边界，保养后的实际恢复点仍按 productionResumeTime 计算。</p>
+     *
+     * @param result 排程结果
+     * @param productionResumeTime 胶囊预热完成及最早开产时间
+     * @return 第一段保养后生产时间；没有保养后产量时返回null
+     */
+    private Date resolveFirstProductionTimeAfterMaintenance(LhScheduleResult result,
+                                                            Date productionResumeTime) {
+        if (Objects.isNull(result) || Objects.isNull(productionResumeTime)) {
+            return null;
+        }
+        Date firstProductionTime = null;
+        for (int shiftIndex = 1; shiftIndex <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT; shiftIndex++) {
+            Integer planQty = ShiftFieldUtil.getShiftPlanQty(result, shiftIndex);
+            Date shiftStartTime = ShiftFieldUtil.getShiftStartTime(result, shiftIndex);
+            Date shiftEndTime = ShiftFieldUtil.getShiftEndTime(result, shiftIndex);
+            if (Objects.isNull(planQty) || planQty <= 0
+                    || Objects.isNull(shiftStartTime) || Objects.isNull(shiftEndTime)
+                    || !shiftEndTime.after(productionResumeTime)) {
+                continue;
+            }
+            Date actualProductionTime = shiftStartTime.before(productionResumeTime)
+                    ? productionResumeTime : shiftStartTime;
+            if (Objects.isNull(firstProductionTime)
+                    || actualProductionTime.before(firstProductionTime)) {
+                firstProductionTime = actualProductionTime;
+            }
+        }
+        return firstProductionTime;
+    }
+
+    /**
+     * 解析机台全部保养及胶囊预热完成后的最晚恢复生产时间。
+     * <p>历史窗口未保存 productionResumeTime 时使用真实保养结束时间，兼容旧运行态数据。</p>
+     *
+     * @param maintenanceWindowList 精度保养窗口
+     * @return 最晚恢复生产时间
+     */
+    private Date resolveMaintenanceResumeTime(List<MachineMaintenanceWindowDTO> maintenanceWindowList) {
+        Date latestResumeTime = null;
+        if (CollectionUtils.isEmpty(maintenanceWindowList)) {
+            return null;
+        }
+        for (MachineMaintenanceWindowDTO window : maintenanceWindowList) {
+            if (Objects.isNull(window)) {
+                continue;
+            }
+            Date resumeTime = Objects.nonNull(window.getProductionResumeTime())
+                    ? window.getProductionResumeTime() : window.getMaintenanceEndTime();
+            if (Objects.nonNull(resumeTime)
+                    && (Objects.isNull(latestResumeTime) || resumeTime.after(latestResumeTime))) {
+                latestResumeTime = resumeTime;
+            }
+        }
+        return latestResumeTime;
+    }
+
+    /**
+     * 按结果生产时间比较先后。
+     *
+     * @param left 左结果
+     * @param right 右结果
+     * @return 小于0-左结果更早；大于0-左结果更晚
+     */
+    private int compareResultTime(LhScheduleResult left, LhScheduleResult right) {
+        Date leftTime = resolveProductionStartTime(left);
+        Date rightTime = resolveProductionStartTime(right);
+        if (Objects.isNull(leftTime)) {
+            leftTime = left.getSpecEndTime();
+        }
+        if (Objects.isNull(rightTime)) {
+            rightTime = right.getSpecEndTime();
+        }
+        if (Objects.isNull(leftTime)) {
+            return Objects.isNull(rightTime) ? 0 : -1;
+        }
+        return Objects.isNull(rightTime) ? 1 : leftTime.compareTo(rightTime);
+    }
+
+    /**
      * 清理无计划量班次的硫化示方号和类型。
      *
      * @param context 排程上下文
@@ -134,7 +490,7 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
      * 排程后置校验：检查结果完整性。
      *
      * <p>该方法会补齐部分保存所需的默认字段，例如批次号、工厂、目标日和发布状态；
-     * 但不会改变机台、班次计划量、排序结果、换模判断和收尾判断。</p>
+     * 普通双模/多模结果会在保存前按模台数收敛，但同物料多状态续作切换必须保留专用链已确定的精确尾量。</p>
      *
      * @param context 排程上下文
      */
@@ -176,9 +532,9 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
                     result.getLeftRightMould(), result.getLhMachineCode()));
             requireField(result.getMaterialCode(), "materialCode", context, result);
             requireField(result.getScheduleType(), "scheduleType", context, result);
-            if (result.getSpecEndTime() == null) {
-                throwValidationFailure(context, result, I18nUtil.getMessage("ui.data.column.lhScheduleResult.specEndTimeMissing"));
-            }
+//            if (result.getSpecEndTime() == null) {
+//                throwValidationFailure(context, result, I18nUtil.getMessage("ui.data.column.lhScheduleResult.specEndTimeMissing"));
+//            }
             if ("1".equals(result.getIsChangeMould()) && StringUtils.isBlank(result.getMouldCode())) {
                 throwValidationFailure(context, result, I18nUtil.getMessage("ui.data.column.lhScheduleResult.mouldCodeMissingInChangeMould"));
             }
@@ -308,6 +664,14 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
         if (mouldQty <= 1) {
             return;
         }
+        // 同物料X/T临时占用续作机台时，收尾班必须严格按剩余量落库，不得在S4.6再向上补齐模数。
+        if (containsSameMaterialStatusContinuationAnalysis(result)) {
+            log.info("同物料多状态续作切换跳过模台数保存前收敛, batchNo: {}, "
+                            + "materialCode: {}, productStatus: {}, machineCode: {}, mouldQty: {}, planQty: {}",
+                    context.getBatchNo(), result.getMaterialCode(), result.getProductStatus(),
+                    result.getLhMachineCode(), mouldQty, ShiftFieldUtil.resolveScheduledQty(result));
+            return;
+        }
         if (getTargetScheduleQtyResolver().isEmbryoStockEnding(context, result)) {
             log.info("成型胎胚库存收尾结果跳过模台数保存前收敛, batchNo: {}, materialCode: {}, embryoCode: {}, "
                             + "machineCode: {}, mouldQty: {}",
@@ -337,6 +701,28 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
         if (adjusted) {
             ShiftFieldUtil.syncDailyPlanQty(result);
         }
+    }
+
+    /**
+     * 判断结果任一有效班次是否带有同物料多状态续作切换标记。
+     *
+     * @param result 排程结果
+     * @return true-专用切换链结果；false-普通排程结果
+     */
+    private boolean containsSameMaterialStatusContinuationAnalysis(LhScheduleResult result) {
+        if (Objects.isNull(result)) {
+            return false;
+        }
+        for (int shiftIndex = 1;
+             shiftIndex <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT;
+             shiftIndex++) {
+            if (StringUtils.contains(
+                    ShiftFieldUtil.getShiftAnalysis(result, shiftIndex),
+                    LhScheduleConstant.SAME_MATERIAL_STATUS_CONTINUATION_ANALYSIS)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -837,7 +1223,9 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
             plan.setIsRelease("0");
             plan.setMouldStatus("0");
             plan.setIsDelete(0);
-            plan.setEndType("1".equals(result.getIsEnd()) ? "0" : "1");
+            // END_TYPE 必须描述换模前物料的下机方式，不得读取当前准备上机的后物料 isEnd。
+            plan.setEndType(resolveMouldChangePlanEndType(context, result.getLhMachineCode(),
+                    state.getCurrentMaterialCode()));
             plan.setChangeTime(resolvePlanChangeTime(result, state));
 
             // 判断交替类型：普通换模、换活字块、干冰清洗、喷砂清洗在这里统一落数据字典值。
@@ -1019,8 +1407,27 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
             MachineScheduleDTO machine = item.getKey();
             MachineCleaningWindowDTO cleaningWindow = item.getValue();
             String machineCode = resolveCleaningMachineCode(machine, cleaningWindow);
+            // 最终优先级：三天内收尾跳过 > 正规换模合并 > 独立清洗。
+            LhScheduleResult endingResult = resolveCleaningEndingResult(
+                    context, changeResults, machineCode, cleaningWindow);
+            if (Objects.nonNull(endingResult)) {
+                log.info("清洗交替计划跳过，最终结果命中三天内收尾, 机台: {}, 物料: {}, 清洗类型: {}, "
+                                + "来源停机计划ID: {}, 收尾时间: {}",
+                        machineCode, endingResult.getMaterialCode(), cleaningWindow.getCleanType(),
+                        cleaningWindow.getSourcePlanId(),
+                        LhScheduleTimeUtil.formatDateTime(endingResult.getSpecEndTime()));
+                continue;
+            }
+            if (isCleaningOverlappedWithRegularMouldChange(context, changeResults, machineCode, cleaningWindow)) {
+                log.info("清洗交替计划跳过，最终处置与正规换模合并, 机台: {}, 清洗类型: {}, "
+                                + "来源停机计划ID: {}, 清洗开始: {}",
+                        machineCode, cleaningWindow.getCleanType(), cleaningWindow.getSourcePlanId(),
+                        LhScheduleTimeUtil.formatDateTime(cleaningWindow.getCleanStartTime()));
+                continue;
+            }
             RollingMachineState cleaningState = resolveCleaningMaterialState(context, changeResults,
                     machineCode, cleaningWindow.getCleanStartTime());
+            String changeMouldType = resolveCleaningMouldChangeType(cleaningWindow);
             LhMouldChangePlan plan = new LhMouldChangePlan();
             plan.setFactoryCode(context.getFactoryCode());
             plan.setLhResultBatchNo(context.getBatchNo());
@@ -1037,17 +1444,306 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
             plan.setBeforeMaterialDesc(cleaningState.getCurrentMaterialDesc());
             plan.setAfterMaterialCode(cleaningState.getCurrentMaterialCode());
             plan.setAfterMaterialDesc(cleaningState.getCurrentMaterialDesc());
-            plan.setChangeMouldType(resolveCleaningMouldChangeType(cleaningWindow));
+            plan.setChangeMouldType(changeMouldType);
             plan.setChangeTime(cleaningWindow.getCleanStartTime());
             plan.setMouldCode(cleaningWindow.getMouldCode());
             plan.setIsRelease("0");
             plan.setMouldStatus("0");
             plan.setRemark(cleaningWindow.getRemark());
             plan.setIsDelete(0);
-            plan.setEndType(machine.isEnding() ? "0" : "1");
+            // 清洗计划同样按清洗发生时点的前物料判断，不能读取排程结束后的机台 ending 状态。
+            plan.setEndType(resolveMouldChangePlanEndType(context, machineCode,
+                    cleaningState.getCurrentMaterialCode()));
             plans.add(plan);
         }
         return planOrder;
+    }
+
+    /**
+     * 按最终排程结果重建清洗处置与设备停机计划日期回填项。
+     * <p>初始化阶段只负责生成候选窗口和保留来源计划信息；最终阶段统一执行
+     * “三天内收尾跳过 > 正规换模合并 > 独立清洗”的优先级，并将回填日期统一归零到自然日。</p>
+     *
+     * @param context 排程上下文
+     */
+    private void finalizeCleaningDisposition(LhScheduleContext context) {
+        if (Objects.isNull(context) || CollectionUtils.isEmpty(context.getCleaningScheduleDateFillList())) {
+            return;
+        }
+        List<CleaningScheduleDateFillItem> sourceFillList =
+                new ArrayList<>(context.getCleaningScheduleDateFillList());
+        List<LhScheduleResult> changeResults = resolveOrderedChangeResults(context);
+        Map<Long, CleaningScheduleDateFillItem> finalFillMap = new LinkedHashMap<>(sourceFillList.size());
+        for (CleaningScheduleDateFillItem sourceFill : sourceFillList) {
+            if (Objects.isNull(sourceFill) || Objects.isNull(sourceFill.getPlanId())) {
+                continue;
+            }
+            MachineCleaningWindowDTO cleaningWindow = resolveSourceCleaningWindow(context, sourceFill);
+            String machineCode = StringUtils.isNotEmpty(sourceFill.getMachineCode())
+                    ? sourceFill.getMachineCode()
+                    : Objects.nonNull(cleaningWindow) ? cleaningWindow.getLhCode() : null;
+            LhScheduleResult endingResult = resolveCleaningEndingResult(
+                    context, changeResults, machineCode, cleaningWindow);
+            CleaningScheduleDateFillItem finalFill = copyCleaningScheduleDateFillItem(sourceFill);
+            if (Objects.nonNull(endingResult)) {
+                applyCleaningEndingAnalysis(endingResult, sourceFill.getCleanType());
+                finalFill.setScheduleDate(LhScheduleTimeUtil.clearTime(endingResult.getSpecEndTime()));
+                finalFill.setFillReason("收尾未安排清洗");
+                log.info("清洗最终处置, 处置: 三天内收尾跳过, 机台: {}, 物料: {}, 产品状态: {}, "
+                                + "清洗类型: {}, 来源停机计划ID: {}, 回填日期: {}",
+                        machineCode, endingResult.getMaterialCode(), endingResult.getProductStatus(),
+                        sourceFill.getCleanType(), sourceFill.getPlanId(),
+                        LhScheduleTimeUtil.formatDate(finalFill.getScheduleDate()));
+            } else if (Objects.nonNull(cleaningWindow)) {
+                boolean mouldChangeOverlap = isCleaningOverlappedWithRegularMouldChange(
+                        context, changeResults, machineCode, cleaningWindow);
+                finalFill.setScheduleDate(LhScheduleTimeUtil.clearTime(cleaningWindow.getCleanStartTime()));
+                finalFill.setFillReason(mouldChangeOverlap ? "清洗与换模合并" : "独立清洗");
+                log.info("清洗最终处置, 处置: {}, 机台: {}, 清洗类型: {}, 来源停机计划ID: {}, 回填日期: {}",
+                        mouldChangeOverlap ? "正规换模合并" : "独立清洗",
+                        machineCode, sourceFill.getCleanType(), sourceFill.getPlanId(),
+                        LhScheduleTimeUtil.formatDate(finalFill.getScheduleDate()));
+            } else if (Objects.nonNull(sourceFill.getScheduleDate())) {
+                // 初始化阶段已确认三天内收尾但本批未生成对应结果时，保留原业务日期，不伪造结果时间。
+                finalFill.setScheduleDate(LhScheduleTimeUtil.clearTime(sourceFill.getScheduleDate()));
+            }
+            if (Objects.nonNull(finalFill.getScheduleDate())) {
+                finalFillMap.putIfAbsent(finalFill.getPlanId(), finalFill);
+            }
+        }
+        context.getCleaningScheduleDateFillList().clear();
+        context.getCleaningScheduleDateFillList().addAll(finalFillMap.values());
+    }
+
+    /**
+     * 解析清洗窗口对应的最终三天内收尾结果。
+     * <p>按机台、清洗时点滚动物料和产品状态精确匹配，禁止同物料不同状态串用。</p>
+     *
+     * @param context 排程上下文
+     * @param changeResults 已按时间排序的换模结果
+     * @param machineCode 机台编码
+     * @param cleaningWindow 清洗窗口；初始化已跳过清洗时可为空
+     * @return 命中三天内收尾的最终结果；未命中返回 null
+     */
+    private LhScheduleResult resolveCleaningEndingResult(LhScheduleContext context,
+                                                         List<LhScheduleResult> changeResults,
+                                                         String machineCode,
+                                                         MachineCleaningWindowDTO cleaningWindow) {
+        if (Objects.isNull(context) || StringUtils.isEmpty(machineCode)
+                || CollectionUtils.isEmpty(context.getScheduleResultList())) {
+            return null;
+        }
+        Date cleanStartTime = Objects.isNull(cleaningWindow) ? null : cleaningWindow.getCleanStartTime();
+        RollingMachineState cleaningState = resolveCleaningMaterialState(
+                context, changeResults, machineCode, cleanStartTime);
+        if (StringUtils.isEmpty(cleaningState.getCurrentMaterialCode())) {
+            return null;
+        }
+        String stateKey = MonthPlanDateResolver.buildMaterialStatusKey(
+                cleaningState.getCurrentMaterialCode(), normalizeProductStatus(cleaningState.getCurrentProductStatus()));
+        return context.getScheduleResultList().stream()
+                .filter(Objects::nonNull)
+                .filter(result -> StringUtils.equals(machineCode, result.getLhMachineCode()))
+                .filter(result -> StringUtils.equals(stateKey, MonthPlanDateResolver.buildMaterialStatusKey(
+                        result.getMaterialCode(), normalizeProductStatus(result.getProductStatus()))))
+                .filter(result -> Objects.nonNull(result.getSpecEndTime()))
+                .filter(result -> Objects.isNull(cleanStartTime) || !result.getSpecEndTime().before(cleanStartTime))
+                .filter(CleaningScheduleRuleUtil::shouldSkipCleaningByResultEnding)
+                .min(Comparator.comparing(LhScheduleResult::getSpecEndTime))
+                .orElse(null);
+    }
+
+    /**
+     * 判断实际清洗窗口是否与正规换模 8 小时窗口严格相交。
+     *
+     * @param context 排程上下文
+     * @param changeResults 换模结果列表
+     * @param machineCode 机台编码
+     * @param cleaningWindow 清洗窗口
+     * @return true-与正规换模合并；false-独立清洗或仅与换活字块重叠
+     */
+    private boolean isCleaningOverlappedWithRegularMouldChange(LhScheduleContext context,
+                                                                List<LhScheduleResult> changeResults,
+                                                                String machineCode,
+                                                                MachineCleaningWindowDTO cleaningWindow) {
+        if (Objects.isNull(context) || CollectionUtils.isEmpty(changeResults)
+                || StringUtils.isEmpty(machineCode) || Objects.isNull(cleaningWindow)) {
+            return false;
+        }
+        for (LhScheduleResult result : changeResults) {
+            if (!StringUtils.equals(machineCode, result.getLhMachineCode())
+                    || !StringUtils.equals(MouldChangeTypeEnum.REGULAR.getCode(), determineChangeMouldType(result))) {
+                continue;
+            }
+            Date mouldChangeStartTime = resolvePlannedMouldChangeStartTime(result);
+            Date mouldChangeEndTime = Objects.isNull(mouldChangeStartTime) ? null
+                    : LhScheduleTimeUtil.addHours(mouldChangeStartTime,
+                    LhScheduleTimeUtil.getMouldChangeTotalHours(context));
+            if (MachineCleaningOverlapUtil.isOverlap(
+                    cleaningWindow, mouldChangeStartTime, mouldChangeEndTime)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * 将清洗加收尾原因写入最终有计划量班次，并清除已跳过清洗的时间摘要。
+     *
+     * @param result 最终收尾结果
+     * @param cleanType 清洗类型
+     */
+    private void applyCleaningEndingAnalysis(LhScheduleResult result, String cleanType) {
+        if (Objects.isNull(result)) {
+            return;
+        }
+        int endingShiftIndex = ShiftFieldUtil.resolveLastPlannedShiftIndex(result);
+        String analysis = StringUtils.equals(CleaningTypeEnum.DRY_ICE.getCode(), cleanType)
+                ? DRY_ICE_ENDING_ANALYSIS
+                : StringUtils.equals(CleaningTypeEnum.SAND_BLAST.getCode(), cleanType)
+                ? SAND_BLAST_ENDING_ANALYSIS : null;
+        if (endingShiftIndex > 0 && StringUtils.isNotEmpty(analysis)) {
+            ShiftFieldUtil.appendShiftAnalysis(result, endingShiftIndex, analysis);
+        }
+        result.setCleaningStartTime(null);
+        result.setCleaningEndTime(null);
+    }
+
+    /**
+     * 按来源计划主键查找原始清洗窗口，优先使用来源停机计划机台，避免单控配对侧抢占回填归属。
+     *
+     * @param context 排程上下文
+     * @param sourceFill 初始化阶段回填项
+     * @return 来源清洗窗口；初始化已按收尾跳过时返回 null
+     */
+    private MachineCleaningWindowDTO resolveSourceCleaningWindow(LhScheduleContext context,
+                                                                  CleaningScheduleDateFillItem sourceFill) {
+        MachineCleaningWindowDTO matchedWindow = null;
+        for (Map.Entry<MachineScheduleDTO, MachineCleaningWindowDTO> item : collectCleaningPlanItems(context)) {
+            MachineCleaningWindowDTO cleaningWindow = item.getValue();
+            if (!Objects.equals(sourceFill.getPlanId(), cleaningWindow.getSourcePlanId())) {
+                continue;
+            }
+            if (StringUtils.equals(sourceFill.getMachineCode(),
+                    resolveCleaningMachineCode(item.getKey(), cleaningWindow))) {
+                return cleaningWindow;
+            }
+            if (Objects.isNull(matchedWindow)) {
+                matchedWindow = cleaningWindow;
+            }
+        }
+        return matchedWindow;
+    }
+
+    /**
+     * 复制清洗日期回填项，最终阶段不修改初始化阶段的只读来源信息。
+     *
+     * @param sourceFill 来源回填项
+     * @return 新回填项
+     */
+    private CleaningScheduleDateFillItem copyCleaningScheduleDateFillItem(CleaningScheduleDateFillItem sourceFill) {
+        CleaningScheduleDateFillItem targetFill = new CleaningScheduleDateFillItem();
+        targetFill.setPlanId(sourceFill.getPlanId());
+        targetFill.setScheduleDate(sourceFill.getScheduleDate());
+        targetFill.setCleanType(sourceFill.getCleanType());
+        targetFill.setMachineCode(sourceFill.getMachineCode());
+        targetFill.setFillReason(sourceFill.getFillReason());
+        return targetFill;
+    }
+
+    /**
+     * 获取最终生成交替计划所使用的有量换模结果，并按机台和时间稳定排序。
+     *
+     * @param context 排程上下文
+     * @return 换模结果列表
+     */
+    private List<LhScheduleResult> resolveOrderedChangeResults(LhScheduleContext context) {
+        if (Objects.isNull(context) || CollectionUtils.isEmpty(context.getScheduleResultList())) {
+            return new ArrayList<>(0);
+        }
+        return context.getScheduleResultList().stream()
+                .filter(Objects::nonNull)
+                .filter(result -> "1".equals(result.getIsChangeMould()))
+                .filter(result -> !result.isRollingInherited())
+                .filter(result -> Objects.nonNull(result.getDailyPlanQty()) && result.getDailyPlanQty() > 0)
+                .sorted(Comparator.comparing(LhScheduleResult::getLhMachineCode,
+                                Comparator.nullsLast(String::compareTo))
+                        .thenComparing(this::resolvePlannedMouldChangeStartTime,
+                                Comparator.nullsLast(Date::compareTo))
+                        .thenComparing(LhScheduleResult::getSpecEndTime,
+                                Comparator.nullsLast(Date::compareTo)))
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * 统一产品状态口径：空状态按正规 S 处理。
+     *
+     * @param productStatus 原产品状态
+     * @return 标准产品状态
+     */
+    private String normalizeProductStatus(String productStatus) {
+        String normalizedStatus = StringUtils.trimToEmpty(productStatus);
+        return StringUtils.isEmpty(normalizedStatus)
+                ? TrialStatusEnum.FORMAL.getCode() : normalizedStatus;
+    }
+
+    /**
+     * 解析模具交替计划下机类型。
+     * <p>只有同时满足以下条件才返回1（按时间下机）：交替计划前物料所在机台由续作降模规则选中下机、
+     * 前物料排程前硫化余量大于0、本次排程全部入口扣减后仍有剩余量。交替类型不参与 END_TYPE 判断；
+     * 若本次排程可将前物料SKU余量排完，则属于正常收尾，统一返回0。</p>
+     * <p>收尾小余量阈值跳过虽然也会释放续作机台，但不会写入续作降模快照，因此会稳定返回0；
+     * 同时以“机台+前物料”精确匹配，避免后物料满足条件时反向污染本条交替计划。</p>
+     *
+     * @param context 排程上下文
+     * @param machineCode 交替计划机台编码
+     * @param beforeMaterialCode 交替计划前物料编码
+     * @return 1-按时间下机；0-按余量收尾下机
+     */
+    private String resolveMouldChangePlanEndType(LhScheduleContext context,
+                                                 String machineCode,
+                                                 String beforeMaterialCode) {
+        Map<String, SkuScheduleDTO> beforeSkuMap = Objects.isNull(context)
+                || CollectionUtils.isEmpty(context.getReducedContinuationMachineBeforeSkuMap())
+                ? null : context.getReducedContinuationMachineBeforeSkuMap().get(machineCode);
+        SkuScheduleDTO beforeSku = CollectionUtils.isEmpty(beforeSkuMap)
+                || StringUtils.isEmpty(beforeMaterialCode) ? null : beforeSkuMap.get(beforeMaterialCode);
+        boolean reducedContinuationMachine = Objects.nonNull(beforeSku);
+        int beforeMaterialSurplusQty = reducedContinuationMachine ? Math.max(0, beforeSku.getSurplusQty()) : 0;
+        Integer beforeMaterialRemainingQty = resolveBeforeMaterialRemainingQty(context, beforeSku);
+        boolean beforeMaterialCannotFinish = reducedContinuationMachine
+                && beforeMaterialSurplusQty > 0
+                && Objects.nonNull(beforeMaterialRemainingQty)
+                && beforeMaterialRemainingQty > 0;
+        String endType = beforeMaterialCannotFinish
+                ? END_TYPE_BY_TIME : END_TYPE_BY_REMAINING_QTY;
+        log.info("模具交替计划END_TYPE判断, machineCode: {}, beforeMaterialCode: {}, "
+                        + "reducedContinuationMachine: {}, beforeMaterialSurplusQty: {}, "
+                        + "beforeMaterialRemainingQty: {}, beforeMaterialCannotFinish: {}, endType: {}",
+                machineCode, beforeMaterialCode, reducedContinuationMachine, beforeMaterialSurplusQty,
+                beforeMaterialRemainingQty, beforeMaterialCannotFinish, endType);
+        return endType;
+    }
+
+    /**
+     * 读取前物料 SKU 在本次排程全部入口消费后的剩余量。
+     * <p>续作、换活字块、续作补偿新增等入口统一扣减 SKU 实际消费账本，账本 key 为“物料+产品状态”。
+     * S4.6 位于排程结果保存前，此时读取到的是本次排程最终剩余量：大于0表示本次不能收尾，等于0表示
+     * 本次可以排完。账本缺失时不重新计算、不使用初始余量兜底，按不满足时间下机条件处理，避免误标。</p>
+     *
+     * @param context 排程上下文
+     * @param beforeSku 续作降模时登记的前物料来源 SKU
+     * @return 本次排程后的 SKU 剩余量；无法取得准确运行态账本时返回 null
+     */
+    private Integer resolveBeforeMaterialRemainingQty(LhScheduleContext context, SkuScheduleDTO beforeSku) {
+        if (Objects.isNull(context) || Objects.isNull(beforeSku)
+                || StringUtils.isEmpty(beforeSku.getMaterialCode())) {
+            return null;
+        }
+        String skuKey = MonthPlanDateResolver.buildMaterialStatusKey(
+                beforeSku.getMaterialCode(), beforeSku.getProductStatus());
+        Integer remainingQty = context.getSkuProductionRemainingQtyMap().get(skuKey);
+        return Objects.isNull(remainingQty) ? null : Math.max(0, remainingQty);
     }
 
     /**
@@ -1623,6 +2319,12 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
             state.setPreviousMaterialDesc(machine.getPreviousMaterialDesc());
             state.setEstimatedEndTime(machine.getEstimatedEndTime());
         }
+        LhMachineOnlineInfo onlineInfo = Objects.isNull(context)
+                || CollectionUtils.isEmpty(context.getMachineOnlineInfoMap())
+                ? null : context.getMachineOnlineInfoMap().get(machineCode);
+        if (Objects.nonNull(onlineInfo)) {
+            state.setCurrentProductStatus(normalizeProductStatus(onlineInfo.getProductStatus()));
+        }
         return state;
     }
 
@@ -1631,6 +2333,7 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
         state.setPreviousMaterialDesc(state.getCurrentMaterialDesc());
         state.setCurrentMaterialCode(result.getMaterialCode());
         state.setCurrentMaterialDesc(result.getMaterialDesc());
+        state.setCurrentProductStatus(normalizeProductStatus(result.getProductStatus()));
         state.setEstimatedEndTime(result.getSpecEndTime());
     }
 
@@ -1641,6 +2344,7 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
 
         private String currentMaterialCode;
         private String currentMaterialDesc;
+        private String currentProductStatus;
         private String previousMaterialCode;
         private String previousMaterialDesc;
         private Date estimatedEndTime;
@@ -1659,6 +2363,14 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
 
         public void setCurrentMaterialDesc(String currentMaterialDesc) {
             this.currentMaterialDesc = currentMaterialDesc;
+        }
+
+        public String getCurrentProductStatus() {
+            return currentProductStatus;
+        }
+
+        public void setCurrentProductStatus(String currentProductStatus) {
+            this.currentProductStatus = currentProductStatus;
         }
 
         public String getPreviousMaterialCode() {

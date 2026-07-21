@@ -15,12 +15,4 @@ export function editParams(query) {
     data: query
   })
 }
-export function removeParams(query) {
-  return request({
-    url: '/gsq/params/remove',
-    method: 'post',
-    data: query
-  })
-}
-
 

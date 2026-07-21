@@ -14,13 +14,38 @@ export function listLossRate(query) {
 }
 
 /**
- * 保存钢丝圈损耗率（id为空新增，id不为空修改）
+ * 获取钢丝圈损耗率详情
+ * @param {Number} id 主键ID
+ * @returns
+ */
+export function getLossRate(id) {
+  return request({
+    url: '/gsq/lossRate/getInfo/' + id,
+    method: 'get'
+  })
+}
+
+/**
+ * 新增钢丝圈损耗率
  * @param {Object} query 实体
  * @returns
  */
-export function saveLossRate(query) {
+export function addLossRate(query) {
   return request({
-    url: '/gsq/lossRate/save',
+    url: '/gsq/lossRate/add',
+    method: 'post',
+    data: query
+  })
+}
+
+/**
+ * 编辑钢丝圈损耗率
+ * @param {Object} query 实体
+ * @returns
+ */
+export function editLossRate(query) {
+  return request({
+    url: '/gsq/lossRate/edit',
     method: 'post',
     data: query
   })
@@ -33,21 +58,9 @@ export function saveLossRate(query) {
  */
 export function removeLossRate(ids) {
   return request({
-    url: '/gsq/lossRate/delete/' + ids,
-    method: 'post'
-  })
-}
-
-/**
- * 校验钢丝圈损耗率唯一性
- * @param {Object} query 实体
- * @returns
- */
-export function checkLossRateUnique(query) {
-  return request({
-    url: '/gsq/lossRate/checkUnique',
+    url: '/gsq/lossRate/remove',
     method: 'post',
-    data: query
+    params: { ids: ids.toString() }
   })
 }
 
@@ -57,5 +70,5 @@ export function checkLossRateUnique(query) {
  * @returns
  */
 export function exportLossRate(query) {
-  return downloadLink('/gsq/lossRate/exportData/钢丝圈损耗率管理', query)
+  return downloadLink('/gsq/lossRate/export', query)
 }

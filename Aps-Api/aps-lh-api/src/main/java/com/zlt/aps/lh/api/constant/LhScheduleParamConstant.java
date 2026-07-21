@@ -18,11 +18,15 @@ package com.zlt.aps.lh.api.constant;
  *   09 - 胶囊管理参数
  *   10 - 开停产参数
  *   11 - 试制与小批量参数
+ *   12 - 量试充抵正规参数
  */
 public final class LhScheduleParamConstant {
 
     private LhScheduleParamConstant() {
     }
+
+    /** 常规结构最低硫化机台数，来源于月计划工厂参数表 */
+    public static final String REGULAR_STRUCTURE_MIN_VULCANIZING_MACHINE = "SYS0204012";
 
     /** 夜班开始小时 */
     public static final String NIGHT_START_HOUR = "SYS0301001";
@@ -156,9 +160,9 @@ public final class LhScheduleParamConstant {
     public static final String PLANNED_REPAIR_FIXED_QTY = "SYS0308010";
     /** 胶囊预警次数 */
     public static final String CAPSULE_WARNING_COUNT = "SYS0309001";
-    /** 胶囊强制下机次数 */
+    /** 胶囊使用次数上限；仅在扣减前实际可排量使累计次数严格超限时触发更换 */
     public static final String CAPSULE_FORCE_DOWN_COUNT = "SYS0309002";
-    /** 胶囊更换损失数量 */
+    /** 换胶囊班次固定扣减计划量；默认2条，对应固定占用1小时 */
     public static final String CAPSULE_CHANGE_LOSS_QTY = "SYS0309003";
     /** 停产前第3天产能比例 */
     public static final String SHUTDOWN_DAY_MINUS_3_RATE = "SYS0310001";
@@ -230,4 +234,8 @@ public final class LhScheduleParamConstant {
     public static final String EARLY_PRODUCTION_DAYS_THRESHOLD = "SYS0304028";
     /** 收尾落在夜班或错开模具交替是否自动补量（0-关闭，1-开启） */
     public static final String ENDING_AUTO_FILL_ENABLED = "SYS0304029";
+    /** 量试充抵正规开关（0-关闭，1-开启）；控制同步硫化排程日完成量时，量试(T)与正规(S)同时存在是否额外插入正规充抵记录 */
+    public static final String ENABLE_MASS_TRIAL_TO_FORMAL = "SYS0312001";
+    /** 在机模具下机时前后计划校验天数 */
+    public static final String CONTINUOUS_MOULD_OFFLINE_CHECK_DAYS = "SYS0304030";
 }

@@ -1,9 +1,11 @@
 package com.zlt.sync.service.impl;
 
 import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.baomidou.dynamic.datasource.toolkit.DynamicDataSourceContextHolder;
 import com.ruoyi.common.utils.StringUtils;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.utils.RedisLock;
+import com.zlt.aps.itf.constant.DataSource;
 import com.zlt.aps.itf.vo.SyncDataLogs;
 import com.zlt.sync.mapper.SyncDataLogsMapper;
 import com.zlt.sync.handle.SyncDataHandle;
@@ -77,12 +79,17 @@ public class SyncDataLogsServiceImpl implements SyncDataLogsService {
         }
 		// 扫描截止时间：30秒后
 		Date endTime = DateUtil.secondLater(feedbackTimeOut);
-		while (true) {
-			SyncDataLogs logs = syncDataLogsMapper.getSyncDataLogs(dataVersion);
-			SyncDataLogs resultLog = this.checkLogStatus(dataVersion, logs, endTime);
-			if (resultLog != null) {
-				return resultLog;
+		DynamicDataSourceContextHolder.push(DataSource.MASTER);
+		try {
+			while (true) {
+				SyncDataLogs logs = syncDataLogsMapper.getSyncDataLogs(dataVersion);
+				SyncDataLogs resultLog = this.checkLogStatus(dataVersion, logs, endTime);
+				if (resultLog != null) {
+					return resultLog;
+				}
 			}
+		} finally {
+			DynamicDataSourceContextHolder.poll();
 		}
 	}
 
@@ -135,12 +142,17 @@ public class SyncDataLogsServiceImpl implements SyncDataLogsService {
 	public SyncDataLogs getReqDataResult(String dataVersion) {
 		// 扫描截止时间：30秒后
 		Date endTime = DateUtil.secondLater(feedbackTimeOut);
-		while (true) {
-			SyncDataLogs logs = syncDataLogsMapper.getReqDataLogs(dataVersion);
-			SyncDataLogs resultLog = this.checkLogStatus(dataVersion, logs, endTime);
-			if (resultLog != null) {
-				return resultLog;
+		DynamicDataSourceContextHolder.push(DataSource.MASTER);
+		try {
+			while (true) {
+				SyncDataLogs logs = syncDataLogsMapper.getReqDataLogs(dataVersion);
+				SyncDataLogs resultLog = this.checkLogStatus(dataVersion, logs, endTime);
+				if (resultLog != null) {
+					return resultLog;
+				}
 			}
+		} finally {
+			DynamicDataSourceContextHolder.poll();
 		}
 	}
 

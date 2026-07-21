@@ -1,5 +1,6 @@
 package com.zlt.aps.itf.mes;
 
+import com.zlt.aps.cd15.api.domain.entity.Cd15ScheduleResultIssue;
 import com.ruoyi.common.constant.ServiceNameConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.cx.api.domain.entity.CxMachineOnlineInfo;
@@ -9,7 +10,11 @@ import com.zlt.aps.itf.vo.MesBrandDict;
 import com.zlt.aps.lh.api.domain.entity.LhMachineOnlineInfo;
 import com.zlt.aps.mdm.api.domain.entity.MdmMoldAlterPlan;
 import com.zlt.aps.mp.api.domain.entity.*;
-import com.zlt.aps.tq.api.domain.entity.TqScheduleResultIssue;import io.swagger.annotations.ApiOperation;
+import com.zlt.aps.gsq.api.domain.entity.GsqScheduleResultIssue;
+import com.zlt.aps.tc.api.domain.entity.TcScheduleResultIssue;
+import com.zlt.aps.tc.api.domain.vo.TcReleaseFeedbackVo;
+import com.zlt.aps.tq.api.domain.entity.TqScheduleResultIssue;
+import io.swagger.annotations.ApiOperation;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -172,6 +177,18 @@ public interface IMesItfService {
     @ApiOperation("同步硫化在机数据")
     @PostMapping("/mesItf/syncLhMachineOnlineInfo")
     public AjaxResult syncLhMachineOnlineInfo(@RequestBody LhMachineOnlineInfo lhMachineOnlineInfo);
+
+    /**
+     * 按指定版本号同步硫化在机数据（临时任务）
+     * 与原syncLhMachineOnlineInfo的区别：不限日期，按指定版本号查询MES中间表所有日期数据
+     * 同步逻辑与硫化排程完成量回报按版本号同步一致：按onlineDate分组后逐组调用逻辑删除+插入
+     *
+     * @param dataVersion 指定版本号
+     * @return 结果
+     */
+    @ApiOperation("按指定版本号同步硫化在机数据（临时任务）")
+    @PostMapping("/mesItf/syncLhMachineOnlineInfoByVersion")
+    public AjaxResult syncLhMachineOnlineInfoByVersion(@RequestParam("dataVersion") String dataVersion);
 
     /**
      * 同步设备保养计划
@@ -364,6 +381,21 @@ public interface IMesItfService {
     public AjaxResult issueTqScheduleResult(@RequestBody List<TqScheduleResultIssue> tqScheduleResultIssueList);
 
     /**
+     * 钢丝圈排程结果下发到MES
+     * 业务规则：
+     * 1. D日（今天）：更新中班数据（钢丝圈1班→MES中班），夜班早班已过不下发
+     * 2. D+1日（明天）：更新夜早中3班数据（钢丝圈2/3/4班→MES夜/早/中班）
+     * 3. D+2日（后天）：先删后插夜早2班数据（钢丝圈5/6班→MES夜/早班），中班尚未排产不下发
+     * 钢丝圈6班覆盖胎圈1~6班，TQ_CLASS1~6_PLAN全量传递
+     *
+     * @param gsqScheduleResultIssueList 钢丝圈排程结果列表（已按3天拆分）
+     * @return 结果
+     */
+    @ApiOperation("钢丝圈排程结果下发到MES")
+    @PostMapping("/mesItf/issueGsqScheduleResult")
+    public AjaxResult issueGsqScheduleResult(@RequestBody List<GsqScheduleResultIssue> gsqScheduleResultIssueList);
+
+    /**
      * 直裁排程结果下发到MES
      * 业务规则：
      * 1. 班次配置由 t_cd90_shift_config 启用项决定，默认 CLASS1~CLASS6
@@ -376,6 +408,17 @@ public interface IMesItfService {
     @ApiOperation("直裁排程结果下发到MES")
     @PostMapping("/mesItf/issueCd90ScheduleResult")
     public AjaxResult issueCd90ScheduleResult(@RequestBody List<Cd90ScheduleResultIssue> cd90ScheduleResultIssueList);
+    /**
+     * 斜裁排程结果下发到 MES。
+     *
+     * @param issueList 按班次展开的斜裁排程结果
+     * @return 下发结果
+     */
+    @ApiOperation("斜裁排程结果下发到MES")
+    @PostMapping("/mesItf/issueCd15ScheduleResult")
+    AjaxResult issueCd15ScheduleResult(
+            @RequestBody List<Cd15ScheduleResultIssue> issueList);
+
 
     /**
      * 同步出库未扫描订单
@@ -533,4 +576,54 @@ public interface IMesItfService {
     @ApiOperation("同步设备停机计划")
     @PostMapping("/mesItf/syncDevPlanClose")
     public AjaxResult syncDevPlanClose(@RequestBody AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 同步胎侧库存。
+     *
+     * @param syncDataLogs 同步参数
+     * @return 同步结果
+     */
+    @ApiOperation("同步胎侧库存")
+    @PostMapping("/mesItf/syncSidewallStock")
+    AjaxResult syncSidewallStock(@RequestBody AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 同步胎侧班次完成量并回写排程结果。
+     *
+     * @param syncDataLogs 同步参数
+     * @return 同步结果
+     */
+    @ApiOperation("同步胎侧班次完成量")
+    @PostMapping("/mesItf/syncTcClassShiftFinishQty")
+    AjaxResult syncTcClassShiftFinishQty(@RequestBody AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 同步胎侧日完成量。
+     *
+     * @param syncDataLogs 同步参数
+     * @return 同步结果
+     */
+    @ApiOperation("同步胎侧日完成量")
+    @PostMapping("/mesItf/syncTcScheDayFinishQty")
+    AjaxResult syncTcScheDayFinishQty(@RequestBody AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 下发胎侧排程结果。
+     *
+     * @param issueList 已按MES业务日期拆分的结果
+     * @return 下发结果
+     */
+    @ApiOperation("胎侧排程结果下发到MES")
+    @PostMapping("/mesItf/issueTcScheduleResult")
+    AjaxResult issueTcScheduleResult(@RequestBody List<TcScheduleResultIssue> issueList);
+
+    /**
+     * 查询胎侧排程发布处理状态。
+     *
+     * @param dataVersion 发布数据版本
+     * @return MES反馈
+     */
+    @ApiOperation("查询胎侧排程发布处理状态")
+    @PostMapping("/mesItf/queryTcScheduleIssueStatus")
+    TcReleaseFeedbackVo queryTcScheduleIssueStatus(@RequestParam("dataVersion") String dataVersion);
 }
