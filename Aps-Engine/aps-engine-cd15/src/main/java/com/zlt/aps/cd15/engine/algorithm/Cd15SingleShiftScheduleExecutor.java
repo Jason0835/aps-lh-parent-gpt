@@ -56,6 +56,9 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class Cd15SingleShiftScheduleExecutor implements Cd15SingleShiftScheduleService {
 
+    /** true时新自动排程只生成单规格一出二，false时恢复异规格分裁配对。 */
+    private static final boolean SINGLE_SPEC_SPLIT_ONLY = true;
+
     private final Cd15ScheduleCandidatePreparationService candidatePreparationService;
     private final Cd15ShiftDemandProvider demandProvider;
     private final Cd15MachineResourceService machineResourceService;
@@ -127,7 +130,10 @@ public class Cd15SingleShiftScheduleExecutor implements Cd15SingleShiftScheduleS
             java.util.Optional<Cd15SplitCutGroup> splitGroup = this.splitCutGroupBuilder.find(
                     candidate, candidates, machineSnapshot.getAngleWidthMaxByAngle(),
                     shift.getClassField());
-            if (splitGroup.isPresent()) {
+            boolean existingSplitGroup = splitGroup.isPresent()
+                    && this.isExistingSplitGroup(splitGroup.get());
+            if (existingSplitGroup
+                    || !SINGLE_SPEC_SPLIT_ONLY && splitGroup.isPresent()) {
                 Cd15ShiftResourceState splitState = this.tryExecuteSplitGroup(
                         context, input, shift, state, rolling, machineSnapshot,
                         splitGroup.get(), sourceTasks, failures, attemptTraces,
@@ -135,6 +141,22 @@ public class Cd15SingleShiftScheduleExecutor implements Cd15SingleShiftScheduleS
                 if (splitState != null) {
                     candidates.remove(splitGroup.get().getSecondCandidate());
                     state = splitState;
+                    continue;
+                }
+            }
+            if (SINGLE_SPEC_SPLIT_ONLY
+                    && this.splitCutGroupBuilder.canSingleSpecSplit(
+                            candidate,
+                            machineSnapshot.getAngleWidthMaxByAngle())) {
+                Cd15ShiftResourceState singleSpecSplitState =
+                        this.tryExecuteSingleSpecSplit(
+                                context, input, shift, state, rolling,
+                                machineSnapshot, candidate, sourceTasks,
+                                failures, attemptTraces,
+                                continueDemandBySteelStrip,
+                                immediateContinueCandidates);
+                if (singleSpecSplitState != null) {
+                    state = singleSpecSplitState;
                     continue;
                 }
             }
@@ -199,7 +221,7 @@ public class Cd15SingleShiftScheduleExecutor implements Cd15SingleShiftScheduleS
             Cd15MachineTrialPlan trialPlan = trialPreparationService.prepare(
                     trialRequest(context, shift, state, construction, netDemand,
                             closeOut.isCloseOut(), candidate, rolling,
-                            false),
+                            false, false),
                     machineSnapshot);
             String cutMode = "SINGLE";
             String splitGroupKey = null;
@@ -272,12 +294,12 @@ public class Cd15SingleShiftScheduleExecutor implements Cd15SingleShiftScheduleS
         Cd15MachineTrialPlan firstPlan = this.trialPreparationService.prepare(
                 this.trialRequest(context, shift, originalState,
                         first.construction, first.netDemand, first.closeOut,
-                        first.candidate, rolling, true),
+                        first.candidate, rolling, true, false),
                 machineSnapshot);
         Cd15MachineTrialPlan secondPlan = this.trialPreparationService.prepare(
                 this.trialRequest(context, shift, originalState,
                         second.construction, second.netDemand, second.closeOut,
-                        second.candidate, rolling, true),
+                        second.candidate, rolling, true, false),
                 machineSnapshot);
         Set<String> firstMachineCodes = this.safe(firstPlan.getTrials()).stream()
                 .filter(item -> item != null
@@ -340,8 +362,63 @@ public class Cd15SingleShiftScheduleExecutor implements Cd15SingleShiftScheduleS
         return splitCommit.getState();
     }
 
+    /** 尝试将单个候选按同规格一出二方式原子提交为一条任务。 */
+    private Cd15ShiftResourceState tryExecuteSingleSpecSplit(
+            Cd15AutoScheduleContext context,
+            Cd15AutoScheduleInput input,
+            Cd15ShiftDescriptor shift,
+            Cd15ShiftResourceState originalState,
+            Cd15RollingScheduleContext rolling,
+            Cd15MachineResourceSnapshot machineSnapshot,
+            Cd15ScheduleCandidate candidate,
+            Map<String, Cd15RollingPendingTask> sourceTasks,
+            Map<String, String> failures,
+            List<Cd15ScheduleAttemptTrace> attemptTraces,
+            Map<String, BigDecimal> continueDemandBySteelStrip,
+            Deque<Cd15ScheduleCandidate> immediateContinueCandidates) {
+        SplitPreparedCandidate prepared = this.prepareSplitCandidate(
+                context, input, shift, candidate, rolling,
+                continueDemandBySteelStrip);
+        if (prepared == null) {
+            return null;
+        }
+        Cd15MachineTrialPlan trialPlan = this.trialPreparationService.prepare(
+                this.trialRequest(context, shift, originalState,
+                        prepared.construction, prepared.netDemand,
+                        prepared.closeOut, prepared.candidate, rolling,
+                        true, true),
+                machineSnapshot);
+        Cd15ShiftCommitResult commit =
+                this.resourceCommitter.commitSingleSpecSplit(
+                        this.commitRequest(
+                                context, shift, prepared.construction,
+                                prepared.candidate, trialPlan,
+                                prepared.closeOut, "SPLIT", null),
+                        originalState);
+        if (!commit.isSuccess()) {
+            return null;
+        }
+        prepared.candidate.setCutMode("SPLIT");
+        prepared.candidate.setSplitGroupKey(null);
+        this.attachRollingSource(
+                prepared.candidate, commit.getTask(), sourceTasks);
+        this.recordSplitSuccess(
+                shift, prepared, commit, rolling, attemptTraces,
+                continueDemandBySteelStrip,
+                immediateContinueCandidates);
+        failures.remove(this.candidateKey(prepared.candidate));
+        log.info("[斜裁自动排程] 单规格分裁原子提交成功, classField={}, "
+                        + "machineCode={}, steelStripCode={}, planQuantity={}, "
+                        + "vehicleCount={}",
+                shift.getClassField(), commit.getTask().getMachineCode(),
+                prepared.candidate.getSteelStripCode(),
+                commit.getTask().getPlanQuantity(),
+                commit.getTask().getVehicleCount());
+        return commit.getState();
+    }
     private SplitPreparedCandidate prepareSplitCandidate(
             Cd15AutoScheduleContext context,
+
             Cd15AutoScheduleInput input,
             Cd15ShiftDescriptor shift,
             Cd15ScheduleCandidate candidate,
@@ -821,7 +898,8 @@ public class Cd15SingleShiftScheduleExecutor implements Cd15SingleShiftScheduleS
                                                   boolean closeOut,
                                                   Cd15ScheduleCandidate candidate,
                                                   Cd15RollingScheduleContext rolling,
-                                                  boolean splitCut) {
+                                                  boolean splitCut,
+                                                  boolean singleSpecSplit) {
         return Cd15MachineTrialRequest.builder()
                 .materialKey(candidate.getMaterialKey())
                 .steelStripCode(construction.getSteelStripCode())
@@ -829,7 +907,12 @@ public class Cd15SingleShiftScheduleExecutor implements Cd15SingleShiftScheduleS
                 .cuttingAngle(construction.getCuttingAngle())
                 .cordSpec(construction.getSteelStripCode())
                 .splitCut(splitCut)
+                .singleSpecSplit(singleSpecSplit)
                 .craftWidth(construction.getCraftWidth())
+                .machineMatchWidth(singleSpecSplit
+                        ? construction.getCraftWidth().multiply(
+                                new BigDecimal("2"))
+                        : construction.getCraftWidth())
                 .unitConsumeMillimeter(construction.getUnitConsumeMillimeter())
                 .curlLength(effectiveCurlLength(context, construction))
                 .cordWidth(construction.getCordWidth())
@@ -888,6 +971,18 @@ public class Cd15SingleShiftScheduleExecutor implements Cd15SingleShiftScheduleS
         log.warn("[斜裁自动排程] 当前规格未匹配到标准卷曲长度，使用参数CRIMP_LENGTH兜底, steelStripCode={}, bigRollCode={}, fallbackMeter={}",
                 construction.getSteelStripCode(), construction.getBigRollCode(), fallback);
         return fallback;
+    }
+
+    /** 历史滚动分裁组不受新排程策略常量影响。 */
+    private boolean isExistingSplitGroup(Cd15SplitCutGroup group) {
+        Cd15ScheduleCandidate first = group.getFirstCandidate();
+        Cd15ScheduleCandidate second = group.getSecondCandidate();
+        return first != null && second != null
+                && "SPLIT".equals(first.getCutMode())
+                && "SPLIT".equals(second.getCutMode())
+                && StringUtils.hasText(first.getSplitGroupKey())
+                && first.getSplitGroupKey().equals(
+                        second.getSplitGroupKey());
     }
 
     private Cd15ConstructionMaterial findConstruction(List<Cd15ConstructionMaterial> materials,

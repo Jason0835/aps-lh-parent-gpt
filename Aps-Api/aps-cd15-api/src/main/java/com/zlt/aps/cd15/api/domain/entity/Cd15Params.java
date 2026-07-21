@@ -47,18 +47,15 @@ public class Cd15Params extends BaseEntity implements Serializable {
     /** 正则表达式 */
     @ImportExcelValidated(maxLength = 100)
     @TableField("REGULAR_EXPRESSION")
-    @Excel(name = "ui.data.column.cd15Params.regularExpression")
     private String regularExpression;
 
     /** 错误提示 */
     @ImportExcelValidated(maxLength = 200)
     @TableField("ERROR_TIPS")
-    @Excel(name = "ui.data.column.cd15Params.errorTips")
     private String errorTips;
 
     /** 参数标识 */
     @ImportExcelValidated(maxLength = 50)
     @TableField("REMARK2")
-    @Excel(name = "ui.data.column.cd15Params.remark2")
     private String remark2;
 }

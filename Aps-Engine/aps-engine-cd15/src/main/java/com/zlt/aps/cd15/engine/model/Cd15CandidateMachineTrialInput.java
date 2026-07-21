@@ -24,6 +24,8 @@ public class Cd15CandidateMachineTrialInput {
     private BigDecimal netDemandQuantity;
     /** 是否收尾规格。 */
     private boolean closeOut;
+    /** 是否按单规格一出二模式试算。 */
+    private boolean singleSpecSplit;
     /** 最小起排量。 */
     private BigDecimal minimumStartQuantity;
     /** 各班计划量均分阈值，按加损耗前的净需求量判断是否触发均分。 */

@@ -280,16 +280,17 @@ public class Cd15ScheduleResultController extends AbstractDocBizController<Cd15S
             Set<Long> selectedIds = selectedGroup.stream()
                     .map(Cd15ScheduleResult::getId)
                     .collect(Collectors.toSet());
-            boolean complete = completeGroup.size() == 2
-                    && selectedGroup.size() == 2
+            boolean selectedAll = completeGroup.size() == selectedGroup.size()
                     && completeGroup.stream()
                     .map(Cd15ScheduleResult::getId)
                     .allMatch(selectedIds::contains)
+                    && (completeGroup.size() == 1
+                    || completeGroup.size() == 2
                     && completeGroup.stream()
                     .map(Cd15ScheduleResult::getSteelStripCode)
                     .filter(code -> code != null && !code.trim().isEmpty())
-                    .distinct().count() == 2L;
-            if (!complete) {
+                    .distinct().count() == 2L);
+            if (!selectedAll) {
                 return AjaxResult.error(I18nUtil.getMessage(
                         "ui.cd15.scheduleResult.splitDeleteTogether"));
             }

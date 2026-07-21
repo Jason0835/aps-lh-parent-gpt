@@ -11,6 +11,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 
 /**
  * 单个候选机台组合试算器。
@@ -45,13 +46,24 @@ public class Cd15CandidateMachineTrialCalculator {
                 input.getSteelStripCode(), input.getMachineCode(), input.getLossRateRules(),
                 input.getFallbackLossRatePercent());
         // 计算含损耗的实际排产量：在净需求基础上上浮损耗量，同时受起排量门槛和均分阈值约束
-        BigDecimal actualQuantity = quantityCalculator.calculateActualQuantity(
-                input.getNetDemandQuantity(), input.isCloseOut(), lossRate.getLossRatePercent(),
-                input.getMinimumStartQuantity(), input.getVehiclePlanQuantity(), input.getEqualShareThreshold());
+        BigDecimal actualQuantity = input.isSingleSpecSplit()
+                ? quantityCalculator.calculateSingleSpecSplitActualQuantity(
+                        input.getNetDemandQuantity(), input.isCloseOut(),
+                        lossRate.getLossRatePercent(), input.getMinimumStartQuantity(),
+                        input.getVehiclePlanQuantity(), input.getEqualShareThreshold(),
+                        input.getCraftWidth())
+                : quantityCalculator.calculateActualQuantity(
+                        input.getNetDemandQuantity(), input.isCloseOut(),
+                        lossRate.getLossRatePercent(), input.getMinimumStartQuantity(),
+                        input.getVehiclePlanQuantity(), input.getEqualShareThreshold());
         // 工装试算：根据实际排产量和工装总数（卷轴）计算每台机可同时上机数量
-        Cd15ToolingTrial tooling = toolingCalculator.calculate(
-                actualQuantity, input.getTotalToolingCount(), input.getOccupiedVehicleCount(),
-                input.getVehiclePlanQuantity());
+        Cd15ToolingTrial tooling = input.isSingleSpecSplit()
+                ? toolingCalculator.calculateSingleSpecSplit(
+                        actualQuantity, input.getTotalToolingCount(),
+                        input.getOccupiedVehicleCount(), input.getVehiclePlanQuantity())
+                : toolingCalculator.calculate(
+                        actualQuantity, input.getTotalToolingCount(),
+                        input.getOccupiedVehicleCount(), input.getVehiclePlanQuantity());
         // 大卷静置时效分配：按大卷释放时间排序，判断是否满足本班次用量，返回延迟秒数或失败
         Cd15BigRollAgingAllocation agingAllocation = agingAllocation(input, actualQuantity);
         // 大卷时效分配失败（如时效期不足），产能直接置零，标记为大卷时效限制
@@ -93,6 +105,25 @@ public class Cd15CandidateMachineTrialCalculator {
         BigDecimal finalQuantity = actualQuantity
                 .min(tooling.getSchedulableQuantity())
                 .min(capacity.getCapacityQuantity());
+        if (input.isSingleSpecSplit()) {
+            finalQuantity = quantityCalculator.roundSingleSpecSplitDown(
+                    finalQuantity, input.getCraftWidth());
+        }
+        int productionSeconds = capacity.getProductionSeconds();
+        int trialRemainingSeconds = capacity.getRemainingSeconds();
+        if (input.isSingleSpecSplit()
+                && finalQuantity.compareTo(capacity.getCapacityQuantity()) < 0) {
+            int fullShiftSeconds = Math.multiplyExact(
+                    input.getShiftHours(), 3600);
+            productionSeconds = finalQuantity.signum() <= 0 ? 0
+                    : finalQuantity.multiply(BigDecimal.valueOf(fullShiftSeconds))
+                            .divide(input.getShiftCapacity(), 0,
+                                    RoundingMode.CEILING)
+                            .intValueExact();
+            trialRemainingSeconds = Math.max(0,
+                    remainingSeconds - capacity.getChangeSeconds()
+                            - productionSeconds);
+        }
         // 判断瓶颈原因：优先级 工装限制 > 产能限制 > 大卷时效限制
         String limitReason = limitReason(actualQuantity, tooling.getSchedulableQuantity(),
                 capacity.getCapacityQuantity(), finalQuantity);
@@ -115,7 +146,7 @@ public class Cd15CandidateMachineTrialCalculator {
                 .preferredMachine(input.isPreferredMachine())
                 .priorityOrder(input.getPriorityOrder())
                 .changeSeconds(capacity.getChangeSeconds())
-                .productionSeconds(capacity.getProductionSeconds())
+                .productionSeconds(productionSeconds)
                 .sameTailSpec(input.getCurrentTail() == null
                             ? input.getPreviousSpec() != null && input.getPreviousSpec().equals(input.getCurrentSpec())
                             : input.getPreviousTail() != null
@@ -123,7 +154,7 @@ public class Cd15CandidateMachineTrialCalculator {
                                     && input.getPreviousTail().getSteelStripCode()
                                             .equals(input.getCurrentTail().getSteelStripCode()))
                 .historyMachine(input.isHistoryMachine())
-                .remainingSeconds(capacity.getRemainingSeconds())
+                .remainingSeconds(trialRemainingSeconds)
                     .taskStartTime(agingAllocation == null ? input.getOriginalStartTime()
                             : agingAllocation.getTaskStartTime())
                 .agingDelaySeconds(agingDelaySeconds)

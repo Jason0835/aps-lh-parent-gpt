@@ -8,6 +8,7 @@ import com.zlt.aps.cd15.engine.model.Cd15ShiftCommitRequest;
 import com.zlt.aps.cd15.engine.model.Cd15ShiftCommitResult;
 import com.zlt.aps.cd15.engine.model.Cd15ShiftResourceState;
 import com.zlt.aps.cd15.engine.model.Cd15ShiftScheduleTask;
+import com.zlt.aps.cd15.engine.model.Cd15StorageLaneAllocation;
 import com.zlt.aps.cd15.engine.model.Cd15StorageLaneAllocationResult;
 import com.zlt.aps.cd15.engine.model.Cd15StorageLaneState;
 import lombok.RequiredArgsConstructor;
@@ -20,6 +21,7 @@ import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -152,6 +154,182 @@ public class Cd15ShiftResourceCommitter {
                 request.getClassField(), request.getSteelStripCode(), lastFailureReason);
         return Cd15ShiftCommitResult.builder().success(false).failureReason(lastFailureReason)
                 .state(originalState).build();
+    }
+
+    /**
+     * 将一个钢带规格按一出二方式原子提交为一条任务。
+     * 两路使用相同规格并分别占用小车和工装，任一路失败时不修改原资源状态。
+     */
+    public Cd15ShiftCommitResult commitSingleSpecSplit(
+            Cd15ShiftCommitRequest request,
+            Cd15ShiftResourceState originalState) {
+        if (request == null || request.getTrialPlan() == null
+                || originalState == null) {
+            throw new IllegalArgumentException(
+                    "单规格分裁请求、试算方案和资源状态不能为空");
+        }
+        List<Cd15MachineTrial> remainingTrials =
+                request.getTrialPlan().getTrials() == null
+                        ? new ArrayList<>()
+                        : new ArrayList<>(request.getTrialPlan().getTrials());
+        String lastFailureReason = request.getTrialPlan().getFailureReason() == null
+                ? "NO_AVAILABLE_MACHINE"
+                : request.getTrialPlan().getFailureReason();
+        while (!remainingTrials.isEmpty()) {
+            Cd15MachineTrial trial = this.trialSelector.select(remainingTrials);
+            if (trial == null) {
+                break;
+            }
+            remainingTrials.remove(trial);
+            BigDecimal totalTrialQuantity = trial.getFinalSchedulableQuantity();
+            if (totalTrialQuantity == null || totalTrialQuantity.signum() <= 0) {
+                lastFailureReason = trial.getLimitReason() == null
+                        ? lastFailureReason : trial.getLimitReason();
+                continue;
+            }
+            BigDecimal branchTrialQuantity = totalTrialQuantity.divide(
+                    new BigDecimal("2"), 10, RoundingMode.UNNECESSARY);
+            BigDecimal vehiclePlanQuantity = trial.getVehiclePlanQuantity();
+            Cd15ShiftResourceState preview = this.copy(originalState);
+            Cd15StorageLaneAllocationResult firstPreview = this.laneAllocator.allocate(
+                    request.getSteelStripCode(), branchTrialQuantity,
+                    vehiclePlanQuantity, preview.getLanes());
+            if (!firstPreview.isSuccess()) {
+                lastFailureReason = "STORAGE_LANE_LIMIT";
+                continue;
+            }
+            preview.setLanes(firstPreview.getLanes());
+            Cd15StorageLaneAllocationResult secondPreview = this.laneAllocator.allocate(
+                    request.getSteelStripCode(), branchTrialQuantity,
+                    vehiclePlanQuantity, preview.getLanes());
+            if (!secondPreview.isSuccess()) {
+                lastFailureReason = "STORAGE_LANE_LIMIT";
+                continue;
+            }
+            int pairVehicleCount = Math.min(
+                    firstPreview.getAllocatedVehicleCount(),
+                    secondPreview.getAllocatedVehicleCount());
+            int requiredPairVehicleCount = Math.max(
+                    firstPreview.getRequiredVehicleCount(),
+                    secondPreview.getRequiredVehicleCount());
+            int totalVehicleCount = pairVehicleCount * 2;
+            if (pairVehicleCount <= 0
+                    || totalVehicleCount > originalState.getTotalToolingCount()
+                    - originalState.getOccupiedToolingCount()
+                    || pairVehicleCount < requiredPairVehicleCount
+                    && !request.isCloseOut()
+                    && totalVehicleCount < Math.max(
+                            1, request.getPartialMinVehicleCount())) {
+                lastFailureReason = pairVehicleCount <= 0
+                        || pairVehicleCount < requiredPairVehicleCount
+                        ? "STORAGE_LANE_LIMIT" : "ROLL_TOOL_LIMIT";
+                continue;
+            }
+
+            BigDecimal branchCommittedQuantity = branchTrialQuantity.min(
+                    vehiclePlanQuantity.multiply(
+                            BigDecimal.valueOf(pairVehicleCount)));
+            BigDecimal committedQuantity = this.normalize(
+                    branchCommittedQuantity.multiply(new BigDecimal("2")));
+            Cd15ShiftResourceState working = this.copy(originalState);
+            Cd15StorageLaneAllocationResult firstAllocation =
+                    this.laneAllocator.allocate(
+                            request.getSteelStripCode(), branchCommittedQuantity,
+                            vehiclePlanQuantity, working.getLanes());
+            working.setLanes(firstAllocation.getLanes());
+            Cd15StorageLaneAllocationResult secondAllocation =
+                    this.laneAllocator.allocate(
+                            request.getSteelStripCode(), branchCommittedQuantity,
+                            vehiclePlanQuantity, working.getLanes());
+            if (!firstAllocation.isSuccess() || !secondAllocation.isSuccess()) {
+                lastFailureReason = "STORAGE_LANE_LIMIT";
+                continue;
+            }
+
+            BigDecimal bigRollConsumeQuantity =
+                    this.bigRollMeterCalculator.calculateForPlanQuantity(
+                            committedQuantity,
+                            request.getUnitConsumeMillimeter(),
+                            request.getCraftWidth(), request.getCordWidth());
+            int beforeSeconds = working.getRemainingSecondsByMachine()
+                    .getOrDefault(trial.getMachineCode(),
+                            this.fullShiftSeconds(request));
+            int afterSeconds = this.adjustedRemainingSeconds(
+                    request, trial, beforeSeconds, committedQuantity);
+            int elapsedBefore = Math.max(0,
+                    this.fullShiftSeconds(request) - beforeSeconds);
+            LocalDateTime originalStart = request.getShiftStart()
+                    .plusSeconds(elapsedBefore);
+            Cd15BigRollAgingAllocation agingAllocation =
+                    this.commitAgingAllocation(
+                            working, request.getBigRollCode(),
+                            bigRollConsumeQuantity, originalStart);
+            if (agingAllocation != null && !agingAllocation.isSuccess()) {
+                lastFailureReason = Cd15BigRollAgingAllocator.AGING_PERIOD_LIMIT;
+                continue;
+            }
+            LocalDateTime expectedStart = agingAllocation == null
+                    ? originalStart : agingAllocation.getTaskStartTime();
+            int productionDurationSeconds = Math.max(0,
+                    beforeSeconds - afterSeconds - trial.getAgingDelaySeconds());
+            int produceOrder = working.getTasks().stream()
+                    .filter(item -> trial.getMachineCode().equals(
+                            item.getMachineCode()))
+                    .map(Cd15ShiftScheduleTask::getProduceOrder)
+                    .max(Integer::compareTo).orElse(0) + 1;
+            List<Cd15StorageLaneAllocation> laneAllocations =
+                    this.mergeLaneAllocations(
+                            firstAllocation.getAllocations(),
+                            secondAllocation.getAllocations());
+            Cd15ShiftScheduleTask task = Cd15ShiftScheduleTask.builder()
+                    .classField(request.getClassField())
+                    .materialKey(request.getMaterialKey())
+                    .steelStripCode(request.getSteelStripCode())
+                    .bigRollCode(request.getBigRollCode())
+                    .cordSpec(request.getCordSpec())
+                    .cuttingAngle(request.getCuttingAngle())
+                    .craftWidth(request.getCraftWidth())
+                    .unitConsumeMillimeter(request.getUnitConsumeMillimeter())
+                    .cordWidth(request.getCordWidth())
+                    .curlLength(request.getCurlLength())
+                    .bigRollConsumeQuantity(bigRollConsumeQuantity)
+                    .cutMode("SPLIT")
+                    .splitGroupKey(null)
+                    .machineCode(trial.getMachineCode())
+                    .planQuantity(committedQuantity)
+                    .vehicleCount(totalVehicleCount)
+                    .produceOrder(produceOrder)
+                    .expectedStartTime(expectedStart)
+                    .expectedEndTime(expectedStart.plusSeconds(
+                            productionDurationSeconds))
+                    .laneAllocations(laneAllocations).build();
+            working.setLanes(secondAllocation.getLanes());
+            working.setOccupiedToolingCount(
+                    working.getOccupiedToolingCount() + totalVehicleCount);
+            working.getRemainingSecondsByMachine().put(
+                    trial.getMachineCode(), afterSeconds);
+            working.getTailSpecByMachine().put(
+                    trial.getMachineCode(), request.getCordSpec());
+            working.getTailByMachine().put(
+                    trial.getMachineCode(), Cd15MachineTailState.builder()
+                            .materialKey(request.getMaterialKey())
+                            .steelStripCode(request.getSteelStripCode())
+                            .bigRollCode(request.getBigRollCode())
+                            .cuttingAngle(request.getCuttingAngle()).build());
+            working.getTasks().add(task);
+            String partialReason = pairVehicleCount < requiredPairVehicleCount
+                    ? "STORAGE_LANE_LIMIT" : trial.getLimitReason();
+            log.info("[斜裁自动排程] 单规格分裁资源提交成功, classField={}, "
+                            + "steelStripCode={}, machineCode={}, planQuantity={}, "
+                            + "branchQuantity={}, vehicleCount={}",
+                    request.getClassField(), request.getSteelStripCode(),
+                    trial.getMachineCode(), committedQuantity,
+                    branchCommittedQuantity, totalVehicleCount);
+            return Cd15ShiftCommitResult.builder().success(true)
+                    .partialReason(partialReason).state(working).task(task).build();
+        }
+        return Cd15ShiftCommitResult.builder().success(false)
+                .failureReason(lastFailureReason).state(originalState).build();
     }
 
     /**
@@ -419,6 +597,27 @@ public class Cd15ShiftResourceCommitter {
                 ? BigDecimal.ZERO : trial.getFinalSchedulableQuantity();
         BigDecimal result = trialQuantity.signum() > 0 ? laneQuantity.min(trialQuantity) : laneQuantity;
         return normalizeCommittedQuantity(result);
+    }
+
+    /** 合并两路同规格库排分配，同一库排累计车数。 */
+    private List<Cd15StorageLaneAllocation> mergeLaneAllocations(
+            List<Cd15StorageLaneAllocation> first,
+            List<Cd15StorageLaneAllocation> second) {
+        Map<String, Integer> vehicleCountByLane = new LinkedHashMap<>();
+        List<Cd15StorageLaneAllocation> source = new ArrayList<>();
+        if (first != null) {
+            source.addAll(first);
+        }
+        if (second != null) {
+            source.addAll(second);
+        }
+        source.forEach(item -> vehicleCountByLane.merge(
+                item.getLaneCode(), item.getVehicleCount(), Integer::sum));
+        return vehicleCountByLane.entrySet().stream()
+                .map(entry -> Cd15StorageLaneAllocation.builder()
+                        .laneCode(entry.getKey())
+                        .vehicleCount(entry.getValue()).build())
+                .collect(Collectors.toList());
     }
 
     private int adjustedRemainingSeconds(Cd15ShiftCommitRequest request, Cd15MachineTrial trial,
