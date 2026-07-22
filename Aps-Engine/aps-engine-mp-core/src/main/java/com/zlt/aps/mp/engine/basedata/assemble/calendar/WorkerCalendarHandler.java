@@ -42,24 +42,6 @@ public class WorkerCalendarHandler {
     private final MonthProductionDataService monthProductionDataService;
 
     /**
-     * 获取当前排产年-月前一个月的最后一天的工作日
-     *
-     * @param context 排产上下文
-     * @return
-     */
-    public Integer getLastMonthLastDay(Context context) {
-        //获取前一个月的排产版本信息
-        LocalDate previousMonth = context.getPreviousMonth();
-        MpFactoryProductionVersion previousVersion = getLastMonthProductionVersion(context);
-        log.info(TbrBeforeProductionGroupLogRecorder.addReaderPreviousMonthLog(context, previousMonth, previousVersion));
-        if (null == previousVersion) {
-            return null;
-        }
-        //根据排产版本信息，确认最后一天的排产日
-        return getProductionVersionLastDay(context, previousVersion, true);
-    }
-
-    /**
      * 获取当前排产年-月前一个月的续作结构信息
      * 即最后一个排产日排产的结构
      *
