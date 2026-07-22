@@ -162,7 +162,8 @@
         ) AS t
         WHERE NOT EXISTS (
         SELECT 1 FROM CX_MONTH_PLAN_ISSUE
-        WHERE YEAR = t.YEAR AND MONTH = t.MONTH AND EMBRYO_CODE = t.EMBRYO_CODE AND DATA_VERSION = t.DATA_VERSION
+        WHERE YEAR = t.YEAR AND MONTH = t.MONTH AND EMBRYO_CODE = t.EMBRYO_CODE
+        AND CONSTRUCTION_STAGE = t.CONSTRUCTION_STAGE AND DATA_VERSION = t.DATA_VERSION
         )
     </insert>
 
@@ -174,7 +175,7 @@
             DEMAND_QTY = #{item.demandQty},
             REMARK = #{item.remark}
             WHERE YEAR = #{item.year} AND MONTH = #{item.month} AND EMBRYO_CODE = #{item.embryoCode}
-            AND DATA_VERSION = #{item.dataVersion}
+            AND CONSTRUCTION_STAGE = #{item.constructionStage} AND DATA_VERSION = #{item.dataVersion}
         </foreach>
     </update>
 </mapper>
