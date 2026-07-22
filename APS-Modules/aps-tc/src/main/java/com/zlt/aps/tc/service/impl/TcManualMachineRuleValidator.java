@@ -199,6 +199,7 @@ public class TcManualMachineRuleValidator {
         List<TcGlueMachineReal> ruleList = this.glueMachineRealMapper.selectList(wrapper);
         List<TcGlueMachineReal> relevantRuleList = ruleList == null ? Collections.emptyList()
                 : ruleList.stream().filter(item -> Objects.equals(item.getGlueCode(), sourceResult.getGlueCode()))
+                .filter(item -> "0".equals(item.getAllowFlag()) || "1".equals(item.getAllowFlag()))
                 .filter(item -> StringUtils.isBlank(item.getBaseGlueCode())
                         || Objects.equals(item.getBaseGlueCode(), sourceResult.getBaseGlueCode()))
                 .filter(item -> StringUtils.isBlank(item.getShiftCode())
@@ -208,10 +209,12 @@ public class TcManualMachineRuleValidator {
         }
         List<TcGlueMachineReal> targetRuleList = relevantRuleList.stream()
                 .filter(item -> Objects.equals(item.getMachineCode(), targetMachineCode)).collect(Collectors.toList());
+        if (targetRuleList.isEmpty()) {
+            return;
+        }
         boolean forbidden = targetRuleList.stream().anyMatch(item -> "0".equals(item.getAllowFlag()));
-        boolean hasAllowRule = relevantRuleList.stream().anyMatch(item -> "1".equals(item.getAllowFlag()));
         boolean allowed = targetRuleList.stream().anyMatch(item -> "1".equals(item.getAllowFlag()));
-        if (forbidden || hasAllowRule && !allowed) {
+        if (forbidden || !allowed) {
             throw new ServiceException(I18nUtil.getMessage("ui.tc.schedule.changeMachine.glueRejected"));
         }
     }
