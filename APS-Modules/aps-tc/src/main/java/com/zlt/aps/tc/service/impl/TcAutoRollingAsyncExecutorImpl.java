@@ -111,6 +111,8 @@ public class TcAutoRollingAsyncExecutorImpl implements TcAutoRollingAsyncExecuto
         int affectedResultCount = 0;
         List<TcAutoScheduleIssueVo> issueList = new ArrayList<>();
         List<Map<String, Object>> adjustmentList = new ArrayList<>();
+        List<TcScheduleResult> changeResultList = new ArrayList<>();
+        List<Long> expectedVersionList = new ArrayList<>();
 
         for (Map.Entry<String, List<TcScheduleResult>> entry : resultGroupMap.entrySet()) {
             String sidewallCode = entry.getKey();
@@ -144,17 +146,22 @@ public class TcAutoRollingAsyncExecutorImpl implements TcAutoRollingAsyncExecuto
             int currentAffectedCount;
             if (compareResult > 0) {
                 currentAffectedCount = this.increasePlan(task, sidewallResultList,
-                        targetShiftOrder, changedQty);
+                        targetShiftOrder, changedQty, changeResultList, expectedVersionList);
                 increasedQty = increasedQty.add(changedQty);
             } else {
                 currentAffectedCount = this.reducePlan(task, sidewallResultList,
-                        targetShiftOrder, changedQty);
+                        targetShiftOrder, changedQty, changeResultList, expectedVersionList);
                 reducedQty = reducedQty.add(changedQty);
             }
             adjustedSidewallCount++;
             affectedResultCount += currentAffectedCount;
             adjustmentList.add(this.buildAdjustment(sidewallCode, stockQty, demandQty,
                     oldPlanQty, desiredPlanQty));
+        }
+        if (!changeResultList.isEmpty()) {
+            affectedResultCount = this.manualOperationFacade.changeQtyBatchForAutoRolling(
+                    changeResultList, expectedVersionList,
+                    I18nUtil.getMessage("ui.tc.schedule.rolling.adjustReason"), task.getTaskId());
         }
         this.backgroundTaskService.updateProgress(task.getTaskId(), 90,
                 TcScheduleConstants.ROLLING_STAGE_PERSISTING,
@@ -193,14 +200,17 @@ public class TcAutoRollingAsyncExecutorImpl implements TcAutoRollingAsyncExecuto
      * @return 受影响结果数
      */
     private int increasePlan(TcAutoScheduleTask task, List<TcScheduleResult> resultList,
-                             int shiftOrder, BigDecimal increaseQty) {
+                             int shiftOrder, BigDecimal increaseQty,
+                             List<TcScheduleResult> changeResultList,
+                             List<Long> expectedVersionList) {
         TcScheduleResult selectedResult = resultList.stream()
                 .max(Comparator.comparing(result -> this.readSequence(result, shiftOrder)))
                 .orElseThrow(IllegalStateException::new);
         TcScheduleResult current = this.scheduleResultMapper.selectById(selectedResult.getId());
         BigDecimal newPlanQty = this.readQty(current, shiftOrder,
                 TcScheduleConstants.SHIFT_PLAN_QTY_FIELD_TEMPLATE).add(increaseQty);
-        return this.changeSingleResult(task, current, shiftOrder, newPlanQty);
+        this.collectChange(current, shiftOrder, newPlanQty, changeResultList, expectedVersionList);
+        return 1;
     }
 
     /**
@@ -213,7 +223,9 @@ public class TcAutoRollingAsyncExecutorImpl implements TcAutoRollingAsyncExecuto
      * @return 受影响结果数
      */
     private int reducePlan(TcAutoScheduleTask task, List<TcScheduleResult> resultList,
-                           int shiftOrder, BigDecimal reduceQty) {
+                           int shiftOrder, BigDecimal reduceQty,
+                           List<TcScheduleResult> changeResultList,
+                           List<Long> expectedVersionList) {
         List<TcScheduleResult> sortedList = resultList.stream()
                 .sorted(Comparator.comparing((TcScheduleResult result) -> this.readSequence(result, shiftOrder))
                         .reversed()).collect(Collectors.toList());
@@ -236,8 +248,9 @@ public class TcAutoRollingAsyncExecutorImpl implements TcAutoRollingAsyncExecuto
             if (currentReduceQty.signum() <= 0) {
                 continue;
             }
-            affectedCount += this.changeSingleResult(task, current, shiftOrder,
-                    planQty.subtract(currentReduceQty));
+            this.collectChange(current, shiftOrder, planQty.subtract(currentReduceQty),
+                    changeResultList, expectedVersionList);
+            affectedCount++;
             remainingQty = remainingQty.subtract(currentReduceQty);
         }
         return affectedCount;
@@ -252,15 +265,17 @@ public class TcAutoRollingAsyncExecutorImpl implements TcAutoRollingAsyncExecuto
      * @param newPlanQty 新计划量
      * @return 受影响行数
      */
-    private int changeSingleResult(TcAutoScheduleTask task, TcScheduleResult current,
-                                   int shiftOrder, BigDecimal newPlanQty) {
+    private void collectChange(TcScheduleResult current, int shiftOrder, BigDecimal newPlanQty,
+                               List<TcScheduleResult> changeResultList,
+                               List<Long> expectedVersionList) {
         TcScheduleResult changeResult = new TcScheduleResult();
         changeResult.setId(current.getId());
         changeResult.setFieldValueByFieldName(String.format(
                 TcScheduleConstants.SHIFT_PLAN_QTY_FIELD_TEMPLATE, shiftOrder), newPlanQty);
-        return this.manualOperationFacade.changeQtyForAutoRolling(changeResult,
-                current.getTaskVersion() == null ? 0L : current.getTaskVersion(),
-                I18nUtil.getMessage("ui.tc.schedule.rolling.adjustReason"), task.getTaskId());
+        changeResult.setFieldValueByFieldName(String.format(
+                TcScheduleConstants.SHIFT_ANALYSIS_FIELD_TEMPLATE, shiftOrder), "ROLLING_RECALC");
+        changeResultList.add(changeResult);
+        expectedVersionList.add(current.getTaskVersion() == null ? 0L : current.getTaskVersion());
     }
 
     /**

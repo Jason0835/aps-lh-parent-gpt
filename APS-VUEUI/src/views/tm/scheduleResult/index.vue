@@ -82,7 +82,7 @@
       uploadUrl="/tm/tmScheduleResult/importDataCust"
     ></tlt-upload-form>
     <autoPlanDialog ref="autoPlanRef" @success="handleAutoPlanSuccess" />
-    <infoDialog ref="infoRef" @success="getList" />
+    <infoDialog ref="infoRef" :machine-options="machines" @success="getList" />
     <changeMachineDialog ref="changeMachineRef" @success="getList" />
     <releaseStatusDialog ref="releaseStatusRef" @success="getList" />
     <el-dialog

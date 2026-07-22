@@ -668,15 +668,34 @@ public class TbrProductionContext extends Context {
         Integer firstQty = this.getBaseDataContainer().getParamConfiguration().getChangeMouldFirstQty();
         BigDecimal lhMachineCount = BigDecimalUtils.valueOf(groupInfo.getMinLhMachineCountByMould());
         Integer otherDay = allocationDays - 1;
-        BigDecimal firstDayProductionQty = BigDecimalUtils.multiply(firstQty, lhMachineCount); // 首日排产量
-        BigDecimal otherDayProductionQty = BigDecimalUtils.multiply(otherDay, groupInfo.getThreshold()); // 其余日排产量
+        // 首日排产量
+        BigDecimal firstDayProductionQty = BigDecimalUtils.multiply(firstQty, lhMachineCount);
+        // 其余日排产量
+        BigDecimal otherDayProductionQty = BigDecimalUtils.multiply(otherDay, groupInfo.getThreshold());
         BigDecimal realProductionQty = BigDecimalUtils.add(firstDayProductionQty, otherDayProductionQty);
         this.allocationSpecialMaterialStock(groupInfo, realProductionQty, SpecialMaterialInfoVo::getSumNoRoundProductionQty,
                 SpecialMaterialInfoVo::setSumNoRoundProductionQty, SpecialMaterialInfoVo::getStock);
 
         this.roundSpecialMaterialPlanQtyStandardLength(groupInfo);
     }
-
+    /**
+     * 20260721+
+     * 更新特殊材料库存--因结构延长收尾
+     * 更新已分配的库存
+     *
+     * @param groupInfo 结构分组信息
+     */
+    public void updateSpecialMaterialInfoByTimeExtension(ProductionPlanGroupInfo groupInfo) {
+        // 非特殊结构，直接结束
+        if (!groupInfo.isSpecialMaterial()) {
+            return;
+        }
+        // 增加一天的分配量 延长1日的分配量
+        BigDecimal realProductionQty = BigDecimalUtils.multiply(BigDecimal.ONE.intValue(), groupInfo.getThreshold());
+        this.allocationSpecialMaterialStock(groupInfo, realProductionQty, SpecialMaterialInfoVo::getSumNoRoundProductionQty,
+                SpecialMaterialInfoVo::setSumNoRoundProductionQty, SpecialMaterialInfoVo::getStock);
+        this.roundSpecialMaterialPlanQtyStandardLength(groupInfo);
+    }
     /**
      * 更新特殊材料库存<br/>
      * 根据结构分组的分配数量量，更新涉及特殊材料的已排库存信息
@@ -822,9 +841,9 @@ public class TbrProductionContext extends Context {
                         // 如果需求量超过实际库存量，则最多只能处理至低于库存量的最大批次数
                         // 需小于最小批次数则不需要处理
                         if (sumProductionQty.compareTo(stockQty) > 0) {
-                            finalProductionQty = BigDecimalUtils.floor(stockQty, standardLength);
+                            finalProductionQty = BigDecimalUtils.ceil(stockQty, standardLength);
                         } else if (sumProductionQty.compareTo(standardLength) > 0) {
-                            finalProductionQty = BigDecimalUtils.floor(sumProductionQty, standardLength);
+                            finalProductionQty = BigDecimalUtils.ceil(sumProductionQty, standardLength);
                         }
                         stockInfo.setSumProductionQty(finalProductionQty.longValue()); // 计算结果设置到取整后的
                     });

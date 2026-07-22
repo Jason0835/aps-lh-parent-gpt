@@ -6,10 +6,15 @@ import com.zlt.aps.tc.engine.domain.TcInsertPosition;
 import com.zlt.aps.tc.engine.domain.TcScheduleContext;
 import com.zlt.aps.tc.engine.domain.TcTaskDraft;
 import com.zlt.aps.tc.engine.domain.TcTransferPosition;
+import com.zlt.aps.tc.engine.domain.manual.TcManualRollingCommandBatch;
+import com.zlt.aps.tc.engine.domain.manual.TcManualRollingContext;
+import com.zlt.aps.tc.engine.domain.manual.TcManualRollingResult;
 import com.zlt.aps.tc.engine.event.TcScheduleEvent;
 import com.zlt.aps.tc.engine.event.TcScheduleEventPublisher;
+import com.zlt.aps.tc.engine.service.impl.TcManualRollingEngineService;
 import com.zlt.aps.tc.engine.service.impl.TcScheduleProcessLogger;
 import com.zlt.aps.tc.engine.service.impl.TcTaskChainScheduleService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 
@@ -30,6 +35,8 @@ public class TcScheduleOperationFacade {
 
     private final TcScheduleEventPublisher eventPublisher;
 
+    private final TcManualRollingEngineService manualRollingEngineService;
+
     /**
      * 创建胎侧排程操作门面。
      *
@@ -40,9 +47,40 @@ public class TcScheduleOperationFacade {
     public TcScheduleOperationFacade(TcTaskChainScheduleService taskChainScheduleService,
                                      @Nullable TcScheduleProcessLogger processLogger,
                                      @Nullable TcScheduleEventPublisher eventPublisher) {
+        this(taskChainScheduleService, processLogger, eventPublisher, new TcManualRollingEngineService());
+    }
+
+    /**
+     * 创建包含人工批量滚动引擎的排程操作门面。
+     *
+     * @param taskChainScheduleService 自动排程任务链服务
+     * @param processLogger 过程日志服务，可为空
+     * @param eventPublisher 事件发布器，可为空
+     * @param manualRollingEngineService 人工批量滚动引擎
+     */
+    @Autowired
+    public TcScheduleOperationFacade(TcTaskChainScheduleService taskChainScheduleService,
+                                     @Nullable TcScheduleProcessLogger processLogger,
+                                     @Nullable TcScheduleEventPublisher eventPublisher,
+                                     TcManualRollingEngineService manualRollingEngineService) {
         this.taskChainScheduleService = taskChainScheduleService;
         this.processLogger = processLogger;
         this.eventPublisher = eventPublisher;
+        this.manualRollingEngineService = manualRollingEngineService;
+    }
+
+    /**
+     * 在一个运行态上下文内批量执行全部胎侧人工滚动命令。
+     *
+     * @param commandBatch 命令批次
+     * @param context 运行态上下文
+     * @return 最终滚动结果
+     * @throws IllegalArgumentException 命令非法时抛出
+     * @throws IllegalStateException 链表或数量校验失败时抛出
+     */
+    public TcManualRollingResult execute(TcManualRollingCommandBatch commandBatch,
+                                         TcManualRollingContext context) {
+        return this.manualRollingEngineService.execute(commandBatch, context);
     }
 
     /**
