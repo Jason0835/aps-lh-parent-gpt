@@ -3,10 +3,10 @@ package com.zlt.aps.maindata.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
 import com.ruoyi.common.constant.UserConstants;
+import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.domain.BaseEntity;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
-import com.zlt.aps.utils.GenerageMapKeyUtils;
 import com.zlt.aps.maindata.mapper.MdmDevicePlanShutEntityMapper;
 import com.zlt.aps.maindata.service.IMdmDevicePlanShutService;
 import com.zlt.aps.mp.api.domain.entity.MdmDevicePlanShut;
@@ -20,8 +20,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import cn.hutool.core.date.DateUtil;
 import java.util.*;
-import java.util.stream.Collectors;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -59,11 +59,6 @@ public class MdmDevicePlanShutServiceImpl extends AbstractDocService<MdmDevicePl
 
     @Override
     public String checkUnique(MdmDevicePlanShut docEntityVO) {
-        String factoryCode = docEntityVO.getFactoryCode();
-//        String procCode = docEntityVO.getProcCode();
-        String machineType = docEntityVO.getMachineType();
-        String machineCode = docEntityVO.getMachineCode();
-
         Date beginDate = docEntityVO.getBeginDate();
         Date endDate = docEntityVO.getEndDate();
         if (beginDate == null || endDate == null) {
@@ -81,11 +76,12 @@ public class MdmDevicePlanShutServiceImpl extends AbstractDocService<MdmDevicePl
                 beginCal.get(Calendar.MONTH) != endCal.get(Calendar.MONTH)) {
             throw new RuntimeException(I18nUtil.getMessage("ui.data.alert.DocDeviceMaintenancePlan.yearAndMonthMustBeTheSame"));
         }
+        // 唯一性校验：同工厂+机台类型+停机类型+机台，不允许时间区间重叠
         LambdaQueryWrapper<MdmDevicePlanShut> queryWrapper = new LambdaQueryWrapper<>();
-        queryWrapper.eq(MdmDevicePlanShut::getFactoryCode, factoryCode);
-//        queryWrapper.eq(MdmDevicePlanShut::getProcCode, procCode);
-        queryWrapper.eq(MdmDevicePlanShut::getMachineType, machineType);
-        queryWrapper.eq(MdmDevicePlanShut::getMachineCode, machineCode);
+        queryWrapper.eq(MdmDevicePlanShut::getFactoryCode, docEntityVO.getFactoryCode());
+        queryWrapper.eq(MdmDevicePlanShut::getMachineType, docEntityVO.getMachineType());
+        queryWrapper.eq(MdmDevicePlanShut::getMachineStopType, docEntityVO.getMachineStopType());
+        queryWrapper.eq(MdmDevicePlanShut::getMachineCode, docEntityVO.getMachineCode());
         queryWrapper.ne(Objects.nonNull(docEntityVO.getId()), BaseEntity::getId, docEntityVO.getId());
         List<MdmDevicePlanShut> mdmDevicePlanShutList = entityMapper.selectList(queryWrapper);
         if (CollectionUtils.isNotEmpty(mdmDevicePlanShutList)) {
@@ -104,58 +100,49 @@ public class MdmDevicePlanShutServiceImpl extends AbstractDocService<MdmDevicePl
 
     @Override
     protected List<String> getCheckUniqueFields() {
-        // 唯一校验字段
-        return Collections.emptyList();
+        // 唯一校验字段：导入时按此匹配更新，必须返回可变 List（基类会 add("id")）
+        return new ArrayList<>(Arrays.asList("factoryCode", "machineType", "machineStopType", "machineCode"));
     }
 
     @Override
-    protected Map<Object, Object> getServiceCheckParams(List<MdmDevicePlanShut> list, List<MdmDevicePlanShut> importList) {
-        Map<Object, Object> serviceCheckParams = super.getServiceCheckParams(list, importList);
-        Map<String, List<MdmDevicePlanShut>> groupMap = list.stream().collect(Collectors.groupingBy(item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), item.getMachineType(), item.getMachineCode())));
-        serviceCheckParams.put("groupMap", groupMap);
-        for (int i = 0; i < list.size(); i++) {
-            MdmDevicePlanShut mdmDevicePlanShut = list.get(i);
-            mdmDevicePlanShut.setSearchValue(i + "");
-        }
-        return serviceCheckParams;
+    public AjaxResult importData(List<MdmDevicePlanShut> list, boolean updateSupport, Long importLogId) {
+        // 导入前：删除 beginDate < 今天0点的过期计划（逻辑删除）
+        Date todayBegin = DateUtil.beginOfDay(new Date());
+        LambdaQueryWrapper<MdmDevicePlanShut> deleteWrapper = new LambdaQueryWrapper<>();
+        deleteWrapper.lt(MdmDevicePlanShut::getBeginDate, todayBegin);
+        entityMapper.delete(deleteWrapper);
+
+        return super.importData(list, updateSupport, importLogId);
     }
 
     @Override
     protected Boolean serviceCheckAndDataHandle(MdmDevicePlanShut importDocEntity, List<ImportErrorLog> importErrorLogs, Long importLogId, int errorRowNum, Map<Object, Object> serviceCheckParams) {
-        if (serviceCheckParams.containsKey("groupMap")) {
-            Map<String, List<MdmDevicePlanShut>> groupMap = (Map<String, List<MdmDevicePlanShut>>) serviceCheckParams.get("groupMap");
-            String mapKey = GenerageMapKeyUtils.createMapKey(importDocEntity.getFactoryCode(), importDocEntity.getMachineType(), importDocEntity.getMachineCode());
-            // excel内校验
-            if (groupMap.containsKey(mapKey)) {
-                List<MdmDevicePlanShut> mdmDevicePlanShutList = groupMap.get(mapKey);
-                for (MdmDevicePlanShut mdmDevicePlanShut : mdmDevicePlanShutList) {
-                    String searchValue = mdmDevicePlanShut.getSearchValue();
-                    // 不一样的比较开始结束时间，看有没冲突区间
-                    if (!searchValue.equals(importDocEntity.getSearchValue())) {
-                        long dbBeginTime = mdmDevicePlanShut.getBeginDate().getTime();
-                        long dbEndTime = mdmDevicePlanShut.getEndDate().getTime();
-                        long beginTime = importDocEntity.getBeginDate().getTime();
-                        long endTime = importDocEntity.getEndDate().getTime();
-                        if (!(beginTime >= dbEndTime || endTime <= dbBeginTime)) {
-                            String message = I18nUtil.getMessage("ui.data.alert.mdmDevicePlanShut.excel.notUnique");
-                            String errorMsg = String.format(message, errorRowNum, Integer.parseInt(searchValue) + 2);
-                            ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.REPEAT.getCode(), errorRowNum, errorMsg, importErrorLogs);
-                            return Boolean.FALSE;
-                        }
-                    }
-                }
-            }
-            // 数据库内校验
-            String unique = null;
-            try {
-                unique = checkUnique(importDocEntity);
-            } catch (Exception e) {
-                logger.error("设备计划停机数据唯一性校验异常", e);
-//                String uniqueMsg = I18nUtil.getMessage("import.validated.unique");
-                ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(), errorRowNum, e.getMessage(), importErrorLogs);
+        Date beginDate = importDocEntity.getBeginDate();
+        Date endDate = importDocEntity.getEndDate();
+
+        // 校验开始时间不大于结束时间
+        if (beginDate != null && endDate != null && beginDate.after(endDate)) {
+            String message = I18nUtil.getMessage("ui.data.alert.DocDeviceMaintenancePlan.timeCheck");
+            ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(),
+                    errorRowNum, message, importErrorLogs);
+            return Boolean.FALSE;
+        }
+
+        // 校验开始结束时间不能跨月
+        if (beginDate != null && endDate != null) {
+            Calendar beginCal = Calendar.getInstance();
+            beginCal.setTime(beginDate);
+            Calendar endCal = Calendar.getInstance();
+            endCal.setTime(endDate);
+            if (beginCal.get(Calendar.YEAR) != endCal.get(Calendar.YEAR) ||
+                    beginCal.get(Calendar.MONTH) != endCal.get(Calendar.MONTH)) {
+                String message = I18nUtil.getMessage("ui.data.alert.DocDeviceMaintenancePlan.yearAndMonthMustBeTheSame");
+                ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(),
+                        errorRowNum, message, importErrorLogs);
                 return Boolean.FALSE;
             }
         }
+
         return super.serviceCheckAndDataHandle(importDocEntity, importErrorLogs, importLogId, errorRowNum, serviceCheckParams);
     }
 }
