@@ -346,6 +346,9 @@ public abstract class AbstractDailyCapacityLimit {
                 blockMachinesAddMould += addMouldArr[1];
                 // 统计换模次数(区别于addMouldArr[0]，主要是将收尾的排除)
                 iChangeMouldCount += addMouldArr[2];
+                if (addMouldArr[3] > 0){
+                    fullMachinesAddMould -= addMouldArr[3];
+                }
                 // 计算主花纹向下的硫化机台数
                 if (mpFinalVo.getFieldValueByFieldName(getMainPatternField()) != null &&
                         mpFinalVo.getFieldValueByFieldName(getMainPatternField()).equals(mainPattern)){
@@ -584,6 +587,7 @@ public abstract class AbstractDailyCapacityLimit {
      * [0]--新增模机台数
      * [1]--换活字块机台数20条
      * [2]--换模次数
+     * [3]--多扣的机台数
      * @param mpFinalVo
      */
     public int[] getAddMouldMachines(BaseEntity mpFinalVo,Integer dailyLhQty,Map<String,Object> paramMap,String dayField,String day1Field,String day2Field) {
@@ -596,7 +600,7 @@ public abstract class AbstractDailyCapacityLimit {
         int changeMouldBlockQty = (Integer) paramMap.get(MonthPlanEnums.CHANGE_TYPE_BLOCK_QTY.getCode());
         //余量
         int remainQty = dayPlanQty % dailyLhQty;
-        int[] resultArr = {0,0,0};
+        int[] resultArr = {0,0,0,0};
         if (remainQty == 0){
             //没有余量，直接退回
             return resultArr;
@@ -618,6 +622,29 @@ public abstract class AbstractDailyCapacityLimit {
             }
             //设置换模次数
             resultArr[2] = iDiffCount;
+            return resultArr;
+        }
+
+        if ((mpFinalVo.getFieldValueByFieldName(day1Field) == null || day1Field.equals(dayField))
+                && mpFinalVo.getFieldValueByFieldName(day2Field) != null){
+            //今天起模，日硫化量60，例子：
+            //96 180
+            //换活字块3次（32+32+32）
+            //64 128
+            //32 68
+            int nextPlanQty = (Integer) mpFinalVo.getFieldValueByFieldName(day2Field);
+            // 不向上取整
+            int nextMachines = nextPlanQty / dailyLhQty;
+            int curMachines = dayPlanQty / dailyLhQty;
+            int iDiffCount = nextMachines;
+            int iDiffValue = dayPlanQty;
+            //解析差异机台数
+            analysisDiffMachines(iDiffCount, iDiffValue, changeMouldBlockQty, changeMouldFirstQty, resultArr);
+            //设置换模次数
+            resultArr[2] = iDiffCount;
+
+            //多扣的机台数
+            resultArr[3] = curMachines;
             return resultArr;
         }
 
