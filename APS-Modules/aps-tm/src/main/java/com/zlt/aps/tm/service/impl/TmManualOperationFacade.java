@@ -171,10 +171,25 @@ public class TmManualOperationFacade {
                                                List<TmScheduleResult> requestList,
                                                List<TmScheduleResult> initialResultList) {
         return this.executeInTransaction(() -> {
-            int changedCount = 0;
+            List<TmScheduleResult> currentList = new ArrayList<>();
             for (int index = 0; index < requestList.size(); index++) {
-                changedCount += this.changeMachineInsideTransaction(
-                        targetMachineCode, requestList.get(index), initialResultList.get(index));
+                TmScheduleResult current = this.reloadAndValidateOperationResult(requestList.get(index).getId(),
+                        "ui.data.alert.tm.schedule.changeMachineResultNotFound", "转机台排程结果不存在或已失效");
+                this.validateLockedSourceMachine(initialResultList.get(index), current);
+                this.normalizeExistingOperationRequest(requestList.get(index), current, true);
+                requestList.get(index).setMachineCode(targetMachineCode);
+                currentList.add(current);
+            }
+            List<String> machineCodes = currentList.stream().map(TmScheduleResult::getMachineCode)
+                    .collect(Collectors.toCollection(ArrayList::new));
+            machineCodes.add(targetMachineCode);
+            machineCodes = machineCodes.stream().distinct().collect(Collectors.toList());
+            List<TmScheduleResult> beforeList = this.lockAndValidateManualOpSnapshot(currentList.get(0), machineCodes);
+            int changedCount = tmManualInsertRollingService.changeMachineAndRollBatch(requestList);
+            List<TmScheduleResult> afterList = this.loadManualOpSnapshot(currentList.get(0), machineCodes);
+            for (TmScheduleResult request : requestList) {
+                request.setBaseVale(request.getId());
+                this.recordDispatcherLog(ApsConstant.DISPATCHER_OPER_MACHINE, request, beforeList, afterList);
             }
             return changedCount;
         });
@@ -243,17 +258,16 @@ public class TmManualOperationFacade {
 
         List<TmScheduleResult> sortedTargetList = lockedTargetList.stream()
                 .sorted(Comparator.comparing(TmScheduleResult::getId)).collect(Collectors.toList());
-        int deletedCount = 0;
-        for (TmScheduleResult targetResult : sortedTargetList) {
-            List<String> machineCodes = Collections.singletonList(targetResult.getMachineCode());
-            List<TmScheduleResult> beforeList = this.lockAndValidateManualOpSnapshot(targetResult, machineCodes);
-            TmScheduleResult currentTarget = beforeList.stream()
-                    .filter(result -> Objects.equals(result.getId(), targetResult.getId()))
-                    .findFirst().orElse(null);
-            this.validateDeleteResults(Collections.singletonList(targetResult.getId()),
-                    currentTarget == null ? Collections.emptyList() : Collections.singletonList(currentTarget));
-            deletedCount += tmManualInsertRollingService.deleteAndRoll(currentTarget);
-            List<TmScheduleResult> afterList = this.loadManualOpSnapshot(targetResult, machineCodes);
+        List<String> machineCodes = sortedTargetList.stream().map(TmScheduleResult::getMachineCode)
+                .distinct().collect(Collectors.toList());
+        List<TmScheduleResult> beforeList = this.lockAndValidateManualOpSnapshot(sortedTargetList.get(0), machineCodes);
+        Map<Long, TmScheduleResult> beforeMap = beforeList.stream()
+                .collect(Collectors.toMap(TmScheduleResult::getId, result -> result));
+        List<TmScheduleResult> currentTargetList = ids.stream().map(beforeMap::get).collect(Collectors.toList());
+        this.validateDeleteResults(ids, currentTargetList);
+        int deletedCount = tmManualInsertRollingService.deleteAndRollBatch(currentTargetList);
+        List<TmScheduleResult> afterList = this.loadManualOpSnapshot(sortedTargetList.get(0), machineCodes);
+        for (TmScheduleResult currentTarget : currentTargetList) {
             this.recordDispatcherLog(ApsConstant.DISPATCHER_OPER_DELETE, currentTarget, beforeList, afterList);
         }
 

@@ -185,10 +185,12 @@ public class TmRollingUpdateServiceImpl implements ITmRollingUpdateService {
         List<TmRollingAdjustment> adjustmentList = this.calculateAdjustments(request, context, beforeList);
         this.validateAffectedReleaseStatuses(beforeList, adjustmentList, request.getTargetShiftOrder());
 
-        int updateCount = 0;
+        List<TmScheduleResult> changeRequestList = new ArrayList<>();
         for (TmRollingAdjustment adjustment : adjustmentList) {
-            updateCount += this.applyAdjustment(request, adjustment);
+            this.appendAdjustmentRequests(request, adjustment, changeRequestList);
         }
+        int updateCount = changeRequestList.isEmpty() ? 0
+                : tmManualInsertRollingService.changeQtyAndRollBatch(changeRequestList);
         List<TmScheduleResult> afterList = this.loadScheduleResults(request);
         TmRollingRecalcResponseVO response = this.buildResponse(request, runKey, traceId,
                 beforeList, afterList, adjustmentList, context, updateCount);
@@ -322,13 +324,15 @@ public class TmRollingUpdateServiceImpl implements ITmRollingUpdateService {
     }
 
     /**
-     * 按目标胎面和班次应用单个调整。每次写入前重新读取当前行，避免前一条滚动产生旧快照。
+     * 按目标胎面和班次生成调量命令，全部调整在同一运行态上下文计算。
      *
      * @param request 滚动请求
      * @param adjustment 调整指令
-     * @return 滚动服务更新行数
+     * @param changeRequestList 调量请求收集器
      */
-    private int applyAdjustment(TmRollingRecalcRequestDTO request, TmRollingAdjustment adjustment) {
+    private void appendAdjustmentRequests(TmRollingRecalcRequestDTO request,
+                                          TmRollingAdjustment adjustment,
+                                          List<TmScheduleResult> changeRequestList) {
         List<TmScheduleResult> currentList = this.loadTreadResults(request, adjustment.getTreadCode());
         Comparator<TmScheduleResult> comparator = Comparator
                 .comparing((TmScheduleResult result) -> this.readShiftSequence(result, request.getTargetShiftOrder()),
@@ -337,51 +341,47 @@ public class TmRollingUpdateServiceImpl implements ITmRollingUpdateService {
         currentList.sort(comparator);
         BigDecimal currentTotal = this.sumResultQty(currentList, request.getTargetShiftOrder(), false);
         BigDecimal delta = adjustment.getTargetPlanQty().subtract(currentTotal);
-        int updateCount = 0;
         if (delta.compareTo(BigDecimal.ZERO) > 0) {
             TmScheduleResult target = currentList.get(currentList.size() - 1);
-            TmScheduleResult current = tmScheduleResultMapper.selectById(target.getId());
-            BigDecimal currentQty = this.readShiftQty(current, request.getTargetShiftOrder(), false);
-            updateCount += this.changeSingleResult(current, request.getTargetShiftOrder(), currentQty.add(delta));
-            return updateCount;
+            BigDecimal currentQty = this.readShiftQty(target, request.getTargetShiftOrder(), false);
+            changeRequestList.add(this.buildChangeRequest(target, request.getTargetShiftOrder(), currentQty.add(delta)));
+            return;
         }
 
         BigDecimal remainingReduceQty = delta.abs();
         ListIterator<TmScheduleResult> iterator = currentList.listIterator(currentList.size());
         while (iterator.hasPrevious() && remainingReduceQty.compareTo(BigDecimal.ZERO) > 0) {
             TmScheduleResult target = iterator.previous();
-            TmScheduleResult current = tmScheduleResultMapper.selectById(target.getId());
-            BigDecimal currentQty = this.readShiftQty(current, request.getTargetShiftOrder(), false);
-            BigDecimal finishQty = this.readShiftQty(current, request.getTargetShiftOrder(), true);
+            BigDecimal currentQty = this.readShiftQty(target, request.getTargetShiftOrder(), false);
+            BigDecimal finishQty = this.readShiftQty(target, request.getTargetShiftOrder(), true);
             BigDecimal reducibleQty = currentQty.subtract(finishQty).max(BigDecimal.ZERO);
             BigDecimal reduceQty = reducibleQty.min(remainingReduceQty);
             if (reduceQty.compareTo(BigDecimal.ZERO) <= 0) {
                 continue;
             }
-            updateCount += this.changeSingleResult(current, request.getTargetShiftOrder(), currentQty.subtract(reduceQty));
+            changeRequestList.add(this.buildChangeRequest(target, request.getTargetShiftOrder(), currentQty.subtract(reduceQty)));
             remainingReduceQty = remainingReduceQty.subtract(reduceQty);
         }
         if (remainingReduceQty.compareTo(BigDecimal.ZERO) > 0) {
             throw new ServiceException(I18nUtil.getMessage("ui.data.alert.tm.schedule.rollingFinishLimit"));
         }
-        return updateCount;
     }
 
     /**
-     * 调用现有人工滚动算法调整单条目标班计划量。
+     * 构建自动滚动调量请求。
      *
-     * @param current 当前数据库结果
+     * @param current 当前结果
      * @param shiftOrder 目标班次
      * @param planQty 新计划量
-     * @return 更新行数
+     * @return 调量请求
      */
-    private int changeSingleResult(TmScheduleResult current, int shiftOrder, BigDecimal planQty) {
+    private TmScheduleResult buildChangeRequest(TmScheduleResult current, int shiftOrder, BigDecimal planQty) {
         TmScheduleResult changeRequest = new TmScheduleResult();
         changeRequest.setId(current.getId());
         changeRequest.setFieldValueByFieldName(String.format(TmScheduleConstants.SHIFT_PLAN_QTY_FIELD_TEMPLATE, shiftOrder), planQty);
         changeRequest.setFieldValueByFieldName(String.format(TmScheduleConstants.SHIFT_ANALYSIS_FIELD_TEMPLATE, shiftOrder),
                 "ROLLING_RECALC");
-        return tmManualInsertRollingService.changeQtyAndRoll(changeRequest);
+        return changeRequest;
     }
 
     /**

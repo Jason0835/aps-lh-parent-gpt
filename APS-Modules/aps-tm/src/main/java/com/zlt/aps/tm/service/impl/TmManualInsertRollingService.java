@@ -2,6 +2,8 @@ package com.zlt.aps.tm.service.impl;
 
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.IdUtil;
+import cn.hutool.core.util.StrUtil;
+import com.alibaba.fastjson.JSON;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
@@ -14,30 +16,32 @@ import com.zlt.aps.tm.api.domain.entity.TmScheduleResult;
 import com.zlt.aps.tm.api.domain.entity.TmScheduleUnplanned;
 import com.zlt.aps.tm.api.enums.TmReleaseStatusTransition;
 import com.zlt.aps.tm.api.enums.TmUnplannedReasonEnum;
-import com.zlt.aps.tm.domain.vo.TmManualRollingTask;
 import com.zlt.aps.tm.domain.vo.TmManualRollingWriteResult;
+import com.zlt.aps.tm.engine.domain.manual.*;
+import com.zlt.aps.tm.engine.service.facade.TmScheduleOperationFacade;
 import com.zlt.aps.tm.engine.validator.TmInsertPositionValidator;
 import com.zlt.aps.tm.mapper.TmMachineInfoMapper;
 import com.zlt.aps.tm.mapper.TmScheduleResultMapper;
 import com.zlt.aps.tm.mapper.TmScheduleUnplannedMapper;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.web.context.request.RequestContextHolder;
 
 import java.math.BigDecimal;
 import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * 胎面人工操作局部滚动服务。
+ * 胎面人工滚动应用服务。
  *
- * <p>该服务处理插单、调量和转机台后的同排程日期局部滚动。滚动范围只覆盖指定机台
- * 从操作班次、操作顺位开始到第 6 班，不跨排程日、不自动选择其他机台。</p>
+ * <p>本服务只负责数据库快照与独立运行态任务之间的映射、结果装配和一次性持久化。
+ * 所有滚动计算统一交给 aps-engine-tm，计算期间不持有或修改数据库实体。</p>
  */
 @Slf4j
 @Service
 public class TmManualInsertRollingService {
-
 
     private static final String INSERT_DATA_SOURCE = "INSERT";
 
@@ -47,54 +51,708 @@ public class TmManualInsertRollingService {
 
     private final TmScheduleUnplannedMapper tmScheduleUnplannedMapper;
 
+    private final TmScheduleOperationFacade tmScheduleOperationFacade;
+
     /**
-     * 构造人工操作局部滚动服务。
+     * 构造人工滚动应用服务。
      *
      * @param tmScheduleResultMapper    排程结果 Mapper
-     * @param tmMachineInfoMapper       胎面机台 Mapper
+     * @param tmMachineInfoMapper       机台信息 Mapper
+     * @param tmScheduleUnplannedMapper 未排结果 Mapper
+     * @param tmScheduleOperationFacade 排程纯计算门面
+     */
+    @Autowired
+    public TmManualInsertRollingService(TmScheduleResultMapper tmScheduleResultMapper,
+                                        TmMachineInfoMapper tmMachineInfoMapper,
+                                        TmScheduleUnplannedMapper tmScheduleUnplannedMapper,
+                                        TmScheduleOperationFacade tmScheduleOperationFacade) {
+        this.tmScheduleResultMapper = tmScheduleResultMapper;
+        this.tmMachineInfoMapper = tmMachineInfoMapper;
+        this.tmScheduleUnplannedMapper = tmScheduleUnplannedMapper;
+        this.tmScheduleOperationFacade = tmScheduleOperationFacade;
+    }
+
+    /**
+     * 为不启动 Spring 的既有单元测试创建应用服务。
+     *
+     * @param tmScheduleResultMapper    排程结果 Mapper
+     * @param tmMachineInfoMapper       机台信息 Mapper
      * @param tmScheduleUnplannedMapper 未排结果 Mapper
      */
     public TmManualInsertRollingService(TmScheduleResultMapper tmScheduleResultMapper,
                                         TmMachineInfoMapper tmMachineInfoMapper,
                                         TmScheduleUnplannedMapper tmScheduleUnplannedMapper) {
-        this.tmScheduleResultMapper = tmScheduleResultMapper;
-        this.tmMachineInfoMapper = tmMachineInfoMapper;
-        this.tmScheduleUnplannedMapper = tmScheduleUnplannedMapper;
+        this(tmScheduleResultMapper, tmMachineInfoMapper, tmScheduleUnplannedMapper,
+                new TmScheduleOperationFacade(new com.zlt.aps.tm.engine.service.impl.TmTaskChainScheduleService(),
+                        null, null, new com.zlt.aps.tm.engine.service.impl.TmManualRollingEngineService()));
     }
 
     /**
-     * 插入人工插单并滚动更新同机台后续班次。
+     * 插入一个或多个班次的人工任务并一次滚动落库。
      *
-     * @param insertResult 人工插单排程结果
-     * @return 新插单结果写入行数
-     * @throws ServiceException 插单班次、顺序或机台产能缺失时抛出
+     * @param insertResult 插单模板
+     * @return 新增结果行数
+     * @throws ServiceException 插单位置、机台产能或任务链校验失败时抛出
      */
     int insertAndRoll(TmScheduleResult insertResult) {
-        List<Integer> insertShiftOrderList = this.resolveInsertShiftOrderList(insertResult);
-        if (CollUtil.isEmpty(insertShiftOrderList)) {
-            throw new ServiceException(this.resolveTmMessage("ui.data.alert.tm.schedule.insertShiftEmpty", "插单班次和顺序不能为空"));
+        List<Integer> shiftOrderList = this.resolveInsertShiftOrderList(insertResult);
+        if (CollUtil.isEmpty(shiftOrderList)) {
+            throw new ServiceException(this.resolveTmMessage(
+                    "ui.data.alert.tm.schedule.insertShiftEmpty", "插单班次和顺序不能为空"));
         }
-        TmManualRollingWriteResult totalWriteResult = new TmManualRollingWriteResult();
-        BigDecimal machineCapacity = this.loadMachineCapacity(insertResult);
-        for (Integer shiftOrder : insertShiftOrderList) {
-            Integer insertSequence = this.getShiftSequence(insertResult, shiftOrder);
-            TmScheduleResult shiftInsertResult = this.buildShiftInsertResult(insertResult, shiftOrder);
-            TmManualRollingTask insertTask = this.buildInsertTask(shiftInsertResult, shiftOrder, insertSequence);
-            totalWriteResult.add(this.rollMachineWindow(shiftInsertResult, shiftOrder, insertSequence,
-                    this.loadSameMachineResults(shiftInsertResult), machineCapacity, null, false, insertTask));
+        String resultGroupKey = "MANUAL:" + IdUtil.fastSimpleUUID();
+        TmManualRollingCommandBatch commandBatch = new TmManualRollingCommandBatch();
+        for (int index = 0; index < shiftOrderList.size(); index++) {
+            int shiftOrder = shiftOrderList.get(index);
+            TmManualTaskDraft task = this.mapInsertTask(insertResult, resultGroupKey, shiftOrder, index);
+            TmManualRollingCommand command = new TmManualRollingCommand();
+            command.setOperationType(TmManualRollingOperationEnum.INSERT);
+            command.setTargetMachineCode(insertResult.getMachineCode());
+            command.setTargetShiftOrder(shiftOrder);
+            command.setTargetSequence(this.getShiftSequence(insertResult, shiftOrder));
+            command.setInsertTask(task);
+            command.setCommandOrder(index);
+            commandBatch.addCommand(command);
         }
-        log.info("[TM_MANUAL_ROLL] operation=INSERT, factoryCode={}, scheduleDate={}, machineCode={}, insertShiftOrders={}, insertCount={}, updateCount={}, unplannedQty={}",
+        Map<String, TmScheduleResult> newTemplateMap = new LinkedHashMap<>();
+        newTemplateMap.put(resultGroupKey, insertResult);
+        TmManualRollingWriteResult writeResult = this.executeAndPersist(insertResult,
+                Collections.singletonList(insertResult.getMachineCode()), commandBatch, newTemplateMap);
+        log.info("[TM_MANUAL_ROLL] operation=INSERT, factoryCode={}, scheduleDate={}, machineCode={}, insertCount={}, updateCount={}, unplannedQty={}",
                 insertResult.getFactoryCode(), insertResult.getScheduleDate(), insertResult.getMachineCode(),
-                insertShiftOrderList, totalWriteResult.getInsertCount(), totalWriteResult.getUpdateCount(),
-                totalWriteResult.getUnplannedQty());
-        return totalWriteResult.getInsertCount();
+                writeResult.getInsertCount(), writeResult.getUpdateCount(), writeResult.getUnplannedQty());
+        return writeResult.getInsertCount();
     }
 
     /**
-     * 解析人工插单中计划量和顺序均有效的班次。
+     * 单条调量并滚动。
      *
-     * @param insertResult 人工插单结果模板
-     * @return 按班次升序排列的有效班次
+     * @param changeResult 调量请求
+     * @return 更新及新增行数
+     * @throws ServiceException 目标不存在或校验失败时抛出
+     */
+    int changeQtyAndRoll(TmScheduleResult changeResult) {
+        return this.changeQtyAndRollBatch(Collections.singletonList(changeResult));
+    }
+
+    /**
+     * 在同一运行态上下文中批量调量并只持久化一次。
+     *
+     * @param changeResultList 调量请求集合
+     * @return 更新及新增行数
+     * @throws ServiceException 请求跨越不同工厂日期批次或校验失败时抛出
+     */
+    int changeQtyAndRollBatch(List<TmScheduleResult> changeResultList) {
+        List<TmScheduleResult> requestList = this.requireRequests(changeResultList);
+        List<TmScheduleResult> currentList = requestList.stream()
+                .map(request -> this.loadResultById(request.getId(),
+                        "ui.data.alert.tm.schedule.changeQtyResultNotFound", "调量排程结果不存在或已失效"))
+                .collect(Collectors.toList());
+        this.validateSameScheduleScope(currentList);
+        TmManualRollingCommandBatch commandBatch = new TmManualRollingCommandBatch();
+        for (int index = 0; index < requestList.size(); index++) {
+            TmScheduleResult request = requestList.get(index);
+            TmScheduleResult current = currentList.get(index);
+            int shiftOrder = this.resolveOperationShift(request, current);
+            TmManualRollingCommand command = new TmManualRollingCommand();
+            String analysis = this.getShiftText(request,
+                    TmScheduleConstants.SHIFT_ANALYSIS_FIELD_TEMPLATE, shiftOrder);
+            command.setOperationType("ROLLING_RECALC".equals(analysis)
+                    ? TmManualRollingOperationEnum.AUTO_ROLLING : TmManualRollingOperationEnum.CHANGE_QTY);
+            command.setResultGroupKey(String.valueOf(current.getId()));
+            command.setSourceMachineCode(current.getMachineCode());
+            command.setSourceShiftOrder(shiftOrder);
+            command.setPlanQty(this.getShiftPlanQty(request, shiftOrder));
+            command.setAnalysis(analysis);
+            command.setCommandOrder(index);
+            commandBatch.addCommand(command);
+        }
+        TmScheduleResult reference = currentList.get(0);
+        List<String> machineCodeList = currentList.stream().map(TmScheduleResult::getMachineCode)
+                .distinct().collect(Collectors.toList());
+        TmManualRollingWriteResult writeResult = this.executeAndPersist(reference,
+                machineCodeList, commandBatch, Collections.emptyMap());
+        return writeResult.getUpdateCount() + writeResult.getInsertCount();
+    }
+
+    /**
+     * 单条转机台并滚动。
+     *
+     * @param transferResult 转机台请求
+     * @return 更新及新增行数
+     * @throws ServiceException 目标不存在或校验失败时抛出
+     */
+    int changeMachineAndRoll(TmScheduleResult transferResult) {
+        return this.changeMachineAndRollBatch(Collections.singletonList(transferResult));
+    }
+
+    /**
+     * 在同一上下文中批量转机台并只持久化一次。
+     *
+     * @param transferResultList 转机台请求集合
+     * @return 更新及新增行数
+     * @throws ServiceException 请求跨越不同工厂日期批次或校验失败时抛出
+     */
+    int changeMachineAndRollBatch(List<TmScheduleResult> transferResultList) {
+        List<TmScheduleResult> requestList = this.requireRequests(transferResultList);
+        List<TmScheduleResult> currentList = requestList.stream()
+                .map(request -> this.loadResultById(request.getId(),
+                        "ui.data.alert.tm.schedule.changeMachineResultNotFound", "转机台排程结果不存在或已失效"))
+                .collect(Collectors.toList());
+        this.validateSameScheduleScope(currentList);
+        TmManualRollingCommandBatch commandBatch = new TmManualRollingCommandBatch();
+        Set<String> machineCodeSet = currentList.stream().map(TmScheduleResult::getMachineCode)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+        for (int index = 0; index < requestList.size(); index++) {
+            TmScheduleResult request = requestList.get(index);
+            TmScheduleResult current = currentList.get(index);
+            int shiftOrder = this.resolveOperationShift(request, current);
+            String targetMachineCode = StrUtil.trim(request.getMachineCode());
+            machineCodeSet.add(targetMachineCode);
+            TmManualRollingCommand command = new TmManualRollingCommand();
+            command.setOperationType(TmManualRollingOperationEnum.CHANGE_MACHINE);
+            command.setResultGroupKey(String.valueOf(current.getId()));
+            command.setSourceMachineCode(current.getMachineCode());
+            command.setSourceShiftOrder(shiftOrder);
+            command.setTargetMachineCode(targetMachineCode);
+            command.setTargetShiftOrder(shiftOrder);
+            command.setTargetSequence(this.getShiftSequence(request, shiftOrder));
+            command.setCommandOrder(index);
+            commandBatch.addCommand(command);
+        }
+        TmManualRollingWriteResult writeResult = this.executeAndPersist(currentList.get(0),
+                new ArrayList<>(machineCodeSet), commandBatch, Collections.emptyMap());
+        return writeResult.getUpdateCount() + writeResult.getInsertCount();
+    }
+
+    /**
+     * 删除单条结果并滚动。
+     *
+     * @param deleteResult 待删除结果
+     * @return 逻辑删除行数
+     * @throws ServiceException 删除目标非法时抛出
+     */
+    int deleteAndRoll(TmScheduleResult deleteResult) {
+        return this.deleteAndRollBatch(Collections.singletonList(deleteResult));
+    }
+
+    /**
+     * 在一个上下文中批量删除并只持久化一次。
+     *
+     * @param deleteResultList 待删除结果集合
+     * @return 逻辑删除行数
+     * @throws ServiceException 请求跨越不同工厂日期批次或校验失败时抛出
+     */
+    int deleteAndRollBatch(List<TmScheduleResult> deleteResultList) {
+        List<TmScheduleResult> targetList = this.requireRequests(deleteResultList);
+        this.validateSameScheduleScope(targetList);
+        TmManualRollingCommandBatch commandBatch = new TmManualRollingCommandBatch();
+        for (int index = 0; index < targetList.size(); index++) {
+            TmScheduleResult target = targetList.get(index);
+            TmManualRollingCommand command = new TmManualRollingCommand();
+            command.setOperationType(TmManualRollingOperationEnum.DELETE);
+            command.setResultGroupKey(String.valueOf(target.getId()));
+            command.setSourceMachineCode(target.getMachineCode());
+            command.setCommandOrder(index);
+            commandBatch.addCommand(command);
+        }
+        List<String> machineCodeList = targetList.stream().map(TmScheduleResult::getMachineCode)
+                .distinct().collect(Collectors.toList());
+        TmManualRollingWriteResult writeResult = this.executeAndPersist(targetList.get(0),
+                machineCodeList, commandBatch, Collections.emptyMap());
+        return writeResult.getDeleteCount();
+    }
+
+    /**
+     * 将锁定范围快照映射为运行态、执行引擎并一次性装配持久化。
+     *
+     * @param reference      排程范围参考
+     * @param machineCodes   锁定机台集合
+     * @param commandBatch   批量命令
+     * @param newTemplateMap 新结果分组模板
+     * @return 写入统计
+     * @throws ServiceException 计算或落库校验失败时抛出并由外层事务回滚
+     */
+    private TmManualRollingWriteResult executeAndPersist(TmScheduleResult reference,
+                                                          List<String> machineCodes,
+                                                          TmManualRollingCommandBatch commandBatch,
+                                                          Map<String, TmScheduleResult> newTemplateMap) {
+        List<TmScheduleResult> snapshotList = this.loadScheduleResults(reference, machineCodes);
+        this.validateEditableResults(snapshotList);
+        TmManualRollingContext context = this.buildContext(reference, machineCodes, snapshotList);
+        TmManualRollingResult rollingResult;
+        try {
+            rollingResult = tmScheduleOperationFacade.execute(commandBatch, context);
+        } catch (IllegalArgumentException | IllegalStateException exception) {
+            log.warn("[TM_MANUAL_ROLL_VALIDATE] factoryCode={}, scheduleDate={}, batchNo={}, reason={}",
+                    reference.getFactoryCode(), reference.getScheduleDate(), reference.getBatchNo(), exception.getMessage());
+            throw new ServiceException(this.resolveTmMessage(
+                    "ui.data.alert.tm.schedule.operationFailed", "人工排程操作失败"));
+        }
+        return this.assembleAndPersist(snapshotList, rollingResult, newTemplateMap, reference);
+    }
+
+    /**
+     * 构建与数据库实体解耦的运行态上下文。
+     *
+     * @param reference    排程范围参考
+     * @param machineCodes 机台集合
+     * @param snapshotList 数据库快照
+     * @return 运行态上下文
+     */
+    private TmManualRollingContext buildContext(TmScheduleResult reference, List<String> machineCodes,
+                                                 List<TmScheduleResult> snapshotList) {
+        TmManualRollingContext context = new TmManualRollingContext();
+        context.setFactoryCode(reference.getFactoryCode());
+        context.setBatchNo(reference.getBatchNo());
+        context.setScheduleDate(reference.getScheduleDate());
+        context.setTraceId(IdUtil.fastSimpleUUID());
+        context.setOperator("TM_MANUAL_OPERATION");
+        context.setMachineCapacityMap(this.loadMachineCapacityMap(reference.getFactoryCode(), machineCodes));
+        List<TmManualTaskDraft> taskList = new ArrayList<>();
+        for (TmScheduleResult result : snapshotList) {
+            for (int shiftOrder = 1; shiftOrder <= TmScheduleConstants.TM_MAX_SHIFT_ORDER; shiftOrder++) {
+                if (this.isPositive(this.getShiftPlanQty(result, shiftOrder))
+                        || this.isPositive(this.getShiftFinishQty(result, shiftOrder))) {
+                    taskList.add(this.mapExistingTask(result, shiftOrder));
+                }
+            }
+        }
+        context.setTaskList(taskList);
+        return context;
+    }
+
+    /**
+     * 装配横向结果并在当前事务内一次提交全部新增、更新、删除和未排记录。
+     *
+     * @param snapshotList  原始快照
+     * @param rollingResult 引擎结果
+     * @param newTemplateMap 新分组模板
+     * @param reference     排程范围参考
+     * @return 写入统计
+     * @throws ServiceException 更新冲突或装配校验失败时抛出
+     */
+    private TmManualRollingWriteResult assembleAndPersist(List<TmScheduleResult> snapshotList,
+                                                           TmManualRollingResult rollingResult,
+                                                           Map<String, TmScheduleResult> newTemplateMap,
+                                                           TmScheduleResult reference) {
+        Map<Long, TmScheduleResult> sourceMap = snapshotList.stream()
+                .filter(result -> result.getId() != null)
+                .collect(Collectors.toMap(TmScheduleResult::getId, Function.identity(), (left, right) -> left,
+                        LinkedHashMap::new));
+        Map<String, List<TmManualTaskDraft>> groupTaskMap = rollingResult.getScheduledTaskList().stream()
+                .collect(Collectors.groupingBy(TmManualTaskDraft::getResultGroupKey,
+                        LinkedHashMap::new, Collectors.toList()));
+        Map<Long, TmScheduleResult> updateMap = new LinkedHashMap<>();
+        List<TmScheduleResult> insertList = new ArrayList<>();
+        Set<Long> retainedSourceIdSet = new LinkedHashSet<>();
+
+        for (Map.Entry<String, List<TmManualTaskDraft>> entry : groupTaskMap.entrySet()) {
+            List<TmManualTaskDraft> groupTaskList = entry.getValue();
+            TmManualTaskDraft firstTask = groupTaskList.get(0);
+            TmScheduleResult source = firstTask.getSourceResultId() == null
+                    ? null : sourceMap.get(firstTask.getSourceResultId());
+            boolean reuseSource = source != null && entry.getKey().equals(String.valueOf(source.getId()));
+            TmScheduleResult target;
+            if (reuseSource) {
+                target = this.copyFullResult(source);
+                retainedSourceIdSet.add(source.getId());
+                updateMap.put(source.getId(), target);
+            } else {
+                TmScheduleResult template = newTemplateMap.get(entry.getKey());
+                if (template == null) {
+                    template = source;
+                }
+                if (template == null) {
+                    throw new ServiceException(this.resolveTmMessage(
+                            "ui.data.alert.tm.schedule.operationFailed", "人工排程操作失败"));
+                }
+                target = this.copyBaseResult(template);
+                target.setOrderNo(reference.getBatchNo() + "-MANUAL-" + IdUtil.fastSimpleUUID().substring(0, 8));
+                target.setDataSource(INSERT_DATA_SOURCE);
+                target.setReleaseStatus(ApsConstant.NO_RELEASE);
+                insertList.add(target);
+            }
+            this.clearScheduleFields(target);
+            target.setMachineCode(firstTask.getMachineCode());
+            for (TmManualTaskDraft task : groupTaskList) {
+                this.writeTask(target, task);
+            }
+            this.validateAssembledResult(target);
+            if (reuseSource) {
+                this.markEditedReleaseStatus(target);
+            }
+        }
+
+        TmManualRollingWriteResult writeResult = new TmManualRollingWriteResult();
+        for (TmScheduleResult source : snapshotList) {
+            if (!retainedSourceIdSet.contains(source.getId())) {
+                int deletedRows = tmScheduleResultMapper.deleteById(source.getId());
+                if (deletedRows != 1) {
+                    throw new ServiceException(this.resolveTmMessage(
+                            "ui.data.alert.tm.schedule.operationConcurrentChanged", "排程状态已变化，请刷新后重试"));
+                }
+                writeResult.setDeleteCount(writeResult.getDeleteCount() + deletedRows);
+            }
+        }
+        for (TmScheduleResult insertResult : insertList) {
+            writeResult.setInsertCount(writeResult.getInsertCount() + tmScheduleResultMapper.insert(insertResult));
+        }
+        for (TmScheduleResult updateResult : updateMap.values()) {
+            int updatedRows = tmScheduleResultMapper.updateById(updateResult);
+            if (updatedRows != 1) {
+                throw new ServiceException(this.resolveTmMessage(
+                        "ui.data.alert.tm.schedule.operationConcurrentChanged", "排程状态已变化，请刷新后重试"));
+            }
+            writeResult.setUpdateCount(writeResult.getUpdateCount() + updatedRows);
+        }
+        for (TmManualTaskDraft unplannedTask : rollingResult.getUnplannedTaskList()) {
+            this.insertUnplanned(reference, unplannedTask);
+            writeResult.setUnplannedCount(writeResult.getUnplannedCount() + 1);
+            writeResult.setUnplannedQty(BigDecimalUtils.add(writeResult.getUnplannedQty(), unplannedTask.getPlanQty()));
+        }
+        return writeResult;
+    }
+
+    /**
+     * 将既有横向班次映射为独立任务片段。
+     *
+     * @param result     排程结果
+     * @param shiftOrder 班次
+     * @return 独立任务片段
+     */
+    private TmManualTaskDraft mapExistingTask(TmScheduleResult result, int shiftOrder) {
+        TmManualTaskDraft task = new TmManualTaskDraft();
+        task.setTaskId(result.getId() + ":" + shiftOrder + ":0");
+        task.setResultGroupKey(String.valueOf(result.getId()));
+        task.setSourceResultId(result.getId());
+        task.setSourceShiftOrder(shiftOrder);
+        task.setSourceSequence(this.getShiftSequence(result, shiftOrder));
+        task.setMachineCode(result.getMachineCode());
+        task.setShiftOrder(shiftOrder);
+        task.setSequence(this.getShiftSequence(result, shiftOrder));
+        task.setPlanQty(this.getShiftPlanQty(result, shiftOrder));
+        task.setFinishQty(this.getShiftFinishQty(result, shiftOrder));
+        task.setTreadCode(result.getTreadCode());
+        task.setGlueCode(result.getGlueCode());
+        task.setBaseGlueCode(result.getBaseGlueCode());
+        task.setMouthPlateCode(result.getMouthPlateCode());
+        task.setDataSource(result.getDataSource());
+        task.setAnalysis(this.getShiftText(result, TmScheduleConstants.SHIFT_ANALYSIS_FIELD_TEMPLATE, shiftOrder));
+        task.setSourceStartTime(this.getShiftDate(result, TmScheduleConstants.SHIFT_START_TIME_FIELD_TEMPLATE, shiftOrder));
+        task.setSourceEndTime(this.getShiftDate(result, TmScheduleConstants.SHIFT_END_TIME_FIELD_TEMPLATE, shiftOrder));
+        return task;
+    }
+
+    /**
+     * 将插单班次映射为稳定临时任务。
+     *
+     * @param resultGroupKey 新结果分组键
+     * @param insertResult   插单模板
+     * @param shiftOrder     班次
+     * @param fragmentIndex  片段号
+     * @return 插单任务
+     */
+    private TmManualTaskDraft mapInsertTask(TmScheduleResult insertResult, String resultGroupKey,
+                                             int shiftOrder, int fragmentIndex) {
+        TmManualTaskDraft task = new TmManualTaskDraft();
+        task.setTaskId(resultGroupKey + ":" + shiftOrder + ":" + fragmentIndex);
+        task.setResultGroupKey(resultGroupKey);
+        task.setSourceShiftOrder(shiftOrder);
+        task.setSourceSequence(this.getShiftSequence(insertResult, shiftOrder));
+        task.setMachineCode(insertResult.getMachineCode());
+        task.setShiftOrder(shiftOrder);
+        task.setSequence(this.getShiftSequence(insertResult, shiftOrder));
+        task.setPlanQty(this.getShiftPlanQty(insertResult, shiftOrder));
+        task.setFinishQty(BigDecimal.ZERO);
+        task.setTreadCode(insertResult.getTreadCode());
+        task.setGlueCode(insertResult.getGlueCode());
+        task.setBaseGlueCode(insertResult.getBaseGlueCode());
+        task.setMouthPlateCode(insertResult.getMouthPlateCode());
+        task.setDataSource(INSERT_DATA_SOURCE);
+        task.setAnalysis(this.getShiftText(insertResult, TmScheduleConstants.SHIFT_ANALYSIS_FIELD_TEMPLATE, shiftOrder));
+        task.setInsertTask(true);
+        return task;
+    }
+
+    /**
+     * 将任务片段写入横向结果的动态班次字段。
+     *
+     * @param target 目标结果
+     * @param task   任务片段
+     */
+    private void writeTask(TmScheduleResult target, TmManualTaskDraft task) {
+        int shiftOrder = task.getShiftOrder();
+        this.setShiftValue(target, TmScheduleConstants.SHIFT_PLAN_QTY_FIELD_TEMPLATE, shiftOrder, task.getPlanQty());
+        this.setShiftValue(target, TmScheduleConstants.SHIFT_FINISH_QTY_FIELD_TEMPLATE, shiftOrder, task.getFinishQty());
+        this.setShiftValue(target, TmScheduleConstants.SHIFT_SEQUENCE_FIELD_TEMPLATE, shiftOrder, task.getSequence());
+        this.setShiftValue(target, TmScheduleConstants.SHIFT_ANALYSIS_FIELD_TEMPLATE, shiftOrder, task.getAnalysis());
+        if (Objects.equals(task.getSourceShiftOrder(), task.getShiftOrder())) {
+            this.setShiftValue(target, TmScheduleConstants.SHIFT_START_TIME_FIELD_TEMPLATE,
+                    shiftOrder, task.getSourceStartTime());
+            this.setShiftValue(target, TmScheduleConstants.SHIFT_END_TIME_FIELD_TEMPLATE,
+                    shiftOrder, task.getSourceEndTime());
+        }
+    }
+
+    /**
+     * 清空横向结果的六班可变字段，随后完全按最终任务链重建。
+     *
+     * @param result 横向结果
+     */
+    private void clearScheduleFields(TmScheduleResult result) {
+        List<String> fieldTemplateList = java.util.Arrays.asList(
+                TmScheduleConstants.SHIFT_PLAN_QTY_FIELD_TEMPLATE,
+                TmScheduleConstants.SHIFT_FINISH_QTY_FIELD_TEMPLATE,
+                TmScheduleConstants.SHIFT_SEQUENCE_FIELD_TEMPLATE,
+                TmScheduleConstants.SHIFT_START_TIME_FIELD_TEMPLATE,
+                TmScheduleConstants.SHIFT_END_TIME_FIELD_TEMPLATE,
+                TmScheduleConstants.SHIFT_ANALYSIS_FIELD_TEMPLATE);
+        for (int shiftOrder = 1; shiftOrder <= TmScheduleConstants.TM_MAX_SHIFT_ORDER; shiftOrder++) {
+            for (String fieldTemplate : fieldTemplateList) {
+                this.setShiftValue(result, fieldTemplate, shiftOrder, null);
+            }
+        }
+    }
+
+    /**
+     * 校验单行装配后不存在同班覆盖且计划量不小于完成量。
+     *
+     * @param result 装配结果
+     * @throws ServiceException 数量非法时抛出
+     */
+    private void validateAssembledResult(TmScheduleResult result) {
+        for (int shiftOrder = 1; shiftOrder <= TmScheduleConstants.TM_MAX_SHIFT_ORDER; shiftOrder++) {
+            BigDecimal planQty = this.getShiftPlanQty(result, shiftOrder);
+            BigDecimal finishQty = this.getShiftFinishQty(result, shiftOrder);
+            if (planQty.compareTo(finishQty) < 0 || finishQty.compareTo(BigDecimal.ZERO) < 0) {
+                throw new ServiceException(this.resolveTmMessage(
+                        "ui.data.alert.tm.schedule.operationFailed", "人工排程操作失败"));
+            }
+        }
+    }
+
+    /**
+     * 查询锁定范围内排程结果。
+     *
+     * @param reference    范围参考
+     * @param machineCodes 机台集合
+     * @return 当前结果快照
+     */
+    private List<TmScheduleResult> loadScheduleResults(TmScheduleResult reference, List<String> machineCodes) {
+        LambdaQueryWrapper<TmScheduleResult> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(TmScheduleResult::getFactoryCode, reference.getFactoryCode());
+        wrapper.eq(TmScheduleResult::getScheduleDate, reference.getScheduleDate());
+        wrapper.eq(StringUtils.isNotBlank(reference.getBatchNo()), TmScheduleResult::getBatchNo, reference.getBatchNo());
+        wrapper.in(TmScheduleResult::getMachineCode, machineCodes);
+        return tmScheduleResultMapper.selectList(wrapper);
+    }
+
+    /**
+     * 查询锁定机台班产。
+     *
+     * @param factoryCode 工厂编码
+     * @param machineCodes 机台集合
+     * @return 机台班产映射
+     * @throws ServiceException 任一机台未维护有效班产时抛出
+     */
+    private Map<String, BigDecimal> loadMachineCapacityMap(String factoryCode, List<String> machineCodes) {
+        LambdaQueryWrapper<TmMachineInfo> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(TmMachineInfo::getFactoryCode, factoryCode);
+        wrapper.in(TmMachineInfo::getMachineCode, machineCodes);
+        Map<String, BigDecimal> capacityMap = tmMachineInfoMapper.selectList(wrapper).stream()
+                .collect(Collectors.toMap(TmMachineInfo::getMachineCode, TmMachineInfo::getMaxCapacity,
+                        (left, right) -> left, LinkedHashMap::new));
+        boolean missingCapacity = machineCodes.stream()
+                .anyMatch(machineCode -> !this.isPositive(capacityMap.get(machineCode)));
+        if (missingCapacity) {
+            throw new ServiceException(this.resolveTmMessage(
+                    "ui.data.alert.tm.schedule.insertMachineCapacityEmpty", "机台最大班产未维护"));
+        }
+        return capacityMap;
+    }
+
+    /**
+     * 写入第六班后仍无法容纳的未排任务。
+     *
+     * @param reference 排程范围参考
+     * @param task      未排任务
+     */
+    private void insertUnplanned(TmScheduleResult reference, TmManualTaskDraft task) {
+        TmUnplannedReasonEnum reason = TmUnplannedReasonEnum.CAPACITY_NOT_ENOUGH;
+        TmScheduleUnplanned unplanned = new TmScheduleUnplanned();
+        unplanned.setFactoryCode(reference.getFactoryCode());
+        unplanned.setBatchNo(reference.getBatchNo());
+        unplanned.setScheduleDate(reference.getScheduleDate());
+        unplanned.setTreadCode(task.getTreadCode());
+        unplanned.setGlueCode(task.getGlueCode());
+        unplanned.setMouthPlateCode(task.getMouthPlateCode());
+        unplanned.setUnplannedReasonCode(reason.getCode());
+        unplanned.setUnplannedReasonDesc(reason.getDesc());
+        Map<String, Object> evidenceMap = new LinkedHashMap<>();
+        evidenceMap.put("source", "MANUAL_ROLL");
+        evidenceMap.put("machineCode", task.getMachineCode());
+        evidenceMap.put("taskId", task.getTaskId());
+        evidenceMap.put("unplannedQty", task.getPlanQty());
+        unplanned.setUnplannedEvidenceJson(JSON.toJSONString(evidenceMap));
+        if (tmScheduleUnplannedMapper.insert(unplanned) != 1) {
+            throw new ServiceException(this.resolveTmMessage(
+                    "ui.data.alert.tm.schedule.operationFailed", "人工排程操作失败"));
+        }
+    }
+
+    /**
+     * 复制完整排程结果，确保引擎计算完成前不修改数据库快照。
+     *
+     * @param source 来源结果
+     * @return 完整副本
+     */
+    private TmScheduleResult copyFullResult(TmScheduleResult source) {
+        TmScheduleResult target = this.copyBaseResult(source);
+        target.setId(source.getId());
+        target.setReleaseStatus(source.getReleaseStatus());
+        target.setDataSource(source.getDataSource());
+        for (int shiftOrder = 1; shiftOrder <= TmScheduleConstants.TM_MAX_SHIFT_ORDER; shiftOrder++) {
+            for (String fieldTemplate : this.scheduleFieldTemplates()) {
+                String fieldName = String.format(fieldTemplate, shiftOrder);
+                target.setFieldValueByFieldName(fieldName, source.getFieldValueByFieldName(fieldName));
+            }
+        }
+        return target;
+    }
+
+    /**
+     * 复制新增结果需要的业务字段。
+     *
+     * @param source 来源模板
+     * @return 新结果模板
+     */
+    private TmScheduleResult copyBaseResult(TmScheduleResult source) {
+        TmScheduleResult target = new TmScheduleResult();
+        target.setFactoryCode(source.getFactoryCode());
+        target.setBatchNo(source.getBatchNo());
+        target.setOrderNo(source.getOrderNo());
+        target.setScheduleDate(source.getScheduleDate());
+        target.setMachineCode(source.getMachineCode());
+        target.setTreadCode(source.getTreadCode());
+        target.setGlueCode(source.getGlueCode());
+        target.setBaseGlueCode(source.getBaseGlueCode());
+        target.setWholeGlueCode(source.getWholeGlueCode());
+        target.setGlueSeq(source.getGlueSeq());
+        target.setMouthPlateCode(source.getMouthPlateCode());
+        target.setTreadShoulderLength(source.getTreadShoulderLength());
+        target.setCxRemainQty(source.getCxRemainQty());
+        target.setMaterialCode(source.getMaterialCode());
+        target.setMaterialDesc(source.getMaterialDesc());
+        target.setEmbryoCode(source.getEmbryoCode());
+        target.setMainMaterialDesc(source.getMainMaterialDesc());
+        target.setCxMachineCode(source.getCxMachineCode());
+        target.setSixClockStockQty(source.getSixClockStockQty());
+        target.setCurlRollLength(source.getCurlRollLength());
+        target.setTailFlag(source.getTailFlag());
+        target.setRemark(source.getRemark());
+        return target;
+    }
+
+    /**
+     * 人工编辑后按既有状态迁移矩阵回退发布状态。
+     *
+     * @param result 待更新结果
+     * @throws ServiceException 状态不可编辑时抛出
+     */
+    private void markEditedReleaseStatus(TmScheduleResult result) {
+        if (!TmReleaseStatusTransition.isEditable(result.getReleaseStatus())) {
+            throw new ServiceException(this.resolveTmMessage(
+                    "ui.data.alert.tm.schedule.illegalReleaseTransition", "排程发布状态迁移不合法"));
+        }
+        if (ApsConstant.IS_RELEASE.equals(result.getReleaseStatus())) {
+            result.setReleaseStatus(ApsConstant.WAIT_RELEASING);
+        }
+    }
+
+    /**
+     * 校验锁定范围结果均可编辑。
+     *
+     * @param resultList 结果集合
+     * @throws ServiceException 存在不可编辑状态时抛出
+     */
+    private void validateEditableResults(List<TmScheduleResult> resultList) {
+        if (resultList.stream().anyMatch(result -> !TmReleaseStatusTransition.isEditable(result.getReleaseStatus()))) {
+            throw new ServiceException(I18nUtil.getMessage(
+                    "ui.data.column.scheduleResult.release.isReleasingOrTimeoutById"));
+        }
+    }
+
+    /**
+     * 校验批量请求处于同一工厂、日期和批次。
+     *
+     * @param resultList 结果集合
+     * @throws ServiceException 范围不一致时抛出
+     */
+    private void validateSameScheduleScope(List<TmScheduleResult> resultList) {
+        TmScheduleResult first = resultList.get(0);
+        boolean invalid = resultList.stream().anyMatch(result ->
+                !Objects.equals(first.getFactoryCode(), result.getFactoryCode())
+                        || !Objects.equals(first.getScheduleDate(), result.getScheduleDate())
+                        || !Objects.equals(first.getBatchNo(), result.getBatchNo()));
+        if (invalid) {
+            throw new ServiceException(this.resolveTmMessage(
+                    "ui.data.alert.tm.schedule.operationFailed", "人工排程操作失败"));
+        }
+    }
+
+    /**
+     * 规范化非空请求集合。
+     *
+     * @param requestList 请求集合
+     * @return 非空请求集合
+     * @throws ServiceException 请求为空时抛出
+     */
+    private List<TmScheduleResult> requireRequests(List<TmScheduleResult> requestList) {
+        if (CollUtil.isEmpty(requestList) || requestList.stream().anyMatch(Objects::isNull)) {
+            throw new ServiceException(this.resolveTmMessage(
+                    "ui.data.alert.tm.schedule.operationFailed", "人工排程操作失败"));
+        }
+        return requestList;
+    }
+
+    /**
+     * 根据ID读取当前排程结果。
+     *
+     * @param id             结果ID
+     * @param messageKey     国际化键
+     * @param defaultMessage 默认文案
+     * @return 当前结果
+     * @throws ServiceException 结果不存在时抛出
+     */
+    private TmScheduleResult loadResultById(Long id, String messageKey, String defaultMessage) {
+        TmScheduleResult result = id == null ? null : tmScheduleResultMapper.selectById(id);
+        if (result == null) {
+            throw new ServiceException(this.resolveTmMessage(messageKey, defaultMessage));
+        }
+        return result;
+    }
+
+    /**
+     * 解析操作班次。
+     *
+     * @param operationResult 操作请求
+     * @param oldResult       当前结果
+     * @return 操作班次
+     */
+    private int resolveOperationShift(TmScheduleResult operationResult, TmScheduleResult oldResult) {
+        Integer shiftOrder = TmInsertPositionValidator.resolveShiftOrder(operationResult);
+        if (shiftOrder == null) {
+            shiftOrder = TmInsertPositionValidator.resolveShiftOrder(oldResult);
+        }
+        return shiftOrder == null ? 1 : shiftOrder;
+    }
+
+    /**
+     * 解析插单有效班次。
+     *
+     * @param insertResult 插单请求
+     * @return 有效班次列表
      */
     private List<Integer> resolveInsertShiftOrderList(TmScheduleResult insertResult) {
         if (insertResult == null) {
@@ -110,829 +768,49 @@ public class TmManualInsertRollingService {
         return shiftOrderList;
     }
 
-    /**
-     * 为指定插单班次生成独立任务级结果模板。
-     *
-     * @param insertResult 原始插单结果
-     * @param shiftOrder 班次顺序
-     * @return 只承载指定班次字段的插单结果模板
-     */
-    private TmScheduleResult buildShiftInsertResult(TmScheduleResult insertResult, int shiftOrder) {
-        TmScheduleResult shiftInsertResult = this.copyBaseResult(insertResult);
-        shiftInsertResult.setOrderNo(insertResult.getBatchNo() + "-MANUAL-"
-                + IdUtil.fastSimpleUUID().substring(0, 8));
-        this.setShiftPlanQty(shiftInsertResult, shiftOrder, this.getShiftPlanQty(insertResult, shiftOrder));
-        this.setShiftSequence(shiftInsertResult, shiftOrder, this.getShiftSequence(insertResult, shiftOrder));
-        Object analysis = insertResult.getFieldValueByFieldName(
-                String.format(TmScheduleConstants.SHIFT_ANALYSIS_FIELD_TEMPLATE, shiftOrder));
-        shiftInsertResult.setFieldValueByFieldName(
-                String.format(TmScheduleConstants.SHIFT_ANALYSIS_FIELD_TEMPLATE, shiftOrder), analysis);
-        return shiftInsertResult;
+    private List<String> scheduleFieldTemplates() {
+        return java.util.Arrays.asList(TmScheduleConstants.SHIFT_PLAN_QTY_FIELD_TEMPLATE,
+                TmScheduleConstants.SHIFT_FINISH_QTY_FIELD_TEMPLATE,
+                TmScheduleConstants.SHIFT_SEQUENCE_FIELD_TEMPLATE,
+                TmScheduleConstants.SHIFT_START_TIME_FIELD_TEMPLATE,
+                TmScheduleConstants.SHIFT_END_TIME_FIELD_TEMPLATE,
+                TmScheduleConstants.SHIFT_ANALYSIS_FIELD_TEMPLATE);
     }
 
-    /**
-     * 调整计划量并滚动更新同机台后续班次。
-     *
-     * @param changeResult 调量后的排程结果
-     * @return 更新行数
-     * @throws ServiceException 调量结果不存在或计划量小于完成量时抛出
-     */
-    int changeQtyAndRoll(TmScheduleResult changeResult) {
-        TmScheduleResult oldResult = this.loadResultById(changeResult.getId(), "ui.data.alert.tm.schedule.changeQtyResultNotFound",
-                "调量排程结果不存在或已失效");
-        Integer shiftOrder = this.resolveOperationShift(changeResult, oldResult);
-        Integer sequence = this.getShiftSequence(oldResult, shiftOrder);
-        if (sequence == null) {
-            sequence = 1;
-        }
-        BigDecimal changeQty = this.getShiftPlanQty(changeResult, shiftOrder);
-        BigDecimal finishQty = this.getShiftFinishQty(oldResult, shiftOrder);
-        if (changeQty.compareTo(finishQty) < 0) {
-            throw new ServiceException(this.resolveTmMessage("ui.data.alert.tm.schedule.changeQtyLessThanFinish", "调量计划量不能小于已完成量"));
-        }
-        Object changeAnalysis = changeResult.getFieldValueByFieldName(
-                String.format(TmScheduleConstants.SHIFT_ANALYSIS_FIELD_TEMPLATE, shiftOrder));
-        this.setShiftAnalysis(oldResult, shiftOrder, changeAnalysis == null ? null : changeAnalysis.toString());
-        TmManualRollingTask changeTask = this.buildExistingTask(oldResult, shiftOrder);
-        changeTask.setPlanQty(changeQty);
-
-        TmManualRollingWriteResult writeResult = this.rollMachineWindow(oldResult, shiftOrder, sequence,
-                this.loadSameMachineResults(oldResult), this.loadMachineCapacity(oldResult), oldResult.getId(), false, changeTask);
-        log.info("[TM_MANUAL_ROLL] operation=CHANGE_QTY, factoryCode={}, scheduleDate={}, machineCode={}, startShiftOrder={}, updateCount={}, unplannedQty={}",
-                oldResult.getFactoryCode(), oldResult.getScheduleDate(), oldResult.getMachineCode(), shiftOrder,
-                writeResult.getUpdateCount(), writeResult.getUnplannedQty());
-        return writeResult.getUpdateCount();
-    }
-
-    /**
-     * 调整机台并滚动更新原机台和目标机台。
-     *
-     * @param transferResult 转机台后的排程结果
-     * @return 更新行数
-     * @throws ServiceException 转机台结果不存在时抛出
-     */
-    int changeMachineAndRoll(TmScheduleResult transferResult) {
-        TmScheduleResult oldResult = this.loadResultById(transferResult.getId(), "ui.data.alert.tm.schedule.changeMachineResultNotFound",
-                "转机台排程结果不存在或已失效");
-        String sourceMachineCode = oldResult.getMachineCode();
-        Integer shiftOrder = this.resolveOperationShift(transferResult, oldResult);
-        Integer sourceSequence = this.getShiftSequence(oldResult, shiftOrder);
-        if (sourceSequence == null) {
-            sourceSequence = 1;
-        }
-        BigDecimal transferPlanQty = this.getShiftPlanQty(oldResult, shiftOrder);
-
-        // 源机台：加载同机台结果，将 oldResult 副本的转出班次计划量置 0，使该班次任务在滚动中不占产能、不被重新装箱，其它班次任务保留并重排
-        List<TmScheduleResult> sourceExistList = this.loadSameMachineResults(oldResult);
-        TmScheduleResult sourceOldResultCopy = null;
-        for (TmScheduleResult item : sourceExistList) {
-            if (item.getId() != null && item.getId().equals(oldResult.getId())) {
-                sourceOldResultCopy = item;
-                break;
-            }
-        }
-        if (sourceOldResultCopy != null) {
-            this.setShiftPlanQty(sourceOldResultCopy, shiftOrder, BigDecimal.ZERO);
-        }
-
-        TmManualRollingWriteResult totalResult = new TmManualRollingWriteResult();
-        // 源机台滚动：不排除 oldResult（replaceResultId=null），其转出班次任务量为 0 不占产能，其它班次任务保留重排
-        totalResult.add(this.rollMachineWindow(oldResult, shiftOrder, sourceSequence,
-                sourceExistList, this.loadMachineCapacity(oldResult), null, false));
-        // 单班次场景下 oldResult 副本无其它班次任务，不会被滚动 updateResultMap 收录，需显式落库以清空转出班次
-        if (sourceOldResultCopy != null) {
-            this.markEditedReleaseStatus(sourceOldResultCopy);
-            if (tmScheduleResultMapper.updateById(sourceOldResultCopy) != 1) {
-                throw new ServiceException(this.resolveTmMessage("ui.data.alert.tm.schedule.operationConcurrentChanged",
-                        "排程状态已变化，请刷新后重试"));
-            }
-        }
-
-        // 目标机台按当前结果粒度查找同胎面，存在时合并到目标记录，避免产生重复结果行。
-        TmScheduleResult moveTemplate = this.copyBaseResult(oldResult);
-        moveTemplate.setMachineCode(transferResult.getMachineCode());
-        List<TmScheduleResult> targetExistList = this.loadSameMachineResults(moveTemplate);
-        TmScheduleResult targetSameTreadResult = targetExistList.stream()
-                .filter(item -> Objects.equals(item.getBatchNo(), oldResult.getBatchNo()))
-                .filter(item -> Objects.equals(item.getTreadCode(), oldResult.getTreadCode()))
-                .findFirst().orElse(null);
-        if (targetSameTreadResult != null) {
-            Integer targetSequence = this.getShiftSequence(targetSameTreadResult, shiftOrder);
-            if (targetSequence == null) {
-                targetSequence = this.resolveNextTargetSequence(targetExistList, shiftOrder);
-            }
-            // 同胎面合并沿用目标机台既有序号，避免改变目标机台当前顺序；后续业务口径变化时在此处调整。
-            BigDecimal mergedPlanQty = BigDecimalUtils.add(this.getShiftPlanQty(targetSameTreadResult, shiftOrder),
-                    transferPlanQty);
-            this.setShiftSequence(targetSameTreadResult, shiftOrder, targetSequence);
-            this.setShiftPlanQty(targetSameTreadResult, shiftOrder, mergedPlanQty);
-            totalResult.add(this.rollMachineWindow(moveTemplate, shiftOrder, targetSequence,
-                    targetExistList, this.loadMachineCapacity(moveTemplate), null, true));
-        } else {
-            // 目标不存在同胎面时保留原插入和滚动口径，新行只承载转出班次，避免跨班次污染。
-            Integer targetSequence = TmInsertPositionValidator.resolveSequence(transferResult, shiftOrder);
-            if (targetSequence == null) {
-                targetSequence = sourceSequence;
-            }
-            this.setShiftPlanQty(moveTemplate, shiftOrder, transferPlanQty);
-            this.setShiftSequence(moveTemplate, shiftOrder, targetSequence);
-            TmManualRollingTask transferTask = this.buildInsertTask(moveTemplate, shiftOrder, targetSequence);
-            totalResult.add(this.rollMachineWindow(moveTemplate, shiftOrder, targetSequence,
-                    targetExistList, this.loadMachineCapacity(moveTemplate), null, false, transferTask));
-        }
-        log.info("[TM_MANUAL_ROLL] operation=CHANGE_MACHINE, factoryCode={}, scheduleDate={}, sourceMachineCode={}, targetMachineCode={}, startShiftOrder={}, updateCount={}, unplannedQty={}",
-                oldResult.getFactoryCode(), oldResult.getScheduleDate(), sourceMachineCode, transferResult.getMachineCode(),
-                shiftOrder, totalResult.getUpdateCount(), totalResult.getUnplannedQty());
-        return totalResult.getUpdateCount();
-    }
-
-    /**
-     * 删除排程结果并滚动更新同机台后续任务。
-     *
-     * <p>从被删除记录最早存在计划或顺序的班次开始重排，任务流排除被删除记录，
-     * 其它任务的完成量由统一滚动算法原样保留。</p>
-     *
-     * @param deleteResult 待删除排程结果
-     * @return 逻辑删除行数
-     * @throws ServiceException 记录不存在、机台产能缺失或并发删除时抛出
-     */
-    int deleteAndRoll(TmScheduleResult deleteResult) {
-        TmScheduleResult oldResult = this.loadResultById(deleteResult.getId(),
-                "ui.data.alert.tm.schedule.resultNotFound", "排程结果不存在或已删除");
-        int startShiftOrder = this.resolveDeleteStartShift(oldResult);
-        Integer startSequence = this.getShiftSequence(oldResult, startShiftOrder);
-        if (startSequence == null) {
-            startSequence = 1;
-        }
-        this.rollMachineWindow(oldResult, startShiftOrder, startSequence,
-                this.loadSameMachineResults(oldResult), this.loadMachineCapacity(oldResult), oldResult.getId(), false);
-        int deletedRows = tmScheduleResultMapper.deleteById(oldResult.getId());
-        if (deletedRows != 1) {
-            throw new ServiceException(this.resolveTmMessage(
-                    "ui.data.alert.tm.schedule.operationConcurrentChanged", "排程状态已变化，请刷新后重试"));
-        }
-        log.info("[TM_MANUAL_ROLL] operation=DELETE, factoryCode={}, scheduleDate={}, machineCode={}, startShiftOrder={}, deleteCount={}",
-                oldResult.getFactoryCode(), oldResult.getScheduleDate(), oldResult.getMachineCode(), startShiftOrder, deletedRows);
-        return deletedRows;
-    }
-
-    /**
-     * 解析删除滚动的最早受影响班次。
-     *
-     * @param scheduleResult 待删除排程结果
-     * @return 最早受影响班次，记录无班次任务时返回 1
-     */
-    private int resolveDeleteStartShift(TmScheduleResult scheduleResult) {
-        for (int shiftOrder = 1; shiftOrder <= TmScheduleConstants.TM_MAX_SHIFT_ORDER; shiftOrder++) {
-            if (this.isPositive(this.getShiftPlanQty(scheduleResult, shiftOrder))
-                    || this.getShiftSequence(scheduleResult, shiftOrder) != null) {
-                return shiftOrder;
-            }
-        }
-        return 1;
-    }
-
-    /**
-     * 查询同工厂、同排程日期、同机台排程结果。
-     *
-     * @param queryResult 查询条件
-     * @return 同机台排程结果
-     */
-    private List<TmScheduleResult> loadSameMachineResults(TmScheduleResult queryResult) {
-        LambdaQueryWrapper<TmScheduleResult> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(TmScheduleResult::getFactoryCode, queryResult.getFactoryCode());
-        wrapper.eq(TmScheduleResult::getScheduleDate, queryResult.getScheduleDate());
-        wrapper.eq(StringUtils.isNotBlank(queryResult.getBatchNo()), TmScheduleResult::getBatchNo, queryResult.getBatchNo());
-        wrapper.eq(TmScheduleResult::getMachineCode, queryResult.getMachineCode());
-        return tmScheduleResultMapper.selectList(wrapper);
-    }
-
-    /**
-     * 计算目标机台操作班次的下一个可用序号。
-     *
-     * <p>目标同胎面在操作班次尚无序号时，只根据目标机台当前窗口计算，禁止使用源机台序号。</p>
-     *
-     * @param targetResultList 目标机台当前结果
-     * @param shiftOrder       操作班次
-     * @return 目标机台下一可用序号
-     */
-    private Integer resolveNextTargetSequence(List<TmScheduleResult> targetResultList, int shiftOrder) {
-        return targetResultList.stream()
-                .map(result -> this.getShiftSequence(result, shiftOrder))
-                .filter(Objects::nonNull)
-                .max(Integer::compareTo)
-                .map(sequence -> sequence + 1)
-                .orElse(1);
-    }
-
-    /**
-     * 根据 ID 查询排程结果。
-     *
-     * @param id             排程结果 ID
-     * @param messageKey     国际化 key
-     * @param defaultMessage 默认提示
-     * @return 排程结果
-     * @throws ServiceException 结果不存在时抛出
-     */
-    private TmScheduleResult loadResultById(Long id, String messageKey, String defaultMessage) {
-        TmScheduleResult oldResult = tmScheduleResultMapper.selectById(id);
-        if (oldResult == null) {
-            throw new ServiceException(this.resolveTmMessage(messageKey, defaultMessage));
-        }
-        return oldResult;
-    }
-
-    /**
-     * 查询机台最大班产。
-     *
-     * @param queryResult 查询条件
-     * @return 最大班产
-     * @throws ServiceException 未维护最大班产时抛出
-     */
-    private BigDecimal loadMachineCapacity(TmScheduleResult queryResult) {
-        LambdaQueryWrapper<TmMachineInfo> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(TmMachineInfo::getFactoryCode, queryResult.getFactoryCode());
-        wrapper.eq(TmMachineInfo::getMachineCode, queryResult.getMachineCode());
-        List<TmMachineInfo> machineInfoList = tmMachineInfoMapper.selectList(wrapper);
-        if (CollUtil.isEmpty(machineInfoList) || !this.isPositive(machineInfoList.get(0).getMaxCapacity())) {
-            throw new ServiceException(this.resolveTmMessage("ui.data.alert.tm.schedule.insertMachineCapacityEmpty", "机台最大班产未维护"));
-        }
-        return machineInfoList.get(0).getMaxCapacity();
-    }
-
-    /**
-     * 滚动单个机台从指定班次和顺序开始的局部窗口。
-     *
-     * @param baseResult      操作基础结果
-     * @param startShiftOrder 起始班次
-     * @param startSequence   起始顺序
-     * @param existResultList 当前机台已有结果
-     * @param machineCapacity 机台班产
-     * @param replaceResultId 需要从原任务流排除的结果 ID
-     * @param preserveStartSequence 是否保留起始任务在操作班次的原数值序号
-     * @param extraTaskList   需要插入窗口起点的任务
-     * @return 写入结果
-     */
-    private TmManualRollingWriteResult rollMachineWindow(TmScheduleResult baseResult, int startShiftOrder, int startSequence,
-                                                         List<TmScheduleResult> existResultList, BigDecimal machineCapacity,
-                                                         Long replaceResultId, boolean preserveStartSequence,
-                                                         TmManualRollingTask... extraTaskList) {
-        this.validateEditableResults(existResultList);
-        Map<Long, TmScheduleResult> updateResultMap = new LinkedHashMap<>();
-        List<TmScheduleResult> insertResultList = new ArrayList<>();
-        LinkedList<TmManualRollingTask> rollingTaskQueue = this.buildRollingTaskQueue(existResultList, startShiftOrder,
-                startSequence, replaceResultId, extraTaskList);
-        List<TmManualRollingTask> startPrefixTaskList = this.buildPrefixTaskList(existResultList, startShiftOrder, startSequence,
-                replaceResultId);
-
-        this.clearAffectedShiftFields(existResultList, startShiftOrder);
-        for (int shiftOrder = startShiftOrder; shiftOrder <= TmScheduleConstants.TM_MAX_SHIFT_ORDER; shiftOrder++) {
-            this.mergeCarryTaskToNextSameTask(rollingTaskQueue);
-            BigDecimal remainCapacity = machineCapacity;
-            int sequence = 1;
-            if (shiftOrder == startShiftOrder) {
-                for (TmManualRollingTask prefixTask : startPrefixTaskList) {
-                    this.applyTaskToResult(prefixTask, shiftOrder, sequence, prefixTask.getPlanQty(), updateResultMap, insertResultList);
-                    remainCapacity = BigDecimalUtils.sub(remainCapacity, prefixTask.getPlanQty());
-                    sequence++;
-                }
-                if (preserveStartSequence && sequence < startSequence) {
-                    // 目标已有同胎面时保留其原数值序号，允许目标窗口原有序号空洞继续存在。
-                    sequence = startSequence;
-                }
-            }
-            this.fillShiftByRollingQueue(baseResult, rollingTaskQueue, shiftOrder, sequence, remainCapacity,
-                    updateResultMap, insertResultList);
-        }
-        return this.persistRollingResult(baseResult, rollingTaskQueue, updateResultMap, insertResultList);
-    }
-
-    /**
-     * 构建窗口起点之后的任务流。
-     *
-     * @param resultList      当前机台结果
-     * @param startShiftOrder 起始班次
-     * @param startSequence   起始顺序
-     * @param replaceResultId 需要排除的结果 ID
-     * @param extraTaskList   额外插入任务
-     * @return 任务流队列
-     */
-    private LinkedList<TmManualRollingTask> buildRollingTaskQueue(List<TmScheduleResult> resultList, int startShiftOrder,
-                                                                  int startSequence, Long replaceResultId,
-                                                                  TmManualRollingTask... extraTaskList) {
-        List<TmManualRollingTask> rollingTaskList = new ArrayList<>();
-        if (extraTaskList != null) {
-            for (TmManualRollingTask extraTask : extraTaskList) {
-                if (extraTask != null) {
-                    rollingTaskList.add(extraTask);
-                }
-            }
-        }
-        for (int shiftOrder = startShiftOrder; shiftOrder <= TmScheduleConstants.TM_MAX_SHIFT_ORDER; shiftOrder++) {
-            List<TmManualRollingTask> shiftTaskList = this.buildShiftTaskList(resultList, shiftOrder, replaceResultId);
-            for (TmManualRollingTask task : shiftTaskList) {
-                if (shiftOrder == startShiftOrder && this.defaultSequence(task.getSequence()) < startSequence) {
-                    continue;
-                }
-                rollingTaskList.add(task);
-            }
-        }
-        return rollingTaskList.stream()
-                .filter(task -> this.isPositive(task.getPlanQty()))
-                .collect(Collectors.toCollection(LinkedList::new));
-    }
-
-    /**
-     * 构建起始班次插入点之前的前置任务。
-     *
-     * @param resultList      当前机台结果
-     * @param startShiftOrder 起始班次
-     * @param startSequence   起始顺序
-     * @param replaceResultId 需要排除的结果 ID
-     * @return 前置任务列表
-     */
-    private List<TmManualRollingTask> buildPrefixTaskList(List<TmScheduleResult> resultList, int startShiftOrder,
-                                                          int startSequence, Long replaceResultId) {
-        return this.buildShiftTaskList(resultList, startShiftOrder, replaceResultId).stream()
-                .filter(task -> this.defaultSequence(task.getSequence()) < startSequence)
-                .collect(Collectors.toList());
-    }
-
-    /**
-     * 拆分单个班次的排程结果为任务列表。
-     *
-     * @param resultList      排程结果
-     * @param shiftOrder      班次
-     * @param replaceResultId 需要排除的结果 ID
-     * @return 任务列表
-     */
-    private List<TmManualRollingTask> buildShiftTaskList(List<TmScheduleResult> resultList, int shiftOrder, Long replaceResultId) {
-        return resultList.stream()
-                .filter(result -> replaceResultId == null || !replaceResultId.equals(result.getId()))
-                .map(result -> this.buildExistingTask(result, shiftOrder))
-                .filter(task -> this.isPositive(task.getPlanQty()) || task.getSequence() != null)
-                .sorted(Comparator.comparing(task -> this.defaultSequence(task.getSequence())))
-                .collect(Collectors.toList());
-    }
-
-    /**
-     * 当前班次按剩余产能承接任务流。
-     *
-     * @param baseResult       操作基础结果
-     * @param rollingTaskQueue 滚动任务队列
-     * @param shiftOrder       当前班次
-     * @param startSequence    当前班次起始顺序
-     * @param remainCapacity   当前班次剩余产能
-     * @param updateResultMap  待更新结果
-     * @param insertResultList 待新增结果
-     */
-    private void fillShiftByRollingQueue(TmScheduleResult baseResult, LinkedList<TmManualRollingTask> rollingTaskQueue,
-                                         int shiftOrder, int startSequence, BigDecimal remainCapacity,
-                                         Map<Long, TmScheduleResult> updateResultMap, List<TmScheduleResult> insertResultList) {
-        int sequence = startSequence;
-        while (!rollingTaskQueue.isEmpty()) {
-            TmManualRollingTask currentTask = rollingTaskQueue.removeFirst();
-            BigDecimal assignedQty = this.resolveAssignedQty(currentTask, remainCapacity);
-            BigDecimal overflowQty = BigDecimalUtils.sub(currentTask.getPlanQty(), assignedQty);
-            if (this.isPositive(assignedQty)) {
-                TmScheduleResult targetResult = this.applyTaskToResult(currentTask, shiftOrder, sequence, assignedQty,
-                        updateResultMap, insertResultList);
-                currentTask.setSourceResult(targetResult);
-                remainCapacity = BigDecimalUtils.sub(remainCapacity, assignedQty);
-                sequence++;
-            }
-            if (this.isPositive(overflowQty)) {
-                TmManualRollingTask carryTask = this.buildCarryTask(currentTask, overflowQty);
-                rollingTaskQueue.addFirst(carryTask);
-                break;
-            }
-            if (!this.isPositive(remainCapacity)) {
-                break;
-            }
-        }
-    }
-
-    /**
-     * 下一班开始前，将上一班溢出的同物料任务合并到后续已有任务。
-     *
-     * @param rollingTaskQueue 滚动任务队列
-     */
-    private void mergeCarryTaskToNextSameTask(LinkedList<TmManualRollingTask> rollingTaskQueue) {
-        if (rollingTaskQueue.size() < 2 || !rollingTaskQueue.getFirst().isCarryoverTask()) {
-            return;
-        }
-        TmManualRollingTask carryTask = rollingTaskQueue.getFirst();
-        TmManualRollingTask nextTask = rollingTaskQueue.get(1);
-        if (!this.isSameMaterial(carryTask, nextTask)) {
-            return;
-        }
-        nextTask.setPlanQty(BigDecimalUtils.add(nextTask.getPlanQty(), carryTask.getPlanQty()));
-        rollingTaskQueue.removeFirst();
-    }
-
-    /**
-     * 持久化滚动结果。
-     *
-     * @param baseResult       操作基础结果
-     * @param remainTaskQueue  第 6 班后剩余任务
-     * @param updateResultMap  待更新结果
-     * @param insertResultList 待新增结果
-     * @return 写入结果
-     */
-    private TmManualRollingWriteResult persistRollingResult(TmScheduleResult baseResult, LinkedList<TmManualRollingTask> remainTaskQueue,
-                                                            Map<Long, TmScheduleResult> updateResultMap,
-                                                            List<TmScheduleResult> insertResultList) {
-        TmManualRollingWriteResult writeResult = new TmManualRollingWriteResult();
-        for (TmManualRollingTask remainTask : remainTaskQueue) {
-            if (this.isPositive(remainTask.getPlanQty())) {
-                this.insertUnplanned(baseResult, remainTask, remainTask.getPlanQty());
-                writeResult.setUnplannedCount(writeResult.getUnplannedCount() + 1);
-                writeResult.setUnplannedQty(BigDecimalUtils.add(writeResult.getUnplannedQty(), remainTask.getPlanQty()));
-            }
-        }
-        for (TmScheduleResult newResult : insertResultList) {
-            writeResult.setInsertCount(writeResult.getInsertCount() + tmScheduleResultMapper.insert(newResult));
-        }
-        for (TmScheduleResult updateResult : updateResultMap.values()) {
-            int updatedRows = tmScheduleResultMapper.updateById(updateResult);
-            if (updatedRows != 1) {
-                throw new ServiceException(this.resolveTmMessage("ui.data.alert.tm.schedule.operationConcurrentChanged",
-                        "排程状态已变化，请刷新后重试"));
-            }
-            writeResult.setUpdateCount(writeResult.getUpdateCount() + updatedRows);
-        }
-        return writeResult;
-    }
-
-    /**
-     * 校验滚动窗口内全部既有结果均允许人工编辑。
-     *
-     * @param resultList 滚动窗口结果
-     * @throws ServiceException 任一记录处于发布中、发布失败或超时失败状态时抛出
-     */
-    private void validateEditableResults(List<TmScheduleResult> resultList) {
-        boolean containsNonEditableResult = resultList.stream()
-                .anyMatch(result -> !TmReleaseStatusTransition.isEditable(result.getReleaseStatus()));
-        if (containsNonEditableResult) {
-            throw new ServiceException(I18nUtil.getMessage(
-                    "ui.data.column.scheduleResult.release.isReleasingOrTimeoutById"));
-        }
-    }
-
-    /**
-     * 构造既有任务。
-     *
-     * @param result     排程结果
-     * @param shiftOrder 班次
-     * @return 人工滚动任务
-     */
-    private TmManualRollingTask buildExistingTask(TmScheduleResult result, int shiftOrder) {
-        TmManualRollingTask task = new TmManualRollingTask();
-        task.setResultId(result.getId());
-        task.setSourceResult(result);
-        task.setTemplateResult(result);
-        task.setShiftOrder(shiftOrder);
-        task.setSequence(this.getShiftSequence(result, shiftOrder));
-        task.setPlanQty(this.getShiftPlanQty(result, shiftOrder));
-        task.setFinishQty(this.getShiftFinishQty(result, shiftOrder));
-        task.setMachineCode(result.getMachineCode());
-        task.setTreadCode(result.getTreadCode());
-        task.setGlueCode(result.getGlueCode());
-        task.setMouthPlateCode(result.getMouthPlateCode());
-        task.setDataSource(result.getDataSource());
-        Object analysis = result.getFieldValueByFieldName(
-                String.format(TmScheduleConstants.SHIFT_ANALYSIS_FIELD_TEMPLATE, shiftOrder));
-        task.setAnalysis(analysis == null ? null : analysis.toString());
-        return task;
-    }
-
-    /**
-     * 构造插单任务。
-     *
-     * @param insertResult    插单排程结果
-     * @param startShiftOrder 插单班次
-     * @param insertSequence  插单顺序
-     * @return 插单任务
-     */
-    private TmManualRollingTask buildInsertTask(TmScheduleResult insertResult, int startShiftOrder, int insertSequence) {
-        TmManualRollingTask task = new TmManualRollingTask();
-        task.setTemplateResult(insertResult);
-        task.setShiftOrder(startShiftOrder);
-        task.setSequence(insertSequence);
-        task.setPlanQty(this.getShiftPlanQty(insertResult, startShiftOrder));
-        task.setFinishQty(BigDecimal.ZERO);
-        task.setMachineCode(insertResult.getMachineCode());
-        task.setTreadCode(insertResult.getTreadCode());
-        task.setGlueCode(insertResult.getGlueCode());
-        task.setMouthPlateCode(insertResult.getMouthPlateCode());
-        task.setDataSource(INSERT_DATA_SOURCE);
-        Object analysis = insertResult.getFieldValueByFieldName(
-                String.format(TmScheduleConstants.SHIFT_ANALYSIS_FIELD_TEMPLATE, startShiftOrder));
-        task.setAnalysis(analysis == null ? null : analysis.toString());
-        task.setInsertTask(true);
-        return task;
-    }
-
-    /**
-     * 清空受影响班次的可变字段。
-     *
-     * @param resultList      排程结果列表
-     * @param startShiftOrder 插单开始班次
-     */
-    private void clearAffectedShiftFields(List<TmScheduleResult> resultList, int startShiftOrder) {
-        for (TmScheduleResult result : resultList) {
-            this.clearAffectedShiftFields(result, startShiftOrder);
-        }
-    }
-
-    /**
-     * 清空单条结果受影响班次的可变字段。
-     *
-     * @param result          排程结果
-     * @param startShiftOrder 开始班次
-     */
-    private void clearAffectedShiftFields(TmScheduleResult result, int startShiftOrder) {
-        for (int shiftOrder = startShiftOrder; shiftOrder <= TmScheduleConstants.TM_MAX_SHIFT_ORDER; shiftOrder++) {
-            this.setShiftSequence(result, shiftOrder, null);
-            this.setShiftPlanQty(result, shiftOrder, null);
-            result.setFieldValueByFieldName(String.format(TmScheduleConstants.SHIFT_START_TIME_FIELD_TEMPLATE, shiftOrder), null);
-            result.setFieldValueByFieldName(String.format(TmScheduleConstants.SHIFT_END_TIME_FIELD_TEMPLATE, shiftOrder), null);
-            result.setFieldValueByFieldName(String.format(TmScheduleConstants.SHIFT_ANALYSIS_FIELD_TEMPLATE, shiftOrder), null);
-        }
-    }
-
-    /**
-     * 计算当前班次承接量，保证已有完成量不被压低。
-     *
-     * @param task           当前任务
-     * @param remainCapacity 当前班次剩余产能
-     * @return 当前班次承接量
-     */
-    private BigDecimal resolveAssignedQty(TmManualRollingTask task, BigDecimal remainCapacity) {
-        BigDecimal availableQty = this.isPositive(remainCapacity) ? remainCapacity : BigDecimal.ZERO;
-        BigDecimal planQty = BigDecimalUtils.valueOf(task.getPlanQty());
-        BigDecimal finishQty = BigDecimalUtils.valueOf(task.getFinishQty());
-        if (planQty.compareTo(availableQty) <= 0) {
-            return planQty;
-        }
-        if (finishQty.compareTo(BigDecimal.ZERO) > 0) {
-            return finishQty.min(planQty).max(availableQty);
-        }
-        return availableQty;
-    }
-
-    /**
-     * 将任务分配量写入目标排程结果。
-     *
-     * @param task             当前任务
-     * @param shiftOrder       当前班次
-     * @param sequence         当前顺序
-     * @param assignedQty      承接量
-     * @param updateResultMap  待更新结果
-     * @param insertResultList 待新增结果
-     * @return 被写入的排程结果
-     */
-    private TmScheduleResult applyTaskToResult(TmManualRollingTask task, int shiftOrder, int sequence, BigDecimal assignedQty,
-                                               Map<Long, TmScheduleResult> updateResultMap, List<TmScheduleResult> insertResultList) {
-        TmScheduleResult targetResult = task.getSourceResult();
-        if (targetResult == null) {
-            targetResult = this.copyBaseResult(task.getTemplateResult());
-            targetResult.setDataSource(INSERT_DATA_SOURCE);
-            targetResult.setReleaseStatus(ApsConstant.NO_RELEASE);
-            insertResultList.add(targetResult);
-        } else {
-            this.markEditedReleaseStatus(targetResult);
-            updateResultMap.put(targetResult.getId(), targetResult);
-        }
-        this.setShiftSequence(targetResult, shiftOrder, sequence);
-        this.setShiftPlanQty(targetResult, shiftOrder, assignedQty);
-        targetResult.setFieldValueByFieldName(
-                String.format(TmScheduleConstants.SHIFT_ANALYSIS_FIELD_TEMPLATE, shiftOrder), task.getAnalysis());
-        return targetResult;
-    }
-
-    /**
-     * 按发布状态迁移矩阵处理人工编辑后的已发布记录。
-     *
-     * <p>保持原业务口径：仅已发布记录回退为待发布，其他可编辑状态保持不变。</p>
-     *
-     * @param scheduleResult 被人工编辑的排程结果
-     * @throws ServiceException 状态迁移不合法时抛出
-     */
-    private void markEditedReleaseStatus(TmScheduleResult scheduleResult) {
-        if (!TmReleaseStatusTransition.isEditable(scheduleResult.getReleaseStatus())) {
-            throw new ServiceException(this.resolveTmMessage("ui.data.alert.tm.schedule.illegalReleaseTransition",
-                    "排程发布状态迁移不合法"));
-        }
-        if (!ApsConstant.IS_RELEASE.equals(scheduleResult.getReleaseStatus())) {
-            return;
-        }
-        if (!TmReleaseStatusTransition.canTransit(scheduleResult.getReleaseStatus(), ApsConstant.WAIT_RELEASING)) {
-            throw new ServiceException(this.resolveTmMessage("ui.data.alert.tm.schedule.illegalReleaseTransition", "排程发布状态迁移不合法"));
-        }
-        scheduleResult.setReleaseStatus(ApsConstant.WAIT_RELEASING);
-    }
-
-    /**
-     * 构造跨班顺延任务。
-     *
-     * @param sourceTask  来源任务
-     * @param overflowQty 溢出数量
-     * @return 顺延任务
-     */
-    private TmManualRollingTask buildCarryTask(TmManualRollingTask sourceTask, BigDecimal overflowQty) {
-        TmManualRollingTask carryTask = new TmManualRollingTask();
-        carryTask.setSourceResult(sourceTask.getSourceResult());
-        carryTask.setTemplateResult(sourceTask.getTemplateResult());
-        carryTask.setShiftOrder(sourceTask.getShiftOrder() + 1);
-        carryTask.setPlanQty(overflowQty);
-        carryTask.setFinishQty(BigDecimal.ZERO);
-        carryTask.setMachineCode(sourceTask.getMachineCode());
-        carryTask.setTreadCode(sourceTask.getTreadCode());
-        carryTask.setGlueCode(sourceTask.getGlueCode());
-        carryTask.setMouthPlateCode(sourceTask.getMouthPlateCode());
-        carryTask.setDataSource(sourceTask.getDataSource());
-        carryTask.setAnalysis(sourceTask.getAnalysis());
-        carryTask.setInsertTask(sourceTask.isInsertTask());
-        carryTask.setCarryoverTask(true);
-        return carryTask;
-    }
-
-    /**
-     * 写入第 6 班后仍无法容纳的未排量。
-     *
-     * @param baseResult   操作基础结果
-     * @param sourceTask   来源任务
-     * @param unplannedQty 未排数量
-     */
-    private void insertUnplanned(TmScheduleResult baseResult, TmManualRollingTask sourceTask, BigDecimal unplannedQty) {
-        TmUnplannedReasonEnum reason = TmUnplannedReasonEnum.CAPACITY_NOT_ENOUGH;
-        TmScheduleUnplanned unplanned = new TmScheduleUnplanned();
-        unplanned.setFactoryCode(baseResult.getFactoryCode());
-        unplanned.setBatchNo(baseResult.getBatchNo());
-        unplanned.setScheduleDate(baseResult.getScheduleDate());
-        unplanned.setTreadCode(sourceTask.getTreadCode());
-        unplanned.setGlueCode(sourceTask.getGlueCode());
-        unplanned.setMouthPlateCode(sourceTask.getMouthPlateCode());
-        unplanned.setUnplannedReasonCode(reason.getCode());
-        unplanned.setUnplannedReasonDesc(reason.getDesc());
-        unplanned.setUnplannedEvidenceJson(String.format("{\"source\":\"MANUAL_ROLL\",\"machineCode\":\"%s\",\"unplannedQty\":%s}",
-                baseResult.getMachineCode(), unplannedQty.stripTrailingZeros().toPlainString()));
-        tmScheduleUnplannedMapper.insert(unplanned);
-    }
-
-    /**
-     * 复制排程结果基础字段用于新增插单或顺延结果。
-     *
-     * @param templateResult 模板结果
-     * @return 新排程结果
-     */
-    private TmScheduleResult copyBaseResult(TmScheduleResult templateResult) {
-        TmScheduleResult result = new TmScheduleResult();
-        result.setFactoryCode(templateResult.getFactoryCode());
-        result.setBatchNo(templateResult.getBatchNo());
-        result.setOrderNo(templateResult.getOrderNo());
-        result.setScheduleDate(templateResult.getScheduleDate());
-        result.setMachineCode(templateResult.getMachineCode());
-        result.setTreadCode(templateResult.getTreadCode());
-        result.setGlueCode(templateResult.getGlueCode());
-        result.setBaseGlueCode(templateResult.getBaseGlueCode());
-        result.setWholeGlueCode(templateResult.getWholeGlueCode());
-        result.setGlueSeq(templateResult.getGlueSeq());
-        result.setMouthPlateCode(templateResult.getMouthPlateCode());
-        result.setTreadShoulderLength(templateResult.getTreadShoulderLength());
-        result.setCxRemainQty(templateResult.getCxRemainQty());
-        result.setMaterialCode(templateResult.getMaterialCode());
-        result.setMaterialDesc(templateResult.getMaterialDesc());
-        result.setEmbryoCode(templateResult.getEmbryoCode());
-        result.setMainMaterialDesc(templateResult.getMainMaterialDesc());
-        result.setCxMachineCode(templateResult.getCxMachineCode());
-        result.setSixClockStockQty(templateResult.getSixClockStockQty());
-        result.setCurlRollLength(templateResult.getCurlRollLength());
-        result.setTailFlag(templateResult.getTailFlag());
-        result.setRemark(templateResult.getRemark());
-        return result;
-    }
-
-    /**
-     * 解析人工操作班次。
-     *
-     * @param operationResult 操作入参
-     * @param oldResult       原排程结果
-     * @return 操作班次
-     */
-    private Integer resolveOperationShift(TmScheduleResult operationResult, TmScheduleResult oldResult) {
-        return Optional.ofNullable(TmInsertPositionValidator.resolveShiftOrder(operationResult))
-                .orElseGet(() -> Optional.ofNullable(TmInsertPositionValidator.resolveShiftOrder(oldResult)).orElse(1));
-    }
-
-    /**
-     * 判断两个任务是否为同胎面、同主胶、同口型。
-     *
-     * @param firstTask  第一个任务
-     * @param secondTask 第二个任务
-     * @return true 表示可合并
-     */
-    private boolean isSameMaterial(TmManualRollingTask firstTask, TmManualRollingTask secondTask) {
-        return Objects.equals(firstTask.getTreadCode(), secondTask.getTreadCode())
-                && Objects.equals(firstTask.getGlueCode(), secondTask.getGlueCode())
-                && Objects.equals(firstTask.getMouthPlateCode(), secondTask.getMouthPlateCode());
-    }
-
-    /**
-     * 读取班次计划量。
-     *
-     * @param result     排程结果
-     * @param shiftOrder 班次顺序
-     * @return 班次计划量
-     */
     private BigDecimal getShiftPlanQty(TmScheduleResult result, int shiftOrder) {
-        return BigDecimalUtils.valueOf(result.getFieldValueByFieldName(String.format(TmScheduleConstants.SHIFT_PLAN_QTY_FIELD_TEMPLATE, shiftOrder)));
+        return BigDecimalUtils.valueOf(result.getFieldValueByFieldName(
+                String.format(TmScheduleConstants.SHIFT_PLAN_QTY_FIELD_TEMPLATE, shiftOrder)));
     }
 
-    /**
-     * 设置班次计划量。
-     *
-     * @param result     排程结果
-     * @param shiftOrder 班次顺序
-     * @param planQty    计划量
-     */
-    private void setShiftPlanQty(TmScheduleResult result, int shiftOrder, BigDecimal planQty) {
-        result.setFieldValueByFieldName(String.format(TmScheduleConstants.SHIFT_PLAN_QTY_FIELD_TEMPLATE, shiftOrder), planQty);
-    }
-
-    /**
-     * 设置班次原因分析。
-     *
-     * @param result     排程结果
-     * @param shiftOrder 班次顺序
-     * @param analysis   原因分析
-     */
-    private void setShiftAnalysis(TmScheduleResult result, int shiftOrder, String analysis) {
-        result.setFieldValueByFieldName(String.format(TmScheduleConstants.SHIFT_ANALYSIS_FIELD_TEMPLATE, shiftOrder), analysis);
-    }
-
-    /**
-     * 读取班次完成量。
-     *
-     * @param result     排程结果
-     * @param shiftOrder 班次顺序
-     * @return 完成量
-     */
     private BigDecimal getShiftFinishQty(TmScheduleResult result, int shiftOrder) {
-        return BigDecimalUtils.valueOf(result.getFieldValueByFieldName(String.format(TmScheduleConstants.SHIFT_FINISH_QTY_FIELD_TEMPLATE, shiftOrder)));
+        return BigDecimalUtils.valueOf(result.getFieldValueByFieldName(
+                String.format(TmScheduleConstants.SHIFT_FINISH_QTY_FIELD_TEMPLATE, shiftOrder)));
     }
 
-    /**
-     * 读取班次顺序。
-     *
-     * @param result     排程结果
-     * @param shiftOrder 班次顺序
-     * @return 班次顺序
-     */
     private Integer getShiftSequence(TmScheduleResult result, int shiftOrder) {
-        Object sequence = result.getFieldValueByFieldName(String.format(TmScheduleConstants.SHIFT_SEQUENCE_FIELD_TEMPLATE, shiftOrder));
-        return sequence instanceof Integer ? (Integer) sequence : null;
+        Object value = result.getFieldValueByFieldName(
+                String.format(TmScheduleConstants.SHIFT_SEQUENCE_FIELD_TEMPLATE, shiftOrder));
+        return value instanceof Integer ? (Integer) value : null;
     }
 
-    /**
-     * 设置班次顺序。
-     *
-     * @param result     排程结果
-     * @param shiftOrder 班次顺序
-     * @param sequence   班次顺序
-     */
-    private void setShiftSequence(TmScheduleResult result, int shiftOrder, Integer sequence) {
-        result.setFieldValueByFieldName(String.format(TmScheduleConstants.SHIFT_SEQUENCE_FIELD_TEMPLATE, shiftOrder), sequence);
+    private String getShiftText(TmScheduleResult result, String fieldTemplate, int shiftOrder) {
+        Object value = result.getFieldValueByFieldName(String.format(fieldTemplate, shiftOrder));
+        return value == null ? null : value.toString();
     }
 
-    /**
-     * 空顺序按最大值排序。
-     *
-     * @param sequence 班内顺序
-     * @return 排序顺序
-     */
-    private Integer defaultSequence(Integer sequence) {
-        return sequence == null ? Integer.MAX_VALUE : sequence;
+    private Date getShiftDate(TmScheduleResult result, String fieldTemplate, int shiftOrder) {
+        Object value = result.getFieldValueByFieldName(String.format(fieldTemplate, shiftOrder));
+        return value instanceof Date ? (Date) value : null;
     }
 
-    /**
-     * 判断数量是否大于 0。
-     *
-     * @param qty 数量
-     * @return true 表示大于 0
-     */
-    private boolean isPositive(BigDecimal qty) {
-        return qty != null && qty.compareTo(BigDecimal.ZERO) > 0;
+    private void setShiftValue(TmScheduleResult result, String fieldTemplate, int shiftOrder, Object value) {
+        result.setFieldValueByFieldName(String.format(fieldTemplate, shiftOrder), value);
     }
 
-    /**
-     * 读取胎面排程国际化提示，未命中时回退默认文案。
-     *
-     * @param messageKey     国际化 key
-     * @param defaultMessage 默认提示
-     * @return 当前语言环境下的提示文案
-     */
+    private boolean isPositive(BigDecimal value) {
+        return value != null && value.compareTo(BigDecimal.ZERO) > 0;
+    }
+
     private String resolveTmMessage(String messageKey, String defaultMessage) {
         if (RequestContextHolder.getRequestAttributes() == null) {
             return defaultMessage;

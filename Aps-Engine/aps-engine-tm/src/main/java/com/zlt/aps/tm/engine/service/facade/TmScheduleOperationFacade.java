@@ -6,10 +6,15 @@ import com.zlt.aps.tm.engine.domain.TmInsertPosition;
 import com.zlt.aps.tm.engine.domain.TmScheduleContext;
 import com.zlt.aps.tm.engine.domain.TmTaskDraft;
 import com.zlt.aps.tm.engine.domain.TmTransferPosition;
+import com.zlt.aps.tm.engine.domain.manual.TmManualRollingCommandBatch;
+import com.zlt.aps.tm.engine.domain.manual.TmManualRollingContext;
+import com.zlt.aps.tm.engine.domain.manual.TmManualRollingResult;
 import com.zlt.aps.tm.engine.event.TmScheduleEvent;
 import com.zlt.aps.tm.engine.event.TmScheduleEventPublisher;
+import com.zlt.aps.tm.engine.service.impl.TmManualRollingEngineService;
 import com.zlt.aps.tm.engine.service.impl.TmScheduleProcessLogger;
 import com.zlt.aps.tm.engine.service.impl.TmTaskChainScheduleService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 
@@ -30,8 +35,29 @@ public class TmScheduleOperationFacade {
 
     private final TmScheduleEventPublisher eventPublisher;
 
+    private final TmManualRollingEngineService manualRollingEngineService;
+
     /**
      * 创建胎面排程操作门面。
+     *
+     * @param taskChainScheduleService 任务链排程服务
+     * @param processLogger            过程日志服务，可为空
+     * @param eventPublisher           事件发布器，可为空
+     * @param manualRollingEngineService 人工滚动纯计算引擎
+     */
+    @Autowired
+    public TmScheduleOperationFacade(TmTaskChainScheduleService taskChainScheduleService,
+                                     @Nullable TmScheduleProcessLogger processLogger,
+                                     @Nullable TmScheduleEventPublisher eventPublisher,
+                                     TmManualRollingEngineService manualRollingEngineService) {
+        this.taskChainScheduleService = taskChainScheduleService;
+        this.processLogger = processLogger;
+        this.eventPublisher = eventPublisher;
+        this.manualRollingEngineService = manualRollingEngineService;
+    }
+
+    /**
+     * 为不启动 Spring 的既有任务链测试创建门面。
      *
      * @param taskChainScheduleService 任务链排程服务
      * @param processLogger            过程日志服务，可为空
@@ -40,9 +66,21 @@ public class TmScheduleOperationFacade {
     public TmScheduleOperationFacade(TmTaskChainScheduleService taskChainScheduleService,
                                      @Nullable TmScheduleProcessLogger processLogger,
                                      @Nullable TmScheduleEventPublisher eventPublisher) {
-        this.taskChainScheduleService = taskChainScheduleService;
-        this.processLogger = processLogger;
-        this.eventPublisher = eventPublisher;
+        this(taskChainScheduleService, processLogger, eventPublisher, new TmManualRollingEngineService());
+    }
+
+    /**
+     * 批量执行人工滚动命令。
+     *
+     * @param commandBatch 人工操作命令批次
+     * @param context      与数据库实体解耦的运行态上下文
+     * @return 最终任务链、未排任务及数量变化
+     * @throws IllegalArgumentException 命令或上下文非法时抛出
+     * @throws IllegalStateException    任务链或数量校验失败时抛出
+     */
+    public TmManualRollingResult execute(TmManualRollingCommandBatch commandBatch,
+                                         TmManualRollingContext context) {
+        return this.manualRollingEngineService.execute(commandBatch, context);
     }
 
     /**

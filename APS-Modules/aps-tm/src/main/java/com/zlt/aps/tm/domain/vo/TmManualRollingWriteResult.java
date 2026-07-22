@@ -18,6 +18,9 @@ public class TmManualRollingWriteResult {
     /** 更新排程结果数量 */
     private int updateCount;
 
+    /** 逻辑删除排程结果数量 */
+    private int deleteCount;
+
     /** 写入未排数量 */
     private int unplannedCount;
 
@@ -35,6 +38,7 @@ public class TmManualRollingWriteResult {
         }
         this.insertCount += other.getInsertCount();
         this.updateCount += other.getUpdateCount();
+        this.deleteCount += other.getDeleteCount();
         this.unplannedCount += other.getUnplannedCount();
         this.unplannedQty = this.unplannedQty.add(other.getUnplannedQty());
     }
