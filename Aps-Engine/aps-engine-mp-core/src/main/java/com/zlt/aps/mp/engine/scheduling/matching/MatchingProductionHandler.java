@@ -611,6 +611,9 @@ public class MatchingProductionHandler extends AbstractDataLoaderService {
         // 不符合上述条件的，需要遍历每一天进行撤销排产处理
         for (Integer day : productDayList) {
             GroupPlanCxLhCapacityLimitHelper productionDayLimit = groupInfo.getDayProductionLimitInfo().get(day);
+            if (productionDayLimit == null) {
+                continue;
+            }
             // 排产统计量扣除需撤销的量
             Map<String, SkuDayProductionInfoHelper> productionSkuQtyInfo = productionDayLimit.getProductionSkuQtyInfo();
             Integer clearProductQty = useMouldMap.values().stream().mapToInt(m -> {
