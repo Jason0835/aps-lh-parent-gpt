@@ -377,11 +377,11 @@ public class LhScheduleContext {
      */
     private Map<String, List<SkuScheduleDTO>> structureSkuMap = new LinkedHashMap<>();
     /**
-     * 当前3天、8班窗口内可全部收尾的结构SKU快照。
-     * <p>该快照在S4.3按现有结构分组和{@code isCurrentWindowEnding}口径一次性冻结，
-     * 不随后续待排结构视图出队而删除，供S4.4/S4.5判断结构是否已完成及配置归属。</p>
+     * 结构最低机台规则使用的全量结构SKU快照。
+     * <p>该快照在S4.3按现有结构分组一次性冻结，不受后续待排结构视图出队影响；规则不再以
+     * “当前3天内可收尾”为准入条件，S4.4/S4.5每次真实下机前均从该快照解析结构归属。</p>
      */
-    private Map<String, List<SkuScheduleDTO>> currentWindowEndingStructureSkuMap = new LinkedHashMap<>();
+    private Map<String, List<SkuScheduleDTO>> structureMinMachineSkuSnapshotMap = new LinkedHashMap<>();
     /** 结构最低硫化机台数，key=结构名称，value=周期结构配置或常规结构工厂参数解析值 */
     private Map<String, Integer> structureMinVulcanizingMachineMap = new LinkedHashMap<>();
     /**
