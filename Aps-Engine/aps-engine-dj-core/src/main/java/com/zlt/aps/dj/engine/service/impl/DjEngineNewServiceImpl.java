@@ -487,7 +487,7 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
         context.appendLog("===== 接班库存（第1班） =====");
         for (Map.Entry<String, BigDecimal> entry : handoverInventory.entrySet()) {
             context.appendLog("  规格 {0}：接班库存 {1}（有效库存 {2} + 前日早班计划 {3} - 当日早班消耗 {4})",
-                    entry.getKey(), entry.getValue(),
+                    context.getPaddingNameByCode(entry.getKey()), entry.getValue(),
                     effectiveStockMap.getOrDefault(entry.getKey(), BigDecimal.ZERO),
                     prevDayClass3Plan.getOrDefault(entry.getKey(), BigDecimal.ZERO),
                     this.calcShiftConsume(context, entry.getKey(), 1));
@@ -528,7 +528,7 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
 
         context.appendLog("===== 步骤4：机台分配 =====");
         for (DjPaddingDemand demand : demandList) {
-            context.appendLog("  规格 {0}：是否新规格={1}，是否已收尾={2}，是否量试/试制={3}，机台={4}",
+            context.appendLog("  规格 {0}：是否新规格={1}，是否收尾={2}，是否量试/试制={3}，机台={4}",
                     DjScheduleContext.buildDisplayName(demand.getPaddingName(), demand.getPaddingCode()),
                     demand.isNewSpec(), demand.isTailFinished(),
                     this.hasTrialConsumption(context, demand.getPaddingCode()),
@@ -1435,10 +1435,20 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
         for (DjPaddingDemand spec : demandList) {
             String needProduceStr = spec.isNeedProduce() ? "需要排产" : "库存充足不排产";
             if (spec.isNeedProduce()) {
-                context.appendLog("  规格 {0}：{1}，可覆盖班次={2}，触发阈值≤{3}，剩余待排={4}",
+                String tailNote = "";
+                if (spec.isTailFinished() && spec.getLossRatePercent() != null
+                        && spec.getLossRatePercent().compareTo(BigDecimal.ZERO) > 0
+                        && spec.getPreLossRateDemand() != null) {
+                    BigDecimal rateFactor = BigDecimal.ONE.add(
+                            spec.getLossRatePercent().divide(BigDecimal.valueOf(100), 4, RoundingMode.HALF_UP));
+                    tailNote = MessageFormat.format(" (收尾，{0} × {1}%)",
+                            spec.getPreLossRateDemand().setScale(2, RoundingMode.HALF_UP),
+                            rateFactor.multiply(BigDecimal.valueOf(100)).setScale(0, RoundingMode.HALF_UP));
+                }
+                context.appendLog("  规格 {0}：{1}，可覆盖班次={2}，触发阈值≤{3}，剩余待排={4}{5}",
                         context.getPaddingNameByCode(spec.getPaddingCode()), needProduceStr, spec.getCoverableShiftCount(),
                         this.getParamAsDecimal(context, DjEngineConstants.PARAM_SCHEDULE_THRESHOLD).intValue(),
-                        spec.getRemainingDemand());
+                        spec.getRemainingDemand(), tailNote);
             } else if (spec.getRemainingDemand() != null
                     && spec.getRemainingDemand().compareTo(BigDecimal.ZERO) > 0) {
                 context.appendLog("  规格 {0}：{1}，可覆盖班次={2}，触发阈值≤{3}",
@@ -2056,16 +2066,25 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
                 int exceedShiftCount = firstFormingClass + specSupplyDepth - DjEngineConstants.CX_SHIFT_COUNT;
                 BigDecimal estimatedExceed = avgLast3Shifts.multiply(BigDecimal.valueOf(exceedShiftCount));
 
-                // 月计划剩余量约束
+                // 月计划剩余量约束（仅当有月计划数据时约束预估，否则使用完整预估值）
                 BigDecimal paddingRemaining = paddingRemainingMap != null
                         ? paddingRemainingMap.getOrDefault(spec.getPaddingCode(), BigDecimal.ZERO)
                         : BigDecimal.ZERO;
-                BigDecimal part2 = estimatedExceed;
-                BigDecimal part1PlusPart2 = part1.add(part2);
-                if (part1PlusPart2.compareTo(paddingRemaining) > 0) {
-                    part2 = paddingRemaining.subtract(part1);
-                    if (part2.compareTo(BigDecimal.ZERO) < 0) {
-                        part2 = BigDecimal.ZERO;
+                boolean hasPaddingRemaining = paddingRemainingMap != null
+                        && paddingRemainingMap.containsKey(spec.getPaddingCode())
+                        && paddingRemaining.compareTo(BigDecimal.ZERO) > 0;
+                BigDecimal part2 = BigDecimal.ZERO;
+                if (!spec.isTailFinished()) {
+                    part2 = estimatedExceed;
+                    if (hasPaddingRemaining) {
+                        BigDecimal part1PlusPart2 = part1.add(part2);
+                        if (part1PlusPart2.compareTo(paddingRemaining) > 0) {
+                            part2 = paddingRemaining.subtract(part1);
+                            if (part2.compareTo(BigDecimal.ZERO) < 0) {
+                                part2 = BigDecimal.ZERO;
+                            }
+                            spec.setConstrainedEstimatedPart2(part2);
+                        }
                     }
                 }
                 netDemand = part1.add(part2);
@@ -2081,6 +2100,9 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
             // ===== 步骤4：已收尾规格净需求含损耗率 =====
             if (spec.isTailFinished()) {
                 BigDecimal lossRate = this.getLossRate(spec.getPaddingCode(), spec.getMachineCode(), context);
+                // 存储收尾损耗信息（日志输出用）
+                spec.setPreLossRateDemand(netDemand);
+                spec.setLossRatePercent(lossRate);
                 // 损耗率存储为百分比值（如 2 表示 2%），需除以 100
                 BigDecimal lossRateDecimal = lossRate.divide(BigDecimal.valueOf(100), 4, RoundingMode.HALF_UP);
                 netDemand = netDemand.multiply(BigDecimal.ONE.add(lossRateDecimal)).setScale(2, RoundingMode.HALF_UP);
@@ -2160,8 +2182,8 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
                 shiftInfo.append("班").append(fc).append("=").append(consume).append(" ");
             }
         }
-        // 供应窗口超出成型8个班时，追加预估班次消耗信息
-        if (firstFormingClass + specSupplyDepth > DjEngineConstants.CX_SHIFT_COUNT) {
+        // 供应窗口超出成型8个班时，追加预估班次消耗信息（收尾规格无需预估）
+        if (firstFormingClass + specSupplyDepth > DjEngineConstants.CX_SHIFT_COUNT && !spec.isTailFinished()) {
             BigDecimal last3Sum = BigDecimal.ZERO;
             for (int i = 6; i <= DjEngineConstants.CX_SHIFT_COUNT; i++) {
                 last3Sum = last3Sum.add(this.calcShiftConsume(context, spec.getPaddingCode(), i));
@@ -2173,7 +2195,12 @@ public class DjEngineNewServiceImpl implements DjEngineNewService {
             }
             BigDecimal avgLast3Shifts = last3Sum.divide(BigDecimal.valueOf(3), 2, RoundingMode.HALF_UP);
             int exceedShiftCount = firstFormingClass + specSupplyDepth - DjEngineConstants.CX_SHIFT_COUNT;
-            shiftInfo.append("(预估: 超出").append(exceedShiftCount).append("班×").append(avgLast3Shifts).append(") ");
+            shiftInfo.append("(预估: 超出").append(exceedShiftCount).append("班×").append(avgLast3Shifts);
+            // 被月计划余量约束时追加限制说明
+            if (spec.getConstrainedEstimatedPart2() != null) {
+                shiftInfo.append("，月计划余量限制：").append(spec.getConstrainedEstimatedPart2().setScale(2, RoundingMode.HALF_UP));
+            }
+            shiftInfo.append(") ");
         }
         // 对应胎胚
         Set<String> embryoSet = new HashSet<>();
