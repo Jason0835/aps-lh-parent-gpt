@@ -176,21 +176,16 @@ public class TmAutoScheduleDataLoadService {
         wrapper.eq(TmMouthPlate::getFactoryCode, context.getFactoryCode());
         wrapper.in(TmMouthPlate::getMachineCode, candidateMap.keySet());
         List<TmMouthPlate> mouthPlateList = tmMouthPlateMapper.selectList(wrapper);
-        Set<String> configuredMouthPlateCodes = mouthPlateList.stream()
-                .map(TmMouthPlate::getMouthPlateCode)
-                .filter(StrUtil::isNotBlank)
-                .collect(Collectors.toSet());
-        for (TmMachineCandidate candidate : candidateMap.values()) {
-            if (candidate.getConfiguredMouthPlateCodes() == null) {
-                candidate.setConfiguredMouthPlateCodes(new HashSet<>());
-            }
-            candidate.getConfiguredMouthPlateCodes().addAll(configuredMouthPlateCodes);
-        }
         for (TmMouthPlate mouthPlate : mouthPlateList) {
             TmMachineCandidate candidate = candidateMap.get(mouthPlate.getMachineCode());
             if (candidate == null || StrUtil.isBlank(mouthPlate.getMouthPlateCode())) {
                 continue;
             }
+            // 口型板配置必须按机台隔离；候选机台自身无有效配置时，空集合表示不限制口型板。
+            if (candidate.getConfiguredMouthPlateCodes() == null) {
+                candidate.setConfiguredMouthPlateCodes(new HashSet<>());
+            }
+            candidate.getConfiguredMouthPlateCodes().add(mouthPlate.getMouthPlateCode());
             if (candidate.getMouthPlateCodes() == null) {
                 candidate.setMouthPlateCodes(new HashSet<>());
             }

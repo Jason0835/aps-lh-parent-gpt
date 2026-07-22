@@ -2135,7 +2135,7 @@ public class TcMachineAssignService implements ITcMachineAssignService {
         if (StrUtil.isBlank(task.getMouthPlateCode())) {
             return true;
         }
-        if (!contains(candidate.getConfiguredMouthPlateCodes(), task.getMouthPlateCode())) {
+        if (CollUtil.isEmpty(candidate.getConfiguredMouthPlateCodes())) {
             return true;
         }
         return contains(candidate.getMouthPlateCodes(), task.getMouthPlateCode());

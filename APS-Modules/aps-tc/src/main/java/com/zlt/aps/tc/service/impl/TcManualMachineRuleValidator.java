@@ -170,11 +170,16 @@ public class TcManualMachineRuleValidator {
         }
         LambdaQueryWrapper<TcMouthPlate> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(TcMouthPlate::getFactoryCode, sourceResult.getFactoryCode());
-        wrapper.eq(TcMouthPlate::getMouthPlateCode, sourceResult.getMouthPlateCode());
+        wrapper.eq(TcMouthPlate::getMachineCode, targetMachineCode);
         List<TcMouthPlate> mouthPlateList = this.mouthPlateMapper.selectList(wrapper);
-        boolean targetMatched = mouthPlateList != null && mouthPlateList.stream()
-                .anyMatch(item -> Objects.equals(item.getMachineCode(), targetMachineCode)
-                        && "1".equals(item.getPlateStatus()));
+        List<TcMouthPlate> enabledMouthPlateList = mouthPlateList == null
+                ? Collections.emptyList()
+                : mouthPlateList.stream()
+                .filter(item -> "1".equals(item.getPlateStatus()))
+                .collect(Collectors.toList());
+        // 目标机台没有有效口型板配置时表示不限制；存在配置时才按本机白名单校验。
+        boolean targetMatched = enabledMouthPlateList.isEmpty() || enabledMouthPlateList.stream()
+                .anyMatch(item -> Objects.equals(item.getMouthPlateCode(), sourceResult.getMouthPlateCode()));
         if (!targetMatched) {
             throw new ServiceException(I18nUtil.getMessage("ui.tc.schedule.changeMachine.mouthPlateRejected"));
         }
