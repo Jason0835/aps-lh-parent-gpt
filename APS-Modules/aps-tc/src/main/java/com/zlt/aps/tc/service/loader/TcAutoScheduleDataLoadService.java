@@ -250,18 +250,6 @@ public class TcAutoScheduleDataLoadService {
         wrapper.eq(TcGlueMachineReal::getEnableStatus, TcYesNoEnum.YES.getCode());
         wrapper.in(TcGlueMachineReal::getMachineCode, candidateMap.keySet());
         List<TcGlueMachineReal> glueRuleList = tmGlueMachineRealMapper.selectList(wrapper);
-        Set<String> configuredGlueCodes = glueRuleList.stream()
-                .filter(glueRule -> TcYesNoEnum.YES.getCode().equals(glueRule.getAllowFlag())
-                        || TcYesNoEnum.NO.getCode().equals(glueRule.getAllowFlag()))
-                .map(TcGlueMachineReal::getGlueCode)
-                .filter(StrUtil::isNotBlank)
-                .collect(Collectors.toSet());
-        for (TcMachineCandidate candidate : candidateMap.values()) {
-            if (candidate.getConfiguredGlueCodes() == null) {
-                candidate.setConfiguredGlueCodes(new HashSet<>());
-            }
-            candidate.getConfiguredGlueCodes().addAll(configuredGlueCodes);
-        }
         for (TcGlueMachineReal glueRule : glueRuleList) {
             if (StrUtil.isBlank(glueRule.getGlueCode())
                     || (!TcYesNoEnum.YES.getCode().equals(glueRule.getAllowFlag())
@@ -272,6 +260,11 @@ public class TcAutoScheduleDataLoadService {
             if (candidate == null) {
                 continue;
             }
+            // 胶料关系必须按机台隔离；当前机台未配置该主胶料时默认不限制。
+            if (candidate.getConfiguredGlueCodes() == null) {
+                candidate.setConfiguredGlueCodes(new HashSet<>());
+            }
+            candidate.getConfiguredGlueCodes().add(glueRule.getGlueCode());
             if (TcYesNoEnum.YES.getCode().equals(glueRule.getAllowFlag())) {
                 if (candidate.getAllowedGlueCodes() == null) {
                     candidate.setAllowedGlueCodes(new HashSet<>());

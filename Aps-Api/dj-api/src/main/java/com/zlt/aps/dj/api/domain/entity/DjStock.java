@@ -51,13 +51,22 @@ public class DjStock extends BaseEntity {
     private String endTime;
 
     /**
-     * 库存物料编号
+     * 垫胶编号
      */
-    @ApiModelProperty(value = "库存物料编号", position = 30)
-    @Excel(name = "ui.data.column.quota.liningCode")
-    @ImportValidated(name = "ui.data.column.quota.liningCode", required = true, maxLength = 50, isCode = true)
+    @ApiModelProperty(value = "垫胶编号", position = 30)
+    @Excel(name = "ui.data.column.dj.scheduleResult.paddingCode")
+    @ImportValidated(name = "ui.data.column.dj.scheduleResult.paddingCode", required = true, maxLength = 50, isCode = true)
     @TableField(value = "MATERIAL_CODE")
     private String materialCode;
+
+    /**
+     * 垫胶名称
+     */
+    @ApiModelProperty(value = "垫胶名称", position = 30)
+    @Excel(name = "ui.data.column.dj.scheduleResult.paddingName")
+    @ImportValidated(name = "ui.data.column.dj.scheduleResult.paddingName", required = true, maxLength = 50, isCode = true)
+    @TableField(value = "MATERIAL_NAME")
+    private String materialName;
 
     /**
      * 库存量
