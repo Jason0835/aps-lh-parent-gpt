@@ -8,25 +8,13 @@
         WHERE SCHEDULE_DATE = #{scheduleDate}
     </delete>
 
-    <!-- 查询各垫胶代码最近一次有排产量的排产日期（联合主表和日志表） -->
+    <!-- 查询各垫胶代码最近一次有排产量的排产日期（仅查当天之前的排产记录，排除当天重排干扰） -->
     <select id="selectLastScheduleDate" resultType="java.util.Map">
         SELECT t.PADDING_CODE, MAX(t.SCHEDULE_DATE) AS LAST_DATE
         FROM (
             SELECT PADDING_CODE, SCHEDULE_DATE FROM T_DJ_SCHEDULE_RESULT
             WHERE FACTORY_CODE = #{factoryCode}
-              AND PADDING_CODE IN
-              <foreach collection="paddingCodes" item="code" open="(" separator="," close=")">
-                  #{code}
-              </foreach>
-              AND (CLASS1_PLAN_QTY IS NOT NULL AND CLASS1_PLAN_QTY > 0
-                OR CLASS2_PLAN_QTY IS NOT NULL AND CLASS2_PLAN_QTY > 0
-                OR CLASS3_PLAN_QTY IS NOT NULL AND CLASS3_PLAN_QTY > 0
-                OR CLASS4_PLAN_QTY IS NOT NULL AND CLASS4_PLAN_QTY > 0
-                OR CLASS5_PLAN_QTY IS NOT NULL AND CLASS5_PLAN_QTY > 0
-                OR CLASS6_PLAN_QTY IS NOT NULL AND CLASS6_PLAN_QTY > 0)
-            UNION ALL
-            SELECT PADDING_CODE, SCHEDULE_DATE FROM T_DJ_SCHEDULE_RESULT_LOG
-            WHERE FACTORY_CODE = #{factoryCode}
+              AND SCHEDULE_DATE &lt; #{scheduleDate}
               AND PADDING_CODE IN
               <foreach collection="paddingCodes" item="code" open="(" separator="," close=")">
                   #{code}

@@ -106,6 +106,9 @@ public class DjScheduleContext {
     /** 各班各规格垫胶消耗量缓存 Map<paddingCode, Map<formingClassIndex, consumeQty>> */
     private Map<String, Map<Integer, BigDecimal>> shiftConsumeCache = new HashMap<>();
 
+    /** 各班各规格垫胶消耗量缓存（仅量试/试制）Map<paddingCode, Map<formingClassIndex, consumeQty>> */
+    private Map<String, Map<Integer, BigDecimal>> shiftConsumeTrialCache = new HashMap<>();
+
     /** 各班次索引对应的排产日数组（长度6），根据 DjShiftConfig 班次顺序动态构建
      *  scheduleDay 从1开始，当班次从last shift绕回first shift时递增 */
     private int[] scheduleDays;

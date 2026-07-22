@@ -57,7 +57,7 @@ public class DjPaddingDemand {
     /** 台车容量（米/台车），即 curlLength */
     private BigDecimal trolleyCapacity;
 
-    /** 是否已收尾（productionStatus = "2" 时为 true） */
+    /** 是否已收尾（使用该垫胶的所有成型计划，各班原因分析均含收尾关键字时为true） */
     private boolean isTailFinished;
 
     /** 是否新规格（库存表中无该垫胶代码记录时为 true） */
