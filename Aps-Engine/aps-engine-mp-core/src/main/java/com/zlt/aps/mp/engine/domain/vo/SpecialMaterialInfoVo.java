@@ -72,6 +72,18 @@ public class SpecialMaterialInfoVo implements Serializable {
     }
 
     /**
+     * 取得余数
+     *
+     * @return
+     */
+    public Long getStandardRemainder() {
+        if (null == sumNoRoundProductionQty || null == standardLength) {
+            return BigDecimal.ZERO.longValue();
+        }
+        return sumNoRoundProductionQty % standardLength;
+    }
+
+    /**
      * 增加现有库存转换后的可生产胎胚量
      *
      * @param stock     库存量

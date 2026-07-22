@@ -7,6 +7,7 @@ import com.zlt.aps.exception.BusinessException;
 import com.zlt.aps.mp.api.domain.entity.MpFactoryProductionVersion;
 import com.zlt.aps.mp.api.domain.entity.MpMouldUsedStatusLog;
 import com.zlt.aps.mp.api.enums.ProductionProcessStage;
+import com.zlt.aps.mp.engine.basedata.assemble.appoint.GroupAppointHandler;
 import com.zlt.aps.mp.engine.basedata.assemble.continueinfo.ContinueGroupInfoHandler;
 import com.zlt.aps.mp.engine.basedata.assemble.cyclegroup.CycleGroupDataHandler;
 import com.zlt.aps.mp.engine.basedata.assemble.datalist.GroupListHandler;
@@ -16,8 +17,8 @@ import com.zlt.aps.mp.engine.domain.Context;
 import com.zlt.aps.mp.engine.domain.dto.*;
 import com.zlt.aps.mp.engine.domain.vo.*;
 import com.zlt.aps.mp.engine.enums.LogRecorderStageEnum;
-import com.zlt.aps.mp.engine.handler.GroupCapacityHandler;
 import com.zlt.aps.mp.engine.handler.ContinueSkuCalculator;
+import com.zlt.aps.mp.engine.handler.GroupCapacityHandler;
 import com.zlt.aps.mp.engine.logrecorder.KeyInformationLogRecorder;
 import com.zlt.aps.mp.engine.logrecorder.TbrBeforeProductionGroupLogRecorder;
 import com.zlt.aps.mp.engine.logrecorder.TbrProductionGroupLogRecorder;
@@ -69,6 +70,7 @@ public class TbrStructureNameCapacityProductionService extends AbstractDataLoade
 
     public TbrStructureNameCapacityProductionService(GroupListHandler groupListHandler,
                                                      ProductionMdmDataService dataService,
+                                                     GroupAppointHandler groupAppointHandler,
                                                      DpRequireDataService dpRequireDataService,
                                                      CycleGroupDataHandler cycleGroupDataHandler,
                                                      GroupFixedInfoHandler groupFixedInfoHandler,
@@ -79,7 +81,7 @@ public class TbrStructureNameCapacityProductionService extends AbstractDataLoade
                                                      GroupCapacityHandler calculateStructureCxMachineNumber,
                                                      ProductionCxMachineCalculationHandler productionCxMachineCalculationHandler,
                                                      AdjustContinueSkuProductionQtyHandler adjustContinueSkuProductionQtyHandler) {
-        super(groupListHandler, dataService, dpRequireDataService, cycleGroupDataHandler, productionHistoryHandler, monthProductionDataService);
+        super(groupListHandler, dataService, groupAppointHandler, dpRequireDataService, cycleGroupDataHandler, productionHistoryHandler, monthProductionDataService);
         this.groupFixedInfoHandler = groupFixedInfoHandler;
         this.continueGroupInfoHandler = continueGroupInfoHandler;
         this.simulateProductionHandler = simulateProductionHandler;
@@ -267,7 +269,8 @@ public class TbrStructureNameCapacityProductionService extends AbstractDataLoade
             return Collections.emptyMap();
         }
         //获取上个排产周期最后排产日的排产信息
-        List<ContinueProductInfo> continueProductionInfoList = getMonthProductionDataService().getContinueProductionInfo(factoryCode, year, month, lastDay);
+        List<Integer> lastTwoDays = ProductionCycleUtils.getLastProductionTowDay(previousVersion, previousProductionDayInfo);
+        List<ContinueProductInfo> continueProductionInfoList = getMonthProductionDataService().getContinueProductionInfo(factoryCode, year, month, lastTwoDays);
         log.info(TbrBeforeProductionGroupLogRecorder.addReadContinueSkuDataLog(context, continueProductionInfoList));
         //获取续作结构--结构转产表
         Map<String, Set<String>> continueGroupInfo = getContinueGroupInfo(context, previousVersion, lastDay);

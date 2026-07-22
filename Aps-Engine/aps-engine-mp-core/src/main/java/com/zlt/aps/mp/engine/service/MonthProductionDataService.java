@@ -4,6 +4,7 @@ import com.zlt.aps.mp.api.domain.entity.*;
 import com.zlt.aps.mp.engine.domain.Context;
 import com.zlt.aps.mp.engine.domain.dto.ContinueGroupInfo;
 import com.zlt.aps.mp.engine.domain.dto.ContinueProductInfo;
+import com.zlt.aps.mp.engine.domain.vo.GroupAppointProductionInfoVo;
 import com.zlt.aps.mp.engine.domain.vo.MonthPlanProductionRequirePlanVo;
 
 import java.util.List;
@@ -140,15 +141,25 @@ public interface MonthProductionDataService {
     Map<String, FactoryNoProduction> getFactoryNoProductionConfiguration(String factoryCode, Integer year, Integer month);
 
     /**
+     * 获取工厂、年-月的特殊定点生产配置信息
+     *
+     * @param factoryCode 工厂编码
+     * @param year        年份
+     * @param month       月份
+     * @return
+     */
+    List<GroupAppointProductionInfoVo> getMonthAppointProductionInfo(String factoryCode, Integer year, Integer month);
+
+    /**
      * 获取续作SKU信息，包含续作机台及使用的模具数
      *
      * @param factoryCode 工厂编码
      * @param year        年份
      * @param month       月份
-     * @param lastDay     最后一天
+     * @param lastDays    最后两天(最后一天盘点，需要看前一天)
      * @return
      */
-    List<ContinueProductInfo> getContinueProductionInfo(String factoryCode, Integer year, Integer month, Integer lastDay);
+    List<ContinueProductInfo> getContinueProductionInfo(String factoryCode, Integer year, Integer month, List<Integer> lastDays);
 
     /**
      * 获取在机结构信息，从结构排产表中获取

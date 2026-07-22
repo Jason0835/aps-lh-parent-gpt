@@ -13,6 +13,7 @@ import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.mp.api.domain.capacity.MpDailyCapacityLimitVo;
 import com.zlt.aps.mp.api.domain.entity.*;
 import com.zlt.aps.mp.api.domain.vo.MpDayProductionStatisticsDetailVo;
+import com.zlt.aps.mp.engine.basedata.assemble.appoint.GroupAppointHandler;
 import com.zlt.aps.mp.engine.basedata.assemble.cyclegroup.CycleGroupDataHandler;
 import com.zlt.aps.mp.engine.basedata.assemble.datalist.GroupListHandler;
 import com.zlt.aps.mp.engine.basedata.assemble.history.ProductionHistoryHandler;
@@ -25,8 +26,8 @@ import com.zlt.aps.mp.engine.domain.dto.*;
 import com.zlt.aps.mp.engine.domain.vo.*;
 import com.zlt.aps.mp.engine.enums.ContinueTypeEnum;
 import com.zlt.aps.mp.engine.enums.ProductionQtyModelEnum;
-import com.zlt.aps.mp.engine.handler.GroupCapacityHandler;
 import com.zlt.aps.mp.engine.handler.CxLhMouldProductionCalculator;
+import com.zlt.aps.mp.engine.handler.GroupCapacityHandler;
 import com.zlt.aps.mp.engine.handler.GroupPlanDeductionDayHandler;
 import com.zlt.aps.mp.engine.handler.MouldProductionResultHandler;
 import com.zlt.aps.mp.engine.logrecorder.TbrBeforeProductionGroupLogRecorder;
@@ -75,11 +76,12 @@ public class MatchingProductionHandler extends AbstractDataLoaderService {
 
     public MatchingProductionHandler(GroupListHandler groupListHandler,
                                      ProductionMdmDataService dataService,
+                                     GroupAppointHandler groupAppointHandler,
                                      DpRequireDataService dpRequireDataService,
                                      CycleGroupDataHandler cycleGroupDataHandler,
                                      ProductionHistoryHandler productionHistoryHandler,
                                      MonthProductionDataService monthProductionDataService) {
-        super(groupListHandler, dataService, dpRequireDataService, cycleGroupDataHandler, productionHistoryHandler, monthProductionDataService);
+        super(groupListHandler, dataService, groupAppointHandler, dpRequireDataService, cycleGroupDataHandler, productionHistoryHandler, monthProductionDataService);
     }
 
     @Autowired
@@ -3084,8 +3086,9 @@ public class MatchingProductionHandler extends AbstractDataLoaderService {
             return Collections.emptyMap();
         }
         // 获取上个排产周期最后排产日的排产信息
+        List<Integer> lastTwoDays = ProductionCycleUtils.getLastProductionTowDay(previousVersion, previousProductionDayInfo);
         List<ContinueProductInfo> continueProductionInfoList = monthProductionDataService.getContinueProductionInfo(factoryCode,
-                year, month, lastDay);
+                year, month, lastTwoDays);
         // 获取续作结构--结构转产表
         Map<String, Set<String>> continueGroupInfo = getContinueGroupInfo(context, previousVersion, lastDay);
         // 构建续作分组信息(TBR为结构，PCR为英寸)
