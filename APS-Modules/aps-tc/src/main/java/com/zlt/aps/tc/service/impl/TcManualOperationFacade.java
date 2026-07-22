@@ -179,6 +179,48 @@ public class TcManualOperationFacade {
     }
 
     /**
+     * 自动滚动在同一锁定快照和短事务内批量调量，只执行一次任务链计算和持久化。
+     *
+     * @param changeResultList 自动调量请求
+     * @param expectedVersionList 与请求同顺序的期望版本
+     * @param reason 自动滚动原因
+     * @param rollingTaskId 当前自动滚动任务 ID
+     * @return 受影响结果行数
+     */
+    public int changeQtyBatchForAutoRolling(List<TcScheduleResult> changeResultList,
+                                             List<Long> expectedVersionList,
+                                             String reason, String rollingTaskId) {
+        if (changeResultList == null || changeResultList.isEmpty()
+                || expectedVersionList == null || expectedVersionList.size() != changeResultList.size()) {
+            return 0;
+        }
+        List<TcScheduleResult> initialList = changeResultList.stream()
+                .map(item -> this.requireResult(item.getId())).collect(Collectors.toList());
+        TcScheduleResult reference = initialList.get(0);
+        this.validateSameScheduleRange(reference, initialList);
+        List<String> machineCodeList = initialList.stream().map(TcScheduleResult::getMachineCode)
+                .distinct().collect(Collectors.toList());
+        return this.executeWithMachineLocks(reference.getFactoryCode(), reference.getScheduleDate(),
+                machineCodeList, rollingTaskId, () -> this.executeInTransaction(() -> {
+                    List<TcScheduleResult> beforeList = this.lockAndLoadSnapshot(reference, machineCodeList);
+                    for (int index = 0; index < changeResultList.size(); index++) {
+                        TcScheduleResult request = changeResultList.get(index);
+                        TcScheduleResult current = beforeList.stream()
+                                .filter(item -> Objects.equals(item.getId(), request.getId()))
+                                .findFirst().orElseThrow(() -> new ServiceException(
+                                        I18nUtil.getMessage("ui.tc.schedule.manual.concurrentChanged")));
+                        this.validateExpectedVersion(expectedVersionList.get(index), current);
+                        this.copyOperationBaseFields(current, request);
+                    }
+                    int affectedCount = this.rollingService.changeQtyAndRollBatch(changeResultList);
+                    List<TcScheduleResult> afterList = this.loadSnapshot(reference, machineCodeList);
+                    this.recordDispatcherLog("4", changeResultList.get(0), reason,
+                            beforeList, afterList, "AUTO_ROLLING");
+                    return affectedCount;
+                }));
+    }
+
+    /**
      * 原子执行一组普通转机台操作。
      *
      * @param transferResultList 转机请求结果，每条只包含一个待转班次
@@ -221,10 +263,7 @@ public class TcManualOperationFacade {
                         int shiftOrder = TcInsertPositionValidator.resolveShiftOrder(transferResult);
                         this.machineRuleValidator.validateTransfer(current, transferResult.getMachineCode(), shiftOrder);
                     }
-                    int affectedCount = 0;
-                    for (TcScheduleResult transferResult : transferResultList) {
-                        affectedCount += this.rollingService.changeMachineAndRoll(transferResult);
-                    }
+                    int affectedCount = this.rollingService.changeMachineAndRollBatch(transferResultList);
                     List<TcScheduleResult> afterList = this.loadSnapshot(reference, machineCodeList);
                     this.recordDispatcherLog("0", transferResultList.get(0), reason,
                             beforeList, afterList);
@@ -260,13 +299,7 @@ public class TcManualOperationFacade {
                         throw new ServiceException(I18nUtil.getMessage("ui.tc.schedule.manual.concurrentChanged"));
                     }
                     this.validateDeleteReleaseStatus(lockedList);
-                    int deletedCount = this.scheduleResultMapper.deleteBatchIds(resultIdList);
-                    if (deletedCount != resultIdList.size()) {
-                        throw new ServiceException(I18nUtil.getMessage("ui.tc.schedule.manual.concurrentChanged"));
-                    }
-                    for (TcScheduleResult removedResult : lockedList) {
-                        this.rollingService.rollAfterRemove(removedResult, 1);
-                    }
+                    int deletedCount = this.rollingService.deleteAndRollBatch(lockedList);
                     List<TcScheduleResult> afterList = this.loadSnapshot(reference, machineCodeList);
                     this.recordDispatcherLog("3", lockedList.get(0), reason, beforeList, afterList);
                     return deletedCount;

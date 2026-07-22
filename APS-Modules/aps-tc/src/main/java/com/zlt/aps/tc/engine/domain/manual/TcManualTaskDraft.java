@@ -1,4 +1,4 @@
-package com.zlt.aps.tm.engine.domain.manual;
+package com.zlt.aps.tc.engine.domain.manual;
 
 import lombok.Data;
 
@@ -6,92 +6,67 @@ import java.math.BigDecimal;
 import java.util.Date;
 
 /**
- * 胎面人工滚动任务草稿。
- *
- * <p>该对象是与数据库实体解耦的运行态任务片段。一个横向排程结果的每个有效班次
- * 都拆成独立任务，滚动计算过程中不得持有或修改 {@code TmScheduleResult}。</p>
+ * 胎侧人工滚动任务片段，与横向结果实体完全解耦。
  */
 @Data
-public class TmManualTaskDraft {
-
-    /** 本次计算内唯一任务标识 */
+public class TcManualTaskDraft {
+    /** 运行态唯一任务标识。 */
     private String taskId;
-
-    /** 同一横向结果行的稳定分组标识 */
+    /** 横向结果稳定分组标识。 */
     private String resultGroupKey;
-
-    /** 来源排程结果ID，新插单任务为空 */
+    /** 可合并业务粒度。 */
+    private String mergeGrainKey;
+    /** 来源结果 ID。 */
     private Long sourceResultId;
-
-    /** 来源班次 */
+    /** 来源班次。 */
     private Integer sourceShiftOrder;
-
-    /** 来源班内顺序 */
+    /** 来源顺序。 */
     private Integer sourceSequence;
-
-    /** 当前机台编码 */
+    /** 当前机台。 */
     private String machineCode;
-
-    /** 当前班次 */
+    /** 当前班次。 */
     private Integer shiftOrder;
-
-    /** 当前班内顺序 */
+    /** 当前顺序。 */
     private Integer sequence;
-
-    /** 最早允许排入班次，仅多班插单和指定目标班次任务使用 */
+    /** 最早允许排入班次。 */
     private Integer minimumShiftOrder;
-
-    /** 计划量 */
+    /** 计划量。 */
     private BigDecimal planQty;
-
-    /** 已完成量 */
+    /** 完成量。 */
     private BigDecimal finishQty;
-
-    /** 胎面编码 */
-    private String treadCode;
-
-    /** 主胶料编码 */
+    /** 胎侧编码。 */
+    private String sidewallCode;
+    /** 胶料编码。 */
     private String glueCode;
-
-    /** 基部胶编码 */
+    /** 基部胶编码。 */
     private String baseGlueCode;
-
-    /** 口型板编码 */
+    /** 口型板编码。 */
     private String mouthPlateCode;
-
-    /** 数据来源 */
+    /** 数据来源。 */
     private String dataSource;
-
-    /** 原因分析 */
+    /** 原因分析。 */
     private String analysis;
-
-    /** 来源班次开始时间，仅在任务未跨班时回写 */
+    /** 来源开始时间。 */
     private Date sourceStartTime;
-
-    /** 来源班次结束时间，仅在任务未跨班时回写 */
+    /** 来源结束时间。 */
     private Date sourceEndTime;
-
-    /** 是否人工插单任务 */
+    /** 是否插单任务。 */
     private boolean insertTask;
-
-    /** 是否跨班顺延任务 */
+    /** 是否顺延片段。 */
     private boolean carryoverTask;
-
-    /** 同顺序时是否优先进入任务链 */
-    private boolean operationPriority;
-
-    /** 批量命令内的稳定优先级 */
+    /** 命令优先级。 */
     private Integer operationOrder;
 
     /**
-     * 创建与当前任务完全解耦的副本。
+     * 复制任务，避免计算阶段修改调用方对象。
      *
-     * @return 任务副本
+     * @return 独立任务副本
      */
-    public TmManualTaskDraft copy() {
-        TmManualTaskDraft target = new TmManualTaskDraft();
+    public TcManualTaskDraft copy() {
+        TcManualTaskDraft target = new TcManualTaskDraft();
         target.setTaskId(this.taskId);
         target.setResultGroupKey(this.resultGroupKey);
+        target.setMergeGrainKey(this.mergeGrainKey);
         target.setSourceResultId(this.sourceResultId);
         target.setSourceShiftOrder(this.sourceShiftOrder);
         target.setSourceSequence(this.sourceSequence);
@@ -101,7 +76,7 @@ public class TmManualTaskDraft {
         target.setMinimumShiftOrder(this.minimumShiftOrder);
         target.setPlanQty(this.planQty);
         target.setFinishQty(this.finishQty);
-        target.setTreadCode(this.treadCode);
+        target.setSidewallCode(this.sidewallCode);
         target.setGlueCode(this.glueCode);
         target.setBaseGlueCode(this.baseGlueCode);
         target.setMouthPlateCode(this.mouthPlateCode);
@@ -111,7 +86,6 @@ public class TmManualTaskDraft {
         target.setSourceEndTime(this.sourceEndTime);
         target.setInsertTask(this.insertTask);
         target.setCarryoverTask(this.carryoverTask);
-        target.setOperationPriority(this.operationPriority);
         target.setOperationOrder(this.operationOrder);
         return target;
     }

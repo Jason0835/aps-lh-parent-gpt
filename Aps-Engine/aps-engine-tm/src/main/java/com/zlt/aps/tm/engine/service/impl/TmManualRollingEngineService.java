@@ -1,6 +1,5 @@
 package com.zlt.aps.tm.engine.service.impl;
 
-import cn.hutool.core.date.DateUtil;
 import cn.hutool.core.util.StrUtil;
 import com.zlt.aps.common.engine.schedule.MachineShiftTaskChain;
 import com.zlt.aps.common.engine.schedule.ScheduleOperationContext;
@@ -11,7 +10,9 @@ import com.zlt.aps.tm.engine.domain.manual.*;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -153,6 +154,7 @@ public class TmManualRollingEngineService {
                 ? insertTask.getSequence() : command.getTargetSequence());
         insertTask.setSourceShiftOrder(insertTask.getShiftOrder());
         insertTask.setSourceSequence(insertTask.getSequence());
+        insertTask.setMinimumShiftOrder(insertTask.getShiftOrder());
         insertTask.setInsertTask(true);
         this.markOperationPriority(insertTask, commandOrder);
         this.validateTaskLocation(insertTask);
@@ -361,7 +363,12 @@ public class TmManualRollingEngineService {
             BigDecimal remainCapacity = machineCapacity.subtract(usedCapacity).max(BigDecimal.ZERO);
             int nextSequence = currentShiftTaskList.size() + 1;
             while (!rollingQueue.isEmpty() && remainCapacity.compareTo(BigDecimal.ZERO) > 0) {
-                TmManualTaskDraft currentTask = rollingQueue.remove(0);
+                TmManualTaskDraft currentTask = rollingQueue.get(0);
+                if (currentTask.getMinimumShiftOrder() != null
+                        && shiftOrder < currentTask.getMinimumShiftOrder()) {
+                    break;
+                }
+                rollingQueue.remove(0);
                 BigDecimal currentPlanQty = this.nvl(currentTask.getPlanQty());
                 BigDecimal assignedQty = currentPlanQty.min(remainCapacity);
                 if (this.nvl(currentTask.getFinishQty()).compareTo(assignedQty) > 0) {
@@ -417,7 +424,7 @@ public class TmManualRollingEngineService {
     private MachineShiftTaskChain<TmManualTaskDraft> buildTaskChains(List<TmManualTaskDraft> taskList,
                                                                       TmManualRollingContext context) {
         MachineShiftTaskChain<TmManualTaskDraft> taskChainGroup = new MachineShiftTaskChain<>();
-        LocalDate scheduleDate = DateUtil.toLocalDateTime(context.getScheduleDate()).toLocalDate();
+        LocalDate scheduleDate = this.toLocalDate(context.getScheduleDate());
         List<TmManualTaskDraft> sortedTaskList = taskList.stream()
                 .filter(task -> this.nvl(task.getPlanQty()).compareTo(BigDecimal.ZERO) > 0)
                 .sorted(Comparator.comparing(TmManualTaskDraft::getMachineCode)
@@ -470,7 +477,7 @@ public class TmManualRollingEngineService {
                 throw new IllegalStateException("同一结果分组在同机台同班次重复落位:" + slotKey);
             }
         }
-        LocalDate scheduleDate = DateUtil.toLocalDateTime(context.getScheduleDate()).toLocalDate();
+        LocalDate scheduleDate = this.toLocalDate(context.getScheduleDate());
         Map<String, List<TmManualTaskDraft>> machineShiftMap = taskList.stream()
                 .collect(Collectors.groupingBy(task -> task.getMachineCode() + "|" + task.getShiftOrder(),
                         LinkedHashMap::new, Collectors.toList()));
@@ -505,13 +512,30 @@ public class TmManualRollingEngineService {
         outputTaskList.addAll(unplannedTaskList);
         boolean outsideMachineScope = outputTaskList.stream()
                 .anyMatch(task -> !context.getMachineCapacityMap().containsKey(task.getMachineCode()));
-        boolean outsideResultScope = affectedResultGroupKeySet.stream()
-                .anyMatch(groupKey -> !initialResultGroupKeySet.contains(groupKey)
-                        && !groupKey.startsWith(NEW_GROUP_PREFIX)
-                        && !groupKey.startsWith(MOVE_GROUP_PREFIX));
+        boolean outsideResultScope = outputTaskList.stream()
+                .anyMatch(task -> !initialResultGroupKeySet.contains(task.getResultGroupKey())
+                        && !task.isInsertTask()
+                        && !task.getResultGroupKey().startsWith(MOVE_GROUP_PREFIX));
         if (outsideMachineScope || outsideResultScope) {
             throw new IllegalStateException("人工滚动输出超出本次锁定范围");
         }
+    }
+
+    /**
+     * 将排程日期转换为本地日期。
+     *
+     * <p>通过毫秒时间戳转换，兼容 {@link java.sql.Date} 不支持 {@code toInstant()} 的实现。</p>
+     *
+     * @param scheduleDate 排程日期
+     * @return 本地日期
+     * @throws IllegalArgumentException 排程日期为空时抛出
+     */
+    private LocalDate toLocalDate(Date scheduleDate) {
+        if (scheduleDate == null) {
+            throw new IllegalArgumentException("排程日期不能为空");
+        }
+        return Instant.ofEpochMilli(scheduleDate.getTime())
+                .atZone(ZoneId.systemDefault()).toLocalDate();
     }
 
     /**

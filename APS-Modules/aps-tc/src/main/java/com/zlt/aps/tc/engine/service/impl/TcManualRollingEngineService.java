@@ -1,0 +1,462 @@
+package com.zlt.aps.tc.engine.service.impl;
+
+import cn.hutool.core.util.StrUtil;
+import com.zlt.aps.common.engine.schedule.MachineShiftTaskChain;
+import com.zlt.aps.common.engine.schedule.ScheduleOperationContext;
+import com.zlt.aps.common.engine.schedule.ScheduleTaskLinkedList;
+import com.zlt.aps.common.engine.schedule.ScheduleTaskNode;
+import com.zlt.aps.tc.api.constant.TcScheduleConstants;
+import com.zlt.aps.tc.engine.domain.manual.*;
+import org.springframework.stereotype.Service;
+
+import java.math.BigDecimal;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.util.*;
+import java.util.stream.Collectors;
+
+/**
+ * 胎侧人工滚动纯计算引擎。
+ *
+ * <p>引擎仅操作独立任务片段，在一个上下文内连续应用全部命令，再从每台机台最早受影响位置
+ * 统一重装箱。数据库实体、事务、锁和审计均由应用层负责。</p>
+ */
+@Service
+public class TcManualRollingEngineService {
+
+    /** 新人工结果分组前缀。 */
+    private static final String MANUAL_GROUP_PREFIX = "MANUAL:";
+
+    /** 转机台新结果分组前缀。 */
+    private static final String MOVE_GROUP_PREFIX = "MOVE:";
+
+    /**
+     * 批量执行人工滚动命令。
+     *
+     * @param commandBatch 命令批次
+     * @param context 运行态上下文
+     * @return 最终任务链结果
+     * @throws IllegalArgumentException 命令目标非法时抛出
+     * @throws IllegalStateException 数量、产能或链表校验失败时抛出
+     */
+    public TcManualRollingResult execute(TcManualRollingCommandBatch commandBatch,
+                                         TcManualRollingContext context) {
+        this.validateInput(commandBatch, context);
+        List<TcManualTaskDraft> taskList = context.getTaskList().stream()
+                .filter(Objects::nonNull).map(TcManualTaskDraft::copy)
+                .collect(Collectors.toCollection(ArrayList::new));
+        Set<String> initialGroupSet = taskList.stream().map(TcManualTaskDraft::getResultGroupKey)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+        TcManualRollingResult result = new TcManualRollingResult();
+        result.setBeforeTotalQty(this.sumQty(taskList));
+        Map<String, Integer[]> scopeMap = new LinkedHashMap<>();
+        BigDecimal commandDeltaQty = BigDecimal.ZERO;
+        for (int commandIndex = 0; commandIndex < commandBatch.getCommandList().size(); commandIndex++) {
+            TcManualRollingCommand command = commandBatch.getCommandList().get(commandIndex);
+            if (command == null || command.getOperationType() == null) {
+                throw new IllegalArgumentException("胎侧人工滚动命令不能为空");
+            }
+            command.setCommandOrder(command.getCommandOrder() == null ? commandIndex : command.getCommandOrder());
+            BigDecimal beforeQty = this.sumQty(taskList);
+            BigDecimal declaredDelta = this.applyCommand(taskList, command, scopeMap,
+                    result.getAffectedResultGroupKeySet());
+            if (this.sumQty(taskList).subtract(beforeQty).compareTo(declaredDelta) != 0) {
+                throw new IllegalStateException("胎侧人工滚动单命令数量不守恒");
+            }
+            commandDeltaQty = commandDeltaQty.add(declaredDelta);
+        }
+        List<TcManualTaskDraft> unplannedList = new ArrayList<>();
+        for (Map.Entry<String, Integer[]> scopeEntry : scopeMap.entrySet()) {
+            Integer[] scope = scopeEntry.getValue();
+            taskList = this.repackMachine(taskList, scopeEntry.getKey(), scope[0], scope[1], context,
+                    unplannedList);
+            result.getChainChangeSummaryList().add(scopeEntry.getKey() + ":CLASS" + scope[0] + ":SEQ" + scope[1]);
+        }
+        this.normalizeSequences(taskList);
+        MachineShiftTaskChain<TcManualTaskDraft> taskChainGroup = this.buildTaskChains(taskList, context);
+        this.validateResult(taskList, unplannedList, result.getBeforeTotalQty(), commandDeltaQty,
+                initialGroupSet, result.getAffectedResultGroupKeySet());
+        result.setScheduledTaskList(taskList);
+        result.setUnplannedTaskList(unplannedList);
+        result.setTaskChainGroup(taskChainGroup);
+        result.setCommandDeltaQty(commandDeltaQty);
+        result.setScheduledTotalQty(this.sumQty(taskList));
+        result.setUnplannedTotalQty(this.sumQty(unplannedList));
+        result.setAffectedResultIdSet(result.getAffectedResultGroupKeySet().stream()
+                .map(this::parseResultId).filter(Objects::nonNull)
+                .collect(Collectors.toCollection(LinkedHashSet::new)));
+        context.setTaskList(taskList);
+        context.setTaskChainGroup(taskChainGroup);
+        return result;
+    }
+
+    /**
+     * 将最终任务按机台和班次装入通用双向任务链。
+     *
+     * @param taskList 最终任务
+     * @param context 运行态上下文
+     * @return 机台班次任务链集合
+     */
+    private MachineShiftTaskChain<TcManualTaskDraft> buildTaskChains(List<TcManualTaskDraft> taskList,
+                                                                      TcManualRollingContext context) {
+        MachineShiftTaskChain<TcManualTaskDraft> taskChainGroup = new MachineShiftTaskChain<>();
+        LocalDate scheduleDate = context.getScheduleDate() == null ? LocalDate.of(1970, 1, 1)
+                : Instant.ofEpochMilli(context.getScheduleDate().getTime())
+                .atZone(ZoneId.systemDefault()).toLocalDate();
+        List<TcManualTaskDraft> sortedList = taskList.stream().sorted(
+                Comparator.comparing(TcManualTaskDraft::getMachineCode)
+                        .thenComparing(TcManualTaskDraft::getShiftOrder)
+                        .thenComparing(TcManualTaskDraft::getSequence)).collect(Collectors.toList());
+        for (TcManualTaskDraft task : sortedList) {
+            ScheduleTaskLinkedList<TcManualTaskDraft> chain = taskChainGroup.getOrCreate(
+                    task.getMachineCode(), scheduleDate, task.getShiftOrder());
+            ScheduleTaskNode<TcManualTaskDraft> node = new ScheduleTaskNode<>(task.getTaskId(), task,
+                    task.getMachineCode(), scheduleDate, "CLASS" + task.getShiftOrder(),
+                    task.getShiftOrder(), task.getPlanQty());
+            chain.append(node, new ScheduleOperationContext("TC_MANUAL", "TC_MANUAL_ROLLING", null));
+            task.setSequence(node.getSequence());
+        }
+        return taskChainGroup;
+    }
+
+    /**
+     * 应用单条命令。
+     *
+     * @param taskList 当前任务
+     * @param command 命令
+     * @param scopeMap 受影响范围
+     * @param affectedGroupSet 受影响分组
+     * @return 命令净数量变化
+     */
+    private BigDecimal applyCommand(List<TcManualTaskDraft> taskList, TcManualRollingCommand command,
+                                    Map<String, Integer[]> scopeMap, Set<String> affectedGroupSet) {
+        if (TcManualRollingOperationEnum.INSERT == command.getOperationType()) {
+            return this.applyInsert(taskList, command, scopeMap, affectedGroupSet);
+        }
+        if (TcManualRollingOperationEnum.DELETE == command.getOperationType()) {
+            return this.applyDelete(taskList, command, scopeMap, affectedGroupSet);
+        }
+        if (TcManualRollingOperationEnum.CHANGE_MACHINE == command.getOperationType()) {
+            return this.applyTransfer(taskList, command, scopeMap, affectedGroupSet);
+        }
+        return this.applyChangeQty(taskList, command, scopeMap, affectedGroupSet);
+    }
+
+    /** 执行插单。 */
+    private BigDecimal applyInsert(List<TcManualTaskDraft> taskList, TcManualRollingCommand command,
+                                   Map<String, Integer[]> scopeMap, Set<String> affectedGroupSet) {
+        TcManualTaskDraft task = command.getInsertTask() == null ? null : command.getInsertTask().copy();
+        if (task == null) {
+            throw new IllegalArgumentException("胎侧插单任务不能为空");
+        }
+        if (StrUtil.isBlank(task.getResultGroupKey())) {
+            task.setResultGroupKey(MANUAL_GROUP_PREFIX + command.getCommandOrder() + ":" + task.getTaskId());
+        }
+        task.setMachineCode(StrUtil.blankToDefault(command.getTargetMachineCode(), task.getMachineCode()));
+        task.setShiftOrder(command.getTargetShiftOrder() == null ? task.getShiftOrder() : command.getTargetShiftOrder());
+        task.setSequence(command.getTargetSequence() == null ? task.getSequence() : command.getTargetSequence());
+        task.setMinimumShiftOrder(task.getShiftOrder());
+        task.setInsertTask(true);
+        task.setOperationOrder(command.getCommandOrder());
+        this.validateLocation(task);
+        taskList.add(task);
+        this.registerScope(scopeMap, task.getMachineCode(), task.getShiftOrder(), task.getSequence());
+        affectedGroupSet.add(task.getResultGroupKey());
+        return this.qty(task.getPlanQty());
+    }
+
+    /** 执行整行删除。 */
+    private BigDecimal applyDelete(List<TcManualTaskDraft> taskList, TcManualRollingCommand command,
+                                   Map<String, Integer[]> scopeMap, Set<String> affectedGroupSet) {
+        List<TcManualTaskDraft> deletedList = taskList.stream()
+                .filter(task -> Objects.equals(command.getResultGroupKey(), task.getResultGroupKey()))
+                .collect(Collectors.toList());
+        if (deletedList.isEmpty()) {
+            throw new IllegalArgumentException("胎侧待删除任务不存在");
+        }
+        if (deletedList.stream().anyMatch(task -> this.qty(task.getFinishQty()).signum() > 0)) {
+            throw new IllegalStateException("存在完成量的胎侧任务不允许删除");
+        }
+        deletedList.forEach(task -> this.registerScope(scopeMap, task.getMachineCode(),
+                task.getShiftOrder(), task.getSequence()));
+        BigDecimal deletedQty = this.sumQty(deletedList);
+        taskList.removeAll(deletedList);
+        affectedGroupSet.add(command.getResultGroupKey());
+        return deletedQty.negate();
+    }
+
+    /** 执行调量或自动滚动调量。 */
+    private BigDecimal applyChangeQty(List<TcManualTaskDraft> taskList, TcManualRollingCommand command,
+                                      Map<String, Integer[]> scopeMap, Set<String> affectedGroupSet) {
+        TcManualTaskDraft task = this.findTask(taskList, command);
+        BigDecimal newPlanQty = this.qty(command.getPlanQty());
+        if (newPlanQty.compareTo(this.qty(task.getFinishQty())) < 0) {
+            throw new IllegalStateException("胎侧计划量不能小于完成量");
+        }
+        BigDecimal deltaQty = newPlanQty.subtract(this.qty(task.getPlanQty()));
+        task.setPlanQty(newPlanQty);
+        task.setAnalysis(command.getAnalysis());
+        task.setOperationOrder(command.getCommandOrder());
+        this.registerScope(scopeMap, task.getMachineCode(), task.getShiftOrder(), task.getSequence());
+        affectedGroupSet.add(task.getResultGroupKey());
+        return deltaQty;
+    }
+
+    /** 执行转机台，完成量固定留在源班次。 */
+    private BigDecimal applyTransfer(List<TcManualTaskDraft> taskList, TcManualRollingCommand command,
+                                     Map<String, Integer[]> scopeMap, Set<String> affectedGroupSet) {
+        TcManualTaskDraft source = this.findTask(taskList, command);
+        BigDecimal finishQty = this.qty(source.getFinishQty());
+        BigDecimal moveQty = this.qty(source.getPlanQty()).subtract(finishQty);
+        if (moveQty.signum() <= 0) {
+            throw new IllegalStateException("胎侧任务没有可转移的未完成量");
+        }
+        this.registerScope(scopeMap, source.getMachineCode(), source.getShiftOrder(), source.getSequence());
+        TcManualTaskDraft moved = source.copy();
+        moved.setTaskId(source.getTaskId() + ":MOVE:" + command.getCommandOrder());
+        moved.setResultGroupKey(MOVE_GROUP_PREFIX + source.getResultGroupKey() + ":" + command.getCommandOrder());
+        moved.setSourceResultId(null);
+        moved.setFinishQty(BigDecimal.ZERO);
+        moved.setPlanQty(moveQty);
+        moved.setMachineCode(command.getTargetMachineCode());
+        moved.setShiftOrder(command.getTargetShiftOrder());
+        moved.setSequence(command.getTargetSequence() == null ? 1 : command.getTargetSequence());
+        moved.setMinimumShiftOrder(moved.getShiftOrder());
+        moved.setOperationOrder(command.getCommandOrder());
+        this.validateLocation(moved);
+        if (finishQty.signum() > 0) {
+            source.setPlanQty(finishQty);
+        } else {
+            taskList.remove(source);
+        }
+        TcManualTaskDraft compatible = taskList.stream()
+                .filter(task -> Objects.equals(moved.getMachineCode(), task.getMachineCode()))
+                .filter(task -> Objects.equals(moved.getMergeGrainKey(), task.getMergeGrainKey()))
+                .sorted(this.taskComparator()).findFirst().orElse(null);
+        if (compatible != null) {
+            moved.setResultGroupKey(compatible.getResultGroupKey());
+            moved.setSourceResultId(compatible.getSourceResultId());
+        }
+        TcManualTaskDraft mergeTarget = taskList.stream()
+                .filter(task -> Objects.equals(moved.getMachineCode(), task.getMachineCode()))
+                .filter(task -> Objects.equals(moved.getShiftOrder(), task.getShiftOrder()))
+                .filter(task -> Objects.equals(moved.getResultGroupKey(), task.getResultGroupKey()))
+                .findFirst().orElse(null);
+        if (mergeTarget == null) {
+            taskList.add(moved);
+        } else {
+            mergeTarget.setPlanQty(this.qty(mergeTarget.getPlanQty()).add(moveQty));
+        }
+        affectedGroupSet.add(source.getResultGroupKey());
+        affectedGroupSet.add(moved.getResultGroupKey());
+        this.registerScope(scopeMap, moved.getMachineCode(), moved.getShiftOrder(), moved.getSequence());
+        return BigDecimal.ZERO;
+    }
+
+    /**
+     * 对单台机台受影响窗口重新装箱。
+     */
+    private List<TcManualTaskDraft> repackMachine(List<TcManualTaskDraft> allTaskList, String machineCode,
+                                                   int startShiftOrder, int startSequence,
+                                                   TcManualRollingContext context,
+                                                   List<TcManualTaskDraft> unplannedList) {
+        List<TcManualTaskDraft> retainedList = allTaskList.stream()
+                .filter(task -> !Objects.equals(machineCode, task.getMachineCode())
+                        || task.getShiftOrder() < startShiftOrder
+                        || (task.getShiftOrder() == startShiftOrder && this.sequence(task) < startSequence))
+                .map(TcManualTaskDraft::copy).collect(Collectors.toCollection(ArrayList::new));
+        List<TcManualTaskDraft> windowList = allTaskList.stream()
+                .filter(task -> Objects.equals(machineCode, task.getMachineCode()))
+                .filter(task -> task.getShiftOrder() > startShiftOrder
+                        || (task.getShiftOrder() == startShiftOrder && this.sequence(task) >= startSequence))
+                .sorted(this.taskComparator()).map(TcManualTaskDraft::copy).collect(Collectors.toList());
+        List<TcManualTaskDraft> queue = new ArrayList<>();
+        for (TcManualTaskDraft task : windowList) {
+            BigDecimal finishQty = this.qty(task.getFinishQty());
+            if (finishQty.signum() > 0) {
+                TcManualTaskDraft locked = task.copy();
+                locked.setPlanQty(finishQty);
+                retainedList.add(locked);
+            }
+            BigDecimal remainingQty = this.qty(task.getPlanQty()).subtract(finishQty);
+            if (remainingQty.signum() > 0) {
+                TcManualTaskDraft rolling = task.copy();
+                rolling.setPlanQty(remainingQty);
+                rolling.setFinishQty(BigDecimal.ZERO);
+                queue.add(rolling);
+            }
+        }
+        queue.sort(this.taskComparator());
+        int fragmentIndex = 1;
+        for (int shiftOrder = startShiftOrder; shiftOrder <= TcScheduleConstants.TC_MAX_SHIFT_ORDER; shiftOrder++) {
+            if (queue.isEmpty()) {
+                break;
+            }
+            BigDecimal capacity = context.getShiftCapacityMap().get(this.capacityKey(machineCode, shiftOrder));
+            if (capacity == null || capacity.signum() <= 0) {
+                throw new IllegalStateException("胎侧机台班次有效产能未维护:" + machineCode + ":" + shiftOrder);
+            }
+            final int currentShiftOrder = shiftOrder;
+            BigDecimal usedQty = retainedList.stream()
+                    .filter(task -> Objects.equals(machineCode, task.getMachineCode()))
+                    .filter(task -> Objects.equals(currentShiftOrder, task.getShiftOrder()))
+                    .map(TcManualTaskDraft::getPlanQty).map(this::qty).reduce(BigDecimal.ZERO, BigDecimal::add);
+            BigDecimal remainCapacity = capacity.subtract(usedQty).max(BigDecimal.ZERO);
+            int nextSequence = (int) retainedList.stream()
+                    .filter(task -> Objects.equals(machineCode, task.getMachineCode()))
+                    .filter(task -> Objects.equals(currentShiftOrder, task.getShiftOrder())).count() + 1;
+            while (!queue.isEmpty() && remainCapacity.signum() > 0) {
+                TcManualTaskDraft task = queue.get(0);
+                if (task.getMinimumShiftOrder() != null && shiftOrder < task.getMinimumShiftOrder()) {
+                    break;
+                }
+                BigDecimal assignedQty = this.qty(task.getPlanQty()).min(remainCapacity);
+                TcManualTaskDraft mergeTarget = retainedList.stream()
+                        .filter(item -> Objects.equals(machineCode, item.getMachineCode()))
+                        .filter(item -> Objects.equals(currentShiftOrder, item.getShiftOrder()))
+                        .filter(item -> Objects.equals(task.getResultGroupKey(), item.getResultGroupKey()))
+                        .findFirst().orElse(null);
+                if (mergeTarget == null) {
+                    TcManualTaskDraft assigned = task.copy();
+                    assigned.setShiftOrder(shiftOrder);
+                    assigned.setSequence(nextSequence++);
+                    assigned.setPlanQty(assignedQty);
+                    assigned.setFinishQty(BigDecimal.ZERO);
+                    retainedList.add(assigned);
+                } else {
+                    mergeTarget.setPlanQty(this.qty(mergeTarget.getPlanQty()).add(assignedQty));
+                }
+                remainCapacity = remainCapacity.subtract(assignedQty);
+                BigDecimal overflowQty = this.qty(task.getPlanQty()).subtract(assignedQty);
+                queue.remove(0);
+                if (overflowQty.signum() > 0) {
+                    TcManualTaskDraft carry = task.copy();
+                    carry.setTaskId(task.getTaskId() + ":CARRY:" + fragmentIndex++);
+                    carry.setPlanQty(overflowQty);
+                    carry.setCarryoverTask(true);
+                    queue.add(0, carry);
+                    break;
+                }
+            }
+        }
+        unplannedList.addAll(queue.stream().filter(task -> this.qty(task.getPlanQty()).signum() > 0)
+                .map(TcManualTaskDraft::copy).collect(Collectors.toList()));
+        return retainedList;
+    }
+
+    /** 将每个机台班次顺序强制整理为 1..N。 */
+    private void normalizeSequences(List<TcManualTaskDraft> taskList) {
+        Map<String, List<TcManualTaskDraft>> chainMap = taskList.stream().collect(Collectors.groupingBy(
+                task -> this.capacityKey(task.getMachineCode(), task.getShiftOrder()), LinkedHashMap::new,
+                Collectors.toList()));
+        chainMap.values().forEach(chain -> {
+            chain.sort(this.taskComparator());
+            for (int index = 0; index < chain.size(); index++) {
+                chain.get(index).setSequence(index + 1);
+            }
+        });
+    }
+
+    /** 强制校验最终数量和链表。 */
+    private void validateResult(List<TcManualTaskDraft> scheduledList, List<TcManualTaskDraft> unplannedList,
+                                BigDecimal beforeQty, BigDecimal commandDeltaQty, Set<String> initialGroupSet,
+                                Set<String> affectedGroupSet) {
+        Set<String> uniqueNodeSet = new LinkedHashSet<>();
+        for (TcManualTaskDraft task : scheduledList) {
+            this.validateLocation(task);
+            if (this.qty(task.getPlanQty()).compareTo(this.qty(task.getFinishQty())) < 0
+                    || this.qty(task.getFinishQty()).signum() < 0) {
+                throw new IllegalStateException("胎侧任务计划量或完成量非法");
+            }
+            String uniqueKey = task.getResultGroupKey() + "|" + task.getMachineCode() + "|" + task.getShiftOrder();
+            if (!uniqueNodeSet.add(uniqueKey)) {
+                throw new IllegalStateException("胎侧同一结果分组在同机台同班次重复");
+            }
+            if (!initialGroupSet.contains(task.getResultGroupKey())
+                    && !task.isInsertTask() && !task.getResultGroupKey().startsWith(MOVE_GROUP_PREFIX)) {
+                throw new IllegalStateException("胎侧人工滚动输出超出锁定范围");
+            }
+        }
+        BigDecimal afterQty = this.sumQty(scheduledList).add(this.sumQty(unplannedList));
+        if (afterQty.compareTo(beforeQty.add(commandDeltaQty)) != 0) {
+            throw new IllegalStateException("胎侧人工滚动总数量不守恒");
+        }
+        affectedGroupSet.remove(null);
+    }
+
+    /** 查找指定来源结果和班次任务。 */
+    private TcManualTaskDraft findTask(List<TcManualTaskDraft> taskList, TcManualRollingCommand command) {
+        return taskList.stream()
+                .filter(task -> Objects.equals(command.getResultGroupKey(), task.getResultGroupKey()))
+                .filter(task -> command.getSourceShiftOrder() == null
+                        || Objects.equals(command.getSourceShiftOrder(), task.getShiftOrder()))
+                .findFirst().orElseThrow(() -> new IllegalArgumentException("胎侧人工滚动目标任务不存在"));
+    }
+
+    /** 合并机台最早受影响位置。 */
+    private void registerScope(Map<String, Integer[]> scopeMap, String machineCode,
+                               Integer shiftOrder, Integer sequence) {
+        int normalizedShift = shiftOrder == null ? 1 : shiftOrder;
+        int normalizedSequence = sequence == null ? 1 : sequence;
+        Integer[] current = scopeMap.get(machineCode);
+        if (current == null || normalizedShift < current[0]
+                || (normalizedShift == current[0] && normalizedSequence < current[1])) {
+            scopeMap.put(machineCode, new Integer[]{normalizedShift, normalizedSequence});
+        }
+    }
+
+    /** 校验基础输入。 */
+    private void validateInput(TcManualRollingCommandBatch commandBatch, TcManualRollingContext context) {
+        if (commandBatch == null || commandBatch.getCommandList() == null
+                || commandBatch.getCommandList().isEmpty() || context == null) {
+            throw new IllegalArgumentException("胎侧人工滚动上下文和命令不能为空");
+        }
+    }
+
+    /** 校验任务位置。 */
+    private void validateLocation(TcManualTaskDraft task) {
+        if (task == null || StrUtil.isBlank(task.getMachineCode()) || task.getShiftOrder() == null
+                || task.getShiftOrder() < 1 || task.getShiftOrder() > TcScheduleConstants.TC_MAX_SHIFT_ORDER
+                || task.getSequence() == null || task.getSequence() < 1) {
+            throw new IllegalArgumentException("胎侧任务机台、班次或顺序非法");
+        }
+    }
+
+    /** 构造稳定任务排序器。 */
+    private Comparator<TcManualTaskDraft> taskComparator() {
+        return Comparator.comparing(TcManualTaskDraft::getShiftOrder)
+                .thenComparing(this::sequence)
+                .thenComparing(task -> task.getOperationOrder() == null ? Integer.MAX_VALUE : task.getOperationOrder())
+                .thenComparing(TcManualTaskDraft::getTaskId, Comparator.nullsLast(String::compareTo));
+    }
+
+    /** 读取默认顺序。 */
+    private int sequence(TcManualTaskDraft task) {
+        return task.getSequence() == null ? Integer.MAX_VALUE : task.getSequence();
+    }
+
+    /** 构造产能键。 */
+    public String capacityKey(String machineCode, Integer shiftOrder) {
+        return machineCode + "|" + shiftOrder;
+    }
+
+    /** 汇总计划量。 */
+    private BigDecimal sumQty(List<TcManualTaskDraft> taskList) {
+        return taskList.stream().map(TcManualTaskDraft::getPlanQty).map(this::qty)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    /** 空数量按零处理。 */
+    private BigDecimal qty(BigDecimal value) {
+        return value == null ? BigDecimal.ZERO : value;
+    }
+
+    /** 从既有结果分组解析结果 ID。 */
+    private Long parseResultId(String resultGroupKey) {
+        if (resultGroupKey == null || !resultGroupKey.matches("\\d+")) {
+            return null;
+        }
+        return Long.valueOf(resultGroupKey);
+    }
+}
