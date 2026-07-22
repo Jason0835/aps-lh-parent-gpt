@@ -8,6 +8,7 @@ import com.zlt.aps.enums.ProductTypeEnum;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.exception.BusinessException;
 import com.zlt.aps.mp.api.domain.entity.*;
+import com.zlt.aps.mp.engine.basedata.assemble.appoint.GroupAppointHandler;
 import com.zlt.aps.mp.engine.basedata.assemble.continueinfo.ContinueGroupInfoHandler;
 import com.zlt.aps.mp.engine.basedata.assemble.cyclegroup.CycleGroupDataHandler;
 import com.zlt.aps.mp.engine.basedata.assemble.datalist.GroupListHandler;
@@ -95,6 +96,7 @@ public class TbrCxCapacityAllocationService extends AbstractDataLoaderService {
 
     public TbrCxCapacityAllocationService(GroupListHandler groupListHandler,
                                           ProductionMdmDataService dataService,
+                                          GroupAppointHandler groupAppointHandler,
                                           DpRequireDataService dpRequireDataService,
                                           CycleGroupDataHandler cycleGroupDataHandler,
                                           GroupFixedInfoHandler groupFixedInfoHandler,
@@ -113,7 +115,7 @@ public class TbrCxCapacityAllocationService extends AbstractDataLoaderService {
                                           ProductionCxMachineCalculationHandler productionCxMachineCalculationHandler,
                                           AdjustContinueSkuProductionQtyHandler adjustContinueSkuProductionQtyHandler,
                                           MatchingProductionHandler matchingProductionHandler) {
-        super(groupListHandler, dataService, dpRequireDataService, cycleGroupDataHandler, productionHistoryHandler, monthProductionDataService);
+        super(groupListHandler, dataService, groupAppointHandler, dpRequireDataService, cycleGroupDataHandler, productionHistoryHandler, monthProductionDataService);
         this.groupFixedInfoHandler = groupFixedInfoHandler;
         this.formalProductionHandler = formalProductionHandler;
         this.iSysDictDataCacheService = iSysDictDataCacheService;
@@ -333,8 +335,9 @@ public class TbrCxCapacityAllocationService extends AbstractDataLoaderService {
         if (lastDay <= BigDecimal.ZERO.intValue()) {
             return Collections.emptyMap();
         }
+        List<Integer> lastTwoDays = ProductionCycleUtils.getLastProductionTowDay(previousVersion, previousProductionDayInfo);
         //获取上个排产周期最后排产日的排产信息
-        List<ContinueProductInfo> continueProductionInfoList = getMonthProductionDataService().getContinueProductionInfo(factoryCode, year, month, lastDay);
+        List<ContinueProductInfo> continueProductionInfoList = getMonthProductionDataService().getContinueProductionInfo(factoryCode, year, month, lastTwoDays);
         log.info(TbrBeforeProductionGroupLogRecorder.addReadContinueSkuDataLog(context, continueProductionInfoList));
         //获取续作结构--结构转产表
         Map<String, Set<String>> continueGroupInfo = getContinueGroupInfo(context, previousVersion, lastDay);
