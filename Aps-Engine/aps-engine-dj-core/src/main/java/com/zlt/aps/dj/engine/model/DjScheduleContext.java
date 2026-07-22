@@ -113,6 +113,9 @@ public class DjScheduleContext {
      *  scheduleDay 从1开始，当班次从last shift绕回first shift时递增 */
     private int[] scheduleDays;
 
+    /** 每日班次数（从 DjShiftConfig 启用的班次记录数），用于计算提前备料天数对应的成型班次前移量 */
+    private int shiftCountPerDay;
+
     /** 排程过程日志收集器 */
     private StringBuilder processLog;
 
