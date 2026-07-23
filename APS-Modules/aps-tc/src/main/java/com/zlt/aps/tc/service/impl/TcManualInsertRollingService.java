@@ -16,6 +16,7 @@ import com.zlt.aps.tc.engine.service.impl.TcTaskChainScheduleService;
 import com.zlt.aps.tc.mapper.TcScheduleResultExplainMapper;
 import com.zlt.aps.tc.mapper.TcScheduleResultMapper;
 import com.zlt.aps.tc.mapper.TcScheduleUnplannedMapper;
+import com.zlt.aps.tc.service.loader.TcManualConstraintDataLoadService;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -49,6 +50,8 @@ public class TcManualInsertRollingService {
 
     private final TcScheduleOperationFacade scheduleOperationFacade;
 
+    private final TcManualConstraintDataLoadService manualConstraintDataLoadService;
+
     /**
      * 构造胎侧人工滚动应用服务。
      *
@@ -57,18 +60,21 @@ public class TcManualInsertRollingService {
      * @param scheduleResultExplainMapper 结果解释 Mapper
      * @param machineRuleValidator 机台规则校验器
      * @param scheduleOperationFacade 纯计算门面
+     * @param manualConstraintDataLoadService 人工约束数据装载服务
      */
     @Autowired
     public TcManualInsertRollingService(TcScheduleResultMapper scheduleResultMapper,
                                         TcScheduleUnplannedMapper scheduleUnplannedMapper,
                                         TcScheduleResultExplainMapper scheduleResultExplainMapper,
                                         TcManualMachineRuleValidator machineRuleValidator,
-                                        TcScheduleOperationFacade scheduleOperationFacade) {
+                                        TcScheduleOperationFacade scheduleOperationFacade,
+                                        TcManualConstraintDataLoadService manualConstraintDataLoadService) {
         this.scheduleResultMapper = scheduleResultMapper;
         this.scheduleUnplannedMapper = scheduleUnplannedMapper;
         this.scheduleResultExplainMapper = scheduleResultExplainMapper;
         this.machineRuleValidator = machineRuleValidator;
         this.scheduleOperationFacade = scheduleOperationFacade;
+        this.manualConstraintDataLoadService = manualConstraintDataLoadService;
     }
 
     /**
@@ -85,7 +91,7 @@ public class TcManualInsertRollingService {
                                         TcManualMachineRuleValidator machineRuleValidator) {
         this(scheduleResultMapper, scheduleUnplannedMapper, scheduleResultExplainMapper, machineRuleValidator,
                 new TcScheduleOperationFacade(new TcTaskChainScheduleService(), null, null,
-                        new TcManualRollingEngineService()));
+                        new TcManualRollingEngineService()), null);
     }
 
     /**
@@ -256,7 +262,8 @@ public class TcManualInsertRollingService {
                                                           Map<String, TcScheduleResult> newTemplateMap) {
         List<TcScheduleResult> snapshotList = this.loadScheduleResults(reference, machineCodeList);
         this.validateEditableResults(snapshotList);
-        TcManualRollingContext context = this.buildContext(reference, machineCodeList, snapshotList);
+        TcManualRollingContext context = this.buildContext(
+                reference, machineCodeList, snapshotList, commandBatch);
         TcManualRollingResult rollingResult;
         try {
             rollingResult = this.scheduleOperationFacade.execute(commandBatch, context);
@@ -268,7 +275,8 @@ public class TcManualInsertRollingService {
 
     /** 将数据库横表快照拆成独立班次任务。 */
     private TcManualRollingContext buildContext(TcScheduleResult reference, List<String> machineCodeList,
-                                                 List<TcScheduleResult> snapshotList) {
+                                                 List<TcScheduleResult> snapshotList,
+                                                 TcManualRollingCommandBatch commandBatch) {
         TcManualRollingContext context = new TcManualRollingContext();
         context.setFactoryCode(reference.getFactoryCode());
         context.setScheduleDate(reference.getScheduleDate());
@@ -287,6 +295,9 @@ public class TcManualInsertRollingService {
                 context.getShiftCapacityMap().put(machineCode + "|" + shiftOrder,
                         this.machineRuleValidator.resolveRollingCapacity(reference, machineCode, shiftOrder));
             }
+        }
+        if (manualConstraintDataLoadService != null) {
+            manualConstraintDataLoadService.enrich(context, machineCodeList, commandBatch);
         }
         return context;
     }
