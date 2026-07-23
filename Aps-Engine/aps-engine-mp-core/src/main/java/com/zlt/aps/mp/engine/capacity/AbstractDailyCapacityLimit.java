@@ -552,14 +552,14 @@ public abstract class AbstractDailyCapacityLimit {
             changeTypeBlockDiffQty = getProportionalDeductQty(dailyCapacityLimitVo,changeTypeBlockDiffQty);
         }
         //前SKU的收尾量与日硫化量差异<=40条(32+8)（有收尾但当日不能换活字块）
-        if (embryoCodePreDayCountMap == null ||
+       /* if (embryoCodePreDayCountMap == null ||
                 embryoCodePreDayCountMap.get((String) mpFinalVo.getFieldValueByFieldName(getEmbryoCodeField())) <= 0){
-            if (dailyLhQty - remainQty <= changeTypeBlockDiffQty){
-                iCount += 1;
-                patternMachinesCountMap(patternMachinesMap,mpFinalVo,iCount);
-            }
-        }
 
+        }*/
+        if (dailyLhQty - remainQty <= changeTypeBlockDiffQty){
+            iCount += 1;
+            patternMachinesCountMap(patternMachinesMap,mpFinalVo,iCount);
+        }
         return iCount;
     }
 
