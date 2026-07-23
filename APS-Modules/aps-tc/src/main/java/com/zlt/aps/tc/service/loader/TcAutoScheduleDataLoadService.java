@@ -218,21 +218,16 @@ public class TcAutoScheduleDataLoadService {
         wrapper.eq(TcMouthPlate::getFactoryCode, context.getFactoryCode());
         wrapper.in(TcMouthPlate::getMachineCode, candidateMap.keySet());
         List<TcMouthPlate> mouthPlateList = tmMouthPlateMapper.selectList(wrapper);
-        Set<String> configuredMouthPlateCodes = mouthPlateList.stream()
-                .map(TcMouthPlate::getMouthPlateCode)
-                .filter(StrUtil::isNotBlank)
-                .collect(Collectors.toSet());
-        for (TcMachineCandidate candidate : candidateMap.values()) {
-            if (candidate.getConfiguredMouthPlateCodes() == null) {
-                candidate.setConfiguredMouthPlateCodes(new HashSet<>());
-            }
-            candidate.getConfiguredMouthPlateCodes().addAll(configuredMouthPlateCodes);
-        }
         for (TcMouthPlate mouthPlate : mouthPlateList) {
             TcMachineCandidate candidate = candidateMap.get(mouthPlate.getMachineCode());
             if (candidate == null || StrUtil.isBlank(mouthPlate.getMouthPlateCode())) {
                 continue;
             }
+            // 口型板配置必须按机台隔离；候选机台自身无有效配置时，空集合表示不限制口型板。
+            if (candidate.getConfiguredMouthPlateCodes() == null) {
+                candidate.setConfiguredMouthPlateCodes(new HashSet<>());
+            }
+            candidate.getConfiguredMouthPlateCodes().add(mouthPlate.getMouthPlateCode());
             if (candidate.getMouthPlateCodes() == null) {
                 candidate.setMouthPlateCodes(new HashSet<>());
             }
@@ -255,18 +250,6 @@ public class TcAutoScheduleDataLoadService {
         wrapper.eq(TcGlueMachineReal::getEnableStatus, TcYesNoEnum.YES.getCode());
         wrapper.in(TcGlueMachineReal::getMachineCode, candidateMap.keySet());
         List<TcGlueMachineReal> glueRuleList = tmGlueMachineRealMapper.selectList(wrapper);
-        Set<String> configuredGlueCodes = glueRuleList.stream()
-                .filter(glueRule -> TcYesNoEnum.YES.getCode().equals(glueRule.getAllowFlag())
-                        || TcYesNoEnum.NO.getCode().equals(glueRule.getAllowFlag()))
-                .map(TcGlueMachineReal::getGlueCode)
-                .filter(StrUtil::isNotBlank)
-                .collect(Collectors.toSet());
-        for (TcMachineCandidate candidate : candidateMap.values()) {
-            if (candidate.getConfiguredGlueCodes() == null) {
-                candidate.setConfiguredGlueCodes(new HashSet<>());
-            }
-            candidate.getConfiguredGlueCodes().addAll(configuredGlueCodes);
-        }
         for (TcGlueMachineReal glueRule : glueRuleList) {
             if (StrUtil.isBlank(glueRule.getGlueCode())
                     || (!TcYesNoEnum.YES.getCode().equals(glueRule.getAllowFlag())
@@ -277,6 +260,11 @@ public class TcAutoScheduleDataLoadService {
             if (candidate == null) {
                 continue;
             }
+            // 胶料关系必须按机台隔离；当前机台未配置该主胶料时默认不限制。
+            if (candidate.getConfiguredGlueCodes() == null) {
+                candidate.setConfiguredGlueCodes(new HashSet<>());
+            }
+            candidate.getConfiguredGlueCodes().add(glueRule.getGlueCode());
             if (TcYesNoEnum.YES.getCode().equals(glueRule.getAllowFlag())) {
                 if (candidate.getAllowedGlueCodes() == null) {
                     candidate.setAllowedGlueCodes(new HashSet<>());

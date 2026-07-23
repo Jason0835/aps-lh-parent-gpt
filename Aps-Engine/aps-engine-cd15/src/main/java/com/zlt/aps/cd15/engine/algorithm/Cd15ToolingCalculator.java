@@ -46,4 +46,34 @@ public class Cd15ToolingCalculator {
                 .limitedQuantity(actualQuantity.subtract(schedulableQuantity))
                 .build();
     }
+
+    /** 单规格一出二按成对工装计算可排总量。 */
+    public Cd15ToolingTrial calculateSingleSpecSplit(
+            BigDecimal actualQuantity,
+            int totalToolingCount,
+            int occupiedVehicleCount,
+            BigDecimal vehiclePlanQuantity) {
+        if (actualQuantity == null || actualQuantity.signum() < 0) {
+            throw new IllegalArgumentException("实际排产量不能小于0");
+        }
+        if (totalToolingCount < 0 || occupiedVehicleCount < 0) {
+            throw new IllegalArgumentException("工装总数和库排占用车数不能小于0");
+        }
+        if (vehiclePlanQuantity == null || vehiclePlanQuantity.signum() <= 0) {
+            throw new IllegalArgumentException("单车斜裁排程米数必须大于0");
+        }
+        int availableCount = Math.max(0,
+                totalToolingCount - occupiedVehicleCount);
+        int availablePairCount = availableCount / 2;
+        BigDecimal availableQuantity = vehiclePlanQuantity
+                .multiply(new BigDecimal("2"))
+                .multiply(BigDecimal.valueOf(availablePairCount));
+        BigDecimal schedulableQuantity = actualQuantity.min(availableQuantity);
+        return Cd15ToolingTrial.builder()
+                .availableToolingCount(availableCount)
+                .availableToolingQuantity(availableQuantity)
+                .schedulableQuantity(schedulableQuantity)
+                .limitedQuantity(actualQuantity.subtract(schedulableQuantity))
+                .build();
+    }
 }

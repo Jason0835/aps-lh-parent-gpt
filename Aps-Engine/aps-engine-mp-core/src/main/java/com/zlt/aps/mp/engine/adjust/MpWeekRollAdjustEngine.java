@@ -2409,7 +2409,7 @@ public class MpWeekRollAdjustEngine {
      * @param iDay 当前天
      * @return 活块数量
      */
-    private int getNewTypeBlockQty(MpRollAdjustContextDTO contextDTO,FactoryMonthPlanFinalAdjustVo mpFinalVo,int iDay){
+    public int getNewTypeBlockQty(MpRollAdjustContextDTO contextDTO,FactoryMonthPlanFinalAdjustVo mpFinalVo,int iDay){
         DailyMouldAvailabilityResult cavity2BlockVo = contextDTO.getCavity2BlockMap().get(iDay);
         if (cavity2BlockVo != null && cavity2BlockVo.getInsertResults() != null){
             Integer blockQty = cavity2BlockVo.getInsertResults().get(mpFinalVo.getMaterialDesc());
@@ -2562,7 +2562,10 @@ public class MpWeekRollAdjustEngine {
         }else{
             //增模
             int[]addMouldArr = adjustDailyCapacityLimitObj.getAddMouldMachines(mpFinalVo,dailyLhQty,paramMap,dayField,day1Field,day2Field);
-            otherMachines = addMouldArr[0];
+            otherMachines = addMouldArr[0] + addMouldArr[1];
+            if (addMouldArr[3] > 0){
+                fullMachines -= addMouldArr[3];
+            }
         }
         return (fullMachines+otherMachines)*2;
     }
@@ -2687,7 +2690,7 @@ public class MpWeekRollAdjustEngine {
      * @param mpFinalVo 定稿Vo
      * @return 日硫化量
      */
-    private Integer getDayVulcanizationQty(FactoryMonthPlanFinalAdjustVo mpFinalVo) {
+    public Integer getDayVulcanizationQty(FactoryMonthPlanFinalAdjustVo mpFinalVo) {
         // 日硫化量 = 单模硫化量 * 2；
         return mpFinalVo.getDayVulcanizationQty() * 2;
     }

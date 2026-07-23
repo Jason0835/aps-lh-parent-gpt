@@ -27,8 +27,12 @@ public class Cd15MachineTrialRequest {
     private String cordSpec;
     /** 是否按分裁模式试算机台。 */
     private boolean splitCut;
-        /** 当前层位斜裁宽度，来自施工表BELT_CRAFT1/2/3 */
+    /** 是否按单规格一出二模式试算。 */
+    private boolean singleSpecSplit;
+    /** 当前层位斜裁宽度，来自施工表BELT_CRAFT1/2/3。 */
     private BigDecimal craftWidth;
+    /** 机台和角度约束使用的实际占用宽度；单规格一出二时为两倍斜裁宽度。 */
+    private BigDecimal machineMatchWidth;
     /** 单片胎体长度，单位毫米/片，来自施工表BELT1_LENGTH/BELT2_LENGTH/BELT3_LENGTH。 */
     private BigDecimal unitConsumeMillimeter;
     /** 本规格采用的标准卷曲长度，单位米；标准表缺失时由CRIMP_LENGTH兜底 */

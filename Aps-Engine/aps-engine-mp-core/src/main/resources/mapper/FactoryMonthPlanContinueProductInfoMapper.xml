@@ -19,6 +19,7 @@
                ppf.DAY_${lastDay} AS PRODUCTION_QTY
           FROM t_mp_month_plan_prod_final ppf
          WHERE IFNULL(ppf.IS_DELETE, 0) = 0
+           AND IFNULL(PRODUCT_STATUS, 'S') = 'S'
            AND ppf.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
            AND ppf.YEAR = #{year,jdbcType=DECIMAL}
            AND ppf.MONTH = #{month,jdbcType=DECIMAL}

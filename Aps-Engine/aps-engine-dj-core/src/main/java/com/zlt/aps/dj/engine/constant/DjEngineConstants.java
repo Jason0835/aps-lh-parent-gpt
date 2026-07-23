@@ -27,15 +27,27 @@ public class DjEngineConstants {
     public static final String PARAM_GLUE_SWITCH_TIME = "SYS1401009";
     /** SYS1401010 排产触发阈值（个班次），当前库存可覆盖的成型班次数 ≤ 此值时触发排产 */
     public static final String PARAM_SCHEDULE_THRESHOLD = "SYS1401010";
-    
+
+    /** SYS1401011 成型原因分析收尾关键字 */
+    public static final String PARAM_CX_ANALYSIS_CLOSEOUT_KEYWORD = "SYS1401011";
+
     /** SYS1401012 新规格判定天数阈值（天），连续N天未排产则视为新规格 */
     public static final String PARAM_NEW_SPEC_DAYS_THRESHOLD = "SYS1401012";
+
+    /** SYS1401013 单规格每班最大排产量（米），默认3000 */
+    public static final String PARAM_MAX_SHIFT_PRODUCE_QTY = "SYS1401013";
 
     /** SYS1401014 每班平均（免费）切换次数，不超过此次数不计算切换产能损失，默认3 */
     public static final String PARAM_AVG_SWITCH_COUNT = "SYS1401014";
 
-    /** SYS1401013 单规格每班最大排产量（米），默认3000 */
-    public static final String PARAM_MAX_SHIFT_PRODUCE_QTY = "SYS1401013";
+    /** SYS1401015 实验量试提前排产班次数，量试/试制规格的成型班次需求提前N个垫胶班次排产，默认3 */
+    public static final String PARAM_TRIAL_ADVANCE_SHIFTS = "SYS1401015";
+
+    /** SYS1401016 实验量试生产阶段编码集合（逗号分隔），匹配 MdmConstructionInfo.productionStage，默认 T,X */
+    public static final String PARAM_TRIAL_PRODUCTION_STAGES = "SYS1401016";
+
+    /** SYS1401017 新规格提前备料天数，成型第一次使用这个新规格的前N天排产，默认1；大于2时按2处理 */
+    public static final String PARAM_NEW_SPEC_ADVANCE_DAYS = "SYS1401017";
 
     // ==================== 班次常量 ====================
 
@@ -113,6 +125,9 @@ public class DjEngineConstants {
     /** 班次顺序字段名模板，format: shiftIndex → class1Sequence */
     public static final String CLASS_SEQUENCE_FIELD = "class%dSequence";
 
-    /** 班次原因分析字段名模板，format: classIndex → class1Analysis */
+    /** 班次原因分析（系统）字段名模板，format: classIndex → class1Analysis */
     public static final String CLASS_ANALYSIS_FIELD = "class%dAnalysis";
+
+    /** 班次原因分析（手动输入）字段名模板，format: classIndex → class1AnalysisInput */
+    public static final String CLASS_ANALYSIS_INPUT_FIELD = "class%dAnalysisInput";
 }

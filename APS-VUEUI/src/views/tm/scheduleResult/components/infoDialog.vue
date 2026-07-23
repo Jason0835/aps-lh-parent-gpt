@@ -67,6 +67,12 @@ const INSERT_TASK_FIELDS = [
 export default {
   components: { infoForm },
   inject: ["parentDict"],
+  props: {
+    machineOptions: {
+      type: Array,
+      default: () => [],
+    },
+  },
   data() {
     return {
       loading: false,
@@ -91,8 +97,8 @@ export default {
         machineCode: [
           {
             required: true,
-            message: this.$t("common.rule.input"),
-            trigger: "blur",
+            message: this.$t("common.rule.select"),
+            trigger: "change",
           },
         ],
         treadCode: [
@@ -136,7 +142,13 @@ export default {
             prop: "machineCode",
             label: this.$t("ui.data.column.tm.scheduleResult.machineCode"),
             span: 12,
-            maxlength: 50,
+            type: "select",
+            dictData: this.machineOptions,
+            props: {
+              label: "machineCode",
+              value: "machineCode",
+            },
+            filterable: true,
           },
           {
             prop: "treadCode",

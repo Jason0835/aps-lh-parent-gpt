@@ -57,7 +57,7 @@ public class DjPaddingDemand {
     /** 台车容量（米/台车），即 curlLength */
     private BigDecimal trolleyCapacity;
 
-    /** 是否已收尾（productionStatus = "2" 时为 true） */
+    /** 是否已收尾（使用该垫胶的所有成型计划，各班原因分析均含收尾关键字时为true） */
     private boolean isTailFinished;
 
     /** 是否新规格（库存表中无该垫胶代码记录时为 true） */
@@ -74,4 +74,13 @@ public class DjPaddingDemand {
 
     /** 供应窗口（当前班之后）是否有成型需求，false 表示后续窗口无需求，若本班不生产则无补救机会 */
     private boolean windowHasDemand;
+
+    /** 损耗率百分比（如 2 表示 2%），收尾规格特有，仅用于日志输出 */
+    private BigDecimal lossRatePercent;
+
+    /** 应用损耗率前的净需求量，仅用于日志输出（如 "(收尾，264.62 × 102%)"） */
+    private BigDecimal preLossRateDemand;
+
+    /** 超出成型8班部分的预估量在被月计划余量约束后的实际值，未受约束时为 null（仅用于日志输出） */
+    private BigDecimal constrainedEstimatedPart2;
 }

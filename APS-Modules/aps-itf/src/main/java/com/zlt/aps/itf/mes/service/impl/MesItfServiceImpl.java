@@ -1891,9 +1891,14 @@ public class MesItfServiceImpl implements MesItfService {
             String scheduleDateStr = DateUtil.formatDate(scheduleDate);
             log.info("胎圈排程完成量同步：开始同步，factoryCode={}, scheduleDate={}, 待插入数量={}", factoryCode, scheduleDateStr, insertList.size());
 
-            FeignTokenHelper.runWithToken(() -> {
-                tqMesSyncRemoteService.logicDeleteAndSaveScheFinishQty(factoryCode, scheduleDateStr, "MES", insertList);
-            });
+            // 接收Feign返回值并校验，避免服务端异常被全局异常处理器吞掉返回HTTP 200+AjaxResult.error时，itf端误判为成功
+            AjaxResult saveResult = FeignTokenHelper.callWithToken(() ->
+                    tqMesSyncRemoteService.logicDeleteAndSaveScheFinishQty(factoryCode, scheduleDateStr, "MES", insertList));
+            if (AjaxResult.Type.SUCCESS.value() != (Integer) saveResult.get(AjaxResult.CODE_TAG)) {
+                log.error("胎圈排程完成量同步：同步失败，factoryCode={}, 返回code={}, 返回消息={}",
+                        factoryCode, saveResult.get(AjaxResult.CODE_TAG), saveResult.get(AjaxResult.MSG_TAG));
+                return AjaxResult.error("胎圈排程完成量同步失败：" + saveResult.get(AjaxResult.MSG_TAG));
+            }
 
             log.info("胎圈排程完成量同步：同步完成，factoryCode={}, 插入数量={}", factoryCode, insertList.size());
         } catch (Exception e) {
@@ -2042,9 +2047,14 @@ public class MesItfServiceImpl implements MesItfService {
             String scheduleDateStr = DateUtil.formatDate(scheduleDate);
             log.info("成型排程完成量同步：开始同步，factoryCode={}, scheduleDate={}, 待插入数量={}", factoryCode, scheduleDateStr, insertList.size());
 
-            FeignTokenHelper.runWithToken(() -> {
-                cxMesSyncRemoteService.logicDeleteAndSaveScheFinishQty(factoryCode, scheduleDateStr, "MES", insertList);
-            });
+            // 接收Feign返回值并校验，避免服务端异常被全局异常处理器吞掉返回HTTP 200+AjaxResult.error时，itf端误判为成功
+            AjaxResult saveResult = FeignTokenHelper.callWithToken(() ->
+                    cxMesSyncRemoteService.logicDeleteAndSaveScheFinishQty(factoryCode, scheduleDateStr, "MES", insertList));
+            if (AjaxResult.Type.SUCCESS.value() != (Integer) saveResult.get(AjaxResult.CODE_TAG)) {
+                log.error("成型排程完成量同步：同步失败，factoryCode={}, 返回code={}, 返回消息={}",
+                        factoryCode, saveResult.get(AjaxResult.CODE_TAG), saveResult.get(AjaxResult.MSG_TAG));
+                return AjaxResult.error("成型排程完成量同步失败：" + saveResult.get(AjaxResult.MSG_TAG));
+            }
 
             log.info("成型排程完成量同步：同步完成，factoryCode={}, 插入数量={}", factoryCode, insertList.size());
         } catch (Exception e) {
@@ -2097,9 +2107,14 @@ public class MesItfServiceImpl implements MesItfService {
             String scheduleDateStr = DateUtil.formatDate(scheduleDate);
             log.info("硫化排程完成量同步：开始同步，factoryCode={}, scheduleDate={}, 待插入数量={}", factoryCode, scheduleDateStr, insertList.size());
 
-            FeignTokenHelper.runWithToken(() -> {
-                lhMesSyncRemoteService.logicDeleteAndSaveScheFinishQty(factoryCode, scheduleDateStr, "MES", insertList);
-            });
+            // 接收Feign返回值并校验，避免服务端异常被全局异常处理器吞掉返回HTTP 200+AjaxResult.error时，itf端误判为成功
+            AjaxResult saveResult = FeignTokenHelper.callWithToken(() ->
+                    lhMesSyncRemoteService.logicDeleteAndSaveScheFinishQty(factoryCode, scheduleDateStr, "MES", insertList));
+            if (AjaxResult.Type.SUCCESS.value() != (Integer) saveResult.get(AjaxResult.CODE_TAG)) {
+                log.error("硫化排程完成量同步：同步失败，factoryCode={}, 返回code={}, 返回消息={}",
+                        factoryCode, saveResult.get(AjaxResult.CODE_TAG), saveResult.get(AjaxResult.MSG_TAG));
+                return AjaxResult.error("硫化排程完成量同步失败：" + saveResult.get(AjaxResult.MSG_TAG));
+            }
 
             log.info("硫化排程完成量同步：同步完成，factoryCode={}, 插入数量={}", factoryCode, insertList.size());
         } catch (Exception e) {
@@ -2155,9 +2170,14 @@ public class MesItfServiceImpl implements MesItfService {
             String scheduleDateStr = DateUtil.formatDate(scheduleDate);
             log.info("硫化排程完成量按上一天最新版本同步：开始同步，factoryCode={}, scheduleDate={}, 待插入数量={}", factoryCode, scheduleDateStr, insertList.size());
 
-            FeignTokenHelper.runWithToken(() -> {
-                lhMesSyncRemoteService.logicDeleteAndSaveScheFinishQty(factoryCode, scheduleDateStr, "MES", insertList);
-            });
+            // 接收Feign返回值并校验，避免服务端异常被全局异常处理器吞掉返回HTTP 200+AjaxResult.error时，itf端误判为成功
+            AjaxResult saveResult = FeignTokenHelper.callWithToken(() ->
+                    lhMesSyncRemoteService.logicDeleteAndSaveScheFinishQty(factoryCode, scheduleDateStr, "MES", insertList));
+            if (AjaxResult.Type.SUCCESS.value() != (Integer) saveResult.get(AjaxResult.CODE_TAG)) {
+                log.error("硫化排程完成量按上一天最新版本同步：同步失败，factoryCode={}, 返回code={}, 返回消息={}",
+                        factoryCode, saveResult.get(AjaxResult.CODE_TAG), saveResult.get(AjaxResult.MSG_TAG));
+                return AjaxResult.error("硫化排程完成量按上一天最新版本同步失败：" + saveResult.get(AjaxResult.MSG_TAG));
+            }
 
             log.info("硫化排程完成量按上一天最新版本同步：同步完成，factoryCode={}, 插入数量={}", factoryCode, insertList.size());
         } catch (Exception e) {
@@ -2227,9 +2247,14 @@ public class MesItfServiceImpl implements MesItfService {
                         dataVersion, factoryCode, scheduleDateStr, groupList.size());
 
                 String finalFactoryCode = factoryCode;
-                FeignTokenHelper.runWithToken(() -> {
-                    lhMesSyncRemoteService.logicDeleteAndSaveScheFinishQty(finalFactoryCode, scheduleDateStr, "MES", groupList);
-                });
+                // 接收Feign返回值并校验，避免服务端异常被全局异常处理器吞掉返回HTTP 200+AjaxResult.error时，itf端误判为成功
+                AjaxResult saveResult = FeignTokenHelper.callWithToken(() ->
+                        lhMesSyncRemoteService.logicDeleteAndSaveScheFinishQty(finalFactoryCode, scheduleDateStr, "MES", groupList));
+                if (AjaxResult.Type.SUCCESS.value() != (Integer) saveResult.get(AjaxResult.CODE_TAG)) {
+                    log.error("硫化排程完成量按版本号同步：同步失败，dataVersion={}, factoryCode={}, scheduleDate={}, 返回code={}, 返回消息={}",
+                            dataVersion, factoryCode, scheduleDateStr, saveResult.get(AjaxResult.CODE_TAG), saveResult.get(AjaxResult.MSG_TAG));
+                    return AjaxResult.error("硫化排程完成量按版本号同步失败：" + saveResult.get(AjaxResult.MSG_TAG));
+                }
 
                 log.info("硫化排程完成量按版本号同步：同步完成，dataVersion={}, factoryCode={}, scheduleDate={}, 插入数量={}",
                         dataVersion, factoryCode, scheduleDateStr, groupList.size());
@@ -3361,9 +3386,14 @@ public class MesItfServiceImpl implements MesItfService {
             String scheduleDateStr = DateUtil.formatDate(scheduleDate);
             log.info("胎面排程完成量同步：开始同步，factoryCode={}, scheduleDate={}, 待插入数量={}", factoryCode, scheduleDateStr, insertList.size());
 
-            FeignTokenHelper.runWithToken(() -> {
-                tmMesSyncRemoteService.logicDeleteAndSaveScheFinishQty(factoryCode, scheduleDateStr, "MES", insertList);
-            });
+            // 接收Feign返回值并校验，避免服务端异常被全局异常处理器吞掉返回HTTP 200+AjaxResult.error时，itf端误判为成功
+            AjaxResult saveResult = FeignTokenHelper.callWithToken(() ->
+                    tmMesSyncRemoteService.logicDeleteAndSaveScheFinishQty(factoryCode, scheduleDateStr, "MES", insertList));
+            if (AjaxResult.Type.SUCCESS.value() != (Integer) saveResult.get(AjaxResult.CODE_TAG)) {
+                log.error("胎面排程完成量同步：同步失败，factoryCode={}, 返回code={}, 返回消息={}",
+                        factoryCode, saveResult.get(AjaxResult.CODE_TAG), saveResult.get(AjaxResult.MSG_TAG));
+                return AjaxResult.error("胎面排程完成量同步失败：" + saveResult.get(AjaxResult.MSG_TAG));
+            }
 
             log.info("胎面排程完成量同步：同步完成，factoryCode={}, 插入数量={}", factoryCode, insertList.size());
         } catch (Exception e) {

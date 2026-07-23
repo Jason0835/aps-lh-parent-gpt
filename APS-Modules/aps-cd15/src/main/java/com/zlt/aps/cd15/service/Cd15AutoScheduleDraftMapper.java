@@ -34,7 +34,8 @@ public class Cd15AutoScheduleDraftMapper {
         result.setScheduleDate(date(scheduleDate));
         result.setCd15BatchNo(batchNo);
         result.setOrderNo(orderNo);
-        result.setGroupNo(draft.getSplitGroupKey() == null ? null : orderNo);
+        result.setGroupNo("SPLIT".equalsIgnoreCase(draft.getCutMode())
+                ? orderNo : null);
         result.setSteelStripCode(draft.getSteelStripCode());
         result.setMaterialKey(draft.getMaterialKey());
         result.setCraftWidth(draft.getCraftWidth());

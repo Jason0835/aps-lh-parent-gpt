@@ -66,11 +66,13 @@ export default {
           type: "select",
           dictData: this.parentDict.type.biz_factory_name,
           filterable: true,
+          disabled: this.isEdit,
         },
         {
           prop: "paramCode",
           label: this.$t("ui.data.column.cd15Params.paramCode"),
           maxlength: 50,
+          disabled: this.isEdit,
         },
         {
           prop: "paramName",
@@ -82,16 +84,7 @@ export default {
           label: this.$t("ui.data.column.cd15Params.paramValue"),
           maxlength: 50,
         },
-        {
-          prop: "regularExpression",
-          label: this.$t("ui.data.column.cd15Params.regularExpression"),
-          maxlength: 100,
-        },
-        {
-          prop: "errorTips",
-          label: this.$t("ui.data.column.cd15Params.errorTips"),
-          maxlength: 200,
-        },
+
         {
           prop: "remark",
           label: this.$t("ui.common.column.remark"),

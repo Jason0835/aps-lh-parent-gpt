@@ -2380,37 +2380,57 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
 
     /**
      * 加载硫化精度保养计划，按机台编号建立Map。
-     * <p>仅加载完成状态为未完成且实际完成时间为空的计划；保留完成状态原有筛选口径，
-     * 同时以实际完成时间拦截已由设备或 MES 确认完成、但状态尚未同步的精度计划。</p>
+     * <p>年度完整性审计读取全年原始计划；运行态只加载计划日期大于等于T日、
+     * 完成状态为未完成且实际执行日期为空的计划，避免历史或已执行计划重复占用机台。
+     * 已安排但设备侧未执行的计划不再按排程日期排除，允许在滚动排程中基于最新数据重新评估。</p>
      *
      * @param context     排程上下文
      * @param factoryCode 分厂编号
      */
     private void loadMaintenancePlan(LhScheduleContext context, String factoryCode) {
         int scheduleYear = resolveScheduleYear(context);
-        List<LhPrecisionPlan> maintenancePlanList = lhPrecisionPlanMapper.selectList(
+        // 精度计划T日与排程引擎窗口起点保持一致，统一使用context.scheduleDate。
+        Date scheduleDate = LhScheduleTimeUtil.clearTime(context.getScheduleDate());
+
+        // 年度完整性审计必须保留全年原始计划口径，不能因运行态过滤把已安排计划误报为年度缺失。
+        List<LhPrecisionPlan> annualMaintenancePlanList = lhPrecisionPlanMapper.selectList(
                 new LambdaQueryWrapper<LhPrecisionPlan>()
                         .eq(LhPrecisionPlan::getFactoryCode, factoryCode)
                         .eq(LhPrecisionPlan::getYear, BigDecimal.valueOf(scheduleYear))
                         .eq(LhPrecisionPlan::getIsDelete, DeleteFlagEnum.NORMAL.getCode()));
+
+        // 运行态只加载T日起设备侧未完成的精准计划；完成判据统一为完成状态与实际执行日期，
+        // 已安排但未执行的计划不再按排程日期排除，允许滚动排程基于最新数据重新评估保养日期。
+        List<LhPrecisionPlan> maintenancePlanList = lhPrecisionPlanMapper.selectList(
+                new LambdaQueryWrapper<LhPrecisionPlan>()
+                        .eq(LhPrecisionPlan::getFactoryCode, factoryCode)
+                        .eq(LhPrecisionPlan::getYear, BigDecimal.valueOf(scheduleYear))
+                        .eq(LhPrecisionPlan::getIsDelete, DeleteFlagEnum.NORMAL.getCode())
+                        .ge(LhPrecisionPlan::getPlanDate, scheduleDate)
+                        .eq(LhPrecisionPlan::getCompletionStatus, "0")
+                        .isNull(LhPrecisionPlan::getActualDate));
         Map<String, LhPrecisionPlan> maintenancePlanMap = new HashMap<>(32);
         Map<String, Integer> annualPlanCountMap = new HashMap<>(32);
+        if (!CollectionUtils.isEmpty(annualMaintenancePlanList)) {
+            for (LhPrecisionPlan plan : annualMaintenancePlanList) {
+                if (StringUtils.isNotEmpty(plan.getMachineCode())) {
+                    annualPlanCountMap.merge(plan.getMachineCode(), 1, Integer::sum);
+                }
+            }
+        }
         if (!CollectionUtils.isEmpty(maintenancePlanList)) {
             for (LhPrecisionPlan plan : maintenancePlanList) {
                 if (StringUtils.isEmpty(plan.getMachineCode())) {
                     continue;
                 }
-                annualPlanCountMap.merge(plan.getMachineCode(), 1, Integer::sum);
-                // 运行态仅保留未完成且实际完成时间为空的计划；完成状态和实际日期继续由 MES/设备侧维护。
-                if ("0".equals(plan.getCompletionStatus()) && Objects.isNull(plan.getActualDate())) {
-                    maintenancePlanMap.put(plan.getMachineCode(), plan);
-                }
+                maintenancePlanMap.put(plan.getMachineCode(), plan);
             }
         }
         context.setMaintenancePlanMap(maintenancePlanMap);
         context.setAnnualMaintenancePlanCountMap(annualPlanCountMap);
-        log.debug("硫化精度保养计划加载完成, 年度: {}, 年度计划数: {}, 未完成有效计划数: {}",
-                scheduleYear, Objects.isNull(maintenancePlanList) ? 0 : maintenancePlanList.size(),
+        log.debug("硫化精度保养计划加载完成, 年度: {}, T日: {}, 年度计划数: {}, T日起未执行计划数: {}",
+                scheduleYear, LhScheduleTimeUtil.formatDate(scheduleDate),
+                Objects.isNull(annualMaintenancePlanList) ? 0 : annualMaintenancePlanList.size(),
                 maintenancePlanMap.size());
     }
 

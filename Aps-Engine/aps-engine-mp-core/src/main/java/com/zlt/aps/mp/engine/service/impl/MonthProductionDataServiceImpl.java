@@ -1,6 +1,8 @@
 package com.zlt.aps.mp.engine.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 import com.zlt.aps.enums.ProductionPlanType;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.mp.api.domain.entity.*;
@@ -8,6 +10,7 @@ import com.zlt.aps.mp.engine.constant.ProductionConstant;
 import com.zlt.aps.mp.engine.domain.Context;
 import com.zlt.aps.mp.engine.domain.dto.ContinueGroupInfo;
 import com.zlt.aps.mp.engine.domain.dto.ContinueProductInfo;
+import com.zlt.aps.mp.engine.domain.vo.GroupAppointProductionInfoVo;
 import com.zlt.aps.mp.engine.domain.vo.MonthPlanProductionRequirePlanVo;
 import com.zlt.aps.mp.engine.logrecorder.TbrBeforeProductionGroupLogRecorder;
 import com.zlt.aps.mp.engine.mapper.*;
@@ -224,12 +227,56 @@ public class MonthProductionDataServiceImpl extends AbstractDataService implemen
     }
 
     @Override
-    public List<ContinueProductInfo> getContinueProductionInfo(String factoryCode, Integer year, Integer month, Integer lastDay) {
+    public List<GroupAppointProductionInfoVo> getMonthAppointProductionInfo(String factoryCode, Integer year, Integer month) {
+        List<GroupAppointProductionInfoVo> result = Lists.newArrayList();
+        GroupAppointProductionInfoVo add = new GroupAppointProductionInfoVo();
+        add.setGroupName("315/80R22.5-JY711零度");
+        add.setCxMachineCode("H1105");
+        add.setMonthStartDay(16);
+        add.setMaxAllocationDay(10);
+        result.add(add);
+        return result;
+    }
+
+    @Override
+    public List<ContinueProductInfo> getContinueProductionInfo(String factoryCode, Integer year, Integer month, List<Integer> lastDays) {
         //取得上个月最后一天的排产信息
-        if (StringUtils.isBlank(factoryCode) || null == year || null == month || null == lastDay) {
+        if (StringUtils.isBlank(factoryCode) || null == year || null == month || CollectionUtils.isEmpty(lastDays)) {
             return Collections.emptyList();
         }
-        return factoryMonthPlanContinueProductInfoMapper.getContinueProductInfo(factoryCode, year, month, lastDay);
+        int days = lastDays.size();
+        if (days == BigDecimal.ONE.intValue()) {
+            return factoryMonthPlanContinueProductInfoMapper.getContinueProductInfo(factoryCode, year, month, lastDays.get(BigDecimal.ZERO.intValue()));
+        }
+        //日期倒序排序
+        lastDays.sort(Comparator.comparing(Integer::intValue, Comparator.reverseOrder()));
+        Map<String, ContinueProductInfo> finalContinueInfo = Maps.newHashMap();
+        //最后一天
+        Integer lastDay = lastDays.get(BigDecimal.ZERO.intValue());
+        List<ContinueProductInfo> lastDayInfo = factoryMonthPlanContinueProductInfoMapper.getContinueProductInfo(factoryCode, year, month, lastDay);
+        if (!CollectionUtils.isEmpty(lastDayInfo)) {
+            lastDayInfo.forEach(singleSku -> finalContinueInfo.put(singleSku.getMaterialDesc(), singleSku));
+        }
+        //最后第二天
+        Integer previousByLastDay = lastDays.get(BigDecimal.ONE.intValue());
+        List<ContinueProductInfo> previousByLastDayInfo = factoryMonthPlanContinueProductInfoMapper.getContinueProductInfo(factoryCode, year, month, previousByLastDay);
+        if (!CollectionUtils.isEmpty(previousByLastDayInfo)) {
+            previousByLastDayInfo.forEach(singleSku -> {
+                String materialDesc = singleSku.getMaterialDesc();
+                if (StringUtils.isBlank(materialDesc)) {
+                    return;
+                }
+                if (finalContinueInfo.containsKey(materialDesc)) {
+                    return;
+                }
+                //没有，取最后第二天的
+                finalContinueInfo.put(materialDesc, singleSku);
+            });
+        }
+        if (CollectionUtils.isEmpty(finalContinueInfo)) {
+            return Collections.emptyList();
+        }
+        return Lists.newArrayList(finalContinueInfo.values());
     }
 
     @Override

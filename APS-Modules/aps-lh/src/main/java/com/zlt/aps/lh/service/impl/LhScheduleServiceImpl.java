@@ -7,6 +7,7 @@ import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
 import com.ruoyi.api.gateway.system.service.ISysDictDataCacheService;
 import com.ruoyi.common.core.domain.SysDictData;
@@ -520,6 +521,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
      * @return 结果
      */
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public AjaxResult adjustQuantity(LhScheduleResultUpdateDTO dto) {
         AjaxResult preCheck = adjustQuantityPreCheck(dto);
         if (preCheck.get(AjaxResult.CODE_TAG).equals(AjaxResult.Type.ERROR.value())) {
@@ -531,6 +533,8 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
             return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.lhScheduleResult.adjustQuantity.recordNotFound"));
         }
 
+        // 记录本次调量中被清零的班次：清零后需同步置空其开始时间、结束时间、硫化示方书号、硫化示方书类型
+        Set<Integer> clearedShifts = new HashSet<>();
         for (int shiftIndex = 1; shiftIndex <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT; shiftIndex++) {
             Integer adjustPlanQty = getAdjustPlanQty(dto, shiftIndex);
             if (Objects.nonNull(adjustPlanQty)) {
@@ -538,6 +542,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
                 setAdjustAnalysis(record, shiftIndex, getAdjustAnalysis(dto, shiftIndex));
                 if (adjustPlanQty == 0) {
                     ShiftFieldUtil.clearShiftPlanAuxFields(record, shiftIndex);
+                    clearedShifts.add(shiftIndex);
                 }
             }
         }
@@ -553,6 +558,27 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         if (updateCount <= 0) {
             return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.lhScheduleResult.adjustQuantity.failRetry"));
         }
+
+        // updateById 默认跳过 null 字段，清零班次的开始时间、结束时间、硫化示方书号、硫化示方书类型，
+        // 以及全部班次清零时的排程类型，需用 UpdateWrapper 显式置空
+        Integer dailyPlanQty = record.getDailyPlanQty();
+        boolean allCleared = dailyPlanQty == null || dailyPlanQty == 0;
+        if (!clearedShifts.isEmpty() || allCleared) {
+            UpdateWrapper<LhScheduleResult> wrapper = new UpdateWrapper<>();
+            wrapper.eq("ID", record.getId());
+            for (int shiftIndex : clearedShifts) {
+                String columnPrefix = "CLASS" + shiftIndex;
+                wrapper.set(columnPrefix + "_START_TIME", null)
+                        .set(columnPrefix + "_END_TIME", null)
+                        .set(columnPrefix + "_LH_NO", null)
+                        .set(columnPrefix + "_LH_TYPE", null);
+            }
+            if (allCleared) {
+                wrapper.set("SCHEDULE_TYPE", null);
+            }
+            scheduleResultMapper.update(null, wrapper);
+        }
+
         return AjaxResult.success(I18nUtil.getMessage("ui.data.alert.lhScheduleResult.adjustQuantity.success"));
     }
 

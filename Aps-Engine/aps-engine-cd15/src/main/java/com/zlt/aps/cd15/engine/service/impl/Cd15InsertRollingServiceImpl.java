@@ -655,15 +655,19 @@ public class Cd15InsertRollingServiceImpl implements Cd15InsertRollingService {
                 if (!this.hasText(groupNo)) {
                     throw new IllegalStateException("分裁滚动任务缺少组号");
                 }
-                if (!processedSplitGroups.add(groupNo)) {
-                    continue;
-                }
                 List<Segment> splitSegments = segments.stream()
                         .filter(item -> Cd15CutMode.SPLIT.equals(
                                 this.cutMode(item.result)))
                         .filter(item -> Objects.equals(
                                 groupNo, item.result.getGroupNo()))
                         .collect(Collectors.toList());
+                if (splitSegments.size() > 2) {
+                    throw new IllegalStateException("分裁组只能包含一条或两条结果");
+                }
+                if (splitSegments.size() == 2) {
+                    if (!processedSplitGroups.add(groupNo)) {
+                        continue;
+                    }
                 SplitRollingOutcome splitOutcome = this.rollSplitGroup(
                         context, shift, classIndex, request, machineSnapshot,
                         splitSegments, nextOrder, remainingSeconds, previousTail,
@@ -678,6 +682,7 @@ public class Cd15InsertRollingServiceImpl implements Cd15InsertRollingService {
                     deferReason = splitOutcome.deferReason;
                 }
                 continue;
+                }
             }
             int assignedOrder = segment.locked && segment.order != null
                     ? segment.order : nextOrder;
@@ -692,6 +697,10 @@ public class Cd15InsertRollingServiceImpl implements Cd15InsertRollingService {
             Cd15MachineResource machine = this.requireTargetMachine(
                     request.getMachineCode(), segment.result, taskMaterial,
                     shift, machineSnapshot, context);
+            if (splitCut) {
+                this.validateSplitWidth(machine, machineSnapshot,
+                        segment.result.getCuttingAngle(), taskMaterial, taskMaterial);
+            }
             BigDecimal shiftCapacity = this.machineModeResolver.capacity(machine, splitCut);
             if (shiftCapacity == null || shiftCapacity.signum() <= 0) {
                 throw new IllegalStateException(
@@ -768,7 +777,11 @@ public class Cd15InsertRollingServiceImpl implements Cd15InsertRollingService {
                         context.getParameters().getDiffRollSameSpecChangeMinutes(),
                         context.getParameters().getDiffRollDiffSpecChangeMinutes(),
                         segment.quantity);
-                scheduled = capacityTrial.getCapacityQuantity();
+                scheduled = splitCut
+                        ? this.roundSingleSpecSplitDown(
+                                capacityTrial.getCapacityQuantity(),
+                                taskMaterial.getCraftWidth())
+                        : capacityTrial.getCapacityQuantity();
                 remainingSeconds = capacityTrial.getRemainingSeconds();
                 expectedEnd = expectedStart.plusSeconds(
                         capacityTrial.getChangeSeconds()
@@ -781,8 +794,13 @@ public class Cd15InsertRollingServiceImpl implements Cd15InsertRollingService {
             LaneCommit laneCommit = segment.locked
                     ? reserveLockedLanes(segment, shift, scheduled, resourceState,
                             sourceLanesByResult, input, context)
-                    : allocateLanes(segment, shift, scheduled, resourceState, input, context);
-            scheduled = normalizeScheduledQuantity(laneCommit.quantity);
+                    : splitCut
+                            ? this.allocateSingleSpecSplitLanes(segment, shift,
+                                    scheduled, resourceState, input, context)
+                            : allocateLanes(segment, shift, scheduled,
+                                    resourceState, input, context);
+            scheduled = splitCut ? laneCommit.quantity
+                    : normalizeScheduledQuantity(laneCommit.quantity);
             if (!segment.locked && scheduled.signum() <= 0) {
                 remainingSeconds = remainingSecondsBeforeTrial;
                 previousTail = previousTailBeforeTrial;
@@ -1637,6 +1655,131 @@ public class Cd15InsertRollingServiceImpl implements Cd15InsertRollingService {
                 allocation.getAllocatedVehicleCount(), reason);
     }
 
+    /** 单条分裁结果按两路相同规格原子分配库排和小车工装。 */
+    private LaneCommit allocateSingleSpecSplitLanes(
+            Segment segment,
+            Cd15ShiftDescriptor shift,
+            BigDecimal requestedQuantity,
+            Cd15ShiftResourceState state,
+            Cd15AutoScheduleInput input,
+            Cd15AutoScheduleContext context) {
+        if (requestedQuantity == null || requestedQuantity.signum() <= 0) {
+            return LaneCommit.empty();
+        }
+        Cd15ConstructionMaterial material = this.findMaterial(
+                input, segment.result);
+        if (material == null || material.getCraftWidth() == null
+                || material.getUnitConsumeMillimeter() == null) {
+            return new LaneCommit(BigDecimal.ZERO,
+                    Collections.emptyList(), 0, "CONSTRUCTION_MISSING");
+        }
+        BigDecimal fallback = context == null ? BigDecimal.valueOf(1000)
+                : context.getParameters().getRollCoilMeter();
+        BigDecimal curlLength = material.getCurlLength() == null
+                || material.getCurlLength().signum() <= 0
+                ? fallback : material.getCurlLength();
+        BigDecimal vehicleQuantity = this.vehiclePlanQuantityCalculator.calculate(
+                material.getUnitConsumeMillimeter(), material.getCraftWidth(),
+                curlLength);
+        int availableTooling = Math.max(0,
+                state.getTotalToolingCount() - state.getOccupiedToolingCount());
+        int availablePairCount = availableTooling / 2;
+        if (availablePairCount <= 0) {
+            return new LaneCommit(BigDecimal.ZERO,
+                    Collections.emptyList(), 0, "ROLL_TOOL_LIMIT");
+        }
+        BigDecimal toolingQuantity = vehicleQuantity
+                .multiply(new BigDecimal("2"))
+                .multiply(BigDecimal.valueOf(availablePairCount));
+        BigDecimal trialQuantity = requestedQuantity.min(toolingQuantity);
+        BigDecimal branchTrialQuantity = trialQuantity.divide(
+                new BigDecimal("2"), 10, RoundingMode.UNNECESSARY);
+        Cd15ShiftResourceState preview = this.copyShiftState(state);
+        Cd15StorageLaneAllocationResult firstPreview = this.laneAllocator.allocate(
+                segment.result.getSteelStripCode(), branchTrialQuantity,
+                vehicleQuantity, preview.getLanes(), segment.hardInsert);
+        if (!firstPreview.isSuccess()) {
+            return new LaneCommit(BigDecimal.ZERO,
+                    Collections.emptyList(), 0, firstPreview.getFailureReason());
+        }
+        preview.setLanes(firstPreview.getLanes());
+        Cd15StorageLaneAllocationResult secondPreview = this.laneAllocator.allocate(
+                segment.result.getSteelStripCode(), branchTrialQuantity,
+                vehicleQuantity, preview.getLanes(), segment.hardInsert);
+        if (!secondPreview.isSuccess()) {
+            return new LaneCommit(BigDecimal.ZERO,
+                    Collections.emptyList(), 0, secondPreview.getFailureReason());
+        }
+        int pairVehicleCount = Math.min(
+                firstPreview.getAllocatedVehicleCount(),
+                secondPreview.getAllocatedVehicleCount());
+        if (pairVehicleCount <= 0) {
+            return new LaneCommit(BigDecimal.ZERO,
+                    Collections.emptyList(), 0, "STORAGE_LANE_LIMIT");
+        }
+        BigDecimal branchCommittedQuantity = branchTrialQuantity.min(
+                vehicleQuantity.multiply(BigDecimal.valueOf(pairVehicleCount)));
+        Cd15ShiftResourceState working = this.copyShiftState(state);
+        Cd15StorageLaneAllocationResult first = this.laneAllocator.allocate(
+                segment.result.getSteelStripCode(), branchCommittedQuantity,
+                vehicleQuantity, working.getLanes(), segment.hardInsert);
+        working.setLanes(first.getLanes());
+        Cd15StorageLaneAllocationResult second = this.laneAllocator.allocate(
+                segment.result.getSteelStripCode(), branchCommittedQuantity,
+                vehicleQuantity, working.getLanes(), segment.hardInsert);
+        if (!first.isSuccess() || !second.isSuccess()) {
+            return new LaneCommit(BigDecimal.ZERO,
+                    Collections.emptyList(), 0, "STORAGE_LANE_LIMIT");
+        }
+        int totalVehicleCount = pairVehicleCount * 2;
+        working.setLanes(second.getLanes());
+        working.setOccupiedToolingCount(
+                working.getOccupiedToolingCount() + totalVehicleCount);
+        this.applyShiftState(state, working);
+        List<Cd15StorageLaneAllocation> allocations =
+                this.mergeSameSpecSplitAllocations(
+                        first.getAllocations(), second.getAllocations());
+        BigDecimal committedQuantity = branchCommittedQuantity
+                .multiply(new BigDecimal("2"));
+        String reason = committedQuantity.compareTo(requestedQuantity) < 0
+                ? toolingQuantity.compareTo(requestedQuantity) < 0
+                        ? "ROLL_TOOL_LIMIT" : "STORAGE_LANE_LIMIT"
+                : null;
+        return new LaneCommit(committedQuantity, allocations,
+                totalVehicleCount, reason);
+    }
+
+    /** 将同规格两路分配合并为一条结果的库排明细。 */
+    private List<Cd15StorageLaneAllocation> mergeSameSpecSplitAllocations(
+            List<Cd15StorageLaneAllocation> first,
+            List<Cd15StorageLaneAllocation> second) {
+        Map<String, Integer> vehicleCountByLane = new LinkedHashMap<>();
+        List<Cd15StorageLaneAllocation> source = new ArrayList<>();
+        if (first != null) {
+            source.addAll(first);
+        }
+        if (second != null) {
+            source.addAll(second);
+        }
+        source.forEach(item -> vehicleCountByLane.merge(
+                item.getLaneCode(), item.getVehicleCount(), Integer::sum));
+        return vehicleCountByLane.entrySet().stream()
+                .map(entry -> Cd15StorageLaneAllocation.builder()
+                        .laneCode(entry.getKey())
+                        .vehicleCount(entry.getValue()).build())
+                .collect(Collectors.toList());
+    }
+
+    /** 将可排总量向下归整为完整的同规格一出二双片步长。 */
+    private BigDecimal roundSingleSpecSplitDown(
+            BigDecimal quantity, BigDecimal craftWidthMillimeter) {
+        BigDecimal pairQuantity = craftWidthMillimeter
+                .multiply(new BigDecimal("2"))
+                .divide(new BigDecimal("1000"), 10, RoundingMode.HALF_UP);
+        return quantity.divide(pairQuantity, 0, RoundingMode.FLOOR)
+                .multiply(pairQuantity);
+    }
+
     /** 插单滚动与自动排程提交层保持一致，最终计划量按整数米向上取整。 */
     private BigDecimal normalizeScheduledQuantity(BigDecimal quantity) {
         if (quantity == null || quantity.signum() <= 0) {
@@ -2007,6 +2150,9 @@ public class Cd15InsertRollingServiceImpl implements Cd15InsertRollingService {
                 .sorted(Comparator.comparing(Cd15ScheduleResult::getId,
                         Comparator.nullsLast(Long::compareTo)))
                 .collect(Collectors.toList());
+        if (groupResults.size() == 1) {
+            return groupResults;
+        }
         if (groupResults.size() != 2
                 || groupResults.stream().map(Cd15ScheduleResult::getSteelStripCode)
                 .filter(Objects::nonNull).distinct().count() != 2L

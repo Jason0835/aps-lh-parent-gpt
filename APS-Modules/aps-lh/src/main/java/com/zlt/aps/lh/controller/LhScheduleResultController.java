@@ -1,6 +1,5 @@
 package com.zlt.aps.lh.controller;
 
-import cn.hutool.core.date.DateUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.ruoyi.api.gateway.system.domain.ExportLog;
@@ -323,15 +322,6 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
         AjaxResult ajaxResult = lhScheduleService.importScheduleTemplate(list, result, updateSupport, importLog.getId());
         // 硫化换模计划导入
         AjaxResult lhMouldChangePlanAjaxResult = lhMouldChangePlanController.importData(importDTO, Boolean.TRUE);
-        // 导入成功后，补全模具交替计划的批次号
-        if (!lhMouldChangePlanAjaxResult.get(AjaxResult.CODE_TAG).equals(AjaxResult.Type.ERROR.value())) {
-            if (CollectionUtils.isNotEmpty(list)) {
-                LhScheduleResult scheduleResult = importDTO.getScheduleResult();
-                Date scheduleDate = DateUtil.beginOfDay(scheduleResult.getScheduleDate());
-                String factoryCode = scheduleResult.getFactoryCode().trim();
-                lhScheduleResultService.fillMouldChangePlanFieldsAfterImport(factoryCode, scheduleDate);
-            }
-        }
 
         Date endTime = DateUtils.getNowDate();
         importLog.setRowCount(list.size());

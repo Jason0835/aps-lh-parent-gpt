@@ -873,7 +873,7 @@ public class CxMachineBaseInfoVo implements Serializable {
                 dayCapacityLimit.deductionCxMachineGroupNameAllocationUsedQty(context, beforeConclusionDay, allocationInfo);
             }
         }
-        //todo 20260211 特殊材料库存分配量(释放)
+        //20260211 特殊材料库存分配量(释放)
         productionContext.updateSpecialMaterialInfoMap(groupPlanInfo, -sumDeductionDay);
     }
 
@@ -944,7 +944,8 @@ public class CxMachineBaseInfoVo implements Serializable {
             return;
         }
         allocationDaySet.add(newEndDay);
-        String proSize = timeExtensionAllocation.getProductionPlanInfo().getProSizeInfo();
+        ProductionPlanGroupInfo timeExtensionGroupInfo = timeExtensionAllocation.getProductionPlanInfo();
+        String proSize = timeExtensionGroupInfo.getProSizeInfo();
         TbrProductionContext productionContext = (TbrProductionContext) context;
         BaseDataContainer baseDataContainer = productionContext.getBaseDataContainer();
         DayCapacityLimitVo dayCapacityLimit = baseDataContainer.getDayCapacityLimit();
@@ -952,6 +953,8 @@ public class CxMachineBaseInfoVo implements Serializable {
         baseDataContainer.addUsedCount(newEndDay, proSize, cxMachineCode);
         //分组占用每日产能
         dayCapacityLimit.addCxMachineGroupNameAllocationUsedQty(context, newEndDay, timeExtensionAllocation);
+        //20260721+ 特殊材料库存--分配量增加
+        productionContext.updateSpecialMaterialInfoByTimeExtension(timeExtensionGroupInfo);
     }
 
     /**
@@ -1260,6 +1263,8 @@ public class CxMachineBaseInfoVo implements Serializable {
         }
         ProductGroupCxCapacityInfo lhRatioInfo = continueGroup.getLhRatioByCxMachine(this);
         CxMachineAllocationPlanHelper before = CxCapacityAllocationHandler.createAllocationPlanHelper(this, lhRatioInfo, continueGroup, null, allocationDays, startDay, endDay);
+        //20260721+ 为后续已分配日补充延长排产日需要
+        before.setTimeExtensionDayByChangeLimit(endDay);
         allocationList.add(before);
         allocationList.sort(Comparator.comparing(CxMachineAllocationPlanHelper::getStartDay));
         return before;
@@ -1482,7 +1487,7 @@ public class CxMachineBaseInfoVo implements Serializable {
             //20260125 分组占用每日产能
             dayCapacityLimit.addCxMachineGroupNameAllocationUsedQty(context, productionDay, addAllocationPlan);
         }
-        //todo 20260211 特殊材料分配库存更新
+        //20260211 特殊材料分配库存更新
         Integer allocationDay = addAllocationPlan.getAllocationDay();
         productionContext.updateSpecialMaterialInfoMap(productionPlanInfo, allocationDay);
     }

@@ -62,9 +62,9 @@ public class MonthPlanIssueServiceImpl implements IMonthPlanIssueService {
     private static final int MONTH_PLAN_ISSUE_BATCH_SIZE = 30;
 
     /**
-     * 根据物料粒度的月计划汇总结果生成成型月计划中间表数据。
+     * 根据工厂、年份、月份、胎胚编码和示方类型粒度的汇总结果生成成型月计划中间表数据。
      *
-     * @param groupMap 按工厂、年月、物料编码汇总的月计划结果
+     * @param groupMap 按工厂、年份、月份、胎胚编码和示方类型汇总的月计划结果
      * @param cxMonthPlanIssuesList 成型月计划下发数据
      * @param dataVersion 接口数据版本号
      * @return 无
@@ -177,10 +177,10 @@ public class MonthPlanIssueServiceImpl implements IMonthPlanIssueService {
         for (List<FactoryMonthPlanProductionFinalResult> finalResultList : splitList) {
             for (FactoryMonthPlanProductionFinalResult finalResult : finalResultList) {
                 String mapKey = GenerageMapKeyUtils.createMapKey(finalResult.getFactoryCode(), finalResult.getYear(),
-                        finalResult.getMonth(), finalResult.getMaterialCode());
+                        finalResult.getMonth(), finalResult.getEmbryoCode(), finalResult.getConstructionStage());
                 if (groupMap.containsKey(mapKey)) {
                     FactoryMonthPlanProductionFinalResult result = groupMap.get(mapKey);
-                    BigDecimal totalDayResult = this.getTotalDayResult(result);
+                    BigDecimal totalDayResult = this.getTotalDayResult(finalResult);
                     Map<String, Object> params = result.getParams();
                     BigDecimal totalDayResultOld = (BigDecimal) params.get("totalDayResult");
                     params.put("totalDayResult", totalDayResult.add(totalDayResultOld));

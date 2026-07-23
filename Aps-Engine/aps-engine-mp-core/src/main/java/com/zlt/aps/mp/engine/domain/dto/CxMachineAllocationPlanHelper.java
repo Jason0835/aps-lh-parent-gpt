@@ -291,6 +291,49 @@ public class CxMachineAllocationPlanHelper implements Serializable {
     }
 
     /**
+     * 根据新的分配结束日，调整分配的结束日及分配天数
+     * 返回实际调整完后变化的分配天数
+     * =0 表示没有变化产能分配天数
+     * <0 表示提前了
+     * >0 表示延后了
+     *
+     * @param productionContext 排产上下文
+     * @param newEndDay         新的分配结束日
+     */
+    public int updateNewEndDay(TbrProductionContext productionContext, Integer newEndDay) {
+        if (StringUtils.isBlank(cxMachineCode) || null == newEndDay) {
+            return BigDecimal.ZERO.intValue();
+        }
+        //超出排产周期，则无效
+        if (newEndDay < BigDecimal.ONE.intValue() || newEndDay > productionContext.getMonthDays()) {
+            return BigDecimal.ZERO.intValue();
+        }
+        CxMachineBaseInfoVo cxMachineInfo = productionContext.getBaseDataContainer().getCxMachineInfoByCode(cxMachineCode);
+        if (null == cxMachineInfo) {
+            return BigDecimal.ZERO.intValue();
+        }
+        Integer originEndDay = endDay;
+        if (newEndDay.equals(originEndDay)) {
+            return BigDecimal.ZERO.intValue();
+        }
+        Integer startDay = Math.min(originEndDay, newEndDay);
+        Integer endDay = Math.max(originEndDay, newEndDay);
+        Integer adjustCount = BigDecimal.ZERO.intValue();
+        for (Integer index = startDay; index < endDay; index++) {
+            if (!cxMachineInfo.getStopDayInfo().contains(index)) {
+                adjustCount = adjustCount + BigDecimal.ONE.intValue();
+            }
+        }
+        Integer originAllocationDay = allocationDay;
+        if (newEndDay > originEndDay) {
+            allocationDay = originAllocationDay + adjustCount;
+            return adjustCount;
+        }
+        allocationDay = originAllocationDay - adjustCount;
+        return -adjustCount;
+    }
+
+    /**
      * 分配的分组名
      *
      * @return

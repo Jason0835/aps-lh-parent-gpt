@@ -177,32 +177,14 @@ public class GroupTimeExtensionHandler extends OnLineGroupOnLineMachineHandler {
         if (null == beforeAllocation) {
             return;
         }
-        Integer newEndDay = beforeAllocation.getTimeExtensionDay();
-        if (null == newEndDay) {
-            return;
-        }
         TbrProductionContext productionContext = (TbrProductionContext) context;
-        if (newEndDay < productionContext.getCycleFirstProductionDay()) {
-            return;
-        }
-        Integer originEndDay = beforeAllocation.getEndDay();
-        if (originEndDay >= newEndDay) {
-            return;
-        }
         String cxMachineCode = beforeAllocation.getCxMachineCode();
         CxMachineBaseInfoVo cxMachineInfo = productionContext.getBaseDataContainer().getCxMachineBaseInfo().get(cxMachineCode);
         if (null == cxMachineInfo) {
             return;
         }
-        Set<Integer> stopDays = Optional.ofNullable(cxMachineInfo.getStopDayInfo()).orElse(Collections.emptySet());
-        int startTimeExtensionDay = originEndDay + BigDecimal.ONE.intValue();
-        List<Integer> effectiveDayList = Lists.newArrayList();
-        for (; startTimeExtensionDay <= newEndDay; startTimeExtensionDay++) {
-            if (stopDays.contains(startTimeExtensionDay)) {
-                continue;
-            }
-            effectiveDayList.add(startTimeExtensionDay);
-        }
+        //取得需要延长的排产日集合
+        List<Integer> effectiveDayList = getTimeExtensionDayList(productionContext, cxMachineInfo, beforeAllocation);
         if (CollectionUtils.isEmpty(effectiveDayList)) {
             return;
         }
@@ -390,12 +372,12 @@ public class GroupTimeExtensionHandler extends OnLineGroupOnLineMachineHandler {
      * @param newEndDay          新的收尾日
      */
     private void forceTimeExtensionOneDayConclusion(Context context, CxMachineAllocationPlanHelper earliestConclusion, Integer newEndDay) {
+        TbrProductionContext productionContext = (TbrProductionContext) context;
         ProductionPlanGroupInfo groupPlan = earliestConclusion.getProductionPlanInfo();
         if (!checkBaseInfo(context, groupPlan, earliestConclusion, newEndDay)) {
             return;
         }
         String selectedCxMachineCode = earliestConclusion.getCxMachineCode();
-        TbrProductionContext productionContext = (TbrProductionContext) context;
         CxMachineBaseInfoVo cxMachineInfo = productionContext.getBaseDataContainer().getCxMachineBaseInfo().get(selectedCxMachineCode);
         //存在分配才延长
         if (!cxMachineInfo.hasAllocation(earliestConclusion)) {
@@ -451,13 +433,13 @@ public class GroupTimeExtensionHandler extends OnLineGroupOnLineMachineHandler {
         if (!groupPlan.getGroupName().equals(earliestConclusion.getAllocationGroup())) {
             return false;
         }
-        if (newEndDay.equals(earliestConclusion.getEndDay())) {
-            return false;
-        }
         String selectedCxMachineCode = earliestConclusion.getCxMachineCode();
         TbrProductionContext productionContext = (TbrProductionContext) context;
         CxMachineBaseInfoVo cxMachineInfo = productionContext.getBaseDataContainer().getCxMachineBaseInfo().get(selectedCxMachineCode);
         if (null == cxMachineInfo) {
+            return false;
+        }
+        if (newEndDay.equals(earliestConclusion.getEndDay()) && !isMonthCycleContinueTimeExtension(productionContext, earliestConclusion)) {
             return false;
         }
         return true;
@@ -534,6 +516,78 @@ public class GroupTimeExtensionHandler extends OnLineGroupOnLineMachineHandler {
         Set<String> effectiveKeySet = Sets.newHashSet();
         matchDetectDay.forEach(day -> effectiveKeySet.add(earliestConclusion.getTimeExtensionDayInfo(day)));
         return effectiveKeySet;
+    }
+
+    /**
+     * 获取前结构需要延长的排产日集合
+     * 1、前结构延长日不可小于原有收尾日
+     * 2、新的收尾日不可小于周期排产起始日
+     * 3、新的收尾日 = 原有收尾日时，看是否是续作结构，是则表示周期续作延长
+     *
+     * @param productionContext 排产上下文
+     * @param cxMachineInfo     成型产能对象
+     * @param beforeAllocation  前结构延长信息对象
+     * @return
+     */
+    private List<Integer> getTimeExtensionDayList(TbrProductionContext productionContext, CxMachineBaseInfoVo cxMachineInfo, CxMachineAllocationPlanHelper beforeAllocation) {
+        Integer newEndDay = beforeAllocation.getTimeExtensionDay();
+        if (null == newEndDay) {
+            return Collections.emptyList();
+        }
+        Integer cycleFirstProductionDay = productionContext.getCycleFirstProductionDay();
+        if (newEndDay < cycleFirstProductionDay) {
+            return Collections.emptyList();
+        }
+        Integer originEndDay = beforeAllocation.getEndDay();
+        if (originEndDay > newEndDay) {
+            return Collections.emptyList();
+        }
+        List<Integer> effectiveDayList = Lists.newArrayList();
+        Set<Integer> stopDays = Optional.ofNullable(cxMachineInfo.getStopDayInfo()).orElse(Collections.emptySet());
+        //周期结构不在月周期名单的续作延长
+        int startTimeExtensionDay;
+        if (originEndDay.equals(newEndDay) && isMonthCycleContinueTimeExtension(productionContext, beforeAllocation)) {
+            startTimeExtensionDay = cycleFirstProductionDay;
+        } else {
+            startTimeExtensionDay = originEndDay + BigDecimal.ONE.intValue();
+        }
+        for (; startTimeExtensionDay <= newEndDay; startTimeExtensionDay++) {
+            if (stopDays.contains(startTimeExtensionDay)) {
+                continue;
+            }
+            effectiveDayList.add(startTimeExtensionDay);
+        }
+        return effectiveDayList;
+    }
+
+    /**
+     * 判断是否周期结构且不在月周期清单中的续作结构延长
+     *
+     * @param productionContext 排产上下文
+     * @param beforeAllocation  结构延长信息对象
+     * @return
+     */
+    private boolean isMonthCycleContinueTimeExtension(TbrProductionContext productionContext, CxMachineAllocationPlanHelper beforeAllocation) {
+        if (null == beforeAllocation) {
+            return false;
+        }
+        String cxMachineCode = beforeAllocation.getCxMachineCode();
+        CxMachineBaseInfoVo cxMachineInfo = productionContext.getBaseDataContainer().getCxMachineBaseInfo().get(cxMachineCode);
+        if (null == cxMachineInfo) {
+            return false;
+        }
+        ProductionPlanGroupInfo groupInfo = beforeAllocation.getProductionPlanInfo();
+        if (null == groupInfo) {
+            return false;
+        }
+        if (!groupInfo.isCycleType()) {
+            return false;
+        }
+        String continueGroupName = productionContext.getContinueStructureMap().get(cxMachineInfo.getCxMachineCode());
+        if (!groupInfo.getGroupName().equals(continueGroupName)) {
+            return false;
+        }
+        return true;
     }
 
     @Override

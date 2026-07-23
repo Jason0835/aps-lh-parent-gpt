@@ -510,7 +510,7 @@ public class FactoryMonthPlanProductionFinalResultController extends AbstractDoc
 
                 // 重算每日产能限制，包括硫化机台数、胎胚种类数、换模次数
                 MpAdjustDailyCapacityLimit adjustDailyCapacityLimitObj = new MpAdjustDailyCapacityLimit();
-                mpAdjustStructureOutStrategy.reCalcAdjustDailyCapacityLimit(contextDTO, targetMonthPLanList, adjustDailyCapacityLimitObj);
+                mpAdjustStructureOutStrategy.reCalcAdjustDailyCapacityLimit(contextDTO, targetMonthPLanList, adjustDailyCapacityLimitObj,null);
 
                 int structureDeadLine = contextDTO.getStructureDeadLine();
                 int newOnLineDay = contextDTO.getLockEndDay() + 1;
