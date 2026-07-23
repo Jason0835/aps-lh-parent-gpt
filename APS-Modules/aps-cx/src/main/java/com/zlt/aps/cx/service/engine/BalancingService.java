@@ -339,11 +339,11 @@ public class BalancingService {
                 sortedTasks, params, typeDiffThreshold, loadDiffThreshold, totalDemand);
 
         if (greedyResult != null) {
-            log.info("====== 贪心R1满足 P1（完整+均衡），跳过R2 ======");
+            log.info("====== 贪心R1满足 P1（完整+均衡），跳过R2，算法路径=GREEDY_R1 ======");
             return greedyResult;
         }
 
-        log.info("====== 贪心R1未满足P1，启动贪心R2（突破容量+续作已预均衡） ======");
+        log.info("====== 贪心R1未满足P1，启动贪心R2（突破容量上限+局部搜索，非DFS） ======");
 
         // 恢复需求快照（贪心可能修改了 vulcanizeMachineCount）
         restoreDemands(sortedTasks, demandSnapshot);
@@ -548,7 +548,7 @@ public class BalancingService {
                 allAssigned, formatMachineLoads(machineStates));
 
         if (!allAssigned) {
-            log.info("贪心分配未完成（剩余 {}），回退 DFS", remainingAfter1b);
+            log.info("贪心R1未全部分配（剩余 {} 台），交由贪心R2继续", remainingAfter1b);
             return null;
         }
 
@@ -569,13 +569,13 @@ public class BalancingService {
         int totalAssigned = machineStates.stream().mapToInt(MachineState::getCurrentLoad).sum();
 
         if (loadGap <= loadDiffThreshold && typeGap <= typeDiffThreshold) {
-            log.info("贪心分配 P1 满足: totalAssigned={}, loadGap={}, typeGap={}",
+            log.info("贪心R1 P1 满足: totalAssigned={}, loadGap={}, typeGap={}",
                     totalAssigned, loadGap, typeGap);
             logBalancingResult(machineStates);
-            return convertMachineStatesToBalancingResult(machineStates);
+            return buildBalancingResult(machineStates, "GREEDY_R1", true, loadGap, typeGap, true);
         }
 
-        log.info("贪心分配 P1 不满足: totalAssigned={}, loadGap={}, typeGap={}",
+        log.info("贪心R1 P1 未满足（负荷/种类差超标）: totalAssigned={}, loadGap={}, typeGap={}, 交由贪心R2继续",
                 totalAssigned, loadGap, typeGap);
         return null;
     }
@@ -658,12 +658,13 @@ public class BalancingService {
             log.info("贪心R2 P1 满足: totalAssigned={}, loadGap={}, typeGap={}",
                     totalAssigned, loadGap, typeGap);
         } else {
-            log.info("贪心R2 P1 不满足（返回最优部分解）: allAssigned={}, totalAssigned={}, loadGap={}, typeGap={}",
-                    allAssigned, totalAssigned, loadGap, typeGap);
+            log.info("贪心R2 P1 未完全满足（仍采用当前最优解）: allAssigned={}, totalAssigned={}, loadGap={}, typeGap={}, 阈值={}/{}",
+                    allAssigned, totalAssigned, loadGap, typeGap, loadDiffThreshold, typeDiffThreshold);
         }
 
         logBalancingResult(machineStates);
-        return convertMachineStatesToBalancingResult(machineStates);
+        boolean p1Satisfied = allAssigned && loadGap <= loadDiffThreshold && typeGap <= typeDiffThreshold;
+        return buildBalancingResult(machineStates, "GREEDY_R2", allAssigned, loadGap, typeGap, p1Satisfied);
     }
 
     /**
@@ -1477,6 +1478,24 @@ public class BalancingService {
                     .collect(Collectors.joining(", "));
             log.info("    分配->机台{}: [{}] (含续作预留{})", ms.getMachineCode(), embryos, continueReserved);
         }
+    }
+
+    /**
+     * 将 MachineState 列表转换为 BalancingResult，并写入算法路径与 P1 摘要。
+     */
+    private BalancingResult buildBalancingResult(List<MachineState> machineStates,
+                                                 String algorithmPath,
+                                                 boolean allAssigned,
+                                                 int loadGap,
+                                                 int typeGap,
+                                                 boolean p1Satisfied) {
+        BalancingResult result = convertMachineStatesToBalancingResult(machineStates);
+        result.setAlgorithmPath(algorithmPath);
+        result.setAllAssigned(allAssigned);
+        result.setLoadGap(loadGap);
+        result.setTypeGap(typeGap);
+        result.setP1Satisfied(p1Satisfied);
+        return result;
     }
 
     /**

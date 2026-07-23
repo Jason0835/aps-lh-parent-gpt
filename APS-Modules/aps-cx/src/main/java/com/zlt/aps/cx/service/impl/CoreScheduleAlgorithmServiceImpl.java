@@ -25,6 +25,7 @@ import com.zlt.aps.cx.vo.ShiftProductionResult;
 import com.zlt.aps.cx.vo.TaskAllocation;
 import com.zlt.aps.cx.vo.TaskAllocationR;
 import com.zlt.aps.cx.vo.TaskDemandSimple;
+import com.zlt.aps.cx.vo.TaskGroupResultVo;
 import com.zlt.aps.cx.vo.TripRecord;
 import com.zlt.aps.cx.vo.MachineAgg;
 import com.zlt.aps.mp.api.domain.entity.MdmMaterialInfo;
@@ -775,7 +776,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                 day, scheduleDate, shiftConfig.getShiftCode());
 
         // 5.2 任务分组（TaskGroupService：R1/R2/R3 + 立库封顶 + 提前生产）
-        TaskGroupService.TaskGroupResult taskGroup = taskGroupService.groupTasks(
+        TaskGroupResultVo taskGroup = taskGroupService.groupTasks(
                 context, machineOnlineEmbryoMap, scheduleDate, singleShiftList);
         log.info("任务分组完成：续作 {} 个，试制 {} 个，新增 {} 个",
                 taskGroup.getContinueTasks().size(),
@@ -1405,7 +1406,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
      * <p>规则：胎胚编码去重计数 ≤ {@code maxTrialSkuPerDay}；周日且不允许时清空全部试制/量试任务。
      * 跨机台、跨班次在同一 {@code dailyTrialAssignedMaterialCodes} 上累计。
      */
-    private void applyDailyTrialSkuLimit(ScheduleContextVo context, TaskGroupService.TaskGroupResult taskGroup) {
+    private void applyDailyTrialSkuLimit(ScheduleContextVo context, TaskGroupResultVo taskGroup) {
         // ==================== 周日不安排试制/量试 ====================
         LocalDate scheduleDate = context.getCurrentScheduleDate();
         boolean sundayTrialBlocked = scheduleDate != null && scheduleDate.getDayOfWeek() == DayOfWeek.SUNDAY
