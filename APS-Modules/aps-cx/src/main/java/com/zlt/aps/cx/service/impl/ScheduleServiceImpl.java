@@ -501,12 +501,7 @@ public class ScheduleServiceImpl implements ScheduleService {
                 log.warn("加载物料收尾信息失败，继续执行：{}", e.getMessage());
             }
 
-            // 1.17 过滤已收尾物料（成型余量≤0 的硫化任务剔除）
-            try {
-                filterCompletedMaterials(context);
-            } catch (Exception e) {
-                log.warn("过滤已收尾物料失败，继续执行：{}", e.getMessage());
-            }
+            // 1.17 过滤已收尾物料已移至校验之后执行（确保校验能看到全部含缺失字段的记录）
 
             // 1.18 结构排产配置（当日机台，NewTaskProcessor/BalancingService 候选机台来源）
             try {

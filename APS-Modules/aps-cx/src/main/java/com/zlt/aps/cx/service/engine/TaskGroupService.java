@@ -1039,7 +1039,14 @@ public class TaskGroupService {
             }
 
             // S5.2.6 收尾余量处理
+            int preEndingPlannedProduction = task.getPlannedProduction() != null ? task.getPlannedProduction() : 0;
             handleEndingRemainder(task, state.context);
+
+            // 收尾舍弃后回滚机台产能（避免产能被占用但无产出）
+            if (Boolean.TRUE.equals(task.getEndingAbandoned()) && preEndingPlannedProduction > 0) {
+                rollbackMachineTimeForCap(structureName, preEndingPlannedProduction,
+                        materialCode, state.structureCumulativeTimeMap, state.structureAvgRatioCache, state.context);
+            }
 
             // S5.2.6.1 收尾余量处理后再次检查：如果 handleEndingRemainder 标记了 isLastEndingBatch，需要回溯更新
             if (Boolean.TRUE.equals(task.getIsLastEndingBatch())) {
@@ -3835,12 +3842,19 @@ public class TaskGroupService {
 
             if (precedingStructures == null || precedingStructures.isEmpty()) {
                 // 无前结构占用 → FREE_AVAILABLE
+                String switchKey = machineCode + "|" + structureName;
                 long availableSeconds = SECONDS_PER_SHIFT;
-                Long remainingSwitch = machineSwitchRemainingMap.get(machineCode);
-                if (remainingSwitch != null && remainingSwitch > 0) {
-                    availableSeconds -= remainingSwitch;
-                    if (availableSeconds > 0) {
-                        machineSwitchRemainingMap.remove(machineCode); // 切换完成，清除
+                Long switchState = machineSwitchRemainingMap.get(switchKey);
+                if (switchState != null) {
+                    if (switchState == 0L) {
+                        // 切换已完成，不扣切换耗时
+                        log.info("【提前生产-已切换】机台={}, 结构={}, 切换已完成，无需扣除切换耗时", machineCode, structureName);
+                    } else {
+                        // 切换未完成，扣除剩余切换耗时
+                        availableSeconds -= switchState;
+                        if (availableSeconds > 0) {
+                            machineSwitchRemainingMap.put(switchKey, 0L); // 切换完成，标记为0
+                        }
                     }
                 }
                 if (availableSeconds > 0) {
@@ -3848,7 +3862,7 @@ public class TaskGroupService {
                     totalAvailableSeconds += availableSeconds;
                 } else {
                     excluded.add(machineCode);
-                    log.info("【提前生产-跨班次切换未完成】机台={}, 遗留切换={}s, 无可用产能", machineCode, remainingSwitch);
+                    log.info("【提前生产-跨班次切换未完成】机台={}, 遗留切换={}s, 无可用产能", machineCode, switchState);
                 }
             } else {
                 // 有前结构占用 → 检查是否全部收尾
@@ -3877,14 +3891,30 @@ public class TaskGroupService {
                     continue;
                 }
 
-                // 前结构全部收尾 → FREE，计算切换耗时（从参数配置读取）
+                // 前结构全部收尾 -> FREE
+                String switchKey = machineCode + "|" + structureName;
+                Long switchState = machineSwitchRemainingMap.get(switchKey);
                 long switchCost;
-                if (precedingProSize != null && precedingProSize.equals(advanceProSize)) {
-                    int sameInchHours = getIntParamValue(context, ScheduleConstants.PARAM_SAME_INCH_SWITCH_HOURS, ScheduleConstants.DEFAULT_SAME_INCH_SWITCH_HOURS);
-                    switchCost = sameInchHours * ScheduleConstants.SECONDS_PER_HOUR;
+                String switchDesc;
+
+                if (switchState != null && switchState == 0L) {
+                    // 前序班次已切换完成，不再扣除切换耗时
+                    switchCost = 0;
+                    switchDesc = "(已切换)";
+                } else if (switchState != null) {
+                    // 前序班次切换未完成，使用剩余切换耗时
+                    switchCost = switchState;
+                    switchDesc = "(续切" + switchCost / ScheduleConstants.SECONDS_PER_HOUR + "h)";
                 } else {
-                    int diffInchHours = getIntParamValue(context, ScheduleConstants.PARAM_DIFF_INCH_SWITCH_HOURS, ScheduleConstants.DEFAULT_DIFF_INCH_SWITCH_HOURS);
-                    switchCost = diffInchHours * ScheduleConstants.SECONDS_PER_HOUR;
+                    // 首次切换，计算完整切换耗时（从参数配置读取）
+                    if (precedingProSize != null && precedingProSize.equals(advanceProSize)) {
+                        int sameInchHours = getIntParamValue(context, ScheduleConstants.PARAM_SAME_INCH_SWITCH_HOURS, ScheduleConstants.DEFAULT_SAME_INCH_SWITCH_HOURS);
+                        switchCost = sameInchHours * ScheduleConstants.SECONDS_PER_HOUR;
+                    } else {
+                        int diffInchHours = getIntParamValue(context, ScheduleConstants.PARAM_DIFF_INCH_SWITCH_HOURS, ScheduleConstants.DEFAULT_DIFF_INCH_SWITCH_HOURS);
+                        switchCost = diffInchHours * ScheduleConstants.SECONDS_PER_HOUR;
+                    }
+                    switchDesc = "";
                 }
 
                 long availableSeconds = SECONDS_PER_SHIFT - maxOccupiedTime - switchCost;
@@ -3892,17 +3922,22 @@ public class TaskGroupService {
                 if (availableSeconds > 0) {
                     available.add(config);
                     totalAvailableSeconds += availableSeconds;
-                    log.info("【提前生产-机台可用产能】机台={}, 前结构占用={}s({}h), 切换={}s({}h), 可用={}s({}h)",
+                    // 切换完成，记录状态（0L=已切换）
+                    machineSwitchRemainingMap.put(switchKey, 0L);
+                    log.info("【提前生产-机台可用产能】机台={}, 前结构占用={}s({}h), 切换={}s({}h){}, 可用={}s({}h)",
                             machineCode, maxOccupiedTime, maxOccupiedTime / ScheduleConstants.SECONDS_PER_HOUR,
                             switchCost, switchCost / ScheduleConstants.SECONDS_PER_HOUR,
+                            switchDesc,
                             availableSeconds, availableSeconds / ScheduleConstants.SECONDS_PER_HOUR);
                 } else {
-                    // 切换无法完成，记录剩余切换耗时
-                    long remainingSwitch = -availableSeconds;
-                    machineSwitchRemainingMap.put(machineCode, remainingSwitch);
+                    // 切换无法完成，记录剩余切换耗时（已切换的机台不更新）
+                    if (switchCost > 0) {
+                        long remainingSwitch = -availableSeconds;
+                        machineSwitchRemainingMap.put(switchKey, remainingSwitch);
+                    }
                     excluded.add(machineCode);
                     log.info("【提前生产-跨班次切换】机台={}, 前结构占用={}s, 切换={}s, 剩余={}s, 遗留切换={}s",
-                            machineCode, maxOccupiedTime, switchCost, SECONDS_PER_SHIFT - maxOccupiedTime, remainingSwitch);
+                            machineCode, maxOccupiedTime, switchCost, SECONDS_PER_SHIFT - maxOccupiedTime, switchCost > 0 ? (-availableSeconds) : 0);
                 }
             }
         }
@@ -3962,7 +3997,12 @@ public class TaskGroupService {
             Map<String, List<DailyEmbryoTask>> materialTasksMap) {
 
         List<MpCxCapacityConfiguration> machines = structureRecommendedMachinesCache.get(structureName);
-        if (machines == null || machines.isEmpty()) return;
+        if (machines == null || machines.isEmpty()) {
+            // 无机台配置（所有任务在预检查阶段被跳过），视为已收尾，释放机台给提前生产结构
+            structureFullyEndedMap.put(structureName, true);
+            log.info("【结构完成】结构={}, 无机台配置(任务全跳过), 视为全部收尾=true", structureName);
+            return;
+        }
 
         BigDecimal cumulativeTime = structureCumulativeTimeMap.getOrDefault(structureName, BigDecimal.ZERO);
 

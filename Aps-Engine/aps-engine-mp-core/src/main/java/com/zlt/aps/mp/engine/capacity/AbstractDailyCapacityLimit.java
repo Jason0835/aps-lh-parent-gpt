@@ -644,8 +644,12 @@ public abstract class AbstractDailyCapacityLimit {
             //64 128
             //32 68
             int nextPlanQty = (Integer) mpFinalVo.getFieldValueByFieldName(day2Field);
-            // 不向上取整
+            //不向上取整
             int nextMachines = nextPlanQty / dailyLhQty;
+            if (nextMachines <=0){
+                //32 18
+                nextMachines = 1;
+            }
             int curMachines = dayPlanQty / dailyLhQty;
             int iDiffCount = nextMachines;
             int iDiffValue = dayPlanQty;
