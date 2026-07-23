@@ -5,6 +5,8 @@ import com.zlt.aps.common.engine.schedule.MachineShiftTaskChain;
 import com.zlt.aps.common.engine.schedule.ScheduleOperationContext;
 import com.zlt.aps.common.engine.schedule.ScheduleTaskLinkedList;
 import com.zlt.aps.common.engine.schedule.ScheduleTaskNode;
+import com.zlt.aps.common.engine.schedule.constraint.ScheduleConstraintCalculator;
+import com.zlt.aps.common.engine.schedule.constraint.ScheduleTaskConstraint;
 import com.zlt.aps.tc.api.constant.TcScheduleConstants;
 import com.zlt.aps.tc.engine.domain.manual.*;
 import org.springframework.stereotype.Service;
@@ -30,6 +32,9 @@ public class TcManualRollingEngineService {
 
     /** 转机台新结果分组前缀。 */
     private static final String MOVE_GROUP_PREFIX = "MOVE:";
+
+    /** 胎面、胎侧共用排程约束纯计算器。 */
+    private final ScheduleConstraintCalculator constraintCalculator = new ScheduleConstraintCalculator();
 
     /**
      * 批量执行人工滚动命令。
@@ -73,6 +78,7 @@ public class TcManualRollingEngineService {
                     unplannedList);
             result.getChainChangeSummaryList().add(scopeEntry.getKey() + ":CLASS" + scope[0] + ":SEQ" + scope[1]);
         }
+        taskList = this.applyToolLimit(taskList, context, unplannedList);
         this.normalizeSequences(taskList);
         MachineShiftTaskChain<TcManualTaskDraft> taskChainGroup = this.buildTaskChains(taskList, context);
         this.validateResult(taskList, unplannedList, result.getBeforeTotalQty(), commandDeltaQty,
@@ -298,11 +304,18 @@ public class TcManualRollingEngineService {
                 throw new IllegalStateException("胎侧机台班次有效产能未维护:" + machineCode + ":" + shiftOrder);
             }
             final int currentShiftOrder = shiftOrder;
-            BigDecimal usedQty = retainedList.stream()
+            List<TcManualTaskDraft> currentShiftTaskList = retainedList.stream()
                     .filter(task -> Objects.equals(machineCode, task.getMachineCode()))
                     .filter(task -> Objects.equals(currentShiftOrder, task.getShiftOrder()))
-                    .map(TcManualTaskDraft::getPlanQty).map(this::qty).reduce(BigDecimal.ZERO, BigDecimal::add);
-            BigDecimal remainCapacity = capacity.subtract(usedQty).max(BigDecimal.ZERO);
+                    .sorted(this.taskComparator()).collect(Collectors.toList());
+            BigDecimal usedQty = currentShiftTaskList.stream().map(TcManualTaskDraft::getPlanQty)
+                    .map(this::qty).reduce(BigDecimal.ZERO, BigDecimal::add);
+            TcManualTaskDraft predecessorTask = this.findPredecessorTask(
+                    retainedList, context, machineCode, currentShiftOrder);
+            BigDecimal existingSwitchCapacityDeduct = this.calculateSwitchCapacityDeduct(
+                    currentShiftTaskList, predecessorTask, context);
+            BigDecimal remainCapacity = this.constraintCalculator.calculateRemainCapacity(
+                    capacity, usedQty, existingSwitchCapacityDeduct);
             int nextSequence = (int) retainedList.stream()
                     .filter(task -> Objects.equals(machineCode, task.getMachineCode()))
                     .filter(task -> Objects.equals(currentShiftOrder, task.getShiftOrder())).count() + 1;
@@ -311,12 +324,27 @@ public class TcManualRollingEngineService {
                 if (task.getMinimumShiftOrder() != null && shiftOrder < task.getMinimumShiftOrder()) {
                     break;
                 }
-                BigDecimal assignedQty = this.qty(task.getPlanQty()).min(remainCapacity);
+                task.setMachineSpeed(context.getMachineSpecSpeedMap().getOrDefault(
+                        machineCode + "|" + task.getSidewallCode(), task.getMachineSpeed()));
                 TcManualTaskDraft mergeTarget = retainedList.stream()
                         .filter(item -> Objects.equals(machineCode, item.getMachineCode()))
                         .filter(item -> Objects.equals(currentShiftOrder, item.getShiftOrder()))
-                        .filter(item -> Objects.equals(task.getResultGroupKey(), item.getResultGroupKey()))
-                        .findFirst().orElse(null);
+                    .filter(item -> Objects.equals(task.getResultGroupKey(), item.getResultGroupKey()))
+                    .findFirst().orElse(null);
+                TcManualTaskDraft previousTask = this.findLastTask(currentShiftTaskList);
+                if (previousTask == null) {
+                    previousTask = predecessorTask;
+                }
+                BigDecimal currentSwitchCapacityDeduct = mergeTarget == null
+                        ? this.calculateTransitionCapacityDeduct(
+                        previousTask, task, context)
+                        : BigDecimal.ZERO;
+                BigDecimal availablePlanCapacity = remainCapacity.subtract(currentSwitchCapacityDeduct)
+                        .max(BigDecimal.ZERO);
+                if (availablePlanCapacity.signum() <= 0) {
+                    break;
+                }
+                BigDecimal assignedQty = this.qty(task.getPlanQty()).min(availablePlanCapacity);
                 if (mergeTarget == null) {
                     TcManualTaskDraft assigned = task.copy();
                     assigned.setShiftOrder(shiftOrder);
@@ -324,10 +352,12 @@ public class TcManualRollingEngineService {
                     assigned.setPlanQty(assignedQty);
                     assigned.setFinishQty(BigDecimal.ZERO);
                     retainedList.add(assigned);
+                    currentShiftTaskList.add(assigned);
                 } else {
                     mergeTarget.setPlanQty(this.qty(mergeTarget.getPlanQty()).add(assignedQty));
                 }
-                remainCapacity = remainCapacity.subtract(assignedQty);
+                remainCapacity = remainCapacity.subtract(currentSwitchCapacityDeduct)
+                        .subtract(assignedQty).max(BigDecimal.ZERO);
                 BigDecimal overflowQty = this.qty(task.getPlanQty()).subtract(assignedQty);
                 queue.remove(0);
                 if (overflowQty.signum() > 0) {
@@ -343,6 +373,137 @@ public class TcManualRollingEngineService {
         unplannedList.addAll(queue.stream().filter(task -> this.qty(task.getPlanQty()).signum() > 0)
                 .map(TcManualTaskDraft::copy).collect(Collectors.toList()));
         return retainedList;
+    }
+
+    /**
+     * 计算胎侧班次完整任务链切换产能扣减。
+     *
+     * @param taskList 班次有序任务
+     * @param predecessorTask 班次开始前的前置任务
+     * @param context 人工滚动上下文
+     * @return 切换产能扣减合计
+     */
+    private BigDecimal calculateSwitchCapacityDeduct(List<TcManualTaskDraft> taskList,
+                                                      TcManualTaskDraft predecessorTask,
+                                                      TcManualRollingContext context) {
+        BigDecimal totalCapacityDeduct = BigDecimal.ZERO;
+        TcManualTaskDraft previousTask = predecessorTask;
+        for (TcManualTaskDraft currentTask : taskList) {
+            totalCapacityDeduct = totalCapacityDeduct.add(
+                    this.calculateTransitionCapacityDeduct(previousTask, currentTask, context));
+            previousTask = currentTask;
+        }
+        return totalCapacityDeduct;
+    }
+
+    /**
+     * 查找指定班次开始前的同机台链尾任务。
+     *
+     * @param taskList 当前重装箱任务
+     * @param context 人工滚动上下文
+     * @param machineCode 机台编码
+     * @param shiftOrder 班次顺序
+     * @return 前一班链尾；一班没有当日前置时返回前日链尾
+     */
+    private TcManualTaskDraft findPredecessorTask(List<TcManualTaskDraft> taskList,
+                                                  TcManualRollingContext context,
+                                                  String machineCode,
+                                                  Integer shiftOrder) {
+        return taskList.stream()
+                .filter(task -> Objects.equals(machineCode, task.getMachineCode()))
+                .filter(task -> task.getShiftOrder() != null && task.getShiftOrder() < shiftOrder)
+                .max(Comparator.comparing(TcManualTaskDraft::getShiftOrder)
+                        .thenComparing(task -> this.defaultSequence(task.getSequence())))
+                .orElse(context.getPredecessorTaskMap().get(machineCode));
+    }
+
+    /**
+     * 计算两个相邻胎侧任务的切换产能。
+     *
+     * @param previousTask 前置任务
+     * @param currentTask 当前任务
+     * @param context 人工滚动上下文
+     * @return 相邻任务切换产能扣减
+     */
+    private BigDecimal calculateTransitionCapacityDeduct(TcManualTaskDraft previousTask,
+                                                         TcManualTaskDraft currentTask,
+                                                         TcManualRollingContext context) {
+        return this.constraintCalculator.calculateTransition(this.toConstraintTask(previousTask),
+                this.toConstraintTask(currentTask), context.getConstraintConfig()).getTotalCapacityDeduct();
+    }
+
+    /**
+     * 将胎侧人工任务映射为共用约束快照。
+     *
+     * @param task 胎侧人工任务
+     * @return 共用约束快照；任务为空时返回空
+     */
+    private ScheduleTaskConstraint toConstraintTask(TcManualTaskDraft task) {
+        if (task == null) {
+            return null;
+        }
+        ScheduleTaskConstraint constraintTask = new ScheduleTaskConstraint();
+        constraintTask.setSpecCode(task.getSidewallCode());
+        constraintTask.setGlueCode(task.getGlueCode());
+        constraintTask.setMachineSpeed(task.getMachineSpeed());
+        return constraintTask;
+    }
+
+    /**
+     * 获取胎侧班次任务链尾任务。
+     *
+     * @param taskList 班次有序任务
+     * @return 链尾任务；空链返回空
+     */
+    private TcManualTaskDraft findLastTask(List<TcManualTaskDraft> taskList) {
+        return taskList == null || taskList.isEmpty() ? null : taskList.get(taskList.size() - 1);
+    }
+
+    /**
+     * 按当前批次全局可用工装限制胎侧已排任务，并将溢出量转为未排。
+     *
+     * @param taskList 当前已排任务
+     * @param context 人工滚动上下文
+     * @param unplannedList 未排任务收集器
+     * @return 应用工装限制后的已排任务
+     */
+    private List<TcManualTaskDraft> applyToolLimit(List<TcManualTaskDraft> taskList,
+                                                   TcManualRollingContext context,
+                                                   List<TcManualTaskDraft> unplannedList) {
+        if (context.getInitialAvailableToolQty() == null) {
+            return taskList;
+        }
+        BigDecimal availableToolQty = context.getInitialAvailableToolQty().max(BigDecimal.ZERO);
+        List<TcManualTaskDraft> sortedTaskList = taskList.stream()
+                .sorted(Comparator.comparing(TcManualTaskDraft::getShiftOrder)
+                        .thenComparing(TcManualTaskDraft::getMachineCode)
+                        .thenComparing(TcManualTaskDraft::getSequence))
+                .collect(Collectors.toList());
+        List<TcManualTaskDraft> limitedTaskList = new ArrayList<>();
+        for (TcManualTaskDraft task : sortedTaskList) {
+            BigDecimal originalPlanQty = this.qty(task.getPlanQty());
+            BigDecimal limitedPlanQty = this.constraintCalculator.limitPlanQtyByTool(
+                    originalPlanQty, availableToolQty, task.getCurlRollLength());
+            limitedPlanQty = limitedPlanQty.max(this.qty(task.getFinishQty())).min(originalPlanQty);
+            if (limitedPlanQty.signum() > 0) {
+                TcManualTaskDraft limitedTask = task.copy();
+                limitedTask.setPlanQty(limitedPlanQty);
+                limitedTaskList.add(limitedTask);
+                availableToolQty = availableToolQty.subtract(
+                        this.constraintCalculator.calculateToolUsedQty(
+                                limitedPlanQty, task.getCurlRollLength())).max(BigDecimal.ZERO);
+            }
+            BigDecimal overflowQty = originalPlanQty.subtract(limitedPlanQty).max(BigDecimal.ZERO);
+            if (overflowQty.signum() > 0) {
+                TcManualTaskDraft overflowTask = task.copy();
+                overflowTask.setTaskId(task.getTaskId() + ":TOOL");
+                overflowTask.setPlanQty(overflowQty);
+                overflowTask.setFinishQty(BigDecimal.ZERO);
+                overflowTask.setCarryoverTask(true);
+                unplannedList.add(overflowTask);
+            }
+        }
+        return limitedTaskList;
     }
 
     /** 将每个机台班次顺序强制整理为 1..N。 */

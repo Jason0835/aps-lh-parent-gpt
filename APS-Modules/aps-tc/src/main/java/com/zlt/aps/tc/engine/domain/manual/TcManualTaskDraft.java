@@ -32,6 +32,10 @@ public class TcManualTaskDraft {
     private Integer minimumShiftOrder;
     /** 计划量。 */
     private BigDecimal planQty;
+    /** 当前胎侧在当前机台的生产速度。 */
+    private BigDecimal machineSpeed;
+    /** 单套工装可生产长度。 */
+    private BigDecimal curlRollLength;
     /** 完成量。 */
     private BigDecimal finishQty;
     /** 胎侧编码。 */
@@ -75,6 +79,8 @@ public class TcManualTaskDraft {
         target.setSequence(this.sequence);
         target.setMinimumShiftOrder(this.minimumShiftOrder);
         target.setPlanQty(this.planQty);
+        target.setMachineSpeed(this.machineSpeed);
+        target.setCurlRollLength(this.curlRollLength);
         target.setFinishQty(this.finishQty);
         target.setSidewallCode(this.sidewallCode);
         target.setGlueCode(this.glueCode);

@@ -23,6 +23,7 @@ import com.zlt.aps.tm.engine.validator.TmInsertPositionValidator;
 import com.zlt.aps.tm.mapper.TmMachineInfoMapper;
 import com.zlt.aps.tm.mapper.TmScheduleResultMapper;
 import com.zlt.aps.tm.mapper.TmScheduleUnplannedMapper;
+import com.zlt.aps.tm.service.loader.TmManualConstraintDataLoadService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -53,6 +54,8 @@ public class TmManualInsertRollingService {
 
     private final TmScheduleOperationFacade tmScheduleOperationFacade;
 
+    private final TmManualConstraintDataLoadService tmManualConstraintDataLoadService;
+
     /**
      * 构造人工滚动应用服务。
      *
@@ -60,16 +63,19 @@ public class TmManualInsertRollingService {
      * @param tmMachineInfoMapper       机台信息 Mapper
      * @param tmScheduleUnplannedMapper 未排结果 Mapper
      * @param tmScheduleOperationFacade 排程纯计算门面
+     * @param tmManualConstraintDataLoadService 人工约束数据装载服务
      */
     @Autowired
     public TmManualInsertRollingService(TmScheduleResultMapper tmScheduleResultMapper,
                                         TmMachineInfoMapper tmMachineInfoMapper,
                                         TmScheduleUnplannedMapper tmScheduleUnplannedMapper,
-                                        TmScheduleOperationFacade tmScheduleOperationFacade) {
+                                        TmScheduleOperationFacade tmScheduleOperationFacade,
+                                        TmManualConstraintDataLoadService tmManualConstraintDataLoadService) {
         this.tmScheduleResultMapper = tmScheduleResultMapper;
         this.tmMachineInfoMapper = tmMachineInfoMapper;
         this.tmScheduleUnplannedMapper = tmScheduleUnplannedMapper;
         this.tmScheduleOperationFacade = tmScheduleOperationFacade;
+        this.tmManualConstraintDataLoadService = tmManualConstraintDataLoadService;
     }
 
     /**
@@ -84,7 +90,7 @@ public class TmManualInsertRollingService {
                                         TmScheduleUnplannedMapper tmScheduleUnplannedMapper) {
         this(tmScheduleResultMapper, tmMachineInfoMapper, tmScheduleUnplannedMapper,
                 new TmScheduleOperationFacade(new com.zlt.aps.tm.engine.service.impl.TmTaskChainScheduleService(),
-                        null, null, new com.zlt.aps.tm.engine.service.impl.TmManualRollingEngineService()));
+                        null, null, new com.zlt.aps.tm.engine.service.impl.TmManualRollingEngineService()), null);
     }
 
     /**
@@ -279,7 +285,7 @@ public class TmManualInsertRollingService {
                                                           Map<String, TmScheduleResult> newTemplateMap) {
         List<TmScheduleResult> snapshotList = this.loadScheduleResults(reference, machineCodes);
         this.validateEditableResults(snapshotList);
-        TmManualRollingContext context = this.buildContext(reference, machineCodes, snapshotList);
+        TmManualRollingContext context = this.buildContext(reference, machineCodes, snapshotList, commandBatch);
         TmManualRollingResult rollingResult;
         try {
             rollingResult = tmScheduleOperationFacade.execute(commandBatch, context);
@@ -298,10 +304,12 @@ public class TmManualInsertRollingService {
      * @param reference    排程范围参考
      * @param machineCodes 机台集合
      * @param snapshotList 数据库快照
+     * @param commandBatch 人工操作命令批次
      * @return 运行态上下文
      */
     private TmManualRollingContext buildContext(TmScheduleResult reference, List<String> machineCodes,
-                                                 List<TmScheduleResult> snapshotList) {
+                                                 List<TmScheduleResult> snapshotList,
+                                                 TmManualRollingCommandBatch commandBatch) {
         TmManualRollingContext context = new TmManualRollingContext();
         context.setFactoryCode(reference.getFactoryCode());
         context.setBatchNo(reference.getBatchNo());
@@ -319,6 +327,9 @@ public class TmManualInsertRollingService {
             }
         }
         context.setTaskList(taskList);
+        if (tmManualConstraintDataLoadService != null) {
+            tmManualConstraintDataLoadService.enrich(context, machineCodes, commandBatch);
+        }
         return context;
     }
 
@@ -437,6 +448,7 @@ public class TmManualInsertRollingService {
         task.setGlueCode(result.getGlueCode());
         task.setBaseGlueCode(result.getBaseGlueCode());
         task.setMouthPlateCode(result.getMouthPlateCode());
+        task.setCurlRollLength(result.getCurlRollLength());
         task.setDataSource(result.getDataSource());
         task.setAnalysis(this.getShiftText(result, TmScheduleConstants.SHIFT_ANALYSIS_FIELD_TEMPLATE, shiftOrder));
         task.setSourceStartTime(this.getShiftDate(result, TmScheduleConstants.SHIFT_START_TIME_FIELD_TEMPLATE, shiftOrder));
@@ -469,6 +481,7 @@ public class TmManualInsertRollingService {
         task.setGlueCode(insertResult.getGlueCode());
         task.setBaseGlueCode(insertResult.getBaseGlueCode());
         task.setMouthPlateCode(insertResult.getMouthPlateCode());
+        task.setCurlRollLength(insertResult.getCurlRollLength());
         task.setDataSource(INSERT_DATA_SOURCE);
         task.setAnalysis(this.getShiftText(insertResult, TmScheduleConstants.SHIFT_ANALYSIS_FIELD_TEMPLATE, shiftOrder));
         task.setInsertTask(true);
