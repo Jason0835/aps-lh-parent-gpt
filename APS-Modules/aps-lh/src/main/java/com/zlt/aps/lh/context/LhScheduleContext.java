@@ -729,6 +729,12 @@ public class LhScheduleContext {
      * 优先级跟踪日志静默深度（局部搜索模拟分支时递增）
      */
     private int priorityTraceMuteDepth = 0;
+    /**
+     * 新增排产SKU选机日志次数，key=物料编码+产品状态。
+     * <p>仅用于当前排程上下文内的过程日志编号，不参与候选过滤、选机排序和排产结果计算。</p>
+     */
+    private Map<String, Integer> newSpecMachineSelectionCountMap = new LinkedHashMap<String, Integer>(16);
+
 
     /**
      * 20260701+ 判断当前排程周期是否存在跨月
@@ -1317,6 +1323,26 @@ public class LhScheduleContext {
     }
 
     /**
+     * 累加并返回新增排产SKU本次选机日志序号。
+     * <p>物料编码与产品状态共同构成计数维度，避免同物料不同产品状态共用序号。
+     * 本方法只允许在真正写选机顺序日志前调用，局部搜索等静默分支不得调用。</p>
+     *
+     * @param sku 当前进入选机流程的SKU
+     * @return 当前SKU本次选机序号；SKU为空时返回0
+     */
+    public int nextNewSpecMachineSelectionCount(SkuScheduleDTO sku) {
+        if (Objects.isNull(sku)) {
+            return 0;
+        }
+        String skuKey = MonthPlanDateResolver.buildMaterialStatusKey(
+                sku.getMaterialCode(), sku.getProductStatus());
+        Integer currentCount = newSpecMachineSelectionCountMap.get(skuKey);
+        int nextCount = Math.max(0, Objects.isNull(currentCount) ? 0 : currentCount) + 1;
+        newSpecMachineSelectionCountMap.put(skuKey, nextCount);
+        return nextCount;
+    }
+
+    /**
      * 将已移出待排队列的SKU同步从结构分组中剔除。
      * <p>structureSkuMap 在 S4.4 / S4.5 期间既用于顺序3结构收尾判断，也作为 SKU 兜底查询来源，
      * 因此需要与当前待排视图保持一致，避免已消费SKU继续影响后续排序与查询。</p>
@@ -1352,6 +1378,8 @@ public class LhScheduleContext {
 
     /**
      * 判断结构分组中的SKU是否与目标SKU一致。
+     * <p>同一物料可能同时存在正规、试制和量试月计划，非同一实例的降级匹配必须使用
+     * “物料+产品状态”复合键，禁止移除其他产品状态的待排SKU。</p>
      *
      * @param currentSku 结构分组中的SKU
      * @param targetSku  目标SKU
@@ -1364,7 +1392,9 @@ public class LhScheduleContext {
         if (Objects.isNull(currentSku) || Objects.isNull(targetSku)) {
             return false;
         }
-        return StringUtils.equals(currentSku.getMaterialCode(), targetSku.getMaterialCode());
+        return StringUtils.equals(currentSku.getMaterialCode(), targetSku.getMaterialCode())
+                && StringUtils.equals(StringUtils.trimToEmpty(currentSku.getProductStatus()),
+                StringUtils.trimToEmpty(targetSku.getProductStatus()));
     }
 
     /**

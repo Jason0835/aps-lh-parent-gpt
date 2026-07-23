@@ -187,7 +187,24 @@ public class TmScheduleResultExcelServiceImpl implements ITmScheduleResultExcelS
             if (inputStream == null) {
                 throw new ServiceException(I18nUtil.getMessage("ui.data.alert.tm.schedule.excel.templateMissing"));
             }
-            resultBytes = ExcelUtils.writeMultiList(inputStream, 0, new HashMap<>(), excelDataList);
+            Map<String, Object> tableMap = new HashMap<>();
+            String title = "{0}全钢压出工程生产计划单 Đơn kế hoạch sản xuất của công đoạn ép đùn toàn thép";
+            String formatDate = DateUtil.format(queryVO.getScheduleDate(), "yyyy年-MM月-dd日");
+            tableMap.put("title", MessageFormat.format(title, formatDate));
+
+            String formatDay = DateUtil.format(queryVO.getScheduleDate(), "MM/dd");
+            String lastDayTitle = "早班{0}\nCa sáng {1}";
+            tableMap.put("lastDayTitle", MessageFormat.format(lastDayTitle, formatDay, formatDay));
+            String midTitle = "中班{0}\nCa sáng {1}";
+            tableMap.put("midTitle", MessageFormat.format(midTitle, formatDay, formatDay));
+
+            String formatNextDay = DateUtil.format(DateUtils.addDays(queryVO.getScheduleDate(), 1), "MM/dd");
+            String nightTitle = "夜班{0}\nCa sáng {1}";
+            tableMap.put("nightTitle", MessageFormat.format(nightTitle, formatNextDay, formatNextDay));
+            String dayTitle = "早班{0}\nCa sáng {1}";
+            tableMap.put("dayTitle", MessageFormat.format(dayTitle, formatNextDay, formatNextDay));
+
+            resultBytes = ExcelUtils.writeMultiList(inputStream, 0, tableMap, excelDataList);
         } catch (IOException exception) {
             log.error("生成胎面排程结果模板失败", exception);
             throw new ServiceException(I18nUtil.getMessage("ui.data.alert.tm.schedule.excel.generateFailed"));

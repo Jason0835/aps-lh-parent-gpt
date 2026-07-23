@@ -44,6 +44,12 @@ public class TmManualTaskDraft {
     /** 计划量 */
     private BigDecimal planQty;
 
+    /** 当前胎面在当前机台的生产速度 */
+    private BigDecimal machineSpeed;
+
+    /** 单套工装可生产长度 */
+    private BigDecimal curlRollLength;
+
     /** 已完成量 */
     private BigDecimal finishQty;
 
@@ -100,6 +106,8 @@ public class TmManualTaskDraft {
         target.setSequence(this.sequence);
         target.setMinimumShiftOrder(this.minimumShiftOrder);
         target.setPlanQty(this.planQty);
+        target.setMachineSpeed(this.machineSpeed);
+        target.setCurlRollLength(this.curlRollLength);
         target.setFinishQty(this.finishQty);
         target.setTreadCode(this.treadCode);
         target.setGlueCode(this.glueCode);
